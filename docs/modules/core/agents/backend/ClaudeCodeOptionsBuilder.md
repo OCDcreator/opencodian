@@ -17,7 +17,10 @@
 - 当 `permissionMode === 'bypassPermissions'` 时显式写入 SDK 要求的 `allowDangerouslySkipPermissions: true`
 - 将 OpenCodian UI 中的 `thinking.type === 'fixed'` 映射为官方 SDK `thinking: { type: 'enabled', budgetTokens }`
 - 只在用户显式配置时写入 `model`、`fallbackModel`、`additionalDirectories`、`pathToClaudeCodeExecutable`、`canUseTool`、`mcpServers`；`ClaudeCodeOptionsBuilderInput` 现在接受可选 `fallbackModel?: string` 字段，该覆盖值优先级高于 `settings.fallbackModel`；同时接受可选 `model?: string` 字段，该诊断级覆盖值优先级高于 `settings.model`，用于 Capability Lab 的 fallback behavior proof
+- 只在用户显式配置时写入 `env`，使用 `{ ...settings.env }` 防御性复制，与 `additionalDirectories`、`allowedTools`、`disallowedTools`、`restrictedBuiltinTools`、`settingSources` 保持一致；调用者在构建后修改 `settings.env` 不会泄漏到 SDK options 快照
 - 只在用户显式开启或 runtime 明确注入时写入 `enableFileCheckpointing`、`includeHookEvents`、`forwardSubagentText`、`agentProgressSummaries`；这些是 SDK 诊断/后续能力 foundation，不等同于稳定 JSONL browser、hook authoring 或 rewind UI。`forwardSubagentText` 和 `agentProgressSummaries` 现在支持 runtime-only 覆盖，让 Capability Lab 的 subagent stream proof 可以在不污染稳定设置的情况下强制打开子代理事件流
+- 只在 `sandbox.enabled === true` 时写入 `sandbox` 到 SDK options，仅包含 `enabled`、`failIfUnavailable`、`autoAllowBashIfSandboxed` 三个布尔字段；network/filesystem/TLS/proxy/Mach lookup 等子策略不在 stable settings surface 暴露。分类为 readback：option wiring 已证明，OS 级 sandbox 强制执行无法从插件层独立验证
+- 只在 `title` 非空且非 resume 时写入 `title` 到 SDK options；SDK 文档说明 title 仅在首次 query 生效，resume 时无效果。分类为 readback：option wiring 已证明，CLI subprocess 是否接受该 title 不从插件层独立验证
 - 只在用户显式配置时写入 `maxTurns` 和 `maxBudgetUsd`；null 时省略，保持 SDK 默认无限行为
 - 只在 adapter 已捕获真实 Claude SDK session id 时写入 `resume`，让后续 per-send `query()` 续接同一个 Claude session
 - 只在 runtime 提供时写入 `abortController` 和 `spawnClaudeCodeProcess`，用于 Obsidian/Electron 下的流取消和进程启动兼容层

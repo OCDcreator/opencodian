@@ -1,4 +1,6 @@
 /* eslint-disable max-lines -- Adapter coverage keeps session, resume, model catalog, permission, and streaming fixtures together for one backend contract. */
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+
 import { AgentCapability } from '../../../../../src/core/agents/AgentCapability';
 import {
   ClaudeCodeAdapter,
@@ -64,6 +66,16 @@ function createAsyncQueue<T>(): AsyncIterable<T> & {
 
 async function nextFrom<T>(iterable: AsyncIterable<T>): Promise<IteratorResult<T>> {
   return await iterable[Symbol.asyncIterator]().next();
+}
+
+async function expectAsyncIterableClosedWithoutValues(iterable: AsyncIterable<unknown>): Promise<void> {
+  const result = await Promise.race([
+    iterable[Symbol.asyncIterator]().next(),
+    new Promise<IteratorResult<unknown>>((resolve) => {
+      setTimeout(() => resolve({ value: 'timeout', done: false }), 20);
+    }),
+  ]);
+  expect(result).toEqual({ value: undefined, done: true });
 }
 
 async function waitForExpect(assertion: () => void, attempts = 10): Promise<void> {
@@ -224,6 +236,665 @@ describe('ClaudeCodeAdapter', () => {
     });
 
     await expect(adapter.supportedModels()).resolves.toEqual([]);
+  });
+
+  it('reads runtime command and agent catalog from the SDK Query readback paths', async () => {
+    const sdk = createSdk([]);
+    const close = jest.fn();
+    const supportedCommands = jest.fn().mockResolvedValue([{
+      name: 'review',
+      description: 'Review selected files',
+      argumentHint: '<path>',
+      aliases: ['audit', 'inspect'],
+    }]);
+    const supportedAgents = jest.fn().mockResolvedValue([{
+      name: 'explore',
+      description: 'Explore the codebase',
+      model: 'sonnet',
+    }]);
+    sdk.query.mockReturnValue(Object.assign((async function* () {})(), {
+      supportedCommands,
+      supportedAgents,
+      close,
+    }));
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+
+    await expect(adapter.getRuntimeCatalog()).resolves.toEqual({
+      commands: [{
+        name: 'review',
+        description: 'Review selected files',
+        argumentHint: '<path>',
+        aliases: ['audit', 'inspect'],
+      }],
+      agents: [{
+        name: 'explore',
+        description: 'Explore the codebase',
+        model: 'sonnet',
+      }],
+    });
+    expect(supportedCommands).toHaveBeenCalledTimes(1);
+    expect(supportedAgents).toHaveBeenCalledTimes(1);
+    expect(close).toHaveBeenCalledTimes(1);
+    await expectAsyncIterableClosedWithoutValues(sdk.query.mock.calls[0][0].prompt);
+  });
+
+  it('reuses active runtime query catalog methods without closing the live runtime query', async () => {
+    const close = jest.fn();
+    const runtimeQuery = createAsyncQueue<unknown>() as ReturnType<typeof createAsyncQueue<unknown>> & {
+      supportedCommands: () => Promise<Array<{ name: string; description: string; argumentHint: string }>>;
+      supportedAgents: () => Promise<Array<{ name: string; description: string; model: string }>>;
+      close: jest.Mock;
+      sentinel: string;
+    };
+    runtimeQuery.sentinel = 'bound-runtime-catalog-context';
+    runtimeQuery.supportedCommands = jest.fn(function (this: { sentinel?: string }) {
+      if (this.sentinel !== 'bound-runtime-catalog-context') {
+        throw new TypeError('unbound supportedCommands context');
+      }
+      return Promise.resolve([{ name: 'cost', description: 'Show cost', argumentHint: '' }]);
+    });
+    runtimeQuery.supportedAgents = jest.fn(function (this: { sentinel?: string }) {
+      if (this.sentinel !== 'bound-runtime-catalog-context') {
+        throw new TypeError('unbound supportedAgents context');
+      }
+      return Promise.resolve([{ name: 'reviewer', description: 'Review code', model: 'opus' }]);
+    });
+    runtimeQuery.close = close;
+    const sdk = createSdk([]);
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+    const sessionId = await adapter.createSession();
+    const session = (adapter as unknown as {
+      sessions: Map<string, {
+        runtime?: { query?: unknown };
+      }>;
+    }).sessions.get(sessionId);
+    if (!session) {
+      throw new Error('expected local session state');
+    }
+    session.runtime = { query: runtimeQuery };
+
+    await expect(adapter.getRuntimeCatalog()).resolves.toEqual({
+      commands: [{ name: 'cost', description: 'Show cost', aliases: [] }],
+      agents: [{ name: 'reviewer', description: 'Review code', model: 'opus' }],
+    });
+    expect(runtimeQuery.supportedCommands).toHaveBeenCalledTimes(1);
+    expect(runtimeQuery.supportedAgents).toHaveBeenCalledTimes(1);
+    expect(close).toHaveBeenCalledTimes(0);
+    expect(sdk.query).not.toHaveBeenCalled();
+  });
+
+  it('returns null for runtime catalog when an active runtime query lacks catalog methods', async () => {
+    const sdk = createSdk([]);
+    sdk.query.mockReturnValue(Object.assign((async function* () {})(), {
+      supportedCommands: jest.fn().mockResolvedValue([{ name: 'from-temporary-query' }]),
+      supportedAgents: jest.fn().mockResolvedValue([{ name: 'from-temporary-agent' }]),
+      close: jest.fn(),
+    }));
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+    const sessionId = await adapter.createSession();
+    const session = (adapter as unknown as {
+      sessions: Map<string, {
+        runtime?: { query?: unknown };
+      }>;
+    }).sessions.get(sessionId);
+    if (!session) {
+      throw new Error('expected local session state');
+    }
+    session.runtime = { query: Object.assign((async function* () {})(), { close: jest.fn() }) };
+
+    await expect(adapter.getRuntimeCatalog()).resolves.toBeNull();
+    expect(sdk.query).not.toHaveBeenCalled();
+  });
+
+  it('returns null for runtime catalog when SDK Query catalog methods are unavailable or throw', async () => {
+    const sdk = createSdk([]);
+    const missingClose = jest.fn();
+    sdk.query.mockReturnValueOnce(Object.assign((async function* () {})(), {
+      supportedCommands: jest.fn().mockResolvedValue([]),
+      close: missingClose,
+    }));
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+
+    await expect(adapter.getRuntimeCatalog()).resolves.toBeNull();
+    expect(missingClose).toHaveBeenCalledTimes(1);
+
+    const throwingClose = jest.fn();
+    sdk.query.mockReturnValueOnce(Object.assign((async function* () {})(), {
+      supportedCommands: jest.fn().mockResolvedValue([]),
+      supportedAgents: jest.fn().mockRejectedValue(new Error('agent catalog unavailable')),
+      close: throwingClose,
+    }));
+
+    await expect(adapter.getRuntimeCatalog()).resolves.toBeNull();
+    expect(throwingClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('sanitizes and sorts malformed runtime catalog entries', async () => {
+    const sdk = createSdk([]);
+    sdk.query.mockReturnValue(Object.assign((async function* () {})(), {
+      supportedCommands: jest.fn().mockResolvedValue([
+        { name: ' zeta ', description: ' Last ', argumentHint: ' <file> ', aliases: [' z ', '', 123] },
+        { name: 'alpha', description: '', argumentHint: '', aliases: ['two', ' one '] },
+        { description: 'missing name', argumentHint: '<x>' },
+        null,
+      ]),
+      supportedAgents: jest.fn().mockResolvedValue([
+        { name: ' writer ', description: ' Writes ', model: ' opus ' },
+        { name: '', description: 'missing name', model: 'sonnet' },
+        { name: 'auditor', description: '', model: '' },
+      ]),
+      close: jest.fn(),
+    }));
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+
+    await expect(adapter.getRuntimeCatalog()).resolves.toEqual({
+      commands: [
+        { name: 'alpha', aliases: ['one', 'two'] },
+        { name: 'zeta', description: 'Last', argumentHint: '<file>', aliases: ['z'] },
+      ],
+      agents: [
+        { name: 'auditor' },
+        { name: 'writer', description: 'Writes', model: 'opus' },
+      ],
+    });
+  });
+
+  it('reads runtime settings from the SDK Query getSettings path', async () => {
+    const sdk = createSdk([]);
+    const close = jest.fn();
+    const runtimeSettings = {
+      model: 'claude-sonnet-4-5',
+      permissions: { defaultMode: 'acceptEdits' },
+    };
+    const getSettings = jest.fn().mockResolvedValue(runtimeSettings);
+    sdk.query.mockReturnValue(Object.assign((async function* () {})(), {
+      getSettings,
+      close,
+    }));
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+
+    await expect(adapter.getRuntimeSettings()).resolves.toBe(runtimeSettings);
+    expect(getSettings).toHaveBeenCalledTimes(1);
+    expect(close).toHaveBeenCalledTimes(1);
+    await expectAsyncIterableClosedWithoutValues(sdk.query.mock.calls[0][0].prompt);
+  });
+
+  it('reuses active runtime query settings without closing the live runtime query', async () => {
+    const close = jest.fn();
+    const runtimeSettings = { model: 'claude-sonnet-4-5' };
+    const runtimeQuery = createAsyncQueue<unknown>() as ReturnType<typeof createAsyncQueue<unknown>> & {
+      getSettings: () => Promise<unknown>;
+      close: jest.Mock;
+      sentinel: string;
+    };
+    runtimeQuery.sentinel = 'bound-settings-context';
+    runtimeQuery.getSettings = jest.fn(function (this: { sentinel?: string }) {
+      if (this.sentinel !== 'bound-settings-context') {
+        throw new TypeError('unbound getSettings context');
+      }
+      return Promise.resolve(runtimeSettings);
+    });
+    runtimeQuery.close = close;
+    const sdk = createSdk([]);
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+    const sessionId = await adapter.createSession();
+    const session = (adapter as unknown as {
+      sessions: Map<string, {
+        runtime?: { query?: unknown };
+      }>;
+    }).sessions.get(sessionId);
+    if (!session) {
+      throw new Error('expected local session state');
+    }
+    session.runtime = { query: runtimeQuery };
+
+    await expect(adapter.getRuntimeSettings()).resolves.toBe(runtimeSettings);
+    expect(runtimeQuery.getSettings).toHaveBeenCalledTimes(1);
+    expect(close).toHaveBeenCalledTimes(0);
+    expect(sdk.query).not.toHaveBeenCalled();
+  });
+
+  it('returns null for runtime settings when the active runtime query lacks getSettings', async () => {
+    const sdk = createSdk([]);
+    sdk.query.mockReturnValue(Object.assign((async function* () {})(), {
+      getSettings: jest.fn().mockResolvedValue({ model: 'from-temporary-query' }),
+      close: jest.fn(),
+    }));
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+    const sessionId = await adapter.createSession();
+    const session = (adapter as unknown as {
+      sessions: Map<string, {
+        runtime?: { query?: unknown };
+      }>;
+    }).sessions.get(sessionId);
+    if (!session) {
+      throw new Error('expected local session state');
+    }
+    session.runtime = { query: Object.assign((async function* () {})(), { close: jest.fn() }) };
+
+    await expect(adapter.getRuntimeSettings()).resolves.toBeNull();
+    expect(sdk.query).not.toHaveBeenCalled();
+  });
+
+  it('returns null for runtime settings when the SDK Query getSettings path is unavailable', async () => {
+    const sdk = createSdk([]);
+    const close = jest.fn();
+    sdk.query.mockReturnValue(Object.assign((async function* () {})(), {
+      close,
+    }));
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+
+    await expect(adapter.getRuntimeSettings()).resolves.toBeNull();
+    expect(close).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns null for runtime settings when the SDK Query getSettings call throws', async () => {
+    const sdk = createSdk([]);
+    const close = jest.fn();
+    sdk.query.mockReturnValue(Object.assign((async function* () {})(), {
+      getSettings: jest.fn().mockRejectedValue(new Error('settings unavailable')),
+      close,
+    }));
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+
+    await expect(adapter.getRuntimeSettings()).resolves.toBeNull();
+    expect(close).toHaveBeenCalledTimes(1);
+  });
+
+  it('reads context usage from the SDK Query getContextUsage path', async () => {
+    const sdk = createSdk([]);
+    const close = jest.fn();
+    const contextUsage = {
+      usedTokens: 1234,
+      maxTokens: 200000,
+    };
+    const getContextUsage = jest.fn().mockResolvedValue(contextUsage);
+    sdk.query.mockReturnValue(Object.assign((async function* () {})(), {
+      getContextUsage,
+      close,
+    }));
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    }) as ClaudeCodeAdapter & { getContextUsage(): Promise<unknown | null> };
+
+    await expect(adapter.getContextUsage()).resolves.toBe(contextUsage);
+    expect(getContextUsage).toHaveBeenCalledTimes(1);
+    expect(close).toHaveBeenCalledTimes(1);
+    await expectAsyncIterableClosedWithoutValues(sdk.query.mock.calls[0][0].prompt);
+  });
+
+  it('returns null for context usage when the SDK Query getContextUsage path is unavailable', async () => {
+    const sdk = createSdk([]);
+    const close = jest.fn();
+    sdk.query.mockReturnValue(Object.assign((async function* () {})(), {
+      close,
+    }));
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    }) as ClaudeCodeAdapter & { getContextUsage(): Promise<unknown | null> };
+
+    await expect(adapter.getContextUsage()).resolves.toBeNull();
+    expect(close).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns null for context usage when the SDK Query getContextUsage call throws', async () => {
+    const sdk = createSdk([]);
+    const close = jest.fn();
+    sdk.query.mockReturnValue(Object.assign((async function* () {})(), {
+      getContextUsage: jest.fn().mockRejectedValue(new Error('context usage unavailable')),
+      close,
+    }));
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    }) as ClaudeCodeAdapter & { getContextUsage(): Promise<unknown | null> };
+
+    await expect(adapter.getContextUsage()).resolves.toBeNull();
+    expect(close).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns null for context usage when the active runtime query lacks getContextUsage', async () => {
+    const sdk = createSdk([]);
+    sdk.query.mockReturnValue(Object.assign((async function* () {})(), {
+      getContextUsage: jest.fn().mockResolvedValue({ usedTokens: 99 }),
+      close: jest.fn(),
+    }));
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    }) as ClaudeCodeAdapter & { getContextUsage(): Promise<unknown | null> };
+    const sessionId = await adapter.createSession();
+    const session = (adapter as unknown as {
+      sessions: Map<string, {
+        runtime?: { query?: unknown };
+      }>;
+    }).sessions.get(sessionId);
+    if (!session) {
+      throw new Error('expected local session state');
+    }
+    session.runtime = { query: Object.assign((async function* () {})(), { close: jest.fn() }) };
+
+    await expect(adapter.getContextUsage()).resolves.toBeNull();
+    expect(sdk.query).not.toHaveBeenCalled();
+  });
+
+  it('reads account info from the SDK Query accountInfo path', async () => {
+    const sdk = createSdk([]);
+    const close = jest.fn();
+    const accountInfo = {
+      email: 'user@example.com',
+      organization: 'Example Org',
+      subscriptionType: 'max',
+      apiProvider: 'firstParty',
+    };
+    const accountInfoReadback = jest.fn().mockResolvedValue(accountInfo);
+    sdk.query.mockReturnValue(Object.assign((async function* () {})(), {
+      accountInfo: accountInfoReadback,
+      close,
+    }));
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    }) as ClaudeCodeAdapter & { getAccountInfo(): Promise<unknown | null> };
+
+    await expect(adapter.getAccountInfo()).resolves.toBe(accountInfo);
+    expect(accountInfoReadback).toHaveBeenCalledTimes(1);
+    expect(close).toHaveBeenCalledTimes(1);
+    await expectAsyncIterableClosedWithoutValues(sdk.query.mock.calls[0][0].prompt);
+  });
+
+  it('reuses active runtime query account info without closing the live runtime query', async () => {
+    const close = jest.fn();
+    const accountInfo = { email: 'user@example.com', apiProvider: 'firstParty' };
+    const runtimeQuery = createAsyncQueue<unknown>() as ReturnType<typeof createAsyncQueue<unknown>> & {
+      accountInfo: () => Promise<unknown>;
+      close: jest.Mock;
+      sentinel: string;
+    };
+    runtimeQuery.sentinel = 'bound-account-context';
+    runtimeQuery.accountInfo = jest.fn(function (this: { sentinel?: string }) {
+      if (this.sentinel !== 'bound-account-context') {
+        throw new TypeError('unbound accountInfo context');
+      }
+      return Promise.resolve(accountInfo);
+    });
+    runtimeQuery.close = close;
+    const sdk = createSdk([]);
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    }) as ClaudeCodeAdapter & { getAccountInfo(): Promise<unknown | null> };
+    const sessionId = await adapter.createSession();
+    const session = (adapter as unknown as {
+      sessions: Map<string, {
+        runtime?: { query?: unknown };
+      }>;
+    }).sessions.get(sessionId);
+    if (!session) {
+      throw new Error('expected local session state');
+    }
+    session.runtime = { query: runtimeQuery };
+
+    await expect(adapter.getAccountInfo()).resolves.toBe(accountInfo);
+    expect(runtimeQuery.accountInfo).toHaveBeenCalledTimes(1);
+    expect(close).toHaveBeenCalledTimes(0);
+    expect(sdk.query).not.toHaveBeenCalled();
+  });
+
+  it('returns null for account info when the SDK Query accountInfo path is unavailable', async () => {
+    const sdk = createSdk([]);
+    const close = jest.fn();
+    sdk.query.mockReturnValue(Object.assign((async function* () {})(), {
+      close,
+    }));
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    }) as ClaudeCodeAdapter & { getAccountInfo(): Promise<unknown | null> };
+
+    await expect(adapter.getAccountInfo()).resolves.toBeNull();
+    expect(close).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns null for account info when the SDK Query accountInfo call throws', async () => {
+    const sdk = createSdk([]);
+    const close = jest.fn();
+    sdk.query.mockReturnValue(Object.assign((async function* () {})(), {
+      accountInfo: jest.fn().mockRejectedValue(new Error('account unavailable')),
+      close,
+    }));
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    }) as ClaudeCodeAdapter & { getAccountInfo(): Promise<unknown | null> };
+
+    await expect(adapter.getAccountInfo()).resolves.toBeNull();
+    expect(close).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns null for account info when the active runtime query lacks accountInfo', async () => {
+    const sdk = createSdk([]);
+    sdk.query.mockReturnValue(Object.assign((async function* () {})(), {
+      accountInfo: jest.fn().mockResolvedValue({ email: 'from-temporary-query@example.com' }),
+      close: jest.fn(),
+    }));
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    }) as ClaudeCodeAdapter & { getAccountInfo(): Promise<unknown | null> };
+    const sessionId = await adapter.createSession();
+    const session = (adapter as unknown as {
+      sessions: Map<string, {
+        runtime?: { query?: unknown };
+      }>;
+    }).sessions.get(sessionId);
+    if (!session) {
+      throw new Error('expected local session state');
+    }
+    session.runtime = { query: Object.assign((async function* () {})(), { close: jest.fn() }) };
+
+    await expect(adapter.getAccountInfo()).resolves.toBeNull();
+    expect(sdk.query).not.toHaveBeenCalled();
+  });
+
+  it('reads a session file through the SDK Query readFile path', async () => {
+    const sdk = createSdk([]);
+    const close = jest.fn();
+    const fileReadback = {
+      contents: '# Hello from Claude runtime',
+      absPath: '/vault/notes/example.md',
+      truncated: false,
+    };
+    const readFile = jest.fn().mockResolvedValue(fileReadback);
+    sdk.query.mockReturnValue(Object.assign((async function* () {})(), {
+      readFile,
+      close,
+    }));
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    }) as ClaudeCodeAdapter & {
+      readRuntimeFile(path: string, options?: { maxBytes?: number; encoding?: 'utf-8' | 'base64' }): Promise<unknown | null>;
+    };
+
+    await expect(adapter.readRuntimeFile('notes/example.md', {
+      maxBytes: 4096,
+      encoding: 'utf-8',
+    })).resolves.toBe(fileReadback);
+    expect(readFile).toHaveBeenCalledWith('notes/example.md', {
+      maxBytes: 4096,
+      encoding: 'utf-8',
+    });
+    expect(close).toHaveBeenCalledTimes(1);
+    await expectAsyncIterableClosedWithoutValues(sdk.query.mock.calls[0][0].prompt);
+  });
+
+  it('returns null for runtime file readback when an active query lacks readFile', async () => {
+    const sdk = createSdk([]);
+    sdk.query.mockReturnValue(Object.assign((async function* () {})(), {
+      readFile: jest.fn().mockResolvedValue({ contents: 'temporary', absPath: '/vault/temporary.md' }),
+      close: jest.fn(),
+    }));
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    }) as ClaudeCodeAdapter & {
+      readRuntimeFile(path: string): Promise<unknown | null>;
+    };
+    const sessionId = await adapter.createSession();
+    const session = (adapter as unknown as {
+      sessions: Map<string, {
+        runtime?: { query?: unknown };
+      }>;
+    }).sessions.get(sessionId);
+    if (!session) {
+      throw new Error('expected local session state');
+    }
+    session.runtime = { query: Object.assign((async function* () {})(), { close: jest.fn() }) };
+
+    await expect(adapter.readRuntimeFile('notes/example.md')).resolves.toBeNull();
+    expect(sdk.query).not.toHaveBeenCalled();
+  });
+
+  it('reads sanitized MCP server statuses from the SDK Query mcpServerStatus path', async () => {
+    const sdk = createSdk([]);
+    const close = jest.fn();
+    const mcpServerStatus = jest.fn().mockResolvedValue([{
+      name: 'zeta-mcp',
+      status: 'connected',
+      scope: 'project',
+      serverInfo: { name: 'Zeta MCP', version: '1.2.3' },
+      tools: [{ name: 'writeTool' }, { name: 'readTool' }],
+      config: {
+        type: 'stdio',
+        command: 'node',
+        env: { SECRET_TOKEN: 'do-not-leak' },
+      },
+    }, {
+      name: 'alpha-mcp',
+      status: 'failed',
+      error: 'failed with token abc123',
+      config: {
+        type: 'sse',
+        url: 'https://example.invalid?token=do-not-leak',
+      },
+    }]);
+    sdk.query.mockReturnValue(Object.assign((async function* () {})(), {
+      mcpServerStatus,
+      close,
+    }));
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+
+    const statuses = await adapter.getMcpServerRuntimeStatuses();
+    expect(statuses).toEqual([{
+      name: 'zeta-mcp',
+      status: 'connected',
+      scope: 'project',
+      serverInfo: { name: 'Zeta MCP', version: '1.2.3' },
+      toolCount: 2,
+      toolNames: ['readTool', 'writeTool'],
+      hasError: false,
+    }, {
+      name: 'alpha-mcp',
+      status: 'failed',
+      toolCount: 0,
+      toolNames: [],
+      hasError: true,
+      errorSummary: 'McpServerError(category=auth, messageLength=24)',
+    }]);
+    expect(JSON.stringify(statuses)).not.toContain('do-not-leak');
+    expect(mcpServerStatus).toHaveBeenCalledTimes(1);
+    expect(close).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns null for MCP server statuses when the SDK Query mcpServerStatus path is unavailable', async () => {
+    const sdk = createSdk([]);
+    const close = jest.fn();
+    sdk.query.mockReturnValue(Object.assign((async function* () {})(), {
+      close,
+    }));
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+
+    await expect(adapter.getMcpServerRuntimeStatuses()).resolves.toBeNull();
+    expect(close).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns null for MCP server statuses when the SDK Query mcpServerStatus call throws', async () => {
+    const sdk = createSdk([]);
+    const close = jest.fn();
+    sdk.query.mockReturnValue(Object.assign((async function* () {})(), {
+      mcpServerStatus: jest.fn().mockRejectedValue(new Error('mcp status unavailable')),
+      close,
+    }));
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+
+    await expect(adapter.getMcpServerRuntimeStatuses()).resolves.toBeNull();
+    expect(close).toHaveBeenCalledTimes(1);
   });
 
   it('reuses runtime query models without closing the live runtime query', async () => {
@@ -406,6 +1077,79 @@ describe('ClaudeCodeAdapter', () => {
       content: 'again',
     }));
     expect(sdk.query.mock.calls[1][0].options.resume).toBe('sdk-session-1');
+  });
+
+  it('passes session title into SDK query options on first send', async () => {
+    const sdk = createSdk([{
+      type: 'system',
+      subtype: 'init',
+      session_id: 'sdk-title-1',
+      model: 'claude-sonnet-4-5',
+    }, {
+      type: 'assistant',
+      message: {
+        id: 'msg-title-1',
+        content: [{ type: 'text', text: 'Title test' }],
+      },
+    }]);
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+    const sessionId = await adapter.createSession('My Custom Title');
+
+    await collectAsync(adapter.sendMessage({
+      sessionId,
+      content: 'hello',
+    }));
+
+    expect(sdk.query).toHaveBeenCalledTimes(1);
+    const firstCallOptions = sdk.query.mock.calls[0][0].options;
+    expect(firstCallOptions.title).toBe('My Custom Title');
+  });
+
+  it('omits title from SDK query options on resumed sends', async () => {
+    const sdk = createSdk([{
+      type: 'system',
+      subtype: 'init',
+      session_id: 'sdk-title-resume',
+      model: 'claude-sonnet-4-5',
+    }, {
+      type: 'assistant',
+      message: {
+        id: 'msg-title-resume-1',
+        content: [{ type: 'text', text: 'First' }],
+      },
+    }, {
+      type: 'assistant',
+      message: {
+        id: 'msg-title-resume-2',
+        content: [{ type: 'text', text: 'Second' }],
+      },
+    }]);
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+    const sessionId = await adapter.createSession('Title Should Not Appear On Resume');
+
+    // First send: title should be present
+    await collectAsync(adapter.sendMessage({
+      sessionId,
+      content: 'first',
+    }));
+    expect(sdk.query.mock.calls[0][0].options.title).toBe('Title Should Not Appear On Resume');
+
+    // Second send (resume): title should be omitted
+    await collectAsync(adapter.sendMessage({
+      sessionId,
+      content: 'second',
+    }));
+    const secondCallOptions = sdk.query.mock.calls[1][0].options;
+    expect(secondCallOptions.resume).toBe('sdk-title-resume');
+    expect(secondCallOptions).not.toHaveProperty('title');
   });
 
   it('passes composer model and effort overrides into the Claude Code SDK query options', async () => {
@@ -2256,6 +3000,70 @@ describe('ClaudeCodeAdapter', () => {
     });
   });
 
+  describe('runCheckpointRewindProbe probe file cleanup', () => {
+    it('cleans up probe file when Phase 2 sdk.query throws', async () => {
+      const vaultPath = `/tmp/opencodian-test-probe-cleanup-${Date.now()}`;
+      mkdirSync(vaultPath, { recursive: true });
+      const probeFilePath = `${vaultPath}/.opencodian-checkpoint-probe.txt`;
+
+      try {
+        let queryCallIndex = 0;
+        const phase1Messages = [
+          { type: 'user', uuid: 'user-msg-cleanup-test', session_id: 'probe-session-cleanup' },
+          { type: 'assistant', session_id: 'probe-session-cleanup', message: { role: 'assistant' } },
+          { type: 'result', subtype: 'success', session_id: 'probe-session-cleanup' },
+        ];
+
+        const mockQuery = jest.fn(() => {
+          if (queryCallIndex === 0) {
+            queryCallIndex++;
+            const queue = createAsyncQueue<unknown>();
+            const closeQueue = queue.close;
+            const q: Record<string, unknown> = Object.assign(queue, {
+              supportedModels: jest.fn().mockResolvedValue([]),
+              close: jest.fn(() => closeQueue()),
+              rewindFiles: jest.fn().mockResolvedValue({ canRewind: false, error: 'No checkpoint' }),
+            });
+            setTimeout(() => {
+              writeFileSync(probeFilePath, 'checkpoint-test-content');
+              for (const msg of phase1Messages) {
+                (q as AsyncIterable<unknown> & { push: (v: unknown) => void }).push(msg);
+              }
+              closeQueue();
+            }, 0);
+            return q;
+          }
+          throw new Error('Phase 2 SDK query creation failed');
+        });
+
+        const sdk: ClaudeCodeSdkFacade = {
+          query: mockQuery as unknown as ClaudeCodeSdkFacade['query'],
+          listSessions: jest.fn().mockResolvedValue([]),
+          getSessionInfo: jest.fn().mockResolvedValue(undefined),
+          getSessionMessages: jest.fn().mockResolvedValue([]),
+          listSubagents: jest.fn().mockResolvedValue([]),
+          getSubagentMessages: jest.fn().mockResolvedValue([]),
+          importSessionToStore: jest.fn().mockResolvedValue(undefined),
+          forkSession: jest.fn().mockResolvedValue({ sessionId: 'fork-session' }),
+          renameSession: jest.fn().mockResolvedValue(undefined),
+        };
+
+        const adapter = new ClaudeCodeAdapter({
+          vaultPath,
+          settings: { ...getDefaultClaudeCodeBackendSettings(), permissionMode: 'bypassPermissions' },
+          sdk,
+        });
+
+        await expect(adapter.runCheckpointRewindProbe())
+          .rejects.toThrow('Phase 2 SDK query creation failed');
+
+        expect(existsSync(probeFilePath)).toBe(false);
+      } finally {
+        rmSync(vaultPath, { recursive: true, force: true });
+      }
+    });
+  });
+
   describe('ClaudeCodeAdapter runtime controls and diagnostic session lookup', () => {
     function createRuntimeControlQuery(overrides: {
       setModel?: jest.Mock;
@@ -2449,6 +3257,14 @@ describe('ClaudeCodeAdapter', () => {
       expect(adapter.getMcpServerCount()).toBe(0);
     });
 
+    it('getMcpServerNames returns an empty list when no MCP config is loaded', () => {
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: getDefaultClaudeCodeBackendSettings(),
+      });
+      expect(adapter.getMcpServerNames()).toEqual([]);
+    });
+
     it('getMcpServerCount returns count from static mcpServers option', () => {
       const mcpServers = {
         server1: { type: 'stdio' as const, command: 'node', args: ['s1.js'] },
@@ -2460,6 +3276,20 @@ describe('ClaudeCodeAdapter', () => {
         mcpServers,
       });
       expect(adapter.getMcpServerCount()).toBe(2);
+    });
+
+    it('getMcpServerNames returns sorted names from static mcpServers option', () => {
+      const mcpServers = {
+        zetaServer: { type: 'stdio' as const, command: 'node', args: ['zeta.js'] },
+        alphaServer: { type: 'stdio' as const, command: 'node', args: ['alpha.js'] },
+        betaServer: { type: 'stdio' as const, command: 'node', args: ['beta.js'] },
+      };
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: getDefaultClaudeCodeBackendSettings(),
+        mcpServers,
+      });
+      expect(adapter.getMcpServerNames()).toEqual(['alphaServer', 'betaServer', 'zetaServer']);
     });
 
     it('getMcpServerCount returns count from dynamically loaded MCP config', async () => {
@@ -2479,6 +3309,28 @@ describe('ClaudeCodeAdapter', () => {
       expect(adapter.getMcpServerCount()).toBe(3);
     });
 
+    it('getMcpServerNames returns sorted names after dynamically loading MCP config', async () => {
+      const mcpServers = {
+        zetaDynamic: { type: 'stdio' as const, command: 'node', args: ['zeta.js'] },
+        alphaDynamic: { type: 'stdio' as const, command: 'node', args: ['alpha.js'] },
+        betaDynamic: { type: 'stdio' as const, command: 'node', args: ['beta.js'] },
+      };
+      const mcpConfigLoader = jest.fn().mockResolvedValue(mcpServers);
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: getDefaultClaudeCodeBackendSettings(),
+        mcpConfigLoader,
+      });
+
+      expect(adapter.getMcpServerNames()).toEqual([]);
+      await adapter.loadMcpConfig();
+
+      expect(mcpConfigLoader).toHaveBeenCalledTimes(1);
+      expect(adapter.getMcpServerNames()).toEqual(['alphaDynamic', 'betaDynamic', 'zetaDynamic']);
+    });
+  });
+
+  describe('ClaudeCodeAdapter runtime ecosystem introspection', () => {
     it('getPluginCount returns 0 when no plugins configured', () => {
       const adapter = new ClaudeCodeAdapter({
         vaultPath: '/vault',
@@ -3323,6 +4175,390 @@ describe('ClaudeCodeAdapter', () => {
       expect(passedOptions.permissionMode).toBe('bypassPermissions');
       expect(passedOptions.allowDangerouslySkipPermissions).toBe(true);
       expect(passedOptions.canUseTool).toBeUndefined();
+    });
+  });
+
+  describe('diagnostic tool restriction defensive copy', () => {
+    it('snapshot options.tools is not mutated when caller mutates the restriction array after runDiagnosticPrompt', async () => {
+      const sdk = createSdk([]);
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: getDefaultClaudeCodeBackendSettings(),
+        sdk,
+      });
+
+      const restriction = ['Read', 'Grep'];
+      await adapter.runDiagnosticPrompt({
+        prompt: 'Tool restriction snapshot test',
+        persistSession: false,
+        _diagnosticToolRestriction: restriction,
+      });
+
+      restriction.push('Edit', 'Write');
+
+      const snapshot = adapter.inspectLastDiagnosticSdkOptions();
+      expect(snapshot).not.toBeNull();
+      expect(snapshot!.tools).toEqual(['Read', 'Grep']);
+    });
+  });
+
+  // =======================================================================
+  // runSetModelLiveProbe — diagnostic probe for setModel() live behavior
+  // =======================================================================
+
+  describe('runSetModelLiveProbe', () => {
+    /**
+     * Creates an SDK facade with a single persistent mock query that supports
+     * the AsyncIterable input + background pump pattern.
+     *
+     * The mock query receives its prompt as an AsyncIterable (streaming input mode).
+     * When items are pushed into the input, the query yields messages until a
+     * turn boundary (type:'result'), then pauses for the next push.
+     *
+     * This mirrors the real SDK streaming-input behavior where `setModel()` is
+     * only meaningful between turns on the same query handle.
+     */
+    function createSingleQueryProbeSdk(opts: {
+      /** All messages the query will yield across both phases, in order */
+      allMessages: unknown[];
+      /** Mock for query.setModel — if omitted, method is not present */
+      setModel?: jest.Mock;
+    }): ClaudeCodeSdkFacade & { query: jest.Mock } {
+      const messages = [...opts.allMessages];
+
+      const mockQuery = jest.fn(() => {
+        const queue = createAsyncQueue<unknown>();
+        // Save original close before overriding — q and queue are the same object
+        const realClose = queue.close.bind(queue);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const q: any = queue;
+        q.supportedModels = jest.fn().mockResolvedValue([]);
+        q.close = jest.fn(() => realClose());
+        if (opts.setModel) {
+          q.setModel = opts.setModel;
+        }
+        // Push all messages after a tick so the async iterator is ready.
+        // The input AsyncIterable is consumed by the SDK internally;
+        // our mock just yields messages in sequence.
+        setTimeout(() => {
+          for (const msg of messages) {
+            queue.push(msg);
+          }
+          realClose();
+        }, 0);
+        return q;
+      });
+
+      return {
+        query: mockQuery as unknown as ClaudeCodeSdkFacade['query'] & jest.Mock,
+        listSessions: jest.fn().mockResolvedValue([]),
+        getSessionInfo: jest.fn().mockResolvedValue(undefined),
+        getSessionMessages: jest.fn().mockResolvedValue([]),
+        listSubagents: jest.fn().mockResolvedValue([]),
+        getSubagentMessages: jest.fn().mockResolvedValue([]),
+        importSessionToStore: jest.fn().mockResolvedValue(undefined),
+        forkSession: jest.fn().mockResolvedValue({ sessionId: 'sdk-fork-session' }),
+        renameSession: jest.fn().mockResolvedValue(undefined),
+      };
+    }
+
+    it('uses a single SDK query for both phases (not two separate queries)', async () => {
+      const setModelMock = jest.fn().mockResolvedValue(undefined);
+      const sdk = createSingleQueryProbeSdk({
+        setModel: setModelMock,
+        allMessages: [
+          // Phase 1 messages
+          { type: 'user', uuid: 'user-001', session_id: 'setmodel-session-1' },
+          { type: 'assistant', session_id: 'setmodel-session-1', message: { role: 'assistant' } },
+          { type: 'result', subtype: 'success', session_id: 'setmodel-session-1', modelUsage: { 'claude-sonnet-4-5': { inputTokens: 50 } } },
+          // Phase 2 messages (after setModel, same query handle)
+          { type: 'assistant', session_id: 'setmodel-session-1', message: { role: 'assistant' } },
+          { type: 'result', subtype: 'success', session_id: 'setmodel-session-1', modelUsage: { 'claude-opus-4-5': { inputTokens: 60 } } },
+        ],
+      });
+
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/tmp/test-vault-setmodel',
+        settings: { ...getDefaultClaudeCodeBackendSettings(), permissionMode: 'bypassPermissions' },
+        sdk,
+      });
+
+      const result = await adapter.runSetModelLiveProbe('claude-opus-4-5');
+
+      // CRITICAL: sdk.query was called exactly ONCE — single persistent query
+      expect(sdk.query).toHaveBeenCalledTimes(1);
+      // The prompt was an AsyncIterable (streaming input mode), not a string
+      const queryArg = sdk.query.mock.calls[0][0] as { prompt: unknown };
+      expect(typeof queryArg.prompt).not.toBe('string');
+      expect(queryArg.prompt).toBeTruthy();
+      // setModel was called on the same query handle
+      expect(setModelMock).toHaveBeenCalledWith('claude-opus-4-5');
+      // Phase 1 and Phase 2 model evidence collected
+      expect(result.setModelAttempted).toBe(true);
+      expect(result.setModelError).toBeUndefined();
+      expect(result.phase1ModelKeys).toEqual(['claude-sonnet-4-5']);
+      expect(result.phase2ModelKeys).toEqual(['claude-opus-4-5']);
+    });
+
+    it('returns setModelError when setModel throws', async () => {
+      const setModelMock = jest.fn().mockRejectedValue(new Error('model switch rejected'));
+      const sdk = createSingleQueryProbeSdk({
+        setModel: setModelMock,
+        allMessages: [
+          { type: 'user', uuid: 'user-002', session_id: 'setmodel-session-2' },
+          { type: 'assistant', session_id: 'setmodel-session-2', message: { role: 'assistant' } },
+          { type: 'result', subtype: 'success', session_id: 'setmodel-session-2', modelUsage: { 'claude-sonnet-4-5': { inputTokens: 50 } } },
+          { type: 'assistant', session_id: 'setmodel-session-2', message: { role: 'assistant' } },
+          { type: 'result', subtype: 'success', session_id: 'setmodel-session-2', modelUsage: { 'claude-sonnet-4-5': { inputTokens: 50 } } },
+        ],
+      });
+
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/tmp/test-vault-setmodel',
+        settings: { ...getDefaultClaudeCodeBackendSettings(), permissionMode: 'bypassPermissions' },
+        sdk,
+      });
+
+      const result = await adapter.runSetModelLiveProbe('claude-opus-4-5');
+
+      // Still uses a single query
+      expect(sdk.query).toHaveBeenCalledTimes(1);
+      expect(result.setModelAttempted).toBe(true);
+      expect(result.setModelError).toBe('model switch rejected');
+    });
+
+    it('returns setModelNotAvailable when query lacks setModel method', async () => {
+      const sdk = createSingleQueryProbeSdk({
+        // no setModel mock
+        allMessages: [
+          { type: 'user', uuid: 'user-003', session_id: 'setmodel-session-3' },
+          { type: 'assistant', session_id: 'setmodel-session-3', message: { role: 'assistant' } },
+          { type: 'result', subtype: 'success', session_id: 'setmodel-session-3' },
+          { type: 'result', subtype: 'success', session_id: 'setmodel-session-3' },
+        ],
+      });
+
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/tmp/test-vault-setmodel',
+        settings: { ...getDefaultClaudeCodeBackendSettings(), permissionMode: 'bypassPermissions' },
+        sdk,
+      });
+
+      const result = await adapter.runSetModelLiveProbe('claude-opus-4-5');
+
+      expect(sdk.query).toHaveBeenCalledTimes(1);
+      expect(result.setModelAttempted).toBe(false);
+      expect(result.setModelNotAvailable).toBe(true);
+    });
+
+    it('returns empty model keys when no modelUsage in result messages', async () => {
+      const setModelMock = jest.fn().mockResolvedValue(undefined);
+      const sdk = createSingleQueryProbeSdk({
+        setModel: setModelMock,
+        allMessages: [
+          { type: 'user', uuid: 'user-004', session_id: 'setmodel-session-4' },
+          { type: 'assistant', session_id: 'setmodel-session-4', message: { role: 'assistant' } },
+          { type: 'result', subtype: 'success', session_id: 'setmodel-session-4' },
+          { type: 'result', subtype: 'success', session_id: 'setmodel-session-4' },
+        ],
+      });
+
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/tmp/test-vault-setmodel',
+        settings: { ...getDefaultClaudeCodeBackendSettings(), permissionMode: 'bypassPermissions' },
+        sdk,
+      });
+
+      const result = await adapter.runSetModelLiveProbe('claude-opus-4-5');
+
+      expect(sdk.query).toHaveBeenCalledTimes(1);
+      expect(result.setModelAttempted).toBe(true);
+      expect(result.phase1ModelKeys).toEqual([]);
+      expect(result.phase2ModelKeys).toEqual([]);
+    });
+  });
+
+  // =======================================================================
+  // runWarmStartupProbe — diagnostic probe for startup() / WarmQuery seam
+  // =======================================================================
+
+  describe('runWarmStartupProbe', () => {
+    function createSdkWithStartup(opts: {
+      startupResult?: {
+        query: jest.Mock;
+        close: jest.Mock;
+      };
+      startupThrows?: Error;
+    }): ClaudeCodeSdkFacade & { query: jest.Mock; startup?: jest.Mock } {
+      const baseSdk = createSdk([]);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const result: any = { ...baseSdk };
+
+      if (opts.startupThrows) {
+        result.startup = jest.fn().mockRejectedValue(opts.startupThrows);
+      } else if (opts.startupResult) {
+        result.startup = jest.fn().mockResolvedValue(opts.startupResult);
+      }
+      // When neither is provided, no startup property (SDK doesn't expose it)
+
+      return result;
+    }
+
+    function createWarmQuery(messages: unknown[]): {
+      query: jest.Mock;
+      close: jest.Mock;
+    } {
+      const mockQuery = jest.fn(() => Object.assign((async function* () {
+        for (const message of messages) {
+          yield message;
+        }
+      })(), {
+        supportedModels: jest.fn().mockResolvedValue([]),
+        close: jest.fn(),
+      }));
+      return {
+        query: mockQuery,
+        close: jest.fn(),
+      };
+    }
+
+    it('returns readback when startup resolves and warm query produces response', async () => {
+      const warmQuery = createWarmQuery([
+        { type: 'system', subtype: 'init' },
+        { type: 'assistant', message: { role: 'assistant', content: [{ type: 'text', text: 'Hello from warm query' }] } },
+        { type: 'result', subtype: 'success', cost_usd: 0.001 },
+      ]);
+      const sdk = createSdkWithStartup({ startupResult: warmQuery });
+
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: getDefaultClaudeCodeBackendSettings(),
+        sdk,
+      });
+
+      const result = await adapter.runWarmStartupProbe();
+
+      expect(result.classification).toBe('readback');
+      expect(result.startupResolved).toBe(true);
+      expect(result.warmQueryAvailable).toBe(true);
+      expect(result.warmQueryResponded).toBe(true);
+      expect(result.rawMessageCount).toBeGreaterThan(0);
+      expect(warmQuery.close).toHaveBeenCalled();
+    });
+
+    it('returns readback when startup resolves but warm query returns empty messages', async () => {
+      const warmQuery = createWarmQuery([]);
+      const sdk = createSdkWithStartup({ startupResult: warmQuery });
+
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: getDefaultClaudeCodeBackendSettings(),
+        sdk,
+      });
+
+      const result = await adapter.runWarmStartupProbe();
+
+      expect(result.classification).toBe('readback');
+      expect(result.startupResolved).toBe(true);
+      expect(result.warmQueryAvailable).toBe(true);
+      expect(result.warmQueryResponded).toBe(false);
+      expect(warmQuery.close).toHaveBeenCalled();
+    });
+
+    it('returns fail when startup throws', async () => {
+      const sdk = createSdkWithStartup({
+        startupThrows: new Error('startup failed: SDK initialization timeout'),
+      });
+
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: getDefaultClaudeCodeBackendSettings(),
+        sdk,
+      });
+
+      const result = await adapter.runWarmStartupProbe();
+
+      expect(result.classification).toBe('fail');
+      expect(result.startupResolved).toBe(false);
+      expect(result.error).toContain('startup failed');
+    });
+
+    it('returns boundary when SDK does not expose startup method', async () => {
+      const sdk = createSdkWithStartup({}); // No startup method
+
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: getDefaultClaudeCodeBackendSettings(),
+        sdk,
+      });
+
+      const result = await adapter.runWarmStartupProbe();
+
+      expect(result.classification).toBe('boundary');
+      expect(result.startupResolved).toBe(false);
+    });
+
+    it('closes warm query when warm query iteration throws', async () => {
+      const mockWarmQuery = {
+        query: jest.fn(() => {
+          const asyncIterable = {
+            [Symbol.asyncIterator]() {
+              return {
+                next(): Promise<IteratorResult<unknown>> {
+                  return Promise.reject(new Error('warm query iteration failed'));
+                },
+              };
+            },
+          };
+          return Object.assign(asyncIterable, {
+            supportedModels: jest.fn().mockResolvedValue([]),
+            close: jest.fn(),
+          });
+        }),
+        close: jest.fn(),
+      };
+      const sdk = createSdkWithStartup({ startupResult: mockWarmQuery });
+
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: getDefaultClaudeCodeBackendSettings(),
+        sdk,
+      });
+
+      const result = await adapter.runWarmStartupProbe();
+
+      expect(result.classification).toBe('fail');
+      expect(result.warmQueryAvailable).toBe(true);
+      expect(mockWarmQuery.close).toHaveBeenCalled();
+    });
+
+    it('routes startup through adapter options pipeline (not bare startup)', async () => {
+      const warmQuery = createWarmQuery([
+        { type: 'result', subtype: 'success' },
+      ]);
+      const sdk = createSdkWithStartup({ startupResult: warmQuery });
+
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault/warm-startup-test',
+        settings: { ...getDefaultClaudeCodeBackendSettings(), permissionMode: 'bypassPermissions' },
+        sdk,
+      });
+
+      await adapter.runWarmStartupProbe();
+
+      // sdk.startup must be called with an options object, not undefined
+      expect(sdk.startup).toHaveBeenCalledTimes(1);
+      const startupCall = (sdk.startup as jest.Mock).mock.calls[0];
+      const startupArg = startupCall?.[0] as { options?: Record<string, unknown> } | undefined;
+
+      // Must receive an options argument (not undefined)
+      expect(startupArg).toBeDefined();
+      expect(startupArg.options).toBeDefined();
+
+      // Must include adapter-owned fields from our options pipeline
+      expect(startupArg.options!.cwd).toBe('/vault/warm-startup-test');
+      expect(startupArg.options!.allowDangerouslySkipPermissions).toBe(true);
+      expect(startupArg.options!.permissionMode).toBe('bypassPermissions');
     });
   });
 });

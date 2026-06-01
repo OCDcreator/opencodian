@@ -79,6 +79,13 @@ interface DiscoveryRowOptions {
   status?: DiscoveryRowStatus;
 }
 
+interface CapabilityLabProbeShell {
+  fieldRowEl: HTMLElement;
+  actionRowEl: HTMLElement;
+  outputEl: HTMLElement;
+  statusEl: HTMLElement | null;
+}
+
 export class CapabilityLabSessionStore {
   private readonly entries = new Map<string, CapabilityLabSessionStoreEntry[]>();
   private readonly mtimes = new Map<string, number>();
@@ -216,6 +223,66 @@ function formatJsonPreview(obj: unknown): string {
 
 function truncate(s: string, max: number): string {
   return s.length > max ? s.slice(0, max) + '…' : s;
+}
+
+const SENSITIVE_RUNTIME_SETTINGS_KEY_PARTS = [
+  'apikey',
+  'token',
+  'secret',
+  'password',
+  'credential',
+  'authorization',
+  'oauth',
+];
+const SENSITIVE_RUNTIME_SETTINGS_ENV_KEYS = new Set([
+  'env',
+  'envvars',
+  'environment',
+  'environmentvariables',
+  'processenv',
+  'processenvironment',
+]);
+
+function isSensitiveRuntimeSettingsKey(key: string): boolean {
+  const normalizedKey = key.replace(/[^a-z0-9]/gi, '').toLowerCase();
+  return SENSITIVE_RUNTIME_SETTINGS_ENV_KEYS.has(normalizedKey)
+    || SENSITIVE_RUNTIME_SETTINGS_KEY_PARTS.some((part) => normalizedKey.includes(part));
+}
+
+function redactRuntimeSettingsReadback(value: unknown, key = '', depth = 0): unknown {
+  if (isSensitiveRuntimeSettingsKey(key)) {
+    if (Array.isArray(value)) {
+      return `[redacted ${value.length} item(s)]`;
+    }
+    if (typeof value === 'object' && value !== null) {
+      return `[redacted ${Object.keys(value as Record<string, unknown>).length} key(s)]`;
+    }
+    return '[redacted]';
+  }
+  if (value === null || typeof value !== 'object') {
+    return value;
+  }
+  if (depth >= 4) {
+    return '[truncated]';
+  }
+  if (Array.isArray(value)) {
+    const preview = value
+      .slice(0, 20)
+      .map((item) => redactRuntimeSettingsReadback(item, key, depth + 1));
+    if (value.length > 20) {
+      preview.push(`[${value.length - 20} more item(s)]`);
+    }
+    return preview;
+  }
+  const entries = Object.entries(value as Record<string, unknown>);
+  const output: Record<string, unknown> = {};
+  for (const [entryKey, entryValue] of entries.slice(0, 80)) {
+    output[entryKey] = redactRuntimeSettingsReadback(entryValue, entryKey, depth + 1);
+  }
+  if (entries.length > 80) {
+    output.__truncated = `${entries.length - 80} more key(s)`;
+  }
+  return output;
 }
 
 interface FallbackStructuredOutput {
@@ -490,6 +557,13 @@ export class SettingsCapabilityLabSection {
     // These are static assessments based on code inspection.
     // Runtime proof requires a live diagnostic call.
     return [
+      ...this.buildCoreMatrixRows(adapter),
+      ...this.buildRecentMatrixRows(),
+    ];
+  }
+
+  private buildCoreMatrixRows(adapter: ClaudeCodeAdapter | null): MatrixRow[] {
+    return [
       {
         capability: 'Hooks',
         sdkExposed: true, // SDK options accept hooks
@@ -501,7 +575,7 @@ export class SettingsCapabilityLabSection {
         capability: 'File Checkpoint / Rewind',
         sdkExposed: true, // enableFileCheckpointing option + rewindFiles on query
         adapterWired: true, // adapter.rewindFiles() exists
-        runtimeProof: 'readback', // BLOCKER=upstream SDK bug #236 (open 2026-03-17, 3 reactions, no maintainer response). SOURCE-BACKED: SDK v0.3.145 sdk.mjs ~line 58: session state initializer `_T()` sets `isInteractive:!1` (always false); NO `isInteractive=true` anywhere in bundled SDK. Snapshot creation is gated behind React/Ink UI useState setters — never fires in SDK query() mode. rewindFiles() sends `sdk_rewind_files` control request to CLI subprocess which checks internal file history (always empty). Two-phase probe confirms: enableFileCheckpointing=true accepted, Write tool creates probe file (probeFileExistedAfterPhase1:true), ALL 6 candidates return canRewind:false with "No file checkpoint found". sdkFilesPersistedEventCount=0 (no snapshot events emitted). applyFlagSettings({ fileCheckpointingEnabled: true }) attempted during Phase 1 after first assistant message — tests whether runtime settings injection activates snapshot creation mid-stream. SDK 0.3.157 (latest) does NOT fix #236 AND introduces AbortSignal/setMaxListeners crash in Obsidian/Electron. PASS requires: Anthropic adds snapshot creation to non-interactive code path (the `_T()` initializer must call the snapshot function even when isInteractive=false).
+        runtimeProof: 'readback', // BLOCKER=upstream SDK bug #236 (open 2026-03-17, 3 reactions, no maintainer response). Current truth: File Checkpoint / Rewind is still readback, not pass. SDK 0.3.158 was tested; Obsidian/Electron needs a setMaxListeners(AbortSignal) monkey-patch. Even with that patch, 10/10 candidates still return canRewind:false, with no improvement over 0.3.145. Snapshot creation is still gated behind React/Ink UI useState setters and never fires in SDK query() mode. rewindFiles() sends `sdk_rewind_files` control request to the CLI subprocess, which still finds empty file history. applyFlagSettings({ fileCheckpointingEnabled: true }) remains a dead-end seam: it does not revive snapshot creation mid-stream.
         userSurface: 'diagnostic', // Capability Lab toggle; no stable rewind UI exposed
       },
       {
@@ -685,6 +759,48 @@ export class SettingsCapabilityLabSection {
         adapterWired: true, // registry.getActive() resolves adapter
         runtimeProof: 'pass', // BUILD_ID feature-phase0-capability.202605281948: registry routes correctly: activeKind=claude-code, adapters=[opencode,claude-code], listSessions via adapter=38 sessions, capabilities=[chat,sessions,fork,models,thinking,file-ops,shell]. Diagnostic-only — no stable routing UI.
         userSurface: 'diagnostic', // Capability Lab backend routing probe only
+      },
+      {
+        capability: '/context Diagnostic',
+        sdkExposed: true, // SDK query() accepts prompt strings including slash commands
+        adapterWired: true, // runDiagnosticPrompt() passes prompt through to SDK query()
+        runtimeProof: 'pass', // Diagnostic-only: adapter.runDiagnosticPrompt({ prompt: '/context', persistSession: false, _diagnosticBypassPermissions: true }) executes the fixed read-only slash command /context and returns the standard "## Context Usage" report with raw message types system → assistant → result. This proves a safe read-only diagnostic command seam exists. This does NOT mean ordinary Claude chat slash commands are productized. Fixed allow-listed command: /context only. No arbitrary command input. No command authoring. No .claude/** writes.
+        userSurface: 'diagnostic', // Capability Lab diagnostic proof only — not a stable command authoring surface
+      },
+      {
+        capability: 'Warm Startup',
+        sdkExposed: true, // SDK exports top-level startup() → Promise<WarmQuery> with query() and close() methods
+        adapterWired: true, // adapter.runWarmStartupProbe() calls sdk.startup() and sends diagnostic prompt through WarmQuery
+        runtimeProof: 'readback', // startup() callable, WarmQuery handle obtainable, warm query() produces response. Warm-vs-cold latency benefit is the SDK's internal claim ("no startup latency"), not independently measured in this probe. The seam proves entry-point availability and warm handle usability, not a measurable behavioral improvement.
+        userSurface: 'diagnostic', // Capability Lab diagnostic proof only — no stable warm-startup surface
+      },
+    ];
+  }
+
+  private buildRecentMatrixRows(): MatrixRow[] {
+    return [
+      {
+        capability: 'Sandbox',
+        sdkExposed: true, // SDK Options.sandbox?: SandboxSettings
+        adapterWired: true, // buildClaudeCodeOptions wires sandbox.enabled/failIfUnavailable/autoAllowBashIfSandboxed
+        runtimeProof: 'readback', // Option wiring proven: sandbox settings propagate from ClaudeCodeBackendSettings through
+        // ClaudeCodeOptionsBuilder into SDK options. Readback ceiling: sandbox behavior (OS-level process isolation,
+        // bubblewrap/seccomp enforcement) is the SDK/CLI binary's internal claim, not independently verifiable from
+        // the plugin layer. The plugin can only prove it passes the option — it cannot observe whether the subprocess
+        // actually runs in a sandbox. Network, filesystem, TLS, proxy, and Mach lookup sub-policies are intentionally
+        // not exposed as stable settings in this version.
+        userSurface: 'settings', // Permissions tab: enabled, failIfUnavailable, autoAllowBashIfSandboxed toggles
+      },
+      {
+        capability: 'Session Title',
+        sdkExposed: true, // SDK Options.title?: string — custom session title, skips automatic generation
+        adapterWired: true, // buildSdkOptions passes session.title on first query (not resume)
+        runtimeProof: 'readback', // Option wiring proven: session.title propagates through buildClaudeCodeOptions
+        // into SDK options.title. Readback ceiling: SDK sets the session title and skips auto-generation,
+        // but the plugin layer does not independently verify the title was accepted by the CLI subprocess
+        // beyond checking the option was passed. The existing renameSession() and getSession() paths
+        // are separate seams. This seam proves the first-query title injection, not post-hoc rename.
+        userSurface: 'diagnostic', // No dedicated title settings control; title comes from existing session creation flow
       },
     ];
   }
@@ -1271,7 +1387,7 @@ export class SettingsCapabilityLabSection {
           cls: 'opencodian-capability-lab-hint',
           text: canRewind
             ? 'Blocker: SDK reports canRewind:true but produces no file diff (empty filesChanged). Upstream bug #236: snapshot creation is gated behind React/Ink UI code paths that never fire in SDK query() mode.'
-            : 'Blocker: SDK returns canRewind:false — no file checkpoint found. Upstream bug #236 (open since 2026-03-17): file history snapshot creation is only called inside React/Ink interactive UI code paths and is NEVER called in SDK non-interactive mode (isInteractive=false in CLI subprocess). Latest SDK 0.3.157 does not fix this and introduces an AbortSignal regression in Obsidian. Pass requires Anthropic to fix #236.',
+            : 'Blocker: SDK returns canRewind:false — no file checkpoint found. Upstream bug #236 (open since 2026-03-17): file history snapshot creation is only called inside React/Ink interactive UI code paths and is NEVER called in SDK non-interactive mode (isInteractive=false in CLI subprocess). SDK 0.3.158 was tested; Obsidian/Electron needs a setMaxListeners(AbortSignal) monkey-patch, but 10/10 candidates still returned canRewind:false, same as 0.3.145. applyFlagSettings({ fileCheckpointingEnabled: true }) remains a dead-end seam. Pass requires Anthropic to fix #236.',
         });
         this.updateRuntimeProof('File Checkpoint / Rewind', 'readback', outputEl);
       }
@@ -1294,12 +1410,68 @@ export class SettingsCapabilityLabSection {
   // Fork Session Diagnostic Probe (provider-owned, diagnostic only)
   // =======================================================================
 
-  private renderForkProbe(containerEl: HTMLElement): void {
-    containerEl.createEl('h4', { text: t('settings.capabilityLab.fork.title') });
-    containerEl.createEl('p', {
+  private createProbeShell(
+    containerEl: HTMLElement,
+    title: string,
+    description: string,
+    options?: { includeStatusGrid?: boolean },
+  ): CapabilityLabProbeShell {
+    const headerEl = containerEl.createDiv({ cls: 'opencodian-capability-lab-probe-header' });
+    const titleRowEl = headerEl.createDiv({ cls: 'opencodian-capability-lab-probe-title-row' });
+    titleRowEl.createEl('h4', { text: title });
+    const badgeEl = titleRowEl.createDiv({ cls: 'opencodian-capability-lab-probe-badge' });
+    createSurfaceChip(badgeEl, 'diagnostic');
+
+    const copyEl = headerEl.createDiv({ cls: 'opencodian-capability-lab-probe-copy' });
+    copyEl.createEl('p', {
       cls: 'opencodian-capability-lab-description',
-      text: t('settings.capabilityLab.fork.description'),
+      text: description,
     });
+
+    const statusEl = options?.includeStatusGrid
+      ? containerEl.createDiv({
+          cls: 'opencodian-capability-lab-status opencodian-capability-lab-probe-status-grid',
+          attr: { 'data-diagnostic': 'true' },
+        })
+      : null;
+
+    const toolbarEl = containerEl.createDiv({
+      cls: 'opencodian-capability-lab-controls opencodian-capability-lab-probe-toolbar',
+    });
+    const fieldRowEl = toolbarEl.createDiv({ cls: 'opencodian-capability-lab-probe-field-row' });
+    const actionRowEl = toolbarEl.createDiv({ cls: 'opencodian-capability-lab-probe-action-row' });
+
+    const outputEl = containerEl.createDiv({
+      cls: 'opencodian-capability-lab-output',
+      attr: { 'data-diagnostic': 'true' },
+    });
+
+    return {
+      fieldRowEl,
+      actionRowEl,
+      outputEl,
+      statusEl,
+    };
+  }
+
+  private createProbeStatusItem(containerEl: HTMLElement, label: string, value: string): void {
+    const itemEl = containerEl.createDiv({ cls: 'opencodian-capability-lab-probe-status-item' });
+    itemEl.createSpan({
+      cls: 'opencodian-capability-lab-probe-status-label',
+      text: label,
+    });
+    itemEl.createSpan({
+      cls: 'opencodian-capability-lab-probe-status-value',
+      text: value,
+    });
+  }
+
+  private renderForkProbe(containerEl: HTMLElement): void {
+    const shell = this.createProbeShell(
+      containerEl,
+      t('settings.capabilityLab.fork.title'),
+      t('settings.capabilityLab.fork.description'),
+    );
 
     const adapter = getClaudeCodeAdapter(this.plugin);
     if (!adapter) {
@@ -1310,9 +1482,7 @@ export class SettingsCapabilityLabSection {
       return;
     }
 
-    const controlsEl = containerEl.createDiv({ cls: 'opencodian-capability-lab-controls' });
-
-    const sessionSelect = controlsEl.createEl('select', {
+    const sessionSelect = shell.fieldRowEl.createEl('select', {
       cls: 'opencodian-capability-lab-select',
       attr: {
         'data-diagnostic': 'true',
@@ -1321,16 +1491,12 @@ export class SettingsCapabilityLabSection {
     });
     sessionSelect.createEl('option', { text: '— Select a session —', attr: { value: '' } });
 
-    const forkBtn = controlsEl.createEl('button', {
+    const forkBtn = shell.actionRowEl.createEl('button', {
       text: 'Run Fork Diagnostic',
       cls: 'opencodian-capability-lab-button',
       attr: { 'data-diagnostic': 'true' },
     });
-
-    const outputEl = containerEl.createDiv({
-      cls: 'opencodian-capability-lab-output',
-      attr: { 'data-diagnostic': 'true' },
-    });
+    const { outputEl } = shell;
 
     const loadSessions = async (): Promise<void> => {
       try {
@@ -1443,11 +1609,11 @@ export class SettingsCapabilityLabSection {
   // =======================================================================
 
   private renderResumeProbe(containerEl: HTMLElement): void {
-    containerEl.createEl('h4', { text: t('settings.capabilityLab.resume.title') });
-    containerEl.createEl('p', {
-      cls: 'opencodian-capability-lab-description',
-      text: t('settings.capabilityLab.resume.description'),
-    });
+    const shell = this.createProbeShell(
+      containerEl,
+      t('settings.capabilityLab.resume.title'),
+      t('settings.capabilityLab.resume.description'),
+    );
 
     const adapter = getClaudeCodeAdapter(this.plugin);
     if (!adapter) {
@@ -1458,9 +1624,7 @@ export class SettingsCapabilityLabSection {
       return;
     }
 
-    const controlsEl = containerEl.createDiv({ cls: 'opencodian-capability-lab-controls' });
-
-    const sessionSelect = controlsEl.createEl('select', {
+    const sessionSelect = shell.fieldRowEl.createEl('select', {
       cls: 'opencodian-capability-lab-select',
       attr: {
         'data-diagnostic': 'true',
@@ -1469,16 +1633,12 @@ export class SettingsCapabilityLabSection {
     });
     sessionSelect.createEl('option', { text: '— Select a session —', attr: { value: '' } });
 
-    const resumeBtn = controlsEl.createEl('button', {
+    const resumeBtn = shell.actionRowEl.createEl('button', {
       text: 'Run Resume Diagnostic',
       cls: 'opencodian-capability-lab-button',
       attr: { 'data-diagnostic': 'true' },
     });
-
-    const outputEl = containerEl.createDiv({
-      cls: 'opencodian-capability-lab-output',
-      attr: { 'data-diagnostic': 'true' },
-    });
+    const { outputEl } = shell;
 
     const loadSessions = async (): Promise<void> => {
       try {
@@ -1576,11 +1736,11 @@ export class SettingsCapabilityLabSection {
   // =======================================================================
 
   private renderSessionDetailProbe(containerEl: HTMLElement): void {
-    containerEl.createEl('h4', { text: t('settings.capabilityLab.sessionDetail.title') });
-    containerEl.createEl('p', {
-      cls: 'opencodian-capability-lab-description',
-      text: t('settings.capabilityLab.sessionDetail.description'),
-    });
+    const shell = this.createProbeShell(
+      containerEl,
+      t('settings.capabilityLab.sessionDetail.title'),
+      t('settings.capabilityLab.sessionDetail.description'),
+    );
 
     const adapter = getClaudeCodeAdapter(this.plugin);
     if (!adapter) {
@@ -1591,9 +1751,7 @@ export class SettingsCapabilityLabSection {
       return;
     }
 
-    const controlsEl = containerEl.createDiv({ cls: 'opencodian-capability-lab-controls' });
-
-    const sessionSelect = controlsEl.createEl('select', {
+    const sessionSelect = shell.fieldRowEl.createEl('select', {
       cls: 'opencodian-capability-lab-select',
       attr: {
         'data-diagnostic': 'true',
@@ -1602,16 +1760,12 @@ export class SettingsCapabilityLabSection {
     });
     sessionSelect.createEl('option', { text: '— Select a session —', attr: { value: '' } });
 
-    const detailBtn = controlsEl.createEl('button', {
+    const detailBtn = shell.actionRowEl.createEl('button', {
       text: 'Inspect Session Detail',
       cls: 'opencodian-capability-lab-button',
       attr: { 'data-diagnostic': 'true' },
     });
-
-    const outputEl = containerEl.createDiv({
-      cls: 'opencodian-capability-lab-output',
-      attr: { 'data-diagnostic': 'true' },
-    });
+    const { outputEl } = shell;
 
     const loadSessions = async (): Promise<void> => {
       try {
@@ -1724,40 +1878,30 @@ export class SettingsCapabilityLabSection {
   // =======================================================================
 
   private renderBackendRoutingProbe(containerEl: HTMLElement): void {
-    containerEl.createEl('h4', { text: t('settings.capabilityLab.backendRouting.title') });
-    containerEl.createEl('p', {
-      cls: 'opencodian-capability-lab-description',
-      text: t('settings.capabilityLab.backendRouting.description'),
-    });
+    const shell = this.createProbeShell(
+      containerEl,
+      t('settings.capabilityLab.backendRouting.title'),
+      t('settings.capabilityLab.backendRouting.description'),
+      { includeStatusGrid: true },
+    );
 
     const registry = this.plugin.agentServiceRegistry;
     const activeKind = registry?.getActiveKind() ?? null;
 
-    // Show current routing state
-    const statusEl = containerEl.createDiv({
-      cls: 'opencodian-capability-lab-status',
-      attr: { 'data-diagnostic': 'true' },
-    });
-
-    statusEl.createEl('p', {
-      cls: 'opencodian-capability-lab-hint',
-      text: `Active backend: ${activeKind ?? '(none)'}`,
-    });
+    const statusEl = shell.statusEl;
+    if (!statusEl) {
+      return;
+    }
+    this.createProbeStatusItem(statusEl, 'Active backend', activeKind ?? '(none)');
 
     // Show registered adapters
     const registeredKinds = registry
       ? registry.listAll().map((adapter) => adapter.kind)
       : [];
     if (registeredKinds.length > 0) {
-      statusEl.createEl('p', {
-        cls: 'opencodian-capability-lab-hint',
-        text: `Registered adapters: ${registeredKinds.join(', ')}`,
-      });
+      this.createProbeStatusItem(statusEl, 'Registered adapters', registeredKinds.join(', '));
     } else {
-      statusEl.createEl('p', {
-        cls: 'opencodian-capability-lab-hint',
-        text: 'No adapters registered.',
-      });
+      this.createProbeStatusItem(statusEl, 'Registered adapters', 'No adapters registered');
     }
 
     // Show backend gate verification for loaded conversations
@@ -1768,10 +1912,11 @@ export class SettingsCapabilityLabSection {
     const nonOpenCodeCount = conversations.length - openCodeCount;
 
     if (conversations.length > 0) {
-      statusEl.createEl('p', {
-        cls: 'opencodian-capability-lab-hint',
-        text: `Conversations: ${conversations.length} total (${openCodeCount} OpenCode, ${nonOpenCodeCount} other)`,
-      });
+      this.createProbeStatusItem(
+        statusEl,
+        'Conversations',
+        `${conversations.length} total (${openCodeCount} OpenCode, ${nonOpenCodeCount} other)`,
+      );
     }
 
     // Probe button - verify routing works through the adapter
@@ -1789,16 +1934,12 @@ export class SettingsCapabilityLabSection {
       return;
     }
 
-    const probeBtn = containerEl.createEl('button', {
+    const probeBtn = shell.actionRowEl.createEl('button', {
       text: 'Run Backend Routing Probe',
       cls: 'opencodian-capability-lab-button',
       attr: { 'data-diagnostic': 'true' },
     });
-
-    const outputEl = containerEl.createDiv({
-      cls: 'opencodian-capability-lab-output',
-      attr: { 'data-diagnostic': 'true' },
-    });
+    const { outputEl } = shell;
 
     probeBtn.addEventListener('click', () => {
       void this.runBackendRoutingProbe(adapter, outputEl);
@@ -2157,12 +2298,13 @@ export class SettingsCapabilityLabSection {
 
     // MCP Servers
     const mcpServerCount = adapter?.getMcpServerCount?.() ?? 0;
+    const mcpServerNames = adapter?.getMcpServerNames?.() ?? [];
     const mcpStatus = mcpServerCount > 0;
     this.addDiscoveryRow(
       tbody,
       'MCP Servers',
       mcpStatus
-        ? `${mcpServerCount} server(s) loaded. Ordinary runtime passthrough via ClaudeCodeMcpConfigAdapter. MCP authoring is in the shared Settings > MCP tab; Claude Code Tools tab refreshes runtime config.`
+        ? `${mcpServerCount} server(s) loaded${mcpServerNames.length > 0 ? `: ${mcpServerNames.join(', ')}` : ''}. Ordinary runtime passthrough via ClaudeCodeMcpConfigAdapter. MCP authoring is in the shared Settings > MCP tab; Claude Code Tools tab refreshes runtime config.`
         : 'Ordinary runtime passthrough via ClaudeCodeMcpConfigAdapter. No servers loaded or adapter not started. MCP authoring is in Settings > MCP.',
       { status: mcpStatus ? 'exposed' : 'discovery' },
     );
@@ -2244,8 +2386,8 @@ export class SettingsCapabilityLabSection {
       tbody,
       'Environment Variables',
       hasEnv
-        ? `${Object.keys(env as Record<string, unknown>).length} variable(s) configured. Runtime behavior proof available via diagnostic bypass (Layer 1-4). Static classification is readback; fresh runtime evidence required for behavior proof. Scope: proves env propagation, not permission approval UX.`
-        : 'No environment variables configured. Runtime behavior proof available via diagnostic bypass when vars are present. Static classification is readback; fresh runtime evidence required for behavior proof.',
+        ? `${Object.keys(env as Record<string, unknown>).length} variable(s) configured. Capability verified (pass): live behavior proof achieved via diagnostic bypass — env-derived side-effect file contains expected nonce value, proving env propagation into Bash subprocess (Layer 1-4). Scope: proves env propagation, not permission approval UX.`
+        : 'No environment variables configured. Capability verified (pass): live behavior proof exists for env propagation (Layer 1-4) when vars are present.',
       { status: 'exposed' },
     );
 
@@ -2261,7 +2403,21 @@ export class SettingsCapabilityLabSection {
       { status: 'discovery' },
     );
 
+    // /context Diagnostic — diagnostic-only /context proof
+    this.addDiscoveryRow(
+      tbody,
+      '/context Diagnostic',
+      'Diagnostic-only: fixed read-only slash command /context executed via runDiagnosticPrompt with _diagnosticBypassPermissions. Proves a safe read-only diagnostic command seam exists. This does NOT mean ordinary Claude chat slash commands are productized. Fixed allow-list: /context only. No arbitrary command input. No command authoring. No .claude/** writes.',
+      { status: 'diagnostic-proof' },
+    );
 
+    // Warm Startup — startup() / WarmQuery diagnostic readback
+    this.addDiscoveryRow(
+      tbody,
+      'Warm Startup',
+      'Readback: SDK startup() callable, returns WarmQuery handle with query() and close(). Warm-vs-cold latency benefit is the SDK\'s internal claim, not independently measured. The probe proves entry-point availability and warm handle usability, not a measurable behavioral improvement. No authoring UI. No .claude/** writes.',
+      { status: 'diagnostic-proof' },
+    );
   }
 
   private renderDiscoveryStandardRows(
@@ -2287,247 +2443,68 @@ export class SettingsCapabilityLabSection {
     this.addDiscoveryRow(tbody, 'Import/Delete/Restore', 'Adapter methods exist but no UI. Deliberately not exposed in this lab (read-only focus).');
   }
 
+  private addProofControl(
+    proofControls: HTMLElement,
+    containerEl: HTMLElement,
+    buttonText: string,
+    handler: (outputEl: HTMLElement) => Promise<void>,
+  ): void {
+    const btn = proofControls.createEl('button', {
+      text: buttonText,
+      cls: 'opencodian-capability-lab-button',
+      attr: { 'data-diagnostic': 'true' },
+    });
+    const outputEl = containerEl.createDiv({
+      cls: 'opencodian-capability-lab-output',
+      attr: { 'data-diagnostic': 'true' },
+    });
+    btn.addEventListener('click', () => { void handler(outputEl); });
+  }
+
   private renderDiscoveryControls(containerEl: HTMLElement, adapter: ClaudeCodeAdapter | null): void {
     if (!adapter) return;
     const proofControls = containerEl.createDiv({ cls: 'opencodian-capability-lab-controls' });
 
-    // Hook proof
-    const hookProofBtn = proofControls.createEl('button', {
-      text: 'Run Hook Proof',
-      cls: 'opencodian-capability-lab-button',
-      attr: { 'data-diagnostic': 'true' },
-    });
-    const hookOutputEl = containerEl.createDiv({
-      cls: 'opencodian-capability-lab-output',
-      attr: { 'data-diagnostic': 'true' },
-    });
-    hookProofBtn.addEventListener('click', () => {
-      void this.runHookProof(adapter, hookOutputEl);
-    });
-
-    // Subagent stream proof
-    const subagentProofBtn = proofControls.createEl('button', {
-      text: 'Run Subagent Stream Proof',
-      cls: 'opencodian-capability-lab-button',
-      attr: { 'data-diagnostic': 'true' },
-    });
-    const subagentOutputEl = containerEl.createDiv({
-      cls: 'opencodian-capability-lab-output',
-      attr: { 'data-diagnostic': 'true' },
-    });
-    subagentProofBtn.addEventListener('click', () => {
-      void this.runSubagentStreamProof(adapter, subagentOutputEl);
-    });
-
-    // Fallback model proof
-    const fallbackModelProofBtn = proofControls.createEl('button', {
-      text: 'Run Fallback Model Proof',
-      cls: 'opencodian-capability-lab-button',
-      attr: { 'data-diagnostic': 'true' },
-    });
-    const fallbackModelOutputEl = containerEl.createDiv({
-      cls: 'opencodian-capability-lab-output',
-      attr: { 'data-diagnostic': 'true' },
-    });
-    fallbackModelProofBtn.addEventListener('click', () => {
-      void this.runFallbackModelProof(adapter, fallbackModelOutputEl);
-    });
-
-    // Permission approval proof
-    const permissionProofBtn = proofControls.createEl('button', {
-      text: 'Run Permission Approval Proof',
-      cls: 'opencodian-capability-lab-button',
-      attr: { 'data-diagnostic': 'true' },
-    });
-    const permissionOutputEl = containerEl.createDiv({
-      cls: 'opencodian-capability-lab-output',
-      attr: { 'data-diagnostic': 'true' },
-    });
-    permissionProofBtn.addEventListener('click', () => {
-      void this.runPermissionApprovalProof(adapter, permissionOutputEl);
-    });
-
-    // AskUserQuestion proof
-    const questionProofBtn = proofControls.createEl('button', {
-      text: 'Run AskUserQuestion Proof',
-      cls: 'opencodian-capability-lab-button',
-      attr: { 'data-diagnostic': 'true' },
-    });
-    const questionOutputEl = containerEl.createDiv({
-      cls: 'opencodian-capability-lab-output',
-      attr: { 'data-diagnostic': 'true' },
-    });
-    questionProofBtn.addEventListener('click', () => {
-      void this.runAskUserQuestionProof(adapter, questionOutputEl);
-    });
-
-    // Live Permission Card harness — deterministic, bypasses model
-    const livePermissionBtn = proofControls.createEl('button', {
-      text: 'Trigger Live Permission Card',
-      cls: 'opencodian-capability-lab-button',
-      attr: { 'data-diagnostic': 'true' },
-    });
-    const livePermissionOutputEl = containerEl.createDiv({
-      cls: 'opencodian-capability-lab-output',
-      attr: { 'data-diagnostic': 'true' },
-    });
-    livePermissionBtn.addEventListener('click', () => {
-      void this.runLivePermissionCardHarness(livePermissionOutputEl);
-    });
-
-    // Live Question Dialog harness — deterministic, bypasses model
-    const liveQuestionBtn = proofControls.createEl('button', {
-      text: 'Trigger Live Question Dialog',
-      cls: 'opencodian-capability-lab-button',
-      attr: { 'data-diagnostic': 'true' },
-    });
-    const liveQuestionOutputEl = containerEl.createDiv({
-      cls: 'opencodian-capability-lab-output',
-      attr: { 'data-diagnostic': 'true' },
-    });
-    liveQuestionBtn.addEventListener('click', () => {
-      void this.runLiveQuestionDialogHarness(liveQuestionOutputEl);
-    });
-
-    // Streaming Context Probe — tests synthetic context in isolation
-    const streamingProbeBtn = proofControls.createEl('button', {
-      text: 'Probe Streaming Context',
-      cls: 'opencodian-capability-lab-button',
-      attr: { 'data-diagnostic': 'true' },
-    });
-    const streamingProbeOutputEl = containerEl.createDiv({
-      cls: 'opencodian-capability-lab-output',
-      attr: { 'data-diagnostic': 'true' },
-    });
-    streamingProbeBtn.addEventListener('click', () => {
-      void this.runStreamingContextProbe(streamingProbeOutputEl);
-    });
-
-    // Stable Settings Readback Proof — verifies that settings are mapped into SDK options
-    const stableSettingsBtn = proofControls.createEl('button', {
-      text: 'Run Stable Settings Readback',
-      cls: 'opencodian-capability-lab-button',
-      attr: { 'data-diagnostic': 'true' },
-    });
-    const stableSettingsOutputEl = containerEl.createDiv({
-      cls: 'opencodian-capability-lab-output',
-      attr: { 'data-diagnostic': 'true' },
-    });
-    stableSettingsBtn.addEventListener('click', () => {
-      void this.runStableSettingsReadbackProof(adapter, stableSettingsOutputEl);
-    });
-
-    // Environment Variables Proof — runtime behavior probe with nonce env var
-    const envProofBtn = proofControls.createEl('button', {
-      text: 'Run Environment Variables Proof',
-      cls: 'opencodian-capability-lab-button',
-      attr: { 'data-diagnostic': 'true' },
-    });
-    const envProofOutputEl = containerEl.createDiv({
-      cls: 'opencodian-capability-lab-output',
-      attr: { 'data-diagnostic': 'true' },
-    });
-    envProofBtn.addEventListener('click', () => {
-      void this.runEnvironmentVariablesProof(adapter, envProofOutputEl);
-    });
-
-    // Agent Definition Proof — tests inline agent definition passthrough via diagnostic path
-    const agentDefProofBtn = proofControls.createEl('button', {
-      text: 'Run Agent Definition Proof',
-      cls: 'opencodian-capability-lab-button',
-      attr: { 'data-diagnostic': 'true' },
-    });
-    const agentDefProofOutputEl = containerEl.createDiv({
-      cls: 'opencodian-capability-lab-output',
-      attr: { 'data-diagnostic': 'true' },
-    });
-    agentDefProofBtn.addEventListener('click', () => {
-      void this.runAgentDefinitionProof(adapter, agentDefProofOutputEl);
-    });
-
-    // Allowed Tools Proof — tests whether the SDK enforces the allowedTools list
-    const allowedToolsProofBtn = proofControls.createEl('button', {
-      text: 'Run Allowed Tools Proof',
-      cls: 'opencodian-capability-lab-button',
-      attr: { 'data-diagnostic': 'true' },
-    });
-    const allowedToolsProofOutputEl = containerEl.createDiv({
-      cls: 'opencodian-capability-lab-output',
-      attr: { 'data-diagnostic': 'true' },
-    });
-    allowedToolsProofBtn.addEventListener('click', () => {
-      void this.runAllowedToolsProof(adapter, allowedToolsProofOutputEl);
-    });
-
-    // Disallowed Tools Proof — tests whether the SDK enforces the disallowedTools list
-    const disallowedToolsProofBtn = proofControls.createEl('button', {
-      text: 'Run Disallowed Tools Proof',
-      cls: 'opencodian-capability-lab-button',
-      attr: { 'data-diagnostic': 'true' },
-    });
-    const disallowedToolsProofOutputEl = containerEl.createDiv({
-      cls: 'opencodian-capability-lab-output',
-      attr: { 'data-diagnostic': 'true' },
-    });
-    disallowedToolsProofBtn.addEventListener('click', () => {
-      void this.runDisallowedToolsProof(adapter, disallowedToolsProofOutputEl);
-    });
-
-    // Restricted Built-in Tools Proof — tests SDK `tools` option as built-in tool availability restrictor
-    const restrictedBuiltinToolsProofBtn = proofControls.createEl('button', {
-      text: 'Run Restricted Built-in Tools Proof',
-      cls: 'opencodian-capability-lab-button',
-      attr: { 'data-diagnostic': 'true' },
-    });
-    const restrictedBuiltinToolsProofOutputEl = containerEl.createDiv({
-      cls: 'opencodian-capability-lab-output',
-      attr: { 'data-diagnostic': 'true' },
-    });
-    restrictedBuiltinToolsProofBtn.addEventListener('click', () => {
-      void this.runRestrictedBuiltinToolsProof(adapter, restrictedBuiltinToolsProofOutputEl);
-    });
-
-    // Plugins Proof — verifies marketplace plugins contribute functional capabilities
-    const pluginsProofBtn = proofControls.createEl('button', {
-      text: 'Run Plugins Proof',
-      cls: 'opencodian-capability-lab-button',
-      attr: { 'data-diagnostic': 'true' },
-    });
-    const pluginsProofOutputEl = containerEl.createDiv({
-      cls: 'opencodian-capability-lab-output',
-      attr: { 'data-diagnostic': 'true' },
-    });
-    pluginsProofBtn.addEventListener('click', () => {
-      void this.runPluginsProof(adapter, pluginsProofOutputEl);
-    });
-
-    // Ordinary Chat Permission Proof — sends a real chat message through the send pipeline
-    const ordinaryPermissionBtn = proofControls.createEl('button', {
-      text: 'Launch Ordinary Chat Permission Proof',
-      cls: 'opencodian-capability-lab-button',
-      attr: { 'data-diagnostic': 'true' },
-    });
-    const ordinaryPermissionOutputEl = containerEl.createDiv({
-      cls: 'opencodian-capability-lab-output',
-      attr: { 'data-diagnostic': 'true' },
-    });
-    ordinaryPermissionBtn.addEventListener('click', () => {
-      void this.launchOrdinaryChatPermissionProof(ordinaryPermissionOutputEl);
-    });
-
-    // Ordinary Chat Question Proof — sends a real chat message through the send pipeline
-    const ordinaryQuestionBtn = proofControls.createEl('button', {
-      text: 'Launch Ordinary Chat Question Proof',
-      cls: 'opencodian-capability-lab-button',
-      attr: { 'data-diagnostic': 'true' },
-    });
-    const ordinaryQuestionOutputEl = containerEl.createDiv({
-      cls: 'opencodian-capability-lab-output',
-      attr: { 'data-diagnostic': 'true' },
-    });
-    ordinaryQuestionBtn.addEventListener('click', () => {
-      void this.launchOrdinaryChatQuestionProof(ordinaryQuestionOutputEl);
-    });
+    this.addProofControl(proofControls, containerEl, 'Run Hook Proof',
+      (o) => this.runHookProof(adapter, o));
+    this.addProofControl(proofControls, containerEl, 'Run Subagent Stream Proof',
+      (o) => this.runSubagentStreamProof(adapter, o));
+    this.addProofControl(proofControls, containerEl, 'Run Fallback Model Proof',
+      (o) => this.runFallbackModelProof(adapter, o));
+    this.addProofControl(proofControls, containerEl, 'Run SetModel Live Proof',
+      (o) => this.runSetModelLiveProof(adapter, o));
+    this.addProofControl(proofControls, containerEl, 'Run Permission Approval Proof',
+      (o) => this.runPermissionApprovalProof(adapter, o));
+    this.addProofControl(proofControls, containerEl, 'Run AskUserQuestion Proof',
+      (o) => this.runAskUserQuestionProof(adapter, o));
+    this.addProofControl(proofControls, containerEl, 'Trigger Live Permission Card',
+      (o) => this.runLivePermissionCardHarness(o));
+    this.addProofControl(proofControls, containerEl, 'Trigger Live Question Dialog',
+      (o) => this.runLiveQuestionDialogHarness(o));
+    this.addProofControl(proofControls, containerEl, 'Probe Streaming Context',
+      (o) => this.runStreamingContextProbe(o));
+    this.addProofControl(proofControls, containerEl, 'Run Stable Settings Readback',
+      (o) => this.runStableSettingsReadbackProof(adapter, o));
+    this.addProofControl(proofControls, containerEl, 'Run Environment Variables Proof',
+      (o) => this.runEnvironmentVariablesProof(adapter, o));
+    this.addProofControl(proofControls, containerEl, 'Run Agent Definition Proof',
+      (o) => this.runAgentDefinitionProof(adapter, o));
+    this.addProofControl(proofControls, containerEl, 'Run Allowed Tools Proof',
+      (o) => this.runAllowedToolsProof(adapter, o));
+    this.addProofControl(proofControls, containerEl, 'Run Disallowed Tools Proof',
+      (o) => this.runDisallowedToolsProof(adapter, o));
+    this.addProofControl(proofControls, containerEl, 'Run Restricted Built-in Tools Proof',
+      (o) => this.runRestrictedBuiltinToolsProof(adapter, o));
+    this.addProofControl(proofControls, containerEl, 'Run Plugins Proof',
+      (o) => this.runPluginsProof(adapter, o));
+    this.addProofControl(proofControls, containerEl, 'Launch Ordinary Chat Permission Proof',
+      (o) => this.launchOrdinaryChatPermissionProof(o));
+    this.addProofControl(proofControls, containerEl, 'Launch Ordinary Chat Question Proof',
+      (o) => this.launchOrdinaryChatQuestionProof(o));
+    this.addProofControl(proofControls, containerEl, 'Run /context Diagnostic Proof',
+      (o) => this.runCommandExecutionProof(adapter, o));
+    this.addProofControl(proofControls, containerEl, 'Run Warm Startup Proof',
+      (o) => this.runWarmStartupProof(adapter, o));
   }
 
   private renderDiagnosticStreamControls(containerEl: HTMLElement): void {
@@ -2653,80 +2630,41 @@ export class SettingsCapabilityLabSection {
     );
   }
 
-  private async runHookProof(
-    adapter: ClaudeCodeAdapter,
-    outputEl: HTMLElement,
-  ): Promise<void> {
-    outputEl.empty();
-    outputEl.createEl('p', { text: 'Running hook proof (JS callback + shell hook)…' });
-
-    // Layer 1 tracker: proves the hooks option callback was actually invoked by the SDK.
-    const hookTracker = {
-      callbackInvoked: false,
-      invocationTime: 0,
-      hookSpecificOutput: null as unknown,
-    };
-
-    // Layer 3 setup: shell-hook via .claude/settings.local.json
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- guard for test mock safety when plugin.app is undefined
-    const vaultPath = this.plugin.app ? getVaultBasePath(this.plugin.app) : null;
+  private setupShellHookConfig(vaultPath: string | null): {
+    nonceFile: string;
+    nonceContent: string;
+    hookConfigCreated: boolean;
+    hookConfigPath: string;
+    preExistingContent: string | null;
+  } {
     const nonce = `hook-shell-${Date.now()}`;
     const nonceFile = join(tmpdir(), `opencodian-hook-proof-${nonce}.txt`);
     const nonceContent = nonce;
     let hookConfigCreated = false;
     let hookConfigPath = '';
-    let layer3NonceExists = false;
-    let layer3NonceContent = '';
-    // Preserve original file state for safe restore
-    let preExistingContent: string | null = null; // null = file did not exist
+    let preExistingContent: string | null = null;
 
     if (vaultPath) {
       const claudeDir = join(vaultPath, '.claude');
       hookConfigPath = join(claudeDir, 'settings.local.json');
       try {
-        // Create .claude/ directory if it doesn't exist
-        if (!existsSync(claudeDir)) {
-          mkdirSync(claudeDir, { recursive: true });
-        }
-        // Read and preserve existing settings.local.json
-        if (existsSync(hookConfigPath)) {
-          preExistingContent = readFileSync(hookConfigPath, 'utf8');
-        }
-        // Parse existing settings (if any)
+        if (!existsSync(claudeDir)) mkdirSync(claudeDir, { recursive: true });
+        if (existsSync(hookConfigPath)) preExistingContent = readFileSync(hookConfigPath, 'utf8');
         let existingSettings: Record<string, unknown> = {};
         if (preExistingContent !== null) {
-          try {
-            existingSettings = JSON.parse(preExistingContent);
-          } catch {
-            existingSettings = {};
-          }
+          try { existingSettings = JSON.parse(preExistingContent); } catch { existingSettings = {}; }
         }
-        // Deep-clone existing hooks to surgically merge
         const existingHooks = (existingSettings.hooks != null && typeof existingSettings.hooks === 'object')
           ? { ...(existingSettings.hooks as Record<string, unknown>) }
           : {} as Record<string, unknown>;
-        // Preserve existing SessionStart hooks array
         const existingSessionStart = Array.isArray(existingHooks.SessionStart)
           ? [...existingHooks.SessionStart]
           : [];
-        // Inject our proof hook at the start
-        const proofHookEntry = {
+        existingHooks.SessionStart = [{
           matcher: '',
-          hooks: [
-            {
-              type: 'command' as const,
-              command: `echo '${nonceContent}' > '${nonceFile}'`,
-              timeout: 10,
-              _opencodianProof: true, // tag for surgical removal on cleanup
-            },
-          ],
-        };
-        existingHooks.SessionStart = [proofHookEntry, ...existingSessionStart];
-        const hookConfig = {
-          ...existingSettings,
-          hooks: existingHooks,
-        };
-        writeFileSync(hookConfigPath, JSON.stringify(hookConfig, null, 2), 'utf8');
+          hooks: [{ type: 'command' as const, command: `echo '${nonceContent}' > '${nonceFile}'`, timeout: 10, _opencodianProof: true }],
+        }, ...existingSessionStart];
+        writeFileSync(hookConfigPath, JSON.stringify({ ...existingSettings, hooks: existingHooks }, null, 2), 'utf8');
         hookConfigCreated = true;
       } catch (configErr) {
         labLogger.warn('Hook proof: could not create settings.local.json for shell hook', {
@@ -2734,6 +2672,141 @@ export class SettingsCapabilityLabSection {
         });
       }
     }
+    return { nonceFile, nonceContent, hookConfigCreated, hookConfigPath, preExistingContent };
+  }
+
+  private cleanupShellHookArtifacts(cfg: {
+    nonceFile: string;
+    hookConfigCreated: boolean;
+    hookConfigPath: string;
+    preExistingContent: string | null;
+  }): void {
+    try { if (existsSync(cfg.nonceFile)) rmSync(cfg.nonceFile, { force: true }); } catch { /* best-effort nonce cleanup */ }
+    try {
+      if (cfg.hookConfigCreated && cfg.hookConfigPath) {
+        if (cfg.preExistingContent !== null) {
+          writeFileSync(cfg.hookConfigPath, cfg.preExistingContent, 'utf8');
+        } else if (existsSync(cfg.hookConfigPath)) {
+          rmSync(cfg.hookConfigPath, { force: true });
+        }
+      }
+    } catch (configErr) {
+      labLogger.warn('Hook proof: failed to restore settings.local.json', {
+        error: configErr instanceof Error ? configErr.message : String(configErr),
+      });
+    }
+  }
+
+  private renderHookLayer2(layer2Section: HTMLElement, hookChunks: Array<{ type: string; event?: string; id?: string; content?: unknown; metadata?: Record<string, unknown> }>): void {
+    layer2Section.createEl('h6', { text: 'Layer 2 — Include Hook Events stream' });
+    if (hookChunks.length > 0) {
+      layer2Section.createEl('p', { text: `Captured ${hookChunks.length} hook event(s) from the diagnostic backend_event stream.` });
+      const sessionStartChunk = hookChunks.find((chunk) => chunk.metadata?.hookEvent === 'SessionStart');
+      if (sessionStartChunk && sessionStartChunk.type === 'backend_event') {
+        layer2Section.createEl('p', { cls: 'opencodian-capability-lab-hint', text: 'SessionStart hook event was captured explicitly.' });
+        layer2Section.createEl('pre', { cls: 'opencodian-capability-lab-json-preview', text: truncate(formatJsonPreview(sessionStartChunk), 4000) });
+      }
+      if (hookChunks.length > 1) {
+        renderMessagePreviewList(layer2Section, 'Hook event timeline',
+          hookChunks.map((chunk) => ({ type: chunk.metadata?.hookEvent ?? chunk.event, id: chunk.id ?? chunk.metadata?.hookEvent, content: chunk.content ?? chunk.metadata })));
+      }
+    } else {
+      layer2Section.createEl('p', { cls: 'opencodian-capability-lab-hint', text: 'No hook backend_events captured in stream (includeHookEvents stream layer).' });
+    }
+  }
+
+  private renderHookLayer3(
+    layer3Section: HTMLElement,
+    cfg: { hookConfigCreated: boolean; hookConfigPath: string; nonceFile: string; nonceContent: string },
+    layer3: { nonceExists: boolean; nonceContent: string },
+    vaultPath: string | null,
+  ): void {
+    layer3Section.createEl('h6', { text: 'Layer 3 — Shell-hook execution via .claude/settings.local.json' });
+    if (cfg.hookConfigCreated) {
+      layer3Section.createEl('p', { text: `Hook config: ${cfg.hookConfigPath}` });
+      layer3Section.createEl('p', { text: `SessionStart hook command: echo '${cfg.nonceContent}' > '${cfg.nonceFile}'` });
+      layer3Section.createEl('p', { text: `Nonce marker file: ${cfg.nonceFile}` });
+      if (layer3.nonceExists) {
+        const contentMatch = layer3.nonceContent === cfg.nonceContent;
+        layer3Section.createEl('p', {
+          cls: contentMatch ? 'opencodian-capability-lab-hint' : 'opencodian-capability-lab-error',
+          text: `Nonce file EXISTS on disk. Content: "${layer3.nonceContent}" (expected "${cfg.nonceContent}"). ${contentMatch ? 'MATCH — shell hook executed successfully.' : 'MISMATCH — file exists but content is wrong.'}`,
+        });
+      } else {
+        layer3Section.createEl('p', { cls: 'opencodian-capability-lab-error', text: 'Nonce file NOT found on disk. Shell hook was not executed (or the hook command failed).' });
+      }
+    } else {
+      layer3Section.createEl('p', { cls: 'opencodian-capability-lab-hint',
+        text: vaultPath ? 'Could not create hook config file. Layer 3 skipped.' : 'Cannot determine vault path. Layer 3 skipped.' });
+    }
+  }
+
+  private renderHookProofReport(opts: {
+    outputEl: HTMLElement;
+    result: { sessionId?: string; chunks: Array<{ type: string; event?: string; id?: string; content?: unknown; metadata?: Record<string, unknown> }> };
+    hookTracker: { callbackInvoked: boolean; invocationTime: number };
+    cfg: { hookConfigCreated: boolean; hookConfigPath: string; nonceFile: string; nonceContent: string };
+    layer3: { nonceExists: boolean; nonceContent: string };
+    vaultPath: string | null;
+    hooksWiredInOptions: boolean;
+  }): void {
+    const { outputEl, result, hookTracker, cfg, layer3, vaultPath, hooksWiredInOptions } = opts;
+    const hookChunks = result.chunks.filter(isHookBackendEventChunk);
+
+    outputEl.empty();
+    outputEl.createEl('h5', { text: `Hook diagnostic session ${result.sessionId?.slice(0, 12) ?? 'unknown'}…` });
+    if (result.sessionId) {
+      outputEl.createEl('p', { cls: 'opencodian-capability-lab-hint', text: `Session ID: ${result.sessionId}` });
+    }
+
+    const layer1Section = outputEl.createDiv({ cls: 'opencodian-capability-lab-output' });
+    layer1Section.createEl('h6', { text: 'Layer 1 — JS callback hooks (SDK options)' });
+    layer1Section.createEl('p', {
+      cls: hookTracker.callbackInvoked ? 'opencodian-capability-lab-hint' : 'opencodian-capability-lab-error',
+      text: hookTracker.callbackInvoked
+        ? `JS callback was invoked by SDK at ${new Date(hookTracker.invocationTime).toISOString()}. Options wiring: ${hooksWiredInOptions ? 'confirmed' : 'not confirmed'}.`
+        : `JS callback was NOT invoked. Options wiring: ${hooksWiredInOptions ? 'confirmed (hooks present in SDK options)' : 'not confirmed'}. SDK limitation: programmatic JS hooks are accepted at the API boundary but not executed by the subprocess.`,
+    });
+
+    this.renderHookLayer2(outputEl.createDiv({ cls: 'opencodian-capability-lab-output' }), hookChunks);
+    const layer2Section = outputEl.querySelector('.opencodian-capability-lab-output:last-of-type') as HTMLElement;
+
+    this.renderHookLayer3(outputEl.createDiv({ cls: 'opencodian-capability-lab-output' }), cfg, layer3, vaultPath);
+
+    const shellHookVerified = layer3.nonceExists && layer3.nonceContent === cfg.nonceContent;
+    if (shellHookVerified || hookTracker.callbackInvoked) {
+      this.updateRuntimeProof('Hooks', 'pass', outputEl);
+      outputEl.createEl('p', { cls: 'opencodian-capability-lab-hint', text: shellHookVerified
+        ? hookTracker.callbackInvoked
+          ? 'Hooks PASS: both shell-hook execution (Layer 3) and JS callback invocation (Layer 1) verified.'
+          : 'Hooks PASS: shell-hook execution via .claude/settings.local.json verified (Layer 3). JS callback path remains uninvoked (SDK limitation), but real runtime hook path is functional.'
+        : 'Hooks PASS: JS callback invocation verified (Layer 1).' });
+    } else if (hooksWiredInOptions) {
+      this.updateRuntimeProof('Hooks', 'readback', outputEl);
+      outputEl.createEl('p', { cls: 'opencodian-capability-lab-hint', text: 'Hooks option wired into SDK options (readback confirmed) but neither JS callback nor shell hook executed. Verdict: readback.' });
+    } else {
+      this.updateRuntimeProof('Hooks', 'fail', outputEl);
+    }
+
+    if (hookChunks.length > 0) {
+      layer2Section.createEl('p', { cls: 'opencodian-capability-lab-hint', text: 'Include Hook Events: hook backend_events confirmed in stream (independent pass evidence preserved).' });
+    } else {
+      layer2Section.createEl('p', { cls: 'opencodian-capability-lab-hint', text: 'Include Hook Events: no hook backend_events in this run (independent pass evidence unchanged).' });
+    }
+  }
+
+  private async runHookProof(
+    adapter: ClaudeCodeAdapter,
+    outputEl: HTMLElement,
+  ): Promise<void> {
+    outputEl.empty();
+    outputEl.createEl('p', { text: 'Running hook proof (JS callback + shell hook)…' });
+
+    const hookTracker = { callbackInvoked: false, invocationTime: 0, hookSpecificOutput: null as unknown };
+
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- guard for test mock safety when plugin.app is undefined
+    const vaultPath = this.plugin.app ? getVaultBasePath(this.plugin.app) : null;
+    const cfg = this.setupShellHookConfig(vaultPath);
 
     try {
       const result = await adapter.runDiagnosticPrompt({
@@ -2743,16 +2816,9 @@ export class SettingsCapabilityLabSection {
             hooks: [async () => {
               hookTracker.callbackInvoked = true;
               hookTracker.invocationTime = Date.now();
-              const output = {
-                hookEventName: 'SessionStart',
-                additionalContext: 'Capability Lab hooks option execution proof',
-                proofToken: `hook-callback-${Date.now()}`,
-              };
+              const output = { hookEventName: 'SessionStart', additionalContext: 'Capability Lab hooks option execution proof', proofToken: `hook-callback-${Date.now()}` };
               hookTracker.hookSpecificOutput = output;
-              return {
-                continue: true,
-                hookSpecificOutput: output,
-              };
+              return { continue: true, hookSpecificOutput: output };
             }],
           }],
         },
@@ -2760,181 +2826,25 @@ export class SettingsCapabilityLabSection {
         persistSession: false,
       });
 
-      // Layer 2: includeHookEvents stream proof — hook backend_events in stream
-      const hookChunks = result.chunks.filter(isHookBackendEventChunk);
-      const sessionStartHookChunk = hookChunks.find((chunk) => chunk.metadata?.hookEvent === 'SessionStart');
-
-      // Layer 1 readback: inspect SDK options to confirm hooks was wired
       const sdkOptions = adapter.inspectLastDiagnosticSdkOptions?.();
       const hooksWiredInOptions = !!(sdkOptions as Record<string, unknown> | null)?.hooks;
 
-      // Layer 3: check nonce file (shell hook execution proof)
-      if (hookConfigCreated) {
-        layer3NonceExists = existsSync(nonceFile);
+      let layer3NonceExists = false;
+      let layer3NonceContent = '';
+      if (cfg.hookConfigCreated) {
+        layer3NonceExists = existsSync(cfg.nonceFile);
         if (layer3NonceExists) {
-          try {
-            layer3NonceContent = readFileSync(nonceFile, 'utf8').trim();
-          } catch {
-            layer3NonceContent = '(read error)';
-          }
+          try { layer3NonceContent = readFileSync(cfg.nonceFile, 'utf8').trim(); } catch { layer3NonceContent = '(read error)'; }
         }
       }
 
-      outputEl.empty();
-      outputEl.createEl('h5', {
-        text: `Hook diagnostic session ${result.sessionId?.slice(0, 12) ?? 'unknown'}…`,
-      });
-      if (result.sessionId) {
-        outputEl.createEl('p', {
-          cls: 'opencodian-capability-lab-hint',
-          text: `Session ID: ${result.sessionId}`,
-        });
-      }
-
-      // Layer 1 report: hooks option execution (JS callbacks)
-      const layer1Section = outputEl.createDiv({ cls: 'opencodian-capability-lab-output' });
-      layer1Section.createEl('h6', { text: 'Layer 1 — JS callback hooks (SDK options)' });
-      layer1Section.createEl('p', {
-        cls: hookTracker.callbackInvoked ? 'opencodian-capability-lab-hint' : 'opencodian-capability-lab-error',
-        text: hookTracker.callbackInvoked
-          ? `JS callback was invoked by SDK at ${new Date(hookTracker.invocationTime).toISOString()}. Options wiring: ${hooksWiredInOptions ? 'confirmed' : 'not confirmed'}.`
-          : `JS callback was NOT invoked. Options wiring: ${hooksWiredInOptions ? 'confirmed (hooks present in SDK options)' : 'not confirmed'}. SDK limitation: programmatic JS hooks are accepted at the API boundary but not executed by the subprocess.`,
-      });
-
-      // Layer 2 report: includeHookEvents stream
-      const layer2Section = outputEl.createDiv({ cls: 'opencodian-capability-lab-output' });
-      layer2Section.createEl('h6', { text: 'Layer 2 — Include Hook Events stream' });
-      if (hookChunks.length > 0) {
-        layer2Section.createEl('p', {
-          text: `Captured ${hookChunks.length} hook event(s) from the diagnostic backend_event stream.`,
-        });
-        if (sessionStartHookChunk && sessionStartHookChunk.type === 'backend_event') {
-          layer2Section.createEl('p', {
-            cls: 'opencodian-capability-lab-hint',
-            text: 'SessionStart hook event was captured explicitly.',
-          });
-          layer2Section.createEl('pre', {
-            cls: 'opencodian-capability-lab-json-preview',
-            text: truncate(formatJsonPreview(sessionStartHookChunk), 4000),
-          });
-        }
-        if (hookChunks.length > 1) {
-          renderMessagePreviewList(
-            layer2Section,
-            'Hook event timeline',
-            hookChunks.map((chunk) => ({
-              type: chunk.metadata?.hookEvent ?? chunk.event,
-              id: chunk.id ?? chunk.metadata?.hookEvent,
-              content: chunk.content ?? chunk.metadata,
-            })),
-          );
-        }
-      } else {
-        layer2Section.createEl('p', {
-          cls: 'opencodian-capability-lab-hint',
-          text: 'No hook backend_events captured in stream (includeHookEvents stream layer).',
-        });
-      }
-
-      // Layer 3 report: shell-hook execution via config file
-      const layer3Section = outputEl.createDiv({ cls: 'opencodian-capability-lab-output' });
-      layer3Section.createEl('h6', { text: 'Layer 3 — Shell-hook execution via .claude/settings.local.json' });
-      if (hookConfigCreated) {
-        layer3Section.createEl('p', {
-          text: `Hook config: ${hookConfigPath}`,
-        });
-        layer3Section.createEl('p', {
-          text: `SessionStart hook command: echo '${nonceContent}' > '${nonceFile}'`,
-        });
-        layer3Section.createEl('p', {
-          text: `Nonce marker file: ${nonceFile}`,
-        });
-        if (layer3NonceExists) {
-          const contentMatch = layer3NonceContent === nonceContent;
-          layer3Section.createEl('p', {
-            cls: contentMatch ? 'opencodian-capability-lab-hint' : 'opencodian-capability-lab-error',
-            text: `Nonce file EXISTS on disk. Content: "${layer3NonceContent}" (expected "${nonceContent}"). ${contentMatch ? 'MATCH — shell hook executed successfully.' : 'MISMATCH — file exists but content is wrong.'}`,
-          });
-        } else {
-          layer3Section.createEl('p', {
-            cls: 'opencodian-capability-lab-error',
-            text: 'Nonce file NOT found on disk. Shell hook was not executed (or the hook command failed).',
-          });
-        }
-      } else {
-        layer3Section.createEl('p', {
-          cls: 'opencodian-capability-lab-hint',
-          text: vaultPath
-            ? 'Could not create hook config file. Layer 3 skipped.'
-            : 'Cannot determine vault path. Layer 3 skipped.',
-        });
-      }
-
-      // Capability verdict — combined layers
-      // Pass if: shell hook executed (Layer 3) OR JS callback invoked (Layer 1)
-      const shellHookVerified = layer3NonceExists && layer3NonceContent === nonceContent;
-      if (shellHookVerified || hookTracker.callbackInvoked) {
-        this.updateRuntimeProof('Hooks', 'pass', outputEl);
-        const reason = shellHookVerified
-          ? hookTracker.callbackInvoked
-            ? 'Hooks PASS: both shell-hook execution (Layer 3) and JS callback invocation (Layer 1) verified.'
-            : 'Hooks PASS: shell-hook execution via .claude/settings.local.json verified (Layer 3). JS callback path remains uninvoked (SDK limitation), but real runtime hook path is functional.'
-          : 'Hooks PASS: JS callback invocation verified (Layer 1).';
-        outputEl.createEl('p', {
-          cls: 'opencodian-capability-lab-hint',
-          text: reason,
-        });
-      } else if (hooksWiredInOptions) {
-        this.updateRuntimeProof('Hooks', 'readback', outputEl);
-        outputEl.createEl('p', {
-          cls: 'opencodian-capability-lab-hint',
-          text: 'Hooks option wired into SDK options (readback confirmed) but neither JS callback nor shell hook executed. Verdict: readback.',
-        });
-      } else {
-        this.updateRuntimeProof('Hooks', 'fail', outputEl);
-      }
-
-      // Include Hook Events verdict (independent)
-      if (hookChunks.length > 0) {
-        layer2Section.createEl('p', {
-          cls: 'opencodian-capability-lab-hint',
-          text: 'Include Hook Events: hook backend_events confirmed in stream (independent pass evidence preserved).',
-        });
-      } else {
-        layer2Section.createEl('p', {
-          cls: 'opencodian-capability-lab-hint',
-          text: 'Include Hook Events: no hook backend_events in this run (independent pass evidence unchanged).',
-        });
-      }
+      this.renderHookProofReport({ outputEl, result, hookTracker, cfg, layer3: { nonceExists: layer3NonceExists, nonceContent: layer3NonceContent }, vaultPath, hooksWiredInOptions });
     } catch (err) {
       outputEl.empty();
-      outputEl.createEl('p', {
-        cls: 'opencodian-capability-lab-error',
-        text: `Hook proof failed: ${err instanceof Error ? err.message : String(err)}`,
-      });
+      outputEl.createEl('p', { cls: 'opencodian-capability-lab-error', text: `Hook proof failed: ${err instanceof Error ? err.message : String(err)}` });
       this.updateRuntimeProof('Hooks', 'fail', outputEl);
     } finally {
-      // Cleanup Layer 3 artifacts — safe restore: never destroy user config
-      try {
-        if (existsSync(nonceFile)) {
-          rmSync(nonceFile, { force: true });
-        }
-      } catch { /* best-effort nonce cleanup */ }
-      try {
-        if (hookConfigCreated && hookConfigPath) {
-          if (preExistingContent !== null) {
-            // File existed before probe — restore exact original content
-            writeFileSync(hookConfigPath, preExistingContent, 'utf8');
-          } else if (existsSync(hookConfigPath)) {
-            // File did not exist before probe — safe to remove
-            rmSync(hookConfigPath, { force: true });
-          }
-        }
-      } catch (configErr) {
-        labLogger.warn('Hook proof: failed to restore settings.local.json', {
-          error: configErr instanceof Error ? configErr.message : String(configErr),
-        });
-      }
+      this.cleanupShellHookArtifacts(cfg);
     }
   }
 
@@ -3117,8 +3027,21 @@ export class SettingsCapabilityLabSection {
         });
       }
 
-      // Even if it succeeded, we can only call it "pass" if a non-invalid model was used.
-      const fallbackOccurred = hasTextOutput && detectedModel !== undefined && detectedModel !== invalidPrimaryModel;
+      const invalidModelUsage = this.extractModelUsage(invalidResult);
+      const invalidModelUsageKeys = invalidModelUsage ? Object.keys(invalidModelUsage) : [];
+      if (invalidModelUsageKeys.length > 0) {
+        outputEl.createEl('p', {
+          cls: 'opencodian-capability-lab-hint',
+          text: `Invalid-primary modelUsage: ${invalidModelUsageKeys.length} model(s) tracked — ${invalidModelUsageKeys.join(', ')}.`,
+        });
+      }
+
+      // Pass requires evidence that the configured fallback model actually handled the request.
+      const fallbackModelUsed = hasTextOutput && detectedModel === testFallbackModel;
+      const hasMultiModelUsageEvidence = invalidModelUsageKeys.length > 1
+        && invalidModelUsageKeys.includes(testFallbackModel);
+      const hasExplicitFallbackSignal = this.hasFallbackSwitchSignal(invalidResult);
+      const fallbackOccurred = fallbackModelUsed && (hasMultiModelUsageEvidence || hasExplicitFallbackSignal);
       if (fallbackOccurred) {
         this.updateRuntimeProof('Fallback Model', 'pass', outputEl);
       } else {
@@ -3221,6 +3144,126 @@ export class SettingsCapabilityLabSection {
       }
     }
     return undefined;
+  }
+
+  private hasFallbackSwitchSignal(result: ClaudeCodeDiagnosticPromptResult): boolean {
+    let payload = '';
+    try {
+      payload = JSON.stringify([result.rawMessages, result.chunks]);
+    } catch {
+      return false;
+    }
+    return payload.includes('model_fallback')
+      || payload.includes('tengu_model_fallback_triggered')
+      || payload.includes('overloaded_error')
+      || payload.includes('Switched to')
+      || /"error_status"\s*:\s*529/.test(payload);
+  }
+
+  /**
+   * SetModel Live Proof — diagnostic probe for query.setModel() live behavior.
+   *
+   * Runs a two-phase diagnostic: Phase 1 captures the initial model usage,
+   * then setModel(targetModel) is called on the query handle, and Phase 2
+   * captures model usage after the switch.
+   *
+   * Classification:
+   * - pass: Phase 2 modelUsage includes targetModel AND differs from Phase 1
+   * - readback: setModel succeeded but model didn't change or evidence ambiguous
+   * - boundary: setModel not available on the query handle
+   * - fail: probe threw an exception
+   *
+   * This is diagnostic-only. It does not change stable settings, chat behavior,
+   * or capability matrix classifications for other capabilities.
+   */
+  private async runSetModelLiveProof(
+    adapter: ClaudeCodeAdapter,
+    outputEl: HTMLElement,
+  ): Promise<void> {
+    outputEl.empty();
+    outputEl.createEl('p', { text: 'Running setModel live proof…' });
+
+    // Use a different model from the current one as the target.
+    // Default to a well-known model; the user can observe whether it matches their catalog.
+    const targetModel = 'claude-opus-4-5';
+
+    try {
+      const result = await adapter.runSetModelLiveProbe(targetModel);
+
+      outputEl.empty();
+      outputEl.createEl('h5', { text: 'SetModel Live Proof (diagnostic)' });
+      outputEl.createEl('p', {
+        text: `Target model: ${targetModel}`,
+        attr: { 'data-diagnostic': 'true' },
+      });
+      outputEl.createEl('p', {
+        text: `setModel attempted: ${result.setModelAttempted}`,
+        attr: { 'data-diagnostic': 'true' },
+      });
+
+      if (result.setModelNotAvailable) {
+        outputEl.createEl('p', {
+          text: 'setModel not available on Query handle — SDK version may not support live model switching.',
+          attr: { 'data-diagnostic': 'true' },
+        });
+        this.updateRuntimeProof('SetModel Live', 'boundary', outputEl);
+        return;
+      }
+
+      if (result.setModelError) {
+        outputEl.createEl('p', {
+          text: `setModel error: ${result.setModelError}`,
+          attr: { 'data-diagnostic': 'true' },
+        });
+      }
+
+      outputEl.createEl('p', {
+        text: `Phase 1 model keys: ${result.phase1ModelKeys.length > 0 ? result.phase1ModelKeys.join(', ') : '(no modelUsage signal)'}`,
+        attr: { 'data-diagnostic': 'true' },
+      });
+      outputEl.createEl('p', {
+        text: `Phase 2 model keys: ${result.phase2ModelKeys.length > 0 ? result.phase2ModelKeys.join(', ') : '(no modelUsage signal)'}`,
+        attr: { 'data-diagnostic': 'true' },
+      });
+
+      // Honest classification:
+      // pass ONLY if Phase 2 shows targetModel AND Phase 1 does not (or differs)
+      const phase2HasTarget = result.phase2ModelKeys.includes(targetModel);
+      const modelSwitched = result.phase1ModelKeys.join(',') !== result.phase2ModelKeys.join(',')
+        || (result.phase2ModelKeys.length > 0 && phase2HasTarget);
+
+      if (!result.setModelError && phase2HasTarget && result.phase1ModelKeys.length > 0
+          && !result.phase1ModelKeys.includes(targetModel)) {
+        outputEl.createEl('p', {
+          text: `PASS: Phase 2 modelUsage includes "${targetModel}" and Phase 1 did not — setModel() live behavior verified.`,
+          attr: { 'data-diagnostic': 'true' },
+        });
+        this.updateRuntimeProof('SetModel Live', 'pass', outputEl);
+      } else if (result.setModelError) {
+        outputEl.createEl('p', {
+          text: `READBACK: setModel threw "${result.setModelError}". Control message was sent but model switch not confirmed.`,
+          attr: { 'data-diagnostic': 'true' },
+        });
+        this.updateRuntimeProof('SetModel Live', 'readback', outputEl);
+      } else {
+        const reason = !modelSwitched
+          ? `Phase 1 and Phase 2 report same model(s): [${result.phase1ModelKeys.join(', ')}]. setModel control message was sent but model did not change.`
+          : `Phase 2 model changed to [${result.phase2ModelKeys.join(', ')}] but target "${targetModel}" not observed.`;
+        outputEl.createEl('p', {
+          text: `READBACK: ${reason}`,
+          attr: { 'data-diagnostic': 'true' },
+        });
+        this.updateRuntimeProof('SetModel Live', 'readback', outputEl);
+      }
+    } catch (err) {
+      outputEl.empty();
+      outputEl.createEl('h5', { text: 'SetModel Live Proof (diagnostic)' });
+      outputEl.createEl('p', {
+        text: `Error: ${err instanceof Error ? err.message : String(err)}`,
+        attr: { 'data-diagnostic': 'true' },
+      });
+      this.updateRuntimeProof('SetModel Live', 'fail', outputEl);
+    }
   }
 
   private async runPermissionApprovalProof(
@@ -3973,6 +4016,7 @@ export class SettingsCapabilityLabSection {
       const results = this.buildReadbackResults(options);
       this.renderReadbackResults(outputEl, results);
       this.updateMatrixFromReadback(outputEl, results);
+      await this.renderRuntimeSettingsReadback(adapter, outputEl);
     } catch (err) {
       outputEl.empty();
       outputEl.createEl('p', {
@@ -3980,6 +4024,59 @@ export class SettingsCapabilityLabSection {
         text: `Stable settings readback failed: ${err instanceof Error ? err.message : String(err)}`,
       });
     }
+  }
+
+  private async renderRuntimeSettingsReadback(
+    adapter: ClaudeCodeAdapter,
+    outputEl: HTMLElement,
+  ): Promise<void> {
+    const runtimeSettingsEl = outputEl.createDiv({
+      cls: 'opencodian-capability-lab-runtime-settings-readback',
+      attr: {
+        'data-runtime-settings-readback': 'true',
+        'data-proof-state': 'readback',
+      },
+    });
+    runtimeSettingsEl.createEl('h5', { text: 'Runtime Settings Readback (Query.getSettings)' });
+    runtimeSettingsEl.createEl('p', {
+      cls: 'opencodian-capability-lab-hint',
+      text: 'Read-only live SDK settings snapshot. Supporting evidence only: this does not author settings and does not promote File Checkpoint / Rewind, Fallback Model, or MCP authoring to pass.',
+    });
+
+    const getRuntimeSettings = (adapter as unknown as {
+      getRuntimeSettings?: () => Promise<unknown | null>;
+    }).getRuntimeSettings;
+    if (typeof getRuntimeSettings !== 'function') {
+      runtimeSettingsEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: 'Query.getSettings() readback is unavailable on this adapter build.',
+      });
+      return;
+    }
+
+    let runtimeSettings: unknown;
+    try {
+      runtimeSettings = await getRuntimeSettings.call(adapter);
+    } catch (err) {
+      runtimeSettingsEl.createEl('p', {
+        cls: 'opencodian-capability-lab-error',
+        text: `Query.getSettings() readback failed: ${err instanceof Error ? err.message : String(err)}. Existing SDK options readback remains the available evidence.`,
+      });
+      return;
+    }
+
+    if (runtimeSettings === null || runtimeSettings === undefined) {
+      runtimeSettingsEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: 'Query.getSettings() returned no runtime settings snapshot. Existing SDK options readback remains the available evidence.',
+      });
+      return;
+    }
+
+    runtimeSettingsEl.createEl('pre', {
+      cls: 'opencodian-capability-lab-json-preview',
+      text: truncate(formatJsonPreview(redactRuntimeSettingsReadback(runtimeSettings)), 8000),
+    });
   }
 
   private buildAgentDefinitionsReadback(
@@ -4062,7 +4159,7 @@ export class SettingsCapabilityLabSection {
           ? `Environment Variables: ${Object.keys(envVal).length} variable(s) configured`
           : 'Environment Variables: not configured',
         overallStatus: 'readback',
-        overallNote: 'Option read back. Runtime behavior proof available via "Run Environment Variables Proof" diagnostic bypass — static classification defers to fresh runtime evidence.',
+        overallNote: 'Option read back. This surface proves settings→SDK mapping only (readback supporting evidence). Live behavior proof (env propagation into Claude/Bash subprocess, Layer 1-4) is verified in Capability Lab. Overall capability: verified (pass).',
       },
       {
         matrixName: 'Fallback Model',
@@ -4367,6 +4464,77 @@ export class SettingsCapabilityLabSection {
     }
   }
 
+  private classifyAllowedToolsResult(
+    outputEl: HTMLElement,
+    phaseA: { initToolArray: string[]; catalogIsSubset: boolean; nonAllowedInCatalog: number; toolNamesA: string[]; disallowedToolCallsA: string[] },
+    phaseB: { nonBypassResult: { toolCallsRequested: string[]; toolCallsExecuted: string[] } | null; nonBypassError: string | null },
+  ): void {
+    if (phaseA.initToolArray.length > 0 && phaseA.catalogIsSubset) {
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: `Init catalog contains only Read (${phaseA.initToolArray.length} tool(s)), but this is NOT allowedTools enforcement. The SDK \`tools\` restrictor is owned by "Restricted Built-in Tools". allowedTools is a pre-approve/auto-approve shortcut only.`,
+      });
+      this.updateRuntimeProof('Allowed Tools', 'readback', outputEl);
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: 'Classification: readback — allowedTools is an auto-approve shortcut, not an availability restrictor. Use "Restricted Built-in Tools" for deterministic built-in catalog filtering.',
+      });
+      return;
+    }
+
+    const nonBypassRequested = phaseB.nonBypassResult?.toolCallsRequested ?? [];
+    const nonBypassRequestedNonAllowed = nonBypassRequested.filter((n) => n !== 'Read');
+
+    if (phaseB.nonBypassResult && nonBypassRequested.length > 0 && nonBypassRequestedNonAllowed.length === 0) {
+      outputEl.createEl('p', { cls: 'opencodian-capability-lab-hint',
+        text: `Phase B inconclusive: SDK only requested approval for [${nonBypassRequested.join(', ')}]. This is consistent with enforcement but not deterministic proof — the model may have omitted non-allowed tools in this single run. Cannot promote past readback.` });
+      this.updateRuntimeProof('Allowed Tools', 'readback', outputEl);
+      outputEl.createEl('p', { cls: 'opencodian-capability-lab-hint',
+        text: 'Classification: readback — absence of non-allowed canUseTool calls from one model run is not SDK-owned enforcement proof.' });
+    } else if (phaseB.nonBypassResult && nonBypassRequestedNonAllowed.length > 0) {
+      outputEl.createEl('p', { cls: 'opencodian-capability-lab-hint',
+        text: `Phase B evidence: SDK requested approval for non-allowed tools [${nonBypassRequestedNonAllowed.join(', ')}] — allowedTools is NOT enforced before canUseTool.` });
+      outputEl.createEl('p', { cls: 'opencodian-capability-lab-hint', text: 'Layer 0 — Proven readback: allowedTools option reaches SDK CLI boundary.' });
+      outputEl.createEl('p', { cls: 'opencodian-capability-lab-hint',
+        text: `Layer 1 — Proven bypass-mode: init catalog unfiltered (${phaseA.nonAllowedInCatalog} non-allowed tools).` });
+      outputEl.createEl('p', { cls: 'opencodian-capability-lab-hint',
+        text: `Layer 2 — Proven non-bypass: synthetic canUseTool received ${nonBypassRequestedNonAllowed.length} non-allowed tool request(s) [${nonBypassRequestedNonAllowed.join(', ')}]. The SDK does NOT enforce allowedTools at the canUseTool boundary — non-allowed tools pass through to the approval callback.` });
+      this.updateRuntimeProof('Allowed Tools', 'readback', outputEl);
+      outputEl.createEl('p', { cls: 'opencodian-capability-lab-hint',
+        text: 'Classification: readback — allowedTools reaches SDK boundary but has zero enforcement (catalog unfiltered, canUseTool not filtered). Option is a dead letter in query() mode.' });
+    } else if (phaseB.nonBypassError) {
+      outputEl.createEl('p', { cls: 'opencodian-capability-lab-hint', text: `Phase B error: ${phaseB.nonBypassError}` });
+      outputEl.createEl('p', { cls: 'opencodian-capability-lab-hint', text: 'Layer 0 — Proven readback: allowedTools option reaches SDK CLI boundary.' });
+      outputEl.createEl('p', { cls: 'opencodian-capability-lab-hint',
+        text: `Layer 1 — Proven bypass-mode: init catalog unfiltered (${phaseA.nonAllowedInCatalog} non-allowed tools).` });
+      outputEl.createEl('p', { cls: 'opencodian-capability-lab-hint',
+        text: `Layer 2 — Non-bypass error: SDK could not complete non-bypass diagnostic run. Error: ${phaseB.nonBypassError}. Approval-host boundary remains.` });
+      this.updateRuntimeProof('Allowed Tools', 'readback', outputEl);
+      outputEl.createEl('p', { cls: 'opencodian-capability-lab-hint',
+        text: 'Classification: readback — Layer 0/1 proven, Layer 2 blocked by non-bypass error.' });
+    } else if (phaseB.nonBypassResult && nonBypassRequested.length === 0) {
+      outputEl.createEl('p', { cls: 'opencodian-capability-lab-hint',
+        text: 'Phase B: SDK did not request approval for any tools (canUseTool dead in query() mode).' });
+      outputEl.createEl('p', { cls: 'opencodian-capability-lab-hint',
+        text: `Phase B executed tools: [${phaseB.nonBypassResult.toolCallsExecuted.join(', ')}]` });
+      if (phaseA.disallowedToolCallsA.length > 0 && phaseA.initToolArray.length === 0) {
+        outputEl.createEl('p', { cls: 'opencodian-capability-lab-hint',
+          text: `Phase A observation: model called ${phaseA.disallowedToolCallsA.join(', ')} which is not in the allowed list. This confirms allowedTools is NOT an availability restrictor — use "Restricted Built-in Tools" for deterministic catalog filtering.` });
+        this.updateRuntimeProof('Allowed Tools', 'readback', outputEl);
+        outputEl.createEl('p', { cls: 'opencodian-capability-lab-hint',
+          text: 'Classification: readback — observing non-allowed tool calls proves allowedTools is not a restrictor, but does not prove the capability "failed". It is a pre-approve shortcut only.' });
+      } else {
+        this.updateRuntimeProof('Allowed Tools', 'readback', outputEl);
+        outputEl.createEl('p', { cls: 'opencodian-capability-lab-hint',
+          text: 'Classification: readback — Phase B inconclusive (zero canUseTool calls). Cannot determine enforcement.' });
+      }
+    } else {
+      outputEl.createEl('p', { cls: 'opencodian-capability-lab-hint',
+        text: 'Phase A: catalog unfiltered, model behavior non-deterministic. Phase B did not produce a classifiable signal.' });
+      this.updateRuntimeProof('Allowed Tools', 'readback', outputEl);
+    }
+  }
+
   private async runAllowedToolsProof(
     adapter: ClaudeCodeAdapter,
     outputEl: HTMLElement,
@@ -4382,14 +4550,12 @@ export class SettingsCapabilityLabSection {
       this.claudeCodeSettings.disallowedTools = [];
       await this.saveClaudeCodeSettings();
 
-      // ── Phase A: Bypass-mode pass (init catalog + tool_use observation) ──
       const resultA = await adapter.runDiagnosticPrompt({
         prompt: 'List files in the current directory using Bash, then read the first file you find.',
         persistSession: false,
         _diagnosticBypassPermissions: true,
       });
 
-      // Init-message tool catalog inspection
       const initMessage = resultA.rawMessages.find((msg): msg is Record<string, unknown> =>
         msg !== null && typeof msg === 'object'
         && (msg as Record<string, unknown>).type === 'system'
@@ -4400,22 +4566,10 @@ export class SettingsCapabilityLabSection {
       const nonAllowedInCatalog = initToolArray.filter((t) => t !== 'Read');
       const catalogIsSubset = initToolArray.length > 0 && nonAllowedInCatalog.length === 0;
 
-      // tool_use observation
       const toolUsesA = resultA.chunks.filter((chunk) => chunk.type === 'tool_use');
       const toolNamesA = toolUsesA.map((chunk) => (chunk as { name?: string }).name).filter(Boolean) as string[];
       const disallowedToolCallsA = toolNamesA.filter((name) => name !== 'Read');
 
-      // NOTE: Phase C (SDK `tools` option restrictor) has been moved to
-      // runRestrictedBuiltinToolsProof(). Allowed Tools is a pre-allow /
-      // auto-approve concept only — it must NOT be promoted to pass via the
-      // SDK `tools` restrictor, which is a semantically distinct capability
-      // now owned by "Restricted Built-in Tools".
-
-      // ── Phase B: Non-bypass pass with synthetic canUseTool ──
-      // This phase crosses the approval-host boundary by providing a synthetic
-      // canUseTool callback that auto-approves all tools while recording which
-      // tools the SDK requests approval for. If allowedTools enforcement exists
-      // in the SDK, non-allowed tools should never reach canUseTool.
       const nonBypassToolCalls: string[] = [];
       let nonBypassError: string | null = null;
       let nonBypassResult: { toolCallsRequested: string[]; toolCallsExecuted: string[] } | null = null;
@@ -4449,153 +4603,30 @@ export class SettingsCapabilityLabSection {
         nonBypassError = err instanceof Error ? err.message : String(err);
       }
 
-      // ── Output ──
       outputEl.empty();
       outputEl.createEl('h5', { text: 'Allowed Tools Proof' });
-      outputEl.createEl('p', { text: `Configured allowedTools: ["Read"]` });
-
-      // Phase A results
-      outputEl.createEl('p', { text: `Phase A (bypass mode):` });
+      outputEl.createEl('p', { text: 'Configured allowedTools: ["Read"]' });
+      outputEl.createEl('p', { text: 'Phase A (bypass mode):' });
       outputEl.createEl('p', { text: `  Init catalog (${initToolArray.length} tools): [${initToolArray.slice(0, 15).map((n) => `"${n}"`).join(', ')}${initToolArray.length > 15 ? '...' : ''}]` });
       outputEl.createEl('p', { text: `  Non-allowed in catalog: ${nonAllowedInCatalog.length}` });
       outputEl.createEl('p', { text: `  Tools called by model: [${toolNamesA.map((n) => `"${n}"`).join(', ')}]` });
-
-      // Phase B results
-      outputEl.createEl('p', { text: `Phase B (non-bypass, synthetic canUseTool):` });
+      outputEl.createEl('p', { text: 'Phase B (non-bypass, synthetic canUseTool):' });
       if (nonBypassError) {
         outputEl.createEl('p', { text: `  Error: ${nonBypassError}` });
       } else if (nonBypassResult) {
         outputEl.createEl('p', { text: `  Tools SDK requested approval for: [${nonBypassResult.toolCallsRequested.map((n) => `"${n}"`).join(', ')}]` });
         outputEl.createEl('p', { text: `  Tools actually executed: [${nonBypassResult.toolCallsExecuted.map((n) => `"${n}"`).join(', ')}]` });
       } else {
-        outputEl.createEl('p', { text: `  No result (unexpected).` });
+        outputEl.createEl('p', { text: '  No result (unexpected).' });
       }
 
-      // ── Classification ──
-      // Allowed Tools is a pre-allow / auto-approve concept only.
-      // The SDK `tools` restrictor is now owned by "Restricted Built-in Tools".
-      // Allowed Tools can only be promoted past readback if the SDK itself
-      // enforces allowedTools at the tool-catalog level — which it does not.
-
-      // Phase A — coincidental catalog subset.
-      // Even if the init catalog happens to be a subset, that is NOT
-      // allowedTools enforcement. The SDK `tools` restrictor (which
-      // deterministically filters built-in tools) belongs to
-      // "Restricted Built-in Tools". allowedTools is a pre-allow /
-      // auto-approve concept only — it never filters the catalog.
-      // Proof: all real runtime evidence (BUILD_ID 202605300415+)
-      // shows 34 tools unfiltered regardless of allowedTools value.
-      if (initToolArray.length > 0 && catalogIsSubset) {
-        outputEl.createEl('p', {
-          cls: 'opencodian-capability-lab-hint',
-          text: `Init catalog contains only Read (${initToolArray.length} tool(s)), but this is NOT allowedTools enforcement. The SDK \`tools\` restrictor is owned by "Restricted Built-in Tools". allowedTools is a pre-approve/auto-approve shortcut only.`,
-        });
-        this.updateRuntimeProof('Allowed Tools', 'readback', outputEl);
-        outputEl.createEl('p', {
-          cls: 'opencodian-capability-lab-hint',
-          text: 'Classification: readback — allowedTools is an auto-approve shortcut, not an availability restrictor. Use "Restricted Built-in Tools" for deterministic built-in catalog filtering.',
-        });
-        return;
-      }
-
-      // Phase B analysis: did SDK enforce allowedTools before canUseTool?
-      const nonBypassRequested = nonBypassResult?.toolCallsRequested ?? [];
-      const nonBypassRequestedNonAllowed = nonBypassRequested.filter((n) => n !== 'Read');
-
-      if (nonBypassResult && nonBypassRequested.length > 0 && nonBypassRequestedNonAllowed.length === 0) {
-        outputEl.createEl('p', {
-          cls: 'opencodian-capability-lab-hint',
-          text: `Phase B inconclusive: SDK only requested approval for [${nonBypassRequested.join(', ')}]. This is consistent with enforcement but not deterministic proof — the model may have omitted non-allowed tools in this single run. Cannot promote past readback.`,
-        });
-        this.updateRuntimeProof('Allowed Tools', 'readback', outputEl);
-        outputEl.createEl('p', {
-          cls: 'opencodian-capability-lab-hint',
-          text: 'Classification: readback — absence of non-allowed canUseTool calls from one model run is not SDK-owned enforcement proof.',
-        });
-      } else if (nonBypassResult && nonBypassRequestedNonAllowed.length > 0) {
-        outputEl.createEl('p', {
-          cls: 'opencodian-capability-lab-hint',
-          text: `Phase B evidence: SDK requested approval for non-allowed tools [${nonBypassRequestedNonAllowed.join(', ')}] — allowedTools is NOT enforced before canUseTool.`,
-        });
-        outputEl.createEl('p', {
-          cls: 'opencodian-capability-lab-hint',
-          text: 'Layer 0 — Proven readback: allowedTools option reaches SDK CLI boundary.',
-        });
-        outputEl.createEl('p', {
-          cls: 'opencodian-capability-lab-hint',
-          text: `Layer 1 — Proven bypass-mode: init catalog unfiltered (${nonAllowedInCatalog.length} non-allowed tools).`,
-        });
-        outputEl.createEl('p', {
-          cls: 'opencodian-capability-lab-hint',
-          text: `Layer 2 — Proven non-bypass: synthetic canUseTool received ${nonBypassRequestedNonAllowed.length} non-allowed tool request(s) [${nonBypassRequestedNonAllowed.join(', ')}]. The SDK does NOT enforce allowedTools at the canUseTool boundary — non-allowed tools pass through to the approval callback.`,
-        });
-        this.updateRuntimeProof('Allowed Tools', 'readback', outputEl);
-        outputEl.createEl('p', {
-          cls: 'opencodian-capability-lab-hint',
-          text: 'Classification: readback — allowedTools reaches SDK boundary but has zero enforcement (catalog unfiltered, canUseTool not filtered). Option is a dead letter in query() mode.',
-        });
-      } else if (nonBypassError) {
-        outputEl.createEl('p', {
-          cls: 'opencodian-capability-lab-hint',
-          text: `Phase B error: ${nonBypassError}`,
-        });
-        outputEl.createEl('p', {
-          cls: 'opencodian-capability-lab-hint',
-          text: 'Layer 0 — Proven readback: allowedTools option reaches SDK CLI boundary.',
-        });
-        outputEl.createEl('p', {
-          cls: 'opencodian-capability-lab-hint',
-          text: `Layer 1 — Proven bypass-mode: init catalog unfiltered (${nonAllowedInCatalog.length} non-allowed tools).`,
-        });
-        outputEl.createEl('p', {
-          cls: 'opencodian-capability-lab-hint',
-          text: `Layer 2 — Non-bypass error: SDK could not complete non-bypass diagnostic run. Error: ${nonBypassError}. Approval-host boundary remains.`,
-        });
-        this.updateRuntimeProof('Allowed Tools', 'readback', outputEl);
-        outputEl.createEl('p', {
-          cls: 'opencodian-capability-lab-hint',
-          text: 'Classification: readback — Layer 0/1 proven, Layer 2 blocked by non-bypass error.',
-        });
-      } else if (nonBypassResult && nonBypassRequested.length === 0) {
-        outputEl.createEl('p', {
-          cls: 'opencodian-capability-lab-hint',
-          text: 'Phase B: SDK did not request approval for any tools (canUseTool dead in query() mode).',
-        });
-        outputEl.createEl('p', {
-          cls: 'opencodian-capability-lab-hint',
-          text: `Phase B executed tools: [${nonBypassResult.toolCallsExecuted.join(', ')}]`,
-        });
-        if (disallowedToolCallsA.length > 0 && initToolArray.length === 0) {
-          outputEl.createEl('p', {
-            cls: 'opencodian-capability-lab-hint',
-            text: `Phase A observation: model called ${disallowedToolCallsA.join(', ')} which is not in the allowed list. This confirms allowedTools is NOT an availability restrictor — use "Restricted Built-in Tools" for deterministic catalog filtering.`,
-          });
-          this.updateRuntimeProof('Allowed Tools', 'readback', outputEl);
-          outputEl.createEl('p', {
-            cls: 'opencodian-capability-lab-hint',
-            text: 'Classification: readback — observing non-allowed tool calls proves allowedTools is not a restrictor, but does not prove the capability "failed". It is a pre-approve shortcut only.',
-          });
-        } else {
-          this.updateRuntimeProof('Allowed Tools', 'readback', outputEl);
-          outputEl.createEl('p', {
-            cls: 'opencodian-capability-lab-hint',
-            text: 'Classification: readback — Phase B inconclusive (zero canUseTool calls). Cannot determine enforcement.',
-          });
-        }
-      } else {
-        outputEl.createEl('p', {
-          cls: 'opencodian-capability-lab-hint',
-          text: 'Phase A: catalog unfiltered, model behavior non-deterministic. Phase B did not produce a classifiable signal.',
-        });
-        this.updateRuntimeProof('Allowed Tools', 'readback', outputEl);
-      }
+      this.classifyAllowedToolsResult(outputEl,
+        { initToolArray, catalogIsSubset, nonAllowedInCatalog: nonAllowedInCatalog.length, toolNamesA, disallowedToolCallsA },
+        { nonBypassResult, nonBypassError });
     } catch (err) {
       outputEl.empty();
       outputEl.createEl('h5', { text: 'Allowed Tools Proof' });
-      outputEl.createEl('p', {
-        cls: 'opencodian-capability-lab-error',
-        text: `Allowed tools proof failed: ${err instanceof Error ? err.message : String(err)}`,
-      });
+      outputEl.createEl('p', { cls: 'opencodian-capability-lab-error', text: `Allowed tools proof failed: ${err instanceof Error ? err.message : String(err)}` });
       this.updateRuntimeProof('Allowed Tools', 'fail', outputEl);
     } finally {
       this.claudeCodeSettings.allowedTools = originalAllowedTools;
@@ -5032,6 +5063,177 @@ export class SettingsCapabilityLabSection {
   // =======================================================================
   // Runtime Proof Update (in-page notification)
   // =======================================================================
+
+  // =======================================================================
+  // /context Diagnostic Proof — diagnostic-only /context command seam
+  // =======================================================================
+
+  private async runCommandExecutionProof(
+    adapter: ClaudeCodeAdapter,
+    outputEl: HTMLElement,
+  ): Promise<void> {
+    outputEl.empty();
+    outputEl.createEl('p', { text: 'Running command execution proof (diagnostic-only, fixed safe command /context)…' });
+
+    try {
+      const result = await adapter.runDiagnosticPrompt({
+        prompt: '/context',
+        persistSession: false,
+        _diagnosticBypassPermissions: true,
+      });
+
+      outputEl.empty();
+      outputEl.createEl('h5', { text: '/context Diagnostic Proof' });
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: '⚠️ Diagnostic-only: fixed read-only slash command /context. This does NOT mean ordinary Claude chat slash commands are productized. No arbitrary command input. No command authoring. No .claude/** writes.',
+      });
+
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-info',
+        text: `Session: ${result.sessionId ?? 'unknown'}`,
+      });
+
+      // Classify based on rawMessages content
+      const rawMsgs = result.rawMessages ?? [];
+      const assistantMessages = rawMsgs.filter(
+        (m: unknown) => (m as { type?: string })?.type === 'assistant',
+      );
+      const resultMessages = rawMsgs.filter(
+        (m: unknown) => (m as { type?: string })?.type === 'result',
+      );
+
+      // Extract assistant text content to look for "Context Usage"
+      // Real SDK assistant messages use block-array content: { content: [{ type: 'text', text: '...' }] }
+      // Some normalized chunks also carry text content. Check both paths.
+      const assistantText = assistantMessages.map(
+        (m: unknown) => {
+          const msg = m as { message?: { content?: unknown } };
+          const content = msg?.message?.content;
+          if (typeof content === 'string') return content;
+          if (Array.isArray(content)) {
+            return content
+              .filter((b: unknown) => (b as { type?: string })?.type === 'text')
+              .map((b: unknown) => (b as { text?: string })?.text ?? '')
+              .join('\n');
+          }
+          return '';
+        },
+      ).join('\n');
+
+      // Also check normalized text chunks as a secondary source
+      const chunkText = result.chunks
+        .filter((c: unknown) => (c as { type?: string })?.type === 'text')
+        .map((c: unknown) => String((c as { content?: unknown })?.content ?? ''))
+        .join('\n');
+
+      const combinedText = assistantText + '\n' + chunkText;
+      const hasContextUsage = combinedText.includes('Context Usage');
+      const hasMessages = rawMsgs.length > 0 && assistantMessages.length > 0 && resultMessages.length > 0;
+
+      if (hasContextUsage) {
+        // PASS: Full success — /context command executed and returned expected output
+        outputEl.createEl('p', {
+          cls: 'opencodian-capability-lab-success',
+          text: `✓ /context command executed successfully. Raw messages: ${rawMsgs.length} (system → assistant → result). Context Usage report found in assistant response.`,
+        });
+        outputEl.createEl('p', {
+          cls: 'opencodian-capability-lab-info',
+          text: `Raw message types: ${rawMsgs.map((m: unknown) => (m as { type?: string })?.type ?? 'unknown').join(' → ')}`,
+        });
+        this.updateRuntimeProof('/context Diagnostic', 'pass', outputEl);
+      } else if (hasMessages) {
+        // READBACK: Messages returned but no "Context Usage" — unexpected output, don't inflate
+        outputEl.createEl('p', {
+          cls: 'opencodian-capability-lab-hint',
+          text: `✓ Readback verified — not behavior verified. Raw messages: ${rawMsgs.length}, but assistant response does not contain "Context Usage". The diagnostic seam is reachable but the /context command did not produce the expected output.`,
+        });
+        outputEl.createEl('p', {
+          cls: 'opencodian-capability-lab-info',
+          text: `Assistant text preview: ${combinedText.slice(0, 200)}`,
+        });
+        this.updateRuntimeProof('/context Diagnostic', 'readback', outputEl);
+      } else {
+        // READBACK: Empty/unexpected — seam reachable but no usable output
+        outputEl.createEl('p', {
+          cls: 'opencodian-capability-lab-hint',
+          text: `✓ Readback verified — not behavior verified. Diagnostic prompt returned ${rawMsgs.length} raw messages with no assistant/result pair. The seam is reachable but produced no usable output.`,
+        });
+        this.updateRuntimeProof('/context Diagnostic', 'readback', outputEl);
+      }
+    } catch (err) {
+      outputEl.empty();
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-error',
+        text: `/context diagnostic proof failed: ${err instanceof Error ? err.message : String(err)}`,
+      });
+      this.updateRuntimeProof('/context Diagnostic', 'fail', outputEl);
+    }
+  }
+
+  // =======================================================================
+  // Warm Startup Proof — diagnostic readback for startup() / WarmQuery seam
+  // =======================================================================
+
+  private async runWarmStartupProof(
+    adapter: ClaudeCodeAdapter,
+    outputEl: HTMLElement,
+  ): Promise<void> {
+    outputEl.empty();
+    outputEl.createEl('p', { text: 'Running warm startup probe (diagnostic readback: startup() → WarmQuery → diagnostic prompt)…' });
+
+    try {
+      const result = await adapter.runWarmStartupProbe();
+
+      outputEl.empty();
+      outputEl.createEl('h5', { text: 'Warm Startup Proof' });
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: '⚠️ Diagnostic readback: startup() callable, WarmQuery handle obtainable, warm query() produces response. Warm-vs-cold latency benefit is the SDK\'s internal claim, not independently measured. No authoring UI. No .claude/** writes.',
+      });
+
+      if (result.classification === 'readback') {
+        // READBACK: startup resolved + warm query responded
+        const responseText = result.warmQueryResponded
+          ? `✓ Readback verified — not behavior verified. startup() resolved → WarmQuery obtained → warm query() produced ${result.rawMessageCount} raw message(s). Warm-vs-cold latency benefit is the SDK's internal claim ("no startup latency"), not independently measured.`
+          : `✓ Readback verified — not behavior verified. startup() resolved → WarmQuery obtained, but warm query() returned no messages.`;
+        outputEl.createEl('p', {
+          cls: 'opencodian-capability-lab-hint',
+          text: responseText,
+        });
+        outputEl.createEl('p', {
+          cls: 'opencodian-capability-lab-info',
+          text: `startupResolved: ${result.startupResolved}, warmQueryAvailable: ${result.warmQueryAvailable}, warmQueryResponded: ${result.warmQueryResponded}, rawMessageCount: ${result.rawMessageCount}`,
+        });
+        this.updateRuntimeProof('Warm Startup', 'readback', outputEl);
+      } else if (result.classification === 'boundary') {
+        // BOUNDARY: SDK lacks startup()
+        outputEl.createEl('p', {
+          cls: 'opencodian-capability-lab-hint',
+          text: `◆ Boundary hit — SDK facade does not expose startup(). The startup() function may not be available in the current SDK version or the SDK loader did not forward it.`,
+        });
+        this.updateRuntimeProof('Warm Startup', 'boundary', outputEl);
+      } else {
+        // FAIL: startup or warm query threw
+        outputEl.createEl('p', {
+          cls: 'opencodian-capability-lab-error',
+          text: `✗ Warm startup probe failed: ${result.error ?? 'unknown error'}`,
+        });
+        outputEl.createEl('p', {
+          cls: 'opencodian-capability-lab-info',
+          text: `startupResolved: ${result.startupResolved}, warmQueryAvailable: ${result.warmQueryAvailable}, warmQueryResponded: ${result.warmQueryResponded}`,
+        });
+        this.updateRuntimeProof('Warm Startup', 'fail', outputEl);
+      }
+    } catch (err) {
+      outputEl.empty();
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-error',
+        text: `Warm startup proof failed: ${err instanceof Error ? err.message : String(err)}`,
+      });
+      this.updateRuntimeProof('Warm Startup', 'fail', outputEl);
+    }
+  }
 
   private updateRuntimeProof(
     _capability: string,

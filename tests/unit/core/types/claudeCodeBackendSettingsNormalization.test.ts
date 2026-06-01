@@ -199,6 +199,59 @@ describe('normalizeClaudeCodeBackendSettings (new fields)', () => {
   });
 });
 
+describe('normalizeClaudeCodeSandboxSettings', () => {
+  it('returns all-false defaults for undefined', () => {
+    const defaults = getDefaultClaudeCodeBackendSettings();
+    expect(defaults.sandbox).toEqual({
+      enabled: false,
+      failIfUnavailable: false,
+      autoAllowBashIfSandboxed: false,
+    });
+  });
+
+  it('returns all-false defaults when sandbox is not an object', () => {
+    const result = normalizeClaudeCodeBackendSettings({ sandbox: 'bad' });
+    expect(result.sandbox).toEqual({
+      enabled: false,
+      failIfUnavailable: false,
+      autoAllowBashIfSandboxed: false,
+    });
+  });
+
+  it('normalizes partial sandbox input, coercing non-booleans to false', () => {
+    const result = normalizeClaudeCodeBackendSettings({
+      sandbox: { enabled: true, failIfUnavailable: 'yes', autoAllowBashIfSandboxed: 1 },
+    });
+    expect(result.sandbox).toEqual({
+      enabled: true,
+      failIfUnavailable: false,
+      autoAllowBashIfSandboxed: false,
+    });
+  });
+
+  it('normalizes full sandbox input', () => {
+    const result = normalizeClaudeCodeBackendSettings({
+      sandbox: { enabled: true, failIfUnavailable: true, autoAllowBashIfSandboxed: true },
+    });
+    expect(result.sandbox).toEqual({
+      enabled: true,
+      failIfUnavailable: true,
+      autoAllowBashIfSandboxed: true,
+    });
+  });
+
+  it('ignores unknown sandbox fields like network or filesystem', () => {
+    const result = normalizeClaudeCodeBackendSettings({
+      sandbox: { enabled: true, network: { allowedDomains: ['example.com'] }, filesystem: { allowWrite: ['/tmp'] } },
+    });
+    expect(result.sandbox).toEqual({
+      enabled: true,
+      failIfUnavailable: false,
+      autoAllowBashIfSandboxed: false,
+    });
+  });
+});
+
 describe('normalizeClaudeCodeDebugChannelSettings', () => {
   it('defines the product debug workbench channel ids in stable order', () => {
     expect(CLAUDE_CODE_DEBUG_CHANNEL_IDS).toEqual([

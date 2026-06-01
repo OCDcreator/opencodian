@@ -1,5 +1,978 @@
 # Claude Code SDK Current State - 2026-05-22
 
+## 2026-06-02 Sandbox — Minimal Readback Seam
+
+### Objective
+
+Implement the smallest honest seam for the Claude Code SDK `sandbox` capability. The SDK `Options.sandbox?: SandboxSettings` accepts sandbox configuration for OS-level process isolation. This batch only exposes three top-level boolean fields: `enabled`, `failIfUnavailable`, `autoAllowBashIfSandboxed`. Network, filesystem, TLS, proxy, and Mach lookup sub-policies are intentionally NOT exposed as stable settings.
+
+### What Changed
+
+- **src/core/types/settings.ts**: Added `ClaudeCodeSandboxSettings` type (enabled, failIfUnavailable, autoAllowBashIfSandboxed), added `sandbox` field to `ClaudeCodeBackendSettings` with honest readback JSDoc, added `normalizeClaudeCodeSandboxSettings` normalizer, updated defaults and normalization pipeline.
+- **src/core/agents/backend/ClaudeCodeOptionsBuilder.ts**: Added `sandbox` to `ClaudeCodeSdkOptionsShape`; wired through `buildClaudeCodeOptions` when `sandbox.enabled` is true. Only truthy fields are included.
+- **src/features/settings/SettingsClaudeCodeSection.ts**: Added sandbox toggles (enabled, failIfUnavailable, autoAllowBashIfSandboxed) to Permissions tab with boundary notice (`data-claude-code-sandbox-boundary`) and next-query lifecycle notice (`data-claude-code-sandbox-lifecycle`). Sandbox settings only apply to the next query, unlike `permissionMode` which tries to live-apply via `setPermissionMode()`.
+- **src/i18n/locales/en.ts + zh.ts**: Sandbox locale strings (boundary notice, lifecycle notice).
+- **tests/**: TDD — RED→GREEN for settings truth audit (JSDoc check), normalization (5 tests), options builder (4 tests), capability lab audit (row count 27→28, readback count 4→5), sandbox UI coverage (5 tests: boundary notice, 3 toggles, no nested editors, lifecycle notice).
+
+### Honesty Boundaries
+
+- Classification: **readback** — SDK option wiring proven (settings propagate through `buildClaudeCodeOptions` into SDK `sandbox` option). OS-level sandbox enforcement (bubblewrap/seccomp/etc.) is the CLI binary's internal claim; the plugin layer cannot independently verify whether the subprocess actually runs sandboxed.
+- No authoring UI, no `.claude/**` writes
+- Network/filesystem/TLS/proxy/Mach lookup sub-policies intentionally NOT exposed
+- Does not inflate readback to pass
+- Does not modify existing warm startup / fallback / allowed tools / checkpoint honesty boundaries
+
+### Matrix
+
+28 rows: 23 pass, 5 readback (File Checkpoint / Rewind, Allowed Tools, Fallback Model, Warm Startup, Sandbox), 0 fail
+
+## 2026-06-02 Session Title — Readback Seam
+
+### Objective
+
+Wire SDK `Options.title?: string` through the existing session title ownership. The SDK accepts a custom session title on the first query, skipping automatic title generation. This seam passes the existing `session.title` (from `createSession(title)`) through `buildClaudeCodeOptions` into the SDK options, only on first query (not resume, per SDK docs).
+
+### What Changed
+
+- **src/core/agents/backend/ClaudeCodeOptionsBuilder.ts**: Added `title?: string` to `ClaudeCodeOptionsBuilderInput` and `ClaudeCodeSdkOptionsShape`. Wired in `buildClaudeCodeOptions` — only passed when non-empty and trimmed.
+- **src/core/agents/backend/ClaudeCodeAdapter.ts**: In `buildSdkOptions`, passes `session.title` as `title` input when the session has no `sdkSessionId` yet (first query only).
+- **src/features/settings/SettingsCapabilityLabSection.ts**: Added Session Title matrix row (#29, readback, diagnostic surface).
+- **tests/**: TDD — RED→GREEN for options builder title (4 tests), capability lab audit (row 28→29, readback 5→6).
+
+### Honesty Boundaries
+
+- Classification: **readback** — option wiring proven (session.title propagates through buildClaudeCodeOptions into SDK options.title). The plugin layer does not independently verify the CLI subprocess accepted and applied the title.
+- No new settings UI — title comes from existing session creation flow
+- No `.claude/**` writes
+- Does not modify existing renameSession / updateSessionTitle / forkSession paths
+
+### Matrix
+
+29 rows: 23 pass, 6 readback, 0 fail
+
+## 2026-06-02 Warm Startup — SDK startup() Diagnostic Readback Seam
+
+### Objective
+
+Implement the smallest honest diagnostic seam for the Claude Code SDK `startup()` / `WarmQuery` capability. The SDK exports a top-level `startup()` function that pre-warms a CLI subprocess (spawns + completes the initialize handshake) and returns a `WarmQuery` handle. `WarmQuery.query(prompt)` sends a prompt to the ready process with zero startup latency (SDK's claim). The probe verifies that `startup()` is callable, returns a usable `WarmQuery` handle, and the warm query produces real messages.
+
+### What Changed
+
+1. **SDK Loader** (`ClaudeCodeSdkLoader.ts`): Added `WarmQueryHandle` interface and `startup` to `ClaudeAgentSdkModule` + facade forwarding.
+2. **Adapter** (`ClaudeCodeAdapter.ts`): Added `runWarmStartupProbe()` method that routes through the diagnostic options pipeline (`buildDiagnosticSdkOptions` with `bypassPermissions` + adapter-owned `vaultPath`, `spawnClaudeCodeProcess`, MCP, etc.), calls `sdk.startup({ options })` with those adapter-owned options, obtains a `WarmQuery` handle, sends a minimal diagnostic prompt, collects raw messages, and returns `WarmStartupProbeResult` with honest classification.
+3. **Capability Lab** (`SettingsCapabilityLabSection.ts`):
+   - Added "Warm Startup" matrix row (#27): `runtimeProof: 'readback'`, `userSurface: 'diagnostic'`
+   - Added discovery row with honest boundary text
+   - Added "Run Warm Startup Proof" button and `runWarmStartupProof()` handler
+
+### Classification: `readback`
+
+- `startup()` callable, `WarmQuery` handle obtainable, `warmQuery.query()` produces real messages.
+- Warm-vs-cold latency benefit is the SDK's internal claim ("no startup latency"), **not independently measured** in this probe.
+- The seam proves entry-point availability and warm handle usability, not a measurable behavioral improvement.
+- If we could independently measure and prove that warm startup measurably reduces first-query latency, that would be `pass`. Until then, `readback` is the honest ceiling.
+
+### TDD
+
+- RED: 5 adapter tests (`runWarmStartupProbe is not a function`) + 4 CapLab tests (button not found + audit row mismatch 26→27) = 9 tests failing.
+- GREEN: 158/158 adapter + 176/176 CapLab = all passing.
+- **Options pipeline fix**: RED test asserted `sdk.startup` called with adapter-owned options (not undefined); confirmed it failed with `startupArg` undefined because `sdk.startup()` was called with no args. GREEN: routed through `buildDiagnosticSdkOptions()` with `bypassPermissions`, producing adapter-owned options with `cwd`, `allowDangerouslySkipPermissions`, `permissionMode`, etc. 159/159 adapter tests pass.
+
+### Honesty Boundaries Preserved
+
+- No authoring UI added
+- No `.claude/**` writes
+- `readback` classification (not inflated to `pass`)
+- Warm-vs-cold latency claim attributed to SDK, not independently verified
+- Warm startup routed through adapter options pipeline, not bare SDK call
+- No change to existing pass/readback boundary for any other capability
+- Matrix: **27 rows, 23 pass, 4 readback** (File Checkpoint / Rewind, Allowed Tools, Fallback Model, Warm Startup)
+
+---
+
+## 2026-06-02 Main Model Live-Apply — Stable Settings Proof-Status Notice
+
+### Objective
+
+Productize the already-proven `setModel()` live-apply seam into the stable Model & Thinking tab as a proof-status notice. The diagnostic probe (`runSetModelLiveProbe()` in Capability Lab) already proves `query.setModel()` works mid-stream on a persistent query. This batch promotes that truth to the product settings surface without overstatement.
+
+### What Changed
+
+1. **`renderMainModelProofStatusNotice()`** in `SettingsClaudeCodeSection.ts`: New compact proof-status notice with `data-claude-code-proof-status="main-model"` and `data-proof-state="pass"`. Rendered in Model & Thinking tab after the model quick-select dropdown.
+2. **i18n keys** added: `settings.claudeCode.proofStatus.mainModel` in both `en.ts` and `zh.ts`. Honest bounded text:
+   - Live model switching has runtime proof when an active persistent query supports `setModel()`
+   - Otherwise the saved model applies to the next query
+   - Does NOT prove fallback model switching
+3. **Test**: New test "renders main-model proof status notice with pass state in model-thinking tab" (75/75 total).
+
+### TDD
+
+- RED: `noticeEl = containerEl.querySelector('[data-claude-code-proof-status="main-model"]')` was `null` — no such element existed.
+- GREEN: Added `renderMainModelProofStatusNotice()`, locale keys, and `renderModelThinkingTab()` wiring. 75/75 tests pass.
+
+### Matrix Decision
+
+**No new matrix row added.** The Capability Lab matrix tracks SDK-level capabilities (individual API seams with pass/readback/fail classification). `setModel()` live-apply is an adapter-level behavioral seam backed by `query.setModel()`. The diagnostic proof already exists as a CapLab proof button ("Run SetModel Live Proof"). Adding a matrix row would expand the matrix scope from "SDK capabilities" to "behavioral seams" without clear semantic benefit. The stable settings notice is the appropriate product surface for this truth.
+
+Matrix remains: **26 rows, 23 pass, 3 readback** (File Checkpoint / Rewind, Allowed Tools, Fallback Model).
+
+### Honesty Boundaries Preserved
+
+- Main model live-apply: `pass` — diagnostic probe proves `query.setModel()` works mid-stream
+- Fallback model switching: `readback` (unchanged) — explicitly excluded from this seam
+- No invented maturity tags
+- No overclaim about query-less or post-query model persistence
+- Notice text clearly states "does not prove fallback model switching"
+
+---
+
+## 2026-06-02 BackendSettings Field Annotations Truth-Sync
+
+### Objective
+
+Sync JSDoc annotations and module doc for `allowedTools`, `disallowedTools`, `maxTurns`, `maxBudgetUsd`, and `env` fields in `ClaudeCodeBackendSettings` to reflect accepted truth. All five had stale `@untested` annotations despite having runtime evidence at pass or readback level.
+
+### What Changed
+
+Source (`src/core/types/settings.ts`):
+- `allowedTools`: `@untested` → honest prose "Readback only: runtime options wiring proven, zero enforcement observed"
+- `disallowedTools`: `@untested` → honest prose "Runtime behavior verified: SDK init-catalog filtering deterministically excludes listed tools"
+- `maxTurns`: `@untested` → honest prose "Runtime behavior verified: SDK emits error_max_turns signal"
+- `maxBudgetUsd`: `@untested` → honest prose "Runtime behavior verified: SDK emits error_max_budget_usd signal"
+- `env`: `@untested` → honest prose "Runtime behavior verified: env propagation into Claude/Bash subprocesses proven (Layer 1-4)"
+
+Module doc (`docs/modules/core/types/settings.md`): Removed stale "工具策略和环境变量字段也标记为 `@untested`" grouping; replaced with per-field honest prose reflecting accepted truth.
+
+### TDD
+
+- RED: 6 new tests in `backendSettingsTruthAudit.test.ts` — all 6 failed because fields still had `@untested` and lacked runtime/readback prose.
+- GREEN: Updated JSDoc and module doc. 6/6 tests pass.
+
+### Classification (unchanged)
+
+No capability classifications changed. This is an annotation/doc sync only:
+- `allowedTools`: readback (unchanged)
+- `disallowedTools`: pass (unchanged)
+- `maxTurns`: pass (unchanged)
+- `maxBudgetUsd`: pass (unchanged)
+- `env`: pass (unchanged)
+
+---
+
+## 2026-06-02 Fallback Model — JSDoc Truth-Sync (stale `@untested` → honest prose)
+
+### Objective
+
+Fix stale `@untested` annotation on `fallbackModel` in `settings.ts` and `settings.md`. The accepted truth is `readback`: option wiring + same-model validation proven, automatic fallback switching NOT locally provable (blocked on real API overload / HTTP 529 path; invalid-primary test undermined). Uses plain prose, not an invented maturity tag.
+
+### What Changed
+
+1. `src/core/types/settings.ts`: `fallbackModel` JSDoc changed from `@untested — Fallback model path wired to SDK option but not runtime-verified` to plain prose: `Fallback model used when the main model is unavailable. Readback only: option wiring and same-model validation proven; automatic fallback switching not locally provable (blocked on real API overload / HTTP 529; invalid-primary test undermined).`
+2. `docs/modules/core/types/settings.md`: Updated from "`fallbackModel` 标记为 `@untested`" to "`fallbackModel` 为 readback only（选项接线和 same-model validation 已证明；自动 fallback 切换无法本地验证...）" — honest prose, no invented tag.
+3. New truth-audit test file that reads source/docs and asserts: no `@untested`, no invented `@readback` tag, readback boundary expressed in prose.
+
+### TDD
+
+- RED (round 1): `expect(jsdocLines).not.toContain('@untested')` failed because JSDoc contained `@untested`.
+- GREEN (round 1): Changed to `@readback` tag.
+- RED (round 2 — correction): `expect(jsdocLines).not.toContain('@readback')` failed because an invented `@readback` tag was used instead of prose.
+- GREEN (round 2): Changed to plain prose. 2/2 tests pass.
+
+### Classification (unchanged)
+
+Fallback Model remains `readback`. This is an annotation truth-sync, not a capability change.
+
+---
+
+## 2026-06-02 File Checkpoint / Rewind — Stable Settings Boundary Notice
+
+### Objective
+
+Add a read-only boundary notice in the stable Claude Code Runtime tab that honestly presents File Checkpoint / Rewind status to users. This is not a new toggle, restore button, or capability promotion — it is a boundary surface that makes the current truth visible where users configure Claude Code.
+
+### Current Truth
+
+- **Classification**: `readback` — API seam exists (`rewindFiles()` callable, dry-run probe works), but snapshot creation does not occur in SDK query() mode (upstream bug #236, open since 2026-03-17).
+- **Stable settings**: `enableFileCheckpointing` toggle exists in Capability Lab (Diagnostic Stream Controls), NOT in stable settings. The new boundary notice in Runtime tab is read-only.
+- **No stable rewind UI**: No restore/rewind button in stable settings. Dry-run preview only in Capability Lab.
+- **Upstream blocker**: `isInteractive:false` hardcoded in SDK; snapshot creation gated behind React/Ink `useState` setters absent from non-interactive mode.
+
+### What Changed
+
+1. **New `renderFileCheckpointBoundaryNotice()`**: Compact proof-status notice in Runtime tab with `data-claude-code-proof-status="file-checkpointing"` and `data-proof-state="readback"`. Text: "Readback — experimental / diagnostic-only. ... No stable rewind UI or restore action. Toggle and dry-run preview available in Debug → Capability Lab."
+2. **Tightened `enableFileCheckpointing.desc` locale**: Replaced optimistic "for future verified rewind actions" with honest "Experimental: current SDK query() mode does not produce usable checkpoints (upstream bug #236)."
+3. **Tightened `settings.ts` comment**: Updated `@experimental` annotation to include upstream bug reference and readback-only boundary.
+4. **Tests**: 2 new tests — boundary notice presence/readback + no rewind/restore buttons in stable settings.
+
+### TDD
+
+- RED: Test "renders file-checkpoint boundary notice with readback state in runtime tab" — `noticeEl` was `null` (no such element existed).
+- GREEN: Added `renderFileCheckpointBoundaryNotice()`, locale keys, and Runtime tab wiring. 74/74 tests pass.
+
+### Classification (unchanged)
+
+File Checkpoint / Rewind remains `readback`. Matrix: 26 rows, 23 pass, 3 readback.
+
+---
+
+## 2026-06-02 Environment Variables Truth-Sync — Discovery Row + Two-Layer Proof Boundary
+
+### Objective
+
+Sync the Environment Variables capability documentation to match its verified (pass) status. The Capability Lab matrix already has `runtimeProof: 'pass'` (live behavior proof achieved), but the discovery row and stable settings notice still claimed "static classification is readback" — which is dishonest given the existing live behavior proof.
+
+### Two-Layer Truth Boundary
+
+| Surface | Proof State | Meaning |
+|---------|------------|---------|
+| Stable settings env proof notice | `readback` | Proves only settings→SDK mapping. This is supporting evidence, not the full proof. |
+| Capability Lab matrix | `pass` (Verified) | Live behavior proof: env-derived side-effect file contains expected nonce, proving env propagation into Bash subprocess (Layer 1-4). |
+| **Overall capability** | **verified (pass)** | Both layers together confirm the capability works end-to-end. |
+
+### Changes
+
+1. **Discovery row text**: Replaced "Static classification is readback; fresh runtime evidence required for behavior proof" with accurate text reflecting verified status.
+2. **Stable settings readback note**: Now explicitly states this surface is "readback supporting evidence" and live behavior proof is verified in Capability Lab.
+3. **Locale (en + zh)**: Updated env proof status text to explain two-layer boundary.
+4. **Status doc**: Marked all historical "22/25 pass" sections as superseded with current 23/26 pass count.
+
+### TDD
+
+- RED: Test "renders Environment Variables discovery row with honest verified/pass description" failed — discovery row contained "Static classification is readback".
+- GREEN: Updated discovery row text — 173/173 CapLab tests pass.
+
+### Classification (unchanged)
+
+- Environment Variables: `pass` (was already pass; this sync fixes stale wording only)
+- Matrix: 26 rows, 23 pass, 3 readback (File Checkpoint / Rewind, Allowed Tools, Fallback Model)
+
+---
+
+## 2026-06-02 OptionsBuilder env — Defensive-Copy Bug Fix + Test Refactor
+
+### Bug Fixed
+`buildClaudeCodeOptions()` assigned `input.settings.env` directly into `options.env` by reference. Mutating `settings.env` after building options would silently corrupt the SDK options snapshot. This was the only settings-derived field not defensively copied.
+
+### Fix
+`options.env` now uses `{ ...input.settings.env }`, consistent with how `additionalDirectories`, `allowedTools`, `disallowedTools`, `restrictedBuiltinTools`, and `settingSources` are already copied.
+
+### TDD
+- RED: test builds options with `env: { KEY_A: 'value_a', KEY_B: 'value_b' }`, then mutates `env.KEY_A = 'mutated'` and adds `env.KEY_C = 'injected'`, asserts `options.env` remains unchanged — `Expected: { KEY_A: 'value_a', KEY_B: 'value_b' }, Received: { KEY_A: 'mutated', KEY_B: 'value_b', KEY_C: 'injected' }`
+- GREEN: `{ ...input.settings.env }` — test passes
+
+### Test Refactor
+Split monolithic `ClaudeCodeOptionsBuilder` describe (207 lines, max 200) into three focused describe blocks. 21/21 tests pass.
+
+### Lint Results
+- Before: **1 warning** (max-lines-per-function 207)
+- After: **0 warnings** on both source and test file
+
+## 2026-06-02 Diagnostic Tool Restriction — Defensive-Copy Bug Fix + Complexity Reduction
+
+### Bug Fixed
+`buildDiagnosticSdkOptions()` assigned `request._diagnosticToolRestriction` directly into `options.tools` by reference. If the caller mutated the original array after `runDiagnosticPrompt()` returned, the mutation leaked into `inspectLastDiagnosticSdkOptions()` snapshot, because `lastDiagnosticSdkOptions` held the same array reference.
+
+### Fix
+`options.tools` now uses `[...request._diagnosticToolRestriction]` (defensive spread copy), consistent with how `buildClaudeCodeOptions()` copies `plugins`, `skills`, `allowedTools`, `disallowedTools`, and `restrictedBuiltinTools`.
+
+### TDD
+- RED: test "snapshot options.tools is not mutated when caller mutates the restriction array after runDiagnosticPrompt" — `Expected: ['Read', 'Grep'], Received: ['Read', 'Grep', 'Edit', 'Write']`
+- GREEN: defensive spread copy — test passes
+- REFACTOR: extracted `resolveDiagnosticSettings()` and `resolveDiagnosticCanUseTool()` from `buildDiagnosticSdkOptions()`
+
+### Refactoring
+- `resolveDiagnosticSettings(request)` — handles bypassPermissions, maxTurns, and forcePermissionMode overrides
+- `resolveDiagnosticCanUseTool(request, bypassPermissions)` — resolves canUseTool wiring (bypass → undefined, override → override, fallback → bridge)
+
+### Lint Results
+- Before: `buildDiagnosticSdkOptions` complexity 22 (max 20) — **1 warning**
+- After: **0 warnings** on `ClaudeCodeAdapter.ts`
+- Test file: 0 warnings
+- Remaining project warnings: `ClaudeCodeOptionsBuilder.test.ts` arrow function 207 lines (pre-existing, out of scope)
+
+## 2026-06-02 Checkpoint Rewind Probe — Cleanup Bug Fix + Lint Elimination
+
+### Bug Fixed
+Probe file (`.opencodian-checkpoint-probe.txt`) could be left on disk if Phase 1 created the file and Phase 2 threw before reaching the happy-path cleanup. Root cause: cleanup was only at the end of the success path, not in a try/finally wrapper.
+
+### Fix
+`runCheckpointRewindProbe()` now wraps the entire probe execution in try/finally that always cleans up the probe file, regardless of where an error occurs.
+
+### Refactoring
+Extracted 7 helper methods from the monolithic 337-line function:
+- `executeCheckpointRewindProbe()` — Phase 1 + Phase 2 orchestration
+- `streamCheckpointPhase1()` — Phase 1 streaming loop
+- `streamCheckpointPhase2Rewind(opts)` — Phase 2 streaming + rewind
+- `executeDryRunCandidates()` — dry-run candidate iteration
+- `executeActualRewind(opts)` — dryRun=false filesystem evidence
+- `attemptApplyFlagSettings()` — applyFlagSettings seam exploration
+- `buildProbeEarlyReturn()` — early return result construction
+
+### Lint Results
+- Before: max-lines-per-function 337 (max 200), complexity 53 (max 20) — **2 warnings**
+- After: **0 new warnings** (all extracted methods under limits)
+- Remaining: `buildDiagnosticSdkOptions` complexity 22 (pre-existing, out of scope)
+
+### TDD
+- RED: test "cleans up probe file when Phase 2 sdk.query throws" — `Expected: false, Received: true`
+- GREEN: try/finally wrapper added — test passes
+- REFACTOR: 7 methods extracted, all 152 adapter tests pass
+
+### Classification
+File Checkpoint / Rewind remains `readback` (blocker: upstream SDK bug #236)
+
+## 2026-06-02 /context Diagnostic — Label Honesty Tightening
+
+### Objective
+
+Rename Capability Lab matrix row, discovery row, proof button, and proof heading from "Command Execution" to "/context Diagnostic" so users immediately see the exact scope (fixed `/context` diagnostic probe) rather than a misleading generic "command execution" label.
+
+### Changes
+
+- **Matrix row label**: `Command Execution` → `/context Diagnostic`
+- **Discovery row label**: `Command Execution` → `/context Diagnostic`
+- **Proof button**: `Run Command Execution Proof` → `Run /context Diagnostic Proof`
+- **Proof heading**: `Command Execution Proof` → `/context Diagnostic Proof`
+- **All `updateRuntimeProof()` keys**: `Command Execution` → `/context Diagnostic`
+- No capability scope change — still diagnostic-only, fixed `/context`, no arbitrary input
+
+### TDD
+
+- RED: 7 tests failed (audit row label mismatch + 5 proof tests button not found)
+- GREEN: 172/172 CapLab tests pass
+
+### Verification
+
+- CapLab tests: 172/172 passed
+- Typecheck: clean
+- git diff --check: clean
+
+---
+
+## 2026-06-02 Command Execution — Block-Array Content Fix
+
+### Bug
+
+`runCommandExecutionProof()` only extracted assistant text when `message.content` was a plain string, but real SDK assistant raw messages use block-array content shape `{ content: [{ type: 'text', text: '...' }] }`. This caused real successful `/context` runs to be misclassified as `readback` instead of `pass`.
+
+### Fix
+
+Updated text extraction to handle three content shapes: plain string, block-array `[{ type: 'text', text }]`, and normalized text chunks. The proof method now merges text from both `rawMessages` and `chunks` before checking for "Context Usage".
+
+### TDD
+
+- RED: success test updated to use real block-array shape → fail (classified readback instead of pass)
+- GREEN: 172/172 CapLab tests pass after fix (+1 new chunks-based test)
+
+### Verification
+
+- CapLab tests: 172/172 passed (was 171)
+- Full test suite: 3546/3546 passed (was 3545, +1 new test)
+- Typecheck: clean
+- git diff --check: clean
+
+---
+
+## 2026-06-02 Command Execution — Diagnostic /context Command Seam
+
+### Objective
+
+Add the smallest honest product slice for Claude command execution proof. Diagnostic-only, safe, fixed allow-listed read-only command `/context`. Does NOT expose arbitrary command input, command authoring, or `.claude/**` writes. Does NOT route through OpenCode slash command execution or `runSessionCommand()`.
+
+### Implementation
+
+- **Matrix row**: Added "Command Execution" to `buildMatrixRows()` with `runtimeProof: 'pass'`, `userSurface: 'diagnostic'`.
+- **Discovery row**: Added to `renderDiscoveryToolRows()` with explicit diagnostic-only boundary text.
+- **Proof button**: Added "Run Command Execution Proof" in `renderDiscoveryControls()`.
+- **Proof method**: `runCommandExecutionProof()` calls `adapter.runDiagnosticPrompt({ prompt: '/context', persistSession: false, _diagnosticBypassPermissions: true })`, extracts text from both rawMessages (string and block-array content shapes) and normalized text chunks, classifies:
+  - `pass`: combined text includes "Context Usage"
+  - `readback`: messages returned but no "Context Usage" (unexpected output — does NOT inflate to pass)
+  - `readback`: empty messages (seam reachable but no usable output)
+  - `fail`: adapter throws
+
+### TDD
+
+- RED: 6 tests failed (audit row count 25→26, verified count 22→23, plus 5 new proof tests with no button/proof method)
+- GREEN: All 171 CapLab tests pass after implementation
+- Block-array fix: RED (1 fail) → GREEN (172/172)
+
+### Honesty Boundaries
+
+- This proves a safe read-only diagnostic command seam exists for `/context` only
+- This does NOT mean ordinary Claude chat slash commands are productized
+- Fixed allow-list: `/context` only — no arbitrary command input
+- No command authoring UI
+- No `.claude/**` writes
+- Does not touch `SlashCommandExecutionService` or `runSessionCommand()`
+
+### Verification
+
+- CapLab tests: 172/172 passed (was 166)
+- Full test suite: 3546/3546 passed (was 3540, +6 new tests)
+- Typecheck: clean
+- Matrix: 26 rows (was 25), 23 pass, 3 readback
+
+---
+
+## 2026-06-02 SetModel Live Proof — Catch Block Fail Marker Bug Fix
+
+### Objective
+
+Close review gap: `runSetModelLiveProof()` documented "fail if the probe throws an exception" but the catch block only rendered error text without calling `updateRuntimeProof('SetModel Live', 'fail', ...)`. The matching test only asserted error text, so the drift was not caught.
+
+### Fix
+
+- **Source**: `src/features/settings/SettingsCapabilityLabSection.ts` catch block now calls `this.updateRuntimeProof('SetModel Live', 'fail', outputEl)`.
+- **Test**: Renamed test from `"handles setModel live proof error when adapter throws"` to `"marks setModel live as fail when adapter throws exception"`, added assertions for `[data-capability="SetModel Live"]` marker and `opencodian-capability-lab-proof-fail` class.
+- **Adapter audit**: `runSetModelLiveProbe()` lifecycle reviewed — try/finally cleanup is correct, 4 existing tests cover all key paths. No additional lifecycle bug found.
+
+### Verification (post-fix)
+
+- Focused tests after the fail-marker fix:
+  - `npm test -- tests/unit/features/settings/SettingsCapabilityLabSection.test.ts --runInBand --no-cache` passed (`166 passed, 166 total`)
+  - `npm test -- tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts --runInBand --no-cache --testNamePattern="runSetModelLiveProbe"` passed (`4 passed, 147 skipped, 151 total`)
+- Checks after the fix:
+  - `npm run check:devlog-order` passed (`305 dated sections in descending order`)
+  - `npm run check:graphify` passed (`graphify freshness ok for current src working-tree changes`)
+  - `npm run check:module-docs -- --range HEAD` passed (`7 required doc targets, range HEAD`)
+  - `git diff --check` passed
+- Larger verification status:
+  - `npm run lint` completed with `0 errors / 8 warnings` — **not fully clean**, not final complete. Remaining warnings are existing oversized/complex diagnostic functions plus `tests/unit/core/agents/backend/ClaudeCodeOptionsBuilder.test.ts`.
+  - `npm run build` passed with `BUILD_ID=feature-phase0-capability.202606020015`
+
+### Deployment State
+
+- `dist/main.js` contains `BUILD_ID=feature-phase0-capability.202606020015`.
+- Test Vault deployment succeeded: copied `dist/main.js`, `dist/manifest.json`, `dist/styles.css` sequentially to `/Volumes/SDD2T/obsidian-vault-write/testvault/.obsidian/plugins/opencodian/`.
+- Test Vault `main.js` confirmed to contain `BUILD_ID=feature-phase0-capability.202606020015`.
+
+### Smoke Validation (Test Vault)
+
+- `obsidian help` worked and included Developer commands.
+- `obsidian plugin:reload id=opencodian vault=testvault` → `Reloaded: opencodian`.
+- `obsidian eval` confirmed plugin runtime build: `OpenCodian 1.0.0 BUILD_ID=feature-phase0-capability.202606020015`.
+- `obsidian dev:errors vault=testvault` → `No errors captured.`
+- `obsidian eval` DOM summary confirmed: root present, capability matrix present, summary present, `Run SetModel Live Proof` button present, matrix rows=25.
+- Runtime CSS assertion via `obsidian eval`: SetModel button `minHeight="34px"`, `fontWeight="650"`, summary grid columns present.
+- Screenshots captured:
+  - `.obsidian-debug/claude-caplab-smoke-20260602-build-202606020015.png`
+  - `.obsidian-debug/claude-caplab-setmodel-controls-202606020015.png`
+- Smoke conclusion: no white screen, no obvious layout collapse in Capability Lab / Claude settings surface.
+
+### Classification (unchanged)
+
+- SetModel Live Probe: `diagnostic-only` (not part of the 25-row capability matrix)
+- Lint: `0 errors / 8 warnings` — honest status, not fully clean.
+- Project: not claimed complete. SetModel Live is diagnostic-only; File Checkpoint / Rewind, Fallback Model, Allowed Tools remain `readback`.
+
+---
+
+## 2026-06-01 SetModel Live Diagnostic Probe — Built, Test Vault Deployment Pending
+
+### Objective
+
+Implement a narrow diagnostic-only seam for verifying whether SDK `query.setModel()` actually changes the model used by subsequent API calls within the same persistent query. This does not promote any existing capability; it creates a new diagnostic proof surface inside Capability Lab.
+
+### Current Product Boundary
+
+- `ClaudeCodeAdapter.runSetModelLiveProbe(targetModel)` is a two-phase diagnostic probe. Phase 1 sends a short prompt and extracts `modelUsage` from the result message. Then `query.setModel(targetModel)` is called on the query handle to send a `{subtype:"set_model",model}` control request to the CLI subprocess. Phase 2 sends another short prompt and extracts `modelUsage` from the second result.
+- `extractModelUsageFromRaw()` is a module-level helper that extracts `modelUsage` from the last `type:'result'` raw message.
+- Capability Lab's Discovery & Status panel now has a `Run SetModel Live Proof` button. The proof calls the adapter probe and classifies honestly:
+  - `pass` if Phase 2 `modelUsage` includes `targetModel` AND Phase 1 did not
+  - `readback` if `setModel()` succeeded but model didn't change or evidence is ambiguous
+  - `boundary` if `setModel()` is not available on the query handle
+  - `fail` if the probe throws an exception
+- This is **diagnostic-only**. It does not change stable chat behavior, does not change settings, does not write `.claude/**`, and does not change the capability matrix.
+- **File Checkpoint / Rewind** remains `readback`; this probe does not affect checkpoint snapshot creation.
+- **Fallback Model** remains `readback`; this probe tests manual `setModel()` switching, not automatic fallback.
+- **Allowed Tools** remains `readback`; this probe is unrelated to tool restrictions.
+
+### Verification
+
+- TDD RED for adapter seam: `npm test -- tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts --runInBand --no-cache --testNamePattern="runSetModelLiveProbe"` failed as expected with `adapter.runSetModelLiveProbe is not a function`.
+- TDD RED for Capability Lab UI: `npm test -- tests/unit/features/settings/SettingsCapabilityLabSection.test.ts --runInBand --no-cache --testNamePattern="SetModel Live"` failed as expected because the button was missing.
+- `npm test -- tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts --runInBand --no-cache`: passed (`151 passed, 151 total`)
+- `npm test -- tests/unit/features/settings/SettingsCapabilityLabSection.test.ts --runInBand --no-cache`: passed (`166 passed, 166 total`)
+- `npm test -- tests/unit/features/settings/SettingsClaudeCodeSection.test.ts --runInBand --no-cache`: passed (`72 passed, 72 total`)
+- Typecheck, module-docs, devlog-order, graphify, lint, build: (pending full verification run)
+
+### Classification
+
+- SetModel Live Probe: `diagnostic-only` (not part of the 25-row capability matrix)
+- File Checkpoint / Rewind: `readback` (unchanged)
+- Fallback Model: `readback` (unchanged)
+- Allowed Tools: `readback` (unchanged)
+
+---
+
+## 2026-06-01 SDK Runtime Catalog Readback — Built and Deployed to Test Vault
+
+### Objective
+
+Implement the next honest Claude Code runtime-visibility seam: read SDK `Query.supportedCommands()` and `Query.supportedAgents()` as a sanitized runtime catalog in the Claude Code Runtime settings tab, without executing commands, authoring agents, or changing capability classifications.
+
+### Current Product Boundary
+
+- `ClaudeCodeAdapter.getRuntimeCatalog()` is a read-only wrapper around SDK `Query.supportedCommands()` / `Query.supportedAgents()` when both methods are available.
+- It reuses an active SDK query when that live query exposes both catalog methods. If an active query exists but lacks either method, it returns `null` instead of creating a temporary query and pretending the result came from the active runtime.
+- Only when no active query exists does it create a temporary query for readback, then closes the prompt input, abort controller, and SDK query handle.
+- Returned commands are sanitized to `name`, optional `description`, optional `argumentHint`, and sorted `aliases`; returned agents are sanitized to `name`, optional `description`, and optional `model`. Entries without a non-empty `name` are dropped.
+- Claude Code Runtime settings now has an `Inspect runtime catalog` action. The output is marked `data-proof-state="readback"` and `data-claude-code-runtime-catalog="true"`.
+- This is **read-only supporting evidence**. It does not execute slash commands, does not create/edit agents, does not save settings, does not write `.claude/**`, and does not change backend enablement.
+- **File Checkpoint / Rewind** remains `readback`; runtime catalog readback does not affect checkpoint snapshot creation, `canRewind:false`, or the upstream non-interactive checkpoint blocker.
+- **Fallback Model** remains `readback`; runtime catalog readback does not provide fallback switching evidence.
+- The static capability matrix is unchanged; this seam is runtime visibility/supporting evidence only.
+
+### Verification
+
+- TDD RED for adapter seam: `npm test -- tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts --runInBand --no-cache` failed as expected with `adapter.getRuntimeCatalog is not a function`.
+- TDD RED for Settings UI: `npm test -- tests/unit/features/settings/SettingsClaudeCodeSection.test.ts --runInBand --no-cache` failed as expected because the `Inspect runtime catalog` button was missing.
+- `npm test -- tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts --runInBand --no-cache`: passed (`147 passed, 147 total`)
+- `npm test -- tests/unit/features/settings/SettingsClaudeCodeSection.test.ts --runInBand --no-cache`: passed (`72 passed, 72 total`)
+- `npm test -- tests/unit/features/settings/SettingsCapabilityLabSection.test.ts --runInBand --no-cache`: passed (`160 passed, 160 total`)
+- `npm run typecheck -- --pretty false`: passed
+- `npm run check:module-docs -- --range HEAD`: passed (`449 source modules`, `449 mapped docs`, `6 required doc targets`)
+- `git diff --check`: passed
+- `npm run graphify:update:src`: refreshed `graphify-out`; current `GRAPH_REPORT.md` reports `6250 nodes`, `11931 edges`, `177 communities detected`
+- `npm run check:graphify`: passed (`graphify freshness ok for current src working-tree changes`)
+- `npm run lint`: completed with `0 errors / 8 warnings`; remaining warnings are existing oversized/complex diagnostic functions plus `tests/unit/core/agents/backend/ClaudeCodeOptionsBuilder.test.ts`, not new pass/fail evidence.
+- `npm run build`: passed with `BUILD_ID=feature-phase0-capability.202606011712`
+
+### Deployment State
+
+- `dist/main.js` contains `BUILD_ID=feature-phase0-capability.202606011712`.
+- Test Vault deployment succeeded for `main.js`, `manifest.json`, and `styles.css`.
+- Test Vault `main.js` now contains `BUILD_ID=feature-phase0-capability.202606011712`.
+- Therefore Test Vault is updated to the June 1 17:12 build in this environment.
+
+---
+
+## 2026-06-01 SDK Query.readFile Runtime File Readback — Built, Test Vault Not Updated
+
+### Objective
+
+Implement and record the new Claude Code SDK `Query.readFile()` seam as a narrow runtime file readback/supporting-evidence surface, without promoting File Checkpoint / Rewind or changing the capability matrix.
+
+### Current Product Boundary
+
+- `ClaudeCodeAdapter.readRuntimeFile()` is a read-only wrapper around SDK `Query.readFile()` when that method is available.
+- The readback request is scoped to a user-supplied path and passes a defensive option shape: default cap around `maxBytes: 4096`, with encoding limited to `utf-8` or `base64`.
+- Runtime output may include `absPath`, `contents`, and `truncated`; UI output must remain marked `data-proof-state="readback"` and `data-claude-code-file-readback="true"`.
+- This is supporting evidence for "the active Claude Code runtime can read and echo a file through the SDK path." It is not file authoring, not checkpoint snapshot creation, and not rewind/restore proof.
+- It does not bypass Claude Code permissions, does not write files, does not write `.claude/**`, does not save plugin settings, and does not change backend enablement.
+- **File Checkpoint / Rewind** remains `readback`; `Query.readFile()` does not affect `canRewind:false`, snapshot persistence, or the upstream non-interactive checkpoint blocker.
+- **Fallback Model** remains `readback`; file readback does not provide any fallback switching evidence and must not be used to mark Fallback Model as `pass`.
+- The static capability matrix is unchanged; this seam is runtime visibility/supporting evidence only.
+
+### Verification
+
+- TDD RED for Settings UI: `npm test -- tests/unit/features/settings/SettingsClaudeCodeSection.test.ts --runInBand --no-cache --testNamePattern='runtime file readback'` failed as expected before implementation because the runtime file path input / inspect action were missing.
+- Adapter focused test execution with a `|` pattern exposed a project `scripts/run-jest.js` shell-quoting pitfall (`/bin/sh: reads: command not found`); full-file Jest runs below are the reliable evidence for this closure.
+- `npm test -- tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts --runInBand --no-cache`: passed (`142 passed, 142 total`)
+- `npm test -- tests/unit/features/settings/SettingsClaudeCodeSection.test.ts --runInBand --no-cache`: passed (`68 passed, 68 total`)
+- `npm test -- tests/unit/features/settings/SettingsCapabilityLabSection.test.ts --runInBand --no-cache`: passed (`160 passed, 160 total`)
+- `npm run typecheck -- --pretty false`: passed
+- `npm run check:module-docs -- --range HEAD`: passed (`449 source modules`, `449 mapped docs`, `5 required doc targets`)
+- `npm run check:devlog-order`: passed (`302 dated sections in descending order`)
+- `git diff --check`: passed
+- `npm run graphify:update:src`: updated `graphify-out`; superseded by the later Runtime Catalog Readback refresh above, whose current committed artifact reports `6250 nodes`, `11931 edges`, `177 communities detected`
+- `npm run check:graphify`: passed (`graphify freshness ok for current src working-tree changes`)
+- `npm run lint`: completed with `0 errors / 8 warnings`; remaining warnings are existing oversized/complex diagnostic functions plus `tests/unit/core/agents/backend/ClaudeCodeOptionsBuilder.test.ts`, not new pass/fail evidence.
+- `npm run build`: passed with `BUILD_ID=feature-phase0-capability.202606011644`
+
+### Deployment State
+
+- `dist/main.js` contains `BUILD_ID=feature-phase0-capability.202606011644`.
+- Test Vault deploy was attempted immediately after the build, but the first copy step failed again: `cp dist/main.js /Volumes/SDD2T/obsidian-vault-write/testvault/.obsidian/plugins/opencodian/main.js` returned `Operation not permitted`.
+- Because the first copy step failed, `manifest.json` and `styles.css` were not copied to avoid a partial deployment.
+- Test Vault `main.js` still contains `BUILD_ID=feature-phase0-capability.202605312344`.
+- Therefore Test Vault is **not** updated to the June 1 16:44 build in this environment.
+
+---
+
+## 2026-06-01 Fallback Diagnostic Guardrail Hardening — Built, Test Vault Not Updated
+
+### Objective
+
+Close a narrow honesty risk in the Fallback Model diagnostic proof: a successful invalid-primary run with any non-invalid detected model could previously be classified as `pass`, even if that detected model was not the configured fallback model.
+
+### Current Product Boundary
+
+- Fallback Model remains `readback`: option/readback plumbing is verified, but automatic fallback switching still requires real API HTTP 529 / overload behavior that is not locally triggerable.
+- The diagnostic proof now requires stricter evidence before `pass`: detected model must equal the configured fallback model, and the run must also include either multi-model `modelUsage` containing that fallback model or an explicit fallback/overload signal (`model_fallback`, `tengu_model_fallback_triggered`, `overloaded_error`, `Switched to`, or `error_status:529`).
+- A different non-fallback model now remains `readback`, preventing SDK default-model normalization from being misread as fallback behavior.
+- File Checkpoint / Rewind remains `readback`; this guardrail does not affect checkpoint snapshot creation.
+
+### Verification
+
+- TDD RED: `npm test -- tests/unit/features/settings/SettingsCapabilityLabSection.test.ts --runInBand --no-cache --testNamePattern="Fallback Model"` failed as expected when a non-fallback normalized model was incorrectly promoted to pass.
+- `npm test -- tests/unit/features/settings/SettingsCapabilityLabSection.test.ts --runInBand --no-cache --testNamePattern="Fallback Model"`: passed (`12 passed`, `272 skipped`)
+- `npm test -- tests/unit/features/settings/SettingsCapabilityLabSection.test.ts --runInBand --no-cache`: passed (`160 passed, 160 total`)
+- `npm run typecheck -- --pretty false`: passed
+- `npm run lint`: completed with `0 errors / 8 warnings`; remaining warnings are existing oversized/complex diagnostic functions plus `tests/unit/core/agents/backend/ClaudeCodeOptionsBuilder.test.ts`, not new pass/fail evidence.
+- `npm run graphify:update:src`: updated `graphify-out` (`6233 nodes`, `11881 edges`, `219 communities`)
+- `npm run build`: passed with `BUILD_ID=feature-phase0-capability.202606011619`
+
+### Deployment State
+
+- `dist/main.js` contains `BUILD_ID=feature-phase0-capability.202606011619`.
+- Test Vault deploy was attempted immediately after the build, but the first copy step failed again: `cp dist/main.js /Volumes/SDD2T/obsidian-vault-write/testvault/.obsidian/plugins/opencodian/main.js` returned `Operation not permitted`.
+- Because the first copy step failed, `manifest.json` and `styles.css` were not copied to avoid a partial deployment.
+- Test Vault `main.js` still contains `BUILD_ID=feature-phase0-capability.202605312344`.
+- Therefore Test Vault is **not** updated to the June 1 16:19 build in this environment.
+
+---
+
+## 2026-06-01 Account Info Runtime Readback — Built, Test Vault Not Updated
+
+### Objective
+
+Continue Claude Code integration through another narrow runtime-visibility seam: expose SDK `Query.accountInfo()` as a read-only authenticated account summary readback action in the Claude Code Runtime settings tab.
+
+### Current Product Boundary
+
+- `ClaudeCodeAdapter.getAccountInfo()` calls SDK `Query.accountInfo()` when available.
+- It reuses an active SDK query when that live query exposes `accountInfo()`. If an active query exists but lacks the method, it returns `null` instead of creating a temporary query and pretending the result came from the active runtime.
+- Only when no active query exists does it create a temporary query for readback, then closes the prompt input, abort controller, and SDK query handle.
+- Claude Code Runtime settings now has an `Inspect account` action. The output is marked `data-proof-state="readback"` and `data-claude-code-account-info-readback="true"`.
+- The output uses defensive JSON formatting. `email` is masked (for example `u***@example.com`), and credential/source-like keys (`apiKeySource`, `tokenSource`, token, secret, credential, authorization, oauth, env) are redacted.
+- This is **read-only supporting evidence**. It does not perform login/authentication, does not save settings, does not write `.claude/**`, does not change backend enablement, and does not update the capability matrix by itself.
+- **File Checkpoint / Rewind** remains `readback`; account info readback does not affect checkpoint snapshot creation.
+- **Fallback Model** remains `readback`; account info readback does not prove automatic fallback switching.
+
+### Verification
+
+- TDD RED for adapter seam: `npm test -- tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts --runInBand --no-cache` failed as expected with `adapter.getAccountInfo is not a function`.
+- TDD RED for Settings UI: `npm test -- tests/unit/features/settings/SettingsClaudeCodeSection.test.ts --runInBand --no-cache` failed as expected because the `Inspect account` button was missing.
+- `npm test -- tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts --runInBand --no-cache`: passed (`140 passed, 140 total`)
+- `npm test -- tests/unit/features/settings/SettingsClaudeCodeSection.test.ts --runInBand --no-cache`: passed (`62 passed, 62 total`)
+- `npm test -- tests/unit/features/settings/SettingsCapabilityLabSection.test.ts --runInBand --no-cache`: passed (`159 passed, 159 total`)
+- `npm run typecheck -- --pretty false`: passed
+- `npm run check:module-docs -- --range HEAD`: passed (`449 source modules`, `449 mapped docs`, `5 required doc targets`)
+- `npm run check:graphify`: initially reported `graphify-out is stale for current src changes`; ran `npm run graphify:update:src`, then `npm run check:graphify` passed (`graphify freshness ok for current src working-tree changes`).
+- `npm run check:devlog-order`: passed (`300 dated sections in descending order`)
+- `git diff --check`: passed
+- `npm run lint`: completed with `0 errors / 8 warnings`; remaining warnings are existing oversized/complex diagnostic functions plus `tests/unit/core/agents/backend/ClaudeCodeOptionsBuilder.test.ts`, not new pass/fail evidence.
+- `npm run build`: passed with `BUILD_ID=feature-phase0-capability.202606011559`
+
+### Deployment State
+
+- `dist/main.js` contains `BUILD_ID=feature-phase0-capability.202606011559`.
+- Test Vault deploy was attempted immediately after the build, but the first copy step failed again: `cp dist/main.js /Volumes/SDD2T/obsidian-vault-write/testvault/.obsidian/plugins/opencodian/main.js` returned `Operation not permitted`.
+- Because the first copy step failed, `manifest.json` and `styles.css` were not copied to avoid a partial deployment.
+- Test Vault `main.js` still contains `BUILD_ID=feature-phase0-capability.202605312344`.
+- Therefore Test Vault is **not** updated to the June 1 15:59 build in this environment.
+
+---
+
+## 2026-06-01 Context Usage Runtime Readback — Built, Test Vault Not Updated
+
+### Objective
+
+Continue Claude Code integration through another narrow runtime-visibility seam: expose SDK `Query.getContextUsage()` as a read-only Context Usage readback action in the Claude Code Runtime settings tab.
+
+### Current Product Boundary
+
+- `ClaudeCodeAdapter.getContextUsage()` calls SDK `Query.getContextUsage()` when available.
+- It reuses an active SDK query when that live query exposes `getContextUsage()`. If an active query exists but lacks the method, it returns `null` instead of creating a temporary query and pretending the result came from the active runtime.
+- Only when no active query exists does it create a temporary query for readback, then closes the prompt input, abort controller, and SDK query handle.
+- Claude Code Runtime settings now has an `Inspect context usage` action. The output is marked `data-proof-state="readback"` and `data-claude-code-context-usage-readback="true"`.
+- The output uses defensive JSON formatting. Credential-like keys (`apiKey`, `authorization`, `accessToken`, `refreshToken`, `sessionToken`, `authToken`, standalone `token`, secret/password/credential/oauth/env) are redacted; ordinary usage fields such as `tokenEstimate` remain visible.
+- This is **read-only supporting evidence**. It does not save settings, does not write `.claude/**`, does not provide context authoring or budget control, and does not update the capability matrix by itself.
+- **File Checkpoint / Rewind** remains `readback`; context usage readback does not affect checkpoint snapshot creation.
+- **Fallback Model** remains `readback`; context usage readback does not prove automatic fallback switching.
+
+### Verification
+
+- TDD RED for Settings UI refinement: `npm test -- tests/unit/features/settings/SettingsClaudeCodeSection.test.ts --runInBand --no-cache` failed as expected when `tokenEstimate` was still redacted.
+- `npm test -- tests/unit/features/settings/SettingsClaudeCodeSection.test.ts --runInBand --no-cache`: passed (`59 passed, 59 total`)
+- `npm test -- tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts --runInBand --no-cache`: passed (`135 passed, 135 total`)
+- `npm test -- tests/unit/features/settings/SettingsCapabilityLabSection.test.ts --runInBand --no-cache`: passed (`159 passed, 159 total`)
+- `npm run typecheck -- --pretty false`: passed
+- `npm run check:module-docs -- --range HEAD`: passed (`449 source modules`, `449 mapped docs`, `5 required doc targets`)
+- `git diff --check`: passed
+- `npm run lint`: completed with `0 errors / 8 warnings`; remaining warnings are existing oversized/complex diagnostic functions plus `tests/unit/core/agents/backend/ClaudeCodeOptionsBuilder.test.ts`, not new pass/fail evidence.
+- `npm run build`: passed with `BUILD_ID=feature-phase0-capability.202606011548`
+
+### Deployment State
+
+- `dist/main.js` contains `BUILD_ID=feature-phase0-capability.202606011548`.
+- Test Vault deploy was attempted immediately after the build, but the first copy step failed again: `cp dist/main.js /Volumes/SDD2T/obsidian-vault-write/testvault/.obsidian/plugins/opencodian/main.js` returned `Operation not permitted`.
+- Because the first copy step failed, `manifest.json` and `styles.css` were not copied to avoid a partial deployment.
+- Test Vault `main.js` still contains `BUILD_ID=feature-phase0-capability.202605312344`.
+- Therefore Test Vault is **not** updated to the June 1 15:48 build in this environment.
+
+---
+
+## 2026-06-01 MCP Runtime Status Readback — Built, Test Vault Not Updated
+
+### Objective
+
+Continue Claude Code integration through another safe runtime-visibility seam: expose SDK `Query.mcpServerStatus()` as read-only MCP runtime status readback in the Claude Code Tools settings tab.
+
+### Current Product Boundary
+
+- Claude Code Tools now has an `Inspect runtime status` action that calls `ClaudeCodeAdapter.getMcpServerRuntimeStatuses()`.
+- The output is marked `data-proof-state="readback"` and shows only sanitized server name, status, scope, server info, tool names/count, and error summary.
+- This is **read-only supporting evidence**. It does not write `.claude/mcp.json`, does not create/edit/delete MCP servers, and does not change MCP authoring ownership.
+- MCP runtime server names/count remain runtime visibility only; shared Settings > MCP remains the authoring surface.
+- **File Checkpoint / Rewind** remains `readback`; this MCP status seam does not affect checkpoint snapshot creation.
+- **Fallback Model** remains `readback`; this MCP status seam does not prove automatic fallback switching.
+
+### Verification
+
+- `npm test -- tests/unit/features/settings/SettingsClaudeCodeSection.test.ts --runInBand --no-cache`: passed (`56 passed, 56 total`)
+- `npm run typecheck -- --pretty false`: passed
+- `npm run check:module-docs -- --range HEAD`: passed (`449 source modules`, `449 mapped docs`, `5 required doc targets`)
+- `npm run lint`: completed with `0 errors / 8 warnings`; remaining warnings are existing oversized/complex diagnostic functions plus `tests/unit/core/agents/backend/ClaudeCodeOptionsBuilder.test.ts`, not new pass/fail evidence.
+- `npm run build`: passed with `BUILD_ID=feature-phase0-capability.202606011535`
+
+### Deployment State
+
+- `dist/main.js` contains `BUILD_ID=feature-phase0-capability.202606011535`.
+- Test Vault deploy was attempted immediately after the build, but the first copy step failed: `cp dist/main.js /Volumes/SDD2T/obsidian-vault-write/testvault/.obsidian/plugins/opencodian/main.js` returned `Operation not permitted`.
+- Test Vault `main.js` still contains `BUILD_ID=feature-phase0-capability.202605312344`.
+- Therefore Test Vault is **not** updated to the June 1 15:35 build in this environment.
+
+---
+
+## 2026-06-01 Parallel Subagent Hardening — Built, Test Vault Not Updated
+
+### Objective
+
+Review and harden the June 1 read-only Claude Code surfaces with parallel subagents, then rebuild and re-check the real artifact state.
+
+### Current Product Boundary
+
+- `ClaudeCodeAdapter.getRuntimeSettings()` remains a read-only runtime settings snapshot seam. It reuses an active SDK query when `getSettings()` exists, otherwise creates a temporary query, closes temporary query handles, and returns `null` when the SDK path is missing or fails.
+- Capability Lab now catches `Query.getSettings()` readback failures locally, keeps the subsection marked `data-proof-state="readback"`, and broadens key-based redaction for env/API key/token/secret/password/credential/authorization/oauth-like settings keys.
+- Claude Code settings and Capability Lab can show MCP runtime server names and runtime ecosystem summaries as read-only discovery surfaces only. They still do not author `.claude/**`, MCP config, skills, plugins, or agent definitions.
+- **File Checkpoint / Rewind** remains `readback`; no new rewind behavior proof exists.
+- **Fallback Model** remains `readback`; the available evidence is still option/readback and passive detection, not a locally triggered automatic fallback switch.
+- **MCP authoring** remains outside these seams; runtime server-name visibility is not authoring.
+
+### Verification
+
+- `npm test -- tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts --runInBand --no-cache`: passed (`131 passed, 131 total`)
+- `npm test -- tests/unit/features/settings/SettingsCapabilityLabSection.test.ts --runInBand --no-cache`: passed (`159 passed, 159 total`)
+- `npm test -- tests/unit/features/settings/SettingsClaudeCodeSection.test.ts --runInBand --no-cache`: passed (`55 passed, 55 total`)
+- `npm run typecheck -- --pretty false`: passed
+- `npm run build`: passed with `BUILD_ID=feature-phase0-capability.202606011519`
+- `npm run lint`: completed with `0 errors / 8 warnings`; remaining warnings are existing oversized/complex diagnostic functions plus `tests/unit/core/agents/backend/ClaudeCodeOptionsBuilder.test.ts`, not new pass/fail evidence.
+
+### Deployment State
+
+- `dist/main.js` contains `BUILD_ID=feature-phase0-capability.202606011519`.
+- Test Vault deploy was attempted immediately after the build, but the first copy step failed: `cp dist/main.js /Volumes/SDD2T/obsidian-vault-write/testvault/.obsidian/plugins/opencodian/main.js` returned `Operation not permitted`.
+- Test Vault `main.js` still contains `BUILD_ID=feature-phase0-capability.202605312344`.
+- Therefore Test Vault is **not** updated to the June 1 15:19 build in this environment.
+
+---
+
+## 2026-06-01 Query.getSettings Runtime Settings Readback — Built, Test Vault Not Updated
+
+### Objective
+
+Continue the Claude Code runtime integration through one safe read-only seam: expose the SDK `Query.getSettings()` live settings snapshot as diagnostic readback only.
+
+### Current Product Boundary
+
+- `ClaudeCodeAdapter.getRuntimeSettings()` calls SDK `Query.getSettings()` when that method is available. It reuses an active query when possible; otherwise it creates a temporary SDK query for the readback.
+- Capability Lab's `Run Stable Settings Readback` output now includes a separate `Runtime Settings Readback (Query.getSettings)` subsection with a redacted JSON preview.
+- The preview redacts sensitive keys such as `env`, token, secret, password, credential, authorization, and oauth-like fields.
+- This is **read-only supporting evidence**. It does not author settings, does not write `.claude/**`, does not change stable chat behavior, and does not update the capability matrix by itself.
+- **File Checkpoint / Rewind** remains `readback`; `Query.getSettings()` does not change the upstream snapshot-creation blocker or `canRewind:false` result.
+- **Fallback Model** remains `readback`; `Query.getSettings()` can only show settings state, not prove automatic fallback switching.
+- **MCP authoring** remains outside this seam; MCP server names are still runtime visibility only.
+
+### Verification
+
+- `npm test -- tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts --runInBand --no-cache`: passed (`126 passed, 126 total`)
+- `npm test -- tests/unit/features/settings/SettingsCapabilityLabSection.test.ts --runInBand --no-cache`: passed (`158 passed, 158 total`)
+- `npm run typecheck -- --pretty false`: passed
+- `npm run check:module-docs -- --range HEAD`: passed (`449 source modules`, `449 mapped docs`, `5 required doc targets`)
+- `npm run check:devlog-order`: passed (`296 dated sections in descending order`)
+- `git diff --check`: passed
+- `npm run build`: passed with `BUILD_ID=feature-phase0-capability.202606011453`
+
+### Deployment State
+
+- `dist/main.js` contains `BUILD_ID=feature-phase0-capability.202606011453`.
+- Test Vault deploy was attempted immediately after the build, but the first copy step failed again: `cp dist/main.js .../testvault/.obsidian/plugins/opencodian/main.js` returned `Operation not permitted`.
+- Test Vault `main.js` still contains `BUILD_ID=feature-phase0-capability.202605312344`.
+- Therefore Test Vault is **not** updated to the June 1 14:53 build in this environment.
+
+---
+
+## 2026-06-01 MCP Runtime Server Names Readback Surface — Built, Test Vault Deploy Blocked
+
+### Objective
+
+Continue the Claude Code runtime integration by productizing one safe seam: display the active Claude Code adapter's loaded MCP runtime server names in read-only settings/discovery surfaces.
+
+### Current Product Boundary
+
+- `ClaudeCodeAdapter.getMcpServerNames()` returns sorted names from static `options.mcpServers` or the dynamic MCP config cache after `loadMcpConfig()`.
+- Claude Code Tools tab now uses `settings.claudeCode.mcpRuntime.loadedWithNames` when server names are available; the refresh button still only calls `reloadMcpServers()`.
+- Capability Lab's MCP Servers discovery row includes server names when the adapter exposes them.
+- This is **runtime visibility only**. It does not author `.claude/mcp.json`, does not add MCP server creation/edit/delete, and does not create a new MCP behavior proof beyond the already-recorded runtime passthrough evidence.
+- `Query.getSettings()` has since been implemented as a separate read-only runtime settings readback seam in the newer section above. It is still not a behavior proof and must not be described as settings authoring.
+- **File Checkpoint / Rewind** remains `readback`; SDK 0.3.158 still produced `canRewind:false`, and no stable rewind UI is promoted.
+- **Fallback Model** remains `readback`; `modelUsage` remains passive detection, not proof of automatic fallback switching.
+
+### Verification
+
+- `npm test -- tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts --runInBand --no-cache`: passed (`123 passed, 123 total`)
+- `npm test -- tests/unit/features/settings/SettingsClaudeCodeSection.test.ts --runInBand --no-cache`: passed (`54 passed, 54 total`)
+- `npm test -- tests/unit/features/settings/SettingsCapabilityLabSection.test.ts --runInBand --no-cache`: passed (`156 passed, 156 total`)
+- `npm run check:module-docs -- --range HEAD`: passed (`449 source modules`, `449 mapped docs`, `5 required doc targets`)
+- `npm run check:devlog-order`: passed after the devlog update (`295 dated sections in descending order`)
+- `git diff --check`: passed
+- `npm run build`: passed with `BUILD_ID=feature-phase0-capability.202606011429`
+
+### Deployment State
+
+- `dist/main.js` contains `BUILD_ID=feature-phase0-capability.202606011429`.
+- Test Vault deploy was attempted, but the first copy step failed: `cp dist/main.js .../testvault/.obsidian/plugins/opencodian/main.js` returned `Operation not permitted`.
+- Test Vault `main.js` still contains `BUILD_ID=feature-phase0-capability.202605312344`.
+- Therefore Test Vault is **not** updated to the June 1 build in this environment.
+
+---
+
+## 2026-05-31 Runtime Ecosystem Read-Only Settings Surface — Implemented
+
+### Objective
+
+Productize the Claude Code runtime ecosystem summary as a read-only settings surface, without overstating authoring or runtime behavior.
+
+### Current Product Boundary
+
+- **Skills / Plugins / Agent Definitions** are runtime/discovery/read-only surfaces when shown outside Capability Lab. The stable settings summary now displays adapter-reported counts, names, and sentinel states such as `skills: "all"`, but it must not create, edit, delete, or persist Claude-native skill, plugin, or agent-definition files.
+- Capability Lab remains the diagnostic/proof surface for deeper probes. Its discovery rows can still show the same read-only runtime data, but the productized settings summary is only status visibility, not authoring and not a behavioral control.
+- This settings surface does not add a new `pass` claim. Skills / Plugins / Agent Definitions already have their existing runtime-proof entries; the change here is user-surface framing from hidden/diagnostic-only toward a read-only discovery/settings surface.
+- Runtime evidence for this settings-surface implementation is build/deploy evidence only: `BUILD_ID=feature-phase0-capability.202605312344` contains the read-only summary and focused settings tests. It is not new behavior proof for File Checkpoint / Rewind or Fallback Model.
+- **File Checkpoint / Rewind** remains `readback`: SDK 0.3.158 did not create snapshots, `applyFlagSettings({ fileCheckpointingEnabled: true })` remains a dead-end seam, and no stable rewind UI is promoted.
+- **Fallback Model** remains `readback`: option wiring and passive `modelUsage` detection are verified, but automatic fallback switching still requires real API HTTP 529 / `overloaded_error` behavior that is not locally triggerable.
+
+### Wording Guardrail
+
+Use `runtime-only`, `read-only`, `discovery surface`, and `readback` for this area. Do not write `pass` unless a section cites the existing runtime evidence for that exact capability, and do not describe skills/plugins/agent-definition authoring as available.
+
+---
+
+## 2026-05-31 File Checkpoint / Rewind — SDK 0.3.158 Runtime Test
+
+### Objective
+
+Test the only remaining executable path for File Checkpoint / Rewind: upgrade SDK from 0.3.145 to 0.3.158 and validate whether checkpointing/rewind works in the real Obsidian/Electron runtime.
+
+### SDK 0.3.158 Electron Incompatibility (Critical Finding)
+
+SDK 0.3.158 **crashes on every `query()` call** in Obsidian/Electron with:
+```
+TypeError [ERR_INVALID_ARG_TYPE]: The "eventTargets" argument must be an instance of EventEmitter or EventTarget. Received an instance of AbortSignal
+    at EventEmitter.setMaxListeners (node:events:331:17)
+```
+
+**Root cause**: SDK 0.3.158 minified code imports `{ setMaxListeners } from "events"` and calls `setMaxListeners(50, abortController.signal)`. Electron 39.8.3's Node.js 22.22.1 does NOT support `AbortSignal` as a target for `setMaxListeners`, even though `AbortSignal` is an `EventTarget` instance. This works in system Node.js but not in Electron's patched runtime.
+
+**Monkey-patch workaround confirmed**: A runtime monkey-patch of `events.setMaxListeners` to filter out `AbortSignal` targets allows 0.3.158 to function in Electron. However, this monkey-patch does NOT improve checkpoint behavior.
+
+### Checkpoint/Rewind Results on 0.3.158 (with monkey-patch)
+
+| Metric | SDK 0.3.145 | SDK 0.3.158 |
+|--------|-------------|-------------|
+| Plugin load | OK | Requires monkey-patch |
+| query() | OK | Requires monkey-patch |
+| probeFileExistedAfterPhase1 | true | true |
+| sdkFilesPersistedEventCount | 0 | 0 |
+| applyFlagSettings succeeded | true | true |
+| Candidates tested | 10 | 10 |
+| canRewind (any candidate) | false (all 10) | false (all 10) |
+| filesChanged | none | none |
+| phase1RewindResult | null | null |
+| rewindActualResult | null | null |
+
+### Conclusion: `readback` (unchanged)
+
+SDK 0.3.158 does NOT fix the File Checkpoint / Rewind blocker. The results are **identical** to 0.3.145:
+- 0/10 candidates have `canRewind:true`
+- 0 `files_persisted` events emitted during Phase 1
+- `applyFlagSettings({ fileCheckpointingEnabled: true })` succeeds but has no effect on snapshot creation
+- The fundamental blocker remains: GitHub Issue #236 (non-interactive `query()` mode never creates file snapshots)
+
+Additionally, SDK 0.3.158 introduces a **new regression** for Electron: `setMaxListeners(abortSignal)` crash requiring a monkey-patch workaround. Since 0.3.158 provides zero checkpoint improvement AND requires a monkey-patch, the repo stays on 0.3.145.
+
+### SDK version decision
+
+- **Current**: 0.3.145 (stable, works in Electron without patches)
+- **Tested**: 0.3.158 (requires Electron monkey-patch, no checkpoint improvement)
+- **Decision**: Stay on 0.3.145. Future SDK upgrade requires either Electron fixing `setMaxListeners(signal)` support or Anthropic adding a non-interactive checkpoint path (Issue #236 fix).
+
+### Runtime Evidence (BUILD_ID: feature-phase0-capability.202605311358)
+
+- SDK 0.3.158 probe session: `556d83c4-02f1-4ccb-bc64-2d463871f66d`
+- SDK 0.3.145 baseline session: `6f9b532b-5220-49f6-8a3c-0c5b5b1d1f3d`
+- Both: Write+Read tools used, probe file created, 10 candidates, all canRewind=false
+- Electron version: 39.8.3 / Node 22.22.1
+- `setMaxListeners(AbortSignal)` fails in Electron: confirmed
+- `setMaxListeners(AbortSignal)` works in system Node: confirmed
+
+### State-Closure Freshness Check (2026-05-31)
+
+- At the 2026-05-31 closure point, the built artifact and Test Vault deployment were newer than the runtime probe: both `dist/main.js` and `/Volumes/SDD2T/obsidian-vault-write/testvault/.obsidian/plugins/opencodian/main.js` contained `BUILD_ID=feature-phase0-capability.202605312344`. This is superseded by the 2026-06-01 sections above: local `dist/main.js` now contains `feature-phase0-capability.202606011453`, while Test Vault remains at `feature-phase0-capability.202605312344` because deployment is blocked by filesystem permissions.
+- The `202605312344` deployment is a settings-surface/productization build for the runtime ecosystem read-only summary plus Capability Lab truth-sync alignment, not new runtime proof for checkpointing or fallback behavior.
+- The `202605311358` SDK 0.3.158 probe result remains the newest recorded runtime evidence for File Checkpoint / Rewind, but no matching `.obsidian-debug/*202605311358*` artifact is present in this worktree. Treat the session IDs and summary above as recorded evidence, not locally replayable artifact evidence.
+
+### Matrix summary (unchanged — historical)
+
+> ⚠️ **Superseded**: Current matrix is 26 rows, 23 pass, 3 readback (File Checkpoint / Rewind, Allowed Tools, Fallback Model). Environment Variables promoted to pass; /context Diagnostic added as pass.
+
+- **pass**: 22/25 (at time of writing)
+- **readback**: 3/25 (File Checkpoint / Rewind, Allowed Tools, Fallback Model)
+
+### Next executable path
+
+**None for File Checkpoint / Rewind.** The blocker is purely upstream:
+1. GitHub Issue #236 (anthropics/claude-agent-sdk-typescript#236) must be fixed by Anthropic
+2. Electron must support `setMaxListeners(signal)` or SDK must stop calling it on AbortSignal targets
+3. No product-level workaround exists for snapshot creation in non-interactive mode
+
+The honest classification remains `readback` until Anthropic ships a fix.
+
+---
+
+## 2026-05-31 File Checkpoint / Rewind — Re-Audit: No New Seam
+
+### Objective
+
+Re-audit File Checkpoint / Rewind for any new honest runtime seam or productizable validation seam beyond the already-dead `applyFlagSettings` path. Current SDK: 0.3.145. Latest npm: 0.3.158.
+
+### Seams Checked This Round
+
+| # | Seam | Status | Reason |
+|---|------|--------|--------|
+| 1 | `extraArgs: { 'replay-user-messages': null }` | ❌ Not a new seam | Official Anthropic docs (code.claude.com/docs/en/agent-sdk/file-checkpointing) list this as required for UUID capture. Our options builder does not support `extraArgs`. However, issue #236 reproduction code already included this flag and `canRewind` still returned false — the blocker is snapshot creation, not UUID capture. |
+| 2 | `query.getSettings()` readback | ℹ️ Read-only runtime readback seam | Available in SDK 0.3.145; can verify the live subprocess settings snapshot, including `fileCheckpointingEnabled`, on an active query. It does not change `canRewind:false`, prove fallback switching, or add MCP authoring. |
+| 3 | SDK 0.3.158 upgrade | ✅ Tested after this re-audit | See the newer 2026-05-31 runtime-test section above: 0.3.158 still crashes in Electron without a monkey-patch and produces the same `canRewind:false` checkpoint result as 0.3.145 even with the patch. |
+| 4 | Official docs vs runtime discrepancy | ℹ️ New data point | Anthropic published official checkpointing guide (code.claude.com/docs/en/agent-sdk/file-checkpointing) showing working TypeScript SDK examples. Either the docs describe newer SDK behavior, non-Electron environments, or are aspirational. Issue #236 remains OPEN with no maintainer response. |
+| 5 | All Query methods re-checked | ❌ No new checkpoint APIs | `rewindFiles()`, `applyFlagSettings()`, `getSettings()`, `initializationResult()` — no new checkpoint-related methods beyond already-tested ones. |
+
+### Conclusion: `readback` (unchanged)
+
+No new honest runtime seam exists in SDK 0.3.145 that could promote File Checkpoint / Rewind beyond `readback`. The fundamental blocker is unchanged: `isInteractive:false` hardcoded in `_T()` (sdk.mjs ~line 58); snapshot creation gated behind React/Ink UI components absent from SDK `query()` mode. All 8 workaround paths eliminated. GitHub Issue #236 still OPEN.
+
+The official Anthropic checkpointing docs are a useful data point, but the later 0.3.158 runtime test above supersedes this re-audit's earlier "test latest SDK" next step. In the currently tested range (0.3.145 and 0.3.158), no local product-level seam remains; the next meaningful path is an upstream non-interactive checkpoint fix or a future SDK release that explicitly changes this behavior.
+
+### Matrix summary (unchanged — historical)
+
+> ⚠️ **Superseded**: Current matrix is 26 rows, 23 pass, 3 readback (File Checkpoint / Rewind, Allowed Tools, Fallback Model). Environment Variables promoted to pass; /context Diagnostic added as pass.
+
+- **pass**: 22/25 (at time of writing)
+- **readback**: 3/25 (File Checkpoint / Rewind, Allowed Tools, Fallback Model)
+
+---
+
 ## 2026-05-31 Fallback Model — modelUsage Detection Seam Verified
 
 ### Objective
@@ -30,6 +1003,8 @@ Explore the SDK `modelUsage` result-message field as a passive detection seam fo
 | DOM assertions | `.obsidian-debug/fallback-model-modelusage-BUILD-feature-phase0-capability.202605311031-assertions.json` (`hasReadbackMarker=true`, `hasPassMarker=false`, `classification=readback`) |
 | Screenshot | `.obsidian-debug/fallback-model-modelusage-BUILD-feature-phase0-capability.202605311031.png` |
 
+State-closure note (2026-05-31): these `202605311031` artifact paths are recorded evidence references, but matching files are not present in this worktree's `.obsidian-debug/` directory. The conclusion remains `readback`; do not treat the artifact list as locally replayable evidence unless the files are restored.
+
 ### Exhaustive Proof Seam Analysis (updated)
 
 | Seam | Status | Reason |
@@ -48,13 +1023,26 @@ Explore the SDK `modelUsage` result-message field as a passive detection seam fo
 
 **Classification remains `readback`**: option wiring + detection plumbing verified, switching behavior not locally provable.
 
-### Precise Blocker (unchanged)
+### Precise Blocker (updated — CLI binary evidence)
 
-SDK source (sdk.mjs v0.3.145) contains exactly 3 fallback references — all in `ProcessTransport.initialize()`: destructure, same-model validate, push `--fallback-model` CLI arg. ZERO switching/overload/retry logic in SDK. All model-switching lives in compiled CLI binary behind API-side HTTP 529/capacity signals. Cannot simulate locally. Same-model validation is deterministic but doesn't prove switching. `modelUsage` detection confirmed but passive. **Next executable path**: either Anthropic exposes a programmatic fallback trigger in SDK, or we accept `readback` as the honest ceiling.
+SDK source (sdk.mjs v0.3.145) contains exactly 3 fallback references — all in `ProcessTransport.initialize()`: destructure, same-model validate, push `--fallback-model` CLI arg. ZERO switching/overload/retry logic in SDK. All model-switching lives in compiled CLI binary (`claude` executable), specifically in the API retry loop:
 
-### Matrix summary (unchanged)
+- **Error class**: `FallbackTriggeredError` (minified: `LvH`), defined in CLI binary, not in SDK
+- **Trigger condition**: `pDH(error) && (FALLBACK_FOR_ALL_PRIMARY_MODELS || (!Aq() && i2H(model)))`
+  - `pDH()` checks HTTP 529 status OR response body contains `"type":"overloaded_error"`
+  - `i2H()` checks model is Opus family (opus-4-0 through opus-4-7)
+  - `FALLBACK_FOR_ALL_PRIMARY_MODELS` env var overrides model check
+- **Retry threshold**: 3 consecutive 529 errors (`dY3=3`) before fallback triggers
+- **Fallback action**: throws `FallbackTriggeredError`, caught by outer try-catch which sets `mainLoopModel=fallbackModel`, emits `tengu_model_fallback_triggered` telemetry, yields "Switched to {model} due to high demand" notification
+- **SDK query source**: `"sdk"` is in the background-drop exclusion set (`aY3`), so SDK queries are NOT silently dropped on 529 — but fallback itself requires the same 529 signal
 
-- **pass**: 22/25
+Cannot simulate locally without producing real Anthropic API HTTP 529 responses. Same-model validation is deterministic but doesn't prove switching. `modelUsage` detection confirmed but passive. **Next executable path**: either Anthropic exposes a programmatic fallback trigger in SDK, or we accept `readback` as the honest ceiling.
+
+### Matrix summary (unchanged — historical)
+
+> ⚠️ **Superseded**: Current matrix is 26 rows, 23 pass, 3 readback (File Checkpoint / Rewind, Allowed Tools, Fallback Model). Environment Variables promoted to pass; /context Diagnostic added as pass.
+
+- **pass**: 22/25 (at time of writing)
 - **readback**: 3/25 (File Checkpoint / Rewind, Allowed Tools, Fallback Model)
 
 ## 2026-05-31 Settings-Side Live-Apply Seam — Honesty Audit
@@ -156,16 +1144,20 @@ Most likely: `applyFlagSettings` succeeds silently (no error) but does NOT activ
 | Screenshot | `.obsidian-debug/checkpoint-rewind-applyflagsettings-BUILD-feature-phase0-capability.202605311016.png` (737 KB, Capability Lab matrix showing File Checkpoint / Rewind = Readback verified) |
 | DOM assertions | `.obsidian-debug/checkpoint-rewind-applyflagsettings-BUILD-feature-phase0-capability.202605311016-assertions.json` (`hasReadbackMarker=true`, `hasPassMarker=false`, `classification=readback`) |
 
+State-closure note (2026-05-31): these `202605311013` / `202605311016` artifact paths are recorded evidence references, but matching files are not present in this worktree's `.obsidian-debug/` directory. The conclusion remains `readback`; do not treat the artifact list as locally replayable evidence unless the files are restored.
+
 **Conclusion: `applyFlagSettings` is a dead-end seam.** The call succeeds (no error) but does NOT activate snapshot creation. `sdkFilesPersistedEventCount` remains 0, all 6 candidates still return `canRewind: false`. This confirms the blocker is architectural, not flag-based: the snapshot function is gated behind React/Ink UI components that never render in SDK query() mode, and no runtime settings injection can bypass this.
 
-### Matrix summary (unchanged)
+### Matrix summary (unchanged — historical)
 
-- **pass**: 22/25
+> ⚠️ **Superseded**: Current matrix is 26 rows, 23 pass, 3 readback (File Checkpoint / Rewind, Allowed Tools, Fallback Model). Environment Variables promoted to pass; /context Diagnostic added as pass.
+
+- **pass**: 22/25 (at time of writing)
 - **readback**: 3/25 (File Checkpoint / Rewind, Allowed Tools, Fallback Model)
 
 ### Precise Blocker (unchanged)
 
-**Upstream SDK bug [anthropics/claude-agent-sdk-typescript#236](https://github.com/anthropics/claude-agent-sdk-typescript/issues/236)**: `isInteractive:false` hardcoded in `_T()` (sdk.mjs ~line 58); snapshot creation gated behind React/Ink `useState` setters absent from SDK `query()` mode; `rewindFiles()` checks always-empty internal file history. `applyFlagSettings({ fileCheckpointingEnabled: true })` seam confirmed dead-end (BUILD_ID feature-phase0-capability.202605311005: call succeeds but `sdkFilesPersistedEventCount` remains 0, all candidates still `canRewind:false`). SDK 0.3.157 (latest) does not fix this and introduces Obsidian/Electron crash. **Next executable path**: Anthropic must add snapshot creation to the non-interactive code path.
+**Upstream SDK bug [anthropics/claude-agent-sdk-typescript#236](https://github.com/anthropics/claude-agent-sdk-typescript/issues/236)**: `isInteractive:false` hardcoded in `_T()` (sdk.mjs ~line 58); snapshot creation gated behind React/Ink `useState` setters absent from SDK `query()` mode; `rewindFiles()` checks always-empty internal file history. `applyFlagSettings({ fileCheckpointingEnabled: true })` seam confirmed dead-end (BUILD_ID feature-phase0-capability.202605311013: call succeeds but `sdkFilesPersistedEventCount` remains 0, all candidates still `canRewind:false`). SDK 0.3.157 regressed with the `setMaxListeners(abortSignal)` crash in Obsidian/Electron; SDK 0.3.158 was later tested with a monkey-patch and produced identical `canRewind:false` results to 0.3.145. **Next executable path**: Anthropic must add snapshot creation to the non-interactive code path, or a future SDK release must explicitly change this behavior.
 
 ### Files changed
 
@@ -212,7 +1204,9 @@ Exhaustive investigation confirms no new deterministic runtime seam exists for A
 
 ### Classification: `readback` (unchanged — finalized)
 
-- **Pass**: 22/25
+> ⚠️ **Superseded**: Current matrix is 26 rows, 23 pass, 3 readback. Environment Variables promoted to pass; /context Diagnostic added as pass.
+
+- **Pass**: 22/25 (at time of writing)
 - **Readback**: 3/25 (File Checkpoint / Rewind, Allowed Tools, Fallback Model)
 
 ---
@@ -245,7 +1239,7 @@ The previous proof relied on `_diagnosticToolRestriction`, an adapter-level esca
   - Classification: **PASS**
 - Settings restored: `restrictedBuiltinTools` returned to `[]` after proof
 - Console errors: none
-- Matrix: 22/25 pass, 3/25 readback, 0/25 fail (artifact `total:26` is internally inconsistent: 22+3+0=25; source buildMatrixRows() has 25 rows, test expects 25)
+- Matrix: 22/25 pass, 3/25 readback, 0/25 fail (at time of writing; superseded — current is 26 rows, 23 pass, 3 readback)
 - Proof artifacts: `.obsidian-debug/restricted-builtin-final-assertions-BUILD-feature-phase0-capability.202605300954.json`
 
 ### Test Coverage
@@ -389,7 +1383,7 @@ Harden the File Checkpoint / Rewind blocker with SDK source-level evidence, elim
 | Manual snapshot trigger | ❌ Not possible | `SDKFilesPersistedEvent` is read-only; no host-side creation API |
 | `spawnClaudeCodeProcess` extra args | ❌ Not effective | `isInteractive` is internal, not a CLI flag |
 | Non-`query()` entry points | ❌ Same issue | `assistant`, `bridge` entry points all initialize `isInteractive:false` |
-| `applyFlagSettings({ fileCheckpointingEnabled: true })` | ❌ Dead-end | Call succeeds (no error) but subprocess does NOT activate snapshot creation. `sdkFilesPersistedEventCount` remains 0, all candidates still `canRewind:false`. BUILD_ID feature-phase0-capability.202605311005 |
+| `applyFlagSettings({ fileCheckpointingEnabled: true })` | ❌ Dead-end | Call succeeds (no error) but subprocess does NOT activate snapshot creation. `sdkFilesPersistedEventCount` remains 0, all candidates still `canRewind:false`. BUILD_ID feature-phase0-capability.202605311013 |
 
 ### Source-Backed Evidence
 
@@ -427,7 +1421,7 @@ Replaced generic "BLOCKER=upstream SDK bug" with source-backed evidence:
 
 ### Precise Blocker (narrowest honest sentence)
 
-**Upstream SDK bug [anthropics/claude-agent-sdk-typescript#236](https://github.com/anthropics/claude-agent-sdk-typescript/issues/236)**: `isInteractive:false` is hardcoded in `_T()` (sdk.mjs ~line 58); snapshot creation is gated behind React/Ink `useState` setters absent from SDK `query()` mode; `rewindFiles()` checks always-empty internal file history. SDK 0.3.157 (latest) does not fix this and introduces Obsidian/Electron crash. **Next executable path**: Anthropic must add snapshot creation to the non-interactive code path.
+**Upstream SDK bug [anthropics/claude-agent-sdk-typescript#236](https://github.com/anthropics/claude-agent-sdk-typescript/issues/236)**: `isInteractive:false` is hardcoded in `_T()` (sdk.mjs ~line 58); snapshot creation is gated behind React/Ink `useState` setters absent from SDK `query()` mode; `rewindFiles()` checks always-empty internal file history. SDK 0.3.157 regressed with the `setMaxListeners(abortSignal)` crash in Obsidian/Electron; SDK 0.3.158 was later tested with a monkey-patch and produced identical `canRewind:false` results to 0.3.145. **Next executable path**: Anthropic must add snapshot creation to the non-interactive code path, or a future SDK release must explicitly change this behavior.
 
 ### Files changed
 
@@ -1531,7 +2525,7 @@ Capabilities exposed in stable UI. This bucket mixes **behavior-verified** capab
 | # | Capability | Surface | Runtime Proof | Evidence |
 |---|---|---|---|---|
 | 1 | MCP Servers | Settings | `pass` | Runtime passthrough verified; shared Settings > MCP tab provides authoring; Claude Code Tools tab provides runtime refresh |
-| 2 | Allowed Tools | Settings | `readback` | Stable Settings UI exposed; SDK option correctly built and passed to SDK. **Behavior proof infeasible**: model tool-calling is non-deterministic, so diagnostic probes can only detect enforcement *failure* (non-allowed tool called), not success |
+| 2 | Allowed Tools | Settings | `readback` | Stable Settings UI exposed; SDK option correctly built and passed to SDK. **Pre-allow / auto-approve shortcut only — not a restrictor**: init catalog always unfiltered (34 tools regardless of allowedTools value), canUseTool non-functional in SDK query() mode. Zero enforcement observed. For deterministic built-in tool filtering, use Restricted Built-in Tools |
 | 3 | Disallowed Tools | Settings | `pass` | Stable Settings UI exposed; SDK option correctly built and passed to SDK. **Promoted 2026-05-30**: init-message tool catalog inspection proves deterministic enforcement — SDK init message (`type:'system', subtype:'init'`) `tools[]` field has 33 entries but **excludes Bash** when `disallowedTools: ['Bash']` is set. This is tool-catalog-level enforcement (tool removed from model's context), not dependent on model behavior. `bypassPermissions` and `disallowedTools` are orthogonal CLI flags — no interaction. Runtime evidence on BUILD_ID `feature-phase0-capability.202605300150`: init catalog = 33 tools, Bash absent, model called Agent/Glob/Glob but never Bash |
 | 4 | Turn/Budget Limits | Settings | `pass` | Stable Settings UI exposed; SDK options correctly built and passed to SDK. **`maxBudgetUsd` enforcement observed** — SDK returns `error_max_budget_usd` with message "Reached maximum budget ($0.01)". **`maxTurns` enforcement observed 2026-05-29** — live proof via `runMaxTurnsProof` diagnostic probe: SDK emitted `result` message with `subtype: 'error_max_turns'`, `num_turns: 2`, `cost: $0.13` when `maxTurns=1` with multi-tool prompt. SDK also throws after the result message; `runDiagnosticPrompt` now catches non-fatal SDK errors and returns `rawMessages + sdkError` for inspection. Combined, both maxTurns and maxBudgetUsd enforcement are verified |
 | 5 | Environment Variables | Settings | `pass` | Stable Settings UI exposed; settings→SDK env readback proved. **Promoted 2026-05-28**: prompt strategy changed to explicitly request "Use the Bash tool" (matching pattern from Subagent Stream Proof). Fresh runtime proof on build `feature-phase0-capability.202605281935`: **All 4 layers PASS** — Layer 1 (SDK readback): env options correctly built; Layer 2 (Bash tool_use): model invoked Bash tool; Layer 3 (env-derived filesystem side effect): nonce value verified in side-effect file at `/tmp/opencodian-env-proof-<nonce>`; Layer 4 (assistant text nonce echo): nonce present in assistant response. Scope boundary: proves env propagation into Bash subprocess, NOT permission approval UX (proven separately) |
@@ -1787,11 +2781,7 @@ The Claude Code SDK spawns successfully, executes SessionStart and UserPromptSub
 
 ### Code decision
 
-**No code changes.** Current classification is already honest:
-- Capability matrix static row: `wiring`
-- Capability Lab proof button: correctly returns `fail` at runtime
-- Stable settings proof-status notice: `data-proof-state="wiring"`
-- No cosmetic文案 changes needed.
+**No code changes were made in this 2026-05-28 slice. Historical note, superseded 2026-05-29+:** at this point the static row / proof-status notice still used `wiring`, while the proof button correctly returned `fail` for the invalid-primary runtime attempt. Current source and newer status sections classify Fallback Model as `readback` with `data-proof-state="readback"` because option readback is verified, while automatic fallback switching remains unproven / blocked.
 
 ### Artifact
 
@@ -2289,7 +3279,7 @@ This slice adds runtime readback proof for Claude Code stable settings (Allowed 
 | Allowed Tools | `readback` | Runtime-readback verified: options.allowedTools built from settings |
 | Disallowed Tools | `readback` | Runtime-readback verified: options.disallowedTools built from settings |
 | Turn/Budget Limits | `readback` | Runtime-readback verified: options.maxTurns/maxBudgetUsd built from settings |
-| Environment Variables | `readback` | Runtime-readback verified: options.env built from settings. Fresh runtime behavior proof (env-derived filesystem side effect via diagnostic bypass) is available on-demand but does NOT permanently promote static classification. Permission approval UX is proven separately and is not implied by env proof. |
+| Environment Variables | `readback` | Runtime-readback verified: options.env built from settings. **Superseded 2026-06-02**: Environment Variables was subsequently promoted to `pass` in the Capability Lab matrix after live behavior proof (env propagation into Bash subprocess, Layer 1-4) was anchored. This table reflects the historical `readback` classification at the time of writing; the current overall capability is `verified (pass)`. Permission approval UX is proven separately and is not implied by env proof. |
 | Fallback Model | `readback` | Option readback verified. Behavior proof failed: invalid primary accepted without error (same invalid string echoed back), no fallback triggered. Invalid-primary strategy undermined — SDK does not validate model names at query boundary |
 
 ### Verification
@@ -2329,7 +3319,7 @@ This slice updates the Claude Code stable settings UI surface to match the Capab
 | Allowed Tools | "wired but not yet runtime-verified" | Runtime readback verified + behavior is SDK/model-dependent |
 | Disallowed Tools | "wired but not yet runtime-verified" | Runtime readback verified + behavior is SDK/model-dependent |
 | Turn/Budget Limits | "wired but not yet runtime-verified" | Runtime readback verified + behavior is SDK/model-dependent |
-| Environment Variables | "wired but not yet runtime-verified" | Runtime readback verified |
+| Environment Variables | "wired but not yet runtime-verified" | Runtime readback verified — **superseded 2026-06-02**: current overall capability is `verified (pass)` (live behavior proof in Capability Lab); stable settings notice remains `readback` as supporting evidence |
 | Fallback Model | Implied stable | Option wiring/readback proven; automatic fallback behavior unproven |
 
 ### Verification
@@ -4648,7 +5638,7 @@ This pass promotes the diagnostics export from "no secret protection" to "best-e
 
 ### Gap
 
-Environment Variables had real live runtime proof via the diagnostic bypass path (Layer 1/2/3/4 all PASS), but the Capability Matrix row and static discovery text remained `readback`. The diagnostic bypass proves env propagation into Claude/Bash subprocesses, yet this evidence is produced on-demand by a diagnostic button rather than being a permanently promoted static classification. The previous round documented a planned promotion to `pass`, but the static source of truth (`buildMatrixRows()`) correctly preserves `readback` to avoid overclaiming.
+Environment Variables had real live runtime proof via the diagnostic bypass path (Layer 1/2/3/4 all PASS), but at the time of this slice the Capability Matrix row and static discovery text remained `readback`. The diagnostic bypass proves env propagation into Claude/Bash subprocesses, yet this evidence was produced on-demand by a diagnostic button rather than being a permanently promoted static classification. The previous round documented a planned promotion to `pass`, but at the time the static source of truth (`buildMatrixRows()`) preserved `readback` to avoid overclaiming. **Superseded 2026-06-02**: the Capability Lab matrix now has `runtimeProof: 'pass'` for Environment Variables; the stable settings notice remains `readback` as supporting evidence only.
 
 ### Honest Boundary
 
@@ -4668,20 +5658,20 @@ Environment Variables had real live runtime proof via the diagnostic bypass path
 
 ### Gap
 
-The stable Model & Thinking tab already had a boundary notice for Fallback Model ("changes require restart") and the Capability Lab matrix correctly showed `wiring`, but the stable settings surface lacked a compact proof-status notice — unlike Tools, Limits, and Env which all render `renderXProofStatusNotice()`. Users saw the fallback model input and quick-select without any inline indication of the proof boundary.
+The stable Model & Thinking tab already had a boundary notice for Fallback Model ("changes require restart") and, at the time of this historical slice, the Capability Lab matrix still showed `wiring`. The stable settings surface lacked a compact proof-status notice — unlike Tools, Limits, and Env which all render `renderXProofStatusNotice()`. This entry is superseded by the later `wiring` → `readback` correction; current source uses `data-proof-state="readback"` for Fallback Model.
 
 ### What Changed
 
-- **`SettingsClaudeCodeSection.ts`**: Added `renderFallbackModelProofStatusNotice()` method rendering a compact inline proof-status notice with `data-claude-code-proof-status="fallback-model"` and `data-proof-state="wiring"`. Inserted into `renderModelThinkingTab()` after the existing `renderFallbackModelBoundaryNotice()`.
+- **`SettingsClaudeCodeSection.ts`**: Added `renderFallbackModelProofStatusNotice()` method rendering a compact inline proof-status notice with `data-claude-code-proof-status="fallback-model"`. Historical implementation used `data-proof-state="wiring"`; current source now uses `data-proof-state="readback"`. Inserted into `renderModelThinkingTab()` after the existing `renderFallbackModelBoundaryNotice()`.
 - **`en.ts`**: Added `settings.claudeCode.proofStatus.fallbackModel` key: "Readback verified. The fallback model option is accepted by the SDK and runtime-readback confirmed (both model and fallbackModel correctly reach SDK). Automatic fallback behavior is unproven — invalid primary model proof accepted without error (same invalid string echoed back), no fallback triggered. Blocker: SDK limitation."
 - **`zh.ts`**: Added corresponding Chinese locale key.
-- **`SettingsClaudeCodeSection.test.ts`**: Added test asserting the fallback proof-status notice renders with `data-proof-state="wiring"` and correct locale text.
+- **`SettingsClaudeCodeSection.test.ts`**: Added test coverage for the fallback proof-status notice. Historical expectations used `data-proof-state="wiring"`; current tests assert the corrected `data-proof-state="readback"` boundary.
 
 ### Classification
 
 | Capability | Capability Lab | Stable Settings Proof-Status |
 |---|---|---|
-| Fallback Model | `wiring` (honest since cc-stable-settings-readback iteration 1) | `wiring` (NEW — added compact proof-status notice) |
+| Fallback Model | Historical: `wiring`; current: `readback` | Historical: `wiring`; current: `readback` |
 
 The fallback model remains `readback` in both surfaces. The new proof-status notice makes the honest boundary visible in the stable settings surface where users configure fallback models. Behavior proof was explicitly attempted and the invalid-primary strategy was undermined: SDK accepted the invalid model name without error and reported the same invalid string back, no fallback triggered. The readback classification is concrete evidence-based, not speculative.
 
@@ -4695,11 +5685,11 @@ This change is purely a stable settings UX honesty improvement. No changes to Ca
 
 ### Gap
 
-After the diagnostic bypass commit proved Environment Variables Layer 1-4 PASS at runtime, there was a temptation to promote the static classification from `readback` to `pass`. However, the static source of truth (`buildMatrixRows`, settings UI, audit tests) correctly preserves `readback` to avoid overclaiming. The diagnostic bypass produces fresh runtime evidence on-demand, but that is not the same as a stable, always-on behavior proof.
+After the diagnostic bypass commit proved Environment Variables Layer 1-4 PASS at runtime, there was a temptation to promote the static classification from `readback` to `pass`. At the time, the static source of truth (`buildMatrixRows`, settings UI, audit tests) preserved `readback` to avoid overclaiming. The diagnostic bypass produced fresh runtime evidence on-demand, which was not the same as a stable, always-on behavior proof. **Superseded 2026-06-02**: the Capability Lab matrix now has `runtimeProof: 'pass'` for Environment Variables; the stable settings notice remains `readback` as supporting evidence only.
 
 ### Honest Boundary
 
-- **Static classification remains `readback`**: `buildMatrixRows()`, `renderEnvProofStatusNotice()`, and audit tests all use `readback`. The settings UI shows "✓ Readback verified — not behavior verified."
+- **Static classification at time of writing: `readback`**: `buildMatrixRows()`, `renderEnvProofStatusNotice()`, and audit tests all used `readback`. The settings UI showed "✓ Readback verified — not behavior verified." **Superseded 2026-06-02**: `buildMatrixRows()` now has `runtimeProof: 'pass'`; `renderEnvProofStatusNotice()` remains `readback` as supporting evidence.
 - **Diagnostic bypass can output `pass`**: The "Run Environment Variables Proof" button produces Layer 1-4 evidence when executed. This is real behavior proof, but it is harness-produced, not ordinary-chat-automatic.
 - **Permission approval UX**: Proven separately via ordinary chat + live harness. Env proof does NOT imply permission approval.
 

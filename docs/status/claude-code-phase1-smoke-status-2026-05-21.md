@@ -77,7 +77,7 @@ These fixes are unit/typecheck validated. They are not a new claim that all Clau
 | `agents` | ✅ | ❌ No wiring | Phase 4: Agent catalog + file-agent management |
 | `sessionStore` | ✅ | ❌ No wiring | Phase 5: External storage adapter |
 | `systemPrompt` | ✅ | ❌ No wiring | Phase 2+: Advanced configuration |
-| `sandbox` | ✅ | ❌ No wiring | Phase 5: Security sandbox |
+| `sandbox` | ✅ | ⚠️ Readback (2026-06-02: top-level booleans wired, readback only) | Phase 5: network/filesystem sub-policies |
 | `outputFormat` | ✅ | ❌ No wiring | Phase 4+: Structured output |
 | `plugins` | ✅ | ❌ No wiring | Phase 5: Plugin system |
 | `betas` | ✅ | ❌ No settings field | Semver-sensitive; should be programmatic only |

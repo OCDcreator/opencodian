@@ -43,6 +43,57 @@ interface SettingsClaudeCodeSectionOptions {
   resolveProcess?: (options: ClaudeCodeProcessResolverOptions) => ClaudeCodeProcessResolution;
 }
 
+interface ClaudeCodeRuntimeEcosystemAdapter {
+  getSkillCount?: () => number;
+  getSkillsList?: () => string[] | 'all';
+  getPluginCount?: () => number;
+  getPluginsList?: () => string[];
+  getMcpServerCount?: () => number;
+  getMcpServerNames?: () => string[];
+  getMcpServerRuntimeStatuses?: () => Promise<ClaudeCodeMcpRuntimeStatus[] | null>;
+  getRuntimeCatalog?: () => Promise<ClaudeCodeRuntimeCatalog | null>;
+  getContextUsage?: () => Promise<unknown | null>;
+  getAccountInfo?: () => Promise<unknown | null>;
+  readRuntimeFile?: (
+    path: string,
+    options?: { maxBytes?: number; encoding?: 'utf-8' | 'base64' },
+  ) => Promise<unknown | null>;
+  getAgentDefinitionCount?: () => number;
+  getAgentDefinitionsList?: () => string[];
+}
+
+interface ClaudeCodeMcpRuntimeStatus {
+  name: string;
+  status: string;
+  scope?: string;
+  serverInfo?: {
+    name?: string;
+    version?: string;
+  };
+  toolCount: number;
+  toolNames: string[];
+  hasError: boolean;
+  errorSummary?: string;
+}
+
+interface ClaudeCodeRuntimeCatalogCommand {
+  name: string;
+  description?: string;
+  argumentHint?: string;
+  aliases?: string[];
+}
+
+interface ClaudeCodeRuntimeCatalogAgent {
+  name: string;
+  description?: string;
+  model?: string;
+}
+
+interface ClaudeCodeRuntimeCatalog {
+  commands: ClaudeCodeRuntimeCatalogCommand[];
+  agents: ClaudeCodeRuntimeCatalogAgent[];
+}
+
 const CLAUDE_SETTING_SOURCES: Array<{ id: ClaudeCodeSettingSource; labelKey: TranslationKey; descKey: TranslationKey }> = [
   { id: 'user', labelKey: 'settings.claudeCode.settingSources.user', descKey: 'settings.claudeCode.settingSources.user.desc' },
   { id: 'project', labelKey: 'settings.claudeCode.settingSources.project', descKey: 'settings.claudeCode.settingSources.project.desc' },
@@ -75,6 +126,8 @@ const CLAUDE_PROJECT_SOURCE_FILES = [
   '.claude/settings.json',
   '.claude/settings.local.json',
 ] as const;
+const CLAUDE_CONTEXT_USAGE_SECRET_KEY_PATTERN = /(?:^env$|api[_-]?key|secret|password|credential|authorization|oauth|(?:access|refresh|session|auth)[_-]?token|^token$)/i;
+const CLAUDE_ACCOUNT_INFO_SECRET_KEY_PATTERN = /(?:^env$|api[_-]?key|secret|password|credential|authorization|oauth|(?:access|refresh|session|auth)?[_-]?token|token[_-]?source)/i;
 
 const CLAUDE_CLASSIC_TABS = [
   'runtime',
@@ -170,10 +223,16 @@ export class SettingsClaudeCodeSection {
 
   private renderRuntimeTab(containerEl: HTMLElement): void {
     this.renderRuntimeBoundaryNotice(containerEl);
+    this.renderRuntimeEcosystemSummary(containerEl);
+    this.renderRuntimeCatalogReadbackControls(containerEl);
+    this.renderAccountInfoReadbackControls(containerEl);
+    this.renderContextUsageReadbackControls(containerEl);
+    this.renderRuntimeFileReadbackControls(containerEl);
     this.renderExecutableSetting(containerEl);
     this.renderEnvironmentHint(containerEl);
     this.renderDiagnostics(containerEl);
     this.renderEnvProofStatusNotice(containerEl);
+    this.renderFileCheckpointBoundaryNotice(containerEl);
     this.renderEnvironmentVariablesSetting(containerEl);
   }
 
@@ -222,11 +281,601 @@ export class SettingsClaudeCodeSection {
       });
   }
 
+  private renderRuntimeEcosystemSummary(containerEl: HTMLElement): void {
+    const adapter = this.getClaudeAdapter() as ClaudeCodeRuntimeEcosystemAdapter | null;
+    const summaryEl = containerEl.createDiv({
+      cls: 'opencodian-settings-inline-notice opencodian-claude-code-runtime-ecosystem',
+      attr: {
+        'data-claude-code-runtime-ecosystem': 'true',
+        'data-runtime-only': 'true',
+        'data-proof-state': 'readback',
+      },
+    });
+
+    summaryEl.createEl('h5', {
+      text: t('settings.claudeCode.runtimeEcosystem.name'),
+    });
+    summaryEl.createEl('p', {
+      cls: 'opencodian-claude-code-runtime-ecosystem-desc',
+      text: t('settings.claudeCode.runtimeEcosystem.desc'),
+    });
+
+    for (const row of this.buildRuntimeEcosystemRows(adapter)) {
+      summaryEl.createEl('p', {
+        cls: 'opencodian-claude-code-runtime-ecosystem-row',
+        attr: {
+          'data-runtime-ecosystem-kind': row.kind,
+          'data-runtime-ecosystem-state': row.state,
+          'data-proof-state': 'readback',
+        },
+        text: row.text,
+      });
+    }
+  }
+
+  private buildRuntimeEcosystemRows(
+    adapter: ClaudeCodeRuntimeEcosystemAdapter | null,
+  ): Array<{
+    kind: 'plugins' | 'skills' | 'agent-definitions';
+    state: 'empty' | 'loaded' | 'all';
+    text: string;
+  }> {
+    return [
+      this.buildRuntimeEcosystemPluginRow(adapter),
+      this.buildRuntimeEcosystemSkillRow(adapter),
+      this.buildRuntimeEcosystemAgentDefinitionRow(adapter),
+    ];
+  }
+
+  private buildRuntimeEcosystemPluginRow(
+    adapter: ClaudeCodeRuntimeEcosystemAdapter | null,
+  ): {
+    kind: 'plugins';
+    state: 'empty' | 'loaded';
+    text: string;
+  } {
+    const pluginCount = adapter?.getPluginCount?.() ?? 0;
+    const pluginNames = adapter?.getPluginsList?.() ?? [];
+    if (pluginCount > 0) {
+      return {
+        kind: 'plugins',
+        state: 'loaded',
+        text: t('settings.claudeCode.runtimeEcosystem.plugins.loaded', {
+          count: pluginCount,
+          names: this.formatRuntimeEcosystemNames(pluginNames),
+        }),
+      };
+    }
+
+    return {
+      kind: 'plugins',
+      state: 'empty',
+      text: t('settings.claudeCode.runtimeEcosystem.plugins.empty'),
+    };
+  }
+
+  private buildRuntimeEcosystemSkillRow(
+    adapter: ClaudeCodeRuntimeEcosystemAdapter | null,
+  ): {
+    kind: 'skills';
+    state: 'empty' | 'loaded' | 'all';
+    text: string;
+  } {
+    const skillCount = adapter?.getSkillCount?.() ?? 0;
+    const skillsList = adapter?.getSkillsList?.() ?? [];
+    if (skillCount < 0 || skillsList === 'all') {
+      return {
+        kind: 'skills',
+        state: 'all',
+        text: t('settings.claudeCode.runtimeEcosystem.skills.all'),
+      };
+    }
+    if (skillCount > 0) {
+      return {
+        kind: 'skills',
+        state: 'loaded',
+        text: t('settings.claudeCode.runtimeEcosystem.skills.loaded', {
+          count: skillCount,
+          names: this.formatRuntimeEcosystemNames(skillsList),
+        }),
+      };
+    }
+
+    return {
+      kind: 'skills',
+      state: 'empty',
+      text: t('settings.claudeCode.runtimeEcosystem.skills.empty'),
+    };
+  }
+
+  private buildRuntimeEcosystemAgentDefinitionRow(
+    adapter: ClaudeCodeRuntimeEcosystemAdapter | null,
+  ): {
+    kind: 'agent-definitions';
+    state: 'empty' | 'loaded';
+    text: string;
+  } {
+    const agentDefinitionCount = adapter?.getAgentDefinitionCount?.() ?? 0;
+    const agentDefinitionNames = adapter?.getAgentDefinitionsList?.() ?? [];
+    if (agentDefinitionCount > 0) {
+      const names = this.formatRuntimeEcosystemNames(agentDefinitionNames);
+      return {
+        kind: 'agent-definitions',
+        state: 'loaded',
+        text: agentDefinitionCount === 1
+          ? t('settings.claudeCode.runtimeEcosystem.agentDefinitions.single', {
+            name: names,
+          })
+          : t('settings.claudeCode.runtimeEcosystem.agentDefinitions.loaded', {
+            count: agentDefinitionCount,
+            names,
+          }),
+      };
+    }
+
+    return {
+      kind: 'agent-definitions',
+      state: 'empty',
+      text: t('settings.claudeCode.runtimeEcosystem.agentDefinitions.empty'),
+    };
+  }
+
+  private formatRuntimeEcosystemNames(names: string[]): string {
+    const normalizedNames = names
+      .map((name) => name.trim())
+      .filter((name) => name.length > 0);
+    return normalizedNames.length > 0
+      ? normalizedNames.join(', ')
+      : t('settings.claudeCode.runtimeEcosystem.unnamed');
+  }
+
+  private renderRuntimeCatalogReadbackControls(containerEl: HTMLElement): void {
+    let outputEl: HTMLElement | null = null;
+    const getOutputEl = (): HTMLElement => {
+      outputEl ??= containerEl.createDiv({
+        cls: 'opencodian-settings-inline-notice opencodian-claude-code-runtime-catalog',
+        attr: {
+          'data-claude-code-runtime-catalog': 'true',
+          'data-proof-state': 'readback',
+        },
+      });
+      return outputEl;
+    };
+
+    new Setting(containerEl)
+      .setName(t('settings.claudeCode.runtimeCatalog.name'))
+      .setDesc(t('settings.claudeCode.runtimeCatalog.desc'))
+      .addButton((button) => {
+        button
+          .setButtonText(t('settings.claudeCode.runtimeCatalog.inspectButton'))
+          .onClick(async () => {
+            await this.renderRuntimeCatalogReadback(getOutputEl());
+          });
+      });
+  }
+
+  private async renderRuntimeCatalogReadback(outputEl: HTMLElement): Promise<void> {
+    outputEl.empty();
+    outputEl.setText(t('settings.claudeCode.runtimeCatalog.loading'));
+    const adapter = this.getClaudeAdapter() as ClaudeCodeRuntimeEcosystemAdapter | null;
+    if (typeof adapter?.getRuntimeCatalog !== 'function') {
+      outputEl.setText(t('settings.claudeCode.runtimeCatalog.unavailable'));
+      return;
+    }
+
+    let catalog: ClaudeCodeRuntimeCatalog | null;
+    try {
+      catalog = await adapter.getRuntimeCatalog();
+    } catch {
+      outputEl.setText(t('settings.claudeCode.runtimeCatalog.failed'));
+      return;
+    }
+
+    if (catalog === null) {
+      outputEl.setText(t('settings.claudeCode.runtimeCatalog.unavailable'));
+      return;
+    }
+
+    outputEl.empty();
+    outputEl.createEl('p', {
+      text: t('settings.claudeCode.runtimeCatalog.summary', {
+        commands: catalog.commands.length,
+        agents: catalog.agents.length,
+      }),
+    });
+    this.renderRuntimeCatalogCommands(outputEl, catalog.commands);
+    this.renderRuntimeCatalogAgents(outputEl, catalog.agents);
+  }
+
+  private renderRuntimeCatalogCommands(
+    containerEl: HTMLElement,
+    commands: ClaudeCodeRuntimeCatalogCommand[],
+  ): void {
+    containerEl.createEl('h5', {
+      text: t('settings.claudeCode.runtimeCatalog.commands'),
+    });
+    if (commands.length === 0) {
+      containerEl.createEl('p', { text: t('settings.claudeCode.runtimeCatalog.emptyCommands') });
+      return;
+    }
+
+    for (const command of commands) {
+      const commandEl = containerEl.createDiv({ cls: 'opencodian-claude-code-runtime-catalog-command' });
+      commandEl.createEl('p', { text: `/${command.name}` });
+      if (command.description) {
+        commandEl.createEl('p', { text: command.description });
+      }
+      if (command.argumentHint) {
+        commandEl.createEl('p', {
+          text: t('settings.claudeCode.runtimeCatalog.argumentHint', {
+            hint: command.argumentHint,
+          }),
+        });
+      }
+      const aliases = Array.isArray(command.aliases)
+        ? command.aliases.filter((alias) => alias.trim().length > 0)
+        : [];
+      if (aliases.length > 0) {
+        commandEl.createEl('p', {
+          text: t('settings.claudeCode.runtimeCatalog.aliases', {
+            aliases: this.formatRuntimeEcosystemNames(aliases),
+          }),
+        });
+      }
+    }
+  }
+
+  private renderRuntimeCatalogAgents(
+    containerEl: HTMLElement,
+    agents: ClaudeCodeRuntimeCatalogAgent[],
+  ): void {
+    containerEl.createEl('h5', {
+      text: t('settings.claudeCode.runtimeCatalog.agents'),
+    });
+    if (agents.length === 0) {
+      containerEl.createEl('p', { text: t('settings.claudeCode.runtimeCatalog.emptyAgents') });
+      return;
+    }
+
+    for (const agent of agents) {
+      const agentEl = containerEl.createDiv({ cls: 'opencodian-claude-code-runtime-catalog-agent' });
+      agentEl.createEl('p', { text: agent.name });
+      if (agent.description) {
+        agentEl.createEl('p', { text: agent.description });
+      }
+      if (agent.model) {
+        agentEl.createEl('p', {
+          text: t('settings.claudeCode.runtimeCatalog.model', {
+            model: agent.model,
+          }),
+        });
+      }
+    }
+  }
+
+  private renderAccountInfoReadbackControls(containerEl: HTMLElement): void {
+    let outputEl: HTMLElement | null = null;
+    const getOutputEl = (): HTMLElement => {
+      outputEl ??= containerEl.createDiv({
+        cls: 'opencodian-settings-inline-notice opencodian-claude-code-account-info-readback',
+        attr: {
+          'data-claude-code-account-info-readback': 'true',
+          'data-proof-state': 'readback',
+        },
+      });
+      return outputEl;
+    };
+
+    new Setting(containerEl)
+      .setName(t('settings.claudeCode.accountInfo.name'))
+      .setDesc(t('settings.claudeCode.accountInfo.desc'))
+      .addButton((button) => {
+        button
+          .setButtonText(t('settings.claudeCode.accountInfo.inspectButton'))
+          .onClick(async () => {
+            await this.renderAccountInfoReadback(getOutputEl());
+          });
+      });
+  }
+
+  private async renderAccountInfoReadback(outputEl: HTMLElement): Promise<void> {
+    outputEl.empty();
+    outputEl.setText(t('settings.claudeCode.accountInfo.loading'));
+    const adapter = this.getClaudeAdapter() as ClaudeCodeRuntimeEcosystemAdapter | null;
+    if (typeof adapter?.getAccountInfo !== 'function') {
+      outputEl.setText(t('settings.claudeCode.accountInfo.unavailable'));
+      return;
+    }
+
+    let accountInfo: unknown | null;
+    try {
+      accountInfo = await adapter.getAccountInfo();
+    } catch {
+      outputEl.setText(t('settings.claudeCode.accountInfo.failed'));
+      return;
+    }
+
+    if (accountInfo === null) {
+      outputEl.setText(t('settings.claudeCode.accountInfo.unavailable'));
+      return;
+    }
+
+    outputEl.empty();
+    outputEl.createEl('p', {
+      text: t('settings.claudeCode.accountInfo.summary'),
+    });
+    outputEl.createEl('pre', {
+      text: this.formatAccountInfoReadback(accountInfo),
+    });
+  }
+
+  private formatAccountInfoReadback(accountInfo: unknown): string {
+    const seen = new WeakSet<object>();
+    return JSON.stringify(this.sanitizeAccountInfoValue(accountInfo, '', seen), null, 2)
+      ?? t('settings.claudeCode.accountInfo.unavailable');
+  }
+
+  private sanitizeAccountInfoValue(value: unknown, key: string, seen: WeakSet<object>): unknown {
+    if (key.toLowerCase() === 'email') {
+      return typeof value === 'string' ? this.maskAccountEmail(value) : '[redacted-email]';
+    }
+    if (CLAUDE_ACCOUNT_INFO_SECRET_KEY_PATTERN.test(key)) {
+      return '[redacted]';
+    }
+    if (value === null || typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+      return value;
+    }
+    if (typeof value === 'bigint') {
+      return value.toString();
+    }
+    if (typeof value !== 'object') {
+      return `[${typeof value}]`;
+    }
+    if (seen.has(value)) {
+      return '[circular]';
+    }
+    seen.add(value);
+    if (Array.isArray(value)) {
+      return value.map((item) => this.sanitizeAccountInfoValue(item, key, seen));
+    }
+
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([entryKey, entryValue]) => [
+        entryKey,
+        this.sanitizeAccountInfoValue(entryValue, entryKey, seen),
+      ]),
+    );
+  }
+
+  private maskAccountEmail(email: string): string {
+    const trimmed = email.trim();
+    const atIndex = trimmed.indexOf('@');
+    if (atIndex <= 0 || atIndex === trimmed.length - 1) {
+      return '[redacted-email]';
+    }
+    return `${trimmed.charAt(0)}***@${trimmed.slice(atIndex + 1)}`;
+  }
+
+  private renderContextUsageReadbackControls(containerEl: HTMLElement): void {
+    let outputEl: HTMLElement | null = null;
+    const getOutputEl = (): HTMLElement => {
+      outputEl ??= containerEl.createDiv({
+        cls: 'opencodian-settings-inline-notice opencodian-claude-code-context-usage-readback',
+        attr: {
+          'data-claude-code-context-usage-readback': 'true',
+          'data-proof-state': 'readback',
+        },
+      });
+      return outputEl;
+    };
+
+    new Setting(containerEl)
+      .setName(t('settings.claudeCode.contextUsage.name'))
+      .setDesc(t('settings.claudeCode.contextUsage.desc'))
+      .addButton((button) => {
+        button
+          .setButtonText(t('settings.claudeCode.contextUsage.inspectButton'))
+          .onClick(async () => {
+            await this.renderContextUsageReadback(getOutputEl());
+          });
+      });
+  }
+
+  private async renderContextUsageReadback(outputEl: HTMLElement): Promise<void> {
+    outputEl.empty();
+    outputEl.setText(t('settings.claudeCode.contextUsage.loading'));
+    const adapter = this.getClaudeAdapter() as ClaudeCodeRuntimeEcosystemAdapter | null;
+    if (typeof adapter?.getContextUsage !== 'function') {
+      outputEl.setText(t('settings.claudeCode.contextUsage.unavailable'));
+      return;
+    }
+
+    let usage: unknown | null;
+    try {
+      usage = await adapter.getContextUsage();
+    } catch {
+      outputEl.setText(t('settings.claudeCode.contextUsage.failed'));
+      return;
+    }
+
+    if (usage === null) {
+      outputEl.setText(t('settings.claudeCode.contextUsage.unavailable'));
+      return;
+    }
+
+    outputEl.empty();
+    outputEl.createEl('p', {
+      text: t('settings.claudeCode.contextUsage.summary'),
+    });
+    outputEl.createEl('pre', {
+      text: this.formatContextUsageReadback(usage),
+    });
+  }
+
+  private formatContextUsageReadback(usage: unknown): string {
+    const seen = new WeakSet<object>();
+    return JSON.stringify(this.sanitizeContextUsageValue(usage, '', seen), null, 2)
+      ?? t('settings.claudeCode.contextUsage.unavailable');
+  }
+
+  private sanitizeContextUsageValue(value: unknown, key: string, seen: WeakSet<object>): unknown {
+    if (CLAUDE_CONTEXT_USAGE_SECRET_KEY_PATTERN.test(key)) {
+      return '[redacted]';
+    }
+    if (value === null || typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+      return value;
+    }
+    if (typeof value === 'bigint') {
+      return value.toString();
+    }
+    if (typeof value !== 'object') {
+      return `[${typeof value}]`;
+    }
+    if (seen.has(value)) {
+      return '[circular]';
+    }
+    seen.add(value);
+    if (Array.isArray(value)) {
+      return value.map((item) => this.sanitizeContextUsageValue(item, key, seen));
+    }
+
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([entryKey, entryValue]) => [
+        entryKey,
+        this.sanitizeContextUsageValue(entryValue, entryKey, seen),
+      ]),
+    );
+  }
+
+  private renderRuntimeFileReadbackControls(containerEl: HTMLElement): void {
+    let outputEl: HTMLElement | null = null;
+    let runtimeFilePath = '';
+    const getOutputEl = (): HTMLElement => {
+      outputEl ??= containerEl.createDiv({
+        cls: 'opencodian-settings-inline-notice opencodian-claude-code-file-readback',
+        attr: {
+          'data-claude-code-file-readback': 'true',
+          'data-proof-state': 'readback',
+        },
+      });
+      return outputEl;
+    };
+
+    new Setting(containerEl)
+      .setName(t('settings.claudeCode.fileReadback.pathName'))
+      .setDesc(t('settings.claudeCode.fileReadback.pathDesc'))
+      .addText((text) => {
+        text
+          .setPlaceholder(t('settings.claudeCode.fileReadback.pathPlaceholder'))
+          .onChange((value) => {
+            runtimeFilePath = value.trim();
+          });
+      })
+      .addButton((button) => {
+        button
+          .setButtonText(t('settings.claudeCode.fileReadback.inspectButton'))
+          .onClick(async () => {
+            await this.renderRuntimeFileReadback(getOutputEl(), runtimeFilePath);
+          });
+      });
+  }
+
+  private async renderRuntimeFileReadback(outputEl: HTMLElement, targetPath: string): Promise<void> {
+    const trimmedPath = targetPath.trim();
+    outputEl.empty();
+    if (!trimmedPath) {
+      outputEl.setText(t('settings.claudeCode.fileReadback.emptyPath'));
+      return;
+    }
+
+    outputEl.setText(t('settings.claudeCode.fileReadback.loading'));
+    const adapter = this.getClaudeAdapter() as ClaudeCodeRuntimeEcosystemAdapter | null;
+    if (typeof adapter?.readRuntimeFile !== 'function') {
+      outputEl.setText(t('settings.claudeCode.fileReadback.unavailable'));
+      return;
+    }
+
+    let readback: unknown | null;
+    try {
+      readback = await adapter.readRuntimeFile(trimmedPath, {
+        maxBytes: 4096,
+        encoding: 'utf-8',
+      });
+    } catch {
+      outputEl.setText(t('settings.claudeCode.fileReadback.failed'));
+      return;
+    }
+
+    if (readback === null) {
+      outputEl.setText(t('settings.claudeCode.fileReadback.notFound'));
+      return;
+    }
+
+    outputEl.empty();
+    outputEl.createEl('p', {
+      text: t('settings.claudeCode.fileReadback.summary'),
+    });
+    outputEl.createEl('p', {
+      text: t('settings.claudeCode.fileReadback.absPath', {
+        path: this.getRuntimeFileReadbackString(readback, 'absPath') ?? trimmedPath,
+      }),
+    });
+    outputEl.createEl('p', {
+      text: t('settings.claudeCode.fileReadback.contents'),
+    });
+    outputEl.createEl('pre', {
+      text: this.getRuntimeFileReadbackString(readback, 'contents') ?? this.formatRuntimeFileReadbackValue(readback),
+    });
+    if (this.isRuntimeFileReadbackTruncated(readback)) {
+      outputEl.createEl('p', {
+        text: t('settings.claudeCode.fileReadback.truncated'),
+      });
+    }
+  }
+
+  private getRuntimeFileReadbackString(readback: unknown, key: string): string | null {
+    const record = this.getRuntimeFileReadbackRecord(readback);
+    if (!record || !(key in record)) {
+      return null;
+    }
+
+    const value = record[key];
+    if (value === null || value === undefined) {
+      return null;
+    }
+    return this.formatRuntimeFileReadbackValue(value);
+  }
+
+  private getRuntimeFileReadbackRecord(readback: unknown): Record<string, unknown> | null {
+    return readback !== null && typeof readback === 'object' && !Array.isArray(readback)
+      ? readback as Record<string, unknown>
+      : null;
+  }
+
+  private formatRuntimeFileReadbackValue(value: unknown): string {
+    if (typeof value === 'string') {
+      return value;
+    }
+    if (typeof value === 'bigint') {
+      return value.toString();
+    }
+    try {
+      return JSON.stringify(value, null, 2) ?? `[${typeof value}]`;
+    } catch {
+      return `[${typeof value}]`;
+    }
+  }
+
+  private isRuntimeFileReadbackTruncated(readback: unknown): boolean {
+    return this.getRuntimeFileReadbackRecord(readback)?.truncated === true;
+  }
+
   // ─── Model & Thinking tab ─────────────────────────────────────────
 
   private renderModelThinkingTab(containerEl: HTMLElement): void {
     const modelTextControl = this.renderModelSetting(containerEl);
     this.renderModelQuickSelect(containerEl, modelTextControl);
+    this.renderMainModelProofStatusNotice(containerEl);
     const fallbackTextControl = this.renderFallbackModelSetting(containerEl);
     this.renderFallbackModelQuickSelect(containerEl, fallbackTextControl);
     this.renderFallbackModelBoundaryNotice(containerEl);
@@ -364,6 +1013,7 @@ export class SettingsClaudeCodeSection {
 
   private renderPermissionsTab(containerEl: HTMLElement): void {
     this.renderPermissionModeSetting(containerEl);
+    this.renderSandboxSettings(containerEl);
   }
 
   private renderPermissionModeSetting(containerEl: HTMLElement): void {
@@ -382,6 +1032,61 @@ export class SettingsClaudeCodeSection {
             await this.saveSettings();
           });
       });
+  }
+
+  // ─── Sandbox settings (Permissions tab) ─────────────────────────
+
+  private renderSandboxSettings(containerEl: HTMLElement): void {
+    containerEl.createEl('h4', { text: t('settings.claudeCode.sandbox.name') });
+    const boundaryEl = containerEl.createDiv({
+      cls: 'opencodian-settings-inline-notice',
+      attr: { 'data-claude-code-sandbox-boundary': 'true' },
+    });
+    boundaryEl.createSpan({ text: t('settings.claudeCode.sandbox.boundaryNotice') });
+
+    new Setting(containerEl)
+      .setName(t('settings.claudeCode.sandbox.enabled.name'))
+      .setDesc(t('settings.claudeCode.sandbox.enabled.desc'))
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.settings.sandbox.enabled)
+          .onChange(async (value) => {
+            this.settings.sandbox.enabled = value;
+            await this.saveSettings();
+          });
+      });
+
+    new Setting(containerEl)
+      .setName(t('settings.claudeCode.sandbox.failIfUnavailable.name'))
+      .setDesc(t('settings.claudeCode.sandbox.failIfUnavailable.desc'))
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.settings.sandbox.failIfUnavailable)
+          .onChange(async (value) => {
+            this.settings.sandbox.failIfUnavailable = value;
+            await this.saveSettings();
+          });
+      });
+
+    new Setting(containerEl)
+      .setName(t('settings.claudeCode.sandbox.autoAllowBashIfSandboxed.name'))
+      .setDesc(t('settings.claudeCode.sandbox.autoAllowBashIfSandboxed.desc'))
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.settings.sandbox.autoAllowBashIfSandboxed)
+          .onChange(async (value) => {
+            this.settings.sandbox.autoAllowBashIfSandboxed = value;
+            await this.saveSettings();
+          });
+      });
+
+    // Sandbox lifecycle honesty: settings only apply to the next query,
+    // unlike permissionMode which tries to apply live via setPermissionMode().
+    const lifecycleEl = containerEl.createDiv({
+      cls: 'opencodian-settings-inline-notice',
+      attr: { 'data-claude-code-sandbox-lifecycle': 'true' },
+    });
+    lifecycleEl.createSpan({ text: t('settings.claudeCode.sandbox.lifecycleNotice') });
   }
 
   // ─── Context & Sources tab ────────────────────────────────────────
@@ -428,6 +1133,20 @@ export class SettingsClaudeCodeSection {
       });
   }
 
+  private renderMainModelProofStatusNotice(containerEl: HTMLElement): void {
+    // Live model switching seam: the adapter's setModel() calls
+    // applyToActiveQueries → query.setModel() on each active runtime.
+    // The diagnostic probe in Capability Lab (runSetModelLiveProbe)
+    // proves query.setModel() works mid-stream on a persistent query.
+    // Honest boundary: only applies when an active query exists; does
+    // NOT prove fallback model switching.
+    const noticeEl = containerEl.createDiv({
+      cls: 'opencodian-settings-inline-notice opencodian-settings-proof-status',
+      attr: { 'data-claude-code-proof-status': 'main-model', 'data-proof-state': 'pass' },
+    });
+    noticeEl.createSpan({ text: t('settings.claudeCode.proofStatus.mainModel') });
+  }
+
   private renderFallbackModelBoundaryNotice(containerEl: HTMLElement): void {
     const noticeEl = containerEl.createDiv({
       cls: 'opencodian-settings-inline-notice opencodian-claude-code-fallback-model-boundary',
@@ -466,6 +1185,14 @@ export class SettingsClaudeCodeSection {
       attr: { 'data-claude-code-proof-status': 'env', 'data-proof-state': 'readback' },
     });
     noticeEl.createSpan({ text: t('settings.claudeCode.proofStatus.env') });
+  }
+
+  private renderFileCheckpointBoundaryNotice(containerEl: HTMLElement): void {
+    const noticeEl = containerEl.createDiv({
+      cls: 'opencodian-settings-inline-notice opencodian-settings-proof-status',
+      attr: { 'data-claude-code-proof-status': 'file-checkpointing', 'data-proof-state': 'readback' },
+    });
+    noticeEl.createSpan({ text: t('settings.claudeCode.proofStatus.fileCheckpointing') });
   }
 
   private renderModelQuickSelect(containerEl: HTMLElement, textControl: unknown): void {
@@ -677,9 +1404,23 @@ export class SettingsClaudeCodeSection {
   private renderMcpRuntimeControls(containerEl: HTMLElement): void {
     const statusEl = containerEl.createDiv({
       cls: 'opencodian-settings-inline-notice opencodian-claude-code-mcp-runtime',
-      attr: { 'data-claude-code-mcp-runtime': 'true' },
+      attr: {
+        'data-claude-code-mcp-runtime': 'true',
+        'data-proof-state': 'readback',
+      },
     });
     this.updateMcpRuntimeStatus(statusEl);
+    let runtimeStatusEl: HTMLElement | null = null;
+    const getRuntimeStatusEl = (): HTMLElement => {
+      runtimeStatusEl ??= containerEl.createDiv({
+        cls: 'opencodian-settings-inline-notice opencodian-claude-code-mcp-runtime-status',
+        attr: {
+          'data-claude-code-mcp-runtime-status': 'true',
+          'data-proof-state': 'readback',
+        },
+      });
+      return runtimeStatusEl;
+    };
 
     new Setting(containerEl)
       .setName(t('settings.claudeCode.mcpRuntime.name'))
@@ -695,17 +1436,92 @@ export class SettingsClaudeCodeSection {
               statusEl.setText(t('settings.claudeCode.mcpRuntime.refreshFailed'));
             }
           });
+      })
+      .addButton((button) => {
+        button
+          .setButtonText(t('settings.claudeCode.mcpRuntime.inspectButton'))
+          .onClick(async () => {
+            await this.renderMcpRuntimeStatusReadback(getRuntimeStatusEl());
+          });
       });
   }
 
   private updateMcpRuntimeStatus(statusEl: HTMLElement): void {
-    const adapter = this.getClaudeAdapter() as { getMcpServerCount?: () => number } | null;
+    const adapter = this.getClaudeAdapter() as ClaudeCodeRuntimeEcosystemAdapter | null;
     const count = adapter?.getMcpServerCount?.() ?? 0;
+    const names = adapter?.getMcpServerNames?.() ?? [];
     statusEl.setText(
       count > 0
-        ? t('settings.claudeCode.mcpRuntime.loaded', { count })
+        ? names.length > 0
+          ? t('settings.claudeCode.mcpRuntime.loadedWithNames', {
+            count,
+            names: this.formatRuntimeEcosystemNames(names),
+          })
+          : t('settings.claudeCode.mcpRuntime.loaded', { count })
         : t('settings.claudeCode.mcpRuntime.empty'),
     );
+  }
+
+  private async renderMcpRuntimeStatusReadback(outputEl: HTMLElement): Promise<void> {
+    outputEl.empty();
+    outputEl.setText(t('settings.claudeCode.mcpRuntime.statusLoading'));
+    const adapter = this.getClaudeAdapter() as ClaudeCodeRuntimeEcosystemAdapter | null;
+    if (typeof adapter?.getMcpServerRuntimeStatuses !== 'function') {
+      outputEl.setText(t('settings.claudeCode.mcpRuntime.statusUnavailable'));
+      return;
+    }
+
+    let statuses: ClaudeCodeMcpRuntimeStatus[] | null;
+    try {
+      statuses = await adapter.getMcpServerRuntimeStatuses();
+    } catch {
+      outputEl.setText(t('settings.claudeCode.mcpRuntime.statusFailed'));
+      return;
+    }
+
+    outputEl.empty();
+    if (!statuses || statuses.length === 0) {
+      outputEl.setText(t('settings.claudeCode.mcpRuntime.statusEmpty'));
+      return;
+    }
+
+    const connectedCount = statuses.filter((status) => status.status === 'connected').length;
+    outputEl.createEl('p', {
+      text: t('settings.claudeCode.mcpRuntime.statusSummary', {
+        count: statuses.length,
+        connected: connectedCount,
+        failed: statuses.length - connectedCount,
+      }),
+    });
+
+    for (const status of statuses) {
+      const statusBlock = outputEl.createDiv({
+        cls: 'opencodian-claude-code-mcp-runtime-status-row',
+      });
+      statusBlock.createEl('p', {
+        text: `${status.name}: ${status.status}${status.scope ? ` (${status.scope})` : ''}`,
+      });
+      statusBlock.createEl('p', {
+        text: status.toolNames.length > 0
+          ? t('settings.claudeCode.mcpRuntime.statusTools', {
+            names: this.formatRuntimeEcosystemNames(status.toolNames),
+          })
+          : t('settings.claudeCode.mcpRuntime.statusNoTools'),
+      });
+      if (status.serverInfo?.name || status.serverInfo?.version) {
+        statusBlock.createEl('p', {
+          text: t('settings.claudeCode.mcpRuntime.statusServerInfo', {
+            name: status.serverInfo.name ?? t('settings.claudeCode.runtimeEcosystem.unnamed'),
+            version: status.serverInfo.version ?? t('settings.claudeCode.runtimeEcosystem.unnamed'),
+          }),
+        });
+      }
+      if (status.hasError && status.errorSummary) {
+        statusBlock.createEl('p', {
+          text: status.errorSummary,
+        });
+      }
+    }
   }
 
   private renderAllowedToolsSetting(containerEl: HTMLElement): void {

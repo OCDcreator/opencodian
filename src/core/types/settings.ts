@@ -41,6 +41,12 @@ export {
   normalizeClaudeCodeDebugChannelSettings,
 };
 
+export interface ClaudeCodeSandboxSettings {
+  enabled: boolean;
+  failIfUnavailable: boolean;
+  autoAllowBashIfSandboxed: boolean;
+}
+
 export interface ClaudeCodeBackendSettings {
   executablePath: string;
   settingSources: ClaudeCodeSettingSource[];
@@ -49,11 +55,11 @@ export interface ClaudeCodeBackendSettings {
   effort: ClaudeCodeEffort;
   additionalDirectories: string[];
   model: string;
-  /** @untested — Fallback model path wired to SDK option but not runtime-verified. */
+  /** Fallback model used when the main model is unavailable. Readback only: option wiring and same-model validation proven; automatic fallback switching not locally provable (blocked on real API overload / HTTP 529; invalid-primary test undermined). */
   fallbackModel: string;
-  /** Tool names that are auto-allowed without prompting. Not a sandbox. Validated as PascalCase alphanumeric. @untested */
+  /** Tool names that are auto-allowed without prompting. Not a sandbox, not a restrictor. Readback only: runtime options wiring proven, zero enforcement observed (init catalog always unfiltered, canUseTool non-functional in SDK query() mode). Validated as PascalCase alphanumeric. */
   allowedTools: string[];
-  /** Tool names that are removed from context entirely. Validated as PascalCase alphanumeric. @untested */
+  /** Tool names that are removed from context entirely. Runtime behavior verified: SDK init-catalog filtering deterministically excludes listed tools. Validated as PascalCase alphanumeric. */
   disallowedTools: string[];
   /**
    * Built-in tool whitelist passed as the SDK `tools` option. When non-empty,
@@ -63,13 +69,13 @@ export interface ClaudeCodeBackendSettings {
    * Validated as PascalCase alphanumeric.
    */
   restrictedBuiltinTools: string[];
-  /** Maximum conversation turns before the query stops. null = unlimited (SDK default). @untested */
+  /** Maximum conversation turns before the query stops. Runtime behavior verified: SDK emits error_max_turns signal when limit reached. null = unlimited (SDK default). */
   maxTurns: number | null;
-  /** Maximum budget in USD before the query stops. null = unlimited (SDK default). @untested */
+  /** Maximum budget in USD before the query stops. Runtime behavior verified: SDK emits error_max_budget_usd signal when limit reached. null = unlimited (SDK default). */
   maxBudgetUsd: number | null;
-  /** Environment variables to pass to the Claude Code process. @untested */
+  /** Environment variables to pass to the Claude Code process. Runtime behavior verified: env propagation into Claude/Bash subprocesses proven (Layer 1-4). */
   env: Record<string, string>;
-  /** Enable Claude Code SDK file checkpoint tracking for later rewind operations. @experimental — SDK option wired but not runtime-verified in stable paths. */
+  /** Enable Claude Code SDK file checkpoint tracking for later rewind operations. @experimental — SDK option wired but checkpoints never created in query() mode (upstream bug #236). Readback only; no stable rewind UI. */
   enableFileCheckpointing: boolean;
   /** Ask the SDK to include hook lifecycle events in the stream. @diagnostic — Diagnostic event stream only; not connected to stable UI. */
   includeHookEvents: boolean;
@@ -79,6 +85,14 @@ export interface ClaudeCodeBackendSettings {
   agentProgressSummaries: boolean;
   /** Product workbench debug channels for future Claude Code logging routes. */
   debugChannels: ClaudeCodeDebugChannelSettings;
+  /**
+   * Sandbox behavior controls for Claude Code subprocess isolation.
+   * Readback: SDK options wiring proven; OS-level process isolation not independently verified.
+   * This controls sandbox behavior (whether the subprocess runs in a sandbox), not filesystem/network
+   * permission rules. Network, filesystem, TLS, proxy, and Mach lookup sub-policies are NOT exposed
+   * as stable settings in this version.
+   */
+  sandbox: ClaudeCodeSandboxSettings;
 }
 
 export interface BackendSettings {
@@ -121,6 +135,7 @@ export function getDefaultClaudeCodeBackendSettings(): ClaudeCodeBackendSettings
     forwardSubagentText: false,
     agentProgressSummaries: false,
     debugChannels: getDefaultClaudeCodeDebugChannelSettings(),
+    sandbox: { enabled: false, failIfUnavailable: false, autoAllowBashIfSandboxed: false },
   };
 }
 
@@ -250,6 +265,19 @@ export function normalizeClaudeCodeEnv(value: unknown): Record<string, string> {
   return result;
 }
 
+export function normalizeClaudeCodeSandboxSettings(value: unknown): ClaudeCodeSandboxSettings {
+  const defaults = { enabled: false, failIfUnavailable: false, autoAllowBashIfSandboxed: false };
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return defaults;
+  }
+  const candidate = value as Record<string, unknown>;
+  return {
+    enabled: candidate.enabled === true,
+    failIfUnavailable: candidate.failIfUnavailable === true,
+    autoAllowBashIfSandboxed: candidate.autoAllowBashIfSandboxed === true,
+  };
+}
+
 export function normalizeClaudeCodeBackendSettings(value: unknown): ClaudeCodeBackendSettings {
   const defaults = getDefaultClaudeCodeBackendSettings();
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -279,6 +307,7 @@ export function normalizeClaudeCodeBackendSettings(value: unknown): ClaudeCodeBa
     forwardSubagentText: candidate.forwardSubagentText === true,
     agentProgressSummaries: candidate.agentProgressSummaries === true,
     debugChannels: normalizeClaudeCodeDebugChannelSettings(candidate.debugChannels),
+    sandbox: normalizeClaudeCodeSandboxSettings(candidate.sandbox),
   };
 }
 

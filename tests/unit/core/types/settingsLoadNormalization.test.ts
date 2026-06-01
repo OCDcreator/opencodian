@@ -110,6 +110,7 @@ describe('prepareLoadedSettingsBootstrapState backend normalization', () => {
         mcp: true,
         experimental: false,
       },
+      sandbox: { enabled: false, failIfUnavailable: false, autoAllowBashIfSandboxed: false },
     });
   });
 

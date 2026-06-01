@@ -11,6 +11,908 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-06-02 Session Title — Readback Seam
+
+### What changed
+
+- **src/core/agents/backend/ClaudeCodeOptionsBuilder.ts**: Added `title?: string` to input/output shapes; wired through `buildClaudeCodeOptions` when non-empty.
+- **src/core/agents/backend/ClaudeCodeAdapter.ts**: In `buildSdkOptions`, passes `session.title` on first query only (no resume).
+- **src/features/settings/SettingsCapabilityLabSection.ts**: Added Session Title matrix row (#29, readback, diagnostic surface).
+- **tests/**: TDD — RED→GREEN for options builder title (4 tests), capability lab audit (row 28→29, readback 5→6).
+
+### Honesty boundaries
+
+- Classification: **readback** (option wiring proven; CLI subprocess title acceptance not independently verified)
+- No new settings UI — reuses existing session title from createSession()
+- No `.claude/**` writes
+- Does not modify existing renameSession / updateSessionTitle / forkSession paths
+
+### Matrix
+
+29 rows: 23 pass, 6 readback, 0 fail
+
+---
+
+## 2026-06-02 Sandbox Review Fix — UI Coverage + Lifecycle Honesty + Docs Drift
+
+### What changed
+
+- **src/features/settings/SettingsClaudeCodeSection.ts**: Added `data-claude-code-sandbox-boundary` attribute to sandbox boundary notice div for testability. Added next-query lifecycle notice (`data-claude-code-sandbox-lifecycle`) explaining sandbox settings only apply to the next query, unlike `permissionMode` which tries to live-apply.
+- **src/i18n/locales/en.ts + zh.ts**: Added `settings.claudeCode.sandbox.lifecycleNotice` locale strings.
+- **tests/unit/features/settings/SettingsClaudeCodeSection.test.ts**: Added 5 sandbox UI tests (boundary notice with `data-*` attribute, exactly 3 stable toggles with locale labels, each toggle updates settings + calls saveSettings, no nested network/filesystem/TLS/proxy/Mach lookup editors, lifecycle notice without restart button).
+- **docs/status/claude-code-backend-capabilities-2026-05-21.md**: Updated sandbox row from "❌ Not wired | ❌ Hidden" to "⚠️ Readback | ✅ Permissions tab".
+- **docs/status/claude-code-phase1-smoke-status-2026-05-21.md**: Updated sandbox row from "❌ No wiring" to "⚠️ Readback".
+- **docs/modules/features/settings/SettingsClaudeCodeSection.md**: Updated sandbox description with lifecycle notice mention.
+- **docs/status/claude-code-current-state-2026-05-22.md**: Updated sandbox section with lifecycle notice details and test counts.
+
+### Honesty boundaries
+
+- Sandbox classification remains **readback** — not promoted to pass
+- Lifecycle notice honestly states "next query only" — does not misrepresent `permissionMode` live-apply capability
+- No authoring UI, no `.claude/**` writes
+- No stable UI for network/filesystem/TLS/proxy/Mach lookup sub-policies
+
+---
+
+## 2026-06-02 Sandbox — Minimal Readback Seam
+
+### What changed
+
+- **src/core/types/settings.ts**: Added `ClaudeCodeSandboxSettings` type (`enabled`, `failIfUnavailable`, `autoAllowBashIfSandboxed`) and `normalizeClaudeCodeSandboxSettings`. Added `sandbox` field to `ClaudeCodeBackendSettings` with honest readback JSDoc.
+- **src/core/agents/backend/ClaudeCodeOptionsBuilder.ts**: Added `sandbox` to `ClaudeCodeSdkOptionsShape`; wired through `buildClaudeCodeOptions` when `sandbox.enabled` is true.
+- **src/features/settings/SettingsCapabilityLabSection.ts**: Added Sandbox matrix row (#28, readback, settings surface).
+- **src/features/settings/SettingsClaudeCodeSection.ts**: Added sandbox toggles to Permissions tab with boundary notice.
+- **src/i18n/locales/en.ts + zh.ts**: Sandbox locale strings.
+- **tests/**: TDD — RED→GREEN for settings truth audit, normalization (5), options builder (4), capability lab audit (row 27→28, readback 4→5).
+
+### Honesty boundaries
+
+- Classification: **readback** (option wiring proven; OS-level sandbox enforcement not independently verifiable from plugin layer)
+- No authoring UI, no `.claude/**` writes
+- Network/filesystem/TLS/proxy/Mach lookup sub-policies intentionally NOT exposed
+- Does not inflate readback to pass
+
+### Matrix
+
+28 rows: 23 pass, 5 readback, 0 fail
+
+---
+
+## 2026-06-02 Warm Startup — SDK startup() Diagnostic Readback Seam
+
+### 变更
+- `ClaudeCodeSdkLoader.ts`: 新增 `WarmQueryHandle` 接口和 `startup` 到 `ClaudeAgentSdkModule` + facade forwarding
+- `ClaudeCodeAdapter.ts`: 新增 `runWarmStartupProbe()` 方法，通过 `buildDiagnosticSdkOptions()` 构建适配器拥有 options（`vaultPath`、`spawnClaudeCodeProcess`、MCP、`bypassPermissions` 等），调用 `sdk.startup({ options })` 获取 WarmQuery handle，发送最小诊断 prompt，返回 `WarmStartupProbeResult`，分类 `readback` / `fail` / `boundary`
+- `SettingsCapabilityLabSection.ts`: 新增 "Warm Startup" 矩阵行 (#27: `runtimeProof: 'readback'`, `userSurface: 'diagnostic'`)、discovery row、"Run Warm Startup Proof" 按钮
+- 测试: adapter +6 测试 (159/159), CapLab +3 测试 (176/176), 审计行数更新 26→27
+- **Options pipeline fix**: `sdk.startup()` 现在接收 adapter-owned options，非空参数调用；RED→GREEN test 断言 `startupArg.options.cwd` 和 `allowDangerouslySkipPermissions`
+
+### 分类: `readback`
+- startup() 可调用，WarmQuery handle 可获取，warm query 产出真实消息
+- Warm-vs-cold 延迟收益是 SDK 内部声明 ("no startup latency")，非独立测量
+- 诚实上限: `readback`——证明入口可用性和 warm handle 可用性，非可测量的行为改善
+
+### 诚实边界
+- 无 authoring UI
+- 无 `.claude/**` 写入
+- 不污染现有 pass/readback 边界
+- Warm startup 通过 adapter options pipeline 路由，非 bare SDK 调用
+- Matrix: 27 rows, 23 pass, 4 readback (File Checkpoint / Rewind, Allowed Tools, Fallback Model, Warm Startup)
+
+---
+
+## 2026-06-02 Main Model Live-Apply — Stable Settings Proof-Status Notice
+
+### 变更
+- `SettingsClaudeCodeSection.ts`: 新增 `renderMainModelProofStatusNotice()`，在 Model & Thinking 标签渲染 `data-proof-state="pass"` proof-status notice，诚实传达 live model switching 边界
+- `en.ts` / `zh.ts`: 新增 `settings.claudeCode.proofStatus.mainModel` locale key
+- 测试: 新增 1 个 proof-status notice 测试（75/75 总计通过）
+
+### TDD
+- RED: `[data-claude-code-proof-status="main-model"]` 元素不存在
+- GREEN: 添加 notice 方法 + locale keys + tab wiring
+
+### Matrix 决策
+不新增 matrix 行。SetModel Live 诊断 probe 已在 CapLab 作为 proof button 存在。Matrix 保持 26 rows / 23 pass / 3 readback。
+
+### 诚实边界
+- Main model live-apply: pass（diagnostic probe 证明 `query.setModel()` mid-stream 有效）
+- Fallback model switching: readback（不变）
+- 不证明 query-less 或 post-query 场景
+
+---
+
+## 2026-06-02 BackendSettings Field Annotations Truth-Sync (5 fields)
+
+**Task**: Sync JSDoc annotations on `allowedTools`, `disallowedTools`, `maxTurns`, `maxBudgetUsd`, and `env` in `ClaudeCodeBackendSettings` from stale `@untested` to honest prose reflecting accepted truth. No capability reclassifications.
+
+**TDD evidence**:
+- RED: 6 new tests in `backendSettingsTruthAudit.test.ts` — all 6 failed (`@untested` present, no runtime/readback prose).
+- GREEN: Updated 5 JSDoc annotations in `settings.ts`, fixed `getFieldJsdoc` helper (walk-back to `/**` instead of fixed 4-line window), made assertions case-insensitive. Updated `docs/modules/core/types/settings.md` (removed stale "工具策略和环境变量字段也标记为 `@untested`" grouping, replaced with per-field honest prose). 6/6 tests pass.
+
+**Changes**:
+- `src/core/types/settings.ts`: 5 field JSDocs — `@untested` → honest prose (readback for `allowedTools`, pass for `disallowedTools`/`maxTurns`/`maxBudgetUsd`/`env`).
+- `docs/modules/core/types/settings.md`: Removed stale `@untested` grouping; per-field prose now matches accepted truth.
+- `tests/unit/core/types/backendSettingsTruthAudit.test.ts`: 6 contract tests (no `@untested`, runtime/readback prose present, case-insensitive).
+- `docs/status/claude-code-current-state-2026-05-22.md`: New 2026-06-02 section.
+- `devlog.md`: This entry.
+
+**Classification (unchanged)**: `allowedTools`=readback, `disallowedTools`=pass, `maxTurns`=pass, `maxBudgetUsd`=pass, `env`=pass. Annotation sync only.
+
+## 2026-06-02 Fallback Model — JSDoc Truth-Sync (stale `@untested` → honest prose)
+
+**Task**: Fix stale `@untested` annotation on `fallbackModel` in `settings.ts` and corresponding module doc. The accepted truth is `readback`: option wiring + same-model validation proven; automatic fallback switching NOT locally provable.
+
+**TDD evidence**:
+- RED (round 1): New `fallbackModelTruthAudit.test.ts` — `expect(jsdocLines).not.toContain('@untested')` failed (JSDoc said `@untested`).
+- GREEN (round 1): Changed JSDoc to `@readback` tag.
+- RED (round 2 — correction): Updated test to reject invented `@readback` tag — `expect(jsdocLines).not.toContain('@readback')` failed.
+- GREEN (round 2): Changed to plain prose: "Readback only: option wiring and same-model validation proven; automatic fallback switching not locally provable (...)". 2/2 tests pass.
+
+**Changes**:
+- `src/core/types/settings.ts`: `fallbackModel` JSDoc: stale `@untested` → honest prose (no invented tag).
+- `docs/modules/core/types/settings.md`: `fallbackModel` described as "readback only" in prose instead of `@untested` or invented `@readback` tag.
+- `tests/unit/core/types/fallbackModelTruthAudit.test.ts`: New truth-audit contract test (2 tests, asserts no `@untested`, no `@readback` tag, readback boundary in prose).
+- `docs/status/claude-code-current-state-2026-05-22.md`: New 2026-06-02 section (corrected round 2).
+- `devlog.md`: This entry.
+
+**Classification (unchanged)**: Fallback Model remains `readback`. Annotation sync only.
+
+## 2026-06-02 File Checkpoint / Rewind — Stable Settings Boundary Notice
+
+**Task**: Add read-only boundary notice in stable Claude Code Runtime tab that honestly presents File Checkpoint / Rewind status. Also tighten `enableFileCheckpointing.desc` locale and `settings.ts` comment to match current truth.
+
+**TDD evidence**:
+- RED: Test "renders file-checkpoint boundary notice with readback state in runtime tab" — `expect(noticeEl).toBeTruthy()` failed with `Received: null` (no `[data-claude-code-proof-status="file-checkpointing"]` element existed).
+- GREEN: Added `renderFileCheckpointBoundaryNotice()`, locale keys `proofStatus.fileCheckpointing` (en + zh), tightened `enableFileCheckpointing.desc` (en + zh), tightened `settings.ts` comment. 74/74 tests pass (was 72, +2 new).
+
+**Changes**:
+- `src/features/settings/SettingsClaudeCodeSection.ts`: New `renderFileCheckpointBoundaryNotice()` method, called from `renderRuntimeTab()` after env proof notice.
+- `src/i18n/locales/en.ts` + `zh.ts`: New `proofStatus.fileCheckpointing` key; tightened `enableFileCheckpointing.desc`.
+- `src/core/types/settings.ts`: Updated `enableFileCheckpointing` JSDoc to mention upstream bug #236 and readback-only boundary.
+- `tests/unit/features/settings/SettingsClaudeCodeSection.test.ts`: +2 tests (boundary notice + no rewind/restore buttons).
+- `docs/status/claude-code-current-state-2026-05-22.md`: New 2026-06-02 section.
+- `docs/modules/features/settings/SettingsClaudeCodeSection.md`: Updated proof-status notice list with file-checkpointing.
+- `devlog.md`: This entry.
+
+**Classification (unchanged)**: File Checkpoint / Rewind remains `readback`. No new toggle, restore button, or capability promotion.
+
+## 2026-06-02 Allowed Tools Stable Settings Truth-Sync — Locale + Docs
+
+**Task**: Update Allowed Tools stable settings proof-status locale to match accepted truth. The old locale said "diagnostic probes can only detect enforcement failure, not prove enforcement success" — implying enforcement exists but is hard to prove. The honest truth is zero enforcement: allowedTools is a pre-allow/auto-approve shortcut with no filtering effect on the init catalog (34 tools always unfiltered) and canUseTool is dead in SDK query() mode.
+
+**TDD evidence**:
+- RED: Test "renders tools proof status notice with readback state in tools tab" — added assertions `expect(toolsText).not.toContain('can only detect enforcement failure')` and `expect(toolsText).not.toContain('只能检测 enforcement 失败')`. Failed with `Received string: "...so diagnostic probes can only detect enforcement failure, not prove enforcement success."`
+- GREEN: Updated locale text in en.ts + zh.ts. 72/72 tests pass.
+
+**Changes**:
+- `src/i18n/locales/en.ts`: `proofStatus.tools` — replaced old "non-deterministic enforcement" framing with honest "pre-allow shortcut, zero enforcement" boundary + pointer to Restricted Built-in Tools.
+- `src/i18n/locales/zh.ts`: Same.
+- `tests/unit/features/settings/SettingsClaudeCodeSection.test.ts`: Added honesty assertions to existing tools proof-status test.
+- `docs/status/claude-code-current-state-2026-05-22.md`: Updated Allowed Tools evidence row from "non-deterministic enforcement" to "pre-allow shortcut, zero enforcement" framing.
+- `docs/modules/i18n/locales/en.md` + `zh.md`: Residual module-doc sync — updated `proofStatus.tools` quoted text from old "non-deterministic enforcement" to current "pre-allow shortcut, zero enforcement" truth; updated `proofStatus.env` quoted text from old "static readback, needs fresh rerun" to current "readback supporting evidence, live behavior verified in Capability Lab" truth.
+
+**Classification (unchanged)**: Allowed Tools remains `readback`. This is a UI copy sync, not a capability change.
+
+## 2026-06-02 Environment Variables Truth-Sync — Review Fix (Docs-Only)
+
+**Task**: Fix residual stale Environment Variables=`readback` wording in 2026-05-28 historical sections of `docs/status/claude-code-current-state-2026-05-22.md`. Previous batch added top-level 2026-06-02 section and superseded "22/25 pass" matrix summaries, but missed 5 locations in 2026-05-28 sections that still presented `readback` as current truth without historical framing.
+
+**RED evidence**: `rg` found 5 stale phrases — "static source of truth correctly preserves readback", "Static classification remains readback", "does NOT permanently promote static classification", "wired but not yet runtime-verified" (in New column, not Old column).
+
+**Fixed sections** (all in `docs/status/claude-code-current-state-2026-05-22.md`):
+1. **2026-05-28 Stable Settings Readback Proof classification table** (line ~3067): Added superseded note to Environment Variables row.
+2. **2026-05-28 Stable Settings UI Honesty Pass table** (line ~3107): Added superseded note to New Settings UI Claim column.
+3. **2026-05-28 Environment Variables Productization: Matrix + Discovery Alignment** gap paragraph (line ~5426): Reworded to past tense + superseded note.
+4. **2026-05-28 Diagnostic Bypass Permissions — Productization Sync** gap paragraph (line ~5473): Reworded to past tense + superseded note.
+5. **Diagnostic Bypass Permissions honest boundary** bullet (line ~5477): Changed "Static classification remains `readback`" to "at time of writing" + superseded note.
+
+**No source files changed.** Only `docs/status/claude-code-current-state-2026-05-22.md` and `devlog.md`.
+
+## 2026-06-02 Environment Variables Truth-Sync — Discovery Row + Two-Layer Proof Boundary
+
+**Task**: Sync Environment Variables capability documentation to match its verified (pass) status. The Capability Lab matrix already has `runtimeProof: 'pass'` (live behavior proof achieved), but discovery row and stable settings notice still claimed "static classification is readback".
+
+**Two-layer truth boundary**:
+- Stable settings env proof notice: `data-proof-state: 'readback'` — proves only settings→SDK mapping (supporting evidence)
+- Capability Lab matrix: `runtimeProof: 'pass'` — live behavior proof (env propagation into Bash subprocess, Layer 1-4)
+- Overall capability: verified (pass)
+
+**TDD evidence**:
+- RED: Test "renders Environment Variables discovery row with honest verified/pass description (not stale readback)" — `expect(received).not.toContain("Static classification is readback")` failed because discovery row contained "Static classification is readback; fresh runtime evidence required for behavior proof."
+- GREEN: Updated discovery row text to reflect verified status. 173/173 CapLab tests pass.
+
+**Changes**:
+- `src/features/settings/SettingsCapabilityLabSection.ts`: Discovery row text updated (both configured and unconfigured variants); stable settings readback note updated with two-layer explanation.
+- `src/i18n/locales/en.ts` + `zh.ts`: Env proof status locale text updated with two-layer boundary.
+- `docs/status/claude-code-current-state-2026-05-22.md`: New section; all historical "22/25 pass" sections marked as superseded.
+- `tests/unit/features/settings/SettingsCapabilityLabSection.test.ts`: +1 new honesty test.
+
+**Classification (unchanged)**: Environment Variables remains `pass`. Matrix: 26 rows, 23 pass, 3 readback.
+
+## 2026-06-02 OptionsBuilder env Defensive-Copy Bug Fix + Test Refactor
+
+### Bug Fixed
+`buildClaudeCodeOptions()` assigned `input.settings.env` directly into `options.env` by reference. If the caller mutated the original `settings.env` object after building options, the mutation leaked into the SDK options snapshot, because `options.env` held the same object reference. This was inconsistent with all other settings-derived fields (`additionalDirectories`, `allowedTools`, `disallowedTools`, `restrictedBuiltinTools`, `settingSources`) which are defensively copied.
+
+### Fix
+`options.env` now uses `{ ...input.settings.env }` (defensive spread copy).
+
+### TDD
+- RED: test "defensively copies settings.env so caller mutation does not leak into options snapshot" — `Expected: { KEY_A: 'value_a', KEY_B: 'value_b' }, Received: { KEY_A: 'mutated', KEY_B: 'value_b', KEY_C: 'injected' }`
+- GREEN: defensive spread copy — test passes
+
+### Test Refactor
+Split the monolithic `ClaudeCodeOptionsBuilder` describe block (207+ lines) into three focused describe blocks:
+- `ClaudeCodeOptionsBuilder` — core shape mapping (6 tests)
+- `ClaudeCodeOptionsBuilder tool restrictions` — allowed/disallowed/restricted tools (4 tests)
+- `ClaudeCodeOptionsBuilder limits, env, and toggles` — maxTurns, maxBudgetUsd, env, capability toggles (7 tests)
+
+### Lint Results
+- Before: `ClaudeCodeOptionsBuilder.test.ts` arrow function 207 lines (max 200) — **1 warning**
+- After: **0 warnings** on both `ClaudeCodeOptionsBuilder.ts` and `ClaudeCodeOptionsBuilder.test.ts`
+- Build: `feature-phase0-capability.202606020238`
+
+## 2026-06-02 Diagnostic Tool Restriction Defensive-Copy Bug Fix + Complexity Reduction
+
+**Task**: TDD batch — fix real defensive-copy bug in `buildDiagnosticSdkOptions()`, then refactor to eliminate the remaining complexity warning on `ClaudeCodeAdapter.ts`.
+
+**Bug found and fixed**: `buildDiagnosticSdkOptions()` assigned `request._diagnosticToolRestriction` directly into `options.tools` by reference. If the caller mutated the original array after `runDiagnosticPrompt()` returned, the mutation leaked into `inspectLastDiagnosticSdkOptions()` snapshot. Inconsistent with `buildClaudeCodeOptions()` which defensively copies `plugins`, `skills`, `allowedTools`, `disallowedTools`, `restrictedBuiltinTools`. Fix: `[...request._diagnosticToolRestriction]`.
+
+**TDD evidence**:
+- RED: New test "snapshot options.tools is not mutated when caller mutates the restriction array after runDiagnosticPrompt" — calls `runDiagnosticPrompt` with `_diagnosticToolRestriction: ['Read', 'Grep']`, then pushes `'Edit', 'Write'` to the original array, asserts `inspectLastDiagnosticSdkOptions().tools` is `['Read', 'Grep']`. Failed with `Expected: ['Read', 'Grep'], Received: ['Read', 'Grep', 'Edit', 'Write']`.
+- GREEN: Changed `options.tools = request._diagnosticToolRestriction` to `options.tools = [...request._diagnosticToolRestriction]`. Test passed.
+
+**Refactoring (behavior-preserving)**:
+- Extracted `resolveDiagnosticSettings(request)` — handles bypassPermissions, maxTurns, and forcePermissionMode overrides (was inline in buildDiagnosticSdkOptions)
+- Extracted `resolveDiagnosticCanUseTool(request, bypassPermissions)` — resolves canUseTool wiring (bypass → undefined, override → override, fallback → bridge)
+
+**Lint results**:
+- Before: `buildDiagnosticSdkOptions` complexity 22 (max 20) — **1 warning**
+- After: **0 warnings** on `ClaudeCodeAdapter.ts` (complexity reduced below threshold by extraction)
+- Remaining project: `ClaudeCodeOptionsBuilder.test.ts` arrow function 207 lines (pre-existing, out of scope)
+
+**Verification**: 153/153 adapter tests (152 existing + 1 new), typecheck clean, lint 0 warnings on touched files, build OK (BUILD_ID: feature-phase0-capability.202606020230), module-docs OK, devlog order OK (311 sections)
+
+## 2026-06-02 Checkpoint Rewind Probe Cleanup Bug Fix + Lint Elimination
+
+**Task**: TDD batch — fix real probe file cleanup bug in `runCheckpointRewindProbe()`, then refactor to eliminate max-lines-per-function and complexity warnings.
+
+**Bug found and fixed**: If Phase 1 created the probe file on disk and Phase 2 `sdk.query()` threw before the happy-path cleanup, the probe file was left behind. The cleanup at line 1440 only ran on the success path — there was no try/finally wrapper around the entire probe body. Fix: `runCheckpointRewindProbe()` now wraps `executeCheckpointRewindProbe()` in try/finally that always runs `unlinkSync(probeFilePath)`.
+
+**TDD evidence**:
+- RED: New test "cleans up probe file when Phase 2 sdk.query throws" — creates temp vault, mock Phase 1 creates probe file, Phase 2 throws. Asserts `existsSync(probeFilePath) === false`. Failed with `Expected: false, Received: true`.
+- GREEN: Added try/finally wrapper in `runCheckpointRewindProbe()`. Test passed.
+
+**Refactoring (behavior-preserving)**:
+- Extracted `executeCheckpointRewindProbe()` — orchestrates Phase 1 + Phase 2
+- Extracted `streamCheckpointPhase1()` — Phase 1 streaming loop
+- Extracted `streamCheckpointPhase2Rewind(opts)` — Phase 2 streaming + rewind (opts object pattern for max-params)
+- Extracted `executeDryRunCandidates()` — dry-run candidate iteration
+- Extracted `executeActualRewind(opts)` — dryRun=false filesystem evidence (opts object pattern)
+- Extracted `attemptApplyFlagSettings()` — applyFlagSettings seam exploration
+- Extracted `buildProbeEarlyReturn()` — early return result construction
+- Defined named types: `CheckpointRewindProbeResult`, `CheckpointPhase1StreamResult`, `CheckpointPhase2StreamResult`, `CheckpointCandidateResult`, etc.
+
+**Lint results**:
+- Before: `runCheckpointRewindProbe` 337 lines (max 200), complexity 53 (max 20) — **2 warnings**
+- After: All extracted methods under limits — **0 new warnings** (only pre-existing `buildDiagnosticSdkOptions` complexity 22 remains)
+- Introduced and fixed 3 intermediate warnings: `streamCheckpointPhase1` complexity, `streamCheckpointPhase2Rewind` max-params, `executeActualRewind` max-params — all resolved
+
+**Verification**: 152/152 adapter tests, typecheck clean, lint 0 new warnings, build OK (BUILD_ID: feature-phase0-capability.202606020215), graphify fresh, devlog order OK (310 sections), module-docs OK
+
+## 2026-06-02 SettingsCapabilityLabSection Lint Warning Elimination
+
+**Task**: Remove 4 lint warnings from `SettingsCapabilityLabSection.ts` while preserving all capability semantics and honesty boundaries.
+
+**Warnings eliminated**:
+- `renderDiscoveryControls` max-lines-per-function (232 → ~55 lines)
+- `runHookProof` max-lines-per-function (249 → ~52 lines)
+- `runHookProof` complexity (47 → under 20)
+- `runAllowedToolsProof` complexity (23 → under 20)
+
+**Helpers extracted** (all behavior-preserving pure refactors):
+- `addProofControl()` — DRYs the repeated button+output+click pattern (19 proof buttons)
+- `setupShellHookConfig()` — shell-hook config merge + nonce setup (extracted from runHookProof)
+- `cleanupShellHookArtifacts()` — safe restore/removal of settings.local.json (extracted from runHookProof finally block)
+- `renderHookLayer2()` — Layer 2 hook event stream output (extracted from renderHookProofReport)
+- `renderHookLayer3()` — Layer 3 shell-hook nonce output (extracted from renderHookProofReport)
+- `renderHookProofReport()` — report assembly + verdict classification (uses opts object for max-params compliance)
+- `classifyAllowedToolsResult()` — Allowed Tools classification branches (all paths → readback, honest boundary preserved)
+
+**Verification**: 172/172 CapLab tests pass, 0 lint warnings, typecheck clean, check:module-docs OK, check:graphify OK
+
+## 2026-06-02 /context Diagnostic — Label Honesty Tightening
+
+- **变更**: 矩阵行、发现行、证明按钮/标题从 "Command Execution" 改名为 "/context Diagnostic"
+- **原因**: "Command Execution" 过宽，容易误读成 Claude 命令执行已产品化；实际范围仅限固定 allow-list `/context`、diagnostic-only、只读
+- **TDD**: RED（7 tests fail: audit + 5 proof tests button not found）→ GREEN（172/172 pass）
+- **诚实边界**: 不变 — 仍然是 `/context` diagnostic-only，不是通用命令执行能力产品化
+
+## 2026-06-02 Command Execution — Block-Array Content Fix
+
+- **Bug**: `runCommandExecutionProof()` 只处理 `message.content` 为字符串的情况，但真实 SDK assistant raw message 使用 block-array 形状 `{ content: [{ type: 'text', text: '...' }] }`，导致真实 `/context` 运行被误分类为 `readback` 而非 `pass`
+- **Fix**: `runCommandExecutionProof()` 现在同时处理三种内容形状：string、block-array `[{ type: 'text', text }]`、和 normalized text chunks；合并后检测 "Context Usage"
+- **TDD**: RED（success test 改用 block-array shape → fail）→ GREEN（172/172 pass）
+- **诚实边界**: 不变 — diagnostic-only，固定 /context，无任意命令输入
+
+## 2026-06-02 Command Execution — Diagnostic /context Command Seam
+
+- **新增**: Capability Lab 矩阵新增第 26 行 "Command Execution"（`runtimeProof: 'pass'`, `userSurface: 'diagnostic'`）
+- **实现**: `runCommandExecutionProof()` 使用固定只读命令 `/context`，通过 `runDiagnosticPrompt({ prompt: '/context', persistSession: false, _diagnosticBypassPermissions: true })` 执行
+- **分类规则**: `pass` = rawMessages 包含 system → assistant → result 且 assistant text 包含 "Context Usage"；`readback` = 有消息但无 "Context Usage"（不虚报为 pass）；`fail` = adapter 抛出
+- **诚实边界**: 证明安全只读诊断命令接缝存在，仅限 `/context`。不代表普通 Claude chat slash 命令已产品化。无任意命令输入，无命令 authoring，无 `.claude/**` 写入。不触及 `SlashCommandExecutionService` 或 `runSessionCommand()`
+- **TDD**: RED（6 tests fail: audit 25→26, verified 22→23, 5 proof tests no button）→ GREEN（171/171 pass）
+- **矩阵**: 26 rows, 23 pass, 3 readback（File Checkpoint / Rewind, Allowed Tools, Fallback Model）
+
+## 2026-06-02 SetModel Live Proof — Catch Block Fail Marker Fix
+
+- **Bug**: `runSetModelLiveProof()` 的 catch 块只渲染错误文本，未调用 `updateRuntimeProof('SetModel Live', 'fail', ...)`，导致 JSDoc 声明的 "fail if the probe throws" 分类从未执行。匹配的测试只断言了错误文本存在，因此漂移未被捕获。
+- **Fix**: catch 块添加 `this.updateRuntimeProof('SetModel Live', 'fail', outputEl)`；测试重命名并增加 fail marker 断言。
+- **Adapter audit**: `runSetModelLiveProbe()` 生命周期审查通过 — try/finally 清理正确，4 个现有测试覆盖所有关键路径。无额外生命周期 bug。
+- **Classification**: SetModel Live Probe = `diagnostic-only`（不变）
+- **TDD**: RED（proofMarker null）→ GREEN（fail marker present）
+
+### Post-Fix Verification
+
+- `npm test -- tests/unit/features/settings/SettingsCapabilityLabSection.test.ts --runInBand --no-cache` passed (`166 passed, 166 total`)
+- `npm test -- tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts --runInBand --no-cache --testNamePattern="runSetModelLiveProbe"` passed (`4 passed, 147 skipped, 151 total`)
+- `npm run check:devlog-order` passed (`305 dated sections`)
+- `npm run check:graphify` passed (`graphify freshness ok`)
+- `npm run check:module-docs -- --range HEAD` passed (`7 required doc targets`)
+- `git diff --check` passed
+- `npm run lint` → `0 errors / 8 warnings`（**not fully clean**，not final complete）
+- `npm run build` passed with `BUILD_ID=feature-phase0-capability.202606020015`
+
+### Test Vault Deployment
+
+- Sequentially copied `dist/main.js`, `dist/manifest.json`, `dist/styles.css` to `/Volumes/SDD2T/obsidian-vault-write/testvault/.obsidian/plugins/opencodian/`
+- Test Vault `main.js` confirmed: `BUILD_ID=feature-phase0-capability.202606020015`
+
+### Smoke Validation (Test Vault)
+
+- `obsidian plugin:reload id=opencodian vault=testvault` → `Reloaded: opencodian`
+- `obsidian eval` → `OpenCodian 1.0.0 BUILD_ID=feature-phase0-capability.202606020015`
+- `obsidian dev:errors vault=testvault` → `No errors captured.`
+- DOM: root present, capability matrix present, summary present, `Run SetModel Live Proof` button present, matrix rows=25
+- CSS: SetModel button `minHeight="34px"`, `fontWeight="650"`, summary grid columns present
+- Screenshots: `.obsidian-debug/claude-caplab-smoke-20260602-build-202606020015.png`, `.obsidian-debug/claude-caplab-setmodel-controls-202606020015.png`
+- Smoke conclusion: no white screen, no obvious layout collapse
+
+### Honest Status
+
+- SetModel Live: `diagnostic-only`（不变）
+- Lint: `0 errors / 8 warnings` — not fully clean
+- Project: not claimed complete
+
+---
+
+## 2026-06-01 SetModel Live Diagnostic Probe
+
+### Summary
+
+实现 Claude Code `query.setModel()` live 行为的窄诊断 seam：`ClaudeCodeAdapter.runSetModelLiveProbe(targetModel)` 两阶段 probe，Phase 1 捕获初始 `modelUsage`，调用 `query.setModel(targetModel)`，Phase 2 捕获切换后 `modelUsage`。Capability Lab Discovery & Status 面板新增 `Run SetModel Live Proof` 按钮。分类诚实：Phase 2 包含 targetModel 且 Phase 1 不包含 → `pass`；setModel 成功但模型未变 → `readback`；setModel 不可用 → `boundary`。诊断专用，不改变稳定聊天行为、设置、或任何现有能力分类。
+
+### Changes
+
+1. `ClaudeCodeAdapter.runSetModelLiveProbe(targetModel)` 新增两阶段诊断 probe：自建 SDK query（不经过 `runDiagnosticPrompt`），Phase 1 短 prompt + `modelUsage` 提取；`query.setModel(targetModel)` 控制请求；Phase 2 短 prompt + `modelUsage` 提取。返回 `setModelAttempted`、`setModelError`、`setModelNotAvailable`、`phase1ModelKeys`、`phase2ModelKeys`。
+2. `extractModelUsageFromRaw()` 模块级辅助函数：从 raw message 数组提取最后一条 `type:'result'` 消息的 `modelUsage` 字段。
+3. `SettingsCapabilityLabSection` Discovery 面板新增 `Run SetModel Live Proof` 按钮和 `runSetModelLiveProof()` 方法。
+4. Module docs、status doc 同步新增 setModel live probe 描述。
+
+### Verification
+
+- TDD RED: `npx jest tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts --testNamePattern="runSetModelLiveProbe"` failed with `adapter.runSetModelLiveProbe is not a function`.
+- TDD RED: `npx jest tests/unit/features/settings/SettingsCapabilityLabSection.test.ts --testNamePattern="SetModel Live"` failed because button was missing.
+- `npm test -- tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts --runInBand --no-cache` passed (`151 passed, 151 total`)
+- `npm test -- tests/unit/features/settings/SettingsCapabilityLabSection.test.ts --runInBand --no-cache` passed (`166 passed, 166 total`)
+- `npm test -- tests/unit/features/settings/SettingsClaudeCodeSection.test.ts --runInBand --no-cache` passed (`72 passed, 72 total`)
+
+### Classification
+
+- SetModel Live Probe: `diagnostic-only` (not in 25-row capability matrix)
+- File Checkpoint / Rewind: `readback` (unchanged)
+- Fallback Model: `readback` (unchanged)
+- Allowed Tools: `readback` (unchanged)
+
+---
+
+## 2026-06-01 Claude Code Runtime Catalog Readback
+
+### Summary
+
+继续推进 Claude Code 只读 runtime visibility seam：把 SDK `Query.supportedCommands()` / `Query.supportedAgents()` 接到 Claude Code Runtime 标签的 `Inspect runtime catalog` 操作。它只展示 sanitized slash command / agent catalog，不执行命令、不创建或编辑 agent、不保存 settings、不写 `.claude/**`，也不把 readback 伪装成 `pass`。
+
+### Changes
+
+1. `ClaudeCodeAdapter.getRuntimeCatalog()` 新增只读 catalog readback：优先复用 active SDK query；如果 active query 存在但缺少 catalog 方法，返回 `null`，不创建临时 query 伪装 live readback；只有没有 active query 时才创建临时 query，并在 `finally` 关闭 prompt input、abort controller 与 SDK query。
+2. Catalog 输出做防御性清洗：command 只保留 `name`、`description`、`argumentHint`、`aliases`，agent 只保留 `name`、`description`、`model`；无 name 条目丢弃，输出排序。
+3. `SettingsClaudeCodeSection` Runtime tab 新增 `Inspect runtime catalog` 按钮，输出容器标记 `data-claude-code-runtime-catalog="true"` / `data-proof-state="readback"`；空目录、adapter 缺失、返回 null、抛错都有明确状态。
+4. Locale 与 module docs 同步新增 `settings.claudeCode.runtimeCatalog.*`，并把 file readback 的 `maxBytes: 4096` 口径收紧为 Settings UI 默认请求上限，避免暗示 adapter 自身补默认值。
+5. `graphify-out` 刷新到当前 `6250 nodes` / `11931 edges` / `177 communities detected`（以落盘 `GRAPH_REPORT.md` 为准），收口上一轮文档中的 community-count drift。
+
+### Verification
+
+- TDD RED: `npm test -- tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts --runInBand --no-cache` failed as expected with `adapter.getRuntimeCatalog is not a function`.
+- TDD RED: `npm test -- tests/unit/features/settings/SettingsClaudeCodeSection.test.ts --runInBand --no-cache` failed as expected because `Inspect runtime catalog` did not exist yet.
+- `npm test -- tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts --runInBand --no-cache` passed (`147 passed, 147 total`)
+- `npm test -- tests/unit/features/settings/SettingsClaudeCodeSection.test.ts --runInBand --no-cache` passed (`72 passed, 72 total`)
+- `npm test -- tests/unit/features/settings/SettingsCapabilityLabSection.test.ts --runInBand --no-cache` passed (`160 passed, 160 total`)
+- `npm run typecheck -- --pretty false` passed
+- `npm run check:module-docs -- --range HEAD` passed (`449 source modules`, `449 mapped docs`, `6 required doc targets`)
+- `git diff --check` passed
+- `npm run graphify:update:src` refreshed `graphify-out`; current `GRAPH_REPORT.md` reports `6250 nodes`, `11931 edges`, `177 communities detected`
+- `npm run check:graphify` passed (`graphify freshness ok for current src working-tree changes`)
+- `npm run lint` completed with `0 errors / 8 warnings`; remaining warnings are existing oversized/complex diagnostic functions plus `tests/unit/core/agents/backend/ClaudeCodeOptionsBuilder.test.ts`, not new pass/fail evidence.
+- `npm run build` passed with `BUILD_ID=feature-phase0-capability.202606011712`
+
+### Deployment
+
+- `dist/main.js` contains `BUILD_ID=feature-phase0-capability.202606011712`.
+- Test Vault deployment succeeded for `main.js`, `manifest.json`, and `styles.css`.
+- Test Vault `main.js` now contains `BUILD_ID=feature-phase0-capability.202606011712`.
+
+### Classification
+
+- Runtime catalog readback: `read-only/supporting evidence`
+- File Checkpoint / Rewind: `readback`
+- Fallback Model: `readback`
+
+---
+
+## 2026-06-01 SDK Query.readFile Runtime File Readback
+
+### Summary
+
+实现并收口 Claude Code SDK `Query.readFile()` seam：它只是 runtime file readback / supporting evidence，用于读取并展示 SDK runtime 回传的文件内容，不是 File Checkpoint / Rewind 行为 proof，不改变 capability matrix，也不把任何能力伪装成 `pass`。
+
+### Changes
+
+1. Current-state 文档新增 `Query.readFile()` runtime file readback 条目，明确默认 `maxBytes` 约 4096、encoding 限定为 `utf-8` / `base64`，输出可能包含 `absPath`、`contents`、`truncated`。
+2. Module docs 同步 adapter 职责：`readRuntimeFile()` 只读调用 SDK `Query.readFile()`，只在没有 active query 时才创建临时 query；若 active query 缺少 `readFile`，返回 `null`，避免把临时 query 伪装成 live readback。
+3. Settings / locale module docs 同步 Runtime tab 的 file readback UI：输出保持 `data-proof-state="readback"` / `data-claude-code-file-readback="true"`，不保存 settings，不写 `.claude/**`。
+4. 文档边界明确：该 seam 不 bypass permissions、不写文件、不证明 checkpoint snapshot / rewind / restore，不影响 Fallback Model，也不提升 capability matrix。
+5. 子代理并行实施后，主线复核确认 adapter、settings/locale、docs 三条线集成一致；最终状态以主线验证结果为准。
+
+### Verification
+
+- TDD RED: `npm test -- tests/unit/features/settings/SettingsClaudeCodeSection.test.ts --runInBand --no-cache --testNamePattern='runtime file readback'` failed as expected before implementation because the runtime file path input / inspect action were missing.
+- Command pitfall observed: adapter focused test patterns containing `|` can be broken by `scripts/run-jest.js` shell argument forwarding (`/bin/sh: reads: command not found`), so full-file Jest runs are used as the reliable closure proof.
+- `npm test -- tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts --runInBand --no-cache` passed (`142 passed, 142 total`)
+- `npm test -- tests/unit/features/settings/SettingsClaudeCodeSection.test.ts --runInBand --no-cache` passed (`68 passed, 68 total`)
+- `npm test -- tests/unit/features/settings/SettingsCapabilityLabSection.test.ts --runInBand --no-cache` passed (`160 passed, 160 total`)
+- `npm run typecheck -- --pretty false` passed
+- `npm run check:module-docs -- --range HEAD` passed (`449 source modules`, `449 mapped docs`, `5 required doc targets`)
+- `npm run check:devlog-order` passed (`302 dated sections in descending order`)
+- `git diff --check` passed
+- `npm run graphify:update:src` updated `graphify-out`; superseded by the later Runtime Catalog Readback refresh above, whose current artifact reports `6250 nodes`, `11931 edges`, `177 communities detected`
+- `npm run check:graphify` passed (`graphify freshness ok for current src working-tree changes`)
+- `npm run lint` completed with `0 errors / 8 warnings`; remaining warnings are existing oversized/complex diagnostic functions plus `tests/unit/core/agents/backend/ClaudeCodeOptionsBuilder.test.ts`, not new pass/fail evidence.
+- `npm run build` passed with `BUILD_ID=feature-phase0-capability.202606011644`
+
+### Deployment
+
+- `dist/main.js` contains `BUILD_ID=feature-phase0-capability.202606011644`.
+- Test Vault deploy attempted immediately after build, but `cp dist/main.js /Volumes/SDD2T/obsidian-vault-write/testvault/.obsidian/plugins/opencodian/main.js` failed with `Operation not permitted`.
+- Because the first copy step failed, `manifest.json` and `styles.css` were not copied to avoid a partial deployment.
+- Test Vault `main.js` still contains `BUILD_ID=feature-phase0-capability.202605312344`, so Test Vault is not updated to this build in the current environment.
+
+### Classification
+
+- Runtime file readback: `read-only/supporting evidence`
+- File Checkpoint / Rewind: `readback`
+- Fallback Model: `readback`
+
+---
+
+## 2026-06-01 Fallback Diagnostic Guardrail Hardening
+
+### Summary
+
+修复 Fallback Model 诊断 proof 的一个诚实性 guardrail：以前 invalid-primary 运行只要返回“不是无效主模型”的 detected model，就可能被标为 `pass`。这不足以证明自动 fallback，因为 SDK 未来也可能把无效模型归一化成某个默认模型。现在 pass 必须同时证明 detected model 等于配置的 fallback model，并且有多模型 `modelUsage` 或明确 fallback / 529 / overload 信号；否则保持 `readback`。
+
+### Changes
+
+1. `runFallbackModelProof()` 收紧 pass 条件：`detectedModel === testFallbackModel` 且具备 `modelUsage` 多模型证据或明确 fallback/overload signal。
+2. 新增 `hasFallbackSwitchSignal()` 防御性 helper，识别 `model_fallback`、`tengu_model_fallback_triggered`、`overloaded_error`、`Switched to`、`error_status:529` 等明确信号；JSON 序列化失败时保守返回 false。
+3. 测试新增“不同非 fallback 模型仍为 readback”的回归用例，并把正向 pass 用例补上多模型 `modelUsage` 证据。
+4. 修正一个陈旧测试注释：Rewind 当前是 `readback`，不是 `Untested`。
+5. Module docs 同步 hardened pass criterion，明确不同非 fallback 模型不能被读成 fallback 行为证明。
+
+### Verification
+
+- TDD RED: `npm test -- tests/unit/features/settings/SettingsCapabilityLabSection.test.ts --runInBand --no-cache --testNamePattern="Fallback Model"` failed as expected when a non-fallback normalized model was incorrectly promoted to pass.
+- `npm test -- tests/unit/features/settings/SettingsCapabilityLabSection.test.ts --runInBand --no-cache --testNamePattern="Fallback Model"` passed (`12 passed`, `272 skipped`)
+- `npm test -- tests/unit/features/settings/SettingsCapabilityLabSection.test.ts --runInBand --no-cache` passed (`160 passed, 160 total`)
+- `npm run typecheck -- --pretty false` passed
+- `npm run lint` completed with `0 errors / 8 warnings`; remaining warnings are existing oversized/complex diagnostic functions plus `tests/unit/core/agents/backend/ClaudeCodeOptionsBuilder.test.ts`, not new pass/fail evidence.
+- `npm run graphify:update:src` updated `graphify-out` (`6233 nodes`, `11881 edges`, `219 communities`)
+- `npm run build` passed with `BUILD_ID=feature-phase0-capability.202606011619`
+
+### Deployment
+
+- `dist/main.js` contains `BUILD_ID=feature-phase0-capability.202606011619`.
+- Test Vault deploy attempted immediately after build, but `cp dist/main.js /Volumes/SDD2T/obsidian-vault-write/testvault/.obsidian/plugins/opencodian/main.js` failed with `Operation not permitted`.
+- Because the first copy step failed, `manifest.json` and `styles.css` were not copied to avoid a partial deployment.
+- Test Vault `main.js` still contains `BUILD_ID=feature-phase0-capability.202605312344`, so Test Vault is not updated to this build in the current environment.
+
+### Classification
+
+- Fallback Model: `readback`
+- File Checkpoint / Rewind: `readback`
+
+---
+
+## 2026-06-01 Account Info Runtime Readback
+
+### Summary
+
+继续推进 Claude Code 功能接入的只读 runtime visibility seam：把 SDK `Query.accountInfo()` 接入 adapter 与 Claude Code Runtime 设置页，作为 sanitized authenticated account readback。边界保持保守：这是 `read-only/supporting evidence`，不执行登录认证、不保存 settings、不写 `.claude/**`、不改变 backend enablement，也不改变 File Checkpoint / Rewind 或 Fallback Model 的 `readback` 分类。
+
+### Changes
+
+1. `ClaudeCodeAdapter.getAccountInfo()` 新增 SDK `Query.accountInfo()` readback seam：优先复用 active query；若 active query 存在但缺少该方法，返回 `null`，避免用临时 query 伪装 live readback；只有没有 active query 时才创建临时 query，并在 `finally` 关闭 input / abort controller / query handle。
+2. Claude Code Runtime tab 新增 `Inspect account` 按钮，输出带 `data-claude-code-account-info-readback="true"` 与 `data-proof-state="readback"`。
+3. Account info 输出使用防御性 JSON formatter：`email` 遮罩为 `u***@example.com` 形式，`apiKeySource` / `tokenSource` / token / secret / credential / authorization / oauth / env 等凭据相关 key 脱敏。
+4. 英文/中文 locale、module docs 和 current-state 文档同步只读边界与 Test Vault drift。
+
+### Verification
+
+- TDD RED: `npm test -- tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts --runInBand --no-cache` failed as expected with `adapter.getAccountInfo is not a function`.
+- TDD RED: `npm test -- tests/unit/features/settings/SettingsClaudeCodeSection.test.ts --runInBand --no-cache` failed as expected because the `Inspect account` button was missing.
+- `npm test -- tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts --runInBand --no-cache` passed (`140 passed, 140 total`)
+- `npm test -- tests/unit/features/settings/SettingsClaudeCodeSection.test.ts --runInBand --no-cache` passed (`62 passed, 62 total`)
+- `npm test -- tests/unit/features/settings/SettingsCapabilityLabSection.test.ts --runInBand --no-cache` passed (`159 passed, 159 total`)
+- `npm run typecheck -- --pretty false` passed
+- `npm run check:module-docs -- --range HEAD` passed (`449 source modules`, `449 mapped docs`, `5 required doc targets`)
+- `npm run check:graphify` initially reported `graphify-out is stale for current src changes`; ran `npm run graphify:update:src`, then `npm run check:graphify` passed (`graphify freshness ok for current src working-tree changes`)
+- `npm run check:devlog-order` passed (`300 dated sections in descending order`)
+- `git diff --check` passed
+- `npm run lint` completed with `0 errors / 8 warnings`; remaining warnings are existing oversized/complex diagnostic functions plus `tests/unit/core/agents/backend/ClaudeCodeOptionsBuilder.test.ts`, not new pass/fail evidence.
+- `npm run build` passed with `BUILD_ID=feature-phase0-capability.202606011559`
+
+### Deployment
+
+- `dist/main.js` contains `BUILD_ID=feature-phase0-capability.202606011559`.
+- Test Vault deploy attempted immediately after build, but `cp dist/main.js /Volumes/SDD2T/obsidian-vault-write/testvault/.obsidian/plugins/opencodian/main.js` failed with `Operation not permitted`.
+- Because the first copy step failed, `manifest.json` and `styles.css` were not copied to avoid a partial deployment.
+- Test Vault `main.js` still contains `BUILD_ID=feature-phase0-capability.202605312344`, so Test Vault is not updated to this build in the current environment.
+
+### Classification
+
+- Account info runtime readback: `read-only/supporting evidence`
+- Login/authentication flow: not implemented
+- File Checkpoint / Rewind: `readback`
+- Fallback Model: `readback`
+
+---
+
+## 2026-06-01 Context Usage Runtime Readback
+
+### Summary
+
+继续使用子代理并行实施 Claude Code 只读 seam：把 SDK `Query.getContextUsage()` 接入 adapter 与 Claude Code Runtime 设置页，作为 sanitized context usage readback。边界保持保守：这是 `read-only/supporting evidence`，不保存 settings、不写 `.claude/**`、不提供 context authoring/budget control，也不改变 File Checkpoint / Rewind 或 Fallback Model 的 `readback` 分类。
+
+### Changes
+
+1. `ClaudeCodeAdapter.getContextUsage()` 新增 SDK `Query.getContextUsage()` readback seam：优先复用 active query；若 active query 存在但缺少该方法，返回 `null`，避免用临时 query 伪装 live readback；只有没有 active query 时才创建临时 query，并在 `finally` 关闭 input / abort controller / query handle。
+2. Claude Code Runtime tab 新增 `Inspect context usage` 按钮，输出带 `data-claude-code-context-usage-readback="true"` 与 `data-proof-state="readback"`。
+3. Context usage 输出使用防御性 JSON formatter：凭据类 key（`apiKey`、`authorization`、`accessToken`、`refreshToken`、`sessionToken`、`authToken`、独立 `token`、secret/password/credential/oauth/env）脱敏；`tokenEstimate` 等普通用量字段保留。
+4. 英文/中文 locale、module docs 和 current-state 文档同步只读边界与 Test Vault drift。
+
+### Verification
+
+- TDD RED: `npm test -- tests/unit/features/settings/SettingsClaudeCodeSection.test.ts --runInBand --no-cache` failed as expected when `tokenEstimate` was still redacted.
+- `npm test -- tests/unit/features/settings/SettingsClaudeCodeSection.test.ts --runInBand --no-cache` passed (`59 passed, 59 total`)
+- `npm test -- tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts --runInBand --no-cache` passed (`135 passed, 135 total`)
+- `npm test -- tests/unit/features/settings/SettingsCapabilityLabSection.test.ts --runInBand --no-cache` passed (`159 passed, 159 total`)
+- `npm run typecheck -- --pretty false` passed
+- `npm run check:module-docs -- --range HEAD` passed (`449 source modules`, `449 mapped docs`, `5 required doc targets`)
+- `git diff --check` passed
+- `npm run lint` completed with `0 errors / 8 warnings`; remaining warnings are existing oversized/complex diagnostic functions plus `tests/unit/core/agents/backend/ClaudeCodeOptionsBuilder.test.ts`, not new pass/fail evidence.
+- `npm run build` passed with `BUILD_ID=feature-phase0-capability.202606011548`
+
+### Deployment
+
+- `dist/main.js` contains `BUILD_ID=feature-phase0-capability.202606011548`.
+- Test Vault deploy attempted immediately after build, but `cp dist/main.js /Volumes/SDD2T/obsidian-vault-write/testvault/.obsidian/plugins/opencodian/main.js` failed with `Operation not permitted`.
+- Because the first copy step failed, `manifest.json` and `styles.css` were not copied to avoid a partial deployment.
+- Test Vault `main.js` still contains `BUILD_ID=feature-phase0-capability.202605312344`, so Test Vault is not updated to this build in the current environment.
+
+### Classification
+
+- Context usage runtime readback: `read-only/supporting evidence`
+- Context authoring / budget control: not implemented
+- File Checkpoint / Rewind: `readback`
+- Fallback Model: `readback`
+
+---
+
+## 2026-06-01 MCP Runtime Status Readback
+
+### Summary
+
+继续推进 Claude Code 功能接入，但只走 runtime visibility seam：把 SDK `Query.mcpServerStatus()` 接到 Claude Code Tools 标签里的只读 `Inspect runtime status` 操作。它显示 sanitized MCP server status / tool names / error summary，不写 `.claude/mcp.json`，不提供 MCP authoring，也不影响 File Checkpoint / Rewind 或 Fallback Model 的 `readback` 分类。
+
+### Changes
+
+1. `SettingsClaudeCodeSection` 的 MCP runtime 控制新增 `Inspect runtime status` 按钮，调用 active Claude adapter 的 `getMcpServerRuntimeStatuses()`。
+2. 状态输出使用 `data-claude-code-mcp-runtime-status="true"` 与 `data-proof-state="readback"`，只展示 server name、status、scope、serverInfo、tool names 和 error summary。
+3. 英文/中文 locale 新增 `settings.claudeCode.mcpRuntime.status*` 文案，明确这是只读 runtime status readback，不 author `.claude/mcp.json`。
+4. Module docs 与 current-state 文档同步边界：MCP authoring 仍在共享 Settings > MCP；runtime status readback 不改判 checkpoint/fallback。
+
+### Verification
+
+- `npm test -- tests/unit/features/settings/SettingsClaudeCodeSection.test.ts --runInBand --no-cache` passed (`56 passed, 56 total`)
+- `npm run typecheck -- --pretty false` passed
+- `npm run check:module-docs -- --range HEAD` passed (`449 source modules`, `449 mapped docs`, `5 required doc targets`)
+- `npm run lint` completed with `0 errors / 8 warnings`; remaining warnings are existing oversized/complex diagnostic functions plus `tests/unit/core/agents/backend/ClaudeCodeOptionsBuilder.test.ts`, not new pass/fail evidence.
+- `npm run build` passed with `BUILD_ID=feature-phase0-capability.202606011535`
+
+### Deployment
+
+- `dist/main.js` contains `BUILD_ID=feature-phase0-capability.202606011535`.
+- Test Vault deploy attempted immediately after build, but `cp dist/main.js /Volumes/SDD2T/obsidian-vault-write/testvault/.obsidian/plugins/opencodian/main.js` failed with `Operation not permitted`.
+- Test Vault `main.js` still contains `BUILD_ID=feature-phase0-capability.202605312344`, so Test Vault is not updated to this build in the current environment.
+
+### Classification
+
+- MCP runtime status readback: `read-only/supporting evidence`
+- MCP authoring: unchanged, shared Settings > MCP
+- File Checkpoint / Rewind: `readback`
+- Fallback Model: `readback`
+
+---
+
+## 2026-06-01 Parallel Subagent Hardening — Claude Code Readback Surfaces
+
+### Summary
+
+开三个子代理并行复查并实施 Claude Code 只读 seam 的收口：adapter runtime settings readback、Capability Lab redaction/readback 展示、Claude Code settings runtime ecosystem/MCP server names。边界不变：这些都是 runtime visibility / supporting evidence，不是 settings/MCP/skills/plugins/agent authoring，也不把 File Checkpoint / Rewind 或 Fallback Model 改判为 pass。
+
+### Changes
+
+1. `ClaudeCodeAdapter.getRuntimeSettings()` 继续保持只读回读：优先复用 active query，临时 query 路径关闭句柄，SDK path 缺失或失败时返回 `null`。
+2. Capability Lab 的 `Query.getSettings()` 子区增加本地失败处理，保持 `data-proof-state="readback"`，并扩大 key-based redaction：env/API key/token/secret/password/credential/authorization/oauth-like key 均脱敏。
+3. Claude Code settings 的 runtime ecosystem 与 MCP runtime server names 继续只读展示，不提供 authoring 控件；相关测试覆盖 names、empty states、`skills: "all"` sentinel 和 no-authoring 边界。
+4. Current-state 文档同步最新 build/deploy 真实状态：本地 dist 已更新，但 Test Vault 因权限失败仍停在 2026-05-31 部署。
+
+### Verification
+
+- `npm test -- tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts --runInBand --no-cache` passed (`131 passed, 131 total`)
+- `npm test -- tests/unit/features/settings/SettingsCapabilityLabSection.test.ts --runInBand --no-cache` passed (`159 passed, 159 total`)
+- `npm test -- tests/unit/features/settings/SettingsClaudeCodeSection.test.ts --runInBand --no-cache` passed (`55 passed, 55 total`)
+- `npm run typecheck -- --pretty false` passed
+- `npm run build` passed with `BUILD_ID=feature-phase0-capability.202606011519`
+- `npm run lint` completed with `0 errors / 8 warnings`; remaining warnings are existing oversized/complex diagnostic functions plus `tests/unit/core/agents/backend/ClaudeCodeOptionsBuilder.test.ts`, not new pass/fail evidence.
+
+### Deployment
+
+- `dist/main.js` contains `BUILD_ID=feature-phase0-capability.202606011519`.
+- Test Vault deploy attempted immediately after build, but `cp dist/main.js /Volumes/SDD2T/obsidian-vault-write/testvault/.obsidian/plugins/opencodian/main.js` failed with `Operation not permitted`.
+- Test Vault `main.js` still contains `BUILD_ID=feature-phase0-capability.202605312344`, so Test Vault is not updated to this build in the current environment.
+
+### Classification
+
+- Runtime settings readback: `read-only/supporting evidence`
+- MCP runtime server names: `read-only/runtime visibility`
+- Runtime ecosystem summary: `read-only/discovery surface`
+- File Checkpoint / Rewind: `readback`
+- Fallback Model: `readback`
+
+---
+
+## 2026-06-01 Query.getSettings Runtime Readback Seam
+
+### Summary
+
+继续推进 Claude Code 的安全只读 seam：通过 SDK `Query.getSettings()` 增加 runtime settings snapshot readback，并把它接到 Capability Lab 的 Stable Settings Readback 输出中。它只显示脱敏后的 live settings snapshot，不写设置、不提供 authoring，也不把 File Checkpoint / Rewind、Fallback Model 或 MCP authoring 改判为 pass。
+
+### Changes
+
+1. `ClaudeCodeAdapter.getRuntimeSettings()` 新增只读 adapter seam：优先复用活跃 SDK `Query.getSettings()`，没有活跃 query 时创建临时 query 读取 snapshot；SDK path 缺失或抛错时返回 `null`。
+2. Capability Lab 的 `Run Stable Settings Readback` 结果新增 `Runtime Settings Readback (Query.getSettings)` 子区，只展示脱敏预览，并明确这是 supporting evidence only。
+3. `SettingsCapabilityLabSection` 对 runtime settings snapshot 做敏感字段脱敏，覆盖 `env`、token、secret、password、credential、authorization、oauth 等 key。
+4. Current-state、module docs 与 devlog 同步边界：这是 runtime readback，不是 settings authoring，也不会提升 rewind/fallback/MCP authoring 分类。
+
+### Verification
+
+- `npm test -- tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts --runInBand --no-cache` passed (`126 passed, 126 total`)
+- `npm test -- tests/unit/features/settings/SettingsCapabilityLabSection.test.ts --runInBand --no-cache` passed (`158 passed, 158 total`)
+- `npm run typecheck -- --pretty false` passed
+- `npm run check:module-docs -- --range HEAD` passed (`449 source modules`, `449 mapped docs`, `5 required doc targets`)
+- `npm run check:devlog-order` passed (`296 dated sections in descending order`)
+- `git diff --check` passed
+- `npm run build` passed with `BUILD_ID=feature-phase0-capability.202606011453`
+
+### Deployment
+
+- `dist/main.js` contains `BUILD_ID=feature-phase0-capability.202606011453`.
+- Test Vault deploy attempted immediately after build, but `cp dist/main.js .../testvault/.obsidian/plugins/opencodian/main.js` failed with `Operation not permitted`.
+- Test Vault `main.js` still contains `BUILD_ID=feature-phase0-capability.202605312344`, so Test Vault is not updated to this build in the current environment.
+
+---
+
+## 2026-06-01 Claude MCP Runtime Server Names Readback
+
+### Summary
+
+继续推进 Claude Code 功能接入，但只走诚实可验证 seam：把当前 Claude Code adapter 已加载的 MCP runtime server names 做成只读回读显示。它不是 MCP authoring，不写 `.claude/mcp.json`，也不把 MCP、File Checkpoint / Rewind 或 Fallback Model 重新分类为新的 pass。
+
+### Changes
+
+1. `ClaudeCodeAdapter` 新增 `getMcpServerNames()`，从静态 `mcpServers` 或动态 MCP config cache 中返回排序后的 server names；未加载时返回空数组。
+2. Claude Code Tools tab 的 MCP runtime 状态在有名称时使用 `settings.claudeCode.mcpRuntime.loadedWithNames`，刷新仍只调用 `reloadMcpServers()`。
+3. Capability Lab 的 MCP Servers discovery row 在 adapter 暴露名称时展示 names，同时继续说明 MCP authoring 在共享 Settings > MCP。
+4. 英文/中文 locale 与 module docs 更新 `loadedWithNames` 和 `getMcpServerNames()` 的只读边界。
+5. Current-state 文档新增 2026-06-01 状态段，明确本地 dist 与 Test Vault BUILD_ID 当前不一致。
+
+### Verification
+
+- `npm test -- tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts --runInBand --no-cache` passed (`123 passed, 123 total`)
+- `npm test -- tests/unit/features/settings/SettingsClaudeCodeSection.test.ts --runInBand --no-cache` passed (`54 passed, 54 total`)
+- `npm test -- tests/unit/features/settings/SettingsCapabilityLabSection.test.ts --runInBand --no-cache` passed (`156 passed, 156 total`)
+- `npm run check:module-docs -- --range HEAD` passed after the docs/status/devlog update (`449 source modules`, `449 mapped docs`, `5 required doc targets`)
+- `npm run check:devlog-order` passed after the new 2026-06-01 entry was inserted (`295 dated sections in descending order`)
+- `git diff --check` passed
+- `npm run build` passed with `BUILD_ID=feature-phase0-capability.202606011429`
+
+### Deployment
+
+- `dist/main.js` contains `BUILD_ID=feature-phase0-capability.202606011429`.
+- Test Vault deploy attempted but failed on the first copy step with `Operation not permitted`.
+- Test Vault `main.js` still contains `BUILD_ID=feature-phase0-capability.202605312344`, so the Test Vault is not updated to the June 1 build in this environment.
+
+---
+
+## 2026-05-31 Runtime Ecosystem Read-Only Settings Surface
+
+### Summary
+
+把 Claude-native runtime ecosystem 从“隐藏 / 诊断-only”推进为 Claude Code Runtime 设置页里的只读发现摘要，同时保持真实边界：Skills / Plugins / Agent Definitions 只是 runtime/discovery/read-only surface，不提供 authoring；File Checkpoint / Rewind 和 Fallback Model 仍保持 readback/blocker。
+
+### Changes
+
+1. **Settings surface**: `src/features/settings/SettingsClaudeCodeSection.ts` 在 Runtime 标签渲染 `Runtime ecosystem` 只读摘要，显示 adapter 回读到的 plugins / skills / agent definitions 数量、名称和 `skills: "all"` sentinel，并用 `data-proof-state="readback"` / `data-runtime-only="true"` 标记边界。
+2. **Focused tests**: `tests/unit/features/settings/SettingsClaudeCodeSection.test.ts` 新增 runtime ecosystem 覆盖，验证列表、empty states、`skills: all` sentinel 和无 authoring 控件。
+3. **Locale copy**: `src/i18n/locales/en.ts` / `src/i18n/locales/zh.ts` 更新摘要说明，明确覆盖 plugins、skills 和 agent definitions。
+4. **Status doc**: `docs/status/claude-code-current-state-2026-05-22.md` 顶部新增当天边界说明，明确 runtime ecosystem summary 是只读 settings/discovery surface，不升格 authoring。
+5. **Module docs**: `docs/modules/features/settings/SettingsClaudeCodeSection.md`、`docs/modules/features/settings/SettingsCapabilityLabSection.md`、`docs/modules/core/agents/backend/ClaudeCodeAdapter.md` 和 i18n locale module docs 更新，只读镜像与无 authoring 口径保持一致。
+
+### Verification
+
+- `npm test -- tests/unit/features/settings/SettingsClaudeCodeSection.test.ts --runInBand --no-cache` passed (`54 passed, 54 total`)
+- `npm test -- tests/unit/features/settings/SettingsCapabilityLabSection.test.ts --runInBand --no-cache` passed (`156 passed, 156 total`)
+- `npm run check:module-docs -- --range HEAD` passed (`449 source modules`, `449 mapped docs`, `4 required doc targets`)
+- `npm run check:devlog-order` passed (`294 dated sections in descending order`)
+- `git diff --check` passed
+- `npm run build` passed with `BUILD_ID=feature-phase0-capability.202605312344`
+- Deployed `dist/main.js`, `dist/manifest.json`, and `dist/styles.css` to Test Vault; deployed `main.js` contains `BUILD_ID=feature-phase0-capability.202605312344`
+
+### Classification
+
+- Runtime ecosystem summary: `read-only/discovery surface`
+- File Checkpoint / Rewind: `readback`
+- Fallback Model: `readback`
+
+---
+
+## 2026-05-31 Claude Code Capability Truth Sync — Source/Test Alignment
+
+### Summary
+
+继续把 Claude Code Capability Lab 的 File Checkpoint / Rewind 口径收口到当前真实状态，并同步测试断言。
+
+### Changes
+
+1. **Source text refresh**: `src/features/settings/SettingsCapabilityLabSection.ts` 里的 File Checkpoint / Rewind 行和 blocker hint 统一更新为当前口径，明确写成 0.3.158 已测、需要 `setMaxListeners(AbortSignal)` monkey-patch、10/10 candidates 仍为 `canRewind:false`，`applyFlagSettings({ fileCheckpointingEnabled: true })` 仍是 dead-end seam。
+
+2. **Test guardrail**: `tests/unit/features/settings/SettingsCapabilityLabSection.test.ts` 的 `canRewind:false` 用例新增断言，要求输出包含 `SDK 0.3.158` 且不再出现 `0.3.157`。
+
+3. **Docs already aligned**: `docs/modules/features/settings/SettingsCapabilityLabSection.md` 与 `docs/modules/core/agents/backend/ClaudeCodeAdapter.md` 已提前对齐当前口径，本轮未引入新的文档漂移。
+
+### Verification
+
+- `npm test -- tests/unit/features/settings/SettingsCapabilityLabSection.test.ts --runInBand --no-cache` passed (`156 passed, 156 total`)
+- `npm run build` passed with `BUILD_ID=feature-phase0-capability.202605312324`
+- Deployed `dist/main.js`, `dist/manifest.json`, and `dist/styles.css` to Test Vault; deployed `main.js` contains `BUILD_ID=feature-phase0-capability.202605312324`
+
+### Classification
+
+- File Checkpoint / Rewind: `readback`
+- Fallback Model: `readback`
+
+---
+
+## 2026-05-31 State Closure — Claude Code Capability Truth Sync
+
+### Summary
+
+Closed documentation drift found during the state audit. This is a truth-sync pass only: no runtime logic changed.
+
+### Corrections
+
+1. **Deployed artifact at that point**: `dist/main.js` and Test Vault `main.js` contained `BUILD_ID=feature-phase0-capability.202605312324` after the source/test alignment build. The earlier state-closure build was `feature-phase0-capability.202605311418`; the current latest deployment is tracked by the newer devlog entry above.
+
+2. **Runtime proof boundary**: `feature-phase0-capability.202605312324` was a source/test-alignment build, not new runtime proof. The latest recorded File Checkpoint / Rewind runtime evidence remains `feature-phase0-capability.202605311358`.
+
+3. **Artifact availability**: the 2026-05-31 `.obsidian-debug/*202605311358*`, `*202605311031*`, `*202605311013*`, and `*202605311016*` evidence files are not present in this worktree, so those entries should be treated as recorded session/result summaries rather than locally replayable artifact evidence.
+
+4. **Stale SDK wording**: replaced "0.3.158 latest, untested" / "test 0.3.158 next" wording in the current-state document with the actual result: 0.3.158 was tested, still needs an Electron monkey-patch, and produces identical `canRewind:false` results to 0.3.145.
+
+5. **Capability Lab readback wording**: clarified that `updateRuntimeProof()` supports `readback` as a distinct runtime-proof state and refreshed the stale 0.3.157 wording in the current-state and module docs.
+
+### Classification
+
+- File Checkpoint / Rewind: `readback` (unchanged; no local executable seam remains)
+- Fallback Model: `readback` (unchanged; `modelUsage` is passive detection, not a trigger)
+- Matrix: 22/25 pass, 3/25 readback
+
+---
+
+## 2026-05-31 File Checkpoint / Rewind — SDK 0.3.158 Runtime Test
+
+### Summary
+
+Tested SDK 0.3.158 upgrade as the only remaining executable path for File Checkpoint / Rewind. **Result: blocker unchanged, version reverted to 0.3.145.**
+
+### Findings
+
+1. **SDK 0.3.158 Electron crash**: `setMaxListeners(50, abortController.signal)` in SDK minified code crashes on every `query()` call in Electron 39.8.3 / Node 22.22.1. The error: `"eventTargets" argument must be an instance of EventEmitter or EventTarget. Received an instance of AbortSignal`.
+
+2. **Monkey-patch workaround**: A runtime patch filtering `AbortSignal` from `events.setMaxListeners` targets allows 0.3.158 to function, but provides zero checkpoint improvement.
+
+3. **Checkpoint results identical to 0.3.145**: 10/10 candidates `canRewind:false`, 0 `files_persisted` events, `applyFlagSettings` succeeds but has no effect on snapshot creation.
+
+4. **SDK version decision**: Reverted to 0.3.145 (stable, no patches needed, same checkpoint behavior).
+
+### Files
+
+- `docs/status/claude-code-current-state-2026-05-22.md`: Added SDK 0.3.158 runtime test section with full evidence table
+- `docs/modules/core/agents/backend/ClaudeCodeAdapter.md`: Updated SDK version references
+- `docs/modules/features/settings/SettingsCapabilityLabSection.md`: Updated SDK version references
+
+### Classification
+
+- File Checkpoint / Rewind: **readback** (unchanged — Issue #236 blocker persists in 0.3.158)
+- Matrix: 22/25 pass, 3/25 readback
+
+---
+
+## 2026-05-31 File Checkpoint / Rewind — Re-Audit: No New Seam
+
+### 审计范围
+
+对 File Checkpoint / Rewind 做完整再审计：检查 SDK 源码、npm 最新版本、官方文档、所有 Query 方法、已消除的 workaround 路径。
+
+### 发现
+
+**无新的 honest runtime seam。** 以下 seam 已检查并排除：
+
+| Seam | 状态 |
+|------|------|
+| `extraArgs: { 'replay-user-messages': null }` | ❌ 官方文档标注为 UUID 捕获必需，但 issue #236 复现代码已包含此标志且仍 `canRewind:false`。blocker 是 snapshot 创建，不是 UUID。 |
+| `query.getSettings()` | ℹ️ 只读 runtime readback seam，可回读 live settings snapshot；不改变 `canRewind:false`、Fallback Model 或 MCP authoring 结论 |
+| SDK 0.3.158 | ✅ 后续已测试（见上方 runtime test）——Electron 中仍需 monkey-patch，checkpoint 结果与 0.3.145 相同。 |
+| 官方文档 vs 运行时差异 | ℹ️ Anthropic 发布了 checkpointing 官方指南 (code.claude.com/docs/en/agent-sdk/file-checkpointing)，但 issue #236 仍 OPEN |
+
+### 文档修正
+
+- SDK 版本引用更新：0.3.157 崩溃说明 + 0.3.158 后续 runtime test 结果
+- 修正范围：status doc、ClaudeCodeAdapter.md、SettingsCapabilityLabSection.md
+- 新增 status doc re-audit section 记录完整 seam 分析
+
+### 分类（不变）
+
+- File Checkpoint / Rewind: `readback`
+- Matrix: 22/25 pass, 3/25 readback
+
+### Next Executable Path
+
+已由上方 SDK 0.3.158 runtime test 收口：0.3.158 仍需 Electron monkey-patch，且 checkpoint 结果没有改善。当前下一步只剩上游修复或未来 SDK 明确改变非交互 checkpoint 行为。
+
+---
+
 ## 2026-05-31 Fallback Model — Same-Model Guard
 
 **问题**：设置 UI 允许用户保存 `model === fallbackModel` 的无效配置，但 SDK 在 `ProcessTransport.initialize()` 中确定性拒绝同模型配置（抛出异常）。用户可以静默保存必然在查询时失败的配置。

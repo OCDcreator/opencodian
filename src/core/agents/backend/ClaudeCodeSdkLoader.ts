@@ -4,6 +4,11 @@
 
 import type { ClaudeCodeSdkFacade } from './ClaudeCodeAdapter';
 
+export interface WarmQueryHandle {
+  query(prompt: string | AsyncIterable<unknown>): AsyncIterable<unknown> & { close?: () => void };
+  close(): void;
+}
+
 export interface ClaudeAgentSdkModule {
   query: ClaudeCodeSdkFacade['query'];
   listSessions?: NonNullable<ClaudeCodeSdkFacade['listSessions']>;
@@ -14,6 +19,7 @@ export interface ClaudeAgentSdkModule {
   importSessionToStore?: NonNullable<ClaudeCodeSdkFacade['importSessionToStore']>;
   forkSession?: NonNullable<ClaudeCodeSdkFacade['forkSession']>;
   renameSession?: NonNullable<ClaudeCodeSdkFacade['renameSession']>;
+  startup?: (params?: { options?: unknown; initializeTimeoutMs?: number }) => Promise<WarmQueryHandle>;
 }
 
 export type ClaudeAgentSdkImporter = () => Promise<ClaudeAgentSdkModule>;
@@ -47,5 +53,6 @@ export async function loadClaudeCodeSdk(
     ...(sdk.importSessionToStore ? { importSessionToStore: sdk.importSessionToStore } : {}),
     ...(sdk.forkSession ? { forkSession: sdk.forkSession } : {}),
     ...(sdk.renameSession ? { renameSession: sdk.renameSession } : {}),
+    ...(sdk.startup ? { startup: sdk.startup } : {}),
   };
 }

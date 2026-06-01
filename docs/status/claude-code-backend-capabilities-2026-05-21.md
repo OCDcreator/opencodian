@@ -109,7 +109,7 @@ for UI exposure.
 | `betas` | ❌ Not wired (programmatic only) | ❌ Hidden | Phase 2+ |
 | `outputFormat` (JSON schema) | ❌ Not wired | ❌ Hidden | Phase 4+ |
 | `plugins` | ❌ Not wired | ❌ Hidden | Phase 5 |
-| `sandbox` | ❌ Not wired | ❌ Hidden | Phase 5 |
+| `sandbox` | ⚠️ Readback (2026-06-02: top-level booleans wired through options builder, readback only) | ✅ Permissions tab (2026-06-02: enabled, failIfUnavailable, autoAllowBashIfSandboxed) | Phase 5 (network/filesystem sub-policies) |
 
 ## Smoke Harness Coverage
 

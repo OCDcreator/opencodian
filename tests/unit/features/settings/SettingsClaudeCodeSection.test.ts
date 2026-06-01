@@ -484,6 +484,21 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       expect(containerEl.textContent).toContain(t('settings.claudeCode.proofStatus.fallbackModel'));
     });
 
+    it('renders main-model proof status notice with pass state in model-thinking tab', () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'model-thinking');
+
+      const noticeEl = containerEl.querySelector('[data-claude-code-proof-status="main-model"]');
+      expect(noticeEl).toBeTruthy();
+      expect(noticeEl?.getAttribute('data-proof-state')).toBe('pass');
+      expect(containerEl.textContent).toContain(t('settings.claudeCode.proofStatus.mainModel'));
+    });
+
     it('renders limits proof status notice with readback state in model-thinking tab', () => {
       const plugin = createPlugin();
       const containerEl = document.createElement('div');
@@ -827,6 +842,100 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       expect(findButton(t('settings.claudeCode.runtimeBoundary.restartButton'))).toBeDefined();
     });
 
+    it('renders runtime ecosystem lists as a read-only runtime summary', () => {
+      const claudeAdapter = {
+        getPluginCount: jest.fn().mockReturnValue(2),
+        getPluginsList: jest.fn().mockReturnValue(['plugin-alpha', 'plugin-beta']),
+        getSkillCount: jest.fn().mockReturnValue(2),
+        getSkillsList: jest.fn().mockReturnValue(['skill-alpha', 'skill-beta']),
+        getAgentDefinitionCount: jest.fn().mockReturnValue(2),
+        getAgentDefinitionsList: jest.fn().mockReturnValue(['proof-agent', 'audit-agent']),
+      };
+      const plugin = createPlugin({ claudeAdapter });
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+
+      section.attachTabbed(containerEl, 'runtime');
+
+      const summaryEl = containerEl.querySelector('[data-claude-code-runtime-ecosystem="true"]');
+      expect(summaryEl).toBeTruthy();
+      expect(summaryEl?.getAttribute('data-runtime-only')).toBe('true');
+      expect(summaryEl?.getAttribute('data-proof-state')).toBe('readback');
+      expect(containerEl.textContent).toContain(t('settings.claudeCode.runtimeEcosystem.name'));
+      expect(containerEl.textContent).toContain(t('settings.claudeCode.runtimeEcosystem.desc'));
+      expect(containerEl.textContent).toContain(t('settings.claudeCode.runtimeEcosystem.plugins.loaded', {
+        count: 2,
+        names: 'plugin-alpha, plugin-beta',
+      }));
+      expect(containerEl.textContent).toContain(t('settings.claudeCode.runtimeEcosystem.skills.loaded', {
+        count: 2,
+        names: 'skill-alpha, skill-beta',
+      }));
+      expect(containerEl.textContent).toContain(t('settings.claudeCode.runtimeEcosystem.agentDefinitions.loaded', {
+        count: 2,
+        names: 'proof-agent, audit-agent',
+      }));
+      expect(buttonRecords.some((record) => record.name === t('settings.claudeCode.runtimeEcosystem.name')))
+        .toBe(false);
+    });
+
+    it('renders runtime ecosystem all-skills sentinel without authoring controls', () => {
+      const claudeAdapter = {
+        getPluginCount: jest.fn().mockReturnValue(0),
+        getPluginsList: jest.fn().mockReturnValue([]),
+        getSkillCount: jest.fn().mockReturnValue(-1),
+        getSkillsList: jest.fn().mockReturnValue('all'),
+        getAgentDefinitionCount: jest.fn().mockReturnValue(0),
+        getAgentDefinitionsList: jest.fn().mockReturnValue([]),
+      };
+      const plugin = createPlugin({ claudeAdapter });
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+
+      section.attachTabbed(containerEl, 'runtime');
+
+      expect(containerEl.textContent).toContain(t('settings.claudeCode.runtimeEcosystem.plugins.empty'));
+      expect(containerEl.textContent).toContain(t('settings.claudeCode.runtimeEcosystem.skills.all'));
+      expect(containerEl.textContent).toContain(t('settings.claudeCode.runtimeEcosystem.agentDefinitions.empty'));
+      const renderedControlNames = [
+        ...textRecords,
+        ...textAreaRecords,
+        ...dropdownRecords,
+        ...toggleRecords,
+        ...buttonRecords,
+      ].map((record) => record.name).join('\n').toLowerCase();
+      expect(renderedControlNames).not.toContain('skill authoring');
+      expect(renderedControlNames).not.toContain('agent definition authoring');
+      expect(renderedControlNames).not.toContain('plugin authoring');
+    });
+
+    it('renders runtime ecosystem empty states when the adapter has no runtime items', () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+
+      section.attachTabbed(containerEl, 'runtime');
+
+      const rows = Array.from(containerEl.querySelectorAll('[data-runtime-ecosystem-kind]'));
+      expect(rows.map((row) => row.getAttribute('data-runtime-ecosystem-state'))).toEqual([
+        'empty',
+        'empty',
+        'empty',
+      ]);
+      expect(containerEl.textContent).toContain(t('settings.claudeCode.runtimeEcosystem.plugins.empty'));
+      expect(containerEl.textContent).toContain(t('settings.claudeCode.runtimeEcosystem.skills.empty'));
+      expect(containerEl.textContent).toContain(t('settings.claudeCode.runtimeEcosystem.agentDefinitions.empty'));
+    });
+
     it('can manually restart active Claude Code sessions from Runtime tab changes', async () => {
       const claudeAdapter = { restartPersistentQueries: jest.fn().mockResolvedValue(undefined) };
       const plugin = createPlugin({ claudeAdapter });
@@ -840,6 +949,439 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       await findButton(t('settings.claudeCode.runtimeBoundary.restartButton')).onClick?.();
 
       expect(claudeAdapter.restartPersistentQueries).toHaveBeenCalledWith('settings-change');
+    });
+
+    it('renders sanitized context usage readback on demand without saving settings', async () => {
+      const claudeAdapter = {
+        getContextUsage: jest.fn().mockResolvedValue({
+          contextWindow: 200000,
+          usedCount: 42000,
+          tokenEstimate: 42000,
+          apiKey: 'sk-live-secret',
+          nested: {
+            authorization: 'Bearer private-token',
+            accessToken: 'access-token-secret',
+            source: 'runtime',
+          },
+        }),
+      };
+      const plugin = createPlugin({ claudeAdapter });
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'runtime');
+
+      await findButton(t('settings.claudeCode.contextUsage.inspectButton')).onClick?.();
+
+      expect(claudeAdapter.getContextUsage).toHaveBeenCalledTimes(1);
+      expect(plugin.saveSettings).not.toHaveBeenCalled();
+      const readbackEl = containerEl.querySelector('[data-claude-code-context-usage-readback="true"]');
+      expect(readbackEl).toBeTruthy();
+      expect(readbackEl?.getAttribute('data-proof-state')).toBe('readback');
+      expect(readbackEl?.textContent).toContain('"contextWindow": 200000');
+      expect(readbackEl?.textContent).toContain('"usedCount": 42000');
+      expect(readbackEl?.textContent).toContain('"tokenEstimate": 42000');
+      expect(readbackEl?.textContent).toContain('"source": "runtime"');
+      expect(readbackEl?.textContent).toContain('"apiKey": "[redacted]"');
+      expect(readbackEl?.textContent).toContain('"authorization": "[redacted]"');
+      expect(readbackEl?.textContent).toContain('"accessToken": "[redacted]"');
+      expect(readbackEl?.textContent).not.toContain('sk-live-secret');
+      expect(readbackEl?.textContent).not.toContain('private-token');
+      expect(readbackEl?.textContent).not.toContain('access-token-secret');
+    });
+
+    it('shows context usage readback unavailable when the adapter method is missing', async () => {
+      const plugin = createPlugin({ claudeAdapter: {} });
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'runtime');
+
+      await findButton(t('settings.claudeCode.contextUsage.inspectButton')).onClick?.();
+
+      expect(plugin.saveSettings).not.toHaveBeenCalled();
+      const readbackEl = containerEl.querySelector('[data-claude-code-context-usage-readback="true"]');
+      expect(readbackEl).toBeTruthy();
+      expect(readbackEl?.getAttribute('data-proof-state')).toBe('readback');
+      expect(readbackEl?.textContent).toContain(t('settings.claudeCode.contextUsage.unavailable'));
+    });
+
+    it('shows context usage readback failure when the adapter rejects', async () => {
+      const claudeAdapter = {
+        getContextUsage: jest.fn().mockRejectedValue(new Error('boom')),
+      };
+      const plugin = createPlugin({ claudeAdapter });
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'runtime');
+
+      await findButton(t('settings.claudeCode.contextUsage.inspectButton')).onClick?.();
+
+      expect(claudeAdapter.getContextUsage).toHaveBeenCalledTimes(1);
+      expect(plugin.saveSettings).not.toHaveBeenCalled();
+      const readbackEl = containerEl.querySelector('[data-claude-code-context-usage-readback="true"]');
+      expect(readbackEl).toBeTruthy();
+      expect(readbackEl?.getAttribute('data-proof-state')).toBe('readback');
+      expect(readbackEl?.textContent).toContain(t('settings.claudeCode.contextUsage.failed'));
+    });
+
+    it('renders sanitized account info readback on demand without saving settings', async () => {
+      const claudeAdapter = {
+        getAccountInfo: jest.fn().mockResolvedValue({
+          email: 'user@example.com',
+          organization: 'Example Org',
+          subscriptionType: 'max',
+          apiProvider: 'firstParty',
+          apiKeySource: 'ANTHROPIC_API_KEY',
+          tokenSource: 'oauth-token-cache',
+        }),
+      };
+      const plugin = createPlugin({ claudeAdapter });
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'runtime');
+
+      await findButton(t('settings.claudeCode.accountInfo.inspectButton')).onClick?.();
+
+      expect(claudeAdapter.getAccountInfo).toHaveBeenCalledTimes(1);
+      expect(plugin.saveSettings).not.toHaveBeenCalled();
+      const readbackEl = containerEl.querySelector('[data-claude-code-account-info-readback="true"]');
+      expect(readbackEl).toBeTruthy();
+      expect(readbackEl?.getAttribute('data-proof-state')).toBe('readback');
+      expect(readbackEl?.textContent).toContain('"email": "u***@example.com"');
+      expect(readbackEl?.textContent).toContain('"organization": "Example Org"');
+      expect(readbackEl?.textContent).toContain('"subscriptionType": "max"');
+      expect(readbackEl?.textContent).toContain('"apiProvider": "firstParty"');
+      expect(readbackEl?.textContent).toContain('"apiKeySource": "[redacted]"');
+      expect(readbackEl?.textContent).toContain('"tokenSource": "[redacted]"');
+      expect(readbackEl?.textContent).not.toContain('user@example.com');
+      expect(readbackEl?.textContent).not.toContain('ANTHROPIC_API_KEY');
+      expect(readbackEl?.textContent).not.toContain('oauth-token-cache');
+    });
+
+    it('shows account info readback unavailable when the adapter method is missing', async () => {
+      const plugin = createPlugin({ claudeAdapter: {} });
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'runtime');
+
+      await findButton(t('settings.claudeCode.accountInfo.inspectButton')).onClick?.();
+
+      expect(plugin.saveSettings).not.toHaveBeenCalled();
+      const readbackEl = containerEl.querySelector('[data-claude-code-account-info-readback="true"]');
+      expect(readbackEl).toBeTruthy();
+      expect(readbackEl?.getAttribute('data-proof-state')).toBe('readback');
+      expect(readbackEl?.textContent).toContain(t('settings.claudeCode.accountInfo.unavailable'));
+    });
+
+    it('shows account info readback failure when the adapter rejects', async () => {
+      const claudeAdapter = {
+        getAccountInfo: jest.fn().mockRejectedValue(new Error('boom')),
+      };
+      const plugin = createPlugin({ claudeAdapter });
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'runtime');
+
+      await findButton(t('settings.claudeCode.accountInfo.inspectButton')).onClick?.();
+
+      expect(claudeAdapter.getAccountInfo).toHaveBeenCalledTimes(1);
+      expect(plugin.saveSettings).not.toHaveBeenCalled();
+      const readbackEl = containerEl.querySelector('[data-claude-code-account-info-readback="true"]');
+      expect(readbackEl).toBeTruthy();
+      expect(readbackEl?.getAttribute('data-proof-state')).toBe('readback');
+      expect(readbackEl?.textContent).toContain(t('settings.claudeCode.accountInfo.failed'));
+    });
+
+    it('renders runtime command and agent catalog readback on demand without saving settings', async () => {
+      const claudeAdapter = {
+        getRuntimeCatalog: jest.fn().mockResolvedValue({
+          commands: [{
+            name: 'review',
+            description: 'Review selected files',
+            argumentHint: '<path>',
+            aliases: ['audit', 'inspect'],
+          }],
+          agents: [{
+            name: 'explore',
+            description: 'Explore the codebase',
+            model: 'sonnet',
+          }],
+        }),
+      };
+      const plugin = createPlugin({ claudeAdapter });
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'runtime');
+
+      await findButton(t('settings.claudeCode.runtimeCatalog.inspectButton')).onClick?.();
+
+      expect(claudeAdapter.getRuntimeCatalog).toHaveBeenCalledTimes(1);
+      expect(plugin.saveSettings).not.toHaveBeenCalled();
+      const catalogEl = containerEl.querySelector('[data-claude-code-runtime-catalog="true"]');
+      expect(catalogEl).toBeTruthy();
+      expect(catalogEl?.getAttribute('data-proof-state')).toBe('readback');
+      expect(catalogEl?.textContent).toContain(t('settings.claudeCode.runtimeCatalog.summary', {
+        commands: 1,
+        agents: 1,
+      }));
+      expect(catalogEl?.textContent).toContain('/review');
+      expect(catalogEl?.textContent).toContain('Review selected files');
+      expect(catalogEl?.textContent).toContain(t('settings.claudeCode.runtimeCatalog.argumentHint', {
+        hint: '<path>',
+      }));
+      expect(catalogEl?.textContent).toContain(t('settings.claudeCode.runtimeCatalog.aliases', {
+        aliases: 'audit, inspect',
+      }));
+      expect(catalogEl?.textContent).toContain('explore');
+      expect(catalogEl?.textContent).toContain('Explore the codebase');
+      expect(catalogEl?.textContent).toContain(t('settings.claudeCode.runtimeCatalog.model', {
+        model: 'sonnet',
+      }));
+
+      const renderedControlNames = [
+        ...textRecords,
+        ...textAreaRecords,
+        ...dropdownRecords,
+        ...toggleRecords,
+        ...buttonRecords,
+      ].map((record) => record.name).join('\n').toLowerCase();
+      expect(renderedControlNames).not.toContain('execute command');
+      expect(renderedControlNames).not.toContain('agent authoring');
+      expect(renderedControlNames).not.toContain('create agent');
+    });
+
+    it('shows runtime catalog empty states when no commands or agents are returned', async () => {
+      const claudeAdapter = {
+        getRuntimeCatalog: jest.fn().mockResolvedValue({
+          commands: [],
+          agents: [],
+        }),
+      };
+      const plugin = createPlugin({ claudeAdapter });
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'runtime');
+
+      await findButton(t('settings.claudeCode.runtimeCatalog.inspectButton')).onClick?.();
+
+      expect(plugin.saveSettings).not.toHaveBeenCalled();
+      const catalogEl = containerEl.querySelector('[data-claude-code-runtime-catalog="true"]');
+      expect(catalogEl).toBeTruthy();
+      expect(catalogEl?.getAttribute('data-proof-state')).toBe('readback');
+      expect(catalogEl?.textContent).toContain(t('settings.claudeCode.runtimeCatalog.emptyCommands'));
+      expect(catalogEl?.textContent).toContain(t('settings.claudeCode.runtimeCatalog.emptyAgents'));
+    });
+
+    it('shows runtime catalog unavailable when the adapter method is missing', async () => {
+      const plugin = createPlugin({ claudeAdapter: {} });
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'runtime');
+
+      await findButton(t('settings.claudeCode.runtimeCatalog.inspectButton')).onClick?.();
+
+      expect(plugin.saveSettings).not.toHaveBeenCalled();
+      const catalogEl = containerEl.querySelector('[data-claude-code-runtime-catalog="true"]');
+      expect(catalogEl).toBeTruthy();
+      expect(catalogEl?.getAttribute('data-proof-state')).toBe('readback');
+      expect(catalogEl?.textContent).toContain(t('settings.claudeCode.runtimeCatalog.unavailable'));
+    });
+
+    it('shows runtime catalog readback failure when the adapter rejects', async () => {
+      const claudeAdapter = {
+        getRuntimeCatalog: jest.fn().mockRejectedValue(new Error('boom')),
+      };
+      const plugin = createPlugin({ claudeAdapter });
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'runtime');
+
+      await findButton(t('settings.claudeCode.runtimeCatalog.inspectButton')).onClick?.();
+
+      expect(claudeAdapter.getRuntimeCatalog).toHaveBeenCalledTimes(1);
+      expect(plugin.saveSettings).not.toHaveBeenCalled();
+      const catalogEl = containerEl.querySelector('[data-claude-code-runtime-catalog="true"]');
+      expect(catalogEl).toBeTruthy();
+      expect(catalogEl?.getAttribute('data-proof-state')).toBe('readback');
+      expect(catalogEl?.textContent).toContain(t('settings.claudeCode.runtimeCatalog.failed'));
+    });
+
+    it('renders runtime file readback on demand without saving settings', async () => {
+      const claudeAdapter = {
+        readRuntimeFile: jest.fn().mockResolvedValue({
+          contents: '# Runtime note\nHello from Claude.',
+          absPath: '/vault/notes/runtime.md',
+          truncated: false,
+        }),
+      };
+      const plugin = createPlugin({ claudeAdapter });
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'runtime');
+
+      await findText(t('settings.claudeCode.fileReadback.pathName')).onChange?.(' notes/runtime.md ' as never);
+      await findButton(t('settings.claudeCode.fileReadback.inspectButton')).onClick?.();
+
+      expect(claudeAdapter.readRuntimeFile).toHaveBeenCalledWith('notes/runtime.md', {
+        maxBytes: 4096,
+        encoding: 'utf-8',
+      });
+      expect(plugin.saveSettings).not.toHaveBeenCalled();
+      const readbackEl = containerEl.querySelector('[data-claude-code-file-readback="true"]');
+      expect(readbackEl).toBeTruthy();
+      expect(readbackEl?.getAttribute('data-proof-state')).toBe('readback');
+      expect(readbackEl?.textContent).toContain('/vault/notes/runtime.md');
+      expect(readbackEl?.textContent).toContain('# Runtime note');
+      expect(readbackEl?.textContent).not.toContain(t('settings.claudeCode.fileReadback.truncated'));
+    });
+
+    it('renders runtime file readback truncated notice when the adapter truncates contents', async () => {
+      const claudeAdapter = {
+        readRuntimeFile: jest.fn().mockResolvedValue({
+          contents: 'partial file contents',
+          absPath: '/vault/notes/large.md',
+          truncated: true,
+        }),
+      };
+      const plugin = createPlugin({ claudeAdapter });
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'runtime');
+
+      await findText(t('settings.claudeCode.fileReadback.pathName')).onChange?.('notes/large.md' as never);
+      await findButton(t('settings.claudeCode.fileReadback.inspectButton')).onClick?.();
+
+      const readbackEl = containerEl.querySelector('[data-claude-code-file-readback="true"]');
+      expect(readbackEl).toBeTruthy();
+      expect(readbackEl?.getAttribute('data-proof-state')).toBe('readback');
+      expect(readbackEl?.textContent).toContain('/vault/notes/large.md');
+      expect(readbackEl?.textContent).toContain('partial file contents');
+      expect(readbackEl?.textContent).toContain(t('settings.claudeCode.fileReadback.truncated'));
+    });
+
+    it('shows runtime file readback empty path without calling adapter', async () => {
+      const claudeAdapter = {
+        readRuntimeFile: jest.fn(),
+      };
+      const plugin = createPlugin({ claudeAdapter });
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'runtime');
+
+      await findButton(t('settings.claudeCode.fileReadback.inspectButton')).onClick?.();
+
+      expect(claudeAdapter.readRuntimeFile).not.toHaveBeenCalled();
+      expect(plugin.saveSettings).not.toHaveBeenCalled();
+      const readbackEl = containerEl.querySelector('[data-claude-code-file-readback="true"]');
+      expect(readbackEl).toBeTruthy();
+      expect(readbackEl?.getAttribute('data-proof-state')).toBe('readback');
+      expect(readbackEl?.textContent).toContain(t('settings.claudeCode.fileReadback.emptyPath'));
+    });
+
+    it('shows runtime file readback unavailable when the adapter method is missing', async () => {
+      const plugin = createPlugin({ claudeAdapter: {} });
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'runtime');
+
+      await findText(t('settings.claudeCode.fileReadback.pathName')).onChange?.('notes/runtime.md' as never);
+      await findButton(t('settings.claudeCode.fileReadback.inspectButton')).onClick?.();
+
+      expect(plugin.saveSettings).not.toHaveBeenCalled();
+      const readbackEl = containerEl.querySelector('[data-claude-code-file-readback="true"]');
+      expect(readbackEl).toBeTruthy();
+      expect(readbackEl?.getAttribute('data-proof-state')).toBe('readback');
+      expect(readbackEl?.textContent).toContain(t('settings.claudeCode.fileReadback.unavailable'));
+    });
+
+    it('shows runtime file readback not found when the adapter returns null', async () => {
+      const claudeAdapter = {
+        readRuntimeFile: jest.fn().mockResolvedValue(null),
+      };
+      const plugin = createPlugin({ claudeAdapter });
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'runtime');
+
+      await findText(t('settings.claudeCode.fileReadback.pathName')).onChange?.('notes/missing.md' as never);
+      await findButton(t('settings.claudeCode.fileReadback.inspectButton')).onClick?.();
+
+      expect(claudeAdapter.readRuntimeFile).toHaveBeenCalledWith('notes/missing.md', {
+        maxBytes: 4096,
+        encoding: 'utf-8',
+      });
+      expect(plugin.saveSettings).not.toHaveBeenCalled();
+      const readbackEl = containerEl.querySelector('[data-claude-code-file-readback="true"]');
+      expect(readbackEl).toBeTruthy();
+      expect(readbackEl?.getAttribute('data-proof-state')).toBe('readback');
+      expect(readbackEl?.textContent).toContain(t('settings.claudeCode.fileReadback.notFound'));
+    });
+
+    it('shows runtime file readback failure when the adapter rejects', async () => {
+      const claudeAdapter = {
+        readRuntimeFile: jest.fn().mockRejectedValue(new Error('boom')),
+      };
+      const plugin = createPlugin({ claudeAdapter });
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'runtime');
+
+      await findText(t('settings.claudeCode.fileReadback.pathName')).onChange?.('notes/runtime.md' as never);
+      await findButton(t('settings.claudeCode.fileReadback.inspectButton')).onClick?.();
+
+      expect(claudeAdapter.readRuntimeFile).toHaveBeenCalledTimes(1);
+      expect(plugin.saveSettings).not.toHaveBeenCalled();
+      const readbackEl = containerEl.querySelector('[data-claude-code-file-readback="true"]');
+      expect(readbackEl).toBeTruthy();
+      expect(readbackEl?.getAttribute('data-proof-state')).toBe('readback');
+      expect(readbackEl?.textContent).toContain(t('settings.claudeCode.fileReadback.failed'));
     });
 
     it('renders environment variables with runtime process settings', async () => {
@@ -957,7 +1499,14 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       const noticeEl = containerEl.querySelector('[data-claude-code-proof-status="tools"]');
       expect(noticeEl).toBeTruthy();
       expect(noticeEl?.getAttribute('data-proof-state')).toBe('readback');
-      expect(containerEl.textContent).toContain(t('settings.claudeCode.proofStatus.tools'));
+      const toolsText = t('settings.claudeCode.proofStatus.tools');
+      expect(containerEl.textContent).toContain(toolsText);
+      // Honesty boundary: locale must NOT use the old "can only detect enforcement failure"
+      // framing. The current truth is that allowedTools is a pre-allow/auto-approve shortcut
+      // with zero enforcement — it is not a restrictor. Use Restricted Built-in Tools for
+      // deterministic built-in filtering.
+      expect(toolsText).not.toContain('can only detect enforcement failure');
+      expect(toolsText).not.toContain('只能检测 enforcement 失败');
     });
 
     it('renders restricted-builtin-tools proof status notice with pass state in tools tab', () => {
@@ -973,6 +1522,44 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       expect(noticeEl).toBeTruthy();
       expect(noticeEl?.getAttribute('data-proof-state')).toBe('pass');
       expect(containerEl.textContent).toContain(t('settings.claudeCode.proofStatus.restrictedBuiltinTools'));
+    });
+
+    it('renders file-checkpoint boundary notice with readback state in runtime tab', () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'runtime');
+
+      // Boundary notice exists with readback proof state
+      const noticeEl = containerEl.querySelector('[data-claude-code-proof-status="file-checkpointing"]');
+      expect(noticeEl).toBeTruthy();
+      expect(noticeEl?.getAttribute('data-proof-state')).toBe('readback');
+      const noticeText = t('settings.claudeCode.proofStatus.fileCheckpointing');
+      expect(containerEl.textContent).toContain(noticeText);
+      // Honesty: notice must mention experimental / diagnostic-only, not stable rewind
+      expect(noticeText).toContain('experimental');
+      // Must NOT contain optimistic "verified rewind" language
+      expect(noticeText).not.toContain('verified rewind');
+      expect(noticeText).not.toContain('已验证的 rewind');
+    });
+
+    it('does not render file-checkpoint rewind/restore button in stable settings', () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'runtime');
+
+      // No rewind/restore action buttons in stable settings
+      const rewindButtons = Array.from(containerEl.querySelectorAll('button')).filter(
+        (btn) => btn.textContent?.toLowerCase().includes('rewind') || btn.textContent?.toLowerCase().includes('restore'),
+      );
+      expect(rewindButtons).toHaveLength(0);
     });
 
     it('rejects invalid tool names and keeps only valid PascalCase alphanumeric names', async () => {
@@ -1001,6 +1588,9 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
         getMcpServerCount: jest.fn()
           .mockReturnValueOnce(2)
           .mockReturnValueOnce(3),
+        getMcpServerNames: jest.fn()
+          .mockReturnValueOnce(['alpha-mcp', 'beta-mcp'])
+          .mockReturnValueOnce(['alpha-mcp', 'beta-mcp', 'gamma-mcp']),
         reloadMcpServers: jest.fn().mockResolvedValue(undefined),
       };
       const plugin = createPlugin({ claudeAdapter });
@@ -1011,21 +1601,120 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       });
       section.attachTabbed(containerEl, 'tools');
 
+      const statusEl = containerEl.querySelector('[data-claude-code-mcp-runtime="true"]');
+      expect(statusEl).toBeTruthy();
+      expect(statusEl?.getAttribute('data-proof-state')).toBe('readback');
+      expect(containerEl.querySelector('[data-claude-code-mcp-runtime-status="true"]')).toBeNull();
+      expect(buttonRecords.some((record) => record.label === t('settings.claudeCode.mcpRuntime.inspectButton'))).toBe(true);
+      expect([
+        ...textRecords,
+        ...textAreaRecords,
+        ...dropdownRecords,
+        ...toggleRecords,
+      ].some((record) => record.name.toLowerCase().includes('mcp'))).toBe(false);
       expect(containerEl.textContent).toContain(
-        t('settings.claudeCode.mcpRuntime.loaded', { count: 2 }),
+        t('settings.claudeCode.mcpRuntime.loadedWithNames', {
+          count: 2,
+          names: 'alpha-mcp, beta-mcp',
+        }),
       );
 
       await findButton(t('settings.claudeCode.mcpRuntime.refreshButton')).onClick?.();
 
       expect(claudeAdapter.reloadMcpServers).toHaveBeenCalledTimes(1);
+      expect(plugin.saveSettings).not.toHaveBeenCalled();
       expect(containerEl.textContent).toContain(
-        t('settings.claudeCode.mcpRuntime.loaded', { count: 3 }),
+        t('settings.claudeCode.mcpRuntime.loadedWithNames', {
+          count: 3,
+          names: 'alpha-mcp, beta-mcp, gamma-mcp',
+        }),
       );
+    });
+
+    it('renders SDK MCP runtime status readback on demand without authoring config', async () => {
+      const claudeAdapter = {
+        getMcpServerCount: jest.fn().mockReturnValue(2),
+        getMcpServerNames: jest.fn().mockReturnValue(['alpha-mcp', 'beta-mcp']),
+        getMcpServerRuntimeStatuses: jest.fn().mockResolvedValue([
+          {
+            name: 'alpha-mcp',
+            status: 'connected',
+            scope: 'project',
+            toolCount: 2,
+            toolNames: ['alpha_read', 'alpha_write'],
+            hasError: false,
+          },
+          {
+            name: 'beta-mcp',
+            status: 'failed',
+            toolCount: 0,
+            toolNames: [],
+            hasError: true,
+            errorSummary: 'McpServerError(category=auth, messageLength=42)',
+          },
+        ]),
+        reloadMcpServers: jest.fn().mockResolvedValue(undefined),
+      };
+      const plugin = createPlugin({ claudeAdapter });
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'tools');
+
+      await findButton(t('settings.claudeCode.mcpRuntime.inspectButton')).onClick?.();
+
+      expect(claudeAdapter.getMcpServerRuntimeStatuses).toHaveBeenCalledTimes(1);
+      expect(plugin.saveSettings).not.toHaveBeenCalled();
+      const statusReadbackEl = containerEl.querySelector('[data-claude-code-mcp-runtime-status="true"]');
+      expect(statusReadbackEl).toBeTruthy();
+      expect(statusReadbackEl?.getAttribute('data-proof-state')).toBe('readback');
+      expect(containerEl.textContent).toContain(t('settings.claudeCode.mcpRuntime.statusSummary', {
+        count: 2,
+        connected: 1,
+        failed: 1,
+      }));
+      expect(containerEl.textContent).toContain('alpha-mcp: connected');
+      expect(containerEl.textContent).toContain(t('settings.claudeCode.mcpRuntime.statusTools', {
+        names: 'alpha_read, alpha_write',
+      }));
+      expect(containerEl.textContent).toContain('beta-mcp: failed');
+      expect(containerEl.textContent).toContain('McpServerError(category=auth, messageLength=42)');
+      expect([
+        ...textRecords,
+        ...textAreaRecords,
+        ...dropdownRecords,
+        ...toggleRecords,
+      ].some((record) => record.name.toLowerCase().includes('mcp'))).toBe(false);
+    });
+
+    it('renders the MCP runtime empty state as read-only discovery', () => {
+      const claudeAdapter = {
+        getMcpServerCount: jest.fn().mockReturnValue(0),
+        getMcpServerNames: jest.fn().mockReturnValue([]),
+        reloadMcpServers: jest.fn().mockResolvedValue(undefined),
+      };
+      const plugin = createPlugin({ claudeAdapter });
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'tools');
+
+      const statusEl = containerEl.querySelector('[data-claude-code-mcp-runtime="true"]');
+      expect(statusEl).toBeTruthy();
+      expect(statusEl?.getAttribute('data-proof-state')).toBe('readback');
+      expect(containerEl.textContent).toContain(t('settings.claudeCode.mcpRuntime.empty'));
+      expect(containerEl.textContent).not.toContain(t('settings.claudeCode.mcpRuntime.loaded', { count: 0 }));
+      expect(buttonRecords.some((record) => record.label === t('settings.claudeCode.mcpRuntime.inspectButton'))).toBe(true);
     });
 
     it('keeps the MCP runtime refresh failure visible', async () => {
       const claudeAdapter = {
         getMcpServerCount: jest.fn().mockReturnValue(2),
+        getMcpServerNames: jest.fn().mockReturnValue(['alpha-mcp', 'beta-mcp']),
         reloadMcpServers: jest.fn().mockRejectedValue(new Error('reload failed')),
       };
       const plugin = createPlugin({ claudeAdapter });
@@ -1041,7 +1730,10 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       expect(claudeAdapter.reloadMcpServers).toHaveBeenCalledTimes(1);
       expect(containerEl.textContent).toContain(t('settings.claudeCode.mcpRuntime.refreshFailed'));
       expect(containerEl.textContent).not.toContain(
-        t('settings.claudeCode.mcpRuntime.loaded', { count: 2 }),
+        t('settings.claudeCode.mcpRuntime.loadedWithNames', {
+          count: 2,
+          names: 'alpha-mcp, beta-mcp',
+        }),
       );
     });
   });
@@ -1242,6 +1934,113 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       expect(plugin.settings.backendSettings.claudeCode.fallbackModel).toBe('claude-haiku-4-5');
       // Should save
       expect(plugin.saveSettings).toHaveBeenCalled();
+    });
+  });
+
+  describe('sandbox settings in Permissions tab', () => {
+    it('renders sandbox boundary notice explaining this is not a permission editor', () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'permissions');
+
+      const boundaryEl = containerEl.querySelector('[data-claude-code-sandbox-boundary="true"]');
+      expect(boundaryEl).toBeTruthy();
+      expect(boundaryEl!.textContent).toContain(t('settings.claudeCode.sandbox.boundaryNotice'));
+    });
+
+    it('renders exactly three stable sandbox toggles with expected locale labels', () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'permissions');
+
+      // All three toggles must exist with correct locale names
+      const enabledToggle = findToggle(t('settings.claudeCode.sandbox.enabled.name'));
+      expect(enabledToggle).toBeDefined();
+
+      const failToggle = findToggle(t('settings.claudeCode.sandbox.failIfUnavailable.name'));
+      expect(failToggle).toBeDefined();
+
+      const autoBashToggle = findToggle(t('settings.claudeCode.sandbox.autoAllowBashIfSandboxed.name'));
+      expect(autoBashToggle).toBeDefined();
+    });
+
+    it('changing each sandbox toggle updates settings and calls saveSettings', async () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'permissions');
+
+      // Toggle sandbox.enabled on
+      await findToggle(t('settings.claudeCode.sandbox.enabled.name')).onChange?.(true as never);
+      expect(plugin.settings.backendSettings.claudeCode.sandbox.enabled).toBe(true);
+      expect(plugin.saveSettings).toHaveBeenCalled();
+
+      // Toggle failIfUnavailable on
+      (plugin.saveSettings as jest.Mock).mockClear();
+      await findToggle(t('settings.claudeCode.sandbox.failIfUnavailable.name')).onChange?.(true as never);
+      expect(plugin.settings.backendSettings.claudeCode.sandbox.failIfUnavailable).toBe(true);
+      expect(plugin.saveSettings).toHaveBeenCalled();
+
+      // Toggle autoAllowBashIfSandboxed on
+      (plugin.saveSettings as jest.Mock).mockClear();
+      await findToggle(t('settings.claudeCode.sandbox.autoAllowBashIfSandboxed.name')).onChange?.(true as never);
+      expect(plugin.settings.backendSettings.claudeCode.sandbox.autoAllowBashIfSandboxed).toBe(true);
+      expect(plugin.saveSettings).toHaveBeenCalled();
+    });
+
+    it('does not render nested sandbox authoring UI for network, filesystem, TLS, proxy, or Mach lookup', () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'permissions');
+
+      const renderedNames = [
+        ...textRecords,
+        ...textAreaRecords,
+        ...dropdownRecords,
+        ...toggleRecords,
+        ...buttonRecords,
+      ].map((r) => r.name.toLowerCase()).join('\n');
+
+      // These sub-policy editors must NOT appear
+      expect(renderedNames).not.toContain('network');
+      expect(renderedNames).not.toContain('filesystem');
+      expect(renderedNames).not.toContain('tls');
+      expect(renderedNames).not.toContain('proxy');
+      expect(renderedNames).not.toContain('mach lookup');
+    });
+
+    it('renders sandbox next-query lifecycle notice without a live-apply restart button', () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'permissions');
+
+      // Sandbox lifecycle notice must exist
+      const lifecycleEl = containerEl.querySelector('[data-claude-code-sandbox-lifecycle]');
+      expect(lifecycleEl).toBeTruthy();
+      // The notice should mention "next query" scope
+      expect(lifecycleEl!.textContent).toContain(t('settings.claudeCode.sandbox.lifecycleNotice'));
+      // It must NOT contain a restart button — sandbox cannot be live-applied
+      const restartButtons = containerEl.querySelectorAll('[data-claude-code-sandbox-lifecycle] button');
+      expect(restartButtons.length).toBe(0);
     });
   });
 

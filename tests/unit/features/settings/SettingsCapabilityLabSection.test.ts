@@ -38,6 +38,7 @@ function createMockPlugin(adapter: unknown = null, activeKind = adapter ? 'claud
     maxBudgetUsd: null,
     env: {},
     fallbackModel: '',
+    sandbox: { enabled: false, failIfUnavailable: false, autoAllowBashIfSandboxed: false },
   };
   return {
     agentServiceRegistry: registry,
@@ -240,7 +241,7 @@ describe('SettingsCapabilityLabSection', () => {
     const rows = Array.from(containerEl.querySelectorAll('.opencodian-capability-lab-matrix tbody tr'));
     const getRow = (label: string) => rows.find((row) => row.textContent?.includes(label));
 
-    // Hooks is pass (Verified), Rewind is still Untested
+    // Hooks is pass (Verified), Rewind remains readback because checkpoint data is still unavailable.
     const hooksRow = getRow('Hooks');
     expect(hooksRow).not.toBeNull();
     expect(hooksRow?.textContent).not.toContain('Complete');
@@ -430,6 +431,7 @@ describe('SettingsCapabilityLabSection', () => {
     const adapter = {
       capabilities: new Set(['chat']),
       getMcpServerCount: jest.fn().mockReturnValue(3),
+      getMcpServerNames: jest.fn().mockReturnValue(['alpha-mcp', 'zeta-mcp']),
     };
     const section = new SettingsCapabilityLabSection({
       plugin: createMockPlugin(adapter),
@@ -445,6 +447,8 @@ describe('SettingsCapabilityLabSection', () => {
     expect(mcpRow).not.toBeNull();
     expect(mcpRow?.textContent).toContain('Exposed');
     expect(mcpRow?.textContent).toContain('3 server(s) loaded');
+    expect(mcpRow?.textContent).toContain('alpha-mcp');
+    expect(mcpRow?.textContent).toContain('zeta-mcp');
     expect(mcpRow?.textContent).toContain('Claude Code Tools tab');
     expect(mcpRow?.textContent).not.toContain('No Claude Code Tools tab');
   });
@@ -978,7 +982,7 @@ describe('SettingsCapabilityLabSection', () => {
 
     const table = containerEl.querySelector('.opencodian-capability-lab-matrix');
     const rows = table!.querySelectorAll('tbody tr');
-    expect(rows.length).toBe(25);
+    expect(rows.length).toBe(29);
   });
 
   it('renders status chips with correct active/inactive classes', () => {
@@ -1014,7 +1018,7 @@ describe('SettingsCapabilityLabSection', () => {
     expect(surfaces).toContain('chat');
   });
 
-  it('audits capability matrix for honest classifications across all 25 rows', () => {
+  it('audits capability matrix for honest classifications across all 29 rows', () => {
     const containerEl = document.createElement('div');
     const section = new SettingsCapabilityLabSection({
       plugin: createMockPlugin(),
@@ -1055,6 +1059,10 @@ describe('SettingsCapabilityLabSection', () => {
       'Resume Session': { runtimeProof: 'pass', userSurface: 'diagnostic' },
       'Session Detail': { runtimeProof: 'pass', userSurface: 'diagnostic' },
       'Backend Routing': { runtimeProof: 'pass', userSurface: 'diagnostic' },
+      '/context Diagnostic': { runtimeProof: 'pass', userSurface: 'diagnostic' },
+      'Warm Startup': { runtimeProof: 'readback', userSurface: 'diagnostic' },
+      'Sandbox': { runtimeProof: 'readback', userSurface: 'settings' },
+      'Session Title': { runtimeProof: 'readback', userSurface: 'diagnostic' },
     };
 
     for (const [name, expectedValues] of Object.entries(expected)) {
@@ -1084,9 +1092,24 @@ describe('SettingsCapabilityLabSection', () => {
       return firstCell?.textContent ?? '';
     });
     expect(verifiedCapabilities).toEqual(
-      expect.arrayContaining(['MCP Servers', 'Permission Approval', 'AskUserQuestion / Elicitation', 'Structured Output', 'Agent Definitions', 'Include Hook Events', 'Environment Variables', 'Fork Session', 'JSONL History Browser', 'Session Store', 'Import Session to Store', 'Resume Session', 'Session Detail', 'Backend Routing', 'Turn/Budget Limits', 'Skills', 'Agents (Subagents)', 'Subagent Transcript / Progress', 'Hooks', 'Disallowed Tools', 'Plugins', 'Restricted Built-in Tools']),
+      expect.arrayContaining(['MCP Servers', 'Permission Approval', 'AskUserQuestion / Elicitation', 'Structured Output', 'Agent Definitions', 'Include Hook Events', 'Environment Variables', 'Fork Session', 'JSONL History Browser', 'Session Store', 'Import Session to Store', 'Resume Session', 'Session Detail', 'Backend Routing', 'Turn/Budget Limits', 'Skills', 'Agents (Subagents)', 'Subagent Transcript / Progress', 'Hooks', 'Disallowed Tools', 'Plugins', 'Restricted Built-in Tools', '/context Diagnostic']),
     );
-    expect(verifiedCapabilities.length).toBe(22);
+    expect(verifiedCapabilities.length).toBe(23);
+
+    // Honesty rule: readback capabilities must not be in the verified count.
+    // Sandbox is readback (option wiring only, not behavior-verified) so it stays out.
+    const readbackRows = rows.filter((row) => {
+      const text = row.textContent ?? '';
+      return text.includes('Readback verified');
+    });
+    const readbackCapabilities = readbackRows.map((row) => {
+      const firstCell = row.querySelector('td');
+      return firstCell?.textContent ?? '';
+    });
+    expect(readbackCapabilities).toEqual(
+      expect.arrayContaining(['File Checkpoint / Rewind', 'Allowed Tools', 'Fallback Model', 'Warm Startup', 'Sandbox', 'Session Title']),
+    );
+    expect(readbackCapabilities.length).toBe(6);
 
     // Honesty rule: hidden capabilities must not have a settings or diagnostic surface chip.
     const hiddenRows = rows.filter((row) => (
@@ -1675,7 +1698,7 @@ describe('SettingsCapabilityLabSection', () => {
   });
 
   it('marks Fallback Model as pass if SDK somehow falls back for invalid primary', async () => {
-    // Edge case: if Phase 2 succeeds and returns a non-invalid model, mark as pass
+    // Edge case: if Phase 2 succeeds with explicit fallback evidence, mark as pass.
     const adapter = {
       listSessions: jest.fn().mockResolvedValue([]),
       runDiagnosticPrompt: jest.fn()
@@ -1686,7 +1709,15 @@ describe('SettingsCapabilityLabSection', () => {
         })
         .mockResolvedValueOnce({ // Phase 2: invalid primary but SDK falls back
           sessionId: 'diag-fallback-1',
-          rawMessages: [],
+          rawMessages: [
+            {
+              type: 'result',
+              modelUsage: {
+                'opencodian-invalid-model-test-xyz123': { inputTokens: 12 },
+                'claude-haiku-4-5': { inputTokens: 24 },
+              },
+            },
+          ],
           chunks: [
             { type: 'message_metadata', modelId: 'claude-haiku-4-5' },
             { type: 'text', text: 'fallback model proof' },
@@ -1716,6 +1747,58 @@ describe('SettingsCapabilityLabSection', () => {
     const proofMarker = containerEl.querySelector('[data-capability="Fallback Model"]');
     expect(proofMarker).toBeTruthy();
     expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-pass')).toBe(true);
+  });
+
+  it('keeps Fallback Model as readback when invalid primary succeeds with a different non-fallback model', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runDiagnosticPrompt: jest.fn()
+        .mockResolvedValueOnce({
+          sessionId: 'diag-wiring-1',
+          rawMessages: [],
+          chunks: [{ type: 'text', text: 'fallback wiring check' }],
+        })
+        .mockResolvedValueOnce({
+          sessionId: 'diag-normalized-1',
+          rawMessages: [
+            {
+              type: 'result',
+              modelUsage: {
+                'claude-sonnet-normalized': { inputTokens: 42 },
+              },
+            },
+          ],
+          chunks: [
+            { type: 'message_metadata', modelId: 'claude-sonnet-normalized' },
+            { type: 'text', text: 'fallback model proof' },
+          ],
+        }),
+      inspectLastDiagnosticSdkOptions: jest.fn().mockReturnValue({
+        fallbackModel: 'claude-haiku-4-5',
+        model: undefined,
+      }),
+      capabilities: new Set(),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Fallback Model Proof')
+    )) as HTMLButtonElement | undefined;
+    expect(button).toBeTruthy();
+
+    button!.click();
+    await flushUi();
+
+    expect(containerEl.textContent).toContain('SDK reported model: "claude-sonnet-normalized"');
+    const proofMarker = containerEl.querySelector('[data-capability="Fallback Model"]');
+    expect(proofMarker).toBeTruthy();
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-readback')).toBe(true);
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-pass')).toBe(false);
   });
 
   it('handles fallback model proof failure when wiring check fails', async () => {
@@ -1843,6 +1926,10 @@ describe('SettingsCapabilityLabSection', () => {
 
     const forkBlock = containerEl.querySelector('[data-section-block="fork"]') as HTMLElement | null;
     expect(forkBlock).toBeTruthy();
+    expect(forkBlock?.querySelector('.opencodian-capability-lab-probe-header')).toBeTruthy();
+    expect(forkBlock?.querySelector('.opencodian-capability-lab-probe-badge')).toBeTruthy();
+    expect(forkBlock?.querySelector('.opencodian-capability-lab-probe-copy')).toBeTruthy();
+    expect(forkBlock?.querySelector('.opencodian-capability-lab-probe-toolbar')).toBeTruthy();
 
     const forkButton = Array.from(forkBlock!.querySelectorAll('button')).find((el) => (
       el.textContent?.includes('Run Fork Diagnostic')
@@ -1851,6 +1938,8 @@ describe('SettingsCapabilityLabSection', () => {
 
     const sessionSelect = forkBlock!.querySelector('[data-diagnostic-session-select="fork"]') as HTMLSelectElement | null;
     expect(sessionSelect).toBeTruthy();
+    expect(sessionSelect?.closest('.opencodian-capability-lab-probe-field-row')).toBeTruthy();
+    expect(forkButton?.closest('.opencodian-capability-lab-probe-action-row')).toBeTruthy();
   });
 
   it('shows unavailable message in fork probe when adapter is not present', () => {
@@ -2337,6 +2426,10 @@ describe('SettingsCapabilityLabSection', () => {
 
     const resumeBlock = containerEl.querySelector('[data-section-block="resume"]') as HTMLElement | null;
     expect(resumeBlock).toBeTruthy();
+    expect(resumeBlock?.querySelector('.opencodian-capability-lab-probe-header')).toBeTruthy();
+    expect(resumeBlock?.querySelector('.opencodian-capability-lab-probe-badge')).toBeTruthy();
+    expect(resumeBlock?.querySelector('.opencodian-capability-lab-probe-copy')).toBeTruthy();
+    expect(resumeBlock?.querySelector('.opencodian-capability-lab-probe-toolbar')).toBeTruthy();
 
     const resumeButton = Array.from(resumeBlock!.querySelectorAll('button')).find((el) => (
       el.textContent?.includes('Run Resume Diagnostic')
@@ -2345,6 +2438,8 @@ describe('SettingsCapabilityLabSection', () => {
 
     const sessionSelect = resumeBlock!.querySelector('[data-diagnostic-session-select="resume"]') as HTMLSelectElement | null;
     expect(sessionSelect).toBeTruthy();
+    expect(sessionSelect?.closest('.opencodian-capability-lab-probe-field-row')).toBeTruthy();
+    expect(resumeButton?.closest('.opencodian-capability-lab-probe-action-row')).toBeTruthy();
   });
 
   it('shows unavailable message in resume probe when adapter is not present', () => {
@@ -2669,6 +2764,10 @@ describe('SettingsCapabilityLabSection', () => {
 
     const detailBlock = containerEl.querySelector('[data-section-block="session-detail"]') as HTMLElement | null;
     expect(detailBlock).toBeTruthy();
+    expect(detailBlock?.querySelector('.opencodian-capability-lab-probe-header')).toBeTruthy();
+    expect(detailBlock?.querySelector('.opencodian-capability-lab-probe-badge')).toBeTruthy();
+    expect(detailBlock?.querySelector('.opencodian-capability-lab-probe-copy')).toBeTruthy();
+    expect(detailBlock?.querySelector('.opencodian-capability-lab-probe-toolbar')).toBeTruthy();
 
     const detailButton = Array.from(detailBlock!.querySelectorAll('button')).find((el) => (
       el.textContent?.includes('Inspect Session Detail')
@@ -2677,6 +2776,8 @@ describe('SettingsCapabilityLabSection', () => {
 
     const sessionSelect = detailBlock!.querySelector('[data-diagnostic-session-select="session-detail"]') as HTMLSelectElement | null;
     expect(sessionSelect).toBeTruthy();
+    expect(sessionSelect?.closest('.opencodian-capability-lab-probe-field-row')).toBeTruthy();
+    expect(detailButton?.closest('.opencodian-capability-lab-probe-action-row')).toBeTruthy();
   });
 
   it('shows unavailable message in session-detail probe when adapter is not present', () => {
@@ -2865,6 +2966,10 @@ describe('SettingsCapabilityLabSection', () => {
 
     const routingBlock = containerEl.querySelector('[data-section-block="backend-routing"]') as HTMLElement | null;
     expect(routingBlock).toBeTruthy();
+    expect(routingBlock?.querySelector('.opencodian-capability-lab-probe-header')).toBeTruthy();
+    expect(routingBlock?.querySelector('.opencodian-capability-lab-probe-badge')).toBeTruthy();
+    expect(routingBlock?.querySelector('.opencodian-capability-lab-probe-copy')).toBeTruthy();
+    expect(routingBlock?.querySelector('.opencodian-capability-lab-probe-status-grid')).toBeTruthy();
     // Should show active backend status even without adapter
     expect(routingBlock!.textContent).toContain('Active backend');
   });
@@ -2888,6 +2993,7 @@ describe('SettingsCapabilityLabSection', () => {
     expect(routingBlock).toBeTruthy();
     const probeButton = routingBlock!.querySelector('button[data-diagnostic]');
     expect(probeButton).toBeTruthy();
+    expect(probeButton?.closest('.opencodian-capability-lab-probe-action-row')).toBeTruthy();
   });
 
   it('exercises registry routing layer in backend routing probe', async () => {
@@ -3047,8 +3153,10 @@ describe('SettingsCapabilityLabSection', () => {
     const proofMarker = outputEl.querySelector('.opencodian-capability-lab-proof-marker');
     expect(proofMarker?.textContent).toContain('Readback verified');
     expect(proofMarker?.textContent).not.toContain('Runtime verified');
-    // Blocker hint should explain the precise blocker
+    // Blocker hint should explain the current SDK 0.3.158 readback blocker, not stale 0.3.157 wording.
     expect(outputEl.textContent).toContain('Blocker: SDK returns canRewind:false');
+    expect(outputEl.textContent).toContain('SDK 0.3.158');
+    expect(outputEl.textContent).not.toContain('0.3.157');
     expect(outputEl.textContent).toContain('#236');
   });
 
@@ -3733,6 +3841,28 @@ describe('SettingsCapabilityLabSection', () => {
       el.textContent?.includes('Run Environment Variables Proof')
     )) as HTMLButtonElement | undefined;
     expect(button).toBeTruthy();
+  });
+
+  it('renders Environment Variables discovery row with honest verified/pass description (not stale readback)', () => {
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+
+    const discoveryTable = containerEl.querySelector('.opencodian-capability-lab-discovery');
+    expect(discoveryTable).toBeTruthy();
+    const rows = Array.from(discoveryTable!.querySelectorAll('tbody tr'));
+    const envRow = rows.find((row) => row.textContent?.includes('Environment Variables'));
+
+    expect(envRow).not.toBeNull();
+    // Honesty check: discovery row must NOT claim "Static classification is readback"
+    // because the capability matrix already has runtimeProof: 'pass' (live behavior proof achieved).
+    expect(envRow?.textContent).not.toContain('Static classification is readback');
+    // Discovery row must reflect that live behavior proof exists (capability is verified).
+    expect(envRow?.textContent).toContain('verified');
   });
 
   it('marks Environment Variables as pass when env-derived filesystem side effect is observed', async () => {
@@ -4659,6 +4789,153 @@ describe('SettingsCapabilityLabSection', () => {
     expect(wiringMarkers.length).toBe(0);
   });
 
+  it('renders Query.getSettings runtime settings readback without changing matrix proof markers', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runDiagnosticPrompt: jest.fn().mockResolvedValue({
+        sessionId: 'diag-runtime-settings-readback',
+        rawMessages: [],
+        chunks: [],
+      }),
+      inspectLastDiagnosticSdkOptions: jest.fn().mockReturnValue({
+        allowedTools: ['Read'],
+        disallowedTools: [],
+        env: {},
+      }),
+      getRuntimeSettings: jest.fn().mockResolvedValue({
+        model: 'claude-sonnet-4-5',
+        env: { ANTHROPIC_API_KEY: 'secret-value' },
+        processEnv: { OPENCODIAN_REAL_ENV: 'process-env-secret' },
+        permissions: { defaultMode: 'default' },
+        safe: { label: 'visible-runtime-setting' },
+        nested: {
+          apiKey: 'camel-api-key-secret',
+          clientSecret: 'client-secret-value',
+          oauth: { accessToken: 'oauth-token-value' },
+          tokenList: ['array-token-value'],
+          headers: [
+            { Authorization: 'Bearer authorization-secret' },
+          ],
+          profile: {
+            credentials: [
+              { username: 'safe-name', password: 'nested-password-secret' },
+            ],
+          },
+        },
+      }),
+      capabilities: new Set(),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Stable Settings Readback')
+    )) as HTMLButtonElement | undefined;
+
+    button!.click();
+    await flushUi();
+
+    expect(adapter.getRuntimeSettings).toHaveBeenCalledTimes(1);
+    const text = containerEl.textContent ?? '';
+    expect(text).toContain('Runtime Settings Readback (Query.getSettings)');
+    expect(text).toContain('claude-sonnet-4-5');
+    expect(text).toContain('visible-runtime-setting');
+    expect(text).toContain('[redacted');
+    expect(text).not.toContain('secret-value');
+    expect(text).not.toContain('process-env-secret');
+    expect(text).not.toContain('camel-api-key-secret');
+    expect(text).not.toContain('client-secret-value');
+    expect(text).not.toContain('oauth-token-value');
+    expect(text).not.toContain('array-token-value');
+    expect(text).not.toContain('Bearer authorization-secret');
+    expect(text).not.toContain('nested-password-secret');
+
+    const runtimeReadbackEl = containerEl.querySelector('[data-runtime-settings-readback="true"][data-proof-state="readback"]');
+    expect(runtimeReadbackEl).not.toBeNull();
+    const readbackMarkers = containerEl.querySelectorAll('.opencodian-capability-lab-proof-readback');
+    expect(readbackMarkers.length).toBe(1);
+  });
+
+  it('keeps Query.getSettings runtime settings readback as a no-op when no snapshot is returned', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runDiagnosticPrompt: jest.fn().mockResolvedValue({
+        sessionId: 'diag-runtime-settings-empty',
+        rawMessages: [],
+        chunks: [],
+      }),
+      inspectLastDiagnosticSdkOptions: jest.fn().mockReturnValue({
+        allowedTools: [],
+        disallowedTools: [],
+        env: {},
+      }),
+      getRuntimeSettings: jest.fn().mockResolvedValue(null),
+      capabilities: new Set(),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Stable Settings Readback')
+    )) as HTMLButtonElement | undefined;
+
+    button!.click();
+    await flushUi();
+
+    expect(containerEl.textContent).toContain('Query.getSettings() returned no runtime settings snapshot');
+    const passMarkers = containerEl.querySelectorAll('.opencodian-capability-lab-proof-pass');
+    expect(passMarkers.length).toBe(0);
+  });
+
+  it('keeps stable settings readback intact when Query.getSettings runtime readback fails', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runDiagnosticPrompt: jest.fn().mockResolvedValue({
+        sessionId: 'diag-runtime-settings-failure',
+        rawMessages: [],
+        chunks: [],
+      }),
+      inspectLastDiagnosticSdkOptions: jest.fn().mockReturnValue({
+        allowedTools: ['Read'],
+        disallowedTools: [],
+        env: {},
+      }),
+      getRuntimeSettings: jest.fn().mockRejectedValue(new Error('SDK getSettings unavailable')),
+      capabilities: new Set(),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Stable Settings Readback')
+    )) as HTMLButtonElement | undefined;
+
+    button!.click();
+    await flushUi();
+
+    expect(adapter.getRuntimeSettings).toHaveBeenCalledTimes(1);
+    expect(containerEl.textContent).toContain('Allowed Tools:');
+    expect(containerEl.textContent).toContain('1 tool(s) configured');
+    expect(containerEl.textContent).toContain('Query.getSettings() readback failed');
+    expect(containerEl.textContent).toContain('Existing SDK options readback remains the available evidence');
+    const readbackMarkers = containerEl.querySelectorAll('.opencodian-capability-lab-proof-readback');
+    expect(readbackMarkers.length).toBe(1);
+    const passMarkers = containerEl.querySelectorAll('.opencodian-capability-lab-proof-pass');
+    expect(passMarkers.length).toBe(0);
+  });
+
   it('shows no-config hint when stable settings readback finds nothing configured', async () => {
     const adapter = {
       listSessions: jest.fn().mockResolvedValue([]),
@@ -5089,5 +5366,498 @@ describe('SettingsCapabilityLabSection', () => {
     expect(readbackMarkers.length).toBeGreaterThan(0);
   });
 
+  // =======================================================================
+  // SetModel Live Proof — diagnostic probe for query.setModel() live behavior
+  // =======================================================================
+
+  it('renders setModel live proof button in discovery controls', () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runSetModelLiveProbe: jest.fn(),
+      capabilities: new Set(),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run SetModel Live Proof')
+    )) as HTMLButtonElement | undefined;
+    expect(button).toBeTruthy();
+  });
+
+  it('marks setModel live as pass when model switches after setModel call', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runSetModelLiveProbe: jest.fn().mockResolvedValue({
+        setModelAttempted: true,
+        setModelError: undefined,
+        setModelNotAvailable: false,
+        phase1ModelKeys: ['claude-sonnet-4-5'],
+        phase2ModelKeys: ['claude-opus-4-5'],
+      }),
+      capabilities: new Set(),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run SetModel Live Proof')
+    )) as HTMLButtonElement | undefined;
+    expect(button).toBeTruthy();
+
+    button!.click();
+    await flushUi();
+
+    expect(containerEl.textContent).toContain('claude-opus-4-5');
+    const proofMarker = containerEl.querySelector('[data-capability="SetModel Live"]');
+    expect(proofMarker).toBeTruthy();
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-pass')).toBe(true);
+  });
+
+  it('marks setModel live as readback when model does not switch after setModel call', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runSetModelLiveProbe: jest.fn().mockResolvedValue({
+        setModelAttempted: true,
+        setModelError: undefined,
+        setModelNotAvailable: false,
+        phase1ModelKeys: ['claude-sonnet-4-5'],
+        phase2ModelKeys: ['claude-sonnet-4-5'],
+      }),
+      capabilities: new Set(),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run SetModel Live Proof')
+    )) as HTMLButtonElement | undefined;
+    button!.click();
+    await flushUi();
+
+    expect(containerEl.textContent).toContain('readback');
+    const proofMarker = containerEl.querySelector('[data-capability="SetModel Live"]');
+    expect(proofMarker).toBeTruthy();
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-readback')).toBe(true);
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-pass')).toBe(false);
+  });
+
+  it('marks setModel live as readback when setModel throws', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runSetModelLiveProbe: jest.fn().mockResolvedValue({
+        setModelAttempted: true,
+        setModelError: 'model switch rejected',
+        setModelNotAvailable: false,
+        phase1ModelKeys: ['claude-sonnet-4-5'],
+        phase2ModelKeys: ['claude-sonnet-4-5'],
+      }),
+      capabilities: new Set(),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run SetModel Live Proof')
+    )) as HTMLButtonElement | undefined;
+    button!.click();
+    await flushUi();
+
+    expect(containerEl.textContent).toContain('model switch rejected');
+    const proofMarker = containerEl.querySelector('[data-capability="SetModel Live"]');
+    expect(proofMarker).toBeTruthy();
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-readback')).toBe(true);
+  });
+
+  it('marks setModel live as boundary when setModel not available on query', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runSetModelLiveProbe: jest.fn().mockResolvedValue({
+        setModelAttempted: false,
+        setModelError: undefined,
+        setModelNotAvailable: true,
+        phase1ModelKeys: [],
+        phase2ModelKeys: [],
+      }),
+      capabilities: new Set(),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run SetModel Live Proof')
+    )) as HTMLButtonElement | undefined;
+    button!.click();
+    await flushUi();
+
+    expect(containerEl.textContent).toContain('not available');
+    const proofMarker = containerEl.querySelector('[data-capability="SetModel Live"]');
+    expect(proofMarker).toBeTruthy();
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-boundary')).toBe(true);
+  });
+
+  it('marks setModel live as fail when adapter throws exception', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runSetModelLiveProbe: jest.fn().mockRejectedValue(new Error('SDK setModel probe error')),
+      capabilities: new Set(),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run SetModel Live Proof')
+    )) as HTMLButtonElement | undefined;
+    button!.click();
+    await flushUi();
+
+    expect(containerEl.textContent).toContain('SDK setModel probe error');
+    const proofMarker = containerEl.querySelector('[data-capability="SetModel Live"]');
+    expect(proofMarker).toBeTruthy();
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-fail')).toBe(true);
+  });
+
   /* eslint-enable @typescript-eslint/no-explicit-any */
+
+  // =====================================================================
+  // /context Diagnostic capability seam — diagnostic-only proof
+  // =====================================================================
+
+  it('runs the command execution proof and marks pass when /context returns Context Usage', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runDiagnosticPrompt: jest.fn().mockResolvedValue({
+        sessionId: 'diag-cmd-exec-1',
+        rawMessages: [
+          { type: 'system', subtype: 'init', session_id: 'diag-cmd-exec-1' },
+          { type: 'assistant', subtype: 'text', session_id: 'diag-cmd-exec-1', message: { content: [{ type: 'text', text: '## Context Usage\nUsing 5 of 200k tokens.' }] } },
+          { type: 'result', subtype: 'success', session_id: 'diag-cmd-exec-1' },
+        ],
+        chunks: [],
+      }),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run /context Diagnostic Proof')
+    )) as HTMLButtonElement | undefined;
+    button!.click();
+    await flushUi();
+
+    // Verify adapter was called with /context prompt, persistSession:false, diagnostic bypass
+    expect(adapter.runDiagnosticPrompt).toHaveBeenCalledWith(expect.objectContaining({
+      prompt: '/context',
+      persistSession: false,
+      _diagnosticBypassPermissions: true,
+    }));
+
+    // Verify output contains the session and evidence
+    expect(containerEl.textContent).toContain('diag-cmd-exec-1');
+    expect(containerEl.textContent).toContain('Context Usage');
+
+    // Verify pass marker
+    const proofMarker = containerEl.querySelector('[data-capability="/context Diagnostic"]');
+    expect(proofMarker).toBeTruthy();
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-pass')).toBe(true);
+
+    // Verify diagnostic-only honesty text
+    expect(containerEl.textContent).toContain('diagnostic-only');
+    expect(containerEl.textContent).toContain('/context');
+  });
+
+  it('detects Context Usage from normalized text chunks when rawMessages have no assistant content', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runDiagnosticPrompt: jest.fn().mockResolvedValue({
+        sessionId: 'diag-cmd-exec-chunks',
+        rawMessages: [
+          { type: 'system', subtype: 'init', session_id: 'diag-cmd-exec-chunks' },
+          { type: 'assistant', subtype: 'text', session_id: 'diag-cmd-exec-chunks', message: { content: [{ type: 'text', text: '## Context Usage\nUsing 3 of 200k tokens.' }] } },
+          { type: 'result', subtype: 'success', session_id: 'diag-cmd-exec-chunks' },
+        ],
+        chunks: [
+          { type: 'text', content: '## Context Usage\nUsing 3 of 200k tokens.' },
+        ],
+      }),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run /context Diagnostic Proof')
+    )) as HTMLButtonElement | undefined;
+    button!.click();
+    await flushUi();
+
+    // Must classify as pass — chunks contain Context Usage
+    const proofMarker = containerEl.querySelector('[data-capability="/context Diagnostic"]');
+    expect(proofMarker).toBeTruthy();
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-pass')).toBe(true);
+    expect(containerEl.textContent).toContain('Context Usage');
+  });
+
+  it('marks command execution as readback when output is present but lacks Context Usage', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runDiagnosticPrompt: jest.fn().mockResolvedValue({
+        sessionId: 'diag-cmd-exec-2',
+        rawMessages: [
+          { type: 'system', subtype: 'init', session_id: 'diag-cmd-exec-2' },
+          { type: 'assistant', subtype: 'text', session_id: 'diag-cmd-exec-2', message: { content: [{ type: 'text', text: 'Hello, I can help you with that.' }] } },
+          { type: 'result', subtype: 'success', session_id: 'diag-cmd-exec-2' },
+        ],
+        chunks: [],
+      }),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run /context Diagnostic Proof')
+    )) as HTMLButtonElement | undefined;
+    button!.click();
+    await flushUi();
+
+    // Must NOT classify as pass — output lacks "Context Usage"
+    const passMarker = containerEl.querySelector('[data-capability="/context Diagnostic"].opencodian-capability-lab-proof-pass');
+    expect(passMarker).toBeNull();
+
+    // Must classify as readback — adapter returned messages but unexpected content
+    const readbackMarker = containerEl.querySelector('[data-capability="/context Diagnostic"].opencodian-capability-lab-proof-readback');
+    expect(readbackMarker).toBeTruthy();
+
+    // Honest classification text
+    expect(containerEl.textContent).toContain('Readback verified');
+  });
+
+  it('marks command execution as fail when adapter throws exception', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runDiagnosticPrompt: jest.fn().mockRejectedValue(new Error('SDK command execution error')),
+      capabilities: new Set(),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run /context Diagnostic Proof')
+    )) as HTMLButtonElement | undefined;
+    button!.click();
+    await flushUi();
+
+    expect(containerEl.textContent).toContain('SDK command execution error');
+    const proofMarker = containerEl.querySelector('[data-capability="/context Diagnostic"]');
+    expect(proofMarker).toBeTruthy();
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-fail')).toBe(true);
+  });
+
+  it('marks command execution as readback when adapter returns empty rawMessages', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runDiagnosticPrompt: jest.fn().mockResolvedValue({
+        sessionId: 'diag-cmd-exec-3',
+        rawMessages: [],
+        chunks: [],
+      }),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run /context Diagnostic Proof')
+    )) as HTMLButtonElement | undefined;
+    button!.click();
+    await flushUi();
+
+    // Must NOT classify as pass — empty messages
+    const passMarker = containerEl.querySelector('[data-capability="/context Diagnostic"].opencodian-capability-lab-proof-pass');
+    expect(passMarker).toBeNull();
+
+    // Must classify as readback
+    const readbackMarker = containerEl.querySelector('[data-capability="/context Diagnostic"].opencodian-capability-lab-proof-readback');
+    expect(readbackMarker).toBeTruthy();
+  });
+
+  it('verifies command execution proof uses persistSession false to avoid session pollution', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runDiagnosticPrompt: jest.fn().mockResolvedValue({
+        sessionId: 'diag-cmd-exec-4',
+        rawMessages: [
+          { type: 'system', subtype: 'init', session_id: 'diag-cmd-exec-4' },
+          { type: 'assistant', subtype: 'text', session_id: 'diag-cmd-exec-4', message: { content: '## Context Usage\nUsing 1 of 200k tokens.' } },
+          { type: 'result', subtype: 'success', session_id: 'diag-cmd-exec-4' },
+        ],
+        chunks: [],
+      }),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run /context Diagnostic Proof')
+    )) as HTMLButtonElement | undefined;
+    button!.click();
+    await flushUi();
+
+    // Verify no session pollution — persistSession must be false
+    const callArgs = adapter.runDiagnosticPrompt.mock.calls[0][0] as { persistSession: boolean };
+    expect(callArgs.persistSession).toBe(false);
+
+    // Verify no resume session (ordinary-session isolation)
+    expect(callArgs).not.toHaveProperty('resumeSessionId');
+  });
+
+  // =====================================================================
+  // Warm Startup capability seam — diagnostic readback proof
+  // =====================================================================
+
+  it('runs the warm startup proof and marks readback when startup resolves and warm query responds', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runWarmStartupProbe: jest.fn().mockResolvedValue({
+        classification: 'readback',
+        startupResolved: true,
+        warmQueryAvailable: true,
+        warmQueryResponded: true,
+        rawMessageCount: 3,
+        error: undefined,
+      }),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Warm Startup Proof')
+    )) as HTMLButtonElement | undefined;
+    expect(button).toBeTruthy();
+
+    button!.click();
+    await flushUi();
+
+    expect(adapter.runWarmStartupProbe).toHaveBeenCalled();
+
+    // Verify readback marker (not pass)
+    const proofMarker = containerEl.querySelector('[data-capability="Warm Startup"]');
+    expect(proofMarker).toBeTruthy();
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-readback')).toBe(true);
+
+    // Verify diagnostic-only honesty text
+    expect(containerEl.textContent).toContain('readback');
+  });
+
+  it('runs the warm startup proof and marks fail when startup throws', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runWarmStartupProbe: jest.fn().mockResolvedValue({
+        classification: 'fail',
+        startupResolved: false,
+        warmQueryAvailable: false,
+        warmQueryResponded: false,
+        rawMessageCount: 0,
+        error: 'startup failed: SDK initialization timeout',
+      }),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Warm Startup Proof')
+    )) as HTMLButtonElement | undefined;
+    button!.click();
+    await flushUi();
+
+    // Verify fail marker
+    const proofMarker = containerEl.querySelector('[data-capability="Warm Startup"]');
+    expect(proofMarker).toBeTruthy();
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-fail')).toBe(true);
+  });
+
+  it('runs the warm startup proof and marks boundary when SDK does not expose startup', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runWarmStartupProbe: jest.fn().mockResolvedValue({
+        classification: 'boundary',
+        startupResolved: false,
+        warmQueryAvailable: false,
+        warmQueryResponded: false,
+        rawMessageCount: 0,
+        error: undefined,
+      }),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Warm Startup Proof')
+    )) as HTMLButtonElement | undefined;
+    button!.click();
+    await flushUi();
+
+    // Verify boundary marker
+    const proofMarker = containerEl.querySelector('[data-capability="Warm Startup"]');
+    expect(proofMarker).toBeTruthy();
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-boundary')).toBe(true);
+  });
 });

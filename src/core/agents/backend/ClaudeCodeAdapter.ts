@@ -35,6 +35,7 @@ import {
   createUserPrompt,
   isTurnBoundaryMessage,
 } from './ClaudeCodeQueue';
+import type { WarmQueryHandle } from './ClaudeCodeSdkLoader';
 import { ClaudeCodeStreamNormalizer } from './ClaudeCodeStreamNormalizer';
 
 const runtimeLogger = createLogger('ClaudeCodeAdapter', { moduleKey: 'claudeCode', channel: 'runtime' });
@@ -47,6 +48,13 @@ export interface ClaudeCodeSdkQueryInput {
 }
 
 type ClaudeCodeQueryHandle = Query & {
+  getSettings?: () => Promise<unknown>;
+  getContextUsage?: () => Promise<unknown>;
+  accountInfo?: () => Promise<unknown>;
+  readFile?: (path: string, options?: ClaudeCodeRuntimeFileReadOptions) => Promise<unknown>;
+  mcpServerStatus?: () => Promise<unknown[]>;
+  supportedCommands?: () => Promise<unknown>;
+  supportedAgents?: () => Promise<unknown>;
   supportedModels(): Promise<ClaudeCodeSdkModelInfo[]>;
 };
 
@@ -54,6 +62,78 @@ type ClaudeCodeModelCatalogQuery = {
   supportedModels(): Promise<ClaudeCodeSdkModelInfo[]>;
   close?: () => void;
   shouldClose?: boolean;
+};
+
+type ClaudeCodeRuntimeSettingsQuery = {
+  getSettings?: () => Promise<unknown>;
+  close?: () => void;
+  closeInput?: () => void;
+  shouldClose?: boolean;
+};
+
+type ClaudeCodeRuntimeQueryWithSettings = NonNullable<ClaudeCodeSessionRuntime['query']> & {
+  getSettings?: () => Promise<unknown>;
+};
+
+type ClaudeCodeContextUsageQuery = {
+  getContextUsage?: () => Promise<unknown>;
+  close?: () => void;
+  closeInput?: () => void;
+  shouldClose?: boolean;
+};
+
+type ClaudeCodeRuntimeQueryWithContextUsage = NonNullable<ClaudeCodeSessionRuntime['query']> & {
+  getContextUsage?: () => Promise<unknown>;
+};
+
+type ClaudeCodeAccountInfoQuery = {
+  accountInfo?: () => Promise<unknown>;
+  close?: () => void;
+  closeInput?: () => void;
+  shouldClose?: boolean;
+};
+
+type ClaudeCodeRuntimeQueryWithAccountInfo = NonNullable<ClaudeCodeSessionRuntime['query']> & {
+  accountInfo?: () => Promise<unknown>;
+};
+
+type ClaudeCodeRuntimeFileReadOptions = {
+  maxBytes?: number;
+  encoding?: 'utf-8' | 'base64';
+};
+
+type ClaudeCodeRuntimeFileQuery = {
+  readFile?: (path: string, options?: ClaudeCodeRuntimeFileReadOptions) => Promise<unknown>;
+  close?: () => void;
+  closeInput?: () => void;
+  shouldClose?: boolean;
+};
+
+type ClaudeCodeRuntimeQueryWithFileReadback = NonNullable<ClaudeCodeSessionRuntime['query']> & {
+  readFile?: (path: string, options?: ClaudeCodeRuntimeFileReadOptions) => Promise<unknown>;
+};
+
+type ClaudeCodeMcpServerStatusQuery = {
+  mcpServerStatus?: () => Promise<unknown[]>;
+  close?: () => void;
+  shouldClose?: boolean;
+};
+
+type ClaudeCodeRuntimeQueryWithMcpServerStatus = NonNullable<ClaudeCodeSessionRuntime['query']> & {
+  mcpServerStatus?: () => Promise<unknown[]>;
+};
+
+type ClaudeCodeRuntimeCatalogQuery = {
+  supportedCommands?: () => Promise<unknown>;
+  supportedAgents?: () => Promise<unknown>;
+  close?: () => void;
+  closeInput?: () => void;
+  shouldClose?: boolean;
+};
+
+type ClaudeCodeRuntimeQueryWithCatalog = NonNullable<ClaudeCodeSessionRuntime['query']> & {
+  supportedCommands?: () => Promise<unknown>;
+  supportedAgents?: () => Promise<unknown>;
 };
 
 export interface ClaudeCodeSdkFacade {
@@ -66,6 +146,7 @@ export interface ClaudeCodeSdkFacade {
   importSessionToStore?(sessionId: string, store: unknown, options?: { dir?: string; includeSubagents?: boolean; batchSize?: number }): Promise<void>;
   forkSession?(sessionId: string, options?: { dir?: string; upToMessageId?: string; title?: string }): Promise<{ sessionId: string }>;
   renameSession?(sessionId: string, title: string, options?: { dir?: string }): Promise<void>;
+  startup?(params?: { options?: unknown; initializeTimeoutMs?: number }): Promise<WarmQueryHandle>;
 }
 
 export type ClaudeCodeSdkModelInfo = {
@@ -75,6 +156,38 @@ export type ClaudeCodeSdkModelInfo = {
   value?: string;
   displayName?: string;
 };
+
+export interface ClaudeCodeMcpServerRuntimeStatus {
+  name: string;
+  status: string;
+  scope?: string;
+  serverInfo?: {
+    name?: string;
+    version?: string;
+  };
+  toolCount: number;
+  toolNames: string[];
+  hasError: boolean;
+  errorSummary?: string;
+}
+
+export interface ClaudeCodeRuntimeCatalogCommand {
+  name: string;
+  description?: string;
+  argumentHint?: string;
+  aliases: string[];
+}
+
+export interface ClaudeCodeRuntimeCatalogAgent {
+  name: string;
+  description?: string;
+  model?: string;
+}
+
+export interface ClaudeCodeRuntimeCatalog {
+  commands: ClaudeCodeRuntimeCatalogCommand[];
+  agents: ClaudeCodeRuntimeCatalogAgent[];
+}
 
 export interface ClaudeCodeSdkSessionInfo {
   sessionId: string;
@@ -188,6 +301,22 @@ export interface ClaudeCodeDiagnosticPromptResult {
   sdkError?: Error;
 }
 
+export interface WarmStartupProbeResult {
+  /** Honest classification: 'readback' when startup resolves + warm query responds;
+   *  'fail' when startup or warm query throws; 'boundary' when SDK lacks startup(). */
+  classification: 'readback' | 'fail' | 'boundary';
+  /** Whether startup() resolved without throwing */
+  startupResolved: boolean;
+  /** Whether a WarmQuery handle was obtained from startup() */
+  warmQueryAvailable: boolean;
+  /** Whether warmQuery.query() produced at least one message */
+  warmQueryResponded: boolean;
+  /** Number of raw messages collected from warm query iteration */
+  rawMessageCount: number;
+  /** Error message if startup or warm query failed */
+  error?: string;
+}
+
 export type ClaudeCodeSdkLoader = () => Promise<ClaudeCodeSdkFacade>;
 
 export type ClaudeCodeMcpConfigLoader = () => Promise<ClaudeCodeMcpServersMap>;
@@ -257,6 +386,135 @@ function summarizeError(error: unknown): string {
   return `${errorName}(category=${category}, messageLength=${rawMessage.length})`;
 }
 
+function summarizeMcpStatusError(value: unknown): string | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  const rawMessage = typeof value === 'string' ? value : String(value);
+  const lowerMessage = rawMessage.toLowerCase();
+  const category =
+    lowerMessage.includes('auth') || lowerMessage.includes('token') || lowerMessage.includes('credential') ? 'auth'
+      : lowerMessage.includes('timeout') || lowerMessage.includes('timed out') ? 'timeout'
+        : lowerMessage.includes('permission') || lowerMessage.includes('denied') ? 'permission'
+          : lowerMessage.includes('not found') || lowerMessage.includes('enoent') ? 'not-found'
+            : lowerMessage.includes('network') || lowerMessage.includes('connection') || lowerMessage.includes('econn') ? 'network'
+              : 'generic';
+  return `McpServerError(category=${category}, messageLength=${rawMessage.length})`;
+}
+
+function normalizeMcpServerInfo(value: unknown): ClaudeCodeMcpServerRuntimeStatus['serverInfo'] | undefined {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return undefined;
+  }
+  const record = value as Record<string, unknown>;
+  const serverInfo = {
+    ...(typeof record.name === 'string' ? { name: record.name } : {}),
+    ...(typeof record.version === 'string' ? { version: record.version } : {}),
+  };
+  return Object.keys(serverInfo).length > 0 ? serverInfo : undefined;
+}
+
+function normalizeMcpToolNames(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .map((tool) => {
+      if (typeof tool !== 'object' || tool === null || Array.isArray(tool)) {
+        return '';
+      }
+      return trimOptionalOptionString((tool as Record<string, unknown>).name) ?? '';
+    })
+    .filter((toolName) => toolName.length > 0)
+    .sort((a, b) => a.localeCompare(b));
+}
+
+function normalizeMcpServerRuntimeStatus(rawStatus: unknown): ClaudeCodeMcpServerRuntimeStatus | null {
+  if (typeof rawStatus !== 'object' || rawStatus === null || Array.isArray(rawStatus)) {
+    return null;
+  }
+  const record = rawStatus as Record<string, unknown>;
+  const name = trimOptionalOptionString(record.name) ?? '(unnamed)';
+  const status = trimOptionalOptionString(record.status) ?? 'unknown';
+  const scope = trimOptionalOptionString(record.scope);
+  const serverInfo = normalizeMcpServerInfo(record.serverInfo);
+  const toolNames = normalizeMcpToolNames(record.tools);
+  const errorSummary = summarizeMcpStatusError(record.error);
+  return {
+    name,
+    status,
+    ...(scope ? { scope } : {}),
+    ...(serverInfo ? { serverInfo } : {}),
+    toolCount: toolNames.length,
+    toolNames,
+    hasError: Boolean(errorSummary),
+    ...(errorSummary ? { errorSummary } : {}),
+  };
+}
+
+function normalizeRuntimeCatalogAliases(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .map((alias) => trimOptionalOptionString(alias) ?? '')
+    .filter((alias) => alias.length > 0)
+    .sort((a, b) => a.localeCompare(b));
+}
+
+function normalizeRuntimeCatalogCommands(value: unknown): ClaudeCodeRuntimeCatalogCommand[] | null {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+  return value
+    .map((entry) => {
+      if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) {
+        return null;
+      }
+      const record = entry as Record<string, unknown>;
+      const name = trimOptionalOptionString(record.name);
+      if (!name) {
+        return null;
+      }
+      const description = trimOptionalOptionString(record.description);
+      const argumentHint = trimOptionalOptionString(record.argumentHint);
+      return {
+        name,
+        ...(description ? { description } : {}),
+        ...(argumentHint ? { argumentHint } : {}),
+        aliases: normalizeRuntimeCatalogAliases(record.aliases),
+      };
+    })
+    .filter((entry): entry is ClaudeCodeRuntimeCatalogCommand => Boolean(entry))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function normalizeRuntimeCatalogAgents(value: unknown): ClaudeCodeRuntimeCatalogAgent[] | null {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+  return value
+    .map((entry) => {
+      if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) {
+        return null;
+      }
+      const record = entry as Record<string, unknown>;
+      const name = trimOptionalOptionString(record.name);
+      if (!name) {
+        return null;
+      }
+      const description = trimOptionalOptionString(record.description);
+      const model = trimOptionalOptionString(record.model);
+      return {
+        name,
+        ...(description ? { description } : {}),
+        ...(model ? { model } : {}),
+      };
+    })
+    .filter((entry): entry is ClaudeCodeRuntimeCatalogAgent => Boolean(entry))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
 function summarizeSendOptions(options: Record<string, unknown> | undefined): Record<string, unknown> {
   const overrides = resolveSendOptionOverrides(options);
   return {
@@ -305,6 +563,24 @@ function resolveDiagnosticSessionId(message: unknown, chunks: readonly StreamChu
   return typeof resolved === 'string' ? resolved : undefined;
 }
 
+/**
+ * Extract modelUsage from the last 'result'-type raw message.
+ * Returns the modelUsage object (map of model name → token stats) or undefined.
+ * Diagnostic-only helper; does not modify any state.
+ */
+function extractModelUsageFromRaw(rawMessages: unknown[]): Record<string, unknown> | undefined {
+  for (let i = rawMessages.length - 1; i >= 0; i--) {
+    const msg = rawMessages[i];
+    if (typeof msg === 'object' && msg !== null && !Array.isArray(msg)) {
+      const record = msg as { type?: unknown; subtype?: unknown; modelUsage?: unknown };
+      if (record.type === 'result' && record.modelUsage && typeof record.modelUsage === 'object') {
+        return record.modelUsage as Record<string, unknown>;
+      }
+    }
+  }
+  return undefined;
+}
+
 function resolveComparableSessionIds(sessionInfo: ClaudeCodeSdkSessionInfo): string[] {
   const record = sessionInfo as ClaudeCodeSdkSessionInfo & { id?: unknown };
   return [record.sessionId, record.id]
@@ -327,6 +603,61 @@ const CLAUDE_CODE_PHASE1_CAPABILITIES: BackendCapabilities = Object.freeze(
 function isOpenCodianLocalClaudeSessionId(sessionId: string): boolean {
   return sessionId.startsWith('claude-code-');
 }
+
+type CheckpointRewindActualResult = {
+  result: unknown;
+  probeFileExistedBefore: boolean;
+  probeFileExistsAfter: boolean;
+  fileWasRemoved: boolean;
+  successfulCandidateId: string;
+};
+
+type CheckpointPhase1RewindResult = {
+  dryRunResult: unknown;
+  filesChanged: unknown[];
+  toolUseTypes: string[];
+  userMessageUuid: string;
+};
+
+type CheckpointCandidateResult = {
+  candidateId: string;
+  canRewind: boolean;
+  filesChanged: unknown;
+  error?: string;
+};
+
+type CheckpointRewindProbeResult = {
+  sessionId: string | undefined;
+  userMessageId: string | undefined;
+  rewindDryRunResult: unknown;
+  rewindActualResult: CheckpointRewindActualResult | undefined;
+  phase1RewindResult: CheckpointPhase1RewindResult | undefined;
+  probeFileExistedAfterPhase1: boolean;
+  chunks: StreamChunk[];
+  toolUseTypes: string[];
+  candidatesAttempted: string[];
+  candidateResults: CheckpointCandidateResult[];
+  sdkFilesPersistedEventCount: number;
+  applyFlagSettingsAttempted: boolean;
+  applyFlagSettingsError: string | undefined;
+};
+
+type CheckpointPhase1StreamResult = {
+  allChunks: StreamChunk[];
+  sessionId: string | undefined;
+  phase1UserMessageUuid: string | undefined;
+  toolUseTypes: string[];
+  sdkFilesPersistedEventCount: number;
+  applyFlagSettingsAttempted: boolean;
+  applyFlagSettingsError: string | undefined;
+};
+
+type CheckpointPhase2StreamResult = {
+  rewindDryRunResult: unknown;
+  rewindActualResult: CheckpointRewindActualResult | undefined;
+  phase1RewindResult: CheckpointPhase1RewindResult | undefined;
+  candidateResults: CheckpointCandidateResult[];
+};
 
 interface ClaudeCodeSessionState {
   id: string;
@@ -489,6 +820,195 @@ export class ClaudeCodeAdapter
     } catch (error) {
       runtimeLogger.debug('supportedModels error', { error: summarizeError(error) });
       return [];
+    } finally {
+      if (query?.shouldClose !== false) {
+        query?.close?.();
+      }
+    }
+  }
+
+  async getRuntimeCatalog(): Promise<ClaudeCodeRuntimeCatalog | null> {
+    let query: ClaudeCodeRuntimeCatalogQuery | undefined;
+    try {
+      query = await this.getRuntimeCatalogQuery();
+      if (typeof query.supportedCommands !== 'function' || typeof query.supportedAgents !== 'function') {
+        runtimeLogger.debug('runtime catalog unavailable', { reason: 'missing-query-catalog-methods' });
+        return null;
+      }
+      const [rawCommands, rawAgents] = await Promise.all([
+        query.supportedCommands(),
+        query.supportedAgents(),
+      ]);
+      const commands = normalizeRuntimeCatalogCommands(rawCommands);
+      const agents = normalizeRuntimeCatalogAgents(rawAgents);
+      if (!commands || !agents) {
+        runtimeLogger.debug('runtime catalog unexpected shape', {
+          commandsType: typeof rawCommands,
+          agentsType: typeof rawAgents,
+        });
+        return null;
+      }
+      runtimeLogger.debug('runtime catalog readback', {
+        commandCount: commands.length,
+        agentCount: agents.length,
+      });
+      return { commands, agents };
+    } catch (error) {
+      runtimeLogger.debug('runtime catalog error', { error: summarizeError(error) });
+      return null;
+    } finally {
+      if (query?.shouldClose !== false) {
+        query?.closeInput?.();
+        try {
+          query?.close?.();
+        } catch (error) {
+          runtimeLogger.debug('runtime catalog close error', { error: summarizeError(error) });
+        }
+      }
+    }
+  }
+
+  async getRuntimeSettings(): Promise<unknown | null> {
+    let query: ClaudeCodeRuntimeSettingsQuery | undefined;
+    try {
+      query = await this.getRuntimeSettingsQuery();
+      if (typeof query.getSettings !== 'function') {
+        runtimeLogger.debug('runtime settings unavailable', { reason: 'missing-query-getSettings' });
+        return null;
+      }
+      const settings = await query.getSettings();
+      runtimeLogger.debug('runtime settings readback', {
+        available: settings !== null && settings !== undefined,
+        valueType: typeof settings,
+      });
+      return settings ?? null;
+    } catch (error) {
+      runtimeLogger.debug('runtime settings error', { error: summarizeError(error) });
+      return null;
+    } finally {
+      if (query?.shouldClose !== false) {
+        query?.closeInput?.();
+        try {
+          query?.close?.();
+        } catch (error) {
+          runtimeLogger.debug('runtime settings close error', { error: summarizeError(error) });
+        }
+      }
+    }
+  }
+
+  async getContextUsage(): Promise<unknown | null> {
+    let query: ClaudeCodeContextUsageQuery | undefined;
+    try {
+      query = await this.getContextUsageQuery();
+      if (typeof query.getContextUsage !== 'function') {
+        runtimeLogger.debug('context usage unavailable', { reason: 'missing-query-getContextUsage' });
+        return null;
+      }
+      const contextUsage = await query.getContextUsage();
+      runtimeLogger.debug('context usage readback', {
+        available: contextUsage !== null && contextUsage !== undefined,
+        valueType: typeof contextUsage,
+      });
+      return contextUsage ?? null;
+    } catch (error) {
+      runtimeLogger.debug('context usage error', { error: summarizeError(error) });
+      return null;
+    } finally {
+      if (query?.shouldClose !== false) {
+        query?.closeInput?.();
+        try {
+          query?.close?.();
+        } catch (error) {
+          runtimeLogger.debug('context usage close error', { error: summarizeError(error) });
+        }
+      }
+    }
+  }
+
+  async getAccountInfo(): Promise<unknown | null> {
+    let query: ClaudeCodeAccountInfoQuery | undefined;
+    try {
+      query = await this.getAccountInfoQuery();
+      if (typeof query.accountInfo !== 'function') {
+        runtimeLogger.debug('account info unavailable', { reason: 'missing-query-accountInfo' });
+        return null;
+      }
+      const accountInfo = await query.accountInfo();
+      runtimeLogger.debug('account info readback', {
+        available: accountInfo !== null && accountInfo !== undefined,
+        valueType: typeof accountInfo,
+      });
+      return accountInfo ?? null;
+    } catch (error) {
+      runtimeLogger.debug('account info error', { error: summarizeError(error) });
+      return null;
+    } finally {
+      if (query?.shouldClose !== false) {
+        query?.closeInput?.();
+        try {
+          query?.close?.();
+        } catch (error) {
+          runtimeLogger.debug('account info close error', { error: summarizeError(error) });
+        }
+      }
+    }
+  }
+
+  async readRuntimeFile(path: string, options?: ClaudeCodeRuntimeFileReadOptions): Promise<unknown | null> {
+    let query: ClaudeCodeRuntimeFileQuery | undefined;
+    try {
+      query = await this.getRuntimeFileQuery();
+      if (typeof query.readFile !== 'function') {
+        runtimeLogger.debug('runtime file readback unavailable', { reason: 'missing-query-readFile' });
+        return null;
+      }
+      const fileReadback = await query.readFile(path, options);
+      runtimeLogger.debug('runtime file readback', {
+        available: fileReadback !== null && fileReadback !== undefined,
+        valueType: typeof fileReadback,
+      });
+      return fileReadback ?? null;
+    } catch (error) {
+      runtimeLogger.debug('runtime file readback error', { error: summarizeError(error) });
+      return null;
+    } finally {
+      if (query?.shouldClose !== false) {
+        query?.closeInput?.();
+        try {
+          query?.close?.();
+        } catch (error) {
+          runtimeLogger.debug('runtime file readback close error', { error: summarizeError(error) });
+        }
+      }
+    }
+  }
+
+  async getMcpServerRuntimeStatuses(): Promise<ClaudeCodeMcpServerRuntimeStatus[] | null> {
+    let query: ClaudeCodeMcpServerStatusQuery | undefined;
+    try {
+      query = await this.getMcpServerStatusQuery();
+      if (typeof query.mcpServerStatus !== 'function') {
+        mcpLogger.debug('MCP server status unavailable', { reason: 'missing-query-mcpServerStatus' });
+        return null;
+      }
+      const rawStatuses = await query.mcpServerStatus();
+      if (!Array.isArray(rawStatuses)) {
+        mcpLogger.debug('MCP server status unexpected shape', { valueType: typeof rawStatuses });
+        return null;
+      }
+      const statuses = rawStatuses
+        .map((rawStatus) => normalizeMcpServerRuntimeStatus(rawStatus))
+        .filter((status): status is ClaudeCodeMcpServerRuntimeStatus => Boolean(status));
+      mcpLogger.debug('MCP server status readback', {
+        count: statuses.length,
+        connectedCount: statuses.filter((status) => status.status === 'connected').length,
+        failedCount: statuses.filter((status) => status.status === 'failed').length,
+      });
+      return statuses;
+    } catch (error) {
+      mcpLogger.debug('MCP server status error', { error: summarizeError(error) });
+      return null;
     } finally {
       if (query?.shouldClose !== false) {
         query?.close?.();
@@ -671,50 +1191,24 @@ export class ClaudeCodeAdapter
     return raw || undefined;
   }
 
-  async runCheckpointRewindProbe(): Promise<{
-    sessionId: string | undefined;
-    userMessageId: string | undefined;
-    rewindDryRunResult: unknown;
-    rewindActualResult: {
-      result: unknown;
-      probeFileExistedBefore: boolean;
-      probeFileExistsAfter: boolean;
-      fileWasRemoved: boolean;
-      successfulCandidateId: string;
-    } | undefined;
-    phase1RewindResult: {
-      dryRunResult: unknown;
-      filesChanged: unknown[];
-      toolUseTypes: string[];
-      userMessageUuid: string;
-    } | undefined;
-    probeFileExistedAfterPhase1: boolean;
-    chunks: StreamChunk[];
-    toolUseTypes: string[];
-    candidatesAttempted: string[];
-    /** Per-candidate rewind results (all candidates, not just first canRewind:true) */
-    candidateResults: Array<{
-      candidateId: string;
-      canRewind: boolean;
-      filesChanged: unknown;
-      error?: string;
-    }>;
-    /** Count of SDK files_persisted events observed during Phase 1 streaming.
-     *  Expected to be 0 when isInteractive=false (upstream bug #236). */
-    sdkFilesPersistedEventCount: number;
-    /** Whether applyFlagSettings({ fileCheckpointingEnabled: true }) was attempted
-     *  on the active Phase 1 query after the first assistant message. Tests whether
-     *  runtime settings injection can activate snapshot creation mid-stream. */
-    applyFlagSettingsAttempted: boolean;
-    /** Error from applyFlagSettings call, if any. undefined = success or not attempted. */
-    applyFlagSettingsError: string | undefined;
-  }> {
+  async runCheckpointRewindProbe(): Promise<CheckpointRewindProbeResult> {
     await this.ensureReadyForQuery();
     const sdk = await this.getSdk();
 
     const probeFilePath = `${this.options.vaultPath}/.opencodian-checkpoint-probe.txt`;
     try { unlinkSync(probeFilePath); } catch { /* not present, ok */ }
 
+    try {
+      return await this.executeCheckpointRewindProbe(sdk, probeFilePath);
+    } finally {
+      try { unlinkSync(probeFilePath); } catch { /* guaranteed cleanup */ }
+    }
+  }
+
+  private async executeCheckpointRewindProbe(
+    sdk: ClaudeCodeSdkFacade,
+    probeFilePath: string,
+  ): Promise<CheckpointRewindProbeResult> {
     const phase1Abort = new ClaudeCodeRuntimeAbortController() as AbortController;
     const phase1Settings: ClaudeCodeBackendSettings = {
       ...this.options.settings,
@@ -736,6 +1230,118 @@ export class ClaudeCodeAdapter
       options: phase1Options,
     });
     const normalizer = new ClaudeCodeStreamNormalizer();
+    const p1 = await this.streamCheckpointPhase1(phase1Query, normalizer);
+
+    const probeFileExistedAfterPhase1 = existsSync(probeFilePath);
+    sessionLogger.debug('checkpoint rewind probe: phase 1 complete', {
+      sessionId: p1.sessionId,
+      probeFileExistedAfterPhase1,
+      phase1UserMessageUuid: p1.phase1UserMessageUuid,
+      toolUseTypes: p1.toolUseTypes,
+    });
+
+    if (!p1.sessionId) {
+      throw new Error('Checkpoint rewind probe phase 1 failed: no session ID captured.');
+    }
+
+    const initialUserMessageId = p1.phase1UserMessageUuid ?? await this.findInitialPromptUuid(sdk, p1.sessionId);
+    sessionLogger.debug('checkpoint rewind probe: found initial prompt UUID', {
+      sessionId: p1.sessionId,
+      initialUserMessageId,
+      source: p1.phase1UserMessageUuid ? 'stream' : 'getSessionMessages',
+    });
+
+    if (!initialUserMessageId) {
+      return this.buildProbeEarlyReturn(p1, probeFileExistedAfterPhase1);
+    }
+
+    const candidates = await this.collectRewindCandidateIds(sdk, p1.sessionId, initialUserMessageId);
+    sessionLogger.debug('checkpoint rewind probe: rewind candidates', {
+      sessionId: p1.sessionId,
+      candidates,
+    });
+
+    const phase2Abort = new ClaudeCodeRuntimeAbortController() as AbortController;
+    const phase2Options = buildClaudeCodeOptions({
+      vaultPath: this.options.vaultPath,
+      settings: phase1Settings,
+      pathToClaudeCodeExecutable: this.options.pathToClaudeCodeExecutable,
+      abortController: phase2Abort,
+      spawnClaudeCodeProcess: this.spawnClaudeCodeProcess,
+      enableFileCheckpointing: true,
+      resumeSessionId: p1.sessionId,
+    });
+
+    const phase2Query = sdk.query({
+      prompt: 'The rewind probe is continuing. Say "rewind probe active" and nothing else.',
+      options: phase2Options,
+    });
+    const phase2Normalizer = new ClaudeCodeStreamNormalizer({ sessionId: p1.sessionId });
+    const p2 = await this.streamCheckpointPhase2Rewind({
+      phase2Query, phase2Normalizer, allChunks: p1.allChunks, candidates,
+      probeFilePath, probeFileExistedAfterPhase1, sessionId: p1.sessionId, toolUseTypes: p1.toolUseTypes,
+    });
+
+    return {
+      sessionId: p1.sessionId,
+      userMessageId: initialUserMessageId,
+      rewindDryRunResult: p2.rewindDryRunResult,
+      rewindActualResult: p2.rewindActualResult,
+      phase1RewindResult: p2.phase1RewindResult,
+      probeFileExistedAfterPhase1,
+      chunks: p1.allChunks,
+      toolUseTypes: p1.toolUseTypes,
+      candidatesAttempted: candidates,
+      candidateResults: p2.candidateResults,
+      sdkFilesPersistedEventCount: p1.sdkFilesPersistedEventCount,
+      applyFlagSettingsAttempted: p1.applyFlagSettingsAttempted,
+      applyFlagSettingsError: p1.applyFlagSettingsError,
+    };
+  }
+
+  private buildProbeEarlyReturn(
+    p1: CheckpointPhase1StreamResult,
+    probeFileExistedAfterPhase1: boolean,
+  ): CheckpointRewindProbeResult {
+    return {
+      sessionId: p1.sessionId,
+      userMessageId: undefined,
+      rewindDryRunResult: undefined,
+      rewindActualResult: undefined,
+      phase1RewindResult: undefined,
+      probeFileExistedAfterPhase1,
+      chunks: p1.allChunks,
+      toolUseTypes: p1.toolUseTypes,
+      candidatesAttempted: [],
+      candidateResults: [],
+      sdkFilesPersistedEventCount: p1.sdkFilesPersistedEventCount,
+      applyFlagSettingsAttempted: p1.applyFlagSettingsAttempted,
+      applyFlagSettingsError: p1.applyFlagSettingsError,
+    };
+  }
+
+  private async attemptApplyFlagSettings(
+    phase1Query: AsyncIterable<unknown> & { applyFlagSettings?: (s: { fileCheckpointingEnabled: boolean }) => Promise<void> },
+    sessionId: string | undefined,
+  ): Promise<string | undefined> {
+    try {
+      if (typeof phase1Query.applyFlagSettings === 'function') {
+        await phase1Query.applyFlagSettings({ fileCheckpointingEnabled: true });
+        sessionLogger.debug('checkpoint rewind probe: applyFlagSettings succeeded', { sessionId });
+        return undefined;
+      }
+      return 'applyFlagSettings not available on Query';
+    } catch (flagErr) {
+      const msg = flagErr instanceof Error ? flagErr.message : String(flagErr);
+      sessionLogger.debug('checkpoint rewind probe: applyFlagSettings failed', { sessionId, error: msg });
+      return msg;
+    }
+  }
+
+  private async streamCheckpointPhase1(
+    phase1Query: AsyncIterable<unknown> & { close?: () => void; applyFlagSettings?: (s: { fileCheckpointingEnabled: boolean }) => Promise<void> },
+    normalizer: ClaudeCodeStreamNormalizer,
+  ): Promise<CheckpointPhase1StreamResult> {
     const allChunks: StreamChunk[] = [];
     let sessionId: string | undefined;
     let phase1UserMessageUuid: string | undefined;
@@ -752,7 +1358,6 @@ export class ClaudeCodeAdapter
         }
         allChunks.push(...nextChunks);
 
-        // Count files_persisted events from raw SDK messages (expected 0 when isInteractive=false).
         if (typeof message === 'object' && message !== null) {
           const rec = message as Record<string, unknown>;
           if (rec.type === 'files_persisted') {
@@ -767,28 +1372,11 @@ export class ClaudeCodeAdapter
           }
         }
 
-        // Seam exploration: after first assistant message (subprocess initialized),
-        // inject fileCheckpointingEnabled via applyFlagSettings to test whether
-        // runtime settings injection activates snapshot creation mid-stream.
-        // This tests a seam not covered by the enableFileCheckpointing option alone.
         if (!applyFlagSettingsAttempted && typeof message === 'object' && message !== null) {
           const rec = message as Record<string, unknown>;
           if (rec.type === 'assistant') {
             applyFlagSettingsAttempted = true;
-            try {
-              if (typeof phase1Query.applyFlagSettings === 'function') {
-                await phase1Query.applyFlagSettings({ fileCheckpointingEnabled: true });
-                sessionLogger.debug('checkpoint rewind probe: applyFlagSettings succeeded', { sessionId });
-              } else {
-                applyFlagSettingsError = 'applyFlagSettings not available on Query';
-              }
-            } catch (flagErr) {
-              applyFlagSettingsError = flagErr instanceof Error ? flagErr.message : String(flagErr);
-              sessionLogger.debug('checkpoint rewind probe: applyFlagSettings failed', {
-                sessionId,
-                error: applyFlagSettingsError,
-              });
-            }
+            applyFlagSettingsError = await this.attemptApplyFlagSettings(phase1Query, sessionId);
           }
         }
 
@@ -805,88 +1393,27 @@ export class ClaudeCodeAdapter
       phase1Query.close?.();
     }
 
-    const probeFileExistedAfterPhase1 = existsSync(probeFilePath);
-    sessionLogger.debug('checkpoint rewind probe: phase 1 complete', {
-      sessionId,
-      probeFileExistedAfterPhase1,
-      phase1UserMessageUuid,
-      toolUseTypes,
-    });
+    return { allChunks, sessionId, phase1UserMessageUuid, toolUseTypes, sdkFilesPersistedEventCount, applyFlagSettingsAttempted, applyFlagSettingsError };
+  }
 
-    if (!sessionId) {
-      try { unlinkSync(probeFilePath); } catch { /* cleanup */ }
-      throw new Error('Checkpoint rewind probe phase 1 failed: no session ID captured.');
-    }
-
-    let phase1RewindResult: {
-      dryRunResult: unknown;
-      filesChanged: unknown[];
+  private async streamCheckpointPhase2Rewind(
+    opts: {
+      phase2Query: AsyncIterable<unknown> & { close?: () => void; rewindFiles?: (id: string, opts: { dryRun?: boolean }) => Promise<unknown> };
+      phase2Normalizer: ClaudeCodeStreamNormalizer;
+      allChunks: StreamChunk[];
+      candidates: string[];
+      probeFilePath: string;
+      probeFileExistedAfterPhase1: boolean;
+      sessionId: string | undefined;
       toolUseTypes: string[];
-      userMessageUuid: string;
-    } | undefined;
-
-    const initialUserMessageId = phase1UserMessageUuid ?? await this.findInitialPromptUuid(sdk, sessionId);
-    sessionLogger.debug('checkpoint rewind probe: found initial prompt UUID', {
-      sessionId,
-      initialUserMessageId,
-      source: phase1UserMessageUuid ? 'stream' : 'getSessionMessages',
-    });
-
-    if (!initialUserMessageId) {
-      try { unlinkSync(probeFilePath); } catch { /* cleanup */ }
-      return {
-        sessionId,
-        userMessageId: undefined,
-        rewindDryRunResult: undefined,
-        rewindActualResult: undefined,
-        phase1RewindResult: undefined,
-        probeFileExistedAfterPhase1,
-        chunks: allChunks,
-        toolUseTypes,
-        candidatesAttempted: [],
-        candidateResults: [],
-        sdkFilesPersistedEventCount,
-        applyFlagSettingsAttempted,
-        applyFlagSettingsError,
-      };    }
-
-    const candidates = await this.collectRewindCandidateIds(sdk, sessionId, initialUserMessageId);
-    sessionLogger.debug('checkpoint rewind probe: rewind candidates', {
-      sessionId,
-      candidates,
-    });
-
-    const phase2Abort = new ClaudeCodeRuntimeAbortController() as AbortController;
-    const phase2Options = buildClaudeCodeOptions({
-      vaultPath: this.options.vaultPath,
-      settings: phase1Settings,
-      pathToClaudeCodeExecutable: this.options.pathToClaudeCodeExecutable,
-      abortController: phase2Abort,
-      spawnClaudeCodeProcess: this.spawnClaudeCodeProcess,
-      enableFileCheckpointing: true,
-      resumeSessionId: sessionId,
-    });
-
-    const phase2Query = sdk.query({
-      prompt: 'The rewind probe is continuing. Say "rewind probe active" and nothing else.',
-      options: phase2Options,
-    });
-    const phase2Normalizer = new ClaudeCodeStreamNormalizer({ sessionId });
-    let rewindDryRunResult: unknown = undefined;
-    let rewindActualResult: {
-      result: unknown;
-      probeFileExistedBefore: boolean;
-      probeFileExistsAfter: boolean;
-      fileWasRemoved: boolean;
-      successfulCandidateId: string;
-    } | undefined;
+    },
+  ): Promise<CheckpointPhase2StreamResult> {
+    const { phase2Query, phase2Normalizer, allChunks, candidates, probeFilePath, probeFileExistedAfterPhase1, sessionId, toolUseTypes } = opts;
+    let rewindDryRunResult: unknown;
+    let rewindActualResult: CheckpointRewindActualResult | undefined;
+    let phase1RewindResult: CheckpointPhase1RewindResult | undefined;
     let rewindDone = false;
-    const candidateResults: Array<{
-      candidateId: string;
-      canRewind: boolean;
-      filesChanged: unknown;
-      error?: string;
-    }> = [];
+    const candidateResults: CheckpointCandidateResult[] = [];
 
     try {
       for await (const message of phase2Query ?? []) {
@@ -899,88 +1426,24 @@ export class ClaudeCodeAdapter
             : undefined;
           if (msgType === 'assistant') {
             rewindDone = true;
-            let successfulCandidateId = '';
-            for (const candidateId of candidates) {
-              try {
-                const attempt = await phase2Query.rewindFiles(candidateId, { dryRun: true });
-                const rewindObj = attempt as Record<string, unknown> | null;
-                const canRewind = rewindObj && typeof rewindObj === 'object' && rewindObj.canRewind === true;
-                candidateResults.push({
-                  candidateId,
-                  canRewind: !!canRewind,
-                  filesChanged: rewindObj?.filesChanged,
-                });
-                rewindDryRunResult = attempt;
-                sessionLogger.debug('checkpoint rewind probe: rewindFiles dryRun result for candidate', {
-                  sessionId,
-                  candidateId,
-                  canRewind,
-                  filesChanged: rewindObj?.filesChanged,
-                  insertions: rewindObj?.insertions,
-                  deletions: rewindObj?.deletions,
-                });
-                if (canRewind) {
-                  successfulCandidateId = candidateId;
-                  break;
-                }
-              } catch (rewindErr) {
-                const errMsg = rewindErr instanceof Error ? rewindErr.message : String(rewindErr);
-                candidateResults.push({
-                  candidateId,
-                  canRewind: false,
-                  filesChanged: undefined,
-                  error: errMsg,
-                });
-                sessionLogger.debug('checkpoint rewind probe: rewindFiles threw for candidate', {
-                  sessionId,
-                  candidateId,
-                  error: errMsg,
-                });
-              }
-            }
-            if (!rewindDryRunResult) {
-              rewindDryRunResult = {
-                canRewind: false,
-                error: 'rewindFiles threw for all candidate IDs',
-                candidates,
-              };
-            } else if (successfulCandidateId) {
-              const filesChanged = (rewindDryRunResult as Record<string, unknown>)?.filesChanged;
-              const hasNonEmptyFilesChanged = Array.isArray(filesChanged) && filesChanged.length > 0;
+            const rewind = await this.executeDryRunCandidates(phase2Query.rewindFiles!, candidates, sessionId);            candidateResults.push(...rewind.candidateResults);
+            rewindDryRunResult = rewind.rewindDryRunResult;
 
+            if (!rewindDryRunResult) {
+              rewindDryRunResult = { canRewind: false, error: 'rewindFiles threw for all candidate IDs', candidates };
+            } else if (rewind.successfulCandidateId) {
+              const filesChanged = (rewindDryRunResult as Record<string, unknown>)?.filesChanged;
               phase1RewindResult = {
                 dryRunResult: rewindDryRunResult,
                 filesChanged: Array.isArray(filesChanged) ? filesChanged : [],
                 toolUseTypes,
-                userMessageUuid: successfulCandidateId,
+                userMessageUuid: rewind.successfulCandidateId,
               };
-
-              if (!hasNonEmptyFilesChanged && probeFileExistedAfterPhase1 && phase2Query.rewindFiles) {
-                try {
-                  const fileExistedBefore = existsSync(probeFilePath);
-                  const actualRewindResult = await phase2Query.rewindFiles(successfulCandidateId, { dryRun: false });
-                  const fileExistsAfter = existsSync(probeFilePath);
-                  rewindActualResult = {
-                    result: actualRewindResult,
-                    probeFileExistedBefore: fileExistedBefore,
-                    probeFileExistsAfter: fileExistsAfter,
-                    fileWasRemoved: fileExistedBefore && !fileExistsAfter,
-                    successfulCandidateId,
-                  };
-                  sessionLogger.debug('checkpoint rewind probe: dryRun=false filesystem evidence', {
-                    sessionId,
-                    candidateId: successfulCandidateId,
-                    fileExistedBefore,
-                    fileExistsAfter,
-                    fileWasRemoved: rewindActualResult.fileWasRemoved,
-                  });
-                } catch (actualRewindErr) {
-                  sessionLogger.debug('checkpoint rewind probe: dryRun=false threw', {
-                    sessionId,
-                    candidateId: successfulCandidateId,
-                    error: actualRewindErr instanceof Error ? actualRewindErr.message : String(actualRewindErr),
-                  });
-                }
+              if (!Array.isArray(filesChanged) || filesChanged.length === 0) {
+                rewindActualResult = await this.executeActualRewind({
+                  rewindFiles: phase2Query.rewindFiles!, successfulCandidateId: rewind.successfulCandidateId,
+                  probeFilePath, probeFileExistedAfterPhase1, sessionId,
+                });
               }
             }
           }
@@ -990,23 +1453,83 @@ export class ClaudeCodeAdapter
       phase2Query.close?.();
     }
 
-    try { unlinkSync(probeFilePath); } catch { /* cleanup */ }
+    return { rewindDryRunResult, rewindActualResult, phase1RewindResult, candidateResults };
+  }
 
-    return {
-      sessionId,
-      userMessageId: initialUserMessageId,
-      rewindDryRunResult,
-      rewindActualResult,
-      phase1RewindResult,
-      probeFileExistedAfterPhase1,
-      chunks: allChunks,
-      toolUseTypes,
-      candidatesAttempted: candidates,
-      candidateResults,
-      sdkFilesPersistedEventCount,
-      applyFlagSettingsAttempted,
-      applyFlagSettingsError,
-    };
+  private async executeDryRunCandidates(
+    rewindFiles: (id: string, opts: { dryRun?: boolean }) => Promise<unknown>,
+    candidates: string[],
+    sessionId: string | undefined,
+  ): Promise<{ rewindDryRunResult: unknown; successfulCandidateId: string; candidateResults: CheckpointCandidateResult[] }> {
+    let rewindDryRunResult: unknown;
+    let successfulCandidateId = '';
+    const candidateResults: CheckpointCandidateResult[] = [];
+
+    for (const candidateId of candidates) {
+      try {
+        const attempt = await rewindFiles(candidateId, { dryRun: true });
+        const rewindObj = attempt as Record<string, unknown> | null;
+        const canRewind = rewindObj && typeof rewindObj === 'object' && rewindObj.canRewind === true;
+        candidateResults.push({
+          candidateId,
+          canRewind: !!canRewind,
+          filesChanged: rewindObj?.filesChanged,
+        });
+        rewindDryRunResult = attempt;
+        sessionLogger.debug('checkpoint rewind probe: rewindFiles dryRun result for candidate', {
+          sessionId, candidateId, canRewind, filesChanged: rewindObj?.filesChanged,
+          insertions: rewindObj?.insertions, deletions: rewindObj?.deletions,
+        });
+        if (canRewind) {
+          successfulCandidateId = candidateId;
+          break;
+        }
+      } catch (rewindErr) {
+        const errMsg = rewindErr instanceof Error ? rewindErr.message : String(rewindErr);
+        candidateResults.push({ candidateId, canRewind: false, filesChanged: undefined, error: errMsg });
+        sessionLogger.debug('checkpoint rewind probe: rewindFiles threw for candidate', {
+          sessionId, candidateId, error: errMsg,
+        });
+      }
+    }
+
+    return { rewindDryRunResult, successfulCandidateId, candidateResults };
+  }
+
+  private async executeActualRewind(
+    opts: {
+      rewindFiles: (id: string, opts: { dryRun?: boolean }) => Promise<unknown>;
+      successfulCandidateId: string;
+      probeFilePath: string;
+      probeFileExistedAfterPhase1: boolean;
+      sessionId: string | undefined;
+    },
+  ): Promise<CheckpointRewindActualResult | undefined> {
+    const { rewindFiles, successfulCandidateId, probeFilePath, probeFileExistedAfterPhase1, sessionId } = opts;
+    if (!probeFileExistedAfterPhase1) return undefined;
+    try {
+      const fileExistedBefore = existsSync(probeFilePath);
+      const actualRewindResult = await rewindFiles(successfulCandidateId, { dryRun: false });
+      const fileExistsAfter = existsSync(probeFilePath);
+      const result: CheckpointRewindActualResult = {
+        result: actualRewindResult,
+        probeFileExistedBefore: fileExistedBefore,
+        probeFileExistsAfter: fileExistsAfter,
+        fileWasRemoved: fileExistedBefore && !fileExistsAfter,
+        successfulCandidateId,
+      };
+      sessionLogger.debug('checkpoint rewind probe: dryRun=false filesystem evidence', {
+        sessionId, candidateId: successfulCandidateId,
+        fileExistedBefore, fileExistsAfter, fileWasRemoved: result.fileWasRemoved,
+      });
+      return result;
+    } catch (actualRewindErr) {
+      sessionLogger.debug('checkpoint rewind probe: dryRun=false threw', {
+        sessionId, candidateId: successfulCandidateId,
+        error: actualRewindErr instanceof Error ? actualRewindErr.message : String(actualRewindErr),
+      });
+      return undefined;
+    }
   }
 
   private async findInitialPromptUuid(
@@ -1056,6 +1579,145 @@ export class ClaudeCodeAdapter
       // best-effort — assistant UUIDs are supplementary candidates
     }
     return candidates;
+  }
+
+  /**
+   * Diagnostic probe for setModel() live behavior verification.
+   *
+   * Two-phase probe:
+   *  Phase 1: sends a short prompt, captures modelUsage from result message.
+   *  Calls query.setModel(targetModel) on the active query handle.
+   *  Phase 2: sends another short prompt to the same query, captures modelUsage.
+   *
+   * Returns structured evidence so the caller can classify honestly:
+   * - pass: phase2 model !== phase1 model AND phase2 includes targetModel
+   * - readback: setModel succeeded but model didn't change or signal ambiguous
+   * - boundary: setModel not available on query
+   * - fail: probe threw
+   *
+   * This is diagnostic-only. It does not change stable chat behavior or settings.
+   */
+  async runSetModelLiveProbe(targetModel: string): Promise<{
+    setModelAttempted: boolean;
+    setModelError: string | undefined;
+    setModelNotAvailable: boolean;
+    phase1ModelKeys: string[];
+    phase2ModelKeys: string[];
+  }> {
+    await this.ensureReadyForQuery();
+    const sdk = await this.getSdk();
+
+    // Single persistent query with AsyncIterable input — same pattern as getOrStartRuntime().
+    // This ensures Phase 1 + setModel + Phase 2 all run on the SAME query handle,
+    // so Phase 2 modelUsage genuinely reflects any model change from setModel().
+    const abortController = new ClaudeCodeRuntimeAbortController() as AbortController;
+    const probeSettings: ClaudeCodeBackendSettings = {
+      ...this.options.settings,
+      permissionMode: 'bypassPermissions' as const,
+    };
+    const probeOptions = buildClaudeCodeOptions({
+      vaultPath: this.options.vaultPath,
+      settings: probeSettings,
+      pathToClaudeCodeExecutable: this.options.pathToClaudeCodeExecutable,
+      abortController,
+      spawnClaudeCodeProcess: this.spawnClaudeCodeProcess,
+      persistSession: true,
+    });
+    this.lastDiagnosticSdkOptions = probeOptions;
+
+    // Create input/output queues — same architecture as normal chat sessions
+    const input = new ClaudeCodeAsyncQueue<ClaudeCodeQueuedPrompt>();
+    const output = new ClaudeCodeAsyncQueue<ClaudeCodeRuntimeOutput>();
+
+    // Single SDK query with AsyncIterable prompt (streaming input mode)
+    const query = sdk.query({
+      prompt: input,
+      options: probeOptions,
+    });
+
+    // Background pump: iterates query messages into output queue
+    const pumpPromise = (async () => {
+      try {
+        for await (const message of query ?? []) {
+          output.push({ type: 'message', message });
+        }
+      } catch (err) {
+        output.push({ type: 'error', error: err });
+      }
+    })();
+
+    const phase1Raw: unknown[] = [];
+    const phase2Raw: unknown[] = [];
+    let setModelAttempted = false;
+    let setModelError: string | undefined;
+    let setModelNotAvailable = false;
+
+    try {
+      // Phase 1: push first prompt, consume until turn boundary (result message)
+      input.push(createUserPrompt('Say hello in exactly one word.'));
+      for await (const item of output) {
+        if (item.type === 'message') {
+          phase1Raw.push(item.message);
+        }
+        if (item.type === 'error') {
+          break;
+        }
+        // Check for turn boundary — result message ends Phase 1
+        if (item.type === 'message' && isTurnBoundaryMessage(item.message)) {
+          break;
+        }
+      }
+
+      // Extract modelUsage from Phase 1 result messages
+      const phase1ModelUsage = extractModelUsageFromRaw(phase1Raw);
+      const phase1ModelKeys = phase1ModelUsage ? Object.keys(phase1ModelUsage) : [];
+
+      // Call setModel on THE SAME query handle (mid-stream)
+      if (typeof (query as unknown as Record<string, unknown>)?.setModel === 'function') {
+        setModelAttempted = true;
+        try {
+          await ((query as unknown as { setModel: (m: string) => Promise<unknown> }).setModel(targetModel));
+        } catch (err) {
+          setModelError = err instanceof Error ? err.message : String(err);
+        }
+      } else {
+        setModelNotAvailable = true;
+      }
+
+      // Phase 2: push second prompt into THE SAME input channel
+      input.push(createUserPrompt('Say goodbye in exactly one word.'));
+      for await (const item of output) {
+        if (item.type === 'message') {
+          phase2Raw.push(item.message);
+        }
+        if (item.type === 'error') {
+          break;
+        }
+        // Check for turn boundary — result message ends Phase 2
+        if (item.type === 'message' && isTurnBoundaryMessage(item.message)) {
+          break;
+        }
+      }
+
+      // Close input to end the query cleanly
+      input.close();
+
+      const phase2ModelUsage = extractModelUsageFromRaw(phase2Raw);
+      const phase2ModelKeys = phase2ModelUsage ? Object.keys(phase2ModelUsage) : [];
+
+      return {
+        setModelAttempted,
+        setModelError,
+        setModelNotAvailable,
+        phase1ModelKeys,
+        phase2ModelKeys,
+      };
+    } finally {
+      // Ensure cleanup regardless of error path
+      input.close();
+      query?.close?.();
+      await pumpPromise.catch(() => { /* pump already settled or errored */ });
+    }
   }
 
   async runDiagnosticPrompt(
@@ -1131,6 +1793,101 @@ export class ClaudeCodeAdapter
       chunks,
       ...(sdkError ? { sdkError } : {}),
     };
+  }
+
+  // =======================================================================
+  // Warm Startup Probe — diagnostic probe for startup() / WarmQuery seam
+  // =======================================================================
+
+  /**
+   * Diagnostic probe: calls SDK startup() to obtain a WarmQuery handle,
+   * optionally sends a minimal diagnostic prompt through the warm handle,
+   * and returns honest classification evidence.
+   *
+   * Classification rules:
+   * - 'readback': startup() resolved + warm query produced messages.
+   *   Warm-vs-cold latency benefit is the SDK's internal claim, not independently measured.
+   * - 'fail': startup() or warm query iteration threw an exception.
+   * - 'boundary': SDK facade does not expose startup().
+   */
+  async runWarmStartupProbe(): Promise<WarmStartupProbeResult> {
+    await this.ensureReadyForQuery();
+    const sdk = await this.getSdk();
+
+    if (!sdk.startup) {
+      runtimeLogger.debug('warm startup probe', { result: 'boundary', reason: 'SDK lacks startup()' });
+      return {
+        classification: 'boundary',
+        startupResolved: false,
+        warmQueryAvailable: false,
+        warmQueryResponded: false,
+        rawMessageCount: 0,
+      };
+    }
+
+    let warmQuery: WarmQueryHandle | undefined;
+    try {
+      // Build adapter-owned options through the diagnostic options pipeline
+      // so the warm subprocess receives the same vaultPath, settings, spawn config,
+      // MCP servers, and abort controller as a normal diagnostic query.
+      const abortController = new ClaudeCodeRuntimeAbortController() as AbortController;
+      const diagnosticOptions = this.buildDiagnosticSdkOptions(abortController, {
+        prompt: '',
+        persistSession: false,
+        _diagnosticBypassPermissions: true,
+      });
+      warmQuery = await sdk.startup({ options: diagnosticOptions });
+      runtimeLogger.debug('warm startup probe', { result: 'startup resolved' });
+
+      // Send a minimal diagnostic prompt through the warm handle
+      const queryHandle = warmQuery.query('Say "warm startup probe ok" and nothing else.');
+      const rawMessages: unknown[] = [];
+
+      try {
+        for await (const message of queryHandle ?? []) {
+          rawMessages.push(message);
+        }
+      } catch (err) {
+        // Warm query iteration threw — classify as fail
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        runtimeLogger.debug('warm startup probe', { result: 'fail', reason: 'warm query iteration threw', error: errorMessage });
+        return {
+          classification: 'fail',
+          startupResolved: true,
+          warmQueryAvailable: true,
+          warmQueryResponded: false,
+          rawMessageCount: rawMessages.length,
+          error: errorMessage,
+        };
+      }
+
+      const responded = rawMessages.length > 0;
+      runtimeLogger.debug('warm startup probe', {
+        result: responded ? 'readback' : 'readback',
+        messageCount: rawMessages.length,
+      });
+
+      return {
+        classification: 'readback',
+        startupResolved: true,
+        warmQueryAvailable: true,
+        warmQueryResponded: responded,
+        rawMessageCount: rawMessages.length,
+      };
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      runtimeLogger.debug('warm startup probe', { result: 'fail', reason: 'startup threw', error: errorMessage });
+      return {
+        classification: 'fail',
+        startupResolved: false,
+        warmQueryAvailable: false,
+        warmQueryResponded: false,
+        rawMessageCount: 0,
+        error: errorMessage,
+      };
+    } finally {
+      warmQuery?.close();
+    }
   }
 
   private async validateDiagnosticResumeSession(
@@ -1349,6 +2106,9 @@ export class ClaudeCodeAdapter
       // Ordinary resume path: only the session's own captured sdkSessionId is used.
       // Arbitrary resume-at ids are rejected; use runDiagnosticPrompt() for diagnostic resume.
       resumeSessionId: session?.sdkSessionId,
+      // Pass session title only on first query (no resume). SDK docs say title
+      // has no effect on persisted title when resuming an existing session.
+      title: !session?.sdkSessionId && session?.title ? session.title : undefined,
     });
     runtimeLogger.debug('buildSdkOptions tool config', {
       allowedToolCount: options.allowedTools?.length ?? 0,
@@ -1366,46 +2126,46 @@ export class ClaudeCodeAdapter
     return options;
   }
 
+  private resolveDiagnosticSettings(
+    request: ClaudeCodeDiagnosticPromptRequest,
+  ): ClaudeCodeBackendSettings {
+    const bypassPermissions = request._diagnosticBypassPermissions === true;
+    let diagnosticSettings = bypassPermissions
+      ? { ...this.options.settings, permissionMode: 'bypassPermissions' as const }
+      : { ...this.options.settings };
+    if (request._diagnosticMaxTurns !== undefined && request._diagnosticMaxTurns !== null) {
+      diagnosticSettings = { ...diagnosticSettings, maxTurns: request._diagnosticMaxTurns };
+    }
+    if (!bypassPermissions && request._diagnosticForcePermissionMode) {
+      diagnosticSettings = { ...diagnosticSettings, permissionMode: request._diagnosticForcePermissionMode };
+    }
+    return diagnosticSettings;
+  }
+
+  private resolveDiagnosticCanUseTool(
+    request: ClaudeCodeDiagnosticPromptRequest,
+    bypassPermissions: boolean,
+  ): unknown {
+    if (bypassPermissions) return undefined;
+    if (request._diagnosticCanUseTool) return request._diagnosticCanUseTool;
+    return this.options.permissionBridge
+      ? this.options.permissionBridge.canUseTool.bind(this.options.permissionBridge)
+      : undefined;
+  }
+
   private buildDiagnosticSdkOptions(
     abortController: AbortController | undefined,
     request: ClaudeCodeDiagnosticPromptRequest,
   ): ClaudeCodeSdkOptionsShape {
     const bypassPermissions = request._diagnosticBypassPermissions === true;
-    let diagnosticSettings = bypassPermissions
-      ? { ...this.options.settings, permissionMode: 'bypassPermissions' as const }
-      : { ...this.options.settings };
-    // Diagnostic maxTurns override: force a low turn limit to test SDK enforcement
-    // without modifying the user's actual settings.
-    if (request._diagnosticMaxTurns !== undefined && request._diagnosticMaxTurns !== null) {
-      diagnosticSettings = { ...diagnosticSettings, maxTurns: request._diagnosticMaxTurns };
-    }
-    // Diagnostic permissionMode override: force non-bypass mode so the SDK subprocess
-    // actually calls canUseTool instead of silently executing all tools.
-    if (!bypassPermissions && request._diagnosticForcePermissionMode) {
-      diagnosticSettings = { ...diagnosticSettings, permissionMode: request._diagnosticForcePermissionMode };
-    }
+    const diagnosticSettings = this.resolveDiagnosticSettings(request);
     const options = buildClaudeCodeOptions({
       vaultPath: this.options.vaultPath,
       settings: diagnosticSettings,
       pathToClaudeCodeExecutable: this.options.pathToClaudeCodeExecutable,
       abortController,
       spawnClaudeCodeProcess: this.spawnClaudeCodeProcess,
-      // When diagnostic bypass is active, skip canUseTool wiring entirely so
-      // the SDK subprocess executes tools without requiring an approval host.
-      // This is scoped to diagnostic probes that test non-permission capabilities
-      // (e.g. env propagation) where no chat streaming UI is available.
-      //
-      // When a diagnostic canUseTool override is provided and bypass is NOT
-      // active, use the override instead of the bridge's canUseTool. This lets
-      // probes inject a synthetic approval handler without touching the live
-      // permission bridge/host architecture.
-      canUseTool: bypassPermissions
-        ? undefined
-        : request._diagnosticCanUseTool
-          ? request._diagnosticCanUseTool as unknown
-          : this.options.permissionBridge
-            ? this.options.permissionBridge.canUseTool.bind(this.options.permissionBridge)
-            : undefined,
+      canUseTool: this.resolveDiagnosticCanUseTool(request, bypassPermissions),
       onElicitation: bypassPermissions
         ? undefined
         : this.options.onElicitation
@@ -1422,8 +2182,6 @@ export class ClaudeCodeAdapter
       forwardSubagentText: request.forwardSubagentText,
       agentProgressSummaries: request.agentProgressSummaries,
       persistSession: request.persistSession,
-      // Diagnostic resume-at path: accepts arbitrary session id for diagnostic probes only.
-      // Intentionally separate from ordinary session resume in buildSdkOptions above.
       resumeSessionId: request.resumeSessionId,
       fallbackModel: request.fallbackModel,
       model: request.model,
@@ -1432,12 +2190,8 @@ export class ClaudeCodeAdapter
       skills: request.skills ?? this.options.skills,
       plugins: request.plugins ?? this.options.plugins,
     });
-    // Diagnostic tool availability restrictor override: replace the default
-    // preset tools with a strict string[] allowlist. The SDK `tools` option
-    // is the actual availability restrictor (removes tools from model context),
-    // unlike `allowedTools` which is an auto-approve permission shortcut only.
     if (request._diagnosticToolRestriction) {
-      options.tools = request._diagnosticToolRestriction;
+      options.tools = [...request._diagnosticToolRestriction];
     }
     this.lastDiagnosticSdkOptions = options;
     return options;
@@ -1512,6 +2266,16 @@ export class ClaudeCodeAdapter
   getMcpServerCount(): number {
     const servers = this.options.mcpServers ?? this.cachedMcpServers;
     return servers ? Object.keys(servers).length : 0;
+  }
+
+  /**
+   * Return the names of MCP servers currently loaded into the adapter.
+   * Returns an empty list if no config has been loaded yet. Read-only
+   * visibility only — MCP authoring stays in the shared MCP settings surface.
+   */
+  getMcpServerNames(): string[] {
+    const servers = this.options.mcpServers ?? this.cachedMcpServers;
+    return servers ? Object.keys(servers).sort((a, b) => a.localeCompare(b)) : [];
   }
 
   /**
@@ -1739,6 +2503,326 @@ export class ClaudeCodeAdapter
     const abortController = new ClaudeCodeRuntimeAbortController() as AbortController;
     runtimeLogger.debug('SDK query creation', {
       source: 'model-catalog',
+      cwd: this.options.vaultPath,
+    });
+    return sdk.query({
+      prompt: new ClaudeCodeAsyncQueue<ClaudeCodeQueuedPrompt>(),
+      options: this.buildSdkOptions(abortController),
+    });
+  }
+
+  private async getRuntimeCatalogQuery(): Promise<ClaudeCodeRuntimeCatalogQuery> {
+    let hasActiveQuery = false;
+    for (const session of this.sessions.values()) {
+      if (!session.runtime?.query || session.runtime.closed) {
+        continue;
+      }
+      hasActiveQuery = true;
+      const query = session.runtime.query as ClaudeCodeRuntimeQueryWithCatalog;
+      if (typeof query.supportedCommands === 'function' && typeof query.supportedAgents === 'function') {
+        runtimeLogger.debug('SDK query creation', {
+          source: 'runtime-catalog-reuse',
+          sessionId: session.id,
+          sdkSessionId: session.sdkSessionId,
+        });
+        return {
+          supportedCommands: query.supportedCommands.bind(query),
+          supportedAgents: query.supportedAgents.bind(query),
+          shouldClose: false,
+        };
+      }
+    }
+    if (hasActiveQuery) {
+      runtimeLogger.debug('runtime catalog unavailable', { reason: 'active-query-missing-catalog-methods' });
+      return { shouldClose: false };
+    }
+
+    await this.ensureReadyForQuery();
+    const sdk = await this.getSdk();
+    const abortController = new ClaudeCodeRuntimeAbortController() as AbortController;
+    const prompt = new ClaudeCodeAsyncQueue<ClaudeCodeQueuedPrompt>();
+    runtimeLogger.debug('SDK query creation', {
+      source: 'runtime-catalog-readback',
+      cwd: this.options.vaultPath,
+    });
+    try {
+      const query = sdk.query({
+        prompt,
+        options: this.buildSdkOptions(abortController),
+      });
+      const readbackQuery: ClaudeCodeRuntimeCatalogQuery = {
+        closeInput: () => {
+          prompt.close();
+          abortController.abort();
+        },
+      };
+      if (typeof query.supportedCommands === 'function') {
+        readbackQuery.supportedCommands = query.supportedCommands.bind(query);
+      }
+      if (typeof query.supportedAgents === 'function') {
+        readbackQuery.supportedAgents = query.supportedAgents.bind(query);
+      }
+      if (typeof query.close === 'function') {
+        readbackQuery.close = query.close.bind(query);
+      }
+      return readbackQuery;
+    } catch (error) {
+      prompt.close();
+      abortController.abort();
+      throw error;
+    }
+  }
+
+  private async getRuntimeSettingsQuery(): Promise<ClaudeCodeRuntimeSettingsQuery> {
+    let hasActiveQuery = false;
+    for (const session of this.sessions.values()) {
+      if (!session.runtime?.query || session.runtime.closed) {
+        continue;
+      }
+      hasActiveQuery = true;
+      const query = session.runtime.query as ClaudeCodeRuntimeQueryWithSettings;
+      if (typeof query?.getSettings === 'function') {
+        runtimeLogger.debug('SDK query creation', {
+          source: 'runtime-settings-reuse',
+          sessionId: session.id,
+          sdkSessionId: session.sdkSessionId,
+        });
+        return {
+          getSettings: query.getSettings.bind(query),
+          shouldClose: false,
+        };
+      }
+    }
+    if (hasActiveQuery) {
+      runtimeLogger.debug('runtime settings unavailable', { reason: 'active-query-missing-getSettings' });
+      return { shouldClose: false };
+    }
+
+    await this.ensureReadyForQuery();
+    const sdk = await this.getSdk();
+    const abortController = new ClaudeCodeRuntimeAbortController() as AbortController;
+    const prompt = new ClaudeCodeAsyncQueue<ClaudeCodeQueuedPrompt>();
+    runtimeLogger.debug('SDK query creation', {
+      source: 'runtime-settings-readback',
+      cwd: this.options.vaultPath,
+    });
+    try {
+      const query = sdk.query({
+        prompt,
+        options: this.buildSdkOptions(abortController),
+      });
+      const readbackQuery: ClaudeCodeRuntimeSettingsQuery = {
+        closeInput: () => {
+          prompt.close();
+          abortController.abort();
+        },
+      };
+      if (typeof query.getSettings === 'function') {
+        readbackQuery.getSettings = query.getSettings.bind(query);
+      }
+      if (typeof query.close === 'function') {
+        readbackQuery.close = query.close.bind(query);
+      }
+      return readbackQuery;
+    } catch (error) {
+      prompt.close();
+      throw error;
+    }
+  }
+
+  private async getContextUsageQuery(): Promise<ClaudeCodeContextUsageQuery> {
+    let hasActiveQuery = false;
+    for (const session of this.sessions.values()) {
+      if (!session.runtime?.query || session.runtime.closed) {
+        continue;
+      }
+      hasActiveQuery = true;
+      const query = session.runtime.query as ClaudeCodeRuntimeQueryWithContextUsage;
+      if (typeof query?.getContextUsage === 'function') {
+        runtimeLogger.debug('SDK query creation', {
+          source: 'context-usage-reuse',
+          sessionId: session.id,
+          sdkSessionId: session.sdkSessionId,
+        });
+        return {
+          getContextUsage: query.getContextUsage.bind(query),
+          shouldClose: false,
+        };
+      }
+    }
+    if (hasActiveQuery) {
+      runtimeLogger.debug('context usage unavailable', { reason: 'active-query-missing-getContextUsage' });
+      return { shouldClose: false };
+    }
+
+    await this.ensureReadyForQuery();
+    const sdk = await this.getSdk();
+    const abortController = new ClaudeCodeRuntimeAbortController() as AbortController;
+    const prompt = new ClaudeCodeAsyncQueue<ClaudeCodeQueuedPrompt>();
+    runtimeLogger.debug('SDK query creation', {
+      source: 'context-usage-readback',
+      cwd: this.options.vaultPath,
+    });
+    try {
+      const query = sdk.query({
+        prompt,
+        options: this.buildSdkOptions(abortController),
+      });
+      const readbackQuery: ClaudeCodeContextUsageQuery = {
+        closeInput: () => {
+          prompt.close();
+          abortController.abort();
+        },
+      };
+      if (typeof query.getContextUsage === 'function') {
+        readbackQuery.getContextUsage = query.getContextUsage.bind(query);
+      }
+      if (typeof query.close === 'function') {
+        readbackQuery.close = query.close.bind(query);
+      }
+      return readbackQuery;
+    } catch (error) {
+      prompt.close();
+      throw error;
+    }
+  }
+
+  private async getAccountInfoQuery(): Promise<ClaudeCodeAccountInfoQuery> {
+    let hasActiveQuery = false;
+    for (const session of this.sessions.values()) {
+      if (!session.runtime?.query || session.runtime.closed) {
+        continue;
+      }
+      hasActiveQuery = true;
+      const query = session.runtime.query as ClaudeCodeRuntimeQueryWithAccountInfo;
+      if (typeof query?.accountInfo === 'function') {
+        runtimeLogger.debug('SDK query creation', {
+          source: 'account-info-reuse',
+          sessionId: session.id,
+          sdkSessionId: session.sdkSessionId,
+        });
+        return {
+          accountInfo: query.accountInfo.bind(query),
+          shouldClose: false,
+        };
+      }
+    }
+    if (hasActiveQuery) {
+      runtimeLogger.debug('account info unavailable', { reason: 'active-query-missing-accountInfo' });
+      return { shouldClose: false };
+    }
+
+    await this.ensureReadyForQuery();
+    const sdk = await this.getSdk();
+    const abortController = new ClaudeCodeRuntimeAbortController() as AbortController;
+    const prompt = new ClaudeCodeAsyncQueue<ClaudeCodeQueuedPrompt>();
+    runtimeLogger.debug('SDK query creation', {
+      source: 'account-info-readback',
+      cwd: this.options.vaultPath,
+    });
+    try {
+      const query = sdk.query({
+        prompt,
+        options: this.buildSdkOptions(abortController),
+      });
+      const readbackQuery: ClaudeCodeAccountInfoQuery = {
+        closeInput: () => {
+          prompt.close();
+          abortController.abort();
+        },
+      };
+      if (typeof query.accountInfo === 'function') {
+        readbackQuery.accountInfo = query.accountInfo.bind(query);
+      }
+      if (typeof query.close === 'function') {
+        readbackQuery.close = query.close.bind(query);
+      }
+      return readbackQuery;
+    } catch (error) {
+      prompt.close();
+      throw error;
+    }
+  }
+
+  private async getRuntimeFileQuery(): Promise<ClaudeCodeRuntimeFileQuery> {
+    let hasActiveQuery = false;
+    for (const session of this.sessions.values()) {
+      if (!session.runtime?.query || session.runtime.closed) {
+        continue;
+      }
+      hasActiveQuery = true;
+      const query = session.runtime.query as ClaudeCodeRuntimeQueryWithFileReadback;
+      if (typeof query?.readFile === 'function') {
+        runtimeLogger.debug('SDK query creation', {
+          source: 'runtime-file-reuse',
+          sessionId: session.id,
+          sdkSessionId: session.sdkSessionId,
+        });
+        return {
+          readFile: query.readFile.bind(query),
+          shouldClose: false,
+        };
+      }
+    }
+    if (hasActiveQuery) {
+      runtimeLogger.debug('runtime file readback unavailable', { reason: 'active-query-missing-readFile' });
+      return { shouldClose: false };
+    }
+
+    await this.ensureReadyForQuery();
+    const sdk = await this.getSdk();
+    const abortController = new ClaudeCodeRuntimeAbortController() as AbortController;
+    const prompt = new ClaudeCodeAsyncQueue<ClaudeCodeQueuedPrompt>();
+    runtimeLogger.debug('SDK query creation', {
+      source: 'runtime-file-readback',
+      cwd: this.options.vaultPath,
+    });
+    try {
+      const query = sdk.query({
+        prompt,
+        options: this.buildSdkOptions(abortController),
+      });
+      const readbackQuery: ClaudeCodeRuntimeFileQuery = {
+        closeInput: () => {
+          prompt.close();
+          abortController.abort();
+        },
+      };
+      if (typeof query?.readFile === 'function') {
+        readbackQuery.readFile = query.readFile.bind(query);
+      }
+      if (typeof query?.close === 'function') {
+        readbackQuery.close = query.close.bind(query);
+      }
+      return readbackQuery;
+    } catch (error) {
+      prompt.close();
+      abortController.abort();
+      throw error;
+    }
+  }
+
+  private async getMcpServerStatusQuery(): Promise<ClaudeCodeMcpServerStatusQuery> {
+    for (const session of this.sessions.values()) {
+      const query = session.runtime?.query as ClaudeCodeRuntimeQueryWithMcpServerStatus | undefined;
+      if (typeof query?.mcpServerStatus === 'function') {
+        mcpLogger.debug('SDK query creation', {
+          source: 'mcp-status-reuse',
+          sessionId: session.id,
+          sdkSessionId: session.sdkSessionId,
+        });
+        return {
+          mcpServerStatus: query.mcpServerStatus.bind(query),
+          shouldClose: false,
+        };
+      }
+    }
+
+    await this.ensureReadyForQuery();
+    const sdk = await this.getSdk();
+    const abortController = new ClaudeCodeRuntimeAbortController() as AbortController;
+    mcpLogger.debug('SDK query creation', {
+      source: 'mcp-status-readback',
       cwd: this.options.vaultPath,
     });
     return sdk.query({

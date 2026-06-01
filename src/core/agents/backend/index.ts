@@ -41,9 +41,13 @@ export { AgentServiceRegistry } from './AgentServiceRegistry';
 export {
   ClaudeCodeAdapter,
   type ClaudeCodeAdapterOptions,
+  type ClaudeCodeRuntimeCatalog,
+  type ClaudeCodeRuntimeCatalogAgent,
+  type ClaudeCodeRuntimeCatalogCommand,
   type ClaudeCodeSdkFacade,
   type ClaudeCodeSdkLoader,
   type ClaudeCodeSdkQueryInput,
+  type WarmStartupProbeResult,
 } from './ClaudeCodeAdapter';
 export {
   adaptMcpConfigForClaude,
@@ -89,6 +93,7 @@ export {
   type ClaudeAgentSdkModule,
   type ClaudeCodeSdkLoaderOptions,
   loadClaudeCodeSdk,
+  type WarmQueryHandle,
 } from './ClaudeCodeSdkLoader';
 export {
   ClaudeCodeStreamNormalizer,

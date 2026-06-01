@@ -8714,6 +8714,10 @@ img.opencodian-model-provider-header-icon {
 .opencodian-settings [data-section-block="subagents"],
 .opencodian-settings [data-section-block="rewind"],
 .opencodian-settings [data-section-block="structured"],
+.opencodian-settings [data-section-block="fork"],
+.opencodian-settings [data-section-block="resume"],
+.opencodian-settings [data-section-block="session-detail"],
+.opencodian-settings [data-section-block="backend-routing"],
 .opencodian-settings [data-section-block="discovery"] {
   display: flex;
   flex-direction: column;
@@ -8730,6 +8734,10 @@ img.opencodian-model-provider-header-icon {
 .opencodian-settings [data-section-block="subagents"] > h4,
 .opencodian-settings [data-section-block="rewind"] > h4,
 .opencodian-settings [data-section-block="structured"] > h4,
+.opencodian-settings [data-section-block="fork"] > h4,
+.opencodian-settings [data-section-block="resume"] > h4,
+.opencodian-settings [data-section-block="session-detail"] > h4,
+.opencodian-settings [data-section-block="backend-routing"] > h4,
 .opencodian-settings [data-section-block="discovery"] > h4 {
   margin: 0;
   color: var(--text-normal);
@@ -8892,6 +8900,44 @@ img.opencodian-model-provider-header-icon {
   color: var(--text-faint);
 }
 
+.opencodian-settings .opencodian-capability-lab-probe-header {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.opencodian-settings .opencodian-capability-lab-probe-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.opencodian-settings .opencodian-capability-lab-probe-title-row > h4 {
+  margin: 0;
+  color: var(--text-normal);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.opencodian-settings .opencodian-capability-lab-probe-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex: 0 0 auto;
+}
+
+.opencodian-settings .opencodian-capability-lab-probe-copy {
+  max-width: 78ch;
+}
+
+.opencodian-settings .opencodian-capability-lab-probe-copy .opencodian-capability-lab-description {
+  color: var(--text-muted);
+  line-height: 1.55;
+}
+
 .opencodian-settings .opencodian-capability-lab-controls {
   display: flex;
   flex-wrap: wrap;
@@ -8899,11 +8945,43 @@ img.opencodian-model-provider-header-icon {
   align-items: center;
 }
 
+.opencodian-settings .opencodian-capability-lab-probe-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+  padding: 10px 12px;
+  border: 1px solid var(--opencodian-settings-row-border);
+  border-radius: var(--opencodian-settings-radius-row);
+  background: color-mix(in srgb, var(--opencodian-settings-row-bg) 82%, var(--background-primary));
+}
+
+.opencodian-settings .opencodian-capability-lab-probe-field-row,
+.opencodian-settings .opencodian-capability-lab-probe-action-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.opencodian-settings .opencodian-capability-lab-probe-field-row {
+  flex: 1 1 auto;
+}
+
+.opencodian-settings .opencodian-capability-lab-probe-field-row .opencodian-capability-lab-select,
+.opencodian-settings .opencodian-capability-lab-probe-field-row .opencodian-capability-lab-input {
+  width: 100%;
+}
+
+.opencodian-settings .opencodian-capability-lab-probe-action-row {
+  justify-content: flex-end;
+}
+
 .opencodian-settings .opencodian-capability-lab-select,
 .opencodian-settings .opencodian-capability-lab-input {
   box-sizing: border-box;
   min-width: min(100%, 220px);
-  min-height: 30px;
+  min-height: 34px;
   border-radius: var(--opencodian-settings-radius-inline);
   font-size: 12px;
 }
@@ -8913,10 +8991,11 @@ img.opencodian-model-provider-header-icon {
 }
 
 .opencodian-settings .opencodian-capability-lab-button {
-  min-height: 30px;
+  min-height: 34px;
   margin: 0;
   border-radius: var(--opencodian-settings-radius-inline);
   font-size: 12px;
+  font-weight: 650;
 }
 
 .opencodian-settings .opencodian-capability-lab-button-warning {
@@ -8935,6 +9014,41 @@ img.opencodian-model-provider-header-icon {
   border: 1px solid var(--opencodian-settings-row-border);
   border-radius: var(--opencodian-settings-radius-row);
   background: var(--opencodian-settings-row-bg);
+}
+
+.opencodian-settings .opencodian-capability-lab-probe-status-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+  padding: 12px;
+}
+
+.opencodian-settings .opencodian-capability-lab-probe-status-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--opencodian-settings-inline-border);
+  border-radius: var(--opencodian-settings-radius-inline);
+  background: color-mix(in srgb, var(--background-primary) 86%, var(--background-secondary));
+}
+
+.opencodian-settings .opencodian-capability-lab-probe-status-label {
+  color: var(--text-faint);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  line-height: 1.35;
+  text-transform: uppercase;
+}
+
+.opencodian-settings .opencodian-capability-lab-probe-status-value {
+  color: var(--text-normal);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.45;
+  word-break: break-word;
 }
 
 .opencodian-settings .opencodian-capability-lab-output:empty,
@@ -9055,6 +9169,14 @@ img.opencodian-model-provider-header-icon {
 @media (max-width: 720px) {
   .opencodian-settings .opencodian-capability-lab-summary {
     grid-template-columns: 1fr;
+  }
+
+  .opencodian-settings .opencodian-capability-lab-probe-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .opencodian-settings .opencodian-capability-lab-probe-action-row {
+    justify-content: stretch;
   }
 
   .opencodian-settings .opencodian-capability-lab-select,

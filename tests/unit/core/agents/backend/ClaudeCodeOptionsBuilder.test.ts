@@ -116,7 +116,9 @@ describe('ClaudeCodeOptionsBuilder', () => {
 
     expect(options.resume).toBe('sdk-session-1');
   });
+});
 
+describe('ClaudeCodeOptionsBuilder tool restrictions', () => {
   it('omits allowedTools/disallowedTools when empty', () => {
     const options = buildClaudeCodeOptions({
       vaultPath: '/vault/project',
@@ -163,7 +165,9 @@ describe('ClaudeCodeOptionsBuilder', () => {
 
     expect(options.tools).toEqual(['Read', 'Grep']);
   });
+});
 
+describe('ClaudeCodeOptionsBuilder limits, env, and toggles', () => {
   it('omits maxTurns/maxBudgetUsd when null', () => {
     const options = buildClaudeCodeOptions({
       vaultPath: '/vault/project',
@@ -211,6 +215,26 @@ describe('ClaudeCodeOptionsBuilder', () => {
     expect(options.env).toEqual({ CLAUDE_AGENT_SDK_CLIENT_APP: 'opencodian/1.0.0' });
   });
 
+  it('defensively copies settings.env so caller mutation does not leak into options snapshot', () => {
+    const env: Record<string, string> = { KEY_A: 'value_a', KEY_B: 'value_b' };
+    const settings = {
+      ...getDefaultClaudeCodeBackendSettings(),
+      env,
+    };
+    const options = buildClaudeCodeOptions({
+      vaultPath: '/vault/project',
+      settings,
+    });
+
+    expect(options.env).toEqual({ KEY_A: 'value_a', KEY_B: 'value_b' });
+
+    env.KEY_A = 'mutated';
+    env.KEY_C = 'injected';
+
+    expect(options.env).toEqual({ KEY_A: 'value_a', KEY_B: 'value_b' });
+    expect(options.env).not.toBe(env);
+  });
+
   it('passes verified Claude Code SDK capability toggles only when enabled', () => {
     const defaultOptions = buildClaudeCodeOptions({
       vaultPath: '/vault/project',
@@ -236,7 +260,6 @@ describe('ClaudeCodeOptionsBuilder', () => {
     expect(enabledOptions.forwardSubagentText).toBe(true);
     expect(enabledOptions.agentProgressSummaries).toBe(true);
   });
-
 });
 
 describe('ClaudeCodeOptionsBuilder runtime injections', () => {
@@ -339,5 +362,100 @@ describe('ClaudeCodeOptionsBuilder runtime injections', () => {
     });
 
     expect(options.fallbackModel).toBe('claude-sonnet-4-5');
+  });
+});
+
+describe('ClaudeCodeOptionsBuilder sandbox', () => {
+  it('omits sandbox when all fields are false (default)', () => {
+    const options = buildClaudeCodeOptions({
+      vaultPath: '/vault/project',
+      settings: getDefaultClaudeCodeBackendSettings(),
+    });
+
+    expect(options).not.toHaveProperty('sandbox');
+  });
+
+  it('passes sandbox to SDK when enabled is true', () => {
+    const settings = {
+      ...getDefaultClaudeCodeBackendSettings(),
+      sandbox: { enabled: true, failIfUnavailable: false, autoAllowBashIfSandboxed: false },
+    };
+    const options = buildClaudeCodeOptions({
+      vaultPath: '/vault/project',
+      settings,
+    });
+
+    expect(options.sandbox).toEqual({ enabled: true });
+  });
+
+  it('passes all three sandbox fields when all are true', () => {
+    const settings = {
+      ...getDefaultClaudeCodeBackendSettings(),
+      sandbox: { enabled: true, failIfUnavailable: true, autoAllowBashIfSandboxed: true },
+    };
+    const options = buildClaudeCodeOptions({
+      vaultPath: '/vault/project',
+      settings,
+    });
+
+    expect(options.sandbox).toEqual({
+      enabled: true,
+      failIfUnavailable: true,
+      autoAllowBashIfSandboxed: true,
+    });
+  });
+
+  it('does not pass sandbox when enabled is false even if other fields are true', () => {
+    const settings = {
+      ...getDefaultClaudeCodeBackendSettings(),
+      sandbox: { enabled: false, failIfUnavailable: true, autoAllowBashIfSandboxed: true },
+    };
+    const options = buildClaudeCodeOptions({
+      vaultPath: '/vault/project',
+      settings,
+    });
+
+    expect(options).not.toHaveProperty('sandbox');
+  });
+});
+
+describe('ClaudeCodeOptionsBuilder title', () => {
+  it('omits title when not provided', () => {
+    const options = buildClaudeCodeOptions({
+      vaultPath: '/vault/project',
+      settings: getDefaultClaudeCodeBackendSettings(),
+    });
+
+    expect(options).not.toHaveProperty('title');
+  });
+
+  it('passes title to SDK when provided', () => {
+    const options = buildClaudeCodeOptions({
+      vaultPath: '/vault/project',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      title: 'My Custom Session Title',
+    });
+
+    expect(options.title).toBe('My Custom Session Title');
+  });
+
+  it('omits title when empty string', () => {
+    const options = buildClaudeCodeOptions({
+      vaultPath: '/vault/project',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      title: '',
+    });
+
+    expect(options).not.toHaveProperty('title');
+  });
+
+  it('omits title when whitespace-only string', () => {
+    const options = buildClaudeCodeOptions({
+      vaultPath: '/vault/project',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      title: '   ',
+    });
+
+    expect(options).not.toHaveProperty('title');
   });
 });

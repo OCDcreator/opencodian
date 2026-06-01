@@ -20,6 +20,17 @@
 - `.opencodian-capability-lab-chip-pass`, `.opencodian-capability-lab-chip-readback`, `.opencodian-capability-lab-chip-untested`, `.opencodian-capability-lab-chip-fail`, `.opencodian-capability-lab-chip-wiring`, `.opencodian-capability-lab-chip-boundary`: 能力矩阵 runtime proof 状态芯片。`pass` 为 behavior verified（绿色），`readback` 为 runtime-readback verified（蓝色 info），`untested` 为未测试（琥珀色），`wiring` 和 `boundary` 为仅接线/边界触发（琥珀色），`fail` 为失败（红色）。`wiring` 与 `fail` 视觉上必须区分：前者是 warning 级别（SDK options 已接受，行为未验证），后者是 error 级别（runtime 验证尝试后失败）。`readback` 与 `pass` 也必须区分：前者是 info 级别（选项被构建并传入 SDK），后者是 success 级别（完整行为验证通过）
 - `.opencodian-capability-lab-proof-marker`, `.opencodian-capability-lab-proof-pass`, `.opencodian-capability-lab-proof-readback`, `.opencodian-capability-lab-proof-fail`, `.opencodian-capability-lab-proof-untested`, `.opencodian-capability-lab-proof-wiring`, `.opencodian-capability-lab-proof-boundary`: 运行时证明 inline marker。`pass` 为 behavior verified（绿色），`readback` 为 runtime-readback verified（蓝色 info，标签显示 "✓ Readback verified — not behavior verified"），`fail` 为失败（红色），`untested` 为未测试（琥珀色），`wiring` 为仅验证选项被 SDK 接受但未验证真实行为（琥珀色，标签显示 "Wiring only — not behavior verified"），`boundary` 为工具边界被触发但诊断路径缺少 UI 上下文（琥珀色，标签显示 "Boundary hit — UI context missing"）。
 - `.opencodian-capability-lab-json-preview`: JSONL / runtime proof 预览区，使用 monospace、内部滚动和自动换行。
+- `data-section-block` 属性选择器（`matrix`、`history`、`subagents`、`rewind`、`structured`、`fork`、`resume`、`session-detail`、`backend-routing`、`discovery`）: 各诊断 section block 的共享容器布局（flex column + section border/radius/bg）。`fork`、`resume`、`session-detail`、`backend-routing` 为后加的 section block，与 `matrix`、`history` 等共用同一套布局规则。
+- `.opencodian-capability-lab-probe-header`: 单个 probe section 的标题区容器，flex column。
+- `.opencodian-capability-lab-probe-title-row`: probe 标题行，flex wrap，space-between 布局标题和 badge。
+- `.opencodian-capability-lab-probe-badge`: probe 标题旁的 inline-flex badge（状态标记等）。
+- `.opencodian-capability-lab-probe-copy`: probe 说明文字容器，max-width 78ch 控制行宽。
+- `.opencodian-capability-lab-probe-toolbar`: probe 操作栏，grid 布局（字段区 + 操作区），带 row-bg 和 border。窄屏时退化为单列。
+- `.opencodian-capability-lab-probe-field-row`, `.opencodian-capability-lab-probe-action-row`: toolbar 内的输入行和操作按钮行。field-row 占满剩余宽度，action-row 右对齐。窄屏时 action-row 改为 stretch。
+- `.opencodian-capability-lab-probe-status-grid`: probe 运行结果的多列状态网格，auto-fit minmax(180px, 1fr)。
+- `.opencodian-capability-lab-probe-status-item`, `.opencodian-capability-lab-probe-status-label`, `.opencodian-capability-lab-probe-status-value`: 状态网格内的单项容器、标签和值。
+- `.opencodian-capability-lab-select`, `.opencodian-capability-lab-input`: 共享的 select/input 基线样式，min-height 34px。
+- `.opencodian-capability-lab-button`, `.opencodian-capability-lab-button-warning`: 操作按钮基线（min-height 34px, font-weight 650）及 warning 变体。
 
 ## 设计约束
 
@@ -28,6 +39,7 @@
 - `Diagnostic`、`Hidden`、`Untested` 等状态不能被弱化成完成态；未验证能力不得通过样式看起来像稳定功能。
 - sessionStore import / mirror proof 虽然是诊断性写入，但视觉上仍必须强调它们是 isolated diagnostic actions，而不是 stable restore/import UI。
 - 横向滚动只用于矩阵和发现表，其他控件在窄屏换行或占满宽度。
+- probe toolbar 和 probe status grid 在 720px 以下窄屏退化为单列，按钮和 select 占满宽度。
 
 ## 修改注意点
 

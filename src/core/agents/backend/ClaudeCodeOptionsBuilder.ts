@@ -61,6 +61,8 @@ export interface ClaudeCodeOptionsBuilderInput {
   fallbackModel?: string;
   /** Diagnostic-only model override. Takes precedence over settings.model. */
   model?: string;
+  /** Custom session title. Passed to SDK options.title; only effective on first query (not resume). */
+  title?: string;
 }
 
 export interface ClaudeCodeSdkOptionsShape {
@@ -101,6 +103,13 @@ export interface ClaudeCodeSdkOptionsShape {
   includeHookEvents?: boolean;
   forwardSubagentText?: boolean;
   agentProgressSummaries?: boolean;
+  sandbox?: {
+    enabled: boolean;
+    failIfUnavailable?: boolean;
+    autoAllowBashIfSandboxed?: boolean;
+  };
+  /** Custom session title. SDK skips automatic title generation when provided. */
+  title?: string;
 }
 
 function cloneSettingSources(sources: readonly ClaudeCodeSettingSource[]): ClaudeCodeSettingSource[] {
@@ -224,7 +233,7 @@ export function buildClaudeCodeOptions(
     options.maxBudgetUsd = input.settings.maxBudgetUsd;
   }
   if (Object.keys(input.settings.env).length > 0) {
-    options.env = input.settings.env;
+    options.env = { ...input.settings.env };
   }
   const shouldEnableFileCheckpointing = input.enableFileCheckpointing === true
     || (input.enableFileCheckpointing !== false && input.settings.enableFileCheckpointing);
@@ -239,6 +248,19 @@ export function buildClaudeCodeOptions(
   }
   if (input.agentProgressSummaries || input.settings.agentProgressSummaries) {
     options.agentProgressSummaries = true;
+  }
+  if (input.settings.sandbox.enabled) {
+    const sandbox: NonNullable<ClaudeCodeSdkOptionsShape['sandbox']> = { enabled: true };
+    if (input.settings.sandbox.failIfUnavailable) {
+      sandbox.failIfUnavailable = true;
+    }
+    if (input.settings.sandbox.autoAllowBashIfSandboxed) {
+      sandbox.autoAllowBashIfSandboxed = true;
+    }
+    options.sandbox = sandbox;
+  }
+  if (input.title && input.title.trim()) {
+    options.title = input.title.trim();
   }
 
   return options;
