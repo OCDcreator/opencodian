@@ -1,8 +1,9 @@
-import type {
-  ClaudeCodeBackendSettings,
-  ClaudeCodeEffort,
-  ClaudeCodePermissionMode,
-  ClaudeCodeSettingSource,
+import {
+  type ClaudeCodeBackendSettings,
+  type ClaudeCodeEffort,
+  type ClaudeCodePermissionMode,
+  type ClaudeCodeSettingSource,
+  normalizeClaudeCodeToolAliases,
 } from '../../types';
 
 /* eslint-disable complexity -- This module is the single audited mapping boundary for Claude Code SDK options. */
@@ -51,6 +52,7 @@ export interface ClaudeCodeOptionsBuilderInput {
   includeHookEvents?: boolean;
   forwardSubagentText?: boolean;
   agentProgressSummaries?: boolean;
+  promptSuggestions?: boolean;
   plugins?: unknown[];
   skills?: string[] | 'all';
   agent?: string;
@@ -98,11 +100,14 @@ export interface ClaudeCodeSdkOptionsShape {
   disallowedTools?: string[];
   maxTurns?: number;
   maxBudgetUsd?: number;
+  taskBudget?: { total: number };
   env?: Record<string, string | undefined>;
   enableFileCheckpointing?: boolean;
   includeHookEvents?: boolean;
   forwardSubagentText?: boolean;
   agentProgressSummaries?: boolean;
+  /** Ask the SDK to emit predicted next-user-prompt suggestions after each turn. */
+  promptSuggestions?: boolean;
   sandbox?: {
     enabled: boolean;
     failIfUnavailable?: boolean;
@@ -110,6 +115,12 @@ export interface ClaudeCodeSdkOptionsShape {
   };
   /** Custom session title. SDK skips automatic title generation when provided. */
   title?: string;
+  /** Custom instructions injected into the plan-mode system reminder when permissionMode is `plan`. */
+  planModeInstructions?: string;
+  /** Tool name aliases passed as the SDK `toolAliases` option. Maps model-emitted tool names to canonical tool names before resolution. */
+  toolAliases?: Record<string, string>;
+  /** Ask the SDK to emit CLI debug logs during query execution. */
+  debug?: boolean;
 }
 
 function cloneSettingSources(sources: readonly ClaudeCodeSettingSource[]): ClaudeCodeSettingSource[] {
@@ -232,6 +243,9 @@ export function buildClaudeCodeOptions(
   if (input.settings.maxBudgetUsd !== null) {
     options.maxBudgetUsd = input.settings.maxBudgetUsd;
   }
+  if (input.settings.taskBudget !== null) {
+    options.taskBudget = { total: input.settings.taskBudget };
+  }
   if (Object.keys(input.settings.env).length > 0) {
     options.env = { ...input.settings.env };
   }
@@ -249,6 +263,9 @@ export function buildClaudeCodeOptions(
   if (input.agentProgressSummaries || input.settings.agentProgressSummaries) {
     options.agentProgressSummaries = true;
   }
+  if (input.promptSuggestions || input.settings.promptSuggestions) {
+    options.promptSuggestions = true;
+  }
   if (input.settings.sandbox.enabled) {
     const sandbox: NonNullable<ClaudeCodeSdkOptionsShape['sandbox']> = { enabled: true };
     if (input.settings.sandbox.failIfUnavailable) {
@@ -261,6 +278,17 @@ export function buildClaudeCodeOptions(
   }
   if (input.title && input.title.trim()) {
     options.title = input.title.trim();
+  }
+  const planModeInstructions = trimOptionalString(input.settings.planModeInstructions);
+  if (planModeInstructions) {
+    options.planModeInstructions = planModeInstructions;
+  }
+  const toolAliases = normalizeClaudeCodeToolAliases(input.settings.toolAliases);
+  if (Object.keys(toolAliases).length > 0) {
+    options.toolAliases = { ...toolAliases };
+  }
+  if (input.settings.debug === true) {
+    options.debug = true;
   }
 
   return options;

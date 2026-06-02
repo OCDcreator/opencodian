@@ -231,6 +231,7 @@ export class SettingsClaudeCodeSection {
     this.renderExecutableSetting(containerEl);
     this.renderEnvironmentHint(containerEl);
     this.renderDiagnostics(containerEl);
+    this.renderDebugSetting(containerEl);
     this.renderEnvProofStatusNotice(containerEl);
     this.renderFileCheckpointBoundaryNotice(containerEl);
     this.renderEnvironmentVariablesSetting(containerEl);
@@ -279,6 +280,32 @@ export class SettingsClaudeCodeSection {
             resultEl.setText(this.formatDiagnostics(resolution));
           });
       });
+  }
+
+  private renderDebugSetting(containerEl: HTMLElement): void {
+    const boundaryEl = containerEl.createDiv({
+      cls: 'opencodian-settings-inline-notice',
+      attr: { 'data-claude-code-debug-boundary': 'true' },
+    });
+    boundaryEl.createSpan({ text: t('settings.claudeCode.debug.boundaryNotice') });
+
+    new Setting(containerEl)
+      .setName(t('settings.claudeCode.debug.name'))
+      .setDesc(t('settings.claudeCode.debug.desc'))
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.settings.debug)
+          .onChange(async (value) => {
+            this.settings.debug = value;
+            await this.saveSettings();
+          });
+      });
+
+    const lifecycleEl = containerEl.createDiv({
+      cls: 'opencodian-settings-inline-notice',
+      attr: { 'data-claude-code-debug-lifecycle': 'true' },
+    });
+    lifecycleEl.createSpan({ text: t('settings.claudeCode.debug.lifecycleNotice') });
   }
 
   private renderRuntimeEcosystemSummary(containerEl: HTMLElement): void {
@@ -889,6 +916,8 @@ export class SettingsClaudeCodeSection {
     this.renderLimitsBoundaryNotice(containerEl);
     this.renderMaxTurnsSetting(containerEl);
     this.renderMaxBudgetSetting(containerEl);
+    this.renderTaskBudgetSetting(containerEl);
+    this.renderPromptSuggestionsSetting(containerEl);
   }
 
   private renderModelSetting(containerEl: HTMLElement): unknown {
@@ -1013,6 +1042,7 @@ export class SettingsClaudeCodeSection {
 
   private renderPermissionsTab(containerEl: HTMLElement): void {
     this.renderPermissionModeSetting(containerEl);
+    this.renderPlanModeInstructionsSetting(containerEl);
     this.renderSandboxSettings(containerEl);
   }
 
@@ -1032,6 +1062,33 @@ export class SettingsClaudeCodeSection {
             await this.saveSettings();
           });
       });
+  }
+
+  private renderPlanModeInstructionsSetting(containerEl: HTMLElement): void {
+    const boundaryEl = containerEl.createDiv({
+      cls: 'opencodian-settings-inline-notice',
+      attr: { 'data-claude-code-plan-mode-instructions-boundary': 'true' },
+    });
+    boundaryEl.createSpan({ text: t('settings.claudeCode.planModeInstructions.boundaryNotice') });
+
+    new Setting(containerEl)
+      .setName(t('settings.claudeCode.planModeInstructions.name'))
+      .setDesc(t('settings.claudeCode.planModeInstructions.desc'))
+      .addTextArea((textArea) => {
+        textArea
+          .setPlaceholder(t('settings.claudeCode.planModeInstructions.placeholder'))
+          .setValue(this.settings.planModeInstructions)
+          .onChange(async (value) => {
+            this.settings.planModeInstructions = value.trim();
+            await this.saveSettings();
+          });
+      });
+
+    const lifecycleEl = containerEl.createDiv({
+      cls: 'opencodian-settings-inline-notice',
+      attr: { 'data-claude-code-plan-mode-instructions-lifecycle': 'true' },
+    });
+    lifecycleEl.createSpan({ text: t('settings.claudeCode.planModeInstructions.lifecycleNotice') });
   }
 
   // ─── Sandbox settings (Permissions tab) ─────────────────────────
@@ -1399,6 +1456,7 @@ export class SettingsClaudeCodeSection {
     this.renderDisallowedToolsSetting(containerEl);
     this.renderRestrictedBuiltinToolsSetting(containerEl);
     this.renderRestrictedBuiltinToolsProofStatusNotice(containerEl);
+    this.renderToolAliasesSetting(containerEl);
   }
 
   private renderMcpRuntimeControls(containerEl: HTMLElement): void {
@@ -1588,6 +1646,41 @@ export class SettingsClaudeCodeSection {
     noticeEl.createSpan({ text: t('settings.claudeCode.proofStatus.restrictedBuiltinTools') });
   }
 
+  private renderToolAliasesSetting(containerEl: HTMLElement): void {
+    new Setting(containerEl)
+      .setName(t('settings.claudeCode.toolAliases.name'))
+      .setDesc(t('settings.claudeCode.toolAliases.desc'))
+      .addTextArea((textArea) => {
+        const aliases = this.settings.toolAliases ?? {};
+        const value = Object.entries(aliases)
+          .map(([key, val]) => `${key}=${val}`)
+          .join('\n');
+        textArea
+          .setPlaceholder(t('settings.claudeCode.toolAliases.placeholder'))
+          .setValue(value)
+          .onChange(async (raw) => {
+            this.settings.toolAliases = this.parseToolAliases(raw);
+            await this.saveSettings();
+          });
+      });
+  }
+
+  private parseToolAliases(raw: string): Record<string, string> {
+    const result: Record<string, string> = {};
+    for (const line of raw.split('\n')) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      const eq = trimmed.indexOf('=');
+      if (eq <= 0 || eq >= trimmed.length - 1) continue;
+      const key = trimmed.slice(0, eq).trim();
+      const val = trimmed.slice(eq + 1).trim();
+      if (key && val) {
+        result[key] = val;
+      }
+    }
+    return result;
+  }
+
   private renderMaxTurnsSetting(containerEl: HTMLElement): void {
     new Setting(containerEl)
       .setName(t('settings.claudeCode.maxTurns.name'))
@@ -1613,6 +1706,35 @@ export class SettingsClaudeCodeSection {
           .setValue(this.settings.maxBudgetUsd === null ? '' : String(this.settings.maxBudgetUsd))
           .onChange(async (value) => {
             this.settings.maxBudgetUsd = this.parseNullablePositiveNumber(value);
+            await this.saveSettings();
+          });
+      });
+  }
+
+  private renderTaskBudgetSetting(containerEl: HTMLElement): void {
+    new Setting(containerEl)
+      .setName(t('settings.claudeCode.taskBudget.name'))
+      .setDesc(t('settings.claudeCode.taskBudget.desc'))
+      .addText((text) => {
+        text
+          .setPlaceholder(t('settings.claudeCode.taskBudget.placeholder'))
+          .setValue(this.settings.taskBudget === null ? '' : String(this.settings.taskBudget))
+          .onChange(async (value) => {
+            this.settings.taskBudget = this.parseNullablePositiveInteger(value);
+            await this.saveSettings();
+          });
+      });
+  }
+
+  private renderPromptSuggestionsSetting(containerEl: HTMLElement): void {
+    new Setting(containerEl)
+      .setName(t('settings.claudeCode.promptSuggestions.name'))
+      .setDesc(t('settings.claudeCode.promptSuggestions.stableDesc'))
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.settings.promptSuggestions)
+          .onChange(async (value) => {
+            this.settings.promptSuggestions = value;
             await this.saveSettings();
           });
       });

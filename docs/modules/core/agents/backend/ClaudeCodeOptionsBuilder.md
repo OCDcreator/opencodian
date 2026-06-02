@@ -21,6 +21,9 @@
 - 只在用户显式开启或 runtime 明确注入时写入 `enableFileCheckpointing`、`includeHookEvents`、`forwardSubagentText`、`agentProgressSummaries`；这些是 SDK 诊断/后续能力 foundation，不等同于稳定 JSONL browser、hook authoring 或 rewind UI。`forwardSubagentText` 和 `agentProgressSummaries` 现在支持 runtime-only 覆盖，让 Capability Lab 的 subagent stream proof 可以在不污染稳定设置的情况下强制打开子代理事件流
 - 只在 `sandbox.enabled === true` 时写入 `sandbox` 到 SDK options，仅包含 `enabled`、`failIfUnavailable`、`autoAllowBashIfSandboxed` 三个布尔字段；network/filesystem/TLS/proxy/Mach lookup 等子策略不在 stable settings surface 暴露。分类为 readback：option wiring 已证明，OS 级 sandbox 强制执行无法从插件层独立验证
 - 只在 `title` 非空且非 resume 时写入 `title` 到 SDK options；SDK 文档说明 title 仅在首次 query 生效，resume 时无效果。分类为 readback：option wiring 已证明，CLI subprocess 是否接受该 title 不从插件层独立验证
+- 只在 `planModeInstructions` 非空且 trimmed 后非空时写入 `planModeInstructions` 到 SDK options；仅当 `permissionMode` 为 `plan` 时由 SDK 消费，替换默认计划模式工作流内容；SDK 仍强制附加只读前言与 ExitPlanMode 协议尾部。分类为 readback：option wiring 已证明，实际计划模式行为无法从插件层独立验证
+- 只在 `toolAliases` 非空时写入 `toolAliases` 到 SDK options；使用 `{ ...toolAliases }` 防御性复制，与 `env` 保持一致；将模型发出的工具名映射到规范工具名，在解析前生效。分类为 readback：option wiring 已证明，实际别名解析行为无法从插件层独立验证
+- 只在 `settings.debug === true` 时写入 `debug` 到 SDK options；分类为 readback：option wiring 已证明，实际 CLI debug log 输出无法从插件层独立验证
 - 只在用户显式配置时写入 `maxTurns` 和 `maxBudgetUsd`；null 时省略，保持 SDK 默认无限行为
 - 只在 adapter 已捕获真实 Claude SDK session id 时写入 `resume`，让后续 per-send `query()` 续接同一个 Claude session
 - 只在 runtime 提供时写入 `abortController` 和 `spawnClaudeCodeProcess`，用于 Obsidian/Electron 下的流取消和进程启动兼容层
@@ -40,3 +43,5 @@
 - `enableFileCheckpointing` 支持 runtime-only 显式关闭。Capability Lab 的 sessionStore probe 会用这个 override 把 checkpoint tracing 关掉，避免触发官方 SDK 对 `sessionStore + enableFileCheckpointing` 组合的不支持错误。
 - `hooks`、`sessionStore`、`outputFormat`、`plugins`、`skills`、`agent` 和 `agents` 是 runtime-injected foundation，只能由后续已验证 runtime owner 传入；不要把它们直接保存到 `backendSettings.claudeCode` 或稳定 settings 控件。
 - `abortController` / `spawnClaudeCodeProcess` 是 runtime 注入，不应保存进用户设置。
+
+- `promptSuggestions?: boolean` 已加入 Input 和 SDK Shape，wiring 逻辑与 `agentProgressSummaries` 一致（input 或 settings 任一为 true 即传入）。

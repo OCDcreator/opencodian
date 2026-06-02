@@ -93,6 +93,42 @@ describe('ClaudeCodeBackendSettings field truth-audit', () => {
     expect(jsdoc.toLowerCase()).toContain('not filesystem');
   });
 
+  // --- taskBudget: readback (SDK @alpha option wiring proven, API-side behavior not independently verified) ---
+
+  it('taskBudget JSDoc reflects readback boundary and alpha status (not @untested)', () => {
+    const jsdoc = getFieldJsdoc(source, /^\s+taskBudget: number \| null/);
+    expect(jsdoc).not.toContain('@untested');
+    expect(jsdoc).toContain('Readback');
+    expect(jsdoc.toLowerCase()).toContain('alpha');
+  });
+
+  // --- planModeInstructions: readback (SDK option wiring proven; plan-mode behavior not independently verified) ---
+
+  it('planModeInstructions JSDoc reflects readback boundary and plan-mode scope (not @untested)', () => {
+    const jsdoc = getFieldJsdoc(source, /^\s+planModeInstructions: string/);
+    expect(jsdoc).not.toContain('@untested');
+    expect(jsdoc).toContain('Readback');
+    expect(jsdoc.toLowerCase()).toContain('plan');
+  });
+
+  // --- toolAliases: readback (SDK option wiring proven; alias resolution not independently verified) ---
+
+  it('toolAliases JSDoc reflects readback boundary (not @untested)', () => {
+    const jsdoc = getFieldJsdoc(source, /^\s+toolAliases: Record<string, string>/);
+    expect(jsdoc).not.toContain('@untested');
+    expect(jsdoc).toContain('Readback');
+    expect(jsdoc.toLowerCase()).toContain('alias');
+  });
+
+  // --- debug: readback (SDK option wiring proven; CLI debug log emission not independently verified) ---
+
+  it('debug JSDoc reflects readback boundary (not @untested)', () => {
+    const jsdoc = getFieldJsdoc(source, /^\s+debug: boolean/);
+    expect(jsdoc).not.toContain('@untested');
+    expect(jsdoc).toContain('Readback');
+    expect(jsdoc.toLowerCase()).toContain('cli');
+  });
+
   // --- settings.md: no stale @untested grouping for these fields ---
 
   it('settings.md does not group tool/env fields as @untested', () => {

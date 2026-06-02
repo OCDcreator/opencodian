@@ -39,6 +39,7 @@ function createMockPlugin(adapter: unknown = null, activeKind = adapter ? 'claud
     env: {},
     fallbackModel: '',
     sandbox: { enabled: false, failIfUnavailable: false, autoAllowBashIfSandboxed: false },
+    debug: false,
   };
   return {
     agentServiceRegistry: registry,
@@ -982,7 +983,7 @@ describe('SettingsCapabilityLabSection', () => {
 
     const table = containerEl.querySelector('.opencodian-capability-lab-matrix');
     const rows = table!.querySelectorAll('tbody tr');
-    expect(rows.length).toBe(29);
+    expect(rows.length).toBe(34);
   });
 
   it('renders status chips with correct active/inactive classes', () => {
@@ -1018,7 +1019,7 @@ describe('SettingsCapabilityLabSection', () => {
     expect(surfaces).toContain('chat');
   });
 
-  it('audits capability matrix for honest classifications across all 29 rows', () => {
+  it('audits capability matrix for honest classifications across all 33 rows', () => {
     const containerEl = document.createElement('div');
     const section = new SettingsCapabilityLabSection({
       plugin: createMockPlugin(),
@@ -1063,6 +1064,11 @@ describe('SettingsCapabilityLabSection', () => {
       'Warm Startup': { runtimeProof: 'readback', userSurface: 'diagnostic' },
       'Sandbox': { runtimeProof: 'readback', userSurface: 'settings' },
       'Session Title': { runtimeProof: 'readback', userSurface: 'diagnostic' },
+      'Prompt Suggestions': { runtimeProof: 'readback', userSurface: 'chat' },
+      'Task Budget': { runtimeProof: 'readback', userSurface: 'settings' },
+      'Plan Mode Instructions': { runtimeProof: 'readback', userSurface: 'settings' },
+      'Tool Aliases': { runtimeProof: 'readback', userSurface: 'settings' },
+      'Debug': { runtimeProof: 'readback', userSurface: 'settings' },
     };
 
     for (const [name, expectedValues] of Object.entries(expected)) {
@@ -1097,7 +1103,7 @@ describe('SettingsCapabilityLabSection', () => {
     expect(verifiedCapabilities.length).toBe(23);
 
     // Honesty rule: readback capabilities must not be in the verified count.
-    // Sandbox is readback (option wiring only, not behavior-verified) so it stays out.
+    // Debug is readback (option wiring only, not behavior-verified) so it stays out.
     const readbackRows = rows.filter((row) => {
       const text = row.textContent ?? '';
       return text.includes('Readback verified');
@@ -1107,9 +1113,9 @@ describe('SettingsCapabilityLabSection', () => {
       return firstCell?.textContent ?? '';
     });
     expect(readbackCapabilities).toEqual(
-      expect.arrayContaining(['File Checkpoint / Rewind', 'Allowed Tools', 'Fallback Model', 'Warm Startup', 'Sandbox', 'Session Title']),
+      expect.arrayContaining(['File Checkpoint / Rewind', 'Allowed Tools', 'Fallback Model', 'Warm Startup', 'Sandbox', 'Session Title', 'Prompt Suggestions', 'Task Budget', 'Plan Mode Instructions', 'Tool Aliases', 'Debug']),
     );
-    expect(readbackCapabilities.length).toBe(6);
+    expect(readbackCapabilities.length).toBe(11);
 
     // Honesty rule: hidden capabilities must not have a settings or diagnostic surface chip.
     const hiddenRows = rows.filter((row) => (

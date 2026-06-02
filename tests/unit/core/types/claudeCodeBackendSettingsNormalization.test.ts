@@ -114,6 +114,7 @@ describe('normalizeClaudeCodeBackendSettings (new fields)', () => {
     expect(defaults.restrictedBuiltinTools).toEqual([]);
     expect(defaults.maxTurns).toBeNull();
     expect(defaults.maxBudgetUsd).toBeNull();
+    expect(defaults.taskBudget).toBeNull();
     expect(defaults.env).toEqual({});
     expect(defaults.debugChannels).toEqual({
       runtime: true,
@@ -132,6 +133,7 @@ describe('normalizeClaudeCodeBackendSettings (new fields)', () => {
     expect(result.restrictedBuiltinTools).toEqual([]);
     expect(result.maxTurns).toBeNull();
     expect(result.maxBudgetUsd).toBeNull();
+    expect(result.taskBudget).toBeNull();
     expect(result.env).toEqual({});
     expect(result.debugChannels).toEqual(getDefaultClaudeCodeBackendSettings().debugChannels);
   });
@@ -143,6 +145,7 @@ describe('normalizeClaudeCodeBackendSettings (new fields)', () => {
       restrictedBuiltinTools: ['Read', ' Grep ', 'Read'],
       maxTurns: 100,
       maxBudgetUsd: 10.5,
+      taskBudget: 50000,
       env: { API_KEY: 'test', DEBUG: 'true' },
       debugChannels: {
         runtime: false,
@@ -158,6 +161,7 @@ describe('normalizeClaudeCodeBackendSettings (new fields)', () => {
     expect(result.restrictedBuiltinTools).toEqual(['Read', 'Grep']);
     expect(result.maxTurns).toBe(100);
     expect(result.maxBudgetUsd).toBe(10.5);
+    expect(result.taskBudget).toBe(50000);
     expect(result.env).toEqual({ API_KEY: 'test', DEBUG: 'true' });
     expect(result.debugChannels).toEqual({
       runtime: false,
@@ -176,6 +180,7 @@ describe('normalizeClaudeCodeBackendSettings (new fields)', () => {
       restrictedBuiltinTools: 'bad',
       maxTurns: -5,
       maxBudgetUsd: 'free',
+      taskBudget: 'unlimited',
       env: 'nope',
       debugChannels: {
         runtime: 'yes',
@@ -187,6 +192,7 @@ describe('normalizeClaudeCodeBackendSettings (new fields)', () => {
     expect(result.disallowedTools).toEqual([]);
     expect(result.maxTurns).toBeNull();
     expect(result.maxBudgetUsd).toBeNull();
+    expect(result.taskBudget).toBeNull();
     expect(result.env).toEqual({});
     expect(result.debugChannels).toEqual({
       runtime: true,
@@ -252,6 +258,28 @@ describe('normalizeClaudeCodeSandboxSettings', () => {
   });
 });
 
+describe('normalizeClaudeCodeBackendSettings promptSuggestions', () => {
+  it('defaults promptSuggestions to false', () => {
+    const defaults = getDefaultClaudeCodeBackendSettings();
+    expect(defaults.promptSuggestions).toBe(false);
+  });
+
+  it('normalizes promptSuggestions true', () => {
+    const result = normalizeClaudeCodeBackendSettings({ promptSuggestions: true });
+    expect(result.promptSuggestions).toBe(true);
+  });
+
+  it('coerces non-boolean promptSuggestions to false', () => {
+    const result = normalizeClaudeCodeBackendSettings({ promptSuggestions: 'yes' });
+    expect(result.promptSuggestions).toBe(false);
+  });
+
+  it('preserves promptSuggestions false explicitly', () => {
+    const result = normalizeClaudeCodeBackendSettings({ promptSuggestions: false });
+    expect(result.promptSuggestions).toBe(false);
+  });
+});
+
 describe('normalizeClaudeCodeDebugChannelSettings', () => {
   it('defines the product debug workbench channel ids in stable order', () => {
     expect(CLAUDE_CODE_DEBUG_CHANNEL_IDS).toEqual([
@@ -288,5 +316,86 @@ describe('normalizeClaudeCodeDebugChannelSettings', () => {
       mcp: true,
       experimental: false,
     })).toEqual(['runtime', 'stream', 'mcp']);
+  });
+});
+
+describe('normalizeClaudeCodeBackendSettings planModeInstructions', () => {
+  it('defaults planModeInstructions to empty string', () => {
+    const defaults = getDefaultClaudeCodeBackendSettings();
+    expect(defaults.planModeInstructions).toBe('');
+  });
+
+  it('normalizes planModeInstructions from valid string', () => {
+    const result = normalizeClaudeCodeBackendSettings({ planModeInstructions: 'Use TDD.' });
+    expect(result.planModeInstructions).toBe('Use TDD.');
+  });
+
+  it('trims planModeInstructions whitespace', () => {
+    const result = normalizeClaudeCodeBackendSettings({ planModeInstructions: '  Use TDD.  ' });
+    expect(result.planModeInstructions).toBe('Use TDD.');
+  });
+
+  it('normalizes whitespace-only planModeInstructions to empty string', () => {
+    const result = normalizeClaudeCodeBackendSettings({ planModeInstructions: '   \t\n  ' });
+    expect(result.planModeInstructions).toBe('');
+  });
+
+  it('normalizes non-string planModeInstructions to empty string', () => {
+    const result = normalizeClaudeCodeBackendSettings({ planModeInstructions: 42 as unknown as string });
+    expect(result.planModeInstructions).toBe('');
+  });
+});
+
+describe('normalizeClaudeCodeBackendSettings debug', () => {
+  it('defaults debug to false', () => {
+    const defaults = getDefaultClaudeCodeBackendSettings();
+    expect(defaults.debug).toBe(false);
+  });
+
+  it('normalizes debug true', () => {
+    const result = normalizeClaudeCodeBackendSettings({ debug: true });
+    expect(result.debug).toBe(true);
+  });
+
+  it('coerces non-boolean debug to false', () => {
+    const result = normalizeClaudeCodeBackendSettings({ debug: 'yes' as unknown as boolean });
+    expect(result.debug).toBe(false);
+  });
+
+  it('preserves debug false explicitly', () => {
+    const result = normalizeClaudeCodeBackendSettings({ debug: false });
+    expect(result.debug).toBe(false);
+  });
+});
+
+describe('normalizeClaudeCodeBackendSettings toolAliases', () => {
+  it('defaults toolAliases to empty object', () => {
+    const defaults = getDefaultClaudeCodeBackendSettings();
+    expect(defaults.toolAliases).toEqual({});
+  });
+
+  it('normalizes toolAliases from valid object', () => {
+    const result = normalizeClaudeCodeBackendSettings({ toolAliases: { Fetch: 'Read', Search: 'Grep' } });
+    expect(result.toolAliases).toEqual({ Fetch: 'Read', Search: 'Grep' });
+  });
+
+  it('trims toolAliases keys and values', () => {
+    const result = normalizeClaudeCodeBackendSettings({ toolAliases: { ' Fetch ': ' Read ', 'Search': ' Grep ' } });
+    expect(result.toolAliases).toEqual({ Fetch: 'Read', Search: 'Grep' });
+  });
+
+  it('drops non-string values and empty keys', () => {
+    const result = normalizeClaudeCodeBackendSettings({ toolAliases: { Fetch: 'Read', Bad: 42 as unknown as string, '': 'Grep', AlsoBad: '' } });
+    expect(result.toolAliases).toEqual({ Fetch: 'Read' });
+  });
+
+  it('normalizes non-object toolAliases to empty object', () => {
+    const result = normalizeClaudeCodeBackendSettings({ toolAliases: 'not-object' as unknown as Record<string, string> });
+    expect(result.toolAliases).toEqual({});
+  });
+
+  it('normalizes array toolAliases to empty object', () => {
+    const result = normalizeClaudeCodeBackendSettings({ toolAliases: ['Read'] as unknown as Record<string, string> });
+    expect(result.toolAliases).toEqual({});
   });
 });

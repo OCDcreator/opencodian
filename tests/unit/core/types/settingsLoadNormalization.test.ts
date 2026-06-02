@@ -97,11 +97,13 @@ describe('prepareLoadedSettingsBootstrapState backend normalization', () => {
       restrictedBuiltinTools: [],
       maxTurns: null,
       maxBudgetUsd: null,
+      taskBudget: null,
       env: {},
       enableFileCheckpointing: false,
       includeHookEvents: false,
       forwardSubagentText: false,
       agentProgressSummaries: false,
+      promptSuggestions: false,
       debugChannels: {
         runtime: true,
         sessions: true,
@@ -111,6 +113,9 @@ describe('prepareLoadedSettingsBootstrapState backend normalization', () => {
         experimental: false,
       },
       sandbox: { enabled: false, failIfUnavailable: false, autoAllowBashIfSandboxed: false },
+      planModeInstructions: '',
+      toolAliases: {},
+      debug: false,
     });
   });
 

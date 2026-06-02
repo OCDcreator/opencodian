@@ -143,7 +143,19 @@ function mockSettingPrototype(): void {
     (this as Setting & { __settingName?: string }).__settingName = name;
     return this;
   });
-  jest.spyOn(Setting.prototype, 'setDesc').mockImplementation(function setDesc(this: Setting) {
+  jest.spyOn(Setting.prototype, 'setDesc').mockImplementation(function setDesc(
+    this: Setting & { settingEl: HTMLElement },
+    desc: string | DocumentFragment,
+  ) {
+    if (typeof desc === 'string') {
+      let descEl = this.settingEl.querySelector('.setting-item-description');
+      if (!descEl) {
+        descEl = document.createElement('div');
+        descEl.className = 'setting-item-description';
+        this.settingEl.appendChild(descEl);
+      }
+      descEl.textContent = desc;
+    }
     return this;
   });
   jest.spyOn(Setting.prototype, 'setClass').mockImplementation(function setClass(this: Setting) {
@@ -433,6 +445,8 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
 
       expect(findText(t('settings.claudeCode.maxTurns.name'))).toBeDefined();
       expect(findText(t('settings.claudeCode.maxBudgetUsd.name'))).toBeDefined();
+      expect(findText(t('settings.claudeCode.taskBudget.name'))).toBeDefined();
+      expect(containerEl.textContent).toContain(t('settings.claudeCode.taskBudget.desc'));
       expect(containerEl.querySelector('[data-claude-code-limits-boundary="true"]')).toBeTruthy();
       expect(containerEl.textContent).toContain(t('settings.claudeCode.runtimeBoundary.nextQuery'));
       expect(findButton(t('settings.claudeCode.runtimeBoundary.restartButton'))).toBeDefined();
@@ -453,6 +467,37 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       expect(hasMaxTurns).toBe(true);
       expect(hasMaxBudget).toBe(true);
       expect(hasLimitsBoundary).toBeTruthy();
+    });
+
+    it('renders prompt suggestions toggle in model-thinking tab', () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'model-thinking');
+
+      const toggle = toggleRecords.find((r) => r.name === t('settings.claudeCode.promptSuggestions.name'));
+      expect(toggle).toBeDefined();
+      expect(toggle!.control.setValue).toHaveBeenCalledWith(false);
+    });
+
+    it('persists prompt suggestions toggle changes from model-thinking tab', async () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'model-thinking');
+
+      const toggle = toggleRecords.find((r) => r.name === t('settings.claudeCode.promptSuggestions.name'));
+      expect(toggle).toBeDefined();
+      expect(toggle!.onChange).toBeDefined();
+      await toggle!.onChange!(true as never);
+      expect(plugin.settings.backendSettings?.claudeCode?.promptSuggestions).toBe(true);
+      expect(plugin.saveSettings).toHaveBeenCalled();
     });
 
     it('renders fallback model boundary notice in model-thinking tab', () => {
@@ -1583,6 +1628,39 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       expect(plugin.settings.backendSettings.claudeCode.disallowedTools).toEqual(['Bash', 'Glob']);
     });
 
+    it('renders and persists tool aliases', async () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'tools');
+
+      expect(findTextArea(t('settings.claudeCode.toolAliases.name'))).toBeDefined();
+
+      await findTextArea(t('settings.claudeCode.toolAliases.name')).onChange?.(
+        'Fetch=Read\nSearch=Grep\nFetch=Write' as never,
+      );
+      expect(plugin.settings.backendSettings.claudeCode.toolAliases).toEqual({ Fetch: 'Write', Search: 'Grep' });
+      expect(plugin.saveSettings).toHaveBeenCalled();
+    });
+
+    it('ignores malformed tool alias lines', async () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'tools');
+
+      await findTextArea(t('settings.claudeCode.toolAliases.name')).onChange?.(
+        'Fetch=Read\nnoequals\n=Value\nKey=\n\nValid=Tool' as never,
+      );
+      expect(plugin.settings.backendSettings.claudeCode.toolAliases).toEqual({ Fetch: 'Read', Valid: 'Tool' });
+    });
+
     it('shows MCP runtime status and refreshes the active Claude adapter config', async () => {
       const claudeAdapter = {
         getMcpServerCount: jest.fn()
@@ -1736,6 +1814,24 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
         }),
       );
     });
+
+    it('renders debug toggle in runtime tab and persists changes', async () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'runtime');
+
+      const toggle = findToggle(t('settings.claudeCode.debug.name'));
+      expect(toggle).toBeDefined();
+      expect(toggle.control.setValue).toHaveBeenCalledWith(false);
+
+      await toggle.onChange?.(true as never);
+      expect(plugin.settings.backendSettings.claudeCode.debug).toBe(true);
+      expect(plugin.saveSettings).toHaveBeenCalled();
+    });
   });
 
   describe('limits (now in model-thinking tab)', () => {
@@ -1750,10 +1846,15 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
 
       expect(findText(t('settings.claudeCode.maxTurns.name'))).toBeDefined();
       expect(findText(t('settings.claudeCode.maxBudgetUsd.name'))).toBeDefined();
+      expect(findText(t('settings.claudeCode.taskBudget.name'))).toBeDefined();
 
       await findText(t('settings.claudeCode.maxTurns.name')).onChange?.('12' as never);
       expect(plugin.settings.backendSettings.claudeCode.maxTurns).toBe(12);
       expect(plugin.saveSettings).toHaveBeenCalled();
+
+      await findText(t('settings.claudeCode.taskBudget.name')).onChange?.('50000' as never);
+      expect(plugin.settings.backendSettings.claudeCode.taskBudget).toBe(50000);
+      expect(plugin.saveSettings).toHaveBeenCalledTimes(2);
     });
 
     it('rejects partially numeric turn and budget limit input', async () => {
@@ -1767,9 +1868,11 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
 
       await findText(t('settings.claudeCode.maxTurns.name')).onChange?.('12abc' as never);
       await findText(t('settings.claudeCode.maxBudgetUsd.name')).onChange?.('5usd' as never);
+      await findText(t('settings.claudeCode.taskBudget.name')).onChange?.('50k' as never);
 
       expect(plugin.settings.backendSettings.claudeCode.maxTurns).toBeNull();
       expect(plugin.settings.backendSettings.claudeCode.maxBudgetUsd).toBeNull();
+      expect(plugin.settings.backendSettings.claudeCode.taskBudget).toBeNull();
       expect(plugin.saveSettings).toHaveBeenCalled();
     });
 
@@ -1784,9 +1887,11 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
 
       await findText(t('settings.claudeCode.maxTurns.name')).onChange?.('-5' as never);
       await findText(t('settings.claudeCode.maxBudgetUsd.name')).onChange?.('0' as never);
+      await findText(t('settings.claudeCode.taskBudget.name')).onChange?.('0' as never);
 
       expect(plugin.settings.backendSettings.claudeCode.maxTurns).toBeNull();
       expect(plugin.settings.backendSettings.claudeCode.maxBudgetUsd).toBeNull();
+      expect(plugin.settings.backendSettings.claudeCode.taskBudget).toBeNull();
     });
 
     it('accepts decimal budget but rejects decimal turns', async () => {
@@ -1800,15 +1905,18 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
 
       await findText(t('settings.claudeCode.maxTurns.name')).onChange?.('12.5' as never);
       await findText(t('settings.claudeCode.maxBudgetUsd.name')).onChange?.('12.5' as never);
+      await findText(t('settings.claudeCode.taskBudget.name')).onChange?.('12.5' as never);
 
       expect(plugin.settings.backendSettings.claudeCode.maxTurns).toBeNull();
       expect(plugin.settings.backendSettings.claudeCode.maxBudgetUsd).toBe(12.5);
+      expect(plugin.settings.backendSettings.claudeCode.taskBudget).toBeNull();
     });
 
     it('clears limits when empty string is provided', async () => {
       const plugin = createPlugin();
       plugin.settings.backendSettings.claudeCode.maxTurns = 50;
       plugin.settings.backendSettings.claudeCode.maxBudgetUsd = 5;
+      plugin.settings.backendSettings.claudeCode.taskBudget = 100;
       const containerEl = document.createElement('div');
       const section = new SettingsClaudeCodeSection({
         plugin: plugin as OpenCodianPlugin,
@@ -1818,9 +1926,11 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
 
       await findText(t('settings.claudeCode.maxTurns.name')).onChange?.('' as never);
       await findText(t('settings.claudeCode.maxBudgetUsd.name')).onChange?.('' as never);
+      await findText(t('settings.claudeCode.taskBudget.name')).onChange?.('' as never);
 
       expect(plugin.settings.backendSettings.claudeCode.maxTurns).toBeNull();
       expect(plugin.settings.backendSettings.claudeCode.maxBudgetUsd).toBeNull();
+      expect(plugin.settings.backendSettings.claudeCode.taskBudget).toBeNull();
     });
   });
 
@@ -2041,6 +2151,79 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       // It must NOT contain a restart button — sandbox cannot be live-applied
       const restartButtons = containerEl.querySelectorAll('[data-claude-code-sandbox-lifecycle] button');
       expect(restartButtons.length).toBe(0);
+    });
+  });
+
+  describe('planModeInstructions in Permissions tab', () => {
+    it('renders planModeInstructions text area with expected locale label', () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'permissions');
+
+      const textAreaRecord = findTextArea(t('settings.claudeCode.planModeInstructions.name'));
+      expect(textAreaRecord).toBeDefined();
+      expect(textAreaRecord.control.setValue).toHaveBeenCalledWith('');
+    });
+
+    it('changing planModeInstructions updates settings and calls saveSettings', async () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'permissions');
+
+      const textAreaRecord = findTextArea(t('settings.claudeCode.planModeInstructions.name'));
+      await textAreaRecord.onChange?.('Use TDD.' as never);
+      expect(plugin.settings.backendSettings.claudeCode.planModeInstructions).toBe('Use TDD.');
+      expect(plugin.saveSettings).toHaveBeenCalled();
+    });
+
+    it('trims planModeInstructions on change', async () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'permissions');
+
+      const textAreaRecord = findTextArea(t('settings.claudeCode.planModeInstructions.name'));
+      await textAreaRecord.onChange?.('  Use TDD.  ' as never);
+      expect(plugin.settings.backendSettings.claudeCode.planModeInstructions).toBe('Use TDD.');
+    });
+
+    it('renders planModeInstructions boundary notice', () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'permissions');
+
+      const boundaryEl = containerEl.querySelector('[data-claude-code-plan-mode-instructions-boundary]');
+      expect(boundaryEl).toBeTruthy();
+      expect(boundaryEl!.textContent).toContain(t('settings.claudeCode.planModeInstructions.boundaryNotice'));
+    });
+
+    it('renders planModeInstructions lifecycle notice', () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'permissions');
+
+      const lifecycleEl = containerEl.querySelector('[data-claude-code-plan-mode-instructions-lifecycle]');
+      expect(lifecycleEl).toBeTruthy();
+      expect(lifecycleEl!.textContent).toContain(t('settings.claudeCode.planModeInstructions.lifecycleNotice'));
     });
   });
 

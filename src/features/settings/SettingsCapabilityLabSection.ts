@@ -802,6 +802,57 @@ export class SettingsCapabilityLabSection {
         // are separate seams. This seam proves the first-query title injection, not post-hoc rename.
         userSurface: 'diagnostic', // No dedicated title settings control; title comes from existing session creation flow
       },
+      {
+        capability: 'Prompt Suggestions',
+        sdkExposed: true, // SDK Options.promptSuggestions?: boolean — emits prompt_suggestion after each turn
+        adapterWired: true, // buildClaudeCodeOptions wires promptSuggestions; pumpRuntimeOutput fires callback
+        runtimeProof: 'readback', // Option wiring proven: promptSuggestions propagates through buildClaudeCodeOptions
+        // into SDK options. pumpRuntimeOutput detects prompt_suggestion SDK messages and fires postResultCallback.
+        // Readback ceiling: option wiring + callback emission proven in tests, but end-to-end delivery from
+        // CLI subprocess through to chat UI suggestion bar not independently verified with live API.
+        // Suggestions may be suppressed on first turn, after API errors, in plan mode, or by env var.
+        userSurface: 'chat', // Chat suggestion bar inserted into composer area (never auto-sent)
+      },
+      {
+        capability: 'Task Budget',
+        sdkExposed: true, // SDK Options.taskBudget?: { total: number }
+        adapterWired: true, // buildClaudeCodeOptions wires taskBudget as { total }
+        runtimeProof: 'readback', // Option wiring proven: taskBudget propagates through buildClaudeCodeOptions
+        // into SDK options as { total: number }. Readback ceiling: SDK @alpha option; API-side behavior
+        // not independently verified. Applies to next query only.
+        userSurface: 'settings', // Stable toggle in Model & Thinking tab
+      },
+      {
+        capability: 'Plan Mode Instructions',
+        sdkExposed: true, // SDK Options.planModeInstructions?: string
+        adapterWired: true, // buildClaudeCodeOptions wires planModeInstructions when non-empty
+        runtimeProof: 'readback', // Option wiring proven: planModeInstructions propagates through buildClaudeCodeOptions
+        // into SDK options when permissionMode is plan and value is non-empty. Readback ceiling:
+        // actual plan-mode behavior (read-only preamble + ExitPlanMode footer enforcement) is the SDK's
+        // internal claim, not independently verifiable from the plugin layer.
+        userSurface: 'settings', // Permissions tab text area
+      },
+      {
+        capability: 'Tool Aliases',
+        sdkExposed: true, // SDK Options.toolAliases?: Record<string, string>
+        adapterWired: true, // buildClaudeCodeOptions wires toolAliases when non-empty
+        runtimeProof: 'readback', // Option wiring proven: toolAliases propagates through buildClaudeCodeOptions
+        // into SDK options as a defensive copy. Readback ceiling: actual alias resolution behavior
+        // (model-emitted tool name remapping before tool resolution) is the SDK/CLI binary's internal
+        // claim, not independently verifiable from the plugin layer. Applies to next query/restarted session only.
+        userSurface: 'settings', // Tools tab key=value text area
+      },
+      {
+        capability: 'Debug',
+        sdkExposed: true, // SDK Options.debug?: boolean
+        adapterWired: true, // buildClaudeCodeOptions wires debug when settings.debug is true
+        runtimeProof: 'readback', // Option wiring proven: debug propagates through buildClaudeCodeOptions
+        // into SDK options. Readback ceiling: actual CLI debug log emission is the SDK/CLI binary's
+        // internal claim, not independently verifiable from the plugin layer. The plugin passes the
+        // option — whether the CLI actually produces debug output depends on SDK/CLI version and
+        // runtime conditions. Applies to next query only.
+        userSurface: 'settings', // Runtime tab toggle
+      },
     ];
   }
 
@@ -2550,6 +2601,18 @@ export class SettingsCapabilityLabSection {
           .setValue(this.claudeCodeSettings.agentProgressSummaries)
           .onChange(async (value) => {
             this.claudeCodeSettings.agentProgressSummaries = value;
+            await this.saveClaudeCodeSettings();
+          });
+      });
+
+    new Setting(controlsEl)
+      .setName(t('settings.claudeCode.promptSuggestions.name'))
+      .setDesc(t('settings.claudeCode.promptSuggestions.desc'))
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.claudeCodeSettings.promptSuggestions)
+          .onChange(async (value) => {
+            this.claudeCodeSettings.promptSuggestions = value;
             await this.saveClaudeCodeSettings();
           });
       });

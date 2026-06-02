@@ -1,5 +1,151 @@
 # Claude Code SDK Current State - 2026-05-22
 
+## 2026-06-02 CLI Debug Logs — Readback Seam
+
+### Objective
+
+Implement the smallest honest seam for Claude Code SDK public option `debug?: boolean`. This option asks the SDK to emit CLI debug logs during query execution.
+
+### What Changed
+
+- **src/core/types/settings.ts**: Added `debug: boolean` to `ClaudeCodeBackendSettings` with honest readback JSDoc. Added default `false` and normalization (`candidate.debug === true`).
+- **src/core/agents/backend/ClaudeCodeOptionsBuilder.ts**: Added `debug?: boolean` to `ClaudeCodeSdkOptionsShape`; wired in `buildClaudeCodeOptions` — omit when false, pass `true` when enabled.
+- **src/features/settings/SettingsClaudeCodeSection.ts**: Added `renderDebugSetting()` in Runtime tab (toggle with honest next-query/readback boundary and lifecycle notices).
+- **src/i18n/locales/en.ts + zh.ts**: Locale strings for name, desc, boundaryNotice, lifecycleNotice with honest copy.
+- **src/features/settings/SettingsCapabilityLabSection.ts**: Added "Debug" matrix row (#34, readback, settings surface).
+- **tests/**: TDD — RED→GREEN for normalization (4 tests), options builder (2 tests), settings UI (1 test), capability lab audit (row count 33→34, readback count 10→11), truth audit (1 test).
+
+### Honesty Boundaries
+
+- Classification: **readback** — SDK option wiring proven (setting propagates through `buildClaudeCodeOptions` into SDK `debug`). Actual CLI debug log emission is the SDK/CLI binary's internal claim; the plugin layer cannot independently verify it.
+- No authoring UI, no `.claude/**` writes, no broad escape-hatch config surface.
+- Applies to next query only; cannot be changed for an already-running session.
+- Does not modify existing pass/readback boundaries.
+- Matrix: 34 rows, 23 pass, 11 readback, 0 fail.
+
+## 2026-06-02 Prompt Suggestion Lifecycle Fix
+
+### Objective
+
+Fix two real product bugs in the prompt suggestion delivery path:
+1. **Multi-view callback clobbering**: `ClaudeCodeAdapter.onPostResultChunk()` stored a single callback, so multiple `ComposerInputShellCoordinator` instances overwrote each other. Destroying the last-built view left remaining views without prompt suggestions.
+2. **Late-registration / reattachment gap**: `ComposerInputShellCoordinator.build()` only checked `getPromptSuggestionSink()` once. If the adapter started after the coordinator built, or if the sink changed later, the coordinator never reattached.
+
+### What Changed
+
+- **src/core/agents/backend/ClaudeCodeAdapter.ts**: Changed `postResultCallback` (single nullable callback) to `postResultCallbacks` (`Set` of callbacks). `onPostResultChunk()` now returns an unsubscribe function. `pumpRuntimeOutput` iterates over all subscribers.
+- **src/core/agents/backend/promptSuggestionSink.ts**: Added `onPromptSuggestionSinkChange(cb)` that notifies subscribers when sink is registered/cleared, and immediately with current state. Exported from `index.ts`.
+- **src/features/chat/services/PromptSuggestionService.ts**: `attachAdapter()` now calls the adapter's returned unsubscribe in its own cleanup, enabling proper callback removal from the adapter's Set.
+- **src/features/chat/services/ComposerInputShellCoordinator.ts**: Replaced one-time `getPromptSuggestionSink()` check with `onPromptSuggestionSinkChange()` subscription. Handles late registration (sink available after build) and reattachment (sink cleared then re-registered). Cleans up old adapter subscription before attaching new one.
+- **tests/**:
+  - `ClaudeCodeAdapter.test.ts`: 2 new tests (multi-subscriber, unsubscribe safety)
+  - `PromptSuggestionService.test.ts`: 2 new tests (multiple attachAdapter calls, destroying one coordinator does not break another)
+  - `promptSuggestionSink.test.ts`: 6 new tests (sink change notifications, immediate callback, unsubscribe, multi-subscriber)
+  - Updated all mock adapters in existing tests to return unsubscribe functions (type contract change)
+
+### Honesty Boundaries
+
+- Prompt suggestions remain **readback** classification. This fix tightens the delivery lifecycle; it does not promote the capability to pass.
+- No new settings UI, no `.claude/**` writes, no authoring surface.
+- Concurrent tab/session behavior preserved; the multi-subscriber fix specifically enables it.
+
+## 2026-06-02 Tool Aliases — Readback Seam
+
+### Objective
+
+Implement the smallest honest seam for Claude Code SDK `toolAliases?: Record<string, string>`. This option maps model-emitted tool names to canonical tool names before resolution. The SDK publicly types this option in `sdk.d.ts`; it is treated as the next real candidate seam after `planModeInstructions`.
+
+### What Changed
+
+- **src/core/types/settings.ts**: Added `toolAliases: Record<string, string>` to `ClaudeCodeBackendSettings` with honest readback JSDoc. Added default `{}` and `normalizeClaudeCodeToolAliases()` normalizer (drops non-string values, empty keys/values, trims keys and values).
+- **src/core/agents/backend/ClaudeCodeOptionsBuilder.ts**: Added `toolAliases?: Record<string, string>` to `ClaudeCodeSdkOptionsShape`; wired in `buildClaudeCodeOptions` — omit when empty, pass defensive copy when non-empty.
+- **src/features/settings/SettingsClaudeCodeSection.ts**: Added `renderToolAliasesSetting()` in Tools tab (key=value text area with honest next-query/readback copy in the setting description). Added `parseToolAliases()` helper that parses `key=value` lines, ignoring malformed entries.
+- **src/i18n/locales/en.ts + zh.ts**: Locale strings for name, desc, placeholder with honest boundary copy.
+- **src/features/settings/SettingsCapabilityLabSection.ts**: Added "Tool Aliases" matrix row (#33, readback, settings surface).
+- **docs/status/claude-code-current-state-2026-05-22.md**: Updated gap-audit wording for `appendSubagentSystemPrompt` and `webSearchIsolationExemptMcpServers` to reflect that they are runtime-observed/internal-leaning surfaces, not repo-implemented public SDK option gaps.
+- **tests/**: TDD — RED→GREEN for normalization (6 tests), options builder (3 tests), settings UI (2 tests), capability lab audit (row count 32→33, readback count 9→10), truth audit (1 test).
+
+### Honesty Boundaries
+
+- Classification: **readback** — SDK option wiring proven (setting propagates through `buildClaudeCodeOptions` into SDK `toolAliases` as a defensive copy). Actual alias resolution behavior (model-emitted tool name remapping before tool resolution) is the SDK/CLI binary's internal claim; the plugin layer cannot independently verify it.
+- No authoring UI for MCP/plugin/agent ecosystems. No `.claude/**` writes.
+- Applies to next query / restarted session only.
+- Does not modify existing pass/readback boundaries.
+
+### Matrix
+
+33 rows: 23 pass, 10 readback, 0 fail
+
+### Gap Audit (2026-06-02)
+
+Current matrix classification:
+- **pass**: 23
+- **readback**: 10
+- **blocked**: 0
+
+Confirmed repo-absent option surfaces (not implemented, not faked):
+- `permissionPromptToolName` — blocked. Current verified product path uses `canUseTool` + `ClaudeCodePermissionBridge`. SDK runtime explicitly rejects using `canUseTool` together with `permissionPromptToolName`. Treating as blocked / not a safe next seam.
+- `appendSubagentSystemPrompt` — runtime-observed in `sdk.mjs` / `browser-sdk.js` but absent from public `sdk.d.ts`. Treating as runtime-internal-leaning, not a repo-implemented public SDK option gap.
+- `webSearchIsolationExemptMcpServers` — runtime-observed in `sdk.mjs` / `browser-sdk.js` but absent from public `sdk.d.ts`. Treating as runtime-internal-leaning, not a repo-implemented public SDK option gap.
+
+---
+
+## 2026-06-02 Plan Mode Instructions — Readback Seam
+
+### Objective
+
+Implement the smallest honest seam for Claude Code SDK `planModeInstructions?: string`. This option replaces the default plan-mode workflow body when `permissionMode` is `plan`; the CLI still wraps it with the read-only enforcement preamble and ExitPlanMode protocol footer.
+
+### What Changed
+
+- **src/core/types/settings.ts**: Added `planModeInstructions: string` to `ClaudeCodeBackendSettings` with honest readback JSDoc. Added default `''` and normalization (trim; non-string/whitespace-only → `''`).
+- **src/core/agents/backend/ClaudeCodeOptionsBuilder.ts**: Added `planModeInstructions?: string` to `ClaudeCodeSdkOptionsShape`; wired in `buildClaudeCodeOptions` — omit when empty/whitespace, pass trimmed string when non-empty.
+- **src/features/settings/SettingsClaudeCodeSection.ts**: Added `renderPlanModeInstructionsSetting()` in Permissions tab (text area + boundary notice + lifecycle notice).
+- **src/i18n/locales/en.ts + zh.ts**: Locale strings for name, desc, placeholder, boundary notice, lifecycle notice.
+- **src/features/settings/SettingsCapabilityLabSection.ts**: Added "Plan Mode Instructions" matrix row (#32, readback, settings surface).
+- **tests/**: TDD — RED→GREEN for normalization (5 tests), options builder (4 tests), settings UI (5 tests), capability lab audit (row count 31→32, readback count 8→9), truth audit (1 test).
+
+### Honesty Boundaries
+
+- Classification: **readback** — SDK option wiring proven (setting propagates through `buildClaudeCodeOptions` into SDK `planModeInstructions`). Actual plan-mode behavior (read-only preamble + ExitPlanMode footer enforcement) is the SDK/CLI binary's internal claim; the plugin layer cannot independently verify it.
+- No authoring UI, no `.claude/**` writes
+- Applies to next query / restarted session only
+- Does not modify existing pass/readback boundaries
+
+### Matrix
+
+32 rows: 23 pass, 9 readback, 0 fail
+
+---
+
+## 2026-06-02 Task Budget — Readback Seam
+
+### Objective
+
+Implement the minimal honest seam for Claude Code SDK `taskBudget?: { total: number }`. This is an `@alpha` SDK option that sets a task-level token budget. The plugin layer can only prove option wiring (the setting propagates into SDK options); API-side enforcement is not independently verifiable.
+
+### What Changed
+
+- **src/core/types/settings.ts**: Added `taskBudget: number | null` to `ClaudeCodeBackendSettings` with honest readback JSDoc (`@alpha` — readback only, API-side behavior not independently verified). Added default `null` and `normalizeClaudeCodeNullablePositiveInt` normalization.
+- **src/core/agents/backend/ClaudeCodeOptionsBuilder.ts**: Added `taskBudget?: { total: number }` to `ClaudeCodeSdkOptionsShape`; wired in `buildClaudeCodeOptions` — when non-null, sets `options.taskBudget = { total: input.settings.taskBudget }`.
+- **src/features/settings/SettingsClaudeCodeSection.ts**: Added `renderTaskBudgetSetting()` in Model & Thinking tab (after maxBudgetUsd) with integer-only parsing (`parseNullablePositiveInteger`).
+- **src/i18n/locales/en.ts + zh.ts**: Task budget locale strings (name, desc, placeholder) with `@alpha` boundary copy.
+- **src/features/settings/SettingsCapabilityLabSection.ts**: Added "Task Budget" matrix row (#31, readback, settings surface).
+- **tests/**: Existing partial RED tests now GREEN — normalization (4 tests), options builder (2 tests), truth audit (1 test), settings UI (1 test), capability lab audit (2 tests: row count 30→31, readback count 7→8).
+
+### Honesty Boundaries
+
+- Classification: **readback** — SDK option wiring proven (settings propagate through `buildClaudeCodeOptions` into SDK `taskBudget` option as `{ total: number }`). API-side enforcement not independently verified. SDK marks this option as `@alpha`.
+- No authoring UI, no `.claude/**` writes
+- Applies to next query only (same boundary as maxTurns/maxBudgetUsd)
+- Does not modify existing pass/readback boundaries
+
+### Matrix
+
+31 rows: 23 pass, 8 readback, 0 fail
+
+---
+
 ## 2026-06-02 Sandbox — Minimal Readback Seam
 
 ### Objective
@@ -49,6 +195,76 @@ Wire SDK `Options.title?: string` through the existing session title ownership. 
 ### Matrix
 
 29 rows: 23 pass, 6 readback, 0 fail
+
+## 2026-06-02 Prompt Suggestions — Readback Seam
+
+### Objective
+
+Implement the smallest honest product seam for Claude Code SDK `promptSuggestions`. The SDK emits a `prompt_suggestion` message after each completed turn when `Options.promptSuggestions` is true. The suggestion is a predicted follow-up prompt shown as a clickable chip above the composer (never auto-sent).
+
+### What Changed
+
+- **src/core/types/settings.ts**: Added `promptSuggestions: boolean` to `ClaudeCodeBackendSettings` (default false, strict boolean normalization).
+- **src/core/agents/backend/ClaudeCodeOptionsBuilder.ts**: Wired `promptSuggestions` into builder input + SDK options shape, same pattern as `agentProgressSummaries`.
+- **src/core/agents/backend/ClaudeCodeStreamNormalizer.ts**: Added `appendPromptSuggestionChunk` — converts SDK `prompt_suggestion` messages to `StreamChunk { type: 'prompt_suggestion', suggestion, uuid, sessionId }`.
+- **src/core/types/chat.ts**: Added `prompt_suggestion` variant to `StreamChunk` union.
+- **src/core/agents/backend/ClaudeCodeAdapter.ts**: Added `postResultCallback` + `onPostResultChunk(callback)`. `pumpRuntimeOutput` detects `prompt_suggestion` SDK messages after result and fires the callback directly. `sendMessage` keeps its original result-boundary return behavior (no lifecycle change to existing flows).
+- **src/features/chat/services/PromptSuggestionService.ts**: Per-session suggestion coordinator — tracks suggestions by `sessionId` so concurrent tabs maintain independent state. Clears on turn start and view teardown. Never auto-sends. Owned by `ComposerInputShellCoordinator`, not the view.
+- **src/features/chat/services/ComposerInputShellCoordinator.ts**: Owns `PromptSuggestionService` instance. Suggestion bar DOM element (`opencodian-prompt-suggestion-bar`) rendered above the composer. `refreshSuggestionBar()` reads from service. Click inserts text via `insertSuggestionText()` and calls `acceptActiveSuggestion()`. Self-wires from the module-level sink bus during `build()` — no view forwarding needed. Creates a scoped channel per coordinator instance for session-change isolation. Captures all unsubscribes (bar refresh, session, adapter) in `promptSuggestionCleanup` to prevent accumulation on rebuild.
+- **src/core/agents/backend/promptSuggestionSink.ts**: Module-level event bus that decouples adapter (core layer) from coordinator (features layer). Supports scoped channels to prevent cross-talk between independent chat views. `ClaudeCodeAdapter.start()` registers the sink; `stop()`/`dispose()` clears it. `TabActivationRuntimeHostProvider` derives the channel from the DOM (`findPromptSuggestionScope`) and emits session changes through that scoped bus channel. Coordinator subscribes on its channel during `build()`.
+- **src/features/chat/services/TabActivationRuntimeHostProvider.ts**: `setCurrentConversation` auto-notifies the prompt suggestion bus of session changes. Derives the channel ID from the DOM: walks up from the active tab's messages container to find the scope stamped by `stampPromptSuggestionScope` on the coordinator container.
+- **src/features/settings/SettingsClaudeCodeSection.ts**: Stable toggle in Model & Thinking tab with honest boundary/lifecycle copy.
+- **src/features/settings/SettingsCapabilityLabSection.ts**: Added Prompt Suggestions matrix row (#30, readback, chat surface) + diagnostic controls toggle.
+- **src/i18n/locales/{en,zh}.ts**: Locale strings for stable toggle name + honest description.
+- **tests/**: TDD — RED→GREEN for settings normalization (4), builder wiring (2), normalizer (3), adapter lifecycle with callback (3), service per-session (10), integration (7), stable settings (2), caplab audit (1).
+
+### Honesty Boundaries
+
+- Classification: **readback** — option wiring + pump callback emission proven in unit tests. End-to-end CLI subprocess suggestion delivery through to chat UI suggestion bar not independently verified with live API.
+- The production wiring chain exists: adapter callback → per-session service → coordinator bar refresh → composer insertion. Each link has tests, but the full end-to-end path against a running Claude Code binary has not been tested.
+- **2026-06-02 live smoke**: 2-turn ordinary chat with `promptSuggestions=true`, backend `claude-code`, setting ON. Console showed model `deepseek-v4-pro[1M][1m]` (not the `claude-haiku-4-5` shown in settings page). No `prompt_suggestion` SDK message observed in console; bar existed in DOM but stayed `is-hidden`. The SDK's `prompt_suggestion` feature piggybacks on Claude-model prompt cache; non-Claude models may not emit suggestions. The `CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION` env var was null (not blocking). The SDK may also suppress on first turn, after API errors, or in plan mode.
+- **Model dependency → provider normalization bug fixed**: The SDK returns `provider='claude'` for its own models, but the plugin used `CLAUDE_CODE_PROVIDER_ID='claude-code'` for model selection lookups. This caused `resolvePreferredAvailableSnapshotModel(provider='claude-code', model='claude-haiku-4-5')` to miss — the model was stored under provider `claude` — and fall back to the first `claude-code` model (`default`). **Fixed**: `buildClaudeCodeModelSelectorProviders` now normalizes `provider='claude'` → `'claude-code'`. The `prompt_suggestion` feature also likely requires a Claude model (piggybacks on prompt cache), so model routing correctness is a prerequisite for suggestions appearing. **Re-smoked 2026-06-02**: model routing bug confirmed fixed — `currentModel={provider:'claude-code', model:'claude-haiku-4-5'}` and `resolution.status='available'` in live Test Vault session. Real 2-turn chat completed successfully with correct backend. However, prompt suggestions still remain `readback`: no `prompt_suggestion` event was observed end-to-end (console captured zero `pump: prompt_suggestion received` lines), suggestion bar DOM existed but stayed `is-hidden`, and suggestion text remained null. The SDK may suppress suggestions on first turn, after API errors, in plan mode, or for other undocumented reasons. Evidence files captured under `.obsidian-debug/` from this re-smoke.
+- Suggestions may be suppressed on first turn, after API errors, in plan mode, or by env var.
+- Never auto-sent — click inserts into composer only.
+- `sendMessage` returns on result as before — no behavior change to existing flows.
+- **Diagnostic logging**: `pumpRuntimeOutput` now logs `pump: prompt_suggestion received` when a `prompt_suggestion` SDK message arrives, and `runtime close` logs `hadPostResultCallback`. Future smoke tests can grep console for these to confirm upstream delivery.
+
+### Architecture Decision
+
+Prompt suggestions arrive *after* the turn boundary (`result`). Rather than changing `sendMessage` to consume post-result items (which would hang for long-lived sessions), the pump (`pumpRuntimeOutput`) fires `prompt_suggestion` through a dedicated callback. The UI layer subscribes to this callback independently of the `sendMessage` generator.
+
+### Production Code Paths
+
+1. **`ClaudeCodeAdapter.start()`** — calls `registerPromptSuggestionSink(this)` to register in the module-level bus
+2. **`ClaudeCodeAdapter.onPostResultChunk(callback)`** — callback registration for stream chunks
+3. **`ComposerInputShellCoordinator.build()`** → `wirePromptSuggestionFromSink()` — creates scoped channel, subscribes to session changes on the channel, attaches adapter from sink, wires bar refresh. All unsubscribes captured for teardown.
+4. **`TabActivationRuntimeHostProvider.setCurrentConversation()`** — derives channel ID from DOM (`findPromptSuggestionScope` on the active tab's messages container), then emits session change through the scoped bus channel
+5. **`PromptSuggestionService.attachAdapter(adapter)`** — stores per-session, fires bar refresh for active session
+6. **`ComposerInputShellCoordinator.refreshSuggestionBar()`** — reads from service's `getActiveSuggestionText()`, renders chip
+7. **`ComposerInputShellCoordinator.trySubmitCurrentInput()`** — clears suggestion on new turn via `clearActiveOnTurnStart()`
+8. **`ComposerInputShellCoordinator.insertSuggestionText(text)`** — click inserts into textarea
+9. **`ClaudeCodeAdapter.stop()`/`dispose()`** — calls `clearPromptSuggestionSink()` to prevent stale adapter registration
+
+### Stable Settings Location
+
+`src/features/settings/SettingsClaudeCodeSection.ts` → `renderPromptSuggestionsSetting()` in Model & Thinking tab.
+
+### Matrix
+
+30 rows: 23 pass, 7 readback, 0 fail
+
+### Gap Audit (2026-06-02)
+
+Current matrix classification:
+- **pass**: 23
+- **readback**: 9
+- **blocked**: 0
+
+Confirmed repo-absent option surfaces (not implemented, not faked):
+- `permissionPromptToolName` — no implementation
+- `toolAliases` — no implementation
+- `appendSubagentSystemPrompt` — no implementation
+- `webSearchIsolationExemptMcpServers` — no implementation
 
 ## 2026-06-02 Warm Startup — SDK startup() Diagnostic Readback Seam
 

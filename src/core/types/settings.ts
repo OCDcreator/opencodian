@@ -73,6 +73,8 @@ export interface ClaudeCodeBackendSettings {
   maxTurns: number | null;
   /** Maximum budget in USD before the query stops. Runtime behavior verified: SDK emits error_max_budget_usd signal when limit reached. null = unlimited (SDK default). */
   maxBudgetUsd: number | null;
+  /** Maximum task-level token budget. Readback only: SDK @alpha option wiring proven; API-side behavior not independently verified. null = unlimited (SDK default). */
+  taskBudget: number | null;
   /** Environment variables to pass to the Claude Code process. Runtime behavior verified: env propagation into Claude/Bash subprocesses proven (Layer 1-4). */
   env: Record<string, string>;
   /** Enable Claude Code SDK file checkpoint tracking for later rewind operations. @experimental — SDK option wired but checkpoints never created in query() mode (upstream bug #236). Readback only; no stable rewind UI. */
@@ -83,6 +85,11 @@ export interface ClaudeCodeBackendSettings {
   forwardSubagentText: boolean;
   /** Ask the SDK to emit periodic subagent progress summaries. @diagnostic — Diagnostic event stream only; not connected to stable UI. */
   agentProgressSummaries: boolean;
+  /** Ask the SDK to emit predicted next-user-prompt suggestions after each completed turn.
+   * Readback: SDK options wiring proven; suggestion delivery to chat UI proven through normalizer + StreamChunkRouter pipeline.
+   * Suggestions may be suppressed on first turn, after API errors, in plan mode, or by env var.
+   * Never auto-sent — only inserted into composer on explicit user click. */
+  promptSuggestions: boolean;
   /** Product workbench debug channels for future Claude Code logging routes. */
   debugChannels: ClaudeCodeDebugChannelSettings;
   /**
@@ -93,6 +100,26 @@ export interface ClaudeCodeBackendSettings {
    * as stable settings in this version.
    */
   sandbox: ClaudeCodeSandboxSettings;
+  /**
+   * Custom instructions injected into the plan-mode system reminder when `permissionMode` is `plan`.
+   * Replaces the default code-implementation workflow body; the SDK still enforces the read-only
+   * preamble and ExitPlanMode protocol footer. Effect applies to the next query or restarted session.
+   * Readback only: SDK option wiring proven; actual plan-mode behavior is not independently verified.
+   */
+  planModeInstructions: string;
+  /**
+   * Tool name aliases passed as the SDK `toolAliases` option. Maps model-emitted tool names
+   * to canonical tool names before resolution. Applies to the next query or restarted session only.
+   * Readback only: SDK option wiring proven; actual alias resolution behavior is not independently verified.
+   */
+  toolAliases: Record<string, string>;
+  /**
+   * Ask the SDK to emit CLI debug logs during query execution.
+   * Readback only: SDK option wiring proven; actual CLI debug log emission is not independently
+   * verified from the plugin layer. The plugin passes the option — whether the CLI binary
+   * actually produces debug output depends on the SDK/CLI version and runtime conditions.
+   */
+  debug: boolean;
 }
 
 export interface BackendSettings {
@@ -129,13 +156,18 @@ export function getDefaultClaudeCodeBackendSettings(): ClaudeCodeBackendSettings
     restrictedBuiltinTools: [],
     maxTurns: null,
     maxBudgetUsd: null,
+    taskBudget: null,
     env: {},
     enableFileCheckpointing: false,
     includeHookEvents: false,
     forwardSubagentText: false,
     agentProgressSummaries: false,
+    promptSuggestions: false,
     debugChannels: getDefaultClaudeCodeDebugChannelSettings(),
     sandbox: { enabled: false, failIfUnavailable: false, autoAllowBashIfSandboxed: false },
+    planModeInstructions: '',
+    toolAliases: {},
+    debug: false,
   };
 }
 
@@ -278,6 +310,20 @@ export function normalizeClaudeCodeSandboxSettings(value: unknown): ClaudeCodeSa
   };
 }
 
+export function normalizeClaudeCodeToolAliases(value: unknown): Record<string, string> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return {};
+  }
+  const result: Record<string, string> = {};
+  for (const [key, val] of Object.entries(value as Record<string, unknown>)) {
+    const trimmedKey = typeof key === 'string' ? key.trim() : '';
+    if (trimmedKey.length > 0 && typeof val === 'string' && val.trim().length > 0) {
+      result[trimmedKey] = val.trim();
+    }
+  }
+  return result;
+}
+
 export function normalizeClaudeCodeBackendSettings(value: unknown): ClaudeCodeBackendSettings {
   const defaults = getDefaultClaudeCodeBackendSettings();
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -301,13 +347,20 @@ export function normalizeClaudeCodeBackendSettings(value: unknown): ClaudeCodeBa
     restrictedBuiltinTools: normalizeClaudeCodeStringArray(candidate.restrictedBuiltinTools),
     maxTurns: normalizeClaudeCodeNullablePositiveInt(candidate.maxTurns),
     maxBudgetUsd: normalizeClaudeCodeNullablePositiveNumber(candidate.maxBudgetUsd),
+    taskBudget: normalizeClaudeCodeNullablePositiveInt(candidate.taskBudget),
     env: normalizeClaudeCodeEnv(candidate.env),
     enableFileCheckpointing: candidate.enableFileCheckpointing === true,
     includeHookEvents: candidate.includeHookEvents === true,
     forwardSubagentText: candidate.forwardSubagentText === true,
     agentProgressSummaries: candidate.agentProgressSummaries === true,
+    promptSuggestions: candidate.promptSuggestions === true,
     debugChannels: normalizeClaudeCodeDebugChannelSettings(candidate.debugChannels),
     sandbox: normalizeClaudeCodeSandboxSettings(candidate.sandbox),
+    planModeInstructions: typeof candidate.planModeInstructions === 'string'
+      ? candidate.planModeInstructions.trim()
+      : defaults.planModeInstructions,
+    toolAliases: normalizeClaudeCodeToolAliases(candidate.toolAliases),
+    debug: candidate.debug === true,
   };
 }
 
