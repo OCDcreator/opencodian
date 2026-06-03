@@ -446,7 +446,6 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       expect(findText(t('settings.claudeCode.maxTurns.name'))).toBeDefined();
       expect(findText(t('settings.claudeCode.maxBudgetUsd.name'))).toBeDefined();
       expect(findText(t('settings.claudeCode.taskBudget.name'))).toBeDefined();
-      expect(containerEl.textContent).toContain(t('settings.claudeCode.taskBudget.desc'));
       expect(containerEl.querySelector('[data-claude-code-limits-boundary="true"]')).toBeTruthy();
       expect(containerEl.textContent).toContain(t('settings.claudeCode.runtimeBoundary.nextQuery'));
       expect(findButton(t('settings.claudeCode.runtimeBoundary.restartButton'))).toBeDefined();
@@ -498,6 +497,34 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       await toggle!.onChange!(true as never);
       expect(plugin.settings.backendSettings?.claudeCode?.promptSuggestions).toBe(true);
       expect(plugin.saveSettings).toHaveBeenCalled();
+    });
+
+    it('renders prompt suggestions boundary notice in model-thinking tab', () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'model-thinking');
+
+      const boundaryEl = containerEl.querySelector('[data-claude-code-prompt-suggestions-boundary="true"]');
+      expect(boundaryEl).toBeTruthy();
+      expect(containerEl.textContent).toContain(t('settings.claudeCode.promptSuggestions.boundaryNotice'));
+    });
+
+    it('renders prompt suggestions lifecycle notice in model-thinking tab', () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'model-thinking');
+
+      const lifecycleEl = containerEl.querySelector('[data-claude-code-prompt-suggestions-lifecycle="true"]');
+      expect(lifecycleEl).toBeTruthy();
+      expect(containerEl.textContent).toContain(t('settings.claudeCode.promptSuggestions.lifecycleNotice'));
     });
 
     it('renders fallback model boundary notice in model-thinking tab', () => {
@@ -1661,6 +1688,61 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       expect(plugin.settings.backendSettings.claudeCode.toolAliases).toEqual({ Fetch: 'Read', Valid: 'Tool' });
     });
 
+    it('renders tool aliases boundary and lifecycle notices', () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'tools');
+
+      const boundaryEl = containerEl.querySelector('[data-claude-code-tool-aliases-boundary="true"]');
+      expect(boundaryEl).toBeTruthy();
+      expect(boundaryEl!.textContent).toContain(t('settings.claudeCode.toolAliases.boundaryNotice'));
+
+      const lifecycleEl = containerEl.querySelector('[data-claude-code-tool-aliases-lifecycle="true"]');
+      expect(lifecycleEl).toBeTruthy();
+      expect(lifecycleEl!.textContent).toContain(t('settings.claudeCode.toolAliases.lifecycleNotice'));
+    });
+
+    it('renders strictMcpConfig boundary and lifecycle notices', () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'tools');
+
+      const boundaryEl = containerEl.querySelector('[data-claude-code-strict-mcp-config-boundary="true"]');
+      expect(boundaryEl).toBeTruthy();
+      expect(boundaryEl!.textContent).toContain(t('settings.claudeCode.strictMcpConfig.boundaryNotice'));
+
+      const lifecycleEl = containerEl.querySelector('[data-claude-code-strict-mcp-config-lifecycle="true"]');
+      expect(lifecycleEl).toBeTruthy();
+      expect(lifecycleEl!.textContent).toContain(t('settings.claudeCode.strictMcpConfig.lifecycleNotice'));
+    });
+
+    it('persists strictMcpConfig changes in tools tab', async () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'tools');
+
+      const toggle = findToggle(t('settings.claudeCode.strictMcpConfig.name'));
+      expect(toggle).toBeDefined();
+      expect(toggle.control.setValue).toHaveBeenCalledWith(false);
+
+      await toggle.onChange?.(true as never);
+
+      expect(plugin.settings.backendSettings.claudeCode.strictMcpConfig).toBe(true);
+      expect(plugin.saveSettings).toHaveBeenCalled();
+    });
+
     it('shows MCP runtime status and refreshes the active Claude adapter config', async () => {
       const claudeAdapter = {
         getMcpServerCount: jest.fn()
@@ -1684,11 +1766,12 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       expect(statusEl?.getAttribute('data-proof-state')).toBe('readback');
       expect(containerEl.querySelector('[data-claude-code-mcp-runtime-status="true"]')).toBeNull();
       expect(buttonRecords.some((record) => record.label === t('settings.claudeCode.mcpRuntime.inspectButton'))).toBe(true);
+      // Authoring UI (text, textarea, dropdown) must not contain MCP config editors;
+      // toggle-based readback surfaces (e.g. strictMcpConfig) are allowed.
       expect([
         ...textRecords,
         ...textAreaRecords,
         ...dropdownRecords,
-        ...toggleRecords,
       ].some((record) => record.name.toLowerCase().includes('mcp'))).toBe(false);
       expect(containerEl.textContent).toContain(
         t('settings.claudeCode.mcpRuntime.loadedWithNames', {
@@ -1759,11 +1842,11 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       }));
       expect(containerEl.textContent).toContain('beta-mcp: failed');
       expect(containerEl.textContent).toContain('McpServerError(category=auth, messageLength=42)');
+      // Authoring UI must not contain MCP config editors; toggle readback surfaces are allowed.
       expect([
         ...textRecords,
         ...textAreaRecords,
         ...dropdownRecords,
-        ...toggleRecords,
       ].some((record) => record.name.toLowerCase().includes('mcp'))).toBe(false);
     });
 
@@ -1830,6 +1913,47 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
 
       await toggle.onChange?.(true as never);
       expect(plugin.settings.backendSettings.claudeCode.debug).toBe(true);
+      expect(plugin.saveSettings).toHaveBeenCalled();
+    });
+
+    it('renders debugFile boundary, implicit-debug, and lifecycle notices in runtime tab', () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'runtime');
+
+      const boundaryEl = containerEl.querySelector('[data-claude-code-debug-file-boundary="true"]');
+      expect(boundaryEl).toBeTruthy();
+      expect(boundaryEl!.textContent).toContain(t('settings.claudeCode.debugFile.boundaryNotice'));
+
+      const implicitEl = containerEl.querySelector('[data-claude-code-debug-file-implicit="true"]');
+      expect(implicitEl).toBeTruthy();
+      expect(implicitEl!.textContent).toContain(t('settings.claudeCode.debugFile.implicitDebugNotice'));
+
+      const lifecycleEl = containerEl.querySelector('[data-claude-code-debug-file-lifecycle="true"]');
+      expect(lifecycleEl).toBeTruthy();
+      expect(lifecycleEl!.textContent).toContain(t('settings.claudeCode.debugFile.lifecycleNotice'));
+    });
+
+    it('trims and persists debugFile changes in runtime tab', async () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'runtime');
+
+      const text = findText(t('settings.claudeCode.debugFile.name'));
+      expect(text).toBeDefined();
+      expect(text.control.setValue).toHaveBeenCalledWith('');
+
+      await text.onChange?.('  /tmp/claude-debug.log  ' as never);
+
+      expect(plugin.settings.backendSettings.claudeCode.debugFile).toBe('/tmp/claude-debug.log');
       expect(plugin.saveSettings).toHaveBeenCalled();
     });
   });
@@ -1931,6 +2055,112 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       expect(plugin.settings.backendSettings.claudeCode.maxTurns).toBeNull();
       expect(plugin.settings.backendSettings.claudeCode.maxBudgetUsd).toBeNull();
       expect(plugin.settings.backendSettings.claudeCode.taskBudget).toBeNull();
+    });
+  });
+
+  describe('system prompt appended instructions (model-thinking tab)', () => {
+    it('renders systemPrompt text area in model-thinking tab', () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'model-thinking');
+
+      const record = textAreaRecords.find((r) => r.name === t('settings.claudeCode.systemPrompt.name'));
+      expect(record).toBeDefined();
+      expect(record!.control.setValue).toHaveBeenCalledWith('');
+      expect(record!.control.setPlaceholder).toHaveBeenCalledWith(t('settings.claudeCode.systemPrompt.placeholder'));
+    });
+
+    it('persists systemPrompt changes trimmed to settings', async () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'model-thinking');
+
+      const record = textAreaRecords.find((r) => r.name === t('settings.claudeCode.systemPrompt.name'));
+      expect(record).toBeDefined();
+      expect(record!.onChange).toBeDefined();
+      await record!.onChange!('  Always use TypeScript.  ' as never);
+      expect(plugin.settings.backendSettings.claudeCode.systemPrompt).toBe('Always use TypeScript.');
+      expect(plugin.saveSettings).toHaveBeenCalled();
+    });
+
+    it('trims empty/whitespace systemPrompt to empty string', async () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'model-thinking');
+
+      const record = textAreaRecords.find((r) => r.name === t('settings.claudeCode.systemPrompt.name'));
+      expect(record).toBeDefined();
+      await record!.onChange!('   ' as never);
+      expect(plugin.settings.backendSettings.claudeCode.systemPrompt).toBe('');
+      expect(plugin.saveSettings).toHaveBeenCalled();
+    });
+
+    it('renders systemPrompt boundary notice with correct data attr', () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'model-thinking');
+
+      const boundaryEl = containerEl.querySelector('[data-claude-code-system-prompt-boundary="true"]');
+      expect(boundaryEl).toBeTruthy();
+      expect(containerEl.textContent).toContain(t('settings.claudeCode.systemPrompt.boundaryNotice'));
+    });
+
+    it('renders systemPrompt lifecycle notice with correct data attr', () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'model-thinking');
+
+      const lifecycleEl = containerEl.querySelector('[data-claude-code-system-prompt-lifecycle="true"]');
+      expect(lifecycleEl).toBeTruthy();
+      expect(containerEl.textContent).toContain(t('settings.claudeCode.systemPrompt.lifecycleNotice'));
+    });
+
+    it('renders taskBudget boundary notice with correct data attr', () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'model-thinking');
+
+      const boundaryEl = containerEl.querySelector('[data-claude-code-task-budget-boundary="true"]');
+      expect(boundaryEl).toBeTruthy();
+      expect(containerEl.textContent).toContain(t('settings.claudeCode.taskBudget.boundaryNotice'));
+    });
+
+    it('renders taskBudget lifecycle notice with correct data attr', () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'model-thinking');
+
+      const lifecycleEl = containerEl.querySelector('[data-claude-code-task-budget-lifecycle="true"]');
+      expect(lifecycleEl).toBeTruthy();
+      expect(containerEl.textContent).toContain(t('settings.claudeCode.taskBudget.lifecycleNotice'));
     });
   });
 

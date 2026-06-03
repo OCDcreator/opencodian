@@ -69,7 +69,7 @@ OpenCodian 全局类型的主聚合入口。它把聊天、模型、设置、权
 | `ThemeSettings` / `ThemePresetId` / `ThemeStyleId` | type | 主题设置 |
 | `PersistedTabState` / `PersistedTabEntry` | type | 标签页持久化 |
 | `ProviderIconEntry` / `ProviderIconLibrary` | type | 提供商图标 |
-| `normalize*` 系列 | function | 归一化函数（约 20+ 个），包含 Claude Code 专属的 `normalizeClaudeCodeStringArray`、`normalizeClaudeCodeNullablePositiveInt`、`normalizeClaudeCodeNullablePositiveNumber`、`normalizeClaudeCodeEnv`、`normalizeClaudeCodeDebugChannelSettings` 和 `normalizeClaudeCodeSandboxSettings` |
+| `normalize*` 系列 | function | 归一化函数（约 20+ 个），包含 Claude Code 专属的 `normalizeClaudeCodeStringArray`、`normalizeClaudeCodeNullablePositiveInt`、`normalizeClaudeCodeNullablePositiveNumber`、`normalizeClaudeCodeEnv`、`normalizeClaudeCodeDebugChannelSettings`、`normalizeClaudeCodeSandboxSettings` 和 `normalizeClaudeCodeToolAliases` |
 | `getDefault*` 系列 | function | 默认值函数 |
 | `CLAUDE_CODE_DEBUG_CHANNEL_IDS` / `ClaudeCodeDebugChannelSettings` | const/type | Claude Code 调试工作台的 runtime/session/stream/permission/MCP/experimental 通道契约 |
 | `isLocalServerMode` / `getServerBaseUrl` | function | 服务器工具函数 |

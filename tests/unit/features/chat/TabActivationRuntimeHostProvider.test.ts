@@ -1,3 +1,10 @@
+import {
+  clearAllPromptSuggestionSessionCallbacks,
+  createPromptSuggestionChannel,
+  deletePromptSuggestionChannel,
+  onPromptSuggestionSessionChange,
+  stampPromptSuggestionScope,
+} from '../../../../src/core/agents/backend/promptSuggestionSink';
 import type { Conversation } from '../../../../src/core/types';
 import {
   createTabActivationRuntimeViewHostFactoryHost,
@@ -167,6 +174,38 @@ describe('TabActivationRuntimeHostProvider', () => {
     expect(fixture.host.clearMessagesContainer).toHaveBeenCalledTimes(1);
     expect(fixture.host.resetTurnState).toHaveBeenCalledTimes(1);
     expect(fixture.host.scheduleSettledScrollToBottom).toHaveBeenCalledWith('tab-active');
+  });
+
+  it('emits session change through channel bus when conversation changes', () => {
+    const fixture = createFixture();
+    const factoryHost = createTabActivationRuntimeViewHostFactoryHost(fixture.host);
+    const conversationState = factoryHost.getConversationState();
+
+    // Create a channel and stamp it on a mock messages container
+    const messagesContainer = document.createElement('div');
+    const channelId = createPromptSuggestionChannel();
+    stampPromptSuggestionScope(messagesContainer, channelId);
+    fixture.setMessagesContainer(messagesContainer);
+
+    const conversation = {
+      ...createConversation('conversation-next'),
+      backendSessionId: 'backend-session-next',
+    };
+
+    // Subscribe to the channel
+    const receivedSessions: (string | null)[] = [];
+    onPromptSuggestionSessionChange((sessionId) => {
+      receivedSessions.push(sessionId);
+    }, channelId);
+
+    conversationState.setCurrentConversation(conversation);
+    conversationState.setCurrentConversation(null);
+
+    expect(receivedSessions).toEqual(['backend-session-next', null]);
+
+    // Cleanup
+    deletePromptSuggestionChannel(channelId);
+    clearAllPromptSuggestionSessionCallbacks();
   });
 
   it('keeps the grouped ports late-bound to the latest activation collaborators', () => {

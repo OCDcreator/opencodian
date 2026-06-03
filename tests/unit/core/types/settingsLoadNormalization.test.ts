@@ -116,6 +116,12 @@ describe('prepareLoadedSettingsBootstrapState backend normalization', () => {
       planModeInstructions: '',
       toolAliases: {},
       debug: false,
+      debugFile: '',
+      enableContext1mBeta: false,
+      jsRuntime: '',
+      loadTimeoutMs: null,
+      strictMcpConfig: false,
+      systemPrompt: '',
     });
   });
 

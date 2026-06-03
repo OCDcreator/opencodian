@@ -349,7 +349,8 @@ export type StreamChunk =
         callID: string;
       };
     }
-  | { type: 'question_request'; request: QuestionRequest };
+  | { type: 'question_request'; request: QuestionRequest }
+  | { type: 'prompt_suggestion'; suggestion: string; uuid: string; sessionId?: string };
 
 /** Logical agent backend identity. Determines which adapter owns a session. */
 export type AgentBackendKind = 'opencode' | 'claude-code' | 'codex' | 'copilot' | 'pi';

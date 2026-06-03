@@ -129,6 +129,61 @@ describe('ClaudeCodeBackendSettings field truth-audit', () => {
     expect(jsdoc.toLowerCase()).toContain('cli');
   });
 
+  // --- strictMcpConfig: readback (SDK option wiring proven; MCP config validation behavior not independently verified) ---
+
+  it('strictMcpConfig JSDoc reflects readback boundary (not @untested)', () => {
+    const jsdoc = getFieldJsdoc(source, /^\s+strictMcpConfig: boolean/);
+    expect(jsdoc).not.toContain('@untested');
+    expect(jsdoc).toContain('Readback');
+    expect(jsdoc.toLowerCase()).toContain('mcp');
+  });
+
+  // --- enableContext1mBeta: readback (SDK option wiring proven; beta behavior not independently verified) ---
+
+  it('enableContext1mBeta JSDoc reflects readback boundary (not @untested)', () => {
+    const jsdoc = getFieldJsdoc(source, /^\s+enableContext1mBeta: boolean/);
+    expect(jsdoc).not.toContain('@untested');
+    expect(jsdoc).toContain('Readback');
+    expect(jsdoc.toLowerCase()).toContain('beta');
+  });
+
+  // --- debugFile: readback (SDK option wiring proven; CLI debug file writing not independently verified) ---
+
+  it('debugFile JSDoc reflects readback boundary (not @untested)', () => {
+    const jsdoc = getFieldJsdoc(source, /^\s+debugFile: string/);
+    expect(jsdoc).not.toContain('@untested');
+    expect(jsdoc).toContain('Readback');
+    expect(jsdoc.toLowerCase()).toContain('debug');
+  });
+
+  // --- jsRuntime: readback (SDK option wiring proven; actual runtime selection not independently verified) ---
+
+  it('jsRuntime JSDoc reflects readback boundary (not @untested)', () => {
+    const jsdoc = getFieldJsdoc(source, /^\s+jsRuntime:/);
+    expect(jsdoc).not.toContain('@untested');
+    expect(jsdoc).toContain('Readback');
+    expect(jsdoc.toLowerCase()).toContain('runtime');
+  });
+
+  // --- loadTimeoutMs: readback (SDK option wiring proven; actual timeout behavior not independently verified) ---
+
+  it('loadTimeoutMs JSDoc reflects readback boundary (not @untested)', () => {
+    const jsdoc = getFieldJsdoc(source, /^\s+loadTimeoutMs:/);
+    expect(jsdoc).not.toContain('@untested');
+    expect(jsdoc).toContain('Readback');
+    expect(jsdoc.toLowerCase()).toContain('timeout');
+  });
+
+  // --- systemPrompt: readback (SDK option wiring proven; actual append behavior not independently verified) ---
+
+  it('systemPrompt JSDoc reflects readback boundary and append-only semantics (not @untested)', () => {
+    const jsdoc = getFieldJsdoc(source, /^\s+systemPrompt: string/);
+    expect(jsdoc).not.toContain('@untested');
+    expect(jsdoc).toContain('Readback');
+    expect(jsdoc.toLowerCase()).toContain('append');
+    expect(jsdoc.toLowerCase()).toContain('preset');
+  });
+
   // --- settings.md: no stale @untested grouping for these fields ---
 
   it('settings.md does not group tool/env fields as @untested', () => {

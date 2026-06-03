@@ -31,6 +31,7 @@
 - `SandboxReadbackProbeResult`: Claude Code `sandbox` 选项 readback probe 结果类型；诊断专用，不验证实际 OS-level sandbox enforcement 行为。
 - `DebugFileReadbackProbeResult`: Claude Code `debugFile` 选项 readback probe 结果类型；诊断专用，不验证实际 CLI debug file writing 行为。
 - `StrictMcpConfigReadbackProbeResult`: Claude Code `strictMcpConfig` 选项 readback probe 结果类型；诊断专用，不验证实际 MCP config validation 行为。
+- `DebugReadbackProbeResult`: Claude Code `debug` 选项 readback probe 结果类型；诊断专用，不验证实际 CLI debug log emission 行为。
 - `buildClaudeCodeModelSelectorProviders` / `CLAUDE_CODE_EFFORT_VARIANTS`: Claude Code composer model aliases、SDK supported-model projection 与 effort variants helper。
 - `loadClaudeCodeSdk` / `buildClaudeCodeOptions` / `adaptMcpConfigForClaude` / `resolveClaudeCodeProcess` / `createClaudeCodeStreamNormalizer` / `createClaudeCodePermissionBridge`: Claude Code Phase 1 前置 SDK loading、options、MCP config adapter、process、stream 转换与 permission/question bridge helper。
 - `AgentService` / `AgentServiceInfo` / `AgentConnectionStatus` / `Disposable` / `StatusChangeHandler`: backend 抽象层核心契约与共享类型。

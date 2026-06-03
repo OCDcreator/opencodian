@@ -786,6 +786,17 @@ export interface StrictMcpConfigReadbackProbeResult {
   error?: string;
 }
 
+/** Debug readback probe result. */
+export interface DebugReadbackProbeResult {
+  classification: 'readback' | 'fail';
+  optionWired: boolean;
+  settingValue: boolean;
+  sdkOptionPresent: boolean;
+  sdkValue?: boolean;
+  valueMatch: boolean;
+  error?: string;
+}
+
 /** Continue diagnostic probe result. */
 export interface ContinueProbeResult {
   classification: 'pass' | 'fail';
@@ -2622,6 +2633,56 @@ export class ClaudeCodeAdapter
         classification: 'fail',
         optionWired: false,
         settingValue: this.options.settings.strictMcpConfig === true,
+        sdkOptionPresent: false,
+        valueMatch: false,
+        error: errorMessage,
+      };
+    }
+  }
+
+  async runDebugReadbackProbe(): Promise<DebugReadbackProbeResult> {
+    try {
+      const abortController = new AbortController();
+      const options = this.buildDiagnosticSdkOptions(abortController, {
+        prompt: 'Debug readback proof.',
+        _diagnosticBypassPermissions: true,
+      });
+      const settingValue = this.options.settings.debug === true;
+      const sdkOptionPresent = options.debug !== undefined && options.debug !== null;
+      const sdkValue = sdkOptionPresent ? Boolean(options.debug) : undefined;
+      const valueMatch = settingValue
+        ? sdkOptionPresent && sdkValue === true
+        : !sdkOptionPresent;
+      const optionWired = valueMatch;
+      if (!optionWired) {
+        const error = settingValue
+          ? `debug is true in settings but SDK options have debug=${String(options.debug)}.`
+          : `debug is false in settings but SDK options still contain debug=${String(options.debug)}.`;
+        return {
+          classification: 'fail',
+          optionWired: false,
+          settingValue,
+          sdkOptionPresent,
+          sdkValue,
+          valueMatch: false,
+          error,
+        };
+      }
+      return {
+        classification: 'readback',
+        optionWired: true,
+        settingValue,
+        sdkOptionPresent,
+        sdkValue,
+        valueMatch: true,
+      };
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      runtimeLogger.debug('debug readback probe', { result: 'fail', error: errorMessage });
+      return {
+        classification: 'fail',
+        optionWired: false,
+        settingValue: this.options.settings.debug === true,
         sdkOptionPresent: false,
         valueMatch: false,
         error: errorMessage,

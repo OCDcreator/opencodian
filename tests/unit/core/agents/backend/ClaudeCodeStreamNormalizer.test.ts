@@ -654,4 +654,57 @@ describe('ClaudeCodeStreamNormalizer', () => {
       },
     }]);
   });
+
+  it('emits prompt_suggestion chunk for SDK prompt_suggestion messages', () => {
+    const normalizer = createClaudeCodeStreamNormalizer({ sessionId: 'sess-ps' });
+
+    expect(normalizer.transformSDKMessage({
+      type: 'prompt_suggestion',
+      suggestion: 'Write unit tests for this function',
+      uuid: 'ps-uuid-1',
+      session_id: 'sess-ps',
+    })).toEqual([{
+      type: 'prompt_suggestion',
+      suggestion: 'Write unit tests for this function',
+      uuid: 'ps-uuid-1',
+      sessionId: 'sess-ps',
+    }]);
+  });
+
+  it('emits prompt_suggestion chunk without sessionId when message lacks it', () => {
+    const normalizer = createClaudeCodeStreamNormalizer();
+
+    expect(normalizer.transformSDKMessage({
+      type: 'prompt_suggestion',
+      suggestion: 'Add error handling',
+      uuid: 'ps-uuid-2',
+    })).toEqual([{
+      type: 'prompt_suggestion',
+      suggestion: 'Add error handling',
+      uuid: 'ps-uuid-2',
+    }]);
+  });
+
+  it('uses normalizer state sessionId as fallback for prompt_suggestion', () => {
+    const normalizer = createClaudeCodeStreamNormalizer({ sessionId: 'fallback-sess' });
+
+    // First establish session state via assistant message
+    normalizer.transformSDKMessage({
+      type: 'assistant',
+      session_id: 'fallback-sess',
+      message: { id: 'msg-1', content: [{ type: 'text', text: 'Hello' }] },
+    });
+
+    // Then prompt_suggestion without explicit session_id should use state
+    expect(normalizer.transformSDKMessage({
+      type: 'prompt_suggestion',
+      suggestion: 'Refactor into smaller functions',
+      uuid: 'ps-uuid-3',
+    })).toEqual([{
+      type: 'prompt_suggestion',
+      suggestion: 'Refactor into smaller functions',
+      uuid: 'ps-uuid-3',
+      sessionId: 'fallback-sess',
+    }]);
+  });
 });

@@ -89,6 +89,10 @@ OpenCodian 的英文翻译表，导出 `enTranslations` 静态对象。它为设
 
 2026-05-28 SDK Foundations 诊断表面迁移：新增 `settings.claudeCode.diagnosticStreamMoved.title` / `.desc`，用于在稳定 SDK Foundations 标签中提示用户诊断流控制已迁移到 Capability Lab；新增 `settings.capabilityLab.diagnosticStreamControls.title` / `.description`，用于 Capability Lab 中 Diagnostic Stream Controls 子区的标题和说明。保留原有的 `settings.claudeCode.includeHookEvents.*`、`settings.claudeCode.forwardSubagentText.*`、`settings.claudeCode.agentProgressSummaries.*`，因为这些设置键仍然有效，只是 UI 表面从稳定设置迁移到了诊断面板。
 
+2026-06-02 Continue diagnostic seam 又补了一组 `settings.capabilityLab.proofs.continue.*` 键，把 Continue proof 按钮、运行中提示、诊断边界说明、seed/continue session labels、yes/no 状态、pass/fail 文案和 thrown-error 提示收进 locale，避免在 Capability Lab 继续硬编码新增诊断 UI 文案。
+
+2026-06-03 调整 `settings.claudeCode.planModeInstructions.desc` 与 `.boundaryNotice`：稳定设置文案不再暗示插件层按 `permissionMode` 做写入门控，而是明确区分 SDK 使用条件（Plan permission mode）与当前 readback-only 边界（插件只验证 settings→SDK option wiring，实际 plan-mode behavior 未独立运行时验证）。
+
 2026-05-28 文档更正：移除关于 `chat.input.placeholderJsonSuffix` 与 backend-aware composer placeholder 已落地的表述。当前实现未引入该 i18n 键，也未在输入框占位符中追加 `/json` discoverability 文案；discoverability 通过 composer capability hint 落地（`chat.input.capabilityHint.json`，Claude Code backend 显示 `/json — structured output`，OpenCode backend 不显示），并且仍然只覆盖固定 schema trigger，不暗示任意 schema authoring。
 
 2026-05-24 新增 `settings.claudeCode.sdkStreamBoundary.*` 键，用于 SDK Foundations 中 hook/subagent stream 开关前的 diagnostic boundary notice，明确这些开关只驱动诊断/实验事件流，不提供稳定 hook authoring 或完整 subagent transcript/progress UI。
@@ -356,3 +360,5 @@ Claude Code no longer uses the overloaded `settings.claudeCode.tab.mcpAdvanced` 
 
 
 本轮 capability-hint 新增 `chat.input.capabilityHint.json` 键，用于 Claude Code backend 激活时在聊天输入区显示 `/json — structured output` 发现性 inline hint。
+
+- 本轮 prompt-suggestions 新增 `settings.claudeCode.promptSuggestions.name` 和 `settings.claudeCode.promptSuggestions.desc` 键，用于 Capability Lab 诊断流控制区域的 toggle 说明。

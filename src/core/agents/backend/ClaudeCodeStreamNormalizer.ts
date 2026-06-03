@@ -458,6 +458,7 @@ export class ClaudeCodeStreamNormalizer {
     }
     this.appendAssistantContentChunks(record, chunks, sessionId);
     this.appendResultChunks(record, chunks);
+    this.appendPromptSuggestionChunk(record, chunks, sessionId);
     appendUsageChunk(record, chunks, sessionId);
     logSummaries(record, chunks, sessionId);
     return chunks;
@@ -726,6 +727,30 @@ export class ClaudeCodeStreamNormalizer {
         content: normalizeErrorContent(record),
       });
     }
+  }
+
+  private appendPromptSuggestionChunk(
+    record: JsonRecord,
+    chunks: StreamChunk[],
+    sessionId: string | undefined,
+  ): void {
+    if (readString(record.type) !== 'prompt_suggestion') {
+      return;
+    }
+
+    const suggestion = readNonEmptyString(record.suggestion);
+    const uuid = readNonEmptyString(record.uuid);
+    if (!suggestion || !uuid) {
+      return;
+    }
+
+    const resolvedSessionId = resolveSessionId(record) ?? sessionId;
+    chunks.push({
+      type: 'prompt_suggestion',
+      suggestion,
+      uuid,
+      ...(resolvedSessionId ? { sessionId: resolvedSessionId } : {}),
+    });
   }
 
   private takeSuffix(lengths: Map<string, number>, key: string, value: string): string {

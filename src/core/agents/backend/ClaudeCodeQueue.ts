@@ -105,3 +105,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 export function isTurnBoundaryMessage(message: unknown): boolean {
   return isRecord(message) && message.type === 'result';
 }
+
+export function isPromptSuggestionMessage(message: unknown): boolean {
+  return isRecord(message) && message.type === 'prompt_suggestion';
+}

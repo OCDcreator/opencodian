@@ -40,6 +40,18 @@ OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings`、`DEFAULT_
 
 `debug` 为 readback only：通过 `buildClaudeCodeOptions` 传入 SDK `debug` 选项，要求 CLI 在查询执行期间发出调试日志。实际调试日志输出是 SDK/CLI binary 的内部行为，无法从插件层独立验证。默认 `false`。UI 位于 Runtime 标签页，为 toggle 开关，仅在下一次查询时生效。
 
+`strictMcpConfig` 为 readback only：通过 `buildClaudeCodeOptions` 传入 SDK `strictMcpConfig` 选项，要求 SDK 将无效的 MCP 服务器配置视为错误而非警告。实际 MCP 配置验证行为是 SDK/CLI binary 的内部行为，无法从插件层独立验证。默认 `false`。UI 位于 Tools 标签页，为 toggle 开关，仅在下一次查询或重启会话时生效。此处不写入 `.claude/mcp.json`，也不提供 MCP 编写界面。
+
+`debugFile` 为 readback only：通过 `buildClaudeCodeOptions` 传入 SDK `debugFile` 选项，要求 SDK 将 CLI 调试日志写入指定文件路径。实际文件写入是 SDK/CLI binary 的内部行为，无法从插件层独立验证。设置调试文件路径会隐式启用调试日志，即使 `debug` toggle 为关闭状态。默认空字符串 `''`。UI 位于 Runtime 标签页，为文本输入，仅在下一次查询或重启会话时生效。插件层不执行路径校验，也不执行文件系统写入。
+
+`enableContext1mBeta` 为 readback only：通过 `buildClaudeCodeOptions` 传入 SDK `betas` 选项（值为 `['context-1m-2025-08-07']`），请求 1M 上下文窗口 beta header。实际 beta 可用性是 SDK/模型/Anthropic 侧的内部行为，无法从插件层独立验证。并非所有模型都支持此 beta。默认 `false`。UI 位于 Model & Thinking 标签页，为 toggle 开关，仅在下一次查询或重启会话时生效。不暴露通用 beta 管理功能。
+
+`jsRuntime` 为 readback only：通过 `buildClaudeCodeOptions` 传入 SDK `executable` 选项（值为 `'node' | 'bun' | 'deno'`），请求 SDK 使用指定的 JavaScript 运行时。空字符串 `''` 表示 auto（由 SDK 自行选择）。实际运行时选择取决于 SDK/CLI 版本、系统 PATH 以及所请求的运行时是否已安装，无法从插件层独立验证。默认 `''`（auto）。UI 位于 Runtime 标签页，为下拉选择框，仅在下一次查询或重启会话时生效。不暴露运行时参数管理功能（`executableArgs`、`extraArgs` 明确未实现）。
+
+`loadTimeoutMs` 为 readback only：通过 `buildClaudeCodeOptions` 传入 SDK `loadTimeoutMs` 选项（值为正整数），设置 Claude Code 子进程加载的最大超时时间（毫秒）。`null` 表示使用 SDK 默认超时。实际超时行为取决于 SDK/CLI 版本和运行时条件，无法从插件层独立验证。默认 `null`。UI 位于 Runtime 标签页，为数字文本输入，仅在下一次查询或重启会话时生效。空输入、非数字、零和负值均归一化为 `null`。
+
+`systemPrompt` 为 readback only：通过 `buildClaudeCodeOptions` 传入 SDK `systemPrompt` 选项。当非空时，使用 preset-with-append 形状 `{ type: 'preset', preset: 'claude_code', append: instructions }`；当为空时，使用默认 `{ type: 'preset', preset: 'claude_code' }`。这是 append-only seam，不会替换官方预设。实际 prompt append 行为（SDK 是否确实将指令追加到 preset 之后）无法从插件层独立验证。默认空字符串 `''`。UI 位于 Model & Thinking 标签页，为文本区域输入，仅在下一次查询或重启会话时生效。输入会被 trim，空白输入归一化为空字符串。
+
 ### 服务器与安全
 
 | 类型 | 说明 |

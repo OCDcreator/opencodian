@@ -229,9 +229,12 @@ export class SettingsClaudeCodeSection {
     this.renderContextUsageReadbackControls(containerEl);
     this.renderRuntimeFileReadbackControls(containerEl);
     this.renderExecutableSetting(containerEl);
+    this.renderJsRuntimeSetting(containerEl);
+    this.renderLoadTimeoutMsSetting(containerEl);
     this.renderEnvironmentHint(containerEl);
     this.renderDiagnostics(containerEl);
     this.renderDebugSetting(containerEl);
+    this.renderDebugFileSetting(containerEl);
     this.renderEnvProofStatusNotice(containerEl);
     this.renderFileCheckpointBoundaryNotice(containerEl);
     this.renderEnvironmentVariablesSetting(containerEl);
@@ -250,6 +253,63 @@ export class SettingsClaudeCodeSection {
             await this.saveSettings();
           });
       });
+  }
+
+  private renderJsRuntimeSetting(containerEl: HTMLElement): void {
+    const boundaryEl = containerEl.createDiv({
+      cls: 'opencodian-settings-inline-notice',
+      attr: { 'data-claude-code-js-runtime-boundary': 'true' },
+    });
+    boundaryEl.createSpan({ text: t('settings.claudeCode.jsRuntime.boundaryNotice') });
+
+    new Setting(containerEl)
+      .setName(t('settings.claudeCode.jsRuntime.name'))
+      .setDesc(t('settings.claudeCode.jsRuntime.desc'))
+      .addDropdown((dropdown) => {
+        dropdown
+          .addOption('', t('settings.claudeCode.jsRuntime.auto'))
+          .addOption('node', 'Node.js')
+          .addOption('bun', 'Bun')
+          .addOption('deno', 'Deno')
+          .setValue(this.settings.jsRuntime)
+          .onChange(async (value) => {
+            this.settings.jsRuntime = value as 'node' | 'bun' | 'deno' | '';
+            await this.saveSettings();
+          });
+      });
+
+    const lifecycleEl = containerEl.createDiv({
+      cls: 'opencodian-settings-inline-notice',
+      attr: { 'data-claude-code-js-runtime-lifecycle': 'true' },
+    });
+    lifecycleEl.createSpan({ text: t('settings.claudeCode.jsRuntime.lifecycleNotice') });
+  }
+
+  private renderLoadTimeoutMsSetting(containerEl: HTMLElement): void {
+    const boundaryEl = containerEl.createDiv({
+      cls: 'opencodian-settings-inline-notice',
+      attr: { 'data-claude-code-load-timeout-ms-boundary': 'true' },
+    });
+    boundaryEl.createSpan({ text: t('settings.claudeCode.loadTimeoutMs.boundaryNotice') });
+
+    new Setting(containerEl)
+      .setName(t('settings.claudeCode.loadTimeoutMs.name'))
+      .setDesc(t('settings.claudeCode.loadTimeoutMs.desc'))
+      .addText((text) => {
+        text
+          .setPlaceholder(t('settings.claudeCode.loadTimeoutMs.placeholder'))
+          .setValue(this.settings.loadTimeoutMs !== null ? String(this.settings.loadTimeoutMs) : '')
+          .onChange(async (value) => {
+            this.settings.loadTimeoutMs = this.parseNullablePositiveInteger(value);
+            await this.saveSettings();
+          });
+      });
+
+    const lifecycleEl = containerEl.createDiv({
+      cls: 'opencodian-settings-inline-notice',
+      attr: { 'data-claude-code-load-timeout-ms-lifecycle': 'true' },
+    });
+    lifecycleEl.createSpan({ text: t('settings.claudeCode.loadTimeoutMs.lifecycleNotice') });
   }
 
   private renderEnvironmentHint(containerEl: HTMLElement): void {
@@ -306,6 +366,39 @@ export class SettingsClaudeCodeSection {
       attr: { 'data-claude-code-debug-lifecycle': 'true' },
     });
     lifecycleEl.createSpan({ text: t('settings.claudeCode.debug.lifecycleNotice') });
+  }
+
+  private renderDebugFileSetting(containerEl: HTMLElement): void {
+    const boundaryEl = containerEl.createDiv({
+      cls: 'opencodian-settings-inline-notice',
+      attr: { 'data-claude-code-debug-file-boundary': 'true' },
+    });
+    boundaryEl.createSpan({ text: t('settings.claudeCode.debugFile.boundaryNotice') });
+
+    new Setting(containerEl)
+      .setName(t('settings.claudeCode.debugFile.name'))
+      .setDesc(t('settings.claudeCode.debugFile.desc'))
+      .addText((text) => {
+        text
+          .setPlaceholder(t('settings.claudeCode.debugFile.placeholder'))
+          .setValue(this.settings.debugFile)
+          .onChange(async (value) => {
+            this.settings.debugFile = value.trim();
+            await this.saveSettings();
+          });
+      });
+
+    const implicitEl = containerEl.createDiv({
+      cls: 'opencodian-settings-inline-notice',
+      attr: { 'data-claude-code-debug-file-implicit': 'true' },
+    });
+    implicitEl.createSpan({ text: t('settings.claudeCode.debugFile.implicitDebugNotice') });
+
+    const lifecycleEl = containerEl.createDiv({
+      cls: 'opencodian-settings-inline-notice',
+      attr: { 'data-claude-code-debug-file-lifecycle': 'true' },
+    });
+    lifecycleEl.createSpan({ text: t('settings.claudeCode.debugFile.lifecycleNotice') });
   }
 
   private renderRuntimeEcosystemSummary(containerEl: HTMLElement): void {
@@ -917,7 +1010,9 @@ export class SettingsClaudeCodeSection {
     this.renderMaxTurnsSetting(containerEl);
     this.renderMaxBudgetSetting(containerEl);
     this.renderTaskBudgetSetting(containerEl);
+    this.renderSystemPromptSetting(containerEl);
     this.renderPromptSuggestionsSetting(containerEl);
+    this.renderEnableContext1mBetaSetting(containerEl);
   }
 
   private renderModelSetting(containerEl: HTMLElement): unknown {
@@ -1451,6 +1546,7 @@ export class SettingsClaudeCodeSection {
   private renderToolsTab(containerEl: HTMLElement): void {
     this.renderRuntimeBoundaryNotice(containerEl);
     this.renderMcpRuntimeControls(containerEl);
+    this.renderStrictMcpConfigSetting(containerEl);
     this.renderToolsProofStatusNotice(containerEl);
     this.renderAllowedToolsSetting(containerEl);
     this.renderDisallowedToolsSetting(containerEl);
@@ -1502,6 +1598,32 @@ export class SettingsClaudeCodeSection {
             await this.renderMcpRuntimeStatusReadback(getRuntimeStatusEl());
           });
       });
+  }
+
+  private renderStrictMcpConfigSetting(containerEl: HTMLElement): void {
+    const boundaryEl = containerEl.createDiv({
+      cls: 'opencodian-settings-inline-notice',
+      attr: { 'data-claude-code-strict-mcp-config-boundary': 'true' },
+    });
+    boundaryEl.createSpan({ text: t('settings.claudeCode.strictMcpConfig.boundaryNotice') });
+
+    new Setting(containerEl)
+      .setName(t('settings.claudeCode.strictMcpConfig.name'))
+      .setDesc(t('settings.claudeCode.strictMcpConfig.desc'))
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.settings.strictMcpConfig)
+          .onChange(async (value) => {
+            this.settings.strictMcpConfig = value;
+            await this.saveSettings();
+          });
+      });
+
+    const lifecycleEl = containerEl.createDiv({
+      cls: 'opencodian-settings-inline-notice',
+      attr: { 'data-claude-code-strict-mcp-config-lifecycle': 'true' },
+    });
+    lifecycleEl.createSpan({ text: t('settings.claudeCode.strictMcpConfig.lifecycleNotice') });
   }
 
   private updateMcpRuntimeStatus(statusEl: HTMLElement): void {
@@ -1647,6 +1769,12 @@ export class SettingsClaudeCodeSection {
   }
 
   private renderToolAliasesSetting(containerEl: HTMLElement): void {
+    const boundaryEl = containerEl.createDiv({
+      cls: 'opencodian-settings-inline-notice',
+      attr: { 'data-claude-code-tool-aliases-boundary': 'true' },
+    });
+    boundaryEl.createSpan({ text: t('settings.claudeCode.toolAliases.boundaryNotice') });
+
     new Setting(containerEl)
       .setName(t('settings.claudeCode.toolAliases.name'))
       .setDesc(t('settings.claudeCode.toolAliases.desc'))
@@ -1663,6 +1791,12 @@ export class SettingsClaudeCodeSection {
             await this.saveSettings();
           });
       });
+
+    const lifecycleEl = containerEl.createDiv({
+      cls: 'opencodian-settings-inline-notice',
+      attr: { 'data-claude-code-tool-aliases-lifecycle': 'true' },
+    });
+    lifecycleEl.createSpan({ text: t('settings.claudeCode.toolAliases.lifecycleNotice') });
   }
 
   private parseToolAliases(raw: string): Record<string, string> {
@@ -1712,6 +1846,12 @@ export class SettingsClaudeCodeSection {
   }
 
   private renderTaskBudgetSetting(containerEl: HTMLElement): void {
+    const boundaryEl = containerEl.createDiv({
+      cls: 'opencodian-settings-inline-notice',
+      attr: { 'data-claude-code-task-budget-boundary': 'true' },
+    });
+    boundaryEl.createSpan({ text: t('settings.claudeCode.taskBudget.boundaryNotice') });
+
     new Setting(containerEl)
       .setName(t('settings.claudeCode.taskBudget.name'))
       .setDesc(t('settings.claudeCode.taskBudget.desc'))
@@ -1724,9 +1864,48 @@ export class SettingsClaudeCodeSection {
             await this.saveSettings();
           });
       });
+
+    const lifecycleEl = containerEl.createDiv({
+      cls: 'opencodian-settings-inline-notice',
+      attr: { 'data-claude-code-task-budget-lifecycle': 'true' },
+    });
+    lifecycleEl.createSpan({ text: t('settings.claudeCode.taskBudget.lifecycleNotice') });
+  }
+
+  private renderSystemPromptSetting(containerEl: HTMLElement): void {
+    const boundaryEl = containerEl.createDiv({
+      cls: 'opencodian-settings-inline-notice',
+      attr: { 'data-claude-code-system-prompt-boundary': 'true' },
+    });
+    boundaryEl.createSpan({ text: t('settings.claudeCode.systemPrompt.boundaryNotice') });
+
+    new Setting(containerEl)
+      .setName(t('settings.claudeCode.systemPrompt.name'))
+      .setDesc(t('settings.claudeCode.systemPrompt.desc'))
+      .addTextArea((textArea) => {
+        textArea
+          .setPlaceholder(t('settings.claudeCode.systemPrompt.placeholder'))
+          .setValue(this.settings.systemPrompt)
+          .onChange(async (value) => {
+            this.settings.systemPrompt = value.trim();
+            await this.saveSettings();
+          });
+      });
+
+    const lifecycleEl = containerEl.createDiv({
+      cls: 'opencodian-settings-inline-notice',
+      attr: { 'data-claude-code-system-prompt-lifecycle': 'true' },
+    });
+    lifecycleEl.createSpan({ text: t('settings.claudeCode.systemPrompt.lifecycleNotice') });
   }
 
   private renderPromptSuggestionsSetting(containerEl: HTMLElement): void {
+    const boundaryEl = containerEl.createDiv({
+      cls: 'opencodian-settings-inline-notice',
+      attr: { 'data-claude-code-prompt-suggestions-boundary': 'true' },
+    });
+    boundaryEl.createSpan({ text: t('settings.claudeCode.promptSuggestions.boundaryNotice') });
+
     new Setting(containerEl)
       .setName(t('settings.claudeCode.promptSuggestions.name'))
       .setDesc(t('settings.claudeCode.promptSuggestions.stableDesc'))
@@ -1738,6 +1917,38 @@ export class SettingsClaudeCodeSection {
             await this.saveSettings();
           });
       });
+
+    const lifecycleEl = containerEl.createDiv({
+      cls: 'opencodian-settings-inline-notice',
+      attr: { 'data-claude-code-prompt-suggestions-lifecycle': 'true' },
+    });
+    lifecycleEl.createSpan({ text: t('settings.claudeCode.promptSuggestions.lifecycleNotice') });
+  }
+
+  private renderEnableContext1mBetaSetting(containerEl: HTMLElement): void {
+    const boundaryEl = containerEl.createDiv({
+      cls: 'opencodian-settings-inline-notice',
+      attr: { 'data-claude-code-enable-context-1m-beta-boundary': 'true' },
+    });
+    boundaryEl.createSpan({ text: t('settings.claudeCode.enableContext1mBeta.boundaryNotice') });
+
+    new Setting(containerEl)
+      .setName(t('settings.claudeCode.enableContext1mBeta.name'))
+      .setDesc(t('settings.claudeCode.enableContext1mBeta.desc'))
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.settings.enableContext1mBeta)
+          .onChange(async (value) => {
+            this.settings.enableContext1mBeta = value;
+            await this.saveSettings();
+          });
+      });
+
+    const lifecycleEl = containerEl.createDiv({
+      cls: 'opencodian-settings-inline-notice',
+      attr: { 'data-claude-code-enable-context-1m-beta-lifecycle': 'true' },
+    });
+    lifecycleEl.createSpan({ text: t('settings.claudeCode.enableContext1mBeta.lifecycleNotice') });
   }
 
   private renderEnvironmentVariablesSetting(containerEl: HTMLElement): void {

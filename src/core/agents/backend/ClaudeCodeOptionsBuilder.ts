@@ -65,12 +65,22 @@ export interface ClaudeCodeOptionsBuilderInput {
   model?: string;
   /** Custom session title. Passed to SDK options.title; only effective on first query (not resume). */
   title?: string;
+  /** Diagnostic-only stderr callback. Receives raw stderr text from the Claude Code subprocess. */
+  stderr?: (data: string) => void;
+  /** Diagnostic-only explicit session id. Passed to SDK options.sessionId. */
+  sessionId?: string;
+  /** Diagnostic-only continue flag. When true, asks the SDK to continue the most recent conversation. */
+  continue?: boolean;
+  /** Diagnostic-only resume-at message UUID. When provided with resume, asks the SDK to resume only up to this message. */
+  resumeSessionAt?: string;
+  /** Diagnostic-only fork-on-resume flag. When true AND resume is provided, asks the SDK to fork into a new session. */
+  forkSession?: boolean;
 }
 
 export interface ClaudeCodeSdkOptionsShape {
   cwd: string;
   includePartialMessages: true;
-  systemPrompt: { type: 'preset'; preset: 'claude_code' };
+  systemPrompt: { type: 'preset'; preset: 'claude_code'; append?: string };
   tools: string[] | { type: 'preset'; preset: 'claude_code' };
   settingSources: ClaudeCodeSettingSource[];
   permissionMode?: ClaudeCodePermissionMode;
@@ -121,6 +131,20 @@ export interface ClaudeCodeSdkOptionsShape {
   toolAliases?: Record<string, string>;
   /** Ask the SDK to emit CLI debug logs during query execution. */
   debug?: boolean;
+  /** Ask the SDK to write CLI debug logs to a file path. */
+  debugFile?: string;
+  /** Enforce strict validation of MCP server configurations. */
+  strictMcpConfig?: boolean;
+  /** Diagnostic-only stderr callback. Receives raw stderr text from the Claude Code subprocess. */
+  stderr?: (data: string) => void;
+  /** Diagnostic-only explicit session id. Passed to SDK options.sessionId. */
+  sessionId?: string;
+  /** Diagnostic-only continue flag. When true, asks the SDK to continue the most recent conversation. */
+  continue?: boolean;
+  /** Diagnostic-only resume-at message UUID. When provided with resume, asks the SDK to resume only up to this message. */
+  resumeSessionAt?: string;
+  /** Diagnostic-only fork-on-resume flag. When true AND resume is provided, asks the SDK to fork into a new session. */
+  forkSession?: boolean;
 }
 
 function cloneSettingSources(sources: readonly ClaudeCodeSettingSource[]): ClaudeCodeSettingSource[] {
@@ -149,10 +173,13 @@ export function buildClaudeCodeOptions(
     trimOptionalString(input.pathToClaudeCodeExecutable)
     ?? trimOptionalString(input.settings.executablePath);
   const additionalDirectories = [...input.settings.additionalDirectories];
+  const systemPrompt = trimOptionalString(input.settings.systemPrompt);
   const options: ClaudeCodeSdkOptionsShape = {
     cwd: input.vaultPath,
     includePartialMessages: true,
-    systemPrompt: { type: 'preset', preset: 'claude_code' },
+    systemPrompt: systemPrompt
+      ? { type: 'preset', preset: 'claude_code', append: systemPrompt }
+      : { type: 'preset', preset: 'claude_code' },
     tools: { type: 'preset', preset: 'claude_code' },
     settingSources: cloneSettingSources(input.settings.settingSources),
     permissionMode: input.settings.permissionMode,
@@ -289,6 +316,28 @@ export function buildClaudeCodeOptions(
   }
   if (input.settings.debug === true) {
     options.debug = true;
+  }
+  const debugFile = trimOptionalString(input.settings.debugFile);
+  if (debugFile) {
+    options.debugFile = debugFile;
+  }
+  if (input.settings.strictMcpConfig === true) {
+    options.strictMcpConfig = true;
+  }
+  if (input.stderr) {
+    options.stderr = input.stderr;
+  }
+  if (input.sessionId) {
+    options.sessionId = input.sessionId;
+  }
+  if (input.continue === true) {
+    options.continue = true;
+  }
+  if (input.resumeSessionAt) {
+    options.resumeSessionAt = input.resumeSessionAt;
+  }
+  if (input.forkSession === true) {
+    options.forkSession = true;
   }
 
   return options;

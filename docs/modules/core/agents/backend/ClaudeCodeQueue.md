@@ -28,6 +28,7 @@
 | `createSessionId()` | 生成 `claude-code-{timestamp}-{random}` 格式的会话 ID |
 | `createUserPrompt()` | 构造标准用户消息结构 |
 | `isTurnBoundaryMessage()` | 判断 SDK 消息是否为 result 边界 |
+| `isPromptSuggestionMessage()` | 判断 SDK 消息是否为 prompt_suggestion 类型 |
 
 ## 注意事项
 

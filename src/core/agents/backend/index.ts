@@ -48,6 +48,7 @@ export {
   type ClaudeCodeSdkLoader,
   type ClaudeCodeSdkQueryInput,
   type DebugFileReadbackProbeResult,
+  type DebugReadbackProbeResult,
   type PlanModeInstructionsReadbackProbeResult,
   type PromptSuggestionsReadbackProbeResult,
   type SandboxReadbackProbeResult,

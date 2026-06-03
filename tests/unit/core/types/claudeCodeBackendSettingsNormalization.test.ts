@@ -399,3 +399,179 @@ describe('normalizeClaudeCodeBackendSettings toolAliases', () => {
     expect(result.toolAliases).toEqual({});
   });
 });
+
+describe('normalizeClaudeCodeBackendSettings strictMcpConfig', () => {
+  it('defaults strictMcpConfig to false', () => {
+    const defaults = getDefaultClaudeCodeBackendSettings();
+    expect(defaults.strictMcpConfig).toBe(false);
+  });
+
+  it('normalizes strictMcpConfig true', () => {
+    const result = normalizeClaudeCodeBackendSettings({ strictMcpConfig: true });
+    expect(result.strictMcpConfig).toBe(true);
+  });
+
+  it('coerces non-boolean strictMcpConfig to false', () => {
+    const result = normalizeClaudeCodeBackendSettings({ strictMcpConfig: 'yes' as unknown as boolean });
+    expect(result.strictMcpConfig).toBe(false);
+  });
+
+  it('preserves strictMcpConfig false explicitly', () => {
+    const result = normalizeClaudeCodeBackendSettings({ strictMcpConfig: false });
+    expect(result.strictMcpConfig).toBe(false);
+  });
+});
+
+describe('normalizeClaudeCodeBackendSettings enableContext1mBeta', () => {
+  it('defaults enableContext1mBeta to false', () => {
+    const defaults = getDefaultClaudeCodeBackendSettings();
+    expect(defaults.enableContext1mBeta).toBe(false);
+  });
+
+  it('normalizes enableContext1mBeta true', () => {
+    const result = normalizeClaudeCodeBackendSettings({ enableContext1mBeta: true });
+    expect(result.enableContext1mBeta).toBe(true);
+  });
+
+  it('coerces non-boolean enableContext1mBeta to false', () => {
+    const result = normalizeClaudeCodeBackendSettings({ enableContext1mBeta: 'yes' as unknown as boolean });
+    expect(result.enableContext1mBeta).toBe(false);
+  });
+
+  it('preserves enableContext1mBeta false explicitly', () => {
+    const result = normalizeClaudeCodeBackendSettings({ enableContext1mBeta: false });
+    expect(result.enableContext1mBeta).toBe(false);
+  });
+});
+
+describe('normalizeClaudeCodeBackendSettings jsRuntime', () => {
+  it('defaults jsRuntime to empty string (auto)', () => {
+    const defaults = getDefaultClaudeCodeBackendSettings();
+    expect(defaults.jsRuntime).toBe('');
+  });
+
+  it('normalizes jsRuntime to node', () => {
+    const result = normalizeClaudeCodeBackendSettings({ jsRuntime: 'node' });
+    expect(result.jsRuntime).toBe('node');
+  });
+
+  it('normalizes jsRuntime to bun', () => {
+    const result = normalizeClaudeCodeBackendSettings({ jsRuntime: 'bun' });
+    expect(result.jsRuntime).toBe('bun');
+  });
+
+  it('normalizes jsRuntime to deno', () => {
+    const result = normalizeClaudeCodeBackendSettings({ jsRuntime: 'deno' });
+    expect(result.jsRuntime).toBe('deno');
+  });
+
+  it('coerces invalid jsRuntime to empty string (auto)', () => {
+    const result = normalizeClaudeCodeBackendSettings({ jsRuntime: 'python' as unknown as string });
+    expect(result.jsRuntime).toBe('');
+  });
+
+  it('coerces non-string jsRuntime to empty string (auto)', () => {
+    const result = normalizeClaudeCodeBackendSettings({ jsRuntime: 42 as unknown as string });
+    expect(result.jsRuntime).toBe('');
+  });
+
+  it('preserves jsRuntime empty string explicitly', () => {
+    const result = normalizeClaudeCodeBackendSettings({ jsRuntime: '' });
+    expect(result.jsRuntime).toBe('');
+  });
+});
+
+describe('normalizeClaudeCodeBackendSettings debugFile', () => {
+  it('defaults debugFile to empty string', () => {
+    const defaults = getDefaultClaudeCodeBackendSettings();
+    expect(defaults.debugFile).toBe('');
+  });
+
+  it('normalizes debugFile from valid string', () => {
+    const result = normalizeClaudeCodeBackendSettings({ debugFile: '/tmp/debug.log' });
+    expect(result.debugFile).toBe('/tmp/debug.log');
+  });
+
+  it('trims debugFile whitespace', () => {
+    const result = normalizeClaudeCodeBackendSettings({ debugFile: '  /tmp/debug.log  ' });
+    expect(result.debugFile).toBe('/tmp/debug.log');
+  });
+
+  it('normalizes whitespace-only debugFile to empty string', () => {
+    const result = normalizeClaudeCodeBackendSettings({ debugFile: '   \t\n  ' });
+    expect(result.debugFile).toBe('');
+  });
+
+  it('normalizes non-string debugFile to empty string', () => {
+    const result = normalizeClaudeCodeBackendSettings({ debugFile: 42 as unknown as string });
+    expect(result.debugFile).toBe('');
+  });
+});
+
+describe('normalizeClaudeCodeBackendSettings loadTimeoutMs', () => {
+  it('defaults loadTimeoutMs to null', () => {
+    const defaults = getDefaultClaudeCodeBackendSettings();
+    expect(defaults.loadTimeoutMs).toBeNull();
+  });
+
+  it('normalizes loadTimeoutMs from valid positive integer', () => {
+    const result = normalizeClaudeCodeBackendSettings({ loadTimeoutMs: 30000 });
+    expect(result.loadTimeoutMs).toBe(30000);
+  });
+
+  it('floors decimal loadTimeoutMs values', () => {
+    const result = normalizeClaudeCodeBackendSettings({ loadTimeoutMs: 30000.7 });
+    expect(result.loadTimeoutMs).toBe(30000);
+  });
+
+  it('coerces non-number loadTimeoutMs to null', () => {
+    const result = normalizeClaudeCodeBackendSettings({ loadTimeoutMs: 'fast' as unknown as number });
+    expect(result.loadTimeoutMs).toBeNull();
+  });
+
+  it('coerces zero and negative loadTimeoutMs to null', () => {
+    const resultZero = normalizeClaudeCodeBackendSettings({ loadTimeoutMs: 0 });
+    expect(resultZero.loadTimeoutMs).toBeNull();
+    const resultNegative = normalizeClaudeCodeBackendSettings({ loadTimeoutMs: -1000 });
+    expect(resultNegative.loadTimeoutMs).toBeNull();
+  });
+
+  it('coerces NaN and Infinity loadTimeoutMs to null', () => {
+    const resultNaN = normalizeClaudeCodeBackendSettings({ loadTimeoutMs: NaN });
+    expect(resultNaN.loadTimeoutMs).toBeNull();
+    const resultInf = normalizeClaudeCodeBackendSettings({ loadTimeoutMs: Infinity });
+    expect(resultInf.loadTimeoutMs).toBeNull();
+  });
+
+  it('preserves loadTimeoutMs null explicitly', () => {
+    const result = normalizeClaudeCodeBackendSettings({ loadTimeoutMs: null });
+    expect(result.loadTimeoutMs).toBeNull();
+  });
+});
+
+describe('normalizeClaudeCodeBackendSettings systemPrompt', () => {
+  it('defaults systemPrompt to empty string', () => {
+    const defaults = getDefaultClaudeCodeBackendSettings();
+    expect(defaults.systemPrompt).toBe('');
+  });
+
+  it('normalizes systemPrompt from valid string', () => {
+    const result = normalizeClaudeCodeBackendSettings({ systemPrompt: 'Always use TypeScript.' });
+    expect(result.systemPrompt).toBe('Always use TypeScript.');
+  });
+
+  it('trims systemPrompt whitespace', () => {
+    const result = normalizeClaudeCodeBackendSettings({ systemPrompt: '  Always use TypeScript.  ' });
+    expect(result.systemPrompt).toBe('Always use TypeScript.');
+  });
+
+  it('normalizes whitespace-only systemPrompt to empty string', () => {
+    const result = normalizeClaudeCodeBackendSettings({ systemPrompt: '   \t\n  ' });
+    expect(result.systemPrompt).toBe('');
+  });
+
+  it('normalizes non-string systemPrompt to empty string', () => {
+    const result = normalizeClaudeCodeBackendSettings({ systemPrompt: 42 as unknown as string });
+    expect(result.systemPrompt).toBe('');
+  });
+});

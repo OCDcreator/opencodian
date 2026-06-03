@@ -4562,3 +4562,106 @@ describe('ClaudeCodeAdapter', () => {
     });
   });
 });
+
+describe('ClaudeCodeAdapter – prompt suggestion post-result callback', () => {
+  beforeEach(() => {
+    clearRecentLogs();
+    setDebugLoggingEnabled(true);
+    setDebugModuleEnabled('claudeCode', true);
+  });
+
+  afterEach(() => {
+    setDebugLoggingEnabled(false);
+    setDebugModuleEnabled('claudeCode', false);
+    clearRecentLogs();
+  });
+
+  it('fires onPostResultChunk callback for prompt_suggestion messages arriving after result boundary', async () => {
+    const messages: unknown[] = [
+      { type: 'assistant', message: { id: 'msg-1', content: [{ type: 'text', text: 'Hello' }] } },
+      { type: 'result', total_usage: { input_tokens: 1, output_tokens: 2 } },
+      { type: 'prompt_suggestion', suggestion: 'Write tests', uuid: 'ps-1', session_id: 'sdk-sess-1' },
+    ];
+    const sdk = createSdk(messages);
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+    await adapter.start();
+    const sessionId = await adapter.createSession();
+
+    const postResultChunks: import('../../../../../src/core/types/chat').StreamChunk[] = [];
+    adapter.onPostResultChunk((chunk) => { postResultChunks.push(chunk); });
+
+    await collectAsync(adapter.sendMessage({ sessionId, content: 'hello' }));
+
+    // Wait a tick for pumpRuntimeOutput to process remaining messages
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(postResultChunks.length).toBeGreaterThanOrEqual(1);
+    expect(postResultChunks.some((c) => c.type === 'prompt_suggestion')).toBe(true);
+    const psChunk = postResultChunks.find((c) => c.type === 'prompt_suggestion');
+    expect(psChunk).toMatchObject({
+      type: 'prompt_suggestion',
+      suggestion: 'Write tests',
+      uuid: 'ps-1',
+      sessionId: 'sdk-sess-1',
+    });
+
+    await adapter.stop();
+  });
+
+  it('does not fire onPostResultChunk for non-prompt-suggestion post-result messages', async () => {
+    const messages: unknown[] = [
+      { type: 'assistant', message: { id: 'msg-1', content: [{ type: 'text', text: 'Hello' }] } },
+      { type: 'result', total_usage: { input_tokens: 1, output_tokens: 2 } },
+      { type: 'system', subtype: 'task_notification', task_id: 'task-1', summary: 'Done' },
+    ];
+    const sdk = createSdk(messages);
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+    await adapter.start();
+    const sessionId = await adapter.createSession();
+
+    const postResultChunks: import('../../../../../src/core/types/chat').StreamChunk[] = [];
+    adapter.onPostResultChunk((chunk) => { postResultChunks.push(chunk); });
+
+    await collectAsync(adapter.sendMessage({ sessionId, content: 'hello' }));
+
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(postResultChunks.some((c) => c.type === 'prompt_suggestion')).toBe(false);
+
+    await adapter.stop();
+  });
+
+  it('sendMessage result-boundary contract is unchanged (returns at result, not after prompt_suggestion)', async () => {
+    const messages: unknown[] = [
+      { type: 'assistant', message: { id: 'msg-1', content: [{ type: 'text', text: 'Hello' }] } },
+      { type: 'result', total_usage: { input_tokens: 1, output_tokens: 2 } },
+      { type: 'prompt_suggestion', suggestion: 'Write tests', uuid: 'ps-1', session_id: 'sdk-sess-1' },
+    ];
+    const sdk = createSdk(messages);
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+    await adapter.start();
+    const sessionId = await adapter.createSession();
+
+    const chunks = await collectAsync(adapter.sendMessage({ sessionId, content: 'hello' }));
+
+    // sendMessage should return at the result boundary, so it should NOT yield prompt_suggestion
+    expect(chunks.some((c) => c.type === 'prompt_suggestion')).toBe(false);
+    // But it should have yielded the assistant text and usage
+    expect(chunks.some((c) => c.type === 'text')).toBe(true);
+    expect(chunks.some((c) => c.type === 'usage')).toBe(true);
+
+    await adapter.stop();
+  });
+});

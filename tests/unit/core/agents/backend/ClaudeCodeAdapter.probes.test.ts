@@ -1166,6 +1166,126 @@ describe('runDebugFileReadbackProbe', () => {
   });
 });
 
+describe('runDebugReadbackProbe', () => {
+  it('returns readback with no debug option when setting is false', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        debug: false,
+      },
+      sdk: createProbeSdk([]),
+    });
+
+    const result = await adapter.runDebugReadbackProbe();
+
+    expect(result.classification).toBe('readback');
+    expect(result.optionWired).toBe(true);
+    expect(result.settingValue).toBe(false);
+    expect(result.sdkOptionPresent).toBe(false);
+    expect(result.valueMatch).toBe(true);
+  });
+
+  it('returns readback with debug option true when setting is true', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        debug: true,
+      },
+      sdk: createProbeSdk([]),
+    });
+
+    const result = await adapter.runDebugReadbackProbe();
+
+    expect(result.classification).toBe('readback');
+    expect(result.optionWired).toBe(true);
+    expect(result.settingValue).toBe(true);
+    expect(result.sdkOptionPresent).toBe(true);
+    expect(result.sdkValue).toBe(true);
+    expect(result.valueMatch).toBe(true);
+  });
+
+  it('returns fail when debug is false but SDK option is present', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        debug: false,
+      },
+      sdk: createProbeSdk([]),
+    });
+
+    jest.spyOn(adapter as unknown as {
+      buildDiagnosticSdkOptions: (...args: unknown[]) => unknown;
+    }, 'buildDiagnosticSdkOptions').mockReturnValue({
+      debug: true,
+    });
+
+    const result = await adapter.runDebugReadbackProbe();
+
+    expect(result.classification).toBe('fail');
+    expect(result.optionWired).toBe(false);
+    expect(result.settingValue).toBe(false);
+    expect(result.sdkOptionPresent).toBe(true);
+    expect(result.sdkValue).toBe(true);
+    expect(result.valueMatch).toBe(false);
+    expect(result.error).toContain('debug');
+  });
+
+  it('returns fail when debug is true but SDK option is missing', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        debug: true,
+      },
+      sdk: createProbeSdk([]),
+    });
+
+    jest.spyOn(adapter as unknown as {
+      buildDiagnosticSdkOptions: (...args: unknown[]) => unknown;
+    }, 'buildDiagnosticSdkOptions').mockReturnValue({
+      debug: undefined,
+    });
+
+    const result = await adapter.runDebugReadbackProbe();
+
+    expect(result.classification).toBe('fail');
+    expect(result.optionWired).toBe(false);
+    expect(result.settingValue).toBe(true);
+    expect(result.sdkOptionPresent).toBe(false);
+    expect(result.valueMatch).toBe(false);
+    expect(result.error).toContain('debug');
+  });
+
+  it('returns fail on thrown error', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        debug: true,
+      },
+      sdk: createProbeSdk([]),
+    });
+
+    jest.spyOn(adapter as unknown as {
+      buildDiagnosticSdkOptions: (...args: unknown[]) => unknown;
+    }, 'buildDiagnosticSdkOptions').mockImplementation(() => {
+      throw new Error('buildDiagnosticSdkOptions threw');
+    });
+
+    const result = await adapter.runDebugReadbackProbe();
+
+    expect(result.classification).toBe('fail');
+    expect(result.optionWired).toBe(false);
+    expect(result.settingValue).toBe(true);
+    expect(result.sdkOptionPresent).toBe(false);
+    expect(result.valueMatch).toBe(false);
+    expect(result.error).toContain('buildDiagnosticSdkOptions threw');
+  });
+});
+
 describe('runStrictMcpConfigReadbackProbe', () => {
   it('returns readback with no strictMcpConfig option when setting is false', async () => {
     const adapter = new ClaudeCodeAdapter({

@@ -6499,6 +6499,88 @@ describe('SettingsCapabilityLabSection', () => {
     expect(containerEl.textContent).toContain('probe exploded');
   });
 
+  it('renders Debug Readback Proof button', () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runDebugReadbackProbe: jest.fn(),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Debug Readback Proof')
+    )) as HTMLButtonElement | undefined;
+    expect(button).toBeTruthy();
+  });
+
+  it('runs the debug readback proof and marks readback', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runDebugReadbackProbe: jest.fn().mockResolvedValue({
+        classification: 'readback',
+        optionWired: true,
+        settingValue: false,
+        sdkOptionPresent: false,
+        valueMatch: true,
+      }),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Debug Readback Proof')
+    )) as HTMLButtonElement | undefined;
+    expect(button).toBeTruthy();
+
+    button!.click();
+    await flushUi();
+
+    expect(adapter.runDebugReadbackProbe).toHaveBeenCalled();
+
+    const proofMarker = containerEl.querySelector('[data-capability="Debug"]');
+    expect(proofMarker).toBeTruthy();
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-readback')).toBe(true);
+    expect(containerEl.textContent).toContain('Diagnostic readback only');
+    expect(containerEl.textContent).toContain('Actual CLI debug log emission is not independently verified');
+    expect(containerEl.textContent).toContain('Applies to the next query');
+    expect(containerEl.textContent).toContain('Active sessions do not update live');
+    expect(containerEl.textContent).toContain('debugFile is a separate seam');
+  });
+
+  it('marks fail when the debug readback probe throws', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runDebugReadbackProbe: jest.fn().mockRejectedValue(new Error('probe exploded')),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Debug Readback Proof')
+    )) as HTMLButtonElement | undefined;
+    expect(button).toBeTruthy();
+
+    button!.click();
+    await flushUi();
+
+    const proofMarker = containerEl.querySelector('[data-capability="Debug"]');
+    expect(proofMarker).toBeTruthy();
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-fail')).toBe(true);
+    expect(containerEl.textContent).toContain('probe exploded');
+  });
+
   it('renders Strict MCP Config Readback Proof button', () => {
     const adapter = {
       listSessions: jest.fn().mockResolvedValue([]),

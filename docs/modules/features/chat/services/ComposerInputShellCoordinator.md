@@ -21,6 +21,10 @@
 - 通过 `ResizeObserver` + `requestAnimationFrame` 维护 composer stack height，并触发 settled scroll
 - 把 selection controls/context-usage/effort/modified-files toggle 这些既有子控件挂到稳定的 toolbar slot
 - 暴露 `refreshToolbarControls()`，允许 backend/capability 切换后只重挂 toolbar 子控件并同步刷新 capability hint，而不重建 textarea、context row 或 footer
+- 拥有 `PromptSuggestionService` 实例，并在 composer content 内渲染 `.opencodian-suggestion-bar` 容器；当存在 active suggestion 时显示可点击的 `.opencodian-suggestion-chip`，点击后仅将 suggestion 文本插入 textarea（不会自动提交），并调用 `acceptActiveSuggestion()` 清除该 suggestion
+- 通过**模块级 channel bus** (`promptSuggestionSink.ts`) 与当前会话 backend session id 同步：`build()` 时创建独立 channel (`createPromptSuggestionChannel`)、在 container 上 stamp scope (`stampPromptSuggestionScope`)，并订阅该 channel 的 session 变更 (`onPromptSuggestionSessionChange`)；`TabActivationRuntimeHostProvider` 在 conversation 切换时通过 `findPromptSuggestionScope(messagesContainer)` 发现对应 channel，再经 `emitPromptSuggestionSessionChange(sessionId, channelId)` 推送新值。该设计把 prompt suggestion lifecycle 完全移出 `OpenCodianView`，解决 suggestion 可能早于 `backendSessionId` writeback 到达的 race，同时避免多视图交叉污染
+- `destroy()` 时移除 stamped scope (`removePromptSuggestionScope`) 并删除 channel (`deletePromptSuggestionChannel`)，防止 teardown 后残留 DOM attribute 导致 stale cross-talk
+- suggestion chip 在以下路径自动隐藏：新用户 turn（`trySubmitCurrentInput` 调用 `clearActiveOnTurnStart`）、sink/backend 清除（`clearPromptSuggestionSink` 触发 `clearAll` + `renderSuggestionBar`）、coordinator destroy、session/conversation 切换
 
 ## 公开接口
 

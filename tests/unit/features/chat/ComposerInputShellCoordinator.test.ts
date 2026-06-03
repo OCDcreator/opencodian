@@ -1,4 +1,10 @@
 /* eslint-disable max-lines -- This suite intentionally keeps shared DOM fixture helpers and coordinator interaction coverage together. */
+import {
+  clearPromptSuggestionSink,
+  emitPromptSuggestionSessionChange,
+  findPromptSuggestionScope,
+  registerPromptSuggestionSink,
+} from '../../../../src/core/agents/backend/promptSuggestionSink';
 import type { SlashCommandMenuItem } from '../../../../src/core/config/slashCommandCatalog';
 import {
   buildComposerInputSubmission,
@@ -44,10 +50,13 @@ function slashItem(id: string, description: string, overrides: Partial<SlashComm
   return { id, description, hasProjectOverride: false, runtimeAvailable: true, source: 'command', subtask: false, ...overrides };
 }
 
+const createdCoordinators: ComposerInputShellCoordinator[] = [];
+
 function createFixture(options: {
   shouldMountAgentSelector?: boolean;
   composerAvailabilityState?: { kind: 'ready' | 'no-backend' | 'backend-offline'; title?: string; description?: string };
   composerCapabilityHint?: { text: string } | null;
+  currentBackendSessionId?: string | null;
 } = {}) {
   let isStreaming = false;
   let isForegroundBusy = false;
@@ -106,6 +115,7 @@ function createFixture(options: {
 
   const coordinator = new ComposerInputShellCoordinator(host);
   coordinator.build(container);
+  createdCoordinators.push(coordinator);
   flushAnimationFrames();
 
   const textarea = container.querySelector<HTMLTextAreaElement>('.opencodian-input');
@@ -164,6 +174,10 @@ function installCoordinatorDomMocks(): void {
 }
 
 function restoreCoordinatorDomMocks(originalResizeObserver: typeof ResizeObserver | undefined): void {
+  for (const coordinator of createdCoordinators) {
+    try { coordinator.destroy(); } catch { /* ignore */ }
+  }
+  createdCoordinators.length = 0;
   document.body.innerHTML = '';
   jest.restoreAllMocks();
   ResizeObserverMock.reset();
@@ -799,4 +813,239 @@ describe('ComposerInputShellCoordinator — fuzzy matching and dropdown UI', () 
     expect(hintEl).toBeNull();
   });
 
+});
+
+describe('ComposerInputShellCoordinator — prompt suggestion lifecycle (channel bus)', () => {
+  const originalResizeObserver = globalThis.ResizeObserver;
+
+  beforeEach(() => {
+    installCoordinatorDomMocks();
+    clearPromptSuggestionSink();
+  });
+
+  afterEach(() => {
+    restoreCoordinatorDomMocks(originalResizeObserver);
+    clearPromptSuggestionSink();
+  });
+
+  it('stamps a channel scope on the container during build', () => {
+    const fixture = createFixture();
+
+    const channelId = findPromptSuggestionScope(fixture.container);
+    expect(channelId).toBeDefined();
+    expect(channelId).toMatch(/^ps-ch-/);
+  });
+
+  it('wires prompt suggestion service and receives adapter callbacks via channel bus', () => {
+    const mockSink = {
+      onPostResultChunk: jest.fn(() => jest.fn()),
+    };
+    registerPromptSuggestionSink(mockSink);
+
+    const fixture = createFixture();
+
+    // Coordinator should have subscribed to the sink
+    expect(mockSink.onPostResultChunk).toHaveBeenCalledTimes(1);
+
+    // Simulate receiving a suggestion
+    const callback = mockSink.onPostResultChunk.mock.calls[0][0];
+    callback({
+      type: 'prompt_suggestion',
+      suggestion: 'Write tests',
+      uuid: 'ps-1',
+      sessionId: 'sess-1',
+    });
+
+    // Suggestion is stored but not visible until session is emitted through channel bus
+    expect(fixture.container.querySelector('.opencodian-suggestion-chip')).toBeNull();
+
+    // Discover the channel and emit session change through the bus
+    const channelId = findPromptSuggestionScope(fixture.container);
+    emitPromptSuggestionSessionChange('sess-1', channelId);
+
+    // Now the chip is visible
+    expect(fixture.container.querySelector('.opencodian-suggestion-chip')).not.toBeNull();
+  });
+
+  it('suggestion can arrive before session writeback, then becomes visible after emission', () => {
+    const mockSink = {
+      onPostResultChunk: jest.fn(() => jest.fn()),
+    };
+    registerPromptSuggestionSink(mockSink);
+
+    const fixture = createFixture();
+
+    const callback = mockSink.onPostResultChunk.mock.calls[0][0];
+
+    // Suggestion arrives before backend session id is known
+    callback({
+      type: 'prompt_suggestion',
+      suggestion: 'Write tests',
+      uuid: 'ps-1',
+      sessionId: 'sdk-sess-1',
+    });
+
+    // Not visible yet
+    expect(fixture.container.querySelector('.opencodian-suggestion-chip')).toBeNull();
+
+    // Emit session through channel bus
+    const channelId = findPromptSuggestionScope(fixture.container);
+    emitPromptSuggestionSessionChange('sdk-sess-1', channelId);
+
+    expect(fixture.container.querySelector('.opencodian-suggestion-chip')).not.toBeNull();
+  });
+
+  it('clears active suggestion on new user turn', () => {
+    const mockSink = {
+      onPostResultChunk: jest.fn(() => jest.fn()),
+    };
+    registerPromptSuggestionSink(mockSink);
+
+    const fixture = createFixture();
+    const callback = mockSink.onPostResultChunk.mock.calls[0][0];
+
+    callback({
+      type: 'prompt_suggestion',
+      suggestion: 'Write tests',
+      uuid: 'ps-1',
+      sessionId: 'sess-1',
+    });
+    const channelId = findPromptSuggestionScope(fixture.container);
+    emitPromptSuggestionSessionChange('sess-1', channelId);
+    expect(fixture.container.querySelector('.opencodian-suggestion-chip')).not.toBeNull();
+
+    // Submit a new message — suggestion should clear
+    fixture.textarea.value = 'new message';
+    fixture.textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    flushAnimationFrames();
+
+    expect(fixture.container.querySelector('.opencodian-suggestion-chip')).toBeNull();
+  });
+
+  it('clears prompt suggestion state on destroy and removes channel scope', () => {
+    const mockSink = {
+      onPostResultChunk: jest.fn(() => jest.fn()),
+    };
+    registerPromptSuggestionSink(mockSink);
+
+    const fixture = createFixture();
+    const callback = mockSink.onPostResultChunk.mock.calls[0][0];
+
+    callback({
+      type: 'prompt_suggestion',
+      suggestion: 'Write tests',
+      uuid: 'ps-1',
+      sessionId: 'sess-1',
+    });
+    const channelId = findPromptSuggestionScope(fixture.container);
+    emitPromptSuggestionSessionChange('sess-1', channelId);
+    expect(fixture.container.querySelector('.opencodian-suggestion-chip')).not.toBeNull();
+
+    fixture.coordinator.destroy();
+
+    expect(fixture.container.querySelector('.opencodian-suggestion-chip')).toBeNull();
+    // Scope should be removed from container
+    expect(findPromptSuggestionScope(fixture.container)).toBeUndefined();
+  });
+
+  it('handles sink-null by clearing all suggestions', () => {
+    const mockSink = {
+      onPostResultChunk: jest.fn(() => jest.fn()),
+    };
+    registerPromptSuggestionSink(mockSink);
+
+    const fixture = createFixture();
+    const callback = mockSink.onPostResultChunk.mock.calls[0][0];
+
+    callback({
+      type: 'prompt_suggestion',
+      suggestion: 'Write tests',
+      uuid: 'ps-1',
+      sessionId: 'sess-1',
+    });
+    const channelId = findPromptSuggestionScope(fixture.container);
+    emitPromptSuggestionSessionChange('sess-1', channelId);
+    expect(fixture.container.querySelector('.opencodian-suggestion-chip')).not.toBeNull();
+
+    // Simulate backend stop
+    clearPromptSuggestionSink();
+    expect(fixture.container.querySelector('.opencodian-suggestion-chip')).toBeNull();
+  });
+
+  it('does not auto-send when clicking suggestion chip', () => {
+    const mockSink = {
+      onPostResultChunk: jest.fn(() => jest.fn()),
+    };
+    registerPromptSuggestionSink(mockSink);
+
+    const fixture = createFixture();
+    const callback = mockSink.onPostResultChunk.mock.calls[0][0];
+
+    callback({
+      type: 'prompt_suggestion',
+      suggestion: 'Refactor this code',
+      uuid: 'ps-1',
+      sessionId: 'sess-1',
+    });
+    const channelId = findPromptSuggestionScope(fixture.container);
+    emitPromptSuggestionSessionChange('sess-1', channelId);
+
+    const chip = fixture.container.querySelector('.opencodian-suggestion-chip') as HTMLElement;
+    expect(chip).not.toBeNull();
+
+    // Click the chip
+    chip.click();
+
+    // Textarea should contain the suggestion text
+    expect(fixture.textarea.value).toBe('Refactor this code');
+    // submitMessage should NOT have been called
+    expect(fixture.host.submitMessage).not.toHaveBeenCalled();
+  });
+
+  it('hides chip on session change to different session', () => {
+    const mockSink = {
+      onPostResultChunk: jest.fn(() => jest.fn()),
+    };
+    registerPromptSuggestionSink(mockSink);
+
+    const fixture = createFixture();
+    const callback = mockSink.onPostResultChunk.mock.calls[0][0];
+
+    callback({
+      type: 'prompt_suggestion',
+      suggestion: 'Write tests',
+      uuid: 'ps-1',
+      sessionId: 'sess-1',
+    });
+    const channelId = findPromptSuggestionScope(fixture.container);
+    emitPromptSuggestionSessionChange('sess-1', channelId);
+    expect(fixture.container.querySelector('.opencodian-suggestion-chip')).not.toBeNull();
+
+    // Change session
+    emitPromptSuggestionSessionChange('sess-2', channelId);
+
+    expect(fixture.container.querySelector('.opencodian-suggestion-chip')).toBeNull();
+  });
+
+  it('does not render chip when suggestion is for a different session', () => {
+    const mockSink = {
+      onPostResultChunk: jest.fn(() => jest.fn()),
+    };
+    registerPromptSuggestionSink(mockSink);
+
+    const fixture = createFixture();
+    const callback = mockSink.onPostResultChunk.mock.calls[0][0];
+
+    callback({
+      type: 'prompt_suggestion',
+      suggestion: 'Write tests',
+      uuid: 'ps-1',
+      sessionId: 'sess-1',
+    });
+    // Sync to a DIFFERENT session
+    const channelId = findPromptSuggestionScope(fixture.container);
+    emitPromptSuggestionSessionChange('sess-2', channelId);
+
+    expect(fixture.container.querySelector('.opencodian-suggestion-chip')).toBeNull();
+  });
 });

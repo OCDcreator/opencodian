@@ -128,6 +128,7 @@ export {
   normalizeClaudeCodeSettingSources,
   normalizeClaudeCodeStringArray,
   normalizeClaudeCodeThinking,
+  normalizeClaudeCodeToolAliases,
   normalizeCompactionReservedTokens,
   normalizeContextRingStyleId,
   normalizeDisabledModelRefs,

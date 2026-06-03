@@ -42,3 +42,5 @@
 
 
 本轮新增 `.opencodian-input-capability-hint` 与 `.opencodian-input-capability-hint-text` 样式，用于在聊天输入区靠近文本输入框的位置渲染 backend-specific capability discovery hint（当前为 Claude Code backend 的 `/json` structured output inline chip）。
+
+本轮新增 prompt suggestion chip 样式：`.opencodian-suggestion-bar`（位于 composer content 内的建议条容器，默认 flex 布局，`is-hidden` 时隐藏）、`.opencodian-suggestion-chip`（可点击的建议 pill，使用 inline-flex 与主题色背景）与 `.opencodian-suggestion-chip-text`（建议文本）。点击 chip 后仅将文本插入 textarea，不会自动发送；样式上保持与输入区其他元素的横向节奏一致，且不占用额外的外部高度。

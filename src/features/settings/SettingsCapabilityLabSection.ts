@@ -2698,6 +2698,8 @@ export class SettingsCapabilityLabSection {
       (o) => this.runPlanModeInstructionsReadbackProof(adapter, o));
     this.addProofControl(proofControls, containerEl, 'Run Tool Aliases Readback Proof',
       (o) => this.runToolAliasesReadbackProof(adapter, o));
+    this.addProofControl(proofControls, containerEl, 'Run Debug Readback Proof',
+      (o) => this.runDebugReadbackProof(adapter, o));
     this.addProofControl(proofControls, containerEl, 'Run Debug File Readback Proof',
       (o) => this.runDebugFileReadbackProof(adapter, o));
     this.addProofControl(proofControls, containerEl, 'Run Strict MCP Config Readback Proof',
@@ -5907,6 +5909,65 @@ export class SettingsCapabilityLabSection {
         text: `Tool aliases readback proof failed: ${err instanceof Error ? err.message : String(err)}`,
       });
       this.updateRuntimeProof('Tool Aliases', 'fail', outputEl);
+    }
+  }
+
+  private async runDebugReadbackProof(
+    adapter: ClaudeCodeAdapter,
+    outputEl: HTMLElement,
+  ): Promise<void> {
+    outputEl.empty();
+    outputEl.createEl('p', { text: 'Running debug readback probe…' });
+
+    try {
+      const result = await adapter.runDebugReadbackProbe();
+
+      outputEl.empty();
+      outputEl.createEl('h5', { text: 'Debug Readback Proof' });
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: '⚠️ Diagnostic readback only: verifies settings→SDK option mapping only. Actual CLI debug log emission is not independently verified from the plugin layer — the plugin passes the option, but whether the CLI binary actually produces debug output depends on the SDK/CLI version and runtime conditions. Applies to the next query or restarted session only. Active sessions do not update live. debugFile is a separate seam; this proof covers only the debug toggle wiring.',
+      });
+
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: `Option wired: ${result.optionWired ? '✓ yes' : '✗ no'}`,
+      });
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: `Setting value: ${result.settingValue ? 'true' : 'false'}`,
+      });
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: `SDK option present: ${result.sdkOptionPresent ? '✓ yes' : '✗ no'}`,
+      });
+      if (result.sdkValue !== undefined) {
+        outputEl.createEl('p', {
+          cls: 'opencodian-capability-lab-hint',
+          text: `SDK value: ${result.sdkValue ? 'true' : 'false'}`,
+        });
+      }
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: `Value match: ${result.valueMatch ? '✓ yes' : '✗ no'}`,
+      });
+
+      if (result.classification === 'readback') {
+        this.updateRuntimeProof('Debug', 'readback', outputEl);
+      } else {
+        outputEl.createEl('p', {
+          cls: 'opencodian-capability-lab-error',
+          text: `✗ Debug readback probe failed: ${result.error ?? 'unknown error'}`,
+        });
+        this.updateRuntimeProof('Debug', 'fail', outputEl);
+      }
+    } catch (err) {
+      outputEl.empty();
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-error',
+        text: `Debug readback proof failed: ${err instanceof Error ? err.message : String(err)}`,
+      });
+      this.updateRuntimeProof('Debug', 'fail', outputEl);
     }
   }
 

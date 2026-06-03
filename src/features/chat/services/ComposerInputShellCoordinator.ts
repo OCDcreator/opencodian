@@ -1,6 +1,14 @@
 /* eslint-disable max-lines -- This owner keeps composer textarea, @agent selector, slash menu, and layout sync together because they share DOM, focus, and overlay lifecycle. */
 import { setIcon } from 'obsidian';
 
+import {
+  createPromptSuggestionChannel,
+  deletePromptSuggestionChannel,
+  onPromptSuggestionSessionChange,
+  onPromptSuggestionSinkChange,
+  removePromptSuggestionScope,
+  stampPromptSuggestionScope,
+} from '../../../core/agents/backend/promptSuggestionSink';
 import type { SlashCommandMenuItem } from '../../../core/config/slashCommandCatalog';
 import type { SlashCommandSkillMode } from '../../../core/types';
 import { t } from '../../../i18n';
@@ -13,6 +21,7 @@ import {
   isCommandComposerText,
 } from './composerInputParsing';
 import type { ComposerInputMode, ComposerInputSubmission } from './MessageSendPreparationService';
+import { PromptSuggestionService } from './PromptSuggestionService';
 import {
   loadAgentMentionCandidatesFromComposerCatalog,
   loadAgentSelectionCandidatesFromComposerCatalog,
@@ -95,6 +104,13 @@ export class ComposerInputShellCoordinator {
   private readonly agentMentionController: AgentMentionComposerController;
   private readonly agentSelectionController: ChatAgentSelectionCoordinator;
   private readonly slashCommandMenuController: SlashCommandMenuCoordinator;
+  private readonly promptSuggestionService: PromptSuggestionService;
+  private promptSuggestionSinkUnsub: (() => void) | null = null;
+  private promptSuggestionAdapterUnsub: (() => void) | null = null;
+  private promptSuggestionSessionUnsub: (() => void) | null = null;
+  private promptSuggestionChannelId: string | null = null;
+  private suggestionBarEl: HTMLElement | null = null;
+  private suggestionBarRefreshUnsub: (() => void) | null = null;
 
   constructor(private readonly host: ComposerInputShellCoordinatorHost) {
     this.agentMentionController = new AgentMentionComposerController({
@@ -133,6 +149,7 @@ export class ComposerInputShellCoordinator {
       },
       scheduleLayoutSync: () => this.scheduleLayoutSync(),
     });
+    this.promptSuggestionService = new PromptSuggestionService();
   }
 
   build(container: HTMLElement): void {
@@ -201,6 +218,11 @@ export class ComposerInputShellCoordinator {
     });
     this.slashCommandMenuEl.setAttribute('role', 'listbox');
 
+    // Prompt suggestion bar — rendered between textarea and footer
+    this.suggestionBarEl = composerContentEl.createDiv({
+      cls: 'opencodian-suggestion-bar is-hidden',
+    });
+
     const composerFooterEl = composerContentEl.createDiv({ cls: 'opencodian-composer-footer' });
     this.addContextBtnEl = composerFooterEl.createEl('button', {
       cls: 'opencodian-composer-add-btn opencodian-tooltip-trigger',
@@ -235,6 +257,8 @@ export class ComposerInputShellCoordinator {
     this.renderCapabilityHint();
 
     this.initializeLayoutMetrics();
+
+    this.wirePromptSuggestionFromSink();
   }
 
   refreshToolbarControls(): void {
@@ -384,10 +408,95 @@ export class ComposerInputShellCoordinator {
     }
   }
 
+  private renderSuggestionBar(): void {
+    if (!this.suggestionBarEl) {
+      return;
+    }
+
+    const suggestionText = this.promptSuggestionService.getActiveSuggestionText();
+    if (!suggestionText) {
+      this.suggestionBarEl.empty();
+      this.suggestionBarEl.addClass('is-hidden');
+      return;
+    }
+
+    this.suggestionBarEl.empty();
+    this.suggestionBarEl.removeClass('is-hidden');
+
+    const chipEl = this.suggestionBarEl.createEl('button', {
+      cls: 'opencodian-suggestion-chip',
+      attr: { type: 'button' },
+    });
+    chipEl.createSpan({ cls: 'opencodian-suggestion-chip-text', text: suggestionText });
+
+    chipEl.addEventListener('click', () => {
+      if (this.inputTextareaEl) {
+        this.inputTextareaEl.value = suggestionText;
+        this.syncTextareaHeight();
+        this.syncHighlightBackdrop();
+        this.inputTextareaEl.focus();
+      }
+      this.promptSuggestionService.acceptActiveSuggestion();
+      this.renderSuggestionBar();
+    });
+  }
+
+  private wirePromptSuggestionFromSink(): void {
+    // Clean up previous wiring if rebuild
+    this.promptSuggestionSinkUnsub?.();
+    this.promptSuggestionSessionUnsub?.();
+    this.suggestionBarRefreshUnsub?.();
+    this.promptSuggestionAdapterUnsub?.();
+    this.promptSuggestionSinkUnsub = null;
+    this.promptSuggestionSessionUnsub = null;
+    this.suggestionBarRefreshUnsub = null;
+    this.promptSuggestionAdapterUnsub = null;
+
+    // Create a channel for scoped session changes
+    this.promptSuggestionChannelId = createPromptSuggestionChannel();
+    if (this.inputContainerEl) {
+      stampPromptSuggestionScope(this.inputContainerEl, this.promptSuggestionChannelId);
+    }
+
+    // Subscribe to scoped session changes from the channel bus
+    this.promptSuggestionSessionUnsub = onPromptSuggestionSessionChange(
+      (sessionId) => {
+        this.promptSuggestionService.setActiveSession(sessionId);
+        this.renderSuggestionBar();
+      },
+      this.promptSuggestionChannelId,
+    );
+
+    // Subscribe to adapter (sink) changes
+    this.promptSuggestionSinkUnsub = onPromptSuggestionSinkChange((sink) => {
+      this.promptSuggestionAdapterUnsub?.();
+      this.promptSuggestionAdapterUnsub = null;
+      if (sink) {
+        this.promptSuggestionAdapterUnsub = this.promptSuggestionService.attachAdapter(sink);
+      } else {
+        this.promptSuggestionService.clearAll();
+        this.renderSuggestionBar();
+      }
+    });
+
+    // Subscribe to bar refresh requests from the service
+    this.suggestionBarRefreshUnsub = this.promptSuggestionService.onBarRefreshRequested(() => {
+      this.renderSuggestionBar();
+    });
+  }
+
   destroy(): void {
     this.clearScheduledLayoutSync();
     this.inputContainerResizeObserver?.disconnect();
     this.inputContainerResizeObserver = null;
+    // Remove prompt suggestion scope and delete channel BEFORE nulling container
+    const containerEl = this.inputContainerEl;
+    const channelId = this.promptSuggestionChannelId;
+    if (containerEl && channelId) {
+      removePromptSuggestionScope(containerEl);
+      deletePromptSuggestionChannel(channelId);
+    }
+    this.promptSuggestionChannelId = null;
     this.host.setContextRowElement(null);
     this.inputContainerEl = null;
     this.inputTabBarSlotEl = null;
@@ -401,9 +510,20 @@ export class ComposerInputShellCoordinator {
     this.capabilityHintEl = null;
     this.slashCommandMenuEl = null;
     this.slashCommandMenuCatalogItems = null;
+    this.suggestionBarEl?.remove();
+    this.suggestionBarEl = null;
     this.slashCommandMenuController.reset();
     this.agentMentionController.reset();
     this.agentSelectionController.destroy();
+    this.promptSuggestionAdapterUnsub?.();
+    this.promptSuggestionAdapterUnsub = null;
+    this.promptSuggestionSinkUnsub?.();
+    this.promptSuggestionSinkUnsub = null;
+    this.promptSuggestionSessionUnsub?.();
+    this.promptSuggestionSessionUnsub = null;
+    this.suggestionBarRefreshUnsub?.();
+    this.suggestionBarRefreshUnsub = null;
+    this.promptSuggestionService.clearAll();
   }
 
   private initializeLayoutMetrics(): void {
@@ -481,6 +601,7 @@ export class ComposerInputShellCoordinator {
       return;
     }
 
+    this.promptSuggestionService.clearActiveOnTurnStart();
     void this.host.submitMessage(submission);
     this.inputTextareaEl.value = '';
     this.agentMentionController.clearTrackedMentions();

@@ -73,6 +73,8 @@ OpenCodian 的简体中文翻译表，导出 `zhTranslations` 静态对象。它
 
 2026-05-24 新增 `settings.claudeCode.sdkStreamBoundary.*` 键，用于 SDK Foundations 中 hook/子代理 stream 开关前的诊断边界提示，明确这些设置只驱动诊断/实验事件流，不提供稳定 hook authoring 或完整子代理 transcript/progress UI。
 
+2026-06-02 Continue 诊断 seam 又补了一组 `settings.capabilityLab.proofs.continue.*` 键，把 Continue proof 按钮、运行中提示、诊断边界说明、seed/continue 会话标签、yes/no 状态、pass/fail 文案和异常提示收进 locale，避免在 Capability Lab 继续硬编码新增诊断 UI 文案。
+
 2026-05-27 新增 `settings.claudeCode.fallbackModel.boundaryNotice` 键，用于 Model & Thinking 标签中 fallback model 控件后的边界提示。文案说明备用模型的修改需要重启活跃 Claude Code 会话或开始新的查询，无法像主模型一样在已运行的流中实时更新。
 
 本轮更新 `settings.claudeCode.model.desc` 和 `settings.claudeCode.fallbackModel.desc`，在主/备用模型描述中明确区分实时应用与仅重启生效的产品边界，并提示用户通过下方 quick-select 下拉框选择模型。新增 `settings.claudeCode.model.quickSelectName` / `quickSelectDesc` 和 `settings.claudeCode.fallbackModel.quickSelectName` / `quickSelectDesc` 键，用于 Model & Thinking 标签中模型/备用模型的 quick-select 下拉框；保留 `settings.claudeCode.modelCatalog.quickSelectPlaceholder` 作为下拉框的默认占位文案。旧的 `modelCatalog.*` 系列键（refreshButton、loading、empty、error、useAsMain、useAsFallback）已随分离式目录列表的移除而废弃。
@@ -107,6 +109,8 @@ export const zhTranslations: Record<string, string> = {
 ### 中文文案实现
 
 该文件为英文键空间提供中文对应值，供 `setLocale('zh')` 后的全部界面使用。
+
+2026-06-03 同步了 `settings.claudeCode.planModeInstructions.desc` 与 `.boundaryNotice` 的中文文案：稳定设置面不再暗示插件层会按 `permissionMode` 决定是否写入该选项，而是明确区分 SDK 仅在计划权限模式下使用它，以及当前仍只是 settings→SDK option wiring 的 readback 证明。
 
 ### 帮助文案承载
 
@@ -360,3 +364,5 @@ Claude Code 不再使用过载的 `settings.claudeCode.tab.mcpAdvanced` 标签�
 
 
 本轮 capability-hint 新增 `chat.input.capabilityHint.json` 键，用于 Claude Code backend 激活时在聊天输入区显示 `/json — 结构化输出` 发现性 inline hint。
+
+- 本轮 prompt-suggestions 新增 `settings.claudeCode.promptSuggestions.name`（提示建议）和 `settings.claudeCode.promptSuggestions.desc` 键，用于 Capability Lab 诊断流控制区域的 toggle 说明。

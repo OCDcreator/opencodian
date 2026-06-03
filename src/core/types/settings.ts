@@ -86,9 +86,11 @@ export interface ClaudeCodeBackendSettings {
   /** Ask the SDK to emit periodic subagent progress summaries. @diagnostic — Diagnostic event stream only; not connected to stable UI. */
   agentProgressSummaries: boolean;
   /** Ask the SDK to emit predicted next-user-prompt suggestions after each completed turn.
-   * Readback: SDK options wiring proven; suggestion delivery to chat UI proven through normalizer + StreamChunkRouter pipeline.
-   * Suggestions may be suppressed on first turn, after API errors, in plan mode, or by env var.
-   * Never auto-sent — only inserted into composer on explicit user click. */
+   * Readback only: SDK options wiring proven; end-to-end chat UI delivery is not independently
+   * live-verified. The plugin routes suggestion chunks through the normalizer + StreamChunkRouter
+   * pipeline, but whether suggestions actually appear depends on model behavior, API state, and
+   * SDK version. Suggestions may be suppressed on first turn, after API errors, in plan mode, or
+   * by env var. Never auto-sent — only inserted into composer on explicit user click. */
   promptSuggestions: boolean;
   /** Product workbench debug channels for future Claude Code logging routes. */
   debugChannels: ClaudeCodeDebugChannelSettings;
@@ -120,6 +122,57 @@ export interface ClaudeCodeBackendSettings {
    * actually produces debug output depends on the SDK/CLI version and runtime conditions.
    */
   debug: boolean;
+  /**
+   * Enforce strict validation of MCP server configurations.
+   * When true, invalid MCP configurations will cause errors instead of warnings.
+   * Readback only: SDK option wiring proven; actual MCP config validation behavior is not
+   * independently verified from the plugin layer. Applies to next query or restarted session only.
+   * Does not write .claude/mcp.json or provide MCP authoring UI.
+   */
+  strictMcpConfig: boolean;
+  /**
+   * Request the SDK 'context-1m-2025-08-07' beta header for 1M context window support.
+   * Readback only: SDK option wiring proven; actual beta availability depends on the
+   * selected model and Anthropic-side behavior. Plugin-side behavior is not independently
+   * verified. No generic beta management is exposed — only this single documented beta.
+   * Applies to next query or restarted session only.
+   */
+  enableContext1mBeta: boolean;
+  /**
+   * Ask the SDK to write CLI debug logs to a file path.
+   * Readback only: SDK option wiring proven; actual file writing is not independently
+   * verified from the plugin layer. Setting a debug file path implicitly enables debug
+   * logging even if the debug toggle is off. Applies to next query or restarted session only.
+   * No plugin-side path validation or filesystem writes are performed.
+   */
+  debugFile: string;
+  /**
+   * Request the SDK to use a specific JavaScript runtime ('node', 'bun', or 'deno').
+   * Empty string means auto — leave runtime selection to the SDK.
+   * Readback only: SDK option wiring proven; actual runtime selection behavior is not
+   * independently verified from the plugin layer. Plugin-side behavior is not independently
+   * verified. No runtime argument management is exposed. Applies to next query or restarted
+   * session only.
+   */
+  jsRuntime: 'node' | 'bun' | 'deno' | '';
+  /**
+   * Maximum time in milliseconds to wait for the Claude Code subprocess to load before timing out.
+   * null means use the SDK default timeout.
+   * Readback only: SDK option wiring proven; actual timeout behavior is not independently
+   * verified from the plugin layer. Plugin-side behavior is not independently verified.
+   * Applies to next query or restarted session only.
+   */
+  loadTimeoutMs: number | null;
+  /**
+   * Custom instructions appended to the Claude Code preset system prompt.
+   * When non-empty, the SDK receives the preset-with-append shape:
+   * `{ type: 'preset', preset: 'claude_code', append: instructions }`.
+   * When empty, the default `{ type: 'preset', preset: 'claude_code' }` is used.
+   * This is an append-only seam — it does NOT replace the official preset.
+   * Readback only: SDK option wiring proven; actual prompt append behavior is not
+   * independently verified from the plugin layer. Applies to next query or restarted session only.
+   */
+  systemPrompt: string;
 }
 
 export interface BackendSettings {
@@ -168,6 +221,12 @@ export function getDefaultClaudeCodeBackendSettings(): ClaudeCodeBackendSettings
     planModeInstructions: '',
     toolAliases: {},
     debug: false,
+    strictMcpConfig: false,
+    enableContext1mBeta: false,
+    debugFile: '',
+    jsRuntime: '',
+    loadTimeoutMs: null,
+    systemPrompt: '',
   };
 }
 
@@ -297,6 +356,13 @@ export function normalizeClaudeCodeEnv(value: unknown): Record<string, string> {
   return result;
 }
 
+export function normalizeClaudeCodeJsRuntime(value: unknown): 'node' | 'bun' | 'deno' | '' {
+  if (value === 'node' || value === 'bun' || value === 'deno') {
+    return value;
+  }
+  return '';
+}
+
 export function normalizeClaudeCodeSandboxSettings(value: unknown): ClaudeCodeSandboxSettings {
   const defaults = { enabled: false, failIfUnavailable: false, autoAllowBashIfSandboxed: false };
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -361,6 +427,16 @@ export function normalizeClaudeCodeBackendSettings(value: unknown): ClaudeCodeBa
       : defaults.planModeInstructions,
     toolAliases: normalizeClaudeCodeToolAliases(candidate.toolAliases),
     debug: candidate.debug === true,
+    strictMcpConfig: candidate.strictMcpConfig === true,
+    enableContext1mBeta: candidate.enableContext1mBeta === true,
+    debugFile: typeof candidate.debugFile === 'string'
+      ? candidate.debugFile.trim()
+      : defaults.debugFile,
+    jsRuntime: normalizeClaudeCodeJsRuntime(candidate.jsRuntime),
+    loadTimeoutMs: normalizeClaudeCodeNullablePositiveInt(candidate.loadTimeoutMs),
+    systemPrompt: typeof candidate.systemPrompt === 'string'
+      ? candidate.systemPrompt.trim()
+      : defaults.systemPrompt,
   };
 }
 

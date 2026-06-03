@@ -141,6 +141,64 @@ describe('ClaudeCodeOptionsBuilder debug option', () => {
   });
 });
 
+describe('ClaudeCodeOptionsBuilder debugFile option', () => {
+  it('omits debugFile when settings.debugFile is empty', () => {
+    const options = buildClaudeCodeOptions({
+      vaultPath: '/vault/project',
+      settings: getDefaultClaudeCodeBackendSettings(),
+    });
+
+    expect(options).not.toHaveProperty('debugFile');
+  });
+
+  it('omits debugFile when settings.debugFile is whitespace-only', () => {
+    const options = buildClaudeCodeOptions({
+      vaultPath: '/vault/project',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        debugFile: '   \t\n  ',
+      },
+    });
+
+    expect(options).not.toHaveProperty('debugFile');
+  });
+
+  it('passes trimmed debugFile when settings.debugFile is non-empty', () => {
+    const options = buildClaudeCodeOptions({
+      vaultPath: '/vault/project',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        debugFile: '  /tmp/debug.log  ',
+      },
+    });
+
+    expect(options.debugFile).toBe('/tmp/debug.log');
+  });
+});
+
+describe('ClaudeCodeOptionsBuilder strictMcpConfig option', () => {
+  it('omits strictMcpConfig when settings.strictMcpConfig is false', () => {
+    const options = buildClaudeCodeOptions({
+      vaultPath: '/vault/project',
+      settings: getDefaultClaudeCodeBackendSettings(),
+    });
+
+    expect(options).not.toHaveProperty('strictMcpConfig');
+  });
+
+  it('passes strictMcpConfig when settings.strictMcpConfig is true', () => {
+    const options = buildClaudeCodeOptions({
+      vaultPath: '/vault/project',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        strictMcpConfig: true,
+      },
+    });
+
+    expect(options.strictMcpConfig).toBe(true);
+  });
+});
+
 describe('ClaudeCodeOptionsBuilder tool restrictions', () => {
   it('omits allowedTools/disallowedTools when empty', () => {
     const options = buildClaudeCodeOptions({
