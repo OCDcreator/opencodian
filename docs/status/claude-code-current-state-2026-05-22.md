@@ -1,5 +1,838 @@
 # Claude Code SDK Current State - 2026-05-22
 
+## 2026-06-03 Prompt Suggestions — Owner-Guard Fix: Channel Bus Refactor
+
+### Objective
+
+Keep the honest `promptSuggestions` runtime seam while removing the Class B ownership growth from guarded `src/features/chat/OpenCodianView.ts`. The lifecycle sync path now matches the already-tracked thin-owner architecture in `promptSuggestionSink.ts`.
+
+### What Changed
+
+- **src/features/chat/OpenCodianView.ts** reverted all prompt-suggestion-specific additions from the earlier round. There is now zero prompt-suggestion diff in this guarded owner.
+- **src/core/agents/backend/promptSuggestionSink.ts** remains the source of truth for the lifecycle bus. The module-level bus already exposed the needed channel helpers: `createPromptSuggestionChannel`, `deletePromptSuggestionChannel`, `stampPromptSuggestionScope`, `removePromptSuggestionScope`, `findPromptSuggestionScope`, `onPromptSuggestionSessionChange`, and `emitPromptSuggestionSessionChange`.
+- **src/features/chat/services/ComposerInputShellCoordinator.ts** now self-wires the lifecycle through that bus:
+  - `build()` creates a per-coordinator channel, stamps the scope on the container, subscribes to `onPromptSuggestionSessionChange(channelId)`, and keeps the existing sink subscription for adapter callbacks.
+  - `destroy()` removes the stamped scope and deletes the channel before clearing refs, preventing stale cross-talk across rebuilt or parallel chat leaves.
+- **src/features/chat/services/TabActivationRuntimeHostProvider.ts** now derives the prompt-suggestion channel from the active tab's messages container via `findPromptSuggestionScope(messagesContainer)` and emits backend session changes through `emitPromptSuggestionSessionChange(sessionId, channelId)`.
+- **tests/** now cover the real path:
+  - channel-scoped session emission and DOM scope discovery,
+  - coordinator session sync through the bus instead of host readback,
+  - teardown cleanup for scope/channel removal, and
+  - the same honest lifecycle boundary where suggestion arrival may precede backend session writeback.
+
+### Honesty Boundaries
+
+- Classification remains **readback**.
+- This refactor does **not** add live runtime proof that the Claude Code SDK emits `prompt_suggestion` in Test Vault. It only moves the already-honest runtime seam onto the thin-owner channel bus.
+- The stable surface remains a composer-owned clickable chip that inserts text only. No auto-send, no authoring UI, no `.claude/**` writes.
+- Historical 2026-06-03 notes below that mention `getCurrentBackendSessionId()`, `syncPromptSuggestionSession(sessionId)`, or `OpenCodianView` prompt-suggestion forwarding should now be read as superseded intermediate states, not the current tracked source.
+
+---
+
+## 2026-06-03 Prompt Suggestions — Honest Runtime Seam Completion
+
+### Objective
+
+Finish the smallest honest runtime seam for Claude Code SDK `promptSuggestions` without inventing a `pass`. This closes the source-truth gap discovered during the 2026-06-03 audit: some earlier notes described a fuller lifecycle path than the tracked source actually implemented.
+
+### What Changed
+
+- **src/core/agents/backend/ClaudeCodeStreamNormalizer.ts** now emits `StreamChunk { type: 'prompt_suggestion', suggestion, uuid, sessionId }` for SDK `prompt_suggestion` messages.
+- **src/core/agents/backend/ClaudeCodeAdapter.ts** now forwards post-result `prompt_suggestion` messages through `onPostResultChunk()` without changing the existing `sendMessage()` result-boundary contract.
+- **src/features/chat/services/ComposerInputShellCoordinator.ts** now renders a real composer-owned suggestion chip surface and syncs its active session both:
+  - at `build()` time from `getCurrentBackendSessionId()`, and
+  - on later conversation/session changes through `syncPromptSuggestionSession(sessionId)`.
+- **src/features/chat/services/TabActivationRuntimeHostProvider.ts** now forwards the active conversation's backend session identity through a narrow prompt-suggestion lifecycle hook when `setCurrentConversation()` runs.
+- **src/features/chat/OpenCodianView.ts** now provides that lifecycle hook and current-session readback seam to the coordinator host.
+- **src/i18n/locales/en.ts + zh.ts** now describe the surface honestly as a clickable chip inside the composer area, not below the assistant response.
+- **tests/**: focused RED→GREEN coverage now proves:
+  - normalizer emission,
+  - adapter post-result callback delivery,
+  - real composer chip render/insert/clear behavior,
+  - build-time current-session sync, and
+  - conversation-change session sync forwarding.
+
+### Honesty Boundaries
+
+- Classification remains **readback**.
+- The runtime seam is now real and test-backed, but live Claude Code SDK emission of `prompt_suggestion` is still unproven in Test Vault smoke. No `pass` claim is made.
+- The stable product surface is composer-owned. Clicking the chip inserts text into the textarea only; it never auto-sends.
+- Earlier 2026-06-03 draft notes that referenced a `MessageFinalizationService.onBackendSessionIdFinalized` hook should be treated as superseded planning notes, not the final tracked implementation. The real tracked sync path is `build()` current-session readback plus `TabActivationRuntimeHostProvider` / `OpenCodianView` conversation-state sync.
+
+---
+
+## 2026-06-03 Debug File / Strict MCP Config — Builder Wiring Fix
+
+### Objective
+
+Fix a truth drift where `debugFile` and `strictMcpConfig` were documented as wired readback seams but were **not actually wired** in `buildClaudeCodeOptions`. The `ClaudeCodeSdkOptionsShape` interface had `debugFile?: string` missing entirely, and `strictMcpConfig?: boolean` was also missing from the shape. Neither field was ever propagated from `settings` into SDK options.
+
+### What Changed
+
+- **src/core/agents/backend/ClaudeCodeOptionsBuilder.ts**:
+  - Added `debugFile?: string` to `ClaudeCodeSdkOptionsShape` interface.
+  - Added `strictMcpConfig?: boolean` to `ClaudeCodeSdkOptionsShape` interface.
+  - Wired `debugFile` in `buildClaudeCodeOptions` — omit when empty/whitespace, pass trimmed string when non-empty (uses existing `trimOptionalString()` helper).
+  - Wired `strictMcpConfig` in `buildClaudeCodeOptions` — omit when false, pass `true` when enabled.
+- **tests/unit/core/agents/backend/ClaudeCodeOptionsBuilder.test.ts**: Added focused TDD tests (RED→GREEN):
+  - `debugFile`: 3 tests (empty → omit, whitespace-only → omit, non-empty → pass trimmed)
+  - `strictMcpConfig`: 2 tests (false → omit, true → pass)
+- **tests/unit/features/settings/SettingsClaudeCodeSection.test.ts**: Added honest settings-surface regression coverage so the stable UI keeps rendering the existing boundary and lifecycle copy:
+  - `debugFile`: boundary notice, implicit-debug notice, lifecycle notice, trimmed persistence
+  - `strictMcpConfig`: boundary notice, lifecycle notice, toggle persistence
+
+### Honesty Boundaries
+
+- Classification remains **readback** — this fix only repairs the builder wiring. No live runtime proof of actual CLI debug file writing or MCP config validation behavior is claimed.
+- No new readback-proof surfaces added in this patch (no adapter probes, no Capability Lab buttons). Those remain a future optional enhancement if pattern-matched by existing seams.
+- The stable settings surface now has explicit regression coverage for the already-existing honest boundary/lifecycle copy, but no new stable authoring or behavior-proof path was added.
+- Matrix unchanged: 46 rows, 28 pass, 18 readback, 0 fail.
+
+---
+
+## 2026-06-03 Tool Aliases — Readback Proof Surface
+
+### Objective
+
+Productize the existing Claude Code SDK `toolAliases` seam as an honest `readback` surface, analogous to the recent Plan Mode Instructions / Sandbox / Task Budget readback proof work. The proof verifies settings→SDK option mapping without claiming actual alias resolution behavior is runtime-proven.
+
+### What Changed
+
+- **src/core/agents/backend/ClaudeCodeAdapter.ts**: Added `ToolAliasesReadbackProbeResult` interface and `runToolAliasesReadbackProbe()` method. The probe does **not** execute a real SDK query, but builds diagnostic SDK options and verifies the `toolAliases` settings→SDK option mapping directly. Returns `readback` with `optionWired`, `settingEmpty`, `sdkOptionPresent`, `sdkEntryCount`, `entriesMatch`, and `defensiveCopyPreserved`. Classification rules: `readback` (settings→SDK mapping verified; empty setting → option omitted; non-empty setting → option present with matching entries and a distinct object reference), `fail` (entry count mismatch, key/value mismatch, same-object-reference leak, or probe throws).
+- **src/core/agents/backend/index.ts**: Exported `ToolAliasesReadbackProbeResult` type.
+- **src/features/settings/SettingsClaudeCodeSection.ts**: `renderToolAliasesSetting()` now renders `data-claude-code-tool-aliases-boundary` and `data-claude-code-tool-aliases-lifecycle` inline notices (comparable to other honest readback settings). The boundary notice states readback-only scope and that actual alias resolution is not independently verified. The lifecycle notice states next-query/restart-only applicability and that active sessions do not update live.
+- **src/i18n/locales/en.ts + zh.ts**: Added `settings.claudeCode.toolAliases.boundaryNotice` and `settings.claudeCode.toolAliases.lifecycleNotice` locale strings with compact honest copy.
+- **src/features/settings/SettingsCapabilityLabSection.ts**: Added "Run Tool Aliases Readback Proof" button in Discovery & Status panel. Proof output clearly states this is diagnostic readback only, actual alias resolution is an SDK/CLI internal claim, and only takes effect on the next query or restarted session. Active sessions do not update live. Displays setting empty state, SDK option presence, entry count, defensive-copy status, entries match, and honest boundary copy.
+- **tests**:
+  - `ClaudeCodeAdapter.probes.test.ts`: 6 focused tests (empty setting → no option, non-empty setting → option with matching entries, entries mismatch → fail, present when should be absent → fail, same-object-reference leak → fail, lifecycle honesty assertion)
+  - `SettingsClaudeCodeSection.test.ts`: 1 focused test (boundary and lifecycle notices render with correct data attrs)
+  - `SettingsCapabilityLabSection.test.ts`: 3 focused tests (proof button renders, readback proof execution marks readback, thrown-error failure path)
+
+### Honesty Boundaries
+
+- Classification remains **readback** — the new proof surface verifies settings→SDK option mapping only; it does not and cannot verify actual alias resolution behavior (model-emitted tool name remapping before tool resolution).
+- No `pass` path invented: the proof button explicitly outputs `readback` classification and honest copy explaining the limitation.
+- The probe now verifies defensive-copy behavior explicitly: if diagnostic SDK options reuse the same `toolAliases` object reference as settings, classification drops to `fail`.
+- Matrix: 46 rows, 28 pass, 18 readback, 0 fail.
+
+---
+
+## 2026-06-03 Strict MCP Config — Readback Proof Surface
+
+### Objective
+
+Productize the existing Claude Code SDK `strictMcpConfig` seam as an honest `readback` surface, analogous to the recent Debug File / Tool Aliases readback proof work. The proof verifies settings→SDK option mapping without claiming actual MCP config validation behavior is runtime-proven.
+
+### What Changed
+
+- **src/core/agents/backend/ClaudeCodeAdapter.ts**: Added `StrictMcpConfigReadbackProbeResult` interface and `runStrictMcpConfigReadbackProbe()` method. The probe does **not** execute a real SDK query, but builds diagnostic SDK options and verifies the `strictMcpConfig` settings→SDK option mapping directly. Returns `readback` with `optionWired`, `settingValue`, `sdkOptionPresent`, `sdkValue`, and `valueMatch`. Classification rules: `readback` (settings→SDK mapping verified; `false` setting → option omitted; `true` setting → option present with value `true`), `fail` (`false` but option present, `true` but option missing/false, or probe throws).
+- **src/core/agents/backend/index.ts**: Exported `StrictMcpConfigReadbackProbeResult` type.
+- **src/features/settings/SettingsCapabilityLabSection.ts**: Added "Run Strict MCP Config Readback Proof" button in Discovery & Status panel. Proof output clearly states this is diagnostic readback only, actual MCP config validation behavior is not independently verified, and only takes effect on the next query or restarted session. Active sessions do not update live. This does not write `.claude/mcp.json` or provide MCP authoring. Displays setting value, SDK option presence, SDK value, value match, and honest boundary copy.
+- **tests**:
+  - `ClaudeCodeAdapter.probes.test.ts`: 6 focused tests (`false` → no option, `true` → option present `true`, `false` but option present → fail, `true` but option missing → fail, `true` but option `false` → fail, thrown-error path)
+  - `SettingsCapabilityLabSection.test.ts`: 3 focused tests (proof button renders, readback proof execution marks readback, thrown-error failure path)
+
+### Honesty Boundaries
+
+- Classification remains **readback** — the new proof surface verifies settings→SDK option mapping only; it does not and cannot verify actual MCP config validation behavior (which is an SDK/CLI internal claim).
+- No `pass` path invented: the proof button explicitly outputs `readback` classification and honest copy explaining the limitation.
+- The probe verifies that `strictMcpConfig: false` results in no `strictMcpConfig` option, and `strictMcpConfig: true` results in a `strictMcpConfig: true` option.
+- Matrix: 46 rows, 28 pass, 18 readback, 0 fail.
+
+---
+
+## 2026-06-03 Debug File — Readback Proof Surface
+
+### Objective
+
+Productize the existing Claude Code SDK `debugFile` seam as an honest `readback` surface, completing the builder-wiring fix from the earlier 2026-06-03 patch. The proof verifies settings→SDK option mapping without claiming actual CLI debug file writing is runtime-proven.
+
+### What Changed
+
+- **src/core/agents/backend/ClaudeCodeAdapter.ts**: Added `DebugFileReadbackProbeResult` interface and `runDebugFileReadbackProbe()` method. The probe does **not** execute a real SDK query, but builds diagnostic SDK options and verifies the `debugFile` settings→SDK option mapping directly. Returns `readback` with `optionWired`, `settingValue`, `emptySetting`, `sdkOptionPresent`, `sdkValue`, and `valueMatch`. Classification rules: `readback` (settings→SDK mapping verified; empty/whitespace setting → option omitted; non-empty setting → option present with trimmed exact match), `fail` (mismatch, option present when should be absent, or probe throws).
+- **src/core/agents/backend/index.ts**: Exported `DebugFileReadbackProbeResult` type.
+- **src/features/settings/SettingsCapabilityLabSection.ts**: Added "Run Debug File Readback Proof" button in Discovery & Status panel. Proof output clearly states this is diagnostic readback only, actual CLI file writing is not independently verified, and only takes effect on the next query or restarted session. Setting a debug file path implicitly enables debug logging even if the debug toggle is off. Displays setting value, empty state, SDK option presence, SDK value, value match, and honest boundary copy.
+- **tests**:
+  - `ClaudeCodeAdapter.probes.test.ts`: 6 focused tests (empty setting → no option, whitespace-only → no option, non-empty setting → option with trimmed exact match, value mismatch → fail, present when should be absent → fail, thrown-error path)
+  - `SettingsCapabilityLabSection.test.ts`: 3 focused tests (proof button renders, readback proof execution marks readback, thrown-error failure path)
+
+### Honesty Boundaries
+
+- Classification remains **readback** — the new proof surface verifies settings→SDK option mapping only; it does not and cannot verify actual CLI debug file writing behavior.
+- No `pass` path invented: the proof button explicitly outputs `readback` classification and honest copy explaining the limitation.
+- The probe verifies that empty/whitespace settings result in no `debugFile` option, and non-empty settings result in a `debugFile` option with the exact trimmed value.
+- Matrix unchanged: 46 rows, 28 pass, 18 readback, 0 fail.
+
+---
+
+## 2026-06-03 Plan Mode Instructions — Honesty Copy Hardening
+
+### What Changed
+
+- **src/features/settings/SettingsCapabilityLabSection.ts**: Hardened the readback proof copy so non-plan runs no longer look contradictory. The proof now states that the SDK is only expected to apply the setting in Plan mode, and when `permissionMode !== 'plan'` but the option is still present, it explicitly explains that this is current builder wiring, not behavior verification.
+- **src/i18n/locales/en.ts + zh.ts**: Tightened the stable Permissions-tab copy so it distinguishes SDK use conditions (`Plan` permission mode) from the plugin's readback-only proof boundary.
+- **tests/unit/features/settings/SettingsCapabilityLabSection.test.ts**: Added focused regression coverage for the non-plan honesty note and the thrown-error failure path.
+
+### Honesty Boundaries
+
+- Classification remains **readback**.
+- The builder still does **not** gate `planModeInstructions` on `permissionMode`; the UI now says that clearly instead of implying a false product guarantee.
+
+---
+
+## 2026-06-03 Plan Mode Instructions — Readback Proof Surface
+
+### Objective
+
+Add the smallest honest readback proof surface for the existing Claude Code SDK `planModeInstructions` seam, analogous to the System Prompt / Task Budget / Sandbox readback proofs. The proof verifies settings→SDK option mapping without claiming actual plan-mode behavior enforcement is runtime-proven.
+
+### What Changed
+
+- **src/core/agents/backend/ClaudeCodeAdapter.ts**: Added `PlanModeInstructionsReadbackProbeResult` interface and `runPlanModeInstructionsReadbackProbe()` method. The probe does **not** execute a real SDK query, but builds diagnostic SDK options and verifies the `planModeInstructions` settings→SDK option mapping directly. Returns `readback` with `optionWired`, `permissionMode`, `settingValue`, `sdkOptionPresent`, `sdkValue`, and `valueMatch`. Classification rules: `readback` (settings→SDK mapping verified; empty/whitespace setting → no planModeInstructions option; non-empty setting → planModeInstructions present with matching trimmed value; builder does not gate on permissionMode, so the probe faithfully records current mapping behavior), `fail` (builder mapping inconsistent with settings or probe throws).
+- **src/core/agents/backend/index.ts**: Exported `PlanModeInstructionsReadbackProbeResult` type.
+- **src/features/settings/SettingsCapabilityLabSection.ts**: Added "Run Plan Mode Instructions Readback Proof" button in Discovery & Status panel. Proof output clearly states this is diagnostic readback only, actual plan-mode behavior is the SDK's internal claim, and only takes effect on next query / restarted session. Displays permission mode, setting value, SDK option presence, value match, and honest boundary copy.
+- **tests**:
+  - `ClaudeCodeAdapter.probes.test.ts`: 6 focused tests (plan mode + non-empty → readback with match, non-plan + non-empty → readback with option present, plan mode + empty → readback with omission, whitespace → trimmed match, value mismatch → fail, option present when should be absent → fail)
+  - `SettingsCapabilityLabSection.test.ts`: 2 focused tests (proof button renders, readback proof execution marks readback)
+
+### Honesty Boundaries
+
+- Classification remains **readback** — the new proof surface verifies settings→SDK option mapping only; it does not and cannot verify actual plan-mode behavior enforcement (read-only preamble + ExitPlanMode protocol footer).
+- No `pass` path invented: the proof button explicitly outputs `readback` classification and honest copy explaining the limitation.
+- The probe faithfully records that the builder does not gate planModeInstructions on permissionMode; it does not invent a false fail classification for this current behavior.
+- Matrix: 46 rows, 28 pass, 18 readback, 0 fail.
+
+---
+
+## 2026-06-03 Sandbox — Readback Proof Surface
+
+### Objective
+
+Add the smallest honest readback proof surface for the existing Claude Code SDK `sandbox` seam, analogous to the Prompt Suggestions and System Prompt readback proofs. The proof verifies settings→SDK option mapping without claiming actual OS-level sandbox enforcement is runtime-proven.
+
+### What Changed
+
+- **src/core/agents/backend/ClaudeCodeAdapter.ts**: Added `SandboxReadbackProbeResult` interface and `runSandboxReadbackProbe()` method. The probe does **not** execute a real SDK query, but builds diagnostic SDK options and verifies the `sandbox` settings→SDK option mapping directly. Returns `readback` with `optionWired`, `enabled`, `failIfUnavailable`, `autoAllowBashIfSandboxed`, `sdkOptionPresent`, `sdkEnabled`, `sdkFailIfUnavailable`, `sdkAutoAllowBashIfSandboxed`, `enabledMatch`, `failIfUnavailableMatch`, and `autoAllowBashIfSandboxedMatch`. Classification rules: `readback` (settings→SDK mapping verified; `enabled=false` → sandbox option omitted entirely; `enabled=true` → sandbox object present with `enabled: true`; false sub-fields stay omitted rather than being passed as explicit `false` values), `fail` (any sub-field mapping inconsistent with settings or probe throws).
+- **src/core/agents/backend/index.ts**: Exported `SandboxReadbackProbeResult` type.
+- **src/features/settings/SettingsCapabilityLabSection.ts**: Added "Run Sandbox Readback Proof" button in Discovery & Status panel. Proof output clearly states this is diagnostic readback only, OS-level enforcement is an SDK/CLI internal claim, and only takes effect on next query / restarted session. Displays enabled state, fail-if-unavailable, auto-allow-bash, SDK option presence, and honest boundary copy.
+- **tests**:
+  - `ClaudeCodeAdapter.probes.test.ts`: 5 focused tests (disabled → no sandbox option, enabled with sub-options → sandbox object with matches, enabled mismatch → fail, disabled-but-present sandbox option → fail, explicit false sub-fields in SDK options → fail)
+  - `SettingsCapabilityLabSection.test.ts`: 2 focused tests (proof button renders, readback proof execution marks readback)
+
+### Honesty Boundaries
+
+- Classification remains **readback** — the new proof surface verifies settings→SDK option mapping only; it does not and cannot verify actual OS-level sandbox enforcement (bubblewrap/seccomp/etc).
+- No `pass` path invented: the proof button explicitly outputs `readback` classification and honest copy explaining the limitation.
+- Matrix: 46 rows, 28 pass, 18 readback, 0 fail.
+
+---
+
+## 2026-06-03 Task Budget — Readback Proof Surface
+
+### Objective
+
+Add the smallest honest readback proof surface for the existing Claude Code SDK `taskBudget` seam, analogous to the Prompt Suggestions and System Prompt readback proofs. The proof verifies settings→SDK option mapping without claiming actual SDK token-budget enforcement is runtime-proven.
+
+### What Changed
+
+- **src/core/agents/backend/ClaudeCodeAdapter.ts**: Added `TaskBudgetReadbackProbeResult` interface and `runTaskBudgetReadbackProbe()` method. The probe does **not** execute a real SDK query, but builds diagnostic SDK options and verifies the `taskBudget` settings→SDK option mapping directly. Returns `readback` with `optionWired`, `settingValue`, `sdkOptionPresent`, `sdkTotalValue`, and `totalMatch`. Classification rules: `readback` (settings→SDK mapping verified; `null` setting → no `taskBudget` option; number setting → `taskBudget: { total: number }` with matching value), `fail` (builder mapping inconsistent with settings or probe throws).
+- **src/core/agents/backend/index.ts**: Exported `TaskBudgetReadbackProbeResult` type.
+- **src/features/settings/SettingsClaudeCodeSection.ts**: `renderTaskBudgetSetting()` now renders `data-claude-code-task-budget-boundary` and `data-claude-code-task-budget-lifecycle` inline notices (comparable to other honest readback settings). The boundary notice states readback-only scope and that API-side enforcement is not independently verified. The lifecycle notice states next-query/restart-only applicability.
+- **src/i18n/locales/en.ts + zh.ts**: Added `settings.claudeCode.taskBudget.boundaryNotice` and `settings.claudeCode.taskBudget.lifecycleNotice` locale strings with compact honest copy: `@alpha`, settings→SDK mapping/readback only, next query / restarted session only, no claim of API-side enforcement.
+- **src/features/settings/SettingsCapabilityLabSection.ts**: Added "Run Task Budget Readback Proof" button in Discovery & Status panel. Proof output clearly states this is diagnostic readback only, `@alpha`, next-query/restart lifecycle only, and API-side enforcement is not independently verified. Displays setting value, SDK option presence, total value match, and honest boundary copy.
+- **tests/**:
+  - `ClaudeCodeAdapter.probes.test.ts`: 3 focused tests (null setting → no taskBudget option, positive integer setting → taskBudget with matching total, total match verification)
+  - `SettingsClaudeCodeSection.test.ts`: 2 focused tests (boundary notice renders with correct data attr, lifecycle notice renders with correct data attr)
+  - `SettingsCapabilityLabSection.test.ts`: 2 focused tests (proof button renders, readback proof execution marks readback)
+
+### Honesty Boundaries
+
+- Classification remains **readback** — the new proof surface verifies settings→SDK option mapping only; it does not and cannot verify actual SDK token-budget enforcement behavior.
+- No `pass` path invented: the proof button explicitly outputs `readback` classification and honest copy explaining the limitation.
+- Matrix: 46 rows, 28 pass, 18 readback, 0 fail.
+
+---
+
+## 2026-06-03 System Prompt — Readback Proof Surface
+
+### Objective
+
+Add the smallest honest readback proof surface for the existing Claude Code SDK `systemPrompt` append-only seam, analogous to the Prompt Suggestions readback proof. The proof verifies settings→SDK option mapping without claiming actual SDK prompt append behavior is runtime-proven.
+
+### What Changed
+
+- **src/core/agents/backend/ClaudeCodeAdapter.ts**: Added `SystemPromptReadbackProbeResult` interface and `runSystemPromptReadbackProbe()` method. The probe does **not** execute a real SDK query, but builds diagnostic SDK options and verifies the `systemPrompt` settings→SDK option mapping directly. Returns `readback` with `optionWired`, `presetPreserved`, `emptySetting`, `appendValue`, `expectedAppendValue`, and `appendMatch`. Classification rules: `readback` (settings→SDK mapping verified; official preset `claude_code` always preserved; actual prompt append behavior not independently verifiable), `fail` (builder mapping inconsistent with settings or probe throws).
+- **src/core/agents/backend/index.ts**: Exported `SystemPromptReadbackProbeResult` type.
+- **src/features/settings/SettingsCapabilityLabSection.ts**: Added "Run System Prompt Readback Proof" button in Discovery & Status panel. Proof output clearly states this is diagnostic readback only, append-only, and next-query/restart lifecycle only. Displays preset preservation, empty vs non-empty setting state, append value match, and honest boundary copy.
+- **tests/**:
+  - `ClaudeCodeAdapter.probes.test.ts`: 3 focused tests (empty setting → default preset, non-empty setting → preset-with-append with match, whitespace → trimmed match)
+  - `SettingsCapabilityLabSection.test.ts`: 2 focused tests (proof button renders, readback proof execution marks readback)
+
+### Honesty Boundaries
+
+- Classification remains **readback** — the new proof surface verifies settings→SDK option mapping only; it does not and cannot verify actual SDK prompt append behavior.
+- No `pass` path invented: the proof button explicitly outputs `readback` classification and honest copy explaining the limitation.
+- Append-only semantics enforced: the probe always checks that the official `claude_code` preset is preserved, never replaced.
+- Matrix: 46 rows, 28 pass, 18 readback, 0 fail.
+
+---
+
+## 2026-06-03 System Prompt — Readback Seam (Append-Only)
+
+### Objective
+
+Implement the smallest honest seam for Claude Code SDK public option `systemPrompt` with SAFE APPEND semantics only. This seam appends custom instructions to the official Claude Code preset system prompt without replacing it.
+
+### What Changed
+
+- **src/core/types/settings.ts**: Added `systemPrompt: string` to `ClaudeCodeBackendSettings` with honest readback JSDoc. Added default `''` and trim-based normalization.
+- **src/core/agents/backend/ClaudeCodeOptionsBuilder.ts**: Updated `ClaudeCodeSdkOptionsShape.systemPrompt` to accept `{ type: 'preset'; preset: 'claude_code'; append?: string }`. Wired in `buildClaudeCodeOptions` — when `settings.systemPrompt` is non-empty, uses preset-with-append shape `{ type: 'preset', preset: 'claude_code', append: instructions }`; when empty, preserves default `{ type: 'preset', preset: 'claude_code' }`.
+- **src/features/settings/SettingsClaudeCodeSection.ts**: Added `renderSystemPromptSetting()` in Model & Thinking tab (text area with honest boundary/lifecycle notices). The setting is clearly labeled as "appended instructions" and not a full replacement.
+- **src/features/settings/SettingsCapabilityLabSection.ts**: Added "System Prompt" matrix row (#46, readback, settings surface). Updated matrix audit: 46 rows, 28 pass, 18 readback, 0 fail.
+- **src/i18n/locales/en.ts + zh.ts**: Locale strings for name, desc, placeholder, boundaryNotice, lifecycleNotice with honest copy covering append-only boundary (does NOT replace official preset) and lifecycle boundary (next query / restarted session only).
+- **tests/**: TDD — RED→GREEN for normalization (5 tests: default, valid string, trim, whitespace-only, non-string), options builder (3 tests: default preset, preset-with-append, trim), settings UI (5 tests: render, change, trim, boundary notice, lifecycle notice), capability lab audit (row count 45→46, readback count 17→18, expected map update), truth audit (1 test).
+
+### Honesty Boundaries
+
+- Classification: **readback** — SDK option wiring proven (systemPrompt propagates through `buildClaudeCodeOptions` into SDK options as preset-with-append shape). Actual prompt append behavior (whether the SDK actually appends instructions after the preset) is not independently verifiable from the plugin layer. The preset is always preserved; this is append-only.
+- **No replacement behavior exposed**: the UI explicitly labels this as "appended instructions" and the builder always preserves the official `claude_code` preset.
+- **Settings surface**: exposed in Model & Thinking tab as a stable text area input, unlike the hidden AskUserQuestion Preview Format seam, because this option has a trustworthy user effect (users can write instructions and expect them to reach the SDK).
+- Does not modify existing pass/readback boundaries.
+- Matrix: 46 rows, 28 pass, 18 readback, 0 fail.
+
+---
+
+## 2026-06-03 Prompt Suggestions — Readback Proof Surface
+
+### Objective
+
+Tighten the honest readback boundary for Claude Code SDK `promptSuggestions` by adding explicit proof-status / lifecycle boundary notices in stable settings UI and a dedicated readback proof button in Capability Lab.
+
+### What Changed
+
+- **src/features/settings/SettingsClaudeCodeSection.ts**: `renderPromptSuggestionsSetting()` now renders `boundaryNotice` and `lifecycleNotice` inline elements (comparable to other honest readback settings like `enableContext1mBeta`, `loadTimeoutMs`, `jsRuntime`). The toggle retains `stableDesc` which already documented SDK suppression conditions.
+- **src/core/agents/backend/ClaudeCodeAdapter.ts**: Added `PromptSuggestionsReadbackProbeResult` interface and `runPromptSuggestionsReadbackProbe()` method. The probe does **not** execute a real SDK query, but it now builds diagnostic SDK options and verifies the settings→SDK option mapping directly instead of merely echoing adapter settings. Returns `readback` with `optionWired`, `optionValue`, `sdkOptionPresent`, `modelState`, and optional `blockerNote` (only when the user explicitly selected a non-Claude model).
+- **src/features/settings/SettingsCapabilityLabSection.ts**: Added "Run Prompt Suggestions Readback Proof" button in Discovery & Status panel. Proof output now distinguishes settings value, SDK option presence, and explicit model-selection state (`Claude` / `Non-Claude` / `Unknown`) so the readback surface does not overclaim effective runtime model knowledge. Classification remains `readback`; no `pass` path is invented.
+- **src/i18n/locales/en.ts + zh.ts**: Added `settings.claudeCode.promptSuggestions.boundaryNotice` and `settings.claudeCode.promptSuggestions.lifecycleNotice` locale strings with honest copy covering readback boundary and lifecycle boundary.
+- **tests/**:
+  - `SettingsClaudeCodeSection.test.ts`: 2 tests (boundary notice renders, lifecycle notice renders)
+  - `SettingsCapabilityLabSection.test.ts`: 2 tests (proof button renders, readback proof execution marks readback)
+  - `ClaudeCodeAdapter.probes.test.ts`: 3 tests (readback with unknown model state, readback with blocker note for explicit non-Claude model, readback when disabled)
+
+### Honesty Boundaries
+
+- Classification: **readback** (unchanged) — the new proof surface verifies settings→SDK option mapping plus explicit model-selection state only; it does not and cannot verify actual SDK `prompt_suggestion` emission.
+- **No pass path invented**: the proof button explicitly outputs `readback` classification and honest copy explaining the limitation. The matrix row remains `readback`.
+- **Model dependency surfaced carefully**: when `promptSuggestions: true` and the user explicitly selected a non-Claude model, the proof displays a blocker note explaining that the feature piggybacks on Claude-specific prompt caching. Blank/default model selection is reported as `unknown`, not as a false blocker.
+- Does not modify existing pass/readback boundaries.
+- Matrix: 46 rows, 28 pass, 18 readback, 0 fail.
+
+---
+
+## 2026-06-03 AskUserQuestion Preview Format — Readback Seam
+
+### Objective
+
+Implement the smallest honest seam for Claude Code SDK public option `toolConfig.askUserQuestion.previewFormat?: 'markdown' | 'html'`. This diagnostic-only surface wires the SDK option through the options builder without exposing a stable settings UI, because the plugin question UI does not extract or render the `preview` field.
+
+### What Changed
+
+- **src/core/agents/backend/ClaudeCodeOptionsBuilder.ts**: Added `toolConfig?: { askUserQuestion?: { previewFormat?: 'markdown' | 'html' } }` to `ClaudeCodeSdkOptionsShape` and `ClaudeCodeOptionsBuilderInput`; wired in `buildClaudeCodeOptions` — omit when not provided, pass the object when provided.
+- **src/core/agents/backend/ClaudeCodeAdapter.ts**: Added `_diagnosticToolConfig` to `ClaudeCodeDiagnosticPromptRequest`; wired through `buildDiagnosticSdkOptions`. Added explicit comment documenting that the plugin question UI does not render preview fields.
+- **src/features/settings/SettingsCapabilityLabSection.ts**: Added "AskUserQuestion Preview Format" matrix row (#45, readback, hidden surface). No diagnostic probe button — the option has no trustworthy user effect without UI support.
+- **tests/**: TDD — RED→GREEN for options builder (3 tests: omit, pass html, pass markdown), adapter diagnostic wiring (2 tests: wires through buildDiagnosticSdkOptions, does not leak into ordinary sendMessage), capability lab audit (row count 44→45, readback count 16→17, hidden count 6→7, expected map update).
+
+### Honesty Boundaries
+
+- Classification: **readback** — SDK option wiring proven (toolConfig propagates through `buildClaudeCodeOptions` into SDK options). Actual preview behavior depends on the SDK/CLI and the consumer's question UI; the plugin layer does not extract or render the `preview` field, so this option has no trustworthy user effect in the current product.
+- **No stable settings UI**: no toggle or input is exposed because toggling this option would be a no-op from the user's perspective.
+- **No diagnostic probe button**: triggering and verifying an `askUserQuestion` preview format change end-to-end would require UI changes that are out of scope for this seam.
+- Does not modify existing pass/readback boundaries.
+- Matrix: 45 rows, 28 pass, 17 readback, 0 fail.
+
+---
+
+## 2026-06-03 Session Title — Pass Seam (Promoted from Readback)
+
+### Objective
+
+Promote the existing Session Title diagnostic harness from `readback` to `pass` only after live Obsidian/Test Vault evidence proves that the requested SDK `title?: string` survives into authoritative backend session detail as an exact `customTitle` match.
+
+### What Changed
+
+- **src/features/settings/SettingsCapabilityLabSection.ts**: Promoted the static "Session Title" matrix row from `readback` to `pass`. Updated the row comment to anchor the promotion to live Test Vault evidence (BUILD_ID `feature-phase0-capability.202606030440`).
+- **tests/unit/features/settings/SettingsCapabilityLabSection.test.ts**: TDD RED→GREEN for the honesty audit. Updated the expected matrix row (`Session Title`: `readback` → `pass`), verified count (27 → 28), and readback count (17 → 16).
+- **docs/**: Updated module docs, current-state report, and devlog so Session Title is no longer described as "pending live acceptance".
+
+### Live Runtime Evidence
+
+- **Date**: 2026-06-03
+- **BUILD_ID**: `feature-phase0-capability.202606030440`
+- **Session id**: `d98c73ea-d4cf-4c8b-9d34-941e42da4288`
+- **Requested title**: `OpenCodian Diagnostic Session Title 1780433378625-1slp1q`
+- **Backend customTitle**: `OpenCodian Diagnostic Session Title 1780433378625-1slp1q`
+- **Exact match**: `true`
+- **Runtime log**: `[ClaudeCodeAdapter] session title probe {"result":"pass","sessionId":"d98c73ea-d4cf-4c8b-9d34-941e42da4288","requestedTitle":"OpenCodian Diagnostic Session Title 1780433378625-1slp1q","customTitle":"OpenCodian Diagnostic Session Title 1780433378625-1slp1q","matchedBy":["customTitle","summary"]}`
+
+### Honesty Boundaries
+
+- Classification: **pass** (matrix) — promotion is anchored to a live backend `customTitle` exact match, not just option wiring.
+- **Diagnostic-only**: ordinary chat paths still set titles through `createSession` / `sendMessage`, not through `_diagnosticTitle`.
+- **No stable title settings UI**: title continues to come from the existing session creation flow.
+- Does not modify other pass/readback boundaries.
+- Matrix: 45 rows, 28 pass, 17 readback, 0 fail.
+
+---
+
+## 2026-06-03 Prompt Suggestions — Production Race Fix (Round 2)
+
+### Objective
+
+Close the remaining production race where a `prompt_suggestion` can arrive **before** `backendSessionId` is written back onto `currentConversation`. The previous fix (Round 1) only handled the case where `backendSessionId` was already available when `refreshSuggestionBar()` ran; it did not provide a guaranteed second refresh after `LocalStreamMessagePersistence` finalized the id.
+
+### Root Cause
+
+The production timeline is:
+1. Stream runs → SDK emits `message_metadata` with `sessionId` → `captureSdkSessionId()` sets `session.sdkSessionId`
+2. Stream continues → `result` arrives → `sendMessage` generator returns
+3. `pumpRuntimeOutput` continues looping in background
+4. **`prompt_suggestion` arrives** → `postResultCallbacks` fires → service requests bar refresh → `refreshSuggestionBar()` calls `host.getCurrentBackendSessionId()` → **returns `undefined`** because `LocalStreamMessagePersistence` has not yet written `backendSessionId` to `conversation`
+5. `StreamLocalFinalizer.finalize()` runs
+6. `messageFinalizationService.finalizeAfterStream()` runs → `LocalStreamMessagePersistence` writes `conversation.backendSessionId`
+7. `setActiveTabConversation(conversation)` is called
+8. **No signal refreshes the suggestion bar** → the suggestion remains invisible
+
+The first fix assumed that `refreshSuggestionBar()` could opportunistically sync `activeSessionId` from `host.getCurrentBackendSessionId()`. But in the real timeline, the `prompt_suggestion` arrives *before* step 6-7, so the opportunistic sync sees `undefined` and the suggestion is stored but never displayed.
+
+### What Changed (Round 2)
+
+- **src/features/chat/services/MessageFinalizationService.ts**: Added optional `onBackendSessionIdFinalized?(sessionId: string): void` to `MessageFinalizationHostDependencies` and `MessageFinalizationHost`. Called in `finalizeAfterStream()` after `setActiveTabConversation()` when `backendSessionId` is present. This provides an **explicit, guaranteed signal** that fires after the id is persisted.
+- **src/features/chat/services/ComposerInputShellCoordinator.ts**: Added `syncPromptSuggestionSession(sessionId?: string)` public method. Sets `activeSessionId` in the service and triggers `refreshSuggestionBar()`. This is the coordinator-side handler for the explicit finalization signal.
+- **src/features/chat/OpenCodianView.ts**:
+  - Passed `onBackendSessionIdFinalized` to `createMessageFinalizationHost()` — delegates to `composerInputShellCoordinator.syncPromptSuggestionSession(sessionId)`.
+  - Round 1 changes (`getCurrentBackendSessionId`) are retained as a defensive fallback for late suggestions.
+- **src/features/chat/services/messageFinalizationErrors.ts**: Extracted `getFriendlyServerStartErrorMessage` and `getUnavailableServerMessage` from `MessageFinalizationService.ts` to keep it under the 500-line lint limit after adding the new callback.
+- **tests/**:
+  - `MessageFinalizationService.test.ts`: 2 new tests — `notifies onBackendSessionIdFinalized when backendSessionId is present` and `does not notify when backendSessionId is absent`
+  - `PromptSuggestionIntegration.test.ts`: `suggestion arriving before backendSessionId finalized becomes visible after sync` — reproduces the exact race timeline
+  - `MessageFinalizationService.serverError.test.ts`: Updated imports to new `messageFinalizationErrors` module
+
+### What Changed (Round 1, retained)
+
+- **src/features/chat/services/PromptSuggestionService.ts**: `attachAdapter()` requests bar refresh when `activeSessionId === null` (defensive path for suggestions that arrive after `backendSessionId` is already available).
+- **src/features/chat/services/ComposerInputShellCoordinator.ts**: `getCurrentBackendSessionId?()` host method + `refreshSuggestionBar()` opportunistic sync.
+- **src/features/chat/OpenCodianView.ts**: `getCurrentBackendSessionId` implementation.
+
+### Live Runtime Proof
+
+- **BUILD_ID**: `feature-phase0-capability.202606030311`
+- Previous live smoke tests (2026-06-02) established that the SDK does not emit `prompt_suggestion` messages in the Test Vault configuration (zero `pump: prompt_suggestion received` log lines).
+- **Round 2 does not change the classification** — it closes a real lifecycle race that would have blocked suggestions from displaying *if* the SDK emitted them, but we still have no live evidence of actual SDK → UI end-to-end delivery.
+
+### Honesty Boundaries
+
+- Classification: **readback** (unchanged).
+- Round 1 fix was incomplete: it closed the "stale activeSessionId" bug but left a "prompt_suggestion arrives before backendSessionId is persisted" race. Round 2 closes that race with an explicit production signal (`onBackendSessionIdFinalized`).
+- No promotion to `pass` without observing an actual `prompt_suggestion` message from the SDK and seeing it render in the suggestion bar.
+
+---
+
+## 2026-06-03 Fork Session On Resume — Pass Seam
+
+### Objective
+
+Implement the smallest honest seam for Claude Code SDK public option `forkSession?: boolean`. This diagnostic-only surface verifies that the SDK can fork a resumed session into a new session id when `forkSession: true` is used with `resumeSessionId`. This is the SDK public query option, NOT the already-existing provider-owned `adapter.forkSession()` capability.
+
+### What Changed
+
+- **src/core/agents/backend/ClaudeCodeOptionsBuilder.ts**: Added `forkSession?: boolean` to `ClaudeCodeSdkOptionsShape` and `ClaudeCodeOptionsBuilderInput`; wired in `buildClaudeCodeOptions` — omit when not `true`, pass `true` when set.
+- **src/core/agents/backend/ClaudeCodeAdapter.ts**: Added `_diagnosticForkSession?: boolean` to `ClaudeCodeDiagnosticPromptRequest`; wired through `buildDiagnosticSdkOptions`. Added `ForkSessionProbeResult` interface and `runForkSessionProbe()` method with two-phase proof design. `runDiagnosticPrompt()` now skips the same-session post-check only when `_diagnosticForkSession === true`, while ordinary diagnostic resume / continue / resumeSessionAt paths still use `validateDiagnosticResumeResult()` for strict same-session validation. The explicit diagnostic resume gate also allows `_diagnosticForkSession` as a fork-specific opt-in when `resumeSessionId` is present. **Honesty boundary**: classification is `pass` only when the forked query returns a DIFFERENT session id from the seed AND the text output recalls the nonce; `fail` when session ids match (no fork occurred), nonce not recalled, or probe throws.
+- **src/core/agents/backend/index.ts**: Exported `ForkSessionProbeResult` type.
+- **src/features/settings/SettingsCapabilityLabSection.ts**: Added "Fork Session On Resume" matrix row (#44, pass, diagnostic surface). Added localized `Run Fork Session On Resume Proof` button + proof output strings via `settings.capabilityLab.proofs.forkSession.*`, and `runForkSessionProof()` handler. Proof UI runs a two-phase diagnostic probe: Phase 1 (seed) creates a session with a nonce, Phase 2 (fork) resumes from that session with `forkSession: true`. Classification promoted from `readback` to `pass` on 2026-06-03 after Codex live acceptance verification in Obsidian (BUILD_ID `feature-phase0-capability.202606030151`).
+- **src/i18n/locales/en.ts + zh.ts**: Locale strings for forkSession proof (button, running, title, boundary, seedSession, forkedSession, sessionIdsDiffer, nonceRecalled, status yes/no, pass, fail, defaultError, threw).
+- **tests/**: TDD — RED→GREEN for options builder (4 tests: omit, pass true, pass false, omit undefined), focused adapter probe outcomes (fork pass with different session id + nonce recall, fork fail when ids match, plus the supporting stderr/custom-session-id/session-title/continue/resumeSessionAt probe cases in `ClaudeCodeAdapter.probes.test.ts`), capability lab audit (row count 43→44, verified count 27, readback count 17, expected map update), proof button tests (5 tests: render, pass, fail same session id, fail no nonce recall, fail throw).
+
+### Proof Design
+
+- **Phase 1 (seed)**: Creates a fresh diagnostic session with a unique nonce, `persistSession: true`, and no forkSession flag.
+- **Phase 2 (fork)**: Runs a second diagnostic query with `resumeSessionId` (seed session) + `forkSession: true`, asking the model to reply with only the nonce from the seed turn.
+- **Pass criteria**:
+  1. The forked query returns a DIFFERENT session id from the seed query (proving a fork occurred).
+  2. The text output proves it recalled context from the seed by recalling the nonce.
+- **Fail criteria**: Same session id (no fork occurred), missing session id, missing nonce recall, or probe throws.
+
+### Honesty Boundaries
+
+- Classification: **pass** (matrix) — two-phase diagnostic probe design with live runtime proof verified by Codex on 2026-06-03 (BUILD_ID `feature-phase0-capability.202606030151`). Seed session: `f91393e7-e652-4a19-a9bc-0ca6920397aa`, forked session: `c0a379c9-752e-43de-94fa-57386bfc52a3`, nonce recalled: true. Runtime log: `[ClaudeCodeAdapter] forkSession probe {"result":"pass","seedSessionId":"f91393e7-e652-4a19-a9bc-0ca6920397aa","forkedSessionId":"c0a379c9-752e-43de-94fa-57386bfc52a3","nonceRecalled":true}`.
+- **Diagnostic-only**: ordinary chat paths never use forkSession. Session management is owned by the adapter.
+- **No stable product surface**: tied to SDK public option `forkSession?: boolean`, not the provider-owned `adapter.forkSession()` capability.
+- **Locale-aware proof scripts**: `.obsidian-debug/fork-session-on-resume-proof-20260603.js` and `.obsidian-debug/fork-session-on-resume-snapshot-20260603.js` are locale-aware for zh/en. The proof script returns structured JSON (including `success`, `status`, `seedSessionId`, `forkedSessionId`, `sessionIdsDiffer`, `nonceRecalled`, `buildId`) and **fails** if any required field is missing or contradictory after a supposed pass. The snapshot script inspects the proof output paragraphs (not just the marker chip) and reports `evidenceQuality` as `full`, `partial`, or `marker_only` honestly. This prevents the previous false-success pattern where the marker showed pass but extracted session IDs were all `unknown`. **DOM fix**: the first hardened attempt still assumed the output was a descendant of `[data-capability="Fork Session On Resume"]`, but the marker is actually a child of `.opencodian-capability-lab-output`; the final scripts use `closest('.opencodian-capability-lab-output')` from the marker to reach the output shell that holds the seed/forked session id paragraphs.
+- No authoring UI, no `.claude/**` writes, no plugin/agent/MCP authoring surfaces, no fake runtime proof.
+- Does not modify existing pass/readback boundaries.
+- Matrix: 44 rows, 27 pass, 17 readback, 0 fail.
+
+---
+
+## 2026-06-03 Prompt Suggestion Sink-Clear Stale-Chip Fix
+
+### Objective
+
+Fix the remaining lifecycle bug in `ComposerInputShellCoordinator.wirePromptSuggestionFromSink()`: when `clearPromptSuggestionSink()` fires (backend stop/restart) and `onPromptSuggestionSinkChange` delivers `null`, the coordinator only unsubscribed the old adapter but did **not** clear `PromptSuggestionService` state or refresh the suggestion bar. A stale chip could remain visible until the user switched conversation or started a new turn.
+
+### What Changed
+
+- **src/features/chat/services/ComposerInputShellCoordinator.ts**: In the `onPromptSuggestionSinkChange(null)` branch, added `this.promptSuggestionService.clearAll()` followed by `this.refreshSuggestionBar()` so the suggestion chip is immediately hidden when the backend goes away.
+- **tests/unit/features/chat/services/PromptSuggestionIntegration.test.ts**: Added `"sink cleared hides active suggestion and refreshes bar"` — a production-lifecycle test that receives a suggestion for the active session, simulates the coordinator's sink-null handling (`clearAll()` + bar refresh), and asserts the active suggestion becomes null and the bar refresh callback fires.
+
+### Honesty Boundaries
+
+- Classification: **readback** (unchanged — this is a delivery/lifecycle bug-fix, not a capability promotion).
+- No new settings UI, no `.claude/**` writes.
+- Concurrent tab/session behaviour preserved.
+
+---
+
+## 2026-06-02 Resume Session At Position — Pass Seam
+
+### Objective
+
+Implement the smallest honest seam for Claude Code SDK public option `resumeSessionAt?: string`. This diagnostic-only surface verifies that the SDK can resume a session from a specific message UUID (from `SDKAssistantMessage.uuid`) instead of the most recent message.
+
+### What Changed
+
+- **src/core/agents/backend/ClaudeCodeOptionsBuilder.ts**: Added `resumeSessionAt?: string` to `ClaudeCodeSdkOptionsShape` and `ClaudeCodeOptionsBuilderInput`; wired in `buildClaudeCodeOptions` — omit when empty/whitespace, pass trimmed string when non-empty.
+- **src/core/agents/backend/ClaudeCodeAdapter.ts**: Added `_diagnosticResumeSessionAt?: string` to `ClaudeCodeDiagnosticPromptRequest`; wired through `buildDiagnosticSdkOptions`. Added `ResumeSessionAtProbeResult` interface and `runResumeSessionAtProbe()` method with three-phase proof design. The probe uses the existing explicit diagnostic resume gate (`_diagnosticResumeAt: true` with `resumeSessionId`) for both the beta follow-up turn and the final resume-at query. **Honesty boundary**: classification is `pass` only when the resumed query returns the same session id AND the text output proves it resumed at the requested point (alpha nonce, not beta); `fail` when session ids mismatch, beta nonce recalled instead of alpha, alpha message UUID cannot be extracted, or probe throws.
+- **src/core/agents/backend/index.ts**: Exported `ResumeSessionAtProbeResult` type.
+- **src/features/settings/SettingsCapabilityLabSection.ts**: Added "Resume Session At Position" matrix row (#43, pass, diagnostic surface). Added localized `Run Resume Session At Position Proof` button + proof output strings via `settings.capabilityLab.proofs.resumeSessionAt.*`, and `runResumeSessionAtProof()` handler. Proof UI runs a three-phase diagnostic probe: Phase 1 (alpha) creates a session with nonce ALPHA, Phase 1b (beta) sends a second turn with nonce BETA, Phase 2 (resume-at) resumes at alpha's assistant message UUID and asks what the last nonce was.
+- **src/i18n/locales/en.ts + zh.ts**: Locale strings for resumeSessionAt proof button, running, title, boundary, sessionId, alphaMessageUuid, resumedAtAlpha, status yes/no, pass, fail, defaultError, threw.
+- **tests/**: TDD — RED→GREEN for options builder (4 tests: omit, pass, empty, whitespace), focused adapter probe outcomes (pass same session + alpha recalled, fail when beta is recalled instead of alpha, plus the supporting probe cases in `ClaudeCodeAdapter.probes.test.ts`), capability lab audit (row count 42→43, pass count 25→26, expected map update), proof button tests (4 tests: render, pass, fail beta recalled, fail throw). The generic `_diagnosticResumeAt` gate remains covered separately in `ClaudeCodeAdapter.test.ts`.
+
+### Proof Design
+
+- **Phase 1 (alpha)**: Creates a fresh diagnostic session with nonce ALPHA, `persistSession: true`, and no resume flag. Extracts the assistant message UUID from the first turn's raw messages.
+- **Phase 1b (beta)**: Sends a second diagnostic turn in the same session with nonce BETA, `persistSession: true`.
+- **Phase 2 (resume-at)**: Runs a diagnostic query with `resumeSessionId` (same session) + `resumeSessionAt` (alpha's assistant message UUID), asking the model what the last nonce was.
+- **Pass criteria**:
+ 1. The resumed query returns the exact same session id as the seed query.
+ 2. The text output proves it resumed at the requested point by recalling ALPHA (not BETA).
+- **Fail criteria**: Any mismatch, missing session id, wrong nonce recalled, or missing UUID extraction.
+
+### Live Runtime Evidence
+
+- **Date**: 2026-06-03
+- **BUILD_ID**: `feature-phase0-capability.202606030008`
+- **Session id**: `06e82771-6dba-43d1-8191-4d8d8439a3f4`
+- **Alpha assistant message UUID**: `8a2e95c7-9625-4f5d-a875-12702430f85b`
+- **Resume-at-alpha status**: pass (`在 alpha 处恢复：✓ 是`)
+- **DOM proof marker**: proof output marker class `opencodian-capability-lab-proof-marker opencodian-capability-lab-proof-pass`, marker text `✓ Runtime verified`
+- **Matrix row evidence**: `Resume Session At Position` row rendered `✓ SDK`, `✓ Adapter`, `Verified`, `Diagnostic`
+- **Visual proof screenshot**: `.obsidian-debug/resume-session-at-proof-20260603.png`
+- **Structured proof snapshot**: `.obsidian-debug/resume-session-at-snapshot-20260603-result.json`
+- **Console state**: zero Obsidian errors, zero warn-level console messages, zero error-level console messages after proof
+
+### Honesty Boundaries
+
+- Classification: **pass** (matrix) — three-phase diagnostic probe design is now backed by final Test Vault live proof on BUILD_ID `feature-phase0-capability.202606030008`: the resumed query kept the same session id and recalled ALPHA rather than BETA. Unit tests cover guards and wiring correctness.
+- **Diagnostic-only**: ordinary chat paths never use resumeSessionAt. Session continuity is owned by the adapter.
+- **No stable product surface**: tied to specific assistant message UUIDs from SDK raw messages, not a stable ordinary-chat guarantee.
+- No authoring UI, no `.claude/**` writes, no plugin/agent/MCP authoring surfaces, no fake runtime proof.
+- Does not modify existing pass/readback boundaries.
+- Matrix: 43 rows, 26 pass, 17 readback, 0 fail.
+
+---
+
+## 2026-06-02 Continue — Pass Seam
+
+### Objective
+
+Implement the smallest honest seam for Claude Code SDK public option `continue?: boolean`. This diagnostic-only surface verifies that the SDK can continue the most recent conversation in the current directory instead of starting a new one.
+
+### What Changed
+
+- **src/core/agents/backend/ClaudeCodeOptionsBuilder.ts**: Added `continue?: boolean` to `ClaudeCodeSdkOptionsShape` and `ClaudeCodeOptionsBuilderInput`; wired in `buildClaudeCodeOptions` — omit when not provided, pass `true` when set.
+- **src/core/agents/backend/ClaudeCodeAdapter.ts**: Added `_diagnosticContinue?: boolean` to `ClaudeCodeDiagnosticPromptRequest`; wired through `buildDiagnosticSdkOptions`. Added `ContinueProbeResult` interface and `runContinueProbe()` method. **Honesty boundary**: classification is `pass` only when the seed and continue queries share the same session id AND the continue query's text output recalls the nonce from the seed query; `fail` when session ids mismatch, nonce not recalled, or probe throws.
+- **src/core/agents/backend/index.ts**: Exported `ContinueProbeResult` type.
+- **src/features/settings/SettingsCapabilityLabSection.ts**: Added "Continue" matrix row (#42, pass, diagnostic surface). Added localized `Run Continue Proof` button + proof output strings via `settings.capabilityLab.proofs.continue.*`, and `runContinueProof()` handler. Proof UI runs a two-phase diagnostic probe: Phase 1 (seed) creates a session with a nonce, Phase 2 (continue) asks the model to recall the nonce with `continue: true`.
+- **tests/**: TDD — RED→GREEN for options builder (3 tests: omit, pass true, pass false), focused adapter probe outcomes (pass same session + nonce recall, fail on session-id mismatch, plus the supporting probe cases in `ClaudeCodeAdapter.probes.test.ts`), capability lab audit (row count 41→42, pass count 24→25, expected map update), proof button tests (5 tests: render, pass, fail mismatch, fail no nonce recall, fail throw).
+
+### Proof Design
+
+- **Phase 1 (seed)**: Creates a fresh diagnostic session with a unique nonce, `persistSession: true`, and no continue flag.
+- **Phase 2 (continue)**: Runs a second diagnostic query with `continue: true`, asking the model to reply with only the nonce from the immediately previous turn.
+- **Pass criteria**:
+  1. The second query returns the exact same session id as the seed query.
+  2. The text output proves it resumed the previous turn by recalling the nonce.
+- **Fail criteria**: Any mismatch, missing session id, or missing nonce recall.
+
+### Honesty Boundaries
+
+- Classification: **pass** (matrix) — live runtime proof confirmed the SDK continues the same session and recalls context from the previous turn.
+- **Diagnostic-only**: ordinary chat paths never use continue. Session continuity is owned by the adapter.
+- **No stable product surface**: tied to "most recent conversation in current directory", not a stable ordinary-chat guarantee.
+- No authoring UI, no `.claude/**` writes, no plugin/agent/MCP authoring surfaces, no fake runtime proof.
+- Does not modify existing pass/readback boundaries.
+- Matrix: 42 rows, 25 pass, 17 readback, 0 fail.
+
+### Live Runtime Evidence
+
+- **Date**: 2026-06-02
+- **BUILD_ID**: `feature-phase0-capability.202606022255`
+- **Seed session id**: `2a3b1082-64ba-4862-96a5-a14a2e01cc49`
+- **Continue session id**: `2a3b1082-64ba-4862-96a5-a14a2e01cc49` (exact match)
+- **Nonce recall**: pass (`是否回忆出 nonce：✓ 是`)
+- **DOM proof marker**: `[data-capability="Continue"]` had class `opencodian-capability-lab-proof-pass`
+- **Visual proof screenshot**: `.obsidian-debug/settings-capability-lab-continue-proof-scrolled-202606022257.png`
+- **Console state**: zero Obsidian errors, zero warn messages, zero error-level console messages after proof
+
+---
+
+## 2026-06-02 Custom Session ID — Pass Seam
+
+### Objective
+
+Implement the smallest honest seam for Claude Code SDK public option `sessionId?: string`. This diagnostic-only surface allows explicitly setting a session id for a query, but only behind a diagnostic boundary. Ordinary chat paths continue to own session identity exactly as today.
+
+### What Changed
+
+- **src/core/agents/backend/ClaudeCodeOptionsBuilder.ts**: Added `sessionId?: string` to `ClaudeCodeSdkOptionsShape` and `ClaudeCodeOptionsBuilderInput`; wired in `buildClaudeCodeOptions` — omit when empty/whitespace, pass trimmed string when non-empty.
+- **src/core/agents/backend/ClaudeCodeAdapter.ts**: Added `_diagnosticSessionId?: string` to `ClaudeCodeDiagnosticPromptRequest`; wired through `buildDiagnosticSdkOptions`. Added `CustomSessionIdProbeResult` interface and `runCustomSessionIdProbe()` method. **Honesty boundary**: classification is `pass` only when the SDK returns the exact requested session id; `fail` on mismatch, no id, or throw.
+- **src/core/agents/backend/index.ts**: Exported `CustomSessionIdProbeResult` type.
+- **src/features/settings/SettingsCapabilityLabSection.ts**: Added "Custom Session ID" matrix row (#41, pass, diagnostic surface). Added `Run Custom Session ID Proof` button and `runCustomSessionIdProof()` handler. Proof UI generates a fresh UUID target, displays requested/returned ids, and marks pass only on exact match.
+- **tests/**: TDD — RED→GREEN for options builder (4 tests: omit, pass, empty, whitespace), adapter probe (6 tests: exact match pass, mismatch fail, throw fail, diagnostic options wiring, no ordinary send leakage, no id fail), capability lab audit (row count 40→41, pass count 23→24, readback count 17→17, expected map update), proof button tests (5 tests: render, pass, mismatch fail, throw fail, UUID format regression).
+
+### Live Runtime Evidence
+
+- **Date**: 2026-06-02
+- **BUILD_ID**: `feature-phase0-capability.202606022121`
+- **Requested session id**: `54d314f4-7624-4ed0-96fe-424cfaa82e86`
+- **Returned session id**: `54d314f4-7624-4ed0-96fe-424cfaa82e86` (exact match)
+- **DOM proof marker**: `[data-capability="Custom Session ID"]` had class `opencodian-capability-lab-proof-pass`
+- **Console state**: zero Obsidian errors or warnings
+
+### Honesty Boundaries
+
+- Classification: **pass** (matrix) — live runtime proof confirmed the SDK honors the requested `sessionId` and returns the exact same id in the stream. The probe itself only marks `pass` on exact match; any mismatch or absence of id classifies `fail`.
+- **No stable product surface**: ordinary chat paths never inject custom session ids. Session identity remains adapter-owned.
+- No authoring UI, no `.claude/**` writes, no plugin/agent/MCP authoring surfaces, no fake runtime proof.
+- Does not modify existing pass/readback boundaries.
+- Matrix: 41 rows, 24 pass, 17 readback, 0 fail.
+
+---
+
+## 2026-06-02 Stderr Diagnostic — Readback Seam
+
+### Objective
+
+Implement the smallest honest seam for Claude Code SDK public option `stderr?: (data: string) => void`. This diagnostic-only surface receives raw stderr text from the Claude Code subprocess.
+
+### What Changed
+
+- **src/core/agents/backend/ClaudeCodeOptionsBuilder.ts**: Added `stderr?: (data: string) => void` to `ClaudeCodeSdkOptionsShape` and `ClaudeCodeOptionsBuilderInput`; wired in `buildClaudeCodeOptions` — omit when not provided, pass the callback when provided.
+- **src/core/agents/backend/ClaudeCodeAdapter.ts**: Added `_diagnosticStderrCallback?: (data: string) => void` to `ClaudeCodeDiagnosticPromptRequest`; wired through `buildDiagnosticSdkOptions`. Added `StderrDiagnosticProbeResult` interface and `runStderrDiagnosticProbe()` method. **Privacy boundary**: all stderr text is sanitized with `sanitizeDiagnosticReport` before truncation to 240 chars; sanitize-first order prevents secret leakage at truncation boundaries. Added `truncateStderrPreview` helper.
+- **src/core/agents/backend/index.ts**: Exported `StderrDiagnosticProbeResult` type.
+- **src/features/settings/SettingsCapabilityLabSection.ts**: Added "Stderr Diagnostic" matrix row (#40, readback, diagnostic surface). Added `Run Stderr Diagnostic Proof` button and `runStderrDiagnosticProof()` handler. Proof UI displays sanitized/truncated preview or explicit "no stderr observed" message.
+- **tests/**: TDD — RED→GREEN for options builder (2 tests: omit, pass), adapter probe (7 tests: callback wired + stderr captured, callback wired + no stderr, fail on throw, sanitization, aggressive truncation, sanitize-before-truncate regression, diagnostic options wiring), capability lab audit (row count 39→40, readback count 16→17, expected map update), proof button tests (4 tests: render, readback with output, readback without output, fail).
+
+### Honesty Boundaries
+
+- Classification: **readback** — SDK option wiring proven (callback propagates through `buildClaudeCodeOptions` into SDK `stderr`). Actual stderr emission depends on SDK/CLI/runtime and may be absent; the plugin layer cannot independently verify it.
+- **No stable raw-log surface**: all stderr text is sanitized and truncated before any display; no persistent logging, no file writes, no user-facing stderr browser.
+- No authoring UI, no `.claude/**` writes, no plugin/agent/MCP authoring surfaces, no fake runtime proof.
+- Does not modify existing pass/readback boundaries.
+- Matrix: 40 rows, 23 pass, 17 readback, 0 fail.
+
+---
+
+## 2026-06-02 Load Timeout — Readback Seam
+
+### Objective
+
+Implement the smallest honest seam for Claude Code SDK public option `loadTimeoutMs?: number`. This option sets the maximum time in milliseconds to wait for the Claude Code subprocess to load before timing out.
+
+### What Changed
+
+- **src/core/types/settings.ts**: Added `loadTimeoutMs: number | null` to `ClaudeCodeBackendSettings` with honest readback JSDoc. Added default `null` and normalization (`normalizeClaudeCodeNullablePositiveInt` — accepts only finite positive integers, floors decimals, rejects zero/negative/NaN/Infinity/non-number, defaults to `null`).
+- **src/core/agents/backend/ClaudeCodeOptionsBuilder.ts**: Added `loadTimeoutMs?: number` to `ClaudeCodeSdkOptionsShape`; wired in `buildClaudeCodeOptions` — omit when null, pass the positive integer value when non-null.
+- **src/features/settings/SettingsClaudeCodeSection.ts**: Added `renderLoadTimeoutMsSetting()` in Runtime tab (numeric text input with honest boundary/lifecycle notices; empty/invalid input normalizes safely to null).
+- **src/i18n/locales/en.ts + zh.ts**: Locale strings for name, desc, placeholder, boundaryNotice, lifecycleNotice with honest copy covering timeout boundary (only passes timeout value to SDK, actual behavior depends on SDK/CLI version and runtime conditions) and lifecycle boundary (next query / restarted session only).
+- **src/features/settings/SettingsCapabilityLabSection.ts**: Added "Load Timeout" matrix row (#39, readback, settings surface).
+- **tests/**: TDD — RED→GREEN for normalization (7 tests), options builder (3 tests), settings UI (2 tests), capability lab audit (row count 38→39, readback count 15→16), truth audit (1 test), settings load normalization snapshot (1 update).
+
+### Honesty Boundaries
+
+- Classification: **readback** — SDK option wiring proven (setting propagates through `buildClaudeCodeOptions` into SDK `loadTimeoutMs` as a positive integer). Actual timeout behavior depends on the SDK/CLI version and runtime conditions; the plugin layer cannot independently verify it.
+- No authoring UI, no `.claude/**` writes, no plugin/agent/MCP authoring surfaces, no fake runtime proof.
+- Applies to next query or restarted session only; cannot be changed for an already-running session.
+- Does not modify existing pass/readback boundaries.
+- Matrix: 39 rows, 23 pass, 16 readback, 0 fail.
+
+---
+
+## 2026-06-02 JS Runtime — Readback Seam
+
+### Objective
+
+Implement the smallest honest seam for Claude Code SDK public option `executable?: 'node' | 'bun' | 'deno'`. This option requests the SDK to use a specific JavaScript runtime for the Claude Code subprocess.
+
+### What Changed
+
+- **src/core/types/settings.ts**: Added `jsRuntime: 'node' | 'bun' | 'deno' | ''` to `ClaudeCodeBackendSettings` with honest readback JSDoc. Added default `''` (auto) and normalization (`normalizeClaudeCodeJsRuntime` — accepts only `'node'`, `'bun'`, `'deno'`, or defaults to `''`).
+- **src/core/agents/backend/ClaudeCodeOptionsBuilder.ts**: Added `executable?: 'node' | 'bun' | 'deno'` to `ClaudeCodeSdkOptionsShape`; wired in `buildClaudeCodeOptions` — omit when empty (auto), pass the runtime value when non-empty.
+- **src/features/settings/SettingsClaudeCodeSection.ts**: Added `renderJsRuntimeSetting()` in Runtime tab (dropdown with Auto/Node.js/Bun/Deno options, honest boundary/lifecycle notices).
+- **src/i18n/locales/en.ts + zh.ts**: Locale strings for name, desc, auto label, boundaryNotice, lifecycleNotice with honest copy covering runtime boundary (only requests runtime from SDK, actual selection depends on SDK/CLI version, PATH, and installation) and lifecycle boundary (next query / restarted session only). Explicitly states no runtime argument management is exposed.
+- **src/features/settings/SettingsCapabilityLabSection.ts**: Added "JS Runtime" matrix row (#38, readback, settings surface).
+- **tests/**: TDD — RED→GREEN for normalization (7 tests), options builder (4 tests), settings UI (1 test), capability lab audit (row count 37→38, readback count 14→15), truth audit (1 test), settings load normalization snapshot (1 update).
+
+### Honesty Boundaries
+
+- Classification: **readback** — SDK option wiring proven (setting propagates through `buildClaudeCodeOptions` into SDK `executable` as `'node' | 'bun' | 'deno'`). Actual runtime selection depends on the SDK/CLI version, system PATH, and whether the requested runtime is installed; the plugin layer cannot independently verify it.
+- No runtime argument management is exposed (`executableArgs`, `extraArgs` explicitly absent).
+- No authoring UI, no `.claude/**` writes, no plugin/agent/MCP authoring surfaces, no fake runtime proof.
+- Applies to next query or restarted session only; cannot be changed for an already-running session.
+- Does not modify existing pass/readback boundaries.
+- Matrix: 38 rows, 23 pass, 15 readback, 0 fail.
+
+---
+
+## 2026-06-02 1M Context Beta — Readback Seam
+
+### Objective
+
+Implement the smallest honest seam for Claude Code SDK public option `betas?: string[]`. The documented practical value is the `'context-1m-2025-08-07'` beta header for 1M context window support.
+
+### What Changed
+
+- **src/core/types/settings.ts**: Added `enableContext1mBeta: boolean` to `ClaudeCodeBackendSettings` with honest readback JSDoc. Added default `false` and normalization (`candidate.enableContext1mBeta === true`). Fixed `promptSuggestions` JSDoc honesty drift — no longer implies end-to-end chat UI delivery is proven when matrix classifies it as readback.
+- **src/core/agents/backend/ClaudeCodeOptionsBuilder.ts**: Added `betas?: string[]` to `ClaudeCodeSdkOptionsShape`; wired in `buildClaudeCodeOptions` — omit when false, pass `['context-1m-2025-08-07']` when enabled.
+- **src/features/settings/SettingsClaudeCodeSection.ts**: Added `renderEnableContext1mBetaSetting()` in Model & Thinking tab (toggle with honest boundary/lifecycle notices).
+- **src/i18n/locales/en.ts + zh.ts**: Locale strings for name, desc, boundaryNotice, lifecycleNotice with honest copy covering beta boundary (only requests SDK/API header, availability depends on model/Anthropic-side behavior, no generic beta management) and lifecycle boundary (next query / restarted session only).
+- **src/features/settings/SettingsCapabilityLabSection.ts**: Added "1M Context Beta" matrix row (#37, readback, settings surface).
+- **tests/**: TDD — RED→GREEN for normalization (4 tests), options builder (2 tests), settings UI (1 test), capability lab audit (row count 36→37, readback count 13→14), truth audit (1 test), settings load normalization snapshot (1 update).
+
+### Honesty Boundaries
+
+- Classification: **readback** — SDK option wiring proven (setting propagates through `buildClaudeCodeOptions` into SDK `betas` as `['context-1m-2025-08-07']`). Actual beta availability depends on the selected model and Anthropic-side behavior; the plugin layer cannot independently verify it.
+- No freeform beta list, no broad escape hatch, no raw JSON editors, no arbitrary string arrays.
+- No authoring UI, no `.claude/**` writes, no plugin/agent/MCP authoring surfaces, no fake runtime proof.
+- Applies to next query or restarted session only; cannot be changed for an already-running session.
+- Does not modify existing pass/readback boundaries.
+- Matrix: 37 rows, 23 pass, 14 readback, 0 fail.
+
+---
+
+## 2026-06-03 Session Title — Diagnostic Proof Harness
+
+### Objective
+
+Implement the smallest honest diagnostic proof harness for Claude Code SDK public option `title?: string`. The harness creates a fresh diagnostic session with a unique custom title, sends a minimal persisted prompt, then reads back the authoritative backend session detail using the existing `getSession()` adapter API to verify the `customTitle` field.
+
+### What Changed
+
+- **src/core/agents/backend/ClaudeCodeOptionsBuilder.ts**: `title?: string` already wired in `buildClaudeCodeOptions` — passes trimmed string when non-empty, omits when empty/whitespace.
+- **src/core/agents/backend/ClaudeCodeAdapter.ts**: Added `_diagnosticTitle?: string` to `ClaudeCodeDiagnosticPromptRequest`; wired through `buildDiagnosticSdkOptions`. Added `SessionTitleProbeResult` interface and `runSessionTitleProbe()` method. **Honesty boundary**: classification is `pass` only when the backend session detail's `customTitle` field exactly matches the requested title; `fail` when `customTitle` is absent, mismatched, `getSession` returns null, or the probe throws.
+- **src/core/agents/backend/index.ts**: Exported `SessionTitleProbeResult` type.
+- **src/features/settings/SettingsCapabilityLabSection.ts**: Added "Session Title" diagnostic proof button + `runSessionTitleProof()` handler. Matrix row comment updated to document the harness is ready but classification remains `readback` pending live acceptance. Row count unchanged (44).
+- **src/i18n/locales/en.ts + zh.ts**: Locale strings for sessionTitle proof (button, running, title, boundary, sessionId, requestedTitle, customTitle, titleMatches, status yes/no, pass, fail, defaultError, threw).
+- **tests/**: TDD — RED→GREEN for adapter probe (8 tests: pass customTitle match, fail customTitle mismatch, fail customTitle absent, fail getSession null, fail throw, fail no session id, diagnostic options wiring, resumed send must not use title), options builder (4 tests: omit, pass, trim, empty/whitespace), capability lab proof button (4 tests: render, pass, fail mismatch, fail throw).
+
+### Proof Design
+
+- **Phase 1 (seed)**: Creates a fresh diagnostic session with `_diagnosticTitle` set to a unique title, `persistSession: true`, and no resume flags.
+- **Phase 2 (readback)**: Calls `getSession()` with the returned session id and checks whether the `customTitle` field exactly matches the requested title.
+- **Pass criteria**: `customTitle` exactly matches the requested title.
+- **Fail criteria**: `customTitle` missing, `customTitle` mismatch, `getSession` returns null, or probe throws.
+
+### Honesty Boundaries
+
+- Classification: **readback** (matrix) — diagnostic proof harness is ready for live acceptance. No promotion to `pass` without Codex live verification in Obsidian/Test Vault observing an actual backend `customTitle` match.
+- **Diagnostic-only**: ordinary chat paths set titles through `createSession` / `sendMessage`, not through `_diagnosticTitle`.
+- **No stable title settings UI**: title comes from existing session creation flow.
+- Does not modify existing pass/readback boundaries.
+- Matrix: 44 rows, 27 pass, 17 readback, 0 fail.
+
+---
+
+## Current Gap Audit (2026-06-03, post-System Prompt)
+
+Matrix: **46 rows, 28 pass, 18 readback, 0 fail**.
+
+Confirmed repo-absent public SDK option surfaces (not implemented, not faked):
+
+**Blocked / not a safe next seam:**
+- `permissionPromptToolName` — blocked. Current verified product path uses `canUseTool` + `ClaudeCodePermissionBridge`. SDK runtime explicitly rejects using `canUseTool` together with `permissionPromptToolName`.
+
+**Not implemented (public `sdk.d.ts` options with no plugin seam):**
+- `executableArgs` — no implementation
+- `extraArgs` — no implementation
+- `settings` — no implementation
+- `managedSettings` — no implementation
+- `maxThinkingTokens` — deprecated, not implemented
+
+**Runtime-internal (observed in `sdk.mjs` / `browser-sdk.js` but absent from public `sdk.d.ts`):**
+- `appendSubagentSystemPrompt` — runtime-internal-leaning, not a repo-implemented public SDK option gap
+- `webSearchIsolationExemptMcpServers` — runtime-internal-leaning, not a repo-implemented public SDK option gap
+
+**Recently implemented (no longer gaps):**
+- `sessionId` — implemented via Custom Session ID seam (2026-06-02)
+- `stderr` — implemented via Stderr Diagnostic seam (2026-06-02)
+- `loadTimeoutMs` — implemented via Load Timeout seam (2026-06-02)
+- `executable` — implemented via JS Runtime seam (2026-06-02)
+- `betas` — implemented via 1M Context Beta seam (2026-06-02)
+- `toolAliases` — implemented via Tool Aliases seam (2026-06-02)
+- `debug` — implemented via CLI Debug Logs seam (2026-06-02)
+- `debugFile` — implemented via Debug File seam (2026-06-02); builder wiring truth drift repaired on 2026-06-03
+- `strictMcpConfig` — implemented via Strict MCP Config seam (2026-06-02); builder wiring truth drift repaired on 2026-06-03
+
+---
+
+## 2026-06-02 Debug File — Readback Seam
+
+### Objective
+
+Implement the smallest honest seam for Claude Code SDK public option `debugFile?: string`. This option asks the SDK to write CLI debug logs to a file path, implicitly enabling debug logging even if the debug toggle is off.
+
+### What Changed
+
+- **src/core/types/settings.ts**: Added `debugFile: string` to `ClaudeCodeBackendSettings` with honest readback JSDoc. Added default `''` and trim-based normalization.
+- **src/core/agents/backend/ClaudeCodeOptionsBuilder.ts**: Added `debugFile?: string` to `ClaudeCodeSdkOptionsShape`; wired in `buildClaudeCodeOptions` — omit when empty/whitespace, pass trimmed string when non-empty.
+- **src/features/settings/SettingsClaudeCodeSection.ts**: Added `renderDebugFileSetting()` in Runtime tab, adjacent to the existing debug toggle (text input with honest next-query/readback boundary, lifecycle, and implicit-debug notices).
+- **src/i18n/locales/en.ts + zh.ts**: Locale strings for name, desc, placeholder, boundaryNotice, lifecycleNotice, implicitDebugNotice with honest copy covering readback boundary (no plugin-side file writing verification), lifecycle boundary (next query / restarted session only), and implicit coupling (setting a debug file path implicitly enables debug logging even if the debug toggle is off).
+- **src/features/settings/SettingsCapabilityLabSection.ts**: Added "Debug File" matrix row (#36, readback, settings surface).
+- **tests/**: TDD — RED→GREEN for normalization (5 tests), options builder (3 tests), settings UI (2 tests), capability lab audit (row count 35→36, readback count 12→13), truth audit (1 test).
+
+### Honesty Boundaries
+
+- Classification: **readback** — SDK option wiring proven (setting propagates through `buildClaudeCodeOptions` into SDK `debugFile` as a trimmed string). Actual CLI debug file writing is the SDK/CLI binary's internal claim; the plugin layer cannot independently verify it.
+- No plugin-side filesystem writes, file existence checks, or path normalization helpers.
+- No authoring UI, no `.claude/**` writes, no broad escape-hatch config surface.
+- Applies to next query or restarted session only; cannot be changed for an already-running session.
+- Setting a debug file path implicitly enables debug logging even if the debug toggle is off.
+- Does not modify existing pass/readback boundaries.
+- Matrix: 36 rows, 23 pass, 13 readback, 0 fail.
+
+## 2026-06-02 Strict MCP Config — Readback Seam
+
+### Objective
+
+Implement the smallest honest seam for Claude Code SDK public option `strictMcpConfig?: boolean`. When enabled, invalid MCP server configurations cause errors instead of warnings.
+
+### What Changed
+
+- **src/core/types/settings.ts**: Added `strictMcpConfig: boolean` to `ClaudeCodeBackendSettings` with honest readback JSDoc. Added default `false` and normalization (`candidate.strictMcpConfig === true`).
+- **src/core/agents/backend/ClaudeCodeOptionsBuilder.ts**: Added `strictMcpConfig?: boolean` to `ClaudeCodeSdkOptionsShape`; wired in `buildClaudeCodeOptions` — omit when false, pass `true` when enabled.
+- **src/features/settings/SettingsClaudeCodeSection.ts**: Added `renderStrictMcpConfigSetting()` in Tools tab, adjacent to MCP runtime controls (toggle with honest next-query/readback boundary and lifecycle notices).
+- **src/i18n/locales/en.ts + zh.ts**: Locale strings for name, desc, boundaryNotice, lifecycleNotice with honest copy covering product boundary (no `.claude/mcp.json` writes, no MCP authoring) and lifecycle boundary (next query / restarted session only).
+- **src/features/settings/SettingsCapabilityLabSection.ts**: Added "Strict MCP Config" matrix row (#35, readback, settings surface).
+- **tests/**: TDD — RED→GREEN for normalization (4 tests), options builder (2 tests), settings UI (1 test), capability lab audit (row count 34→35, readback count 11→12), truth audit (1 test).
+
+### Honesty Boundaries
+
+- Classification: **readback** — SDK option wiring proven (setting propagates through `buildClaudeCodeOptions` into SDK `strictMcpConfig`). Actual MCP config validation behavior is the SDK/CLI binary's internal claim; the plugin layer cannot independently verify it.
+- No authoring UI, no `.claude/**` writes, no broad escape-hatch config surface.
+- Applies to next query or restarted session only; cannot be changed for an already-running session.
+- Does not modify existing pass/readback boundaries.
+- Matrix: 35 rows, 23 pass, 12 readback, 0 fail. -> superseded by Debug File seam above; final matrix: 36 rows, 23 pass, 13 readback, 0 fail.
+
 ## 2026-06-02 CLI Debug Logs — Readback Seam
 
 ### Objective
@@ -78,23 +911,7 @@ Implement the smallest honest seam for Claude Code SDK `toolAliases?: Record<str
 
 ### Gap Audit (2026-06-02)
 
-Current matrix classification:
-- **pass**: 23
-- **readback**: 10
-- **blocked**: 0
-
-Confirmed repo-absent option surfaces (not implemented, not faked):
-- `permissionPromptToolName` — blocked. Current verified product path uses `canUseTool` + `ClaudeCodePermissionBridge`. SDK runtime explicitly rejects using `canUseTool` together with `permissionPromptToolName`. Treating as blocked / not a safe next seam.
-- `appendSubagentSystemPrompt` — runtime-observed in `sdk.mjs` / `browser-sdk.js` but absent from public `sdk.d.ts`. Treating as runtime-internal-leaning, not a repo-implemented public SDK option gap.
-- `webSearchIsolationExemptMcpServers` — runtime-observed in `sdk.mjs` / `browser-sdk.js` but absent from public `sdk.d.ts`. Treating as runtime-internal-leaning, not a repo-implemented public SDK option gap.
-
----
-
-## 2026-06-02 Plan Mode Instructions — Readback Seam
-
-### Objective
-
-Implement the smallest honest seam for Claude Code SDK `planModeInstructions?: string`. This option replaces the default plan-mode workflow body when `permissionMode` is `plan`; the CLI still wraps it with the read-only enforcement preamble and ExitPlanMode protocol footer.
+> ⚠️ **Superseded**: See the newer "Current Gap Audit (2026-06-02, post-Custom Session ID)" section near the top of this document for the honest remaining-gap list. This historical block understates the gap surface.
 
 ### What Changed
 
@@ -255,7 +1072,9 @@ Prompt suggestions arrive *after* the turn boundary (`result`). Rather than chan
 
 ### Gap Audit (2026-06-02)
 
-Current matrix classification:
+> ⚠️ **Superseded**: See the newer "Current Gap Audit (2026-06-02, post-Custom Session ID)" section near the top of this document for the honest remaining-gap list. This historical block understates the gap surface and incorrectly lists `toolAliases` as absent (it was implemented in the Tool Aliases seam above).
+
+Current matrix classification (at time of writing):
 - **pass**: 23
 - **readback**: 9
 - **blocked**: 0

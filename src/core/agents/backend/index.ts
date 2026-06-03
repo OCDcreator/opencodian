@@ -47,6 +47,14 @@ export {
   type ClaudeCodeSdkFacade,
   type ClaudeCodeSdkLoader,
   type ClaudeCodeSdkQueryInput,
+  type DebugFileReadbackProbeResult,
+  type PlanModeInstructionsReadbackProbeResult,
+  type PromptSuggestionsReadbackProbeResult,
+  type SandboxReadbackProbeResult,
+  type StrictMcpConfigReadbackProbeResult,
+  type SystemPromptReadbackProbeResult,
+  type TaskBudgetReadbackProbeResult,
+  type ToolAliasesReadbackProbeResult,
   type WarmStartupProbeResult,
 } from './ClaudeCodeAdapter';
 export {

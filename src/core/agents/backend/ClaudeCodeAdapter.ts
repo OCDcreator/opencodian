@@ -4,7 +4,7 @@ import { existsSync, unlinkSync } from 'node:fs';
 import type { ElicitationRequest, ElicitationResult, Query } from '@anthropic-ai/claude-agent-sdk';
 import { spawn } from 'child_process';
 
-import { createLogger } from '../../../shared';
+import { createLogger, sanitizeDiagnosticReport } from '../../../shared';
 import type { AgentBackendKind, StreamChunk } from '../../types/chat';
 import type { ClaudeCodeBackendSettings, ClaudeCodeEffort } from '../../types/settings';
 import { AgentCapability, type BackendCapabilities } from '../AgentCapability';
@@ -33,10 +33,15 @@ import {
   type ClaudeCodeSessionRuntime,
   createSessionId,
   createUserPrompt,
+  isPromptSuggestionMessage,
   isTurnBoundaryMessage,
 } from './ClaudeCodeQueue';
 import type { WarmQueryHandle } from './ClaudeCodeSdkLoader';
 import { ClaudeCodeStreamNormalizer } from './ClaudeCodeStreamNormalizer';
+import {
+  clearPromptSuggestionSink,
+  registerPromptSuggestionSink,
+} from './promptSuggestionSink';
 
 const runtimeLogger = createLogger('ClaudeCodeAdapter', { moduleKey: 'claudeCode', channel: 'runtime' });
 const sessionLogger = createLogger('ClaudeCodeAdapter', { moduleKey: 'claudeCode', channel: 'sessions' });
@@ -194,6 +199,7 @@ export interface ClaudeCodeSdkSessionInfo {
   summary: string;
   lastModified: number;
   createdAt?: number;
+  customTitle?: string;
 }
 
 export interface ClaudeCodeDiagnosticPromptRequest {
@@ -288,6 +294,36 @@ export interface ClaudeCodeDiagnosticPromptRequest {
     * pass through the SDK `tools` filter.
     */
    _diagnosticToolRestriction?: string[];
+  /**
+   * Diagnostic-only stderr callback. When provided, receives raw stderr text
+   * from the Claude Code subprocess during diagnostic prompt execution.
+   */
+  _diagnosticStderrCallback?: (data: string) => void;
+  /**
+   * Diagnostic-only explicit session id. Passed to SDK options.sessionId;
+   * only effective when the SDK honors it.
+   */
+  _diagnosticSessionId?: string;
+  /**
+   * Diagnostic-only continue flag. When true, asks the SDK to continue the
+   * most recent conversation instead of starting a new one.
+   */
+  _diagnosticContinue?: boolean;
+  /**
+   * Diagnostic-only resume-at message UUID. When provided with resumeSessionId,
+   * asks the SDK to resume only up to and including the message with this UUID.
+   */
+  _diagnosticResumeSessionAt?: string;
+  /**
+   * Diagnostic-only fork-on-resume flag. When true AND resumeSessionId is
+   * provided, asks the SDK to fork the resumed session into a new session id.
+   */
+  _diagnosticForkSession?: boolean;
+  /**
+   * Diagnostic-only custom session title. Passed to SDK options.title;
+   * only effective on first query (not resume).
+   */
+  _diagnosticTitle?: string;
 }
 
 export interface ClaudeCodeDiagnosticPromptResult {
@@ -642,6 +678,170 @@ type CheckpointRewindProbeResult = {
   applyFlagSettingsError: string | undefined;
 };
 
+/** Stderr diagnostic probe result. */
+export interface StderrDiagnosticProbeResult {
+  classification: 'readback' | 'fail';
+  callbackWired: boolean;
+  chunksReceived?: number;
+  totalBytes?: number;
+  sanitizedPreview?: string;
+  error?: string;
+}
+
+/** Prompt suggestions readback probe result. */
+export interface PromptSuggestionsReadbackProbeResult {
+  classification: 'readback' | 'fail';
+  optionWired: boolean;
+  optionValue: boolean;
+  sdkOptionPresent: boolean;
+  modelState: 'claude' | 'non-claude' | 'unknown';
+  blockerNote?: string;
+  error?: string;
+}
+
+/** System prompt readback probe result. */
+export interface SystemPromptReadbackProbeResult {
+  classification: 'readback' | 'fail';
+  optionWired: boolean;
+  presetPreserved: boolean;
+  emptySetting: boolean;
+  appendValue?: string;
+  expectedAppendValue?: string;
+  appendMatch?: boolean;
+  error?: string;
+}
+
+/** Task budget readback probe result. */
+export interface TaskBudgetReadbackProbeResult {
+  classification: 'readback' | 'fail';
+  optionWired: boolean;
+  settingValue: number | null;
+  sdkOptionPresent: boolean;
+  sdkTotalValue?: number;
+  totalMatch: boolean;
+  error?: string;
+}
+
+/** Sandbox readback probe result. */
+export interface SandboxReadbackProbeResult {
+  classification: 'readback' | 'fail';
+  optionWired: boolean;
+  settingEnabled: boolean;
+  settingFailIfUnavailable: boolean;
+  settingAutoAllowBashIfSandboxed: boolean;
+  sdkOptionPresent: boolean;
+  sdkEnabled?: boolean;
+  sdkFailIfUnavailable?: boolean;
+  sdkAutoAllowBashIfSandboxed?: boolean;
+  enabledMatch: boolean;
+  failIfUnavailableMatch: boolean;
+  autoAllowBashIfSandboxedMatch: boolean;
+  error?: string;
+}
+
+/** Plan mode instructions readback probe result. */
+export interface PlanModeInstructionsReadbackProbeResult {
+  classification: 'readback' | 'fail';
+  optionWired: boolean;
+  permissionMode: string;
+  settingValue: string;
+  sdkOptionPresent: boolean;
+  sdkValue?: string;
+  valueMatch: boolean;
+  error?: string;
+}
+
+/** Tool aliases readback probe result. */
+export interface ToolAliasesReadbackProbeResult {
+  classification: 'readback' | 'fail';
+  optionWired: boolean;
+  settingEmpty: boolean;
+  sdkOptionPresent: boolean;
+  sdkEntryCount?: number;
+  entriesMatch: boolean;
+  defensiveCopyPreserved: boolean;
+  error?: string;
+}
+
+/** Debug file readback probe result. */
+export interface DebugFileReadbackProbeResult {
+  classification: 'readback' | 'fail';
+  optionWired: boolean;
+  settingValue: string;
+  emptySetting: boolean;
+  sdkOptionPresent: boolean;
+  sdkValue?: string;
+  valueMatch: boolean;
+  error?: string;
+}
+
+/** Strict MCP config readback probe result. */
+export interface StrictMcpConfigReadbackProbeResult {
+  classification: 'readback' | 'fail';
+  optionWired: boolean;
+  settingValue: boolean;
+  sdkOptionPresent: boolean;
+  sdkValue?: boolean;
+  valueMatch: boolean;
+  error?: string;
+}
+
+/** Continue diagnostic probe result. */
+export interface ContinueProbeResult {
+  classification: 'pass' | 'fail';
+  seedSessionId?: string;
+  continueSessionId?: string;
+  nonce?: string;
+  recalled?: boolean;
+  sessionIdsMatch?: boolean;
+  nonceRecalled?: boolean;
+  error?: string;
+}
+
+/** Resume session at diagnostic probe result. */
+export interface ResumeSessionAtProbeResult {
+  classification: 'pass' | 'fail';
+  seedSessionId?: string;
+  resumedSessionId?: string;
+  sessionId?: string;
+  alphaNonce?: string;
+  betaNonce?: string;
+  alphaMessageUuid?: string;
+  recalledAlpha?: boolean;
+  resumedAtAlpha?: boolean;
+  error?: string;
+}
+
+/** Fork session diagnostic probe result. */
+export interface ForkSessionProbeResult {
+  classification: 'pass' | 'fail';
+  seedSessionId?: string;
+  forkedSessionId?: string;
+  nonce?: string;
+  recalled?: boolean;
+  sessionIdsDiffer?: boolean;
+  nonceRecalled?: boolean;
+  error?: string;
+}
+
+/** Session title diagnostic probe result. */
+export interface SessionTitleProbeResult {
+  classification: 'pass' | 'fail';
+  sessionId?: string;
+  requestedTitle?: string;
+  customTitle?: string;
+  error?: string;
+}
+
+/** Custom session id diagnostic probe result. */
+export interface CustomSessionIdProbeResult {
+  classification: 'pass' | 'fail';
+  requestedSessionId?: string;
+  actualSessionId?: string;
+  returnedSessionId?: string;
+  error?: string;
+}
+
 type CheckpointPhase1StreamResult = {
   allChunks: StreamChunk[];
   sessionId: string | undefined;
@@ -692,6 +892,7 @@ export class ClaudeCodeAdapter
   private readonly invalidatedSessions = new Set<string>();
   private sdkLoadPromise: Promise<ClaudeCodeSdkFacade> | null = null;
   private lastDiagnosticSdkOptions: ClaudeCodeSdkOptionsShape | null = null;
+  private readonly postResultCallbacks = new Set<(chunk: StreamChunk) => void>();
 
   constructor(private readonly options: ClaudeCodeAdapterOptions) {}
 
@@ -716,6 +917,7 @@ export class ClaudeCodeAdapter
   async start(): Promise<void> {
     runtimeLogger.debug('start', { vaultPath: this.options.vaultPath });
     await this.loadMcpConfig();
+    registerPromptSuggestionSink(this);
     this.setStatus('connected');
   }
 
@@ -725,6 +927,8 @@ export class ClaudeCodeAdapter
     for (const session of this.sessions.values()) {
       this.closeRuntime(session);
     }
+    clearPromptSuggestionSink();
+    this.postResultCallbacks.clear();
     this.setStatus('disconnected');
   }
 
@@ -739,7 +943,25 @@ export class ClaudeCodeAdapter
     }
     this.sessions.clear();
     this.statusChangeHandlers.clear();
+    this.postResultCallbacks.clear();
+    clearPromptSuggestionSink();
     this.statusValue = 'disconnected';
+  }
+
+  /**
+   * Register a callback to receive post-result chunks (e.g. prompt suggestions)
+   * after the main turn boundary has been reached.
+   * Returns an unsubscribe function.
+   */
+  onPostResultChunk(callback: (chunk: StreamChunk) => void): () => void {
+    this.postResultCallbacks.add(callback);
+    return () => { this.postResultCallbacks.delete(callback); };
+  }
+
+  private firePostResultChunk(chunk: StreamChunk): void {
+    for (const cb of this.postResultCallbacks) {
+      try { cb(chunk); } catch { /* ignore callback errors */ }
+    }
   }
 
   onStatusChange(handler: StatusChangeHandler): Disposable {
@@ -1729,7 +1951,7 @@ export class ClaudeCodeAdapter
     // Diagnostic flag gate: resume-at requires explicit opt-in.
     // This keeps arbitrary session resume behind a diagnostic boundary
     // and prevents accidental stable usage.
-    if (request.resumeSessionId && request._diagnosticResumeAt !== true) {
+    if (request.resumeSessionId && request._diagnosticResumeAt !== true && request._diagnosticForkSession !== true) {
       throw new Error(
         'Claude Code diagnostic resume-at requires _diagnosticResumeAt flag. ' +
         'Resume-at is diagnostic-only and must not be used for ordinary chat resume.',
@@ -1771,7 +1993,9 @@ export class ClaudeCodeAdapter
       query.close?.();
     }
 
-    const validatedSessionId = this.validateDiagnosticResumeResult(request.resumeSessionId, sessionId);
+    const validatedSessionId = request._diagnosticForkSession
+      ? sessionId
+      : this.validateDiagnosticResumeResult(request.resumeSessionId, sessionId);
 
     // Explicit isolation: diagnostic resume-at must never modify ordinary session state.
     // The diagnostic result is returned to the caller but is not stored in this.sessions
@@ -1888,6 +2112,789 @@ export class ClaudeCodeAdapter
     } finally {
       warmQuery?.close();
     }
+  }
+
+  // ─── Diagnostic probe implementations ───
+
+  async runStderrDiagnosticProbe(): Promise<StderrDiagnosticProbeResult> {
+    const chunks: string[] = [];
+    let totalBytes = 0;
+    const stderrCallback = (data: string): void => {
+      chunks.push(data);
+      totalBytes += data.length;
+    };
+    try {
+      await this.runDiagnosticPrompt({
+        prompt: 'Say "stderr probe test" and nothing else.',
+        _diagnosticBypassPermissions: true,
+        _diagnosticStderrCallback: stderrCallback,
+      });
+      const sanitizedPreview = chunks.length > 0
+        ? sanitizeDiagnosticReport(chunks.join('')).slice(0, 240)
+        : 'Callback wired — no stderr observed';
+      return {
+        classification: 'readback',
+        callbackWired: true,
+        chunksReceived: chunks.length,
+        totalBytes,
+        sanitizedPreview,
+      };
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      runtimeLogger.debug('stderr diagnostic probe', { result: 'fail', error: errorMessage });
+      return {
+        classification: 'fail',
+        callbackWired: false,
+        error: errorMessage,
+      };
+    }
+  }
+
+  async runPromptSuggestionsReadbackProbe(): Promise<PromptSuggestionsReadbackProbeResult> {
+    try {
+      const abortController = new AbortController();
+      const options = this.buildDiagnosticSdkOptions(abortController, {
+        prompt: 'Prompt suggestions readback proof.',
+        _diagnosticBypassPermissions: true,
+      });
+      const optionValue = this.options.settings.promptSuggestions === true;
+      const sdkOptionPresent = options.promptSuggestions === true;
+      const optionWired = optionValue ? sdkOptionPresent : !('promptSuggestions' in options);
+      const explicitModel = this.options.settings.model?.trim() ?? '';
+      const modelState = explicitModel.length === 0
+        ? 'unknown'
+        : explicitModel.toLowerCase().startsWith('claude')
+          ? 'claude'
+          : 'non-claude';
+      const blockerNote = optionValue && modelState === 'non-claude'
+        ? 'Option enabled but model is non-Claude. Prompt suggestions piggyback on Claude-specific prompt caching; non-Claude models may not emit suggestions.'
+        : undefined;
+      if (!optionWired) {
+        return {
+          classification: 'fail',
+          optionWired: false,
+          optionValue,
+          sdkOptionPresent,
+          modelState,
+          error: optionValue
+            ? 'promptSuggestions is enabled in settings but missing from built SDK options.'
+            : 'promptSuggestions is disabled in settings but still present in built SDK options.',
+        };
+      }
+      return {
+        classification: 'readback',
+        optionWired: true,
+        optionValue,
+        sdkOptionPresent,
+        modelState,
+        blockerNote,
+      };
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      runtimeLogger.debug('prompt suggestions readback probe', { result: 'fail', error: errorMessage });
+      return {
+        classification: 'fail',
+        optionWired: false,
+        optionValue: false,
+        sdkOptionPresent: false,
+        modelState: 'unknown',
+        error: errorMessage,
+      };
+    }
+  }
+
+  async runSystemPromptReadbackProbe(): Promise<SystemPromptReadbackProbeResult> {
+    try {
+      const abortController = new AbortController();
+      const options = this.buildDiagnosticSdkOptions(abortController, {
+        prompt: 'System prompt readback proof.',
+        _diagnosticBypassPermissions: true,
+      });
+      const rawSetting = this.options.settings.systemPrompt ?? '';
+      const trimmedSetting = rawSetting.trim();
+      const emptySetting = trimmedSetting.length === 0;
+      const sdkSystemPrompt = options.systemPrompt;
+      const presetPreserved =
+        sdkSystemPrompt?.type === 'preset' && sdkSystemPrompt?.preset === 'claude_code';
+      const sdkAppendValue =
+        sdkSystemPrompt?.type === 'preset' ? sdkSystemPrompt.append : undefined;
+      const expectedAppendValue = emptySetting ? undefined : trimmedSetting;
+      const appendMatch =
+        emptySetting
+          ? sdkAppendValue === undefined
+          : sdkAppendValue === expectedAppendValue;
+      const optionWired = presetPreserved && appendMatch;
+      if (!optionWired) {
+        return {
+          classification: 'fail',
+          optionWired: false,
+          presetPreserved,
+          emptySetting,
+          appendValue: sdkAppendValue,
+          expectedAppendValue,
+          appendMatch,
+          error: emptySetting
+            ? `Expected default preset { type: 'preset', preset: 'claude_code' } but got ${JSON.stringify(sdkSystemPrompt)}`
+            : `Expected preset-with-append { type: 'preset', preset: 'claude_code', append: '${expectedAppendValue}' } but got ${JSON.stringify(sdkSystemPrompt)}`,
+        };
+      }
+      return {
+        classification: 'readback',
+        optionWired: true,
+        presetPreserved,
+        emptySetting,
+        appendValue: sdkAppendValue,
+        expectedAppendValue,
+        appendMatch,
+      };
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      runtimeLogger.debug('system prompt readback probe', { result: 'fail', error: errorMessage });
+      return {
+        classification: 'fail',
+        optionWired: false,
+        presetPreserved: false,
+        emptySetting: false,
+        error: errorMessage,
+      };
+    }
+  }
+
+  async runTaskBudgetReadbackProbe(): Promise<TaskBudgetReadbackProbeResult> {
+    try {
+      const abortController = new AbortController();
+      const options = this.buildDiagnosticSdkOptions(abortController, {
+        prompt: 'Task budget readback proof.',
+        _diagnosticBypassPermissions: true,
+      });
+      const settingValue = this.options.settings.taskBudget ?? null;
+      const sdkOptionPresent = options.taskBudget !== undefined && options.taskBudget !== null;
+      const sdkTotalValue = sdkOptionPresent && typeof options.taskBudget === 'object' && options.taskBudget !== null
+        ? (options.taskBudget as { total?: number }).total
+        : undefined;
+      const totalMatch = settingValue === null
+        ? !sdkOptionPresent
+        : sdkOptionPresent && sdkTotalValue === settingValue;
+      const optionWired = totalMatch;
+      if (!optionWired) {
+        return {
+          classification: 'fail',
+          optionWired: false,
+          settingValue,
+          sdkOptionPresent,
+          sdkTotalValue,
+          totalMatch,
+          error: settingValue === null
+            ? `taskBudget is null in settings but present in built SDK options (total=${String(sdkTotalValue)}).`
+            : `taskBudget is ${settingValue} in settings but SDK options have total=${String(sdkTotalValue)}.`,
+        };
+      }
+      return {
+        classification: 'readback',
+        optionWired: true,
+        settingValue,
+        sdkOptionPresent,
+        sdkTotalValue,
+        totalMatch,
+      };
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      runtimeLogger.debug('task budget readback probe', { result: 'fail', error: errorMessage });
+      return {
+        classification: 'fail',
+        optionWired: false,
+        settingValue: this.options.settings.taskBudget ?? null,
+        sdkOptionPresent: false,
+        totalMatch: false,
+        error: errorMessage,
+      };
+    }
+  }
+
+  async runSandboxReadbackProbe(): Promise<SandboxReadbackProbeResult> {
+    try {
+      const abortController = new AbortController();
+      const options = this.buildDiagnosticSdkOptions(abortController, {
+        prompt: 'Sandbox readback proof.',
+        _diagnosticBypassPermissions: true,
+      });
+      const settingEnabled = this.options.settings.sandbox.enabled;
+      const settingFailIfUnavailable = this.options.settings.sandbox.failIfUnavailable;
+      const settingAutoAllowBashIfSandboxed = this.options.settings.sandbox.autoAllowBashIfSandboxed;
+      const sdkOptionPresent = options.sandbox !== undefined && options.sandbox !== null;
+      const sdkSandbox = sdkOptionPresent && typeof options.sandbox === 'object' && options.sandbox !== null
+        ? options.sandbox as { enabled?: boolean; failIfUnavailable?: boolean; autoAllowBashIfSandboxed?: boolean }
+        : undefined;
+      const sdkEnabled = sdkSandbox?.enabled;
+      const sdkFailIfUnavailable = sdkSandbox?.failIfUnavailable;
+      const sdkAutoAllowBashIfSandboxed = sdkSandbox?.autoAllowBashIfSandboxed;
+      const enabledMatch = settingEnabled
+        ? sdkOptionPresent && sdkEnabled === true
+        : !sdkOptionPresent;
+      const failIfUnavailableMatch = settingFailIfUnavailable
+        ? sdkFailIfUnavailable === true
+        : sdkFailIfUnavailable === undefined;
+      const autoAllowBashIfSandboxedMatch = settingAutoAllowBashIfSandboxed
+        ? sdkAutoAllowBashIfSandboxed === true
+        : sdkAutoAllowBashIfSandboxed === undefined;
+      const optionWired = enabledMatch && failIfUnavailableMatch && autoAllowBashIfSandboxedMatch;
+      if (!optionWired) {
+        return {
+          classification: 'fail',
+          optionWired: false,
+          settingEnabled,
+          settingFailIfUnavailable,
+          settingAutoAllowBashIfSandboxed,
+          sdkOptionPresent,
+          sdkEnabled,
+          sdkFailIfUnavailable,
+          sdkAutoAllowBashIfSandboxed,
+          enabledMatch,
+          failIfUnavailableMatch,
+          autoAllowBashIfSandboxedMatch,
+          error: `sandbox.optionPresent=${String(sdkOptionPresent)}, ` +
+            `sandbox.enabled=${String(settingEnabled)}→${String(sdkEnabled)}, ` +
+            `sandbox.failIfUnavailable=${String(settingFailIfUnavailable)}→${String(sdkFailIfUnavailable)}, ` +
+            `sandbox.autoAllowBashIfSandboxed=${String(settingAutoAllowBashIfSandboxed)}→${String(sdkAutoAllowBashIfSandboxed)}`,
+        };
+      }
+      return {
+        classification: 'readback',
+        optionWired: true,
+        settingEnabled,
+        settingFailIfUnavailable,
+        settingAutoAllowBashIfSandboxed,
+        sdkOptionPresent,
+        sdkEnabled,
+        sdkFailIfUnavailable,
+        sdkAutoAllowBashIfSandboxed,
+        enabledMatch,
+        failIfUnavailableMatch,
+        autoAllowBashIfSandboxedMatch,
+      };
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      runtimeLogger.debug('sandbox readback probe', { result: 'fail', error: errorMessage });
+      return {
+        classification: 'fail',
+        optionWired: false,
+        settingEnabled: this.options.settings.sandbox.enabled,
+        settingFailIfUnavailable: this.options.settings.sandbox.failIfUnavailable,
+        settingAutoAllowBashIfSandboxed: this.options.settings.sandbox.autoAllowBashIfSandboxed,
+        sdkOptionPresent: false,
+        enabledMatch: false,
+        failIfUnavailableMatch: false,
+        autoAllowBashIfSandboxedMatch: false,
+        error: errorMessage,
+      };
+    }
+  }
+
+  async runPlanModeInstructionsReadbackProbe(): Promise<PlanModeInstructionsReadbackProbeResult> {
+    try {
+      const abortController = new AbortController();
+      const options = this.buildDiagnosticSdkOptions(abortController, {
+        prompt: 'Plan mode instructions readback proof.',
+        _diagnosticBypassPermissions: true,
+      });
+      const permissionMode = this.options.settings.permissionMode ?? 'default';
+      const rawSetting = this.options.settings.planModeInstructions ?? '';
+      const trimmedSetting = rawSetting.trim();
+      const sdkOptionPresent = options.planModeInstructions !== undefined && options.planModeInstructions !== null;
+      const sdkValue = sdkOptionPresent ? String(options.planModeInstructions) : undefined;
+      // The builder wires planModeInstructions whenever the trimmed setting is non-empty.
+      const expectedPresent = trimmedSetting.length > 0;
+      const valueMatch = expectedPresent
+        ? sdkOptionPresent && sdkValue === trimmedSetting
+        : !sdkOptionPresent;
+      const optionWired = valueMatch;
+      if (!optionWired) {
+        return {
+          classification: 'fail',
+          optionWired: false,
+          permissionMode,
+          settingValue: trimmedSetting,
+          sdkOptionPresent,
+          sdkValue,
+          valueMatch,
+          error: expectedPresent
+            ? `planModeInstructions is '${trimmedSetting}' in settings but SDK options have ${sdkOptionPresent ? `'${String(sdkValue)}'` : 'no planModeInstructions'}.`
+            : `planModeInstructions is empty in settings but SDK options still contain planModeInstructions=${String(sdkValue)}.`,
+        };
+      }
+      return {
+        classification: 'readback',
+        optionWired: true,
+        permissionMode,
+        settingValue: trimmedSetting,
+        sdkOptionPresent,
+        sdkValue,
+        valueMatch,
+      };
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      runtimeLogger.debug('plan mode instructions readback probe', { result: 'fail', error: errorMessage });
+      return {
+        classification: 'fail',
+        optionWired: false,
+        permissionMode: this.options.settings.permissionMode ?? 'default',
+        settingValue: (this.options.settings.planModeInstructions ?? '').trim(),
+        sdkOptionPresent: false,
+        valueMatch: false,
+        error: errorMessage,
+      };
+    }
+  }
+
+  async runToolAliasesReadbackProbe(): Promise<ToolAliasesReadbackProbeResult> {
+    try {
+      const abortController = new AbortController();
+      const options = this.buildDiagnosticSdkOptions(abortController, {
+        prompt: 'Tool aliases readback proof.',
+        _diagnosticBypassPermissions: true,
+      });
+      const settingAliases = this.options.settings.toolAliases ?? {};
+      const settingEmpty = Object.keys(settingAliases).length === 0;
+      const sdkOptionPresent = options.toolAliases !== undefined && options.toolAliases !== null;
+      const sdkAliases = sdkOptionPresent && typeof options.toolAliases === 'object' && options.toolAliases !== null
+        ? options.toolAliases as Record<string, string>
+        : undefined;
+      const sdkEntryCount = sdkAliases ? Object.keys(sdkAliases).length : 0;
+      const defensiveCopyPreserved = !sdkOptionPresent || sdkAliases !== settingAliases;
+
+      // Verify entries match (defensive copy check)
+      let entriesMatch: boolean;
+      if (settingEmpty) {
+        entriesMatch = !sdkOptionPresent;
+      } else {
+        const settingKeys = Object.keys(settingAliases).sort();
+        const sdkKeys = sdkAliases ? Object.keys(sdkAliases).sort() : [];
+        entriesMatch = sdkOptionPresent &&
+          settingKeys.length === sdkKeys.length &&
+          settingKeys.every((key) => settingAliases[key] === sdkAliases![key]);
+      }
+
+      const optionWired = entriesMatch && defensiveCopyPreserved;
+      if (!optionWired) {
+        let error: string;
+        if (!defensiveCopyPreserved) {
+          error = 'toolAliases SDK option reuses the same object reference as settings instead of a defensive copy.';
+        } else if (settingEmpty) {
+          error = `toolAliases is empty in settings but SDK options still contain toolAliases=${JSON.stringify(sdkAliases)}.`;
+        } else {
+          error = `toolAliases entries mismatch: settings=${JSON.stringify(settingAliases)} vs SDK=${JSON.stringify(sdkAliases)}.`;
+        }
+        return {
+          classification: 'fail',
+          optionWired: false,
+          settingEmpty,
+          sdkOptionPresent,
+          sdkEntryCount,
+          entriesMatch,
+          defensiveCopyPreserved,
+          error,
+        };
+      }
+      return {
+        classification: 'readback',
+        optionWired: true,
+        settingEmpty,
+        sdkOptionPresent,
+        sdkEntryCount,
+        entriesMatch,
+        defensiveCopyPreserved,
+      };
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      runtimeLogger.debug('tool aliases readback probe', { result: 'fail', error: errorMessage });
+      return {
+        classification: 'fail',
+        optionWired: false,
+        settingEmpty: Object.keys(this.options.settings.toolAliases ?? {}).length === 0,
+        sdkOptionPresent: false,
+        entriesMatch: false,
+        defensiveCopyPreserved: false,
+        error: errorMessage,
+      };
+    }
+  }
+
+  async runDebugFileReadbackProbe(): Promise<DebugFileReadbackProbeResult> {
+    try {
+      const abortController = new AbortController();
+      const options = this.buildDiagnosticSdkOptions(abortController, {
+        prompt: 'Debug file readback proof.',
+        _diagnosticBypassPermissions: true,
+      });
+      const settingValue = (this.options.settings.debugFile ?? '').trim();
+      const emptySetting = settingValue.length === 0;
+      const sdkOptionPresent = options.debugFile !== undefined && options.debugFile !== null;
+      const sdkValue = sdkOptionPresent && typeof options.debugFile === 'string'
+        ? options.debugFile
+        : undefined;
+      const valueMatch = emptySetting
+        ? !sdkOptionPresent
+        : sdkOptionPresent && sdkValue === settingValue;
+
+      const optionWired = valueMatch;
+      if (!optionWired) {
+        let error: string;
+        if (emptySetting) {
+          error = `debugFile is empty in settings but SDK options still contain debugFile=${JSON.stringify(sdkValue)}.`;
+        } else {
+          error = `debugFile is "${settingValue}" in settings but SDK options have debugFile=${JSON.stringify(sdkValue)}.`;
+        }
+        return {
+          classification: 'fail',
+          optionWired: false,
+          settingValue,
+          emptySetting,
+          sdkOptionPresent,
+          sdkValue,
+          valueMatch: false,
+          error,
+        };
+      }
+      return {
+        classification: 'readback',
+        optionWired: true,
+        settingValue,
+        emptySetting,
+        sdkOptionPresent,
+        sdkValue,
+        valueMatch: true,
+      };
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      runtimeLogger.debug('debug file readback probe', { result: 'fail', error: errorMessage });
+      return {
+        classification: 'fail',
+        optionWired: false,
+        settingValue: (this.options.settings.debugFile ?? '').trim(),
+        emptySetting: (this.options.settings.debugFile ?? '').trim().length === 0,
+        sdkOptionPresent: false,
+        valueMatch: false,
+        error: errorMessage,
+      };
+    }
+  }
+
+  async runStrictMcpConfigReadbackProbe(): Promise<StrictMcpConfigReadbackProbeResult> {
+    try {
+      const abortController = new AbortController();
+      const options = this.buildDiagnosticSdkOptions(abortController, {
+        prompt: 'Strict MCP config readback proof.',
+        _diagnosticBypassPermissions: true,
+      });
+      const settingValue = this.options.settings.strictMcpConfig === true;
+      const sdkOptionPresent = options.strictMcpConfig !== undefined && options.strictMcpConfig !== null;
+      const sdkValue = sdkOptionPresent ? Boolean(options.strictMcpConfig) : undefined;
+      const valueMatch = settingValue
+        ? sdkOptionPresent && sdkValue === true
+        : !sdkOptionPresent;
+      const optionWired = valueMatch;
+      if (!optionWired) {
+        const error = settingValue
+          ? `strictMcpConfig is true in settings but SDK options have strictMcpConfig=${String(options.strictMcpConfig)}.`
+          : `strictMcpConfig is false in settings but SDK options still contain strictMcpConfig=${String(options.strictMcpConfig)}.`;
+        return {
+          classification: 'fail',
+          optionWired: false,
+          settingValue,
+          sdkOptionPresent,
+          sdkValue,
+          valueMatch: false,
+          error,
+        };
+      }
+      return {
+        classification: 'readback',
+        optionWired: true,
+        settingValue,
+        sdkOptionPresent,
+        sdkValue,
+        valueMatch: true,
+      };
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      runtimeLogger.debug('strict MCP config readback probe', { result: 'fail', error: errorMessage });
+      return {
+        classification: 'fail',
+        optionWired: false,
+        settingValue: this.options.settings.strictMcpConfig === true,
+        sdkOptionPresent: false,
+        valueMatch: false,
+        error: errorMessage,
+      };
+    }
+  }
+
+  async runContinueProbe(): Promise<ContinueProbeResult> {
+    const nonce = Math.random().toString(36).slice(2, 10);
+    try {
+      // Phase 1: seed with nonce
+      const seedResult = await this.runDiagnosticPrompt({
+        prompt: `Remember this nonce: ${nonce}. Reply with only "seed ok".`,
+        persistSession: true,
+        _diagnosticBypassPermissions: true,
+      });
+      const seedSessionId = seedResult.sessionId;
+      if (!seedSessionId) {
+        return { classification: 'fail', error: 'Seed query did not return a session id' };
+      }
+
+      // Phase 2: continue and ask to recall nonce
+      const continueResult = await this.runDiagnosticPrompt({
+        prompt: 'What was the nonce from the immediately previous turn? Reply with only the nonce.',
+        _diagnosticContinue: true,
+        _diagnosticBypassPermissions: true,
+      });
+      const continueSessionId = continueResult.sessionId;
+      const text = this.extractTextFromChunks(continueResult.chunks);
+      const nonceRecalled = text.includes(nonce);
+      const sessionIdsMatch = seedSessionId === continueSessionId;
+
+      if (sessionIdsMatch && nonceRecalled) {
+        return {
+          classification: 'pass',
+          seedSessionId,
+          continueSessionId,
+          nonce,
+          recalled: true,
+          sessionIdsMatch: true,
+          nonceRecalled: true,
+        };
+      }
+      return {
+        classification: 'fail',
+        seedSessionId,
+        continueSessionId,
+        nonce,
+        recalled: nonceRecalled,
+        sessionIdsMatch,
+        nonceRecalled,
+        error: sessionIdsMatch ? 'Nonce not recalled' : 'Session ids mismatch',
+      };
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      runtimeLogger.debug('continue probe', { result: 'fail', error: errorMessage });
+      return { classification: 'fail', error: errorMessage };
+    }
+  }
+
+  async runResumeSessionAtProbe(): Promise<ResumeSessionAtProbeResult> {
+    const alphaNonce = Math.random().toString(36).slice(2, 10);
+    const betaNonce = Math.random().toString(36).slice(2, 10);
+    try {
+      // Phase 1a: seed with ALPHA
+      const alphaResult = await this.runDiagnosticPrompt({
+        prompt: `Remember this nonce: ${alphaNonce}. Reply with only "alpha ok".`,
+        persistSession: true,
+        _diagnosticBypassPermissions: true,
+      });
+      const seedSessionId = alphaResult.sessionId;
+      if (!seedSessionId) {
+        return { classification: 'fail', error: 'Alpha query did not return a session id' };
+      }
+
+      // Extract alpha assistant message UUID from raw messages
+      const alphaMessageUuid = this.extractAssistantMessageUuid(alphaResult.rawMessages);
+      if (!alphaMessageUuid) {
+        return { classification: 'fail', error: 'Could not extract alpha assistant message UUID' };
+      }
+
+      // Phase 1b: send BETA in same session
+      await this.runDiagnosticPrompt({
+        prompt: `Remember this nonce: ${betaNonce}. Reply with only "beta ok".`,
+        persistSession: true,
+        resumeSessionId: seedSessionId,
+        _diagnosticBypassPermissions: true,
+        _diagnosticResumeAt: true,
+      });
+
+      // Phase 2: resume at alpha's UUID
+      const resumeResult = await this.runDiagnosticPrompt({
+        prompt: 'What was the last nonce? Reply with only the nonce.',
+        resumeSessionId: seedSessionId,
+        _diagnosticResumeAt: true,
+        _diagnosticResumeSessionAt: alphaMessageUuid,
+        _diagnosticBypassPermissions: true,
+      });
+
+      const text = this.extractTextFromChunks(resumeResult.chunks);
+      const resumedAtAlpha = text.includes(alphaNonce) && !text.includes(betaNonce);
+      const sessionId = resumeResult.sessionId;
+
+      if (sessionId === seedSessionId && resumedAtAlpha) {
+        return {
+          classification: 'pass',
+          seedSessionId,
+          resumedSessionId: sessionId,
+          sessionId,
+          alphaNonce,
+          betaNonce,
+          alphaMessageUuid,
+          recalledAlpha: true,
+          resumedAtAlpha: true,
+        };
+      }
+      return {
+        classification: 'fail',
+        seedSessionId,
+        resumedSessionId: sessionId,
+        sessionId,
+        alphaNonce,
+        betaNonce,
+        alphaMessageUuid,
+        recalledAlpha: resumedAtAlpha,
+        resumedAtAlpha,
+        error: sessionId !== seedSessionId ? 'Session ids mismatch' : 'Did not recall alpha nonce',
+      };
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      runtimeLogger.debug('resume session at probe', { result: 'fail', error: errorMessage });
+      return { classification: 'fail', error: errorMessage };
+    }
+  }
+
+  async runForkSessionProbe(): Promise<ForkSessionProbeResult> {
+    const nonce = Math.random().toString(36).slice(2, 10);
+    try {
+      // Phase 1: seed with nonce
+      const seedResult = await this.runDiagnosticPrompt({
+        prompt: `Remember this nonce: ${nonce}. Reply with only "seed ok".`,
+        persistSession: true,
+        _diagnosticBypassPermissions: true,
+      });
+      const seedSessionId = seedResult.sessionId;
+      if (!seedSessionId) {
+        return { classification: 'fail', error: 'Seed query did not return a session id' };
+      }
+
+      // Phase 2: fork and recall
+      const forkResult = await this.runDiagnosticPrompt({
+        prompt: 'What was the nonce from the previous turn? Reply with only the nonce.',
+        resumeSessionId: seedSessionId,
+        _diagnosticForkSession: true,
+        _diagnosticBypassPermissions: true,
+      });
+      const forkedSessionId = forkResult.sessionId;
+      const text = this.extractTextFromChunks(forkResult.chunks);
+      const nonceRecalled = text.includes(nonce);
+      const sessionIdsDiffer = seedSessionId !== forkedSessionId;
+
+      if (sessionIdsDiffer && nonceRecalled) {
+        return {
+          classification: 'pass',
+          seedSessionId,
+          forkedSessionId,
+          nonce,
+          recalled: true,
+          sessionIdsDiffer: true,
+          nonceRecalled: true,
+        };
+      }
+      return {
+        classification: 'fail',
+        seedSessionId,
+        forkedSessionId,
+        nonce,
+        recalled: nonceRecalled,
+        sessionIdsDiffer,
+        nonceRecalled,
+        error: !sessionIdsDiffer ? 'Session ids match (no fork occurred)' : 'Nonce not recalled',
+      };
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      runtimeLogger.debug('fork session probe', { result: 'fail', error: errorMessage });
+      return { classification: 'fail', error: errorMessage };
+    }
+  }
+
+  async runSessionTitleProbe(requestedTitle: string): Promise<SessionTitleProbeResult> {
+    try {
+      const result = await this.runDiagnosticPrompt({
+        prompt: 'Say "title probe test" and nothing else.',
+        persistSession: true,
+        _diagnosticTitle: requestedTitle,
+        _diagnosticBypassPermissions: true,
+      });
+      const sessionId = result.sessionId;
+      if (!sessionId) {
+        return { classification: 'fail', requestedTitle, error: 'No session id returned' };
+      }
+
+      const sessionInfo = await this.getSession(sessionId);
+      const customTitle = sessionInfo?.customTitle;
+      if (customTitle === requestedTitle) {
+        return {
+          classification: 'pass',
+          sessionId,
+          requestedTitle,
+          customTitle,
+        };
+      }
+      return {
+        classification: 'fail',
+        sessionId,
+        requestedTitle,
+        customTitle,
+        error: customTitle ? `customTitle mismatch: ${customTitle}` : 'customTitle absent',
+      };
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      runtimeLogger.debug('session title probe', { result: 'fail', error: errorMessage });
+      return { classification: 'fail', requestedTitle, error: errorMessage };
+    }
+  }
+
+  async runCustomSessionIdProbe(targetSessionId: string): Promise<CustomSessionIdProbeResult> {
+    try {
+      const result = await this.runDiagnosticPrompt({
+        prompt: 'Say "session id probe test" and nothing else.',
+        _diagnosticSessionId: targetSessionId,
+        _diagnosticBypassPermissions: true,
+      });
+      const returnedSessionId = result.sessionId;
+      if (returnedSessionId === targetSessionId) {
+        return {
+          classification: 'pass',
+          requestedSessionId: targetSessionId,
+          actualSessionId: returnedSessionId,
+          returnedSessionId,
+        };
+      }
+      return {
+        classification: 'fail',
+        requestedSessionId: targetSessionId,
+        actualSessionId: returnedSessionId,
+        returnedSessionId,
+        error: returnedSessionId ? `Mismatch: expected ${targetSessionId}, got ${returnedSessionId}` : 'No session id returned',
+      };
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      runtimeLogger.debug('custom session id probe', { result: 'fail', error: errorMessage });
+      return { classification: 'fail', requestedSessionId: targetSessionId, error: errorMessage };
+    }
+  }
+
+  private extractTextFromChunks(chunks: StreamChunk[]): string {
+    return chunks
+      .filter((c): c is Extract<StreamChunk, { type: 'text' }> => c.type === 'text')
+      .map((c) => c.content)
+      .join('');
+  }
+
+  private extractAssistantMessageUuid(messages: unknown[]): string | undefined {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const msg = messages[i];
+      if (typeof msg !== 'object' || msg === null) continue;
+      const rec = msg as Record<string, unknown>;
+      if (rec.type === 'assistant' && typeof rec.uuid === 'string') {
+        return rec.uuid.trim() || undefined;
+      }
+    }
+    return undefined;
   }
 
   private async validateDiagnosticResumeSession(
@@ -2192,6 +3199,24 @@ export class ClaudeCodeAdapter
     });
     if (request._diagnosticToolRestriction) {
       options.tools = [...request._diagnosticToolRestriction];
+    }
+    if (request._diagnosticStderrCallback) {
+      options.stderr = request._diagnosticStderrCallback;
+    }
+    if (request._diagnosticSessionId) {
+      options.sessionId = request._diagnosticSessionId;
+    }
+    if (request._diagnosticContinue === true) {
+      options.continue = true;
+    }
+    if (request._diagnosticResumeSessionAt) {
+      options.resumeSessionAt = request._diagnosticResumeSessionAt;
+    }
+    if (request._diagnosticForkSession === true) {
+      options.forkSession = true;
+    }
+    if (request._diagnosticTitle) {
+      options.title = request._diagnosticTitle;
     }
     this.lastDiagnosticSdkOptions = options;
     return options;
@@ -2843,6 +3868,15 @@ export class ClaudeCodeAdapter
     try {
       for await (const message of runtime.query ?? []) {
         runtime.output.push({ type: 'message', message });
+        // Post-result prompt suggestions bypass the normal streaming consumer
+        // (sendMessage returns at the turn boundary) and are delivered through
+        // the dedicated post-result callback channel.
+        if (isPromptSuggestionMessage(message)) {
+          const chunks = runtime.normalizer.transformSDKMessage(message);
+          for (const chunk of chunks) {
+            this.firePostResultChunk(chunk);
+          }
+        }
       }
     } catch (error) {
       runtimeLogger.debug('sendMessage error', {

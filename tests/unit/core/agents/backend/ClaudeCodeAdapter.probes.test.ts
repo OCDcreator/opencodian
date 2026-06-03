@@ -1,0 +1,1314 @@
+/* eslint-disable max-lines -- Probe test file accumulates focused tests for each readback/pass diagnostic surface. */
+import {
+  ClaudeCodeAdapter,
+  type ClaudeCodeSdkFacade,
+} from '../../../../../src/core/agents/backend';
+import { ClaudeCodeStreamNormalizer } from '../../../../../src/core/agents/backend/ClaudeCodeStreamNormalizer';
+import { getDefaultClaudeCodeBackendSettings } from '../../../../../src/core/types';
+
+/**
+ * Helper: create a mock SDK whose query() yields the given messages.
+ * Messages use the real SDK shape so ClaudeCodeStreamNormalizer produces
+ * correct text/session chunks.
+ */
+function createProbeSdk(messages: unknown[]): ClaudeCodeSdkFacade & {
+  query: jest.Mock;
+  getSessionInfo: jest.Mock;
+} {
+  return {
+    query: jest.fn(() => Object.assign((async function* () {
+      for (const message of messages) {
+        yield message;
+      }
+    })(), {
+      close: jest.fn(),
+    })),
+    getSessionInfo: jest.fn((_sessionId: string) =>
+      Promise.resolve({
+        sessionId: _sessionId,
+        summary: 'probe-session',
+        lastModified: Date.now(),
+      }),
+    ),
+  } as unknown as ClaudeCodeSdkFacade & { query: jest.Mock; getSessionInfo: jest.Mock };
+}
+
+/**
+ * Real SDK-shaped assistant message with text content and session_id.
+ * The normalizer will generate a text chunk from `content[0].text`
+ * and `resolveDiagnosticSessionId` will find `session_id`.
+ */
+function assistantMessage(sessionId: string, text: string) {
+  return {
+    type: 'assistant',
+    session_id: sessionId,
+    content: [{ type: 'text', text }],
+  };
+}
+
+/** Real SDK-shaped result terminator. */
+function resultMessage(sessionId: string) {
+  return { type: 'result', subtype: 'success', session_id: sessionId };
+}
+
+describe('ClaudeCodeStreamNormalizer assistant message', () => {
+  it('generates text chunks from assistant content blocks', () => {
+    const normalizer = new ClaudeCodeStreamNormalizer();
+    const message = {
+      type: 'assistant',
+      session_id: 'test-session',
+      content: [{ type: 'text', text: 'hello world' }],
+    };
+    const chunks = normalizer.transformSDKMessage(message);
+    expect(chunks.some((c) => c.type === 'text' && c.content === 'hello world')).toBe(true);
+  });
+});
+
+describe('runStderrDiagnosticProbe', () => {
+  it('returns readback when callback is wired', async () => {
+    const sdk = createProbeSdk([
+      assistantMessage('probe-session', 'ok'),
+      resultMessage('probe-session'),
+    ]);
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+
+    const result = await adapter.runStderrDiagnosticProbe();
+
+    expect(result.classification).toBe('readback');
+    expect(result.callbackWired).toBe(true);
+  });
+
+  it('returns fail on throw', async () => {
+    const sdk = createProbeSdk([]);
+    sdk.query.mockImplementation(() => {
+      throw new Error('query failed');
+    });
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+
+    const result = await adapter.runStderrDiagnosticProbe();
+
+    expect(result.classification).toBe('fail');
+    expect(result.error).toContain('query failed');
+  });
+});
+
+describe('runPromptSuggestionsReadbackProbe', () => {
+  it('returns readback when option is wired and no explicit model is configured', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        promptSuggestions: true,
+      },
+      sdk: createProbeSdk([]),
+    });
+
+    const result = await adapter.runPromptSuggestionsReadbackProbe();
+
+    expect(result.classification).toBe('readback');
+    expect(result.optionWired).toBe(true);
+    expect(result.optionValue).toBe(true);
+    expect(result.sdkOptionPresent).toBe(true);
+    expect(result.modelState).toBe('unknown');
+    expect(result.blockerNote).toBeUndefined();
+  });
+
+  it('returns readback with blocker note when using non-Claude model', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        promptSuggestions: true,
+        model: 'deepseek-v4-pro',
+      },
+      sdk: createProbeSdk([]),
+    });
+
+    const result = await adapter.runPromptSuggestionsReadbackProbe();
+
+    expect(result.classification).toBe('readback');
+    expect(result.optionWired).toBe(true);
+    expect(result.sdkOptionPresent).toBe(true);
+    expect(result.modelState).toBe('non-claude');
+    expect(result.blockerNote).toContain('non-Claude');
+  });
+
+  it('returns readback when promptSuggestions is disabled', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        promptSuggestions: false,
+      },
+      sdk: createProbeSdk([]),
+    });
+
+    const result = await adapter.runPromptSuggestionsReadbackProbe();
+
+    expect(result.classification).toBe('readback');
+    expect(result.optionWired).toBe(true);
+    expect(result.optionValue).toBe(false);
+    expect(result.sdkOptionPresent).toBe(false);
+    expect(result.modelState).toBe('unknown');
+  });
+});
+
+describe('runSystemPromptReadbackProbe', () => {
+  it('returns readback with default preset when systemPrompt is empty', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        systemPrompt: '',
+      },
+      sdk: createProbeSdk([]),
+    });
+
+    const result = await adapter.runSystemPromptReadbackProbe();
+
+    expect(result.classification).toBe('readback');
+    expect(result.optionWired).toBe(true);
+    expect(result.emptySetting).toBe(true);
+    expect(result.presetPreserved).toBe(true);
+    expect(result.appendValue).toBeUndefined();
+    expect(result.appendMatch).toBe(true);
+  });
+
+  it('returns readback with preset-and-append when systemPrompt is non-empty', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        systemPrompt: 'Be concise. Use bullet points.',
+      },
+      sdk: createProbeSdk([]),
+    });
+
+    const result = await adapter.runSystemPromptReadbackProbe();
+
+    expect(result.classification).toBe('readback');
+    expect(result.optionWired).toBe(true);
+    expect(result.emptySetting).toBe(false);
+    expect(result.presetPreserved).toBe(true);
+    expect(result.appendValue).toBe('Be concise. Use bullet points.');
+    expect(result.expectedAppendValue).toBe('Be concise. Use bullet points.');
+    expect(result.appendMatch).toBe(true);
+  });
+
+  it('returns readback with trimmed append value when systemPrompt has surrounding whitespace', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        systemPrompt: '  Be concise.  ',
+      },
+      sdk: createProbeSdk([]),
+    });
+
+    const result = await adapter.runSystemPromptReadbackProbe();
+
+    expect(result.classification).toBe('readback');
+    expect(result.optionWired).toBe(true);
+    expect(result.emptySetting).toBe(false);
+    expect(result.presetPreserved).toBe(true);
+    expect(result.appendValue).toBe('Be concise.');
+    expect(result.expectedAppendValue).toBe('Be concise.');
+    expect(result.appendMatch).toBe(true);
+  });
+});
+
+describe('runCustomSessionIdProbe', () => {
+  it('returns pass when session id matches', async () => {
+    const targetId = 'test-session-id-123';
+    const sdk = createProbeSdk([
+      assistantMessage(targetId, 'ok'),
+      resultMessage(targetId),
+    ]);
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+
+    const result = await adapter.runCustomSessionIdProbe(targetId);
+
+    expect(result.classification).toBe('pass');
+    expect(result.returnedSessionId).toBe(targetId);
+  });
+
+  it('returns fail when session id mismatches', async () => {
+    const sdk = createProbeSdk([
+      assistantMessage('different-id', 'ok'),
+      resultMessage('different-id'),
+    ]);
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+
+    const result = await adapter.runCustomSessionIdProbe('expected-id');
+
+    expect(result.classification).toBe('fail');
+    expect(result.returnedSessionId).toBe('different-id');
+  });
+});
+
+describe('runSessionTitleProbe', () => {
+  it('returns pass when customTitle matches', async () => {
+    const title = 'Test Diagnostic Title';
+    const sessionId = 'session-123';
+    const sdk = createProbeSdk([
+      assistantMessage(sessionId, 'ok'),
+      resultMessage(sessionId),
+    ]);
+    sdk.getSessionInfo.mockResolvedValue({
+      sessionId,
+      summary: 'test',
+      lastModified: Date.now(),
+      customTitle: title,
+    });
+
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+
+    const result = await adapter.runSessionTitleProbe(title);
+
+    expect(result.classification).toBe('pass');
+    expect(result.customTitle).toBe(title);
+  });
+
+  it('returns fail when customTitle mismatches', async () => {
+    const title = 'Test Diagnostic Title';
+    const sessionId = 'session-123';
+    const sdk = createProbeSdk([
+      assistantMessage(sessionId, 'ok'),
+      resultMessage(sessionId),
+    ]);
+    sdk.getSessionInfo.mockResolvedValue({
+      sessionId,
+      summary: 'test',
+      lastModified: Date.now(),
+      customTitle: 'Different Title',
+    });
+
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+
+    const result = await adapter.runSessionTitleProbe(title);
+
+    expect(result.classification).toBe('fail');
+    expect(result.customTitle).toBe('Different Title');
+  });
+});
+
+describe('runForkSessionProbe', () => {
+  it('returns pass when session ids differ and nonce is recalled', async () => {
+    let callIndex = 0;
+    const sdk = createProbeSdk([]);
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+
+    // Mock Math.random to get deterministic nonce
+    const realRandom = Math.random;
+    Math.random = () => 0.123456789;
+    const expectedNonce = Math.random().toString(36).slice(2, 10);
+
+    sdk.query.mockImplementation(() => {
+      callIndex++;
+      return Object.assign((async function* () {
+        if (callIndex === 1) {
+          yield assistantMessage('seed-session', 'seed ok');
+          yield resultMessage('seed-session');
+        } else {
+          yield assistantMessage('forked-session', `recall ${expectedNonce}`);
+          yield resultMessage('forked-session');
+        }
+      })(), { close: jest.fn() });
+    });
+
+    const result = await adapter.runForkSessionProbe();
+    Math.random = realRandom;
+
+    expect(result.classification).toBe('pass');
+    expect(result.sessionIdsDiffer).toBe(true);
+    expect(result.nonceRecalled).toBe(true);
+  });
+
+  it('returns fail when session ids match (no fork occurred)', async () => {
+    let callIndex = 0;
+    const sdk = createProbeSdk([]);
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+
+    const realRandom = Math.random;
+    Math.random = () => 0.123456789;
+    const expectedNonce = Math.random().toString(36).slice(2, 10);
+
+    sdk.query.mockImplementation(() => {
+      callIndex++;
+      return Object.assign((async function* () {
+        const sessionId = 'same-session';
+        if (callIndex === 1) {
+          yield assistantMessage(sessionId, 'seed ok');
+          yield resultMessage(sessionId);
+        } else {
+          yield assistantMessage(sessionId, `recall ${expectedNonce}`);
+          yield resultMessage(sessionId);
+        }
+      })(), { close: jest.fn() });
+    });
+
+    const result = await adapter.runForkSessionProbe();
+    Math.random = realRandom;
+
+    expect(result.classification).toBe('fail');
+    expect(result.sessionIdsDiffer).toBe(false);
+  });
+});
+
+describe('runContinueProbe', () => {
+  it('returns pass when session ids match and nonce is recalled', async () => {
+    let callIndex = 0;
+    const sdk = createProbeSdk([]);
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+
+    const realRandom = Math.random;
+    Math.random = () => 0.987654321;
+    const expectedNonce = Math.random().toString(36).slice(2, 10);
+
+    sdk.query.mockImplementation(() => {
+      callIndex++;
+      return Object.assign((async function* () {
+        if (callIndex === 1) {
+          yield assistantMessage('session-1', 'seed ok');
+          yield resultMessage('session-1');
+        } else {
+          yield assistantMessage('session-1', `recall ok ${expectedNonce}`);
+          yield resultMessage('session-1');
+        }
+      })(), { close: jest.fn() });
+    });
+
+    const result = await adapter.runContinueProbe();
+    Math.random = realRandom;
+
+    expect(result.classification).toBe('pass');
+    expect(result.sessionIdsMatch).toBe(true);
+    expect(result.nonceRecalled).toBe(true);
+  });
+
+  it('returns fail when session ids mismatch', async () => {
+    let callIndex = 0;
+    const sdk = createProbeSdk([]);
+    sdk.query.mockImplementation(() => {
+      callIndex++;
+      return Object.assign((async function* () {
+        if (callIndex === 1) {
+          yield assistantMessage('session-1', 'seed ok');
+          yield resultMessage('session-1');
+        } else {
+          yield assistantMessage('session-2', 'different session');
+          yield resultMessage('session-2');
+        }
+      })(), { close: jest.fn() });
+    });
+
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+
+    const result = await adapter.runContinueProbe();
+
+    expect(result.classification).toBe('fail');
+    expect(result.sessionIdsMatch).toBe(false);
+  });
+});
+
+describe('runResumeSessionAtProbe', () => {
+  it('returns pass when resumed at alpha and alpha is recalled', async () => {
+    const alphaUuid = 'assistant-uuid-alpha';
+    let callIndex = 0;
+    const sdk = createProbeSdk([]);
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+
+    // Deterministic nonces: alpha=0.1→nonce1, beta=0.2→nonce2
+    const realRandom = Math.random;
+    let randomCount = 0;
+    Math.random = () => {
+      randomCount++;
+      return 0.1 * randomCount;
+    };
+
+    const alphaNonce = (0.1).toString(36).slice(2, 10);
+
+    sdk.query.mockImplementation(() => {
+      callIndex++;
+      return Object.assign((async function* () {
+        if (callIndex === 1) {
+          yield { type: 'assistant', uuid: alphaUuid, session_id: 'session-1' };
+          yield assistantMessage('session-1', 'alpha ok');
+          yield resultMessage('session-1');
+        } else if (callIndex === 2) {
+          yield assistantMessage('session-1', 'beta ok');
+          yield resultMessage('session-1');
+        } else {
+          yield assistantMessage('session-1', `The nonce was ${alphaNonce}`);
+          yield resultMessage('session-1');
+        }
+      })(), { close: jest.fn() });
+    });
+
+    const result = await adapter.runResumeSessionAtProbe();
+    Math.random = realRandom;
+
+    expect(result.classification).toBe('pass');
+    expect(result.resumedAtAlpha).toBe(true);
+    expect(result.alphaMessageUuid).toBe(alphaUuid);
+  });
+
+  it('returns fail when beta is recalled instead of alpha', async () => {
+    const alphaUuid = 'assistant-uuid-alpha';
+    let callIndex = 0;
+    const sdk = createProbeSdk([]);
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+
+    const realRandom = Math.random;
+    let randomCount = 0;
+    Math.random = () => {
+      randomCount++;
+      return 0.1 * randomCount;
+    };
+
+    const betaNonce = (0.2).toString(36).slice(2, 10);
+
+    sdk.query.mockImplementation(() => {
+      callIndex++;
+      return Object.assign((async function* () {
+        if (callIndex === 1) {
+          yield { type: 'assistant', uuid: alphaUuid, session_id: 'session-1' };
+          yield assistantMessage('session-1', 'alpha ok');
+          yield resultMessage('session-1');
+        } else if (callIndex === 2) {
+          yield assistantMessage('session-1', 'beta ok');
+          yield resultMessage('session-1');
+        } else {
+          yield assistantMessage('session-1', `The nonce was ${betaNonce}`);
+          yield resultMessage('session-1');
+        }
+      })(), { close: jest.fn() });
+    });
+
+    const result = await adapter.runResumeSessionAtProbe();
+    Math.random = realRandom;
+
+    expect(result.classification).toBe('fail');
+    expect(result.resumedAtAlpha).toBe(false);
+  });
+});
+
+describe('runTaskBudgetReadbackProbe', () => {
+  it('returns readback with no taskBudget option when setting is null', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        taskBudget: null,
+      },
+      sdk: createProbeSdk([]),
+    });
+
+    const result = await adapter.runTaskBudgetReadbackProbe();
+
+    expect(result.classification).toBe('readback');
+    expect(result.optionWired).toBe(true);
+    expect(result.settingValue).toBeNull();
+    expect(result.sdkOptionPresent).toBe(false);
+    expect(result.sdkTotalValue).toBeUndefined();
+    expect(result.totalMatch).toBe(true);
+  });
+
+  it('returns readback with taskBudget option when setting is a positive integer', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        taskBudget: 50000,
+      },
+      sdk: createProbeSdk([]),
+    });
+
+    const result = await adapter.runTaskBudgetReadbackProbe();
+
+    expect(result.classification).toBe('readback');
+    expect(result.optionWired).toBe(true);
+    expect(result.settingValue).toBe(50000);
+    expect(result.sdkOptionPresent).toBe(true);
+    expect(result.sdkTotalValue).toBe(50000);
+    expect(result.totalMatch).toBe(true);
+  });
+
+  it('returns fail when total value does not match setting', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        taskBudget: 50000,
+      },
+      sdk: createProbeSdk([]),
+    });
+
+    jest.spyOn(adapter as unknown as {
+      buildDiagnosticSdkOptions: (...args: unknown[]) => unknown;
+    }, 'buildDiagnosticSdkOptions').mockReturnValue({
+      taskBudget: { total: 12345 },
+    });
+
+    const result = await adapter.runTaskBudgetReadbackProbe();
+
+    expect(result.classification).toBe('fail');
+    expect(result.optionWired).toBe(false);
+    expect(result.settingValue).toBe(50000);
+    expect(result.sdkOptionPresent).toBe(true);
+    expect(result.sdkTotalValue).toBe(12345);
+    expect(result.totalMatch).toBe(false);
+    expect(result.error).toContain('taskBudget is 50000 in settings but SDK options have total=12345');
+  });
+});
+
+describe('runSandboxReadbackProbe', () => {
+  it('returns readback with no sandbox option when sandbox is disabled', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        sandbox: { enabled: false, failIfUnavailable: false, autoAllowBashIfSandboxed: false },
+      },
+      sdk: createProbeSdk([]),
+    });
+
+    const result = await adapter.runSandboxReadbackProbe();
+
+    expect(result.classification).toBe('readback');
+    expect(result.optionWired).toBe(true);
+    expect(result.settingEnabled).toBe(false);
+    expect(result.sdkOptionPresent).toBe(false);
+    expect(result.enabledMatch).toBe(true);
+    expect(result.failIfUnavailableMatch).toBe(true);
+    expect(result.autoAllowBashIfSandboxedMatch).toBe(true);
+  });
+
+  it('returns readback with sandbox option when sandbox is enabled with sub-options', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        sandbox: { enabled: true, failIfUnavailable: true, autoAllowBashIfSandboxed: true },
+      },
+      sdk: createProbeSdk([]),
+    });
+
+    const result = await adapter.runSandboxReadbackProbe();
+
+    expect(result.classification).toBe('readback');
+    expect(result.optionWired).toBe(true);
+    expect(result.settingEnabled).toBe(true);
+    expect(result.settingFailIfUnavailable).toBe(true);
+    expect(result.settingAutoAllowBashIfSandboxed).toBe(true);
+    expect(result.sdkOptionPresent).toBe(true);
+    expect(result.sdkEnabled).toBe(true);
+    expect(result.sdkFailIfUnavailable).toBe(true);
+    expect(result.sdkAutoAllowBashIfSandboxed).toBe(true);
+    expect(result.enabledMatch).toBe(true);
+    expect(result.failIfUnavailableMatch).toBe(true);
+    expect(result.autoAllowBashIfSandboxedMatch).toBe(true);
+  });
+
+  it('returns fail when sandbox enabled setting mismatches SDK options', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        sandbox: { enabled: true, failIfUnavailable: false, autoAllowBashIfSandboxed: false },
+      },
+      sdk: createProbeSdk([]),
+    });
+
+    jest.spyOn(adapter as unknown as {
+      buildDiagnosticSdkOptions: (...args: unknown[]) => unknown;
+    }, 'buildDiagnosticSdkOptions').mockReturnValue({
+      sandbox: { enabled: false },
+    });
+
+    const result = await adapter.runSandboxReadbackProbe();
+
+    expect(result.classification).toBe('fail');
+    expect(result.optionWired).toBe(false);
+    expect(result.settingEnabled).toBe(true);
+    expect(result.sdkOptionPresent).toBe(true);
+    expect(result.sdkEnabled).toBe(false);
+    expect(result.enabledMatch).toBe(false);
+    expect(result.error).toContain('sandbox.enabled');
+  });
+
+  it('returns fail when sandbox is disabled but SDK options still include sandbox', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        sandbox: { enabled: false, failIfUnavailable: false, autoAllowBashIfSandboxed: false },
+      },
+      sdk: createProbeSdk([]),
+    });
+
+    jest.spyOn(adapter as unknown as {
+      buildDiagnosticSdkOptions: (...args: unknown[]) => unknown;
+    }, 'buildDiagnosticSdkOptions').mockReturnValue({
+      sandbox: { enabled: false },
+    });
+
+    const result = await adapter.runSandboxReadbackProbe();
+
+    expect(result.classification).toBe('fail');
+    expect(result.optionWired).toBe(false);
+    expect(result.sdkOptionPresent).toBe(true);
+    expect(result.enabledMatch).toBe(false);
+    expect(result.error).toContain('sandbox.optionPresent=true');
+  });
+
+  it('returns fail when false sandbox sub-options are explicitly passed into SDK options', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        sandbox: { enabled: true, failIfUnavailable: false, autoAllowBashIfSandboxed: false },
+      },
+      sdk: createProbeSdk([]),
+    });
+
+    jest.spyOn(adapter as unknown as {
+      buildDiagnosticSdkOptions: (...args: unknown[]) => unknown;
+    }, 'buildDiagnosticSdkOptions').mockReturnValue({
+      sandbox: { enabled: true, failIfUnavailable: false, autoAllowBashIfSandboxed: false },
+    });
+
+    const result = await adapter.runSandboxReadbackProbe();
+
+    expect(result.classification).toBe('fail');
+    expect(result.optionWired).toBe(false);
+    expect(result.sdkOptionPresent).toBe(true);
+    expect(result.enabledMatch).toBe(true);
+    expect(result.failIfUnavailableMatch).toBe(false);
+    expect(result.autoAllowBashIfSandboxedMatch).toBe(false);
+    expect(result.error).toContain('sandbox.failIfUnavailable=false→false');
+    expect(result.error).toContain('sandbox.autoAllowBashIfSandboxed=false→false');
+  });
+});
+
+describe('runPlanModeInstructionsReadbackProbe', () => {
+  it('returns readback with planModeInstructions option when permissionMode is plan and setting is non-empty', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        permissionMode: 'plan',
+        planModeInstructions: 'Use bullet points for all plans.',
+      },
+      sdk: createProbeSdk([]),
+    });
+
+    const result = await adapter.runPlanModeInstructionsReadbackProbe();
+
+    expect(result.classification).toBe('readback');
+    expect(result.optionWired).toBe(true);
+    expect(result.permissionMode).toBe('plan');
+    expect(result.settingValue).toBe('Use bullet points for all plans.');
+    expect(result.sdkOptionPresent).toBe(true);
+    expect(result.sdkValue).toBe('Use bullet points for all plans.');
+    expect(result.valueMatch).toBe(true);
+  });
+
+  it('returns readback with planModeInstructions option even when permissionMode is not plan (builder does not gate on permissionMode)', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        permissionMode: 'default',
+        planModeInstructions: 'Use bullet points for all plans.',
+      },
+      sdk: createProbeSdk([]),
+    });
+
+    const result = await adapter.runPlanModeInstructionsReadbackProbe();
+
+    // The builder wires planModeInstructions whenever the trimmed setting is non-empty,
+    // regardless of permissionMode. The probe verifies this current mapping behavior.
+    expect(result.classification).toBe('readback');
+    expect(result.optionWired).toBe(true);
+    expect(result.permissionMode).toBe('default');
+    expect(result.settingValue).toBe('Use bullet points for all plans.');
+    expect(result.sdkOptionPresent).toBe(true);
+    expect(result.sdkValue).toBe('Use bullet points for all plans.');
+    expect(result.valueMatch).toBe(true);
+  });
+
+  it('returns readback with no planModeInstructions option when permissionMode is plan but setting is empty', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        permissionMode: 'plan',
+        planModeInstructions: '',
+      },
+      sdk: createProbeSdk([]),
+    });
+
+    const result = await adapter.runPlanModeInstructionsReadbackProbe();
+
+    expect(result.classification).toBe('readback');
+    expect(result.optionWired).toBe(true);
+    expect(result.permissionMode).toBe('plan');
+    expect(result.settingValue).toBe('');
+    expect(result.sdkOptionPresent).toBe(false);
+    expect(result.sdkValue).toBeUndefined();
+    expect(result.valueMatch).toBe(true);
+  });
+
+  it('returns readback with trimmed value when setting has surrounding whitespace', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        permissionMode: 'plan',
+        planModeInstructions: '  Use bullet points.  ',
+      },
+      sdk: createProbeSdk([]),
+    });
+
+    const result = await adapter.runPlanModeInstructionsReadbackProbe();
+
+    expect(result.classification).toBe('readback');
+    expect(result.optionWired).toBe(true);
+    expect(result.settingValue).toBe('Use bullet points.');
+    expect(result.sdkOptionPresent).toBe(true);
+    expect(result.sdkValue).toBe('Use bullet points.');
+    expect(result.valueMatch).toBe(true);
+  });
+
+  it('returns fail when planModeInstructions value does not match setting', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        permissionMode: 'plan',
+        planModeInstructions: 'Use bullet points.',
+      },
+      sdk: createProbeSdk([]),
+    });
+
+    jest.spyOn(adapter as unknown as {
+      buildDiagnosticSdkOptions: (...args: unknown[]) => unknown;
+    }, 'buildDiagnosticSdkOptions').mockReturnValue({
+      planModeInstructions: 'Different instructions.',
+    });
+
+    const result = await adapter.runPlanModeInstructionsReadbackProbe();
+
+    expect(result.classification).toBe('fail');
+    expect(result.optionWired).toBe(false);
+    expect(result.permissionMode).toBe('plan');
+    expect(result.settingValue).toBe('Use bullet points.');
+    expect(result.sdkOptionPresent).toBe(true);
+    expect(result.sdkValue).toBe('Different instructions.');
+    expect(result.valueMatch).toBe(false);
+    expect(result.error).toContain('planModeInstructions');
+  });
+
+  it('returns fail when planModeInstructions is present but value mismatches setting', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        permissionMode: 'plan',
+        planModeInstructions: 'Use bullet points.',
+      },
+      sdk: createProbeSdk([]),
+    });
+
+    jest.spyOn(adapter as unknown as {
+      buildDiagnosticSdkOptions: (...args: unknown[]) => unknown;
+    }, 'buildDiagnosticSdkOptions').mockReturnValue({
+      planModeInstructions: 'Different instructions.',
+    });
+
+    const result = await adapter.runPlanModeInstructionsReadbackProbe();
+
+    expect(result.classification).toBe('fail');
+    expect(result.optionWired).toBe(false);
+    expect(result.permissionMode).toBe('plan');
+    expect(result.sdkOptionPresent).toBe(true);
+    expect(result.valueMatch).toBe(false);
+    expect(result.error).toContain('planModeInstructions');
+  });
+});
+
+describe('runToolAliasesReadbackProbe', () => {
+  it('returns readback with no toolAliases option when setting is empty', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        toolAliases: {},
+      },
+      sdk: createProbeSdk([]),
+    });
+
+    const result = await adapter.runToolAliasesReadbackProbe();
+
+    expect(result.classification).toBe('readback');
+    expect(result.optionWired).toBe(true);
+    expect(result.settingEmpty).toBe(true);
+    expect(result.sdkOptionPresent).toBe(false);
+    expect(result.entriesMatch).toBe(true);
+  });
+
+  it('returns readback with toolAliases option when setting has entries', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        toolAliases: { Fetch: 'Read', Search: 'Grep' },
+      },
+      sdk: createProbeSdk([]),
+    });
+
+    const result = await adapter.runToolAliasesReadbackProbe();
+
+    expect(result.classification).toBe('readback');
+    expect(result.optionWired).toBe(true);
+    expect(result.settingEmpty).toBe(false);
+    expect(result.sdkOptionPresent).toBe(true);
+    expect(result.sdkEntryCount).toBe(2);
+    expect(result.entriesMatch).toBe(true);
+  });
+
+  it('returns fail when toolAliases entries mismatch', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        toolAliases: { Fetch: 'Read' },
+      },
+      sdk: createProbeSdk([]),
+    });
+
+    jest.spyOn(adapter as unknown as {
+      buildDiagnosticSdkOptions: (...args: unknown[]) => unknown;
+    }, 'buildDiagnosticSdkOptions').mockReturnValue({
+      toolAliases: { Fetch: 'Write' },
+    });
+
+    const result = await adapter.runToolAliasesReadbackProbe();
+
+    expect(result.classification).toBe('fail');
+    expect(result.optionWired).toBe(false);
+    expect(result.settingEmpty).toBe(false);
+    expect(result.sdkOptionPresent).toBe(true);
+    expect(result.entriesMatch).toBe(false);
+    expect(result.error).toContain('toolAliases');
+  });
+
+  it('returns fail when toolAliases is present but setting is empty', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        toolAliases: {},
+      },
+      sdk: createProbeSdk([]),
+    });
+
+    jest.spyOn(adapter as unknown as {
+      buildDiagnosticSdkOptions: (...args: unknown[]) => unknown;
+    }, 'buildDiagnosticSdkOptions').mockReturnValue({
+      toolAliases: { Fetch: 'Read' },
+    });
+
+    const result = await adapter.runToolAliasesReadbackProbe();
+
+    expect(result.classification).toBe('fail');
+    expect(result.optionWired).toBe(false);
+    expect(result.settingEmpty).toBe(true);
+    expect(result.sdkOptionPresent).toBe(true);
+    expect(result.entriesMatch).toBe(false);
+    expect(result.error).toContain('toolAliases');
+  });
+
+  it('returns fail when SDK toolAliases shares the same object reference as settings', async () => {
+    const sharedAliases = { Fetch: 'Read' };
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        toolAliases: sharedAliases,
+      },
+      sdk: createProbeSdk([]),
+    });
+
+    jest.spyOn(adapter as unknown as {
+      buildDiagnosticSdkOptions: (...args: unknown[]) => unknown;
+    }, 'buildDiagnosticSdkOptions').mockReturnValue({
+      toolAliases: sharedAliases,
+    });
+
+    const result = await adapter.runToolAliasesReadbackProbe();
+
+    expect(result.classification).toBe('fail');
+    expect(result.optionWired).toBe(false);
+    expect(result.settingEmpty).toBe(false);
+    expect(result.sdkOptionPresent).toBe(true);
+    expect(result.entriesMatch).toBe(true);
+    expect(result.defensiveCopyPreserved).toBe(false);
+    expect(result.error).toContain('same object reference');
+  });
+
+  it('honestly states lifecycle applies to next query only', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        toolAliases: { Fetch: 'Read' },
+      },
+      sdk: createProbeSdk([]),
+    });
+
+    const result = await adapter.runToolAliasesReadbackProbe();
+
+    expect(result.classification).toBe('readback');
+    expect(result.optionWired).toBe(true);
+    // readback means we do NOT claim alias resolution is behavior-verified
+    expect(result.sdkOptionPresent).toBe(true);
+    expect(result.entriesMatch).toBe(true);
+  });
+});
+
+describe('runDebugFileReadbackProbe', () => {
+  it('returns readback with no debugFile option when setting is empty', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        debugFile: '',
+      },
+      sdk: createProbeSdk([]),
+    });
+
+    const result = await adapter.runDebugFileReadbackProbe();
+
+    expect(result.classification).toBe('readback');
+    expect(result.optionWired).toBe(true);
+    expect(result.settingValue).toBe('');
+    expect(result.emptySetting).toBe(true);
+    expect(result.sdkOptionPresent).toBe(false);
+    expect(result.sdkValue).toBeUndefined();
+    expect(result.valueMatch).toBe(true);
+  });
+
+  it('returns readback with no debugFile option when setting is whitespace-only', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        debugFile: '   ',
+      },
+      sdk: createProbeSdk([]),
+    });
+
+    const result = await adapter.runDebugFileReadbackProbe();
+
+    expect(result.classification).toBe('readback');
+    expect(result.optionWired).toBe(true);
+    expect(result.settingValue).toBe('');
+    expect(result.emptySetting).toBe(true);
+    expect(result.sdkOptionPresent).toBe(false);
+    expect(result.sdkValue).toBeUndefined();
+    expect(result.valueMatch).toBe(true);
+  });
+
+  it('returns readback with debugFile option when setting is non-empty', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        debugFile: '/tmp/claude-debug.log',
+      },
+      sdk: createProbeSdk([]),
+    });
+
+    const result = await adapter.runDebugFileReadbackProbe();
+
+    expect(result.classification).toBe('readback');
+    expect(result.optionWired).toBe(true);
+    expect(result.settingValue).toBe('/tmp/claude-debug.log');
+    expect(result.emptySetting).toBe(false);
+    expect(result.sdkOptionPresent).toBe(true);
+    expect(result.sdkValue).toBe('/tmp/claude-debug.log');
+    expect(result.valueMatch).toBe(true);
+  });
+
+  it('returns readback with trimmed debugFile option when setting has surrounding whitespace', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        debugFile: '  /tmp/claude-debug.log  ',
+      },
+      sdk: createProbeSdk([]),
+    });
+
+    const result = await adapter.runDebugFileReadbackProbe();
+
+    expect(result.classification).toBe('readback');
+    expect(result.optionWired).toBe(true);
+    expect(result.settingValue).toBe('/tmp/claude-debug.log');
+    expect(result.emptySetting).toBe(false);
+    expect(result.sdkOptionPresent).toBe(true);
+    expect(result.sdkValue).toBe('/tmp/claude-debug.log');
+    expect(result.valueMatch).toBe(true);
+  });
+
+  it('returns fail when debugFile value does not match setting', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        debugFile: '/tmp/claude-debug.log',
+      },
+      sdk: createProbeSdk([]),
+    });
+
+    jest.spyOn(adapter as unknown as {
+      buildDiagnosticSdkOptions: (...args: unknown[]) => unknown;
+    }, 'buildDiagnosticSdkOptions').mockReturnValue({
+      debugFile: '/wrong/path.log',
+    });
+
+    const result = await adapter.runDebugFileReadbackProbe();
+
+    expect(result.classification).toBe('fail');
+    expect(result.optionWired).toBe(false);
+    expect(result.settingValue).toBe('/tmp/claude-debug.log');
+    expect(result.sdkOptionPresent).toBe(true);
+    expect(result.sdkValue).toBe('/wrong/path.log');
+    expect(result.valueMatch).toBe(false);
+    expect(result.error).toContain('debugFile');
+  });
+
+  it('returns fail when debugFile option is present but setting is empty', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        debugFile: '',
+      },
+      sdk: createProbeSdk([]),
+    });
+
+    jest.spyOn(adapter as unknown as {
+      buildDiagnosticSdkOptions: (...args: unknown[]) => unknown;
+    }, 'buildDiagnosticSdkOptions').mockReturnValue({
+      debugFile: '/unexpected/path.log',
+    });
+
+    const result = await adapter.runDebugFileReadbackProbe();
+
+    expect(result.classification).toBe('fail');
+    expect(result.optionWired).toBe(false);
+    expect(result.settingValue).toBe('');
+    expect(result.emptySetting).toBe(true);
+    expect(result.sdkOptionPresent).toBe(true);
+    expect(result.valueMatch).toBe(false);
+    expect(result.error).toContain('debugFile');
+  });
+});
+
+describe('runStrictMcpConfigReadbackProbe', () => {
+  it('returns readback with no strictMcpConfig option when setting is false', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        strictMcpConfig: false,
+      },
+      sdk: createProbeSdk([]),
+    });
+
+    const result = await adapter.runStrictMcpConfigReadbackProbe();
+
+    expect(result.classification).toBe('readback');
+    expect(result.optionWired).toBe(true);
+    expect(result.settingValue).toBe(false);
+    expect(result.sdkOptionPresent).toBe(false);
+    expect(result.valueMatch).toBe(true);
+  });
+
+  it('returns readback with strictMcpConfig option true when setting is true', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        strictMcpConfig: true,
+      },
+      sdk: createProbeSdk([]),
+    });
+
+    const result = await adapter.runStrictMcpConfigReadbackProbe();
+
+    expect(result.classification).toBe('readback');
+    expect(result.optionWired).toBe(true);
+    expect(result.settingValue).toBe(true);
+    expect(result.sdkOptionPresent).toBe(true);
+    expect(result.sdkValue).toBe(true);
+    expect(result.valueMatch).toBe(true);
+  });
+
+  it('returns fail when strictMcpConfig is false but SDK option is present', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        strictMcpConfig: false,
+      },
+      sdk: createProbeSdk([]),
+    });
+
+    jest.spyOn(adapter as unknown as {
+      buildDiagnosticSdkOptions: (...args: unknown[]) => unknown;
+    }, 'buildDiagnosticSdkOptions').mockReturnValue({
+      strictMcpConfig: true,
+    });
+
+    const result = await adapter.runStrictMcpConfigReadbackProbe();
+
+    expect(result.classification).toBe('fail');
+    expect(result.optionWired).toBe(false);
+    expect(result.settingValue).toBe(false);
+    expect(result.sdkOptionPresent).toBe(true);
+    expect(result.sdkValue).toBe(true);
+    expect(result.valueMatch).toBe(false);
+    expect(result.error).toContain('strictMcpConfig');
+  });
+
+  it('returns fail when strictMcpConfig is true but SDK option is missing', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        strictMcpConfig: true,
+      },
+      sdk: createProbeSdk([]),
+    });
+
+    jest.spyOn(adapter as unknown as {
+      buildDiagnosticSdkOptions: (...args: unknown[]) => unknown;
+    }, 'buildDiagnosticSdkOptions').mockReturnValue({
+      strictMcpConfig: undefined,
+    });
+
+    const result = await adapter.runStrictMcpConfigReadbackProbe();
+
+    expect(result.classification).toBe('fail');
+    expect(result.optionWired).toBe(false);
+    expect(result.settingValue).toBe(true);
+    expect(result.sdkOptionPresent).toBe(false);
+    expect(result.valueMatch).toBe(false);
+    expect(result.error).toContain('strictMcpConfig');
+  });
+
+  it('returns fail when strictMcpConfig is true but SDK option is false', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        strictMcpConfig: true,
+      },
+      sdk: createProbeSdk([]),
+    });
+
+    jest.spyOn(adapter as unknown as {
+      buildDiagnosticSdkOptions: (...args: unknown[]) => unknown;
+    }, 'buildDiagnosticSdkOptions').mockReturnValue({
+      strictMcpConfig: false,
+    });
+
+    const result = await adapter.runStrictMcpConfigReadbackProbe();
+
+    expect(result.classification).toBe('fail');
+    expect(result.optionWired).toBe(false);
+    expect(result.settingValue).toBe(true);
+    expect(result.sdkOptionPresent).toBe(true);
+    expect(result.sdkValue).toBe(false);
+    expect(result.valueMatch).toBe(false);
+    expect(result.error).toContain('strictMcpConfig');
+  });
+
+  it('returns fail on thrown error', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        strictMcpConfig: true,
+      },
+      sdk: createProbeSdk([]),
+    });
+
+    jest.spyOn(adapter as unknown as {
+      buildDiagnosticSdkOptions: (...args: unknown[]) => unknown;
+    }, 'buildDiagnosticSdkOptions').mockImplementation(() => {
+      throw new Error('buildDiagnosticSdkOptions threw');
+    });
+
+    const result = await adapter.runStrictMcpConfigReadbackProbe();
+
+    expect(result.classification).toBe('fail');
+    expect(result.optionWired).toBe(false);
+    expect(result.settingValue).toBe(true);
+    expect(result.sdkOptionPresent).toBe(false);
+    expect(result.valueMatch).toBe(false);
+    expect(result.error).toContain('buildDiagnosticSdkOptions threw');
+  });
+});
