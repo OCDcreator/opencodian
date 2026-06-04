@@ -975,10 +975,8 @@ export class SettingsCapabilityLabSection {
         capability: 'System Prompt',
         sdkExposed: true, // SDK Options.systemPrompt supports preset-with-append shape
         adapterWired: true, // buildClaudeCodeOptions wires systemPrompt when settings.systemPrompt is non-empty
-        runtimeProof: 'readback', // Option wiring proven: systemPrompt propagates through buildClaudeCodeOptions
-        // into SDK options as preset-with-append shape. Readback ceiling: actual prompt append behavior
-        // (whether the SDK actually appends instructions after the preset) is not independently
-        // verifiable from the plugin layer. The preset is always preserved; this is append-only.
+        runtimeProof: 'pass', // Combined evidence: readback proves the saved setting reaches the preset-with-append
+        // SDK path, and live behavior proof shows that same path influences a fresh diagnostic query.
         userSurface: 'settings', // Model & Thinking tab text area
       },
     ];
@@ -2684,26 +2682,34 @@ export class SettingsCapabilityLabSection {
       (o) => this.runCommandExecutionProof(adapter, o));
     this.addProofControl(proofControls, containerEl, 'Run Warm Startup Proof',
       (o) => this.runWarmStartupProof(adapter, o));
-    this.addProofControl(proofControls, containerEl, 'Run Stderr Diagnostic Proof',
+    this.addProofControl(proofControls, containerEl, t('settings.capabilityLab.proofs.stderr.button'),
       (o) => this.runStderrDiagnosticProof(adapter, o));
-    this.addProofControl(proofControls, containerEl, 'Run Prompt Suggestions Readback Proof',
+    this.addProofControl(proofControls, containerEl, t('settings.capabilityLab.proofs.promptSuggestions.button'),
       (o) => this.runPromptSuggestionsReadbackProof(adapter, o));
     this.addProofControl(proofControls, containerEl, 'Run System Prompt Readback Proof',
       (o) => this.runSystemPromptReadbackProof(adapter, o));
-    this.addProofControl(proofControls, containerEl, 'Run Task Budget Readback Proof',
+    this.addProofControl(proofControls, containerEl, t('settings.capabilityLab.proofs.systemPromptLive.button'),
+      (o) => this.runSystemPromptLiveProof(adapter, o));
+    this.addProofControl(proofControls, containerEl, t('settings.capabilityLab.proofs.taskBudget.button'),
       (o) => this.runTaskBudgetReadbackProof(adapter, o));
-    this.addProofControl(proofControls, containerEl, 'Run Sandbox Readback Proof',
+    this.addProofControl(proofControls, containerEl, t('settings.capabilityLab.proofs.sandbox.button'),
       (o) => this.runSandboxReadbackProof(adapter, o));
-    this.addProofControl(proofControls, containerEl, 'Run Plan Mode Instructions Readback Proof',
+    this.addProofControl(proofControls, containerEl, t('settings.capabilityLab.proofs.planModeInstructions.button'),
       (o) => this.runPlanModeInstructionsReadbackProof(adapter, o));
-    this.addProofControl(proofControls, containerEl, 'Run Tool Aliases Readback Proof',
+    this.addProofControl(proofControls, containerEl, t('settings.capabilityLab.proofs.toolAliases.button'),
       (o) => this.runToolAliasesReadbackProof(adapter, o));
-    this.addProofControl(proofControls, containerEl, 'Run Debug Readback Proof',
+    this.addProofControl(proofControls, containerEl, t('settings.capabilityLab.proofs.debug.button'),
       (o) => this.runDebugReadbackProof(adapter, o));
     this.addProofControl(proofControls, containerEl, 'Run Debug File Readback Proof',
       (o) => this.runDebugFileReadbackProof(adapter, o));
     this.addProofControl(proofControls, containerEl, 'Run Strict MCP Config Readback Proof',
       (o) => this.runStrictMcpConfigReadbackProof(adapter, o));
+    this.addProofControl(proofControls, containerEl, 'Run 1M Context Beta Readback Proof',
+      (o) => this.runContext1mBetaReadbackProof(adapter, o));
+    this.addProofControl(proofControls, containerEl, 'Run JS Runtime Readback Proof',
+      (o) => this.runJsRuntimeReadbackProof(adapter, o));
+    this.addProofControl(proofControls, containerEl, 'Run Load Timeout Readback Proof',
+      (o) => this.runLoadTimeoutReadbackProof(adapter, o));
     this.addProofControl(proofControls, containerEl, 'Run Custom Session ID Proof',
       (o) => this.runCustomSessionIdProof(adapter, o));
     this.addProofControl(proofControls, containerEl, t('settings.capabilityLab.proofs.continue.button'),
@@ -5461,24 +5467,31 @@ export class SettingsCapabilityLabSection {
     outputEl: HTMLElement,
   ): Promise<void> {
     outputEl.empty();
-    outputEl.createEl('p', { text: 'Running stderr diagnostic probe (callback wiring readback)…' });
+    outputEl.createEl('p', { text: t('settings.capabilityLab.proofs.stderr.running') });
 
     try {
       const result = await adapter.runStderrDiagnosticProbe();
 
       outputEl.empty();
-      outputEl.createEl('h5', { text: 'Stderr Diagnostic Proof' });
+      outputEl.createEl('h5', { text: t('settings.capabilityLab.proofs.stderr.title') });
       outputEl.createEl('p', {
         cls: 'opencodian-capability-lab-hint',
-        text: '⚠️ Diagnostic readback: stderr callback wiring proven. Actual stderr emission depends on SDK/CLI/runtime and may be absent. All text is sanitized and truncated. No stable raw-log surface.',
+        text: t('settings.capabilityLab.proofs.stderr.boundary'),
+      });
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: t('settings.capabilityLab.proofs.stderr.isolatedBoundary'),
       });
 
       if (result.classification === 'readback') {
         outputEl.createEl('p', {
           cls: 'opencodian-capability-lab-hint',
           text: (result.chunksReceived ?? 0) > 0
-            ? `✓ Readback verified — not behavior verified. Callback wired → received ${result.chunksReceived} chunk(s), ${result.totalBytes} byte(s). Preview sanitized/truncated below.`
-            : `✓ Readback verified — not behavior verified. Callback wired — no stderr observed.`,
+            ? t('settings.capabilityLab.proofs.stderr.readbackObserved', {
+              chunks: result.chunksReceived ?? 0,
+              totalBytes: result.totalBytes ?? 0,
+            })
+            : t('settings.capabilityLab.proofs.stderr.readbackSilent'),
         });
         if (result.sanitizedPreview && result.sanitizedPreview !== 'Callback wired — no stderr observed') {
           outputEl.createEl('pre', {
@@ -5490,7 +5503,9 @@ export class SettingsCapabilityLabSection {
       } else {
         outputEl.createEl('p', {
           cls: 'opencodian-capability-lab-error',
-          text: `✗ Stderr diagnostic probe failed: ${result.error ?? 'unknown error'}`,
+          text: t('settings.capabilityLab.proofs.stderr.fail', {
+            error: result.error ?? t('settings.capabilityLab.proofs.stderr.defaultError'),
+          }),
         });
         this.updateRuntimeProof('Stderr Diagnostic', 'fail', outputEl);
       }
@@ -5498,7 +5513,9 @@ export class SettingsCapabilityLabSection {
       outputEl.empty();
       outputEl.createEl('p', {
         cls: 'opencodian-capability-lab-error',
-        text: `Stderr diagnostic proof failed: ${err instanceof Error ? err.message : String(err)}`,
+        text: t('settings.capabilityLab.proofs.stderr.threw', {
+          error: err instanceof Error ? err.message : String(err),
+        }),
       });
       this.updateRuntimeProof('Stderr Diagnostic', 'fail', outputEl);
     }
@@ -5509,54 +5526,82 @@ export class SettingsCapabilityLabSection {
     outputEl: HTMLElement,
   ): Promise<void> {
     outputEl.empty();
-    outputEl.createEl('p', { text: 'Running prompt suggestions readback probe…' });
+    outputEl.createEl('p', { text: t('settings.capabilityLab.proofs.promptSuggestions.running') });
 
     try {
       const result = await adapter.runPromptSuggestionsReadbackProbe();
 
       outputEl.empty();
-      outputEl.createEl('h5', { text: 'Prompt Suggestions Readback Proof' });
+      outputEl.createEl('h5', { text: t('settings.capabilityLab.proofs.promptSuggestions.title') });
       outputEl.createEl('p', {
         cls: 'opencodian-capability-lab-hint',
-        text: '⚠️ Diagnostic readback: settings→SDK option mapping verified. Actual prompt suggestion emission depends on SDK/CLI version, effective model selection, and runtime conditions. The plugin layer cannot independently verify that the SDK emits prompt suggestions.',
+        text: t('settings.capabilityLab.proofs.promptSuggestions.boundary'),
       });
 
       outputEl.createEl('p', {
         cls: 'opencodian-capability-lab-hint',
-        text: `Option wired: ${result.optionWired ? '✓ yes' : '✗ no'}`,
+        text: t('settings.capabilityLab.proofs.promptSuggestions.optionWired', {
+          status: result.optionWired
+            ? t('settings.capabilityLab.proofs.promptSuggestions.status.yes')
+            : t('settings.capabilityLab.proofs.promptSuggestions.status.no'),
+        }),
       });
       outputEl.createEl('p', {
         cls: 'opencodian-capability-lab-hint',
-        text: `Option value: ${result.optionValue ? 'enabled' : 'disabled'}`,
+        text: t('settings.capabilityLab.proofs.promptSuggestions.optionValue', {
+          value: result.optionValue
+            ? t('settings.capabilityLab.proofs.promptSuggestions.status.enabled')
+            : t('settings.capabilityLab.proofs.promptSuggestions.status.disabled'),
+        }),
       });
       outputEl.createEl('p', {
         cls: 'opencodian-capability-lab-hint',
-        text: `SDK option present: ${result.sdkOptionPresent ? '✓ yes' : '✗ no'}`,
+        text: t('settings.capabilityLab.proofs.promptSuggestions.sdkOptionPresent', {
+          status: result.sdkOptionPresent
+            ? t('settings.capabilityLab.proofs.promptSuggestions.status.yes')
+            : t('settings.capabilityLab.proofs.promptSuggestions.status.no'),
+        }),
       });
       outputEl.createEl('p', {
         cls: 'opencodian-capability-lab-hint',
-        text: `Explicit model selection: ${
-          result.modelState === 'claude'
-            ? 'Claude'
+        text: t('settings.capabilityLab.proofs.promptSuggestions.modelState', {
+          state: result.modelState === 'claude'
+            ? t('settings.capabilityLab.proofs.promptSuggestions.modelState.claude')
             : result.modelState === 'non-claude'
-              ? 'Non-Claude'
-              : 'Unknown (using SDK default / inherited model)'
-        }`,
+              ? t('settings.capabilityLab.proofs.promptSuggestions.modelState.nonClaude')
+              : t('settings.capabilityLab.proofs.promptSuggestions.modelState.unknown'),
+        }),
       });
 
       if (result.blockerNote) {
         outputEl.createEl('p', {
           cls: 'opencodian-capability-lab-warning',
-          text: `⚠️ ${result.blockerNote}`,
+          text: t('settings.capabilityLab.proofs.promptSuggestions.blockerNote', {
+            note: result.blockerNote,
+          }),
         });
       }
 
       if (result.classification === 'readback') {
+        outputEl.createEl('p', {
+          cls: 'opencodian-capability-lab-hint',
+          text: t('settings.capabilityLab.proofs.promptSuggestions.readback'),
+        });
+        outputEl.createEl('p', {
+          cls: 'opencodian-capability-lab-hint',
+          text: t('settings.capabilityLab.proofs.promptSuggestions.lifecycleBoundary'),
+        });
+        outputEl.createEl('p', {
+          cls: 'opencodian-capability-lab-hint',
+          text: t('settings.capabilityLab.proofs.promptSuggestions.uiLifecycleEvidence'),
+        });
         this.updateRuntimeProof('Prompt Suggestions', 'readback', outputEl);
       } else {
         outputEl.createEl('p', {
           cls: 'opencodian-capability-lab-error',
-          text: `✗ Prompt suggestions readback probe failed: ${result.error ?? 'unknown error'}`,
+          text: t('settings.capabilityLab.proofs.promptSuggestions.fail', {
+            error: result.error ?? t('settings.capabilityLab.proofs.promptSuggestions.defaultError'),
+          }),
         });
         this.updateRuntimeProof('Prompt Suggestions', 'fail', outputEl);
       }
@@ -5564,7 +5609,9 @@ export class SettingsCapabilityLabSection {
       outputEl.empty();
       outputEl.createEl('p', {
         cls: 'opencodian-capability-lab-error',
-        text: `Prompt suggestions readback proof failed: ${err instanceof Error ? err.message : String(err)}`,
+        text: t('settings.capabilityLab.proofs.promptSuggestions.threw', {
+          error: err instanceof Error ? err.message : String(err),
+        }),
       });
       this.updateRuntimeProof('Prompt Suggestions', 'fail', outputEl);
     }
@@ -5634,52 +5681,155 @@ export class SettingsCapabilityLabSection {
     }
   }
 
+  private async runSystemPromptLiveProof(
+    adapter: ClaudeCodeAdapter,
+    outputEl: HTMLElement,
+  ): Promise<void> {
+    outputEl.empty();
+    outputEl.createEl('p', { text: t('settings.capabilityLab.proofs.systemPromptLive.running') });
+
+    try {
+      const result = await adapter.runSystemPromptLiveProbe();
+
+      outputEl.empty();
+      outputEl.createEl('h5', { text: t('settings.capabilityLab.proofs.systemPromptLive.title') });
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: t('settings.capabilityLab.proofs.systemPromptLive.behaviorBoundary'),
+      });
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: t('settings.capabilityLab.proofs.systemPromptLive.mappingBoundary'),
+      });
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: t('settings.capabilityLab.proofs.systemPromptLive.lifecycleBoundary'),
+      });
+
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: t('settings.capabilityLab.proofs.systemPromptLive.nonce', {
+          nonce: result.nonce,
+        }),
+      });
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: t('settings.capabilityLab.proofs.systemPromptLive.nonceRecalled', {
+          status: result.nonceRecalled
+            ? t('settings.capabilityLab.proofs.systemPromptLive.status.yes')
+            : t('settings.capabilityLab.proofs.systemPromptLive.status.no'),
+        }),
+      });
+      if (result.responsePreview) {
+        outputEl.createEl('p', {
+          cls: 'opencodian-capability-lab-hint',
+          text: t('settings.capabilityLab.proofs.systemPromptLive.responsePreview', {
+            preview: result.responsePreview,
+          }),
+        });
+      }
+
+      if (result.classification === 'pass') {
+        outputEl.createEl('p', {
+          cls: 'opencodian-capability-lab-hint',
+          text: t('settings.capabilityLab.proofs.systemPromptLive.pass'),
+        });
+        this.updateRuntimeProof('System Prompt', 'pass', outputEl);
+      } else {
+        outputEl.createEl('p', {
+          cls: 'opencodian-capability-lab-error',
+          text: t('settings.capabilityLab.proofs.systemPromptLive.fail', {
+            error: result.error ?? t('settings.capabilityLab.proofs.systemPromptLive.defaultError'),
+          }),
+        });
+        this.updateRuntimeProof('System Prompt', 'fail', outputEl);
+      }
+    } catch (err) {
+      outputEl.empty();
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-error',
+        text: t('settings.capabilityLab.proofs.systemPromptLive.threw', {
+          error: err instanceof Error ? err.message : String(err),
+        }),
+      });
+      this.updateRuntimeProof('System Prompt', 'fail', outputEl);
+    }
+  }
+
   private async runTaskBudgetReadbackProof(
     adapter: ClaudeCodeAdapter,
     outputEl: HTMLElement,
   ): Promise<void> {
     outputEl.empty();
-    outputEl.createEl('p', { text: 'Running task budget readback probe…' });
+    outputEl.createEl('p', { text: t('settings.capabilityLab.proofs.taskBudget.running') });
 
     try {
       const result = await adapter.runTaskBudgetReadbackProbe();
 
       outputEl.empty();
-      outputEl.createEl('h5', { text: 'Task Budget Readback Proof' });
+      outputEl.createEl('h5', { text: t('settings.capabilityLab.proofs.taskBudget.title') });
       outputEl.createEl('p', {
         cls: 'opencodian-capability-lab-hint',
-        text: '⚠️ Diagnostic readback only: settings→SDK option mapping verified. Actual token-budget enforcement is the SDK/API\'s internal claim, not independently verifiable from the plugin layer. @alpha — applies to next query / restarted session only.',
+        text: t('settings.capabilityLab.proofs.taskBudget.boundary'),
+      });
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: t('settings.capabilityLab.proofs.taskBudget.lifecycleBoundary'),
       });
 
       outputEl.createEl('p', {
         cls: 'opencodian-capability-lab-hint',
-        text: `Option wired: ${result.optionWired ? '✓ yes' : '✗ no'}`,
+        text: t('settings.capabilityLab.proofs.taskBudget.optionWired', {
+          status: result.optionWired
+            ? t('settings.capabilityLab.proofs.taskBudget.status.yes')
+            : t('settings.capabilityLab.proofs.taskBudget.status.no'),
+        }),
       });
       outputEl.createEl('p', {
         cls: 'opencodian-capability-lab-hint',
-        text: `Setting value: ${result.settingValue === null ? 'null (no budget)' : String(result.settingValue)}`,
+        text: t('settings.capabilityLab.proofs.taskBudget.settingValue', {
+          value: result.settingValue === null
+            ? t('settings.capabilityLab.proofs.taskBudget.settingValueNull')
+            : String(result.settingValue),
+        }),
       });
       outputEl.createEl('p', {
         cls: 'opencodian-capability-lab-hint',
-        text: `SDK option present: ${result.sdkOptionPresent ? '✓ yes' : '✗ no'}`,
+        text: t('settings.capabilityLab.proofs.taskBudget.sdkOptionPresent', {
+          status: result.sdkOptionPresent
+            ? t('settings.capabilityLab.proofs.taskBudget.status.yes')
+            : t('settings.capabilityLab.proofs.taskBudget.status.no'),
+        }),
       });
       if (result.sdkTotalValue !== undefined) {
         outputEl.createEl('p', {
           cls: 'opencodian-capability-lab-hint',
-          text: `SDK total value: ${String(result.sdkTotalValue)}`,
+          text: t('settings.capabilityLab.proofs.taskBudget.sdkTotalValue', {
+            value: String(result.sdkTotalValue),
+          }),
         });
       }
       outputEl.createEl('p', {
         cls: 'opencodian-capability-lab-hint',
-        text: `Total match: ${result.totalMatch ? '✓ yes' : '✗ no'}`,
+        text: t('settings.capabilityLab.proofs.taskBudget.totalMatch', {
+          status: result.totalMatch
+            ? t('settings.capabilityLab.proofs.taskBudget.status.yes')
+            : t('settings.capabilityLab.proofs.taskBudget.status.no'),
+        }),
       });
 
       if (result.classification === 'readback') {
+        outputEl.createEl('p', {
+          cls: 'opencodian-capability-lab-hint',
+          text: t('settings.capabilityLab.proofs.taskBudget.readback'),
+        });
         this.updateRuntimeProof('Task Budget', 'readback', outputEl);
       } else {
         outputEl.createEl('p', {
           cls: 'opencodian-capability-lab-error',
-          text: `✗ Task budget readback probe failed: ${result.error ?? 'unknown error'}`,
+          text: t('settings.capabilityLab.proofs.taskBudget.fail', {
+            error: result.error ?? t('settings.capabilityLab.proofs.taskBudget.defaultError'),
+          }),
         });
         this.updateRuntimeProof('Task Budget', 'fail', outputEl);
       }
@@ -5687,7 +5837,9 @@ export class SettingsCapabilityLabSection {
       outputEl.empty();
       outputEl.createEl('p', {
         cls: 'opencodian-capability-lab-error',
-        text: `Task budget readback proof failed: ${err instanceof Error ? err.message : String(err)}`,
+        text: t('settings.capabilityLab.proofs.taskBudget.threw', {
+          error: err instanceof Error ? err.message : String(err),
+        }),
       });
       this.updateRuntimeProof('Task Budget', 'fail', outputEl);
     }
@@ -5698,75 +5850,129 @@ export class SettingsCapabilityLabSection {
     outputEl: HTMLElement,
   ): Promise<void> {
     outputEl.empty();
-    outputEl.createEl('p', { text: 'Running sandbox readback probe…' });
+    outputEl.createEl('p', { text: t('settings.capabilityLab.proofs.sandbox.running') });
 
     try {
       const result = await adapter.runSandboxReadbackProbe();
 
       outputEl.empty();
-      outputEl.createEl('h5', { text: 'Sandbox Readback Proof' });
+      outputEl.createEl('h5', { text: t('settings.capabilityLab.proofs.sandbox.title') });
       outputEl.createEl('p', {
         cls: 'opencodian-capability-lab-hint',
-        text: '⚠️ Diagnostic readback only: settings→SDK option mapping verified. Actual OS-level sandbox enforcement (process isolation, bubblewrap/seccomp) is the SDK/CLI binary\'s internal claim, not independently verifiable from the plugin layer. Applies to next query / restarted session only.',
+        text: t('settings.capabilityLab.proofs.sandbox.boundary'),
+      });
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: t('settings.capabilityLab.proofs.sandbox.lifecycleBoundary'),
       });
 
       outputEl.createEl('p', {
         cls: 'opencodian-capability-lab-hint',
-        text: `Option wired: ${result.optionWired ? '✓ yes' : '✗ no'}`,
+        text: t('settings.capabilityLab.proofs.sandbox.optionWired', {
+          status: result.optionWired
+            ? t('settings.capabilityLab.proofs.sandbox.status.yes')
+            : t('settings.capabilityLab.proofs.sandbox.status.no'),
+        }),
       });
       outputEl.createEl('p', {
         cls: 'opencodian-capability-lab-hint',
-        text: `Setting enabled: ${result.settingEnabled ? 'yes' : 'no'}`,
+        text: t('settings.capabilityLab.proofs.sandbox.settingEnabled', {
+          status: result.settingEnabled
+            ? t('settings.capabilityLab.proofs.sandbox.status.yes')
+            : t('settings.capabilityLab.proofs.sandbox.status.no'),
+        }),
       });
       outputEl.createEl('p', {
         cls: 'opencodian-capability-lab-hint',
-        text: `Setting failIfUnavailable: ${result.settingFailIfUnavailable ? 'yes' : 'no'}`,
+        text: t('settings.capabilityLab.proofs.sandbox.settingFailIfUnavailable', {
+          status: result.settingFailIfUnavailable
+            ? t('settings.capabilityLab.proofs.sandbox.status.yes')
+            : t('settings.capabilityLab.proofs.sandbox.status.no'),
+        }),
       });
       outputEl.createEl('p', {
         cls: 'opencodian-capability-lab-hint',
-        text: `Setting autoAllowBashIfSandboxed: ${result.settingAutoAllowBashIfSandboxed ? 'yes' : 'no'}`,
+        text: t('settings.capabilityLab.proofs.sandbox.settingAutoAllowBashIfSandboxed', {
+          status: result.settingAutoAllowBashIfSandboxed
+            ? t('settings.capabilityLab.proofs.sandbox.status.yes')
+            : t('settings.capabilityLab.proofs.sandbox.status.no'),
+        }),
       });
       outputEl.createEl('p', {
         cls: 'opencodian-capability-lab-hint',
-        text: `SDK option present: ${result.sdkOptionPresent ? '✓ yes' : '✗ no'}`,
+        text: t('settings.capabilityLab.proofs.sandbox.sdkOptionPresent', {
+          status: result.sdkOptionPresent
+            ? t('settings.capabilityLab.proofs.sandbox.status.yes')
+            : t('settings.capabilityLab.proofs.sandbox.status.no'),
+        }),
       });
       if (result.sdkEnabled !== undefined) {
         outputEl.createEl('p', {
           cls: 'opencodian-capability-lab-hint',
-          text: `SDK enabled: ${result.sdkEnabled ? 'yes' : 'no'}`,
+          text: t('settings.capabilityLab.proofs.sandbox.sdkEnabled', {
+            status: result.sdkEnabled
+              ? t('settings.capabilityLab.proofs.sandbox.status.yes')
+              : t('settings.capabilityLab.proofs.sandbox.status.no'),
+          }),
         });
       }
       if (result.sdkFailIfUnavailable !== undefined) {
         outputEl.createEl('p', {
           cls: 'opencodian-capability-lab-hint',
-          text: `SDK failIfUnavailable: ${result.sdkFailIfUnavailable ? 'yes' : 'no'}`,
+          text: t('settings.capabilityLab.proofs.sandbox.sdkFailIfUnavailable', {
+            status: result.sdkFailIfUnavailable
+              ? t('settings.capabilityLab.proofs.sandbox.status.yes')
+              : t('settings.capabilityLab.proofs.sandbox.status.no'),
+          }),
         });
       }
       if (result.sdkAutoAllowBashIfSandboxed !== undefined) {
         outputEl.createEl('p', {
           cls: 'opencodian-capability-lab-hint',
-          text: `SDK autoAllowBashIfSandboxed: ${result.sdkAutoAllowBashIfSandboxed ? 'yes' : 'no'}`,
+          text: t('settings.capabilityLab.proofs.sandbox.sdkAutoAllowBashIfSandboxed', {
+            status: result.sdkAutoAllowBashIfSandboxed
+              ? t('settings.capabilityLab.proofs.sandbox.status.yes')
+              : t('settings.capabilityLab.proofs.sandbox.status.no'),
+          }),
         });
       }
       outputEl.createEl('p', {
         cls: 'opencodian-capability-lab-hint',
-        text: `enabledMatch: ${result.enabledMatch ? '✓ yes' : '✗ no'}`,
+        text: t('settings.capabilityLab.proofs.sandbox.enabledMatch', {
+          status: result.enabledMatch
+            ? t('settings.capabilityLab.proofs.sandbox.status.yes')
+            : t('settings.capabilityLab.proofs.sandbox.status.no'),
+        }),
       });
       outputEl.createEl('p', {
         cls: 'opencodian-capability-lab-hint',
-        text: `failIfUnavailableMatch: ${result.failIfUnavailableMatch ? '✓ yes' : '✗ no'}`,
+        text: t('settings.capabilityLab.proofs.sandbox.failIfUnavailableMatch', {
+          status: result.failIfUnavailableMatch
+            ? t('settings.capabilityLab.proofs.sandbox.status.yes')
+            : t('settings.capabilityLab.proofs.sandbox.status.no'),
+        }),
       });
       outputEl.createEl('p', {
         cls: 'opencodian-capability-lab-hint',
-        text: `autoAllowBashIfSandboxedMatch: ${result.autoAllowBashIfSandboxedMatch ? '✓ yes' : '✗ no'}`,
+        text: t('settings.capabilityLab.proofs.sandbox.autoAllowBashIfSandboxedMatch', {
+          status: result.autoAllowBashIfSandboxedMatch
+            ? t('settings.capabilityLab.proofs.sandbox.status.yes')
+            : t('settings.capabilityLab.proofs.sandbox.status.no'),
+        }),
       });
 
       if (result.classification === 'readback') {
+        outputEl.createEl('p', {
+          cls: 'opencodian-capability-lab-hint',
+          text: t('settings.capabilityLab.proofs.sandbox.readback'),
+        });
         this.updateRuntimeProof('Sandbox', 'readback', outputEl);
       } else {
         outputEl.createEl('p', {
           cls: 'opencodian-capability-lab-error',
-          text: `✗ Sandbox readback probe failed: ${result.error ?? 'unknown error'}`,
+          text: t('settings.capabilityLab.proofs.sandbox.fail', {
+            error: result.error ?? t('settings.capabilityLab.proofs.sandbox.defaultError'),
+          }),
         });
         this.updateRuntimeProof('Sandbox', 'fail', outputEl);
       }
@@ -5774,7 +5980,9 @@ export class SettingsCapabilityLabSection {
       outputEl.empty();
       outputEl.createEl('p', {
         cls: 'opencodian-capability-lab-error',
-        text: `Sandbox readback proof failed: ${err instanceof Error ? err.message : String(err)}`,
+        text: t('settings.capabilityLab.proofs.sandbox.threw', {
+          error: err instanceof Error ? err.message : String(err),
+        }),
       });
       this.updateRuntimeProof('Sandbox', 'fail', outputEl);
     }
@@ -5785,49 +5993,72 @@ export class SettingsCapabilityLabSection {
     outputEl: HTMLElement,
   ): Promise<void> {
     outputEl.empty();
-    outputEl.createEl('p', { text: 'Running plan mode instructions readback probe…' });
+    outputEl.createEl('p', { text: t('settings.capabilityLab.proofs.planModeInstructions.running') });
 
     try {
       const result = await adapter.runPlanModeInstructionsReadbackProbe();
 
       outputEl.empty();
-      outputEl.createEl('h5', { text: 'Plan Mode Instructions Readback Proof' });
+      outputEl.createEl('h5', { text: t('settings.capabilityLab.proofs.planModeInstructions.title') });
       outputEl.createEl('p', {
         cls: 'opencodian-capability-lab-hint',
-        text: '⚠️ Diagnostic readback only: settings→SDK option mapping verified. Actual plan-mode behavior (read-only preamble + ExitPlanMode protocol footer enforcement) is the SDK\'s internal claim, not independently verifiable from the plugin layer. The SDK is expected to apply these instructions only in Plan mode. Applies to next query / restarted session only.',
+        text: [
+          t('settings.capabilityLab.proofs.planModeInstructions.boundary'),
+          t('settings.capabilityLab.proofs.planModeInstructions.lifecycleBoundary'),
+        ].join(' '),
       });
 
       outputEl.createEl('p', {
         cls: 'opencodian-capability-lab-hint',
-        text: `Option wired: ${result.optionWired ? '✓ yes' : '✗ no'}`,
+        text: t('settings.capabilityLab.proofs.planModeInstructions.optionWired', {
+          status: result.optionWired
+            ? t('settings.capabilityLab.proofs.planModeInstructions.status.yes')
+            : t('settings.capabilityLab.proofs.planModeInstructions.status.no'),
+        }),
       });
       outputEl.createEl('p', {
         cls: 'opencodian-capability-lab-hint',
-        text: `Permission mode: ${result.permissionMode}`,
+        text: t('settings.capabilityLab.proofs.planModeInstructions.permissionMode', {
+          mode: String(result.permissionMode),
+        }),
       });
       outputEl.createEl('p', {
         cls: 'opencodian-capability-lab-hint',
-        text: `Setting value: ${result.settingValue.length > 0 ? `'${result.settingValue}'` : '(empty)'}`,
+        text: t('settings.capabilityLab.proofs.planModeInstructions.settingValue', {
+          value: result.settingValue.length > 0
+            ? `'${result.settingValue}'`
+            : t('settings.capabilityLab.proofs.planModeInstructions.settingValueEmpty'),
+        }),
       });
       outputEl.createEl('p', {
         cls: 'opencodian-capability-lab-hint',
-        text: `SDK option present: ${result.sdkOptionPresent ? '✓ yes' : '✗ no'}`,
+        text: t('settings.capabilityLab.proofs.planModeInstructions.sdkOptionPresent', {
+          status: result.sdkOptionPresent
+            ? t('settings.capabilityLab.proofs.planModeInstructions.status.yes')
+            : t('settings.capabilityLab.proofs.planModeInstructions.status.no'),
+        }),
       });
       if (result.sdkValue !== undefined) {
         outputEl.createEl('p', {
           cls: 'opencodian-capability-lab-hint',
-          text: `SDK value: '${result.sdkValue}'`,
+          text: t('settings.capabilityLab.proofs.planModeInstructions.sdkValue', {
+            value: String(result.sdkValue),
+          }),
         });
       }
       if (result.permissionMode !== 'plan' && result.settingValue.length > 0 && result.sdkOptionPresent) {
         outputEl.createEl('p', {
           cls: 'opencodian-capability-lab-hint',
-          text: 'Current builder behavior: the plugin still wires a non-empty setting into SDK options outside Plan mode. Effective behavior still depends on switching Permission mode to Plan.',
+          text: t('settings.capabilityLab.proofs.planModeInstructions.builderWiringNuance'),
         });
       }
       outputEl.createEl('p', {
         cls: 'opencodian-capability-lab-hint',
-        text: `Value match: ${result.valueMatch ? '✓ yes' : '✗ no'}`,
+        text: t('settings.capabilityLab.proofs.planModeInstructions.valueMatch', {
+          status: result.valueMatch
+            ? t('settings.capabilityLab.proofs.planModeInstructions.status.yes')
+            : t('settings.capabilityLab.proofs.planModeInstructions.status.no'),
+        }),
       });
 
       if (result.classification === 'readback') {
@@ -5835,7 +6066,9 @@ export class SettingsCapabilityLabSection {
       } else {
         outputEl.createEl('p', {
           cls: 'opencodian-capability-lab-error',
-          text: `✗ Plan mode instructions readback probe failed: ${result.error ?? 'unknown error'}`,
+          text: t('settings.capabilityLab.proofs.planModeInstructions.fail', {
+            error: result.error ?? t('settings.capabilityLab.proofs.planModeInstructions.defaultError'),
+          }),
         });
         this.updateRuntimeProof('Plan Mode Instructions', 'fail', outputEl);
       }
@@ -5843,7 +6076,9 @@ export class SettingsCapabilityLabSection {
       outputEl.empty();
       outputEl.createEl('p', {
         cls: 'opencodian-capability-lab-error',
-        text: `Plan mode instructions readback proof failed: ${err instanceof Error ? err.message : String(err)}`,
+        text: t('settings.capabilityLab.proofs.planModeInstructions.threw', {
+          error: err instanceof Error ? err.message : String(err),
+        }),
       });
       this.updateRuntimeProof('Plan Mode Instructions', 'fail', outputEl);
     }
@@ -5854,51 +6089,83 @@ export class SettingsCapabilityLabSection {
     outputEl: HTMLElement,
   ): Promise<void> {
     outputEl.empty();
-    outputEl.createEl('p', { text: 'Running tool aliases readback probe…' });
+    outputEl.createEl('p', { text: t('settings.capabilityLab.proofs.toolAliases.running') });
 
     try {
       const result = await adapter.runToolAliasesReadbackProbe();
 
       outputEl.empty();
-      outputEl.createEl('h5', { text: 'Tool Aliases Readback Proof' });
+      outputEl.createEl('h5', { text: t('settings.capabilityLab.proofs.toolAliases.title') });
       outputEl.createEl('p', {
         cls: 'opencodian-capability-lab-hint',
-        text: '⚠️ Diagnostic readback only: settings→SDK option mapping verified. Actual alias resolution behavior (model-emitted tool name remapping before tool resolution) is the SDK/CLI binary\'s internal claim, not independently verifiable from the plugin layer. Applies to the next query or restarted session only. Active sessions do not update live.',
+        text: t('settings.capabilityLab.proofs.toolAliases.boundary'),
+      });
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: t('settings.capabilityLab.proofs.toolAliases.lifecycleBoundary'),
       });
 
       outputEl.createEl('p', {
         cls: 'opencodian-capability-lab-hint',
-        text: `Option wired: ${result.optionWired ? '✓ yes' : '✗ no'}`,
+        text: t('settings.capabilityLab.proofs.toolAliases.optionWired', {
+          status: result.optionWired
+            ? t('settings.capabilityLab.proofs.toolAliases.status.yes')
+            : t('settings.capabilityLab.proofs.toolAliases.status.no'),
+        }),
       });
       outputEl.createEl('p', {
         cls: 'opencodian-capability-lab-hint',
-        text: `Setting empty: ${result.settingEmpty ? 'yes' : 'no'}`,
+        text: t('settings.capabilityLab.proofs.toolAliases.settingEmpty', {
+          status: result.settingEmpty
+            ? t('settings.capabilityLab.proofs.toolAliases.status.yes')
+            : t('settings.capabilityLab.proofs.toolAliases.status.no'),
+        }),
       });
       outputEl.createEl('p', {
         cls: 'opencodian-capability-lab-hint',
-        text: `SDK option present: ${result.sdkOptionPresent ? '✓ yes' : '✗ no'}`,
+        text: t('settings.capabilityLab.proofs.toolAliases.sdkOptionPresent', {
+          status: result.sdkOptionPresent
+            ? t('settings.capabilityLab.proofs.toolAliases.status.yes')
+            : t('settings.capabilityLab.proofs.toolAliases.status.no'),
+        }),
       });
       if (result.sdkEntryCount !== undefined) {
         outputEl.createEl('p', {
           cls: 'opencodian-capability-lab-hint',
-          text: `SDK entry count: ${result.sdkEntryCount}`,
+          text: t('settings.capabilityLab.proofs.toolAliases.sdkEntryCount', {
+            count: result.sdkEntryCount,
+          }),
         });
       }
       outputEl.createEl('p', {
         cls: 'opencodian-capability-lab-hint',
-        text: `Defensive copy preserved: ${result.defensiveCopyPreserved ? '✓ yes' : '✗ no'}`,
+        text: t('settings.capabilityLab.proofs.toolAliases.defensiveCopyPreserved', {
+          status: result.defensiveCopyPreserved
+            ? t('settings.capabilityLab.proofs.toolAliases.status.yes')
+            : t('settings.capabilityLab.proofs.toolAliases.status.no'),
+        }),
       });
       outputEl.createEl('p', {
         cls: 'opencodian-capability-lab-hint',
-        text: `Entries match: ${result.entriesMatch ? '✓ yes' : '✗ no'}`,
+        text: t('settings.capabilityLab.proofs.toolAliases.entriesMatch', {
+          status: result.entriesMatch
+            ? t('settings.capabilityLab.proofs.toolAliases.status.yes')
+            : t('settings.capabilityLab.proofs.toolAliases.status.no'),
+        }),
       });
 
       if (result.classification === 'readback') {
+        outputEl.createEl('p', {
+          cls: 'opencodian-capability-lab-hint',
+          text: t('settings.capabilityLab.proofs.toolAliases.readback'),
+        });
         this.updateRuntimeProof('Tool Aliases', 'readback', outputEl);
       } else {
         outputEl.createEl('p', {
           cls: 'opencodian-capability-lab-error',
-          text: `✗ Tool aliases readback probe failed: ${result.error ?? 'unknown error'}`,
+          text: t('settings.capabilityLab.proofs.toolAliases.fail', {
+            error: result.error ?? t('settings.capabilityLab.proofs.toolAliases.defaultError'),
+          }),
         });
         this.updateRuntimeProof('Tool Aliases', 'fail', outputEl);
       }
@@ -5906,7 +6173,9 @@ export class SettingsCapabilityLabSection {
       outputEl.empty();
       outputEl.createEl('p', {
         cls: 'opencodian-capability-lab-error',
-        text: `Tool aliases readback proof failed: ${err instanceof Error ? err.message : String(err)}`,
+        text: t('settings.capabilityLab.proofs.toolAliases.threw', {
+          error: err instanceof Error ? err.message : String(err),
+        }),
       });
       this.updateRuntimeProof('Tool Aliases', 'fail', outputEl);
     }
@@ -5917,16 +6186,103 @@ export class SettingsCapabilityLabSection {
     outputEl: HTMLElement,
   ): Promise<void> {
     outputEl.empty();
-    outputEl.createEl('p', { text: 'Running debug readback probe…' });
+    outputEl.createEl('p', { text: t('settings.capabilityLab.proofs.debug.running') });
 
     try {
       const result = await adapter.runDebugReadbackProbe();
 
       outputEl.empty();
-      outputEl.createEl('h5', { text: 'Debug Readback Proof' });
+      outputEl.createEl('h5', { text: t('settings.capabilityLab.proofs.debug.title') });
       outputEl.createEl('p', {
         cls: 'opencodian-capability-lab-hint',
-        text: '⚠️ Diagnostic readback only: verifies settings→SDK option mapping only. Actual CLI debug log emission is not independently verified from the plugin layer — the plugin passes the option, but whether the CLI binary actually produces debug output depends on the SDK/CLI version and runtime conditions. Applies to the next query or restarted session only. Active sessions do not update live. debugFile is a separate seam; this proof covers only the debug toggle wiring.',
+        text: t('settings.capabilityLab.proofs.debug.boundary'),
+      });
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: t('settings.capabilityLab.proofs.debug.lifecycleBoundary'),
+      });
+
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: t('settings.capabilityLab.proofs.debug.optionWired', {
+          status: result.optionWired
+            ? t('settings.capabilityLab.proofs.debug.status.yes')
+            : t('settings.capabilityLab.proofs.debug.status.no'),
+        }),
+      });
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: t('settings.capabilityLab.proofs.debug.settingValue', {
+          value: result.settingValue ? 'true' : 'false',
+        }),
+      });
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: t('settings.capabilityLab.proofs.debug.sdkOptionPresent', {
+          status: result.sdkOptionPresent
+            ? t('settings.capabilityLab.proofs.debug.status.yes')
+            : t('settings.capabilityLab.proofs.debug.status.no'),
+        }),
+      });
+      if (result.sdkValue !== undefined) {
+        outputEl.createEl('p', {
+          cls: 'opencodian-capability-lab-hint',
+          text: t('settings.capabilityLab.proofs.debug.sdkValue', {
+            value: result.sdkValue ? 'true' : 'false',
+          }),
+        });
+      }
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: t('settings.capabilityLab.proofs.debug.valueMatch', {
+          status: result.valueMatch
+            ? t('settings.capabilityLab.proofs.debug.status.yes')
+            : t('settings.capabilityLab.proofs.debug.status.no'),
+        }),
+      });
+
+      if (result.classification === 'readback') {
+        outputEl.createEl('p', {
+          cls: 'opencodian-capability-lab-hint',
+          text: t('settings.capabilityLab.proofs.debug.readback'),
+        });
+        this.updateRuntimeProof('Debug', 'readback', outputEl);
+      } else {
+        outputEl.createEl('p', {
+          cls: 'opencodian-capability-lab-error',
+          text: t('settings.capabilityLab.proofs.debug.fail', {
+            error: result.error ?? t('settings.capabilityLab.proofs.debug.defaultError'),
+          }),
+        });
+        this.updateRuntimeProof('Debug', 'fail', outputEl);
+      }
+    } catch (err) {
+      outputEl.empty();
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-error',
+        text: t('settings.capabilityLab.proofs.debug.threw', {
+          error: err instanceof Error ? err.message : String(err),
+        }),
+      });
+      this.updateRuntimeProof('Debug', 'fail', outputEl);
+    }
+  }
+
+  private async runJsRuntimeReadbackProof(
+    adapter: ClaudeCodeAdapter,
+    outputEl: HTMLElement,
+  ): Promise<void> {
+    outputEl.empty();
+    outputEl.createEl('p', { text: 'Running JS Runtime readback probe…' });
+
+    try {
+      const result = await adapter.runJsRuntimeReadbackProbe();
+
+      outputEl.empty();
+      outputEl.createEl('h5', { text: 'JS Runtime Readback Proof' });
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: '⚠️ Diagnostic readback only: verifies settings→SDK option mapping only. Actual runtime selection depends on the SDK/CLI version, system PATH, and whether the requested runtime is installed. The plugin passes the option, but whether the subprocess actually uses the requested runtime is not independently verified. Applies to the next query or restarted session only. Active sessions do not update live. No runtime argument management is exposed (executableArgs / extraArgs remain absent).',
       });
 
       outputEl.createEl('p', {
@@ -5935,7 +6291,7 @@ export class SettingsCapabilityLabSection {
       });
       outputEl.createEl('p', {
         cls: 'opencodian-capability-lab-hint',
-        text: `Setting value: ${result.settingValue ? 'true' : 'false'}`,
+        text: `Setting value: ${result.emptySetting ? '(empty — auto)' : result.settingValue}`,
       });
       outputEl.createEl('p', {
         cls: 'opencodian-capability-lab-hint',
@@ -5944,7 +6300,7 @@ export class SettingsCapabilityLabSection {
       if (result.sdkValue !== undefined) {
         outputEl.createEl('p', {
           cls: 'opencodian-capability-lab-hint',
-          text: `SDK value: ${result.sdkValue ? 'true' : 'false'}`,
+          text: `SDK value: ${result.sdkValue}`,
         });
       }
       outputEl.createEl('p', {
@@ -5953,21 +6309,80 @@ export class SettingsCapabilityLabSection {
       });
 
       if (result.classification === 'readback') {
-        this.updateRuntimeProof('Debug', 'readback', outputEl);
+        this.updateRuntimeProof('JS Runtime', 'readback', outputEl);
       } else {
         outputEl.createEl('p', {
           cls: 'opencodian-capability-lab-error',
-          text: `✗ Debug readback probe failed: ${result.error ?? 'unknown error'}`,
+          text: `✗ JS Runtime readback probe failed: ${result.error ?? 'unknown error'}`,
         });
-        this.updateRuntimeProof('Debug', 'fail', outputEl);
+        this.updateRuntimeProof('JS Runtime', 'fail', outputEl);
       }
     } catch (err) {
       outputEl.empty();
       outputEl.createEl('p', {
         cls: 'opencodian-capability-lab-error',
-        text: `Debug readback proof failed: ${err instanceof Error ? err.message : String(err)}`,
+        text: `JS Runtime readback proof failed: ${err instanceof Error ? err.message : String(err)}`,
       });
-      this.updateRuntimeProof('Debug', 'fail', outputEl);
+      this.updateRuntimeProof('JS Runtime', 'fail', outputEl);
+    }
+  }
+
+  private async runLoadTimeoutReadbackProof(
+    adapter: ClaudeCodeAdapter,
+    outputEl: HTMLElement,
+  ): Promise<void> {
+    outputEl.empty();
+    outputEl.createEl('p', { text: 'Running Load Timeout readback probe…' });
+
+    try {
+      const result = await adapter.runLoadTimeoutReadbackProbe();
+
+      outputEl.empty();
+      outputEl.createEl('h5', { text: 'Load Timeout Readback Proof' });
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: '⚠️ Diagnostic readback only: verifies settings→SDK option mapping only. Actual timeout behavior depends on the SDK/CLI version and runtime conditions. The plugin passes the option, but whether the subprocess actually honors the timeout is not independently verified. Applies to the next query or restarted session only. Active sessions do not update live.',
+      });
+
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: `Option wired: ${result.optionWired ? '✓ yes' : '✗ no'}`,
+      });
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: `Setting value: ${result.settingValue !== null ? result.settingValue : '(null — SDK default)'}`,
+      });
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: `SDK option present: ${result.sdkOptionPresent ? '✓ yes' : '✗ no'}`,
+      });
+      if (result.sdkValue !== undefined) {
+        outputEl.createEl('p', {
+          cls: 'opencodian-capability-lab-hint',
+          text: `SDK value: ${result.sdkValue}`,
+        });
+      }
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: `Value match: ${result.valueMatch ? '✓ yes' : '✗ no'}`,
+      });
+
+      if (result.classification === 'readback') {
+        this.updateRuntimeProof('Load Timeout', 'readback', outputEl);
+      } else {
+        outputEl.createEl('p', {
+          cls: 'opencodian-capability-lab-error',
+          text: `✗ Load Timeout readback probe failed: ${result.error ?? 'unknown error'}`,
+        });
+        this.updateRuntimeProof('Load Timeout', 'fail', outputEl);
+      }
+    } catch (err) {
+      outputEl.empty();
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-error',
+        text: `Load Timeout readback proof failed: ${err instanceof Error ? err.message : String(err)}`,
+      });
+      this.updateRuntimeProof('Load Timeout', 'fail', outputEl);
     }
   }
 
@@ -6086,6 +6501,65 @@ export class SettingsCapabilityLabSection {
         text: `Strict MCP config readback proof failed: ${err instanceof Error ? err.message : String(err)}`,
       });
       this.updateRuntimeProof('Strict MCP Config', 'fail', outputEl);
+    }
+  }
+
+  private async runContext1mBetaReadbackProof(
+    adapter: ClaudeCodeAdapter,
+    outputEl: HTMLElement,
+  ): Promise<void> {
+    outputEl.empty();
+    outputEl.createEl('p', { text: 'Running 1M Context Beta readback probe…' });
+
+    try {
+      const result = await adapter.runContext1mBetaReadbackProbe();
+
+      outputEl.empty();
+      outputEl.createEl('h5', { text: '1M Context Beta Readback Proof' });
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: '⚠️ Diagnostic readback only: verifies settings→SDK option mapping only. Actual beta availability depends on selected model and Anthropic-side behavior — the plugin passes the option, but whether the beta is actually honored depends on the SDK/CLI version, model support, and API state. Applies to the next query or restarted session only. Active sessions do not update live. No generic beta management is exposed; this covers only the single documented beta seam.',
+      });
+
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: `Option wired: ${result.optionWired ? '✓ yes' : '✗ no'}`,
+      });
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: `Setting value: ${result.settingValue ? 'true' : 'false'}`,
+      });
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: `SDK option present: ${result.sdkOptionPresent ? '✓ yes' : '✗ no'}`,
+      });
+      if (result.sdkValue !== undefined) {
+        outputEl.createEl('p', {
+          cls: 'opencodian-capability-lab-hint',
+          text: `SDK value: ${JSON.stringify(result.sdkValue)}`,
+        });
+      }
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: `Value match: ${result.valueMatch ? '✓ yes' : '✗ no'}`,
+      });
+
+      if (result.classification === 'readback') {
+        this.updateRuntimeProof('1M Context Beta', 'readback', outputEl);
+      } else {
+        outputEl.createEl('p', {
+          cls: 'opencodian-capability-lab-error',
+          text: `✗ 1M Context Beta readback probe failed: ${result.error ?? 'unknown error'}`,
+        });
+        this.updateRuntimeProof('1M Context Beta', 'fail', outputEl);
+      }
+    } catch (err) {
+      outputEl.empty();
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-error',
+        text: `1M Context Beta readback proof failed: ${err instanceof Error ? err.message : String(err)}`,
+      });
+      this.updateRuntimeProof('1M Context Beta', 'fail', outputEl);
     }
   }
 

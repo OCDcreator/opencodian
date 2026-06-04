@@ -145,6 +145,12 @@ export interface ClaudeCodeSdkOptionsShape {
   resumeSessionAt?: string;
   /** Diagnostic-only fork-on-resume flag. When true AND resume is provided, asks the SDK to fork into a new session. */
   forkSession?: boolean;
+  /** Requested beta features passed as the SDK `betas` option. */
+  betas?: string[];
+  /** Requested JavaScript runtime for the Claude Code subprocess. */
+  executable?: 'node' | 'bun' | 'deno';
+  /** Load timeout in milliseconds for the Claude Code subprocess initialization. */
+  loadTimeoutMs?: number;
 }
 
 function cloneSettingSources(sources: readonly ClaudeCodeSettingSource[]): ClaudeCodeSettingSource[] {
@@ -338,6 +344,16 @@ export function buildClaudeCodeOptions(
   }
   if (input.forkSession === true) {
     options.forkSession = true;
+  }
+  if (input.settings.enableContext1mBeta === true) {
+    options.betas = ['context-1m-2025-08-07'];
+  }
+  const jsRuntime = trimOptionalString(input.settings.jsRuntime);
+  if (jsRuntime) {
+    options.executable = jsRuntime as 'node' | 'bun' | 'deno';
+  }
+  if (input.settings.loadTimeoutMs !== null) {
+    options.loadTimeoutMs = input.settings.loadTimeoutMs;
   }
 
   return options;

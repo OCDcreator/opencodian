@@ -51,6 +51,36 @@ function resultMessage(sessionId: string) {
   return { type: 'result', subtype: 'success', session_id: sessionId };
 }
 
+/**
+ * Helper: create a mock SDK whose query() invokes options.stderr if provided.
+ */
+function createStderrEmittingSdk(
+  messages: unknown[],
+  stderrText?: string,
+): ClaudeCodeSdkFacade & { query: jest.Mock; getSessionInfo: jest.Mock } {
+  return {
+    query: jest.fn((input: { options?: { stderr?: (data: string) => void } }) => {
+      if (input.options?.stderr && stderrText !== undefined) {
+        input.options.stderr(stderrText);
+      }
+      return Object.assign((async function* () {
+        for (const message of messages) {
+          yield message;
+        }
+      })(), {
+        close: jest.fn(),
+      });
+    }),
+    getSessionInfo: jest.fn((_sessionId: string) =>
+      Promise.resolve({
+        sessionId: _sessionId,
+        summary: 'probe-session',
+        lastModified: Date.now(),
+      }),
+    ),
+  } as unknown as ClaudeCodeSdkFacade & { query: jest.Mock; getSessionInfo: jest.Mock };
+}
+
 describe('ClaudeCodeStreamNormalizer assistant message', () => {
   it('generates text chunks from assistant content blocks', () => {
     const normalizer = new ClaudeCodeStreamNormalizer();
@@ -65,7 +95,28 @@ describe('ClaudeCodeStreamNormalizer assistant message', () => {
 });
 
 describe('runStderrDiagnosticProbe', () => {
-  it('returns readback when callback is wired', async () => {
+  it('returns readback when callback is wired and stderr is captured', async () => {
+    const sdk = createStderrEmittingSdk([
+      assistantMessage('probe-session', 'ok'),
+      resultMessage('probe-session'),
+    ], 'stderr probe test output');
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+
+    const result = await adapter.runStderrDiagnosticProbe();
+
+    expect(result.classification).toBe('readback');
+    expect(result.callbackWired).toBe(true);
+    expect(result.isolatedDiagnosticOnly).toBe(true);
+    expect(result.chunksReceived).toBe(1);
+    expect(result.totalBytes).toBe('stderr probe test output'.length);
+    expect(result.sanitizedPreview).toBe('stderr probe test output');
+  });
+
+  it('returns readback with no-stderr-observed when callback is wired but no stderr emitted', async () => {
     const sdk = createProbeSdk([
       assistantMessage('probe-session', 'ok'),
       resultMessage('probe-session'),
@@ -80,9 +131,13 @@ describe('runStderrDiagnosticProbe', () => {
 
     expect(result.classification).toBe('readback');
     expect(result.callbackWired).toBe(true);
+    expect(result.isolatedDiagnosticOnly).toBe(true);
+    expect(result.chunksReceived).toBe(0);
+    expect(result.totalBytes).toBe(0);
+    expect(result.sanitizedPreview).toBe('Callback wired — no stderr observed');
   });
 
-  it('returns fail on throw', async () => {
+  it('returns fail on thrown error', async () => {
     const sdk = createProbeSdk([]);
     sdk.query.mockImplementation(() => {
       throw new Error('query failed');
@@ -97,6 +152,92 @@ describe('runStderrDiagnosticProbe', () => {
 
     expect(result.classification).toBe('fail');
     expect(result.error).toContain('query failed');
+  });
+
+  it('sanitizes stderr text before preview', async () => {
+    const secretText = 'api_key=sk-ant-api03-secret123';
+    const sdk = createStderrEmittingSdk([
+      assistantMessage('probe-session', 'ok'),
+      resultMessage('probe-session'),
+    ], secretText);
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+
+    const result = await adapter.runStderrDiagnosticProbe();
+
+    expect(result.classification).toBe('readback');
+    expect(result.callbackWired).toBe(true);
+    expect(result.chunksReceived).toBe(1);
+    expect(result.sanitizedPreview).toContain('[REDACTED]');
+    expect(result.sanitizedPreview).not.toContain('secret123');
+  });
+
+  it('aggressively truncates long stderr to 240 chars', async () => {
+    const longText = 'x'.repeat(500);
+    const sdk = createStderrEmittingSdk([
+      assistantMessage('probe-session', 'ok'),
+      resultMessage('probe-session'),
+    ], longText);
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+
+    const result = await adapter.runStderrDiagnosticProbe();
+
+    expect(result.classification).toBe('readback');
+    expect(result.callbackWired).toBe(true);
+    expect(result.chunksReceived).toBe(1);
+    expect(result.totalBytes).toBe(500);
+    expect(result.sanitizedPreview!.length).toBeLessThanOrEqual(240);
+  });
+
+  it('sanitizes before truncation to prevent secret leakage at truncation boundary', async () => {
+    const prefix = 'a'.repeat(220);
+    const secret = 'api_key=sk-ant-api03-leaky-boundary-value-here';
+    const suffix = 'b'.repeat(100);
+    const text = prefix + secret + suffix;
+
+    const sdk = createStderrEmittingSdk([
+      assistantMessage('probe-session', 'ok'),
+      resultMessage('probe-session'),
+    ], text);
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+
+    const result = await adapter.runStderrDiagnosticProbe();
+
+    expect(result.classification).toBe('readback');
+    expect(result.sanitizedPreview).not.toContain('leaky-boundary-value');
+    expect(result.sanitizedPreview).toContain('[REDACTED]');
+  });
+
+  it('proves _diagnosticStderrCallback reaches built SDK options', async () => {
+    const stderrText = 'diagnostic stderr wiring test';
+    const sdk = createStderrEmittingSdk([
+      assistantMessage('probe-session', 'ok'),
+      resultMessage('probe-session'),
+    ], stderrText);
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+
+    await adapter.runStderrDiagnosticProbe();
+    // inspectLastDiagnosticSdkOptions uses structuredClone which strips functions,
+    // so access the raw internal property to verify the callback was wired.
+    const rawOptions = (adapter as unknown as { lastDiagnosticSdkOptions?: { stderr?: unknown } }).lastDiagnosticSdkOptions;
+
+    expect(rawOptions).toBeDefined();
+    expect(typeof rawOptions!.stderr).toBe('function');
   });
 });
 
@@ -158,6 +299,78 @@ describe('runPromptSuggestionsReadbackProbe', () => {
     expect(result.optionValue).toBe(false);
     expect(result.sdkOptionPresent).toBe(false);
     expect(result.modelState).toBe('unknown');
+  });
+
+  it('returns fail when promptSuggestions is enabled but SDK option is missing', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        promptSuggestions: true,
+      },
+      sdk: createProbeSdk([]),
+    });
+
+    jest.spyOn(adapter as unknown as {
+      buildDiagnosticSdkOptions: (...args: unknown[]) => unknown;
+    }, 'buildDiagnosticSdkOptions').mockReturnValue({
+      promptSuggestions: undefined,
+    });
+
+    const result = await adapter.runPromptSuggestionsReadbackProbe();
+
+    expect(result.classification).toBe('fail');
+    expect(result.optionWired).toBe(false);
+    expect(result.optionValue).toBe(true);
+    expect(result.sdkOptionPresent).toBe(false);
+    expect(result.modelState).toBe('unknown');
+    expect(result.error).toContain('promptSuggestions');
+  });
+
+  it('returns fail when promptSuggestions is disabled but SDK option is present', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        promptSuggestions: false,
+      },
+      sdk: createProbeSdk([]),
+    });
+
+    jest.spyOn(adapter as unknown as {
+      buildDiagnosticSdkOptions: (...args: unknown[]) => unknown;
+    }, 'buildDiagnosticSdkOptions').mockReturnValue({
+      promptSuggestions: true,
+    });
+
+    const result = await adapter.runPromptSuggestionsReadbackProbe();
+
+    expect(result.classification).toBe('fail');
+    expect(result.optionWired).toBe(false);
+    expect(result.optionValue).toBe(false);
+    expect(result.sdkOptionPresent).toBe(true);
+    expect(result.modelState).toBe('unknown');
+    expect(result.error).toContain('promptSuggestions');
+  });
+
+  it('returns fail on thrown error', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk: createProbeSdk([]),
+    });
+
+    jest.spyOn(adapter as unknown as {
+      buildDiagnosticSdkOptions: (...args: unknown[]) => unknown;
+    }, 'buildDiagnosticSdkOptions').mockImplementation(() => {
+      throw new Error('build failed');
+    });
+
+    const result = await adapter.runPromptSuggestionsReadbackProbe();
+
+    expect(result.classification).toBe('fail');
+    expect(result.optionWired).toBe(false);
+    expect(result.error).toContain('build failed');
   });
 });
 
@@ -1259,6 +1472,33 @@ describe('runDebugReadbackProbe', () => {
     expect(result.error).toContain('debug');
   });
 
+  it('returns fail when debug is true but SDK option is false', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        debug: true,
+      },
+      sdk: createProbeSdk([]),
+    });
+
+    jest.spyOn(adapter as unknown as {
+      buildDiagnosticSdkOptions: (...args: unknown[]) => unknown;
+    }, 'buildDiagnosticSdkOptions').mockReturnValue({
+      debug: false,
+    });
+
+    const result = await adapter.runDebugReadbackProbe();
+
+    expect(result.classification).toBe('fail');
+    expect(result.optionWired).toBe(false);
+    expect(result.settingValue).toBe(true);
+    expect(result.sdkOptionPresent).toBe(true);
+    expect(result.sdkValue).toBe(false);
+    expect(result.valueMatch).toBe(false);
+    expect(result.error).toContain('debug');
+  });
+
   it('returns fail on thrown error', async () => {
     const adapter = new ClaudeCodeAdapter({
       vaultPath: '/vault',
@@ -1430,5 +1670,609 @@ describe('runStrictMcpConfigReadbackProbe', () => {
     expect(result.sdkOptionPresent).toBe(false);
     expect(result.valueMatch).toBe(false);
     expect(result.error).toContain('buildDiagnosticSdkOptions threw');
+  });
+});
+
+describe('runContext1mBetaReadbackProbe', () => {
+  it('returns readback with no betas option when setting is false', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        enableContext1mBeta: false,
+      },
+      sdk: createProbeSdk([]),
+    });
+
+    const result = await adapter.runContext1mBetaReadbackProbe();
+
+    expect(result.classification).toBe('readback');
+    expect(result.optionWired).toBe(true);
+    expect(result.settingValue).toBe(false);
+    expect(result.sdkOptionPresent).toBe(false);
+    expect(result.valueMatch).toBe(true);
+  });
+
+  it('returns readback with betas option when setting is true', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        enableContext1mBeta: true,
+      },
+      sdk: createProbeSdk([]),
+    });
+
+    const result = await adapter.runContext1mBetaReadbackProbe();
+
+    expect(result.classification).toBe('readback');
+    expect(result.optionWired).toBe(true);
+    expect(result.settingValue).toBe(true);
+    expect(result.sdkOptionPresent).toBe(true);
+    expect(result.sdkValue).toEqual(['context-1m-2025-08-07']);
+    expect(result.valueMatch).toBe(true);
+  });
+
+  it('returns fail when enableContext1mBeta is false but SDK option is present', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        enableContext1mBeta: false,
+      },
+      sdk: createProbeSdk([]),
+    });
+
+    jest.spyOn(adapter as unknown as {
+      buildDiagnosticSdkOptions: (...args: unknown[]) => unknown;
+    }, 'buildDiagnosticSdkOptions').mockReturnValue({
+      betas: ['context-1m-2025-08-07'],
+    });
+
+    const result = await adapter.runContext1mBetaReadbackProbe();
+
+    expect(result.classification).toBe('fail');
+    expect(result.optionWired).toBe(false);
+    expect(result.settingValue).toBe(false);
+    expect(result.sdkOptionPresent).toBe(true);
+    expect(result.sdkValue).toEqual(['context-1m-2025-08-07']);
+    expect(result.valueMatch).toBe(false);
+    expect(result.error).toContain('betas');
+  });
+
+  it('returns fail when enableContext1mBeta is true but SDK option is missing', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        enableContext1mBeta: true,
+      },
+      sdk: createProbeSdk([]),
+    });
+
+    jest.spyOn(adapter as unknown as {
+      buildDiagnosticSdkOptions: (...args: unknown[]) => unknown;
+    }, 'buildDiagnosticSdkOptions').mockReturnValue({
+      betas: undefined,
+    });
+
+    const result = await adapter.runContext1mBetaReadbackProbe();
+
+    expect(result.classification).toBe('fail');
+    expect(result.optionWired).toBe(false);
+    expect(result.settingValue).toBe(true);
+    expect(result.sdkOptionPresent).toBe(false);
+    expect(result.valueMatch).toBe(false);
+    expect(result.error).toContain('betas');
+  });
+
+  it('returns fail when enableContext1mBeta is true but SDK option has wrong value', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        enableContext1mBeta: true,
+      },
+      sdk: createProbeSdk([]),
+    });
+
+    jest.spyOn(adapter as unknown as {
+      buildDiagnosticSdkOptions: (...args: unknown[]) => unknown;
+    }, 'buildDiagnosticSdkOptions').mockReturnValue({
+      betas: ['wrong-beta'],
+    });
+
+    const result = await adapter.runContext1mBetaReadbackProbe();
+
+    expect(result.classification).toBe('fail');
+    expect(result.optionWired).toBe(false);
+    expect(result.settingValue).toBe(true);
+    expect(result.sdkOptionPresent).toBe(true);
+    expect(result.sdkValue).toEqual(['wrong-beta']);
+    expect(result.valueMatch).toBe(false);
+    expect(result.error).toContain('betas');
+  });
+
+  it('returns fail when enableContext1mBeta is true but SDK option has wrong length', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        enableContext1mBeta: true,
+      },
+      sdk: createProbeSdk([]),
+    });
+
+    jest.spyOn(adapter as unknown as {
+      buildDiagnosticSdkOptions: (...args: unknown[]) => unknown;
+    }, 'buildDiagnosticSdkOptions').mockReturnValue({
+      betas: ['context-1m-2025-08-07', 'extra-beta'],
+    });
+
+    const result = await adapter.runContext1mBetaReadbackProbe();
+
+    expect(result.classification).toBe('fail');
+    expect(result.optionWired).toBe(false);
+    expect(result.settingValue).toBe(true);
+    expect(result.sdkOptionPresent).toBe(true);
+    expect(result.sdkValue).toEqual(['context-1m-2025-08-07', 'extra-beta']);
+    expect(result.valueMatch).toBe(false);
+    expect(result.error).toContain('betas');
+  });
+
+  it('returns fail on thrown error', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        enableContext1mBeta: true,
+      },
+      sdk: createProbeSdk([]),
+    });
+
+    jest.spyOn(adapter as unknown as {
+      buildDiagnosticSdkOptions: (...args: unknown[]) => unknown;
+    }, 'buildDiagnosticSdkOptions').mockImplementation(() => {
+      throw new Error('buildDiagnosticSdkOptions threw');
+    });
+
+    const result = await adapter.runContext1mBetaReadbackProbe();
+
+    expect(result.classification).toBe('fail');
+    expect(result.optionWired).toBe(false);
+    expect(result.settingValue).toBe(true);
+    expect(result.sdkOptionPresent).toBe(false);
+    expect(result.valueMatch).toBe(false);
+    expect(result.error).toContain('buildDiagnosticSdkOptions threw');
+  });
+});
+
+describe('runLoadTimeoutReadbackProbe', () => {
+  it('returns readback with no loadTimeoutMs option when setting is null', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk: createProbeSdk([]),
+    });
+
+    const result = await adapter.runLoadTimeoutReadbackProbe();
+
+    expect(result.classification).toBe('readback');
+    expect(result.optionWired).toBe(true);
+    expect(result.settingValue).toBeNull();
+    expect(result.sdkOptionPresent).toBe(false);
+    expect(result.valueMatch).toBe(true);
+  });
+
+  it('returns readback with loadTimeoutMs option when setting is a positive integer', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        loadTimeoutMs: 60000,
+      },
+      sdk: createProbeSdk([]),
+    });
+
+    const result = await adapter.runLoadTimeoutReadbackProbe();
+
+    expect(result.classification).toBe('readback');
+    expect(result.optionWired).toBe(true);
+    expect(result.settingValue).toBe(60000);
+    expect(result.sdkOptionPresent).toBe(true);
+    expect(result.sdkValue).toBe(60000);
+    expect(result.valueMatch).toBe(true);
+  });
+
+  it('returns fail when loadTimeoutMs is null but SDK option is present', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk: createProbeSdk([]),
+    });
+
+    jest.spyOn(adapter as unknown as {
+      buildDiagnosticSdkOptions: (...args: unknown[]) => unknown;
+    }, 'buildDiagnosticSdkOptions').mockReturnValue({
+      loadTimeoutMs: 30000,
+    });
+
+    const result = await adapter.runLoadTimeoutReadbackProbe();
+
+    expect(result.classification).toBe('fail');
+    expect(result.optionWired).toBe(false);
+    expect(result.settingValue).toBeNull();
+    expect(result.sdkOptionPresent).toBe(true);
+    expect(result.valueMatch).toBe(false);
+    expect(result.error).toContain('loadTimeoutMs');
+  });
+
+  it('returns fail when loadTimeoutMs is set but SDK option is missing', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        loadTimeoutMs: 60000,
+      },
+      sdk: createProbeSdk([]),
+    });
+
+    jest.spyOn(adapter as unknown as {
+      buildDiagnosticSdkOptions: (...args: unknown[]) => unknown;
+    }, 'buildDiagnosticSdkOptions').mockReturnValue({
+      loadTimeoutMs: undefined,
+    });
+
+    const result = await adapter.runLoadTimeoutReadbackProbe();
+
+    expect(result.classification).toBe('fail');
+    expect(result.optionWired).toBe(false);
+    expect(result.settingValue).toBe(60000);
+    expect(result.sdkOptionPresent).toBe(false);
+    expect(result.valueMatch).toBe(false);
+    expect(result.error).toContain('loadTimeoutMs');
+  });
+
+  it('returns fail when loadTimeoutMs is set but SDK option has wrong value', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        loadTimeoutMs: 60000,
+      },
+      sdk: createProbeSdk([]),
+    });
+
+    jest.spyOn(adapter as unknown as {
+      buildDiagnosticSdkOptions: (...args: unknown[]) => unknown;
+    }, 'buildDiagnosticSdkOptions').mockReturnValue({
+      loadTimeoutMs: 30000,
+    });
+
+    const result = await adapter.runLoadTimeoutReadbackProbe();
+
+    expect(result.classification).toBe('fail');
+    expect(result.optionWired).toBe(false);
+    expect(result.settingValue).toBe(60000);
+    expect(result.sdkOptionPresent).toBe(true);
+    expect(result.sdkValue).toBe(30000);
+    expect(result.valueMatch).toBe(false);
+    expect(result.error).toContain('loadTimeoutMs');
+  });
+
+  it('returns fail on thrown error', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        loadTimeoutMs: 60000,
+      },
+      sdk: createProbeSdk([]),
+    });
+
+    jest.spyOn(adapter as unknown as {
+      buildDiagnosticSdkOptions: (...args: unknown[]) => unknown;
+    }, 'buildDiagnosticSdkOptions').mockImplementation(() => {
+      throw new Error('buildDiagnosticSdkOptions threw');
+    });
+
+    const result = await adapter.runLoadTimeoutReadbackProbe();
+
+    expect(result.classification).toBe('fail');
+    expect(result.optionWired).toBe(false);
+    expect(result.settingValue).toBe(60000);
+    expect(result.sdkOptionPresent).toBe(false);
+    expect(result.valueMatch).toBe(false);
+    expect(result.error).toContain('buildDiagnosticSdkOptions threw');
+  });
+});
+
+describe('runJsRuntimeReadbackProbe', () => {
+  it('returns readback with no executable option when jsRuntime is empty', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk: createProbeSdk([]),
+    });
+
+    const result = await adapter.runJsRuntimeReadbackProbe();
+
+    expect(result.classification).toBe('readback');
+    expect(result.optionWired).toBe(true);
+    expect(result.settingValue).toBe('');
+    expect(result.emptySetting).toBe(true);
+    expect(result.sdkOptionPresent).toBe(false);
+    expect(result.valueMatch).toBe(true);
+  });
+
+  it('returns readback with executable option when jsRuntime is node', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        jsRuntime: 'node',
+      },
+      sdk: createProbeSdk([]),
+    });
+
+    const result = await adapter.runJsRuntimeReadbackProbe();
+
+    expect(result.classification).toBe('readback');
+    expect(result.optionWired).toBe(true);
+    expect(result.settingValue).toBe('node');
+    expect(result.emptySetting).toBe(false);
+    expect(result.sdkOptionPresent).toBe(true);
+    expect(result.sdkValue).toBe('node');
+    expect(result.valueMatch).toBe(true);
+  });
+
+  it('returns readback with executable option when jsRuntime is bun', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        jsRuntime: 'bun',
+      },
+      sdk: createProbeSdk([]),
+    });
+
+    const result = await adapter.runJsRuntimeReadbackProbe();
+
+    expect(result.classification).toBe('readback');
+    expect(result.optionWired).toBe(true);
+    expect(result.settingValue).toBe('bun');
+    expect(result.emptySetting).toBe(false);
+    expect(result.sdkOptionPresent).toBe(true);
+    expect(result.sdkValue).toBe('bun');
+    expect(result.valueMatch).toBe(true);
+  });
+
+  it('returns readback with executable option when jsRuntime is deno', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        jsRuntime: 'deno',
+      },
+      sdk: createProbeSdk([]),
+    });
+
+    const result = await adapter.runJsRuntimeReadbackProbe();
+
+    expect(result.classification).toBe('readback');
+    expect(result.optionWired).toBe(true);
+    expect(result.settingValue).toBe('deno');
+    expect(result.emptySetting).toBe(false);
+    expect(result.sdkOptionPresent).toBe(true);
+    expect(result.sdkValue).toBe('deno');
+    expect(result.valueMatch).toBe(true);
+  });
+
+  it('returns fail when jsRuntime is empty but SDK option is present', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk: createProbeSdk([]),
+    });
+
+    jest.spyOn(adapter as unknown as {
+      buildDiagnosticSdkOptions: (...args: unknown[]) => unknown;
+    }, 'buildDiagnosticSdkOptions').mockReturnValue({
+      executable: 'node',
+    });
+
+    const result = await adapter.runJsRuntimeReadbackProbe();
+
+    expect(result.classification).toBe('fail');
+    expect(result.optionWired).toBe(false);
+    expect(result.settingValue).toBe('');
+    expect(result.emptySetting).toBe(true);
+    expect(result.sdkOptionPresent).toBe(true);
+    expect(result.valueMatch).toBe(false);
+    expect(result.error).toContain('executable');
+  });
+
+  it('returns fail when jsRuntime is non-empty but SDK option is missing', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        jsRuntime: 'node',
+      },
+      sdk: createProbeSdk([]),
+    });
+
+    jest.spyOn(adapter as unknown as {
+      buildDiagnosticSdkOptions: (...args: unknown[]) => unknown;
+    }, 'buildDiagnosticSdkOptions').mockReturnValue({
+      executable: undefined,
+    });
+
+    const result = await adapter.runJsRuntimeReadbackProbe();
+
+    expect(result.classification).toBe('fail');
+    expect(result.optionWired).toBe(false);
+    expect(result.settingValue).toBe('node');
+    expect(result.emptySetting).toBe(false);
+    expect(result.sdkOptionPresent).toBe(false);
+    expect(result.valueMatch).toBe(false);
+    expect(result.error).toContain('executable');
+  });
+
+  it('returns fail when jsRuntime is non-empty but SDK option has wrong value', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        jsRuntime: 'node',
+      },
+      sdk: createProbeSdk([]),
+    });
+
+    jest.spyOn(adapter as unknown as {
+      buildDiagnosticSdkOptions: (...args: unknown[]) => unknown;
+    }, 'buildDiagnosticSdkOptions').mockReturnValue({
+      executable: 'bun',
+    });
+
+    const result = await adapter.runJsRuntimeReadbackProbe();
+
+    expect(result.classification).toBe('fail');
+    expect(result.optionWired).toBe(false);
+    expect(result.settingValue).toBe('node');
+    expect(result.emptySetting).toBe(false);
+    expect(result.sdkOptionPresent).toBe(true);
+    expect(result.sdkValue).toBe('bun');
+    expect(result.valueMatch).toBe(false);
+    expect(result.error).toContain('executable');
+  });
+
+  it('returns fail on thrown error', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        jsRuntime: 'node',
+      },
+      sdk: createProbeSdk([]),
+    });
+
+    jest.spyOn(adapter as unknown as {
+      buildDiagnosticSdkOptions: (...args: unknown[]) => unknown;
+    }, 'buildDiagnosticSdkOptions').mockImplementation(() => {
+      throw new Error('buildDiagnosticSdkOptions threw');
+    });
+
+    const result = await adapter.runJsRuntimeReadbackProbe();
+
+    expect(result.classification).toBe('fail');
+    expect(result.optionWired).toBe(false);
+    expect(result.settingValue).toBe('node');
+    expect(result.sdkOptionPresent).toBe(false);
+    expect(result.valueMatch).toBe(false);
+    expect(result.error).toContain('buildDiagnosticSdkOptions threw');
+  });
+});
+
+describe('runSystemPromptLiveProbe', () => {
+  it('returns pass when nonce is recalled in response', async () => {
+    const realRandom = Math.random;
+    Math.random = () => 0.555555555;
+    const expectedNonce = Math.random().toString(36).slice(2, 10);
+
+    const sdk = createProbeSdk([
+      assistantMessage('probe-session', `The secret codeword is ${expectedNonce}`),
+      resultMessage('probe-session'),
+    ]);
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+
+    const result = await adapter.runSystemPromptLiveProbe();
+    Math.random = realRandom;
+
+    expect(result.classification).toBe('pass');
+    expect(result.nonce).toBe(expectedNonce);
+    expect(result.nonceRecalled).toBe(true);
+    expect(result.responsePreview).toContain(expectedNonce);
+  });
+
+  it('returns fail when nonce is not recalled', async () => {
+    const realRandom = Math.random;
+    Math.random = () => 0.555555555;
+    const expectedNonce = Math.random().toString(36).slice(2, 10);
+
+    const sdk = createProbeSdk([
+      assistantMessage('probe-session', 'I do not know the secret codeword.'),
+      resultMessage('probe-session'),
+    ]);
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+
+    const result = await adapter.runSystemPromptLiveProbe();
+    Math.random = realRandom;
+
+    expect(result.classification).toBe('fail');
+    expect(result.nonce).toBe(expectedNonce);
+    expect(result.nonceRecalled).toBe(false);
+    expect(result.error).toContain('Nonce not found');
+  });
+
+  it('returns fail on thrown error', async () => {
+    const realRandom = Math.random;
+    Math.random = () => 0.555555555;
+    const expectedNonce = Math.random().toString(36).slice(2, 10);
+
+    const sdk = createProbeSdk([]);
+    sdk.query.mockImplementation(() => {
+      throw new Error('SDK query failed');
+    });
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+
+    const result = await adapter.runSystemPromptLiveProbe();
+    Math.random = realRandom;
+
+    expect(result.classification).toBe('fail');
+    expect(result.nonce).toBe(expectedNonce);
+    expect(result.nonceRecalled).toBe(false);
+    expect(result.error).toContain('SDK query failed');
+  });
+
+  it('passes _diagnosticSystemPrompt with nonce to runDiagnosticPrompt', async () => {
+    const realRandom = Math.random;
+    Math.random = () => 0.777777777;
+    const expectedNonce = Math.random().toString(36).slice(2, 10);
+
+    const sdk = createProbeSdk([
+      assistantMessage('probe-session', `codeword: ${expectedNonce}`),
+      resultMessage('probe-session'),
+    ]);
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+
+    const runDiagnosticPromptSpy = jest.spyOn(adapter, 'runDiagnosticPrompt');
+
+    await adapter.runSystemPromptLiveProbe();
+    Math.random = realRandom;
+
+    expect(runDiagnosticPromptSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        prompt: 'What is the secret codeword?',
+        _diagnosticBypassPermissions: true,
+        _diagnosticSystemPrompt: `If asked for the secret codeword, reply with exactly '${expectedNonce}' and nothing else.`,
+      }),
+    );
   });
 });

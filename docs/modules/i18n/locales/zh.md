@@ -75,6 +75,10 @@ OpenCodian 的简体中文翻译表，导出 `zhTranslations` 静态对象。它
 
 2026-06-02 Continue 诊断 seam 又补了一组 `settings.capabilityLab.proofs.continue.*` 键，把 Continue proof 按钮、运行中提示、诊断边界说明、seed/continue 会话标签、yes/no 状态、pass/fail 文案和异常提示收进 locale，避免在 Capability Lab 继续硬编码新增诊断 UI 文案。
 
+2026-06-04 继续新增 `settings.capabilityLab.proofs.stderr.*` 键，把 Stderr Diagnostic proof 的按钮、运行中、标题、readback/fail 提示，以及“隔离诊断查询 / 不暴露持久 raw-log surface / 不写入文件”的诚实边界文案收进中文 locale。这样 Capability Lab 在中文界面下也能保留和英文一致的 readback 语义，不会退回硬编码英文。
+
+2026-06-04 继续新增 `settings.capabilityLab.proofs.planModeInstructions.*` 键（18+ proof keys 覆盖中英双语），把 Plan Mode Instructions readback proof 的按钮、运行中、标题、边界文案、生命周期边界、option-wired/permission-mode/setting-value/sdk-option/sdk-value/builder-wiring-nuance/value-match 状态行，以及 readback/fail/thrown 提示全部收进中文 locale。取代之前的硬编码英文，使 Capability Lab 在中文界面下同样显示明确的 readback 语义和生命周期边界（“仅在下次查询或重启会话后生效。活跃会话不会实时更新。”）。
+
 2026-05-27 新增 `settings.claudeCode.fallbackModel.boundaryNotice` 键，用于 Model & Thinking 标签中 fallback model 控件后的边界提示。文案说明备用模型的修改需要重启活跃 Claude Code 会话或开始新的查询，无法像主模型一样在已运行的流中实时更新。
 
 本轮更新 `settings.claudeCode.model.desc` 和 `settings.claudeCode.fallbackModel.desc`，在主/备用模型描述中明确区分实时应用与仅重启生效的产品边界，并提示用户通过下方 quick-select 下拉框选择模型。新增 `settings.claudeCode.model.quickSelectName` / `quickSelectDesc` 和 `settings.claudeCode.fallbackModel.quickSelectName` / `quickSelectDesc` 键，用于 Model & Thinking 标签中模型/备用模型的 quick-select 下拉框；保留 `settings.claudeCode.modelCatalog.quickSelectPlaceholder` 作为下拉框的默认占位文案。旧的 `modelCatalog.*` 系列键（refreshButton、loading、empty、error、useAsMain、useAsFallback）已随分离式目录列表的移除而废弃。
@@ -110,6 +114,11 @@ export const zhTranslations: Record<string, string> = {
 
 该文件为英文键空间提供中文对应值，供 `setLocale('zh')` 后的全部界面使用。
 
+2026-06-04 同步收紧 `settings.claudeCode.planModeInstructions.lifecycleNotice`：稳定 Settings 中文文案不再只写“下次查询或重启后生效”，而是明确补出 active-session 边界，说明无法 live 更改正在运行中的会话。
+2026-06-04 新增 `settings.capabilityLab.proofs.taskBudget.*` 键（17 个 proof keys，覆盖中英双语），把 Task Budget 回读证明的按钮、运行中、标题、诊断 readback 边界、生命周期边界、option-wired/setting-value/sdk-option/sdk-total/total-match 状态行，以及 readback/fail/thrown 提示全部收进中文 locale。这样 Capability Lab 在中文界面下也能一致表达 `@alpha`、active-session 不会实时更新，以及“仅验证 settings→SDK option mapping”的诚实边界。
+2026-06-04 继续新增 `settings.capabilityLab.proofs.toolAliases.*` 键（17 个 proof keys，覆盖中英双语），把 Tool Aliases 回读证明的按钮、运行中、标题、诊断 readback 边界、生命周期边界、option-wired/setting-empty/sdk-option/sdk-entry-count/defensive-copy/entries-match 状态行，以及 readback/fail/thrown 提示全部收进中文 locale，移除 Capability Lab 中该 proof 的硬编码英文。稳定 `settings.claudeCode.toolAliases.*` 文案本轮未改动，因为它已经匹配较新的 readback/lifecycle 诚实模式。
+2026-06-04 继续新增 `settings.capabilityLab.proofs.sandbox.*` 键（22 个 proof keys，覆盖中英双语），把 Sandbox 回读证明的按钮、运行中、标题、诊断 readback 边界、生命周期边界、option-wired/3 个 setting 状态/SDK option presence/3 个 SDK 子状态/3 个 match 状态，以及 readback/fail/thrown 提示全部收进中文 locale，移除 Capability Lab 中该 proof 的硬编码英文。同步收紧 `settings.claudeCode.sandbox.boundaryNotice` 与 `.lifecycleNotice`，稳定 Settings 文案现在明确写出“仅为 readback”与 active-session 不会实时更新的边界。
+2026-06-04 继续新增 `settings.capabilityLab.proofs.debug.*` 键（16 个 proof keys，覆盖中英双语），把 Debug 回读证明的按钮、运行中、标题、诊断 readback 边界、生命周期边界、option-wired/setting-value/sdk-option/sdk-value/value-match 状态行，以及 readback/fail/thrown 提示全部收进中文 locale，移除 Capability Lab 中该 proof 的硬编码英文。后续又把该 proof 的 `lifecycleBoundary` 收紧为更保守的“仅在下次查询时生效”，与既有 `settings.claudeCode.debug.lifecycleNotice` 保持一致，不额外发明“重启会话后生效”的已验证语义。
 2026-06-03 同步了 `settings.claudeCode.planModeInstructions.desc` 与 `.boundaryNotice` 的中文文案：稳定设置面不再暗示插件层会按 `permissionMode` 决定是否写入该选项，而是明确区分 SDK 仅在计划权限模式下使用它，以及当前仍只是 settings→SDK option wiring 的 readback 证明。
 
 ### 帮助文案承载
@@ -332,6 +341,8 @@ Claude Code 不再使用过载的 `settings.claudeCode.tab.mcpAdvanced` 标签�
 
 2026-05-28 本轮更新 `settings.claudeCode.maxTurns.desc`、`settings.claudeCode.maxBudgetUsd.desc`、`settings.claudeCode.env.desc`，移除过时的“已连接但尚未经过运行时验证”文案；新增 `settings.claudeCode.proofStatus.tools`、`settings.claudeCode.proofStatus.limits`、`settings.claudeCode.proofStatus.env` 三个共享 proof-status notice 键，用于在 Tools、Model & Thinking、Runtime 标签中 compact 地展示运行时 proof 状态。`proofStatus.env` 已更新为 "设置→SDK 映射已验证（回读辅助证据）。实时行为验证（环境变量传播到 Claude/Bash 子进程，Layer 1-4）已在 Capability Lab 中确认。总体能力：已验证（pass）。"，反映 Environment Variables stable settings notice 是回读辅助证据，live behavior proof 已在 Capability Lab 验证（2026-06-02 truth-sync）。更新 `settings.claudeCode.fallbackModel.desc` 和 `settings.claudeCode.fallbackModel.boundaryNotice`，诚实标注“选项连接和回读已验证；当前 SDK 下自动回退行为尚未验证”。新增 `settings.claudeCode.proofStatus.fallbackModel`，用于 Model & Thinking 标签的 Fallback Model compact proof-status notice（`data-proof-state="readback"`），明确标注选项回读已验证但自动 fallback 行为未验证。2026-05-29 proof-status 从 `wiring` 晋升为 `readback`；行为 Blocker = SDK 不在 query boundary 验证 model 名称，无效主模型被接受无错误并回显相同无效字符串，未触发 fallback；fallback 是 overload-oriented，无法在本地模拟 real overload。
 
+2026-06-04 新增 `settings.capabilityLab.proofs.systemPromptLive.*` locale keys，覆盖 System Prompt 实时行为证明按钮、运行中提示、标题、三段诚实边界文案、nonce/status/preview 标签，以及 pass/fail/thrown 提示，移除 Capability Lab 中这组 proof 的硬编码英文。同步更新 `settings.claudeCode.systemPrompt.boundaryNotice`：稳定设置页现在会明确说明 System Prompt 的 `pass` 依赖两类互补证据，而不是把诊断 live proof 误写成“当前保存字符串已经被直接 live 执行”的证明。
+
 2026-05-28 SDK Foundations 诊断表面迁移：新增 `settings.claudeCode.diagnosticStreamMoved.title` / `.desc`，用于在稳定 SDK Foundations 标签中提示用户诊断流控制已迁移到能力实验室；新增 `settings.capabilityLab.diagnosticStreamControls.title` / `.description`，用于能力实验室中诊断流控制子区的标题和说明。保留原有的 `settings.claudeCode.includeHookEvents.*`、`settings.claudeCode.forwardSubagentText.*`、`settings.claudeCode.agentProgressSummaries.*`，因为这些设置键仍然有效，只是 UI 表面从稳定设置迁移到了诊断面板。
 
 2026-05-28 文档更正：移除“`chat.input.placeholderJsonSuffix` 与后端感知输入框占位符已落地”的描述。当前实现并未新增该 i18n 键，也未在输入框占位符追加 `/json` 可发现性提示；discoverability 已通过 composer capability hint 落地（`chat.input.capabilityHint.json`，Claude Code backend 显示 `/json — 结构化输出`，OpenCode backend 不显示），且仍仅覆盖固定 schema trigger，不暗示任意 schema authoring。
@@ -363,6 +374,8 @@ Claude Code 不再使用过载的 `settings.claudeCode.tab.mcpAdvanced` 标签�
 新增 `chat.structuredOutput.label` 键，为 Claude Code structured output 在普通聊天 transcript 中的可折叠渲染提供中文标签文案。
 
 
-本轮 capability-hint 新增 `chat.input.capabilityHint.json` 键，用于 Claude Code backend 激活时在聊天输入区显示 `/json — 结构化输出` 发现性 inline hint。
+本轮 capability-hint 新增 `chat.input.capabilityHint.json` 键，用于 Claude Code backend 激活时在 composer footer 的 send 按钮左侧显示 `/json — 结构化输出` 发现性 chip。
 
 - 本轮 prompt-suggestions 新增 `settings.claudeCode.promptSuggestions.name`（提示建议）和 `settings.claudeCode.promptSuggestions.desc` 键，用于 Capability Lab 诊断流控制区域的 toggle 说明。
+- 2026-06-04 进一步收紧 `settings.claudeCode.promptSuggestions.desc` / `.stableDesc`：稳定设置文案现在明确写成“显示在最后一条 assistant 消息下方”，不再笼统写成输入框区域建议。
+- 2026-06-04 继续新增 `settings.capabilityLab.proofs.promptSuggestions.*` 这组中文 locale proof keys，把 Prompt Suggestions readback proof 的按钮、运行中、标题、readback/fail 提示、模型状态、blocker note，以及新增的 `lifecycleBoundary` / `uiLifecycleEvidence` 一起收进中文文案。这样 Capability Lab proof 会直接说明“仅在下次查询或重启会话时生效，活跃会话不会实时更新”，并把聊天侧 supporting evidence 限定为会话内 suggestion chip、新一轮或后端停止时清除、点击只插入不自动发送，而不会把这些 UI 现象误写成 SDK 行为已经 pass。

@@ -26,12 +26,16 @@
 - `ClaudeCodeAdapter`: Claude Code official Agent SDK adapter，生产 runtime 通过 `ClaudeCodeSdkLoader` lazy-load 官方 SDK。
 - `ClaudeCodeRuntimeCatalog` / `ClaudeCodeRuntimeCatalogCommand` / `ClaudeCodeRuntimeCatalogAgent`: Claude SDK `supportedCommands()` / `supportedAgents()` 的 sanitized readback 类型；只用于 runtime catalog 可见性，不代表命令执行或 agent authoring 能力。
 - `PromptSuggestionsReadbackProbeResult`: Claude Code `promptSuggestions` 选项 readback probe 结果类型；诊断专用，不验证实际 SDK emission。
-- `SystemPromptReadbackProbeResult`: Claude Code `systemPrompt` 选项 readback probe 结果类型；诊断专用，不验证实际 SDK prompt append 行为。
+- `SystemPromptLiveProbeResult`: Claude Code `systemPrompt` 选项 live behavior probe 结果类型；通过 nonce-bearing diagnostic query 验证同一条 preset-with-append SDK 路径确实影响模型响应。2026-06-04 将 System Prompt 矩阵分类从 `readback` 晋升为 `pass`，但最终 `pass` 依赖 readback wiring + same-path live proof 两层互补证据。
+- `SystemPromptReadbackProbeResult`: Claude Code `systemPrompt` 选项 readback probe 结果类型；诊断专用，验证 settings→SDK option mapping，不声称行为验证。
 - `PlanModeInstructionsReadbackProbeResult`: Claude Code `planModeInstructions` 选项 readback probe 结果类型；诊断专用，不验证实际 plan-mode behavior enforcement。
 - `SandboxReadbackProbeResult`: Claude Code `sandbox` 选项 readback probe 结果类型；诊断专用，不验证实际 OS-level sandbox enforcement 行为。
 - `DebugFileReadbackProbeResult`: Claude Code `debugFile` 选项 readback probe 结果类型；诊断专用，不验证实际 CLI debug file writing 行为。
 - `StrictMcpConfigReadbackProbeResult`: Claude Code `strictMcpConfig` 选项 readback probe 结果类型；诊断专用，不验证实际 MCP config validation 行为。
 - `DebugReadbackProbeResult`: Claude Code `debug` 选项 readback probe 结果类型；诊断专用，不验证实际 CLI debug log emission 行为。
+- `Context1mBetaReadbackProbeResult`: Claude Code `betas` 选项 readback probe 结果类型；诊断专用，不验证实际 beta 可用性。
+- `JsRuntimeReadbackProbeResult`: Claude Code `executable` 选项 readback probe 结果类型；诊断专用，不验证实际运行时选择行为。
+- `LoadTimeoutReadbackProbeResult`: Claude Code `loadTimeoutMs` 选项 readback probe 结果类型；诊断专用，不验证实际超时行为。
 - `buildClaudeCodeModelSelectorProviders` / `CLAUDE_CODE_EFFORT_VARIANTS`: Claude Code composer model aliases、SDK supported-model projection 与 effort variants helper。
 - `loadClaudeCodeSdk` / `buildClaudeCodeOptions` / `adaptMcpConfigForClaude` / `resolveClaudeCodeProcess` / `createClaudeCodeStreamNormalizer` / `createClaudeCodePermissionBridge`: Claude Code Phase 1 前置 SDK loading、options、MCP config adapter、process、stream 转换与 permission/question bridge helper。
 - `AgentService` / `AgentServiceInfo` / `AgentConnectionStatus` / `Disposable` / `StatusChangeHandler`: backend 抽象层核心契约与共享类型。

@@ -50,7 +50,7 @@ OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings`、`DEFAULT_
 
 `loadTimeoutMs` 为 readback only：通过 `buildClaudeCodeOptions` 传入 SDK `loadTimeoutMs` 选项（值为正整数），设置 Claude Code 子进程加载的最大超时时间（毫秒）。`null` 表示使用 SDK 默认超时。实际超时行为取决于 SDK/CLI 版本和运行时条件，无法从插件层独立验证。默认 `null`。UI 位于 Runtime 标签页，为数字文本输入，仅在下一次查询或重启会话时生效。空输入、非数字、零和负值均归一化为 `null`。
 
-`systemPrompt` 为 readback only：通过 `buildClaudeCodeOptions` 传入 SDK `systemPrompt` 选项。当非空时，使用 preset-with-append 形状 `{ type: 'preset', preset: 'claude_code', append: instructions }`；当为空时，使用默认 `{ type: 'preset', preset: 'claude_code' }`。这是 append-only seam，不会替换官方预设。实际 prompt append 行为（SDK 是否确实将指令追加到 preset 之后）无法从插件层独立验证。默认空字符串 `''`。UI 位于 Model & Thinking 标签页，为文本区域输入，仅在下一次查询或重启会话时生效。输入会被 trim，空白输入归一化为空字符串。
+`systemPrompt` 为 pass：通过两层互补证据成立。第一层是 readback proof：`runSystemPromptReadbackProbe()` 验证当前已保存的 `settings.systemPrompt` 会经由 `buildClaudeCodeOptions` 进入 SDK `systemPrompt` 选项；当非空时，使用 preset-with-append 形状 `{ type: 'preset', preset: 'claude_code', append: instructions }`；当为空时，使用默认 `{ type: 'preset', preset: 'claude_code' }`。第二层是 live behavior proof：`runSystemPromptLiveProbe()` 通过 `_diagnosticSystemPrompt` 走同一条 preset-with-append SDK 路径，注入 nonce-bearing diagnostic append，验证该路径确实会影响一次新的诊断查询响应。这是 append-only seam，不会替换官方预设；active session 不会被 live mutate。默认空字符串 `''`。UI 位于 Model & Thinking 标签页，为文本区域输入，仅在下一次查询或重启会话时生效。输入会被 trim，空白输入归一化为空字符串。
 
 ### 服务器与安全
 

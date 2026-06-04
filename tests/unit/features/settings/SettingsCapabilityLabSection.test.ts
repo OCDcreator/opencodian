@@ -1080,7 +1080,7 @@ describe('SettingsCapabilityLabSection', () => {
       'Resume Session At Position': { runtimeProof: 'pass', userSurface: 'diagnostic' },
       'Fork Session On Resume': { runtimeProof: 'pass', userSurface: 'diagnostic' },
       'AskUserQuestion Preview Format': { runtimeProof: 'readback', userSurface: 'hidden' },
-      'System Prompt': { runtimeProof: 'readback', userSurface: 'settings' },
+      'System Prompt': { runtimeProof: 'pass', userSurface: 'settings' },
     };
 
     for (const [name, expectedValues] of Object.entries(expected)) {
@@ -1110,9 +1110,9 @@ describe('SettingsCapabilityLabSection', () => {
       return firstCell?.textContent ?? '';
     });
     expect(verifiedCapabilities).toEqual(
-      expect.arrayContaining(['MCP Servers', 'Permission Approval', 'AskUserQuestion / Elicitation', 'Structured Output', 'Agent Definitions', 'Include Hook Events', 'Environment Variables', 'Fork Session', 'JSONL History Browser', 'Session Store', 'Import Session to Store', 'Resume Session', 'Session Detail', 'Backend Routing', 'Turn/Budget Limits', 'Skills', 'Agents (Subagents)', 'Subagent Transcript / Progress', 'Hooks', 'Disallowed Tools', 'Plugins', 'Restricted Built-in Tools', '/context Diagnostic', 'Session Title', 'Custom Session ID', 'Continue', 'Resume Session At Position', 'Fork Session On Resume']),
+      expect.arrayContaining(['MCP Servers', 'Permission Approval', 'AskUserQuestion / Elicitation', 'Structured Output', 'Agent Definitions', 'Include Hook Events', 'Environment Variables', 'Fork Session', 'JSONL History Browser', 'Session Store', 'Import Session to Store', 'Resume Session', 'Session Detail', 'Backend Routing', 'Turn/Budget Limits', 'Skills', 'Agents (Subagents)', 'Subagent Transcript / Progress', 'Hooks', 'Disallowed Tools', 'Plugins', 'Restricted Built-in Tools', '/context Diagnostic', 'Session Title', 'Custom Session ID', 'Continue', 'Resume Session At Position', 'Fork Session On Resume', 'System Prompt']),
     );
-    expect(verifiedCapabilities.length).toBe(28);
+    expect(verifiedCapabilities.length).toBe(29);
 
     // Total rows check
     expect(rows.length).toBe(46);
@@ -1128,9 +1128,9 @@ describe('SettingsCapabilityLabSection', () => {
       return firstCell?.textContent ?? '';
     });
     expect(readbackCapabilities).toEqual(
-      expect.arrayContaining(['File Checkpoint / Rewind', 'Allowed Tools', 'Fallback Model', 'Warm Startup', 'Sandbox', 'Prompt Suggestions', 'Task Budget', 'Plan Mode Instructions', 'Tool Aliases', 'Debug', 'Debug File', 'Strict MCP Config', '1M Context Beta', 'JS Runtime', 'Load Timeout', 'Stderr Diagnostic', 'AskUserQuestion Preview Format', 'System Prompt']),
+      expect.arrayContaining(['File Checkpoint / Rewind', 'Allowed Tools', 'Fallback Model', 'Warm Startup', 'Sandbox', 'Prompt Suggestions', 'Task Budget', 'Plan Mode Instructions', 'Tool Aliases', 'Debug', 'Debug File', 'Strict MCP Config', '1M Context Beta', 'JS Runtime', 'Load Timeout', 'Stderr Diagnostic', 'AskUserQuestion Preview Format']),
     );
-    expect(readbackCapabilities.length).toBe(18);
+    expect(readbackCapabilities.length).toBe(17);
 
     // Honesty rule: hidden capabilities must not have a settings or diagnostic surface chip.
     const hiddenRows = rows.filter((row) => (
@@ -6001,6 +6001,72 @@ describe('SettingsCapabilityLabSection', () => {
     expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-fail')).toBe(true);
   });
 
+  it('renders honest boundary text for stderr diagnostic proof', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runStderrDiagnosticProbe: jest.fn().mockResolvedValue({
+        classification: 'readback',
+        callbackWired: true,
+        isolatedDiagnosticOnly: true,
+        chunksReceived: 1,
+        totalBytes: 42,
+        sanitizedPreview: 'debug: loading model…',
+      }),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Stderr Diagnostic Proof')
+    )) as HTMLButtonElement | undefined;
+    expect(button).toBeTruthy();
+
+    button!.click();
+    await flushUi();
+
+    expect(containerEl.textContent).toContain('Isolated diagnostic query');
+    expect(containerEl.textContent).toContain('Active ordinary chat sessions do not gain a live stderr subscription');
+    expect(containerEl.textContent).toContain('No persistent raw-log surface');
+    expect(containerEl.textContent).toContain('file write is exposed');
+  });
+
+  it('renders stderr diagnostic proof copy from locale in Chinese', async () => {
+    setLocale('zh');
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runStderrDiagnosticProbe: jest.fn().mockResolvedValue({
+        classification: 'readback',
+        callbackWired: true,
+        isolatedDiagnosticOnly: true,
+        chunksReceived: 1,
+        totalBytes: 42,
+        sanitizedPreview: 'debug: loading model…',
+      }),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('运行 Stderr 诊断证明')
+    )) as HTMLButtonElement | undefined;
+    expect(button).toBeTruthy();
+
+    button!.click();
+    await flushUi();
+
+    expect(containerEl.textContent).toContain('隔离诊断查询');
+    expect(containerEl.textContent).toContain('活跃的普通聊天会话不会获得实时 stderr 订阅');
+    expect(containerEl.textContent).toContain('不会写入文件');
+  });
+
   it('renders Prompt Suggestions Readback Proof button', () => {
     const adapter = {
       listSessions: jest.fn().mockResolvedValue([]),
@@ -6050,6 +6116,128 @@ describe('SettingsCapabilityLabSection', () => {
     const proofMarker = containerEl.querySelector('[data-capability="Prompt Suggestions"]');
     expect(proofMarker).toBeTruthy();
     expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-readback')).toBe(true);
+    expect(containerEl.textContent).toContain('Readback');
+    expect(containerEl.textContent).toContain('Active sessions do not update live');
+  });
+
+  it('runs the prompt suggestions readback proof and marks fail when probe returns fail', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runPromptSuggestionsReadbackProbe: jest.fn().mockResolvedValue({
+        classification: 'fail',
+        optionWired: false,
+        optionValue: true,
+        sdkOptionPresent: false,
+        modelState: 'unknown',
+        error: 'promptSuggestions is enabled in settings but missing from built SDK options.',
+      }),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Prompt Suggestions Readback Proof')
+    )) as HTMLButtonElement | undefined;
+    expect(button).toBeTruthy();
+
+    button!.click();
+    await flushUi();
+
+    const proofMarker = containerEl.querySelector('[data-capability="Prompt Suggestions"]');
+    expect(proofMarker).toBeTruthy();
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-fail')).toBe(true);
+  });
+
+  it('marks fail when the prompt suggestions readback probe throws', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runPromptSuggestionsReadbackProbe: jest.fn().mockRejectedValue(new Error('probe crashed')),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Prompt Suggestions Readback Proof')
+    )) as HTMLButtonElement | undefined;
+    expect(button).toBeTruthy();
+
+    button!.click();
+    await flushUi();
+
+    const proofMarker = containerEl.querySelector('[data-capability="Prompt Suggestions"]');
+    expect(proofMarker).toBeTruthy();
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-fail')).toBe(true);
+  });
+
+  it('renders prompt suggestions readback proof copy from locale in Chinese', async () => {
+    setLocale('zh');
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runPromptSuggestionsReadbackProbe: jest.fn().mockResolvedValue({
+        classification: 'readback',
+        optionWired: true,
+        optionValue: true,
+        sdkOptionPresent: true,
+        modelState: 'claude',
+      }),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('运行提示建议 Readback 证明')
+    )) as HTMLButtonElement | undefined;
+    expect(button).toBeTruthy();
+
+    button!.click();
+    await flushUi();
+
+    expect(containerEl.textContent).toContain('诊断 readback');
+    expect(containerEl.textContent).toContain('仅在下次查询或重启会话时生效');
+  });
+
+  it('renders prompt suggestions proof output with model state and blocker note', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runPromptSuggestionsReadbackProbe: jest.fn().mockResolvedValue({
+        classification: 'readback',
+        optionWired: true,
+        optionValue: true,
+        sdkOptionPresent: true,
+        modelState: 'non-claude',
+        blockerNote: 'Option enabled but model is non-Claude. Prompt suggestions piggyback on Claude-specific prompt caching; non-Claude models may not emit suggestions.',
+      }),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Prompt Suggestions Readback Proof')
+    )) as HTMLButtonElement | undefined;
+    expect(button).toBeTruthy();
+
+    button!.click();
+    await flushUi();
+
+    expect(containerEl.textContent).toContain('Non-Claude');
+    expect(containerEl.textContent).toContain('non-Claude');
+    expect(containerEl.textContent).toContain('piggyback');
   });
 
   it('renders System Prompt Readback Proof button', () => {
@@ -6104,6 +6292,123 @@ describe('SettingsCapabilityLabSection', () => {
     const proofMarker = containerEl.querySelector('[data-capability="System Prompt"]');
     expect(proofMarker).toBeTruthy();
     expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-readback')).toBe(true);
+  });
+
+  it('renders System Prompt Live Behavior Proof button', () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runSystemPromptLiveProbe: jest.fn(),
+      capabilities: new Set(),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run System Prompt Live Behavior Proof')
+    )) as HTMLButtonElement | undefined;
+    expect(button).toBeTruthy();
+  });
+
+  it('runs the system prompt live proof and marks pass when nonce is recalled', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runSystemPromptLiveProbe: jest.fn().mockResolvedValue({
+        classification: 'pass',
+        nonce: 'abc123',
+        nonceRecalled: true,
+        responsePreview: 'The secret codeword is abc123',
+      }),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run System Prompt Live Behavior Proof')
+    )) as HTMLButtonElement | undefined;
+    expect(button).toBeTruthy();
+
+    button!.click();
+    await flushUi();
+
+    expect(adapter.runSystemPromptLiveProbe).toHaveBeenCalled();
+
+    const proofMarker = containerEl.querySelector('[data-capability="System Prompt"]');
+    expect(proofMarker).toBeTruthy();
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-pass')).toBe(true);
+    expect(containerEl.textContent).toContain('Diagnostic live proof: this probe injects a one-off appended system prompt through the same preset-with-append SDK path.');
+    expect(containerEl.textContent).toContain('Use System Prompt Readback Proof to confirm the currently saved appended-instructions value is wired into that same path.');
+    expect(containerEl.textContent).toContain('Fresh diagnostic query only. Active sessions are not mutated.');
+    expect(containerEl.textContent).toContain('the preset-with-append system prompt path influenced the model response');
+  });
+
+  it('runs the system prompt live proof and marks fail when nonce is not recalled', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runSystemPromptLiveProbe: jest.fn().mockResolvedValue({
+        classification: 'fail',
+        nonce: 'abc123',
+        nonceRecalled: false,
+        responsePreview: 'I do not know.',
+        error: 'Nonce not found in response.',
+      }),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run System Prompt Live Behavior Proof')
+    )) as HTMLButtonElement | undefined;
+    expect(button).toBeTruthy();
+
+    button!.click();
+    await flushUi();
+
+    const proofMarker = containerEl.querySelector('[data-capability="System Prompt"]');
+    expect(proofMarker).toBeTruthy();
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-fail')).toBe(true);
+  });
+
+  it('renders system prompt live proof copy from locale in Chinese', async () => {
+    setLocale('zh');
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runSystemPromptLiveProbe: jest.fn().mockResolvedValue({
+        classification: 'pass',
+        nonce: 'abc123',
+        nonceRecalled: true,
+        responsePreview: 'secret codeword: abc123',
+      }),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('运行 System Prompt 实时行为证明')
+    )) as HTMLButtonElement | undefined;
+    expect(button).toBeTruthy();
+
+    button!.click();
+    await flushUi();
+
+    expect(containerEl.textContent).toContain('诊断实时证明');
+    expect(containerEl.textContent).toContain('当前已保存的附加指令值是否接入同一路径');
+    expect(containerEl.textContent).toContain('不会修改活跃会话');
   });
 
   it('renders Task Budget Readback Proof button', () => {
@@ -6173,12 +6478,12 @@ describe('SettingsCapabilityLabSection', () => {
 
     section.attachTabbed(containerEl, 'capability-lab');
     const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
-      el.textContent?.includes('Run Sandbox Readback Proof')
+      el.textContent?.includes(t('settings.capabilityLab.proofs.sandbox.button'))
     )) as HTMLButtonElement | undefined;
     expect(button).toBeTruthy();
   });
 
-  it('runs the sandbox readback proof and marks readback', async () => {
+  it('runs the sandbox readback proof and marks readback with lifecycle boundary', async () => {
     const adapter = {
       listSessions: jest.fn().mockResolvedValue([]),
       runSandboxReadbackProbe: jest.fn().mockResolvedValue({
@@ -6204,7 +6509,7 @@ describe('SettingsCapabilityLabSection', () => {
 
     section.attachTabbed(containerEl, 'capability-lab');
     const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
-      el.textContent?.includes('Run Sandbox Readback Proof')
+      el.textContent?.includes(t('settings.capabilityLab.proofs.sandbox.button'))
     )) as HTMLButtonElement | undefined;
     expect(button).toBeTruthy();
 
@@ -6213,9 +6518,133 @@ describe('SettingsCapabilityLabSection', () => {
 
     expect(adapter.runSandboxReadbackProbe).toHaveBeenCalled();
 
+    // Lifecycle boundary must be explicit in the proof output
+    expect(containerEl.textContent).toContain(
+      t('settings.capabilityLab.proofs.sandbox.lifecycleBoundary')
+    );
+
+    // Honesty boundary must be explicit
+    expect(containerEl.textContent).toContain(
+      t('settings.capabilityLab.proofs.sandbox.boundary')
+    );
+
+    // Readback classification marker
     const proofMarker = containerEl.querySelector('[data-capability="Sandbox"]');
     expect(proofMarker).toBeTruthy();
     expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-readback')).toBe(true);
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-pass')).toBe(false);
+  });
+
+  it('renders sandbox proof copy from locale in Chinese', async () => {
+    setLocale('zh');
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runSandboxReadbackProbe: jest.fn().mockResolvedValue({
+        classification: 'readback',
+        optionWired: true,
+        settingEnabled: true,
+        settingFailIfUnavailable: true,
+        settingAutoAllowBashIfSandboxed: true,
+        sdkOptionPresent: true,
+        sdkEnabled: true,
+        sdkFailIfUnavailable: true,
+        sdkAutoAllowBashIfSandboxed: true,
+        enabledMatch: true,
+        failIfUnavailableMatch: true,
+        autoAllowBashIfSandboxedMatch: true,
+      }),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes(t('settings.capabilityLab.proofs.sandbox.button'))
+    )) as HTMLButtonElement | undefined;
+    expect(button).toBeTruthy();
+
+    button!.click();
+    await flushUi();
+
+    // Chinese lifecycle boundary must appear
+    expect(containerEl.textContent).toContain(
+      t('settings.capabilityLab.proofs.sandbox.lifecycleBoundary')
+    );
+    // Chinese boundary notice must appear
+    expect(containerEl.textContent).toContain(
+      t('settings.capabilityLab.proofs.sandbox.boundary')
+    );
+    // Chinese readback marker
+    expect(containerEl.textContent).toContain(
+      t('settings.capabilityLab.proofs.sandbox.readback')
+    );
+  });
+
+  it('marks fail when the sandbox readback probe returns fail', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runSandboxReadbackProbe: jest.fn().mockResolvedValue({
+        classification: 'fail',
+        optionWired: false,
+        settingEnabled: true,
+        settingFailIfUnavailable: true,
+        settingAutoAllowBashIfSandboxed: true,
+        sdkOptionPresent: false,
+        enabledMatch: false,
+        failIfUnavailableMatch: false,
+        autoAllowBashIfSandboxedMatch: false,
+        error: 'sandbox option not wired into SDK options',
+      }),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes(t('settings.capabilityLab.proofs.sandbox.button'))
+    )) as HTMLButtonElement | undefined;
+    expect(button).toBeTruthy();
+
+    button!.click();
+    await flushUi();
+
+    const proofMarker = containerEl.querySelector('[data-capability="Sandbox"]');
+    expect(proofMarker).toBeTruthy();
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-fail')).toBe(true);
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-readback')).toBe(false);
+    expect(containerEl.textContent).toContain('sandbox option not wired');
+  });
+
+  it('marks fail when the sandbox readback probe throws', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runSandboxReadbackProbe: jest.fn().mockRejectedValue(new Error('probe crashed')),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes(t('settings.capabilityLab.proofs.sandbox.button'))
+    )) as HTMLButtonElement | undefined;
+    expect(button).toBeTruthy();
+
+    button!.click();
+    await flushUi();
+
+    const proofMarker = containerEl.querySelector('[data-capability="Sandbox"]');
+    expect(proofMarker).toBeTruthy();
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-fail')).toBe(true);
+    expect(containerEl.textContent).toContain('probe crashed');
   });
 
   it('renders Plan Mode Instructions Readback Proof button', () => {
@@ -6232,7 +6661,7 @@ describe('SettingsCapabilityLabSection', () => {
 
     section.attachTabbed(containerEl, 'capability-lab');
     const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
-      el.textContent?.includes('Run Plan Mode Instructions Readback Proof')
+      el.textContent?.includes(t('settings.capabilityLab.proofs.planModeInstructions.button'))
     )) as HTMLButtonElement | undefined;
     expect(button).toBeTruthy();
   });
@@ -6258,7 +6687,7 @@ describe('SettingsCapabilityLabSection', () => {
 
     section.attachTabbed(containerEl, 'capability-lab');
     const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
-      el.textContent?.includes('Run Plan Mode Instructions Readback Proof')
+      el.textContent?.includes(t('settings.capabilityLab.proofs.planModeInstructions.button'))
     )) as HTMLButtonElement | undefined;
     expect(button).toBeTruthy();
 
@@ -6266,6 +6695,11 @@ describe('SettingsCapabilityLabSection', () => {
     await flushUi();
 
     expect(adapter.runPlanModeInstructionsReadbackProbe).toHaveBeenCalled();
+
+    // Lifecycle boundary must be explicit in the proof output
+    expect(containerEl.textContent).toContain(
+      t('settings.capabilityLab.proofs.planModeInstructions.lifecycleBoundary')
+    );
 
     const proofMarker = containerEl.querySelector('[data-capability="Plan Mode Instructions"]');
     expect(proofMarker).toBeTruthy();
@@ -6293,19 +6727,97 @@ describe('SettingsCapabilityLabSection', () => {
 
     section.attachTabbed(containerEl, 'capability-lab');
     const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
-      el.textContent?.includes('Run Plan Mode Instructions Readback Proof')
+      el.textContent?.includes(t('settings.capabilityLab.proofs.planModeInstructions.button'))
     )) as HTMLButtonElement | undefined;
     expect(button).toBeTruthy();
 
     button!.click();
     await flushUi();
 
+    // Builder wiring nuance must surface from locale
     expect(containerEl.textContent).toContain(
-      'Current builder behavior: the plugin still wires a non-empty setting into SDK options outside Plan mode.'
+      t('settings.capabilityLab.proofs.planModeInstructions.builderWiringNuance')
     );
+    // Must remain readback, not pass
+    const proofMarker = containerEl.querySelector('[data-capability="Plan Mode Instructions"]');
+    expect(proofMarker).toBeTruthy();
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-readback')).toBe(true);
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-pass')).toBe(false);
+  });
+
+  it('renders plan mode instructions proof copy from locale in Chinese', async () => {
+    setLocale('zh');
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runPlanModeInstructionsReadbackProbe: jest.fn().mockResolvedValue({
+        classification: 'readback',
+        optionWired: true,
+        permissionMode: 'plan',
+        settingValue: 'Use bullet points.',
+        sdkOptionPresent: true,
+        sdkValue: 'Use bullet points.',
+        valueMatch: true,
+      }),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes(t('settings.capabilityLab.proofs.planModeInstructions.button'))
+    )) as HTMLButtonElement | undefined;
+    expect(button).toBeTruthy();
+
+    button!.click();
+    await flushUi();
+
+    // Chinese lifecycle boundary must appear
     expect(containerEl.textContent).toContain(
-      'Effective behavior still depends on switching Permission mode to Plan.'
+      t('settings.capabilityLab.proofs.planModeInstructions.lifecycleBoundary')
     );
+    // Chinese boundary notice must appear
+    expect(containerEl.textContent).toContain(
+      t('settings.capabilityLab.proofs.planModeInstructions.boundary')
+    );
+  });
+
+  it('marks fail when the plan mode instructions readback probe returns fail', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runPlanModeInstructionsReadbackProbe: jest.fn().mockResolvedValue({
+        classification: 'fail',
+        error: 'value mismatch',
+        optionWired: true,
+        permissionMode: 'plan',
+        settingValue: 'Use bullet points.',
+        sdkOptionPresent: true,
+        sdkValue: 'Different value.',
+        valueMatch: false,
+      }),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes(t('settings.capabilityLab.proofs.planModeInstructions.button'))
+    )) as HTMLButtonElement | undefined;
+    expect(button).toBeTruthy();
+
+    button!.click();
+    await flushUi();
+
+    const proofMarker = containerEl.querySelector('[data-capability="Plan Mode Instructions"]');
+    expect(proofMarker).toBeTruthy();
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-fail')).toBe(true);
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-readback')).toBe(false);
+    expect(containerEl.textContent).toContain('value mismatch');
   });
 
   it('marks fail when the plan mode instructions readback probe throws', async () => {
@@ -6321,7 +6833,7 @@ describe('SettingsCapabilityLabSection', () => {
 
     section.attachTabbed(containerEl, 'capability-lab');
     const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
-      el.textContent?.includes('Run Plan Mode Instructions Readback Proof')
+      el.textContent?.includes(t('settings.capabilityLab.proofs.planModeInstructions.button'))
     )) as HTMLButtonElement | undefined;
     expect(button).toBeTruthy();
 
@@ -6334,7 +6846,7 @@ describe('SettingsCapabilityLabSection', () => {
     expect(containerEl.textContent).toContain('probe exploded');
   });
 
-  it('renders Tool Aliases Readback Proof button', () => {
+  it('renders Tool Aliases Readback Proof button backed by locale key', () => {
     const adapter = {
       listSessions: jest.fn().mockResolvedValue([]),
       runToolAliasesReadbackProbe: jest.fn(),
@@ -6348,12 +6860,12 @@ describe('SettingsCapabilityLabSection', () => {
 
     section.attachTabbed(containerEl, 'capability-lab');
     const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
-      el.textContent?.includes('Run Tool Aliases Readback Proof')
+      el.textContent?.includes(t('settings.capabilityLab.proofs.toolAliases.button'))
     )) as HTMLButtonElement | undefined;
     expect(button).toBeTruthy();
   });
 
-  it('runs the tool aliases readback proof and marks readback', async () => {
+  it('runs the tool aliases readback proof and marks readback with lifecycle boundary', async () => {
     const adapter = {
       listSessions: jest.fn().mockResolvedValue([]),
       runToolAliasesReadbackProbe: jest.fn().mockResolvedValue({
@@ -6374,7 +6886,7 @@ describe('SettingsCapabilityLabSection', () => {
 
     section.attachTabbed(containerEl, 'capability-lab');
     const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
-      el.textContent?.includes('Run Tool Aliases Readback Proof')
+      el.textContent?.includes(t('settings.capabilityLab.proofs.toolAliases.button'))
     )) as HTMLButtonElement | undefined;
     expect(button).toBeTruthy();
 
@@ -6383,17 +6895,36 @@ describe('SettingsCapabilityLabSection', () => {
 
     expect(adapter.runToolAliasesReadbackProbe).toHaveBeenCalled();
 
+    // Lifecycle boundary must be explicit in the proof output
+    expect(containerEl.textContent).toContain(
+      t('settings.capabilityLab.proofs.toolAliases.lifecycleBoundary')
+    );
+
+    // Honesty boundary must be explicit
+    expect(containerEl.textContent).toContain(
+      t('settings.capabilityLab.proofs.toolAliases.boundary')
+    );
+
+    // Readback classification marker
     const proofMarker = containerEl.querySelector('[data-capability="Tool Aliases"]');
     expect(proofMarker).toBeTruthy();
     expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-readback')).toBe(true);
-    expect(containerEl.textContent).toContain('Defensive copy preserved: ✓ yes');
-    expect(containerEl.textContent).toContain('Active sessions do not update live');
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-pass')).toBe(false);
   });
 
-  it('marks fail when the tool aliases readback probe throws', async () => {
+  it('renders tool aliases proof copy from locale in Chinese', async () => {
+    setLocale('zh');
     const adapter = {
       listSessions: jest.fn().mockResolvedValue([]),
-      runToolAliasesReadbackProbe: jest.fn().mockRejectedValue(new Error('probe exploded')),
+      runToolAliasesReadbackProbe: jest.fn().mockResolvedValue({
+        classification: 'readback',
+        optionWired: true,
+        settingEmpty: false,
+        sdkOptionPresent: true,
+        sdkEntryCount: 2,
+        entriesMatch: true,
+        defensiveCopyPreserved: true,
+      }),
     };
     const containerEl = document.createElement('div');
     const section = new SettingsCapabilityLabSection({
@@ -6403,7 +6934,50 @@ describe('SettingsCapabilityLabSection', () => {
 
     section.attachTabbed(containerEl, 'capability-lab');
     const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
-      el.textContent?.includes('Run Tool Aliases Readback Proof')
+      el.textContent?.includes(t('settings.capabilityLab.proofs.toolAliases.button'))
+    )) as HTMLButtonElement | undefined;
+    expect(button).toBeTruthy();
+
+    button!.click();
+    await flushUi();
+
+    // Chinese lifecycle boundary must appear
+    expect(containerEl.textContent).toContain(
+      t('settings.capabilityLab.proofs.toolAliases.lifecycleBoundary')
+    );
+    // Chinese boundary notice must appear
+    expect(containerEl.textContent).toContain(
+      t('settings.capabilityLab.proofs.toolAliases.boundary')
+    );
+    // Chinese readback marker
+    expect(containerEl.textContent).toContain(
+      t('settings.capabilityLab.proofs.toolAliases.readback')
+    );
+  });
+
+  it('marks fail when the tool aliases readback probe returns fail', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runToolAliasesReadbackProbe: jest.fn().mockResolvedValue({
+        classification: 'fail',
+        optionWired: true,
+        settingEmpty: false,
+        sdkOptionPresent: true,
+        sdkEntryCount: 1,
+        entriesMatch: false,
+        defensiveCopyPreserved: true,
+        error: 'toolAliases entries mismatch',
+      }),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes(t('settings.capabilityLab.proofs.toolAliases.button'))
     )) as HTMLButtonElement | undefined;
     expect(button).toBeTruthy();
 
@@ -6413,7 +6987,201 @@ describe('SettingsCapabilityLabSection', () => {
     const proofMarker = containerEl.querySelector('[data-capability="Tool Aliases"]');
     expect(proofMarker).toBeTruthy();
     expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-fail')).toBe(true);
-    expect(containerEl.textContent).toContain('probe exploded');
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-readback')).toBe(false);
+    expect(containerEl.textContent).toContain('toolAliases entries mismatch');
+  });
+
+  it('marks fail when the tool aliases readback probe throws', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runToolAliasesReadbackProbe: jest.fn().mockRejectedValue(new Error('probe threw')),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes(t('settings.capabilityLab.proofs.toolAliases.button'))
+    )) as HTMLButtonElement | undefined;
+    expect(button).toBeTruthy();
+
+    button!.click();
+    await flushUi();
+
+    const proofMarker = containerEl.querySelector('[data-capability="Tool Aliases"]');
+    expect(proofMarker).toBeTruthy();
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-fail')).toBe(true);
+    expect(containerEl.textContent).toContain('probe threw');
+  });
+
+  it('renders Task Budget Readback Proof button backed by locale key', () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runTaskBudgetReadbackProbe: jest.fn(),
+      capabilities: new Set(),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes(t('settings.capabilityLab.proofs.taskBudget.button'))
+    )) as HTMLButtonElement | undefined;
+    expect(button).toBeTruthy();
+  });
+
+  it('runs the task budget readback proof and marks readback with lifecycle boundary', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runTaskBudgetReadbackProbe: jest.fn().mockResolvedValue({
+        classification: 'readback',
+        optionWired: true,
+        settingValue: 50000,
+        sdkOptionPresent: true,
+        sdkTotalValue: 50000,
+        totalMatch: true,
+      }),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes(t('settings.capabilityLab.proofs.taskBudget.button'))
+    )) as HTMLButtonElement | undefined;
+    expect(button).toBeTruthy();
+
+    button!.click();
+    await flushUi();
+
+    expect(adapter.runTaskBudgetReadbackProbe).toHaveBeenCalled();
+
+    // Lifecycle boundary must be explicit in the proof output
+    expect(containerEl.textContent).toContain(
+      t('settings.capabilityLab.proofs.taskBudget.lifecycleBoundary')
+    );
+
+    // Honesty boundary must be explicit
+    expect(containerEl.textContent).toContain(
+      t('settings.capabilityLab.proofs.taskBudget.boundary')
+    );
+
+    // Readback classification marker
+    const proofMarker = containerEl.querySelector('[data-capability="Task Budget"]');
+    expect(proofMarker).toBeTruthy();
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-readback')).toBe(true);
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-pass')).toBe(false);
+  });
+
+  it('renders task budget proof copy from locale in Chinese', async () => {
+    setLocale('zh');
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runTaskBudgetReadbackProbe: jest.fn().mockResolvedValue({
+        classification: 'readback',
+        optionWired: true,
+        settingValue: 50000,
+        sdkOptionPresent: true,
+        sdkTotalValue: 50000,
+        totalMatch: true,
+      }),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes(t('settings.capabilityLab.proofs.taskBudget.button'))
+    )) as HTMLButtonElement | undefined;
+    expect(button).toBeTruthy();
+
+    button!.click();
+    await flushUi();
+
+    // Chinese lifecycle boundary must appear
+    expect(containerEl.textContent).toContain(
+      t('settings.capabilityLab.proofs.taskBudget.lifecycleBoundary')
+    );
+    // Chinese boundary notice must appear
+    expect(containerEl.textContent).toContain(
+      t('settings.capabilityLab.proofs.taskBudget.boundary')
+    );
+    // Chinese readback marker
+    expect(containerEl.textContent).toContain(
+      t('settings.capabilityLab.proofs.taskBudget.readback')
+    );
+  });
+
+  it('marks fail when the task budget readback probe returns fail', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runTaskBudgetReadbackProbe: jest.fn().mockResolvedValue({
+        classification: 'fail',
+        optionWired: false,
+        settingValue: 50000,
+        sdkOptionPresent: false,
+        totalMatch: false,
+        error: 'taskBudget is 50000 in settings but SDK options have total=undefined.',
+      }),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes(t('settings.capabilityLab.proofs.taskBudget.button'))
+    )) as HTMLButtonElement | undefined;
+    expect(button).toBeTruthy();
+
+    button!.click();
+    await flushUi();
+
+    const proofMarker = containerEl.querySelector('[data-capability="Task Budget"]');
+    expect(proofMarker).toBeTruthy();
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-fail')).toBe(true);
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-readback')).toBe(false);
+    expect(containerEl.textContent).toContain('50000 in settings');
+  });
+
+  it('marks fail when the task budget readback probe throws', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runTaskBudgetReadbackProbe: jest.fn().mockRejectedValue(new Error('probe crashed')),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes(t('settings.capabilityLab.proofs.taskBudget.button'))
+    )) as HTMLButtonElement | undefined;
+    expect(button).toBeTruthy();
+
+    button!.click();
+    await flushUi();
+
+    const proofMarker = containerEl.querySelector('[data-capability="Task Budget"]');
+    expect(proofMarker).toBeTruthy();
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-fail')).toBe(true);
+    expect(containerEl.textContent).toContain('probe crashed');
   });
 
   it('renders Debug File Readback Proof button', () => {
@@ -6499,7 +7267,7 @@ describe('SettingsCapabilityLabSection', () => {
     expect(containerEl.textContent).toContain('probe exploded');
   });
 
-  it('renders Debug Readback Proof button', () => {
+  it('renders Debug Readback Proof button from locale', () => {
     const adapter = {
       listSessions: jest.fn().mockResolvedValue([]),
       runDebugReadbackProbe: jest.fn(),
@@ -6512,12 +7280,12 @@ describe('SettingsCapabilityLabSection', () => {
 
     section.attachTabbed(containerEl, 'capability-lab');
     const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
-      el.textContent?.includes('Run Debug Readback Proof')
+      el.textContent?.includes(t('settings.capabilityLab.proofs.debug.button'))
     )) as HTMLButtonElement | undefined;
     expect(button).toBeTruthy();
   });
 
-  it('runs the debug readback proof and marks readback', async () => {
+  it('runs the debug readback proof and marks readback with lifecycle boundary', async () => {
     const adapter = {
       listSessions: jest.fn().mockResolvedValue([]),
       runDebugReadbackProbe: jest.fn().mockResolvedValue({
@@ -6536,7 +7304,7 @@ describe('SettingsCapabilityLabSection', () => {
 
     section.attachTabbed(containerEl, 'capability-lab');
     const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
-      el.textContent?.includes('Run Debug Readback Proof')
+      el.textContent?.includes(t('settings.capabilityLab.proofs.debug.button'))
     )) as HTMLButtonElement | undefined;
     expect(button).toBeTruthy();
 
@@ -6548,11 +7316,81 @@ describe('SettingsCapabilityLabSection', () => {
     const proofMarker = containerEl.querySelector('[data-capability="Debug"]');
     expect(proofMarker).toBeTruthy();
     expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-readback')).toBe(true);
-    expect(containerEl.textContent).toContain('Diagnostic readback only');
-    expect(containerEl.textContent).toContain('Actual CLI debug log emission is not independently verified');
-    expect(containerEl.textContent).toContain('Applies to the next query');
-    expect(containerEl.textContent).toContain('Active sessions do not update live');
-    expect(containerEl.textContent).toContain('debugFile is a separate seam');
+    expect(containerEl.textContent).toContain(t('settings.capabilityLab.proofs.debug.boundary'));
+    expect(containerEl.textContent).toContain(t('settings.capabilityLab.proofs.debug.lifecycleBoundary'));
+    expect(containerEl.textContent).not.toContain('restarted session');
+    expect(containerEl.textContent).toContain(t('settings.capabilityLab.proofs.debug.readback'));
+  });
+
+  it('renders debug proof copy from locale in Chinese', async () => {
+    setLocale('zh');
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runDebugReadbackProbe: jest.fn().mockResolvedValue({
+        classification: 'readback',
+        optionWired: true,
+        settingValue: true,
+        sdkOptionPresent: true,
+        sdkValue: true,
+        valueMatch: true,
+      }),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes(t('settings.capabilityLab.proofs.debug.button'))
+    )) as HTMLButtonElement | undefined;
+    expect(button).toBeTruthy();
+
+    button!.click();
+    await flushUi();
+
+    expect(containerEl.textContent).toContain(t('settings.capabilityLab.proofs.debug.title'));
+    expect(containerEl.textContent).toContain(t('settings.capabilityLab.proofs.debug.boundary'));
+    expect(containerEl.textContent).toContain(t('settings.capabilityLab.proofs.debug.lifecycleBoundary'));
+    expect(containerEl.textContent).not.toContain('重启会话');
+    expect(containerEl.textContent).toContain(t('settings.capabilityLab.proofs.debug.readback'));
+    setLocale('en');
+  });
+
+  it('marks fail when the debug readback probe returns fail classification', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runDebugReadbackProbe: jest.fn().mockResolvedValue({
+        classification: 'fail',
+        optionWired: true,
+        settingValue: true,
+        sdkOptionPresent: false,
+        valueMatch: false,
+        error: 'SDK option missing',
+      }),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes(t('settings.capabilityLab.proofs.debug.button'))
+    )) as HTMLButtonElement | undefined;
+    expect(button).toBeTruthy();
+
+    button!.click();
+    await flushUi();
+
+    const proofMarker = containerEl.querySelector('[data-capability="Debug"]');
+    expect(proofMarker).toBeTruthy();
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-fail')).toBe(true);
+    expect(containerEl.textContent).toContain(t('settings.capabilityLab.proofs.debug.fail', {
+      error: 'SDK option missing',
+    }));
   });
 
   it('marks fail when the debug readback probe throws', async () => {
@@ -6568,7 +7406,7 @@ describe('SettingsCapabilityLabSection', () => {
 
     section.attachTabbed(containerEl, 'capability-lab');
     const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
-      el.textContent?.includes('Run Debug Readback Proof')
+      el.textContent?.includes(t('settings.capabilityLab.proofs.debug.button'))
     )) as HTMLButtonElement | undefined;
     expect(button).toBeTruthy();
 
@@ -6578,7 +7416,9 @@ describe('SettingsCapabilityLabSection', () => {
     const proofMarker = containerEl.querySelector('[data-capability="Debug"]');
     expect(proofMarker).toBeTruthy();
     expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-fail')).toBe(true);
-    expect(containerEl.textContent).toContain('probe exploded');
+    expect(containerEl.textContent).toContain(t('settings.capabilityLab.proofs.debug.threw', {
+      error: 'probe exploded',
+    }));
   });
 
   it('renders Strict MCP Config Readback Proof button', () => {
@@ -6663,6 +7503,89 @@ describe('SettingsCapabilityLabSection', () => {
     expect(proofMarker).toBeTruthy();
     expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-fail')).toBe(true);
     expect(containerEl.textContent).toContain('strict mcp probe exploded');
+  });
+
+  it('renders 1M Context Beta Readback Proof button', () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runContext1mBetaReadbackProbe: jest.fn(),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run 1M Context Beta Readback Proof')
+    )) as HTMLButtonElement | undefined;
+    expect(button).toBeTruthy();
+  });
+
+  it('runs the 1M Context Beta readback proof and marks readback', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runContext1mBetaReadbackProbe: jest.fn().mockResolvedValue({
+        classification: 'readback',
+        optionWired: true,
+        settingValue: true,
+        sdkOptionPresent: true,
+        sdkValue: ['context-1m-2025-08-07'],
+        valueMatch: true,
+      }),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run 1M Context Beta Readback Proof')
+    )) as HTMLButtonElement | undefined;
+    expect(button).toBeTruthy();
+
+    button!.click();
+    await flushUi();
+
+    expect(adapter.runContext1mBetaReadbackProbe).toHaveBeenCalled();
+
+    const proofMarker = containerEl.querySelector('[data-capability="1M Context Beta"]');
+    expect(proofMarker).toBeTruthy();
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-readback')).toBe(true);
+    expect(containerEl.textContent).toContain('Diagnostic readback only');
+    expect(containerEl.textContent).toContain('Actual beta availability depends on selected model');
+    expect(containerEl.textContent).toContain('Applies to the next query');
+    expect(containerEl.textContent).toContain('Active sessions do not update live');
+    expect(containerEl.textContent).toContain('No generic beta management');
+  });
+
+  it('marks fail when the 1M Context Beta readback probe throws', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runContext1mBetaReadbackProbe: jest.fn().mockRejectedValue(new Error('beta probe exploded')),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run 1M Context Beta Readback Proof')
+    )) as HTMLButtonElement | undefined;
+    expect(button).toBeTruthy();
+
+    button!.click();
+    await flushUi();
+
+    const proofMarker = containerEl.querySelector('[data-capability="1M Context Beta"]');
+    expect(proofMarker).toBeTruthy();
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-fail')).toBe(true);
+    expect(containerEl.textContent).toContain('beta probe exploded');
   });
 
   it('renders Custom Session ID Proof button', () => {
@@ -7320,5 +8243,132 @@ describe('SettingsCapabilityLabSection', () => {
     const proofMarker = containerEl.querySelector('[data-capability="Session Title"]');
     expect(proofMarker).toBeTruthy();
     expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-fail')).toBe(true);
+  });
+
+  it('renders JS Runtime readback proof button and shows readback output', async () => {
+    const adapter = {
+      runJsRuntimeReadbackProbe: jest.fn().mockResolvedValue({
+        classification: 'readback',
+        optionWired: true,
+        settingValue: 'node',
+        emptySetting: false,
+        sdkOptionPresent: true,
+        sdkValue: 'node',
+        valueMatch: true,
+      }),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run JS Runtime Readback Proof')
+    )) as HTMLButtonElement | undefined;
+    expect(button).toBeTruthy();
+
+    button!.click();
+    await flushUi();
+
+    expect(adapter.runJsRuntimeReadbackProbe).toHaveBeenCalled();
+    expect(containerEl.textContent).toContain('JS Runtime Readback Proof');
+    expect(containerEl.textContent).toContain('Option wired: ✓ yes');
+    expect(containerEl.textContent).toContain('Setting value: node');
+    expect(containerEl.textContent).toContain('SDK option present: ✓ yes');
+    expect(containerEl.textContent).toContain('SDK value: node');
+    expect(containerEl.textContent).toContain('Value match: ✓ yes');
+  });
+
+  it('renders JS Runtime readback proof button and shows error on thrown error', async () => {
+    const adapter = {
+      runJsRuntimeReadbackProbe: jest.fn().mockRejectedValue(new Error('probe exploded')),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run JS Runtime Readback Proof')
+    )) as HTMLButtonElement | undefined;
+    expect(button).toBeTruthy();
+
+    button!.click();
+    await flushUi();
+
+    expect(containerEl.textContent).toContain('JS Runtime Readback Proof');
+    expect(containerEl.textContent).toContain('probe exploded');
+  });
+
+  it('renders Load Timeout readback proof button and shows readback output', async () => {
+    const adapter = {
+      runLoadTimeoutReadbackProbe: jest.fn().mockResolvedValue({
+        classification: 'readback',
+        optionWired: true,
+        settingValue: 60000,
+        sdkOptionPresent: true,
+        sdkValue: 60000,
+        valueMatch: true,
+      }),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Load Timeout Readback Proof')
+    )) as HTMLButtonElement | undefined;
+    expect(button).toBeTruthy();
+
+    button!.click();
+    await flushUi();
+
+    expect(adapter.runLoadTimeoutReadbackProbe).toHaveBeenCalled();
+    const proofMarker = containerEl.querySelector('[data-capability="Load Timeout"]');
+    expect(proofMarker).toBeTruthy();
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-readback')).toBe(true);
+    expect(containerEl.textContent).toContain('Load Timeout Readback Proof');
+    expect(containerEl.textContent).toContain('Diagnostic readback only');
+    expect(containerEl.textContent).toContain('Actual timeout behavior depends on the SDK/CLI version and runtime conditions');
+    expect(containerEl.textContent).toContain('Applies to the next query or restarted session only');
+    expect(containerEl.textContent).toContain('Active sessions do not update live');
+    expect(containerEl.textContent).toContain('Option wired: ✓ yes');
+    expect(containerEl.textContent).toContain('Setting value: 60000');
+    expect(containerEl.textContent).toContain('SDK option present: ✓ yes');
+    expect(containerEl.textContent).toContain('SDK value: 60000');
+    expect(containerEl.textContent).toContain('Value match: ✓ yes');
+  });
+
+  it('renders Load Timeout readback proof button and shows error on thrown error', async () => {
+    const adapter = {
+      runLoadTimeoutReadbackProbe: jest.fn().mockRejectedValue(new Error('probe exploded')),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Load Timeout Readback Proof')
+    )) as HTMLButtonElement | undefined;
+    expect(button).toBeTruthy();
+
+    button!.click();
+    await flushUi();
+
+    const proofMarker = containerEl.querySelector('[data-capability="Load Timeout"]');
+    expect(proofMarker).toBeTruthy();
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-fail')).toBe(true);
+    expect(containerEl.textContent).toContain('Load Timeout Readback Proof');
+    expect(containerEl.textContent).toContain('probe exploded');
   });
 });

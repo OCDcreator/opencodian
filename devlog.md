@@ -11,6 +11,345 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-06-04 Debug — Readback Hardening / Locale-Backed Proof / Lifecycle Coverage / Stable Settings Regression
+
+### What changed
+
+- **src/features/settings/SettingsCapabilityLabSection.ts**:
+  - Replaced hardcoded English proof button text (`'Run Debug Readback Proof'`) with locale-backed `t('settings.capabilityLab.proofs.debug.button')`.
+  - Replaced all hardcoded English proof output copy with locale-backed `settings.capabilityLab.proofs.debug.*` keys (16 keys).
+  - The proof output now renders localized strings for title, boundary notice, lifecycle boundary, option-wired status, setting value, SDK option presence, SDK value, value match, readback summary, fail message, and thrown-error message.
+  - Boundary notice and lifecycle boundary are now rendered as two distinct paragraphs, matching the newer honesty pattern used by toolAliases, sandbox, taskBudget, and planModeInstructions.
+  - Proof copy stays honest about active-query lifecycle and does not collapse into the separate `debugFile` seam.
+
+- **src/i18n/locales/en.ts + zh.ts**:
+  - Added 16 `settings.capabilityLab.proofs.debug.*` locale keys covering all proof UI strings in both English and Chinese.
+  - Stable `settings.claudeCode.debug.*` wording already matched the newer readback/lifecycle pattern, so this round only hardened the Capability Lab proof surface and did not churn the stable settings copy.
+
+- **tests/unit/features/settings/SettingsCapabilityLabSection.test.ts**:
+  - Replaced 3 existing debug tests with 5 locale-backed tests:
+    1. Locale-backed button lookup
+    2. Readback execution with lifecycle boundary and honesty boundary assertions
+    3. Chinese locale regression for button, title, lifecycle, boundary, and readback copy
+    4. Fail-classification path with error message assertion
+    5. Throw path with localized error message assertion
+
+- **tests/unit/features/settings/SettingsClaudeCodeSection.test.ts**:
+  - Added stable debug settings regression test asserting debug boundary + lifecycle notices in the Runtime tab (`data-claude-code-debug-boundary` and `data-claude-code-debug-lifecycle`).
+
+### Honesty boundaries
+
+- Classification remains **readback** — this is a proof-strength hardening pass, not a promotion to `pass`.
+- The proof verifies settings→SDK option mapping only; actual CLI debug log emission is not independently verifiable from the plugin layer.
+- The Capability Lab proof output now explicitly states: diagnostic readback only; actual CLI debug log emission is not independently verified; applies on the next query only; active sessions do not update live; debugFile is a separate seam.
+- The lifecycle copy intentionally matches stable `settings.claudeCode.debug.lifecycleNotice` instead of inventing restart semantics that are not independently evidenced for this seam.
+- No `pass` path invented. No authoring UI. No `.claude/**` writes.
+- Matrix unchanged: 46 rows, 29 pass, 17 readback, 0 fail.
+
+---
+
+## 2026-06-04 Tool Aliases — Readback Hardening / Locale-Backed Proof / Lifecycle Coverage
+
+### What changed
+
+- **src/features/settings/SettingsCapabilityLabSection.ts**:
+  - Replaced hardcoded English proof button text (`'Run Tool Aliases Readback Proof'`) with locale-backed `t('settings.capabilityLab.proofs.toolAliases.button')`.
+  - Replaced all hardcoded English proof output copy with locale-backed `settings.capabilityLab.proofs.toolAliases.*` keys (17 keys).
+  - The proof output now renders localized strings for title, boundary notice, lifecycle boundary, option-wired status, setting-empty status, SDK option presence, SDK entry count, defensive-copy status, entries-match status, readback summary, fail message, and thrown-error message.
+  - Boundary notice and lifecycle boundary are now rendered as two distinct paragraphs, matching the newer honesty pattern used by sandbox, taskBudget, and planModeInstructions.
+
+- **src/i18n/locales/en.ts + zh.ts**:
+  - Added 17 `settings.capabilityLab.proofs.toolAliases.*` locale keys covering all proof UI strings in both English and Chinese.
+  - Stable `settings.claudeCode.toolAliases.*` wording already matched the newer readback/lifecycle pattern, so this round only hardened the Capability Lab proof surface and did not churn the stable settings copy.
+
+- **tests/unit/features/settings/SettingsCapabilityLabSection.test.ts**:
+  - Added 5 focused tests:
+    1. Locale-backed button lookup
+    2. Readback execution with lifecycle boundary and honesty boundary assertions
+    3. Chinese locale regression for button, lifecycle, boundary, and readback copy
+    4. Fail-classification path with error message assertion
+    5. Throw path with error message assertion
+
+### Honesty boundaries
+
+- Classification remains **readback** — this is a proof-strength hardening pass, not a promotion to `pass`.
+- The proof verifies settings→SDK option mapping only; actual alias resolution behavior (model-emitted tool name remapping before tool resolution) is not independently verifiable.
+- The Capability Lab proof output now explicitly states: diagnostic readback only; actual alias resolution behavior is not independently verified; applies on the next query or restarted session only; active sessions do not update live.
+- Stable settings boundary notice tightened to match newer pattern: "Readback only: the plugin verifies settings→SDK option wiring. Actual alias resolution..."
+- No `pass` path invented. No authoring UI. No `.claude/**` writes.
+- Matrix unchanged: 46 rows, 29 pass, 17 readback, 0 fail.
+
+---
+
+## 2026-06-04 Sandbox — Readback Hardening / Locale-Backed Proof / Lifecycle Coverage / Stable Settings Honesty Tightening
+
+### What changed
+
+- **src/features/settings/SettingsCapabilityLabSection.ts**:
+  - Replaced hardcoded English proof button text (`'Run Sandbox Readback Proof'`) with locale-backed `t('settings.capabilityLab.proofs.sandbox.button')`.
+  - Replaced all hardcoded English proof output copy with locale-backed `settings.capabilityLab.proofs.sandbox.*` keys (22 keys).
+  - The proof output now renders localized strings for title, boundary notice, lifecycle boundary, option-wired status, all three setting statuses, SDK option presence, all three SDK sub-statuses, all three match statuses, readback summary, fail message, and thrown-error message.
+  - Boundary notice and lifecycle boundary are now rendered as two distinct paragraphs, matching the newer honesty pattern used by taskBudget and planModeInstructions.
+
+- **src/i18n/locales/en.ts + zh.ts**:
+  - Added 22 `settings.capabilityLab.proofs.sandbox.*` locale keys covering all proof UI strings in both English and Chinese.
+  - **Tightened stable settings wording**: `settings.claudeCode.sandbox.boundaryNotice` now explicitly leads with "Readback only:" and clarifies that actual sandbox enforcement is the SDK/CLI binary's internal claim. `settings.claudeCode.sandbox.lifecycleNotice` updated to match the newer next-query/restarted-session pattern.
+
+- **tests/unit/features/settings/SettingsCapabilityLabSection.test.ts**:
+  - Replaced and expanded the 2 existing sandbox tests into 5 focused tests:
+    1. Locale-backed button lookup
+    2. Readback execution with lifecycle boundary and honesty boundary assertions
+    3. Chinese locale regression for button, lifecycle, boundary, and readback copy
+    4. Fail-classification path with error message assertion
+    5. Throw path with error message assertion
+
+### Honesty boundaries
+
+- Classification remains **readback** — this is a proof-strength hardening pass, not a promotion to `pass`.
+- The proof verifies settings→SDK option mapping only; actual OS-level sandbox enforcement (bubblewrap/seccomp) is not independently verifiable.
+- The Capability Lab proof output now explicitly states: diagnostic readback only; actual OS-level sandbox enforcement is not independently verified; applies on the next query or restarted session only; active sessions do not update live.
+- Stable settings boundary notice tightened to match newer pattern: "Readback only: the plugin passes sandbox options to the SDK, but cannot independently verify..."
+- No `pass` path invented. No authoring UI. No `.claude/**` writes.
+- Matrix unchanged: 46 rows, 29 pass, 17 readback, 0 fail.
+
+---
+
+## 2026-06-04 Task Budget — Readback Hardening / Locale-Backed Proof / Lifecycle Coverage
+
+### What changed
+
+- **src/features/settings/SettingsCapabilityLabSection.ts**:
+  - Replaced all hardcoded English proof button text and output copy with locale-backed `settings.capabilityLab.proofs.taskBudget.*` keys.
+  - The proof output now uses localized strings for title, boundary notice, lifecycle boundary, option-wired status, setting value, SDK option presence, SDK total value, total match, readback summary, fail message, and thrown-error message.
+  - The boundary text now explicitly states: diagnostic readback only; actual token-budget enforcement is not independently verified; `@alpha`; applies on the next query or restarted session only; active sessions do not update live.
+
+- **src/i18n/locales/en.ts + zh.ts**:
+  - Added comprehensive `settings.capabilityLab.proofs.taskBudget.*` locale keys (17 proof keys including status variants) covering all proof UI strings in both English and Chinese, including the explicit lifecycle boundary and `@alpha` marker.
+
+- **tests/unit/features/settings/SettingsCapabilityLabSection.test.ts**:
+  - Added 5 focused tests: locale-backed button lookup, readback execution with lifecycle boundary assertion, Chinese locale regression, fail-classification path, and throw path.
+  - All tests verify the proof output renders from locale keys rather than hardcoded English.
+
+### Honesty boundaries
+
+- Classification remains **readback** — this is a proof-strength hardening pass, not a promotion to `pass`.
+- The proof verifies settings→SDK option mapping only; actual token-budget enforcement is not independently verifiable.
+- The Capability Lab proof output now explicitly states the lifecycle boundary: applies on the next query or restarted session only; active sessions do not update live.
+- No `pass` path invented. No authoring UI. No `.claude/**` writes.
+- Matrix unchanged: 46 rows, 29 pass, 17 readback, 0 fail.
+
+---
+
+## 2026-06-04 Plan Mode Instructions — Readback Hardening / Locale-Backed Proof / Lifecycle Coverage
+
+### What changed
+
+- **src/features/settings/SettingsCapabilityLabSection.ts**:
+  - Replaced hardcoded English proof button text and output copy with locale-backed `settings.capabilityLab.proofs.planModeInstructions.*` keys.
+  - The proof output now uses localized strings for title, boundary notice, lifecycle boundary, option-wired status, permission mode, setting value, SDK option presence, SDK value, builder-wiring nuance, value match, readback summary, fail message, and thrown-error message.
+  - The boundary text now explicitly states: diagnostic readback only; actual plan-mode behavior is not independently verified; applies on the next query or restarted session only; active sessions do not update live.
+  - The builder-wiring nuance for non-plan permission mode is preserved and rendered from locale keys.
+
+- **src/i18n/locales/en.ts + zh.ts**:
+  - Added comprehensive `settings.capabilityLab.proofs.planModeInstructions.*` locale keys (18 proof keys plus status variants) covering all proof UI strings in both English and Chinese, including the explicit lifecycle boundary and builder-wiring nuance.
+  - Tightened the stable `planModeInstructions.lifecycleNotice` copy so the Settings surface also states the active-session boundary explicitly: next query / restarted session only, cannot change an already-running session live.
+
+- **tests/unit/features/settings/SettingsCapabilityLabSection.test.ts**:
+  - Added 2 focused tests: Chinese locale regression (proving lifecycle boundary and boundary notice render from locale keys in Chinese), and fail-path when probe returns `fail` classification.
+  - Tightened 4 existing tests to use locale keys instead of hardcoded English strings and to assert lifecycle boundary / builder-wiring nuance explicitly.
+
+### Honesty boundaries
+
+- Classification remains **readback** — this is a proof-strength hardening pass, not a promotion to `pass`.
+- The proof verifies settings→SDK option mapping only; actual plan-mode behavior enforcement is not independently verifiable.
+- The Capability Lab proof output now explicitly states the lifecycle boundary: applies on the next query or restarted session only; active sessions do not update live.
+- The stable Settings lifecycle notice now matches that boundary instead of implying a softer restart-only hint.
+- The builder-wiring nuance is preserved: when `permissionMode !== 'plan'` but the option is still present, the proof explicitly explains this is current builder wiring, not behavior verification.
+- No `pass` path invented. No authoring UI. No `.claude/**` writes.
+- Matrix unchanged: 46 rows, 29 pass, 17 readback, 0 fail.
+
+---
+
+## 2026-06-04 Prompt Suggestions — Readback Hardening / Locale-Backed Proof / Lifecycle Coverage
+
+### What changed
+
+- **src/features/settings/SettingsCapabilityLabSection.ts**:
+  - Replaced hardcoded English proof button text and output copy with locale-backed `settings.capabilityLab.proofs.promptSuggestions.*` keys.
+  - The proof output now uses localized strings for title, boundary notice, option-wired status, option value, SDK option presence, model state, blocker note, readback summary, active-session lifecycle boundary, UI supporting-evidence note, fail message, and thrown-error message.
+
+- **src/i18n/locales/en.ts + zh.ts**:
+  - Added comprehensive `settings.capabilityLab.proofs.promptSuggestions.*` locale keys (21+ proof keys plus model/status variants) covering all proof UI strings in both English and Chinese, including the explicit lifecycle boundary and UI supporting-evidence note.
+
+- **tests/unit/core/agents/backend/ClaudeCodeAdapter.probes.test.ts**:
+  - Added 3 focused TDD tests for fail paths: enabled-but-missing, disabled-but-present, and thrown-error.
+
+- **tests/unit/features/settings/SettingsCapabilityLabSection.test.ts**:
+  - Added 4 focused tests: fail path, throw path, Chinese locale regression, and model-state/blocker-note output verification.
+  - Tightened the existing English and Chinese readback-proof assertions so the proof output itself must render the lifecycle boundary in both locales (`Active sessions do not update live` / `仅在下次查询或重启会话时生效`), giving this last honesty copy patch a real RED→GREEN.
+
+- **tests/unit/features/chat/services/PromptSuggestionService.test.ts**:
+  - Added 5 focused edge-case tests: last-suggestion-wins, accept-isolates-session, empty-sessionId-drop, clear-noop, and bar-refresh-on-null-active-session.
+
+### Honesty boundaries
+
+- Classification remains **readback** — this is a proof-strength hardening pass, not a promotion to `pass`.
+- The proof verifies settings→SDK option mapping only; actual SDK `prompt_suggestion` emission is not independently verifiable.
+- The Capability Lab proof output now says the quiet part out loud: changes apply on the next query or restarted session only, active sessions do not live-update, and the nearby chat evidence is UI-only (session-scoped chip, clear-on-new-turn/backend-stop, click inserts without auto-send).
+- Chat lifecycle coverage now spans race conditions, session gating, backend stop, turn-start clearing, click-insert-only, and per-session isolation.
+- Matrix unchanged: 46 rows, 29 pass, 17 readback, 0 fail.
+
+---
+
+## 2026-06-04 System Prompt — Live Behavior Proof / Promotion to Pass
+
+### What changed
+
+- **src/core/agents/backend/ClaudeCodeAdapter.ts**:
+  - Added `_diagnosticSystemPrompt?: string` to `ClaudeCodeDiagnosticPromptRequest`, allowing diagnostic probes to override `settings.systemPrompt` without modifying the user's actual settings.
+  - Added `SystemPromptLiveProbeResult` interface with `classification: 'pass' | 'fail'`, `nonce`, `nonceRecalled`, `responsePreview`, and `error`.
+  - Added `runSystemPromptLiveProbe()` method. The probe generates a random nonce, injects a diagnostic-only system prompt containing the nonce via `_diagnosticSystemPrompt`, sends the user prompt "What is the secret codeword?" (which does NOT contain the nonce), and verifies the model's response contains the nonce. Returns `pass` when the nonce is recalled; `fail` otherwise.
+  - Updated `resolveDiagnosticSettings()` to honor `_diagnosticSystemPrompt` overrides.
+  - Kept the existing `runSystemPromptReadbackProbe()` for settings→SDK option mapping verification.
+
+- **src/core/agents/backend/index.ts**:
+  - Exported `SystemPromptLiveProbeResult` type.
+
+- **src/features/settings/SettingsCapabilityLabSection.ts**:
+  - Updated Capability Lab matrix: `System Prompt` `runtimeProof` changed from `'readback'` to `'pass'`.
+  - Added locale-backed "Run System Prompt Live Behavior Proof" button in Discovery & Status panel.
+  - Added `runSystemPromptLiveProof()` method with explicit two-part honesty copy: live proof covers the same preset-with-append SDK path via a diagnostic-only override, while the existing readback proof still anchors the currently saved setting value.
+  - Preserved the existing "Run System Prompt Readback Proof" button for settings→SDK mapping verification.
+
+- **src/i18n/locales/en.ts** + **src/i18n/locales/zh.ts**:
+  - Updated `settings.claudeCode.systemPrompt.boundaryNotice` to explain the two complementary proofs (saved-setting readback + same-path live behavior proof).
+  - Added `settings.capabilityLab.proofs.systemPromptLive.*` keys so the new proof button and boundary copy stay localized in both English and Chinese.
+
+- **tests**:
+  - `ClaudeCodeAdapter.probes.test.ts`: 4 focused TDD tests for `runSystemPromptLiveProbe`.
+  - `SettingsCapabilityLabSection.test.ts`: updated focused tests to cover the renamed live-proof button, honest boundary copy, fail path, and Chinese locale rendering.
+
+### Honesty boundaries
+
+- Classification promoted to **pass**, but only as combined evidence: readback confirms the current saved value is wired into the preset-with-append SDK path, and live proof confirms that same path influences a fresh diagnostic query.
+- The nonce never appears in the user prompt, excluding simple prompt-echo.
+- The live proof uses `_diagnosticSystemPrompt`, so it is diagnostic-only supporting evidence for path semantics, not a direct live execution of the user's currently saved string.
+- This is a fresh diagnostic query; active ordinary chat sessions are not mutated.
+- Changes take effect on the next query or after restarting the session.
+- Matrix: 46 rows, 29 pass, 17 readback, 0 fail.
+
+---
+
+## 2026-06-04 Stderr Diagnostic — Readback Hardening
+
+### What changed
+
+- **src/core/agents/backend/ClaudeCodeAdapter.ts**:
+  - Extracted `truncateStderrPreview()` as an explicit private helper so the `sanitizeDiagnosticReport` → `slice(0, 239) + '…'` boundary is testable and documented.
+  - Added `isolatedDiagnosticOnly: boolean` to `StderrDiagnosticProbeResult`. The readback result now explicitly carries `isolatedDiagnosticOnly: true`, making the lifecycle boundary honest: this probe uses an isolated diagnostic-only callback; active ordinary chat sessions do not gain a live stderr subscription; no persistent raw-log surface or file write is exposed.
+  - Kept classification at `readback`: callback wiring proven, actual stderr emission may still be absent.
+
+- **src/features/settings/SettingsCapabilityLabSection.ts**:
+  - Tightened `runStderrDiagnosticProof()` output copy to explicitly state: isolated diagnostic query; active ordinary chat sessions do not gain a live stderr subscription; no persistent raw-log surface or file write is exposed.
+  - Moved the stderr proof UI strings into locale-backed `settings.capabilityLab.proofs.stderr.*` keys so English and Chinese both render the same honest readback boundary instead of silently falling back to hardcoded English.
+  - Kept the proof as diagnostic readback only. No stable raw-log browser, live tail, persistence, or authoring UI added.
+
+- **tests**:
+  - `ClaudeCodeAdapter.probes.test.ts`: Expanded from 2 to 7 focused TDD tests covering: basic readback when callback wired + stderr captured (with `isolatedDiagnosticOnly`); no-stderr-observed case (chunksReceived=0, explicit message); fail on thrown error; sanitization case (secret redacted to `[REDACTED]`); aggressive truncation case (≤240 chars ceiling); sanitize-before-truncate regression case (secret spanning truncation boundary is redacted, not leaked); diagnostic options wiring case (`_diagnosticStderrCallback` reaches built SDK options).
+  - `SettingsCapabilityLabSection.test.ts`: Added 1 test verifying honest boundary text appears in proof output (isolated diagnostic query / active sessions unaffected / no persistent raw-log surface).
+  - Added a RED→GREEN Chinese locale regression test proving the stderr proof button and honesty copy come from locale keys instead of hardcoded English.
+
+- **docs**:
+  - `docs/modules/core/agents/backend/ClaudeCodeAdapter.md`: Added `truncateStderrPreview()` and `isolatedDiagnosticOnly` documentation.
+  - `docs/modules/features/settings/SettingsCapabilityLabSection.md`: Updated Stderr Diagnostic row with explicit lifecycle boundary text.
+  - `docs/status/claude-code-current-state-2026-05-22.md`: Added dedicated hardening section.
+
+### Honesty boundaries
+
+- Classification remains **readback** — this is a proof-strength / lifecycle-honesty / doc-sync pass, not a promotion.
+- Privacy boundary: all stderr text is sanitized before truncation to the 240-char ceiling; sanitize-first order prevents secret leakage at truncation boundaries.
+- Lifecycle boundary: `isolatedDiagnosticOnly: true` explicitly declares the diagnostic-only scope. Active ordinary chat sessions do not gain a live stderr subscription. No persistent raw-log surface, file write, or stable stderr browser.
+
+---
+
+## 2026-06-04 Load Timeout — Truth-Sync / Readback Proof Completion
+
+### What changed
+
+- **src/core/agents/backend/ClaudeCodeOptionsBuilder.ts**: Added `loadTimeoutMs?: number` to `ClaudeCodeSdkOptionsShape`. Wired `settings.loadTimeoutMs` (when non-null) → `options.loadTimeoutMs` in `buildClaudeCodeOptions`. Omits the option when `loadTimeoutMs` is `null`.
+- **src/core/agents/backend/ClaudeCodeAdapter.ts**: Added `LoadTimeoutReadbackProbeResult` interface and `runLoadTimeoutReadbackProbe()` method. Probe builds diagnostic SDK options and verifies `loadTimeoutMs` settings→SDK option mapping directly. Classification: `readback` (null → no option; positive integer → option present with exact value), `fail` (null-but-present, non-null-but-missing, non-null-but-wrong-value, or probe throws).
+- **src/core/agents/backend/index.ts**: Exported `LoadTimeoutReadbackProbeResult` type.
+- **src/features/settings/SettingsCapabilityLabSection.ts**: Added "Run Load Timeout Readback Proof" button. Proof output states diagnostic readback only, actual timeout behavior depends on SDK/CLI version and runtime conditions, applies on next query/restarted session only, active sessions do not update live.
+- **tests**:
+  - `ClaudeCodeOptionsBuilder.settings.test.ts`: 3 TDD tests (null → omit, 60000 → exact value, 1000 → exact value)
+  - `ClaudeCodeAdapter.probes.test.ts`: 6 TDD tests (null → no option, positive integer → correct option, null-but-present → fail, non-null-but-missing → fail, non-null-but-wrong-value → fail, thrown-error)
+  - `SettingsCapabilityLabSection.test.ts`: 2 tests (button render + readback output, thrown-error fail)
+
+### Honesty boundaries
+
+- Classification remains **readback** — this is a truth-sync completion, not a promotion. Historical docs/matrix claimed the seam was wired, but the builder did not actually map the option until this patch.
+- No timeout argument management is exposed.
+
+---
+
+## 2026-06-04 JS Runtime — Truth-Sync / Readback Proof Completion
+
+### What changed
+
+- **src/core/agents/backend/ClaudeCodeOptionsBuilder.ts**: Added `executable?: 'node' | 'bun' | 'deno'` to `ClaudeCodeSdkOptionsShape`. Wired `settings.jsRuntime` (non-empty) → `options.executable` in `buildClaudeCodeOptions`. Omits the option when `jsRuntime` is empty (`''`). The correct SDK option name is `executable`, confirmed by `sdk.d.ts`.
+- **src/core/agents/backend/ClaudeCodeAdapter.ts**: Added `JsRuntimeReadbackProbeResult` interface and `runJsRuntimeReadbackProbe()` method. Probe builds diagnostic SDK options and verifies `executable` settings→SDK option mapping directly. Classification: `readback` (empty → no option; `node`/`bun`/`deno` → option present with exact value), `fail` (empty-but-present, non-empty-but-missing, non-empty-but-wrong-value, or probe throws).
+- **src/core/agents/backend/index.ts**: Exported `JsRuntimeReadbackProbeResult` type.
+- **src/features/settings/SettingsCapabilityLabSection.ts**: Added "Run JS Runtime Readback Proof" button. Proof output states diagnostic readback only, actual runtime selection depends on SDK/CLI version/system PATH/runtime installation, applies on next query/restarted session only, active sessions do not update live, no runtime argument management exposed.
+- **tests**:
+  - `ClaudeCodeOptionsBuilder.settings.test.ts`: 4 TDD tests (empty → omit, `node` → `executable: 'node'`, `bun` → `executable: 'bun'`, `deno` → `executable: 'deno'`)
+  - `ClaudeCodeAdapter.probes.test.ts`: 8 TDD tests (empty → no option, `node`/`bun`/`deno` → correct option, empty-but-present → fail, non-empty-but-missing → fail, non-empty-but-wrong → fail, thrown-error)
+  - `SettingsCapabilityLabSection.test.ts`: 2 tests (button render + readback output, thrown-error fail)
+
+### Honesty boundaries
+
+- Classification remains **readback** — this is a truth-sync completion, not a promotion. Historical docs/matrix claimed the seam was wired, but the builder did not actually map the option until this patch.
+- No runtime argument management exposed; `executableArgs` and `extraArgs` remain absent.
+
+---
+
+## 2026-06-04 1M Context Beta — Truth-Sync / Readback Proof Completion
+
+### What changed
+
+- **src/core/agents/backend/ClaudeCodeOptionsBuilder.ts**: Added `betas?: string[]` to `ClaudeCodeSdkOptionsShape`. Wired `settings.enableContext1mBeta === true` → `options.betas = ['context-1m-2025-08-07']`. Omits the option when the setting is false.
+- **src/core/agents/backend/ClaudeCodeAdapter.ts**: Added `Context1mBetaReadbackProbeResult` interface and `runContext1mBetaReadbackProbe()` method. Probe builds diagnostic SDK options and verifies `betas` settings→SDK option mapping directly. Classification: `readback` (false → no option; true → exact `['context-1m-2025-08-07']`), `fail` (false-but-present, true-but-missing/wrong-value/wrong-length, or probe throws).
+- **src/core/agents/backend/index.ts**: Exported `Context1mBetaReadbackProbeResult` type.
+- **src/features/settings/SettingsCapabilityLabSection.ts**: Added "Run 1M Context Beta Readback Proof" button. Proof output states diagnostic readback only, actual beta availability depends on model and Anthropic-side behavior, applies on next query/restarted session only, active sessions do not update live, no generic beta management exposed.
+- **tests**:
+  - `ClaudeCodeOptionsBuilder.test.ts`: 3 TDD tests (false → omit, true → exact array, undefined → omit)
+  - `ClaudeCodeAdapter.probes.test.ts`: 7 TDD tests (false → no option, true → correct array, false-but-present → fail, true-but-missing → fail, true-but-wrong-value → fail, true-but-wrong-length → fail, thrown-error)
+  - `SettingsCapabilityLabSection.test.ts`: 3 tests (button render, readback execution, thrown-error fail)
+
+### Honesty boundaries
+
+- Classification remains **readback** — this is a truth-sync completion, not a promotion. Historical docs/matrix claimed the seam was wired, but the builder did not actually map the option until this patch.
+- No generic beta management exposed; only the single documented beta seam.
+
+---
+
+## 2026-06-04 Debug — Readback Proof Surface
+
+### What changed
+
+- **src/core/agents/backend/ClaudeCodeAdapter.ts**: Added `DebugReadbackProbeResult` interface and `runDebugReadbackProbe()` method. The probe does not execute a real SDK query; it builds diagnostic SDK options and verifies `debug` settings→SDK option mapping directly. Classification: `readback` (`false` → no option, `true` → option present with value `true`), `fail` (option present when disabled, option missing/false when enabled, or probe throws).
+- **src/core/agents/backend/index.ts**: Exported `DebugReadbackProbeResult` type.
+- **src/features/settings/SettingsCapabilityLabSection.ts**: Added `Run Debug Readback Proof` in Discovery & Status. Proof output explicitly states diagnostic readback only, actual CLI debug log emission is not independently verified, applies on next query only, active sessions do not update live, and `debugFile` is a separate seam.
+- **tests**:
+  - `ClaudeCodeAdapter.probes.test.ts`: focused TDD coverage for disabled → no option, enabled → `debug: true`, enabled-but-missing, enabled-but-false, disabled-but-present, and thrown-error path
+  - `SettingsCapabilityLabSection.test.ts`: button render, readback execution, and thrown-error fail path
+
+### Honesty boundaries
+
+- Classification remains **readback**. The proof verifies settings→SDK option mapping only; actual CLI debug log emission is not independently verifiable from the plugin layer.
+- This seam does not claim live behavior proof, does not update active sessions in place, and does not subsume the separate `debugFile` seam.
+
+---
+
 ## 2026-06-03 Strict MCP Config — Readback Proof Surface
 
 ### What changed

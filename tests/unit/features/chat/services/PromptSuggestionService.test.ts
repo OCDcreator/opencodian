@@ -357,4 +357,61 @@ describe('PromptSuggestionService – adapter & events', () => {
     service.onActiveSessionChanged('sess-1');
     expect(cb).not.toHaveBeenCalled();
   });
+
+  // ─── Edge cases ───────────────────────────────────────────────
+
+  it('last suggestion wins when multiple arrive for the same session', () => {
+    service.setSuggestion({ type: 'prompt_suggestion', suggestion: 'First', uuid: 'ps-1', sessionId: 'sess-1' });
+    service.setSuggestion({ type: 'prompt_suggestion', suggestion: 'Second', uuid: 'ps-2', sessionId: 'sess-1' });
+    service.setActiveSession('sess-1');
+
+    expect(service.getActiveSuggestionText()).toBe('Second');
+    expect(service.getSuggestion('sess-1')!.uuid).toBe('ps-2');
+  });
+
+  it('acceptActiveSuggestion only clears the active session, leaving other sessions intact', () => {
+    service.setSuggestion({ type: 'prompt_suggestion', suggestion: 'A', uuid: 'ps-1', sessionId: 'sess-1' });
+    service.setSuggestion({ type: 'prompt_suggestion', suggestion: 'B', uuid: 'ps-2', sessionId: 'sess-2' });
+    service.setActiveSession('sess-1');
+
+    const text = service.acceptActiveSuggestion();
+    expect(text).toBe('A');
+    expect(service.getSuggestion('sess-1')).toBeNull();
+    expect(service.getSuggestion('sess-2')!.suggestion).toBe('B');
+  });
+
+  it('setSuggestion drops suggestions with empty sessionId and does not notify listeners', () => {
+    const cb = jest.fn();
+    service.onSuggestionSet(cb);
+    service.setSuggestion({ type: 'prompt_suggestion', suggestion: 'No session', uuid: 'ps-ns' });
+    expect(cb).not.toHaveBeenCalled();
+    expect(service.getSuggestion('')).toBeNull();
+  });
+
+  it('clearForSession does not notify when session was already empty', () => {
+    const cb = jest.fn();
+    service.onSuggestionCleared(cb);
+    service.clearForSession('sess-never-had-one');
+    expect(cb).not.toHaveBeenCalled();
+  });
+
+  it('attachAdapter callback for matching session triggers bar refresh even when activeSessionId is initially null', () => {
+    let capturedCallback: ((chunk: StreamChunk) => void) | null = null;
+    const mockAdapter: PromptSuggestionAdapter = {
+      onPostResultChunk: (cb) => { capturedCallback = cb; return () => {}; },
+    };
+
+    service.attachAdapter(mockAdapter);
+    const refreshCb = jest.fn();
+    service.onBarRefreshRequested(refreshCb);
+
+    capturedCallback!({
+      type: 'prompt_suggestion',
+      suggestion: 'For current context',
+      uuid: 'ps-1',
+      sessionId: 'sess-1',
+    });
+
+    expect(refreshCb).toHaveBeenCalledTimes(1);
+  });
 });

@@ -74,14 +74,20 @@ export interface ComposerInputShellCoordinatorHost {
     description?: string;
   };
   /**
-   * Optional backend-specific capability hint rendered near the composer input.
+   * Optional backend-specific capability chip rendered in the composer footer.
    * Returns null when no hint should be displayed.
-   * This is intentionally narrow: the coordinator renders the hint as-is;
-   * the host decides what hint (if any) is appropriate for the active backend.
-   * Currently falls back to deriving the hint from shouldMountAgentSelector
-   * when the host does not implement getComposerCapabilityHint.
+   * This is intentionally narrow: the host decides what copy (and optional
+   * insertion affordance) is appropriate for the active backend.
+   * Currently falls back to deriving the Claude `/json` affordance from
+   * shouldMountAgentSelector when the host does not implement this seam.
    */
-  getComposerCapabilityHint?(): { text: string } | null;
+  getComposerCapabilityHint?(): ComposerCapabilityHint | null;
+}
+
+export interface ComposerCapabilityHint {
+  text: string;
+  tooltip?: string;
+  insertText?: string;
 }
 
 export class ComposerInputShellCoordinator {
@@ -89,13 +95,16 @@ export class ComposerInputShellCoordinator {
   private inputTabBarSlotEl: HTMLElement | null = null;
   private composerShellEl: HTMLElement | null = null;
   private inputWrapperEl: HTMLElement | null = null;
+  private composerFooterLeadingEl: HTMLElement | null = null;
+  private composerFooterTrailingEl: HTMLElement | null = null;
   private addContextBtnEl: HTMLButtonElement | null = null;
   private sendBtnEl: HTMLButtonElement | null = null;
   private inputTextareaEl: HTMLTextAreaElement | null = null;
   private highlightBackdropEl: HTMLElement | null = null;
   private placeholderOverlayEl: HTMLElement | null = null;
-  private disabledStateEl: HTMLElement | null = null;
-  private capabilityHintEl: HTMLElement | null = null;
+  private availabilityNoticeEl: HTMLElement | null = null;
+  private capabilityHintEl: HTMLButtonElement | null = null;
+  private activeCapabilityHint: ComposerCapabilityHint | null = null;
   private readonly capabilityHintHostClass = 'opencodian-input-capability-hint';
   private slashCommandMenuEl: HTMLElement | null = null;
   private layoutSyncFrameId: number | null = null;
@@ -111,6 +120,11 @@ export class ComposerInputShellCoordinator {
   private promptSuggestionChannelId: string | null = null;
   private suggestionBarEl: HTMLElement | null = null;
   private suggestionBarRefreshUnsub: (() => void) | null = null;
+  private promptSuggestionPlacementObserver: MutationObserver | null = null;
+  private promptSuggestionPlacementRootEl: HTMLElement | null = null;
+  private composerAvailabilityObserver: MutationObserver | null = null;
+  private composerAvailabilityObserverRootEl: HTMLElement | null = null;
+  private composerAvailabilityNoticeSignature: string | null = null;
 
   constructor(private readonly host: ComposerInputShellCoordinatorHost) {
     this.agentMentionController = new AgentMentionComposerController({
@@ -161,6 +175,11 @@ export class ComposerInputShellCoordinator {
     });
     this.host.attachSessionTodo(container);
     this.host.attachQuestionDock(container);
+
+    // Prompt suggestion chip is mounted under the latest assistant turn body,
+    // so it stays semantically tied to the assistant follow-up it suggests.
+    this.suggestionBarEl = document.createElement('div');
+    this.suggestionBarEl.className = 'opencodian-suggestion-bar is-hidden';
 
     this.composerShellEl = container.createDiv({ cls: 'opencodian-composer-shell' });
     this.inputWrapperEl = this.composerShellEl.createDiv({ cls: 'opencodian-input-wrapper' });
@@ -218,13 +237,10 @@ export class ComposerInputShellCoordinator {
     });
     this.slashCommandMenuEl.setAttribute('role', 'listbox');
 
-    // Prompt suggestion bar — rendered between textarea and footer
-    this.suggestionBarEl = composerContentEl.createDiv({
-      cls: 'opencodian-suggestion-bar is-hidden',
-    });
-
     const composerFooterEl = composerContentEl.createDiv({ cls: 'opencodian-composer-footer' });
-    this.addContextBtnEl = composerFooterEl.createEl('button', {
+    this.composerFooterLeadingEl = composerFooterEl.createDiv({ cls: 'opencodian-composer-footer-leading' });
+    this.composerFooterTrailingEl = composerFooterEl.createDiv({ cls: 'opencodian-composer-footer-trailing' });
+    this.addContextBtnEl = this.composerFooterLeadingEl.createEl('button', {
       cls: 'opencodian-composer-add-btn opencodian-tooltip-trigger',
       attr: {
         type: 'button',
@@ -237,7 +253,7 @@ export class ComposerInputShellCoordinator {
       void this.host.addChosenFileContextToActiveTab();
     });
 
-    this.sendBtnEl = composerFooterEl.createEl('button', {
+    this.sendBtnEl = this.composerFooterTrailingEl.createEl('button', {
       cls: 'opencodian-send-btn opencodian-tooltip-trigger',
       attr: {
         type: 'button',
@@ -288,30 +304,48 @@ export class ComposerInputShellCoordinator {
   }
 
   /**
-   * Render or remove a backend-specific capability hint near the composer input.
+   * Render or remove a backend-specific capability chip near the send action.
    * First tries the host's getComposerCapabilityHint(); if the host does not
    * implement that seam, derives the hint from existing host signals:
    *   - When shouldMountAgentSelector is defined and returns false → Claude Code
-   *     backend (lacks Subagents capability); show the /json structured-output hint.
+   *     backend (lacks Subagents capability); show the /json structured-output chip.
    *   - Otherwise → no hint (OpenCode or unknown backend).
    * The hint is intentionally narrow: one fixed-schema trigger, no schema authoring.
    */
   private renderCapabilityHint(): void {
     const hint = this.resolveCapabilityHint();
     if (!hint) {
+      this.activeCapabilityHint = null;
       this.capabilityHintEl?.remove();
       this.capabilityHintEl = null;
       return;
     }
 
+    if (!this.composerFooterTrailingEl || !this.sendBtnEl) {
+      return;
+    }
+
+    this.activeCapabilityHint = hint;
+
     if (!this.capabilityHintEl) {
-      // Insert after the composer content (textarea area) but before the toolbar,
-      // inside inputWrapperEl — this is the most discoverable position near the text input.
-      this.capabilityHintEl = this.inputWrapperEl?.createDiv({ cls: this.capabilityHintHostClass }) ?? null;
+      this.capabilityHintEl = this.composerFooterTrailingEl.createEl('button', {
+        cls: `${this.capabilityHintHostClass} opencodian-tooltip-trigger`,
+        attr: {
+          type: 'button',
+        },
+      });
+      this.capabilityHintEl.addEventListener('click', () => {
+        this.applyCapabilityHintAction();
+      });
+      this.sendBtnEl.before(this.capabilityHintEl);
     }
 
     if (this.capabilityHintEl) {
       this.capabilityHintEl.empty();
+      this.capabilityHintEl.disabled = !hint.insertText || this.isComposerInteractionDisabled();
+      this.capabilityHintEl.toggleClass('is-actionable', Boolean(hint.insertText));
+      this.capabilityHintEl.setAttribute('aria-label', hint.tooltip ?? hint.text);
+      this.host.setTooltipLabel(this.capabilityHintEl, hint.tooltip ?? hint.text, 'top');
       this.capabilityHintEl.createSpan({
         cls: `${this.capabilityHintHostClass}-text`,
         text: hint.text,
@@ -325,7 +359,7 @@ export class ComposerInputShellCoordinator {
    * getComposerCapabilityHint: when shouldMountAgentSelector is explicitly
    * false (no Subagents → Claude Code), show the /json hint.
    */
-  private resolveCapabilityHint(): { text: string } | null {
+  private resolveCapabilityHint(): ComposerCapabilityHint | null {
     // When the host explicitly implements getComposerCapabilityHint, use it directly
     // (even if it returns null — that means "no hint for this backend").
     if (typeof this.host.getComposerCapabilityHint === 'function') {
@@ -335,7 +369,11 @@ export class ComposerInputShellCoordinator {
     // Fallback: derive the hint from existing host signals.
     // No agent selector → Claude Code backend (lacks Subagents capability).
     if (this.host.shouldMountAgentSelector?.() === false) {
-      return { text: t('chat.input.capabilityHint.json') };
+      return {
+        text: '/json',
+        tooltip: t('chat.input.capabilityHint.json'),
+        insertText: '/json ',
+      };
     }
 
     return null;
@@ -415,30 +453,67 @@ export class ComposerInputShellCoordinator {
 
     const suggestionText = this.promptSuggestionService.getActiveSuggestionText();
     if (!suggestionText) {
-      this.suggestionBarEl.empty();
-      this.suggestionBarEl.addClass('is-hidden');
+      this.suggestionBarEl.replaceChildren();
+      this.suggestionBarEl.classList.add('is-hidden');
+      this.suggestionBarEl.remove();
+      this.syncPromptSuggestionPlacementObserver(false);
       return;
     }
 
-    this.suggestionBarEl.empty();
-    this.suggestionBarEl.removeClass('is-hidden');
+    this.suggestionBarEl.replaceChildren();
+    this.suggestionBarEl.classList.remove('is-hidden');
+    this.syncPromptSuggestionPlacementObserver(true);
+    this.syncPromptSuggestionPlacement();
 
     const chipEl = this.suggestionBarEl.createEl('button', {
-      cls: 'opencodian-suggestion-chip',
+      cls: 'opencodian-suggestion-chip opencodian-tooltip-trigger',
       attr: { type: 'button' },
     });
     chipEl.createSpan({ cls: 'opencodian-suggestion-chip-text', text: suggestionText });
+    this.host.setTooltipLabel(chipEl, suggestionText, 'top');
 
     chipEl.addEventListener('click', () => {
-      if (this.inputTextareaEl) {
-        this.inputTextareaEl.value = suggestionText;
-        this.syncTextareaHeight();
-        this.syncHighlightBackdrop();
-        this.inputTextareaEl.focus();
-      }
+      this.replaceComposerInputValue(suggestionText);
       this.promptSuggestionService.acceptActiveSuggestion();
       this.renderSuggestionBar();
     });
+  }
+
+  private applyCapabilityHintAction(): void {
+    const hint = this.activeCapabilityHint;
+    if (!hint?.insertText || this.isComposerInteractionDisabled()) {
+      return;
+    }
+
+    const textarea = this.inputTextareaEl;
+    if (!textarea) {
+      return;
+    }
+
+    if (/^\s*\/json(?:\s|$)/i.test(textarea.value)) {
+      textarea.focus();
+      textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+      return;
+    }
+
+    this.replaceComposerInputValue(`${hint.insertText}${textarea.value}`);
+  }
+
+  private replaceComposerInputValue(nextValue: string): void {
+    if (!this.inputTextareaEl) {
+      return;
+    }
+
+    this.inputTextareaEl.value = nextValue;
+    this.syncTextareaHeight();
+    if (this.host.shouldMountAgentSelector?.() !== false) {
+      this.agentMentionController.syncContent(nextValue);
+    }
+    this.syncHighlightBackdrop();
+    this.inputTextareaEl.focus();
+    const cursor = nextValue.length;
+    this.inputTextareaEl.setSelectionRange(cursor, cursor);
+    void this.refreshComposerSuggestionMenu();
   }
 
   private wirePromptSuggestionFromSink(): void {
@@ -489,6 +564,8 @@ export class ComposerInputShellCoordinator {
     this.clearScheduledLayoutSync();
     this.inputContainerResizeObserver?.disconnect();
     this.inputContainerResizeObserver = null;
+    this.syncComposerAvailabilityObserver(false);
+    this.syncPromptSuggestionPlacementObserver(false);
     // Remove prompt suggestion scope and delete channel BEFORE nulling container
     const containerEl = this.inputContainerEl;
     const channelId = this.promptSuggestionChannelId;
@@ -502,12 +579,17 @@ export class ComposerInputShellCoordinator {
     this.inputTabBarSlotEl = null;
     this.composerShellEl = null;
     this.inputWrapperEl = null;
+    this.composerFooterLeadingEl = null;
+    this.composerFooterTrailingEl = null;
     this.addContextBtnEl = null;
     this.sendBtnEl = null;
     this.inputTextareaEl = null;
     this.highlightBackdropEl = null;
-    this.disabledStateEl = null;
+    this.availabilityNoticeEl?.remove();
+    this.availabilityNoticeEl = null;
+    this.composerAvailabilityNoticeSignature = null;
     this.capabilityHintEl = null;
+    this.activeCapabilityHint = null;
     this.slashCommandMenuEl = null;
     this.slashCommandMenuCatalogItems = null;
     this.suggestionBarEl?.remove();
@@ -561,7 +643,9 @@ export class ComposerInputShellCoordinator {
       return;
     }
 
-    const stackHeight = Math.ceil(this.inputContainerEl.offsetHeight);
+    const stackHeight = Math.ceil(
+      this.inputContainerEl.offsetHeight + this.measureComposerAvailabilityNoticeHeight(),
+    );
     this.host.setComposerStackHeight(Math.max(0, stackHeight));
     this.host.scheduleSettledScrollToBottomIfNeeded();
   }
@@ -642,35 +726,223 @@ export class ComposerInputShellCoordinator {
     this.inputTextareaEl?.toggleAttribute('disabled', isDisabled);
     this.addContextBtnEl?.toggleAttribute('disabled', isDisabled);
     this.updateSendButtonState();
-
-    if (!this.inputWrapperEl) {
-      return;
-    }
-
-    if (!isDisabled) {
-      this.disabledStateEl?.remove();
-      this.disabledStateEl = null;
-      return;
-    }
-
-    if (!this.disabledStateEl) {
-      this.disabledStateEl = this.inputWrapperEl.createDiv({ cls: 'opencodian-composer-disabled-state' });
-    } else {
-      this.disabledStateEl.empty();
-    }
-
-    this.disabledStateEl.createDiv({
-      cls: 'opencodian-composer-disabled-title',
-      text: state.title ?? t('chat.empty.noBackend.title'),
-    });
-    this.disabledStateEl.createDiv({
-      cls: 'opencodian-composer-disabled-description',
-      text: state.description ?? t('chat.empty.noBackend.description'),
-    });
+    this.renderCapabilityHint();
+    this.syncComposerAvailabilityObserver(isDisabled);
+    this.renderComposerAvailabilityNotice(state);
+    this.scheduleLayoutSync();
   }
 
   private isComposerInteractionDisabled(): boolean {
     return (this.host.getComposerAvailabilityState?.().kind ?? 'ready') !== 'ready';
+  }
+
+  private syncPromptSuggestionPlacement(): void {
+    const suggestionBarEl = this.suggestionBarEl;
+    if (!suggestionBarEl || suggestionBarEl.classList.contains('is-hidden')) {
+      return;
+    }
+
+    const mountTarget = this.resolvePromptSuggestionMountTarget();
+    const mountParent = mountTarget?.parentElement;
+    if (!mountTarget?.isConnected || !mountParent) {
+      suggestionBarEl.remove();
+      return;
+    }
+
+    if (suggestionBarEl.parentElement !== mountParent || suggestionBarEl.previousElementSibling !== mountTarget) {
+      mountParent.insertBefore(suggestionBarEl, mountTarget.nextSibling);
+    }
+  }
+
+  private syncPromptSuggestionPlacementObserver(shouldObserve: boolean): void {
+    if (!shouldObserve) {
+      this.promptSuggestionPlacementObserver?.disconnect();
+      this.promptSuggestionPlacementObserver = null;
+      this.promptSuggestionPlacementRootEl = null;
+      return;
+    }
+
+    const nextRoot = this.resolvePromptSuggestionPlacementRoot();
+    if (!nextRoot?.isConnected) {
+      this.promptSuggestionPlacementObserver?.disconnect();
+      this.promptSuggestionPlacementObserver = null;
+      this.promptSuggestionPlacementRootEl = null;
+      return;
+    }
+
+    if (this.promptSuggestionPlacementObserver && this.promptSuggestionPlacementRootEl === nextRoot) {
+      return;
+    }
+
+    this.promptSuggestionPlacementObserver?.disconnect();
+    this.promptSuggestionPlacementRootEl = nextRoot;
+    this.promptSuggestionPlacementObserver = new MutationObserver(() => {
+      this.syncPromptSuggestionPlacement();
+    });
+    this.promptSuggestionPlacementObserver.observe(nextRoot, {
+      childList: true,
+      subtree: true,
+    });
+  }
+
+  private renderComposerAvailabilityNotice(
+    state: NonNullable<ReturnType<NonNullable<ComposerInputShellCoordinatorHost['getComposerAvailabilityState']>>>,
+  ): boolean {
+    if (state.kind === 'ready' || this.shouldSuppressComposerAvailabilityNotice()) {
+      const hadNotice = Boolean(this.availabilityNoticeEl?.isConnected);
+      this.availabilityNoticeEl?.remove();
+      this.composerAvailabilityNoticeSignature = null;
+      return hadNotice;
+    }
+
+    if (!this.inputContainerEl?.parentElement) {
+      return false;
+    }
+
+    let didMutate = false;
+
+    if (!this.availabilityNoticeEl) {
+      this.availabilityNoticeEl = document.createElement('div');
+      this.availabilityNoticeEl.className =
+        'opencodian-composer-availability-notice opencodian-chat-notice-card is-warning';
+      didMutate = true;
+    }
+
+    const title = state.title ?? t('chat.empty.noBackend.title');
+    const description = state.description ?? t('chat.empty.noBackend.description');
+    const actionLabel = this.resolveSettingsActionButton()
+      ? t('chat.settings.open')
+      : '';
+    const nextSignature = `${state.kind}\u0000${title}\u0000${description}\u0000${actionLabel}`;
+    if (this.composerAvailabilityNoticeSignature !== nextSignature) {
+      this.availabilityNoticeEl.replaceChildren();
+      const iconEl = this.availabilityNoticeEl.createDiv({ cls: 'opencodian-chat-notice-icon' });
+      setIcon(iconEl, 'alert-triangle');
+
+      const bodyEl = this.availabilityNoticeEl.createDiv({ cls: 'opencodian-chat-notice-body' });
+      bodyEl.createDiv({
+        cls: 'opencodian-chat-notice-title',
+        text: title,
+      });
+      bodyEl.createDiv({
+        cls: 'opencodian-chat-notice-text',
+        text: description,
+      });
+
+      if (actionLabel) {
+        const actionsEl = bodyEl.createDiv({ cls: 'opencodian-chat-notice-actions' });
+        const actionBtn = actionsEl.createEl('button', {
+          cls: 'opencodian-chat-notice-action-btn',
+          text: actionLabel,
+        });
+        actionBtn.type = 'button';
+        actionBtn.addEventListener('click', () => {
+          this.resolveSettingsActionButton()?.click();
+        });
+      }
+
+      this.composerAvailabilityNoticeSignature = nextSignature;
+      didMutate = true;
+    }
+
+    if (this.availabilityNoticeEl.parentElement !== this.inputContainerEl.parentElement
+      || this.availabilityNoticeEl.nextElementSibling !== this.inputContainerEl) {
+      this.inputContainerEl.before(this.availabilityNoticeEl);
+      didMutate = true;
+    }
+    return didMutate;
+  }
+
+  private resolvePromptSuggestionPlacementRoot(): HTMLElement | null {
+    const containerEl = this.inputContainerEl?.closest<HTMLElement>('.opencodian-container');
+    if (!containerEl) {
+      return null;
+    }
+
+    return containerEl.querySelector<HTMLElement>('.opencodian-messages.is-active')
+      ?? containerEl.querySelector<HTMLElement>('.opencodian-messages');
+  }
+
+  private resolvePromptSuggestionMountTarget(): HTMLElement | null {
+    const messagesRoot = this.resolvePromptSuggestionPlacementRoot();
+    const assistantMessages = Array.from(
+      messagesRoot?.querySelectorAll<HTMLElement>(
+        '.opencodian-message--assistant:not(.opencodian-message--notice):not(.opencodian-message--background-task)',
+      ) ?? [],
+    );
+    return assistantMessages.at(-1) ?? null;
+  }
+
+  private shouldSuppressComposerAvailabilityNotice(): boolean {
+    const messagesRoot = this.resolvePromptSuggestionPlacementRoot();
+    if (!messagesRoot) {
+      return false;
+    }
+
+    return Boolean(
+      messagesRoot.querySelector<HTMLElement>(
+        '.opencodian-message[data-message-id="opencodian-empty-state-no-backend"],'
+        + '.opencodian-message[data-message-id="opencodian-empty-state-backend-offline"]',
+      ),
+    );
+  }
+
+  private resolveSettingsActionButton(): HTMLButtonElement | null {
+    const containerEl = this.inputContainerEl?.closest<HTMLElement>('.opencodian-container');
+    if (!containerEl) {
+      return null;
+    }
+
+    const buttonEl = containerEl.querySelector<HTMLButtonElement>('.opencodian-header-btn[data-action="settings"]');
+    return buttonEl?.isConnected ? buttonEl : null;
+  }
+
+  private syncComposerAvailabilityObserver(shouldObserve: boolean): void {
+    if (!shouldObserve) {
+      this.composerAvailabilityObserver?.disconnect();
+      this.composerAvailabilityObserver = null;
+      this.composerAvailabilityObserverRootEl = null;
+      return;
+    }
+
+    const nextRoot = this.inputContainerEl?.parentElement ?? null;
+    if (!nextRoot?.isConnected) {
+      this.composerAvailabilityObserver?.disconnect();
+      this.composerAvailabilityObserver = null;
+      this.composerAvailabilityObserverRootEl = null;
+      return;
+    }
+
+    if (this.composerAvailabilityObserver && this.composerAvailabilityObserverRootEl === nextRoot) {
+      return;
+    }
+
+    this.composerAvailabilityObserver?.disconnect();
+    this.composerAvailabilityObserverRootEl = nextRoot;
+    this.composerAvailabilityObserver = new MutationObserver(() => {
+      const didMutate = this.renderComposerAvailabilityNotice(
+        this.host.getComposerAvailabilityState?.() ?? { kind: 'ready' },
+      );
+      if (didMutate) {
+        this.scheduleLayoutSync();
+      }
+    });
+    this.composerAvailabilityObserver.observe(nextRoot, {
+      childList: true,
+      subtree: true,
+    });
+  }
+
+  private measureComposerAvailabilityNoticeHeight(): number {
+    const noticeEl = this.availabilityNoticeEl;
+    if (!noticeEl?.isConnected) {
+      return 0;
+    }
+
+    const styles = window.getComputedStyle(noticeEl);
+    const marginTop = Number.parseFloat(styles.marginTop || '0') || 0;
+    const marginBottom = Number.parseFloat(styles.marginBottom || '0') || 0;
+    return Math.ceil(noticeEl.getBoundingClientRect().height + marginTop + marginBottom);
   }
 
   private async refreshComposerSuggestionMenu(): Promise<void> {

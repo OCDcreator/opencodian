@@ -1916,6 +1916,24 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       expect(plugin.saveSettings).toHaveBeenCalled();
     });
 
+    it('renders debug boundary and lifecycle notices in runtime tab', () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'runtime');
+
+      const boundaryEl = containerEl.querySelector('[data-claude-code-debug-boundary="true"]');
+      expect(boundaryEl).toBeTruthy();
+      expect(boundaryEl!.textContent).toContain(t('settings.claudeCode.debug.boundaryNotice'));
+
+      const lifecycleEl = containerEl.querySelector('[data-claude-code-debug-lifecycle="true"]');
+      expect(lifecycleEl).toBeTruthy();
+      expect(lifecycleEl!.textContent).toContain(t('settings.claudeCode.debug.lifecycleNotice'));
+    });
+
     it('renders debugFile boundary, implicit-debug, and lifecycle notices in runtime tab', () => {
       const plugin = createPlugin();
       const containerEl = document.createElement('div');
@@ -2454,6 +2472,23 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       const lifecycleEl = containerEl.querySelector('[data-claude-code-plan-mode-instructions-lifecycle]');
       expect(lifecycleEl).toBeTruthy();
       expect(lifecycleEl!.textContent).toContain(t('settings.claudeCode.planModeInstructions.lifecycleNotice'));
+      expect(lifecycleEl!.textContent).toContain('already-running session');
+    });
+
+    it('renders planModeInstructions lifecycle notice with explicit active-session boundary in Chinese', () => {
+      setLocale('zh');
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'permissions');
+
+      const lifecycleEl = containerEl.querySelector('[data-claude-code-plan-mode-instructions-lifecycle]');
+      expect(lifecycleEl).toBeTruthy();
+      expect(lifecycleEl!.textContent).toContain(t('settings.claudeCode.planModeInstructions.lifecycleNotice'));
+      expect(lifecycleEl!.textContent).toContain('正在运行中的会话');
     });
   });
 

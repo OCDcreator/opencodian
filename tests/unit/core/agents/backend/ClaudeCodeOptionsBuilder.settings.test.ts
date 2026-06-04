@@ -435,6 +435,90 @@ describe('ClaudeCodeOptionsBuilder toolAliases', () => {
   });
 });
 
+describe('ClaudeCodeOptionsBuilder jsRuntime option', () => {
+  it('omits executable when jsRuntime is empty (default)', () => {
+    const options = buildClaudeCodeOptions({
+      vaultPath: '/vault/project',
+      settings: getDefaultClaudeCodeBackendSettings(),
+    });
+
+    expect(options).not.toHaveProperty('executable');
+  });
+
+  it('passes executable node when jsRuntime is node', () => {
+    const options = buildClaudeCodeOptions({
+      vaultPath: '/vault/project',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        jsRuntime: 'node',
+      },
+    });
+
+    expect(options.executable).toBe('node');
+  });
+
+  it('passes executable bun when jsRuntime is bun', () => {
+    const options = buildClaudeCodeOptions({
+      vaultPath: '/vault/project',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        jsRuntime: 'bun',
+      },
+    });
+
+    expect(options.executable).toBe('bun');
+  });
+
+  it('passes executable deno when jsRuntime is deno', () => {
+    const options = buildClaudeCodeOptions({
+      vaultPath: '/vault/project',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        jsRuntime: 'deno',
+      },
+    });
+
+    expect(options.executable).toBe('deno');
+  });
+});
+
+describe('ClaudeCodeOptionsBuilder loadTimeoutMs', () => {
+  it('omits loadTimeoutMs when null (default)', () => {
+    const options = buildClaudeCodeOptions({
+      vaultPath: '/vault/project',
+      settings: getDefaultClaudeCodeBackendSettings(),
+    });
+
+    expect(options).not.toHaveProperty('loadTimeoutMs');
+  });
+
+  it('passes loadTimeoutMs when set to a positive integer', () => {
+    const settings = {
+      ...getDefaultClaudeCodeBackendSettings(),
+      loadTimeoutMs: 60000,
+    };
+    const options = buildClaudeCodeOptions({
+      vaultPath: '/vault/project',
+      settings,
+    });
+
+    expect(options.loadTimeoutMs).toBe(60000);
+  });
+
+  it('passes loadTimeoutMs when set to a small positive integer', () => {
+    const settings = {
+      ...getDefaultClaudeCodeBackendSettings(),
+      loadTimeoutMs: 1000,
+    };
+    const options = buildClaudeCodeOptions({
+      vaultPath: '/vault/project',
+      settings,
+    });
+
+    expect(options.loadTimeoutMs).toBe(1000);
+  });
+});
+
 describe('ClaudeCodeOptionsBuilder title via input', () => {
   it('omits title when not provided', () => {
     const options = buildClaudeCodeOptions({

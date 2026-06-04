@@ -199,6 +199,40 @@ describe('ClaudeCodeOptionsBuilder strictMcpConfig option', () => {
   });
 });
 
+describe('ClaudeCodeOptionsBuilder betas option (1M Context Beta)', () => {
+  it('omits betas when settings.enableContext1mBeta is false', () => {
+    const options = buildClaudeCodeOptions({
+      vaultPath: '/vault/project',
+      settings: getDefaultClaudeCodeBackendSettings(),
+    });
+
+    expect(options).not.toHaveProperty('betas');
+  });
+
+  it('passes betas with exactly one entry when settings.enableContext1mBeta is true', () => {
+    const options = buildClaudeCodeOptions({
+      vaultPath: '/vault/project',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        enableContext1mBeta: true,
+      },
+    });
+
+    expect(options.betas).toEqual(['context-1m-2025-08-07']);
+  });
+
+  it('does not pass betas when settings.enableContext1mBeta is undefined', () => {
+    const settings = getDefaultClaudeCodeBackendSettings();
+    delete (settings as Record<string, unknown>).enableContext1mBeta;
+    const options = buildClaudeCodeOptions({
+      vaultPath: '/vault/project',
+      settings,
+    });
+
+    expect(options).not.toHaveProperty('betas');
+  });
+});
+
 describe('ClaudeCodeOptionsBuilder tool restrictions', () => {
   it('omits allowedTools/disallowedTools when empty', () => {
     const options = buildClaudeCodeOptions({

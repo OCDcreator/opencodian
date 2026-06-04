@@ -10886,6 +10886,22 @@ img.opencodian-model-provider-header-icon {
   border-top: none;
 }
 
+.opencodian-composer-footer-leading,
+.opencodian-composer-footer-trailing {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.opencodian-composer-footer-leading {
+  flex: 1 1 auto;
+}
+
+.opencodian-composer-footer-trailing {
+  flex: 0 0 auto;
+}
+
 .opencodian-slash-command-menu {
   position: absolute;
   right: 0;
@@ -11555,52 +11571,66 @@ img.opencodian-model-provider-header-icon {
   pointer-events: none;
 }
 
-.opencodian-composer-disabled-state {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin: 2px 0 12px;
-  padding: 12px 14px;
-  border: 1px solid var(--background-modifier-border);
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--background-secondary) 82%, transparent);
+.opencodian-composer-availability-notice {
+  margin: 0 0 12px;
 }
 
-.opencodian-composer-disabled-title {
-  font-size: 13px;
-  font-weight: 600;
+/* Backend-specific capability chip rendered beside the send action. */
+.opencodian-input-capability-hint {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  max-width: 100%;
+  padding: 4px 10px;
+  border: 1px solid color-mix(in srgb, var(--interactive-accent) 26%, var(--background-modifier-border));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--interactive-accent) 11%, transparent);
+  font-size: 11px;
+  line-height: 1.4;
+  color: color-mix(in srgb, var(--text-normal) 70%, var(--interactive-accent));
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease, transform 120ms ease;
+  appearance: none;
+}
+
+.opencodian-input-capability-hint:hover {
+  background: color-mix(in srgb, var(--interactive-accent) 16%, transparent);
+  border-color: color-mix(in srgb, var(--interactive-accent) 40%, var(--background-modifier-border-hover));
   color: var(--text-normal);
 }
 
-.opencodian-composer-disabled-description {
-  font-size: 12px;
-  line-height: 1.55;
-  color: var(--text-muted);
+.opencodian-input-capability-hint:active {
+  transform: scale(0.98);
 }
 
-/* Backend-specific capability hint rendered near the composer input.
-   Subtle inline chip — visible enough for discovery but not intrusive. */
-.opencodian-input-capability-hint {
-  display: flex;
-  align-items: center;
-  margin: 6px 0 4px;
-  padding: 3px 10px;
-  font-size: 11px;
-  line-height: 1.4;
-  color: var(--text-muted);
-  border-left: 2px solid var(--color-blue);
-  background: color-mix(in srgb, var(--color-blue) 8%, transparent);
-  border-radius: 0 6px 6px 0;
+.opencodian-input-capability-hint:focus-visible {
+  outline: none;
+  border-color: var(--interactive-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--interactive-accent) 18%, transparent);
+  color: var(--text-normal);
+}
+
+.opencodian-input-capability-hint:disabled {
+  cursor: default;
+  opacity: 0.6;
+  transform: none;
 }
 
 .opencodian-input-capability-hint-text {
   white-space: nowrap;
+  font-family: var(--font-monospace);
+  font-weight: 600;
+  letter-spacing: 0.01em;
 }
 
 .opencodian-suggestion-bar {
   display: flex;
   align-items: center;
-  padding: 4px 12px 0;
+  justify-content: flex-start;
+  flex: 0 0 auto;
+  min-width: 0;
+  padding: 0 12px 2px;
 }
 
 .opencodian-suggestion-bar.is-hidden {
@@ -11639,6 +11669,20 @@ img.opencodian-model-provider-header-icon {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.opencodian-composer-shell--action-buttons-etched .opencodian-input-capability-hint {
+  border-color: color-mix(in srgb, var(--text-muted) 22%, transparent);
+  background: color-mix(in srgb, var(--opencodian-composer-embedded-fill) 18%, transparent);
+  color: color-mix(in srgb, var(--text-normal) 76%, var(--interactive-accent));
+  box-shadow: none;
+}
+
+.opencodian-composer-shell--action-buttons-etched .opencodian-input-capability-hint:hover,
+.opencodian-composer-shell--action-buttons-etched .opencodian-input-capability-hint:focus-visible {
+  border-color: color-mix(in srgb, var(--interactive-accent) 42%, transparent);
+  background: color-mix(in srgb, var(--opencodian-composer-embedded-fill) 24%, transparent);
+  color: var(--text-normal);
 }
 
 .opencodian-input-toolbar {

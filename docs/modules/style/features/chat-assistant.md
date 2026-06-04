@@ -16,7 +16,7 @@
 - Fork target modal：`.opencodian-fork-target-list`、`.opencodian-fork-target-option` 和 `.opencodian-fork-target-note`，后者用于禁用会话标签时解释 why “fork to new tab” 不显示。
 - 问题与 TODO：`.opencodian-question-dock*`、`.opencodian-question-dock-collapse-toggle`、`.opencodian-question-dock.is-collapsed`、`.opencodian-session-todo-*`。
 - 输入区：`.opencodian-composer-*`、`.opencodian-slash-command-menu*`、`.opencodian-slash-command-menu-state*`、`.opencodian-slash-command-menu-hint`、`.opencodian-input-toolbar`、`.opencodian-context-ring*`。
-- 输入禁用壳层：`.opencodian-input-wrapper.is-composer-disabled`、`.opencodian-composer-disabled-state`、`.opencodian-composer-disabled-title`、`.opencodian-composer-disabled-description`。Phase 0/1 收尾用它来覆盖“无 backend”与“backend offline”场景，压缩输入区空白，同时保持消息区、历史与 tab runtime 不变。
+- 输入禁用壳层：`.opencodian-input-wrapper.is-composer-disabled` 继续只负责降低 textarea/footer 可交互性；“无 backend / backend offline”说明不再作为输入区内嵌块存在，而是由 `.opencodian-composer-availability-notice` 这张外部 notice card 承载，落在消息区下缘与 composer 之间。
 - 输入高亮：`.opencodian-input-highlight-container`（textarea 包裹层）、`.opencodian-input-highlight-backdrop`（镜像 backdrop）、`.opencodian-input-highlight-token`（通用 token 基础样式）、`.opencodian-input-highlight-agent`（backdrop 内 selected `@agent` pill span）、`.opencodian-input-highlight-command`（backdrop 内已知 slash command 高亮 span）与 `.opencodian-input-highlight-skill`（backdrop 内已知 direct / prefixed skill 高亮 span）。textarea 设为 `color: transparent; caret-color: var(--text-normal)`，backdrop 承担全部文本渲染；selected `@agent` 使用 pill 半径、小幅非排版型 `box-shadow` 外扩、cloned box decoration，以及与 textarea 完全一致的行高和 padding 呼吸空间，不能通过 token 自身的 padding / font-weight 改变镜像层文本宽度，否则会造成 textarea caret 与渲染文本错位；实际 metadata / 原子编辑保护由 `AgentMentionComposerController` 和 `ComposerInputShellCoordinator` 维护；未知 `/xxx` typo 不应被着色。
 - 输入工具栏现在为 Agent / permission / model / effort selector 统一保留 flex slot，并通过 `--opencodian-input-toolbar-control-gap` / `--opencodian-input-toolbar-control-height` 统一控制横向节奏与控件高度；context usage ring 也跟随该高度，并在 `action-buttons-etched` 下切换成刻入式透明状态。ring 内部通过 `.opencodian-context-ring-meter` 固定 34px 仪表盒，`classic` 样式显示原有连续环形进度，`segmented` 样式显示 24 个留有间隔的较长 SVG 刻度线段；状态只由环形进度色/刻度色和中心数字表达，不渲染额外 LOW / MEDIUM / HIGH 文本，也不再通过 CSS 伪元素追加 `%` 后缀。中心数字使用 bundled Oxanium 字体文件 `assets/fonts/oxanium/Oxanium[wght].ttf`，不依赖运行时外链。Agent 下拉框本体样式在 `components/agent-selector.css`。
 - `.opencodian-input-area` 现在使用 `font-family: var(--opencodian-composer-font-family, inherit)`，让输入区跟随外观设置里的中英文字体组合。
@@ -36,11 +36,13 @@
 - 该文件覆盖面非常广，建议先锁定子域（消息 / 通知 / 输入区）再改，避免回归。
 - `--opencodian-assistant-*`、`--opencodian-composer-*` 与 `base/core.css` 变量紧耦合，改值要联动检查。
 - slash menu 现在是 composer shell 上方的 absolute overlay，不参与输入区高度计算；如果调整 `.opencodian-slash-command-menu*` 或 `.opencodian-slash-command-menu-state*`，记得同时检查上方弹出位置、长文本换行、状态行可读性与 hover/focus 对比度。
-- composer disabled shell 只应降低 textarea/footer 的可交互性并显示紧凑说明块，不应把整个 input area 高度清空，也不应影响 history/tabs/question/todo 等相邻 runtime 区块。
+- composer disabled shell 只应降低 textarea/footer 的可交互性；availability 文案应作为外部 notice 呈现，不应再把说明块塞回 input area，也不应影响 history/tabs/question/todo 等相邻 runtime 区块。
+
+本轮继续收口 backend availability 提示：旧的 `.opencodian-composer-disabled-state` 内嵌说明块已移除，改为 `.opencodian-composer-availability-notice`。该 notice 复用现有 warning card 视觉语言，但挂在 `.opencodian-input-area` 之外，因此“当前 backend 不可用”不再破坏输入区的一致性。禁用输入时仍会 dim 掉 textarea/footer；只是状态说明回到更合适的消息区边界。
 - QuestionDock collapse 只调整 above-input dock shell：折叠时 header 保留，tabs/body/footer 不渲染，样式只负责 toggle button 与 collapsed gap，不应影响 inline question cards。
 - 修改后执行 `npm run build:css`（或完整 `npm run build`）。
 
 
-本轮新增 `.opencodian-input-capability-hint` 与 `.opencodian-input-capability-hint-text` 样式，用于在聊天输入区靠近文本输入框的位置渲染 backend-specific capability discovery hint（当前为 Claude Code backend 的 `/json` structured output inline chip）。
+本轮调整 `.opencodian-input-capability-hint` 与 `.opencodian-input-capability-hint-text`：它们不再占用 textarea 下方的一整行提示，而是作为 footer trailing chip 固定插在 send 按钮左侧。当前唯一 capability chip 仍是 Claude Code backend 的 `/json` structured output affordance，但视觉权重已经收敛为与 action cluster 同级的小 pill，tooltip 继续承载完整说明。
 
-本轮新增 prompt suggestion chip 样式：`.opencodian-suggestion-bar`（位于 composer content 内的建议条容器，默认 flex 布局，`is-hidden` 时隐藏）、`.opencodian-suggestion-chip`（可点击的建议 pill，使用 inline-flex 与主题色背景）与 `.opencodian-suggestion-chip-text`（建议文本）。点击 chip 后仅将文本插入 textarea，不会自动发送；样式上保持与输入区其他元素的横向节奏一致，且不占用额外的外部高度。
+本轮同步收口 prompt suggestion chip 样式：`.opencodian-suggestion-bar` 不再挂在 composer footer 或输入区顶部，而是作为最后一条 assistant message 的后继 sibling 插入同一个 turn body，视觉上紧跟该回复本身。`.opencodian-suggestion-chip` 继续是可点击 pill，点击后仅将文本插入 textarea，不会自动发送。这样 `/json` capability chip 继续留在 footer trailing，负责固定能力入口；prompt suggestion 则真正回到 assistant follow-up 的语义位置，不再与 add/send action 混成同一层。

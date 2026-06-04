@@ -324,6 +324,13 @@ export interface ClaudeCodeDiagnosticPromptRequest {
    * only effective on first query (not resume).
    */
   _diagnosticTitle?: string;
+  /**
+   * Diagnostic-only system prompt override. When provided, replaces the
+   * adapter's settings.systemPrompt for this diagnostic query only.
+   * Used by the System Prompt live proof to inject a nonce-bearing
+   * instruction without modifying the user's actual settings.
+   */
+  _diagnosticSystemPrompt?: string;
 }
 
 export interface ClaudeCodeDiagnosticPromptResult {
@@ -682,6 +689,8 @@ type CheckpointRewindProbeResult = {
 export interface StderrDiagnosticProbeResult {
   classification: 'readback' | 'fail';
   callbackWired: boolean;
+  /** True when this probe uses an isolated diagnostic query; active sessions are unaffected. */
+  isolatedDiagnosticOnly: boolean;
   chunksReceived?: number;
   totalBytes?: number;
   sanitizedPreview?: string;
@@ -708,6 +717,15 @@ export interface SystemPromptReadbackProbeResult {
   appendValue?: string;
   expectedAppendValue?: string;
   appendMatch?: boolean;
+  error?: string;
+}
+
+/** System prompt live behavior probe result. */
+export interface SystemPromptLiveProbeResult {
+  classification: 'pass' | 'fail';
+  nonce: string;
+  nonceRecalled: boolean;
+  responsePreview?: string;
   error?: string;
 }
 
@@ -793,6 +811,40 @@ export interface DebugReadbackProbeResult {
   settingValue: boolean;
   sdkOptionPresent: boolean;
   sdkValue?: boolean;
+  valueMatch: boolean;
+  error?: string;
+}
+
+/** 1M Context Beta readback probe result. */
+export interface Context1mBetaReadbackProbeResult {
+  classification: 'readback' | 'fail';
+  optionWired: boolean;
+  settingValue: boolean;
+  sdkOptionPresent: boolean;
+  sdkValue?: string[];
+  valueMatch: boolean;
+  error?: string;
+}
+
+/** JS Runtime readback probe result. */
+export interface JsRuntimeReadbackProbeResult {
+  classification: 'readback' | 'fail';
+  optionWired: boolean;
+  settingValue: string;
+  emptySetting: boolean;
+  sdkOptionPresent: boolean;
+  sdkValue?: string;
+  valueMatch: boolean;
+  error?: string;
+}
+
+/** Load Timeout readback probe result. */
+export interface LoadTimeoutReadbackProbeResult {
+  classification: 'readback' | 'fail';
+  optionWired: boolean;
+  settingValue: number | null;
+  sdkOptionPresent: boolean;
+  sdkValue?: number;
   valueMatch: boolean;
   error?: string;
 }
@@ -2127,6 +2179,16 @@ export class ClaudeCodeAdapter
 
   // ─── Diagnostic probe implementations ───
 
+  /**
+   * Truncate a sanitized stderr preview to the honest display ceiling.
+   * Preceding sanitize step must already have run via `sanitizeDiagnosticReport()`.
+   */
+  private truncateStderrPreview(sanitized: string): string {
+    const CEILING = 240;
+    if (sanitized.length <= CEILING) return sanitized;
+    return sanitized.slice(0, CEILING - 1) + '…';
+  }
+
   async runStderrDiagnosticProbe(): Promise<StderrDiagnosticProbeResult> {
     const chunks: string[] = [];
     let totalBytes = 0;
@@ -2141,11 +2203,12 @@ export class ClaudeCodeAdapter
         _diagnosticStderrCallback: stderrCallback,
       });
       const sanitizedPreview = chunks.length > 0
-        ? sanitizeDiagnosticReport(chunks.join('')).slice(0, 240)
+        ? this.truncateStderrPreview(sanitizeDiagnosticReport(chunks.join('')))
         : 'Callback wired — no stderr observed';
       return {
         classification: 'readback',
         callbackWired: true,
+        isolatedDiagnosticOnly: true,
         chunksReceived: chunks.length,
         totalBytes,
         sanitizedPreview,
@@ -2156,6 +2219,7 @@ export class ClaudeCodeAdapter
       return {
         classification: 'fail',
         callbackWired: false,
+        isolatedDiagnosticOnly: true,
         error: errorMessage,
       };
     }
@@ -2266,6 +2330,64 @@ export class ClaudeCodeAdapter
         optionWired: false,
         presetPreserved: false,
         emptySetting: false,
+        error: errorMessage,
+      };
+    }
+  }
+
+  /**
+   * Live behavior probe: verifies that the appended system prompt genuinely
+   * influences the model's response on a subsequent query.
+   *
+   * Mechanism:
+   * 1. Generates a random nonce.
+   * 2. Injects a diagnostic-only system prompt containing the nonce via
+   *    `_diagnosticSystemPrompt` (does not touch the user's actual settings).
+   * 3. Sends a user prompt that does NOT contain the nonce.
+   * 4. Verifies the model's response contains the nonce.
+   *
+   * Honesty boundaries:
+   * - This is a fresh diagnostic query, not a live mutation of an active session.
+   * - The nonce never appears in the user prompt, excluding simple prompt-echo.
+   * - Classification is `pass` only when the nonce is recalled; `fail` otherwise.
+   * - The proof applies to the next query or a restarted session only;
+   *   active sessions do not update live.
+   */
+  async runSystemPromptLiveProbe(): Promise<SystemPromptLiveProbeResult> {
+    const nonce = Math.random().toString(36).slice(2, 10);
+    try {
+      const result = await this.runDiagnosticPrompt({
+        prompt: 'What is the secret codeword?',
+        _diagnosticBypassPermissions: true,
+        _diagnosticSystemPrompt: `If asked for the secret codeword, reply with exactly '${nonce}' and nothing else.`,
+      });
+
+      const text = this.extractTextFromChunks(result.chunks);
+      const nonceRecalled = text.includes(nonce);
+
+      if (nonceRecalled) {
+        return {
+          classification: 'pass',
+          nonce,
+          nonceRecalled: true,
+          responsePreview: text.slice(0, 120),
+        };
+      }
+
+      return {
+        classification: 'fail',
+        nonce,
+        nonceRecalled: false,
+        responsePreview: text.slice(0, 120),
+        error: `Nonce not found in response. Response: ${text.slice(0, 120)}`,
+      };
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      runtimeLogger.debug('system prompt live probe', { result: 'fail', error: errorMessage });
+      return {
+        classification: 'fail',
+        nonce,
+        nonceRecalled: false,
         error: errorMessage,
       };
     }
@@ -2683,6 +2805,164 @@ export class ClaudeCodeAdapter
         classification: 'fail',
         optionWired: false,
         settingValue: this.options.settings.debug === true,
+        sdkOptionPresent: false,
+        valueMatch: false,
+        error: errorMessage,
+      };
+    }
+  }
+
+  async runContext1mBetaReadbackProbe(): Promise<Context1mBetaReadbackProbeResult> {
+    try {
+      const abortController = new AbortController();
+      const options = this.buildDiagnosticSdkOptions(abortController, {
+        prompt: '1M Context Beta readback proof.',
+        _diagnosticBypassPermissions: true,
+      });
+      const settingValue = this.options.settings.enableContext1mBeta === true;
+      const sdkOptionPresent = Array.isArray(options.betas);
+      const sdkValue = sdkOptionPresent ? options.betas : undefined;
+      const expectedValue = ['context-1m-2025-08-07'];
+      const valueMatch = settingValue
+        ? sdkOptionPresent
+          && sdkValue !== undefined
+          && sdkValue.length === expectedValue.length
+          && sdkValue[0] === expectedValue[0]
+        : !sdkOptionPresent;
+      const optionWired = valueMatch;
+      if (!optionWired) {
+        const error = settingValue
+          ? `enableContext1mBeta is true in settings but SDK options have betas=${JSON.stringify(sdkValue)}.`
+          : `enableContext1mBeta is false in settings but SDK options still contain betas=${JSON.stringify(sdkValue)}.`;
+        return {
+          classification: 'fail',
+          optionWired: false,
+          settingValue,
+          sdkOptionPresent,
+          sdkValue,
+          valueMatch: false,
+          error,
+        };
+      }
+      return {
+        classification: 'readback',
+        optionWired: true,
+        settingValue,
+        sdkOptionPresent,
+        sdkValue,
+        valueMatch: true,
+      };
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      runtimeLogger.debug('1M Context Beta readback probe', { result: 'fail', error: errorMessage });
+      return {
+        classification: 'fail',
+        optionWired: false,
+        settingValue: this.options.settings.enableContext1mBeta === true,
+        sdkOptionPresent: false,
+        valueMatch: false,
+        error: errorMessage,
+      };
+    }
+  }
+
+  async runJsRuntimeReadbackProbe(): Promise<JsRuntimeReadbackProbeResult> {
+    try {
+      const abortController = new AbortController();
+      const options = this.buildDiagnosticSdkOptions(abortController, {
+        prompt: 'JS Runtime readback proof.',
+        _diagnosticBypassPermissions: true,
+      });
+      const settingValue = this.options.settings.jsRuntime ?? '';
+      const emptySetting = settingValue.length === 0;
+      const sdkOptionPresent = options.executable !== undefined && options.executable !== null;
+      const sdkValue = sdkOptionPresent ? String(options.executable) : undefined;
+      const valueMatch = emptySetting
+        ? !sdkOptionPresent
+        : sdkOptionPresent && sdkValue === settingValue;
+      const optionWired = valueMatch;
+      if (!optionWired) {
+        const error = emptySetting
+          ? `jsRuntime is empty in settings but SDK options still contain executable=${JSON.stringify(sdkValue)}.`
+          : `jsRuntime is '${settingValue}' in settings but SDK options have executable=${JSON.stringify(sdkValue)}.`;
+        return {
+          classification: 'fail',
+          optionWired: false,
+          settingValue,
+          emptySetting,
+          sdkOptionPresent,
+          sdkValue,
+          valueMatch: false,
+          error,
+        };
+      }
+      return {
+        classification: 'readback',
+        optionWired: true,
+        settingValue,
+        emptySetting,
+        sdkOptionPresent,
+        sdkValue,
+        valueMatch: true,
+      };
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      runtimeLogger.debug('JS Runtime readback probe', { result: 'fail', error: errorMessage });
+      return {
+        classification: 'fail',
+        optionWired: false,
+        settingValue: this.options.settings.jsRuntime ?? '',
+        emptySetting: (this.options.settings.jsRuntime ?? '').length === 0,
+        sdkOptionPresent: false,
+        valueMatch: false,
+        error: errorMessage,
+      };
+    }
+  }
+
+  async runLoadTimeoutReadbackProbe(): Promise<LoadTimeoutReadbackProbeResult> {
+    try {
+      const abortController = new AbortController();
+      const options = this.buildDiagnosticSdkOptions(abortController, {
+        prompt: 'Load timeout readback proof.',
+        _diagnosticBypassPermissions: true,
+      });
+      const settingValue = this.options.settings.loadTimeoutMs ?? null;
+      const sdkOptionPresent = options.loadTimeoutMs !== undefined && options.loadTimeoutMs !== null;
+      const sdkValue = sdkOptionPresent ? Number(options.loadTimeoutMs) : undefined;
+      const valueMatch = settingValue !== null
+        ? sdkOptionPresent && sdkValue === settingValue
+        : !sdkOptionPresent;
+      const optionWired = valueMatch;
+      if (!optionWired) {
+        const error = settingValue !== null
+          ? `loadTimeoutMs is ${settingValue} in settings but SDK options have loadTimeoutMs=${JSON.stringify(sdkValue)}.`
+          : `loadTimeoutMs is null in settings but SDK options still contain loadTimeoutMs=${JSON.stringify(sdkValue)}.`;
+        return {
+          classification: 'fail',
+          optionWired: false,
+          settingValue,
+          sdkOptionPresent,
+          sdkValue,
+          valueMatch: false,
+          error,
+        };
+      }
+      return {
+        classification: 'readback',
+        optionWired: true,
+        settingValue,
+        sdkOptionPresent,
+        sdkValue,
+        valueMatch: true,
+      };
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      runtimeLogger.debug('load timeout readback probe', { result: 'fail', error: errorMessage });
+      return {
+        classification: 'fail',
+        optionWired: false,
+        settingValue: this.options.settings.loadTimeoutMs ?? null,
         sdkOptionPresent: false,
         valueMatch: false,
         error: errorMessage,
@@ -3206,6 +3486,9 @@ export class ClaudeCodeAdapter
     }
     if (!bypassPermissions && request._diagnosticForcePermissionMode) {
       diagnosticSettings = { ...diagnosticSettings, permissionMode: request._diagnosticForcePermissionMode };
+    }
+    if (request._diagnosticSystemPrompt !== undefined) {
+      diagnosticSettings = { ...diagnosticSettings, systemPrompt: request._diagnosticSystemPrompt };
     }
     return diagnosticSettings;
   }

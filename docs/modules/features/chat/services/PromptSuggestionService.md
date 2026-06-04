@@ -47,6 +47,14 @@ export interface PromptSuggestionData {
 - `ClaudeCodeAdapter.stop()`/`dispose()` 调用 `clearPromptSuggestionSink()` 清除已注册的 sink，所有 `onPromptSuggestionSinkChange` 订阅者收到 `null` 通知。
 - 多视图并发时，每个 coordinator 独立 `attachAdapter()`，adapter 内部通过 `postResultCallbacks` Set 维护所有活跃订阅，避免单回调覆盖（callback clobbering）。
 
+## 边缘情况与回归覆盖
+
+- **last suggestion wins**: 同一 session 多次收到 suggestion 时，后到的覆盖先到的
+- **accept isolates sessions**: `acceptActiveSuggestion()` 只清除 active session，不影响其他 session 的 suggestion
+- **empty sessionId drop**: `setSuggestion()` 会丢弃没有 `sessionId` 的 suggestion，且不会触发 listener
+- **clear noop**: `clearForSession()` 在 session 原本就没有 suggestion 时不会触发 clear listener
+- **bar refresh on null active session**: 即使 `activeSessionId` 为 `null`，adapter callback 收到 matching session 的 suggestion 仍会触发 bar refresh，允许 coordinator 从 host 同步 session id 后再渲染
+
 ## 分类
 
 此能力被分类为 **readback**：

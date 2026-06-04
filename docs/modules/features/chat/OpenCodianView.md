@@ -113,7 +113,7 @@ background task completion notice 的 queued-state 则已经完全移出 `TabRun
 - Claude Code `backend_event` 诊断 chunk（hook/subagent/tool progress/structured output）不会转换成渲染层 stream chunk；这些事件只进入 send pipeline 调试摘要，直到对应产品 UI 完成运行期证明。
 - header status badge 的 settings action 按 active backend 路由：OpenCode 继续跳 Server section，Claude Code 则跳 Claude Code runtime section，避免 Claude mode 下露出 OpenCode-only server chrome。
 - non-OpenCode backend 的 chat/server availability 现在会读取 active adapter 的 `status`，再映射成 `running` / `starting` / `offline`；Claude Code 断开时不再被视为默认在线，composer 和 header 会显示真实离线态。
-- `services/ComposerInputShellCoordinator.ts` 的 host seam：input shell DOM 装配、submit gate、textarea 高度同步、composer stack height、Agent selector / toolbar slot mount，以及共享 composer catalog 加载入口
+- `services/ComposerInputShellCoordinator.ts` 的 host seam：input shell DOM 装配、submit gate、textarea 高度同步、composer stack height、Agent selector / toolbar slot mount，以及 `/json` capability chip 显示决策
 - `SlashCommandMenuCatalogCache` / `SlashCommandExecutionService` 的 host seam：缓存 runtime commands + skills、项目级 command/agent 配置与 `.opencode/commands/**/*.md` markdown commands 合并后的 composer suggestion catalog；现在还携带 `@agent` mention 和主 Agent selector 的候选 sidecar，并支持由插件入口在设置保存、server 恢复到 `running` 时主动失效。view 还为 synthetic `/compact` command 提供 manual compaction seam，解析当前 session/provider/model 后调用 `OpenCodeService.summarizeSession(..., false)` 并显示 Obsidian notice。
 - slash command catalog 的后台 warm preload 现在也受 chat-surface availability guard 约束：当 header/composer 已把状态解释为 `disabled` 或 `offline` 时，view 不再提前 `warm()` runtime slash catalog，避免 backend 不可用时额外制造一次预热拒连日志。
 - `services/InputPanelAppearanceCoordinator.ts` 的 host seam：input panel theme class、action button style、SVG filter layer、liquid-glass mount/unmount 与 diagnostics log 去重
@@ -211,7 +211,7 @@ History dropdown 的实际 conversation 过滤仍由 view host 根据 `settings.
 
 稳定聊天视图当前明确只启用 prompt 输入模式：`getComposerInputMode()` 固定返回 `prompt`，意外进入的 shell submission 会被记录并忽略，不会走本地-only shell 状态。后续如果要开启 shell parity，入口必须通过 `OpenCodeService.runSessionShell()` / `session.shell`，并复用 canonical session/message/part projection，而不是在 view 内新增 shell 消息状态。
 
-Phase 0/1 的 backend-empty / backend-offline 收尾还在这个 seam 上新增了一层高阶 composer availability state：`OpenCodianView` 负责把“没有任何 enabled backend”和“OpenCode active 但运行时不可连接”聚合成统一 surface 状态，再交给 `ComposerInputShellCoordinator` 渲染禁用壳层；Claude Code 等非 OpenCode active backend 不再因为 OpenCode server 离线而禁用 composer。具体 textarea/button 禁用与说明块 DOM 不回流到 view。
+Phase 0/1 的 backend-empty / backend-offline 收尾还在这个 seam 上新增了一层高阶 composer availability state：`OpenCodianView` 负责把“没有任何 enabled backend”和“OpenCode active 但运行时不可连接”聚合成统一 surface 状态，再交给 `ComposerInputShellCoordinator` 渲染禁用态。Claude Code 等非 OpenCode active backend 不再因为 OpenCode server 离线而禁用 composer。具体 textarea/button 禁用与 availability notice DOM 不回流到 view；coordinator 现在会把说明移出 input wrapper，空会话继续复用消息区 empty-state notice，非空会话则在消息区下缘挂一条 transient warning notice。
 
 这样 view 不再直接维护 textarea Enter-submit、高度同步、`ResizeObserver` / RAF layout 节流或 send/stop button tooltip 状态；toolbar 里的 selector 区域也已经进一步交给专门 owner，input shell 只保留 slot 级挂载职责。
 
