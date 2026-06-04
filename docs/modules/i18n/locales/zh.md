@@ -345,7 +345,7 @@ Claude Code 不再使用过载的 `settings.claudeCode.tab.mcpAdvanced` 标签�
 
 2026-05-28 SDK Foundations 诊断表面迁移：新增 `settings.claudeCode.diagnosticStreamMoved.title` / `.desc`，用于在稳定 SDK Foundations 标签中提示用户诊断流控制已迁移到能力实验室；新增 `settings.capabilityLab.diagnosticStreamControls.title` / `.description`，用于能力实验室中诊断流控制子区的标题和说明。保留原有的 `settings.claudeCode.includeHookEvents.*`、`settings.claudeCode.forwardSubagentText.*`、`settings.claudeCode.agentProgressSummaries.*`，因为这些设置键仍然有效，只是 UI 表面从稳定设置迁移到了诊断面板。
 
-2026-05-28 文档更正：移除“`chat.input.placeholderJsonSuffix` 与后端感知输入框占位符已落地”的描述。当前实现并未新增该 i18n 键，也未在输入框占位符追加 `/json` 可发现性提示；discoverability 已通过 composer capability hint 落地（`chat.input.capabilityHint.json`，Claude Code backend 显示 `/json — 结构化输出`，OpenCode backend 不显示），且仍仅覆盖固定 schema trigger，不暗示任意 schema authoring。
+2026-05-28 文档更正：移除“`chat.input.placeholderJsonSuffix` 与后端感知输入框占位符已落地”的描述。当前实现并未新增该 i18n 键，也未在输入框占位符追加 `/json` 可发现性提示；discoverability 已通过 composer capability hint 落地（`chat.input.capabilityHint.jsonLabel` + `chat.input.capabilityHint.jsonTooltip`，Claude Code backend 对用户显示“结构化回复”，点击后底层仍插入 `/json `，OpenCode backend 不显示），且仍仅覆盖固定 schema trigger，不暗示任意 schema authoring。
 
 ## 2026-05-22 Capability Lab 诊断面板
 
@@ -374,7 +374,7 @@ Claude Code 不再使用过载的 `settings.claudeCode.tab.mcpAdvanced` 标签�
 新增 `chat.structuredOutput.label` 键，为 Claude Code structured output 在普通聊天 transcript 中的可折叠渲染提供中文标签文案。
 
 
-本轮 capability-hint 新增 `chat.input.capabilityHint.json` 键，用于 Claude Code backend 激活时在 composer footer 的 send 按钮左侧显示 `/json — 结构化输出` 发现性 chip。
+本轮 capability-hint 现使用三组相关键：`chat.input.capabilityHint.json` 继续表示 capability 本身，`chat.input.capabilityHint.jsonLabel` 用于 Claude Code backend 激活时在 composer footer 的 send 按钮左侧显示“结构化回复”，`chat.input.capabilityHint.jsonTooltip` 用于悬浮说明“固定结构返回结果、点击不会自动发送”。
 
 - 本轮 prompt-suggestions 新增 `settings.claudeCode.promptSuggestions.name`（提示建议）和 `settings.claudeCode.promptSuggestions.desc` 键，用于 Capability Lab 诊断流控制区域的 toggle 说明。
 - 2026-06-04 进一步收紧 `settings.claudeCode.promptSuggestions.desc` / `.stableDesc`：稳定设置文案现在明确写成“显示在最后一条 assistant 消息下方”，不再笼统写成输入框区域建议。

@@ -2096,7 +2096,11 @@
 }
 
 .opencodian-composer-availability-notice {
-  margin: 0 0 12px;
+  position: absolute;
+  right: 16px;
+  left: 16px;
+  z-index: 41;
+  margin: 0;
 }
 
 /* Backend-specific capability chip rendered beside the send action. */

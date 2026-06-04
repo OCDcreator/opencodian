@@ -104,7 +104,7 @@ OpenCodian 的英文翻译表，导出 `enTranslations` 静态对象。它为设
 2026-06-04 同步收紧 `settings.claudeCode.planModeInstructions.lifecycleNotice`：稳定 Settings 文案不再只写“下次查询或重启后生效”，而是明确补出 active-session 边界，说明不能 live 变更 already-running session。
 2026-06-03 调整 `settings.claudeCode.planModeInstructions.desc` 与 `.boundaryNotice`：稳定设置文案不再暗示插件层按 `permissionMode` 做写入门控，而是明确区分 SDK 使用条件（Plan permission mode）与当前 readback-only 边界（插件只验证 settings→SDK option wiring，实际 plan-mode behavior 未独立运行时验证）。
 
-2026-05-28 文档更正：移除关于 `chat.input.placeholderJsonSuffix` 与 backend-aware composer placeholder 已落地的表述。当前实现未引入该 i18n 键，也未在输入框占位符中追加 `/json` discoverability 文案；discoverability 通过 composer capability hint 落地（`chat.input.capabilityHint.json`，Claude Code backend 显示 `/json — structured output`，OpenCode backend 不显示），并且仍然只覆盖固定 schema trigger，不暗示任意 schema authoring。
+2026-05-28 文档更正：移除关于 `chat.input.placeholderJsonSuffix` 与 backend-aware composer placeholder 已落地的表述。当前实现未引入该 i18n 键，也未在输入框占位符中追加 `/json` discoverability 文案；discoverability 通过 composer capability hint 落地（`chat.input.capabilityHint.jsonLabel` + `chat.input.capabilityHint.jsonTooltip`，Claude Code backend 对用户显示 `Structured reply`，点击后底层仍插入 `/json `，OpenCode backend 不显示），并且仍然只覆盖固定 schema trigger，不暗示任意 schema authoring。
 
 2026-05-24 新增 `settings.claudeCode.sdkStreamBoundary.*` 键，用于 SDK Foundations 中 hook/subagent stream 开关前的 diagnostic boundary notice，明确这些开关只驱动诊断/实验事件流，不提供稳定 hook authoring 或完整 subagent transcript/progress UI。
 
@@ -370,7 +370,7 @@ Claude Code no longer uses the overloaded `settings.claudeCode.tab.mcpAdvanced` 
 新增 `chat.structuredOutput.label` 键，为 Claude Code structured output 在普通聊天 transcript 中的可折叠渲染提供标签文案。
 
 
-本轮 capability-hint 新增 `chat.input.capabilityHint.json` 键，用于 Claude Code backend 激活时在 composer footer 的 send 按钮左侧显示 `/json — structured output` 发现性 chip。
+本轮 capability-hint 现使用三组相关键：`chat.input.capabilityHint.json` 继续表示 capability 本身，`chat.input.capabilityHint.jsonLabel` 用于 Claude Code backend 激活时在 composer footer 的 send 按钮左侧显示 `Structured reply`，`chat.input.capabilityHint.jsonTooltip` 用于悬浮说明“固定结构返回结果、点击不会自动发送”。
 
 - 本轮 prompt-suggestions 新增 `settings.claudeCode.promptSuggestions.name` 和 `settings.claudeCode.promptSuggestions.desc` 键，用于 Capability Lab 诊断流控制区域的 toggle 说明。
 - 2026-06-04 进一步收紧 `settings.claudeCode.promptSuggestions.desc` / `.stableDesc`：稳定设置文案现在明确写成“显示在最后一条 assistant 消息下方”，不再含糊写成 composer/input-area suggestion。

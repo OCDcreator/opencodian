@@ -307,7 +307,7 @@ describe('ComposerInputShellCoordinator', () => {
     expect(fixture.container.querySelector('.opencodian-agent-selector')).toBeNull();
     expect(
       fixture.container.querySelector('.opencodian-input-capability-hint-text')?.textContent,
-    ).toBe('/json');
+    ).toBe(t('chat.input.capabilityHint.jsonLabel'));
     expect(fixture.host.mountSelectionControls).toHaveBeenCalledTimes(2);
     expect(fixture.host.mountContextUsageIndicator).toHaveBeenCalledTimes(2);
     expect(fixture.host.mountEffortSelector).toHaveBeenCalledTimes(2);
@@ -329,6 +329,27 @@ describe('ComposerInputShellCoordinator', () => {
     expect(fixture.container.querySelector('.opencodian-composer-disabled-state')).toBeNull();
     expect(fixture.surfaceRoot.querySelector('.opencodian-composer-availability-notice')?.textContent)
       .toContain('No backend enabled');
+  });
+
+  it('positions the external availability notice above the composer stack and keeps it synced to composer height', () => {
+    const fixture = createFixture({
+      shouldMountAgentSelector: false,
+      composerAvailabilityState: {
+        kind: 'backend-offline',
+        title: 'Backend unavailable',
+        description: 'The current backend is enabled, but it is not connected right now.',
+      },
+    });
+    const resizeObserver = ResizeObserverMock.instances[0];
+    const noticeEl = fixture.surfaceRoot.querySelector<HTMLElement>('.opencodian-composer-availability-notice');
+
+    expect(noticeEl?.style.bottom).toBe('96px');
+
+    fixture.setInputContainerHeight(132);
+    resizeObserver?.trigger();
+    flushAnimationFrames();
+
+    expect(noticeEl?.style.bottom).toBe('140px');
   });
 
   it('refreshes composer availability state when locale-driven refresh reapplies texts', () => {
@@ -452,8 +473,8 @@ describe('ComposerInputShellCoordinator — capability hint behaviors', () => {
     const hintEl = fixture.container.querySelector<HTMLButtonElement>('.opencodian-input-capability-hint');
     expect(hintEl).toBeTruthy();
     expect(hintEl?.querySelector('.opencodian-input-capability-hint-text')?.textContent)
-      .toBe('/json');
-    expect(hintEl?.getAttribute('data-tooltip')).toBe(t('chat.input.capabilityHint.json'));
+      .toBe(t('chat.input.capabilityHint.jsonLabel'));
+    expect(hintEl?.getAttribute('data-tooltip')).toBe(t('chat.input.capabilityHint.jsonTooltip'));
     expect(hintEl?.nextElementSibling).toBe(fixture.sendBtn);
   });
 
@@ -658,7 +679,7 @@ describe('ComposerInputShellCoordinator — slash menu core behaviors', () => {
     const hintEl = fixture.container.querySelector<HTMLElement>('.opencodian-input-capability-hint');
     expect(hintEl).toBeTruthy();
     expect(hintEl?.querySelector('.opencodian-input-capability-hint-text')?.textContent)
-      .toBe('/json');
+      .toBe(t('chat.input.capabilityHint.jsonLabel'));
   });
 
   it('does not derive capability hint when shouldMountAgentSelector returns true', () => {
@@ -901,7 +922,7 @@ describe('ComposerInputShellCoordinator — fuzzy matching and dropdown UI', () 
     const hintEl = fixture.container.querySelector<HTMLElement>('.opencodian-input-capability-hint');
     expect(hintEl).toBeTruthy();
     expect(hintEl?.querySelector('.opencodian-input-capability-hint-text')?.textContent)
-      .toBe('/json');
+      .toBe(t('chat.input.capabilityHint.jsonLabel'));
   });
 
   it('does not derive capability hint when shouldMountAgentSelector returns true', () => {

@@ -29,6 +29,7 @@ import {
 import { SlashCommandMenuCoordinator } from './SlashCommandMenuCoordinator';
 
 const COMPOSER_TEXTAREA_MAX_HEIGHT = 240;
+const COMPOSER_AVAILABILITY_NOTICE_GAP_PX = 8;
 const INPUT_HIGHLIGHT_SLASH_REGEX = /(^|\s)(\/(?:skills|skill)(?:\s+\S+)?|\/\S+)/g;
 
 const logger = createLogger('ComposerInputShellCoordinator');
@@ -370,8 +371,8 @@ export class ComposerInputShellCoordinator {
     // No agent selector → Claude Code backend (lacks Subagents capability).
     if (this.host.shouldMountAgentSelector?.() === false) {
       return {
-        text: '/json',
-        tooltip: t('chat.input.capabilityHint.json'),
+        text: t('chat.input.capabilityHint.jsonLabel'),
+        tooltip: t('chat.input.capabilityHint.jsonTooltip'),
         insertText: '/json ',
       };
     }
@@ -643,8 +644,9 @@ export class ComposerInputShellCoordinator {
       return;
     }
 
+    this.syncComposerAvailabilityNoticePosition();
     const stackHeight = Math.ceil(
-      this.inputContainerEl.offsetHeight + this.measureComposerAvailabilityNoticeHeight(),
+      this.inputContainerEl.offsetHeight + this.measureComposerAvailabilityNoticeReservedHeight(),
     );
     this.host.setComposerStackHeight(Math.max(0, stackHeight));
     this.host.scheduleSettledScrollToBottomIfNeeded();
@@ -850,6 +852,9 @@ export class ComposerInputShellCoordinator {
       this.inputContainerEl.before(this.availabilityNoticeEl);
       didMutate = true;
     }
+    if (this.syncComposerAvailabilityNoticePosition()) {
+      didMutate = true;
+    }
     return didMutate;
   }
 
@@ -943,6 +948,29 @@ export class ComposerInputShellCoordinator {
     const marginTop = Number.parseFloat(styles.marginTop || '0') || 0;
     const marginBottom = Number.parseFloat(styles.marginBottom || '0') || 0;
     return Math.ceil(noticeEl.getBoundingClientRect().height + marginTop + marginBottom);
+  }
+
+  private measureComposerAvailabilityNoticeReservedHeight(): number {
+    const noticeHeight = this.measureComposerAvailabilityNoticeHeight();
+    if (noticeHeight <= 0) {
+      return 0;
+    }
+
+    return noticeHeight + COMPOSER_AVAILABILITY_NOTICE_GAP_PX;
+  }
+
+  private syncComposerAvailabilityNoticePosition(): boolean {
+    if (!this.inputContainerEl || !this.availabilityNoticeEl?.isConnected) {
+      return false;
+    }
+
+    const nextBottom = `${Math.ceil(this.inputContainerEl.offsetHeight + COMPOSER_AVAILABILITY_NOTICE_GAP_PX)}px`;
+    if (this.availabilityNoticeEl.style.bottom === nextBottom) {
+      return false;
+    }
+
+    this.availabilityNoticeEl.style.bottom = nextBottom;
+    return true;
   }
 
   private async refreshComposerSuggestionMenu(): Promise<void> {
