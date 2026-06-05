@@ -125,6 +125,7 @@ export {
 } from './ClaudeProjectCommandDiscovery';
 export {
   type ClaudeHookEntry,
+  type ClaudeHookGroup,
   type ClaudeHooksConfig,
   type ClaudeProjectSettingsInfo,
   createClaudeProjectSettingsFile,

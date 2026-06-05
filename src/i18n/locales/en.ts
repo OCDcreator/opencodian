@@ -2466,6 +2466,7 @@ export const enTranslations = {
   'settings.claudeCode.projectSettings.pluginsSummary': 'Plugins: {count} ({names})',
   'settings.claudeCode.projectSettings.noPlugins': 'No plugins enabled.',
   'settings.claudeCode.projectSettings.marketplacesSummary': 'Extra marketplaces: {count} ({urls})',
+  'settings.claudeCode.projectSettings.noMarketplaces': 'No extra marketplaces configured.',
   'settings.claudeCode.projectSettings.openButton': 'Open',
   'settings.claudeCode.projectSettings.createFailed': 'Failed to create settings file (may already exist).',
 

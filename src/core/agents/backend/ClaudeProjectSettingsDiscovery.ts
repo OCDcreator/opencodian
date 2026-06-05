@@ -9,7 +9,7 @@
 import { mkdir, readFile, writeFile } from 'fs/promises';
 import * as path from 'path';
 
-/** Parsed hook entry from a Claude settings file. */
+/** Parsed hook command from a Claude settings file. */
 export interface ClaudeHookEntry {
   type: string;
   command: string;
@@ -18,8 +18,26 @@ export interface ClaudeHookEntry {
   [key: string]: unknown;
 }
 
-/** Hooks grouped by event name. */
-export type ClaudeHooksConfig = Record<string, ClaudeHookEntry[]>;
+/**
+ * Official nested hook group: an event array entry containing an optional
+ * matcher and a nested `hooks` array of individual hook commands.
+ *
+ * The official Claude Code settings shape is:
+ * ```json
+ * { "hooks": { "SessionStart": [{ "matcher": "", "hooks": [{ "type": "command", "command": "..." }] }] } }
+ * ```
+ */
+export interface ClaudeHookGroup {
+  /** Optional pattern matcher for this hook group. */
+  matcher?: string;
+  /** The actual hook commands in this group. */
+  hooks: ClaudeHookEntry[];
+  /** Any additional fields from the group entry. */
+  [key: string]: unknown;
+}
+
+/** Hooks grouped by event name. Each event maps to an array of hook groups. */
+export type ClaudeHooksConfig = Record<string, ClaudeHookGroup[]>;
 
 /** Summary of a single Claude project settings file. */
 export interface ClaudeProjectSettingsInfo {
@@ -65,6 +83,21 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+/**
+ * Check if a value looks like a direct flat hook entry ({ type, command }).
+ * Used as a lenient fallback for non-standard flat shapes.
+ */
+function isFlatHookEntry(value: unknown): value is ClaudeHookEntry {
+  return isRecord(value) && typeof value.type === 'string' && typeof value.command === 'string';
+}
+
+/**
+ * Check if a value looks like an official nested hook group ({ hooks: [...] }).
+ */
+function isNestedHookGroup(value: unknown): value is { matcher?: string; hooks: unknown[]; [key: string]: unknown } {
+  return isRecord(value) && Array.isArray(value.hooks);
+}
+
 function parseHooks(value: unknown): ClaudeHooksConfig {
   if (!isRecord(value)) {
     return {};
@@ -77,11 +110,26 @@ function parseHooks(value: unknown): ClaudeHooksConfig {
       continue;
     }
 
-    const parsedEntries = entries.filter(
-      (entry): entry is ClaudeHookEntry => isRecord(entry) && typeof entry.type === 'string' && typeof entry.command === 'string',
-    );
-    if (parsedEntries.length > 0) {
-      hooks[eventName] = parsedEntries;
+    const groups: ClaudeHookGroup[] = [];
+
+    for (const entry of entries) {
+      if (isNestedHookGroup(entry)) {
+        // Official nested shape: { matcher?, hooks: [{ type, command, ... }] }
+        const nestedHooks = entry.hooks.filter(isFlatHookEntry);
+        if (nestedHooks.length > 0) {
+          groups.push({
+            matcher: typeof entry.matcher === 'string' ? entry.matcher : undefined,
+            hooks: nestedHooks,
+          });
+        }
+      } else if (isFlatHookEntry(entry)) {
+        // Lenient fallback: flat direct entry promoted to a single-command group
+        groups.push({ hooks: [entry] });
+      }
+    }
+
+    if (groups.length > 0) {
+      hooks[eventName] = groups;
     }
   }
 
@@ -97,7 +145,10 @@ function parseEnabledPlugins(value: unknown): string[] {
 }
 
 function countHooks(hooks: ClaudeHooksConfig): number {
-  return Object.values(hooks).reduce((total, entries) => total + entries.length, 0);
+  return Object.values(hooks).reduce(
+    (total, groups) => total + groups.reduce((groupTotal, group) => groupTotal + group.hooks.length, 0),
+    0,
+  );
 }
 
 async function readSettingsFile(vaultPath: string | null | undefined, fileName: ClaudeProjectSettingsFileName): Promise<ClaudeProjectSettingsInfo> {

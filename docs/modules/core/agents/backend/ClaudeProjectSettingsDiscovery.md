@@ -16,8 +16,9 @@
 
 | 类型 | 说明 |
 |------|------|
-| `ClaudeHookEntry` | 单个 hook 条目，包含 `type`、`command`、`timeout` 和任意扩展字段 |
-| `ClaudeHooksConfig` | 按事件名分组的 hook 条目映射（如 `PreToolUse`、`SessionStart`） |
+| `ClaudeHookEntry` | 单个 hook 命令，包含 `type`、`command`、`timeout` 和任意扩展字段 |
+| `ClaudeHookGroup` | 官方嵌套 hook 组：`{ matcher?, hooks: ClaudeHookEntry[] }`，是 settings 文件中的第一等公民 |
+| `ClaudeHooksConfig` | 按事件名分组的 hook 组映射（如 `{ SessionStart: ClaudeHookGroup[] }`） |
 | `ClaudeProjectSettingsInfo` | 单个设置文件的摘要：`relativePath`、`exists`、`hooks`、`enabledPlugins`、`extraKnownMarketplaces`、`hookCount`、`parseError` |
 
 ## 核心导出
@@ -33,7 +34,9 @@
 - `vaultPath` 为空或空白时返回两个 exists=false 的条目，不抛错。
 - `.claude/` 目录不存在时同样返回 exists=false。
 - JSON 解析失败时设置 `parseError` 字段，不抛错。
-- `hookCount` 为所有事件名下 hook 条目数之和。
+- `hookCount` 为所有事件名下所有 hook 组中 individual hook commands 数量之和（非组数）。
+- hooks 解析以**官方嵌套形状为第一等公民**：`hooks -> event[] -> { matcher?, hooks: [{ type, command, timeout }] }`。这和仓库中 `SettingsCapabilityLabSection.setupShellHookConfig()` 写入并验证通过的形状一致。
+- 非官方的扁平 direct-entry 形状（`{ type, command }` 直接作为事件数组元素）被宽容降级为单命令组，但不保证被 Claude runtime 执行。
 - `enabledPlugins` 从解析后的 `enabledPlugins` 数组提取；非数组或不存在时为空数组。
 - `extraKnownMarketplaces` 从解析后的 `extraKnownMarketplaces` 数组提取（URL 字符串列表）；非数组或不存在时为空数组。
 - `createClaudeProjectSettingsFile` 会递归创建 `.claude/` 目录，写入 `{}`（空合法 JSON）。
@@ -44,4 +47,5 @@
 - Settings 直接使用 `discoverClaudeProjectSettings` 动态导入而非通过 `ClaudeCodeAdapter`，以避免 owner-guard 耦合。
 - 这不是 hook 可视化编辑器 — 它提供文件发现和访问入口，用户直接编辑 JSON 文件。
 - hooks 配置路径是官方 Claude Code 路径（`.claude/settings.json`），不是 SDK programmatic JS callback。
+- hooks 解析的 official nested shape 与 `SettingsCapabilityLabSection.setupShellHookConfig()` 写入的形状一致：`{ matcher: '', hooks: [{ type: 'command', command: '...', timeout: 10 }] }`。该形状已通过普通 Claude chat 的 nonce file side effect 验证。
 - 保持错误吞掉并返回安全默认值的语义。

@@ -990,7 +990,11 @@ export class SettingsClaudeCodeSection {
       if (sf.hookCount > 0) {
         const hookEvents = Object.keys(sf.hooks);
         const hookSummary = hookEvents
-          .map((event) => `${event} (${sf.hooks[event].length})`)
+          .map((event) => {
+            const groups = sf.hooks[event];
+            const cmdCount = groups.reduce((sum, g) => sum + g.hooks.length, 0);
+            return `${event} (${cmdCount})`;
+          })
           .join(', ');
         fileEl.createEl('p', {
           text: t('settings.claudeCode.projectSettings.hooksSummary', {
@@ -1025,6 +1029,11 @@ export class SettingsClaudeCodeSection {
             count: sf.extraKnownMarketplaces.length,
             urls: sf.extraKnownMarketplaces.join(', '),
           }),
+        });
+      } else {
+        fileEl.createEl('p', {
+          cls: 'opencodian-settings-inline-notice',
+          text: t('settings.claudeCode.projectSettings.noMarketplaces'),
         });
       }
 

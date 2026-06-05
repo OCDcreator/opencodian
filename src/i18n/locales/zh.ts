@@ -2465,6 +2465,7 @@ export const zhTranslations = {
   'settings.claudeCode.projectSettings.pluginsSummary': '插件：{count} 个（{names}）',
   'settings.claudeCode.projectSettings.noPlugins': '未启用插件。',
   'settings.claudeCode.projectSettings.marketplacesSummary': '额外市场: {count} ({urls})',
+  'settings.claudeCode.projectSettings.noMarketplaces': '未配置额外市场。',
   'settings.claudeCode.projectSettings.openButton': '打开',
   'settings.claudeCode.projectSettings.createFailed': '创建设置文件失败（可能已存在）。',
 
