@@ -26,6 +26,7 @@ import {
   stringifySkillToolMode,
   stringifyTaskAllowlist,
 } from './projectAgentEditorConfig';
+import { TextareaSizeMemory } from './TextareaSizeMemory';
 
 const logger = createLogger('SettingsProjectAgentEditor');
 
@@ -77,9 +78,18 @@ interface EditorGroupOptions {
 }
 
 export class SettingsProjectAgentEditor {
+  private textareaSizeMemories: TextareaSizeMemory[] = [];
+
   constructor(
     private readonly configManager: NonNullable<OpenCodianPlugin['opencodeConfigManager']>,
   ) {}
+
+  dispose(): void {
+    for (const memory of this.textareaSizeMemories) {
+      memory.destroy();
+    }
+    this.textareaSizeMemories = [];
+  }
 
   // eslint-disable-next-line max-lines-per-function
   render(options: SettingsProjectAgentEditorRenderOptions): void {
@@ -90,6 +100,7 @@ export class SettingsProjectAgentEditor {
       mergedAgents,
     } = options;
 
+    this.dispose();
     const previousScrollTop = containerEl.scrollTop;
     const previousMinHeight = containerEl.style.minHeight;
     const measuredHeight = containerEl.offsetHeight;
@@ -259,6 +270,7 @@ export class SettingsProjectAgentEditor {
           .onChange((value) => {
             state.prompt = value;
           });
+        this.textareaSizeMemories.push(TextareaSizeMemory.attach(text.inputEl, 'project-agent-prompt'));
       });
 
     new Setting(modelBodyEl)
@@ -584,6 +596,9 @@ export class SettingsProjectAgentEditor {
             state.taskAllowlist = value;
             state.taskAllowlistDirty = true;
           });
+        this.textareaSizeMemories.push(
+          TextareaSizeMemory.attach(text.inputEl, 'project-agent-task-allowlist'),
+        );
       });
   }
 
@@ -692,6 +707,9 @@ export class SettingsProjectAgentEditor {
             state.optionsJson = value;
             state.optionsDirty = true;
           });
+        this.textareaSizeMemories.push(
+          TextareaSizeMemory.attach(text.inputEl, 'project-agent-options'),
+        );
       });
   }
 

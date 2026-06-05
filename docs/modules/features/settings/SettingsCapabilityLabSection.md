@@ -14,7 +14,7 @@
 | 面板 | 功能 | 数据来源 |
 |------|------|----------|
 | Capability Matrix | 静态 SDK 能力对等矩阵；`userSurface` 支持 `settings`（稳定设置控制）、`diagnostic`（实验性表面）、`hidden`（未暴露）和 `chat`（普通聊天交互表面）四种分类 | 代码检查 + `getClaudeCodeAdapter()` |
-| JSONL History Browser | 浏览本地 JSONL 或 diagnostic store 会话历史，支持 import / mirror proof | `adapter.listSessions()` / `getSessionMessages()` / `importSessionToStore()` / `runDiagnosticPrompt()` |
+| JSONL History Browser | 浏览本地 JSONL 或 diagnostic store 会话历史，支持 import / mirror proof。会话元数据（sessionId / summary / lastModified）不再通过 `<option title>` 显示，而是选择会话后渲染到固定可见的 `data-capability-history-session-detail` 详情区域 | `adapter.listSessions()` / `getSessionMessages()` / `importSessionToStore()` / `runDiagnosticPrompt()` |
 | Subagent Browser | 列出/检查子代理转录 | `adapter.listSubagents()` / `getSubagentMessages()` |
 | Rewind Dry-Run Preview | 预览文件检查点回退（不执行）；手动选择 session + message ID 执行 `rewindFiles(dryRun:true)`。readback 分类显示 source-backed blocker hint。静态矩阵标为 `Readback`（source-backed blocker: `isInteractive:false` 硬编码于 `_T()` (sdk.mjs ~line 58)，零 `isInteractive=true` 存在于打包 SDK，snapshot 创建被 React `useState` setter 门控，`rewindFiles()` 发送 `sdk_rewind_files` 到子进程检查始终空的 file history）。探针新增 `sdkFilesPersistedEventCount`（预期 0）和 `applyFlagSettings` seam 探测（在 Phase 1 首个 assistant 消息后调用 `query.applyFlagSettings({ fileCheckpointingEnabled: true })` 测试运行时设置注入）| `adapter.rewindFiles(dryRun: true)` / `adapter.runCheckpointRewindProbe()` |
 | Structured Output Playground | 启动 runtime-only outputFormat probe 并展示 `backend_event`；探针支持双路径检测：首选 `structured_output` backend_event，若无则回退检测 text chunk 中的合法 JSON | `adapter.runDiagnosticPrompt()` |

@@ -2,7 +2,7 @@
 
 > **源码**: `src/features/chat/services/MessageSendPreparationService.ts`
 > **状态**: [REVIEW]
-> **最近更新**: Busy-tab follow-up enqueue
+> **最近更新**: Busy-tab follow-up enqueue and backend-aware first-turn title bootstrap
 
 ## 概述
 
@@ -92,8 +92,11 @@ export function createMessageSendPreparationHost(
 
 - 只有当前 conversation 在 optimistic append 之后，user message 数量为 `1` 时，才进入 first-message title 路径
 - fallback title 始终先于 AI title kickoff
-- 是否启动 AI title generation 仍由 view 当前设置决定
-- 这条路径当前只属于 `conversation.backend === 'opencode'`（缺省旧会话也按 OpenCode 处理）。Claude Code conversation 不会调用 `applyFallbackConversationTitle()` 或 `startAiConversationTitleGeneration()`，避免在 Claude Code 尚未接入标题机制时触发 OpenCode 专用逻辑。
+- 这条 bootstrap 现在允许 `opencode` 和 `claude-code` 两种 conversation backend 进入；其他 backend 仍跳过
+- 是否启动后续异步标题生成由 host 按 backend 决定：
+  - OpenCode：`titleMode === 'ai'`
+  - Claude Code：`backendSettings.claudeCode.autoTitle === true`
+- Claude Code 接入的是“官方标题轮询”这半条链路，而不是 OpenCode 专用 fallback session。也就是说，prepare 阶段仍只负责调用 `applyFallbackConversationTitle()` / `startAiConversationTitleGeneration()`；真正 backend-aware 的 official title read 和 “Claude 无 summary 时退回本地 fallback title” 逻辑仍在 `TitleGenerationService`。
 
 ### backend model options
 

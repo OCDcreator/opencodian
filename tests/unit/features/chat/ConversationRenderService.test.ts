@@ -1,3 +1,6 @@
+import { readFileSync } from 'fs';
+import { join } from 'path';
+
 import {
   ConversationRenderService,
   createConversationRenderHost,
@@ -193,6 +196,31 @@ describe('ConversationRenderService tooltip / copy utilities', () => {
       const labels = buttonEl.querySelectorAll('.opencodian-visually-hidden[data-tooltip-label="true"]');
       expect(labels).toHaveLength(1);
       expect(labels[0].textContent).toBe('Updated');
+    });
+  });
+
+  describe('shared tooltip CSS contract', () => {
+    it('uses a body-level overlay instead of pseudo-element tooltip bubbles on triggers', () => {
+      const css = readFileSync(
+        join(process.cwd(), 'src/style/components/model-selector.css'),
+        'utf8',
+      );
+
+      expect(css).toMatch(
+        /\.opencodian-tooltip-layer\s*\{[\s\S]*position:\s*fixed;[\s\S]*z-index:\s*2300;/,
+      );
+      expect(css).toMatch(
+        /\.opencodian-tooltip-bubble\s*\{[\s\S]*max-width:\s*min\(240px,\s*calc\(100vw\s*-\s*32px\)\);/,
+      );
+      expect(css).toMatch(
+        /\.opencodian-tooltip-layer\[data-placement="top"\][\s\S]*\.opencodian-tooltip-arrow[\s\S]*bottom:\s*-4px;/,
+      );
+      expect(css).not.toMatch(
+        /\.opencodian-tooltip-trigger\[data-tooltip\]:not\(\[data-tooltip=""\]\)::after/,
+      );
+      expect(css).not.toMatch(
+        /\.opencodian-tooltip-trigger\[data-tooltip\]:not\(\[data-tooltip=""\]\)::before/,
+      );
     });
   });
 

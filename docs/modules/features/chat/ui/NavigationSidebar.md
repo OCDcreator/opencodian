@@ -34,6 +34,8 @@ constructor(
 - `chevron-down` → 下一条用户消息
 - `chevrons-down` → 底部
 
+按钮 host 在构造时会确保 `TooltipLayerController` 已注册，因此这些左侧悬浮按钮的 tooltip 也统一走 `document.body` overlay，而不是依赖按钮伪元素留在局部层级里。
+
 ### 可见性控制
 
 `updateVisibility()`：当 `scrollHeight > clientHeight + 50` 时显示，否则隐藏。

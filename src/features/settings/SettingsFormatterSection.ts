@@ -13,6 +13,8 @@ import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { OpenCodeProjectConfigHelpModal } from './OpenCodeProjectConfigHelpModal';
 import { isOpenCodeSettingsBackendActive } from './settingsBackendGuards';
+import { SettingsPopoverController } from './SettingsPopoverController';
+import { TextareaSizeMemory } from './TextareaSizeMemory';
 
 type FormatterMode = 'default' | 'disabled' | 'custom';
 type BuiltinEntryAction = 'default' | 'disable' | 'override';
@@ -178,6 +180,8 @@ export class SettingsFormatterSection {
   private activeRenderMode: 'classic' | 'tabbed' | null = null;
   private activeSecondaryTabId = 'overview';
   private contentRefreshRunId = 0;
+  private bodyLevelPopovers: HTMLElement[] = [];
+  private textareaSizeMemories: TextareaSizeMemory[] = [];
 
   constructor(options: SettingsFormatterSectionOptions) {
     this.plugin = options.plugin;
@@ -189,6 +193,44 @@ export class SettingsFormatterSection {
     this.contentRefreshRunId += 1;
     this.activeRenderContainerEl = null;
     this.activeRenderMode = null;
+    this.destroyTextareaSizeMemories();
+    this.removeBodyLevelPopovers();
+  }
+
+  private destroyTextareaSizeMemories(): void {
+    for (const memory of this.textareaSizeMemories) {
+      memory.destroy();
+    }
+    this.textareaSizeMemories = [];
+  }
+
+  private removeBodyLevelPopovers(): void {
+    for (const popoverEl of this.bodyLevelPopovers) {
+      popoverEl.remove();
+    }
+    this.bodyLevelPopovers = [];
+  }
+
+  private showSearchPopover(inputEl: HTMLInputElement, popoverEl: HTMLElement): void {
+    if (!popoverEl.parentElement) {
+      inputEl.ownerDocument.body.appendChild(popoverEl);
+    }
+    const boundaryEl = inputEl.closest<HTMLElement>(
+      '.vertical-tab-content-container, .vertical-tab-content, .modal-content',
+    );
+    SettingsPopoverController.ensureForDocument(inputEl.ownerDocument).show({
+      anchorEl: inputEl,
+      popoverEl,
+      matchAnchorWidth: true,
+      preferredPlacement: 'bottom-start',
+      boundaryEl: boundaryEl ?? undefined,
+    });
+  }
+
+  private hideSearchPopover(inputEl: HTMLInputElement, popoverEl: HTMLElement): void {
+    SettingsPopoverController.ensureForDocument(inputEl.ownerDocument).hide(popoverEl);
+    inputEl.setAttribute('aria-expanded', 'false');
+    inputEl.removeAttribute('aria-activedescendant');
   }
 
   attach(containerEl: HTMLElement): HTMLHeadingElement {
@@ -246,6 +288,10 @@ export class SettingsFormatterSection {
     }
 
     const runId = ++this.contentRefreshRunId;
+    // Remove body-level popovers from the previous render cycle before
+    // re-rendering so they do not accumulate in document.body.
+    this.removeBodyLevelPopovers();
+    this.destroyTextareaSizeMemories();
     const previousMinHeight = containerEl.style.minHeight;
     const measuredHeight = containerEl.offsetHeight;
     const scrollContainerEl = this.getScrollContainer(containerEl);
@@ -707,11 +753,12 @@ export class SettingsFormatterSection {
       },
     });
     searchInputEl.dataset.searchScope = 'runtime-formatter';
-    const popoverEl = searchFieldEl.createDiv({
-      cls: 'opencodian-builtin-list-search-popover',
-      attr: { role: 'listbox' },
-    });
+    const popoverEl = searchInputEl.ownerDocument.createElement('div');
+    popoverEl.className = 'opencodian-builtin-list-search-popover';
+    popoverEl.setAttribute('role', 'listbox');
     popoverEl.hidden = true;
+    // Kept detached; showSearchPopover() appends it to document.body on demand.
+    this.bodyLevelPopovers.push(popoverEl);
     const toolbarCountEl = toolbarEl.createSpan({ cls: 'opencodian-builtin-list-search-count' });
     const clearButtonEl = toolbarEl.createEl('button', {
       cls: 'opencodian-builtin-list-search-clear',
@@ -749,9 +796,7 @@ export class SettingsFormatterSection {
     let activeSuggestionIndex = -1;
     let suggestionItems: OpencodeFormatterStatus[] = [];
     const hidePopover = () => {
-      popoverEl.hidden = true;
-      searchInputEl.setAttribute('aria-expanded', 'false');
-      searchInputEl.removeAttribute('aria-activedescendant');
+      this.hideSearchPopover(searchInputEl, popoverEl);
     };
     const selectFormatterSuggestion = (formatter: OpencodeFormatterStatus) => {
       searchInputEl.value = formatter.name;
@@ -796,7 +841,7 @@ export class SettingsFormatterSection {
         });
       });
 
-      popoverEl.hidden = false;
+      this.showSearchPopover(searchInputEl, popoverEl);
       searchInputEl.setAttribute('aria-expanded', 'true');
       if (activeSuggestionIndex >= 0) {
         searchInputEl.setAttribute(
@@ -1731,6 +1776,7 @@ export class SettingsFormatterSection {
     });
     textareaEl.rows = 12;
     textareaEl.spellcheck = false;
+    this.textareaSizeMemories.push(TextareaSizeMemory.attach(textareaEl, 'formatter-json-editor'));
 
     void this.loadJsonEditorContent(textareaEl);
 
@@ -2076,11 +2122,12 @@ export class SettingsFormatterSection {
     inputEl.dataset.searchScope = scope;
     labelEl.appendChild(inputEl);
 
-    const popoverEl = fieldEl.createDiv({
-      cls: 'opencodian-builtin-list-search-popover',
-      attr: { role: 'listbox' },
-    });
+    const popoverEl = inputEl.ownerDocument.createElement('div');
+    popoverEl.className = 'opencodian-builtin-list-search-popover';
+    popoverEl.setAttribute('role', 'listbox');
     popoverEl.hidden = true;
+    // Kept detached; showSearchPopover() appends it to document.body on demand.
+    this.bodyLevelPopovers.push(popoverEl);
 
     const metaEl = searchEl.createSpan({ cls: 'opencodian-builtin-list-search-count' });
     const filterEl = searchEl.createEl('select', {
@@ -2119,9 +2166,7 @@ export class SettingsFormatterSection {
     };
 
     const hidePopover = () => {
-      popoverEl.hidden = true;
-      inputEl.setAttribute('aria-expanded', 'false');
-      inputEl.removeAttribute('aria-activedescendant');
+      this.hideSearchPopover(inputEl, popoverEl);
     };
 
     const renderPopover = () => {
@@ -2156,7 +2201,7 @@ export class SettingsFormatterSection {
         });
       });
 
-      popoverEl.hidden = false;
+      this.showSearchPopover(inputEl, popoverEl);
       inputEl.setAttribute('aria-expanded', 'true');
       if (activeIndex >= 0) {
         inputEl.setAttribute('aria-activedescendant', `opencodian-${scope}-builtin-search-option-${activeIndex}`);
@@ -2413,6 +2458,7 @@ export class SettingsFormatterSection {
       .setDesc(t('settings.formatter.lsp.initializationDesc'));
     const initText = fieldsEl.createEl('textarea', { cls: 'opencodian-lsp-initialization-input' });
     initText.value = JSON.stringify(entry.initialization ?? {}, null, 2);
+    this.textareaSizeMemories.push(TextareaSizeMemory.attach(initText, 'lsp-initialization-editor'));
 
     new Setting(fieldsEl)
       .addButton((btn) => {
@@ -2544,6 +2590,7 @@ export class SettingsFormatterSection {
     });
     textareaEl.rows = 12;
     textareaEl.spellcheck = false;
+    this.textareaSizeMemories.push(TextareaSizeMemory.attach(textareaEl, 'lsp-json-editor'));
     void this.loadLspJsonEditorContent(textareaEl);
 
     const buttonBar = sectionEl.createDiv({ cls: 'opencodian-formatter-json-buttons' });

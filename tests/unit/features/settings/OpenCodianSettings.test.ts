@@ -1068,7 +1068,7 @@ describe('OpenCodianSettingTab title styling', () => {
       /\.opencodian-settings\s+\.opencodian-settings-quick-nav\s*\{[\s\S]*padding:\s*10px\s+12px;/,
     );
     expect(css).toMatch(
-      /\.opencodian-settings-quick-nav-tooltip-layer\s*\{[\s\S]*position:\s*fixed;[\s\S]*z-index:\s*2200;/,
+      /\.opencodian-settings-quick-nav-tooltip-layer\s*\{[\s\S]*position:\s*fixed;[\s\S]*z-index:\s*2260;/,
     );
     expect(css).toMatch(
       /\.opencodian-settings-quick-nav-tooltip-layer\s*\{[\s\S]*gap:\s*0;/,
@@ -1081,5 +1081,23 @@ describe('OpenCodianSettingTab title styling', () => {
     );
     expect(css).not.toMatch(/opencodian-settings-quick-nav-tooltip-layer\[data-align="left"\]/);
     expect(css).not.toMatch(/opencodian-settings-quick-nav-tooltip-layer\[data-align="right"\]/);
+  });
+
+  it('keeps the quick-nav tooltip below the shared settings tooltip and popover layers', () => {
+    const overlayCss = readFileSync(
+      join(process.cwd(), 'src/style/components/model-selector.css'),
+      'utf8',
+    );
+    const popoverCss = readFileSync(
+      join(process.cwd(), 'src/style/modals/config-editor-modal.css'),
+      'utf8',
+    );
+
+    // Quick-nav tooltip: z-index 2260 (lowest)
+    expect(overlayCss).toMatch(/\.opencodian-settings-quick-nav-tooltip-layer\s*\{[\s\S]*z-index:\s*2260;/);
+    // Settings popover: z-index 2280 (middle)
+    expect(popoverCss).toMatch(/\.opencodian-builtin-list-search-popover\s*\{[\s\S]*z-index:\s*2280;/);
+    // Settings tooltip: z-index 2300 (highest)
+    expect(overlayCss).toMatch(/\.opencodian-settings-tooltip-layer\s*\{[\s\S]*z-index:\s*2300;/);
   });
 });

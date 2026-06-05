@@ -34,7 +34,7 @@ interface TabBarCallbacks {
 `partitionItems()` 按布局模式确定最大可见数（header=4, input=5, below-header=5）。当激活标签不在可见范围内时，保留前 N-1 个标签并将激活标签添加到可见列表末尾。
 
 ### 标签按钮
-每个标签按钮显示序号徽章、标题文本和状态指示器。支持 CSS class 标记（`is-active`, `is-streaming`, `has-background-task`, `needs-attention`）。左键点击切换标签，右键点击关闭标签。
+每个标签按钮显示序号徽章、标题文本和状态指示器。支持 CSS class 标记（`is-active`, `is-streaming`, `has-background-task`, `needs-attention`）。左键点击切换标签，右键点击关闭标签。非 `below-header-vertical` 布局会在 render 时确保 `TooltipLayerController` 已注册，让 tab tooltip 统一走 body-level overlay；竖排布局仍故意禁用 tooltip 以避免窄栏拥挤。
 
 ### 父会话返回
 当激活标签的 `parentTabId` 指向当前 tab 列表中的父标签时，`render()` 会在标签按钮前渲染 `opencodian-tab-bar-parent-breadcrumb`。点击面包屑复用 `onTabClick(parentTabId)` 切回父 tab，不内联渲染子会话内容。`renderParentNavigation()` 会只渲染父会话面包屑和关闭当前子 tab 的 `opencodian-tab-bar-parent-close` 图标按钮，不渲染标签按钮或溢出菜单，供禁用可见标签 UI 后的隐藏子会话返回与清理入口使用。若父 tab 已缺失但 active child 仍有 `parentTabId`，则省略返回面包屑并保留 close-only 图标，方便清理孤儿隐藏子会话。
@@ -86,7 +86,7 @@ TabManager.getTabBarItems()
 - 父会话面包屑只在 active child 的 `parentTabId` 能匹配当前 tab 列表时显示；父 tab 已关闭时不显示
 - 溢出菜单挂载在 `document.body` 上，不在容器内部
 - `tooltipLabelId` 为静态计数器，组件销毁后不清零（不影响功能）
-- `below-header-vertical` 布局不显示 tooltip（空间不足）
+- `below-header-vertical` 布局不显示 tooltip（空间不足），也不会注册共享 tooltip overlay
 - `shouldOpenOverflowAbove()` 判断是否在 input 布局下向上打开菜单
 
 ## 补充说明

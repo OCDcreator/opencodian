@@ -7,6 +7,7 @@ import type OpenCodianPlugin from '../../main';
 import { createLogger } from '../../shared';
 import { ProviderIconService } from '../../utils/icons';
 import { ProviderIconCacheModal } from './ProviderIconCacheModal';
+import { SettingsTooltipController } from './SettingsTooltipController';
 
 const logger = createLogger('SettingsModelIconCacheManager');
 
@@ -277,12 +278,12 @@ export class SettingsModelIconCacheManager {
       imgEl.classList.add('opencodian-provider-icon-image');
       imgEl.src = iconUrl;
       imgEl.alt = label;
-      imgEl.title = label;
       targetEl.appendChild(imgEl);
-      return;
+    } else {
+      setIcon(targetEl, 'bot');
     }
-
-    setIcon(targetEl, 'bot');
+    SettingsTooltipController.ensureForDocument(targetEl.ownerDocument);
+    targetEl.dataset.settingsTooltip = label;
   }
 
   private setButtonsDisabled(disabled: boolean): void {

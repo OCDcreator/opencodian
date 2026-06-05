@@ -10,6 +10,7 @@ import { createLogger, getVaultBasePath } from '../../shared';
 import { OpencodeConfigModal } from './OpencodeConfigModal';
 import { OpenCodeProjectConfigHelpModal } from './OpenCodeProjectConfigHelpModal';
 import { isOpenCodeSettingsBackendActive } from './settingsBackendGuards';
+import { TextareaSizeMemory } from './TextareaSizeMemory';
 
 const logger = createLogger('SettingsSecuritySection');
 
@@ -395,6 +396,7 @@ export class SettingsSecuritySection {
             await this.plugin.saveSettings();
           });
         text.inputEl.rows = 3;
+        TextareaSizeMemory.attach(text.inputEl, 'security-allowed-commands');
       });
   }
 
@@ -428,6 +430,7 @@ export class SettingsSecuritySection {
           });
         text.inputEl.rows = 6;
         text.inputEl.cols = 40;
+        TextareaSizeMemory.attach(text.inputEl, 'security-denied-commands');
       });
     this.addBashPermissionHelpButton(blockedCommandsSetting);
 
@@ -459,6 +462,7 @@ export class SettingsSecuritySection {
           });
         text.inputEl.rows = 4;
         text.inputEl.cols = 40;
+        TextareaSizeMemory.attach(text.inputEl, 'security-bash-profile');
       });
     this.addBashPermissionHelpButton(blockedCommandsSetting);
   }

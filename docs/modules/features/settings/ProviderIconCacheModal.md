@@ -101,3 +101,4 @@ render(restoreScrollTop) 重新渲染
 
 - `ProviderIconService` 核心方法：`getProviderCacheState()` 返回 `{ providers, summary }`，`addCustomIconSource(app, providerId, source, library)` 返回更新后的 library，`splitCustomIconSourcesInput(input)` 按行分割并去空行
 - 自定义图标源支持格式：URL（`https://...`）、SVG 文本（`<svg>...</svg>`）、Obsidian vault 内文件路径（相对路径，如 `assets/icon.svg`），由 `ProviderIconService.addCustomIconSource()` 自动检测类型
+- 自定义图标源 textarea 通过 `TextareaSizeMemory` 使用 `provider-icon-cache-input` key 记忆手动调整高度，并在重新渲染或关闭 modal 时销毁 observer。

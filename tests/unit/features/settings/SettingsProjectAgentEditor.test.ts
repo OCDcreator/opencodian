@@ -1,8 +1,10 @@
+/* eslint-disable max-lines -- Project agent editor tests keep grouped creation, editing, and regression coverage together. */
 import { Setting } from 'obsidian';
 import * as obsidian from 'obsidian';
 
 import type { OpencodeAgentConfigRecord } from '../../../../src/core/types';
 import { SettingsProjectAgentEditor } from '../../../../src/features/settings/SettingsProjectAgentEditor';
+import { TextareaSizeMemory } from '../../../../src/features/settings/TextareaSizeMemory';
 import { setLocale, t } from '../../../../src/i18n';
 import type OpenCodianPlugin from '../../../../src/main';
 
@@ -184,6 +186,9 @@ beforeEach(() => {
   textRecords.length = 0;
   textAreaRecords.length = 0;
   buttonRecords.length = 0;
+  jest.spyOn(TextareaSizeMemory, 'attach').mockReturnValue({
+    destroy: jest.fn(),
+  } as unknown as TextareaSizeMemory);
 
   jest.spyOn(Setting.prototype, 'setName').mockImplementation(function setName(this: Setting, name: string) {
     (this as Setting & { __settingName?: string }).__settingName = name;
@@ -295,6 +300,30 @@ describe('SettingsProjectAgentEditor layout and creation', () => {
     );
     expect(advancedGroup).not.toBeNull();
     expect(advancedGroup?.open).toBe(false);
+  });
+
+  it('attaches textarea size memory to prompt, task allowlist, and options editors', () => {
+    renderEditor();
+
+    const promptRecord = findTextArea(t('settings.agents.editor.prompt.name'));
+    const taskAllowlistRecord = findTextArea(t('settings.agents.editor.taskAllowlist.name'));
+    const optionsRecord = findTextArea(t('settings.agents.editor.options.name'));
+
+    expect(promptRecord).toBeDefined();
+    expect(taskAllowlistRecord).toBeDefined();
+    expect(optionsRecord).toBeDefined();
+    expect(TextareaSizeMemory.attach).toHaveBeenCalledWith(
+      promptRecord!.control.inputEl,
+      'project-agent-prompt',
+    );
+    expect(TextareaSizeMemory.attach).toHaveBeenCalledWith(
+      taskAllowlistRecord!.control.inputEl,
+      'project-agent-task-allowlist',
+    );
+    expect(TextareaSizeMemory.attach).toHaveBeenCalledWith(
+      optionsRecord!.control.inputEl,
+      'project-agent-options',
+    );
   });
 
   it('creates a project agent with editable core fields', async () => {

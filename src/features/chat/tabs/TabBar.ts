@@ -1,6 +1,7 @@
 import { setIcon } from 'obsidian';
 
 import { t } from '../../../i18n';
+import { TooltipLayerController } from '../../../shared/TooltipLayerController';
 import type { TabBarItem, TabBarLayoutMode, TabId } from './types';
 
 export interface TabBarCallbacks {
@@ -28,6 +29,9 @@ export class TabBar {
     this.closeOverflowMenu();
     this.containerEl.empty();
     this.containerEl.setAttribute('data-layout', layout);
+    if (layout !== 'below-header-vertical') {
+      TooltipLayerController.ensureForElement(this.containerEl);
+    }
 
     const { visibleItems, overflowItems } = this.partitionItems(items, layout);
     this.renderParentBreadcrumb(items, layout);
@@ -45,6 +49,9 @@ export class TabBar {
     this.closeOverflowMenu();
     this.containerEl.empty();
     this.containerEl.setAttribute('data-layout', layout);
+    if (layout !== 'below-header-vertical') {
+      TooltipLayerController.ensureForElement(this.containerEl);
+    }
     this.renderParentBreadcrumb(items, layout);
   }
 

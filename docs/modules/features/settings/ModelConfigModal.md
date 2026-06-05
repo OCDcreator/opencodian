@@ -151,3 +151,4 @@ interface ModelConfigModalOpenOptions {
 
 - 设置入口：OpenCodianSettings 的 `addModelSettings()` 中 "可视化模型配置" 按钮，点击后 `new ModelConfigModal(app, plugin).open()`
 - save plan / state 纯逻辑现在有独立单测覆盖，modal 侧继续保留 opening flow、close confirm、以及 editor owner 装配路径的 focused tests
+- modal 在 render 前和关闭时调用 `ModelConfigProviderEditor.dispose()`，确保 provider preview / key-value textarea 的尺寸记忆 observer 不会跨 DOM 重建残留。

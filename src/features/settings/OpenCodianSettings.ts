@@ -269,6 +269,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     this.mcpSection?.dispose();
     this.securitySection?.dispose();
     this.formatterSection?.dispose();
+    this.userSection?.dispose();
     this.userSection = null;
     this.serverSection = null;
     this.mcpSection = null;

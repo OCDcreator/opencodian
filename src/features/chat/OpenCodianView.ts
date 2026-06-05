@@ -2075,6 +2075,7 @@ export class OpenCodianView extends ItemView {
         applyFallbackConversationTitle: (conversationId, firstMessage) =>
           this.applyFallbackConversationTitle(conversationId, firstMessage),
         getTitleMode: () => this.plugin.settings.titleMode,
+        getClaudeAutoTitle: () => this.plugin.settings.backendSettings.claudeCode.autoTitle,
         startAiConversationTitleGeneration: (conversationId, firstMessage, modelOptions) => {
           void this.startAiConversationTitleGeneration(conversationId, firstMessage, modelOptions);
         },

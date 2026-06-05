@@ -1042,6 +1042,11 @@ export class SettingsCapabilityLabSection {
       cls: 'opencodian-capability-lab-output',
       attr: { 'data-diagnostic': 'true' },
     });
+    const sessionDetailEl = controlsEl.createDiv({
+      cls: 'opencodian-capability-lab-session-detail',
+      attr: { 'data-capability-history-session-detail': 'true' },
+    });
+    let loadedSessions: Array<{ sessionId: string; summary: string; lastModified: number }> = [];
     let sessionLoadRequestId = 0;
 
     // Load sessions
@@ -1058,13 +1063,13 @@ export class SettingsCapabilityLabSection {
         if (requestId !== sessionLoadRequestId) {
           return;
         }
+        loadedSessions = sessions;
         for (const session of sessions) {
           const opt = sessionSelect.createEl('option', {
             text: truncate(`${session.sessionId.slice(0, 8)}… ${session.summary}`, 80),
             attr: { value: session.sessionId },
           });
           opt.value = session.sessionId;
-          opt.title = `Session: ${session.sessionId}\nSummary: ${session.summary}\nModified: ${new Date(session.lastModified).toISOString()}`;
         }
         outputEl.empty();
         outputEl.createEl('p', {
@@ -1111,7 +1116,15 @@ export class SettingsCapabilityLabSection {
       const sessionId = sessionSelect.value;
       if (!sessionId) {
         outputEl.empty();
+        sessionDetailEl.empty();
         return;
+      }
+      const selected = loadedSessions.find((s) => s.sessionId === sessionId);
+      sessionDetailEl.empty();
+      if (selected) {
+        sessionDetailEl.createDiv({ text: `Session: ${selected.sessionId}` });
+        sessionDetailEl.createDiv({ text: `Summary: ${selected.summary}` });
+        sessionDetailEl.createDiv({ text: `Modified: ${new Date(selected.lastModified).toISOString()}` });
       }
       void this.loadSessionMessages(
         adapter,

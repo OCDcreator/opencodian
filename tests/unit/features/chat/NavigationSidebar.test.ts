@@ -1,4 +1,6 @@
 import { NavigationSidebar } from '../../../../src/features/chat/ui/NavigationSidebar';
+import { t } from '../../../../src/i18n';
+import { TooltipLayerController } from '../../../../src/shared/TooltipLayerController';
 
 type ObsidianLikeElement = HTMLElement & {
   createDiv: (options?: { cls?: string }) => HTMLDivElement;
@@ -116,6 +118,11 @@ describe('NavigationSidebar', () => {
     document.body.innerHTML = '';
   });
 
+  afterEach(() => {
+    TooltipLayerController.ensureForDocument(document).destroy();
+    document.body.innerHTML = '';
+  });
+
   it('uses the turn anchor for previous navigation in sticky mode', () => {
     const parentEl = document.createElement('div') as ObsidianLikeElement;
     const messagesShellEl = document.createElement('div');
@@ -225,6 +232,46 @@ describe('NavigationSidebar', () => {
 
     expect(onScrollToBottom).toHaveBeenCalledTimes(1);
     expect(scrollTo).not.toHaveBeenCalled();
+
+    sidebar.destroy();
+  });
+
+  it('renders navigation button tooltips through the shared body-level overlay', () => {
+    const parentEl = document.createElement('div') as ObsidianLikeElement;
+    const messagesShellEl = document.createElement('div');
+    const messagesEl = document.createElement('div');
+    messagesShellEl.appendChild(messagesEl);
+    parentEl.appendChild(messagesShellEl);
+    document.body.appendChild(parentEl);
+
+    setNumericProperty(messagesEl, 'scrollHeight', 1800);
+    setNumericProperty(messagesEl, 'clientHeight', 500);
+    setRect(messagesShellEl, 0, 500);
+    setRect(messagesEl, 0, 500);
+
+    const sidebar = new NavigationSidebar(parentEl, messagesShellEl, messagesEl);
+    const topBtn = parentEl.querySelector<HTMLButtonElement>('.opencodian-nav-btn-top');
+
+    Object.defineProperty(topBtn as HTMLButtonElement, 'getBoundingClientRect', {
+      configurable: true,
+      value: () => ({
+        left: 24,
+        top: 96,
+        right: 64,
+        bottom: 136,
+        width: 40,
+        height: 40,
+        x: 24,
+        y: 96,
+        toJSON: () => '',
+      }),
+    });
+
+    topBtn?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+
+    const overlay = document.body.querySelector<HTMLElement>('.opencodian-tooltip-layer');
+    expect(overlay).not.toBeNull();
+    expect(overlay?.textContent).toContain(t('chat.navigation.top'));
 
     sidebar.destroy();
   });

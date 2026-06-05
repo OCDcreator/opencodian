@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- Style settings tests keep wiring, helpers, and preset coverage together in one file. */
 import type { App } from 'obsidian';
 import { Setting } from 'obsidian';
 
@@ -5,6 +6,7 @@ import { getBuiltinThemePresets, getThemePresetDefinition } from '../../../../sr
 import { DEFAULT_SETTINGS, getDefaultChatAppearanceSettings } from '../../../../src/core/types';
 import { SettingsStylePresetSection } from '../../../../src/features/settings/SettingsStylePresetSection';
 import { SettingsStyleSection } from '../../../../src/features/settings/SettingsStyleSection';
+import { TextareaSizeMemory } from '../../../../src/features/settings/TextareaSizeMemory';
 import { setLocale } from '../../../../src/i18n';
 
 interface MockDropdownControl {
@@ -212,6 +214,53 @@ describe('OpenCodian style settings helpers', () => {
     });
 
     expect(inputChars).toBe(5);
+  });
+
+  it('attaches textarea size memory to advanced custom CSS textarea', () => {
+    const plugin = {
+      settings: {
+        ...DEFAULT_SETTINGS,
+        chatAppearance: getDefaultChatAppearanceSettings(),
+      },
+      getChatAppearanceBaseline: jest.fn(() => getDefaultChatAppearanceSettings()),
+      updateChatAppearance: jest.fn(),
+    } as unknown as ConstructorParameters<typeof SettingsStyleSection>[0]['plugin'];
+    const styleSection = createStyleSection(plugin);
+    const containerEl = document.createElement('div');
+    const attachSpy = jest.spyOn(TextareaSizeMemory, 'attach').mockReturnValue({
+      destroy: jest.fn(),
+    } as unknown as TextareaSizeMemory);
+    const addTextAreaSpy = jest.spyOn(Setting.prototype, 'addTextArea').mockImplementation(function addTextArea(
+      this: Setting,
+      callback: (control: {
+        inputEl: HTMLTextAreaElement;
+        setPlaceholder: (value: string) => unknown;
+        setValue: (value: string) => unknown;
+        onChange: (handler: (value: string) => void | Promise<void>) => unknown;
+      }) => unknown,
+    ) {
+      const inputEl = document.createElement('textarea');
+      callback({
+        inputEl,
+        setPlaceholder: jest.fn().mockReturnThis(),
+        setValue: jest.fn().mockReturnThis(),
+        onChange: jest.fn().mockReturnThis(),
+      });
+      return this;
+    });
+    const privateSection = styleSection as unknown as {
+      addAdvancedStyleGroup: (containerEl: HTMLElement) => void;
+      createStyleGroupSection: (containerEl: HTMLElement, title: string, desc: string) => HTMLElement;
+      registerStyleControlBinding: (group: unknown, callback: () => void) => void;
+    };
+
+    jest.spyOn(privateSection, 'createStyleGroupSection').mockImplementation((parent) => parent.createDiv());
+    jest.spyOn(privateSection, 'registerStyleControlBinding').mockImplementation(() => {});
+
+    privateSection.addAdvancedStyleGroup(containerEl);
+
+    expect(addTextAreaSpy).toHaveBeenCalled();
+    expect(attachSpy).toHaveBeenCalledWith(expect.any(HTMLTextAreaElement), 'style-custom-css-declarations');
   });
 });
 

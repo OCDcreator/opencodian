@@ -1,5 +1,6 @@
 import type { TabContextState } from '../../../core/types';
 import { t } from '../../../i18n';
+import { TooltipLayerController } from '../../../shared/TooltipLayerController';
 import { ContextUsageService } from '../services/ContextUsageService';
 
 const RADIUS = 13.4;
@@ -24,6 +25,7 @@ export class ContextRing {
       cls: 'opencodian-context-ring opencodian-tooltip-trigger',
       attr: { type: 'button', 'data-tooltip-position': 'top' },
     });
+    TooltipLayerController.ensureForElement(this.buttonEl);
 
     const meterEl = this.buttonEl.createSpan({ cls: 'opencodian-context-ring-meter' });
 

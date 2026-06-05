@@ -55,3 +55,4 @@
 - 该 section 不应直接依赖 `@anthropic-ai/claude-agent-sdk`；真实 SDK runtime 由 `ClaudeCodeAdapter` / `ClaudeCodeSdkLoader` 负责
 - 所有文案必须通过 locale key 获取
 - 修改字段时同步 `src/core/types/settings.ts` 的默认值/normalizer 和 `SettingsClaudeCodeSection.test.ts`
+- Runtime / permissions / context / tools textareas that expose manual resize use `TextareaSizeMemory` with stable keys, and `dispose()` cleans the attached observers when the section is rebuilt.

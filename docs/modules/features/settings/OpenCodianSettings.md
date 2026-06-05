@@ -121,6 +121,7 @@ classic 和 tabbed 两种布局都必须按当前 active backend 过滤后端专
 
 - DOM 引用会失效
 - section heading / quick-nav / scroll restore 需要在重建后重新接线
+- 每次重建前都必须先释放各 section owner 的副作用；现在 `disposeSections()` 也会显式销毁 `SettingsUserSection`，避免 user prompt / excluded-tags textarea 的 size-memory observer 残留在旧 DOM 上
 
 从 R9 开始，这部分壳层生命周期已委托给 `SettingsSectionCoordinator`：`OpenCodianSettings` 只负责按顺序挂载当前 backend 可见的 General / backend-specific sections / Conversation / UI / Style / Debug / User 等 section，本身不再直接持有 quick-nav DOM 组装或滚动恢复定时器细节。tabbed 模式也必须先进入 `beginDisplay({ showQuickNav: false })`，由 coordinator 捕获当前滚动位置后再清空重建内容；不要在调用 `beginDisplay()` 前额外 `empty()` 容器，否则新增/删除格式化器等 tabbed 刷新会先把滚动容器夹回顶部。tabbed 模式只保留标题 + 一级标签栏 + 二级标签栏 + 内容区。
 
@@ -218,6 +219,7 @@ provider 开关写回仍遵循 `ModelConfigService` 返回的 `effectiveProvider
 - `SettingsDropdownControl`: 管理设置页 `<select>` / `DropdownComponent` 的跨平台自绘视觉层，底层保存逻辑仍走原 select change 事件
 - `SettingsTabbedRenderer`: 标签模式下的标签栏渲染与内容路由，从 `OpenCodianSettings` 中提取以控制代码行数；用户标签内容通过单一 `renderUserContent` seam 委托给 user section owner
 - `SettingsUserSection`: 用户 profile/prompt/tags 设置的经典 section shell 与 tabbed content routing owner，从 `OpenCodianSettings` 中提取
+- `display()` / `hide()` 生命周期现在会先调用 `disposeSections()`，因此 `SettingsUserSection` 的 textarea size-memory 清理由主设置页 shell 统一触发
 - `settingsLayoutRegistry`: 标签模式的标签结构定义与查找/回退函数
 - `SettingsServerSection`: 管理 server section 的 mode 切换、host/port/remote URL、auth 输入、状态轮询与 start/stop/test/refresh action；`OpenCodianSettings` 只保留 owner 装配与跨 section server-state 同步
 - `SettingsMcpSection`: 管理 MCP 服务器状态概览、逐服务器行渲染、catalog subscription 与显式刷新 action；tabbed 模式下路由到独立一级 `MCP` 标签，classic 模式下紧跟 Server 部分之后并进入 quick-nav

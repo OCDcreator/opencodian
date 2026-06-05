@@ -10,6 +10,7 @@ import type OpenCodianPlugin from '../../main';
 import { createLogger } from '../../shared';
 import { getChatAppearanceBackgroundSizeValue } from '../chat/chatAppearance';
 import type { NumericStyleControlConfig } from './settingsStyleControls';
+import { SettingsTooltipController } from './SettingsTooltipController';
 
 const logger = createLogger('SettingsStyleBackgroundSection');
 
@@ -381,7 +382,8 @@ export class SettingsStyleBackgroundSection {
     };
 
     previewEl.addClass('is-draggable');
-    previewEl.setAttribute('title', t('settings.style.background.preview.dragHint'));
+    SettingsTooltipController.ensureForDocument(previewEl.ownerDocument);
+    previewEl.dataset.settingsTooltip = t('settings.style.background.preview.dragHint');
     previewEl.style.touchAction = 'none';
 
     previewEl.addEventListener('pointerdown', (event) => {

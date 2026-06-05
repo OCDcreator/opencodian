@@ -165,23 +165,6 @@ describe('MessageSendPreparationService', () => {
     });
   });
 
-  it('does not kick off OpenCode title generation for Claude Code conversations', async () => {
-    const conversation = createConversation();
-    conversation.backend = 'claude-code';
-    conversation.backendSessionId = 'claude-code-session';
-    delete conversation.openCodeSessionId;
-    const host = createHost(conversation, [], {
-      shouldGenerateAiTitle: jest.fn().mockReturnValue(true),
-    });
-    const service = new MessageSendPreparationService(host, createComposerSendContext());
-
-    const result = await service.prepareMessageSend({ content: 'Hello Claude' });
-
-    expect(result).not.toBeNull();
-    expect(host.applyFallbackConversationTitle).not.toHaveBeenCalled();
-    expect(host.startAiConversationTitleGeneration).not.toHaveBeenCalled();
-  });
-
   it('merges one-shot outputFormat into modelOptions when provided', async () => {
     const conversation = createConversation();
     const host = createHost(conversation);

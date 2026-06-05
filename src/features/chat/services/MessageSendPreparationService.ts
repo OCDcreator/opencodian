@@ -186,7 +186,7 @@ export interface MessageSendPreparationHost {
   renderMessage(message: ChatMessage): Promise<unknown>;
   scrollToBottom(options: { tabId: TabId | null; enableAutoScroll?: boolean }): void;
   applyFallbackConversationTitle(conversationId: string, firstMessage: string): Promise<void>;
-  shouldGenerateAiTitle(): boolean;
+  shouldGenerateAiTitle(conversation: Conversation): boolean;
   startAiConversationTitleGeneration(
     conversationId: string,
     firstMessage: string,
@@ -277,6 +277,7 @@ export interface MessageSendPreparationHostDependencies {
   scrollToBottom: (options: { tabId: TabId | null; enableAutoScroll?: boolean }) => void;
   applyFallbackConversationTitle: (conversationId: string, firstMessage: string) => Promise<void>;
   getTitleMode: () => string;
+  getClaudeAutoTitle: () => boolean;
   startAiConversationTitleGeneration: (
     conversationId: string,
     firstMessage: string,
@@ -391,9 +392,18 @@ export class MessageSendPreparationService {
     this.host.setAutoScrollEnabled(tabId, true);
     await this.host.renderMessage(userMessage);
     this.host.scrollToBottom({ tabId, enableAutoScroll: true });
-    if (this.isFirstUserMessage(conversation) && (conversation.backend ?? 'opencode') === 'opencode') {
+    const conversationBackend = conversation.backend ?? 'opencode';
+    const shouldBootstrapTitle = this.isFirstUserMessage(conversation)
+      && (conversationBackend === 'opencode' || conversationBackend === 'claude-code');
+    if (shouldBootstrapTitle) {
       await this.host.applyFallbackConversationTitle(conversation.id, options.content);
-      if (this.host.shouldGenerateAiTitle()) this.host.startAiConversationTitleGeneration(conversation.id, options.content, modelOptions);
+      const shouldGenerateAiTitle = this.host.shouldGenerateAiTitle(conversation);
+      if (conversationBackend === 'claude-code' && shouldGenerateAiTitle) {
+        await this.markConversationTitleGenerationPending(conversation);
+      }
+      if (shouldGenerateAiTitle) {
+        this.host.startAiConversationTitleGeneration(conversation.id, options.content, modelOptions);
+      }
     }
     return {
       conversation, tabId, messageID: structuredSend.messageID,
@@ -425,6 +435,22 @@ export class MessageSendPreparationService {
 
   private resetPreparingLifecycle(tabId: TabId | null): void {
     this.host.transitionTabSessionLifecycle(tabId, 'idle', 'send-preflight-aborted');
+  }
+
+  private async markConversationTitleGenerationPending(conversation: Conversation): Promise<void> {
+    if (conversation.titleGenerationStatus === 'pending') {
+      return;
+    }
+
+    const writeTicket = this.host.createConversationWriteTicket(conversation.id);
+    await this.host.commitConversationWrite(
+      conversation,
+      writeTicket,
+      'claude-title-generation-pending',
+      () => {
+        conversation.titleGenerationStatus = 'pending';
+      },
+    );
   }
 
   private queueFollowUpSend(tabId: TabId, options: PrepareMessageSendOptions): boolean {
@@ -647,7 +673,13 @@ export function createMessageSendPreparationHost(
     renderMessage: (message) => conversationRenderService.renderMessage(message),
     scrollToBottom: (options) => deps.scrollToBottom(options),
     applyFallbackConversationTitle: (conversationId, firstMessage) => deps.applyFallbackConversationTitle(conversationId, firstMessage),
-    shouldGenerateAiTitle: () => deps.getTitleMode() === 'ai',
+    shouldGenerateAiTitle: (conversation) => {
+      const backend = conversation.backend ?? 'opencode';
+      if (backend === 'claude-code') {
+        return deps.getClaudeAutoTitle();
+      }
+      return backend === 'opencode' && deps.getTitleMode() === 'ai';
+    },
     startAiConversationTitleGeneration: (conversationId, firstMessage, modelOptions) => deps.startAiConversationTitleGeneration(conversationId, firstMessage, modelOptions),
     setStreaming: (tabId, value) => tabRuntime.setStreaming(tabId, value),
     syncTabStreamLikeState: (tabId) => deps.syncTabStreamLikeState(tabId),

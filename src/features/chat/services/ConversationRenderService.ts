@@ -8,6 +8,7 @@ import {
   type Conversation,
   getConversationBackendSessionId,
 } from '../../../core/types';
+import { TooltipLayerController } from '../../../shared/TooltipLayerController';
 import { summarizeChatMessageForDebug } from '../runtime/SendPipelineDebugSummaries';
 import type { UserMessageContentRenderer } from '../runtime/UserMessageContentRenderer';
 import type { TabId } from '../tabs';
@@ -472,6 +473,8 @@ export class ConversationRenderService {
     label: string,
     position?: 'bottom' | 'top' | 'right',
   ): void {
+    buttonEl.classList.add('opencodian-tooltip-trigger');
+    TooltipLayerController.ensureForElement(buttonEl);
     buttonEl.setAttribute('data-tooltip', label);
     buttonEl.removeAttribute('title');
     buttonEl.removeAttribute('aria-label');
@@ -489,6 +492,8 @@ export class ConversationRenderService {
   }
 
   static attachTooltipLabel(buttonEl: HTMLElement, label: string): void {
+    buttonEl.classList.add('opencodian-tooltip-trigger');
+    TooltipLayerController.ensureForElement(buttonEl);
     const labelId = `opencodian-tooltip-label-${ConversationRenderService.tooltipLabelId++}`;
     const labelEl = buttonEl.createSpan({
       cls: 'opencodian-visually-hidden',

@@ -2322,6 +2322,49 @@ describe('SettingsCapabilityLabSection', () => {
     expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-pass')).toBe(true);
   });
 
+  it('shows selected history-session metadata in a fixed detail region instead of option.title', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([
+        {
+          sessionId: 'abc12345-session',
+          summary: 'History summary',
+          lastModified: new Date('2026-06-05T10:20:30.000Z').getTime(),
+        },
+      ]),
+      getSessionMessages: jest.fn().mockResolvedValue([]),
+      importSessionToStore: jest.fn(),
+      runDiagnosticPrompt: jest.fn().mockResolvedValue({
+        sessionId: 'unused',
+        rawMessages: [],
+        chunks: [],
+      }),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    await flushUi();
+
+    const refreshButton = Array.from(containerEl.querySelectorAll<HTMLButtonElement>('button'))
+      .find((button) => button.textContent === 'Refresh Sessions');
+    refreshButton?.click();
+    await flushUi();
+
+    const sessionSelect = containerEl.querySelector<HTMLSelectElement>('[data-diagnostic-session-select="history"]');
+    const detailEl = containerEl.querySelector<HTMLElement>('[data-capability-history-session-detail]');
+
+    // Options must not carry native title metadata.
+    expect(sessionSelect?.options[1]?.title ?? '').toBe('');
+    sessionSelect!.value = 'abc12345-session';
+    sessionSelect!.dispatchEvent(new Event('change'));
+
+    expect(detailEl?.textContent).toContain('History summary');
+    expect(detailEl?.textContent).toContain('2026-06-05T10:20:30.000Z');
+  });
+
   it('fails the store mirror proof when diagnostic store readback returns no messages', async () => {
     const adapter = {
       listSessions: jest.fn().mockResolvedValue([{

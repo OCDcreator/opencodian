@@ -2,7 +2,7 @@
 
 > **源码**: `src/features/chat/OpenCodianView.ts`
 > **状态**: [REVIEW]
-> **最近更新**: Claude Code active-backend routing and OpenCode-only guardrails
+> **最近更新**: Claude Code active-backend routing, backend-aware first-turn title pending state, and history dropdown polish
 
 ## 概述
 
@@ -198,6 +198,16 @@ header 上 history 按钮触发的 conversation history dropdown、rename dialog
 
 因此 view 不再直接持有 history dropdown DOM/state、rename/delete confirm overlay 或 dropdown positioning RAF；delete fallback、rename title sync 到 session，以及 tab cleanup/reset 语义保持不变。
 History dropdown 的实际 conversation 过滤仍由 view host 根据 `settings.activeBackend` 完成；coordinator 只显示 host 提供的 backend scope label，让 Claude / OpenCode 历史过滤在 UI 上明确可见。
+本轮还把 history dropdown 的视觉层级重新拉开：scope label、active/selected 态、标题生成状态 pill、footer action 区和滚动容器都使用更明确的玻璃卡片层次，但仍保留原 class hooks，避免破坏现有 tests。
+
+### backend-aware first-turn title pending
+
+首条 user message 的标题 bootstrap 不再只有 OpenCode 会进入。当前实现是在 send-preparation owner 中按 backend 决定是否继续异步标题生成，并通过 view host seam 暴露 Claude Code `autoTitle` truth：
+
+- OpenCode：只有 `titleMode === 'ai'` 时标记 `pending`
+- Claude Code：只有 `backendSettings.claudeCode.autoTitle === true` 时标记 `pending`
+
+这样 Claude Code 新会话在 auto-title 开启时，也会先显示本地 provisional title，再等待 backend `summary` 回写；后续 `startAiConversationTitleGeneration()` 的 callback 仍复用“只有 fallback title 且状态仍是 `pending` 才覆盖”的保护条件，避免用户手动 rename 后被官方标题抢回。view 本体只新增了一个窄 host getter，把 Claude Code title setting 暴露给相邻的 `MessageSendPreparationService` owner，而没有把更多标题状态判断回灌进 `OpenCodianView.ts`。
 
 ### Composer input shell 抽离
 

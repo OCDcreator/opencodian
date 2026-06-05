@@ -75,3 +75,5 @@ Added `attachTabbed(containerEl, secondaryTabId)` method for the tabbed settings
 - `safety` — renders platform blocked commands
 
 The classic `attach()` method remains unchanged.
+
+Security blocklist, external path, and blocked-command textareas use `TextareaSizeMemory` with stable keys so manual resize height survives settings reloads; `dispose()` cleans the attached observers.

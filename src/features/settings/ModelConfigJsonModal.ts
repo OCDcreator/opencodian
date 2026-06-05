@@ -4,12 +4,14 @@ import type { OpencodeModelConfigSubset } from '../../core/types';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { createLogger } from '../../shared';
+import { TextareaSizeMemory } from './TextareaSizeMemory';
 
 const logger = createLogger('ModelConfigJsonModal');
 
 export class ModelConfigJsonModal extends Modal {
   private editorEl: HTMLTextAreaElement | null = null;
   private restartToggleEl: HTMLInputElement | null = null;
+  private editorSizeMemory: TextareaSizeMemory | null = null;
   private initialEditorValue = '';
 
   constructor(
@@ -46,6 +48,7 @@ export class ModelConfigJsonModal extends Modal {
     });
     this.editorEl.value = JSON.stringify(config, null, 2);
     this.initialEditorValue = this.editorEl.value;
+    this.editorSizeMemory = TextareaSizeMemory.attach(this.editorEl, 'model-config-json-editor');
 
     const optionsEl = contentEl.createDiv({ cls: 'opencodian-model-config-options' });
     const restartLabel = optionsEl.createEl('label', { cls: 'opencodian-model-config-checkbox' });
@@ -109,6 +112,8 @@ export class ModelConfigJsonModal extends Modal {
   }
 
   onClose() {
+    this.editorSizeMemory?.destroy();
+    this.editorSizeMemory = null;
     this.contentEl.empty();
   }
 

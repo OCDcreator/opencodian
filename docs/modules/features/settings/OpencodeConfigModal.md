@@ -80,3 +80,4 @@ JSON.parse() → configManager.write() → 重启服务
 
 - `OpencodeConfig` 类型定义在 `src/core/types/opencodeConfig.ts`，包含 `$schema`、`permission`、`mcp`、`provider`、`model` 等顶层字段
 - 与 `ModelConfigJsonModal` 的职责边界：本 modal 编辑完整的 `.opencode/opencode.json`（含 permission/mcp/plugin 等），`ModelConfigJsonModal` 只读写其中的模型相关子集（model/provider/limits 等）。两者操作的是同一个配置文件，只是写入范围不同，因此并行打开时也存在后保存覆盖先保存的风险
+- 配置 textarea 通过 `TextareaSizeMemory` 使用 `opencode-config-editor` key 记忆手动调整高度，并在 modal 关闭时销毁 observer。

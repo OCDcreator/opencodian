@@ -15,6 +15,7 @@ import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { createLogger } from '../../shared';
 import { SettingsProjectAgentEditor } from './SettingsProjectAgentEditor';
+import { TextareaSizeMemory } from './TextareaSizeMemory';
 
 const logger = createLogger('SettingsAgentsSection');
 
@@ -64,6 +65,7 @@ export class SettingsAgentsSection {
 
   dispose(): void {
     this.refreshRunId += 1;
+    this.projectAgentEditor?.dispose();
   }
 
   attach(containerEl: HTMLElement): HTMLHeadingElement {
@@ -810,6 +812,7 @@ export class SettingsAgentsSection {
         text
           .setValue(frontmatterText)
           .onChange((value) => { currentFrontmatter = value; });
+        TextareaSizeMemory.attach(text.inputEl, 'agents-user-instructions');
       });
 
     new Setting(editorEl)
@@ -818,6 +821,7 @@ export class SettingsAgentsSection {
         text
           .setValue(file.promptBody)
           .onChange((value) => { currentPromptBody = value; });
+        TextareaSizeMemory.attach(text.inputEl, 'agents-project-instructions');
       });
 
     new Setting(editorEl)

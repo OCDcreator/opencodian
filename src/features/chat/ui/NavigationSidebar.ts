@@ -8,6 +8,7 @@
 import { setIcon } from 'obsidian';
 
 import { t } from '../../../i18n';
+import { TooltipLayerController } from '../../../shared/TooltipLayerController';
 
 interface NavigationSidebarOptions {
   onScrollToBottom?: () => void;
@@ -37,6 +38,7 @@ export class NavigationSidebar {
   ) {
     this.host = this.mountEl.createDiv({ cls: 'opencodian-nav-sidebar-host' });
     this.container = this.host.createDiv({ cls: 'opencodian-nav-sidebar' });
+    TooltipLayerController.ensureForElement(this.container);
 
     // Create buttons
     this.topBtn = this.createButton('opencodian-nav-btn-top', 'chevrons-up', t('chat.navigation.top'));

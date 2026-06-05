@@ -144,6 +144,11 @@ export class ConversationRenderService {
 - persisted user/assistant render、single-user rerender、以及 synced assistant pseudo-stream reveal 现在先经由 service 内部的 message-render delegate，再落回 host ports 执行真实 DOM 更新
 - 基础消息 render delegate 与 synced append apply delegate 现在位于 `ConversationRenderRuntime`，service 只委托这些 runtime owner
 
+### Tooltip / copy 辅助
+
+- `setTooltipLabel()` / `attachTooltipLabel()` 现在除了写入 `data-tooltip`、隐藏 label 与 `aria-labelledby` 外，还会确保当前 `Document` 的 `TooltipLayerController` 已注册。这样 header / composer / inline action button 这类共享 tooltip trigger 会统一走 body-level overlay，而不是落回 trigger 伪元素。
+- 这条合同专门规避了 send / stop 按钮这类本身已经占用 `::after` 做视觉装饰的控件，避免 tooltip 和按钮特效抢同一个伪元素。
+
 ### 空壳清理
 
 - `removeEmptyAssistantShells()` 遍历 messagesContainer 内的 assistant shell，跳过 `notice` 和 `background-task` 标记的 shell，移除既无 structured content 又无可见文本的空壳；**`.opencodian-structured-output-details` 被识别为有效结构化内容**，避免 structured-only assistant shell 被误删

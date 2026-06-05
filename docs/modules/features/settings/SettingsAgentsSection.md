@@ -153,3 +153,5 @@ Added `attachTabbed(containerEl, secondaryTabId)` method for the tabbed settings
 - `workspace` — renders Markdown agent file workspace
 
 The classic `attach()` method now renders the same surfaces in a stacked layout.
+
+Project agent prompt, options, and task allowlist textareas use `TextareaSizeMemory` with stable settings keys so manual resize height survives settings reloads; `dispose()` cleans the attached observers.

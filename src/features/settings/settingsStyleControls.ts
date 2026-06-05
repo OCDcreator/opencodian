@@ -3,6 +3,7 @@ import { Setting } from 'obsidian';
 import type { ChatAppearanceSettings } from '../../core/types';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
+import { SettingsTooltipController } from './SettingsTooltipController';
 
 export type ChatAppearanceStyleGroup =
   | 'layout'
@@ -142,7 +143,8 @@ export class SettingsStyleControls {
     });
     resetBtn.type = 'button';
     resetBtn.setAttribute('aria-label', t('settings.style.resetSingle.tooltip'));
-    resetBtn.setAttribute('title', t('settings.style.resetSingle.tooltip'));
+    SettingsTooltipController.ensureForDocument(resetBtn.ownerDocument);
+    resetBtn.dataset.settingsTooltip = t('settings.style.resetSingle.tooltip');
 
     let isEditingNumberInput = false;
     let isDraggingSlider = false;
@@ -474,9 +476,10 @@ export class SettingsStyleControls {
 
     colorInput.value = pickerHex;
     previewBtn.style.background = normalizedValue || resetValue;
-    previewBtn.setAttribute('title', followsTheme ? t('settings.style.colorPicker.followThemeValue') : normalizedValue);
+    SettingsTooltipController.ensureForDocument(previewBtn.ownerDocument);
+    previewBtn.dataset.settingsTooltip = followsTheme ? t('settings.style.colorPicker.followThemeValue') : normalizedValue;
     valueEl.setText(followsTheme ? t('settings.style.colorPicker.followThemeValue') : pickerHex.toUpperCase());
-    valueEl.setAttribute('title', normalizedValue || resetValue);
+    valueEl.dataset.settingsTooltip = normalizedValue || resetValue;
     followThemeBtn.disabled = followsTheme;
   }
 

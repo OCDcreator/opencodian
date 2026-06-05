@@ -32,6 +32,7 @@ import {
 } from '../../core/types';
 import { t, type TranslationKey } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
+import { TextareaSizeMemory } from './TextareaSizeMemory';
 
 interface SettingsClaudeCodeSectionOptions {
   plugin: OpenCodianPlugin;
@@ -1177,6 +1178,7 @@ export class SettingsClaudeCodeSection {
             this.settings.planModeInstructions = value.trim();
             await this.saveSettings();
           });
+        TextareaSizeMemory.attach(textArea.inputEl, 'claude-code-instructions');
       });
 
     const lifecycleEl = containerEl.createDiv({
@@ -1538,6 +1540,7 @@ export class SettingsClaudeCodeSection {
               .filter((line) => line.length > 0);
             await this.saveSettings();
           });
+        TextareaSizeMemory.attach(textArea.inputEl, 'claude-code-mcp-json');
       });
   }
 
@@ -1716,6 +1719,7 @@ export class SettingsClaudeCodeSection {
             this.settings.allowedTools = this.parseToolList(value);
             await this.saveSettings();
           });
+        TextareaSizeMemory.attach(textArea.inputEl, 'claude-code-hooks-pre');
       });
   }
 
@@ -1731,6 +1735,7 @@ export class SettingsClaudeCodeSection {
             this.settings.disallowedTools = this.parseToolList(value);
             await this.saveSettings();
           });
+        TextareaSizeMemory.attach(textArea.inputEl, 'claude-code-hooks-post');
       });
   }
 
@@ -1746,6 +1751,7 @@ export class SettingsClaudeCodeSection {
             this.settings.restrictedBuiltinTools = this.parseToolList(value);
             await this.saveSettings();
           });
+        TextareaSizeMemory.attach(textArea.inputEl, 'claude-code-hooks-stop');
       });
   }
 
@@ -1790,6 +1796,7 @@ export class SettingsClaudeCodeSection {
             this.settings.toolAliases = this.parseToolAliases(raw);
             await this.saveSettings();
           });
+        TextareaSizeMemory.attach(textArea.inputEl, 'claude-code-hooks-subagent');
       });
 
     const lifecycleEl = containerEl.createDiv({
@@ -1890,6 +1897,7 @@ export class SettingsClaudeCodeSection {
             this.settings.systemPrompt = value.trim();
             await this.saveSettings();
           });
+        TextareaSizeMemory.attach(textArea.inputEl, 'claude-code-env-json');
       });
 
     const lifecycleEl = containerEl.createDiv({
@@ -1957,6 +1965,7 @@ export class SettingsClaudeCodeSection {
             this.settings.env = this.parseEnv(value);
             await this.saveSettings();
           });
+        TextareaSizeMemory.attach(textArea.inputEl, 'claude-code-permissions-json');
       });
   }
 

@@ -85,3 +85,4 @@ export interface SelectedProviderEditorState {
 - 不要拆成按 section 分散的小文件；共享控件 primitive 已集中在本 owner 内。
 - provider 图标 fallback 仍由 `ProviderIconService` / cache modal 管理，本模块只打开管理入口。
 - Provider 状态测试和模型拉取仍通过 modal callback 进入原来的 service side-effect 路径。
+- Provider JSON preview 和 key-value textarea 通过 `TextareaSizeMemory` 分别使用 `model-provider-json-editor` / `model-workspace-keyvalue` key 记忆高度；`dispose()` 会清理当前 render 周期的 observer。

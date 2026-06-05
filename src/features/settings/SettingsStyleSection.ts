@@ -16,6 +16,7 @@ import {
 } from './settingsStyleControls';
 import { SettingsStyleInputPanelSection } from './SettingsStyleInputPanelSection';
 import { SettingsStylePresetSection } from './SettingsStylePresetSection';
+import { TextareaSizeMemory } from './TextareaSizeMemory';
 
 const logger = createLogger('SettingsStyleSection');
 
@@ -41,6 +42,7 @@ export class SettingsStyleSection {
   private readonly addSettingHelpButton: (setting: Setting, helpButton: SettingHelpButtonConfig) => void;
   private readonly styleControls: SettingsStyleControls;
   private runtime: SettingsStyleSectionRuntimeState | null = null;
+  private textareaSizeMemories: TextareaSizeMemory[] = [];
 
   constructor(options: SettingsStyleSectionOptions) {
     this.app = options.app;
@@ -105,6 +107,10 @@ export class SettingsStyleSection {
 
   dispose(): void {
     this.styleControls.dispose();
+    for (const memory of this.textareaSizeMemories) {
+      memory.destroy();
+    }
+    this.textareaSizeMemories = [];
     const runtime = this.runtime;
     this.runtime = null;
     runtime?.backgroundStyleSection.dispose();
@@ -690,6 +696,9 @@ export class SettingsStyleSection {
       text.inputEl.rows = 6;
       text.inputEl.cols = 44;
       text.inputEl.addClass('opencodian-style-textarea');
+      this.textareaSizeMemories.push(
+        TextareaSizeMemory.attach(text.inputEl, 'style-custom-css-declarations'),
+      );
 
       this.registerStyleControlBinding('advanced', syncFromSettings);
     });

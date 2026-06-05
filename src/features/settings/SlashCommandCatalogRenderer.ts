@@ -3,6 +3,7 @@ import { setIcon } from 'obsidian';
 import type { SlashCommandCatalogEntry, SlashCommandCatalogSource } from '../../core/config/slashCommandCatalog';
 import { t } from '../../i18n';
 import { enhanceSearchInput } from './searchInputEnhancer';
+import { SettingsTooltipController } from './SettingsTooltipController';
 
 type CatalogFilterTab = 'all' | 'skill' | 'command' | 'enabled' | 'disabled';
 
@@ -297,7 +298,8 @@ export class SlashCommandCatalogRenderer {
         state: stateLabel,
       }));
       toggleWrap.classList.toggle('is-enabled', toggle.checked);
-      toggleWrap.setAttribute('title', stateLabel);
+      SettingsTooltipController.ensureForDocument(toggleWrap.ownerDocument);
+      toggleWrap.dataset.settingsTooltip = stateLabel;
     };
     toggle.checked = !cmd.hidden;
     syncToggleLabel();
