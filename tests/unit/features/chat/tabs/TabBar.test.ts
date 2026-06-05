@@ -134,6 +134,10 @@ describe('TabBar', () => {
     expect(closeEl).not.toBeNull();
     expect(containerEl.querySelector('.opencodian-tab-bar-item')).toBeNull();
     expect(containerEl.querySelector('.opencodian-tab-bar-overflow')).toBeNull();
+    expect(closeEl?.hasAttribute('aria-label')).toBe(false);
+    const hiddenLabel = closeEl?.querySelector<HTMLElement>('.opencodian-visually-hidden');
+    expect(hiddenLabel?.textContent).toBe(t('chat.tab.close'));
+    expect(closeEl?.getAttribute('aria-labelledby')).toBe(hiddenLabel?.id);
 
     closeEl?.click();
 

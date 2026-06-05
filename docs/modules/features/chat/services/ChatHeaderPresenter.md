@@ -65,7 +65,7 @@ export class ChatHeaderPresenter {
 
 - `build()` 组装完整 header DOM，并把 header tab bar slot 暴露给 `OpenCodianView` 的 tab layout 逻辑；header actions 现在包含 server status、LSP status、history → session settings → global settings 这条会话/全局配置链路
 - LSP status indicator 展示 `lsp.status()` 的 server connection summary；`startLspStatusLoop()` 在 presenter 内创建并持有 `LspStatusRefreshCoordinator`，把状态更新转发给 UI 组件，并在 `destroy()` 中停止轮询
-- header action 现在都是真正的 `button[type="button"]`，带稳定 `data-action`（`new-tab`、`new-current-tab`、`history`、`session-settings`、`settings`）和同步 locale 的 `aria-label` / tooltip；真实 UI 验收脚本可以直接按这些 locator 点击，不再依赖图标 SVG 或按钮顺序
+- header action 现在都是真正的 `button[type="button"]`，带稳定 `data-action`（`new-tab`、`new-current-tab`、`history`、`session-settings`、`settings`）和同步 locale 的 `data-tooltip`；可访问名称通过 `ConversationRenderService.setTooltipLabel()` 注入的隐藏 label + `aria-labelledby` 提供，避免在 Obsidian/Electron 里再冒出一层原生 hover tooltip。真实 UI 验收脚本可以直接按这些 locator 点击，不再依赖图标 SVG 或按钮顺序
 - “新建标签”圆形加号带有 `opencodian-header-btn--new-tab` class；当 `ConversationTabRuntimeCoordinator` 给聊天容器加上 `opencodian-container--tabs-disabled` 时，core CSS 会隐藏这个入口，只保留“当前标签新建会话”入口，避免禁用标签后 header 上出现两个等价的新建按钮
 - `startServerStatusLoop()` 立即刷新一次 status badge，然后每 5 秒重新查询 host 的 server availability
 - `refreshServerStatusBadge()` 更新 `is-running` / `is-disabled` / `is-offline` 等状态 class，并根据 local/remote mode 选择 status 文案；如果 async availability 返回时 header 已销毁，会重新检查 DOM refs 并跳过写入，避免设置页/视图切换期间的空节点错误

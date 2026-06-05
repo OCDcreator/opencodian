@@ -43,7 +43,7 @@ interface TabBarCallbacks {
 超出可见限制的标签显示为 `+N` 按钮。点击后在 `document.body` 上创建浮动菜单，支持 Escape 和外部点击关闭。菜单位置根据锚点和视口空间自动计算（上方/下方）。
 
 ### 辅助功能
-每个按钮附带 `aria-labelledby` 指向隐藏的文本标签。溢出菜单使用 `role="menu"` / `role="menuitem"`。可展开按钮支持 Enter/Space 键盘操作。
+每个按钮附带 `aria-labelledby` 指向隐藏的文本标签；本轮连 parent-close 这种 icon-only 子会话清理按钮也统一回到这条合同，不再额外保留 raw `aria-label`，避免在 Obsidian/Electron 中叠出第二层 hover tooltip。溢出菜单使用 `role="menu"` / `role="menuitem"`。可展开按钮支持 Enter/Space 键盘操作。
 
 ### 状态指示
 - streaming: 主标签栏中无图标（通过 CSS 动画 `is-streaming`），溢出菜单中显示 `loader-circle` 图标 + `is-streaming` 类

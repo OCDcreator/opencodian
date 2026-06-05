@@ -320,7 +320,6 @@ export class ChatHeaderPresenter {
       cls: 'opencodian-header-btn opencodian-tooltip-trigger',
       attr: {
         type: 'button',
-        'aria-label': label,
         'data-action': config.actionId,
       },
     });
@@ -334,7 +333,6 @@ export class ChatHeaderPresenter {
 
   private applyActionLabel(buttonEl: HTMLElement, label: string): void {
     this.host.setTooltipLabel(buttonEl, label, 'bottom');
-    buttonEl.setAttribute('aria-label', label);
   }
 
   async refreshServerStatusBadge(): Promise<void> {

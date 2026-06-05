@@ -3,6 +3,7 @@ import {
   type ChatHeaderPresenterHost,
   type ChatServerAvailability,
 } from '../../../../src/features/chat/services/ChatHeaderPresenter';
+import { ConversationRenderService } from '../../../../src/features/chat/services/ConversationRenderService';
 import { t } from '../../../../src/i18n';
 
 function createFixture() {
@@ -13,11 +14,7 @@ function createFixture() {
 
   const host: jest.Mocked<ChatHeaderPresenterHost> = {
     setTooltipLabel: jest.fn((element, label, position) => {
-      element.setAttribute('data-tooltip', label);
-      element.removeAttribute('aria-label');
-      if (position) {
-        element.setAttribute('data-tooltip-position', position);
-      }
+      ConversationRenderService.setTooltipLabel(element, label, position);
     }),
     registerCssChangeListener: jest.fn((listener) => {
       cssChangeListener = listener;
@@ -169,8 +166,11 @@ describe('ChatHeaderPresenter', () => {
       expect(buttonEl).not.toBeNull();
       expect(buttonEl?.tagName).toBe('BUTTON');
       expect(buttonEl?.getAttribute('type')).toBe('button');
-      expect(buttonEl?.getAttribute('aria-label')).toBe(label);
+      expect(buttonEl?.hasAttribute('aria-label')).toBe(false);
       expect(buttonEl?.getAttribute('data-tooltip')).toBe(label);
+      const hiddenLabel = buttonEl?.querySelector<HTMLElement>('.opencodian-visually-hidden[data-tooltip-label="true"]');
+      expect(hiddenLabel?.textContent).toBe(label);
+      expect(buttonEl?.getAttribute('aria-labelledby')).toBe(hiddenLabel?.id);
     }
   });
 

@@ -164,7 +164,6 @@ export class TabBar {
           },
     });
     this.attachTooltipLabel(closeEl, label);
-    closeEl.setAttribute('aria-label', label);
 
     const iconEl = closeEl.createSpan({ cls: 'opencodian-tab-bar-parent-close-icon' });
     iconEl.setAttribute('aria-hidden', 'true');

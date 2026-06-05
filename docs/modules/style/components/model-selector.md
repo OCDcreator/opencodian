@@ -27,6 +27,7 @@
   - 动画简化：选项入场仅为 `opacity` 淡入，移除了按 provider group 交错延迟和 `translateX(-6px)` 滑入。
   - 全链路 `prefers-reduced-motion: reduce` 兜底。
 - classic 设置页 quick-nav 的 tooltip 现在不再依赖 `.opencodian-settings-quick-nav-btn` 的伪元素，而是用 `.opencodian-settings-quick-nav-tooltip-layer` / `-bubble` / `-arrow` 这组 body-level overlay 样式。这样提示层可以真正越过 settings 滚动容器，不再受容器裁切影响。
+- chat / tabs / sidebar 仍复用 `.opencodian-tooltip-trigger` 这套共享伪元素 tooltip，但本轮补上了两条保护：只有存在非空 `data-tooltip` 时才会渲染气泡/箭头，避免 hover 时出现“空白 tooltip 条”；同时气泡改为 `fit-content + 240px clamp + pre-wrap/anywhere`，让长文案在窄聊天面板里优先换行，不再轻易整块冲出界面。
 - editor-area 设置页样式现在只匹配 `.workspace-leaf-content[data-type="opencodian-settings-view"] > .view-content.opencodian-settings`。这和 `OpenCodianSettingsView` 渲染到 `ItemView.contentEl` 的结构保持一致，避免 classic/平铺模式下 Obsidian `Setting` 行只剩分隔线、名称和控件被异常层级样式吞掉。classic 模式会把 `.view-content` 顶部 padding 清零，让 quick-nav 像标准设置页一样贴住顶部；tabbed 模式继续保留自己的标题间距修正。
 - settings layout visible unification 后，此文件保留 settings 旧类名的兼容样式，但不再承担共享层级合同：
   - `.opencodian-settings-tab-panel` 只保留 `display: contents`，避免重 tab panel 再包一层 section card。
