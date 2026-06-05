@@ -1019,6 +1019,15 @@ export class SettingsClaudeCodeSection {
         });
       }
 
+      if (sf.extraKnownMarketplaces.length > 0) {
+        fileEl.createEl('p', {
+          text: t('settings.claudeCode.projectSettings.marketplacesSummary', {
+            count: sf.extraKnownMarketplaces.length,
+            urls: sf.extraKnownMarketplaces.join(', '),
+          }),
+        });
+      }
+
       const openBtn = fileEl.createEl('button', {
         cls: 'opencodian-claude-code-action-button',
         text: t('settings.claudeCode.projectSettings.openButton'),

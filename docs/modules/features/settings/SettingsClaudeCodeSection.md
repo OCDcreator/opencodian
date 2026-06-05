@@ -2,11 +2,11 @@
 
 > **源码**: `src/features/settings/SettingsClaudeCodeSection.ts`
 > **状态**: [REVIEW]
-> **最近更新**: Cleaned up Prompt Suggestions settings: removed diagnostic boundaryNotice from stable UI, replaced smoke-report wording in description with user-friendly copy (2026-06-04).
+> **最近更新**: Added project agents discovery + project settings (hooks & plugins) surface including extraKnownMarketplaces display (2026-06-06).
 
 ## 概述
 
-`SettingsClaudeCodeSection` 负责 Claude Code backend 的 Phase A/Phase 2 设置面板。它通过 Claude Code 二级标签路由不同配置分组，暴露当前已有 adapter wiring 与测试覆盖的 runtime、模型思考、权限、上下文来源和工具策略；Claude-native Skills / Plugins / Agent Definitions 只允许作为 runtime/discovery/read-only 摘要进入设置表面，不提供 authoring。backend 启用仍由 `SettingsBackendSection` 负责，本 section 不注册 runtime，也不导入官方 Claude SDK。
+`SettingsClaudeCodeSection` 负责 Claude Code backend 的 Phase A/Phase 2 设置面板。它通过 Claude Code 二级标签路由不同配置分组，暴露当前已有 adapter wiring 与测试覆盖的 runtime、模型思考、权限、上下文来源和工具策略；Claude-native Skills / Plugins / Agent Definitions 只允许作为 runtime/discovery/read-only 摘要进入设置表面，不提供 authoring。**项目级配置**：Runtime 标签现在提供项目 agents（`.claude/agents/*.md`）和项目 settings（`.claude/settings.json` / `.claude/settings.local.json`）的 scan/create/open 操作——项目 settings 表面解析 `hooks`、`enabledPlugins` 和 `extraKnownMarketplaces` 字段，用户通过 Open 按钮在编辑器中直接编辑这些 JSON 文件（官方路径），而非通过可视化编辑器。backend 启用仍由 `SettingsBackendSection` 负责，本 section 不注册 runtime，也不导入官方 Claude SDK。
 
 ## 职责
 
@@ -33,13 +33,14 @@
 - Permissions 标签中的 `planModeInstructions` 继续保持稳定 readback surface：描述文案改为强调“SDK only uses them in Plan permission mode”，boundary notice 明确当前只验证 settings→SDK option wiring，不把实际 plan-mode behavior 升格为 `pass`；lifecycle notice 现在也明确声明 next query / restarted session only，且不能 live 变更已经运行中的会话
 - Tools 标签中的 `toolAliases` 继续保持稳定 readback surface：boundary notice 明确当前只验证 settings→SDK option wiring，不把实际 alias resolution behavior 升格为 `pass`；lifecycle notice 继续限定为 next query / restarted session only，且 active sessions 不会 live update
 - File Checkpoint / Rewind boundary notice 只在 Runtime 标签中渲染只读 boundary status；`enableFileCheckpointing` toggle 位于 Capability Lab 的 Diagnostic Stream Controls 子区，不在稳定设置中暴露
-- 保持 hook authoring、skills/plugins authoring、agent-definition authoring、external SessionStore、JSONL import/browser 等未完成能力不在 UI 中暴露，直到对应 phase 有端到端 runtime proof；Skills / Plugins / Agent Definitions 的只读 runtime ecosystem 摘要是例外边界，它只能显示发现状态，不能写入配置或提供 authoring 操作
+- 保持 hook authoring、skills/plugins authoring、agent-definition authoring、external SessionStore、JSONL import/browser 等未完成能力不在 UI 中暴露，直到对应 phase 有端到端 runtime proof；Skills / Plugins / Agent Definitions 的只读 runtime ecosystem 摘要是例外边界，它只能显示发现状态，不能写入配置或提供 authoring 操作。**项目 settings 表面是新的例外边界**：它提供 `.claude/settings.json` / `.claude/settings.local.json` 的 scan/create/open，解析 hooks、enabledPlugins 和 extraKnownMarketplaces 字段并展示摘要，但用户通过编辑器直接编辑 JSON 文件（官方 Claude Code 配置路径），不提供可视化编辑器或 marketplace manager
 
 ## 公共导出
 
 - `SettingsClaudeCodeSection`: 构造参数包含 `plugin`、`createSectionHeading()`，以及测试/诊断可注入的 `resolveProcess()`。`attach()` 用于 classic 设置页，`attachTabbed()` 用于 tabbed 设置页。
 - `ClaudeCodeRuntimeEcosystemAdapter`（内部窄化接口）现在包含 `getProjectClaudeSkills?()`；Runtime 标签通过该方法扫描项目 `.claude/skills`，并继续通过 `getRuntimeCatalog?()` 展示 Claude runtime commands。
 - **Batch 2 新增**: Runtime 标签现在提供项目技能 create + open 操作（`handleCreateClaudeProjectSkill` + `openFileInEditor`），项目命令 discovery + create + open 操作（`renderClaudeProjectCommandsControls` + `handleCreateClaudeProjectCommand`）。项目命令通过直接导入 `ClaudeProjectCommandDiscovery` 而非通过 `ClaudeCodeAdapter`，避免 owner-guard 耦合。`getVaultBasePath()` 和 `openFileInEditor()` 是共享 helper 方法。
+- **Batch 3 新增**: Runtime 标签现在提供项目 agents（`renderClaudeProjectAgentsControls`）和项目 settings/hooks+plugins（`renderClaudeProjectSettingsControls`）的 scan/create/open 操作。项目 settings 使用 `ClaudeProjectSettingsDiscovery` 直接动态导入，解析 `hooks`、`enabledPlugins` 和 `extraKnownMarketplaces`，以文件发现和编辑器打开方式提供官方路径入口，不实现可视化 hook/plugin 编辑器。`ClaudeCodeRuntimeEcosystemAdapter` 新增 `getProjectClaudeAgents?()` 方法。
 
 ## 集成
 

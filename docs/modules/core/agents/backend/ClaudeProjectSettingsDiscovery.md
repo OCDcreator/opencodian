@@ -18,7 +18,7 @@
 |------|------|
 | `ClaudeHookEntry` | 单个 hook 条目，包含 `type`、`command`、`timeout` 和任意扩展字段 |
 | `ClaudeHooksConfig` | 按事件名分组的 hook 条目映射（如 `PreToolUse`、`SessionStart`） |
-| `ClaudeProjectSettingsInfo` | 单个设置文件的摘要：`relativePath`、`exists`、`hooks`、`enabledPlugins`、`hookCount`、`parseError` |
+| `ClaudeProjectSettingsInfo` | 单个设置文件的摘要：`relativePath`、`exists`、`hooks`、`enabledPlugins`、`extraKnownMarketplaces`、`hookCount`、`parseError` |
 
 ## 核心导出
 
@@ -35,6 +35,7 @@
 - JSON 解析失败时设置 `parseError` 字段，不抛错。
 - `hookCount` 为所有事件名下 hook 条目数之和。
 - `enabledPlugins` 从解析后的 `enabledPlugins` 数组提取；非数组或不存在时为空数组。
+- `extraKnownMarketplaces` 从解析后的 `extraKnownMarketplaces` 数组提取（URL 字符串列表）；非数组或不存在时为空数组。
 - `createClaudeProjectSettingsFile` 会递归创建 `.claude/` 目录，写入 `{}`（空合法 JSON）。
 - 文件已存在时返回 null，不覆盖。
 

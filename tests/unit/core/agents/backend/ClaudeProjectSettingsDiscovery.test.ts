@@ -33,6 +33,7 @@ describe('ClaudeProjectSettingsDiscovery', () => {
         exists: false,
         hooks: {},
         enabledPlugins: [],
+        extraKnownMarketplaces: [],
         hookCount: 0,
       },
       {
@@ -41,6 +42,7 @@ describe('ClaudeProjectSettingsDiscovery', () => {
         exists: false,
         hooks: {},
         enabledPlugins: [],
+        extraKnownMarketplaces: [],
         hookCount: 0,
       },
     ]);
@@ -57,6 +59,7 @@ describe('ClaudeProjectSettingsDiscovery', () => {
         exists: false,
         hooks: {},
         enabledPlugins: [],
+        extraKnownMarketplaces: [],
         hookCount: 0,
       },
       {
@@ -65,6 +68,7 @@ describe('ClaudeProjectSettingsDiscovery', () => {
         exists: false,
         hooks: {},
         enabledPlugins: [],
+        extraKnownMarketplaces: [],
         hookCount: 0,
       },
     ]);
@@ -97,9 +101,27 @@ describe('ClaudeProjectSettingsDiscovery', () => {
         Stop: [{ type: 'command', command: 'stop.sh' }],
       },
       enabledPlugins: ['plugin-one', 'plugin-two'],
+      extraKnownMarketplaces: [],
       hookCount: 3,
     });
     expect(localSettings.exists).toBe(false);
+  });
+
+  it('parses extraKnownMarketplaces from settings file', async () => {
+    await writeSettings(
+      'settings.local.json',
+      JSON.stringify({
+        extraKnownMarketplaces: ['https://example.com/marketplace', 'https://other.com/plugins', 123, true],
+      }),
+    );
+
+    const [, localSettings] = await discoverClaudeProjectSettings(tempRoot);
+
+    expect(localSettings.exists).toBe(true);
+    expect(localSettings.extraKnownMarketplaces).toEqual([
+      'https://example.com/marketplace',
+      'https://other.com/plugins',
+    ]);
   });
 
   it('returns empty hooks and plugins for an empty JSON file', async () => {
@@ -110,6 +132,7 @@ describe('ClaudeProjectSettingsDiscovery', () => {
     expect(settingsJson.exists).toBe(true);
     expect(settingsJson.hooks).toEqual({});
     expect(settingsJson.enabledPlugins).toEqual([]);
+    expect(settingsJson.extraKnownMarketplaces).toEqual([]);
     expect(settingsJson.hookCount).toBe(0);
   });
 
@@ -121,6 +144,7 @@ describe('ClaudeProjectSettingsDiscovery', () => {
     expect(localSettings.exists).toBe(true);
     expect(localSettings.hooks).toEqual({});
     expect(localSettings.enabledPlugins).toEqual([]);
+    expect(localSettings.extraKnownMarketplaces).toEqual([]);
     expect(localSettings.hookCount).toBe(0);
     expect(localSettings.parseError).toEqual(expect.any(String));
   });

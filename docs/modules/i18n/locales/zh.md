@@ -1,7 +1,7 @@
 # Chinese Locale
 
 > **源码**: `src/i18n/locales/zh.ts`
-> **状态**: [REVIEW]
+> **最近更新**: 2026-06-06
 
 ## 概述
 

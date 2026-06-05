@@ -33,6 +33,8 @@ export interface ClaudeProjectSettingsInfo {
   hooks: ClaudeHooksConfig;
   /** List of enabled plugins from the file. */
   enabledPlugins: string[];
+  /** List of extra known marketplace URLs from the file. */
+  extraKnownMarketplaces: string[];
   /** Total number of hook entries across all events. */
   hookCount: number;
   /** Parse error message if the file exists but couldn't be parsed. */
@@ -54,6 +56,7 @@ function emptySettingsInfo(vaultPath: string | null | undefined, fileName: Claud
     exists: false,
     hooks: {},
     enabledPlugins: [],
+    extraKnownMarketplaces: [],
     hookCount: 0,
   };
 }
@@ -120,6 +123,7 @@ async function readSettingsFile(vaultPath: string | null | undefined, fileName: 
 
     info.hooks = parseHooks(parsed.hooks);
     info.enabledPlugins = parseEnabledPlugins(parsed.enabledPlugins);
+    info.extraKnownMarketplaces = parseEnabledPlugins(parsed.extraKnownMarketplaces);
     info.hookCount = countHooks(info.hooks);
   } catch (error) {
     info.parseError = error instanceof Error ? error.message : String(error);
