@@ -1,7 +1,7 @@
 # ConversationHistoryActionsCoordinator
 
 > **源码**: `src/features/chat/services/ConversationHistoryActionsCoordinator.ts`
-> **状态**: [REVIEW]
+> **最近更新**: 2026-06-06
 
 ## 概述
 

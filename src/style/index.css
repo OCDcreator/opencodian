@@ -5,6 +5,7 @@
 @import 'components/model-selector.css';
 @import 'components/permission-mode-selector.css';
 @import 'components/history-dropdown.css';
+@import 'components/backend-session-browser.css';
 @import 'components/streaming-content.css';
 @import 'components/inline-permission.css';
 @import 'components/config-status.css';

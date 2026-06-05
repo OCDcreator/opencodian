@@ -2,7 +2,7 @@
 
 > **源码**: `src/features/chat/OpenCodianView.ts`
 > **状态**: [REVIEW]
-> **最近更新**: Claude Code active-backend routing, backend-aware first-turn title pending state, and history dropdown polish
+> **最近更新**: Backend session browser integration (Browse backend sessions button in history dropdown) + Claude Code active-backend routing
 
 ## 概述
 

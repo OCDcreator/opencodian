@@ -20,6 +20,7 @@ export interface ConversationHistoryActionsHost {
   deleteAllConversationsAndReset(conversationIds: string[]): Promise<void>;
   showNotice(message: string): void;
   openTitleSettings?(): void;
+  browseBackendSessions?(): void;
 }
 
 export class ConversationHistoryActionsCoordinator {
@@ -173,6 +174,23 @@ export class ConversationHistoryActionsCoordinator {
         innerEvent.stopPropagation();
         this.closeHistoryDropdown();
         this.host.openTitleSettings!();
+      });
+    }
+
+    if (this.host.browseBackendSessions) {
+      const browseEl = actionsEl.createDiv({ cls: 'opencodian-history-action' });
+      const browseIcon = browseEl.createSpan({
+        cls: 'opencodian-history-action-icon',
+      });
+      setIcon(browseIcon, 'server');
+      browseEl.createSpan({
+        cls: 'opencodian-history-action-text',
+        text: t('chat.backendSessions.browseButton'),
+      });
+      browseEl.addEventListener('click', (innerEvent) => {
+        innerEvent.stopPropagation();
+        this.closeHistoryDropdown();
+        this.host.browseBackendSessions!();
       });
     }
 

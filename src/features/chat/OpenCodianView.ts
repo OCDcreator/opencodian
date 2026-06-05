@@ -314,6 +314,7 @@ import {
   previewLogText,
 } from './services/trailingAssistantPatchDebug';
 import type { TabBar, TabId, TabManager } from './tabs';
+import { type BackendSessionBrowserHost,BackendSessionBrowserModal } from './ui/BackendSessionBrowserModal';
 import { ContextDetailModal } from './ui/ContextDetailModal';
 import { ContextRing } from './ui/ContextRing';
 import { EffortSelector } from './ui/EffortSelector';
@@ -769,6 +770,21 @@ export class OpenCodianView extends ItemView {
         new Notice(message);
       },
       openTitleSettings: () => { const titleSettings = this.appSettings(); this.plugin.settingsTab?.prepareScrollToConversationOnNextOpen('title'); titleSettings.open(); try { titleSettings.openTabById('opencodian'); } catch { /* title settings not ready */ } },
+      browseBackendSessions: () => {
+        const modalHost: BackendSessionBrowserHost = {
+          getAgentServiceRegistry: () => this.plugin.agentServiceRegistry ?? null,
+          createConversationFromBackendSession: async (sessionId, title) => {
+            const backend = this.plugin.settings.activeBackend ?? 'opencode';
+            const conversation = await this.plugin.createConversationFromSession(sessionId, { title, backend });
+            return conversation.id;
+          },
+          loadConversation: (conversationId) => this.loadConversation(conversationId),
+          getActiveBackendKind: () => this.plugin.settings.activeBackend ?? null,
+          showNotice: (message) => { new Notice(message); },
+          isStreaming: () => this.isActiveTabStreaming(),
+        };
+        new BackendSessionBrowserModal(this.app, modalHost).open();
+      },
     };
   }
 
