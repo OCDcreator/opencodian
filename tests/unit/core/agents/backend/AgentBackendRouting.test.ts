@@ -254,6 +254,38 @@ describe('loadBackendSessionMessages', () => {
       expect(result[1].role).toBe('assistant');
     });
 
+    it('unwraps Claude SDK nested message envelope for role', async () => {
+      // Real Claude Code SDK shape: role under record.message.role
+      const adapter = createMockSessionAdapter('claude-code', new Set([
+        AgentCapability.Chat,
+        AgentCapability.Sessions,
+        AgentCapability.Fork,
+      ]), {
+        getSessionMessages: async () => [
+          {
+            type: 'user',
+            uuid: 'u1',
+            session_id: 'ses-nested',
+            message: { role: 'user', content: 'hello from nested' },
+          },
+          {
+            type: 'assistant',
+            uuid: 'a1',
+            session_id: 'ses-nested',
+            message: { role: 'assistant', content: 'reply from nested' },
+          },
+        ],
+      });
+      const registry = createMockRegistry(new Map([['claude-code', adapter]]));
+      const result = await loadBackendSessionMessages(registry, { backend: 'claude-code' }, 'ses-nested');
+      expect(result).toHaveLength(2);
+      // Role should come from record.message.role, not record.type
+      expect(result[0].role).toBe('user');
+      expect(result[0].id).toBe('u1'); // falls back to uuid when id is absent
+      expect(result[1].role).toBe('assistant');
+      expect(result[1].id).toBe('a1');
+    });
+
     it('propagates error when getSessionMessages throws', async () => {
       const adapter = createMockSessionAdapter('opencode', OPENCODE_FULL_CAPABILITIES, {
         getSessionMessages: async () => { throw new Error('backend error'); },
@@ -838,5 +870,98 @@ describe('getBackendSessionPreview', () => {
     const registry = createMockRegistry(new Map([['opencode', adapter]]));
     const result = await getBackendSessionPreview(registry, 'ses-1');
     expect(result).toBeNull();
+  });
+
+  it('normalizes Claude SDK nested message envelope (record.message.content string)', async () => {
+    // Real Claude Code SDK getSessionMessages shape:
+    // { type: "user", uuid: "...", session_id: "...", message: { role: "user", content: "Reply with exactly OK" } }
+    const adapter = createMockSessionAdapter('claude-code', new Set([
+      AgentCapability.Chat,
+      AgentCapability.Sessions,
+      AgentCapability.Fork,
+    ]), {
+      getSessionMessages: async () => [
+        {
+          type: 'user',
+          uuid: 'u1',
+          session_id: '75f2fb28-4b59-47e2-b84c-b1c8e7de2d61',
+          message: { role: 'user', content: 'Reply with exactly OK' },
+        },
+        {
+          type: 'assistant',
+          uuid: 'a1',
+          session_id: '75f2fb28-4b59-47e2-b84c-b1c8e7de2d61',
+          message: { role: 'assistant', content: 'OK' },
+        },
+      ],
+    });
+    const registry = createMockRegistry(new Map([['claude-code', adapter]]));
+    const result = await getBackendSessionPreview(registry, '75f2fb28');
+    expect(result).toHaveLength(2);
+    // User message: should produce text parts, NOT json fallback
+    expect(result![0]).toEqual({
+      role: 'user',
+      parts: [{ type: 'text', text: 'Reply with exactly OK' }],
+    });
+    // Assistant message: same
+    expect(result![1]).toEqual({
+      role: 'assistant',
+      parts: [{ type: 'text', text: 'OK' }],
+    });
+  });
+
+  it('normalizes Claude SDK nested message envelope (record.message.content array)', async () => {
+    // Claude SDK also returns array content blocks under message.content
+    const adapter = createMockSessionAdapter('claude-code', new Set([
+      AgentCapability.Chat,
+      AgentCapability.Sessions,
+      AgentCapability.Fork,
+    ]), {
+      getSessionMessages: async () => [
+        {
+          type: 'assistant',
+          uuid: 'a2',
+          session_id: 'ses-2',
+          message: {
+            role: 'assistant',
+            content: [
+              { type: 'text', text: 'Here is the answer' },
+              { type: 'tool_use', id: 'tu1', name: 'search' },
+            ],
+          },
+        },
+      ],
+    });
+    const registry = createMockRegistry(new Map([['claude-code', adapter]]));
+    const result = await getBackendSessionPreview(registry, 'ses-2');
+    expect(result).toHaveLength(1);
+    expect(result![0].role).toBe('assistant');
+    expect(result![0].parts).toHaveLength(2);
+    expect(result![0].parts[0]).toEqual({ type: 'text', text: 'Here is the answer' });
+    // Non-text block gets serialized
+    expect(result![0].parts[1].type).toBe('tool_use');
+    expect(result![0].parts[1].text).toContain('"name": "search"');
+  });
+
+  it('falls back to generic content when record.message exists but has no content', async () => {
+    const adapter = createMockSessionAdapter('claude-code', new Set([
+      AgentCapability.Chat,
+      AgentCapability.Sessions,
+      AgentCapability.Fork,
+    ]), {
+      getSessionMessages: async () => [
+        {
+          type: 'user',
+          message: { role: 'user' }, // no content field
+          content: 'top-level fallback',
+        },
+      ],
+    });
+    const registry = createMockRegistry(new Map([['claude-code', adapter]]));
+    const result = await getBackendSessionPreview(registry, 'ses-fb');
+    expect(result).toHaveLength(1);
+    // Should use top-level content since nested message has no content
+    expect(result![0].role).toBe('user');
+    expect(result![0].parts).toEqual([{ type: 'text', text: 'top-level fallback' }]);
   });
 });

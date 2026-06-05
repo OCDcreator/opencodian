@@ -305,6 +305,25 @@ export async function listBackendSessions(
 }
 
 /**
+ * Normalize an array of content blocks (Claude SDK style) into preview parts.
+ * Each block should be an object; non-object entries are skipped.
+ */
+function normalizeContentBlocks(blocks: unknown[]): NormalizedSessionPreviewPart[] {
+  const parts: NormalizedSessionPreviewPart[] = [];
+  for (const block of blocks) {
+    if (typeof block === 'object' && block !== null) {
+      const b = block as Record<string, unknown>;
+      if (b.type === 'text' && typeof b.text === 'string') {
+        parts.push({ type: 'text', text: b.text });
+      } else {
+        parts.push({ type: String(b.type ?? 'block'), text: JSON.stringify(block, null, 2) });
+      }
+    }
+  }
+  return parts;
+}
+
+/**
  * Read session preview messages from the active backend as normalized entries.
  *
  * Routes through the registry and calls `getSessionMessages(sessionId)` on
@@ -352,28 +371,25 @@ export async function getBackendSessionPreview(
       };
     }
 
-    // Generic / Claude normalization
-    const role = String(record.role ?? record.type ?? 'unknown');
+    // Resolve role and content, handling Claude SDK nested envelope
+    // { type, message: { role, content } } as well as top-level fields.
+    const msg = record.message && typeof record.message === 'object'
+      ? record.message as Record<string, unknown>
+      : null;
+    const role = msg
+      ? String(msg.role ?? record.type ?? record.role ?? 'unknown')
+      : String(record.role ?? record.type ?? 'unknown');
+    // Prefer nested message.content; fall back to top-level record.content
+    const content = (msg && msg.content !== undefined) ? msg.content : record.content;
 
     // Try recognized content fields
-    const content = record.content;
     if (typeof content === 'string') {
       return { role, parts: [{ type: 'text', text: content }] };
     }
 
     if (Array.isArray(content)) {
       // Claude SDK content blocks: [{ type: 'text', text: '...' }, ...]
-      const parts: NormalizedSessionPreviewPart[] = [];
-      for (const block of content) {
-        if (typeof block === 'object' && block !== null) {
-          const b = block as Record<string, unknown>;
-          if (b.type === 'text' && typeof b.text === 'string') {
-            parts.push({ type: 'text', text: b.text });
-          } else {
-            parts.push({ type: String(b.type ?? 'block'), text: JSON.stringify(block, null, 2) });
-          }
-        }
-      }
+      const parts = normalizeContentBlocks(content);
       if (parts.length > 0) {
         return { role, parts };
       }
@@ -429,10 +445,18 @@ export async function loadBackendSessionMessages(
   }
 
   // Generic normalization for Claude / other backends.
-  return safeMessages.map((record, idx) => ({
-    id: (record.id ?? record.message_id ?? `msg-${idx}`) as string,
-    role: (record.role ?? record.type ?? 'unknown') as string,
-    createdAt: typeof record.created_at === 'number' ? record.created_at : null,
-    payload: JSON.stringify(record, null, 2),
-  }));
+  // Claude SDK records nest role/content under `record.message`, so unwrap
+  // when the envelope exists; otherwise fall back to top-level fields.
+  return safeMessages.map((record, idx) => {
+    // Claude SDK nested envelope: { message: { role, content } }
+    const msg = record.message && typeof record.message === 'object'
+      ? record.message as Record<string, unknown>
+      : null;
+    return {
+      id: (record.id ?? record.message_id ?? record.uuid ?? `msg-${idx}`) as string,
+      role: ((msg?.role ?? record.role ?? record.type ?? 'unknown') as string),
+      createdAt: typeof record.created_at === 'number' ? record.created_at : null,
+      payload: JSON.stringify(record, null, 2),
+    };
+  });
 }

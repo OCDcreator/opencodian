@@ -2359,6 +2359,106 @@ describe('ClaudeCodeAdapter', () => {
     expect(sdk.getSessionInfo).toHaveBeenCalledTimes(1);
   });
 
+  it('ignores hook event session IDs during resumed session send', async () => {
+    // Regression: hook_started events carry an internal hook-runtime session ID
+    // that differs from the resumed conversation session ID. The adapter must
+    // NOT treat hook session IDs as authoritative for conversation identity.
+    const sdk = createSdk([
+      {
+        type: 'system',
+        subtype: 'hook_started',
+        session_id: 'hook-runtime-9eda7308',
+        hook_id: 'hook-1',
+        hook_name: 'pre-tool',
+        hook_event: 'before',
+      },
+      {
+        type: 'system',
+        subtype: 'init',
+        session_id: 'sdk-persisted-session',
+      },
+      {
+        type: 'assistant',
+        session_id: 'sdk-persisted-session',
+        message: {
+          id: 'msg-1',
+          content: [{ type: 'text', text: 'Resumed after hook' }],
+        },
+      },
+    ]);
+    sdk.getSessionInfo.mockResolvedValue({
+      sessionId: 'sdk-persisted-session',
+      summary: 'Persisted session',
+      lastModified: 123,
+    });
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+
+    const chunks = await collectAsync(adapter.sendMessage({
+      sessionId: 'sdk-persisted-session',
+      content: 'resume me',
+    }));
+
+    // Should complete without a resume validation error
+    const errorChunks = chunks.filter(c => c.type === 'error');
+    expect(errorChunks).toEqual([]);
+
+    // Should contain the actual assistant reply
+    expect(chunks).toContainEqual({
+      type: 'text',
+      content: 'Resumed after hook',
+    });
+
+    expect(sdk.query).toHaveBeenCalledTimes(1);
+    expect(sdk.query.mock.calls[0][0].options.resume).toBe('sdk-persisted-session');
+  });
+
+  it('still rejects a resumed session when a non-hook backend event carries a different session id', async () => {
+    // Safety boundary: only hook events are excluded from session identity.
+    // A subagent backend event with a mismatched session ID should still
+    // trigger resume validation failure.
+    const sdk = createSdk([
+      {
+        type: 'system',
+        subtype: 'task_started',
+        session_id: 'other-session-mismatch',
+        task_id: 'task-1',
+        subagent_type: 'codex',
+      },
+      {
+        type: 'assistant',
+        session_id: 'other-session-mismatch',
+        message: {
+          id: 'msg-1',
+          content: [{ type: 'text', text: 'Should not appear' }],
+        },
+      },
+    ]);
+    sdk.getSessionInfo.mockResolvedValue({
+      sessionId: 'sdk-persisted-session',
+      summary: 'Persisted session',
+      lastModified: 123,
+    });
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+
+    await expect(collectAsync(adapter.sendMessage({
+      sessionId: 'sdk-persisted-session',
+      content: 'resume me',
+    }))).resolves.toEqual([{
+      type: 'error',
+      content: expect.stringContaining('Claude Code resume validation failed'),
+    }]);
+
+    expect(sdk.query).toHaveBeenCalledTimes(1);
+  });
+
   it('lazy-loads the official SDK facade on first send instead of plugin startup', async () => {
     const sdk = createSdk([{
       type: 'assistant',

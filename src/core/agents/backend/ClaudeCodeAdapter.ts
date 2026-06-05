@@ -582,6 +582,9 @@ function summarizeSession(session: ClaudeCodeSessionState): Record<string, unkno
 }
 
 function resolveDiagnosticSessionId(message: unknown, chunks: readonly StreamChunk[]): string | undefined {
+  // Check authoritative chunk sources first.
+  // Hook events carry their own internal runtime session ID and are not
+  // authoritative for conversation identity.
   for (const chunk of chunks) {
     if (chunk.type === 'message_metadata' && chunk.sessionId) {
       return chunk.sessionId;
@@ -589,9 +592,14 @@ function resolveDiagnosticSessionId(message: unknown, chunks: readonly StreamChu
     if (chunk.type === 'usage' && chunk.sessionId) {
       return chunk.sessionId;
     }
-    if (chunk.type === 'backend_event' && chunk.sessionId) {
+    if (chunk.type === 'backend_event' && chunk.sessionId && chunk.event !== 'hook') {
       return chunk.sessionId;
     }
+  }
+  // If any hook chunk carried a session ID, the raw message is a hook
+  // lifecycle event whose session_id is NOT the conversation session ID.
+  if (chunks.some(c => c.type === 'backend_event' && c.event === 'hook' && c.sessionId)) {
+    return undefined;
   }
   if (typeof message !== 'object' || message === null || Array.isArray(message)) {
     return undefined;
