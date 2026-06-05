@@ -16,6 +16,8 @@
  */
 /* eslint-disable max-lines -- Claude Code settings keeps cross-layout tab rendering and persistence controls co-located for auditability. */
 
+import * as path from 'path';
+
 import { Notice, Setting } from 'obsidian';
 
 import {
@@ -23,6 +25,8 @@ import {
   type ClaudeCodeProcessResolverOptions,
   resolveClaudeCodeProcess,
 } from '../../core/agents/backend/ClaudeCodeProcessResolver';
+import type { ClaudeProjectCommandInfo } from '../../core/agents/backend/ClaudeProjectCommandDiscovery';
+import type { ClaudeProjectSkillInfo } from '../../core/agents/backend/ClaudeProjectSkillDiscovery';
 import {
   type ClaudeCodeEffort,
   type ClaudeCodePermissionMode,
@@ -32,6 +36,7 @@ import {
 } from '../../core/types';
 import { t, type TranslationKey } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
+import { getVaultBasePath } from '../../shared';
 import { TextareaSizeMemory } from './TextareaSizeMemory';
 
 interface SettingsClaudeCodeSectionOptions {
@@ -53,6 +58,7 @@ interface ClaudeCodeRuntimeEcosystemAdapter {
   getMcpServerNames?: () => string[];
   getMcpServerRuntimeStatuses?: () => Promise<ClaudeCodeMcpRuntimeStatus[] | null>;
   getRuntimeCatalog?: () => Promise<ClaudeCodeRuntimeCatalog | null>;
+  getProjectClaudeSkills?: () => Promise<ClaudeProjectSkillInfo[]>;
   getContextUsage?: () => Promise<unknown | null>;
   getAccountInfo?: () => Promise<unknown | null>;
   readRuntimeFile?: (
@@ -225,6 +231,9 @@ export class SettingsClaudeCodeSection {
   private renderRuntimeTab(containerEl: HTMLElement): void {
     this.renderRuntimeBoundaryNotice(containerEl);
     this.renderRuntimeEcosystemSummary(containerEl);
+    this.renderClaudeProjectSkillsControls(containerEl);
+    this.renderClaudeProjectCommandsControls(containerEl);
+    this.renderClaudeRuntimeCommandsControls(containerEl);
     this.renderRuntimeCatalogReadbackControls(containerEl);
     this.renderAccountInfoReadbackControls(containerEl);
     this.renderContextUsageReadbackControls(containerEl);
@@ -548,6 +557,316 @@ export class SettingsClaudeCodeSection {
     return normalizedNames.length > 0
       ? normalizedNames.join(', ')
       : t('settings.claudeCode.runtimeEcosystem.unnamed');
+  }
+
+  // ─── Claude Project Skills discovery ───────────────────────────────
+
+  private renderClaudeProjectSkillsControls(containerEl: HTMLElement): void {
+    let outputEl: HTMLElement | null = null;
+    const getOutputEl = (): HTMLElement => {
+      outputEl ??= containerEl.createDiv({
+        cls: 'opencodian-settings-inline-notice opencodian-claude-code-project-skills',
+        attr: {
+          'data-claude-code-project-skills': 'true',
+        },
+      });
+      return outputEl;
+    };
+
+    new Setting(containerEl)
+      .setName(t('settings.claudeCode.projectSkills.name'))
+      .setDesc(t('settings.claudeCode.projectSkills.desc'))
+      .addButton((button) => {
+        button
+          .setButtonText(t('settings.claudeCode.projectSkills.scanButton'))
+          .onClick(async () => {
+            await this.renderClaudeProjectSkillsReadback(getOutputEl());
+          });
+      })
+      .addButton((button) => {
+        button
+          .setButtonText(t('settings.claudeCode.projectSkills.createButton'))
+          .onClick(async () => {
+            await this.handleCreateClaudeProjectSkill(getOutputEl());
+          });
+      });
+  }
+
+  private async renderClaudeProjectSkillsReadback(outputEl: HTMLElement): Promise<void> {
+    outputEl.empty();
+    outputEl.setText(t('settings.claudeCode.projectSkills.loading'));
+    const adapter = this.getClaudeAdapter() as ClaudeCodeRuntimeEcosystemAdapter | null;
+    if (typeof adapter?.getProjectClaudeSkills !== 'function') {
+      outputEl.setText(t('settings.claudeCode.projectSkills.empty'));
+      return;
+    }
+
+    let skills: ClaudeProjectSkillInfo[];
+    try {
+      skills = await adapter.getProjectClaudeSkills();
+    } catch {
+      outputEl.setText(t('settings.claudeCode.projectSkills.failed'));
+      return;
+    }
+
+    outputEl.empty();
+    if (skills.length === 0) {
+      outputEl.setText(t('settings.claudeCode.projectSkills.empty'));
+      return;
+    }
+
+    for (const skill of skills) {
+      const skillEl = outputEl.createDiv({
+        cls: 'opencodian-claude-code-project-skill-entry',
+        attr: {
+          'data-skill-name': skill.name,
+          'data-skill-path': skill.relativePath,
+        },
+      });
+      const label = skill.description
+        ? t('settings.claudeCode.projectSkills.skillEntry', { name: skill.name, description: skill.description })
+        : t('settings.claudeCode.projectSkills.skillEntryNoDesc', { name: skill.name });
+      skillEl.createEl('p', { text: label });
+      skillEl.createEl('p', {
+        cls: 'opencodian-settings-inline-notice',
+        text: t('settings.claudeCode.projectSkills.skillPath', { path: skill.relativePath }),
+      });
+      const openBtn = skillEl.createEl('button', {
+        cls: 'opencodian-claude-code-action-button',
+        text: t('settings.claudeCode.projectSkills.openButton'),
+      });
+      openBtn.addEventListener('click', () => {
+        void this.openFileInEditor(skill.skillMdPath);
+      });
+    }
+  }
+
+  private async handleCreateClaudeProjectSkill(outputEl: HTMLElement): Promise<void> {
+    const name = window.prompt(t('settings.claudeCode.projectSkills.createPrompt'));
+    if (!name?.trim()) return;
+
+    const vaultPath = this.plugin.app ? this.getVaultBasePath() : null;
+    if (!vaultPath) return;
+
+    // Check if skill already exists
+    const adapter = this.getClaudeAdapter() as ClaudeCodeRuntimeEcosystemAdapter | null;
+    if (typeof adapter?.getProjectClaudeSkills === 'function') {
+      const existing = await adapter.getProjectClaudeSkills();
+      if (existing.some((s) => s.name === name.trim())) {
+        new Notice(t('settings.claudeCode.projectSkills.alreadyExists'));
+        return;
+      }
+    }
+
+    const { createClaudeProjectSkill } = await import('../../core/agents/backend/ClaudeProjectSkillDiscovery');
+    const filePath = await createClaudeProjectSkill(vaultPath, name.trim());
+    if (!filePath) {
+      new Notice(t('settings.claudeCode.projectSkills.createFailed'));
+      return;
+    }
+
+    await this.openFileInEditor(filePath);
+    // Re-scan to show the new skill
+    await this.renderClaudeProjectSkillsReadback(outputEl);
+  }
+
+  // ─── Claude Project Commands discovery & actions ──────────────────
+
+  private renderClaudeProjectCommandsControls(containerEl: HTMLElement): void {
+    let outputEl: HTMLElement | null = null;
+    const getOutputEl = (): HTMLElement => {
+      outputEl ??= containerEl.createDiv({
+        cls: 'opencodian-settings-inline-notice opencodian-claude-code-project-commands',
+        attr: {
+          'data-claude-code-project-commands': 'true',
+        },
+      });
+      return outputEl;
+    };
+
+    new Setting(containerEl)
+      .setName(t('settings.claudeCode.projectCommands.name'))
+      .setDesc(t('settings.claudeCode.projectCommands.desc'))
+      .addButton((button) => {
+        button
+          .setButtonText(t('settings.claudeCode.projectCommands.scanButton'))
+          .onClick(async () => {
+            await this.renderClaudeProjectCommandsReadback(getOutputEl());
+          });
+      })
+      .addButton((button) => {
+        button
+          .setButtonText(t('settings.claudeCode.projectCommands.createButton'))
+          .onClick(async () => {
+            await this.handleCreateClaudeProjectCommand(getOutputEl());
+          });
+      });
+  }
+
+  private async renderClaudeProjectCommandsReadback(outputEl: HTMLElement): Promise<void> {
+    outputEl.empty();
+    outputEl.setText(t('settings.claudeCode.projectCommands.loading'));
+
+    const vaultPath = this.getVaultBasePath();
+    if (!vaultPath) {
+      outputEl.setText(t('settings.claudeCode.projectCommands.empty'));
+      return;
+    }
+
+    let commands: ClaudeProjectCommandInfo[];
+    try {
+      const { discoverClaudeProjectCommands } = await import('../../core/agents/backend/ClaudeProjectCommandDiscovery');
+      commands = await discoverClaudeProjectCommands(vaultPath);
+    } catch {
+      outputEl.setText(t('settings.claudeCode.projectCommands.failed'));
+      return;
+    }
+
+    outputEl.empty();
+    if (commands.length === 0) {
+      outputEl.setText(t('settings.claudeCode.projectCommands.empty'));
+      return;
+    }
+
+    for (const cmd of commands) {
+      const cmdEl = outputEl.createDiv({
+        cls: 'opencodian-claude-code-project-command-entry',
+        attr: {
+          'data-command-name': cmd.name,
+          'data-command-path': cmd.relativePath,
+        },
+      });
+      const label = cmd.description
+        ? t('settings.claudeCode.projectCommands.commandEntry', { name: cmd.name, description: cmd.description })
+        : t('settings.claudeCode.projectCommands.commandEntryNoDesc', { name: cmd.name });
+      cmdEl.createEl('p', { text: label });
+      cmdEl.createEl('p', {
+        cls: 'opencodian-settings-inline-notice',
+        text: t('settings.claudeCode.projectCommands.commandPath', { path: cmd.relativePath }),
+      });
+      const openBtn = cmdEl.createEl('button', {
+        cls: 'opencodian-claude-code-action-button',
+        text: t('settings.claudeCode.projectCommands.openButton'),
+      });
+      openBtn.addEventListener('click', () => {
+        void this.openFileInEditor(cmd.filePath);
+      });
+    }
+  }
+
+  private async handleCreateClaudeProjectCommand(outputEl: HTMLElement): Promise<void> {
+    const name = window.prompt(t('settings.claudeCode.projectCommands.createPrompt'));
+    if (!name?.trim()) return;
+
+    const vaultPath = this.plugin.app ? this.getVaultBasePath() : null;
+    if (!vaultPath) return;
+
+    // Check if command already exists
+    const { discoverClaudeProjectCommands, createClaudeProjectCommand } = await import('../../core/agents/backend/ClaudeProjectCommandDiscovery');
+    const existing = await discoverClaudeProjectCommands(vaultPath);
+    if (existing.some((c) => c.name === name.trim())) {
+      new Notice(t('settings.claudeCode.projectCommands.alreadyExists'));
+      return;
+    }
+
+    const filePath = await createClaudeProjectCommand(vaultPath, name.trim());
+    if (!filePath) {
+      new Notice(t('settings.claudeCode.projectCommands.createFailed'));
+      return;
+    }
+
+    await this.openFileInEditor(filePath);
+    // Re-scan to show the new command
+    await this.renderClaudeProjectCommandsReadback(outputEl);
+  }
+
+  // ─── Shared helpers ────────────────────────────────────────────────
+
+  private getVaultBasePath(): string | null {
+    return getVaultBasePath(this.plugin.app);
+  }
+
+  private async openFileInEditor(absolutePath: string): Promise<void> {
+    try {
+      const vaultPath = this.getVaultBasePath();
+      if (!vaultPath) return;
+      const relativePath = path.relative(vaultPath, absolutePath).replace(/\\/g, '/');
+      await this.plugin.app.workspace.openLinkText(relativePath, '', 'tab');
+    } catch {
+      // Fallback: no-op
+    }
+  }
+
+  // ─── Claude Runtime Commands discovery ─────────────────────────────
+
+  private renderClaudeRuntimeCommandsControls(containerEl: HTMLElement): void {
+    let outputEl: HTMLElement | null = null;
+    const getOutputEl = (): HTMLElement => {
+      outputEl ??= containerEl.createDiv({
+        cls: 'opencodian-settings-inline-notice opencodian-claude-code-runtime-commands',
+        attr: {
+          'data-claude-code-runtime-commands': 'true',
+        },
+      });
+      return outputEl;
+    };
+
+    new Setting(containerEl)
+      .setName(t('settings.claudeCode.runtimeCommands.name'))
+      .setDesc(t('settings.claudeCode.runtimeCommands.desc'))
+      .addButton((button) => {
+        button
+          .setButtonText(t('settings.claudeCode.runtimeCommands.scanButton'))
+          .onClick(async () => {
+            await this.renderClaudeRuntimeCommandsReadback(getOutputEl());
+          });
+      });
+  }
+
+  private async renderClaudeRuntimeCommandsReadback(outputEl: HTMLElement): Promise<void> {
+    outputEl.empty();
+    outputEl.setText(t('settings.claudeCode.runtimeCommands.loading'));
+    const adapter = this.getClaudeAdapter() as ClaudeCodeRuntimeEcosystemAdapter | null;
+    if (typeof adapter?.getRuntimeCatalog !== 'function') {
+      outputEl.setText(t('settings.claudeCode.runtimeCommands.unavailable'));
+      return;
+    }
+
+    let catalog: ClaudeCodeRuntimeCatalog | null;
+    try {
+      catalog = await adapter.getRuntimeCatalog();
+    } catch {
+      outputEl.setText(t('settings.claudeCode.runtimeCommands.failed'));
+      return;
+    }
+
+    if (!catalog || catalog.commands.length === 0) {
+      outputEl.setText(t('settings.claudeCode.runtimeCommands.empty'));
+      return;
+    }
+
+    outputEl.empty();
+    const boundaryEl = outputEl.createEl('p', {
+      cls: 'opencodian-settings-inline-notice',
+      text: t('settings.claudeCode.runtimeCommands.boundaryNotice'),
+    });
+    boundaryEl.setAttribute('data-claude-code-runtime-commands-boundary', 'true');
+
+    const listEl = outputEl.createEl('ul');
+    for (const cmd of catalog.commands) {
+      const itemEl = listEl.createEl('li');
+      itemEl.setAttribute('data-command-name', cmd.name);
+      const desc = cmd.description
+        ? t('settings.claudeCode.runtimeCommands.commandDesc', { name: cmd.name, description: cmd.description })
+        : t('settings.claudeCode.runtimeCommands.commandEntry', { name: cmd.name });
+      itemEl.createEl('span', { text: '/' + desc.replace(/^\/+/, '') });
+      if (cmd.argumentHint) {
+        itemEl.createEl('span', {
+          cls: 'opencodian-settings-inline-notice',
+          text: ' ' + t('settings.claudeCode.runtimeCommands.commandHint', { hint: cmd.argumentHint }),
+        });
+      }
+    }
   }
 
   private renderRuntimeCatalogReadbackControls(containerEl: HTMLElement): void {

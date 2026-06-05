@@ -40,6 +40,10 @@ import {
 import type { WarmQueryHandle } from './ClaudeCodeSdkLoader';
 import { ClaudeCodeStreamNormalizer } from './ClaudeCodeStreamNormalizer';
 import {
+  type ClaudeProjectSkillInfo,
+  discoverClaudeProjectSkills,
+} from './ClaudeProjectSkillDiscovery';
+import {
   clearPromptSuggestionSink,
   registerPromptSuggestionSink,
 } from './promptSuggestionSink';
@@ -3768,6 +3772,23 @@ export class ClaudeCodeAdapter
     }
     return names;
   }
+
+  /**
+   * Discover Claude project skills from the vault's .claude/skills/ directory.
+   * Returns structured metadata for each SKILL.md found.
+   * This is a pure filesystem scan — no SDK or runtime query involved.
+   */
+  async getProjectClaudeSkills(): Promise<ClaudeProjectSkillInfo[]> {
+    return discoverClaudeProjectSkills(this.options.vaultPath);
+  }
+
+  /**
+   * Discover Claude project commands from .claude/commands/*.md files.
+   * Returns structured metadata for each command file found.
+   * This is a pure filesystem scan — no SDK or runtime query involved.
+   * NOTE: Settings surfaces import discoverClaudeProjectCommands directly
+   * instead of routing through this method to avoid owner-guard coupling.
+   */
 
   private async applyToActiveQueries(
     apply: (runtime: ClaudeCodeSessionRuntime) => Promise<unknown> | void | undefined,

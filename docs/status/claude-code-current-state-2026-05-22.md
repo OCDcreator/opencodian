@@ -1,5 +1,99 @@
 # Claude Code SDK Current State - 2026-05-22
 
+## 2026-06-06 Claude Skills & Commands Productization (Batch 2)
+
+### Objective
+
+Move Claude skills/commands from discovery-only toward real user ability: (1) Claude slash commands appear in the chat slash menu when Claude Code is the active backend, and fall through to raw text send; (2) Claude project skills get create + open settings actions; (3) Claude project commands get discovery + create + open settings actions.
+
+### What Changed
+
+#### Chat layer
+
+- **`src/features/chat/services/SlashCommandExecutionService.ts`**: Added early passthrough check — when the current conversation's backend is `claude-code`, `tryRunSlashCommand()` returns `false` immediately, letting `/command` text fall through to the raw send path. Added `getCurrentConversation?()` to `SlashCommandExecutionHost`.
+- **`src/features/chat/services/SlashCommandExecutionHostFactory.ts`**: Wired `getCurrentConversation` through the host factory.
+- **`src/features/chat/OpenCodianView.ts`**: Added `loadClaudeSlashCommandMenuItems()` — when Claude Code is active, loads runtime commands directly from the Claude adapter as `SlashCommandMenuItem[]` with `source: 'claude-runtime'`. Updated `loadSlashCommandMenuItems()` to call this for Claude backend. Updated `scheduleSlashCommandMenuPreload()` to support Claude backend.
+
+#### Backend layer
+
+- **`src/core/agents/backend/ClaudeProjectCommandDiscovery.ts`** (new): Standalone filesystem scanner for `.claude/commands/*.md` files. Returns `ClaudeProjectCommandInfo[]` with name, description, and paths. Also provides `createClaudeProjectCommand()` for creating new command files.
+- **`src/core/agents/backend/ClaudeProjectSkillDiscovery.ts`**: Added `createClaudeProjectSkill()` — creates `.claude/skills/<name>/SKILL.md` with directory structure.
+- **`src/core/agents/backend/ClaudeCodeAdapter.ts`**: Added `getProjectClaudeCommands(): Promise<ClaudeProjectCommandInfo[]>` method.
+- **`src/core/agents/backend/index.ts`**: Exports `ClaudeProjectCommandInfo`, `discoverClaudeProjectCommands`, `createClaudeProjectCommand`, `createClaudeProjectSkill`.
+
+#### Settings layer
+
+- **`src/features/settings/SettingsClaudeCodeSection.ts`**: Three significant changes:
+  - Project skills: added "Create skill" button + per-entry "Open" buttons. Skills can now be created and opened in editor from settings.
+  - Project commands: new section with scan/create buttons and per-entry "Open" buttons. Discovers `.claude/commands/*.md`.
+  - Added `getVaultBasePath()` and `openFileInEditor()` helpers.
+- **`src/features/settings/SettingsCapabilityLabSection.ts`**: Updated Skills `userSurface` comment to reflect new create/open actions and chat slash discoverability.
+
+#### Locale
+
+- **`src/i18n/locales/en.ts` + `zh.ts`**: Added 22+ locale keys for skill create/open actions, project commands discovery, create/open actions, and status messages.
+
+### Honesty Boundaries
+
+- **Claude slash commands in the chat menu only appear when Claude Code is the active backend.** They are not shown for OpenCode or other backends.
+- **Claude slash execution is raw text passthrough.** When a user sends `/command args` in a Claude conversation, the slash execution service returns `false` and the raw text is sent to the Claude backend. Claude Code natively interprets `/` commands. There is no OpenCode-mediated execution — this is intentional.
+- **Project commands are file-backed management.** Create generates a markdown file; open opens it in the Obsidian editor. There is no rich template editor or argument autocomplete in this batch.
+- **Project commands are NOT wired into the chat slash menu yet.** Only Claude runtime commands (from `supportedCommands()`) appear in the chat slash menu. User-authored `.claude/commands/*.md` files are discovered and managed in settings only. Claude Code will natively discover them from the filesystem when processing `/` input.
+- **Skills are NOT dispatched through chat.** They remain settings-only discovery + create/open.
+
+### Matrix Change
+
+- Skills: `userSurface` remains `'settings'` with enhanced comment (now includes create/open actions).
+- No change to hidden row count.
+- New: `ClaudeProjectCommandDiscovery` module for `.claude/commands/` scanning.
+
+---
+
+## 2026-06-06 Claude Skills & Commands Productization (Batch 1)
+
+### Objective
+
+Turn Claude Code `hidden/unwired` skills and slash command surfaces into real user-facing capability entry points. This batch adds: (1) Claude Skills discovery from `.claude/skills/` as a read-only settings surface, and (2) Claude runtime slash command discoverability as a settings-only readback surface.
+
+### What Changed
+
+#### Backend layer
+
+- **`src/core/agents/backend/ClaudeProjectSkillDiscovery.ts`** (new): Standalone filesystem scanner that discovers `.claude/skills/*/SKILL.md` files. Returns structured `ClaudeProjectSkillInfo` with name, description, and path. Pure `fs/promises` — no SDK or runtime dependency.
+- **`src/core/agents/backend/ClaudeCodeAdapter.ts`**: Added `getProjectClaudeSkills(): Promise<ClaudeProjectSkillInfo[]>` method. Delegates to `discoverClaudeProjectSkills()`.
+- **`src/core/agents/backend/index.ts`**: Exports `ClaudeProjectSkillInfo` and `discoverClaudeProjectSkills`.
+
+#### Settings layer
+
+- **`src/features/settings/SettingsClaudeCodeSection.ts`**: Added two new discovery surfaces in the Runtime tab:
+  - "Claude project skills" section: Scans `.claude/skills/` via `getProjectClaudeSkills()` and displays each skill with name, description, and relative path. Read-only scan; no create/edit/delete management actions yet.
+  - "Claude runtime commands" section: Uses `getRuntimeCatalog()` to display available slash commands with boundary notice about runtime dependency. Read-only discovery; not wired into chat slash dispatch.
+- **`src/features/settings/SettingsCapabilityLabSection.ts`**: Changed Skills `userSurface` from `'hidden'` to `'settings'` (read-only discovery surface only, no chat dispatch or management actions).
+- **`src/features/settings/SlashCommandCatalogRenderer.ts`**: Added `'claude-runtime'` case in `getSourceChipLabel()` with locale key `settings.commands.catalog.chip.claudeRuntime`.
+
+#### Catalog infrastructure
+
+- **`src/core/config/slashCommandCatalog.ts`**: Added `'claude-runtime'` as a new `SlashCommandCatalogSource`. Added `ClaudeRuntimeCommand` interface. Extended `MergeSlashCommandCatalogOptions` with `claudeRuntimeCommands` parameter. This infrastructure supports future chat slash integration but is not wired into the chat menu yet.
+
+#### Locale
+
+- **`src/i18n/locales/en.ts` + `zh.ts`**: Added 18+ locale keys for project skills discovery, runtime commands discovery, and the Claude runtime chip label.
+
+### Honesty Boundaries
+
+- Skills discovery is filesystem-only — no SDK or runtime query involved. It scans what exists on disk, not what the runtime actually loads. No create/edit/delete management actions are provided.
+- Runtime commands come from `supportedCommands()` which is a read-only diagnostic seam. Command availability depends on the active session and server version.
+- **Claude commands are NOT in the chat slash menu.** They are discoverable only in the settings surface. Adding them to the chat menu would be false productization because `SlashCommandExecutionService` requires an OpenCode conversation and routes through `runSessionCommand()`, which would fail with "No OpenCode session available" for Claude conversations. Until a Claude-native dispatch path exists, Claude commands stay settings/readback-only.
+- No `.claude/commands/*.md` authoring surface was added — that remains a documented gap for a future batch.
+- The `OpenCodianView.ts` file has zero diff.
+
+### Matrix Change
+
+- Skills: `userSurface` changed from `'hidden'` to `'settings'` (read-only discovery without management or chat dispatch).
+- Hidden row count reduced from 7 to 6 (Skills promoted to settings).
+
+---
+
 ## 2026-06-04 Current Gap Audit (post-Tool-Aliases readback hardening)
 
 ### pass

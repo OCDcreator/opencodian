@@ -597,7 +597,7 @@ export class SettingsCapabilityLabSection {
         sdkExposed: true, // skills option in SDK
         adapterWired: true, // buildSdkOptions wires skills
         runtimeProof: 'pass', // Runtime verified (BUILD_ID feature-phase0-capability.202605291343, session 62720fb2-c031-441a-95d2-f3d3932f62b5): test SKILL.md created in vault/.claude/skills/opencodian-proof-skill/ with marker SP26, skills:['opencodian-proof-skill'] passed via SDK options, SDK subprocess CWD matches vault path, Layer 1 readback PASS, Layer 2 behavior PASS — marker SP26 found at start of model response. Skills context filtering is functional. No authoring UI.
-        userSurface: 'hidden',
+        userSurface: 'settings', // Settings: project skills discovery + create/open actions in Claude Code runtime tab. Chat slash discoverability for Claude runtime commands (via raw text passthrough when claude-code backend is active).
       },
       {
         capability: 'Plugins',

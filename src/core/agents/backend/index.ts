@@ -113,4 +113,14 @@ export {
   type ClaudeCodeStreamNormalizerOptions,
   createClaudeCodeStreamNormalizer,
 } from './ClaudeCodeStreamNormalizer';
+export {
+  type ClaudeProjectCommandInfo,
+  createClaudeProjectCommand,
+  discoverClaudeProjectCommands,
+} from './ClaudeProjectCommandDiscovery';
+export {
+  type ClaudeProjectSkillInfo,
+  createClaudeProjectSkill,
+  discoverClaudeProjectSkills,
+} from './ClaudeProjectSkillDiscovery';
 export { OpenCodeAdapter } from './OpenCodeAdapter';

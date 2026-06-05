@@ -24,6 +24,7 @@ function getSourceChipLabel(source: SlashCommandCatalogSource): string {
     case 'skill': return t('settings.commands.catalog.chip.skill');
     case 'project': return t('settings.commands.catalog.chip.project');
     case 'md-command': return t('settings.commands.catalog.chip.md-command');
+    case 'claude-runtime': return t('settings.commands.catalog.chip.claudeRuntime');
   }
 }
 

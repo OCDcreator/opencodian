@@ -25,6 +25,7 @@
 - 暴露 `getPluginCount()` 供 Capability Lab 与 Claude Code settings runtime ecosystem 摘要做只读 plugin 检测；该方法返回 `options.plugins?.length ?? 0`，未配置时返回 0，不提供 plugin authoring 能力
 - 暴露 `getSkillCount()` 供 Capability Lab 与 Claude Code settings runtime ecosystem 摘要做只读 skill 检测；该方法返回 `options.skills` 的计数（数组长度），`skills` 为 `'all'` 时返回 `-1` 表示"全量启用"，未配置时返回 0，不提供 skill authoring 能力
 - 暴露 `getSkillsList()` 供 Capability Lab 与 Claude Code settings runtime ecosystem 摘要做只读 skill 名称列表诊断；该方法返回 `options.skills` 的防御性拷贝（`string[]`），`skills` 为 `'all'` 时返回 `'all'` sentinel，未配置时返回空数组，不提供 skill authoring 能力
+- 暴露 `getProjectClaudeSkills()` 供 Claude Code settings 与 chat slash catalog 的项目技能发现表面读取 vault `.claude/skills/<name>/SKILL.md`；它委托 `discoverClaudeProjectSkills(this.options.vaultPath)` 做纯文件系统扫描，返回 `ClaudeProjectSkillInfo[]`，不依赖 SDK runtime query、不执行 skill、不写 `.claude/**`，也不提供 skill authoring 能力
 - 暴露 `getPluginsList()` 供 Capability Lab 与 Claude Code settings runtime ecosystem 摘要做只读 plugin 名称列表诊断；该方法返回 `options.plugins` 的字符串化拷贝（处理 `unknown[]` 类型：字符串直接返回，对象 JSON 序列化），未配置时返回空数组，不提供 plugin authoring 能力
 - 暴露 `getAgentDefinitionCount()` 供 Capability Lab 与 Claude Code settings runtime ecosystem 摘要做只读 agent definition 检测；该方法统计 `options.agent`（单个 selector，存在且非空时计 1）与 `options.agents`（map 的键数量）之和，未配置时返回 0，不提供 agent authoring 能力
 - 暴露 `getAgentDefinitionsList()` 供 Capability Lab 与 Claude Code settings runtime ecosystem 摘要做只读 agent definition 名称列表诊断；该方法返回 `options.agent`（若存在且非空）后接 `options.agents` 的键列表，未配置时返回空数组，不提供 agent authoring 能力

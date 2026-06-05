@@ -1039,7 +1039,7 @@ describe('SettingsCapabilityLabSection', () => {
       'File Checkpoint / Rewind': { runtimeProof: 'readback', userSurface: 'diagnostic' },
       'JSONL History Browser': { runtimeProof: 'pass', userSurface: 'diagnostic' },
       'Session Store': { runtimeProof: 'pass', userSurface: 'hidden' },
-      Skills: { runtimeProof: 'pass', userSurface: 'hidden' },
+      Skills: { runtimeProof: 'pass', userSurface: 'settings' },
       Plugins: { runtimeProof: 'pass', userSurface: 'hidden' },
       'MCP Servers': { runtimeProof: 'pass', userSurface: 'settings' },
       'Allowed Tools': { runtimeProof: 'readback', userSurface: 'settings' },
@@ -1136,7 +1136,7 @@ describe('SettingsCapabilityLabSection', () => {
     const hiddenRows = rows.filter((row) => (
       row.querySelector('[data-surface="hidden"]') !== null
     ));
-    expect(hiddenRows.length).toBe(7); // Hooks, Session Store, Skills, Plugins, Agent Definitions, Import Session to Store, AskUserQuestion Preview Format
+    expect(hiddenRows.length).toBe(6); // Hooks, Session Store, Plugins, Agent Definitions, Import Session to Store, AskUserQuestion Preview Format
   });
 
   it('runs the structured output diagnostic probe through the adapter runtime', async () => {

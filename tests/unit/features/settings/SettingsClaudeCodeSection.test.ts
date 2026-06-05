@@ -2518,7 +2518,7 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
           ...buttonRecords,
         ].map((r) => r.name.toLowerCase()).join('\n');
         expect(renderedNames).not.toContain('hook authoring');
-        expect(renderedNames).not.toContain('skills');
+        expect(renderedNames).not.toContain('skills authoring');
         expect(renderedNames).not.toContain('agents');
         expect(renderedNames).not.toContain('sessionstore');
         expect(renderedNames).not.toContain('jsonl');
