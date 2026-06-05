@@ -27,6 +27,7 @@ function createMockPlugin(adapter: unknown = null, activeKind = adapter ? 'claud
         adapters: new Map(),
       };
   const defaultClaudeSettings = {
+    settingSources: ['project'],
     enableFileCheckpointing: false,
     includeHookEvents: false,
     forwardSubagentText: false,

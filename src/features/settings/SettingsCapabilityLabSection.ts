@@ -568,8 +568,8 @@ export class SettingsCapabilityLabSection {
         capability: 'Hooks',
         sdkExposed: true, // SDK options accept hooks
         adapterWired: true, // buildSdkOptions wires hooks
-        runtimeProof: 'pass', // Shell-command hooks from .claude/settings.local.json verified: SDK subprocess reads project-scoped hook config and executes shell commands, leaving deterministic side effects on disk (nonce marker file). Programmatic JS callback hooks via SDK options remain uninvoked (SDK limitation), but the real runtime hook path (config-file shell hooks) is functional. Layer 1 (JS callback): NOT invoked — SDK subprocess ignores programmatic hooks option. Layer 2 (includeHookEvents stream): captures real hook backend_events. Layer 3 (shell-hook execution): .claude/settings.local.json SessionStart hook creates nonce file on disk — PASS.
-        userSurface: 'settings', // Settings: project settings scan/create/open for .claude/settings.json + .claude/settings.local.json. Hooks are configured by editing these files directly; the settings surface provides discovery and file access, not a visual hook editor.
+        runtimeProof: 'pass', // Layer 1 (JS callback): programmatic hooks option passed to SDK query(). SDK subprocess may or may not invoke JS callbacks depending on SDK version. Layer 2 (includeHookEvents stream): captures hook backend_events when includeHookEvents=true. Layer 3 (shell-hook from config file): .claude/settings.json and .claude/settings.local.json shell hooks are loaded by the SDK subprocess when the corresponding settingSources are enabled. IMPORTANT: default settingSources is ['project'] which reads .claude/settings.json but NOT .claude/settings.local.json. To activate hooks in settings.local.json, users must enable 'local' in settingSources (Context & Sources tab). The hook proof report now honestly distinguishes Layer 1 vs Layer 3 results and reports current settingSources configuration.
+        userSurface: 'settings', // Settings: project settings scan/create/open for .claude/settings.json + .claude/settings.local.json. Hooks are configured by editing these files directly; the settings surface provides discovery and file access, not a visual hook editor. Note: hooks in .claude/settings.local.json only activate when settingSources includes 'local'.
       },
       {
         capability: 'File Checkpoint / Rewind',
@@ -2456,7 +2456,7 @@ export class SettingsCapabilityLabSection {
     adapter: ClaudeCodeAdapter | null,
   ): void {
     // Hooks
-    this.addDiscoveryRow(tbody, 'Hooks', 'Project settings surface: scan/create/open for .claude/settings.json + .claude/settings.local.json. Hooks configured by editing these files. Shell-command hooks verified (Layer 3: nonce file on disk). JS callback path via SDK options remains uninvoked (SDK limitation). Include Hook Events proven separately.');
+    this.addDiscoveryRow(tbody, 'Hooks', 'Project settings surface: scan/create/open for .claude/settings.json + .claude/settings.local.json. Hooks configured by editing these files. Layer 1 (JS callback): wired via SDK options. Layer 3 (shell hook from config file): requires settingSources to include the corresponding source. Default settingSources is [project] — only .claude/settings.json hooks activate by default. To use .claude/settings.local.json hooks, enable "local" in settingSources (Context & Sources tab). Include Hook Events proven separately.');
 
     // Plugins
     const pluginCount = adapter?.getPluginCount?.() ?? 0;
@@ -3014,13 +3014,19 @@ export class SettingsCapabilityLabSection {
     this.renderHookLayer3(outputEl.createDiv({ cls: 'opencodian-capability-lab-output' }), cfg, layer3, vaultPath);
 
     const shellHookVerified = layer3.nonceExists && layer3.nonceContent === cfg.nonceContent;
-    if (shellHookVerified || hookTracker.callbackInvoked) {
+    const hasLocalSource = this.claudeCodeSettings.settingSources.includes('local');
+    if (shellHookVerified) {
+      // Layer 3 genuinely passed: nonce file exists with correct content.
       this.updateRuntimeProof('Hooks', 'pass', outputEl);
-      outputEl.createEl('p', { cls: 'opencodian-capability-lab-hint', text: shellHookVerified
-        ? hookTracker.callbackInvoked
-          ? 'Hooks PASS: both shell-hook execution (Layer 3) and JS callback invocation (Layer 1) verified.'
-          : 'Hooks PASS: shell-hook execution via .claude/settings.local.json verified (Layer 3). JS callback path remains uninvoked (SDK limitation), but real runtime hook path is functional.'
-        : 'Hooks PASS: JS callback invocation verified (Layer 1).' });
+      outputEl.createEl('p', { cls: 'opencodian-capability-lab-hint', text: hookTracker.callbackInvoked
+        ? 'Hooks PASS: both shell-hook execution (Layer 3) and JS callback invocation (Layer 1) verified.'
+        : 'Hooks PASS: shell-hook execution via .claude/settings.local.json verified (Layer 3). JS callback path remains uninvoked (SDK limitation), but real runtime hook path is functional.' });
+    } else if (hookTracker.callbackInvoked) {
+      // Layer 1 passed but Layer 3 did not. Report honestly.
+      this.updateRuntimeProof('Hooks', 'pass', outputEl);
+      outputEl.createEl('p', { cls: 'opencodian-capability-lab-hint', text: layer3.nonceExists
+        ? 'Hooks PASS: JS callback invocation verified (Layer 1). Shell-hook nonce file exists but content mismatch (Layer 3 inconclusive).'
+        : `Hooks PASS: JS callback invocation verified (Layer 1). Shell-hook nonce file NOT found (Layer 3 not verified). Shell hooks from .claude/settings.local.json require settingSources to include 'local'. Current settingSources: [${this.claudeCodeSettings.settingSources.join(', ')}]. ${hasLocalSource ? "'local' is enabled — shell hooks should work in ordinary chat." : "'local' is NOT enabled — add it in Context & Sources tab to activate .claude/settings.local.json hooks."}` });
     } else if (hooksWiredInOptions) {
       this.updateRuntimeProof('Hooks', 'readback', outputEl);
       outputEl.createEl('p', { cls: 'opencodian-capability-lab-hint', text: 'Hooks option wired into SDK options (readback confirmed) but neither JS callback nor shell hook executed. Verdict: readback.' });

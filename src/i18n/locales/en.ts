@@ -2451,7 +2451,7 @@ export const enTranslations = {
 
   'settings.claudeCode.projectSettings.name': 'Claude project settings (hooks & plugins)',
   'settings.claudeCode.projectSettings.desc': 'Project-level configuration files for Claude Code hooks and plugins. These are the official .claude/settings.json and .claude/settings.local.json files.',
-  'settings.claudeCode.projectSettings.boundaryNotice': 'Advanced: these files are the official Claude Code project configuration path. Edit them to configure hooks (PreToolUse, PostToolUse, SessionStart, etc.) and enable plugins.',
+  'settings.claudeCode.projectSettings.boundaryNotice': 'Advanced: these files are the official Claude Code project configuration path. Edit them to configure hooks (PreToolUse, PostToolUse, SessionStart, etc.) and enable plugins. Note: hooks in .claude/settings.local.json only activate when "local" is enabled in settingSources (Context & Sources tab). Default settingSources is [project] which reads .claude/settings.json only.',
   'settings.claudeCode.projectSettings.scanButton': 'Scan settings files',
   'settings.claudeCode.projectSettings.createLocalButton': 'Create local settings',
   'settings.claudeCode.projectSettings.createSharedButton': 'Create shared settings',

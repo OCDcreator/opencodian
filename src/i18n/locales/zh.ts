@@ -2450,7 +2450,7 @@ export const zhTranslations = {
 
   'settings.claudeCode.projectSettings.name': 'Claude 项目设置（钩子与插件）',
   'settings.claudeCode.projectSettings.desc': 'Claude Code 钩子和插件的项目级配置文件。即官方的 .claude/settings.json 和 .claude/settings.local.json 文件。',
-  'settings.claudeCode.projectSettings.boundaryNotice': '高级功能：这些文件是 Claude Code 官方项目配置路径。编辑它们可配置钩子（PreToolUse、PostToolUse、SessionStart 等）和启用插件。',
+  'settings.claudeCode.projectSettings.boundaryNotice': '高级功能：这些文件是 Claude Code 官方项目配置路径。编辑它们可配置钩子（PreToolUse、PostToolUse、SessionStart 等）和启用插件。注意：.claude/settings.local.json 中的钩子仅在 settingSources 包含 "local" 时生效（Context & Sources 标签页）。默认 settingSources 为 [project]，仅读取 .claude/settings.json。',
   'settings.claudeCode.projectSettings.scanButton': '扫描设置文件',
   'settings.claudeCode.projectSettings.createLocalButton': '创建本地设置',
   'settings.claudeCode.projectSettings.createSharedButton': '创建共享设置',
