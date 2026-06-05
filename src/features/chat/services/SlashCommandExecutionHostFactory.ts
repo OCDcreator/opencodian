@@ -40,6 +40,7 @@ export function createSlashCommandExecutionHost(
       if (!deps.getCurrentConversation()) await deps.createNewConversation();
       return deps.getCurrentConversation();
     },
+    getCurrentConversation: () => deps.getCurrentConversation(),
     getActiveTabId: () => deps.getActiveTabId(),
     ensureTabRuntime: (tabId) => Boolean(tabId && deps.ensureTabRuntimeState(tabId)),
     isTabForegroundBusy: (tabId) => (tabId ? deps.isTabForegroundBusy(tabId) : false),

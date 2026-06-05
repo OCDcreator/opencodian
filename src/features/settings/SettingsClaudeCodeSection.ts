@@ -16,16 +16,17 @@
  */
 /* eslint-disable max-lines -- Claude Code settings keeps cross-layout tab rendering and persistence controls co-located for auditability. */
 
-import * as path from 'path';
-
 import { Notice, Setting } from 'obsidian';
+import * as path from 'path';
 
 import {
   type ClaudeCodeProcessResolution,
   type ClaudeCodeProcessResolverOptions,
   resolveClaudeCodeProcess,
 } from '../../core/agents/backend/ClaudeCodeProcessResolver';
+import type { ClaudeProjectAgentInfo } from '../../core/agents/backend/ClaudeProjectAgentDiscovery';
 import type { ClaudeProjectCommandInfo } from '../../core/agents/backend/ClaudeProjectCommandDiscovery';
+import type { ClaudeProjectSettingsInfo } from '../../core/agents/backend/ClaudeProjectSettingsDiscovery';
 import type { ClaudeProjectSkillInfo } from '../../core/agents/backend/ClaudeProjectSkillDiscovery';
 import {
   type ClaudeCodeEffort,
@@ -67,6 +68,7 @@ interface ClaudeCodeRuntimeEcosystemAdapter {
   ) => Promise<unknown | null>;
   getAgentDefinitionCount?: () => number;
   getAgentDefinitionsList?: () => string[];
+  getProjectClaudeAgents?: () => Promise<ClaudeProjectAgentInfo[]>;
 }
 
 interface ClaudeCodeMcpRuntimeStatus {
@@ -233,6 +235,8 @@ export class SettingsClaudeCodeSection {
     this.renderRuntimeEcosystemSummary(containerEl);
     this.renderClaudeProjectSkillsControls(containerEl);
     this.renderClaudeProjectCommandsControls(containerEl);
+    this.renderClaudeProjectAgentsControls(containerEl);
+    this.renderClaudeProjectSettingsControls(containerEl);
     this.renderClaudeRuntimeCommandsControls(containerEl);
     this.renderRuntimeCatalogReadbackControls(containerEl);
     this.renderAccountInfoReadbackControls(containerEl);
@@ -778,6 +782,269 @@ export class SettingsClaudeCodeSection {
     await this.openFileInEditor(filePath);
     // Re-scan to show the new command
     await this.renderClaudeProjectCommandsReadback(outputEl);
+  }
+
+  // ─── Claude Project Agents discovery & actions ───────────────────
+
+  private renderClaudeProjectAgentsControls(containerEl: HTMLElement): void {
+    let outputEl: HTMLElement | null = null;
+    const getOutputEl = (): HTMLElement => {
+      outputEl ??= containerEl.createDiv({
+        cls: 'opencodian-settings-inline-notice opencodian-claude-code-project-agents',
+        attr: {
+          'data-claude-code-project-agents': 'true',
+        },
+      });
+      return outputEl;
+    };
+
+    new Setting(containerEl)
+      .setName(t('settings.claudeCode.projectAgents.name'))
+      .setDesc(t('settings.claudeCode.projectAgents.desc'))
+      .addButton((button) => {
+        button
+          .setButtonText(t('settings.claudeCode.projectAgents.scanButton'))
+          .onClick(async () => {
+            await this.renderClaudeProjectAgentsReadback(getOutputEl());
+          });
+      })
+      .addButton((button) => {
+        button
+          .setButtonText(t('settings.claudeCode.projectAgents.createButton'))
+          .onClick(async () => {
+            await this.handleCreateClaudeProjectAgent(getOutputEl());
+          });
+      });
+  }
+
+  private async renderClaudeProjectAgentsReadback(outputEl: HTMLElement): Promise<void> {
+    outputEl.empty();
+    outputEl.setText(t('settings.claudeCode.projectAgents.loading'));
+
+    const vaultPath = this.getVaultBasePath();
+    if (!vaultPath) {
+      outputEl.setText(t('settings.claudeCode.projectAgents.empty'));
+      return;
+    }
+
+    let agents: ClaudeProjectAgentInfo[];
+    try {
+      const { discoverClaudeProjectAgents } = await import('../../core/agents/backend/ClaudeProjectAgentDiscovery');
+      agents = await discoverClaudeProjectAgents(vaultPath);
+    } catch {
+      outputEl.setText(t('settings.claudeCode.projectAgents.failed'));
+      return;
+    }
+
+    outputEl.empty();
+    if (agents.length === 0) {
+      outputEl.setText(t('settings.claudeCode.projectAgents.empty'));
+      return;
+    }
+
+    for (const agent of agents) {
+      const agentEl = outputEl.createDiv({
+        cls: 'opencodian-claude-code-project-agent-entry',
+        attr: {
+          'data-agent-name': agent.name,
+          'data-agent-path': agent.relativePath,
+        },
+      });
+      const label = agent.description
+        ? t('settings.claudeCode.projectAgents.agentEntry', { name: agent.name, description: agent.description })
+        : t('settings.claudeCode.projectAgents.agentEntryNoDesc', { name: agent.name });
+      agentEl.createEl('p', { text: label });
+      agentEl.createEl('p', {
+        cls: 'opencodian-settings-inline-notice',
+        text: t('settings.claudeCode.projectAgents.agentPath', { path: agent.relativePath }),
+      });
+      const openBtn = agentEl.createEl('button', {
+        cls: 'opencodian-claude-code-action-button',
+        text: t('settings.claudeCode.projectAgents.openButton'),
+      });
+      openBtn.addEventListener('click', () => {
+        void this.openFileInEditor(agent.filePath);
+      });
+    }
+  }
+
+  private async handleCreateClaudeProjectAgent(outputEl: HTMLElement): Promise<void> {
+    const name = window.prompt(t('settings.claudeCode.projectAgents.createPrompt'));
+    if (!name?.trim()) return;
+
+    const vaultPath = this.plugin.app ? this.getVaultBasePath() : null;
+    if (!vaultPath) return;
+
+    // Check if agent already exists
+    const { discoverClaudeProjectAgents, createClaudeProjectAgent } = await import('../../core/agents/backend/ClaudeProjectAgentDiscovery');
+    const existing = await discoverClaudeProjectAgents(vaultPath);
+    if (existing.some((a) => a.name === name.trim())) {
+      new Notice(t('settings.claudeCode.projectAgents.alreadyExists'));
+      return;
+    }
+
+    const filePath = await createClaudeProjectAgent(vaultPath, name.trim());
+    if (!filePath) {
+      new Notice(t('settings.claudeCode.projectAgents.createFailed'));
+      return;
+    }
+
+    await this.openFileInEditor(filePath);
+    // Re-scan to show the new agent
+    await this.renderClaudeProjectAgentsReadback(outputEl);
+  }
+
+  // ─── Claude Project Settings (Hooks & Plugins) ────────────────
+
+  private renderClaudeProjectSettingsControls(containerEl: HTMLElement): void {
+    const boundaryEl = containerEl.createDiv({
+      cls: 'opencodian-settings-inline-notice',
+      attr: { 'data-claude-code-project-settings-boundary': 'true' },
+    });
+    boundaryEl.createSpan({ text: t('settings.claudeCode.projectSettings.boundaryNotice') });
+
+    let outputEl: HTMLElement | null = null;
+    const getOutputEl = (): HTMLElement => {
+      outputEl ??= containerEl.createDiv({
+        cls: 'opencodian-settings-inline-notice opencodian-claude-code-project-settings',
+        attr: {
+          'data-claude-code-project-settings': 'true',
+        },
+      });
+      return outputEl;
+    };
+
+    new Setting(containerEl)
+      .setName(t('settings.claudeCode.projectSettings.name'))
+      .setDesc(t('settings.claudeCode.projectSettings.desc'))
+      .addButton((button) => {
+        button
+          .setButtonText(t('settings.claudeCode.projectSettings.scanButton'))
+          .onClick(async () => {
+            await this.renderClaudeProjectSettingsReadback(getOutputEl());
+          });
+      })
+      .addButton((button) => {
+        button
+          .setButtonText(t('settings.claudeCode.projectSettings.createLocalButton'))
+          .onClick(async () => {
+            await this.handleCreateClaudeProjectSettingsFile(getOutputEl(), 'settings.local.json');
+          });
+      })
+      .addButton((button) => {
+        button
+          .setButtonText(t('settings.claudeCode.projectSettings.createSharedButton'))
+          .onClick(async () => {
+            await this.handleCreateClaudeProjectSettingsFile(getOutputEl(), 'settings.json');
+          });
+      });
+  }
+
+  private async renderClaudeProjectSettingsReadback(outputEl: HTMLElement): Promise<void> {
+    outputEl.empty();
+    outputEl.setText(t('settings.claudeCode.projectSettings.loading'));
+
+    const vaultPath = this.getVaultBasePath();
+    if (!vaultPath) {
+      outputEl.setText(t('settings.claudeCode.projectSettings.empty'));
+      return;
+    }
+
+    let settingsFiles: ClaudeProjectSettingsInfo[];
+    try {
+      const { discoverClaudeProjectSettings } = await import('../../core/agents/backend/ClaudeProjectSettingsDiscovery');
+      settingsFiles = await discoverClaudeProjectSettings(vaultPath);
+    } catch {
+      outputEl.setText(t('settings.claudeCode.projectSettings.failed'));
+      return;
+    }
+
+    outputEl.empty();
+
+    for (const sf of settingsFiles) {
+      const fileEl = outputEl.createDiv({
+        cls: 'opencodian-claude-code-project-settings-file-entry',
+        attr: {
+          'data-settings-file': sf.relativePath,
+          'data-settings-exists': String(sf.exists),
+        },
+      });
+
+      const headerLabel = sf.exists
+        ? t('settings.claudeCode.projectSettings.fileEntry', { path: sf.relativePath })
+        : t('settings.claudeCode.projectSettings.fileNotFound', { path: sf.relativePath });
+      fileEl.createEl('p', { text: headerLabel });
+
+      if (sf.parseError) {
+        fileEl.createEl('p', {
+          cls: 'opencodian-settings-inline-notice',
+          text: t('settings.claudeCode.projectSettings.parseError', { error: sf.parseError }),
+        });
+        continue;
+      }
+
+      if (!sf.exists) {
+        continue;
+      }
+
+      if (sf.hookCount > 0) {
+        const hookEvents = Object.keys(sf.hooks);
+        const hookSummary = hookEvents
+          .map((event) => `${event} (${sf.hooks[event].length})`)
+          .join(', ');
+        fileEl.createEl('p', {
+          text: t('settings.claudeCode.projectSettings.hooksSummary', {
+            count: sf.hookCount,
+            events: hookSummary,
+          }),
+        });
+      } else {
+        fileEl.createEl('p', {
+          cls: 'opencodian-settings-inline-notice',
+          text: t('settings.claudeCode.projectSettings.noHooks'),
+        });
+      }
+
+      if (sf.enabledPlugins.length > 0) {
+        fileEl.createEl('p', {
+          text: t('settings.claudeCode.projectSettings.pluginsSummary', {
+            count: sf.enabledPlugins.length,
+            names: sf.enabledPlugins.join(', '),
+          }),
+        });
+      } else {
+        fileEl.createEl('p', {
+          cls: 'opencodian-settings-inline-notice',
+          text: t('settings.claudeCode.projectSettings.noPlugins'),
+        });
+      }
+
+      const openBtn = fileEl.createEl('button', {
+        cls: 'opencodian-claude-code-action-button',
+        text: t('settings.claudeCode.projectSettings.openButton'),
+      });
+      openBtn.addEventListener('click', () => {
+        void this.openFileInEditor(sf.filePath);
+      });
+    }
+  }
+
+  private async handleCreateClaudeProjectSettingsFile(
+    outputEl: HTMLElement,
+    fileName: 'settings.json' | 'settings.local.json',
+  ): Promise<void> {
+    const vaultPath = this.plugin.app ? this.getVaultBasePath() : null;
+    if (!vaultPath) return;
+
+    const { createClaudeProjectSettingsFile } = await import('../../core/agents/backend/ClaudeProjectSettingsDiscovery');
+    const filePath = await createClaudeProjectSettingsFile(vaultPath, fileName);
+    if (!filePath) {
+      new Notice(t('settings.claudeCode.projectSettings.createFailed'));
+      return;
+    }
+
+    await this.openFileInEditor(filePath);
+    await this.renderClaudeProjectSettingsReadback(outputEl);
   }
 
   // ─── Shared helpers ────────────────────────────────────────────────

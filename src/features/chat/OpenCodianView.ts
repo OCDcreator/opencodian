@@ -801,7 +801,27 @@ export class OpenCodianView extends ItemView {
           showPermissions: options.showPermissions && hasCapability(this.caps, AgentCapability.Permissions),
         });
       },
-      shouldMountAgentSelector: () => hasCapability(this.caps, AgentCapability.Subagents),
+      shouldMountAgentSelector: () => {
+        // OpenCode: gate on Subagents capability
+        if (!this.isClaudeCodeConversationActive()) {
+          return hasCapability(this.caps, AgentCapability.Subagents);
+        }
+        // Claude: @agent mention menu uses Claude runtime agents; agent selector
+        // shows Claude candidates. Always mount when Claude is active.
+        return true;
+      },
+      getComposerCapabilityHint: () => {
+        // Claude backend: show /json structured-output chip.
+        // OpenCode backend: no hint (uses model selector + permissions instead).
+        if (!this.isClaudeCodeConversationActive()) {
+          return null;
+        }
+        return {
+          text: t('chat.input.capabilityHint.jsonLabel'),
+          tooltip: t('chat.input.capabilityHint.jsonTooltip'),
+          insertText: '/json ',
+        };
+      },
       mountContextUsageIndicator: (container) => {
         if (!hasCapability(this.caps, AgentCapability.Context)) {
           return;
@@ -889,11 +909,11 @@ export class OpenCodianView extends ItemView {
   }
 
   private loadSlashCommandMenuItems(): Promise<SlashCommandMenuItem[]> {
-    if (!this.isOpenCodeBackendActive()) {
+    if (!this.isOpenCodeBackendActive() && !this.isClaudeCodeConversationActive()) {
       return Promise.resolve([]);
     }
 
-    if (!this.plugin.opencodeConfigManager) {
+    if (!this.plugin.opencodeConfigManager && !this.isClaudeCodeConversationActive()) {
       return Promise.resolve([]);
     }
 
@@ -901,7 +921,7 @@ export class OpenCodianView extends ItemView {
   }
 
   private scheduleSlashCommandMenuPreload(): void {
-    if (!this.isOpenCodeBackendActive()) {
+    if (!this.isOpenCodeBackendActive() && !this.isClaudeCodeConversationActive()) {
       return;
     }
 
@@ -1387,10 +1407,27 @@ export class OpenCodianView extends ItemView {
     this.currentVariant = undefined;
     this.slashCommandMenuCatalogCache = new SlashCommandMenuCatalogCache({
       getHiddenCommandIds: () => this.plugin.settings.hiddenSlashCommands ?? [],
-      loadProjectAgents: async () => this.plugin.opencodeConfigManager?.getAgentConfig() ?? {},
-      loadProjectCommands: async () => this.plugin.opencodeConfigManager?.getCommandConfig() ?? {},
-      loadRuntimeCommands: async () => this.plugin.openCodeService.sdk.command.list(),
-      loadRuntimeSkills: async () => this.plugin.openCodeService.sdk.app.skills(),
+      loadProjectAgents: async () => this.isClaudeCodeConversationActive() ? {} : (this.plugin.opencodeConfigManager?.getAgentConfig() ?? {}),
+      loadProjectCommands: async () => this.isClaudeCodeConversationActive() ? {} : (this.plugin.opencodeConfigManager?.getCommandConfig() ?? {}),
+      loadRuntimeCommands: async () => this.isClaudeCodeConversationActive() ? [] : this.plugin.openCodeService.sdk.command.list(),
+      loadRuntimeSkills: async () => this.isClaudeCodeConversationActive() ? [] : this.plugin.openCodeService.sdk.app.skills(),
+      loadClaudeRuntimeCommands: async () => {
+        if (!this.isClaudeCodeConversationActive()) return null;
+        const adapter = this.plugin.agentServiceRegistry?.get('claude-code') as {
+          getRuntimeCatalog?: () => Promise<{ commands: Array<{ name: string; description?: string }> } | null>;
+        } | undefined;
+        const catalog = await adapter?.getRuntimeCatalog?.();
+        return catalog?.commands ?? null;
+      },
+      loadClaudeRuntimeAgents: async () => {
+        if (!this.isClaudeCodeConversationActive()) return null;
+        const adapter = this.plugin.agentServiceRegistry?.get('claude-code') as {
+          getRuntimeCatalog?: () => Promise<{ agents: Array<{ name: string; description?: string }> } | null>;
+        } | undefined;
+        const catalog = await adapter?.getRuntimeCatalog?.();
+        return catalog?.agents ?? null;
+      },
+      getBackendKey: () => this.isClaudeCodeConversationActive() ? 'claude-code' : 'opencode',
       getVaultPath: () => getVaultBasePath(this.app),
       onWarmLoadFailed: (error) => { logger.debug('Failed to preload slash command menu items:', error); },
     });

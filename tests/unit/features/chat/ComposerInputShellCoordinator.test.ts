@@ -510,6 +510,67 @@ describe('ComposerInputShellCoordinator — capability hint behaviors', () => {
   });
 });
 
+describe('ComposerInputShellCoordinator — Claude backend: @agent menu + /json hint coexist', () => {
+  const originalResizeObserver = globalThis.ResizeObserver;
+
+  beforeEach(() => {
+    installCoordinatorDomMocks();
+  });
+
+  afterEach(() => {
+    restoreCoordinatorDomMocks(originalResizeObserver);
+  });
+
+  it('shows /json capability hint when host provides explicit getComposerCapabilityHint (even with shouldMountAgentSelector=true)', () => {
+    // Simulates Claude backend: agent selector is mounted (true) but /json hint
+    // is provided via the explicit seam, not the fallback.
+    const fixture = createFixture({
+      shouldMountAgentSelector: true,
+      composerCapabilityHint: {
+        text: t('chat.input.capabilityHint.jsonLabel'),
+      },
+    });
+
+    const hintEl = fixture.container.querySelector<HTMLButtonElement>('.opencodian-input-capability-hint');
+    expect(hintEl).toBeTruthy();
+    expect(hintEl?.querySelector('.opencodian-input-capability-hint-text')?.textContent)
+      .toBe(t('chat.input.capabilityHint.jsonLabel'));
+  });
+
+  it('hides /json hint when host provides explicit null capability hint (Claude without /json)', () => {
+    const fixture = createFixture({
+      shouldMountAgentSelector: true,
+      composerCapabilityHint: null,
+    });
+
+    const hintEl = fixture.container.querySelector<HTMLElement>('.opencodian-input-capability-hint');
+    expect(hintEl).toBeNull();
+  });
+
+  it('no /json hint for OpenCode backend (no explicit hint + agent selector mounted)', () => {
+    // OpenCode backend: no explicit hint, agent selector mounted
+    const fixture = createFixture({
+      shouldMountAgentSelector: true,
+    });
+
+    const hintEl = fixture.container.querySelector<HTMLElement>('.opencodian-input-capability-hint');
+    expect(hintEl).toBeNull();
+  });
+
+  it('agent selector is mounted when shouldMountAgentSelector=true', () => {
+    const fixture = createFixture({
+      shouldMountAgentSelector: true,
+      composerCapabilityHint: {
+        text: t('chat.input.capabilityHint.jsonLabel'),
+      },
+    });
+
+    // Agent selector container is created when shouldMountAgentSelector is true
+    const agentSelector = fixture.container.querySelector('.opencodian-agent-selector');
+    expect(agentSelector).toBeTruthy();
+  });
+});
+
 describe('ComposerInputShellCoordinator — slash menu core behaviors', () => {
   const originalResizeObserver = globalThis.ResizeObserver;
 

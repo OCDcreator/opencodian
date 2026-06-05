@@ -23,6 +23,7 @@
 | 导出 | 说明 |
 |------|------|
 | `discoverClaudeProjectSkills(vaultPath)` | 扫描 vault `.claude/skills` 目录，返回按名称排序的项目技能列表 |
+| `createClaudeProjectSkill(vaultPath, name, content?)` | 创建 `.claude/skills/<name>/SKILL.md`，含 YAML frontmatter 默认模板（`name` + `description`），返回绝对路径或 null |
 
 ## 核心行为
 

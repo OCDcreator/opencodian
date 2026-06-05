@@ -162,7 +162,7 @@ export async function createClaudeProjectSkill(
 
   try {
     await mkdir(skillDir, { recursive: true });
-    const defaultContent = content ?? `# ${trimmed}\n\nDescription of the ${trimmed} skill.\n`;
+    const defaultContent = content ?? `---\nname: ${trimmed}\ndescription: Describe when this skill should be used.\n---\n\n# ${trimmed}\n\nWrite the workflow, constraints, and examples for this skill.\n`;
     await writeFile(skillMdPath, defaultContent, 'utf-8');
     return skillMdPath;
   } catch {

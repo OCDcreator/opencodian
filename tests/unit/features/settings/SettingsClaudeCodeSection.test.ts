@@ -338,7 +338,8 @@ describe('SettingsClaudeCodeSection', () => {
       ...toggleRecords,
       ...buttonRecords,
     ].map((record) => record.name).join('\n').toLowerCase();
-    expect(renderedNamesLower).not.toContain('hooks');
+    expect(renderedNamesLower).not.toContain('hook editor');
+    expect(renderedNamesLower).not.toContain('hooks authoring');
     expect(renderedNamesLower).not.toContain('skills authoring');
     expect(renderedNamesLower).not.toContain('agent authoring');
     expect(renderedNamesLower).not.toContain('sessionstore');
@@ -2519,7 +2520,8 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
         ].map((r) => r.name.toLowerCase()).join('\n');
         expect(renderedNames).not.toContain('hook authoring');
         expect(renderedNames).not.toContain('skills authoring');
-        expect(renderedNames).not.toContain('agents');
+        expect(renderedNames).not.toContain('agents authoring');
+        expect(renderedNames).not.toContain('subagent browser');
         expect(renderedNames).not.toContain('sessionstore');
         expect(renderedNames).not.toContain('jsonl');
       }

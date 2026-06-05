@@ -121,13 +121,15 @@ describe('ClaudeProjectSkillDiscovery', () => {
     expect(skill.description).toHaveLength(200);
   });
 
-  it('creates .claude/skills/<name>/SKILL.md with default content', async () => {
+  it('creates .claude/skills/<name>/SKILL.md with valid frontmatter default content', async () => {
     const skillMdPath = await createClaudeProjectSkill(tempRoot, 'draft-notes');
 
     expect(skillMdPath).toBe(path.join(tempRoot, '.claude', 'skills', 'draft-notes', 'SKILL.md'));
-    await expect(fs.readFile(skillMdPath ?? '', 'utf-8')).resolves.toBe(
-      '# draft-notes\n\nDescription of the draft-notes skill.\n',
-    );
+    const content = await fs.readFile(skillMdPath ?? '', 'utf-8');
+    expect(content).toContain('---');
+    expect(content).toContain('name: draft-notes');
+    expect(content).toContain('description:');
+    expect(content).toContain('# draft-notes');
   });
 
   it('creates .claude/skills/<name>/SKILL.md with custom content when provided', async () => {

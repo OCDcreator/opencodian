@@ -36,6 +36,12 @@ export interface SlashCommandMenuCatalogCacheHost {
   loadProjectCommands(): Promise<OpencodeCommandConfigRecord>;
   loadRuntimeCommands(): Promise<unknown>;
   loadRuntimeSkills(): Promise<unknown>;
+  /** Optional: load Claude Code runtime commands for the slash menu. Returns null or undefined when not applicable. */
+  loadClaudeRuntimeCommands?(): Promise<Array<{ name: string; description?: string }> | null | undefined>;
+  /** Optional: load Claude Code runtime agents for the @agent mention menu. Returns null or undefined when not applicable. */
+  loadClaudeRuntimeAgents?(): Promise<Array<{ name: string; description?: string }> | null | undefined>;
+  /** Optional: returns a short backend discriminator for cache key partitioning. Return different values for different backends (e.g. 'opencode', 'claude-code'). */
+  getBackendKey?(): string;
   getVaultPath(): string | null;
   now?(): number;
   onWarmLoadFailed?(error: unknown): void;
@@ -249,6 +255,18 @@ function resolveProjectConfigDir(vaultPath: string | null): string | null {
   return vaultPath ? path.join(vaultPath, '.opencode') : null;
 }
 
+function normalizeClaudeRuntimeAgents(
+  value: Array<{ name: string; description?: string }> | null | undefined,
+): Array<{ name: string; description?: string }> {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.filter(
+    (item): item is { name: string; description?: string } =>
+      Boolean(item && typeof item === 'object' && typeof item.name === 'string'),
+  );
+}
+
 export class SlashCommandMenuCatalogCache {
   private cacheEntry: SlashCommandMenuCatalogCacheEntry | null = null;
   private generation = 0;
@@ -306,7 +324,9 @@ export class SlashCommandMenuCatalogCache {
   }
 
   private buildCacheKey(): string {
-    return buildHiddenCommandCacheKey(this.host.getHiddenCommandIds());
+    const hiddenKey = buildHiddenCommandCacheKey(this.host.getHiddenCommandIds());
+    const backendKey = this.host.getBackendKey?.() ?? 'default';
+    return `${hiddenKey}:${backendKey}`;
   }
 
   private now(): number {
@@ -316,14 +336,23 @@ export class SlashCommandMenuCatalogCache {
   private startLoad(key: string): Promise<SlashCommandMenuItem[]> {
     const generation = this.generation;
     const token = Symbol('slash-command-menu-catalog-load');
+    const isClaudeBackend = (this.host.getBackendKey?.() ?? 'opencode') === 'claude-code';
 
     const promise = (async () => {
-      const [runtimeCommandsResult, runtimeSkillsResult, projectCommands, projectAgents, mdFileCommands] = await Promise.all([
+      const [runtimeCommandsResult, runtimeSkillsResult, projectCommands, projectAgents, mdFileCommands, claudeRuntimeResult, claudeRuntimeAgentsResult] = await Promise.all([
         this.host.loadRuntimeCommands(),
         this.host.loadRuntimeSkills().catch(() => []),
         this.host.loadProjectCommands(),
         this.host.loadProjectAgents(),
-        Promise.resolve(loadCommandsFromConfigDir(resolveProjectConfigDir(this.host.getVaultPath()))).catch(() => []),
+        // Do not load .opencode/commands/*.md for Claude backend
+        isClaudeBackend
+          ? Promise.resolve([])
+          : Promise.resolve(loadCommandsFromConfigDir(resolveProjectConfigDir(this.host.getVaultPath()))).catch(() => []),
+        this.host.loadClaudeRuntimeCommands?.().catch(() => null) ?? null,
+        // Load Claude runtime agents for @agent menu (null when not applicable)
+        isClaudeBackend
+          ? (this.host.loadClaudeRuntimeAgents?.().catch(() => null) ?? null)
+          : null,
       ]);
       const runtimeSkills = normalizeRuntimeSkills(runtimeSkillsResult);
       const runtimeSkillSources = buildRuntimeSkillSourceMap(
@@ -335,31 +364,65 @@ export class SlashCommandMenuCatalogCache {
         runtimeSkills,
       );
 
-      const runtimeAgentsResult = Promise.resolve(getAttachedOpenCodeAppAgents(runtimeSkillsResult) ?? [])
-        .catch(() => []);
-      const agentMentionCandidates = runtimeAgentsResult
-        .then((agents) => this.agentMentionCandidateService.projectCandidates({
-          runtimeAgentsResult: agents,
-          projectAgents,
-        }))
-        .catch(() => []);
-      const agentSelectionCandidates = runtimeAgentsResult
-        .then((agents) => this.agentMentionCandidateService.defaultCandidates({
-          runtimeAgentsResult: agents,
-          projectAgents,
-        }))
-        .catch(() => []);
+      // Build agent mention/selection candidates, backend-aware
+      let agentMentionCandidates: Promise<AgentMentionCandidate[]>;
+      let agentSelectionCandidates: Promise<AgentSelectionCandidate[]>;
+      if (isClaudeBackend) {
+        // Claude backend: use Claude runtime agents only; skip OpenCode runtime/project agents
+        const claudeAgents = normalizeClaudeRuntimeAgents(claudeRuntimeAgentsResult);
+        agentMentionCandidates = Promise.resolve(
+          claudeAgents.map((agent) => ({
+            id: agent.name,
+            displayName: agent.name,
+            description: agent.description ?? '',
+            mode: 'all' as const,
+            hidden: false,
+          })),
+        );
+        agentSelectionCandidates = Promise.resolve(
+          claudeAgents.map((agent) => ({
+            id: agent.name,
+            displayName: agent.name,
+            description: agent.description ?? '',
+            mode: 'all' as const,
+          })),
+        );
+      } else {
+        // OpenCode backend: use OpenCode runtime agents + project agents
+        const runtimeAgentsResult = Promise.resolve(getAttachedOpenCodeAppAgents(runtimeSkillsResult) ?? [])
+          .catch(() => []);
+        agentMentionCandidates = runtimeAgentsResult
+          .then((agents) => this.agentMentionCandidateService.projectCandidates({
+            runtimeAgentsResult: agents,
+            projectAgents,
+          }))
+          .catch(() => []);
+        agentSelectionCandidates = runtimeAgentsResult
+          .then((agents) => this.agentMentionCandidateService.defaultCandidates({
+            runtimeAgentsResult: agents,
+            projectAgents,
+          }))
+          .catch(() => []);
+      }
       const hiddenCommandIds = new Set(this.host.getHiddenCommandIds());
-      const items = buildVisibleSlashCommandMenuItems(
-        appendSyntheticBuiltinCommands(mergeSlashCommandCatalog({
-          runtimeCommands,
-          runtimeSkillSources,
-          projectCommands,
-          projectAgents,
-          hiddenCommandIds,
-          mdFileCommands,
-        }), hiddenCommandIds),
-      );
+      const claudeRuntimeCommands = Array.isArray(claudeRuntimeResult) && claudeRuntimeResult.length > 0
+        ? claudeRuntimeResult.map((cmd) => ({
+            name: cmd.name,
+            description: cmd.description,
+          }))
+        : undefined;
+      const mergedCatalog = mergeSlashCommandCatalog({
+        runtimeCommands,
+        runtimeSkillSources,
+        projectCommands,
+        projectAgents,
+        hiddenCommandIds,
+        mdFileCommands,
+        claudeRuntimeCommands,
+      });
+      // Do not append OpenCode synthetic builtins for Claude backend
+      const finalCatalog = isClaudeBackend ? mergedCatalog : appendSyntheticBuiltinCommands(mergedCatalog, hiddenCommandIds);
+      const items = buildVisibleSlashCommandMenuItems(finalCatalog);
       attachAgentMentionCandidatesToSlashCommandMenuItems(items, agentMentionCandidates);
       attachAgentSelectionCandidatesToSlashCommandMenuItems(items, agentSelectionCandidates);
 

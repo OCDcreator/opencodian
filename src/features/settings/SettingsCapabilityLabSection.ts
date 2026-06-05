@@ -568,8 +568,8 @@ export class SettingsCapabilityLabSection {
         capability: 'Hooks',
         sdkExposed: true, // SDK options accept hooks
         adapterWired: true, // buildSdkOptions wires hooks
-        runtimeProof: 'pass', // Shell-command hooks from .claude/settings.local.json verified: SDK subprocess reads project-scoped hook config and executes shell commands, leaving deterministic side effects on disk (nonce marker file). Programmatic JS callback hooks via SDK options remain uninvoked (SDK limitation), but the real runtime hook path (config-file shell hooks) is functional. Layer 1 (JS callback): NOT invoked — SDK subprocess ignores programmatic hooks option. Layer 2 (includeHookEvents stream): captures real hook backend_events. Layer 3 (shell-hook execution): .claude/settings.local.json SessionStart hook creates nonce file on disk — PASS. No authoring UI.
-        userSurface: 'hidden', // No authoring UI
+        runtimeProof: 'pass', // Shell-command hooks from .claude/settings.local.json verified: SDK subprocess reads project-scoped hook config and executes shell commands, leaving deterministic side effects on disk (nonce marker file). Programmatic JS callback hooks via SDK options remain uninvoked (SDK limitation), but the real runtime hook path (config-file shell hooks) is functional. Layer 1 (JS callback): NOT invoked — SDK subprocess ignores programmatic hooks option. Layer 2 (includeHookEvents stream): captures real hook backend_events. Layer 3 (shell-hook execution): .claude/settings.local.json SessionStart hook creates nonce file on disk — PASS.
+        userSurface: 'settings', // Settings: project settings scan/create/open for .claude/settings.json + .claude/settings.local.json. Hooks are configured by editing these files directly; the settings surface provides discovery and file access, not a visual hook editor.
       },
       {
         capability: 'File Checkpoint / Rewind',
@@ -603,8 +603,8 @@ export class SettingsCapabilityLabSection {
         capability: 'Plugins',
         sdkExposed: true, // plugins option in SDK
         adapterWired: true, // buildSdkOptions wires plugins
-        runtimeProof: 'pass', // Marketplace plugin system is the real runtime path. Programmatic SdkPluginConfig (type:'local', path) is accepted at API boundary but ignored by the subprocess — structurally identical to Hooks JS callback limitation. Marketplace-installed plugins from ~/.claude/plugins/ cache ARE loaded and contribute plugin-scoped skills (pluginName:skillName naming) to init.skills — 36 plugin-provided skills verified (BUILD_ID feature-phase0-capability.202605300326). Plugin-provided MCP servers appear in init.mcp_servers with plugin: prefix but status is "failed" at probe time, so they are registered but not currently functional — that is readback evidence, not behavior proof. Pass is anchored to plugin→skills chain only. No authoring UI.
-        userSurface: 'hidden',
+        runtimeProof: 'pass', // Marketplace plugin system is the real runtime path. Programmatic SdkPluginConfig (type:'local', path) is accepted at API boundary but ignored by the subprocess — structurally identical to Hooks JS callback limitation. Marketplace-installed plugins from ~/.claude/plugins/ cache ARE loaded and contribute plugin-scoped skills (pluginName:skillName naming) to init.skills. Plugin-provided MCP servers appear in init.mcp_servers with plugin: prefix. Pass is anchored to plugin→skills chain only.
+        userSurface: 'settings', // Settings: project settings scan/create/open for .claude/settings.json + .claude/settings.local.json. Plugins are enabled by editing enabledPlugins in these files; the settings surface provides discovery and file access, not a marketplace manager.
       },
       {
         capability: 'MCP Servers',
@@ -701,8 +701,8 @@ export class SettingsCapabilityLabSection {
         capability: 'Agent Definitions',
         sdkExposed: true, // SDK options accept agent and agents
         adapterWired: true, // buildSdkOptions wires runtime-only agent definitions
-        runtimeProof: 'pass', // Runtime verified: inline agent definition proof passes. SDK accepts agent/agents options (Layer 1 readback) AND the selected agent alters assistant behavior (Layer 2 marker echo). Agent Definitions remains hidden (no authoring UI).
-        userSurface: 'hidden', // No stable authoring UI
+        runtimeProof: 'pass', // Runtime verified: inline agent definition proof passes. SDK accepts agent/agents options (Layer 1 readback) AND the selected agent alters assistant behavior (Layer 2 marker echo).
+        userSurface: 'settings', // Settings: project agents discovery + create/open actions in Claude Code runtime tab. @agent mention menu shows Claude runtime agents for Claude backend conversations.
       },
       {
         capability: 'Structured Output',
@@ -2456,7 +2456,7 @@ export class SettingsCapabilityLabSection {
     adapter: ClaudeCodeAdapter | null,
   ): void {
     // Hooks
-    this.addDiscoveryRow(tbody, 'Hooks', 'No authoring UI. Shell-command hooks from .claude/settings.local.json verified (Layer 3: nonce file on disk). JS callback path via SDK options remains uninvoked (SDK limitation). Include Hook Events proven separately.');
+    this.addDiscoveryRow(tbody, 'Hooks', 'Project settings surface: scan/create/open for .claude/settings.json + .claude/settings.local.json. Hooks configured by editing these files. Shell-command hooks verified (Layer 3: nonce file on disk). JS callback path via SDK options remains uninvoked (SDK limitation). Include Hook Events proven separately.');
 
     // Plugins
     const pluginCount = adapter?.getPluginCount?.() ?? 0;

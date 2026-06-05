@@ -30,6 +30,7 @@ export function executeCompactSession(
 
 - 从 `SlashCommandExecutionHostDependencies` 扁平结构映射到 `SlashCommandExecutionHost` 接口
 - 所有方法都是 thin delegation，不做额外业务判断
+- `getCurrentConversation` 也作为 thin delegation 暴露为 `() => deps.getCurrentConversation()`，供 execution service 做 backend-aware passthrough 判定
 - `runCompactSession` 直接委托 `deps.runCompactSession`，实际 compact 逻辑在 `executeCompactSession` 中
 - `shareSession` / `unshareSession` 做简单的异常吞掉与 boolean 转换，保持与原来一致的容错行为
 - `revertSession`、`unrevertSession` 直接委托 `deps.openCodeService`，维持 OpenCode-only 语义（`SlashCommandExecutionService.handleUndoCommand` / `handleRedoCommand` 负责 backend gate）

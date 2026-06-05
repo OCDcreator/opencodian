@@ -35,6 +35,7 @@ export class SlashCommandExecutionService {
 }
 ```
 
+- `SlashCommandExecutionHost` 现在还包含可选 `getCurrentConversation?(): Conversation | null`，用于在执行前读取当前 conversation owner/backend。
 - 返回 `true`：当前输入已经被当作 slash command 消费（包括 ready/busy/error path）
 - 返回 `false`：当前输入不属于已知 slash command，调用方继续走普通 chat send pipeline
 
@@ -45,6 +46,7 @@ export class SlashCommandExecutionService {
 ### command 识别
 
 - 非 `/` 前缀输入（不包含行中 `/command`）直接返回 `false`
+- 如果 `getCurrentConversation()?.backend === 'claude-code'`，`tryRunSlashCommand()` 会在解析前直接返回 `false`，让 `/command` 原文落回普通发送路径；Claude Code 会在自己的 backend runtime 中原生处理这些 `/` 命令
 - `//` 与 `/ ` 这种非命令输入也直接放回普通消息路径
 - **行首 `/command`**：原有行为不变，`trimmedContent.startsWith('/')` 路径
 - **行中 `/command`**（空白后的 `/command`，例如 `"请帮我 /review src/app.ts"`）：`parseSlashCommandInput()` 使用全局正则匹配并取最后一个匹配项，提取 command 和 arguments；**行中命令现在始终 fall through 到 prompt 路径**（返回 `false`），不会作为 slash command 执行——前导文字的存在意味着用户意图是普通消息而非命令
@@ -98,6 +100,7 @@ export class SlashCommandExecutionService {
   - 如果返回 `false`，再继续普通 `prepareMessageSend()` + streaming pipeline
 - markdown command 会通过 `runMdFileCommandAsMessage()` 重新进入 send pipeline，并设置 skip-slash 标志避免 template 以 `/` 开头时再次递归拦截
 - OpenCode conversation 的 runtime/project slash command 真正执行仍走 `OpenCodeService.runSessionCommand()` / `session.command`；执行后的 visible follow-up sync 复用 `ConversationSyncBridge.syncVisibleConversationInBackground()`，因此会优先从 canonical session graph 投影，canonical 缺失时才通过 server read 回填 canonical snapshot
+- Claude Code conversation 的 slash text 不在本 service 中消费；它会返回 `false` 交给 raw send，避免把 Claude 原生 `/` 命令误路由到 OpenCode-only `session.command()`
 - dispatch runtime/project command 前会先确认 `conversation.backend ?? 'opencode'` 是 `opencode`，再用 `getConversationBackendSessionId()` 解析 session identity；没有 OpenCode backend 或没有 backend session id 时返回 command failure，不会创建 queued prompt 或误调用 OpenCode session command。
 - **OpenCode-only synthetic command gates**: `/compact`、`/undo`、`/redo`、`/share` 与 `/unshare` 在 `backend !== 'opencode'` 时直接返回 no-session notice。compact / summarize、revert / unrevert 与 share / unshare writes 目前仍是 OpenCode-only 能力，Claude 等 backend 暂不提供稳定支持。
 - `/compact` 不属于普通 slash command runtime：`SlashCommandExecutionHostFactory.executeCompactSession()` 负责 provider/model resolution、start/success/failure notice 和 `OpenCodeService.summarizeSession(sessionId, providerID, modelID, false)` 调用，view host 只传入当前 model resolver 与 service 引用

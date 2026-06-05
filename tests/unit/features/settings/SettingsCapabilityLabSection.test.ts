@@ -223,10 +223,11 @@ describe('SettingsCapabilityLabSection', () => {
     }
 
     // Agent Definitions has a dedicated diagnostic proof path (Run Agent Definition Proof button).
-    // Runtime verified: inline agent definition proof passes. Remains hidden (no authoring UI).
+    // Promoted to 'settings' surface: project agents discovery + create/open actions in Claude Code runtime tab.
+    // @agent mention menu shows Claude runtime agents for Claude backend conversations.
     const agentDefRow = getRow('Agent Definitions');
     expect(agentDefRow).not.toBeNull();
-    expect(agentDefRow?.querySelector('[data-surface]')?.getAttribute('data-surface')).toBe('hidden');
+    expect(agentDefRow?.querySelector('[data-surface]')?.getAttribute('data-surface')).toBe('settings');
     expect(agentDefRow?.textContent).toContain('Verified');
   });
 
@@ -1035,12 +1036,12 @@ describe('SettingsCapabilityLabSection', () => {
     // runtimeProof: 'pass' only when direct SDK smoke proof exists.
     // userSurface: 'settings' for stable settings controls; 'diagnostic' for experimental-only surfaces; 'hidden' for unexposed capabilities.
     const expected: Record<string, { runtimeProof: 'untested' | 'pass' | 'fail' | 'wiring' | 'boundary' | 'readback'; userSurface: 'settings' | 'diagnostic' | 'hidden' | 'chat' }> = {
-      Hooks: { runtimeProof: 'pass', userSurface: 'hidden' },
+      Hooks: { runtimeProof: 'pass', userSurface: 'settings' },
       'File Checkpoint / Rewind': { runtimeProof: 'readback', userSurface: 'diagnostic' },
       'JSONL History Browser': { runtimeProof: 'pass', userSurface: 'diagnostic' },
       'Session Store': { runtimeProof: 'pass', userSurface: 'hidden' },
       Skills: { runtimeProof: 'pass', userSurface: 'settings' },
-      Plugins: { runtimeProof: 'pass', userSurface: 'hidden' },
+      Plugins: { runtimeProof: 'pass', userSurface: 'settings' },
       'MCP Servers': { runtimeProof: 'pass', userSurface: 'settings' },
       'Allowed Tools': { runtimeProof: 'readback', userSurface: 'settings' },
       'Disallowed Tools': { runtimeProof: 'pass', userSurface: 'settings' },
@@ -1051,7 +1052,7 @@ describe('SettingsCapabilityLabSection', () => {
       'Permission Approval': { runtimeProof: 'pass', userSurface: 'chat' },
       'AskUserQuestion / Elicitation': { runtimeProof: 'pass', userSurface: 'chat' },
       'Agents (Subagents)': { runtimeProof: 'pass', userSurface: 'diagnostic' },
-      'Agent Definitions': { runtimeProof: 'pass', userSurface: 'hidden' },
+      'Agent Definitions': { runtimeProof: 'pass', userSurface: 'settings' },
       'Structured Output': { runtimeProof: 'pass', userSurface: 'chat' },
       'Subagent Transcript / Progress': { runtimeProof: 'pass', userSurface: 'diagnostic' },
       'Include Hook Events': { runtimeProof: 'pass', userSurface: 'diagnostic' },
@@ -1136,7 +1137,7 @@ describe('SettingsCapabilityLabSection', () => {
     const hiddenRows = rows.filter((row) => (
       row.querySelector('[data-surface="hidden"]') !== null
     ));
-    expect(hiddenRows.length).toBe(6); // Hooks, Session Store, Plugins, Agent Definitions, Import Session to Store, AskUserQuestion Preview Format
+    expect(hiddenRows.length).toBe(3); // Session Store, Import Session to Store, AskUserQuestion Preview Format
   });
 
   it('runs the structured output diagnostic probe through the adapter runtime', async () => {

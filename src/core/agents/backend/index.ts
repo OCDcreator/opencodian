@@ -114,10 +114,23 @@ export {
   createClaudeCodeStreamNormalizer,
 } from './ClaudeCodeStreamNormalizer';
 export {
+  type ClaudeProjectAgentInfo,
+  createClaudeProjectAgent,
+  discoverClaudeProjectAgents,
+} from './ClaudeProjectAgentDiscovery';
+export {
   type ClaudeProjectCommandInfo,
   createClaudeProjectCommand,
   discoverClaudeProjectCommands,
 } from './ClaudeProjectCommandDiscovery';
+export {
+  type ClaudeHookEntry,
+  type ClaudeHooksConfig,
+  type ClaudeProjectSettingsInfo,
+  createClaudeProjectSettingsFile,
+  discoverClaudeProjectSettings,
+  openClaudeProjectSettingsFile,
+} from './ClaudeProjectSettingsDiscovery';
 export {
   type ClaudeProjectSkillInfo,
   createClaudeProjectSkill,

@@ -351,7 +351,12 @@ export class MessageSendPreparationService {
     const persistentContextItems = await this.composerSendContext.resolvePersistentContextItems(conversation.externalContextPaths);
     const contextItems = this.mergeContextItems(persistentContextItems, draftContextItems);
     const resolvedAgentInvocation = this.agentInvocationService.resolveInvocationIntent(options.invocationIntent);
-    const requestContent = this.agentInvocationService.removeMentionFallbackText(options.content, resolvedAgentInvocation);
+    // For Claude backend, preserve @agent mentions as raw text in the prompt.
+    // Claude processes @agent natively; OpenCode strips mentions into invocationParts.
+    const isClaudeBackend = (conversation.backend ?? 'opencode') === 'claude-code';
+    const requestContent = isClaudeBackend
+      ? options.content
+      : this.agentInvocationService.removeMentionFallbackText(options.content, resolvedAgentInvocation);
     const skillExpansion = await this.skillContentExpander.expand(requestContent);
     const syntheticTextParts: PromptSyntheticTextPartInput[] = [
       ...(options.syntheticTextParts ?? []),
@@ -364,7 +369,8 @@ export class MessageSendPreparationService {
     const structuredSend = this.host.buildStructuredPromptSendPayload(requestContent, {
       contextItems,
       ...(syntheticTextParts.length > 0 ? { syntheticTextParts } : {}),
-      ...(resolvedAgentInvocation.invocationParts.length > 0 ? { invocationParts: resolvedAgentInvocation.invocationParts } : {}),
+      // Do not send OpenCode invocationParts to Claude backend — agent mentions are raw text
+      ...(!isClaudeBackend && resolvedAgentInvocation.invocationParts.length > 0 ? { invocationParts: resolvedAgentInvocation.invocationParts } : {}),
     });
     const userMessage = buildOptimisticUserMessage(options.content, contextItems, Date.now(), { optimisticUserParts: structuredSend.optimisticUserParts });
     const writeTicket = this.host.createConversationWriteTicket(conversation.id);

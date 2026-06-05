@@ -36,6 +36,8 @@ export interface CompactSessionOpenCodeService {
 
 export interface SlashCommandExecutionHost {
   ensureConversationReady(): Promise<Conversation | null>;
+  /** Returns the current active conversation without side effects, or null. */
+  getCurrentConversation?(): Conversation | null;
   getActiveTabId(): TabId | null;
   ensureTabRuntime(tabId: TabId | null): boolean;
   isTabForegroundBusy(tabId: TabId | null): boolean;
@@ -252,6 +254,14 @@ export class SlashCommandExecutionService {
 
     // Mid-text commands always fall through to prompt path
     if (!content.trimStart().startsWith('/')) {
+      return false;
+    }
+
+    // Claude Code backend: all slash commands fall through to raw send.
+    // Claude natively handles its own /commands; intercepting them here
+    // would route through OpenCode's runSessionCommand which rejects non-opencode backends.
+    const currentConversation = this.host.getCurrentConversation?.();
+    if (currentConversation && (currentConversation.backend ?? 'opencode') === 'claude-code') {
       return false;
     }
 
