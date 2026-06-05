@@ -120,6 +120,9 @@ export async function persistLocalStreamOutcome(options: {
       if (outcome.finalizedBackendSessionId) {
         preparedSend.conversation.backendSessionId = outcome.finalizedBackendSessionId;
       }
+      if (outcome.resolvedUserMessageIdentity && !preparedSend.userMessage.sourceMessageId) {
+        preparedSend.userMessage.sourceMessageId = outcome.resolvedUserMessageIdentity;
+      }
       persistLocalMessage?.();
       preparedSend.conversation.updatedAt = outcome.finalizedTimestamp;
       preparedSend.conversation.lastResponseAt = outcome.finalizedTimestamp;
@@ -147,7 +150,10 @@ async function persistBackendSessionIdentityIfNeeded(options: {
   logAssistantFinalizationStage: (stage: string, payload?: Record<string, unknown>) => void;
 }): Promise<void> {
   const sessionId = options.outcome.finalizedBackendSessionId;
-  if (!sessionId || getConversationBackendSessionId(options.preparedSend.conversation) === sessionId) {
+  const userMessageIdentity = options.outcome.resolvedUserMessageIdentity;
+  const needsSessionId = sessionId && getConversationBackendSessionId(options.preparedSend.conversation) !== sessionId;
+  const needsUserIdentity = userMessageIdentity && !options.preparedSend.userMessage.sourceMessageId;
+  if (!needsSessionId && !needsUserIdentity) {
     return;
   }
 
@@ -157,13 +163,19 @@ async function persistBackendSessionIdentityIfNeeded(options: {
     writeTicket,
     'backend-session-id-finalization',
     () => {
-      options.preparedSend.conversation.backendSessionId = sessionId;
+      if (needsSessionId) {
+        options.preparedSend.conversation.backendSessionId = sessionId;
+      }
+      if (needsUserIdentity) {
+        options.preparedSend.userMessage.sourceMessageId = userMessageIdentity;
+      }
     },
   );
   options.logAssistantFinalizationStage(
     writeApplied ? 'backend-session-id-finalized' : 'backend-session-id-finalization-skipped',
     {
       backendSessionId: sessionId,
+      resolvedUserMessageIdentity: userMessageIdentity,
     },
   );
 }

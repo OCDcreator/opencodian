@@ -1900,15 +1900,9 @@ export class SettingsClaudeCodeSection {
   }
 
   private renderPromptSuggestionsSetting(containerEl: HTMLElement): void {
-    const boundaryEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice',
-      attr: { 'data-claude-code-prompt-suggestions-boundary': 'true' },
-    });
-    boundaryEl.createSpan({ text: t('settings.claudeCode.promptSuggestions.boundaryNotice') });
-
     new Setting(containerEl)
       .setName(t('settings.claudeCode.promptSuggestions.name'))
-      .setDesc(t('settings.claudeCode.promptSuggestions.stableDesc'))
+      .setDesc(t('settings.claudeCode.promptSuggestions.desc'))
       .addToggle((toggle) => {
         toggle
           .setValue(this.settings.promptSuggestions)

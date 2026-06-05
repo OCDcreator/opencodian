@@ -12,6 +12,7 @@ import type {
   AgentChatCapability,
   AgentChatSendRequest,
   AgentConnectionStatus,
+  AgentForkCapability,
   AgentService,
   AgentServiceInfo,
   AgentSessionCapability,
@@ -941,7 +942,7 @@ export class ClaudeCodeRuntimeAbortController {
 }
 
 export class ClaudeCodeAdapter
-  implements AgentService, AgentChatCapability, AgentSessionCapability
+  implements AgentService, AgentChatCapability, AgentSessionCapability, AgentForkCapability
 {
   readonly kind: AgentBackendKind = 'claude-code';
   readonly displayName = 'Claude Code';
@@ -1035,12 +1036,17 @@ export class ClaudeCodeAdapter
   async createSession(title = 'New Claude Code chat'): Promise<string> {
     const id = createSessionId();
     this.invalidatedSessions.delete(id);
+    const sessionTitle = this.options.settings.autoTitle ? '' : title;
     this.sessions.set(id, {
       id,
-      title,
+      title: sessionTitle,
       messages: [],
     });
-    sessionLogger.debug('create session', { sessionId: id, titleLength: title.length });
+    sessionLogger.debug('create session', {
+      sessionId: id,
+      titleLength: sessionTitle.length,
+      autoTitle: this.options.settings.autoTitle,
+    });
     return id;
   }
 
@@ -1838,6 +1844,41 @@ export class ClaudeCodeAdapter
       });
     }
     return undefined;
+  }
+
+  async resolveClaudeUserMessageIdentities(sessionId: string): Promise<string[]> {
+    const sdk = await this.getSdk();
+    if (!sdk.getSessionMessages) {
+      return [];
+    }
+    const state = this.sessions.get(sessionId);
+    const sdkSessionId = state?.sdkSessionId ?? sessionId;
+    try {
+      const messages = await sdk.getSessionMessages(sdkSessionId, {
+        dir: this.options.vaultPath,
+        includeSystemMessages: false,
+      });
+      if (!Array.isArray(messages)) return [];
+      const identities: string[] = [];
+      for (const msg of messages) {
+        if (typeof msg !== 'object' || msg === null) continue;
+        const rec = msg as Record<string, unknown>;
+        if (
+          rec.type === 'user'
+          && (!rec.parent_tool_use_id || rec.parent_tool_use_id === null)
+          && typeof rec.uuid === 'string'
+        ) {
+          identities.push(rec.uuid.trim());
+        }
+      }
+      return identities;
+    } catch (err) {
+      sessionLogger.debug('resolveClaudeUserMessageIdentities failed', {
+        sessionId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return [];
+    }
   }
 
   private async collectRewindCandidateIds(

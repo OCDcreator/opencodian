@@ -1079,7 +1079,7 @@ describe('ClaudeCodeAdapter', () => {
     expect(sdk.query.mock.calls[1][0].options.resume).toBe('sdk-session-1');
   });
 
-  it('passes session title into SDK query options on first send', async () => {
+  it('omits session title from SDK query options on first send when Claude auto-title is enabled by default', async () => {
     const sdk = createSdk([{
       type: 'system',
       subtype: 'init',
@@ -1106,10 +1106,10 @@ describe('ClaudeCodeAdapter', () => {
 
     expect(sdk.query).toHaveBeenCalledTimes(1);
     const firstCallOptions = sdk.query.mock.calls[0][0].options;
-    expect(firstCallOptions.title).toBe('My Custom Title');
+    expect(firstCallOptions).not.toHaveProperty('title');
   });
 
-  it('omits title from SDK query options on resumed sends', async () => {
+  it('passes title on first send and omits it on resumed sends when Claude auto-title is disabled', async () => {
     const sdk = createSdk([{
       type: 'system',
       subtype: 'init',
@@ -1130,7 +1130,10 @@ describe('ClaudeCodeAdapter', () => {
     }]);
     const adapter = new ClaudeCodeAdapter({
       vaultPath: '/vault',
-      settings: getDefaultClaudeCodeBackendSettings(),
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        autoTitle: false,
+      },
       sdk,
     });
     const sessionId = await adapter.createSession('Title Should Not Appear On Resume');

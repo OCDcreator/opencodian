@@ -736,8 +736,8 @@ export class SettingsCapabilityLabSection {
         capability: 'Fork Session',
         sdkExposed: !!adapter, // forkSession on SDK facade
         adapterWired: !!adapter, // adapter.forkSession()
-        runtimeProof: 'pass', // BUILD_ID feature-phase0-capability.202605281335: adapter-layer fork of provider session 5983419f→35ba7b0a (valid UUID), UI-path fork d5f325ad→d2ea808d (valid UUID, title "Restored Claude Code chat (fork)"), local-handle rejection confirmed. Both adapter and Capability Lab UI proofs passed with screenshot+JSON artifacts. Diagnostic-only — no stable fork UI.
-        userSurface: 'diagnostic', // Capability Lab fork probe only — not stable fork productization
+        runtimeProof: 'pass', // BUILD_ID feature-phase0-capability.202605281335: adapter-layer fork of provider session 5983419f→35ba7b0a (valid UUID), UI-path fork d5f325ad→d2ea808d (valid UUID, title "Restored Claude Code chat (fork)"), local-handle rejection confirmed. Both adapter and Capability Lab UI proofs passed with screenshot+JSON artifacts. Stable chat surface: UserMessageFooterRenderer renders fork button per AgentCapability.Fork; ConversationLoadRecoveryCoordinator handles fork flow with tab/new-tab targets.
+        userSurface: 'chat', // Chat surface: fork button on user message footer, routed via AgentCapability.Fork through getCurrentConversationForkService()
       },
       {
         capability: 'Resume Session',

@@ -19,6 +19,7 @@ export interface ConversationHistoryActionsHost {
   deleteConversationsAndCleanupTabs(conversationIds: string[]): Promise<void>;
   deleteAllConversationsAndReset(conversationIds: string[]): Promise<void>;
   showNotice(message: string): void;
+  openTitleSettings?(): void;
 }
 
 export class ConversationHistoryActionsCoordinator {
@@ -157,6 +158,24 @@ export class ConversationHistoryActionsCoordinator {
     footerEl.createDiv({ cls: 'opencodian-history-separator' });
 
     const actionsEl = footerEl.createDiv({ cls: 'opencodian-history-actions' });
+
+    if (this.host.openTitleSettings) {
+      const titleSettingsEl = actionsEl.createDiv({ cls: 'opencodian-history-action' });
+      const titleSettingsIcon = titleSettingsEl.createSpan({
+        cls: 'opencodian-history-action-icon',
+      });
+      setIcon(titleSettingsIcon, 'settings');
+      titleSettingsEl.createSpan({
+        cls: 'opencodian-history-action-text',
+        text: t('chat.history.titlePreferences'),
+      });
+      titleSettingsEl.addEventListener('click', (innerEvent) => {
+        innerEvent.stopPropagation();
+        this.closeHistoryDropdown();
+        this.host.openTitleSettings!();
+      });
+    }
+
     const deleteTargetEl = actionsEl.createDiv({ cls: 'opencodian-history-action' });
     const deleteTargetIcon = deleteTargetEl.createSpan({
       cls: 'opencodian-history-action-icon',

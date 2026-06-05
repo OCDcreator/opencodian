@@ -72,5 +72,6 @@ export function buildLocalStreamOutcome(options: {
         latestErrorMessage: options.routedStream.latestErrorMessage,
       }),
     structuredOutput: options.routedStream.structuredOutput,
+    resolvedUserMessageIdentity: options.routedStream.resolvedUserMessageIdentity,
   };
 }

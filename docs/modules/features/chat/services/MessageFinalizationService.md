@@ -118,6 +118,12 @@ export class MessageFinalizationService {
 - sync lock 会在 service 自己的 `finally` 中释放，避免 send finalization 途中遗漏解锁
 - tab session lifecycle 也会在同一个 `finally` 中收口到 `idle`，避免本地流或非 server-sync backend 结束后停在 `finalizing` 而阻塞下一次发送
 
+### Claude Code 用户消息身份回填
+
+当 `conversation.backend === 'claude-code'` 时，`finalizeAfterStream()` 在最终保存之前会调用 `ClaudeUserMessageIdentityBackfillService.backfill()`，从 Claude SDK session history 查询 top-level user message UUID 并回填到本地 `sourceMessageId`。这确保 Claude 普通聊天发送后 user message 拥有真实 `sourceMessageId`，使 fork 按钮在消息 footer 正常显示。
+
+回填成功后，如果是前景 tab，service 会在原地调用 `applySyncedConversationUpdate` 触发增量重渲。`ConversationIdentityRuntime.getMessageVisualSignature()` 现在包含 `sourceMessageId`，因此回填前后的视觉签名会不同，增量更新路径可以正确检测到用户消息变化并重渲 footer（显示 fork 按钮），无需用户手动 reload。
+
 ## 与 `OpenCodianView` 的边界
 
 - `SendPipelineRuntime` 仍保留 stream loop、本地 shell finalization、本地 assistant/notice message 构建；正常 completed assistant 的 cache writeback 可延后到本服务的 canonical convergence，client-only notice / interrupted / questionResolution 边界才需要第一次本地 `saveConversation()`

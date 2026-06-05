@@ -768,6 +768,7 @@ export class OpenCodianView extends ItemView {
       showNotice: (message) => {
         new Notice(message);
       },
+      openTitleSettings: () => { const titleSettings = this.appSettings(); this.plugin.settingsTab?.prepareScrollToConversationOnNextOpen('title'); titleSettings.open(); try { titleSettings.openTabById('opencodian'); } catch { /* title settings not ready */ } },
     };
   }
 

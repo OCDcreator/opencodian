@@ -12,6 +12,7 @@
 - 接收 SDK-style `system`、`assistant`、`user`、`content_block_delta`、`result` message/event
 - 将文本、thinking、tool use、tool result、usage、error 映射到现有 `StreamChunk`
 - 将 SDK message 上的 `session_id` 写入 `message_metadata.sessionId`，供 adapter 和发送持久化链路捕获真实 Claude session identity
+- 遇到带 `uuid` 字段的 SDK `type: 'user'` message 时，通过 `appendUserMessageIdentityChunk()` 产出 `user_message_identity` chunk，把 Claude SDK user message identity 传给发送持久化链路
 - 将 SDK `prompt_suggestion` 消息映射为 `StreamChunk { type: 'prompt_suggestion', suggestion, uuid, sessionId }`，供后结果回调通道使用
 - 将 assistant-level SDK 错误（例如 `authentication_failed`）优先映射成 `error` chunk，避免把认证失败提示当普通 assistant 文本渲染
 - 将 result-level `errors[]` 汇总为 error chunk 内容，保留 SDK 认证/运行时错误关键词
@@ -22,7 +23,7 @@
 - 将 SDK `hook_started` / `hook_progress` / `hook_response`、`task_started` / `task_progress` / `task_notification` / `task_updated`、`tool_progress` 和 result `structured_output` 映射为 `backend_event` 诊断 chunk，供日志和后续实验 UI 使用
 - 过滤 `user` 类型消息中的 `text` / `thinking` / `tool_use` 内容块，防止 hook 反馈或 synthetic user 文本泄漏到可见 assistant transcript；保留 `user` 消息中的 `tool_result` 块，因为工具结果仍需要正常路由
 - 只把包含 input/output/reasoning token 计数字段的 usage 形状映射为主 `usage` chunk，避免把 subagent `usage.total_tokens` 误写进上下文用量
-- 通过 `claudeCode` debug module 的 `stream` channel 记录 SDK message summary 与产出 chunk summary，覆盖 text、thinking、tool_use、tool_result、backend_event、usage、error、message_metadata；日志跳过无 chunk 消息，并用 fingerprint 节流相同形状的高频 delta summary，只保留 type/subtype/session/message id、content length、metadata keys 和 counts，不记录文本全文、tool input 全文或 message metadata 的 model id
+- 通过 `claudeCode` debug module 的 `stream` channel 记录 SDK message summary 与产出 chunk summary，覆盖 text、thinking、tool_use、tool_result、backend_event、usage、error、message_metadata、user_message_identity；日志跳过无 chunk 消息，并用 fingerprint 节流相同形状的高频 delta summary，只保留 type/subtype/session/message id、content length、metadata keys 和 counts，不记录文本全文、tool input 全文或 message metadata 的 model id
 
 ## 维护约束
 
@@ -30,5 +31,5 @@
 - normalizer 的摘要日志必须只使用 shared logger 的 `debug`/`info` 可选日志路径，继续受 `enableDebugLogging`、`claudeCode` module 和 `stream` channel 控制。
 - 不在这里触发权限审批或用户提问 UI；`canUseTool` 和 `AskUserQuestion` 的交互桥接属于 `ClaudeCodePermissionBridge`。
 - `backend_event` 当前是诊断事件，不直接渲染成用户 transcript；完整 hook/subagent/structured-output UI 需要单独的 runtime proof。
-- 不在这里持久化 session/history；normalizer 只负责把 SDK `session_id` 作为 metadata 传下去，真正的 identity alias 与 conversation 保存属于 adapter / send pipeline。
+- 不在这里持久化 session/history；normalizer 只负责把 SDK `session_id` 作为 metadata、把 SDK user message `uuid` 作为 `user_message_identity` 传下去，真正的 identity alias、`sourceMessageId` 写入与 conversation 保存属于 adapter / send pipeline。
 - 新增 Claude 特有 stream 事件时先补 fixture 测试，再扩展转换逻辑。

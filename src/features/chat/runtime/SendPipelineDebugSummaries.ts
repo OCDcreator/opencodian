@@ -181,6 +181,12 @@ export function summarizeCoreStreamChunkForDebug(
         length: chunk.content.length,
         preview: getLogPreview(chunk.content, 120),
       };
+    case 'user_message_identity':
+      return {
+        type: chunk.type,
+        uuid: chunk.uuid,
+        sessionId: chunk.sessionId ?? null,
+      };
     default:
       return { type: chunk.type };
   }

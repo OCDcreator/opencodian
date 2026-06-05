@@ -26,6 +26,7 @@ export class StreamChunkRouter {
   private streamTimedOut = false;
   private latestErrorMessage: string | null = null;
   private finalizedAssistantMetadata: Extract<CoreStreamChunk, { type: 'message_metadata' }> | null = null;
+  private resolvedUserMessageIdentity: string | null = null;
   private receivedMeaningfulChunk = false;
   private receivedFirstVisibleContent = false;
   private structuredOutput: unknown | undefined;
@@ -146,6 +147,15 @@ export class StreamChunkRouter {
       this.finalizedAssistantMetadata = chunk;
       this.trace.logStage('message-metadata-received', {
         metadata: host.summarizeCoreStreamChunkForDebug(chunk),
+      });
+      return true;
+    }
+
+    if (chunk.type === 'user_message_identity') {
+      this.resolvedUserMessageIdentity = chunk.uuid;
+      this.trace.logStage('user-message-identity-received', {
+        uuid: chunk.uuid,
+        sessionId: chunk.sessionId ?? null,
       });
       return true;
     }
@@ -359,6 +369,7 @@ export class StreamChunkRouter {
       latestErrorMessage: this.latestErrorMessage,
       finalizedAssistantMetadata: this.finalizedAssistantMetadata,
       finalizedBackendSessionId: this.finalizedAssistantMetadata?.sessionId ?? null,
+      resolvedUserMessageIdentity: this.resolvedUserMessageIdentity,
     };
   }
 }

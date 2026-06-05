@@ -38,7 +38,7 @@ export class ConversationIdentityRuntime {
 
 - `getConversationSyncFingerprint()` 先调用 host 注入的 canonical fingerprint builder；只有 builder 不可用时才退回原来的 JSON 字段映射，避免 view / service 自己重建 OpenCodeService 的判定逻辑
 - `shouldRenderConversationMessage()` 继续隐藏 background-task completion reminder，但保留 notice、question resolution、OMO、compaction divider 等非纯文本消息；**assistant 角色的 `structured` 字段也被视为可渲染依据**，避免 structured-only assistant message 在 render filtering 阶段被过滤掉
-- `getMessageVisualSignature()` 计算单条消息的 visual signature，用于 hydration / authoritative merge 后判断尾部 assistant 是否需要重渲；**签名包含 `structured` 字段**，确保仅 structured 变化时也能触发尾部重渲
+- `getMessageVisualSignature()` 计算单条消息的 visual signature，用于 hydration / authoritative merge 后判断尾部 assistant 是否需要重渲；**签名包含 `structured` 字段和 `sourceMessageId` 字段**，确保仅 structured 变化或 `sourceMessageId` 回填时也能触发尾部/用户消息重渲
 - `getMessagesForRender()` 继续串联 `renderGroups.ts` 里的 `buildMessageRenderGroups()` → `mergeAssistantMessagesForRender()` → `injectLiveCompactionDivider()` → `tagCompactionSummaries()`，把 render-list shaping 留在单一 owner 内
 - **Backend-aware session identity**: sync fingerprint payload 中的 `sessionId` 现在通过 `getConversationBackendSessionId()` 解析，不再直接读取 `conversation.openCodeSessionId`。
 

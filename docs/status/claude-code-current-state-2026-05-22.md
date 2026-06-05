@@ -815,7 +815,7 @@ Promote the existing Session Title diagnostic harness from `readback` to `pass` 
 
 - Classification: **pass** (matrix) — promotion is anchored to a live backend `customTitle` exact match, not just option wiring.
 - **Diagnostic-only**: ordinary chat paths still set titles through `createSession` / `sendMessage`, not through `_diagnosticTitle`.
-- **No stable title settings UI**: title continues to come from the existing session creation flow.
+- **Stable title settings UI added 2026-06-05**: Conversation settings now expose a "Let Claude auto-generate titles" toggle (`backend.claudeCode.autoTitle`), default enabled. When enabled, new sessions pass an empty title so the SDK auto-generates a summary; when disabled, sessions use the fixed "New Claude Code chat" title. The history panel footer also provides a "Title preferences" global entry point that navigates to the conversation title settings.
 - Does not modify other pass/readback boundaries.
 - Matrix: 45 rows, 28 pass, 17 readback, 0 fail.
 
@@ -1183,7 +1183,7 @@ Implement the smallest honest diagnostic proof harness for Claude Code SDK publi
 
 - Classification: **readback** (matrix) — diagnostic proof harness is ready for live acceptance. No promotion to `pass` without Codex live verification in Obsidian/Test Vault observing an actual backend `customTitle` match.
 - **Diagnostic-only**: ordinary chat paths set titles through `createSession` / `sendMessage`, not through `_diagnosticTitle`.
-- **No stable title settings UI**: title comes from existing session creation flow.
+- **Stable title settings UI added 2026-06-05**: Conversation settings now expose a "Let Claude auto-generate titles" toggle (`backend.claudeCode.autoTitle`), default enabled. When enabled, new sessions pass an empty title so the SDK auto-generates a summary; when disabled, sessions use the fixed "New Claude Code chat" title. The history panel footer also provides a "Title preferences" global entry point that navigates to the conversation title settings.
 - Does not modify existing pass/readback boundaries.
 - Matrix: 44 rows, 27 pass, 17 readback, 0 fail.
 

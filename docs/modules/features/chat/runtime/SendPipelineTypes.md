@@ -18,8 +18,9 @@
 - `SendPipelineExecutionHost` / `StreamChunkRouterHost` / `StreamLocalFinalizerHost`：runtime、router 与本地收尾各自真正依赖的 host 子集
 - `SendPipelineTraceState`：chunk router 汇总出来的流状态快照
 - `SendPipelineTraceState.finalizedBackendSessionId`：从最终 `message_metadata.sessionId` 捕获的 backend-neutral session identity，允许 Claude Code 等 backend 将本地临时 handle 收敛为真实 SDK session id
-- `StreamChunkRouterOptions` / `StreamChunkRouterResult`：stream 消费阶段输入输出；`StreamChunkRouterResult.structuredOutput` 承载从 `backend_event` 捕获的 Claude 结构化输出 payload
-- `LocalStreamOutcome` / `StreamLocalFinalizerOptions` / `StreamLocalFinalizerResult`：本地收尾阶段输入输出，其中 `LocalStreamOutcome.finalizedBackendSessionId` 负责把 router 捕获的 backend session id 交给持久化层，`LocalStreamOutcome.structuredOutput` 负责把结构化输出 payload 交给持久化层
+- `SendPipelineTraceState.resolvedUserMessageIdentity`：从 `user_message_identity.uuid` 捕获的 Claude SDK user message id，用于 trace 与本地持久化对齐
+- `StreamChunkRouterOptions` / `StreamChunkRouterResult`：stream 消费阶段输入输出；`StreamChunkRouterResult.structuredOutput` 承载从 `backend_event` 捕获的 Claude 结构化输出 payload，`StreamChunkRouterResult.resolvedUserMessageIdentity` 承载从 `user_message_identity` 捕获的 user UUID
+- `LocalStreamOutcome` / `StreamLocalFinalizerOptions` / `StreamLocalFinalizerResult`：本地收尾阶段输入输出，其中 `LocalStreamOutcome.finalizedBackendSessionId` 负责把 router 捕获的 backend session id 交给持久化层，`LocalStreamOutcome.structuredOutput` 负责把结构化输出 payload 交给持久化层，`LocalStreamOutcome.resolvedUserMessageIdentity` 负责把 Claude user message UUID 交给持久化层
 
 ## 设计目的
 
@@ -28,6 +29,7 @@
 - 让 send preparation 生成的 stable `messageID + parts[]` 以及可选显式 main `agent` 能通过类型层明确传到 transport，而不是再次退回匿名字段
 - 让 busy-tab follow-up 只通过 preparation port 暴露为一次性 send-intent，避免把 queued prompt 误建成 message truth source
 - 让本地 assistant/error notice persistence 通过 serialized conversation write boundary 写回 compatibility cache，避免 stream finalization 与 authoritative sync 交错覆盖
+- 让 Claude SDK user message UUID 能以 `resolvedUserMessageIdentity: string | null` 的形式从 router 传到 local outcome，再由持久化层写入 optimistic user message 的 `sourceMessageId`
 - 让发送链路里的每个子模块只声明自己真正需要的 host port，避免 `SendPipelineHost` 继续膨胀成新的隐形大接口
 - 让单测可以只 mock 必需能力，而不是构造整个 `OpenCodianView`
 

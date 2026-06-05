@@ -5,7 +5,7 @@
 
 ## 概述
 
-`ClaudeCodeAdapter.ts` 是 Claude Code Agent SDK backend adapter。它实现 `AgentService`、`AgentChatCapability` 和 `AgentSessionCapability`，通过注入式或 lazy-loaded SDK facade 调用 `query()`，并复用 Claude options builder、stream normalizer 和 permission bridge。
+`ClaudeCodeAdapter.ts` 是 Claude Code Agent SDK backend adapter。它实现 `AgentService`、`AgentChatCapability`、`AgentSessionCapability` 和 `AgentForkCapability`，通过注入式或 lazy-loaded SDK facade 调用 `query()`，并复用 Claude options builder、stream normalizer 和 permission bridge。
 
 生产 runtime 通过 `ClaudeCodeSdkLoader` lazy-load 官方 SDK facade，避免插件启动时因为 SDK 包、bundled binary 或本机认证状态阻塞 OpenCodian 启动。生产构建会把 SDK 主包打进 `main.js`，并把当前平台 Claude Code binary 放入 `dist/node_modules/@anthropic-ai/claude-agent-sdk-<platform>/`。`claude-code` 已进入 `IMPLEMENTED_AGENT_BACKENDS`，但默认设置仍只启用 OpenCode；用户需要在 backend 设置中显式启用 Claude Code 并完成 Claude Code 认证。
 

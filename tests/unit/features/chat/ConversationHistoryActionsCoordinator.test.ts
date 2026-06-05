@@ -194,4 +194,39 @@ describe('ConversationHistoryActionsCoordinator', () => {
 
     coordinator.destroy();
   });
+
+  it('renders a title preferences action when the host provides openTitleSettings', () => {
+    const openTitleSettings = jest.fn();
+    const fixture = createFixture({ openTitleSettings });
+
+    fixture.coordinator.show(createHistoryEvent(fixture.anchorEl));
+
+    const titlePrefEl = document.body.querySelector<HTMLElement>(
+      '.opencodian-history-action:has(.opencodian-history-action-text)',
+    );
+    const titlePrefText = document.body.querySelector<HTMLElement>(
+      '.opencodian-history-action-text',
+    );
+    expect(titlePrefText?.textContent).toBe(t('chat.history.titlePreferences'));
+
+    titlePrefEl?.click();
+    expect(openTitleSettings).toHaveBeenCalledTimes(1);
+    expect(document.body.querySelector('.opencodian-history-dropdown')).toBeNull();
+
+    fixture.coordinator.destroy();
+  });
+
+  it('does not render a title preferences action when the host omits openTitleSettings', () => {
+    const fixture = createFixture();
+    delete (fixture.host as Partial<typeof fixture.host>).openTitleSettings;
+
+    fixture.coordinator.show(createHistoryEvent(fixture.anchorEl));
+
+    const actionTexts = Array.from(
+      document.body.querySelectorAll<HTMLElement>('.opencodian-history-action-text'),
+    ).map((el) => el.textContent);
+    expect(actionTexts).not.toContain(t('chat.history.titlePreferences'));
+
+    fixture.coordinator.destroy();
+  });
 });

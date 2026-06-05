@@ -50,7 +50,7 @@
 
 | 类型 | 说明 |
 |------|------|
-| `StreamChunk` | 联合类型，17 种流式事件（`text`, `thinking`, `tool_use`, `tool_result`, `file_edited`, `message_metadata`, `usage`, `backend_event`, `error`, `message_start`, `message_stop`, `content_block_start`, `content_block_stop`, `permission_request`, `question_request`, `prompt_suggestion`；其中 `message_metadata.sessionId?` 可携带 backend 真实 session identity，`backend_event` 承载 Claude Code hook/subagent/tool-progress/structured-output 等诊断事件，`error` 可带 `errorClass?` 字段标识错误类型，`tool_use` 可带 `kind?`、`toolMetadata?` 与 `toolResultVisibility?`，`permission_request` 带 `sessionID`、`always` 与可选 `tool` 引用，`prompt_suggestion` 带 `suggestion`、`uuid` 与可选 `sessionId`） |
+| `StreamChunk` | 联合类型，18 种流式事件（`text`, `thinking`, `tool_use`, `tool_result`, `file_edited`, `message_metadata`, `user_message_identity`, `usage`, `backend_event`, `error`, `message_start`, `message_stop`, `content_block_start`, `content_block_stop`, `permission_request`, `question_request`, `prompt_suggestion`；其中 `message_metadata.sessionId?` 可携带 backend 真实 session identity，`user_message_identity` 形状为 `{ type: 'user_message_identity'; uuid: string; sessionId?: string }`，用于把 Claude SDK user message UUID 传给持久化层，`backend_event` 承载 Claude Code hook/subagent/tool-progress/structured-output 等诊断事件，`error` 可带 `errorClass?` 字段标识错误类型，`tool_use` 可带 `kind?`、`toolMetadata?` 与 `toolResultVisibility?`，`permission_request` 带 `sessionID`、`always` 与可选 `tool` 引用，`prompt_suggestion` 带 `suggestion`、`uuid` 与可选 `sessionId`） |
 
 ### OMO 兼容
 
@@ -117,7 +117,7 @@
 `StreamChunk` 联合类型覆盖了从 `message_start` 到 `message_stop` 的完整事件链：
 1. 生命周期：`message_start` → ... → `message_stop`
 2. 内容事件：`text`, `thinking`, `tool_use`, `tool_result`
-3. 元数据：`message_metadata`, `usage`, `file_edited`, `backend_event`；Claude Code 等 backend 可通过 `message_metadata.sessionId` 把 stream 中首次出现的真实 backend session id 回传给发送持久化层，Claude Code hook/subagent/tool-progress/structured-output 事件先进入 `backend_event` 诊断通道而不是稳定 transcript UI
+3. 元数据：`message_metadata`, `user_message_identity`, `usage`, `file_edited`, `backend_event`；Claude Code 等 backend 可通过 `message_metadata.sessionId` 把 stream 中首次出现的真实 backend session id 回传给发送持久化层，并通过 `user_message_identity.uuid` 把 SDK user message identity 写回 optimistic user message 的 `sourceMessageId`，Claude Code hook/subagent/tool-progress/structured-output 事件先进入 `backend_event` 诊断通道而不是稳定 transcript UI
 4. 交互事件：`permission_request`, `question_request`
 5. 结构事件：`content_block_start`, `content_block_stop`
 6. 错误：`error`

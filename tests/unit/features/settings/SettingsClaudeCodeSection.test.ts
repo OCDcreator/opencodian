@@ -499,7 +499,7 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       expect(plugin.saveSettings).toHaveBeenCalled();
     });
 
-    it('renders prompt suggestions boundary notice in model-thinking tab', () => {
+    it('renders prompt suggestions setting without boundary notice in model-thinking tab', () => {
       const plugin = createPlugin();
       const containerEl = document.createElement('div');
       const section = new SettingsClaudeCodeSection({
@@ -508,9 +508,14 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       });
       section.attachTabbed(containerEl, 'model-thinking');
 
+      // Boundary notice was removed in stable-surface cleanup
       const boundaryEl = containerEl.querySelector('[data-claude-code-prompt-suggestions-boundary="true"]');
-      expect(boundaryEl).toBeTruthy();
-      expect(containerEl.textContent).toContain(t('settings.claudeCode.promptSuggestions.boundaryNotice'));
+      expect(boundaryEl).toBeNull();
+
+      // Lifecycle notice should still exist (confirms the setting item was rendered)
+      const lifecycleEl = containerEl.querySelector('[data-claude-code-prompt-suggestions-lifecycle="true"]');
+      expect(lifecycleEl).toBeTruthy();
+      expect(containerEl.textContent).toContain(t('settings.claudeCode.promptSuggestions.lifecycleNotice'));
     });
 
     it('renders prompt suggestions lifecycle notice in model-thinking tab', () => {

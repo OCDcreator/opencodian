@@ -173,6 +173,14 @@ export interface ClaudeCodeBackendSettings {
    * independently verified from the plugin layer. Applies to next query or restarted session only.
    */
   systemPrompt: string;
+  /**
+   * When true, new Claude Code sessions do not receive an explicit title on first query,
+   * allowing the SDK to auto-generate a conversation summary/title.
+   * When false, the plugin passes "New Claude Code chat" as the explicit title,
+   * which skips Claude's auto title generation.
+   * Applies to the next new session only; existing sessions are unaffected.
+   */
+  autoTitle: boolean;
 }
 
 export interface BackendSettings {
@@ -227,6 +235,7 @@ export function getDefaultClaudeCodeBackendSettings(): ClaudeCodeBackendSettings
     jsRuntime: '',
     loadTimeoutMs: null,
     systemPrompt: '',
+    autoTitle: true,
   };
 }
 
@@ -437,6 +446,7 @@ export function normalizeClaudeCodeBackendSettings(value: unknown): ClaudeCodeBa
     systemPrompt: typeof candidate.systemPrompt === 'string'
       ? candidate.systemPrompt.trim()
       : defaults.systemPrompt,
+    autoTitle: normalizeBoolean(candidate.autoTitle, defaults.autoTitle),
   };
 }
 

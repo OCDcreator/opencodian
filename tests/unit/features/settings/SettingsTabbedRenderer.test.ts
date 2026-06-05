@@ -236,8 +236,12 @@ describe('SettingsTabbedRenderer', () => {
 
     renderer.renderDisplay(containerEl);
 
-    expect(containerEl.querySelectorAll<HTMLElement>('.opencodian-settings-tab-secondary')).toHaveLength(0);
-    expectSingleContentShell(containerEl, 'conversation', 'display');
+    // title and display are backend-agnostic, so they remain visible
+    const secondaryTabs = containerEl.querySelectorAll<HTMLElement>('.opencodian-settings-tab-secondary');
+    expect(secondaryTabs).toHaveLength(2);
+    expect(Array.from(secondaryTabs).map((tab) => tab.dataset.tabId)).toEqual(['title', 'display']);
+    // compaction is OpenCode-only and filtered out; falls back to first visible secondary tab (title)
+    expectSingleContentShell(containerEl, 'conversation', 'title');
   });
 
   it('shows only OpenCode-owned settings when OpenCode is the active backend', () => {

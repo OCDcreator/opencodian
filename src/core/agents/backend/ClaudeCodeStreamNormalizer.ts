@@ -344,6 +344,12 @@ function summarizeChunk(chunk: StreamChunk): Record<string, unknown> {
         messageId: chunk.messageId,
         sessionId: chunk.sessionId,
       };
+    case 'user_message_identity':
+      return {
+        type: chunk.type,
+        uuid: chunk.uuid,
+        sessionId: chunk.sessionId,
+      };
     default:
       return {
         type: chunk.type,
@@ -456,6 +462,7 @@ export class ClaudeCodeStreamNormalizer {
       logSummaries(record, chunks, sessionId);
       return chunks;
     }
+    this.appendUserMessageIdentityChunk(record, chunks, sessionId);
     this.appendAssistantContentChunks(record, chunks, sessionId);
     this.appendResultChunks(record, chunks);
     this.appendPromptSuggestionChunk(record, chunks, sessionId);
@@ -748,6 +755,28 @@ export class ClaudeCodeStreamNormalizer {
     chunks.push({
       type: 'prompt_suggestion',
       suggestion,
+      uuid,
+      ...(resolvedSessionId ? { sessionId: resolvedSessionId } : {}),
+    });
+  }
+
+  private appendUserMessageIdentityChunk(
+    record: JsonRecord,
+    chunks: StreamChunk[],
+    sessionId: string | undefined,
+  ): void {
+    if (readString(record.type) !== 'user') {
+      return;
+    }
+
+    const uuid = readNonEmptyString(record.uuid);
+    if (!uuid) {
+      return;
+    }
+
+    const resolvedSessionId = resolveSessionId(record) ?? sessionId;
+    chunks.push({
+      type: 'user_message_identity',
       uuid,
       ...(resolvedSessionId ? { sessionId: resolvedSessionId } : {}),
     });

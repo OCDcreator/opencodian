@@ -231,6 +231,7 @@ export interface SendPipelineTraceState {
   latestErrorMessage: string | null;
   finalizedAssistantMetadata: Extract<CoreStreamChunk, { type: 'message_metadata' }> | null;
   finalizedBackendSessionId: string | null;
+  resolvedUserMessageIdentity: string | null;
 }
 
 export interface StreamChunkRouterOptions {
@@ -263,6 +264,7 @@ export interface LocalStreamOutcome {
   interruptedNoticeMessage: ChatMessage | null;
   shouldSyncFromServer: boolean;
   structuredOutput?: unknown;
+  resolvedUserMessageIdentity: string | null;
 }
 
 export interface StreamLocalFinalizerOptions {

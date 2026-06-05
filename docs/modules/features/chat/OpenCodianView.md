@@ -253,6 +253,7 @@ Phase 0/1 的 backend-empty / backend-offline 收尾还在这个 seam 上新增�
 - 重新渲染消息、背景任务指示器、todo dock、question dock
 - 通过 `ConversationSyncHostAdapter` 组装 `ConversationSyncRuntimeCoordinator` / `ConversationSyncOrchestrationService` / `ConversationSyncBridge`，并通过 `ConversationSessionSignalRuntime` 接入 session sync event + todo/status live signal 的订阅、session→tab 匹配与 cleanup 生命周期
 - 更新模型显示和 context usage
+- Claude Code conversation 的 `loadConversation()` 在 authoritative hydration 之后会调用 `ClaudeUserMessageIdentityBackfillService.backfill()`，从 Claude SDK session history 回填 user message `sourceMessageId`，确保已有 Claude 对话 reload 后 fork 按钮仍然正常显示
 
 后台同步分两路：
 

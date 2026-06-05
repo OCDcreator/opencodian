@@ -7399,8 +7399,6 @@ img.opencodian-model-provider-header-icon {
   grid-template-columns: minmax(0, 1fr) max-content;
   gap: var(--opencodian-settings-space-md) var(--opencodian-settings-space-lg);
   align-items: start;
-  padding-top: var(--opencodian-settings-space-md);
-  border-top: 1px solid var(--opencodian-settings-inline-border);
 }
 
 .opencodian-settings .opencodian-share-diagnostics-rows {
@@ -7701,12 +7699,37 @@ img.opencodian-model-provider-header-icon {
 
   .opencodian-settings .opencodian-share-policy-control,
   .opencodian-settings .opencodian-share-policy-setting .setting-item-control,
-  .opencodian-settings .opencodian-share-diagnostics,
+  .opencodian-settings .opencodian-share-troubleshooting,
   .opencodian-settings .opencodian-shared-sessions-tools {
     justify-content: flex-start;
   }
 
-  .opencodian-settings .opencodian-share-diagnostics {
+.opencodian-settings .opencodian-share-troubleshooting {
+  border-top: 1px solid var(--opencodian-settings-inline-border);
+  padding-top: var(--opencodian-settings-space-sm);
+}
+
+.opencodian-settings .opencodian-share-troubleshooting-summary {
+  display: list-item;
+  cursor: pointer;
+  color: var(--text-faint);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.5;
+  padding: 4px 0;
+  user-select: none;
+}
+
+.opencodian-settings .opencodian-share-troubleshooting-summary:hover {
+  color: var(--text-muted);
+}
+
+.opencodian-settings .opencodian-share-troubleshooting[open] > .opencodian-share-troubleshooting-summary {
+  margin-bottom: var(--opencodian-settings-space-sm);
+  color: var(--text-muted);
+}
+
+.opencodian-settings .opencodian-share-diagnostics {
     grid-template-columns: minmax(0, 1fr);
   }
 

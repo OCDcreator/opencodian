@@ -21,7 +21,7 @@
 
 - `attach()` 负责创建 section heading、按当前 mode 渲染 local 或 remote 子区块，并挂上 auth/status 区块
 - `dispose()` 清掉轮询、状态按钮引用与 unload listener，避免 settings 面板重建后旧 section 继续回写
-- `refreshStatus()` 会读取 `OpenCodeService` 的 health、diagnostics、internal status，再同步按钮可用态与描述文本；如果当前 active backend 已经切出 OpenCode，旧轮询回调会静默返回，避免 Claude active backend 下继续探测 OpenCode server
+- `refreshStatus()` 会读取 `OpenCodeService` 的 health、diagnostics、internal status，再同步按钮可用态与描述文本；当前稳定 surface 只展示 `🟢/🔴 + statusText`，不再把 raw diagnostics.message 或重复 qualifier 直接拼进用户面。若当前 active backend 已经切出 OpenCode，旧轮询回调会静默返回，避免 Claude active backend 下继续探测 OpenCode server
 
 ### 配置写回
 
@@ -33,9 +33,9 @@
 
 ### 状态与动作
 
-- status 文案继续区分 local managed / external / conflict / orphan restarted / remote connected 等状态
+- status 文案继续区分 local managed / external / conflict / orphan restarted / remote connected 等状态，但稳定描述会直接使用收口后的 `statusText`
 - action 按钮继续保留 local `start` 与 remote `test` 的分叉行为
-- stop / refresh 按钮继续沿用原有禁用条件，并在每次刷新后通知模型分区同步 catalog refresh 按钮状态
+- stop / refresh 按钮继续沿用原有禁用条件，并在每次刷新后通知模型分区同步 catalog refresh 按钮状态；manual refresh notice 也收口为 `refreshHealthy` / `refreshUnhealthy` 这类用户语言，而不是 `Health: OK | Status: ...` 调试式摘要
 - start / stop / test / manual refresh 按钮执行前也会重新确认 active backend 仍是 OpenCode；如果已经切到 Claude Code，只显示 OpenCode-only Notice，不调用 `openCodeService.start()`、`stop()` 或 `checkHealth()`。
 
 ## 关键方法

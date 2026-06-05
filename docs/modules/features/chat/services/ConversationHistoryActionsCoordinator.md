@@ -28,6 +28,7 @@ export interface ConversationHistoryActionsHost {
   deleteConversationsAndCleanupTabs(conversationIds: string[]): Promise<void>;
   deleteAllConversationsAndReset(conversationIds: string[]): Promise<void>;
   showNotice(message: string): void;
+  openTitleSettings?(): void;
 }
 
 export class ConversationHistoryActionsCoordinator {
@@ -44,6 +45,7 @@ export class ConversationHistoryActionsCoordinator {
 - 点击 history item 时仍会先关闭 dropdown；若前台 tab 正在 streaming，则继续走 `chat.tab.streamingBlocked` notice 并阻止切换
 - rename flow 仍会先取消当前 conversation 的 title generation，再通过 `ConversationHistoryDialogService` 取得新标题并把 host 回调写回 view
 - delete current / selected 继续复用 view 的 recover path；delete-all 继续复用 tab reset + fallback bootstrap path；confirm/countdown dialog DOM 由 `ConversationHistoryDialogService` 负责
+- 当 host 提供 `openTitleSettings()` 时，dropdown footer 会渲染全局 "Title preferences" 入口（gear 图标），点击后关闭 dropdown 并导航到设置页的会话标题分组
 - `destroy()` 会统一清理 dropdown DOM、click listener 与 positioning RAF，供 `OpenCodianView.onClose()` 调用
 
 ## 与 `OpenCodianView` 的边界

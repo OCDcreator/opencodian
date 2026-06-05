@@ -2,7 +2,7 @@
 
 > **源码**: `src/features/settings/SettingsClaudeCodeSection.ts`
 > **状态**: [REVIEW]
-> **最近更新**: Added prompt suggestions toggle to Model & Thinking tab (renderPromptSuggestionsSetting) with boundary and lifecycle notices (2026-06-03).
+> **最近更新**: Cleaned up Prompt Suggestions settings: removed diagnostic boundaryNotice from stable UI, replaced smoke-report wording in description with user-friendly copy (2026-06-04).
 
 ## 概述
 

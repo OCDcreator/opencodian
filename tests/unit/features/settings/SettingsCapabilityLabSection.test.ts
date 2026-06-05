@@ -1056,7 +1056,7 @@ describe('SettingsCapabilityLabSection', () => {
       'Subagent Transcript / Progress': { runtimeProof: 'pass', userSurface: 'diagnostic' },
       'Include Hook Events': { runtimeProof: 'pass', userSurface: 'diagnostic' },
       'Import Session to Store': { runtimeProof: 'pass', userSurface: 'hidden' },
-      'Fork Session': { runtimeProof: 'pass', userSurface: 'diagnostic' },
+      'Fork Session': { runtimeProof: 'pass', userSurface: 'chat' },
       'Resume Session': { runtimeProof: 'pass', userSurface: 'diagnostic' },
       'Session Detail': { runtimeProof: 'pass', userSurface: 'diagnostic' },
       'Backend Routing': { runtimeProof: 'pass', userSurface: 'diagnostic' },
@@ -2202,8 +2202,8 @@ describe('SettingsCapabilityLabSection', () => {
     )) as HTMLElement | undefined;
     expect(row).toBeTruthy();
     const surfaceChip = row!.querySelector('[data-surface]') as HTMLElement | null;
-    expect(surfaceChip?.dataset.surface).toBe('diagnostic');
-    expect(surfaceChip?.textContent).toBe('Diagnostic');
+    expect(surfaceChip?.dataset.surface).toBe('chat');
+    expect(surfaceChip?.textContent).toBe('Chat');
   });
 
   it('describes history import and mirror as diagnostic-store only without stable delete or restore', () => {

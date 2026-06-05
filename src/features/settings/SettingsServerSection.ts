@@ -134,7 +134,7 @@ export class SettingsServerSection {
       return;
     }
 
-    this.statusSetting.setDesc(this.buildStatusDescription(snapshot, isLocalMode));
+    this.statusSetting.setDesc(this.buildStatusDescription(snapshot));
     this.updateStatusButtons(snapshot, isLocalMode);
     this.notifyModelCatalogStatus();
   }
@@ -460,7 +460,9 @@ export class SettingsServerSection {
             }
 
             await this.refreshStatus();
-            new Notice(`Health: ${snapshot.isHealthy ? 'OK' : 'FAIL'} | Status: ${snapshot.statusText}`);
+            new Notice(snapshot.isHealthy
+              ? t('settings.server.status.refreshHealthy')
+              : t('settings.server.status.refreshUnhealthy'));
             button.setDisabled(false);
           });
       });
@@ -533,22 +535,9 @@ export class SettingsServerSection {
     return t('settings.server.status.stopped');
   }
 
-  private buildStatusDescription(snapshot: ServerStatusSnapshot, isLocalMode: boolean): string {
+  private buildStatusDescription(snapshot: ServerStatusSnapshot): string {
     const healthIndicator = snapshot.isHealthy ? '🟢' : '🔴';
-    let description = `${t('settings.server.status.desc')} - ${healthIndicator} ${snapshot.statusText}`;
-
-    if (isLocalMode && snapshot.isExternalServer) {
-      description += ` (${t('settings.server.external.title')})`;
-    } else if (isLocalMode && snapshot.diagnostics.reason === 'local-orphan-restarted') {
-      description += ` (${t('settings.server.orphanRestarted.title')})`;
-    } else if (isLocalMode && snapshot.internalStatus === 'conflict') {
-      description += ` (${t('settings.server.conflict.title')})`;
-    }
-    if (snapshot.diagnostics.message) {
-      description += ` — ${snapshot.diagnostics.message}`;
-    }
-
-    return description;
+    return `${healthIndicator} ${snapshot.statusText}`;
   }
 
   private updateStatusButtons(snapshot: ServerStatusSnapshot, isLocalMode: boolean): void {

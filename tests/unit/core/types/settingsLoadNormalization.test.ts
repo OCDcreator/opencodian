@@ -122,6 +122,7 @@ describe('prepareLoadedSettingsBootstrapState backend normalization', () => {
       loadTimeoutMs: null,
       strictMcpConfig: false,
       systemPrompt: '',
+      autoTitle: true,
     });
   });
 
@@ -173,5 +174,32 @@ describe('prepareLoadedSettingsBootstrapState backend normalization', () => {
 
     expect(missing.settings.backendSettings.claudeCode.settingSources).toEqual(['project']);
     expect(explicitNone.settings.backendSettings.claudeCode.settingSources).toEqual([]);
+  });
+
+  it('preserves an explicit Claude autoTitle false override', () => {
+    const state = prepareLoadedSettingsBootstrapState({
+      core: {
+        data: {
+          backendSettings: {
+            claudeCode: {
+              autoTitle: false,
+            },
+          },
+        },
+        filePath: '.opencodian/settings.core.json',
+        source: 'primary',
+        shouldPersist: false,
+      },
+      ui: {
+        data: null,
+        filePath: '.opencodian/settings.ui.json',
+        source: 'missing',
+        shouldPersist: false,
+      },
+      writable: true,
+      shouldPersist: false,
+    });
+
+    expect(state.settings.backendSettings.claudeCode.autoTitle).toBe(false);
   });
 });

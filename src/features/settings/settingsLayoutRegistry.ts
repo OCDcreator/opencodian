@@ -82,7 +82,7 @@ export const SETTINGS_PRIMARY_TABS: SettingsPrimaryTabDefinition[] = [
     icon: 'messages-square',
     defaultSecondaryTabId: 'display',
     secondaryTabs: [
-      { id: 'title', labelKey: 'settings.conversation.tab.title', backendRequired: 'opencode' },
+      { id: 'title', labelKey: 'settings.conversation.tab.title' },
       { id: 'compaction', labelKey: 'settings.conversation.tab.compaction', backendRequired: 'opencode' },
       { id: 'sharing', labelKey: 'settings.conversation.tab.sharing', backendRequired: 'opencode' },
       { id: 'display', labelKey: 'settings.conversation.tab.display' },

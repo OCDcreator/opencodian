@@ -38,6 +38,7 @@ export class StreamChunkRouter {
 - `latestErrorMessage`
 - `finalizedAssistantMetadata`
 - `finalizedBackendSessionId`
+- `resolvedUserMessageIdentity`
 - `logAssistantFinalizationStage()`
 - `resetStreamingState()`
 - `cleanupPendingIndicator()`
@@ -49,6 +50,7 @@ export class StreamChunkRouter {
 - `message_start`：触发最新 user message authoritative sync，并开始 context usage stream
 - `usage`：更新 tab context usage
 - `message_metadata`：记录最终 assistant message id / timestamp / model id，并把可选 `sessionId` 暴露为 backend-neutral finalized session identity
+- `user_message_identity`：捕获 Claude Code stream 中的 user message UUID，保存为 `resolvedUserMessageIdentity` 并随 router result 传给本地持久化层
 - `message_stop`：标记 stream 正常完成，并结束 context usage stream
 - `file_edited`：追加到 tab runtime 的 `pendingEditedFiles`
 - `backend_event` + `structured_output`：捕获 `metadata.structuredOutput` 到 router result，供下游持久化与渲染使用

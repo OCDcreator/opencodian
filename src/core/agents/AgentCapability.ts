@@ -66,6 +66,14 @@ export function setAgentServiceRegistry(registry: AgentServiceRegistry | null): 
 }
 
 /**
+ * Get the module-level agent service registry.
+ * Returns null before plugin initialization completes or after disposal.
+ */
+export function getAgentServiceRegistry(): AgentServiceRegistry | null {
+  return _registry;
+}
+
+/**
  * Get the capabilities of the currently active backend.
  *
  * - If a registry is set and has an active adapter, returns its capabilities.

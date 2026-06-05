@@ -26,7 +26,7 @@ registry 里的 `backendRequired` 是设置 surface 的后端边界声明：Open
 | `claude-code` | `runtime`, `model-thinking`, `permissions`, `context-sources`, `tools` |
 | `server` | `connection`, `auth`, `status` |
 | `model` | `common`, `project-config`, `availability`, `tools` |
-| `conversation` | `display`, plus OpenCode-only `title`, `compaction`, `sharing`, `questions` |
+| `conversation` | `display`, `title`, plus OpenCode-only `compaction`, `sharing`, `questions` |
 | `agents` | `default`, `catalog`, `editor`, `workspace` |
 | `commands` | `mode`, `editor`, `catalog` |
 | `mcp` | `overview` |
@@ -54,6 +54,6 @@ registry 里的 `backendRequired` 是设置 surface 的后端边界声明：Open
 
 Claude Code 的二级标签拆成 `runtime`、`model-thinking`、`permissions`、`context-sources`、`tools`，分别承载运行时/环境变量、模型与思考配置及轮数/预算限制、权限模式、上下文来源与额外目录、工具 allow/block。旧的 `mcp-advanced` 二级标签会迁移到 `tools`，旧的 `limits` 二级标签会迁移到 `model-thinking`，旧的 `sdk-foundations` 已移除（实验性/诊断性控制移至 Capability Lab）；避免用户停留在已移除标签时回到空白或默认页；新增或移除二级标签时需要同步 `SettingsClaudeCodeSection.renderTabContent()` 与 locale key。
 
-Conversation 的默认二级标签是 `display`，因为聊天字号和用户消息渲染属于后端无关的显示设置；`title`、`compaction`、`sharing`、`questions` 目前都依赖 OpenCode SDK / `.opencode/opencode.json` / OpenCode session API，必须继续标记为 `backendRequired: 'opencode'`，直到对应 Claude Code 能力真实接入。
+Conversation 的默认二级标签是 `display`，因为聊天字号和用户消息渲染属于后端无关的显示设置。`title` 二级标签对所有后端可见，因为标题设置块内部已根据 active backend 做自适应（OpenCode 时展示模式与模型选择器，Claude Code 时展示 `autoTitle` 开关），因此不再标记 `backendRequired: 'opencode'`。`compaction`、`sharing`、`questions` 仍依赖 OpenCode SDK / `.opencode/opencode.json` / OpenCode session API，继续标记为 `backendRequired: 'opencode'`，直到对应 Claude Code 能力真实接入。
 
 Debug 的默认二级标签是 `plugin`，因为总开关和插件内部模块开关是最通用入口。旧的 `debug/general`、`debug/modules` 会迁移到 `plugin`，旧的 `debug/logs`、`debug/actions` 会迁移到 `export`；`opencode` 与 `claude-code` 是新的来源分区，分别承载 OpenCode 后端诊断和 Claude Code SDK 诊断。`capability-lab` 是诊断/实验面板，提供 SDK 能力矩阵、JSONL 历史浏览器、子代理浏览器、rewind dry-run 预览、结构化输出实验场和发现状态，均标记为 ⚠️ DIAGNOSTIC / EXPERIMENTAL / NOT STABLE，不连接稳定设置持久化。

@@ -26,6 +26,7 @@ import type {
   TabId,
   TabModelOverride,
 } from '../tabs';
+import { ClaudeUserMessageIdentityBackfillService } from './ClaudeUserMessageIdentityBackfillService';
 import {
   ConversationTabLifecycleRecoveryCoordinator,
   type ConversationTabLifecycleRecoveryHost,
@@ -89,6 +90,7 @@ export interface ConversationLoadRecoveryHost {
   syncActiveTabConversation(conversation: Conversation): void;
   updateModelSelectorDisplay(): void;
   showNotice(message: string): void;
+  backfillClaudeUserMessageIdentities?(conversation: Conversation): Promise<boolean>;
 }
 
 import type { App } from 'obsidian';
@@ -117,6 +119,7 @@ export interface ConversationLoadRecoveryHostDependencies {
   deleteConversation(conversationId: string): Promise<void>;
   syncActiveTabConversation(conversation: Conversation): void;
   updateModelSelectorDisplay(): void;
+  backfillClaudeUserMessageIdentities?(conversation: Conversation): Promise<boolean>;
 }
 
 export function createConversationLoadRecoveryHost(
@@ -151,6 +154,9 @@ export function createConversationLoadRecoveryHost(
     showNotice: (message) => {
       new Notice(message);
     },
+    ...(deps.backfillClaudeUserMessageIdentities
+      ? { backfillClaudeUserMessageIdentities: deps.backfillClaudeUserMessageIdentities }
+      : {}),
   };
 }
 
@@ -186,6 +192,12 @@ export class ConversationLoadRecoveryCoordinator {
     options: LoadConversationOptions = {},
   ): Promise<void> {
     await this.port.loadConversation(id, options);
+    const conversation = this.host.getCurrentConversation();
+    if (conversation?.backend === 'claude-code' && this.host.backfillClaudeUserMessageIdentities) {
+      try {
+        await this.host.backfillClaudeUserMessageIdentities(conversation);
+      } catch { /* best-effort */ }
+    }
   }
 
   async deleteConversationsAndRecover(conversationIds: readonly string[]): Promise<void> {
@@ -574,8 +586,13 @@ export function assembleConversationLoadRecovery(
       },
     );
 
+  const claudeBackfillService = new ClaudeUserMessageIdentityBackfillService();
+
   const conversationLoadRecoveryCoordinator = new ConversationLoadRecoveryCoordinator(
-    createConversationLoadRecoveryHost(deps.loadRecoveryHostDeps),
+    {
+      ...createConversationLoadRecoveryHost(deps.loadRecoveryHostDeps),
+      backfillClaudeUserMessageIdentities: (conversation: Conversation) => claudeBackfillService.backfill(conversation),
+    },
     {
       activateTab: (tabId) => conversationViewStateService.activateTab(tabId),
       createConversationInNewTab: () =>

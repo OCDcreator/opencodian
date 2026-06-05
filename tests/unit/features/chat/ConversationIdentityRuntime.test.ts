@@ -423,4 +423,18 @@ describe('ConversationIdentityRuntime.getMessageVisualSignature', () => {
 
     expect(parsed.structured).toBeNull();
   });
+
+  it('produces different signatures when sourceMessageId changes', () => {
+    const host = createHost();
+    const runtime = new ConversationIdentityRuntime(host);
+    const msg1: ChatMessage = { id: 'msg-1', role: 'user', content: 'hello', timestamp: 100 };
+    const msg2: ChatMessage = { id: 'msg-1', role: 'user', content: 'hello', timestamp: 100, sourceMessageId: 'uuid-abc' };
+
+    const sig1 = runtime.getMessageVisualSignature(msg1);
+    const sig2 = runtime.getMessageVisualSignature(msg2);
+
+    expect(sig1).not.toBe(sig2);
+    expect(JSON.parse(sig1).sourceMessageId).toBeNull();
+    expect(JSON.parse(sig2).sourceMessageId).toBe('uuid-abc');
+  });
 });

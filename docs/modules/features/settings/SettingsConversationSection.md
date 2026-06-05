@@ -7,7 +7,11 @@
 
 `SettingsConversationSection` 是 settings/conversation 分区的厚 owner。它从 `OpenCodianSettings.ts` 接管 conversation section 的完整 lifecycle：标题生成模式与备用标题模型 picker、项目级 compaction 配置编辑、聊天字体大小、问题卡片显示/位置、已回答卡片显示，以及 user markup 渲染开关。
 
-它必须按当前 active backend 过滤能力：聊天字体大小与 user markup 渲染是通用显示设置，Claude Code 和 OpenCode 都可以显示；标题生成、项目级 compaction、会话分享与问答卡片当前都依赖 OpenCode 机制，只有 active backend 为 `opencode` 时才装配、加载模型目录或监听 `.opencode/opencode.json`。
+它必须按当前 active backend 过滤能力：聊天字体大小与 user markup 渲染是通用显示设置，Claude Code 和 OpenCode 都可以显示；项目级 compaction、会话分享与问答卡片当前都依赖 OpenCode 机制，只有 active backend 为 `opencode` 时才装配、加载模型目录或监听 `.opencode/opencode.json`。
+
+会话标题分组现在对所有 backend 可见，但内容按 backend 切换：
+- OpenCode active 时：title mode dropdown（first-message / smart）+ 备用 AI 标题模型 picker
+- Claude Code active 时："Let Claude auto-generate titles" toggle（默认开启），控制新 Claude 会话是否让 SDK 自动生成摘要标题；关闭时固定使用 "New Claude Code chat" 作为显式标题
 
 当前 conversation section 不再把不同职责的设置平铺成单层列表，而是复用主设置页的 `settings block` 语言拆成六个二级分组：
 
@@ -85,7 +89,7 @@ The sharing block edits OpenCode's top-level `share` field:
 - Supported modes are `manual`, `auto`, and `disabled`; missing or unrecognized values display as upstream default `manual`
 - This is a project config setting, not a per-conversation session override
 - After saving, local managed OpenCode services are restarted when currently running so the running server rereads `share`; remote mode shows the standard remote-management Notice instead of pretending the plugin can reload it
-- The share setting is rendered inside a dedicated share-policy panel with a current-mode chip, a help button backed by `OpenCodeProjectConfigHelpModal`, and a diagnostics action that checks project mode, `OpenCodeService.checkHealth()`, and public share host reachability
+- The share setting is rendered inside a dedicated share-policy panel with a current-mode chip, a help button backed by `OpenCodeProjectConfigHelpModal`, and a progressively disclosed troubleshooting section. The troubleshooting section is collapsed by default (`<details>/<summary>`) to keep the stable sharing surface calm; when expanded, it shows connectivity checks for project mode, `OpenCodeService.checkHealth()`, and public share host reachability, with a "Check connectivity" button to run the probes
 - The sharing block also renders a shared-session manager: it routes session listing through `listBackendSessions()` and message preview through `getBackendSessionPreview()` (backend-aware normalization helpers in `AgentBackendRouting`), using `NormalizedSessionRow` and `NormalizedSessionPreviewMessage` types instead of casting to OpenCode `Session` / `SessionMessage`. Sessions are filtered by `shareUrl`, showing a public-session count and refresh action, showing the public URL, supporting copy/unshare, and opening a full message preview. `shareUrl` is now populated only for active OpenCode session rows; Claude Code / generic adapters may still provide title/summary/message-preview data for inspection seams, but a compatible non-OpenCode `share.url` must not make a row appear in this OpenCode-only sharing surface. `unshareSession()` remains a direct `openCodeService` call because it is an OpenCode-specific write operation, and the unshare callback now has an explicit runtime guard (`isOpenCodeActive()`) that blocks the call if the active backend has switched away from OpenCode while the settings page is open.
 - Share mode change callbacks and the share diagnostics button use the same early active-backend re-check as compaction controls, so stale mounted controls cannot update the policy chip / diagnostics, call `updateShareConfig()`, restart OpenCode, call `checkHealth()`, or probe the public share host after the active backend changes away from OpenCode.
 - Shared-session previews render all messages; non-text parts and text longer than 800 characters are placed in closed `<details>` blocks so tool calls and long output are present but folded by default. If the backend cannot supply preview messages, the section shows the existing preview-failed text; if the backend responds with an empty history, the section shows a neutral empty-preview message instead of treating it as an error.

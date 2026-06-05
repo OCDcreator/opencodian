@@ -275,12 +275,17 @@ describe('OpenCodian conversation settings', () => {
     expect(renderUserMarkup?.control.setValue).toHaveBeenCalledWith(true);
   });
 
-  it('hides OpenCode-only title and question controls when Claude Code is active', () => {
+  it('shows Claude title controls and hides OpenCode-only controls when Claude Code is active', () => {
     renderConversationSettings({
       activeBackend: 'claude-code',
       enabledBackends: ['opencode', 'claude-code'],
     });
 
+    const autoTitleToggle = toggleRecords.find(
+      (record) => record.name === t('settings.titleGeneration.claudeAutoTitle.name'),
+    );
+    expect(autoTitleToggle).toBeDefined();
+    expect(autoTitleToggle?.control.setValue).toHaveBeenCalledWith(true);
     expect(dropdownRecords.find((record) => record.name === t('settings.titleGeneration.mode.name'))).toBeUndefined();
     expect(buttonRecords.find((record) => record.name === t('settings.titleGeneration.model.name'))).toBeUndefined();
     expect(

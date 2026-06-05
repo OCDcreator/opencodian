@@ -49,6 +49,8 @@
 
 `summarizeCoreStreamChunkForDebug()` 现在识别 `backend_event`，把 Claude Code hook、subagent、tool progress、structured output 等诊断事件压缩为 source/event/status/id/name/contentLength/metadataKeys。它不泄露完整 structured output payload 到日志摘要，也不把这些事件当成可渲染 transcript。
 
+`summarizeCoreStreamChunkForDebug()` 也识别 `user_message_identity`，在 trace/debug 输出中记录 Claude SDK user message UUID 与可选 session id，方便追踪该 identity 如何流向本地持久化层。
+
 ## 设计约束
 
 - 所有函数均为纯函数，不依赖外部状态

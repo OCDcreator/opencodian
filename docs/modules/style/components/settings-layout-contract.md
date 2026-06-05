@@ -65,7 +65,8 @@ Rule: never apply one hierarchy rule globally across both layout modes. In class
 ## Shared Session Manager Styles
 
 - `.opencodian-share-policy-panel` / `.opencodian-share-policy-*`：Conversation > Sharing 顶部的分享策略控制面板。左侧解释项目级策略，右侧保留 Obsidian dropdown 与帮助按钮，当前模式以低调状态 chip 显示，避免把公开分享配置伪装成普通表单行。
-- `.opencodian-share-diagnostics*`：分享策略面板内的诊断区。按钮会检查项目 share mode、OpenCode 服务健康状态和公共分享主机可达性，用 compact status rows 显示 ok / warning / error。
+- `.opencodian-share-troubleshooting` / `.opencodian-share-troubleshooting-summary`：分享策略面板里包住辅助诊断内容的 `<details>` disclosure。它负责默认折叠、顶部细分隔线、summary hover/expanded 状态，以及“Sharing setup check / 分享连接检查”这类稳定 affordance，不让 troubleshooting rows 一上来就挤占 sharing 主 surface。
+- `.opencodian-share-diagnostics*`：分享策略面板内真正的诊断 rows。按钮会检查项目 share mode、OpenCode 服务健康状态和公共分享主机可达性，用 compact status rows 显示 ok / warning / error；diagnostics rows 本身不再承担顶部边框或折叠标题样式。
 - `.opencodian-shared-sessions` / `.opencodian-shared-sessions-header`：已分享会话管理区，使用标题、说明、公开数量与刷新按钮组成轻量工具头，不复用截图式的单行 setting layout。
 - `.opencodian-shared-session-row`：单个已分享会话的数据行，左侧为标题、更新时间、公开 URL，右侧为复制、预览、取消分享动作；多行共享一个 list surface，窄屏改为单列。
 - `.opencodian-shared-session-preview` / `.opencodian-shared-session-message*`：完整会话预览区域。普通文本直接展开，工具调用和长输出由 `<details>` 默认折叠；消息之间使用 transcript 分隔线，避免在 setting row 内继续嵌套卡片。

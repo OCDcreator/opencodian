@@ -79,6 +79,7 @@ export class ConversationIdentityRuntime {
       content: message.content,
       timestamp: message.timestamp,
       modelId: message.modelId ?? null,
+      sourceMessageId: message.sourceMessageId ?? null,
       summaryKind: message.summaryKind ?? null,
       compactionDivider: message.compactionDivider ?? null,
       noticeTitle: message.noticeTitle ?? null,

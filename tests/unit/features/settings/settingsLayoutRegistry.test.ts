@@ -110,7 +110,7 @@ describe('SETTINGS_PRIMARY_TABS', () => {
 
     const conversationTab = getPrimaryTabDefinition('conversation');
     expect(conversationTab?.secondaryTabs.filter((tab) => tab.backendRequired === 'opencode').map((tab) => tab.id))
-      .toEqual(['title', 'compaction', 'sharing', 'questions']);
+      .toEqual(['compaction', 'sharing', 'questions']);
     expect(getPrimaryTabDefinition('claude-code')?.backendRequired).toBe('claude-code');
   });
 

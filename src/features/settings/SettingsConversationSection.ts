@@ -191,15 +191,13 @@ export class SettingsConversationSection {
     );
 
     const isOpenCodeActive = this.isOpenCodeActive();
-    const titleGenerationBodyEl = isOpenCodeActive
-      ? this.createSettingsBlock(containerEl, {
-          title: t('settings.titleGeneration.title'),
-          description: t('settings.titleGeneration.groupDesc'),
-        })
-      : null;
-    if (titleGenerationBodyEl) {
-      this.markSettingsTarget(titleGenerationBodyEl, 'title');
-    }
+    const titleGenerationBodyEl = this.createSettingsBlock(containerEl, {
+      title: t('settings.titleGeneration.title'),
+      description: isOpenCodeActive
+        ? t('settings.titleGeneration.groupDesc')
+        : t('settings.titleGeneration.claudeGroupDesc'),
+    });
+    this.markSettingsTarget(titleGenerationBodyEl, 'title');
     const compactionBodyEl = isOpenCodeActive
       ? this.createSettingsBlock(containerEl, {
           title: t('settings.conversation.compaction.projectNote'),
@@ -238,9 +236,7 @@ export class SettingsConversationSection {
     });
     this.markSettingsTarget(renderingBodyEl, 'rendering');
 
-    if (titleGenerationBodyEl) {
-      this.renderTitleBlock(titleGenerationBodyEl);
-    }
+    this.renderTitleBlock(titleGenerationBodyEl);
     if (compactionBodyEl) {
       this.renderCompactionBlock(compactionBodyEl);
     }
@@ -263,9 +259,9 @@ export class SettingsConversationSection {
     this.setSharedCallbacks();
 
     const blocks: { id: string; render: (el: HTMLElement) => void }[] = [
+      { id: 'title', render: (el: HTMLElement) => this.renderTitleBlock(el) },
       ...(this.isOpenCodeActive()
         ? [
-            { id: 'title', render: (el: HTMLElement) => this.renderTitleBlock(el) },
             { id: 'compaction', render: (el: HTMLElement) => this.renderCompactionBlock(el) },
             { id: 'sharing', render: (el: HTMLElement) => this.renderSharingBlock(el) },
           ]
@@ -315,8 +311,12 @@ export class SettingsConversationSection {
   }
 
   private renderTitleBlock(containerEl: HTMLElement): void {
-    this.addTitleModeSetting(containerEl);
-    this.addTitleModelSetting(containerEl);
+    if (this.isOpenCodeActive()) {
+      this.addTitleModeSetting(containerEl);
+      this.addTitleModelSetting(containerEl);
+    } else {
+      this.addClaudeAutoTitleSetting(containerEl);
+    }
   }
 
   private renderCompactionBlock(containerEl: HTMLElement): void {
@@ -458,6 +458,20 @@ export class SettingsConversationSection {
             this.plugin.settings.titleMode = value as TitleMode;
             await this.plugin.saveSettings();
             this.updateTitleModelSettingVisibility();
+          });
+      });
+  }
+
+  private addClaudeAutoTitleSetting(containerEl: HTMLElement): void {
+    new Setting(containerEl)
+      .setName(t('settings.titleGeneration.claudeAutoTitle.name'))
+      .setDesc(t('settings.titleGeneration.claudeAutoTitle.desc'))
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.plugin.settings.backendSettings.claudeCode.autoTitle)
+          .onChange(async (value) => {
+            this.plugin.settings.backendSettings.claudeCode.autoTitle = value;
+            await this.plugin.saveSettings();
           });
       });
   }
@@ -670,7 +684,14 @@ export class SettingsConversationSection {
   }
 
   private addShareDiagnostics(containerEl: HTMLElement, policyStateEl: HTMLElement): void {
-    const diagnosticsEl = containerEl.createDiv({
+    const detailsEl = containerEl.createEl('details', {
+      cls: 'opencodian-share-troubleshooting',
+    });
+    detailsEl.createEl('summary', {
+      cls: 'opencodian-share-troubleshooting-summary',
+      text: t('settings.conversation.share.troubleshooting.summary'),
+    });
+    const diagnosticsEl = detailsEl.createDiv({
       cls: 'opencodian-share-diagnostics',
     });
     const rowsEl = diagnosticsEl.createDiv({

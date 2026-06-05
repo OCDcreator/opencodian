@@ -52,6 +52,8 @@ OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings`、`DEFAULT_
 
 `systemPrompt` 为 pass：通过两层互补证据成立。第一层是 readback proof：`runSystemPromptReadbackProbe()` 验证当前已保存的 `settings.systemPrompt` 会经由 `buildClaudeCodeOptions` 进入 SDK `systemPrompt` 选项；当非空时，使用 preset-with-append 形状 `{ type: 'preset', preset: 'claude_code', append: instructions }`；当为空时，使用默认 `{ type: 'preset', preset: 'claude_code' }`。第二层是 live behavior proof：`runSystemPromptLiveProbe()` 通过 `_diagnosticSystemPrompt` 走同一条 preset-with-append SDK 路径，注入 nonce-bearing diagnostic append，验证该路径确实会影响一次新的诊断查询响应。这是 append-only seam，不会替换官方预设；active session 不会被 live mutate。默认空字符串 `''`。UI 位于 Model & Thinking 标签页，为文本区域输入，仅在下一次查询或重启会话时生效。输入会被 trim，空白输入归一化为空字符串。
 
+`autoTitle` 控制新 Claude Code 会话是否让 SDK 自动生成对话摘要标题。默认 `true`：会话标题为空字符串，首次查询不传 `title`，允许 Claude SDK 自行生成摘要。当 `false` 时，插件在 `createSession` 中存储固定标题 `"New Claude Code chat"`，并在首次查询时通过 `buildClaudeCodeOptions` 传入 SDK `title` 选项，这会跳过 Claude 的自动标题生成。此设置只影响新会话；已有会话不受影响。UI 位于 Conversation 设置的"会话标题"分组，为 toggle 开关。
+
 ### 服务器与安全
 
 | 类型 | 说明 |

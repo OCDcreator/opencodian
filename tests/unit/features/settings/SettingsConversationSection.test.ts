@@ -864,10 +864,13 @@ describe('SettingsConversationSection', () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    const checkButton = containerEl.querySelector<HTMLButtonElement>('[data-action="check-share-diagnostics"]');
-    expect(containerEl.textContent).toContain('Project mode');
-    expect(containerEl.textContent).toContain('Not checked');
+    const detailsEl = containerEl.querySelector<HTMLDetailsElement>('details.opencodian-share-troubleshooting');
+    expect(detailsEl).not.toBeNull();
+    expect(detailsEl?.querySelector('summary')?.textContent).toBe(t('settings.conversation.share.troubleshooting.summary'));
+    expect(detailsEl?.textContent).toContain('Project mode');
+    expect(detailsEl?.textContent).toContain('Not checked');
 
+    const checkButton = detailsEl?.querySelector<HTMLButtonElement>('[data-action="check-share-diagnostics"]');
     checkButton?.click();
     for (let i = 0; i < 6; i += 1) {
       await Promise.resolve();
@@ -879,8 +882,8 @@ describe('SettingsConversationSection', () => {
       method: 'GET',
       throw: false,
     }));
-    expect(containerEl.textContent).toContain('Connected');
-    expect(containerEl.textContent).toContain('Reachable');
+    expect(detailsEl?.textContent).toContain('Connected');
+    expect(detailsEl?.textContent).toContain('Reachable');
   });
 
   it('blocks stale share diagnostics when the active backend is no longer OpenCode', async () => {
@@ -920,13 +923,14 @@ describe('SettingsConversationSection', () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    containerEl.querySelector<HTMLButtonElement>('[data-action="check-share-diagnostics"]')?.click();
+    const detailsEl = containerEl.querySelector<HTMLDetailsElement>('details.opencodian-share-troubleshooting');
+    detailsEl?.querySelector<HTMLButtonElement>('[data-action="check-share-diagnostics"]')?.click();
     for (let i = 0; i < 6; i += 1) {
       await Promise.resolve();
     }
 
-    expect(containerEl.textContent).toContain('TLS');
-    expect(containerEl.textContent).toContain('working proxy');
+    expect(detailsEl?.textContent).toContain('TLS');
+    expect(detailsEl?.textContent).toContain('working proxy');
   });
 
   it('updates the share diagnostics when share mode is disabled', async () => {
