@@ -2489,6 +2489,8 @@ export const enTranslations = {
   'settings.claudeCode.projectSettings.marketplacesSummary': 'Extra marketplaces: {count} ({urls})',
   'settings.claudeCode.projectSettings.noMarketplaces': 'No extra marketplaces configured.',
   'settings.claudeCode.projectSettings.openButton': 'Open',
+
+  'settings.claudeCode.sessionBrowser.info': 'Backend session browsing: Open the chat history dropdown and click "Browse backend sessions" to view and resume provider sessions. Resumed conversations show a preview snapshot of the session transcript; subsequent messages continue in the same provider session.',
   'settings.claudeCode.projectSettings.createFailed': 'Failed to create settings file (may already exist).',
 
   'settings.claudeCode.runtimeCommands.name': 'Claude runtime commands',

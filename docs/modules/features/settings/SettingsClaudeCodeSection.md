@@ -2,7 +2,7 @@
 
 > **源码**: `src/features/settings/SettingsClaudeCodeSection.ts`
 > **状态**: [REVIEW]
-> **最近更新**: Added official nested hook config parsing (matcher + hooks[] shape matching setupShellHookConfig) + project agents discovery + project settings surface (2026-06-06).
+> **最近更新**: Added session browser info entry + official nested hook config parsing + project settings surface (2026-06-06).
 
 ## 概述
 

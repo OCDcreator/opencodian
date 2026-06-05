@@ -233,6 +233,7 @@ export class SettingsClaudeCodeSection {
   private renderRuntimeTab(containerEl: HTMLElement): void {
     this.renderRuntimeBoundaryNotice(containerEl);
     this.renderRuntimeEcosystemSummary(containerEl);
+    this.renderBackendSessionBrowserInfo(containerEl);
     this.renderClaudeProjectSkillsControls(containerEl);
     this.renderClaudeProjectCommandsControls(containerEl);
     this.renderClaudeProjectAgentsControls(containerEl);
@@ -561,6 +562,16 @@ export class SettingsClaudeCodeSection {
     return normalizedNames.length > 0
       ? normalizedNames.join(', ')
       : t('settings.claudeCode.runtimeEcosystem.unnamed');
+  }
+
+  // ─── Backend Session Browser Info ─────────────────────────────────
+
+  private renderBackendSessionBrowserInfo(containerEl: HTMLElement): void {
+    const infoEl = containerEl.createDiv({
+      cls: 'opencodian-settings-inline-notice',
+      attr: { 'data-claude-code-session-browser-info': 'true' },
+    });
+    infoEl.createSpan({ text: t('settings.claudeCode.sessionBrowser.info') });
   }
 
   // ─── Claude Project Skills discovery ───────────────────────────────

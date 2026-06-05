@@ -20,7 +20,8 @@ export interface ConversationHistoryActionsHost {
   deleteAllConversationsAndReset(conversationIds: string[]): Promise<void>;
   showNotice(message: string): void;
   openTitleSettings?(): void;
-  browseBackendSessions?(): void;
+  /** Open the backend session browser modal. */
+  openBackendSessionBrowserModal?(): void;
 }
 
 export class ConversationHistoryActionsCoordinator {
@@ -177,7 +178,7 @@ export class ConversationHistoryActionsCoordinator {
       });
     }
 
-    if (this.host.browseBackendSessions) {
+    if (this.host.openBackendSessionBrowserModal) {
       const browseEl = actionsEl.createDiv({ cls: 'opencodian-history-action' });
       const browseIcon = browseEl.createSpan({
         cls: 'opencodian-history-action-icon',
@@ -190,7 +191,7 @@ export class ConversationHistoryActionsCoordinator {
       browseEl.addEventListener('click', (innerEvent) => {
         innerEvent.stopPropagation();
         this.closeHistoryDropdown();
-        this.host.browseBackendSessions!();
+        this.openBackendSessionBrowser();
       });
     }
 
@@ -261,6 +262,10 @@ export class ConversationHistoryActionsCoordinator {
 
   destroy(): void {
     this.closeHistoryDropdown();
+  }
+
+  private openBackendSessionBrowser(): void {
+    this.host.openBackendSessionBrowserModal?.();
   }
 
   private resolveAnchorElement(event: MouseEvent): HTMLElement | null {

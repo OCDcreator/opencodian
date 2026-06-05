@@ -1,7 +1,7 @@
 # BackendSessionBrowserModal
 
 > **源码**: `src/features/chat/ui/BackendSessionBrowserModal.ts`
-> **最近更新**: 2026-06-06
+> **最近更新**: 2026-06-06 (preview transcript seeding into resumed conversations)
 
 ## 概述
 

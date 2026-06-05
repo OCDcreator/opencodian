@@ -770,12 +770,12 @@ export class OpenCodianView extends ItemView {
         new Notice(message);
       },
       openTitleSettings: () => { const titleSettings = this.appSettings(); this.plugin.settingsTab?.prepareScrollToConversationOnNextOpen('title'); titleSettings.open(); try { titleSettings.openTabById('opencodian'); } catch { /* title settings not ready */ } },
-      browseBackendSessions: () => {
+      openBackendSessionBrowserModal: () => {
         const modalHost: BackendSessionBrowserHost = {
           getAgentServiceRegistry: () => this.plugin.agentServiceRegistry ?? null,
-          createConversationFromBackendSession: async (sessionId, title) => {
+          createConversationFromBackendSession: async (sessionId, title, initialMessages) => {
             const backend = this.plugin.settings.activeBackend ?? 'opencode';
-            const conversation = await this.plugin.createConversationFromSession(sessionId, { title, backend });
+            const conversation = await this.plugin.createConversationFromSession(sessionId, { title, backend, messages: initialMessages as ChatMessage[] });
             return conversation.id;
           },
           loadConversation: (conversationId) => this.loadConversation(conversationId),

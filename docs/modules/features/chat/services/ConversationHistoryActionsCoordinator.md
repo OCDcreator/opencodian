@@ -1,7 +1,7 @@
 # ConversationHistoryActionsCoordinator
 
 > **源码**: `src/features/chat/services/ConversationHistoryActionsCoordinator.ts`
-> **最近更新**: 2026-06-06
+> **最近更新**: 2026-06-06 (preview transcript seeding + settings info)
 
 ## 概述
 

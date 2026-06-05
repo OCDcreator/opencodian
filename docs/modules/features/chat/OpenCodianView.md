@@ -2,7 +2,7 @@
 
 > **源码**: `src/features/chat/OpenCodianView.ts`
 > **状态**: [REVIEW]
-> **最近更新**: Backend session browser integration (Browse backend sessions button in history dropdown) + Claude Code active-backend routing
+> **最近更新**: Backend session browser with preview transcript seeding + settings info entry
 
 ## 概述
 

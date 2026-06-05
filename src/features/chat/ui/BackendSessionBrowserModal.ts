@@ -7,9 +7,17 @@ import { createLogger } from '../../../shared';
 
 const logger = createLogger('BackendSessionBrowserModal');
 
+/** Lightweight chat message used to seed a resumed conversation with preview content. */
+export interface BackendSessionPreviewChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: number;
+}
+
 export interface BackendSessionBrowserHost {
   getAgentServiceRegistry(): AgentServiceRegistry | null;
-  createConversationFromBackendSession(sessionId: string, title: string): Promise<string | null>;
+  createConversationFromBackendSession(sessionId: string, title: string, initialMessages?: Array<{ id: string; role: 'user' | 'assistant'; content: string; timestamp: number }>): Promise<string | null>;
   loadConversation(conversationId: string): Promise<void>;
   getActiveBackendKind(): string | null;
   showNotice(message: string): void;
@@ -231,7 +239,28 @@ export class BackendSessionBrowserModal extends Modal {
     const title = session?.title || t('chat.backendSessions.untitled');
 
     try {
-      const conversationId = await this.host.createConversationFromBackendSession(sessionId, title);
+      // Load preview transcript to seed the conversation with visible history.
+      // This is a preview snapshot, not an authoritative full transcript.
+      let previewChatMessages: Array<{ id: string; role: 'user' | 'assistant'; content: string; timestamp: number }> | undefined;
+      const registry = this.host.getAgentServiceRegistry();
+      try {
+        const preview = await getBackendSessionPreview(registry, sessionId);
+        if (preview && preview.length > 0) {
+          previewChatMessages = preview.map((msg, idx) => ({
+            id: `preview-${idx}-${Date.now()}`,
+            role: (msg.role === 'user' ? 'user' : 'assistant') as 'user' | 'assistant',
+            content: msg.parts
+              .filter((p) => p.type === 'text' && p.text)
+              .map((p) => p.text)
+              .join('\n') || '(empty)',
+            timestamp: Date.now(),
+          }));
+        }
+      } catch {
+        // Preview load failure is non-blocking; resume with empty messages.
+      }
+
+      const conversationId = await this.host.createConversationFromBackendSession(sessionId, title, previewChatMessages);
       if (!conversationId) {
         this.host.showNotice(t('chat.backendSessions.createFailed'));
         return;

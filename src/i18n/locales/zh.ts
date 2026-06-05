@@ -2488,6 +2488,8 @@ export const zhTranslations = {
   'settings.claudeCode.projectSettings.marketplacesSummary': '额外市场: {count} ({urls})',
   'settings.claudeCode.projectSettings.noMarketplaces': '未配置额外市场。',
   'settings.claudeCode.projectSettings.openButton': '打开',
+
+  'settings.claudeCode.sessionBrowser.info': '后端会话浏览：打开聊天历史下拉菜单，点击"浏览后端会话"可查看并恢复 provider 会话。恢复后的对话显示会话 transcript 的预览快照；后续消息在同一 provider 会话中继续。',
   'settings.claudeCode.projectSettings.createFailed': '创建设置文件失败（可能已存在）。',
 
   'settings.claudeCode.runtimeCommands.name': 'Claude 运行时命令',
