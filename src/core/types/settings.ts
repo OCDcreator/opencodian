@@ -162,9 +162,13 @@ export interface ClaudeCodeBackendSettings {
    * Request the SDK to use a specific JavaScript runtime ('node', 'bun', or 'deno').
    * Empty string means auto — leave runtime selection to the SDK.
    * Readback only: SDK option wiring proven; actual runtime selection behavior is not
-   * independently verified from the plugin layer. Plugin-side behavior is not independently
-   * verified. No runtime argument management is exposed. Applies to next query or restarted
-   * session only.
+   * independently verified from the plugin layer. No observable signal in init events,
+   * stderr, or tool output confirms which runtime the CLI subprocess actually uses.
+   * The model runs remotely and cannot inspect the local subprocess's process.execPath.
+   * Host PATH checks only prove installation, not actual runtime selection.
+   * executablePath/ProcessResolver is a separate capability about Claude binary resolution.
+   * No runtime argument management is exposed (executableArgs / extraArgs remain absent).
+   * Applies to next query or restarted session only.
    */
   jsRuntime: 'node' | 'bun' | 'deno' | '';
   /**

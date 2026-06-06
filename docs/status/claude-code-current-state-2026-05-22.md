@@ -70,7 +70,7 @@ Option wiring proven through `buildClaudeCodeOptions`, but no independent plugin
 - Debug — option wiring verified; fundamental limitation: debug toggle enables CLI verbose logging but has no observable side effect without debugFile or stderr callback. Debug File (pass/verified) already covers the "capture debug output" use case. **2026-06-06 audit completed** (Outcome B): remains readback with hardened boundary.
 - Strict MCP Config — option wiring verified; validation behavior lives in compiled CLI binary
 - 1M Context Beta — option wiring verified through full SDK path (setting → buildClaudeCodeOptions → ProcessTransport → CLI --betas flag); model-side beta acceptance and 1M context activation unobservable from plugin layer
-- JS Runtime — option wiring verified; actual runtime selection depends on system PATH and installation
+- JS Runtime — option wiring verified; actual runtime selection depends on system PATH and installation. **2026-06-06 audit completed** (Outcome B): remains readback with hardened boundary. No observable signal in init events, stderr, or tool output confirms which runtime the CLI subprocess actually uses.
 - Load Timeout — `@alpha`; option wiring verified; timeout code path only executes with resume/continue + sessionStore
 - AskUserQuestion Preview Format — option wiring + UI preview rendering path verified; actual preview arrival depends on SDK version and model behavior
 
@@ -93,8 +93,69 @@ These have adapter wiring and runtime proof, but no stable or diagnostic user su
 ### suggested next 3 checkpoints
 
 1. **File Checkpoint / Rewind** — Highest user-value if unblocked. Monitor Anthropic SDK bug #236. Re-audit on any SDK version bump that mentions checkpointing or interactive-mode fixes. Current state: readback with known upstream blocker.
-2. **JS Runtime** — Readback; option wiring verified. Potential seam: actual runtime selection depends on system PATH and installation, but `executable` option reaches CLI. Could audit whether CLI produces an observable signal indicating which runtime was actually selected.
-3. **Load Timeout** — `@alpha`; option wiring verified. Potential seam: timeout code path only executes with resume/continue + sessionStore. Could audit whether a timeout event or error produces an observable signal.
+2. **Load Timeout** — `@alpha`; option wiring verified. Potential seam: timeout code path only executes with resume/continue + sessionStore. Could audit whether a timeout event or error produces an observable signal.
+3. **Allowed Tools** — Readback; auto-approve shortcut only, zero enforcement at tool-catalog level. Potential seam: if SDK adds enforcement at the catalog level (currently `allowedTools` only affects `canUseTool` auto-approve, not tool availability). Low priority.
+
+---
+
+## 2026-06-06 JS Runtime — Audit and Boundary Hardening (Outcome B)
+
+### Objective
+
+Audit the Claude Code SDK `Options.executable?: 'node' | 'bun' | 'deno'` seam to determine if it can be productized beyond the current readback boundary into a stable pass/verified capability, or if it should remain readback with a hardened boundary.
+
+### SDK Seam Analysis
+
+The SDK exposes exactly one runtime-selection option:
+
+```typescript
+// SDK Options
+executable?: 'node' | 'bun' | 'deno';
+```
+
+When set, the SDK's `spawnLocalProcess` resolves the runtime binary from the system PATH and uses it to spawn the Claude Code CLI subprocess.
+
+### Decision
+
+**Outcome B** — JS Runtime REMAINS `readback` with hardened boundary.
+
+### What IS verified
+
+1. **Settings→SDK option wiring**: `settings.jsRuntime` propagates through `ClaudeCodeOptionsBuilder` → `Options.executable` → CLI subprocess.
+2. **Builder semantics**: `jsRuntime=''` → option omitted entirely; `jsRuntime='node'` → `options.executable = 'node'`.
+3. **Normalization**: `normalizeClaudeCodeJsRuntime` accepts only `'node'`/`'bun'`/`'deno'`; all other values → `''`.
+4. **Probe coverage**: `runJsRuntimeReadbackProbe()` builds diagnostic SDK options and verifies all 4 values (empty/node/bun/deno) plus mismatch and error cases (7 focused tests).
+5. **Stable settings surface**: Runtime tab dropdown with boundary notice and lifecycle notice.
+6. **Semantic separation from `executablePath`**: `jsRuntime` selects the JS runtime engine (node/bun/deno); `executablePath`/ProcessResolver resolves the Claude Code binary itself. These are orthogonal concepts.
+
+### What is NOT verified — and fundamentally unverifiable from the plugin layer
+
+1. **No observable signal confirms runtime selection**: The init message (type:`system`, subtype:`init`) has no runtime metadata field. No stderr pattern, no tool output, no status metadata indicates which runtime was actually used.
+2. **The model runs remotely**: Claude runs on Anthropic's servers and cannot inspect the local subprocess's `process.execPath`. Bash tool spawns a new shell process, not the CLI process itself.
+3. **Host PATH checks prove installation, not selection**: Checking if `node`/`bun`/`deno` exists on PATH proves the runtime IS installed, but does NOT prove the CLI subprocess actually uses it.
+4. **`executablePath`/ProcessResolver is a separate capability**: It resolves the Claude Code binary path, which is conceptually distinct from selecting which JavaScript runtime to use.
+5. **No runtime argument management is exposed**: `executableArgs` / `extraArgs` remain absent from the SDK options surface.
+
+### Adjacent seams audited and REJECTED
+
+1. **Host PATH check** — Proves runtime is installed, not that CLI uses it. Not a runtime-selection proof.
+2. **Model-queried process.execPath** — The model runs remotely and cannot access the local subprocess's environment. Bash tool spawns a separate process.
+3. **executablePath/ProcessResolver** — Separate capability about Claude binary resolution. Different semantics from runtime engine selection.
+4. **Subprocess PID inspection** — No portable API from the plugin layer to inspect a child process's runtime.
+5. **Init event runtime metadata** — No such field exists in the SDK init message schema.
+
+### Changes made
+
+- Matrix row comment: hardened with full VERIFIED/NOT VERIFIED sections, adjacent seams rejected, and promotion path.
+- Locale boundary text (en+zh): `settings.claudeCode.jsRuntime.boundaryNotice` updated to explicit "Readback only" pattern.
+- Locale proof text (en+zh): Added 16 `settings.capabilityLab.proofs.jsRuntime.*` keys replacing hardcoded English strings.
+- Proof method: `runJsRuntimeReadbackProof()` converted from hardcoded English to locale-backed strings.
+- Settings JSDoc: `jsRuntime` field expanded with specific unverified items and adjacent seam boundaries.
+- Tests: JS Runtime tests updated to use `t()` locale lookups instead of hardcoded English strings.
+
+### Promotion path
+
+Requires one of: (a) SDK adds runtime metadata to init event, (b) SDK exposes a queryable runtime status API, (c) an observable runtime-selection side effect — none currently exists.
 
 ---
 

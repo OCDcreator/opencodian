@@ -8406,7 +8406,7 @@ describe('SettingsCapabilityLabSection', () => {
     expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-fail')).toBe(true);
   });
 
-  it('renders JS Runtime readback proof button and shows readback output', async () => {
+  it('renders JS Runtime readback proof button backed by locale key and shows readback output', async () => {
     const adapter = {
       runJsRuntimeReadbackProbe: jest.fn().mockResolvedValue({
         classification: 'readback',
@@ -8426,7 +8426,7 @@ describe('SettingsCapabilityLabSection', () => {
 
     section.attachTabbed(containerEl, 'capability-lab');
     const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
-      el.textContent?.includes('Run JS Runtime Readback Proof')
+      el.textContent?.includes(t('settings.capabilityLab.proofs.jsRuntime.button'))
     )) as HTMLButtonElement | undefined;
     expect(button).toBeTruthy();
 
@@ -8434,12 +8434,13 @@ describe('SettingsCapabilityLabSection', () => {
     await flushUi();
 
     expect(adapter.runJsRuntimeReadbackProbe).toHaveBeenCalled();
-    expect(containerEl.textContent).toContain('JS Runtime Readback Proof');
-    expect(containerEl.textContent).toContain('Option wired: ✓ yes');
-    expect(containerEl.textContent).toContain('Setting value: node');
-    expect(containerEl.textContent).toContain('SDK option present: ✓ yes');
-    expect(containerEl.textContent).toContain('SDK value: node');
-    expect(containerEl.textContent).toContain('Value match: ✓ yes');
+    expect(containerEl.textContent).toContain(t('settings.capabilityLab.proofs.jsRuntime.title'));
+    expect(containerEl.textContent).toContain(t('settings.capabilityLab.proofs.jsRuntime.optionWired', { status: t('settings.capabilityLab.proofs.jsRuntime.status.yes') }));
+    expect(containerEl.textContent).toContain(t('settings.capabilityLab.proofs.jsRuntime.settingValue', { value: 'node' }));
+    expect(containerEl.textContent).toContain(t('settings.capabilityLab.proofs.jsRuntime.sdkOptionPresent', { status: t('settings.capabilityLab.proofs.jsRuntime.status.yes') }));
+    expect(containerEl.textContent).toContain(t('settings.capabilityLab.proofs.jsRuntime.sdkValue', { value: 'node' }));
+    expect(containerEl.textContent).toContain(t('settings.capabilityLab.proofs.jsRuntime.valueMatch', { status: t('settings.capabilityLab.proofs.jsRuntime.status.yes') }));
+    expect(containerEl.textContent).toContain(t('settings.capabilityLab.proofs.jsRuntime.readback'));
   });
 
   it('renders JS Runtime readback proof button and shows error on thrown error', async () => {
@@ -8454,14 +8455,14 @@ describe('SettingsCapabilityLabSection', () => {
 
     section.attachTabbed(containerEl, 'capability-lab');
     const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
-      el.textContent?.includes('Run JS Runtime Readback Proof')
+      el.textContent?.includes(t('settings.capabilityLab.proofs.jsRuntime.button'))
     )) as HTMLButtonElement | undefined;
     expect(button).toBeTruthy();
 
     button!.click();
     await flushUi();
 
-    expect(containerEl.textContent).toContain('JS Runtime Readback Proof');
+    expect(containerEl.textContent).toContain(t('settings.capabilityLab.proofs.jsRuntime.title'));
     expect(containerEl.textContent).toContain('probe exploded');
   });
 

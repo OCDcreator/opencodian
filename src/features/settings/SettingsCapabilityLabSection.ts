@@ -1054,10 +1054,44 @@ export class SettingsCapabilityLabSection {
         capability: 'JS Runtime',
         sdkExposed: true, // SDK Options.executable?: 'node' | 'bun' | 'deno'
         adapterWired: true, // buildClaudeCodeOptions wires executable when settings.jsRuntime is non-empty
-        runtimeProof: 'readback', // Option wiring proven: executable propagates through buildClaudeCodeOptions
-        // into SDK options as 'node' | 'bun' | 'deno'. Readback ceiling: actual runtime selection
-        // depends on the SDK/CLI version, system PATH, and whether the requested runtime is installed.
-        // Plugin-side behavior is not independently verified. No runtime argument management is exposed.
+        runtimeProof: 'readback', // 2026-06-06 audit (checkpoint round): JS Runtime stays readback.
+        //
+        // VERIFIED:
+        // 1. Settings→SDK option wiring: jsRuntime propagates through
+        //    ClaudeCodeOptionsBuilder → SDK Options.executable → CLI subprocess.
+        // 2. Builder semantics: empty → option omitted; non-empty → executable set.
+        // 3. Normalization: only 'node'/'bun'/'deno' accepted; invalid → ''.
+        // 4. Probe coverage: runJsRuntimeReadbackProbe() builds diagnostic SDK options
+        //    and verifies all 4 values (empty/node/bun/deno) + mismatch + error cases.
+        // 5. Stable settings surface: Runtime tab dropdown with boundary + lifecycle notices.
+        // 6. Semantic separation from executablePath: jsRuntime selects the JS runtime
+        //    engine (node/bun/deno), while executablePath/ProcessResolver resolves the
+        //    Claude Code binary itself. These are orthogonal concepts.
+        //
+        // NOT VERIFIED — and fundamentally unverifiable from the plugin layer:
+        // 1. No observable signal confirms which runtime the CLI subprocess actually uses.
+        //    The init message (type:'system', subtype:'init') has no runtime metadata field.
+        // 2. The model runs on Anthropic's servers and cannot inspect the local subprocess's
+        //    process.execPath. Bash tool spawns a new shell process, not the CLI process itself.
+        // 3. Host PATH resolution (checking if node/bun/deno is installed) proves installation,
+        //    not actual runtime selection. The SDK resolves the binary path internally.
+        // 4. No stderr pattern reliably indicates runtime selection.
+        // 5. executablePath/ProcessResolver is a separate capability about Claude binary
+        //    resolution; it does not prove runtime engine selection.
+        //
+        // ADJACENT SEAMS REJECTED for productization:
+        // (a) Host PATH check — proves runtime installed, not that CLI uses it.
+        // (b) Model-queried process.execPath — model runs remotely; Bash spawns separate process.
+        // (c) executablePath/ProcessResolver — separate capability, different semantics.
+        // (d) Subprocess PID inspection — no portable API from plugin layer.
+        // (e) Init event runtime metadata — no such field exists in SDK init events.
+        //
+        // Honest ceiling: readback. The plugin verifies the option reaches the SDK boundary
+        // (options.executable). Actual runtime selection is CLI-internal and not independently
+        // verifiable. Do not misread the settings dropdown as proof of runtime behavior.
+        //
+        // Promotion path: if the SDK adds: (a) runtime metadata to init event, (b) a queryable
+        // runtime status API, or (c) an observable runtime-selection side effect.
         userSurface: 'settings', // Runtime tab dropdown, adjacent to executable path
       },
       {
@@ -2929,7 +2963,7 @@ export class SettingsCapabilityLabSection {
       (o) => this.runStrictMcpConfigReadbackProof(adapter, o));
     this.addProofControl(proofControls, containerEl, 'Run 1M Context Beta Readback Proof',
       (o) => this.runContext1mBetaReadbackProof(adapter, o));
-    this.addProofControl(proofControls, containerEl, 'Run JS Runtime Readback Proof',
+    this.addProofControl(proofControls, containerEl, t('settings.capabilityLab.proofs.jsRuntime.button'),
       (o) => this.runJsRuntimeReadbackProof(adapter, o));
     this.addProofControl(proofControls, containerEl, 'Run Load Timeout Readback Proof',
       (o) => this.runLoadTimeoutReadbackProof(adapter, o));
@@ -6548,47 +6582,67 @@ export class SettingsCapabilityLabSection {
     outputEl: HTMLElement,
   ): Promise<void> {
     outputEl.empty();
-    outputEl.createEl('p', { text: 'Running JS Runtime readback probe…' });
+    outputEl.createEl('p', { text: t('settings.capabilityLab.proofs.jsRuntime.running') });
 
     try {
       const result = await adapter.runJsRuntimeReadbackProbe();
 
       outputEl.empty();
-      outputEl.createEl('h5', { text: 'JS Runtime Readback Proof' });
+      outputEl.createEl('h5', { text: t('settings.capabilityLab.proofs.jsRuntime.title') });
       outputEl.createEl('p', {
         cls: 'opencodian-capability-lab-hint',
-        text: '⚠️ Diagnostic readback only: verifies settings→SDK option mapping only. Actual runtime selection depends on the SDK/CLI version, system PATH, and whether the requested runtime is installed. The plugin passes the option, but whether the subprocess actually uses the requested runtime is not independently verified. Applies to the next query or restarted session only. Active sessions do not update live. No runtime argument management is exposed (executableArgs / extraArgs remain absent).',
+        text: t('settings.capabilityLab.proofs.jsRuntime.boundary'),
+      });
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: t('settings.capabilityLab.proofs.jsRuntime.lifecycleBoundary'),
       });
 
       outputEl.createEl('p', {
         cls: 'opencodian-capability-lab-hint',
-        text: `Option wired: ${result.optionWired ? '✓ yes' : '✗ no'}`,
+        text: t('settings.capabilityLab.proofs.jsRuntime.optionWired', {
+          status: result.optionWired ? t('settings.capabilityLab.proofs.jsRuntime.status.yes') : t('settings.capabilityLab.proofs.jsRuntime.status.no'),
+        }),
       });
       outputEl.createEl('p', {
         cls: 'opencodian-capability-lab-hint',
-        text: `Setting value: ${result.emptySetting ? '(empty — auto)' : result.settingValue}`,
+        text: t('settings.capabilityLab.proofs.jsRuntime.settingValue', {
+          value: result.emptySetting ? '(empty — auto)' : result.settingValue,
+        }),
       });
       outputEl.createEl('p', {
         cls: 'opencodian-capability-lab-hint',
-        text: `SDK option present: ${result.sdkOptionPresent ? '✓ yes' : '✗ no'}`,
+        text: t('settings.capabilityLab.proofs.jsRuntime.sdkOptionPresent', {
+          status: result.sdkOptionPresent ? t('settings.capabilityLab.proofs.jsRuntime.status.yes') : t('settings.capabilityLab.proofs.jsRuntime.status.no'),
+        }),
       });
       if (result.sdkValue !== undefined) {
         outputEl.createEl('p', {
           cls: 'opencodian-capability-lab-hint',
-          text: `SDK value: ${result.sdkValue}`,
+          text: t('settings.capabilityLab.proofs.jsRuntime.sdkValue', {
+            value: result.sdkValue,
+          }),
         });
       }
       outputEl.createEl('p', {
         cls: 'opencodian-capability-lab-hint',
-        text: `Value match: ${result.valueMatch ? '✓ yes' : '✗ no'}`,
+        text: t('settings.capabilityLab.proofs.jsRuntime.valueMatch', {
+          status: result.valueMatch ? t('settings.capabilityLab.proofs.jsRuntime.status.yes') : t('settings.capabilityLab.proofs.jsRuntime.status.no'),
+        }),
       });
 
       if (result.classification === 'readback') {
+        outputEl.createEl('p', {
+          cls: 'opencodian-capability-lab-hint',
+          text: t('settings.capabilityLab.proofs.jsRuntime.readback'),
+        });
         this.updateRuntimeProof('JS Runtime', 'readback', outputEl);
       } else {
         outputEl.createEl('p', {
           cls: 'opencodian-capability-lab-error',
-          text: `✗ JS Runtime readback probe failed: ${result.error ?? 'unknown error'}`,
+          text: t('settings.capabilityLab.proofs.jsRuntime.fail', {
+            error: result.error ?? t('settings.capabilityLab.proofs.jsRuntime.defaultError'),
+          }),
         });
         this.updateRuntimeProof('JS Runtime', 'fail', outputEl);
       }
@@ -6596,7 +6650,9 @@ export class SettingsCapabilityLabSection {
       outputEl.empty();
       outputEl.createEl('p', {
         cls: 'opencodian-capability-lab-error',
-        text: `JS Runtime readback proof failed: ${err instanceof Error ? err.message : String(err)}`,
+        text: t('settings.capabilityLab.proofs.jsRuntime.threw', {
+          error: err instanceof Error ? err.message : String(err),
+        }),
       });
       this.updateRuntimeProof('JS Runtime', 'fail', outputEl);
     }

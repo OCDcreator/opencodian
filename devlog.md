@@ -11,6 +11,44 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-06-06 JS Runtime — Audit and Boundary Hardening (Outcome B)
+
+Audit the `JS Runtime` capability (SDK `Options.executable?: 'node' | 'bun' | 'deno'`) to determine whether it can be productized beyond readback into a stable pass/verified capability. The `executablePath`/ProcessResolver capability is separate and covers Claude binary resolution.
+
+**Decision: Outcome B** — `JS Runtime` remains `runtimeProof: 'readback'`. No honest promotion to pass is possible.
+
+**Audit findings:**
+
+1. `settings.jsRuntime` propagates through `ClaudeCodeOptionsBuilder` → `Options.executable` → CLI subprocess. Full wiring verified.
+2. No observable signal confirms which runtime the CLI subprocess actually uses. Init events have no runtime metadata field.
+3. The model runs on Anthropic's servers and cannot inspect the local subprocess's `process.execPath`.
+4. Bash tool spawns a new shell process, not the CLI process itself — cannot reveal CLI runtime.
+5. Host PATH checks prove installation, not actual runtime selection by the SDK.
+6. `executablePath`/ProcessResolver is a separate capability about Claude binary resolution, not runtime engine selection.
+
+**Adjacent seams REJECTED:** host PATH check, model-queried process.execPath, executablePath/ProcessResolver conflation, subprocess PID inspection, init event runtime metadata.
+
+**Changes made:**
+
+- Matrix row comment: hardened with full VERIFIED/NOT VERIFIED sections, adjacent seams rejected, and promotion path.
+- Locale boundary text (en+zh): `settings.claudeCode.jsRuntime.boundaryNotice` updated to explicit "Readback only" pattern.
+- Locale proof text (en+zh): Added 16 `settings.capabilityLab.proofs.jsRuntime.*` keys replacing hardcoded English strings.
+- Proof method: `runJsRuntimeReadbackProof()` converted from hardcoded English to locale-backed strings.
+- Settings JSDoc: `jsRuntime` field expanded with specific unverified items and adjacent seam boundaries.
+- Tests: JS Runtime tests updated to use `t()` locale lookups instead of hardcoded English strings.
+- Current state doc: JS Runtime audit checkpoint section added, readback entry hardened, suggested checkpoints updated.
+
+**Files changed:**
+
+- `src/features/settings/SettingsCapabilityLabSection.ts` (matrix row comment, proof method)
+- `src/i18n/locales/en.ts` (boundary notice, 16 proof keys)
+- `src/i18n/locales/zh.ts` (boundary notice, 16 proof keys)
+- `src/core/types/settings.ts` (jsRuntime JSDoc)
+- `tests/unit/features/settings/SettingsCapabilityLabSection.test.ts` (locale-backed assertions)
+- `docs/status/claude-code-current-state-2026-05-22.md` (audit checkpoint, readback entry, suggested checkpoints)
+
+---
+
 ## 2026-06-06 Debug — Audit and Boundary Hardening (Outcome B)
 
 Audit the `Debug` capability (SDK `Options.debug?: boolean`) to determine whether it can be productized beyond readback into a stable pass/verified capability. The Debug File row is already pass/verified; this audit covers the separate debug toggle only.
