@@ -91,6 +91,21 @@
 文件内部持有一个 plugin-scoped `CapabilityLabSessionStore`，实现 SDK `SessionStore` 所需的 `append` / `load` / `listSessions` / `listSubkeys`，用于 Capability Lab 的 mirror/import/list/load proof。Mirror probe 使用 `runDiagnosticPrompt({ sessionStore, sessionStoreFlush: 'eager' })` 写入后，会切到 Diagnostic Store、重新列出并选中返回的 session，再通过 `getSessionMessages(sessionId, { sessionStore, limit: 50, includeSystemMessages: false })` 渲染消息预览作为 readback proof；如果 readback 没有返回任何消息，则 Session Store proof 失败。它是内存态、plugin-owned 的诊断 adapter，不是稳定数据层。
 该内存 store 现在也有直接单测，覆盖 append/load 往返、重复 append、listSessions mtime、listSubkeys、空 store 隔离和 projectKey 隔离，但这些测试只证明诊断 store 行为，不把它升级成正式存储产品。
 
+**2026-06-06 审计硬化 — Session Store / Import Session to Store 保持 hidden**：
+- **Session Store** 的 `runtimeProof` 保持 `pass`（诊断 mirror proof 通过），但 `userSurface` 保持 `hidden`。晋升到稳定产品面的 blocker：
+  1. Alpha SDK 接口（sdk.d.ts 标记 SessionStore 为 alpha），无跨版本格式稳定性保证。
+  2. Store 数据格式是 CLI 实现定义的 opaque 格式——无 schema 契约，无跨版本兼容承诺。append/load/listSessions/listSubkeys 是底层 persistence seam，不是用户-facing archive 格式。
+  3. 现有 `BackendSessionBrowserModal` 已提供 browse + resume，无需外部 store。
+  4. 现有 `StorageService` 已在 human-readable 格式中持久化 OpenCodian conversations。
+  5. 产品化会创建第二个并行 persistence layer，对 native JSONL + conversation persistence 无明确用户价值。用户看到的是 opaque store entries 而非可读 transcript。
+  6. 无未被现有功能覆盖的用户工作流：browse（backend browser）、resume（backend browser + chat）、persist（StorageService）。
+- **Import Session to Store** 的 `runtimeProof` 保持 `pass`（诊断 import proof 通过），但 `userSurface` 保持 `hidden`。晋升 blocker：
+  1. Alpha SDK 接口，无格式稳定性保证。
+  2. 导入到 opaque store 格式，而非 user-readable OpenCodian conversations。目标格式是 CLI 实现定义的。
+  3. 无未被现有功能覆盖的用户工作流：browse native JSONL（backend browser）、resume（backend browser + chat）、persist conversations（StorageService）。
+  4. 导入方向与典型用户需求不匹配：用户想导入到 readable conversations，而非 opaque archive store。
+  5. 现有 backend session browser 已能 list、preview、detail、resume 任何 native JSONL session，无需 import 间接层。
+
 ### Adapter 获取
 
 `getClaudeCodeAdapter()` 从 `plugin.agentServiceRegistry` 获取 `'claude-code'` 注册的 adapter 并窄化类型为 `ClaudeCodeAdapter`。如果 adapter 不可用，相关面板显示 "not available" 提示。

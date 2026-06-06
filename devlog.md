@@ -11,6 +11,46 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-06-06 Session Store + Import Session to Store — Audit Hardening (Kept Hidden)
+
+### What changed
+
+- **src/features/settings/SettingsCapabilityLabSection.ts**:
+  - Hardened `Session Store` matrix row comment with explicit blocker text: alpha SDK interface, opaque implementation-defined format, existing BackendSessionBrowserModal + StorageService already serve all user needs, no clear value in a second parallel persistence layer.
+  - Hardened `Import Session to Store` matrix row comment with explicit blocker text: imports INTO opaque store format not user-readable conversations, import direction mismatches user need, existing backend browser already covers browse/resume/persist.
+  - Updated `Session Store` discovery row: now explicitly states "BLOCKED from stable UI" with rationale.
+  - Updated `Import/Delete/Restore` discovery row: now explicitly states "BLOCKED from stable UI" with rationale.
+
+- **docs/modules/features/settings/SettingsCapabilityLabSection.md**:
+  - Added "2026-06-06 审计硬化 — Session Store / Import Session to Store 保持 hidden" section with full blocker rationale in Chinese.
+
+- **docs/status/claude-code-current-state-2026-05-22.md**:
+  - Updated `Session Store` table row with full blocker text.
+  - Updated `Import Session to Store` table row with full blocker text.
+
+### Audit findings
+
+**Decision: KEEP HIDDEN** — both capabilities remain `runtimeProof: 'pass'`, `userSurface: 'hidden'`.
+
+**Session Store blocker:**
+1. Alpha SDK interface (sdk.d.ts marks SessionStore as alpha) with no format stability guarantee.
+2. Store data format is opaque and implementation-defined by the CLI — no schema contract, no cross-version compatibility promise.
+3. Existing BackendSessionBrowserModal already provides browse + resume for native JSONL sessions.
+4. Existing StorageService already persists OpenCodian conversations in human-readable format.
+5. Productizing would create a second parallel persistence layer with no clear user value.
+6. No user workflow is served that isn't already covered.
+
+**Import Session to Store blocker:**
+1. Alpha SDK interface with no format stability guarantee.
+2. Imports INTO an opaque store format, not into user-readable OpenCodian conversations.
+3. No user workflow is served that isn't already covered by existing features.
+4. Import direction mismatches typical user need (users want to import INTO readable conversations, not an opaque archive).
+5. Existing backend session browser can already list, preview, detail, and resume any native JSONL session.
+
+**No code changes** to adapter, store implementation, tests, or UI. Only comments and documentation hardened.
+
+---
+
 ## 2026-06-06 AskUserQuestion Preview Format — Productized Settings Surface with Safe Preview Rendering
 
 ### What changed

@@ -589,7 +589,15 @@ export class SettingsCapabilityLabSection {
         capability: 'Session Store',
         sdkExposed: true, // sessionStore option in SDK
         adapterWired: true, // buildSdkOptions wires sessionStore
-        runtimeProof: 'pass', // BUILD_ID feature-phase0-capability.202605281948: runDiagnosticPrompt with sessionStore + sessionStoreFlush='eager' succeeded; store captured 14 entries across 1 key for session 8c762ebb…. importSessionToStore also proven separately. Diagnostic-only — no stable store UI.
+        runtimeProof: 'pass', // BUILD_ID feature-phase0-capability.202605281948: runDiagnosticPrompt with sessionStore + sessionStoreFlush='eager' succeeded; store captured 14 entries across 1 key for session 8c762ebb…. importSessionToStore also proven separately.
+        // BLOCKER for promotion to stable user surface:
+        // 1. Alpha SDK interface (sdk.d.ts marks SessionStore as alpha) with no format stability guarantee across SDK versions.
+        // 2. Store data format is opaque and implementation-defined by the CLI — no schema contract, no cross-version compatibility promise. The append/load/listSessions/listSubkeys interface is a low-level persistence seam, not a user-facing archive format.
+        // 3. Existing BackendSessionBrowserModal already provides browse + resume for native JSONL sessions without requiring an external store.
+        // 4. Existing StorageService already persists OpenCodian conversations in a human-readable format.
+        // 5. Productizing would create a second parallel persistence layer with no clear user value over native JSONL + conversation persistence. Users would see opaque store entries instead of readable transcripts.
+        // 6. No user workflow is served that isn't already covered: browse (backend browser), resume (backend browser + chat), persist (StorageService).
+        // KEEP HIDDEN — diagnostic proof only.
         userSurface: 'hidden',
       },
       {
@@ -736,7 +744,14 @@ export class SettingsCapabilityLabSection {
         capability: 'Import Session to Store',
         sdkExposed: !!adapter, // importSessionToStore on SDK facade
         adapterWired: !!adapter, // adapter.importSessionToStore()
-        runtimeProof: 'pass', // BUILD_ID feature-phase0-capability.202605281948: imported session d2ea808d… into diagnostic store with 51 entries, 1 store key. SDK importSessionToStore accepted sessionStore with append/load interface. Diagnostic-only — no stable import UI.
+        runtimeProof: 'pass', // BUILD_ID feature-phase0-capability.202605281948: imported session d2ea808d… into diagnostic store with 51 entries, 1 store key. SDK importSessionToStore accepted sessionStore with append/load interface.
+        // BLOCKER for promotion to stable user surface:
+        // 1. Alpha SDK interface with no format stability guarantee.
+        // 2. Imports INTO an opaque store format, not into user-readable OpenCodian conversations. The destination format is implementation-defined by the CLI.
+        // 3. No user workflow is served that isn't already covered by existing features: browse native JSONL (backend browser), resume (backend browser + chat), persist conversations (StorageService).
+        // 4. Import direction mismatches typical user need: users would want to import sessions INTO readable conversations, not into an opaque archive store.
+        // 5. The existing backend session browser can already list, preview, detail, and resume any native JSONL session without import indirection.
+        // KEEP HIDDEN — diagnostic proof only.
         userSurface: 'hidden',
       },
       {
@@ -2692,10 +2707,10 @@ export class SettingsCapabilityLabSection {
     );
 
     // Session Store
-    this.addDiscoveryRow(tbody, 'Session Store', 'No UI. Wired as runtime-only option.');
+    this.addDiscoveryRow(tbody, 'Session Store', 'BLOCKED from stable UI. Alpha SDK interface with opaque implementation-defined format. Existing BackendSessionBrowserModal + StorageService already serve all user needs (browse/resume/persist). No user value in a second parallel persistence layer.');
 
     // Import/Delete/Restore
-    this.addDiscoveryRow(tbody, 'Import/Delete/Restore', 'Adapter methods exist but no UI. Deliberately not exposed in this lab (read-only focus).');
+    this.addDiscoveryRow(tbody, 'Import/Delete/Restore', 'BLOCKED from stable UI. importSessionToStore imports INTO an opaque store format, not into readable conversations. No workflow served that is not already covered by the backend session browser + conversation persistence.');
   }
 
   private addProofControl(
