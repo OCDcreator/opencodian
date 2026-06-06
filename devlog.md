@@ -11,6 +11,27 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-06-06 File Checkpoint / Rewind — Re-Audit and Boundary Hardening (Outcome B)
+
+Re-audit the Claude Code SDK file checkpoint/rewind seam against current SDK/repo state to determine whether the upstream blocker has been resolved or any new productizable seam has appeared.
+
+**Decision: Outcome B** — `File Checkpoint / Rewind` remains `runtimeProof: 'readback'`, `userSurface: 'diagnostic'`. Blocker confirmed unchanged.
+
+**Re-audit findings:**
+- SDK #236 (anthropics/claude-agent-sdk-typescript): open since 2026-03-17, 3 reactions, zero maintainer response.
+- `_T()` in `sdk.mjs` (~line 280170) still hardcodes `isInteractive:!1` (false). Snapshot creation gated behind React/Ink `useState` setters that never fire in SDK `query()` mode.
+- SDK 0.3.145 installed; 0.3.158 tested with identical canRewind:false results (10/10 candidates). npm latest 0.3.143 shows no checkpoint fixes.
+- Additional upstream evidence: claude-code #16976 (headless checkpoint restore — open), #18858 (PostRewind hook event — open).
+- No SDK changelog entry (0.3.143–0.3.158) or CLI version (2.1.167) mentions checkpoint/rewind fixes.
+- All adjacent seams rejected: enableFileCheckpointing toggle (flag-only), applyFlagSettings (dead-end), sessionStore (mutually exclusive), extraArgs (UUID capture only), Fork Session (different semantics).
+
+**Changes:**
+- `src/features/settings/SettingsCapabilityLabSection.ts`: Hardened matrix row comment with 2026-06-06 Outcome B, full VERIFIED/NOT VERIFIED split, upstream evidence table, adjacent seams rejected, promotion path.
+- `docs/status/claude-code-current-state-2026-05-22.md`: Updated readback summary, suggested checkpoints, added full checkpoint section.
+- `docs/modules/features/settings/SettingsCapabilityLabSection.md`: Updated Rewind Dry-Run Preview entry and honesty audit item 7.
+
+---
+
 ## 2026-06-06 AskUserQuestion Preview Format — Audit and Boundary Hardening (Outcome B)
 
 Audit the `AskUserQuestion Preview Format` capability (SDK `toolConfig.askUserQuestion.previewFormat?: 'markdown' | 'html'`) to determine whether it can be productized beyond readback into a stable pass/verified capability.

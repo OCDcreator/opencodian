@@ -576,7 +576,49 @@ export class SettingsCapabilityLabSection {
         capability: 'File Checkpoint / Rewind',
         sdkExposed: true, // enableFileCheckpointing option + rewindFiles on query
         adapterWired: true, // adapter.rewindFiles() exists
-        runtimeProof: 'readback', // BLOCKER=upstream SDK bug #236 (open 2026-03-17, 3 reactions, no maintainer response). Current truth: File Checkpoint / Rewind is still readback, not pass. SDK 0.3.158 was tested; Obsidian/Electron needs a setMaxListeners(AbortSignal) monkey-patch. Even with that patch, 10/10 candidates still return canRewind:false, with no improvement over 0.3.145. Snapshot creation is still gated behind React/Ink UI useState setters and never fires in SDK query() mode. rewindFiles() sends `sdk_rewind_files` control request to the CLI subprocess, which still finds empty file history. applyFlagSettings({ fileCheckpointingEnabled: true }) remains a dead-end seam: it does not revive snapshot creation mid-stream.
+        runtimeProof: 'readback', // 2026-06-06 re-audit (Outcome B): File Checkpoint / Rewind REMAINS readback with hardened boundary.
+        //
+        // VERIFIED (option wiring + diagnostic probe):
+        // 1. enableFileCheckpointing propagates through ClaudeCodeOptionsBuilder → SDK Options.enableFileCheckpointing → CLI subprocess.
+        // 2. adapter.rewindFiles(sessionId, userMessageId, { dryRun: true }) sends sdk_rewind_files control request to CLI subprocess.
+        // 3. Two-phase probe (Phase 1: write probe file, Phase 2: resume + test rewind candidates) executes without SDK errors.
+        // 4. applyFlagSettings({ fileCheckpointingEnabled: true }) seam tested — call succeeds but has no observable effect.
+        // 5. Stream monitoring counts files_persisted events (expected 0, observed 0).
+        //
+        // NOT VERIFIED — upstream blocker (NOT a temporary gap):
+        // 1. ROOT CAUSE: _T() in sdk.mjs (~line 280170) initializes CLI subprocess session state with
+        //    isInteractive:!1 (hardcoded false). Snapshot creation is gated behind React/Ink UI useState
+        //    setters that only mount in interactive TUI mode — they NEVER fire in SDK query() mode.
+        // 2. 10/10 candidates return canRewind:false with error "No file checkpoint found for this message."
+        //    across SDK 0.3.145 (installed) and 0.3.158 (tested with monkey-patch, identical results).
+        // 3. applyFlagSettings({ fileCheckpointingEnabled: true }) is a dead-end seam: it modifies runtime
+        //    settings flags but does not retroactively create snapshots or activate React/Ink components.
+        // 4. Zero files_persisted events observed in any diagnostic stream.
+        // 5. rewindFiles() finds empty file history because snapshots were never created.
+        //
+        // UPSTREAM EVIDENCE:
+        // - GitHub Issue #236 (anthropics/claude-agent-sdk-typescript): open since 2026-03-17, 3 reactions,
+        //   zero maintainer response. Describes exact root cause.
+        // - GitHub Issue #16976 (anthropics/claude-code): "Expose checkpoint restore in headless mode" — open,
+        //   confirms community demand for non-interactive checkpoint support.
+        // - GitHub Issue #18858 (anthropics/claude-code): "PostRewind hook event request" — open, confirms
+        //   plugin ecosystem wants rewind notification events that depend on functional checkpointing.
+        // - No SDK changelog entry (0.3.143 through 0.3.158) mentions checkpoint/rewind fixes.
+        // - CLI version 2.1.167 (2026-06-06) shows no relevant change.
+        //
+        // ADJACENT SEAMS AUDITED AND REJECTED:
+        // (a) enableFileCheckpointing toggle — correctly wired, but only sets a config flag on the CLI
+        //     subprocess; does not activate snapshot creation in non-interactive mode.
+        // (b) applyFlagSettings({ fileCheckpointingEnabled: true }) — dead-end: modifies runtime flags
+        //     mid-stream but does not create snapshots or activate React/Ink components.
+        // (c) sessionStore + enableFileCheckpointing — mutually exclusive in SDK (throws error);
+        //     sessionStore captures opaque CLI state, not file snapshots.
+        // (d) SDK extraArgs: { 'replay-user-messages': null } — documented for UUID capture,
+        //     but UUIDs are already available in probe candidates; this does not affect snapshot creation.
+        //
+        // PROMOTION PATH: Requires Anthropic to add snapshot creation to the non-interactive code path
+        // in the CLI subprocess — specifically, decoupling snapshot persistence from React/Ink UI state.
+        // No plugin-side workaround exists. This is the highest user-value seam that remains blocked.
         userSurface: 'diagnostic', // Capability Lab toggle; no stable rewind UI exposed
       },
       {

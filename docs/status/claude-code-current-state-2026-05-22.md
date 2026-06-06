@@ -75,7 +75,7 @@ Option wiring proven through `buildClaudeCodeOptions`, but no independent plugin
 - AskUserQuestion Preview Format — option wiring + UI preview rendering path verified; actual preview arrival depends on SDK version and model behavior. **2026-06-06 audit completed** (Outcome B): remains readback with hardened boundary. Full code path (settings→SDK→bridge extraction→UI rendering) proven with synthetic data; no proof that SDK actually includes `.preview` in real AskUserQuestion tool inputs.
 
 **Diagnostic (`userSurface: 'diagnostic'`) — 3**
-- File Checkpoint / Rewind — `rewindFiles(dryRun: true)` callable but returns `canRewind: false` for all candidates. Upstream blocker: SDK #236 (snapshot creation gated behind React/Ink UI code paths, never fires in `query()` mode).
+- File Checkpoint / Rewind — `rewindFiles(dryRun: true)` callable but returns `canRewind: false` for all candidates. ✅ **2026-06-06 re-audit (Outcome B)**: blocker confirmed unchanged. Upstream blocker: SDK #236 (open since 2026-03-17, zero maintainer response; `_T()` in sdk.mjs hardcodes `isInteractive:!1`, gating snapshot creation behind React/Ink `useState` setters that never fire in `query()` mode). Additional upstream evidence: claude-code #16976 (headless checkpoint restore — open), #18858 (PostRewind hook event — open). SDK 0.3.145 installed; 0.3.158 tested with identical canRewind:false results. No SDK changelog entry through 0.3.158 mentions checkpoint fixes. See full audit section below.
 - Warm Startup — `startup()` callable and WarmQuery produces response. WarmQuery is single-use (query() once per handle); no persistent warm pool. "No startup latency" is SDK internal documentation claim, not independently measured. Readback ceiling.
 - Stderr Diagnostic — stderr callback wiring proven; no query reliably provokes stderr output. ✅ 2026-06-06 audit (Outcome B): fundamental limitation, not temporary gap. Debug File (pass/verified) covers the "capture debug output" use case.
 
@@ -92,9 +92,97 @@ These have adapter wiring and runtime proof, but no stable or diagnostic user su
 
 ### suggested next 3 checkpoints
 
-1. **File Checkpoint / Rewind** — Highest user-value if unblocked. Monitor Anthropic SDK bug #236. Re-audit on any SDK version bump that mentions checkpointing or interactive-mode fixes. Current state: readback with known upstream blocker.
+1. **File Checkpoint / Rewind** — Highest user-value if unblocked. ✅ **2026-06-06 re-audited** — blocker confirmed unchanged. Monitor SDK #236 + claude-code #16976. Re-audit on any SDK version bump that mentions checkpointing or interactive-mode fixes. Current state: readback with confirmed upstream blocker.
 2. **Allowed Tools** — Readback; auto-approve shortcut only, zero enforcement at tool-catalog level. Potential seam: if SDK adds enforcement at the catalog level (currently `allowedTools` only affects `canUseTool` auto-approve, not tool availability). Low priority.
 3. **Task Budget** — Readback; `@alpha` option wiring verified. Potential seam: if SDK adds budget-enforcement status signals or error types.
+
+---
+
+## 2026-06-06 File Checkpoint / Rewind — Re-Audit and Boundary Hardening (Outcome B)
+
+### Objective
+
+Re-audit the Claude Code SDK file checkpoint/rewind seam against the current SDK/repo state to determine whether the upstream blocker has been resolved or any new productizable seam has appeared.
+
+### SDK Seam Analysis
+
+The SDK exposes two checkpoint/rewind APIs:
+
+```typescript
+// SDK Options
+enableFileCheckpointing?: boolean;  // default: false
+
+// Query method
+query.rewindFiles(userMessageId: string, options?: { dryRun?: boolean }): Promise<RewindFilesResult>;
+
+// Result shape
+interface RewindFilesResult {
+  canRewind: boolean;
+  error?: string;
+  filesChanged?: string[];
+  insertions?: number;
+  deletions?: number;
+}
+
+// Runtime flag injection (dead-end seam)
+query.applyFlagSettings({ fileCheckpointingEnabled: true });
+
+// Stream event (never observed in query() mode)
+interface SDKFilesPersistedEvent {
+  type: 'system';
+  subtype: 'files_persisted';
+  files: Array<{ path: string; success: boolean }>;
+}
+```
+
+### Decision
+
+**Outcome B** — File Checkpoint / Rewind REMAINS `readback` with hardened boundary.
+
+### What IS verified (option wiring + diagnostic probe)
+
+1. **Settings→SDK option wiring**: `enableFileCheckpointing` propagates through `ClaudeCodeOptionsBuilder` → SDK `Options.enableFileCheckpointing` → CLI subprocess.
+2. **Adapter rewindFiles()**: Sends `sdk_rewind_files` control request to CLI subprocess via `session.runtime.query.rewindFiles()`.
+3. **Two-phase diagnostic probe**: Phase 1 writes a probe file, Phase 2 resumes session and tests rewind candidates against all assistant message UUIDs.
+4. **applyFlagSettings seam**: `query.applyFlagSettings({ fileCheckpointingEnabled: true })` call succeeds without error after first assistant message.
+5. **Stream monitoring**: Counts `files_persisted` events (expected 0, observed 0).
+
+### What is NOT verified — upstream blocker (NOT a temporary gap)
+
+1. **ROOT CAUSE**: `_T()` in `sdk.mjs` (~line 280170) initializes CLI subprocess session state with `isInteractive:!1` (hardcoded `false`). Snapshot creation is gated behind React/Ink UI `useState` setters that only mount in interactive TUI mode — they NEVER fire in SDK `query()` mode.
+2. **10/10 candidates return `canRewind:false`** with error "No file checkpoint found for this message." across SDK 0.3.145 (installed) and 0.3.158 (tested with setMaxListeners monkey-patch, identical results).
+3. **`applyFlagSettings({ fileCheckpointingEnabled: true })` is a dead-end seam**: It modifies runtime settings flags but does not retroactively create snapshots or activate React/Ink components.
+4. **Zero `files_persisted` events** observed in any diagnostic stream.
+5. **`rewindFiles()` finds empty file history** because snapshots were never created.
+
+### Upstream evidence
+
+| Source | Description | Status |
+|--------|-------------|--------|
+| SDK #236 (claude-agent-sdk-typescript) | "File checkpointing snapshots not created in SDK (non-interactive) mode" — exact root cause | **Open** since 2026-03-17, 3 reactions, zero maintainer response |
+| claude-code #16976 | "Expose checkpoint restore in headless mode" — community demand for non-interactive checkpoint support | **Open** |
+| claude-code #18858 | "PostRewind hook event request" — plugin ecosystem wants rewind notification events | **Open** |
+| claude-code #15403 | Checkpoint restore broken (server-side format change) | Closed (not_planned) |
+| SDK changelog (0.3.143–0.3.158) | No checkpoint/rewind fix mentioned | — |
+| CLI version 2.1.167 (2026-06-06) | No relevant checkpoint change | — |
+
+### Adjacent seams audited and REJECTED
+
+1. **enableFileCheckpointing toggle** — Correctly wired but only sets a config flag; does not activate snapshot creation in non-interactive mode.
+2. **applyFlagSettings({ fileCheckpointingEnabled: true })** — Dead-end: modifies runtime flags mid-stream but does not create snapshots or activate React/Ink components.
+3. **sessionStore + enableFileCheckpointing** — Mutually exclusive in SDK (throws error). sessionStore captures opaque CLI state, not file snapshots.
+4. **SDK extraArgs: { 'replay-user-messages': null }** — Documented for UUID capture, but UUIDs are already available in probe candidates; does not affect snapshot creation.
+5. **Fork Session as "rewind alternative"** — Fork branches from a message point (pass/verified), but does NOT restore file state. Semantically distinct from checkpoint-based rewind.
+
+### Changes made
+
+- Matrix row comment: hardened with 2026-06-06 re-audit Outcome B, full VERIFIED/NOT VERIFIED evidence trace, upstream evidence table, adjacent seams rejected, and promotion path.
+- Current-state doc: updated readback summary line and suggested checkpoints with re-audit evidence.
+- Module doc: updated Rewind Dry-Run Preview entry with 2026-06-06 re-audit classification.
+
+### Promotion path
+
+Requires Anthropic to add snapshot creation to the non-interactive code path in the CLI subprocess — specifically, decoupling snapshot persistence from React/Ink UI state. No plugin-side workaround exists. This is the highest user-value seam that remains blocked. Re-audit on any SDK version bump that mentions checkpointing or interactive-mode fixes.
 
 ---
 
