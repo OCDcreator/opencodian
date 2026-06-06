@@ -227,6 +227,41 @@ describe('ClaudeCodePermissionBridge', () => {
     });
   });
 
+  it('preserves AskUserQuestion option previews in the question request', async () => {
+    const collectQuestionAnswers = jest.fn(async () => [['Yes']]);
+    const bridge = createClaudeCodePermissionBridge({ collectQuestionAnswers }, {
+      sessionId: 'claude-session-previews',
+    });
+
+    const input = {
+      questions: [{
+        question: 'Continue?',
+        header: 'Confirm',
+        options: [
+          { label: 'Yes', description: 'Proceed', preview: '**Proceed** with the operation' },
+          { label: 'No', description: 'Stop', preview: 'Stop the operation' },
+        ],
+      }],
+    };
+
+    await bridge.canUseTool('AskUserQuestion', input, { toolUseID: 'question-preview' });
+
+    expect(collectQuestionAnswers).toHaveBeenCalledWith({
+      id: 'question-preview',
+      sessionId: 'claude-session-previews',
+      questions: [{
+        question: 'Continue?',
+        header: 'Confirm',
+        options: [
+          { label: 'Yes', description: 'Proceed', preview: '**Proceed** with the operation' },
+          { label: 'No', description: 'Stop', preview: 'Stop the operation' },
+        ],
+        multiple: false,
+        custom: true,
+      }],
+    }, { toolUseID: 'question-preview' });
+  });
+
   it('logs permission and question decisions without leaking user answers', async () => {
     const bridge = createClaudeCodePermissionBridge({
       collectToolApproval: jest.fn(async () => 'session' as const),

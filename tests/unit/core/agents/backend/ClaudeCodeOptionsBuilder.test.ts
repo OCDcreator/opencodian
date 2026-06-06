@@ -280,4 +280,41 @@ describe('ClaudeCodeOptionsBuilder tool restrictions', () => {
 
     expect(options.tools).toEqual(['Read', 'Grep']);
   });
+
+  it('omits toolConfig when askUserQuestionPreviewFormat is empty', () => {
+    const options = buildClaudeCodeOptions({
+      vaultPath: '/vault/project',
+      settings: getDefaultClaudeCodeBackendSettings(),
+    });
+
+    expect(options).not.toHaveProperty('toolConfig');
+  });
+
+  it('wires markdown preview format into toolConfig', () => {
+    const options = buildClaudeCodeOptions({
+      vaultPath: '/vault/project',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        askUserQuestionPreviewFormat: 'markdown',
+      },
+    });
+
+    expect(options.toolConfig).toEqual({
+      askUserQuestion: { previewFormat: 'markdown' },
+    });
+  });
+
+  it('wires html preview format into toolConfig', () => {
+    const options = buildClaudeCodeOptions({
+      vaultPath: '/vault/project',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        askUserQuestionPreviewFormat: 'html',
+      },
+    });
+
+    expect(options.toolConfig).toEqual({
+      askUserQuestion: { previewFormat: 'html' },
+    });
+  });
 });

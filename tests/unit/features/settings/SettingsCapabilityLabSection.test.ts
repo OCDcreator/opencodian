@@ -1081,7 +1081,7 @@ describe('SettingsCapabilityLabSection', () => {
       'Continue': { runtimeProof: 'pass', userSurface: 'diagnostic' },
       'Resume Session At Position': { runtimeProof: 'pass', userSurface: 'diagnostic' },
       'Fork Session On Resume': { runtimeProof: 'pass', userSurface: 'diagnostic' },
-      'AskUserQuestion Preview Format': { runtimeProof: 'readback', userSurface: 'hidden' },
+      'AskUserQuestion Preview Format': { runtimeProof: 'readback', userSurface: 'settings' },
       'System Prompt': { runtimeProof: 'pass', userSurface: 'settings' },
     };
 
@@ -1138,7 +1138,7 @@ describe('SettingsCapabilityLabSection', () => {
     const hiddenRows = rows.filter((row) => (
       row.querySelector('[data-surface="hidden"]') !== null
     ));
-    expect(hiddenRows.length).toBe(3); // Session Store, Import Session to Store, AskUserQuestion Preview Format
+    expect(hiddenRows.length).toBe(2); // Session Store, Import Session to Store
   });
 
   it('runs the structured output diagnostic probe through the adapter runtime', async () => {

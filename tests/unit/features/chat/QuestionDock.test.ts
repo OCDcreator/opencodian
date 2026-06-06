@@ -305,6 +305,58 @@ describe('QuestionDock keyboard interaction', () => {
   });
 });
 
+describe('QuestionDock preview rendering', () => {
+  beforeEach(() => {
+    document.body.replaceChildren();
+    jest.clearAllMocks();
+    setLocale('en');
+  });
+
+  afterEach(() => {
+    document.body.replaceChildren();
+  });
+
+  it('renders AskUserQuestion option preview on focus and hides it on blur', () => {
+    const { rootEl } = renderDock({
+      request: createQuestionRequest({
+        questions: [{
+          header: 'Confirm',
+          question: 'Continue?',
+          options: [
+            { label: 'Yes', description: 'Proceed', preview: '<strong>Proceed</strong> with the operation' },
+            { label: 'No', description: 'Stop' },
+          ],
+          multiple: false,
+          custom: false,
+        }],
+      }),
+      displayMode: 'all',
+    });
+    if (!rootEl) {
+      throw new Error('Expected dock root');
+    }
+
+    const previewEl = rootEl.querySelector('.opencodian-question-inline-option-preview');
+    expect(previewEl).not.toBeNull();
+    expect(previewEl!.classList.contains('is-hidden')).toBe(true);
+
+    const yesInput = rootEl.querySelector<HTMLInputElement>('input[value="Yes"]');
+    expect(yesInput).not.toBeNull();
+    yesInput!.focus();
+    yesInput!.dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
+
+    expect(previewEl!.classList.contains('is-hidden')).toBe(false);
+    expect(previewEl!.textContent).toBe('<strong>Proceed</strong> with the operation');
+
+    const noInput = rootEl.querySelector<HTMLInputElement>('input[value="No"]');
+    expect(noInput).not.toBeNull();
+    noInput!.focus();
+    noInput!.dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
+
+    expect(previewEl!.classList.contains('is-hidden')).toBe(true);
+  });
+});
+
 describe('QuestionDock collapse interaction', () => {
   beforeEach(() => {
     document.body.replaceChildren();

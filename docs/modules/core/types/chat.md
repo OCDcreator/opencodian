@@ -75,7 +75,7 @@
 
 | 类型 | 说明 |
 |------|------|
-| `QuestionOption` | 选项（`label`, `description`） |
+| `QuestionOption` | 选项（`label`, `description`, `preview?`）|
 | `QuestionPrompt` | 问题提示（`question`, `header`, `options`, `multiple?`, `custom?`） |
 | `QuestionRequest` | 问题请求（`id`, `sessionId`, `questions`） |
 | `QuestionResolution` | 问题解决状态（`request`, `status: 'answered' \| 'rejected'`, `answers?`） |

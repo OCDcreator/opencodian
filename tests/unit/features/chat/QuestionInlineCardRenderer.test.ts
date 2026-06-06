@@ -204,6 +204,51 @@ describe('QuestionInlineCardRenderer', () => {
     expect(keepPinnedSpy).toHaveBeenCalledWith('tab-1');
   });
 
+  it('renders AskUserQuestion option preview on focus and hides it on blur', async () => {
+    const { renderer, runtime } = createRendererHarness();
+    const request = createQuestionRequest({
+      questions: [{
+        header: 'Confirm',
+        question: 'Continue?',
+        options: [
+          { label: 'Yes', description: 'Proceed', preview: '**Proceed** with the operation' },
+          { label: 'No', description: 'Stop' },
+        ],
+        multiple: false,
+        custom: false,
+      }],
+    });
+
+    const responsePromise = renderer.collectAction(request, 'all', 'tab-1');
+    await flushInlineRender();
+
+    const cardEl = runtime.questionInlineCardEl;
+    expect(cardEl).not.toBeNull();
+
+    const previewEl = cardEl!.querySelector('.opencodian-question-inline-option-preview');
+    expect(previewEl).not.toBeNull();
+    expect(previewEl!.classList.contains('is-hidden')).toBe(true);
+
+    const yesInput = cardEl?.querySelector<HTMLInputElement>('input[value="Yes"]');
+    expect(yesInput).not.toBeNull();
+    yesInput!.focus();
+    yesInput!.dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
+
+    expect(previewEl!.classList.contains('is-hidden')).toBe(false);
+    expect(previewEl!.textContent).toBe('**Proceed** with the operation');
+
+    const noInput = cardEl?.querySelector<HTMLInputElement>('input[value="No"]');
+    expect(noInput).not.toBeNull();
+    noInput!.focus();
+    noInput!.dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
+
+    expect(previewEl!.classList.contains('is-hidden')).toBe(true);
+
+    yesInput!.checked = true;
+    cardEl?.querySelector<HTMLButtonElement>('.opencodian-question-inline-btn.is-submit')?.click();
+    await expect(responsePromise).resolves.toEqual({ type: 'reply', answers: [['Yes']] });
+  });
+
   it('reuses the inline card while collecting sequential question answers', async () => {
     const {
       keepPinnedSpy,

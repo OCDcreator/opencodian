@@ -116,6 +116,15 @@ export interface ClaudeCodeBackendSettings {
    */
   toolAliases: Record<string, string>;
   /**
+   * Request the SDK to include a preview for each AskUserQuestion option in the specified format
+   * ('markdown' or 'html'). The plugin preserves and displays preview text safely as plain text;
+   * rich HTML rendering is disabled for security. Empty string means do not request previews
+   * (SDK default). Applies to the next query or restarted session only.
+   * Readback only: SDK option wiring and UI rendering path are proven; actual preview arrival
+   * depends on the SDK version and model behavior and is not independently verified.
+   */
+  askUserQuestionPreviewFormat: 'markdown' | 'html' | '';
+  /**
    * Ask the SDK to emit CLI debug logs during query execution.
    * Readback only: SDK option wiring proven; actual CLI debug log emission is not independently
    * verified from the plugin layer. The plugin passes the option — whether the CLI binary
@@ -232,6 +241,7 @@ export function getDefaultClaudeCodeBackendSettings(): ClaudeCodeBackendSettings
     sandbox: { enabled: false, failIfUnavailable: false, autoAllowBashIfSandboxed: false },
     planModeInstructions: '',
     toolAliases: {},
+    askUserQuestionPreviewFormat: '',
     debug: false,
     strictMcpConfig: false,
     enableContext1mBeta: false,
@@ -376,6 +386,13 @@ export function normalizeClaudeCodeJsRuntime(value: unknown): 'node' | 'bun' | '
   return '';
 }
 
+export function normalizeClaudeCodeAskUserQuestionPreviewFormat(value: unknown): 'markdown' | 'html' | '' {
+  if (value === 'markdown' || value === 'html') {
+    return value;
+  }
+  return '';
+}
+
 export function normalizeClaudeCodeSandboxSettings(value: unknown): ClaudeCodeSandboxSettings {
   const defaults = { enabled: false, failIfUnavailable: false, autoAllowBashIfSandboxed: false };
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -439,6 +456,7 @@ export function normalizeClaudeCodeBackendSettings(value: unknown): ClaudeCodeBa
       ? candidate.planModeInstructions.trim()
       : defaults.planModeInstructions,
     toolAliases: normalizeClaudeCodeToolAliases(candidate.toolAliases),
+    askUserQuestionPreviewFormat: normalizeClaudeCodeAskUserQuestionPreviewFormat(candidate.askUserQuestionPreviewFormat),
     debug: candidate.debug === true,
     strictMcpConfig: candidate.strictMcpConfig === true,
     enableContext1mBeta: candidate.enableContext1mBeta === true,

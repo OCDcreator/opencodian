@@ -2199,6 +2199,7 @@ export class SettingsClaudeCodeSection {
     this.renderRestrictedBuiltinToolsSetting(containerEl);
     this.renderRestrictedBuiltinToolsProofStatusNotice(containerEl);
     this.renderToolAliasesSetting(containerEl);
+    this.renderAskUserQuestionPreviewFormatSetting(containerEl);
   }
 
   private renderMcpRuntimeControls(containerEl: HTMLElement): void {
@@ -2447,6 +2448,35 @@ export class SettingsClaudeCodeSection {
       attr: { 'data-claude-code-tool-aliases-lifecycle': 'true' },
     });
     lifecycleEl.createSpan({ text: t('settings.claudeCode.toolAliases.lifecycleNotice') });
+  }
+
+  private renderAskUserQuestionPreviewFormatSetting(containerEl: HTMLElement): void {
+    const boundaryEl = containerEl.createDiv({
+      cls: 'opencodian-settings-inline-notice',
+      attr: { 'data-claude-code-ask-user-question-preview-format-boundary': 'true' },
+    });
+    boundaryEl.createSpan({ text: t('settings.claudeCode.askUserQuestionPreviewFormat.boundaryNotice') });
+
+    new Setting(containerEl)
+      .setName(t('settings.claudeCode.askUserQuestionPreviewFormat.name'))
+      .setDesc(t('settings.claudeCode.askUserQuestionPreviewFormat.desc'))
+      .addDropdown((dropdown) => {
+        dropdown
+          .addOption('', t('settings.claudeCode.askUserQuestionPreviewFormat.none'))
+          .addOption('markdown', t('settings.claudeCode.askUserQuestionPreviewFormat.markdown'))
+          .addOption('html', t('settings.claudeCode.askUserQuestionPreviewFormat.html'))
+          .setValue(this.settings.askUserQuestionPreviewFormat)
+          .onChange(async (value) => {
+            this.settings.askUserQuestionPreviewFormat = value as 'markdown' | 'html' | '';
+            await this.saveSettings();
+          });
+      });
+
+    const lifecycleEl = containerEl.createDiv({
+      cls: 'opencodian-settings-inline-notice',
+      attr: { 'data-claude-code-ask-user-question-preview-format-lifecycle': 'true' },
+    });
+    lifecycleEl.createSpan({ text: t('settings.claudeCode.askUserQuestionPreviewFormat.lifecycleNotice') });
   }
 
   private parseToolAliases(raw: string): Record<string, string> {

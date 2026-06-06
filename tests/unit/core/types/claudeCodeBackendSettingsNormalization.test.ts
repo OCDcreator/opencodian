@@ -575,3 +575,30 @@ describe('normalizeClaudeCodeBackendSettings systemPrompt', () => {
     expect(result.systemPrompt).toBe('');
   });
 });
+
+describe('normalizeClaudeCodeBackendSettings askUserQuestionPreviewFormat', () => {
+  it('defaults to empty string', () => {
+    const result = normalizeClaudeCodeBackendSettings({});
+    expect(result.askUserQuestionPreviewFormat).toBe('');
+  });
+
+  it('preserves markdown value', () => {
+    const result = normalizeClaudeCodeBackendSettings({ askUserQuestionPreviewFormat: 'markdown' });
+    expect(result.askUserQuestionPreviewFormat).toBe('markdown');
+  });
+
+  it('preserves html value', () => {
+    const result = normalizeClaudeCodeBackendSettings({ askUserQuestionPreviewFormat: 'html' });
+    expect(result.askUserQuestionPreviewFormat).toBe('html');
+  });
+
+  it('falls invalid values back to empty string', () => {
+    const result = normalizeClaudeCodeBackendSettings({ askUserQuestionPreviewFormat: 'latex' as unknown as 'markdown' });
+    expect(result.askUserQuestionPreviewFormat).toBe('');
+  });
+
+  it('falls non-string values back to empty string', () => {
+    const result = normalizeClaudeCodeBackendSettings({ askUserQuestionPreviewFormat: 42 as unknown as 'markdown' });
+    expect(result.askUserQuestionPreviewFormat).toBe('');
+  });
+});

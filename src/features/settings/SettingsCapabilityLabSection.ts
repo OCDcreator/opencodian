@@ -1028,13 +1028,13 @@ export class SettingsCapabilityLabSection {
       {
         capability: 'AskUserQuestion Preview Format',
         sdkExposed: true, // SDK Options.toolConfig?: ToolConfig — askUserQuestion.previewFormat?: 'markdown' | 'html'
-        adapterWired: true, // buildClaudeCodeOptions wires toolConfig when input.toolConfig is provided
+        adapterWired: true, // buildClaudeCodeOptions wires toolConfig from settings.askUserQuestionPreviewFormat
         runtimeProof: 'readback', // Option wiring proven: toolConfig propagates through buildClaudeCodeOptions
-        // into SDK options. Readback ceiling: the plugin question UI does not extract or render
-        // the preview field from question options, so this option has no trustworthy user effect.
-        // No stable settings UI is exposed because toggling this would be a no-op from the user's
-        // perspective. Diagnostic-only surface for SDK parity tracking.
-        userSurface: 'hidden', // No stable or diagnostic UI — wired for SDK parity tracking only
+        // into SDK options, and the permission bridge preserves preview data through QuestionRequest.
+        // The question UI (inline card and dock) now renders preview text safely as plain text.
+        // Readback ceiling: actual preview arrival from the SDK depends on version/model behavior
+        // and is not independently verified from the plugin layer.
+        userSurface: 'settings', // Tools tab dropdown; Claude-only surface
       },
       {
         capability: 'System Prompt',

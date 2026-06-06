@@ -103,6 +103,7 @@ describe('prepareLoadedSettingsBootstrapState backend normalization', () => {
       includeHookEvents: false,
       forwardSubagentText: false,
       agentProgressSummaries: false,
+      askUserQuestionPreviewFormat: '',
       promptSuggestions: false,
       debugChannels: {
         runtime: true,

@@ -129,6 +129,12 @@ export interface ClaudeCodeSdkOptionsShape {
   planModeInstructions?: string;
   /** Tool name aliases passed as the SDK `toolAliases` option. Maps model-emitted tool names to canonical tool names before resolution. */
   toolAliases?: Record<string, string>;
+  /** Ask the SDK to include a preview for each AskUserQuestion option in the specified format. */
+  toolConfig?: {
+    askUserQuestion?: {
+      previewFormat?: 'markdown' | 'html';
+    };
+  };
   /** Ask the SDK to emit CLI debug logs during query execution. */
   debug?: boolean;
   /** Ask the SDK to write CLI debug logs to a file path. */
@@ -319,6 +325,12 @@ export function buildClaudeCodeOptions(
   const toolAliases = normalizeClaudeCodeToolAliases(input.settings.toolAliases);
   if (Object.keys(toolAliases).length > 0) {
     options.toolAliases = { ...toolAliases };
+  }
+  const previewFormat = input.settings.askUserQuestionPreviewFormat;
+  if (previewFormat === 'markdown' || previewFormat === 'html') {
+    options.toolConfig = {
+      askUserQuestion: { previewFormat },
+    };
   }
   if (input.settings.debug === true) {
     options.debug = true;

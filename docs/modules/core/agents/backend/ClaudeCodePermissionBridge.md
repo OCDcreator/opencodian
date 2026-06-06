@@ -13,7 +13,7 @@
 - 将普通工具请求转换为 `permission_request` chunk 形状，复用现有 inline permission UI 的字段语义
 - 将 `once`、`always`、`session`、`reject`、取消和 abort 映射成 Claude `allow` / `deny` result
 - 根据 Claude `suggestions` 筛选 `updatedPermissions`，只在用户选择 always/session 时返回对应持久或会话更新
-- 将 `AskUserQuestion` 的 `questions` 输入转换为 `QuestionRequest`，并把答案写回 `updatedInput.answers`
+- 将 `AskUserQuestion` 的 `questions` 输入转换为 `QuestionRequest`，并把答案写回 `updatedInput.answers`；每个 option 的 `preview` 字段会被保留并透传给 question UI，UI 仅在选项获得焦点或悬停时以纯文本安全渲染 preview（HTML 不解析）
 - 保持 SDK result 类型为本地兼容形状，避免在 Phase 0 引入官方 SDK 依赖
 - 提供 `setHost(host)` 方法，允许运行时更新 host callbacks（例如在 chat view 激活时注入 UI 上下文）
 - 通过 `createLogger('ClaudeCodePermissionBridge', { moduleKey: 'claudeCode', channel: 'permissions' })` 记录 canUseTool request/decision 和 AskUserQuestion request/decision/cancel/error 摘要；日志字段限制为 `toolName`、`toolUseID`、`patternCount`、`questionCount`、`behavior`、`reply`、`updatedPermissionsCount`，不记录用户回答、完整 input、问题文本或额外上下文字段

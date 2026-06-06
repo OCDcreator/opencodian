@@ -1712,6 +1712,45 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       expect(lifecycleEl!.textContent).toContain(t('settings.claudeCode.toolAliases.lifecycleNotice'));
     });
 
+    it('renders AskUserQuestion preview format dropdown and persists changes', async () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'tools');
+
+      const dropdown = findDropdown(t('settings.claudeCode.askUserQuestionPreviewFormat.name'));
+      expect(dropdown).toBeDefined();
+      expect(dropdown?.control.setValue).toHaveBeenCalledWith('');
+
+      await dropdown?.onChange?.('markdown' as never);
+      expect(plugin.settings.backendSettings.claudeCode.askUserQuestionPreviewFormat).toBe('markdown');
+      expect(plugin.saveSettings).toHaveBeenCalled();
+
+      await dropdown?.onChange?.('html' as never);
+      expect(plugin.settings.backendSettings.claudeCode.askUserQuestionPreviewFormat).toBe('html');
+    });
+
+    it('renders AskUserQuestion preview format boundary and lifecycle notices', () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'tools');
+
+      const boundaryEl = containerEl.querySelector('[data-claude-code-ask-user-question-preview-format-boundary="true"]');
+      expect(boundaryEl).toBeTruthy();
+      expect(boundaryEl!.textContent).toContain(t('settings.claudeCode.askUserQuestionPreviewFormat.boundaryNotice'));
+
+      const lifecycleEl = containerEl.querySelector('[data-claude-code-ask-user-question-preview-format-lifecycle="true"]');
+      expect(lifecycleEl).toBeTruthy();
+      expect(lifecycleEl!.textContent).toContain(t('settings.claudeCode.askUserQuestionPreviewFormat.lifecycleNotice'));
+    });
+
     it('renders strictMcpConfig boundary and lifecycle notices', () => {
       const plugin = createPlugin();
       const containerEl = document.createElement('div');

@@ -259,6 +259,7 @@ export class QuestionDock {
               type: inputType,
               name: `opencodian-question-dock-${visibleQuestion.index}`,
               value: option.label,
+              ...(option.preview ? { 'data-preview': option.preview } : {}),
             },
           });
           inputEl.checked = visibleQuestion.answer.includes(option.label);
@@ -281,6 +282,11 @@ export class QuestionDock {
             });
           }
         }
+
+        const previewEl = sectionEl.createDiv({
+          cls: 'opencodian-question-inline-option-preview is-hidden',
+        });
+        this.attachPreviewHandlers(optionsEl, previewEl);
       }
 
       if (visibleQuestion.question.custom !== false) {
@@ -410,6 +416,43 @@ export class QuestionDock {
 
     const boundedIndex = Math.max(0, Math.min(nextIndex, optionInputs.length - 1));
     optionInputs[boundedIndex]?.focus();
+  }
+
+  private attachPreviewHandlers(
+    optionsEl: HTMLElement,
+    previewEl: HTMLElement,
+  ): void {
+    const updateForTarget = (target: EventTarget | null): void => {
+      if (!(target instanceof HTMLElement)) {
+        previewEl.addClass('is-hidden');
+        return;
+      }
+      const input = target.closest<HTMLInputElement>('label.opencodian-question-inline-option input');
+      const preview = input?.dataset?.preview;
+      if (preview) {
+        previewEl.setText(preview);
+        previewEl.removeClass('is-hidden');
+      } else {
+        previewEl.addClass('is-hidden');
+      }
+    };
+
+    optionsEl.addEventListener('focusin', (event) => {
+      updateForTarget(event.target);
+    });
+
+    optionsEl.addEventListener('mouseenter', (event) => {
+      updateForTarget(event.target);
+    }, { capture: true });
+
+    optionsEl.addEventListener('focusout', () => {
+      window.setTimeout(() => {
+        const active = document.activeElement;
+        if (!active || !optionsEl.contains(active)) {
+          previewEl.addClass('is-hidden');
+        }
+      }, 0);
+    });
   }
 
   private toggleOptionInput(

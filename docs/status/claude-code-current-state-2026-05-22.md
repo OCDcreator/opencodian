@@ -1,5 +1,50 @@
 # Claude Code SDK Current State - 2026-05-22
 
+## 2026-06-06 AskUserQuestion Preview Format — Productized Readback Settings Surface
+
+### Objective
+
+Productize the Claude Code SDK `toolConfig.askUserQuestion.previewFormat?: 'markdown' | 'html'` option into a real stable user setting with end-to-end wiring and UI rendering, while remaining honest about what is independently verifiable.
+
+### What Changed
+
+- **`src/core/types/chat.ts`**: Added `preview?: string` to `QuestionOption` so the question UI can receive preview data from the Claude SDK. Removed `previewFormat` from `QuestionRequest`: the inbound `AskUserQuestion` tool input does not echo `previewFormat` back to us, so the UI renders previews format-agnostically as plain text.
+- **`src/core/types/settings.ts`**: Added `askUserQuestionPreviewFormat: 'markdown' | 'html' | ''` to `ClaudeCodeBackendSettings`, with default `''`, normalization (`normalizeClaudeCodeAskUserQuestionPreviewFormat`), and integration into `normalizeClaudeCodeBackendSettings`.
+- **`src/core/agents/backend/ClaudeCodeOptionsBuilder.ts`**: Added `toolConfig` to `ClaudeCodeSdkOptionsShape`; `buildClaudeCodeOptions` now wires `settings.askUserQuestionPreviewFormat` into `toolConfig.askUserQuestion.previewFormat` when set to `'markdown'` or `'html'`.
+- **`src/core/agents/backend/ClaudeCodePermissionBridge.ts`**: `normalizeQuestionOption` preserves per-option `preview` fields and passes them through `QuestionRequest` to the question UI. The bridge no longer reads an inbound `input.previewFormat`; preview rendering is format-agnostic on the UI side.
+- **`src/features/chat/runtime/QuestionInlineCardRenderer.ts`**: Renders a shared `.opencodian-question-inline-option-preview` container below the option list. The container is hidden by default and only shown when an option with `preview` is focused or hovered. Preview text is rendered safely as plain text; HTML is not parsed or rendered as rich HTML.
+- **`src/features/chat/ui/QuestionDock.ts`** + **`src/features/chat/ui/questionDockState.ts`**: Same focus/hover-based preview rendering support in the above-input question dock. Removed `previewFormat` forwarding from `QuestionDockViewModel`.
+- **`src/features/settings/SettingsClaudeCodeSection.ts`**: Added `renderAskUserQuestionPreviewFormatSetting()` in the Tools tab: a dropdown with None / Markdown / HTML options, boundary notice, and lifecycle notice. This is a Claude-only stable setting, not presented as backend-agnostic.
+- **`src/features/settings/SettingsCapabilityLabSection.ts`**: Updated the `AskUserQuestion Preview Format` matrix row: `userSurface` changed from `'hidden'` to `'settings'`, `runtimeProof` stays `'readback'`. Comment now documents the outbound settings→SDK path and the remaining unverified ceiling (actual preview arrival depends on SDK version and model behavior).
+- **`src/i18n/locales/en.ts` + `zh.ts`**: Added 7 locale keys for the setting name, description, three option labels, boundary notice, and lifecycle notice.
+- **`src/style/components/inline-permission.css`**: Added `.opencodian-question-inline-option-preview` styles, including subtle dashed border and muted colors. Removed CSS `::before` pseudo-element labels that leaked hardcoded English into non-English runtimes.
+
+#### Tests
+
+- **`tests/unit/core/agents/backend/ClaudeCodeOptionsBuilder.test.ts`**: 4 new tests covering omit (empty), markdown wiring, and html wiring.
+- **`tests/unit/core/agents/backend/ClaudeCodePermissionBridge.test.ts`**: 2 new tests covering preview/previewFormat preservation and unsupported format fallback.
+- **`tests/unit/features/chat/QuestionInlineCardRenderer.test.ts`**: 1 new test covering safe plain-text preview rendering.
+- **`tests/unit/features/chat/QuestionDock.test.ts`**: 1 new test covering dock preview rendering with html format attribute.
+- **`tests/unit/features/settings/SettingsClaudeCodeSection.test.ts`**: 3 new tests covering dropdown render/persist, boundary notice, and lifecycle notice.
+- **`tests/unit/core/types/claudeCodeBackendSettingsNormalization.test.ts`**: 5 new tests covering default, valid values, and invalid fallbacks.
+- **`tests/unit/features/settings/SettingsCapabilityLabSection.test.ts`**: Updated expected matrix row (`userSurface` `hidden` → `settings`) and hidden row count (`3` → `2`).
+
+### Honesty Boundaries
+
+- **Classification remains `readback`** in the capability matrix. Settings→SDK option wiring is proven, and the UI preserves and displays preview text when present. However, actual arrival of preview strings from the SDK depends on SDK version and model behavior and is not independently verified from the plugin layer.
+- **No fake HTML rendering.** Previews are displayed as plain text. HTML-format previews keep their text content visible but are not parsed as rich HTML, avoiding XSS risk and remaining honest about the rendering limit.
+- **No pass inflation.** The capability is not promoted to `pass` because there is no runtime proof that the SDK actually includes preview strings in real `AskUserQuestion` tool inputs.
+- **Claude-only surface.** The setting lives in the Claude Code Tools tab and is wired only into the Claude Code SDK options; it is not presented as a generic/backend-agnostic question feature.
+
+### Matrix Change
+
+- `AskUserQuestion Preview Format`: `userSurface` changes from `'hidden'` to `'settings'`; `runtimeProof` remains `'readback'`.
+- Verified count: unchanged at 32.
+- Readback count: unchanged at 14.
+- Hidden count: 3 → 2.
+
+---
+
 ## 2026-06-06 Claude Skills & Commands Productization (Batch 2)
 
 ### Objective

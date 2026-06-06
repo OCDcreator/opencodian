@@ -57,6 +57,8 @@ export interface MessageContextAttachment {
 export interface QuestionOption {
   label: string;
   description: string;
+  /** Optional preview text supplied by the Claude Code SDK when AskUserQuestion preview formatting is enabled. */
+  preview?: string;
 }
 
 export interface QuestionPrompt {
