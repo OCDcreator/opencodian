@@ -2389,7 +2389,7 @@ export const zhTranslations = {
   'settings.claudeCode.enableFileCheckpointing.name': '文件 checkpoint',
   'settings.claudeCode.enableFileCheckpointing.desc': '实验性：启用 SDK 文件 checkpoint 选项。当前 SDK query() 模式不会产生可用快照（上游 bug #236 — 快照创建被 React/Ink UI 路径阻断，在非交互模式下不可用）。无稳定 rewind/恢复 UI。开关和 dry-run 预览：Debug → Capability Lab。',
   'settings.claudeCode.includeHookEvents.name': 'Hook 事件流',
-  'settings.claudeCode.includeHookEvents.desc': '将 Claude Code hook 生命周期事件纳入诊断 stream 日志。Hook authoring 在完成运行期证明前仍隐藏。',
+  'settings.claudeCode.includeHookEvents.desc': '将 Claude Code hook 生命周期事件纳入诊断 stream 日志。Hook authoring 已通过 Claude 项目设置提供（扫描/创建/打开 .claude/settings.json）。此开关仅影响诊断流捕获，不控制 hook 激活或稳定界面。',
   'settings.claudeCode.forwardSubagentText.name': '转发子代理 transcript',
   'settings.claudeCode.forwardSubagentText.desc': '要求 SDK 转发子代理文本和 thinking block 到诊断事件流。稳定聊天界面已通过 ToolCallRenderer 和后台任务 UI 渲染 task/subagent 工具；此开关仅影响诊断流捕获。',
   'settings.claudeCode.agentProgressSummaries.name': '子代理进度摘要',

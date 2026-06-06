@@ -743,8 +743,8 @@ export class SettingsCapabilityLabSection {
         capability: 'Include Hook Events',
         sdkExposed: true, // includeHookEvents option
         adapterWired: true, // buildSdkOptions wires it
-        runtimeProof: 'pass', // Runtime verified: includeHookEvents: true captures real hook backend_events in diagnostic stream. Diagnostic-only — no stable hook authoring or transcript UI.
-        userSurface: 'diagnostic', // Diagnostic-only; no stable hook authoring productization
+        runtimeProof: 'pass', // Runtime verified: includeHookEvents: true captures real hook backend_events in diagnostic stream. Diagnostic-only stream logging toggle; NOT the same as stable hook productization. Stable hook surface is the separate 'Hooks' row (project settings scan/create/open for .claude/settings.json + .claude/settings.local.json).
+        userSurface: 'diagnostic', // Diagnostic-only stream logging toggle. Stable hook authoring surface is represented by the separate 'Hooks' row.
       },
       {
         capability: 'Import Session to Store',

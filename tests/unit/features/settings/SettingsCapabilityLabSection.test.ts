@@ -116,6 +116,9 @@ describe('SettingsCapabilityLabSection', () => {
     expect(controlsEl!.getAttribute('data-diagnostic')).toBe('true');
     expect(controlsEl!.textContent).toContain(t('settings.capabilityLab.diagnosticStreamControls.title'));
     expect(controlsEl!.textContent).toContain(t('settings.capabilityLab.diagnosticStreamControls.description'));
+    expect(t('settings.claudeCode.includeHookEvents.desc').toLowerCase()).toContain('hook authoring is already available via claude project settings');
+    expect(t('settings.claudeCode.includeHookEvents.desc').toLowerCase()).toContain('hook lifecycle events');
+    expect(t('settings.claudeCode.includeHookEvents.desc')).not.toContain('remains hidden until runtime proof is complete');
 
     // Verify settings object reflects initial values
     const claudeSettings = (plugin as unknown as { settings: { backendSettings: { claudeCode: Record<string, unknown> } } }).settings.backendSettings.claudeCode;

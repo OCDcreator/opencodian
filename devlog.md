@@ -11,6 +11,38 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-06-06 Include Hook Events — Truth-Sync (Outcome B)
+
+### Objective
+
+Audit the relationship between `Hooks` and `Include Hook Events` in `SettingsCapabilityLabSection.ts`. The user explicitly called out hooks as a high-risk Claude capability that should have a real entry in advanced settings rather than living only in Capability Lab. Determine whether `Include Hook Events` should be promoted to a stable user surface or kept as diagnostic-only.
+
+### Decision
+
+**Outcome B** — `Include Hook Events` REMAINS diagnostic-only.
+
+The `Hooks` capability row already correctly represents the stable user surface (`userSurface: 'settings'`): project settings scan/create/open for `.claude/settings.json` and `.claude/settings.local.json`. Hook authoring is available via these project settings files — users can scan, create, and open them directly from the Claude Code Runtime settings tab.
+
+`Include Hook Events` is a separate diagnostic stream logging toggle. It controls whether hook lifecycle events are captured in the diagnostic backend_event stream. It does NOT control hook activation (hooks work regardless of this toggle) and does NOT provide any stable UI surface.
+
+The two capabilities are intentionally distinct:
+- **Hooks** (`userSurface: 'settings'`): Stable project settings surface for hook authoring
+- **Include Hook Events** (`userSurface: 'diagnostic'`): Diagnostic stream logging toggle for hook backend_events
+
+### What Changed
+
+- **src/features/settings/SettingsCapabilityLabSection.ts**: Hardened the `Include Hook Events` matrix row comment to explicitly distinguish it from the stable `Hooks` surface. Updated comments now state: "Diagnostic-only stream logging toggle; NOT the same as stable hook productization. Stable hook surface is the separate 'Hooks' row."
+- **src/i18n/locales/en.ts**: Updated `settings.claudeCode.includeHookEvents.desc` to remove the stale claim "Hook authoring remains hidden until runtime proof is complete." Replaced with honest copy acknowledging that hook authoring is already available via Claude project settings, and this toggle only affects diagnostic stream capture.
+- **src/i18n/locales/zh.ts**: Same truth-sync update in Chinese.
+- **docs/modules/i18n/locales/en.md**: Added changelog entry for the locale copy update.
+- **docs/modules/i18n/locales/zh.md**: Added changelog entry for the locale copy update.
+
+### Honesty Boundary
+
+- Stable hook surface IS available: project settings scan/create/open for `.claude/settings.json` + `.claude/settings.local.json`
+- `Include Hook Events` is NOT that surface: it's a diagnostic logging toggle only
+- No UI was added or removed; only stale copy was corrected
+
 ## 2026-06-06 Backend Routing — Boundary Hardening (Outcome B)
 
 ### Objective

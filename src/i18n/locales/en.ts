@@ -2389,7 +2389,7 @@ export const enTranslations = {
   'settings.claudeCode.enableFileCheckpointing.name': 'File checkpointing',
   'settings.claudeCode.enableFileCheckpointing.desc': 'Experimental: enable SDK file checkpointing option. Current SDK query() mode does not produce usable checkpoints (upstream bug #236 — snapshot creation gated behind React/Ink UI paths absent in non-interactive mode). No stable rewind/restore UI. Toggle and dry-run preview: Debug → Capability Lab.',
   'settings.claudeCode.includeHookEvents.name': 'Hook event stream',
-  'settings.claudeCode.includeHookEvents.desc': 'Include Claude Code hook lifecycle events in diagnostic stream logs. Hook authoring remains hidden until runtime proof is complete.',
+  'settings.claudeCode.includeHookEvents.desc': 'Include Claude Code hook lifecycle events in diagnostic stream logs. Hook authoring is already available via Claude project settings (scan/create/open for .claude/settings.json). This toggle only affects diagnostic stream capture, not hook activation or stable UI.',
   'settings.claudeCode.forwardSubagentText.name': 'Forward subagent transcript',
   'settings.claudeCode.forwardSubagentText.desc': 'Ask the SDK to forward subagent text and thinking blocks for diagnostic event streams. Stable chat already renders task/subagent tools via ToolCallRenderer and background-task UI; this toggle only affects the diagnostic stream proof.',
   'settings.claudeCode.agentProgressSummaries.name': 'Subagent progress summaries',
