@@ -1024,7 +1024,13 @@ export class SettingsCapabilityLabSection {
         // Phase 2 (continue): runs a second diagnostic query with continue: true,
         //   asking the model to reply with only the nonce from the immediately previous turn.
         // Pass requires: (a) same session id as seed, AND (b) text output recalls the nonce.
-        // Ordinary chat paths never use continue — session continuity is owned by the adapter.
+        // Remains diagnostic with explicit blockers:
+        //   1. The adapter already maintains ordinary conversation continuity automatically.
+        //   2. continue: true is an implicit "most recent conversation" flag that conflicts with
+        //      the adapter's explicit per-conversation session tracking.
+        //   3. All real user needs are covered by stable surfaces: ordinary chat (auto-continues),
+        //      Backend Session Browser (resume any session), and Fork Session (branch from any message).
+        //   4. Exposing this as a user control would add non-determinism without value.
         userSurface: 'diagnostic', // Capability Lab probe only; no stable settings UI
       },
       {
@@ -1036,7 +1042,12 @@ export class SettingsCapabilityLabSection {
         // Phase 1b (beta): sends a second turn in the same session with nonce BETA.
         // Phase 2 (resume-at): resumes at alpha's assistant message UUID and asks what the last nonce was.
         // Pass requires: (a) same session id, AND (b) text output recalls ALPHA (not BETA).
-        // Ordinary chat paths never use resumeSessionAt — session continuity is owned by the adapter.
+        // Remains diagnostic with explicit blockers:
+        //   1. Fork Session already provides a stable "branch from here" surface.
+        //   2. resumeSessionAt mutates existing session state in-place; no coherent UX path exists
+        //      for "rewind" vs "fork" in the existing conversation model.
+        //   3. In-place truncation conflicts with the plugin's append-only conversation history.
+        //   4. The adapter already guards resumeSessionAt behind a diagnostic-only flag.
         userSurface: 'diagnostic', // Capability Lab probe only; no stable settings UI
       },
       {

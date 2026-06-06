@@ -11,6 +11,41 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-06-06 Continue / Resume Session At Position — Boundary Hardening (Diagnostic-Only)
+
+### Objective
+
+Evaluate whether `Continue` and `Resume Session At Position` can be productized into stable user-facing capabilities. Decision: both remain diagnostic-only with explicit, user-centered blocker reasons.
+
+### What Changed
+
+- **src/i18n/locales/en.ts + zh.ts**:
+  - Updated `settings.capabilityLab.proofs.continue.boundary` and `settings.capabilityLab.proofs.resumeSessionAt.boundary` locale strings with four explicit blockers each, explaining why these capabilities cannot be promoted to stable user surfaces.
+  - English and Chinese strings now clearly distinguish these SDK controls from the adapter's existing continuity ownership.
+  - After runtime screenshot review, tightened the Chinese `resumeSessionAt` proof button/title copy to `运行 Resume Session At Position 证明` / `Resume Session At Position 证明` so the action label stays localized while the official SDK capability name remains recognizable.
+
+- **src/features/settings/SettingsCapabilityLabSection.ts**:
+  - Updated matrix row comments for both `Continue` and `Resume Session At Position` to list explicit blockers instead of generic "ordinary chat paths never use" language.
+  - Blockers are now user-centered and specific: adapter-owned continuity, conflicting implicit semantics, existing stable surface coverage, and model/history conflicts.
+
+- **docs/status/claude-code-current-state-2026-05-22.md**:
+  - Split the `pass` gap audit into two subsections: `pass` (stable user surfaces) and `pass (diagnostic-only — explicit blockers documented)`.
+  - Moved `Continue` and `Resume Session At Position` into the diagnostic-only subsection with full blocker documentation.
+
+- **docs/modules/features/settings/SettingsCapabilityLabSection.md**:
+  - Updated both capability sections with "2026-06-06 边界硬化" annotations and the four explicit blockers in Chinese documentation.
+
+### Honesty Boundaries
+
+- Both capabilities keep `runtimeProof: 'pass'` and `userSurface: 'diagnostic'`.
+- No promotion attempted. No new UI added. No `.claude/**` writes.
+- The explicit blockers distinguish carefully between:
+  - Ordinary current-conversation continuity that the adapter already owns automatically, and
+  - The low-level SDK `continue?: boolean` / `resumeSessionAt?: string` controls as potential user features.
+- Conclusion: neither has a coherent UX path; both remain behind the Capability Lab diagnostic boundary.
+
+---
+
 ## 2026-06-06 Session Title — Truth-Sync (Reclassified)
 
 ### What changed

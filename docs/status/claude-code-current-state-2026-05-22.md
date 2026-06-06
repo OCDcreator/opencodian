@@ -144,14 +144,26 @@ Turn Claude Code `hidden/unwired` skills and slash command surfaces into real us
 ### pass
 
 - `Session Title`
-- `Continue`
-- `Resume Session At Position`
 - `Fork Session On Resume`
 - `Environment Variables`
 - `Permission Approval`
 - `AskUserQuestion / Elicitation`
 - `System Prompt`
 - stable structured-output transcript / render path
+
+### pass (diagnostic-only — explicit blockers documented)
+
+- `Continue` — Runtime proof passes (same session id + nonce recall verified), but remains diagnostic with explicit blockers:
+  1. The adapter already maintains ordinary conversation continuity automatically; no user action needed.
+  2. `continue: true` is an implicit "most recent conversation in this directory" flag that conflicts with the adapter's explicit per-conversation session tracking.
+  3. All real user needs are covered by stable surfaces: ordinary chat (auto-continues), Backend Session Browser (resume any session), and Fork Session (branch from any message).
+  4. Exposing this as a user control would add non-determinism without value.
+
+- `Resume Session At Position` — Runtime proof passes (same session id + alpha nonce recall verified), but remains diagnostic with explicit blockers:
+  1. Fork Session already provides a stable "branch from here" surface; `resumeSessionAt` mutates existing session state in-place instead of creating a clean branch.
+  2. No coherent UX path: users cannot meaningfully distinguish "rewind to here" from "fork from here" in the existing conversation model.
+  3. In-place session truncation conflicts with the plugin's append-only conversation history model and would cause UI/state divergence.
+  4. The adapter already explicitly guards `resumeSessionAt` behind a diagnostic-only flag (`_diagnosticResumeAt`) to prevent accidental stable usage.
 
 ### readback
 
