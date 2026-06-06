@@ -824,12 +824,20 @@ export class SettingsCapabilityLabSection {
       },
       {
         capability: 'Task Budget',
-        sdkExposed: true, // SDK Options.taskBudget?: { total: number }
+        sdkExposed: true, // SDK Options.taskBudget?: { total: number } (@alpha)
         adapterWired: true, // buildClaudeCodeOptions wires taskBudget as { total }
-        runtimeProof: 'readback', // Option wiring proven: taskBudget propagates through buildClaudeCodeOptions
-        // into SDK options as { total: number }. Readback ceiling: SDK @alpha option; API-side behavior
-        // not independently verified. Applies to next query only.
-        userSurface: 'settings', // Stable toggle in Model & Thinking tab
+        runtimeProof: 'readback', // 2026-06-06 audit: SDK propagates taskBudget as --task-budget CLI flag
+        // (sdk.mjs initialize(): if(z)i.push("--task-budget",z.total.toString())). The CLI binary
+        // sends it as output_config.task_budget with beta header task-budgets-2026-03-13 to the API.
+        // The model is "made aware of its remaining token budget so it can pace tool use and wrap up"
+        // (sdk.d.ts lines 1516-1525) — this is behavioral pacing, not a hard enforcement cutoff.
+        // Readback ceiling: no deterministic observable side effect from the plugin layer.
+        // Unlike maxTurns (which produces error_max_turns result subtype), taskBudget has no local
+        // SDK enforcement signal. A tiny budget (e.g. 1) may cause shorter model responses but
+        // produces no structured error event; the model may simply emit less text. The @alpha marker
+        // confirms the feature is unstable. Promotion path: if the SDK adds a structured
+        // error_max_task_budget result subtype or a deterministic observable cutoff behavior.
+        userSurface: 'settings', // Numeric input in Model & Thinking tab
       },
       {
         capability: 'Plan Mode Instructions',
@@ -914,12 +922,19 @@ export class SettingsCapabilityLabSection {
       },
       {
         capability: 'Load Timeout',
-        sdkExposed: true, // SDK Options.loadTimeoutMs?: number
-        adapterWired: true, // buildClaudeCodeOptions wires loadTimeoutMs when settings.loadTimeoutMs is non-null
-        runtimeProof: 'readback', // Option wiring proven: loadTimeoutMs propagates through buildClaudeCodeOptions
-        // into SDK options as a positive integer. Readback ceiling: actual timeout behavior
-        // depends on the SDK/CLI version and runtime conditions. Plugin-side behavior is not
-        // independently verified. Applies to next query or restarted session only.
+        sdkExposed: true, // SDK Options.loadTimeoutMs?: number (@alpha)
+        adapterWired: true, // buildClaudeCodeOptions wires loadTimeoutMs when non-null
+        runtimeProof: 'readback', // 2026-06-06 audit: SDK only uses loadTimeoutMs when
+        // (options.resume || options.continue) && options.sessionStore is true (sdk.mjs yj$).
+        // It wraps sessionStore.listSessions() in a Promise.race timeout (C4 function, offset 154014):
+        // C4(store.listSessions(projectKey), loadTimeoutMs, "SessionStore.listSessions() timed out").
+        // On timeout, the promise rejects and propagates to yj$.catch which calls
+        // transport.spawnAbort(error) and queryInstance.setError(error).
+        // Readback ceiling: without resume/continue + sessionStore, the timeout code path never
+        // executes. The plugin's diagnostic path (runDiagnosticPrompt) does not use resume/continue
+        // or sessionStore, so a live proof cannot trigger the timeout without mocking sessionStore.
+        // Default 60000ms (@alpha). Promotion path: if the SDK exposes a general query timeout
+        // or if the plugin gains sessionStore access for resume paths.
         userSurface: 'settings', // Runtime tab numeric input, adjacent to jsRuntime
       },
       {

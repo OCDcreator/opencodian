@@ -73,7 +73,7 @@ export interface ClaudeCodeBackendSettings {
   maxTurns: number | null;
   /** Maximum budget in USD before the query stops. Runtime behavior verified: SDK emits error_max_budget_usd signal when limit reached. null = unlimited (SDK default). */
   maxBudgetUsd: number | null;
-  /** Maximum task-level token budget. Readback only: SDK @alpha option wiring proven; API-side behavior not independently verified. null = unlimited (SDK default). */
+  /** Maximum task-level token budget. Readback only: SDK @alpha option wiring proven (--task-budget CLI flag, output_config.task_budget + beta header). Behavioral pacing only (no structured enforcement signal like error_max_turns). null = unlimited (SDK default). */
   taskBudget: number | null;
   /** Environment variables to pass to the Claude Code process. Runtime behavior verified: env propagation into Claude/Bash subprocesses proven (Layer 1-4). */
   env: Record<string, string>;
@@ -156,10 +156,11 @@ export interface ClaudeCodeBackendSettings {
    */
   jsRuntime: 'node' | 'bun' | 'deno' | '';
   /**
-   * Maximum time in milliseconds to wait for the Claude Code subprocess to load before timing out.
-   * null means use the SDK default timeout.
-   * Readback only: SDK option wiring proven; actual timeout behavior is not independently
-   * verified from the plugin layer. Plugin-side behavior is not independently verified.
+   * Maximum time in milliseconds for sessionStore.listSessions() during resume/continue
+   * materialization. SDK only uses this when (resume || continue) && sessionStore is true.
+   * null means use the SDK default (60000ms). @alpha.
+   * Readback only: option wiring proven; timeout code path never executes without
+   * resume/continue + sessionStore, which the diagnostic path does not use.
    * Applies to next query or restarted session only.
    */
   loadTimeoutMs: number | null;

@@ -2373,9 +2373,9 @@ export const zhTranslations = {
   'settings.claudeCode.maxBudgetUsd.desc': '传给 Claude Code SDK 的可选正数费用限制（USD）。仅接受大于 0 的数值。',
   'settings.claudeCode.maxBudgetUsd.placeholder': '5',
   'settings.claudeCode.taskBudget.name': '任务预算',
-  'settings.claudeCode.taskBudget.desc': '传给 Claude Code SDK 的可选正整数 token 预算（作为 taskBudget.total）。@alpha — 仅对下一次查询生效。仅选项连接和回读；尚无实时运行时验证。仅接受大于 0 的整数。',
+  'settings.claudeCode.taskBudget.desc': '传给 Claude Code SDK 的可选正整数 token 预算（作为 taskBudget.total）。@alpha — 仅在下一次查询时生效。仅 readback：模型把它当作 pacing 提示，而不是硬性截止。仅接受大于 0 的整数。',
   'settings.claudeCode.taskBudget.placeholder': '50000',
-  'settings.claudeCode.taskBudget.boundaryNotice': '仅 readback：插件可验证 taskBudget 选项已接入 SDK 选项，但无法独立确认 SDK 是否执行 token 预算限制。API 端 enforcement 未验证。',
+  'settings.claudeCode.taskBudget.boundaryNotice': '仅 readback：插件验证 taskBudget 已接入 SDK 选项并以 --task-budget 传递给 CLI 子进程。CLI 将其作为 output_config.task_budget 连同 task-budgets-2026-03-13 beta header 发送给 API，模型将其用作行为 pacing（非硬性截止）。与 maxTurns（产生 error_max_turns）不同，没有结构化 enforcement 信号。@alpha。',
   'settings.claudeCode.taskBudget.lifecycleNotice': '仅在下次查询或重启会话时生效。无法更改正在运行中的会话的任务预算。',
   'settings.claudeCode.diagnosticStreamMoved.title': '诊断流控制已迁移',
   'settings.claudeCode.diagnosticStreamMoved.desc': 'Hook 事件流、子代理 transcript 转发和进度摘要控制已移至 调试 → 能力实验室。它们仍仅限诊断用途，不影响稳定聊天界面。',
@@ -2418,9 +2418,9 @@ export const zhTranslations = {
   'settings.claudeCode.jsRuntime.lifecycleNotice': '运行时设置在下次查询或重启会话时生效。无法更改正在运行中的会话的运行时状态。',
 
   'settings.claudeCode.loadTimeoutMs.name': '加载超时',
-  'settings.claudeCode.loadTimeoutMs.desc': '等待 Claude Code 子进程加载的最大超时时间（毫秒）。留空则使用 SDK 默认值。插件侧行为未独立验证。',
+  'settings.claudeCode.loadTimeoutMs.desc': 'sessionStore resume/continue 材料化允许使用的最大超时时间（毫秒）。留空则使用 SDK 默认值。仅 readback：普通新查询不会走这条路径。',
   'settings.claudeCode.loadTimeoutMs.placeholder': 'SDK 默认（例如 30000）',
-  'settings.claudeCode.loadTimeoutMs.boundaryNotice': '此设置仅向 SDK 传递超时值。实际超时行为取决于 SDK/CLI 版本和运行时条件。插件侧行为未独立验证。',
+  'settings.claudeCode.loadTimeoutMs.boundaryNotice': '仅 readback：插件验证 loadTimeoutMs 已接入 SDK 选项。SDK 仅在 sessionStore resume/continue 材料化期间使用此超时（sessionStore.listSessions() Promise.race）。没有 resume + sessionStore 时超时代码路径永不执行。@alpha。',
   'settings.claudeCode.loadTimeoutMs.lifecycleNotice': '加载超时设置在下次查询或重启会话时生效。无法更改正在运行中的会话的超时状态。',
 
   'settings.claudeCode.runtimeEcosystem.name': '运行时生态',

@@ -2373,9 +2373,9 @@ export const enTranslations = {
   'settings.claudeCode.maxBudgetUsd.desc': 'Optional positive spend limit (USD) passed to the Claude Code SDK. Only numbers greater than 0 are accepted.',
   'settings.claudeCode.maxBudgetUsd.placeholder': '5',
   'settings.claudeCode.taskBudget.name': 'Task budget',
-  'settings.claudeCode.taskBudget.desc': 'Optional positive integer token budget passed to the Claude Code SDK as taskBudget.total. @alpha — applies to next query only. Option wiring and readback only; no live runtime proof. Only whole numbers greater than 0 are accepted.',
+  'settings.claudeCode.taskBudget.desc': 'Optional positive integer token budget passed to the Claude Code SDK as taskBudget.total. @alpha — applies on the next query only. Readback only: the model treats it as pacing guidance, not a hard cutoff. Only whole numbers greater than 0 are accepted.',
   'settings.claudeCode.taskBudget.placeholder': '50000',
-  'settings.claudeCode.taskBudget.boundaryNotice': 'Readback only: the plugin can verify that the taskBudget option is wired into SDK options, but cannot independently confirm that the SDK enforces the token budget. API-side enforcement is not verified.',
+  'settings.claudeCode.taskBudget.boundaryNotice': 'Readback only: the plugin verifies that taskBudget is wired into SDK options and passed as --task-budget to the CLI subprocess. The CLI sends it as output_config.task_budget with the task-budgets-2026-03-13 beta header, and the model uses it as behavioral pacing (not a hard cutoff). Unlike maxTurns (which produces error_max_turns), there is no structured enforcement signal. @alpha.',
   'settings.claudeCode.taskBudget.lifecycleNotice': 'Applies on the next query or restarted session only. Cannot be changed for an already-running session.',
   'settings.claudeCode.diagnosticStreamMoved.title': 'Diagnostic stream controls moved',
   'settings.claudeCode.diagnosticStreamMoved.desc': 'Hook event stream, subagent transcript forwarding, and progress summary controls have moved to Debug → Capability Lab. They remain diagnostic-only and do not affect stable chat surfaces.',
@@ -2419,9 +2419,9 @@ export const enTranslations = {
   'settings.claudeCode.jsRuntime.lifecycleNotice': 'Runtime setting applies on the next query or restarted session. It cannot be changed for an already-running session.',
 
   'settings.claudeCode.loadTimeoutMs.name': 'Load timeout',
-  'settings.claudeCode.loadTimeoutMs.desc': 'Maximum time in milliseconds to wait for the Claude Code subprocess to load before timing out. Leave empty to use the SDK default. Plugin-side behavior is not independently verified.',
+  'settings.claudeCode.loadTimeoutMs.desc': 'Maximum time in milliseconds to allow sessionStore resume/continue materialization before timing out. Leave empty to use the SDK default. Readback only: ordinary fresh queries do not use this path.',
   'settings.claudeCode.loadTimeoutMs.placeholder': 'SDK default (e.g. 30000)',
-  'settings.claudeCode.loadTimeoutMs.boundaryNotice': 'This only passes a timeout value to the SDK. Actual timeout behavior depends on the SDK/CLI version and runtime conditions. Plugin-side behavior is not independently verified.',
+  'settings.claudeCode.loadTimeoutMs.boundaryNotice': 'Readback only: the plugin verifies that loadTimeoutMs is wired into SDK options. The SDK only uses this timeout during sessionStore resume/continue materialization (sessionStore.listSessions() Promise.race). Without resume + sessionStore, the timeout code path never executes. @alpha.',
   'settings.claudeCode.loadTimeoutMs.lifecycleNotice': 'Load timeout applies on the next query or restarted session. It cannot be changed for an already-running session.',
 
   'settings.claudeCode.runtimeEcosystem.name': 'Runtime ecosystem',
