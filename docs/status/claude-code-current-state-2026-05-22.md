@@ -85,8 +85,8 @@ Option wiring proven through `buildClaudeCodeOptions`, but no independent plugin
 
 These have adapter wiring and runtime proof, but no stable or diagnostic user surface is exposed.
 
-- **Session Store** — `userSurface: 'hidden'`. Live proof: store capture + readback verified. Blockers: (1) alpha SDK interface with no format stability guarantee; (2) opaque implementation-defined format; (3) existing BackendSessionBrowserModal + StorageService already serve all user needs.
-- **Import Session to Store** — `userSurface: 'hidden'`. Live proof: import into diagnostic store verified. Blockers: (1) alpha SDK interface; (2) imports into opaque format, not user-readable conversations; (3) existing backend browser already covers browse/resume/persist.
+- **Session Store** — `userSurface: 'hidden'`. Live proof: store capture + readback verified. Blockers: (1) all SessionStore-related APIs remain `@alpha` in SDK 0.3.145 (SessionStore, SessionKey, SessionStoreEntry, SessionStoreFlush, SessionSummaryEntry, foldSessionSummary, InMemorySessionStore, importSessionToStore); (2) opaque implementation-defined format — SessionStoreEntry is `{ type: string; uuid?: string; timestamp?: string; [k: string]: unknown }` with SDK docs: "adapters should treat entries as pass-through blobs"; SessionSummaryEntry.data: "Opaque SDK-owned state. Stores MUST persist verbatim and MUST NOT interpret"; (3) SDKMirrorErrorMessage (sdk.d.ts L3241) confirms external-mirror plumbing, not user feature; (4) existing BackendSessionBrowserModal + StorageService already serve all user needs (browse/preview/detail/resume/persist). ✅ **2026-06-07 re-audited** (Outcome B) — hidden confirmed. Latest npm 0.3.167; no graduation evidence.
+- **Import Session to Store** — `userSurface: 'hidden'`. Live proof: import into diagnostic store verified. Blockers: (1) `importSessionToStore` + `ImportSessionToStoreOptions` both `@alpha` in SDK 0.3.145; (2) imports INTO opaque mirror store format (SessionStoreEntry with `[k: string]: unknown` payload), not user-readable OpenCodian conversations; (3) import direction mismatches user need — users want readable imports, not opaque archive copies; (4) existing BackendSessionBrowserModal already covers browse/preview/detail/resume without import indirection. ✅ **2026-06-07 re-audited** (Outcome B) — hidden confirmed.
 
 ---
 
@@ -97,6 +97,76 @@ These have adapter wiring and runtime proof, but no stable or diagnostic user su
 3. **Task Budget** — ✅ **2026-06-06 re-audited** (Outcome B) — readback confirmed; `@alpha`, no enforcement signal, no budget-related error subtype/event/terminal-reason. No promotion path unless SDK adds structured enforcement signal.
 4. **Fallback Model** — Readback; option wiring verified. Potential seam: if SDK exposes fallback activation event or observable same-model/auto-switch signal.
 5. **Sandbox** — Readback; option wiring verified, 3 settings exposed. Potential seam: `decision_reason_type: 'sandboxOverride'` as indirect activation proof if reliably provoked.
+6. **Session Store + Import Session to Store** — ✅ **2026-06-07 re-audited** (Outcome B) — hidden confirmed. All SessionStore APIs remain `@alpha` (SessionStore, SessionKey, SessionStoreEntry, SessionStoreFlush, SessionSummaryEntry, foldSessionSummary, InMemorySessionStore, importSessionToStore). Store entries are opaque pass-through blobs. SessionSummaryEntry.data is "Opaque SDK-owned state, MUST NOT interpret." No promotion path unless SDK graduates from `@alpha` with format stability guarantees AND a clear user workflow gap.
+
+---
+
+## 2026-06-07 Session Store + Import Session to Store — Re-Audit (Outcome B)
+
+### Objective
+
+Re-audit the hidden Session Store and Import Session to Store seams against the current SDK/repo state to determine whether any new productizable seam exists beyond the existing hidden classification.
+
+### SDK Seam Analysis
+
+The SDK exposes a comprehensive SessionStore mirroring API, all marked `@alpha`:
+
+| Type | SDK Location | `@alpha` |
+|------|-------------|----------|
+| `SessionKey` | sdk.d.ts L3727 | ✅ |
+| `SessionStore` | sdk.d.ts L3797 | ✅ |
+| `SessionStoreEntry` | sdk.d.ts L3889 | ✅ |
+| `SessionStoreFlush` | sdk.d.ts L3908 | ✅ |
+| `SessionSummaryEntry` | sdk.d.ts L3919 | ✅ |
+| `foldSessionSummary` | sdk.d.ts L646 | ✅ |
+| `importSessionToStore` | sdk.d.ts L821 | ✅ |
+| `ImportSessionToStoreOptions` | sdk.d.ts L827 | ✅ |
+| `InMemorySessionStore` | sdk.d.ts L867 | ✅ |
+| `SDKMirrorErrorMessage` | sdk.d.ts L3241 | — |
+
+Key format characteristics:
+- `SessionStoreEntry`: `{ type: string; uuid?: string; timestamp?: string; [k: string]: unknown }` — opaque pass-through blobs
+- `SessionSummaryEntry.data`: "Opaque SDK-owned state. Stores MUST persist verbatim and MUST NOT interpret."
+- `SDKMirrorErrorMessage`: emitted on append failure after bounded retry — operational/error plumbing, not user feature signal
+
+Installed SDK: 0.3.145. Latest npm: 0.3.167. No changelog evidence of SessionStore graduation from alpha.
+
+### Decision
+
+**Outcome B** — Both Session Store and Import Session to Store REMAIN `hidden`.
+
+### What IS verified (diagnostic proof)
+
+1. **Session Store**: `runDiagnosticPrompt` with `sessionStore` + `sessionStoreFlush='eager'` captures entries (14 entries across 1 key for session 8c762ebb…). `CapabilityLabSessionStore` implements `append/load/listSessions/listSubkeys` for diagnostic probing. `loadStoreMirrorReadback()` confirms readback via `getSessionMessages({ sessionStore })`.
+2. **Import Session to Store**: `adapter.importSessionToStore()` imports session into diagnostic store (51 entries, 1 store key). SDK accepts sessionStore with append/load interface.
+3. **Options builder**: `sessionStore` and `sessionStoreFlush` are correctly wired through `ClaudeCodeOptionsBuilder` (nested guard: `sessionStoreFlush` only forwarded when `sessionStore` is present).
+
+### What is NOT productizable — and fundamentally blocked by opaque format
+
+1. **All 9 SessionStore-related types remain `@alpha`**: No format stability guarantee. Any plugin-side code consuming store entries would break when the CLI's internal transcript format changes.
+2. **Store entries are opaque blobs**: SDK docs explicitly say "adapters should treat entries as pass-through blobs; round-tripping JSON.stringify/JSON.parse is the only required invariant." The plugin cannot interpret, render, or transform these entries into user-readable content.
+3. **SessionSummaryEntry.data is explicitly off-limits**: "Opaque SDK-owned state. Stores MUST persist verbatim and MUST NOT interpret." This eliminates any metadata extraction use case.
+4. **No user workflow gap exists**: BackendSessionBrowserModal (browse + preview + detail + resume from both chat and settings) + StorageService (human-readable JSON persistence) already cover all user-facing session management needs.
+5. **Import direction mismatches user need**: `importSessionToStore` imports INTO an opaque mirror store, not into user-readable OpenCodian conversations. Users would expect readable imports, not opaque archive copies.
+6. **Productizing would create redundant persistence**: A second parallel persistence layer (opaque store) alongside native JSONL + conversation JSON adds complexity without user value.
+
+### Adjacent seams audited and REJECTED
+
+1. **SessionStore as conversation backup** — Backup format is opaque; users cannot verify or inspect backed-up content. Not a meaningful backup UX.
+2. **SessionStore for cross-device sync** — Would require external adapter infrastructure (S3, Postgres, etc.) far beyond plugin scope. Not a plugin capability.
+3. **SessionStore as archive/export** — SessionSummaryEntry.data is explicitly opaque; cannot render or export in user-meaningful format.
+4. **Import-to-conversation conversion** — SessionStore has no conversion to StorageService format; would require parsing opaque entries whose schema is CLI-internal and unstable.
+5. **Exposing mirror_error as diagnostic surface** — SDKMirrorErrorMessage is an operational error signal, not a user-facing feature. Existing stderr/debug-file diagnostics already cover error observability.
+
+### Changes made
+
+- Matrix row comments: hardened with 2026-06-07 re-audit Outcome B, full @alpha type inventory, opaque format evidence, adjacent seams rejected, promotion path.
+- Discovery rows: hardened with Outcome B evidence, specific SDK type names, and explicit opaque-format blockers.
+- Current-state doc: updated hidden section and suggested checkpoints.
+
+### Promotion path
+
+Requires ALL of: (a) SDK graduates SessionStore from `@alpha` with format stability guarantees; (b) SDK documents the SessionStoreEntry schema as contractual (not implementation-defined); (c) a clear user workflow gap is identified that BackendSessionBrowserModal + StorageService cannot fill. None currently exists.
 
 ---
 

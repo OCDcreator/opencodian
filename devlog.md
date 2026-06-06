@@ -11,6 +11,32 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-06-07 Session Store + Import Session to Store — Re-Audit (Outcome B)
+
+### 变更
+
+- `src/features/settings/SettingsCapabilityLabSection.ts`：Session Store 和 Import Session to Store 矩阵行注释硬化（2026-06-07 重新审计 Outcome B），discovery 行硬化
+- `docs/status/claude-code-current-state-2026-05-22.md`：hidden section 更新（完整 @alpha 类型清单、opaque format 证据、SDKMirrorErrorMessage、latest npm 0.3.167 无 graduation），新增完整 checkpoint section，suggested checkpoints 更新
+- `docs/modules/features/settings/SettingsCapabilityLabSection.md`：Session Store / Import Session to Store 条目更新为 2026-06-07 重新审计 Outcome B
+
+### 审计结论
+
+**Outcome B** — Session Store 和 Import Session to Store 保持 `hidden`。
+
+### 证据
+
+1. **所有 SessionStore 相关 API 仍为 `@alpha`**（SDK 0.3.145）：SessionStore、SessionKey、SessionStoreEntry、SessionStoreFlush、SessionSummaryEntry、foldSessionSummary、InMemorySessionStore、importSessionToStore、ImportSessionToStoreOptions。最新 npm 0.3.167 无 graduation 证据。
+2. **Store entries 是 opaque pass-through blobs**：SessionStoreEntry `{ type: string; uuid?: string; timestamp?: string; [k: string]: unknown }`，SDK 文档 "adapters should treat entries as pass-through blobs"。SessionSummaryEntry.data "Opaque SDK-owned state. Stores MUST persist verbatim and MUST NOT interpret."
+3. **SDKMirrorErrorMessage** 确认 external-mirror plumbing（append 失败后 bounded retry 的 error 信号），不是用户功能。
+4. **无用户工作流缺口**：BackendSessionBrowserModal（browse + preview + detail + resume，chat 和 settings 双入口）+ StorageService（human-readable JSON persistence）已覆盖所有用户需求。
+5. **Import 方向不匹配用户需求**：`importSessionToStore` 导入到 opaque mirror store，不是 readable conversations。
+
+### Adjacent seams 拒绝
+
+(a) SessionStore as backup — opaque 不可读；(b) cross-device sync — 需外部基础设施；(c) archive/export — SessionSummaryEntry.data 不可解释；(d) import-to-conversation — 无转换路径；(e) mirror_error as diagnostic — operational error，非用户功能。
+
+---
+
 ## 2026-06-06 File Checkpoint / Rewind — Re-Audit and Boundary Hardening (Outcome B)
 
 Re-audit the Claude Code SDK file checkpoint/rewind seam against current SDK/repo state to determine whether the upstream blocker has been resolved or any new productizable seam has appeared.

@@ -634,13 +634,30 @@ export class SettingsCapabilityLabSection {
         sdkExposed: true, // sessionStore option in SDK
         adapterWired: true, // buildSdkOptions wires sessionStore
         runtimeProof: 'pass', // BUILD_ID feature-phase0-capability.202605281948: runDiagnosticPrompt with sessionStore + sessionStoreFlush='eager' succeeded; store captured 14 entries across 1 key for session 8c762ebb…. importSessionToStore also proven separately.
-        // BLOCKER for promotion to stable user surface:
-        // 1. Alpha SDK interface (sdk.d.ts marks SessionStore as alpha) with no format stability guarantee across SDK versions.
-        // 2. Store data format is opaque and implementation-defined by the CLI — no schema contract, no cross-version compatibility promise. The append/load/listSessions/listSubkeys interface is a low-level persistence seam, not a user-facing archive format.
-        // 3. Existing BackendSessionBrowserModal already provides browse + resume for native JSONL sessions without requiring an external store.
-        // 4. Existing StorageService already persists OpenCodian conversations in a human-readable format.
-        // 5. Productizing would create a second parallel persistence layer with no clear user value over native JSONL + conversation persistence. Users would see opaque store entries instead of readable transcripts.
-        // 6. No user workflow is served that isn't already covered: browse (backend browser), resume (backend browser + chat), persist (StorageService).
+        // BLOCKER for promotion to stable user surface (2026-06-07 re-audit, Outcome B — confirmed hidden):
+        // 1. Alpha SDK interface — SessionStore, SessionKey, SessionStoreEntry, SessionStoreFlush, SessionSummaryEntry,
+        //    foldSessionSummary, importSessionToStore, InMemorySessionStore ALL marked @alpha in sdk.d.ts (SDK 0.3.145).
+        //    No format stability guarantee across SDK versions. Latest npm 0.3.167; no graduation evidence in changelog.
+        // 2. Store data format is opaque and implementation-defined by the CLI — no schema contract, no cross-version
+        //    compatibility promise. SessionStoreEntry: { type: string; uuid?: string; timestamp?: string; [k: string]: unknown }
+        //    with SDK docs: "adapters should treat entries as pass-through blobs; round-tripping JSON.stringify/JSON.parse
+        //    is the only required invariant." SessionSummaryEntry.data: "Opaque SDK-owned state. Stores MUST persist
+        //    verbatim and MUST NOT interpret." This is a low-level mirror plumbing API, not a user-facing archive format.
+        // 3. SDKMirrorErrorMessage (sdk.d.ts L3241) confirms store is external-mirror plumbing — emitted on append
+        //    failure after bounded retry (3 attempts with backoff). This is an operational/error-channel concern,
+        //    not a user-facing feature signal.
+        // 4. Existing BackendSessionBrowserModal already provides browse + preview + detail + resume for native JSONL
+        //    sessions from both chat history and settings, without requiring an external store.
+        // 5. Existing StorageService already persists OpenCodian conversations in human-readable JSON format.
+        // 6. Productizing would create a second parallel persistence layer with no clear user value over native
+        //    JSONL browsing + conversation persistence. Users would see opaque store entries instead of readable transcripts.
+        // 7. No user workflow is served that isn't already covered: browse (backend browser), resume (backend browser + chat),
+        //    persist (StorageService), detail (backend browser detail view).
+        // Adjacent seams REJECTED: (a) SessionStore as conversation backup — backup format is opaque, not human-readable;
+        //    (b) SessionStore for cross-device sync — would require external adapter infrastructure beyond plugin scope;
+        //    (c) SessionStore as archive/export — SessionSummaryEntry.data is explicitly opaque, cannot be rendered.
+        // Promotion path: requires SDK to graduate SessionStore from @alpha with format stability guarantees AND
+        //    a clear user workflow not already covered by BackendSessionBrowserModal + StorageService.
         // KEEP HIDDEN — diagnostic proof only.
         userSurface: 'hidden',
       },
@@ -844,12 +861,25 @@ export class SettingsCapabilityLabSection {
         sdkExposed: !!adapter, // importSessionToStore on SDK facade
         adapterWired: !!adapter, // adapter.importSessionToStore()
         runtimeProof: 'pass', // BUILD_ID feature-phase0-capability.202605281948: imported session d2ea808d… into diagnostic store with 51 entries, 1 store key. SDK importSessionToStore accepted sessionStore with append/load interface.
-        // BLOCKER for promotion to stable user surface:
-        // 1. Alpha SDK interface with no format stability guarantee.
-        // 2. Imports INTO an opaque store format, not into user-readable OpenCodian conversations. The destination format is implementation-defined by the CLI.
-        // 3. No user workflow is served that isn't already covered by existing features: browse native JSONL (backend browser), resume (backend browser + chat), persist conversations (StorageService).
-        // 4. Import direction mismatches typical user need: users would want to import sessions INTO readable conversations, not into an opaque archive store.
-        // 5. The existing backend session browser can already list, preview, detail, and resume any native JSONL session without import indirection.
+        // BLOCKER for promotion to stable user surface (2026-06-07 re-audit, Outcome B — confirmed hidden):
+        // 1. Alpha SDK interface — importSessionToStore AND its ImportSessionToStoreOptions are both @alpha in sdk.d.ts.
+        //    No format stability guarantee. Latest npm 0.3.167; no graduation evidence in changelog.
+        // 2. Imports INTO an opaque store format (SessionStoreEntry with [k: string]: unknown payload), NOT into
+        //    user-readable OpenCodian conversations. The destination is the same opaque mirror store as Session Store.
+        //    SessionSummaryEntry.data is "Opaque SDK-owned state. Stores MUST persist verbatim and MUST NOT interpret."
+        // 3. No user workflow is served that isn't already covered by existing features: browse native JSONL
+        //    (BackendSessionBrowserModal), resume (backend browser + chat), persist conversations (StorageService),
+        //    detail view (backend browser detail mode).
+        // 4. Import direction mismatches typical user need: users want to import sessions INTO readable conversations,
+        //    not into an opaque archive store. The existing backend session browser already lists, previews, details,
+        //    and resumes any native JSONL session without import indirection.
+        // 5. The SDK function signature (importSessionToStore) copies local JSONL into a SessionStore adapter —
+        //    this is plumbing for external mirror/backup, not a user-facing UX operation.
+        // Adjacent seams REJECTED: (a) Import-to-conversation — SessionStore has no conversion to StorageService
+        //    format; would require parsing opaque entries; (b) Import as backup — backup target is opaque store,
+        //    not user-verifiable; (c) Import for cross-device sync — same SessionStore scope limitation as (a).
+        // Promotion path: requires SDK to graduate from @alpha AND provide a user-meaningful import target
+        //    (e.g., import into readable conversations, not opaque mirror store).
         // KEEP HIDDEN — diagnostic proof only.
         userSurface: 'hidden',
       },
@@ -2988,10 +3018,10 @@ export class SettingsCapabilityLabSection {
     );
 
     // Session Store
-    this.addDiscoveryRow(tbody, 'Session Store', 'BLOCKED from stable UI. Alpha SDK interface with opaque implementation-defined format. Existing BackendSessionBrowserModal + StorageService already serve all user needs (browse/resume/persist). No user value in a second parallel persistence layer.');
+    this.addDiscoveryRow(tbody, 'Session Store', 'BLOCKED from stable UI (2026-06-07 re-audit, Outcome B). All SessionStore-related APIs remain @alpha in SDK 0.3.145 (SessionStore, SessionKey, SessionStoreEntry, SessionStoreFlush, SessionSummaryEntry, foldSessionSummary, InMemorySessionStore). Store entries are opaque pass-through blobs; SessionSummaryEntry.data is "Opaque SDK-owned state, MUST NOT interpret." SDKMirrorErrorMessage confirms external-mirror plumbing, not user feature. Existing BackendSessionBrowserModal + StorageService already serve all user needs (browse/preview/detail/resume/persist). No user value in a second parallel opaque persistence layer.');
 
     // Import/Delete/Restore
-    this.addDiscoveryRow(tbody, 'Import/Delete/Restore', 'BLOCKED from stable UI. importSessionToStore imports INTO an opaque store format, not into readable conversations. No workflow served that is not already covered by the backend session browser + conversation persistence.');
+    this.addDiscoveryRow(tbody, 'Import/Delete/Restore', 'BLOCKED from stable UI (2026-06-07 re-audit, Outcome B). importSessionToStore and ImportSessionToStoreOptions both @alpha. Imports INTO opaque mirror store, NOT into readable conversations. Destination format: SessionStoreEntry with [k: string]: unknown payload. No workflow served that is not already covered by BackendSessionBrowserModal (browse/preview/detail/resume) + StorageService (persist). Import direction mismatches user need: users want readable imports, not opaque archive copies.');
   }
 
   private addProofControl(

@@ -97,20 +97,25 @@
 文件内部持有一个 plugin-scoped `CapabilityLabSessionStore`，实现 SDK `SessionStore` 所需的 `append` / `load` / `listSessions` / `listSubkeys`，用于 Capability Lab 的 mirror/import/list/load proof。Mirror probe 使用 `runDiagnosticPrompt({ sessionStore, sessionStoreFlush: 'eager' })` 写入后，会切到 Diagnostic Store、重新列出并选中返回的 session，再通过 `getSessionMessages(sessionId, { sessionStore, limit: 50, includeSystemMessages: false })` 渲染消息预览作为 readback proof；如果 readback 没有返回任何消息，则 Session Store proof 失败。它是内存态、plugin-owned 的诊断 adapter，不是稳定数据层。
 该内存 store 现在也有直接单测，覆盖 append/load 往返、重复 append、listSessions mtime、listSubkeys、空 store 隔离和 projectKey 隔离，但这些测试只证明诊断 store 行为，不把它升级成正式存储产品。
 
-**2026-06-06 审计硬化 — Session Store / Import Session to Store 保持 hidden**：
+**2026-06-07 重新审计（Outcome B）— Session Store / Import Session to Store 保持 hidden**：
 - **Session Store** 的 `runtimeProof` 保持 `pass`（诊断 mirror proof 通过），但 `userSurface` 保持 `hidden`。晋升到稳定产品面的 blocker：
-  1. Alpha SDK 接口（sdk.d.ts 标记 SessionStore 为 alpha），无跨版本格式稳定性保证。
-  2. Store 数据格式是 CLI 实现定义的 opaque 格式——无 schema 契约，无跨版本兼容承诺。append/load/listSessions/listSubkeys 是底层 persistence seam，不是用户-facing archive 格式。
-  3. 现有 `BackendSessionBrowserModal` 已提供 browse + resume，无需外部 store。
-  4. 现有 `StorageService` 已在 human-readable 格式中持久化 OpenCodian conversations。
-  5. 产品化会创建第二个并行 persistence layer，对 native JSONL + conversation persistence 无明确用户价值。用户看到的是 opaque store entries 而非可读 transcript。
-  6. 无未被现有功能覆盖的用户工作流：browse（backend browser）、resume（backend browser + chat）、persist（StorageService）。
+  1. 所有 SessionStore 相关 API 仍为 `@alpha`（SDK 0.3.145）：SessionStore、SessionKey、SessionStoreEntry、SessionStoreFlush、SessionSummaryEntry、foldSessionSummary、InMemorySessionStore。最新 npm 0.3.167 无 graduation 证据。
+  2. Store 数据格式是 opaque pass-through blobs — SessionStoreEntry: `{ type: string; uuid?: string; timestamp?: string; [k: string]: unknown }`，SDK 文档明确声明 "adapters should treat entries as pass-through blobs"。SessionSummaryEntry.data: "Opaque SDK-owned state. Stores MUST persist verbatim and MUST NOT interpret."
+  3. SDKMirrorErrorMessage（sdk.d.ts L3241）确认 SessionStore 是外部 mirror plumbing，不是用户功能。
+  4. 现有 `BackendSessionBrowserModal` 已提供 browse + preview + detail + resume（chat 和 settings 双入口）。
+  5. 现有 `StorageService` 已在 human-readable JSON 格式中持久化 OpenCodian conversations。
+  6. 产品化会创建第二个并行 persistence layer，对 native JSONL + conversation persistence 无明确用户价值。
+  7. 无未被现有功能覆盖的用户工作流：browse（backend browser）、preview（backend browser）、detail（backend browser detail view）、resume（backend browser + chat）、persist（StorageService）。
+  8. Adjacent seams 已拒绝：(a) SessionStore as backup — backup 格式 opaque 不可读；(b) SessionStore for cross-device sync — 需外部 adapter 基础设施；(c) SessionStore as archive/export — SessionSummaryEntry.data 不可解释。
+  9. Promotion path：需 SDK 将 SessionStore 从 @alpha 毕业并提供格式稳定性保证 AND 确认 BackendSessionBrowserModal + StorageService 无法覆盖的用户工作流。
 - **Import Session to Store** 的 `runtimeProof` 保持 `pass`（诊断 import proof 通过），但 `userSurface` 保持 `hidden`。晋升 blocker：
-  1. Alpha SDK 接口，无格式稳定性保证。
-  2. 导入到 opaque store 格式，而非 user-readable OpenCodian conversations。目标格式是 CLI 实现定义的。
-  3. 无未被现有功能覆盖的用户工作流：browse native JSONL（backend browser）、resume（backend browser + chat）、persist conversations（StorageService）。
+  1. `importSessionToStore` + `ImportSessionToStoreOptions` 均为 `@alpha`（SDK 0.3.145）。
+  2. 导入到 opaque mirror store 格式（SessionStoreEntry with `[k: string]: unknown` payload），而非 user-readable OpenCodian conversations。
+  3. 无未被现有功能覆盖的用户工作流：browse（BackendSessionBrowserModal）、resume（backend browser + chat）、persist（StorageService）、detail（backend browser detail view）。
   4. 导入方向与典型用户需求不匹配：用户想导入到 readable conversations，而非 opaque archive store。
   5. 现有 backend session browser 已能 list、preview、detail、resume 任何 native JSONL session，无需 import 间接层。
+  6. Adjacent seams 已拒绝：(a) Import-to-conversation — SessionStore 无转换到 StorageService 格式的路径；(b) Import as backup — backup 目标为 opaque store 不可用户验证。
+  7. Promotion path：需 SDK 从 @alpha 毕业 AND 提供用户有意义的 import target（如导入到 readable conversations 而非 opaque mirror store）。
 
 ### Adapter 获取
 
