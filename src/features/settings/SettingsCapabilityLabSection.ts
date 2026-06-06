@@ -1060,8 +1060,17 @@ export class SettingsCapabilityLabSection {
         // Pass requires: (a) DIFFERENT session id from seed (proving fork occurred), AND (b) text output recalls the nonce.
         // Live runtime proof verified by Codex on 2026-06-03 (BUILD_ID feature-phase0-capability.202606030151):
         //   seed: f91393e7-e652-4a19-a9bc-0ca6920397aa, forked: c0a379c9-752e-43de-94fa-57386bfc52a3, nonce recalled: true.
-        // This is the SDK public option forkSession?: boolean, NOT the provider-owned adapter.forkSession() capability.
-        // Ordinary chat paths never use forkSession — session management is owned by the adapter.
+        // Remains diagnostic with explicit blockers:
+        //   1. The SDK option forkSession?: boolean operates at resume-time (forks the ENTIRE session on
+        //      resume), while the stable chat Fork Session branches from a SPECIFIC message point.
+        //      These are different semantics: one duplicates full history, the other truncates at a message.
+        //   2. The stable chat surface already provides explicit per-message forking via
+        //      adapter.forkSession(sourceSessionId, { upToMessageId }) with coherent UX
+        //      (fork button on message footer → new tab/current tab choice).
+        //   3. No user workflow is served by an automatic "fork on every resume" setting that the
+        //      SDK option would enable; it would create session proliferation without user intent.
+        //   4. The adapter owns explicit session lifecycle management; injecting automatic fork-on-resume
+        //      would break the adapter's session tracking and create orphaned backend sessions.
         userSurface: 'diagnostic', // Capability Lab probe only; no stable settings UI
       },
       {

@@ -11,6 +11,41 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-06-06 Fork Session On Resume — Truth-Sync Hardened Boundary (Outcome B)
+
+### Objective
+
+Audit whether the Claude Code SDK public option `forkSession?: boolean` is semantically already productized by the existing stable chat "Fork Session" surface. Decide between Outcome A (promote to stable surface) or Outcome B (keep diagnostic, harden boundary with explicit blockers).
+
+### Decision
+
+**Outcome B** — `Fork Session On Resume` REMAINS diagnostic-only.
+
+The SDK public option `forkSession?: boolean` is NOT semantically equivalent to the stable chat Fork Session surface. The existing `Fork Session` capability (userSurface: `chat`) uses `adapter.forkSession(sourceSessionId, { upToMessageId })` which branches from a SPECIFIC message point. The SDK option `forkSession?: boolean` is a resume-time flag that forks the ENTIRE session when resuming — preserving full history in a new session ID. These are different operations with different semantics and different user values.
+
+### What Changed
+
+- **src/features/settings/SettingsCapabilityLabSection.ts**: Hardened the `Fork Session On Resume` matrix row comment with four explicit blockers matching the same standard as `Continue` and `Resume Session At Position`:
+  1. SDK option forks entire session on resume; stable chat Fork Session branches from a specific message point — different semantics.
+  2. Stable chat already provides explicit per-message forking via the message footer fork button.
+  3. No user workflow is served by automatic fork-on-resume; it would create session proliferation without intent.
+  4. The adapter owns session lifecycle management; automatic fork-on-resume would break session tracking.
+- **src/i18n/locales/en.ts**: Updated `settings.capabilityLab.proofs.forkSession.boundary` with the four explicit blockers.
+- **src/i18n/locales/zh.ts**: Same boundary text update in Chinese.
+- **docs/status/claude-code-current-state-2026-05-22.md**: Added truth-sync section documenting the hardened boundary.
+- **docs/modules/features/settings/SettingsCapabilityLabSection.md**: Updated module doc to reflect the hardened boundary.
+
+### Honesty Boundaries
+
+- Classification: **pass** (unchanged — runtime proof verified by Codex on 2026-06-03).
+- User surface: **diagnostic** (unchanged — explicitly NOT promoted to stable).
+- No fake UI added. No capability claim inflated.
+- The stable `Fork Session` surface (userSurface: `chat`) continues to provide the real user-facing "branch from here" capability.
+- The `Resume Session` surface (userSurface: `chat`) continues to provide the real user-facing "continue this session" capability.
+- `Fork Session On Resume` remains a verified SDK seam with no stable product mapping.
+
+---
+
 ## 2026-06-06 Continue / Resume Session At Position — Boundary Hardening (Diagnostic-Only)
 
 ### Objective

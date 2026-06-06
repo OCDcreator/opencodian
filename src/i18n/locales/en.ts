@@ -2952,7 +2952,7 @@ export const enTranslations = {
   'settings.capabilityLab.proofs.forkSession.button': 'Run Fork Session On Resume Proof',
   'settings.capabilityLab.proofs.forkSession.running': 'Running forkSession probe (different session id + nonce recall required for pass)…',
   'settings.capabilityLab.proofs.forkSession.title': 'Fork Session On Resume Proof',
-  'settings.capabilityLab.proofs.forkSession.boundary': '⚠️ Diagnostic-only: not a stable product surface. Ordinary chat paths never use forkSession. Session management is owned by the adapter. This is the SDK public option forkSession?: boolean, NOT the provider-owned adapter.forkSession() capability. This probe resumes and forks into a new session id.',
+  'settings.capabilityLab.proofs.forkSession.boundary': '⚠️ Diagnostic-only: not a stable product surface. This is the SDK public option forkSession?: boolean, NOT the stable chat Fork Session surface. Blockers: (1) SDK option forks the ENTIRE session on resume; stable chat Fork Session branches from a SPECIFIC message point — different semantics. (2) Stable chat already provides explicit per-message forking via the message footer fork button. (3) No user workflow is served by automatic fork-on-resume; it would create session proliferation without intent. (4) The adapter owns session lifecycle management; automatic fork-on-resume would break session tracking.',
   'settings.capabilityLab.proofs.forkSession.seedSession': 'Seed session: {{sessionId}}',
   'settings.capabilityLab.proofs.forkSession.forkedSession': 'Forked session: {{sessionId}}',
   'settings.capabilityLab.proofs.forkSession.sessionIdsDiffer': 'Session ids differ (fork occurred): {{status}}',

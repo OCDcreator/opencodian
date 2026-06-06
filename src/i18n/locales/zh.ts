@@ -2951,7 +2951,7 @@ export const zhTranslations = {
   'settings.capabilityLab.proofs.forkSession.button': '运行 Fork Session On Resume 证明',
   'settings.capabilityLab.proofs.forkSession.running': '正在运行 forkSession 探针（只有不同 session id 且成功回忆 nonce 才算 pass）…',
   'settings.capabilityLab.proofs.forkSession.title': 'Fork Session On Resume 证明',
-  'settings.capabilityLab.proofs.forkSession.boundary': '⚠️ 仅限诊断：这不是稳定产品界面。普通聊天路径绝不会使用 forkSession。会话管理由 adapter 持有。这是 SDK 公共选项 forkSession?: boolean，不是 provider 持有的 adapter.forkSession() 能力。这个探针会在恢复时 fork 到一个新的 session id。',
+  'settings.capabilityLab.proofs.forkSession.boundary': '⚠️ 仅限诊断：这不是稳定产品界面。这是 SDK 公共选项 forkSession?: boolean，不是稳定聊天 Fork Session 界面。阻止原因：(1) SDK 选项在恢复时 fork 整个会话；稳定聊天 Fork Session 从特定消息点分支——语义不同。(2) 稳定聊天已通过消息底部 fork 按钮提供显式的逐消息分支。(3) 自动恢复时 fork 没有服务任何用户工作流；会在无用户意图的情况下产生大量会话。(4) adapter 持有会话生命周期管理；自动恢复时 fork 会破坏会话跟踪。',
   'settings.capabilityLab.proofs.forkSession.seedSession': '种子会话：{{sessionId}}',
   'settings.capabilityLab.proofs.forkSession.forkedSession': 'Fork 会话：{{sessionId}}',
   'settings.capabilityLab.proofs.forkSession.sessionIdsDiffer': '会话 ID 是否不同（已 fork）：{{status}}',
