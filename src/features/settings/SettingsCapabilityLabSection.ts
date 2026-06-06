@@ -677,6 +677,32 @@ export class SettingsCapabilityLabSection {
         // "Restricted Built-in Tools" owns the SDK `tools` restrictor (deterministic pass).
         // Readback is the honest ceiling for Allowed Tools — the option reaches the SDK boundary
         // but has no measurable enforcement effect.
+        //
+        // 2026-06-06 re-audit (Outcome B): no new productizable seam exists beyond the already-known
+        // zero-enforcement boundary. SDK docs (sdk.d.ts line 1253) confirm: "List of tool names
+        // that are auto-allowed without prompting for permission. To restrict which tools are
+        // available, use the `tools` option instead." The SDK itself explicitly delegates
+        // availability restriction to `tools`, NOT `allowedTools`.
+        //
+        // Adjacent seams audited and REJECTED:
+        // 1. SDK `dontAsk` permission mode — "deny if not pre-approved" would deny execution
+        //    of non-allowed tools at the permission layer, NOT restrict availability. Semantically
+        //    distinct from catalog-level filtering. Plugin normalizes `dontAsk` → `bypassPermissions`,
+        //    so this mode is never sent to SDK. Even if exposed, it would make allowedTools a
+        //    permission-layer gate, not an availability restrictor.
+        // 2. SDK `auto` permission mode — uses model classifier to approve/deny. Plugin normalizes
+        //    `auto` → `default`. Classifier decisions are model-dependent, not deterministic.
+        //    Does not change allowedTools enforcement boundary.
+        // 3. SDK `SDKPermissionDeniedMessage` event (sdk.d.ts line 3287) — emitted when a tool
+        //    is auto-denied without interactive prompt. Has `decision_reason_type` discriminator
+        //    ('classifier', 'mode', 'rule', etc.). This is a permission-denial notification, NOT
+        //    an availability restriction signal. Would only appear in dontAsk/auto modes which the
+        //    plugin does not expose.
+        // 4. Reusing Restricted Built-in Tools (SDK `tools`) evidence as allowedTools proof —
+        //    Explicitly prohibited: `tools` restricts availability at init catalog level;
+        //    `allowedTools` is an auto-approve shortcut. These are semantically distinct.
+        //
+        // SDK version: 0.3.145 (installed). Skill deprecation note in allowedTools confirmed.
         userSurface: 'settings',
       },
       {

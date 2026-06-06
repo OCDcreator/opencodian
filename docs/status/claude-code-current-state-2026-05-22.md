@@ -93,8 +93,77 @@ These have adapter wiring and runtime proof, but no stable or diagnostic user su
 ### suggested next 3 checkpoints
 
 1. **File Checkpoint / Rewind** — Highest user-value if unblocked. ✅ **2026-06-06 re-audited** — blocker confirmed unchanged. Monitor SDK #236 + claude-code #16976. Re-audit on any SDK version bump that mentions checkpointing or interactive-mode fixes. Current state: readback with confirmed upstream blocker.
-2. **Allowed Tools** — Readback; auto-approve shortcut only, zero enforcement at tool-catalog level. Potential seam: if SDK adds enforcement at the catalog level (currently `allowedTools` only affects `canUseTool` auto-approve, not tool availability). Low priority.
+2. **Allowed Tools** — ✅ **2026-06-06 re-audited** (Outcome B) — readback confirmed; auto-approve shortcut only, zero enforcement at tool-catalog level. SDK docs explicitly delegate availability restriction to `tools`, NOT `allowedTools`. New SDK `dontAsk`/`auto` permission modes and `SDKPermissionDeniedMessage` event audited and REJECTED as enforcement evidence: they are permission-layer gates, not availability restrictors. Plugin does not expose these modes. No promotion path unless SDK adds catalog-level enforcement.
 3. **Task Budget** — Readback; `@alpha` option wiring verified. Potential seam: if SDK adds budget-enforcement status signals or error types.
+
+---
+
+## 2026-06-06 Allowed Tools — Re-Audit and Boundary Hardening (Outcome B)
+
+### Objective
+
+Re-audit the Claude Code SDK `allowedTools` seam against the current SDK/repo state to determine whether any new productizable seam exists beyond the already-known "auto-approve shortcut, zero enforcement" boundary. Maintain strict semantic separation from `restrictedBuiltinTools` (SDK `tools` option).
+
+### SDK Seam Analysis
+
+The SDK exposes `allowedTools` as a query option:
+
+```typescript
+// SDK Options (sdk.d.ts line 1253)
+/**
+ * List of tool names that are auto-allowed without prompting for permission.
+ * These tools will execute automatically without asking the user for approval.
+ * To restrict which tools are available, use the `tools` option instead.
+ *
+ * Note: passing `'Skill'` here is deprecated — use the `skills` option instead.
+ */
+allowedTools?: string[];
+```
+
+The SDK documentation explicitly:
+1. Defines `allowedTools` as "auto-allowed without prompting for permission" — an auto-approve shortcut.
+2. States "To restrict which tools are available, use the `tools` option instead" — delegates availability restriction to `tools`.
+3. Deprecates `'Skill'` in `allowedTools` in favor of the `skills` option.
+
+### Decision
+
+**Outcome B** — Allowed Tools REMAINS `readback` with hardened boundary.
+
+### What IS verified (existing evidence, unchanged)
+
+1. **Settings→SDK option wiring**: `settings.allowedTools` propagates through `ClaudeCodeOptionsBuilder` → SDK `Options.allowedTools` → CLI subprocess. When non-empty, `options.allowedTools = [...settings.allowedTools]`.
+2. **Init catalog always unfiltered**: All runtime evidence confirms the SDK init message `tools[]` catalog contains all 34 built-in tools regardless of `allowedTools` value. Setting `allowedTools: ['Read']` does NOT remove other tools from the catalog.
+3. **`canUseTool` dead in query() mode**: Even with `_diagnosticForcePermissionMode: 'default'` and `_diagnosticBypassPermissions: false`, the SDK subprocess makes zero `canUseTool` calls. The callback is a dead path in SDK `query()` mode.
+4. **Non-bypass synthetic approval passes non-allowed tools through**: When `_diagnosticCanUseTool` is provided, non-allowed tool calls arrive at the callback — proving the SDK does NOT enforce `allowedTools` before calling `canUseTool`.
+5. **Stable settings surface**: Tools tab text area with honest boundary notice distinguishing from Restricted Built-in Tools.
+6. **Semantic separation maintained**: `allowedTools` = auto-approve shortcut; `disallowedTools` = catalog-level remover; `restrictedBuiltinTools` (SDK `tools`) = availability restrictor. These are three distinct semantics.
+
+### What is NOT verified — and remains fundamentally unverifiable
+
+1. **No catalog-level enforcement**: `allowedTools` never removes tools from the model's context. The SDK init catalog is always the full 34 built-in tools.
+2. **No permission-layer enforcement observable from plugin**: `canUseTool` callback is dead in `query()` mode. Even if the SDK internally uses `allowedTools` to auto-approve, the plugin cannot observe this because the callback is never invoked.
+3. **Option is a one-way signal**: `allowedTools` is sent to the CLI subprocess but produces no observable feedback event, status metadata, or stream marker confirming its effect.
+
+### Adjacent seams audited and REJECTED
+
+1. **SDK `dontAsk` permission mode** — SDK docs: "Don't prompt for permissions, deny if not pre-approved." In `dontAsk` mode, non-allowed tools would be denied at the permission layer, NOT removed from the catalog. This is a permission-layer execution gate, semantically distinct from catalog-level availability restriction. Plugin normalizes `dontAsk` → `bypassPermissions`, so this mode is never sent to the SDK. Even if exposed, it would make `allowedTools` a permission gate, not an availability restrictor — the classification boundary is about tool *availability*, not tool *execution permission*.
+
+2. **SDK `auto` permission mode** — SDK docs: "Use a model classifier to approve/deny permission prompts." Plugin normalizes `auto` → `default`. Classifier decisions are model-dependent and non-deterministic. Does not change the `allowedTools` enforcement boundary.
+
+3. **SDK `SDKPermissionDeniedMessage` event (sdk.d.ts line 3287)** — Emitted when a tool is auto-denied without interactive prompt. Has `decision_reason_type` discriminator ('classifier', 'mode', 'rule', etc.). This is a permission-denial notification, NOT an availability restriction signal. Would only appear in `dontAsk`/`auto` modes which the plugin does not expose. Even if observed, it proves execution denial, not catalog filtering.
+
+4. **Reusing Restricted Built-in Tools (SDK `tools`) evidence as allowedTools proof** — Explicitly prohibited: `tools` restricts availability at init catalog level (pass/verified); `allowedTools` is an auto-approve shortcut (readback). These are semantically distinct capabilities with distinct enforcement mechanisms.
+
+5. **Reusing Disallowed Tools (SDK `disallowedTools`) evidence as allowedTools proof** — Explicitly prohibited: `disallowedTools` removes tools from the model's context at the catalog level (pass/verified); `allowedTools` is an auto-approve shortcut (readback). The audit must treat these as independent seams.
+
+### Changes made
+
+- Matrix row comment: hardened with 2026-06-06 re-audit Outcome B, SDK documentation quote, full adjacent seams rejected, and explicit promotion path.
+- Current-state doc: updated suggested checkpoints with re-audit evidence.
+
+### Promotion path
+
+Requires one of: (a) SDK adds catalog-level enforcement for `allowedTools` (removing non-allowed tools from init catalog), (b) SDK emits an observable signal confirming `allowedTools` auto-approval took effect, (c) plugin gains access to `canUseTool` callback in `query()` mode — none currently exists. The SDK docs themselves explicitly delegate availability restriction to the `tools` option, making catalog-level enforcement by `allowedTools` architecturally unlikely.
 
 ---
 
