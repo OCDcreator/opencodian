@@ -93,8 +93,93 @@ These have adapter wiring and runtime proof, but no stable or diagnostic user su
 ### suggested next 3 checkpoints
 
 1. **File Checkpoint / Rewind** — Highest user-value if unblocked. Monitor Anthropic SDK bug #236. Re-audit on any SDK version bump that mentions checkpointing or interactive-mode fixes. Current state: readback with known upstream blocker.
-2. **1M Context Beta** — ✅ Audit complete (2026-06-06, Outcome B). Full SDK path traced: setting → buildClaudeCodeOptions → ProcessTransport.initialize() → CLI --betas flag. SDK init message has betas field but plugin does not consume it. Remains readback; hardened boundary text. Model-side beta acceptance unobservable. Potential future seam: consume init message betas field for stronger readback.
-3. **Stderr Diagnostic** — ✅ Audit complete (2026-06-06, Outcome B). Callback wiring proven via real diagnostic query. No query reliably provokes stderr output — fundamental limitation (CLI-internal, unstructured, version-dependent, not contractual). Debug File (pass/verified) covers the "capture debug output" use case. Remains readback with hardened boundary.
+2. **Debug** — Readback; option wiring verified. Potential seam: `debugFile` already has deterministic filesystem side effect (separate pass/verified row), but the `debug` toggle itself only enables debug logging without observable output unless `debugFile` or stderr callback is set. Could audit whether combining with stderr callback produces verifiable output.
+3. **JS Runtime** — Readback; option wiring verified. Potential seam: actual runtime selection depends on system PATH and installation, but `executable` option reaches CLI. Could audit whether CLI produces an observable signal indicating which runtime was actually selected.
+
+---
+
+## 2026-06-06 Sandbox — Audit and Boundary Hardening (Outcome B)
+
+### Objective
+
+Audit the Claude Code SDK `Options.sandbox?: SandboxSettings` seam to determine if it can be productized beyond the current readback boundary into a stable pass/verified capability, or if it should remain readback with a hardened boundary.
+
+### SDK Seam Analysis
+
+The SDK exposes a rich `SandboxSettings` type (inferred from `SandboxSettingsSchema`):
+
+```typescript
+// SDK SandboxSettingsSchema — full shape (sdk.d.ts lines 2479-2516)
+{
+  enabled?: boolean;
+  failIfUnavailable?: boolean;
+  autoAllowBashIfSandboxed?: boolean;
+  allowUnsandboxedCommands?: boolean;
+  network?: {
+    allowedDomains?: string[];
+    deniedDomains?: string[];
+    allowManagedDomainsOnly?: boolean;
+    allowUnixSockets?: string[];
+    allowAllUnixSockets?: boolean;
+    allowLocalBinding?: boolean;
+    allowMachLookup?: string[];
+    httpProxyPort?: number;
+    socksProxyPort?: number;
+    tlsTerminate?: { caCertPath?: string; caKeyPath?: string };
+  };
+  filesystem?: {
+    allowWrite?: string[];
+    denyWrite?: string[];
+    denyRead?: string[];
+    allowRead?: string[];
+    allowManagedReadPathsOnly?: boolean;
+  };
+  ignoreViolations?: Record<string, string[]>;
+  enableWeakerNestedSandbox?: boolean;
+  enableWeakerNetworkIsolation?: boolean;
+  excludedCommands?: string[];
+  ripgrep?: { command: string; args?: string[] };
+  bwrapPath?: string;
+  socatPath?: string;
+}
+```
+
+The plugin exposes only 3 of these fields (`enabled`, `failIfUnavailable`, `autoAllowBashIfSandboxed`) via stable settings in the Permissions tab. The remaining ~20 fields (network, filesystem, TLS, proxy, Mach lookup, `allowUnsandboxedCommands`, `excludedCommands`, `ignoreViolations`, `ripgrep`, `bwrapPath`, `socatPath`) are intentionally not exposed.
+
+### Decision
+
+**Outcome B** — Sandbox REMAINS `readback` with hardened boundary.
+
+### What IS verified
+
+1. **Settings→SDK option wiring**: `enabled`, `failIfUnavailable`, `autoAllowBashIfSandboxed` propagate through `ClaudeCodeOptionsBuilder` → SDK `Options.sandbox` → SDK `X2()` → `--settings` JSON → CLI subprocess.
+2. **SDK default behavior**: When `enabled=true`, `X2()` sets `failIfUnavailable=true` if unspecified (per `sdk.d.ts` line 1662). This means queries fail if sandbox dependencies are missing.
+3. **Builder semantics**: `enabled=false` → sandbox option omitted entirely; `enabled=true` → sandbox object present; false sub-fields stay omitted rather than being passed as explicit `false`.
+4. **Probe coverage**: `runSandboxReadbackProbe()` builds diagnostic SDK options and verifies all 3 fields map correctly. 5 focused tests cover disabled, enabled with sub-options, mismatch, disabled-but-present, and explicit-false-sub-fields.
+5. **Stable settings surface**: Permissions tab has 3 toggles with boundary notice, lifecycle notice, and proper normalization.
+
+### What is NOT verified — and fundamentally unverifiable from the plugin layer
+
+1. **No observable signal confirms sandbox activation**: No init event, no tool metadata, no stderr pattern, no `CLAUDE_CODE_SANDBOXED` env var in `createQuery` path (that var only exists in the `assistant-worker` path).
+2. **OS-level enforcement is CLI-internal**: bubblewrap on Linux, platform-native on macOS — the plugin cannot distinguish "sandbox active" from "sandbox silently degraded" or "unsupported platform".
+3. **`decision_reason_type: 'sandboxOverride'`** exists in SDK `SDKPermissionRequest` events (sdk.d.ts line 2911), but this is a permission decision reason type — it only appears when a specific bash auto-approve interaction occurs with an active sandbox. It is not a dedicated sandbox activation signal and cannot be provoked from the plugin layer without `autoAllowBashIfSandboxed=true` AND sandbox actually active.
+4. **Rich sub-policies are unobservable**: Network, filesystem, TLS, proxy, Mach lookup, `allowUnsandboxedCommands`, `excludedCommands`, `ignoreViolations`, `ripgrep`, `bwrapPath`, `socatPath` all exist in the SDK schema but produce no observable signal from the plugin layer.
+
+### Adjacent seams audited and REJECTED
+
+1. **`decision_reason_type: 'sandboxOverride'` passive detection** — Would only appear on permission events with `autoAllowBashIfSandboxed=true` AND sandbox active. Cannot be provoked without actual sandbox activation. Not a standalone activation signal.
+2. **Exposing `allowUnsandboxedCommands`** — New SDK field that forces all commands to be sandboxed when `false`. Still readback without activation proof. Adding it would expand the settings surface without changing the classification.
+3. **Exposing network/filesystem sub-policies** — 20+ additional fields with no observable signals. Would be a settings explosion without verification value.
+4. **Live sandbox status probe** — No SDK API exists to query whether sandbox is currently active for a running session.
+
+### Changes made
+
+- Matrix row comment: updated with full SDK `SandboxSettingsSchema` field inventory, `decision_reason_type: 'sandboxOverride'` as additional promotion path, explicit statement that stable settings surface is already the right user entry.
+- Module docs: updated with the 2026-06-06 checkpoint audit findings and expanded SandboxSettingsSchema coverage.
+
+### Promotion path
+
+Requires one of: (a) SDK adds sandbox status to init event or tool result metadata, (b) SDK exposes a `sandboxStatus` query API, (c) `decision_reason_type: 'sandboxOverride'` can be reliably provoked and observed as indirect activation proof — none currently feasible.
 
 ---
 

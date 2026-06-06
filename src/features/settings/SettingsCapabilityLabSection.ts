@@ -873,7 +873,7 @@ export class SettingsCapabilityLabSection {
         capability: 'Sandbox',
         sdkExposed: true, // SDK Options.sandbox?: SandboxSettings
         adapterWired: true, // buildClaudeCodeOptions wires sandbox.enabled/failIfUnavailable/autoAllowBashIfSandboxed
-        runtimeProof: 'readback', // 2026-06-06 audit: SDK sandbox path fully traced.
+        runtimeProof: 'readback', // 2026-06-06 audit (checkpoint round): Sandbox stays readback.
         // Option wiring: enabled/failIfUnavailable/autoAllowBashIfSandboxed propagate through
         // ClaudeCodeOptionsBuilder → SDK Options.sandbox → SDK X2() merges into --settings JSON → CLI subprocess.
         // SDK defaults: when enabled=true, X2() sets failIfUnavailable=true if unspecified (per sdk.d.ts line 1662).
@@ -881,9 +881,13 @@ export class SettingsCapabilityLabSection {
         // No observable signal confirms activation: no init event, no tool metadata, no stderr pattern,
         // no CLAUDE_CODE_SANDBOXED env var (that's assistant-worker path only, not createQuery path).
         // Plugin cannot distinguish "sandbox active" from "sandbox silently degraded" or "unsupported platform".
-        // Network, filesystem, TLS, proxy, and Mach lookup sub-policies exist in SandboxSettingsSchema
+        // Stable settings surface is already the right user entry (Permissions tab, 3 toggles).
+        // Network, filesystem, TLS, proxy, Mach lookup, allowUnsandboxedCommands, excludedCommands,
+        // ignoreViolations, ripgrep, bwrapPath, socatPath sub-policies exist in SandboxSettingsSchema
         // but are intentionally not exposed as stable settings in this version.
-        // Promotion path: if SDK adds sandbox status to init event or tool result metadata, re-audit.
+        // Promotion path: if SDK adds sandbox status to init event, tool result metadata, or if
+        // permission events expose decision_reason_type='sandboxOverride' during an auto-allow bash
+        // interaction when sandbox is active, re-audit for indirect activation proof.
         userSurface: 'settings', // Permissions tab: enabled, failIfUnavailable, autoAllowBashIfSandboxed toggles
       },
       {

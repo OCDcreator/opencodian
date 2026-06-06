@@ -11,6 +11,33 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-06-06 Sandbox — Audit and Boundary Hardening (Outcome B)
+
+Audit the `Sandbox` capability to determine whether any real productizable user-facing seam exists beyond the current readback boundary. The existing stable settings surface (Permissions tab, 3 toggles) is already the right user entry.
+
+**Decision: Outcome B** — `Sandbox` remains `runtimeProof: 'readback'`. The stable settings surface is already the right user entry. No honest promotion to pass is possible.
+
+**Audit findings:**
+
+1. SDK `SandboxSettingsSchema` has ~20+ fields. Plugin exposes only 3 (`enabled`, `failIfUnavailable`, `autoAllowBashIfSandboxed`). Remaining fields (network, filesystem, TLS, proxy, Mach lookup, `allowUnsandboxedCommands`, `excludedCommands`, `ignoreViolations`, `ripgrep`, `bwrapPath`, `socatPath`) are intentionally not exposed.
+2. SDK sandbox path fully traced: `Options.sandbox` → SDK `X2()` → `--settings` JSON → CLI subprocess. SDK defaults `failIfUnavailable=true` when `enabled=true`.
+3. No observable signal confirms sandbox activation: no init event, no tool metadata, no stderr pattern, no `CLAUDE_CODE_SANDBOXED` env var in `createQuery` path.
+4. `decision_reason_type: 'sandboxOverride'` (sdk.d.ts line 2911) exists in permission events but is not a standalone activation signal — it only appears on bash auto-approve with active sandbox, cannot be provoked without actual activation.
+5. Plugin cannot distinguish "sandbox active" from "sandbox silently degraded" or "unsupported platform".
+
+**Changes made:**
+
+- Matrix row comment: updated with full SDK field inventory, `decision_reason_type: 'sandboxOverride'` promotion path, explicit statement that stable settings surface is already correct.
+- Module doc: updated entry 19 with checkpoint audit findings and full SandboxSettingsSchema field list.
+- Current-state doc: added Sandbox checkpoint section, updated suggested next checkpoints.
+- No code changes — all layers already consistent.
+
+**Promotion path:**
+
+(a) SDK adds sandbox status to init event or tool result metadata, (b) SDK exposes `sandboxStatus` query API, (c) `decision_reason_type='sandboxOverride'` can be reliably provoked as indirect activation proof.
+
+---
+
 ## 2026-06-06 Stderr Diagnostic — Audit and Boundary Hardening (Outcome B)
 
 Audit the `Stderr Diagnostic` capability to determine whether any real productizable user-facing seam exists beyond diagnostic readback.
