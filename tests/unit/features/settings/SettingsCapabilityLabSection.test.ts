@@ -8466,7 +8466,7 @@ describe('SettingsCapabilityLabSection', () => {
     expect(containerEl.textContent).toContain('probe exploded');
   });
 
-  it('renders Load Timeout readback proof button and shows readback output', async () => {
+  it('renders Load Timeout readback proof button backed by locale key and shows readback output', async () => {
     const adapter = {
       runLoadTimeoutReadbackProbe: jest.fn().mockResolvedValue({
         classification: 'readback',
@@ -8485,7 +8485,7 @@ describe('SettingsCapabilityLabSection', () => {
 
     section.attachTabbed(containerEl, 'capability-lab');
     const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
-      el.textContent?.includes('Run Load Timeout Readback Proof')
+      el.textContent?.includes(t('settings.capabilityLab.proofs.loadTimeout.button'))
     )) as HTMLButtonElement | undefined;
     expect(button).toBeTruthy();
 
@@ -8496,16 +8496,13 @@ describe('SettingsCapabilityLabSection', () => {
     const proofMarker = containerEl.querySelector('[data-capability="Load Timeout"]');
     expect(proofMarker).toBeTruthy();
     expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-readback')).toBe(true);
-    expect(containerEl.textContent).toContain('Load Timeout Readback Proof');
-    expect(containerEl.textContent).toContain('Diagnostic readback only');
-    expect(containerEl.textContent).toContain('Actual timeout behavior depends on the SDK/CLI version and runtime conditions');
-    expect(containerEl.textContent).toContain('Applies to the next query or restarted session only');
-    expect(containerEl.textContent).toContain('Active sessions do not update live');
-    expect(containerEl.textContent).toContain('Option wired: ✓ yes');
-    expect(containerEl.textContent).toContain('Setting value: 60000');
-    expect(containerEl.textContent).toContain('SDK option present: ✓ yes');
-    expect(containerEl.textContent).toContain('SDK value: 60000');
-    expect(containerEl.textContent).toContain('Value match: ✓ yes');
+    expect(containerEl.textContent).toContain(t('settings.capabilityLab.proofs.loadTimeout.title'));
+    expect(containerEl.textContent).toContain(t('settings.capabilityLab.proofs.loadTimeout.optionWired', { status: t('settings.capabilityLab.proofs.loadTimeout.status.yes') }));
+    expect(containerEl.textContent).toContain(t('settings.capabilityLab.proofs.loadTimeout.settingValue', { value: 60000 }));
+    expect(containerEl.textContent).toContain(t('settings.capabilityLab.proofs.loadTimeout.sdkOptionPresent', { status: t('settings.capabilityLab.proofs.loadTimeout.status.yes') }));
+    expect(containerEl.textContent).toContain(t('settings.capabilityLab.proofs.loadTimeout.sdkValue', { value: 60000 }));
+    expect(containerEl.textContent).toContain(t('settings.capabilityLab.proofs.loadTimeout.valueMatch', { status: t('settings.capabilityLab.proofs.loadTimeout.status.yes') }));
+    expect(containerEl.textContent).toContain(t('settings.capabilityLab.proofs.loadTimeout.readback'));
   });
 
   it('renders Load Timeout readback proof button and shows error on thrown error', async () => {
@@ -8520,7 +8517,7 @@ describe('SettingsCapabilityLabSection', () => {
 
     section.attachTabbed(containerEl, 'capability-lab');
     const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
-      el.textContent?.includes('Run Load Timeout Readback Proof')
+      el.textContent?.includes(t('settings.capabilityLab.proofs.loadTimeout.button'))
     )) as HTMLButtonElement | undefined;
     expect(button).toBeTruthy();
 
@@ -8530,7 +8527,7 @@ describe('SettingsCapabilityLabSection', () => {
     const proofMarker = containerEl.querySelector('[data-capability="Load Timeout"]');
     expect(proofMarker).toBeTruthy();
     expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-fail')).toBe(true);
-    expect(containerEl.textContent).toContain('Load Timeout Readback Proof');
+    expect(containerEl.textContent).toContain(t('settings.capabilityLab.proofs.loadTimeout.title'));
     expect(containerEl.textContent).toContain('probe exploded');
   });
 });

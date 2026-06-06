@@ -11,6 +11,35 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-06-06 Load Timeout — Audit and Boundary Hardening (Outcome B)
+
+Audit the `Load Timeout` capability (SDK `Options.loadTimeoutMs?: number`, @alpha) to determine whether it can be productized beyond readback into a stable pass/verified capability.
+
+**Decision: Outcome B** — `Load Timeout` remains `runtimeProof: 'readback'`. No honest promotion to pass is possible.
+
+**Audit findings:**
+
+1. `settings.loadTimeoutMs` propagates through `ClaudeCodeOptionsBuilder` → `Options.loadTimeoutMs` → SDK. Full wiring verified.
+2. SDK only consumes `loadTimeoutMs` when `(options.resume || options.continue) && options.sessionStore` is true. It wraps `sessionStore.listSessions()` in a `Promise.race` timeout (C4 function, offset 154014).
+3. On timeout, the promise rejects → `transport.spawnAbort(error)` + `queryInstance.setError(error)`. No dedicated timeout event.
+4. The plugin's diagnostic path does NOT use resume/continue or sessionStore, so the timeout code path never executes.
+5. `@alpha` — the SDK marks this as alpha, meaning the API could change without notice.
+6. `loadTimeoutMs` is NOT a general query timeout. It only covers sessionStore resume/continue materialization. Do not conflate with network timeout, model latency, or server startup timeout.
+
+**Changes made:**
+
+- Matrix row comment: hardened with explicit Outcome B, VERIFIED/NOT VERIFIED sections, adjacent seams rejected, and promotion path.
+- Locale proof text (en+zh): Added 16 `settings.capabilityLab.proofs.loadTimeout.*` keys replacing hardcoded English strings.
+- Proof method: `runLoadTimeoutReadbackProof()` converted from hardcoded English to locale-backed strings.
+- Proof button label: converted from hardcoded string to locale key.
+- Tests: Load Timeout tests updated to use `t()` locale lookups instead of hardcoded English strings.
+- Module docs: Updated `SettingsCapabilityLabSection.md` entry 11h with Outcome B audit details.
+- Audit doc: Added Load Timeout checkpoint section with full VERIFIED/NOT VERIFIED breakdown.
+
+**Classification unchanged:** `readback` / `settings` — option wiring proven, timeout behavior not independently verifiable.
+
+---
+
 ## 2026-06-06 JS Runtime — Audit and Boundary Hardening (Outcome B)
 
 Audit the `JS Runtime` capability (SDK `Options.executable?: 'node' | 'bun' | 'deno'`) to determine whether it can be productized beyond readback into a stable pass/verified capability. The `executablePath`/ProcessResolver capability is separate and covers Claude binary resolution.

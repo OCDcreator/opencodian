@@ -71,7 +71,7 @@ Option wiring proven through `buildClaudeCodeOptions`, but no independent plugin
 - Strict MCP Config — option wiring verified; validation behavior lives in compiled CLI binary
 - 1M Context Beta — option wiring verified through full SDK path (setting → buildClaudeCodeOptions → ProcessTransport → CLI --betas flag); model-side beta acceptance and 1M context activation unobservable from plugin layer
 - JS Runtime — option wiring verified; actual runtime selection depends on system PATH and installation. **2026-06-06 audit completed** (Outcome B): remains readback with hardened boundary. No observable signal in init events, stderr, or tool output confirms which runtime the CLI subprocess actually uses.
-- Load Timeout — `@alpha`; option wiring verified; timeout code path only executes with resume/continue + sessionStore
+- Load Timeout — `@alpha`; option wiring verified; timeout code path only executes with resume/continue + sessionStore. **2026-06-06 audit completed** (Outcome B): remains readback with hardened boundary.
 - AskUserQuestion Preview Format — option wiring + UI preview rendering path verified; actual preview arrival depends on SDK version and model behavior
 
 **Diagnostic (`userSurface: 'diagnostic'`) — 3**
@@ -93,8 +93,72 @@ These have adapter wiring and runtime proof, but no stable or diagnostic user su
 ### suggested next 3 checkpoints
 
 1. **File Checkpoint / Rewind** — Highest user-value if unblocked. Monitor Anthropic SDK bug #236. Re-audit on any SDK version bump that mentions checkpointing or interactive-mode fixes. Current state: readback with known upstream blocker.
-2. **Load Timeout** — `@alpha`; option wiring verified. Potential seam: timeout code path only executes with resume/continue + sessionStore. Could audit whether a timeout event or error produces an observable signal.
+2. **AskUserQuestion Preview Format** — Readback; option wiring + UI preview rendering path verified. Potential seam: if SDK version reliably includes preview strings in AskUserQuestion tool inputs, could be promoted.
 3. **Allowed Tools** — Readback; auto-approve shortcut only, zero enforcement at tool-catalog level. Potential seam: if SDK adds enforcement at the catalog level (currently `allowedTools` only affects `canUseTool` auto-approve, not tool availability). Low priority.
+
+---
+
+## 2026-06-06 Load Timeout — Audit and Boundary Hardening (Outcome B)
+
+### Objective
+
+Audit the Claude Code SDK `Options.loadTimeoutMs?: number` seam to determine if it can be productized beyond the current readback boundary into a stable pass/verified capability, or if it should remain readback with a hardened boundary.
+
+### SDK Seam Analysis
+
+The SDK exposes exactly one load-timeout-related option:
+
+```typescript
+// SDK Options
+loadTimeoutMs?: number; // @alpha
+```
+
+The SDK only consumes `loadTimeoutMs` when `(options.resume || options.continue) && options.sessionStore` is true. In that path, it wraps `sessionStore.listSessions()` in a `Promise.race` timeout (function `C4`, offset 154014 in sdk.mjs):
+
+```
+C4(store.listSessions(projectKey), loadTimeoutMs, "SessionStore.listSessions() timed out")
+```
+
+On timeout, the promise rejects and propagates to `yj$.catch`, which calls `transport.spawnAbort(error)` and `queryInstance.setError(error)`.
+
+### Decision
+
+**Outcome B** — Load Timeout REMAINS `readback` with hardened boundary.
+
+### What IS verified
+
+1. **Settings→SDK option wiring**: `settings.loadTimeoutMs` propagates through `ClaudeCodeOptionsBuilder` → `Options.loadTimeoutMs` → SDK.
+2. **Builder semantics**: `null` → option omitted entirely; positive integer → forwarded as-is.
+3. **Normalization**: `normalizeClaudeCodeNullablePositiveInt` handles defaults, rounding, and invalid values.
+4. **Probe coverage**: `runLoadTimeoutReadbackProbe()` builds diagnostic SDK options and verifies all 6 cases (null→readback, positive-int→readback, null-but-option-present→fail, set-but-option-missing→fail, wrong-value→fail, error-thrown→fail).
+5. **Stable settings surface**: Runtime tab numeric input with boundary notice and lifecycle notice.
+6. **Semantic separation from general query timeout**: `loadTimeoutMs` is ONLY about sessionStore resume/continue materialization, not general query latency, model latency, network timeout, or server startup timeout.
+
+### What is NOT verified — and fundamentally unverifiable from the plugin layer
+
+1. **Timeout code path requires resume/continue + sessionStore**: The plugin's normal and diagnostic query paths do NOT use `resume`, `continue`, or `sessionStore`. The timeout code path never executes from the plugin layer.
+2. **No observable timeout signal**: Even if the timeout fires, it rejects the query promise with a generic error. There's no dedicated timeout event, no status metadata, no stream marker. The plugin would see a failed query, not a "timeout fired" event.
+3. **Cannot inject resume/sessionStore without architecture change**: Injecting `resume: true` and a mock `sessionStore` into the diagnostic path would require fundamentally changing the adapter architecture, not justified for an `@alpha` seam.
+4. **@alpha status**: The SDK marks this as alpha, meaning the API could change without notice.
+5. **Default 60000ms is SDK-internal**: The plugin passes `null` when the user leaves the field empty, and the SDK defaults to 60000ms. This default is not contractual.
+
+### Adjacent seams audited and REJECTED
+
+1. **Injecting resume + sessionStore into diagnostic path** — Would require fundamentally changing adapter architecture; not justified for an @alpha seam. Would test mock behavior, not real SDK behavior.
+2. **Mocking sessionStore.listSessions() to delay** — Would test mock behavior, not real SDK timeout enforcement.
+3. **General query timeout conflation** — `loadTimeoutMs` is NOT a general query timeout. It only covers sessionStore resume/continue materialization. Do not conflate with network timeout, model latency, or server startup timeout.
+
+### Changes made
+
+- Matrix row comment: hardened with explicit Outcome B, VERIFIED/NOT VERIFIED sections, adjacent seams rejected, and promotion path.
+- Locale proof text (en+zh): Added 16 `settings.capabilityLab.proofs.loadTimeout.*` keys replacing hardcoded English strings.
+- Proof method: `runLoadTimeoutReadbackProof()` converted from hardcoded English to locale-backed strings.
+- Proof button label: converted from hardcoded string to locale key.
+- Tests: Load Timeout tests updated to use `t()` locale lookups instead of hardcoded English strings.
+
+### Promotion path
+
+Requires one of: (a) SDK exposes a general query timeout (not limited to sessionStore resume/continue), (b) plugin gains sessionStore access for resume paths, (c) SDK adds a dedicated timeout event or status signal — none currently exists.
 
 ---
 

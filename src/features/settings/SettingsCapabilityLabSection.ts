@@ -1098,17 +1098,42 @@ export class SettingsCapabilityLabSection {
         capability: 'Load Timeout',
         sdkExposed: true, // SDK Options.loadTimeoutMs?: number (@alpha)
         adapterWired: true, // buildClaudeCodeOptions wires loadTimeoutMs when non-null
-        runtimeProof: 'readback', // 2026-06-06 audit: SDK only uses loadTimeoutMs when
-        // (options.resume || options.continue) && options.sessionStore is true (sdk.mjs yj$).
-        // It wraps sessionStore.listSessions() in a Promise.race timeout (C4 function, offset 154014):
-        // C4(store.listSessions(projectKey), loadTimeoutMs, "SessionStore.listSessions() timed out").
-        // On timeout, the promise rejects and propagates to yj$.catch which calls
-        // transport.spawnAbort(error) and queryInstance.setError(error).
-        // Readback ceiling: without resume/continue + sessionStore, the timeout code path never
-        // executes. The plugin's diagnostic path (runDiagnosticPrompt) does not use resume/continue
-        // or sessionStore, so a live proof cannot trigger the timeout without mocking sessionStore.
-        // Default 60000ms (@alpha). Promotion path: if the SDK exposes a general query timeout
-        // or if the plugin gains sessionStore access for resume paths.
+        runtimeProof: 'readback', // 2026-06-06 audit (Outcome B): Load Timeout REMAINS readback.
+        //
+        // VERIFIED:
+        // 1. Settings→SDK option wiring: loadTimeoutMs propagates through
+        //    ClaudeCodeOptionsBuilder → Options.loadTimeoutMs → SDK.
+        // 2. Builder semantics: null → option omitted; positive int → forwarded.
+        // 3. Normalization: normalizeClaudeCodeNullablePositiveInt handles defaults.
+        // 4. Probe coverage: 6 focused tests (null→readback, positive-int→readback,
+        //    null-but-option-present→fail, set-but-option-missing→fail,
+        //    wrong-value→fail, error-thrown→fail).
+        // 5. Stable settings surface: Runtime tab numeric input with boundary +
+        //    lifecycle notices.
+        //
+        // NOT VERIFIED — and fundamentally unverifiable from the plugin layer:
+        // 1. SDK only uses loadTimeoutMs when (options.resume || options.continue)
+        //    && options.sessionStore is true (sdk.mjs yj$).
+        // 2. It wraps sessionStore.listSessions() in a Promise.race timeout
+        //    (C4 function, offset 154014).
+        // 3. On timeout, the promise rejects → transport.spawnAbort(error) +
+        //    queryInstance.setError(error).
+        // 4. The plugin's diagnostic path (runDiagnosticPrompt) does NOT use
+        //    resume/continue or sessionStore, so the timeout code path never executes.
+        // 5. No observable signal confirms the timeout fired — would appear as a
+        //    generic query failure, not a "timeout" event.
+        // 6. @alpha — API may change without notice.
+        //
+        // Adjacent seams audited and REJECTED:
+        // 1. Injecting resume + sessionStore into diagnostic path — would require
+        //    fundamentally changing adapter architecture; not justified for an @alpha seam.
+        // 2. Mocking sessionStore.listSessions() to delay — would test mock behavior,
+        //    not real SDK behavior.
+        // 3. General query timeout — loadTimeoutMs is NOT a general query timeout;
+        //    it only covers sessionStore resume/continue materialization. Do not conflate.
+        //
+        // Promotion path: if the SDK exposes a general query timeout or if the plugin
+        // gains sessionStore access for resume paths.
         userSurface: 'settings', // Runtime tab numeric input, adjacent to jsRuntime
       },
       {
@@ -2965,7 +2990,7 @@ export class SettingsCapabilityLabSection {
       (o) => this.runContext1mBetaReadbackProof(adapter, o));
     this.addProofControl(proofControls, containerEl, t('settings.capabilityLab.proofs.jsRuntime.button'),
       (o) => this.runJsRuntimeReadbackProof(adapter, o));
-    this.addProofControl(proofControls, containerEl, 'Run Load Timeout Readback Proof',
+    this.addProofControl(proofControls, containerEl, t('settings.capabilityLab.proofs.loadTimeout.button'),
       (o) => this.runLoadTimeoutReadbackProof(adapter, o));
     this.addProofControl(proofControls, containerEl, 'Run Custom Session ID Proof',
       (o) => this.runCustomSessionIdProof(adapter, o));
@@ -6663,47 +6688,67 @@ export class SettingsCapabilityLabSection {
     outputEl: HTMLElement,
   ): Promise<void> {
     outputEl.empty();
-    outputEl.createEl('p', { text: 'Running Load Timeout readback probe…' });
+    outputEl.createEl('p', { text: t('settings.capabilityLab.proofs.loadTimeout.running') });
 
     try {
       const result = await adapter.runLoadTimeoutReadbackProbe();
 
       outputEl.empty();
-      outputEl.createEl('h5', { text: 'Load Timeout Readback Proof' });
+      outputEl.createEl('h5', { text: t('settings.capabilityLab.proofs.loadTimeout.title') });
       outputEl.createEl('p', {
         cls: 'opencodian-capability-lab-hint',
-        text: '⚠️ Diagnostic readback only: verifies settings→SDK option mapping only. Actual timeout behavior depends on the SDK/CLI version and runtime conditions. The plugin passes the option, but whether the subprocess actually honors the timeout is not independently verified. Applies to the next query or restarted session only. Active sessions do not update live.',
+        text: t('settings.capabilityLab.proofs.loadTimeout.boundary'),
+      });
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: t('settings.capabilityLab.proofs.loadTimeout.lifecycleBoundary'),
       });
 
       outputEl.createEl('p', {
         cls: 'opencodian-capability-lab-hint',
-        text: `Option wired: ${result.optionWired ? '✓ yes' : '✗ no'}`,
+        text: t('settings.capabilityLab.proofs.loadTimeout.optionWired', {
+          status: result.optionWired ? t('settings.capabilityLab.proofs.loadTimeout.status.yes') : t('settings.capabilityLab.proofs.loadTimeout.status.no'),
+        }),
       });
       outputEl.createEl('p', {
         cls: 'opencodian-capability-lab-hint',
-        text: `Setting value: ${result.settingValue !== null ? result.settingValue : '(null — SDK default)'}`,
+        text: t('settings.capabilityLab.proofs.loadTimeout.settingValue', {
+          value: result.settingValue !== null ? result.settingValue : '(null — SDK default)',
+        }),
       });
       outputEl.createEl('p', {
         cls: 'opencodian-capability-lab-hint',
-        text: `SDK option present: ${result.sdkOptionPresent ? '✓ yes' : '✗ no'}`,
+        text: t('settings.capabilityLab.proofs.loadTimeout.sdkOptionPresent', {
+          status: result.sdkOptionPresent ? t('settings.capabilityLab.proofs.loadTimeout.status.yes') : t('settings.capabilityLab.proofs.loadTimeout.status.no'),
+        }),
       });
       if (result.sdkValue !== undefined) {
         outputEl.createEl('p', {
           cls: 'opencodian-capability-lab-hint',
-          text: `SDK value: ${result.sdkValue}`,
+          text: t('settings.capabilityLab.proofs.loadTimeout.sdkValue', {
+            value: result.sdkValue,
+          }),
         });
       }
       outputEl.createEl('p', {
         cls: 'opencodian-capability-lab-hint',
-        text: `Value match: ${result.valueMatch ? '✓ yes' : '✗ no'}`,
+        text: t('settings.capabilityLab.proofs.loadTimeout.valueMatch', {
+          status: result.valueMatch ? t('settings.capabilityLab.proofs.loadTimeout.status.yes') : t('settings.capabilityLab.proofs.loadTimeout.status.no'),
+        }),
       });
 
       if (result.classification === 'readback') {
+        outputEl.createEl('p', {
+          cls: 'opencodian-capability-lab-hint',
+          text: t('settings.capabilityLab.proofs.loadTimeout.readback'),
+        });
         this.updateRuntimeProof('Load Timeout', 'readback', outputEl);
       } else {
         outputEl.createEl('p', {
           cls: 'opencodian-capability-lab-error',
-          text: `✗ Load Timeout readback probe failed: ${result.error ?? 'unknown error'}`,
+          text: t('settings.capabilityLab.proofs.loadTimeout.fail', {
+            error: result.error ?? t('settings.capabilityLab.proofs.loadTimeout.defaultError'),
+          }),
         });
         this.updateRuntimeProof('Load Timeout', 'fail', outputEl);
       }
@@ -6711,7 +6756,9 @@ export class SettingsCapabilityLabSection {
       outputEl.empty();
       outputEl.createEl('p', {
         cls: 'opencodian-capability-lab-error',
-        text: `Load Timeout readback proof failed: ${err instanceof Error ? err.message : String(err)}`,
+        text: t('settings.capabilityLab.proofs.loadTimeout.threw', {
+          error: err instanceof Error ? err.message : String(err),
+        }),
       });
       this.updateRuntimeProof('Load Timeout', 'fail', outputEl);
     }
