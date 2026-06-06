@@ -67,7 +67,7 @@ Option wiring proven through `buildClaudeCodeOptions`, but no independent plugin
 - Sandbox — option wiring verified; OS-level sandbox enforcement not independently verifiable
 - Task Budget — `@alpha`; option wiring verified; no deterministic SDK enforcement signal. **2026-06-06 audit completed**: no live behavior proof path exists; remains readback with hardened boundary.
 - Tool Aliases — option wiring verified; alias resolution unobservable from plugin layer (post-resolution names only in stream)
-- Debug — option wiring verified; stderr output silently discarded without `debugFile` or stderr callback
+- Debug — option wiring verified; fundamental limitation: debug toggle enables CLI verbose logging but has no observable side effect without debugFile or stderr callback. Debug File (pass/verified) already covers the "capture debug output" use case. **2026-06-06 audit completed** (Outcome B): remains readback with hardened boundary.
 - Strict MCP Config — option wiring verified; validation behavior lives in compiled CLI binary
 - 1M Context Beta — option wiring verified through full SDK path (setting → buildClaudeCodeOptions → ProcessTransport → CLI --betas flag); model-side beta acceptance and 1M context activation unobservable from plugin layer
 - JS Runtime — option wiring verified; actual runtime selection depends on system PATH and installation
@@ -93,8 +93,64 @@ These have adapter wiring and runtime proof, but no stable or diagnostic user su
 ### suggested next 3 checkpoints
 
 1. **File Checkpoint / Rewind** — Highest user-value if unblocked. Monitor Anthropic SDK bug #236. Re-audit on any SDK version bump that mentions checkpointing or interactive-mode fixes. Current state: readback with known upstream blocker.
-2. **Debug** — Readback; option wiring verified. Potential seam: `debugFile` already has deterministic filesystem side effect (separate pass/verified row), but the `debug` toggle itself only enables debug logging without observable output unless `debugFile` or stderr callback is set. Could audit whether combining with stderr callback produces verifiable output.
-3. **JS Runtime** — Readback; option wiring verified. Potential seam: actual runtime selection depends on system PATH and installation, but `executable` option reaches CLI. Could audit whether CLI produces an observable signal indicating which runtime was actually selected.
+2. **JS Runtime** — Readback; option wiring verified. Potential seam: actual runtime selection depends on system PATH and installation, but `executable` option reaches CLI. Could audit whether CLI produces an observable signal indicating which runtime was actually selected.
+3. **Load Timeout** — `@alpha`; option wiring verified. Potential seam: timeout code path only executes with resume/continue + sessionStore. Could audit whether a timeout event or error produces an observable signal.
+
+---
+
+## 2026-06-06 Debug — Audit and Boundary Hardening (Outcome B)
+
+### Objective
+
+Audit the Claude Code SDK `Options.debug?: boolean` seam to determine if it can be productized beyond the current readback boundary into a stable pass/verified capability, or if it should remain readback with a hardened boundary.
+
+### SDK Seam Analysis
+
+The SDK exposes exactly one debug-related boolean option:
+
+```typescript
+// SDK Options
+debug?: boolean;
+```
+
+When `debug=true`, the SDK's `spawnLocalProcess` passes `--debug` as a CLI flag to the Claude Code subprocess. The CLI subprocess then emits verbose debug logs to its stderr stream.
+
+### Decision
+
+**Outcome B** — Debug REMAINS `readback` with hardened boundary.
+
+### What IS verified
+
+1. **Settings→SDK option wiring**: `settings.debug` propagates through `ClaudeCodeOptionsBuilder` → `Options.debug` → `--debug` CLI flag.
+2. **Builder semantics**: `debug=false` → option omitted entirely; `debug=true` → `options.debug = true`.
+3. **Probe coverage**: `runDebugReadbackProbe()` builds diagnostic SDK options and verifies the boolean maps correctly. 6 focused tests cover true, false, mismatch, and error cases.
+4. **Stable settings surface**: Runtime tab toggle with boundary notice and lifecycle notice.
+5. **Semantic separation from `debugFile`**: `debug` enables verbose logging; `debugFile` specifies where debug output goes. They are independently wired in the options builder.
+
+### What is NOT verified — and fundamentally unverifiable from the plugin layer
+
+1. **No observable side effect without output destination**: `debug=true` causes the CLI to emit verbose logs to stderr. Without `debugFile` (which captures to a file) or `stderr` callback (which captures the stream), the SDK's default spawn sets `stdio[2]="ignore"`, silently discarding all debug output.
+2. **debug is a subordinate prerequisite flag**: It enables verbose logging but creates no output destination. It only has observable effect when combined with `debugFile` or `stderr`.
+3. **Debug File already covers the use case**: `Debug File` (pass/verified) has deterministic filesystem side effect proof (temp file creation verified). Setting a `debugFile` implicitly enables debug mode. The debug toggle alone adds no verifiable value.
+4. **No SDK event confirms debug mode activation**: No init event, no status metadata, no stream marker.
+5. **Auto-detected debug path is unreliable**: `~/.claude/debug/sdk-<pid>.txt` has a PID suffix and unpredictable lifecycle, making it unsuitable for a deterministic probe.
+
+### Adjacent seams audited and REJECTED
+
+1. **debug+stderr combined probe** — The `stderr` row (readback/hardened) already covers the callback path. No query reliably provokes stderr output. Combining debug with stderr does not create a new independent capability.
+2. **debug+debugFile combined probe** — The `debugFile` live probe already proves the full pipeline including implicit debug mode activation. Adding an explicit `debug=true` on top does not change the observable result.
+3. **Auto-detected debug path monitoring** — PID suffix and lifecycle are unpredictable. Not a contractual API.
+4. **Exposing debug as a diagnostic-only surface** — The toggle already exists as a stable settings surface. Demoting to diagnostic-only would remove user access without adding verification value.
+
+### Changes made
+
+- Matrix row comment: hardened with explicit Outcome B, VERIFIED/NOT VERIFIED sections, adjacent seams rejected, and promotion path.
+- Locale boundary text (en+zh): `settings.claudeCode.debug.boundaryNotice` updated to "Readback only" pattern with explicit subordinate-to-debugFile relationship.
+- Locale proof text (en+zh): `settings.capabilityLab.proofs.debug.boundary` and `.readback` hardened with Outcome B, Debug File cross-reference, and explicit limitation statement.
+
+### Promotion path
+
+Requires one of: (a) SDK adds debug-status signal to init event, (b) SDK adds queryable debug state API, (c) debug toggle produces an observable side effect beyond what debugFile already provides — none currently feasible.
 
 ---
 

@@ -982,16 +982,27 @@ export class SettingsCapabilityLabSection {
         capability: 'Debug',
         sdkExposed: true, // SDK Options.debug?: boolean
         adapterWired: true, // buildClaudeCodeOptions wires debug when settings.debug is true
-        runtimeProof: 'readback', // 2026-06-06 audit: SDK propagates debug as --debug CLI flag (not --settings).
+        runtimeProof: 'readback', // 2026-06-06 audit (Outcome B): Debug stays readback with hardened boundary.
+        // VERIFIED: settings.debug → buildClaudeCodeOptions → SDK Options.debug → --debug CLI flag.
         // debug=true causes CLI subprocess to emit verbose logs to its stderr stream.
-        // Readback ceiling: the plugin cannot observe --debug's effect independently.
-        // Without debugFile (which provides a filesystem side effect) or a stderr callback
-        // (which captures the stream), debug output is silently discarded by the SDK's
-        // default spawn stdio[2]="ignore" (sdk.mjs spawnLocalProcess). The auto-detected
-        // debug file path (~/.claude/debug/sdk-<pid>.txt) has a PID suffix and unpredictable
-        // lifecycle, making it unreliable for a deterministic probe.
-        // Promotion path: if the SDK emits a debug-status signal in the init event or
-        // if debugFile is set, use runDebugFileLiveProbe instead (already pass).
+        // NOT VERIFIED — fundamental limitation, not temporary gap:
+        // 1. Without debugFile or stderr callback, debug output is silently discarded by
+        //    SDK's default spawn stdio[2]="ignore" (sdk.mjs spawnLocalProcess).
+        // 2. debug is a prerequisite flag: it enables verbose logging but creates no output
+        //    destination. It is subordinate to debugFile (pass/verified) and stderr (readback).
+        // 3. No SDK event, init signal, or stream metadata confirms debug mode activation.
+        // 4. The auto-detected debug path (~/.claude/debug/sdk-<pid>.txt) has a PID suffix
+        //    and unpredictable lifecycle — unreliable for a deterministic probe.
+        // Debug File (pass/verified) already covers the "capture debug output" use case with
+        // a deterministic filesystem side effect. Debug toggle alone has no independent
+        // observable effect from the plugin layer.
+        // Adjacent seams REJECTED: (a) debug+stderr combined probe — stderr row already covers
+        // the callback path and no query reliably provokes stderr output; (b) debug+debugFile
+        // combined probe — debugFile live probe already proves the full pipeline including
+        // implicit debug mode activation; (c) auto-detected debug path monitoring — PID suffix
+        // and lifecycle are unpredictable, not a contractual API.
+        // Promotion path: if the SDK emits a debug-status signal in the init event or adds a
+        // queryable debug state API.
         userSurface: 'settings', // Runtime tab toggle
       },
       {

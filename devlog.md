@@ -11,6 +11,40 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-06-06 Debug — Audit and Boundary Hardening (Outcome B)
+
+Audit the `Debug` capability (SDK `Options.debug?: boolean`) to determine whether it can be productized beyond readback into a stable pass/verified capability. The Debug File row is already pass/verified; this audit covers the separate debug toggle only.
+
+**Decision: Outcome B** — `Debug` remains `runtimeProof: 'readback'`. No honest promotion to pass is possible.
+
+**Audit findings:**
+
+1. `debug=true` passes `--debug` CLI flag to subprocess, causing verbose log emission to stderr.
+2. Without `debugFile` or `stderr` callback, all debug output is silently discarded (`stdio[2]="ignore"`).
+3. `debug` is a subordinate prerequisite flag — it enables verbose logging but creates no output destination.
+4. Debug File (pass/verified) already covers the "capture debug output" use case with deterministic filesystem proof.
+5. No SDK event, init signal, or stream metadata confirms debug mode activation.
+6. Auto-detected debug path (`~/.claude/debug/sdk-<pid>.txt`) has PID suffix and unpredictable lifecycle.
+
+**Adjacent seams REJECTED:** debug+stderr combined probe, debug+debugFile combined probe, auto-detected path monitoring, diagnostic-only demotion.
+
+**Changes made:**
+
+- Matrix row comment: hardened with explicit Outcome B, VERIFIED/NOT VERIFIED sections, and rejected seams.
+- Locale boundary text (en+zh): `settings.claudeCode.debug.boundaryNotice` updated to "Readback only" pattern.
+- Locale proof text (en+zh): `settings.capabilityLab.proofs.debug.boundary` and `.readback` hardened with Outcome B.
+- Current state doc: Debug audit checkpoint section added, readback entry hardened, suggested checkpoints updated.
+
+**Files changed:**
+
+- `src/features/settings/SettingsCapabilityLabSection.ts` (matrix row comment)
+- `src/i18n/locales/en.ts` (boundaryNotice, proof boundary, proof readback)
+- `src/i18n/locales/zh.ts` (boundaryNotice, proof boundary, proof readback)
+- `docs/status/claude-code-current-state-2026-05-22.md` (audit checkpoint + readback entry)
+- `devlog.md` (this entry)
+
+---
+
 ## 2026-06-06 Sandbox — Audit and Boundary Hardening (Outcome B)
 
 Audit the `Sandbox` capability to determine whether any real productizable user-facing seam exists beyond the current readback boundary. The existing stable settings surface (Permissions tab, 3 toggles) is already the right user entry.
