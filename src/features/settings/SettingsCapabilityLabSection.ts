@@ -716,6 +716,13 @@ export class SettingsCapabilityLabSection {
         sdkExposed: true, // forwardSubagentText + agentProgressSummaries options
         adapterWired: true, // buildSdkOptions wires both
         runtimeProof: 'pass', // Runtime verified (BUILD_ID feature-phase0-capability.202605300015, session 47a3a9ed-ea6e-45a9-8b2a-67be62d807dc): inline agent definitions + Agent tool prompt triggers real subagent spawning, producing task_started and task_notification events in the stream. Model used Agent tool to invoke proof-worker subagent. Promoted from fail to pass.
+        // This row also subsumes the Claude Code `task` tool (Agent tool) rendering lifecycle:
+        // ToolCallRenderer special kind:'task' path, BackgroundTaskStreamTriggerCoordinator,
+        // BackgroundTaskInlinePanelRenderer, BackgroundTaskTimelineService, child session graph,
+        // tab indicators, completion notices. TodoWrite/TodoRead are rendered as generic builtin
+        // tools via SessionTodoCoordinator. TaskCreate/Get/Update/List/Output/Stop are project-management
+        // tools rendered via generic tool rendering. These are all tool-call-level features
+        // (model decides to invoke), not SDK Options-level capabilities (host configures before query).
         userSurface: 'diagnostic', // Diagnostic-only; no stable chat transcript/progress UI
       },
       {
