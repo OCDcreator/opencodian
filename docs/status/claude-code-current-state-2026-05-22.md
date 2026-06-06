@@ -76,7 +76,7 @@ Option wiring proven through `buildClaudeCodeOptions`, but no independent plugin
 
 **Diagnostic (`userSurface: 'diagnostic'`) — 3**
 - File Checkpoint / Rewind — `rewindFiles(dryRun: true)` callable but returns `canRewind: false` for all candidates. Upstream blocker: SDK #236 (snapshot creation gated behind React/Ink UI code paths, never fires in `query()` mode).
-- Warm Startup — `startup()` callable and WarmQuery produces response; warm-vs-cold latency benefit not independently measured.
+- Warm Startup — `startup()` callable and WarmQuery produces response. WarmQuery is single-use (query() once per handle); no persistent warm pool. "No startup latency" is SDK internal documentation claim, not independently measured. Readback ceiling.
 - Stderr Diagnostic — stderr callback wiring proven; actual stderr byte emission is environment-dependent (trivial queries may produce zero stderr).
 
 ---
@@ -92,9 +92,63 @@ These have adapter wiring and runtime proof, but no stable or diagnostic user su
 
 ### suggested next 3 checkpoints
 
-1. **Warm Startup** — Audit whether warm-vs-cold latency can be independently measured and productized, or if it should remain readback with explicit boundary limits. Current state: readback; latency benefit is SDK internal claim only.
-2. **File Checkpoint / Rewind** — Highest user-value if unblocked. Monitor Anthropic SDK bug #236. Re-audit on any SDK version bump that mentions checkpointing or interactive-mode fixes. Current state: readback with known upstream blocker.
-3. **1M Context Beta** — Audit whether the beta flag has any live behavior proof path or adjacent productizable seams, or if it should remain readback with hardened boundary text. Current state: readback; actual beta availability depends on model and Anthropic-side behavior.
+1. **File Checkpoint / Rewind** — Highest user-value if unblocked. Monitor Anthropic SDK bug #236. Re-audit on any SDK version bump that mentions checkpointing or interactive-mode fixes. Current state: readback with known upstream blocker.
+2. **1M Context Beta** — Audit whether the beta flag has any live behavior proof path or adjacent productizable seams, or if it should remain readback with hardened boundary text. Current state: readback; actual beta availability depends on model and Anthropic-side behavior.
+3. **Stderr Diagnostic** — Audit whether any query reliably provokes stderr output (e.g. error scenario, debug mode), or if it should remain readback with hardened boundary. Current state: readback; callback wiring proven but stderr byte emission is environment-dependent.
+
+---
+
+## 2026-06-06 Warm Startup — Audit startup()/WarmQuery Productization Potential (Outcome B)
+
+### Objective
+
+Audit whether `startup()` / `WarmQuery` can be productized beyond diagnostic readback — either as a measurable latency improvement or as a stable user-facing capability.
+
+### SDK Official API (sdk.d.ts)
+
+```typescript
+/** Pre-warms the CLI subprocess so the first `query()` resolves immediately. */
+function startup(_params?: { options?: Options; initializeTimeoutMs?: number }): Promise<WarmQuery>;
+
+/** A pre-warmed query handle ... calling query() writes the prompt directly to a ready process — no startup latency. */
+interface WarmQuery extends AsyncDisposable {
+  query(prompt: string | AsyncIterable<SDKUserMessage>): Query; // Can only be called ONCE per WarmQuery
+  close(): void;
+}
+```
+
+### Decision
+
+**Outcome B** — Warm Startup REMAINS `readback` with hardened boundary.
+
+### What IS verified
+
+1. `startup()` is callable and returns a `WarmQuery` handle.
+2. `WarmQuery.query()` can send a diagnostic prompt and produce raw messages.
+3. The API entry point exists and the handle is usable.
+
+### What is NOT verified — and fundamentally unverifiable from the plugin layer
+
+1. **Single-use handle**: SDK types document `query()` as "Can only be called once per WarmQuery." There is no persistent warm pool, no connection reuse, no `isWarmed()` signal. After one query, the handle is spent.
+2. **"No startup latency" is SDK's internal claim** (sdk.d.ts line 5763): Latency measurement is environment-dependent (machine speed, network, API load, SDK/CLI version) and cannot serve as a repeatable proof.
+3. **No observable signal**: No init event difference, no status metadata, no side effect that confirms warm-vs-cold behavior.
+
+### Adjacent seams audited and REJECTED
+
+1. **Integrating startup() into adapter's ordinary query path** — WarmQuery is single-use; after one `query()`, the handle is spent. The adapter already manages subprocess lifecycle internally. A pre-warm saves one cold-start per handle, but the adapter's normal `query()` handles startup transparently. No user-facing value.
+2. **Latency benchmarking** — Environment-dependent, non-repeatable, not a stable capability.
+3. **WarmQuery as persistent optimization** — SDK explicitly designs it as single-use. No reuse API exists.
+
+### Changes made
+
+- Matrix row comment hardened with explicit VERIFIED/NOT VERIFIED distinction
+- Discovery row text hardened with single-use constraint and SDK claim attribution
+- Probe UI copy hardened with single-use constraint
+- Adapter JSDoc hardened with single-use constraint
+
+### Promotion path
+
+If the SDK adds: (a) a reusable warm pool (multiple `query()` calls per handle), (b) observable warm-status metadata, or (c) a deterministic latency contract — re-audit.
 
 ---
 

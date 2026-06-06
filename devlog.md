@@ -11,6 +11,52 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-06-06 Warm Startup — Audit startup()/WarmQuery Productization Potential (Outcome B)
+
+### Objective
+
+Audit whether the Claude Code SDK `startup()` → `WarmQuery` seam can be productized beyond diagnostic readback — either as a measurable latency improvement or as a stable user-facing capability.
+
+### Decision
+
+**Outcome B** — Warm Startup REMAINS `readback` with hardened boundary.
+
+### Evidence
+
+SDK official API (sdk.d.ts):
+- `startup()` pre-warms the CLI subprocess, returns a `WarmQuery` handle.
+- SDK documentation claims "no startup latency" (sdk.d.ts line 5763).
+- `WarmQuery.query()` can only be called **once** per handle — no persistent warm pool.
+
+### What IS verified
+
+1. `startup()` is callable and returns a `WarmQuery` handle.
+2. `WarmQuery.query()` sends a prompt and produces raw messages.
+3. The API entry point exists and the handle is usable.
+
+### What is NOT verified — fundamentally unverifiable from the plugin layer
+
+1. **Single-use handle**: WarmQuery.query() can only be called once per handle. No reuse API. No persistent warm pool.
+2. **Latency measurement**: Environment-dependent (machine, network, API load, SDK version). Not repeatable as proof.
+3. **No observable signal**: No init event difference, no status metadata, no side effect confirming warm-vs-cold behavior.
+
+### Adjacent seams rejected
+
+1. Integrating startup() into adapter's ordinary query path — single-use handle provides no lasting benefit over adapter's existing lifecycle management.
+2. Latency benchmarking — environment-dependent, non-repeatable, not a stable capability.
+
+### Changes
+
+- `src/features/settings/SettingsCapabilityLabSection.ts`: Hardened matrix row comment (VERIFIED/NOT VERIFIED distinction), discovery row text (single-use constraint), probe UI copy (single-use constraint).
+- `src/core/agents/backend/ClaudeCodeAdapter.ts`: Hardened JSDoc.
+- `docs/status/claude-code-current-state-2026-05-22.md`: Added audit section with full decision rationale.
+
+### Promotion path
+
+If SDK adds: reusable warm pool, observable warm-status metadata, or deterministic latency contract — re-audit.
+
+---
+
 ## 2026-06-06 Task Budget — Audit Live Behavior Proof Path (Outcome B)
 
 ### Objective

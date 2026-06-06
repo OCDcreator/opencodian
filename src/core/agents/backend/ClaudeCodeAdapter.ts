@@ -2191,7 +2191,9 @@ export class ClaudeCodeAdapter
    *
    * Classification rules:
    * - 'readback': startup() resolved + warm query produced messages.
-   *   Warm-vs-cold latency benefit is the SDK's internal claim, not independently measured.
+   *   WarmQuery is single-use (query() can only be called once per handle).
+   *   "No startup latency" is the SDK's internal documentation claim,
+   *   not independently measured or verified from the plugin layer.
    * - 'fail': startup() or warm query iteration threw an exception.
    * - 'boundary': SDK facade does not expose startup().
    */

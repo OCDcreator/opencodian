@@ -838,7 +838,30 @@ export class SettingsCapabilityLabSection {
         capability: 'Warm Startup',
         sdkExposed: true, // SDK exports top-level startup() → Promise<WarmQuery> with query() and close() methods
         adapterWired: true, // adapter.runWarmStartupProbe() calls sdk.startup() and sends diagnostic prompt through WarmQuery
-        runtimeProof: 'readback', // startup() callable, WarmQuery handle obtainable, warm query() produces response. Warm-vs-cold latency benefit is the SDK's internal claim ("no startup latency"), not independently measured in this probe. The seam proves entry-point availability and warm handle usability, not a measurable behavioral improvement.
+        runtimeProof: 'readback', // 2026-06-06 audit conclusion: remains readback.
+        // VERIFIED: startup() is callable, returns a WarmQuery handle, and WarmQuery.query() produces
+        // a response. This proves the API entry point exists and the handle is usable.
+        //
+        // NOT VERIFIED — and fundamentally unverifiable from the plugin layer:
+        // 1. SDK types document WarmQuery as single-use: "query() ... Can only be called once per
+        //    WarmQuery." There is no persistent warm pool, no connection reuse, no isWarmed() signal.
+        // 2. "no startup latency" (sdk.d.ts line 5763) is the SDK's internal documentation claim about
+        //    subprocess pre-initialization. Latency measurement is environment-dependent (machine speed,
+        //    network, API load, SDK/CLI version) and cannot serve as a repeatable proof.
+        // 3. No observable signal distinguishes warm-vs-cold paths: no init event difference, no status
+        //    metadata, no side effect confirming the subprocess was pre-warmed.
+        //
+        // ADJACENT SEAMS REJECTED for productization:
+        // (a) Integrating startup() into the adapter's ordinary query path — WarmQuery is single-use;
+        //     after one query(), the handle is spent. The adapter already manages subprocess lifecycle
+        //     internally. A pre-warm would save one cold-start per handle, but the adapter's normal
+        //     query() call already handles startup transparently. No user-facing value.
+        // (b) Latency benchmarking — environment-dependent, non-repeatable, not a stable capability.
+        //
+        // Honest ceiling: readback. The plugin verifies the API entry point works. Do not misread the
+        // probe output as proof that warm startup measurably reduces latency.
+        // Promotion path: if the SDK adds a reusable warm pool (multiple query() calls per handle),
+        // observable warm-status metadata, or a deterministic latency contract.
         userSurface: 'diagnostic', // Capability Lab diagnostic proof only — no stable warm-startup surface
       },
     ];
@@ -2763,7 +2786,7 @@ export class SettingsCapabilityLabSection {
     this.addDiscoveryRow(
       tbody,
       'Warm Startup',
-      'Readback: SDK startup() callable, returns WarmQuery handle with query() and close(). Warm-vs-cold latency benefit is the SDK\'s internal claim, not independently measured. The probe proves entry-point availability and warm handle usability, not a measurable behavioral improvement. No authoring UI. No .claude/** writes.',
+      'Readback: SDK startup() callable, returns single-use WarmQuery handle (query() can only be called ONCE per handle — no persistent warm pool). "No startup latency" is the SDK\'s internal documentation claim (sdk.d.ts line 5763), not independently measured or verified. No observable signal distinguishes warm-vs-cold paths. The probe proves API entry-point availability and handle usability only, not a measurable latency improvement. No authoring UI. No .claude/** writes.',
       { status: 'diagnostic-proof' },
     );
   }
@@ -5597,13 +5620,13 @@ export class SettingsCapabilityLabSection {
       outputEl.createEl('h5', { text: 'Warm Startup Proof' });
       outputEl.createEl('p', {
         cls: 'opencodian-capability-lab-hint',
-        text: '⚠️ Diagnostic readback: startup() callable, WarmQuery handle obtainable, warm query() produces response. Warm-vs-cold latency benefit is the SDK\'s internal claim, not independently measured. No authoring UI. No .claude/** writes.',
+        text: '⚠️ Diagnostic readback only. startup() callable → WarmQuery handle obtained → warm query() produced response. WarmQuery is single-use (query() can only be called once per handle); there is no persistent warm pool. "No startup latency" is the SDK\'s internal documentation claim, not independently measured. No authoring UI. No .claude/** writes.',
       });
 
       if (result.classification === 'readback') {
         // READBACK: startup resolved + warm query responded
         const responseText = result.warmQueryResponded
-          ? `✓ Readback verified — not behavior verified. startup() resolved → WarmQuery obtained → warm query() produced ${result.rawMessageCount} raw message(s). Warm-vs-cold latency benefit is the SDK's internal claim ("no startup latency"), not independently measured.`
+          ? `✓ Readback verified — not behavior verified. startup() resolved → WarmQuery obtained → warm query() produced ${result.rawMessageCount} raw message(s). WarmQuery is single-use (query() once per handle); no persistent warm pool. "No startup latency" is the SDK's internal documentation claim, not independently measured.`
           : `✓ Readback verified — not behavior verified. startup() resolved → WarmQuery obtained, but warm query() returned no messages.`;
         outputEl.createEl('p', {
           cls: 'opencodian-capability-lab-hint',
