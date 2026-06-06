@@ -898,17 +898,25 @@ export class SettingsCapabilityLabSection {
         capability: 'Task Budget',
         sdkExposed: true, // SDK Options.taskBudget?: { total: number } (@alpha)
         adapterWired: true, // buildClaudeCodeOptions wires taskBudget as { total }
-        runtimeProof: 'readback', // 2026-06-06 audit: SDK propagates taskBudget as --task-budget CLI flag
-        // (sdk.mjs initialize(): if(z)i.push("--task-budget",z.total.toString())). The CLI binary
-        // sends it as output_config.task_budget with beta header task-budgets-2026-03-13 to the API.
+        runtimeProof: 'readback', // 2026-06-06 audit conclusion: remains readback.
+        // SDK propagates taskBudget as --task-budget CLI flag (sdk.mjs initialize():
+        // if(z)i.push("--task-budget",z.total.toString())). The CLI binary sends it as
+        // output_config.task_budget with beta header task-budgets-2026-03-13 to the API.
         // The model is "made aware of its remaining token budget so it can pace tool use and wrap up"
         // (sdk.d.ts lines 1516-1525) — this is behavioral pacing, not a hard enforcement cutoff.
-        // Readback ceiling: no deterministic observable side effect from the plugin layer.
         // Unlike maxTurns (which produces error_max_turns result subtype), taskBudget has no local
         // SDK enforcement signal. A tiny budget (e.g. 1) may cause shorter model responses but
         // produces no structured error event; the model may simply emit less text. The @alpha marker
-        // confirms the feature is unstable. Promotion path: if the SDK adds a structured
-        // error_max_task_budget result subtype or a deterministic observable cutoff behavior.
+        // confirms the feature is unstable.
+        // Adjacent live-behavior seams audited: there are no adjacent productizable seams.
+        // A non-deterministic "shorter response" observation cannot be distinguished from normal
+        // model variance and therefore cannot serve as a reliable proof path.
+        // Honest ceiling: readback. The plugin verifies the option reaches the SDK boundary
+        // (--task-budget CLI flag + beta header emission). Actual token-budget enforcement is
+        // NOT locally provable and has NOT been independently verified. Do not misread the saved
+        // settings value as proof that budget pacing behavior works.
+        // Promotion path: if the SDK adds a structured error_max_task_budget result subtype
+        // or a deterministic observable cutoff behavior.
         userSurface: 'settings', // Numeric input in Model & Thinking tab
       },
       {

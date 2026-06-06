@@ -65,7 +65,7 @@ Option wiring proven through `buildClaudeCodeOptions`, but no independent plugin
 - Allowed Tools — auto-approve shortcut only; zero enforcement at tool-catalog level. Stable settings UI now renders an explicit boundary notice distinguishing it from Restricted Built-in Tools (deterministic availability restrictor).
 - Fallback Model — option wiring verified; automatic switching not locally provable (requires API 529 overload signal)
 - Sandbox — option wiring verified; OS-level sandbox enforcement not independently verifiable
-- Task Budget — `@alpha`; option wiring verified; no deterministic SDK enforcement signal
+- Task Budget — `@alpha`; option wiring verified; no deterministic SDK enforcement signal. **2026-06-06 audit completed**: no live behavior proof path exists; remains readback with hardened boundary.
 - Tool Aliases — option wiring verified; alias resolution unobservable from plugin layer (post-resolution names only in stream)
 - Debug — option wiring verified; stderr output silently discarded without `debugFile` or stderr callback
 - Strict MCP Config — option wiring verified; validation behavior lives in compiled CLI binary
@@ -92,9 +92,9 @@ These have adapter wiring and runtime proof, but no stable or diagnostic user su
 
 ### suggested next 3 checkpoints
 
-1. **File Checkpoint / Rewind** — Highest user-value if unblocked. Monitor Anthropic SDK bug #236. Re-audit on any SDK version bump that mentions checkpointing or interactive-mode fixes. Current state: readback with known upstream blocker.
-2. **Task Budget** — Audit whether the `@alpha` option has any live behavior proof path, or if it should remain readback with hardened boundary text. Current state: readback; no deterministic SDK enforcement signal identified.
-3. **Warm Startup** — Audit whether warm-vs-cold latency can be independently measured and productized, or if it should remain readback with explicit boundary limits. Current state: readback; latency benefit is SDK internal claim only.
+1. **Warm Startup** — Audit whether warm-vs-cold latency can be independently measured and productized, or if it should remain readback with explicit boundary limits. Current state: readback; latency benefit is SDK internal claim only.
+2. **File Checkpoint / Rewind** — Highest user-value if unblocked. Monitor Anthropic SDK bug #236. Re-audit on any SDK version bump that mentions checkpointing or interactive-mode fixes. Current state: readback with known upstream blocker.
+3. **1M Context Beta** — Audit whether the beta flag has any live behavior proof path or adjacent productizable seams, or if it should remain readback with hardened boundary text. Current state: readback; actual beta availability depends on model and Anthropic-side behavior.
 
 ---
 

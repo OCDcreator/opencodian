@@ -11,6 +11,46 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-06-06 Task Budget — Audit Live Behavior Proof Path (Outcome B)
+
+### Objective
+
+Audit whether the Claude Code SDK `@alpha` `taskBudget` option has any live behavior proof path, or if it should remain readback with hardened boundary text.
+
+### Decision
+
+**Outcome B** — `Task Budget` REMAINS `readback` with hardened boundary.
+
+No live behavior proof path exists. The existing evidence is conclusive:
+
+1. **SDK propagation proven**: `taskBudget` is forwarded as `--task-budget` CLI flag (sdk.mjs `initialize()`), then as `output_config.task_budget` with beta header `task-budgets-2026-03-13` to the API.
+2. **Behavior is pacing, not enforcement**: SDK docs state the model is "made aware of its remaining token budget so it can pace tool use and wrap up" (sdk.d.ts lines 1516-1525). This is behavioral guidance, not a deterministic cutoff.
+3. **No structured enforcement signal**: Unlike `maxTurns` (which produces `error_max_turns` result subtype), `taskBudget` has no local SDK signal confirming budget exhaustion. A tiny budget may cause shorter responses or may be ignored — there is no observable structured event.
+4. **@alpha marker**: The SDK explicitly marks this option as unstable, meaning behavior may change between versions.
+5. **No adjacent productizable seams**: There are no related SDK features (like `setModel()` for Fallback Model) that could be productized as stable user-facing capabilities under the Task Budget umbrella.
+
+### What Changed
+
+- **`src/features/settings/SettingsCapabilityLabSection.ts`**: Hardened the `Task Budget` matrix row comment with explicit audit conclusion, rejection of non-deterministic "shorter response" observation as a proof path, and "Honest ceiling: readback" summary matching the Fallback Model pattern.
+- **`docs/status/claude-code-current-state-2026-05-22.md`**: Updated current gap audit — Task Budget checkpoint completed, replaced with new suggested next checkpoints (Warm Startup, File Checkpoint / Rewind).
+- **`docs/modules/features/settings/SettingsCapabilityLabSection.md`**: Updated module doc to reflect the standalone audit conclusion.
+- **`docs/modules/i18n/locales/en.md`** + **`zh.md`**: Added changelog entries.
+
+### Honesty Boundaries
+
+- Classification: **readback** (unchanged — option wiring verified, actual token-budget pacing behavior not locally provable).
+- User surface: **settings** (unchanged — stable numeric input in Model & Thinking tab + boundary notice + lifecycle notice).
+- **No fake UI added**. No capability claim inflated.
+- The saved value is honestly presented as "reaches SDK boundary", not "proves budget enforcement works."
+- Stable settings already provide: input validation (positive integers only), boundary notice, lifecycle notice, and readback proof in Capability Lab.
+
+### Suggested Next Checkpoint
+
+1. **Warm Startup** — Audit whether warm-vs-cold latency can be independently measured
+2. **File Checkpoint / Rewind** — Monitor Anthropic SDK bug #236
+
+---
+
 ## 2026-06-06 Fallback Model — Audit `setModel()` / `modelUsage` Productization Potential (Outcome B)
 
 ### Objective
