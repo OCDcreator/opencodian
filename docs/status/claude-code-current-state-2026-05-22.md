@@ -1,5 +1,103 @@
 # Claude Code SDK Current State - 2026-05-22
 
+## Current Gap Audit (2026-06-06, post-truth-sync)
+
+> **Single source of truth for Codex checkpoint rounds.**  
+> Matrix: **46 rows, 32 pass, 14 readback, 2 hidden, 0 fail.**  
+> All counts enforced by `tests/unit/features/settings/SettingsCapabilityLabSection.test.ts`.
+
+---
+
+### pass — stable user surfaces
+
+These have live runtime proof (BUILD_ID-anchored) AND a stable user-facing control or chat interaction.
+
+**Settings (`userSurface: 'settings'`) — 12**
+- Hooks — project settings scan/create/open for `.claude/settings.json` + `.claude/settings.local.json`
+- Skills — project skills discovery + create/open actions; chat slash discoverability for Claude runtime commands
+- Plugins — project settings scan/create/open for plugin config
+- MCP Servers — shared MCP settings tab + Claude Code Tools tab refresh
+- Disallowed Tools — deterministic init-catalog enforcement proven
+- Restricted Built-in Tools — deterministic init-catalog enforcement proven
+- Turn/Budget Limits — live proof: `error_max_turns` + `error_max_budget_usd` result subtypes
+- Environment Variables — live proof: env-derived filesystem side effect with matching nonce
+- Agent Definitions — project agents discovery + create/open actions; `@agent` mention menu
+- Debug File — live proof: filesystem side effect (non-empty debug file created at specified path)
+- Plan Mode Instructions — live proof: model recalls nonce in plan mode
+- System Prompt — live proof: model recalls nonce via preset-with-append path
+
+**Chat (`userSurface: 'chat'`) — 7**
+- Permission Approval — ordinary chat end-to-end: real permission cards render per tool call
+- AskUserQuestion / Elicitation — ordinary chat end-to-end: real question dialog renders
+- Structured Output — `/json` prefix trigger in ordinary chat; badge renders during stream and survives reload
+- Subagent Transcript / Progress — task/subagent tool rendering, background task UI, todo snapshots
+- Fork Session — fork button on user message footer; new tab / current tab routing
+- Resume Session — backend session browser resume flow from chat
+- Prompt Suggestions — composer suggestion chip; click-to-fill behavior verified
+
+**Settings + Chat (`userSurface: 'settings+chat'`) — 3**
+- JSONL History Browser — browse + preview + detail from both chat and settings
+- Session Detail — metadata + transcript detail view in both chat and settings
+- Session Title — auto-title toggle in conversation settings; title preferences in history footer; customTitle in backend browser
+
+---
+
+### pass (diagnostic-only — explicit blockers or scope limits documented)
+
+Runtime proof passes, but explicit blockers prevent promotion to stable user surface.
+
+- **Agents (Subagents)** — `userSurface: 'diagnostic'`. Live proof: inline agents + Agent tool prompt trigger real subagent spawning. Blocker: this row represents the diagnostic API browser (`listSubagents` / `getSubagentMessages`), not a stable subagent management surface. Stable UX is chat task rendering (covered by Subagent Transcript / Progress).
+- **Include Hook Events** — `userSurface: 'diagnostic'`. Live proof: real hook `backend_event`s captured in diagnostic stream. Blocker: this is a diagnostic stream logging toggle, NOT hook activation control. Stable hook surface is the separate Hooks row.
+- **Backend Routing** — `userSurface: 'diagnostic'`. Live proof: registry routes correctly. Blocker: routing is infrastructure, not a product feature. Stable downstream features (session browser, resume, fork, title read, share-URL read, backend kind resolution) already have their own rows.
+- **/context Diagnostic** — `userSurface: 'diagnostic'`. Live proof: fixed allow-listed read-only `/context` command returns the expected context-usage report. Blocker: this proves a safe diagnostic command seam exists, not that ordinary Claude chat slash commands are productized. No arbitrary command input, no command authoring, no `.claude/**` writes.
+- **Custom Session ID** — `userSurface: 'diagnostic'`. Live proof: requested session ID returned exactly. Blocker: ordinary chat never injects custom session IDs; session identity is adapter-owned.
+- **Continue** — `userSurface: 'diagnostic'`. Live proof: same session ID + nonce recall verified. Blockers: (1) adapter already maintains ordinary conversation continuity automatically; (2) `continue: true` conflicts with explicit per-conversation session tracking; (3) all real user needs covered by stable chat, Backend Session Browser, and Fork Session; (4) exposing as user control would add non-determinism without value.
+- **Resume Session At Position** — `userSurface: 'diagnostic'`. Live proof: same session ID + alpha nonce recall verified. Blockers: (1) Fork Session already provides stable "branch from here"; (2) in-place truncation conflicts with append-only conversation history; (3) no coherent UX path for "rewind" vs "fork"; (4) adapter guards this behind diagnostic-only flag.
+- **Fork Session On Resume** — `userSurface: 'diagnostic'`. Live proof: different session ID + nonce recall verified. Blockers: (1) SDK option forks entire session on resume; stable chat Fork Session branches from a specific message point — different semantics; (2) stable chat already provides per-message forking; (3) automatic fork-on-resume would create session proliferation without intent; (4) would break adapter session tracking.
+
+---
+
+### readback — seams exposed but not behavior-verified
+
+Option wiring proven through `buildClaudeCodeOptions`, but no independent plugin-side behavioral verification exists.
+
+**Settings (`userSurface: 'settings'`) — 11**
+- Allowed Tools — auto-approve shortcut only; zero enforcement at tool-catalog level
+- Fallback Model — option wiring verified; automatic switching not locally provable (requires API 529 overload signal)
+- Sandbox — option wiring verified; OS-level sandbox enforcement not independently verifiable
+- Task Budget — `@alpha`; option wiring verified; no deterministic SDK enforcement signal
+- Tool Aliases — option wiring verified; alias resolution unobservable from plugin layer (post-resolution names only in stream)
+- Debug — option wiring verified; stderr output silently discarded without `debugFile` or stderr callback
+- Strict MCP Config — option wiring verified; validation behavior lives in compiled CLI binary
+- 1M Context Beta — option wiring verified; actual beta availability depends on model and Anthropic-side behavior
+- JS Runtime — option wiring verified; actual runtime selection depends on system PATH and installation
+- Load Timeout — `@alpha`; option wiring verified; timeout code path only executes with resume/continue + sessionStore
+- AskUserQuestion Preview Format — option wiring + UI preview rendering path verified; actual preview arrival depends on SDK version and model behavior
+
+**Diagnostic (`userSurface: 'diagnostic'`) — 3**
+- File Checkpoint / Rewind — `rewindFiles(dryRun: true)` callable but returns `canRewind: false` for all candidates. Upstream blocker: SDK #236 (snapshot creation gated behind React/Ink UI code paths, never fires in `query()` mode).
+- Warm Startup — `startup()` callable and WarmQuery produces response; warm-vs-cold latency benefit not independently measured.
+- Stderr Diagnostic — stderr callback wiring proven; actual stderr byte emission is environment-dependent (trivial queries may produce zero stderr).
+
+---
+
+### hidden / blocked
+
+These have adapter wiring and runtime proof, but no stable or diagnostic user surface is exposed.
+
+- **Session Store** — `userSurface: 'hidden'`. Live proof: store capture + readback verified. Blockers: (1) alpha SDK interface with no format stability guarantee; (2) opaque implementation-defined format; (3) existing BackendSessionBrowserModal + StorageService already serve all user needs.
+- **Import Session to Store** — `userSurface: 'hidden'`. Live proof: import into diagnostic store verified. Blockers: (1) alpha SDK interface; (2) imports into opaque format, not user-readable conversations; (3) existing backend browser already covers browse/resume/persist.
+
+---
+
+### suggested next 3 checkpoints
+
+1. **File Checkpoint / Rewind** — Highest user-value if unblocked. Monitor Anthropic SDK bug #236. Re-audit on any SDK version bump that mentions checkpointing or interactive-mode fixes. Current state: readback with known upstream blocker.
+2. **Fallback Model** — Audit whether `setModel()` live-apply or `modelUsage` multi-model detection can be productized as stable chat surfaces, or if the readback ceiling should be hardened with additional explicit blockers. Current state: readback; automatic fallback not locally provable.
+3. **Allowed Tools** — Audit the honesty boundary between stable settings UI and readback classification. The setting has a real toggle and stable UI, but the capability is an auto-approve shortcut with zero enforcement. Ensure user-facing copy does not overclaim filtering behavior. Current state: readback with stable settings surface.
+
+---
+
 ## 2026-06-06 Fork Session On Resume — Truth-Sync Hardened Boundary (Outcome B)
 
 ### Objective
@@ -175,6 +273,8 @@ Turn Claude Code `hidden/unwired` skills and slash command surfaces into real us
 ---
 
 ## 2026-06-04 Current Gap Audit (post-Tool-Aliases readback hardening)
+
+> ⚠️ **Superseded**: See the newer "Current Gap Audit (2026-06-06, post-truth-sync)" section near the top of this document for the authoritative current state. This historical block understates the pass surface, misclassifies Fallback Model and File Checkpoint / Rewind as "blocked" rather than "readback", and omits many stable surfaces added after 2026-06-04.
 
 ### pass
 
@@ -1379,6 +1479,8 @@ Implement the smallest honest diagnostic proof harness for Claude Code SDK publi
 
 ## Current Gap Audit (2026-06-03, post-System Prompt)
 
+> ⚠️ **Superseded**: See the newer "Current Gap Audit (2026-06-06, post-truth-sync)" section near the top of this document for the authoritative current state. This historical block reflects an older matrix state (28 pass / 18 readback) that has since been updated to 32 pass / 14 readback.
+
 Matrix: **46 rows, 28 pass, 18 readback, 0 fail**.
 
 Confirmed repo-absent public SDK option surfaces (not implemented, not faked):
@@ -1536,7 +1638,7 @@ Implement the smallest honest seam for Claude Code SDK `toolAliases?: Record<str
 
 ### Gap Audit (2026-06-02)
 
-> ⚠️ **Superseded**: See the newer "Current Gap Audit (2026-06-02, post-Custom Session ID)" section near the top of this document for the honest remaining-gap list. This historical block understates the gap surface.
+> ⚠️ **Superseded**: See the newer "Current Gap Audit (2026-06-06, post-truth-sync)" section near the top of this document for the authoritative current state. This historical block understates the gap surface.
 
 ### What Changed
 
@@ -1697,7 +1799,7 @@ Prompt suggestions arrive *after* the turn boundary (`result`). Rather than chan
 
 ### Gap Audit (2026-06-02)
 
-> ⚠️ **Superseded**: See the newer "Current Gap Audit (2026-06-02, post-Custom Session ID)" section near the top of this document for the honest remaining-gap list. This historical block understates the gap surface and incorrectly lists `toolAliases` as absent (it was implemented in the Tool Aliases seam above).
+> ⚠️ **Superseded**: See the newer "Current Gap Audit (2026-06-06, post-truth-sync)" section near the top of this document for the authoritative current state. This historical block understates the gap surface and incorrectly lists `toolAliases` as absent (it was implemented in the Tool Aliases seam above).
 
 Current matrix classification (at time of writing):
 - **pass**: 23
