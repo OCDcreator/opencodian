@@ -65,7 +65,7 @@ Option wiring proven through `buildClaudeCodeOptions`, but no independent plugin
 - Allowed Tools — auto-approve shortcut only; zero enforcement at tool-catalog level. Stable settings UI now renders an explicit boundary notice distinguishing it from Restricted Built-in Tools (deterministic availability restrictor).
 - Fallback Model — option wiring verified; automatic switching not locally provable (requires API 529 overload signal)
 - Sandbox — option wiring verified; OS-level sandbox enforcement not independently verifiable
-- Task Budget — `@alpha`; option wiring verified; no deterministic SDK enforcement signal. **2026-06-06 audit completed**: no live behavior proof path exists; remains readback with hardened boundary.
+- Task Budget — `@alpha`; option wiring verified; no deterministic SDK enforcement signal. **2026-06-06 re-audit (Outcome B)**: no new productizable seam. SDK 0.3.145 unchanged; 4 error result subtypes contain no `error_max_task_budget`; `TerminalReason` has `max_turns` but no `max_task_budget`; no budget-related events (`tokens_remaining`, `budget_status`, `usage_update`). Remains readback with hardened boundary.
 - Tool Aliases — option wiring verified; alias resolution unobservable from plugin layer (post-resolution names only in stream)
 - Debug — option wiring verified; fundamental limitation: debug toggle enables CLI verbose logging but has no observable side effect without debugFile or stderr callback. Debug File (pass/verified) already covers the "capture debug output" use case. **2026-06-06 audit completed** (Outcome B): remains readback with hardened boundary.
 - Strict MCP Config — option wiring verified; validation behavior lives in compiled CLI binary
@@ -94,7 +94,9 @@ These have adapter wiring and runtime proof, but no stable or diagnostic user su
 
 1. **File Checkpoint / Rewind** — Highest user-value if unblocked. ✅ **2026-06-06 re-audited** — blocker confirmed unchanged. Monitor SDK #236 + claude-code #16976. Re-audit on any SDK version bump that mentions checkpointing or interactive-mode fixes. Current state: readback with confirmed upstream blocker.
 2. **Allowed Tools** — ✅ **2026-06-06 re-audited** (Outcome B) — readback confirmed; auto-approve shortcut only, zero enforcement at tool-catalog level. SDK docs explicitly delegate availability restriction to `tools`, NOT `allowedTools`. New SDK `dontAsk`/`auto` permission modes and `SDKPermissionDeniedMessage` event audited and REJECTED as enforcement evidence: they are permission-layer gates, not availability restrictors. Plugin does not expose these modes. No promotion path unless SDK adds catalog-level enforcement.
-3. **Task Budget** — Readback; `@alpha` option wiring verified. Potential seam: if SDK adds budget-enforcement status signals or error types.
+3. **Task Budget** — ✅ **2026-06-06 re-audited** (Outcome B) — readback confirmed; `@alpha`, no enforcement signal, no budget-related error subtype/event/terminal-reason. No promotion path unless SDK adds structured enforcement signal.
+4. **Fallback Model** — Readback; option wiring verified. Potential seam: if SDK exposes fallback activation event or observable same-model/auto-switch signal.
+5. **Sandbox** — Readback; option wiring verified, 3 settings exposed. Potential seam: `decision_reason_type: 'sandboxOverride'` as indirect activation proof if reliably provoked.
 
 ---
 
@@ -8120,3 +8122,84 @@ Additionally, `runEnvironmentVariablesProof` tried to work around this by tempor
 
 - 2 new adapter tests: bypass sets `allowDangerouslySkipPermissions` + skips `canUseTool`; non-bypass keeps `canUseTool` wired
 - 3 updated capability lab tests: verifies `_diagnosticBypassPermissions: true` is passed, settings `permissionMode` is NOT modified, and output shows "diagnostic bypass" label
+
+---
+
+## 2026-06-06 Task Budget — Re-Audit and Boundary Hardening (Outcome B)
+
+### Objective
+
+Re-audit the Claude Code SDK `taskBudget` seam as a distinct seam (separate from `maxTurns` and `maxBudgetUsd`) to determine whether any new productizable seam exists beyond the already-known pacing-guidance / non-hard-enforcement boundary.
+
+### Critical semantic boundary
+
+- `taskBudget` (`Options.taskBudget?: { total: number }`) — API-side behavioral pacing: model is told remaining token budget to "pace tool use and wrap up before the limit". `@alpha`.
+- `maxTurns` (`Options.maxTurns?: number`) — local SDK turn-count enforcement: produces `error_max_turns` result subtype. Pass/verified.
+- `maxBudgetUsd` (`Options.maxBudgetUsd?: number`) — local SDK cost enforcement: produces `error_max_budget_usd` result subtype. Pass/verified.
+
+These are three semantically distinct seams. Turn/Budget Limits proof (`error_max_turns` + `error_max_budget_usd`) does NOT apply to Task Budget.
+
+### SDK Seam Analysis
+
+The SDK exposes exactly one task-budget-related option:
+
+```typescript
+// SDK Options (sdk.d.ts lines 1516-1525)
+/**
+ * API-side task budget in tokens. When set, the model is made aware of
+ * its remaining token budget so it can pace tool use and wrap up before
+ * the limit. Sent as `output_config.task_budget` with the
+ * `task-budgets-2026-03-13` beta header.
+ * @alpha
+ */
+taskBudget?: {
+    total: number;
+};
+```
+
+SDK bundle analysis (sdk.mjs, SDK 0.3.145):
+
+1. **`initialize()` function** (offset ~301599): Destructures `taskBudget: z` from options.
+2. **CLI flag propagation** (offset ~302687): `if(z)i.push("--task-budget",z.total.toString())` — passes as `--task-budget` CLI flag.
+3. **`createQuery()` function** (offset ~835606): Destructures `taskBudget: IS`.
+4. **No enforcement code**: No `error_max_task_budget`, `max_task_budget`, `task_budget_exceeded`, `budget_exceeded`, `budget_remaining`, or `tokens_remaining` found anywhere in the SDK bundle.
+
+### Decision
+
+**Outcome B** — Task Budget REMAINS `readback` with hardened boundary.
+
+### What IS verified (existing evidence, unchanged)
+
+1. **Settings→SDK option wiring**: `settings.taskBudget` propagates through `ClaudeCodeOptionsBuilder` → SDK `Options.taskBudget` → `--task-budget` CLI flag. When non-null, `options.taskBudget = { total: settings.taskBudget }`.
+2. **Builder semantics**: `null` → option omitted entirely; positive integer → `{ total: Math.floor(value) }`.
+3. **Normalization**: `normalizeClaudeCodeNullablePositiveInt` handles defaults, rounding, and invalid values.
+4. **Probe coverage**: `runTaskBudgetReadbackProbe()` builds diagnostic SDK options and verifies all 6 cases (null→readback, positive-int→readback, null-but-option-present→fail, set-but-option-missing→fail, wrong-value→fail, error-thrown→fail).
+5. **Stable settings surface**: Model & Thinking tab numeric input with boundary notice and lifecycle notice.
+6. **Semantic separation from maxTurns/maxBudgetUsd**: `taskBudget` is API-side behavioral pacing (`@alpha`); `maxTurns` and `maxBudgetUsd` are local SDK enforcement with structured error subtypes (pass/verified). These are three distinct capabilities.
+
+### What is NOT verified — and fundamentally unverifiable from the plugin layer
+
+1. **No structured enforcement signal**: The SDK's `SDKResultError.subtype` union contains exactly 4 values: `error_during_execution`, `error_max_turns`, `error_max_budget_usd`, `error_max_structured_output_retries`. There is no `error_max_task_budget`.
+2. **No budget-related terminal reason**: The `TerminalReason` type has `max_turns` but no `max_task_budget` or equivalent. Budget exhaustion would not produce a distinct terminal reason.
+3. **No budget-related SDK event**: No `tokens_remaining`, `budget_status`, `usage_update`, or `token_usage` event type exists in the SDK.
+4. **Behavioral pacing is non-deterministic**: The model "paces tool use and wraps up" based on budget hints — this is model-dependent behavior, not a deterministic enforcement cutoff. A tiny budget may cause shorter responses but cannot be distinguished from normal model variance.
+5. **@alpha status**: The SDK marks this as alpha, meaning the API could change without notice.
+6. **Beta header is implementation detail**: `task-budgets-2026-03-13` is an API beta header, not a contractual enforcement guarantee.
+
+### Adjacent seams audited and REJECTED
+
+1. **Reusing Turn/Budget Limits proof as Task Budget proof** — Explicitly prohibited: `maxTurns` produces `error_max_turns` and `maxBudgetUsd` produces `error_max_budget_usd`; these are local SDK enforcement signals. `taskBudget` is API-side pacing with no enforcement signal. The three seams are semantically distinct.
+2. **Observing shorter model responses as budget proof** — A model producing shorter responses with a tiny budget is non-deterministic behavioral pacing. Response length variation is normal model behavior and cannot serve as proof of budget enforcement.
+3. **Token usage counting from result messages** — `SDKResultSuccess.usage` reports aggregate token counts but has no budget-vs-actual comparison field. Cannot prove budget was enforced.
+4. **API-side budget tracking** — The API may track budget internally, but the SDK provides no feedback channel for budget consumption or enforcement events.
+5. **`TerminalReason` values** — Only `max_turns` exists as a limit-related terminal reason. No `max_task_budget` value exists.
+
+### Changes made
+
+- Readback summary line: hardened with 2026-06-06 re-audit Outcome B, explicit evidence (4 error subtypes, TerminalReason values, missing event types).
+- Suggested checkpoints: Task Budget promoted to "audited" status; next targets identified (Fallback Model, Sandbox).
+- Module doc: updated Task Budget entry with re-audit confirmation.
+
+### Promotion path
+
+Requires one of: (a) SDK adds `error_max_task_budget` result subtype, (b) SDK adds a budget-related `TerminalReason` value (e.g., `max_task_budget`), (c) SDK emits a structured budget event (e.g., `tokens_remaining`, `budget_exceeded`) — none currently exists. Even if the API enforces the budget server-side, the plugin cannot verify this without an SDK feedback channel.
