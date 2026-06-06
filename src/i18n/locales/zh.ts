@@ -2410,7 +2410,7 @@ export const zhTranslations = {
   'settings.claudeCode.strictMcpConfig.lifecycleNotice': '严格 MCP 配置设置在下次查询或重启会话时生效。无法更改正在运行中的会话的严格配置状态。',
   'settings.claudeCode.enableContext1mBeta.name': '1M 上下文 Beta',
   'settings.claudeCode.enableContext1mBeta.desc': '向 SDK 请求 \'context-1m-2025-08-07\' beta header 以支持 1M 上下文窗口。插件将此选项传递给 SDK；实际 beta 可用性取决于所选模型和 Anthropic 侧行为。并非所有模型都支持此 beta。',
-  'settings.claudeCode.enableContext1mBeta.boundaryNotice': '此设置仅请求 SDK/API beta header。Beta 可用性取决于所选模型和 Anthropic 侧行为。插件侧行为未独立验证。不暴露通用 beta 管理功能。',
+  'settings.claudeCode.enableContext1mBeta.boundaryNotice': '仅回读：已验证选项接线。设置通过 buildClaudeCodeOptions 传入 SDK options，并以 --betas 标志到达 CLI 子进程。但插件无法验证模型侧 beta 接受、1M 上下文激活或 API 密钥资格。实际可用性取决于所选模型和 Anthropic 侧行为。不暴露通用 beta 管理功能。',
   'settings.claudeCode.enableContext1mBeta.lifecycleNotice': 'Beta 设置在下次查询或重启会话时生效。无法更改正在运行中的会话的 beta 状态。',
   'settings.claudeCode.debugFile.name': '调试文件路径',
   'settings.claudeCode.debugFile.desc': '要求 SDK 将 CLI 调试日志写入指定文件路径。已通过实时验证：真实诊断查询可让 CLI 子进程在共享文件系统上的该路径创建非空文件。设置调试文件路径会隐式启用调试日志，即使上方调试开关为关闭状态。',

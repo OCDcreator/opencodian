@@ -1022,12 +1022,17 @@ export class SettingsCapabilityLabSection {
       },
       {
         capability: '1M Context Beta',
-        sdkExposed: true, // SDK Options.betas?: string[]
-        adapterWired: true, // buildClaudeCodeOptions wires betas when settings.enableContext1mBeta is true
-        runtimeProof: 'readback', // Option wiring proven: betas propagates through buildClaudeCodeOptions
-        // into SDK options as ['context-1m-2025-08-07']. Readback ceiling: actual beta availability
-        // depends on selected model and Anthropic-side behavior. Plugin-side behavior is not
-        // independently verified. No generic beta management is exposed.
+        sdkExposed: true, // SDK Options.betas?: SdkBeta[] (type alias for 'context-1m-2025-08-07')
+        adapterWired: true, // buildClaudeCodeOptions maps enableContext1mBeta → options.betas = ['context-1m-2025-08-07']
+        runtimeProof: 'readback', // Full SDK path: setting → buildClaudeCodeOptions → SDK Options.betas →
+        // ProcessTransport.initialize() → CLI --betas flag (sdk.mjs: `i.push("--betas",J.join(","))`).
+        // SDK init message (type:'system', subtype:'init') has `betas?: string[]` field reporting
+        // CLI-acknowledged betas, but plugin does not consume it. Readback ceiling: the plugin verifies
+        // option wiring to CLI subprocess boundary; it cannot verify model-side beta acceptance,
+        // 1M context activation, API key eligibility, or distinguish "beta active" from
+        // "beta silently ignored" / "model doesn't support". No generic beta management is exposed.
+        // Promotion path: consume init message betas field → stronger readback; still not pass until
+        // model behavior is independently observable.
         userSurface: 'settings', // Model & Thinking tab toggle
       },
       {

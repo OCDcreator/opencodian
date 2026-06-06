@@ -11,6 +11,37 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-06-06 1M Context Beta — Audit SDK Path Trace and Boundary Hardening (Outcome B)
+
+Audit the `1M Context Beta` capability to determine whether any adjacent productizable seam exists beyond pure readback.
+
+**Decision: Outcome B** — `1M Context Beta` remains `runtimeProof: 'readback'`. No meaningful stable user-facing capability beyond option wiring can be honestly claimed.
+
+**SDK path trace findings:**
+1. `Options.betas` is deconstructed in SDK `vz` function and passed to `ProcessTransport` constructor
+2. `ProcessTransport.initialize()` forwards `betas` to CLI subprocess as `--betas` flag: `if(J&&J.length>0)i.push("--betas",J.join(","))` (sdk.mjs)
+3. SDK init message (`type:'system', subtype:'init'`) includes `betas?: string[]` field — CLI subprocess reports acknowledged betas
+4. Plugin already consumes init messages (`ClaudeCodeStreamNormalizer.ts` line 486) but does not extract `betas` field
+5. No observable signal confirms model-side beta acceptance, 1M context activation, or API key eligibility
+
+**What IS verified:** Setting → `buildClaudeCodeOptions` → SDK `Options.betas` → `ProcessTransport` → CLI `--betas` flag
+**What is NOT verified:** Model-side beta acceptance, 1M context activation, API key eligibility, or distinction between "beta active" and "beta silently ignored"
+
+**Potential future seam:** Consume init message `betas` field for stronger readback — still not `pass` until model behavior is independently observable.
+
+**Changes:**
+- **src/features/settings/SettingsCapabilityLabSection.ts**: Matrix row comment hardened with full SDK path trace
+- **src/i18n/locales/en.ts**: `boundaryNotice` hardened with verified path and unverified boundary
+- **src/i18n/locales/zh.ts**: `boundaryNotice` hardened with verified path and unverified boundary
+- **docs/modules/features/settings/SettingsCapabilityLabSection.md**: Entry 11f hardened with SDK path trace and promotion path
+- **docs/modules/core/agents/backend/ClaudeCodeAdapter.md**: Probe doc hardened with SDK path trace
+- **docs/modules/core/agents/backend/ClaudeCodeOptionsBuilder.md**: Builder doc hardened with full path
+- **docs/modules/core/types/settings.md**: Field doc hardened with full path
+- **docs/modules/features/settings/SettingsClaudeCodeSection.md**: Settings UI doc hardened
+- **docs/status/claude-code-current-state-2026-05-22.md**: Status line hardened, checkpoint marked complete
+
+---
+
 ## 2026-06-06 Warm Startup — Audit startup()/WarmQuery Productization Potential (Outcome B)
 
 ### Objective

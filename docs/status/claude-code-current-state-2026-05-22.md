@@ -69,7 +69,7 @@ Option wiring proven through `buildClaudeCodeOptions`, but no independent plugin
 - Tool Aliases — option wiring verified; alias resolution unobservable from plugin layer (post-resolution names only in stream)
 - Debug — option wiring verified; stderr output silently discarded without `debugFile` or stderr callback
 - Strict MCP Config — option wiring verified; validation behavior lives in compiled CLI binary
-- 1M Context Beta — option wiring verified; actual beta availability depends on model and Anthropic-side behavior
+- 1M Context Beta — option wiring verified through full SDK path (setting → buildClaudeCodeOptions → ProcessTransport → CLI --betas flag); model-side beta acceptance and 1M context activation unobservable from plugin layer
 - JS Runtime — option wiring verified; actual runtime selection depends on system PATH and installation
 - Load Timeout — `@alpha`; option wiring verified; timeout code path only executes with resume/continue + sessionStore
 - AskUserQuestion Preview Format — option wiring + UI preview rendering path verified; actual preview arrival depends on SDK version and model behavior
@@ -93,7 +93,7 @@ These have adapter wiring and runtime proof, but no stable or diagnostic user su
 ### suggested next 3 checkpoints
 
 1. **File Checkpoint / Rewind** — Highest user-value if unblocked. Monitor Anthropic SDK bug #236. Re-audit on any SDK version bump that mentions checkpointing or interactive-mode fixes. Current state: readback with known upstream blocker.
-2. **1M Context Beta** — Audit whether the beta flag has any live behavior proof path or adjacent productizable seams, or if it should remain readback with hardened boundary text. Current state: readback; actual beta availability depends on model and Anthropic-side behavior.
+2. **1M Context Beta** — ✅ Audit complete (2026-06-06, Outcome B). Full SDK path traced: setting → buildClaudeCodeOptions → ProcessTransport.initialize() → CLI --betas flag. SDK init message has betas field but plugin does not consume it. Remains readback; hardened boundary text. Model-side beta acceptance unobservable. Potential future seam: consume init message betas field for stronger readback.
 3. **Stderr Diagnostic** — Audit whether any query reliably provokes stderr output (e.g. error scenario, debug mode), or if it should remain readback with hardened boundary. Current state: readback; callback wiring proven but stderr byte emission is environment-dependent.
 
 ---

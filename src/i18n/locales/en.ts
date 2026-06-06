@@ -2410,7 +2410,7 @@ export const enTranslations = {
   'settings.claudeCode.strictMcpConfig.lifecycleNotice': 'Strict MCP config setting applies on the next query or restarted session. It cannot be changed for an already-running session.',
   'settings.claudeCode.enableContext1mBeta.name': '1M context beta',
   'settings.claudeCode.enableContext1mBeta.desc': 'Request the SDK \'context-1m-2025-08-07\' beta header for 1M context window support. This passes the option to the SDK; actual beta availability depends on the selected model and Anthropic-side behavior. Not all models support this beta.',
-  'settings.claudeCode.enableContext1mBeta.boundaryNotice': 'This only requests the SDK/API beta header. Beta availability depends on the selected model and Anthropic-side behavior. Plugin-side behavior is not independently verified. No generic beta management is exposed.',
+  'settings.claudeCode.enableContext1mBeta.boundaryNotice': 'Readback only: option wiring is proven. The setting propagates through buildClaudeCodeOptions into SDK options and reaches the CLI subprocess as a --betas flag. However, the plugin cannot verify model-side beta acceptance, 1M context activation, or API key eligibility. Actual availability depends on the selected model and Anthropic-side behavior. No generic beta management is exposed.',
   'settings.claudeCode.enableContext1mBeta.lifecycleNotice': 'Beta setting applies on the next query or restarted session. It cannot be changed for an already-running session.',
 
   'settings.claudeCode.debugFile.name': 'Debug file path',

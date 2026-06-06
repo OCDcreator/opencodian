@@ -565,6 +565,23 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       expect(containerEl.textContent).toContain(t('settings.claudeCode.proofStatus.fallbackModel'));
     });
 
+    it('renders 1M context beta boundary notice in model-thinking tab', () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'model-thinking');
+
+      const boundaryEl = containerEl.querySelector('[data-claude-code-enable-context-1m-beta-boundary="true"]');
+      expect(boundaryEl).toBeTruthy();
+      expect(boundaryEl!.textContent).toContain(t('settings.claudeCode.enableContext1mBeta.boundaryNotice'));
+      expect(boundaryEl!.textContent).toContain('Readback only');
+      expect(boundaryEl!.textContent).toContain('--betas');
+      expect(boundaryEl!.textContent).toContain('API key eligibility');
+    });
+
     it('renders main-model proof status notice with pass state in model-thinking tab', () => {
       const plugin = createPlugin();
       const containerEl = document.createElement('div');

@@ -44,7 +44,7 @@ OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings`、`DEFAULT_
 
 `debugFile` 为 readback only：通过 `buildClaudeCodeOptions` 传入 SDK `debugFile` 选项，要求 SDK 将 CLI 调试日志写入指定文件路径。实际文件写入是 SDK/CLI binary 的内部行为，无法从插件层独立验证。设置调试文件路径会隐式启用调试日志，即使 `debug` toggle 为关闭状态。默认空字符串 `''`。UI 位于 Runtime 标签页，为文本输入，仅在下一次查询或重启会话时生效。插件层不执行路径校验，也不执行文件系统写入。
 
-`enableContext1mBeta` 为 readback only：通过 `buildClaudeCodeOptions` 传入 SDK `betas` 选项（值为 `['context-1m-2025-08-07']`），请求 1M 上下文窗口 beta header。实际 beta 可用性是 SDK/模型/Anthropic 侧的内部行为，无法从插件层独立验证。并非所有模型都支持此 beta。默认 `false`。UI 位于 Model & Thinking 标签页，为 toggle 开关，仅在下一次查询或重启会话时生效。不暴露通用 beta 管理功能。
+`enableContext1mBeta` 为 readback only（2026-06-06 审计硬化）：通过 `buildClaudeCodeOptions` 传入 SDK `betas` 选项（值为 `['context-1m-2025-08-07']`），请求 1M 上下文窗口 beta header。完整 SDK 路径：setting → buildClaudeCodeOptions → SDK Options.betas → ProcessTransport.initialize() → CLI `--betas` 标志（sdk.mjs: `if(J&&J.length>0)i.push("--betas",J.join(","))`）。Option wiring 到 CLI 子进程边界已证明。SDK init 消息（`type:'system', subtype:'init'`）含 `betas?: string[]` 但插件未消费。实际 beta 可用性是 SDK/模型/Anthropic 侧的内部行为，无法从插件层独立验证。并非所有模型都支持此 beta。默认 `false`。UI 位于 Model & Thinking 标签页，为 toggle 开关，仅在下一次查询或重启会话时生效。不暴露通用 beta 管理功能。
 
 `askUserQuestionPreviewFormat` 为 readback only：通过 `buildClaudeCodeOptions` 传入 SDK `toolConfig.askUserQuestion.previewFormat` 选项（值为 `'markdown' | 'html'`），请求 SDK 为每个 `AskUserQuestion` 选项包含预览文本。空字符串 `''` 表示不请求预览（SDK 默认）。插件 question UI（inline card 与 dock）会保留并安全显示 SDK 提供的预览文本：以纯文本形式渲染，HTML 不会被当作富 HTML 解析，避免 XSS 风险；预览仅在选项获得焦点或悬停时显示，不常驻在所有选项下方。UI 不依赖 inbound `AskUserQuestion` 输入回显 `previewFormat`，而是对 preview 文本做格式无关的纯文本展示。实际预览是否从 SDK 到达取决于 SDK 版本和模型行为，无法从插件层独立验证。默认 `''`（auto）。UI 位于 Tools 标签页，为下拉选择框（None / Markdown / HTML），仅在下一次查询或重启会话时生效。这是 Claude-only 设置，不暴露为 backend-agnostic 能力。
 
