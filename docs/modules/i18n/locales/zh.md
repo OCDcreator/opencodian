@@ -372,7 +372,7 @@ Claude Code 不再使用过载的 `settings.claudeCode.tab.mcpAdvanced` 标签�
 
 新增 `settings.capabilityLab.sessionDetail.*`，为会话详情检查诊断探针提供中文文案。该探针展示 `adapter.getSession()` 返回的原始 session 字段，是 provider-owned 诊断，不代表稳定的跨后端 session-detail 对象契约。
 
-新增 `settings.capabilityLab.backendRouting.*`，为后端路由验证诊断探针提供中文文案。该探针验证后端路由基础设施工作正常，显示活跃后端、已注册适配器和会话后端分布，是 provider-owned 诊断，不代表稳定的后端路由产品界面。
+新增 `settings.capabilityLab.backendRouting.*`，为后端路由验证诊断探针提供中文文案。该探针验证后端路由基础设施工作正常，显示活跃后端、已注册适配器和会话后端分布，是 provider-owned 诊断。**2026-06-06 边界硬化**：路由层是内部基础设施，不是独立产品功能。稳定下游功能（会话浏览器、恢复、分叉、标题读取、分享链接读取、后端种类解析）已各自拥有矩阵行和 stable user surface；不存在独立的 "Backend Routing" 产品界面。
 
 2026-05-24 调整 `settings.capabilityLab.history.description`，明确 JSONL 历史浏览器只提供 diagnostic store 的导入、镜像和回读探针，不提供稳定的删除或恢复操作，避免把 Session Store 诊断证明误读成正式历史管理能力。
 

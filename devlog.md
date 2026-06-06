@@ -11,6 +11,44 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-06-06 Backend Routing — Boundary Hardening (Outcome B)
+
+### Objective
+
+Audit whether the `Backend Routing` capability row in the Capability Lab matrix under-reports an existing stable user surface. The routing layer (`AgentBackendRouting.ts`, `AgentServiceRegistry`) is used by multiple stable features (session browser, resume, fork, title read, share-URL read, backend kind resolution). Decide between Outcome A (promote to stable surface if a meaningful product surface exists) or Outcome B (keep diagnostic, harden boundary with explicit blockers explaining why stable seams do NOT add up to a stable product surface).
+
+### Decision
+
+**Outcome B** — `Backend Routing` REMAINS diagnostic-only.
+
+The routing layer is internal infrastructure, not a user-facing product feature. Users never interact with "Backend Routing" directly; they use the downstream features it enables. Each downstream feature already has its own capability row in the matrix with its own stable user surface classification:
+
+- Session browser / preview / detail / resume / fork → `JSONL History Browser` (`settings+chat`), `Session Detail` (`settings+chat`), `Resume Session` (`chat`), `Fork Session` (`chat`)
+- Session title read → `Session Title` (`settings+chat`)
+- Backend share-URL read → used by `ConversationSessionSettingsCoordinator` (stable settings seam, no separate row)
+- Backend kind resolution for chat/tool routing → used by `PostSyncQuestionTodoRefreshHostAdapter`, `ClaudeUserMessageIdentityBackfillService` (stable chat seams, no separate row)
+
+Promoting "Backend Routing" would double-count infrastructure that already earns credit through its consumer rows. There is no "Backend Routing" settings page, toggle, or chat command.
+
+### What Changed
+
+- **src/features/settings/SettingsCapabilityLabSection.ts**: Hardened the `Backend Routing` matrix row comment with explicit scope limits:
+  1. Listed the 4 stable narrow seams that USE routing (session browser, title read, share-URL read, backend kind resolution).
+  2. Explained why they do NOT add up to a stable "Backend Routing" product surface: users interact with downstream features, not routing; no standalone routing UI; registry is internal DI layer; consumer rows already track the product surface.
+- **src/i18n/locales/en.ts**: Updated `settings.capabilityLab.backendRouting.description` to clarify diagnostic-only boundary.
+- **src/i18n/locales/zh.ts**: Same boundary text update in Chinese.
+- **docs/modules/core/agents/backend/AgentBackendRouting.md**: Added product boundary declaration stating this is internal infrastructure, not an independent product feature.
+
+### Honesty Boundaries
+
+- Classification: **pass** (unchanged — runtime proof verified).
+- User surface: **diagnostic** (unchanged — explicitly NOT promoted to stable).
+- No fake UI added. No capability claim inflated.
+- All stable downstream features continue to be tracked by their own capability rows.
+- The routing layer remains an internal dependency-injection seam verified by the Capability Lab diagnostic probe.
+
+---
+
 ## 2026-06-06 Fork Session On Resume — Truth-Sync Hardened Boundary (Outcome B)
 
 ### Objective

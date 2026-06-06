@@ -2916,7 +2916,7 @@ export const zhTranslations = {
   'settings.capabilityLab.sessionDetail.title': '会话详情检查（诊断用）',
   'settings.capabilityLab.sessionDetail.description': 'getSession() 的供应商级诊断探针。选择一个会话并检查其原始详情。显示 sessionId、摘要、最后修改时间和其它可用字段作为诊断输出。非稳定产品界面——不代表跨后端会话对象契约。',
   'settings.capabilityLab.backendRouting.title': '后端路由验证（诊断用）',
-  'settings.capabilityLab.backendRouting.description': '验证后端路由基础设施。显示活跃后端、已注册适配器和会话后端分布。通过供应商级路由路径执行 listSessions() 和 getSession()。',
+  'settings.capabilityLab.backendRouting.description': '验证后端路由基础设施。显示活跃后端、已注册适配器和会话后端分布。通过供应商级路由路径执行 listSessions() 和 getSession()。仅限诊断：路由层是支持稳定下游功能（会话浏览器、恢复、分叉、标题读取）的内部基础设施，但不存在独立的“后端路由”产品界面。',
   'settings.capabilityLab.discovery.title': '发现与状态',
   'settings.capabilityLab.discovery.description': 'hooks、插件、技能、代理和其他 SDK 功能的状态概览。无创作 UI — 仅发现/状态。',
   'settings.capabilityLab.diagnosticStreamControls.title': '诊断流控制',

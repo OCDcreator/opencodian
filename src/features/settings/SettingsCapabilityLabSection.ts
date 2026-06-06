@@ -787,8 +787,20 @@ export class SettingsCapabilityLabSection {
         capability: 'Backend Routing',
         sdkExposed: true, // AgentServiceRegistry provides routing
         adapterWired: true, // registry.getActive() resolves adapter
-        runtimeProof: 'pass', // BUILD_ID feature-phase0-capability.202605281948: registry routes correctly: activeKind=claude-code, adapters=[opencode,claude-code], listSessions via adapter=38 sessions, capabilities=[chat,sessions,fork,models,thinking,file-ops,shell]. Diagnostic-only — no stable routing UI.
-        userSurface: 'diagnostic', // Capability Lab backend routing probe only
+        runtimeProof: 'pass', // BUILD_ID feature-phase0-capability.202605281948: registry routes correctly: activeKind=claude-code, adapters=[opencode,claude-code], listSessions via adapter=38 sessions, capabilities=[chat,sessions,fork,models,thinking,file-ops,shell].
+        // DIAGNOSTIC ONLY — Outcome B (2026-06-06 audit): Keep as diagnostic. The routing layer is infrastructure, not a user-facing product surface.
+        // Stable narrow seams that USE routing (and have their own capability rows):
+        //   1. Session browser + preview/detail/resume/fork (JSONL History Browser, Session Detail, Resume Session, Fork Session — all have their own stable UI rows)
+        //   2. Session title read (Session Title — stable settings+chat row)
+        //   3. Backend share-URL read (ConversationSessionSettingsCoordinator — stable settings seam)
+        //   4. Backend kind resolution for chat/tool routing (PostSyncQuestionTodoRefreshHostAdapter, ClaudeUserMessageIdentityBackfillService — stable chat seams)
+        // Why these do NOT add up to a stable "Backend Routing" product surface:
+        //   - Users never interact with routing directly; they use the downstream features above.
+        //   - There is no "Backend Routing" settings page, toggle, or chat command.
+        //   - The registry is an internal dependency-injection layer, not a user-facing capability.
+        //   - Each downstream feature is already productized and tracked separately in this matrix.
+        //   - Promoting "Backend Routing" would double-count infrastructure that already earns credit through its consumer rows.
+        userSurface: 'diagnostic', // Capability Lab backend routing probe only — verifies infrastructure, not a product feature
       },
       {
         capability: '/context Diagnostic',

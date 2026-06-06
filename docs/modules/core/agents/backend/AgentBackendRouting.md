@@ -7,6 +7,8 @@
 
 `AgentBackendRouting.ts` 是 backend registry 的窄路由 helper。它把 conversation 的 `backend` 字段解析为实际 adapter，并用 capability narrowing 返回 chat/session 能力，避免 `main.ts`、`OpenCodianView` 和发送管线继续直接假设所有会话都归 OpenCode 所有。
 
+> **产品边界声明（2026-06-06）**: 本模块是**内部基础设施**，不是独立的产品功能。用户不直接与路由层交互；他们使用的是路由层所支持的下游功能（会话浏览器、恢复、分叉、标题读取等）。Capability Lab 中的 "Backend Routing" 诊断探针仅用于验证该基础设施，其 `userSurface` 保持为 `diagnostic`。
+
 ## 职责
 
 - 将缺失 `conversation.backend` 的历史会话视为 `opencode`
