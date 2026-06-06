@@ -783,12 +783,17 @@ export class SettingsCapabilityLabSection {
         capability: 'Sandbox',
         sdkExposed: true, // SDK Options.sandbox?: SandboxSettings
         adapterWired: true, // buildClaudeCodeOptions wires sandbox.enabled/failIfUnavailable/autoAllowBashIfSandboxed
-        runtimeProof: 'readback', // Option wiring proven: sandbox settings propagate from ClaudeCodeBackendSettings through
-        // ClaudeCodeOptionsBuilder into SDK options. Readback ceiling: sandbox behavior (OS-level process isolation,
-        // bubblewrap/seccomp enforcement) is the SDK/CLI binary's internal claim, not independently verifiable from
-        // the plugin layer. The plugin can only prove it passes the option — it cannot observe whether the subprocess
-        // actually runs in a sandbox. Network, filesystem, TLS, proxy, and Mach lookup sub-policies are intentionally
-        // not exposed as stable settings in this version.
+        runtimeProof: 'readback', // 2026-06-06 audit: SDK sandbox path fully traced.
+        // Option wiring: enabled/failIfUnavailable/autoAllowBashIfSandboxed propagate through
+        // ClaudeCodeOptionsBuilder → SDK Options.sandbox → SDK X2() merges into --settings JSON → CLI subprocess.
+        // SDK defaults: when enabled=true, X2() sets failIfUnavailable=true if unspecified (per sdk.d.ts line 1662).
+        // Readback ceiling remains: the CLI binary handles OS-level sandbox enforcement internally.
+        // No observable signal confirms activation: no init event, no tool metadata, no stderr pattern,
+        // no CLAUDE_CODE_SANDBOXED env var (that's assistant-worker path only, not createQuery path).
+        // Plugin cannot distinguish "sandbox active" from "sandbox silently degraded" or "unsupported platform".
+        // Network, filesystem, TLS, proxy, and Mach lookup sub-policies exist in SandboxSettingsSchema
+        // but are intentionally not exposed as stable settings in this version.
+        // Promotion path: if SDK adds sandbox status to init event or tool result metadata, re-audit.
         userSurface: 'settings', // Permissions tab: enabled, failIfUnavailable, autoAllowBashIfSandboxed toggles
       },
       {

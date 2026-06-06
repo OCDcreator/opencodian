@@ -2285,7 +2285,7 @@ export const zhTranslations = {
   'settings.claudeCode.sandbox.failIfUnavailable.desc': '启用后，如果无法设置操作系统沙箱，查询将失败。禁用时，如果沙箱设置失败，查询将在无沙箱状态下继续运行。',
   'settings.claudeCode.sandbox.autoAllowBashIfSandboxed.name': '沙箱内自动允许 Bash',
   'settings.claudeCode.sandbox.autoAllowBashIfSandboxed.desc': '当沙箱处于活动状态时，自动批准 Bash 工具调用。仅在启用沙箱时生效。',
-  'settings.claudeCode.sandbox.boundaryNotice': '仅为 readback：插件将沙箱选项传递给 SDK，但无法独立验证子进程是否真正运行在操作系统级沙箱中。实际沙箱强制执行（进程隔离、bubblewrap/seccomp）是 SDK/CLI 二进制文件的内部声明。这些设置不是文件系统或网络权限编辑器。网络、文件系统、TLS、代理和 Mach 查找子策略在此版本中未暴露。',
+  'settings.claudeCode.sandbox.boundaryNotice': '仅为 readback：插件将沙箱选项传递给 SDK，但无法独立验证子进程是否真正运行在操作系统级沙箱中。实际沙箱强制执行（进程隔离、Linux 上的 bubblewrap、macOS 上的平台原生机制）是 SDK/CLI 二进制文件的内部声明——插件层没有 init 事件、工具元数据或 stderr 信号可确认激活状态。当 enabled 为 true 时，SDK 默认将 failIfUnavailable 设为 true，因此如果当前主机缺少沙箱依赖，查询会失败。这些设置不是文件系统或网络权限编辑器。网络、文件系统、TLS、代理和 Mach 查找子策略在此版本中未暴露。',
   'settings.claudeCode.sandbox.lifecycleNotice': '仅在下一次查询或重启会话时生效。活跃会话不会实时更新。',
   'settings.claudeCode.planModeInstructions.name': '计划模式指令',
   'settings.claudeCode.planModeInstructions.desc': '用于 SDK 计划模式系统提醒的自定义指令。SDK 只会在权限模式为“计划”时使用它们。',
