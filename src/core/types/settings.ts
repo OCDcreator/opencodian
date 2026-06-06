@@ -125,8 +125,11 @@ export interface ClaudeCodeBackendSettings {
   /**
    * Enforce strict validation of MCP server configurations.
    * When true, invalid MCP configurations will cause errors instead of warnings.
-   * Readback only: SDK option wiring proven; actual MCP config validation behavior is not
-   * independently verified from the plugin layer. Applies to next query or restarted session only.
+   * Readback only: SDK propagates this as --strict-mcp-config CLI flag; actual
+   * validation lives in the compiled CLI binary, not the SDK wrapper. No structured
+   * signal confirms whether strict validation was applied. The plugin-side adapter
+   * silently drops structurally malformed entries, so many malformed configs never
+   * reach the CLI. Applies to next query or restarted session only.
    * Does not write .claude/mcp.json or provide MCP authoring UI.
    */
   strictMcpConfig: boolean;

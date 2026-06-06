@@ -40,7 +40,7 @@ OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings`、`DEFAULT_
 
 `debug` 为 readback only：通过 `buildClaudeCodeOptions` 传入 SDK `debug` 选项，要求 CLI 在查询执行期间发出调试日志。实际调试日志输出是 SDK/CLI binary 的内部行为，无法从插件层独立验证。默认 `false`。UI 位于 Runtime 标签页，为 toggle 开关，仅在下一次查询时生效。
 
-`strictMcpConfig` 为 readback only：通过 `buildClaudeCodeOptions` 传入 SDK `strictMcpConfig` 选项，要求 SDK 将无效的 MCP 服务器配置视为错误而非警告。实际 MCP 配置验证行为是 SDK/CLI binary 的内部行为，无法从插件层独立验证。默认 `false`。UI 位于 Tools 标签页，为 toggle 开关，仅在下一次查询或重启会话时生效。此处不写入 `.claude/mcp.json`，也不提供 MCP 编写界面。
+`strictMcpConfig` 为 readback only（2026-06-06 审计硬化）：SDK 将其作为 `--strict-mcp-config` CLI 标志传递给子进程；实际验证位于编译后的 CLI binary 中。没有结构化信号确认严格验证是否已应用。插件侧 MCP adapter（ClaudeCodeMcpConfigAdapter.ts）会静默丢弃结构性 malformed 条目（返回 null），因此许多 malformed 配置从未到达 CLI。默认 `false`。UI 位于 Tools 标签页，为 toggle 开关，仅在下一次查询或重启会话时生效。此处不写入 `.claude/mcp.json`，也不提供 MCP 编写界面。
 
 `debugFile` 为 readback only：通过 `buildClaudeCodeOptions` 传入 SDK `debugFile` 选项，要求 SDK 将 CLI 调试日志写入指定文件路径。实际文件写入是 SDK/CLI binary 的内部行为，无法从插件层独立验证。设置调试文件路径会隐式启用调试日志，即使 `debug` toggle 为关闭状态。默认空字符串 `''`。UI 位于 Runtime 标签页，为文本输入，仅在下一次查询或重启会话时生效。插件层不执行路径校验，也不执行文件系统写入。
 

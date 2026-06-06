@@ -2398,7 +2398,7 @@ export const zhTranslations = {
   'settings.claudeCode.debug.lifecycleNotice': '调试日志设置在下次查询时生效。无法更改正在运行中的会话的调试状态。',
   'settings.claudeCode.strictMcpConfig.name': '严格 MCP 配置',
   'settings.claudeCode.strictMcpConfig.desc': '要求 SDK 将无效的 MCP 服务器配置视为错误而非警告。插件将此选项传递给 SDK；CLI 二进制文件是否实际执行严格验证无法从插件层独立验证。',
-  'settings.claudeCode.strictMcpConfig.boundaryNotice': '严格 MCP 配置控制 SDK 是否将无效 MCP 配置视为错误——不保证验证一定被执行。实际行为取决于 SDK/CLI 版本和运行时条件。此处不写入 .claude/mcp.json，也不提供 MCP 编写界面。',
+  'settings.claudeCode.strictMcpConfig.boundaryNotice': '仅 readback：插件验证 strictMcpConfig 已接入 SDK 选项并以 --strict-mcp-config 传递给 CLI 子进程。实际验证位于编译后的 CLI binary 中；没有结构化信号确认严格验证是否已应用。插件侧 MCP adapter 会静默丢弃结构性 malformed 条目，因此许多 malformed 配置从未到达 CLI。',
   'settings.claudeCode.strictMcpConfig.lifecycleNotice': '严格 MCP 配置设置在下次查询或重启会话时生效。无法更改正在运行中的会话的严格配置状态。',
   'settings.claudeCode.enableContext1mBeta.name': '1M 上下文 Beta',
   'settings.claudeCode.enableContext1mBeta.desc': '向 SDK 请求 \'context-1m-2025-08-07\' beta header 以支持 1M 上下文窗口。插件将此选项传递给 SDK；实际 beta 可用性取决于所选模型和 Anthropic 侧行为。并非所有模型都支持此 beta。',

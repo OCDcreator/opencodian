@@ -907,10 +907,16 @@ export class SettingsCapabilityLabSection {
         capability: 'Strict MCP Config',
         sdkExposed: true, // SDK Options.strictMcpConfig?: boolean
         adapterWired: true, // buildClaudeCodeOptions wires strictMcpConfig when settings.strictMcpConfig is true
-        runtimeProof: 'readback', // Option wiring proven: strictMcpConfig propagates through buildClaudeCodeOptions
-        // into SDK options. Readback ceiling: actual MCP config validation behavior is not independently
-        // verified from the plugin layer. Applies to next query or restarted session only.
-        // Does not write .claude/mcp.json or provide MCP authoring UI.
+        runtimeProof: 'readback', // 2026-06-06 audit: SDK propagates strictMcpConfig as
+        // --strict-mcp-config CLI flag (sdk.mjs: if(v4)i.push("--strict-mcp-config")). The actual
+        // validation behavior lives in the compiled CLI binary, not the SDK wrapper. The SDK
+        // only forwards the flag; there is no structured signal (no init event field, no result
+        // subtype, no stderr contract) confirming whether strict validation was applied.
+        // Readback ceiling: malformed-config probes would be environment-dependent and
+        // CLI-version-dependent. The plugin-side adapter (ClaudeCodeMcpConfigAdapter.ts)
+        // silently drops structurally malformed entries (returns null), so many malformed
+        // configs never reach the CLI. Promotion path: SDK exposes a strict-validation status
+        // event or a deterministic structured error subtype for invalid MCP configs.
         userSurface: 'settings', // Tools tab toggle, adjacent to MCP runtime controls
       },
       {
