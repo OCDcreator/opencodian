@@ -1229,11 +1229,39 @@ export class SettingsCapabilityLabSection {
         capability: 'AskUserQuestion Preview Format',
         sdkExposed: true, // SDK Options.toolConfig?: ToolConfig — askUserQuestion.previewFormat?: 'markdown' | 'html'
         adapterWired: true, // buildClaudeCodeOptions wires toolConfig from settings.askUserQuestionPreviewFormat
-        runtimeProof: 'readback', // Option wiring proven: toolConfig propagates through buildClaudeCodeOptions
-        // into SDK options, and the permission bridge preserves preview data through QuestionRequest.
-        // The question UI (inline card and dock) now renders preview text safely as plain text.
-        // Readback ceiling: actual preview arrival from the SDK depends on version/model behavior
-        // and is not independently verified from the plugin layer.
+        runtimeProof: 'readback', // 2026-06-06 audit (Outcome B): remains readback with hardened boundary.
+        // VERIFIED (synthetic data, unit tests):
+        //   1. Settings→SDK wiring: buildClaudeCodeOptions omits toolConfig when ''/empty,
+        //      sets toolConfig.askUserQuestion.previewFormat when 'markdown'|'html'.
+        //      Tests: ClaudeCodeOptionsBuilder.test.ts (omit, markdown, html).
+        //   2. Bridge extraction: normalizeQuestionOption reads raw.preview → preserves in
+        //      NormalizedQuestionPrompt.options[].preview → passes to QuestionRequest.
+        //      Tests: ClaudeCodePermissionBridge.test.ts (preview preservation).
+        //   3. UI rendering: QuestionInlineCardRenderer + QuestionDock store preview in
+        //      data-preview attribute, show on focusin/mouseenter via setText() (textContent),
+        //      hide on focusout. HTML is never parsed as rich HTML.
+        //      Tests: QuestionInlineCardRenderer.test.ts, QuestionDock.test.ts (focus/hide).
+        //   4. Settings surface: Tools tab dropdown (''|'markdown'|'html'), boundary notice,
+        //      lifecycle notice. Claude-only surface.
+        //      Tests: SettingsClaudeCodeSection.test.ts (dropdown, notices).
+        // NOT VERIFIED — fundamental limitation (not temporary gap):
+        //   1. Whether the SDK actually includes .preview in AskUserQuestion tool inputs when
+        //      previewFormat is set. This is a pure outbound SDK request; the inbound AskUserQuestion
+        //      tool input does NOT echo previewFormat back. Preview arrival is model/SDK-dependent.
+        //   2. Whether the model generates meaningful preview text that differs between markdown
+        //      and html format settings.
+        //   3. Whether markdown preview text is semantically different from html preview text.
+        // ADJACENT SEAMS REJECTED:
+        //   1. Reusing AskUserQuestion/Elicitation pass proof as previewFormat proof — the pass
+        //      proof only verifies that question dialogs arrive and render; it does NOT verify
+        //      that preview text is included in the tool input or differs by format setting.
+        //   2. Mocking AskUserQuestion tool input with synthetic preview — would test mock
+        //      behavior, not real SDK/model preview generation.
+        //   3. Inspecting SDK source for preview generation logic — even if found, runtime
+        //      proof requires observing the actual data arrive in a real query, not reading code.
+        // PROMOTION PATH: requires one of (a) SDK emits a confirmation event when previewFormat
+        // is active, (b) plugin captures a real AskUserQuestion tool input with .preview data
+        // during a live session, or (c) SDK documents preview arrival as contractual behavior.
         userSurface: 'settings', // Tools tab dropdown; Claude-only surface
       },
       {

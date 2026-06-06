@@ -72,7 +72,7 @@ Option wiring proven through `buildClaudeCodeOptions`, but no independent plugin
 - 1M Context Beta — option wiring verified through full SDK path (setting → buildClaudeCodeOptions → ProcessTransport → CLI --betas flag); model-side beta acceptance and 1M context activation unobservable from plugin layer
 - JS Runtime — option wiring verified; actual runtime selection depends on system PATH and installation. **2026-06-06 audit completed** (Outcome B): remains readback with hardened boundary. No observable signal in init events, stderr, or tool output confirms which runtime the CLI subprocess actually uses.
 - Load Timeout — `@alpha`; option wiring verified; timeout code path only executes with resume/continue + sessionStore. **2026-06-06 audit completed** (Outcome B): remains readback with hardened boundary.
-- AskUserQuestion Preview Format — option wiring + UI preview rendering path verified; actual preview arrival depends on SDK version and model behavior
+- AskUserQuestion Preview Format — option wiring + UI preview rendering path verified; actual preview arrival depends on SDK version and model behavior. **2026-06-06 audit completed** (Outcome B): remains readback with hardened boundary. Full code path (settings→SDK→bridge extraction→UI rendering) proven with synthetic data; no proof that SDK actually includes `.preview` in real AskUserQuestion tool inputs.
 
 **Diagnostic (`userSurface: 'diagnostic'`) — 3**
 - File Checkpoint / Rewind — `rewindFiles(dryRun: true)` callable but returns `canRewind: false` for all candidates. Upstream blocker: SDK #236 (snapshot creation gated behind React/Ink UI code paths, never fires in `query()` mode).
@@ -93,8 +93,65 @@ These have adapter wiring and runtime proof, but no stable or diagnostic user su
 ### suggested next 3 checkpoints
 
 1. **File Checkpoint / Rewind** — Highest user-value if unblocked. Monitor Anthropic SDK bug #236. Re-audit on any SDK version bump that mentions checkpointing or interactive-mode fixes. Current state: readback with known upstream blocker.
-2. **AskUserQuestion Preview Format** — Readback; option wiring + UI preview rendering path verified. Potential seam: if SDK version reliably includes preview strings in AskUserQuestion tool inputs, could be promoted.
-3. **Allowed Tools** — Readback; auto-approve shortcut only, zero enforcement at tool-catalog level. Potential seam: if SDK adds enforcement at the catalog level (currently `allowedTools` only affects `canUseTool` auto-approve, not tool availability). Low priority.
+2. **Allowed Tools** — Readback; auto-approve shortcut only, zero enforcement at tool-catalog level. Potential seam: if SDK adds enforcement at the catalog level (currently `allowedTools` only affects `canUseTool` auto-approve, not tool availability). Low priority.
+3. **Task Budget** — Readback; `@alpha` option wiring verified. Potential seam: if SDK adds budget-enforcement status signals or error types.
+
+---
+
+## 2026-06-06 AskUserQuestion Preview Format — Audit and Boundary Hardening (Outcome B)
+
+### Objective
+
+Audit the Claude Code SDK `toolConfig.askUserQuestion.previewFormat?: 'markdown' | 'html'` seam to determine if it can be productized beyond the current readback boundary into a stable pass/verified capability, or if it should remain readback with a hardened boundary.
+
+### SDK Seam Analysis
+
+The SDK exposes exactly one preview-format-related option:
+
+```typescript
+// SDK Options.toolConfig
+toolConfig?: {
+  askUserQuestion?: {
+    previewFormat?: 'markdown' | 'html';
+  };
+};
+```
+
+This is a **pure outbound SDK request**. When set, the SDK *may* include a `preview` field in each option of the `AskUserQuestion` tool input. The inbound `AskUserQuestion` tool input does **NOT** echo `previewFormat` back to the caller.
+
+### Decision
+
+**Outcome B** — AskUserQuestion Preview Format REMAINS `readback` with hardened boundary.
+
+### What IS verified (with synthetic data, unit tests)
+
+1. **Settings→SDK option wiring**: `buildClaudeCodeOptions` omits `toolConfig` when `askUserQuestionPreviewFormat` is `''`, and sets `toolConfig.askUserQuestion.previewFormat` when `'markdown'` or `'html'`. Tests: `ClaudeCodeOptionsBuilder.test.ts` (omit, markdown, html).
+2. **Bridge extraction**: `normalizeQuestionOption` reads `raw.preview` from SDK tool input and preserves it in `NormalizedQuestionPrompt.options[].preview`, which passes through `QuestionRequest` to the question UI. Tests: `ClaudeCodePermissionBridge.test.ts` (preview preservation).
+3. **UI rendering**: `QuestionInlineCardRenderer` + `QuestionDock` store preview in `data-preview` attribute on option inputs, show on `focusin`/`mouseenter` via `setText()` (textContent, never innerHTML), hide on `focusout`. HTML previews are shown as plain text — no rich HTML rendering. Tests: `QuestionInlineCardRenderer.test.ts`, `QuestionDock.test.ts` (focus show, blur hide, plain text).
+4. **Settings surface**: Tools tab dropdown (`''`/`'markdown'`/`'html'`), boundary notice, lifecycle notice. Claude-only surface. Tests: `SettingsClaudeCodeSection.test.ts` (dropdown, notices).
+5. **Semantic separation from AskUserQuestion/Elicitation overall**: The overall AskUserQuestion capability is **pass** (question dialogs arrive, render, answers go back, model uses answers). This seam is specifically about `previewFormat` — whether preview *text* arrives in the tool input and is rendered by the UI.
+
+### What is NOT verified — fundamental limitation (not temporary gap)
+
+1. **No proof that SDK includes `.preview` in real AskUserQuestion tool inputs**: The existing tests all use synthetic `preview` data injected into the bridge/UI. No test observes a real SDK query where the model produces an `AskUserQuestion` tool call with `.preview` fields on its options. Actual preview arrival depends on SDK version, model behavior, and whether the model chooses to include preview text.
+2. **No proof that format choice affects preview content**: Whether setting `'markdown'` vs `'html'` produces different preview text (or any preview text at all) is unobservable from the plugin layer.
+3. **The option is a pure request, not a contract**: The SDK may silently ignore `previewFormat` without producing any error or feedback. The inbound `AskUserQuestion` tool input does not echo `previewFormat` back, so we cannot confirm the SDK even processed our request.
+
+### Adjacent seams audited and REJECTED
+
+1. **Reusing AskUserQuestion/Elicitation pass proof as previewFormat proof** — The pass proof only verifies that question dialogs arrive and render correctly, and that answers flow back to the model. It does NOT verify that preview text is included in the tool input or differs by format setting. Using the question-dialog proof as previewFormat proof would be dishonest overclaiming.
+2. **Mocking AskUserQuestion tool input with synthetic preview data** — Would test mock behavior, not real SDK/model preview generation. The bridge and UI tests already do this correctly; they prove rendering, not arrival.
+3. **Inspecting SDK source for preview generation logic** — Even if found, runtime proof requires observing the actual data arrive in a real query, not reading code comments.
+
+### Changes made
+
+- Matrix row comment: hardened with explicit Outcome B, full VERIFIED/NOT VERIFIED evidence trace, adjacent seams rejected, and promotion path.
+- Current-state doc: added checkpoint section with full audit findings.
+- Module doc: hardened entry 17 with Outcome B classification.
+
+### Promotion path
+
+Requires one of: (a) SDK emits a confirmation event or response metadata when `previewFormat` is active, (b) plugin captures a real `AskUserQuestion` tool input with `.preview` data during a live session (would require a question-triggering prompt + format setting + inspection of the raw tool input), or (c) SDK documents preview arrival as contractual behavior — none currently exists.
 
 ---
 

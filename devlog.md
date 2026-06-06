@@ -11,7 +11,27 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
-## 2026-06-06 Load Timeout — Audit and Boundary Hardening (Outcome B)
+## 2026-06-06 AskUserQuestion Preview Format — Audit and Boundary Hardening (Outcome B)
+
+Audit the `AskUserQuestion Preview Format` capability (SDK `toolConfig.askUserQuestion.previewFormat?: 'markdown' | 'html'`) to determine whether it can be productized beyond readback into a stable pass/verified capability.
+
+**Decision: Outcome B** — `AskUserQuestion Preview Format` remains `runtimeProof: 'readback'`. No honest promotion to pass is possible.
+
+**Audit findings:**
+
+1. The full code path exists and is proven with synthetic data: settings→SDK option wiring (ClaudeCodeOptionsBuilder), bridge extraction (ClaudeCodePermissionBridge `normalizeQuestionOption` preserves `raw.preview`), UI rendering (QuestionInlineCardRenderer + QuestionDock via `setText()`/textContent, never innerHTML).
+2. All layers have unit tests using synthetic preview data: ClaudeCodeOptionsBuilder.test.ts (omit/markdown/html), ClaudeCodePermissionBridge.test.ts (preview preservation), QuestionInlineCardRenderer.test.ts + QuestionDock.test.ts (focus/hide/plain text), SettingsClaudeCodeSection.test.ts (dropdown/notices).
+3. The critical gap: no test or live observation proves that the SDK actually includes `.preview` in real `AskUserQuestion` tool inputs when `previewFormat` is set. This is a **pure outbound SDK request**; the inbound tool input does NOT echo `previewFormat` back.
+4. AskUserQuestion/Elicitation overall is **pass** (question dialogs arrive, render, answers work), but this specific seam (`previewFormat`) is separate — it's about whether preview *text* arrives and differs by format setting, which is NOT proven.
+5. Adjacent seams explicitly REJECTED: (a) reusing AskUserQuestion pass proof as previewFormat proof (dishonest overclaiming), (b) mocking AskUserQuestion input with synthetic preview (already done in bridge/UI tests, proves rendering not arrival), (c) inspecting SDK source (not runtime proof).
+
+**Changes made:**
+
+- Matrix row comment: hardened with full VERIFIED/NOT VERIFIED evidence trace, adjacent seams rejected, and promotion path.
+- Current-state doc: added checkpoint section with full audit findings; updated readback description; updated suggested next checkpoints.
+- Module doc: hardened entry 17 with Outcome B classification and full evidence trace.
+
+---
 
 Audit the `Load Timeout` capability (SDK `Options.loadTimeoutMs?: number`, @alpha) to determine whether it can be productized beyond readback into a stable pass/verified capability.
 
