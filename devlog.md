@@ -11,6 +11,54 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-06-06 Tool Aliases — Readback Hardening / SDK Source Evidence / Observability Gap Audit
+
+### What changed
+
+- **src/features/settings/SettingsCapabilityLabSection.ts**:
+  - Expanded the `Tool Aliases` matrix row comment with concrete SDK source evidence.
+  - Documents that browser-sdk.js `initialize()` forwards `toolAliases` as a one-way init parameter (`toolAliases: this.initConfig?.toolAliases`) with no feedback event or status confirmation.
+  - Documents that alias resolution occurs in the CLI binary's internal tool execution path, and stream `tool_use` chunks expose only post-resolution names with no aliasing metadata.
+  - Documents the epistemic impossibility: the plugin cannot distinguish "model emitted aliased name → resolved to canonical" from "model emitted canonical name directly".
+
+- **src/i18n/locales/en.ts + zh.ts**:
+  - Updated `settings.claudeCode.toolAliases.boundaryNotice` to reference SDK source audit and stream observability gap instead of vague "internal claim" wording.
+  - Updated `settings.capabilityLab.proofs.toolAliases.boundary` to include the same concrete technical barrier.
+  - Updated `settings.capabilityLab.proofs.toolAliases.readback` to mention the one-way init parameter nature and lack of feedback event.
+
+- **docs/modules/core/types/settings.md**:
+  - Updated `toolAliases` field description with 2026-06-06 audit hardening note, citing browser-sdk.js evidence and the internal tool execution path barrier.
+
+- **docs/modules/features/settings/SettingsCapabilityLabSection.md**:
+  - Updated entry 11b with 2026-06-06 audit findings: SDK source evidence, one-way init parameter, stream observability gap.
+
+- **docs/modules/core/agents/backend/ClaudeCodeAdapter.md**:
+  - Updated `runToolAliasesReadbackProbe()` documentation with 2026-06-06 hardened blocker text citing SDK source and observability gap.
+
+- **docs/status/claude-code-current-state-2026-05-22.md**:
+  - Updated the 2026-06-03 Tool Aliases section with 2026-06-06 audit hardening details.
+  - Updated Honesty Boundaries to explicitly state the SDK source findings.
+
+- **docs/modules/i18n/locales/en.md + zh.md**:
+  - Added changelog entries for the 2026-06-06 locale string updates.
+
+- **graphify-out/**:
+  - Refreshed with `npm run graphify:update:src`.
+
+### Honesty Boundaries
+
+- Classification remains **readback** — no promotion to pass.
+- The hardened blocker now cites specific SDK source evidence (browser-sdk.js `initialize()` one-way parameter forwarding) rather than a hand-wavy "internal claim".
+- The fundamental unobservability is explained: alias resolution happens before stream events, and the plugin sees only post-resolution tool names with no aliasing metadata.
+- No `pass` path invented.
+
+### Outcome
+
+- Tool Aliases stays readback with a concrete, source-backed justification.
+- All verification gates pass: owner-guard, module-docs, graphify, devlog-order, lint (0 errors), typecheck, 4150/4150 tests, build (BUILD_ID feature-phase0-capability.202606061344).
+
+---
+
 ## 2026-06-04 Debug — Readback Hardening / Locale-Backed Proof / Lifecycle Coverage / Stable Settings Regression
 
 ### What changed

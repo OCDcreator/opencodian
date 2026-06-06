@@ -36,7 +36,7 @@ OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings`、`DEFAULT_
 
 `planModeInstructions` 为 readback only：当 `permissionMode` 为 `plan` 时，自定义指令通过 `buildClaudeCodeOptions` 传入 SDK `planModeInstructions` 选项，替换默认计划模式工作流内容；SDK 仍强制附加只读前言与 ExitPlanMode 协议尾部。实际计划模式行为无法从插件层独立验证。UI 位于 Permissions 标签页，为文本区域输入，仅在下一次查询或重启会话后生效。
 
-`toolAliases` 为 readback only：通过 `buildClaudeCodeOptions` 传入 SDK `toolAliases` 选项，将模型发出的工具名映射到规范工具名，在解析前生效。实际别名解析行为是 SDK/CLI binary 的内部实现，无法从插件层独立验证。默认空对象 `{}`。UI 位于 Tools 标签页，为高级文本区域输入，格式为每行 `key=value`（如 `Fetch=Read`），仅在下一次查询或重启会话后生效。
+`toolAliases` 为 readback only（2026-06-06 审计硬化）：通过 `buildClaudeCodeOptions` 传入 SDK `toolAliases` 选项，将模型发出的工具名映射到规范工具名，在解析前生效。**SDK 源码审计（browser-sdk.js）确认 toolAliases 是单向初始化参数**：`initialize()` 方法将其作为 `toolAliases: this.initConfig?.toolAliases` 转发给 CLI 子进程，无反馈事件或状态确认。别名解析发生在 CLI binary 的内部工具执行路径中，流式 `tool_use` 块仅暴露解析后的名称，无别名元数据。插件无法区分别名调用与直接规范调用，因此别名解析行为无法从插件层独立验证。默认空对象 `{}`。UI 位于 Tools 标签页，为高级文本区域输入，格式为每行 `key=value`（如 `Fetch=Read`），仅在下一次查询或重启会话后生效。
 
 `debug` 为 readback only：通过 `buildClaudeCodeOptions` 传入 SDK `debug` 选项，要求 CLI 在查询执行期间发出调试日志。实际调试日志输出是 SDK/CLI binary 的内部行为，无法从插件层独立验证。默认 `false`。UI 位于 Runtime 标签页，为 toggle 开关，仅在下一次查询时生效。
 

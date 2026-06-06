@@ -867,10 +867,15 @@ export class SettingsCapabilityLabSection {
         capability: 'Tool Aliases',
         sdkExposed: true, // SDK Options.toolAliases?: Record<string, string>
         adapterWired: true, // buildClaudeCodeOptions wires toolAliases when non-empty
-        runtimeProof: 'readback', // Option wiring proven: toolAliases propagates through buildClaudeCodeOptions
-        // into SDK options as a defensive copy. Readback ceiling: actual alias resolution behavior
-        // (model-emitted tool name remapping before tool resolution) is the SDK/CLI binary's internal
-        // claim, not independently verifiable from the plugin layer. Applies to next query/restarted session only.
+        runtimeProof: 'readback', // 2026-06-06 audit: SDK source (browser-sdk.js) shows toolAliases forwarded
+        // as a one-way init parameter: `toolAliases: this.initConfig?.toolAliases` in initialize().
+        // SDK types confirm alias resolution happens "before name resolution" in the internal
+        // "tool execution path" — entirely inside the CLI binary, not exposed through the streaming
+        // interface. Stream tool_use chunks contain only post-resolution names with no metadata
+        // indicating aliasing occurred. Therefore the plugin cannot distinguish
+        // "model emitted aliased name → resolved to canonical" from "model emitted canonical name
+        // directly", making alias resolution fundamentally unobservable from the plugin layer.
+        // Applies to next query/restarted session only.
         userSurface: 'settings', // Tools tab key=value text area
       },
       {
