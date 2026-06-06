@@ -2352,6 +2352,12 @@ export class SettingsClaudeCodeSection {
   }
 
   private renderAllowedToolsSetting(containerEl: HTMLElement): void {
+    const boundaryEl = containerEl.createDiv({
+      cls: 'opencodian-settings-inline-notice',
+      attr: { 'data-claude-code-allowed-tools-boundary': 'true' },
+    });
+    boundaryEl.createSpan({ text: t('settings.claudeCode.allowedTools.boundaryNotice') });
+
     new Setting(containerEl)
       .setName(t('settings.claudeCode.allowedTools.name'))
       .setDesc(t('settings.claudeCode.allowedTools.desc'))

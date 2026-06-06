@@ -62,7 +62,7 @@ Runtime proof passes, but explicit blockers prevent promotion to stable user sur
 Option wiring proven through `buildClaudeCodeOptions`, but no independent plugin-side behavioral verification exists.
 
 **Settings (`userSurface: 'settings'`) — 11**
-- Allowed Tools — auto-approve shortcut only; zero enforcement at tool-catalog level
+- Allowed Tools — auto-approve shortcut only; zero enforcement at tool-catalog level. Stable settings UI now renders an explicit boundary notice distinguishing it from Restricted Built-in Tools (deterministic availability restrictor).
 - Fallback Model — option wiring verified; automatic switching not locally provable (requires API 529 overload signal)
 - Sandbox — option wiring verified; OS-level sandbox enforcement not independently verifiable
 - Task Budget — `@alpha`; option wiring verified; no deterministic SDK enforcement signal

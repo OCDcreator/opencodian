@@ -1587,6 +1587,23 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       expect(toolsText).not.toContain('只能检测 enforcement 失败');
     });
 
+    it('renders allowed tools boundary notice clarifying readback-only and redirecting users to Restricted Built-in Tools', () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'tools');
+
+      const boundaryEl = containerEl.querySelector('[data-claude-code-allowed-tools-boundary="true"]');
+      expect(boundaryEl).toBeTruthy();
+      expect(boundaryEl!.textContent).toContain(t('settings.claudeCode.allowedTools.boundaryNotice'));
+      expect(boundaryEl!.textContent).toContain('Readback only');
+      expect(boundaryEl!.textContent).toContain('Restricted Built-in Tools');
+      expect(boundaryEl!.textContent).toContain('NOT a tool availability restrictor');
+    });
+
     it('renders restricted-builtin-tools proof status notice with pass state in tools tab', () => {
       const plugin = createPlugin();
       const containerEl = document.createElement('div');

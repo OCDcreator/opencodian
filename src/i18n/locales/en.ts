@@ -2338,6 +2338,7 @@ export const enTranslations = {
   'settings.claudeCode.allowedTools.name': 'Allowed tools',
   'settings.claudeCode.allowedTools.desc': 'Claude Code tool names to pre-allow for this backend. One name per line. Names must be alphanumeric PascalCase (e.g. Read, Grep).',
   'settings.claudeCode.allowedTools.placeholder': 'Read\nGrep',
+  'settings.claudeCode.allowedTools.boundaryNotice': 'Readback only: the plugin verifies that allowedTools is wired into SDK options. However, all runtime evidence confirms zero enforcement: the SDK init tool catalog remains unfiltered (34 tools regardless of allowedTools value), and the canUseTool callback is non-functional in SDK query() mode. Non-bypass synthetic approval tests show non-allowed tools pass through to the approval callback. This setting is an auto-approve/pre-allow shortcut, NOT a tool availability restrictor. For deterministic built-in tool filtering, use Restricted Built-in Tools instead.',
   'settings.claudeCode.disallowedTools.name': 'Disallowed tools',
   'settings.claudeCode.disallowedTools.desc': 'Claude Code tool names to block from this backend. One name per line. Names must be alphanumeric PascalCase (e.g. Bash).',
   'settings.claudeCode.disallowedTools.placeholder': 'Bash',

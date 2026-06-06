@@ -2338,6 +2338,7 @@ export const zhTranslations = {
   'settings.claudeCode.allowedTools.name': '允许的工具',
   'settings.claudeCode.allowedTools.desc': '为此后端预先允许的 Claude Code 工具名。每行一个。名称必须是 PascalCase 字母数字（例如 Read、Grep）。',
   'settings.claudeCode.allowedTools.placeholder': 'Read\nGrep',
+  'settings.claudeCode.allowedTools.boundaryNotice': '仅 readback：插件验证 allowedTools 已接入 SDK 选项。然而所有运行时证据均确认零 enforcement：SDK 初始化工具目录始终保持未过滤状态（无论 allowedTools 值如何，均为 34 个工具），且 canUseTool 回调在 SDK query() 模式下不工作。非 bypass 合成审批测试表明非允许工具会穿透到审批回调。此设置是自动批准/预允许快捷方式，不是工具可用性限制器。如需确定性内置工具过滤，请改用 Restricted Built-in Tools。',
   'settings.claudeCode.disallowedTools.name': '禁用的工具',
   'settings.claudeCode.disallowedTools.desc': '为此后端阻止的 Claude Code 工具名。每行一个。名称必须是 PascalCase 字母数字（例如 Bash）。',
   'settings.claudeCode.disallowedTools.placeholder': 'Bash',

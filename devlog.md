@@ -11,6 +11,47 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-06-06 Allowed Tools — Boundary Hardening (Outcome B)
+
+### Objective
+
+Audit the honesty boundary between the stable `Allowed Tools` settings UI and its `readback` classification in the Capability Lab matrix. The setting has a real toggle and stable UI, but extensive runtime evidence confirms zero enforcement. Ensure user-facing copy cannot be misread as a tool availability restrictor.
+
+### Decision
+
+**Outcome B** — `Allowed Tools` REMAINS `readback`.
+
+No new deterministic runtime seam exists to promote `Allowed Tools` beyond readback. The existing evidence is conclusive:
+- Init catalog is always unfiltered (34 tools regardless of `allowedTools` value)
+- `canUseTool` callback is non-functional in SDK `query()` mode
+- Non-bypass synthetic approval tests show non-allowed tools pass through to the approval callback
+- No honest non-bypass runtime seam exists to isolate `allowedTools` enforcement
+
+### What Changed
+
+- **src/i18n/locales/en.ts**: Added `settings.claudeCode.allowedTools.boundaryNotice` with explicit Readback-only classification, zero-enforcement evidence summary, and guidance to use Restricted Built-in Tools for deterministic filtering.
+- **src/i18n/locales/zh.ts**: Added corresponding Chinese `settings.claudeCode.allowedTools.boundaryNotice`.
+- **src/features/settings/SettingsClaudeCodeSection.ts**: `renderAllowedToolsSetting()` now renders a `data-claude-code-allowed-tools-boundary="true"` boundary notice before the textarea setting, matching the pattern used by `toolAliases`, `sandbox`, and other readback settings.
+- **docs/modules/features/settings/SettingsCapabilityLabSection.md**: Updated Allowed Tools matrix entry to mention the hardened boundary notice.
+- **docs/modules/features/settings/SettingsClaudeCodeSection.md**: Updated Tools tab description to mention the explicit boundary notice for allowedTools.
+- **docs/status/claude-code-current-state-2026-05-22.md**: Updated Allowed Tools readback description to note the explicit boundary notice.
+- **docs/modules/i18n/locales/en.md** + **zh.md**: Added changelog entries.
+
+### Honesty Boundary
+
+- The stable settings UI for `Allowed Tools` continues to exist (textarea in Tools tab)
+- The setting is honestly labeled as a "pre-allow / auto-approve shortcut", NOT a restrictor
+- The new boundary notice explicitly states: "Readback only", "zero enforcement", "NOT a tool availability restrictor", and "use Restricted Built-in Tools instead"
+- No capability claim was inflated; classification remains `readback`
+- No fake UI was added
+
+### Suggested Next Checkpoint
+
+1. **File Checkpoint / Rewind** — Monitor Anthropic SDK bug #236
+2. **Fallback Model** — Audit whether `setModel()` live-apply or `modelUsage` detection can be productized
+
+---
+
 ## 2026-06-06 Include Hook Events — Truth-Sync (Outcome B)
 
 ### Objective
