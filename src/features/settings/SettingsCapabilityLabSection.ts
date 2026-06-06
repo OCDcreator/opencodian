@@ -850,11 +850,17 @@ export class SettingsCapabilityLabSection {
         capability: 'Plan Mode Instructions',
         sdkExposed: true, // SDK Options.planModeInstructions?: string
         adapterWired: true, // buildClaudeCodeOptions wires planModeInstructions when non-empty
-        runtimeProof: 'readback', // Option wiring proven: planModeInstructions propagates through buildClaudeCodeOptions
-        // whenever the trimmed setting is non-empty. The builder does not gate on permissionMode, so
-        // non-plan readback can still show the option present. Readback ceiling: actual plan-mode
-        // behavior (read-only preamble + ExitPlanMode footer enforcement) is the SDK's internal claim,
-        // not independently verifiable from the plugin layer.
+        runtimeProof: 'pass', // 2026-06-06 combined proof: readback + live behavior.
+        // Readback probe proves the saved setting maps into SDK options whenever the trimmed value
+        // is non-empty. The builder does not gate on permissionMode, so non-plan readback may still
+        // show the option present. Live probe (BUILD_ID feature-phase0-capability.202606061246)
+        // forces Plan permission mode for a fresh diagnostic query, injects nonce-bearing
+        // _diagnosticPlanModeInstructions, and verifies the model recalls the nonce in its response.
+        // This proves planModeInstructions reaches model context and influences plan-mode behavior.
+        // Honesty boundary: the live probe uses a diagnostic-only override, so the final pass claim
+        // depends on the complementary readback proof for the saved value. The SDK's read-only
+        // preamble + ExitPlanMode footer remain internal enforcement details, not separately
+        // runtime-verified from the plugin layer.
         userSurface: 'settings', // Permissions tab text area
       },
       {
@@ -2757,6 +2763,8 @@ export class SettingsCapabilityLabSection {
       (o) => this.runSandboxReadbackProof(adapter, o));
     this.addProofControl(proofControls, containerEl, t('settings.capabilityLab.proofs.planModeInstructions.button'),
       (o) => this.runPlanModeInstructionsReadbackProof(adapter, o));
+    this.addProofControl(proofControls, containerEl, t('settings.capabilityLab.proofs.planModeInstructionsLive.button'),
+      (o) => this.runPlanModeInstructionsLiveProof(adapter, o));
     this.addProofControl(proofControls, containerEl, t('settings.capabilityLab.proofs.toolAliases.button'),
       (o) => this.runToolAliasesReadbackProof(adapter, o));
     this.addProofControl(proofControls, containerEl, t('settings.capabilityLab.proofs.debug.button'),
@@ -6149,6 +6157,52 @@ export class SettingsCapabilityLabSection {
           error: err instanceof Error ? err.message : String(err),
         }),
       });
+      this.updateRuntimeProof('Plan Mode Instructions', 'fail', outputEl);
+    }
+  }
+
+  private async runPlanModeInstructionsLiveProof(adapter: ClaudeCodeAdapter, outputEl: HTMLElement): Promise<void> {
+    outputEl.empty();
+    outputEl.createEl('p', { text: t('settings.capabilityLab.proofs.planModeInstructionsLive.running') });
+    try {
+      const result = await adapter.runPlanModeInstructionsLiveProbe();
+      outputEl.empty();
+      outputEl.createEl('h5', { text: t('settings.capabilityLab.proofs.planModeInstructionsLive.title') });
+
+      // behavior boundary
+      outputEl.createEl('p', { cls: 'opencodian-capability-lab-hint', text: t('settings.capabilityLab.proofs.planModeInstructionsLive.behaviorBoundary') });
+      // lifecycle boundary
+      outputEl.createEl('p', { cls: 'opencodian-capability-lab-hint', text: t('settings.capabilityLab.proofs.planModeInstructionsLive.lifecycleBoundary') });
+      // plan mode note
+      outputEl.createEl('p', { cls: 'opencodian-capability-lab-hint', text: t('settings.capabilityLab.proofs.planModeInstructionsLive.planModeNote') });
+
+      // nonce
+      outputEl.createEl('p', { text: t('settings.capabilityLab.proofs.planModeInstructionsLive.nonce', { nonce: result.nonce }) });
+
+      // nonce recalled
+      const recalledStatus = result.nonceRecalled
+        ? t('settings.capabilityLab.proofs.planModeInstructionsLive.status.yes')
+        : t('settings.capabilityLab.proofs.planModeInstructionsLive.status.no');
+      outputEl.createEl('p', { text: t('settings.capabilityLab.proofs.planModeInstructionsLive.nonceRecalled', { status: recalledStatus }) });
+
+      // response preview
+      if (result.responsePreview) {
+        outputEl.createEl('p', { text: t('settings.capabilityLab.proofs.planModeInstructionsLive.responsePreview', { preview: result.responsePreview }) });
+      }
+
+      if (result.classification === 'pass') {
+        outputEl.createEl('p', { cls: 'opencodian-capability-lab-hint', text: t('settings.capabilityLab.proofs.planModeInstructionsLive.pass') });
+        this.updateRuntimeProof('Plan Mode Instructions', 'pass', outputEl);
+      } else {
+        const error = result.error ?? t('settings.capabilityLab.proofs.planModeInstructionsLive.defaultError');
+        outputEl.createEl('p', { cls: 'opencodian-capability-lab-hint', text: t('settings.capabilityLab.proofs.planModeInstructionsLive.fail', { error }) });
+        this.updateRuntimeProof('Plan Mode Instructions', 'fail', outputEl);
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      outputEl.empty();
+      outputEl.createEl('h5', { text: t('settings.capabilityLab.proofs.planModeInstructionsLive.title') });
+      outputEl.createEl('p', { cls: 'opencodian-capability-lab-hint', text: t('settings.capabilityLab.proofs.planModeInstructionsLive.threw', { error: errorMessage }) });
       this.updateRuntimeProof('Plan Mode Instructions', 'fail', outputEl);
     }
   }

@@ -32,6 +32,7 @@
 - `SystemPromptLiveProbeResult`: Claude Code `systemPrompt` 选项 live behavior probe 结果类型；通过 nonce-bearing diagnostic query 验证同一条 preset-with-append SDK 路径确实影响模型响应。2026-06-04 将 System Prompt 矩阵分类从 `readback` 晋升为 `pass`，但最终 `pass` 依赖 readback wiring + same-path live proof 两层互补证据。
 - `SystemPromptReadbackProbeResult`: Claude Code `systemPrompt` 选项 readback probe 结果类型；诊断专用，验证 settings→SDK option mapping，不声称行为验证。
 - `PlanModeInstructionsReadbackProbeResult`: Claude Code `planModeInstructions` 选项 readback probe 结果类型；诊断专用，不验证实际 plan-mode behavior enforcement。
+- `PlanModeInstructionsLiveProbeResult`: Claude Code `planModeInstructions` live probe 结果类型；通过计划权限模式、nonce-bearing diagnostic instructions 与自动工具批准验证 planModeInstructions 实际到达模型上下文并影响响应。
 - `SandboxReadbackProbeResult`: Claude Code `sandbox` 选项 readback probe 结果类型；诊断专用，不验证实际 OS-level sandbox enforcement 行为。
 - `DebugFileReadbackProbeResult`: Claude Code `debugFile` 选项 readback probe 结果类型；诊断专用，验证 settings→SDK option mapping。
 - `DebugFileLiveProbeResult`: Claude Code `debugFile` live probe 结果类型；2026-06-06 新增，验证 CLI 子进程在共享文件系统上实际创建非空 debug 文件。整体能力已从 readback 晋升为 pass。

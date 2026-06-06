@@ -1068,7 +1068,7 @@ describe('SettingsCapabilityLabSection', () => {
       'Session Title': { runtimeProof: 'pass', userSurface: 'diagnostic' },
       'Prompt Suggestions': { runtimeProof: 'pass', userSurface: 'chat' },
       'Task Budget': { runtimeProof: 'readback', userSurface: 'settings' },
-      'Plan Mode Instructions': { runtimeProof: 'readback', userSurface: 'settings' },
+      'Plan Mode Instructions': { runtimeProof: 'pass', userSurface: 'settings' },
       'Tool Aliases': { runtimeProof: 'readback', userSurface: 'settings' },
       'Debug': { runtimeProof: 'readback', userSurface: 'settings' },
       'Debug File': { runtimeProof: 'pass', userSurface: 'settings' },
@@ -1112,9 +1112,9 @@ describe('SettingsCapabilityLabSection', () => {
       return firstCell?.textContent ?? '';
     });
     expect(verifiedCapabilities).toEqual(
-      expect.arrayContaining(['MCP Servers', 'Permission Approval', 'AskUserQuestion / Elicitation', 'Structured Output', 'Agent Definitions', 'Include Hook Events', 'Environment Variables', 'Fork Session', 'JSONL History Browser', 'Session Store', 'Import Session to Store', 'Resume Session', 'Session Detail', 'Backend Routing', 'Turn/Budget Limits', 'Skills', 'Agents (Subagents)', 'Subagent Transcript / Progress', 'Hooks', 'Disallowed Tools', 'Plugins', 'Restricted Built-in Tools', '/context Diagnostic', 'Session Title', 'Custom Session ID', 'Continue', 'Resume Session At Position', 'Fork Session On Resume', 'System Prompt', 'Prompt Suggestions', 'Debug File']),
+      expect.arrayContaining(['MCP Servers', 'Permission Approval', 'AskUserQuestion / Elicitation', 'Structured Output', 'Agent Definitions', 'Include Hook Events', 'Environment Variables', 'Fork Session', 'JSONL History Browser', 'Session Store', 'Import Session to Store', 'Resume Session', 'Session Detail', 'Backend Routing', 'Turn/Budget Limits', 'Skills', 'Agents (Subagents)', 'Subagent Transcript / Progress', 'Hooks', 'Disallowed Tools', 'Plugins', 'Restricted Built-in Tools', '/context Diagnostic', 'Session Title', 'Custom Session ID', 'Continue', 'Resume Session At Position', 'Fork Session On Resume', 'System Prompt', 'Prompt Suggestions', 'Debug File', 'Plan Mode Instructions']),
     );
-    expect(verifiedCapabilities.length).toBe(31);
+    expect(verifiedCapabilities.length).toBe(32);
 
     // Total rows check
     expect(rows.length).toBe(46);
@@ -1130,9 +1130,9 @@ describe('SettingsCapabilityLabSection', () => {
       return firstCell?.textContent ?? '';
     });
     expect(readbackCapabilities).toEqual(
-      expect.arrayContaining(['File Checkpoint / Rewind', 'Allowed Tools', 'Fallback Model', 'Warm Startup', 'Sandbox', 'Task Budget', 'Plan Mode Instructions', 'Tool Aliases', 'Debug', 'Strict MCP Config', '1M Context Beta', 'JS Runtime', 'Load Timeout', 'Stderr Diagnostic', 'AskUserQuestion Preview Format']),
+      expect.arrayContaining(['File Checkpoint / Rewind', 'Allowed Tools', 'Fallback Model', 'Warm Startup', 'Sandbox', 'Task Budget', 'Tool Aliases', 'Debug', 'Strict MCP Config', '1M Context Beta', 'JS Runtime', 'Load Timeout', 'Stderr Diagnostic', 'AskUserQuestion Preview Format']),
     );
-    expect(readbackCapabilities.length).toBe(15);
+    expect(readbackCapabilities.length).toBe(14);
 
     // Honesty rule: hidden capabilities must not have a settings or diagnostic surface chip.
     const hiddenRows = rows.filter((row) => (
@@ -6889,6 +6889,60 @@ describe('SettingsCapabilityLabSection', () => {
     expect(proofMarker).toBeTruthy();
     expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-fail')).toBe(true);
     expect(containerEl.textContent).toContain('probe exploded');
+  });
+
+  it('renders Plan Mode Instructions Live Behavior Proof button from locale', () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runPlanModeInstructionsLiveProbe: jest.fn(),
+      capabilities: new Set(),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes(t('settings.capabilityLab.proofs.planModeInstructionsLive.button'))
+    )) as HTMLButtonElement | undefined;
+    expect(button).toBeTruthy();
+  });
+
+  it('runs the plan mode instructions live proof and marks pass', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runPlanModeInstructionsLiveProbe: jest.fn().mockResolvedValue({
+        classification: 'pass',
+        nonce: 'abcd1234',
+        nonceRecalled: true,
+        responsePreview: 'abcd1234',
+      }),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes(t('settings.capabilityLab.proofs.planModeInstructionsLive.button'))
+    )) as HTMLButtonElement | undefined;
+    expect(button).toBeTruthy();
+
+    button!.click();
+    await flushUi();
+
+    expect(adapter.runPlanModeInstructionsLiveProbe).toHaveBeenCalled();
+
+    const proofMarker = containerEl.querySelector('[data-capability="Plan Mode Instructions"]');
+    expect(proofMarker).toBeTruthy();
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-pass')).toBe(true);
+    expect(containerEl.textContent).toContain(t('settings.capabilityLab.proofs.planModeInstructionsLive.behaviorBoundary'));
+    expect(containerEl.textContent).toContain('abcd1234');
+    expect(containerEl.textContent).toContain(t('settings.capabilityLab.proofs.planModeInstructionsLive.pass'));
   });
 
   it('renders Tool Aliases Readback Proof button backed by locale key', () => {

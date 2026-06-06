@@ -338,14 +338,22 @@ export interface ClaudeCodeDiagnosticPromptRequest {
    * instruction without modifying the user's actual settings.
    */
   _diagnosticSystemPrompt?: string;
+   /**
+    * Diagnostic-only debugFile override. When provided, replaces the
+    * adapter's settings.debugFile for this diagnostic query only.
+    * Used by the Debug File live proof to set a temp path and verify
+    * file creation without modifying the user's actual settings.
+    */
+   _diagnosticDebugFile?: string;
   /**
-   * Diagnostic-only debugFile override. When provided, replaces the
-   * adapter's settings.debugFile for this diagnostic query only.
-   * Used by the Debug File live proof to set a temp path and verify
-   * file creation without modifying the user's actual settings.
+   * Diagnostic-only planModeInstructions override. When provided, replaces
+   * the adapter's settings.planModeInstructions for this diagnostic query only.
+   * Used by the Plan Mode Instructions live proof to inject a nonce-bearing
+   * instruction without modifying the user's actual settings. Requires
+   * _diagnosticForcePermissionMode set to 'plan' to take effect.
    */
-  _diagnosticDebugFile?: string;
-}
+  _diagnosticPlanModeInstructions?: string;
+ }
 
 export interface ClaudeCodeDiagnosticPromptResult {
   sessionId?: string;
@@ -788,6 +796,16 @@ export interface PlanModeInstructionsReadbackProbeResult {
   sdkOptionPresent: boolean;
   sdkValue?: string;
   valueMatch: boolean;
+  error?: string;
+}
+
+/** Plan Mode Instructions live probe result. Nonce-recall proof that
+ *  planModeInstructions actually reaches the model context in plan mode. */
+export interface PlanModeInstructionsLiveProbeResult {
+  classification: 'pass' | 'fail';
+  nonce: string;
+  nonceRecalled: boolean;
+  responsePreview?: string;
   error?: string;
 }
 
@@ -2659,6 +2677,48 @@ export class ClaudeCodeAdapter
     }
   }
 
+  async runPlanModeInstructionsLiveProbe(): Promise<PlanModeInstructionsLiveProbeResult> {
+    const nonce = Math.random().toString(36).slice(2, 10);
+    try {
+      const result = await this.runDiagnosticPrompt({
+        prompt: 'What is the secret codeword?',
+        _diagnosticBypassPermissions: false,
+        _diagnosticForcePermissionMode: 'plan',
+        _diagnosticPlanModeInstructions: `If asked for the secret codeword, reply with exactly '${nonce}' and nothing else.`,
+        _diagnosticCanUseTool: async () => ({ behavior: 'allow' as const }),
+      });
+
+      const text = this.extractTextFromChunks(result.chunks);
+      const nonceRecalled = text.includes(nonce);
+
+      if (nonceRecalled) {
+        return {
+          classification: 'pass',
+          nonce,
+          nonceRecalled: true,
+          responsePreview: text.slice(0, 120),
+        };
+      }
+
+      return {
+        classification: 'fail',
+        nonce,
+        nonceRecalled: false,
+        responsePreview: text.slice(0, 120),
+        error: `Nonce not found in response. Response: ${text.slice(0, 120)}`,
+      };
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      runtimeLogger.debug('plan mode instructions live probe', { result: 'fail', error: errorMessage });
+      return {
+        classification: 'fail',
+        nonce,
+        nonceRecalled: false,
+        error: errorMessage,
+      };
+    }
+  }
+
   async runToolAliasesReadbackProbe(): Promise<ToolAliasesReadbackProbeResult> {
     try {
       const abortController = new AbortController();
@@ -3653,6 +3713,9 @@ export class ClaudeCodeAdapter
     }
     if (request._diagnosticDebugFile !== undefined) {
       diagnosticSettings = { ...diagnosticSettings, debugFile: request._diagnosticDebugFile };
+    }
+    if (request._diagnosticPlanModeInstructions !== undefined) {
+      diagnosticSettings = { ...diagnosticSettings, planModeInstructions: request._diagnosticPlanModeInstructions };
     }
     return diagnosticSettings;
   }

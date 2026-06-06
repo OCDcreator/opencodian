@@ -53,6 +53,7 @@ export {
   type DebugReadbackProbeResult,
   type JsRuntimeReadbackProbeResult,
   type LoadTimeoutReadbackProbeResult,
+  type PlanModeInstructionsLiveProbeResult,
   type PlanModeInstructionsReadbackProbeResult,
   type PromptSuggestionsReadbackProbeResult,
   type SandboxReadbackProbeResult,
