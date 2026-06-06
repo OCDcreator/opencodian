@@ -1,4 +1,8 @@
 /* eslint-disable max-lines -- This owner intentionally keeps tab lifecycle, derived phase, and one-slot follow-up queue state together. */
+import {
+  emitPromptSuggestionSessionChange,
+  findPromptSuggestionScope,
+} from '../../../core/agents/backend/promptSuggestionSink';
 import type { SessionActivityStatus } from '../../../core/opencode';
 import type {
   BelowHeaderTabBarLayout,
@@ -291,6 +295,17 @@ export class ConversationTabRuntimeCoordinator<
   }
   clearTabMessagesPanes(): void {
     this.paneCoordinator.clearPanes();
+  }
+  /** Scoped prompt-suggestion session resync: emits the backendSessionId
+   *  through the channel bus for a specific tab, avoiding cross-talk. */
+  emitPromptSuggestionSessionResync(tabId: TabId | null, sessionId: string | null): void {
+    const messagesEl = this.getPaneState(tabId)?.messagesEl;
+    if (messagesEl) {
+      const channelId = findPromptSuggestionScope(messagesEl);
+      if (channelId) {
+        emitPromptSuggestionSessionChange(sessionId, channelId);
+      }
+    }
   }
   syncPaneScrollMetrics(
     tabId: TabId | null,

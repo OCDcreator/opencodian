@@ -111,14 +111,17 @@ describe('Prompt suggestion production lifecycle', () => {
 
   // ─── Backend switch ────────────────────────────────────────────
 
-  it('backend switch clears all', () => {
+  it('backend switch clears all and fires bar refresh', () => {
     adapterCallback!({ type: 'prompt_suggestion', suggestion: 'X', uuid: 'ps-1', sessionId: 'sess-1' });
     service.onActiveSessionChanged('sess-1');
+    expect(bridge.getPromptSuggestion()).toBe('X');
+    const prevRefreshCount = barRefreshCount;
 
     service.clearAll();
-    service.onActiveSessionChanged(null);
 
     expect(bridge.getPromptSuggestion()).toBeNull();
+    // clearAll fires bar refresh since suggestions existed
+    expect(barRefreshCount).toBeGreaterThan(prevRefreshCount);
   });
 
   // ─── Subscription without active conversation ──────────────────
@@ -321,5 +324,140 @@ describe('Prompt suggestion sink-null production path', () => {
 
     unsubSinkChange();
     unsubAdapter?.();
+  });
+});
+
+// ─── Session identity transition tests (RED first) ────────────────
+//
+// These test the real production race where:
+//   1. Conversation starts with a provisional session id (e.g. "claude-code-xxx")
+//   2. SDK backendSessionId is written after stream (e.g. "321c351f-...")
+//   3. prompt_suggestion arrives with the real SDK session id
+//   4. Without fix: suggestion is stored but never shown because activeSessionId
+//      still holds the provisional id (or null), not the final SDK id.
+//   5. After finalization's setActiveTabConversation triggers session resync,
+//      the suggestion becomes visible.
+
+describe('Prompt suggestion session identity transition', () => {
+  let service: PromptSuggestionService;
+  let barRefreshCount: number;
+  let adapterCallback: ((chunk: StreamChunk) => void) | null;
+
+  beforeEach(() => {
+    service = new PromptSuggestionService();
+    barRefreshCount = 0;
+    adapterCallback = null;
+
+    service.onBarRefreshRequested(() => { barRefreshCount++; });
+
+    const adapter: PromptSuggestionAdapter = {
+      onPostResultChunk: (cb) => { adapterCallback = cb; return () => {}; },
+    };
+    service.attachAdapter(adapter);
+  });
+
+  it('case A: provisional activeSessionId does not match SDK suggestion sessionId — suggestion not visible', () => {
+    // Simulate: conversation activated with provisional id
+    service.setActiveSession('claude-code-provisional-123');
+
+    // Suggestion arrives from SDK with the real session id
+    adapterCallback!({
+      type: 'prompt_suggestion',
+      suggestion: 'Write tests for this module',
+      uuid: 'ps-sdk-1',
+      sessionId: '321c351f-c991-4799-9b16-9d18975bef4c',
+    });
+
+    // BUG: suggestion is stored but not visible because activeSessionId doesn't match
+    expect(service.getSuggestion('321c351f-c991-4799-9b16-9d18975bef4c')).not.toBeNull();
+    expect(service.getActiveSuggestionText()).toBeNull();
+    // Bar refresh should NOT have fired (no match, no null activeSessionId)
+    expect(barRefreshCount).toBe(0);
+  });
+
+  it('case A fixed: after session resync with final SDK id, suggestion becomes visible', () => {
+    // Start with provisional id
+    service.setActiveSession('claude-code-provisional-123');
+
+    // Suggestion arrives from SDK with final id
+    adapterCallback!({
+      type: 'prompt_suggestion',
+      suggestion: 'Write tests for this module',
+      uuid: 'ps-sdk-1',
+      sessionId: '321c351f-c991-4799-9b16-9d18975bef4c',
+    });
+
+    expect(service.getActiveSuggestionText()).toBeNull();
+
+    // Simulate: finalization writes backendSessionId and resync triggers
+    // session change through the prompt-suggestion bus
+    service.onActiveSessionChanged('321c351f-c991-4799-9b16-9d18975bef4c');
+
+    // NOW the suggestion should be visible
+    expect(service.getActiveSuggestionText()).toBe('Write tests for this module');
+    expect(barRefreshCount).toBeGreaterThan(0);
+  });
+
+  it('case B: after finalization session resync, suggestion stored under SDK id matches active session', () => {
+    // Simulate full production flow:
+    // 1. Conversation activated — no backend session id yet
+    service.setActiveSession(null);
+
+    // 2. Suggestion arrives from SDK (post-result) with real session id
+    adapterCallback!({
+      type: 'prompt_suggestion',
+      suggestion: 'Refactor the error handler',
+      uuid: 'ps-sdk-2',
+      sessionId: 'sdk-sess-abc-def',
+    });
+
+    // Bar refresh fires because activeSessionId === null
+    expect(barRefreshCount).toBeGreaterThan(0);
+    // But suggestion is NOT visible yet (activeSessionId is null)
+    expect(service.getActiveSuggestionText()).toBeNull();
+
+    const prevRefreshCount = barRefreshCount;
+
+    // 3. backendSessionId is written, finalization triggers session resync
+    service.onActiveSessionChanged('sdk-sess-abc-def');
+
+    // NOW the suggestion is visible
+    expect(service.getActiveSuggestionText()).toBe('Refactor the error handler');
+    expect(barRefreshCount).toBeGreaterThan(prevRefreshCount);
+  });
+
+  it('case C: session resync does not steal suggestions from other sessions', () => {
+    // Two sessions active in different tabs
+    service.setActiveSession('claude-code-tab-A');
+
+    // Tab B receives a suggestion (stored but not visible for tab A)
+    adapterCallback!({
+      type: 'prompt_suggestion',
+      suggestion: 'For tab B',
+      uuid: 'ps-B',
+      sessionId: 'sdk-sess-tab-B',
+    });
+
+    // Tab A's active session doesn't match — no bar refresh
+    expect(service.getActiveSuggestionText()).toBeNull();
+
+    // Tab A receives its own suggestion
+    adapterCallback!({
+      type: 'prompt_suggestion',
+      suggestion: 'For tab A',
+      uuid: 'ps-A',
+      sessionId: 'sdk-sess-tab-A',
+    });
+
+    // Still not visible — provisional id doesn't match SDK id
+    expect(service.getActiveSuggestionText()).toBeNull();
+
+    // Tab A's finalization resyncs to the real SDK id
+    service.onActiveSessionChanged('sdk-sess-tab-A');
+
+    // Tab A's suggestion is now visible, Tab B's is NOT
+    expect(service.getActiveSuggestionText()).toBe('For tab A');
+    // Tab B's suggestion is still stored correctly
+    expect(service.getSuggestion('sdk-sess-tab-B')!.suggestion).toBe('For tab B');
   });
 });

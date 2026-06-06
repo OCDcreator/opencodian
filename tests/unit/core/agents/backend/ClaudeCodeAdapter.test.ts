@@ -8,6 +8,11 @@ import {
   type ClaudeCodeSdkLoader,
   createClaudeCodePermissionBridge,
 } from '../../../../../src/core/agents/backend';
+import {
+  clearPromptSuggestionSink,
+  getPromptSuggestionSink,
+  onPromptSuggestionSinkChange,
+} from '../../../../../src/core/agents/backend/promptSuggestionSink';
 import { getDefaultClaudeCodeBackendSettings } from '../../../../../src/core/types';
 import {
   clearRecentLogs,
@@ -4766,5 +4771,122 @@ describe('ClaudeCodeAdapter – prompt suggestion post-result callback', () => {
     expect(chunks.some((c) => c.type === 'usage')).toBe(true);
 
     await adapter.stop();
+  });
+});
+
+// ─── Sink registration without explicit start() ──────────────────
+//
+// ROOT CAUSE: registerPromptSuggestionSink(this) only lived in start(),
+// but the real product path goes through ensureReadyForQuery() (called
+// on every sendMessage/createSession). The sink was never registered,
+// so the coordinator never attached to onPostResultChunk.
+//
+// FIX: ensureReadyForQuery() also registers the sink. The registration
+// is idempotent — no callbacks re-fire if the same adapter is already
+// registered.
+
+describe('ClaudeCodeAdapter – sink registration on real product path', () => {
+  beforeEach(() => {
+    clearRecentLogs();
+    setDebugLoggingEnabled(true);
+    setDebugModuleEnabled('claudeCode', true);
+  });
+
+  afterEach(() => {
+    setDebugLoggingEnabled(false);
+    setDebugModuleEnabled('claudeCode', false);
+    clearRecentLogs();
+  });
+
+  it('registers prompt-suggestion sink when sendMessage is called without explicit start()', async () => {
+    const messages: unknown[] = [
+      { type: 'assistant', message: { id: 'msg-1', content: [{ type: 'text', text: 'Hello' }] } },
+      { type: 'result', total_usage: { input_tokens: 1, output_tokens: 2 } },
+      { type: 'prompt_suggestion', suggestion: 'Write tests', uuid: 'ps-1', session_id: 'sdk-sess-1' },
+    ];
+    const sdk = createSdk(messages);
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+
+    // DO NOT call adapter.start() — this is the real product path
+    const sessionId = await adapter.createSession();
+
+    // Subscribe to sink changes BEFORE sendMessage
+    const unsubSinkChange = onPromptSuggestionSinkChange(() => { /* observe registration */ });
+
+    // sendMessage triggers ensureReadyForQuery → should register sink
+    const postResultChunks: import('../../../../../src/core/types/chat').StreamChunk[] = [];
+    adapter.onPostResultChunk((chunk) => { postResultChunks.push(chunk); });
+
+    await collectAsync(adapter.sendMessage({ sessionId, content: 'hello' }));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    // Sink should be registered now (via ensureReadyForQuery)
+    expect(getPromptSuggestionSink()).toBe(adapter);
+
+    // Post-result callback should have fired for the prompt_suggestion
+    expect(postResultChunks.some((c) => c.type === 'prompt_suggestion')).toBe(true);
+
+    unsubSinkChange();
+    await adapter.dispose();
+  });
+
+  it('sink registration is idempotent — does not re-fire callbacks on second query', async () => {
+    const messages: unknown[] = [
+      { type: 'assistant', message: { id: 'msg-1', content: [{ type: 'text', text: 'Hello' }] } },
+      { type: 'result', total_usage: { input_tokens: 1, output_tokens: 2 } },
+    ];
+    const sdk = createSdk(messages);
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+
+    clearPromptSuggestionSink();
+
+    let sinkChangeCount = 0;
+    const unsub = onPromptSuggestionSinkChange(() => { sinkChangeCount++; });
+
+    const sessionId = await adapter.createSession();
+
+    // First query — sink should be registered, callback fires once
+    await collectAsync(adapter.sendMessage({ sessionId, content: 'hello' }));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    const firstCount = sinkChangeCount;
+    expect(firstCount).toBeGreaterThanOrEqual(1);
+
+    // Second query — same adapter, should NOT fire callback again (idempotent)
+    const sessionId2 = await adapter.createSession();
+    await collectAsync(adapter.sendMessage({ sessionId: sessionId2, content: 'world' }));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(sinkChangeCount).toBe(firstCount); // no additional change callbacks
+
+    unsub();
+    clearPromptSuggestionSink();
+    await adapter.dispose();
+  });
+
+  it('stop() clears the registered sink', async () => {
+    const sdk = createSdk([]);
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+
+    clearPromptSuggestionSink();
+
+    await adapter.start();
+    expect(getPromptSuggestionSink()).toBe(adapter);
+
+    await adapter.stop();
+    expect(getPromptSuggestionSink()).toBeNull();
+
+    clearPromptSuggestionSink();
   });
 });

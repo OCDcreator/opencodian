@@ -3,6 +3,7 @@ import type {
   Conversation,
   SessionTodo,
 } from '../../../core/types';
+import { getConversationBackendSessionId } from '../../../core/types';
 import { summarizeChatMessageForDebug } from '../runtime/SendPipelineDebugSummaries';
 import type { TabId } from '../tabs';
 import { ClaudeUserMessageIdentityBackfillService, setBackfillPersistenceHost } from './ClaudeUserMessageIdentityBackfillService';
@@ -85,7 +86,7 @@ export interface MessageFinalizationHost {
   setLastConversationSyncFingerprint(tabId: TabId | null, fingerprint: string): void;
   clearPendingEditedFiles(tabId: TabId | null): void;
   setTabNeedsAttention(tabId: TabId | null, needsAttention: boolean): void;
-  setActiveTabConversation(conversation: Conversation): void;
+  setActiveTabConversation(conversation: Conversation, tabId?: TabId | null): void;
   syncActiveTabContextUsageIdentity(): void;
   refreshActiveTabContextUsageFromServer(): Promise<void>;
   summarizeChatMessageForDebug(message: ChatMessage | null | undefined): Record<string, unknown> | null;
@@ -150,6 +151,7 @@ export interface MessageFinalizationHostDependencies {
     ): void;
     clearPendingEditedFiles(tabId: TabId | null): void;
     transitionTabSessionLifecycle(tabId: TabId | null, phase: WritableTabSessionPhase, reason: string): boolean;
+    emitPromptSuggestionSessionResync(tabId: TabId | null, sessionId: string | null): void;
   };
   setTabNeedsAttention(tabId: TabId | null, needsAttention: boolean): void;
   tabConversationStateBridge: {
@@ -205,8 +207,13 @@ export function createMessageFinalizationHost(
     clearPendingEditedFiles: (tabId) => tabRuntime.clearPendingEditedFiles(tabId),
     setTabNeedsAttention: (tabId, needsAttention) =>
       deps.setTabNeedsAttention(tabId, needsAttention),
-    setActiveTabConversation: (conversation) =>
-      deps.tabConversationStateBridge.syncActiveTabConversation(conversation),
+    setActiveTabConversation: (conversation, tabId) => {
+      deps.tabConversationStateBridge.syncActiveTabConversation(conversation);
+      // Scoped prompt-suggestion session resync: after backendSessionId is written
+      // (provisional → final SDK id), emit through the tab's channel only.
+      const sessionId = getConversationBackendSessionId(conversation) ?? null;
+      tabRuntime.emitPromptSuggestionSessionResync(tabId ?? null, sessionId);
+    },
     syncActiveTabContextUsageIdentity: () => ctxUsage.syncIdentity(),
     refreshActiveTabContextUsageFromServer: () => ctxUsage.refreshFromServer(),
     summarizeChatMessageForDebug: (message) => summarizeChatMessageForDebug(message),

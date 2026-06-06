@@ -150,7 +150,7 @@ export class MessageFinalizationService {
           this.host.getConversationSyncFingerprint(conversation.messages),
         );
         this.host.setTabNeedsAttention(tabId, false);
-        this.host.setActiveTabConversation(conversation);
+        this.host.setActiveTabConversation(conversation, tabId);
         this.host.syncActiveTabContextUsageIdentity();
         await this.host.refreshActiveTabContextUsageFromServer();
         logStage('assistant-message-finalization-complete', {

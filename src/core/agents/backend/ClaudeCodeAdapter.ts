@@ -4272,6 +4272,7 @@ export class ClaudeCodeAdapter
 
   private async ensureReadyForQuery(): Promise<void> {
     await this.loadMcpConfig();
+    registerPromptSuggestionSink(this);
     this.setStatus('connected');
   }
 

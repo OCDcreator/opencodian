@@ -47,7 +47,7 @@ describe('MessageFinalizationService foreground finalization', () => {
     expect(host.saveConversation).toHaveBeenCalledWith(conversation);
     expect(host.clearPendingEditedFiles).toHaveBeenCalledWith('tab-1');
     expect(host.setTabNeedsAttention).toHaveBeenCalledWith('tab-1', false);
-    expect(host.setActiveTabConversation).toHaveBeenCalledWith(conversation);
+    expect(host.setActiveTabConversation).toHaveBeenCalledWith(conversation, 'tab-1');
     expect(host.syncActiveTabContextUsageIdentity).toHaveBeenCalledTimes(1);
     expect(host.refreshActiveTabContextUsageFromServer).toHaveBeenCalledTimes(1);
     expect(host.setConversationSyncInFlight).not.toHaveBeenCalled();

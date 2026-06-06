@@ -54,8 +54,10 @@ let channelCounter = 0;
 
 // ─── Sink registration ──────────────────────────────────────────
 
-/** Register a prompt-suggestion-capable adapter (e.g. ClaudeCodeAdapter). */
+/** Register a prompt-suggestion-capable adapter (e.g. ClaudeCodeAdapter).
+ *  Idempotent: if the same sink is already registered, callbacks are not re-fired. */
 export function registerPromptSuggestionSink(s: PromptSuggestionSink): void {
+  if (sink === s) return;
   sink = s;
   for (const cb of sinkChangeCallbacks) {
     cb(s);

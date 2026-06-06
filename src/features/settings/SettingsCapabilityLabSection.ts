@@ -806,11 +806,15 @@ export class SettingsCapabilityLabSection {
         capability: 'Prompt Suggestions',
         sdkExposed: true, // SDK Options.promptSuggestions?: boolean — emits prompt_suggestion after each turn
         adapterWired: true, // buildClaudeCodeOptions wires promptSuggestions; pumpRuntimeOutput fires callback
-        runtimeProof: 'readback', // Option wiring proven: promptSuggestions propagates through buildClaudeCodeOptions
-        // into SDK options. pumpRuntimeOutput detects prompt_suggestion SDK messages and fires postResultCallback.
-        // Readback ceiling: option wiring + callback emission proven in tests, but end-to-end delivery from
-        // CLI subprocess through to chat UI suggestion bar not independently verified with live API.
-        // Suggestions may be suppressed on first turn, after API errors, in plan mode, or by env var.
+        runtimeProof: 'pass', // Live proof 2026-06-06 (BUILD_ID feature-phase0-capability.202606060953):
+        // Test Vault ordinary chat observed prompt_suggestion end-to-end: suggestionKeys=["ccb3a44c…"],
+        // activeSuggestionText="Create that note in Obsidian", DOM chip visible in opencodian-turn-body.
+        // Quick interaction proof also passed: noAutoSendOnClick=true, textareaAfterClick=chip text,
+        // chipGoneAfterClick=true, chipClearedOnTurnStart=true.
+        // Runtime caveat: SDK may not emit prompt_suggestion on first turn, after API errors, in plan mode,
+        // or for non-Claude models — this is a platform limitation, not a plugin bug.
+        // Diagnostic readback probe (runPromptSuggestionsReadbackProbe) remains classified as readback:
+        // it verifies settings→SDK option mapping only, not live behavior.
         userSurface: 'chat', // Chat suggestion bar inserted into composer area (never auto-sent)
       },
       {

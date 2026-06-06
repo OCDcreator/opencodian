@@ -169,7 +169,7 @@ export class MessageFinalizationService {
 - `setLastConversationSyncFingerprint(tabId, fingerprint)` → `deps.conversationTabRuntimeCoordinator.updateConversationSyncRuntime(tabId, { fingerprint })`
 - `clearPendingEditedFiles(tabId)` → `deps.conversationTabRuntimeCoordinator.clearPendingEditedFiles(tabId)`
 - `transitionTabSessionLifecycle(tabId, phase, reason)` → `deps.conversationTabRuntimeCoordinator.transitionTabSessionLifecycle(tabId, phase, reason)`
-- `setActiveTabConversation(conversation)` → `deps.tabConversationStateBridge.syncActiveTabConversation(conversation)`
+- `setActiveTabConversation(conversation, tabId?)` → `deps.tabConversationStateBridge.syncActiveTabConversation(conversation)` + scoped `deps.promptSuggestionSessionResync(tabId, sessionId)` for prompt-suggestion session identity resync
 - `syncActiveTabContextUsageIdentity()` → `deps.activeTabContextUsageCoordinator.syncIdentity()`
 - `refreshActiveTabContextUsageFromServer()` → `deps.activeTabContextUsageCoordinator.refreshFromServer()`
 - `getConversationSyncFingerprint(messages)` → `deps.conversationIdentityRuntime.getConversationSyncFingerprint(messages)`

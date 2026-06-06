@@ -47,12 +47,18 @@ findPromptSuggestionScope(fromElement: Element): string | undefined
 
 ## 生命周期
 
-1. `ClaudeCodeAdapter.start()` → `registerPromptSuggestionSink(this)`
-2. `ComposerInputShellCoordinator.build()` → `createPromptSuggestionChannel()` + `stampPromptSuggestionScope(inputContainerEl, channelId)` + `onPromptSuggestionSessionChange(cb, channelId)` + `onPromptSuggestionSinkChange(cb)`（动态 attach adapter，处理 late registration）
-3. `TabActivationRuntimeHostProvider.setCurrentConversation()` → DOM walk from `messagesContainer` → `findPromptSuggestionScope()` → `emitPromptSuggestionSessionChange(sessionId, discoveredChannelId)`
-4. `ComposerInputShellCoordinator.destroy()` → `removePromptSuggestionScope()` + `deletePromptSuggestionChannel()` + 清除所有订阅（包括 sink-change 订阅和 adapter unsubscribe）
-5. `ClaudeCodeAdapter.stop()`/`dispose()` → `clearPromptSuggestionSink()` → 所有 `onPromptSuggestionSinkChange` 订阅者收到 `null`
+1. `ClaudeCodeAdapter.start()` → `registerPromptSuggestionSink(this)`（显式初始化路径）
+2. `ClaudeCodeAdapter.ensureReadyForQuery()` → `registerPromptSuggestionSink(this)`（真实产品路径：每次 `sendMessage`/`createSession` 调用时触发；幂等——同一 adapter 不会重发 callback）
+3. `ComposerInputShellCoordinator.build()` → `createPromptSuggestionChannel()` + `stampPromptSuggestionScope(inputContainerEl, channelId)` + `onPromptSuggestionSessionChange(cb, channelId)` + `onPromptSuggestionSinkChange(cb)`（动态 attach adapter，处理 late registration）
+4. `TabActivationRuntimeHostProvider.setCurrentConversation()` → DOM walk from `messagesContainer` → `findPromptSuggestionScope()` → `emitPromptSuggestionSessionChange(sessionId, discoveredChannelId)`
+5. `MessageFinalizationHost.setActiveTabConversation(conversation, tabId)` → scoped `promptSuggestionSessionResync(tabId, sessionId)` → `emitPromptSuggestionSessionChange(sessionId, channelId)`（provisional → final SDK id 切换后的 scoped session resync）
+6. `ComposerInputShellCoordinator.destroy()` → `removePromptSuggestionScope()` + `deletePromptSuggestionChannel()` + 清除所有订阅（包括 sink-change 订阅和 adapter unsubscribe）
+7. `ClaudeCodeAdapter.stop()`/`dispose()` → `clearPromptSuggestionSink()` → 所有 `onPromptSuggestionSinkChange` 订阅者收到 `null`
 
 ## 分类
 
-此模块支持的能力被分类为 **readback**。
+此模块支持的整体能力已被分类为 **pass**（live proof 2026-06-06, BUILD_ID feature-phase0-capability.202606060953：Test Vault 普通聊天中端到端观测到 suggestion chip，quick interaction proof 全部通过）。
+
+Capability Lab 中的诊断 probe（`runPromptSuggestionsReadbackProbe`）仍分类为 **readback**：它验证 settings→SDK option mapping，不执行真实 SDK 查询。
+
+Runtime caveat：SDK 可能在首轮对话、API 错误后、计划模式下或非 Claude 模型时不发射 `prompt_suggestion`——这是平台限制，不是插件 bug。

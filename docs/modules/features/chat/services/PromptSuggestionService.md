@@ -34,7 +34,7 @@ export interface PromptSuggestionData {
 7. 以下任一事件清除建议：
    - `clearActiveOnTurnStart()`：新用户轮次开始
    - `onActiveSessionChanged(sessionId)`：标签页切换（通过 scoped bus）
-   - `clearAll()`：view teardown、backend 切换，或 sink 被清除（backend stop/restart 时 coordinator 收到 `null` 通知）
+   - `clearAll()`：view teardown、backend 切换，或 sink 被清除（backend stop/restart 时 coordinator 收到 `null` 通知）。`clearAll()` 当有 suggestion 存在时会触发 bar refresh，保证 UI 自刷新。
 
 ## 不自动发送
 
@@ -53,7 +53,9 @@ export interface PromptSuggestionData {
 - **accept isolates sessions**: `acceptActiveSuggestion()` 只清除 active session，不影响其他 session 的 suggestion
 - **empty sessionId drop**: `setSuggestion()` 会丢弃没有 `sessionId` 的 suggestion，且不会触发 listener
 - **clear noop**: `clearForSession()` 在 session 原本就没有 suggestion 时不会触发 clear listener
+- **clearAll bar refresh**: `clearAll()` 仅在存在 suggestion 时触发 bar refresh，空 map 时 noop
 - **bar refresh on null active session**: 即使 `activeSessionId` 为 `null`，adapter callback 收到 matching session 的 suggestion 仍会触发 bar refresh，允许 coordinator 从 host 同步 session id 后再渲染
+- **session identity transition**: 当 `backendSessionId` 从 provisional id 变为最终 SDK id 时，`MessageFinalizationHost.setActiveTabConversation` 通过 `emitPromptSuggestionSessionChange` 发射新 id，coordinator 的 session change callback 调用 `setActiveSession(finalId)` 并刷新 bar，使 SDK id 下存储的 suggestion 可见
 
 ## 分类
 

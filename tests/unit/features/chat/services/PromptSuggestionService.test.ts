@@ -80,6 +80,25 @@ describe('PromptSuggestionService – storage & active session', () => {
     expect(service.getSuggestion('sess-2')).toBeNull();
   });
 
+  it('clearAll fires bar refresh when suggestions existed', () => {
+    const refreshCb = jest.fn();
+    service.onBarRefreshRequested(refreshCb);
+    service.setSuggestion({ type: 'prompt_suggestion', suggestion: 'A', uuid: 'ps-1', sessionId: 'sess-1' });
+
+    service.clearAll();
+
+    expect(refreshCb).toHaveBeenCalledTimes(1);
+  });
+
+  it('clearAll does not fire bar refresh when no suggestions existed', () => {
+    const refreshCb = jest.fn();
+    service.onBarRefreshRequested(refreshCb);
+
+    service.clearAll();
+
+    expect(refreshCb).not.toHaveBeenCalled();
+  });
+
   it('drops suggestions without sessionId', () => {
     service.setSuggestion({ type: 'prompt_suggestion', suggestion: 'No session', uuid: 'ps-ns' });
     expect(service.getSuggestion('')).toBeNull();

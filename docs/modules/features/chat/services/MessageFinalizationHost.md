@@ -18,3 +18,11 @@
 - `createMessageFinalizationHost()` registers the existing conversation-write helpers as the module-level fallback persistence host through `setBackfillPersistenceHost()`.
 - The returned `backfillClaudeUserMessageIdentities()` still uses `ClaudeUserMessageIdentityBackfillService`, but registry lookup now comes from `getAgentServiceRegistry()` instead of a new `OpenCodianView` injection seam.
 - This keeps fresh-send Claude `sourceMessageId` backfill available to `MessageFinalizationService` while also letting load/reopen recovery reuse the same serialized persistence path without growing the guarded view shell.
+
+## Prompt Suggestion Session Resync
+
+- `setActiveTabConversation(conversation, tabId?)` now also calls `deps.promptSuggestionSessionResync(tabId, sessionId)` after the lightweight bridge sync.
+- This closes the identity race: after `LocalStreamMessagePersistence` writes the final SDK session id to `conversation.backendSessionId`, the finalization host propagates it to the prompt-suggestion service so stored suggestions can be matched and rendered.
+- The emission is **scoped by channel** (not global): the `promptSuggestionSessionResync` dep is wired in `OpenCodianView` to find the tab's messages container, discover the channel via `findPromptSuggestionScope`, and emit `emitPromptSuggestionSessionChange(sessionId, channelId)`.
+- This preserves multi-leaf isolation: only the target tab's coordinator receives the session change. Other leaves are unaffected.
+- `MessageFinalizationService` passes `tabId` to `setActiveTabConversation` so the scoped seam knows which tab's channel to target.

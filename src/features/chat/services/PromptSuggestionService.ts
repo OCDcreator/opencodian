@@ -110,9 +110,13 @@ export class PromptSuggestionService {
     this.requestBarRefresh();
   }
 
-  /** Clear all on backend switch or view teardown. */
+  /** Clear all on backend switch or view teardown. Fires bar refresh if any suggestions existed. */
   clearAll(): void {
+    const hadAny = this.suggestions.size > 0;
     this.suggestions.clear();
+    if (hadAny) {
+      this.requestBarRefresh();
+    }
   }
 
   /** Register a callback that triggers bar refresh in the coordinator. */
