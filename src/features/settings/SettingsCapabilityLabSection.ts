@@ -856,9 +856,16 @@ export class SettingsCapabilityLabSection {
         capability: 'Debug',
         sdkExposed: true, // SDK Options.debug?: boolean
         adapterWired: true, // buildClaudeCodeOptions wires debug when settings.debug is true
-        runtimeProof: 'readback', // Option wiring proven: debug propagates through buildClaudeCodeOptions
-        // into SDK options. Readback ceiling: actual CLI debug log emission is not independently
-        // verified from the plugin layer.
+        runtimeProof: 'readback', // 2026-06-06 audit: SDK propagates debug as --debug CLI flag (not --settings).
+        // debug=true causes CLI subprocess to emit verbose logs to its stderr stream.
+        // Readback ceiling: the plugin cannot observe --debug's effect independently.
+        // Without debugFile (which provides a filesystem side effect) or a stderr callback
+        // (which captures the stream), debug output is silently discarded by the SDK's
+        // default spawn stdio[2]="ignore" (sdk.mjs spawnLocalProcess). The auto-detected
+        // debug file path (~/.claude/debug/sdk-<pid>.txt) has a PID suffix and unpredictable
+        // lifecycle, making it unreliable for a deterministic probe.
+        // Promotion path: if the SDK emits a debug-status signal in the init event or
+        // if debugFile is set, use runDebugFileLiveProbe instead (already pass).
         userSurface: 'settings', // Runtime tab toggle
       },
       {
@@ -919,10 +926,17 @@ export class SettingsCapabilityLabSection {
         capability: 'Stderr Diagnostic',
         sdkExposed: true, // SDK Options.stderr?: (data: string) => void
         adapterWired: true, // buildClaudeCodeOptions wires stderr when input.stderr is provided
-        runtimeProof: 'readback', // Callback wiring proven: stderr callback propagates through buildClaudeCodeOptions
-        // into SDK options. Readback ceiling: actual stderr emission depends on SDK/CLI/runtime
-        // and may be absent. Plugin-side behavior is not independently verified.
-        // All stderr text is sanitized and truncated before display.
+        runtimeProof: 'readback', // 2026-06-06 audit: callback wiring is proven via real diagnostic query.
+        // SDK spawnLocalProcess (sdk.mjs): when stderr callback is provided, stdio[2]="pipe"
+        // and subprocess stderr is forwarded via stderr.on("data", callback). Without callback,
+        // stdio[2]="ignore" — all stderr silently discarded.
+        // Readback ceiling: actual stderr BYTE emission is environment-dependent. Trivial queries
+        // may produce zero stderr; output volume depends on SDK/CLI version and query type.
+        // The probe already runs a real query with a callback and captures stderr chunks,
+        // but classifying as "pass" when stderr is empty would be dishonest.
+        // Promotion path: if the SDK guarantees deterministic stderr output on every query,
+        // or if we can find a query that reliably provokes stderr (e.g. error scenario).
+        // All captured stderr text is sanitized via sanitizeDiagnosticReport and truncated to 240 chars.
         userSurface: 'diagnostic', // Capability Lab probe only; no stable settings UI
       },
       {
