@@ -9,11 +9,17 @@
 
 设计原则：不把未验证能力包装成稳定 UI。允许最小的 diagnostic-only runtime proof，但不能把 hooks / sessionStore 伪装成 stable/completed。structured output 的 transcript 渲染与持久化已稳定，普通聊天 `/json` trigger 与 composer capability chip 也已落地；但自定义 schema authoring 仍为 diagnostic-only，Capability Lab 只证明边界，不把诊断态升级成正式产品面。Claude-native Skills / Agent Definitions 的稳定设置页入口已落地（Runtime tab: discovery + create/open actions）。Agent Definitions 同时有 `@agent` mention menu 的 backend-aware 支持。Hooks 和 Plugins 已从 `hidden` 升格为 `settings`：项目设置文件（`.claude/settings.json` + `.claude/settings.local.json`）提供 scan/create/open 入口，用户直接编辑 JSON 文件配置 hooks 和 enabledPlugins。**重要边界**：hooks 在 `.claude/settings.local.json` 中仅在 `settingSources` 包含 `'local'` 时才会被 SDK 子进程读取执行；默认 `settingSources` 为 `['project']`，只读取 `.claude/settings.json`。用户需在 Context & Sources 标签页启用 `'local'` 才能激活 `settings.local.json` 中的 hooks。Hook proof 报告现已诚实区分 Layer 1（JS callback）和 Layer 3（shell hook from config file），并在 Layer 3 未触发时报告当前 `settingSources` 配置。Include Hook Events 仍为 `diagnostic`（流式诊断事件，非用户面）。Fork 已从 diagnostic-only 升格为稳定 chat surface（`UserMessageFooterRenderer` + `ConversationLoadRecoveryCoordinator`），Capability Lab 保留 fork 诊断探针用于 adapter 级别验证。Prompt Suggestions 是稳定 chat surface（composer 下方 suggestion chip），settings 有 stable toggle，且已通过 2026-06-06 Test Vault 普通聊天 live proof 晋升为 `pass`；Capability Lab 中保留的 readback proof 仅作为 settings→SDK option mapping 的辅助证据。
 
+**2026-06-06 Backend Session Browser 集群诚实性同步**：`JSONL History Browser`、`Resume Session` 和 `Session Detail` 三行此前被标为 `diagnostic`，但实际上 `BackendSessionBrowserModal` 已从 chat 历史（支持 resume）和 settings（browse-only）提供稳定的浏览/预览/详情/恢复流。本次更新将矩阵 `userSurface` 类型扩展为 `'settings' | 'diagnostic' | 'hidden' | 'chat' | 'settings+chat'`，并重新分类：
+- `JSONL History Browser` → `settings+chat`：settings launcher 和 chat launcher 都能浏览、预览和查看会话详情；settings 端为 browse-only（无 resume）。
+- `Resume Session` → `chat`：仅 chat 端支持 resume（settings launcher 显式设置 `supportsResume: false`）。
+- `Session Detail` → `settings+chat`：detail view（元数据 + 完整转录）在 chat 和 settings 两个表面都可用。
+新增的 `settings+chat` surface chip 使用渐变样式（success + info 双色），表示能力跨越设置页只读发现和普通聊天交互两个表面。此变更不新增任何 UI 功能，仅让矩阵分类与现有代码行为保持一致。
+
 ## 诊断面板
 
 | 面板 | 功能 | 数据来源 |
 |------|------|----------|
-| Capability Matrix | 静态 SDK 能力对等矩阵；`userSurface` 支持 `settings`（稳定设置控制）、`diagnostic`（实验性表面）、`hidden`（未暴露）、`chat`（普通聊天交互表面）和 `settings-chat`（设置页只读发现 + 聊天发现/触发入口）五种分类 | 代码检查 + `getClaudeCodeAdapter()` |
+| Capability Matrix | 静态 SDK 能力对等矩阵；`userSurface` 支持 `settings`（稳定设置控制）、`diagnostic`（实验性表面）、`hidden`（未暴露）、`chat`（普通聊天交互表面）和 `settings+chat`（设置页只读发现 + 聊天交互表面同时可用）五种分类 | 代码检查 + `getClaudeCodeAdapter()` |
 | JSONL History Browser | 浏览本地 JSONL 或 diagnostic store 会话历史，支持 import / mirror proof。会话元数据（sessionId / summary / lastModified）不再通过 `<option title>` 显示，而是选择会话后渲染到固定可见的 `data-capability-history-session-detail` 详情区域 | `adapter.listSessions()` / `getSessionMessages()` / `importSessionToStore()` / `runDiagnosticPrompt()` |
 | Subagent Browser | 列出/检查子代理转录 | `adapter.listSubagents()` / `getSubagentMessages()` |
 | Rewind Dry-Run Preview | 预览文件检查点回退（不执行）；手动选择 session + message ID 执行 `rewindFiles(dryRun:true)`。readback 分类显示 source-backed blocker hint。静态矩阵标为 `Readback`（source-backed blocker: `isInteractive:false` 硬编码于 `_T()` (sdk.mjs ~line 58)，零 `isInteractive=true` 存在于打包 SDK，snapshot 创建被 React `useState` setter 门控，`rewindFiles()` 发送 `sdk_rewind_files` 到子进程检查始终空的 file history）。探针新增 `sdkFilesPersistedEventCount`（预期 0）和 `applyFlagSettings` seam 探测（在 Phase 1 首个 assistant 消息后调用 `query.applyFlagSettings({ fileCheckpointingEnabled: true })` 测试运行时设置注入）| `adapter.rewindFiles(dryRun: true)` / `adapter.runCheckpointRewindProbe()` |

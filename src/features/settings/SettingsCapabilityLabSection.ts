@@ -53,7 +53,7 @@ interface MatrixRow {
   sdkExposed: boolean;
   adapterWired: boolean;
   runtimeProof: 'untested' | 'pass' | 'fail' | 'wiring' | 'boundary' | 'readback';
-  userSurface: 'settings' | 'diagnostic' | 'hidden' | 'chat';
+  userSurface: 'settings' | 'diagnostic' | 'hidden' | 'chat' | 'settings+chat';
 }
 
 interface CapabilityLabSessionStoreEntry {
@@ -205,6 +205,7 @@ function createSurfaceChip(containerEl: HTMLElement, surface: MatrixRow['userSur
     diagnostic: 'Diagnostic',
     hidden: 'Hidden',
     chat: 'Chat',
+    'settings+chat': 'Settings + Chat',
   };
   const chip = containerEl.createSpan({
     cls: `opencodian-capability-lab-chip opencodian-capability-lab-chip-surface-${surface}`,
@@ -582,8 +583,9 @@ export class SettingsCapabilityLabSection {
         capability: 'JSONL History Browser',
         sdkExposed: !!adapter, // getSessionMessages on SDK facade
         adapterWired: !!adapter, // adapter.getSessionMessages()
-        runtimeProof: 'pass', // BUILD_ID feature-phase0-capability.202605281948: listSessions returned 38 sessions, getSessionMessages returned 10 messages for d2ea808d…, full message preview rendered. Diagnostic-only — no stable history browser UI.
-        userSurface: 'diagnostic', // Only this diagnostic panel
+        runtimeProof: 'pass', // BUILD_ID feature-phase0-capability.202605281948: listSessions returned 38 sessions, getSessionMessages returned 10 messages for d2ea808d…, full message preview rendered.
+        // Stable user surface: BackendSessionBrowserModal provides browse + preview + detail from both chat history and settings. Settings launcher is browse-only (no resume); chat launcher supports resume. The modal itself is a stable shared component.
+        userSurface: 'settings+chat',
       },
       {
         capability: 'Session Store',
@@ -765,15 +767,17 @@ export class SettingsCapabilityLabSection {
         capability: 'Resume Session',
         sdkExposed: true, // resume option in SDK
         adapterWired: true, // buildSdkOptions wires resumeSessionId
-        runtimeProof: 'pass', // BUILD_ID feature-phase0-capability.202605281948: resumed session d2ea808d…, resulting sessionId matches target, model responded "Session resumed successfully.", 1 text chunk, exit code 0. Diagnostic-only — not stable resume-at productization.
-        userSurface: 'diagnostic', // Capability Lab resume probe only — not stable resume-at productization
+        runtimeProof: 'pass', // BUILD_ID feature-phase0-capability.202605281948: resumed session d2ea808d…, resulting sessionId matches target, model responded "Session resumed successfully.", 1 text chunk, exit code 0.
+        // Stable user surface: chat-only. BackendSessionBrowserModal launched from chat history supports full resume flow (createConversationFromBackendSession + loadConversation). Settings launcher is browse-only (supportsResume: false) and does not expose resume.
+        userSurface: 'chat',
       },
       {
         capability: 'Session Detail',
         sdkExposed: !!adapter, // getSession on SDK facade
         adapterWired: !!adapter, // adapter.getSession()
-        runtimeProof: 'pass', // BUILD_ID feature-phase0-capability.202605281948: getSession(d2ea808d…) returned 10 keys (sessionId, summary, lastModified, fileSize, customTitle, firstPrompt, gitBranch, cwd, tag, createdAt), id=d2ea808d, summary="Restored Claude Code chat (fork)". Diagnostic-only — no stable session detail UI.
-        userSurface: 'diagnostic', // Capability Lab session detail probe only
+        runtimeProof: 'pass', // BUILD_ID feature-phase0-capability.202605281948: getSession(d2ea808d…) returned 10 keys (sessionId, summary, lastModified, fileSize, customTitle, firstPrompt, gitBranch, cwd, tag, createdAt), id=d2ea808d, summary="Restored Claude Code chat (fork)".
+        // Stable user surface: BackendSessionBrowserModal detail view is available from both chat and settings. Both surfaces show the same metadata + transcript detail UI.
+        userSurface: 'settings+chat',
       },
       {
         capability: 'Backend Routing',

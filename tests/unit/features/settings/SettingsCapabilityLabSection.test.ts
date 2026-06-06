@@ -1036,10 +1036,10 @@ describe('SettingsCapabilityLabSection', () => {
     // Expected honest classifications for every capability row.
     // runtimeProof: 'pass' only when direct SDK smoke proof exists.
     // userSurface: 'settings' for stable settings controls; 'diagnostic' for experimental-only surfaces; 'hidden' for unexposed capabilities.
-    const expected: Record<string, { runtimeProof: 'untested' | 'pass' | 'fail' | 'wiring' | 'boundary' | 'readback'; userSurface: 'settings' | 'diagnostic' | 'hidden' | 'chat' }> = {
+    const expected: Record<string, { runtimeProof: 'untested' | 'pass' | 'fail' | 'wiring' | 'boundary' | 'readback'; userSurface: 'settings' | 'diagnostic' | 'hidden' | 'chat' | 'settings+chat' }> = {
       Hooks: { runtimeProof: 'pass', userSurface: 'settings' },
       'File Checkpoint / Rewind': { runtimeProof: 'readback', userSurface: 'diagnostic' },
-      'JSONL History Browser': { runtimeProof: 'pass', userSurface: 'diagnostic' },
+      'JSONL History Browser': { runtimeProof: 'pass', userSurface: 'settings+chat' },
       'Session Store': { runtimeProof: 'pass', userSurface: 'hidden' },
       Skills: { runtimeProof: 'pass', userSurface: 'settings' },
       Plugins: { runtimeProof: 'pass', userSurface: 'settings' },
@@ -1059,8 +1059,8 @@ describe('SettingsCapabilityLabSection', () => {
       'Include Hook Events': { runtimeProof: 'pass', userSurface: 'diagnostic' },
       'Import Session to Store': { runtimeProof: 'pass', userSurface: 'hidden' },
       'Fork Session': { runtimeProof: 'pass', userSurface: 'chat' },
-      'Resume Session': { runtimeProof: 'pass', userSurface: 'diagnostic' },
-      'Session Detail': { runtimeProof: 'pass', userSurface: 'diagnostic' },
+      'Resume Session': { runtimeProof: 'pass', userSurface: 'chat' },
+      'Session Detail': { runtimeProof: 'pass', userSurface: 'settings+chat' },
       'Backend Routing': { runtimeProof: 'pass', userSurface: 'diagnostic' },
       '/context Diagnostic': { runtimeProof: 'pass', userSurface: 'diagnostic' },
       'Warm Startup': { runtimeProof: 'readback', userSurface: 'diagnostic' },
@@ -2773,7 +2773,7 @@ describe('SettingsCapabilityLabSection', () => {
     expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-fail')).toBe(true);
   });
 
-  it('marks Resume Session as a diagnostic surface in the capability matrix', async () => {
+  it('marks Resume Session as a chat surface in the capability matrix', async () => {
     const adapter = {
       listSessions: jest.fn().mockResolvedValue([]),
       runDiagnosticPrompt: jest.fn(),
@@ -2792,8 +2792,8 @@ describe('SettingsCapabilityLabSection', () => {
     )) as HTMLElement | undefined;
     expect(row).toBeTruthy();
     const surfaceChip = row!.querySelector('[data-surface]') as HTMLElement | null;
-    expect(surfaceChip?.dataset.surface).toBe('diagnostic');
-    expect(surfaceChip?.textContent).toBe('Diagnostic');
+    expect(surfaceChip?.dataset.surface).toBe('chat');
+    expect(surfaceChip?.textContent).toBe('Chat');
   });
 
   it('renders i18n keys for resume probe panel', () => {
@@ -2998,10 +2998,10 @@ describe('SettingsCapabilityLabSection', () => {
     expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-fail')).toBe(true);
   });
 
-  it('marks Session Detail as a diagnostic surface in the capability matrix', async () => {
+  it('marks Session Detail as a settings+chat surface in the capability matrix', async () => {
     const adapter = {
       listSessions: jest.fn().mockResolvedValue([]),
-      getSession: jest.fn(),
+      runDiagnosticPrompt: jest.fn(),
     };
     const containerEl = document.createElement('div');
     const section = new SettingsCapabilityLabSection({
@@ -3017,8 +3017,8 @@ describe('SettingsCapabilityLabSection', () => {
     )) as HTMLElement | undefined;
     expect(row).toBeTruthy();
     const surfaceChip = row!.querySelector('[data-surface]') as HTMLElement | null;
-    expect(surfaceChip?.dataset.surface).toBe('diagnostic');
-    expect(surfaceChip?.textContent).toBe('Diagnostic');
+    expect(surfaceChip?.dataset.surface).toBe('settings+chat');
+    expect(surfaceChip?.textContent).toBe('Settings + Chat');
   });
 
   it('renders backend-routing probe section with routing status display', () => {

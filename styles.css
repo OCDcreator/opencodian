@@ -9223,6 +9223,12 @@ img.opencodian-model-provider-header-icon {
   color: var(--opencodian-status-info);
 }
 
+.opencodian-settings .opencodian-capability-lab-chip-surface-settings-chat {
+  border-color: var(--opencodian-status-success-border);
+  background: linear-gradient(135deg, var(--opencodian-status-success-subtle) 50%, var(--opencodian-status-info-subtle) 50%);
+  color: var(--opencodian-status-success);
+}
+
 .opencodian-settings .opencodian-capability-lab-chip-surface-hidden {
   border-style: dashed;
   color: var(--text-faint);

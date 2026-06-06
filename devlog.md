@@ -11,6 +11,41 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-06-06 Backend Session Browser Cluster — Truth-Sync (Reclassified)
+
+### What changed
+
+- **src/features/settings/SettingsCapabilityLabSection.ts**:
+  - Extended `MatrixRow['userSurface']` type to include `'settings+chat'` for capabilities available from both settings and chat surfaces.
+  - Reclassified `JSONL History Browser` from `diagnostic` → `settings+chat`: `BackendSessionBrowserModal` provides stable browse + preview + detail from both chat history and settings (settings launcher is browse-only, no resume).
+  - Reclassified `Resume Session` from `diagnostic` → `chat`: chat launcher supports full resume flow; settings launcher explicitly sets `supportsResume: false`.
+  - Reclassified `Session Detail` from `diagnostic` → `settings+chat`: detail view (metadata + full transcript) is available from both chat and settings via the same `BackendSessionBrowserModal`.
+  - Updated chip labels and CSS class mapping for the new surface type.
+
+- **src/style/components/settings-capability-lab.css**:
+  - Added `.opencodian-capability-lab-chip-surface-settings-chat` with a gradient style blending success (settings) and info (chat) colors to visually represent mixed surfaces.
+
+- **tests/unit/features/settings/SettingsCapabilityLabSection.test.ts**:
+  - Updated the comprehensive audit test expected values for the three reclassified rows.
+  - Updated individual surface classification tests for `Resume Session` and `Session Detail`.
+  - All 263 tests pass.
+
+- **docs/modules/features/settings/SettingsCapabilityLabSection.md**:
+  - Added "2026-06-06 Backend Session Browser 集群诚实性同步" section explaining the rationale and exact surface boundaries.
+  - Updated Capability Matrix table row to reference `settings+chat` instead of the conceptual `settings-chat`.
+
+### Why this matters
+
+The `BackendSessionBrowserModal` has been a stable, runtime-verified component for months (browse + preview + detail + resume from chat). Calling these capabilities "diagnostic-only" was misleading. The new `settings+chat` taxonomy allows the matrix to honestly express mixed surfaces without inflating claims:
+- Settings can browse/preview/detail, but cannot resume.
+- Chat can do everything including resume.
+- The classification now matches the actual code behavior.
+
+### Remaining boundaries
+
+- `Backend Routing` remains `diagnostic`: no stable routing UI exists beyond the internal registry.
+- The Capability Lab's diagnostic probes for resume/session-detail/backend-routing are still present for adapter-level validation, but the matrix now correctly reflects that the *capability* (not the probe) is user-facing.
+
 ## 2026-06-06 Session Store + Import Session to Store — Audit Hardening (Kept Hidden)
 
 ### What changed
