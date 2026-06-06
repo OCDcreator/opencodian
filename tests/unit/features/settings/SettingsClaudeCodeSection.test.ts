@@ -545,6 +545,9 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       const boundaryEl = containerEl.querySelector('[data-claude-code-fallback-model-boundary="true"]');
       expect(boundaryEl).toBeTruthy();
       expect(containerEl.textContent).toContain(t('settings.claudeCode.fallbackModel.boundaryNotice'));
+      expect(boundaryEl!.textContent).toContain('Readback only');
+      expect(boundaryEl!.textContent).toContain('--fallback-model');
+      expect(boundaryEl!.textContent).toContain('HTTP 529');
     });
 
     it('renders fallback model proof status notice with readback state in model-thinking tab', () => {

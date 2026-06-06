@@ -83,6 +83,8 @@ OpenCodian 的简体中文翻译表，导出 `zhTranslations` 静态对象。本
 
 2026-06-04 继续新增 `settings.capabilityLab.proofs.planModeInstructions.*` 键（18+ proof keys 覆盖中英双语），把 Plan Mode Instructions readback proof 的按钮、运行中、标题、边界文案、生命周期边界、option-wired/permission-mode/setting-value/sdk-option/sdk-value/builder-wiring-nuance/value-match 状态行，以及 readback/fail/thrown 提示全部收进中文 locale。取代之前的硬编码英文，使 Capability Lab 在中文界面下同样显示明确的 readback 语义和生命周期边界（“仅在下次查询或重启会话后生效。活跃会话不会实时更新。”）。
 
+2026-06-06 Fallback Model 审计硬化：`settings.claudeCode.fallbackModel.boundaryNotice` 更新为显式 "仅 readback" 模式，匹配 Allowed Tools 硬化模式。文案现在明确声明：此设置保存一个备用模型名称并传递给 SDK；插件已验证该选项到达 SDK 边界（`--fallback-model` CLI 标志）且同模型校验生效；但自动回退切换行为无法本地验证——需要真实的 API 过载（HTTP 529）信号，无法在本地模拟；请勿将此保存值误解为自动回退生效的证明。相邻 seams（`modelUsage` 被动检测、`query.setModel()` 手动切换、`applyFlagSettings({model})`、`SDKAPIRetryMessage`）经审计后均拒绝产品化为稳定用户界面功能。
+
 2026-05-27 新增 `settings.claudeCode.fallbackModel.boundaryNotice` 键，用于 Model & Thinking 标签中 fallback model 控件后的边界提示。文案说明备用模型的修改需要重启活跃 Claude Code 会话或开始新的查询，无法像主模型一样在已运行的流中实时更新。
 
 本轮更新 `settings.claudeCode.model.desc` 和 `settings.claudeCode.fallbackModel.desc`，在主/备用模型描述中明确区分实时应用与仅重启生效的产品边界，并提示用户通过下方 quick-select 下拉框选择模型。新增 `settings.claudeCode.model.quickSelectName` / `quickSelectDesc` 和 `settings.claudeCode.fallbackModel.quickSelectName` / `quickSelectDesc` 键，用于 Model & Thinking 标签中模型/备用模型的 quick-select 下拉框；保留 `settings.claudeCode.modelCatalog.quickSelectPlaceholder` 作为下拉框的默认占位文案。旧的 `modelCatalog.*` 系列键（refreshButton、loading、empty、error、useAsMain、useAsFallback）已随分离式目录列表的移除而废弃。

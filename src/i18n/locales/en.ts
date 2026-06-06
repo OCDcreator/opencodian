@@ -2305,7 +2305,7 @@ export const enTranslations = {
   'settings.claudeCode.fallbackModel.name': 'Fallback model',
   'settings.claudeCode.fallbackModel.desc': 'Fallback model used when the main model is unavailable. Unlike the main model, this only takes effect on the next query or after restarting the session. Option wiring and readback are proven; automatic fallback behavior is unproven with the current SDK.',
   'settings.claudeCode.fallbackModel.placeholder': 'claude-haiku-4-5',
-  'settings.claudeCode.fallbackModel.boundaryNotice': 'Changes to fallback model require restarting the active Claude Code session or starting a new query. Unlike the main model, fallback model cannot be updated on an already-running stream. Automatic fallback behavior is unproven with the current SDK.',
+  'settings.claudeCode.fallbackModel.boundaryNotice': 'Readback only: this setting saves a fallback model name that is passed to the SDK. The plugin has verified the option reaches the SDK boundary (--fallback-model CLI flag) and that same-model validation works. However, automatic fallback switching behavior is NOT locally provable — it requires real API overload (HTTP 529) signals that cannot be simulated locally. Do not misread this saved value as proof that automatic fallback works. Changes require restarting the active session or starting a new query.',
   'settings.claudeCode.fallbackModel.quickSelectName': 'Quick select fallback model',
   'settings.claudeCode.fallbackModel.quickSelectDesc': 'Choose a fallback model from the discovered catalog. The selected value updates the fallback model field above automatically.',
   'settings.claudeCode.fallbackModel.sameModelWarning': 'Fallback model cannot be the same as the main model. The SDK rejects same-model fallback configuration.',

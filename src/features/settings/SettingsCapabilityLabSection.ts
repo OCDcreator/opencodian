@@ -682,7 +682,32 @@ export class SettingsCapabilityLabSection {
         capability: 'Fallback Model',
         sdkExposed: true, // fallbackModel option in SDK query options
         adapterWired: true, // buildSdkOptions wires normalized settings into SDK options
-        runtimeProof: 'readback', // Source-backed blocker hardened. SDK source (sdk.mjs) contains exactly 3 fallback references, all in ProcessTransport.initialize(): (1) destructure fallbackModel:w from options, (2) validate w!==N (same-model throws), (3) push --fallback-model w to CLI args. ZERO switching logic in SDK — all model-switching lives in compiled CLI binary, triggered by API-side HTTP 529/capacity overload. CLI help confirms: "when default model is overloaded (only works with --print)". Invalid-primary test (BUILD_ID feature-phase0-capability.202605300441) undermined: SDK accepts arbitrary model names at query boundary, reports same string back, no fallback triggered. Cannot simulate real API overload locally without faking external signals. Detection seams explored: (a) result message `modelUsage` — passive detection plumbing runtime-verified; if native fallback occurs, `Object.keys(modelUsage).length > 1`. (b) `query.setModel()` — SDK source verified (sdk.mjs: sends `{subtype:"set_model",model}` control request); wiring proven; NOT live-runtime-verified (no test confirming model change for subsequent API calls); manual switch seam, not automatic fallback. (c) `applyFlagSettings({model})` — identified in SDK types but NOT runtime-verified; settings-layer manual switch; same category as setModel. (d) `SDKAPIRetryMessage` with `error_status===529` — identified in SDK types (sdk.d.ts:2521) but NOT runtime-verified; detects retries, not fallback itself. Classification remains readback: automatic fallback option wiring verified, switching behavior not locally provable. Next executable path: either Anthropic exposes a programmatic fallback trigger in SDK, or we accept readback as the honest ceiling.
+        runtimeProof: 'readback', // 2026-06-06 audit conclusion: remains readback.
+        // SDK source (sdk.mjs): exactly 3 fallback references in ProcessTransport.initialize():
+        // (1) destructure fallbackModel:w from options, (2) validate w!==N (same-model throws),
+        // (3) push --fallback-model w to CLI args. ZERO switching logic in SDK — all model-switching
+        // lives in compiled CLI binary, triggered by API-side HTTP 529/capacity overload.
+        // CLI help: "when default model is overloaded (only works with --print)".
+        // Invalid-primary test (BUILD_ID feature-phase0-capability.202605300441) undermined:
+        // SDK accepts arbitrary model names at query boundary, reports same string back, no fallback.
+        // Cannot simulate real API overload locally without faking external signals.
+        //
+        // Adjacent seams audited and REJECTED for productization as stable user-facing capabilities:
+        // (a) result message `modelUsage` — passive detection plumbing runtime-verified; if native
+        //     fallback occurs, `Object.keys(modelUsage).length > 1`. NOT a user-facing feature;
+        //     never observed in practice; no product value as a standalone chat surface.
+        // (b) `query.setModel()` — SDK source verified (sends `{subtype:"set_model",model}` control
+        //     request); wiring proven; NOT live-runtime-verified. Even if verified, this is a MANUAL
+        //     model switch seam, semantically distinct from automatic fallback. Would require a
+        //     separate "Manual Model Switch" capability row, not promotion of Fallback Model.
+        // (c) `applyFlagSettings({model})` — identified in SDK types only; NOT runtime-verified.
+        // (d) `SDKAPIRetryMessage` with `error_status===529` — identified in SDK types only;
+        //     NOT runtime-verified; detects retries, not fallback itself.
+        //
+        // Honest ceiling: readback. The plugin verifies the option reaches the SDK boundary
+        // (--fallback-model CLI flag + same-model validation). Automatic fallback switching is
+        // NOT locally provable and has NOT been independently verified. Do not misread the saved
+        // settings value as proof that fallback behavior works.
         userSurface: 'settings',
       },
 

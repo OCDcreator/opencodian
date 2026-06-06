@@ -11,6 +11,50 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-06-06 Fallback Model — Audit `setModel()` / `modelUsage` Productization Potential (Outcome B)
+
+### Objective
+
+Audit whether `setModel()` live-apply or `modelUsage` multi-model detection can be productized as stable chat surfaces, or if the readback ceiling should be hardened with additional explicit blockers.
+
+### Decision
+
+**Outcome B** — `Fallback Model` REMAINS `readback` with hardened boundary.
+
+Adjacent seams were audited and REJECTED for productization as stable user-facing capabilities:
+
+1. **`modelUsage` passive detection** — Runtime-verified plumbing (if native fallback occurs, `Object.keys(modelUsage).length > 1`). NOT a user-facing feature; never observed in practice; no standalone product value.
+2. **`query.setModel()`** — SDK source verified (sends `{subtype:"set_model",model}` control request); wiring proven; NOT live-runtime-verified. Even if verified, this is a MANUAL model switch seam, semantically distinct from automatic fallback. Would require a separate "Manual Model Switch" capability row.
+3. **`applyFlagSettings({model})`** — Identified in SDK types only; NOT runtime-verified.
+4. **`SDKAPIRetryMessage` with `error_status===529`** — Identified in SDK types only; NOT runtime-verified; detects retries, not fallback itself.
+
+Honest ceiling: readback. The plugin verifies the option reaches the SDK boundary (`--fallback-model` CLI flag + same-model validation). Automatic fallback switching is NOT locally provable and has NOT been independently verified.
+
+### What Changed
+
+- **`src/features/settings/SettingsCapabilityLabSection.ts`**: Hardened the `Fallback Model` matrix row comment with explicit audit conclusion that adjacent seams are NOT productizable as stable user-facing capabilities.
+- **`src/i18n/locales/en.ts`**: Updated `settings.claudeCode.fallbackModel.boundaryNotice` to explicit "Readback only" pattern, matching the Allowed Tools hardening pattern.
+- **`src/i18n/locales/zh.ts`**: Same boundary text update in Chinese.
+- **`docs/modules/features/settings/SettingsCapabilityLabSection.md`**: Updated module doc to reflect the hardened boundary.
+- **`docs/modules/features/settings/SettingsClaudeCodeSection.md`**: Updated Model & Thinking tab description to reflect hardened boundary.
+- **`docs/status/claude-code-current-state-2026-05-22.md`**: Updated current gap audit — Fallback Model checkpoint completed, replaced with new suggested next checkpoints (Task Budget, Warm Startup).
+- **`docs/modules/i18n/locales/en.md`** + **`zh.md`**: Added changelog entries.
+
+### Honesty Boundaries
+
+- Classification: **readback** (unchanged — option wiring verified, switching behavior not locally provable).
+- User surface: **settings** (unchanged — stable settings UI for saving value + same-model guards + quick-select).
+- **No fake UI added**. No capability claim inflated.
+- The saved value is honestly presented as "reaches SDK boundary", not "proves automatic fallback works."
+
+### Suggested Next Checkpoint
+
+1. **File Checkpoint / Rewind** — Monitor Anthropic SDK bug #236
+2. **Task Budget** — Audit whether the `@alpha` option has any live behavior proof path
+3. **Warm Startup** — Audit whether warm-vs-cold latency can be independently measured
+
+---
+
 ## 2026-06-06 Allowed Tools — Boundary Hardening (Outcome B)
 
 ### Objective

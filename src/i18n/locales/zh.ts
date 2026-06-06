@@ -2305,7 +2305,7 @@ export const zhTranslations = {
   'settings.claudeCode.fallbackModel.name': '备用模型',
   'settings.claudeCode.fallbackModel.desc': '主模型不可用时使用的备用模型。与主模型不同，备用模型仅在下次查询或重启会话后生效。选项连接和回读已验证；当前 SDK 下自动回退行为尚未验证。',
   'settings.claudeCode.fallbackModel.placeholder': 'claude-haiku-4-5',
-  'settings.claudeCode.fallbackModel.boundaryNotice': '备用模型的修改需要重启当前 Claude Code 会话或开始新的查询。与主模型不同，备用模型无法在已运行的流中实时更新。当前 SDK 下自动回退行为尚未验证。',
+  'settings.claudeCode.fallbackModel.boundaryNotice': '仅 readback：此设置保存一个备用模型名称并传递给 SDK。插件已验证该选项到达 SDK 边界（--fallback-model CLI 标志）且同模型校验生效。但自动回退切换行为无法本地验证——需要真实的 API 过载（HTTP 529）信号，无法在本地模拟。请勿将此保存值误解为自动回退生效的证明。修改后需要重启当前会话或开始新的查询。',
   'settings.claudeCode.fallbackModel.quickSelectName': '快速选择备用模型',
   'settings.claudeCode.fallbackModel.quickSelectDesc': '从发现的模型目录中选择备用模型。所选值会自动更新上方的备用模型字段。',
   'settings.claudeCode.fallbackModel.sameModelWarning': '备用模型不能与主模型相同。SDK 会拒绝同模型备用配置。',

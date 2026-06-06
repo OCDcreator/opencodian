@@ -93,8 +93,46 @@ These have adapter wiring and runtime proof, but no stable or diagnostic user su
 ### suggested next 3 checkpoints
 
 1. **File Checkpoint / Rewind** — Highest user-value if unblocked. Monitor Anthropic SDK bug #236. Re-audit on any SDK version bump that mentions checkpointing or interactive-mode fixes. Current state: readback with known upstream blocker.
-2. **Fallback Model** — Audit whether `setModel()` live-apply or `modelUsage` multi-model detection can be productized as stable chat surfaces, or if the readback ceiling should be hardened with additional explicit blockers. Current state: readback; automatic fallback not locally provable.
-3. **Allowed Tools** — Audit the honesty boundary between stable settings UI and readback classification. The setting has a real toggle and stable UI, but the capability is an auto-approve shortcut with zero enforcement. Ensure user-facing copy does not overclaim filtering behavior. Current state: readback with stable settings surface.
+2. **Task Budget** — Audit whether the `@alpha` option has any live behavior proof path, or if it should remain readback with hardened boundary text. Current state: readback; no deterministic SDK enforcement signal identified.
+3. **Warm Startup** — Audit whether warm-vs-cold latency can be independently measured and productized, or if it should remain readback with explicit boundary limits. Current state: readback; latency benefit is SDK internal claim only.
+
+---
+
+## 2026-06-06 Fallback Model — Audit `setModel()` / `modelUsage` Productization Potential (Outcome B)
+
+### Objective
+
+Audit whether `setModel()` live-apply or `modelUsage` multi-model detection can be productized as stable chat surfaces, or if the readback ceiling should be hardened with additional explicit blockers.
+
+### Decision
+
+**Outcome B** — `Fallback Model` REMAINS `readback` with hardened boundary.
+
+Adjacent seams were audited and REJECTED for productization as stable user-facing capabilities:
+
+1. **`modelUsage` passive detection** — Runtime-verified plumbing (if native fallback occurs, `Object.keys(modelUsage).length > 1`). NOT a user-facing feature; never observed in practice; no standalone product value.
+2. **`query.setModel()`** — SDK source verified (sends `{subtype:"set_model",model}` control request); wiring proven; NOT live-runtime-verified. Even if verified, this is a MANUAL model switch seam, semantically distinct from automatic fallback. Would require a separate "Manual Model Switch" capability row.
+3. **`applyFlagSettings({model})`** — Identified in SDK types only; NOT runtime-verified.
+4. **`SDKAPIRetryMessage` with `error_status===529`** — Identified in SDK types only; NOT runtime-verified; detects retries, not fallback itself.
+
+Honest ceiling: readback. The plugin verifies the option reaches the SDK boundary (`--fallback-model` CLI flag + same-model validation). Automatic fallback switching is NOT locally provable and has NOT been independently verified.
+
+### What Changed
+
+- **`src/features/settings/SettingsCapabilityLabSection.ts`**: Hardened the `Fallback Model` matrix row comment with explicit audit conclusion that adjacent seams (`setModel`, `modelUsage`, `applyFlagSettings`, `SDKAPIRetryMessage`) are NOT productizable as stable user-facing capabilities for Fallback Model.
+- **`src/i18n/locales/en.ts`**: Updated `settings.claudeCode.fallbackModel.boundaryNotice` to explicit "Readback only" pattern, matching the Allowed Tools hardening pattern.
+- **`src/i18n/locales/zh.ts`**: Same boundary text update in Chinese.
+- **`docs/modules/features/settings/SettingsCapabilityLabSection.md`**: Updated module doc to reflect the hardened boundary.
+- **`docs/modules/features/settings/SettingsClaudeCodeSection.md`**: Updated Model & Thinking tab description to reflect hardened boundary.
+- **`devlog.md`**: Added audit checkpoint entry.
+
+### Honesty Boundaries
+
+- Classification: **readback** (unchanged — option wiring verified, switching behavior not locally provable).
+- User surface: **settings** (unchanged — stable settings UI for saving value + same-model guards + quick-select).
+- **No fake UI added**. No capability claim inflated.
+- Stable settings already provide: saved value wiring, same-model validation, quick-select dropdown, explicit boundary notice.
+- The saved value is honestly presented as "reaches SDK boundary", not "proves automatic fallback works."
 
 ---
 
