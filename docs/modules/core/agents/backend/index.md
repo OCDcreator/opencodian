@@ -33,7 +33,8 @@
 - `SystemPromptReadbackProbeResult`: Claude Code `systemPrompt` 选项 readback probe 结果类型；诊断专用，验证 settings→SDK option mapping，不声称行为验证。
 - `PlanModeInstructionsReadbackProbeResult`: Claude Code `planModeInstructions` 选项 readback probe 结果类型；诊断专用，不验证实际 plan-mode behavior enforcement。
 - `SandboxReadbackProbeResult`: Claude Code `sandbox` 选项 readback probe 结果类型；诊断专用，不验证实际 OS-level sandbox enforcement 行为。
-- `DebugFileReadbackProbeResult`: Claude Code `debugFile` 选项 readback probe 结果类型；诊断专用，不验证实际 CLI debug file writing 行为。
+- `DebugFileReadbackProbeResult`: Claude Code `debugFile` 选项 readback probe 结果类型；诊断专用，验证 settings→SDK option mapping。
+- `DebugFileLiveProbeResult`: Claude Code `debugFile` live probe 结果类型；2026-06-06 新增，验证 CLI 子进程在共享文件系统上实际创建非空 debug 文件。整体能力已从 readback 晋升为 pass。
 - `StrictMcpConfigReadbackProbeResult`: Claude Code `strictMcpConfig` 选项 readback probe 结果类型；诊断专用，不验证实际 MCP config validation 行为。
 - `DebugReadbackProbeResult`: Claude Code `debug` 选项 readback probe 结果类型；诊断专用，不验证实际 CLI debug log emission 行为。
 - `Context1mBetaReadbackProbeResult`: Claude Code `betas` 选项 readback probe 结果类型；诊断专用，不验证实际 beta 可用性。

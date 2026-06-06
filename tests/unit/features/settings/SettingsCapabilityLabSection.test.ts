@@ -1071,7 +1071,7 @@ describe('SettingsCapabilityLabSection', () => {
       'Plan Mode Instructions': { runtimeProof: 'readback', userSurface: 'settings' },
       'Tool Aliases': { runtimeProof: 'readback', userSurface: 'settings' },
       'Debug': { runtimeProof: 'readback', userSurface: 'settings' },
-      'Debug File': { runtimeProof: 'readback', userSurface: 'settings' },
+      'Debug File': { runtimeProof: 'pass', userSurface: 'settings' },
       'Strict MCP Config': { runtimeProof: 'readback', userSurface: 'settings' },
       '1M Context Beta': { runtimeProof: 'readback', userSurface: 'settings' },
       'JS Runtime': { runtimeProof: 'readback', userSurface: 'settings' },
@@ -1112,9 +1112,9 @@ describe('SettingsCapabilityLabSection', () => {
       return firstCell?.textContent ?? '';
     });
     expect(verifiedCapabilities).toEqual(
-      expect.arrayContaining(['MCP Servers', 'Permission Approval', 'AskUserQuestion / Elicitation', 'Structured Output', 'Agent Definitions', 'Include Hook Events', 'Environment Variables', 'Fork Session', 'JSONL History Browser', 'Session Store', 'Import Session to Store', 'Resume Session', 'Session Detail', 'Backend Routing', 'Turn/Budget Limits', 'Skills', 'Agents (Subagents)', 'Subagent Transcript / Progress', 'Hooks', 'Disallowed Tools', 'Plugins', 'Restricted Built-in Tools', '/context Diagnostic', 'Session Title', 'Custom Session ID', 'Continue', 'Resume Session At Position', 'Fork Session On Resume', 'System Prompt', 'Prompt Suggestions']),
+      expect.arrayContaining(['MCP Servers', 'Permission Approval', 'AskUserQuestion / Elicitation', 'Structured Output', 'Agent Definitions', 'Include Hook Events', 'Environment Variables', 'Fork Session', 'JSONL History Browser', 'Session Store', 'Import Session to Store', 'Resume Session', 'Session Detail', 'Backend Routing', 'Turn/Budget Limits', 'Skills', 'Agents (Subagents)', 'Subagent Transcript / Progress', 'Hooks', 'Disallowed Tools', 'Plugins', 'Restricted Built-in Tools', '/context Diagnostic', 'Session Title', 'Custom Session ID', 'Continue', 'Resume Session At Position', 'Fork Session On Resume', 'System Prompt', 'Prompt Suggestions', 'Debug File']),
     );
-    expect(verifiedCapabilities.length).toBe(30);
+    expect(verifiedCapabilities.length).toBe(31);
 
     // Total rows check
     expect(rows.length).toBe(46);
@@ -1130,9 +1130,9 @@ describe('SettingsCapabilityLabSection', () => {
       return firstCell?.textContent ?? '';
     });
     expect(readbackCapabilities).toEqual(
-      expect.arrayContaining(['File Checkpoint / Rewind', 'Allowed Tools', 'Fallback Model', 'Warm Startup', 'Sandbox', 'Task Budget', 'Plan Mode Instructions', 'Tool Aliases', 'Debug', 'Debug File', 'Strict MCP Config', '1M Context Beta', 'JS Runtime', 'Load Timeout', 'Stderr Diagnostic', 'AskUserQuestion Preview Format']),
+      expect.arrayContaining(['File Checkpoint / Rewind', 'Allowed Tools', 'Fallback Model', 'Warm Startup', 'Sandbox', 'Task Budget', 'Plan Mode Instructions', 'Tool Aliases', 'Debug', 'Strict MCP Config', '1M Context Beta', 'JS Runtime', 'Load Timeout', 'Stderr Diagnostic', 'AskUserQuestion Preview Format']),
     );
-    expect(readbackCapabilities.length).toBe(16);
+    expect(readbackCapabilities.length).toBe(15);
 
     // Honesty rule: hidden capabilities must not have a settings or diagnostic surface chip.
     const hiddenRows = rows.filter((row) => (
@@ -7243,7 +7243,7 @@ describe('SettingsCapabilityLabSection', () => {
 
     section.attachTabbed(containerEl, 'capability-lab');
     const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
-      el.textContent?.includes('Run Debug File Readback Proof')
+      el.textContent?.includes(t('settings.capabilityLab.proofs.debugFile.button'))
     )) as HTMLButtonElement | undefined;
     expect(button).toBeTruthy();
   });
@@ -7269,7 +7269,7 @@ describe('SettingsCapabilityLabSection', () => {
 
     section.attachTabbed(containerEl, 'capability-lab');
     const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
-      el.textContent?.includes('Run Debug File Readback Proof')
+      el.textContent?.includes(t('settings.capabilityLab.proofs.debugFile.button'))
     )) as HTMLButtonElement | undefined;
     expect(button).toBeTruthy();
 
@@ -7281,9 +7281,11 @@ describe('SettingsCapabilityLabSection', () => {
     const proofMarker = containerEl.querySelector('[data-capability="Debug File"]');
     expect(proofMarker).toBeTruthy();
     expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-readback')).toBe(true);
-    expect(containerEl.textContent).toContain('Setting value');
+    expect(containerEl.textContent).toContain(t('settings.capabilityLab.proofs.debugFile.settingValue', {
+      value: '"/tmp/claude-debug.log"',
+    }));
     expect(containerEl.textContent).toContain('/tmp/claude-debug.log');
-    expect(containerEl.textContent).toContain('Diagnostic readback only');
+    expect(containerEl.textContent).toContain(t('settings.capabilityLab.proofs.debugFile.boundary'));
   });
 
   it('marks fail when the debug file readback probe throws', async () => {
@@ -7299,7 +7301,7 @@ describe('SettingsCapabilityLabSection', () => {
 
     section.attachTabbed(containerEl, 'capability-lab');
     const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
-      el.textContent?.includes('Run Debug File Readback Proof')
+      el.textContent?.includes(t('settings.capabilityLab.proofs.debugFile.button'))
     )) as HTMLButtonElement | undefined;
     expect(button).toBeTruthy();
 
@@ -7310,6 +7312,63 @@ describe('SettingsCapabilityLabSection', () => {
     expect(proofMarker).toBeTruthy();
     expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-fail')).toBe(true);
     expect(containerEl.textContent).toContain('probe exploded');
+  });
+
+  it('renders Debug File Live Proof button from locale', () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runDebugFileLiveProbe: jest.fn(),
+      capabilities: new Set(),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes(t('settings.capabilityLab.proofs.debugFileLive.button'))
+    )) as HTMLButtonElement | undefined;
+    expect(button).toBeTruthy();
+  });
+
+  it('runs the debug file live proof and marks pass', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runDebugFileLiveProbe: jest.fn().mockResolvedValue({
+        classification: 'pass',
+        tempDir: '/tmp/opencodian-debug-file-probe-123',
+        debugFilePath: '/tmp/opencodian-debug-file-probe-123/debug.log',
+        fileExists: true,
+        fileSize: 128,
+        optionWired: true,
+        sessionId: 'ses_debug_file_probe',
+      }),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes(t('settings.capabilityLab.proofs.debugFileLive.button'))
+    )) as HTMLButtonElement | undefined;
+    expect(button).toBeTruthy();
+
+    button!.click();
+    await flushUi();
+
+    expect(adapter.runDebugFileLiveProbe).toHaveBeenCalled();
+
+    const proofMarker = containerEl.querySelector('[data-capability="Debug File"]');
+    expect(proofMarker).toBeTruthy();
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-pass')).toBe(true);
+    expect(containerEl.textContent).toContain(t('settings.capabilityLab.proofs.debugFileLive.boundary'));
+    expect(containerEl.textContent).toContain('/tmp/opencodian-debug-file-probe-123/debug.log');
+    expect(containerEl.textContent).toContain(t('settings.capabilityLab.proofs.debugFileLive.pass'));
   });
 
   it('renders Debug Readback Proof button from locale', () => {

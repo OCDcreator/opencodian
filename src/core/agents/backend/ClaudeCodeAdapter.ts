@@ -1,5 +1,7 @@
 /* eslint-disable max-lines -- Claude Code adapter owns SDK query lifecycle, session identity, permissions, MCP refresh, and model catalog wiring for the same backend boundary. */
-import { existsSync, unlinkSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync, statSync, unlinkSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 import type { ElicitationRequest, ElicitationResult, Query } from '@anthropic-ai/claude-agent-sdk';
 import { spawn } from 'child_process';
@@ -336,6 +338,13 @@ export interface ClaudeCodeDiagnosticPromptRequest {
    * instruction without modifying the user's actual settings.
    */
   _diagnosticSystemPrompt?: string;
+  /**
+   * Diagnostic-only debugFile override. When provided, replaces the
+   * adapter's settings.debugFile for this diagnostic query only.
+   * Used by the Debug File live proof to set a temp path and verify
+   * file creation without modifying the user's actual settings.
+   */
+  _diagnosticDebugFile?: string;
 }
 
 export interface ClaudeCodeDiagnosticPromptResult {
@@ -803,6 +812,24 @@ export interface DebugFileReadbackProbeResult {
   sdkOptionPresent: boolean;
   sdkValue?: string;
   valueMatch: boolean;
+  error?: string;
+}
+
+/** Debug file live probe result. Verifies actual file creation by the CLI subprocess. */
+export interface DebugFileLiveProbeResult {
+  classification: 'pass' | 'fail';
+  /** The temp directory created for this probe. */
+  tempDir: string;
+  /** The debug file path that was requested. */
+  debugFilePath: string;
+  /** Whether the file was found to exist after the diagnostic query. */
+  fileExists: boolean;
+  /** File size in bytes (0 if file doesn't exist). */
+  fileSize: number;
+  /** Whether the SDK options were correctly wired with the debug file path. */
+  optionWired: boolean;
+  /** Session ID from the diagnostic query (for traceability). */
+  sessionId?: string;
   error?: string;
 }
 
@@ -2765,6 +2792,87 @@ export class ClaudeCodeAdapter
     }
   }
 
+  /**
+   * Run a live proof that debugFile causes actual file creation by the CLI subprocess.
+   * Creates a temp directory, sets debugFile to a path inside it, runs a minimal
+   * diagnostic query, and checks whether the file was created and contains content.
+   * This proves the option produces a real observable side effect, not just option wiring.
+   */
+  async runDebugFileLiveProbe(): Promise<DebugFileLiveProbeResult> {
+    let tempDir = '';
+    try {
+      tempDir = mkdtempSync(join(tmpdir(), 'opencodian-debug-file-probe-'));
+      const debugFilePath = join(tempDir, 'debug.log');
+
+      // First verify option wiring
+      const abortController = new AbortController();
+      const options = this.buildDiagnosticSdkOptions(abortController, {
+        prompt: 'Debug file live proof.',
+        _diagnosticBypassPermissions: true,
+        _diagnosticDebugFile: debugFilePath,
+      });
+      const optionWired = options.debugFile === debugFilePath;
+      if (!optionWired) {
+        return {
+          classification: 'fail',
+          tempDir,
+          debugFilePath,
+          fileExists: false,
+          fileSize: 0,
+          optionWired: false,
+          error: `debugFile option mismatch: expected "${debugFilePath}", got ${JSON.stringify(options.debugFile)}`,
+        };
+      }
+
+      // Run a real diagnostic query with the debug file path
+      const result = await this.runDiagnosticPrompt({
+        prompt: 'Reply with exactly: debug-file-probe-ok',
+        _diagnosticBypassPermissions: true,
+        _diagnosticDebugFile: debugFilePath,
+      });
+
+      // Check whether the file was created
+      const fileExists = existsSync(debugFilePath);
+      const fileSize = fileExists ? statSync(debugFilePath).size : 0;
+
+      const classification: 'pass' | 'fail' = fileExists && fileSize > 0 ? 'pass' : 'fail';
+
+      return {
+        classification,
+        tempDir,
+        debugFilePath,
+        fileExists,
+        fileSize,
+        optionWired: true,
+        sessionId: result.sessionId,
+        error: classification === 'fail'
+          ? `Debug file not created or empty at ${debugFilePath} (exists=${fileExists}, size=${fileSize})`
+          : undefined,
+      };
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      runtimeLogger.debug('debug file live probe', { result: 'fail', error: errorMessage });
+      return {
+        classification: 'fail',
+        tempDir: tempDir || '(not created)',
+        debugFilePath: tempDir ? join(tempDir, 'debug.log') : '(not created)',
+        fileExists: false,
+        fileSize: 0,
+        optionWired: false,
+        error: errorMessage,
+      };
+    } finally {
+      // Clean up temp directory
+      if (tempDir && existsSync(tempDir)) {
+        try {
+          rmSync(tempDir, { recursive: true, force: true });
+        } catch {
+          // Best-effort cleanup; temp dir will be cleaned by OS eventually
+        }
+      }
+    }
+  }
+
   async runStrictMcpConfigReadbackProbe(): Promise<StrictMcpConfigReadbackProbeResult> {
     try {
       const abortController = new AbortController();
@@ -3542,6 +3650,9 @@ export class ClaudeCodeAdapter
     }
     if (request._diagnosticSystemPrompt !== undefined) {
       diagnosticSettings = { ...diagnosticSettings, systemPrompt: request._diagnosticSystemPrompt };
+    }
+    if (request._diagnosticDebugFile !== undefined) {
+      diagnosticSettings = { ...diagnosticSettings, debugFile: request._diagnosticDebugFile };
     }
     return diagnosticSettings;
   }

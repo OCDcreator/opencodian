@@ -48,6 +48,7 @@ export {
   type ClaudeCodeSdkLoader,
   type ClaudeCodeSdkQueryInput,
   type Context1mBetaReadbackProbeResult,
+  type DebugFileLiveProbeResult,
   type DebugFileReadbackProbeResult,
   type DebugReadbackProbeResult,
   type JsRuntimeReadbackProbeResult,

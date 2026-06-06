@@ -865,11 +865,14 @@ export class SettingsCapabilityLabSection {
         capability: 'Debug File',
         sdkExposed: true, // SDK Options.debugFile?: string
         adapterWired: true, // buildClaudeCodeOptions wires debugFile when settings.debugFile is non-empty
-        runtimeProof: 'readback', // Option wiring proven: debugFile propagates through buildClaudeCodeOptions
-        // into SDK options as a trimmed string. Readback ceiling: actual CLI debug file writing
-        // is not independently verified from the plugin layer. Setting a debug file path implicitly
-        // enables debug logging even if the debug toggle is off. Applies to next query or restarted
-        // session only. No plugin-side path validation or filesystem writes are performed.
+        runtimeProof: 'pass', // Live proof 2026-06-06: runDebugFileLiveProbe creates a temp directory,
+        // sets debugFile to a path inside it, runs a real diagnostic query via runDiagnosticPrompt(),
+        // and verifies via fs.existsSync + fs.statSync that the CLI subprocess created a non-empty file
+        // at the specified path. This is a real observable side effect on a shared filesystem, not just
+        // option wiring. Setting a debug file path implicitly enables debug logging even if the debug
+        // toggle is off (per SDK types: "Implicitly enables debug mode"). Applies to next query or
+        // restarted session only. The existing readback probe (runDebugFileReadbackProbe) remains as
+        // supporting evidence for settings→SDK option mapping.
         userSurface: 'settings', // Runtime tab text input, adjacent to debug toggle
       },
       {
@@ -2722,8 +2725,10 @@ export class SettingsCapabilityLabSection {
       (o) => this.runToolAliasesReadbackProof(adapter, o));
     this.addProofControl(proofControls, containerEl, t('settings.capabilityLab.proofs.debug.button'),
       (o) => this.runDebugReadbackProof(adapter, o));
-    this.addProofControl(proofControls, containerEl, 'Run Debug File Readback Proof',
+    this.addProofControl(proofControls, containerEl, t('settings.capabilityLab.proofs.debugFile.button'),
       (o) => this.runDebugFileReadbackProof(adapter, o));
+    this.addProofControl(proofControls, containerEl, t('settings.capabilityLab.proofs.debugFileLive.button'),
+      (o) => this.runDebugFileLiveProof(adapter, o));
     this.addProofControl(proofControls, containerEl, 'Run Strict MCP Config Readback Proof',
       (o) => this.runStrictMcpConfigReadbackProof(adapter, o));
     this.addProofControl(proofControls, containerEl, 'Run 1M Context Beta Readback Proof',
@@ -6419,47 +6424,71 @@ export class SettingsCapabilityLabSection {
     outputEl: HTMLElement,
   ): Promise<void> {
     outputEl.empty();
-    outputEl.createEl('p', { text: 'Running debug file readback probe…' });
+    outputEl.createEl('p', { text: t('settings.capabilityLab.proofs.debugFile.running') });
 
     try {
       const result = await adapter.runDebugFileReadbackProbe();
 
       outputEl.empty();
-      outputEl.createEl('h5', { text: 'Debug File Readback Proof' });
+      outputEl.createEl('h5', { text: t('settings.capabilityLab.proofs.debugFile.title') });
       outputEl.createEl('p', {
         cls: 'opencodian-capability-lab-hint',
-        text: '⚠️ Diagnostic readback only: verifies settings→SDK option mapping only. Actual CLI debug file writing is not independently verified from the plugin layer. Applies to the next query or restarted session only. Setting a debug file path implicitly enables debug logging even if the debug toggle is off.',
+        text: t('settings.capabilityLab.proofs.debugFile.boundary'),
       });
 
       outputEl.createEl('p', {
         cls: 'opencodian-capability-lab-hint',
-        text: `Option wired: ${result.optionWired ? '✓ yes' : '✗ no'}`,
+        text: t('settings.capabilityLab.proofs.debugFile.optionWired', {
+          status: t(result.optionWired
+            ? 'settings.capabilityLab.proofs.debugFile.status.yes'
+            : 'settings.capabilityLab.proofs.debugFile.status.no'),
+        }),
       });
       outputEl.createEl('p', {
         cls: 'opencodian-capability-lab-hint',
-        text: `Setting value: ${result.emptySetting ? '(empty)' : `"${result.settingValue}"`}`,
+        text: t('settings.capabilityLab.proofs.debugFile.settingValue', {
+          value: result.emptySetting
+            ? t('settings.capabilityLab.proofs.debugFile.emptyValue')
+            : `"${result.settingValue}"`,
+        }),
       });
       outputEl.createEl('p', {
         cls: 'opencodian-capability-lab-hint',
-        text: `SDK option present: ${result.sdkOptionPresent ? '✓ yes' : '✗ no'}`,
+        text: t('settings.capabilityLab.proofs.debugFile.sdkOptionPresent', {
+          status: t(result.sdkOptionPresent
+            ? 'settings.capabilityLab.proofs.debugFile.status.yes'
+            : 'settings.capabilityLab.proofs.debugFile.status.no'),
+        }),
       });
       if (result.sdkValue !== undefined) {
         outputEl.createEl('p', {
           cls: 'opencodian-capability-lab-hint',
-          text: `SDK value: "${result.sdkValue}"`,
+          text: t('settings.capabilityLab.proofs.debugFile.sdkValue', {
+            value: `"${result.sdkValue}"`,
+          }),
         });
       }
       outputEl.createEl('p', {
         cls: 'opencodian-capability-lab-hint',
-        text: `Value match: ${result.valueMatch ? '✓ yes' : '✗ no'}`,
+        text: t('settings.capabilityLab.proofs.debugFile.valueMatch', {
+          status: t(result.valueMatch
+            ? 'settings.capabilityLab.proofs.debugFile.status.yes'
+            : 'settings.capabilityLab.proofs.debugFile.status.no'),
+        }),
       });
 
       if (result.classification === 'readback') {
+        outputEl.createEl('p', {
+          cls: 'opencodian-capability-lab-hint',
+          text: t('settings.capabilityLab.proofs.debugFile.readback'),
+        });
         this.updateRuntimeProof('Debug File', 'readback', outputEl);
       } else {
         outputEl.createEl('p', {
           cls: 'opencodian-capability-lab-error',
-          text: `✗ Debug file readback probe failed: ${result.error ?? 'unknown error'}`,
+          text: t('settings.capabilityLab.proofs.debugFile.fail', {
+            error: result.error ?? t('settings.capabilityLab.proofs.debugFile.defaultError'),
+          }),
         });
         this.updateRuntimeProof('Debug File', 'fail', outputEl);
       }
@@ -6467,7 +6496,95 @@ export class SettingsCapabilityLabSection {
       outputEl.empty();
       outputEl.createEl('p', {
         cls: 'opencodian-capability-lab-error',
-        text: `Debug file readback proof failed: ${err instanceof Error ? err.message : String(err)}`,
+        text: t('settings.capabilityLab.proofs.debugFile.threw', {
+          error: err instanceof Error ? err.message : String(err),
+        }),
+      });
+      this.updateRuntimeProof('Debug File', 'fail', outputEl);
+    }
+  }
+
+  private async runDebugFileLiveProof(
+    adapter: ClaudeCodeAdapter,
+    outputEl: HTMLElement,
+  ): Promise<void> {
+    outputEl.empty();
+    outputEl.createEl('p', { text: t('settings.capabilityLab.proofs.debugFileLive.running') });
+
+    try {
+      const result = await adapter.runDebugFileLiveProbe();
+
+      outputEl.empty();
+      outputEl.createEl('h5', { text: t('settings.capabilityLab.proofs.debugFileLive.title') });
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: t('settings.capabilityLab.proofs.debugFileLive.boundary'),
+      });
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: t('settings.capabilityLab.proofs.debugFileLive.tempDir', {
+          path: result.tempDir,
+        }),
+      });
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: t('settings.capabilityLab.proofs.debugFileLive.debugFilePath', {
+          path: result.debugFilePath,
+        }),
+      });
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: t('settings.capabilityLab.proofs.debugFileLive.optionWired', {
+          status: t(result.optionWired
+            ? 'settings.capabilityLab.proofs.debugFileLive.status.yes'
+            : 'settings.capabilityLab.proofs.debugFileLive.status.no'),
+        }),
+      });
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: t('settings.capabilityLab.proofs.debugFileLive.fileCreated', {
+          status: t(result.fileExists
+            ? 'settings.capabilityLab.proofs.debugFileLive.status.yes'
+            : 'settings.capabilityLab.proofs.debugFileLive.status.no'),
+        }),
+      });
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: t('settings.capabilityLab.proofs.debugFileLive.fileSize', {
+          size: String(result.fileSize),
+        }),
+      });
+      if (result.sessionId) {
+        outputEl.createEl('p', {
+          cls: 'opencodian-capability-lab-hint',
+          text: t('settings.capabilityLab.proofs.debugFileLive.session', {
+            sessionId: result.sessionId,
+          }),
+        });
+      }
+
+      if (result.classification === 'pass') {
+        outputEl.createEl('p', {
+          cls: 'opencodian-capability-lab-hint',
+          text: t('settings.capabilityLab.proofs.debugFileLive.pass'),
+        });
+        this.updateRuntimeProof('Debug File', 'pass', outputEl);
+      } else {
+        outputEl.createEl('p', {
+          cls: 'opencodian-capability-lab-error',
+          text: t('settings.capabilityLab.proofs.debugFileLive.fail', {
+            error: result.error ?? t('settings.capabilityLab.proofs.debugFileLive.defaultError'),
+          }),
+        });
+        this.updateRuntimeProof('Debug File', 'fail', outputEl);
+      }
+    } catch (err) {
+      outputEl.empty();
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-error',
+        text: t('settings.capabilityLab.proofs.debugFileLive.threw', {
+          error: err instanceof Error ? err.message : String(err),
+        }),
       });
       this.updateRuntimeProof('Debug File', 'fail', outputEl);
     }
