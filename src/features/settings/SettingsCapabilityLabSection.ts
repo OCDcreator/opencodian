@@ -705,7 +705,11 @@ export class SettingsCapabilityLabSection {
         sdkExposed: !!adapter, // listSubagents, getSubagentMessages
         adapterWired: !!adapter, // adapter methods exist
         runtimeProof: 'pass', // Runtime verified (BUILD_ID feature-phase0-capability.202605300015, session 3437aca1-8433-458a-83f2-f3cb1b944841): inline agent definitions + Agent tool prompt triggers real subagent spawning. listSubagents() returned 1 subagent (a3c7d70a179a6bc1b), getSubagentMessages() returned 2 messages. Promoted from readback to pass.
-        userSurface: 'diagnostic', // Not in CLAUDE_CODE_PHASE1_CAPABILITIES
+        // DIAGNOSTIC ONLY: This row represents the diagnostic API browser (listSubagents/getSubagentMessages),
+        // not a stable user-facing subagent management surface. The stable user ability is ordinary chat
+        // task rendering — which is covered by 'Subagent Transcript / Progress' (userSurface: 'chat').
+        // There is no general subagent browser as a stable product surface.
+        userSurface: 'diagnostic', // Diagnostic API browser only; stable UX is task rendering in chat
       },
       {
         capability: 'Agent Definitions',
@@ -726,14 +730,14 @@ export class SettingsCapabilityLabSection {
         sdkExposed: true, // forwardSubagentText + agentProgressSummaries options
         adapterWired: true, // buildSdkOptions wires both
         runtimeProof: 'pass', // Runtime verified (BUILD_ID feature-phase0-capability.202605300015, session 47a3a9ed-ea6e-45a9-8b2a-67be62d807dc): inline agent definitions + Agent tool prompt triggers real subagent spawning, producing task_started and task_notification events in the stream. Model used Agent tool to invoke proof-worker subagent. Promoted from fail to pass.
-        // This row also subsumes the Claude Code `task` tool (Agent tool) rendering lifecycle:
-        // ToolCallRenderer special kind:'task' path, BackgroundTaskStreamTriggerCoordinator,
-        // BackgroundTaskInlinePanelRenderer, BackgroundTaskTimelineService, child session graph,
-        // tab indicators, completion notices. TodoWrite/TodoRead are rendered as generic builtin
-        // tools via SessionTodoCoordinator. TaskCreate/Get/Update/List/Output/Stop are project-management
-        // tools rendered via generic tool rendering. These are all tool-call-level features
-        // (model decides to invoke), not SDK Options-level capabilities (host configures before query).
-        userSurface: 'diagnostic', // Diagnostic-only; no stable chat transcript/progress UI
+        // STABLE CHAT SURFACE: This row covers the ordinary chat task/subagent/todo rendering that users already see:
+        // ToolCallRenderer kind:'task' path renders subagent type, description, session ID, and open button;
+        // BackgroundTaskStreamTriggerCoordinator manages lifecycle; BackgroundTaskInlinePanelRenderer shows inline status;
+        // BackgroundTaskTimelineService assembles timeline; ChildSessionGraphService renders child-session graph;
+        // tab indicators and completion notices signal background work; SessionTodoCoordinator renders todo snapshots.
+        // These are tool-call-level features (model decides to invoke), not SDK Options-level capabilities.
+        // SEPARATE from the diagnostic stream proof (forwardSubagentText + agentProgressSummaries backend events in Capability Lab).
+        userSurface: 'chat', // Stable chat surface: task/subagent tool rendering, background task UI, todo snapshots
       },
       {
         capability: 'Include Hook Events',

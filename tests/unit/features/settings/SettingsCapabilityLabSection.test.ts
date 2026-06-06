@@ -328,14 +328,14 @@ describe('SettingsCapabilityLabSection', () => {
     expect(hookRow?.textContent).toContain('Diagnostic');
     expect(hookRow?.querySelector('[data-surface]')?.getAttribute('data-surface')).toBe('diagnostic');
 
-    // Subagent Transcript / Progress: runtimeProof pass (inline agents + Agent tool prompt triggers real subagent spawning), diagnostic surface
+    // Subagent Transcript / Progress: runtimeProof pass (inline agents + Agent tool prompt triggers real subagent spawning), chat surface (task/subagent tool rendering)
     const subagentRow = getRow('Subagent Transcript / Progress');
     expect(subagentRow).not.toBeNull();
     expect(subagentRow?.textContent).toContain('SDK');
     expect(subagentRow?.textContent).toContain('Adapter');
     expect(subagentRow?.textContent).toContain('Verified');
-    expect(subagentRow?.textContent).toContain('Diagnostic');
-    expect(subagentRow?.querySelector('[data-surface]')?.getAttribute('data-surface')).toBe('diagnostic');
+    expect(subagentRow?.textContent).toContain('Chat');
+    expect(subagentRow?.querySelector('[data-surface]')?.getAttribute('data-surface')).toBe('chat');
   });
 
   it('renders exposed discovery rows for permission approval, AskUserQuestion, and MCP', () => {
@@ -1055,7 +1055,7 @@ describe('SettingsCapabilityLabSection', () => {
       'Agents (Subagents)': { runtimeProof: 'pass', userSurface: 'diagnostic' },
       'Agent Definitions': { runtimeProof: 'pass', userSurface: 'settings' },
       'Structured Output': { runtimeProof: 'pass', userSurface: 'chat' },
-      'Subagent Transcript / Progress': { runtimeProof: 'pass', userSurface: 'diagnostic' },
+      'Subagent Transcript / Progress': { runtimeProof: 'pass', userSurface: 'chat' },
       'Include Hook Events': { runtimeProof: 'pass', userSurface: 'diagnostic' },
       'Import Session to Store': { runtimeProof: 'pass', userSurface: 'hidden' },
       'Fork Session': { runtimeProof: 'pass', userSurface: 'chat' },

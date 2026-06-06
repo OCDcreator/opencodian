@@ -11,6 +11,46 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-06-06 Subagent Transcript / Progress + Agents (Subagents) — Truth-Sync (Reclassified)
+
+### What changed
+
+- **src/features/settings/SettingsCapabilityLabSection.ts**:
+  - Reclassified `Subagent Transcript / Progress` `userSurface` from `diagnostic` → `chat`: the ordinary chat task/subagent/todo rendering is already a stable user-facing surface via ToolCallRenderer (`kind:'task'`), BackgroundTaskStreamTriggerCoordinator, BackgroundTaskInlinePanelRenderer, BackgroundTaskTimelineService, ChildSessionGraphService, tab indicators, completion notices, and SessionTodoCoordinator.
+  - Kept `Agents (Subagents)` as `diagnostic` with clarified boundary comment: this row represents the diagnostic API browser (`listSubagents()` / `getSubagentMessages()`), not a stable subagent management surface. The stable user ability is chat task rendering, covered by `Subagent Transcript / Progress`.
+  - Updated matrix row comments to distinguish stable chat surfaces from diagnostic stream proof (forwardSubagentText + agentProgressSummaries backend events in Capability Lab).
+
+- **src/i18n/locales/en.ts + zh.ts**:
+  - Updated `settings.claudeCode.forwardSubagentText.desc` to clarify stable chat already renders task/subagent tools; the toggle only affects diagnostic stream capture.
+  - Updated `settings.claudeCode.agentProgressSummaries.desc` to note ordinary chat already shows background-task status when model invokes task tools.
+  - Updated `settings.claudeCode.sdkStreamBoundary.desc` to state subagent transcript/progress already renders as stable chat task tools; stream flags only affect diagnostic capture.
+
+- **tests/unit/features/settings/SettingsCapabilityLabSection.test.ts**:
+  - Updated expected `userSurface` for `Subagent Transcript / Progress` from `diagnostic` to `chat`.
+  - Updated comment to reflect chat surface classification.
+
+- **docs/modules/features/settings/SettingsCapabilityLabSection.md**:
+  - Updated item 6 to describe `Subagent Transcript / Progress` as `Chat` + `Verified` with 2026-06-06 truth-sync note.
+  - Updated item 7 (`Agents (Subagents)`) to clarify diagnostic-only API browser boundary.
+
+- **docs/status/claude-code-current-state-2026-05-22.md**:
+  - Updated table rows 9 (Agents) and 17 (Subagent Transcript) with reclassification notes and boundary explanations.
+
+- **docs/modules/i18n/locales/en.md + zh.md**:
+  - Added 2026-06-06 truth-sync changelog entries documenting locale description updates.
+
+### Why this matters
+
+The matrix previously understated the stable chat surface for task/subagent rendering. ToolCallRenderer, background task services, and todo coordinators have been rendering task tools in chat for months. Calling this "diagnostic-only" was misleading. The reclassification honestly distinguishes:
+- **Stable chat UX**: task tool rendering, background task indicators, todo snapshots (covered by `Subagent Transcript / Progress`, now `chat`).
+- **Diagnostic API browser**: `listSubagents()` / `getSubagentMessages()` (remains `diagnostic`, covered by `Agents (Subagents)`).
+- **Diagnostic stream proof**: `forwardSubagentText` + `agentProgressSummaries` backend events (remains a Capability Lab diagnostic probe, does not affect stable chat classification).
+
+### Remaining boundaries
+
+- `Agents (Subagents)` remains `diagnostic`: no stable subagent browser UI exists beyond the diagnostic API probes.
+- The diagnostic stream proof for subagent events is still present in Capability Lab but does not affect the stable chat surface claim.
+
 ## 2026-06-06 Backend Session Browser Cluster — Truth-Sync (Reclassified)
 
 ### What changed

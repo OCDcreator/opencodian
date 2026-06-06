@@ -109,6 +109,8 @@ OpenCodian 的英文翻译表，导出 `enTranslations` 静态对象。本轮新
 
 2026-05-28 文档更正：移除关于 `chat.input.placeholderJsonSuffix` 与 backend-aware composer placeholder 已落地的表述。当前实现未引入该 i18n 键，也未在输入框占位符中追加 `/json` discoverability 文案；discoverability 通过 composer capability hint 落地（`chat.input.capabilityHint.jsonLabel` + `chat.input.capabilityHint.jsonTooltip`，Claude Code backend 对用户显示 `Structured reply`，点击后底层仍插入 `/json `，OpenCode backend 不显示），并且仍然只覆盖固定 schema trigger，不暗示任意 schema authoring。
 
+2026-06-06 truth-sync：`settings.claudeCode.forwardSubagentText.desc` 和 `settings.claudeCode.agentProgressSummaries.desc` 更新，明确区分稳定聊天 task/subagent 渲染（ToolCallRenderer + background-task UI）与诊断流捕获。`settings.claudeCode.sdkStreamBoundary.desc` 同步更新，明确 subagent transcript/progress 已作为稳定聊天 surface 存在，诊断流开关仅影响额外事件捕获。Subagent Transcript / Progress 矩阵 `userSurface` 从 `diagnostic` 重新分类为 `chat`。
+
 2026-05-24 新增 `settings.claudeCode.sdkStreamBoundary.*` 键，用于 SDK Foundations 中 hook/subagent stream 开关前的 diagnostic boundary notice，明确这些开关只驱动诊断/实验事件流，不提供稳定 hook authoring 或完整 subagent transcript/progress UI。
 
 2026-05-27 新增 `settings.claudeCode.fallbackModel.boundaryNotice` 键，用于 Model & Thinking 标签中 fallback model 控件后的边界提示。文案说明 fallbackModel 的修改需要重启活跃 Claude Code 会话或开始新的查询,无法像主模型一样在已运行的流中实时更新。
