@@ -77,7 +77,7 @@ Option wiring proven through `buildClaudeCodeOptions`, but no independent plugin
 **Diagnostic (`userSurface: 'diagnostic'`) — 3**
 - File Checkpoint / Rewind — `rewindFiles(dryRun: true)` callable but returns `canRewind: false` for all candidates. Upstream blocker: SDK #236 (snapshot creation gated behind React/Ink UI code paths, never fires in `query()` mode).
 - Warm Startup — `startup()` callable and WarmQuery produces response. WarmQuery is single-use (query() once per handle); no persistent warm pool. "No startup latency" is SDK internal documentation claim, not independently measured. Readback ceiling.
-- Stderr Diagnostic — stderr callback wiring proven; actual stderr byte emission is environment-dependent (trivial queries may produce zero stderr).
+- Stderr Diagnostic — stderr callback wiring proven; no query reliably provokes stderr output. ✅ 2026-06-06 audit (Outcome B): fundamental limitation, not temporary gap. Debug File (pass/verified) covers the "capture debug output" use case.
 
 ---
 
@@ -94,7 +94,62 @@ These have adapter wiring and runtime proof, but no stable or diagnostic user su
 
 1. **File Checkpoint / Rewind** — Highest user-value if unblocked. Monitor Anthropic SDK bug #236. Re-audit on any SDK version bump that mentions checkpointing or interactive-mode fixes. Current state: readback with known upstream blocker.
 2. **1M Context Beta** — ✅ Audit complete (2026-06-06, Outcome B). Full SDK path traced: setting → buildClaudeCodeOptions → ProcessTransport.initialize() → CLI --betas flag. SDK init message has betas field but plugin does not consume it. Remains readback; hardened boundary text. Model-side beta acceptance unobservable. Potential future seam: consume init message betas field for stronger readback.
-3. **Stderr Diagnostic** — Audit whether any query reliably provokes stderr output (e.g. error scenario, debug mode), or if it should remain readback with hardened boundary. Current state: readback; callback wiring proven but stderr byte emission is environment-dependent.
+3. **Stderr Diagnostic** — ✅ Audit complete (2026-06-06, Outcome B). Callback wiring proven via real diagnostic query. No query reliably provokes stderr output — fundamental limitation (CLI-internal, unstructured, version-dependent, not contractual). Debug File (pass/verified) covers the "capture debug output" use case. Remains readback with hardened boundary.
+
+---
+
+## 2026-06-06 Stderr Diagnostic — Audit and Boundary Hardening (Outcome B)
+
+### Objective
+
+Audit the Claude Code SDK `Options.stderr?: (data: string) => void` seam to determine if it can be productized beyond diagnostic readback into a stable user-facing capability, or if it should remain readback with a hardened boundary.
+
+### SDK Seam Analysis
+
+The SDK exposes exactly one stderr-related API:
+
+```typescript
+// SDK Options
+stderr?: (data: string) => void;
+```
+
+When provided, the SDK's `spawnLocalProcess` sets `stdio[2]="pipe"` and forwards subprocess stderr via `stderr.on("data", callback)`. Without a callback, `stdio[2]="ignore"` — all subprocess stderr is silently discarded.
+
+### Decision
+
+**Outcome B** — Stderr Diagnostic REMAINS `readback` with hardened boundary.
+
+### What IS verified
+
+1. `Options.stderr` callback wiring is proven through `buildClaudeCodeOptions` → SDK options propagation.
+2. The probe runs a real diagnostic query with a callback and can capture stderr chunks when emitted.
+3. The callback correctly receives raw stderr text from the Claude Code subprocess.
+4. Sanitization (`sanitizeDiagnosticReport`) and truncation (240-char ceiling) work correctly.
+5. The probe is properly isolated: `isolatedDiagnosticOnly: true` — active chat sessions are unaffected.
+
+### What is NOT verified — and fundamentally unverifiable from the plugin layer
+
+1. **No query reliably provokes stderr output**: Tested trivial, error, and multi-turn scenarios. Stderr emission depends on CLI internals, platform, and SDK version. The probe's trivial query "Say 'stderr probe test'" often produces zero stderr.
+2. **Stderr is unstructured CLI-internal text**: Not contractual, not parseable, not stable across versions, not actionable for users.
+3. **Not a product surface**: Raw CLI stderr exposed as a user-facing feature would be a developer diagnostic tool, not a product capability.
+4. **Semantic overlap with Debug File**: The "capture debug output" use case is already covered by Debug File (pass/verified) with a deterministic filesystem side effect. Stderr is the byte-level transport; Debug File is the user-facing product.
+
+### Adjacent seams audited and REJECTED
+
+1. **Live stderr subscription in ordinary chat** — Would expose raw CLI-internal output to users. Unstructured, version-fragile, not actionable. No user workflow is served by a live stderr panel.
+2. **Error-provoking query to force stderr** — No query reliably forces stderr. Even error scenarios produce structured SDK events (result subtypes), not stderr output.
+3. **debug=true + stderr** — This is the "Debug" capability (separate row), not "Stderr Diagnostic". The task explicitly requires keeping the two distinct.
+4. **Structured stderr parsing** — No structured stderr contract exists. The SDK provides raw bytes, not parsed events.
+
+### Changes made
+
+- Matrix row comment hardened with explicit Outcome B, fundamental limitation details, and promotion path.
+- Locale boundary text (en+zh) updated with 2026-06-06 audit conclusion.
+- Module docs updated with audit findings.
+
+### Promotion path
+
+Requires one of: (a) SDK exposes structured stderr events (not raw byte stream), (b) contractual guarantee of stderr output per query, (c) SDK adds stderr-based status/error signals — none exists as of this audit.
 
 ---
 

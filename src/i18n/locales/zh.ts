@@ -3157,7 +3157,7 @@ export const zhTranslations = {
   'settings.capabilityLab.proofs.stderr.button': '运行 Stderr 诊断证明',
   'settings.capabilityLab.proofs.stderr.running': '正在运行 stderr 诊断探针（仅验证回调接线的 readback）…',
   'settings.capabilityLab.proofs.stderr.title': 'Stderr 诊断证明',
-  'settings.capabilityLab.proofs.stderr.boundary': '⚠️ 仅限诊断回读：已证明 stderr 回调接线。实际 stderr 输出取决于 SDK / CLI / 运行时，可能仍然为空。所有文本都会先脱敏再截断。不提供稳定的原始日志界面。',
+  'settings.capabilityLab.proofs.stderr.boundary': '⚠️ 仅限诊断回读：已证明 stderr 回调接线。2026-06-06 审计确认没有查询能可靠地触发 stderr 输出——发射取决于 CLI 内部实现、平台和 SDK 版本。Stderr 文本是非结构化的 CLI 内部输出，不是契约性 API 界面。"捕获调试输出"用例已由 Debug File（pass/verified）覆盖。不提供稳定的原始日志界面。',
   'settings.capabilityLab.proofs.stderr.isolatedBoundary': '隔离诊断查询：这个证明使用仅限诊断的合成回调。活跃的普通聊天会话不会获得实时 stderr 订阅。不暴露持久化原始日志界面，也不会写入文件。',
   'settings.capabilityLab.proofs.stderr.readbackObserved': '✓ 已验证 readback，而非行为验证。回调已接线，收到 {{chunks}} 个分片、{{totalBytes}} 字节。下方预览已脱敏并截断。',
   'settings.capabilityLab.proofs.stderr.readbackSilent': '✓ 已验证 readback，而非行为验证。回调已接线，但未观察到 stderr。',

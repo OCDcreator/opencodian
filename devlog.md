@@ -11,6 +11,32 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-06-06 Stderr Diagnostic — Audit and Boundary Hardening (Outcome B)
+
+Audit the `Stderr Diagnostic` capability to determine whether any real productizable user-facing seam exists beyond diagnostic readback.
+
+**Decision: Outcome B** — `Stderr Diagnostic` remains `runtimeProof: 'readback'`. No query reliably provokes stderr output — this is a fundamental limitation, not a temporary gap.
+
+**Audit findings:**
+
+1. SDK seam: `Options.stderr?: (data: string) => void` — the only stderr API. When provided, SDK sets `stdio[2]="pipe"` and forwards subprocess stderr via `stderr.on("data", callback)`. Without callback, `stdio[2]="ignore"` — all stderr silently discarded.
+2. Callback wiring is proven via real diagnostic query with `_diagnosticStderrCallback`.
+3. No query reliably provokes stderr output — tested trivial, error, and multi-turn scenarios. Emission depends on CLI internals, platform, and SDK version.
+4. Stderr output is unstructured CLI-internal text — not contractual, not parseable, not stable across versions, not actionable for users.
+5. Debug File (pass/verified) already covers the "capture debug output" use case with a deterministic filesystem side effect.
+6. Adjacent seams audited and rejected: (a) live stderr subscription in chat, (b) error-provoking query, (c) debug=true+stderr (separate Debug capability), (d) structured stderr parsing (SDK provides raw bytes, not parsed events).
+
+**Changes made:**
+
+- Matrix row comment hardened with explicit Outcome B, fundamental limitation details, and adjacent seams rejected.
+- Locale boundary text (en+zh) updated with 2026-06-06 audit conclusion.
+- docs/status/claude-code-current-state-2026-05-22.md: new dedicated audit section + updated readback entry + updated suggested next checkpoints.
+- docs/modules/features/settings/SettingsCapabilityLabSection.md: updated Stderr Diagnostic entry with Outcome B audit conclusion.
+- docs/modules/core/agents/backend/ClaudeCodeAdapter.md: updated probe doc with Outcome B conclusion.
+- docs/modules/i18n/locales/en.md + zh.md: changelog entries.
+
+---
+
 ## 2026-06-06 1M Context Beta — Audit SDK Path Trace and Boundary Hardening (Outcome B)
 
 Audit the `1M Context Beta` capability to determine whether any adjacent productizable seam exists beyond pure readback.

@@ -3158,7 +3158,7 @@ export const enTranslations = {
   'settings.capabilityLab.proofs.stderr.button': 'Run Stderr Diagnostic Proof',
   'settings.capabilityLab.proofs.stderr.running': 'Running stderr diagnostic probe (callback wiring readback)…',
   'settings.capabilityLab.proofs.stderr.title': 'Stderr Diagnostic Proof',
-  'settings.capabilityLab.proofs.stderr.boundary': '⚠️ Diagnostic readback: stderr callback wiring proven. Actual stderr emission depends on SDK/CLI/runtime and may be absent. All text is sanitized and truncated. No stable raw-log surface.',
+  'settings.capabilityLab.proofs.stderr.boundary': '⚠️ Diagnostic readback only: stderr callback wiring proven. 2026-06-06 audit confirmed no query reliably provokes stderr output — emission depends on CLI internals, platform, and SDK version. Stderr text is unstructured CLI-internal output, not a contractual API surface. The "capture debug output" use case is already covered by Debug File (pass/verified). No stable raw-log surface.',
   'settings.capabilityLab.proofs.stderr.isolatedBoundary': 'Isolated diagnostic query: this proof uses a synthetic diagnostic-only callback. Active ordinary chat sessions do not gain a live stderr subscription. No persistent raw-log surface or file write is exposed.',
   'settings.capabilityLab.proofs.stderr.readbackObserved': '✓ Readback verified — not behavior verified. Callback wired → received {{chunks}} chunk(s), {{totalBytes}} byte(s). Preview sanitized/truncated below.',
   'settings.capabilityLab.proofs.stderr.readbackSilent': '✓ Readback verified — not behavior verified. Callback wired — no stderr observed.',

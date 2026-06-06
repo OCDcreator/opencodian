@@ -1066,16 +1066,21 @@ export class SettingsCapabilityLabSection {
         capability: 'Stderr Diagnostic',
         sdkExposed: true, // SDK Options.stderr?: (data: string) => void
         adapterWired: true, // buildClaudeCodeOptions wires stderr when input.stderr is provided
-        runtimeProof: 'readback', // 2026-06-06 audit: callback wiring is proven via real diagnostic query.
+        runtimeProof: 'readback', // 2026-06-06 audit (Outcome B): callback wiring proven; stays readback.
         // SDK spawnLocalProcess (sdk.mjs): when stderr callback is provided, stdio[2]="pipe"
         // and subprocess stderr is forwarded via stderr.on("data", callback). Without callback,
         // stdio[2]="ignore" — all stderr silently discarded.
-        // Readback ceiling: actual stderr BYTE emission is environment-dependent. Trivial queries
-        // may produce zero stderr; output volume depends on SDK/CLI version and query type.
-        // The probe already runs a real query with a callback and captures stderr chunks,
-        // but classifying as "pass" when stderr is empty would be dishonest.
-        // Promotion path: if the SDK guarantees deterministic stderr output on every query,
-        // or if we can find a query that reliably provokes stderr (e.g. error scenario).
+        // FUNDAMENTAL LIMITATION (not temporary gap):
+        // 1. No query reliably provokes stderr output — tested trivial, error, and multi-turn
+        //    scenarios; stderr emission depends on CLI internals, platform, and SDK version.
+        // 2. Stderr output is unstructured CLI-internal text — not contractual, not parseable,
+        //    not stable across versions, not actionable for users.
+        // 3. The "capture debug output" use case is already covered by Debug File (pass/verified)
+        //    with a deterministic filesystem side effect.
+        // 4. Raw CLI stderr exposed as a user surface would be a developer diagnostic, not a
+        //    product capability — confusing, version-fragile, and semantically overlapping Debug.
+        // Promotion path: requires SDK to expose structured stderr events (not raw byte stream),
+        // or a contractual guarantee of stderr output per query — neither exists as of this audit.
         // All captured stderr text is sanitized via sanitizeDiagnosticReport and truncated to 240 chars.
         userSurface: 'diagnostic', // Capability Lab probe only; no stable settings UI
       },

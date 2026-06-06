@@ -95,6 +95,8 @@ OpenCodian 的英文翻译表，导出 `enTranslations` 静态对象。本轮新
 
 2026-06-06 Continue / Resume Session At Position 边界硬化：`settings.capabilityLab.proofs.continue.boundary` 与 `settings.capabilityLab.proofs.resumeSessionAt.boundary` 已更新，各自列出四条保留诊断状态的明确原因。Continue 的 blockers：(1) adapter 已自动维护普通对话连续性；(2) continue 是隐式标志，与显式会话追踪冲突；(3) 所有真实需求已由稳定界面覆盖；(4) 暴露为用户控件只会增加不确定性。Resume Session At Position 的 blockers：(1) Fork Session 已提供稳定分支界面；(2) resumeSessionAt 原地修改会话状态，无清晰 UX 路径；(3) 与追加式对话历史模型冲突；(4) adapter 已显式将其置于诊断标志之后。取代之前较模糊的 "not a stable product surface" 措辞。
 
+2026-06-06 Stderr Diagnostic Outcome B 审计硬化：`settings.capabilityLab.proofs.stderr.boundary` 已更新，显式标注 2026-06-06 审计结论：无查询能可靠触发 stderr 输出；stderr 是非结构化 CLI 内部输出，非契约性 API 界面；Debug File（pass/verified）已覆盖"捕获调试输出"用例。
+
 2026-06-04 又新增 `settings.capabilityLab.proofs.stderr.*` 键，把 Stderr Diagnostic proof 的按钮、运行中、标题、readback/fail 提示和“隔离诊断查询 / 无持久 raw-log surface / 不写文件”诚实边界文案收进 locale。这样 Capability Lab 在英文和中文下都显示同一组 readback 语义，而不会在中文环境退回硬编码英文。
 
 2026-06-04 继续新增 `settings.capabilityLab.proofs.planModeInstructions.*` 键（18+ proof keys 覆盖中英双语），把 Plan Mode Instructions readback proof 的按钮、运行中、标题、边界文案、生命周期边界、option-wired/permission-mode/setting-value/sdk-option/sdk-value/builder-wiring-nuance/value-match 状态行，以及 readback/fail/thrown 提示全部收进 locale。取代之前的硬编码英文，使 Capability Lab 在中文界面下同样显示明确的 readback 语义和生命周期边界（“Applies on the next query or restarted session only. Active sessions do not update live.”）。
