@@ -1065,7 +1065,7 @@ describe('SettingsCapabilityLabSection', () => {
       '/context Diagnostic': { runtimeProof: 'pass', userSurface: 'diagnostic' },
       'Warm Startup': { runtimeProof: 'readback', userSurface: 'diagnostic' },
       'Sandbox': { runtimeProof: 'readback', userSurface: 'settings' },
-      'Session Title': { runtimeProof: 'pass', userSurface: 'diagnostic' },
+      'Session Title': { runtimeProof: 'pass', userSurface: 'settings+chat' },
       'Prompt Suggestions': { runtimeProof: 'pass', userSurface: 'chat' },
       'Task Budget': { runtimeProof: 'readback', userSurface: 'settings' },
       'Plan Mode Instructions': { runtimeProof: 'pass', userSurface: 'settings' },

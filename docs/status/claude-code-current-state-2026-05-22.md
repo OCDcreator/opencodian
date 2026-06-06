@@ -954,8 +954,9 @@ Promote the existing Session Title diagnostic harness from `readback` to `pass` 
 ### Honesty Boundaries
 
 - Classification: **pass** (matrix) — promotion is anchored to a live backend `customTitle` exact match, not just option wiring.
-- **Diagnostic-only**: ordinary chat paths still set titles through `createSession` / `sendMessage`, not through `_diagnosticTitle`.
-- **Stable title settings UI added 2026-06-05**: Conversation settings now expose a "Let Claude auto-generate titles" toggle (`backend.claudeCode.autoTitle`), default enabled. When enabled, new sessions pass an empty title so the SDK auto-generates a summary; when disabled, sessions use the fixed "New Claude Code chat" title. The history panel footer also provides a "Title preferences" global entry point that navigates to the conversation title settings.
+- **Truth-sync 2026-06-06**: `userSurface` reclassified from `diagnostic` to `settings+chat` because stable title UX already exists (auto-title toggle, title preferences entry point, displayed customTitle). The diagnostic proof harness remains for exact `customTitle` semantics verification, but the capability is no longer diagnostic-only.
+- **Stable title settings UI added 2026-06-05**: Conversation settings now expose a "Let Claude auto-generate titles" toggle (`backend.claudeCode.autoTitle`), default enabled. When enabled, new sessions pass an empty title so the SDK auto-generates a summary; when disabled, sessions use the fixed "New Claude Code chat" title. The history panel footer also provides a "Title preferences" global entry point that navigates to the conversation title settings. Backend session browser displays `customTitle`.
+- **Honesty boundary**: stable surface is auto-title toggle + title preferences + displayed titles only; does NOT claim arbitrary custom title authoring/editing.
 - Does not modify other pass/readback boundaries.
 - Matrix: 45 rows, 28 pass, 17 readback, 0 fail.
 

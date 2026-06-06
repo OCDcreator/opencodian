@@ -11,6 +11,31 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-06-06 Session Title — Truth-Sync (Reclassified)
+
+### What changed
+
+- **src/features/settings/SettingsCapabilityLabSection.ts**:
+  - Reclassified `Session Title` `userSurface` from `diagnostic` → `settings+chat`: stable title UX already exists — Conversation settings expose `autoTitle` toggle (`backend.claudeCode.autoTitle`), history footer provides "Title preferences" entry point, and backend session browser displays `customTitle`.
+  - Updated row comment to distinguish stable surface (auto-title toggle / title preferences / displayed titles) from the diagnostic exact-match proof harness for backend `customTitle` semantics.
+  - Honesty boundary: does NOT claim arbitrary custom title authoring/editing beyond the auto-title toggle.
+
+- **tests/unit/features/settings/SettingsCapabilityLabSection.test.ts**: Updated expected `userSurface` for `Session Title` from `diagnostic` to `settings+chat`.
+
+- **docs/modules/features/settings/SettingsCapabilityLabSection.md**: Updated audit item 16 to reflect `Settings+Chat` + `Verified` classification with 2026-06-06 truth-sync note.
+
+- **docs/status/claude-code-current-state-2026-05-22.md**: Updated Session Title pass seam honesty boundaries to document the truth-sync.
+
+### Classification
+
+- `runtimeProof`: `pass` (unchanged — live backend `customTitle` exact match verified 2026-06-03)
+- `userSurface`: `settings+chat` (was `diagnostic`)
+- Stable surface claimed: auto-title toggle, title preferences entry point, displayed customTitle in backend session browser
+- Remaining diagnostic seam: Capability Lab "Run Session Title Proof" button verifies exact `customTitle` semantics
+- NOT claimed: arbitrary custom title authoring/editing
+
+---
+
 ## 2026-06-06 Subagent Transcript / Progress + Agents (Subagents) — Truth-Sync (Reclassified)
 
 ### What changed

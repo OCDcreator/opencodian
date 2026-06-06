@@ -834,8 +834,13 @@ export class SettingsCapabilityLabSection {
         // feature-phase0-capability.202606030440): runSessionTitleProbe created diagnostic session
         // d98c73ea-d4cf-4c8b-9d34-941e42da4288 with requested title
         // "OpenCodian Diagnostic Session Title 1780433378625-1slp1q", and getSession() returned an exact
-        // customTitle match. Diagnostic-only seam; ordinary chat still uses createSession/sendMessage titles.
-        userSurface: 'diagnostic', // Capability Lab diagnostic proof button only; no stable title settings UI
+        // customTitle match.
+        // Stable user surface (settings+chat): Conversation settings expose auto-title toggle
+        // (backend.claudeCode.autoTitle); history footer provides "Title preferences" entry point;
+        // backend session browser displays customTitle. Diagnostic proof harness (Capability Lab
+        // "Run Session Title Proof") separately verifies exact backend customTitle semantics.
+        // NOT claimed: arbitrary custom title authoring/editing beyond auto-title toggle.
+        userSurface: 'settings+chat',
       },
       {
         capability: 'Prompt Suggestions',
