@@ -213,6 +213,141 @@ export async function readBackendSessionShareUrl(
 }
 
 // ---------------------------------------------------------------------------
+// Backend-aware session detail normalization (stable inspection seam)
+// ---------------------------------------------------------------------------
+
+/**
+ * Normalized session-detail shape for stable inspection surfaces.
+ *
+ * This is a **best-effort detail seam**, not a generic cross-backend
+ * session-detail contract. Fields that the backend does not provide are
+ * returned as `null`. Consumers should omit or label unavailable fields
+ * rather than inventing fake values.
+ */
+export interface NormalizedSessionDetail {
+  id: string;
+  backendKind: string;
+  /** Display title (summary for Claude, title for OpenCode). */
+  title: string;
+  /** Backend summary or description, if distinct from title. */
+  summary: string;
+  createdAt: number | null;
+  updatedAt: number | null;
+  customTitle: string | null;
+  /** Best-effort backend-specific fields — null when unavailable. */
+  gitBranch: string | null;
+  cwd: string | null;
+  tag: string | null;
+  fileSize: number | null;
+}
+
+/**
+ * Read session detail metadata from the active backend as a normalized object.
+ *
+ * Routes through the registry and calls `getSession(sessionId)` on the active
+ * session-capable adapter, then extracts fields based on the active backend
+ * kind. Returns `null` when no session-capable adapter is available,
+ * `getSession` is not implemented, or the session is not found.
+ *
+ * This is a **narrow read-only seam** for stable inspection surfaces. It does
+ * not expose raw provider-owned diagnostic controls.
+ */
+export async function getBackendSessionDetail(
+  registry: AgentServiceRegistry | null | undefined,
+  sessionId: string,
+): Promise<NormalizedSessionDetail | null> {
+  const active = getActiveSessionBackendService(registry);
+  if (!active || typeof active.getSession !== 'function') {
+    return null;
+  }
+
+  let session: unknown;
+  try {
+    session = await active.getSession(sessionId);
+  } catch {
+    return null;
+  }
+  if (!session || typeof session !== 'object') {
+    return null;
+  }
+
+  const record = session as Record<string, unknown>;
+  const kind = (active as { kind?: string }).kind ?? 'unknown';
+
+  return extractSessionDetailFields(record, kind, sessionId);
+}
+
+/** Extract normalized detail fields from a raw session record. */
+function extractSessionDetailFields(
+  record: Record<string, unknown>,
+  kind: string,
+  fallbackId: string,
+): NormalizedSessionDetail {
+  const id = String(record.id ?? record.sessionId ?? fallbackId);
+  const updatedAt = extractTimestamp(record, 'lastModified', 'updatedAt', 'updated');
+  const createdAt = extractTimestamp(record, 'createdAt', undefined, 'created');
+  const customTitle = typeof record.customTitle === 'string' && record.customTitle.trim()
+    ? record.customTitle.trim()
+    : null;
+
+  const { title, summary } = extractTitleSummary(record, kind);
+  const stringField = (value: unknown): string | null =>
+    typeof value === 'string' && value.trim() ? value.trim() : null;
+  const numberField = (value: unknown): number | null =>
+    typeof value === 'number' && Number.isFinite(value) ? value : null;
+
+  return {
+    id,
+    backendKind: kind,
+    title,
+    summary,
+    createdAt,
+    updatedAt,
+    customTitle,
+    gitBranch: stringField(record.gitBranch ?? record.git_branch),
+    cwd: stringField(record.cwd ?? record.workingDirectory ?? record.working_directory),
+    tag: stringField(record.tag),
+    fileSize: numberField(record.fileSize ?? record.file_size),
+  };
+}
+
+/** Extract a timestamp from a session record, trying multiple field paths. */
+function extractTimestamp(
+  record: Record<string, unknown>,
+  direct: string,
+  alt?: string,
+  timeField?: string,
+): number | null {
+  if (typeof record[direct] === 'number') return record[direct] as number;
+  if (alt && typeof record[alt] === 'number') return record[alt] as number;
+  if (timeField) {
+    const time = record.time as Record<string, unknown> | undefined;
+    if (time && typeof time === 'object' && typeof time[timeField] === 'number') {
+      return time[timeField] as number;
+    }
+  }
+  return null;
+}
+
+/** Extract title and summary based on backend kind. */
+function extractTitleSummary(
+  record: Record<string, unknown>,
+  kind: string,
+): { title: string; summary: string } {
+  if (kind === 'opencode') {
+    return {
+      title: String(record.title ?? ''),
+      summary: String(record.description ?? ''),
+    };
+  }
+  // Claude Code and generic: summary is the main title field
+  return {
+    title: String(record.summary ?? record.title ?? ''),
+    summary: String(record.summary ?? ''),
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Backend-aware session message normalization
 // ---------------------------------------------------------------------------
 

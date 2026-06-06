@@ -4,6 +4,7 @@ import { describe, expect, it } from '@jest/globals';
 import { AgentCapability, OPENCODE_FULL_CAPABILITIES } from '../../../../../src/core/agents/AgentCapability';
 import {
   getActiveSessionHistoryService,
+  getBackendSessionDetail,
   getBackendSessionPreview,
   getConversationSessionBackendService,
   getConversationSessionHistoryService,
@@ -963,5 +964,164 @@ describe('getBackendSessionPreview', () => {
     // Should use top-level content since nested message has no content
     expect(result![0].role).toBe('user');
     expect(result![0].parts).toEqual([{ type: 'text', text: 'top-level fallback' }]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getBackendSessionDetail
+// ---------------------------------------------------------------------------
+
+describe('getBackendSessionDetail', () => {
+  it('returns null when registry is null', async () => {
+    const result = await getBackendSessionDetail(null, 'ses-1');
+    expect(result).toBeNull();
+  });
+
+  it('returns null when active adapter lacks getSession', async () => {
+    const adapter = createMockSessionAdapter('claude-code', new Set([
+      AgentCapability.Chat,
+      AgentCapability.Sessions,
+    ]));
+    // No getSession method
+    const registry = createMockRegistry(new Map([['claude-code', adapter]]));
+    const result = await getBackendSessionDetail(registry, 'ses-1');
+    expect(result).toBeNull();
+  });
+
+  it('returns null when no active backend exists', async () => {
+    const registry = createMockRegistry(new Map());
+    const result = await getBackendSessionDetail(registry, 'ses-1');
+    expect(result).toBeNull();
+  });
+
+  it('normalizes Claude Code session detail with sessionId/summary/lastModified', async () => {
+    const adapter = createMockSessionAdapter('claude-code', new Set([
+      AgentCapability.Chat,
+      AgentCapability.Sessions,
+    ]), {
+      getSession: async () => ({
+        sessionId: 'ses-claude-1',
+        summary: 'Test Claude session',
+        lastModified: 1717500000000,
+        createdAt: 1717400000000,
+        customTitle: 'My Title',
+      }),
+    });
+    const registry = createMockRegistry(new Map([['claude-code', adapter]]));
+    const result = await getBackendSessionDetail(registry, 'ses-claude-1');
+
+    expect(result).not.toBeNull();
+    expect(result!.id).toBe('ses-claude-1');
+    expect(result!.backendKind).toBe('claude-code');
+    expect(result!.title).toBe('Test Claude session');
+    expect(result!.summary).toBe('Test Claude session');
+    expect(result!.updatedAt).toBe(1717500000000);
+    expect(result!.createdAt).toBe(1717400000000);
+    expect(result!.customTitle).toBe('My Title');
+    expect(result!.gitBranch).toBeNull();
+    expect(result!.cwd).toBeNull();
+  });
+
+  it('normalizes OpenCode session detail with id/title/time shape', async () => {
+    const adapter = createMockSessionAdapter('opencode', new Set([
+      AgentCapability.Chat,
+      AgentCapability.Sessions,
+    ]), {
+      getSession: async () => ({
+        id: 'ses-oc-1',
+        title: 'OpenCode session',
+        time: { created: 1717300000000, updated: 1717600000000 },
+      }),
+    });
+    const registry = createMockRegistry(new Map([['opencode', adapter]]));
+    const result = await getBackendSessionDetail(registry, 'ses-oc-1');
+
+    expect(result).not.toBeNull();
+    expect(result!.id).toBe('ses-oc-1');
+    expect(result!.backendKind).toBe('opencode');
+    expect(result!.title).toBe('OpenCode session');
+    expect(result!.createdAt).toBe(1717300000000);
+    expect(result!.updatedAt).toBe(1717600000000);
+  });
+
+  it('extracts best-effort gitBranch and cwd fields', async () => {
+    const adapter = createMockSessionAdapter('claude-code', new Set([
+      AgentCapability.Chat,
+      AgentCapability.Sessions,
+    ]), {
+      getSession: async () => ({
+        sessionId: 'ses-extra',
+        summary: 'Extra fields session',
+        lastModified: 1717500000000,
+        gitBranch: 'feature/test',
+        cwd: '/home/user/project',
+        fileSize: 4096,
+      }),
+    });
+    const registry = createMockRegistry(new Map([['claude-code', adapter]]));
+    const result = await getBackendSessionDetail(registry, 'ses-extra');
+
+    expect(result).not.toBeNull();
+    expect(result!.gitBranch).toBe('feature/test');
+    expect(result!.cwd).toBe('/home/user/project');
+    expect(result!.fileSize).toBe(4096);
+  });
+
+  it('returns null when getSession throws', async () => {
+    const adapter = createMockSessionAdapter('claude-code', new Set([
+      AgentCapability.Chat,
+      AgentCapability.Sessions,
+    ]), {
+      getSession: async () => { throw new Error('not found'); },
+    });
+    const registry = createMockRegistry(new Map([['claude-code', adapter]]));
+    const result = await getBackendSessionDetail(registry, 'missing');
+    expect(result).toBeNull();
+  });
+
+  it('returns null when getSession returns null', async () => {
+    const adapter = createMockSessionAdapter('claude-code', new Set([
+      AgentCapability.Chat,
+      AgentCapability.Sessions,
+    ]), {
+      getSession: async () => null,
+    });
+    const registry = createMockRegistry(new Map([['claude-code', adapter]]));
+    const result = await getBackendSessionDetail(registry, 'missing');
+    expect(result).toBeNull();
+  });
+
+  it('returns null when session is not an object', async () => {
+    const adapter = createMockSessionAdapter('claude-code', new Set([
+      AgentCapability.Chat,
+      AgentCapability.Sessions,
+    ]), {
+      getSession: async () => 'not-an-object',
+    });
+    const registry = createMockRegistry(new Map([['claude-code', adapter]]));
+    const result = await getBackendSessionDetail(registry, 'bad');
+    expect(result).toBeNull();
+  });
+
+  it('omits empty-string customTitle and best-effort fields', async () => {
+    const adapter = createMockSessionAdapter('claude-code', new Set([
+      AgentCapability.Chat,
+      AgentCapability.Sessions,
+    ]), {
+      getSession: async () => ({
+        sessionId: 'ses-empty',
+        summary: '',
+        lastModified: 1717500000000,
+        customTitle: '   ',
+        gitBranch: '',
+      }),
+    });
+    const registry = createMockRegistry(new Map([['claude-code', adapter]]));
+    const result = await getBackendSessionDetail(registry, 'ses-empty');
+
+    expect(result).not.toBeNull();
+    expect(result!.customTitle).toBeNull();
+    expect(result!.gitBranch).toBeNull();
+    expect(result!.title).toBe('');
   });
 });

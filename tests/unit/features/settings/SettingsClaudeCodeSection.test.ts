@@ -2527,4 +2527,47 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       }
     });
   });
+
+  describe('backend session browser launcher', () => {
+    it('renders session browser launcher button in runtime tab', () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'runtime');
+
+      const launchButton = findButton(t('settings.claudeCode.sessionBrowser.launchButton'));
+      expect(launchButton).toBeDefined();
+      expect(launchButton.onClick).toBeDefined();
+    });
+
+    it('renders session browser info notice in runtime tab', () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'runtime');
+
+      const infoEl = containerEl.querySelector('[data-claude-code-session-browser-info="true"]');
+      expect(infoEl).toBeTruthy();
+    });
+
+    it('renders browse-only notice explaining resume requires chat view', () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'runtime');
+
+      const browseOnlyEl = containerEl.querySelector('[data-claude-code-session-browser-browse-only="true"]');
+      expect(browseOnlyEl).toBeTruthy();
+      expect(browseOnlyEl?.textContent).toContain(t('settings.claudeCode.sessionBrowser.browseOnlyNotice'));
+    });
+  });
 });

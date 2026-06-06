@@ -5,7 +5,7 @@
 
 ## 概述
 
-OpenCodian 的简体中文翻译表，导出 `zhTranslations` 静态对象。本轮新增 `chat.backendSessions.*` 键（backend session browser modal：浏览/预览/恢复 backend sessions + preview transcript seeding）和 `settings.claudeCode.sessionBrowser.info`（settings 侧 session browser 说明）以及 `settings.claudeCode.projectSettings.*` 键（含 `marketplacesSummary` / `noMarketplaces` / `boundaryNotice` 含 settingSources 要求说明）。 `chat.sessionSharing.*` 与 `settings.conversation.share.sharedSessions.*` / `settings.conversation.share.diagnostics.*`，用于当前会话分享状态、分享禁用提示、分享失败归一化说明、分享诊断、已分享会话列表、公开数量、刷新、完整预览、复制链接和取消分享操作；其中新增 `settings.conversation.share.sharedSessions.previewEmpty`，用于区分“后端不可预览”和“会话暂时没有可预览消息”的中性空态。 同时保留 `settings.conversation.share.help.*`、`settings.security.blockedCommands.help.*` 与 `settings.projectConfigHelp.*`，用于会话分享模式和 `permission.bash` 帮助弹窗。
+OpenCodian 的简体中文翻译表，导出 `zhTranslations` 静态对象。本轮新增并扩展 `chat.backendSessions.*` 键（backend session browser modal：浏览/预览/恢复 backend sessions、preview transcript seeding、详情 metadata、完整 transcript、preview/detail 导航）和 `settings.claudeCode.sessionBrowser.*`（settings 侧 browse-only session browser launcher：说明、按钮和 browse-only notice）以及 `settings.claudeCode.projectSettings.*` 键（含 `marketplacesSummary` / `noMarketplaces` / `boundaryNotice` 含 settingSources 要求说明）。 `chat.sessionSharing.*` 与 `settings.conversation.share.sharedSessions.*` / `settings.conversation.share.diagnostics.*`，用于当前会话分享状态、分享禁用提示、分享失败归一化说明、分享诊断、已分享会话列表、公开数量、刷新、完整预览、复制链接和取消分享操作；其中新增 `settings.conversation.share.sharedSessions.previewEmpty`，用于区分“后端不可预览”和“会话暂时没有可预览消息”的中性空态。 同时保留 `settings.conversation.share.help.*`、`settings.security.blockedCommands.help.*` 与 `settings.projectConfigHelp.*`，用于会话分享模式和 `permission.bash` 帮助弹窗。
 
 会话设置弹窗本轮还新增了 `chat.sessionSettings.modal.globalDefaultsGroup`、`globalDefaultsDesc` 和 `summary.*` 文案，用于 Display 分组下方的全局默认值摘要行与“打开设置”按钮。
 
@@ -168,6 +168,7 @@ t('settings.server.started')
 |------|--------|------|
 | `settings.*` | 400+ | 设置界面（最大分组，含完整 debug logging 文案） |
 | `chat.*` | 150+ | 聊天界面 |
+| `settings.claudeCode.sessionBrowser.*` | 4+ | Claude Code 设置页中的 browse-only backend session browser launcher 文案 |
 | `plugin.*` | 2 | 插件基础信息 |
 
 ### 主要键域
@@ -231,6 +232,15 @@ t('settings.server.started')
 10. `summary.on`
 11. `summary.off`
 12. `summary.openSettings`
+
+## 2026-06-06 Backend session detail 与设置页入口
+
+Backend session browser locale 覆盖扩展到 inline detail 模式和 Settings 入口：
+
+1. `chat.backendSessions.detailTitle`、`detailLoading`、`detailMetadataUnavailable` 和 `detailField.*` 为 id/backend/title/summary/时间/custom title/git branch/cwd/tag/file size 等 metadata 行提供标签。
+2. `chat.backendSessions.detailTranscriptTitle`、`detailTranscriptNotice`、`detailTranscriptEmpty` 和 `detailTranscriptCount` 描述完整 transcript 面板。
+3. `chat.backendSessions.previewNotice`、`viewDetails` 和 `backToPreview` 区分截断预览与完整详情视图。
+4. `settings.claudeCode.sessionBrowser.launchName`、`launchDesc`、`launchButton` 和 `browseOnlyNotice` 支撑 Settings 中的 browse-only launcher。
 
 ## 2026-04-23 Conversation settings grouping
 

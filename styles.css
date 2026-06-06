@@ -5348,9 +5348,118 @@ img.opencodian-model-provider-header-icon {
   border-top: 1px solid var(--background-modifier-border);
 }
 
-.opencodian-backend-session-browser-resume-btn:disabled {
+.opencodian-backend-session-browser-resume-btn:disabled,
+.opencodian-backend-session-browser-detail-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* Preview notice */
+.opencodian-backend-session-browser-preview-notice {
+  margin-bottom: 8px;
+}
+.opencodian-backend-session-browser-preview-notice p {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-style: italic;
+  margin: 0;
+}
+
+/* Detail view */
+.opencodian-backend-session-browser-detail-metadata {
+  margin-bottom: 16px;
+}
+.opencodian-backend-session-browser-detail-metadata h4 {
+  margin: 0 0 8px 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+.opencodian-backend-session-browser-detail-unavailable {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-style: italic;
+}
+.opencodian-backend-session-browser-detail-field {
+  display: flex;
+  gap: 8px;
+  padding: 3px 0;
+  font-size: 12px;
+  line-height: 1.4;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+.opencodian-backend-session-browser-detail-field:last-child {
+  border-bottom: none;
+}
+.opencodian-backend-session-browser-detail-field-label {
+  flex: 0 0 100px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+.opencodian-backend-session-browser-detail-field-value {
+  flex: 1;
+  word-break: break-all;
+  min-width: 0;
+}
+
+/* Detail transcript */
+.opencodian-backend-session-browser-detail-transcript {
+  border-top: 1px solid var(--background-modifier-border);
+  padding-top: 12px;
+}
+.opencodian-backend-session-browser-detail-transcript h4 {
+  margin: 0 0 4px 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+.opencodian-backend-session-browser-detail-transcript-notice {
+  margin-bottom: 8px;
+}
+.opencodian-backend-session-browser-detail-transcript-notice p {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-style: italic;
+  margin: 0;
+}
+.opencodian-backend-session-browser-detail-transcript-empty {
+  color: var(--text-muted);
+  font-size: 12px;
+  padding: 12px 0;
+}
+.opencodian-backend-session-browser-detail-transcript-count {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin: 0 0 8px 0;
+}
+.opencodian-backend-session-browser-detail-messages {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.opencodian-backend-session-browser-detail-msg {
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+.opencodian-backend-session-browser-detail-msg-user {
+  background-color: var(--background-modifier-hover);
+}
+.opencodian-backend-session-browser-detail-msg-assistant {
+  background-color: var(--background-primary-alt);
+}
+.opencodian-backend-session-browser-detail-msg-role {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  margin-bottom: 2px;
+}
+.opencodian-backend-session-browser-detail-msg-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.5;
+  max-height: 300px;
+  overflow-y: auto;
 }
 
 

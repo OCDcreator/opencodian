@@ -20,8 +20,16 @@
 - 提供 `readBackendSessionShareUrl()` 用于 backend-aware session 分享链接读取路由，通过 `getSession(sessionId)` 获取 session 详情并按已 productize 的 backend kind 提取分享 URL（OpenCode: `session.share.url`；Claude Code 及其他 backend 目前无分享概念，返回 `null`）。这是一个**窄的 backend-aware session-detail read seam**，仅用于分享链接读取，不作为 generic stable cross-backend session-detail object contract
 - 提供 `listBackendSessions()` 用于 active backend 的 session 列表路由，调用 `listSessions()` 并将原始结果归一化为 `NormalizedSessionRow[]`（`id`/`title`/`shareUrl`/`updatedAt`），使 settings inspection surface 不再直接依赖 OpenCode `Session` 类型；其中 `shareUrl` 只在 active backend kind 为 `opencode` 时从 `record.share.url` 提取，Claude Code / generic backend 即使返回兼容 `share` 字段也归一化为 `null`
 - 提供 `getBackendSessionPreview()` 用于 active backend 的 session 消息预览路由，调用 `getSessionMessages()` 并将原始结果归一化为 `NormalizedSessionPreviewMessage[]`（`role`/`parts[]`），使 settings 预览不再假设 OpenCode `{info, parts}` 消息形状；当 backend 不支持该读取时返回 `null`，当 backend 支持但没有消息时返回空数组
+- 提供 `getBackendSessionDetail()` 用于 active backend 的 session 详情读取路由，通过 `getSession()` 做 best-effort metadata 归一化并返回 `NormalizedSessionDetail`（`id`、`backendKind`、`title`、`summary`、`createdAt`、`updatedAt`、`customTitle`、`gitBranch`、`cwd`、`tag`、`fileSize`），供 settings/chat inspection surface 稳定展示详情；backend 不支持或读取失败时返回 `null`
 - 提供 `loadBackendSessionMessages()` 用于从 backend 加载并归一化原始 session 消息。OpenCode 消息按 `{info, parts}` 形状解析，Claude / 其他 backend 使用 best-effort 通用归一化。当没有 session history service 或 `getSessionMessages` 返回非数组时返回 `[]`，避免在 OpenCode path 上直接对非数组值调用 `.map` 导致 runtime crash
-- 提供 `NormalizedSessionRow`、`NormalizedSessionPreviewMessage`、`NormalizedSessionPreviewPart` 轻量类型，仅供 inspection surface 消费，不作为 stable cross-backend session contract
+- 提供 `NormalizedSessionRow`、`NormalizedSessionDetail`、`NormalizedSessionMessage`、`NormalizedSessionPreviewMessage`、`NormalizedSessionPreviewPart` 轻量类型，仅供 inspection surface 消费，不作为 stable cross-backend session contract
+
+## 公共导出
+
+| 导出 | 类型 | 说明 |
+|------|------|------|
+| `NormalizedSessionDetail` | interface | Active backend session 详情的 best-effort metadata 归一化结果，字段覆盖标题、摘要、时间、custom title、git branch、cwd、tag 和文件大小 |
+| `getBackendSessionDetail()` | async function | 调用 active backend `getSession()` 并归一化为 `NormalizedSessionDetail`，作为 session detail inspection surface 的稳定 seam；不可用或失败时返回 `null` |
 
 ## 维护约束
 
@@ -34,3 +42,4 @@
 - 2026-05-23 第四轮 runtime-safety 加固为 `getBackendSessionPreview()` 的 OpenCode `{info, parts}` 归一化路径增加了 `parts` 内部 null / primitive item 过滤，防止 backend 返回的 `parts` 数组中包含 `null` 或 primitive 元素时 `part.type` 属性访问抛出 TypeError；该修复与 Claude content block 路径已有的 null 过滤保持一致
 - 2026-05-24 boundary slice 收紧 `listBackendSessions()` 的分享链接归一化：只有 active OpenCode backend 的 row 会保留 `share.url` 为 `shareUrl`，Claude Code / generic backend 的 session 预览、title/summary、updatedAt 归一化仍保留，但非 OpenCode `share.url` 不再驱动 settings shared-session 列表
 - 2026-06-06 Claude SDK 嵌套信封归一化修复：`getBackendSessionPreview()` 和 `loadBackendSessionMessages()` 现在在尝试通用 `record.content` 之前先检测 Claude SDK 的 `{ type, message: { role, content } }` 嵌套信封形状；role 从 `record.message.role` 提取（而非 `record.type`），content 从 `record.message.content` 提取（而非 `record.content`）。这修复了 backend session browser 预览窗格和 resume seed 消息对 Claude Code 会话显示为空的 bug——之前的代码路径不识别嵌套信封，fallback 为 `json` part type，而 UI 只渲染 `text` part
+- 2026-06-06 session detail seam：新增 `NormalizedSessionDetail` 和 `getBackendSessionDetail()`，把 `getSession()` 原始结果中的 metadata 归一化为只读 inspection surface 可稳定使用的字段；该 seam 是 best-effort 展示层 contract，不替代 backend 原生 session schema

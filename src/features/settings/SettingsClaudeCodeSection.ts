@@ -38,6 +38,7 @@ import {
 import { t, type TranslationKey } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { getVaultBasePath } from '../../shared';
+import { BackendSessionBrowserModal } from '../chat/ui/BackendSessionBrowserModal';
 import { TextareaSizeMemory } from './TextareaSizeMemory';
 
 interface SettingsClaudeCodeSectionOptions {
@@ -564,7 +565,7 @@ export class SettingsClaudeCodeSection {
       : t('settings.claudeCode.runtimeEcosystem.unnamed');
   }
 
-  // ─── Backend Session Browser Info ─────────────────────────────────
+  // ─── Backend Session Browser Launcher ──────────────────────────────
 
   private renderBackendSessionBrowserInfo(containerEl: HTMLElement): void {
     const infoEl = containerEl.createDiv({
@@ -572,6 +573,33 @@ export class SettingsClaudeCodeSection {
       attr: { 'data-claude-code-session-browser-info': 'true' },
     });
     infoEl.createSpan({ text: t('settings.claudeCode.sessionBrowser.info') });
+
+    new Setting(containerEl)
+      .setName(t('settings.claudeCode.sessionBrowser.launchName'))
+      .setDesc(t('settings.claudeCode.sessionBrowser.launchDesc'))
+      .addButton((button) => {
+        button
+          .setButtonText(t('settings.claudeCode.sessionBrowser.launchButton'))
+          .onClick(() => {
+            const host = {
+              getAgentServiceRegistry: () => this.plugin.agentServiceRegistry ?? null,
+              createConversationFromBackendSession: async () => null,
+              loadConversation: async () => {},
+              getActiveBackendKind: () => this.plugin.settings.activeBackend ?? null,
+              showNotice: (msg: string) => { new Notice(msg); },
+              isStreaming: () => false,
+              supportsResume: () => false,
+              forcedBackendKind: 'claude-code' as const,
+            };
+            new BackendSessionBrowserModal(this.plugin.app, host).open();
+          });
+      });
+
+    const browseOnlyEl = containerEl.createDiv({
+      cls: 'opencodian-settings-inline-notice',
+      attr: { 'data-claude-code-session-browser-browse-only': 'true' },
+    });
+    browseOnlyEl.createSpan({ text: t('settings.claudeCode.sessionBrowser.browseOnlyNotice') });
   }
 
   // ─── Claude Project Skills discovery ───────────────────────────────
