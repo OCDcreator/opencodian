@@ -110,19 +110,32 @@ rl.on('line', (line) => {
       }
     });
   } else if (msg.id === 'elicit-live-1' && pendingToolCall) {
-    const elicitationResult = msg.result || msg;
-    const args = pendingToolCall.params?.arguments || {};
-    sendMessage({ jsonrpc: '2.0', id: pendingToolCall.id, result: {
-      content: [{
-        type: 'text',
-        text: JSON.stringify({
-          echoed: args.message || 'no message',
-          elicitationAction: elicitationResult?.action || 'unknown',
-          nonce: elicitationResult?.content?.nonce || 'no-nonce'
-        })
-      }],
-      isError: false
-    }});
+    if (msg.error) {
+      sendMessage({ jsonrpc: '2.0', id: pendingToolCall.id, result: {
+        content: [{
+          type: 'text',
+          text: JSON.stringify({
+            error: 'Elicitation failed',
+            errorDetail: msg.error?.message || String(msg.error)
+          })
+        }],
+        isError: true
+      }});
+    } else {
+      const elicitationResult = msg.result || msg;
+      const args = pendingToolCall.params?.arguments || {};
+      sendMessage({ jsonrpc: '2.0', id: pendingToolCall.id, result: {
+        content: [{
+          type: 'text',
+          text: JSON.stringify({
+            echoed: args.message || 'no message',
+            elicitationAction: elicitationResult?.action || 'unknown',
+            nonce: elicitationResult?.content?.nonce || 'no-nonce'
+          })
+        }],
+        isError: false
+      }});
+    }
     pendingToolCall = null;
   }
 });
@@ -512,6 +525,8 @@ export interface McpElicitationLiveProbeResult {
   rawMessageCount: number;
   /** Error message if the probe failed */
   error?: string;
+  /** Sanitized preview of tool_result error text when tool execution failed */
+  toolResultErrorPreview?: string;
   /** Detailed step-by-step log for diagnostic reporting */
   stepLog: string[];
 }
@@ -2566,17 +2581,26 @@ export class ClaudeCodeAdapter
   ): { nonceEchoed: boolean; echoedNonce?: string } {
     for (const message of rawMessages) {
       const msg = message as Record<string, unknown>;
-      const content = msg.content as Array<Record<string, unknown>> | undefined;
-      if (!content || !Array.isArray(content)) continue;
-      for (const block of content) {
-        const text = block.type === 'tool_result' || block.type === 'text'
+      // SDK raw messages may carry tool_result on user, assistant, or backend_event types
+      const content = msg.content;
+      if (!content) continue;
+      const blocks: Array<Record<string, unknown>> = Array.isArray(content)
+        ? (content as Array<Record<string, unknown>>)
+        : typeof content === 'object' && content !== null
+          ? [content as Record<string, unknown>]
+          : [];
+      for (const block of blocks) {
+        if (block.type !== 'tool_result' && block.type !== 'text') continue;
+        const text = typeof block.text === 'string'
           ? block.text
-          : undefined;
+          : typeof block.content === 'string'
+            ? block.content
+            : undefined;
         if (typeof text !== 'string') continue;
         try {
           const parsed = JSON.parse(text) as Record<string, unknown>;
           if (parsed.nonce === nonce) {
-            addStep(`Nonce echoed in ${block.type} block: ${String(parsed.nonce)}`);
+            addStep(`Nonce echoed in ${String(block.type)} block: ${String(parsed.nonce)}`);
             return { nonceEchoed: true, echoedNonce: String(parsed.nonce) };
           }
         } catch {
@@ -2585,6 +2609,32 @@ export class ClaudeCodeAdapter
       }
     }
     return { nonceEchoed: false };
+  }
+
+  private extractToolResultErrorPreview(rawMessages: unknown[]): string | undefined {
+    for (const message of rawMessages) {
+      const msg = message as Record<string, unknown>;
+      const content = msg.content;
+      if (!content) continue;
+      const blocks: Array<Record<string, unknown>> = Array.isArray(content)
+        ? (content as Array<Record<string, unknown>>)
+        : typeof content === 'object' && content !== null
+          ? [content as Record<string, unknown>]
+          : [];
+      for (const block of blocks) {
+        if (block.type !== 'tool_result') continue;
+        if (block.isError !== true) continue;
+        const text = typeof block.text === 'string'
+          ? block.text
+          : typeof block.content === 'string'
+            ? block.content
+            : undefined;
+        if (typeof text !== 'string') continue;
+        const sanitized = sanitizeDiagnosticReport(text).slice(0, 239);
+        return sanitized.length < text.length ? `${sanitized}…` : sanitized;
+      }
+    }
+    return undefined;
   }
 
   private buildMcpElicitationProbeResult(
@@ -2599,6 +2649,7 @@ export class ClaudeCodeAdapter
       echoedNonce?: string;
       rawMessageCount: number;
       error?: string;
+      toolResultErrorPreview?: string;
       stepLog: string[];
     },
   ): McpElicitationLiveProbeResult {
@@ -2615,6 +2666,7 @@ export class ClaudeCodeAdapter
       rawMessageCount: params.rawMessageCount,
       stepLog: params.stepLog,
       ...(params.error ? { error: params.error } : {}),
+      ...(params.toolResultErrorPreview ? { toolResultErrorPreview: params.toolResultErrorPreview } : {}),
     };
   }
 
@@ -2641,7 +2693,10 @@ export class ClaudeCodeAdapter
       let hostAccepted = false;
       let hostNonce: string | undefined;
 
-      const onElicitation = async (request: ElicitationRequest): Promise<ElicitationResult> => {
+      const onElicitation = async (
+        request: ElicitationRequest,
+        _options: { signal: AbortSignal },
+      ): Promise<ElicitationResult> => {
         elicitationCalls.push({
           serverName: request.serverName,
           message: request.message,
@@ -2671,11 +2726,22 @@ export class ClaudeCodeAdapter
 
       const { nonceEchoed, echoedNonce } = this.scanMessagesForNonce(result.rawMessages, nonce, addStep);
       const hasElicitation = elicitationCalls.length > 0;
+      // Real SDK raw messages carry tool_result on user, assistant, or backend_event types
       const hasToolResult = result.rawMessages.some((m) => {
         const msg = m as Record<string, unknown>;
-        return msg.type === 'assistant' && Array.isArray(msg.content)
-          && msg.content.some((b: Record<string, unknown>) => b.type === 'tool_result');
+        const content = msg.content;
+        if (!content) return false;
+        const blocks: Array<Record<string, unknown>> = Array.isArray(content)
+          ? (content as Array<Record<string, unknown>>)
+          : typeof content === 'object' && content !== null
+            ? [content as Record<string, unknown>]
+            : [];
+        return blocks.some((b) => b.type === 'tool_result');
       });
+      const toolResultErrorPreview = this.extractToolResultErrorPreview(result.rawMessages);
+      if (toolResultErrorPreview) {
+        addStep(`Tool result error preview: ${toolResultErrorPreview}`);
+      }
 
       if (hasElicitation && nonceEchoed) {
         addStep('CLASSIFICATION: pass — full chain verified');
@@ -2693,7 +2759,8 @@ export class ClaudeCodeAdapter
         addStep('CLASSIFICATION: wiring — tool result observed but onElicitation not called');
         probeResult = this.buildMcpElicitationProbeResult('wiring', {
           serverCreated, serverCleanedUp, elicitationCalls: [], hostAccepted: false,
-          nonceEchoed: false, rawMessageCount: result.rawMessages.length, stepLog,
+          nonceEchoed: false, rawMessageCount: result.rawMessages.length,
+          toolResultErrorPreview, stepLog,
         });
       } else {
         addStep('CLASSIFICATION: wiring — no elicitation or tool result observed');
