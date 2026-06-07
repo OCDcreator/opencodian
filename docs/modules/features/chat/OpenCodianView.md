@@ -2,7 +2,7 @@
 
 > **源码**: `src/features/chat/OpenCodianView.ts`
 > **状态**: [REVIEW]
-> **最近更新**: Backend session browser with preview transcript seeding + settings info entry
+> **最近更新**: Backend session browser with preview transcript seeding + settings info entry + sandbox badge host wiring
 
 ## 概述
 
@@ -103,7 +103,7 @@ background task completion notice 的 queued-state 则已经完全移出 `TabRun
 - `ConversationWriteSerializationService`：为 send preparation、local stream persistence、message finalization 与 authoritative reload/hydration 提供 per-conversation write ticket + commit boundary；各 view 仍持有本地 service 实例，但默认 shared scope 会让多个 pane 共享同一 conversation 的 ticket/version queue，`OpenCodianView.commitConversationWrite()` 继续是当前保存入口
 - `services/ConversationIdentityRuntime.ts` 的 host seam：conversation sync fingerprint、interrupted-sync preservation log fingerprint、message visual signature，以及 render-list shaping（消息可见性过滤、assistant merge、compaction divider 注入）
 - `services/ChildSessionGraphCoordinator.ts` 的 host seam：从当前活动对话 + `session.children()` live 数据重建 child-session graph，并在消息区底部渲染最小 session tree
-- `services/ChatSelectionControlsCoordinator.ts` 的 host seam：model catalog data source、tab model override/default selection、model-source/server availability 查询、provider icon lookup、permission mode writeback 和 effort selector 联动。OpenCode 会继续使用 `ModelConfigService` / server catalog；Claude Code 会使用 `ClaudeCodeModelCatalog` 把官方 aliases 与 SDK `supportedModels()` 投影成 composer model provider，并把 effort selector 切到 Claude Code `low/medium/high/xhigh/max` 语义。
+- `services/ChatSelectionControlsCoordinator.ts` 的 host seam：model catalog data source、tab model override/default selection、model-source/server availability 查询、provider icon lookup、permission mode writeback、effort selector 联动。sandbox badge settings provider（`getSandboxSettings` 可选方法）已接入 coordinator，但当前对 Claude Code 后端不可见（badge 挂载依赖 `AgentCapability.Permissions`，而 Claude Code 不声明此 capability）。OpenCode 会继续使用 `ModelConfigService` / server catalog；Claude Code 会使用 `ClaudeCodeModelCatalog` 把官方 aliases 与 SDK `supportedModels()` 投影成 composer model provider，并把 effort selector 切到 Claude Code `low/medium/high/xhigh/max` 语义。
 - `SessionPermissionTracker`：记录“本次会话允许”的临时权限批准；view 在权限卡片返回 `session` 时保存当前 `sessionID` 的 scope，同一会话再次请求相同 scope 时自动回复，并通过 service 边界发送 OpenCode 支持的 `always`
 - Claude Code permission/question bridge 的 view 级 UI context：聊天视图会把当前 active tab id、既有 permission inline card renderer，以及统一的 `QuestionResolutionFlowCoordinator` 注入插件级 `claudeCodePermissionHostContext`；Claude Code adapter 的 `canUseTool` 可复用现有 permission inline card，`AskUserQuestion` 和 MCP `onElicitation` 会强制走 inline Question UI 来同步收集答案并在完成后清理临时卡片，避免污染 OpenCode question API 或落入 dock-only 写回路径。没有聊天 UI context 时，host 仍返回 `null`，由 bridge 按拒绝/无答案路径处理。
 - send/cancel/title 相关 runtime bridge 现在会通过 `AgentServiceRegistry` 按 conversation owner 解析 chat/session backend；OpenCode conversation 继续走 OpenCode adapter，非 OpenCode conversation 不再静默落回 `openCodeService`。cancel/detach 同样按当前 conversation backend 分流，Claude Code 等非 OpenCode backend 不会再调用 `openCodeService.detachStream()`。
@@ -256,6 +256,7 @@ Phase 0/1 的 backend-empty / backend-offline 收尾还在这个 seam 上新增�
 - OpenCode 首条消息后的标题链路仍由 view 发起并接收回调；实际官方标题优先、本地兜底、以及首次 provisional server 写入抑制分别由 `TitleGenerationService` 和 `OpenCodeSessionLifecycleCoordinator` 承接，view 只负责更新本地 conversation/title status 与 tab 标题。Claude Code 当前未接入标题生成，发送准备阶段不会触发 OpenCode title fallback 或 AI title kickoff。
 - 清空当前消息区并重置 turn 状态
 - 把 legacy `openCodeSessionId` 交给 `openCodeService`；发送和 tab runtime 的通用 session identity 逐步迁到 `backendSessionId` / `getConversationBackendSessionId()`，但标题同步、取消流、child session 等 OpenCode-only surface 仍按 backend/capability 分阶段保留 guard
+- `getSessionIdForTab()` / `getOpenCodeSessionIdForConversation()` 的命名仍带历史 OpenCode 语义，但现在通过 `getConversationBackendSessionId()` 为 OpenCode、Claude Code 和 ACP 等所有 backend 解析 backend-agnostic session id。这个通用解析值也用于 Claude Code conversation 的 TodoWrite snapshot 路由，避免把 Claude session id 误判成 OpenCode-only identity
 - revert / unrevert 的 session control 调用现在通过 `AgentServiceRegistry` 路由到拥有 `AgentCapability.Branching` 的 backend adapter；fork 则通过 `AgentCapability.Fork` 路由到 `AgentForkCapability` adapter；OpenCode 仍走 `openCodeService` 作为 fallback，Claude 等 backend 在未声明对应能力时直接抛错，避免把 Claude session ID 误传入 OpenCode-only 路径
 - 在必要时调用 `syncConversationMessagesFromServer()`
 - 在 load 完成与 authoritative sync 完成后额外调用 `ChildSessionGraphCoordinator.refreshGraph()`，让 child-session tree 跟随当前可见对话的 persisted/live child-session 数据刷新

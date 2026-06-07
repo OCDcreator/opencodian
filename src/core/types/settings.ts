@@ -41,10 +41,47 @@ export {
   normalizeClaudeCodeDebugChannelSettings,
 };
 
+export interface SandboxFilesystemConfig {
+  /** Additional paths where sandboxed commands can write. Merged across all settings scopes. */
+  allowWrite: string[];
+  /** Paths where sandboxed commands cannot write. Merged across all settings scopes. */
+  denyWrite: string[];
+  /** Paths where sandboxed commands cannot read. Merged across all settings scopes. */
+  denyRead: string[];
+}
+
+export interface SandboxNetworkConfig {
+  /** Domain names that sandboxed processes can access. Supports wildcards. */
+  allowedDomains: string[];
+  /** Domain names that sandboxed processes cannot access. Takes precedence over allowedDomains. */
+  deniedDomains: string[];
+}
+
+export interface SandboxRipgrepConfig {
+  /** Custom ripgrep binary command path for sandbox environments. */
+  command: string;
+  /** Optional extra arguments for the custom ripgrep binary. */
+  args: string[];
+}
+
 export interface ClaudeCodeSandboxSettings {
   enabled: boolean;
   failIfUnavailable: boolean;
   autoAllowBashIfSandboxed: boolean;
+  /** Commands that always bypass sandbox restrictions (e.g. ['docker']). These run unsandboxed automatically without model involvement. */
+  excludedCommands: string[];
+  /** Allow the model to request running commands outside the sandbox via dangerouslyDisableSandbox. When false, the escape hatch is completely disabled. Default: true (SDK default). */
+  allowUnsandboxedCommands: boolean;
+  /** Filesystem sub-policy for sandbox mode. Controls read/write path restrictions at the OS level. */
+  filesystem: SandboxFilesystemConfig;
+  /** Network sub-policy for sandbox mode. Controls outbound domain access. */
+  network: SandboxNetworkConfig;
+  /** Enable weaker sandbox for unprivileged Docker environments (Linux/WSL2 only). Reduces security. Default: false. */
+  enableWeakerNestedSandbox: boolean;
+  /** (macOS only) Allow access to the system TLS trust service in the sandbox. Required for Go-based tools with MITM proxy. Reduces security. Default: false. */
+  enableWeakerNetworkIsolation: boolean;
+  /** Custom ripgrep binary configuration for sandbox environments. */
+  ripgrep: SandboxRipgrepConfig;
 }
 
 export interface ClaudeCodeBackendSettings {
@@ -97,9 +134,38 @@ export interface ClaudeCodeBackendSettings {
   /**
    * Sandbox behavior controls for Claude Code subprocess isolation.
    * Readback: SDK options wiring proven; OS-level process isolation not independently verified.
-   * This controls sandbox behavior (whether the subprocess runs in a sandbox), not filesystem/network
-   * permission rules. Network, filesystem, TLS, proxy, and Mach lookup sub-policies are NOT exposed
-   * as stable settings in this version.
+   *
+   * Advanced sub-policies (exposed expert settings wired to SDK options, user-facing in
+   * Permissions tab):
+   * - excludedCommands, allowUnsandboxedCommands
+   * - filesystem: allowWrite, denyWrite, denyRead
+   * - network domain filters: allowedDomains, deniedDomains
+   * - enableWeakerNestedSandbox, enableWeakerNetworkIsolation
+   * - ripgrep: command, args
+   *
+   * Managed-only fields intentionally UNEXPOSED official SDK fields and reasons:
+   * - filesystem.allowRead: re-allows reads inside denyRead regions; confusing semantics for
+   *   general users, easy to misconfigure into false sense of security
+   * - filesystem.allowManagedReadPathsOnly: managed-settings-only (enterprise); SDK docs state
+   *   "Has no effect when set via SDK options"
+   * - network.allowManagedDomainsOnly: managed-settings-only (enterprise); SDK docs state
+   *   "Has no effect when set via SDK options"
+   * - network.allowUnixSockets: macOS-only; misleading on Linux/WSL2 where seccomp cannot
+   *   inspect socket paths
+   * - network.allowAllUnixSockets: grants all Unix socket access (including Docker socket);
+   *   too dangerous for general plugin exposure, opens full host access path
+   * - network.allowLocalBinding: macOS-only; platform-specific in misleading way for a
+   *   cross-platform plugin
+   * - network.allowMachLookup: macOS-only XPC/Mach service lookup; extremely niche,
+   *   iOS Simulator / Playwright specific
+   * - network.httpProxyPort: advanced proxy config; users who need this should configure
+   *   via .claude/settings.json directly
+   * - network.socksProxyPort: same as httpProxyPort — advanced proxy config
+   * - ignoreViolations: suppresses security violation reports; dangerous, hides real sandbox
+   *   escape evidence from the user
+   * - bwrapPath: managed-settings-only (enterprise); only honored from managed settings,
+   *   not user/project/local
+   * - socatPath: managed-settings-only (enterprise); same scope limitation as bwrapPath
    */
   sandbox: ClaudeCodeSandboxSettings;
   /**
@@ -242,7 +308,18 @@ export function getDefaultClaudeCodeBackendSettings(): ClaudeCodeBackendSettings
     agentProgressSummaries: false,
     promptSuggestions: false,
     debugChannels: getDefaultClaudeCodeDebugChannelSettings(),
-    sandbox: { enabled: false, failIfUnavailable: false, autoAllowBashIfSandboxed: false },
+    sandbox: {
+      enabled: false,
+      failIfUnavailable: false,
+      autoAllowBashIfSandboxed: false,
+      excludedCommands: [],
+      allowUnsandboxedCommands: true,
+      filesystem: { allowWrite: [], denyWrite: [], denyRead: [] },
+      network: { allowedDomains: [], deniedDomains: [] },
+      enableWeakerNestedSandbox: false,
+      enableWeakerNetworkIsolation: false,
+      ripgrep: { command: '', args: [] },
+    },
     planModeInstructions: '',
     toolAliases: {},
     askUserQuestionPreviewFormat: '',
@@ -398,15 +475,68 @@ export function normalizeClaudeCodeAskUserQuestionPreviewFormat(value: unknown):
 }
 
 export function normalizeClaudeCodeSandboxSettings(value: unknown): ClaudeCodeSandboxSettings {
-  const defaults = { enabled: false, failIfUnavailable: false, autoAllowBashIfSandboxed: false };
+  const defaults: ClaudeCodeSandboxSettings = {
+    enabled: false,
+    failIfUnavailable: false,
+    autoAllowBashIfSandboxed: false,
+    excludedCommands: [] as string[],
+    allowUnsandboxedCommands: true,
+    filesystem: { allowWrite: [] as string[], denyWrite: [] as string[], denyRead: [] as string[] },
+    network: { allowedDomains: [] as string[], deniedDomains: [] as string[] },
+    enableWeakerNestedSandbox: false,
+    enableWeakerNetworkIsolation: false,
+    ripgrep: { command: '', args: [] as string[] },
+  };
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return defaults;
   }
   const candidate = value as Record<string, unknown>;
+
+  // Normalize filesystem sub-policy
+  const fsRaw = candidate.filesystem;
+  let filesystem = defaults.filesystem;
+  if (fsRaw && typeof fsRaw === 'object' && !Array.isArray(fsRaw)) {
+    const fs = fsRaw as Record<string, unknown>;
+    filesystem = {
+      allowWrite: normalizeClaudeCodeStringArray(fs.allowWrite),
+      denyWrite: normalizeClaudeCodeStringArray(fs.denyWrite),
+      denyRead: normalizeClaudeCodeStringArray(fs.denyRead),
+    };
+  }
+
+  // Normalize network sub-policy
+  const netRaw = candidate.network;
+  let network = defaults.network;
+  if (netRaw && typeof netRaw === 'object' && !Array.isArray(netRaw)) {
+    const net = netRaw as Record<string, unknown>;
+    network = {
+      allowedDomains: normalizeClaudeCodeStringArray(net.allowedDomains),
+      deniedDomains: normalizeClaudeCodeStringArray(net.deniedDomains),
+    };
+  }
+
+  // Normalize ripgrep sub-config
+  const rgRaw = candidate.ripgrep;
+  let ripgrep = defaults.ripgrep;
+  if (rgRaw && typeof rgRaw === 'object' && !Array.isArray(rgRaw)) {
+    const rg = rgRaw as Record<string, unknown>;
+    ripgrep = {
+      command: typeof rg.command === 'string' ? rg.command.trim() : '',
+      args: normalizeClaudeCodeStringArray(rg.args),
+    };
+  }
+
   return {
     enabled: candidate.enabled === true,
     failIfUnavailable: candidate.failIfUnavailable === true,
     autoAllowBashIfSandboxed: candidate.autoAllowBashIfSandboxed === true,
+    excludedCommands: normalizeClaudeCodeStringArray(candidate.excludedCommands),
+    allowUnsandboxedCommands: candidate.allowUnsandboxedCommands !== false,
+    filesystem,
+    network,
+    enableWeakerNestedSandbox: candidate.enableWeakerNestedSandbox === true,
+    enableWeakerNetworkIsolation: candidate.enableWeakerNetworkIsolation === true,
+    ripgrep,
   };
 }
 

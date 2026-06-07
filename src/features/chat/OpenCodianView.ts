@@ -1344,11 +1344,13 @@ export class OpenCodianView extends ItemView {
   }
 
   private getOpenCodeSessionIdForConversation(
-    conversation: Pick<Conversation, 'backend' | 'openCodeSessionId'> | null | undefined,
+    conversation: Pick<Conversation, 'backend' | 'openCodeSessionId' | 'backendSessionId' | 'acpSessionId'> | null | undefined,
   ): string | null {
-    return (conversation?.backend ?? 'opencode') === 'opencode'
-      ? conversation?.openCodeSessionId ?? null
-      : null;
+    // Use the universal resolver so all backends (OpenCode, Claude Code, ACP)
+    // resolve their authoritative session ID.  The method name is historical;
+    // the resolved value is the backend-agnostic session key used by
+    // SessionTodoCoordinator for snapshot storage.
+    return conversation ? (getConversationBackendSessionId(conversation) ?? null) : null;
   }
 
   private getConversationForTab(tabId: TabId | null = this.getActiveTabId()): Conversation | null {

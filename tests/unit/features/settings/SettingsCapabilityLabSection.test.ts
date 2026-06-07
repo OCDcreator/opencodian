@@ -39,7 +39,18 @@ function createMockPlugin(adapter: unknown = null, activeKind = adapter ? 'claud
     maxBudgetUsd: null,
     env: {},
     fallbackModel: '',
-    sandbox: { enabled: false, failIfUnavailable: false, autoAllowBashIfSandboxed: false },
+    sandbox: {
+      enabled: false,
+      failIfUnavailable: false,
+      autoAllowBashIfSandboxed: false,
+      excludedCommands: [],
+      allowUnsandboxedCommands: true,
+      filesystem: { allowWrite: [], denyWrite: [], denyRead: [] },
+      network: { allowedDomains: [], deniedDomains: [] },
+      enableWeakerNestedSandbox: false,
+      enableWeakerNetworkIsolation: false,
+      ripgrep: { command: '', args: [] },
+    },
     debug: false,
   };
   return {
@@ -988,7 +999,7 @@ describe('SettingsCapabilityLabSection', () => {
 
     const table = containerEl.querySelector('.opencodian-capability-lab-matrix');
     const rows = table!.querySelectorAll('tbody tr');
-    expect(rows.length).toBe(46);
+    expect(rows.length).toBe(48);
   });
 
   it('renders status chips with correct active/inactive classes', () => {
@@ -1024,7 +1035,7 @@ describe('SettingsCapabilityLabSection', () => {
     expect(surfaces).toContain('chat');
   });
 
-  it('audits capability matrix for honest classifications across all 46 rows', () => {
+  it('audits capability matrix for honest classifications across all 48 rows', () => {
     const containerEl = document.createElement('div');
     const section = new SettingsCapabilityLabSection({
       plugin: createMockPlugin(),
@@ -1044,7 +1055,7 @@ describe('SettingsCapabilityLabSection', () => {
       'File Checkpoint / Rewind': { runtimeProof: 'readback', userSurface: 'diagnostic' },
       'JSONL History Browser': { runtimeProof: 'pass', userSurface: 'settings+chat' },
       'Session Store': { runtimeProof: 'pass', userSurface: 'hidden' },
-      Skills: { runtimeProof: 'pass', userSurface: 'settings' },
+      Skills: { runtimeProof: 'pass', userSurface: 'settings+chat' },
       Plugins: { runtimeProof: 'pass', userSurface: 'settings' },
       'MCP Servers': { runtimeProof: 'pass', userSurface: 'settings' },
       'Allowed Tools': { runtimeProof: 'readback', userSurface: 'settings' },
@@ -1067,7 +1078,7 @@ describe('SettingsCapabilityLabSection', () => {
       'Backend Routing': { runtimeProof: 'pass', userSurface: 'diagnostic' },
       '/context Diagnostic': { runtimeProof: 'pass', userSurface: 'diagnostic' },
       'Warm Startup': { runtimeProof: 'readback', userSurface: 'diagnostic' },
-      'Sandbox': { runtimeProof: 'readback', userSurface: 'settings' },
+      'Sandbox': { runtimeProof: 'readback', userSurface: 'settings+chat' },
       'Session Title': { runtimeProof: 'pass', userSurface: 'settings+chat' },
       'Prompt Suggestions': { runtimeProof: 'pass', userSurface: 'chat' },
       'Task Budget': { runtimeProof: 'readback', userSurface: 'settings' },
@@ -1084,8 +1095,10 @@ describe('SettingsCapabilityLabSection', () => {
       'Continue': { runtimeProof: 'pass', userSurface: 'diagnostic' },
       'Resume Session At Position': { runtimeProof: 'pass', userSurface: 'diagnostic' },
       'Fork Session On Resume': { runtimeProof: 'pass', userSurface: 'diagnostic' },
-      'AskUserQuestion Preview Format': { runtimeProof: 'readback', userSurface: 'settings' },
+      'AskUserQuestion Preview Format': { runtimeProof: 'pass', userSurface: 'settings+chat' },
       'System Prompt': { runtimeProof: 'pass', userSurface: 'settings' },
+      'Main Model Live Switch': { runtimeProof: 'pass', userSurface: 'settings+chat' },
+      'Permission Mode Live Switch': { runtimeProof: 'readback', userSurface: 'settings' },
     };
 
     for (const [name, expectedValues] of Object.entries(expected)) {
@@ -1115,12 +1128,12 @@ describe('SettingsCapabilityLabSection', () => {
       return firstCell?.textContent ?? '';
     });
     expect(verifiedCapabilities).toEqual(
-      expect.arrayContaining(['MCP Servers', 'Permission Approval', 'AskUserQuestion / Elicitation', 'Structured Output', 'Agent Definitions', 'Include Hook Events', 'Environment Variables', 'Fork Session', 'JSONL History Browser', 'Session Store', 'Import Session to Store', 'Resume Session', 'Session Detail', 'Backend Routing', 'Turn/Budget Limits', 'Skills', 'Agents (Subagents)', 'Subagent Transcript / Progress', 'Hooks', 'Disallowed Tools', 'Plugins', 'Restricted Built-in Tools', '/context Diagnostic', 'Session Title', 'Custom Session ID', 'Continue', 'Resume Session At Position', 'Fork Session On Resume', 'System Prompt', 'Prompt Suggestions', 'Debug File', 'Plan Mode Instructions']),
+      expect.arrayContaining(['MCP Servers', 'Permission Approval', 'AskUserQuestion / Elicitation', 'Structured Output', 'Agent Definitions', 'Include Hook Events', 'Environment Variables', 'Fork Session', 'JSONL History Browser', 'Session Store', 'Import Session to Store', 'Resume Session', 'Session Detail', 'Backend Routing', 'Turn/Budget Limits', 'Skills', 'Agents (Subagents)', 'Subagent Transcript / Progress', 'Hooks', 'Disallowed Tools', 'Plugins', 'Restricted Built-in Tools', '/context Diagnostic', 'Session Title', 'Custom Session ID', 'Continue', 'Resume Session At Position', 'Fork Session On Resume', 'System Prompt', 'Prompt Suggestions', 'Debug File', 'Plan Mode Instructions', 'AskUserQuestion Preview Format', 'Main Model Live Switch']),
     );
-    expect(verifiedCapabilities.length).toBe(32);
+    expect(verifiedCapabilities.length).toBe(34);
 
     // Total rows check
-    expect(rows.length).toBe(46);
+    expect(rows.length).toBe(48);
 
     // Honesty rule: readback capabilities must not be in the verified count.
     // Debug is readback (option wiring only, not behavior-verified) so it stays out.
@@ -1133,7 +1146,7 @@ describe('SettingsCapabilityLabSection', () => {
       return firstCell?.textContent ?? '';
     });
     expect(readbackCapabilities).toEqual(
-      expect.arrayContaining(['File Checkpoint / Rewind', 'Allowed Tools', 'Fallback Model', 'Warm Startup', 'Sandbox', 'Task Budget', 'Tool Aliases', 'Debug', 'Strict MCP Config', '1M Context Beta', 'JS Runtime', 'Load Timeout', 'Stderr Diagnostic', 'AskUserQuestion Preview Format']),
+      expect.arrayContaining(['File Checkpoint / Rewind', 'Allowed Tools', 'Fallback Model', 'Warm Startup', 'Sandbox', 'Task Budget', 'Tool Aliases', 'Debug', 'Strict MCP Config', '1M Context Beta', 'JS Runtime', 'Load Timeout', 'Stderr Diagnostic', 'Permission Mode Live Switch']),
     );
     expect(readbackCapabilities.length).toBe(14);
 

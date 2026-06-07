@@ -52,7 +52,9 @@ export class SessionTodoCoordinator {
 
 ## 关键行为
 
-- `refreshTabSessionTodos()` / `refreshTabSessionStatus()` 继续拥有 request-id stale guard，并在 refresh 成功后触发 foreground background-task reconcile。这两个方法现在有显式 backend gate：如果 `conversation.backend` 不是 `'opencode'`，则跳过 OpenCode-only 的 `getSessionTodos` / `getSessionStatuses` 调用并提前返回空结果
+- `refreshTabSessionTodos()` / `refreshTabSessionStatus()` 继续拥有 request-id stale guard，并在 refresh 成功后触发 foreground background-task reconcile。这两个方法现在有显式 backend gate：如果 `conversation.backend` 不是 `'opencode'`，`refreshTabSessionTodos()` 会跳过 OpenCode-only 的 `getSessionTodos()` 调用，`refreshTabSessionStatus()` 会跳过 OpenCode-only 的 `getSessionStatuses()` 调用，并提前返回空结果
+- Claude Code session todo snapshot 纯粹来自 stream tool call：`BackgroundTaskStreamTriggerCoordinator` / view pipeline 把 TodoWrite 工具输入交给 `applyStreamingTodoSnapshotFromTool()`，再写入同一套 per-tab todo state；不会为 Claude Code 调用 OpenCode server session todo API
+- 这个 backend gate 是有意的边界：Claude Code 已声明 `Todos` capability 以启用 dock/snapshot 路由，但 todo 数据来源是 stream-derived snapshot，而不是 OpenCode 专属的 `getSessionTodos()` refresh API
 - `applySessionTodoUpdate()` / `applySessionStatusUpdate()`、`applyStreamingTodoSnapshotFromTool()` 与 tab reset 入口都统一回落到同一套 state write path，避免 live refresh / stream snapshot / activation reset 各走一套 helper
 - `attach()` / `render()` / `updateForTab()` / `destroy()` 继续复用 `SessionTodoDockCoordinator` 的 active-vs-runtime session 选择，不把 dock DOM 细节重新塞回 view
 

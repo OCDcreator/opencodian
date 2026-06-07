@@ -670,6 +670,11 @@ const CLAUDE_CODE_PHASE1_CAPABILITIES: BackendCapabilities = Object.freeze(
     AgentCapability.Thinking,
     AgentCapability.FileOps,
     AgentCapability.Shell,
+    // Claude's built-in TodoWrite tool emits stream-derived todo snapshots.
+    // The generic SessionTodoCoordinator + SessionTodoDock already handle
+    // todowrite tool calls; enabling this capability mounts the dock for
+    // Claude Code conversations without calling OpenCode-specific session APIs.
+    AgentCapability.Todos,
   ]),
 );
 

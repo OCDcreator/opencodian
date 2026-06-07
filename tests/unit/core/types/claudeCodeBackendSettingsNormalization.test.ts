@@ -206,55 +206,112 @@ describe('normalizeClaudeCodeBackendSettings (new fields)', () => {
 });
 
 describe('normalizeClaudeCodeSandboxSettings', () => {
-  it('returns all-false defaults for undefined', () => {
+  it('returns default sandbox policy for undefined', () => {
     const defaults = getDefaultClaudeCodeBackendSettings();
     expect(defaults.sandbox).toEqual({
       enabled: false,
       failIfUnavailable: false,
       autoAllowBashIfSandboxed: false,
+      excludedCommands: [],
+      allowUnsandboxedCommands: true,
+      filesystem: { allowWrite: [], denyWrite: [], denyRead: [] },
+      network: { allowedDomains: [], deniedDomains: [] },
+      enableWeakerNestedSandbox: false,
+      enableWeakerNetworkIsolation: false,
+      ripgrep: { command: '', args: [] },
     });
   });
 
-  it('returns all-false defaults when sandbox is not an object', () => {
+  it('returns default sandbox policy when sandbox is not an object', () => {
     const result = normalizeClaudeCodeBackendSettings({ sandbox: 'bad' });
-    expect(result.sandbox).toEqual({
-      enabled: false,
-      failIfUnavailable: false,
-      autoAllowBashIfSandboxed: false,
-    });
+    expect(result.sandbox).toEqual(getDefaultClaudeCodeBackendSettings().sandbox);
   });
 
   it('normalizes partial sandbox input, coercing non-booleans to false', () => {
     const result = normalizeClaudeCodeBackendSettings({
-      sandbox: { enabled: true, failIfUnavailable: 'yes', autoAllowBashIfSandboxed: 1 },
+      sandbox: {
+        ...getDefaultClaudeCodeBackendSettings().sandbox,
+        enabled: true,
+        failIfUnavailable: 'yes',
+        autoAllowBashIfSandboxed: 1,
+      },
     });
     expect(result.sandbox).toEqual({
+      ...getDefaultClaudeCodeBackendSettings().sandbox,
       enabled: true,
-      failIfUnavailable: false,
-      autoAllowBashIfSandboxed: false,
     });
   });
 
-  it('normalizes full sandbox input', () => {
+  it('normalizes full basic sandbox input', () => {
     const result = normalizeClaudeCodeBackendSettings({
-      sandbox: { enabled: true, failIfUnavailable: true, autoAllowBashIfSandboxed: true },
+      sandbox: {
+        ...getDefaultClaudeCodeBackendSettings().sandbox,
+        enabled: true,
+        failIfUnavailable: true,
+        autoAllowBashIfSandboxed: true,
+      },
     });
     expect(result.sandbox).toEqual({
+      ...getDefaultClaudeCodeBackendSettings().sandbox,
       enabled: true,
       failIfUnavailable: true,
       autoAllowBashIfSandboxed: true,
     });
   });
 
-  it('ignores unknown sandbox fields like network or filesystem', () => {
+  it('normalizes sandbox filesystem sub-policy', () => {
     const result = normalizeClaudeCodeBackendSettings({
-      sandbox: { enabled: true, network: { allowedDomains: ['example.com'] }, filesystem: { allowWrite: ['/tmp'] } },
+      sandbox: {
+        filesystem: {
+          allowWrite: [' /tmp/build ', '/tmp/build', 42],
+          denyWrite: ['/etc'],
+          denyRead: ['~/.aws/credentials'],
+        },
+      },
     });
-    expect(result.sandbox).toEqual({
-      enabled: true,
-      failIfUnavailable: false,
-      autoAllowBashIfSandboxed: false,
+    expect(result.sandbox.filesystem).toEqual({
+      allowWrite: ['/tmp/build'],
+      denyWrite: ['/etc'],
+      denyRead: ['~/.aws/credentials'],
     });
+  });
+
+  it('normalizes sandbox network sub-policy', () => {
+    const result = normalizeClaudeCodeBackendSettings({
+      sandbox: {
+        network: {
+          allowedDomains: [' github.com ', 'github.com', null],
+          deniedDomains: ['internal.example.com'],
+        },
+      },
+    });
+    expect(result.sandbox.network).toEqual({
+      allowedDomains: ['github.com'],
+      deniedDomains: ['internal.example.com'],
+    });
+  });
+
+  it('normalizes sandbox ripgrep config', () => {
+    const result = normalizeClaudeCodeBackendSettings({
+      sandbox: {
+        ripgrep: {
+          command: ' /usr/local/bin/rg ',
+          args: [' --max-count=100 ', '--max-count=100', 100],
+        },
+      },
+    });
+    expect(result.sandbox.ripgrep).toEqual({ command: '/usr/local/bin/rg', args: ['--max-count=100'] });
+  });
+
+  it('preserves allowUnsandboxedCommands=false and normalizes excludedCommands', () => {
+    const result = normalizeClaudeCodeBackendSettings({
+      sandbox: {
+        allowUnsandboxedCommands: false,
+        excludedCommands: [' docker * ', 'docker *', '', 'podman *'],
+      },
+    });
+    expect(result.sandbox.allowUnsandboxedCommands).toBe(false);
+    expect(result.sandbox.excludedCommands).toEqual(['docker *', 'podman *']);
   });
 });
 

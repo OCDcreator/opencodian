@@ -829,7 +829,7 @@ describe('runSandboxReadbackProbe', () => {
       vaultPath: '/vault',
       settings: {
         ...getDefaultClaudeCodeBackendSettings(),
-        sandbox: { enabled: false, failIfUnavailable: false, autoAllowBashIfSandboxed: false },
+        sandbox: { ...getDefaultClaudeCodeBackendSettings().sandbox, enabled: false },
       },
       sdk: createProbeSdk([]),
     });
@@ -850,7 +850,12 @@ describe('runSandboxReadbackProbe', () => {
       vaultPath: '/vault',
       settings: {
         ...getDefaultClaudeCodeBackendSettings(),
-        sandbox: { enabled: true, failIfUnavailable: true, autoAllowBashIfSandboxed: true },
+        sandbox: {
+          ...getDefaultClaudeCodeBackendSettings().sandbox,
+          enabled: true,
+          failIfUnavailable: true,
+          autoAllowBashIfSandboxed: true,
+        },
       },
       sdk: createProbeSdk([]),
     });
@@ -876,7 +881,7 @@ describe('runSandboxReadbackProbe', () => {
       vaultPath: '/vault',
       settings: {
         ...getDefaultClaudeCodeBackendSettings(),
-        sandbox: { enabled: true, failIfUnavailable: false, autoAllowBashIfSandboxed: false },
+        sandbox: { ...getDefaultClaudeCodeBackendSettings().sandbox, enabled: true },
       },
       sdk: createProbeSdk([]),
     });
@@ -903,7 +908,7 @@ describe('runSandboxReadbackProbe', () => {
       vaultPath: '/vault',
       settings: {
         ...getDefaultClaudeCodeBackendSettings(),
-        sandbox: { enabled: false, failIfUnavailable: false, autoAllowBashIfSandboxed: false },
+        sandbox: { ...getDefaultClaudeCodeBackendSettings().sandbox, enabled: false },
       },
       sdk: createProbeSdk([]),
     });
@@ -928,7 +933,7 @@ describe('runSandboxReadbackProbe', () => {
       vaultPath: '/vault',
       settings: {
         ...getDefaultClaudeCodeBackendSettings(),
-        sandbox: { enabled: true, failIfUnavailable: false, autoAllowBashIfSandboxed: false },
+        sandbox: { ...getDefaultClaudeCodeBackendSettings().sandbox, enabled: true },
       },
       sdk: createProbeSdk([]),
     });

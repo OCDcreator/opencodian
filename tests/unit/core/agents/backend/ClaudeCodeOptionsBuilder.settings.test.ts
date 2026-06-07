@@ -223,7 +223,7 @@ describe('ClaudeCodeOptionsBuilder runtime injections', () => {
 });
 
 describe('ClaudeCodeOptionsBuilder sandbox', () => {
-  it('omits sandbox when all fields are false (default)', () => {
+  it('omits sandbox when all fields are false or default', () => {
     const options = buildClaudeCodeOptions({
       vaultPath: '/vault/project',
       settings: getDefaultClaudeCodeBackendSettings(),
@@ -235,7 +235,7 @@ describe('ClaudeCodeOptionsBuilder sandbox', () => {
   it('passes sandbox to SDK when enabled is true', () => {
     const settings = {
       ...getDefaultClaudeCodeBackendSettings(),
-      sandbox: { enabled: true, failIfUnavailable: false, autoAllowBashIfSandboxed: false },
+      sandbox: { ...getDefaultClaudeCodeBackendSettings().sandbox, enabled: true },
     };
     const options = buildClaudeCodeOptions({
       vaultPath: '/vault/project',
@@ -245,10 +245,15 @@ describe('ClaudeCodeOptionsBuilder sandbox', () => {
     expect(options.sandbox).toEqual({ enabled: true });
   });
 
-  it('passes all three sandbox fields when all are true', () => {
+  it('passes basic true sandbox fields when enabled', () => {
     const settings = {
       ...getDefaultClaudeCodeBackendSettings(),
-      sandbox: { enabled: true, failIfUnavailable: true, autoAllowBashIfSandboxed: true },
+      sandbox: {
+        ...getDefaultClaudeCodeBackendSettings().sandbox,
+        enabled: true,
+        failIfUnavailable: true,
+        autoAllowBashIfSandboxed: true,
+      },
     };
     const options = buildClaudeCodeOptions({
       vaultPath: '/vault/project',
@@ -262,10 +267,22 @@ describe('ClaudeCodeOptionsBuilder sandbox', () => {
     });
   });
 
-  it('does not pass sandbox when enabled is false even if other fields are true', () => {
+  it('does not pass sandbox when enabled is false even if other fields are non-default', () => {
     const settings = {
       ...getDefaultClaudeCodeBackendSettings(),
-      sandbox: { enabled: false, failIfUnavailable: true, autoAllowBashIfSandboxed: true },
+      sandbox: {
+        ...getDefaultClaudeCodeBackendSettings().sandbox,
+        enabled: false,
+        failIfUnavailable: true,
+        autoAllowBashIfSandboxed: true,
+        excludedCommands: ['docker *'],
+        allowUnsandboxedCommands: false,
+        filesystem: { allowWrite: ['/tmp/build'], denyWrite: ['/etc'], denyRead: ['~/.aws/credentials'] },
+        network: { allowedDomains: ['github.com'], deniedDomains: ['internal.example.com'] },
+        enableWeakerNestedSandbox: true,
+        enableWeakerNetworkIsolation: true,
+        ripgrep: { command: '/usr/local/bin/rg', args: ['--max-count=100'] },
+      },
     };
     const options = buildClaudeCodeOptions({
       vaultPath: '/vault/project',
@@ -273,6 +290,116 @@ describe('ClaudeCodeOptionsBuilder sandbox', () => {
     });
 
     expect(options).not.toHaveProperty('sandbox');
+  });
+
+  it('passes excludedCommands only when sandbox is enabled and non-empty', () => {
+    const options = buildClaudeCodeOptions({
+      vaultPath: '/vault/project',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        sandbox: {
+          ...getDefaultClaudeCodeBackendSettings().sandbox,
+          enabled: true,
+          excludedCommands: ['docker *'],
+        },
+      },
+    });
+
+    expect(options.sandbox).toEqual({ enabled: true, excludedCommands: ['docker *'] });
+  });
+
+  it('passes allowUnsandboxedCommands only when explicitly false', () => {
+    const options = buildClaudeCodeOptions({
+      vaultPath: '/vault/project',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        sandbox: {
+          ...getDefaultClaudeCodeBackendSettings().sandbox,
+          enabled: true,
+          allowUnsandboxedCommands: false,
+        },
+      },
+    });
+
+    expect(options.sandbox).toEqual({ enabled: true, allowUnsandboxedCommands: false });
+  });
+
+  it('passes filesystem sub-policy only when a path list is non-empty', () => {
+    const options = buildClaudeCodeOptions({
+      vaultPath: '/vault/project',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        sandbox: {
+          ...getDefaultClaudeCodeBackendSettings().sandbox,
+          enabled: true,
+          filesystem: { allowWrite: ['/tmp/build'], denyWrite: ['/etc'], denyRead: ['~/.aws/credentials'] },
+        },
+      },
+    });
+
+    expect(options.sandbox).toEqual({
+      enabled: true,
+      filesystem: { allowWrite: ['/tmp/build'], denyWrite: ['/etc'], denyRead: ['~/.aws/credentials'] },
+    });
+  });
+
+  it('passes network sub-policy only when a domain list is non-empty', () => {
+    const options = buildClaudeCodeOptions({
+      vaultPath: '/vault/project',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        sandbox: {
+          ...getDefaultClaudeCodeBackendSettings().sandbox,
+          enabled: true,
+          network: { allowedDomains: ['github.com'], deniedDomains: ['internal.example.com'] },
+        },
+      },
+    });
+
+    expect(options.sandbox).toEqual({
+      enabled: true,
+      network: { allowedDomains: ['github.com'], deniedDomains: ['internal.example.com'] },
+    });
+  });
+
+  it('passes weaker sandbox flags only when true', () => {
+    const options = buildClaudeCodeOptions({
+      vaultPath: '/vault/project',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        sandbox: {
+          ...getDefaultClaudeCodeBackendSettings().sandbox,
+          enabled: true,
+          enableWeakerNestedSandbox: true,
+          enableWeakerNetworkIsolation: true,
+        },
+      },
+    });
+
+    expect(options.sandbox).toEqual({
+      enabled: true,
+      enableWeakerNestedSandbox: true,
+      enableWeakerNetworkIsolation: true,
+    });
+  });
+
+  it('passes ripgrep only when command is non-empty', () => {
+    const options = buildClaudeCodeOptions({
+      vaultPath: '/vault/project',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        sandbox: {
+          ...getDefaultClaudeCodeBackendSettings().sandbox,
+          enabled: true,
+          ripgrep: { command: ' /usr/local/bin/rg ', args: ['--max-count=100'] },
+        },
+      },
+    });
+
+    expect(options.sandbox).toEqual({
+      enabled: true,
+      ripgrep: { command: '/usr/local/bin/rg', args: ['--max-count=100'] },
+    });
   });
 });
 

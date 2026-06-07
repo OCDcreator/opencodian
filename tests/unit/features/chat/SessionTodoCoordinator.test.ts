@@ -279,4 +279,45 @@ describe('SessionTodoCoordinator', () => {
     expect(result).toEqual(todos);
     expect(host.getSessionTodos).toHaveBeenCalledWith('session-1');
   });
+
+  // ── Claude Code todo snapshot path ─────────────────────────────────
+  // Claude Code sessions use stream-derived TodoWrite tool snapshots
+  // exclusively; refreshTabSessionTodos must not overwrite them with
+  // empty results from the OpenCode-only backend gate.
+
+  it('preserves stream-derived todo snapshots for Claude Code sessions after refresh returns early', async () => {
+    const { coordinator, host, runtime } = createFixture();
+    host.getConversationForTab.mockReturnValue({ backend: 'claude-code' } as Conversation);
+
+    // 1. Apply a streaming snapshot (from TodoWrite tool call)
+    coordinator.applyStreamingTodoSnapshotFromTool(createToolCall(), 'tab-1');
+    expect(runtime?.sessionTodos).toEqual([
+      { content: 'Refactor coordinator', status: 'pending', id: undefined, priority: undefined },
+    ]);
+
+    // 2. Refresh hits the backend gate — should NOT call getSessionTodos
+    const result = await coordinator.refreshTabSessionTodos('tab-1', 'session-1');
+
+    // 3. The snapshot is preserved (not overwritten)
+    expect(result).toEqual([]);
+    expect(host.getSessionTodos).not.toHaveBeenCalled();
+    // The runtime still holds the stream-derived snapshot after render
+    expect(runtime?.sessionTodos).toEqual([
+      { content: 'Refactor coordinator', status: 'pending', id: undefined, priority: undefined },
+    ]);
+    expect(runtime?.sessionTodoSessionId).toBe('session-1');
+  });
+
+  it('stores stream-derived todo snapshots using Claude Code backend session ID', () => {
+    const claudeSessionId = 'claude-code-abc123';
+    const { coordinator, host, runtime } = createFixture({ sessionId: claudeSessionId });
+
+    coordinator.applyStreamingTodoSnapshotFromTool(createToolCall(), 'tab-1');
+
+    expect(host.getSessionIdForTab).toHaveBeenCalledWith('tab-1');
+    expect(runtime?.sessionTodos).toEqual([
+      { content: 'Refactor coordinator', status: 'pending', id: undefined, priority: undefined },
+    ]);
+    expect(runtime?.sessionTodoSessionId).toBe(claudeSessionId);
+  });
 });

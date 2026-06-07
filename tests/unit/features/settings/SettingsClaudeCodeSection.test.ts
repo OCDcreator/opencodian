@@ -2392,7 +2392,7 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       expect(boundaryEl!.textContent).toContain(t('settings.claudeCode.sandbox.boundaryNotice'));
     });
 
-    it('renders exactly three stable sandbox toggles with expected locale labels', () => {
+    it('renders stable sandbox toggles and advanced text controls with expected locale labels', () => {
       const plugin = createPlugin();
       const containerEl = document.createElement('div');
       const section = new SettingsClaudeCodeSection({
@@ -2401,15 +2401,21 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       });
       section.attachTabbed(containerEl, 'permissions');
 
-      // All three toggles must exist with correct locale names
-      const enabledToggle = findToggle(t('settings.claudeCode.sandbox.enabled.name'));
-      expect(enabledToggle).toBeDefined();
+      expect(findToggle(t('settings.claudeCode.sandbox.enabled.name'))).toBeDefined();
+      expect(findToggle(t('settings.claudeCode.sandbox.failIfUnavailable.name'))).toBeDefined();
+      expect(findToggle(t('settings.claudeCode.sandbox.autoAllowBashIfSandboxed.name'))).toBeDefined();
+      expect(findToggle(t('settings.claudeCode.sandbox.allowUnsandboxedCommands.name'))).toBeDefined();
+      expect(findToggle(t('settings.claudeCode.sandbox.enableWeakerNestedSandbox.name'))).toBeDefined();
+      expect(findToggle(t('settings.claudeCode.sandbox.enableWeakerNetworkIsolation.name'))).toBeDefined();
 
-      const failToggle = findToggle(t('settings.claudeCode.sandbox.failIfUnavailable.name'));
-      expect(failToggle).toBeDefined();
-
-      const autoBashToggle = findToggle(t('settings.claudeCode.sandbox.autoAllowBashIfSandboxed.name'));
-      expect(autoBashToggle).toBeDefined();
+      expect(findTextArea(t('settings.claudeCode.sandbox.excludedCommands.name'))).toBeDefined();
+      expect(findTextArea(t('settings.claudeCode.sandbox.filesystem.allowWrite.name'))).toBeDefined();
+      expect(findTextArea(t('settings.claudeCode.sandbox.filesystem.denyWrite.name'))).toBeDefined();
+      expect(findTextArea(t('settings.claudeCode.sandbox.filesystem.denyRead.name'))).toBeDefined();
+      expect(findTextArea(t('settings.claudeCode.sandbox.network.allowedDomains.name'))).toBeDefined();
+      expect(findTextArea(t('settings.claudeCode.sandbox.network.deniedDomains.name'))).toBeDefined();
+      expect(findText(t('settings.claudeCode.sandbox.ripgrep.command.name'))).toBeDefined();
+      expect(findTextArea(t('settings.claudeCode.sandbox.ripgrep.args.name'))).toBeDefined();
     });
 
     it('changing each sandbox toggle updates settings and calls saveSettings', async () => {
@@ -2437,9 +2443,26 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       await findToggle(t('settings.claudeCode.sandbox.autoAllowBashIfSandboxed.name')).onChange?.(true as never);
       expect(plugin.settings.backendSettings.claudeCode.sandbox.autoAllowBashIfSandboxed).toBe(true);
       expect(plugin.saveSettings).toHaveBeenCalled();
+
+      // Toggle allowUnsandboxedCommands off
+      (plugin.saveSettings as jest.Mock).mockClear();
+      await findToggle(t('settings.claudeCode.sandbox.allowUnsandboxedCommands.name')).onChange?.(false as never);
+      expect(plugin.settings.backendSettings.claudeCode.sandbox.allowUnsandboxedCommands).toBe(false);
+      expect(plugin.saveSettings).toHaveBeenCalled();
+
+      // Toggle weaker sandbox options on
+      (plugin.saveSettings as jest.Mock).mockClear();
+      await findToggle(t('settings.claudeCode.sandbox.enableWeakerNestedSandbox.name')).onChange?.(true as never);
+      expect(plugin.settings.backendSettings.claudeCode.sandbox.enableWeakerNestedSandbox).toBe(true);
+      expect(plugin.saveSettings).toHaveBeenCalled();
+
+      (plugin.saveSettings as jest.Mock).mockClear();
+      await findToggle(t('settings.claudeCode.sandbox.enableWeakerNetworkIsolation.name')).onChange?.(true as never);
+      expect(plugin.settings.backendSettings.claudeCode.sandbox.enableWeakerNetworkIsolation).toBe(true);
+      expect(plugin.saveSettings).toHaveBeenCalled();
     });
 
-    it('does not render nested sandbox authoring UI for network, filesystem, TLS, proxy, or Mach lookup', () => {
+    it('does not render managed-only sandbox authoring UI fields', () => {
       const plugin = createPlugin();
       const containerEl = document.createElement('div');
       const section = new SettingsClaudeCodeSection({
@@ -2456,12 +2479,20 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
         ...buttonRecords,
       ].map((r) => r.name.toLowerCase()).join('\n');
 
-      // These sub-policy editors must NOT appear
-      expect(renderedNames).not.toContain('network');
-      expect(renderedNames).not.toContain('filesystem');
-      expect(renderedNames).not.toContain('tls');
-      expect(renderedNames).not.toContain('proxy');
+      expect(renderedNames).toContain(t('settings.claudeCode.sandbox.filesystem.allowWrite.name').toLowerCase());
+      expect(renderedNames).toContain(t('settings.claudeCode.sandbox.network.allowedDomains.name').toLowerCase());
+
+      // Managed-only SDK fields must NOT appear in stable settings.
+      expect(renderedNames).not.toContain('allow managed domains only');
+      expect(renderedNames).not.toContain('bwrap path');
+      expect(renderedNames).not.toContain('socat path');
       expect(renderedNames).not.toContain('mach lookup');
+      expect(renderedNames).not.toContain('unix sockets');
+      expect(renderedNames).not.toContain('all unix sockets');
+      expect(renderedNames).not.toContain('local binding');
+      expect(renderedNames).not.toContain('http proxy port');
+      expect(renderedNames).not.toContain('socks proxy port');
+      expect(renderedNames).not.toContain('ignore violations');
     });
 
     it('renders sandbox next-query lifecycle notice without a live-apply restart button', () => {

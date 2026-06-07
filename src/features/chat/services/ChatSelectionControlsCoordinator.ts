@@ -22,6 +22,7 @@ import {
   type ModelUnavailableNoticeContent,
 } from './ModelSelectionRuntime';
 import { PermissionModeSelectorCoordinator } from './PermissionModeSelectorCoordinator';
+import { SandboxConfigBadgeCoordinator } from './SandboxConfigBadgeCoordinator';
 
 export interface ChatSelectionControlsCoordinatorHost extends ModelSelectionRuntimeHost {
   registerEscapeHandler(handler: () => boolean): void;
@@ -33,10 +34,27 @@ export interface ChatSelectionControlsCoordinatorHost extends ModelSelectionRunt
 
 const MODEL_SEARCH_PLACEHOLDER = 'Search models...';
 
+/**
+ * Read the active backend from the live plugin instance.
+ * Uses the Obsidian global `app` to avoid coupling to the guarded
+ * `OpenCodianView.ts` host object.
+ */
+function readActiveBackendFromPlugin(): string {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const plugin = (globalThis as any).app?.plugins?.plugins?.opencodian;
+    return plugin?.settings?.activeBackend ?? 'opencode';
+  } catch {
+    return 'opencode';
+  }
+}
+
 export class ChatSelectionControlsCoordinator {
   private toolbarEl: HTMLElement | null = null;
   private readonly modelSelectionRuntime: ModelSelectionRuntime;
   private readonly permissionSelector: PermissionModeSelectorCoordinator;
+  private readonly sandboxBadge: SandboxConfigBadgeCoordinator;
+  private sandboxBadgeContainer: HTMLElement | null = null;
 
   private modelSelectorContainer: HTMLElement | null = null;
   private modelSelectorTrigger: HTMLElement | null = null;
@@ -52,12 +70,17 @@ export class ChatSelectionControlsCoordinator {
 
   private hasRegisteredEscapeHandler = false;
 
-  constructor(private readonly host: ChatSelectionControlsCoordinatorHost) {
+  constructor(
+    private readonly host: ChatSelectionControlsCoordinatorHost,
+  ) {
     this.modelSelectionRuntime = new ModelSelectionRuntime(host);
     this.permissionSelector = new PermissionModeSelectorCoordinator({
       getPermissionMode: () => this.host.getPermissionMode(),
       switchPermissionMode: (mode) => this.host.switchPermissionMode(mode),
     });
+    // Sandbox badge reads settings directly from the plugin instance,
+    // avoiding coupling to the guarded OpenCodianView.ts host object.
+    this.sandboxBadge = new SandboxConfigBadgeCoordinator();
   }
 
   build(toolbarEl: HTMLElement, options?: { showModels?: boolean; showPermissions?: boolean }): void {
@@ -74,6 +97,11 @@ export class ChatSelectionControlsCoordinator {
     if (showModels) {
       this.mountModelSelector(toolbarEl.createDiv({ cls: 'opencodian-model-selector' }));
     }
+    // Sandbox badge: self-gated by active backend.
+    // syncSandboxBadge() reads the current backend from the plugin instance
+    // on every refresh, so hot-switching backends within a live UI correctly
+    // shows or hides the badge without a full rebuild.
+    this.syncSandboxBadge();
   }
 
   async reloadModelCatalog(): Promise<void> {
@@ -163,6 +191,7 @@ export class ChatSelectionControlsCoordinator {
 
   updatePermissionTriggerDisplay(): void {
     this.permissionSelector.updateTriggerDisplay();
+    this.syncSandboxBadge();
   }
 
   applyLocaleTexts(): void {
@@ -170,11 +199,14 @@ export class ChatSelectionControlsCoordinator {
     this.refreshModelOptions();
     this.updateModelSelectorDisplay();
     this.permissionSelector.applyLocaleTexts();
+    this.syncSandboxBadge();
   }
 
   destroy(): void {
     this.closeModelDropdown();
     this.permissionSelector.destroy();
+    this.sandboxBadge.destroy();
+    this.sandboxBadgeContainer = null;
     this.disposeModelSelectorStickyHeaders?.();
     this.disposeModelSelectorStickyHeaders = null;
     this.toolbarEl = null;
@@ -187,6 +219,42 @@ export class ChatSelectionControlsCoordinator {
     this.modelSelectionRuntime.reset();
     this.currentModelTriggerIconUrl = null;
     this.modelSelectorIconRequestId += 1;
+  }
+
+  /**
+   * Synchronize the sandbox badge container with the current active backend.
+   *
+   * On every refresh (build, updatePermissionTriggerDisplay, applyLocaleTexts),
+   * this re-reads the active backend from the live plugin settings:
+   * - claude-code + no container → mount badge
+   * - claude-code + existing container → update badge content
+   * - other backend + existing container → remove badge and container
+   * - other backend + no container → noop
+   *
+   * This ensures backend hot-switches within a live UI surface the correct
+   * badge state without requiring a full toolbar rebuild.
+   */
+  private syncSandboxBadge(): void {
+    if (!this.toolbarEl) {
+      return;
+    }
+
+    const isClaudeCode = readActiveBackendFromPlugin() === 'claude-code';
+
+    if (isClaudeCode) {
+      if (!this.sandboxBadgeContainer) {
+        this.sandboxBadgeContainer = this.toolbarEl.createDiv({ cls: 'opencodian-sandbox-badge-container' });
+        this.sandboxBadge.mount(this.sandboxBadgeContainer);
+      } else {
+        this.sandboxBadge.update();
+      }
+    } else {
+      if (this.sandboxBadgeContainer) {
+        this.sandboxBadge.destroy();
+        this.sandboxBadgeContainer.remove();
+        this.sandboxBadgeContainer = null;
+      }
+    }
   }
 
   private registerEscapeHandler(): void {

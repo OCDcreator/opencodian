@@ -1877,6 +1877,166 @@ export class SettingsClaudeCodeSection {
           });
       });
 
+    // ── Advanced sandbox sub-policies ───────────────────────────────────
+    containerEl.createEl('h5', { text: t('settings.claudeCode.sandbox.advanced.name') });
+    containerEl.createEl('p', {
+      cls: 'opencodian-settings-inline-notice',
+      text: t('settings.claudeCode.sandbox.advanced.desc'),
+    });
+
+    // excludedCommands
+    new Setting(containerEl)
+      .setName(t('settings.claudeCode.sandbox.excludedCommands.name'))
+      .setDesc(t('settings.claudeCode.sandbox.excludedCommands.desc'))
+      .addTextArea((textArea) => {
+        textArea
+          .setPlaceholder(t('settings.claudeCode.sandbox.excludedCommands.placeholder'))
+          .setValue(this.settings.sandbox.excludedCommands.join('\n'))
+          .onChange(async (value) => {
+            this.settings.sandbox.excludedCommands = this.parseLineList(value);
+            await this.saveSettings();
+          });
+      });
+
+    // allowUnsandboxedCommands
+    new Setting(containerEl)
+      .setName(t('settings.claudeCode.sandbox.allowUnsandboxedCommands.name'))
+      .setDesc(t('settings.claudeCode.sandbox.allowUnsandboxedCommands.desc'))
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.settings.sandbox.allowUnsandboxedCommands)
+          .onChange(async (value) => {
+            this.settings.sandbox.allowUnsandboxedCommands = value;
+            await this.saveSettings();
+          });
+      });
+
+    // Filesystem sub-policy
+    new Setting(containerEl)
+      .setName(t('settings.claudeCode.sandbox.filesystem.allowWrite.name'))
+      .setDesc(t('settings.claudeCode.sandbox.filesystem.allowWrite.desc'))
+      .addTextArea((textArea) => {
+        textArea
+          .setPlaceholder(t('settings.claudeCode.sandbox.filesystem.allowWrite.placeholder'))
+          .setValue(this.settings.sandbox.filesystem.allowWrite.join('\n'))
+          .onChange(async (value) => {
+            this.settings.sandbox.filesystem.allowWrite = this.parseLineList(value);
+            await this.saveSettings();
+          });
+      });
+
+    new Setting(containerEl)
+      .setName(t('settings.claudeCode.sandbox.filesystem.denyWrite.name'))
+      .setDesc(t('settings.claudeCode.sandbox.filesystem.denyWrite.desc'))
+      .addTextArea((textArea) => {
+        textArea
+          .setPlaceholder(t('settings.claudeCode.sandbox.filesystem.denyWrite.placeholder'))
+          .setValue(this.settings.sandbox.filesystem.denyWrite.join('\n'))
+          .onChange(async (value) => {
+            this.settings.sandbox.filesystem.denyWrite = this.parseLineList(value);
+            await this.saveSettings();
+          });
+      });
+
+    new Setting(containerEl)
+      .setName(t('settings.claudeCode.sandbox.filesystem.denyRead.name'))
+      .setDesc(t('settings.claudeCode.sandbox.filesystem.denyRead.desc'))
+      .addTextArea((textArea) => {
+        textArea
+          .setPlaceholder(t('settings.claudeCode.sandbox.filesystem.denyRead.placeholder'))
+          .setValue(this.settings.sandbox.filesystem.denyRead.join('\n'))
+          .onChange(async (value) => {
+            this.settings.sandbox.filesystem.denyRead = this.parseLineList(value);
+            await this.saveSettings();
+          });
+      });
+
+    // Network sub-policy
+    new Setting(containerEl)
+      .setName(t('settings.claudeCode.sandbox.network.allowedDomains.name'))
+      .setDesc(t('settings.claudeCode.sandbox.network.allowedDomains.desc'))
+      .addTextArea((textArea) => {
+        textArea
+          .setPlaceholder(t('settings.claudeCode.sandbox.network.allowedDomains.placeholder'))
+          .setValue(this.settings.sandbox.network.allowedDomains.join('\n'))
+          .onChange(async (value) => {
+            this.settings.sandbox.network.allowedDomains = this.parseLineList(value);
+            await this.saveSettings();
+          });
+      });
+
+    new Setting(containerEl)
+      .setName(t('settings.claudeCode.sandbox.network.deniedDomains.name'))
+      .setDesc(t('settings.claudeCode.sandbox.network.deniedDomains.desc'))
+      .addTextArea((textArea) => {
+        textArea
+          .setPlaceholder(t('settings.claudeCode.sandbox.network.deniedDomains.placeholder'))
+          .setValue(this.settings.sandbox.network.deniedDomains.join('\n'))
+          .onChange(async (value) => {
+            this.settings.sandbox.network.deniedDomains = this.parseLineList(value);
+            await this.saveSettings();
+          });
+      });
+
+    // Weaker sandbox toggles
+    new Setting(containerEl)
+      .setName(t('settings.claudeCode.sandbox.enableWeakerNestedSandbox.name'))
+      .setDesc(t('settings.claudeCode.sandbox.enableWeakerNestedSandbox.desc'))
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.settings.sandbox.enableWeakerNestedSandbox)
+          .onChange(async (value) => {
+            this.settings.sandbox.enableWeakerNestedSandbox = value;
+            await this.saveSettings();
+          });
+      });
+
+    new Setting(containerEl)
+      .setName(t('settings.claudeCode.sandbox.enableWeakerNetworkIsolation.name'))
+      .setDesc(t('settings.claudeCode.sandbox.enableWeakerNetworkIsolation.desc'))
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.settings.sandbox.enableWeakerNetworkIsolation)
+          .onChange(async (value) => {
+            this.settings.sandbox.enableWeakerNetworkIsolation = value;
+            await this.saveSettings();
+          });
+      });
+
+    // Custom ripgrep
+    new Setting(containerEl)
+      .setName(t('settings.claudeCode.sandbox.ripgrep.command.name'))
+      .setDesc(t('settings.claudeCode.sandbox.ripgrep.command.desc'))
+      .addText((text) => {
+        text
+          .setPlaceholder(t('settings.claudeCode.sandbox.ripgrep.command.placeholder'))
+          .setValue(this.settings.sandbox.ripgrep.command)
+          .onChange(async (value) => {
+            this.settings.sandbox.ripgrep.command = value.trim();
+            await this.saveSettings();
+          });
+      });
+
+    new Setting(containerEl)
+      .setName(t('settings.claudeCode.sandbox.ripgrep.args.name'))
+      .setDesc(t('settings.claudeCode.sandbox.ripgrep.args.desc'))
+      .addTextArea((textArea) => {
+        textArea
+          .setPlaceholder(t('settings.claudeCode.sandbox.ripgrep.args.placeholder'))
+          .setValue(this.settings.sandbox.ripgrep.args.join('\n'))
+          .onChange(async (value) => {
+            this.settings.sandbox.ripgrep.args = this.parseLineList(value);
+            await this.saveSettings();
+          });
+      });
+
+    // Unexposed fields notice
+    const unexposedEl = containerEl.createDiv({
+      cls: 'opencodian-settings-inline-notice',
+      attr: { 'data-claude-code-sandbox-unexposed': 'true' },
+    });
+    unexposedEl.createSpan({ text: t('settings.claudeCode.sandbox.unexposedNotice') });
+
     // Sandbox lifecycle honesty: settings only apply to the next query,
     // unlike permissionMode which tries to apply live via setPermissionMode().
     const lifecycleEl = containerEl.createDiv({

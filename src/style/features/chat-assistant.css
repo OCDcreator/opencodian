@@ -2237,6 +2237,7 @@
 
 .opencodian-input-toolbar .opencodian-agent-selector,
 .opencodian-input-toolbar .opencodian-permission-selector,
+.opencodian-input-toolbar .opencodian-sandbox-badge-container,
 .opencodian-input-toolbar .opencodian-model-selector {
   min-height: var(--opencodian-input-toolbar-control-height);
   flex-shrink: 0;

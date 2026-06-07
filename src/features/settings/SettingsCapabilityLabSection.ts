@@ -665,8 +665,8 @@ export class SettingsCapabilityLabSection {
         capability: 'Skills',
         sdkExposed: true, // skills option in SDK
         adapterWired: true, // buildSdkOptions wires skills
-        runtimeProof: 'pass', // Runtime verified (BUILD_ID feature-phase0-capability.202605291343, session 62720fb2-c031-441a-95d2-f3d3932f62b5): test SKILL.md created in vault/.claude/skills/opencodian-proof-skill/ with marker SP26, skills:['opencodian-proof-skill'] passed via SDK options, SDK subprocess CWD matches vault path, Layer 1 readback PASS, Layer 2 behavior PASS — marker SP26 found at start of model response. Skills context filtering is functional. No authoring UI.
-        userSurface: 'settings', // Settings: project skills discovery + create/open actions in Claude Code runtime tab. Chat slash discoverability for Claude runtime commands (via raw text passthrough when claude-code backend is active).
+        runtimeProof: 'pass', // Runtime verified (BUILD_ID feature-phase0-capability.202605291343, session 62720fb2-c031-441a-95d2-f3d3932f62b5): test SKILL.md created in vault/.claude/skills/opencodian-proof-skill/ with marker SP26, skills:['opencodian-proof-skill'] passed via SDK options, SDK subprocess CWD matches vault path, Layer 1 readback PASS, Layer 2 behavior PASS — marker SP26 found at start of model response. Skills context filtering is functional.
+        userSurface: 'settings+chat', // 2026-06-07 LIVE VERIFIED (Outcome A, BUILD_ID feature-phase0-capability.202606070146): Settings surface: project skills discovery + create/open actions in Claude Code runtime tab. Chat surface: custom .claude/commands/*.md and .claude/skills/*/SKILL.md entries discovered in slash menu autocomplete dropdown (tagged "(project)"), selectable, and sent via raw text passthrough. Custom command "opencodian-slash-proof-command" and custom skill "opencodian-slash-proof-skill" both appeared in dropdown; selecting command inserted "/opencodian-slash-proof-command " into input; sending produced model response containing exact marker "MARKER:SLASH-CMD-PROOF-SP27". Both entries persisted after page reload. No authoring UI.
       },
       {
         capability: 'Plugins',
@@ -680,7 +680,19 @@ export class SettingsCapabilityLabSection {
         sdkExposed: true, // mcpServers option in SDK
         adapterWired: true, // buildSdkOptions wires mcpServers + ClaudeCodeMcpConfigAdapter
         runtimeProof: 'pass', // Direct SDK smoke artifact proves positive MCP passthrough.
-        userSurface: 'settings', // Runtime passthrough via shared MCP settings tab; Claude Code Tools tab exposes refresh.
+        // 2026-06-07 re-audit: live-apply path fully traced:
+        //   adapter.reloadMcpServers() → refreshMcpConfig() + loadMcpConfig() + applyToActiveQueries(q => q.setMcpServers(cached))
+        //   → SDK query.setMcpServers() on every active query → CLI control_request → live MCP config update on running sessions.
+        //   Settings Tools tab: "Refresh MCP runtime" button triggers reloadMcpServers(), "Inspect runtime status" button
+        //   triggers adapter.getMcpServerRuntimeStatuses() → query.mcpServerStatus() → per-server connected/failed + tool names.
+        //   Shared Settings > MCP tab provides authoring (create/edit/delete MCP servers in .claude/mcp.json).
+        //   NO chat surface for MCP management (by design — MCP is infrastructure, not conversation).
+        // Unwired SDK methods (explicit closure — NOT productizable at current scope):
+        //   query.reconnectMcpServer(name): single-server reconnect; bulk setMcpServers() covers the use case.
+        //   query.toggleMcpServer(name, enabled): single-server enable/disable; same bulk coverage.
+        //   query.reloadPlugins(): runtime plugin reload; Plugins row covers init-time loading at pass.
+        //   query.stopTask(taskId) / query.backgroundTasks(): task lifecycle control; no UI surface.
+        userSurface: 'settings', // Settings: shared MCP tab for authoring + Claude Code Tools tab for refresh/inspect.
       },
       {
         capability: 'Allowed Tools',
@@ -767,32 +779,52 @@ export class SettingsCapabilityLabSection {
         capability: 'Fallback Model',
         sdkExposed: true, // fallbackModel option in SDK query options
         adapterWired: true, // buildSdkOptions wires normalized settings into SDK options
-        runtimeProof: 'readback', // 2026-06-06 audit conclusion: remains readback.
+        runtimeProof: 'readback', // ✅ **2026-06-07 FORMAL CLOSURE (Outcome B)** — readback is the permanent ceiling.
+        //
+        // CLOSURE EVIDENCE (2026-06-07 re-audit against latest upstream):
         // SDK source (sdk.mjs): exactly 3 fallback references in ProcessTransport.initialize():
-        // (1) destructure fallbackModel:w from options, (2) validate w!==N (same-model throws),
-        // (3) push --fallback-model w to CLI args. ZERO switching logic in SDK — all model-switching
+        // (1) destructure fallbackModel from options, (2) same-model validation (throws),
+        // (3) push --fallback-model to CLI args. ZERO switching logic in SDK — all model-switching
         // lives in compiled CLI binary, triggered by API-side HTTP 529/capacity overload.
-        // CLI help: "when default model is overloaded (only works with --print)".
-        // Invalid-primary test (BUILD_ID feature-phase0-capability.202605300441) undermined:
-        // SDK accepts arbitrary model names at query boundary, reports same string back, no fallback.
-        // Cannot simulate real API overload locally without faking external signals.
+        //
+        // LATEST CLI BEHAVIOR CHANGES (confirmed, but NO new SDK observable signals):
+        // (a) --fallback-model now applies to interactive sessions (not just --print mode)
+        // (b) settings.json supports up to 3 fallback models tried in order
+        // (c) Sticky session fallback: switches for rest of session when primary not found
+        // (d) FALLBACK_FOR_ALL_PRIMARY_MODELS env var: triggers fallback on any primary overload
+        // (e) /bg and detached workers degrade to fallback instead of hard-failing
+        // ALL of these enhance CLI-side behavior but produce NO new SDK-level observable event,
+        // callback, stream marker, or status metadata. The plugin cannot detect when fallback
+        // activates, which model was actually used during a turn, or whether switching occurred.
+        //
+        // DETECTION MECHANISM (unchanged, heuristic-only):
+        // modelUsage on SDKResultMessage: if Object.keys(modelUsage).length > 1, fallback likely
+        // occurred. This is passive post-hoc detection, never observed in practice (cannot
+        // produce real API 529 overload locally). NOT a user-facing feature.
         //
         // Adjacent seams audited and REJECTED for productization as stable user-facing capabilities:
-        // (a) result message `modelUsage` — passive detection plumbing runtime-verified; if native
-        //     fallback occurs, `Object.keys(modelUsage).length > 1`. NOT a user-facing feature;
-        //     never observed in practice; no product value as a standalone chat surface.
-        // (b) `query.setModel()` — SDK source verified (sends `{subtype:"set_model",model}` control
-        //     request); wiring proven; NOT live-runtime-verified. Even if verified, this is a MANUAL
-        //     model switch seam, semantically distinct from automatic fallback. Would require a
-        //     separate "Manual Model Switch" capability row, not promotion of Fallback Model.
-        // (c) `applyFlagSettings({model})` — identified in SDK types only; NOT runtime-verified.
-        // (d) `SDKAPIRetryMessage` with `error_status===529` — identified in SDK types only;
-        //     NOT runtime-verified; detects retries, not fallback itself.
+        // (a) modelUsage — passive detection plumbing; never observed; no standalone product value.
+        // (b) query.setModel() — fully documented SDK method for MANUAL model switch. Semantically
+        //     distinct from automatic fallback. Now tracked separately as "Main Model Live Switch"
+        //     capability row (pass/settings+chat, promoted 2026-06-07).
+        // (c) applyFlagSettings({model}) — documented; same semantics as setModel().
+        // (d) SDKAPIRetryMessage with error_status===529 — detects retries, NOT fallback itself.
+        //     Cannot distinguish same-model retry from fallback-model retry.
+        // (e) ModelFallbackTriggered/ModelFallbackRecovered hook events — proposed in community
+        //     issue #22917 but NOT implemented. Issue closed as duplicate.
+        //
+        // WHY THIS IS CLOSURE, NOT A TEMPORARY GAP:
+        // The fundamental barrier is architectural: fallback switching happens inside the compiled
+        // CLI binary in response to API-side HTTP 529 signals. The SDK layer is a thin transport
+        // that passes the --fallback-model flag and receives stream events. The SDK has no
+        // mechanism to observe or report internal model switching. This requires Anthropic to add
+        // dedicated fallback activation events to the SDK message protocol — a protocol-level
+        // change, not a feature gap.
         //
         // Honest ceiling: readback. The plugin verifies the option reaches the SDK boundary
         // (--fallback-model CLI flag + same-model validation). Automatic fallback switching is
         // NOT locally provable and has NOT been independently verified. Do not misread the saved
-        // settings value as proof that fallback behavior works.
+        // settings value as proof that fallback behavior works. This row is CLOSED at readback.
         userSurface: 'settings',
       },
 
@@ -970,23 +1002,37 @@ export class SettingsCapabilityLabSection {
       {
         capability: 'Sandbox',
         sdkExposed: true, // SDK Options.sandbox?: SandboxSettings
-        adapterWired: true, // buildClaudeCodeOptions wires sandbox.enabled/failIfUnavailable/autoAllowBashIfSandboxed
-        runtimeProof: 'readback', // 2026-06-06 audit (checkpoint round): Sandbox stays readback.
-        // Option wiring: enabled/failIfUnavailable/autoAllowBashIfSandboxed propagate through
-        // ClaudeCodeOptionsBuilder → SDK Options.sandbox → SDK X2() merges into --settings JSON → CLI subprocess.
-        // SDK defaults: when enabled=true, X2() sets failIfUnavailable=true if unspecified (per sdk.d.ts line 1662).
+        adapterWired: true, // buildClaudeCodeOptions wires all exposed sandbox fields
+        runtimeProof: 'readback', // 2026-06-07 expanded productization: Sandbox stays readback for OS-level enforcement
+        // but settings surface now includes advanced sub-policies.
+        // Option wiring: enabled/failIfUnavailable/autoAllowBashIfSandboxed/excludedCommands/
+        // allowUnsandboxedCommands/filesystem.{allowWrite,denyWrite,denyRead}/
+        // network.{allowedDomains,deniedDomains}/enableWeakerNestedSandbox/
+        // enableWeakerNetworkIsolation/ripgrep all propagate through
+        // ClaudeCodeOptionsBuilder → SDK Options.sandbox → CLI subprocess.
         // Readback ceiling remains: the CLI binary handles OS-level sandbox enforcement internally.
-        // No observable signal confirms activation: no init event, no tool metadata, no stderr pattern,
-        // no CLAUDE_CODE_SANDBOXED env var (that's assistant-worker path only, not createQuery path).
+        // No observable signal confirms activation: no init event, no tool metadata, no stderr pattern.
         // Plugin cannot distinguish "sandbox active" from "sandbox silently degraded" or "unsupported platform".
-        // Stable settings surface is already the right user entry (Permissions tab, 3 toggles).
-        // Network, filesystem, TLS, proxy, Mach lookup, allowUnsandboxedCommands, excludedCommands,
-        // ignoreViolations, ripgrep, bwrapPath, socatPath sub-policies exist in SandboxSettingsSchema
-        // but are intentionally not exposed as stable settings in this version.
+        // Settings surface: Permissions tab includes basic toggles + advanced sub-policy section
+        // (filesystem paths, network domains, excluded commands, weaker sandbox options, custom ripgrep).
+        // Managed-only fields (bwrapPath, socatPath, allowManagedDomainsOnly, allowManagedReadPathsOnly,
+        // allowAllUnixSockets, allowUnixSockets, allowLocalBinding, allowMachLookup, httpProxyPort,
+        // socksProxyPort, ignoreViolations, filesystem.allowRead) are NOT exposed.
         // Promotion path: if SDK adds sandbox status to init event, tool result metadata, or if
         // permission events expose decision_reason_type='sandboxOverride' during an auto-allow bash
         // interaction when sandbox is active, re-audit for indirect activation proof.
-        userSurface: 'settings', // Permissions tab: enabled, failIfUnavailable, autoAllowBashIfSandboxed toggles
+        userSurface: 'settings+chat', // Settings: Permissions tab (basic toggles + advanced sub-policies).
+        // Chat: read-only SandboxConfigBadgeCoordinator badge in chat toolbar.
+        // Badge is mounted independently of the permission selector (not gated on
+        // AgentCapability.Permissions) so it renders for Claude Code conversations.
+        // Shows sub-policy count and detailed tooltip; does NOT claim verified OS-level enforcement.
+        // 2026-06-07 LIVE VERIFIED (Outcome A, BUILD_ID feature-phase0-capability.202606070542):
+        // Claude Code chat toolbar shows "沙箱（2 条策略）" badge with shield icon.
+        // Tooltip lists excluded commands, network domains, readback boundary notice.
+        // Badge updates dynamically when settings change. Badge hides when sandbox disabled.
+        // Badge persists correctly after plugin reload + view hydration.
+        // Hot-switch claude-code → opencode → claude-code in same live UI: badge 1 → 0 → 1.
+        // obsidian dev:errors clean.
       },
       {
         capability: 'Session Title',
@@ -1327,40 +1373,28 @@ export class SettingsCapabilityLabSection {
         capability: 'AskUserQuestion Preview Format',
         sdkExposed: true, // SDK Options.toolConfig?: ToolConfig — askUserQuestion.previewFormat?: 'markdown' | 'html'
         adapterWired: true, // buildClaudeCodeOptions wires toolConfig from settings.askUserQuestionPreviewFormat
-        runtimeProof: 'readback', // 2026-06-06 audit (Outcome B): remains readback with hardened boundary.
-        // VERIFIED (synthetic data, unit tests):
-        //   1. Settings→SDK wiring: buildClaudeCodeOptions omits toolConfig when ''/empty,
-        //      sets toolConfig.askUserQuestion.previewFormat when 'markdown'|'html'.
-        //      Tests: ClaudeCodeOptionsBuilder.test.ts (omit, markdown, html).
-        //   2. Bridge extraction: normalizeQuestionOption reads raw.preview → preserves in
-        //      NormalizedQuestionPrompt.options[].preview → passes to QuestionRequest.
-        //      Tests: ClaudeCodePermissionBridge.test.ts (preview preservation).
-        //   3. UI rendering: QuestionInlineCardRenderer + QuestionDock store preview in
-        //      data-preview attribute, show on focusin/mouseenter via setText() (textContent),
-        //      hide on focusout. HTML is never parsed as rich HTML.
-        //      Tests: QuestionInlineCardRenderer.test.ts, QuestionDock.test.ts (focus/hide).
-        //   4. Settings surface: Tools tab dropdown (''|'markdown'|'html'), boundary notice,
-        //      lifecycle notice. Claude-only surface.
-        //      Tests: SettingsClaudeCodeSection.test.ts (dropdown, notices).
-        // NOT VERIFIED — fundamental limitation (not temporary gap):
-        //   1. Whether the SDK actually includes .preview in AskUserQuestion tool inputs when
-        //      previewFormat is set. This is a pure outbound SDK request; the inbound AskUserQuestion
-        //      tool input does NOT echo previewFormat back. Preview arrival is model/SDK-dependent.
-        //   2. Whether the model generates meaningful preview text that differs between markdown
-        //      and html format settings.
-        //   3. Whether markdown preview text is semantically different from html preview text.
-        // ADJACENT SEAMS REJECTED:
-        //   1. Reusing AskUserQuestion/Elicitation pass proof as previewFormat proof — the pass
-        //      proof only verifies that question dialogs arrive and render; it does NOT verify
-        //      that preview text is included in the tool input or differs by format setting.
-        //   2. Mocking AskUserQuestion tool input with synthetic preview — would test mock
-        //      behavior, not real SDK/model preview generation.
-        //   3. Inspecting SDK source for preview generation logic — even if found, runtime
-        //      proof requires observing the actual data arrive in a real query, not reading code.
-        // PROMOTION PATH: requires one of (a) SDK emits a confirmation event when previewFormat
-        // is active, (b) plugin captures a real AskUserQuestion tool input with .preview data
-        // during a live session, or (c) SDK documents preview arrival as contractual behavior.
-        userSurface: 'settings', // Tools tab dropdown; Claude-only surface
+        runtimeProof: 'pass', // 2026-06-07 live Obsidian proof (Outcome A — promoted from readback).
+        // LIVE VERIFIED (Test Vault BUILD_ID feature-phase0-capability.202606070354):
+        //   1. previewFormat='markdown': real AskUserQuestion tool input arrived with .preview on
+        //      all 3 options — full markdown content (## headings, **bold**, numbered lists).
+        //      Console: hasAnyPreview=true, totalQuestions=1.
+        //   2. previewFormat='html': real AskUserQuestion tool input arrived with .preview on
+        //      all 3 options — full HTML content (<div>, <h3>, <ul>/<li>, inline CSS styles).
+        //      Console: hasAnyPreview=true, totalQuestions=1.
+        //   3. Format choice DOES affect preview content: markdown→markdown text, html→HTML fragments.
+        //   4. UI renders previews: data-preview attribute on <input>, previewEl.setText() on
+        //      focus/hover, hidden=false with 506+ chars for markdown, 877+ chars for html.
+        //   5. SDK forwards previewFormat as CLAUDE_CODE_QUESTION_PREVIEW_FORMAT env var to CLI
+        //      subprocess, which modifies the tool schema description the model sees.
+        // SYNTHETIC UNIT TESTS (pre-existing, still valid):
+        //   - ClaudeCodeOptionsBuilder.test.ts: omit, markdown, html wiring
+        //   - ClaudeCodePermissionBridge.test.ts: preview preservation in bridge normalization
+        //   - QuestionInlineCardRenderer.test.ts + QuestionDock.test.ts: focus/hide preview
+        //   - SettingsClaudeCodeSection.test.ts: dropdown, boundary + lifecycle notices
+        // CAVEAT: preview is model-dependent — the model may not always include previews for
+        //   every question, but the plumbing is proven and the format setting does affect content.
+        // HTML is rendered as plain text (textContent, never innerHTML) for XSS safety.
+        userSurface: 'settings+chat', // Tools tab dropdown + chat question dialog shows preview on focus/hover
       },
       {
         capability: 'System Prompt',
@@ -1369,6 +1403,144 @@ export class SettingsCapabilityLabSection {
         runtimeProof: 'pass', // Combined evidence: readback proves the saved setting reaches the preset-with-append
         // SDK path, and live behavior proof shows that same path influences a fresh diagnostic query.
         userSurface: 'settings', // Model & Thinking tab text area
+      },
+      {
+        capability: 'Main Model Live Switch',
+        sdkExposed: true, // Query.setModel(model) — fully documented SDK method; sends {subtype:"set_model",model} control request
+        adapterWired: true, // ClaudeCodeAdapter.setModel() → applyToActiveQueries(runtime => runtime.query?.setModel?.(model))
+        runtimeProof: 'pass', // ✅ 2026-06-07 LIVE VERIFIED (Outcome A — promoted to matrix row).
+        // Three-layer evidence:
+        //
+        // 1. BACKEND (adapter wiring — pass):
+        //    - ClaudeCodeAdapter.setModel(model) calls applyToActiveQueries() → query.setModel(model)
+        //      on each active runtime.
+        //    - getOrStartRuntime(): when chat sends with a model override, if session.runtime
+        //      already exists and is reused (no effort-triggered rebuild), query.setModel(overrides.model)
+        //      is called on the active query. If no active runtime or runtime is rebuilt, the override
+        //      takes effect via initial options.model on the new query — NOT via mid-stream setModel().
+        //    - runSetModelLiveProbe(): two-phase diagnostic probe (Phase 1 baseline modelUsage,
+        //      setModel(targetModel) on same query handle, Phase 2 modelUsage comparison).
+        //    - Unit tests: setModel on active/closed/idle runtimes; probe pass/readback/boundary/fail.
+        //
+        // 2. SETTINGS (stable user surface — pass):
+        //    - Model & Thinking tab: text input + quick-select dropdown.
+        //    - applyClaudeModel() → adapter.setModel(model) on change.
+        //    - renderMainModelProofStatusNotice() with data-proof-state='pass' and explicit boundary text:
+        //      "Live model switching verified. When an active persistent query supports setModel(),
+        //       changing the model here takes effect immediately on the running query."
+        //    - Boundary notice correctly distinguishes from Fallback Model (automatic, unobservable).
+        //
+        // 3. CHAT (stable user surface — pass):
+        //    - Chat model selector sets TabModelOverride → on send, getOrStartRuntime() checks for
+        //      an existing reusable runtime:
+        //      (a) If runtime exists and is not rebuilt → query.setModel(overrides.model) mid-stream.
+        //      (b) If runtime is new or rebuilt (e.g. effort change) → override applied via initial
+        //          options.model on the new query — NOT via query.setModel().
+        //    - Both paths route through the same adapter seam; the difference is mid-stream vs initial.
+        //
+        // SEMANTIC BOUNDARIES (explicit to prevent future confusion):
+        // - This is MANUAL model switch, NOT automatic Fallback Model (separate row, readback, CLOSED).
+        // - Chat "live switch" ONLY means query.setModel() when an active persistent runtime is REUSED.
+        //   When no runtime exists or effort change triggers rebuild, the model override takes effect
+        //   through initial options.model on the next query — a different SDK mechanism.
+        // - Chat model selector and settings model input both call the SAME adapter.setModel() path;
+        //   they are not independent capabilities. This row covers the SDK seam they share.
+        // - applyFlagSettings({model}) has the same semantics as setModel(); it is not a separate seam.
+        //
+        // DIAGNOSTIC EVIDENCE (BUILD_ID feature-phase0-capability.202606070617):
+        // - runSetModelLiveProbe('claude-opus-4-5') returned:
+        //   setModelAttempted: true, setModelNotAvailable: false,
+        //   phase1ModelKeys: ['claude-haiku-4-5'], phase2ModelKeys: ['claude-haiku-4-5', 'claude-opus-4-5'].
+        // - Settings surface: data-claude-code-proof-status="main-model" visible.
+        // - Capability Lab: proof chip = Verified.
+        // - obsidian dev:errors clean.
+        // - Unit tests: adapter setModel on active/closed/idle; probe 5 cases; smoke harness.
+        userSurface: 'settings+chat', // Settings: Model & Thinking tab text input + quick-select.
+        // Chat: model selector dropdown sets TabModelOverride → on send: if active runtime
+        // reused → query.setModel() mid-stream; if new/rebuilt runtime → initial options.model.
+      },
+      {
+        capability: 'Permission Mode Live Switch',
+        sdkExposed: true, // Query.setPermissionMode(mode) — SDK method; sends control request to active CLI subprocess
+        adapterWired: true, // ClaudeCodeAdapter.setPermissionMode() → applyToActiveQueries(runtime => runtime.query?.setPermissionMode?.(mode))
+        runtimeProof: 'readback', // ✅ 2026-06-07 AUDIT (Outcome A — promoted to matrix row at readback).
+        // ✅ 2026-06-07 PROMOTION PATH ATTEMPT — FAILED. Hardened boundary with full SDK evidence.
+        //
+        // Three-layer assessment:
+        //
+        // 1. BACKEND (adapter wiring — readback, promotion path exhausted):
+        //    - ClaudeCodeAdapter.setPermissionMode(mode) calls applyToActiveQueries() →
+        //      query.setPermissionMode(mode) on each active runtime.
+        //    - Identical pattern to setModel() (Main Model Live Switch, pass/settings+chat).
+        //    - Unit tests: setPermissionMode on active/closed/idle runtimes verified.
+        //    - Smoke harness: adapter.setPermissionMode('plan') → query.setPermissionMode('plan') verified.
+        //    - Settings wiring test: dropdown change → adapter.setPermissionMode called.
+        //
+        //    SDK mechanism fully traced (sdk.mjs):
+        //    - query.setPermissionMode(mode) → request({subtype:"set_permission_mode",mode})
+        //      → control_request JSON written to CLI subprocess stdin
+        //      → CLI responds with control_response {subtype:"success"} or {subtype:"error"}
+        //      → response may include pending_permission_requests (auto-resolved pending approvals)
+        //    - Structurally identical to setModel(): same request() transport mechanism.
+        //
+        //    WHY PROMOTION FAILED — three structural blockers:
+        //
+        //    BLOCKER 1 — No observable stream signal:
+        //      SDKStatusMessage.permissionMode is optional (sdk.d.ts line 3500) and the plugin's
+        //      ClaudeCodeStreamNormalizer.appendLifecycleChunks() does NOT handle subtype==='status'
+        //      — these messages are silently dropped (no StreamChunk created). No dedicated event,
+        //      getter, or client_event exists for permission mode changes. Unlike setModel() where
+        //      modelUsage key comparison provides an observable stream marker, setPermissionMode()
+        //      produces NO equivalent observable artifact.
+        //
+        //    BLOCKER 2 — canUseTool inconsistency across modes:
+        //      In query() mode, canUseTool callback is ONLY invoked by the SDK in 'plan' mode.
+        //      Switching between 'default' and 'bypassPermissions' has NO observable difference
+        //      (callback never fires in either mode). Switching from 'plan' to 'bypass' mid-stream
+        //      would require observing the callback stop firing — but the callback fires from inside
+        //      the SDK's readMessages() generator, and calling setPermissionMode() from there
+        //      creates a transport deadlock (request and response share the same transport).
+        //
+        //    BLOCKER 3 — CLI subprocess opaqueness:
+        //      The actual permission handling change happens inside the compiled CLI binary.
+        //      The onSetPermissionMode callback (sdk.mjs processControlRequest) returns {ok:true}
+        //      to acknowledge the request, but the plugin cannot observe whether the subprocess's
+        //      internal tool-approval state actually changed. This is fundamentally different from
+        //      setModel() where the model change is externally verifiable via API response metadata.
+        //
+        //    UNLIKE setModel() (which IS pass): model change produces observable modelUsage keys
+        //    in the stream; permission mode change produces no equivalent marker.
+        //
+        //    Promotion would require ONE of: (a) SDK adds permissionModeChanged client_event or
+        //    stream marker, (b) CLI consistently emits SDKStatusMessage.permissionMode after
+        //    setPermissionMode(), (c) plugin adds separate query execution context for mid-stream
+        //    behavioral observation. All require SDK-side changes or significant architecture changes.
+        //
+        // 2. SETTINGS (stable user surface — pass):
+        //    - Permissions tab: dropdown with 4 modes (default, acceptEdits, bypassPermissions, plan).
+        //    - applyClaudePermissionMode() → adapter.setPermissionMode(mode) on change,
+        //      then saveSettings(). This is the live-apply path.
+        //    - The Permission Approval proof launcher also uses this seam to temporarily
+        //      switch to 'plan' mode for triggering permission cards.
+        //
+        // 3. CHAT (NO user surface for Claude Code):
+        //    - The shared chat permission selector (PermissionModeSelectorCoordinator) controls
+        //      OpenCode's global permissionMode (yolo/normal/plan) and restarts the OpenCode service.
+        //    - It does NOT call ClaudeCodeAdapter.setPermissionMode() or query.setPermissionMode().
+        //    - The chat permission selector is a completely separate system from Claude Code's
+        //      permission mode. Do not conflate them.
+        //
+        // SEMANTIC BOUNDARIES (explicit to prevent future confusion):
+        // - This is the Claude Code SDK query.setPermissionMode() seam ONLY.
+        // - This is NOT Permission Approval (tool-call cards in chat — separate row, pass/chat).
+        // - This is NOT OpenCode global permission templates (SettingsSecuritySection /
+        //   PermissionModeSelectorCoordinator — separate system, restarts OpenCode service).
+        // - This is NOT Plan Mode Instructions (dependent on permissionMode='plan' but a separate
+        //   capability row, pass/settings).
+        // - The chat permission selector does NOT route to this seam; it only controls OpenCode.
+        userSurface: 'settings', // Settings: Permissions tab dropdown with live apply.
+        // Chat: NO Claude Code permission selector in chat toolbar.
+        // The shared chat selector controls OpenCode only.
       },
     ];
   }

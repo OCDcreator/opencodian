@@ -11,6 +11,7 @@
 
 - 通过 `ModelSelectionRuntime` 加载并缓存 model catalog bundle / available providers，维护 requested/current/resolved model selection
 - 创建 toolbar 内的 permission / model selector 容器，并把 permission 容器交给 `PermissionModeSelectorCoordinator`
+- 在 permission selector 旁集成 sandbox badge 容器（仅 Claude Code backend），用于显示 Claude Code sandbox 配置摘要
 - 维护 model selector 的搜索、keyboard navigation、sticky header cleanup 与 provider icon 刷新
 - 统一更新当前模型显示、unavailable / unconfigured class、switch-model override 写回结果、unavailable notice 文案与 effort selector 连动；trigger tooltip 明确这是当前标签的发送覆盖，不是持久化 `ConversationSessionSettings`
 - 委托 `PermissionModeSelectorCoordinator` 维护 permission selector 的 mode label、selected state 与 dropdown open/close lifecycle
@@ -48,12 +49,13 @@ export class ChatSelectionControlsCoordinator {
 
 ## 关键行为
 
-- `build()` 一次性挂载 permission / model selector，并注册共享的 Escape close handler
+- `build()` 一次性挂载 permission / model selector，并通过 `syncSandboxBadge()` 根据 active backend 决定是否挂载 sandbox badge
 - `reloadModelCatalog()` 触发 runtime data reload，重建 available provider/model cache，并同步 active-tab context-usage identity
 - `getCurrentSessionModel()` / `getCurrentSessionModelResolution()` 通过 `ModelSelectionRuntime` 完成 requested/current/resolved selection 推导，不再要求 view 直接维护 catalog 分支
 - `ensureSelectedModelAvailable()` / `getModelUnavailableNoticeContent()` 把 send 前 availability follow-up 与 notice copy 判定委托到 selection runtime
 - `refreshModelOptions()` / `updateModelSelectorDisplay()` 把 list 渲染、trigger/icon 刷新与 unavailable/unconfigured state 收束到同一个 owner
-- `updatePermissionTriggerDisplay()` / `applyLocaleTexts()` 继续作为 view-facing 入口，但 permission mode 文案与 selected state 刷新会委托给 `PermissionModeSelectorCoordinator`
+- `updatePermissionTriggerDisplay()` / `applyLocaleTexts()` 继续作为 view-facing 入口，但 permission mode 文案与 selected state 刷新会委托给 `PermissionModeSelectorCoordinator`；同时通过 `syncSandboxBadge()` 确保 sandbox badge 在 backend hot-switch 后同步显示/隐藏
+- sandbox badge 通过 `syncSandboxBadge()` 在每次刷新时重新读取 active backend：仅 Claude Code backend 显示 badge，其他 backend 自动移除。该检查在 `build()`、`updatePermissionTriggerDisplay()` 和 `applyLocaleTexts()` 三个入口都会执行，确保同一活跃界面内 backend 切换后 badge 状态立即正确。badge 用于反映 expanded sandbox 设置（命令例外、filesystem/network 子策略和 ripgrep override）的当前状态。
 - model dropdown 的 outside-click listener 使用 capture 阶段注册，确保点击其他 toolbar dropdown trigger 时当前 dropdown 能被正确关闭
 - model selector trigger 现在携带 `role="button"`、`tabindex="0"`、`aria-haspopup="listbox"` 与 `aria-expanded`，dropdown 打开/关闭时同步更新这些属性并添加/移除 `is-open` 类以触发 CSS 动画
 - `destroy()` 关闭 dropdown、移除 document click listener，并释放 sticky header cleanup

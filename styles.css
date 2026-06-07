@@ -4927,6 +4927,46 @@ img.opencodian-model-provider-header-icon {
   }
 }
 
+/* ============================================================
+   Sandbox Config Badge (read-only, chat toolbar)
+   ============================================================ */
+
+.opencodian-sandbox-badge-container {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+}
+
+.opencodian-sandbox-config-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: var(--opencodian-input-toolbar-control-height, 30px);
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: var(--background-modifier-hover);
+  color: var(--text-muted);
+  font-size: 11px;
+  white-space: nowrap;
+  user-select: none;
+  cursor: default;
+}
+
+.opencodian-sandbox-config-badge-icon {
+  display: flex;
+  align-items: center;
+}
+
+.opencodian-sandbox-config-badge-icon svg {
+  width: 12px;
+  height: 12px;
+  color: var(--text-success);
+}
+
+.opencodian-sandbox-config-badge-text {
+  font-weight: 500;
+}
+
 
 /* components/history-dropdown.css */
 /* ============================================================
@@ -12047,6 +12087,7 @@ img.opencodian-model-provider-header-icon {
 
 .opencodian-input-toolbar .opencodian-agent-selector,
 .opencodian-input-toolbar .opencodian-permission-selector,
+.opencodian-input-toolbar .opencodian-sandbox-badge-container,
 .opencodian-input-toolbar .opencodian-model-selector {
   min-height: var(--opencodian-input-toolbar-control-height);
   flex-shrink: 0;

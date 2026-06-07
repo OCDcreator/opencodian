@@ -122,6 +122,23 @@ export interface ClaudeCodeSdkOptionsShape {
     enabled: boolean;
     failIfUnavailable?: boolean;
     autoAllowBashIfSandboxed?: boolean;
+    excludedCommands?: string[];
+    allowUnsandboxedCommands?: boolean;
+    filesystem?: {
+      allowWrite?: string[];
+      denyWrite?: string[];
+      denyRead?: string[];
+    };
+    network?: {
+      allowedDomains?: string[];
+      deniedDomains?: string[];
+    };
+    enableWeakerNestedSandbox?: boolean;
+    enableWeakerNetworkIsolation?: boolean;
+    ripgrep?: {
+      command: string;
+      args?: string[];
+    };
   };
   /** Custom session title. SDK skips automatic title generation when provided. */
   title?: string;
@@ -312,6 +329,54 @@ export function buildClaudeCodeOptions(
     }
     if (input.settings.sandbox.autoAllowBashIfSandboxed) {
       sandbox.autoAllowBashIfSandboxed = true;
+    }
+    // Advanced sandbox sub-policies
+    if (input.settings.sandbox.excludedCommands.length > 0) {
+      sandbox.excludedCommands = [...input.settings.sandbox.excludedCommands];
+    }
+    // allowUnsandboxedCommands defaults to true in SDK; only send when explicitly false
+    if (!input.settings.sandbox.allowUnsandboxedCommands) {
+      sandbox.allowUnsandboxedCommands = false;
+    }
+    // Filesystem sub-policy
+    const fs = input.settings.sandbox.filesystem;
+    if (fs.allowWrite.length > 0 || fs.denyWrite.length > 0 || fs.denyRead.length > 0) {
+      sandbox.filesystem = {};
+      if (fs.allowWrite.length > 0) {
+        sandbox.filesystem.allowWrite = [...fs.allowWrite];
+      }
+      if (fs.denyWrite.length > 0) {
+        sandbox.filesystem.denyWrite = [...fs.denyWrite];
+      }
+      if (fs.denyRead.length > 0) {
+        sandbox.filesystem.denyRead = [...fs.denyRead];
+      }
+    }
+    // Network sub-policy
+    const net = input.settings.sandbox.network;
+    if (net.allowedDomains.length > 0 || net.deniedDomains.length > 0) {
+      sandbox.network = {};
+      if (net.allowedDomains.length > 0) {
+        sandbox.network.allowedDomains = [...net.allowedDomains];
+      }
+      if (net.deniedDomains.length > 0) {
+        sandbox.network.deniedDomains = [...net.deniedDomains];
+      }
+    }
+    // Weaker sandbox options
+    if (input.settings.sandbox.enableWeakerNestedSandbox) {
+      sandbox.enableWeakerNestedSandbox = true;
+    }
+    if (input.settings.sandbox.enableWeakerNetworkIsolation) {
+      sandbox.enableWeakerNetworkIsolation = true;
+    }
+    // Custom ripgrep
+    const rg = input.settings.sandbox.ripgrep;
+    if (rg.command.trim().length > 0) {
+      sandbox.ripgrep = { command: rg.command.trim() };
+      if (rg.args.length > 0) {
+        sandbox.ripgrep.args = [...rg.args];
+      }
     }
     options.sandbox = sandbox;
   }

@@ -178,6 +178,10 @@ describe('ClaudeCodeAdapter', () => {
     expect(adapter.hasCapability(AgentCapability.Models)).toBe(true);
     expect(adapter.hasCapability(AgentCapability.Questions)).toBe(false);
     expect(adapter.hasCapability(AgentCapability.Hooks)).toBe(false);
+    // Claude Code supports stream-derived todo snapshots via TodoWrite tool.
+    // The generic SessionTodoCoordinator + SessionTodoDock handle them;
+    // enabling this capability mounts the dock for Claude Code conversations.
+    expect(adapter.hasCapability(AgentCapability.Todos)).toBe(true);
   });
 
   it('returns normalized supported models from the SDK', async () => {

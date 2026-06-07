@@ -86,11 +86,16 @@ describe('ClaudeCodeBackendSettings field truth-audit', () => {
 
   // --- sandbox: readback (SDK option wiring proven, OS-level isolation not independently verified) ---
 
-  it('sandbox JSDoc reflects readback boundary and warns it is not filesystem/network rules', () => {
+  it('sandbox JSDoc reflects readback boundary and advanced sub-policy scope', () => {
     const jsdoc = getFieldJsdoc(source, /^\s+sandbox:\s/);
     expect(jsdoc).not.toContain('@untested');
     expect(jsdoc).toContain('Readback');
-    expect(jsdoc.toLowerCase()).toContain('not filesystem');
+    expect(jsdoc).toContain('Advanced sub-policies');
+    expect(jsdoc).toContain('excludedCommands');
+    expect(jsdoc).toContain('filesystem');
+    expect(jsdoc).toContain('network domain filters');
+    expect(jsdoc).toContain('ripgrep');
+    expect(jsdoc).toContain('Managed-only fields');
   });
 
   // --- taskBudget: readback (SDK @alpha option wiring proven, API-side behavior not independently verified) ---

@@ -55,6 +55,7 @@ OpenCodian 全局类型的主聚合入口。它把聊天、模型、设置、权
 |------|------|------|
 | `OpenCodianSettings` | type | 完整设置接口 |
 | `DEFAULT_SETTINGS` | const | 默认设置常量 |
+| `SandboxFilesystemConfig` / `SandboxNetworkConfig` / `SandboxRipgrepConfig` | type | Claude Code sandbox 子策略类型（filesystem/network/ripgrep） |
 | `ServerMode` / `ServerAuthType` | type | 服务器模式/认证类型 |
 | `ServerConfig` / `LocalServerConfig` / `RemoteServerConfig` | type | 服务器配置 |
 | `PermissionMode` / `ApprovalDecision` | type | 权限模式/审批决策 |
@@ -152,6 +153,10 @@ OpenCodian 全局类型的主聚合入口。它把聊天、模型、设置、权
 ## 2026-05-16 Plugin availability settings
 
 Settings exports now include the plugin-side disabled plugin spec fields used by plugin management docs and settings UI.
+
+## 2026-06-07 Sandbox expansion
+
+Settings exports now include `SandboxFilesystemConfig`, `SandboxNetworkConfig`, and `SandboxRipgrepConfig` for the expanded Claude Code sandbox shape.
 
 ## 注意事项
 

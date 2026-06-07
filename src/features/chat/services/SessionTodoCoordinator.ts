@@ -137,8 +137,10 @@ export class SessionTodoCoordinator {
       return [];
     }
 
-    // Backend gate: todos are an OpenCode-only feature.
-    // Non-OpenCode sessions should not trigger getSessionTodos calls.
+    // Backend gate: getSessionTodos() is an OpenCode-only server API.
+    // Claude Code sessions derive todo snapshots purely from stream tool calls
+    // (applyStreamingTodoSnapshotFromTool); this refresh path is intentionally
+    // skipped for non-OpenCode backends.
     const conversation = this.host.getConversationForTab(tabId);
     const backend = conversation?.backend ?? 'opencode';
     if (backend !== 'opencode') {
@@ -179,8 +181,8 @@ export class SessionTodoCoordinator {
       return null;
     }
 
-    // Backend gate: session statuses are an OpenCode-only feature.
-    // Non-OpenCode sessions should not trigger getSessionStatuses calls.
+    // Backend gate: getSessionStatuses() is an OpenCode-only server API.
+    // Claude Code sessions do not have a server-side session status endpoint.
     const conversation = this.host.getConversationForTab(tabId);
     const backend = conversation?.backend ?? 'opencode';
     if (backend !== 'opencode') {

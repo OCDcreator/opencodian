@@ -11,6 +11,238 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-06-07 Claude Code Todo/Task User Surface — Re-Audit and Productization
+
+**Outcome: Claude Code todo dock productized via capability flag + session routing fix.**
+
+### Gap Identified
+
+Three conditions prevented Claude Code conversations from using the todo dock:
+
+1. **Capability gate**: `AgentCapability.Todos` was NOT in `CLAUDE_CODE_PHASE1_CAPABILITIES`, so `attachSessionTodo()` and `renderSessionTodoDock()` in `OpenCodianView` skipped mounting for Claude Code sessions.
+2. **Session ID routing**: `getOpenCodeSessionIdForConversation()` returned `null` for non-OpenCode backends — only checked `openCodeSessionId` when `backend === 'opencode'`. Claude Code conversations have `backendSessionId` but it was never resolved.
+3. **Backend API gate (already correct)**: `refreshTabSessionTodos()` already had a gate that returns early for non-OpenCode backends, preventing `getSessionTodos()` calls for Claude Code.
+
+### Changes
+
+- **`ClaudeCodeAdapter.ts`**: Added `AgentCapability.Todos` to `CLAUDE_CODE_PHASE1_CAPABILITIES` — enables todo dock mounting for Claude Code conversations.
+- **`OpenCodianView.ts`**: Changed `getOpenCodeSessionIdForConversation()` to use `getConversationBackendSessionId()` for all backends — enables session ID routing for Claude Code todo snapshots.
+- **`SessionTodoCoordinator.ts`**: Updated backend gate comments to clarify Claude Code stream-derived semantics.
+- **Tests**: Added `AgentCapability.Todos` assertion to adapter test; added Claude session ID snapshot test and backend gate preservation test to coordinator test.
+
+### Honest Boundaries
+
+- Claude's TodoWrite is **stream-derived only** — no `getSessionTodos()` / `getSessionStatuses()` equivalent.
+- No `stopTask()` / `backgroundTasks()` for Claude Code (OpenCode-only SDK runtime methods).
+- The `task` tool rendering was already backend-agnostic via `ToolCallRenderer` + `BackgroundTaskInlinePanelRenderer`.
+- Stale todo detection (120s timeout) applies uniformly.
+
+### Matrix Impact
+
+No new row needed. Folded into existing "Subagent Transcript / Progress" row (`pass` / `chat`). The plumbing was already generic; only capability gating and session routing needed fixing.
+
+---
+
+## 2026-06-07 MCP Servers Re-Audit + Unwired SDK Method Closure
+
+**Outcome: Row hardened, no classification changes, unwired methods formally closed.**
+
+### MCP Servers Row Assessment
+
+- **Classification**: `pass` / `settings` — confirmed honest and complete
+- **Live-apply path traced**: `adapter.reloadMcpServers()` → `refreshMcpConfig()` + `loadMcpConfig()` + `applyToActiveQueries(q => q.setMcpServers(cached))` → SDK `query.setMcpServers()` on every active query
+- **Runtime inspection**: `adapter.getMcpServerRuntimeStatuses()` → `query.mcpServerStatus()` → per-server connected/failed + tool names
+- **Settings surface**: Tools tab refresh + inspect buttons, shared MCP settings tab for authoring
+- **No chat surface** (by design — MCP is infrastructure)
+
+### Unwired SDK Method Closure
+
+9 SDK Query methods not called by plugin (all explicitly closed with rejection reasons):
+- `setMaxThinkingTokens()` — DEPRECATED, plugin uses `thinking` option
+- `initializationResult()` — redundant with granular methods
+- `reloadPlugins()` — Plugins row covers init-time loading at `pass`
+- `seedReadState()` — DEPRECATED/INTERNAL
+- `reconnectMcpServer(name)` — bulk `setMcpServers()` covers use case
+- `toggleMcpServer(name, enabled)` — same bulk coverage
+- `streamInput(stream)` — INTERNAL, plugin uses `query()` correctly
+- `stopTask(taskId)` — no UI surface
+- `backgroundTasks(toolUseId)` — no UI surface
+
+6 SDK Options not wired (all explicitly closed):
+- `managedSettings` — enterprise policy, not a user feature
+- `permissionPromptToolName` — covered by `canUseTool` callback
+- `extraArgs` — all config through SDK options
+- `executableArgs` — no JS runtime args needed
+- `settings` inline — equivalent to `settingSources` + individual options
+- `maxThinkingTokens` — DEPRECATED
+
+### Changed Files
+
+- `src/features/settings/SettingsCapabilityLabSection.ts` — MCP Servers row comment hardened with full live-apply trace + unwired-method closure
+- `docs/status/claude-code-current-state-2026-05-22.md` — new re-audit section + updated capability table entry + updated top-level description
+- `docs/modules/features/settings/SettingsCapabilityLabSection.md` — updated MCP Servers description with 2026-06-07 re-audit findings
+
+### Matrix Unchanged
+
+48 rows, 34 pass, 14 readback, 2 hidden, 0 fail.
+
+---
+
+## 2026-06-07 AskUserQuestion Preview Format — Promoted from Readback to Pass (Outcome A)
+
+**Outcome A**: Live Obsidian runtime proof confirms `.preview` fields DO arrive in real AskUserQuestion tool inputs when `previewFormat` is set.
+
+### Runtime Experiment
+
+- **BUILD_ID**: feature-phase0-capability.202606070354
+- **Method**: Added diagnostic `console.log` in `ClaudeCodePermissionBridge.handleAskUserQuestion` to capture raw `.preview` fields; deployed to Test Vault; triggered real AskUserQuestion in Obsidian via agent-browser CDP (port 9222)
+- **Markdown test** (`previewFormat='markdown'`): `hasAnyPreview: true`, all 3 options with full Markdown previews (## headings, **bold**, numbered lists). `data-preview` attributes confirmed. Hover rendered `hidden=false`, 506+ chars.
+- **HTML test** (`previewFormat='html'`): `hasAnyPreview: true`, all 3 options with full HTML fragments (`<div>`, `<h3>`, `<ul>/<li>`, inline CSS). Hover rendered `hidden=false`, 877+ chars. HTML shown as plain text (textContent, never innerHTML).
+- **SDK mechanism**: SDK forwards `previewFormat` as `CLAUDE_CODE_QUESTION_PREVIEW_FORMAT` env var to CLI subprocess (`assistant.mjs` confirmed). CLI modifies AskUserQuestion tool schema description. Model emits format-appropriate `.preview` fields.
+
+### Taxonomy Changes
+
+| Attribute | Before | After |
+|-----------|--------|-------|
+| `runtimeProof` | `'readback'` | `'pass'` |
+| `userSurface` | `'settings'` | `'settings+chat'` |
+
+Matrix: 46 rows, 33 pass, 13 readback, 0 hidden → verified count 32→33, readback count 14→13.
+
+### Files Changed
+
+- `src/features/settings/SettingsCapabilityLabSection.ts` — matrix row promoted, comment updated with live evidence
+- `src/i18n/locales/en.ts` — boundaryNotice updated from "Readback only" to "Live verified"
+- `src/i18n/locales/zh.ts` — boundaryNotice updated from "仅 readback" to "已通过实时验证"
+- `tests/unit/features/settings/SettingsCapabilityLabSection.test.ts` — expected mapping + counts updated
+- `docs/status/claude-code-current-state-2026-05-22.md` — new audit section, readback→pass, settings→settings+chat
+- `docs/modules/features/settings/SettingsCapabilityLabSection.md` — entry 17 promoted, honesty counts updated
+- `docs/modules/core/agents/backend/ClaudeCodeOptionsBuilder.md` — classification updated to pass
+- `docs/modules/core/agents/backend/ClaudeCodePermissionBridge.md` — live verified note added
+- `docs/modules/core/types/settings.md` — classification updated to pass
+- `docs/modules/features/settings/SettingsClaudeCodeSection.md` — preview format description updated
+- `docs/modules/i18n/locales/en.md` — changelog entry for Outcome A promotion
+- `docs/modules/i18n/locales/zh.md` — changelog entry for Outcome A promotion
+- `devlog.md` — this entry
+
+## 2026-06-07 Sandbox Productization — Expanded Expert Settings + Chat Badge
+
+**Scope**: Expand the Claude Code sandbox seam from 3 basic fields to 13 exposed fields with advanced sub-policy controls and a read-only chat badge.
+
+**BUILD_ID**: feature-phase0-capability.202606070244
+
+**Changes**:
+
+### Backend types + SDK wiring
+- `src/core/types/settings.ts`: Expanded `ClaudeCodeSandboxSettings` with 7 new sub-types (`excludedCommands`, `allowUnsandboxedCommands`, `filesystem.{allowWrite,denyWrite,denyRead}`, `network.{allowedDomains,deniedDomains}`, `enableWeakerNestedSandbox`, `enableWeakerNetworkIsolation`, `ripgrep.{command,args}`). Added explicit JSDoc documenting all 13 intentionally unexposed fields with per-field reasons.
+- `src/core/agents/backend/ClaudeCodeOptionsBuilder.ts`: Wired all 10 new fields to SDK `Options.sandbox` conditionally.
+
+### Settings UI
+- `src/features/settings/SettingsClaudeCodeSection.ts`: Advanced sandbox sub-policy section in Permissions tab with textareas, toggles, boundary notice, lifecycle notice, and explicit "not all official fields exposed" notice.
+
+### Chat badge
+- `src/features/chat/services/SandboxConfigBadgeCoordinator.ts`: New read-only badge coordinator. Visible when `sandbox.enabled = true`. Shows sub-policy count, detailed tooltip. Participates in `applyLocaleTexts()` / `destroy()` / `update()` lifecycle.
+- `src/features/chat/services/ChatSelectionControlsCoordinator.ts`: Integrates badge into chat toolbar, delegates lifecycle methods.
+- `src/features/chat/OpenCodianView.ts`: Provides `getSandboxSettings` in host object (owner-guard approved, one-line pass-through).
+
+### Tests
+- `tests/unit/features/chat/services/SandboxConfigBadgeCoordinator.test.ts`: 13 focused tests (hidden, visible, policy count, tooltip contents, locale refresh, destroy, dynamic enable/disable).
+- Updated 7 existing test files referencing old 3-field sandbox shape.
+
+### Locales
+- `src/i18n/locales/en.ts` + `zh.ts`: ~25 new sandbox-related strings for settings + badge.
+
+### Documentation
+- `docs/status/claude-code-current-state-2026-05-22.md`: New 2026-06-07 sandbox productization checkpoint section with field inventory, unexposed field reasoning, userSurface taxonomy decision.
+- `docs/modules/features/chat/services/SandboxConfigBadgeCoordinator.md`: New module doc.
+- Updated module docs for 9 changed source files.
+
+### Capability Lab
+- `src/features/settings/SettingsCapabilityLabSection.ts`: Updated sandbox row `userSurface` from `'settings'` to `'settings+chat'` with explicit justification. Updated matrix comments for expanded field inventory.
+
+**Classification**: Sandbox remains **readback**. OS-level enforcement is the CLI binary's internal claim; the badge reflects configured settings, not verified enforcement. No observable signal confirms sandbox activation.
+
+**Runtime validation (BUILD_ID feature-phase0-capability.202606070310, Test Vault macOS)**:
+- ✅ Advanced sandbox settings render correctly in Permissions tab (screenshot confirmed): all 10 expert settings, boundary notice, lifecycle notice, unexposed-fields notice
+- ✅ Sandbox badge visible in Claude Code chat toolbar: "沙箱（2 条策略）" with shield icon (screenshot confirmed)
+- ✅ Tooltip shows: excluded commands, network domains, readback boundary notice
+- ✅ Badge updates dynamically when settings change (1 → 2 policies after adding network domain)
+- ✅ Badge hides when sandbox disabled
+- ✅ Badge persists after plugin reload + view hydration
+
+**Badge mount fix**: Initial deployment showed badge could not render for Claude Code because it was mounted inside permission selector gated on `AgentCapability.Permissions`. Fixed by moving badge mount out of `showPermissions` gate in `ChatSelectionControlsCoordinator.build()` — badge now mounts independently in toolbar.
+
+**userSurface taxonomy decision**: `settings+chat` (Outcome A — LIVE VERIFIED). Badge is a real, stable chat-facing surface for Claude Code conversations. It is a read-only settings readback indicator, not a runtime verification badge.
+
+**Verify**: `npm run verify` — 468 suites, 4187 tests, 0 errors, build OK. Owner-guard approved for one-line OpenCodianView host wiring.
+
+---
+
+## 2026-06-07 Skills Slash Menu Live Verification — Outcome A (Promoted)
+
+**Scope**: Obtain real Obsidian/Test Vault runtime evidence for whether custom Claude project commands and skills are discoverable in the slash menu autocomplete.
+
+**BUILD_ID**: feature-phase0-capability.202606070146
+
+**Test artifacts created in Test Vault**:
+- `/Volumes/SDD2T/obsidian-vault-write/testvault/.claude/commands/opencodian-slash-proof-command.md` — custom command with marker `MARKER:SLASH-CMD-PROOF-SP27`
+- `/Volumes/SDD2T/obsidian-vault-write/testvault/.claude/skills/opencodian-slash-proof-skill/SKILL.md` — custom skill with marker `MARKER:SLASH-SKILL-PROOF-SP28`
+
+**Runtime evidence**:
+1. **Slash menu discovery** ✅ — Both custom entries appeared in the slash menu autocomplete dropdown after typing `/` in the chat input. A11y tree snapshot shows:
+   - `option "/opencodian-slash-proof-command COMMAND ... (project)" [ref=e78]`
+   - `option "/opencodian-slash-proof-skill COMMAND ... (project)" [ref=e79]`
+2. **Screenshot evidence** ✅ — `opencodian-slash-test-03-scrolled-to-custom.png` confirms both entries visible in dropdown with `(project)` tags
+3. **Selection/insertion** ✅ — Clicking e78 inserted `/opencodian-slash-proof-command ` into the chat input textbox (ref=e74). Dropdown closed after selection.
+4. **Raw text passthrough execution** ✅ — Sending the command produced a model response (Turn 3) containing exact marker `MARKER:SLASH-CMD-PROOF-SP27`. DOM eval confirms: `Turn 3: ...MARKER:SLASH-CMD-PROOF-SP27...`
+5. **Skill selection** ✅ — `/opencodian-slash-proof-skill` also selectable from dropdown, inserts into input field
+6. **Reload persistence** ✅ — After `agent-browser reload`, both custom entries reappeared in the slash menu dropdown (a11y tree refs e78/e79)
+7. **Screenshot evidence post-reload** ✅ — `opencodian-slash-test-07-post-reload.png` confirms persistence
+
+**Outcome**: **A — Promoted**. Skills `userSurface` promoted from `'settings'` to `'settings+chat'`.
+
+**Changes**:
+- `src/features/settings/SettingsCapabilityLabSection.ts`: Skills `userSurface` promoted to `'settings+chat'` with LIVE VERIFIED evidence comment
+- `tests/unit/features/settings/SettingsCapabilityLabSection.test.ts`: Skills expected `userSurface` updated to `'settings+chat'`
+- `docs/status/claude-code-current-state-2026-05-22.md`: Skills entry promoted to settings+chat; surface counts updated (settings 11, settings+chat 4); promotion blocker marked RESOLVED; implementation analysis table updated with ✅ verified status
+- `docs/modules/features/settings/SettingsCapabilityLabSection.md`: Skills entry updated with Outcome A evidence
+
+**Evidence artifacts** (in `/var/folders/kr/gbgh00qn3m70ff_fjsh7d55h0000gn/T/`):
+- `opencodian-slash-test-02-menu-open.png` — slash menu with all commands
+- `opencodian-slash-test-03-scrolled-to-custom.png` — custom entries visible (image analysis confirmed)
+- `opencodian-slash-test-04-command-inserted.png` — command text in input after selection
+- `opencodian-slash-test-05-response.png` — model response after sending
+- `opencodian-slash-test-06-skill-inserted.png` — skill text in input after selection
+- `opencodian-slash-test-07-post-reload.png` — both entries persist after reload (image analysis confirmed)
+
+---
+
+## 2026-06-07 Claude Commands / Slash Surface Re-Audit
+
+**Scope**: Re-audit Claude commands/slash productization state against latest official docs.
+
+**Official docs verified** (code.claude.com): commands, slash-commands, agent-sdk/slash-commands, sessions, session-storage, hooks, plugins.
+
+**Key findings**:
+1. **Slash menu pipeline is code-complete** — `loadClaudeRuntimeCommands` → `getRuntimeCatalog()` → `supportedCommands()` → `mergeSlashCommandCatalog()` as `claude-runtime` source → slash menu dropdown. Execution is raw text passthrough.
+2. **SDK docs confirm `supportedCommands()` returns custom commands** — "Custom commands defined in `.claude/commands/` or `.claude/skills/` are automatically available through the SDK once defined in the filesystem."
+3. **BUT: No runtime proof that custom commands appear in the slash menu** — No Test Vault evidence exists. Code correctness ≠ runtime proof.
+4. **Skills `userSurface` stays `'settings'`** — Promotion to `'settings+chat'` blocked until Test Vault runtime verification with a custom `.claude/commands/*.md` file.
+5. **Historical batch sections contained stale claims** — Batch 1 said "Claude commands NOT in chat slash menu" (correct at time, superseded by Batch 2). Batch 2 said "Project commands NOT wired" (under-claimed for built-in commands, correct distinction for project-specific commands). Both now annotated with superseded notices.
+6. **`/context` stays diagnostic** — Matrix row is about proof harness, not command accessibility.
+
+**Changes**:
+- `SettingsCapabilityLabSection.ts`: Skills `userSurface` stays `'settings'`; matrix row comment updated with honest assessment and explicit promotion blocker.
+- `SettingsCapabilityLabSection.test.ts`: Skills expected `userSurface` stays `'settings'`.
+- `docs/status/claude-code-current-state-2026-05-22.md`: Rewrote audit section honestly; annotated 4 historical batch claims with superseded notices; surface counts restored (settings 12, settings+chat 3).
+- `docs/modules/features/settings/SettingsCapabilityLabSection.md`: Updated Skills/Plugins/Agent Definitions references to reflect rollback.
+
+**Matrix unchanged**: 46 rows, 32 pass, 14 readback, 2 hidden, 0 fail. No taxonomy changes.
+
+**Promotion blocker**: Skills `userSurface` promotion requires (1) custom command file in Test Vault, (2) slash menu observation, (3) selection + passthrough verification.
+
+---
+
 ## 2026-06-07 Session Store + Import Session to Store — Re-Audit (Outcome B)
 
 ### 变更

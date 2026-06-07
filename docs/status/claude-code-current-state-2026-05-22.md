@@ -1,9 +1,9 @@
 # Claude Code SDK Current State - 2026-05-22
 
-## Current Gap Audit (2026-06-06, post-truth-sync)
+## Current Gap Audit (2026-06-07, post-truth-sync)
 
 > **Single source of truth for Codex checkpoint rounds.**  
-> Matrix: **46 rows, 32 pass, 14 readback, 2 hidden, 0 fail.**  
+> Matrix: **48 rows, 34 pass, 14 readback, 2 hidden, 0 fail.**  
 > All counts enforced by `tests/unit/features/settings/SettingsCapabilityLabSection.test.ts`.
 
 ---
@@ -12,11 +12,10 @@
 
 These have live runtime proof (BUILD_ID-anchored) AND a stable user-facing control or chat interaction.
 
-**Settings (`userSurface: 'settings'`) — 12**
+**Settings (`userSurface: 'settings'`) — 11**
 - Hooks — project settings scan/create/open for `.claude/settings.json` + `.claude/settings.local.json`
-- Skills — project skills discovery + create/open actions; chat slash discoverability for Claude runtime commands
 - Plugins — project settings scan/create/open for plugin config
-- MCP Servers — shared MCP settings tab + Claude Code Tools tab refresh
+- MCP Servers — shared MCP settings tab + Claude Code Tools tab refresh/inspect; `query.setMcpServers()` live-apply on active queries
 - Disallowed Tools — deterministic init-catalog enforcement proven
 - Restricted Built-in Tools — deterministic init-catalog enforcement proven
 - Turn/Budget Limits — live proof: `error_max_turns` + `error_max_budget_usd` result subtypes
@@ -30,15 +29,18 @@ These have live runtime proof (BUILD_ID-anchored) AND a stable user-facing contr
 - Permission Approval — ordinary chat end-to-end: real permission cards render per tool call
 - AskUserQuestion / Elicitation — ordinary chat end-to-end: real question dialog renders
 - Structured Output — `/json` prefix trigger in ordinary chat; badge renders during stream and survives reload
-- Subagent Transcript / Progress — task/subagent tool rendering, background task UI, todo snapshots
+- Subagent Transcript / Progress — task/subagent tool rendering, background task UI, todo snapshots. ✅ **2026-06-07 Claude Code todo dock productized**: `AgentCapability.Todos` added to `CLAUDE_CODE_PHASE1_CAPABILITIES`; `getOpenCodeSessionIdForConversation()` now uses `getConversationBackendSessionId()` for all backends, enabling session ID routing for Claude Code conversations. Claude's `TodoWrite` tool calls are captured as stream-derived snapshots by the existing generic `SessionTodoCoordinator`; the dock renders them without calling OpenCode-specific session APIs.
 - Fork Session — fork button on user message footer; new tab / current tab routing
 - Resume Session — backend session browser resume flow from chat
 - Prompt Suggestions — composer suggestion chip; click-to-fill behavior verified
 
-**Settings + Chat (`userSurface: 'settings+chat'`) — 3**
+**Settings + Chat (`userSurface: 'settings+chat'`) — 6**
 - JSONL History Browser — browse + preview + detail from both chat and settings
 - Session Detail — metadata + transcript detail view in both chat and settings
 - Session Title — auto-title toggle in conversation settings; title preferences in history footer; customTitle in backend browser
+- Skills — settings: project skills/commands discovery + create/open actions; chat: custom `.claude/commands/*.md` and `.claude/skills/*/SKILL.md` entries discoverable in slash menu autocomplete dropdown, selectable, sent via raw text passthrough ✅ **2026-06-07 LIVE VERIFIED** (BUILD_ID feature-phase0-capability.202606070146)
+- AskUserQuestion Preview Format — settings: Tools tab dropdown for preview format; chat: question dialog shows preview on focus/hover ✅ **2026-06-07 LIVE VERIFIED** (BUILD_ID feature-phase0-capability.202606070354)
+- Main Model Live Switch — settings: Model & Thinking tab text input + quick-select; chat: model selector dropdown → TabModelOverride → on send: if active persistent runtime is reused → `query.setModel()` mid-stream; otherwise → initial `options.model` on new query. ✅ **2026-06-07 promoted to matrix row** (Outcome A): official SDK `query.setModel()` method, three-layer evidence (adapter wiring, stable settings proof-status notice, chat model selector routes to same adapter seam). **BUILD_ID feature-phase0-capability.202606070617** runtime probe verified.
 
 ---
 
@@ -61,10 +63,9 @@ Runtime proof passes, but explicit blockers prevent promotion to stable user sur
 
 Option wiring proven through `buildClaudeCodeOptions`, but no independent plugin-side behavioral verification exists.
 
-**Settings (`userSurface: 'settings'`) — 11**
+**Settings (`userSurface: 'settings'`) — 10**
 - Allowed Tools — auto-approve shortcut only; zero enforcement at tool-catalog level. Stable settings UI now renders an explicit boundary notice distinguishing it from Restricted Built-in Tools (deterministic availability restrictor).
-- Fallback Model — option wiring verified; automatic switching not locally provable (requires API 529 overload signal)
-- Sandbox — option wiring verified; OS-level sandbox enforcement not independently verifiable
+- Fallback Model — option wiring verified; automatic switching not locally provable (requires API 529 overload signal). ✅ **2026-06-07 FORMAL CLOSURE** (Outcome B): no new SDK observable signal exists. Latest CLI features (multi-fallback, sticky session, FALLBACK_FOR_ALL_PRIMARY_MODELS env var) enhance CLI behavior but produce no new SDK event/callback/stream marker. Architectural barrier: switching happens inside compiled CLI binary; SDK has no observation mechanism. `query.setModel()` is tracked separately as "Main Model Live Switch" (pass/settings+chat, promoted 2026-06-07). CLOSED at readback.
 - Task Budget — `@alpha`; option wiring verified; no deterministic SDK enforcement signal. **2026-06-06 re-audit (Outcome B)**: no new productizable seam. SDK 0.3.145 unchanged; 4 error result subtypes contain no `error_max_task_budget`; `TerminalReason` has `max_turns` but no `max_task_budget`; no budget-related events (`tokens_remaining`, `budget_status`, `usage_update`). Remains readback with hardened boundary.
 - Tool Aliases — option wiring verified; alias resolution unobservable from plugin layer (post-resolution names only in stream)
 - Debug — option wiring verified; fundamental limitation: debug toggle enables CLI verbose logging but has no observable side effect without debugFile or stderr callback. Debug File (pass/verified) already covers the "capture debug output" use case. **2026-06-06 audit completed** (Outcome B): remains readback with hardened boundary.
@@ -72,10 +73,13 @@ Option wiring proven through `buildClaudeCodeOptions`, but no independent plugin
 - 1M Context Beta — option wiring verified through full SDK path (setting → buildClaudeCodeOptions → ProcessTransport → CLI --betas flag); model-side beta acceptance and 1M context activation unobservable from plugin layer
 - JS Runtime — option wiring verified; actual runtime selection depends on system PATH and installation. **2026-06-06 audit completed** (Outcome B): remains readback with hardened boundary. No observable signal in init events, stderr, or tool output confirms which runtime the CLI subprocess actually uses.
 - Load Timeout — `@alpha`; option wiring verified; timeout code path only executes with resume/continue + sessionStore. **2026-06-06 audit completed** (Outcome B): remains readback with hardened boundary.
-- AskUserQuestion Preview Format — option wiring + UI preview rendering path verified; actual preview arrival depends on SDK version and model behavior. **2026-06-06 audit completed** (Outcome B): remains readback with hardened boundary. Full code path (settings→SDK→bridge extraction→UI rendering) proven with synthetic data; no proof that SDK actually includes `.preview` in real AskUserQuestion tool inputs.
+- Permission Mode Live Switch — official SDK `query.setPermissionMode()` seam; adapter wiring via `applyToActiveQueries()` verified (identical pattern to Main Model Live Switch). ✅ **2026-06-07 AUDIT (Outcome A — promoted to matrix row at readback)**. ✅ **2026-06-07 PROMOTION PATH ATTEMPT FAILED** (Outcome B — hardened boundary with full SDK evidence). Settings: Permissions tab dropdown with live apply (`applyClaudePermissionMode()` → `adapter.setPermissionMode(mode)` → `saveSettings()`). Chat: NO Claude Code permission surface — the shared chat permission selector controls OpenCode's global mode only (yolo/normal/plan → restarts OpenCode service); it does NOT call `query.setPermissionMode()` on Claude active runtime. **Readback is the permanent ceiling** — three structural blockers prevent promotion: (1) No observable stream signal: `SDKStatusMessage.permissionMode` is optional (sdk.d.ts line 3500), and `ClaudeCodeStreamNormalizer.appendLifecycleChunks()` does NOT handle `subtype==='status'` (silently dropped); no dedicated event/getter/client_event exists for mode changes. Unlike `setModel()` which produces observable `modelUsage` keys, `setPermissionMode()` produces no equivalent marker. (2) canUseTool inconsistency: in `query()` mode, `canUseTool` is only invoked in `plan` mode; switching between `default`/`bypassPermissions` has no observable difference (callback never fires). Switching from `plan` to `bypass` mid-stream would require concurrent stream observation — blocked by transport architecture (request/response share same transport, creating deadlock). (3) CLI subprocess opaqueness: actual permission handling change happens inside compiled CLI binary; `onSetPermissionMode` callback returns `{ok:true}` but plugin cannot observe whether subprocess's internal state changed. Promotion would require: (a) SDK adds `permissionModeChanged` client_event or stream marker, or (b) CLI consistently emits `SDKStatusMessage.permissionMode` after `setPermissionMode()`, or (c) plugin adds separate query execution context for mid-stream behavioral observation. All require SDK-side changes or significant architecture changes. Explicitly NOT: Permission Approval (tool-call cards, separate row), OpenCode permission templates (separate system), Plan Mode Instructions (dependent on permissionMode='plan', separate row).
+
+**Settings + Chat (`userSurface: 'settings+chat'`) — 1**
+- Sandbox — option wiring verified; OS-level sandbox enforcement not independently verifiable. ✅ **2026-06-07 expanded productization, Outcome A (LIVE VERIFIED, BUILD_ID feature-phase0-capability.202606070542)**: 10 expert settings + 3 basic toggles in Permissions tab; chat badge shows configured state when enabled; hot-switch claude-code → opencode → claude-code in same live UI: badge 1 → 0 → 1; obsidian dev:errors clean. Readback ceiling: CLI handles OS-level sandbox internally; no init event, tool metadata, or stderr pattern confirms activation. Plugin cannot distinguish "sandbox active" from "sandbox silently degraded" or "unsupported platform".
 
 **Diagnostic (`userSurface: 'diagnostic'`) — 3**
-- File Checkpoint / Rewind — `rewindFiles(dryRun: true)` callable but returns `canRewind: false` for all candidates. ✅ **2026-06-06 re-audit (Outcome B)**: blocker confirmed unchanged. Upstream blocker: SDK #236 (open since 2026-03-17, zero maintainer response; `_T()` in sdk.mjs hardcodes `isInteractive:!1`, gating snapshot creation behind React/Ink `useState` setters that never fire in `query()` mode). Additional upstream evidence: claude-code #16976 (headless checkpoint restore — open), #18858 (PostRewind hook event — open). SDK 0.3.145 installed; 0.3.158 tested with identical canRewind:false results. No SDK changelog entry through 0.3.158 mentions checkpoint fixes. See full audit section below.
+- File Checkpoint / Rewind — `rewindFiles(dryRun: true)` callable but returns `canRewind: false` for all candidates. ✅ **2026-06-07 re-audit (Outcome B)**: blocker confirmed unchanged. Upstream blocker: SDK #236 (open since 2026-03-17, zero maintainer response; snapshot creation gated behind React/Ink interactive UI code paths, never invoked in SDK `query()` mode). Additional upstream evidence: claude-code #16976 (headless checkpoint restore — closed `not_planned` by stale bot), #18858 (PostRewind hook event — closed `not_planned` by stale bot; follow-up #32780 opened). SDK 0.3.145 installed; latest npm 0.3.167; no changelog entry through 0.3.167 mentions checkpoint fixes. CLI 2.1.167 latest. Official docs present SDK checkpointing as working but it silently fails in non-interactive mode (docs-vs-runtime discrepancy). See full audit section below.
 - Warm Startup — `startup()` callable and WarmQuery produces response. WarmQuery is single-use (query() once per handle); no persistent warm pool. "No startup latency" is SDK internal documentation claim, not independently measured. Readback ceiling.
 - Stderr Diagnostic — stderr callback wiring proven; no query reliably provokes stderr output. ✅ 2026-06-06 audit (Outcome B): fundamental limitation, not temporary gap. Debug File (pass/verified) covers the "capture debug output" use case.
 
@@ -90,14 +94,414 @@ These have adapter wiring and runtime proof, but no stable or diagnostic user su
 
 ---
 
-### suggested next 3 checkpoints
+### long-lived readback/hidden checkpoints — re-audit status
 
-1. **File Checkpoint / Rewind** — Highest user-value if unblocked. ✅ **2026-06-06 re-audited** — blocker confirmed unchanged. Monitor SDK #236 + claude-code #16976. Re-audit on any SDK version bump that mentions checkpointing or interactive-mode fixes. Current state: readback with confirmed upstream blocker.
-2. **Allowed Tools** — ✅ **2026-06-06 re-audited** (Outcome B) — readback confirmed; auto-approve shortcut only, zero enforcement at tool-catalog level. SDK docs explicitly delegate availability restriction to `tools`, NOT `allowedTools`. New SDK `dontAsk`/`auto` permission modes and `SDKPermissionDeniedMessage` event audited and REJECTED as enforcement evidence: they are permission-layer gates, not availability restrictors. Plugin does not expose these modes. No promotion path unless SDK adds catalog-level enforcement.
+These 5 checkpoints have been individually re-audited and closed at their current classification (readback or hidden). Closure means "no further productization path exists under current SDK constraints" — it does NOT mean the overall backlog is empty.
+
+1. **File Checkpoint / Rewind** — Highest user-value if unblocked. ✅ **2026-06-07 re-audited** — blocker confirmed unchanged. SDK #236 still open (zero maintainer response). claude-code #16976 and #18858 closed `not_planned` by stale bot. Latest npm 0.3.167; no changelog entry mentions checkpoint fixes. CLI 2.1.167. Official docs present SDK checkpointing as working but it silently fails in non-interactive mode. Monitor SDK #236. Re-audit on any SDK version bump that mentions checkpointing or interactive-mode fixes. Current state: readback with confirmed upstream blocker.
+2. **Allowed Tools** — ✅ **2026-06-06 re-audited** (Outcome B) — readback confirmed; auto-approve shortcut only, zero enforcement at tool-catalog level. SDK docs explicitly delegate availability restriction to `tools`, NOT `allowedTools`. No promotion path unless SDK adds catalog-level enforcement.
 3. **Task Budget** — ✅ **2026-06-06 re-audited** (Outcome B) — readback confirmed; `@alpha`, no enforcement signal, no budget-related error subtype/event/terminal-reason. No promotion path unless SDK adds structured enforcement signal.
-4. **Fallback Model** — Readback; option wiring verified. Potential seam: if SDK exposes fallback activation event or observable same-model/auto-switch signal.
-5. **Sandbox** — Readback; option wiring verified, 3 settings exposed. Potential seam: `decision_reason_type: 'sandboxOverride'` as indirect activation proof if reliably provoked.
-6. **Session Store + Import Session to Store** — ✅ **2026-06-07 re-audited** (Outcome B) — hidden confirmed. All SessionStore APIs remain `@alpha` (SessionStore, SessionKey, SessionStoreEntry, SessionStoreFlush, SessionSummaryEntry, foldSessionSummary, InMemorySessionStore, importSessionToStore). Store entries are opaque pass-through blobs. SessionSummaryEntry.data is "Opaque SDK-owned state, MUST NOT interpret." No promotion path unless SDK graduates from `@alpha` with format stability guarantees AND a clear user workflow gap.
+4. **Fallback Model** — ✅ **2026-06-07 FORMAL CLOSURE** (Outcome B) — readback is the permanent ceiling. Option wiring verified (--fallback-model CLI flag + same-model validation). Latest CLI features (multi-fallback, sticky session, FALLBACK_FOR_ALL_PRIMARY_MODELS) enhance CLI-side behavior but produce NO new SDK observable event. No fallback activation callback, stream marker, or status metadata exists. Architectural barrier: fallback switching happens inside compiled CLI binary; SDK is a thin transport with no observation mechanism. `query.setModel()` is a separate seam (manual model switch) NOT pursued in this closure. CLOSED at readback. Re-audit only if SDK adds dedicated fallback activation events to the message protocol.
+5. **Session Store + Import Session to Store** — ✅ **2026-06-07 re-audited** (Outcome B) — hidden confirmed. All SessionStore APIs remain `@alpha`. Store entries are opaque pass-through blobs. No promotion path unless SDK graduates from `@alpha` with format stability guarantees AND a clear user workflow gap.
+
+These 5 checkpoints are individually closed. The overall backlog remains open: existing `query.setModel()` / Main Model live-apply is now a formal capability row (Main Model Live Switch, `pass` / `settings+chat`, promoted 2026-06-07, BUILD_ID feature-phase0-capability.202606070617); existing `query.setPermissionMode()` / Permission Mode live-apply is now a formal capability row (Permission Mode Live Switch, `readback` / `settings`, promoted 2026-06-07, promotion path exhausted same day — see dedicated section below); diagnostic-only seams may gain promotion paths in future SDK versions; and new SDK releases may introduce additional productizable seams. Future triage rounds should also scan for newly surfaced official seams, adapter-level SDK methods not yet in the matrix, and community feature requests that get implemented.
+
+---
+
+## 2026-06-07 Claude Code Todo/Task User Surface — Re-Audit and Productization
+
+### Objective
+
+Re-audit the Claude Code Todo/Task user surface honestly. Determine whether Claude can and should support a stable todo dock / todo snapshot chat surface using existing generic tooling. If yes, implement the smallest honest productization.
+
+### Findings
+
+**Gap identified and closed.** Three conditions prevented Claude Code conversations from using the todo dock:
+
+| # | Gap | Root Cause | Fix |
+|---|-----|------------|-----|
+| 1 | Todo dock never mounted for Claude | `AgentCapability.Todos` absent from `CLAUDE_CODE_PHASE1_CAPABILITIES` → `hasCapability(caps, AgentCapability.Todos)` returns `false` → `attachSessionTodo` + `renderSessionTodoDock` skip | Added `AgentCapability.Todos` to capability set |
+| 2 | Todo snapshots had no session key for Claude | `getOpenCodeSessionIdForConversation()` returned `null` for non-OpenCode backends (only checked `openCodeSessionId` when `backend === 'opencode'`) | Changed to use `getConversationBackendSessionId()` for all backends |
+| 3 | Refresh would call OpenCode-only API | Already handled — `refreshTabSessionTodos()` has a backend gate (line 140-147) that returns early for non-OpenCode backends | No change needed (gate already correct) |
+
+### Productization Outcome
+
+**Claude Code Todo Tracking: promoted to active user surface (stream-derived).**
+
+| Aspect | Evidence |
+|--------|----------|
+| Stream capture | `BackgroundTaskStreamTriggerCoordinator.handleToolCallStart/End()` → `applyStreamingTodoSnapshotFromTool()` — already backend-agnostic, processes `todowrite` tool calls from ALL backends |
+| Snapshot storage | `SessionTodoCoordinator.applyStreamingTodoSnapshotFromTool()` → `writeSessionTodos(tabId, sessionId, todos)` — now receives valid Claude Code `backendSessionId` |
+| Dock rendering | `SessionTodoDock` — generic UI, renders incomplete todos from stored snapshots |
+| Backend gate | `refreshTabSessionTodos()` correctly returns early for Claude Code — no `getSessionTodos()` call (OpenCode-only server API) |
+| Stale detection | `STALE_SESSION_TODO_TIMEOUT_MS = 120_000` applies uniformly — Claude snapshots stale after 2min inactivity |
+| Test coverage | `ClaudeCodeAdapter.test.ts`: `AgentCapability.Todos` assertion; `SessionTodoCoordinator.test.ts`: Claude session ID snapshot storage, backend gate preservation after refresh |
+
+### Honest Boundaries
+
+- Claude's TodoWrite is **stream-derived only** — no session-level todo polling/status API equivalent to OpenCode's `getSessionTodos()` / `getSessionStatuses()`
+- The `refreshTabSessionTodos()` call after `todowrite` tool completion hits the backend gate and returns early (correct — no stale data overwrite)
+- No `stopTask()` / `backgroundTasks()` for Claude Code (those are OpenCode SDK runtime methods, not relevant to todo tracking)
+- The `task` tool rendering (subagent progress, inline panels) was already backend-agnostic via `ToolCallRenderer` + `BackgroundTaskInlinePanelRenderer`
+
+### Matrix Decision
+
+**Folded into existing row** — "Subagent Transcript / Progress" already covers `pass` / `chat` for task/subagent tool rendering, background task UI, and todo snapshots. No new matrix row needed because:
+1. The TodoWrite/TodoRead rendering is a tool rendering feature, not a separate SDK capability
+2. The plumbing was already generic; only capability gating and session routing needed fixing
+3. Adding a new row would overstate scope
+
+### Files Changed
+
+- `src/core/agents/backend/ClaudeCodeAdapter.ts` — added `AgentCapability.Todos` to capability set
+- `src/features/chat/OpenCodianView.ts` — `getOpenCodeSessionIdForConversation()` now uses `getConversationBackendSessionId()` for all backends
+- `src/features/chat/services/SessionTodoCoordinator.ts` — updated backend gate comments
+- `tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts` — added `AgentCapability.Todos` assertion
+- `tests/unit/features/chat/SessionTodoCoordinator.test.ts` — added Claude Code session snapshot test + backend gate preservation test
+
+---
+
+## 2026-06-07 MCP Servers Re-Audit + Unwired SDK Method Closure
+
+### Objective
+
+Re-audit the `MCP Servers` row against the current SDK surface, focusing on `reloadMcpServers()` / `setMcpServers()` live-apply path, settings Tools-tab runtime refresh/inspect surface, and whether the row honestly represents the full MCP runtime control capability. Then scan for any other official SDK `Query` methods or `Options` wired in the repo but not yet represented in the matrix.
+
+### MCP Servers Row Assessment
+
+**Classification: `pass` / `settings` — confirmed honest and complete.**
+
+| Aspect | Evidence |
+|--------|----------|
+| Init-time MCP passthrough | `mcpServers` option → `ClaudeCodeOptionsBuilder` → SDK `Options.mcpServers` → CLI subprocess init |
+| Live-apply path | `adapter.reloadMcpServers()` → `refreshMcpConfig()` + `loadMcpConfig()` + `applyToActiveQueries(q => q.setMcpServers(cached))` → `query.setMcpServers()` on every active query → CLI `control_request` → live MCP config update |
+| Runtime inspection | `adapter.getMcpServerRuntimeStatuses()` → `query.mcpServerStatus()` → per-server connected/failed + tool names + error summaries |
+| Settings surface | Tools tab: "Refresh MCP runtime" button → `reloadMcpServers()`, "Inspect runtime status" button → `getMcpServerRuntimeStatuses()`, live server count display, `strictMcpConfig` toggle (adjacent readback row) |
+| Authoring surface | Shared Settings > MCP tab (OpenCode-owned) → create/edit/delete MCP servers in `.claude/mcp.json` |
+| Chat surface | None (by design — MCP is infrastructure, not conversation-level interaction) |
+| Test coverage | `ClaudeCodeAdapter.test.ts` (reload mock + assertions), `ClaudeCodeSmokeHarness.test.ts` (smoke reload), `SettingsClaudeCodeSection.test.ts` (6 UI tests for refresh/inspect) |
+
+**Row comment hardened** with full `setMcpServers()`/`reloadMcpServers()` live-apply trace and explicit unwired-method closure.
+
+### Unwired SDK Query Methods — Explicit Closure
+
+The SDK `Query` interface defines 23 methods. Plugin calls 14. The 9 unwired methods are explicitly closed:
+
+| Method | Status | Rejection Reason |
+|--------|--------|-----------------|
+| `setMaxThinkingTokens(n)` | DEPRECATED | Plugin uses `thinking` option (SDK-recommended replacement) |
+| `initializationResult()` | NOT NEEDED | Plugin gets same data via granular methods (`supportedModels()`, `supportedCommands()`, `accountInfo()`) |
+| `reloadPlugins()` | NOT NEEDED | Plugins row covers init-time loading at `pass`. No user demand for live plugin reload. |
+| `seedReadState(path, mtime)` | DEPRECATED/INTERNAL | SDK-internal read-state cache before edits |
+| `reconnectMcpServer(name)` | NOT NEEDED | Bulk `setMcpServers()` via `reloadMcpServers()` covers the use case |
+| `toggleMcpServer(name, enabled)` | NOT NEEDED | Same bulk coverage as `reconnectMcpServer()` |
+| `streamInput(stream)` | INTERNAL | Multi-turn streaming interface; plugin correctly uses `query({ prompt: AsyncIterable })` |
+| `stopTask(taskId)` | NO UI SURFACE | No task management UI. Task rendering is covered by Subagent Transcript / Progress at `pass`/`chat`. |
+| `backgroundTasks(toolUseId)` | NO UI SURFACE | No foreground→background control UI. Same coverage note as `stopTask()`. |
+
+### Unwired SDK Options — Explicit Closure
+
+6 SDK `Options` fields are not wired:
+
+| Option | Status | Rejection Reason |
+|--------|--------|-----------------|
+| `managedSettings` | NOT A USER FEATURE | Enterprise policy layer for lock-down (sandbox, permission deny, MCP restrictions) |
+| `permissionPromptToolName` | NOT NEEDED | All permission routing goes through `canUseTool` callback |
+| `extraArgs` | NOT NEEDED | All configuration flows through SDK options, not raw CLI args |
+| `executableArgs` | NOT NEEDED | No need for JS runtime arguments beyond `executable` (already wired) |
+| `settings` (inline) | EQUIVALENT | Plugin uses `settingSources` + individual field options — same effect |
+| `maxThinkingTokens` | DEPRECATED | Plugin uses `thinking` option (SDK-recommended replacement) |
+
+### Conclusion
+
+**No new matrix rows needed.** The MCP Servers row at `pass`/`settings` is honest, complete, and now explicitly documents the full live-apply path. All unwired SDK methods are closed with specific rejection reasons. Matrix counts unchanged: 48 rows, 34 pass, 14 readback, 2 hidden, 0 fail.
+
+---
+
+## 2026-06-07 Permission Mode Live Switch — Promotion to Matrix Row at Readback (Outcome A)
+
+### Objective
+
+Focused audit of the official Claude SDK `query.setPermissionMode()` seam to determine whether it should be a formal capability row in the matrix.
+
+### Key distinction established
+
+Two completely separate permission mode systems exist in the plugin:
+
+1. **Claude Code SDK `query.setPermissionMode()` seam** — `ClaudeCodePermissionMode` (default/acceptEdits/bypassPermissions/plan). Routes through `ClaudeCodeAdapter.setPermissionMode()` → `applyToActiveQueries()` → `query.setPermissionMode(mode)` on each active runtime. Controlled via Claude Code Settings → Permissions tab dropdown.
+
+2. **OpenCode global permission mode** — `PermissionMode` (yolo/normal/plan). Routes through `PermissionModeSelectorCoordinator` in chat toolbar → `OpenCodianView.switchPermissionMode()` → restarts OpenCode service. Does NOT call `query.setPermissionMode()` on Claude active runtime.
+
+The audit conclusion is that these must NOT be conflated.
+
+### Three-layer assessment
+
+| Layer | Status | Evidence |
+|---|---|---|
+| Backend | Adapter wiring verified | `ClaudeCodeAdapter.setPermissionMode(mode)` → `applyToActiveQueries(runtime => runtime.query?.setPermissionMode?.(mode))`. Unit tests: active/closed/idle runtimes. Smoke harness: adapter.setPermissionMode('plan') → query.setPermissionMode('plan'). |
+| Settings | Stable entry verified | Permissions tab dropdown (default/acceptEdits/bypassPermissions/plan) with live apply: `applyClaudePermissionMode()` → `adapter.setPermissionMode(mode)` → `saveSettings()`. |
+| Chat | **NO surface for Claude** | Shared chat permission selector controls OpenCode only. `PermissionModeSelectorCoordinator` uses `PermissionMode` (yolo/normal/plan) and `OpenCodianView.switchPermissionMode()` restarts OpenCode service — never calls `query.setPermissionMode()`. |
+
+### Classification
+
+- **runtimeProof: readback** — Option wiring verified through full chain. No live behavioral probe proving mid-stream tool approval behavior changes. Unlike Main Model Live Switch (which verified model change via `modelUsage` key comparison), permission mode's effect is indirect (changes how CLI handles tool approvals). Readback is the honest ceiling.
+- **userSurface: settings** — Only the Claude Code Permissions tab dropdown. Chat selector is OpenCode-only.
+
+### Explicitly NOT this seam
+
+- Permission Approval (tool-call cards in chat — separate row, `pass` / `chat`)
+- OpenCode global permission templates (`SettingsSecuritySection` / `PermissionModeSelectorCoordinator` — separate system)
+- Plan Mode Instructions (dependent on `permissionMode='plan'` but a separate capability row, `pass` / `settings`)
+
+### Promotion path
+
+**FAILED** — Promotion path exhaustively explored and blocked by three structural factors (2026-06-07).
+
+The initial assessment stated: "A live behavioral probe verifying that `setPermissionMode('bypassPermissions')` mid-stream causes tool calls to skip `canUseTool` would justify upgrading to `pass`." This section documents why that probe cannot be built from the plugin layer.
+
+#### SDK mechanism traced (sdk.mjs)
+
+```
+query.setPermissionMode(mode)
+  → request({subtype:"set_permission_mode", mode})
+    → control_request JSON written to CLI subprocess stdin
+      → CLI responds with control_response {subtype:"success"} or {subtype:"error"}
+        → response may include pending_permission_requests (auto-resolved pending approvals)
+```
+
+Structurally identical to `setModel()`: same `request()` transport mechanism, same `applyToActiveQueries()` fan-out pattern.
+
+#### Blocker 1 — No observable stream signal
+
+- `SDKStatusMessage.permissionMode` is optional (sdk.d.ts line 3500) and only MAY appear during streaming when mode changes internally
+- Plugin's `ClaudeCodeStreamNormalizer.appendLifecycleChunks()` handles `session_init`, `hook_*`, and `task_*` subtypes but does NOT handle `subtype==='status'` — these messages are silently dropped (no StreamChunk created)
+- No dedicated event: no `onPermissionModeChanged` callback, no `getPermissionMode()` getter, no `client_event` for permission mode changes
+- Unlike `setModel()` which produces observable `modelUsage` key changes in the stream (different model IDs before/after switch), `setPermissionMode()` produces no equivalent observable artifact
+
+#### Blocker 2 — canUseTool inconsistency across modes
+
+- In `query()` mode, `canUseTool` callback is ONLY invoked by the SDK in `plan` mode
+- Switching between `default` and `bypassPermissions` has NO observable difference (callback never fires in either mode)
+- Switching from `plan` to `bypass` mid-stream would require observing the callback stop firing, but:
+  - The `canUseTool` callback fires from inside the SDK's `readMessages()` generator
+  - Calling `setPermissionMode()` from there creates a transport deadlock: request goes out via stdin, response comes back via the same `readMessages()` generator that's currently paused at the callback
+  - The diagnostic probe infrastructure (`runDiagnosticPrompt`) iterates the query in a single `for await` loop with no mid-stream interaction mechanism
+
+#### Blocker 3 — CLI subprocess opaqueness
+
+- The `onSetPermissionMode` callback (sdk.mjs `processControlRequest`) returns `{ok: true}` to acknowledge the request
+- But the plugin cannot observe whether the subprocess's internal tool-approval state actually changed
+- The actual permission handling change happens inside the compiled CLI binary — no external signal confirms behavioral change
+- This is fundamentally different from `setModel()` where the model change is externally verifiable via API response metadata (modelUsage keys)
+
+#### What would be needed for promotion
+
+One of: (a) SDK adds `permissionModeChanged` client_event or stream marker, (b) CLI consistently emits `SDKStatusMessage.permissionMode` after `setPermissionMode()`, (c) plugin adds separate query execution context for mid-stream behavioral observation (significant architecture change). All require SDK-side changes or major plugin refactoring.
+
+---
+
+## 2026-06-07 Main Model Live Switch — Promotion to Matrix Row (Outcome A)
+
+### Objective
+
+Audit the `query.setModel()` / Main Model live-apply seam to determine whether it should become a formal capability row in the matrix, or remain as a non-row productized auxiliary seam (or be formally closed).
+
+### Three-Layer Evidence
+
+| Layer | Evidence | Status |
+|-------|----------|--------|
+| **Backend adapter** | `ClaudeCodeAdapter.setModel()` → `applyToActiveQueries(runtime => runtime.query?.setModel?.(model))` | ✅ Fully wired |
+| **Chat → setModel** | `getOrStartRuntime()`: chat selector writes `TabModelOverride`; on send, if session.runtime already exists and is reused (no effort-triggered rebuild), `query.setModel(overrides.model)` is called on the active query. If no active runtime or runtime is rebuilt, override takes effect via initial `options.model` on the new query — NOT via mid-stream `setModel()`. | ✅ Routes to adapter seam (split: `query.setModel()` when reused, `options.model` when new) |
+| **Settings surface** | Model & Thinking tab: text input + quick-select dropdown → `applyClaudeModel()` → `adapter.setModel()` | ✅ Stable, with proof-status notice (`data-proof-state='pass'`) |
+| **Chat surface** | Model selector → `TabModelOverride` → on send: if active runtime reused → `query.setModel()` mid-stream; if new/rebuilt runtime → initial `options.model` path | ✅ Routes to same adapter seam |
+| **Diagnostic proof** | `runSetModelLiveProbe()`: two-phase probe (baseline modelUsage → setModel() → comparison modelUsage) | ✅ With 5 unit test cases |
+| **Unit tests** | Adapter: setModel on active/closed/idle runtimes; Settings: applyClaudeModel on text input and quick-select; Smoke harness: adapter.setModel() → query.setModel() | ✅ Comprehensive |
+
+### Runtime Evidence (BUILD_ID feature-phase0-capability.202606070617)
+
+Codex independently verified on latest Test Vault build:
+- **Settings surface**: `[data-claude-code-proof-status="main-model"]` visible, notice text confirms live model switching verified.
+- **Capability Lab**: `Main Model Live Switch` row visible, proof chip = `Verified`.
+- **Backend probe**: `adapter.runSetModelLiveProbe('claude-opus-4-5')` returned:
+  - `setModelAttempted: true`
+  - `setModelNotAvailable: false`
+  - `phase1ModelKeys: ['claude-haiku-4-5']` (baseline)
+  - `phase2ModelKeys: ['claude-haiku-4-5', 'claude-opus-4-5']` (after setModel)
+- `obsidian dev:errors` clean.
+
+### Key Distinctions (explicit to prevent future confusion)
+
+1. **NOT Fallback Model**: This is MANUAL model switch via `query.setModel()`, NOT automatic fallback triggered by API 529 overload. Fallback Model is a separate row (readback, CLOSED).
+2. **NOT tab-override masquerading**: The chat model selector genuinely calls `query.setModel()` on the active query handle via the adapter — it is not a separate OpenCode-level override that bypasses the Claude SDK.
+3. **NOT just Options.model**: The initial-query `options.model` parameter is one path — it sets the model for a NEW query. `setModel()` changes the model MID-STREAM on an existing persistent query. The chat surface uses both: initial `options.model` when a new runtime is created (or effort change triggers rebuild), and `query.setModel()` when an existing runtime is reused. The settings surface uses both: initial model for new queries, and `setModel()` for live-switching on active queries.
+4. **`applyFlagSettings({model})`** has the same semantics as `setModel()` — not a separate seam.
+
+### Decision
+
+**Outcome A — Main Model Live Switch is promoted to a formal capability row.**
+
+- **Capability name**: `Main Model Live Switch`
+- **runtimeProof**: `pass` — three-layer evidence: adapter wiring, diagnostic probe with unit tests, chat model selector routes to same SDK seam
+- **userSurface**: `settings+chat` — Settings: Model & Thinking tab text input + quick-select; Chat: model selector dropdown
+
+### Changes made
+
+- `SettingsCapabilityLabSection.ts`: Added 'Main Model Live Switch' matrix row with full evidence documentation.
+- `SettingsCapabilityLabSection.test.ts`: Added row assertion, updated verified capabilities list (33→34), updated total rows (46→47).
+- Current-state doc: Added row to pass/settings+chat section, updated counts (47 rows, 34 pass), added this audit section, clarified the Fallback Model section's reference to `query.setModel()`.
+
+---
+
+## 2026-06-07 Fallback Model — Re-Audit and Formal Closure (Outcome B)
+
+### Objective
+
+Re-audit the Fallback Model seam against the LATEST Claude Code / Agent SDK documentation, changelog, and community issues to make a definitive determination: is there any new productizable seam, or should it be formally closed at readback?
+
+### Upstream Evidence Checked (2026-06-07)
+
+| Source | Evidence | Status |
+|--------|----------|--------|
+| **npm `@anthropic-ai/claude-agent-sdk`** | Latest version: **0.3.167** | Installed: 0.3.145 |
+| **CLI `@anthropic-ai/claude-code`** | Latest version: **2.1.167** | — |
+| **SDK source (sdk.mjs)** | Exactly 3 fallback references in ProcessTransport.initialize(): destructure, same-model validation, push --fallback-model to CLI args. ZERO switching logic in SDK | Unchanged |
+| **`query.setModel()`** | Fully documented SDK method; sends `{subtype:"set_model",model}` control request; takes effect on next turn | Documented, NOT a fallback signal |
+| **`modelUsage` on SDKResultMessage** | Multiple model keys = fallback likely occurred | Heuristic-only, never observed |
+| **`SDKAPIRetryMessage`** | Fires on retries; cannot distinguish same-model retry from fallback retry | Not a fallback detector |
+| **`applyFlagSettings({model})`** | Documented; same semantics as setModel() | Not a fallback signal |
+| **Claude Code CLI changelog** | --fallback-model now applies to interactive sessions (not just --print); settings.json supports up to 3 fallback models; sticky session fallback; FALLBACK_FOR_ALL_PRIMARY_MODELS env var; /bg workers degrade to fallback | CLI-side enhancements only |
+| **Community issue #22917** | Proposed ModelFallbackTriggered/ModelFallbackRecovered hook events | **Closed as duplicate, NOT implemented** |
+| **Community issues #60577, #8413** | 529 aborts sessions without auto-recovery; fallback only triggers on overload, not invalid model names | Ongoing pain, no SDK fix |
+| **Official docs (code.claude.com)** | fallbackModel option documented; modelUsage documented as detection mechanism; no fallback activation event documented | No new observable |
+
+### Decision
+
+**Outcome B — Fallback Model is FORMALLY CLOSED at readback.**
+
+This is not a temporary gap. The architectural barrier is fundamental:
+
+1. **Fallback switching happens inside the compiled CLI binary** in response to API-side HTTP 529 signals. The SDK layer is a thin transport that passes `--fallback-model` to the CLI and receives stream events.
+2. **The SDK has no mechanism to observe or report internal model switching.** No event type, no callback, no stream marker, no status metadata distinguishes "switched to fallback" from "continued on primary."
+3. **CLI-side enhancements (multi-fallback, sticky sessions, FALLBACK_FOR_ALL_PRIMARY_MODELS)** improve fallback behavior but do not create new SDK-level observables. The SDK consumer sees the same stream regardless of whether fallback occurred.
+4. **Community-proposed hook events (ModelFallbackTriggered/ModelFallbackRecovered)** have NOT been implemented. The proposal in issue #22917 was closed as duplicate.
+5. **`query.setModel()` is semantically distinct** — it is a manual model switch API, not an automatic fallback mechanism. The separate "Main Model Live Switch" capability row (promoted 2026-06-07, Outcome A) now tracks this seam.
+
+### What IS verified (unchanged)
+
+1. **Option wiring**: `fallbackModel` propagates through `ClaudeCodeOptionsBuilder` → SDK `Options.fallbackModel` → `--fallback-model` CLI flag.
+2. **Same-model validation**: SDK throws if `fallbackModel === model`.
+3. **Init message inspection**: `extractInitFallbackModel()` reads fallback model metadata from init event.
+4. **modelUsage plumbing**: If fallback occurred, `Object.keys(modelUsage).length > 1` on `SDKResultMessage`.
+5. **Stable settings surface**: Model & Thinking tab text input with boundary notice.
+
+### What will NOT be productized — architectural barrier
+
+1. **No fallback activation event**: The SDK message protocol has no dedicated event type for model switching.
+2. **Cannot simulate API overload locally**: The trigger is HTTP 529 from Anthropic's API — unproducible in local tests.
+3. **Invalid-primary test strategy is undermined**: SDK accepts arbitrary model names at query boundary without validation or fallback.
+4. **modelUsage is heuristic, not contractual**: Multiple keys suggest fallback, but the SDK does not guarantee this interpretation.
+
+### Adjacent seams audited and REJECTED
+
+1. **modelUsage as chat surface** — Passive post-hoc detection; never observed; no standalone product value.
+2. **query.setModel() as Manual Model Switch** — Fully documented SDK method; semantically distinct from automatic fallback; would require a separate capability row. NOT pursued: would expand scope beyond Fallback Model closure.
+3. **applyFlagSettings({model})** — Documented; same semantics as setModel().
+4. **SDKAPIRetryMessage** — Detects retries, not fallback; cannot distinguish same-model from fallback retry.
+5. **ConfigChange hook event** — Fires on config file changes, not programmatic model switches.
+
+### Promotion path
+
+Requires Anthropic to add dedicated fallback activation events to the SDK message protocol (e.g., `ModelFallbackTriggered`, `ModelSwitch` stream event, or `fallback_activated` result metadata). This is a protocol-level change that cannot be worked around from the plugin layer. Re-audit on any SDK version bump that mentions fallback events or model-switch notifications.
+
+### Changes made
+
+- Matrix row comment: updated with formal closure wording, latest CLI evidence, architectural barrier explanation, and adjacent seams.
+- Current-state doc: updated readback summary, suggested next checkpoints, and added this closure section.
+
+---
+
+## 2026-06-07 Claude Commands / Slash Surface Re-Audit
+
+### Objective
+
+Re-audit the Claude commands/slash surface against the LATEST official Claude Code / Agent SDK documentation to determine:
+1. Whether `.claude/commands/*.md` custom commands should enter the Claude backend's chat slash menu
+2. Whether `/context` should remain diagnostic or be promoted
+3. The honest productization state of the entire slash command surface
+
+### Official Documentation Baseline (2026-06-07)
+
+Sources verified: code.claude.com/docs/en/commands, slash-commands, agent-sdk/slash-commands, agent-sdk/sessions, agent-sdk/session-storage, hooks, agent-sdk/hooks, plugins, plugins-reference.
+
+Key facts from official docs:
+1. **Custom commands merged into skills**: `.claude/commands/deploy.md` and `.claude/skills/deploy/SKILL.md` both create `/deploy` and work identically. Legacy format still fully supported.
+2. **SDK `supportedCommands()` returns all commands**: `system/init` message's `slash_commands` field contains both built-in AND custom commands. Custom commands from `.claude/commands/` and `.claude/skills/` are "automatically available through the SDK once defined in the filesystem."
+3. **SDK dispatches slash commands via prompt string**: Include `/command` in the prompt — it is treated as SDK input.
+4. **`/context` is a documented built-in command**: Available in both CLI and SDK, appears in `slash_commands` list.
+5. **Plugin commands use namespace prefix**: Skills in plugins create `/plugin-name:skill-name` entries.
+6. **SKILL.md frontmatter controls invocation**: `disable-model-invocation`, `user-invocable`, `allowed-tools`, `disallowed-tools`, `context: fork`.
+
+### Current Implementation Analysis
+
+The plugin's slash command pipeline for Claude backend:
+
+| Layer | Implementation | Code Wired? | Runtime Verified? |
+|-------|---------------|-------------|-------------------|
+| Discovery | `getRuntimeCatalog()` → `query.supportedCommands()` → returns all commands | ✅ Yes | ✅ **2026-06-07 VERIFIED**: Custom `opencodian-slash-proof-command` and `opencodian-slash-proof-skill` both returned by `supportedCommands()`, appeared in slash menu dropdown tagged `(project)` |
+| Catalog merge | `mergeSlashCommandCatalog()` → adds as `source:'claude-runtime'` entries | ✅ Yes | ✅ Unit tests cover merge behavior |
+| Slash menu rendering | `SlashCommandMenuCatalogCache` → `buildVisibleSlashCommandMenuItems()` → autocomplete dropdown | ✅ Yes | ✅ **2026-06-07 VERIFIED**: Both custom entries visible in autocomplete dropdown (a11y tree ref e78/e79, screenshot evidence) |
+| Execution | `SlashCommandExecutionService` returns `false` for Claude backend → raw text passthrough | ✅ Yes | ✅ **2026-06-07 VERIFIED**: Selecting `/opencodian-slash-proof-command` inserted command text; sending produced model response with exact marker `MARKER:SLASH-CMD-PROOF-SP27` |
+| Settings: skills | `ClaudeProjectSkillDiscovery` + create/open | ✅ Yes | ✅ Unit tests + manual settings verification |
+| Settings: commands | `ClaudeProjectCommandDiscovery` + create/open | ✅ Yes | ✅ Unit tests + manual settings verification |
+
+### Findings
+
+1. **Code pipeline IS structurally complete for built-in runtime commands** — `loadClaudeRuntimeCommands` host seam reads `getRuntimeCatalog()` → `supportedCommands()`, merges results into slash menu catalog as `claude-runtime` source, renders in autocomplete dropdown. Execution is raw text passthrough.
+
+2. **Custom commands from `.claude/commands/*.md` ARE NOW RUNTIME-VERIFIED in the slash menu** — ✅ **2026-06-07 LIVE VERIFIED (Outcome A, BUILD_ID feature-phase0-capability.202606070146)**: Custom command `opencodian-slash-proof-command` and custom skill `opencodian-slash-proof-skill` both appeared in the Obsidian autocomplete dropdown, tagged `(project)`. Selection inserted the command text into the input field. Sending via raw text passthrough produced a model response containing the exact marker `MARKER:SLASH-CMD-PROOF-SP27`. Both entries persisted after page reload. Evidence artifacts: a11y tree snapshot (refs e78/e79), screenshots (opencodian-slash-test-03-scrolled-to-custom.png, opencodian-slash-test-04-command-inserted.png), DOM eval (Turn 3 text contains MARKER:SLASH-CMD-PROOF-SP27).
+
+3. **Historical batch sections contained stale claims that were NOT correct even at time of writing** — Batch 1 (line ~1032) claimed "Claude commands are NOT in the chat slash menu" but batch 2 (line ~984-987) wired `loadClaudeRuntimeCommands` INTO the slash menu catalog. Batch 1's claim was written about the pre-wiring state but was never corrected after batch 2 wired it. Batch 2's own honesty boundaries (line ~987) then under-claimed by saying "NOT wired into the chat slash menu" for PROJECT commands specifically — which was about `.claude/commands/*.md` files vs `supportedCommands()` results. The distinction was: built-in runtime commands from `supportedCommands()` ARE in the menu; user-authored `.claude/commands/*.md` files are shown in settings only. That distinction was unresolved at the time of the earlier re-audit, but is now closed by the 2026-06-07 live verification above.
+
+4. **`/context` remains diagnostic** — While `/context` is a built-in command that would appear in `supportedCommands()` results, the `/context Diagnostic` matrix row represents the proof harness. The command's accessibility is a consequence of the overall slash command pipeline, not a separate productized surface.
+
+### Decisions
+
+| Item | Previous | New | Reason |
+|------|----------|-----|--------|
+| Skills `userSurface` | `'settings'` | **`'settings+chat'`** | ✅ **2026-06-07 LIVE VERIFIED (Outcome A, BUILD_ID feature-phase0-capability.202606070146)**: Custom `.claude/commands/opencodian-slash-proof-command.md` and `.claude/skills/opencodian-slash-proof-skill/SKILL.md` both discovered in slash menu autocomplete dropdown, tagged `(project)`, selectable, sent via raw text passthrough. Custom command returned exact marker `MARKER:SLASH-CMD-PROOF-SP27`. Both entries persisted after page reload. |
+| `/context Diagnostic` | `'diagnostic'` | `'diagnostic'` (unchanged) | Matrix row is about proof harness, not command accessibility. |
+| Code changes | — | None | Pipeline is structurally complete. No new code required. |
+| Historical batch sections | Contain stale claims | **Annotated with superseded notices** | Batch 1 and Batch 2 claims corrected in-place with strike-through and current-true notes. |
+
+### Promotion Blocker — RESOLVED ✅
+
+Skills `userSurface` promotion from `'settings'` to `'settings+chat'` required ALL of:
+1. ✅ A custom `.claude/commands/opencodian-slash-proof-command.md` file created in Test Vault
+2. ✅ Slash menu opened in a Claude Code conversation
+3. ✅ Custom command observed in the autocomplete dropdown (a11y tree + screenshot evidence, tagged `(project)`)
+4. ✅ Selection of the custom command inserted text and sent via raw text passthrough; model returned exact marker `MARKER:SLASH-CMD-PROOF-SP27`
+5. ✅ Custom `.claude/skills/opencodian-slash-proof-skill/SKILL.md` also appeared in dropdown, tagged `(project)`
+6. ✅ Both entries persisted after page reload
+
+**All blockers resolved. Promotion applied 2026-06-07.**
+
+### Changes Made
+
+- `SettingsCapabilityLabSection.ts`: Skills `userSurface` promoted from `'settings'` to `'settings+chat'`; matrix row comment updated with LIVE VERIFIED evidence (BUILD_ID feature-phase0-capability.202606070146).
+- `SettingsCapabilityLabSection.test.ts`: Skills expected `userSurface` updated to `'settings+chat'`.
+- Current-state doc: Updated Skills entry to settings+chat; surface counts updated (settings 11, settings+chat 4); promotion blocker section marked RESOLVED.
+
+### Historical Batch Sections — Corrections
+
+The following claims in historical batch sections are stale or were superseded by later implementation:
+
+**Batch 2 (Claude Skills & Commands Productization — Batch 2) Honesty Boundaries:**
+- Line ~987: ~~"Project commands are NOT wired into the chat slash menu yet."~~ → **Superseded**: Built-in runtime commands from `supportedCommands()` ARE wired into the slash menu via `loadClaudeRuntimeCommands` host seam (added in this same batch). Custom `.claude/commands/*.md` files were structurally supported per SDK docs and are now live-verified by the 2026-06-07 Outcome A runtime proof.
+- Line ~988: ~~"Skills are NOT dispatched through chat."~~ → **Superseded**: Skills as slash commands follow the same passthrough path — raw text goes to Claude backend which handles them natively.
+
+**Batch 1 (Claude Skills & Commands Productization — Batch 1) Honesty Boundaries:**
+- Line ~1016: ~~"Read-only discovery; not wired into chat slash dispatch."~~ → **Superseded**: Batch 2 wired `loadClaudeRuntimeCommands` into the slash menu catalog. Runtime commands from `supportedCommands()` now appear in the slash menu dropdown.
+- Line ~1032: ~~"Claude commands are NOT in the chat slash menu."~~ → **Superseded**: Batch 2 wired `loadClaudeRuntimeCommands` into the slash menu catalog. The execution path (raw text passthrough) was also added in batch 2. However, this statement was correct AT THE TIME batch 1 was written — batch 1 only added settings discovery and catalog infrastructure. Batch 2 completed the wiring.
 
 ---
 
@@ -167,6 +571,63 @@ Installed SDK: 0.3.145. Latest npm: 0.3.167. No changelog evidence of SessionSto
 ### Promotion path
 
 Requires ALL of: (a) SDK graduates SessionStore from `@alpha` with format stability guarantees; (b) SDK documents the SessionStoreEntry schema as contractual (not implementation-defined); (c) a clear user workflow gap is identified that BackendSessionBrowserModal + StorageService cannot fill. None currently exists.
+
+---
+
+## 2026-06-07 File Checkpoint / Rewind — Re-Audit Against Latest Upstream (Outcome B)
+
+### Objective
+
+Re-audit File Checkpoint / Rewind against the latest Claude Agent SDK upstream (npm, GitHub, official docs) to determine whether the non-interactive snapshot creation blocker has been resolved or any new productizable seam has appeared since the 2026-06-06 audit.
+
+### Upstream Evidence Checked (2026-06-07)
+
+| Source | Evidence | Status |
+|--------|----------|--------|
+| **npm `@anthropic-ai/claude-agent-sdk`** | Latest version: **0.3.167** | Installed: 0.3.145 |
+| **CLI `@anthropic-ai/claude-code`** | Latest version: **2.1.167** | — |
+| **SDK #236** — "File checkpointing snapshots not created in SDK (non-interactive) mode" | Root cause: snapshot creation gated behind React/Ink interactive UI code paths (`useState` setters), never invoked in SDK `query()` mode. `_T()` in CLI hardcodes `isInteractive:!1` | **OPEN** since 2026-03-17, 3 reactions, **zero maintainer response** |
+| **claude-code #16976** — "Headless checkpoint restore" | Feature request for checkpoint/rewind in headless mode | **CLOSED `not_planned`** by stale bot (2026-02-22). Locked. No maintainer response. |
+| **claude-code #18858** — "PostRewind hook event" | Plugin ecosystem request for rewind notification | **CLOSED `not_planned`** by stale bot (2026-03-08). Locked. Follow-up #32780 opened 2026-03-10. |
+| **SDK changelog 0.3.145→0.3.167** | Reviewed all entries | **No checkpoint, rewind, snapshot, or non-interactive mode fix mentioned**. Entries are mostly "Updated to parity with Claude Code v2.1.xxx" plus specific fixes for unrelated features. |
+| **Official docs** (code.claude.com/docs/en/agent-sdk/file-checkpointing) | Present SDK checkpointing as working with full examples and troubleshooting | **Docs-vs-runtime discrepancy**: docs show working TypeScript examples, but issue #236 root cause proves snapshots are never created in non-interactive mode. Docs do not mention this limitation. |
+| **SDK API surface** | `rewindFiles()` + `applyFlagSettings({fileCheckpointingEnabled})` | **No new checkpoint APIs** added. These remain the only two checkpoint-related methods. |
+
+### Decision
+
+**Outcome B** — File Checkpoint / Rewind REMAINS `readback` with confirmed upstream blocker.
+
+### What IS verified (unchanged since 2026-06-06)
+
+1. **API callable**: `rewindFiles(dryRun: true)` executes without error.
+2. **canRewind always false**: All 10 tested candidates return `canRewind: false` with error "No file checkpoint found for this message."
+3. **Settings surface**: Stable settings boundary notice + Capability Lab toggle exist.
+4. **SDK option wiring**: `enableFileCheckpointing` propagates through `ClaudeCodeOptionsBuilder` → SDK `Options` → CLI subprocess. The `CLAUDE_CODE_ENABLE_SDK_FILE_CHECKPOINTING` env var IS correctly set (confirmed by the `iz()` check passing — otherwise error would be "File rewinding is not enabled").
+
+### What has NOT changed — fundamental blocker persists
+
+1. **Snapshot creation is gated behind React/Ink UI components**: The CLI binary's file history snapshot creation function is only called inside interactive TUI code paths. In SDK `query()` mode (`isInteractive = false`), the function is never invoked.
+2. **No changelog fix through 0.3.167**: 22 versions between 0.3.145 and 0.3.167 contain zero mentions of checkpointing fixes.
+3. **Community issues closed without response**: Both #16976 and #18858 were auto-closed by stale bots with no Anthropic engagement. #236 remains open but unanswered.
+4. **Official docs are aspirational**: The checkpointing guide presents the feature as working, contradicting the actual runtime behavior in non-interactive mode.
+
+### No new productizable seam
+
+- No new SDK methods for checkpoint creation or status reporting.
+- No new init events, stream signals, or tool metadata related to checkpoints.
+- No `PostRewind` hook event (still only requested, not implemented).
+- No CLI flags for headless snapshot creation.
+- Fork Session provides "branch from here" but does NOT restore file state — semantically distinct.
+
+### Changes made
+
+- Current-state doc: updated readback entry with 2026-06-07 evidence (latest npm 0.3.167, closed issues, docs discrepancy).
+- Current-state doc: updated suggested next checkpoints.
+- Current-state doc: truth-synced top-level counts (33 pass, 13 readback, 2 hidden).
+
+### Promotion path
+
+Requires Anthropic to add snapshot creation to the non-interactive code path in the CLI binary — specifically, decoupling snapshot persistence from React/Ink UI state. No plugin-side workaround exists. This remains the highest user-value seam that is blocked. Re-audit on any SDK version bump that mentions checkpointing or interactive-mode fixes.
 
 ---
 
@@ -324,6 +785,65 @@ interface SDKFilesPersistedEvent {
 ### Promotion path
 
 Requires Anthropic to add snapshot creation to the non-interactive code path in the CLI subprocess — specifically, decoupling snapshot persistence from React/Ink UI state. No plugin-side workaround exists. This is the highest user-value seam that remains blocked. Re-audit on any SDK version bump that mentions checkpointing or interactive-mode fixes.
+
+---
+
+## 2026-06-07 AskUserQuestion Preview Format — Promotion (Outcome A)
+
+### Objective
+
+Re-audit the AskUserQuestion Preview Format seam with a live Obsidian runtime experiment to determine if real `.preview` fields arrive in AskUserQuestion tool inputs when `previewFormat` is set.
+
+### Runtime Experiment
+
+**BUILD_ID**: feature-phase0-capability.202606070354 (deployed to Test Vault)
+
+**Setup**:
+1. Added diagnostic `console.log` in `ClaudeCodePermissionBridge.handleAskUserQuestion` to capture raw `.preview` fields on incoming AskUserQuestion tool inputs
+2. Built and deployed to Test Vault
+3. Connected via agent-browser CDP (port 9222)
+
+**Test 1 — Markdown format**:
+- Set `askUserQuestionPreviewFormat` to `'markdown'` in Settings → Tools tab
+- Started new conversation
+- Prompted Claude to use the ask tool with 3 options and detailed previews
+- **Result**: `hasAnyPreview: true`, all 3 options arrived with `.preview` fields containing full Markdown content:
+  - `"## Blue-Green Deployment\n\nTwo identical production environments — **Blue** (live) and **Green** (staging).\n\n1. Deploy new version to Green..."`
+  - `"## Rolling Update\n\nReplace instances one batch at a time..."`
+  - `"## Canary Release\n\nRoute a small, controlled percentage..."`
+- `data-preview` attributes confirmed on all `<input>` elements
+- Hover/focus rendered preview text: `hidden=false`, 506+ characters
+
+**Test 2 — HTML format**:
+- Set `askUserQuestionPreviewFormat` to `'html'` in Settings → Tools tab
+- Started new conversation
+- Same prompt pattern
+- **Result**: `hasAnyPreview: true`, all 3 options arrived with `.preview` fields containing full HTML fragments:
+  - `"<div style=\"font-family: system-ui; max-width: 500px;\"><h3 style=\"margin: 0 0 8px; color: #c21325;\">Jest</h3>..."`
+  - Similar structured HTML with inline CSS styles for Vitest and Mocha
+- `data-preview` attributes confirmed on all `<input>` elements
+- Hover/focus rendered preview as plain text: `hidden=false`, 877+ characters (HTML tags visible as text, not parsed)
+
+**SDK mechanism**:
+- SDK forwards `previewFormat` as `CLAUDE_CODE_QUESTION_PREVIEW_FORMAT` env var to CLI subprocess (confirmed: `assistant.mjs` contains `if(TA?.askUserQuestion?.previewFormat)HQ.CLAUDE_CODE_QUESTION_PREVIEW_FORMAT=TA.askUserQuestion.previewFormat`)
+- CLI modifies the AskUserQuestion tool schema description based on the env var
+- Model emits `.preview` fields with format-appropriate content
+
+### Conclusion
+
+**Outcome A — Promoted from `readback` to `pass`**.
+
+Evidence:
+1. Real `.preview` fields DO arrive in AskUserQuestion tool inputs
+2. Format choice DOES affect preview content (markdown→Markdown text, html→HTML fragments)
+3. Preview rendering works through the actual question UI (data-preview, focus/hover)
+4. SDK env var mechanism confirmed in source
+
+Taxonomy changes:
+- `runtimeProof`: `'readback'` → `'pass'`
+- `userSurface`: `'settings'` → `'settings+chat'`
+
+Caveat: preview inclusion is model-dependent (the model may not always include previews for every question), but the full pipeline and format differentiation are proven with live evidence.
 
 ---
 
@@ -611,7 +1131,7 @@ The SDK exposes a rich `SandboxSettings` type (inferred from `SandboxSettingsSch
 }
 ```
 
-The plugin exposes only 3 of these fields (`enabled`, `failIfUnavailable`, `autoAllowBashIfSandboxed`) via stable settings in the Permissions tab. The remaining ~20 fields (network, filesystem, TLS, proxy, Mach lookup, `allowUnsandboxedCommands`, `excludedCommands`, `ignoreViolations`, `ripgrep`, `bwrapPath`, `socatPath`) are intentionally not exposed.
+The plugin now exposes 10 expert settings beyond the original 3 basic toggles, for a total of 13 exposed fields. The remaining 13 official SDK fields are intentionally not exposed with explicit per-field reasons documented in JSDoc (`src/core/types/settings.ts`). A read-only chat badge (`SandboxConfigBadgeCoordinator`) surfaces the configured state in the chat toolbar when sandbox is enabled.
 
 ### Decision
 
@@ -647,6 +1167,97 @@ The plugin exposes only 3 of these fields (`enabled`, `failIfUnavailable`, `auto
 ### Promotion path
 
 Requires one of: (a) SDK adds sandbox status to init event or tool result metadata, (b) SDK exposes a `sandboxStatus` query API, (c) `decision_reason_type: 'sandboxOverride'` can be reliably provoked and observed as indirect activation proof — none currently feasible.
+
+---
+
+## 2026-06-07 Sandbox Productization — Expanded Expert Settings + Chat Badge
+
+### Objective
+
+Expand the Claude Code SDK sandbox seam beyond the initial 3-field surface to expose meaningful expert sub-policies and add a read-only chat badge reflecting configured state.
+
+### Changes Made
+
+**Exposed expert settings (10 new fields, Permissions tab advanced sub-policy section):**
+- `excludedCommands: string[]` — commands exempted from sandbox enforcement
+- `allowUnsandboxedCommands: boolean` — when false, forces all commands into sandbox
+- `filesystem.allowWrite: string[]` — paths where sandboxed writes are permitted
+- `filesystem.denyWrite: string[]` — paths where writes are blocked even with sandbox
+- `filesystem.denyRead: string[]` — paths where reads are blocked
+- `network.allowedDomains: string[]` — domains accessible from sandboxed network
+- `network.deniedDomains: string[]` — domains blocked from sandboxed network
+- `enableWeakerNestedSandbox: boolean` — reduces nested sandbox strictness
+- `enableWeakerNetworkIsolation: boolean` — reduces network isolation strictness
+- `ripgrep.command: string` + `ripgrep.args: string[]` — custom ripgrep binary for sandboxed search
+
+**Chat-facing badge surface (SandboxConfigBadgeCoordinator):**
+- Read-only badge in chat toolbar, visible only when `sandbox.enabled = true`
+- Shows "Sandbox: ON" with active sub-policy count (e.g., "Sandbox: ON · 3 policies")
+- Detailed tooltip listing all configured sub-policies
+- Badge lifecycle: mounted with toolbar, refreshed on `applyLocaleTexts()` and `updatePermissionTriggerDisplay()`, destroyed on teardown
+- 13 focused unit tests covering hidden/visible/policy-count/tooltip/locale-refresh/destroy
+
+**Intentionally unexposed fields (13 fields with explicit reasons):**
+1. `filesystem.allowRead` — confusing semantics (re-allows reads in denyRead regions)
+2. `filesystem.allowManagedReadPathsOnly` — managed-settings-only, SDK docs: "Has no effect when set via SDK options"
+3. `network.allowManagedDomainsOnly` — managed-settings-only, same limitation
+4. `network.allowUnixSockets` — macOS-only, misleading on Linux/WSL2
+5. `network.allowAllUnixSockets` — grants Docker socket access, too dangerous
+6. `network.allowLocalBinding` — macOS-only, misleading for cross-platform plugin
+7. `network.allowMachLookup` — macOS-only XPC/Mach, iOS Simulator specific
+8. `network.httpProxyPort` — advanced proxy config, use .claude/settings.json directly
+9. `network.socksProxyPort` — same as httpProxyPort
+10. `network.tlsTerminate` — advanced TLS termination, enterprise use case
+11. `ignoreViolations` — suppresses security violation reports, hides escape evidence
+12. `bwrapPath` — managed-settings-only (enterprise)
+13. `socatPath` — managed-settings-only (enterprise)
+
+### userSurface Taxonomy Decision
+
+**`settings+chat`** (Outcome A — LIVE VERIFIED).
+
+Initial deployment (BUILD_ID feature-phase0-capability.202606070250) revealed the badge could not render for Claude Code because it was mounted inside the permission selector, gated on `AgentCapability.Permissions` which Claude Code does not declare.
+
+Fix: moved badge mount out of the `showPermissions` gate in `ChatSelectionControlsCoordinator.build()` so it mounts independently in the toolbar regardless of capability.
+
+Runtime validation (BUILD_ID feature-phase0-capability.202606070310, Test Vault macOS):
+1. ✅ Badge visible in Claude Code chat toolbar: "沙箱（2 条策略）" with shield icon
+2. ✅ Tooltip reflects configured settings: excluded commands, network domains, readback boundary
+3. ✅ Badge updates dynamically when settings change (added `github.com` → count changed from 1 to 2)
+4. ✅ Badge hides when sandbox disabled (`enabled = false` → badge removed from DOM)
+5. ✅ Badge persists after plugin reload + view hydration (settings correctly reloaded from saved data)
+6. ✅ No console errors during badge lifecycle
+
+### Classification Remains Readback
+
+Despite the expanded settings surface and chat badge:
+- OS-level enforcement (bubblewrap/seccomp) is the CLI binary's internal claim
+- No init event, tool metadata, or stderr pattern confirms sandbox activation
+- Plugin cannot distinguish "sandbox active" from "sandbox silently degraded"
+- The badge reflects *configured state*, not *verified enforcement state*
+- `decision_reason_type: 'sandboxOverride'` promotion path still untested
+
+### Verification Evidence
+
+- Unit tests: 13 focused tests for SandboxConfigBadgeCoordinator, 7 updated existing tests for expanded sandbox shape
+- Truth audit: JSDoc in `settings.ts` contains explicit "Advanced sub-policies" and "Managed-only fields" sections with per-field reasons
+- `npm run verify`: 468 suites, 4187 tests, 0 errors, build OK
+- Owner-guard: approved for one-line host wiring pass-through in OpenCodianView.ts
+- **Runtime validation (BUILD_ID feature-phase0-capability.202606070310, Test Vault macOS)**:
+  - ✅ Advanced sandbox settings section renders correctly in Permissions tab (screenshot confirmed)
+  - ✅ All 10 new expert settings visible: excluded commands, unsandboxed commands, filesystem paths, network domains, weaker sandbox toggles, custom ripgrep
+  - ✅ Boundary notice, lifecycle notice, unexposed-fields notice all render correctly in Chinese locale
+  - ✅ Sandbox badge visible in Claude Code chat toolbar: "沙箱（2 条策略）" with shield icon (screenshot confirmed)
+  - ✅ Tooltip shows: excluded commands ("docker *"), network domains ("github.com"), readback boundary notice
+  - ✅ Badge updates dynamically when settings change (1 → 2 policies after adding network domain)
+  - ✅ Badge hides when sandbox disabled
+  - ✅ Badge persists after plugin reload + view hydration
+  - ✅ No console errors during badge lifecycle
+- **Re-validated on BUILD_ID feature-phase0-capability.202606070542 (latest fully revalidated build)**:
+  - ✅ Claude backend: badge visible
+  - ✅ OpenCode backend: badge hidden
+  - ✅ Hot-switch `claude-code → opencode → claude-code` in same live UI: badge 1 → 0 → 1
+  - ✅ `obsidian dev:errors` clean
 
 ---
 
@@ -760,6 +1371,8 @@ If the SDK adds: (a) a reusable warm pool (multiple `query()` calls per handle),
 ---
 
 ## 2026-06-06 Fallback Model — Audit `setModel()` / `modelUsage` Productization Potential (Outcome B)
+
+> **Superseded by 2026-06-07 formal closure.** This 2026-06-06 audit hardened the boundary. The 2026-06-07 re-audit against latest upstream confirmed no new signals and formally closed this seam at readback. See "2026-06-07 Fallback Model — Re-Audit and Formal Closure" above.
 
 ### Objective
 
@@ -915,8 +1528,10 @@ Move Claude skills/commands from discovery-only toward real user ability: (1) Cl
 - **Claude slash commands in the chat menu only appear when Claude Code is the active backend.** They are not shown for OpenCode or other backends.
 - **Claude slash execution is raw text passthrough.** When a user sends `/command args` in a Claude conversation, the slash execution service returns `false` and the raw text is sent to the Claude backend. Claude Code natively interprets `/` commands. There is no OpenCode-mediated execution — this is intentional.
 - **Project commands are file-backed management.** Create generates a markdown file; open opens it in the Obsidian editor. There is no rich template editor or argument autocomplete in this batch.
-- **Project commands are NOT wired into the chat slash menu yet.** Only Claude runtime commands (from `supportedCommands()`) appear in the chat slash menu. User-authored `.claude/commands/*.md` files are discovered and managed in settings only. Claude Code will natively discover them from the filesystem when processing `/` input.
-- **Skills are NOT dispatched through chat.** They remain settings-only discovery + create/open.
+- **Project commands and the slash menu.** Built-in runtime commands from `supportedCommands()` ARE wired into the chat slash menu (via `loadClaudeRuntimeCommands` host seam, added in this batch). At the time this batch shipped, custom `.claude/commands/*.md` visibility in Test Vault had not yet been independently proven. That gap is now closed by the 2026-06-07 Outcome A live verification: custom project commands do appear in the dropdown, are tagged `(project)`, and survive reload. Project commands are additionally discovered and managed in settings. Claude Code natively discovers custom commands from the filesystem when processing `/` input regardless of slash menu visibility.
+- **Skills follow the slash passthrough path.** When a user sends `/skill-name` in a Claude conversation, the slash execution service returns `false` and the raw text is sent to the Claude backend, which handles skill/command loading natively.
+
+> ⚠️ **2026-06-07 re-audit note**: The original batch 2 text said "Project commands are NOT wired into the chat slash menu" and "Skills are NOT dispatched through chat." This was partially incorrect even at time of writing — this same batch wired `loadClaudeRuntimeCommands` into the slash menu catalog, making built-in runtime commands visible in the dropdown. The statements have been updated to reflect the actual state.
 
 ### Matrix Change
 
@@ -944,13 +1559,13 @@ Turn Claude Code `hidden/unwired` skills and slash command surfaces into real us
 
 - **`src/features/settings/SettingsClaudeCodeSection.ts`**: Added two new discovery surfaces in the Runtime tab:
   - "Claude project skills" section: Scans `.claude/skills/` via `getProjectClaudeSkills()` and displays each skill with name, description, and relative path. Read-only scan; no create/edit/delete management actions yet.
-  - "Claude runtime commands" section: Uses `getRuntimeCatalog()` to display available slash commands with boundary notice about runtime dependency. Read-only discovery; not wired into chat slash dispatch.
+  - "Claude runtime commands" section: Uses `getRuntimeCatalog()` to display available slash commands with boundary notice about runtime dependency. Read-only discovery in settings; batch 2 later wired `loadClaudeRuntimeCommands` into the chat slash menu catalog so these commands also appear in the chat dropdown.
 - **`src/features/settings/SettingsCapabilityLabSection.ts`**: Changed Skills `userSurface` from `'hidden'` to `'settings'` (read-only discovery surface only, no chat dispatch or management actions).
 - **`src/features/settings/SlashCommandCatalogRenderer.ts`**: Added `'claude-runtime'` case in `getSourceChipLabel()` with locale key `settings.commands.catalog.chip.claudeRuntime`.
 
 #### Catalog infrastructure
 
-- **`src/core/config/slashCommandCatalog.ts`**: Added `'claude-runtime'` as a new `SlashCommandCatalogSource`. Added `ClaudeRuntimeCommand` interface. Extended `MergeSlashCommandCatalogOptions` with `claudeRuntimeCommands` parameter. This infrastructure supports future chat slash integration but is not wired into the chat menu yet.
+- **`src/core/config/slashCommandCatalog.ts`**: Added `'claude-runtime'` as a new `SlashCommandCatalogSource`. Added `ClaudeRuntimeCommand` interface. Extended `MergeSlashCommandCatalogOptions` with `claudeRuntimeCommands` parameter. Batch 2 later wired this into the chat menu via `loadClaudeRuntimeCommands` host seam in `SlashCommandMenuCatalogCache`.
 
 #### Locale
 
@@ -960,7 +1575,9 @@ Turn Claude Code `hidden/unwired` skills and slash command surfaces into real us
 
 - Skills discovery is filesystem-only — no SDK or runtime query involved. It scans what exists on disk, not what the runtime actually loads. No create/edit/delete management actions are provided.
 - Runtime commands come from `supportedCommands()` which is a read-only diagnostic seam. Command availability depends on the active session and server version.
-- **Claude commands are NOT in the chat slash menu.** They are discoverable only in the settings surface. Adding them to the chat menu would be false productization because `SlashCommandExecutionService` requires an OpenCode conversation and routes through `runSessionCommand()`, which would fail with "No OpenCode session available" for Claude conversations. Until a Claude-native dispatch path exists, Claude commands stay settings/readback-only.
+- **Claude runtime commands ARE in the chat slash menu** (wired by batch 2). `loadClaudeRuntimeCommands` host seam reads `getRuntimeCatalog()` → `supportedCommands()` and merges results into the slash menu catalog as `claude-runtime` source entries. Execution is raw text passthrough (`SlashCommandExecutionService` returns `false` for claude-code backend). Custom commands from `.claude/commands/` and `.claude/skills/` were later live-verified in Test Vault on 2026-06-07 (Outcome A): both appeared in the dropdown, were selectable, and persisted after reload.
+
+> ⚠️ **2026-06-07 re-audit note**: The original batch 1 text said "Claude commands are NOT in the chat slash menu" and "Adding them to the chat menu would be false productization." This was correct AT THE TIME batch 1 was written — batch 1 only added settings discovery and catalog infrastructure. Batch 2 completed both the slash menu wiring and the Claude-native dispatch path.
 - No `.claude/commands/*.md` authoring surface was added — that remains a documented gap for a future batch.
 - The `OpenCodianView.ts` file has zero diff.
 
@@ -4985,7 +5602,7 @@ Capabilities exposed in stable UI. This bucket mixes **behavior-verified** capab
 
 | # | Capability | Surface | Runtime Proof | Evidence |
 |---|---|---|---|---|
-| 1 | MCP Servers | Settings | `pass` | Runtime passthrough verified; shared Settings > MCP tab provides authoring; Claude Code Tools tab provides runtime refresh |
+| 1 | MCP Servers | Settings | `pass` | Runtime passthrough verified; shared Settings > MCP tab provides authoring; Claude Code Tools tab provides runtime refresh + inspect. **2026-06-07 re-audit**: live-apply path fully traced — `adapter.reloadMcpServers()` → `applyToActiveQueries(q => q.setMcpServers(cached))` → SDK `query.setMcpServers()` on every active query → live MCP config update on running sessions. `adapter.getMcpServerRuntimeStatuses()` → `query.mcpServerStatus()` → per-server connected/failed + tool names. Unwired SDK methods (explicit closure): `reconnectMcpServer(name)` (bulk `setMcpServers()` covers use case), `toggleMcpServer(name, enabled)` (same), `reloadPlugins()` (Plugins row covers init-time loading at `pass`) |
 | 2 | Allowed Tools | Settings | `readback` | Stable Settings UI exposed; SDK option correctly built and passed to SDK. **Pre-allow / auto-approve shortcut only — not a restrictor**: init catalog always unfiltered (34 tools regardless of allowedTools value), canUseTool non-functional in SDK query() mode. Zero enforcement observed. For deterministic built-in tool filtering, use Restricted Built-in Tools |
 | 3 | Disallowed Tools | Settings | `pass` | Stable Settings UI exposed; SDK option correctly built and passed to SDK. **Promoted 2026-05-30**: init-message tool catalog inspection proves deterministic enforcement — SDK init message (`type:'system', subtype:'init'`) `tools[]` field has 33 entries but **excludes Bash** when `disallowedTools: ['Bash']` is set. This is tool-catalog-level enforcement (tool removed from model's context), not dependent on model behavior. `bypassPermissions` and `disallowedTools` are orthogonal CLI flags — no interaction. Runtime evidence on BUILD_ID `feature-phase0-capability.202605300150`: init catalog = 33 tools, Bash absent, model called Agent/Glob/Glob but never Bash |
 | 4 | Turn/Budget Limits | Settings | `pass` | Stable Settings UI exposed; SDK options correctly built and passed to SDK. **`maxBudgetUsd` enforcement observed** — SDK returns `error_max_budget_usd` with message "Reached maximum budget ($0.01)". **`maxTurns` enforcement observed 2026-05-29** — live proof via `runMaxTurnsProof` diagnostic probe: SDK emitted `result` message with `subtype: 'error_max_turns'`, `num_turns: 2`, `cost: $0.13` when `maxTurns=1` with multi-tool prompt. SDK also throws after the result message; `runDiagnosticPrompt` now catches non-fatal SDK errors and returns `rawMessages + sdkError` for inspection. Combined, both maxTurns and maxBudgetUsd enforcement are verified |
