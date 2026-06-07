@@ -164,7 +164,7 @@ Upgrade the existing synthetic `Probe MCP Elicitation Wiring` with a live diagno
 | Proof level | Status | Evidence |
 |---|---|---|
 | SDK-level roundtrip | ✅ Proven (Round 15) | `scripts/claude-code-smoke.mjs` temp MCP server → `elicitation/create` → `onElicitation` → host response → server consumption |
-| Diagnostic live server proof | ✅ Proven (Round 16) | `ClaudeCodeAdapter.runMcpElicitationLiveProbe()` full chain verification with nonce echo |
+| Diagnostic live server proof | ❌ NOT proven — DIAGNOSTIC LIVE PROBE ADDED (Round 16) | `ClaudeCodeAdapter.runMcpElicitationLiveProbe()` attempts full chain verification with nonce echo; Test Vault has consistently observed `wiring` (BUILD_IDs `feature-phase0-capability.202606080238` and `feature-phase0-capability.202606080313`) |
 | Obsidian shared question dialog product path | ❌ NOT proven | No Test Vault evidence; auto-resolver used instead of real question dialog |
 
 ### Remaining product-path gaps
