@@ -6113,7 +6113,7 @@ Determine whether Agent Definitions can be pushed beyond `hidden/untested` to an
 
 Exhaustive grouping of all **24** Claude Code SDK capabilities, aligned with `SettingsCapabilityLabSection.ts` `buildMatrixRows()` and the unit-test `expected` mapping. Each capability appears exactly once; panel/probe names are not treated as separate capabilities.
 
-> **Superseded current-state note (2026-06-08):** this historical 24-row summary predates the `AskUserQuestion` / `MCP Elicitation` split. The authoritative current matrix is the top-of-file 55-row audit: `AskUserQuestion` remains `pass` through the built-in tool path, while `MCP Elicitation` is a separate `wiring` row until a real MCP server roundtrip is captured.
+> **Superseded current-state note (2026-06-08):** this historical 24-row summary predates the `AskUserQuestion` / `MCP Elicitation` split. The authoritative current matrix is the top-of-file 55-row audit: `AskUserQuestion` remains `pass` through the built-in tool path, while `MCP Elicitation` is a separate `wiring` row. **Round 16 (2026-06-08) added a diagnostic live proof**: a temporary MCP stdio server is created, the SDK `onElicitation` callback fires, the shared question host accepts the elicitation and sends a nonce, and the server consumes the user's answer and echoes the nonce in tool output — proving the full SDK/diagnostic real MCP roundtrip. However, stable `pass` still requires Obsidian shared question-dialog product-path proof with a real user's answer consumed by the server; the live probe uses an auto-resolver, not the actual shared dialog.
 
 ### user-facing
 

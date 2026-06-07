@@ -54,6 +54,80 @@ const runtimeLogger = createLogger('ClaudeCodeAdapter', { moduleKey: 'claudeCode
 const sessionLogger = createLogger('ClaudeCodeAdapter', { moduleKey: 'claudeCode', channel: 'sessions' });
 const mcpLogger = createLogger('ClaudeCodeAdapter', { moduleKey: 'claudeCode', channel: 'mcp' });
 
+/** Inline MCP stdio server that supports the elicitation protocol for diagnostic probes. */
+const MCP_ELICITATION_PROBE_SERVER_CODE = `#!/usr/bin/env node
+import { createInterface } from 'readline';
+
+const rl = createInterface({ input: process.stdin, terminal: false });
+
+function sendMessage(msg) {
+  process.stdout.write(JSON.stringify(msg) + '\\n');
+}
+
+let pendingToolCall = null;
+
+rl.on('line', (line) => {
+  let msg;
+  try { msg = JSON.parse(line); } catch { return; }
+
+  if (msg.method === 'initialize') {
+    sendMessage({ jsonrpc: '2.0', id: msg.id, result: {
+      protocolVersion: '2025-03-26',
+      capabilities: { tools: {}, elicitation: {} },
+      serverInfo: { name: 'elicitation-live-probe', version: '1.0.0' }
+    }});
+  } else if (msg.method === 'notifications/initialized') {
+    // No response needed
+  } else if (msg.method === 'tools/list') {
+    sendMessage({ jsonrpc: '2.0', id: msg.id, result: {
+      tools: [{
+        name: 'ask_and_echo',
+        description: 'Asks the user a question via elicitation, then echoes the answer',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            message: { type: 'string', description: 'The message to echo back' }
+          },
+          required: ['message']
+        }
+      }]
+    }});
+  } else if (msg.method === 'tools/call') {
+    pendingToolCall = msg;
+    sendMessage({
+      jsonrpc: '2.0',
+      id: 'elicit-live-1',
+      method: 'elicitation/create',
+      params: {
+        message: 'Live probe: please confirm the echo operation.',
+        requestedSchema: {
+          type: 'object',
+          properties: {
+            confirmed: { type: 'boolean', title: 'Confirm', description: 'Confirm the operation' }
+          },
+          required: ['confirmed']
+        }
+      }
+    });
+  } else if (msg.id === 'elicit-live-1' && pendingToolCall) {
+    const elicitationResult = msg.result || msg;
+    const args = pendingToolCall.params?.arguments || {};
+    sendMessage({ jsonrpc: '2.0', id: pendingToolCall.id, result: {
+      content: [{
+        type: 'text',
+        text: JSON.stringify({
+          echoed: args.message || 'no message',
+          elicitationAction: elicitationResult?.action || 'unknown',
+          nonce: elicitationResult?.content?.nonce || 'no-nonce'
+        })
+      }],
+      isError: false
+    }});
+    pendingToolCall = null;
+  }
+});
+`;
+
 export interface ClaudeCodeSdkQueryInput {
   prompt: string | AsyncIterable<unknown>;
   options: ClaudeCodeSdkOptionsShape;
@@ -2479,14 +2553,76 @@ export class ClaudeCodeAdapter
    * the Obsidian product path (shared question dialog + user answer consumed by server).
    * The callback used here is an auto-resolver, not the real Obsidian question dialog.
    */
+  private writeMcpElicitationProbeServer(tmpDir: string): string {
+    const serverPath = join(tmpDir, 'mcp-elicitation-server.mjs');
+    writeFileSync(serverPath, MCP_ELICITATION_PROBE_SERVER_CODE, 'utf-8');
+    return serverPath;
+  }
+
+  private scanMessagesForNonce(
+    rawMessages: unknown[],
+    nonce: string,
+    addStep: (msg: string) => void,
+  ): { nonceEchoed: boolean; echoedNonce?: string } {
+    for (const message of rawMessages) {
+      const msg = message as Record<string, unknown>;
+      const content = msg.content as Array<Record<string, unknown>> | undefined;
+      if (!content || !Array.isArray(content)) continue;
+      for (const block of content) {
+        const text = block.type === 'tool_result' || block.type === 'text'
+          ? block.text
+          : undefined;
+        if (typeof text !== 'string') continue;
+        try {
+          const parsed = JSON.parse(text) as Record<string, unknown>;
+          if (parsed.nonce === nonce) {
+            addStep(`Nonce echoed in ${block.type} block: ${String(parsed.nonce)}`);
+            return { nonceEchoed: true, echoedNonce: String(parsed.nonce) };
+          }
+        } catch {
+          // Not JSON, ignore
+        }
+      }
+    }
+    return { nonceEchoed: false };
+  }
+
+  private buildMcpElicitationProbeResult(
+    classification: McpElicitationLiveProbeResult['classification'],
+    params: {
+      serverCreated: boolean;
+      serverCleanedUp: boolean;
+      elicitationCalls: Array<{ serverName: string; message: string; mode?: string }>;
+      hostAccepted: boolean;
+      hostNonce?: string;
+      nonceEchoed: boolean;
+      echoedNonce?: string;
+      rawMessageCount: number;
+      error?: string;
+      stepLog: string[];
+    },
+  ): McpElicitationLiveProbeResult {
+    return {
+      classification,
+      serverCreated: params.serverCreated,
+      serverCleanedUp: params.serverCleanedUp,
+      onElicitationCallCount: params.elicitationCalls.length,
+      onElicitationCalls: params.elicitationCalls,
+      hostAccepted: params.hostAccepted,
+      hostNonce: params.hostNonce,
+      nonceEchoed: params.nonceEchoed,
+      echoedNonce: params.echoedNonce,
+      rawMessageCount: params.rawMessageCount,
+      stepLog: params.stepLog,
+      ...(params.error ? { error: params.error } : {}),
+    };
+  }
+
   async runMcpElicitationLiveProbe(): Promise<McpElicitationLiveProbeResult> {
     const stepLog: string[] = [];
     let serverCreated = false;
     let serverCleanedUp = false;
     let tmpDir = '';
-    let serverPath = '';
-    // Use a mutable result container so the finally block can update cleanup status
-    // after the main logic completes but before returning.
     let probeResult: McpElicitationLiveProbeResult | undefined;
 
     const addStep = (msg: string): void => {
@@ -2495,88 +2631,12 @@ export class ClaudeCodeAdapter
     };
 
     try {
-      // Step 1: Create temp MCP elicitation server
       tmpDir = mkdtempSync(join(tmpdir(), 'opencodian-mcp-elicitation-'));
-      serverPath = join(tmpDir, 'mcp-elicitation-server.mjs');
+      const serverPath = this.writeMcpElicitationProbeServer(tmpDir);
       const nonce = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-
-      const serverCode = `#!/usr/bin/env node
-import { createInterface } from 'readline';
-
-const rl = createInterface({ input: process.stdin, terminal: false });
-
-function sendMessage(msg) {
-  process.stdout.write(JSON.stringify(msg) + '\\n');
-}
-
-let pendingToolCall = null;
-
-rl.on('line', (line) => {
-  let msg;
-  try { msg = JSON.parse(line); } catch { return; }
-
-  if (msg.method === 'initialize') {
-    sendMessage({ jsonrpc: '2.0', id: msg.id, result: {
-      protocolVersion: '2025-03-26',
-      capabilities: { tools: {}, elicitation: {} },
-      serverInfo: { name: 'elicitation-live-probe', version: '1.0.0' }
-    }});
-  } else if (msg.method === 'notifications/initialized') {
-    // No response needed
-  } else if (msg.method === 'tools/list') {
-    sendMessage({ jsonrpc: '2.0', id: msg.id, result: {
-      tools: [{
-        name: 'ask_and_echo',
-        description: 'Asks the user a question via elicitation, then echoes the answer',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            message: { type: 'string', description: 'The message to echo back' }
-          },
-          required: ['message']
-        }
-      }]
-    }});
-  } else if (msg.method === 'tools/call') {
-    pendingToolCall = msg;
-    sendMessage({
-      jsonrpc: '2.0',
-      id: 'elicit-live-1',
-      method: 'elicitation/create',
-      params: {
-        message: 'Live probe: please confirm the echo operation.',
-        requestedSchema: {
-          type: 'object',
-          properties: {
-            confirmed: { type: 'boolean', title: 'Confirm', description: 'Confirm the operation' }
-          },
-          required: ['confirmed']
-        }
-      }
-    });
-  } else if (msg.id === 'elicit-live-1' && pendingToolCall) {
-    const elicitationResult = msg.result || msg;
-    const args = pendingToolCall.params?.arguments || {};
-    sendMessage({ jsonrpc: '2.0', id: pendingToolCall.id, result: {
-      content: [{
-        type: 'text',
-        text: JSON.stringify({
-          echoed: args.message || 'no message',
-          elicitationAction: elicitationResult?.action || 'unknown',
-          nonce: elicitationResult?.content?.nonce || 'no-nonce'
-        })
-      }],
-      isError: false
-    }});
-    pendingToolCall = null;
-  }
-});
-`;
-      writeFileSync(serverPath, serverCode, 'utf-8');
       serverCreated = true;
       addStep(`Temp MCP server created at ${serverPath}`);
 
-      // Step 2: Prepare diagnostic prompt with MCP config and onElicitation
       const elicitationCalls: Array<{ serverName: string; message: string; mode?: string }> = [];
       let hostAccepted = false;
       let hostNonce: string | undefined;
@@ -2594,81 +2654,22 @@ rl.on('line', (line) => {
       };
 
       addStep('Running diagnostic prompt with temp MCP server...');
-
       const result = await this.runDiagnosticPrompt({
         prompt: 'You MUST use the ask_and_echo tool from the elicit_live server. '
           + 'Call it with message "elicitation-live-test". '
           + 'Do NOT just reply with text — you must invoke the tool.',
         _diagnosticBypassPermissions: false,
         _diagnosticMcpServers: {
-          elicit_live: {
-            type: 'stdio',
-            command: 'node',
-            args: [serverPath],
-            alwaysLoad: true,
-          },
+          elicit_live: { type: 'stdio', command: 'node', args: [serverPath], alwaysLoad: true },
         },
         _diagnosticAllowedTools: ['mcp__elicit_live__ask_and_echo'],
         _diagnosticCanUseTool: async () => ({ behavior: 'allow' as const }),
         _diagnosticOnElicitation: onElicitation,
         _diagnosticMaxTurns: 3,
       });
-
       addStep(`Diagnostic prompt completed: ${result.rawMessages.length} raw messages`);
 
-      // Step 3: Scan raw messages for tool_result containing nonce
-      let nonceEchoed = false;
-      let echoedNonce: string | undefined;
-
-      for (const message of result.rawMessages) {
-        const msg = message as Record<string, unknown>;
-        // Look for tool_result blocks in assistant or tool_result messages
-        const content = msg.content as Array<Record<string, unknown>> | undefined;
-        if (content && Array.isArray(content)) {
-          for (const block of content) {
-            if (block.type === 'tool_result' && typeof block.text === 'string') {
-              try {
-                const parsed = JSON.parse(block.text) as Record<string, unknown>;
-                if (parsed.nonce === nonce) {
-                  nonceEchoed = true;
-                  echoedNonce = String(parsed.nonce);
-                  addStep(`Nonce echoed in tool_result: ${echoedNonce}`);
-                }
-              } catch {
-                // Not JSON, ignore
-              }
-            }
-          }
-        }
-        // Also check content array with isError field (MCP result shape)
-        if (content && Array.isArray(content)) {
-          for (const block of content) {
-            if (block.type === 'text' && typeof block.text === 'string') {
-              try {
-                const parsed = JSON.parse(block.text) as Record<string, unknown>;
-                if (parsed.nonce === nonce) {
-                  nonceEchoed = true;
-                  echoedNonce = String(parsed.nonce);
-                  addStep(`Nonce echoed in text block: ${echoedNonce}`);
-                }
-              } catch {
-                // Not JSON, ignore
-              }
-            }
-          }
-        }
-      }
-
-      // Also scan chunks for any tool-related content
-      if (!nonceEchoed) {
-        for (const chunk of result.chunks) {
-          if (chunk.type === 'tool_result' || chunk.type === 'tool_use') {
-            addStep(`Found chunk type=${chunk.type} but nonce not matched`);
-          }
-        }
-      }
-
-      // Step 4: Determine classification
+      const { nonceEchoed, echoedNonce } = this.scanMessagesForNonce(result.rawMessages, nonce, addStep);
       const hasElicitation = elicitationCalls.length > 0;
       const hasToolResult = result.rawMessages.some((m) => {
         const msg = m as Record<string, unknown>;
@@ -2678,78 +2679,37 @@ rl.on('line', (line) => {
 
       if (hasElicitation && nonceEchoed) {
         addStep('CLASSIFICATION: pass — full chain verified');
-        probeResult = {
-          classification: 'pass',
-          serverCreated,
-          serverCleanedUp,
-          onElicitationCallCount: elicitationCalls.length,
-          onElicitationCalls: elicitationCalls,
-          hostAccepted,
-          hostNonce,
-          nonceEchoed,
-          echoedNonce,
-          rawMessageCount: result.rawMessages.length,
-          stepLog,
-        };
+        probeResult = this.buildMcpElicitationProbeResult('pass', {
+          serverCreated, serverCleanedUp, elicitationCalls, hostAccepted, hostNonce,
+          nonceEchoed, echoedNonce, rawMessageCount: result.rawMessages.length, stepLog,
+        });
       } else if (hasElicitation) {
-        addStep('CLASSIFICATION: wiring — onElicitation called but nonce not echoed in tool result');
-        probeResult = {
-          classification: 'wiring',
-          serverCreated,
-          serverCleanedUp,
-          onElicitationCallCount: elicitationCalls.length,
-          onElicitationCalls: elicitationCalls,
-          hostAccepted,
-          hostNonce,
-          nonceEchoed,
-          echoedNonce,
-          rawMessageCount: result.rawMessages.length,
-          stepLog,
-        };
+        addStep('CLASSIFICATION: wiring — onElicitation called but nonce not echoed');
+        probeResult = this.buildMcpElicitationProbeResult('wiring', {
+          serverCreated, serverCleanedUp, elicitationCalls, hostAccepted, hostNonce,
+          nonceEchoed, echoedNonce, rawMessageCount: result.rawMessages.length, stepLog,
+        });
       } else if (hasToolResult) {
         addStep('CLASSIFICATION: wiring — tool result observed but onElicitation not called');
-        probeResult = {
-          classification: 'wiring',
-          serverCreated,
-          serverCleanedUp,
-          onElicitationCallCount: 0,
-          onElicitationCalls: [],
-          hostAccepted: false,
-          nonceEchoed: false,
-          rawMessageCount: result.rawMessages.length,
-          stepLog,
-        };
+        probeResult = this.buildMcpElicitationProbeResult('wiring', {
+          serverCreated, serverCleanedUp, elicitationCalls: [], hostAccepted: false,
+          nonceEchoed: false, rawMessageCount: result.rawMessages.length, stepLog,
+        });
       } else {
         addStep('CLASSIFICATION: wiring — no elicitation or tool result observed');
-        probeResult = {
-          classification: 'wiring',
-          serverCreated,
-          serverCleanedUp,
-          onElicitationCallCount: 0,
-          onElicitationCalls: [],
-          hostAccepted: false,
-          nonceEchoed: false,
-          rawMessageCount: result.rawMessages.length,
-          stepLog,
-        };
+        probeResult = this.buildMcpElicitationProbeResult('wiring', {
+          serverCreated, serverCleanedUp, elicitationCalls: [], hostAccepted: false,
+          nonceEchoed: false, rawMessageCount: result.rawMessages.length, stepLog,
+        });
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
       addStep(`CLASSIFICATION: fail — ${errorMessage}`);
-      probeResult = {
-        classification: 'fail',
-        serverCreated,
-        serverCleanedUp,
-        onElicitationCallCount: 0,
-        onElicitationCalls: [],
-        hostAccepted: false,
-        nonceEchoed: false,
-        rawMessageCount: 0,
-        error: errorMessage,
-        stepLog,
-      };
+      probeResult = this.buildMcpElicitationProbeResult('fail', {
+        serverCreated, serverCleanedUp, elicitationCalls: [], hostAccepted: false,
+        nonceEchoed: false, rawMessageCount: 0, error: errorMessage, stepLog,
+      });
     } finally {
-      // Cleanup temp server
       if (tmpDir) {
         try {
           rmSync(tmpDir, { recursive: true, force: true });
@@ -2759,24 +2719,15 @@ rl.on('line', (line) => {
           addStep(`Cleanup warning: ${cleanupErr instanceof Error ? cleanupErr.message : String(cleanupErr)}`);
         }
       }
-      // Update cleanup status in the result before returning
       if (probeResult) {
         probeResult.serverCleanedUp = serverCleanedUp;
       }
     }
 
-    return probeResult ?? {
-      classification: 'fail',
-      serverCreated,
-      serverCleanedUp,
-      onElicitationCallCount: 0,
-      onElicitationCalls: [],
-      hostAccepted: false,
-      nonceEchoed: false,
-      rawMessageCount: 0,
-      error: 'Probe completed without setting a result',
-      stepLog,
-    };
+    return probeResult ?? this.buildMcpElicitationProbeResult('fail', {
+      serverCreated, serverCleanedUp, elicitationCalls: [], hostAccepted: false,
+      nonceEchoed: false, rawMessageCount: 0, error: 'Probe completed without setting a result', stepLog,
+    });
   }
 
   async runPromptSuggestionsReadbackProbe(): Promise<PromptSuggestionsReadbackProbeResult> {
@@ -4310,6 +4261,38 @@ rl.on('line', (line) => {
       : undefined;
   }
 
+  private resolveDiagnosticOnElicitation(
+    request: ClaudeCodeDiagnosticPromptRequest,
+    bypassPermissions: boolean,
+  ): unknown {
+    if (request._diagnosticOnElicitation) return request._diagnosticOnElicitation;
+    if (bypassPermissions) return undefined;
+    if (!this.options.onElicitation) return undefined;
+    return async (promptRequest: ElicitationRequest, context: { signal: AbortSignal }) =>
+      await this.options.onElicitation!(promptRequest, context);
+  }
+
+  private applyDiagnosticSdkOverrides(
+    options: ClaudeCodeSdkOptionsShape,
+    request: ClaudeCodeDiagnosticPromptRequest,
+  ): void {
+    const overrides: Array<[keyof ClaudeCodeSdkOptionsShape, unknown]> = [
+      ['tools', request._diagnosticToolRestriction ? [...request._diagnosticToolRestriction] : undefined],
+      ['allowedTools', request._diagnosticAllowedTools ? [...request._diagnosticAllowedTools] : undefined],
+      ['stderr', request._diagnosticStderrCallback],
+      ['sessionId', request._diagnosticSessionId],
+      ['continue', request._diagnosticContinue === true ? true : undefined],
+      ['resumeSessionAt', request._diagnosticResumeSessionAt],
+      ['forkSession', request._diagnosticForkSession === true ? true : undefined],
+      ['title', request._diagnosticTitle],
+    ];
+    for (const [key, value] of overrides) {
+      if (value !== undefined) {
+        (options as unknown as Record<string, unknown>)[key] = value;
+      }
+    }
+  }
+
   private buildDiagnosticSdkOptions(
     abortController: AbortController | undefined,
     request: ClaudeCodeDiagnosticPromptRequest,
@@ -4323,14 +4306,7 @@ rl.on('line', (line) => {
       abortController,
       spawnClaudeCodeProcess: this.spawnClaudeCodeProcess,
       canUseTool: this.resolveDiagnosticCanUseTool(request, bypassPermissions),
-      onElicitation: request._diagnosticOnElicitation
-        ? request._diagnosticOnElicitation
-        : bypassPermissions
-          ? undefined
-          : this.options.onElicitation
-            ? async (promptRequest: ElicitationRequest, context: { signal: AbortSignal }) =>
-              await this.options.onElicitation!(promptRequest, context)
-            : undefined,
+      onElicitation: this.resolveDiagnosticOnElicitation(request, bypassPermissions),
       mcpServers: request._diagnosticMcpServers ?? this.options.mcpServers ?? this.cachedMcpServers,
       hooks: request.hooks ?? this.options.hooks,
       sessionStore: request.sessionStore ?? this.options.sessionStore,
@@ -4349,30 +4325,7 @@ rl.on('line', (line) => {
       skills: request.skills ?? this.options.skills,
       plugins: request.plugins ?? this.options.plugins,
     });
-    if (request._diagnosticToolRestriction) {
-      options.tools = [...request._diagnosticToolRestriction];
-    }
-    if (request._diagnosticAllowedTools) {
-      options.allowedTools = [...request._diagnosticAllowedTools];
-    }
-    if (request._diagnosticStderrCallback) {
-      options.stderr = request._diagnosticStderrCallback;
-    }
-    if (request._diagnosticSessionId) {
-      options.sessionId = request._diagnosticSessionId;
-    }
-    if (request._diagnosticContinue === true) {
-      options.continue = true;
-    }
-    if (request._diagnosticResumeSessionAt) {
-      options.resumeSessionAt = request._diagnosticResumeSessionAt;
-    }
-    if (request._diagnosticForkSession === true) {
-      options.forkSession = true;
-    }
-    if (request._diagnosticTitle) {
-      options.title = request._diagnosticTitle;
-    }
+    this.applyDiagnosticSdkOverrides(options, request);
     this.lastDiagnosticSdkOptions = options;
     return options;
   }
