@@ -11,6 +11,38 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-06-08 Claude Code Capability Round 16 — MCP Elicitation Diagnostic Live Proof
+
+**Upgrade synthetic MCP Elicitation probe to real live diagnostic proof while maintaining honest product-path boundary.**
+
+Round 16 delivers the live diagnostic probe that Round 15 identified as a re-audit condition. The existing synthetic `Probe MCP Elicitation Wiring` is now supplemented by `Run MCP Elicitation Live Probe`, which creates a real temp MCP stdio server and verifies the full SDK onElicitation callback roundtrip.
+
+- **DIAGNOSTIC LIVE PROOF ADDED**: `ClaudeCodeAdapter.runMcpElicitationLiveProbe()` creates a temp MCP stdio server with `elicitation` capability, runs a diagnostic prompt with `_diagnosticMcpServers` + `_diagnosticAllowedTools` + `_diagnosticCanUseTool` + `_diagnosticOnElicitation` overrides, and verifies the full chain: server creation → `elicitation/create` → `onElicitation` invocation → host accept+nonce → server consumption → tool output nonce echo. The probe returns `pass` when the full chain is observed, `wiring` when partial, `fail` on error.
+- **New diagnostic request overrides**: `ClaudeCodeDiagnosticPromptRequest` extended with `_diagnosticMcpServers` (temp MCP servers), `_diagnosticOnElicitation` (override adapter's production callback), and `_diagnosticAllowedTools` (restrict allowed tools). `buildDiagnosticSdkOptions()` updated to use these overrides without affecting ordinary chat paths.
+- **Capability Lab UI updated**: New **Run MCP Elicitation Live Probe** button added; old synthetic probe renamed to **Probe MCP Elicitation Wiring (Synthetic)**. Live probe output shows step-by-step log, summary table, and explicit honest boundary notice.
+- **Matrix classification stays `wiring`**: userSurface='chat' would mislead if we claimed ordinary chat product path without Obsidian shared question dialog proof. The diagnostic proof uses an auto-resolver callback, NOT the real Obsidian question dialog. Promotion to `pass` requires live product-path proof through the shared question dialog with real user answer consumption.
+- **Product-path gaps remaining**:
+  1. Obsidian shared question dialog: live probe uses auto-resolver, does not route through `ClaudeCodeElicitationBridge` → `showQuestionDialog()` → `elicitationCardRenderer` → user interaction.
+  2. User answer consumption by server: no proof that a real user's answer in the Obsidian question dialog is serialized, returned through SDK `onElicitation`, and consumed by the MCP server.
+  3. Test Vault validation: no BUILD_ID-anchored Test Vault screenshot or DOM evidence exists for MCP Elicitation surfacing in ordinary chat.
+- **SDK-level roundtrip still proven** (Round 15): `scripts/claude-code-smoke.mjs` temp stdio MCP server → `elicitation/create` → `onElicitation` → host response → server consumption. This is supporting evidence, not product-path proof.
+- **Tests added**: 5 adapter probe tests (pass, wiring, fail, override verification, cleanup) + 2 SettingsCapabilityLabSection UI tests (button rendering, live probe execution and wiring classification).
+
+Matrix impact: **55 rows, 38 pass, 16 readback, 1 wiring, 2 hidden, 0 fail** (unchanged). MCP Elicitation remains the sole `wiring` row.
+
+### Files changed
+
+- `src/core/agents/backend/ClaudeCodeAdapter.ts` — `runMcpElicitationLiveProbe()`, `McpElicitationLiveProbeResult`, `_diagnosticMcpServers`/`_diagnosticOnElicitation`/`_diagnosticAllowedTools` overrides, `buildDiagnosticSdkOptions()` updates
+- `src/features/settings/SettingsCapabilityLabSection.ts` — `runMcpElicitationLiveProbe()` UI, synthetic probe retained, matrix/discovery row comments updated
+- `tests/unit/core/agents/backend/ClaudeCodeAdapter.probes.test.ts` — 5 new live probe tests
+- `tests/unit/features/settings/SettingsCapabilityLabSection.test.ts` — 2 new live probe UI tests
+- `docs/modules/core/agents/backend/ClaudeCodeAdapter.md` — Round 16 live probe documentation
+- `docs/modules/features/settings/SettingsCapabilityLabSection.md` — Round 16 live probe and matrix documentation
+- `docs/status/claude-code-current-state-2026-05-22.md` — Round 16 section with classification decision and remaining gaps
+- `devlog.md` — this entry
+
+---
+
 ## 2026-06-08 Claude Code Capability Round 15 — MCP Elicitation Correction
 
 **Correction to Round 15 initial conclusion — MCP Elicitation stays at `wiring`, not readback closure.**

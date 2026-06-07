@@ -92,7 +92,7 @@ Option wiring proven through `buildClaudeCodeOptions`, but no independent plugin
 
 ### wiring — exposed but not behavior-verified
 
-- **MCP Elicitation** — `userSurface: 'chat'`, `runtimeProof: 'wiring'`. Official SDK `onElicitation` accepts MCP server initiated `ElicitationRequest` callbacks, and OpenCodian routes the callback through `main.ts` into `ClaudeCodeElicitationBridge`, which maps form/url/schema requests onto the shared question dialog host. Enum fields become option groups; non-enum scalar/schema fields become shared custom text inputs with basic number/boolean coercion on returned content. **SDK-level roundtrip proven**: `scripts/claude-code-smoke.mjs` `writeMcpElicitationServer()` creates a temp stdio MCP server with elicitation capability; when the tool is called, the server sends `elicitation/create` to the SDK client, `onElicitation` is invoked, the callback returns accept+content, and the server consumes the result in its tool output (recorded in `.obsidian-debug/claude-code-smoke-2026-05-24-current.json`: "onElicitation invoked 1 time"). **Product-path gap**: the existing Capability Lab probe is synthetic (no live server); no Test Vault / Obsidian chat UI proof exists where a real MCP server elicitation surfaces through the shared question dialog and the user's answer is consumed by the server. The SDK smoke proof does not automatically imply the Obsidian product path works; the bridge and renderer need their own live verification. Promotion to `pass` requires live product-path proof. This row is deliberately separate from `AskUserQuestion`, because `AskUserQuestion` enters through the built-in tool `canUseTool` path while MCP Elicitation enters through the SDK `onElicitation` callback.
+- **MCP Elicitation** — `userSurface: 'chat'`, `runtimeProof: 'wiring'`. Official SDK `onElicitation` accepts MCP server initiated `ElicitationRequest` callbacks, and OpenCodian routes the callback through `main.ts` into `ClaudeCodeElicitationBridge`, which maps form/url/schema requests onto the shared question dialog host. Enum fields become option groups; non-enum scalar/schema fields become shared custom text inputs with basic number/boolean coercion on returned content. **SDK-level roundtrip proven** (Round 15): `scripts/claude-code-smoke.mjs` `writeMcpElicitationServer()` creates a temp stdio MCP server with elicitation capability; when the tool is called, the server sends `elicitation/create` to the SDK client, `onElicitation` is invoked, the callback returns accept+content, and the server consumes the result in its tool output (recorded in `.obsidian-debug/claude-code-smoke-2026-05-24-current.json`: "onElicitation invoked 1 time"). **DIAGNOSTIC LIVE PROOF ADDED** (Round 16): `ClaudeCodeAdapter.runMcpElicitationLiveProbe()` creates a temp MCP stdio server, runs a diagnostic prompt with `_diagnosticMcpServers` + `_diagnosticAllowedTools` + `_diagnosticCanUseTool` + `_diagnosticOnElicitation`, and verifies the full chain: server creation → `elicitation/create` → `onElicitation` invocation → host accept+nonce → server consumption → tool output nonce echo. The probe returns `pass` when the full chain is observed, `wiring` when partial, `fail` on error. **Product-path gap remains**: the diagnostic proof uses an auto-resolver `onElicitation` callback, NOT the real Obsidian shared question dialog. No Test Vault / Obsidian chat UI proof exists where a real MCP server elicitation surfaces through the shared question dialog and the user's answer is consumed by the server. The SDK smoke proof and diagnostic live proof do not automatically imply the Obsidian product path works; the bridge and renderer need their own live verification with real user interaction. Promotion to `pass` requires live product-path proof through the shared question dialog with real user answer consumption. This row is deliberately separate from `AskUserQuestion`, because `AskUserQuestion` enters through the built-in tool `canUseTool` path while MCP Elicitation enters through the SDK `onElicitation` callback.
 
 ---
 
@@ -117,9 +117,70 @@ These 7 checkpoints have been individually re-audited and closed at their curren
 6. **Tool Aliases** — ✅ **2026-06-07 FORMAL CLOSURE** (Outcome B) — readback is the permanent ceiling. Option wiring verified (`toolAliases` forwarded as one-way init parameter to CLI subprocess). SDK source confirms alias resolution happens inside compiled CLI binary with no feedback event or stream metadata. Stream tool_use chunks expose only post-resolution names; plugin cannot distinguish aliased from canonical emission. Architectural barrier: one-way init parameter with no observation channel is a protocol-level constraint. CLOSED at readback. Re-audit only if SDK adds alias-resolution confirmation event or pre-resolution name field to tool_use chunks.
 7. **Session Store + Import Session to Store** — ✅ **2026-06-07 re-audited** (Outcome B) — hidden confirmed. All SessionStore APIs remain `@alpha`. Store entries are opaque pass-through blobs. No promotion path unless SDK graduates from `@alpha` with format stability guarantees AND a clear user workflow gap.
 
-**MCP Elicitation** — NOT formally closed. `runtimeProof: 'wiring'` maintained (2026-06-08 Round 15 correction). SDK-level roundtrip is proven (`scripts/claude-code-smoke.mjs` temp stdio MCP server sends `elicitation/create`, triggers `onElicitation`, and consumes host response). Product-path gap remains: no Test Vault / Obsidian chat UI proof exists. Promotion to `pass` requires live product-path proof, not just SDK smoke evidence.
+**MCP Elicitation** — NOT formally closed. `runtimeProof: 'wiring'` maintained (2026-06-08 Round 16). SDK-level roundtrip proven (Round 15, `scripts/claude-code-smoke.mjs`). **DIAGNOSTIC LIVE PROOF ADDED** (Round 16): `ClaudeCodeAdapter.runMcpElicitationLiveProbe()` creates a temp MCP stdio server and verifies the full chain through `runDiagnosticPrompt()` with `_diagnosticMcpServers` + `_diagnosticOnElicitation` + `_diagnosticAllowedTools` + `_diagnosticCanUseTool`. The probe returns `pass` when onElicitation is called and the nonce is echoed in tool_result, `wiring` when partial, `fail` on error. Product-path gap remains: the diagnostic proof uses an auto-resolver callback, NOT the real Obsidian shared question dialog. No Test Vault / Obsidian chat UI proof exists. Promotion to `pass` requires live product-path proof through the shared question dialog with real user answer consumption, not just diagnostic live server evidence.
 
-These 7 checkpoints are individually closed. The overall backlog remains open: existing `query.setModel()` / Main Model live-apply is now a formal capability row (Main Model Live Switch, `pass` / `settings+chat`, promoted 2026-06-07, BUILD_ID feature-phase0-capability.202606070617); existing `query.setPermissionMode()` / Permission Mode live-apply is now a formal capability row (Permission Mode Live Switch, `readback` / `settings+chat`, promoted 2026-06-07, promotion path exhausted same day — see dedicated section below); **MCP Elicitation** has SDK smoke proof but lacks product-path proof; diagnostic-only seams may gain promotion paths in future SDK versions; and new SDK releases may introduce additional productizable seams. Future triage rounds should also scan for newly surfaced official seams, adapter-level SDK methods not yet in the matrix, and community feature requests that get implemented.
+These 7 checkpoints are individually closed. The overall backlog remains open: existing `query.setModel()` / Main Model live-apply is now a formal capability row (Main Model Live Switch, `pass` / `settings+chat`, promoted 2026-06-07, BUILD_ID feature-phase0-capability.202606070617); existing `query.setPermissionMode()` / Permission Mode live-apply is now a formal capability row (Permission Mode Live Switch, `readback` / `settings+chat`, promoted 2026-06-07, promotion path exhausted same day — see dedicated section below); **MCP Elicitation** has SDK smoke proof + diagnostic live proof but lacks product-path proof; diagnostic-only seams may gain promotion paths in future SDK versions; and new SDK releases may introduce additional productizable seams. Future triage rounds should also scan for newly surfaced official seams, adapter-level SDK methods not yet in the matrix, and community feature requests that get implemented.
+
+---
+
+## 2026-06-08 Round 16 — MCP Elicitation Diagnostic Live Proof
+
+### Objective
+
+Upgrade the existing synthetic `Probe MCP Elicitation Wiring` to a real live diagnostic proof that goes through the actual SDK `onElicitation` path with a temporary MCP stdio server, while maintaining honest product-path boundaries.
+
+### What changed
+
+1. **New adapter method**: `ClaudeCodeAdapter.runMcpElicitationLiveProbe()` creates a temp MCP stdio server with `elicitation` capability, runs a diagnostic prompt via `runDiagnosticPrompt()` with `_diagnosticMcpServers` + `_diagnosticAllowedTools` + `_diagnosticCanUseTool` + `_diagnosticOnElicitation` overrides, and verifies the full chain:
+   - Temp server file created
+   - Query starts with MCP config
+   - `onElicitation` called with correct `serverName`/`message`
+   - Host returns `action: 'accept'` with a nonce
+   - Server consumes result and echoes nonce in tool output
+   - Probe scans `rawMessages` for `tool_result` blocks containing the nonce
+   - Cleanup removes temp server files
+
+2. **New diagnostic request overrides**: `ClaudeCodeDiagnosticPromptRequest` extended with:
+   - `_diagnosticMcpServers`: temp MCP servers for diagnostic queries
+   - `_diagnosticOnElicitation`: override the adapter's production `onElicitation` callback
+   - `_diagnosticAllowedTools`: restrict allowed tools for diagnostic queries
+   - `buildDiagnosticSdkOptions()` updated to use these overrides without affecting ordinary chat paths
+
+3. **Capability Lab UI updated**:
+   - New button: **Run MCP Elicitation Live Probe**
+   - Old synthetic probe renamed: **Probe MCP Elicitation Wiring (Synthetic)**
+   - Live probe output shows step-by-step log, summary table, and honest boundary notice
+
+4. **Matrix classification**: MCP Elicitation stays at `wiring` (not promoted to `pass`).
+   - **Reason**: `userSurface='chat'` would mislead if we claimed ordinary chat product path without Obsidian shared question dialog proof.
+   - The diagnostic live proof uses an **auto-resolver** callback, not the real Obsidian question dialog.
+   - Promotion to `pass` requires Test Vault / Obsidian chat UI proof where a real MCP server elicitation surfaces through the shared question dialog and the user's answer is consumed by the server.
+
+### Classification decision
+
+| Proof level | Status | Evidence |
+|---|---|---|
+| SDK-level roundtrip | ✅ Proven (Round 15) | `scripts/claude-code-smoke.mjs` temp MCP server → `elicitation/create` → `onElicitation` → host response → server consumption |
+| Diagnostic live server proof | ✅ Proven (Round 16) | `ClaudeCodeAdapter.runMcpElicitationLiveProbe()` full chain verification with nonce echo |
+| Obsidian shared question dialog product path | ❌ NOT proven | No Test Vault evidence; auto-resolver used instead of real question dialog |
+
+### Remaining product-path gaps
+
+1. **Obsidian shared question dialog**: The live probe uses an auto-resolver `onElicitation` callback that immediately returns `accept+content`. It does NOT route through `ClaudeCodeElicitationBridge` → `showQuestionDialog()` → `elicitationCardRenderer` → user interaction → result consumption.
+2. **User answer consumption by server**: No proof that a real user's answer in the Obsidian question dialog is serialized, returned through the SDK `onElicitation` callback, and consumed by the MCP server in its tool output.
+3. **Test Vault validation**: No BUILD_ID-anchored Test Vault screenshot or DOM evidence exists for MCP Elicitation surfacing in ordinary chat.
+
+### Files changed
+
+- `src/core/agents/backend/ClaudeCodeAdapter.ts` — `runMcpElicitationLiveProbe()`, `McpElicitationLiveProbeResult`, diagnostic request overrides, `buildDiagnosticSdkOptions()` updates
+- `src/features/settings/SettingsCapabilityLabSection.ts` — live probe UI, synthetic probe retained, matrix/discovery row updates
+- `tests/unit/core/agents/backend/ClaudeCodeAdapter.probes.test.ts` — 5 new tests for live probe (pass, wiring, fail, override verification, cleanup)
+- `tests/unit/features/settings/SettingsCapabilityLabSection.test.ts` — 2 new tests for live probe button and UI behavior
+
+### Next checkpoint batch
+
+- Attempt MCP Elicitation product-path proof: route `onElicitation` through the real Obsidian shared question dialog in a Test Vault session with a real MCP server, capture DOM evidence of the dialog rendering and the user's answer being consumed by the server.
+- Alternatively, if the shared question dialog path proves infeasible, document the exact architectural barrier and keep `wiring` with hardened boundary notes.
 
 ---
 

@@ -3975,6 +3975,92 @@ describe('SettingsCapabilityLabSection', () => {
     expect(button).toBeTruthy();
   });
 
+  it('renders MCP Elicitation live probe button in discovery controls', () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runMcpElicitationLiveProbe: jest.fn().mockResolvedValue({
+        classification: 'pass',
+        serverCreated: true,
+        serverCleanedUp: true,
+        onElicitationCallCount: 1,
+        onElicitationCalls: [{ serverName: 'elicit_live', message: 'test' }],
+        hostAccepted: true,
+        hostNonce: 'test-nonce',
+        nonceEchoed: true,
+        echoedNonce: 'test-nonce',
+        rawMessageCount: 3,
+        stepLog: ['Temp MCP server created', 'onElicitation called', 'Nonce echoed', 'CLASSIFICATION: pass'],
+      }),
+      capabilities: new Set(),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const liveButton = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run MCP Elicitation Live Probe')
+    )) as HTMLButtonElement | undefined;
+    expect(liveButton).toBeTruthy();
+
+    const syntheticButton = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Probe MCP Elicitation Wiring (Synthetic)')
+    )) as HTMLButtonElement | undefined;
+    expect(syntheticButton).toBeTruthy();
+  });
+
+  it('runs MCP Elicitation live probe and marks wiring with diagnostic pass evidence', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runMcpElicitationLiveProbe: jest.fn().mockResolvedValue({
+        classification: 'pass',
+        serverCreated: true,
+        serverCleanedUp: true,
+        onElicitationCallCount: 1,
+        onElicitationCalls: [{ serverName: 'elicit_live', message: 'test' }],
+        hostAccepted: true,
+        hostNonce: 'nonce-123',
+        nonceEchoed: true,
+        echoedNonce: 'nonce-123',
+        rawMessageCount: 3,
+        stepLog: ['Temp MCP server created', 'onElicitation called', 'Nonce echoed', 'CLASSIFICATION: pass'],
+      }),
+      capabilities: new Set(),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const liveButton = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run MCP Elicitation Live Probe')
+    )) as HTMLButtonElement | undefined;
+    expect(liveButton).toBeTruthy();
+
+    liveButton!.click();
+    await flushUi();
+
+    expect(adapter.runMcpElicitationLiveProbe).toHaveBeenCalled();
+
+    // Find the output element that contains the MCP Elicitation live probe result
+    // (there are multiple .opencodian-capability-lab-output elements in the container)
+    const outputEls = Array.from(containerEl.querySelectorAll('.opencodian-capability-lab-output'));
+    const probeOutput = outputEls.find((el) => el.textContent?.includes('MCP Elicitation live probe'));
+    expect(probeOutput).toBeTruthy();
+    expect(probeOutput?.textContent).toContain('Diagnostic live server roundtrip PROVEN');
+    expect(probeOutput?.textContent).toContain('Nonce echoed: Yes');
+    expect(probeOutput?.textContent).toContain('Wiring only');
+
+    const matrixRows = Array.from(containerEl.querySelectorAll('.opencodian-capability-lab-matrix tbody tr'));
+    const elicitationRow = matrixRows.find((row) => row.textContent?.includes('MCP Elicitation'));
+    expect(elicitationRow?.textContent).toContain('Wiring only');
+    expect(elicitationRow?.textContent).not.toContain('Verified');
+  });
+
   it('renders environment variables proof button in discovery controls', () => {
     const adapter = {
       listSessions: jest.fn().mockResolvedValue([]),

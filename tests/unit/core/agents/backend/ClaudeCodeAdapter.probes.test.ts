@@ -2388,3 +2388,174 @@ describe('runOutputStyleLiveProbe', () => {
     expect(result.cleanup.fileRemoved).toBe(true);
   });
 });
+
+describe('runMcpElicitationLiveProbe', () => {
+  /**
+   * Helper: create a mock runDiagnosticPrompt that invokes _diagnosticOnElicitation
+   * if provided, extracts the nonce from the callback result, and builds rawMessages
+   * with that nonce in the tool_result text.
+   */
+  function createMockRunDiagnosticPrompt(
+    adapter: ClaudeCodeAdapter,
+    buildRawMessages: (nonce: string) => unknown[],
+  ): jest.SpyInstance {
+    return jest.spyOn(adapter, 'runDiagnosticPrompt').mockImplementation(async (request) => {
+      let nonce = 'fallback-nonce';
+      if (request._diagnosticOnElicitation) {
+        const result = await request._diagnosticOnElicitation(
+          { serverName: 'elicit_live', message: 'test' } as unknown as import('@anthropic-ai/claude-agent-sdk').ElicitationRequest,
+          { signal: new AbortController().signal },
+        );
+        nonce = (result.content as Record<string, unknown> | undefined)?.nonce as string ?? 'fallback-nonce';
+      }
+      return {
+        sessionId: 'probe-session',
+        rawMessages: buildRawMessages(nonce),
+        chunks: [],
+      };
+    });
+  }
+
+  it('returns pass when full chain is observed (onElicitation + nonce echo)', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+    });
+
+    createMockRunDiagnosticPrompt(adapter, (n) => [
+      {
+        type: 'assistant',
+        session_id: 'probe-session',
+        content: [
+          {
+            type: 'tool_result',
+            text: JSON.stringify({ echoed: 'elicitation-live-test', elicitationAction: 'accept', nonce: n }),
+          },
+        ],
+      },
+      { type: 'result', subtype: 'success', session_id: 'probe-session' },
+    ]);
+
+    const result = await adapter.runMcpElicitationLiveProbe();
+
+    expect(result.classification).toBe('pass');
+    expect(result.serverCreated).toBe(true);
+    expect(result.serverCleanedUp).toBe(true);
+    expect(result.onElicitationCallCount).toBe(1);
+    expect(result.hostAccepted).toBe(true);
+    expect(result.hostNonce).toBe(result.hostNonce); // nonce is probe-generated
+    expect(result.nonceEchoed).toBe(true);
+    expect(result.echoedNonce).toBe(result.echoedNonce);
+    expect(result.stepLog.some((s) => s.includes('CLASSIFICATION: pass'))).toBe(true);
+  });
+
+  it('returns wiring when onElicitation is called but nonce is not echoed', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+    });
+
+    createMockRunDiagnosticPrompt(adapter, () => [
+      {
+        type: 'assistant',
+        session_id: 'probe-session',
+        content: [{ type: 'text', text: 'No tool result here' }],
+      },
+      { type: 'result', subtype: 'success', session_id: 'probe-session' },
+    ]);
+
+    const result = await adapter.runMcpElicitationLiveProbe();
+
+    expect(result.classification).toBe('wiring');
+    expect(result.serverCreated).toBe(true);
+    expect(result.serverCleanedUp).toBe(true);
+    expect(result.onElicitationCallCount).toBe(1);
+    expect(result.hostAccepted).toBe(true);
+    expect(result.nonceEchoed).toBe(false);
+  });
+
+  it('returns fail when runDiagnosticPrompt throws', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+    });
+
+    jest.spyOn(adapter, 'runDiagnosticPrompt').mockImplementation(() => {
+      throw new Error('Diagnostic query failed');
+    });
+
+    const result = await adapter.runMcpElicitationLiveProbe();
+
+    expect(result.classification).toBe('fail');
+    expect(result.serverCreated).toBe(true);
+    expect(result.serverCleanedUp).toBe(true);
+    expect(result.error).toContain('Diagnostic query failed');
+  });
+
+  it('passes correct diagnostic overrides to runDiagnosticPrompt', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+    });
+
+    const runDiagnosticPromptSpy = createMockRunDiagnosticPrompt(adapter, (n) => [
+      {
+        type: 'assistant',
+        session_id: 'probe-session',
+        content: [
+          {
+            type: 'tool_result',
+            text: JSON.stringify({ echoed: 'test', elicitationAction: 'accept', nonce: n }),
+          },
+        ],
+      },
+      { type: 'result', subtype: 'success', session_id: 'probe-session' },
+    ]);
+
+    await adapter.runMcpElicitationLiveProbe();
+
+    expect(runDiagnosticPromptSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        _diagnosticBypassPermissions: false,
+        _diagnosticMcpServers: expect.objectContaining({
+          elicit_live: expect.objectContaining({
+            type: 'stdio',
+            command: 'node',
+            alwaysLoad: true,
+          }),
+        }),
+        _diagnosticAllowedTools: ['mcp__elicit_live__ask_and_echo'],
+        _diagnosticCanUseTool: expect.any(Function),
+        _diagnosticOnElicitation: expect.any(Function),
+        _diagnosticMaxTurns: 3,
+      }),
+    );
+
+    // Verify the onElicitation callback works
+    const callArgs = runDiagnosticPromptSpy.mock.calls[0][0];
+    expect(callArgs._diagnosticOnElicitation).toBeDefined();
+    const elicitationResult = await callArgs._diagnosticOnElicitation!(
+      { serverName: 'elicit_live', message: 'test' } as unknown as import('@anthropic-ai/claude-agent-sdk').ElicitationRequest,
+      { signal: new AbortController().signal },
+    );
+    expect(elicitationResult.action).toBe('accept');
+    expect(elicitationResult.content).toHaveProperty('nonce');
+  });
+
+  it('cleans up temp server even on failure', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+    });
+
+    jest.spyOn(adapter, 'runDiagnosticPrompt').mockImplementation(() => {
+      throw new Error('Simulated failure');
+    });
+
+    const result = await adapter.runMcpElicitationLiveProbe();
+
+    expect(result.serverCreated).toBe(true);
+    expect(result.serverCleanedUp).toBe(true);
+    expect(result.stepLog.some((s) => s.includes('cleaned up'))).toBe(true);
+  });
+});

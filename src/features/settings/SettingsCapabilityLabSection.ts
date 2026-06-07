@@ -848,22 +848,28 @@ export class SettingsCapabilityLabSection {
         capability: 'MCP Elicitation',
         sdkExposed: true, // SDK onElicitation callback for MCP server user-input requests
         adapterWired: true, // adapter forwards onElicitation; main handler maps MCP form/url requests to shared question UI
-        // 2026-06-08 Round 15 correction — keeps 'wiring', not readback closure.
-        // SDK-LEVEL ROUNDTRIP PROVEN: scripts/claude-code-smoke.mjs writeMcpElicitationServer()
+        // 2026-06-08 Round 16 — DIAGNOSTIC LIVE SERVER PROOF ADDED.
+        // SDK-LEVEL ROUNDTRIP PROVEN (Round 15): scripts/claude-code-smoke.mjs writeMcpElicitationServer()
         //   creates a temp stdio MCP server with elicitation capability. When the tool is called,
         //   the server sends elicitation/create to the SDK client, onElicitation is invoked,
         //   the callback returns accept+content, and the server consumes the result in its
-        //   tool output (recorded in .obsidian-debug/claude-code-smoke-2026-05-24-current.json:
-        //   "onElicitation invoked 1 time"). This is a real MCP server → elicitation/create →
-        //   onElicitation → host response → MCP server consumption roundtrip.
-        // PRODUCT-PATH GAP: The existing Capability Lab probe is synthetic (no live server).
-        //   No Test Vault / Obsidian chat UI proof exists where a real MCP server elicitation
-        //   surfaces through the shared question dialog and the user's answer is consumed by
-        //   the server. The SDK smoke proof does not automatically imply the Obsidian product
-        //   path works; the bridge and renderer need their own live verification.
-        // Classification stays 'wiring': SDK callback + bridge mapping are wired, and SDK-level
-        //   roundtrip exists in smoke tests, but the product path (Obsidian chat UI + server
-        //   consumption) is not yet proven. Promotion to 'pass' requires live product-path proof.
+        //   tool output. This is a real MCP server → elicitation/create → onElicitation →
+        //   host response → MCP server consumption roundtrip.
+        // DIAGNOSTIC LIVE PROOF (Round 16): ClaudeCodeAdapter.runMcpElicitationLiveProbe() creates
+        //   a temp MCP stdio server, runs a diagnostic prompt with _diagnosticMcpServers +
+        //   _diagnosticAllowedTools + _diagnosticCanUseTool + _diagnosticOnElicitation, and verifies
+        //   the full chain: server creation → elicitation/create → onElicitation invocation →
+        //   host accept+nonce → server consumption → tool output nonce echo. The probe returns
+        //   'pass' when the full chain is observed, 'wiring' when partial, 'fail' on error.
+        // PRODUCT-PATH GAP REMAINS: The diagnostic proof uses an AUTO-RESOLVER onElicitation
+        //   callback, NOT the real Obsidian shared question dialog. No Test Vault / Obsidian chat
+        //   UI proof exists where a real MCP server elicitation surfaces through the shared question
+        //   dialog and the user's answer is consumed by the server. The bridge and renderer need
+        //   their own live verification with real user interaction.
+        // Classification stays 'wiring': userSurface='chat' would mislead if we claimed ordinary
+        //   chat product path without Obsidian UI proof. Diagnostic live proof is supporting
+        //   evidence only. Promotion to 'pass' requires live product-path proof through the
+        //   shared question dialog with real user answer consumption.
         runtimeProof: 'wiring',
         userSurface: 'chat', // MCP server elicitations surface as chat-time question dialogs; MCP authoring/status remains in settings.
       },
@@ -3353,7 +3359,7 @@ export class SettingsCapabilityLabSection {
     this.addDiscoveryRow(
       tbody,
       'MCP Elicitation',
-      'SDK onElicitation callback wiring is mapped to the shared question dialog for MCP form/url requests. Bridge logic verified by synthetic probe (enum→options, scalar→text input, coercion, normalization). SDK-level roundtrip proven: scripts/claude-code-smoke.mjs creates a temp stdio MCP server that sends elicitation/create, triggers onElicitation, and consumes the host response in tool output. Product-path gap: no Test Vault / Obsidian chat UI proof exists where a real MCP server elicitation surfaces through the shared question dialog and the user answer is consumed by the server. This row is separate from AskUserQuestion because it enters through ElicitationRequest, not canUseTool.',
+      'SDK onElicitation callback wiring is mapped to the shared question dialog for MCP form/url requests. Bridge logic verified by synthetic probe (enum→options, scalar→text input, coercion, normalization). SDK-level roundtrip proven: scripts/claude-code-smoke.mjs creates a temp stdio MCP server that sends elicitation/create, triggers onElicitation, and consumes the host response in tool output. DIAGNOSTIC LIVE PROOF ADDED (Round 16): ClaudeCodeAdapter.runMcpElicitationLiveProbe() creates a temp MCP server, runs a diagnostic prompt with _diagnosticMcpServers + _diagnosticOnElicitation, and verifies the full chain including nonce echo. Product-path gap remains: no Test Vault / Obsidian chat UI proof exists where a real MCP server elicitation surfaces through the shared question dialog and the user answer is consumed by the server. The diagnostic proof uses an auto-resolver, not the real Obsidian question dialog. This row is separate from AskUserQuestion because it enters through ElicitationRequest, not canUseTool.',
       { status: 'exposed' },
     );
 
@@ -3504,7 +3510,9 @@ export class SettingsCapabilityLabSection {
       (o) => this.runLivePermissionCardHarness(o));
     this.addProofControl(proofControls, containerEl, 'Trigger Live Question Dialog',
       (o) => this.runLiveQuestionDialogHarness(o));
-    this.addProofControl(proofControls, containerEl, 'Probe MCP Elicitation Wiring',
+    this.addProofControl(proofControls, containerEl, 'Run MCP Elicitation Live Probe',
+      (o) => this.runMcpElicitationLiveProbe(adapter, o));
+    this.addProofControl(proofControls, containerEl, 'Probe MCP Elicitation Wiring (Synthetic)',
       (o) => this.runMcpElicitationWiringProbe(o));
     this.addProofControl(proofControls, containerEl, 'Probe Streaming Context',
       (o) => this.runStreamingContextProbe(o));
@@ -4930,9 +4938,74 @@ export class SettingsCapabilityLabSection {
     }
   }
 
+  private async runMcpElicitationLiveProbe(
+    adapter: ClaudeCodeAdapter,
+    outputEl: HTMLElement,
+  ): Promise<void> {
+    outputEl.empty();
+    outputEl.createEl('p', { text: 'Running MCP Elicitation live diagnostic probe...' });
+
+    try {
+      const result = await adapter.runMcpElicitationLiveProbe();
+
+      outputEl.empty();
+      outputEl.createEl('h5', { text: 'MCP Elicitation live probe' });
+
+      // Render step-by-step log
+      const logEl = outputEl.createDiv({ cls: 'opencodian-capability-lab-hint' });
+      for (const step of result.stepLog) {
+        logEl.createEl('p', { text: `• ${step}` });
+      }
+
+      // Render summary table
+      const summary = outputEl.createDiv({ cls: 'opencodian-capability-lab-hint' });
+      summary.createEl('p', {
+        text: `Server created: ${result.serverCreated ? 'Yes' : 'No'} | Cleaned up: ${result.serverCleanedUp ? 'Yes' : 'No'}`,
+      });
+      summary.createEl('p', {
+        text: `onElicitation calls: ${result.onElicitationCallCount} | Host accepted: ${result.hostAccepted ? 'Yes' : 'No'}`,
+      });
+      summary.createEl('p', {
+        text: `Nonce echoed: ${result.nonceEchoed ? 'Yes' : 'No'} | Raw messages: ${result.rawMessageCount}`,
+      });
+
+      if (result.error) {
+        outputEl.createEl('p', {
+          cls: 'opencodian-capability-lab-error',
+          text: `Error: ${result.error}`,
+        });
+      }
+
+      // Honest boundary notice
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: result.classification === 'pass'
+          ? 'Diagnostic live server roundtrip PROVEN: temp MCP server → elicitation/create → onElicitation → host response → server consumption → tool output nonce echo. This is a DIAGNOSTIC proof only — it does NOT prove the Obsidian product path (shared question dialog + user answer consumed by server).'
+          : 'Live probe did not achieve full chain verification. See step log for details.',
+      });
+
+      // Classification mapping: pass/wiring/fail/boundary → matrix runtimeProof
+      // Honest rule: keep wiring in matrix even if diagnostic passes, because userSurface=chat
+      // would mislead if we claimed ordinary chat product path without Obsidian UI proof.
+      const matrixProof: MatrixRow['runtimeProof'] = result.classification === 'pass'
+        ? 'wiring' // Diagnostic pass exists but product path remains unproven
+        : result.classification === 'fail'
+          ? 'fail'
+          : 'wiring';
+
+      this.updateRuntimeProof('MCP Elicitation', matrixProof, outputEl);
+    } catch (err) {
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-error',
+        text: `Live probe failed: ${err instanceof Error ? err.message : String(err)}`,
+      });
+      this.updateRuntimeProof('MCP Elicitation', 'fail', outputEl);
+    }
+  }
+
   private async runMcpElicitationWiringProbe(outputEl: HTMLElement): Promise<void> {
     outputEl.empty();
-    outputEl.createEl('p', { text: 'Probing MCP Elicitation SDK callback wiring...' });
+    outputEl.createEl('p', { text: 'Probing MCP Elicitation SDK callback wiring (synthetic)...' });
 
     const request: ElicitationRequest = {
       serverName: 'diagnostic-mcp',
@@ -4967,14 +5040,14 @@ export class SettingsCapabilityLabSection {
     const hasRenderer = !!this.plugin.claudeCodePermissionHostContext.elicitationCardRenderer;
 
     outputEl.empty();
-    outputEl.createEl('h5', { text: 'MCP Elicitation wiring probe' });
+    outputEl.createEl('h5', { text: 'MCP Elicitation wiring probe (synthetic)' });
     outputEl.createEl('p', {
       cls: 'opencodian-capability-lab-hint',
       text: 'This diagnostic maps a synthetic SDK ElicitationRequest into the shared question request shape and reports whether the chat renderer is registered. Enum fields become option groups; non-enum scalar fields become custom text inputs.',
     });
     outputEl.createEl('p', {
       cls: 'opencodian-capability-lab-hint',
-      text: 'Honest boundary: this does not start an MCP server, does not receive elicitation/create, and does not prove that an MCP server consumed the result.',
+      text: 'Honest boundary: this does not start an MCP server, does not receive elicitation/create, and does not prove that an MCP server consumed the result. For live server proof, use "Run MCP Elicitation Live Probe".',
     });
     outputEl.createEl('pre', {
       cls: 'opencodian-capability-lab-json-preview',
