@@ -174,13 +174,14 @@ describe('ClaudeCodeAdapter', () => {
     expect(adapter.hasCapability(AgentCapability.Branching)).toBe(false);
     expect(adapter.hasCapability(AgentCapability.Tools)).toBe(false);
     expect(adapter.hasCapability(AgentCapability.Mcp)).toBe(false);
-    expect(adapter.hasCapability(AgentCapability.Permissions)).toBe(false);
+    // Productized 2026-06-07: Chat toolbar permission selector routes to
+    // adapter.setPermissionMode() when claude-code backend is active.
+    expect(adapter.hasCapability(AgentCapability.Permissions)).toBe(true);
     expect(adapter.hasCapability(AgentCapability.Models)).toBe(true);
     expect(adapter.hasCapability(AgentCapability.Questions)).toBe(false);
     expect(adapter.hasCapability(AgentCapability.Hooks)).toBe(false);
-    // Claude Code supports stream-derived todo snapshots via TodoWrite tool.
-    // The generic SessionTodoCoordinator + SessionTodoDock handle them;
-    // enabling this capability mounts the dock for Claude Code conversations.
+    // Productized 2026-06-07: SessionTodoCoordinator now derives task state
+    // from TaskCreate/TaskUpdate tool traffic and feeds the existing dock.
     expect(adapter.hasCapability(AgentCapability.Todos)).toBe(true);
   });
 

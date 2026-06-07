@@ -1,31 +1,105 @@
 import { setIcon } from 'obsidian';
 
+import type { ClaudeCodePermissionMode } from '../../../core/types/settings';
 import type { PermissionMode } from '../../../core/types/settings';
 import { t } from '../../../i18n';
 
 export interface PermissionModeSelectorHost {
-  getPermissionMode(): PermissionMode;
-  switchPermissionMode(mode: PermissionMode): Promise<void>;
+  getPermissionMode(): string;
+  switchPermissionMode(mode: string): Promise<void>;
 }
 
-interface PermissionModeOption {
-  id: PermissionMode;
+export interface PermissionModeOption {
+  id: string;
   label: string;
   description: string;
 }
 
-interface PermissionTriggerDisplayState {
-  label: string;
-  modeClass: `mode-${PermissionMode}`;
+export interface PermissionModeConfig {
+  options: PermissionModeOption[];
+  /** Short display labels for the trigger button (e.g. 'YOLO', 'ASK', 'DEF'). */
+  displayMap: Record<string, string>;
+  /** CSS class names for each mode, used on the trigger element. */
+  modeCssClasses: readonly string[];
+  /** Stable data attribute value identifying the backend system. */
+  backendLabel: 'opencode' | 'claude-code';
 }
 
-const PERMISSION_MODE_CLASSES = ['mode-yolo', 'mode-normal', 'mode-plan'] as const;
+interface PermissionTriggerDisplayState {
+  label: string;
+  modeClass: string;
+}
 
-const PERMISSION_MODE_DISPLAY: Record<PermissionMode, string> = {
-  yolo: 'YOLO',
-  normal: 'ASK',
-  plan: 'PLAN',
-};
+// ─── Factory: OpenCode permission templates (yolo/normal/plan) ────────
+
+export function createOpenCodePermissionConfig(): PermissionModeConfig {
+  return {
+    backendLabel: 'opencode',
+    options: [
+      {
+        id: 'yolo',
+        label: t('settings.security.permissionMode.yolo'),
+        description: t('settings.security.permissionMode.yoloDescription')
+          || 'Allow all tools without asking',
+      },
+      {
+        id: 'normal',
+        label: t('settings.security.permissionMode.normal'),
+        description: t('settings.security.permissionMode.normalDescription')
+          || 'Ask before executing tools',
+      },
+      {
+        id: 'plan',
+        label: t('settings.security.permissionMode.plan'),
+        description: t('settings.security.permissionMode.planDescription')
+          || 'Review and approve all actions',
+      },
+    ],
+    displayMap: { yolo: 'YOLO', normal: 'ASK', plan: 'PLAN' } as Record<PermissionMode, string>,
+    modeCssClasses: ['mode-yolo', 'mode-normal', 'mode-plan'] as const,
+  };
+}
+
+// ─── Factory: Claude Code permission modes ───────────────────────────
+
+export function createClaudeCodePermissionConfig(): PermissionModeConfig {
+  return {
+    backendLabel: 'claude-code',
+    options: [
+      {
+        id: 'default',
+        label: t('settings.claudeCode.permissionMode.default'),
+        description: t('chat.claudeCode.permissionMode.default.description')
+          || 'Default permission prompts',
+      },
+      {
+        id: 'acceptEdits',
+        label: t('settings.claudeCode.permissionMode.acceptEdits'),
+        description: t('chat.claudeCode.permissionMode.acceptEdits.description')
+          || 'Auto-accept file edits',
+      },
+      {
+        id: 'bypassPermissions',
+        label: t('settings.claudeCode.permissionMode.bypassPermissions'),
+        description: t('chat.claudeCode.permissionMode.bypassPermissions.description')
+          || 'Skip all permission prompts',
+      },
+      {
+        id: 'plan',
+        label: t('settings.claudeCode.permissionMode.plan'),
+        description: t('chat.claudeCode.permissionMode.plan.description')
+          || 'Plan mode — review before executing',
+      },
+    ],
+    displayMap: {
+      default: 'DEF',
+      acceptEdits: 'EDIT',
+      bypassPermissions: 'BYP',
+      plan: 'PLAN',
+    } as Record<ClaudeCodePermissionMode, string>,
+    modeCssClasses: ['mode-default', 'mode-acceptEdits', 'mode-bypassPermissions', 'mode-plan'] as const,
+  };
+}
 
 export class PermissionModeSelectorCoordinator {
   private containerEl: HTMLElement | null = null;
@@ -33,8 +107,14 @@ export class PermissionModeSelectorCoordinator {
   private dropdownEl: HTMLElement | null = null;
   private isDropdownOpen = false;
   private clickOutsideHandler: ((event: MouseEvent) => void) | null = null;
+  private config: PermissionModeConfig;
 
-  constructor(private readonly host: PermissionModeSelectorHost) {}
+  constructor(
+    private readonly host: PermissionModeSelectorHost,
+    config?: PermissionModeConfig,
+  ) {
+    this.config = config ?? createOpenCodePermissionConfig();
+  }
 
   mount(containerEl: HTMLElement): void {
     this.destroy();
@@ -46,6 +126,7 @@ export class PermissionModeSelectorCoordinator {
         tabindex: '0',
         'aria-haspopup': 'listbox',
         'aria-expanded': 'false',
+        'data-permission-backend': this.config.backendLabel,
       },
     });
 
@@ -112,7 +193,7 @@ export class PermissionModeSelectorCoordinator {
   private getTriggerDisplayState(): PermissionTriggerDisplayState {
     const mode = this.host.getPermissionMode();
     return {
-      label: PERMISSION_MODE_DISPLAY[mode] || mode,
+      label: this.config.displayMap[mode] || mode,
       modeClass: `mode-${mode}`,
     };
   }
@@ -126,7 +207,7 @@ export class PermissionModeSelectorCoordinator {
       textEl.textContent = displayState.label;
     }
 
-    triggerEl.removeClass(...PERMISSION_MODE_CLASSES);
+    triggerEl.removeClass(...this.config.modeCssClasses);
     triggerEl.addClass(displayState.modeClass);
   }
 
@@ -163,26 +244,7 @@ export class PermissionModeSelectorCoordinator {
   }
 
   private getPermissionModeOptions(): PermissionModeOption[] {
-    return [
-      {
-        id: 'yolo',
-        label: t('settings.security.permissionMode.yolo'),
-        description: t('settings.security.permissionMode.yoloDescription')
-          || 'Allow all tools without asking',
-      },
-      {
-        id: 'normal',
-        label: t('settings.security.permissionMode.normal'),
-        description: t('settings.security.permissionMode.normalDescription')
-          || 'Ask before executing tools',
-      },
-      {
-        id: 'plan',
-        label: t('settings.security.permissionMode.plan'),
-        description: t('settings.security.permissionMode.planDescription')
-          || 'Review and approve all actions',
-      },
-    ];
+    return this.config.options;
   }
 
   private updateDropdownSelection(): void {
@@ -226,7 +288,7 @@ export class PermissionModeSelectorCoordinator {
     }
   }
 
-  private async selectPermissionMode(mode: PermissionMode): Promise<void> {
+  private async selectPermissionMode(mode: string): Promise<void> {
     await this.host.switchPermissionMode(mode);
     this.updateTriggerDisplay();
     this.closeDropdown();

@@ -44,6 +44,12 @@
 | `task` | `type · description` |
 | `question` | 第一个问题的 header |
 | `todowrite` | `done/total · preview` |
+| `task_create` | subject 文本（截断 80 字符） |
+| `task_update` | `status: subject` 或 `status: taskId` |
+| `task_list` | 'List all tasks' |
+| `task_get` | taskId 文本（截断 80 字符） |
+| `task_output` | task_id 文本（截断 80 字符） |
+| `task_stop` | task_id 文本（截断 80 字符） |
 | `skill` | 技能名称文本（截断 80 字符） |
 | `lsp` | `operation · file:line:char` |
 | `plan_enter` / `enter_plan_mode` | 'Switch to plan mode' |
@@ -113,6 +119,8 @@
 | `enter_plan_mode` / `plan_enter` | `list` |
 | `exit_plan_mode` / `plan_exit` | `check` |
 | `todowrite` / `todoread` | `list-checks` |
+| `task_create` / `task_update` / `task_list` / `task_get` | `list-checks` |
+| `task_output` / `task_stop` | `wrench` |
 | `mcp__*` / 结构化 `kind: 'mcp'` | `opencodian-tool-mcp` |
 | `kind: 'custom'` | `layers` |
 | 其他未知工具 | `wrench` |

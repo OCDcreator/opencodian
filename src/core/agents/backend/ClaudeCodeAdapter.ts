@@ -670,11 +670,19 @@ const CLAUDE_CODE_PHASE1_CAPABILITIES: BackendCapabilities = Object.freeze(
     AgentCapability.Thinking,
     AgentCapability.FileOps,
     AgentCapability.Shell,
-    // Claude's built-in TodoWrite tool emits stream-derived todo snapshots.
-    // The generic SessionTodoCoordinator + SessionTodoDock already handle
-    // todowrite tool calls; enabling this capability mounts the dock for
-    // Claude Code conversations without calling OpenCode-specific session APIs.
+    // Productized 2026-06-07: Claude uses TaskCreate/TaskUpdate/TaskList/TaskGet/
+    // TaskOutput/TaskStop (NOT TodoWrite). The SessionTodoCoordinator derives
+    // task state from TaskCreate/TaskUpdate tool traffic and feeds the existing
+    // SessionTodoDock. Stored contentBlocks are replayed during Claude session
+    // reset/activation so reload continuity restores persisted Task* state.
     AgentCapability.Todos,
+    // Permission mode live switch: adapter exposes setPermissionMode() which
+    // calls query.setPermissionMode() on active runtimes. Chat-level control
+    // routes through ChatSelectionControlsCoordinator with backend-aware
+    // permission selector. runtimeProof remains 'readback' (no observable
+    // stream marker for permission mode changes, but adapter wiring and
+    // settings apply-path are verified).
+    AgentCapability.Permissions,
   ]),
 );
 

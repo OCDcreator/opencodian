@@ -41,3 +41,7 @@ export interface ConversationHydrationOutcomePort {
 - `ConversationViewStateService` 现在只保留 loaded-conversation 的 resolve / activation / transition / hydration-tail orchestration，不再直接持有消息装载后的 background-task rebuild、message rerender 与 baseline commit
 - `TabViewActivationBridge` 继续负责 UI-only 的 post-render / hydration-tail writeback，但 loaded-conversation 的 post-render outcome 入口现在由本 bridge 统一触发
 - 这条边界推进的是 master plan 的 P1 `tab / pane / conversation activation 与 sync orchestration` ownership 迁移
+
+## Recent Note
+
+- 2026-06-07 的 Claude Task* hydration 修复最终没有把专用 rehydration hook 留在本 bridge。当前源码保持 bridge 只负责 background-task rebuild、visual-state reapply、message render 与 baseline commit；Claude task persisted-history replay 已回收到 `SessionTodoCoordinator` 的会话 reset/activation 路径。

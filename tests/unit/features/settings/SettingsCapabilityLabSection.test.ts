@@ -1098,7 +1098,7 @@ describe('SettingsCapabilityLabSection', () => {
       'AskUserQuestion Preview Format': { runtimeProof: 'pass', userSurface: 'settings+chat' },
       'System Prompt': { runtimeProof: 'pass', userSurface: 'settings' },
       'Main Model Live Switch': { runtimeProof: 'pass', userSurface: 'settings+chat' },
-      'Permission Mode Live Switch': { runtimeProof: 'readback', userSurface: 'settings' },
+      'Permission Mode Live Switch': { runtimeProof: 'readback', userSurface: 'settings+chat' },
     };
 
     for (const [name, expectedValues] of Object.entries(expected)) {
@@ -1371,6 +1371,49 @@ describe('SettingsCapabilityLabSection', () => {
     // Include Hook Events is NOT updated by runHookProof (independent pass)
     const includeHookMarker = Array.from(proofMarkers).find((el) => el.getAttribute('data-capability') === 'Include Hook Events');
     expect(includeHookMarker).toBeFalsy();
+  });
+
+  it('keeps Hooks at readback when only the JS callback layer fires', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runDiagnosticPrompt: jest.fn().mockImplementation(async (request: {
+        hooks?: { SessionStart?: Array<{ hooks?: Array<() => Promise<unknown>> }> };
+      }) => {
+        await request.hooks?.SessionStart?.[0]?.hooks?.[0]?.();
+        return {
+          sessionId: 'diag-hook-callback-only',
+          rawMessages: [],
+          chunks: [],
+        };
+      }),
+      inspectLastDiagnosticSdkOptions: jest.fn().mockReturnValue({
+        hooks: { SessionStart: [{ hooks: [] }] },
+      }),
+      capabilities: new Set(),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes('Run Hook Proof')
+    )) as HTMLButtonElement | undefined;
+    expect(button).toBeTruthy();
+
+    button!.click();
+    await flushUi();
+
+    expect(containerEl.textContent).toContain('JS callback was invoked by SDK');
+    expect(containerEl.textContent).toContain('Hooks READBACK: JS callback invocation verified');
+    expect(containerEl.textContent).toContain('Stable Hooks pass requires Layer 3 shell-hook execution');
+    expect(containerEl.textContent).not.toContain('Hooks PASS');
+    const hookMarker = containerEl.querySelector('[data-capability="Hooks"]');
+    expect(hookMarker).toBeTruthy();
+    expect(hookMarker!.classList.contains('opencodian-capability-lab-proof-readback')).toBe(true);
+    expect(hookMarker!.classList.contains('opencodian-capability-lab-proof-pass')).toBe(false);
   });
 
   describe('Hook proof settings.local.json restore/cleanup', () => {

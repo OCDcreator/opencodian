@@ -13,8 +13,8 @@
 These have live runtime proof (BUILD_ID-anchored) AND a stable user-facing control or chat interaction.
 
 **Settings (`userSurface: 'settings'`) — 11**
-- Hooks — project settings scan/create/open for `.claude/settings.json` + `.claude/settings.local.json`
-- Plugins — project settings scan/create/open for plugin config
+- Hooks — project settings scan/create/open for `.claude/settings.json` + `.claude/settings.local.json`. Pass is anchored to Layer 3 (shell hooks from config files) only. Layer 1 (JS callbacks) is dead-letter at runtime. Layer 2 (includeHookEvents) is a separate diagnostic row. Default `settingSources` is `['project']` — only `.claude/settings.json` hooks activate; `.claude/settings.local.json` requires `'local'` in settingSources.
+- Plugins — project settings scan/create/open for plugin config. Pass is anchored to marketplace plugin→skills chain only. Programmatic `SdkPluginConfig` is dead-letter at runtime. Marketplace plugins from `~/.claude/plugins/` cache are the real loading path.
 - MCP Servers — shared MCP settings tab + Claude Code Tools tab refresh/inspect; `query.setMcpServers()` live-apply on active queries
 - Disallowed Tools — deterministic init-catalog enforcement proven
 - Restricted Built-in Tools — deterministic init-catalog enforcement proven
@@ -29,7 +29,7 @@ These have live runtime proof (BUILD_ID-anchored) AND a stable user-facing contr
 - Permission Approval — ordinary chat end-to-end: real permission cards render per tool call
 - AskUserQuestion / Elicitation — ordinary chat end-to-end: real question dialog renders
 - Structured Output — `/json` prefix trigger in ordinary chat; badge renders during stream and survives reload
-- Subagent Transcript / Progress — task/subagent tool rendering, background task UI, todo snapshots. ✅ **2026-06-07 Claude Code todo dock productized**: `AgentCapability.Todos` added to `CLAUDE_CODE_PHASE1_CAPABILITIES`; `getOpenCodeSessionIdForConversation()` now uses `getConversationBackendSessionId()` for all backends, enabling session ID routing for Claude Code conversations. Claude's `TodoWrite` tool calls are captured as stream-derived snapshots by the existing generic `SessionTodoCoordinator`; the dock renders them without calling OpenCode-specific session APIs.
+- Subagent Transcript / Progress — task/subagent tool rendering, background task UI, todo snapshots. ✅ **2026-06-07 Task* productized**: runtime proof (BUILD_ID feature-phase0-capability.202606070927) shows Claude uses `TaskCreate`/`TaskUpdate`/`TaskList`/`TaskGet`/`TaskOutput`/`TaskStop`, NOT `TodoWrite`. `AgentCapability.Todos` re-enabled in `CLAUDE_CODE_PHASE1_CAPABILITIES`. `SessionTodoCoordinator.applyStreamingTodoSnapshotFromTool` now dispatches Task* tool traffic to the per-session `claudeTaskSessionStates` CRUD model: TaskCreate result parsing extracts task IDs (`Task #N`), TaskUpdate input drives status transitions, and fallback IDs are derived from tool call IDs with a `tc_` prefix so they cannot collide with real numeric task IDs. Task* tool names in `toolIdentity.ts` provide proper chat rendering. ✅ **2026-06-07 reload / activation continuity LIVE VERIFIED** (BUILD_ID feature-phase0-capability.202606071202): Test Vault conversation `conv-1780776153801-v9lnfeihy` reloaded with Claude backend session `79673f0e-d48c-49c2-baa8-5704700c1fac`; `SessionTodoCoordinator.resetTabSessionState()` rebuilt persisted Task* state from stored messages, real Obsidian runtime logged `[claude-task-rehydrate] ... entries=3, messages scanned=8`, visible todo dock rendered 3 recovered tasks (`1 in_progress`, `2 pending`, `3 pending`), then a new user turn restricted to `TaskUpdate` only updated task `1` to `completed` while preserving tasks `2` and `3` as `pending`. `obsidian dev:errors` stayed clean. Screenshot evidence: `/tmp/opencodian-claude-task-rehydrate-1202.png`, `/tmp/opencodian-claude-task-updated-1202.png`.
 - Fork Session — fork button on user message footer; new tab / current tab routing
 - Resume Session — backend session browser resume flow from chat
 - Prompt Suggestions — composer suggestion chip; click-to-fill behavior verified
@@ -49,7 +49,7 @@ These have live runtime proof (BUILD_ID-anchored) AND a stable user-facing contr
 Runtime proof passes, but explicit blockers prevent promotion to stable user surface.
 
 - **Agents (Subagents)** — `userSurface: 'diagnostic'`. Live proof: inline agents + Agent tool prompt trigger real subagent spawning. Blocker: this row represents the diagnostic API browser (`listSubagents` / `getSubagentMessages`), not a stable subagent management surface. Stable UX is chat task rendering (covered by Subagent Transcript / Progress).
-- **Include Hook Events** — `userSurface: 'diagnostic'`. Live proof: real hook `backend_event`s captured in diagnostic stream. Blocker: this is a diagnostic stream logging toggle, NOT hook activation control. Stable hook surface is the separate Hooks row.
+- **Include Hook Events** — `userSurface: 'diagnostic'`. Live proof: real hook `backend_event`s captured in diagnostic stream. Blocker: this is a diagnostic stream logging toggle, NOT hook activation control. Hooks activate regardless of this toggle (via shell hooks in config files). This toggle only controls whether hook lifecycle events appear in the diagnostic stream. Stable hook surface is the separate Hooks row.
 - **Backend Routing** — `userSurface: 'diagnostic'`. Live proof: registry routes correctly. Blocker: routing is infrastructure, not a product feature. Stable downstream features (session browser, resume, fork, title read, share-URL read, backend kind resolution) already have their own rows.
 - **/context Diagnostic** — `userSurface: 'diagnostic'`. Live proof: fixed allow-listed read-only `/context` command returns the expected context-usage report. Blocker: this proves a safe diagnostic command seam exists, not that ordinary Claude chat slash commands are productized. No arbitrary command input, no command authoring, no `.claude/**` writes.
 - **Custom Session ID** — `userSurface: 'diagnostic'`. Live proof: requested session ID returned exactly. Blocker: ordinary chat never injects custom session IDs; session identity is adapter-owned.
@@ -63,7 +63,7 @@ Runtime proof passes, but explicit blockers prevent promotion to stable user sur
 
 Option wiring proven through `buildClaudeCodeOptions`, but no independent plugin-side behavioral verification exists.
 
-**Settings (`userSurface: 'settings'`) — 10**
+**Settings (`userSurface: 'settings'`) — 9**
 - Allowed Tools — auto-approve shortcut only; zero enforcement at tool-catalog level. Stable settings UI now renders an explicit boundary notice distinguishing it from Restricted Built-in Tools (deterministic availability restrictor).
 - Fallback Model — option wiring verified; automatic switching not locally provable (requires API 529 overload signal). ✅ **2026-06-07 FORMAL CLOSURE** (Outcome B): no new SDK observable signal exists. Latest CLI features (multi-fallback, sticky session, FALLBACK_FOR_ALL_PRIMARY_MODELS env var) enhance CLI behavior but produce no new SDK event/callback/stream marker. Architectural barrier: switching happens inside compiled CLI binary; SDK has no observation mechanism. `query.setModel()` is tracked separately as "Main Model Live Switch" (pass/settings+chat, promoted 2026-06-07). CLOSED at readback.
 - Task Budget — `@alpha`; option wiring verified; no deterministic SDK enforcement signal. **2026-06-06 re-audit (Outcome B)**: no new productizable seam. SDK 0.3.145 unchanged; 4 error result subtypes contain no `error_max_task_budget`; `TerminalReason` has `max_turns` but no `max_task_budget`; no budget-related events (`tokens_remaining`, `budget_status`, `usage_update`). Remains readback with hardened boundary.
@@ -73,9 +73,9 @@ Option wiring proven through `buildClaudeCodeOptions`, but no independent plugin
 - 1M Context Beta — option wiring verified through full SDK path (setting → buildClaudeCodeOptions → ProcessTransport → CLI --betas flag); model-side beta acceptance and 1M context activation unobservable from plugin layer
 - JS Runtime — option wiring verified; actual runtime selection depends on system PATH and installation. **2026-06-06 audit completed** (Outcome B): remains readback with hardened boundary. No observable signal in init events, stderr, or tool output confirms which runtime the CLI subprocess actually uses.
 - Load Timeout — `@alpha`; option wiring verified; timeout code path only executes with resume/continue + sessionStore. **2026-06-06 audit completed** (Outcome B): remains readback with hardened boundary.
-- Permission Mode Live Switch — official SDK `query.setPermissionMode()` seam; adapter wiring via `applyToActiveQueries()` verified (identical pattern to Main Model Live Switch). ✅ **2026-06-07 AUDIT (Outcome A — promoted to matrix row at readback)**. ✅ **2026-06-07 PROMOTION PATH ATTEMPT FAILED** (Outcome B — hardened boundary with full SDK evidence). Settings: Permissions tab dropdown with live apply (`applyClaudePermissionMode()` → `adapter.setPermissionMode(mode)` → `saveSettings()`). Chat: NO Claude Code permission surface — the shared chat permission selector controls OpenCode's global mode only (yolo/normal/plan → restarts OpenCode service); it does NOT call `query.setPermissionMode()` on Claude active runtime. **Readback is the permanent ceiling** — three structural blockers prevent promotion: (1) No observable stream signal: `SDKStatusMessage.permissionMode` is optional (sdk.d.ts line 3500), and `ClaudeCodeStreamNormalizer.appendLifecycleChunks()` does NOT handle `subtype==='status'` (silently dropped); no dedicated event/getter/client_event exists for mode changes. Unlike `setModel()` which produces observable `modelUsage` keys, `setPermissionMode()` produces no equivalent marker. (2) canUseTool inconsistency: in `query()` mode, `canUseTool` is only invoked in `plan` mode; switching between `default`/`bypassPermissions` has no observable difference (callback never fires). Switching from `plan` to `bypass` mid-stream would require concurrent stream observation — blocked by transport architecture (request/response share same transport, creating deadlock). (3) CLI subprocess opaqueness: actual permission handling change happens inside compiled CLI binary; `onSetPermissionMode` callback returns `{ok:true}` but plugin cannot observe whether subprocess's internal state changed. Promotion would require: (a) SDK adds `permissionModeChanged` client_event or stream marker, or (b) CLI consistently emits `SDKStatusMessage.permissionMode` after `setPermissionMode()`, or (c) plugin adds separate query execution context for mid-stream behavioral observation. All require SDK-side changes or significant architecture changes. Explicitly NOT: Permission Approval (tool-call cards, separate row), OpenCode permission templates (separate system), Plan Mode Instructions (dependent on permissionMode='plan', separate row).
 
-**Settings + Chat (`userSurface: 'settings+chat'`) — 1**
+**Settings + Chat (`userSurface: 'settings+chat'`) — 2**
+- Permission Mode Live Switch — official SDK `query.setPermissionMode()` seam; `AgentCapability.Permissions` is now in `CLAUDE_CODE_PHASE1_CAPABILITIES`, so the chat toolbar shows a backend-appropriate permission selector. Settings: Permissions tab dropdown live-applies `default` / `acceptEdits` / `bypassPermissions` / `plan`. Chat: when `claude-code` is active, the toolbar exposes those Claude Code modes and calls `query.setPermissionMode()` through the adapter seam; when `opencode` is active, it shows OpenCode permission templates `yolo` / `normal` / `plan` and keeps the OpenCode restart path. The trigger carries `data-permission-backend="claude-code"` or `"opencode"` for runtime verification. Runtime proof remains `readback`: mode changes are acknowledged by SDK control responses, but no observable stream marker confirms behavioral enforcement.
 - Sandbox — option wiring verified; OS-level sandbox enforcement not independently verifiable. ✅ **2026-06-07 expanded productization, Outcome A (LIVE VERIFIED, BUILD_ID feature-phase0-capability.202606070542)**: 10 expert settings + 3 basic toggles in Permissions tab; chat badge shows configured state when enabled; hot-switch claude-code → opencode → claude-code in same live UI: badge 1 → 0 → 1; obsidian dev:errors clean. Readback ceiling: CLI handles OS-level sandbox internally; no init event, tool metadata, or stderr pattern confirms activation. Plugin cannot distinguish "sandbox active" from "sandbox silently degraded" or "unsupported platform".
 
 **Diagnostic (`userSurface: 'diagnostic'`) — 3**
@@ -104,60 +104,80 @@ These 5 checkpoints have been individually re-audited and closed at their curren
 4. **Fallback Model** — ✅ **2026-06-07 FORMAL CLOSURE** (Outcome B) — readback is the permanent ceiling. Option wiring verified (--fallback-model CLI flag + same-model validation). Latest CLI features (multi-fallback, sticky session, FALLBACK_FOR_ALL_PRIMARY_MODELS) enhance CLI-side behavior but produce NO new SDK observable event. No fallback activation callback, stream marker, or status metadata exists. Architectural barrier: fallback switching happens inside compiled CLI binary; SDK is a thin transport with no observation mechanism. `query.setModel()` is a separate seam (manual model switch) NOT pursued in this closure. CLOSED at readback. Re-audit only if SDK adds dedicated fallback activation events to the message protocol.
 5. **Session Store + Import Session to Store** — ✅ **2026-06-07 re-audited** (Outcome B) — hidden confirmed. All SessionStore APIs remain `@alpha`. Store entries are opaque pass-through blobs. No promotion path unless SDK graduates from `@alpha` with format stability guarantees AND a clear user workflow gap.
 
-These 5 checkpoints are individually closed. The overall backlog remains open: existing `query.setModel()` / Main Model live-apply is now a formal capability row (Main Model Live Switch, `pass` / `settings+chat`, promoted 2026-06-07, BUILD_ID feature-phase0-capability.202606070617); existing `query.setPermissionMode()` / Permission Mode live-apply is now a formal capability row (Permission Mode Live Switch, `readback` / `settings`, promoted 2026-06-07, promotion path exhausted same day — see dedicated section below); diagnostic-only seams may gain promotion paths in future SDK versions; and new SDK releases may introduce additional productizable seams. Future triage rounds should also scan for newly surfaced official seams, adapter-level SDK methods not yet in the matrix, and community feature requests that get implemented.
+These 5 checkpoints are individually closed. The overall backlog remains open: existing `query.setModel()` / Main Model live-apply is now a formal capability row (Main Model Live Switch, `pass` / `settings+chat`, promoted 2026-06-07, BUILD_ID feature-phase0-capability.202606070617); existing `query.setPermissionMode()` / Permission Mode live-apply is now a formal capability row (Permission Mode Live Switch, `readback` / `settings+chat`, promoted 2026-06-07, promotion path exhausted same day — see dedicated section below); diagnostic-only seams may gain promotion paths in future SDK versions; and new SDK releases may introduce additional productizable seams. Future triage rounds should also scan for newly surfaced official seams, adapter-level SDK methods not yet in the matrix, and community feature requests that get implemented.
 
 ---
 
-## 2026-06-07 Claude Code Todo/Task User Surface — Re-Audit and Productization
+## 2026-06-07 Claude Code Todo/Task — Runtime Evidence, Rollback, and Task* Productization
 
 ### Objective
 
-Re-audit the Claude Code Todo/Task user surface honestly. Determine whether Claude can and should support a stable todo dock / todo snapshot chat surface using existing generic tooling. If yes, implement the smallest honest productization.
+Re-audit the Claude Code Todo/Task user surface honestly against real Obsidian/Test Vault runtime evidence from Codex (BUILD_ID feature-phase0-capability.202606070927), then productize the real Task* seam.
 
-### Findings
+### Runtime Evidence (Codex ground truth)
 
-**Gap identified and closed.** Three conditions prevented Claude Code conversations from using the todo dock:
+1. Claude backend is active; `hasCapability('todos') === true` (at time of evidence capture).
+2. Todo dock DOM is mounted but stays hidden: `.opencodian-session-todo-dock is-hidden is-collapsed`.
+3. Claude chat was sent with strong prompt requiring TodoWrite.
+4. **Claude did NOT use TodoWrite.** It used `ToolSearch`, `Bash`, then `TaskCreate` / `TaskUpdate` / `TaskList` / `TaskGet` / `TaskOutput` / `TaskStop`.
+5. Claude explicitly stated: *"TodoWrite is not an available tool in my tool set."*
+6. Todo dock stayed hidden in both attempts. No console errors.
 
-| # | Gap | Root Cause | Fix |
-|---|-----|------------|-----|
-| 1 | Todo dock never mounted for Claude | `AgentCapability.Todos` absent from `CLAUDE_CODE_PHASE1_CAPABILITIES` → `hasCapability(caps, AgentCapability.Todos)` returns `false` → `attachSessionTodo` + `renderSessionTodoDock` skip | Added `AgentCapability.Todos` to capability set |
-| 2 | Todo snapshots had no session key for Claude | `getOpenCodeSessionIdForConversation()` returned `null` for non-OpenCode backends (only checked `openCodeSessionId` when `backend === 'opencode'`) | Changed to use `getConversationBackendSessionId()` for all backends |
-| 3 | Refresh would call OpenCode-only API | Already handled — `refreshTabSessionTodos()` has a backend gate (line 140-147) that returns early for non-OpenCode backends | No change needed (gate already correct) |
+### Phase 1: TodoWrite Rollback (Outcome B — superseded by Phase 2)
 
-### Productization Outcome
+The initial TodoWrite productization was rolled back because the runtime proved Claude uses Task* tools, not TodoWrite. This rollback is preserved as historical context below.
 
-**Claude Code Todo Tracking: promoted to active user surface (stream-derived).**
+<details>
+<summary>Phase 1 details (collapsed — superseded)</summary>
 
-| Aspect | Evidence |
-|--------|----------|
-| Stream capture | `BackgroundTaskStreamTriggerCoordinator.handleToolCallStart/End()` → `applyStreamingTodoSnapshotFromTool()` — already backend-agnostic, processes `todowrite` tool calls from ALL backends |
-| Snapshot storage | `SessionTodoCoordinator.applyStreamingTodoSnapshotFromTool()` → `writeSessionTodos(tabId, sessionId, todos)` — now receives valid Claude Code `backendSessionId` |
-| Dock rendering | `SessionTodoDock` — generic UI, renders incomplete todos from stored snapshots |
-| Backend gate | `refreshTabSessionTodos()` correctly returns early for Claude Code — no `getSessionTodos()` call (OpenCode-only server API) |
-| Stale detection | `STALE_SESSION_TODO_TIMEOUT_MS = 120_000` applies uniformly — Claude snapshots stale after 2min inactivity |
-| Test coverage | `ClaudeCodeAdapter.test.ts`: `AgentCapability.Todos` assertion; `SessionTodoCoordinator.test.ts`: Claude session ID snapshot storage, backend gate preservation after refresh |
+**Why TodoWrite productization was wrong:**
+1. TodoWrite exists in SDK but is NOT available to the current Claude model
+2. Claude explicitly stated TodoWrite is unavailable
+3. Real Claude tool traffic uses TaskCreate/TaskUpdate/TaskList/TaskGet/TaskOutput/TaskStop
+4. Task* tools are CRUD operations, not snapshots — different state model
 
-### Honest Boundaries
+**Phase 1 changes (now superseded):**
+- Removed `AgentCapability.Todos` from `CLAUDE_CODE_PHASE1_CAPABILITIES`
+- Added Task* tool names to `BUILTIN_TOOL_DEFINITIONS` (kept — still active)
+- Added Task* summary resolvers to `ToolCallRenderer` (kept — still active)
 
-- Claude's TodoWrite is **stream-derived only** — no session-level todo polling/status API equivalent to OpenCode's `getSessionTodos()` / `getSessionStatuses()`
-- The `refreshTabSessionTodos()` call after `todowrite` tool completion hits the backend gate and returns early (correct — no stale data overwrite)
-- No `stopTask()` / `backgroundTasks()` for Claude Code (those are OpenCode SDK runtime methods, not relevant to todo tracking)
-- The `task` tool rendering (subagent progress, inline panels) was already backend-agnostic via `ToolCallRenderer` + `BackgroundTaskInlinePanelRenderer`
+</details>
 
-### Matrix Decision
+### Phase 2: Task* Productization (Outcome A — current state)
 
-**Folded into existing row** — "Subagent Transcript / Progress" already covers `pass` / `chat` for task/subagent tool rendering, background task UI, and todo snapshots. No new matrix row needed because:
-1. The TodoWrite/TodoRead rendering is a tool rendering feature, not a separate SDK capability
-2. The plumbing was already generic; only capability gating and session routing needed fixing
-3. Adding a new row would overstate scope
+**Classification: `pass` / `chat` — Task* tools drive the todo dock.**
 
-### Files Changed
+The Task* family has been productized with an incremental CRUD model:
 
-- `src/core/agents/backend/ClaudeCodeAdapter.ts` — added `AgentCapability.Todos` to capability set
-- `src/features/chat/OpenCodianView.ts` — `getOpenCodeSessionIdForConversation()` now uses `getConversationBackendSessionId()` for all backends
-- `src/features/chat/services/SessionTodoCoordinator.ts` — updated backend gate comments
-- `tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts` — added `AgentCapability.Todos` assertion
-- `tests/unit/features/chat/SessionTodoCoordinator.test.ts` — added Claude Code session snapshot test + backend gate preservation test
+| Component | Implementation |
+|-----------|---------------|
+| `SessionTodoCoordinator.applyStreamingTodoSnapshotFromTool` | Dispatches TaskCreate/TaskUpdate to per-session `claudeTaskSessionStates` |
+| Task ID extraction | Regex `/Task\s+#(\d+)/i` on result string; fallback to synthetic `tc_<toolCallId>` |
+| State scope | Per-session (`claudeTaskSessionStates` keyed by backend sessionId) |
+| Dock rendering | Reuses existing `SessionTodoDock` — renders `SessionTodo[]` unchanged |
+| Capability flag | `AgentCapability.Todos` re-enabled in `CLAUDE_CODE_PHASE1_CAPABILITIES` |
+
+**Honest boundaries:**
+- State derivation is stream-first plus persisted-history rebuild on Claude session reset/activation; there is still no broader server-backed todo API for Claude
+- TaskCreate result parsing (`"Task #N created successfully: subject"`) is inherently fragile; fallback uses tool-call-derived synthetic IDs that never collide with real numeric IDs
+- TaskList/TaskGet payloads not consumed — only TaskCreate/TaskUpdate drive the dock
+- TaskOutput/TaskStop not productized — no coherent user workflow
+- The dock is shared between OpenCode (TodoWrite snapshot) and Claude Code (Task* CRUD); only one backend's traffic is active per session
+
+**Remaining gaps:**
+1. TaskList/TaskGet full-list reconciliation
+2. TaskOutput/TaskStop user workflow design
+3. Any future non-create/update task semantics need separate UX evaluation before promotion
+
+### Files Changed (cumulative across both phases)
+
+- `src/core/agents/backend/ClaudeCodeAdapter.ts` — removed, then re-added `AgentCapability.Todos`
+- `src/shared/toolIdentity.ts` — added 6 Task* tool definitions
+- `src/utils/streaming/ToolCallRenderer.ts` — added Task* summary resolvers
+- `src/features/chat/services/SessionTodoCoordinator.ts` — added per-session Task* CRUD path plus persisted-history rehydration on Claude session reset/activation
+- `src/features/chat/runtime/BackgroundTaskStreamTriggerCoordinator.ts` — extended `isTodoTool` for Task*
+- `tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts` — Todos assertion
+- `tests/unit/features/chat/SessionTodoCoordinator.test.ts` — Task* CRUD, isolation, and persisted-history rehydration tests
 
 ---
 
@@ -228,9 +248,9 @@ Focused audit of the official Claude SDK `query.setPermissionMode()` seam to det
 
 Two completely separate permission mode systems exist in the plugin:
 
-1. **Claude Code SDK `query.setPermissionMode()` seam** — `ClaudeCodePermissionMode` (default/acceptEdits/bypassPermissions/plan). Routes through `ClaudeCodeAdapter.setPermissionMode()` → `applyToActiveQueries()` → `query.setPermissionMode(mode)` on each active runtime. Controlled via Claude Code Settings → Permissions tab dropdown.
+1. **Claude Code SDK `query.setPermissionMode()` seam** — `ClaudeCodePermissionMode` (default/acceptEdits/bypassPermissions/plan). Routes through `ClaudeCodeAdapter.setPermissionMode()` → `applyToActiveQueries()` → `query.setPermissionMode(mode)` on each active runtime. Controlled via Claude Code Settings → Permissions tab dropdown and the chat toolbar when `claude-code` is active.
 
-2. **OpenCode global permission mode** — `PermissionMode` (yolo/normal/plan). Routes through `PermissionModeSelectorCoordinator` in chat toolbar → `OpenCodianView.switchPermissionMode()` → restarts OpenCode service. Does NOT call `query.setPermissionMode()` on Claude active runtime.
+2. **OpenCode global permission mode** — `PermissionMode` (yolo/normal/plan). Routes through `PermissionModeSelectorCoordinator` in chat toolbar → `OpenCodianView.switchPermissionMode()` → restarts OpenCode service. This remains the active chat selector when `opencode` is active and does NOT call `query.setPermissionMode()`.
 
 The audit conclusion is that these must NOT be conflated.
 
@@ -240,12 +260,12 @@ The audit conclusion is that these must NOT be conflated.
 |---|---|---|
 | Backend | Adapter wiring verified | `ClaudeCodeAdapter.setPermissionMode(mode)` → `applyToActiveQueries(runtime => runtime.query?.setPermissionMode?.(mode))`. Unit tests: active/closed/idle runtimes. Smoke harness: adapter.setPermissionMode('plan') → query.setPermissionMode('plan'). |
 | Settings | Stable entry verified | Permissions tab dropdown (default/acceptEdits/bypassPermissions/plan) with live apply: `applyClaudePermissionMode()` → `adapter.setPermissionMode(mode)` → `saveSettings()`. |
-| Chat | **NO surface for Claude** | Shared chat permission selector controls OpenCode only. `PermissionModeSelectorCoordinator` uses `PermissionMode` (yolo/normal/plan) and `OpenCodianView.switchPermissionMode()` restarts OpenCode service — never calls `query.setPermissionMode()`. |
+| Chat | Stable backend-aware entry verified | `AgentCapability.Permissions` is in `CLAUDE_CODE_PHASE1_CAPABILITIES`. `ChatSelectionControlsCoordinator.buildBackendPermissionSelector()` creates the active backend's selector at build time: Claude Code exposes `default` / `acceptEdits` / `bypassPermissions` / `plan` and routes through live plugin settings plus `adapter.setPermissionMode()`; OpenCode exposes `yolo` / `normal` / `plan` and keeps the OpenCode restart path. Trigger carries `data-permission-backend` for runtime verification. |
 
 ### Classification
 
-- **runtimeProof: readback** — Option wiring verified through full chain. No live behavioral probe proving mid-stream tool approval behavior changes. Unlike Main Model Live Switch (which verified model change via `modelUsage` key comparison), permission mode's effect is indirect (changes how CLI handles tool approvals). Readback is the honest ceiling.
-- **userSurface: settings** — Only the Claude Code Permissions tab dropdown. Chat selector is OpenCode-only.
+- **runtimeProof: readback** — Option wiring and chat/settings routing are verified through the full chain. No live behavioral probe or observable stream marker proves mid-stream tool approval behavior changes. Unlike Main Model Live Switch (which verified model change via `modelUsage` key comparison), permission mode's effect is indirect (changes how CLI handles tool approvals). Readback is the honest ceiling.
+- **userSurface: settings+chat** — Claude Code Permissions tab dropdown plus backend-appropriate chat toolbar selector. Claude Code modes appear only when `claude-code` is active; OpenCode templates appear when `opencode` is active.
 
 ### Explicitly NOT this seam
 
@@ -417,6 +437,71 @@ Requires Anthropic to add dedicated fallback activation events to the SDK messag
 
 - Matrix row comment: updated with formal closure wording, latest CLI evidence, architectural barrier explanation, and adjacent seams.
 - Current-state doc: updated readback summary, suggested next checkpoints, and added this closure section.
+
+---
+
+## 2026-06-07 Claude Code Hooks + Plugins — Productization Closure
+
+### Objective
+
+Audit the Hooks and Plugins matrix rows against the current SDK/runtime truth, verify that stable user surfaces are honest and sufficient, and close any truth gaps without manufacturing fake capabilities.
+
+### Audit Findings
+
+#### Hooks — `pass` / `settings`
+
+**Three-layer architecture** (already documented in matrix row):
+
+| Layer | Mechanism | Status |
+|-------|-----------|--------|
+| Layer 1 (JS callback) | Programmatic `hooks` option → SDK `query()` → subprocess | **Dead-letter**: SDK accepts callbacks at API boundary but does NOT invoke them |
+| Layer 2 (includeHookEvents stream) | `includeHookEvents: true` → hook `backend_events` in stream | **Diagnostic-only**: separate row, NOT hook activation control |
+| Layer 3 (shell hooks from config) | `.claude/settings.json` / `.claude/settings.local.json` → CLI subprocess reads and executes | **Real runtime path**: pass is anchored here |
+
+**Pass anchoring**: Layer 3 only. The hook proof creates a temporary `settings.local.json` with a `SessionStart` shell hook, runs a diagnostic prompt, and checks if the nonce file was created on disk. Layer 3 pass = nonce file exists with correct content.
+
+**Settings surface**: Claude Code Settings → Runtime tab → "Claude project settings (hooks & plugins)". Provides scan (discover hook counts per event), create (create `settings.json` or `settings.local.json`), open (open in editor). Boundary notice explains `settingSources` requirement: default is `['project']` (only `.claude/settings.json`); to use `.claude/settings.local.json` hooks, enable `'local'` in settingSources.
+
+**Assessment**: **SUFFICIENT and HONEST**. Hooks are config-driven lifecycle mechanisms (PreToolUse, PostToolUse, SessionStart, etc.). A visual hook editor would be nice but is not required for stable user entry. The scan/create/open surface covers discovery, creation, and editing.
+
+**2026-06-07 change**: Matrix row comment hardened with explicit "Pass is anchored to Layer 3 only" statement, matching the pattern used by the Plugins row.
+
+#### Plugins — `pass` / `settings`
+
+**Two-path architecture** (already documented in matrix row):
+
+| Path | Mechanism | Status |
+|------|-----------|--------|
+| Programmatic `SdkPluginConfig` | `{ type: 'local', path }` → SDK `options.plugins` → subprocess | **Dead-letter**: subprocess ignores programmatic plugin declarations |
+| Marketplace plugins | `~/.claude/plugins/` cache → CLI subprocess loads → `init.plugins` + `init.skills` | **Real runtime path**: pass is anchored to plugin→skills chain |
+
+**Pass anchoring**: Marketplace plugin→skills chain only. The plugins proof inspects `init.plugins` (loaded marketplace plugins), `init.skills` (plugin-scoped skills using `pluginName:skillName` naming), and `init.mcp_servers` (plugin-provided MCP servers with `plugin:` prefix). Pass requires plugins loaded AND contributing plugin-scoped skills.
+
+**Settings surface**: Same "Claude project settings" section — shows `enabledPlugins` from config files. Capability Lab discovery tab shows adapter plugin count with explicit "dead-letter at runtime" notice for programmatic options.
+
+**Assessment**: **SUFFICIENT and HONEST**. No marketplace manager UI exists in the plugin, but the matrix row and discovery tab correctly explain that marketplace plugins from `~/.claude/plugins/` cache are the real loading path. Adding a marketplace UI would be scope expansion beyond productization closure.
+
+#### Include Hook Events — `pass` / `diagnostic`
+
+Already correctly classified. This is a diagnostic stream logging toggle that controls whether hook lifecycle events appear in the diagnostic stream. It does NOT control hook activation (hooks work regardless via shell hooks in config files). The stable hook surface is the separate Hooks row.
+
+### Decision
+
+**Truth closure only — no new code needed.**
+
+The current implementation is already honest:
+1. Matrix rows accurately represent real runtime paths vs dead-letter boundaries
+2. Settings surface provides sufficient user entry (scan/create/open)
+3. Proof handlers honestly distinguish layers and report failures
+4. Discovery tab explains dead-letter programmatic options
+5. Locale strings and boundary notices are accurate
+6. Tests enforce correct classifications
+
+### Changes Made
+
+- `SettingsCapabilityLabSection.ts`: Hooks matrix row comment hardened with explicit three-layer anchoring statement (pass anchored to Layer 3 only, Layer 1 dead-letter, Layer 2 separate diagnostic row).
+- Status doc: Hooks and Plugins pass entries updated with explicit runtime-path anchoring and dead-letter boundaries. Include Hook Events entry clarified to note hooks activate regardless of the toggle.
+- Devlog: Added this audit entry.
 
 ---
 

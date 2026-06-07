@@ -1,6 +1,6 @@
 import type { ModelCatalogBundle } from '../../../../src/core/config';
 import type { ModelCatalogProvider } from '../../../../src/core/config/modelConfig';
-import type { ModelSourceMode, PermissionMode } from '../../../../src/core/types/settings';
+import type { ClaudeCodePermissionMode, ModelSourceMode, PermissionMode } from '../../../../src/core/types/settings';
 import {
   ChatSelectionControlsCoordinator,
   type ChatSelectionControlsCoordinatorHost,
@@ -381,18 +381,8 @@ describe('ChatSelectionControlsCoordinator', () => {
       };
     }
 
-    it('does not mount sandbox badge container when active backend is not claude-code', async () => {
-      mockOpencodeBackend();
-
-      const fixture = await createFixture();
-      const badgeContainer = fixture.toolbarEl.querySelector('.opencodian-sandbox-badge-container');
-      expect(badgeContainer).toBeNull();
-    });
-
-    it('mounts sandbox badge container when active backend is claude-code', async () => {
-      mockClaudeCodeBackendWithSandbox();
-
-      const host: jest.Mocked<ChatSelectionControlsCoordinatorHost> = {
+    function createMinimalHost(): ChatSelectionControlsCoordinatorHost {
+      return {
         registerEscapeHandler: jest.fn(),
         loadModelCatalogData: jest.fn(async () => ({
           catalogBundle: null,
@@ -409,7 +399,20 @@ describe('ChatSelectionControlsCoordinator', () => {
         getPermissionMode: jest.fn(() => 'normal'),
         switchPermissionMode: jest.fn(async () => {}),
       };
+    }
 
+    it('does not mount sandbox badge container when active backend is not claude-code', async () => {
+      mockOpencodeBackend();
+
+      const fixture = await createFixture();
+      const badgeContainer = fixture.toolbarEl.querySelector('.opencodian-sandbox-badge-container');
+      expect(badgeContainer).toBeNull();
+    });
+
+    it('mounts sandbox badge container when active backend is claude-code', async () => {
+      mockClaudeCodeBackendWithSandbox();
+
+      const host = createMinimalHost();
       const toolbarEl = document.createElement('div');
       document.body.appendChild(toolbarEl);
 
@@ -428,24 +431,7 @@ describe('ChatSelectionControlsCoordinator', () => {
     it('does not mount sandbox badge even with sandbox settings enabled when active backend is opencode', async () => {
       mockOpencodeBackend();
 
-      const host: jest.Mocked<ChatSelectionControlsCoordinatorHost> = {
-        registerEscapeHandler: jest.fn(),
-        loadModelCatalogData: jest.fn(async () => ({
-          catalogBundle: null,
-          providers: [],
-        })),
-        getActiveTabModelOverride: jest.fn(() => null),
-        setActiveTabModelOverride: jest.fn(() => true),
-        getDefaultModelSelection: jest.fn(() => null),
-        syncActiveTabContextUsageIdentity: jest.fn(),
-        getModelSourceMode: jest.fn(() => 'merge'),
-        isModelAvailableOnServer: jest.fn(async () => true),
-        resolveProviderIconUrl: jest.fn(async () => null),
-        updateEffortSelectorDisplay: jest.fn(),
-        getPermissionMode: jest.fn(() => 'normal'),
-        switchPermissionMode: jest.fn(async () => {}),
-      };
-
+      const host = createMinimalHost();
       const toolbarEl = document.createElement('div');
       document.body.appendChild(toolbarEl);
 
@@ -458,27 +444,9 @@ describe('ChatSelectionControlsCoordinator', () => {
     });
 
     it('removes badge when backend hot-switches from claude-code to opencode via updatePermissionTriggerDisplay', async () => {
-      // Start with claude-code backend — badge should be mounted
       mockClaudeCodeBackendWithSandbox();
 
-      const host: jest.Mocked<ChatSelectionControlsCoordinatorHost> = {
-        registerEscapeHandler: jest.fn(),
-        loadModelCatalogData: jest.fn(async () => ({
-          catalogBundle: null,
-          providers: [],
-        })),
-        getActiveTabModelOverride: jest.fn(() => null),
-        setActiveTabModelOverride: jest.fn(() => true),
-        getDefaultModelSelection: jest.fn(() => null),
-        syncActiveTabContextUsageIdentity: jest.fn(),
-        getModelSourceMode: jest.fn(() => 'merge'),
-        isModelAvailableOnServer: jest.fn(async () => true),
-        resolveProviderIconUrl: jest.fn(async () => null),
-        updateEffortSelectorDisplay: jest.fn(),
-        getPermissionMode: jest.fn(() => 'normal'),
-        switchPermissionMode: jest.fn(async () => {}),
-      };
-
+      const host = createMinimalHost();
       const toolbarEl = document.createElement('div');
       document.body.appendChild(toolbarEl);
 
@@ -486,41 +454,20 @@ describe('ChatSelectionControlsCoordinator', () => {
       coordinator.build(toolbarEl);
       await settleAsyncWork();
 
-      // Verify badge is present initially
       expect(toolbarEl.querySelector('.opencodian-sandbox-badge-container')).not.toBeNull();
       expect(toolbarEl.querySelector('.opencodian-sandbox-config-badge')).not.toBeNull();
 
-      // Hot-switch backend to opencode
       mockOpencodeBackend();
       coordinator.updatePermissionTriggerDisplay();
 
-      // Badge container should be removed
       expect(toolbarEl.querySelector('.opencodian-sandbox-badge-container')).toBeNull();
       expect(toolbarEl.querySelector('.opencodian-sandbox-config-badge')).toBeNull();
     });
 
     it('removes badge when backend hot-switches from claude-code to opencode via applyLocaleTexts', async () => {
-      // Start with claude-code backend — badge should be mounted
       mockClaudeCodeBackendWithSandbox();
 
-      const host: jest.Mocked<ChatSelectionControlsCoordinatorHost> = {
-        registerEscapeHandler: jest.fn(),
-        loadModelCatalogData: jest.fn(async () => ({
-          catalogBundle: null,
-          providers: [],
-        })),
-        getActiveTabModelOverride: jest.fn(() => null),
-        setActiveTabModelOverride: jest.fn(() => true),
-        getDefaultModelSelection: jest.fn(() => null),
-        syncActiveTabContextUsageIdentity: jest.fn(),
-        getModelSourceMode: jest.fn(() => 'merge'),
-        isModelAvailableOnServer: jest.fn(async () => true),
-        resolveProviderIconUrl: jest.fn(async () => null),
-        updateEffortSelectorDisplay: jest.fn(),
-        getPermissionMode: jest.fn(() => 'normal'),
-        switchPermissionMode: jest.fn(async () => {}),
-      };
-
+      const host = createMinimalHost();
       const toolbarEl = document.createElement('div');
       document.body.appendChild(toolbarEl);
 
@@ -528,27 +475,56 @@ describe('ChatSelectionControlsCoordinator', () => {
       coordinator.build(toolbarEl);
       await settleAsyncWork();
 
-      // Verify badge is present initially
       expect(toolbarEl.querySelector('.opencodian-sandbox-badge-container')).not.toBeNull();
 
-      // Hot-switch backend to opencode and trigger locale refresh
       mockOpencodeBackend();
       coordinator.applyLocaleTexts();
 
-      // Badge container should be removed
       expect(toolbarEl.querySelector('.opencodian-sandbox-badge-container')).toBeNull();
     });
 
     it('re-mounts badge when backend hot-switches back from opencode to claude-code', async () => {
-      // Start with opencode backend — no badge
       mockOpencodeBackend();
 
-      const host: jest.Mocked<ChatSelectionControlsCoordinatorHost> = {
+      const host = createMinimalHost();
+      const toolbarEl = document.createElement('div');
+      document.body.appendChild(toolbarEl);
+
+      const coordinator = new ChatSelectionControlsCoordinator(host);
+      coordinator.build(toolbarEl);
+      await settleAsyncWork();
+
+      expect(toolbarEl.querySelector('.opencodian-sandbox-badge-container')).toBeNull();
+
+      mockClaudeCodeBackendWithSandbox();
+      coordinator.updatePermissionTriggerDisplay();
+
+      expect(toolbarEl.querySelector('.opencodian-sandbox-badge-container')).not.toBeNull();
+      expect(toolbarEl.querySelector('.opencodian-sandbox-config-badge')).not.toBeNull();
+    });
+    /* eslint-enable @typescript-eslint/no-explicit-any */
+  });
+
+  describe('backend-aware permission routing', () => {
+    /* eslint-disable @typescript-eslint/no-explicit-any */
+    let savedApp: any;
+
+    beforeAll(() => {
+      savedApp = (globalThis as any).app;
+    });
+
+    afterAll(() => {
+      (globalThis as any).app = savedApp;
+    });
+
+    it('renders OpenCode permission modes when backend is opencode', async () => {
+      (globalThis as any).app = {
+        plugins: { plugins: { opencodian: { settings: { activeBackend: 'opencode' } } } },
+      };
+
+      const host = {
         registerEscapeHandler: jest.fn(),
-        loadModelCatalogData: jest.fn(async () => ({
-          catalogBundle: null,
-          providers: [],
-        })),
+        loadModelCatalogData: jest.fn(async () => ({ catalogBundle: null, providers: [] })),
         getActiveTabModelOverride: jest.fn(() => null),
         setActiveTabModelOverride: jest.fn(() => true),
         getDefaultModelSelection: jest.fn(() => null),
@@ -557,9 +533,9 @@ describe('ChatSelectionControlsCoordinator', () => {
         isModelAvailableOnServer: jest.fn(async () => true),
         resolveProviderIconUrl: jest.fn(async () => null),
         updateEffortSelectorDisplay: jest.fn(),
-        getPermissionMode: jest.fn(() => 'normal'),
+        getPermissionMode: jest.fn(() => 'yolo' as PermissionMode),
         switchPermissionMode: jest.fn(async () => {}),
-      };
+      } as unknown as ChatSelectionControlsCoordinatorHost;
 
       const toolbarEl = document.createElement('div');
       document.body.appendChild(toolbarEl);
@@ -568,16 +544,171 @@ describe('ChatSelectionControlsCoordinator', () => {
       coordinator.build(toolbarEl);
       await settleAsyncWork();
 
-      // No badge initially
-      expect(toolbarEl.querySelector('.opencodian-sandbox-badge-container')).toBeNull();
+      const trigger = toolbarEl.querySelector<HTMLElement>('.opencodian-permission-trigger');
+      expect(trigger?.getAttribute('data-permission-backend')).toBe('opencode');
+      expect(trigger?.querySelector('.opencodian-permission-trigger-text')?.textContent).toBe('YOLO');
 
-      // Hot-switch to claude-code
-      mockClaudeCodeBackendWithSandbox();
-      coordinator.updatePermissionTriggerDisplay();
+      // OpenCode modes should be available
+      trigger?.click();
+      expect(toolbarEl.querySelector('[data-mode="yolo"]')).not.toBeNull();
+      expect(toolbarEl.querySelector('[data-mode="normal"]')).not.toBeNull();
+      expect(toolbarEl.querySelector('[data-mode="plan"]')).not.toBeNull();
+      // Claude modes should NOT be available
+      expect(toolbarEl.querySelector('[data-mode="acceptEdits"]')).toBeNull();
+      expect(toolbarEl.querySelector('[data-mode="bypassPermissions"]')).toBeNull();
+    });
 
-      // Badge should now be mounted
-      expect(toolbarEl.querySelector('.opencodian-sandbox-badge-container')).not.toBeNull();
-      expect(toolbarEl.querySelector('.opencodian-sandbox-config-badge')).not.toBeNull();
+    it('renders Claude Code permission modes when backend is claude-code', async () => {
+      (globalThis as any).app = {
+        plugins: {
+          plugins: {
+            opencodian: {
+              settings: {
+                activeBackend: 'claude-code',
+                backendSettings: {
+                  claudeCode: {
+                    permissionMode: 'acceptEdits' as ClaudeCodePermissionMode,
+                  },
+                },
+              },
+            },
+          },
+        },
+      };
+
+      const host = {
+        registerEscapeHandler: jest.fn(),
+        loadModelCatalogData: jest.fn(async () => ({ catalogBundle: null, providers: [] })),
+        getActiveTabModelOverride: jest.fn(() => null),
+        setActiveTabModelOverride: jest.fn(() => true),
+        getDefaultModelSelection: jest.fn(() => null),
+        syncActiveTabContextUsageIdentity: jest.fn(),
+        getModelSourceMode: jest.fn(() => 'merge'),
+        isModelAvailableOnServer: jest.fn(async () => true),
+        resolveProviderIconUrl: jest.fn(async () => null),
+        updateEffortSelectorDisplay: jest.fn(),
+        getPermissionMode: jest.fn(() => 'normal' as PermissionMode),
+        switchPermissionMode: jest.fn(async () => {}),
+      } as unknown as ChatSelectionControlsCoordinatorHost;
+
+      const toolbarEl = document.createElement('div');
+      document.body.appendChild(toolbarEl);
+
+      const coordinator = new ChatSelectionControlsCoordinator(host);
+      coordinator.build(toolbarEl);
+      await settleAsyncWork();
+
+      const trigger = toolbarEl.querySelector<HTMLElement>('.opencodian-permission-trigger');
+      expect(trigger?.getAttribute('data-permission-backend')).toBe('claude-code');
+      expect(trigger?.querySelector('.opencodian-permission-trigger-text')?.textContent).toBe('EDIT');
+
+      // Claude Code modes should be available
+      trigger?.click();
+      expect(toolbarEl.querySelector('[data-mode="default"]')).not.toBeNull();
+      expect(toolbarEl.querySelector('[data-mode="acceptEdits"]')).not.toBeNull();
+      expect(toolbarEl.querySelector('[data-mode="bypassPermissions"]')).not.toBeNull();
+      expect(toolbarEl.querySelector('[data-mode="plan"]')).not.toBeNull();
+      // OpenCode modes should NOT be available
+      expect(toolbarEl.querySelector('[data-mode="yolo"]')).toBeNull();
+    });
+
+    it('routes Claude mode selection through the live plugin permission seam', async () => {
+      const saveSettings = jest.fn(async () => {});
+      const setPermissionMode = jest.fn(async () => {});
+      (globalThis as any).app = {
+        plugins: {
+          plugins: {
+            opencodian: {
+              settings: {
+                activeBackend: 'claude-code',
+                backendSettings: {
+                  claudeCode: {
+                    permissionMode: 'default' as ClaudeCodePermissionMode,
+                  },
+                },
+              },
+              saveSettings,
+              agentServiceRegistry: {
+                get: jest.fn(() => ({ setPermissionMode })),
+              },
+            },
+          },
+        },
+      };
+
+      const host = {
+        registerEscapeHandler: jest.fn(),
+        loadModelCatalogData: jest.fn(async () => ({ catalogBundle: null, providers: [] })),
+        getActiveTabModelOverride: jest.fn(() => null),
+        setActiveTabModelOverride: jest.fn(() => true),
+        getDefaultModelSelection: jest.fn(() => null),
+        syncActiveTabContextUsageIdentity: jest.fn(),
+        getModelSourceMode: jest.fn(() => 'merge'),
+        isModelAvailableOnServer: jest.fn(async () => true),
+        resolveProviderIconUrl: jest.fn(async () => null),
+        updateEffortSelectorDisplay: jest.fn(),
+        getPermissionMode: jest.fn(() => 'normal' as PermissionMode),
+        switchPermissionMode: jest.fn(async () => {}),
+      } as unknown as ChatSelectionControlsCoordinatorHost;
+
+      const toolbarEl = document.createElement('div');
+      document.body.appendChild(toolbarEl);
+
+      const coordinator = new ChatSelectionControlsCoordinator(host);
+      coordinator.build(toolbarEl);
+      await settleAsyncWork();
+
+      const trigger = toolbarEl.querySelector<HTMLElement>('.opencodian-permission-trigger');
+      trigger?.click();
+
+      const planOption = toolbarEl.querySelector<HTMLElement>('[data-mode="plan"]');
+      planOption?.click();
+      await settleAsyncWork();
+
+      // Claude Code mode changes are owned by the selector's live plugin seam,
+      // not by a new OpenCodianView host method.
+      expect((globalThis as any).app.plugins.plugins.opencodian.settings.backendSettings.claudeCode.permissionMode).toBe('plan');
+      expect(saveSettings).toHaveBeenCalledTimes(1);
+      expect(setPermissionMode).toHaveBeenCalledWith('plan');
+      expect(host.switchPermissionMode).not.toHaveBeenCalled();
+    });
+
+    it('routes OpenCode mode selection through switchPermissionMode', async () => {
+      (globalThis as any).app = {
+        plugins: { plugins: { opencodian: { settings: { activeBackend: 'opencode' } } } },
+      };
+
+      const host = {
+        registerEscapeHandler: jest.fn(),
+        loadModelCatalogData: jest.fn(async () => ({ catalogBundle: null, providers: [] })),
+        getActiveTabModelOverride: jest.fn(() => null),
+        setActiveTabModelOverride: jest.fn(() => true),
+        getDefaultModelSelection: jest.fn(() => null),
+        syncActiveTabContextUsageIdentity: jest.fn(),
+        getModelSourceMode: jest.fn(() => 'merge'),
+        isModelAvailableOnServer: jest.fn(async () => true),
+        resolveProviderIconUrl: jest.fn(async () => null),
+        updateEffortSelectorDisplay: jest.fn(),
+        getPermissionMode: jest.fn(() => 'normal' as PermissionMode),
+        switchPermissionMode: jest.fn(async () => {}),
+      } as unknown as ChatSelectionControlsCoordinatorHost;
+
+      const toolbarEl = document.createElement('div');
+      document.body.appendChild(toolbarEl);
+
+      const coordinator = new ChatSelectionControlsCoordinator(host);
+      coordinator.build(toolbarEl);
+      await settleAsyncWork();
+
+      const trigger = toolbarEl.querySelector<HTMLElement>('.opencodian-permission-trigger');
+      trigger?.click();
+
+      const yoloOption = toolbarEl.querySelector<HTMLElement>('[data-mode="yolo"]');
+      yoloOption?.click();
+      await settleAsyncWork();
+
+      // Should call the OpenCode-specific switch, not the Claude switch
+      expect(host.switchPermissionMode).toHaveBeenCalledWith('yolo');
     });
     /* eslint-enable @typescript-eslint/no-explicit-any */
   });

@@ -11,17 +11,282 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
-## 2026-06-07 Claude Code Todo/Task User Surface — Re-Audit and Productization
+## 2026-06-07 Permission Mode Live Switch — Chat Surface Productization
 
-**Outcome: Claude Code todo dock productized via capability flag + session routing fix.**
+**Outcome: Promoted `Permission Mode Live Switch` user surface from `settings` to `settings+chat`. Chat toolbar now shows backend-appropriate permission controls. Runtime proof remains `readback`.**
 
-### Gap Identified
+### Changes
 
-Three conditions prevented Claude Code conversations from using the todo dock:
+#### PermissionModeSelectorCoordinator (refactored)
+- Made configurable: accepts `PermissionModeConfig` at construction with mode options, display labels, and CSS classes.
+- Exported factory functions: `createOpenCodePermissionConfig()` (yolo/normal/plan) and `createClaudeCodePermissionConfig()` (default/acceptEdits/bypassPermissions/plan).
+- Added `data-permission-backend` attribute (`opencode`/`claude-code`) on trigger element for runtime verification.
+- Host interface now uses `string` instead of `PermissionMode` for generality.
 
-1. **Capability gate**: `AgentCapability.Todos` was NOT in `CLAUDE_CODE_PHASE1_CAPABILITIES`, so `attachSessionTodo()` and `renderSessionTodoDock()` in `OpenCodianView` skipped mounting for Claude Code sessions.
-2. **Session ID routing**: `getOpenCodeSessionIdForConversation()` returned `null` for non-OpenCode backends — only checked `openCodeSessionId` when `backend === 'opencode'`. Claude Code conversations have `backendSessionId` but it was never resolved.
-3. **Backend API gate (already correct)**: `refreshTabSessionTodos()` already had a gate that returns early for non-OpenCode backends, preventing `getSessionTodos()` calls for Claude Code.
+#### ChatSelectionControlsCoordinator (backend-aware routing)
+- New `buildBackendPermissionSelector()` detects active backend at build time and creates the appropriate selector with correct mode system.
+- Permission selector created per-build (not in constructor) since mode system depends on active backend.
+- Claude Code routing stays inside this coordinator via the live plugin seam: it reads `backendSettings.claudeCode.permissionMode`, saves the setting, and calls `adapter.setPermissionMode()`.
+- OpenCode routing still uses the existing host `getPermissionMode()` / `switchPermissionMode()` path.
+- Toolbar fully rebuilt on backend switch, so correct selector appears automatically.
+
+#### OpenCodianView ownership boundary
+- No new Claude permission writeback ownership was added to guarded `OpenCodianView.ts`.
+- The final path keeps Claude Code permission live-apply in `ChatSelectionControlsCoordinator`, avoiding another view-local runtime seam.
+
+#### ClaudeCodeAdapter (capability promotion)
+- Added `AgentCapability.Permissions` to `CLAUDE_CODE_PHASE1_CAPABILITIES` so permission selector renders for Claude Code conversations.
+
+#### Capability matrix
+- `userSurface` promoted from `'settings'` to `'settings+chat'`.
+- Updated chat section description to document the backend-aware routing.
+
+#### i18n
+- Added 4 new chat-level description keys for Claude Code permission modes in both en.ts and zh.ts.
+
+#### Tests
+- Added 4 new test cases in `ChatSelectionControlsCoordinator.test.ts`:
+  - Renders OpenCode permission modes when backend is opencode
+  - Renders Claude Code permission modes when backend is claude-code
+  - Routes Claude mode selection through live plugin settings plus `adapter.setPermissionMode()`
+  - Routes OpenCode mode selection through `switchPermissionMode`
+- All existing sandbox badge tests preserved with updated mocks.
+
+### Honesty Boundary
+
+Runtime proof remains `readback`. The chat control successfully writes settings and calls `adapter.setPermissionMode()`, but no observable stream marker confirms internal CLI permission state change. The three structural blockers documented in the capability matrix still apply.
+
+### Touched Files
+
+- `src/features/chat/services/PermissionModeSelectorCoordinator.ts`
+- `src/features/chat/services/ChatSelectionControlsCoordinator.ts`
+- `src/core/agents/backend/ClaudeCodeAdapter.ts`
+- `src/features/settings/SettingsCapabilityLabSection.ts`
+- `src/i18n/locales/en.ts`
+- `src/i18n/locales/zh.ts`
+- `tests/unit/features/chat/ChatSelectionControlsCoordinator.test.ts`
+
+---
+
+## 2026-06-07 Claude Code Hooks + Plugins — Productization Closure (Truth Audit)
+
+**Outcome: Truth closure with one Codex review correction. Existing stable surfaces remain sufficient; JS-callback-only hook evidence is now guarded as readback.**
+
+### Audit Scope
+
+Focused audit of Claude Code Hooks and Plugins matrix rows against current SDK/runtime truth. Fixed goal: verify that stable user surfaces honestly represent real runtime paths, clearly mark dead-letter boundaries, and don't manufacture fake capabilities.
+
+### Key Findings
+
+1. **Hooks** (`pass` / `settings`): Three-layer architecture already documented. Pass is anchored to Layer 3 (shell hooks from `.claude/settings.json` / `.claude/settings.local.json`) only. Layer 1 (JS callbacks) is dead-letter at runtime — structurally identical to Plugins programmatic path. Layer 2 (includeHookEvents) is a separate diagnostic-only row. Matrix row comment hardened with explicit anchoring statement. Codex review also corrected the dynamic proof report so Layer 1 callback invocation without Layer 3 shell-hook evidence updates Hooks to `readback`, not `pass`.
+
+2. **Plugins** (`pass` / `settings`): Marketplace plugin→skills chain is the real runtime path. Programmatic `SdkPluginConfig` is dead-letter at runtime (subprocess ignores it). Pass anchored to plugin→skills chain only. No changes needed — already honest.
+
+3. **Include Hook Events** (`pass` / `diagnostic`): Correctly classified as diagnostic-only stream logging toggle. Does NOT control hook activation (hooks work regardless). Already honest.
+
+4. **Settings surface assessment**: Project settings scan/create/open for `.claude/settings.json` + `.claude/settings.local.json` is sufficient for both hooks and plugins. Boundary notice explains `settingSources` requirement. No visual hook/plugin editor needed for stable user entry — these are config-driven lifecycle mechanisms edited via JSON files.
+
+### Changes
+
+- `SettingsCapabilityLabSection.ts`: Hooks matrix row comment hardened with explicit "Pass is anchored to Layer 3 only" statement, matching the pattern used by Plugins row. The Hook proof report now keeps callback-only evidence at `readback`.
+- `SettingsCapabilityLabSection.test.ts`: Added a regression test proving JS-callback-only hook evidence renders `Hooks READBACK` and does not emit `Hooks PASS`.
+- `docs/status/claude-code-current-state-2026-05-22.md`: Hooks/Plugins pass entries updated with runtime-path anchoring. Include Hook Events entry clarified. New "2026-06-07 Claude Code Hooks + Plugins — Productization Closure" audit section added.
+- Matrix counts unchanged: 48 rows, 34 pass, 14 readback, 2 hidden, 0 fail.
+
+---
+
+## 2026-06-07 Claude Code Task* Hydration — Persisted-History Rehydration
+
+**Outcome: Rehydration implemented, unit tests pass, and real Obsidian runtime proof is now captured.**
+
+### Problem
+
+After conversation reload (hydration), the in-memory `claudeTaskSessionStates` was empty. Historical `TaskCreate`/`TaskUpdate` tool calls stored in `contentBlocks` were not replayed. This meant:
+- Subsequent `TaskUpdate`-only turns could not find existing task entries
+- Todo dock was empty and hidden after reload, even though task data existed in stored messages
+
+### Solution
+
+Added `rehydrateClaudeTasksFromMessages(tabId, messages)` to `SessionTodoCoordinator`:
+- Scans `contentBlocks` (fallback: `toolCalls`) for `tool_use` blocks matching Task* names
+- Converts each `ContentBlock` to `ToolCallInfo` and replays through existing `applyStreamingTodoSnapshotFromTool` path
+- Idempotent: skips if session already has task entries (live streaming already populated)
+- Per-session isolation preserved
+
+Final implementation path:
+- Keep `ConversationHydrationOutcomeBridge` unchanged except for import cleanup
+- Trigger Claude Task* replay from `SessionTodoCoordinator.resetTabSessionState()`
+- When tab session state is cleared for a Claude conversation that already carries persisted messages, immediately rebuild Task* state from those stored messages
+- This keeps the rehydration truth inside the session-todo owner and removes the extra guarded `OpenCodianView` host wiring
+
+### Changes
+
+- **`SessionTodoCoordinator.ts`**: Added `rehydrateClaudeTasksFromMessages()`, `contentBlockToToolCallInfo()` helper, imported `ContentBlock` type, and now rehydrates during Claude session reset/activation after clearing the per-session registry
+- **`ConversationHydrationOutcomeBridge.ts`**: No new runtime ownership retained; only import cleanup after the rehydration hook was pulled back out
+- **`ConversationHydrationRuntimeViewHostFactory.ts`**: Reverted the temporary rehydration host seam so hydration assembly stays unchanged
+- **`OpenCodianView.ts`**: Temporary host pass-through was removed to satisfy owner-guard honestly
+- **Tests**: Added persisted-history rehydration coverage plus a reset-path regression test; the focused SessionTodoCoordinator + hydration bridge suites now pass against the final trigger path
+- **Docs**: Updated `SessionTodoCoordinator.md`, `ConversationHydrationOutcomeBridge.md`, status doc, and this devlog to reflect the final owner path. Runtime proof captured later in this same entry (BUILD_ID feature-phase0-capability.202606071202)
+
+### Runtime Proof
+
+Real Test Vault / Obsidian verification completed on BUILD_ID `feature-phase0-capability.202606071202`:
+- Reloaded Claude conversation `conv-1780776153801-v9lnfeihy`
+- Runtime log showed `SessionTodoCoordinator [claude-task-rehydrate] rehydrated session=79673f0e-d48c-49c2-baa8-5704700c1fac, entries=3, messages scanned=8`
+- DOM/runtime state showed visible todo dock with 3 recovered tasks:
+  - task `1`: `in_progress`
+  - task `2`: `pending`
+  - task `3`: `pending`
+- Sent a new user turn restricted to `TaskUpdate` only; Claude emitted a real `TaskUpdate` tool call and the dock updated to:
+  - task `1`: `completed`
+  - task `2`: `pending`
+  - task `3`: `pending`
+- `obsidian dev:errors` remained empty
+- Screenshots:
+  - `/tmp/opencodian-claude-task-rehydrate-1202.png`
+  - `/tmp/opencodian-claude-task-updated-1202.png`
+
+### Remaining Gaps
+
+- **TaskList/TaskGet consumption**: Not needed for the verified continuity path; consider for completeness later
+- **TaskOutput/TaskStop consumption**: still no coherent stable user workflow
+
+---
+
+## 2026-06-07 Claude Code Task* Productization — Per-Session Scoping + Collision-Free Fallback Fix
+
+**Outcome: Codex review fixes applied. Task* remains productized.**
+
+### Issues Fixed
+
+1. **`claudeTaskRegistry` was coordinator-global** — replaced with `claudeTaskSessionStates` Map keyed by backend sessionId. Each session now has its own isolated task registry. `resetTabSessionState` only clears the specific session's state, preventing cross-tab/cross-session leakage.
+2. **Fallback task ID was collision-prone** — sequential counter could overwrite parsed real IDs. Replaced with tool-call-derived synthetic IDs (`tc_<last8chars>`). The `tc_` prefix guarantees no collision with real numeric IDs. Added defensive collision guard in the extremely unlikely case of tool-call-ID suffix collision.
+3. **Status doc contradiction** — the "Outcome B — ROLL BACK" decision block and "Future Path" list contradicted the productized state. Replaced with a two-phase narrative: Phase 1 (rollback) preserved in collapsed detail, Phase 2 (productization) as the current state.
+
+### Changes
+
+- **`SessionTodoCoordinator.ts`**: Replaced `claudeTaskRegistry` + `claudeTaskCreateCounter` with `claudeTaskSessionStates: Map<sessionId, { tasks: Map<taskId, SessionTodo> }>`. All Task* methods now look up the session-specific state. Fallback ID uses tool call ID suffix.
+- **Tests**: Updated fallback ID assertions, added 3 cross-session isolation tests (distinct sessions, reset isolation, preserved alpha when beta resets). Total 32 tests pass.
+- **Docs**: Updated `SessionTodoCoordinator.md` (per-session scoping), status doc (consistent two-phase narrative), devlog.
+
+### Task* Status After Fix
+
+**Still productized.** Both implementation issues were real but fixable with small, coherent changes. The per-session scoping and collision-free fallback are now structurally correct.
+
+---
+
+## 2026-06-07 Claude Code Task* Productization — Incremental CRUD Dock Surface
+
+**Outcome: Outcome A — Task* tools productized via incremental CRUD model in SessionTodoCoordinator.**
+
+> **2026-06-07 follow-up:** This was the first Task* productization checkpoint. Later same-day fixes replaced the initial coordinator-global registry with per-session `claudeTaskSessionStates`, replaced sequential fallback IDs with tool-call-derived `tc_` IDs, and added persisted-history rehydration through `SessionTodoCoordinator.resetTabSessionState()`. The details below preserve the initial checkpoint context; the current implementation is summarized in the two entries above.
+
+### Context
+
+Previous rollback proved Claude uses `TaskCreate`/`TaskUpdate`/`TaskList`/`TaskGet`/`TaskOutput`/`TaskStop` (NOT `TodoWrite`). This checkpoint evaluates whether the real Task* traffic can drive the existing `SessionTodoDock`.
+
+### Feasibility Analysis
+
+- **TaskCreate input**: `{ subject, description, activeForm }` — stable tool parameters
+- **TaskCreate result**: `"Task #N created successfully: subject"` — parseable with regex `/Task #(\d+)/i`
+- **TaskUpdate input**: `{ taskId: "N", status: "in_progress"|"completed" }` — stable
+- **Mapping to SessionTodo**: straightforward — `{id: taskId, content: subject, status: "pending"}`
+- **Rehydration**: possible from stored `contentBlocks` (toolResult is persisted); completed later in the persisted-history rehydration checkpoint above
+- **Fragility**: result-string parsing is fragile; later fixed fallback uses tool-call-derived `tc_` IDs that cannot collide with real numeric task IDs
+
+### Implementation
+
+- **`SessionTodoCoordinator.ts`**:
+  - Added the first incremental task state tracking path; later replaced by per-session `claudeTaskSessionStates`
+  - Extended `applyStreamingTodoSnapshotFromTool` to dispatch `TaskCreate`/`TaskUpdate` to new CRUD path
+  - `applyClaudeTaskCreate`: extracts task ID from result string; later fallback uses a tool-call-derived `tc_` synthetic ID
+  - `applyClaudeTaskUpdate`: updates existing entry status; seeds entry if TaskUpdate arrives before TaskCreate result
+  - `resetTabSessionState`/`clearTabSessionState` initially cleared the registry; later reset/activation also rehydrates persisted Claude Task* state from stored messages
+- **`BackgroundTaskStreamTriggerCoordinator.ts`**: Extended `isTodoTool` to recognize `taskcreate`/`taskupdate`/`tasklist`/`taskget` for refresh triggers
+- **`ClaudeCodeAdapter.ts`**: Re-enabled `AgentCapability.Todos` in `CLAUDE_CODE_PHASE1_CAPABILITIES`
+- **Tests**: Added 11 Task* tests to `SessionTodoCoordinator.test.ts`; updated `ClaudeCodeAdapter.test.ts` assertion
+- **Docs**: Updated `BackgroundTaskStreamTriggerCoordinator.md`, `SessionTodoCoordinator.md`, `ClaudeCodeAdapter.md`, status doc
+
+### Honest Boundaries
+
+- State derivation is stream-first plus persisted-history rehydration on Claude session reset/activation; there is still no broader server-backed todo API for Claude
+- TaskCreate result parsing (`Task #N`) is inherently fragile — Claude could change the format; fallback now uses tool-call-derived `tc_` IDs
+- TaskList/TaskGet payloads are not consumed yet — only TaskCreate/TaskUpdate drive the dock
+- TaskOutput/TaskStop are not productized — no coherent user workflow for these controls
+- The dock is shared between OpenCode (TodoWrite snapshot) and Claude Code (Task* CRUD) — only one backend's traffic will be active per session
+
+### Remaining Gaps
+
+1. TaskList/TaskGet full-list reconciliation (if Claude sends these)
+2. TaskOutput/TaskStop user workflow design
+3. Any future non-create/update task semantics need separate UX evaluation before promotion
+
+---
+
+## 2026-06-07 Claude Code Todo/Task — Runtime-Truth Repair (TodoWrite Rollback)
+
+**Outcome: Outcome B — TodoWrite-based productization ROLLED BACK.**
+
+### Runtime Evidence (Codex ground truth, BUILD_ID feature-phase0-capability.202606070927)
+
+1. Claude backend active, `hasCapability('todos') === true` (at time of capture).
+2. Todo dock mounted but hidden: `.opencodian-session-todo-dock is-hidden is-collapsed`.
+3. Claude did NOT use TodoWrite. Used `ToolSearch`, `Bash`, then `TaskCreate`/`TaskUpdate`/`TaskList`/`TaskGet`/`TaskOutput`/`TaskStop`.
+4. Claude explicitly stated: "TodoWrite is not an available tool in my tool set."
+5. Todo dock stayed hidden in both attempts. No console errors.
+
+### SDK Analysis
+
+Both `TodoWrite` and `TaskCreate`/`TaskUpdate`/`TaskList`/`TaskGet`/`TaskOutput`/`TaskStop` are defined in `sdk-tools.d.ts`:
+- TodoWrite: snapshot model — `{ todos: [{ content, status, activeForm }] }`
+- TaskCreate: CRUD — `{ subject, description, activeForm?, metadata? }`
+- TaskUpdate: CRUD — `{ taskId, status?, subject?, description?, ... }`
+- Task* tools have hook events: `TaskCreated`, `TaskCompleted`
+
+### Why Not Outcome A (productize Task* tools)
+
+1. Task* tools are CRUD operations, not snapshots — need new stateful tracking (task ID linking across create→update chains)
+2. `applyStreamingTodoSnapshotFromTool` only receives `ToolCallInfo` (input, no result) — cannot extract `TaskCreateOutput.task.id`
+3. Exceeds "small, real changes" — it's a new data model
+4. Cannot verify exact wire-format names without additional runtime testing
+
+### Changes
+
+- **`ClaudeCodeAdapter.ts`**: Removed `AgentCapability.Todos` from `CLAUDE_CODE_PHASE1_CAPABILITIES` — todo dock no longer mounts for Claude Code.
+- **`toolIdentity.ts`**: Added 6 Task* tool definitions (`taskcreate`, `taskupdate`, `tasklist`, `taskget`, `taskoutput`, `taskstop`) for proper chat rendering.
+- **`ToolCallRenderer.ts`**: Added Task* summary resolvers for one-line tool call card summaries.
+- **Tests**: `ClaudeCodeAdapter.test.ts`: `AgentCapability.Todos` → `false`. Updated `SessionTodoCoordinator.test.ts` section comments.
+
+### Honest Boundaries After Repair
+
+- Claude Code does NOT drive the todo dock — `AgentCapability.Todos` removed.
+- TodoWrite exists in SDK but NOT available to current Claude model.
+- Task* tools are the real runtime seam — SDK-documented, full type definitions, CRUD model.
+- Todo dock remains fully functional for OpenCode sessions (unchanged).
+- Task* tool calls now render with proper names/icons/summaries in Claude Code chat.
+
+### Future Path
+
+1. Extend `applyStreamingTodoSnapshotFromTool` to handle `TaskCreate`/`TaskUpdate`.
+2. Add task ID tracking state.
+3. Extract task IDs from tool_result blocks (requires infrastructure change).
+4. Re-add `AgentCapability.Todos` once verified with real Task* traffic.
+
+---
+
+## 2026-06-07 Claude Code Todo/Task User Surface — Initial Productization (SUPERSEDED)
+
+> **⚠️ SUPERSEDED by runtime-truth repair above.** The TodoWrite productization was based on theoretical SDK docs, not real runtime evidence. Runtime proved Claude uses Task* tools, not TodoWrite.
+
+**Original Outcome: Claude Code todo dock productized via capability flag + session routing fix.**
+
+### Gap Identified (SUPERSEDED)
+
+Three conditions were believed to prevent Claude Code conversations from using the todo dock:
+
+1. **Capability gate**: `AgentCapability.Todos` was NOT in `CLAUDE_CODE_PHASE1_CAPABILITIES`.
+2. **Session ID routing**: `getOpenCodeSessionIdForConversation()` returned `null` for non-OpenCode backends.
+3. **Backend API gate (already correct)**: `refreshTabSessionTodos()` already returned early for non-OpenCode backends.
 
 ### Changes
 

@@ -1,7 +1,4 @@
-import type {
-  ChatMessage,
-  Conversation,
-} from '../../../core/types';
+import type { ChatMessage, Conversation } from '../../../core/types';
 import { getConversationBackendSessionId } from '../../../core/types';
 import type { TabId } from '../tabs';
 import type { TabConversationStateBridge } from './TabConversationStateBridge';

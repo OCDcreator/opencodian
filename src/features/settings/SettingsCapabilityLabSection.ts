@@ -569,7 +569,7 @@ export class SettingsCapabilityLabSection {
         capability: 'Hooks',
         sdkExposed: true, // SDK options accept hooks
         adapterWired: true, // buildSdkOptions wires hooks
-        runtimeProof: 'pass', // Layer 1 (JS callback): programmatic hooks option passed to SDK query(). SDK subprocess may or may not invoke JS callbacks depending on SDK version. Layer 2 (includeHookEvents stream): captures hook backend_events when includeHookEvents=true. Layer 3 (shell-hook from config file): .claude/settings.json and .claude/settings.local.json shell hooks are loaded by the SDK subprocess when the corresponding settingSources are enabled. IMPORTANT: default settingSources is ['project'] which reads .claude/settings.json but NOT .claude/settings.local.json. To activate hooks in settings.local.json, users must enable 'local' in settingSources (Context & Sources tab). The hook proof report now honestly distinguishes Layer 1 vs Layer 3 results and reports current settingSources configuration.
+        runtimeProof: 'pass', // Three-layer architecture. Pass is anchored to Layer 3 (shell hooks from config files) only. Layer 1 (JS callback): programmatic hooks option passed to SDK query(). SDK subprocess accepts JS callbacks at the API boundary but does NOT invoke them — structurally identical to Plugins programmatic SdkPluginConfig limitation. Layer 2 (includeHookEvents stream): captures hook backend_events when includeHookEvents=true — tracked as separate "Include Hook Events" row (diagnostic-only stream logging toggle, NOT hook activation control). Layer 3 (shell-hook from config file): .claude/settings.json and .claude/settings.local.json shell hooks are loaded and executed by the SDK subprocess when the corresponding settingSources are enabled. IMPORTANT: default settingSources is ['project'] which reads .claude/settings.json but NOT .claude/settings.local.json. To activate hooks in settings.local.json, users must enable 'local' in settingSources (Context & Sources tab). The hook proof report honestly distinguishes all three layers and reports current settingSources configuration.
         userSurface: 'settings', // Settings: project settings scan/create/open for .claude/settings.json + .claude/settings.local.json. Hooks are configured by editing these files directly; the settings surface provides discovery and file access, not a visual hook editor. Note: hooks in .claude/settings.local.json only activate when settingSources includes 'local'.
       },
       {
@@ -1523,12 +1523,24 @@ export class SettingsCapabilityLabSection {
         //    - The Permission Approval proof launcher also uses this seam to temporarily
         //      switch to 'plan' mode for triggering permission cards.
         //
-        // 3. CHAT (NO user surface for Claude Code):
-        //    - The shared chat permission selector (PermissionModeSelectorCoordinator) controls
-        //      OpenCode's global permissionMode (yolo/normal/plan) and restarts the OpenCode service.
-        //    - It does NOT call ClaudeCodeAdapter.setPermissionMode() or query.setPermissionMode().
-        //    - The chat permission selector is a completely separate system from Claude Code's
-        //      permission mode. Do not conflate them.
+        // 3. CHAT (stable user surface — readback):
+        //    - ChatSelectionControlsCoordinator now detects the active backend at build time
+        //      and routes to the appropriate permission mode system:
+        //      - claude-code: Claude Code permission modes (default/acceptEdits/bypassPermissions/plan)
+        //        routed through getClaudeCodePermissionMode() / switchClaudeCodePermissionMode().
+        //        The chat control writes to backendSettings.claudeCode.permissionMode, saves settings,
+        //        and calls adapter.setPermissionMode() for live apply. data-permission-backend="claude-code".
+        //      - opencode: OpenCode permission templates (yolo/normal/plan) via the existing
+        //        getPermissionMode() / switchPermissionMode() path (restarts OpenCode service).
+        //        data-permission-backend="opencode".
+        //    - The two systems are architecturally separate. Claude chat control uses
+        //      ClaudeCodePermissionMode type and adapter.setPermissionMode(). OpenCode chat control
+        //      uses PermissionMode type and OpenCode service restart.
+        //    - AgentCapability.Permissions is now included in CLAUDE_CODE_PHASE1_CAPABILITIES,
+        //      so the permission selector renders for Claude Code conversations.
+        //    - Runtime proof remains 'readback': the chat control successfully calls
+        //      adapter.setPermissionMode() and saves settings, but produces no observable
+        //      stream marker confirming internal CLI state change.
         //
         // SEMANTIC BOUNDARIES (explicit to prevent future confusion):
         // - This is the Claude Code SDK query.setPermissionMode() seam ONLY.
@@ -1537,10 +1549,9 @@ export class SettingsCapabilityLabSection {
         //   PermissionModeSelectorCoordinator — separate system, restarts OpenCode service).
         // - This is NOT Plan Mode Instructions (dependent on permissionMode='plan' but a separate
         //   capability row, pass/settings).
-        // - The chat permission selector does NOT route to this seam; it only controls OpenCode.
-        userSurface: 'settings', // Settings: Permissions tab dropdown with live apply.
-        // Chat: NO Claude Code permission selector in chat toolbar.
-        // The shared chat selector controls OpenCode only.
+        userSurface: 'settings+chat', // Settings: Permissions tab dropdown with live apply.
+        // Chat: backend-aware permission selector — Claude Code modes when claude-code active,
+        // OpenCode templates when opencode active.
       },
     ];
   }
@@ -3589,11 +3600,11 @@ export class SettingsCapabilityLabSection {
         ? 'Hooks PASS: both shell-hook execution (Layer 3) and JS callback invocation (Layer 1) verified.'
         : 'Hooks PASS: shell-hook execution via .claude/settings.local.json verified (Layer 3). JS callback path remains uninvoked (SDK limitation), but real runtime hook path is functional.' });
     } else if (hookTracker.callbackInvoked) {
-      // Layer 1 passed but Layer 3 did not. Report honestly.
-      this.updateRuntimeProof('Hooks', 'pass', outputEl);
+      // Layer 1 callback activity alone is not the stable hook product path.
+      this.updateRuntimeProof('Hooks', 'readback', outputEl);
       outputEl.createEl('p', { cls: 'opencodian-capability-lab-hint', text: layer3.nonceExists
-        ? 'Hooks PASS: JS callback invocation verified (Layer 1). Shell-hook nonce file exists but content mismatch (Layer 3 inconclusive).'
-        : `Hooks PASS: JS callback invocation verified (Layer 1). Shell-hook nonce file NOT found (Layer 3 not verified). Shell hooks from .claude/settings.local.json require settingSources to include 'local'. Current settingSources: [${this.claudeCodeSettings.settingSources.join(', ')}]. ${hasLocalSource ? "'local' is enabled — shell hooks should work in ordinary chat." : "'local' is NOT enabled — add it in Context & Sources tab to activate .claude/settings.local.json hooks."}` });
+        ? 'Hooks READBACK: JS callback invocation verified (Layer 1), but shell-hook nonce file content did not match (Layer 3 inconclusive). Stable Hooks pass requires Layer 3 shell-hook execution.'
+        : `Hooks READBACK: JS callback invocation verified (Layer 1), but shell-hook nonce file was NOT found (Layer 3 not verified). Stable Hooks pass requires Layer 3 shell-hook execution. Shell hooks from .claude/settings.local.json require settingSources to include 'local'. Current settingSources: [${this.claudeCodeSettings.settingSources.join(', ')}]. ${hasLocalSource ? "'local' is enabled — shell hooks should work in ordinary chat." : "'local' is NOT enabled — add it in Context & Sources tab to activate .claude/settings.local.json hooks."}` });
     } else if (hooksWiredInOptions) {
       this.updateRuntimeProof('Hooks', 'readback', outputEl);
       outputEl.createEl('p', { cls: 'opencodian-capability-lab-hint', text: 'Hooks option wired into SDK options (readback confirmed) but neither JS callback nor shell hook executed. Verdict: readback.' });

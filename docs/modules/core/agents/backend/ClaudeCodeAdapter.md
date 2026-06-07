@@ -11,7 +11,7 @@
 
 ## 职责
 
-- 声明 Claude Code backend kind、显示名、状态和 Phase 1 capability 集合：`Chat`、`Sessions`、`Fork`、`Models`、`Thinking`、`FileOps`、`Shell` 和 `Todos`。其中 `Fork` 支持 `forkSession()`，但不声明 `Branching`（revert/unrevert/diff 仍保持 OpenCode-only）；`Todos` 使用 Claude Code stream 中 TodoWrite tool 派生的 todo snapshot，不调用 OpenCode server 的 session todo API
+- 声明 Claude Code backend kind、显示名、状态和 Phase 1 capability 集合：`Chat`、`Sessions`、`Fork`、`Models`、`Thinking`、`FileOps`、`Shell`、`Todos`、`Permissions`。其中 `Fork` 支持 `forkSession()`，但不声明 `Branching`（revert/unrevert/diff 仍保持 OpenCode-only）。`Todos` capability 已于 2026-06-07 productized：Claude 使用 `TaskCreate`/`TaskUpdate`/`TaskList`/`TaskGet`/`TaskOutput`/`TaskStop`（NOT `TodoWrite`）；`SessionTodoCoordinator` 从 `TaskCreate`/`TaskUpdate` 工具流量按 incremental CRUD model 推导 task state，并复用现有 `SessionTodoDock`，同时在 Claude session reset/activation 时 replay stored `contentBlocks` 以恢复 persisted Task* state。`Permissions` capability 表示 Claude Code 支持 settings + chat permission-mode live switch（`default` / `acceptEdits` / `bypassPermissions` / `plan`）并通过 `setPermissionMode()` fan-out 到活跃 SDK query；runtime proof 仍是 readback，因为 SDK 没有可观察的 mode-change stream marker。
 - 维护本地 session handle，用于后续 OpenCodian conversation 到 Claude SDK 会话的映射基础
 - 捕获 Claude SDK stream 中的真实 `session_id`，把本地 handle alias 到 SDK session id，并在后续发送中通过 `options.resume` 恢复同一 Claude session
 - 在 `sendMessage()` 中构造 SDK `query({ prompt, options })` 输入

@@ -1,11 +1,15 @@
 # Chinese Locale
 
 > **源码**: `src/i18n/locales/zh.ts`
-> **最近更新**: 2026-06-06
+> **最近更新**: 2026-06-07
 
 ## 概述
 
-OpenCodian 的简体中文翻译表，导出 `zhTranslations` 静态对象。本轮新增并扩展 `chat.backendSessions.*` 键（backend session browser modal：浏览/预览/恢复 backend sessions、preview transcript seeding、详情 metadata、完整 transcript、preview/detail 导航）和 `settings.claudeCode.sessionBrowser.*`（settings 侧 browse-only session browser launcher：说明、按钮和 browse-only notice）以及 `settings.claudeCode.projectSettings.*` 键（含 `marketplacesSummary` / `noMarketplaces` / `boundaryNotice` 含 settingSources 要求说明）。 `chat.sessionSharing.*` 与 `settings.conversation.share.sharedSessions.*` / `settings.conversation.share.diagnostics.*`，用于当前会话分享状态、分享禁用提示、分享失败归一化说明、分享诊断、已分享会话列表、公开数量、刷新、完整预览、复制链接和取消分享操作；其中新增 `settings.conversation.share.sharedSessions.previewEmpty`，用于区分“后端不可预览”和“会话暂时没有可预览消息”的中性空态。 同时保留 `settings.conversation.share.help.*`、`settings.security.blockedCommands.help.*` 与 `settings.projectConfigHelp.*`，用于会话分享模式和 `permission.bash` 帮助弹窗。
+OpenCodian 的简体中文翻译表，导出 `zhTranslations` 静态对象。
+
+2026-06-07：新增 `chat.claudeCode.permissionMode.*.description` 键（4 个），为 Claude Code 权限模式的聊天选择器提供中文描述文案。
+
+本轮新增并扩展 `chat.backendSessions.*` 键（backend session browser modal：浏览/预览/恢复 backend sessions、preview transcript seeding、详情 metadata、完整 transcript、preview/detail 导航）和 `settings.claudeCode.sessionBrowser.*`（settings 侧 browse-only session browser launcher：说明、按钮和 browse-only notice）以及 `settings.claudeCode.projectSettings.*` 键（含 `marketplacesSummary` / `noMarketplaces` / `boundaryNotice` 含 settingSources 要求说明）。 `chat.sessionSharing.*` 与 `settings.conversation.share.sharedSessions.*` / `settings.conversation.share.diagnostics.*`，用于当前会话分享状态、分享禁用提示、分享失败归一化说明、分享诊断、已分享会话列表、公开数量、刷新、完整预览、复制链接和取消分享操作；其中新增 `settings.conversation.share.sharedSessions.previewEmpty`，用于区分“后端不可预览”和“会话暂时没有可预览消息”的中性空态。 同时保留 `settings.conversation.share.help.*`、`settings.security.blockedCommands.help.*` 与 `settings.projectConfigHelp.*`，用于会话分享模式和 `permission.bash` 帮助弹窗。
 
 会话设置弹窗本轮还新增了 `chat.sessionSettings.modal.globalDefaultsGroup`、`globalDefaultsDesc` 和 `summary.*` 文案，用于 Display 分组下方的全局默认值摘要行与“打开设置”按钮。
 

@@ -62,3 +62,4 @@ interface ToolIdentity {
 - `task` 的显示名现在刻意保持为 `Subagent Task`，避免把 OpenCode 原生 subagent/task 卡片误称成 OMO background task。
 - `apply_patch` 与 `patch` 的显示名已区分：`Apply Patch` vs `Create Patch`，避免在工具权限 UI 中出现同名歧义。
 - `StructuredOutput` / `structured_output` 仍会被归一到同一规范名，保证内部过滤逻辑不回归。
+- 2026-06-07 新增 6 个 Claude Code Task* 工具定义：`task_create`（Task Create）、`task_update`（Task Update）、`task_list`（Task List）、`task_get`（Task Get）、`task_output`（Task Output）、`task_stop`（Task Stop）。这些是 Claude Code 运行时实际可用的任务管理工具（非 TodoWrite），全部归类为 `builtin`、使用 `list-checks` 或 `wrench` 图标。

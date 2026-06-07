@@ -60,6 +60,17 @@ export class ToolCallRenderer {
     exit_plan_mode: () => 'Switch to build mode',
     todoread: (input) => this.getTodoSummary(input) || 'Current tasks',
     todowrite: (input) => this.getTodoSummary(input),
+    task_create: (input) => this.truncateText((input.subject as string) || '', 80),
+    task_update: (input) => {
+      const status = input.status as string;
+      const subject = (input.subject as string) || '';
+      if (status) return `${status}: ${subject || (input.taskId as string) || ''}`;
+      return subject || (input.taskId as string) || '';
+    },
+    task_list: () => 'List all tasks',
+    task_get: (input) => this.truncateText((input.taskId as string) || '', 80),
+    task_output: (input) => this.truncateText((input.task_id as string) || '', 80),
+    task_stop: (input) => this.truncateText((input.task_id as string) || '', 80),
   };
 
   constructor(options?: Partial<ToolRendererOptions>) {
