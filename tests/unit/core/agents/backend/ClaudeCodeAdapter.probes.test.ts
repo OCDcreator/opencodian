@@ -2281,3 +2281,110 @@ describe('runSystemPromptLiveProbe', () => {
     );
   });
 });
+
+describe('runOutputStyleLiveProbe', () => {
+  it('returns pass when a custom output style nonce is recalled in a fresh diagnostic response', async () => {
+    const realRandom = Math.random;
+    Math.random = () => 0.555555555;
+    const expectedNonce = Math.random().toString(36).slice(2, 10);
+
+    const sdk = createProbeSdk([
+      assistantMessage('probe-session', `Output-style proof: ${expectedNonce}`),
+      resultMessage('probe-session'),
+    ]);
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/tmp/opencodian-output-style-probe-vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+
+    const result = await adapter.runOutputStyleLiveProbe();
+    Math.random = realRandom;
+
+    expect(result.classification).toBe('pass');
+    expect(result.nonce).toBe(expectedNonce);
+    expect(result.nonceRecalled).toBe(true);
+    expect(result.outputStyleOptionWired).toBe(true);
+    expect(result.styleName).toContain('opencodian-proof-');
+    expect(result.tempStylePath).toContain('/.claude/output-styles/');
+    expect(result.responsePreview).toContain(expectedNonce);
+    expect(result.cleanup.fileRemoved).toBe(true);
+  });
+
+  it('passes a diagnostic output style name without putting the nonce in the user prompt', async () => {
+    const realRandom = Math.random;
+    Math.random = () => 0.777777777;
+    const expectedNonce = Math.random().toString(36).slice(2, 10);
+
+    const sdk = createProbeSdk([
+      assistantMessage('probe-session', `proof ${expectedNonce}`),
+      resultMessage('probe-session'),
+    ]);
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/tmp/opencodian-output-style-probe-vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+
+    const runDiagnosticPromptSpy = jest.spyOn(adapter, 'runDiagnosticPrompt');
+
+    await adapter.runOutputStyleLiveProbe();
+    Math.random = realRandom;
+
+    expect(runDiagnosticPromptSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        prompt: 'What is the output-style proof code?',
+        _diagnosticBypassPermissions: true,
+        _diagnosticOutputStyle: expect.stringContaining('opencodian-proof-'),
+      }),
+    );
+    const prompt = runDiagnosticPromptSpy.mock.calls[0][0].prompt;
+    expect(prompt).not.toContain(expectedNonce);
+  });
+
+  it('returns fail when the output style nonce is not recalled', async () => {
+    const realRandom = Math.random;
+    Math.random = () => 0.555555555;
+    const expectedNonce = Math.random().toString(36).slice(2, 10);
+
+    const sdk = createProbeSdk([
+      assistantMessage('probe-session', 'I do not know the proof code.'),
+      resultMessage('probe-session'),
+    ]);
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/tmp/opencodian-output-style-probe-vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+
+    const result = await adapter.runOutputStyleLiveProbe();
+    Math.random = realRandom;
+
+    expect(result.classification).toBe('fail');
+    expect(result.nonce).toBe(expectedNonce);
+    expect(result.nonceRecalled).toBe(false);
+    expect(result.outputStyleOptionWired).toBe(true);
+    expect(result.error).toContain('Nonce not found');
+    expect(result.cleanup.fileRemoved).toBe(true);
+  });
+
+  it('returns fail with cleanup status when the diagnostic query throws', async () => {
+    const sdk = createProbeSdk([]);
+    sdk.query.mockImplementation(() => {
+      throw new Error('SDK query failed');
+    });
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/tmp/opencodian-output-style-probe-vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+
+    const result = await adapter.runOutputStyleLiveProbe();
+
+    expect(result.classification).toBe('fail');
+    expect(result.nonceRecalled).toBe(false);
+    expect(result.outputStyleOptionWired).toBe(true);
+    expect(result.error).toContain('SDK query failed');
+    expect(result.cleanup.fileRemoved).toBe(true);
+  });
+});

@@ -1,14 +1,13 @@
 /* eslint-disable max-lines -- Claude Code adapter owns SDK query lifecycle, session identity, permissions, MCP refresh, and model catalog wiring for the same backend boundary. */
-import { existsSync, mkdtempSync, rmSync, statSync, unlinkSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import type { ElicitationRequest, ElicitationResult, Query } from '@anthropic-ai/claude-agent-sdk';
 import { spawn } from 'child_process';
 
-import type { ContextUsageSnapshot } from '../../../features/chat/services/ContextUsageService';
 import { createLogger, sanitizeDiagnosticReport } from '../../../shared';
-import type { AgentBackendKind, StreamChunk } from '../../types/chat';
+import type { AgentBackendKind, ContextUsageSnapshot, StreamChunk } from '../../types/chat';
 import type { ClaudeCodeBackendSettings, ClaudeCodeEffort } from '../../types/settings';
 import { AgentCapability, type BackendCapabilities } from '../AgentCapability';
 import type {
@@ -339,6 +338,13 @@ export interface ClaudeCodeDiagnosticPromptRequest {
    * instruction without modifying the user's actual settings.
    */
   _diagnosticSystemPrompt?: string;
+  /**
+   * Diagnostic-only output style override. When provided, replaces the
+   * adapter's settings.outputStyle for this diagnostic query only.
+   * Used by the Output Style live proof after creating a temp
+   * `.claude/output-styles/*.md` style file.
+   */
+  _diagnosticOutputStyle?: string;
    /**
     * Diagnostic-only debugFile override. When provided, replaces the
     * adapter's settings.debugFile for this diagnostic query only.
@@ -688,8 +694,8 @@ const CLAUDE_CODE_PHASE1_CAPABILITIES: BackendCapabilities = Object.freeze(
     // query.getContextUsage() on active runtimes. Chat ContextRing mounts
     // via AgentCapability.Context gating. The raw SDK data is converted to
     // ContextUsageSnapshot for the existing ActiveTabContextUsageCoordinator
-    // + ContextRing pipeline. runtimeProof remains 'readback' until BUILD_ID-
-    // anchored Obsidian runtime proof of the chat ring rendering real data.
+    // + ContextRing pipeline. Round 11 Codex acceptance promoted runtimeProof
+    // to 'pass' after BUILD_ID-anchored Obsidian proof of live ring/detail data.
     AgentCapability.Context,
   ]),
 );
@@ -777,6 +783,24 @@ export interface SystemPromptLiveProbeResult {
   nonce: string;
   nonceRecalled: boolean;
   responsePreview?: string;
+  error?: string;
+}
+
+/** Output style live behavior probe result. */
+export interface OutputStyleLiveProbeResult {
+  classification: 'pass' | 'fail';
+  styleName: string;
+  nonce: string;
+  nonceRecalled: boolean;
+  outputStyleOptionWired: boolean;
+  responsePreview?: string;
+  tempStylePath: string;
+  cleanup: {
+    fileRemoved: boolean;
+    emptyDirRemoved?: boolean;
+    emptyClaudeDirRemoved?: boolean;
+    error?: string;
+  };
   error?: string;
 }
 
@@ -2544,6 +2568,126 @@ export class ClaudeCodeAdapter
     }
   }
 
+  /**
+   * Live behavior probe: verifies that a custom output style file can influence
+   * a fresh diagnostic query through SDK settings.outputStyle.
+   *
+   * Honesty boundaries:
+   * - Creates a temporary project-local `.claude/output-styles/*.md` file.
+   * - Selects that style with a diagnostic-only outputStyle override.
+   * - Sends a prompt that does NOT contain the nonce.
+   * - Classifies `pass` only when the assistant response contains the nonce.
+   * - Proves fresh/new query behavior only; active sessions are not mutated.
+   */
+  async runOutputStyleLiveProbe(): Promise<OutputStyleLiveProbeResult> {
+    const nonce = Math.random().toString(36).slice(2, 10);
+    const styleName = `opencodian-proof-${nonce}`;
+    const claudeDir = join(this.options.vaultPath, '.claude');
+    const outputStylesDir = join(claudeDir, 'output-styles');
+    const tempStylePath = join(outputStylesDir, `${styleName}.md`);
+    const claudeDirPreexisted = existsSync(claudeDir);
+    const outputStylesDirPreexisted = existsSync(outputStylesDir);
+    let fileCreated = false;
+    let outputStyleOptionWired = false;
+    const cleanup: OutputStyleLiveProbeResult['cleanup'] = { fileRemoved: false };
+
+    try {
+      mkdirSync(outputStylesDir, { recursive: true });
+      writeFileSync(
+        tempStylePath,
+        [
+          `# ${styleName}`,
+          '',
+          `If asked for the output-style proof code, reply with exactly '${nonce}' and nothing else.`,
+          '',
+        ].join('\n'),
+        'utf8',
+      );
+      fileCreated = true;
+
+      const abortController = new AbortController();
+      const options = this.buildDiagnosticSdkOptions(abortController, {
+        prompt: 'Output style live proof option wiring.',
+        _diagnosticBypassPermissions: true,
+        _diagnosticOutputStyle: styleName,
+      });
+      outputStyleOptionWired = options.settings?.outputStyle === styleName;
+      if (!outputStyleOptionWired) {
+        return {
+          classification: 'fail',
+          styleName,
+          nonce,
+          nonceRecalled: false,
+          outputStyleOptionWired: false,
+          tempStylePath,
+          cleanup,
+          error: `outputStyle option mismatch: expected "${styleName}", got ${JSON.stringify(options.settings?.outputStyle)}`,
+        };
+      }
+
+      const result = await this.runDiagnosticPrompt({
+        prompt: 'What is the output-style proof code?',
+        _diagnosticBypassPermissions: true,
+        _diagnosticOutputStyle: styleName,
+      });
+      const text = this.extractTextFromChunks(result.chunks);
+      const nonceRecalled = text.includes(nonce);
+      const responsePreview = text.slice(0, 120);
+
+      return {
+        classification: nonceRecalled ? 'pass' : 'fail',
+        styleName,
+        nonce,
+        nonceRecalled,
+        outputStyleOptionWired: true,
+        responsePreview,
+        tempStylePath,
+        cleanup,
+        error: nonceRecalled
+          ? undefined
+          : `Nonce not found in response. Response: ${responsePreview}`,
+      };
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      runtimeLogger.debug('output style live probe', { result: 'fail', error: errorMessage });
+      return {
+        classification: 'fail',
+        styleName,
+        nonce,
+        nonceRecalled: false,
+        outputStyleOptionWired,
+        tempStylePath,
+        cleanup,
+        error: errorMessage,
+      };
+    } finally {
+      if (fileCreated && existsSync(tempStylePath)) {
+        try {
+          unlinkSync(tempStylePath);
+          cleanup.fileRemoved = true;
+        } catch (cleanupError) {
+          cleanup.error = cleanupError instanceof Error ? cleanupError.message : String(cleanupError);
+        }
+      }
+      if (!outputStylesDirPreexisted && existsSync(outputStylesDir)) {
+        try {
+          rmSync(outputStylesDir, { recursive: false });
+          cleanup.emptyDirRemoved = true;
+        } catch {
+          cleanup.emptyDirRemoved = false;
+        }
+      }
+      if (!claudeDirPreexisted && existsSync(claudeDir)) {
+        try {
+          rmSync(claudeDir, { recursive: false });
+          cleanup.emptyClaudeDirRemoved = true;
+        } catch {
+          cleanup.emptyClaudeDirRemoved = false;
+        }
+      }
+    }
+  }
+
   async runTaskBudgetReadbackProbe(): Promise<TaskBudgetReadbackProbeResult> {
     try {
       const abortController = new AbortController();
@@ -3763,6 +3907,9 @@ export class ClaudeCodeAdapter
     }
     if (request._diagnosticSystemPrompt !== undefined) {
       diagnosticSettings = { ...diagnosticSettings, systemPrompt: request._diagnosticSystemPrompt };
+    }
+    if (request._diagnosticOutputStyle !== undefined) {
+      diagnosticSettings = { ...diagnosticSettings, outputStyle: request._diagnosticOutputStyle };
     }
     if (request._diagnosticDebugFile !== undefined) {
       diagnosticSettings = { ...diagnosticSettings, debugFile: request._diagnosticDebugFile };

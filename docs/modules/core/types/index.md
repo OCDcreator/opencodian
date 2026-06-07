@@ -29,6 +29,7 @@ OpenCodian 全局类型的主聚合入口。它把聊天、模型、设置、权
 | `ConversationMeta` | type | 会话元数据 |
 | `StreamChunk` | type | 流式事件联合类型（13 种事件） |
 | `TabContextState` | type | 标签页上下文状态 |
+| `ContextUsageSnapshot` | type | backend-neutral session context usage 快照 DTO，供 OpenCode/Claude Code snapshot owner 与 chat context ring 管线共享 |
 | `createEmptyTabContextState` | function | 创建空白上下文状态 |
 | `getConversationBackendSessionId` | function | 按 `backendSessionId → openCodeSessionId → acpSessionId` 解析 backend-neutral session id |
 | `UsageInfo` | type | Token 使用信息 |

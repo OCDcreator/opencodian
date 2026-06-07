@@ -240,6 +240,26 @@ export interface UsageInfo {
   sessionId?: string;
 }
 
+/** Backend session context usage snapshot */
+export interface ContextUsageSnapshot {
+  sessionId: string;
+  sessionTitle: string;
+  createdAt: number;
+  updatedAt: number;
+  compactingAt?: number | null;
+  providerId: string | null;
+  providerName: string | null;
+  modelId: string | null;
+  modelName: string | null;
+  contextWindow: number;
+  inputTokens: number;
+  outputTokens: number;
+  reasoningTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+  totalCost: number;
+}
+
 export type ContextBreakdownKey = 'system' | 'user' | 'assistant' | 'tool' | 'other';
 
 export interface ContextBreakdownSegment {

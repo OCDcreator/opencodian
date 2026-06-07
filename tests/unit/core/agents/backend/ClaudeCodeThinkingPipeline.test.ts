@@ -120,6 +120,51 @@ describe('Thinking end-to-end pipeline', () => {
     ]);
   });
 
+  it('renders redacted thinking blocks in the streaming chat DOM', async () => {
+    const containerEl = document.createElement('div');
+    const contentEl = document.createElement('div');
+    containerEl.appendChild(contentEl);
+
+    const markdownService = {
+      render: jest.fn().mockImplementation(async (el: HTMLElement, content: string) => {
+        el.textContent = content;
+      }),
+    };
+
+    const controller = new StreamController({
+      containerEl,
+      markdownService: markdownService as never,
+    });
+
+    controller.startStream(contentEl);
+
+    await controller.handleChunk({
+      type: 'thinking',
+      partId: 'redacted-1',
+      content: '[Redacted thinking content]',
+    });
+
+    await controller.handleChunk({ type: 'text', content: 'Public response.' });
+
+    // Flush buffered text block so both blocks are persisted for inspection.
+    controller.cancelStream();
+
+    const blocks = controller.getContentBlocks();
+    expect(blocks).toHaveLength(2);
+    expect(blocks[0]).toMatchObject({
+      type: 'thinking',
+      content: '[Redacted thinking content]',
+      partId: 'redacted-1',
+    });
+
+    const thinkingContent = contentEl.querySelector('.streaming-thinking-content');
+    expect(thinkingContent).not.toBeNull();
+    expect(thinkingContent?.textContent).toBe('[Redacted thinking content]');
+
+    const thinkingBlock = contentEl.querySelector('.streaming-thinking-block');
+    expect(thinkingBlock).not.toBeNull();
+  });
+
   it('deduplicates thinking blocks with suffix tracking within a single message', () => {
     const normalizer = new ClaudeCodeStreamNormalizer();
 

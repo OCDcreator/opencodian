@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- Adapter coverage keeps session, resume, model catalog, permission, and streaming fixtures together for one backend contract. */
-import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 
 import { AgentCapability } from '../../../../../src/core/agents/AgentCapability';
 import {
@@ -134,6 +134,12 @@ describe('ClaudeCodeAdapter', () => {
     clearRecentLogs();
     setDebugLoggingEnabled(true);
     setDebugModuleEnabled('claudeCode', true);
+  });
+
+  it('does not depend on chat feature-layer types for context usage snapshots', () => {
+    const source = readFileSync('src/core/agents/backend/ClaudeCodeAdapter.ts', 'utf8');
+
+    expect(source).not.toContain('../../../features/chat');
   });
 
   afterEach(() => {

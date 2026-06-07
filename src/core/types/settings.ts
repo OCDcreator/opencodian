@@ -251,10 +251,12 @@ export interface ClaudeCodeBackendSettings {
    * option. Official built-in styles include `Default`, `Proactive`, `Explanatory`,
    * and `Learning`. Custom styles can be created as markdown files in
    * `.claude/output-styles` or `~/.claude/output-styles`.
-   * Readback only: SDK option wiring proven (settings.outputStyle passed to CLI);
-   * actual system prompt modification is not independently verified from the plugin layer.
-   * Official docs say output styles are read at session start and apply after `/clear`
-   * or a new session; existing active or resumed sessions may keep their previous prompt.
+   * Live proof boundary: a temporary custom style file can influence a fresh
+   * diagnostic query through SDK settings.outputStyle when the model recalls a
+   * nonce that is absent from the user prompt. This does not prove active-session
+   * live mutation or validate the currently saved style name. Official docs say
+   * output styles are read at session start and apply after `/clear` or a new
+   * session; existing active or resumed sessions may keep their previous prompt.
    */
   outputStyle: string;
   /**

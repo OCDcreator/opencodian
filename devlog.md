@@ -11,9 +11,211 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-06-08 Claude Code Capability Round 15 — MCP Elicitation Correction
+
+**Correction to Round 15 initial conclusion — MCP Elicitation stays at `wiring`, not readback closure.**
+
+Codex review found that the initial Round 15 conclusion over-stated the barrier. Existing repo evidence (`scripts/claude-code-smoke.mjs` `writeMcpElicitationServer`) already proves a real MCP server → `elicitation/create` → SDK `onElicitation` → host response → MCP server consumption roundtrip at the SDK level. The claim "no real MCP server roundtrip has been captured" and "readback is permanent upper bound" were incorrect.
+
+- **SDK-level roundtrip PROVEN**: `scripts/claude-code-smoke.mjs` creates a temp stdio MCP server with elicitation capability. When the tool is called, the server sends `elicitation/create` to the SDK client, `onElicitation` is invoked, the callback returns accept+content, and the server consumes the result in its tool output (recorded in `.obsidian-debug/claude-code-smoke-2026-05-24-current.json`: "onElicitation invoked 1 time"). This is a real MCP server roundtrip.
+- **Product-path gap REMAINS**: The existing Capability Lab probe is synthetic (no live server). No Test Vault / Obsidian chat UI proof exists where a real MCP server elicitation surfaces through the shared question dialog and the user's answer is consumed by the server. The SDK smoke proof does not automatically imply the Obsidian product path works.
+- **Classification stays `wiring`**: SDK callback + bridge mapping are wired, and SDK-level roundtrip exists in smoke tests, but the product path (Obsidian chat UI + server consumption) is not yet proven. Promotion to `pass` requires live product-path proof.
+- **Adjacent seams REJECTED**: (a) synthetic probe as pass proof — validates mapping logic only, not server consumption; (b) SDK smoke as pass proof — proves SDK-level roundtrip, not Obsidian chat UI product path; (c) hook-based auto-response — `ElicitationHookInput` is shell-script only (same barrier as Hooks JS callback).
+- **Re-audit conditions**: Implement a Capability Lab live diagnostic probe that starts a real MCP server and captures the full roundtrip through Obsidian UI, or obtain Test Vault chat UI roundtrip proof.
+
+Matrix impact: **55 rows, 38 pass, 16 readback, 1 wiring, 2 hidden, 0 fail** (unchanged from Round 14). MCP Elicitation remains the sole `wiring` row.
+
+### Files changed
+
+- `src/features/settings/SettingsCapabilityLabSection.ts` (matrix row runtimeProof: 'wiring' corrected, comment updated with smoke evidence and product-path gap, discovery row text, probe status 'wiring')
+- `tests/unit/features/settings/SettingsCapabilityLabSection.test.ts` (expected runtimeProof: 'wiring', readback count 17→16, wiring rows 0→1)
+- `docs/status/claude-code-current-state-2026-05-22.md` (header counts restored, wiring section restored with smoke evidence, MCP Elicitation removed from formal closure list)
+- `docs/modules/features/settings/SettingsCapabilityLabSection.md` (MCP Elicitation Discovery entry, matrix description, readback/wiring counts, boundary text corrected)
+- `devlog.md` (Round 15 entry replaced with corrected conclusion)
+
+### Verification
+
+- Focused tests: `npm test -- SettingsCapabilityLabSection.test.ts --runInBand` passed (267 tests).
+- Guard checks: `npm run check:module-docs`, `npm run check:devlog-order`, `npm run graphify:update:src`, `npm run check:graphify`, and `git diff --check` passed.
+- Full gate: `OWNER_GUARD_APPROVED="Round 15 MCP elicitation correction keeps SDK smoke evidence and product-path proof boundary honest" npm run verify` passed.
+
+---
+
+## 2026-06-08 Claude Code Capability Round 14 — AskUserQuestion / MCP Elicitation Split
+
+**Outcome B — split an over-broad row without promoting MCP Elicitation.**
+
+This round separates the Claude built-in `AskUserQuestion` tool path from MCP-server initiated `onElicitation` callbacks. `AskUserQuestion` remains `runtimeProof: 'pass'` / `userSurface: 'chat'` because prior ordinary-chat evidence covers the built-in tool path through `canUseTool('AskUserQuestion', ...)`. `MCP Elicitation` is now its own row at `runtimeProof: 'wiring'` / `userSurface: 'chat'`: SDK `onElicitation` is wired through `main.ts`, `ClaudeCodeElicitationBridge` maps SDK `ElicitationRequest` form/url shapes to the shared question request, and Capability Lab exposes a synthetic wiring probe, but no real MCP server has sent `elicitation/create` and consumed the returned result. The bridge now maps mixed schemas without silently dropping non-enum fields: enum fields become option groups, while non-enum scalar/schema fields become custom text inputs with basic number/boolean coercion on returned content. This remains a wiring boundary, not full JSON Schema form authoring.
+
+Matrix impact: **55 rows, 38 pass, 16 readback, 1 wiring, 2 hidden, 0 fail**. This is not a product-completion claim for MCP Elicitation.
+
+### Files changed
+
+- `src/core/agents/backend/ClaudeCodeElicitationBridge.ts`
+- `src/core/agents/backend/index.ts`
+- `src/main.ts`
+- `src/features/settings/SettingsCapabilityLabSection.ts`
+- `tests/unit/core/agents/backend/ClaudeCodeElicitationBridge.test.ts`
+- `tests/unit/features/settings/SettingsCapabilityLabSection.test.ts`
+- `docs/modules/core/agents/backend/ClaudeCodeElicitationBridge.md`
+- `docs/modules/core/agents/backend/ClaudeCodeAdapter.md`
+- `docs/modules/core/agents/backend/index.md`
+- `docs/modules/entry-point/main.md`
+- `docs/modules/features/chat/OpenCodianView.md`
+- `docs/modules/features/settings/SettingsCapabilityLabSection.md`
+- `docs/status/claude-code-current-state-2026-05-22.md`
+- `devlog.md`
+
+### Verification
+
+- Focused tests: `tests/unit/core/agents/backend/ClaudeCodeElicitationBridge.test.ts --runInBand` and `tests/unit/features/settings/SettingsCapabilityLabSection.test.ts --runInBand` passed.
+- Guard checks: `npm run check:module-docs`, `npm run check:devlog-order`, `npm run graphify:update:src`, `npm run check:graphify`, and `git diff --check` passed.
+- Full gate: `OWNER_GUARD_APPROVED="Round 14 MCP elicitation split keeps wiring boundary and fixes mixed-schema mapping without adding runtime ownership" npm run verify` passed, with 18 existing lint warnings and 0 errors.
+- Build/deploy/runtime: build produced `BUILD_ID feature-phase0-capability.202606080052`; `dist/main.js`, `dist/manifest.json`, and `dist/styles.css` were copied to the Test Vault plugin directory; deployed `main.js` contains that BUILD_ID. Obsidian plugin reload succeeded, `dev:errors` and error console were clean, Capability Lab showed 55 rows with `AskUserQuestion = Verified / Chat` and `MCP Elicitation = Wiring only / Chat`, and **Probe MCP Elicitation Wiring** updated proof status to `wiring`.
+- Runtime evidence: DOM proof confirmed the synthetic `note` non-enum field maps to `options: []` + `custom: true`; screenshot `/tmp/opencodian-round14-mcp-elicitation-probe-output-view-0052.png` shows the settings view probe output and `Wiring only — not behavior verified` badge.
+
+## 2026-06-07 Claude Code Capability Round 13 — Additional Directories Chat Surface
+
+**Outcome A — Additional Directories user surface expanded from `settings` to `settings+chat`, while runtime proof remains `readback`.**
+
+Added a stable read-only chat toolbar badge for Claude Code `additionalDirectories`. The badge appears only when Claude Code is the active backend and at least one non-empty additional directory is configured. It shows the requested extra directory count and a tooltip listing the requested paths, lifecycle boundary, and readback ceiling.
+
+This is deliberately not a `pass` promotion. `additionalDirectories` remains closed at readback because the SDK/CLI accepts the option as a one-way init parameter and exposes no event, tool metadata, stderr signal, or directory expansion readback proving which paths were resolved or actually accessible. The new chat surface makes the configured scope visible before sending; it does not prove filesystem access.
+
+### Files changed
+
+- `src/features/chat/services/AdditionalDirectoriesConfigBadgeCoordinator.ts`
+- `src/features/chat/services/ChatSelectionControlsCoordinator.ts`
+- `src/style/components/permission-mode-selector.css`
+- `src/features/settings/SettingsCapabilityLabSection.ts`
+- `src/i18n/locales/en.ts`
+- `src/i18n/locales/zh.ts`
+- `tests/unit/features/chat/services/AdditionalDirectoriesConfigBadgeCoordinator.test.ts`
+- `tests/unit/features/chat/ChatSelectionControlsCoordinator.test.ts`
+- `tests/unit/features/settings/SettingsCapabilityLabSection.test.ts`
+- `docs/modules/features/chat/services/AdditionalDirectoriesConfigBadgeCoordinator.md`
+- `docs/modules/features/chat/services/ChatSelectionControlsCoordinator.md`
+- `docs/modules/features/chat/services/SandboxConfigBadgeCoordinator.md`
+- `docs/modules/features/settings/SettingsCapabilityLabSection.md`
+- `docs/modules/i18n/locales/en.md`
+- `docs/modules/i18n/locales/zh.md`
+- `docs/status/claude-code-current-state-2026-05-22.md`
+- `devlog.md`
+
+### Verification
+
+- TDD red: `npm test -- --runTestsByPath tests/unit/features/chat/ChatSelectionControlsCoordinator.test.ts --runInBand` failed before implementation because `.opencodian-additional-directories-config-badge` was missing.
+- Green: `npm test -- --runTestsByPath tests/unit/features/chat/services/AdditionalDirectoriesConfigBadgeCoordinator.test.ts --runInBand` passed (3/3).
+- Green: `npm test -- --runTestsByPath tests/unit/features/chat/ChatSelectionControlsCoordinator.test.ts --runInBand` passed (16/16).
+- Green: `npm test -- --runTestsByPath tests/unit/features/settings/SettingsCapabilityLabSection.test.ts --runInBand` passed (267/267).
+- `npm run verify` passed after graphify refresh: owner guard, module docs, graphify freshness, devlog order, lint (`0 errors`, `18 warnings`), typecheck, 470 test suites / 4263 tests, and production build. The build produced `BUILD_ID feature-phase0-capability.202606072344`.
+- Deploy copied `dist/main.js`, `dist/manifest.json`, and `dist/styles.css` sequentially to Test Vault, verified the deployed `main.js` contains `feature-phase0-capability.202606072344`, and reloaded `opencodian`.
+- Test Vault runtime proof on `BUILD_ID feature-phase0-capability.202606072344`: with active backend `claude-code` and temporary `additionalDirectories` set to `/tmp/opencodian-extra-proof` plus `~/Documents/opencodian-proof-notes`, the chat toolbar rendered `.opencodian-additional-directories-config-badge` with text `2 个额外目录`, `data-additional-directory-count="2"`, width `97px`, height `30px`, `white-space: nowrap`, and tooltip containing both paths, next-query lifecycle text, and the readback boundary. Screenshot evidence: `/tmp/opencodian-additional-directories-badge-2344.png`.
+- Reload/hydration proof: after `obsidian plugin:reload vault="testvault" id=opencodian`, the badge still rendered with the same count/text/tooltip and no console errors; screenshot evidence: `/tmp/opencodian-additional-directories-badge-reload-2344.png`.
+- Cleanup proof: restored Test Vault `additionalDirectories` to `[]`; the badge disappeared and `obsidian dev:errors vault="testvault"` returned `No errors captured`.
+
+## 2026-06-07 Claude Code Output Style Live Proof
+
+**Outcome A — Output Style PROMOTED from `readback` to `pass` / `settings`.**
+
+Added an honest live behavior proof for custom Claude Code output styles. `ClaudeCodeAdapter.runOutputStyleLiveProbe()` now creates a temporary project-local `.claude/output-styles/<style>.md` file containing a nonce instruction, selects that style through diagnostic-only `_diagnosticOutputStyle` / SDK `settings.outputStyle`, and sends the fresh diagnostic prompt `What is the output-style proof code?` without the nonce in the user prompt. Classification is `pass` only when assistant text includes the nonce. The probe reports `styleName`, `nonce`, `nonceRecalled`, `outputStyleOptionWired`, `responsePreview`, `tempStylePath`, cleanup status, and errors.
+
+Capability Lab now exposes `Run Output Style Live Behavior Proof`, renders localized proof details in English/Chinese, and promotes only the Output Style matrix row to `runtimeProof: 'pass'`. Boundary remains explicit: this proves fresh/new query behavior for a custom style file, not active-session live mutation and not validity of the currently saved style name. Changes still apply after `/clear` or a new Claude Code session.
+
+### Files changed
+
+- `src/core/agents/backend/ClaudeCodeAdapter.ts`
+- `src/core/agents/backend/index.ts`
+- `src/features/settings/SettingsCapabilityLabSection.ts`
+- `src/i18n/locales/en.ts`
+- `src/i18n/locales/zh.ts`
+- `tests/unit/core/agents/backend/ClaudeCodeAdapter.probes.test.ts`
+- `tests/unit/features/settings/SettingsCapabilityLabSection.test.ts`
+- `docs/modules/core/agents/backend/ClaudeCodeAdapter.md`
+- `docs/modules/core/agents/backend/ClaudeCodeOptionsBuilder.md`
+- `docs/modules/features/settings/SettingsCapabilityLabSection.md`
+- `docs/modules/i18n/locales/en.md`
+- `docs/modules/i18n/locales/zh.md`
+- `docs/status/claude-code-current-state-2026-05-22.md`
+- `devlog.md`
+
+### Verification
+
+- TDD red: focused adapter/UI tests failed before implementation (`runOutputStyleLiveProbe is not a function`, missing button, matrix still readback).
+- Green: `npx jest tests/unit/core/agents/backend/ClaudeCodeAdapter.probes.test.ts --runInBand --no-cache --testNamePattern="runOutputStyleLiveProbe"` passed (4/4).
+- Green: `npx jest tests/unit/features/settings/SettingsCapabilityLabSection.test.ts --runInBand --no-cache --testNamePattern="Output Style|capability matrix"` passed (13/13).
+- `npm run verify` passed after integration: owner guard, module docs, graphify freshness, devlog order, lint (`0 errors`, `16 warnings`), typecheck, 469 test suites / 4258 tests, and production build. The build produced `BUILD_ID feature-phase0-capability.202606072307`; deploy copied `dist/main.js`, `dist/manifest.json`, and `dist/styles.css` to Test Vault, verified that BUILD_ID in deployed `main.js`, and reloaded `opencodian`.
+- Test Vault runtime proof on `BUILD_ID feature-phase0-capability.202606072307`: clicking `运行输出样式行为验证` produced style `opencodian-proof-b2f7xdaa`, nonce `b2f7xdaa`, `SDK outputStyle` wired `✓`, nonce recalled `✓`, temp style file removed `✓`, response preview `b2f7xdaa`, and `✓ Runtime verified`. `obsidian dev:errors vault="testvault"` returned `No errors captured`; console showed the SDK init event with `output_style` metadata and `CapabilityLab` updated `Output Style` to `pass`. Screenshot evidence: `/tmp/opencodian-output-style-live-proof-macos-editor-2307.png`.
+
+## 2026-06-07 Claude Code Backend Capability Productization — Round 12 (Thinking Promotion)
+
+**Outcome A — Thinking PROMOTED from `readback` to `pass` / `settings+chat`.** Anchored to Codex acceptance runtime proof on `BUILD_ID feature-phase0-capability.202606072146`.
+
+### Summary
+
+Round 12 re-audited the Claude Code `Thinking` capability against the installed official `@anthropic-ai/claude-agent-sdk` declarations and the repository pipeline. No code gap was found. After adding a deterministic DOM harness, Codex produced the missing BUILD_ID-anchored ordinary-chat runtime proof, allowing an honest promotion to `pass`.
+
+### SDK audit
+
+- `Options.thinking?: ThinkingConfig` (`sdk.d.ts:1483`).
+- `ThinkingConfig = ThinkingAdaptive | ThinkingEnabled | ThinkingDisabled` (`sdk.d.ts:5649`).
+- `ThinkingAdaptive` / `ThinkingEnabled` both support optional `display?: 'summarized' | 'omitted'` (`sdk.d.ts:5643`, `sdk.d.ts:5664`); plugin omits it and relies on the SDK default (full blocks in the response stream).
+- `setMaxThinkingTokens` is deprecated (`sdk.d.ts:2129`); plugin correctly uses the modern `thinking` option.
+- `redacted_thinking` and `thinking_delta` are runtime message shapes, not declared in `.d.ts`, and are handled by `ClaudeCodeStreamNormalizer`.
+
+### Code pipeline
+
+All five layers remain code-complete: backend adapter (`ClaudeCodeOptionsBuilder.mapThinkingForSdk`), stream normalization (`ClaudeCodeStreamNormalizer`), chat streaming (`OpenCodianView.convertToStreamingChunk` → `StreamController` → `ThinkingBlockRenderer`), persistence (`ConversationIdentityRuntime` + `sendPipelineContent`), and rehydration (`AssistantShellViewHostAdapter.renderContentBlock`). No code gap was identified.
+
+### Deterministic harness
+
+- Extended `tests/unit/core/agents/backend/ClaudeCodeThinkingPipeline.test.ts` with a `'renders redacted thinking blocks in the streaming chat DOM'` test. It feeds a synthetic thinking chunk into `StreamController` and asserts `.streaming-thinking-block` / `.streaming-thinking-content` appear in the DOM with the redacted content.
+- This proves the visible chat rendering pipeline is wired; it is **not** a substitute for a live-model runtime proof.
+
+### Codex acceptance evidence
+
+- Test Vault deployed build: OpenCodian 1.0.0 `BUILD_ID=feature-phase0-capability.202606072146`.
+- After `obsidian plugin:reload vault="testvault" id=opencodian`, active leaf was `opencodian-view`.
+- Runtime settings: `activeBackend=claude-code`, thinking setting `{ type: "adaptive" }`.
+- Conversation: id `conv-1780776153801-v9lnfeihy`, `conversationBackend=claude-code`, `backendSessionId=79673f0e-d48c-49c2-baa8-5704700c1fac`, `messageCount=10`.
+- Same `currentConversation` persisted 12 contentBlocks with type `thinking`.
+- DOM inside `.workspace-leaf-content[data-type="opencodian-view"]` had 12 `.streaming-thinking-block` elements.
+- First visible block: label `Thought for 16s`, content length 143 chars, `firstVisible=true`.
+- `obsidian dev:errors vault="testvault"` returned `No errors captured.`
+- Screenshot `/tmp/opencodian-round12-thinking-visible-2146.png` shows ordinary chat surface with `Claude Code 已连接` and visible `Thought for 16s`, `Thought for 0.5s`, `Thought for 0.8s` blocks.
+
+### Honest boundary
+
+This pass applies specifically to visible thinking block rendering in ordinary Claude Code chat. It does **not** prove Effort enforcement, Sandbox OS-level enforcement, Permission Mode Live Switch behavioral effects, or any other unrelated seam.
+
+### Matrix impact
+
+Round 12 matrix impact was **54 rows, 37 pass, 17 readback, 2 hidden, 0 fail** with `Thinking` moved from `readback` to `pass`. This was later superseded by the Output Style live proof entry above: **54 rows, 38 pass, 16 readback, 2 hidden, 0 fail**.
+
+### Files changed
+
+- `src/features/settings/SettingsCapabilityLabSection.ts` — updated `Thinking` matrix row to `runtimeProof: 'pass'` with Codex acceptance evidence and explicit honest boundary.
+- `tests/unit/features/settings/SettingsCapabilityLabSection.test.ts` — updated expected counts from 36 pass / 18 readback to 37 pass / 17 readback; moved `Thinking` from readback list to pass list.
+- `docs/status/claude-code-current-state-2026-05-22.md` — updated top-level matrix count and `Thinking` classification; kept Round 12 audit details and added Codex acceptance subsection.
+- `docs/modules/features/settings/SettingsCapabilityLabSection.md` — updated `Thinking` entry to `Verified` with Codex acceptance evidence and honest boundary.
+- `devlog.md` — this entry.
+
+### Verification
+
+- `npm run test -- ClaudeCodeThinkingPipeline --no-coverage` passed (6/6).
+- `npm run test -- SettingsCapabilityLabSection.test.ts --no-coverage` passed (264/264).
+- `npm run check:module-docs` passed (465/465 mapped docs; 10 required doc targets).
+- `npm run check:graphify` passed after `npm run graphify:update:src`.
+- `npm run check:devlog-order` passed (417 dated sections).
+- `git diff --check` passed.
+- `npm run verify` passed: owner guard, module docs, graphify, devlog order, lint (0 errors / 16 existing warnings), typecheck, 469 test suites / 4251 tests, and production build.
+- Final deployed Test Vault build: `feature-phase0-capability.202606072208`. BUILD_ID was verified in the deployed `main.js`, plugin reload completed, and the same Claude Code conversation still showed 12 persisted and 12 visible DOM thinking blocks. `obsidian dev:errors` returned `No errors captured`; console still showed an unrelated OpenCode sidecar startup timeout, so console was not counted as clean evidence for this round.
+
+---
+
 ## 2026-06-07 Claude Code Backend Capability Productization — Round 11 (Context Usage Chat Surface)
 
-**BUILD_ID:** `feature-phase0-capability.202606072029`
+**BUILD_ID:** `feature-phase0-capability.202606072029`; Codex acceptance runtime proof on `feature-phase0-capability.202606072048`
 
 ### Summary
 
@@ -25,8 +227,8 @@ Round 11 productized Claude Code Context Usage into the ordinary chat surface by
 - **`OpenCodianView.ts`**: Updated `getSessionContextUsageSnapshot` host method to route Claude Code backend requests to the adapter instead of returning `null`. The view now calls `adapter.getSessionContextUsageSnapshot()` for `claude-code` backend sessions.
 - **`SettingsCapabilityLabSection.ts`**: Updated Context Usage matrix row:
   - `userSurface`: `'settings'` → `'settings+chat'` (chat ContextRing now mounts)
-  - `runtimeProof`: remains `'readback'` (no BUILD_ID-anchored Obsidian runtime proof yet)
-  - Comment updated to document Round 11 wiring and promotion blocker
+  - `runtimeProof`: `'readback'` → `'pass'` after BUILD_ID-anchored Test Vault proof
+  - Comment updated with Codex acceptance evidence
 
 ### Architecture audit
 
@@ -38,36 +240,48 @@ The existing chat context pipeline is fully backend-agnostic after `OpenCodianVi
 
 The only Claude Code-specific addition is the conversion layer: SDK `getContextUsage()` → `ContextUsageSnapshot`. No new UI components or parallel pipelines were added.
 
+### Codex review fix
+
+Codex review found that the first implementation imported `ContextUsageSnapshot` from `features/chat/services/ContextUsageService` inside `core/agents/backend/ClaudeCodeAdapter.ts`, creating a core → feature type dependency. The DTO now lives in `src/core/types/chat.ts`; `ContextUsageService` re-exports it for compatibility, and OpenCode's `SessionContextUsageSnapshot` is a type alias. A focused guard test now prevents `ClaudeCodeAdapter` from importing `../../../features/chat`.
+
+### Codex acceptance runtime proof
+
+After the boundary fix, Codex verified the deployed Test Vault build `feature-phase0-capability.202606072048`: active backend `claude-code`, `.opencodian-context-ring` mounted in chat, ring text showed `22%` / `28,231` tokens, tooltip reported total tokens 28,231 / usage 22% / cost US$0.00, and `ContextDetailModal` showed provider Claude Code, model Default, 16 rows, 4 breakdown items. `obsidian dev:errors` stayed clean. Screenshots: `/tmp/opencodian-round11-context-ring-2048.png`, `/tmp/opencodian-round11-context-detail-2048.png`.
+
 ### Matrix impact
 
 - Before: 54 rows, 35 pass, 19 readback, 2 hidden, 0 fail
-- After: 54 rows, 35 pass, 19 readback, 2 hidden, 0 fail (no promotion; userSurface expanded)
+- After Codex acceptance: 54 rows, 36 pass, 18 readback, 2 hidden, 0 fail
 
 ### Tests added
 
 - `ClaudeCodeAdapter.test.ts`: 3 new tests for `getSessionContextUsageSnapshot` (successful conversion, null handling, error handling)
 - `ClaudeCodeAdapter.test.ts`: Added `AgentCapability.Context` to capabilities assertion
-- `SettingsCapabilityLabSection.test.ts`: Updated Context Usage expected `userSurface` to `'settings+chat'`
+- `SettingsCapabilityLabSection.test.ts`: Updated Context Usage expected `runtimeProof` to `'pass'` and `userSurface` to `'settings+chat'`
+- `i18n/index.test.ts`: Added backend-neutral guards for the context breakdown note and Context Usage settings copy, ensuring the verified snapshot surface no longer labels itself as `readback`
 
 ### Files changed
 
 - `src/core/agents/backend/ClaudeCodeAdapter.ts`
 - `src/features/chat/OpenCodianView.ts`
 - `src/features/settings/SettingsCapabilityLabSection.ts`
+- `src/i18n/locales/en.ts`
+- `src/i18n/locales/zh.ts`
+- `docs/modules/i18n/locales/en.md`
+- `docs/modules/i18n/locales/zh.md`
 - `tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts`
 - `tests/unit/features/settings/SettingsCapabilityLabSection.test.ts`
+- `tests/unit/i18n/index.test.ts`
 
 ### Honest boundaries
 
-- **runtimeProof remains `readback`**: The chat ContextRing is structurally wired and will mount for Claude Code sessions, but no BUILD_ID-anchored Obsidian runtime proof exists yet showing the ring with real data.
-- **Missing live verification**: Need to verify that after a message exchange, the ring updates with actual token counts from `query.getContextUsage()`.
+- **Promotion was proof-gated**: Context Usage was promoted only after live Test Vault evidence showed real Claude Code context data in the chat ring and detail modal.
+- **Scope**: This Round 11 proof did not itself promote Thinking; Round 12 handled Thinking separately. Sandbox enforcement, Permission Mode behavior, and other remaining readback seams are still outside this proof.
 - **OpenCode behavior preserved**: When backend is `opencode`, the existing `openCodeService.getSessionContextUsageSnapshot()` path is unchanged.
 
 ### Suggested next batch
 
-1. **Context Usage runtime verification**: Deploy to Test Vault, send a message, verify ContextRing shows real token counts — then promote to `pass`
-2. **Thinking blocks live verification**: BUILD_ID-anchored live proof of thinking blocks visibly rendered in ordinary Claude Code chat
-3. **Full SDK seam re-scan**: Check if latest SDK versions introduce new productizable seams
+> Superseded by Round 12 and the Output Style live proof above: Thinking and Output Style are now live verified and promoted. Current audit candidates are Sandbox / Permission Mode observability, MCP elicitation split, session rename/tag, and Claude task controls.
 
 ---
 
@@ -89,6 +303,8 @@ Round 10 attempted to promote Account Info and Context Usage from `readback` to 
 - **userSurface:** `settings` (stable settings UI only; no chat surface)
 
 ### Context Usage → remains readback (partial proof) ❌
+
+> Superseded by Round 11 Codex acceptance: Context Usage is now `pass` / `settings+chat` after BUILD_ID-anchored chat ContextRing and detail-modal runtime proof.
 
 - **SDK seam:** `query.getContextUsage()` (sdk.d.ts:2195) returns context window usage breakdown
 - **Settings surface VERIFIED:** "Inspect context usage" button returned rich structured data:
@@ -112,6 +328,8 @@ Round 10 attempted to promote Account Info and Context Usage from `readback` to 
 - `devlog.md` — this entry
 
 ### Suggested Round 11
+
+> Superseded by Rounds 11/12 and the Output Style live proof above: Context Usage, Thinking, and Output Style are now live verified. Current audit candidates are Sandbox / Permission Mode observability, MCP elicitation split, session rename/tag, and Claude task controls.
 
 1. **Context Usage chat surface promotion:** Add `AgentCapability.Context` to `CLAUDE_CODE_PHASE1_CAPABILITIES` and verify ContextRing renders in chat with real data — the highest-value single promotion remaining
 2. **Thinking blocks live verification:** BUILD_ID-anchored live proof of thinking blocks visibly rendered in ordinary Claude Code chat (pipeline code complete, just needs runtime proof)
@@ -965,7 +1183,7 @@ Audit the `AskUserQuestion Preview Format` capability (SDK `toolConfig.askUserQu
 1. The full code path exists and is proven with synthetic data: settings→SDK option wiring (ClaudeCodeOptionsBuilder), bridge extraction (ClaudeCodePermissionBridge `normalizeQuestionOption` preserves `raw.preview`), UI rendering (QuestionInlineCardRenderer + QuestionDock via `setText()`/textContent, never innerHTML).
 2. All layers have unit tests using synthetic preview data: ClaudeCodeOptionsBuilder.test.ts (omit/markdown/html), ClaudeCodePermissionBridge.test.ts (preview preservation), QuestionInlineCardRenderer.test.ts + QuestionDock.test.ts (focus/hide/plain text), SettingsClaudeCodeSection.test.ts (dropdown/notices).
 3. The critical gap: no test or live observation proves that the SDK actually includes `.preview` in real `AskUserQuestion` tool inputs when `previewFormat` is set. This is a **pure outbound SDK request**; the inbound tool input does NOT echo `previewFormat` back.
-4. AskUserQuestion/Elicitation overall is **pass** (question dialogs arrive, render, answers work), but this specific seam (`previewFormat`) is separate — it's about whether preview *text* arrives and differs by format setting, which is NOT proven.
+4. The built-in `AskUserQuestion` path is **pass** (question dialogs arrive, render, answers work), but MCP Elicitation is now tracked as a separate `wiring` row until real MCP server roundtrip proof exists. This specific seam (`previewFormat`) is separate again — it's about whether preview *text* arrives and differs by format setting, which is NOT proven.
 5. Adjacent seams explicitly REJECTED: (a) reusing AskUserQuestion pass proof as previewFormat proof (dishonest overclaiming), (b) mocking AskUserQuestion input with synthetic preview (already done in bridge/UI tests, proves rendering not arrival), (c) inspecting SDK source (not runtime proof).
 
 **Changes made:**

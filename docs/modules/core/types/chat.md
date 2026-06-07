@@ -67,6 +67,7 @@
 | 类型 | 说明 |
 |------|------|
 | `UsageInfo` | Token 使用信息（`inputTokens`, `outputTokens`, `model`, `contextWindow`, `percentage`, `sessionId?`） |
+| `ContextUsageSnapshot` | Backend session 上下文用量快照 DTO（session/model/provider 元数据、contextWindow、input/output/reasoning/cache token、cost、`compactingAt?`），由 OpenCode 与 Claude Code 的 snapshot 读取路径共同使用，避免 core backend 反向依赖 chat feature service |
 | `TabContextState` | 标签页级上下文状态（估算/精确 token、费用、模型信息、会话元数据，以及 `compactingAt?` live compaction 时间戳） |
 | `ContextBreakdownKey` | `'system' \| 'user' \| 'assistant' \| 'tool' \| 'other'` |
 | `ContextBreakdownSegment` | 上下文分段统计（`key`, `tokens`, `width`, `percent`） |

@@ -33,6 +33,7 @@ import {
 } from '../../core/opencode';
 import {
   type ChatMessage,
+  type ContextUsageSnapshot,
   type Conversation,
   getConversationBackendSessionId,
   type PromptContextItem,
@@ -175,7 +176,6 @@ import {
   ComposerInputShellCoordinator,
   type ComposerInputShellCoordinatorHost,
 } from './services/ComposerInputShellCoordinator';
-import type { ContextUsageSnapshot } from './services/ContextUsageService';
 import {
   ConversationAuthoritativeSyncCoordinator,
   type ConversationAuthoritativeSyncHost,

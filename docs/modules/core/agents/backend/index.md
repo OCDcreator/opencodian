@@ -1,7 +1,7 @@
 # backend/index
 
 > **源码**: `src/core/agents/backend/index.ts`
-> **最近更新**: 2026-06-06
+> **最近更新**: 2026-06-07
 
 ## 概述
 
@@ -13,7 +13,7 @@
 - 重新导出 `AgentService.ts` 中的核心接口、状态类型、共享 disposable 类型、chat/session 请求类型和可选 capability interface
 - 导出 `OpenCodeAdapter` 作为当前 OpenCode backend 的 adapter 实现
 - 导出 backend routing helper，供入口、聊天视图和发送管线按 conversation owner / active backend 做 capability narrowing
-- 导出 Claude Code adapter、runtime catalog readback 类型、project skill/command/agent/settings discovery helper、model catalog projection、SDK loader、options builder、MCP config adapter、process resolver、stream normalizer 与 permission bridge；`claude-code` 已可在设置中显式启用，默认仍保持 OpenCode
+- 导出 Claude Code adapter、runtime catalog readback 类型、project skill/command/agent/settings discovery helper、model catalog projection、SDK loader、options builder、MCP config adapter、MCP elicitation bridge、process resolver、stream normalizer 与 permission bridge；`claude-code` 已可在设置中显式启用，默认仍保持 OpenCode
 - 导出 `AgentServiceRegistry` 作为 adapter 注册与 active backend 解析 owner
 - 保持 type-only 导出与 value 导出分层，避免 barrel 额外引入运行时副作用
 
@@ -33,6 +33,7 @@
 - `SystemPromptReadbackProbeResult`: Claude Code `systemPrompt` 选项 readback probe 结果类型；诊断专用，验证 settings→SDK option mapping，不声称行为验证。
 - `PlanModeInstructionsReadbackProbeResult`: Claude Code `planModeInstructions` 选项 readback probe 结果类型；诊断专用，不验证实际 plan-mode behavior enforcement。
 - `PlanModeInstructionsLiveProbeResult`: Claude Code `planModeInstructions` live probe 结果类型；通过计划权限模式、nonce-bearing diagnostic instructions 与自动工具批准验证 planModeInstructions 实际到达模型上下文并影响响应。
+- `OutputStyleLiveProbeResult`: Claude Code `settings.outputStyle` live probe 结果类型；通过临时 `.claude/output-styles/<style>.md` custom style file、diagnostic outputStyle override 和 nonce recall 验证 fresh diagnostic query 行为。诊断专用，不证明 active-session live mutation 或当前保存 style name 有效。
 - `SandboxReadbackProbeResult`: Claude Code `sandbox` 选项 readback probe 结果类型；诊断专用，不验证实际 OS-level sandbox enforcement 行为。
 - `DebugFileReadbackProbeResult`: Claude Code `debugFile` 选项 readback probe 结果类型；诊断专用，验证 settings→SDK option mapping。
 - `DebugFileLiveProbeResult`: Claude Code `debugFile` live probe 结果类型；2026-06-06 新增，验证 CLI 子进程在共享文件系统上实际创建非空 debug 文件。整体能力已从 readback 晋升为 pass。
@@ -42,7 +43,7 @@
 - `JsRuntimeReadbackProbeResult`: Claude Code `executable` 选项 readback probe 结果类型；诊断专用，不验证实际运行时选择行为。
 - `LoadTimeoutReadbackProbeResult`: Claude Code `loadTimeoutMs` 选项 readback probe 结果类型；诊断专用，不验证实际超时行为。
 - `buildClaudeCodeModelSelectorProviders` / `CLAUDE_CODE_EFFORT_VARIANTS`: Claude Code composer model aliases、SDK supported-model projection 与 effort variants helper。
-- `loadClaudeCodeSdk` / `buildClaudeCodeOptions` / `adaptMcpConfigForClaude` / `resolveClaudeCodeProcess` / `createClaudeCodeStreamNormalizer` / `createClaudeCodePermissionBridge`: Claude Code Phase 1 前置 SDK loading、options、MCP config adapter、process、stream 转换与 permission/question bridge helper。
+- `loadClaudeCodeSdk` / `buildClaudeCodeOptions` / `adaptMcpConfigForClaude` / `buildClaudeCodeElicitationQuestionRequest` / `resolveClaudeCodeProcess` / `createClaudeCodeStreamNormalizer` / `createClaudeCodePermissionBridge`: Claude Code Phase 1 前置 SDK loading、options、MCP config adapter、MCP elicitation request/content mapping、process、stream 转换与 permission/question bridge helper。
 - `AgentService` / `AgentServiceInfo` / `AgentConnectionStatus` / `Disposable` / `StatusChangeHandler`: backend 抽象层核心契约与共享类型。
 - `AgentChatSendRequest`: backend-neutral chat 发送请求类型。
 - `AgentChatCapability` / `AgentSessionCapability` / `AgentAuthCapability` / `AgentBranchCapability` / `AgentConfigCapability` / `AgentMcpCapability` / `AgentModelCapability` / `AgentPermissionCapability` / `AgentQuestionCapability` / `AgentTodoCapability` / `AgentToolCapability`: 可选 capability interface。
@@ -61,6 +62,7 @@
 - `src/core/agents/backend/ClaudeCodeSdkLoader.ts`：官方 Claude Agent SDK dynamic import facade
 - `src/core/agents/backend/ClaudeCodeOptionsBuilder.ts`：Claude SDK options 形状 builder
 - `src/core/agents/backend/ClaudeCodeMcpConfigAdapter.ts`：OpenCodian MCP config 到 Claude SDK `mcpServers` 的配置桥接 helper
+- `src/core/agents/backend/ClaudeCodeElicitationBridge.ts`：Claude SDK `onElicitation` request/content 到 OpenCodian `QuestionRequest` 的 shape mapping helper；仅证明 wiring，不代表真实 MCP server roundtrip 已 pass
 - `src/core/agents/backend/ClaudeCodeProcessResolver.ts`：Claude process/executable 解析 helper
 - `src/core/agents/backend/ClaudeCodeStreamNormalizer.ts`：Claude SDK message 到 `StreamChunk` 的转换 helper
 - `src/core/agents/backend/ClaudeCodePermissionBridge.ts`：Claude `canUseTool` / `AskUserQuestion` 到 OpenCodian permission/question host 的桥接 helper

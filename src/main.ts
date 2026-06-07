@@ -13,6 +13,11 @@ import {
 } from './core/agents/backend/AgentBackendRouting';
 import { AgentServiceRegistry } from './core/agents/backend/AgentServiceRegistry';
 import { ClaudeCodeAdapter } from './core/agents/backend/ClaudeCodeAdapter';
+import {
+  buildClaudeCodeElicitationContent,
+  buildClaudeCodeElicitationQuestionRequest,
+  normalizeClaudeCodeElicitationContent,
+} from './core/agents/backend/ClaudeCodeElicitationBridge';
 import { adaptMcpConfigForClaude } from './core/agents/backend/ClaudeCodeMcpConfigAdapter';
 import { type ClaudeCodePermissionBridgeHostContext, createClaudeCodePermissionBridgeHost } from './core/agents/backend/ClaudeCodeDefaultPermissionHost';
 import { ClaudeCodePermissionBridge, createClaudeCodePermissionBridge } from './core/agents/backend/ClaudeCodePermissionBridge';
@@ -28,7 +33,6 @@ import type {
   ChatAppearanceSettings,
   Conversation,
   OpenCodianSettings,
-  QuestionRequest,
   ThemePresetDefinition,
   ThemePresetId,
 } from './core/types';
@@ -288,7 +292,7 @@ export default class OpenCodianPlugin extends Plugin {
       return { action: 'cancel' };
     }
 
-    const questionRequest = this.createClaudeCodeElicitationQuestionRequest(request);
+    const questionRequest = buildClaudeCodeElicitationQuestionRequest(request);
     const response = await renderer.collectResponse(questionRequest, ctx.getActiveTabId());
     if (!response) {
       return { action: 'cancel' };
@@ -306,94 +310,9 @@ export default class OpenCodianPlugin extends Plugin {
 
     return {
       action: 'accept',
-      content: this.normalizeClaudeCodeElicitationContent(response.content)
-        ?? this.createClaudeCodeElicitationContent(questionRequest, response.answers ?? []),
+      content: normalizeClaudeCodeElicitationContent(response.content)
+        ?? buildClaudeCodeElicitationContent(questionRequest, response.answers ?? [], request),
     };
-  }
-
-  private createClaudeCodeElicitationQuestionRequest(
-    request: ElicitationRequest,
-  ): QuestionRequest {
-    const schemaProperties = this.getClaudeCodeElicitationSchemaProperties(request.requestedSchema);
-    const schemaQuestions = Object.entries(schemaProperties).flatMap(([key, property]) => {
-      const options = Array.isArray(property.enum)
-        ? property.enum
-            .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
-            .map((value) => ({ label: value, description: '' }))
-        : [];
-      if (options.length === 0) {
-        return [];
-      }
-      return [{
-        question: key,
-        header: typeof property.title === 'string' ? property.title : request.title ?? request.displayName ?? request.serverName,
-        options,
-        multiple: property.type === 'array',
-        custom: true,
-      }];
-    });
-
-    return {
-      id: request.elicitationId ?? `claude-elicitation-${Date.now()}`,
-      sessionId: 'claude-code',
-      questions: schemaQuestions.length > 0
-        ? schemaQuestions
-        : [{
-            question: request.message,
-            header: request.title ?? request.displayName ?? request.serverName,
-            options: [
-              { label: 'Accept', description: request.description ?? '' },
-              { label: 'Decline', description: '' },
-            ],
-            multiple: false,
-            custom: true,
-          }],
-    };
-  }
-
-  private getClaudeCodeElicitationSchemaProperties(
-    schema: Record<string, unknown> | undefined,
-  ): Record<string, { enum?: unknown; title?: unknown; type?: unknown }> {
-    const properties = schema?.properties;
-    if (!properties || typeof properties !== 'object' || Array.isArray(properties)) {
-      return {};
-    }
-    return properties as Record<string, { enum?: unknown; title?: unknown; type?: unknown }>;
-  }
-
-  private createClaudeCodeElicitationContent(
-    request: QuestionRequest,
-    answers: readonly string[][],
-  ): Record<string, string | string[]> {
-    const content: Record<string, string | string[]> = {};
-    request.questions.forEach((question, index) => {
-      const selected = answers[index] ?? [];
-      if (question.question === request.questions[0]?.question && selected[0] === 'Decline') {
-        return;
-      }
-      content[question.question] = question.multiple ? [...selected] : selected[0] ?? '';
-    });
-    return content;
-  }
-
-  private normalizeClaudeCodeElicitationContent(
-    content: Record<string, unknown> | undefined,
-  ): Record<string, string | number | boolean | string[]> | undefined {
-    if (!content) {
-      return undefined;
-    }
-    const normalized: Record<string, string | number | boolean | string[]> = {};
-    for (const [key, value] of Object.entries(content)) {
-      if (
-        typeof value === 'string'
-        || typeof value === 'number'
-        || typeof value === 'boolean'
-        || (Array.isArray(value) && value.every((item): item is string => typeof item === 'string'))
-      ) {
-        normalized[key] = value;
-      }
-    }
-    return normalized;
   }
 
   private getClaudeAgentSdkPlatformPackageName(): string {

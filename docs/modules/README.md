@@ -165,6 +165,7 @@ docs/modules/
 │   │   ├── services/
 │   │   │   ├── AgentMentionCandidateService.md
 │   │   │   ├── AgentMentionComposerController.md
+│   │   │   ├── AdditionalDirectoriesConfigBadgeCoordinator.md
 │   │   │   ├── ChatHeaderPresenter.md
 │   │   │   ├── ChatVisualDemoCoordinator.md
 │   │   │   ├── ChatSelectionControlsCoordinator.md

@@ -53,6 +53,7 @@ export {
   type DebugReadbackProbeResult,
   type JsRuntimeReadbackProbeResult,
   type LoadTimeoutReadbackProbeResult,
+  type OutputStyleLiveProbeResult,
   type PlanModeInstructionsLiveProbeResult,
   type PlanModeInstructionsReadbackProbeResult,
   type PromptSuggestionsReadbackProbeResult,
@@ -64,6 +65,11 @@ export {
   type ToolAliasesReadbackProbeResult,
   type WarmStartupProbeResult,
 } from './ClaudeCodeAdapter';
+export {
+  buildClaudeCodeElicitationContent,
+  buildClaudeCodeElicitationQuestionRequest,
+  normalizeClaudeCodeElicitationContent,
+} from './ClaudeCodeElicitationBridge';
 export {
   adaptMcpConfigForClaude,
   type ClaudeCodeMcpHttpConfig,

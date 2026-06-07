@@ -13,6 +13,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import type { ElicitationRequest } from '@anthropic-ai/claude-agent-sdk';
 import { Notice, Setting } from 'obsidian';
 
 import type { BackendCapabilities } from '../../core/agents/AgentCapability';
@@ -24,6 +25,7 @@ import {
   readBackendSessionTitle,
 } from '../../core/agents/backend/AgentBackendRouting';
 import type { ClaudeCodeAdapter, ClaudeCodeDiagnosticPromptResult } from '../../core/agents/backend/ClaudeCodeAdapter';
+import { buildClaudeCodeElicitationQuestionRequest } from '../../core/agents/backend/ClaudeCodeElicitationBridge';
 import type { ClaudeCodePermissionBridge } from '../../core/agents/backend/ClaudeCodePermissionBridge';
 import type { AgentBackendKind } from '../../core/types/chat';
 import {
@@ -836,11 +838,34 @@ export class SettingsCapabilityLabSection {
         userSurface: 'chat', // Reuses existing shared permission card UI in ordinary chat; no separate Claude permission settings page. The user surface is the chat interaction itself, not a settings control.
       },
       {
-        capability: 'AskUserQuestion / Elicitation',
-        sdkExposed: true, // AskUserQuestion canUseTool path + onElicitation option
-        adapterWired: true, // bridge maps question answers and options builder forwards onElicitation
+        capability: 'AskUserQuestion',
+        sdkExposed: true, // AskUserQuestion built-in tool via canUseTool
+        adapterWired: true, // bridge maps AskUserQuestion answers into updatedInput.answers
         runtimeProof: 'pass', // Ordinary chat end-to-end proof achieved: message sent through real chat pipeline (sendPipelineRuntime.sendMessage), model called AskUserQuestion through SDK, question dialog rendered with data-question-card selector, user selected Yes and clicked submit (data-question-action), stream continued with answer incorporated. The chat view (opencodian-view leaf) and send pipeline are fully accessible. Added data-question-card and data-question-action selectors for verification stability. Added ordinary chat launcher in Capability Lab.
         userSurface: 'chat', // Reuses existing shared question dialog in ordinary chat; no separate Claude question settings page. The user surface is the chat interaction itself, not a settings control.
+      },
+      {
+        capability: 'MCP Elicitation',
+        sdkExposed: true, // SDK onElicitation callback for MCP server user-input requests
+        adapterWired: true, // adapter forwards onElicitation; main handler maps MCP form/url requests to shared question UI
+        // 2026-06-08 Round 15 correction — keeps 'wiring', not readback closure.
+        // SDK-LEVEL ROUNDTRIP PROVEN: scripts/claude-code-smoke.mjs writeMcpElicitationServer()
+        //   creates a temp stdio MCP server with elicitation capability. When the tool is called,
+        //   the server sends elicitation/create to the SDK client, onElicitation is invoked,
+        //   the callback returns accept+content, and the server consumes the result in its
+        //   tool output (recorded in .obsidian-debug/claude-code-smoke-2026-05-24-current.json:
+        //   "onElicitation invoked 1 time"). This is a real MCP server → elicitation/create →
+        //   onElicitation → host response → MCP server consumption roundtrip.
+        // PRODUCT-PATH GAP: The existing Capability Lab probe is synthetic (no live server).
+        //   No Test Vault / Obsidian chat UI proof exists where a real MCP server elicitation
+        //   surfaces through the shared question dialog and the user's answer is consumed by
+        //   the server. The SDK smoke proof does not automatically imply the Obsidian product
+        //   path works; the bridge and renderer need their own live verification.
+        // Classification stays 'wiring': SDK callback + bridge mapping are wired, and SDK-level
+        //   roundtrip exists in smoke tests, but the product path (Obsidian chat UI + server
+        //   consumption) is not yet proven. Promotion to 'pass' requires live product-path proof.
+        runtimeProof: 'wiring',
+        userSurface: 'chat', // MCP server elicitations surface as chat-time question dialogs; MCP authoring/status remains in settings.
       },
       {
         capability: 'Agents (Subagents)',
@@ -1106,15 +1131,30 @@ export class SettingsCapabilityLabSection {
         capability: 'Thinking',
         sdkExposed: true, // SDK Options.thinking?: ThinkingConfig (sdk.d.ts line 5649: ThinkingAdaptive | ThinkingEnabled | ThinkingDisabled)
         adapterWired: true, // ClaudeCodeOptionsBuilder.mapThinkingForSdk() maps settings.thinking to SDK options
-        runtimeProof: 'readback', // SDK types support thinking option; builder maps it; stream normalizer handles
-        // thinking and redacted_thinking blocks. SDK smoke artifact recorded thinking blocks in the
-        // stream (part of 10/10 direct SDK smoke pass). Status doc confirms thinking is
-        // "runtime-proved but not stable" at stream normalization level.
+        runtimeProof: 'pass', // PROMOTED on Codex acceptance after BUILD_ID-anchored Obsidian runtime proof.
         //
-        // FULL PIPELINE VERIFIED (code audit 2026-06-07):
+        // Codex acceptance evidence (BUILD_ID feature-phase0-capability.202606072146):
+        // - Test Vault deployed build: OpenCodian 1.0.0 BUILD_ID=feature-phase0-capability.202606072146.
+        // - After obsidian plugin:reload vault="testvault" id=opencodian, active leaf was opencodian-view.
+        // - Runtime settings: activeBackend=claude-code, thinking setting { type: "adaptive" }.
+        // - Conversation: id conv-1780776153801-v9lnfeihy, conversationBackend=claude-code,
+        //   backendSessionId=79673f0e-d48c-49c2-baa8-5704700c1fac, messageCount=10.
+        // - Same currentConversation persisted 12 contentBlocks with type `thinking`.
+        // - DOM inside .workspace-leaf-content[data-type="opencodian-view"] had 12
+        //   .streaming-thinking-block elements.
+        // - First visible block: label "Thought for 16s", content length 143 chars, firstVisible=true.
+        // - obsidian dev:errors vault="testvault" returned "No errors captured."
+        // - Screenshot /tmp/opencodian-round12-thinking-visible-2146.png shows ordinary chat surface
+        //   with Claude Code connected and visible "Thought for 16s", "Thought for 0.5s",
+        //   "Thought for 0.8s" blocks.
+        //
+        // FULL PIPELINE VERIFIED (Round 12 code audit 2026-06-07):
         // 1. Backend adapter: ClaudeCodeOptionsBuilder.mapThinkingForSdk() correctly maps
         //    adaptive → {type:'adaptive'}, disabled → {type:'disabled'}, fixed → {type:'enabled', budgetTokens}.
         //    buildClaudeCodeOptions injects thinking into SDK options. Covered by builder unit tests.
+        //    SDK audit (sdk.d.ts:5641-5665): ThinkingAdaptive/ThinkingEnabled both support optional
+        //    display?: 'summarized' | 'omitted'; plugin does not surface this toggle and omits it,
+        //    so the SDK default (full thinking blocks in the response stream) applies.
         // 2. Stream normalization: ClaudeCodeStreamNormalizer handles 'thinking'/'redacted_thinking'
         //    content blocks and 'thinking_delta' partial chunks. Covered by normalizer unit tests.
         // 3. Chat streaming: OpenCodianView.convertToStreamingChunk() routes thinking chunks to
@@ -1126,20 +1166,16 @@ export class SettingsCapabilityLabSection {
         // 5. Rehydration: AssistantShellViewHostAdapter.renderContentBlock() renders stored thinking
         //    blocks via ThinkingBlockRenderer.renderStored(). Covered by adapter tests.
         //
-        // MISSING — and blocking promotion to pass:
-        // No BUILD_ID-anchored runtime proof showing thinking blocks visibly rendered in an
-        // ordinary Claude Code chat conversation. The SDK smoke artifact proved thinking blocks
-        // arrive in the stream, but did not capture the chat UI state. A live proof requires:
-        //   (a) A Claude Code backend query with thinking option enabled,
-        //   (b) Observable thinking prose rendered in the chat transcript,
-        //   (c) Screenshot or DOM assertion proving .streaming-thinking-block visibility.
+        // Deterministic harness: tests/unit/core/agents/backend/ClaudeCodeThinkingPipeline.test.ts
+        // exercises the full SDK-message → normalizer → StreamController → DOM path, including
+        // redacted_thinking, suffix deduplication, and duration finalization. This proves the
+        // visible chat rendering pipeline is wired; it is NOT a substitute for real-model runtime
+        // proof because it uses synthetic chunks rather than a live Claude Code response.
         //
-        // Honest ceiling: readback. The full pipeline is code-verified end-to-end, but visible
-        // chat rendering is NOT independently BUILD_ID-anchored. Do not promote to pass without
-        // a live runtime proof.
-        // Promotion path: obtain a BUILD_ID-anchored live proof showing thinking blocks rendered
-        // in the chat UI for a Claude Code backend conversation.
-        userSurface: 'settings+chat', // Settings: Model & Thinking tab dropdown + budget input. Chat: generic StreamController renders thinking blocks for any backend that produces them, including Claude Code.
+        // Honest boundary: this pass applies specifically to visible thinking block rendering in
+        // ordinary Claude Code chat. It does NOT prove Effort enforcement, Sandbox OS-level
+        // enforcement, Permission Mode Live Switch behavioral effects, or any other unrelated seam.
+        userSurface: 'settings+chat', // Settings: Model & Thinking tab dropdown + budget input. Chat: visible thinking blocks rendered in ordinary Claude Code chat transcript.
       },
       {
         capability: 'Plan Mode Instructions',
@@ -1641,13 +1677,14 @@ export class SettingsCapabilityLabSection {
         capability: 'Output Style',
         sdkExposed: true, // SDK Options.settings?: Settings; Settings.outputStyle?: string
         adapterWired: true, // buildClaudeCodeOptions wires outputStyle into options.settings.outputStyle
-        runtimeProof: 'readback', // SDK option wiring proven: settings.outputStyle forwarded as
-        // part of the inline settings object passed to query(). Per SDK docs, outputStyle modifies
-        // the system prompt and takes effect after /clear or a new session. The plugin cannot
-        // independently verify system prompt modification from the stream — no structured signal
-        // exposes the active system prompt text. Claude Code reads outputStyle at session
-        // start; changes apply after /clear or a new session, while existing active/resumed
-        // sessions may keep their previous prompt.
+        runtimeProof: 'pass', // Diagnostic live proof: adapter.runOutputStyleLiveProbe()
+        // creates a temp project-local `.claude/output-styles/<style>.md`, selects it through
+        // SDK options.settings.outputStyle for one fresh diagnostic query, and marks pass only
+        // when the assistant recalls a nonce that is present in the style file but NOT in the
+        // user prompt. This proves custom output style files can influence fresh/new query
+        // behavior through the SDK settings path. It does NOT claim active-session live mutation,
+        // and it does not prove the user's currently saved outputStyle text/name is valid; the
+        // stable settings value is still read at session start (/clear or new session).
         userSurface: 'settings', // Model & Thinking tab text input, adjacent to systemPrompt
       },
       {
@@ -1711,8 +1748,10 @@ export class SettingsCapabilityLabSection {
         //     confirmation; same one-way opacity as Options version.
         // Re-audit only if SDK adds: directory expansion confirmation event, tool metadata
         // that exposes resolved filesystem scope, or init event listing accessible paths.
-        userSurface: 'settings', // Claude Code Runtime tab textarea (newline-separated paths)
-        // Stable settings surface; changes require session restart to take effect.
+        userSurface: 'settings+chat', // Runtime tab textarea + chat toolbar configured-scope badge
+        // Stable settings surface plus read-only chat badge. The badge reflects requested
+        // additionalDirectories scope for the next/new query and keeps the readback boundary:
+        // it does not verify resolved path access inside the SDK/CLI subprocess.
       },
       {
         capability: 'Account Info',
@@ -1752,17 +1791,18 @@ export class SettingsCapabilityLabSection {
         // ContextRing.ts renders chat input toolbar indicator;
         // ContextDetailModal.ts renders detail modal with full breakdown;
         // 20+ locale keys in en+zh for context.usage.*.
-        runtimeProof: 'readback', // Round 10 settings surface VERIFIED (BUILD_ID
-        // feature-phase0-capability.202606071932): "Inspect context usage" button returned
-        // rich structured data. Round 11: AgentCapability.Context added to
-        // CLAUDE_CODE_PHASE1_CAPABILITIES; getSessionContextUsageSnapshot() wired; chat
-        // ContextRing now mounts for Claude Code sessions. HOWEVER, chat surface remains
-        // unverified: no BUILD_ID-anchored Obsidian runtime proof of the ContextRing
-        // rendering real Claude Code context data. Promotion to pass requires live
-        // verification that the ring shows actual token counts after a message exchange.
+        runtimeProof: 'pass', // Round 10 settings surface VERIFIED (BUILD_ID
+        // feature-phase0-capability.202606071932): "Inspect context usage" returned rich
+        // structured data. Round 11 productized chat surface. Codex acceptance runtime
+        // proof (BUILD_ID feature-phase0-capability.202606072048): active backend
+        // claude-code, .opencodian-context-ring mounted in Test Vault, ring text showed
+        // 22% / 28,231 tokens, tooltip reported total tokens 28,231, usage 22%, cost
+        // US$0.00, and ContextDetailModal showed provider Claude Code, model Default,
+        // 16 rows, 4 breakdown items. Screenshots:
+        // /tmp/opencodian-round11-context-ring-2048.png and
+        // /tmp/opencodian-round11-context-detail-2048.png. obsidian dev:errors clean.
         userSurface: 'settings+chat', // Settings tab "Context usage" readback section +
         // chat ContextRing (mounted via AgentCapability.Context) + ContextDetailModal.
-        // Chat surface is structurally wired but not yet runtime-verified in Obsidian.
       },
     ];
   }
@@ -3301,11 +3341,19 @@ export class SettingsCapabilityLabSection {
       { status: 'exposed' },
     );
 
-    // AskUserQuestion / Elicitation
+    // AskUserQuestion
     this.addDiscoveryRow(
       tbody,
-      'AskUserQuestion / Elicitation',
-      'Chat-surface validated in Capability Lab harness. The question bridge returns AskUserQuestion answers through the shared question dialog, and onElicitation is forwarded as a runtime SDK callback. End-to-end proof is anchored to ordinary chat + deterministic harness evidence (chat surface activated and bridge-rendered question dialog observed with stable selectors). No separate Claude question settings page — the user surface is the chat interaction itself.',
+      'AskUserQuestion',
+      'Chat-surface validated in ordinary chat and Capability Lab harness. The question bridge returns AskUserQuestion answers through the shared question dialog. This row covers the built-in AskUserQuestion tool path only; MCP Elicitation is tracked separately because it enters through SDK onElicitation callbacks.',
+      { status: 'exposed' },
+    );
+
+    // MCP Elicitation
+    this.addDiscoveryRow(
+      tbody,
+      'MCP Elicitation',
+      'SDK onElicitation callback wiring is mapped to the shared question dialog for MCP form/url requests. Bridge logic verified by synthetic probe (enum→options, scalar→text input, coercion, normalization). SDK-level roundtrip proven: scripts/claude-code-smoke.mjs creates a temp stdio MCP server that sends elicitation/create, triggers onElicitation, and consumes the host response in tool output. Product-path gap: no Test Vault / Obsidian chat UI proof exists where a real MCP server elicitation surfaces through the shared question dialog and the user answer is consumed by the server. This row is separate from AskUserQuestion because it enters through ElicitationRequest, not canUseTool.',
       { status: 'exposed' },
     );
 
@@ -3456,6 +3504,8 @@ export class SettingsCapabilityLabSection {
       (o) => this.runLivePermissionCardHarness(o));
     this.addProofControl(proofControls, containerEl, 'Trigger Live Question Dialog',
       (o) => this.runLiveQuestionDialogHarness(o));
+    this.addProofControl(proofControls, containerEl, 'Probe MCP Elicitation Wiring',
+      (o) => this.runMcpElicitationWiringProbe(o));
     this.addProofControl(proofControls, containerEl, 'Probe Streaming Context',
       (o) => this.runStreamingContextProbe(o));
     this.addProofControl(proofControls, containerEl, 'Run Stable Settings Readback',
@@ -3496,6 +3546,8 @@ export class SettingsCapabilityLabSection {
       (o) => this.runPlanModeInstructionsReadbackProof(adapter, o));
     this.addProofControl(proofControls, containerEl, t('settings.capabilityLab.proofs.planModeInstructionsLive.button'),
       (o) => this.runPlanModeInstructionsLiveProof(adapter, o));
+    this.addProofControl(proofControls, containerEl, t('settings.capabilityLab.proofs.outputStyleLive.button'),
+      (o) => this.runOutputStyleLiveProof(adapter, o));
     this.addProofControl(proofControls, containerEl, t('settings.capabilityLab.proofs.toolAliases.button'),
       (o) => this.runToolAliasesReadbackProof(adapter, o));
     this.addProofControl(proofControls, containerEl, t('settings.capabilityLab.proofs.debug.button'),
@@ -4453,13 +4505,13 @@ export class SettingsCapabilityLabSection {
         outputEl.createEl('p', {
           text: 'The model called AskUserQuestion. The SDK tool boundary was triggered, proving the bridge wiring is functional. However, the diagnostic path lacks the normal chat UI context, so the Obsidian question dialog was not shown and no user answer was collected. This is a boundary state, not a failure.',
         });
-        this.updateRuntimeProof('AskUserQuestion / Elicitation', 'boundary', outputEl);
+        this.updateRuntimeProof('AskUserQuestion', 'boundary', outputEl);
       } else {
         outputEl.createEl('p', {
           cls: 'opencodian-capability-lab-hint',
           text: 'The model did not call AskUserQuestion in this diagnostic prompt. Tool calling is non-deterministic and depends on the model, prompt, and context. This does not prove or disprove the AskUserQuestion wiring.',
         });
-        this.updateRuntimeProof('AskUserQuestion / Elicitation', 'wiring', outputEl);
+        this.updateRuntimeProof('AskUserQuestion', 'wiring', outputEl);
       }
     } catch (err) {
       outputEl.empty();
@@ -4467,7 +4519,7 @@ export class SettingsCapabilityLabSection {
         cls: 'opencodian-capability-lab-error',
         text: `AskUserQuestion proof failed: ${err instanceof Error ? err.message : String(err)}`,
       });
-      this.updateRuntimeProof('AskUserQuestion / Elicitation', 'fail', outputEl);
+      this.updateRuntimeProof('AskUserQuestion', 'fail', outputEl);
     }
   }
 
@@ -4798,7 +4850,7 @@ export class SettingsCapabilityLabSection {
         cls: 'opencodian-capability-lab-error',
         text: 'Permission bridge not available. Claude Code backend may not be enabled.',
       });
-      this.updateRuntimeProof('AskUserQuestion / Elicitation', 'fail', outputEl);
+      this.updateRuntimeProof('AskUserQuestion', 'fail', outputEl);
       return;
     }
 
@@ -4810,7 +4862,7 @@ export class SettingsCapabilityLabSection {
         cls: 'opencodian-capability-lab-hint',
         text: 'Question dialog renderer is not available. Open the OpenCodian chat view first to register the UI renderer.',
       });
-      this.updateRuntimeProof('AskUserQuestion / Elicitation', 'boundary', outputEl);
+      this.updateRuntimeProof('AskUserQuestion', 'boundary', outputEl);
       return;
     }
 
@@ -4820,7 +4872,7 @@ export class SettingsCapabilityLabSection {
         cls: 'opencodian-capability-lab-hint',
         text: `Cannot create diagnostic streaming context: ${synthetic.message} The renderer exists but requires an active streaming assistant message. This is an architectural boundary: shared inline dialogs are designed to render within a live chat stream, not in isolation.`,
       });
-      this.updateRuntimeProof('AskUserQuestion / Elicitation', 'boundary', outputEl);
+      this.updateRuntimeProof('AskUserQuestion', 'boundary', outputEl);
       return;
     }
 
@@ -4856,7 +4908,7 @@ export class SettingsCapabilityLabSection {
         outputEl.createEl('p', {
           text: 'User answered the diagnostic question. The bridge → host → question renderer → user → result chain is fully functional.',
         });
-        this.updateRuntimeProof('AskUserQuestion / Elicitation', 'pass', outputEl);
+        this.updateRuntimeProof('AskUserQuestion', 'pass', outputEl);
       } else {
         // Deny or interrupt both prove the chain worked: the dialog rendered, the user saw it,
         // and the decision propagated back through renderer → host → bridge.
@@ -4865,17 +4917,74 @@ export class SettingsCapabilityLabSection {
         outputEl.createEl('p', {
           text: `User decision: ${result.behavior}. The question dialog rendered and the interaction completed — this is a live UI proof.`,
         });
-        this.updateRuntimeProof('AskUserQuestion / Elicitation', 'pass', outputEl);
+        this.updateRuntimeProof('AskUserQuestion', 'pass', outputEl);
       }
     } catch (err) {
       outputEl.createEl('p', {
         cls: 'opencodian-capability-lab-error',
         text: `Live question dialog failed: ${err instanceof Error ? err.message : String(err)}`,
       });
-      this.updateRuntimeProof('AskUserQuestion / Elicitation', 'fail', outputEl);
+      this.updateRuntimeProof('AskUserQuestion', 'fail', outputEl);
     } finally {
       synthetic.cleanup();
     }
+  }
+
+  private async runMcpElicitationWiringProbe(outputEl: HTMLElement): Promise<void> {
+    outputEl.empty();
+    outputEl.createEl('p', { text: 'Probing MCP Elicitation SDK callback wiring...' });
+
+    const request: ElicitationRequest = {
+      serverName: 'diagnostic-mcp',
+      message: 'Choose a diagnostic MCP approval scope.',
+      mode: 'form',
+      elicitationId: 'diagnostic-elicitation',
+      title: 'MCP Elicitation',
+      displayName: 'Diagnostic MCP',
+      description: 'Synthetic request used only to verify host-side request mapping.',
+      requestedSchema: {
+        type: 'object',
+        properties: {
+          scope: {
+            type: 'string',
+            title: 'Scope',
+            enum: ['Read only', 'Read write'],
+          },
+          labels: {
+            type: 'array',
+            title: 'Labels',
+            enum: ['issue', 'pull request'],
+          },
+          note: {
+            type: 'string',
+            title: 'Freeform note',
+          },
+        },
+      },
+    };
+
+    const questionRequest = buildClaudeCodeElicitationQuestionRequest(request);
+    const hasRenderer = !!this.plugin.claudeCodePermissionHostContext.elicitationCardRenderer;
+
+    outputEl.empty();
+    outputEl.createEl('h5', { text: 'MCP Elicitation wiring probe' });
+    outputEl.createEl('p', {
+      cls: 'opencodian-capability-lab-hint',
+      text: 'This diagnostic maps a synthetic SDK ElicitationRequest into the shared question request shape and reports whether the chat renderer is registered. Enum fields become option groups; non-enum scalar fields become custom text inputs.',
+    });
+    outputEl.createEl('p', {
+      cls: 'opencodian-capability-lab-hint',
+      text: 'Honest boundary: this does not start an MCP server, does not receive elicitation/create, and does not prove that an MCP server consumed the result.',
+    });
+    outputEl.createEl('pre', {
+      cls: 'opencodian-capability-lab-json-preview',
+      text: formatJsonPreview({
+        rendererRegistered: hasRenderer,
+        sampleRequest: request,
+        mappedQuestionRequest: questionRequest,
+      }),
+    });
+    this.updateRuntimeProof('MCP Elicitation', 'wiring', outputEl);
   }
 
   /**
@@ -6935,6 +7044,63 @@ export class SettingsCapabilityLabSection {
       outputEl.createEl('h5', { text: t('settings.capabilityLab.proofs.planModeInstructionsLive.title') });
       outputEl.createEl('p', { cls: 'opencodian-capability-lab-hint', text: t('settings.capabilityLab.proofs.planModeInstructionsLive.threw', { error: errorMessage }) });
       this.updateRuntimeProof('Plan Mode Instructions', 'fail', outputEl);
+    }
+  }
+
+  private async runOutputStyleLiveProof(adapter: ClaudeCodeAdapter, outputEl: HTMLElement): Promise<void> {
+    outputEl.empty();
+    outputEl.createEl('p', { text: t('settings.capabilityLab.proofs.outputStyleLive.running') });
+    try {
+      const result = await adapter.runOutputStyleLiveProbe();
+      outputEl.empty();
+      outputEl.createEl('h5', { text: t('settings.capabilityLab.proofs.outputStyleLive.title') });
+      outputEl.createEl('p', { cls: 'opencodian-capability-lab-hint', text: t('settings.capabilityLab.proofs.outputStyleLive.behaviorBoundary') });
+      outputEl.createEl('p', { cls: 'opencodian-capability-lab-hint', text: t('settings.capabilityLab.proofs.outputStyleLive.lifecycleBoundary') });
+      outputEl.createEl('p', { cls: 'opencodian-capability-lab-hint', text: t('settings.capabilityLab.proofs.outputStyleLive.styleName', { styleName: result.styleName }) });
+      outputEl.createEl('p', { cls: 'opencodian-capability-lab-hint', text: t('settings.capabilityLab.proofs.outputStyleLive.nonce', { nonce: result.nonce }) });
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: t('settings.capabilityLab.proofs.outputStyleLive.outputStyleOptionWired', {
+          status: result.outputStyleOptionWired
+            ? t('settings.capabilityLab.proofs.outputStyleLive.status.yes')
+            : t('settings.capabilityLab.proofs.outputStyleLive.status.no'),
+        }),
+      });
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: t('settings.capabilityLab.proofs.outputStyleLive.nonceRecalled', {
+          status: result.nonceRecalled
+            ? t('settings.capabilityLab.proofs.outputStyleLive.status.yes')
+            : t('settings.capabilityLab.proofs.outputStyleLive.status.no'),
+        }),
+      });
+      outputEl.createEl('p', { cls: 'opencodian-capability-lab-hint', text: t('settings.capabilityLab.proofs.outputStyleLive.tempStylePath', { path: result.tempStylePath }) });
+      outputEl.createEl('p', {
+        cls: 'opencodian-capability-lab-hint',
+        text: t('settings.capabilityLab.proofs.outputStyleLive.cleanup', {
+          status: result.cleanup.fileRemoved
+            ? t('settings.capabilityLab.proofs.outputStyleLive.status.yes')
+            : t('settings.capabilityLab.proofs.outputStyleLive.status.no'),
+        }),
+      });
+      if (result.responsePreview) {
+        outputEl.createEl('p', { cls: 'opencodian-capability-lab-hint', text: t('settings.capabilityLab.proofs.outputStyleLive.responsePreview', { preview: result.responsePreview }) });
+      }
+
+      if (result.classification === 'pass') {
+        outputEl.createEl('p', { cls: 'opencodian-capability-lab-hint', text: t('settings.capabilityLab.proofs.outputStyleLive.pass') });
+        this.updateRuntimeProof('Output Style', 'pass', outputEl);
+      } else {
+        const error = result.error ?? t('settings.capabilityLab.proofs.outputStyleLive.defaultError');
+        outputEl.createEl('p', { cls: 'opencodian-capability-lab-error', text: t('settings.capabilityLab.proofs.outputStyleLive.fail', { error }) });
+        this.updateRuntimeProof('Output Style', 'fail', outputEl);
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      outputEl.empty();
+      outputEl.createEl('h5', { text: t('settings.capabilityLab.proofs.outputStyleLive.title') });
+      outputEl.createEl('p', { cls: 'opencodian-capability-lab-error', text: t('settings.capabilityLab.proofs.outputStyleLive.threw', { error: errorMessage }) });
+      this.updateRuntimeProof('Output Style', 'fail', outputEl);
     }
   }
 

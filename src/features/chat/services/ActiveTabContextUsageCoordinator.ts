@@ -1,5 +1,6 @@
 import type { ResolvedModelSelection } from '../../../core/config/modelConfig';
 import {
+  type ContextUsageSnapshot,
   createEmptyTabContextState,
   getConversationBackendSessionId,
   type StreamChunk,
@@ -16,10 +17,7 @@ import type {
   ModelSelectorKnownModelInfo,
   ModelSelectorSelection,
 } from '../ui/modelSelector/types';
-import {
-  ContextUsageService,
-  type ContextUsageSnapshot,
-} from './ContextUsageService';
+import { ContextUsageService } from './ContextUsageService';
 
 const logger = createLogger('ActiveTabContextUsageCoordinator');
 

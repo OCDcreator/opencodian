@@ -21,6 +21,8 @@
 
 文件头部保留了针对 `simple-import-sort/imports` 的局部豁免：入口导入按启动编排 seam 手工分组，避免 owner-guard 保护下的 wiring 变更频繁触发与行为无关的排序 diff。
 
+Claude Code MCP elicitation 的入口处理保留在 `main.ts`：`onElicitation` 会检查 abort signal、查找当前 chat view 注册的 `elicitationCardRenderer`，并把用户 accept/decline/cancel 映射回 SDK `ElicitationResult`。请求和内容形状转换已下沉到 `ClaudeCodeElicitationBridge.ts`，入口层不再内联 schema parsing 或 answer-to-content 逻辑。当前产品状态仍为 wiring：真实 pass 需要 MCP server 发起 elicitation 并消费返回结果的端到端运行时证据。
+
 ## 导入关系
 
 ```text

@@ -17,6 +17,7 @@ import type {
   ModelSelectorProvider,
   ModelSelectorSelection,
 } from '../ui/modelSelector/types';
+import { AdditionalDirectoriesConfigBadgeCoordinator } from './AdditionalDirectoriesConfigBadgeCoordinator';
 import {
   ModelSelectionRuntime,
   type ModelSelectionRuntimeHost,
@@ -102,6 +103,8 @@ export class ChatSelectionControlsCoordinator {
   private toolbarEl: HTMLElement | null = null;
   private readonly modelSelectionRuntime: ModelSelectionRuntime;
   private permissionSelector: PermissionModeSelectorCoordinator | null = null;
+  private readonly additionalDirectoriesBadge: AdditionalDirectoriesConfigBadgeCoordinator;
+  private additionalDirectoriesBadgeContainer: HTMLElement | null = null;
   private readonly sandboxBadge: SandboxConfigBadgeCoordinator;
   private sandboxBadgeContainer: HTMLElement | null = null;
 
@@ -125,6 +128,7 @@ export class ChatSelectionControlsCoordinator {
     this.modelSelectionRuntime = new ModelSelectionRuntime(host);
     // Permission selector is created per-build in buildBackendPermissionSelector()
     // because the mode system depends on the active backend.
+    this.additionalDirectoriesBadge = new AdditionalDirectoriesConfigBadgeCoordinator();
     // Sandbox badge reads settings directly from the plugin instance,
     // avoiding coupling to the guarded OpenCodianView.ts host object.
     this.sandboxBadge = new SandboxConfigBadgeCoordinator();
@@ -148,6 +152,7 @@ export class ChatSelectionControlsCoordinator {
     // syncSandboxBadge() reads the current backend from the plugin instance
     // on every refresh, so hot-switching backends within a live UI correctly
     // shows or hides the badge without a full rebuild.
+    this.syncAdditionalDirectoriesBadge();
     this.syncSandboxBadge();
   }
 
@@ -238,6 +243,7 @@ export class ChatSelectionControlsCoordinator {
 
   updatePermissionTriggerDisplay(): void {
     this.permissionSelector?.updateTriggerDisplay();
+    this.syncAdditionalDirectoriesBadge();
     this.syncSandboxBadge();
   }
 
@@ -246,6 +252,7 @@ export class ChatSelectionControlsCoordinator {
     this.refreshModelOptions();
     this.updateModelSelectorDisplay();
     this.permissionSelector?.applyLocaleTexts();
+    this.syncAdditionalDirectoriesBadge();
     this.syncSandboxBadge();
   }
 
@@ -253,6 +260,8 @@ export class ChatSelectionControlsCoordinator {
     this.closeModelDropdown();
     this.permissionSelector?.destroy();
     this.permissionSelector = null;
+    this.additionalDirectoriesBadge.destroy();
+    this.additionalDirectoriesBadgeContainer = null;
     this.sandboxBadge.destroy();
     this.sandboxBadgeContainer = null;
     this.disposeModelSelectorStickyHeaders?.();
@@ -267,6 +276,38 @@ export class ChatSelectionControlsCoordinator {
     this.modelSelectionRuntime.reset();
     this.currentModelTriggerIconUrl = null;
     this.modelSelectorIconRequestId += 1;
+  }
+
+  private syncAdditionalDirectoriesBadge(): void {
+    if (!this.toolbarEl) {
+      return;
+    }
+
+    const isClaudeCode = readActiveBackendFromPlugin() === 'claude-code';
+
+    if (isClaudeCode) {
+      if (!this.additionalDirectoriesBadgeContainer) {
+        this.additionalDirectoriesBadgeContainer = this.toolbarEl.createDiv({
+          cls: 'opencodian-additional-directories-badge-container',
+        });
+        this.additionalDirectoriesBadge.mount(this.additionalDirectoriesBadgeContainer);
+      } else {
+        this.additionalDirectoriesBadge.update();
+      }
+
+      if (!this.additionalDirectoriesBadgeContainer.querySelector('.opencodian-additional-directories-config-badge')) {
+        this.additionalDirectoriesBadge.destroy();
+        this.additionalDirectoriesBadgeContainer.remove();
+        this.additionalDirectoriesBadgeContainer = null;
+      }
+      return;
+    }
+
+    if (this.additionalDirectoriesBadgeContainer) {
+      this.additionalDirectoriesBadge.destroy();
+      this.additionalDirectoriesBadgeContainer.remove();
+      this.additionalDirectoriesBadgeContainer = null;
+    }
   }
 
   /**

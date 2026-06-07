@@ -1,6 +1,6 @@
 import { createLogger } from '../../shared';
 import { normalizeContextPath } from '../../shared/contextPath';
-import type { SessionDiffEntry } from '../types';
+import type { ContextUsageSnapshot, SessionDiffEntry } from '../types';
 import type {
   Part,
   Session,
@@ -9,24 +9,7 @@ import type {
 
 const logger = createLogger('OpenCodeSessionControlOrchestrator');
 
-export interface SessionContextUsageSnapshot {
-  sessionId: string;
-  sessionTitle: string;
-  createdAt: number;
-  updatedAt: number;
-  compactingAt: number | null;
-  providerId: string | null;
-  providerName: string | null;
-  modelId: string | null;
-  modelName: string | null;
-  contextWindow: number;
-  inputTokens: number;
-  outputTokens: number;
-  reasoningTokens: number;
-  cacheReadTokens: number;
-  cacheWriteTokens: number;
-  totalCost: number;
-}
+export type SessionContextUsageSnapshot = ContextUsageSnapshot;
 
 type AvailableModelDirectory = {
   providers: Array<{

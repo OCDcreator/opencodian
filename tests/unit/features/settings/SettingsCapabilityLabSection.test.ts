@@ -294,7 +294,7 @@ describe('SettingsCapabilityLabSection', () => {
     expect(mcpRow?.textContent).toContain('Verified');
   });
 
-  it('renders permission approval, AskUserQuestion, and Structured Output rows as chat surface', () => {
+  it('renders permission approval, AskUserQuestion, MCP Elicitation, and Structured Output rows with honest chat surfaces', () => {
     const containerEl = document.createElement('div');
     const section = new SettingsCapabilityLabSection({
       plugin: createMockPlugin(),
@@ -305,7 +305,8 @@ describe('SettingsCapabilityLabSection', () => {
 
     const rows = Array.from(containerEl.querySelectorAll('.opencodian-capability-lab-matrix tbody tr'));
     const permissionRow = rows.find((row) => row.textContent?.includes('Permission Approval'));
-    const questionRow = rows.find((row) => row.textContent?.includes('AskUserQuestion / Elicitation'));
+    const questionRow = rows.find((row) => row.textContent?.includes('AskUserQuestion'));
+    const elicitationRow = rows.find((row) => row.textContent?.includes('MCP Elicitation'));
     const structuredRow = rows.find((row) => row.textContent?.includes('Structured Output'));
 
     expect(permissionRow).not.toBeNull();
@@ -315,6 +316,11 @@ describe('SettingsCapabilityLabSection', () => {
     expect(questionRow).not.toBeNull();
     expect(questionRow?.querySelector('[data-surface]')?.getAttribute('data-surface')).toBe('chat');
     expect(questionRow?.textContent).toContain('Verified');
+
+    expect(elicitationRow).not.toBeNull();
+    expect(elicitationRow?.querySelector('[data-surface]')?.getAttribute('data-surface')).toBe('chat');
+    expect(elicitationRow?.textContent).toContain('Wiring only');
+    expect(elicitationRow?.textContent).not.toContain('Verified');
 
     expect(structuredRow).not.toBeNull();
     expect(structuredRow?.querySelector('[data-surface]')?.getAttribute('data-surface')).toBe('chat');
@@ -368,10 +374,12 @@ describe('SettingsCapabilityLabSection', () => {
     const discoveryTable = containerEl.querySelector('.opencodian-capability-lab-discovery');
     expect(discoveryTable).toBeTruthy();
     const rows = Array.from(discoveryTable!.querySelectorAll('tbody tr'));
-    const permissionRow = rows.find((row) => row.textContent?.includes('Permission Approval'));
-    const questionRow = rows.find((row) => row.textContent?.includes('AskUserQuestion / Elicitation'));
-    const structuredOutputRow = rows.find((row) => row.textContent?.includes('Structured Output'));
-    const mcpRow = rows.find((row) => row.textContent?.includes('MCP Servers'));
+    const getDiscoveryRow = (label: string) => rows.find((row) => row.querySelector('td')?.textContent === label);
+    const permissionRow = getDiscoveryRow('Permission Approval');
+    const questionRow = getDiscoveryRow('AskUserQuestion');
+    const elicitationRow = getDiscoveryRow('MCP Elicitation');
+    const structuredOutputRow = getDiscoveryRow('Structured Output');
+    const mcpRow = getDiscoveryRow('MCP Servers');
 
     expect(permissionRow).not.toBeNull();
     expect(permissionRow?.textContent).toContain('Exposed');
@@ -381,9 +389,15 @@ describe('SettingsCapabilityLabSection', () => {
 
     expect(questionRow).not.toBeNull();
     expect(questionRow?.textContent).toContain('Exposed');
-    expect(questionRow?.textContent).toContain('Chat-surface validated in Capability Lab harness');
+    expect(questionRow?.textContent).toContain('Chat-surface validated in ordinary chat and Capability Lab harness');
     expect(questionRow?.textContent).toContain('question dialog');
     expect(questionRow?.querySelector('.opencodian-capability-lab-chip-active')).not.toBeNull();
+
+    expect(elicitationRow).not.toBeNull();
+    expect(elicitationRow?.textContent).toContain('Exposed');
+    expect(elicitationRow?.textContent).toContain('SDK onElicitation callback');
+    expect(elicitationRow?.textContent).toContain('SDK-level roundtrip proven');
+    expect(elicitationRow?.querySelector('.opencodian-capability-lab-chip-active')).not.toBeNull();
 
     expect(structuredOutputRow).not.toBeNull();
     expect(structuredOutputRow?.textContent).toContain('Exposed');
@@ -999,7 +1013,7 @@ describe('SettingsCapabilityLabSection', () => {
 
     const table = containerEl.querySelector('.opencodian-capability-lab-matrix');
     const rows = table!.querySelectorAll('tbody tr');
-    expect(rows.length).toBe(54);
+    expect(rows.length).toBe(55);
   });
 
   it('renders status chips with correct active/inactive classes', () => {
@@ -1035,7 +1049,7 @@ describe('SettingsCapabilityLabSection', () => {
     expect(surfaces).toContain('chat');
   });
 
-  it('audits capability matrix for honest classifications across all 54 rows', () => {
+  it('audits capability matrix for honest classifications across all 55 rows', () => {
     const containerEl = document.createElement('div');
     const section = new SettingsCapabilityLabSection({
       plugin: createMockPlugin(),
@@ -1065,7 +1079,8 @@ describe('SettingsCapabilityLabSection', () => {
       'Environment Variables': { runtimeProof: 'pass', userSurface: 'settings' },
       'Fallback Model': { runtimeProof: 'readback', userSurface: 'settings' },
       'Permission Approval': { runtimeProof: 'pass', userSurface: 'chat' },
-      'AskUserQuestion / Elicitation': { runtimeProof: 'pass', userSurface: 'chat' },
+      AskUserQuestion: { runtimeProof: 'pass', userSurface: 'chat' },
+      'MCP Elicitation': { runtimeProof: 'wiring', userSurface: 'chat' },
       'Agents (Subagents)': { runtimeProof: 'pass', userSurface: 'diagnostic' },
       'Agent Definitions': { runtimeProof: 'pass', userSurface: 'settings' },
       'Structured Output': { runtimeProof: 'pass', userSurface: 'chat' },
@@ -1082,7 +1097,7 @@ describe('SettingsCapabilityLabSection', () => {
       'Session Title': { runtimeProof: 'pass', userSurface: 'settings+chat' },
       'Prompt Suggestions': { runtimeProof: 'pass', userSurface: 'chat' },
       'Task Budget': { runtimeProof: 'readback', userSurface: 'settings' },
-      'Thinking': { runtimeProof: 'readback', userSurface: 'settings+chat' },
+      'Thinking': { runtimeProof: 'pass', userSurface: 'settings+chat' },
       'Plan Mode Instructions': { runtimeProof: 'pass', userSurface: 'settings' },
       'Tool Aliases': { runtimeProof: 'readback', userSurface: 'settings' },
       'Debug': { runtimeProof: 'readback', userSurface: 'settings' },
@@ -1100,11 +1115,11 @@ describe('SettingsCapabilityLabSection', () => {
       'System Prompt': { runtimeProof: 'pass', userSurface: 'settings' },
       'Main Model Live Switch': { runtimeProof: 'pass', userSurface: 'settings+chat' },
       'Permission Mode Live Switch': { runtimeProof: 'readback', userSurface: 'settings+chat' },
-      'Output Style': { runtimeProof: 'readback', userSurface: 'settings' },
+      'Output Style': { runtimeProof: 'pass', userSurface: 'settings' },
       'Effort': { runtimeProof: 'readback', userSurface: 'settings+chat' },
-      'Additional Directories': { runtimeProof: 'readback', userSurface: 'settings' },
+      'Additional Directories': { runtimeProof: 'readback', userSurface: 'settings+chat' },
       'Account Info': { runtimeProof: 'pass', userSurface: 'settings' },
-      'Context Usage': { runtimeProof: 'readback', userSurface: 'settings+chat' },
+      'Context Usage': { runtimeProof: 'pass', userSurface: 'settings+chat' },
     };
 
     for (const [name, expectedValues] of Object.entries(expected)) {
@@ -1134,12 +1149,13 @@ describe('SettingsCapabilityLabSection', () => {
       return firstCell?.textContent ?? '';
     });
     expect(verifiedCapabilities).toEqual(
-      expect.arrayContaining(['MCP Servers', 'Permission Approval', 'AskUserQuestion / Elicitation', 'Structured Output', 'Agent Definitions', 'Include Hook Events', 'Environment Variables', 'Fork Session', 'JSONL History Browser', 'Session Store', 'Import Session to Store', 'Resume Session', 'Session Detail', 'Backend Routing', 'Turn/Budget Limits', 'Skills', 'Agents (Subagents)', 'Subagent Transcript / Progress', 'Hooks', 'Disallowed Tools', 'Plugins', 'Restricted Built-in Tools', '/context Diagnostic', 'Session Title', 'Custom Session ID', 'Continue', 'Resume Session At Position', 'Fork Session On Resume', 'System Prompt', 'Prompt Suggestions', 'Debug File', 'Plan Mode Instructions', 'AskUserQuestion Preview Format', 'Main Model Live Switch', 'Account Info']),
+      expect.arrayContaining(['MCP Servers', 'Permission Approval', 'AskUserQuestion', 'Structured Output', 'Agent Definitions', 'Include Hook Events', 'Environment Variables', 'Fork Session', 'JSONL History Browser', 'Session Store', 'Import Session to Store', 'Resume Session', 'Session Detail', 'Backend Routing', 'Turn/Budget Limits', 'Skills', 'Agents (Subagents)', 'Subagent Transcript / Progress', 'Hooks', 'Disallowed Tools', 'Plugins', 'Restricted Built-in Tools', '/context Diagnostic', 'Session Title', 'Custom Session ID', 'Continue', 'Resume Session At Position', 'Fork Session On Resume', 'System Prompt', 'Prompt Suggestions', 'Debug File', 'Plan Mode Instructions', 'AskUserQuestion Preview Format', 'Main Model Live Switch', 'Output Style', 'Account Info', 'Context Usage', 'Thinking']),
     );
-    expect(verifiedCapabilities.length).toBe(35);
+    expect(verifiedCapabilities).not.toContain('MCP Elicitation');
+    expect(verifiedCapabilities.length).toBe(38);
 
     // Total rows check
-    expect(rows.length).toBe(54);
+    expect(rows.length).toBe(55);
 
     // Honesty rule: readback capabilities must not be in the verified count.
     // Debug is readback (option wiring only, not behavior-verified) so it stays out.
@@ -1152,9 +1168,14 @@ describe('SettingsCapabilityLabSection', () => {
       return firstCell?.textContent ?? '';
     });
     expect(readbackCapabilities).toEqual(
-      expect.arrayContaining(['File Checkpoint / Rewind', 'Allowed Tools', 'Fallback Model', 'Warm Startup', 'Sandbox', 'Task Budget', 'Thinking', 'Tool Aliases', 'Debug', 'Strict MCP Config', '1M Context Beta', 'JS Runtime', 'Load Timeout', 'Stderr Diagnostic', 'Permission Mode Live Switch', 'Output Style', 'Effort', 'Additional Directories', 'Context Usage']),
+      expect.arrayContaining(['File Checkpoint / Rewind', 'Allowed Tools', 'Fallback Model', 'Warm Startup', 'Sandbox', 'Task Budget', 'Tool Aliases', 'Debug', 'Strict MCP Config', '1M Context Beta', 'JS Runtime', 'Load Timeout', 'Stderr Diagnostic', 'Permission Mode Live Switch', 'Effort', 'Additional Directories']),
     );
-    expect(readbackCapabilities.length).toBe(19);
+    expect(readbackCapabilities.length).toBe(16);
+
+    const wiringRows = rows.filter((row) => (row.textContent ?? '').includes('Wiring only'));
+    const wiringCapabilities = wiringRows.map((row) => row.querySelector('td')?.textContent ?? '');
+    expect(wiringCapabilities).toEqual(expect.arrayContaining(['MCP Elicitation']));
+    expect(wiringRows.length).toBe(1);
 
     // Honesty rule: hidden capabilities must not have a settings or diagnostic surface chip.
     const hiddenRows = rows.filter((row) => (
@@ -7008,6 +7029,103 @@ describe('SettingsCapabilityLabSection', () => {
     expect(containerEl.textContent).toContain(t('settings.capabilityLab.proofs.planModeInstructionsLive.behaviorBoundary'));
     expect(containerEl.textContent).toContain('abcd1234');
     expect(containerEl.textContent).toContain(t('settings.capabilityLab.proofs.planModeInstructionsLive.pass'));
+  });
+
+  it('renders Output Style Live Behavior Proof button from locale', () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runOutputStyleLiveProbe: jest.fn(),
+      capabilities: new Set(),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes(t('settings.capabilityLab.proofs.outputStyleLive.button'))
+    )) as HTMLButtonElement | undefined;
+    expect(button).toBeTruthy();
+  });
+
+  it('runs the output style live proof and marks pass only for nonce recall', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runOutputStyleLiveProbe: jest.fn().mockResolvedValue({
+        classification: 'pass',
+        styleName: 'opencodian-proof-abcd1234',
+        nonce: 'abcd1234',
+        nonceRecalled: true,
+        outputStyleOptionWired: true,
+        responsePreview: 'Output-style proof: abcd1234',
+        tempStylePath: '/tmp/vault/.claude/output-styles/opencodian-proof-abcd1234.md',
+        cleanup: { fileRemoved: true, emptyDirRemoved: true },
+      }),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes(t('settings.capabilityLab.proofs.outputStyleLive.button'))
+    )) as HTMLButtonElement | undefined;
+    expect(button).toBeTruthy();
+
+    button!.click();
+    await flushUi();
+
+    expect(adapter.runOutputStyleLiveProbe).toHaveBeenCalled();
+
+    const proofMarker = containerEl.querySelector('[data-capability="Output Style"]');
+    expect(proofMarker).toBeTruthy();
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-pass')).toBe(true);
+    expect(containerEl.textContent).toContain(t('settings.capabilityLab.proofs.outputStyleLive.behaviorBoundary'));
+    expect(containerEl.textContent).toContain(t('settings.capabilityLab.proofs.outputStyleLive.lifecycleBoundary'));
+    expect(containerEl.textContent).toContain('opencodian-proof-abcd1234');
+    expect(containerEl.textContent).toContain('abcd1234');
+    expect(containerEl.textContent).toContain(t('settings.capabilityLab.proofs.outputStyleLive.pass'));
+  });
+
+  it('marks fail when the output style live proof misses the nonce', async () => {
+    const adapter = {
+      listSessions: jest.fn().mockResolvedValue([]),
+      runOutputStyleLiveProbe: jest.fn().mockResolvedValue({
+        classification: 'fail',
+        styleName: 'opencodian-proof-abcd1234',
+        nonce: 'abcd1234',
+        nonceRecalled: false,
+        outputStyleOptionWired: true,
+        responsePreview: 'No proof code.',
+        tempStylePath: '/tmp/vault/.claude/output-styles/opencodian-proof-abcd1234.md',
+        cleanup: { fileRemoved: true },
+        error: 'Nonce not found in response.',
+      }),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    const button = Array.from(containerEl.querySelectorAll('button')).find((el) => (
+      el.textContent?.includes(t('settings.capabilityLab.proofs.outputStyleLive.button'))
+    )) as HTMLButtonElement | undefined;
+    expect(button).toBeTruthy();
+
+    button!.click();
+    await flushUi();
+
+    const proofMarker = containerEl.querySelector('[data-capability="Output Style"]');
+    expect(proofMarker).toBeTruthy();
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-fail')).toBe(true);
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-pass')).toBe(false);
+    expect(containerEl.textContent).toContain('Nonce not found in response.');
   });
 
   it('renders Tool Aliases Readback Proof button backed by locale key', () => {

@@ -24,7 +24,7 @@
 
 ## 核心类型 / 接口
 
-- `SessionContextUsageSnapshot`: active tab context-usage 浮层消费的 session token/cost 快照；当前还会透传 `compactingAt`，让上层能读取 upstream `Session.time.compacting`。
+- `SessionContextUsageSnapshot`: `ContextUsageSnapshot` 的 OpenCode 兼容别名，active tab context-usage 浮层消费的 session token/cost 快照；当前还会透传 `compactingAt`，让上层能读取 upstream `Session.time.compacting`。共享 DTO 的 owner 是 `src/core/types/chat.ts`，避免 OpenCode / Claude backend snapshot 路径重复定义字段。
 - `SessionCommandTemplateContext`: `runSessionCommand()` 专用的 OpenCodian placeholder runtime 值，覆盖 vault path、当前笔记、当前选区、持久 external context paths 与会话标题。
 - `SessionShellInput`: `runSessionShell()` 的结构化 shell 输入，集中持有 `agent`、shell `command`、可选 `model` 与 `messageID`。
 - `OpenCodeSessionControlSdk`: orchestrator 依赖的最小 session SDK 面，覆盖 fork/revert/diff、session tree/share/summarize，以及 message command/shell。

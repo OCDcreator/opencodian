@@ -6,6 +6,7 @@ export {
   type ContentBlock,
   type ContextBreakdownKey,
   type ContextBreakdownSegment,
+  type ContextUsageSnapshot,
   type Conversation,
   type ConversationBackgroundTaskMetadata,
   type ConversationMeta,
