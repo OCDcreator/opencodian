@@ -2,8 +2,8 @@
 
 ## Current Gap Audit (2026-06-07, post-truth-sync)
 
-> **Single source of truth for Codex checkpoint rounds.**  
-> Matrix: **48 rows, 34 pass, 14 readback, 2 hidden, 0 fail.**  
+> **Single source of truth for Codex checkpoint rounds.**
+> Matrix: **50 rows, 34 pass, 16 readback, 2 hidden, 0 fail.**
 > All counts enforced by `tests/unit/features/settings/SettingsCapabilityLabSection.test.ts`.
 
 ---
@@ -63,7 +63,7 @@ Runtime proof passes, but explicit blockers prevent promotion to stable user sur
 
 Option wiring proven through `buildClaudeCodeOptions`, but no independent plugin-side behavioral verification exists.
 
-**Settings (`userSurface: 'settings'`) — 9**
+**Settings (`userSurface: 'settings'`) — 10**
 - Allowed Tools — auto-approve shortcut only; zero enforcement at tool-catalog level. Stable settings UI now renders an explicit boundary notice distinguishing it from Restricted Built-in Tools (deterministic availability restrictor).
 - Fallback Model — option wiring verified; automatic switching not locally provable (requires API 529 overload signal). ✅ **2026-06-07 FORMAL CLOSURE** (Outcome B): no new SDK observable signal exists. Latest CLI features (multi-fallback, sticky session, FALLBACK_FOR_ALL_PRIMARY_MODELS env var) enhance CLI behavior but produce no new SDK event/callback/stream marker. Architectural barrier: switching happens inside compiled CLI binary; SDK has no observation mechanism. `query.setModel()` is tracked separately as "Main Model Live Switch" (pass/settings+chat, promoted 2026-06-07). CLOSED at readback.
 - Task Budget — `@alpha`; option wiring verified; no deterministic SDK enforcement signal. **2026-06-06 re-audit (Outcome B)**: no new productizable seam. SDK 0.3.145 unchanged; 4 error result subtypes contain no `error_max_task_budget`; `TerminalReason` has `max_turns` but no `max_task_budget`; no budget-related events (`tokens_remaining`, `budget_status`, `usage_update`). Remains readback with hardened boundary.
@@ -73,8 +73,12 @@ Option wiring proven through `buildClaudeCodeOptions`, but no independent plugin
 - 1M Context Beta — option wiring verified through full SDK path (setting → buildClaudeCodeOptions → ProcessTransport → CLI --betas flag); model-side beta acceptance and 1M context activation unobservable from plugin layer
 - JS Runtime — option wiring verified; actual runtime selection depends on system PATH and installation. **2026-06-06 audit completed** (Outcome B): remains readback with hardened boundary. No observable signal in init events, stderr, or tool output confirms which runtime the CLI subprocess actually uses.
 - Load Timeout — `@alpha`; option wiring verified; timeout code path only executes with resume/continue + sessionStore. **2026-06-06 audit completed** (Outcome B): remains readback with hardened boundary.
+- Output Style — SDK `settings.outputStyle` option wiring verified through `ClaudeCodeOptionsBuilder`; stable Model & Thinking tab input persists the configured style name. Readback ceiling: Claude Code applies output style by modifying its system prompt at session start, and the SDK stream exposes no structured signal for the active output style or resolved prompt. Changes apply after `/clear` or a new Claude Code session; existing active/resumed sessions may keep the previous prompt.
 
-**Settings + Chat (`userSurface: 'settings+chat'`) — 2**
+**Settings + Chat (`userSurface: 'settings+chat'`) — 3**
+- **Thinking** — SDK `thinking?: ThinkingConfig` option wiring verified through `mapThinkingForSdk()` (adaptive/disabled/fixed → SDK shape). Stream normalizer handles `thinking` and `redacted_thinking` blocks; SDK smoke artifact recorded thinking blocks in stream. **2026-06-07 audit**: no independent BUILD_ID for visible thinking chunks rendered in chat UI. Status doc marks thinking as "runtime-proved but not stable" at stream normalization level. Honest ceiling: readback. Promotion path: BUILD_ID-anchored live proof of thinking blocks visibly rendered in chat.
+
+  **2026-06-07 Round 5 re-audit**: Full pipeline code-verified end-to-end. Backend adapter (`ClaudeCodeOptionsBuilder.mapThinkingForSdk`), stream normalization (`ClaudeCodeStreamNormalizer`), chat streaming (`OpenCodianView.convertToStreamingChunk` → `StreamController` → `ThinkingBlockRenderer`), persistence (`ConversationIdentityRuntime` + `sendPipelineContent`), and rehydration (`AssistantShellViewHostAdapter.renderContentBlock`) are all covered by existing unit tests. New focused integration test (`tests/unit/core/agents/backend/ClaudeCodeThinkingPipeline.test.ts`, 5 cases) validates the complete flow from SDK message → normalized chunk → streaming content block → persisted block, including `redacted_thinking` and suffix deduplication. `userSurface` updated from `settings` to `settings+chat` because the generic StreamController renders thinking blocks for any backend that produces them. Runtime proof remains `readback` because no BUILD_ID-anchored live proof shows thinking blocks visibly rendered in an ordinary Claude Code chat conversation.
 - Permission Mode Live Switch — official SDK `query.setPermissionMode()` seam; `AgentCapability.Permissions` is now in `CLAUDE_CODE_PHASE1_CAPABILITIES`, so the chat toolbar shows a backend-appropriate permission selector. Settings: Permissions tab dropdown live-applies `default` / `acceptEdits` / `bypassPermissions` / `plan`. Chat: when `claude-code` is active, the toolbar exposes those Claude Code modes and calls `query.setPermissionMode()` through the adapter seam; when `opencode` is active, it shows OpenCode permission templates `yolo` / `normal` / `plan` and keeps the OpenCode restart path. The trigger carries `data-permission-backend="claude-code"` or `"opencode"` for runtime verification. Runtime proof remains `readback`: mode changes are acknowledged by SDK control responses, but no observable stream marker confirms behavioral enforcement.
 - Sandbox — option wiring verified; OS-level sandbox enforcement not independently verifiable. ✅ **2026-06-07 expanded productization, Outcome A (LIVE VERIFIED, BUILD_ID feature-phase0-capability.202606070542)**: 10 expert settings + 3 basic toggles in Permissions tab; chat badge shows configured state when enabled; hot-switch claude-code → opencode → claude-code in same live UI: badge 1 → 0 → 1; obsidian dev:errors clean. Readback ceiling: CLI handles OS-level sandbox internally; no init event, tool metadata, or stderr pattern confirms activation. Plugin cannot distinguish "sandbox active" from "sandbox silently degraded" or "unsupported platform".
 

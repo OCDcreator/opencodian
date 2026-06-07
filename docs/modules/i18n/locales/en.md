@@ -7,7 +7,7 @@
 
 OpenCodian 的英文翻译表，导出 `enTranslations` 静态对象。
 
-2026-06-07：新增 `chat.claudeCode.permissionMode.*.description` 键（4 个），为 Claude Code 权限模式的聊天选择器提供描述文案。
+2026-06-07：新增 `settings.claudeCode.outputStyle.*` 键（5 个：name / desc / placeholder / boundaryNotice / lifecycleNotice），为 Claude Code 输出样式设置提供英文文案。新增 `chat.claudeCode.permissionMode.*.description` 键（4 个），为 Claude Code 权限模式的聊天选择器提供描述文案。
 
 本轮新增并扩展 `chat.backendSessions.*` 键（backend session browser modal：浏览/预览/恢复 backend sessions、preview transcript seeding、detail metadata、完整 transcript、preview/detail 导航）和 `settings.claudeCode.sessionBrowser.*`（settings 侧 browse-only session browser launcher：说明、按钮和 browse-only notice）以及 `settings.claudeCode.projectSettings.*` 键（含 `marketplacesSummary` / `noMarketplaces` / `boundaryNotice` 含 settingSources 要求说明）。 `chat.sessionSharing.*` 与 `settings.conversation.share.sharedSessions.*` / `settings.conversation.share.diagnostics.*`，用于当前会话分享状态、分享禁用提示、分享失败归一化说明、分享诊断、已分享会话列表、公开数量、刷新、完整预览、复制链接和取消分享操作；其中新增 `settings.conversation.share.sharedSessions.previewEmpty`，用于区分“后端不可预览”与“会话目前没有可预览消息”的中性空态。 同时保留 `settings.conversation.share.help.*`、`settings.security.blockedCommands.help.*` 与 `settings.projectConfigHelp.*`，用于会话分享模式和 `permission.bash` 帮助弹窗。
 

@@ -999,7 +999,7 @@ describe('SettingsCapabilityLabSection', () => {
 
     const table = containerEl.querySelector('.opencodian-capability-lab-matrix');
     const rows = table!.querySelectorAll('tbody tr');
-    expect(rows.length).toBe(48);
+    expect(rows.length).toBe(50);
   });
 
   it('renders status chips with correct active/inactive classes', () => {
@@ -1035,7 +1035,7 @@ describe('SettingsCapabilityLabSection', () => {
     expect(surfaces).toContain('chat');
   });
 
-  it('audits capability matrix for honest classifications across all 48 rows', () => {
+  it('audits capability matrix for honest classifications across all 50 rows', () => {
     const containerEl = document.createElement('div');
     const section = new SettingsCapabilityLabSection({
       plugin: createMockPlugin(),
@@ -1082,6 +1082,7 @@ describe('SettingsCapabilityLabSection', () => {
       'Session Title': { runtimeProof: 'pass', userSurface: 'settings+chat' },
       'Prompt Suggestions': { runtimeProof: 'pass', userSurface: 'chat' },
       'Task Budget': { runtimeProof: 'readback', userSurface: 'settings' },
+      'Thinking': { runtimeProof: 'readback', userSurface: 'settings+chat' },
       'Plan Mode Instructions': { runtimeProof: 'pass', userSurface: 'settings' },
       'Tool Aliases': { runtimeProof: 'readback', userSurface: 'settings' },
       'Debug': { runtimeProof: 'readback', userSurface: 'settings' },
@@ -1099,6 +1100,7 @@ describe('SettingsCapabilityLabSection', () => {
       'System Prompt': { runtimeProof: 'pass', userSurface: 'settings' },
       'Main Model Live Switch': { runtimeProof: 'pass', userSurface: 'settings+chat' },
       'Permission Mode Live Switch': { runtimeProof: 'readback', userSurface: 'settings+chat' },
+      'Output Style': { runtimeProof: 'readback', userSurface: 'settings' },
     };
 
     for (const [name, expectedValues] of Object.entries(expected)) {
@@ -1133,7 +1135,7 @@ describe('SettingsCapabilityLabSection', () => {
     expect(verifiedCapabilities.length).toBe(34);
 
     // Total rows check
-    expect(rows.length).toBe(48);
+    expect(rows.length).toBe(50);
 
     // Honesty rule: readback capabilities must not be in the verified count.
     // Debug is readback (option wiring only, not behavior-verified) so it stays out.
@@ -1146,9 +1148,9 @@ describe('SettingsCapabilityLabSection', () => {
       return firstCell?.textContent ?? '';
     });
     expect(readbackCapabilities).toEqual(
-      expect.arrayContaining(['File Checkpoint / Rewind', 'Allowed Tools', 'Fallback Model', 'Warm Startup', 'Sandbox', 'Task Budget', 'Tool Aliases', 'Debug', 'Strict MCP Config', '1M Context Beta', 'JS Runtime', 'Load Timeout', 'Stderr Diagnostic', 'Permission Mode Live Switch']),
+      expect.arrayContaining(['File Checkpoint / Rewind', 'Allowed Tools', 'Fallback Model', 'Warm Startup', 'Sandbox', 'Task Budget', 'Thinking', 'Tool Aliases', 'Debug', 'Strict MCP Config', '1M Context Beta', 'JS Runtime', 'Load Timeout', 'Stderr Diagnostic', 'Permission Mode Live Switch', 'Output Style']),
     );
-    expect(readbackCapabilities.length).toBe(14);
+    expect(readbackCapabilities.length).toBe(16);
 
     // Honesty rule: hidden capabilities must not have a settings or diagnostic surface chip.
     const hiddenRows = rows.filter((row) => (

@@ -247,6 +247,17 @@ export interface ClaudeCodeBackendSettings {
    */
   loadTimeoutMs: number | null;
   /**
+   * Claude Code output style name. Modifies the system prompt via the SDK `settings`
+   * option. Official built-in styles include `Default`, `Proactive`, `Explanatory`,
+   * and `Learning`. Custom styles can be created as markdown files in
+   * `.claude/output-styles` or `~/.claude/output-styles`.
+   * Readback only: SDK option wiring proven (settings.outputStyle passed to CLI);
+   * actual system prompt modification is not independently verified from the plugin layer.
+   * Official docs say output styles are read at session start and apply after `/clear`
+   * or a new session; existing active or resumed sessions may keep their previous prompt.
+   */
+  outputStyle: string;
+  /**
    * Custom instructions appended to the Claude Code preset system prompt.
    * When non-empty, the SDK receives the preset-with-append shape:
    * `{ type: 'preset', preset: 'claude_code', append: instructions }`.
@@ -330,6 +341,7 @@ export function getDefaultClaudeCodeBackendSettings(): ClaudeCodeBackendSettings
     jsRuntime: '',
     loadTimeoutMs: null,
     systemPrompt: '',
+    outputStyle: '',
     autoTitle: true,
   };
 }
@@ -602,6 +614,9 @@ export function normalizeClaudeCodeBackendSettings(value: unknown): ClaudeCodeBa
     systemPrompt: typeof candidate.systemPrompt === 'string'
       ? candidate.systemPrompt.trim()
       : defaults.systemPrompt,
+    outputStyle: typeof candidate.outputStyle === 'string'
+      ? candidate.outputStyle.trim()
+      : defaults.outputStyle,
     autoTitle: normalizeBoolean(candidate.autoTitle, defaults.autoTitle),
   };
 }

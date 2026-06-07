@@ -174,6 +174,8 @@ export interface ClaudeCodeSdkOptionsShape {
   executable?: 'node' | 'bun' | 'deno';
   /** Load timeout in milliseconds for the Claude Code subprocess initialization. */
   loadTimeoutMs?: number;
+  /** Inline SDK settings object. Used for outputStyle and other settings-file overrides. */
+  settings?: { outputStyle?: string };
 }
 
 function cloneSettingSources(sources: readonly ClaudeCodeSettingSource[]): ClaudeCodeSettingSource[] {
@@ -431,6 +433,10 @@ export function buildClaudeCodeOptions(
   }
   if (input.settings.loadTimeoutMs !== null) {
     options.loadTimeoutMs = input.settings.loadTimeoutMs;
+  }
+  const outputStyle = trimOptionalString(input.settings.outputStyle);
+  if (outputStyle) {
+    options.settings = { outputStyle };
   }
 
   return options;

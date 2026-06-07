@@ -659,3 +659,25 @@ describe('normalizeClaudeCodeBackendSettings askUserQuestionPreviewFormat', () =
     expect(result.askUserQuestionPreviewFormat).toBe('');
   });
 });
+
+describe('normalizeClaudeCodeBackendSettings outputStyle', () => {
+  it('defaults to empty string', () => {
+    const result = normalizeClaudeCodeBackendSettings({});
+    expect(result.outputStyle).toBe('');
+  });
+
+  it('preserves valid string value trimmed', () => {
+    const result = normalizeClaudeCodeBackendSettings({ outputStyle: '  Explanatory  ' });
+    expect(result.outputStyle).toBe('Explanatory');
+  });
+
+  it('trims whitespace-only to empty string', () => {
+    const result = normalizeClaudeCodeBackendSettings({ outputStyle: '   \t\n  ' });
+    expect(result.outputStyle).toBe('');
+  });
+
+  it('falls non-string values back to empty string', () => {
+    const result = normalizeClaudeCodeBackendSettings({ outputStyle: 42 as unknown as string });
+    expect(result.outputStyle).toBe('');
+  });
+});

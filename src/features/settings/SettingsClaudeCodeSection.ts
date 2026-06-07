@@ -1655,6 +1655,7 @@ export class SettingsClaudeCodeSection {
     this.renderMaxBudgetSetting(containerEl);
     this.renderTaskBudgetSetting(containerEl);
     this.renderSystemPromptSetting(containerEl);
+    this.renderOutputStyleSetting(containerEl);
     this.renderPromptSuggestionsSetting(containerEl);
     this.renderEnableContext1mBetaSetting(containerEl);
   }
@@ -2744,6 +2745,33 @@ export class SettingsClaudeCodeSection {
       attr: { 'data-claude-code-system-prompt-lifecycle': 'true' },
     });
     lifecycleEl.createSpan({ text: t('settings.claudeCode.systemPrompt.lifecycleNotice') });
+  }
+
+  private renderOutputStyleSetting(containerEl: HTMLElement): void {
+    const boundaryEl = containerEl.createDiv({
+      cls: 'opencodian-settings-inline-notice',
+      attr: { 'data-claude-code-output-style-boundary': 'true' },
+    });
+    boundaryEl.createSpan({ text: t('settings.claudeCode.outputStyle.boundaryNotice') });
+
+    new Setting(containerEl)
+      .setName(t('settings.claudeCode.outputStyle.name'))
+      .setDesc(t('settings.claudeCode.outputStyle.desc'))
+      .addText((text) => {
+        text
+          .setPlaceholder(t('settings.claudeCode.outputStyle.placeholder'))
+          .setValue(this.settings.outputStyle)
+          .onChange(async (value) => {
+            this.settings.outputStyle = value.trim();
+            await this.saveSettings();
+          });
+      });
+
+    const lifecycleEl = containerEl.createDiv({
+      cls: 'opencodian-settings-inline-notice',
+      attr: { 'data-claude-code-output-style-lifecycle': 'true' },
+    });
+    lifecycleEl.createSpan({ text: t('settings.claudeCode.outputStyle.lifecycleNotice') });
   }
 
   private renderPromptSuggestionsSetting(containerEl: HTMLElement): void {

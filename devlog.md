@@ -11,6 +11,124 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-06-07 Claude Code Thinking Round 5 Re-Audit
+
+**Outcome: userSurface promoted from `settings` to `settings+chat`; runtimeProof stays `readback`. Full pipeline code-verified end-to-end. Matrix counts unchanged: 50 rows, 34 pass, 16 readback, 2 hidden, 0 fail.**
+
+### Audit Evidence
+
+- **Backend adapter**: `ClaudeCodeOptionsBuilder.mapThinkingForSdk()` correctly maps adaptive → `{type:'adaptive'}`, disabled → `{type:'disabled'}`, fixed → `{type:'enabled', budgetTokens}`. Covered by existing builder unit tests.
+- **Stream normalization**: `ClaudeCodeStreamNormalizer` handles `thinking`/`redacted_thinking` content blocks and `thinking_delta` partial chunks. Covered by existing normalizer unit tests.
+- **Chat streaming**: `OpenCodianView.convertToStreamingChunk()` routes thinking chunks to generic `StreamController`. `StreamController` creates `ThinkingBlockRenderer` instances, appends delta content, and finalizes blocks with duration. Covered by existing StreamController tests.
+- **Persistence**: `ConversationIdentityRuntime` maps thinking blocks with `thinking` content and `durationSeconds`. `sendPipelineContent.mapStreamingContentBlocksToMessageContentBlocks()` preserves thinking blocks. Covered by existing identity-runtime and send-pipeline tests.
+- **Rehydration**: `AssistantShellViewHostAdapter.renderContentBlock()` renders stored thinking blocks via `ThinkingBlockRenderer.renderStored()`. Covered by existing adapter tests.
+- **New focused integration test**: `tests/unit/core/agents/backend/ClaudeCodeThinkingPipeline.test.ts` (5 cases) validates the complete flow from SDK message → normalized chunk → streaming content block → persisted block, including `redacted_thinking` and suffix deduplication.
+
+### Decision
+
+**Cannot promote to pass.** The full pipeline is code-verified, but no BUILD_ID-anchored runtime proof shows thinking blocks visibly rendered in an ordinary Claude Code chat conversation. The SDK smoke artifact proved thinking blocks arrive in the stream, but did not capture the chat UI state. Honest ceiling remains `readback`.
+
+### Changes
+
+#### src/features/settings/SettingsCapabilityLabSection.ts
+- Updated "Thinking" matrix row: `userSurface` changed from `'settings'` to `'settings+chat'`.
+- Expanded row comment with full pipeline verification (5 layers) and explicit promotion blocker.
+
+#### tests/unit/features/settings/SettingsCapabilityLabSection.test.ts
+- Updated expected `userSurface` for "Thinking" from `'settings'` to `'settings+chat'`.
+
+#### tests/unit/core/agents/backend/ClaudeCodeThinkingPipeline.test.ts
+- New file: 5 focused integration tests covering the complete thinking block pipeline.
+
+#### docs/modules/features/settings/SettingsCapabilityLabSection.md
+- Updated Thinking entry with full pipeline audit, new integration test reference, and promotion blocker.
+
+#### docs/status/claude-code-current-state-2026-05-22.md
+- Moved Thinking from "Settings — 11" to "Settings + Chat — 3" in readback section.
+- Added Round 5 re-audit findings with complete pipeline evidence.
+
+#### docs/modules/core/agents/backend/ClaudeCodeAdapter.md
+- Updated capability list with Thinking Round 5 audit findings.
+
+---
+
+## 2026-06-07 Claude Code Thinking Matrix Row
+
+**Outcome: Added formal "Thinking" capability matrix row. Classification: readback/settings. Matrix counts: 50 rows, 34 pass, 16 readback, 2 hidden, 0 fail.**
+
+### Audit Evidence
+
+- **SDK types**: `ThinkingConfig` exists in sdk.d.ts (line 5649: `ThinkingAdaptive | ThinkingEnabled | ThinkingDisabled`). Deprecated `maxThinkingTokens` replaced by `thinking` option (sdk.d.ts line 1501).
+- **Adapter wired**: `ClaudeCodeOptionsBuilder.mapThinkingForSdk()` maps `settings.thinking` to SDK options; `buildClaudeCodeOptions` sets `thinking` at line 217.
+- **Capability flag**: `AgentCapability.Thinking` is in `CLAUDE_CODE_PHASE1_CAPABILITIES` (ClaudeCodeAdapter.ts line 670).
+- **Settings UI**: `SettingsClaudeCodeSection.ts` renders thinking dropdown (adaptive/disabled/fixed) + budget input in Model & Thinking tab.
+- **Stream normalization**: `ClaudeCodeStreamNormalizer.ts` handles `thinking` and `redacted_thinking` blocks.
+- **Runtime proof ceiling**: SDK smoke artifact shows thinking blocks in stream, and status doc marks thinking as "runtime-proved but not stable" at stream normalization level. No independent BUILD_ID for visible thinking chunks rendered in chat UI.
+
+### Changes
+
+#### src/features/settings/SettingsCapabilityLabSection.ts
+- Added "Thinking" matrix row in `buildRecentMatrixRows()` (#50).
+- `sdkExposed: true` (SDK ThinkingConfig type supported).
+- `adapterWired: true` (mapThinkingForSdk builder mapping verified).
+- `runtimeProof: 'readback'` (option wiring + stream normalizer proven; visible chat rendering NOT independently BUILD_ID-anchored).
+- `userSurface: 'settings'` (Model & Thinking tab dropdown + budget input).
+
+#### tests/unit/features/settings/SettingsCapabilityLabSection.test.ts
+- Updated row count: 49 → 50.
+- Updated readback count: 15 → 16.
+- Added "Thinking" to expected classifications in honesty audit test.
+- Added "Thinking" to readbackCapabilities array.
+
+#### Docs
+- `docs/modules/features/settings/SettingsCapabilityLabSection.md`: Updated row count (49→50), added Thinking entry description, updated readback count (15→16).
+- `docs/status/claude-code-current-state-2026-05-22.md`: Updated matrix counts (50 rows, 16 readback), added Thinking to readback/settings section.
+
+---
+
+## 2026-06-07 Claude Code Output Styles Productization
+
+**Outcome: Added `outputStyle: string` to `ClaudeCodeBackendSettings`, wired through `ClaudeCodeOptionsBuilder` to SDK `options.settings.outputStyle`, added stable settings UI in Model & Thinking tab, locale strings (en/zh), and Capability Lab matrix row. Classification: readback. Matrix counts: 49 rows, 34 pass, 15 readback, 2 hidden, 0 fail.**
+
+### Changes
+
+#### src/core/types/settings.ts
+- Added `outputStyle: string` to `ClaudeCodeBackendSettings` interface with readback JSDoc.
+- Added default `''` in `getDefaultClaudeCodeBackendSettings()`.
+- Added trim-based normalization in `normalizeClaudeCodeBackendSettings()` (non-string/whitespace-only → `''`).
+
+#### src/core/agents/backend/ClaudeCodeOptionsBuilder.ts
+- Added `settings?: { outputStyle?: string }` to `ClaudeCodeSdkOptionsShape`.
+- Wired `outputStyle` in `buildClaudeCodeOptions`: when non-empty trimmed, sets `options.settings = { outputStyle: trimmed }`.
+- Does NOT create top-level `options.outputStyle`.
+
+#### src/features/settings/SettingsClaudeCodeSection.ts
+- Added `renderOutputStyleSetting()` in Model & Thinking tab (text input with boundary/lifecycle notices).
+- Boundary notice: readback-only, mentions custom style files in `.claude/output-styles` or `~/.claude/output-styles`.
+- Lifecycle notice: Claude Code reads output style at session start; changes apply after `/clear` or a new Claude Code session, while existing active/resumed sessions may keep the previous prompt.
+
+#### src/features/settings/SettingsCapabilityLabSection.ts
+- Added "Output Style" matrix row (#49, readback, settings surface).
+- Updated matrix counts: 49 rows, 34 pass, 15 readback, 2 hidden, 0 fail.
+
+#### src/i18n/locales/en.ts + zh.ts
+- Added locale keys for output style name, desc, placeholder, boundary notice, lifecycle notice.
+
+#### Tests (TDD RED→GREEN)
+- `claudeCodeBackendSettingsNormalization.test.ts`: 4 tests (default, trim, whitespace-only, non-string).
+- `ClaudeCodeOptionsBuilder.test.ts`: 4 tests (omit empty, no top-level outputStyle, map trimmed, omit whitespace-only).
+- `SettingsClaudeCodeSection.test.ts`: 5 tests (render, persist trimmed, clear whitespace, boundary notice, lifecycle notice).
+- `SettingsCapabilityLabSection.test.ts`: Updated row count (48→49), readback count (14→15), verified capabilities list.
+
+#### Docs
+- `docs/modules/core/types/settings.md`: Added `outputStyle` description.
+- `docs/modules/core/agents/backend/ClaudeCodeOptionsBuilder.md`: Added outputStyle wiring description.
+- `docs/modules/features/settings/SettingsClaudeCodeSection.md`: Added outputStyle UI description.
+- `docs/modules/features/settings/SettingsCapabilityLabSection.md`: Updated row count (46→49).
+- `docs/status/claude-code-current-state-2026-05-22.md`: Updated current matrix counts (49 rows, 15 readback).
+
+---
+
 ## 2026-06-07 Permission Mode Live Switch — Chat Surface Productization
 
 **Outcome: Promoted `Permission Mode Live Switch` user surface from `settings` to `settings+chat`. Chat toolbar now shows backend-appropriate permission controls. Runtime proof remains `readback`.**

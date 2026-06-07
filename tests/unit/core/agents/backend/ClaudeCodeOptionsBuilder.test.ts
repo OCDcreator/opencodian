@@ -318,3 +318,50 @@ describe('ClaudeCodeOptionsBuilder tool restrictions', () => {
     });
   });
 });
+
+describe('ClaudeCodeOptionsBuilder outputStyle option', () => {
+  it('omits settings when outputStyle is empty', () => {
+    const options = buildClaudeCodeOptions({
+      vaultPath: '/vault/project',
+      settings: getDefaultClaudeCodeBackendSettings(),
+    });
+
+    expect(options).not.toHaveProperty('settings');
+  });
+
+  it('does not create top-level outputStyle', () => {
+    const options = buildClaudeCodeOptions({
+      vaultPath: '/vault/project',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        outputStyle: 'Explanatory',
+      },
+    });
+
+    expect(options).not.toHaveProperty('outputStyle');
+  });
+
+  it('maps non-empty outputStyle to options.settings.outputStyle trimmed', () => {
+    const options = buildClaudeCodeOptions({
+      vaultPath: '/vault/project',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        outputStyle: '  Explanatory  ',
+      },
+    });
+
+    expect(options.settings).toEqual({ outputStyle: 'Explanatory' });
+  });
+
+  it('omits settings when outputStyle is whitespace-only', () => {
+    const options = buildClaudeCodeOptions({
+      vaultPath: '/vault/project',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        outputStyle: '   \t\n  ',
+      },
+    });
+
+    expect(options).not.toHaveProperty('settings');
+  });
+});

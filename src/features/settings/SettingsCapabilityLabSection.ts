@@ -1091,6 +1091,45 @@ export class SettingsCapabilityLabSection {
         userSurface: 'settings', // Numeric input in Model & Thinking tab
       },
       {
+        capability: 'Thinking',
+        sdkExposed: true, // SDK Options.thinking?: ThinkingConfig (sdk.d.ts line 5649: ThinkingAdaptive | ThinkingEnabled | ThinkingDisabled)
+        adapterWired: true, // ClaudeCodeOptionsBuilder.mapThinkingForSdk() maps settings.thinking to SDK options
+        runtimeProof: 'readback', // SDK types support thinking option; builder maps it; stream normalizer handles
+        // thinking and redacted_thinking blocks. SDK smoke artifact recorded thinking blocks in the
+        // stream (part of 10/10 direct SDK smoke pass). Status doc confirms thinking is
+        // "runtime-proved but not stable" at stream normalization level.
+        //
+        // FULL PIPELINE VERIFIED (code audit 2026-06-07):
+        // 1. Backend adapter: ClaudeCodeOptionsBuilder.mapThinkingForSdk() correctly maps
+        //    adaptive → {type:'adaptive'}, disabled → {type:'disabled'}, fixed → {type:'enabled', budgetTokens}.
+        //    buildClaudeCodeOptions injects thinking into SDK options. Covered by builder unit tests.
+        // 2. Stream normalization: ClaudeCodeStreamNormalizer handles 'thinking'/'redacted_thinking'
+        //    content blocks and 'thinking_delta' partial chunks. Covered by normalizer unit tests.
+        // 3. Chat streaming: OpenCodianView.convertToStreamingChunk() routes thinking chunks to
+        //    the generic StreamController. StreamController creates ThinkingBlockRenderer instances,
+        //    appends delta content, and finalizes blocks with duration. Covered by StreamController tests.
+        // 4. Persistence: ConversationIdentityRuntime maps thinking blocks with thinking content
+        //    and durationSeconds. sendPipelineContent.mapStreamingContentBlocksToMessageContentBlocks()
+        //    preserves thinking blocks. Covered by identity-runtime and send-pipeline tests.
+        // 5. Rehydration: AssistantShellViewHostAdapter.renderContentBlock() renders stored thinking
+        //    blocks via ThinkingBlockRenderer.renderStored(). Covered by adapter tests.
+        //
+        // MISSING — and blocking promotion to pass:
+        // No BUILD_ID-anchored runtime proof showing thinking blocks visibly rendered in an
+        // ordinary Claude Code chat conversation. The SDK smoke artifact proved thinking blocks
+        // arrive in the stream, but did not capture the chat UI state. A live proof requires:
+        //   (a) A Claude Code backend query with thinking option enabled,
+        //   (b) Observable thinking prose rendered in the chat transcript,
+        //   (c) Screenshot or DOM assertion proving .streaming-thinking-block visibility.
+        //
+        // Honest ceiling: readback. The full pipeline is code-verified end-to-end, but visible
+        // chat rendering is NOT independently BUILD_ID-anchored. Do not promote to pass without
+        // a live runtime proof.
+        // Promotion path: obtain a BUILD_ID-anchored live proof showing thinking blocks rendered
+        // in the chat UI for a Claude Code backend conversation.
+        userSurface: 'settings+chat', // Settings: Model & Thinking tab dropdown + budget input. Chat: generic StreamController renders thinking blocks for any backend that produces them, including Claude Code.
+      },
+      {
         capability: 'Plan Mode Instructions',
         sdkExposed: true, // SDK Options.planModeInstructions?: string
         adapterWired: true, // buildClaudeCodeOptions wires planModeInstructions when non-empty
@@ -1552,6 +1591,19 @@ export class SettingsCapabilityLabSection {
         userSurface: 'settings+chat', // Settings: Permissions tab dropdown with live apply.
         // Chat: backend-aware permission selector — Claude Code modes when claude-code active,
         // OpenCode templates when opencode active.
+      },
+      {
+        capability: 'Output Style',
+        sdkExposed: true, // SDK Options.settings?: Settings; Settings.outputStyle?: string
+        adapterWired: true, // buildClaudeCodeOptions wires outputStyle into options.settings.outputStyle
+        runtimeProof: 'readback', // SDK option wiring proven: settings.outputStyle forwarded as
+        // part of the inline settings object passed to query(). Per SDK docs, outputStyle modifies
+        // the system prompt and takes effect after /clear or a new session. The plugin cannot
+        // independently verify system prompt modification from the stream — no structured signal
+        // exposes the active system prompt text. Claude Code reads outputStyle at session
+        // start; changes apply after /clear or a new session, while existing active/resumed
+        // sessions may keep their previous prompt.
+        userSurface: 'settings', // Model & Thinking tab text input, adjacent to systemPrompt
       },
     ];
   }

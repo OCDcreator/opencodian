@@ -2235,6 +2235,82 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       expect(containerEl.textContent).toContain(t('settings.claudeCode.systemPrompt.lifecycleNotice'));
     });
 
+    it('renders outputStyle text input in model-thinking tab', () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'model-thinking');
+
+      const record = textRecords.find((r) => r.name === t('settings.claudeCode.outputStyle.name'));
+      expect(record).toBeDefined();
+      expect(record!.control.setValue).toHaveBeenCalledWith('');
+      expect(record!.control.setPlaceholder).toHaveBeenCalledWith(t('settings.claudeCode.outputStyle.placeholder'));
+    });
+
+    it('persists outputStyle changes trimmed to settings', async () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'model-thinking');
+
+      const record = textRecords.find((r) => r.name === t('settings.claudeCode.outputStyle.name'));
+      expect(record).toBeDefined();
+      expect(record!.onChange).toBeDefined();
+      await record!.onChange!('  Explanatory  ' as never);
+      expect(plugin.settings.backendSettings.claudeCode.outputStyle).toBe('Explanatory');
+      expect(plugin.saveSettings).toHaveBeenCalled();
+    });
+
+    it('trims empty/whitespace outputStyle to empty string', async () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'model-thinking');
+
+      const record = textRecords.find((r) => r.name === t('settings.claudeCode.outputStyle.name'));
+      expect(record).toBeDefined();
+      await record!.onChange!('   ' as never);
+      expect(plugin.settings.backendSettings.claudeCode.outputStyle).toBe('');
+      expect(plugin.saveSettings).toHaveBeenCalled();
+    });
+
+    it('renders outputStyle boundary notice with correct data attr', () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'model-thinking');
+
+      const boundaryEl = containerEl.querySelector('[data-claude-code-output-style-boundary="true"]');
+      expect(boundaryEl).toBeTruthy();
+      expect(containerEl.textContent).toContain(t('settings.claudeCode.outputStyle.boundaryNotice'));
+    });
+
+    it('renders outputStyle lifecycle notice with correct data attr', () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'model-thinking');
+
+      const lifecycleEl = containerEl.querySelector('[data-claude-code-output-style-lifecycle="true"]');
+      expect(lifecycleEl).toBeTruthy();
+      expect(containerEl.textContent).toContain(t('settings.claudeCode.outputStyle.lifecycleNotice'));
+    });
+
     it('renders taskBudget boundary notice with correct data attr', () => {
       const plugin = createPlugin();
       const containerEl = document.createElement('div');
