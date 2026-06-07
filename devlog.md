@@ -11,6 +11,29 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-06-08 Claude Code Capability Round 18 — MCP Elicitation SDK Audit
+
+**Audit installed vs latest SDK to determine whether 0.3.168 fixes the MCP Elicitation diagnostic live path.**
+
+Round 18 audits `@anthropic-ai/claude-agent-sdk` local installed version (0.3.145) against npm latest (0.3.168). The goal was to determine if SDK changes between these versions resolve the MCP Elicitation live probe failures observed in Test Vault during Round 16.
+
+- **SDK type audit**: `diff -u` of `sdk.d.ts` between 0.3.145 and 0.3.168 shows ~855 lines changed, but `onElicitation`, `ElicitationRequest`, `ElicitationResult`, `mcpServers`, `allowedTools`, and `disallowedTools` type signatures are **identical**. No type-level changes to the MCP elicitation surface.
+- **New features in 0.3.168** (unrelated to elicitation fix): `onRequestUserDialog` callback for blocking dialogs, `MessageDisplay` hook event, per-server MCP `timeout` field, `strictMcpConfig` semantics changed from "strict validation" to "ignore all non-explicit MCP configurations".
+- **Isolated runtime proof**: A standalone Node.js harness (`/tmp/test-elicitation.mjs`) was created using the exact same temp MCP stdio server code and prompt strategy as `ClaudeCodeAdapter.runMcpElicitationLiveProbe()`. The harness was run against both SDK versions in isolated temp directories:
+  - **SDK 0.3.145**: PASS — `onElicitation` invoked 1 time, `mode: 'form'`, tool result echoed `elicitationAction: 'accept'`, full chain verified.
+  - **SDK 0.3.168**: PASS — `onElicitation` invoked 1 time, `mode: 'form'`, tool result echoed `elicitationAction: 'accept'`, full chain verified.
+- **Conclusion**: The SDK is **NOT the blocker**. Both versions correctly invoke `onElicitation` when queried directly with `mcpServers` + `onElicitation` + `allowedTools`. The Test Vault live probe failure is in the adapter/integration layer (how `runDiagnosticPrompt()` builds and passes options, or the Test Vault runtime environment), not in the SDK itself.
+- **No dependency upgrade performed**: Since 0.3.168 does not fix the diagnostic live path, upgrading would not change the MCP Elicitation classification. Dependency remains at 0.3.145. Future upgrade should be considered when the actual adapter/Test Vault blocker is identified and the SDK version bump provides unrelated value.
+- **Matrix impact**: **55 rows, 38 pass, 16 readback, 1 wiring, 2 hidden, 0 fail** (unchanged). MCP Elicitation remains the sole `wiring` row.
+
+### Files changed
+
+- `docs/status/claude-code-current-state-2026-05-22.md` — Round 18 audit section with SDK version evidence and blocker analysis
+- `docs/modules/core/agents/backend/ClaudeCodeAdapter.md` — Round 18 audit note appended to MCP Elicitation documentation
+- `devlog.md` — this entry
+
+---
+
 ## 2026-06-08 Claude Code Capability Round 16 — MCP Elicitation Diagnostic Live Probe Added
 
 **Add live diagnostic probe entry for MCP Elicitation; honest status is `wiring`, not `pass`.**
