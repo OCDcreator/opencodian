@@ -175,6 +175,7 @@ import {
   ComposerInputShellCoordinator,
   type ComposerInputShellCoordinatorHost,
 } from './services/ComposerInputShellCoordinator';
+import type { ContextUsageSnapshot } from './services/ContextUsageService';
 import {
   ConversationAuthoritativeSyncCoordinator,
   type ConversationAuthoritativeSyncHost,
@@ -2433,11 +2434,20 @@ export class OpenCodianView extends ItemView {
         }
       },
       getSessionContextUsageSnapshot: (sessionId) => {
-        // Context usage snapshots are OpenCode-specific — no backend-neutral
-        // equivalent exists yet.  Claude context usage is tracked through
-        // usage events, not a session snapshot API.
         const conversation = this.currentConversation;
-        if (conversation && (conversation.backend ?? 'opencode') !== 'opencode') {
+        const backend = conversation ? (conversation.backend ?? 'opencode') : 'opencode';
+        if (backend === 'claude-code') {
+          const adapter = this.plugin.agentServiceRegistry?.get('claude-code') as {
+            getSessionContextUsageSnapshot?(sessionId: string): Promise<unknown | null>;
+          } | undefined;
+          if (typeof adapter?.getSessionContextUsageSnapshot === 'function') {
+            return adapter.getSessionContextUsageSnapshot(sessionId).then((result) => {
+              if (result && typeof result === 'object' && 'sessionId' in result) {
+                return result as ContextUsageSnapshot;
+              }
+              return null;
+            });
+          }
           return Promise.resolve(null);
         }
         return this.plugin.openCodeService.getSessionContextUsageSnapshot(sessionId);

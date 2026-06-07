@@ -183,6 +183,10 @@ describe('ClaudeCodeAdapter', () => {
     // Productized 2026-06-07: SessionTodoCoordinator now derives task state
     // from TaskCreate/TaskUpdate tool traffic and feeds the existing dock.
     expect(adapter.hasCapability(AgentCapability.Todos)).toBe(true);
+    // Round 11: AgentCapability.Context added to CLAUDE_CODE_PHASE1_CAPABILITIES.
+    // getSessionContextUsageSnapshot() converts raw SDK getContextUsage() to
+    // ContextUsageSnapshot for the existing chat ContextRing pipeline.
+    expect(adapter.hasCapability(AgentCapability.Context)).toBe(true);
   });
 
   it('returns normalized supported models from the SDK', async () => {
@@ -632,6 +636,84 @@ describe('ClaudeCodeAdapter', () => {
 
     await expect(adapter.getContextUsage()).resolves.toBeNull();
     expect(sdk.query).not.toHaveBeenCalled();
+  });
+
+  it('converts getContextUsage result to ContextUsageSnapshot for getSessionContextUsageSnapshot', async () => {
+    const sdk = createSdk([]);
+    const close = jest.fn();
+    const contextUsage = {
+      totalTokens: 28231,
+      maxTokens: 200000,
+      percentage: 14,
+      model: 'claude-haiku-4-5',
+      categories: [
+        { name: 'System prompt', tokens: 5581 },
+        { name: 'System tools', tokens: 20596 },
+      ],
+    };
+    sdk.query.mockReturnValue(Object.assign((async function* () {})(), {
+      getContextUsage: jest.fn().mockResolvedValue(contextUsage),
+      close,
+    }));
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    }) as ClaudeCodeAdapter & { getSessionContextUsageSnapshot(sessionId: string): Promise<unknown | null> };
+
+    const result = await adapter.getSessionContextUsageSnapshot('sess-123');
+    expect(result).not.toBeNull();
+    expect(result).toMatchObject({
+      sessionId: 'sess-123',
+      sessionTitle: '',
+      modelId: 'claude-haiku-4-5',
+      modelName: 'claude-haiku-4-5',
+      contextWindow: 200000,
+      inputTokens: 28231,
+      outputTokens: 0,
+      reasoningTokens: 0,
+      cacheReadTokens: 0,
+      cacheWriteTokens: 0,
+      totalCost: 0,
+      compactingAt: null,
+      providerId: null,
+      providerName: null,
+    });
+    expect(close).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns null for getSessionContextUsageSnapshot when getContextUsage returns null', async () => {
+    const sdk = createSdk([]);
+    const close = jest.fn();
+    sdk.query.mockReturnValue(Object.assign((async function* () {})(), {
+      getContextUsage: jest.fn().mockResolvedValue(null),
+      close,
+    }));
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    }) as ClaudeCodeAdapter & { getSessionContextUsageSnapshot(sessionId: string): Promise<unknown | null> };
+
+    await expect(adapter.getSessionContextUsageSnapshot('sess-123')).resolves.toBeNull();
+    expect(close).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns null for getSessionContextUsageSnapshot when getContextUsage throws', async () => {
+    const sdk = createSdk([]);
+    const close = jest.fn();
+    sdk.query.mockReturnValue(Object.assign((async function* () {})(), {
+      getContextUsage: jest.fn().mockRejectedValue(new Error('context usage unavailable')),
+      close,
+    }));
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    }) as ClaudeCodeAdapter & { getSessionContextUsageSnapshot(sessionId: string): Promise<unknown | null> };
+
+    await expect(adapter.getSessionContextUsageSnapshot('sess-123')).resolves.toBeNull();
+    expect(close).toHaveBeenCalledTimes(1);
   });
 
   it('reads account info from the SDK Query accountInfo path', async () => {

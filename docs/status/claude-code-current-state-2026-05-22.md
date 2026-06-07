@@ -1,9 +1,9 @@
 # Claude Code SDK Current State - 2026-05-22
 
-## Current Gap Audit (2026-06-07, post-truth-sync)
+## Current Gap Audit (2026-06-07, post-Round-10)
 
 > **Single source of truth for Codex checkpoint rounds.**
-> Matrix: **50 rows, 34 pass, 16 readback, 2 hidden, 0 fail.**
+> Matrix: **54 rows, 35 pass, 19 readback, 2 hidden, 0 fail.**
 > All counts enforced by `tests/unit/features/settings/SettingsCapabilityLabSection.test.ts`.
 
 ---
@@ -12,7 +12,7 @@
 
 These have live runtime proof (BUILD_ID-anchored) AND a stable user-facing control or chat interaction.
 
-**Settings (`userSurface: 'settings'`) — 11**
+**Settings (`userSurface: 'settings'`) — 12**
 - Hooks — project settings scan/create/open for `.claude/settings.json` + `.claude/settings.local.json`. Pass is anchored to Layer 3 (shell hooks from config files) only. Layer 1 (JS callbacks) is dead-letter at runtime. Layer 2 (includeHookEvents) is a separate diagnostic row. Default `settingSources` is `['project']` — only `.claude/settings.json` hooks activate; `.claude/settings.local.json` requires `'local'` in settingSources.
 - Plugins — project settings scan/create/open for plugin config. Pass is anchored to marketplace plugin→skills chain only. Programmatic `SdkPluginConfig` is dead-letter at runtime. Marketplace plugins from `~/.claude/plugins/` cache are the real loading path.
 - MCP Servers — shared MCP settings tab + Claude Code Tools tab refresh/inspect; `query.setMcpServers()` live-apply on active queries
@@ -24,6 +24,7 @@ These have live runtime proof (BUILD_ID-anchored) AND a stable user-facing contr
 - Debug File — live proof: filesystem side effect (non-empty debug file created at specified path)
 - Plan Mode Instructions — live proof: model recalls nonce in plan mode
 - System Prompt — live proof: model recalls nonce via preset-with-append path
+- **Account Info** — ✅ **2026-06-07 LIVE VERIFIED** (Round 10, BUILD_ID feature-phase0-capability.202606071932): "Inspect account" button in Test Vault Claude Code Runtime tab executed `query.accountInfo()` successfully, returned real sanitized account data (`{ tokenSource: "[redacted]", apiProvider: "firstParty" }`). Full pipeline verified: settings button → `adapter.getAccountInfo()` → `query.accountInfo()` → structured `AccountInfo` with real authentication metadata → `formatAccountInfoReadback()` → `<pre>` block in settings UI. Email masked by `sanitizeAccountInfoValue()`; tokenSource redacted by `CLAUDE_ACCOUNT_INFO_SECRET_KEY_PATTERN`.
 
 **Chat (`userSurface: 'chat'`) — 7**
 - Permission Approval — ordinary chat end-to-end: real permission cards render per tool call
@@ -63,28 +64,30 @@ Runtime proof passes, but explicit blockers prevent promotion to stable user sur
 
 Option wiring proven through `buildClaudeCodeOptions`, but no independent plugin-side behavioral verification exists.
 
-**Settings (`userSurface: 'settings'`) — 10**
+**Settings (`userSurface: 'settings'`) — 12**
 - Allowed Tools — auto-approve shortcut only; zero enforcement at tool-catalog level. Stable settings UI now renders an explicit boundary notice distinguishing it from Restricted Built-in Tools (deterministic availability restrictor).
 - Fallback Model — option wiring verified; automatic switching not locally provable (requires API 529 overload signal). ✅ **2026-06-07 FORMAL CLOSURE** (Outcome B): no new SDK observable signal exists. Latest CLI features (multi-fallback, sticky session, FALLBACK_FOR_ALL_PRIMARY_MODELS env var) enhance CLI behavior but produce no new SDK event/callback/stream marker. Architectural barrier: switching happens inside compiled CLI binary; SDK has no observation mechanism. `query.setModel()` is tracked separately as "Main Model Live Switch" (pass/settings+chat, promoted 2026-06-07). CLOSED at readback.
 - Task Budget — `@alpha`; option wiring verified; no deterministic SDK enforcement signal. **2026-06-06 re-audit (Outcome B)**: no new productizable seam. SDK 0.3.145 unchanged; 4 error result subtypes contain no `error_max_task_budget`; `TerminalReason` has `max_turns` but no `max_task_budget`; no budget-related events (`tokens_remaining`, `budget_status`, `usage_update`). Remains readback with hardened boundary.
-- Tool Aliases — option wiring verified; alias resolution unobservable from plugin layer (post-resolution names only in stream)
+- Tool Aliases — option wiring verified; alias resolution unobservable from plugin layer (post-resolution names only in stream). ✅ **2026-06-07 FORMAL CLOSURE** (Outcome B): SDK source confirms `toolAliases` is a one-way init parameter with no feedback event. Stream `tool_use` chunks expose only post-resolution names with no aliasing metadata. Plugin cannot distinguish aliased from canonical emission — an epistemic impossibility, not a temporary gap. Architectural barrier: one-way init parameter with no observation channel is a protocol-level constraint. CLOSED at readback. Re-audit only if SDK adds alias-resolution confirmation event or pre-resolution name field to tool_use chunks.
 - Debug — option wiring verified; fundamental limitation: debug toggle enables CLI verbose logging but has no observable side effect without debugFile or stderr callback. Debug File (pass/verified) already covers the "capture debug output" use case. **2026-06-06 audit completed** (Outcome B): remains readback with hardened boundary.
 - Strict MCP Config — option wiring verified; validation behavior lives in compiled CLI binary
 - 1M Context Beta — option wiring verified through full SDK path (setting → buildClaudeCodeOptions → ProcessTransport → CLI --betas flag); model-side beta acceptance and 1M context activation unobservable from plugin layer
 - JS Runtime — option wiring verified; actual runtime selection depends on system PATH and installation. **2026-06-06 audit completed** (Outcome B): remains readback with hardened boundary. No observable signal in init events, stderr, or tool output confirms which runtime the CLI subprocess actually uses.
 - Load Timeout — `@alpha`; option wiring verified; timeout code path only executes with resume/continue + sessionStore. **2026-06-06 audit completed** (Outcome B): remains readback with hardened boundary.
 - Output Style — SDK `settings.outputStyle` option wiring verified through `ClaudeCodeOptionsBuilder`; stable Model & Thinking tab input persists the configured style name. Readback ceiling: Claude Code applies output style by modifying its system prompt at session start, and the SDK stream exposes no structured signal for the active output style or resolved prompt. Changes apply after `/clear` or a new Claude Code session; existing active/resumed sessions may keep the previous prompt.
+- **Additional Directories** — ✅ **2026-06-07 FORMAL CLOSURE** (Round 8, Outcome B): SDK `Options.additionalDirectories?: string[]` (sdk.d.ts:1210) + `Settings.permissions.additionalDirectories` (sdk.d.ts:4060). Option wiring verified through `buildClaudeCodeOptions` (ClaudeCodeOptionsBuilder.ts:206,234-236). Stable settings surface: Claude Code Runtime tab textarea (newline-separated paths). CLOSED at readback. Architectural barrier: `additionalDirectories` is a one-way init parameter to the CLI subprocess; the compiled CLI binary expands filesystem context/scope internally, but this expansion is opaque and no SDK event exposes which paths are actually accessible or resolved. No init event lists directories, no tool metadata confirms path resolution, no stderr pattern confirms expansion. Adjacent seams REJECTED: (a) filesystem tool result metadata — no structured signal exposes resolved paths; (b) Bash pwd — proves CWD only; (c) Read tool path listing — no directory enumeration tool; (d) Settings.permissions.additionalDirectories — config-level allowlist, same one-way opacity. Re-audit only if SDK adds directory expansion confirmation event, tool metadata exposing resolved filesystem scope, or init event listing accessible paths.
+- **Context Usage** — SDK `query.getContextUsage()` readback seam. ✅ **2026-06-07 Round 11 productized**: `AgentCapability.Context` added to `CLAUDE_CODE_PHASE1_CAPABILITIES`; `ClaudeCodeAdapter.getSessionContextUsageSnapshot()` converts raw SDK `getContextUsage()` to `ContextUsageSnapshot`; `OpenCodianView` routes Claude Code backend to adapter snapshot method. Settings readback UI verified in Round 10 (BUILD_ID feature-phase0-capability.202606071932): "Inspect context usage" button returned rich structured data. Chat ContextRing now structurally mounts for Claude Code sessions (capability gating removed). Matrix row: `readback` / `settings+chat`. Runtime proof remains `readback` because no BUILD_ID-anchored Obsidian runtime proof yet shows the ContextRing rendering real Claude Code context data. Promotion path: live verification in Test Vault that the ring updates with actual token counts after a message exchange.
 
-**Settings + Chat (`userSurface: 'settings+chat'`) — 3**
+**Settings + Chat (`userSurface: 'settings+chat'`) — 4**
+- **Effort** — ✅ **2026-06-07 FORMAL CLOSURE** (Round 8, Outcome B): SDK has 5 type locations for effort: `Options.effort?: EffortLevel` (sdk.d.ts:1496), `AgentDefinition.effort` (sdk.d.ts:87), `BaseHookInput.effort` (sdk.d.ts:172), `ResultMessage.effortLevel` (sdk.d.ts:5149), `Model.supportsEffort`/`supportedEffortLevels` (sdk.d.ts:1142/1146). Option wiring verified through `buildClaudeCodeOptions` (ClaudeCodeOptionsBuilder.ts:218). Adapter has live-apply logic (ClaudeCodeAdapter.ts:4056-4064): effort change closes existing runtime and recreates with new effort on next query — restart-based apply, NOT mid-stream seamless switch like `setModel()`. Stable settings surface: Model & Thinking tab dropdown. Stable chat surface: composer effort selector. CLOSED at readback. Architectural barrier: effort is a one-way init parameter; CLI/model handling of configured effort is opaque, and no SDK event exposes an applied effort state or reasoning-budget change. `ResultMessage.effortLevel` is post-hoc read-only metadata that cannot distinguish "model honored effort" from "model happened to use this effort level". `BaseHookInput.effort` is available to hook commands only, not observable from plugin layer. No structured error/event confirms effort enforcement. Adjacent seams REJECTED: (a) effortLevel stream metadata — post-hoc, epistemically ambiguous; (b) CLAUDE_EFFORT env var — hook-only; (c) setMaxThinkingTokens — deprecated; (d) BaseHookInput.effort.level — hook-only; (e) Model.supportsEffort — capability metadata, not enforcement confirmation. Re-audit only if SDK adds effort application event, pre/post reasoning-budget signal, or structured confirmation that CLI applied the configured effort level.
 - **Thinking** — SDK `thinking?: ThinkingConfig` option wiring verified through `mapThinkingForSdk()` (adaptive/disabled/fixed → SDK shape). Stream normalizer handles `thinking` and `redacted_thinking` blocks; SDK smoke artifact recorded thinking blocks in stream. **2026-06-07 audit**: no independent BUILD_ID for visible thinking chunks rendered in chat UI. Status doc marks thinking as "runtime-proved but not stable" at stream normalization level. Honest ceiling: readback. Promotion path: BUILD_ID-anchored live proof of thinking blocks visibly rendered in chat.
 
   **2026-06-07 Round 5 re-audit**: Full pipeline code-verified end-to-end. Backend adapter (`ClaudeCodeOptionsBuilder.mapThinkingForSdk`), stream normalization (`ClaudeCodeStreamNormalizer`), chat streaming (`OpenCodianView.convertToStreamingChunk` → `StreamController` → `ThinkingBlockRenderer`), persistence (`ConversationIdentityRuntime` + `sendPipelineContent`), and rehydration (`AssistantShellViewHostAdapter.renderContentBlock`) are all covered by existing unit tests. New focused integration test (`tests/unit/core/agents/backend/ClaudeCodeThinkingPipeline.test.ts`, 5 cases) validates the complete flow from SDK message → normalized chunk → streaming content block → persisted block, including `redacted_thinking` and suffix deduplication. `userSurface` updated from `settings` to `settings+chat` because the generic StreamController renders thinking blocks for any backend that produces them. Runtime proof remains `readback` because no BUILD_ID-anchored live proof shows thinking blocks visibly rendered in an ordinary Claude Code chat conversation.
 - Permission Mode Live Switch — official SDK `query.setPermissionMode()` seam; `AgentCapability.Permissions` is now in `CLAUDE_CODE_PHASE1_CAPABILITIES`, so the chat toolbar shows a backend-appropriate permission selector. Settings: Permissions tab dropdown live-applies `default` / `acceptEdits` / `bypassPermissions` / `plan`. Chat: when `claude-code` is active, the toolbar exposes those Claude Code modes and calls `query.setPermissionMode()` through the adapter seam; when `opencode` is active, it shows OpenCode permission templates `yolo` / `normal` / `plan` and keeps the OpenCode restart path. The trigger carries `data-permission-backend="claude-code"` or `"opencode"` for runtime verification. Runtime proof remains `readback`: mode changes are acknowledged by SDK control responses, but no observable stream marker confirms behavioral enforcement.
 - Sandbox — option wiring verified; OS-level sandbox enforcement not independently verifiable. ✅ **2026-06-07 expanded productization, Outcome A (LIVE VERIFIED, BUILD_ID feature-phase0-capability.202606070542)**: 10 expert settings + 3 basic toggles in Permissions tab; chat badge shows configured state when enabled; hot-switch claude-code → opencode → claude-code in same live UI: badge 1 → 0 → 1; obsidian dev:errors clean. Readback ceiling: CLI handles OS-level sandbox internally; no init event, tool metadata, or stderr pattern confirms activation. Plugin cannot distinguish "sandbox active" from "sandbox silently degraded" or "unsupported platform".
-
 **Diagnostic (`userSurface: 'diagnostic'`) — 3**
 - File Checkpoint / Rewind — `rewindFiles(dryRun: true)` callable but returns `canRewind: false` for all candidates. ✅ **2026-06-07 re-audit (Outcome B)**: blocker confirmed unchanged. Upstream blocker: SDK #236 (open since 2026-03-17, zero maintainer response; snapshot creation gated behind React/Ink interactive UI code paths, never invoked in SDK `query()` mode). Additional upstream evidence: claude-code #16976 (headless checkpoint restore — closed `not_planned` by stale bot), #18858 (PostRewind hook event — closed `not_planned` by stale bot; follow-up #32780 opened). SDK 0.3.145 installed; latest npm 0.3.167; no changelog entry through 0.3.167 mentions checkpoint fixes. CLI 2.1.167 latest. Official docs present SDK checkpointing as working but it silently fails in non-interactive mode (docs-vs-runtime discrepancy). See full audit section below.
-- Warm Startup — `startup()` callable and WarmQuery produces response. WarmQuery is single-use (query() once per handle); no persistent warm pool. "No startup latency" is SDK internal documentation claim, not independently measured. Readback ceiling.
+- Warm Startup — `startup()` callable and WarmQuery produces response. ✅ **2026-06-07 FORMAL CLOSURE** (Outcome B): SDK types explicitly document WarmQuery as single-use: "Can only be called once per WarmQuery." No persistent warm pool, no connection reuse, no `isWarmed()` signal. "No startup latency" is SDK internal documentation claim, not independently measured. No observable signal distinguishes warm-vs-cold paths. Architectural barrier: single-use handle design is a protocol-level constraint, not a plugin-side gap. CLOSED at readback. Re-audit only if SDK adds reusable warm pool API or observable warm-status metadata.
 - Stderr Diagnostic — stderr callback wiring proven; no query reliably provokes stderr output. ✅ 2026-06-06 audit (Outcome B): fundamental limitation, not temporary gap. Debug File (pass/verified) covers the "capture debug output" use case.
 
 ---
@@ -100,15 +103,218 @@ These have adapter wiring and runtime proof, but no stable or diagnostic user su
 
 ### long-lived readback/hidden checkpoints — re-audit status
 
-These 5 checkpoints have been individually re-audited and closed at their current classification (readback or hidden). Closure means "no further productization path exists under current SDK constraints" — it does NOT mean the overall backlog is empty.
+These 7 checkpoints have been individually re-audited and closed at their current classification (readback or hidden). Closure means "no further productization path exists under current SDK constraints" — it does NOT mean the overall backlog is empty.
 
 1. **File Checkpoint / Rewind** — Highest user-value if unblocked. ✅ **2026-06-07 re-audited** — blocker confirmed unchanged. SDK #236 still open (zero maintainer response). claude-code #16976 and #18858 closed `not_planned` by stale bot. Latest npm 0.3.167; no changelog entry mentions checkpoint fixes. CLI 2.1.167. Official docs present SDK checkpointing as working but it silently fails in non-interactive mode. Monitor SDK #236. Re-audit on any SDK version bump that mentions checkpointing or interactive-mode fixes. Current state: readback with confirmed upstream blocker.
 2. **Allowed Tools** — ✅ **2026-06-06 re-audited** (Outcome B) — readback confirmed; auto-approve shortcut only, zero enforcement at tool-catalog level. SDK docs explicitly delegate availability restriction to `tools`, NOT `allowedTools`. No promotion path unless SDK adds catalog-level enforcement.
 3. **Task Budget** — ✅ **2026-06-06 re-audited** (Outcome B) — readback confirmed; `@alpha`, no enforcement signal, no budget-related error subtype/event/terminal-reason. No promotion path unless SDK adds structured enforcement signal.
 4. **Fallback Model** — ✅ **2026-06-07 FORMAL CLOSURE** (Outcome B) — readback is the permanent ceiling. Option wiring verified (--fallback-model CLI flag + same-model validation). Latest CLI features (multi-fallback, sticky session, FALLBACK_FOR_ALL_PRIMARY_MODELS) enhance CLI-side behavior but produce NO new SDK observable event. No fallback activation callback, stream marker, or status metadata exists. Architectural barrier: fallback switching happens inside compiled CLI binary; SDK is a thin transport with no observation mechanism. `query.setModel()` is a separate seam (manual model switch) NOT pursued in this closure. CLOSED at readback. Re-audit only if SDK adds dedicated fallback activation events to the message protocol.
-5. **Session Store + Import Session to Store** — ✅ **2026-06-07 re-audited** (Outcome B) — hidden confirmed. All SessionStore APIs remain `@alpha`. Store entries are opaque pass-through blobs. No promotion path unless SDK graduates from `@alpha` with format stability guarantees AND a clear user workflow gap.
+5. **Warm Startup** — ✅ **2026-06-07 FORMAL CLOSURE** (Outcome B) — readback is the permanent ceiling. `startup()` callable and WarmQuery produces response. SDK types explicitly document WarmQuery as single-use: "Can only be called once per WarmQuery." No persistent warm pool, no connection reuse, no `isWarmed()` signal. "No startup latency" is SDK internal documentation claim, not independently measured. No observable signal distinguishes warm-vs-cold paths. Architectural barrier: single-use handle design is a protocol-level constraint, not a plugin-side gap. CLOSED at readback. Re-audit only if SDK adds reusable warm pool API or observable warm-status metadata.
+6. **Tool Aliases** — ✅ **2026-06-07 FORMAL CLOSURE** (Outcome B) — readback is the permanent ceiling. Option wiring verified (`toolAliases` forwarded as one-way init parameter to CLI subprocess). SDK source confirms alias resolution happens inside compiled CLI binary with no feedback event or stream metadata. Stream tool_use chunks expose only post-resolution names; plugin cannot distinguish aliased from canonical emission. Architectural barrier: one-way init parameter with no observation channel is a protocol-level constraint. CLOSED at readback. Re-audit only if SDK adds alias-resolution confirmation event or pre-resolution name field to tool_use chunks.
+7. **Session Store + Import Session to Store** — ✅ **2026-06-07 re-audited** (Outcome B) — hidden confirmed. All SessionStore APIs remain `@alpha`. Store entries are opaque pass-through blobs. No promotion path unless SDK graduates from `@alpha` with format stability guarantees AND a clear user workflow gap.
 
-These 5 checkpoints are individually closed. The overall backlog remains open: existing `query.setModel()` / Main Model live-apply is now a formal capability row (Main Model Live Switch, `pass` / `settings+chat`, promoted 2026-06-07, BUILD_ID feature-phase0-capability.202606070617); existing `query.setPermissionMode()` / Permission Mode live-apply is now a formal capability row (Permission Mode Live Switch, `readback` / `settings+chat`, promoted 2026-06-07, promotion path exhausted same day — see dedicated section below); diagnostic-only seams may gain promotion paths in future SDK versions; and new SDK releases may introduce additional productizable seams. Future triage rounds should also scan for newly surfaced official seams, adapter-level SDK methods not yet in the matrix, and community feature requests that get implemented.
+These 7 checkpoints are individually closed. The overall backlog remains open: existing `query.setModel()` / Main Model live-apply is now a formal capability row (Main Model Live Switch, `pass` / `settings+chat`, promoted 2026-06-07, BUILD_ID feature-phase0-capability.202606070617); existing `query.setPermissionMode()` / Permission Mode live-apply is now a formal capability row (Permission Mode Live Switch, `readback` / `settings+chat`, promoted 2026-06-07, promotion path exhausted same day — see dedicated section below); diagnostic-only seams may gain promotion paths in future SDK versions; and new SDK releases may introduce additional productizable seams. Future triage rounds should also scan for newly surfaced official seams, adapter-level SDK methods not yet in the matrix, and community feature requests that get implemented.
+
+---
+
+## 2026-06-07 Round 10 — Account Info / Context Usage Live Verification
+
+### Objective
+
+Attempt to promote Account Info and Context Usage from `readback` to `pass` with BUILD_ID-anchored live Obsidian proof.
+
+### BUILD_ID
+
+`feature-phase0-capability.202606071932` (deployed to Test Vault, BUILD_ID verified in `main.js`).
+
+### Account Info — PROMOTED to pass ✅
+
+**Runtime evidence:** "Inspect account" button in Claude Code Runtime tab executed `query.accountInfo()` successfully.
+
+**Live data returned:**
+```json
+{
+  "tokenSource": "[redacted]",
+  "apiProvider": "firstParty"
+}
+```
+
+**Full pipeline verified:** settings button → `adapter.getAccountInfo()` → `query.accountInfo()` → structured `AccountInfo` → `formatAccountInfoReadback()` → `<pre>` block. Email masked by `sanitizeAccountInfoValue()`; tokenSource redacted by `CLAUDE_ACCOUNT_INFO_SECRET_KEY_PATTERN`.
+
+**Verification method:** JS eval of `[data-claude-code-account-info-readback]` innerText confirmed the pre block displayed the JSON response.
+
+### Context Usage — remains readback (partial proof) ❌
+
+**Settings surface verified:** "Inspect context usage" button executed `query.getContextUsage()` successfully and returned rich structured data:
+- 8 categories: System prompt (5581 tokens), System tools (20596), Custom agents (242), Memory files (384), Skills (1423), Messages (5), Autocompact buffer (33000), Free space (138769)
+- `totalTokens`: 28231, `maxTokens`: 200000, `percentage`: 14%
+- `model`: `claude-haiku-4-5`
+- 7 agents (bug-analyzer, code-reviewer, codex-proof-agent-0606, etc.)
+- 24 slash commands, 24 skills with per-skill token breakdown
+
+**Chat surface NOT exposed:** ContextRing is NOT mounted for Claude Code sessions because `AgentCapability.Context` is not in `CLAUDE_CODE_PHASE1_CAPABILITIES`. The chat ContextRing code exists in `ContextRing.ts` + `ActiveTabContextUsageCoordinator.ts` but is gated at mount time (`OpenCodianView.ts:842`: `if (!hasCapability(this.caps, AgentCapability.Context)) return`). Current matrix surface is `settings`, not `settings+chat`.
+
+**Promotion path:** Add `AgentCapability.Context` to `CLAUDE_CODE_PHASE1_CAPABILITIES`, rebuild, and verify the ContextRing renders with real context data in the chat input toolbar.
+
+### Matrix impact
+
+Matrix: 54 rows, 35 pass, 19 readback, 2 hidden, 0 fail. Account Info promoted from readback to pass.
+
+---
+
+## 2026-06-07 Round 11 — Context Usage Chat Surface Productization
+
+### Objective
+
+Productize Claude Code Context Usage into the ordinary chat surface by adding `AgentCapability.Context` to `CLAUDE_CODE_PHASE1_CAPABILITIES` and wiring the existing `ContextRing` / `ActiveTabContextUsageCoordinator` pipeline.
+
+### Changes
+
+1. **`ClaudeCodeAdapter.ts`**: Added `AgentCapability.Context` to `CLAUDE_CODE_PHASE1_CAPABILITIES`. Added `getSessionContextUsageSnapshot(sessionId)` which:
+   - Calls existing `getContextUsage()` → `query.getContextUsage()`
+   - Converts raw SDK result to `ContextUsageSnapshot` format
+   - Maps `totalTokens` → `inputTokens`, `maxTokens` → `contextWindow`, `model` → `modelId`/`modelName`
+   - Sets unknown fields (`outputTokens`, `reasoningTokens`, `cacheReadTokens`, `cacheWriteTokens`, `totalCost`) to `0`
+
+2. **`OpenCodianView.ts`**: Updated `getSessionContextUsageSnapshot` host method:
+   - When backend is `claude-code`, routes to `adapter.getSessionContextUsageSnapshot()`
+   - When backend is `opencode`, preserves existing `openCodeService.getSessionContextUsageSnapshot()` path
+   - No longer returns `null` for non-OpenCode backends
+
+3. **`SettingsCapabilityLabSection.ts`**: Updated Context Usage matrix row:
+   - `userSurface`: `'settings'` → `'settings+chat'`
+   - `runtimeProof`: remains `'readback'`
+
+### Architecture audit
+
+The chat context pipeline is fully backend-agnostic after `getSessionContextUsageSnapshot()`:
+- `ActiveTabContextUsageCoordinator.refreshFromServer()` calls host snapshot
+- `ContextUsageService.applyUsageSnapshot()` converts to `TabContextState`
+- `ContextRing.update()` renders SVG ring indicator
+- `ContextDetailModal` renders full breakdown on click
+
+No new UI components or parallel pipelines were added. The only backend-specific code is the conversion layer in `ClaudeCodeAdapter`.
+
+### Tests added
+
+- `ClaudeCodeAdapter.test.ts`: 3 tests for `getSessionContextUsageSnapshot` (conversion, null, error)
+- `ClaudeCodeAdapter.test.ts`: `AgentCapability.Context` added to capabilities assertion
+- `SettingsCapabilityLabSection.test.ts`: Context Usage `userSurface` updated to `'settings+chat'`
+
+### Matrix impact
+
+- Before: 54 rows, 35 pass, 19 readback, 2 hidden, 0 fail
+- After: 54 rows, 35 pass, 19 readback, 2 hidden, 0 fail (no promotion; userSurface expanded)
+
+### Honest boundaries
+
+- **runtimeProof remains `readback`**: Chat ContextRing is structurally wired and will mount, but no BUILD_ID-anchored Obsidian runtime proof exists yet showing the ring with real data.
+- **Missing live verification**: Need to verify that after a message exchange, the ring updates with actual token counts from `query.getContextUsage()`.
+- **OpenCode behavior preserved**: Existing `openCodeService.getSessionContextUsageSnapshot()` path unchanged for `opencode` backend.
+
+---
+
+## 2026-06-07 Round 9 — Gap-First Re-Scan
+
+### Objective
+
+Gap-first re-scan of SDK seams against the pre-Round-9 52-row capability matrix.
+
+### SDK seam inventory
+
+- Gap inventory covered the local SDK declaration/source files most relevant to product surfaces: `sdk.d.ts`, `sdk-tools.d.ts`, `agentSdkTypes.d.ts`, `assistant.d.ts`, `bridge.d.ts`, `browser-sdk.d.ts`, and `extractFromBunfs.d.ts`.
+- Cross-reference focused on Options properties, Settings properties, Query methods, SDK functions, hook events, message types, and control requests against the 52 existing matrix rows.
+- The scan found 2 genuine gaps: **Account Info** and **Context Usage**.
+
+### Genuine gaps added
+
+| Capability | SDK seam | Classification | Evidence | Boundary |
+|------------|----------|----------------|----------|----------|
+| Account Info | `query.accountInfo()` | `readback` / `settings` | Adapter wired; settings UI has inspect button, readback display, and 7 locale keys | No dedicated BUILD_ID live proof |
+| Context Usage | `query.getContextUsage()` | `readback` / `settings` | Adapter wired; settings readback UI; 20+ locale keys | Adjacent chat `ContextRing` / `ContextDetailModal` code exists but is not exposed for Claude Code until `AgentCapability.Context` is enabled and live-verified |
+
+Both new rows represent wired SDK Query methods with real settings UI. Neither is promoted to `pass` because neither has dedicated BUILD_ID-anchored live proof.
+
+### Not exposed / not applicable
+
+- ~45 Settings properties are **NOT applicable** to OpenCodian's embedded SDK surface: TUI/terminal-specific controls, enterprise policy, remote infrastructure, and CLI display behavior.
+- ~20 init-only Settings properties share the same architectural barrier as Effort and Additional Directories from Round 8: one-way parameters with no observable feedback.
+- `resolveSettings()` and `filterEscalatingDefaultMode()` remain `@alpha` enterprise/infra seams, not user-facing product capabilities.
+- `tagSession()`, `renameSession()`, and `deleteSession()` are covered by the existing JSONL History Browser row.
+
+### Matrix impact
+
+Matrix is now 54 rows, 34 pass, 20 readback, 2 hidden, 0 fail. No new safe productization opportunities were found beyond the 2 readback rows.
+
+---
+
+## 2026-06-07 Effort + Additional Directories — Formal Closure at Readback (Round 8, Outcome B)
+
+### Objective
+
+Formal closure of the two Round 6 additions (Effort, Additional Directories) — determine if they can be promoted to `pass`, or formally close at `readback` with hardened boundary evidence.
+
+### Effort — CLOSED at readback
+
+**SDK surface (5 type locations):**
+1. `Options.effort?: EffortLevel` (sdk.d.ts:1496) — query-level per-turn effort control
+2. `AgentDefinition.effort` (sdk.d.ts:87) — per-agent effort override
+3. `BaseHookInput.effort` (sdk.d.ts:172) — active effort level available to hook commands
+4. `ResultMessage.effortLevel` (sdk.d.ts:5149) — post-hoc effort level in stream metadata
+5. `Model.supportsEffort` / `supportedEffortLevels` (sdk.d.ts:1142/1146) — model capability metadata
+
+**OpenCodian surface:**
+- Settings: Model & Thinking tab dropdown (stable)
+- Chat: composer effort selector (stable), routes through `resolveSendOptionOverrides` → adapter restarts runtime on effort change
+
+**Architectural barrier (fundamental):**
+- Effort is a one-way init parameter to the compiled CLI binary
+- CLI/model handling of configured effort is opaque
+- `ResultMessage.effortLevel` is post-hoc read-only metadata: cannot distinguish "model honored configured effort" from "model happened to use this effort level"
+- `BaseHookInput.effort` is hook-only, not observable from plugin transport
+- No structured error/event confirms effort enforcement
+- No pre/post reasoning-budget signal exposed by SDK
+
+**Adjacent seams REJECTED:**
+| Seam | Reason |
+|------|--------|
+| `effortLevel` stream metadata | Post-hoc, epistemically ambiguous |
+| `CLAUDE_EFFORT` env var | Hook env var, not observable from plugin |
+| `setMaxThinkingTokens(n)` | Deprecated (sdk.d.ts:2136) |
+| `BaseHookInput.effort.level` | Hook-only, not plugin-observable |
+| `Model.supportsEffort` | Capability metadata, not enforcement confirmation |
+
+**Re-audit condition:** SDK adds effort application event, pre/post reasoning-budget signal, or structured confirmation that CLI applied the configured effort level.
+
+### Additional Directories — CLOSED at readback
+
+**SDK surface (2 type locations):**
+1. `Options.additionalDirectories?: string[]` (sdk.d.ts:1210) — query-level directory expansion
+2. `Settings.permissions.additionalDirectories` (sdk.d.ts:4060) — permissions config-level allowlist
+
+**OpenCodian surface:**
+- Settings: Claude Code Runtime tab textarea (newline-separated paths, stable)
+- Option wiring through `buildClaudeCodeOptions` (ClaudeCodeOptionsBuilder.ts:206,234-236)
+
+**Architectural barrier (fundamental):**
+- `additionalDirectories` is a one-way init parameter to the compiled CLI binary
+- CLI expands filesystem context/scope internally — this expansion is opaque
+- No SDK event exposes which paths are actually accessible or resolved
+- No init event lists directories, no tool metadata confirms path resolution, no stderr pattern confirms expansion
+
+**Adjacent seams REJECTED:**
+| Seam | Reason |
+|------|--------|
+| Filesystem tool result metadata | No structured signal exposes resolved paths |
+| Bash pwd | Proves CWD only, not additionalDirectories |
+| Read tool path listing | No directory enumeration tool in SDK catalog |
+| Settings.permissions.additionalDirectories | Config-level allowlist, same one-way opacity |
+
+**Re-audit condition:** SDK adds directory expansion confirmation event, tool metadata exposing resolved filesystem scope, or init event listing accessible paths.
+
+### Matrix impact
+
+Unchanged: 52 rows, 34 pass, 18 readback, 2 hidden, 0 fail. Both capabilities remain `readback` — formal closure adds hardened boundary evidence and explicit re-audit conditions.
 
 ---
 
@@ -239,6 +445,91 @@ The SDK `Query` interface defines 23 methods. Plugin calls 14. The 9 unwired met
 ### Conclusion
 
 **No new matrix rows needed.** The MCP Servers row at `pass`/`settings` is honest, complete, and now explicitly documents the full live-apply path. All unwired SDK methods are closed with specific rejection reasons. Matrix counts unchanged: 48 rows, 34 pass, 14 readback, 2 hidden, 0 fail.
+
+---
+
+## 2026-06-07 Warm Startup — Formal Closure at Readback (Outcome B)
+
+### Objective
+
+Re-audit the `startup()` / `WarmQuery` seam to make a definitive determination: is there any real stable user benefit or promotion path, or should Warm Startup be formally closed at readback?
+
+### Decision
+
+**Outcome B — Warm Startup is FORMALLY CLOSED at readback.**
+
+This is not a temporary gap. The architectural barrier is fundamental:
+
+1. **Single-use handle design**: SDK types explicitly document `WarmQuery.query()` as "Can only be called once per WarmQuery." There is no persistent warm pool, no connection reuse, no `isWarmed()` signal. After one query, the handle is spent.
+2. **"No startup latency" is an SDK internal claim** (sdk.d.ts line 5763): Latency measurement is environment-dependent (machine speed, network, API load, SDK/CLI version) and cannot serve as a repeatable proof.
+3. **No observable signal**: No init event difference, no status metadata, no side effect confirms warm-vs-cold behavior.
+4. **Adapter already handles subprocess lifecycle**: The adapter's normal `query()` call already manages startup transparently. A single-use pre-warm saves one cold-start per handle but provides no persistent user-facing value.
+
+### What IS verified (unchanged)
+
+1. `startup()` is callable and returns a `WarmQuery` handle.
+2. `WarmQuery.query()` can send a diagnostic prompt and produce raw messages.
+3. The API entry point exists and the handle is usable.
+
+### What will NOT be productized — architectural barrier
+
+1. **No persistent warm pool**: The SDK explicitly designs WarmQuery as single-use. No reuse API exists.
+2. **No warm-status observation**: No init event field, no status metadata, no `isWarmed()` getter distinguishes warm from cold starts.
+3. **No deterministic latency contract**: "No startup latency" is an internal documentation claim, not an externally verifiable behavior guarantee.
+4. **No stable user workflow**: A single-use pre-warm per handle does not create a coherent user-facing capability. The adapter already manages startup transparently.
+
+### Adjacent seams audited and REJECTED
+
+1. **Integrating startup() into adapter's ordinary query path** — WarmQuery is single-use; after one `query()`, the handle is spent. The adapter already manages subprocess lifecycle internally. No user-facing value.
+2. **Latency benchmarking** — Environment-dependent, non-repeatable, not a stable capability.
+3. **WarmQuery as persistent optimization** — SDK explicitly designs it as single-use. No reuse API exists.
+
+### Promotion path
+
+Requires SDK to add: (a) a reusable warm pool (multiple `query()` calls per handle), (b) observable warm-status metadata, or (c) a deterministic latency contract. These are SDK-level design changes, not plugin-side gaps. Re-audit on any SDK version that mentions reusable warm queries or warm-status APIs.
+
+---
+
+## 2026-06-07 Tool Aliases — Formal Closure at Readback (Outcome B)
+
+### Objective
+
+Re-audit the `toolAliases` seam to make a definitive determination: is there any deterministic SDK signal that confirms alias resolution occurred, or should Tool Aliases be formally closed at readback?
+
+### Decision
+
+**Outcome B — Tool Aliases is FORMALLY CLOSED at readback.**
+
+This is not a temporary gap. The architectural barrier is fundamental:
+
+1. **One-way init parameter**: SDK source (browser-sdk.js) shows `toolAliases` forwarded as `toolAliases: this.initConfig?.toolAliases` in `initialize()`. There is no feedback event, status signal, or stream metadata confirming alias resolution occurred.
+2. **Resolution is CLI-internal**: Alias resolution happens "before name resolution" in the internal "tool execution path" — entirely inside the compiled CLI binary, not exposed through the streaming interface.
+3. **Stream exposes post-resolution names only**: `tool_use` chunks in the stream contain only canonical tool names after resolution. There is no aliasing metadata, no "originalName" field, no "wasAliased" flag.
+4. **Plugin cannot distinguish aliased from direct emission**: The plugin sees the same stream regardless of whether the model emitted an aliased name that was resolved, or emitted the canonical name directly. This is an epistemic impossibility, not a temporary gap.
+
+### What IS verified (unchanged)
+
+1. **Settings→SDK option wiring**: `toolAliases` propagates through `ClaudeCodeOptionsBuilder` → SDK `Options.toolAliases` → CLI subprocess.
+2. **Builder semantics**: empty → option omitted; non-empty → `toolAliases` present with matching entries and distinct object reference.
+3. **Probe coverage**: `runToolAliasesReadbackProbe()` verifies all entries map correctly. Focused tests cover empty, populated, mismatch, and throw paths.
+4. **Stable settings surface**: Tools tab key=value textarea with boundary notice and lifecycle notice.
+
+### What will NOT be productized — architectural barrier
+
+1. **No alias-resolution confirmation event**: The SDK message protocol has no event type for alias resolution.
+2. **Cannot observe pre-resolution names**: Stream `tool_use` chunks expose only canonical names after resolution. The original aliased name is lost at the protocol boundary.
+3. **Cannot simulate alias usage locally**: Alias resolution depends on model behavior (whether the model chooses to emit an aliased name). The plugin cannot force or detect this from the SDK layer.
+4. **No structured alias-status API**: No SDK method exists to query which aliases are active or whether resolution succeeded.
+
+### Adjacent seams audited and REJECTED
+
+1. **Prompting the model to call an alias** — Model-dependent and non-deterministic; even if the final tool call succeeds, the stream does not reveal whether the model emitted the alias or the canonical tool name.
+2. **Comparing canonical `tool_use.name` output** — Indistinguishable from direct canonical emission because stream chunks expose only post-resolution names.
+3. **Reusing permission or tool-catalog evidence** — Proves tool availability or approval behavior, not alias resolution.
+
+### Promotion path
+
+Requires SDK to add: (a) an alias-resolution confirmation event or stream marker, (b) a pre-resolution name field in `tool_use` chunks, or (c) a queryable alias-status API. These are protocol-level changes, not plugin-side gaps. Re-audit on any SDK version that mentions alias observability or tool-use metadata expansion.
 
 ---
 

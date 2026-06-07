@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import type { ElicitationRequest, ElicitationResult, Query } from '@anthropic-ai/claude-agent-sdk';
 import { spawn } from 'child_process';
 
+import type { ContextUsageSnapshot } from '../../../features/chat/services/ContextUsageService';
 import { createLogger, sanitizeDiagnosticReport } from '../../../shared';
 import type { AgentBackendKind, StreamChunk } from '../../types/chat';
 import type { ClaudeCodeBackendSettings, ClaudeCodeEffort } from '../../types/settings';
@@ -683,6 +684,13 @@ const CLAUDE_CODE_PHASE1_CAPABILITIES: BackendCapabilities = Object.freeze(
     // stream marker for permission mode changes, but adapter wiring and
     // settings apply-path are verified).
     AgentCapability.Permissions,
+    // Context usage: adapter exposes getContextUsage() which calls
+    // query.getContextUsage() on active runtimes. Chat ContextRing mounts
+    // via AgentCapability.Context gating. The raw SDK data is converted to
+    // ContextUsageSnapshot for the existing ActiveTabContextUsageCoordinator
+    // + ContextRing pipeline. runtimeProof remains 'readback' until BUILD_ID-
+    // anchored Obsidian runtime proof of the chat ring rendering real data.
+    AgentCapability.Context,
   ]),
 );
 
@@ -1285,6 +1293,36 @@ export class ClaudeCodeAdapter
         }
       }
     }
+  }
+
+  async getSessionContextUsageSnapshot(sessionId: string): Promise<ContextUsageSnapshot | null> {
+    const raw = await this.getContextUsage();
+    if (raw === null || typeof raw !== 'object') {
+      return null;
+    }
+    const usage = raw as Record<string, unknown>;
+    const model = typeof usage.model === 'string' ? usage.model : null;
+    const totalTokens = typeof usage.totalTokens === 'number' ? usage.totalTokens : 0;
+    const maxTokens = typeof usage.maxTokens === 'number' ? usage.maxTokens : 0;
+    const now = Date.now();
+    return {
+      sessionId,
+      sessionTitle: '',
+      createdAt: now,
+      updatedAt: now,
+      compactingAt: null,
+      providerId: null,
+      providerName: null,
+      modelId: model,
+      modelName: model,
+      contextWindow: maxTokens,
+      inputTokens: totalTokens,
+      outputTokens: 0,
+      reasoningTokens: 0,
+      cacheReadTokens: 0,
+      cacheWriteTokens: 0,
+      totalCost: 0,
+    };
   }
 
   async getAccountInfo(): Promise<unknown | null> {

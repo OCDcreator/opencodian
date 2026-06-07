@@ -999,7 +999,7 @@ describe('SettingsCapabilityLabSection', () => {
 
     const table = containerEl.querySelector('.opencodian-capability-lab-matrix');
     const rows = table!.querySelectorAll('tbody tr');
-    expect(rows.length).toBe(50);
+    expect(rows.length).toBe(54);
   });
 
   it('renders status chips with correct active/inactive classes', () => {
@@ -1035,7 +1035,7 @@ describe('SettingsCapabilityLabSection', () => {
     expect(surfaces).toContain('chat');
   });
 
-  it('audits capability matrix for honest classifications across all 50 rows', () => {
+  it('audits capability matrix for honest classifications across all 54 rows', () => {
     const containerEl = document.createElement('div');
     const section = new SettingsCapabilityLabSection({
       plugin: createMockPlugin(),
@@ -1101,6 +1101,10 @@ describe('SettingsCapabilityLabSection', () => {
       'Main Model Live Switch': { runtimeProof: 'pass', userSurface: 'settings+chat' },
       'Permission Mode Live Switch': { runtimeProof: 'readback', userSurface: 'settings+chat' },
       'Output Style': { runtimeProof: 'readback', userSurface: 'settings' },
+      'Effort': { runtimeProof: 'readback', userSurface: 'settings+chat' },
+      'Additional Directories': { runtimeProof: 'readback', userSurface: 'settings' },
+      'Account Info': { runtimeProof: 'pass', userSurface: 'settings' },
+      'Context Usage': { runtimeProof: 'readback', userSurface: 'settings+chat' },
     };
 
     for (const [name, expectedValues] of Object.entries(expected)) {
@@ -1130,12 +1134,12 @@ describe('SettingsCapabilityLabSection', () => {
       return firstCell?.textContent ?? '';
     });
     expect(verifiedCapabilities).toEqual(
-      expect.arrayContaining(['MCP Servers', 'Permission Approval', 'AskUserQuestion / Elicitation', 'Structured Output', 'Agent Definitions', 'Include Hook Events', 'Environment Variables', 'Fork Session', 'JSONL History Browser', 'Session Store', 'Import Session to Store', 'Resume Session', 'Session Detail', 'Backend Routing', 'Turn/Budget Limits', 'Skills', 'Agents (Subagents)', 'Subagent Transcript / Progress', 'Hooks', 'Disallowed Tools', 'Plugins', 'Restricted Built-in Tools', '/context Diagnostic', 'Session Title', 'Custom Session ID', 'Continue', 'Resume Session At Position', 'Fork Session On Resume', 'System Prompt', 'Prompt Suggestions', 'Debug File', 'Plan Mode Instructions', 'AskUserQuestion Preview Format', 'Main Model Live Switch']),
+      expect.arrayContaining(['MCP Servers', 'Permission Approval', 'AskUserQuestion / Elicitation', 'Structured Output', 'Agent Definitions', 'Include Hook Events', 'Environment Variables', 'Fork Session', 'JSONL History Browser', 'Session Store', 'Import Session to Store', 'Resume Session', 'Session Detail', 'Backend Routing', 'Turn/Budget Limits', 'Skills', 'Agents (Subagents)', 'Subagent Transcript / Progress', 'Hooks', 'Disallowed Tools', 'Plugins', 'Restricted Built-in Tools', '/context Diagnostic', 'Session Title', 'Custom Session ID', 'Continue', 'Resume Session At Position', 'Fork Session On Resume', 'System Prompt', 'Prompt Suggestions', 'Debug File', 'Plan Mode Instructions', 'AskUserQuestion Preview Format', 'Main Model Live Switch', 'Account Info']),
     );
-    expect(verifiedCapabilities.length).toBe(34);
+    expect(verifiedCapabilities.length).toBe(35);
 
     // Total rows check
-    expect(rows.length).toBe(50);
+    expect(rows.length).toBe(54);
 
     // Honesty rule: readback capabilities must not be in the verified count.
     // Debug is readback (option wiring only, not behavior-verified) so it stays out.
@@ -1148,9 +1152,9 @@ describe('SettingsCapabilityLabSection', () => {
       return firstCell?.textContent ?? '';
     });
     expect(readbackCapabilities).toEqual(
-      expect.arrayContaining(['File Checkpoint / Rewind', 'Allowed Tools', 'Fallback Model', 'Warm Startup', 'Sandbox', 'Task Budget', 'Thinking', 'Tool Aliases', 'Debug', 'Strict MCP Config', '1M Context Beta', 'JS Runtime', 'Load Timeout', 'Stderr Diagnostic', 'Permission Mode Live Switch', 'Output Style']),
+      expect.arrayContaining(['File Checkpoint / Rewind', 'Allowed Tools', 'Fallback Model', 'Warm Startup', 'Sandbox', 'Task Budget', 'Thinking', 'Tool Aliases', 'Debug', 'Strict MCP Config', '1M Context Beta', 'JS Runtime', 'Load Timeout', 'Stderr Diagnostic', 'Permission Mode Live Switch', 'Output Style', 'Effort', 'Additional Directories', 'Context Usage']),
     );
-    expect(readbackCapabilities.length).toBe(16);
+    expect(readbackCapabilities.length).toBe(19);
 
     // Honesty rule: hidden capabilities must not have a settings or diagnostic surface chip.
     const hiddenRows = rows.filter((row) => (

@@ -11,6 +11,287 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-06-07 Claude Code Backend Capability Productization — Round 11 (Context Usage Chat Surface)
+
+**BUILD_ID:** `feature-phase0-capability.202606072029`
+
+### Summary
+
+Round 11 productized Claude Code Context Usage into the ordinary chat surface by adding `AgentCapability.Context` to `CLAUDE_CODE_PHASE1_CAPABILITIES` and wiring the existing `ContextRing` / `ActiveTabContextUsageCoordinator` pipeline to fetch real context data from the Claude Code SDK.
+
+### Changes
+
+- **`ClaudeCodeAdapter.ts`**: Added `AgentCapability.Context` to `CLAUDE_CODE_PHASE1_CAPABILITIES`. Added `getSessionContextUsageSnapshot(sessionId)` which calls `query.getContextUsage()` and converts the raw SDK result to `ContextUsageSnapshot` for the existing chat pipeline.
+- **`OpenCodianView.ts`**: Updated `getSessionContextUsageSnapshot` host method to route Claude Code backend requests to the adapter instead of returning `null`. The view now calls `adapter.getSessionContextUsageSnapshot()` for `claude-code` backend sessions.
+- **`SettingsCapabilityLabSection.ts`**: Updated Context Usage matrix row:
+  - `userSurface`: `'settings'` → `'settings+chat'` (chat ContextRing now mounts)
+  - `runtimeProof`: remains `'readback'` (no BUILD_ID-anchored Obsidian runtime proof yet)
+  - Comment updated to document Round 11 wiring and promotion blocker
+
+### Architecture audit
+
+The existing chat context pipeline is fully backend-agnostic after `OpenCodianView.getSessionContextUsageSnapshot()`:
+1. `ActiveTabContextUsageCoordinator.refreshFromServer()` calls host `getSessionContextUsageSnapshot()`
+2. `ContextUsageService.applyUsageSnapshot()` converts snapshot to `TabContextState`
+3. `ContextRing.update()` renders the state as an SVG ring indicator
+4. `ContextDetailModal` renders full breakdown on click
+
+The only Claude Code-specific addition is the conversion layer: SDK `getContextUsage()` → `ContextUsageSnapshot`. No new UI components or parallel pipelines were added.
+
+### Matrix impact
+
+- Before: 54 rows, 35 pass, 19 readback, 2 hidden, 0 fail
+- After: 54 rows, 35 pass, 19 readback, 2 hidden, 0 fail (no promotion; userSurface expanded)
+
+### Tests added
+
+- `ClaudeCodeAdapter.test.ts`: 3 new tests for `getSessionContextUsageSnapshot` (successful conversion, null handling, error handling)
+- `ClaudeCodeAdapter.test.ts`: Added `AgentCapability.Context` to capabilities assertion
+- `SettingsCapabilityLabSection.test.ts`: Updated Context Usage expected `userSurface` to `'settings+chat'`
+
+### Files changed
+
+- `src/core/agents/backend/ClaudeCodeAdapter.ts`
+- `src/features/chat/OpenCodianView.ts`
+- `src/features/settings/SettingsCapabilityLabSection.ts`
+- `tests/unit/core/agents/backend/ClaudeCodeAdapter.test.ts`
+- `tests/unit/features/settings/SettingsCapabilityLabSection.test.ts`
+
+### Honest boundaries
+
+- **runtimeProof remains `readback`**: The chat ContextRing is structurally wired and will mount for Claude Code sessions, but no BUILD_ID-anchored Obsidian runtime proof exists yet showing the ring with real data.
+- **Missing live verification**: Need to verify that after a message exchange, the ring updates with actual token counts from `query.getContextUsage()`.
+- **OpenCode behavior preserved**: When backend is `opencode`, the existing `openCodeService.getSessionContextUsageSnapshot()` path is unchanged.
+
+### Suggested next batch
+
+1. **Context Usage runtime verification**: Deploy to Test Vault, send a message, verify ContextRing shows real token counts — then promote to `pass`
+2. **Thinking blocks live verification**: BUILD_ID-anchored live proof of thinking blocks visibly rendered in ordinary Claude Code chat
+3. **Full SDK seam re-scan**: Check if latest SDK versions introduce new productizable seams
+
+---
+
+## 2026-06-07 Claude Code Backend Capability Productization — Round 10 (Account Info Live Verification)
+
+**BUILD_ID:** `feature-phase0-capability.202606071932`
+
+### Summary
+
+Round 10 attempted to promote Account Info and Context Usage from `readback` to `pass` with BUILD_ID-anchored live Obsidian proof.
+
+### Account Info → PROMOTED to pass ✅
+
+- **SDK seam:** `query.accountInfo()` (sdk.d.ts:2222) returns `AccountInfo`
+- **Live evidence:** "Inspect account" button in Test Vault Claude Code Runtime tab executed `query.accountInfo()` successfully via agent-browser CDP automation
+- **Returned data:** `{ tokenSource: "[redacted]", apiProvider: "firstParty" }` — real sanitized account data
+- **Pipeline verified:** settings button → `adapter.getAccountInfo()` → `query.accountInfo()` → structured AccountInfo → `formatAccountInfoReadback()` → `<pre>` block in settings UI
+- **Verification method:** JS eval of `[data-claude-code-account-info-readback]` innerText confirmed the `<pre>` block displayed the JSON response
+- **userSurface:** `settings` (stable settings UI only; no chat surface)
+
+### Context Usage → remains readback (partial proof) ❌
+
+- **SDK seam:** `query.getContextUsage()` (sdk.d.ts:2195) returns context window usage breakdown
+- **Settings surface VERIFIED:** "Inspect context usage" button returned rich structured data:
+  - 8 categories: System prompt (5581), System tools (20596), Custom agents (242), Memory files (384), Skills (1423), Messages (5), Autocompact buffer (33000), Free space (138769)
+  - `totalTokens`: 28231, `maxTokens`: 200000, `percentage`: 14%
+  - `model`: `claude-haiku-4-5`, 7 agents, 24 slash commands, 24 skills with per-skill token breakdown
+- **Chat surface NOT EXPOSED:** `ContextRing` is NOT mounted for Claude Code sessions because `AgentCapability.Context` is not in `CLAUDE_CODE_PHASE1_CAPABILITIES` (`OpenCodianView.ts:842`: `if (!hasCapability(this.caps, AgentCapability.Context)) return`). The chat input toolbar has 5 elements (agent selector, permission selector, model selector, sandbox badge, effort slot) but no context ring. Current matrix surface is `settings`, not `settings+chat`.
+- **Promotion path:** Add `AgentCapability.Context` to `CLAUDE_CODE_PHASE1_CAPABILITIES`, rebuild, verify ContextRing renders with real context data in chat input toolbar
+
+### Matrix impact
+
+- Before: 54 rows, 34 pass, 20 readback, 2 hidden, 0 fail
+- After: 54 rows, 35 pass, 19 readback, 2 hidden, 0 fail
+
+### Files changed
+
+- `src/features/settings/SettingsCapabilityLabSection.ts` — Account Info `runtimeProof: 'readback'` → `'pass'` with BUILD_ID-anchored evidence; Context Usage comment hardened with partial proof and chat surface gating documentation, with current `userSurface` corrected to `settings`
+- `tests/unit/features/settings/SettingsCapabilityLabSection.test.ts` — Account Info classification updated to `'pass'`, moved from readback to verified array; Context Usage expected as `readback/settings`; counts: 35 pass / 19 readback
+- `docs/status/claude-code-current-state-2026-05-22.md` — Round 10 audit section, Account Info promoted, Context Usage partial proof documented, counts updated
+- `docs/modules/features/settings/SettingsCapabilityLabSection.md` — Account Info entry updated to pass, Context Usage entry hardened with partial proof and chat gating
+- `devlog.md` — this entry
+
+### Suggested Round 11
+
+1. **Context Usage chat surface promotion:** Add `AgentCapability.Context` to `CLAUDE_CODE_PHASE1_CAPABILITIES` and verify ContextRing renders in chat with real data — the highest-value single promotion remaining
+2. **Thinking blocks live verification:** BUILD_ID-anchored live proof of thinking blocks visibly rendered in ordinary Claude Code chat (pipeline code complete, just needs runtime proof)
+3. **Full SDK seam re-scan:** Check if latest SDK versions introduce new productizable seams not covered by the 54-row matrix
+
+---
+
+## 2026-06-07 Claude Code Backend Capability Productization — Round 9 (Gap-First Re-Scan)
+
+**Objective**: Gap-first re-scan of SDK seams vs the pre-Round-9 52-row capability matrix.
+
+**Approach**: Gap inventory of the local SDK declaration/source files most relevant to product surfaces (sdk.d.ts, sdk-tools.d.ts, agentSdkTypes.d.ts, assistant.d.ts, bridge.d.ts, browser-sdk.d.ts, extractFromBunfs.d.ts). Cross-referenced Options/Settings properties, Query methods, SDK functions, hook events, message types, and control requests against the 52 existing matrix rows.
+
+**Gaps found**: 2 genuine gaps — features with adapter wiring and user-facing UI but no matrix representation:
+1. **Account Info** (query.accountInfo) — readback/settings: adapter wired, settings UI with inspect button and readback display, 7 locale keys. No dedicated BUILD_ID live proof.
+2. **Context Usage** (query.getContextUsage) — readback/settings: adapter wired, settings readback UI, 20+ locale keys. Round 9 initially suspected a settings+chat surface because adjacent ContextRing/ContextDetailModal code exists, but Round 10 proved that chat surface is not exposed for Claude Code until `AgentCapability.Context` is added and live-verified.
+
+**Not exposed (honest classification)**:
+- ~15 TUI/terminal-specific Settings (tui, theme, editorMode, statusLine, spinnerTips, terminalProgressBar, etc.) — NOT applicable to embedded SDK
+- ~10 enterprise/managed policy Settings (managedSettings, strictPluginOnlyCustomization, allowManaged*, forceLogin*) — NOT user features
+- ~5 remote/bridge/assistant infrastructure (remote, voice, sshConfigs, channelsEnabled, isolatePeerMachines) — NOT applicable
+- ~20 init-only CLI behavior Settings share the same architectural barrier as Effort/Additional Directories (Round 8 closure): one-way parameters with no observable feedback
+- ~10 internal plumbing (persistSession, includePartialMessages, spawnClaudeCodeProcess, initializationResult, streamInput, seedReadState, etc.)
+- resolveSettings(), filterEscalatingDefaultMode() — @alpha, enterprise/infra
+- tagSession(), renameSession(), deleteSession() — covered by JSONL History Browser row
+
+**Matrix**: 54 rows, 34 pass, 20 readback, 2 hidden, 0 fail.
+
+**Files changed**: SettingsCapabilityLabSection.ts, SettingsCapabilityLabSection.test.ts, docs.
+
+**Verification**: 264 capability lab tests pass (52→54 rows, 18→20 readback). Focused audit test pass.
+
+---
+
+## 2026-06-07 Claude Code Capability Round 8 — Effort & Additional Directories Formal Closure
+
+**Outcome: Formal closure of 2 readback capabilities (Round 6 additions) at their current classification. Matrix counts unchanged: 52 rows, 34 pass, 18 readback, 2 hidden, 0 fail.**
+
+### Audit Questions (Round 8)
+
+1. **Can Effort be promoted from readback to pass?** — NO. SDK has 5 type locations for effort (Options.effort, AgentDefinition.effort, BaseHookInput.effort, ResultMessage.effortLevel, Model.supportsEffort), but all are one-way or post-hoc. `ResultMessage.effortLevel` is read-only stream metadata that cannot distinguish "model honored configured effort" from "model happened to use this effort level". `BaseHookInput.effort` is hook-only. No structured error/event confirms effort enforcement. CLI/model handling of configured effort is opaque. Architectural barrier: one-way init parameter with no observation channel.
+2. **Can Additional Directories be promoted from readback to pass?** — NO. SDK has 2 type locations (Options.additionalDirectories, Settings.permissions.additionalDirectories), both string[] allowlists. No observable signal confirms directory access: no init event lists directories, no tool metadata confirms path resolution, no stderr pattern confirms expansion. Architectural barrier: one-way init parameter to compiled CLI binary; internal filesystem context/scope expansion is opaque.
+
+### Capabilities Closed
+
+**Effort — CLOSED at readback (Outcome B)**
+- SDK surface: 5 type locations (Options.effort, AgentDefinition.effort, BaseHookInput.effort, ResultMessage.effortLevel, Model.supportsEffort)
+- OpenCodian surface: settings dropdown (Model & Thinking tab) + chat composer effort selector
+- Adapter wiring: restart-based apply (runtime closes and recreates on effort change)
+- Blocker: `effortLevel` is post-hoc, epistemically ambiguous; CLI/model effort handling is opaque; no application event exists
+- Adjacent seams rejected: effortLevel metadata, CLAUDE_EFFORT env var, setMaxThinkingTokens (deprecated), BaseHookInput.effort.level (hook-only), Model.supportsEffort (capability metadata, not enforcement)
+- Re-audit condition: SDK adds effort application event, pre/post reasoning-budget signal, or structured CLI confirmation
+
+**Additional Directories — CLOSED at readback (Outcome B)**
+- SDK surface: 2 type locations (Options.additionalDirectories, Settings.permissions.additionalDirectories)
+- OpenCodian surface: settings textarea (Runtime tab)
+- Adapter wiring: buildClaudeCodeOptions forwards to SDK Options
+- Blocker: no observable signal confirms directory access — expansion happens inside compiled CLI binary
+- Adjacent seams rejected: filesystem tool metadata (no resolved paths), Bash pwd (CWD only), Read tool (no enumeration), Settings.permissions (same opacity)
+- Re-audit condition: SDK adds directory expansion confirmation event, tool metadata exposing resolved scope, or init event listing accessible paths
+
+### Files Changed
+
+- `src/features/settings/SettingsCapabilityLabSection.ts` — matrix row comments hardened with formal closure wording, architectural barrier evidence, expanded adjacent seam analysis (Effort: 5 seams, Additional Directories: 4 seams)
+- `docs/status/claude-code-current-state-2026-05-22.md` — readback entries updated with FORMAL CLOSURE wording and full evidence tables; new Round 8 audit section added
+- `docs/modules/features/settings/SettingsCapabilityLabSection.md` — entries 20 (Effort) and 21 (Additional Directories) updated with formal closure wording and re-audit conditions
+- `devlog.md` — new entry
+
+### Remaining Readback Follow-Up
+
+Round 8 only formally closes the two Round 6 additions at readback:
+- Effort: stable settings + chat surfaces exist, but no SDK signal proves applied reasoning behavior.
+- Additional Directories: stable settings surface exists, but no SDK signal proves resolved filesystem scope.
+- The overall readback backlog remains open to future SDK changes and fresh seam audits; do not treat this round as a global pass.
+
+### Suggested Next Round
+
+- No remaining unclosed readback capabilities from Round 6 additions.
+- Round 9 should scan for newly surfaced SDK seams or community feature requests.
+- Keep future rounds gap-first: re-scan official SDK declarations, docs, and recent community issues before changing classifications.
+
+---
+
+## 2026-06-07 Claude Code Capability Round 7 Audit — Warm Startup & Tool Aliases Formal Closure
+
+**Outcome: Formal closure of 2 readback capabilities at their current classification. Matrix counts unchanged: 52 rows, 34 pass, 18 readback, 2 hidden, 0 fail.**
+
+### Audit Questions (Round 7)
+
+1. **Is Thinking now productizable to pass?** — NO. Full 5-layer pipeline is code-verified end-to-end, but no BUILD_ID-anchored live proof of visible thinking chunks rendered in ordinary Claude chat exists. Remains readback.
+2. **Is Warm Startup capable of real stable user benefit?** — NO. WarmQuery is explicitly single-use per SDK types. No persistent warm pool, no observable signal, no deterministic latency contract. Formally closed.
+3. **Are Tool Aliases or Additional Directories productizable?** — NO for Tool Aliases (one-way init parameter, no feedback event, resolution inside CLI binary). NO for Additional Directories (no observable signal confirms directory access). Tool Aliases formally closed.
+4. **Are diagnostic session controls correctly blocked?** — YES. Continue, Resume Session At Position, Fork Session On Resume, and Custom Session ID all have explicit blockers documented and remain diagnostic-only.
+
+### Capabilities Closed
+
+**Warm Startup — CLOSED at readback (Outcome B)**
+- SDK types explicitly document WarmQuery.query() as single-use: "Can only be called once per WarmQuery."
+- No persistent warm pool, no connection reuse, no isWarmed() signal.
+- "No startup latency" is SDK internal claim, not independently measurable.
+- No observable signal distinguishes warm-vs-cold paths.
+- Architectural barrier: single-use handle design is a protocol-level constraint.
+- Adjacent seams rejected: integrating into ordinary query path (no value), latency benchmarking (environment-dependent).
+
+**Tool Aliases — CLOSED at readback (Outcome B)**
+- SDK source confirms toolAliases is a one-way init parameter with no feedback event.
+- Alias resolution happens inside compiled CLI binary, not exposed through streaming interface.
+- Stream tool_use chunks expose only post-resolution names with no aliasing metadata.
+- Plugin cannot distinguish aliased from canonical emission — epistemic impossibility.
+- Architectural barrier: one-way init parameter with no observation channel is a protocol-level constraint.
+- Adjacent seams rejected: asking the model to use an alias (model-dependent), comparing canonical tool_use names (indistinguishable from direct canonical emission), and reusing permission/tool-catalog evidence (proves availability, not alias resolution).
+
+### Changes
+
+#### src/features/settings/SettingsCapabilityLabSection.ts
+- Updated "Warm Startup" matrix row comment: added formal closure language, explicit VERIFIED/NOT VERIFIED sections, architectural barrier explanation, and adjacent seam rejection reasons.
+- Updated "Tool Aliases" matrix row comment: added formal closure language, SDK source evidence, stream observability gap details, epistemic impossibility explanation, and adjacent seam rejection reasons.
+
+#### docs/status/claude-code-current-state-2026-05-22.md
+- Added "Warm Startup — Formal Closure at Readback (Outcome B)" section with full evidence table.
+- Added "Tool Aliases — Formal Closure at Readback (Outcome B)" section with full evidence table.
+- Updated top-level readback summary entries for both capabilities with closure wording.
+- Updated "long-lived readback/hidden checkpoints" section: 5 → 7 closed checkpoints.
+
+#### docs/modules/features/settings/SettingsCapabilityLabSection.md
+- Updated Warm Startup entry with formal closure wording and architectural barrier explanation.
+- Updated Tool Aliases entry with formal closure wording and SDK source evidence.
+
+---
+
+## 2026-06-07 Claude Code Capability Round 6 Audit — Effort & Additional Directories Matrix Rows
+
+**Outcome: Added 2 new matrix rows (Effort, Additional Directories). Effort is readback/settings+chat; Additional Directories is readback/settings. Matrix counts updated: 52 rows, 34 pass, 18 readback, 2 hidden, 0 fail.**
+
+### Audit Evidence
+
+Round 6 focused on scanning for official SDK capabilities not yet represented in the matrix. Two stable settings surfaces with full SDK option wiring were found missing:
+
+- **Effort** (sdk.d.ts:1496): `Options.effort?: 'low' | 'medium' | 'high' | 'xhigh' | 'max'`. Stable settings UI exists (Model & Thinking tab dropdown), and stable chat UI already exists through the Claude Code composer effort selector, which sends selected variants as `options.variant` and lets the adapter map them to SDK `effort`. Option wiring verified through `buildClaudeCodeOptions` (ClaudeCodeOptionsBuilder.ts:218). Adapter has live-apply logic (ClaudeCodeAdapter.ts:4056-4064): effort change closes existing runtime and recreates with new effort on next query — restart-based apply, NOT mid-stream seamless switch. SDK ResultMessage exposes `effortLevel` post-hoc (sdk.d.ts:5149) but this is read-only stream metadata, not a behavioral proof signal. Readback ceiling: no structured error/event confirms effort enforcement; plugin cannot verify model honored the effort level.
+- **Additional Directories** (sdk.d.ts:1210): `Options.additionalDirectories?: string[]`. Stable settings UI exists (Claude Code Runtime tab textarea, newline-separated paths). Option wiring verified through `buildClaudeCodeOptions` (ClaudeCodeOptionsBuilder.ts:206,234-236). Readback ceiling: no observable signal confirms directory access — no init event lists directories, no tool metadata confirms path resolution, no stderr pattern confirms expansion. Plugin cannot distinguish "directories accessible" from "directories silently ignored" or "paths invalid". Changes require session restart to take effect.
+
+### Adjacent Seams Audited and Rejected
+
+**Effort**:
+- (a) effortLevel stream metadata as proof — read-only, post-hoc, cannot distinguish "model honored effort" from "model happened to use this level"
+- (b) CLAUDE_EFFORT env var (sdk.d.ts:174) — hook env var, not observable from plugin
+- (c) setMaxThinkingTokens(n) — DEPRECATED (sdk.d.ts:2136), plugin uses `thinking` option
+
+**Additional Directories**:
+- (a) Filesystem tool result metadata — no structured signal exposes resolved paths
+- (b) Bash pwd confirmation — proves CWD only, not additionalDirectories
+- (c) Read tool path listing — no directory enumeration tool in SDK catalog
+
+### Decision
+
+Both capabilities are honest readback rows. Effort has stable settings and chat controls; Additional Directories has a stable settings control. Both have verified SDK option wiring but lack independent behavioral verification signals. No promotion path exists under current SDK constraints.
+
+### Changes
+
+#### src/features/settings/SettingsCapabilityLabSection.ts
+- Added "Effort" matrix row: `runtimeProof: 'readback'`, `userSurface: 'settings+chat'`
+- Added "Additional Directories" matrix row: `runtimeProof: 'readback'`, `userSurface: 'settings'`
+
+#### tests/unit/features/settings/SettingsCapabilityLabSection.test.ts
+- Updated matrix row count: 50 → 52
+- Updated readback row count: 16 → 18
+- Added expected classifications for "Effort" and "Additional Directories"
+- Updated readbackCapabilities arrayContaining to include new rows
+
+#### docs/status/claude-code-current-state-2026-05-22.md
+- Updated header counts: 50 rows → 52, 16 readback → 18
+- Added Effort and Additional Directories entries to the readback sections
+- Added full audit evidence with file/line references
+
+#### docs/modules/features/settings/SettingsCapabilityLabSection.md
+- Updated buildMatrixRows count: 50 → 52
+- Updated honesty audit test description: 50 → 52 rows
+- Updated readback count: 16 → 18
+- Added detailed Effort and Additional Directories entries (items 20-21)
+
 ## 2026-06-07 Claude Code Thinking Round 5 Re-Audit
 
 **Outcome: userSurface promoted from `settings` to `settings+chat`; runtimeProof stays `readback`. Full pipeline code-verified end-to-end. Matrix counts unchanged: 50 rows, 34 pass, 16 readback, 2 hidden, 0 fail.**
