@@ -11,22 +11,27 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
-## 2026-06-08 Claude Code Capability Round 16 — MCP Elicitation Diagnostic Live Proof
+## 2026-06-08 Claude Code Capability Round 16 — MCP Elicitation Diagnostic Live Probe Added
 
-**Upgrade synthetic MCP Elicitation probe to real live diagnostic proof while maintaining honest product-path boundary.**
+**Add live diagnostic probe entry for MCP Elicitation; honest status is `wiring`, not `pass`.**
 
-Round 16 delivers the live diagnostic probe that Round 15 identified as a re-audit condition. The existing synthetic `Probe MCP Elicitation Wiring` is now supplemented by `Run MCP Elicitation Live Probe`, which creates a real temp MCP stdio server and verifies the full SDK onElicitation callback roundtrip.
+Round 16 adds the `Run MCP Elicitation Live Probe` button to the Capability Lab. The probe creates a real temp MCP stdio server and attempts to verify the full SDK `onElicitation` callback roundtrip. **The probe did NOT achieve a stable diagnostic `pass` in Test Vault validation.**
 
-- **DIAGNOSTIC LIVE PROOF ADDED**: `ClaudeCodeAdapter.runMcpElicitationLiveProbe()` creates a temp MCP stdio server with `elicitation` capability, runs a diagnostic prompt with `_diagnosticMcpServers` + `_diagnosticAllowedTools` + `_diagnosticCanUseTool` + `_diagnosticOnElicitation` overrides, and verifies the full chain: server creation → `elicitation/create` → `onElicitation` invocation → host accept+nonce → server consumption → tool output nonce echo. The probe returns `pass` when the full chain is observed, `wiring` when partial, `fail` on error.
+- **DIAGNOSTIC LIVE PROBE ADDED** (not proof): `ClaudeCodeAdapter.runMcpElicitationLiveProbe()` creates a temp MCP stdio server with `elicitation` capability, runs a diagnostic prompt with `_diagnosticMcpServers` + `_diagnosticAllowedTools` + `_diagnosticCanUseTool` + `_diagnosticOnElicitation` overrides, and attempts to verify the full chain: server creation → `elicitation/create` → `onElicitation` invocation → host accept+nonce → server consumption → tool output nonce echo. The probe can classify `pass` only if the full chain is observed; Test Vault validation has consistently observed `wiring`.
+- **Codex Test Vault runtime validation notes**:
+  - BUILD_ID `feature-phase0-capability.202606080238`: model called the tool (`mcp__elicit_live__ask_and_echo`), but `tool_result` had `isError: true`; `onElicitationCallCount: 0`.
+  - BUILD_ID `feature-phase0-capability.202606080313`: model did not call the MCP tool at all; `onElicitationCallCount: 0`; 490 raw messages collected but no tool_use or tool_result observed.
+  - Conclusion: the SDK did not invoke the `onElicitation` callback in either attempt. The probe now correctly reports this as `wiring` with diagnostic detail.
 - **New diagnostic request overrides**: `ClaudeCodeDiagnosticPromptRequest` extended with `_diagnosticMcpServers` (temp MCP servers), `_diagnosticOnElicitation` (override adapter's production callback), and `_diagnosticAllowedTools` (restrict allowed tools). `buildDiagnosticSdkOptions()` updated to use these overrides without affecting ordinary chat paths.
 - **Capability Lab UI updated**: New **Run MCP Elicitation Live Probe** button added; old synthetic probe renamed to **Probe MCP Elicitation Wiring (Synthetic)**. Live probe output shows step-by-step log, summary table, and explicit honest boundary notice.
-- **Matrix classification stays `wiring`**: userSurface='chat' would mislead if we claimed ordinary chat product path without Obsidian shared question dialog proof. The diagnostic proof uses an auto-resolver callback, NOT the real Obsidian question dialog. Promotion to `pass` requires live product-path proof through the shared question dialog with real user answer consumption.
+- **Matrix classification stays `wiring`**: `userSurface='chat'` would mislead if we claimed ordinary chat product path without Obsidian shared question dialog proof. The diagnostic probe uses an auto-resolver callback, NOT the real Obsidian question dialog. Promotion to `pass` requires either (a) a stable Test Vault diagnostic live proof where the SDK calls `onElicitation`, or (b) live product-path proof through the shared question dialog with real user answer consumption.
 - **Product-path gaps remaining**:
-  1. Obsidian shared question dialog: live probe uses auto-resolver, does not route through `ClaudeCodeElicitationBridge` → `showQuestionDialog()` → `elicitationCardRenderer` → user interaction.
-  2. User answer consumption by server: no proof that a real user's answer in the Obsidian question dialog is serialized, returned through SDK `onElicitation`, and consumed by the MCP server.
-  3. Test Vault validation: no BUILD_ID-anchored Test Vault screenshot or DOM evidence exists for MCP Elicitation surfacing in ordinary chat.
-- **SDK-level roundtrip still proven** (Round 15): `scripts/claude-code-smoke.mjs` temp stdio MCP server → `elicitation/create` → `onElicitation` → host response → server consumption. This is supporting evidence, not product-path proof.
-- **Tests added**: 5 adapter probe tests (pass, wiring, fail, override verification, cleanup) + 2 SettingsCapabilityLabSection UI tests (button rendering, live probe execution and wiring classification).
+  1. SDK `onElicitation` not invoked: Test Vault validation shows the temp MCP server is created and the model sometimes calls the tool, but the SDK does not fire the `onElicitation` callback.
+  2. Obsidian shared question dialog: even if `onElicitation` were invoked, the live probe uses an auto-resolver, not `ClaudeCodeElicitationBridge` → `showQuestionDialog()` → `elicitationCardRenderer` → user interaction.
+  3. User answer consumption by server: no proof that a real user's answer in the Obsidian question dialog is serialized, returned through SDK `onElicitation`, and consumed by the MCP server.
+  4. Test Vault validation: no BUILD_ID-anchored Test Vault screenshot or DOM evidence exists for MCP Elicitation surfacing in ordinary chat.
+- **SDK-level roundtrip still proven** (Round 15): `scripts/claude-code-smoke.mjs` temp stdio MCP server → `elicitation/create` → `onElicitation` → host response → server consumption. This is supporting evidence, not product-path proof, and does not automatically imply the Capability Lab live probe will pass.
+- **Tests added**: 11 adapter probe tests covering scanner shapes (assistant/user/backend_event messages, array/object content, text/content fields), error preview extraction, wiring classification, fail on throw, override verification, cleanup, and integration scenarios.
 
 Matrix impact: **55 rows, 38 pass, 16 readback, 1 wiring, 2 hidden, 0 fail** (unchanged). MCP Elicitation remains the sole `wiring` row.
 
