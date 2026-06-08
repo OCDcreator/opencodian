@@ -31,14 +31,29 @@ const justifiedMaxLinesFiles = [
   'src/utils/streaming/StreamController.ts',
   'tests/unit/core/opencode/OpenCodeStreamingFinalizationCoordinator.test.ts',
   'tests/unit/core/opencode/OpenCodeStreamingRuntimeCoordinator.test.ts',
+  'src/features/chat/services/ChatSelectionControlsCoordinator.ts',
+  'tests/unit/core/agents/backend/ClaudeCodeOptionsBuilder.settings.test.ts',
   'tests/unit/core/storage/StorageService.test.ts',
+  'tests/unit/core/types/claudeCodeBackendSettingsNormalization.test.ts',
+  'tests/unit/features/chat/ChatSelectionControlsCoordinator.test.ts',
+  'tests/unit/features/chat/SessionTodoCoordinator.test.ts',
   'tests/unit/features/chat/glassOctahedronDemo.test.ts',
 ];
 
 const justifiedMaxLinesPerFunctionFiles = [
+  'src/core/agents/backend/ClaudeCodeOptionsBuilder.ts',
+  'src/features/chat/OpenCodianView.ts',
   'src/features/chat/liquidDiamondDemo.ts',
   'src/features/chat/liquidDiamondDemoWebgl.ts',
+  'src/features/chat/services/ConversationHistoryActionsCoordinator.ts',
+  'tests/unit/core/agents/backend/AgentBackendRouting.test.ts',
+  'tests/unit/core/agents/backend/ClaudeCodeAdapter.probes.test.ts',
+  'tests/unit/core/agents/backend/ClaudeProjectSettingsDiscovery.test.ts',
+  'tests/unit/core/config/slashCommandCatalog.test.ts',
   'tests/unit/core/opencode/OpenCodeStreamingFinalizationCoordinator.test.ts',
+  'tests/unit/core/types/settingsLoadNormalization.test.ts',
+  'tests/unit/features/chat/ChatSelectionControlsCoordinator.test.ts',
+  'tests/unit/features/chat/SessionTodoCoordinator.test.ts',
 ];
 
 module.exports = {

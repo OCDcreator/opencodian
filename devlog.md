@@ -11,6 +11,208 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-06-08 Claude Code Capability Round 24b — MCP Elicitation Promoted to Pass
+
+**Promote MCP Elicitation from `wiring` to `pass` in the capability matrix, product-path proof handler, discovery copy, tests, and docs, based on Codex Test Vault validation of the Round 24 product-path harness.**
+
+This is a truth-sync checkpoint, not a new investigation. The Round 24 harness was already implemented; this run confirms the product-path proof and updates all status surfaces to match.
+
+- **Static matrix row promoted**: `SettingsCapabilityLabSection.ts` `buildMatrixRows()` — MCP Elicitation `runtimeProof` changed from `'wiring'` to `'pass'`. Comments updated with BUILD_ID-anchored evidence: question card `[data-question-card]`, prompt field `Confirmation Phrase` / `proofPhrase`, user input `PRODUCT-PATH-PROOF-1803`, console proof `Proof phrase echoed in tool_use_result.text: action=accept, proofPhrase=PRODUCT-PATH-PROOF-1803`, hydration continuity (`chatLeaves=1`, `viewLeaves=1`, `settingsLeaves=1`, `msgCount=10`).
+- **Product-path proof handler promoted**: `runMcpElicitationProductPathProof()` now maps `classification === 'pass'` to matrix `pass` instead of `wiring`. The honest boundary comment updated: "Product-path proof is now promoted to pass (Round 24, BUILD_ID feature-phase0-capability.202606081800)."
+- **Diagnostic live probe intentionally unchanged**: `runMcpElicitationLiveProbe()` still maps diagnostic `pass` to matrix `wiring`. Diagnostic pass alone (auto-resolver, not real shared question dialog) is no longer sufficient for promotion; the product-path proof is the authoritative basis.
+- **Discovery copy updated**: MCP Elicitation discovery row now states "PRODUCT-PATH PROOF ACHIEVED (Round 24, BUILD_ID feature-phase0-capability.202606081800)" and "PROMOTED to pass" instead of "Product-path gap remains."
+- **Tests updated**: `SettingsCapabilityLabSection.test.ts` matrix expectations updated:
+  - `'MCP Elicitation': { runtimeProof: 'pass', userSurface: 'chat' }`
+  - Verified capabilities count: 38 → 39
+  - Verified capabilities array now includes `'MCP Elicitation'`
+  - Wiring rows count: 1 → 0
+  - `wiringCapabilities` check updated to `not.toContain('MCP Elicitation')`
+- **Docs updated**:
+  - `docs/status/claude-code-current-state-2026-05-22.md`: Matrix counts updated (39 pass / 0 wiring), MCP Elicitation moved from wiring section to pass → Chat section, wiring section now states "No capabilities currently in wiring state", historical Round summaries updated with promotion context, summary paragraph updated.
+  - `docs/modules/features/settings/SettingsCapabilityLabSection.md`: Will be updated in follow-up if module doc checks require it.
+- **Honest scope preserved**: This promotion does NOT claim the overall Claude Code backend productization goal is complete. It only promotes MCP Elicitation based on validated product-path evidence. The distinction between diagnostic live-server proof (Rounds 16-23) and product-path proof (Round 24) is preserved as historical context.
+
+---
+
+## 2026-06-08 Claude Code Capability Round 24 — MCP Elicitation Product-Path Proof Harness
+
+**Add a dedicated, repeatable MCP Elicitation product-path proof harness that uses the REAL `onElicitation` path through the shared question dialog, distinguishing diagnostic auto-resolver proof from user-facing product-path proof.**
+
+Round 24 follows Codex's manual product-path experiment in the Test Vault (no code changes, direct live run). Codex confirmed the real path `MCP server -> onElicitation -> handleClaudeCodeElicitation -> shared question dialog -> user answer -> server-consumed tool_result` is functionally alive. The remaining gap was durable, repeatable proof infrastructure and honest status surfacing.
+
+- **Product-path proof harness added**:
+  - `ClaudeCodeAdapter.runMcpElicitationProductPathProbe()` creates a temp MCP server with a `proofPhrase` text-input schema, runs a diagnostic prompt **WITHOUT** `_diagnosticOnElicitation` override, and verifies the server echoes the user's actual proof phrase back in the tool result. This forces the real `onElicitation` path: `this.options.onElicitation` → `main.ts handleClaudeCodeElicitation` → `elicitationCardRenderer` → shared question dialog.
+  - `MCP_ELICITATION_PRODUCT_PATH_SERVER_CODE` is a new inline MCP stdio server template that echoes back `proofPhrase`, `elicitationAction`, and `receivedContent` — making server-consumption evidence explicit for the real question-dialog path.
+  - `scanMessagesForProofPhrase()` scans rawMessages across all three SDK message shapes (content, tool_use_result, nested message.content) for the proof phrase in tool_result text blocks.
+- **Capability Lab UI added**:
+  - New proof control button: "Run MCP Elicitation Product-Path Proof"
+  - Handler `runMcpElicitationProductPathProof()` checks for `elicitationCardRenderer`, injects synthetic streaming context, runs the product-path probe, and displays step-by-step results.
+  - Honest boundary: classification stays `wiring` in the matrix until Codex validates the product-path harness in Test Vault. The harness itself can report `pass`, but matrix promotion requires confirmed real-user interaction.
+- **Diagnostic probe preserved**: `runMcpElicitationLiveProbe()` remains unchanged with its auto-resolver path and nonce-based verification.
+- **Verification**: Added 10 focused Jest unit tests for the product-path probe:
+  - `returns pass when proof phrase is echoed in tool_result`
+  - `returns wiring when proof phrase is "no-proof-phrase" (cancel/decline)`
+  - `returns wiring when no tool result observed`
+  - `returns fail when runDiagnosticPrompt throws`
+  - `does NOT pass _diagnosticOnElicitation to runDiagnosticPrompt`
+  - `finds proof phrase in pinned SDK tool_use_result shape (content null)`
+  - `finds proof phrase in pinned SDK nested message.content shape (content null)`
+  - `cleans up temp server even on failure`
+  - `detects tool_result error preview in product-path probe`
+
+### Files changed
+
+- `src/core/agents/backend/ClaudeCodeAdapter.ts` — added `MCP_ELICITATION_PRODUCT_PATH_SERVER_CODE`, `McpElicitationProductPathProbeResult`, `runMcpElicitationProductPathProbe()`, `writeMcpElicitationProductPathProbeServer()`, `scanMessagesForProofPhrase()`
+- `src/features/settings/SettingsCapabilityLabSection.ts` — added "Run MCP Elicitation Product-Path Proof" button, `runMcpElicitationProductPathProof()` handler, updated matrix description for MCP Elicitation row
+- `tests/unit/core/agents/backend/ClaudeCodeAdapter.probes.test.ts` — added 10 focused tests for product-path probe
+- `devlog.md` — this entry
+
+---
+
+## 2026-06-08 Claude Code Capability Round 23 — MCP Elicitation Pinned SDK v2 Nested Message Shape Fix
+
+**Fix `scanMessagesForNonce()` and `extractToolResultErrorPreview()` missing the pinned SDK runtime raw message shape where `msg.content` is `null` and the actual tool_result lives under `msg.tool_use_result` and nested `msg.message.content`.**
+
+Round 23 follows Codex's direct live runtime inspection of the pinned SDK (`BUILD_ID feature-phase0-capability.202606081632`). Round 22 fixed nested `block.content` array handling, but only when `msg.content` was non-null. The actual pinned SDK raw user tool-result message has `content: null` at the top level, with the nonce distributed across two alternate raw-message paths:
+
+- `msg.tool_use_result` — top-level array of `{type, text}` blocks
+- `msg.message.content` — nested structured `tool_result` blocks with nested `content` arrays
+
+- **Fix applied**:
+  - Updated `scanMessagesForNonce()` to inspect three sources: `msg.content` (legacy), `msg.tool_use_result` (pinned SDK top-level), and nested `msg.message.content` (pinned SDK nested structure). Each source uses the existing `extractBlockTexts()` helper for uniform text extraction.
+  - Updated `extractToolResultErrorPreview()` to inspect both `msg.content` and nested `msg.message.content` for `tool_result` blocks with `isError: true`.
+  - Updated `hasToolResult` predicate in `runMcpElicitationLiveProbe()` to detect `tool_result` presence in all three sources.
+- **Verification**: Added 6 focused Jest unit tests covering the exact pinned SDK v2 shapes:
+  - `finds nonce in top-level tool_use_result (pinned SDK shape)`
+  - `finds nonce in nested message.content (pinned SDK shape)`
+  - `finds nonce when both tool_use_result and nested message.content are present`
+  - `extractToolResultErrorPreview extracts error from nested message.content (pinned SDK shape)`
+  - Integration tests for `hasToolResult` detection in both new shapes
+- **Codex Test Vault revalidation** (`BUILD_ID feature-phase0-capability.202606081706`): the live probe now reaches full diagnostic roundtrip proof — `onElicitation calls: 1`, `Host accepted: Yes`, `Nonce echoed: Yes`, `Raw messages: 174`, `dev:errors` clean. The UI shows `CLASSIFICATION: pass — full chain verified` plus `Diagnostic live server roundtrip PROVEN`.
+- **Scope boundary**: This is still a scanner/diagnostic fix only. It proves the **diagnostic live server** chain, not the overall MCP Elicitation product path. The matrix/runtime badge intentionally remains `wiring only — not behavior verified` because the shared Obsidian question dialog path and real user answer consumption are still unproven.
+
+### Files changed
+
+- `src/core/agents/backend/ClaudeCodeAdapter.ts` — updated `scanMessagesForNonce()`, `extractToolResultErrorPreview()`, and `hasToolResult` predicate to inspect `tool_use_result` and nested `message.content`
+- `tests/unit/core/agents/backend/ClaudeCodeAdapter.probes.test.ts` — added 6 focused tests for pinned SDK v2 raw message shapes
+- `docs/status/claude-code-current-state-2026-05-22.md` — added Round 23 section and updated wiring status paragraph
+- `devlog.md` — this entry
+
+---
+
+## 2026-06-08 Claude Code Capability Round 22 — MCP Elicitation Nonce Scanner Nested Content Fix
+
+**Fix `scanMessagesForNonce()` missing nested `tool_result.content` array shape, which caused the live probe to falsely report `nonceEchoed: false` even when the server correctly echoed the nonce.**
+
+Round 22 follows Codex's fresh runtime findings gathered after Round 21's node-resolution fix. In the deployed live probe, the chain had already advanced to `onElicitation calls=1`, `tool_use/tool_result` observed, and `Host accepted=Yes`. However, `Nonce echoed` still reported `No` and classification stayed `wiring`.
+
+- **Root cause found**: Real runtime `tool_result` content shape is:
+  ```json
+  {"content":[{"type":"text","text":"{\"echoed\":\"elicitation-live-test\",\"elicitationAction\":\"accept\",\"nonce\":\"eval-nonce\"}"}]}
+  ```
+  The existing `scanMessagesForNonce()` only handled `block.text` (string) and `block.content` (string). It did not handle `block.content` as an **array of nested content blocks** where each item has a `.text` property.
+- **Fix applied**:
+  - Extracted a new private helper `extractBlockTexts(block)` that returns an array of text strings from all supported shapes: `block.text`, `block.content` (string), `block.content` (array of `{type, text}`), and `block.content` (single object `{type, text}`).
+  - Updated `scanMessagesForNonce()` to iterate over all extracted texts and try `JSON.parse` on each one independently. This correctly finds JSON nonce echoes even when mixed with non-JSON text items in the same content array.
+  - Updated `extractToolResultErrorPreview()` to use the same helper, joining extracted texts with `\n` for error preview display. This prevents the same blind spot from hiding error messages in nested content arrays.
+- **Verification**: Standalone script mimicking the exact logic passed 16/16 tests covering:
+  - Real SDK nested content array shape (the bug fix)
+  - Multiple text items in nested content (non-JSON prefix + JSON nonce)
+  - Single-object content wrapper
+  - Legacy direct `block.text` string
+  - Legacy direct `block.content` string
+  - Single-object message content (non-array)
+  - Missing nonce returns false
+  - Non-JSON text in nested content does not crash
+  - `extractToolResultErrorPreview` with nested content array
+- **Scope boundary**: This is a scanner/diagnostic fix only. It removes a false-negative in the probe's readback logic. It does NOT prove the overall MCP Elicitation product path (Obsidian shared question dialog with real user interaction) works. Classification remains `wiring` until Test Vault revalidation with this fix deployed plus product-path proof.
+
+### Files changed
+
+- `src/core/agents/backend/ClaudeCodeAdapter.ts` — added `extractBlockTexts()` helper; updated `scanMessagesForNonce()` and `extractToolResultErrorPreview()` to handle nested content arrays
+- `tests/unit/core/agents/backend/ClaudeCodeAdapter.probes.test.ts` — added 4 focused tests for nested content array shapes plus regression coverage for `extractToolResultErrorPreview`
+- `devlog.md` — this entry
+
+---
+
+## 2026-06-08 Claude Code Capability Round 21 — MCP Elicitation Node PATH Resolution Fix
+
+**Fix the root cause where the diagnostic probe's temp MCP server fails to start because `command: 'node'` is not resolvable in the SDK/CLI child environment.**
+
+Round 21 follows Codex's fresh runtime findings on BUILD_ID `feature-phase0-capability.202606081425`. After Round 19 and 20 cleared adapter-level option divergences (`permissionMode`, `restrictedBuiltinTools`, `disallowedTools`, `strictMcpConfig`), the live probe still returned `wiring`. Codex inspected the real diagnostic raw init message and found the actual blocker.
+
+- **Root cause found**: The adapter-generated debug log showed `MCP server "elicit_live": Connection failed after 7ms: Executable not found in $PATH: "node"`. The diagnostic probe hardcodes `command: 'node'` in the `_diagnosticMcpServers` config for the temp stdio MCP server. The SDK/CLI spawns this as a child process, and the child environment does not have `node` in PATH.
+- **Fix (corrected)**: Use `resolveExecutableCandidate('node', ...)` from `ClaudeCodeProcessResolver` to resolve `node` to an absolute path via PATH search before passing to `_diagnosticMcpServers`. Falls back to bare `'node'` if resolution fails. This uses the same PATH-search logic already proven for Claude Code executable resolution.
+- **Why `process.execPath` was wrong**: In the Obsidian/Electron runtime, `process.execPath` points to the Electron renderer (`/Applications/Obsidian.app/.../Obsidian Helper (Renderer)`), NOT Node.js. The initial Round 21 fix using `process.execPath` would have failed in the real app. The corrected fix uses proper PATH resolution.
+- **Verification by Codex**: Re-running the same diagnostic query with `command='/Users/dht/.local/bin/node'` instead of `'node'` succeeded:
+  - `init.mcp_servers`: `elicit_live` status `connected`
+  - `init.tools` DID include `mcp__elicit_live__ask_and_echo`
+  - `tool_use` observed: `mcp__elicit_live__ask_and_echo`
+  - `tool_result` observed: 1
+- **Scope decision**: Probe-local fix only. The evidence only shows this affects the diagnostic probe's hardcoded temp server. General user-configured MCP servers may have their own command resolution strategies. Making this general could mask configuration errors or have unintended side effects. However, the resolution utility (`resolveExecutableCandidate`) is now exported and available for future generalization if needed.
+- **Tests added**:
+  - Deterministic test proves `_diagnosticMcpServers.elicit_live.command` is an absolute path resolved via PATH search, not `process.execPath` and not bare `'node'`.
+  - Test verifies the command is not `process.execPath` (would catch the incorrect Electron renderer path in real runtime).
+  - Test verifies fallback to bare `'node'` when resolution fails.
+- **Matrix impact**: **55 rows, 38 pass, 16 readback, 1 wiring, 2 hidden, 0 fail** (unchanged). MCP Elicitation remains `wiring` until Codex revalidates in Test Vault with this fix deployed. This is a root-cause fix for MCP server startup in the diagnostic probe, NOT a pass promotion by itself. Product-path proof remains separate.
+
+### Files changed
+
+- `src/core/agents/backend/ClaudeCodeProcessResolver.ts` — exported `resolveExecutableCandidate` for reuse
+- `src/core/agents/backend/ClaudeCodeAdapter.ts` — uses `resolveExecutableCandidate('node', ...)` to resolve node to absolute path before passing to `_diagnosticMcpServers`
+- `tests/unit/core/agents/backend/ClaudeCodeAdapter.probes.test.ts` — updated test expectations, added PATH resolution test and fallback test
+- `devlog.md` — this entry
+
+---
+
+## 2026-06-08 Claude Code Capability Round 20 — MCP Elicitation Secondary Blockers
+
+**Investigate and clear secondary adapter divergences that may hide or block MCP tools in the diagnostic live probe.**
+
+Round 20 continues from Round 19's partial fix. Round 19 cleared the `permissionMode: 'bypassPermissions'` divergence by forcing `_diagnosticForcePermissionMode: 'default'`, but Test Vault re-test (BUILD_ID `feature-phase0-capability.202606080420`) still showed `wiring` with 327 raw messages and zero `onElicitation` calls. Three additional inherited settings diverge from the standalone harness's clean defaults: `restrictedBuiltinTools`, `disallowedTools`, and `strictMcpConfig`.
+
+- **Hypothesis**: `restrictedBuiltinTools` is the strongest secondary suspect. When set, `buildClaudeCodeOptions()` replaces `tools: { type: 'preset', preset: 'claude_code' }` with a strict `string[]`. MCP tools like `mcp__elicit_live__ask_and_echo` are NOT in that array, so the model may not see them. This directly explains the Test Vault observation "model did not call MCP tool at all" (BUILD_ID 202606080313 case).
+- **Evidence added**:
+  - Deterministic test proves `restrictedBuiltinTools` replaces the tools preset with a strict array.
+  - Deterministic test proves `disallowedTools` can include MCP tool names.
+  - Deterministic test proves `strictMcpConfig: true` propagates to SDK options.
+- **Fix**: Added `_diagnosticClearInheritedToolRestrictions` flag to `ClaudeCodeDiagnosticPromptRequest`. When true, `resolveDiagnosticSettings()` clears `restrictedBuiltinTools`, `disallowedTools`, `allowedTools`, and `strictMcpConfig` from diagnostic settings. `runMcpElicitationLiveProbe()` now sets this flag so the diagnostic options match the standalone harness's clean defaults.
+- **Diagnostic**: `McpElicitationLiveProbeResult` now includes `inheritedSettingsDivergence` field reporting which settings were inherited. The probe logs this in `stepLog` for Test Vault diagnosis.
+- **Codex Test Vault validation on current build**: BUILD_ID `feature-phase0-capability.202606081425` was deployed and reloaded. Live vault settings had `restrictedBuiltinTools`, `disallowedTools`, `allowedTools`, and `strictMcpConfig` all empty/unset, so the Round 20 suspects were not active in the current Test Vault state. Runtime `inspectLastDiagnosticSdkOptions()` still confirmed the Round 20 clearing path worked as intended: `tools` remained `{ type: 'preset', preset: 'claude_code' }`, `allowedTools` was exactly `['mcp__elicit_live__ask_and_echo']`, `disallowedTools` and `strictMcpConfig` were absent, `permissionMode` was `default`, and `mcpServers` contained only `elicit_live`. Despite that, the live probe still returned `wiring`: 320 raw messages, zero `onElicitation` calls, zero `tool_result`, and clean `dev:errors`. This narrows the blocker: inherited tool-restriction settings are not the current Test Vault blocker.
+- **Matrix impact**: **55 rows, 38 pass, 16 readback, 1 wiring, 2 hidden, 0 fail** (unchanged). MCP Elicitation remains `wiring` until Test Vault/product-path proof succeeds. This round is a hypothesis test, not a confirmed root cause.
+
+### Files changed
+
+- `src/core/agents/backend/ClaudeCodeAdapter.ts` — `_diagnosticClearInheritedToolRestrictions` flag, divergence detection, and clearing logic
+- `tests/unit/core/agents/backend/ClaudeCodeAdapter.probes.test.ts` — 8 targeted tests added plus existing MCP live-probe expectations updated
+- `docs/modules/core/agents/backend/ClaudeCodeAdapter.md` — Round 20 secondary blocker documentation
+- `docs/status/claude-code-current-state-2026-05-22.md` — Round 20 audit section
+- `devlog.md` — this entry
+
+---
+
+## 2026-06-08 Claude Code Capability Round 19 — MCP Elicitation Adapter Divergence Fix
+
+**Investigate adapter-level divergence between standalone harness and diagnostic live probe; fix concrete inherited setting blocker.**
+
+Round 19 investigates why the MCP Elicitation standalone harness (Round 18) passes while the `ClaudeCodeAdapter.runMcpElicitationLiveProbe()` diagnostic probe fails in Test Vault. The SDK is not the blocker for the standalone path (proven in Round 18); one confirmed adapter divergence is in how `buildDiagnosticSdkOptions()` inherits adapter settings.
+
+- **Concrete adapter divergence fixed, not yet root-cause proof**: When adapter settings have `permissionMode: 'bypassPermissions'` (common in Test Vault to avoid approval dialogs), `buildDiagnosticSdkOptions()` propagates this into `allowDangerouslySkipPermissions: true` in the SDK options. The probe set `_diagnosticBypassPermissions: false`, but `resolveDiagnosticSettings()` only overrides `permissionMode` when `_diagnosticBypassPermissions === true`; it did NOT clear an inherited `bypassPermissions` setting. Round 19 removes this divergence from the standalone harness. Codex follow-up reproduced the standalone harness with `permissionMode: 'bypassPermissions'` + `allowDangerouslySkipPermissions: true` and `onElicitation` still fired, so this is a plausible adapter cleanup rather than confirmed root cause.
+- **Minimal fix**: `runMcpElicitationLiveProbe()` now passes `_diagnosticForcePermissionMode: 'default'` to `runDiagnosticPrompt()`. This forces the diagnostic settings to use `'default'` permission mode, preventing `allowDangerouslySkipPermissions` from being set. The probe already provides `_diagnosticCanUseTool: async () => ({ behavior: 'allow' })` as an auto-approval callback, so tool execution is not blocked.
+- **Additional divergence documented** (not fixed): `restrictedBuiltinTools`, `disallowedTools`, and `strictMcpConfig` are inherited from adapter settings into diagnostic options. A new deterministic test documents this divergence by verifying these settings appear in the built options. The standalone harness used clean defaults; the adapter inherits whatever the Test Vault has configured. These are secondary suspects that could explain case 2 (model did not call MCP tool at all in BUILD_ID 202606080313) but do not explain case 1 (tool called but onElicitation not invoked).
+- **Codex Test Vault re-test after fix**: BUILD_ID `feature-phase0-capability.202606080420` was deployed/reloaded, the Settings → Capability Lab `Run MCP Elicitation Live Probe` button was clicked in Obsidian, and the result remained `wiring`: temp MCP server created/cleaned up, 327 raw messages, `onElicitation` calls `0`, host accepted `No`, nonce echoed `No`, and `dev:errors` reported `No errors captured.` The fix did not prove the full chain; secondary inherited settings remain the next suspects.
+- **Matrix impact**: **55 rows, 38 pass, 16 readback, 1 wiring, 2 hidden, 0 fail** (unchanged). MCP Elicitation remains `wiring` until Test Vault/product-path proof succeeds. The fix only removes a confirmed options divergence; it does not claim Test Vault pass.
+
+### Files changed
+
+- `src/core/agents/backend/ClaudeCodeAdapter.ts` — `runMcpElicitationLiveProbe()` now passes `_diagnosticForcePermissionMode: 'default'`
+- `tests/unit/core/agents/backend/ClaudeCodeAdapter.probes.test.ts` — 3 new tests: override verification updated, permissionMode force test, inherited divergence documentation test
+- `docs/modules/core/agents/backend/ClaudeCodeAdapter.md` — Round 19 fix documentation
+- `docs/status/claude-code-current-state-2026-05-22.md` — Round 19 audit section and root cause note
+- `devlog.md` — this entry
+
+---
+
 ## 2026-06-08 Claude Code Capability Round 18 — MCP Elicitation SDK Audit
 
 **Audit installed vs latest SDK to determine whether 0.3.168 fixes the MCP Elicitation diagnostic live path.**

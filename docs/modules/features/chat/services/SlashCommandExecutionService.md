@@ -57,6 +57,7 @@ export class SlashCommandExecutionService {
 - project config 只用于识别“这个 runtime command 是否同时存在 project override”，不会让 runtime 未注册的 command 提前执行
 - markdown command 只在 runtime command 不存在且 project config 没有同名 command 时接管；因此 `.opencode/commands/*.md` 不会覆盖 JSON/runtime command
 - runtime catalog 会过滤掉 `source === 'mcp'` 的条目
+- `tryRunSlashCommand()` 带有 justified complexity suppression（23 branches over known command dispatch paths in one auditable method）
 - `slashCommandSkillMode === 'direct'` 时，runtime `source === 'skill'` 可以直接用 `/skill-id arguments` 执行
 - `slashCommandSkillMode === 'skills-command'` 时，直接 `/skill-id` 不接管；只有 `/skills skill-id arguments` 会映射为真实 `session.command({ command: 'skill-id' })`
 - 如果某个 runtime command 同时也有 project override，direct `/command` 仍按该 runtime command 执行，不会被 `/skills` 前缀规则错误降级

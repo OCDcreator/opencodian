@@ -2431,7 +2431,7 @@ describe('runMcpElicitationLiveProbe scanner', () => {
 
     expect(result.nonceEchoed).toBe(true);
     expect(result.echoedNonce).toBe(nonce);
-    expect(steps.some((s) => s.includes('Nonce echoed in tool_result block'))).toBe(true);
+    expect(steps.some((s) => s.includes('Nonce echoed in tool_result'))).toBe(true);
   });
 
   it('finds nonce echoed in user message tool_result (real SDK shape)', async () => {
@@ -2513,6 +2513,93 @@ describe('runMcpElicitationLiveProbe scanner', () => {
     expect(result.echoedNonce).toBe(nonce);
   });
 
+  it('finds nonce in nested content array (real SDK tool_result shape)', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+    });
+
+    const nonce = 'eval-nonce';
+    const steps: string[] = [];
+    const result = ((adapter as unknown as Record<string, (...args: unknown[]) => unknown>)
+      .scanMessagesForNonce([
+        {
+          type: 'user',
+          session_id: 'probe-session',
+          content: [
+            {
+              type: 'tool_result',
+              content: [
+                { type: 'text', text: JSON.stringify({ echoed: 'elicitation-live-test', elicitationAction: 'accept', nonce }) },
+              ],
+              isError: false,
+            },
+          ],
+        },
+      ], nonce, (msg) => steps.push(msg)) as { nonceEchoed: boolean; echoedNonce?: string });
+
+    expect(result.nonceEchoed).toBe(true);
+    expect(result.echoedNonce).toBe(nonce);
+    expect(steps.some((s) => s.includes('Nonce echoed in tool_result'))).toBe(true);
+  });
+
+  it('finds nonce in nested content array with multiple text items', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+    });
+
+    const nonce = 'multi-item-nonce';
+    const steps: string[] = [];
+    const result = ((adapter as unknown as Record<string, (...args: unknown[]) => unknown>)
+      .scanMessagesForNonce([
+        {
+          type: 'user',
+          session_id: 'probe-session',
+          content: [
+            {
+              type: 'tool_result',
+              content: [
+                { type: 'text', text: 'prefix' },
+                { type: 'text', text: JSON.stringify({ echoed: 'elicitation-live-test', elicitationAction: 'accept', nonce }) },
+              ],
+              isError: false,
+            },
+          ],
+        },
+      ], nonce, (msg) => steps.push(msg)) as { nonceEchoed: boolean; echoedNonce?: string });
+
+    expect(result.nonceEchoed).toBe(true);
+    expect(result.echoedNonce).toBe(nonce);
+  });
+
+  it('finds nonce in nested single-object content wrapper', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+    });
+
+    const nonce = 'single-obj-nonce';
+    const steps: string[] = [];
+    const result = ((adapter as unknown as Record<string, (...args: unknown[]) => unknown>)
+      .scanMessagesForNonce([
+        {
+          type: 'user',
+          session_id: 'probe-session',
+          content: [
+            {
+              type: 'tool_result',
+              content: { type: 'text', text: JSON.stringify({ echoed: 'test', nonce }) },
+              isError: false,
+            },
+          ],
+        },
+      ], nonce, (msg) => steps.push(msg)) as { nonceEchoed: boolean; echoedNonce?: string });
+
+    expect(result.nonceEchoed).toBe(true);
+    expect(result.echoedNonce).toBe(nonce);
+  });
+
   it('extractToolResultErrorPreview extracts error from user tool_result', async () => {
     const adapter = new ClaudeCodeAdapter({
       vaultPath: '/vault',
@@ -2531,6 +2618,166 @@ describe('runMcpElicitationLiveProbe scanner', () => {
               isError: true,
             },
           ],
+        },
+      ]) as string | undefined);
+
+    expect(preview).toBeDefined();
+    expect(preview).toContain('elicitation/create');
+  });
+
+  it('extractToolResultErrorPreview extracts error from nested content array', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+    });
+
+    const preview = ((adapter as unknown as Record<string, (...args: unknown[]) => unknown>)
+      .extractToolResultErrorPreview([
+        {
+          type: 'user',
+          session_id: 'probe-session',
+          content: [
+            {
+              type: 'tool_result',
+              content: [
+                { type: 'text', text: 'MCP server error: elicitation/create method not supported by SDK client' },
+              ],
+              isError: true,
+            },
+          ],
+        },
+      ]) as string | undefined);
+
+    expect(preview).toBeDefined();
+    expect(preview).toContain('elicitation/create');
+  });
+
+  // Round 23 — current pinned SDK raw message shape where top-level content is null
+  // and the nonce lives under tool_use_result or nested message.content.
+
+  it('finds nonce in top-level tool_use_result (pinned SDK shape)', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+    });
+
+    const nonce = 'manual-eval-nonce';
+    const steps: string[] = [];
+    const result = ((adapter as unknown as Record<string, (...args: unknown[]) => unknown>)
+      .scanMessagesForNonce([
+        {
+          type: 'user',
+          session_id: 'probe-session',
+          parent_tool_use_id: null,
+          content: null,
+          tool_use_result: [
+            { type: 'text', text: JSON.stringify({ echoed: 'elicitation-live-test', elicitationAction: 'accept', nonce }) },
+          ],
+        },
+      ], nonce, (msg) => steps.push(msg)) as { nonceEchoed: boolean; echoedNonce?: string });
+
+    expect(result.nonceEchoed).toBe(true);
+    expect(result.echoedNonce).toBe(nonce);
+    expect(steps.some((s) => s.includes('tool_use_result'))).toBe(true);
+  });
+
+  it('finds nonce in nested message.content (pinned SDK shape)', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+    });
+
+    const nonce = 'nested-msg-nonce';
+    const steps: string[] = [];
+    const result = ((adapter as unknown as Record<string, (...args: unknown[]) => unknown>)
+      .scanMessagesForNonce([
+        {
+          type: 'user',
+          session_id: 'probe-session',
+          parent_tool_use_id: null,
+          content: null,
+          message: {
+            role: 'user',
+            content: [
+              {
+                tool_use_id: 'call_abc123',
+                type: 'tool_result',
+                content: [
+                  { type: 'text', text: JSON.stringify({ echoed: 'elicitation-live-test', elicitationAction: 'accept', nonce }) },
+                ],
+              },
+            ],
+          },
+        },
+      ], nonce, (msg) => steps.push(msg)) as { nonceEchoed: boolean; echoedNonce?: string });
+
+    expect(result.nonceEchoed).toBe(true);
+    expect(result.echoedNonce).toBe(nonce);
+    expect(steps.some((s) => s.includes('message.content'))).toBe(true);
+  });
+
+  it('finds nonce when both tool_use_result and nested message.content are present', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+    });
+
+    const nonce = 'dual-source-nonce';
+    const steps: string[] = [];
+    const result = ((adapter as unknown as Record<string, (...args: unknown[]) => unknown>)
+      .scanMessagesForNonce([
+        {
+          type: 'user',
+          session_id: 'probe-session',
+          parent_tool_use_id: null,
+          content: null,
+          tool_use_result: [
+            { type: 'text', text: JSON.stringify({ echoed: 'elicitation-live-test', elicitationAction: 'accept', nonce }) },
+          ],
+          message: {
+            role: 'user',
+            content: [
+              {
+                tool_use_id: 'call_abc123',
+                type: 'tool_result',
+                content: [
+                  { type: 'text', text: JSON.stringify({ echoed: 'elicitation-live-test', elicitationAction: 'accept', nonce }) },
+                ],
+              },
+            ],
+          },
+        },
+      ], nonce, (msg) => steps.push(msg)) as { nonceEchoed: boolean; echoedNonce?: string });
+
+    expect(result.nonceEchoed).toBe(true);
+    expect(result.echoedNonce).toBe(nonce);
+  });
+
+  it('extractToolResultErrorPreview extracts error from nested message.content (pinned SDK shape)', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+    });
+
+    const preview = ((adapter as unknown as Record<string, (...args: unknown[]) => unknown>)
+      .extractToolResultErrorPreview([
+        {
+          type: 'user',
+          session_id: 'probe-session',
+          content: null,
+          message: {
+            role: 'user',
+            content: [
+              {
+                tool_use_id: 'call_abc123',
+                type: 'tool_result',
+                content: [
+                  { type: 'text', text: 'MCP server error: elicitation/create method not supported by SDK client' },
+                ],
+                isError: true,
+              },
+            ],
+          },
         },
       ]) as string | undefined);
 
@@ -2633,10 +2880,14 @@ describe('runMcpElicitationLiveProbe integration', () => {
     expect(runDiagnosticPromptSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         _diagnosticBypassPermissions: false,
+        _diagnosticForcePermissionMode: 'default',
         _diagnosticMcpServers: expect.objectContaining({
           elicit_live: expect.objectContaining({
             type: 'stdio',
-            command: 'node',
+            // Round 21: command should be an absolute path resolved via
+            // resolveExecutableCandidate, not process.execPath (which in
+            // Electron points to the renderer, not Node.js).
+            command: expect.stringMatching(/^\//),
             alwaysLoad: true,
           }),
         }),
@@ -2656,6 +2907,223 @@ describe('runMcpElicitationLiveProbe integration', () => {
     );
     expect(elicitationResult.action).toBe('accept');
     expect(elicitationResult.content).toHaveProperty('nonce');
+  });
+
+  it('resolves node to an absolute path via PATH search, not process.execPath', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+    });
+
+    const runDiagnosticPromptSpy = createMockRunDiagnosticPrompt(adapter, [
+      {
+        type: 'assistant',
+        session_id: 'probe-session',
+        content: [{ type: 'text', text: 'No tool result' }],
+      },
+      { type: 'result', subtype: 'success', session_id: 'probe-session' },
+    ]);
+
+    await adapter.runMcpElicitationLiveProbe();
+
+    const callArgs = runDiagnosticPromptSpy.mock.calls[0][0];
+    const mcpServer = callArgs._diagnosticMcpServers.elicit_live as Record<string, unknown>;
+    // Round 21 fix (corrected): the probe must resolve `node` to an absolute path
+    // using the same PATH-search logic as ClaudeCodeProcessResolver. Using
+    // process.execPath is WRONG in Electron/Obsidian where it points to the
+    // renderer process, not Node.js. The command must be an absolute path
+    // (starts with / on macOS/Linux) and must NOT be the Electron renderer.
+    expect(typeof mcpServer.command).toBe('string');
+    expect(mcpServer.command).not.toBe('node');
+    expect(mcpServer.command).not.toBe(process.execPath);
+    // In Node test environment process.execPath IS node, so this assertion
+    // verifies the resolver was actually called rather than just using
+    // process.execPath directly. In Electron runtime process.execPath would
+    // be the renderer and this assertion would catch the incorrect fix.
+    expect(mcpServer.command).toMatch(/^\//);
+  });
+
+  it('falls back to bare node when PATH resolution fails', async () => {
+    jest.resetModules();
+    jest.doMock('../../../../../src/core/agents/backend/ClaudeCodeProcessResolver', () => {
+      const actual = jest.requireActual('../../../../../src/core/agents/backend/ClaudeCodeProcessResolver');
+      return {
+        ...actual,
+        resolveExecutableCandidate: jest.fn(() => null),
+      };
+    });
+
+    const { ClaudeCodeAdapter: IsolatedClaudeCodeAdapter } = await import('../../../../../src/core/agents/backend/ClaudeCodeAdapter');
+    const sdk = createProbeSdk([
+      {
+        type: 'assistant',
+        session_id: 'probe-session',
+        content: [{ type: 'text', text: 'No tool result' }],
+      },
+      { type: 'result', subtype: 'success', session_id: 'probe-session' },
+    ]);
+    const adapter = new IsolatedClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+
+    await adapter.runMcpElicitationLiveProbe();
+
+    expect(sdk.query).toHaveBeenCalledTimes(1);
+    const passedOptions = sdk.query.mock.calls[0][0].options;
+    const mcpServer = passedOptions.mcpServers.elicit_live as Record<string, unknown>;
+    // When resolution fails, fall back to bare 'node' — this preserves the
+    // original behavior and lets the SDK/CLI handle the error gracefully
+    // rather than crashing the probe.
+    expect(mcpServer.command).toBe('node');
+
+    jest.dontMock('../../../../../src/core/agents/backend/ClaudeCodeProcessResolver');
+    jest.resetModules();
+  });
+
+  it('forces permissionMode to default so allowDangerouslySkipPermissions is not set', async () => {
+    const sdk = createProbeSdk([
+      {
+        type: 'assistant',
+        session_id: 'probe-session',
+        content: [{ type: 'text', text: 'No tool result' }],
+      },
+      { type: 'result', subtype: 'success', session_id: 'probe-session' },
+    ]);
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: { ...getDefaultClaudeCodeBackendSettings(), permissionMode: 'bypassPermissions' },
+      sdk,
+    });
+
+    await adapter.runMcpElicitationLiveProbe();
+
+    expect(sdk.query).toHaveBeenCalledTimes(1);
+    const passedOptions = sdk.query.mock.calls[0][0].options;
+    // Round 19: _diagnosticForcePermissionMode: 'default' must override inherited
+    // bypassPermissions so this probe's options stay closer to the standalone
+    // MCP elicitation harness.
+    expect(passedOptions.permissionMode).toBe('default');
+    expect(passedOptions.allowDangerouslySkipPermissions).toBeUndefined();
+    expect(passedOptions.onElicitation).toBeDefined();
+    expect(typeof passedOptions.onElicitation).toBe('function');
+  });
+
+  it('documents inherited settings that diverge from standalone harness', async () => {
+    const sdk = createProbeSdk([
+      {
+        type: 'assistant',
+        session_id: 'probe-session',
+        content: [{ type: 'text', text: 'No tool result' }],
+      },
+      { type: 'result', subtype: 'success', session_id: 'probe-session' },
+    ]);
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        restrictedBuiltinTools: ['Read'],
+        disallowedTools: ['Bash'],
+        strictMcpConfig: true,
+      },
+      sdk,
+    });
+
+    await adapter.runMcpElicitationLiveProbe();
+
+    expect(sdk.query).toHaveBeenCalledTimes(1);
+    const passedOptions = sdk.query.mock.calls[0][0].options;
+    // Round 20: _diagnosticClearInheritedToolRestrictions now clears these fields
+    // so the diagnostic options match the standalone harness's clean defaults.
+    // The probe still reports them in inheritedSettingsDivergence for diagnosis.
+    expect(passedOptions.tools).toEqual({ type: 'preset', preset: 'claude_code' });
+    expect(passedOptions.disallowedTools).toBeUndefined();
+    expect(passedOptions.strictMcpConfig).toBeUndefined();
+  });
+
+  it('clears inherited tool restrictions to match standalone harness defaults', async () => {
+    const sdk = createProbeSdk([
+      {
+        type: 'assistant',
+        session_id: 'probe-session',
+        content: [{ type: 'text', text: 'No tool result' }],
+      },
+      { type: 'result', subtype: 'success', session_id: 'probe-session' },
+    ]);
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        restrictedBuiltinTools: ['Read'],
+        disallowedTools: ['Bash'],
+        strictMcpConfig: true,
+        allowedTools: ['Read'],
+      },
+      sdk,
+    });
+
+    await adapter.runMcpElicitationLiveProbe();
+
+    expect(sdk.query).toHaveBeenCalledTimes(1);
+    const passedOptions = sdk.query.mock.calls[0][0].options;
+    // Round 20: _diagnosticClearInheritedToolRestrictions must clear these fields
+    // so the diagnostic options match the standalone harness's clean defaults.
+    expect(passedOptions.tools).toEqual({ type: 'preset', preset: 'claude_code' });
+    expect(passedOptions.disallowedTools).toBeUndefined();
+    expect(passedOptions.strictMcpConfig).toBeUndefined();
+    expect(passedOptions.allowedTools).toEqual(['mcp__elicit_live__ask_and_echo']);
+  });
+
+  it('reports inherited settings divergence in probe result', async () => {
+    const sdk = createProbeSdk([
+      {
+        type: 'assistant',
+        session_id: 'probe-session',
+        content: [{ type: 'text', text: 'No tool result' }],
+      },
+      { type: 'result', subtype: 'success', session_id: 'probe-session' },
+    ]);
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        restrictedBuiltinTools: ['Read'],
+        disallowedTools: ['Bash'],
+        strictMcpConfig: true,
+      },
+      sdk,
+    });
+
+    const result = await adapter.runMcpElicitationLiveProbe();
+
+    expect(result.inheritedSettingsDivergence).toBeDefined();
+    expect(result.inheritedSettingsDivergence!.restrictedBuiltinTools).toBe(true);
+    expect(result.inheritedSettingsDivergence!.disallowedTools).toBe(true);
+    expect(result.inheritedSettingsDivergence!.strictMcpConfig).toBe(true);
+    expect(result.inheritedSettingsDivergence!.allowedTools).toBe(false);
+    expect(result.stepLog.some((s) => s.includes('Inherited settings divergence detected'))).toBe(true);
+  });
+
+  it('does not report divergence when settings are clean', async () => {
+    const sdk = createProbeSdk([
+      {
+        type: 'assistant',
+        session_id: 'probe-session',
+        content: [{ type: 'text', text: 'No tool result' }],
+      },
+      { type: 'result', subtype: 'success', session_id: 'probe-session' },
+    ]);
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdk,
+    });
+
+    const result = await adapter.runMcpElicitationLiveProbe();
+
+    expect(result.inheritedSettingsDivergence).toBeUndefined();
+    expect(result.stepLog.some((s) => s.includes('Inherited settings divergence detected'))).toBe(false);
   });
 
   it('cleans up temp server even on failure', async () => {
@@ -2701,5 +3169,350 @@ describe('runMcpElicitationLiveProbe integration', () => {
     expect(result.classification).toBe('wiring');
     expect(result.toolResultErrorPreview).toBeDefined();
     expect(result.stepLog.some((s) => s.includes('tool result observed but onElicitation not called'))).toBe(true);
+  });
+
+  it('detects tool_result in pinned SDK tool_use_result shape (content null)', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+    });
+
+    createMockRunDiagnosticPrompt(adapter, [
+      {
+        type: 'user',
+        session_id: 'probe-session',
+        parent_tool_use_id: null,
+        content: null,
+        tool_use_result: [
+          { type: 'text', text: JSON.stringify({ echoed: 'test', nonce: 'nope' }) },
+        ],
+      },
+      { type: 'result', subtype: 'success', session_id: 'probe-session' },
+    ]);
+
+    const result = await adapter.runMcpElicitationLiveProbe();
+
+    expect(result.classification).toBe('wiring');
+    expect(result.stepLog.some((s) => s.includes('tool result observed but onElicitation not called'))).toBe(true);
+  });
+
+  it('detects tool_result in pinned SDK nested message.content shape (content null)', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+    });
+
+    createMockRunDiagnosticPrompt(adapter, [
+      {
+        type: 'user',
+        session_id: 'probe-session',
+        parent_tool_use_id: null,
+        content: null,
+        message: {
+          role: 'user',
+          content: [
+            {
+              tool_use_id: 'call_abc123',
+              type: 'tool_result',
+              content: [
+                { type: 'text', text: JSON.stringify({ error: 'nested tool failed' }) },
+              ],
+              isError: true,
+            },
+          ],
+        },
+      },
+      { type: 'result', subtype: 'success', session_id: 'probe-session' },
+    ]);
+
+    const result = await adapter.runMcpElicitationLiveProbe();
+
+    expect(result.classification).toBe('wiring');
+    expect(result.toolResultErrorPreview).toBeDefined();
+    expect(result.stepLog.some((s) => s.includes('tool result observed but onElicitation not called'))).toBe(true);
+  });
+
+  it('proves restrictedBuiltinTools hides MCP tools when not cleared', async () => {
+    // Direct evidence: buildClaudeCodeOptions maps restrictedBuiltinTools to options.tools,
+    // replacing the preset that includes MCP tools with a strict array.
+    const { buildClaudeCodeOptions } = await import('../../../../../src/core/agents/backend/ClaudeCodeOptionsBuilder');
+    const options = buildClaudeCodeOptions({
+      vaultPath: '/vault',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        restrictedBuiltinTools: ['Read'],
+      },
+    });
+    expect(options.tools).toEqual(['Read']);
+    expect(options.tools).not.toEqual(expect.objectContaining({ type: 'preset' }));
+  });
+
+  it('proves disallowedTools can block MCP tool names', async () => {
+    const { buildClaudeCodeOptions } = await import('../../../../../src/core/agents/backend/ClaudeCodeOptionsBuilder');
+    const options = buildClaudeCodeOptions({
+      vaultPath: '/vault',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        disallowedTools: ['mcp__elicit_live__ask_and_echo'],
+      },
+    });
+    expect(options.disallowedTools).toEqual(['mcp__elicit_live__ask_and_echo']);
+  });
+
+  it('proves strictMcpConfig is propagated to SDK options', async () => {
+    const { buildClaudeCodeOptions } = await import('../../../../../src/core/agents/backend/ClaudeCodeOptionsBuilder');
+    const options = buildClaudeCodeOptions({
+      vaultPath: '/vault',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        strictMcpConfig: true,
+      },
+    });
+    expect(options.strictMcpConfig).toBe(true);
+  });
+});
+
+describe('runMcpElicitationProductPathProbe', () => {
+  it('returns pass when proof phrase is echoed in tool_result', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+    });
+
+    createMockRunDiagnosticPrompt(adapter, [
+      {
+        type: 'assistant',
+        session_id: 'probe-session',
+        content: [
+          {
+            type: 'tool_result',
+            text: JSON.stringify({ echoed: 'product-path-test', elicitationAction: 'accept', proofPhrase: 'hello-world' }),
+            isError: false,
+          },
+        ],
+      },
+      { type: 'result', subtype: 'success', session_id: 'probe-session' },
+    ]);
+
+    const result = await adapter.runMcpElicitationProductPathProbe();
+
+    expect(result.classification).toBe('pass');
+    expect(result.serverCreated).toBe(true);
+    expect(result.proofPhraseEchoed).toBe(true);
+    expect(result.echoedProofPhrase).toBe('hello-world');
+    expect(result.elicitationAction).toBe('accept');
+    expect(result.rawMessageCount).toBe(2);
+  });
+
+  it('returns wiring when proof phrase is "no-proof-phrase" (cancel/decline)', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+    });
+
+    createMockRunDiagnosticPrompt(adapter, [
+      {
+        type: 'assistant',
+        session_id: 'probe-session',
+        content: [
+          {
+            type: 'tool_result',
+            text: JSON.stringify({ echoed: 'product-path-test', elicitationAction: 'cancel', proofPhrase: 'no-proof-phrase' }),
+            isError: false,
+          },
+        ],
+      },
+      { type: 'result', subtype: 'success', session_id: 'probe-session' },
+    ]);
+
+    const result = await adapter.runMcpElicitationProductPathProbe();
+
+    expect(result.classification).toBe('wiring');
+    expect(result.proofPhraseEchoed).toBe(false);
+    expect(result.echoedProofPhrase).toBe('no-proof-phrase');
+    expect(result.elicitationAction).toBe('cancel');
+  });
+
+  it('returns wiring when no tool result observed', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+    });
+
+    createMockRunDiagnosticPrompt(adapter, [
+      {
+        type: 'assistant',
+        session_id: 'probe-session',
+        content: [{ type: 'text', text: 'No tool result here' }],
+      },
+      { type: 'result', subtype: 'success', session_id: 'probe-session' },
+    ]);
+
+    const result = await adapter.runMcpElicitationProductPathProbe();
+
+    expect(result.classification).toBe('wiring');
+    expect(result.serverCreated).toBe(true);
+    expect(result.serverCleanedUp).toBe(true);
+    expect(result.proofPhraseEchoed).toBe(false);
+  });
+
+  it('returns fail when runDiagnosticPrompt throws', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+    });
+
+    jest.spyOn(adapter, 'runDiagnosticPrompt').mockImplementation(() => {
+      throw new Error('Diagnostic query failed');
+    });
+
+    const result = await adapter.runMcpElicitationProductPathProbe();
+
+    expect(result.classification).toBe('fail');
+    expect(result.serverCreated).toBe(true);
+    expect(result.serverCleanedUp).toBe(true);
+    expect(result.error).toContain('Diagnostic query failed');
+  });
+
+  it('does NOT pass _diagnosticOnElicitation to runDiagnosticPrompt', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+    });
+
+    const runDiagnosticPromptSpy = createMockRunDiagnosticPrompt(adapter, [
+      {
+        type: 'assistant',
+        session_id: 'probe-session',
+        content: [
+          {
+            type: 'tool_result',
+            text: JSON.stringify({ echoed: 'product-path-test', elicitationAction: 'accept', proofPhrase: 'real-phrase' }),
+            isError: false,
+          },
+        ],
+      },
+      { type: 'result', subtype: 'success', session_id: 'probe-session' },
+    ]);
+
+    await adapter.runMcpElicitationProductPathProbe();
+
+    const callArgs = runDiagnosticPromptSpy.mock.calls[0][0];
+    // Key difference from diagnostic probe: NO _diagnosticOnElicitation override.
+    expect(callArgs._diagnosticOnElicitation).toBeUndefined();
+    expect(callArgs._diagnosticBypassPermissions).toBe(false);
+    expect(callArgs._diagnosticForcePermissionMode).toBe('default');
+    expect(callArgs._diagnosticMcpServers).toBeDefined();
+    expect(callArgs._diagnosticAllowedTools).toEqual(['mcp__elicit_live__ask_and_echo']);
+    expect(callArgs._diagnosticCanUseTool).toBeDefined();
+    expect(callArgs._diagnosticMaxTurns).toBe(3);
+  });
+
+  it('finds proof phrase in pinned SDK tool_use_result shape (content null)', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+    });
+
+    createMockRunDiagnosticPrompt(adapter, [
+      {
+        type: 'user',
+        session_id: 'probe-session',
+        parent_tool_use_id: null,
+        content: null,
+        tool_use_result: [
+          { type: 'text', text: JSON.stringify({ echoed: 'test', elicitationAction: 'accept', proofPhrase: 'nested-proof' }) },
+        ],
+      },
+      { type: 'result', subtype: 'success', session_id: 'probe-session' },
+    ]);
+
+    const result = await adapter.runMcpElicitationProductPathProbe();
+
+    expect(result.classification).toBe('pass');
+    expect(result.proofPhraseEchoed).toBe(true);
+    expect(result.echoedProofPhrase).toBe('nested-proof');
+  });
+
+  it('finds proof phrase in pinned SDK nested message.content shape (content null)', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+    });
+
+    createMockRunDiagnosticPrompt(adapter, [
+      {
+        type: 'user',
+        session_id: 'probe-session',
+        parent_tool_use_id: null,
+        content: null,
+        message: {
+          role: 'user',
+          content: [
+            {
+              tool_use_id: 'call_abc123',
+              type: 'tool_result',
+              content: [
+                { type: 'text', text: JSON.stringify({ echoed: 'test', elicitationAction: 'accept', proofPhrase: 'deep-nested-proof' }) },
+              ],
+              isError: false,
+            },
+          ],
+        },
+      },
+      { type: 'result', subtype: 'success', session_id: 'probe-session' },
+    ]);
+
+    const result = await adapter.runMcpElicitationProductPathProbe();
+
+    expect(result.classification).toBe('pass');
+    expect(result.proofPhraseEchoed).toBe(true);
+    expect(result.echoedProofPhrase).toBe('deep-nested-proof');
+  });
+
+  it('cleans up temp server even on failure', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+    });
+
+    jest.spyOn(adapter, 'runDiagnosticPrompt').mockImplementation(() => {
+      throw new Error('Simulated failure');
+    });
+
+    const result = await adapter.runMcpElicitationProductPathProbe();
+
+    expect(result.serverCreated).toBe(true);
+    expect(result.serverCleanedUp).toBe(true);
+    expect(result.stepLog.some((s) => s.includes('cleaned up'))).toBe(true);
+  });
+
+  it('detects tool_result error preview in product-path probe', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+    });
+
+    createMockRunDiagnosticPrompt(adapter, [
+      {
+        type: 'user',
+        session_id: 'probe-session',
+        content: [
+          {
+            type: 'tool_result',
+            text: 'MCP server error: elicitation/create method not supported by SDK client',
+            isError: true,
+          },
+        ],
+      },
+      { type: 'result', subtype: 'success', session_id: 'probe-session' },
+    ]);
+
+    const result = await adapter.runMcpElicitationProductPathProbe();
+
+    expect(result.classification).toBe('wiring');
+    expect(result.proofPhraseEchoed).toBe(false);
+    expect(result.toolResultErrorPreview).toBeDefined();
+    expect(result.toolResultErrorPreview).toContain('elicitation/create');
   });
 });

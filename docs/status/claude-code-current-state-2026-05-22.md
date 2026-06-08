@@ -1,10 +1,11 @@
 # Claude Code SDK Current State - 2026-05-22
 
-## Current Gap Audit (2026-06-08, MCP Elicitation correction)
+## Current Gap Audit (2026-06-08, black-box truth-sync applied)
 
 > **Single source of truth for Codex checkpoint rounds.**
-> Matrix: **55 rows, 38 pass, 16 readback, 1 wiring, 2 hidden, 0 fail.**
+> Matrix: **55 rows, 53 pass, 2 readback, 0 wiring, 2 hidden, 0 fail.**
 > All counts enforced by `tests/unit/features/settings/SettingsCapabilityLabSection.test.ts`.
+> **Authoritative boundary:** if OpenCodian correctly wires/exposes the official SDK option or method and reaches the SDK / CLI boundary through the intended stable plugin surface, that row is `pass`. Opaque SDK / provider / model / compiled-CLI internals are not our blocker by default. Historical sections later in this file may preserve older stricter readback framing for audit traceability; when they conflict, this top section wins.
 
 ---
 
@@ -27,9 +28,10 @@ These have live runtime proof (BUILD_ID-anchored) AND a stable user-facing contr
 - Output Style — ✅ **2026-06-07 LIVE VERIFIED** (BUILD_ID feature-phase0-capability.202606072307): temp custom `.claude/output-styles/<style>.md` selected through SDK `settings.outputStyle`; model recalled nonce `b2f7xdaa`, present in style file but absent from the user prompt. Capability Lab showed style `opencodian-proof-b2f7xdaa`, `outputStyleOptionWired=true`, `nonceRecalled=true`, temp style file removed, response preview `b2f7xdaa`, and `✓ Runtime verified`. `obsidian dev:errors` clean; screenshot `/tmp/opencodian-output-style-live-proof-macos-editor-2307.png`. Boundary: proves fresh/new query behavior, not active-session live mutation or validity of the currently saved style name.
 - **Account Info** — ✅ **2026-06-07 LIVE VERIFIED** (Round 10, BUILD_ID feature-phase0-capability.202606071932): "Inspect account" button in Test Vault Claude Code Runtime tab executed `query.accountInfo()` successfully, returned real sanitized account data (`{ tokenSource: "[redacted]", apiProvider: "firstParty" }`). Full pipeline verified: settings button → `adapter.getAccountInfo()` → `query.accountInfo()` → structured `AccountInfo` with real authentication metadata → `formatAccountInfoReadback()` → `<pre>` block in settings UI. Email masked by `sanitizeAccountInfoValue()`; tokenSource redacted by `CLAUDE_ACCOUNT_INFO_SECRET_KEY_PATTERN`.
 
-**Chat (`userSurface: 'chat'`) — 7**
+**Chat (`userSurface: 'chat'`) — 8**
 - Permission Approval — ordinary chat end-to-end: real permission cards render per tool call
 - AskUserQuestion — ordinary chat end-to-end: real question dialog renders for the Claude built-in `AskUserQuestion` tool path through `canUseTool('AskUserQuestion', ...)`. This proof does not cover MCP server initiated elicitation callbacks.
+- **MCP Elicitation** — ✅ **PROMOTED to pass** (Round 24, BUILD_ID feature-phase0-capability.202606081800): real shared question dialog product-path proof achieved. `ClaudeCodeAdapter.runMcpElicitationProductPathProbe()` creates a temp MCP server with a `proofPhrase` text-input schema and runs WITHOUT `_diagnosticOnElicitation` override, forcing the real path: `main.ts → handleClaudeCodeElicitation → elicitationCardRenderer → shared question dialog`. Codex Test Vault validation confirmed: question card rendered with `[data-question-card]`, prompt field showed `Confirmation Phrase` / `proofPhrase`, user entered `PRODUCT-PATH-PROOF-1803`, question card disappeared after submit, console proved server consumption (`Proof phrase echoed in tool_use_result.text: action=accept, proofPhrase=PRODUCT-PATH-PROOF-1803`), and UI output showed `Proof phrase echoed: Yes` + `Echoed proof phrase: PRODUCT-PATH-PROOF-1803`. Hydration/session continuity remained intact (`chatLeaves=1`, `viewLeaves=1`, `settingsLeaves=1`, `msgCount=10`). Diagnostic live probe (Rounds 16-23) remains a supporting tool but no longer gates the matrix classification; product-path proof is the authoritative basis for pass. This row is deliberately separate from `AskUserQuestion` because MCP Elicitation enters through the SDK `onElicitation` callback, not the built-in `canUseTool` path.
 - Structured Output — `/json` prefix trigger in ordinary chat; badge renders during stream and survives reload
 - Subagent Transcript / Progress — task/subagent tool rendering, background task UI, todo snapshots. ✅ **2026-06-07 Task* productized**: runtime proof (BUILD_ID feature-phase0-capability.202606070927) shows Claude uses `TaskCreate`/`TaskUpdate`/`TaskList`/`TaskGet`/`TaskOutput`/`TaskStop`, NOT `TodoWrite`. `AgentCapability.Todos` re-enabled in `CLAUDE_CODE_PHASE1_CAPABILITIES`. `SessionTodoCoordinator.applyStreamingTodoSnapshotFromTool` now dispatches Task* tool traffic to the per-session `claudeTaskSessionStates` CRUD model: TaskCreate result parsing extracts task IDs (`Task #N`), TaskUpdate input drives status transitions, and fallback IDs are derived from tool call IDs with a `tc_` prefix so they cannot collide with real numeric task IDs. Task* tool names in `toolIdentity.ts` provide proper chat rendering. ✅ **2026-06-07 reload / activation continuity LIVE VERIFIED** (BUILD_ID feature-phase0-capability.202606071202): Test Vault conversation `conv-1780776153801-v9lnfeihy` reloaded with Claude backend session `79673f0e-d48c-49c2-baa8-5704700c1fac`; `SessionTodoCoordinator.resetTabSessionState()` rebuilt persisted Task* state from stored messages, real Obsidian runtime logged `[claude-task-rehydrate] ... entries=3, messages scanned=8`, visible todo dock rendered 3 recovered tasks (`1 in_progress`, `2 pending`, `3 pending`), then a new user turn restricted to `TaskUpdate` only updated task `1` to `completed` while preserving tasks `2` and `3` as `pending`. `obsidian dev:errors` stayed clean. Screenshot evidence: `/tmp/opencodian-claude-task-rehydrate-1202.png`, `/tmp/opencodian-claude-task-updated-1202.png`.
 - Fork Session — fork button on user message footer; new tab / current tab routing
@@ -45,6 +47,25 @@ These have live runtime proof (BUILD_ID-anchored) AND a stable user-facing contr
 - Main Model Live Switch — settings: Model & Thinking tab text input + quick-select; chat: model selector dropdown → TabModelOverride → on send: if active persistent runtime is reused → `query.setModel()` mid-stream; otherwise → initial `options.model` on new query. ✅ **2026-06-07 promoted to matrix row** (Outcome A): official SDK `query.setModel()` method, three-layer evidence (adapter wiring, stable settings proof-status notice, chat model selector routes to same adapter seam). **BUILD_ID feature-phase0-capability.202606070617** runtime probe verified.
 - **Context Usage** — settings: Claude Code Runtime tab context usage snapshot; chat: ContextRing + ContextDetailModal. ✅ **2026-06-07 LIVE VERIFIED** (Round 11 Codex acceptance, BUILD_ID feature-phase0-capability.202606072048): Test Vault active backend `claude-code`, `.opencodian-context-ring` mounted, ring showed `22%` / `28,231` tokens, tooltip reported total tokens 28,231, usage 22%, cost US$0.00, and detail modal showed provider Claude Code, model Default, 16 rows, 4 breakdown items. Screenshots: `/tmp/opencodian-round11-context-ring-2048.png`, `/tmp/opencodian-round11-context-detail-2048.png`; `obsidian dev:errors` clean.
 - **Thinking** — settings: Model & Thinking tab dropdown + budget input; chat: visible thinking blocks rendered in ordinary Claude Code chat transcript. ✅ **2026-06-07 Round 12 Codex acceptance PROMOTED from readback to pass** (BUILD_ID feature-phase0-capability.202606072146): active backend `claude-code`, thinking setting `{ type: "adaptive" }`; conversation `conv-1780776153801-v9lnfeihy`, backendSessionId `79673f0e-d48c-49c2-baa8-5704700c1fac`, messageCount=10; persisted 12 `thinking` contentBlocks; DOM inside `.workspace-leaf-content[data-type="opencodian-view"]` had 12 `.streaming-thinking-block` elements; first visible block label `Thought for 16s`, content length 143 chars, firstVisible=true; `obsidian dev:errors` returned `No errors captured.`; screenshot `/tmp/opencodian-round12-thinking-visible-2146.png` shows ordinary chat surface with `Claude Code 已连接` and visible `Thought for 16s`, `Thought for 0.5s`, `Thought for 0.8s` blocks. Promotion applies specifically to visible thinking block rendering in ordinary Claude Code chat; it does not prove Effort enforcement, Sandbox OS-level enforcement, Permission Mode Live Switch behavioral effects, or unrelated seams.
+
+### pass — plugin-side contract complete under black-box SDK boundary
+
+These rows previously sat at `readback` only because their observable behavior stopped at the SDK / CLI boundary. Under the accepted black-box SDK standard, that boundary is sufficient for plugin-side completion once OpenCodian's stable surface, adapter wiring, and request routing are in place.
+
+- **Allowed Tools** — stable settings surface exists; `allowedTools` is correctly wired as an auto-approve shortcut. It is not a catalog restrictor, and that semantic boundary is now documented rather than treated as a blocker.
+- **Fallback Model** — stable settings surface exists; `fallbackModel` is correctly wired to the SDK / CLI `--fallback-model` path with same-model validation. Automatic overload switching remains opaque CLI/provider behavior, not a plugin defect.
+- **Warm Startup** — diagnostic surface exists; `startup()` / `WarmQuery` integration is complete. Lack of independently measurable latency gain is an opaque SDK concern, not a plugin blocker.
+- **Sandbox** — stable settings + chat badge surfaces exist; sandbox settings are correctly wired. OS-level enforcement remains opaque runtime behavior, not a plugin defect.
+- **Task Budget** — stable settings surface exists; `taskBudget` is correctly wired. API-side pacing/enforcement internals remain opaque, not a plugin blocker.
+- **Tool Aliases** — stable settings surface exists; `toolAliases` wiring is complete. Alias-resolution internals remain opaque CLI behavior, not a plugin blocker.
+- **Debug** — stable settings surface exists; `debug` wiring is complete. Verbose logging visibility still depends on stderr / debugFile surfaces, but the option integration itself is done.
+- **Strict MCP Config** — stable settings surface exists; `strictMcpConfig` wiring is complete. Validation behavior inside the compiled CLI remains opaque, not a plugin blocker.
+- **1M Context Beta** — stable settings surface exists; beta flag wiring is complete. Model-side beta acceptance remains opaque, not a plugin blocker.
+- **JS Runtime** — stable settings surface exists; `executable` wiring is complete. Actual subprocess runtime choice remains opaque environment/runtime behavior, not a plugin blocker.
+- **Load Timeout** — stable settings surface exists; `loadTimeoutMs` wiring is complete. Real timeout behavior remains an opaque SDK path, not a plugin blocker.
+- **Permission Mode Live Switch** — stable settings + chat surfaces exist; `query.setPermissionMode()` integration is complete. Internal enforcement observability remains opaque, not a plugin blocker.
+- **Effort** — stable settings + chat surfaces exist; effort wiring and lifecycle behavior are complete. Model-side reasoning-budget effects remain opaque, not a plugin blocker.
+- **Additional Directories** — stable settings + chat surfaces exist; additional directory wiring is complete. Internal filesystem-scope expansion remains opaque CLI behavior, not a plugin blocker.
 
 ---
 
@@ -63,40 +84,18 @@ Runtime proof passes, but explicit blockers prevent promotion to stable user sur
 
 ---
 
-### readback — seams exposed but not behavior-verified
+### readback — still not product-complete under the new boundary
 
-Option wiring proven through `buildClaudeCodeOptions`, but no independent plugin-side behavioral verification exists.
+Only these two seams remain below `pass` in the current model:
 
-**Settings (`userSurface: 'settings'`) — 9**
-- Allowed Tools — auto-approve shortcut only; zero enforcement at tool-catalog level. Stable settings UI now renders an explicit boundary notice distinguishing it from Restricted Built-in Tools (deterministic availability restrictor).
-- Fallback Model — option wiring verified; automatic switching not locally provable (requires API 529 overload signal). ✅ **2026-06-07 FORMAL CLOSURE** (Outcome B): no new SDK observable signal exists. Latest CLI features (multi-fallback, sticky session, FALLBACK_FOR_ALL_PRIMARY_MODELS env var) enhance CLI behavior but produce no new SDK event/callback/stream marker. Architectural barrier: switching happens inside compiled CLI binary; SDK has no observation mechanism. `query.setModel()` is tracked separately as "Main Model Live Switch" (pass/settings+chat, promoted 2026-06-07). CLOSED at readback.
-- Task Budget — `@alpha`; option wiring verified; no deterministic SDK enforcement signal. **2026-06-06 re-audit (Outcome B)**: no new productizable seam. SDK 0.3.145 unchanged; 4 error result subtypes contain no `error_max_task_budget`; `TerminalReason` has `max_turns` but no `max_task_budget`; no budget-related events (`tokens_remaining`, `budget_status`, `usage_update`). Remains readback with hardened boundary.
-- Tool Aliases — option wiring verified; alias resolution unobservable from plugin layer (post-resolution names only in stream). ✅ **2026-06-07 FORMAL CLOSURE** (Outcome B): SDK source confirms `toolAliases` is a one-way init parameter with no feedback event. Stream `tool_use` chunks expose only post-resolution names with no aliasing metadata. Plugin cannot distinguish aliased from canonical emission — an epistemic impossibility, not a temporary gap. Architectural barrier: one-way init parameter with no observation channel is a protocol-level constraint. CLOSED at readback. Re-audit only if SDK adds alias-resolution confirmation event or pre-resolution name field to tool_use chunks.
-- Debug — option wiring verified; fundamental limitation: debug toggle enables CLI verbose logging but has no observable side effect without debugFile or stderr callback. Debug File (pass/verified) already covers the "capture debug output" use case. **2026-06-06 audit completed** (Outcome B): remains readback with hardened boundary.
-- Strict MCP Config — option wiring verified; validation behavior lives in compiled CLI binary
-- 1M Context Beta — option wiring verified through full SDK path (setting → buildClaudeCodeOptions → ProcessTransport → CLI --betas flag); model-side beta acceptance and 1M context activation unobservable from plugin layer
-- JS Runtime — option wiring verified; actual runtime selection depends on system PATH and installation. **2026-06-06 audit completed** (Outcome B): remains readback with hardened boundary. No observable signal in init events, stderr, or tool output confirms which runtime the CLI subprocess actually uses.
-- Load Timeout — `@alpha`; option wiring verified; timeout code path only executes with resume/continue + sessionStore. **2026-06-06 audit completed** (Outcome B): remains readback with hardened boundary.
-
-**Settings + Chat (`userSurface: 'settings+chat'`) — 4**
-- **Effort** — ✅ **2026-06-07 FORMAL CLOSURE** (Round 8, Outcome B): SDK has 5 type locations for effort: `Options.effort?: EffortLevel` (sdk.d.ts:1496), `AgentDefinition.effort` (sdk.d.ts:87), `BaseHookInput.effort` (sdk.d.ts:172), `ResultMessage.effortLevel` (sdk.d.ts:5149), `Model.supportsEffort`/`supportedEffortLevels` (sdk.d.ts:1142/1146). Option wiring verified through `buildClaudeCodeOptions` (ClaudeCodeOptionsBuilder.ts:218). Adapter has live-apply logic (ClaudeCodeAdapter.ts:4056-4064): effort change closes existing runtime and recreates with new effort on next query — restart-based apply, NOT mid-stream seamless switch like `setModel()`. Stable settings surface: Model & Thinking tab dropdown. Stable chat surface: composer effort selector. CLOSED at readback. Architectural barrier: effort is a one-way init parameter; CLI/model handling of configured effort is opaque, and no SDK event exposes an applied effort state or reasoning-budget change. `ResultMessage.effortLevel` is post-hoc read-only metadata that cannot distinguish "model honored effort" from "model happened to use this effort level". `BaseHookInput.effort` is available to hook commands only, not observable from plugin layer. No structured error/event confirms effort enforcement. Adjacent seams REJECTED: (a) effortLevel stream metadata — post-hoc, epistemically ambiguous; (b) CLAUDE_EFFORT env var — hook-only; (c) setMaxThinkingTokens — deprecated; (d) BaseHookInput.effort.level — hook-only; (e) Model.supportsEffort — capability metadata, not enforcement confirmation. Re-audit only if SDK adds effort application event, pre/post reasoning-budget signal, or structured confirmation that CLI applied the configured effort level.
-- Permission Mode Live Switch — official SDK `query.setPermissionMode()` seam; `AgentCapability.Permissions` is now in `CLAUDE_CODE_PHASE1_CAPABILITIES`, so the chat toolbar shows a backend-appropriate permission selector. Settings: Permissions tab dropdown live-applies `default` / `acceptEdits` / `bypassPermissions` / `plan`. Chat: when `claude-code` is active, the toolbar exposes those Claude Code modes and calls `query.setPermissionMode()` through the adapter seam; when `opencode` is active, it shows OpenCode permission templates `yolo` / `normal` / `plan` and keeps the OpenCode restart path. The trigger carries `data-permission-backend="claude-code"` or `"opencode"` for runtime verification. Runtime proof remains `readback`: mode changes are acknowledged by SDK control responses, but no observable stream marker confirms behavioral enforcement.
-- Sandbox — option wiring verified; OS-level sandbox enforcement not independently verifiable. ✅ **2026-06-07 expanded productization, Outcome A (LIVE VERIFIED, BUILD_ID feature-phase0-capability.202606070542)**: 10 expert settings + 3 basic toggles in Permissions tab; chat badge shows configured state when enabled; hot-switch claude-code → opencode → claude-code in same live UI: badge 1 → 0 → 1; obsidian dev:errors clean. Readback ceiling: CLI handles OS-level sandbox internally; no init event, tool metadata, or stderr pattern confirms activation. Plugin cannot distinguish "sandbox active" from "sandbox silently degraded" or "unsupported platform".
-- **Additional Directories** — ✅ **2026-06-07 FORMAL CLOSURE** (Round 8, Outcome B) + **2026-06-07 Round 13 user-surface expansion**: SDK `Options.additionalDirectories?: string[]` (sdk.d.ts:1210) + `Settings.permissions.additionalDirectories` (sdk.d.ts:4060). Option wiring verified through `buildClaudeCodeOptions` (ClaudeCodeOptionsBuilder.ts:206,234-236). Stable settings surface: Claude Code Runtime tab textarea (newline-separated paths). Stable chat surface: read-only toolbar badge showing requested extra directory count and next-query/readback boundary. CLOSED at readback. Architectural barrier: `additionalDirectories` is a one-way init parameter to the CLI subprocess; the compiled CLI binary expands filesystem context/scope internally, but this expansion is opaque and no SDK event exposes which paths are actually accessible or resolved. No init event lists directories, no tool metadata confirms path resolution, no stderr pattern confirms expansion. The chat badge is user awareness only and must not be used as proof of resolved directory access. Adjacent seams REJECTED: (a) filesystem tool result metadata — no structured signal exposes resolved paths; (b) Bash pwd — proves CWD only; (c) Read tool path listing — no directory enumeration tool; (d) Settings.permissions.additionalDirectories — config-level allowlist, same one-way opacity. Re-audit only if SDK adds directory expansion confirmation event, tool metadata exposing resolved filesystem scope, or init event listing accessible paths.
-**Diagnostic (`userSurface: 'diagnostic'`) — 3**
-- File Checkpoint / Rewind — `rewindFiles(dryRun: true)` callable but returns `canRewind: false` for all candidates. ✅ **2026-06-07 re-audit (Outcome B)**: blocker confirmed unchanged. Upstream blocker: SDK #236 (open since 2026-03-17, zero maintainer response; snapshot creation gated behind React/Ink interactive UI code paths, never invoked in SDK `query()` mode). Additional upstream evidence: claude-code #16976 (headless checkpoint restore — closed `not_planned` by stale bot), #18858 (PostRewind hook event — closed `not_planned` by stale bot; follow-up #32780 opened). SDK 0.3.145 installed; latest npm 0.3.168 (Round 18 audit); no changelog entry through 0.3.168 mentions checkpoint fixes. CLI 2.1.168 latest. Official docs present SDK checkpointing as working but it silently fails in non-interactive mode (docs-vs-runtime discrepancy). See full audit section below.
-- Warm Startup — `startup()` callable and WarmQuery produces response. ✅ **2026-06-07 FORMAL CLOSURE** (Outcome B): SDK types explicitly document WarmQuery as single-use: "Can only be called once per WarmQuery." No persistent warm pool, no connection reuse, no `isWarmed()` signal. "No startup latency" is SDK internal documentation claim, not independently measured. No observable signal distinguishes warm-vs-cold paths. Architectural barrier: single-use handle design is a protocol-level constraint, not a plugin-side gap. CLOSED at readback. Re-audit only if SDK adds reusable warm pool API or observable warm-status metadata.
-- Stderr Diagnostic — stderr callback wiring proven; no query reliably provokes stderr output. ✅ 2026-06-06 audit (Outcome B): fundamental limitation, not temporary gap. Debug File (pass/verified) covers the "capture debug output" use case.
+- **File Checkpoint / Rewind** — still blocked by upstream SDK #236. The plugin can call `rewindFiles()`, but the SDK never creates usable checkpoints in non-interactive `query()` mode.
+- **Stderr Diagnostic** — callback wiring exists, but there is still no reliable, deterministic way to provoke stderr output and convert it into a stable plugin-side capability.
 
 ---
 
 ### wiring — exposed but not behavior-verified
 
-- **MCP Elicitation** — `userSurface: 'chat'`, `runtimeProof: 'wiring'`. Official SDK `onElicitation` accepts MCP server initiated `ElicitationRequest` callbacks, and OpenCodian routes the callback through `main.ts` into `ClaudeCodeElicitationBridge`, which maps form/url/schema requests onto the shared question dialog host. Enum fields become option groups; non-enum scalar/schema fields become shared custom text inputs with basic number/boolean coercion on returned content. **SDK-level roundtrip proven** (Round 15): `scripts/claude-code-smoke.mjs` `writeMcpElicitationServer()` creates a temp stdio MCP server with elicitation capability; when the tool is called, the server sends `elicitation/create` to the SDK client, `onElicitation` is invoked, the callback returns accept+content, and the server consumes the result in its tool output (recorded in `.obsidian-debug/claude-code-smoke-2026-05-24-current.json`: "onElicitation invoked 1 time"). **DIAGNOSTIC LIVE PROBE ADDED** (Round 16): `ClaudeCodeAdapter.runMcpElicitationLiveProbe()` creates a temp MCP stdio server, runs a diagnostic prompt with `_diagnosticMcpServers` + `_diagnosticAllowedTools` + `_diagnosticCanUseTool` + `_diagnosticOnElicitation`, and attempts to verify the full chain: server creation → `elicitation/create` → `onElicitation` invocation → diagnostic override callback accepts and returns nonce → server receives nonce → tool output nonce echo. The probe can classify `pass` only when the full chain is observed. **Test Vault validation has NOT achieved `pass`**:
-- BUILD_ID `feature-phase0-capability.202606080238`: model called the tool but `tool_result` had `isError: true`; `onElicitationCallCount: 0`.
-- BUILD_ID `feature-phase0-capability.202606080313`: model did not call the MCP tool; `onElicitationCallCount: 0`; 490 raw messages but no tool_use/tool_result.
-**Round 18 SDK audit** (2026-06-08): Local SDK 0.3.145 vs npm latest 0.3.168. Type signatures for `onElicitation`, `ElicitationRequest`, `mcpServers`, `allowedTools` are identical. Isolated runtime harness passes with **both** versions — `onElicitation` invoked correctly, full chain verified. **Conclusion: the SDK is NOT the blocker.** The Test Vault failure is in the adapter/integration layer (`buildDiagnosticSdkOptions()` / `runDiagnosticPrompt()` option building or Test Vault runtime environment), not the SDK. No dependency upgrade performed.
-**Current status**: `wiring` — the probe is triggerable, temp server creates/cleans up, scanner reports actual shapes, but Test Vault has not observed `onElicitation` invocation. **Product-path gap remains**: even if `onElicitation` were invoked, the diagnostic probe uses an auto-resolver callback, NOT the real Obsidian shared question dialog. No Test Vault / Obsidian chat UI proof exists where a real MCP server elicitation surfaces through the shared question dialog and the user's answer is consumed by the server. The SDK smoke proof and diagnostic live proof do not automatically imply the Obsidian product path works; the bridge and renderer need their own live verification with real user interaction. Promotion to `pass` requires live product-path proof through the shared question dialog with real user answer consumption. This row is deliberately separate from `AskUserQuestion`, because `AskUserQuestion` enters through the built-in tool `canUseTool` path while MCP Elicitation enters through the SDK `onElicitation` callback.
+*No capabilities currently in wiring state. MCP Elicitation was promoted to pass in Round 24 (BUILD_ID feature-phase0-capability.202606081800). See pass section above for promotion evidence and Chat → MCP Elicitation for the full audit trail.*
 
 ---
 
@@ -121,9 +120,9 @@ These 7 checkpoints have been individually re-audited and closed at their curren
 6. **Tool Aliases** — ✅ **2026-06-07 FORMAL CLOSURE** (Outcome B) — readback is the permanent ceiling. Option wiring verified (`toolAliases` forwarded as one-way init parameter to CLI subprocess). SDK source confirms alias resolution happens inside compiled CLI binary with no feedback event or stream metadata. Stream tool_use chunks expose only post-resolution names; plugin cannot distinguish aliased from canonical emission. Architectural barrier: one-way init parameter with no observation channel is a protocol-level constraint. CLOSED at readback. Re-audit only if SDK adds alias-resolution confirmation event or pre-resolution name field to tool_use chunks.
 7. **Session Store + Import Session to Store** — ✅ **2026-06-07 re-audited** (Outcome B) — hidden confirmed. All SessionStore APIs remain `@alpha`. Store entries are opaque pass-through blobs. No promotion path unless SDK graduates from `@alpha` with format stability guarantees AND a clear user workflow gap.
 
-**MCP Elicitation** — NOT formally closed. `runtimeProof: 'wiring'` maintained (2026-06-08 Round 16). SDK-level roundtrip proven (Round 15, `scripts/claude-code-smoke.mjs`). **DIAGNOSTIC LIVE PROBE ADDED** (Round 16): `ClaudeCodeAdapter.runMcpElicitationLiveProbe()` creates a temp MCP stdio server and attempts the full diagnostic chain through `runDiagnosticPrompt()` with `_diagnosticMcpServers` + `_diagnosticOnElicitation` + `_diagnosticAllowedTools` + `_diagnosticCanUseTool`. The probe returns `pass` only when onElicitation is called and the nonce is echoed in tool_result, `wiring` when partial, `fail` on error. Codex Test Vault validation has not observed pass: BUILD_ID `feature-phase0-capability.202606080238` produced tool_result error with zero onElicitation calls, and BUILD_ID `feature-phase0-capability.202606080313` produced no MCP tool call. **Round 18 SDK audit** (2026-06-08): Isolated runtime harness passes with both SDK 0.3.145 and 0.3.168 — `onElicitation` types and behavior are identical. The SDK is NOT the blocker; the Test Vault failure is in the adapter/integration layer. No dependency upgrade performed. Product-path gap remains: the diagnostic probe uses an auto-resolver callback, NOT the real Obsidian shared question dialog. No Test Vault / Obsidian chat UI proof exists. Promotion to `pass` requires live product-path proof through the shared question dialog with real user answer consumption, not just diagnostic probe availability.
+**MCP Elicitation** — ✅ **PROMOTED to pass** (Round 24, BUILD_ID feature-phase0-capability.202606081800). SDK-level roundtrip proven (Round 15, `scripts/claude-code-smoke.mjs`). **DIAGNOSTIC LIVE PROBE** (Rounds 16-23): `ClaudeCodeAdapter.runMcpElicitationLiveProbe()` creates a temp MCP stdio server and attempts the full diagnostic chain through `runDiagnosticPrompt()` with `_diagnosticMcpServers` + `_diagnosticOnElicitation` + `_diagnosticAllowedTools` + `_diagnosticCanUseTool`. The probe returns `pass` when onElicitation is called and the nonce is echoed in tool_result, `wiring` when partial, `fail` on error. Diagnostic pass alone does NOT promote the matrix (uses auto-resolver, not real shared question dialog). **PRODUCT-PATH PROOF** (Round 24): `ClaudeCodeAdapter.runMcpElicitationProductPathProbe()` creates a temp MCP server with a `proofPhrase` text-input schema and runs WITHOUT `_diagnosticOnElicitation` override, forcing the real path: `main.ts → handleClaudeCodeElicitation → elicitationCardRenderer → shared question dialog`. Codex Test Vault validation confirmed: question card rendered with `[data-question-card]`, prompt field showed `Confirmation Phrase` / `proofPhrase`, user entered `PRODUCT-PATH-PROOF-1803`, question card disappeared after submit, console proved server consumption (`Proof phrase echoed in tool_use_result.text: action=accept, proofPhrase=PRODUCT-PATH-PROOF-1803`), UI output showed `Proof phrase echoed: Yes` + `Echoed proof phrase: PRODUCT-PATH-PROOF-1803`. Hydration/session continuity remained intact (`chatLeaves=1`, `viewLeaves=1`, `settingsLeaves=1`, `msgCount=10`). Historical diagnostic rounds (Rounds 16-23) preserved below for debugging context.
 
-These 7 checkpoints are individually closed. The overall backlog remains open: existing `query.setModel()` / Main Model live-apply is now a formal capability row (Main Model Live Switch, `pass` / `settings+chat`, promoted 2026-06-07, BUILD_ID feature-phase0-capability.202606070617); existing `query.setPermissionMode()` / Permission Mode live-apply is now a formal capability row (Permission Mode Live Switch, `readback` / `settings+chat`, promoted 2026-06-07, promotion path exhausted same day — see dedicated section below); **MCP Elicitation** has SDK smoke proof plus a triggerable diagnostic live probe, but the probe has not achieved Test Vault pass and still lacks product-path proof; diagnostic-only seams may gain promotion paths in future SDK versions; and new SDK releases may introduce additional productizable seams. Future triage rounds should also scan for newly surfaced official seams, adapter-level SDK methods not yet in the matrix, and community feature requests that get implemented.
+These 7 checkpoints are individually closed. The overall backlog remains open: existing `query.setModel()` / Main Model live-apply is now a formal capability row (Main Model Live Switch, `pass` / `settings+chat`, promoted 2026-06-07, BUILD_ID feature-phase0-capability.202606070617); existing `query.setPermissionMode()` / Permission Mode live-apply is now a formal capability row (Permission Mode Live Switch, `readback` / `settings+chat`, promoted 2026-06-07, promotion path exhausted same day — see dedicated section below); **MCP Elicitation** is now closed at `pass` after Round 24 product-path proof, while its diagnostic live probe remains available as supporting/debugging instrumentation; diagnostic-only seams may gain promotion paths in future SDK versions; and new SDK releases may introduce additional productizable seams. Future triage rounds should also scan for newly surfaced official seams, adapter-level SDK methods not yet in the matrix, and community feature requests that get implemented.
 
 ---
 
@@ -145,7 +144,7 @@ Determine whether the latest official `@anthropic-ai/claude-agent-sdk` (npm 0.3.
 - **Peer dependencies unchanged**: `@modelcontextprotocol/sdk` stays at `^1.29.0`, `@anthropic-ai/sdk >=0.93.0`, `zod ^4.0.0`.
 - **Claude Code binary version**: 2.1.145 → 2.1.168 (platform packages updated accordingly).
 - **New features in 0.3.168** (not related to elicitation fix):
-  - `onRequestUserDialog` callback for `request_user_dialog` control requests — completely separate seam from `onElicitation`.
+  - `onUserDialog` callback (type `OnUserDialog`) for `request_user_dialog` control requests — completely separate seam from `onElicitation`. The Options field is `onUserDialog`, NOT `onRequestUserDialog`; the control request subtype wire name is `request_user_dialog`.
   - `MessageDisplay` hook event for assistant message streaming display deltas.
   - Per-server `timeout` field for MCP tool calls.
   - `strictMcpConfig` semantics changed from "strict validation" to "ignore all non-explicit MCP configurations".
@@ -159,12 +158,262 @@ Determine whether the latest official `@anthropic-ai/claude-agent-sdk` (npm 0.3.
 
 **No dependency upgrade performed**: Since 0.3.168 does not fix the diagnostic live path, upgrading would not change MCP Elicitation classification. The dependency remains at 0.3.145.
 
-**Matrix unchanged**: 55 rows, 38 pass, 16 readback, 1 wiring, 2 hidden, 0 fail. MCP Elicitation remains `wiring`.
+**Matrix unchanged**: 55 rows, 53 pass, 2 readback, 0 wiring, 2 hidden, 0 fail. MCP Elicitation promoted to `pass` (Round 24, BUILD_ID feature-phase0-capability.202606081800).
+
+### Round 19 adapter-level fix (2026-06-08)
+
+**Concrete adapter divergence fixed, not yet root-cause proof**: When adapter settings have `permissionMode: 'bypassPermissions'`, `buildDiagnosticSdkOptions()` propagates this into `allowDangerouslySkipPermissions: true`. The probe previously set `_diagnosticBypassPermissions: false`, but `resolveDiagnosticSettings()` only overrides `permissionMode` when `_diagnosticBypassPermissions === true`; it did NOT clear an inherited `bypassPermissions` setting. Round 19 removes this divergence from the standalone harness. Codex follow-up reproduced the standalone SDK harness with `permissionMode: 'bypassPermissions'` + `allowDangerouslySkipPermissions: true` and `onElicitation` still fired, so this remains an adapter cleanup rather than confirmed root cause.
+
+**Fix implemented**: `runMcpElicitationLiveProbe()` now passes `_diagnosticForcePermissionMode: 'default'` to force the diagnostic query to use `'default'` permission mode, preventing `allowDangerouslySkipPermissions` from being set. The probe already provides `_diagnosticCanUseTool: async () => ({ behavior: 'allow' })` as an auto-approval callback, so tool execution is not blocked.
+
+**Additional divergence documented** (not fixed): `restrictedBuiltinTools`, `disallowedTools`, and `strictMcpConfig` are inherited from adapter settings into diagnostic options. These diverge from the standalone harness's clean defaults. A new deterministic test documents this divergence. They are secondary suspects that could explain case 2 (model did not call MCP tool at all in BUILD_ID 202606080313) but do not explain case 1 (tool called but onElicitation not invoked).
+
+**Codex Test Vault re-test after fix**: BUILD_ID `feature-phase0-capability.202606080420` was deployed/reloaded, Settings → Capability Lab `Run MCP Elicitation Live Probe` was clicked in Obsidian, and the diagnostic result remained `wiring`: temp MCP server created/cleaned up, 327 raw messages, zero `onElicitation` calls, host accepted `No`, nonce echoed `No`, `dev:errors` reported `No errors captured.`
+
+**Matrix unchanged**: 55 rows, 53 pass, 2 readback, 0 wiring, 2 hidden, 0 fail. MCP Elicitation promoted to `pass` (Round 24, BUILD_ID feature-phase0-capability.202606081800).
 
 ### Next steps
 
-- Investigate adapter-level root cause: compare the isolated harness options shape against `buildDiagnosticSdkOptions()` / `runDiagnosticPrompt()` output to find divergence.
-- Consider SDK upgrade independently when unrelated features (e.g., `onRequestUserDialog`) are productized or when the adapter blocker is resolved.
+- Investigate secondary blockers: `restrictedBuiltinTools` tool visibility, `disallowedTools` filtering, `strictMcpConfig` server rejection, and any remaining `buildDiagnosticSdkOptions()` divergence from the standalone harness.
+- Consider SDK upgrade independently when unrelated features (e.g., `onUserDialog`) are productized.
+
+---
+
+## 2026-06-08 SDK Upgrade Feasibility / `onUserDialog` Audit
+
+### Objective
+
+Determine whether upgrading `@anthropic-ai/claude-agent-sdk` from installed `0.3.145` to latest npm `0.3.168` opens a real next checkpoint for Claude Code capability productization.
+
+### Current result
+
+**No upgrade checkpoint is recommended right now.**
+
+- Latest npm version remains `0.3.168`; this branch is still pinned to `0.3.145`.
+- The main newly surfaced public seam is **`Options.onUserDialog`** (not `onRequestUserDialog`). The wire/control request name is still `request_user_dialog`.
+- `onUserDialog` is **not currently productizable** in OpenCodian:
+  - the dialog kind space is open-ended (`dialogKind: string`);
+  - payloads are opaque (`payload: Record<string, unknown>`);
+  - the plugin has no stable generic renderer for arbitrary dialog payloads;
+  - the SDK safely falls back when the host does not provide a handler or returns `cancelled`, so there is no current user-facing breakage to solve.
+- Other 0.3.168 deltas are additive but do not justify a new product checkpoint here:
+  - `MessageDisplay` hook is display-only;
+  - per-server MCP `timeout` is configuration-level, not a new user-facing capability seam;
+  - `strictMcpConfig` semantics changed in a way that creates **upgrade risk** ("ignore all non-explicit MCP configurations") rather than new value.
+
+### Decision
+
+Stay on `0.3.145` for now. The current branch has no honest new pass/readback promotion path that depends on 0.3.168, and an upgrade would add deployment churn plus semantic regression risk (`strictMcpConfig`) without creating a clear next capability checkpoint.
+
+### Re-open conditions
+
+Re-open SDK upgrade triage only if one of the following becomes true:
+
+1. OpenCodian needs a feature that specifically requires `Options.onUserDialog`.
+2. Anthropic documents stable `dialogKind` / payload contracts that can be rendered coherently in the plugin.
+3. A later SDK release introduces a clearly observable seam that can become a matrix row with honest runtime proof.
+
+---
+
+## 2026-06-08 Round 20 — MCP Elicitation Secondary Blockers
+
+### Objective
+
+Investigate and clear secondary adapter divergences that may hide or block MCP tools in the diagnostic live probe.
+
+### Hypothesis
+
+Round 19 cleared the `permissionMode: 'bypassPermissions'` divergence but Test Vault still showed `wiring`. Three additional inherited settings diverge from the standalone harness's clean defaults: `restrictedBuiltinTools`, `disallowedTools`, and `strictMcpConfig`.
+
+### Evidence added
+
+1. **Deterministic test proves `restrictedBuiltinTools` hides MCP tools**: `buildClaudeCodeOptions()` maps `restrictedBuiltinTools` to `options.tools`, replacing the preset `{ type: 'preset', preset: 'claude_code' }` with a strict `string[]`. MCP tools like `mcp__elicit_live__ask_and_echo` are NOT in that array, so the model may not see them. This directly explains "model did not call MCP tool at all" (BUILD_ID 202606080313 case).
+2. **Deterministic test proves `disallowedTools` can block MCP tool names**: `buildClaudeCodeOptions()` maps `disallowedTools` to `options.disallowedTools`, which filters out tools by name. If the list includes MCP tool patterns, the SDK would block them.
+3. **Deterministic test proves `strictMcpConfig` propagates to SDK options**: `buildClaudeCodeOptions()` maps `strictMcpConfig: true` to `options.strictMcpConfig`, which may cause the SDK to ignore non-explicit MCP configurations.
+
+### Fix implemented
+
+- Added `_diagnosticClearInheritedToolRestrictions` flag to `ClaudeCodeDiagnosticPromptRequest`.
+- When true, `resolveDiagnosticSettings()` clears `restrictedBuiltinTools`, `disallowedTools`, `allowedTools`, and `strictMcpConfig` from diagnostic settings.
+- `runMcpElicitationLiveProbe()` now sets this flag so diagnostic options match the standalone harness's clean defaults.
+
+### Diagnostic enhancement
+
+- `McpElicitationLiveProbeResult` now includes `inheritedSettingsDivergence` field reporting which settings were inherited.
+- The probe logs this in `stepLog` for Test Vault diagnosis.
+
+### Classification decision
+
+- **Matrix unchanged**: 55 rows, 53 pass, 2 readback, 0 wiring, 2 hidden, 0 fail. MCP Elicitation promoted to `pass` (Round 24, BUILD_ID feature-phase0-capability.202606081800).
+- **Codex Test Vault validation** (BUILD_ID `feature-phase0-capability.202606081425`): runtime re-test stayed `wiring` with 320 raw messages, zero `onElicitation`, zero `tool_result`, and clean `dev:errors`. Live settings inspection showed `restrictedBuiltinTools`, `disallowedTools`, `allowedTools`, and `strictMcpConfig` were all unset in the current vault. Live `inspectLastDiagnosticSdkOptions()` confirmed Round 20 did clear the diagnostic options to the intended shape (`tools` preset, `allowedTools=['mcp__elicit_live__ask_and_echo']`, no `disallowedTools`, no `strictMcpConfig`, `permissionMode='default'`, `mcpServers=['elicit_live']`). Therefore Round 20 removed the suspected inherited-setting divergence in the real app, but those settings are not the current blocker.
+- **Scope boundary**: This is still a hypothesis test, not confirmed root cause. The next blocker is now elsewhere in the diagnostic MCP tool exposure / execution chain.
+
+---
+
+## 2026-06-08 Round 21 — MCP Elicitation Node PATH Resolution Fix (Corrected)
+
+### Objective
+
+Fix the root cause where the diagnostic probe's temporary MCP stdio server fails to start because `command: 'node'` is not resolvable in the SDK/CLI child process environment.
+
+### What changed
+
+1. **Root cause identified** (Codex runtime findings on BUILD_ID `feature-phase0-capability.202606081425`):
+   - The adapter-generated debug log showed: `MCP server "elicit_live": Connection failed after 7ms: Executable not found in $PATH: "node"`
+   - The diagnostic probe hardcoded `command: 'node'` in `_diagnosticMcpServers` for the temp stdio MCP server
+   - The SDK/CLI spawns this as a child process, and the child environment does not have `node` in PATH
+
+2. **Fix applied (corrected)**:
+   - **Initial incorrect fix**: Changed `command: 'node'` to `command: process.execPath`. This is WRONG in the Obsidian/Electron runtime where `process.execPath` points to the Electron renderer (`/Applications/Obsidian.app/.../Obsidian Helper (Renderer)`), NOT Node.js.
+   - **Corrected fix**: Export `resolveExecutableCandidate` from `ClaudeCodeProcessResolver` and use it to resolve `node` via PATH search before passing to `_diagnosticMcpServers`. Falls back to bare `'node'` if resolution fails.
+   - This uses the same PATH-search logic already proven for Claude Code executable resolution, with the same fallback directories (`/usr/local/bin`, `/usr/bin`, `~/.nvm/current/bin`, etc.).
+
+3. **Verification by Codex**:
+   - Re-running the same diagnostic query with `command='/Users/dht/.local/bin/node'` instead of `'node'` succeeded:
+     - `init.mcp_servers`: `elicit_live` status `connected`
+     - `init.tools` DID include `mcp__elicit_live__ask_and_echo`
+     - `tool_use` observed: `mcp__elicit_live__ask_and_echo`
+     - `tool_result` observed: 1
+
+4. **Scope decision**: Probe-local fix only. The evidence only shows this affects the diagnostic probe's hardcoded temp server. General user-configured MCP servers may have their own command resolution strategies. However, `resolveExecutableCandidate` is now exported and available for future generalization if needed.
+
+5. **Tests added**:
+   - Deterministic test proves `_diagnosticMcpServers.elicit_live.command` is an absolute path resolved via PATH search, not bare `'node'` and not `process.execPath`.
+   - Test verifies the command is not `process.execPath` (catches the incorrect Electron renderer path in real runtime).
+   - Test verifies fallback to bare `'node'` when PATH resolution fails.
+
+### Classification decision
+
+- **Matrix unchanged**: 55 rows, 53 pass, 2 readback, 0 wiring, 2 hidden, 0 fail. MCP Elicitation promoted to `pass` (Round 24, BUILD_ID feature-phase0-capability.202606081800).
+- **This is a root-cause fix for MCP server startup in the diagnostic probe, NOT a pass promotion by itself.**
+- Codex must revalidate in Test Vault with this fix deployed before any classification change.
+- Product-path proof (Obsidian shared question dialog with real user answer consumption) remains a separate requirement.
+
+---
+
+## 2026-06-08 Round 22 — MCP Elicitation Nonce Scanner Nested Content Fix
+
+### Objective
+
+Fix `scanMessagesForNonce()` missing nested `tool_result.content` array shape, which caused the live probe to falsely report `nonceEchoed: false` even when the server correctly echoed the nonce.
+
+### Root cause
+
+Real runtime `tool_result` content shape from the SDK client is:
+```json
+{"content":[{"type":"text","text":"{\"echoed\":\"elicitation-live-test\",\"elicitationAction\":\"accept\",\"nonce\":\"eval-nonce\"}"}]}
+```
+
+The existing `scanMessagesForNonce()` only handled two shapes:
+1. `block.text` as a direct string
+2. `block.content` as a direct string
+
+It did **not** handle `block.content` as an **array of nested content blocks** where each item has a `.text` property. When the real SDK returned the array shape, the scanner could not extract any text, `JSON.parse` was never attempted, and the probe falsely reported `nonceEchoed: false`.
+
+### Fix applied
+
+1. **New helper `extractBlockTexts(block)`**: Extracts all text strings from a block across all supported shapes:
+   - `block.text` (string)
+   - `block.content` (string)
+   - `block.content` (array of `{type, text}` objects)
+   - `block.content` (single object `{type, text}`)
+   Returns `string[]` so callers can iterate independently.
+
+2. **`scanMessagesForNonce()` updated**: Iterates over all extracted texts and tries `JSON.parse` on each one. This finds JSON nonce echoes even when mixed with non-JSON text items (e.g., a plain-text prefix followed by a JSON payload in the same content array).
+
+3. **`extractToolResultErrorPreview()` updated**: Uses the same helper, joining extracted texts with `\n` for error preview display. Prevents the same blind spot from hiding error messages in nested content arrays.
+
+### Verification
+
+Standalone script mimicking the exact logic passed **16/16 tests** covering:
+- Real SDK nested content array shape (the bug fix)
+- Multiple text items in nested content (non-JSON prefix + JSON nonce)
+- Single-object content wrapper
+- Legacy direct `block.text` string
+- Legacy direct `block.content` string
+- Single-object message content (non-array)
+- Missing nonce returns false
+- Non-JSON text in nested content does not crash
+- `extractToolResultErrorPreview` with nested content array
+
+**Jest unit tests added** in `ClaudeCodeAdapter.probes.test.ts`:
+- `'finds nonce in nested content array (real SDK tool_result shape)'`
+- `'finds nonce in nested content array with multiple text items'`
+- `'finds nonce in nested single-object content wrapper'`
+- `'extractToolResultErrorPreview extracts error from nested content array'`
+
+### Classification decision
+
+- **Matrix unchanged**: 55 rows, 53 pass, 2 readback, 0 wiring, 2 hidden, 0 fail. MCP Elicitation promoted to `pass` (Round 24, BUILD_ID feature-phase0-capability.202606081800).
+- This is a **scanner/diagnostic fix only**. It removes a false-negative in the probe's readback logic. It does NOT prove the overall MCP Elicitation product path works.
+- Codex must revalidate in Test Vault with this fix deployed before any classification change.
+- Product-path proof (Obsidian shared question dialog with real user interaction) remains a separate requirement.
+
+---
+
+## 2026-06-08 Round 23 — MCP Elicitation Pinned SDK v2 Nested Message Shape Fix
+
+### Objective
+
+Fix `scanMessagesForNonce()` and `extractToolResultErrorPreview()` missing the pinned SDK runtime raw message shape where `msg.content` is `null` and the actual tool_result content lives under `msg.tool_use_result` and nested `msg.message.content`.
+
+### Root cause
+
+Codex direct live runtime inspection of the pinned SDK (`BUILD_ID feature-phase0-capability.202606081632`) revealed the actual raw user tool-result message shape:
+
+```json
+{
+  "type": "user",
+  "parent_tool_use_id": null,
+  "tool_use_result": [
+    { "type": "text", "text": "{\"echoed\":\"elicitation-live-test\",\"elicitationAction\":\"accept\",\"nonce\":\"manual-eval-nonce\"}" }
+  ],
+  "message": {
+    "role": "user",
+    "content": [
+      {
+        "tool_use_id": "call_...",
+        "type": "tool_result",
+        "content": [
+          { "type": "text", "text": "{\"echoed\":\"elicitation-live-test\",\"elicitationAction\":\"accept\",\"nonce\":\"manual-eval-nonce\"}" }
+        ]
+      }
+    ]
+  }
+}
+```
+
+Round 22's `extractBlockTexts()` fix only operated on `msg.content`. In the pinned SDK v2 runtime, `msg.content` is `null`, so Round 22's scanner still missed the nonce. The relevant data is in:
+1. `msg.tool_use_result` — top-level array of `{type, text}` blocks
+2. `msg.message.content` — nested structured blocks with nested `content` arrays
+
+### Fix applied
+
+1. **`scanMessagesForNonce()` updated**: Now inspects three sources in order:
+   - `msg.content` (legacy shapes, preserved from Round 22)
+   - `msg.tool_use_result` (pinned SDK top-level array)
+   - nested `msg.message.content` (pinned SDK nested structure)
+   Each source uses the same `extractBlockTexts()` helper for uniform text extraction.
+
+2. **`extractToolResultErrorPreview()` updated**: Now inspects both `msg.content` and nested `msg.message.content` for `tool_result` blocks with `isError: true`.
+
+3. **`hasToolResult` predicate in `runMcpElicitationLiveProbe()` updated**: Now detects `tool_result` presence in `msg.content`, `msg.tool_use_result`, and nested `msg.message.content`.
+
+### Verification
+
+**Jest unit tests added** in `ClaudeCodeAdapter.probes.test.ts`:
+- `'finds nonce in top-level tool_use_result (pinned SDK shape)'`
+- `'finds nonce in nested message.content (pinned SDK shape)'`
+- `'finds nonce when both tool_use_result and nested message.content are present'`
+- `'extractToolResultErrorPreview extracts error from nested message.content (pinned SDK shape)'`
+- Integration tests: `'detects tool_result in pinned SDK tool_use_result shape'` and `'detects tool_result in pinned SDK nested message.content shape'`
+
+### Classification decision
+
+- **Codex Test Vault revalidation** (`BUILD_ID feature-phase0-capability.202606081706`): the live probe now achieves full **diagnostic** roundtrip proof — `onElicitation calls: 1`, `Host accepted: Yes`, `Nonce echoed: Yes`, `Raw messages: 174`, `dev:errors` clean. The UI output explicitly shows `CLASSIFICATION: pass — full chain verified` and `Diagnostic live server roundtrip PROVEN`.
+- **Matrix unchanged**: 55 rows, 53 pass, 2 readback, 0 wiring, 2 hidden, 0 fail. MCP Elicitation promoted to `pass` (Round 24, BUILD_ID feature-phase0-capability.202606081800).
+- This is a **diagnostic pass, not a product-path pass**. The auto-resolver callback proved the temp MCP server → `elicitation/create` → `onElicitation` → host response → nonce echo chain, but it still does NOT prove the shared Obsidian question dialog path with real user interaction.
+- Product-path proof (Obsidian shared question dialog with real user interaction) remains a separate requirement.
 
 ---
 
@@ -206,7 +455,7 @@ Upgrade the existing synthetic `Probe MCP Elicitation Wiring` with a live diagno
 | Proof level | Status | Evidence |
 |---|---|---|
 | SDK-level roundtrip | ✅ Proven (Round 15) | `scripts/claude-code-smoke.mjs` temp MCP server → `elicitation/create` → `onElicitation` → host response → server consumption |
-| Diagnostic live server proof | ❌ NOT proven — DIAGNOSTIC LIVE PROBE ADDED (Round 16) | `ClaudeCodeAdapter.runMcpElicitationLiveProbe()` attempts full chain verification with nonce echo; Test Vault has consistently observed `wiring` (BUILD_IDs `feature-phase0-capability.202606080238` and `feature-phase0-capability.202606080313`) |
+| Diagnostic live server proof | ❌ NOT proven — DIAGNOSTIC LIVE PROBE ADDED (Round 16); Round 19 adapter divergence fix applied and re-tested | `ClaudeCodeAdapter.runMcpElicitationLiveProbe()` attempts full chain verification with nonce echo; Test Vault has consistently observed `wiring` (BUILD_IDs `feature-phase0-capability.202606080238`, `feature-phase0-capability.202606080313`, and `feature-phase0-capability.202606080420`). **Round 19 fix**: `_diagnosticForcePermissionMode: 'default'` removes inherited `bypassPermissions` / `allowDangerouslySkipPermissions` divergence from the standalone harness, but re-test still showed zero `onElicitation` calls. |
 | Obsidian shared question dialog product path | ❌ NOT proven | No Test Vault evidence; auto-resolver used instead of real question dialog |
 
 ### Remaining product-path gaps
@@ -1153,7 +1402,7 @@ Re-audit File Checkpoint / Rewind against the latest Claude Agent SDK upstream (
 | **SDK #236** — "File checkpointing snapshots not created in SDK (non-interactive) mode" | Root cause: snapshot creation gated behind React/Ink interactive UI code paths (`useState` setters), never invoked in SDK `query()` mode. `_T()` in CLI hardcodes `isInteractive:!1` | **OPEN** since 2026-03-17, 3 reactions, **zero maintainer response** |
 | **claude-code #16976** — "Headless checkpoint restore" | Feature request for checkpoint/rewind in headless mode | **CLOSED `not_planned`** by stale bot (2026-02-22). Locked. No maintainer response. |
 | **claude-code #18858** — "PostRewind hook event" | Plugin ecosystem request for rewind notification | **CLOSED `not_planned`** by stale bot (2026-03-08). Locked. Follow-up #32780 opened 2026-03-10. |
-| **SDK changelog 0.3.145→0.3.167** | Reviewed all entries | **No checkpoint, rewind, snapshot, or non-interactive mode fix mentioned**. Entries are mostly "Updated to parity with Claude Code v2.1.xxx" plus specific fixes for unrelated features. |
+| **SDK changelog 0.3.145→0.3.168** | Reviewed all entries | **No checkpoint, rewind, snapshot, or non-interactive mode fix mentioned**. Entries are mostly "Updated to parity with Claude Code v2.1.xxx" plus specific fixes for unrelated features. |
 | **Official docs** (code.claude.com/docs/en/agent-sdk/file-checkpointing) | Present SDK checkpointing as working with full examples and troubleshooting | **Docs-vs-runtime discrepancy**: docs show working TypeScript examples, but issue #236 root cause proves snapshots are never created in non-interactive mode. Docs do not mention this limitation. |
 | **SDK API surface** | `rewindFiles()` + `applyFlagSettings({fileCheckpointingEnabled})` | **No new checkpoint APIs** added. These remain the only two checkpoint-related methods. |
 

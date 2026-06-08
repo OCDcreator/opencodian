@@ -246,6 +246,7 @@ function shouldUseBuiltInSyntheticCommand(
 export class SlashCommandExecutionService {
   constructor(private readonly host: SlashCommandExecutionHost) {}
 
+  // eslint-disable-next-line complexity -- Slash command dispatch intentionally branches over known commands in one auditable method.
   async tryRunSlashCommand(content: string): Promise<boolean | string> {
     const parsedCommand = parseSlashCommandInput(content);
     if (!parsedCommand) {

@@ -86,7 +86,7 @@ function getAugmentedPath(env: ClaudeCodeProcessResolverEnv, platform: NodeJS.Pl
   return [...new Set(entries)].join(delimiter);
 }
 
-function resolveExecutableCandidate(
+export function resolveExecutableCandidate(
   configuredPath: string,
   options: {
     env: ClaudeCodeProcessResolverEnv;

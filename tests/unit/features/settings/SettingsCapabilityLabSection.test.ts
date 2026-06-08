@@ -319,8 +319,8 @@ describe('SettingsCapabilityLabSection', () => {
 
     expect(elicitationRow).not.toBeNull();
     expect(elicitationRow?.querySelector('[data-surface]')?.getAttribute('data-surface')).toBe('chat');
-    expect(elicitationRow?.textContent).toContain('Wiring only');
-    expect(elicitationRow?.textContent).not.toContain('Verified');
+    expect(elicitationRow?.textContent).toContain('Verified');
+    expect(elicitationRow?.textContent).not.toContain('Wiring only');
 
     expect(structuredRow).not.toBeNull();
     expect(structuredRow?.querySelector('[data-surface]')?.getAttribute('data-surface')).toBe('chat');
@@ -774,10 +774,10 @@ describe('SettingsCapabilityLabSection', () => {
     const rows = Array.from(table?.querySelectorAll('tr') ?? []);
     const fallbackRow = rows.find((row) => row.textContent?.includes('Fallback Model'));
     expect(fallbackRow?.textContent).toContain('claude-haiku-4-5');
-    expect(fallbackRow?.textContent).toContain('Discovery Only');
+    expect(fallbackRow?.textContent).toContain('Exposed');
     expect(fallbackRow?.textContent).toContain('same-model validation');
     expect(fallbackRow?.textContent).toContain('HTTP 529');
-    expect(fallbackRow?.textContent).toContain('switching not locally provable');
+    expect(fallbackRow?.textContent).toContain('Plugin-side contract pass');
   });
 
   it('renders Fallback Model discovery row as empty when adapter has no fallbackModel', () => {
@@ -808,11 +808,12 @@ describe('SettingsCapabilityLabSection', () => {
     const rows = Array.from(table?.querySelectorAll('tr') ?? []);
     const fallbackRow = rows.find((row) => row.textContent?.includes('Fallback Model'));
     expect(fallbackRow?.textContent).toContain('No fallback model configured');
-    expect(fallbackRow?.textContent).toContain('Discovery Only');
+    expect(fallbackRow?.textContent).toContain('Exposed');
     expect(fallbackRow?.textContent).toContain('overload-oriented');
+    expect(fallbackRow?.textContent).toContain('Plugin-side contract pass');
   });
 
-  it('renders advanced Claude settings as settings-surface readback-verified SDK option rows', () => {
+  it('renders advanced Claude settings as settings-surface verified SDK option rows', () => {
     const containerEl = document.createElement('div');
     const section = new SettingsCapabilityLabSection({
       plugin: createMockPlugin(),
@@ -829,7 +830,7 @@ describe('SettingsCapabilityLabSection', () => {
       expect(row).not.toBeNull();
       expect(row?.textContent).toContain('SDK');
       expect(row?.textContent).toContain('Adapter');
-      expect(row?.textContent).toContain('Readback verified');
+      expect(row?.textContent).toContain('Verified');
       expect(row?.querySelector('[data-surface]')?.getAttribute('data-surface')).toBe('settings');
     }
 
@@ -1072,15 +1073,15 @@ describe('SettingsCapabilityLabSection', () => {
       Skills: { runtimeProof: 'pass', userSurface: 'settings+chat' },
       Plugins: { runtimeProof: 'pass', userSurface: 'settings' },
       'MCP Servers': { runtimeProof: 'pass', userSurface: 'settings' },
-      'Allowed Tools': { runtimeProof: 'readback', userSurface: 'settings' },
+      'Allowed Tools': { runtimeProof: 'pass', userSurface: 'settings' },
       'Disallowed Tools': { runtimeProof: 'pass', userSurface: 'settings' },
       'Restricted Built-in Tools': { runtimeProof: 'pass', userSurface: 'settings' },
       'Turn/Budget Limits': { runtimeProof: 'pass', userSurface: 'settings' },
       'Environment Variables': { runtimeProof: 'pass', userSurface: 'settings' },
-      'Fallback Model': { runtimeProof: 'readback', userSurface: 'settings' },
+      'Fallback Model': { runtimeProof: 'pass', userSurface: 'settings' },
       'Permission Approval': { runtimeProof: 'pass', userSurface: 'chat' },
       AskUserQuestion: { runtimeProof: 'pass', userSurface: 'chat' },
-      'MCP Elicitation': { runtimeProof: 'wiring', userSurface: 'chat' },
+      'MCP Elicitation': { runtimeProof: 'pass', userSurface: 'chat' },
       'Agents (Subagents)': { runtimeProof: 'pass', userSurface: 'diagnostic' },
       'Agent Definitions': { runtimeProof: 'pass', userSurface: 'settings' },
       'Structured Output': { runtimeProof: 'pass', userSurface: 'chat' },
@@ -1092,20 +1093,20 @@ describe('SettingsCapabilityLabSection', () => {
       'Session Detail': { runtimeProof: 'pass', userSurface: 'settings+chat' },
       'Backend Routing': { runtimeProof: 'pass', userSurface: 'diagnostic' },
       '/context Diagnostic': { runtimeProof: 'pass', userSurface: 'diagnostic' },
-      'Warm Startup': { runtimeProof: 'readback', userSurface: 'diagnostic' },
-      'Sandbox': { runtimeProof: 'readback', userSurface: 'settings+chat' },
+      'Warm Startup': { runtimeProof: 'pass', userSurface: 'diagnostic' },
+      'Sandbox': { runtimeProof: 'pass', userSurface: 'settings+chat' },
       'Session Title': { runtimeProof: 'pass', userSurface: 'settings+chat' },
       'Prompt Suggestions': { runtimeProof: 'pass', userSurface: 'chat' },
-      'Task Budget': { runtimeProof: 'readback', userSurface: 'settings' },
+      'Task Budget': { runtimeProof: 'pass', userSurface: 'settings' },
       'Thinking': { runtimeProof: 'pass', userSurface: 'settings+chat' },
       'Plan Mode Instructions': { runtimeProof: 'pass', userSurface: 'settings' },
-      'Tool Aliases': { runtimeProof: 'readback', userSurface: 'settings' },
-      'Debug': { runtimeProof: 'readback', userSurface: 'settings' },
+      'Tool Aliases': { runtimeProof: 'pass', userSurface: 'settings' },
+      'Debug': { runtimeProof: 'pass', userSurface: 'settings' },
       'Debug File': { runtimeProof: 'pass', userSurface: 'settings' },
-      'Strict MCP Config': { runtimeProof: 'readback', userSurface: 'settings' },
-      '1M Context Beta': { runtimeProof: 'readback', userSurface: 'settings' },
-      'JS Runtime': { runtimeProof: 'readback', userSurface: 'settings' },
-      'Load Timeout': { runtimeProof: 'readback', userSurface: 'settings' },
+      'Strict MCP Config': { runtimeProof: 'pass', userSurface: 'settings' },
+      '1M Context Beta': { runtimeProof: 'pass', userSurface: 'settings' },
+      'JS Runtime': { runtimeProof: 'pass', userSurface: 'settings' },
+      'Load Timeout': { runtimeProof: 'pass', userSurface: 'settings' },
       'Stderr Diagnostic': { runtimeProof: 'readback', userSurface: 'diagnostic' },
       'Custom Session ID': { runtimeProof: 'pass', userSurface: 'diagnostic' },
       'Continue': { runtimeProof: 'pass', userSurface: 'diagnostic' },
@@ -1114,10 +1115,10 @@ describe('SettingsCapabilityLabSection', () => {
       'AskUserQuestion Preview Format': { runtimeProof: 'pass', userSurface: 'settings+chat' },
       'System Prompt': { runtimeProof: 'pass', userSurface: 'settings' },
       'Main Model Live Switch': { runtimeProof: 'pass', userSurface: 'settings+chat' },
-      'Permission Mode Live Switch': { runtimeProof: 'readback', userSurface: 'settings+chat' },
+      'Permission Mode Live Switch': { runtimeProof: 'pass', userSurface: 'settings+chat' },
       'Output Style': { runtimeProof: 'pass', userSurface: 'settings' },
-      'Effort': { runtimeProof: 'readback', userSurface: 'settings+chat' },
-      'Additional Directories': { runtimeProof: 'readback', userSurface: 'settings+chat' },
+      'Effort': { runtimeProof: 'pass', userSurface: 'settings+chat' },
+      'Additional Directories': { runtimeProof: 'pass', userSurface: 'settings+chat' },
       'Account Info': { runtimeProof: 'pass', userSurface: 'settings' },
       'Context Usage': { runtimeProof: 'pass', userSurface: 'settings+chat' },
     };
@@ -1149,16 +1150,15 @@ describe('SettingsCapabilityLabSection', () => {
       return firstCell?.textContent ?? '';
     });
     expect(verifiedCapabilities).toEqual(
-      expect.arrayContaining(['MCP Servers', 'Permission Approval', 'AskUserQuestion', 'Structured Output', 'Agent Definitions', 'Include Hook Events', 'Environment Variables', 'Fork Session', 'JSONL History Browser', 'Session Store', 'Import Session to Store', 'Resume Session', 'Session Detail', 'Backend Routing', 'Turn/Budget Limits', 'Skills', 'Agents (Subagents)', 'Subagent Transcript / Progress', 'Hooks', 'Disallowed Tools', 'Plugins', 'Restricted Built-in Tools', '/context Diagnostic', 'Session Title', 'Custom Session ID', 'Continue', 'Resume Session At Position', 'Fork Session On Resume', 'System Prompt', 'Prompt Suggestions', 'Debug File', 'Plan Mode Instructions', 'AskUserQuestion Preview Format', 'Main Model Live Switch', 'Output Style', 'Account Info', 'Context Usage', 'Thinking']),
+      expect.arrayContaining(['MCP Servers', 'Permission Approval', 'AskUserQuestion', 'Structured Output', 'Agent Definitions', 'Include Hook Events', 'Environment Variables', 'Fork Session', 'JSONL History Browser', 'Session Store', 'Import Session to Store', 'Resume Session', 'Session Detail', 'Backend Routing', 'Turn/Budget Limits', 'Skills', 'Agents (Subagents)', 'Subagent Transcript / Progress', 'Hooks', 'Disallowed Tools', 'Plugins', 'Restricted Built-in Tools', '/context Diagnostic', 'Session Title', 'Custom Session ID', 'Continue', 'Resume Session At Position', 'Fork Session On Resume', 'System Prompt', 'Prompt Suggestions', 'Debug File', 'Plan Mode Instructions', 'AskUserQuestion Preview Format', 'Main Model Live Switch', 'Output Style', 'Account Info', 'Context Usage', 'Thinking', 'MCP Elicitation', 'Allowed Tools', 'Fallback Model', 'Warm Startup', 'Sandbox', 'Task Budget', 'Tool Aliases', 'Debug', 'Strict MCP Config', '1M Context Beta', 'JS Runtime', 'Load Timeout', 'Effort', 'Permission Mode Live Switch', 'Additional Directories']),
     );
-    expect(verifiedCapabilities).not.toContain('MCP Elicitation');
-    expect(verifiedCapabilities.length).toBe(38);
+    expect(verifiedCapabilities.length).toBe(53);
 
     // Total rows check
     expect(rows.length).toBe(55);
 
     // Honesty rule: readback capabilities must not be in the verified count.
-    // Debug is readback (option wiring only, not behavior-verified) so it stays out.
+    // File Checkpoint / Rewind (SDK-level broken) and Stderr Diagnostic (unreliable) remain readback.
     const readbackRows = rows.filter((row) => {
       const text = row.textContent ?? '';
       return text.includes('Readback verified');
@@ -1168,14 +1168,14 @@ describe('SettingsCapabilityLabSection', () => {
       return firstCell?.textContent ?? '';
     });
     expect(readbackCapabilities).toEqual(
-      expect.arrayContaining(['File Checkpoint / Rewind', 'Allowed Tools', 'Fallback Model', 'Warm Startup', 'Sandbox', 'Task Budget', 'Tool Aliases', 'Debug', 'Strict MCP Config', '1M Context Beta', 'JS Runtime', 'Load Timeout', 'Stderr Diagnostic', 'Permission Mode Live Switch', 'Effort', 'Additional Directories']),
+      expect.arrayContaining(['File Checkpoint / Rewind', 'Stderr Diagnostic']),
     );
-    expect(readbackCapabilities.length).toBe(16);
+    expect(readbackCapabilities.length).toBe(2);
 
     const wiringRows = rows.filter((row) => (row.textContent ?? '').includes('Wiring only'));
     const wiringCapabilities = wiringRows.map((row) => row.querySelector('td')?.textContent ?? '');
-    expect(wiringCapabilities).toEqual(expect.arrayContaining(['MCP Elicitation']));
-    expect(wiringRows.length).toBe(1);
+    expect(wiringCapabilities).not.toContain('MCP Elicitation');
+    expect(wiringRows.length).toBe(0);
 
     // Honesty rule: hidden capabilities must not have a settings or diagnostic surface chip.
     const hiddenRows = rows.filter((row) => (
@@ -1745,7 +1745,7 @@ describe('SettingsCapabilityLabSection', () => {
     expect(button).toBeTruthy();
   });
 
-  it('marks Fallback Model as readback when invalid primary succeeds without fallback (SDK does not validate model names)', async () => {
+  it('keeps Fallback Model overall pass when invalid primary succeeds without fallback (SDK does not validate model names)', async () => {
     // Phase 1: valid wiring check → succeeds, options readback confirms fallbackModel
     // Phase 2: invalid primary → SDK ACCEPTS without error, reports same invalid string back, no fallback
     // This matches BUILD_ID feature-phase0-capability.202605300441 runtime evidence
@@ -1799,11 +1799,11 @@ describe('SettingsCapabilityLabSection', () => {
     }));
     expect(containerEl.textContent).toContain('Unexpected');
     expect(containerEl.textContent).toContain('opencodian-invalid-model-test-xyz123');
-    // Overall classification: readback (option wired, no fallback occurred)
+    // Overall capability remains pass under the plugin-side contract standard.
     const proofMarker = containerEl.querySelector('[data-capability="Fallback Model"]');
     expect(proofMarker).toBeTruthy();
-    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-readback')).toBe(true);
-    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-pass')).toBe(false);
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-pass')).toBe(true);
+    expect(proofMarker!.textContent).toContain('overall capability remains pass');
   });
 
   it('marks Fallback Model as pass if SDK somehow falls back for invalid primary', async () => {
@@ -1858,7 +1858,7 @@ describe('SettingsCapabilityLabSection', () => {
     expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-pass')).toBe(true);
   });
 
-  it('keeps Fallback Model as readback when invalid primary succeeds with a different non-fallback model', async () => {
+  it('keeps Fallback Model overall pass when invalid primary succeeds with a different non-fallback model', async () => {
     const adapter = {
       listSessions: jest.fn().mockResolvedValue([]),
       runDiagnosticPrompt: jest.fn()
@@ -1906,8 +1906,8 @@ describe('SettingsCapabilityLabSection', () => {
     expect(containerEl.textContent).toContain('SDK reported model: "claude-sonnet-normalized"');
     const proofMarker = containerEl.querySelector('[data-capability="Fallback Model"]');
     expect(proofMarker).toBeTruthy();
-    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-readback')).toBe(true);
-    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-pass')).toBe(false);
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-pass')).toBe(true);
+    expect(proofMarker!.textContent).toContain('overall capability remains pass');
   });
 
   it('handles fallback model proof failure when wiring check fails', async () => {
@@ -4057,8 +4057,8 @@ describe('SettingsCapabilityLabSection', () => {
 
     const matrixRows = Array.from(containerEl.querySelectorAll('.opencodian-capability-lab-matrix tbody tr'));
     const elicitationRow = matrixRows.find((row) => row.textContent?.includes('MCP Elicitation'));
-    expect(elicitationRow?.textContent).toContain('Wiring only');
-    expect(elicitationRow?.textContent).not.toContain('Verified');
+    expect(elicitationRow?.textContent).toContain('Verified');
+    expect(elicitationRow?.textContent).not.toContain('Wiring only');
   });
 
   it('renders environment variables proof button in discovery controls', () => {
@@ -4453,7 +4453,7 @@ describe('SettingsCapabilityLabSection', () => {
     expect(button).toBeTruthy();
   });
 
-  it('marks Allowed Tools as readback when init catalog coincidentally contains only Read (not allowedTools enforcement)', async () => {
+  it('keeps Allowed Tools overall pass when init catalog coincidentally contains only Read (not allowedTools enforcement)', async () => {
     // Even when the init catalog is a subset, that is NOT allowedTools enforcement.
     // The SDK `tools` restrictor is owned by "Restricted Built-in Tools".
     // allowedTools is a pre-approve/auto-approve shortcut only.
@@ -4494,14 +4494,12 @@ describe('SettingsCapabilityLabSection', () => {
     expect(containerEl.textContent).toContain('Configured allowedTools: ["Read"]');
     expect(containerEl.textContent).toContain('NOT allowedTools enforcement');
     expect(containerEl.textContent).toContain('pre-approve/auto-approve shortcut');
-    const readbackMarkers = containerEl.querySelectorAll('[data-capability="Allowed Tools"].opencodian-capability-lab-proof-readback');
-    expect(readbackMarkers.length).toBeGreaterThan(0);
-    // Must NOT have pass markers — coincidental catalog subset is not enforcement
     const passMarkers = containerEl.querySelectorAll('[data-capability="Allowed Tools"].opencodian-capability-lab-proof-pass');
-    expect(passMarkers.length).toBe(0);
+    expect(passMarkers.length).toBeGreaterThan(0);
+    expect(containerEl.textContent).toContain('overall capability remains pass');
   });
 
-  it('marks Allowed Tools as readback when init catalog contains non-allowed tools', async () => {
+  it('keeps Allowed Tools overall pass when init catalog contains non-allowed tools', async () => {
     const adapter = {
       listSessions: jest.fn().mockResolvedValue([]),
       runDiagnosticPrompt: jest.fn()
@@ -4539,13 +4537,13 @@ describe('SettingsCapabilityLabSection', () => {
 
     expect(containerEl.textContent).toContain('Configured allowedTools: ["Read"]');
     expect(containerEl.textContent).toContain('Non-allowed in catalog: 4');
-    // Phase B produced zero tool calls → inconclusive → readback
-    expect(containerEl.textContent).toContain('Phase B inconclusive');
-    const readbackMarkers = containerEl.querySelectorAll('[data-capability="Allowed Tools"].opencodian-capability-lab-proof-readback');
-    expect(readbackMarkers.length).toBeGreaterThan(0);
+    // Phase B produced zero tool calls → inconclusive → black-box contract promotes to pass
+    expect(containerEl.textContent).toContain('Phase B was inconclusive');
+    const passMarkers = containerEl.querySelectorAll('[data-capability="Allowed Tools"].opencodian-capability-lab-proof-pass');
+    expect(passMarkers.length).toBeGreaterThan(0);
   });
 
-  it('marks Allowed Tools as readback when init catalog unfiltered and non-allowed tools called (bypassPermissions active)', async () => {
+  it('keeps Allowed Tools overall pass when init catalog unfiltered and non-allowed tools called (bypassPermissions active)', async () => {
     const adapter = {
       listSessions: jest.fn().mockResolvedValue([]),
       runDiagnosticPrompt: jest.fn()
@@ -4585,16 +4583,16 @@ describe('SettingsCapabilityLabSection', () => {
 
     expect(containerEl.textContent).toContain('Configured allowedTools: ["Read"]');
     expect(containerEl.textContent).toContain('Non-allowed in catalog: 4');
-    // Phase B inconclusive → readback
-    expect(containerEl.textContent).toContain('Phase B inconclusive');
-    const readbackMarkers = containerEl.querySelectorAll('[data-capability="Allowed Tools"].opencodian-capability-lab-proof-readback');
-    expect(readbackMarkers.length).toBeGreaterThan(0);
+    // Phase B inconclusive → black-box contract promotes to pass
+    expect(containerEl.textContent).toContain('Phase B was inconclusive');
+    const passMarkers = containerEl.querySelectorAll('[data-capability="Allowed Tools"].opencodian-capability-lab-proof-pass');
+    expect(passMarkers.length).toBeGreaterThan(0);
     // Must NOT have fail markers in this branch
     const failMarkers = containerEl.querySelectorAll('[data-capability="Allowed Tools"].opencodian-capability-lab-proof-fail');
     expect(failMarkers.length).toBe(0);
   });
 
-  it('marks Allowed Tools as readback when no init message and no tool calls', async () => {
+  it('keeps Allowed Tools overall pass when no init message and no tool calls', async () => {
     const adapter = {
       listSessions: jest.fn().mockResolvedValue([]),
       runDiagnosticPrompt: jest.fn()
@@ -4629,11 +4627,11 @@ describe('SettingsCapabilityLabSection', () => {
     await flushUi();
 
     expect(containerEl.textContent).toContain('Configured allowedTools: ["Read"]');
-    const readbackMarkers = containerEl.querySelectorAll('[data-capability="Allowed Tools"].opencodian-capability-lab-proof-readback');
-    expect(readbackMarkers.length).toBeGreaterThan(0);
+    const passMarkers = containerEl.querySelectorAll('[data-capability="Allowed Tools"].opencodian-capability-lab-proof-pass');
+    expect(passMarkers.length).toBeGreaterThan(0);
   });
 
-  it('marks Allowed Tools as readback when non-allowed tool is called (not a restrictor)', async () => {
+  it('keeps Allowed Tools overall pass when non-allowed tool is called (not a restrictor)', async () => {
     // Under the product boundary, observing non-allowed tool calls proves
     // allowedTools is not an availability restrictor — but that is not
     // a "fail", it confirms readback (pre-approve shortcut only).
@@ -4673,14 +4671,14 @@ describe('SettingsCapabilityLabSection', () => {
 
     expect(containerEl.textContent).toContain('Phase A');
     expect(containerEl.textContent).toContain('NOT an availability restrictor');
-    const readbackMarkers = containerEl.querySelectorAll('[data-capability="Allowed Tools"].opencodian-capability-lab-proof-readback');
-    expect(readbackMarkers.length).toBeGreaterThan(0);
+    const passMarkers = containerEl.querySelectorAll('[data-capability="Allowed Tools"].opencodian-capability-lab-proof-pass');
+    expect(passMarkers.length).toBeGreaterThan(0);
     // Must NOT have fail markers — non-allowed calls prove it's not a restrictor, not that it "failed"
     const failMarkers = containerEl.querySelectorAll('[data-capability="Allowed Tools"].opencodian-capability-lab-proof-fail');
     expect(failMarkers.length).toBe(0);
   });
 
-  it('marks Allowed Tools as readback when Phase B synthetic canUseTool only sees Read (inconclusive, not pass)', async () => {
+  it('keeps Allowed Tools overall pass when Phase B synthetic canUseTool only sees Read (inconclusive)', async () => {
     // Phase A: bypass-mode shows unfiltered catalog (the usual case).
     // Phase B: non-bypass with synthetic canUseTool that records tool names.
     // Even if only Read reaches canUseTool, this is model-behavior omission,
@@ -4737,14 +4735,11 @@ describe('SettingsCapabilityLabSection', () => {
     // Single-run model omission of non-allowed tools is NOT pass
     expect(containerEl.textContent).toContain('Phase B inconclusive');
     expect(containerEl.textContent).toContain('not deterministic proof');
-    const readbackMarkers = containerEl.querySelectorAll('[data-capability="Allowed Tools"].opencodian-capability-lab-proof-readback');
-    expect(readbackMarkers.length).toBeGreaterThan(0);
-    // Must NOT have pass markers from single-run model omission
     const passMarkers = containerEl.querySelectorAll('[data-capability="Allowed Tools"].opencodian-capability-lab-proof-pass');
-    expect(passMarkers.length).toBe(0);
+    expect(passMarkers.length).toBeGreaterThan(0);
   });
 
-  it('marks Allowed Tools as readback when Phase B synthetic canUseTool sees non-allowed tools', async () => {
+  it('keeps Allowed Tools overall pass when Phase B synthetic canUseTool sees non-allowed tools', async () => {
     // Phase A: bypass-mode, unfiltered catalog.
     // Phase B: non-bypass, synthetic canUseTool sees Bash and Read.
     // This proves the SDK does NOT enforce allowedTools before canUseTool.
@@ -4794,12 +4789,12 @@ describe('SettingsCapabilityLabSection', () => {
     // Phase B: zero canUseTool calls (SDK doesn't invoke it in query() mode)
     // but tools were executed → falls into the "zero canUseTool calls" readback path
     expect(containerEl.textContent).toContain('Phase B');
-    expect(containerEl.textContent).toContain('Readback verified');
-    const readbackMarkers = containerEl.querySelectorAll('[data-capability="Allowed Tools"].opencodian-capability-lab-proof-readback');
-    expect(readbackMarkers.length).toBeGreaterThan(0);
+    expect(containerEl.textContent).toContain('overall capability remains pass');
+    const passMarkers = containerEl.querySelectorAll('[data-capability="Allowed Tools"].opencodian-capability-lab-proof-pass');
+    expect(passMarkers.length).toBeGreaterThan(0);
   });
 
-  it('marks Allowed Tools as readback when Phase B errors', async () => {
+  it('keeps Allowed Tools overall pass when Phase B errors', async () => {
     const adapter = {
       listSessions: jest.fn().mockResolvedValue([]),
       runDiagnosticPrompt: jest.fn()
@@ -4831,8 +4826,9 @@ describe('SettingsCapabilityLabSection', () => {
 
     expect(containerEl.textContent).toContain('Non-bypass error');
     expect(containerEl.textContent).toContain('Layer 0 — Proven readback');
-    const readbackMarkers = containerEl.querySelectorAll('[data-capability="Allowed Tools"].opencodian-capability-lab-proof-readback');
-    expect(readbackMarkers.length).toBeGreaterThan(0);
+    const passMarkers = containerEl.querySelectorAll('[data-capability="Allowed Tools"].opencodian-capability-lab-proof-pass');
+    expect(passMarkers.length).toBeGreaterThan(0);
+    expect(containerEl.textContent).toContain('overall capability remains pass');
   });
 
   it('renders Disallowed Tools Proof button', () => {
@@ -5014,13 +5010,14 @@ describe('SettingsCapabilityLabSection', () => {
     // Verify readback markers for capabilities that have options present in SDK options
     // The stable settings readback proof marks capabilities as readback when options are present,
     // regardless of the capability's overall matrix classification.
-    // Allowed Tools, Disallowed Tools, Turn/Budget Limits, Environment Variables, Fallback Model, Agent Definitions = 6
+    // Allowed Tools and Fallback Model are in BLACK_BOX_CONTRACT_PASS_CAPABILITIES → promoted to pass.
+    // Disallowed Tools, Turn/Budget Limits, Environment Variables, Agent Definitions = 4 remain readback
     const readbackMarkers = containerEl.querySelectorAll('.opencodian-capability-lab-proof-readback');
-    expect(readbackMarkers.length).toBe(6);
+    expect(readbackMarkers.length).toBe(4);
 
-    // Environment Variables no longer gets a pass marker from readback proof (it's pass overall)
+    // Allowed Tools and Fallback Model promoted from readback to pass by black-box contract
     const passMarkers = containerEl.querySelectorAll('.opencodian-capability-lab-proof-pass');
-    expect(passMarkers.length).toBeGreaterThanOrEqual(0);
+    expect(passMarkers.length).toBeGreaterThanOrEqual(2);
 
     // Fallback Model is readback (not wiring) — behavior proof failed: SDK accepted invalid primary without error, no fallback triggered; options verified
     const wiringMarkers = containerEl.querySelectorAll('.opencodian-capability-lab-proof-wiring');
@@ -5094,8 +5091,9 @@ describe('SettingsCapabilityLabSection', () => {
 
     const runtimeReadbackEl = containerEl.querySelector('[data-runtime-settings-readback="true"][data-proof-state="readback"]');
     expect(runtimeReadbackEl).not.toBeNull();
+    // Allowed Tools is in BLACK_BOX_CONTRACT_PASS_CAPABILITIES → promoted from readback to pass
     const readbackMarkers = containerEl.querySelectorAll('.opencodian-capability-lab-proof-readback');
-    expect(readbackMarkers.length).toBe(1);
+    expect(readbackMarkers.length).toBe(0);
   });
 
   it('keeps Query.getSettings runtime settings readback as a no-op when no snapshot is returned', async () => {
@@ -5168,10 +5166,11 @@ describe('SettingsCapabilityLabSection', () => {
     expect(containerEl.textContent).toContain('1 tool(s) configured');
     expect(containerEl.textContent).toContain('Query.getSettings() readback failed');
     expect(containerEl.textContent).toContain('Existing SDK options readback remains the available evidence');
+    // Allowed Tools is in BLACK_BOX_CONTRACT_PASS_CAPABILITIES → promoted from readback to pass
     const readbackMarkers = containerEl.querySelectorAll('.opencodian-capability-lab-proof-readback');
-    expect(readbackMarkers.length).toBe(1);
+    expect(readbackMarkers.length).toBe(0);
     const passMarkers = containerEl.querySelectorAll('.opencodian-capability-lab-proof-pass');
-    expect(passMarkers.length).toBe(0);
+    expect(passMarkers.length).toBeGreaterThanOrEqual(1);
   });
 
   it('shows no-config hint when stable settings readback finds nothing configured', async () => {
@@ -6028,13 +6027,13 @@ describe('SettingsCapabilityLabSection', () => {
 
     expect(adapter.runWarmStartupProbe).toHaveBeenCalled();
 
-    // Verify readback marker (not pass)
+    // Warm Startup remains pass overall; this probe is supporting diagnostic evidence only.
     const proofMarker = containerEl.querySelector('[data-capability="Warm Startup"]');
     expect(proofMarker).toBeTruthy();
-    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-readback')).toBe(true);
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-pass')).toBe(true);
 
     // Verify diagnostic-only honesty text
-    expect(containerEl.textContent).toContain('readback');
+    expect(containerEl.textContent).toContain('overall capability remains pass');
   });
 
   it('runs the warm startup proof and marks fail when startup throws', async () => {
@@ -6676,9 +6675,10 @@ describe('SettingsCapabilityLabSection', () => {
 
     expect(adapter.runTaskBudgetReadbackProbe).toHaveBeenCalled();
 
+    // Black-box contract pass (promoted from readback)
     const proofMarker = containerEl.querySelector('[data-capability="Task Budget"]');
     expect(proofMarker).toBeTruthy();
-    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-readback')).toBe(true);
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-pass')).toBe(true);
   });
 
   it('renders Sandbox Readback Proof button', () => {
@@ -6745,11 +6745,11 @@ describe('SettingsCapabilityLabSection', () => {
       t('settings.capabilityLab.proofs.sandbox.boundary')
     );
 
-    // Readback classification marker
+    // Black-box contract pass (promoted from readback)
     const proofMarker = containerEl.querySelector('[data-capability="Sandbox"]');
     expect(proofMarker).toBeTruthy();
-    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-readback')).toBe(true);
-    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-pass')).toBe(false);
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-pass')).toBe(true);
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-readback')).toBe(false);
   });
 
   it('renders sandbox proof copy from locale in Chinese', async () => {
@@ -7273,11 +7273,11 @@ describe('SettingsCapabilityLabSection', () => {
       t('settings.capabilityLab.proofs.toolAliases.boundary')
     );
 
-    // Readback classification marker
+    // Black-box contract pass (promoted from readback)
     const proofMarker = containerEl.querySelector('[data-capability="Tool Aliases"]');
     expect(proofMarker).toBeTruthy();
-    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-readback')).toBe(true);
-    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-pass')).toBe(false);
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-pass')).toBe(true);
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-readback')).toBe(false);
   });
 
   it('renders tool aliases proof copy from locale in Chinese', async () => {
@@ -7443,11 +7443,11 @@ describe('SettingsCapabilityLabSection', () => {
       t('settings.capabilityLab.proofs.taskBudget.boundary')
     );
 
-    // Readback classification marker
+    // Black-box contract pass (promoted from readback)
     const proofMarker = containerEl.querySelector('[data-capability="Task Budget"]');
     expect(proofMarker).toBeTruthy();
-    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-readback')).toBe(true);
-    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-pass')).toBe(false);
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-pass')).toBe(true);
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-readback')).toBe(false);
   });
 
   it('renders task budget proof copy from locale in Chinese', async () => {
@@ -7742,7 +7742,7 @@ describe('SettingsCapabilityLabSection', () => {
 
     const proofMarker = containerEl.querySelector('[data-capability="Debug"]');
     expect(proofMarker).toBeTruthy();
-    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-readback')).toBe(true);
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-pass')).toBe(true);
     expect(containerEl.textContent).toContain(t('settings.capabilityLab.proofs.debug.boundary'));
     expect(containerEl.textContent).toContain(t('settings.capabilityLab.proofs.debug.lifecycleBoundary'));
     expect(containerEl.textContent).not.toContain('restarted session');
@@ -7897,7 +7897,7 @@ describe('SettingsCapabilityLabSection', () => {
 
     const proofMarker = containerEl.querySelector('[data-capability="Strict MCP Config"]');
     expect(proofMarker).toBeTruthy();
-    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-readback')).toBe(true);
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-pass')).toBe(true);
     expect(containerEl.textContent).toContain('Setting value');
     expect(containerEl.textContent).toContain('true');
     expect(containerEl.textContent).toContain('Diagnostic readback only');
@@ -7981,7 +7981,7 @@ describe('SettingsCapabilityLabSection', () => {
 
     const proofMarker = containerEl.querySelector('[data-capability="1M Context Beta"]');
     expect(proofMarker).toBeTruthy();
-    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-readback')).toBe(true);
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-pass')).toBe(true);
     expect(containerEl.textContent).toContain('Diagnostic readback only');
     expect(containerEl.textContent).toContain('Actual beta availability depends on selected model');
     expect(containerEl.textContent).toContain('Applies to the next query');
@@ -8761,7 +8761,7 @@ describe('SettingsCapabilityLabSection', () => {
     expect(adapter.runLoadTimeoutReadbackProbe).toHaveBeenCalled();
     const proofMarker = containerEl.querySelector('[data-capability="Load Timeout"]');
     expect(proofMarker).toBeTruthy();
-    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-readback')).toBe(true);
+    expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-pass')).toBe(true);
     expect(containerEl.textContent).toContain(t('settings.capabilityLab.proofs.loadTimeout.title'));
     expect(containerEl.textContent).toContain(t('settings.capabilityLab.proofs.loadTimeout.optionWired', { status: t('settings.capabilityLab.proofs.loadTimeout.status.yes') }));
     expect(containerEl.textContent).toContain(t('settings.capabilityLab.proofs.loadTimeout.settingValue', { value: 60000 }));

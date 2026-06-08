@@ -17,6 +17,7 @@
 
 ## 维护约束
 
+- `resolveExecutableCandidate` 已导出，可用于其他需要 PATH 解析可执行文件的场景（如 MCP stdio server 的 `command` 字段解析）。支持 `~` 展开、绝对路径保留、PATH 条目遍历和平台扩展名（Windows `.cmd`/`.exe`/`.bat`）。解析失败时返回 `null`，调用方自行决定回退策略。
 - 不负责 spawn 进程；后续 Claude adapter 或 SDK integration owner 使用本模块输出。
 - 默认不要寻找或强制要求本机 `claude` CLI，因为官方 SDK bundled binary 是主路径；external path 只作为用户配置 fallback/diagnostic。
 - PATH 增强只能影响 resolver 返回的 env，不要直接修改 `process.env`。
