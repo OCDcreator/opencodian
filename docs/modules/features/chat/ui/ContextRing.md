@@ -28,7 +28,7 @@ SVG 环形仪表组件，用于在聊天工具栏中实时显示当前会话的�
 ### 无障碍
 
 - 生成唯一 `srLabelEl.id`，通过 `aria-labelledby` 关联
-- `data-tooltip` 提供 hover 提示
+- `data-tooltip` 提供 hover 提示；构造时会确保 `TooltipLayerController` 已注册，让 ring 的详细说明也走 body-level overlay
 - `aria-hidden="true"` 用于 SVG
 - `summary.isCompacting` 时，屏幕阅读器标签会优先读出“Compacting context…”而不是百分比
 

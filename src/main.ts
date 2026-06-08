@@ -1,9 +1,28 @@
+/* eslint-disable simple-import-sort/imports -- Entry-point bootstrap imports stay manually clustered by startup seam so owner-guarded wiring changes do not create unrelated reorder churn. */
 import * as fs from 'fs';
+import type { ElicitationRequest, ElicitationResult } from '@anthropic-ai/claude-agent-sdk';
 import type { Editor, MarkdownView } from 'obsidian';
 import { addIcon, Notice, Plugin } from 'obsidian';
 import * as path from 'path';
 
 import { ModelConfigService, OpencodeConfigManager } from './core/config';
+import { setAgentServiceRegistry } from './core/agents/AgentCapability';
+import {
+  getConversationSessionBackendService,
+  hasSessionCreationCapability,
+} from './core/agents/backend/AgentBackendRouting';
+import { AgentServiceRegistry } from './core/agents/backend/AgentServiceRegistry';
+import { ClaudeCodeAdapter } from './core/agents/backend/ClaudeCodeAdapter';
+import {
+  buildClaudeCodeElicitationContent,
+  buildClaudeCodeElicitationQuestionRequest,
+  normalizeClaudeCodeElicitationContent,
+} from './core/agents/backend/ClaudeCodeElicitationBridge';
+import { adaptMcpConfigForClaude } from './core/agents/backend/ClaudeCodeMcpConfigAdapter';
+import { type ClaudeCodePermissionBridgeHostContext, createClaudeCodePermissionBridgeHost } from './core/agents/backend/ClaudeCodeDefaultPermissionHost';
+import { ClaudeCodePermissionBridge, createClaudeCodePermissionBridge } from './core/agents/backend/ClaudeCodePermissionBridge';
+import { loadClaudeCodeSdk } from './core/agents/backend/ClaudeCodeSdkLoader';
+import { OpenCodeAdapter } from './core/agents/backend/OpenCodeAdapter';
 import { OpenCodeService, SDK_FEATURE_FLAG_ROLLOUT_DEFAULTS } from './core/opencode';
 import { OpenCodianSettingsRuntimeCoordinator } from './core/runtime/OpenCodianSettingsRuntimeCoordinator';
 import { OpenCodianStartupCoordinator } from './core/runtime/OpenCodianStartupCoordinator';
@@ -18,6 +37,7 @@ import type {
   ThemePresetId,
 } from './core/types';
 import {
+  getConversationBackendSessionId,
   getCurrentPlatformDebugLogPath,
   getCurrentPlatformKey,
   getServerBaseUrl,
@@ -35,12 +55,15 @@ import {
   createLogger,
   getRecentLogText,
   getVaultBasePath,
+  sanitizeDiagnosticReport,
+  setClaudeCodeDebugChannelSettings,
   setDebugLoggingEnabled,
   setDebugModuleSettings,
   setDebugRefreshIntervalMs,
   setInlineSerializedDebugLogArgsEnabled,
 } from './shared';
 import { registerBuiltinGlassAdapters } from './utils/glass';
+import type { AgentBackendKind } from './core/types/chat';
 
 const logger = createLogger('OpenCodian');
 const OPENCODIAN_APP_ICON = 'opencodian-app-icon';
@@ -65,6 +88,9 @@ export default class OpenCodianPlugin extends Plugin {
   settings: OpenCodianSettings;
   storage: StorageService;
   openCodeService: OpenCodeService;
+  agentServiceRegistry: AgentServiceRegistry;
+  claudeCodePermissionBridge: ClaudeCodePermissionBridge | null = null;
+  claudeCodePermissionHostContext: ClaudeCodePermissionBridgeHostContext = { getActiveTabId: () => null };
   opencodeConfigManager: OpencodeConfigManager | null = null;
   modelConfigService: ModelConfigService | null = null;
   settingsTab?: InstanceType<typeof OpenCodianSettingTab>;
@@ -79,6 +105,8 @@ export default class OpenCodianPlugin extends Plugin {
     getSettings: () => this.settings ?? null,
     getOpenCodeService: () => this.openCodeService ?? null,
     getOpenCodianLeaves: () => this.app.workspace.getLeavesOfType(VIEW_TYPE_OPENCODIAN),
+    hasEnabledBackend: (backendId: AgentBackendKind) =>
+      this.settings?.enabledBackends?.includes(backendId) ?? false,
     applyProviderIconColorMode: () => this.applyProviderIconColorMode(),
     startConfiguredLocalServerIfNeeded: () => this.startConfiguredLocalServerIfNeeded(),
     logServerStatusSnapshot: (source?: string) => this.logServerStatusSnapshot(source),
@@ -104,6 +132,7 @@ export default class OpenCodianPlugin extends Plugin {
         getVaultBasePath: () => getVaultBasePath(this.app),
         refreshOpenCodianViews: (options) => this.runtimeCoordinator.refreshOpenCodianViews(options),
         invalidateSlashCommandMenuCatalogs: (options) => this.runtimeCoordinator.invalidateSlashCommandMenuCatalogs(options),
+        scheduleDeferredRuntimeWarmup: () => this.runtimeCoordinator.scheduleDeferredRuntimeWarmup(),
         applyProviderIconColorMode: () => this.applyProviderIconColorMode(),
         getOpenCodianLeaves: () => this.app.workspace.getLeavesOfType(VIEW_TYPE_OPENCODIAN),
         onSettingsPersistenceBlocked: (message) => this.warnSettingsPersistenceBlocked(message),
@@ -187,6 +216,42 @@ export default class OpenCodianPlugin extends Plugin {
           },
         },
       );
+
+      // Wire agent service registry
+      this.agentServiceRegistry = new AgentServiceRegistry();
+      const openCodeAdapter = new OpenCodeAdapter(this.openCodeService);
+      this.agentServiceRegistry.register(openCodeAdapter);
+      const vaultPath = getVaultBasePath(this.app);
+      if (vaultPath) {
+        const permissionHost = createClaudeCodePermissionBridgeHost(() => this.claudeCodePermissionHostContext);
+        this.claudeCodePermissionBridge = createClaudeCodePermissionBridge(permissionHost);
+        this.agentServiceRegistry.register(new ClaudeCodeAdapter({
+          vaultPath,
+          settings: this.settings.backendSettings.claudeCode,
+          pathToClaudeCodeExecutable: this.getBundledClaudeCodeExecutablePath(vaultPath),
+          sdkLoader: loadClaudeCodeSdk,
+          permissionBridge: this.claudeCodePermissionBridge,
+          onElicitation: (request, options) => this.handleClaudeCodeElicitation(request, options),
+          mcpConfigLoader: async () => {
+            if (!this.opencodeConfigManager) {
+              return {};
+            }
+            try {
+              const { McpConfigService } = await import('./core/config/McpConfigService');
+              const mcpConfigService = new McpConfigService(this.opencodeConfigManager);
+              const servers = await mcpConfigService.readProjectServers();
+              return adaptMcpConfigForClaude(servers);
+            } catch {
+              return {};
+            }
+          },
+        }));
+      }
+      this.agentServiceRegistry.setEnabledBackends(this.settings.enabledBackends);
+      if (this.settings.activeBackend) {
+        this.agentServiceRegistry.setActive(this.settings.activeBackend);
+      }
+      setAgentServiceRegistry(this.agentServiceRegistry);
     });
 
     await this.startupCoordinator.measureStartupStep('configureVaultScopedServices', () => {
@@ -194,6 +259,73 @@ export default class OpenCodianPlugin extends Plugin {
     });
 
     await this.startupCoordinator.measureStartupStep('loadConversations', () => this.loadConversations());
+  }
+
+  private getBundledClaudeCodeExecutablePath(vaultPath: string): string {
+    const pluginId = this.manifest.id?.trim() || 'opencodian';
+    const pluginDir = this.manifest.dir?.trim()
+      ? this.manifest.dir
+      : path.join((this.app.vault as { configDir?: string }).configDir ?? '.obsidian', 'plugins', pluginId);
+    const platformPackage = this.getClaudeAgentSdkPlatformPackageName();
+    const binaryName = process.platform === 'win32' ? 'claude.exe' : 'claude';
+    return path.join(
+      vaultPath,
+      pluginDir,
+      'node_modules',
+      '@anthropic-ai',
+      platformPackage,
+      binaryName,
+    );
+  }
+
+  private async handleClaudeCodeElicitation(
+    request: ElicitationRequest,
+    options: { signal: AbortSignal },
+  ): Promise<ElicitationResult> {
+    if (options.signal.aborted) {
+      return { action: 'cancel' };
+    }
+
+    const ctx = this.claudeCodePermissionHostContext;
+    const renderer = ctx.elicitationCardRenderer;
+    if (!renderer) {
+      return { action: 'cancel' };
+    }
+
+    const questionRequest = buildClaudeCodeElicitationQuestionRequest(request);
+    const response = await renderer.collectResponse(questionRequest, ctx.getActiveTabId());
+    if (!response) {
+      return { action: 'cancel' };
+    }
+    if (response.action !== 'accept') {
+      return { action: response.action };
+    }
+    if (
+      questionRequest.questions.length === 1
+      && questionRequest.questions[0].options.some((option) => option.label === 'Decline')
+      && response.answers?.[0]?.[0] === 'Decline'
+    ) {
+      return { action: 'decline' };
+    }
+
+    return {
+      action: 'accept',
+      content: normalizeClaudeCodeElicitationContent(response.content)
+        ?? buildClaudeCodeElicitationContent(questionRequest, response.answers ?? [], request),
+    };
+  }
+
+  private getClaudeAgentSdkPlatformPackageName(): string {
+    const key = `${process.platform}-${process.arch}`;
+    const packages: Record<string, string> = {
+      'darwin-arm64': 'claude-agent-sdk-darwin-arm64',
+      'darwin-x64': 'claude-agent-sdk-darwin-x64',
+      'linux-arm64': 'claude-agent-sdk-linux-arm64',
+      'linux-x64': 'claude-agent-sdk-linux-x64',
+      'win32-arm64': 'claude-agent-sdk-win32-arm64',
+      'win32-x64': 'claude-agent-sdk-win32-x64',
+    };
+    return packages[key] ?? `claude-agent-sdk-${process.platform}-${process.arch}`;
   }
 
   private configureVaultScopedServices(): void {
@@ -213,6 +345,12 @@ export default class OpenCodianPlugin extends Plugin {
 
   private async startConfiguredLocalServerIfNeeded(): Promise<void> {
     if (!isLocalServerMode(this.settings.server) || !this.settings.server.local.autoStart) {
+      return;
+    }
+
+    // Skip server startup if OpenCode agent is not enabled
+    if (!this.settings.enabledBackends.includes('opencode')) {
+      logger.debug('OpenCode agent disabled — skipping local server startup');
       return;
     }
 
@@ -321,10 +459,13 @@ export default class OpenCodianPlugin extends Plugin {
 
   onunload() {
     this.runtimeCoordinator.dispose();
-    this.openCodeService?.dispose();
+    // Stop the OpenCode server (async, best-effort)
     void this.openCodeService?.stop().catch((error) => {
       logger.warn('Failed to asynchronously stop OpenCode service during unload:', error);
     });
+    // Dispose registry (which disposes adapters, which disposes OpenCodeService)
+    this.agentServiceRegistry?.dispose();
+    setAgentServiceRegistry(null);
     this.getSettingsRuntimeCoordinator().clearChatAppearanceSaveTimer();
     delete document.body.dataset.opencodianProviderIconMode;
 
@@ -421,6 +562,7 @@ export default class OpenCodianPlugin extends Plugin {
     const settings = this.settings;
     setDebugLoggingEnabled(settings.enableDebugLogging);
     setDebugModuleSettings(settings.debugModuleSettings);
+    setClaudeCodeDebugChannelSettings(settings.backendSettings.claudeCode.debugChannels);
     setDebugRefreshIntervalMs(settings.debugRefreshIntervalMs);
     setInlineSerializedDebugLogArgsEnabled(settings.inlineSerializedDebugLogArgs);
   }
@@ -546,7 +688,7 @@ export default class OpenCodianPlugin extends Plugin {
     const managedProcess = this.openCodeService.isServerProcessRunning();
     const diagnostics = this.openCodeService.getServerDiagnostics();
 
-    return [
+    const raw = [
       '# OpenCodian Diagnostic Report',
       '',
       `Generated: ${new Date().toISOString()}`,
@@ -569,6 +711,22 @@ export default class OpenCodianPlugin extends Plugin {
       `Local port: ${this.settings.server.local.port}`,
       `Local auto-start: ${this.settings.server.local.autoStart}`,
       `Auth type: ${this.settings.server.auth.type}`,
+      '',
+      '## Claude Code',
+      `Enabled: ${this.settings.enabledBackends.includes('claude-code')}`,
+      `Active: ${this.settings.activeBackend === 'claude-code'}`,
+      `Debug module enabled: ${this.settings.debugModuleSettings.claudeCode}`,
+      `Model: ${this.settings.backendSettings.claudeCode.model || '(default)'}`,
+      `Effort: ${this.settings.backendSettings.claudeCode.effort}`,
+      `Permission mode: ${this.settings.backendSettings.claudeCode.permissionMode}`,
+      `Setting sources: ${this.settings.backendSettings.claudeCode.settingSources.join(', ') || '(none)'}`,
+      `Additional directories: ${this.settings.backendSettings.claudeCode.additionalDirectories.length}`,
+      'MCP servers configured: loaded from project MCP config at runtime',
+      `Environment variables configured: ${Object.keys(this.settings.backendSettings.claudeCode.env).length}`,
+      `File checkpoint: ${this.settings.backendSettings.claudeCode.enableFileCheckpointing}`,
+      `Hook event stream: ${this.settings.backendSettings.claudeCode.includeHookEvents}`,
+      `Forward subagent text: ${this.settings.backendSettings.claudeCode.forwardSubagentText}`,
+      `Subagent progress summaries: ${this.settings.backendSettings.claudeCode.agentProgressSummaries}`,
       '',
       '## Settings',
       `Locale: ${this.settings.locale}`,
@@ -593,6 +751,8 @@ export default class OpenCodianPlugin extends Plugin {
       getRecentLogText() || '(no logs captured yet)',
       '',
     ].join('\n');
+
+    return sanitizeDiagnosticReport(raw);
   }
 
   async writeDiagnosticLogFile(targetDirectory: string, source = 'manual'): Promise<string> {
@@ -638,7 +798,10 @@ export default class OpenCodianPlugin extends Plugin {
           updatedAt: meta.updatedAt,
           lastResponseAt: meta.lastResponseAt,
           titleGenerationStatus: meta.titleGenerationStatus,
+          backend: meta.backend,
           openCodeSessionId: meta.openCodeSessionId ?? meta.id,
+          backendSessionId: meta.backendSessionId ?? meta.openCodeSessionId ?? meta.id,
+          backendAgentId: meta.backendAgentId,
           messages: [],
         })),
         { detail: () => `${metas.length} conversations` },
@@ -655,17 +818,44 @@ export default class OpenCodianPlugin extends Plugin {
 
   /** Create a new conversation */
   async createConversation(): Promise<Conversation> {
-    await this.runtimeCoordinator.ensureRuntimeWarmupReadyForSessionBootstrap();
+    const activeBackend = this.settings.activeBackend ?? 'opencode';
+    const activeBackendAdapter = Array.isArray(this.settings.enabledBackends) && this.settings.enabledBackends.includes(activeBackend)
+      ? this.agentServiceRegistry?.get(activeBackend)
+      : null;
+    const sessionBackend = hasSessionCreationCapability(activeBackendAdapter) ? activeBackendAdapter : null;
+    if (!sessionBackend && activeBackend === 'opencode') {
+      if (!Array.isArray(this.settings.enabledBackends) || !this.settings.enabledBackends.includes('opencode')) {
+        throw new Error('Cannot create conversation: opencode backend is not enabled');
+      }
 
-    // Create session in OpenCode
-    const sessionId = await this.openCodeService.createSession();
+      await this.runtimeCoordinator.ensureRuntimeWarmupReadyForSessionBootstrap();
+      const sessionId = await this.openCodeService.createSession();
+      return this.createConversationRecord('opencode', sessionId);
+    }
+    if (!sessionBackend) {
+      throw new Error('Cannot create conversation: active backend does not support sessions');
+    }
+    if (sessionBackend.kind === 'opencode') {
+      await this.runtimeCoordinator.ensureRuntimeWarmupReadyForSessionBootstrap();
+    }
 
+    const sessionId = await sessionBackend.createSession();
+
+    return this.createConversationRecord(sessionBackend.kind, sessionId);
+  }
+
+  private async createConversationRecord(
+    backend: AgentBackendKind,
+    sessionId: string,
+  ): Promise<Conversation> {
     const conversation: Conversation = {
       id: `conv-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
       title: this.getEmptyConversationTitle(),
       createdAt: Date.now(),
       updatedAt: Date.now(),
-      openCodeSessionId: sessionId,
+      backend,
+      ...(backend === 'opencode' ? { openCodeSessionId: sessionId } : {}),
+      backendSessionId: sessionId,
       messages: [],
     };
 
@@ -678,14 +868,17 @@ export default class OpenCodianPlugin extends Plugin {
 
   async createConversationFromSession(
     sessionId: string,
-    initial?: Partial<Omit<Conversation, 'id' | 'createdAt' | 'updatedAt' | 'openCodeSessionId'>>,
+    initial?: Partial<Omit<Conversation, 'id' | 'createdAt' | 'updatedAt' | 'openCodeSessionId' | 'backendSessionId'>>,
   ): Promise<Conversation> {
+    const backend = initial?.backend ?? this.settings.activeBackend ?? 'opencode';
     const conversation: Conversation = {
       id: `conv-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
       title: initial?.title || this.getEmptyConversationTitle(),
       createdAt: Date.now(),
       updatedAt: Date.now(),
-      openCodeSessionId: sessionId,
+      backend,
+      ...(backend === 'opencode' ? { openCodeSessionId: sessionId } : {}),
+      backendSessionId: sessionId,
       messages: initial?.messages ? JSON.parse(JSON.stringify(initial.messages)) as Conversation['messages'] : [],
       currentNote: initial?.currentNote,
       externalContextPaths: initial?.externalContextPaths ? [...initial.externalContextPaths] : undefined,
@@ -777,11 +970,14 @@ export default class OpenCodianPlugin extends Plugin {
     this.conversations.splice(index, 1);
     this.conversationFullMessageCache.forget(id);
 
-    // Delete from OpenCode
-    try {
-      await this.openCodeService.deleteSession(conversation.openCodeSessionId);
-    } catch {
-      // Ignore errors
+    const backendSessionId = getConversationBackendSessionId(conversation);
+    const sessionBackend = getConversationSessionBackendService(this.agentServiceRegistry, conversation);
+    if (backendSessionId && sessionBackend) {
+      try {
+        await sessionBackend.deleteSession(backendSessionId);
+      } catch {
+        // Ignore errors
+      }
     }
 
     // Delete from storage
@@ -867,6 +1063,11 @@ export default class OpenCodianPlugin extends Plugin {
     logger.debug(`Server status changed: ${status}`);
     this.settingsTab?.refreshServerStatusDisplay();
     broadcastServerStatusToSettingsViews(this);
+    // Forward to adapter for registry-level status subscribers
+    const adapter = this.agentServiceRegistry?.get('opencode');
+    if (adapter && 'notifyStatusChange' in adapter) {
+      (adapter as import('./core/agents/backend/OpenCodeAdapter').OpenCodeAdapter).notifyStatusChange(status);
+    }
     if (status === 'running') {
       this.runtimeCoordinator.invalidateSlashCommandMenuCatalogs({ preload: true });
     }

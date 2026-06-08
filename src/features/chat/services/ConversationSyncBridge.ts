@@ -84,6 +84,7 @@ export function createConversationSyncBridgePorts(
 
 export interface ConversationSyncBridgeHost {
   getCurrentConversation(): Conversation | null;
+  canSyncConversationWithServer(): Promise<boolean>;
   syncConversationMessagesFromServer(
     conversation: Conversation,
     tabId: TabId | null,
@@ -231,12 +232,16 @@ export class ConversationSyncBridge {
             'visible-background-sync',
             { suppressVerboseLogs: true },
           )
-          ?? await this.host.syncConversationMessagesFromServer(
+          ?? await this.syncConversationWithServerIfAvailable(
             conversation,
             syncContext.tabId,
             'visible-background-sync',
             { suppressVerboseLogs: true },
           );
+
+        if (!syncResult) {
+          return;
+        }
 
         await this.visiblePostSyncRouter.routeVisibleSyncComplete({
           syncContext,
@@ -256,11 +261,17 @@ export class ConversationSyncBridge {
             syncContext.tabId,
             'background-tab-sync',
           )
-          ?? await this.host.syncConversationMessagesFromServer(
+          ?? await this.syncConversationWithServerIfAvailable(
             syncContext.conversation,
             syncContext.tabId,
             'background-tab-sync',
+            { suppressVerboseLogs: true },
           );
+
+        if (!syncResult) {
+          return;
+        }
+
         await this.backgroundPostSyncRouter.routeBackgroundTabSyncComplete({
           syncContext,
           syncResult,
@@ -272,12 +283,16 @@ export class ConversationSyncBridge {
   private async syncSignalTabConversation(
     syncContext: SignalConversationSyncContext,
   ): Promise<void> {
-    const syncResult = await this.host.syncConversationMessagesFromServer(
+    const syncResult = await this.syncConversationWithServerIfAvailable(
       syncContext.conversation,
       syncContext.tabId,
       `sync-event:${syncContext.reason}`,
       { suppressVerboseLogs: true },
     );
+
+    if (!syncResult) {
+      return;
+    }
 
     await this.backgroundPostSyncRouter.routeSignalSyncComplete({
       syncContext,
@@ -305,12 +320,16 @@ export class ConversationSyncBridge {
             reason,
             { suppressVerboseLogs: true },
           )
-          ?? await this.host.syncConversationMessagesFromServer(
+          ?? await this.syncConversationWithServerIfAvailable(
             conversation,
             syncContext.tabId,
             reason,
             { suppressVerboseLogs: true },
           );
+
+        if (!syncResult) {
+          return;
+        }
 
         await this.visiblePostSyncRouter.routeVisibleSyncComplete({
           syncContext,
@@ -334,12 +353,16 @@ export class ConversationSyncBridge {
 
         const previousMessages = [...conversation.messages];
         const reason = `sync-event:${update.type}`;
-        const syncResult = await this.host.syncConversationMessagesFromServer(
+        const syncResult = await this.syncConversationWithServerIfAvailable(
           conversation,
           syncContext.tabId,
           reason,
           { suppressVerboseLogs: true },
         );
+
+        if (!syncResult) {
+          return;
+        }
 
         await this.visiblePostSyncRouter.routeVisibleSyncComplete({
           syncContext,
@@ -376,5 +399,23 @@ export class ConversationSyncBridge {
       syncContext,
       syncResult,
     });
+  }
+
+  private async syncConversationWithServerIfAvailable(
+    conversation: Conversation,
+    tabId: TabId | null,
+    reason: string,
+    options?: { suppressVerboseLogs?: boolean },
+  ): Promise<ConversationSyncBridgeSyncResult | null> {
+    if (!await this.host.canSyncConversationWithServer()) {
+      return null;
+    }
+
+    return this.host.syncConversationMessagesFromServer(
+      conversation,
+      tabId,
+      reason,
+      options,
+    );
   }
 }

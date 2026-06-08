@@ -49,6 +49,14 @@ docs/modules/
 ├── entry-point/
 │   └── main.md
 ├── core/
+│   ├── agents/
+│   │   ├── AgentCapability.md
+│   │   └── backend/
+│   │       ├── index.md
+│   │       ├── AgentService.md
+│   │       ├── ClaudeCodeModelCatalog.md
+│   │       ├── OpenCodeAdapter.md
+│   │       └── AgentServiceRegistry.md
 │   ├── config/
 │   │   ├── index.md
 │   │   ├── commandScopedAgent.md
@@ -157,6 +165,7 @@ docs/modules/
 │   │   ├── services/
 │   │   │   ├── AgentMentionCandidateService.md
 │   │   │   ├── AgentMentionComposerController.md
+│   │   │   ├── AdditionalDirectoriesConfigBadgeCoordinator.md
 │   │   │   ├── ChatHeaderPresenter.md
 │   │   │   ├── ChatVisualDemoCoordinator.md
 │   │   │   ├── ChatSelectionControlsCoordinator.md
@@ -310,7 +319,9 @@ docs/modules/
 ├── vendor/
 │   └── three.md
 ├── style/
-│   └── README.md
+│   ├── README.md
+│   └── components/
+│       └── settings-claude-code.md
 └── infrastructure/
     ├── build-pipeline.md
     ├── scripts.md

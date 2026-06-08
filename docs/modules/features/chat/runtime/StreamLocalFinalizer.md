@@ -59,6 +59,7 @@ export class StreamLocalFinalizer {
 - 正常 completed assistant 的本地 cache writeback 现在可延后给 canonical finalization，只有 interrupted / error / questionResolution 等 client-only 边界会先落本地
 - 只有 error：把占位 assistant shell 渲染成 error notice card
 - interrupted 且无内容：默认把占位 shell 渲染成 interrupted notice；如果当前 session 是 retry 状态且带 message，则改走 error notice 展示 retry 原因
+- retry status 匹配使用 `getConversationBackendSessionId()`，因此 OpenCode 旧会话和未来只带 `backendSessionId` 的会话共用同一条本地收尾判断。
 - 既无内容又无 notice：移除空 shell
 
 ### local message persistence

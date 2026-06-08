@@ -68,6 +68,7 @@ function createHost(conversation: Conversation): MockedHost {
     finalizeAssistantMessageWithServerUnavailableError: jest.fn().mockResolvedValue(undefined),
     openPluginSettingsAtServerSection: jest.fn(),
     startServer: jest.fn().mockResolvedValue(undefined),
+    shouldUseModelCatalog: jest.fn().mockReturnValue(true),
     hasLoadedModelCatalog: jest.fn().mockReturnValue(true),
     loadAvailableModels: jest.fn().mockResolvedValue(undefined),
     getSendMessageOptions: jest.fn().mockReturnValue({
@@ -232,5 +233,106 @@ describe('MessageSendPreparationService agent invocation', () => {
       ],
     });
     expect(result?.userMessage.content).toBe('please ask @reviewer to check this');
+  });
+});
+
+describe('MessageSendPreparationService agent invocation — Claude backend', () => {
+  function createClaudeConversation(): Conversation {
+    return {
+      id: 'conversation-claude-1',
+      title: 'Claude Conversation',
+      createdAt: 1,
+      updatedAt: 1,
+      openCodeSessionId: 'claude-session-1',
+      messages: [],
+      backend: 'claude-code',
+    };
+  }
+
+  it('preserves @agent mention text for Claude backend (no stripping)', async () => {
+    const conversation = createClaudeConversation();
+    const host = createHost(conversation);
+    const service = new MessageSendPreparationService(host, createComposerSendContext());
+
+    await service.prepareMessageSend({
+      content: 'please ask @code-reviewer to check this',
+      invocationIntent: {
+        kind: 'prompt',
+        mentions: [
+          {
+            agentId: 'code-reviewer',
+            source: {
+              value: '@code-reviewer',
+              start: 11,
+              end: 26,
+            },
+          },
+        ],
+      },
+    });
+
+    // For Claude backend, @agent text is preserved as raw text
+    expect(host.buildStructuredPromptSendPayload).toHaveBeenCalledWith(
+      'please ask @code-reviewer to check this',
+      expect.objectContaining({
+        contextItems: [],
+      }),
+    );
+    // No invocationParts should be sent
+    const callArgs = host.buildStructuredPromptSendPayload.mock.calls[0];
+    expect(callArgs?.[1]).not.toHaveProperty('invocationParts');
+  });
+
+  it('does not send invocationParts for Claude backend', async () => {
+    const conversation = createClaudeConversation();
+    const host = createHost(conversation);
+    const service = new MessageSendPreparationService(host, createComposerSendContext());
+
+    await service.prepareMessageSend({
+      content: 'Hello @agent-a and @agent-b',
+      invocationIntent: {
+        kind: 'prompt',
+        mentions: [
+          {
+            agentId: 'agent-a',
+            source: { value: '@agent-a', start: 6, end: 14 },
+          },
+          {
+            agentId: 'agent-b',
+            source: { value: '@agent-b', start: 19, end: 27 },
+          },
+        ],
+      },
+    });
+
+    const callArgs = host.buildStructuredPromptSendPayload.mock.calls[0];
+    expect(callArgs?.[1]).not.toHaveProperty('invocationParts');
+  });
+
+  it('preserves primaryAgent in resolvedAgentInvocation for Claude backend', async () => {
+    const conversation = createClaudeConversation();
+    const host = createHost(conversation);
+    const service = new MessageSendPreparationService(host, createComposerSendContext());
+
+    const result = await service.prepareMessageSend({
+      content: 'Hello',
+      invocationIntent: {
+        kind: 'prompt',
+        primaryAgent: 'reviewer',
+        mentions: [
+          {
+            agentId: 'reviewer',
+            source: { value: '@reviewer', start: 0, end: 9 },
+          },
+        ],
+      },
+    });
+
+    // resolvedAgentInvocation should still have the data for optimistic display
+    expect(result?.resolvedAgentInvocation?.agent).toBe('reviewer');
+    // But the transport text should preserve @reviewer
+    expect(host.buildStructuredPromptSendPayload).toHaveBeenCalledWith('Hello', expect.objectContaining({
+      contextItems: [],
+    }));
   });
 });

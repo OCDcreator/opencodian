@@ -83,3 +83,4 @@ maybeRestartServer() → saveSettings()
 
 - `validate()` 仅检查 `provider` 为 object 且 `enabled_providers`/`disabled_providers` 为 string[]，不检查 provider 内部的 name/npm/options/models 结构
 - 与 `ModelConfigModal` 的关系：两者都通过 `ModelConfigService` 读写同一份 `.opencode/opencode.json` 的模型相关字段。JSON 编辑器适合批量/高级编辑，可视化编辑器适合单条增删改。两者无互锁机制，同时打开时后保存者覆盖先保存者
+- JSON textarea 通过 `TextareaSizeMemory` 使用 `model-config-json-editor` key 记忆手动调整高度，并在 modal 关闭时销毁 observer。

@@ -2,15 +2,16 @@ import type { App, ButtonComponent, ExtraButtonComponent } from 'obsidian';
 import { Notice, requestUrl, Setting } from 'obsidian';
 
 import {
+  getBackendSessionPreview,
+  listBackendSessions,
+  type NormalizedSessionPreviewMessage,
+  type NormalizedSessionPreviewPart,
+  type NormalizedSessionRow,
+} from '../../core/agents/backend/AgentBackendRouting';
+import {
   parseModelReference,
   resolveModelSelection,
 } from '../../core/config/modelConfig';
-import type {
-  Message,
-  Part,
-  Session,
-  SessionMessage,
-} from '../../core/opencode/OpenCodeSessionLifecycleCoordinator';
 import type {
   OpencodeCompactionConfig,
   OpencodeShareMode,
@@ -21,6 +22,7 @@ import type {
 import {
   normalizeChatFontSizePx,
 } from '../../core/types';
+import type { AgentBackendKind } from '../../core/types/chat';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { createLogger } from '../../shared';
@@ -159,6 +161,25 @@ export class SettingsConversationSection {
     this.sharedSessionsContainerEl = null;
   }
 
+  private getActiveBackend(): AgentBackendKind | undefined {
+    const activeBackend = this.plugin.settings.activeBackend;
+    return activeBackend && this.plugin.settings.enabledBackends.includes(activeBackend)
+      ? activeBackend
+      : this.plugin.settings.enabledBackends[0];
+  }
+
+  private isOpenCodeActive(): boolean {
+    return this.getActiveBackend() === 'opencode';
+  }
+
+  private canSaveOpenCodeProjectConversationConfig(): boolean {
+    if (this.isOpenCodeActive()) {
+      return true;
+    }
+    new Notice(t('settings.conversation.projectConfig.openCodeOnly'));
+    return false;
+  }
+
   attach(containerEl: HTMLElement): HTMLHeadingElement {
     this.resetState();
     this.setSharedCallbacks();
@@ -169,31 +190,46 @@ export class SettingsConversationSection {
       t('settings.quickNav.conversationDesc'),
     );
 
+    const isOpenCodeActive = this.isOpenCodeActive();
     const titleGenerationBodyEl = this.createSettingsBlock(containerEl, {
       title: t('settings.titleGeneration.title'),
-      description: t('settings.titleGeneration.groupDesc'),
+      description: isOpenCodeActive
+        ? t('settings.titleGeneration.groupDesc')
+        : t('settings.titleGeneration.claudeGroupDesc'),
     });
     this.markSettingsTarget(titleGenerationBodyEl, 'title');
-    const compactionBodyEl = this.createSettingsBlock(containerEl, {
-      title: t('settings.conversation.compaction.projectNote'),
-      description: t('settings.conversation.compaction.projectNoteDesc'),
-    });
-    this.markSettingsTarget(compactionBodyEl, 'compaction');
-    const sharingBodyEl = this.createSettingsBlock(containerEl, {
-      title: t('settings.conversation.share.projectNote'),
-      description: t('settings.conversation.share.projectNoteDesc'),
-    });
-    this.markSettingsTarget(sharingBodyEl, 'sharing');
+    const compactionBodyEl = isOpenCodeActive
+      ? this.createSettingsBlock(containerEl, {
+          title: t('settings.conversation.compaction.projectNote'),
+          description: t('settings.conversation.compaction.projectNoteDesc'),
+        })
+      : null;
+    if (compactionBodyEl) {
+      this.markSettingsTarget(compactionBodyEl, 'compaction');
+    }
+    const sharingBodyEl = isOpenCodeActive
+      ? this.createSettingsBlock(containerEl, {
+          title: t('settings.conversation.share.projectNote'),
+          description: t('settings.conversation.share.projectNoteDesc'),
+        })
+      : null;
+    if (sharingBodyEl) {
+      this.markSettingsTarget(sharingBodyEl, 'sharing');
+    }
     const displayBodyEl = this.createSettingsBlock(containerEl, {
       title: t('settings.conversation.display.title'),
       description: t('settings.conversation.display.desc'),
     });
     this.markSettingsTarget(displayBodyEl, 'display');
-    const questionBodyEl = this.createSettingsBlock(containerEl, {
-      title: t('settings.conversation.questions.title'),
-      description: t('settings.conversation.questions.desc'),
-    });
-    this.markSettingsTarget(questionBodyEl, 'questions');
+    const questionBodyEl = isOpenCodeActive
+      ? this.createSettingsBlock(containerEl, {
+          title: t('settings.conversation.questions.title'),
+          description: t('settings.conversation.questions.desc'),
+        })
+      : null;
+    if (questionBodyEl) {
+      this.markSettingsTarget(questionBodyEl, 'questions');
+    }
     const renderingBodyEl = this.createSettingsBlock(containerEl, {
       title: t('settings.conversation.rendering.title'),
       description: t('settings.conversation.rendering.desc'),
@@ -201,10 +237,16 @@ export class SettingsConversationSection {
     this.markSettingsTarget(renderingBodyEl, 'rendering');
 
     this.renderTitleBlock(titleGenerationBodyEl);
-    this.renderCompactionBlock(compactionBodyEl);
-    this.renderSharingBlock(sharingBodyEl);
+    if (compactionBodyEl) {
+      this.renderCompactionBlock(compactionBodyEl);
+    }
+    if (sharingBodyEl) {
+      this.renderSharingBlock(sharingBodyEl);
+    }
     this.renderDisplayBlock(displayBodyEl);
-    this.renderQuestionsBlock(questionBodyEl);
+    if (questionBodyEl) {
+      this.renderQuestionsBlock(questionBodyEl);
+    }
     this.renderRenderingBlock(renderingBodyEl);
 
     this.finishAttach();
@@ -217,11 +259,17 @@ export class SettingsConversationSection {
     this.setSharedCallbacks();
 
     const blocks: { id: string; render: (el: HTMLElement) => void }[] = [
-      { id: 'title', render: (el) => this.renderTitleBlock(el) },
-      { id: 'compaction', render: (el) => this.renderCompactionBlock(el) },
-      { id: 'sharing', render: (el) => this.renderSharingBlock(el) },
+      { id: 'title', render: (el: HTMLElement) => this.renderTitleBlock(el) },
+      ...(this.isOpenCodeActive()
+        ? [
+            { id: 'compaction', render: (el: HTMLElement) => this.renderCompactionBlock(el) },
+            { id: 'sharing', render: (el: HTMLElement) => this.renderSharingBlock(el) },
+          ]
+        : []),
       { id: 'display', render: (el) => this.renderDisplayTabBlock(el) },
-      { id: 'questions', render: (el) => this.renderQuestionsBlock(el) },
+      ...(this.isOpenCodeActive()
+        ? [{ id: 'questions', render: (el: HTMLElement) => this.renderQuestionsBlock(el) }]
+        : []),
     ];
 
     for (const block of blocks) {
@@ -263,8 +311,12 @@ export class SettingsConversationSection {
   }
 
   private renderTitleBlock(containerEl: HTMLElement): void {
-    this.addTitleModeSetting(containerEl);
-    this.addTitleModelSetting(containerEl);
+    if (this.isOpenCodeActive()) {
+      this.addTitleModeSetting(containerEl);
+      this.addTitleModelSetting(containerEl);
+    } else {
+      this.addClaudeAutoTitleSetting(containerEl);
+    }
   }
 
   private renderCompactionBlock(containerEl: HTMLElement): void {
@@ -296,9 +348,11 @@ export class SettingsConversationSection {
 
   private finishAttach(): void {
     this.updateTitleModelSettingVisibility();
-    void this.loadTitleModels();
-    this.registerProjectConfigListeners();
-    void this.loadProjectConversationConfig();
+    if (this.isOpenCodeActive()) {
+      void this.loadTitleModels();
+      this.registerProjectConfigListeners();
+      void this.loadProjectConversationConfig();
+    }
   }
 
   private markSettingsTarget(bodyEl: HTMLElement, blockId: string): void {
@@ -408,6 +462,20 @@ export class SettingsConversationSection {
       });
   }
 
+  private addClaudeAutoTitleSetting(containerEl: HTMLElement): void {
+    new Setting(containerEl)
+      .setName(t('settings.titleGeneration.claudeAutoTitle.name'))
+      .setDesc(t('settings.titleGeneration.claudeAutoTitle.desc'))
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.plugin.settings.backendSettings.claudeCode.autoTitle)
+          .onChange(async (value) => {
+            this.plugin.settings.backendSettings.claudeCode.autoTitle = value;
+            await this.plugin.saveSettings();
+          });
+      });
+  }
+
   private addQuestionDisplayModeSetting(containerEl: HTMLElement): void {
     new Setting(containerEl)
       .setName(t('settings.conversation.questionDisplayMode.name'))
@@ -434,6 +502,10 @@ export class SettingsConversationSection {
         toggle
           .setValue(true)
           .onChange(async (value) => {
+            if (!this.canSaveOpenCodeProjectConversationConfig()) {
+              this.projectCompactionAutoControl?.setValue(this.currentCompactionState.auto);
+              return;
+            }
             this.currentCompactionState.auto = value;
             await this.saveProjectCompactionConfig({ auto: value });
           });
@@ -448,6 +520,10 @@ export class SettingsConversationSection {
         toggle
           .setValue(true)
           .onChange(async (value) => {
+            if (!this.canSaveOpenCodeProjectConversationConfig()) {
+              this.projectCompactionPruneControl?.setValue(this.currentCompactionState.prune);
+              return;
+            }
             this.currentCompactionState.prune = value;
             await this.saveProjectCompactionConfig({ prune: value });
           });
@@ -465,6 +541,10 @@ export class SettingsConversationSection {
           .setPlaceholder('2')
           .setValue('2')
           .onChange(async (value) => {
+            if (!this.canSaveOpenCodeProjectConversationConfig()) {
+              this.resetCompactionTailTurnsInput();
+              return;
+            }
             const parsed = parseNonNegativeInteger(value.trim());
             if (parsed === null) {
               this.resetCompactionTailTurnsInput();
@@ -487,6 +567,10 @@ export class SettingsConversationSection {
           .setPlaceholder(t('settings.conversation.compaction.followDefault'))
           .setValue('')
           .onChange(async (value) => {
+            if (!this.canSaveOpenCodeProjectConversationConfig()) {
+              this.resetCompactionPreserveRecentTokensInput();
+              return;
+            }
             const trimmed = value.trim();
             if (!trimmed) {
               this.currentCompactionState.preserveRecentTokens = undefined;
@@ -515,6 +599,10 @@ export class SettingsConversationSection {
           .setPlaceholder(t('settings.conversation.compaction.followDefault'))
           .setValue('')
           .onChange(async (value) => {
+            if (!this.canSaveOpenCodeProjectConversationConfig()) {
+              this.resetCompactionReservedInput();
+              return;
+            }
             const trimmed = value.trim();
             if (!trimmed) {
               this.currentCompactionState.reserved = undefined;
@@ -569,6 +657,10 @@ export class SettingsConversationSection {
           .addOption('disabled', t('settings.conversation.share.mode.disabled'))
           .setValue(this.currentShareMode)
           .onChange(async (value) => {
+            if (!this.canSaveOpenCodeProjectConversationConfig()) {
+              this.projectShareModeControl?.setValue(this.currentShareMode);
+              return;
+            }
             this.currentShareMode = value as OpencodeShareMode;
             policyStateEl.setText(this.getShareModeLabel(this.currentShareMode));
             if (this.shareModeDiagnosticValueEl) {
@@ -592,7 +684,14 @@ export class SettingsConversationSection {
   }
 
   private addShareDiagnostics(containerEl: HTMLElement, policyStateEl: HTMLElement): void {
-    const diagnosticsEl = containerEl.createDiv({
+    const detailsEl = containerEl.createEl('details', {
+      cls: 'opencodian-share-troubleshooting',
+    });
+    detailsEl.createEl('summary', {
+      cls: 'opencodian-share-troubleshooting-summary',
+      text: t('settings.conversation.share.troubleshooting.summary'),
+    });
+    const diagnosticsEl = detailsEl.createDiv({
       cls: 'opencodian-share-diagnostics',
     });
     const rowsEl = diagnosticsEl.createDiv({
@@ -621,6 +720,9 @@ export class SettingsConversationSection {
     });
     checkButtonEl.addEventListener('click', () => {
       void (async () => {
+        if (!this.canSaveOpenCodeProjectConversationConfig()) {
+          return;
+        }
         checkButtonEl.disabled = true;
         this.setShareDiagnosticValue(modeValueEl, this.getShareModeDiagnosticText(), this.currentShareMode === 'disabled' ? 'error' : 'ok');
         this.setShareDiagnosticValue(serviceValueEl, t('settings.conversation.share.diagnostics.checking'), 'pending');
@@ -745,10 +847,10 @@ export class SettingsConversationSection {
     });
 
     try {
-      const sessions = await this.plugin.openCodeService.listSessions();
-      const sharedSessions = sessions
-        .map((session) => ({ session, url: this.getSessionShareUrl(session) }))
-        .filter((entry): entry is { session: Session; url: string } => Boolean(entry.url));
+      const sessions = await listBackendSessions(
+        this.plugin.agentServiceRegistry,
+      );
+      const sharedSessions = sessions.filter((row) => Boolean(row.shareUrl));
       countEl.setText(t('settings.conversation.share.sharedSessions.count', {
         count: String(sharedSessions.length),
       }));
@@ -764,8 +866,8 @@ export class SettingsConversationSection {
       const listEl = containerEl.createDiv({
         cls: 'opencodian-shared-sessions-list',
       });
-      for (const entry of sharedSessions) {
-        this.renderSharedSessionRow(listEl, entry.session, entry.url);
+      for (const row of sharedSessions) {
+        this.renderSharedSessionRow(listEl, row, row.shareUrl!);
       }
     } catch (error) {
       logger.warn('Failed to load shared sessions:', error);
@@ -776,22 +878,22 @@ export class SettingsConversationSection {
     }
   }
 
-  private renderSharedSessionRow(containerEl: HTMLElement, session: Session, shareUrl: string): void {
+  private renderSharedSessionRow(containerEl: HTMLElement, row: NormalizedSessionRow, shareUrl: string): void {
     const rowEl = containerEl.createDiv({
       cls: 'opencodian-shared-session-row',
-      attr: { 'data-shared-session-id': session.id },
+      attr: { 'data-shared-session-id': row.id },
     });
     const mainEl = rowEl.createDiv({
       cls: 'opencodian-shared-session-main',
     });
     mainEl.createDiv({
       cls: 'opencodian-shared-session-title',
-      text: session.title || t('chat.history.untitled'),
+      text: row.title || t('chat.history.untitled'),
     });
     mainEl.createDiv({
       cls: 'opencodian-shared-session-meta',
       text: t('settings.conversation.share.sharedSessions.updated', {
-        value: this.formatTimestamp(session.time?.updated),
+        value: this.formatTimestamp(row.updatedAt ?? undefined),
       }),
     });
     mainEl.createDiv({
@@ -807,10 +909,17 @@ export class SettingsConversationSection {
       new Notice(t('settings.conversation.share.sharedSessions.copySuccess'));
     });
     this.createSharedSessionButton(actionsEl, 'preview-shared-session', t('settings.conversation.share.sharedSessions.preview'), async () => {
-      await this.toggleSharedSessionPreview(rowEl, session.id);
+      await this.toggleSharedSessionPreview(rowEl, row.id);
     });
     this.createSharedSessionButton(actionsEl, 'unshare-shared-session', t('settings.conversation.share.sharedSessions.unshare'), async () => {
-      await this.plugin.openCodeService.unshareSession(session.id);
+      // Defensive guard: sharing/unsharing is an OpenCode-specific write operation.
+      // The entire sharing block is already gated by isOpenCodeActive(), but this
+      // inner guard protects against backend switches while the settings page is open.
+      if (!this.isOpenCodeActive()) {
+        new Notice(t('settings.conversation.share.sharedSessions.unshareUnavailable'));
+        return;
+      }
+      await this.plugin.openCodeService.unshareSession(row.id);
       new Notice(t('settings.conversation.share.sharedSessions.unshared'));
       await this.renderSharedSessionsList();
     });
@@ -856,8 +965,25 @@ export class SettingsConversationSection {
     });
 
     try {
-      const messages = await this.plugin.openCodeService.getSessionMessages(sessionId);
+      const messages = await getBackendSessionPreview(
+        this.plugin.agentServiceRegistry,
+        sessionId,
+      );
       previewEl.empty();
+      if (messages === null) {
+        previewEl.createDiv({
+          cls: 'opencodian-shared-sessions-empty',
+          text: t('settings.conversation.share.sharedSessions.previewFailed'),
+        });
+        return;
+      }
+      if (messages.length === 0) {
+        previewEl.createDiv({
+          cls: 'opencodian-shared-sessions-empty',
+          text: t('settings.conversation.share.sharedSessions.previewEmpty'),
+        });
+        return;
+      }
       for (const message of messages) {
         this.renderSharedSessionMessage(previewEl, message);
       }
@@ -871,13 +997,13 @@ export class SettingsConversationSection {
     }
   }
 
-  private renderSharedSessionMessage(containerEl: HTMLElement, message: SessionMessage): void {
+  private renderSharedSessionMessage(containerEl: HTMLElement, message: NormalizedSessionPreviewMessage): void {
     const messageEl = containerEl.createDiv({
       cls: 'opencodian-shared-session-message',
     });
     messageEl.createDiv({
       cls: 'opencodian-shared-session-message-role',
-      text: this.getMessageRoleLabel(message.info),
+      text: this.getNormalizedMessageRoleLabel(message.role),
     });
     const partsEl = messageEl.createDiv({
       cls: 'opencodian-shared-session-message-parts',
@@ -887,7 +1013,7 @@ export class SettingsConversationSection {
     }
   }
 
-  private renderSharedSessionPart(containerEl: HTMLElement, part: Part): void {
+  private renderSharedSessionPart(containerEl: HTMLElement, part: NormalizedSessionPreviewPart): void {
     const text = typeof part.text === 'string' ? part.text : JSON.stringify(part, null, 2);
     const shouldCollapse = part.type !== 'text' || text.length > 800;
     if (shouldCollapse) {
@@ -911,13 +1037,14 @@ export class SettingsConversationSection {
     });
   }
 
-  private getSessionShareUrl(session: Session): string | null {
-    const share = session.share;
-    if (!share || typeof share !== 'object') {
-      return null;
+  private getNormalizedMessageRoleLabel(role: string): string {
+    if (role === 'assistant') {
+      return t('settings.conversation.share.sharedSessions.assistant');
     }
-    const url = (share as { url?: unknown }).url;
-    return typeof url === 'string' && url.trim().length > 0 ? url : null;
+    if (role === 'user') {
+      return t('settings.conversation.share.sharedSessions.user');
+    }
+    return role.trim() || 'unknown';
   }
 
   private getShareModeLabel(mode: OpencodeShareMode): string {
@@ -930,12 +1057,6 @@ export class SettingsConversationSection {
       default:
         return t('settings.conversation.share.mode.manual');
     }
-  }
-
-  private getMessageRoleLabel(message: Message): string {
-    return message.role === 'assistant'
-      ? t('settings.conversation.share.sharedSessions.assistant')
-      : t('settings.conversation.share.sharedSessions.user');
   }
 
   private formatTimestamp(value: number | undefined): string {

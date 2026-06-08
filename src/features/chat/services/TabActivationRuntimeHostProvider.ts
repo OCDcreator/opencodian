@@ -1,3 +1,8 @@
+import {
+  emitPromptSuggestionSessionChange,
+  findPromptSuggestionScope,
+} from '../../../core/agents/backend/promptSuggestionSink';
+import { getConversationBackendSessionId } from '../../../core/types';
 import type {
   TabActivationRuntimeViewHostFactoryHost,
 } from './TabActivationRuntimeViewHostFactory';
@@ -68,6 +73,19 @@ export function createTabActivationRuntimeViewHostFactoryHost(
     getConversationState: () => ({
       setCurrentConversation: (conversation) => {
         host.setCurrentConversation(conversation);
+
+        // Emit session change through the prompt suggestion channel bus
+        const sessionId = conversation
+          ? getConversationBackendSessionId(conversation) ?? null
+          : null;
+        const activeTabId = host.getActiveTabId();
+        const messagesContainer = host.getTabMessagesContainer(activeTabId);
+        if (messagesContainer && messagesContainer instanceof Element) {
+          const channelId = findPromptSuggestionScope(messagesContainer);
+          if (channelId) {
+            emitPromptSuggestionSessionChange(sessionId, channelId);
+          }
+        }
       },
       setCurrentConversationRevertState: (revertState) => {
         host.setCurrentConversationRevertState(revertState);

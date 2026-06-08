@@ -1,4 +1,5 @@
 import type { Conversation } from '../../../core/types';
+import { getConversationBackendSessionId } from '../../../core/types';
 import type { TabId } from '../tabs';
 import type { PostSyncQuestionTodoStatusRefreshOptions } from './QuestionTodoStatusRefreshCoordinator';
 
@@ -37,7 +38,7 @@ export class PostSyncQuestionTodoRefreshPlanBuilder {
 
   createSignalSyncedBackgroundConversationPlan(
     options: SignalSyncedBackgroundConversationRefreshPlanOptions,
-  ): PostSyncQuestionTodoStatusRefreshOptions {
+  ): PostSyncQuestionTodoStatusRefreshOptions | null {
     return this.createBackgroundConversationPlan(
       options.tabId,
       options.conversation,
@@ -47,7 +48,7 @@ export class PostSyncQuestionTodoRefreshPlanBuilder {
 
   createBackgroundTabConversationPlan(
     options: BackgroundTabConversationRefreshPlanOptions,
-  ): PostSyncQuestionTodoStatusRefreshOptions {
+  ): PostSyncQuestionTodoStatusRefreshOptions | null {
     return this.createBackgroundConversationPlan(
       options.tabId,
       options.conversation,
@@ -59,11 +60,19 @@ export class PostSyncQuestionTodoRefreshPlanBuilder {
     tabId: TabId,
     conversation: Conversation,
     forceTodoStatusRefresh: boolean,
-  ): PostSyncQuestionTodoStatusRefreshOptions {
+  ): PostSyncQuestionTodoStatusRefreshOptions | null {
+    // Backend gate: question/todo refresh is an OpenCode-only feature.
+    // Non-OpenCode conversations have no server-side question or todo API;
+    // skip the entire refresh plan rather than calling with wrong session identity.
+    const backend = conversation.backend ?? 'opencode';
+    if (backend !== 'opencode') {
+      return null;
+    }
+
     return {
       tabId,
-      questionSessionId: conversation.openCodeSessionId,
-      todoStatusSessionId: conversation.openCodeSessionId,
+      questionSessionId: getConversationBackendSessionId(conversation),
+      todoStatusSessionId: getConversationBackendSessionId(conversation),
       forceTodoStatusRefresh,
     };
   }

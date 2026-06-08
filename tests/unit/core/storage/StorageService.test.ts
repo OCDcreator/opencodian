@@ -115,6 +115,35 @@ describe('StorageService conversation persistence - saveConversation', () => {
         '.opencodian/session-metas/conv-meta.json',
         expect.stringContaining('"openCodeSessionId": "session-meta"'),
       );
+      expect(mockAdapter.write).toHaveBeenCalledWith(
+        '.opencodian/session-metas/conv-meta.json',
+        expect.stringContaining('"backendSessionId": "session-meta"'),
+      );
+  });
+
+  it('persists backend session identity for non-OpenCode conversations', async () => {
+      const conversation = {
+        id: 'conv-claude',
+        title: 'Claude conversation',
+        createdAt: 1234567890,
+        updatedAt: 1234567999,
+        backend: 'claude-code',
+        backendSessionId: 'claude-session-1',
+        backendAgentId: 'agent-reviewer',
+        messages: [],
+      };
+
+      await storage.saveConversation(conversation as never);
+
+      const savedData = JSON.parse(mockAdapter.write.mock.calls[0][1]);
+      expect(savedData.openCodeSessionId).toBeUndefined();
+      expect(savedData.backend).toBe('claude-code');
+      expect(savedData.backendSessionId).toBe('claude-session-1');
+      expect(savedData.backendAgentId).toBe('agent-reviewer');
+      expect(mockAdapter.write).toHaveBeenCalledWith(
+        '.opencodian/session-metas/conv-claude.json',
+        expect.stringContaining('"backendSessionId": "claude-session-1"'),
+      );
   });
 
   it('persists user context attachments inside full messages', async () => {
@@ -361,6 +390,23 @@ describe('StorageService conversation persistence - loadFullConversation', () =>
         noticeTone: 'warning',
         noticeActions: [{ type: 'open_model_settings' }],
       });
+  });
+
+  it('normalizes old OpenCode session identity into backendSessionId after reload', async () => {
+      mockAdapter.read.mockResolvedValue(JSON.stringify({
+        id: 'conv-legacy',
+        title: 'Legacy Conversation',
+        createdAt: 1234567890,
+        updatedAt: 1234567999,
+        openCodeSessionId: 'session-legacy',
+        messages: [],
+      }));
+
+      const result = await storage.loadFullConversation('conv-legacy');
+
+      expect(result?.backend).toBe('opencode');
+      expect(result?.openCodeSessionId).toBe('session-legacy');
+      expect(result?.backendSessionId).toBe('session-legacy');
   });
 
   it('restores persisted context attachments after reload', async () => {

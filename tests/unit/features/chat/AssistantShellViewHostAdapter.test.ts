@@ -134,6 +134,30 @@ describe('AssistantShellViewHostAdapter', () => {
     expect(messageEl.querySelector('.opencodian-message-time-row')?.textContent).toContain('gpt-5.4');
   });
 
+  it('renders persisted structured output as a collapsible JSON block', async () => {
+    const { adapter, turnBody } = createAdapter();
+    const message: ChatMessage = {
+      id: 'assistant-structured-1',
+      role: 'assistant',
+      content: 'Persisted assistant answer',
+      timestamp: 32346,
+      modelId: 'anthropic/claude-sonnet-4',
+      structured: {
+        status: 'ok',
+        items: [1, 2, 3],
+      },
+    };
+
+    const messageEl = await adapter.renderPersistedAssistantMessage({ message });
+    const detailsEl = messageEl.querySelector('.opencodian-structured-output-details') as HTMLDetailsElement | null;
+
+    expect(turnBody.contains(messageEl)).toBe(true);
+    expect(detailsEl).not.toBeNull();
+    expect(detailsEl?.querySelector('.opencodian-structured-output-summary')?.textContent).toContain('Structured Output');
+    expect(detailsEl?.querySelector('.opencodian-structured-output-code')?.textContent).toContain('"status": "ok"');
+    expect(detailsEl?.querySelector('.opencodian-structured-output-code')?.textContent).toContain('"items": [');
+  });
+
   it('finalizes persisted assistant footers through the shared shell renderer', () => {
     const { adapter, scrollSpy, turnBody } = createAdapter();
     const { messageEl } = adapter.createAssistantMessageElement('tab-1', true);

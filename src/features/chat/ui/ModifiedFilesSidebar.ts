@@ -9,6 +9,7 @@ import { App, Component, setIcon } from 'obsidian';
 
 import type { SessionDiffEntry } from '../../../core/types/chat';
 import { t } from '../../../i18n';
+import { ConversationRenderService } from '../services/ConversationRenderService';
 
 export class ModifiedFilesSidebar extends Component {
   private wrapperEl: HTMLElement;
@@ -44,12 +45,11 @@ export class ModifiedFilesSidebar extends Component {
       cls: 'opencodian-modified-files-sidebar-collapse opencodian-tooltip-trigger',
       attr: {
         type: 'button',
-        'aria-label': t('modifiedFiles.toggleTooltip'),
-        'data-tooltip': t('modifiedFiles.toggleTooltip'),
         'data-tooltip-align': 'left',
       },
     });
     setIcon(collapseButtonEl, 'panel-right-close');
+    ConversationRenderService.setTooltipLabel(collapseButtonEl, t('modifiedFiles.toggleTooltip'));
 
     this.listEl = this.containerEl.createDiv({ cls: 'opencodian-modified-files-sidebar-list' });
     this.render();

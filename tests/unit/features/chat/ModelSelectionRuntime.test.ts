@@ -248,4 +248,45 @@ describe('ModelSelectionRuntime', () => {
       message: t('chat.notice.modelUnavailable.unconfiguredBody'),
     });
   });
+
+  it('validates lightweight provider snapshots when no catalog bundle is available', async () => {
+    const { host, runtime } = createRuntimeFixture({
+      activeTabModelOverride: {
+        provider: 'anthropic',
+        model: 'claude-3-7-sonnet',
+      },
+      defaultModelSelection: {
+        provider: 'claude-code',
+        model: 'default',
+      },
+      loadModelCatalogData: {
+        catalogBundle: null,
+        providers: [{
+          id: 'claude-code',
+          name: 'Claude Code',
+          models: [{ id: 'default', name: 'Default', variants: ['low', 'medium', 'high'] }],
+        }],
+      },
+    });
+
+    await runtime.reloadModelCatalog();
+
+    expect(runtime.getCurrentSessionModel()).toEqual({
+      provider: 'claude-code',
+      model: 'default',
+    });
+    expect(runtime.getCurrentSessionModelResolution()).toMatchObject({
+      status: 'available',
+      provider: 'claude-code',
+      model: 'default',
+      providerName: 'Claude Code',
+      modelName: 'Default',
+    });
+    expect(await runtime.ensureSelectedModelAvailable('anthropic', 'claude-3-7-sonnet')).toBe(false);
+    expect(host.isModelAvailableOnServer).not.toHaveBeenCalledWith(
+      'anthropic',
+      'claude-3-7-sonnet',
+    );
+    expect(await runtime.ensureSelectedModelAvailable('claude-code', 'default')).toBe(true);
+  });
 });

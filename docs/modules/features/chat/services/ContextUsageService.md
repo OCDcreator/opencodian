@@ -16,6 +16,8 @@
 
 ## 核心类型
 
+`ContextUsageSnapshot` 由 `src/core/types/chat.ts` 拥有，本模块仅 re-export 以兼容既有 chat 调用方。backend adapter / OpenCode session control 不应从本 feature service 反向导入该 DTO。
+
 ```typescript
 export interface ContextUsageSnapshot {
   sessionId: string;

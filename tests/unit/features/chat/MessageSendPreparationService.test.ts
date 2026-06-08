@@ -1,9 +1,6 @@
 import type {
   PromptRequestPart,
 } from '../../../../src/core/opencode/OpenCodePromptRequestBuilder';
-import type {
-  PromptContextItem,
-} from '../../../../src/core/types';
 import {
   buildOptimisticUserMessage,
   MessageSendPreparationService,
@@ -12,21 +9,9 @@ import {
   createComposerSendContext,
   createConversation,
   createHost,
+  createPromptContextItem,
   createStructuredSendPayload,
 } from './MessageSendPreparationService.testSupport';
-
-function createPromptContextItem(overrides: Partial<PromptContextItem> = {}): PromptContextItem {
-  return {
-    id: 'context-1',
-    kind: 'selection',
-    path: 'notes/example.md',
-    label: 'example.md:1-3',
-    mime: 'text/markdown',
-    lineRange: { startLine: 1, endLine: 3 },
-    textSnapshot: 'Selected text',
-    ...overrides,
-  };
-}
 
 describe('buildOptimisticUserMessage', () => {
   it('builds a user message with context attachments', () => {
@@ -88,9 +73,27 @@ describe('MessageSendPreparationService', () => {
 
     expect(result).toBeNull();
     expect(ensureReadySpy).toHaveBeenCalledWith('offline');
+    expect(host.ensureConversationReady).not.toHaveBeenCalled();
     expect(host.saveConversation).not.toHaveBeenCalled();
     expect(host.renderMessage).not.toHaveBeenCalled();
     expect(conversation.messages).toHaveLength(0);
+
+    ensureReadySpy.mockRestore();
+  });
+
+  it('does not create a conversation before prompting when no backend is enabled', async () => {
+    const conversation = createConversation();
+    const host = createHost(conversation, [], {
+      getServerAvailability: jest.fn().mockResolvedValue('disabled'),
+    });
+    const service = new MessageSendPreparationService(host, createComposerSendContext());
+    const ensureReadySpy = jest.spyOn(service, 'ensureServerReadyForChat').mockResolvedValue(false);
+
+    const result = await service.prepareMessageSend({ content: 'Hello' });
+
+    expect(result).toBeNull();
+    expect(ensureReadySpy).toHaveBeenCalledWith('disabled');
+    expect(host.ensureConversationReady).not.toHaveBeenCalled();
 
     ensureReadySpy.mockRestore();
   });
@@ -124,6 +127,65 @@ describe('MessageSendPreparationService', () => {
     expect(host.saveConversation).not.toHaveBeenCalled();
     expect(host.renderMessage).not.toHaveBeenCalled();
     expect(conversation.messages).toHaveLength(0);
+  });
+
+  it('uses Claude Code model catalog options for Claude Code conversations', async () => {
+    const conversation = createConversation();
+    conversation.backend = 'claude-code';
+    conversation.backendSessionId = 'claude-code-session';
+    delete conversation.openCodeSessionId;
+    const host = createHost(conversation, [], {
+      hasLoadedModelCatalog: jest.fn().mockReturnValue(false),
+      getSendMessageOptions: jest.fn().mockReturnValue({
+        provider: 'claude-code',
+        model: 'opus',
+        variant: 'xhigh',
+      }),
+    });
+    const service = new MessageSendPreparationService(host, createComposerSendContext());
+
+    const result = await service.prepareMessageSend({ content: 'Hello Claude' });
+
+    expect(result).not.toBeNull();
+    expect(host.loadAvailableModels).toHaveBeenCalledTimes(1);
+    expect(host.getSendMessageOptions).toHaveBeenCalledTimes(1);
+    expect(host.ensureSelectedModelAvailable).toHaveBeenCalledWith('claude-code', 'opus');
+    expect(host.appendModelUnavailableNoticeMessage).not.toHaveBeenCalled();
+    expect(result?.modelOptions).toEqual({
+      provider: 'claude-code',
+      model: 'opus',
+      variant: 'xhigh',
+    });
+    expect(result?.activeModelId).toBe('claude-code/opus');
+    expect(host.seedCanonicalUserMessage).toHaveBeenCalledWith({
+      sessionID: 'claude-code-session',
+      messageID: 'message-1',
+      parts: [{ id: 'part-1', type: 'text', text: 'Hello Claude' }],
+      timestamp: result?.userMessage.timestamp,
+    });
+  });
+
+  it('merges one-shot outputFormat into modelOptions when provided', async () => {
+    const conversation = createConversation();
+    const host = createHost(conversation);
+    const service = new MessageSendPreparationService(host, createComposerSendContext());
+    const outputFormat = { type: 'json_schema', schema: { type: 'object' } };
+
+    const result = await service.prepareMessageSend({ content: 'Hello', outputFormat });
+
+    expect(result).not.toBeNull();
+    expect(result?.modelOptions).toEqual(expect.objectContaining({ outputFormat }));
+  });
+
+  it('does not add outputFormat to modelOptions when not provided', async () => {
+    const conversation = createConversation();
+    const host = createHost(conversation);
+    const service = new MessageSendPreparationService(host, createComposerSendContext());
+
+    const result = await service.prepareMessageSend({ content: 'Hello' });
+
+    expect(result).not.toBeNull();
+    expect(result?.modelOptions).not.toHaveProperty('outputFormat');
   });
 });
 
@@ -172,7 +234,9 @@ describe('MessageSendPreparationService optimistic preparation', () => {
     expect(conversation.messages[0]).toBe(result?.userMessage);
     expect(conversation.updatedAt).toBe(result?.userMessage.timestamp);
     expect(callOrder).toEqual([
+      'getServerAvailability',
       'transitionTabSessionLifecycle:preparing',
+      'getServerAvailability',
       'refreshSettingsTabStatus',
       'ensureSelectedModelAvailable',
       'saveConversation',
@@ -337,8 +401,9 @@ describe('MessageSendPreparationService context preparation', () => {
 
     expect(result).toBeNull();
     expect(host.notifyForegroundBusy).toHaveBeenCalledTimes(1);
-    expect(host.getServerAvailability).not.toHaveBeenCalled();
-    expect(callOrder).toEqual(['notifyForegroundBusy']);
+    // Early disabled-backend guard calls getServerAvailability before the busy check.
+    expect(host.getServerAvailability).toHaveBeenCalledTimes(1);
+    expect(callOrder).toEqual(['getServerAvailability', 'notifyForegroundBusy']);
   });
 
   it('enters streaming state and clears staged input state in the existing order', () => {

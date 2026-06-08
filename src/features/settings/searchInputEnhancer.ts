@@ -1,6 +1,7 @@
 import { setIcon } from 'obsidian';
 
 import { t } from '../../i18n';
+import { SettingsPopoverController } from './SettingsPopoverController';
 
 const SEARCH_HISTORY_PREFIX = 'opencodian:settings-search-history:';
 const SEARCH_HISTORY_LIMIT = 8;
@@ -12,6 +13,10 @@ interface SearchInputEnhancerOptions {
   inputEl: HTMLInputElement;
   containerEl: HTMLElement;
   onClear?: () => void;
+  /** Optional boundary element for popover positioning. When provided the
+   *  search history popover is clamped within this element's visible rect
+   *  instead of the full viewport. */
+  boundaryEl?: HTMLElement;
 }
 
 export interface SearchInputEnhancerHandle {
@@ -57,14 +62,26 @@ function commitHistoryValue(historyKey: string, rawValue: string): void {
   writeHistory(historyKey, nextHistory);
 }
 
+const SETTINGS_BOUNDARY_SELECTORS = '.vertical-tab-content-container, .vertical-tab-content, .modal-content';
+
+function resolveBoundary(el: HTMLElement, explicit?: HTMLElement): HTMLElement | undefined {
+  if (explicit) {
+    return explicit;
+  }
+  return el.closest<HTMLElement>(SETTINGS_BOUNDARY_SELECTORS) ?? undefined;
+}
+
 export function enhanceSearchInput(options: SearchInputEnhancerOptions): SearchInputEnhancerHandle {
   const { historyKey, inputEl, containerEl, onClear } = options;
-  const historyPopoverEl = containerEl.createDiv({
-    cls: 'opencodian-settings-search-history-popover is-hidden',
-    attr: {
-      'aria-label': t('settings.search.recent'),
-    },
-  });
+  const resolvedBoundary = resolveBoundary(inputEl, options.boundaryEl);
+  const ownerDocument = inputEl.ownerDocument;
+  const popoverController = SettingsPopoverController.ensureForDocument(ownerDocument);
+
+  const historyPopoverEl = ownerDocument.createElement('div');
+  historyPopoverEl.className = 'opencodian-settings-search-history-popover is-hidden';
+  historyPopoverEl.setAttribute('aria-label', t('settings.search.recent'));
+  ownerDocument.body.appendChild(historyPopoverEl);
+
   const historyListEl = historyPopoverEl.createDiv({
     cls: 'opencodian-settings-search-history-list',
   });
@@ -83,6 +100,22 @@ export function enhanceSearchInput(options: SearchInputEnhancerOptions): SearchI
 
   let isFocused = false;
 
+  const hideHistoryPopover = () => {
+    historyPopoverEl.toggleClass('is-hidden', true);
+    popoverController.hide(historyPopoverEl);
+  };
+
+  const showHistoryPopover = () => {
+    historyPopoverEl.toggleClass('is-hidden', false);
+    popoverController.show({
+      anchorEl: inputEl,
+      popoverEl: historyPopoverEl,
+      matchAnchorWidth: true,
+      preferredPlacement: 'bottom-start',
+      boundaryEl: resolvedBoundary,
+    });
+  };
+
   const renderHistory = () => {
     historyListEl.empty();
 
@@ -97,8 +130,8 @@ export function enhanceSearchInput(options: SearchInputEnhancerOptions): SearchI
     });
 
     const shouldShow = isFocused && history.length > 0;
-    historyPopoverEl.toggleClass('is-hidden', !shouldShow);
     if (!shouldShow) {
+      hideHistoryPopover();
       return;
     }
 
@@ -121,6 +154,8 @@ export function enhanceSearchInput(options: SearchInputEnhancerOptions): SearchI
         inputEl.focus();
       });
     }
+
+    showHistoryPopover();
   };
 
   const syncClearButton = () => {
@@ -216,6 +251,7 @@ export function enhanceSearchInput(options: SearchInputEnhancerOptions): SearchI
   return {
     commitCurrentValue,
     destroy: () => {
+      popoverController.hide(historyPopoverEl);
       historyPopoverEl.remove();
       clearButtonEl.remove();
     },

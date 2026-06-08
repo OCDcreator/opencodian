@@ -11,13 +11,18 @@
 
 - `.opencodian-history-dropdown`：下拉卡片容器（玻璃态背景）。
 - `.opencodian-history-scroll`：可滚动列表区域。
+- `.opencodian-history-scope`：后端作用域标签（大写、字间距、增强后的 muted 对比度，避免在玻璃背景上过淡）。
 - `.opencodian-history-item` + `is-active` / `is-selected`：会话条目状态。
-- `.opencodian-history-item-status.is-pending|is-failed`：标题生成状态标记。
+  - `is-active`：左侧 3px 强调色边框 + 极淡中性背景。
+  - `is-selected`：中性高亮背景，复选框提供主视觉信号。
+  - `is-active.is-selected`：组合上述两者。
+- `.opencodian-history-item-status.is-pending|is-failed`：标题生成状态标记（小药丸样式，含背景和边框）。
 - `.opencodian-history-footer`、`.opencodian-history-action`：底部操作区（删除目标/删除全部等）。
 
 ## 关联 TS 组件
 
 - `src/features/chat/OpenCodianView.ts`
+- `src/features/chat/services/ConversationHistoryActionsCoordinator.ts`
 
 ## 修改注意点
 

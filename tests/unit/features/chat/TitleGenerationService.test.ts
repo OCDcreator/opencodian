@@ -12,6 +12,31 @@ describe('TitleGenerationService', () => {
   });
 
   const createHarness = () => {
+    const openCodeSessions = new Map<string, { title: string }>();
+
+    const mockAdapter = {
+      kind: 'opencode' as const,
+      capabilities: new Set(['chat', 'sessions'] as const),
+      hasCapability(cap: string) { return this.capabilities.has(cap); },
+      getSession: jest.fn().mockImplementation(async (sessionId: string) => {
+        return openCodeSessions.get(sessionId) ?? null;
+      }),
+    };
+    const claudeAdapter = {
+      kind: 'claude-code' as const,
+      capabilities: new Set(['chat', 'sessions'] as const),
+      hasCapability(cap: string) { return this.capabilities.has(cap); },
+      getSession: jest.fn().mockResolvedValue(null),
+    };
+
+    const agentServiceRegistry = {
+      get: jest.fn().mockImplementation((kind: string) => {
+        if (kind === 'opencode') return mockAdapter;
+        if (kind === 'claude-code') return claudeAdapter;
+        return undefined;
+      }),
+    };
+
     const openCodeService = {
       listSessions: jest.fn().mockResolvedValue([]),
       createSession: jest.fn().mockResolvedValue('temp-session'),
@@ -28,13 +53,15 @@ describe('TitleGenerationService', () => {
         aiTitleModel: '',
       },
       openCodeService,
+      agentServiceRegistry,
       modelConfigService,
       getConversationById: jest.fn().mockResolvedValue(null),
+      generateDefaultTitle: jest.fn((firstMessage: string) => firstMessage.substring(0, 50).trim()),
     };
     const service = new TitleGenerationService(plugin as unknown as OpenCodianPlugin);
     const callback = jest.fn().mockResolvedValue(undefined);
 
-    return { service, callback, openCodeService, modelConfigService, plugin };
+    return { service, callback, openCodeService, modelConfigService, plugin, openCodeSessions, mockAdapter, claudeAdapter };
   };
 
   it('prefers structured title output and still normalizes punctuation and length', async () => {
@@ -72,14 +99,8 @@ describe('TitleGenerationService', () => {
   });
 
   it('uses the official OpenCode title when it has been generated for the real session', async () => {
-    const { service, callback, openCodeService } = createHarness();
-    openCodeService.listSessions.mockResolvedValue([
-      {
-        id: 'real-session',
-        title: 'Official SDK title',
-        time: { created: 1, updated: 2 },
-      },
-    ]);
+    const { service, callback, openCodeService, openCodeSessions } = createHarness();
+    openCodeSessions.set('real-session', { title: 'Official SDK title' });
 
     await service.generateTitle(
       'conversation-official',
@@ -89,7 +110,6 @@ describe('TitleGenerationService', () => {
       { sessionId: 'real-session', officialPollAttempts: 1, officialPollIntervalMs: 0 },
     );
 
-    expect(openCodeService.listSessions).toHaveBeenCalled();
     expect(openCodeService.requestAssistantResponse).not.toHaveBeenCalled();
     expect(callback).toHaveBeenCalledWith('conversation-official', {
       success: true,
@@ -98,14 +118,8 @@ describe('TitleGenerationService', () => {
   });
 
   it('falls back to local title generation when the official title remains the OpenCode default', async () => {
-    const { service, callback, openCodeService } = createHarness();
-    openCodeService.listSessions.mockResolvedValue([
-      {
-        id: 'real-session',
-        title: 'New session - 2026-05-14T10:00:00.000Z',
-        time: { created: 1, updated: 2 },
-      },
-    ]);
+    const { service, callback, openCodeService, openCodeSessions } = createHarness();
+    openCodeSessions.set('real-session', { title: 'New session - 2026-05-14T10:00:00.000Z' });
     openCodeService.requestAssistantResponse.mockResolvedValue({
       content: 'Title: Local fallback title',
       structured: null,
@@ -119,7 +133,6 @@ describe('TitleGenerationService', () => {
       { sessionId: 'real-session', officialPollAttempts: 1, officialPollIntervalMs: 0 },
     );
 
-    expect(openCodeService.listSessions).toHaveBeenCalled();
     expect(openCodeService.requestAssistantResponse).toHaveBeenCalled();
     expect(callback).toHaveBeenCalledWith('conversation-local-fallback', {
       success: true,
@@ -127,8 +140,43 @@ describe('TitleGenerationService', () => {
     });
   });
 
+  it('does not create an OpenCode fallback title session for Claude conversations without an official summary', async () => {
+    const { service, callback, openCodeService, plugin, claudeAdapter } = createHarness();
+    plugin.getConversationById.mockResolvedValue({
+      id: 'conversation-claude',
+      title: 'Local provisional',
+      createdAt: 1,
+      updatedAt: 2,
+      backend: 'claude-code',
+      backendSessionId: 'claude-session',
+      messages: [],
+    });
+    claudeAdapter.getSession.mockResolvedValue({
+      sessionId: 'claude-session',
+      summary: '',
+      lastModified: 1,
+    });
+
+    await service.generateTitle(
+      'conversation-claude',
+      'Help me keep Claude title routing honest',
+      { provider: 'anthropic', model: 'claude-sonnet-4-5' },
+      callback,
+      { officialPollAttempts: 1, officialPollIntervalMs: 0 },
+    );
+
+    expect(claudeAdapter.getSession).toHaveBeenCalledWith('claude-session');
+    expect(openCodeService.createSession).not.toHaveBeenCalled();
+    expect(openCodeService.requestAssistantResponse).not.toHaveBeenCalled();
+    expect(openCodeService.deleteSession).not.toHaveBeenCalled();
+    expect(callback).toHaveBeenCalledWith('conversation-claude', {
+      success: true,
+      title: 'Help me keep Claude title routing honest',
+    });
+  });
+
   it('resolves the real session id from the conversation when no explicit session id is supplied', async () => {
-    const { service, callback, openCodeService, plugin } = createHarness();
+    const { service, callback, openCodeService, plugin, openCodeSessions } = createHarness();
     plugin.getConversationById.mockResolvedValue({
       id: 'conversation-from-cache',
       title: 'Local provisional',
@@ -137,13 +185,9 @@ describe('TitleGenerationService', () => {
       openCodeSessionId: 'real-session-from-conversation',
       messages: [],
     });
-    openCodeService.listSessions.mockResolvedValue([
-      {
-        id: 'real-session-from-conversation',
-        title: 'Official title from conversation session',
-        time: { created: 1, updated: 2 },
-      },
-    ]);
+    openCodeSessions.set('real-session-from-conversation', {
+      title: 'Official title from conversation session',
+    });
 
     await service.generateTitle(
       'conversation-from-cache',
@@ -156,7 +200,6 @@ describe('TitleGenerationService', () => {
     expect(plugin.getConversationById).toHaveBeenCalledWith('conversation-from-cache', {
       preferCache: true,
     });
-    expect(openCodeService.listSessions).toHaveBeenCalled();
     expect(openCodeService.requestAssistantResponse).not.toHaveBeenCalled();
     expect(callback).toHaveBeenCalledWith('conversation-from-cache', {
       success: true,

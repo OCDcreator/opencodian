@@ -18,6 +18,7 @@ import {
   redactMcpSensitiveText,
   summarizeCommand,
 } from './McpServerStatusModal';
+import { isOpenCodeSettingsBackendActive } from './settingsBackendGuards';
 
 const logger = createLogger('SettingsMcpSection');
 
@@ -160,6 +161,9 @@ export class SettingsMcpSection {
   }
 
   async triggerRefresh(): Promise<void> {
+    if (!this.ensureOpenCodeActive()) {
+      return;
+    }
     if (this.isRefreshing) {
       return;
     }
@@ -431,6 +435,9 @@ export class SettingsMcpSection {
           .setButtonText(label)
           .setDisabled(this.isActionPending || options.disabled === true)
           .onClick(async () => {
+            if (!this.ensureOpenCodeActive()) {
+              return;
+            }
             if (options.disabled) {
               return;
             }
@@ -504,6 +511,9 @@ export class SettingsMcpSection {
   }
 
   private openAddModal(): void {
+    if (!this.ensureOpenCodeActive()) {
+      return;
+    }
     if (!this.configService) {
       new Notice(t('settings.server.mcp.notice.configUnavailable'));
       return;
@@ -513,6 +523,9 @@ export class SettingsMcpSection {
       existingNames: Object.keys({ ...this.plugin.openCodeService.getMcpServerSnapshot().servers, ...this.projectServers }),
       configService: this.configService,
       onSaved: async ({ name, config }) => {
+        if (!this.ensureOpenCodeActive()) {
+          return;
+        }
         try {
           await this.plugin.openCodeService.addMcpServer(name, config);
         } finally {
@@ -523,6 +536,9 @@ export class SettingsMcpSection {
   }
 
   private openEditModal(name: string, entry: OpencodeMcpEntryConfig): void {
+    if (!this.ensureOpenCodeActive()) {
+      return;
+    }
     if (!this.configService) {
       new Notice(t('settings.server.mcp.notice.configUnavailable'));
       return;
@@ -534,6 +550,9 @@ export class SettingsMcpSection {
       existingNames: Object.keys(this.projectServers),
       configService: this.configService,
       onSaved: async ({ name: nextName, config }) => {
+        if (!this.ensureOpenCodeActive()) {
+          return;
+        }
         try {
           await this.plugin.openCodeService.addMcpServer(nextName, config);
         } finally {
@@ -548,6 +567,9 @@ export class SettingsMcpSection {
     status: McpServerStatus,
     projectOwned: boolean,
   ): Promise<void> {
+    if (!this.ensureOpenCodeActive()) {
+      return;
+    }
     if (!this.configService || !projectOwned) {
       new Notice(t('settings.server.mcp.notice.readOnly'));
       return;
@@ -578,5 +600,17 @@ export class SettingsMcpSection {
 
   private getApp(): App {
     return (this.plugin as OpenCodianPlugin & { app?: App }).app ?? ({} as App);
+  }
+
+  private isOpenCodeActive(): boolean {
+    return isOpenCodeSettingsBackendActive(this.plugin.settings);
+  }
+
+  private ensureOpenCodeActive(): boolean {
+    if (this.isOpenCodeActive()) {
+      return true;
+    }
+    new Notice(t('settings.server.mcp.notice.openCodeOnly'));
+    return false;
   }
 }

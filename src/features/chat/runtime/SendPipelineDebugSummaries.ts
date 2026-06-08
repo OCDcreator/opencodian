@@ -98,6 +98,7 @@ export function summarizeChatMessageForDebug(
   };
 }
 
+// eslint-disable-next-line complexity -- The debug summarizer is deliberately exhaustive over the core stream union.
 export function summarizeCoreStreamChunkForDebug(
   chunk: CoreStreamChunk,
 ): Record<string, unknown> {
@@ -138,6 +139,17 @@ export function summarizeCoreStreamChunkForDebug(
         outputTokens: chunk.outputTokens,
         sessionId: chunk.sessionId ?? null,
       };
+    case 'backend_event':
+      return {
+        type: chunk.type,
+        source: chunk.source,
+        event: chunk.event,
+        status: chunk.status ?? null,
+        id: chunk.id ?? null,
+        name: chunk.name ?? null,
+        contentLength: chunk.content?.length ?? 0,
+        metadataKeys: Object.keys(chunk.metadata ?? {}),
+      };
     case 'message_metadata':
       return {
         type: chunk.type,
@@ -168,6 +180,12 @@ export function summarizeCoreStreamChunkForDebug(
         type: chunk.type,
         length: chunk.content.length,
         preview: getLogPreview(chunk.content, 120),
+      };
+    case 'user_message_identity':
+      return {
+        type: chunk.type,
+        uuid: chunk.uuid,
+        sessionId: chunk.sessionId ?? null,
       };
     default:
       return { type: chunk.type };

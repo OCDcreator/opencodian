@@ -7,6 +7,12 @@
 
 `SettingsConversationSection` 是 settings/conversation 分区的厚 owner。它从 `OpenCodianSettings.ts` 接管 conversation section 的完整 lifecycle：标题生成模式与备用标题模型 picker、项目级 compaction 配置编辑、聊天字体大小、问题卡片显示/位置、已回答卡片显示，以及 user markup 渲染开关。
 
+它必须按当前 active backend 过滤能力：聊天字体大小与 user markup 渲染是通用显示设置，Claude Code 和 OpenCode 都可以显示；项目级 compaction、会话分享与问答卡片当前都依赖 OpenCode 机制，只有 active backend 为 `opencode` 时才装配、加载模型目录或监听 `.opencode/opencode.json`。
+
+会话标题分组现在对所有 backend 可见，但内容按 backend 切换：
+- OpenCode active 时：title mode dropdown（first-message / smart）+ 备用 AI 标题模型 picker
+- Claude Code active 时："Let Claude auto-generate titles" toggle（默认开启），控制新 Claude 会话是否让 SDK 自动生成摘要标题；关闭时固定使用 "New Claude Code chat" 作为显式标题
+
 当前 conversation section 不再把不同职责的设置平铺成单层列表，而是复用主设置页的 `settings block` 语言拆成六个二级分组：
 
 - 会话标题
@@ -39,7 +45,7 @@
 `attach()` 会在一个 owner 内完成 conversation section 的主要阶段：
 
 - 创建 section heading
-- 通过 `OpenCodianSettings.createSettingsBlock()` 创建六个 conversation 二级分组卡片
+- 通过 `OpenCodianSettings.createSettingsBlock()` 创建当前 backend 可用的 conversation 二级分组卡片
 - 在“会话标题”块装配 title mode dropdown 与 AI title model picker
 - 在“上下文压缩（项目级）”块装配 compaction controls
 - 在“会话分享（项目级）”块装配 OpenCode `share` mode dropdown
@@ -48,7 +54,7 @@
 - 在“消息渲染”块装配 user markup 渲染 toggle
 - 注册首次与后续模型目录变化时复用的 title-model refresh callback
 
-这样 `OpenCodianSettings` 不再直接持有 conversation section 的 DOM/state/model-picker wiring，只保留 owner 创建、block 样式 seam 与 callback bridge。
+这样 `OpenCodianSettings` 不再直接持有 conversation section 的 DOM/state/model-picker wiring，只保留 owner 创建、block 样式 seam 与 callback bridge。Claude Code active 时，classic 和 tabbed layout 都只显示显示/渲染类通用分组，不会启动 OpenCode title-model refresh、project config listener 或 share/compaction load。
 
 ### title-model refresh orchestration
 
@@ -72,6 +78,7 @@ conversation section compaction controls now edit project `.opencode/opencode.js
 - After write, call `OpenCodeService.reapplyCompactionConfigFromProjectConfig()` to reload sidecar
 - While the settings tab is open, delegate `.opencode/opencode.json` `create` / `modify` / `delete` / `rename` watching to `ProjectConfigFileWatcher` and reload the project conversation controls when that file changes externally
 - Show `configUnavailable` notice when config manager is missing
+- Change callbacks re-check that OpenCode is still the active backend before mutating section-local compaction state, writing `.opencode/opencode.json`, or asking OpenCode to reapply compaction. This protects stale controls that were mounted while OpenCode was active but clicked after the active backend switched to Claude Code.
 
 ### share config (project-scoped)
 
@@ -82,9 +89,12 @@ The sharing block edits OpenCode's top-level `share` field:
 - Supported modes are `manual`, `auto`, and `disabled`; missing or unrecognized values display as upstream default `manual`
 - This is a project config setting, not a per-conversation session override
 - After saving, local managed OpenCode services are restarted when currently running so the running server rereads `share`; remote mode shows the standard remote-management Notice instead of pretending the plugin can reload it
-- The share setting is rendered inside a dedicated share-policy panel with a current-mode chip, a help button backed by `OpenCodeProjectConfigHelpModal`, and a diagnostics action that checks project mode, `OpenCodeService.checkHealth()`, and public share host reachability
-- The sharing block also renders a shared-session manager backed by `OpenCodeService.listSessions()`: it filters sessions with `session.share.url`, shows a public-session count and refresh action, shows the public URL, supports copy/unshare, and opens a full message preview through `OpenCodeService.getSessionMessages()`
-- Shared-session previews render all messages; non-text parts and text longer than 800 characters are placed in closed `<details>` blocks so tool calls and long output are present but folded by default
+- The share setting is rendered inside a dedicated share-policy panel with a current-mode chip, a help button backed by `OpenCodeProjectConfigHelpModal`, and a progressively disclosed troubleshooting section. The troubleshooting section is collapsed by default (`<details>/<summary>`) to keep the stable sharing surface calm; when expanded, it shows connectivity checks for project mode, `OpenCodeService.checkHealth()`, and public share host reachability, with a "Check connectivity" button to run the probes
+- The sharing block also renders a shared-session manager: it routes session listing through `listBackendSessions()` and message preview through `getBackendSessionPreview()` (backend-aware normalization helpers in `AgentBackendRouting`), using `NormalizedSessionRow` and `NormalizedSessionPreviewMessage` types instead of casting to OpenCode `Session` / `SessionMessage`. Sessions are filtered by `shareUrl`, showing a public-session count and refresh action, showing the public URL, supporting copy/unshare, and opening a full message preview. `shareUrl` is now populated only for active OpenCode session rows; Claude Code / generic adapters may still provide title/summary/message-preview data for inspection seams, but a compatible non-OpenCode `share.url` must not make a row appear in this OpenCode-only sharing surface. `unshareSession()` remains a direct `openCodeService` call because it is an OpenCode-specific write operation, and the unshare callback now has an explicit runtime guard (`isOpenCodeActive()`) that blocks the call if the active backend has switched away from OpenCode while the settings page is open.
+- Share mode change callbacks and the share diagnostics button use the same early active-backend re-check as compaction controls, so stale mounted controls cannot update the policy chip / diagnostics, call `updateShareConfig()`, restart OpenCode, call `checkHealth()`, or probe the public share host after the active backend changes away from OpenCode.
+- Shared-session previews render all messages; non-text parts and text longer than 800 characters are placed in closed `<details>` blocks so tool calls and long output are present but folded by default. If the backend cannot supply preview messages, the section shows the existing preview-failed text; if the backend responds with an empty history, the section shows a neutral empty-preview message instead of treating it as an error.
+- A follow-up 2026-05-23 audit confirmed no additional backend-switch guards are needed for preview, refresh, count, or copy-link actions: preview/refresh already degrade safely through `AgentBackendRouting` (`null`/`[]`), stale sharing blocks are removed on standard settings re-render, and copy-link is a pure local UI action.
+- 2026-05-24 follow-up narrowed the shared-session list boundary further: list rows are still normalized through `AgentBackendRouting`, but only OpenCode active backend rows can carry `shareUrl`; preview normalization coverage for generic/Claude-shaped payloads remains defensive and is exercised through OpenCode shared rows rather than by treating non-OpenCode `share.url` as a public OpenCode link.
 
 ### chat font size (global session default)
 
@@ -106,7 +116,8 @@ The sharing block edits OpenCode's top-level `share` field:
 - `OpenCodeProjectConfigHelpModal.ts`: 为 share mode 提供用户可读解释和官方文档链接
 - `main.ts`: 提供 `reapplyConversationSessionDefaults()`，把 settings 保存后的默认值变化桥接到当前聊天视图运行时
 - `OpencodeConfigManager.ts`: 提供 `getCompactionConfig()` / `updateCompactionConfig()` 与 `getShareConfig()` / `updateShareConfig()` 读写项目 `.opencode/opencode.json` 中的 conversation 相关项目配置
-- `OpenCodeService.ts`: 提供 `reapplyCompactionConfigFromProjectConfig()` 让 sidecar 重读项目配置，并提供 shared-session manager 所需的 `listSessions()` / `getSessionMessages()` / `unshareSession()`
+- `OpenCodeService.ts`: 提供 `reapplyCompactionConfigFromProjectConfig()` 让 sidecar 重读项目配置，以及 shared-session unshare 所需的 `unshareSession()`
+- `AgentBackendRouting.ts`: 提供 `listBackendSessions()` 和 `getBackendSessionPreview()` 用于 shared-session 列表和消息预览的 backend-aware 归一化路由，返回 `NormalizedSessionRow` / `NormalizedSessionPreviewMessage` 类型而非 OpenCode `Session` / `SessionMessage`
 - `ProjectConfigFileWatcher.ts`: 监听当前 vault 的 `.opencode/opencode.json` 外部文件变更并触发项目 conversation 控件回读
 - `ModelConfigService.ts`: 提供 AI 标题模型使用的有效模型目录
 - `modelPicker.ts`: 构建并解析 AI 标题模型 picker group / 选项
@@ -115,6 +126,7 @@ The sharing block edits OpenCode's top-level `share` field:
 ## 注意事项
 
 - 不要改变 title model fallback、follow-current 语义、chat font-size 的即时重应用语义，或 question card refresh / conversation rendering 触发条件。
+- 新增 conversation 选项时先判定是否后端无关。只改本地显示的选项可以在所有 backend 展示；任何读写 `.opencode/opencode.json`、调用 OpenCode session API、依赖 OpenCode title/question/share/compaction 语义的选项都必须继续只在 OpenCode active 时展示。
 - 备用标题模型是 OpenCodian 智能标题的兜底模型，独立于 OpenCode 顶层 `small_model`；文案和 picker 说明必须继续保持这个边界。
 - compaction 配置已改为项目级，不再从 plugin settings 或 conversation session settings 读取或写入。
 - settings 页面打开期间，如果外部工具直接改动或删除 `.opencode/opencode.json`，项目级 compaction/share controls 会自动回读项目配置并刷新到最新状态；不需要手动重开设置页。
@@ -141,4 +153,4 @@ Added `attachTabbed(containerEl, secondaryTabId)` method for the tabbed settings
 - `questions` — renders question card display/position/answered-card toggles
 - `rendering` — renders user markup render toggle
 
-The classic `attach()` method remains unchanged.
+The classic `attach()` method remains the full-list owner, but both classic and tabbed paths now apply the same active-backend visibility rules.

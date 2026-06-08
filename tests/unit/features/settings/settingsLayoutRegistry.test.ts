@@ -14,18 +14,19 @@ import {
 } from '../../../../src/features/settings/settingsLayoutRegistry';
 
 describe('SETTINGS_PRIMARY_TABS', () => {
-  it('defines general as a single-page primary tab without extra secondary navigation', () => {
+  it('defines general with basic and agents secondary tabs', () => {
     const generalTab = getPrimaryTabDefinition('general');
     expect(generalTab).toBeDefined();
     expect(generalTab!.labelKey).toBe('settings.general.title');
     expect(generalTab!.defaultSecondaryTabId).toBe('basic');
-    expect(generalTab!.secondaryTabs.map((secondaryTab) => secondaryTab.id)).toEqual(['basic']);
+    expect(generalTab!.secondaryTabs.map((secondaryTab) => secondaryTab.id)).toEqual(['basic', 'agents']);
   });
 
   it('defines all expected primary tabs in order', () => {
     const ids = SETTINGS_PRIMARY_TABS.map((t) => t.id);
     expect(ids).toEqual([
       'general',
+      'claude-code',
       'server',
       'model',
       'conversation',
@@ -89,6 +90,45 @@ describe('SETTINGS_PRIMARY_TABS', () => {
     ]);
   });
 
+  it('marks backend-owned settings tabs with backend requirements', () => {
+    const opencodeOnlyPrimaryTabs = [
+      'server',
+      'model',
+      'agents',
+      'commands',
+      'mcp',
+      'formatter',
+      'plugins',
+      'skills',
+      'tools',
+      'acp',
+    ];
+
+    for (const tabId of opencodeOnlyPrimaryTabs) {
+      expect(getPrimaryTabDefinition(tabId)?.backendRequired).toBe('opencode');
+    }
+
+    const conversationTab = getPrimaryTabDefinition('conversation');
+    expect(conversationTab?.secondaryTabs.filter((tab) => tab.backendRequired === 'opencode').map((tab) => tab.id))
+      .toEqual(['compaction', 'sharing', 'questions']);
+    expect(getPrimaryTabDefinition('claude-code')?.backendRequired).toBe('claude-code');
+  });
+
+  it('exposes Claude Code as a Claude-owned configuration tab', () => {
+    const claudeTab = getPrimaryTabDefinition('claude-code');
+
+    expect(claudeTab).toBeDefined();
+    expect(claudeTab!.labelKey).toBe('settings.claudeCode.title');
+    expect(claudeTab!.defaultSecondaryTabId).toBe('runtime');
+    expect(claudeTab!.secondaryTabs.map((secondaryTab) => secondaryTab.id)).toEqual([
+      'runtime',
+      'model-thinking',
+      'permissions',
+      'context-sources',
+      'tools',
+    ]);
+  });
+
   it('splits formatter settings into formatter and language server secondary tabs', () => {
     const formatterTab = getPrimaryTabDefinition('formatter');
 
@@ -96,6 +136,19 @@ describe('SETTINGS_PRIMARY_TABS', () => {
       'overview',
       'formatter',
       'lsp',
+    ]);
+  });
+
+  it('splits debug settings by diagnostic source', () => {
+    const debugTab = getPrimaryTabDefinition('debug');
+
+    expect(debugTab!.defaultSecondaryTabId).toBe('plugin');
+    expect(debugTab!.secondaryTabs.map((secondaryTab) => secondaryTab.id)).toEqual([
+      'plugin',
+      'opencode',
+      'claude-code',
+      'export',
+      'capability-lab',
     ]);
   });
 });
@@ -137,8 +190,15 @@ describe('resolveSecondaryTabId', () => {
 
   it('maps legacy secondary ids to their merged targets', () => {
     expect(resolveSecondaryTabId('general', 'language')).toBe('basic');
+    expect(resolveSecondaryTabId('general', 'backend')).toBe('agents');
     expect(resolveSecondaryTabId('conversation', 'rendering')).toBe('display');
     expect(resolveSecondaryTabId('security', 'permissions')).toBe('config');
+    expect(resolveSecondaryTabId('claude-code', 'mcp-advanced')).toBe('tools');
+    expect(resolveSecondaryTabId('claude-code', 'limits')).toBe('model-thinking');
+    expect(resolveSecondaryTabId('debug', 'general')).toBe('plugin');
+    expect(resolveSecondaryTabId('debug', 'modules')).toBe('plugin');
+    expect(resolveSecondaryTabId('debug', 'logs')).toBe('export');
+    expect(resolveSecondaryTabId('debug', 'actions')).toBe('export');
   });
 
   it('falls back to the first primary for unknown primary ids', () => {
@@ -186,6 +246,12 @@ describe('getActiveSecondaryTabId', () => {
     // After switching back to server, it should remember 'auth'
     expect(getActiveSecondaryTabId('server', { ...saved, model: 'tools' })).toBe('auth');
   });
+
+  it('regression: persisted limits selection migrates to model-thinking', () => {
+    const saved = { 'claude-code': 'limits' };
+    const result = getActiveSecondaryTabId('claude-code', saved);
+    expect(result).toBe('model-thinking');
+  });
 });
 
 describe('getPrimaryTabDefinition', () => {
@@ -200,6 +266,6 @@ describe('getPrimaryTabDefinition', () => {
     expect(def!.id).toBe('general');
     expect(def!.labelKey).toBe('settings.general.title');
     expect(def!.defaultSecondaryTabId).toBe('basic');
-    expect(def!.secondaryTabs).toHaveLength(1);
+    expect(def!.secondaryTabs).toHaveLength(2);
   });
 });

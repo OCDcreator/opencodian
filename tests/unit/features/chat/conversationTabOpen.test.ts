@@ -62,3 +62,56 @@ describe('OpenCodianView new conversation delegation', () => {
     expect(spy).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('OpenCodianView Claude Code permission host wiring', () => {
+  it('injects active chat renderers into the plugin permission host context', async () => {
+    const plugin = {
+      settings: {
+        effortLevel: 'medium',
+        thinkingBudget: 0,
+        locale: 'en',
+        enableAutoScroll: true,
+        maxTabs: 4,
+        tabState: {
+          tabs: [],
+          activeTabIndex: 0,
+        },
+        questionDisplayMode: 'single',
+        questionCardPosition: 'inline',
+      },
+      openCodeService: {},
+      storage: {},
+      createConversation: jest.fn(),
+      scheduleSettingsUiStateSave: jest.fn(),
+      saveSettingsUiStateImmediately: jest.fn().mockResolvedValue(undefined),
+      claudeCodePermissionHostContext: { getActiveTabId: () => null },
+    };
+    const view = new OpenCodianView(new WorkspaceLeaf(), plugin as never) as OpenCodianView & {
+      getActiveTabId: () => string | null;
+      permissionInlineCardRenderer: unknown;
+      questionRuntimeServices: { inlineCardRenderer: unknown };
+    };
+    jest.spyOn(view, 'getActiveTabId').mockReturnValue('tab-claude');
+
+    expect(plugin.claudeCodePermissionHostContext.getActiveTabId()).toBe('tab-claude');
+    expect(plugin.claudeCodePermissionHostContext.permissionCardRenderer)
+      .toBe(view.permissionInlineCardRenderer);
+    const collectAction = jest.spyOn(view.questionRuntimeServices.inlineCardRenderer, 'collectAction')
+      .mockResolvedValue({ type: 'reply', answers: [['ok']] });
+
+    await expect(plugin.claudeCodePermissionHostContext.questionCardRenderer?.collectResponse({
+      id: 'q-1',
+      sessionId: 'claude-session',
+      questions: [],
+    }, 'tab-claude')).resolves.toEqual([['ok']]);
+    expect(collectAction).toHaveBeenCalledWith(
+      {
+        id: 'q-1',
+        sessionId: 'claude-session',
+        questions: [],
+      },
+      'single',
+      'tab-claude',
+    );
+  });
+});

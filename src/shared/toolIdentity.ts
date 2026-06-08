@@ -9,7 +9,7 @@ export type ToolIdentityKind =
   | 'unknown';
 
 export interface ToolIdentityOptions {
-  source?: 'generic' | 'opencode' | 'claudian' | 'codex';
+  source?: 'generic' | 'opencode' | 'claudian' | 'codex' | 'claude-code';
   knownMcpTools?: Iterable<string>;
   registryTools?: Iterable<string>;
   observedExternalTools?: Iterable<string>;
@@ -59,6 +59,12 @@ const BUILTIN_TOOL_DEFINITIONS: Record<string, BuiltinToolDefinition> = {
   planexit: { normalizedName: 'plan_exit', displayName: 'ExitPlanMode', icon: 'check', kind: 'plan' },
   todowrite: { normalizedName: 'todowrite', displayName: 'Todos', icon: 'list-checks', kind: 'builtin' },
   todoread: { normalizedName: 'todoread', displayName: 'Todo Read', icon: 'list-checks', kind: 'builtin' },
+  taskcreate: { normalizedName: 'task_create', displayName: 'Task Create', icon: 'list-checks', kind: 'builtin' },
+  taskupdate: { normalizedName: 'task_update', displayName: 'Task Update', icon: 'list-checks', kind: 'builtin' },
+  tasklist: { normalizedName: 'task_list', displayName: 'Task List', icon: 'list-checks', kind: 'builtin' },
+  taskget: { normalizedName: 'task_get', displayName: 'Task Get', icon: 'list-checks', kind: 'builtin' },
+  taskoutput: { normalizedName: 'task_output', displayName: 'Task Output', icon: 'wrench', kind: 'builtin' },
+  taskstop: { normalizedName: 'task_stop', displayName: 'Task Stop', icon: 'wrench', kind: 'builtin' },
   structuredoutput: { normalizedName: 'structuredoutput', displayName: 'StructuredOutput', icon: 'wrench', kind: 'unknown' },
   invalid: { normalizedName: 'invalid', displayName: 'Invalid', icon: 'wrench', kind: 'unknown' },
 };
@@ -168,6 +174,15 @@ export function getToolIdentity(name: string, options: ToolIdentityOptions = {})
       normalizedName: rawName,
       kind: 'mcp',
       icon: MCP_TOOL_ICON_ID,
+    });
+  }
+
+  if (options.source === 'claude-code') {
+    return createIdentity({
+      rawName,
+      normalizedName: rawName,
+      kind: 'unknown',
+      icon: 'wrench',
     });
   }
 

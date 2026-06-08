@@ -1,4 +1,4 @@
-/* eslint-disable max-lines -- Project command editor tests cover rendering, save/delete validation, and stable local refresh regression cases together. */
+/* eslint-disable max-lines, max-lines-per-function -- Project command editor tests cover rendering, save/delete validation, and stable local refresh regression cases together. */
 import { Setting } from 'obsidian';
 import * as obsidian from 'obsidian';
 
@@ -8,6 +8,7 @@ import {
   type ProjectCommandEditorSource,
   SettingsProjectCommandEditor,
 } from '../../../../src/features/settings/SettingsProjectCommandEditor';
+import { TextareaSizeMemory } from '../../../../src/features/settings/TextareaSizeMemory';
 import { setLocale, t } from '../../../../src/i18n';
 import type OpenCodianPlugin from '../../../../src/main';
 
@@ -277,6 +278,9 @@ beforeEach(() => {
   textRecords.length = 0;
   textAreaRecords.length = 0;
   buttonRecords.length = 0;
+  jest.spyOn(TextareaSizeMemory, 'attach').mockReturnValue({
+    destroy: jest.fn(),
+  } as unknown as TextareaSizeMemory);
 
   jest.spyOn(Setting.prototype, 'setName').mockImplementation(function setName(this: Setting, name: string) {
     (this as Setting & { __settingName?: string }).__settingName = name;
@@ -392,6 +396,19 @@ describe('SettingsProjectCommandEditor', () => {
     expect(containerEl.textContent).toContain('{{current_selection}}');
     expect(containerEl.textContent).toContain('{{external_context_paths}}');
     expect(containerEl.textContent).toContain('{{conversation_title}}');
+  });
+
+  it('attaches textarea size memory to the template editor', () => {
+    renderEditor();
+
+    const templateRecord = textAreaRecords.find(
+      (record) => record.name === t('settings.commands.editor.template.name'),
+    );
+    expect(templateRecord).toBeDefined();
+    expect(TextareaSizeMemory.attach).toHaveBeenCalledWith(
+      templateRecord!.control.inputEl,
+      'project-command-template',
+    );
   });
 
   it('creates a project command with editable core fields', async () => {

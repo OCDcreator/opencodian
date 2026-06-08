@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- Authoritative reload owner keeps reload, merge, render, and recovery orchestration together. */
 import type {
   OpenCodeCanonicalSessionState,
 } from '../../../core/opencode';
@@ -5,6 +6,7 @@ import type {
   ChatMessage,
   Conversation,
 } from '../../../core/types';
+import { getConversationBackendSessionId } from '../../../core/types';
 import { createLogger } from '../../../shared';
 import type { TabId } from '../tabs';
 import {
@@ -76,6 +78,7 @@ export interface ConversationAuthoritativeReloadCoordinatorDependencies {
     existingMessages: ChatMessage[],
     syncedMessages: ChatMessage[],
     verbose: boolean,
+    backend?: string,
   ): ChatMessage[];
 }
 
@@ -99,6 +102,18 @@ export class ConversationAuthoritativeReloadCoordinator {
     reason = 'unspecified',
     options?: { suppressVerboseLogs?: boolean },
   ): Promise<ConversationAuthoritativeSyncResult> {
+    // Authoritative server sync is OpenCode-specific: the message shape,
+    // hydration path, and canonical state all assume OpenCode semantics.
+    // Skip for other backends until a backend-neutral sync contract exists.
+    if (conversation.backend && conversation.backend !== 'opencode') {
+      const fingerprint = this.host.getConversationSyncFingerprint(conversation.messages);
+      return {
+        messages: conversation.messages,
+        changed: false,
+        fingerprint,
+        revertState: null,
+      };
+    }
     const verbose = !options?.suppressVerboseLogs;
     try {
       const ticket = this.host.createConversationWriteTicket(conversation.id);
@@ -135,7 +150,7 @@ export class ConversationAuthoritativeReloadCoordinator {
       this.host.logAssistantFinalizationDebug('server-sync-failed', {
         reason,
         conversationId: conversation.id,
-        sessionId: conversation.openCodeSessionId,
+        sessionId: getConversationBackendSessionId(conversation),
         tabId,
         errorMessage: error instanceof Error ? error.message : String(error),
       });
@@ -156,7 +171,12 @@ export class ConversationAuthoritativeReloadCoordinator {
     reason = 'sync-event',
     options?: { suppressVerboseLogs?: boolean },
   ): Promise<ConversationAuthoritativeSyncResult | null> {
-    const canonicalMessages = this.host.getCanonicalSessionMessages(conversation.openCodeSessionId);
+    const sessionId = getConversationBackendSessionId(conversation);
+    if (!sessionId) {
+      return null;
+    }
+
+    const canonicalMessages = this.host.getCanonicalSessionMessages(sessionId);
     if (!canonicalMessages) {
       return null;
     }
@@ -171,7 +191,7 @@ export class ConversationAuthoritativeReloadCoordinator {
     const snapshot: ConversationServerSyncSnapshot = {
       serverMessages: canonicalMessages,
       convertedServerMessages: this.projectCanonicalRenderMessages(
-        conversation.openCodeSessionId,
+        sessionId,
         canonicalMessages,
       ),
       revertState: this.getConversationCanonicalSyncRevertState(conversation, canonicalMessages),
@@ -210,7 +230,7 @@ export class ConversationAuthoritativeReloadCoordinator {
     this.host.logAssistantFinalizationDebug('server-sync-begin', {
       reason,
       conversationId: conversation.id,
-      sessionId: conversation.openCodeSessionId,
+      sessionId: getConversationBackendSessionId(conversation),
       tabId,
       existingMessageCount: conversation.messages.length,
       localTailAssistant: this.host.summarizeChatMessageForDebug(
@@ -222,13 +242,22 @@ export class ConversationAuthoritativeReloadCoordinator {
   private async getConversationServerSyncSnapshot(
     conversation: Conversation,
   ): Promise<ConversationServerSyncSnapshot> {
-    const serverMessages = await this.host.getSessionMessages(conversation.openCodeSessionId);
+    const sessionId = getConversationBackendSessionId(conversation);
+    if (!sessionId) {
+      return {
+        serverMessages: [],
+        convertedServerMessages: [],
+        revertState: null,
+      };
+    }
+
+    const serverMessages = await this.host.getSessionMessages(sessionId);
     const revertState = await this.getConversationServerSyncRevertState(
       conversation,
       serverMessages,
     );
     const convertedServerMessages = this.projectCanonicalRenderMessages(
-      conversation.openCodeSessionId,
+      sessionId,
       serverMessages,
     );
 
@@ -275,7 +304,8 @@ export class ConversationAuthoritativeReloadCoordinator {
       return null;
     }
 
-    return this.host.getSessionRevertState(conversation.openCodeSessionId);
+    const sessionId = getConversationBackendSessionId(conversation);
+    return sessionId ? this.host.getSessionRevertState(sessionId) : null;
   }
 
   private getConversationCanonicalSyncRevertState(
@@ -301,7 +331,7 @@ export class ConversationAuthoritativeReloadCoordinator {
     this.host.logAssistantFinalizationDebug('server-sync-fetched', {
       reason,
       conversationId: conversation.id,
-      sessionId: conversation.openCodeSessionId,
+      sessionId: getConversationBackendSessionId(conversation),
       tabId,
       serverMessageCount: snapshot.serverMessages.length,
       convertedMessageCount: snapshot.convertedServerMessages.length,
@@ -320,6 +350,7 @@ export class ConversationAuthoritativeReloadCoordinator {
       conversation.messages,
       snapshot.convertedServerMessages,
       verbose,
+      conversation.backend,
     );
     const preservedClientOnlyMessages = this.getClientOnlyMessagesToPreserveOnSync(
       conversation.messages,
@@ -451,7 +482,7 @@ export class ConversationAuthoritativeReloadCoordinator {
 
     logger.debug(`Preserving local interrupted assistant message(s) during conversation sync: ${this.host.stringifyLogPayload({
       conversationId: conversation.id,
-      sessionId: conversation.openCodeSessionId,
+      sessionId: getConversationBackendSessionId(conversation),
       count: preservedInterruptedMessages.length,
       messages: preservedInterruptedMessages.map((message) => ({
         id: message.id,
@@ -475,7 +506,7 @@ export class ConversationAuthoritativeReloadCoordinator {
     this.host.logAssistantFinalizationDebug('server-sync-merged', {
       reason,
       conversationId: conversation.id,
-      sessionId: conversation.openCodeSessionId,
+      sessionId: getConversationBackendSessionId(conversation),
       tabId,
       mergedMessageCount: merged.length,
       preservedClientOnlyMessageCount: preservedClientOnlyMessages.length,
@@ -521,7 +552,7 @@ export class ConversationAuthoritativeReloadCoordinator {
 
     logger.debug('Conversation sync complete', {
       conversationId: conversation.id,
-      sessionId: conversation.openCodeSessionId,
+      sessionId: getConversationBackendSessionId(conversation),
       reason,
       serverMessageCount: snapshot.serverMessages.length,
       mergedMessageCount: syncMerge.merged.length,
@@ -546,7 +577,7 @@ export class ConversationAuthoritativeReloadCoordinator {
     this.host.logAssistantFinalizationDebug('server-sync-finished', {
       reason,
       conversationId: conversation.id,
-      sessionId: conversation.openCodeSessionId,
+      sessionId: getConversationBackendSessionId(conversation),
       tabId,
       changed: syncMerge.changed,
       cacheWritebackChanged: syncMerge.cacheWritebackChanged,

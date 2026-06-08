@@ -48,7 +48,7 @@ Dock 折叠是组件本地状态，按当前 `QuestionRequest.id` 记忆。同�
 
 每个问题包含：
 - header 文本 + body 文本
-- 选项列表（radio 或 checkbox，取决于 `question.multiple`）
+- 选项列表（radio 或 checkbox，取决于 `question.multiple`）；若 option 携带 `preview` 文本，会在选项列表下方放置一个共享的 `.opencodian-question-inline-option-preview` 容器。该容器初始隐藏，仅在选项获得焦点或悬停时显示当前对应 option 的 preview 文本。预览统一以纯文本显示，HTML 不会被解析渲染，也不通过 CSS 伪元素注入未本地化的前缀标签
 - 自定义文本输入（当 `question.custom !== false`）
 
 ### 答案收集

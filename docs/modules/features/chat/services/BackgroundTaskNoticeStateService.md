@@ -42,6 +42,7 @@ export class BackgroundTaskNoticeStateService {
 
 - `buildStoppedNoticeContent()` 先按显示 ID + description 排序，再生成统一 markdown；同一组 pending task 会得到稳定 fingerprint
 - 这里的 fingerprint 继续直接复用 notice content，这样 persisted dedupe 与 runtime suppression 可以共享同一份键
+- **Backend-aware session identity**: 在匹配当前 tab 的 session id 与 conversation 时，使用 `getConversationBackendSessionId()` 而不是直接比较 `conversation.openCodeSessionId`，以兼容非 OpenCode backend。
 
 ### suppression 恢复与去重
 

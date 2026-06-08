@@ -1,9 +1,11 @@
 @import 'base/core.css';
 @import 'utils/markdown.css';
 @import 'components/agent-selector.css';
+@import 'components/agent-switcher.css';
 @import 'components/model-selector.css';
 @import 'components/permission-mode-selector.css';
 @import 'components/history-dropdown.css';
+@import 'components/backend-session-browser.css';
 @import 'components/streaming-content.css';
 @import 'components/inline-permission.css';
 @import 'components/config-status.css';
@@ -13,6 +15,8 @@
 @import 'components/lsp-status-indicator.css';
 @import 'components/settings-dropdown.css';
 @import 'components/settings-layout-contract.css';
+@import 'components/settings-capability-lab.css';
+@import 'components/settings-claude-code.css';
 @import 'features/chat-user.css';
 @import 'features/chat-assistant.css';
 @import 'modals/delete-confirm-dialog.css';

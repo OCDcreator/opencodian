@@ -39,6 +39,24 @@ describe('toolIdentity', () => {
     });
   });
 
+  it('classifies Claude Code built-in tools using the shared dictionary', () => {
+    expect(getToolIdentity('Bash', { source: 'claude-code' })).toMatchObject({
+      normalizedName: 'bash',
+      kind: 'builtin',
+      icon: 'terminal',
+      isMcp: false,
+    });
+  });
+
+  it('classifies Claude Code MCP-prefixed tools as MCP', () => {
+    expect(getToolIdentity('mcp__some_server_tool', { source: 'claude-code' })).toMatchObject({
+      normalizedName: 'mcp__some_server_tool',
+      kind: 'mcp',
+      icon: 'opencodian-tool-mcp',
+      isMcp: true,
+    });
+  });
+
   it('falls back OpenCode external tools to custom styling', () => {
     expect(getToolIdentity('exa_search', { source: 'opencode' })).toMatchObject({
       normalizedName: 'exa_search',

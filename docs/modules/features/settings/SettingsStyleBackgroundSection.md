@@ -29,6 +29,7 @@
 - 当已有背景图时，会调用 `plugin.resolveChatThemeBackgroundDataUrl()` 异步读取 data URL
 - 预览应用 `fitMode`、opacity、blur、depth、dim、saturation、brightness、focusX / focusY 等样式
 - 拖拽预览时直接写回 `chatAppearance.background.focusX/focusY`，并复用设置页的 style apply/save 节流链路
+- 拖拽提示使用 `data-settings-tooltip` 属性（`SettingsTooltipController` body-level overlay），替代了原来的 `previewEl.setAttribute('title', ...)`
 
 ### 设置写回
 
@@ -49,6 +50,7 @@
 
 - `SettingsStyleSection`: 负责创建该 owner，并提供 style-group scaffolding、shared-control seam、binding 清理与统一 apply/save 回调
 - `settingsStyleControls.ts`: 通过注入的 numeric-style/binding contract 承担 slider/number/reset 的具体控件语义
+- `SettingsTooltipController`: 提供拖拽预览的 body-level tooltip overlay
 - `OpenCodianPlugin`: 提供背景资源导入/清理、baseline reset、主题背景 data URL 解析与 chat appearance 写回
 - `core/types/settings.ts`: 定义 background 设置结构、默认值与归一化边界
 - `src/features/chat/chatAppearance.ts`: 提供 `fitMode -> background-size` 映射

@@ -3,11 +3,18 @@
  */
 
 import {
+  CLAUDE_CODE_DEBUG_CHANNEL_IDS,
+  type ClaudeCodeDebugChannelId,
+  type ClaudeCodeDebugChannelSettings,
   type DebugModuleSettings,
+  getDefaultClaudeCodeDebugChannelSettings,
   getDefaultDebugModuleSettings,
+  getEnabledClaudeCodeDebugChannels,
+  normalizeClaudeCodeDebugChannelSettings,
   normalizeDebugModuleSettings,
   normalizeDebugRefreshIntervalMs,
 } from '../../shared/debugModules';
+import type { AgentBackendKind } from './chat';
 
 /** Permission mode for tool execution */
 export type PermissionMode = 'yolo' | 'plan' | 'normal';
@@ -17,6 +24,264 @@ export type EffortLevel = 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
 
 /** Thinking budget for custom models */
 export type ThinkingBudget = 0 | 1024 | 4096 | 8192 | 16384;
+
+export type ClaudeCodeSettingSource = 'user' | 'project' | 'local';
+export type ClaudeCodePermissionMode = 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan';
+export type ClaudeCodeEffort = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+export type ClaudeCodeThinking =
+  | { type: 'adaptive' }
+  | { type: 'disabled' }
+  | { type: 'fixed'; budgetTokens: number };
+export {
+  CLAUDE_CODE_DEBUG_CHANNEL_IDS,
+  type ClaudeCodeDebugChannelId,
+  type ClaudeCodeDebugChannelSettings,
+  getDefaultClaudeCodeDebugChannelSettings,
+  getEnabledClaudeCodeDebugChannels,
+  normalizeClaudeCodeDebugChannelSettings,
+};
+
+export interface SandboxFilesystemConfig {
+  /** Additional paths where sandboxed commands can write. Merged across all settings scopes. */
+  allowWrite: string[];
+  /** Paths where sandboxed commands cannot write. Merged across all settings scopes. */
+  denyWrite: string[];
+  /** Paths where sandboxed commands cannot read. Merged across all settings scopes. */
+  denyRead: string[];
+}
+
+export interface SandboxNetworkConfig {
+  /** Domain names that sandboxed processes can access. Supports wildcards. */
+  allowedDomains: string[];
+  /** Domain names that sandboxed processes cannot access. Takes precedence over allowedDomains. */
+  deniedDomains: string[];
+}
+
+export interface SandboxRipgrepConfig {
+  /** Custom ripgrep binary command path for sandbox environments. */
+  command: string;
+  /** Optional extra arguments for the custom ripgrep binary. */
+  args: string[];
+}
+
+export interface ClaudeCodeSandboxSettings {
+  enabled: boolean;
+  failIfUnavailable: boolean;
+  autoAllowBashIfSandboxed: boolean;
+  /** Commands that always bypass sandbox restrictions (e.g. ['docker']). These run unsandboxed automatically without model involvement. */
+  excludedCommands: string[];
+  /** Allow the model to request running commands outside the sandbox via dangerouslyDisableSandbox. When false, the escape hatch is completely disabled. Default: true (SDK default). */
+  allowUnsandboxedCommands: boolean;
+  /** Filesystem sub-policy for sandbox mode. Controls read/write path restrictions at the OS level. */
+  filesystem: SandboxFilesystemConfig;
+  /** Network sub-policy for sandbox mode. Controls outbound domain access. */
+  network: SandboxNetworkConfig;
+  /** Enable weaker sandbox for unprivileged Docker environments (Linux/WSL2 only). Reduces security. Default: false. */
+  enableWeakerNestedSandbox: boolean;
+  /** (macOS only) Allow access to the system TLS trust service in the sandbox. Required for Go-based tools with MITM proxy. Reduces security. Default: false. */
+  enableWeakerNetworkIsolation: boolean;
+  /** Custom ripgrep binary configuration for sandbox environments. */
+  ripgrep: SandboxRipgrepConfig;
+}
+
+export interface ClaudeCodeBackendSettings {
+  executablePath: string;
+  settingSources: ClaudeCodeSettingSource[];
+  permissionMode: ClaudeCodePermissionMode;
+  thinking: ClaudeCodeThinking;
+  effort: ClaudeCodeEffort;
+  additionalDirectories: string[];
+  model: string;
+  /** Fallback model used when the main model is unavailable. Readback only: option wiring and same-model validation proven; automatic fallback switching not locally provable (blocked on real API overload / HTTP 529; invalid-primary test undermined). */
+  fallbackModel: string;
+  /** Tool names that are auto-allowed without prompting. Not a sandbox, not a restrictor. Readback only: runtime options wiring proven, zero enforcement observed (init catalog always unfiltered, canUseTool non-functional in SDK query() mode). Validated as PascalCase alphanumeric. */
+  allowedTools: string[];
+  /** Tool names that are removed from context entirely. Runtime behavior verified: SDK init-catalog filtering deterministically excludes listed tools. Validated as PascalCase alphanumeric. */
+  disallowedTools: string[];
+  /**
+   * Built-in tool whitelist passed as the SDK `tools` option. When non-empty,
+   * only the listed built-in Claude Code tools are available to the model.
+   * MCP tools are NOT restricted by this setting — they always pass through.
+   * Empty array = use the SDK default preset (all built-in tools).
+   * Validated as PascalCase alphanumeric.
+   */
+  restrictedBuiltinTools: string[];
+  /** Maximum conversation turns before the query stops. Runtime behavior verified: SDK emits error_max_turns signal when limit reached. null = unlimited (SDK default). */
+  maxTurns: number | null;
+  /** Maximum budget in USD before the query stops. Runtime behavior verified: SDK emits error_max_budget_usd signal when limit reached. null = unlimited (SDK default). */
+  maxBudgetUsd: number | null;
+  /** Maximum task-level token budget. Readback only: SDK @alpha option wiring proven (--task-budget CLI flag, output_config.task_budget + beta header). Behavioral pacing only (no structured enforcement signal like error_max_turns). null = unlimited (SDK default). */
+  taskBudget: number | null;
+  /** Environment variables to pass to the Claude Code process. Runtime behavior verified: env propagation into Claude/Bash subprocesses proven (Layer 1-4). */
+  env: Record<string, string>;
+  /** Enable Claude Code SDK file checkpoint tracking for later rewind operations. @experimental — SDK option wired but checkpoints never created in query() mode (upstream bug #236). Readback only; no stable rewind UI. */
+  enableFileCheckpointing: boolean;
+  /** Ask the SDK to include hook lifecycle events in the stream. @diagnostic — Diagnostic event stream only; not connected to stable UI. */
+  includeHookEvents: boolean;
+  /** Forward subagent text/thinking blocks into the parent stream. @diagnostic — Diagnostic event stream only; not connected to stable UI. */
+  forwardSubagentText: boolean;
+  /** Ask the SDK to emit periodic subagent progress summaries. @diagnostic — Diagnostic event stream only; not connected to stable UI. */
+  agentProgressSummaries: boolean;
+  /** Ask the SDK to emit predicted next-user-prompt suggestions after each completed turn.
+   * Readback only: SDK options wiring proven; end-to-end chat UI delivery is not independently
+   * live-verified. The plugin routes suggestion chunks through the normalizer + StreamChunkRouter
+   * pipeline, but whether suggestions actually appear depends on model behavior, API state, and
+   * SDK version. Suggestions may be suppressed on first turn, after API errors, in plan mode, or
+   * by env var. Never auto-sent — only inserted into composer on explicit user click. */
+  promptSuggestions: boolean;
+  /** Product workbench debug channels for future Claude Code logging routes. */
+  debugChannels: ClaudeCodeDebugChannelSettings;
+  /**
+   * Sandbox behavior controls for Claude Code subprocess isolation.
+   * Readback: SDK options wiring proven; OS-level process isolation not independently verified.
+   *
+   * Advanced sub-policies (exposed expert settings wired to SDK options, user-facing in
+   * Permissions tab):
+   * - excludedCommands, allowUnsandboxedCommands
+   * - filesystem: allowWrite, denyWrite, denyRead
+   * - network domain filters: allowedDomains, deniedDomains
+   * - enableWeakerNestedSandbox, enableWeakerNetworkIsolation
+   * - ripgrep: command, args
+   *
+   * Managed-only fields intentionally UNEXPOSED official SDK fields and reasons:
+   * - filesystem.allowRead: re-allows reads inside denyRead regions; confusing semantics for
+   *   general users, easy to misconfigure into false sense of security
+   * - filesystem.allowManagedReadPathsOnly: managed-settings-only (enterprise); SDK docs state
+   *   "Has no effect when set via SDK options"
+   * - network.allowManagedDomainsOnly: managed-settings-only (enterprise); SDK docs state
+   *   "Has no effect when set via SDK options"
+   * - network.allowUnixSockets: macOS-only; misleading on Linux/WSL2 where seccomp cannot
+   *   inspect socket paths
+   * - network.allowAllUnixSockets: grants all Unix socket access (including Docker socket);
+   *   too dangerous for general plugin exposure, opens full host access path
+   * - network.allowLocalBinding: macOS-only; platform-specific in misleading way for a
+   *   cross-platform plugin
+   * - network.allowMachLookup: macOS-only XPC/Mach service lookup; extremely niche,
+   *   iOS Simulator / Playwright specific
+   * - network.httpProxyPort: advanced proxy config; users who need this should configure
+   *   via .claude/settings.json directly
+   * - network.socksProxyPort: same as httpProxyPort — advanced proxy config
+   * - ignoreViolations: suppresses security violation reports; dangerous, hides real sandbox
+   *   escape evidence from the user
+   * - bwrapPath: managed-settings-only (enterprise); only honored from managed settings,
+   *   not user/project/local
+   * - socatPath: managed-settings-only (enterprise); same scope limitation as bwrapPath
+   */
+  sandbox: ClaudeCodeSandboxSettings;
+  /**
+   * Custom instructions injected into the plan-mode system reminder when `permissionMode` is `plan`.
+   * Replaces the default code-implementation workflow body; the SDK still enforces the read-only
+   * preamble and ExitPlanMode protocol footer. Effect applies to the next query or restarted session.
+   * Readback only: SDK option wiring proven; actual plan-mode behavior is not independently verified.
+   */
+  planModeInstructions: string;
+  /**
+   * Tool name aliases passed as the SDK `toolAliases` option. Maps model-emitted tool names
+   * to canonical tool names before resolution. Applies to the next query or restarted session only.
+   * Readback only: SDK option wiring proven; actual alias resolution behavior is not independently verified.
+   */
+  toolAliases: Record<string, string>;
+  /**
+   * Request the SDK to include a preview for each AskUserQuestion option in the specified format
+   * ('markdown' or 'html'). The plugin preserves and displays preview text safely as plain text;
+   * rich HTML rendering is disabled for security. Empty string means do not request previews
+   * (SDK default). Applies to the next query or restarted session only.
+   * Readback only: SDK option wiring and UI rendering path are proven; actual preview arrival
+   * depends on the SDK version and model behavior and is not independently verified.
+   */
+  askUserQuestionPreviewFormat: 'markdown' | 'html' | '';
+  /**
+   * Ask the SDK to emit CLI debug logs during query execution.
+   * Readback only: SDK option wiring proven; actual CLI debug log emission is not independently
+   * verified from the plugin layer. The plugin passes the option — whether the CLI binary
+   * actually produces debug output depends on the SDK/CLI version and runtime conditions.
+   */
+  debug: boolean;
+  /**
+   * Enforce strict validation of MCP server configurations.
+   * When true, invalid MCP configurations will cause errors instead of warnings.
+   * Readback only: SDK propagates this as --strict-mcp-config CLI flag; actual
+   * validation lives in the compiled CLI binary, not the SDK wrapper. No structured
+   * signal confirms whether strict validation was applied. The plugin-side adapter
+   * silently drops structurally malformed entries, so many malformed configs never
+   * reach the CLI. Applies to next query or restarted session only.
+   * Does not write .claude/mcp.json or provide MCP authoring UI.
+   */
+  strictMcpConfig: boolean;
+  /**
+   * Request the SDK 'context-1m-2025-08-07' beta header for 1M context window support.
+   * Readback only: SDK option wiring proven; actual beta availability depends on the
+   * selected model and Anthropic-side behavior. Plugin-side behavior is not independently
+   * verified. No generic beta management is exposed — only this single documented beta.
+   * Applies to next query or restarted session only.
+   */
+  enableContext1mBeta: boolean;
+  /**
+   * Ask the SDK to write CLI debug logs to a file path.
+   * Readback only: SDK option wiring proven; actual file writing is not independently
+   * verified from the plugin layer. Setting a debug file path implicitly enables debug
+   * logging even if the debug toggle is off. Applies to next query or restarted session only.
+   * No plugin-side path validation or filesystem writes are performed.
+   */
+  debugFile: string;
+  /**
+   * Request the SDK to use a specific JavaScript runtime ('node', 'bun', or 'deno').
+   * Empty string means auto — leave runtime selection to the SDK.
+   * Readback only: SDK option wiring proven; actual runtime selection behavior is not
+   * independently verified from the plugin layer. No observable signal in init events,
+   * stderr, or tool output confirms which runtime the CLI subprocess actually uses.
+   * The model runs remotely and cannot inspect the local subprocess's process.execPath.
+   * Host PATH checks only prove installation, not actual runtime selection.
+   * executablePath/ProcessResolver is a separate capability about Claude binary resolution.
+   * No runtime argument management is exposed (executableArgs / extraArgs remain absent).
+   * Applies to next query or restarted session only.
+   */
+  jsRuntime: 'node' | 'bun' | 'deno' | '';
+  /**
+   * Maximum time in milliseconds for sessionStore.listSessions() during resume/continue
+   * materialization. SDK only uses this when (resume || continue) && sessionStore is true.
+   * null means use the SDK default (60000ms). @alpha.
+   * Readback only: option wiring proven; timeout code path never executes without
+   * resume/continue + sessionStore, which the diagnostic path does not use.
+   * Applies to next query or restarted session only.
+   */
+  loadTimeoutMs: number | null;
+  /**
+   * Claude Code output style name. Modifies the system prompt via the SDK `settings`
+   * option. Official built-in styles include `Default`, `Proactive`, `Explanatory`,
+   * and `Learning`. Custom styles can be created as markdown files in
+   * `.claude/output-styles` or `~/.claude/output-styles`.
+   * Live proof boundary: a temporary custom style file can influence a fresh
+   * diagnostic query through SDK settings.outputStyle when the model recalls a
+   * nonce that is absent from the user prompt. This does not prove active-session
+   * live mutation or validate the currently saved style name. Official docs say
+   * output styles are read at session start and apply after `/clear` or a new
+   * session; existing active or resumed sessions may keep their previous prompt.
+   */
+  outputStyle: string;
+  /**
+   * Custom instructions appended to the Claude Code preset system prompt.
+   * When non-empty, the SDK receives the preset-with-append shape:
+   * `{ type: 'preset', preset: 'claude_code', append: instructions }`.
+   * When empty, the default `{ type: 'preset', preset: 'claude_code' }` is used.
+   * This is an append-only seam — it does NOT replace the official preset.
+   * Readback only: SDK option wiring proven; actual prompt append behavior is not
+   * independently verified from the plugin layer. Applies to next query or restarted session only.
+   */
+  systemPrompt: string;
+  /**
+   * When true, new Claude Code sessions do not receive an explicit title on first query,
+   * allowing the SDK to auto-generate a conversation summary/title.
+   * When false, the plugin passes "New Claude Code chat" as the explicit title,
+   * which skips Claude's auto title generation.
+   * Applies to the next new session only; existing sessions are unaffected.
+   */
+  autoTitle: boolean;
+}
+
+export interface BackendSettings {
+  claudeCode: ClaudeCodeBackendSettings;
+}
 
 export function normalizeEffortLevel(value: unknown): EffortLevel {
   switch (value) {
@@ -31,6 +296,340 @@ export function normalizeEffortLevel(value: unknown): EffortLevel {
     default:
       return 'high';
   }
+}
+
+export function getDefaultClaudeCodeBackendSettings(): ClaudeCodeBackendSettings {
+  return {
+    executablePath: '',
+    settingSources: ['project'],
+    permissionMode: 'default',
+    thinking: { type: 'adaptive' },
+    effort: 'medium',
+    additionalDirectories: [],
+    model: '',
+    fallbackModel: '',
+    allowedTools: [],
+    disallowedTools: [],
+    restrictedBuiltinTools: [],
+    maxTurns: null,
+    maxBudgetUsd: null,
+    taskBudget: null,
+    env: {},
+    enableFileCheckpointing: false,
+    includeHookEvents: false,
+    forwardSubagentText: false,
+    agentProgressSummaries: false,
+    promptSuggestions: false,
+    debugChannels: getDefaultClaudeCodeDebugChannelSettings(),
+    sandbox: {
+      enabled: false,
+      failIfUnavailable: false,
+      autoAllowBashIfSandboxed: false,
+      excludedCommands: [],
+      allowUnsandboxedCommands: true,
+      filesystem: { allowWrite: [], denyWrite: [], denyRead: [] },
+      network: { allowedDomains: [], deniedDomains: [] },
+      enableWeakerNestedSandbox: false,
+      enableWeakerNetworkIsolation: false,
+      ripgrep: { command: '', args: [] },
+    },
+    planModeInstructions: '',
+    toolAliases: {},
+    askUserQuestionPreviewFormat: '',
+    debug: false,
+    strictMcpConfig: false,
+    enableContext1mBeta: false,
+    debugFile: '',
+    jsRuntime: '',
+    loadTimeoutMs: null,
+    systemPrompt: '',
+    outputStyle: '',
+    autoTitle: true,
+  };
+}
+
+export function getDefaultBackendSettings(): BackendSettings {
+  return {
+    claudeCode: getDefaultClaudeCodeBackendSettings(),
+  };
+}
+
+export function normalizeClaudeCodeSettingSources(value: unknown): ClaudeCodeSettingSource[] {
+  if (value === 'none') {
+    return [];
+  }
+  if (!Array.isArray(value)) {
+    return ['project'];
+  }
+
+  const normalized = value
+    .map((entry) => typeof entry === 'string' ? entry.trim() : '')
+    .filter((entry): entry is ClaudeCodeSettingSource =>
+      entry === 'user' || entry === 'project' || entry === 'local');
+
+  return [...new Set(normalized)];
+}
+
+export function normalizeClaudeCodePermissionMode(value: unknown): ClaudeCodePermissionMode {
+  switch (value) {
+    case 'acceptEdits':
+    case 'bypassPermissions':
+    case 'plan':
+    case 'default':
+      return value;
+    case 'auto':
+    case 'normal':
+      return 'default';
+    case 'dontAsk':
+      return 'bypassPermissions';
+    default:
+      return 'default';
+  }
+}
+
+export function normalizeClaudeCodeEffort(value: unknown): ClaudeCodeEffort {
+  switch (value) {
+    case 'low':
+    case 'medium':
+    case 'high':
+    case 'xhigh':
+    case 'max':
+      return value;
+    case 'minimal':
+      return 'low';
+    default:
+      return 'medium';
+  }
+}
+
+export function normalizeClaudeCodeThinking(value: unknown): ClaudeCodeThinking {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return { type: 'adaptive' };
+  }
+
+  const candidate = value as Record<string, unknown>;
+  if (candidate.type === 'disabled') {
+    return { type: 'disabled' };
+  }
+  if (candidate.type === 'fixed') {
+    const budgetTokens = typeof candidate.budgetTokens === 'number'
+      && Number.isFinite(candidate.budgetTokens)
+      && candidate.budgetTokens > 0
+      ? Math.floor(candidate.budgetTokens)
+      : 4096;
+    return { type: 'fixed', budgetTokens };
+  }
+  return { type: 'adaptive' };
+}
+
+export function normalizeClaudeCodeAdditionalDirectories(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return [...new Set(
+    value
+      .map((entry) => typeof entry === 'string' ? entry.trim() : '')
+      .filter((entry) => entry.length > 0),
+  )];
+}
+
+export function normalizeClaudeCodeStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return [...new Set(
+    value
+      .map((entry) => typeof entry === 'string' ? entry.trim() : '')
+      .filter((entry) => entry.length > 0),
+  )];
+}
+
+export function normalizeClaudeCodeNullablePositiveInt(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
+    return Math.floor(value);
+  }
+  return null;
+}
+
+export function normalizeClaudeCodeNullablePositiveNumber(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
+    return value;
+  }
+  return null;
+}
+
+export function normalizeClaudeCodeEnv(value: unknown): Record<string, string> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return {};
+  }
+
+  const result: Record<string, string> = {};
+  for (const [key, val] of Object.entries(value as Record<string, unknown>)) {
+    if (typeof val === 'string') {
+      result[key] = val;
+    }
+  }
+  return result;
+}
+
+export function normalizeClaudeCodeJsRuntime(value: unknown): 'node' | 'bun' | 'deno' | '' {
+  if (value === 'node' || value === 'bun' || value === 'deno') {
+    return value;
+  }
+  return '';
+}
+
+export function normalizeClaudeCodeAskUserQuestionPreviewFormat(value: unknown): 'markdown' | 'html' | '' {
+  if (value === 'markdown' || value === 'html') {
+    return value;
+  }
+  return '';
+}
+
+export function normalizeClaudeCodeSandboxSettings(value: unknown): ClaudeCodeSandboxSettings {
+  const defaults: ClaudeCodeSandboxSettings = {
+    enabled: false,
+    failIfUnavailable: false,
+    autoAllowBashIfSandboxed: false,
+    excludedCommands: [] as string[],
+    allowUnsandboxedCommands: true,
+    filesystem: { allowWrite: [] as string[], denyWrite: [] as string[], denyRead: [] as string[] },
+    network: { allowedDomains: [] as string[], deniedDomains: [] as string[] },
+    enableWeakerNestedSandbox: false,
+    enableWeakerNetworkIsolation: false,
+    ripgrep: { command: '', args: [] as string[] },
+  };
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return defaults;
+  }
+  const candidate = value as Record<string, unknown>;
+
+  // Normalize filesystem sub-policy
+  const fsRaw = candidate.filesystem;
+  let filesystem = defaults.filesystem;
+  if (fsRaw && typeof fsRaw === 'object' && !Array.isArray(fsRaw)) {
+    const fs = fsRaw as Record<string, unknown>;
+    filesystem = {
+      allowWrite: normalizeClaudeCodeStringArray(fs.allowWrite),
+      denyWrite: normalizeClaudeCodeStringArray(fs.denyWrite),
+      denyRead: normalizeClaudeCodeStringArray(fs.denyRead),
+    };
+  }
+
+  // Normalize network sub-policy
+  const netRaw = candidate.network;
+  let network = defaults.network;
+  if (netRaw && typeof netRaw === 'object' && !Array.isArray(netRaw)) {
+    const net = netRaw as Record<string, unknown>;
+    network = {
+      allowedDomains: normalizeClaudeCodeStringArray(net.allowedDomains),
+      deniedDomains: normalizeClaudeCodeStringArray(net.deniedDomains),
+    };
+  }
+
+  // Normalize ripgrep sub-config
+  const rgRaw = candidate.ripgrep;
+  let ripgrep = defaults.ripgrep;
+  if (rgRaw && typeof rgRaw === 'object' && !Array.isArray(rgRaw)) {
+    const rg = rgRaw as Record<string, unknown>;
+    ripgrep = {
+      command: typeof rg.command === 'string' ? rg.command.trim() : '',
+      args: normalizeClaudeCodeStringArray(rg.args),
+    };
+  }
+
+  return {
+    enabled: candidate.enabled === true,
+    failIfUnavailable: candidate.failIfUnavailable === true,
+    autoAllowBashIfSandboxed: candidate.autoAllowBashIfSandboxed === true,
+    excludedCommands: normalizeClaudeCodeStringArray(candidate.excludedCommands),
+    allowUnsandboxedCommands: candidate.allowUnsandboxedCommands !== false,
+    filesystem,
+    network,
+    enableWeakerNestedSandbox: candidate.enableWeakerNestedSandbox === true,
+    enableWeakerNetworkIsolation: candidate.enableWeakerNetworkIsolation === true,
+    ripgrep,
+  };
+}
+
+export function normalizeClaudeCodeToolAliases(value: unknown): Record<string, string> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return {};
+  }
+  const result: Record<string, string> = {};
+  for (const [key, val] of Object.entries(value as Record<string, unknown>)) {
+    const trimmedKey = typeof key === 'string' ? key.trim() : '';
+    if (trimmedKey.length > 0 && typeof val === 'string' && val.trim().length > 0) {
+      result[trimmedKey] = val.trim();
+    }
+  }
+  return result;
+}
+
+export function normalizeClaudeCodeBackendSettings(value: unknown): ClaudeCodeBackendSettings {
+  const defaults = getDefaultClaudeCodeBackendSettings();
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return defaults;
+  }
+
+  const candidate = value as Partial<Record<keyof ClaudeCodeBackendSettings, unknown>>;
+  return {
+    executablePath: typeof candidate.executablePath === 'string'
+      ? candidate.executablePath.trim()
+      : defaults.executablePath,
+    settingSources: normalizeClaudeCodeSettingSources(candidate.settingSources),
+    permissionMode: normalizeClaudeCodePermissionMode(candidate.permissionMode),
+    thinking: normalizeClaudeCodeThinking(candidate.thinking),
+    effort: normalizeClaudeCodeEffort(candidate.effort),
+    additionalDirectories: normalizeClaudeCodeAdditionalDirectories(candidate.additionalDirectories),
+    model: typeof candidate.model === 'string' ? candidate.model.trim() : defaults.model,
+    fallbackModel: typeof candidate.fallbackModel === 'string' ? candidate.fallbackModel.trim() : defaults.fallbackModel,
+    allowedTools: normalizeClaudeCodeStringArray(candidate.allowedTools),
+    disallowedTools: normalizeClaudeCodeStringArray(candidate.disallowedTools),
+    restrictedBuiltinTools: normalizeClaudeCodeStringArray(candidate.restrictedBuiltinTools),
+    maxTurns: normalizeClaudeCodeNullablePositiveInt(candidate.maxTurns),
+    maxBudgetUsd: normalizeClaudeCodeNullablePositiveNumber(candidate.maxBudgetUsd),
+    taskBudget: normalizeClaudeCodeNullablePositiveInt(candidate.taskBudget),
+    env: normalizeClaudeCodeEnv(candidate.env),
+    enableFileCheckpointing: candidate.enableFileCheckpointing === true,
+    includeHookEvents: candidate.includeHookEvents === true,
+    forwardSubagentText: candidate.forwardSubagentText === true,
+    agentProgressSummaries: candidate.agentProgressSummaries === true,
+    promptSuggestions: candidate.promptSuggestions === true,
+    debugChannels: normalizeClaudeCodeDebugChannelSettings(candidate.debugChannels),
+    sandbox: normalizeClaudeCodeSandboxSettings(candidate.sandbox),
+    planModeInstructions: typeof candidate.planModeInstructions === 'string'
+      ? candidate.planModeInstructions.trim()
+      : defaults.planModeInstructions,
+    toolAliases: normalizeClaudeCodeToolAliases(candidate.toolAliases),
+    askUserQuestionPreviewFormat: normalizeClaudeCodeAskUserQuestionPreviewFormat(candidate.askUserQuestionPreviewFormat),
+    debug: candidate.debug === true,
+    strictMcpConfig: candidate.strictMcpConfig === true,
+    enableContext1mBeta: candidate.enableContext1mBeta === true,
+    debugFile: typeof candidate.debugFile === 'string'
+      ? candidate.debugFile.trim()
+      : defaults.debugFile,
+    jsRuntime: normalizeClaudeCodeJsRuntime(candidate.jsRuntime),
+    loadTimeoutMs: normalizeClaudeCodeNullablePositiveInt(candidate.loadTimeoutMs),
+    systemPrompt: typeof candidate.systemPrompt === 'string'
+      ? candidate.systemPrompt.trim()
+      : defaults.systemPrompt,
+    outputStyle: typeof candidate.outputStyle === 'string'
+      ? candidate.outputStyle.trim()
+      : defaults.outputStyle,
+    autoTitle: normalizeBoolean(candidate.autoTitle, defaults.autoTitle),
+  };
+}
+
+export function normalizeBackendSettings(value: unknown): BackendSettings {
+  const candidate = value && typeof value === 'object' && !Array.isArray(value)
+    ? value as { claudeCode?: unknown }
+    : {};
+  return {
+    claudeCode: normalizeClaudeCodeBackendSettings(candidate.claudeCode),
+  };
 }
 
 export function normalizeThinkingBudget(value: unknown): ThinkingBudget {
@@ -1730,6 +2329,15 @@ export interface OpenCodianSettings {
   // User preferences
   userName: string;
 
+  /** Currently active backend for new conversations, if one is enabled. */
+  activeBackend: AgentBackendKind | undefined;
+
+  /** List of enabled backends. It can be empty when all agents are disabled. */
+  enabledBackends: AgentBackendKind[];
+
+  /** Backend-specific settings that should not be flattened into OpenCode fields. */
+  backendSettings: BackendSettings;
+
   // Server configuration
   server: ServerConfig;
 
@@ -1876,6 +2484,9 @@ export function normalizeSettingsTabbedSecondaryTabByPrimary(
 /** Default settings */
 export const DEFAULT_SETTINGS: OpenCodianSettings = {
   userName: '',
+  activeBackend: 'opencode',
+  enabledBackends: ['opencode'],
+  backendSettings: getDefaultBackendSettings(),
 
   server: {
     mode: 'local',

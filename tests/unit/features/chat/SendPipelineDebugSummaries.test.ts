@@ -246,6 +246,34 @@ describe('summarizeContentBlocksForDebug', () => {
       });
     });
 
+    it('summarizes backend diagnostic events without expanding payloads', () => {
+      const chunk: CoreStreamChunk = {
+        type: 'backend_event',
+        source: 'claude-code',
+        event: 'structured_output',
+        status: 'received',
+        id: 'event-1',
+        name: 'schema',
+        content: '{"status":"ok"}',
+        metadata: {
+          structuredOutput: { status: 'ok' },
+          deferredToolUse: null,
+        },
+      };
+      const result = summarizeCoreStreamChunkForDebug(chunk);
+
+      expect(result).toEqual({
+        type: 'backend_event',
+        source: 'claude-code',
+        event: 'structured_output',
+        status: 'received',
+        id: 'event-1',
+        name: 'schema',
+        contentLength: 15,
+        metadataKeys: ['structuredOutput', 'deferredToolUse'],
+      });
+    });
+
     it('summarizes message_metadata chunk', () => {
       const chunk: CoreStreamChunk = {
         type: 'message_metadata',

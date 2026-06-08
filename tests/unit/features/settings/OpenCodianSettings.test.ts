@@ -1,4 +1,4 @@
-/* eslint-disable max-lines -- This file covers both SettingsSectionCoordinator integration and OpenCodianSettingTab layout shell behavior; keeping those regression cases together makes the settings-surface contract easier to review. */
+/* eslint-disable max-lines, max-lines-per-function -- This file covers both SettingsSectionCoordinator integration and OpenCodianSettingTab layout shell behavior; keeping those regression cases together makes the settings-surface contract easier to review. */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -776,19 +776,18 @@ describe('OpenCodianSettingTab layout shell', () => {
         (element) => element.textContent?.trim(),
       ),
     ).toEqual(['General']);
+    const generalBlock = tab.containerEl.querySelector<HTMLElement>('.opencodian-settings-general-merged-block');
+    expect(generalBlock).not.toBeNull();
     expect(
-      Array.from(tab.containerEl.querySelectorAll<HTMLElement>('.opencodian-settings-subsection-heading')).map(
+      Array.from(generalBlock!.querySelectorAll<HTMLElement>('.opencodian-settings-subsection-heading')).map(
         (element) => element.textContent?.trim(),
       ),
     ).toEqual([]);
-
-    const generalBlocks = Array.from(tab.containerEl.querySelectorAll<HTMLElement>('.opencodian-settings-block'));
-    expect(generalBlocks).toHaveLength(1);
-    expect(generalBlocks[0]?.classList.contains('opencodian-settings-section')).toBe(true);
-    expect(generalBlocks[0]?.dataset.settingsSurface).toBe('section');
-    expect(generalBlocks[0]?.querySelector('.opencodian-settings-section-body')).not.toBeNull();
-    expect(generalBlocks[0]?.querySelector('.layout-mode-setting')).not.toBeNull();
-    expect(generalBlocks[0]?.querySelector('.language-setting')).not.toBeNull();
+    expect(generalBlock?.classList.contains('opencodian-settings-section')).toBe(true);
+    expect(generalBlock?.dataset.settingsSurface).toBe('section');
+    expect(generalBlock?.querySelector('.opencodian-settings-section-body')).not.toBeNull();
+    expect(generalBlock?.querySelector('.layout-mode-setting')).not.toBeNull();
+    expect(generalBlock?.querySelector('.language-setting')).not.toBeNull();
   });
 
   it('keeps ordinary setting rows scoped under marked classic settings sections', () => {
@@ -858,6 +857,48 @@ describe('OpenCodianSettingTab layout shell', () => {
     ).map((element) => element.textContent?.trim());
     expect(labels.indexOf('Commands')).toBeLessThan(labels.indexOf('MCP'));
     expect(labels.indexOf('MCP')).toBeLessThan(labels.indexOf('Formatter'));
+  });
+
+  it('hides OpenCode-owned classic settings sections when Claude Code is active', () => {
+    const { plugin, tab } = createSettingsTab('classic');
+    plugin.settings.enabledBackends = ['opencode', 'claude-code'];
+    plugin.settings.activeBackend = 'claude-code';
+    const appendHeading = (title: string) => (containerEl: HTMLElement) => {
+      (tab as unknown as { createSectionHeading: (host: HTMLElement, heading: string, tooltip?: string) => HTMLHeadingElement })
+        .createSectionHeading(containerEl, title, `${title} tooltip`);
+    };
+
+    Object.assign(tab as unknown as Record<string, unknown>, {
+      addServerSettings: appendHeading('Server'),
+      addMcpSettings: appendHeading('MCP'),
+      addModelSettings: appendHeading('Model'),
+      addConversationSettings: appendHeading('Conversation'),
+      addAgentsSettings: appendHeading('Agents'),
+      addCommandsSettings: appendHeading('Commands'),
+      addFormatterSettings: appendHeading('Formatter'),
+      addPluginSettings: appendHeading('Plugins'),
+      addSecuritySettings: appendHeading('Security'),
+      addUISettings: appendHeading('UI'),
+      addStyleSettings: appendHeading('Style'),
+      addDebugSettings: appendHeading('Debug'),
+      addUserSettings: appendHeading('User'),
+      addClaudeCodeSettings: appendHeading('Claude Code'),
+      addSkillsSettings: appendHeading('Skills'),
+      addToolsSettings: appendHeading('Tools'),
+      addAcpSettings: appendHeading('ACP'),
+      renderLayoutModeSetting: jest.fn(),
+      renderLanguageSetting: jest.fn(),
+    });
+
+    tab.display();
+
+    const labels = Array.from(
+      tab.containerEl.querySelectorAll<HTMLButtonElement>('.opencodian-settings-quick-nav-btn'),
+    ).map((element) => element.textContent?.trim());
+    expect(labels).toEqual(['General', 'Claude Code', 'Conversation', 'UI', 'Style', 'Debug', 'User']);
+    expect(labels).not.toContain('Server');
+    expect(labels).not.toContain('Model');
+    expect(labels).not.toContain('Security');
   });
 
   it('does not render quick-nav in tabbed layout mode', () => {
@@ -1027,7 +1068,7 @@ describe('OpenCodianSettingTab title styling', () => {
       /\.opencodian-settings\s+\.opencodian-settings-quick-nav\s*\{[\s\S]*padding:\s*10px\s+12px;/,
     );
     expect(css).toMatch(
-      /\.opencodian-settings-quick-nav-tooltip-layer\s*\{[\s\S]*position:\s*fixed;[\s\S]*z-index:\s*2200;/,
+      /\.opencodian-settings-quick-nav-tooltip-layer\s*\{[\s\S]*position:\s*fixed;[\s\S]*z-index:\s*2260;/,
     );
     expect(css).toMatch(
       /\.opencodian-settings-quick-nav-tooltip-layer\s*\{[\s\S]*gap:\s*0;/,
@@ -1040,5 +1081,23 @@ describe('OpenCodianSettingTab title styling', () => {
     );
     expect(css).not.toMatch(/opencodian-settings-quick-nav-tooltip-layer\[data-align="left"\]/);
     expect(css).not.toMatch(/opencodian-settings-quick-nav-tooltip-layer\[data-align="right"\]/);
+  });
+
+  it('keeps the quick-nav tooltip below the shared settings tooltip and popover layers', () => {
+    const overlayCss = readFileSync(
+      join(process.cwd(), 'src/style/components/model-selector.css'),
+      'utf8',
+    );
+    const popoverCss = readFileSync(
+      join(process.cwd(), 'src/style/modals/config-editor-modal.css'),
+      'utf8',
+    );
+
+    // Quick-nav tooltip: z-index 2260 (lowest)
+    expect(overlayCss).toMatch(/\.opencodian-settings-quick-nav-tooltip-layer\s*\{[\s\S]*z-index:\s*2260;/);
+    // Settings popover: z-index 2280 (middle)
+    expect(popoverCss).toMatch(/\.opencodian-builtin-list-search-popover\s*\{[\s\S]*z-index:\s*2280;/);
+    // Settings tooltip: z-index 2300 (highest)
+    expect(overlayCss).toMatch(/\.opencodian-settings-tooltip-layer\s*\{[\s\S]*z-index:\s*2300;/);
   });
 });

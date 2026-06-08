@@ -43,14 +43,14 @@
 | `ConversationSessionSettings` | 会话级覆盖设置（`chatFontSizePx?`，支持 `null` 表示显式继承）。Compaction 配置已移至项目级 `.opencode/opencode.json`；手动 `session.summarize()` 仍是会话级动作，而不是这里的字段。 |
 | `ConversationBackgroundTaskMetadata` | 会话级 background-task lifecycle 缓存（当前只包含可选 `activeAnchor`，用于 hydration/recovery 恢复 active anchor 生命周期，不承载消息正文、工具输出、结构化 payload 或 `contentBlocks` 真值） |
 | `BackgroundTaskActiveAnchorMetadata` | active background-task anchor 的轻量字段（`startedAt`, `anchorKey`, `modeTag`, `waitingForFollowUp`, `updatedAt`） |
-| `ConversationMeta` | 会话元数据（不含消息体） |
-| `Conversation` | 完整会话（含 `messages` 数组，以及 `externalContextPaths?` / `sessionSettings?` 等本地元数据） |
+| `ConversationMeta` | 会话元数据（不含消息体），同时保留 legacy `openCodeSessionId?` 与 backend-neutral `backendSessionId?` / `backendAgentId?` |
+| `Conversation` | 完整会话（含 `messages` 数组，以及 `externalContextPaths?` / `sessionSettings?` 等本地元数据）；`openCodeSessionId?` 是 OpenCode 兼容字段，通用发送路径应通过 `getConversationBackendSessionId()` 读取 backend session |
 
 ### 流式事件
 
 | 类型 | 说明 |
 |------|------|
-| `StreamChunk` | 联合类型，15 种流式事件（`text`, `thinking`, `tool_use`, `tool_result`, `file_edited`, `message_metadata`, `usage`, `error`, `message_start`, `message_stop`, `content_block_start`, `content_block_stop`, `permission_request`, `question_request`；其中 `error` 可带 `errorClass?` 字段标识错误类型，`tool_use` 可带 `kind?`、`toolMetadata?` 与 `toolResultVisibility?`，`permission_request` 带 `sessionID`、`always` 与可选 `tool` 引用） |
+| `StreamChunk` | 联合类型，18 种流式事件（`text`, `thinking`, `tool_use`, `tool_result`, `file_edited`, `message_metadata`, `user_message_identity`, `usage`, `backend_event`, `error`, `message_start`, `message_stop`, `content_block_start`, `content_block_stop`, `permission_request`, `question_request`, `prompt_suggestion`；其中 `message_metadata.sessionId?` 可携带 backend 真实 session identity，`user_message_identity` 形状为 `{ type: 'user_message_identity'; uuid: string; sessionId?: string }`，用于把 Claude SDK user message UUID 传给持久化层，`backend_event` 承载 Claude Code hook/subagent/tool-progress/structured-output 等诊断事件，`error` 可带 `errorClass?` 字段标识错误类型，`tool_use` 可带 `kind?`、`toolMetadata?` 与 `toolResultVisibility?`，`permission_request` 带 `sessionID`、`always` 与可选 `tool` 引用，`prompt_suggestion` 带 `suggestion`、`uuid` 与可选 `sessionId`） |
 
 ### OMO 兼容
 
@@ -67,6 +67,7 @@
 | 类型 | 说明 |
 |------|------|
 | `UsageInfo` | Token 使用信息（`inputTokens`, `outputTokens`, `model`, `contextWindow`, `percentage`, `sessionId?`） |
+| `ContextUsageSnapshot` | Backend session 上下文用量快照 DTO（session/model/provider 元数据、contextWindow、input/output/reasoning/cache token、cost、`compactingAt?`），由 OpenCode 与 Claude Code 的 snapshot 读取路径共同使用，避免 core backend 反向依赖 chat feature service |
 | `TabContextState` | 标签页级上下文状态（估算/精确 token、费用、模型信息、会话元数据，以及 `compactingAt?` live compaction 时间戳） |
 | `ContextBreakdownKey` | `'system' \| 'user' \| 'assistant' \| 'tool' \| 'other'` |
 | `ContextBreakdownSegment` | 上下文分段统计（`key`, `tokens`, `width`, `percent`） |
@@ -75,7 +76,7 @@
 
 | 类型 | 说明 |
 |------|------|
-| `QuestionOption` | 选项（`label`, `description`） |
+| `QuestionOption` | 选项（`label`, `description`, `preview?`）|
 | `QuestionPrompt` | 问题提示（`question`, `header`, `options`, `multiple?`, `custom?`） |
 | `QuestionRequest` | 问题请求（`id`, `sessionId`, `questions`） |
 | `QuestionResolution` | 问题解决状态（`request`, `status: 'answered' \| 'rejected'`, `answers?`） |
@@ -117,7 +118,7 @@
 `StreamChunk` 联合类型覆盖了从 `message_start` 到 `message_stop` 的完整事件链：
 1. 生命周期：`message_start` → ... → `message_stop`
 2. 内容事件：`text`, `thinking`, `tool_use`, `tool_result`
-3. 元数据：`message_metadata`, `usage`, `file_edited`
+3. 元数据：`message_metadata`, `user_message_identity`, `usage`, `file_edited`, `backend_event`；Claude Code 等 backend 可通过 `message_metadata.sessionId` 把 stream 中首次出现的真实 backend session id 回传给发送持久化层，并通过 `user_message_identity.uuid` 把 SDK user message identity 写回 optimistic user message 的 `sourceMessageId`，Claude Code hook/subagent/tool-progress/structured-output 事件先进入 `backend_event` 诊断通道而不是稳定 transcript UI
 4. 交互事件：`permission_request`, `question_request`
 5. 结构事件：`content_block_start`, `content_block_stop`
 6. 错误：`error`
@@ -143,6 +144,7 @@
 | 方法 | 说明 |
 |------|------|
 | `createEmptyTabContextState()` | 创建空白的标签页上下文状态对象，所有字段归零/置空 |
+| `getConversationBackendSessionId(conversation)` | 按 `backendSessionId → openCodeSessionId → acpSessionId` 顺序解析通用 backend session id；用于 Phase 0/1 发送链路与持久化兼容层 |
 
 ## 数据流
 
@@ -172,7 +174,8 @@
 - `ChatMessage.compactionDivider` 携带结构化 compaction 分界元数据（`auto`, `overflow`, `tailStartId`），替代旧 plain-text marker
 - `ChatMessage.summary` 当前由 OpenCode 原生 assistant `summary` 字段透传，主要用于 compaction report 的 merge/render 语义
 - `ChatMessage.streamState` 目前仅支持 `'interrupted'`，标记被取消的流
-- `Conversation.openCodeSessionId` 是 OpenCode 服务端的会话 ID，与本地 `Conversation.id` 不同
+- `Conversation.openCodeSessionId` 是 OpenCode 服务端的 legacy 会话 ID，与本地 `Conversation.id` 不同；新 backend 会话可以只写 `backendSessionId`，OpenCode 旧数据会在加载和保存时回填到 `backendSessionId`
+- `Conversation.backendAgentId` / legacy `acpAgentId` 用于记录 backend-owned agent identity；新代码应优先读写 `backendAgentId`
 - `normalizeConversationSessionSettings()` 会在会话读写时清理无效 override，并保留 `null` 形式的“显式继承”标记
 - `ContentBlock.durationSeconds` 仅用于 `thinking` 类型块
 - `toolMetadata` 当前是 UI-safe 白名单字段，主要用于 `task` / subagent 卡片的 child session linkage，不等于原始 OpenCode metadata 全量透传

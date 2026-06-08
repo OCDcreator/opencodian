@@ -19,6 +19,10 @@
 
 设置保存编排（`saveSettings()`、主题/外观变更、背景资源管理、防抖定时器）已从 `main.ts` 提取到 `OpenCodianSettingsRuntimeCoordinator`。`main.ts` 保留公共 API 表面，所有设置运行时调用委托给该 coordinator。
 
+文件头部保留了针对 `simple-import-sort/imports` 的局部豁免：入口导入按启动编排 seam 手工分组，避免 owner-guard 保护下的 wiring 变更频繁触发与行为无关的排序 diff。
+
+Claude Code MCP elicitation 的入口处理保留在 `main.ts`：`onElicitation` 会检查 abort signal、查找当前 chat view 注册的 `elicitationCardRenderer`，并把用户 accept/decline/cancel 映射回 SDK `ElicitationResult`。请求和内容形状转换已下沉到 `ClaudeCodeElicitationBridge.ts`，入口层不再内联 schema parsing 或 answer-to-content 逻辑。当前产品状态仍为 wiring：真实 pass 需要 MCP server 发起 elicitation 并消费返回结果的端到端运行时证据。
+
 ## 导入关系
 
 ```text
@@ -76,8 +80,9 @@
 12. 在注册视图之前执行 `loadConversations()`，只预热会话元数据；`StorageService` 会优先读取轻量 `session-metas/` sidecar，缺失时再回退完整 session JSON，并把这次 fallback 统计送进 startup diagnosis。
 13. 注册 `OpenCodianView`、自定义品牌 icon（供 ribbon / tab header 复用）、命令与设置页。
 14. 启动结束时输出一行汇总日志；这条汇总同样走 `always`。若检测到失败或明显慢启动，还会额外输出一条 automatic diagnosis。
-15. 最近一次 trace 会暴露给诊断报告；若 debug 已开启，或本次启动被判定为慢启动/失败，还会自动把 `startup-perf-latest.log` 写到 vault 的 `.opencodian/debug/`。
+15. 最近一次 trace 会暴露给诊断报告；若 debug 已开启，或本次启动被判定为慢启动/失败，还会自动把 `startup-perf-latest.log` 写到 vault 的 `.opencodian/debug/`。诊断报告也会输出 Claude Code backend 设置摘要、debug module 状态和 debug channel 配置，但不会把 Claude Code 能力包装成 full runtime proof。
 16. `onload()` 返回后再后台调度 deferred runtime warmup：本地 sidecar 自启动与首个 server snapshot 不再阻塞插件注册和视图恢复；真正需要新 session 的路径（当前主要是 `createConversation()`）才会显式接管并等待这次 warmup，避免首次建会话撞上未就绪 server，同时不拖慢已有会话的视图首开。
+17. 这条 warmup 现在还会先看当前是否真的启用了 `opencode` backend。若用户把所有 backend 都禁用，`main.ts` 只向 `PluginRuntimeCoordinator` 暴露 enabled-backend truth，不再触发启动期的 runtime warmup / snapshot 探测，避免聊天界面已明确显示“已禁用”时后台仍做无意义的本地服务离线探测并产生日志噪音。
 
 这里没有调用 `OpenCodeService.initialize()`；实际运行时由 `main.ts` 自己决定是否启动服务。
 
@@ -148,16 +153,21 @@ OpenCode server status 回调也不再只刷新设置页状态：当本地/远�
 - `refreshCurrentConversationRendering()`
 - `refreshQuestionUi()`
 
+同时它还统一拥有插件级 runtime warmup gate：
+
+- 只有 `enabledBackends` 里包含 `opencode`，且当前 server 仍是 local auto-start 模式时，才会安排 deferred warmup 或被 `createConversation()` 接管为 session-bootstrap warmup。
+- 这个 gate 只决定“是否值得启动/探测本地 runtime”，不会改变既有会话、历史记录、tab runtime 或会话绑定 backend 的持久化语义。
+
 ### 会话缓存与本地持久化
 
 `loadConversations()` 只读取 `StorageService.listConversations()` 返回的元数据，并通过 `conversationsLoadPromise` 防止并发重复加载。
 
 后续流程分成两层：
 
-- `createConversation()` 会先接管尚未完成的 deferred runtime warmup，再在 OpenCode 侧创建 session，最后建立本地 conversation 记录。
-- `createConversationFromSession()` 允许已有 OpenCode session 映射为新的本地 conversation。
+- `createConversation()` 会以 `settings.activeBackend` 作为新会话 owner，再从 `AgentServiceRegistry` 查找同名 adapter，并通过 `AgentBackendRouting.hasSessionCreationCapability()` 确认其声明 sessions 且实现 create/delete/title-update 这组会话创建所需方法。OpenCode 会话仍会先接管 deferred runtime warmup，非 OpenCode backend 则直接调用其 `createSession()`，并只写 `backendSessionId`。如果当前 active backend 是 Claude/Codex 等非 OpenCode，但对应 adapter 没有会话创建能力或不可用，入口会直接报错，不会回退去创建 OpenCode 会话。更宽的 session read/list/preview seam 仍由 `hasSessionCapability()` 判定。
+- `createConversationFromSession()` 允许已有 backend session 映射为新的本地 conversation。优先使用调用方传入的 `initial.backend`（如 fork 来源 conversation 的 backend），未指定时回退到 `settings.activeBackend`。只有最终 backend 是 OpenCode 时才写 legacy `openCodeSessionId`，其他 backend 只写通用 `backendSessionId`。
 - `getConversationById()` 默认优先从磁盘补全完整消息，再更新内存缓存；`preferCache` 可跳过这一步。
-- `deleteConversation()` 会先把本地缓存删掉，再 best-effort 删除 OpenCode session，最后清理本地存储。
+- `deleteConversation()` 会先把本地缓存删掉，再按 conversation owner 解析 session backend 并 best-effort 删除 backend session，最后清理本地存储。历史 conversation 缺失 `backend` 时继续按 OpenCode 处理。
 
 ### 主题背景资源与诊断导出
 
@@ -168,7 +178,9 @@ OpenCode server status 回调也不再只刷新设置页状态：当本地/远�
   - 维护 data URL 缓存
   - 在保存失败时回滚外观并删除新导入的资源
 - 诊断导出：
-  - `buildDiagnosticReport()` 汇总 server 状态、关键设置、debug module 开关、debug refresh interval、最近一次 startup perf trace、自动 startup analysis 与最近日志
+  - `buildDiagnosticReport()` 汇总 OpenCode server 状态、Claude Code SDK 诊断状态、关键设置、debug module 开关、debug refresh interval、最近一次 startup perf trace、自动 startup analysis 与最近日志，导出前通过 `sanitizeDiagnosticReport()` 对全文执行密钥/令牌/密码净化
+  - Claude Code 诊断区块只写摘要计数与开关状态，例如 model/effort、setting sources、MCP/env/additional directory 数量、checkpoint/hook/subagent 诊断开关，不导出环境变量值或 prompt 内容
+  - 密钥净化覆盖 Bearer 令牌、API key 赋值、CLI 标志、URL 内嵌密码、查询字符串参数、环境变量、Anthropic API key 前缀、PEM 私钥块等常见敏感模式
   - `writeDiagnosticLogFile()` 把报告写到指定目录
   - `getDebugBuildIdentityText()` 提供设置页“复制版本 / BUILD_ID”动作使用的稳定文本
 
@@ -183,7 +195,7 @@ OpenCode server status 回调也不再只刷新设置页状态：当本地/远�
 | `activateView()` | 打开或定位 `OpenCodianView` |
 | `startNewConversationForCurrentView()` | 激活聊天视图并在当前视图/当前 tab 打开新会话 |
 | `loadConversations()` | 预加载会话元数据，保证视图恢复前数据已就绪 |
-| `createConversation()` | 创建 OpenCode session 并建立本地 conversation |
+| `createConversation()` | 按 `settings.activeBackend` 创建对应 backend session 并建立本地 conversation |
 | `getConversationById()` | 从缓存或磁盘获取完整 conversation |
 | `deleteConversation()` | 删除本地 conversation，并 best-effort 删除远端 session |
 | `buildDiagnosticReport()` | 生成调试报告文本 |
@@ -265,6 +277,7 @@ graph TD
 ### 其他注意事项
 
 - `loadConversations()` 只加载元数据，不加载消息正文；正文由 `getConversationById()` 按需补读。
+- 会话元数据加载会把 legacy `openCodeSessionId` 回填为 `backendSessionId`；新建 OpenCode 会话会双写两者。删除和标题同步这类 OpenCode-only 路径只在能解析到 OpenCode session id 时调用底层 `OpenCodeService`。
 - 本地 server auto-start 已改成注册完成后的后台 warmup；冷启动 trace 现在更接近"插件何时可见"，而不是"sidecar 何时 ready"。
 - 启动 trace 会同时记录顶层 phase 和嵌套子步骤；诊断报告里的总耗时只汇总顶层 phase，避免双重累计。
 - `saveSettings()` 的失败回滚只覆盖服务层设置同步；分层磁盘写入发生在服务层更新之后。

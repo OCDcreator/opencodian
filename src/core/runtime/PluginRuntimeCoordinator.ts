@@ -6,6 +6,7 @@ import { createLogger, formatDurationMs, getPerformanceTimestampMs } from '../..
 import { OpenCodeService } from '../opencode';
 import type { OpenCodianSettings } from '../types';
 import { isLocalServerMode } from '../types';
+import type { AgentBackendKind } from '../types/chat';
 
 const logger = createLogger('PluginRuntimeCoordinator');
 
@@ -24,6 +25,7 @@ export interface PluginRuntimeCoordinatorHost {
   getSettings(): OpenCodianSettings | null;
   getOpenCodeService(): OpenCodeService | null;
   getOpenCodianLeaves(): WorkspaceLeaf[];
+  hasEnabledBackend?(backendId: AgentBackendKind): boolean;
   applyProviderIconColorMode(): void;
   startConfiguredLocalServerIfNeeded(): Promise<void>;
   logServerStatusSnapshot(source?: string): Promise<void>;
@@ -56,6 +58,7 @@ export class PluginRuntimeCoordinator {
         view.applyChatAppearanceSettings();
         view.applyChatScrollMode();
         view.applyTabBarLayout();
+        view.refreshAvailabilityUi();
       }
       if (reloadModels) {
         void view.reloadModelCatalog();
@@ -136,9 +139,12 @@ export class PluginRuntimeCoordinator {
 
   private shouldWarmupRuntimeAfterStartup(): boolean {
     const settings = this.host.getSettings();
+    const hasEnabledOpenCodeBackend = this.host.hasEnabledBackend?.('opencode')
+      ?? Boolean(settings?.enabledBackends?.includes('opencode'));
     return Boolean(
       this.host.getOpenCodeService()
       && settings
+      && hasEnabledOpenCodeBackend
       && isLocalServerMode(settings.server)
       && settings.server.local.autoStart,
     );

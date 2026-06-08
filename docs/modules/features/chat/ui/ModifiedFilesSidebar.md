@@ -25,6 +25,7 @@
 - **OpenCodianView**: 负责创建/销毁组件、从 `OpenCodeService.getCachedSessionDiffEntries(sessionId)` 推送当前 session entries。
 - **modified-files-sidebar.css**: 控制右侧浮层、列表、状态 badge 和 toolbar toggle 样式。
 - **i18n locales**: 提供标题、空状态、状态文案和 toggle tooltip。
+- **ConversationRenderService**: collapse 按钮的 tooltip/accessibility label 通过 `setTooltipLabel()` 挂载，保持和 chat 其余 shared tooltip trigger 一致，并避免额外原生 hover tooltip。
 
 ## 注意事项
 

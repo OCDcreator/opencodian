@@ -74,6 +74,9 @@ export class PermissionInlineCardRenderer {
       'opencodian-permission-inline',
       tabId,
     );
+    if (permissionCard) {
+      permissionCard.setAttribute('data-permission-card', 'true');
+    }
     if (!permissionCard) {
       return null;
     }
@@ -133,24 +136,31 @@ export class PermissionInlineCardRenderer {
   private renderButtons(permissionCard: HTMLElement): PermissionInlineCardButtons {
     const buttonsEl = permissionCard.createDiv({ cls: 'opencodian-permission-inline-buttons' });
 
-    return {
-      onceBtn: buttonsEl.createEl('button', {
-        cls: 'opencodian-permission-inline-btn opencodian-permission-inline-once',
-        text: t('permissionDialog.allowOnce'),
-      }),
-      alwaysBtn: buttonsEl.createEl('button', {
-        cls: 'opencodian-permission-inline-btn opencodian-permission-inline-always',
-        text: t('permissionDialog.allowAlways'),
-      }),
-      sessionBtn: buttonsEl.createEl('button', {
-        cls: 'opencodian-permission-inline-btn opencodian-permission-inline-session',
-        text: t('permissionDialog.allowSession'),
-      }),
-      rejectBtn: buttonsEl.createEl('button', {
-        cls: 'opencodian-permission-inline-btn opencodian-permission-inline-reject',
-        text: t('permissionDialog.reject'),
-      }),
-    };
+    const onceBtn = buttonsEl.createEl('button', {
+      cls: 'opencodian-permission-inline-btn opencodian-permission-inline-once',
+      text: t('permissionDialog.allowOnce'),
+    });
+    onceBtn.setAttribute('data-permission-action', 'once');
+
+    const alwaysBtn = buttonsEl.createEl('button', {
+      cls: 'opencodian-permission-inline-btn opencodian-permission-inline-always',
+      text: t('permissionDialog.allowAlways'),
+    });
+    alwaysBtn.setAttribute('data-permission-action', 'always');
+
+    const sessionBtn = buttonsEl.createEl('button', {
+      cls: 'opencodian-permission-inline-btn opencodian-permission-inline-session',
+      text: t('permissionDialog.allowSession'),
+    });
+    sessionBtn.setAttribute('data-permission-action', 'session');
+
+    const rejectBtn = buttonsEl.createEl('button', {
+      cls: 'opencodian-permission-inline-btn opencodian-permission-inline-reject',
+      text: t('permissionDialog.reject'),
+    });
+    rejectBtn.setAttribute('data-permission-action', 'reject');
+
+    return { onceBtn, alwaysBtn, sessionBtn, rejectBtn };
   }
 
   private waitForResponse(buttons: PermissionInlineCardButtons): Promise<PermissionInlineCardResult> {

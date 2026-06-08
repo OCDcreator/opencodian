@@ -19,6 +19,7 @@ import type {
   Conversation,
   PromptContextItem,
 } from '../../../core/types';
+import { getConversationBackendSessionId } from '../../../core/types';
 import { t } from '../../../i18n';
 import { buildContextAttachment, createLogger } from '../../../shared';
 import { getPromptContextTargetKey } from '../composerContext';
@@ -32,6 +33,7 @@ const logger = createLogger('MessageSendPreparationService');
 
 export type SendPreparationServerAvailability =
   'checking'
+  | 'disabled'
   | 'running'
   | 'starting'
   | 'offline'
@@ -41,6 +43,8 @@ export interface SendMessageModelOptions {
   provider?: string;
   model?: string;
   variant?: string;
+  /** One-shot structured-output schema for Claude Code `/json` trigger. Not persisted. */
+  outputFormat?: Record<string, unknown>;
 }
 
 export type ComposerInputMode = 'prompt' | 'shell';
@@ -81,6 +85,8 @@ export interface PrepareMessageSendOptions {
   invocationIntent?: SurfaceInvocationIntent;
   targetTabId?: TabId;
   skipSlashCommand?: boolean;
+  /** One-shot structured-output schema for Claude Code `/json` trigger. Not persisted. */
+  outputFormat?: Record<string, unknown>;
 }
 
 export interface PreparedMessageSend {
@@ -130,7 +136,7 @@ export interface MessageSendPreparationHost {
   refreshSettingsTabStatus(): void;
   getServerMode(): 'local' | 'remote';
   createAssistantShellContainer(): SendPipelineStreamElements;
-  getUnavailableServerPromptMessage(availability: 'checking' | 'starting' | 'offline'): string;
+  getUnavailableServerPromptMessage(availability: 'checking' | 'disabled' | 'starting' | 'offline'): string;
   finalizeAssistantMessageWithServerError(
     messageEl: HTMLElement,
     contentEl: HTMLElement,
@@ -139,7 +145,7 @@ export interface MessageSendPreparationHost {
   finalizeAssistantMessageWithServerUnavailableError(
     messageEl: HTMLElement,
     contentEl: HTMLElement,
-    availability: 'checking' | 'starting' | 'offline',
+    availability: 'checking' | 'disabled' | 'starting' | 'offline',
   ): Promise<void>;
   openPluginSettingsAtServerSection(): void;
   startServer(): Promise<void>;
@@ -147,6 +153,7 @@ export interface MessageSendPreparationHost {
   loadAvailableModels(): Promise<void>;
   getSendMessageOptions(): SendMessageModelOptions;
   formatModelId(model: Partial<SendMessageModelOptions> | null | undefined): string | undefined;
+  shouldUseModelCatalog(conversation: Conversation): boolean;
   ensureSelectedModelAvailable(provider: string | undefined, model: string | undefined): Promise<boolean>;
   appendModelUnavailableNoticeMessage(): Promise<void>;
   buildStructuredPromptSendPayload(
@@ -179,7 +186,7 @@ export interface MessageSendPreparationHost {
   renderMessage(message: ChatMessage): Promise<unknown>;
   scrollToBottom(options: { tabId: TabId | null; enableAutoScroll?: boolean }): void;
   applyFallbackConversationTitle(conversationId: string, firstMessage: string): Promise<void>;
-  shouldGenerateAiTitle(): boolean;
+  shouldGenerateAiTitle(conversation: Conversation): boolean;
   startAiConversationTitleGeneration(
     conversationId: string,
     firstMessage: string,
@@ -221,7 +228,7 @@ export interface MessageSendPreparationHostDependencies {
   notifyForegroundBusy: () => void;
   assistantShellViewHostAdapter: { createAssistantShellContainer(): SendPipelineStreamElements };
   messageFinalizationService: {
-    getUnavailableServerPromptMessage(availability: 'checking' | 'starting' | 'offline'): string;
+    getUnavailableServerPromptMessage(availability: 'checking' | 'disabled' | 'starting' | 'offline'): string;
     finalizeAssistantMessageWithServerError(
       messageEl: HTMLElement,
       contentEl: HTMLElement,
@@ -230,7 +237,7 @@ export interface MessageSendPreparationHostDependencies {
     finalizeAssistantMessageWithServerUnavailableError(
       messageEl: HTMLElement,
       contentEl: HTMLElement,
-      availability: 'checking' | 'starting' | 'offline',
+      availability: 'checking' | 'disabled' | 'starting' | 'offline',
     ): Promise<void>;
   };
   chatSelectionControlsCoordinator: {
@@ -270,6 +277,7 @@ export interface MessageSendPreparationHostDependencies {
   scrollToBottom: (options: { tabId: TabId | null; enableAutoScroll?: boolean }) => void;
   applyFallbackConversationTitle: (conversationId: string, firstMessage: string) => Promise<void>;
   getTitleMode: () => string;
+  getClaudeAutoTitle: () => boolean;
   startAiConversationTitleGeneration: (
     conversationId: string,
     firstMessage: string,
@@ -300,8 +308,21 @@ export class MessageSendPreparationService {
     if (!tabId || !this.isTargetTabActive(options.targetTabId)) {
       return null;
     }
+    // Check server availability BEFORE creating a conversation/session,
+    // so we never bootstrap an orphan session when the backend is disabled/offline.
+    const earlyAvailability = await this.host.getServerAvailability();
+    if (earlyAvailability !== 'running' && earlyAvailability !== 'external') {
+      if (!(await this.ensureServerReadyForChat(earlyAvailability))) {
+        return null;
+      }
+    }
     const conversation = await this.host.ensureConversationReady();
     if (!conversation) return null;
+    const backendSessionId = getConversationBackendSessionId(conversation);
+    if (!backendSessionId) {
+      this.resetPreparingLifecycle(tabId);
+      return null;
+    }
     if (!this.isTargetTabActive(options.targetTabId) || !this.host.ensureTabRuntime(tabId)) return null;
     if (this.host.isTabForegroundBusy(tabId)) {
       if (!this.queueFollowUpSend(tabId, options)) this.host.notifyForegroundBusy();
@@ -317,19 +338,25 @@ export class MessageSendPreparationService {
         return null;
       }
     }
-    if (!this.host.hasLoadedModelCatalog()) await this.host.loadAvailableModels();
-    const modelOptions = this.host.getSendMessageOptions();
-    const activeModelId = this.host.formatModelId(modelOptions);
-    const modelAvailable = await this.host.ensureSelectedModelAvailable(modelOptions.provider, modelOptions.model);
-    if (!modelAvailable) {
-      await this.host.appendModelUnavailableNoticeMessage();
-      this.resetPreparingLifecycle(tabId);
+    const usesModelCatalog = this.host.shouldUseModelCatalog(conversation);
+    const modelOptions = usesModelCatalog ? await this.prepareModelOptions(tabId) : {};
+    if (!modelOptions) {
       return null;
     }
+    // Merge one-shot structured-output trigger into model options for this send only.
+    if (options.outputFormat) {
+      modelOptions.outputFormat = options.outputFormat;
+    }
+    const activeModelId = this.host.formatModelId(modelOptions);
     const persistentContextItems = await this.composerSendContext.resolvePersistentContextItems(conversation.externalContextPaths);
     const contextItems = this.mergeContextItems(persistentContextItems, draftContextItems);
     const resolvedAgentInvocation = this.agentInvocationService.resolveInvocationIntent(options.invocationIntent);
-    const requestContent = this.agentInvocationService.removeMentionFallbackText(options.content, resolvedAgentInvocation);
+    // For Claude backend, preserve @agent mentions as raw text in the prompt.
+    // Claude processes @agent natively; OpenCode strips mentions into invocationParts.
+    const isClaudeBackend = (conversation.backend ?? 'opencode') === 'claude-code';
+    const requestContent = isClaudeBackend
+      ? options.content
+      : this.agentInvocationService.removeMentionFallbackText(options.content, resolvedAgentInvocation);
     const skillExpansion = await this.skillContentExpander.expand(requestContent);
     const syntheticTextParts: PromptSyntheticTextPartInput[] = [
       ...(options.syntheticTextParts ?? []),
@@ -342,7 +369,8 @@ export class MessageSendPreparationService {
     const structuredSend = this.host.buildStructuredPromptSendPayload(requestContent, {
       contextItems,
       ...(syntheticTextParts.length > 0 ? { syntheticTextParts } : {}),
-      ...(resolvedAgentInvocation.invocationParts.length > 0 ? { invocationParts: resolvedAgentInvocation.invocationParts } : {}),
+      // Do not send OpenCode invocationParts to Claude backend — agent mentions are raw text
+      ...(!isClaudeBackend && resolvedAgentInvocation.invocationParts.length > 0 ? { invocationParts: resolvedAgentInvocation.invocationParts } : {}),
     });
     const userMessage = buildOptimisticUserMessage(options.content, contextItems, Date.now(), { optimisticUserParts: structuredSend.optimisticUserParts });
     const writeTicket = this.host.createConversationWriteTicket(conversation.id);
@@ -361,7 +389,7 @@ export class MessageSendPreparationService {
     }
 
     this.host.seedCanonicalUserMessage({
-      sessionID: conversation.openCodeSessionId, messageID: structuredSend.messageID,
+      sessionID: backendSessionId, messageID: structuredSend.messageID,
       parts: structuredSend.optimisticUserParts, timestamp: userMessage.timestamp,
     });
     this.host.resetBackgroundTaskIndicator(tabId);
@@ -370,9 +398,18 @@ export class MessageSendPreparationService {
     this.host.setAutoScrollEnabled(tabId, true);
     await this.host.renderMessage(userMessage);
     this.host.scrollToBottom({ tabId, enableAutoScroll: true });
-    if (this.isFirstUserMessage(conversation)) {
+    const conversationBackend = conversation.backend ?? 'opencode';
+    const shouldBootstrapTitle = this.isFirstUserMessage(conversation)
+      && (conversationBackend === 'opencode' || conversationBackend === 'claude-code');
+    if (shouldBootstrapTitle) {
       await this.host.applyFallbackConversationTitle(conversation.id, options.content);
-      if (this.host.shouldGenerateAiTitle()) this.host.startAiConversationTitleGeneration(conversation.id, options.content, modelOptions);
+      const shouldGenerateAiTitle = this.host.shouldGenerateAiTitle(conversation);
+      if (conversationBackend === 'claude-code' && shouldGenerateAiTitle) {
+        await this.markConversationTitleGenerationPending(conversation);
+      }
+      if (shouldGenerateAiTitle) {
+        this.host.startAiConversationTitleGeneration(conversation.id, options.content, modelOptions);
+      }
     }
     return {
       conversation, tabId, messageID: structuredSend.messageID,
@@ -406,6 +443,22 @@ export class MessageSendPreparationService {
     this.host.transitionTabSessionLifecycle(tabId, 'idle', 'send-preflight-aborted');
   }
 
+  private async markConversationTitleGenerationPending(conversation: Conversation): Promise<void> {
+    if (conversation.titleGenerationStatus === 'pending') {
+      return;
+    }
+
+    const writeTicket = this.host.createConversationWriteTicket(conversation.id);
+    await this.host.commitConversationWrite(
+      conversation,
+      writeTicket,
+      'claude-title-generation-pending',
+      () => {
+        conversation.titleGenerationStatus = 'pending';
+      },
+    );
+  }
+
   private queueFollowUpSend(tabId: TabId, options: PrepareMessageSendOptions): boolean {
     return this.host.queueFollowUpSend(tabId, {
       content: options.content,
@@ -417,6 +470,21 @@ export class MessageSendPreparationService {
 
   private isFirstUserMessage(conversation: Conversation): boolean {
     return conversation.messages.filter((message) => message.role === 'user').length === 1;
+  }
+
+  private async prepareModelOptions(tabId: TabId): Promise<SendMessageModelOptions | null> {
+    if (!this.host.hasLoadedModelCatalog()) await this.host.loadAvailableModels();
+    const modelOptions = this.host.getSendMessageOptions();
+    const modelAvailable = await this.host.ensureSelectedModelAvailable(
+      modelOptions.provider,
+      modelOptions.model,
+    );
+    if (!modelAvailable) {
+      await this.host.appendModelUnavailableNoticeMessage();
+      this.resetPreparingLifecycle(tabId);
+      return null;
+    }
+    return modelOptions;
   }
 
   private mergeContextItems(
@@ -455,15 +523,19 @@ export class MessageSendPreparationService {
       text: `${t('chat.serverPrompt.currentStatus')} ${t(
         availability === 'starting'
           ? 'chat.serverStatus.starting'
-          : 'chat.serverStatus.offline'
+          : availability === 'disabled'
+            ? 'chat.serverStatus.disabled'
+            : 'chat.serverStatus.offline'
       )}`,
     });
 
     const buttonRow = cardEl.createDiv({ cls: 'opencodian-server-action-buttons' });
     const serverMode = this.host.getServerMode();
-    const primaryButtonLabel = serverMode === 'local'
-      ? t('chat.serverPrompt.start')
-      : t('chat.serverPrompt.retry');
+    const primaryButtonLabel = availability === 'disabled'
+      ? t('chat.serverPrompt.enableBackend')
+      : serverMode === 'local'
+        ? t('chat.serverPrompt.start')
+        : t('chat.serverPrompt.retry');
     const startBtn = buttonRow.createEl('button', {
       cls: 'opencodian-server-action-btn mod-cta',
       text: primaryButtonLabel,
@@ -483,6 +555,17 @@ export class MessageSendPreparationService {
       settingsBtn.addEventListener('click', () => resolve('settings'));
     });
 
+    if (choice === 'start' && availability === 'disabled') {
+      this.host.openPluginSettingsAtServerSection();
+      // Bail out — the user must enable a backend and re-send manually.
+      await this.host.finalizeAssistantMessageWithServerUnavailableError(
+        messageEl,
+        contentEl,
+        'disabled',
+      );
+      return false;
+    }
+
     if (choice === 'settings') this.host.openPluginSettingsAtServerSection();
     if (choice === 'settings' || choice === 'skip') {
       await this.refreshStatusSurfaces();
@@ -492,7 +575,7 @@ export class MessageSendPreparationService {
         return true;
       }
       await this.host.finalizeAssistantMessageWithServerUnavailableError(
-        messageEl, contentEl, latestAvailability as 'checking' | 'starting' | 'offline',
+        messageEl, contentEl, latestAvailability as 'checking' | 'disabled' | 'starting' | 'offline',
       );
       return false;
     }
@@ -571,6 +654,10 @@ export function createMessageSendPreparationHost(
     loadAvailableModels: () => deps.reloadModelCatalog(),
     getSendMessageOptions: () => deps.getSendMessageOptions(),
     formatModelId: (model) => selectionCtrl.formatModelId(model),
+    shouldUseModelCatalog: (conversation) => {
+      const backend = conversation.backend ?? 'opencode';
+      return backend === 'opencode' || backend === 'claude-code';
+    },
     ensureSelectedModelAvailable: (provider, model) => selectionCtrl.ensureSelectedModelAvailable(provider, model),
     appendModelUnavailableNoticeMessage: () => deps.appendModelUnavailableNoticeMessage(),
     buildStructuredPromptSendPayload: (content, options) => openCodeService.buildStructuredPromptSendPayload(content, options),
@@ -592,7 +679,13 @@ export function createMessageSendPreparationHost(
     renderMessage: (message) => conversationRenderService.renderMessage(message),
     scrollToBottom: (options) => deps.scrollToBottom(options),
     applyFallbackConversationTitle: (conversationId, firstMessage) => deps.applyFallbackConversationTitle(conversationId, firstMessage),
-    shouldGenerateAiTitle: () => deps.getTitleMode() === 'ai',
+    shouldGenerateAiTitle: (conversation) => {
+      const backend = conversation.backend ?? 'opencode';
+      if (backend === 'claude-code') {
+        return deps.getClaudeAutoTitle();
+      }
+      return backend === 'opencode' && deps.getTitleMode() === 'ai';
+    },
     startAiConversationTitleGeneration: (conversationId, firstMessage, modelOptions) => deps.startAiConversationTitleGeneration(conversationId, firstMessage, modelOptions),
     setStreaming: (tabId, value) => tabRuntime.setStreaming(tabId, value),
     syncTabStreamLikeState: (tabId) => deps.syncTabStreamLikeState(tabId),

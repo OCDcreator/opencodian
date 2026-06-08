@@ -1,3 +1,4 @@
+import { getConversationBackendSessionId } from '../../../core/types';
 import type {
   PreparedMessageSend,
   PrepareMessageSendOptions,
@@ -45,6 +46,39 @@ export type {
 
 export interface SendPipelineSlashCommandPort {
   tryRunSlashCommand(content: string): Promise<boolean | string>;
+}
+
+/** Fixed JSON schema used for the `/json` ordinary-chat structured-output trigger. */
+const STRUCTURED_OUTPUT_FIXED_SCHEMA: Record<string, unknown> = {
+  type: 'object',
+  description: 'Return your complete response ONLY as a JSON object matching this schema. Do not include markdown code blocks, explanations, or conversational text.',
+  properties: {
+    response: { type: 'string', description: 'Put all response content here as a single JSON string value. Do not include markdown formatting.' },
+    tags: { type: 'array', items: { type: 'string' } },
+    confidence: { type: 'number', minimum: 0, maximum: 1 },
+  },
+  required: ['response'],
+};
+
+/**
+ * Detect the `/json ` structured-output trigger prefix.
+ * Returns the stripped content and a fixed outputFormat when the prefix is present.
+ * This is intentionally narrow: one fixed schema, one message at a time.
+ */
+function extractStructuredOutputTrigger(content: string): { cleanContent: string; outputFormat: Record<string, unknown> } | null {
+  const trimmed = content.trimStart();
+  const triggerPattern = /^\/json\s+/i;
+  if (!triggerPattern.test(trimmed)) {
+    return null;
+  }
+  const cleanContent = trimmed.replace(triggerPattern, '');
+  return {
+    cleanContent,
+    outputFormat: {
+      type: 'json_schema',
+      schema: STRUCTURED_OUTPUT_FIXED_SCHEMA,
+    },
+  };
 }
 
 export interface SendPipelineHostDependencies {
@@ -97,7 +131,7 @@ export function createSendPipelineRuntimeHost(deps: SendPipelineHostDependencies
     refreshServerStatusBadge: () => deps.refreshServerStatusBadge(),
   };
   const transportPort: SendPipelineTransportPort = {
-    sendStreamMessage: (content, options) => deps.sendStreamMessage(content, options),
+    sendStreamMessage: (conversation, content, options) => deps.sendStreamMessage(conversation, content, options),
     detachStream: (sessionId) => deps.detachStream(sessionId),
     syncLatestUserMessageFromServer: (conversation, optimisticMessageId, tabId) =>
       deps.syncLatestUserMessageFromServer(conversation, optimisticMessageId, tabId),
@@ -146,6 +180,13 @@ export class SendPipelineRuntime {
   async sendMessage(input: string | PrepareMessageSendOptions): Promise<void> {
     let preparationOptions = typeof input === 'string' ? { content: input } : input;
     let content = preparationOptions.content;
+
+    // Detect and strip the `/json ` structured-output trigger before any further processing.
+    const structuredTrigger = extractStructuredOutputTrigger(content);
+    if (structuredTrigger) {
+      content = structuredTrigger.cleanContent;
+      preparationOptions = { ...preparationOptions, content, outputFormat: structuredTrigger.outputFormat };
+    }
 
     if (!preparationOptions.skipSlashCommand) {
       const slashCommandResult = await this.slashCommandExecutionService?.tryRunSlashCommand(content);
@@ -218,8 +259,9 @@ export class SendPipelineRuntime {
     }
 
     this.messageSendPreparationService.enterStreamingState(preparedSend.tabId);
-    const stream = this.host.sendStreamMessage(content, {
-      sessionId: preparedSend.conversation.openCodeSessionId,
+    const backendSessionId = getConversationBackendSessionId(preparedSend.conversation);
+    const stream = this.host.sendStreamMessage(preparedSend.conversation, content, {
+      sessionId: backendSessionId,
       ...preparedSend.modelOptions,
       ...(preparedSend.resolvedAgentInvocation?.agent
         ? { agent: preparedSend.resolvedAgentInvocation.agent }

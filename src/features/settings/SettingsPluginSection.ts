@@ -11,6 +11,7 @@ import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { createLogger, getVaultBasePath } from '../../shared';
 import { OpencodeConfigModal } from './OpencodeConfigModal';
+import { TextareaSizeMemory } from './TextareaSizeMemory';
 
 const logger = createLogger('SettingsPluginSection');
 
@@ -241,6 +242,7 @@ export class SettingsPluginSection {
         projectPluginEditorEl = text.inputEl;
         text.setPlaceholder(t('settings.plugins.projectConfig.placeholder'));
         text.inputEl.rows = 6;
+        TextareaSizeMemory.attach(text.inputEl, 'plugin-custom-sources');
       })
       .addButton((button) => {
         button

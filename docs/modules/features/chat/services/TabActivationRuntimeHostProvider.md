@@ -54,5 +54,6 @@ export function createTabActivationRuntimeViewHostFactoryHost(
 - `OpenCodianView` 只保留扁平 activation/runtime seam 的 late-bound 实现
 - `TabActivationRuntimeViewHostFactory` 自身负责 conversation-sync fingerprint / loop-control regrouping
 - `TabActivationRuntimeHostProvider` 只负责重新分组，不新增业务逻辑；conversation session settings runtime reapply 也只是作为 conversation-state port 的一部分继续透传
+- **prompt suggestion session sync**：`setCurrentConversation` 在转发给 host 后，通过 `getActiveTabId()` + `getTabMessagesContainer()` 定位当前 tab 的 messages container，再使用 `findPromptSuggestionScope()` 从 DOM 发现对应 coordinator 的 channel，最后经 `emitPromptSuggestionSessionChange(sessionId, channelId)` 推送 session 变更。该机制把 prompt suggestion lifecycle 从 `OpenCodianView` 的 host seam 中移除，完全由 channel bus 承载
 - `TabActivationRuntimeViewHostFactory` 继续负责 shared activation runtime host assembly
 - `TabActivationRuntimeHostAdapter` 继续负责派生 activation / conversation-state / runtime-state bridge hosts

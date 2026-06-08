@@ -10,6 +10,7 @@ const logger = createLogger('ConversationHistoryActionsCoordinator');
 export interface ConversationHistoryActionsHost {
   getConversations(): Conversation[];
   getCurrentConversation(): Conversation | null;
+  getHistoryBackendDisplayName?(): string;
   isActiveTabStreaming(): boolean;
   loadConversation(conversationId: string): Promise<void>;
   getConversationById(conversationId: string): Promise<Conversation | null>;
@@ -18,6 +19,9 @@ export interface ConversationHistoryActionsHost {
   deleteConversationsAndCleanupTabs(conversationIds: string[]): Promise<void>;
   deleteAllConversationsAndReset(conversationIds: string[]): Promise<void>;
   showNotice(message: string): void;
+  openTitleSettings?(): void;
+  /** Open the backend session browser modal. */
+  openBackendSessionBrowserModal?(): void;
 }
 
 export class ConversationHistoryActionsCoordinator {
@@ -51,6 +55,14 @@ export class ConversationHistoryActionsCoordinator {
     const scrollContainer = this.historyDropdownEl.createDiv({
       cls: 'opencodian-history-scroll',
     });
+
+    const scopeLabel = this.host.getHistoryBackendDisplayName?.();
+    if (scopeLabel) {
+      scrollContainer.createDiv({
+        cls: 'opencodian-history-scope',
+        text: t('chat.history.backendScope', { backend: scopeLabel }),
+      });
+    }
 
     let updateDeleteActionText: (() => void) | null = null;
 
@@ -148,6 +160,41 @@ export class ConversationHistoryActionsCoordinator {
     footerEl.createDiv({ cls: 'opencodian-history-separator' });
 
     const actionsEl = footerEl.createDiv({ cls: 'opencodian-history-actions' });
+
+    if (this.host.openTitleSettings) {
+      const titleSettingsEl = actionsEl.createDiv({ cls: 'opencodian-history-action' });
+      const titleSettingsIcon = titleSettingsEl.createSpan({
+        cls: 'opencodian-history-action-icon',
+      });
+      setIcon(titleSettingsIcon, 'settings');
+      titleSettingsEl.createSpan({
+        cls: 'opencodian-history-action-text',
+        text: t('chat.history.titlePreferences'),
+      });
+      titleSettingsEl.addEventListener('click', (innerEvent) => {
+        innerEvent.stopPropagation();
+        this.closeHistoryDropdown();
+        this.host.openTitleSettings!();
+      });
+    }
+
+    if (this.host.openBackendSessionBrowserModal) {
+      const browseEl = actionsEl.createDiv({ cls: 'opencodian-history-action' });
+      const browseIcon = browseEl.createSpan({
+        cls: 'opencodian-history-action-icon',
+      });
+      setIcon(browseIcon, 'server');
+      browseEl.createSpan({
+        cls: 'opencodian-history-action-text',
+        text: t('chat.backendSessions.browseButton'),
+      });
+      browseEl.addEventListener('click', (innerEvent) => {
+        innerEvent.stopPropagation();
+        this.closeHistoryDropdown();
+        this.openBackendSessionBrowser();
+      });
+    }
+
     const deleteTargetEl = actionsEl.createDiv({ cls: 'opencodian-history-action' });
     const deleteTargetIcon = deleteTargetEl.createSpan({
       cls: 'opencodian-history-action-icon',
@@ -215,6 +262,10 @@ export class ConversationHistoryActionsCoordinator {
 
   destroy(): void {
     this.closeHistoryDropdown();
+  }
+
+  private openBackendSessionBrowser(): void {
+    this.host.openBackendSessionBrowserModal?.();
   }
 
   private resolveAnchorElement(event: MouseEvent): HTMLElement | null {

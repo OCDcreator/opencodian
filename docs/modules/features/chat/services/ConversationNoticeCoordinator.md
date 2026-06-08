@@ -30,6 +30,8 @@ export interface ConversationNoticeCoordinatorHost {
   renderBackgroundTaskIndicatorIfNeeded(tabId: TabId | null): Promise<void>;
   handleRestoreRewindRequest(): Promise<void>;
   openPluginSettingsPreservingScroll(): void;
+  hasAnyEnabledBackend(): boolean;
+  hasBackendConnection(): boolean;
 }
 
 export class ConversationNoticeCoordinator {
@@ -48,16 +50,22 @@ export class ConversationNoticeCoordinator {
 ### 空对话与 rewind notice
 
 - `shouldRenderEmptyConversationNotice()` 只读 host 的 rewind 状态
-- `createEmptyConversationNotice()` 根据 rewind 状态返回 normal empty-state 或 rewind warning notice
+- `createEmptyConversationNotice()` 现在会先区分三类 chat surface 空状态：
+  - rewind：保留原有 rewind warning notice
+  - 没有任何 enabled backend：返回 warning notice，引导用户去启用 backend，而不是继续显示“输入消息开始对话”
+  - backend 已启用但当前不可连接：返回 warning notice，引导用户检查 backend / server 设置
+  - 只有在 backend 可用时才回落到普通 empty-state
 
 ### stream error notice
 
 - `createStreamErrorNotice()` 复用 `AssistantNoticeRenderer.buildStreamErrorNotice()`，统一补上当前模型 id
 - `getFriendlyStreamErrorMessage()` 把原始流错误字符串映射为用户友好文案：网络错误 → server connection，opencode not found → binary missing，空消息 → no response，其余 → send failed + 原文
+- Claude Code backend 的 SDK/stream 错误保留 Claude Code 标签，不再被映射成 OpenCode server connection failure，避免用户在 Claude 后端失败时被引导去排查 OpenCode 本地服务。
 
 ### turn diff notice
 
 - `appendTurnDiffNoticeIfNeeded()` 先查当前 session 的 live diff，再回退 cached diff，最后回退 edited file 列表
+- **OpenCode-only diff gate**: `backend !== 'opencode'` 时直接返回。`getSessionDiff` 与 `getCachedSessionDiffEntries` 是 OpenCode-specific API，暂无 backend-neutral 等价物。Claude 等 backend 的 diff surface 未稳定完成前不伪造 diff notice。
 - `formatDiffNoticeMarkdown()` 输出 vault 链接、diff stats 与 status
 - 只有 active tab 才会补发 background task indicator
 
@@ -73,7 +81,7 @@ export class ConversationNoticeCoordinator {
 | `getFriendlyStreamErrorMessage()` | 将原始流错误字符串映射为用户友好文案 |
 | `createStreamErrorNotice()` | 生成 stream error assistant notice |
 | `shouldRenderEmptyConversationNotice()` | 判断是否应显示 empty notice |
-| `createEmptyConversationNotice()` | 生成 normal / rewind empty notice |
+| `createEmptyConversationNotice()` | 生成 normal / rewind / no-backend / backend-offline empty notice |
 | `appendTurnDiffNoticeIfNeeded()` | 为编辑过的文件补发 turn diff notice |
 | `formatDiffNoticeMarkdown()` | 格式化 diff notice markdown |
 | `routeNoticeAction()` | 路由 notice action |

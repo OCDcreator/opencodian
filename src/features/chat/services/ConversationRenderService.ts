@@ -6,7 +6,9 @@ import type {
 import {
   type ChatMessage,
   type Conversation,
+  getConversationBackendSessionId,
 } from '../../../core/types';
+import { TooltipLayerController } from '../../../shared/TooltipLayerController';
 import { summarizeChatMessageForDebug } from '../runtime/SendPipelineDebugSummaries';
 import type { UserMessageContentRenderer } from '../runtime/UserMessageContentRenderer';
 import type { TabId } from '../tabs';
@@ -237,7 +239,7 @@ export class ConversationRenderService {
 
     this.host.logAssistantFinalizationDebug('rerender-conversation-messages-start', {
       conversationId: conversation.id,
-      sessionId: conversation.openCodeSessionId,
+      sessionId: getConversationBackendSessionId(conversation),
       messageCount: resolvedMessages.length,
       tailAssistant: this.host.summarizeChatMessageForDebug(
         [...resolvedMessages].reverse().find((message) => message.role === 'assistant'),
@@ -283,7 +285,7 @@ export class ConversationRenderService {
 
     this.host.logAssistantFinalizationDebug('rerender-conversation-messages-complete', {
       conversationId: conversation.id,
-      sessionId: conversation.openCodeSessionId,
+      sessionId: getConversationBackendSessionId(conversation),
       shouldStickToBottom,
       previousScrollTop,
     });
@@ -384,7 +386,16 @@ export class ConversationRenderService {
     conversation: Conversation,
     fallbackMessages?: ChatMessage[],
   ): ChatMessage[] {
-    const canonicalMessages = this.buildCanonicalRenderMessages(conversation.openCodeSessionId);
+    // Canonical session state is an OpenCode-specific concept (getCanonicalSessionState
+    // returns null for non-OpenCode backends). Gate explicitly so the intent is clear
+    // even though buildCanonicalRenderMessages handles the null case implicitly.
+    const backend = conversation.backend ?? 'opencode';
+    if (backend !== 'opencode') {
+      return fallbackMessages ?? conversation.messages;
+    }
+
+    const sessionId = getConversationBackendSessionId(conversation);
+    const canonicalMessages = sessionId ? this.buildCanonicalRenderMessages(sessionId) : [];
     return canonicalMessages.length > 0 ? canonicalMessages : (fallbackMessages ?? conversation.messages);
   }
 
@@ -462,6 +473,8 @@ export class ConversationRenderService {
     label: string,
     position?: 'bottom' | 'top' | 'right',
   ): void {
+    buttonEl.classList.add('opencodian-tooltip-trigger');
+    TooltipLayerController.ensureForElement(buttonEl);
     buttonEl.setAttribute('data-tooltip', label);
     buttonEl.removeAttribute('title');
     buttonEl.removeAttribute('aria-label');
@@ -479,6 +492,8 @@ export class ConversationRenderService {
   }
 
   static attachTooltipLabel(buttonEl: HTMLElement, label: string): void {
+    buttonEl.classList.add('opencodian-tooltip-trigger');
+    TooltipLayerController.ensureForElement(buttonEl);
     const labelId = `opencodian-tooltip-label-${ConversationRenderService.tooltipLabelId++}`;
     const labelEl = buttonEl.createSpan({
       cls: 'opencodian-visually-hidden',
@@ -502,7 +517,7 @@ export class ConversationRenderService {
 
       const hasStructuredContent = Boolean(
         contentEl.querySelector(
-          '.streaming-text-block, .opencodian-message-text, .streaming-error-block, .streaming-tool-call, .streaming-thinking-block, .opencodian-permission-inline, .opencodian-question-inline, .opencodian-chat-notice-card, .opencodian-pending',
+          '.streaming-text-block, .opencodian-message-text, .streaming-error-block, .streaming-tool-call, .streaming-thinking-block, .opencodian-permission-inline, .opencodian-question-inline, .opencodian-chat-notice-card, .opencodian-pending, .opencodian-structured-output-details',
         ),
       );
       const hasVisibleText = Boolean(contentEl.textContent?.trim());

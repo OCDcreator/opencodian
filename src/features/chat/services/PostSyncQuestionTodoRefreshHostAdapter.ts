@@ -1,9 +1,11 @@
+import { resolveConversationBackendKind } from '../../../core/agents/backend/AgentBackendRouting';
 import type { SessionActivityStatus } from '../../../core/opencode';
 import type {
   Conversation,
   QuestionRequest,
   SessionTodo,
 } from '../../../core/types';
+import { getConversationBackendSessionId } from '../../../core/types';
 import type { TabId } from '../tabs';
 import { PostSyncQuestionTodoRefreshFacade } from './PostSyncQuestionTodoRefreshFacade';
 import {
@@ -54,6 +56,8 @@ export function createPostSyncQuestionTodoRefreshHosts(
     questionTodoStatusRefreshHost: {
       getTabRuntimeState: (tabId: TabId | null) => viewHost.getTabRuntimeState(tabId),
       hasIncompleteTodos: (todos: readonly SessionTodo[]) => viewHost.hasIncompleteTodos(todos),
+      getCurrentConversationBackend: () =>
+        resolveConversationBackendKind(viewHost.getCurrentConversation()),
       refreshPendingQuestionsForTab: (
         tabId: TabId | null,
         sessionId: string | null | undefined,
@@ -70,8 +74,10 @@ export function createPostSyncQuestionTodoRefreshHosts(
       ) => viewHost.refreshTabSessionTodos(tabId, sessionId, options),
     },
     postSyncQuestionTodoRefreshPlanBuilderHost: {
-      getCurrentConversationSessionId: () =>
-        viewHost.getCurrentConversation()?.openCodeSessionId,
+      getCurrentConversationSessionId: () => {
+        const conversation = viewHost.getCurrentConversation();
+        return conversation ? getConversationBackendSessionId(conversation) : undefined;
+      },
     },
   };
 }

@@ -198,6 +198,30 @@ describe('TabViewActivationBridge', () => {
     expect(callOrder).toEqual(['indicator', 'activation-refresh']);
   });
 
+  it('skips OpenCode activation refresh when loaded conversation has no OpenCode session id', async () => {
+    const callOrder: string[] = [];
+    const host = createHost(callOrder);
+    const focusContextPreviewCoordinator = createFocusContextPreviewCoordinator(callOrder);
+    const refreshCoordinator = createRefreshCoordinator(callOrder);
+    const backgroundTaskCoordinator = createBackgroundTaskCoordinator(callOrder);
+    const contextUsageCoordinator = createContextUsageCoordinator(callOrder);
+    const bridge = new TabViewActivationBridge({
+      host,
+      focusContextPreviewCoordinator,
+      questionTodoActivationRefreshCoordinator: refreshCoordinator,
+      backgroundTaskActivationIndicatorCoordinator: backgroundTaskCoordinator,
+      activeTabContextUsageCoordinator: contextUsageCoordinator,
+    });
+
+    await bridge.applyLoadedConversationPostRenderOutcome('tab-1', null);
+
+    expect(backgroundTaskCoordinator.renderLoadedConversationIndicator).toHaveBeenCalledWith(
+      'tab-1',
+    );
+    expect(refreshCoordinator.applyConversationActivation).not.toHaveBeenCalled();
+    expect(callOrder).toEqual(['indicator']);
+  });
+
   it('applies loaded-conversation hydration tail refreshes in order without awaiting the server refresh', async () => {
     const callOrder: string[] = [];
     const host = createHost(callOrder);

@@ -1,4 +1,5 @@
 import type { ChatMessage } from '../../../core/types';
+import { getConversationBackendSessionId } from '../../../core/types';
 import { createLogger } from '../../../shared';
 import type { PreparedMessageSend } from '../services/MessageSendPreparationService';
 import { mapStreamingContentBlocksToMessageContentBlocks } from './sendPipelineContent';
@@ -27,12 +28,19 @@ export async function persistLocalStreamOutcome(options: {
 
   let persistLocalMessage: (() => void) | null = null;
 
-  if (outcome.hasStreamContentBlocks && outcome.streamContentBlocks) {
+  const shouldPersistStructuredOnlyAssistantMessage = outcome.structuredOutput !== undefined;
+  if ((outcome.hasStreamContentBlocks && outcome.streamContentBlocks) || shouldPersistStructuredOnlyAssistantMessage) {
     const shouldPersistAssistantMessage = shouldPersistLocalAssistantMessage(
       outcome,
       runtime,
     );
     if (!shouldPersistAssistantMessage) {
+      await persistBackendSessionIdentityIfNeeded({
+        host,
+        preparedSend,
+        outcome,
+        logAssistantFinalizationStage,
+      });
       logAssistantFinalizationStage('local-assistant-cache-deferred', {
         finalizedAssistantMessageId: outcome.finalizedAssistantMessageId ?? null,
         reason: 'canonical-sync-pending',
@@ -48,8 +56,11 @@ export async function persistLocalStreamOutcome(options: {
       modelId: outcome.finalizedModelId,
       sourceMessageId: outcome.finalizedAssistantMessageId,
       streamState: outcome.shouldPersistInterruptedState ? 'interrupted' : undefined,
-      contentBlocks: mapStreamingContentBlocksToMessageContentBlocks(outcome.streamContentBlocks),
+      contentBlocks: outcome.streamContentBlocks
+        ? mapStreamingContentBlocksToMessageContentBlocks(outcome.streamContentBlocks)
+        : [],
       questionResolution: runtime.pendingQuestionResolution ?? undefined,
+      structured: outcome.structuredOutput,
     };
     logAssistantFinalizationStage('local-assistant-message-built', {
       message: host.summarizeChatMessageForDebug(assistantMessage),
@@ -91,6 +102,12 @@ export async function persistLocalStreamOutcome(options: {
   }
 
   if (!persistLocalMessage) {
+    await persistBackendSessionIdentityIfNeeded({
+      host,
+      preparedSend,
+      outcome,
+      logAssistantFinalizationStage,
+    });
     return;
   }
 
@@ -100,6 +117,12 @@ export async function persistLocalStreamOutcome(options: {
     writeTicket,
     'local-stream-finalization',
     () => {
+      if (outcome.finalizedBackendSessionId) {
+        preparedSend.conversation.backendSessionId = outcome.finalizedBackendSessionId;
+      }
+      if (outcome.resolvedUserMessageIdentity && !preparedSend.userMessage.sourceMessageId) {
+        preparedSend.userMessage.sourceMessageId = outcome.resolvedUserMessageIdentity;
+      }
       persistLocalMessage?.();
       preparedSend.conversation.updatedAt = outcome.finalizedTimestamp;
       preparedSend.conversation.lastResponseAt = outcome.finalizedTimestamp;
@@ -118,6 +141,43 @@ export async function persistLocalStreamOutcome(options: {
     lastResponseAt: preparedSend.conversation.lastResponseAt ?? null,
     messageCount: preparedSend.conversation.messages.length,
   });
+}
+
+async function persistBackendSessionIdentityIfNeeded(options: {
+  host: LocalStreamPersistenceHost;
+  preparedSend: PreparedMessageSend;
+  outcome: LocalStreamOutcome;
+  logAssistantFinalizationStage: (stage: string, payload?: Record<string, unknown>) => void;
+}): Promise<void> {
+  const sessionId = options.outcome.finalizedBackendSessionId;
+  const userMessageIdentity = options.outcome.resolvedUserMessageIdentity;
+  const needsSessionId = sessionId && getConversationBackendSessionId(options.preparedSend.conversation) !== sessionId;
+  const needsUserIdentity = userMessageIdentity && !options.preparedSend.userMessage.sourceMessageId;
+  if (!needsSessionId && !needsUserIdentity) {
+    return;
+  }
+
+  const writeTicket = options.host.createConversationWriteTicket(options.preparedSend.conversation.id);
+  const writeApplied = await options.host.commitConversationWrite(
+    options.preparedSend.conversation,
+    writeTicket,
+    'backend-session-id-finalization',
+    () => {
+      if (needsSessionId) {
+        options.preparedSend.conversation.backendSessionId = sessionId;
+      }
+      if (needsUserIdentity) {
+        options.preparedSend.userMessage.sourceMessageId = userMessageIdentity;
+      }
+    },
+  );
+  options.logAssistantFinalizationStage(
+    writeApplied ? 'backend-session-id-finalized' : 'backend-session-id-finalization-skipped',
+    {
+      backendSessionId: sessionId,
+      resolvedUserMessageIdentity: userMessageIdentity,
+    },
+  );
 }
 
 function shouldPersistLocalAssistantMessage(
@@ -169,7 +229,7 @@ function logInterruptedAssistantPersistence(
   logger.debug(`Persisting interrupted assistant message after stream cancellation: ${host.stringifyLogPayload({
     tabId: preparedSend.tabId,
     conversationId: preparedSend.conversation.id,
-    sessionId: preparedSend.conversation.openCodeSessionId,
+    sessionId: getConversationBackendSessionId(preparedSend.conversation),
     messageId: message.id,
     sourceMessageId: message.sourceMessageId ?? null,
     contentPreview: host.getLogPreview(message.content, 160),
@@ -185,7 +245,7 @@ function logInterruptedNoticePersistence(
   logger.debug(`Persisting interrupted assistant notice because no visible assistant content survived cancellation: ${host.stringifyLogPayload({
     tabId: preparedSend.tabId,
     conversationId: preparedSend.conversation.id,
-    sessionId: preparedSend.conversation.openCodeSessionId,
+    sessionId: getConversationBackendSessionId(preparedSend.conversation),
     noticeId: message.id,
   })}`);
 }

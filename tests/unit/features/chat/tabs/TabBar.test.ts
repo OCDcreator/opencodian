@@ -1,6 +1,7 @@
 import type { TabBarItem, TabBarLayoutMode } from '../../../../../src/features/chat/tabs';
 import { TabBar } from '../../../../../src/features/chat/tabs';
 import { t } from '../../../../../src/i18n';
+import { TooltipLayerController } from '../../../../../src/shared/TooltipLayerController';
 
 function createItems(count: number, activeIndex = 0): TabBarItem[] {
   return Array.from({ length: count }, (_, index) => ({
@@ -32,6 +33,11 @@ function renderTabBar(
 }
 
 describe('TabBar', () => {
+  afterEach(() => {
+    TooltipLayerController.ensureForDocument(document).destroy();
+    document.body.innerHTML = '';
+  });
+
   it('limits header layout to four visible tabs plus overflow', () => {
     const containerEl = renderTabBar(createItems(6, 5), 'header');
 
@@ -134,6 +140,10 @@ describe('TabBar', () => {
     expect(closeEl).not.toBeNull();
     expect(containerEl.querySelector('.opencodian-tab-bar-item')).toBeNull();
     expect(containerEl.querySelector('.opencodian-tab-bar-overflow')).toBeNull();
+    expect(closeEl?.hasAttribute('aria-label')).toBe(false);
+    const hiddenLabel = closeEl?.querySelector<HTMLElement>('.opencodian-visually-hidden');
+    expect(hiddenLabel?.textContent).toBe(t('chat.tab.close'));
+    expect(closeEl?.getAttribute('aria-labelledby')).toBe(hiddenLabel?.id);
 
     closeEl?.click();
 
@@ -162,5 +172,33 @@ describe('TabBar', () => {
     closeEl?.click();
 
     expect(onTabClose).toHaveBeenCalledWith(items[0].id);
+  });
+
+  it('shows tab tooltips through the shared body-level overlay in non-vertical layouts', () => {
+    const containerEl = renderTabBar(createItems(1, 0), 'input');
+    document.body.appendChild(containerEl);
+    const tabEl = containerEl.querySelector<HTMLButtonElement>('.opencodian-tab-bar-item');
+
+    Object.defineProperty(tabEl as HTMLButtonElement, 'getBoundingClientRect', {
+      configurable: true,
+      value: () => ({
+        left: 120,
+        top: 72,
+        right: 260,
+        bottom: 104,
+        width: 140,
+        height: 32,
+        x: 120,
+        y: 72,
+        toJSON: () => '',
+      }),
+    });
+
+    tabEl?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+
+    const overlay = document.body.querySelector<HTMLElement>('.opencodian-tooltip-layer');
+    expect(overlay).not.toBeNull();
+    expect(overlay?.textContent).toContain('Tab 1');
+    expect(containerEl.contains(overlay)).toBe(false);
   });
 });

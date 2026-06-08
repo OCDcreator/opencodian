@@ -14,6 +14,7 @@
 ```text
 上游:
 - `src/core/storage/index.ts` (`SettingsLoadResult`)
+- `src/core/agents/backend/index.ts` (`IMPLEMENTED_AGENT_BACKENDS`)
 - `src/core/theme/*`
 - `src/core/types/settings.ts`
 
@@ -25,7 +26,7 @@
 
 - `LoadedSettingsSnapshot`: 合并 `settings.core.json` / `settings.ui.json` 后的临时快照，同时兼容 legacy flat server 与废弃字段。
 - `LoadSettingsNormalizationContext`: 聚合 server/theme/chat appearance/tab/input-panel 的归一化结果，供最终 settings 装配复用。
-- `LoadSettingsBootstrapState`: `prepareLoadedSettingsBootstrapState()` 的返回值，包含 `settings`、原始 `persistedSettings` 以及 `shouldPersistNormalizedSettings` 判定。
+- `LoadSettingsBootstrapState`: `prepareLoadedSettingsBootstrapState()` 的返回值，包含 `settings`、原始 `persistedSettings`、migration flags 以及 `shouldPersistNormalizedSettings` 判定。
 
 ## 核心逻辑
 
@@ -34,10 +35,12 @@
 唯一公开入口，完成：
 
 1. 合并分层持久化快照；
-2. 归一化 server/theme/chat appearance/input-panel/question/debug 等启动设置；
+2. 归一化 server/theme/chat appearance/input-panel/question/debug/backend/tabbed-layout 等启动设置；
 3. 计算 legacy local port 与 glass defaults migration 是否命中；
 4. 生成最终 `OpenCodianSettings`；
 5. 决定本次启动是否需要把归一化结果立即写回磁盘。
+
+最终 settings merge 会用 `IMPLEMENTED_AGENT_BACKENDS` 过滤 `enabledBackends`，并在 `activeBackend` 不在 enabled 列表中时回退到第一个 enabled backend。当前实现只保留 `opencode`，避免旧快照或手写设置启用尚未接入的 backend。`backendSettings.claudeCode` 仍会归一化并持久保留，作为隐藏 foundation，不能因此把 Claude 暴露成已实现 backend。
 
 ### server / theme / input-panel 迁移
 
@@ -48,8 +51,10 @@
 ## 与其他模块的交互
 
 - 依赖 `settings.ts` 的 `normalize*` / `getDefault*` 工具函数，但不把这些纯函数重新包装成新的 facade。
+- Claude Code backend settings 在启动期通过 `normalizeBackendSettings()` 清洗：`settingSources` 默认 `['project']`，显式空数组保留为空，invalid permission/thinking/effort/additionalDirectories 回退安全默认。
 - 会话标签启用状态通过 `normalizeTabsEnabled()` 在启动快照构建阶段清洗一次，只有持久化值明确为 `false` 才禁用；最终 settings merge 直接使用该归一化结果或默认值，避免重复清洗和历史设置误关标签入口。
 - 依赖 `core/theme` 的 preset 解析与 appearance override 计算，确保 theme startup 顺序与原逻辑一致。
+- 依赖 `core/agents/backend` 的 `IMPLEMENTED_AGENT_BACKENDS` 清洗 backend 设置，使新安装和旧设置都只落到已实现 backend。
 - 被 `main.ts` 调用后，`loadSettings()` 只负责状态落位、可写性标记与必要的持久化回写。
 
 ## 注意事项
@@ -74,6 +79,6 @@ Ownership facts:
 - If settings exist (existing user) but no explicit layout mode, default to `'classic'` to avoid forced migration
 - If no saved settings at all (fresh install), return the `DEFAULT_SETTINGS` value (`'tabbed'`)
 
-`normalizeLoadedPluginSettings()` now also normalizes `settingsTabbedPrimaryTab` (with `'server'` fallback) and `settingsTabbedSecondaryTabByPrimary` from saved snapshots during bootstrap. This bootstrap path also migrates legacy dual-layout memory from `language` to `general`, so old saved `{ settingsTabbedPrimaryTab: 'language', settingsTabbedSecondaryTabByPrimary: { language: 'general' } }` becomes `general -> language`.
+`normalizeLoadedPluginSettings()` now also normalizes `settingsTabbedPrimaryTab` (with `'server'` fallback) and `settingsTabbedSecondaryTabByPrimary` from saved snapshots during bootstrap.
 
 It also migrates the old `Server > MCP` remembered location into the new top-level `MCP` tab. A saved snapshot like `{ settingsTabbedPrimaryTab: 'server', settingsTabbedSecondaryTabByPrimary: { server: 'mcp' } }` now becomes `settingsTabbedPrimaryTab: 'mcp'` with `settingsTabbedSecondaryTabByPrimary.mcp = 'overview'`.

@@ -81,6 +81,7 @@ export interface SendPipelineViewPort {
 
 export interface SendPipelineTransportPort {
   sendStreamMessage(
+    conversation: Conversation,
     content: string,
     options: SendMessageModelOptions & {
       sessionId?: string;
@@ -88,6 +89,8 @@ export interface SendPipelineTransportPort {
       contextItems: PromptContextItem[];
       messageID: PreparedMessageSend['messageID'];
       requestParts: PreparedMessageSend['requestParts'];
+      /** One-shot structured-output schema for Claude Code `/json` trigger. Not persisted. */
+      outputFormat?: Record<string, unknown>;
     },
   ): AsyncGenerator<CoreStreamChunk>;
   detachStream(sessionId: string | undefined): void;
@@ -129,6 +132,10 @@ export interface SendPipelineShellPort {
     modelId?: string;
     statusLabel?: string;
   }): void;
+  renderStructuredOutputIfPresent(
+    messageEl: HTMLElement,
+    structuredOutput: unknown,
+  ): void;
 }
 
 export interface SendPipelinePersistencePort {
@@ -190,7 +197,7 @@ export type StreamChunkRouterHost =
 
 export type StreamShellFinalizerHost = Pick<
   SendPipelineShellPort,
-  'addTimestampWithCopyButton' | 'renderAssistantPlaceholderAsNotice'
+  'addTimestampWithCopyButton' | 'renderAssistantPlaceholderAsNotice' | 'renderStructuredOutputIfPresent'
 >;
 
 export type LocalStreamPersistenceHost =
@@ -223,6 +230,8 @@ export interface SendPipelineTraceState {
   streamTimedOut: boolean;
   latestErrorMessage: string | null;
   finalizedAssistantMetadata: Extract<CoreStreamChunk, { type: 'message_metadata' }> | null;
+  finalizedBackendSessionId: string | null;
+  resolvedUserMessageIdentity: string | null;
 }
 
 export interface StreamChunkRouterOptions {
@@ -238,12 +247,14 @@ export interface StreamChunkRouterResult extends SendPipelineTraceState {
   logAssistantFinalizationStage(stage: string, payload?: Record<string, unknown>): void;
   resetStreamingState(): void;
   cleanupPendingIndicator(): void;
+  structuredOutput?: unknown;
 }
 
 export interface LocalStreamOutcome {
   finalizedTimestamp: number;
   finalizedModelId: string | undefined;
   finalizedAssistantMessageId: string | undefined;
+  finalizedBackendSessionId: string | undefined;
   finalizedStreamingMessageEl: HTMLElement | null;
   streamContentBlocks: StreamingContentBlock[] | undefined;
   streamedTextContent: string;
@@ -252,6 +263,8 @@ export interface LocalStreamOutcome {
   streamErrorNoticeMessage: ChatMessage | null;
   interruptedNoticeMessage: ChatMessage | null;
   shouldSyncFromServer: boolean;
+  structuredOutput?: unknown;
+  resolvedUserMessageIdentity: string | null;
 }
 
 export interface StreamLocalFinalizerOptions {

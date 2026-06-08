@@ -15,6 +15,7 @@ import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { SettingsAcpSection } from './SettingsAcpSection';
 import { SettingsAgentsSection } from './SettingsAgentsSection';
+import { SettingsClaudeCodeSection } from './SettingsClaudeCodeSection';
 import { SettingsCommandsSection } from './SettingsCommandsSection';
 import { SettingsConversationSection } from './SettingsConversationSection';
 import { SettingsDebugSection } from './SettingsDebugSection';
@@ -66,6 +67,7 @@ export class OpenCodianSettingsView extends ItemView {
   private uiSection: SettingsUiSection | null = null;
   private debugSection: SettingsDebugSection | null = null;
   private serverSection: SettingsServerSection | null = null;
+  private claudeCodeSection: SettingsClaudeCodeSection | null = null;
   private mcpSection: SettingsMcpSection | null = null;
   private securitySection: SettingsSecuritySection | null = null;
   private formatterSection: SettingsFormatterSection | null = null;
@@ -163,6 +165,7 @@ export class OpenCodianSettingsView extends ItemView {
     containerEl.dataset.settingsLayoutMode = 'classic';
 
     this.renderClassicGeneralSection(containerEl);
+    this.addClaudeCodeSettings(containerEl);
     this.addServerSettings(containerEl);
     this.addModelSettings(containerEl);
     this.addConversationSettings(containerEl);
@@ -333,6 +336,14 @@ export class OpenCodianSettingsView extends ItemView {
     });
     this.serverSection = serverSection;
     serverSection.attach(containerEl);
+  }
+
+  private addClaudeCodeSettings(containerEl: HTMLElement): void {
+    this.claudeCodeSection ??= new SettingsClaudeCodeSection({
+      plugin: this.plugin,
+      createSectionHeading: (hostEl, title, tooltip) => this.createSectionHeading(hostEl, title, tooltip),
+    });
+    this.claudeCodeSection.attach(containerEl);
   }
 
   private addMcpSettings(containerEl: HTMLElement): void {
@@ -514,11 +525,13 @@ export class OpenCodianSettingsView extends ItemView {
     this.mcpSection?.dispose();
     this.securitySection?.dispose();
     this.formatterSection?.dispose();
+    this.userSection?.dispose();
     this.userSection = null;
     this.serverSection = null;
     this.mcpSection = null;
     this.securitySection = null;
     this.formatterSection = null;
+    this.claudeCodeSection = null;
     this.refreshModelCatalogStatusCallback = undefined;
   }
 

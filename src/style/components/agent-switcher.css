@@ -1,0 +1,170 @@
+.opencodian-settings-tabbed {
+  position: relative;
+}
+
+.opencodian-agent-switcher-hover-zone {
+  display: none;
+}
+
+.opencodian-agent-switcher-floating {
+  position: fixed;
+  left: var(--opencodian-agent-switcher-fixed-left, 0);
+  top: 50%;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 4px;
+  padding: 6px 0;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--background-modifier-border-hover) 56%, transparent);
+  border-left: 0;
+  border-radius: 0 10px 10px 0;
+  background: color-mix(in srgb, var(--background-secondary) 92%, transparent);
+  box-shadow:
+    inset 1px 0 0 color-mix(in srgb, var(--background-primary) 42%, transparent),
+    0 8px 18px color-mix(in srgb, var(--text-normal) 8%, transparent);
+  opacity: 0.72;
+  pointer-events: auto;
+  transform: translateY(-50%);
+  transition:
+    width 180ms cubic-bezier(0.22, 1, 0.36, 1),
+    padding 180ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 140ms ease,
+    background 140ms ease,
+    border-color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.opencodian-agent-switcher-floating:hover,
+.opencodian-agent-switcher-floating:focus-within {
+  width: 40px;
+  padding: 6px 3px;
+  opacity: 1;
+  border-color: color-mix(in srgb, var(--interactive-accent) 34%, var(--background-modifier-border-hover));
+  background: color-mix(in srgb, var(--background-secondary) 98%, transparent);
+  box-shadow:
+    inset 1px 0 0 color-mix(in srgb, var(--background-primary) 54%, transparent),
+    0 10px 22px color-mix(in srgb, var(--text-normal) 12%, transparent);
+}
+
+.opencodian-agent-switcher-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-normal);
+  cursor: pointer;
+  opacity: 0;
+  transform: translateX(-8px);
+  transition:
+    opacity 120ms ease,
+    transform 160ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 150ms ease,
+    background 150ms ease,
+    border-color 150ms ease;
+}
+
+.opencodian-agent-switcher-floating:hover .opencodian-agent-switcher-icon,
+.opencodian-agent-switcher-floating:focus-within .opencodian-agent-switcher-icon {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.opencodian-agent-switcher-icon:hover {
+  background: color-mix(in srgb, var(--background-modifier-hover) 70%, transparent);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--text-normal) 10%, transparent);
+  transform: translateX(0) translateY(-1px);
+}
+
+.opencodian-agent-switcher-icon:active {
+  transform: scale(0.95);
+}
+
+.opencodian-agent-switcher-icon.opencodian-agent-switcher-clicked {
+  animation: agent-icon-click 220ms ease;
+}
+
+.opencodian-agent-switcher-icon.opencodian-agent-switcher-selected {
+  border-color: color-mix(in srgb, var(--interactive-accent) 42%, var(--background-modifier-border-hover));
+  background: color-mix(in srgb, var(--interactive-accent) 12%, var(--background-secondary-alt));
+}
+
+.opencodian-agent-switcher-icon--lobehub svg {
+  display: none;
+}
+
+.opencodian-agent-switcher-lobehub-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  pointer-events: none;
+}
+
+.opencodian-agent-switcher-lobehub-img {
+  display: block;
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+}
+
+.opencodian-agent-switcher-lobehub-img--dark {
+  display: none;
+}
+
+body.theme-dark .opencodian-agent-switcher-lobehub-img--light {
+  display: none;
+}
+
+body.theme-dark .opencodian-agent-switcher-lobehub-img--dark {
+  display: block;
+}
+
+.opencodian-agent-switcher-icon.entering {
+  animation: none;
+}
+
+@keyframes agent-icon-click {
+  0% { transform: scale(0.95); }
+  60% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+
+.opencodian-agent-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 0;
+}
+
+.opencodian-agent-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 16px;
+  background: var(--background-secondary);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 12px;
+  transition: background 150ms ease, color 150ms ease;
+}
+
+.opencodian-agent-chip:hover {
+  background: var(--background-secondary-alt);
+}
+
+.opencodian-agent-chip.opencodian-agent-chip-selected {
+  border-color: var(--interactive-accent);
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}

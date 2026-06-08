@@ -5,7 +5,7 @@
 
 ## 概述
 
-`SlashCommandExecutionService` 是 chat-side slash command execution owner。它拦截 composer 里以 `/` 开头的输入，为当前 runtime 已注册的 backend slash commands 接管执行，并把真正的 session command 调用继续委托给 `OpenCodeService.runSessionCommand()`。project config 仍会参与 override语义判断，但单独存在于 `.opencode/opencode.json` 的 command 不会在 runtime 注册前被当作可执行命令；`.opencode/commands/**/*.md` markdown command 则在没有同名 runtime/project command 时展开为普通 prompt 发送。
+`SlashCommandExecutionService` 是 chat-side slash command execution owner。它拦截 composer 里以 `/` 开头的输入，为当前 runtime 已注册的 OpenCode slash commands 接管执行，并把真正的 session command 调用继续委托给 `OpenCodeService.runSessionCommand()`。project config 仍会参与 override语义判断，但单独存在于 `.opencode/opencode.json` 的 command 不会在 runtime 注册前被当作可执行命令；`.opencode/commands/**/*.md` markdown command 则在没有同名 runtime/project command 时展开为普通 prompt 发送。
 
 这层 owner 当前只覆盖：
 
@@ -33,22 +33,20 @@ export interface SlashCommandExecutionHostDependencies { /* flat view deps */ }
 export class SlashCommandExecutionService {
   tryRunSlashCommand(content: string): Promise<boolean>;
 }
-
-export function createSlashCommandExecutionHost(
-  deps: SlashCommandExecutionHostDependencies,
-): SlashCommandExecutionHost;
-
-export function executeCompactSession(...): Promise<boolean>;
 ```
 
+- `SlashCommandExecutionHost` 现在还包含可选 `getCurrentConversation?(): Conversation | null`，用于在执行前读取当前 conversation owner/backend。
 - 返回 `true`：当前输入已经被当作 slash command 消费（包括 ready/busy/error path）
 - 返回 `false`：当前输入不属于已知 slash command，调用方继续走普通 chat send pipeline
+
+> `createSlashCommandExecutionHost` 与 `executeCompactSession` 已提取到 `SlashCommandExecutionHostFactory.ts`。
 
 ## 关键行为
 
 ### command 识别
 
 - 非 `/` 前缀输入（不包含行中 `/command`）直接返回 `false`
+- 如果 `getCurrentConversation()?.backend === 'claude-code'`，`tryRunSlashCommand()` 会在解析前直接返回 `false`，让 `/command` 原文落回普通发送路径；Claude Code 会在自己的 backend runtime 中原生处理这些 `/` 命令
 - `//` 与 `/ ` 这种非命令输入也直接放回普通消息路径
 - **行首 `/command`**：原有行为不变，`trimmedContent.startsWith('/')` 路径
 - **行中 `/command`**（空白后的 `/command`，例如 `"请帮我 /review src/app.ts"`）：`parseSlashCommandInput()` 使用全局正则匹配并取最后一个匹配项，提取 command 和 arguments；**行中命令现在始终 fall through 到 prompt 路径**（返回 `false`），不会作为 slash command 执行——前导文字的存在意味着用户意图是普通消息而非命令
@@ -59,22 +57,24 @@ export function executeCompactSession(...): Promise<boolean>;
 - project config 只用于识别“这个 runtime command 是否同时存在 project override”，不会让 runtime 未注册的 command 提前执行
 - markdown command 只在 runtime command 不存在且 project config 没有同名 command 时接管；因此 `.opencode/commands/*.md` 不会覆盖 JSON/runtime command
 - runtime catalog 会过滤掉 `source === 'mcp'` 的条目
+- `tryRunSlashCommand()` 带有 justified complexity suppression（23 branches over known command dispatch paths in one auditable method）
 - `slashCommandSkillMode === 'direct'` 时，runtime `source === 'skill'` 可以直接用 `/skill-id arguments` 执行
 - `slashCommandSkillMode === 'skills-command'` 时，直接 `/skill-id` 不接管；只有 `/skills skill-id arguments` 会映射为真实 `session.command({ command: 'skill-id' })`
 - 如果某个 runtime command 同时也有 project override，direct `/command` 仍按该 runtime command 执行，不会被 `/skills` 前缀规则错误降级
-- `/compact` 是 synthetic command：只在没有同名 project override 且 runtime catalog 未提供非内置条目时消费，先经过 server readiness 与当前 tab busy gate，再用当前 OpenCode session 调用 view host 的 manual compaction seam；无 active session 时显示专用 notice
+- `/compact` 是 OpenCode-only synthetic command：只在没有同名 project override 且 runtime catalog 未提供非内置条目时消费，先经过 server readiness 与当前 tab busy gate，再用当前 OpenCode session 调用 view host 的 manual compaction seam；无 active OpenCode session 或非 OpenCode backend 时显示专用 no-session notice
 - `/undo`、`/redo`、`/new`、`/share`、`/unshare` 是额外的 synthetic builtin commands，与 `/compact` 共享同一条检测路径：只在没有同名 project override 且 runtime 未提供非内置条目时走插件内置逻辑
-  - `/undo`：查找当前会话最后一条用户消息的 `sourceMessageId`，调用 `revertSession()` 撤销，成功后触发 background sync
-  - `/redo`：调用 `unrevertSession()` 重做，成功后触发 background sync
+  - `/undo`：查找当前会话最后一条用户消息的 `sourceMessageId`，调用 `revertSession()` 撤销，成功后触发 background sync；无 conversation / 无 session / 非 opencode backend / 无 sourceMessageId 各路径均显示对应 notice 并提前返回
+  - `/redo`：调用 `unrevertSession()` 重做，成功后触发 background sync；与 `/undo` 共享一致的 `!conversation` null guard、backend gate 和 error-catch notice 模式
   - `/new`：调用 `createNewConversation()` 创建新会话
-  - `/share`：调用 `shareSession()` 分享，成功后将 URL 复制到剪贴板
-  - `/unshare`：调用 `unshareSession()` 取消分享
-- 所有 synthetic builtin 的 host 方法在 `createSlashCommandExecutionHost()` 工厂中从 `deps.openCodeService` 直接映射，不需要 `OpenCodianView` 提供额外辅助方法
+  - `/share`：仅对 OpenCode conversation 调用 `shareSession()` 分享，成功后将 URL 复制到剪贴板；非 OpenCode backend 即使存在 `backendSessionId` 也显示 no-session notice 并提前返回
+  - `/unshare`：仅对 OpenCode conversation 调用 `unshareSession()` 取消分享；非 OpenCode backend 即使存在 `backendSessionId` 也显示 no-session notice 并提前返回
+- 所有 synthetic builtin 的 host 方法在 `SlashCommandExecutionHostFactory.createSlashCommandExecutionHost()` 工厂中从 `deps.openCodeService` 直接映射，不需要 `OpenCodianView` 提供额外辅助方法
 
 ### 执行前 gate
 
 - 先复用现有 server readiness / badge refresh seam，保证任何需要 runtime catalog truth 的 slash command 场景都能拉起服务
 - 再复用现有 conversation/tab/foreground busy gate，避免和前台 busy/retry 状态打架
+- 普通 runtime/project command 与 `/skills skill-id ...` prefixed skill dispatch 都是 OpenCode-only：如果当前 conversation 的 `backend !== 'opencode'`，即使存在 `backendSessionId`，也会消费命令、走现有 slash failure notifier，并且不会调用 `runSessionCommand()`、`startConversationSyncLoop()` 或 visible background sync
 - foreground busy 时只走现有 blocked notice，不会退回普通发送路径
 
 ### runtime placeholder context
@@ -100,8 +100,11 @@ export function executeCompactSession(...): Promise<boolean>;
   - 先问 `SlashCommandExecutionService.tryRunSlashCommand()`
   - 如果返回 `false`，再继续普通 `prepareMessageSend()` + streaming pipeline
 - markdown command 会通过 `runMdFileCommandAsMessage()` 重新进入 send pipeline，并设置 skip-slash 标志避免 template 以 `/` 开头时再次递归拦截
-- slash command 真正执行仍走 `OpenCodeService.runSessionCommand()` / `session.command`；执行后的 visible follow-up sync 复用 `ConversationSyncBridge.syncVisibleConversationInBackground()`，因此会优先从 canonical session graph 投影，canonical 缺失时才通过 server read 回填 canonical snapshot
-- `/compact` 不属于普通 slash command runtime：`executeCompactSession()` 负责 provider/model resolution、start/success/failure notice 和 `OpenCodeService.summarizeSession(sessionId, providerID, modelID, false)` 调用，view host 只传入当前 model resolver 与 service 引用
+- OpenCode conversation 的 runtime/project slash command 真正执行仍走 `OpenCodeService.runSessionCommand()` / `session.command`；执行后的 visible follow-up sync 复用 `ConversationSyncBridge.syncVisibleConversationInBackground()`，因此会优先从 canonical session graph 投影，canonical 缺失时才通过 server read 回填 canonical snapshot
+- Claude Code conversation 的 slash text 不在本 service 中消费；它会返回 `false` 交给 raw send，避免把 Claude 原生 `/` 命令误路由到 OpenCode-only `session.command()`
+- dispatch runtime/project command 前会先确认 `conversation.backend ?? 'opencode'` 是 `opencode`，再用 `getConversationBackendSessionId()` 解析 session identity；没有 OpenCode backend 或没有 backend session id 时返回 command failure，不会创建 queued prompt 或误调用 OpenCode session command。
+- **OpenCode-only synthetic command gates**: `/compact`、`/undo`、`/redo`、`/share` 与 `/unshare` 在 `backend !== 'opencode'` 时直接返回 no-session notice。compact / summarize、revert / unrevert 与 share / unshare writes 目前仍是 OpenCode-only 能力，Claude 等 backend 暂不提供稳定支持。
+- `/compact` 不属于普通 slash command runtime：`SlashCommandExecutionHostFactory.executeCompactSession()` 负责 provider/model resolution、start/success/failure notice 和 `OpenCodeService.summarizeSession(sessionId, providerID, modelID, false)` 调用，view host 只传入当前 model resolver 与 service 引用
 - `session.command` 的返回值不在这层另起一套本地 projector：正常情况下后续 sync event 已写入 canonical graph；如果 command 刚返回但 sync event 尚未投影，visible follow-up sync 会按 canonical-miss fallback 做一次 server gap recovery
-- `OpenCodianView` 只负责提供扁平依赖，不持有 slash command host 装配逻辑；host 回调装配由 `createSlashCommandExecutionHost()` 工厂函数完成，view 只传递原始 service 引用和简单 lambda
-- synthetic builtin commands（`/compact`、`/undo`、`/redo`、`/new`、`/share`、`/unshare`）的 host 方法（`revertSession`、`unrevertSession`、`shareSession`、`unshareSession`、`createNewConversation`）直接从 `deps.openCodeService` 和 `deps.createNewConversation` 映射，不经过 view 层新增方法
+- `OpenCodianView` 只负责提供扁平依赖，不持有 slash command host 装配逻辑；host 回调装配由 `SlashCommandExecutionHostFactory.createSlashCommandExecutionHost()` 工厂函数完成，view 只传递原始 service 引用和简单 lambda
+- synthetic builtin commands 的 host seam 保持扁平：`/compact` 通过 `deps.runCompactSession` 进入 `executeCompactSession()`，`/undo`、`/redo`、`/share`、`/unshare` 与 `/new` 分别从 `deps.openCodeService` 和 `deps.createNewConversation` 映射，不经过 view 层新增方法

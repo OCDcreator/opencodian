@@ -28,6 +28,13 @@ export class ConversationSyncVisiblePostSyncRouter {
 
 ## 关键行为
 
+### Backend gate: OpenCode-only question/todo refresh
+
+- `routeVisibleSyncComplete()` 在调用 `VisibleConversationPostSyncCoordinator` 前检查 `conversation.backend`
+- 对于非 OpenCode 后端（如 `claude-code`），直接执行 `applySyncedConversationUpdate()` 并跳过 question/todo 刷新
+- Question/todo 是 OpenCode server 独有的 API，不是跨后端通用 contract
+- Session identity 通过 `getConversationBackendSessionId()` 解析，而非直接访问 `openCodeSessionId`
+
 ### visible post-sync routing
 
 - 保留 runtime/orchestration 已经确定好的 `tabId` 与 visible conversation

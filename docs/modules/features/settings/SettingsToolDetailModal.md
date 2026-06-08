@@ -21,6 +21,7 @@
 - `validateToolSource()` 执行轻量校验：文件名必须是小写字母/数字加连字符或下划线，内容不能为空，并且包含 `tool(...)` 或 `execute` 函数。
 - `save()` 通过 `plugin.app.vault.adapter.write()` 写回项目相对路径，并触发 `onSaved()` 刷新父 section。
 - `delete()` 先弹出确认，再通过 `adapter.remove()` 删除项目工具文件，并触发父 section 刷新。
+- `save()` / `delete()` 是 OpenCode-owned 项目工具写操作，会在执行前重新检查 active backend。若 modal 打开后切到 Claude Code，stale Save/Delete 只显示 Tools OpenCode-only Notice，不写入或删除 `.opencode/tools`，也不触发父 section 的 refresh/restart callback。
 
 ## 依赖
 

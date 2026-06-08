@@ -65,6 +65,7 @@
 ## 注意事项
 
 - 该 section 只编辑 OpenCode `permission` 配置并装配项目工具定义文件入口，不直接执行工具权限判断或加载工具。
+- 该 section 是 OpenCode-owned 设置面板；权限下拉、项目工具新建/打开/删除以及写入后的本地服务重启都会在执行前重新检查 active backend。若页面在 OpenCode active 时挂载后切到 Claude Code，stale callback 只显示 OpenCode-only Notice，不写 `.opencode`、不调用 `saveSettings()`，也不触发 OpenCode restart。
 - 自定义工具文件可离线管理；运行时 custom tool 列表依赖 OpenCode catalog，服务器未启动时可能为空。
 - 全局工具目录只读，避免一个 vault 的设置页意外修改用户级工具。
 - `getCatalogStore()` 通过可选 runtime seam 读取 catalog store，避免强绑定插件公开类型。

@@ -14,12 +14,14 @@
 - `addNumericControl()` 同时装配 step button、range slider、自由 number input 与单项 reset
 - slider 拖拽期间只更新草稿显示，不立刻提交；`change` 时才提交最终值
 - number input 允许自由输入小数，只在草稿稳定后提交，并保留未完成的 `8.` / `-` / `1e` 这类编辑状态
+- reset 按钮的提示使用 `data-settings-tooltip` 属性（`SettingsTooltipController` body-level overlay），替代了原来的 `resetBtn.setAttribute('title', ...)`
 
 ### Color control 语义
 
 - `addColorStyleControl()` 统一提供预览按钮、Pick、Follow theme 与隐藏 `input[type=color]`
 - 颜色只在 picker `change` 时提交，不会在 `input` 阶段提前写回 settings
 - `resolveCssColorToHex()` 会临时挂载 probe element，把 CSS 变量 / 主题色解析成 color input 可用的十六进制值
+- 颜色预览按钮和色值显示的提示使用 `data-settings-tooltip` 属性，替代了原来的 `setAttribute('title', ...)`，跟随主题状态动态更新
 
 ### Binding 与 reset
 
@@ -42,6 +44,7 @@
 - `SettingsStyleSection.ts`: 持有该 owner，并把其能力分发给 layout/user/assistant/scrollbar/advanced 以及相邻 subsection owners
 - `SettingsStyleBackgroundSection.ts`: 复用 numeric style control 合约渲染 background sliders
 - `SettingsStyleInputPanelSection.ts` / `SettingsStyleLiquidGlassInputControls.ts`: 复用 numeric control / help-button 合约渲染 input-panel 数值参数
+- `SettingsTooltipController`: 提供 reset 按钮、颜色预览和色值的 body-level tooltip overlay
 - `OpenCodianPlugin`: 提供 `updateChatAppearance()`、group reset、apply/save 等设置写回能力
 
 ## 注意事项

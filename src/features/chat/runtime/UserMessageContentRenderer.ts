@@ -9,6 +9,7 @@ import {
 
 export interface UserMessageContentRendererHost {
   getRenderUserMarkupAsCodeBlocks(): boolean;
+  hasCompactionCapability(): boolean;
   renderMarkdownInto(container: HTMLElement, markdown: string): Promise<void>;
   scheduleActiveSettledScrollToBottomIfNeeded(): void;
   openContextAttachment(path: string): void;
@@ -18,6 +19,10 @@ export class UserMessageContentRenderer {
   constructor(private readonly host: UserMessageContentRendererHost) {}
 
   renderCompactionDivider(messageEl: HTMLElement, divider: CompactionDividerMeta): void {
+    if (!this.host.hasCompactionCapability()) {
+      return;
+    }
+
     const lineEl = messageEl.createDiv({ cls: 'opencodian-compaction-divider-line' });
 
     if (divider.live) {

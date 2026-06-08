@@ -1,6 +1,7 @@
 import { setIcon } from 'obsidian';
 
 import type { ResolvedModelSelection } from '../../../core/config/modelConfig';
+import type { ClaudeCodePermissionMode } from '../../../core/types/settings';
 import type { PermissionMode } from '../../../core/types/settings';
 import { t } from '../../../i18n';
 import { buildModelSelectorDisplayState } from '../ui/modelSelector/ModelSelectorDisplay';
@@ -16,27 +17,96 @@ import type {
   ModelSelectorProvider,
   ModelSelectorSelection,
 } from '../ui/modelSelector/types';
+import { AdditionalDirectoriesConfigBadgeCoordinator } from './AdditionalDirectoriesConfigBadgeCoordinator';
 import {
   ModelSelectionRuntime,
   type ModelSelectionRuntimeHost,
   type ModelUnavailableNoticeContent,
 } from './ModelSelectionRuntime';
-import { PermissionModeSelectorCoordinator } from './PermissionModeSelectorCoordinator';
+import {
+  createClaudeCodePermissionConfig,
+  createOpenCodePermissionConfig,
+  PermissionModeSelectorCoordinator,
+} from './PermissionModeSelectorCoordinator';
+import { SandboxConfigBadgeCoordinator } from './SandboxConfigBadgeCoordinator';
 
 export interface ChatSelectionControlsCoordinatorHost extends ModelSelectionRuntimeHost {
   registerEscapeHandler(handler: () => boolean): void;
   resolveProviderIconUrl(providerId: string): Promise<string | null>;
   updateEffortSelectorDisplay(): void;
+  /** OpenCode permission template mode (yolo/normal/plan). */
   getPermissionMode(): PermissionMode;
   switchPermissionMode(mode: PermissionMode): Promise<void>;
 }
 
 const MODEL_SEARCH_PLACEHOLDER = 'Search models...';
+const CLAUDE_CODE_PERMISSION_MODES: readonly ClaudeCodePermissionMode[] = [
+  'default', 'acceptEdits', 'bypassPermissions', 'plan',
+];
+
+interface LiveOpenCodianPlugin {
+  settings?: {
+    activeBackend?: string;
+    backendSettings?: { claudeCode?: { permissionMode?: ClaudeCodePermissionMode } };
+  };
+  saveSettings?: () => Promise<void>;
+  agentServiceRegistry?: { get?: (backend: string) => unknown };
+}
+
+/**
+ * Read the live plugin instance from Obsidian globals. This keeps backend-aware
+ * permission UI ownership inside this selector coordinator instead of adding
+ * new runtime ownership to the guarded OpenCodianView.ts shell.
+ */
+function readOpenCodianPlugin(): LiveOpenCodianPlugin | null {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (globalThis as any).app?.plugins?.plugins?.opencodian ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function readActiveBackendFromPlugin(): string {
+  return readOpenCodianPlugin()?.settings?.activeBackend ?? 'opencode';
+}
+
+function normalizeClaudeCodePermissionMode(value: ClaudeCodePermissionMode | undefined): ClaudeCodePermissionMode {
+  return value && CLAUDE_CODE_PERMISSION_MODES.includes(value)
+    ? value
+    : 'default';
+}
+
+function readClaudeCodePermissionModeFromPlugin(): ClaudeCodePermissionMode {
+  return normalizeClaudeCodePermissionMode(
+    readOpenCodianPlugin()?.settings?.backendSettings?.claudeCode?.permissionMode,
+  );
+}
+
+async function switchClaudeCodePermissionModeInPlugin(mode: ClaudeCodePermissionMode): Promise<void> {
+  const plugin = readOpenCodianPlugin();
+  const claudeSettings = plugin?.settings?.backendSettings?.claudeCode;
+  if (!plugin || !claudeSettings) {
+    return;
+  }
+
+  claudeSettings.permissionMode = mode;
+  await plugin.saveSettings?.();
+
+  const adapter = plugin.agentServiceRegistry?.get?.('claude-code') as {
+    setPermissionMode?: (nextMode: ClaudeCodePermissionMode) => Promise<void> | void;
+  } | undefined;
+  await adapter?.setPermissionMode?.(mode);
+}
 
 export class ChatSelectionControlsCoordinator {
   private toolbarEl: HTMLElement | null = null;
   private readonly modelSelectionRuntime: ModelSelectionRuntime;
-  private readonly permissionSelector: PermissionModeSelectorCoordinator;
+  private permissionSelector: PermissionModeSelectorCoordinator | null = null;
+  private readonly additionalDirectoriesBadge: AdditionalDirectoriesConfigBadgeCoordinator;
+  private additionalDirectoriesBadgeContainer: HTMLElement | null = null;
+  private readonly sandboxBadge: SandboxConfigBadgeCoordinator;
+  private sandboxBadgeContainer: HTMLElement | null = null;
 
   private modelSelectorContainer: HTMLElement | null = null;
   private modelSelectorTrigger: HTMLElement | null = null;
@@ -52,21 +122,38 @@ export class ChatSelectionControlsCoordinator {
 
   private hasRegisteredEscapeHandler = false;
 
-  constructor(private readonly host: ChatSelectionControlsCoordinatorHost) {
+  constructor(
+    private readonly host: ChatSelectionControlsCoordinatorHost,
+  ) {
     this.modelSelectionRuntime = new ModelSelectionRuntime(host);
-    this.permissionSelector = new PermissionModeSelectorCoordinator({
-      getPermissionMode: () => this.host.getPermissionMode(),
-      switchPermissionMode: (mode) => this.host.switchPermissionMode(mode),
-    });
+    // Permission selector is created per-build in buildBackendPermissionSelector()
+    // because the mode system depends on the active backend.
+    this.additionalDirectoriesBadge = new AdditionalDirectoriesConfigBadgeCoordinator();
+    // Sandbox badge reads settings directly from the plugin instance,
+    // avoiding coupling to the guarded OpenCodianView.ts host object.
+    this.sandboxBadge = new SandboxConfigBadgeCoordinator();
   }
 
-  build(toolbarEl: HTMLElement): void {
+  build(toolbarEl: HTMLElement, options?: { showModels?: boolean; showPermissions?: boolean }): void {
     this.destroy();
     this.toolbarEl = toolbarEl;
     this.registerEscapeHandler();
 
-    this.permissionSelector.mount(toolbarEl.createDiv({ cls: 'opencodian-permission-selector' }));
-    this.mountModelSelector(toolbarEl.createDiv({ cls: 'opencodian-model-selector' }));
+    const showModels = options?.showModels !== false;
+    const showPermissions = options?.showPermissions !== false;
+
+    if (showPermissions) {
+      this.buildBackendPermissionSelector(toolbarEl.createDiv({ cls: 'opencodian-permission-selector' }));
+    }
+    if (showModels) {
+      this.mountModelSelector(toolbarEl.createDiv({ cls: 'opencodian-model-selector' }));
+    }
+    // Sandbox badge: self-gated by active backend.
+    // syncSandboxBadge() reads the current backend from the plugin instance
+    // on every refresh, so hot-switching backends within a live UI correctly
+    // shows or hides the badge without a full rebuild.
+    this.syncAdditionalDirectoriesBadge();
+    this.syncSandboxBadge();
   }
 
   async reloadModelCatalog(): Promise<void> {
@@ -155,19 +242,28 @@ export class ChatSelectionControlsCoordinator {
   }
 
   updatePermissionTriggerDisplay(): void {
-    this.permissionSelector.updateTriggerDisplay();
+    this.permissionSelector?.updateTriggerDisplay();
+    this.syncAdditionalDirectoriesBadge();
+    this.syncSandboxBadge();
   }
 
   applyLocaleTexts(): void {
     this.modelSelectorSearchInput?.setAttribute('placeholder', MODEL_SEARCH_PLACEHOLDER);
     this.refreshModelOptions();
     this.updateModelSelectorDisplay();
-    this.permissionSelector.applyLocaleTexts();
+    this.permissionSelector?.applyLocaleTexts();
+    this.syncAdditionalDirectoriesBadge();
+    this.syncSandboxBadge();
   }
 
   destroy(): void {
     this.closeModelDropdown();
-    this.permissionSelector.destroy();
+    this.permissionSelector?.destroy();
+    this.permissionSelector = null;
+    this.additionalDirectoriesBadge.destroy();
+    this.additionalDirectoriesBadgeContainer = null;
+    this.sandboxBadge.destroy();
+    this.sandboxBadgeContainer = null;
     this.disposeModelSelectorStickyHeaders?.();
     this.disposeModelSelectorStickyHeaders = null;
     this.toolbarEl = null;
@@ -182,6 +278,74 @@ export class ChatSelectionControlsCoordinator {
     this.modelSelectorIconRequestId += 1;
   }
 
+  private syncAdditionalDirectoriesBadge(): void {
+    if (!this.toolbarEl) {
+      return;
+    }
+
+    const isClaudeCode = readActiveBackendFromPlugin() === 'claude-code';
+
+    if (isClaudeCode) {
+      if (!this.additionalDirectoriesBadgeContainer) {
+        this.additionalDirectoriesBadgeContainer = this.toolbarEl.createDiv({
+          cls: 'opencodian-additional-directories-badge-container',
+        });
+        this.additionalDirectoriesBadge.mount(this.additionalDirectoriesBadgeContainer);
+      } else {
+        this.additionalDirectoriesBadge.update();
+      }
+
+      if (!this.additionalDirectoriesBadgeContainer.querySelector('.opencodian-additional-directories-config-badge')) {
+        this.additionalDirectoriesBadge.destroy();
+        this.additionalDirectoriesBadgeContainer.remove();
+        this.additionalDirectoriesBadgeContainer = null;
+      }
+      return;
+    }
+
+    if (this.additionalDirectoriesBadgeContainer) {
+      this.additionalDirectoriesBadge.destroy();
+      this.additionalDirectoriesBadgeContainer.remove();
+      this.additionalDirectoriesBadgeContainer = null;
+    }
+  }
+
+  /**
+   * Synchronize the sandbox badge container with the current active backend.
+   *
+   * On every refresh (build, updatePermissionTriggerDisplay, applyLocaleTexts),
+   * this re-reads the active backend from the live plugin settings:
+   * - claude-code + no container → mount badge
+   * - claude-code + existing container → update badge content
+   * - other backend + existing container → remove badge and container
+   * - other backend + no container → noop
+   *
+   * This ensures backend hot-switches within a live UI surface the correct
+   * badge state without requiring a full toolbar rebuild.
+   */
+  private syncSandboxBadge(): void {
+    if (!this.toolbarEl) {
+      return;
+    }
+
+    const isClaudeCode = readActiveBackendFromPlugin() === 'claude-code';
+
+    if (isClaudeCode) {
+      if (!this.sandboxBadgeContainer) {
+        this.sandboxBadgeContainer = this.toolbarEl.createDiv({ cls: 'opencodian-sandbox-badge-container' });
+        this.sandboxBadge.mount(this.sandboxBadgeContainer);
+      } else {
+        this.sandboxBadge.update();
+      }
+    } else {
+      if (this.sandboxBadgeContainer) {
+        this.sandboxBadge.destroy();
+        this.sandboxBadgeContainer.remove();
+        this.sandboxBadgeContainer = null;
+      }
+    }
+  }
+
   private registerEscapeHandler(): void {
     if (this.hasRegisteredEscapeHandler) {
       return;
@@ -189,12 +353,12 @@ export class ChatSelectionControlsCoordinator {
 
     this.hasRegisteredEscapeHandler = true;
     this.host.registerEscapeHandler(() => {
-      if (!this.isModelDropdownOpen && !this.permissionSelector.isOpen()) {
+      if (!this.isModelDropdownOpen && !(this.permissionSelector?.isOpen() ?? false)) {
         return false;
       }
 
       this.closeModelDropdown();
-      this.permissionSelector.closeDropdown();
+      this.permissionSelector?.closeDropdown();
       return true;
     });
   }
@@ -293,7 +457,7 @@ export class ChatSelectionControlsCoordinator {
       return;
     }
 
-    this.permissionSelector.closeDropdown();
+    this.permissionSelector?.closeDropdown();
     this.isModelDropdownOpen = true;
     this.modelSelectorDropdown.style.display = 'block';
     this.modelSelectorDropdown.addClass('is-open');
@@ -459,5 +623,42 @@ export class ChatSelectionControlsCoordinator {
         existingImg.title = iconLabel;
       }
     }
+  }
+
+  /**
+   * Create and mount the backend-appropriate permission selector.
+   *
+   * - claude-code → Claude Code permission modes (default/acceptEdits/bypassPermissions/plan),
+   *   routed through the live plugin settings + adapter.setPermissionMode() seam.
+   * - opencode (default) → OpenCode permission templates (yolo/normal/plan),
+   *   routed through host.getPermissionMode() / switchPermissionMode().
+   *
+   * The toolbar is fully rebuilt on backend switch, so this is called once per
+   * build() invocation with the correct backend active.
+   */
+  private buildBackendPermissionSelector(containerEl: HTMLElement): void {
+    const isClaudeCode = readActiveBackendFromPlugin() === 'claude-code';
+
+    if (isClaudeCode) {
+      const permissionConfig = createClaudeCodePermissionConfig();
+      this.permissionSelector = new PermissionModeSelectorCoordinator(
+        {
+          getPermissionMode: () => readClaudeCodePermissionModeFromPlugin(),
+          switchPermissionMode: (mode) => switchClaudeCodePermissionModeInPlugin(mode as ClaudeCodePermissionMode),
+        },
+        permissionConfig,
+      );
+    } else {
+      const permissionConfig = createOpenCodePermissionConfig();
+      this.permissionSelector = new PermissionModeSelectorCoordinator(
+        {
+          getPermissionMode: () => this.host.getPermissionMode(),
+          switchPermissionMode: (mode) => this.host.switchPermissionMode(mode as PermissionMode),
+        },
+        permissionConfig,
+      );
+    }
+
+    this.permissionSelector.mount(containerEl);
   }
 }

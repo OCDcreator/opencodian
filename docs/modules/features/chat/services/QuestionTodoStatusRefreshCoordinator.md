@@ -19,21 +19,17 @@
 export interface QuestionTodoStatusRefreshCoordinatorHost {
   getTabRuntimeState(tabId: TabId | null): QuestionTodoStatusRefreshRuntime | null;
   hasIncompleteTodos(todos: readonly SessionTodo[]): boolean;
+  getCurrentConversationBackend(): string;
   refreshPendingQuestionsForTab(...): Promise<QuestionRequest[]>;
   refreshTabSessionStatus(...): Promise<SessionActivityStatus | null>;
   refreshTabSessionTodos(...): Promise<SessionTodo[]>;
-}
-
-export class QuestionTodoStatusRefreshCoordinator {
-  refreshAfterActivation(tabId: TabId | null, sessionId: string | null | undefined): Promise<void>;
-  refreshAfterPostSync(options: PostSyncQuestionTodoStatusRefreshOptions): Promise<void>;
 }
 ```
 
 ## 关键行为
 
-- `refreshAfterActivation()` 保持 activation/open fast path 语义：并行启动 status、pending-question、todo 三条 lazy refresh，不等待其中一条完成后才发起下一条
-- `refreshAfterPostSync()` 保持 post-sync 语义：先等待 pending-question refresh，再运行 `afterPendingQuestionRefresh` hook，让 background-task rebuild / follow-up facade 仍能稳定发生在 todo/status gate 之前
+- `refreshAfterActivation()` 保持 activation/open fast path 语义：并行启动 status、pending-question、todo 三条 lazy refresh，不等待其中一条完成后才发起下一条。**后端守护**：非 OpenCode 后端跳过 `refreshPendingQuestionsForTab()`（pending-questions REST 轮询仅限 OpenCode）
+- `refreshAfterPostSync()` 保持 post-sync 语义：先等待 pending-question refresh，再运行 `afterPendingQuestionRefresh` hook，让 background-task rebuild / follow-up facade 仍能稳定发生在 todo/status gate 之前。**后端守护**：非 OpenCode 后端跳过 `refreshPendingQuestionsForTab()`
 - todo/status post-sync refresh 只有在 tab runtime 存在，且存在 incomplete todos、background-task launch、waiting-for-follow-up，或调用方强制刷新时才会执行
 - visible-conversation post-sync 可把 pending-question session 与当前 todo/status session 分开传入，保留“当前 conversation 已切换时仍刷新当前 session live state”的旧行为
 

@@ -1,3 +1,4 @@
+import type { AgentBackendKind } from '../../../../src/core/types/chat';
 import {
   ConversationHistoryActionsCoordinator,
   type ConversationHistoryActionsHost,
@@ -8,12 +9,14 @@ function createConversation(
   id: string,
   title = `Chat ${id}`,
   titleGenerationStatus: 'pending' | 'success' | 'failed' = 'success',
+  backend: AgentBackendKind = 'opencode',
 ) {
   return {
     id,
     title,
     createdAt: 1,
     updatedAt: 1,
+    backend,
     openCodeSessionId: `${id}-session`,
     titleGenerationStatus,
     messages: [],
@@ -35,6 +38,7 @@ function createHost(
     getConversations: jest.fn(() => conversations),
     getCurrentConversation: jest.fn(() => conversations[0] ?? null),
     isActiveTabStreaming: jest.fn(() => false),
+    getHistoryBackendDisplayName: jest.fn(() => 'OpenCode'),
     loadConversation: jest.fn().mockResolvedValue(undefined),
     getConversationById: jest.fn(async (conversationId: string) =>
       conversations.find((conversation) => conversation.id === conversationId) ?? null),
@@ -163,6 +167,65 @@ describe('ConversationHistoryActionsCoordinator', () => {
       'conv-1',
       'conv-2',
     ]);
+
+    fixture.coordinator.destroy();
+  });
+
+  it('renders the active backend scope above the filtered history list', () => {
+    const conversations = [
+      createConversation('claude-1', 'Claude chat', 'success', 'claude-code'),
+    ];
+    const host = createHost(conversations, {
+      getHistoryBackendDisplayName: jest.fn(() => 'Claude Code'),
+    });
+    const coordinator = new ConversationHistoryActionsCoordinator(host);
+    const anchorEl = document.createElement('button');
+    Object.defineProperty(anchorEl, 'getBoundingClientRect', {
+      value: () => new DOMRect(32, 48, 24, 24),
+    });
+    document.body.appendChild(anchorEl);
+
+    coordinator.show(createHistoryEvent(anchorEl));
+
+    const scopeEl = document.body.querySelector<HTMLElement>('.opencodian-history-scope');
+    expect(scopeEl?.textContent).toBe(t('chat.history.backendScope', {
+      backend: 'Claude Code',
+    }));
+
+    coordinator.destroy();
+  });
+
+  it('renders a title preferences action when the host provides openTitleSettings', () => {
+    const openTitleSettings = jest.fn();
+    const fixture = createFixture({ openTitleSettings });
+
+    fixture.coordinator.show(createHistoryEvent(fixture.anchorEl));
+
+    const titlePrefEl = document.body.querySelector<HTMLElement>(
+      '.opencodian-history-action:has(.opencodian-history-action-text)',
+    );
+    const titlePrefText = document.body.querySelector<HTMLElement>(
+      '.opencodian-history-action-text',
+    );
+    expect(titlePrefText?.textContent).toBe(t('chat.history.titlePreferences'));
+
+    titlePrefEl?.click();
+    expect(openTitleSettings).toHaveBeenCalledTimes(1);
+    expect(document.body.querySelector('.opencodian-history-dropdown')).toBeNull();
+
+    fixture.coordinator.destroy();
+  });
+
+  it('does not render a title preferences action when the host omits openTitleSettings', () => {
+    const fixture = createFixture();
+    delete (fixture.host as Partial<typeof fixture.host>).openTitleSettings;
+
+    fixture.coordinator.show(createHistoryEvent(fixture.anchorEl));
+
+    const actionTexts = Array.from(
+      document.body.querySelectorAll<HTMLElement>('.opencodian-history-action-text'),
+    ).map((el) => el.textContent);
+    expect(actionTexts).not.toContain(t('chat.history.titlePreferences'));
 
     fixture.coordinator.destroy();
   });

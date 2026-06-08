@@ -1,7 +1,7 @@
 import { shouldSyncAfterStream } from '../services/MessageFinalizationService';
 import type { PreparedMessageSend } from '../services/MessageSendPreparationService';
 import { buildStreamErrorNotice } from './AssistantNoticeRenderer';
-import { getStreamedTextContent } from './sendPipelineContent';
+import { filterDuplicateStructuredOutputTextBlocks, getStreamedTextContent } from './sendPipelineContent';
 import type {
   LocalStreamOutcome,
   SendPipelineStreamController,
@@ -20,7 +20,12 @@ export function buildLocalStreamOutcome(options: {
   const finalizedModelId = options.routedStream.finalizedAssistantMetadata?.modelId
     ?? options.preparedSend.activeModelId;
   const finalizedAssistantMessageId = options.routedStream.finalizedAssistantMetadata?.messageId;
-  const streamContentBlocks = options.streamController?.getContentBlocks();
+  const finalizedBackendSessionId = options.routedStream.finalizedBackendSessionId ?? undefined;
+  const rawContentBlocks = options.streamController?.getContentBlocks();
+  const streamContentBlocks = filterDuplicateStructuredOutputTextBlocks(
+    rawContentBlocks,
+    options.routedStream.structuredOutput,
+  );
   const streamedTextContent = getStreamedTextContent(streamContentBlocks);
   const hasStreamContentBlocks = Boolean(streamContentBlocks && streamContentBlocks.length > 0);
   const shouldPersistInterruptedState = options.routedStream.streamInterrupted
@@ -45,11 +50,13 @@ export function buildLocalStreamOutcome(options: {
   const effectiveShouldPersistInterruptedState = retryErrorNoticeMessage
     ? false
     : shouldPersistInterruptedState;
+  const backend = options.preparedSend.conversation.backend ?? 'opencode';
 
   return {
     finalizedTimestamp,
     finalizedModelId,
     finalizedAssistantMessageId,
+    finalizedBackendSessionId,
     finalizedStreamingMessageEl: options.runtime.streamingMessageEl,
     streamContentBlocks,
     streamedTextContent,
@@ -57,11 +64,14 @@ export function buildLocalStreamOutcome(options: {
     shouldPersistInterruptedState: effectiveShouldPersistInterruptedState,
     streamErrorNoticeMessage: streamErrorNoticeMessage ?? retryErrorNoticeMessage,
     interruptedNoticeMessage: null,
-    shouldSyncFromServer: shouldSyncAfterStream({
-      streamCompleted: options.routedStream.streamCompleted,
-      streamTimedOut: options.routedStream.streamTimedOut,
-      streamInterrupted: options.routedStream.streamInterrupted,
-      latestErrorMessage: options.routedStream.latestErrorMessage,
-    }),
+    shouldSyncFromServer: backend === 'opencode'
+      && shouldSyncAfterStream({
+        streamCompleted: options.routedStream.streamCompleted,
+        streamTimedOut: options.routedStream.streamTimedOut,
+        streamInterrupted: options.routedStream.streamInterrupted,
+        latestErrorMessage: options.routedStream.latestErrorMessage,
+      }),
+    structuredOutput: options.routedStream.structuredOutput,
+    resolvedUserMessageIdentity: options.routedStream.resolvedUserMessageIdentity,
   };
 }

@@ -12,7 +12,7 @@ import {
   getCommandScopedAgentMetadata,
 } from './commandScopedAgent';
 
-export type SlashCommandCatalogSource = 'command' | 'skill' | 'project' | 'md-command';
+export type SlashCommandCatalogSource = 'command' | 'skill' | 'project' | 'md-command' | 'claude-runtime';
 export type SlashCommandMenuItemSource = SlashCommandCatalogSource | 'skills-command';
 
 /** Known built-in command IDs that come from OpenCode itself (not user-defined). */
@@ -82,6 +82,14 @@ export interface MdCommandEntry {
   description: string;
 }
 
+/** A single Claude runtime command reported by supportedCommands(). */
+export interface ClaudeRuntimeCommand {
+  name: string;
+  description?: string;
+  argumentHint?: string;
+  aliases?: string[];
+}
+
 export interface MergeSlashCommandCatalogOptions {
   runtimeCommands: RuntimeCommand[];
   runtimeSkillSources: Map<string, SlashCommandSkillSource>;
@@ -89,6 +97,8 @@ export interface MergeSlashCommandCatalogOptions {
   projectAgents: OpencodeAgentConfigRecord;
   hiddenCommandIds: Set<string>;
   mdFileCommands?: MdCommandEntry[];
+  /** Claude runtime commands from supportedCommands(). When provided, these are merged as 'claude-runtime' source entries. */
+  claudeRuntimeCommands?: ClaudeRuntimeCommand[];
 }
 
 export function isCatalogRuntimeCommand(command: RuntimeCommand): boolean {
@@ -188,12 +198,14 @@ function getSourceSortRank(source: SlashCommandCatalogSource): number {
       return 0;
     case 'skill':
       return 1;
-    case 'md-command':
+    case 'claude-runtime':
       return 2;
-    case 'project':
+    case 'md-command':
       return 3;
-    default:
+    case 'project':
       return 4;
+    default:
+      return 5;
   }
 }
 
@@ -353,6 +365,7 @@ export function mergeSlashCommandCatalog(
     projectAgents,
     hiddenCommandIds,
     mdFileCommands,
+    claudeRuntimeCommands,
   } = options;
   const mergedEntries = new Map<string, SlashCommandCatalogEntry>();
 
@@ -386,6 +399,34 @@ export function mergeSlashCommandCatalog(
       subtask: normalizeCommandSubtask(runtimeCommand, projectCommand),
       isBuiltin: BUILTIN_COMMAND_IDS.has(runtimeCommand.name),
     });
+  }
+
+  // Merge Claude runtime commands (from supportedCommands())
+  if (claudeRuntimeCommands && claudeRuntimeCommands.length > 0) {
+    for (const claudeCmd of claudeRuntimeCommands) {
+      const name = claudeCmd.name.trim();
+      if (!name) {
+        continue;
+      }
+      // Don't overwrite existing entries (OpenCode commands take priority)
+      if (mergedEntries.has(name)) {
+        continue;
+      }
+      mergedEntries.set(name, {
+        id: name,
+        template: `/${name}`,
+        description: claudeCmd.description?.trim() ?? '',
+        agent: '',
+        model: '',
+        hasProjectOverride: false,
+        hidden: hiddenCommandIds.has(name),
+        runtimeAvailable: true,
+        source: 'claude-runtime',
+        skillSource: undefined,
+        subtask: false,
+        isBuiltin: false,
+      });
+    }
   }
 
   for (const [commandId, projectCommand] of Object.entries(projectCommands)) {

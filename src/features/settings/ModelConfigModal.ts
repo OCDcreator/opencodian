@@ -189,6 +189,7 @@ export class ModelConfigModal extends Modal {
   onClose(): void {
     this.dropdownsEnhancer?.destroy();
     this.dropdownsEnhancer = null;
+    this.providerEditor.dispose();
     this.contentEl.empty();
   }
 
@@ -196,6 +197,7 @@ export class ModelConfigModal extends Modal {
     const { contentEl } = this;
     this.dropdownsEnhancer?.destroy();
     this.dropdownsEnhancer = null;
+    this.providerEditor.dispose();
     contentEl.empty();
 
     const service = this.plugin.modelConfigService;

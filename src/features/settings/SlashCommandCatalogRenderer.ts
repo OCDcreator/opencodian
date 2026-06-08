@@ -3,6 +3,7 @@ import { setIcon } from 'obsidian';
 import type { SlashCommandCatalogEntry, SlashCommandCatalogSource } from '../../core/config/slashCommandCatalog';
 import { t } from '../../i18n';
 import { enhanceSearchInput } from './searchInputEnhancer';
+import { SettingsTooltipController } from './SettingsTooltipController';
 
 type CatalogFilterTab = 'all' | 'skill' | 'command' | 'enabled' | 'disabled';
 
@@ -23,6 +24,7 @@ function getSourceChipLabel(source: SlashCommandCatalogSource): string {
     case 'skill': return t('settings.commands.catalog.chip.skill');
     case 'project': return t('settings.commands.catalog.chip.project');
     case 'md-command': return t('settings.commands.catalog.chip.md-command');
+    case 'claude-runtime': return t('settings.commands.catalog.chip.claudeRuntime');
   }
 }
 
@@ -297,7 +299,8 @@ export class SlashCommandCatalogRenderer {
         state: stateLabel,
       }));
       toggleWrap.classList.toggle('is-enabled', toggle.checked);
-      toggleWrap.setAttribute('title', stateLabel);
+      SettingsTooltipController.ensureForDocument(toggleWrap.ownerDocument);
+      toggleWrap.dataset.settingsTooltip = stateLabel;
     };
     toggle.checked = !cmd.hidden;
     syncToggleLabel();

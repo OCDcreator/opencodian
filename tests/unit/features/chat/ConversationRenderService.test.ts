@@ -1,3 +1,6 @@
+import { readFileSync } from 'fs';
+import { join } from 'path';
+
 import {
   ConversationRenderService,
   createConversationRenderHost,
@@ -196,6 +199,31 @@ describe('ConversationRenderService tooltip / copy utilities', () => {
     });
   });
 
+  describe('shared tooltip CSS contract', () => {
+    it('uses a body-level overlay instead of pseudo-element tooltip bubbles on triggers', () => {
+      const css = readFileSync(
+        join(process.cwd(), 'src/style/components/model-selector.css'),
+        'utf8',
+      );
+
+      expect(css).toMatch(
+        /\.opencodian-tooltip-layer\s*\{[\s\S]*position:\s*fixed;[\s\S]*z-index:\s*2300;/,
+      );
+      expect(css).toMatch(
+        /\.opencodian-tooltip-bubble\s*\{[\s\S]*max-width:\s*min\(240px,\s*calc\(100vw\s*-\s*32px\)\);/,
+      );
+      expect(css).toMatch(
+        /\.opencodian-tooltip-layer\[data-placement="top"\][\s\S]*\.opencodian-tooltip-arrow[\s\S]*bottom:\s*-4px;/,
+      );
+      expect(css).not.toMatch(
+        /\.opencodian-tooltip-trigger\[data-tooltip\]:not\(\[data-tooltip=""\]\)::after/,
+      );
+      expect(css).not.toMatch(
+        /\.opencodian-tooltip-trigger\[data-tooltip\]:not\(\[data-tooltip=""\]\)::before/,
+      );
+    });
+  });
+
   describe('removeEmptyAssistantShells', () => {
     it('removes assistant shells with no content', () => {
       const container = document.createElement('div');
@@ -239,6 +267,17 @@ describe('ConversationRenderService tooltip / copy utilities', () => {
       ConversationRenderService.removeEmptyAssistantShells(container);
 
       expect(container.children).toHaveLength(2);
+    });
+
+    it('preserves assistant shells with structured output details (regression: structured-only shell must survive cleanup)', () => {
+      const container = document.createElement('div');
+      const assistant = container.createDiv({ cls: 'opencodian-message opencodian-message--assistant' });
+      const content = assistant.createDiv({ cls: 'opencodian-message-content' });
+      content.createDiv({ cls: 'opencodian-structured-output-details' });
+
+      ConversationRenderService.removeEmptyAssistantShells(container);
+
+      expect(container.children).toHaveLength(1);
     });
   });
 });

@@ -1,8 +1,16 @@
 /* eslint-disable max-lines */
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
+
+import { AgentCapability } from '../../src/core/agents/AgentCapability';
+import { ClaudeCodeAdapter, type ClaudeCodeSdkFacade } from '../../src/core/agents/backend';
+import { AgentServiceRegistry } from '../../src/core/agents/backend/AgentServiceRegistry';
 import type { StorageService } from '../../src/core/storage';
 import { type Conversation, DEFAULT_SETTINGS } from '../../src/core/types';
 import { OpenCodianView } from '../../src/features/chat/OpenCodianView';
 import OpenCodianPlugin from '../../src/main';
+import { sanitizeDiagnosticReport } from '../../src/shared';
 
 jest.mock('@opencode-ai/sdk/v2/client', () => ({
   createOpencodeClient: jest.fn(() => ({ client: 'mock-sdk-client' })),
@@ -535,6 +543,52 @@ describe('OpenCodianPlugin.onload', () => {
   });
 });
 
+describe('OpenCodianPlugin backend bootstrap', () => {
+  it('registers Claude Code and restores it as the active backend from settings', async () => {
+    const vaultPath = fs.mkdtempSync(path.join(os.tmpdir(), 'opencodian-claude-bootstrap-'));
+    const plugin = new OpenCodianPlugin() as OpenCodianPlugin & {
+      app: {
+        vault: { adapter: { basePath: string } };
+        workspace: { getLeavesOfType: jest.Mock<unknown[], [string]> };
+      };
+      settings: typeof DEFAULT_SETTINGS;
+      storage: Pick<StorageService, 'saveManagedServerState' | 'listConversations'>;
+      loadConversations: jest.Mock<Promise<void>, []>;
+      configureVaultScopedServices: jest.Mock<void, []>;
+    };
+
+    plugin.app = {
+      vault: { adapter: { basePath: vaultPath } },
+      workspace: { getLeavesOfType: jest.fn().mockReturnValue([]) },
+    };
+    plugin.settings = {
+      ...DEFAULT_SETTINGS,
+      enabledBackends: ['opencode', 'claude-code'],
+      activeBackend: 'claude-code',
+    };
+    plugin.storage = {
+      saveManagedServerState: jest.fn().mockResolvedValue(undefined),
+      listConversations: jest.fn().mockResolvedValue([]),
+    } as Pick<StorageService, 'saveManagedServerState' | 'listConversations'>;
+    plugin.loadConversations = jest.fn().mockResolvedValue(undefined);
+    plugin.configureVaultScopedServices = jest.fn();
+
+    await (
+      plugin as unknown as {
+        handleBootstrapOpenCodeRuntime: (initialManagedServerState: null) => Promise<void>;
+      }
+    ).handleBootstrapOpenCodeRuntime(null);
+
+    expect(plugin.agentServiceRegistry.get('opencode')).toBeDefined();
+    expect(plugin.agentServiceRegistry.get('claude-code')).toBeDefined();
+    expect(plugin.agentServiceRegistry.getActiveKind()).toBe('claude-code');
+    expect(plugin.claudeCodePermissionBridge).toBeDefined();
+    expect(plugin.claudeCodePermissionHostContext).toBeDefined();
+    expect(typeof plugin.claudeCodePermissionHostContext.getActiveTabId).toBe('function');
+  });
+});
+
+// eslint-disable-next-line max-lines-per-function -- Deferred warmup cases share plugin bootstrap fixtures and backend-routing assertions.
 describe('OpenCodianPlugin deferred runtime warmup', () => {
   beforeEach(() => {
     jest.useFakeTimers();
@@ -547,6 +601,7 @@ describe('OpenCodianPlugin deferred runtime warmup', () => {
   it('defers runtime warmup until after the current tick', async () => {
     const plugin = new OpenCodianPlugin() as OpenCodianPlugin & {
       settings: {
+        enabledBackends?: string[];
         server: {
           mode: 'local';
           local: { autoStart: boolean };
@@ -559,6 +614,7 @@ describe('OpenCodianPlugin deferred runtime warmup', () => {
     };
 
     plugin.settings = {
+      enabledBackends: ['opencode'],
       server: {
         mode: 'local',
         local: { autoStart: true },
@@ -587,9 +643,51 @@ describe('OpenCodianPlugin deferred runtime warmup', () => {
     expect(plugin.logServerStatusSnapshot).toHaveBeenCalledWith('deferred-onload');
   });
 
+  it('skips deferred runtime warmup when no backend is enabled', async () => {
+    const plugin = new OpenCodianPlugin() as OpenCodianPlugin & {
+      settings: {
+        enabledBackends: string[];
+        server: {
+          mode: 'local';
+          local: { autoStart: boolean };
+        };
+      };
+      openCodeService: { isReady: jest.Mock<boolean, []> };
+      startConfiguredLocalServerIfNeeded: jest.Mock<Promise<void>, []>;
+      logServerStatusSnapshot: jest.Mock<Promise<void>, [string?]>;
+    };
+
+    plugin.settings = {
+      enabledBackends: [],
+      server: {
+        mode: 'local',
+        local: { autoStart: true },
+      },
+    };
+    plugin.openCodeService = {
+      isReady: jest.fn().mockReturnValue(false),
+    };
+    plugin.startConfiguredLocalServerIfNeeded = jest.fn().mockResolvedValue(undefined);
+    plugin.logServerStatusSnapshot = jest.fn().mockResolvedValue(undefined);
+
+    (
+      plugin as unknown as {
+        runtimeCoordinator: { scheduleDeferredRuntimeWarmup: () => void };
+      }
+    ).runtimeCoordinator.scheduleDeferredRuntimeWarmup();
+
+    jest.runOnlyPendingTimers();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(plugin.startConfiguredLocalServerIfNeeded).not.toHaveBeenCalled();
+    expect(plugin.logServerStatusSnapshot).not.toHaveBeenCalled();
+  });
+
   it('forces pending warmup to finish before creating a conversation', async () => {
     const plugin = new OpenCodianPlugin() as OpenCodianPlugin & {
       settings: {
+        enabledBackends?: string[];
         server: {
           mode: 'local';
           local: { autoStart: boolean };
@@ -609,6 +707,7 @@ describe('OpenCodianPlugin deferred runtime warmup', () => {
     };
 
     plugin.settings = {
+      enabledBackends: ['opencode'],
       server: {
         mode: 'local',
         local: { autoStart: true },
@@ -636,6 +735,363 @@ describe('OpenCodianPlugin deferred runtime warmup', () => {
     expect(plugin.logServerStatusSnapshot).toHaveBeenCalledWith('session-bootstrap');
     expect(plugin.openCodeService.createSession).toHaveBeenCalledTimes(1);
     expect(conversation.openCodeSessionId).toBe('session-created');
+  });
+
+  it('does not force session-bootstrap warmup when no backend is enabled', async () => {
+    const plugin = new OpenCodianPlugin() as OpenCodianPlugin & {
+      settings: {
+        enabledBackends: string[];
+        activeBackend?: string;
+        server: {
+          mode: 'local';
+          local: { autoStart: boolean };
+        };
+      };
+      openCodeService: {
+        isReady: jest.Mock<boolean, []>;
+        createSession: jest.Mock<Promise<string>, []>;
+      };
+      conversations: unknown[];
+      storage: { saveConversation: jest.Mock<Promise<void>, [unknown]> };
+      startConfiguredLocalServerIfNeeded: jest.Mock<Promise<void>, []>;
+      logServerStatusSnapshot: jest.Mock<Promise<void>, [string?]>;
+    };
+
+    plugin.settings = {
+      enabledBackends: [],
+      activeBackend: 'opencode',
+      server: {
+        mode: 'local',
+        local: { autoStart: true },
+      },
+    };
+    plugin.openCodeService = {
+      isReady: jest.fn().mockReturnValue(false),
+      createSession: jest.fn().mockResolvedValue('session-created'),
+    };
+    plugin.conversations = [];
+    plugin.storage = {
+      saveConversation: jest.fn().mockResolvedValue(undefined),
+    };
+    plugin.startConfiguredLocalServerIfNeeded = jest.fn().mockResolvedValue(undefined);
+    plugin.logServerStatusSnapshot = jest.fn().mockResolvedValue(undefined);
+
+    await expect(plugin.createConversation()).rejects.toThrow('opencode backend is not enabled');
+
+    expect(plugin.startConfiguredLocalServerIfNeeded).not.toHaveBeenCalled();
+    expect(plugin.logServerStatusSnapshot).not.toHaveBeenCalled();
+    expect(plugin.openCodeService.createSession).not.toHaveBeenCalled();
+  });
+
+  it('creates Claude conversations through the active session backend without OpenCode warmup', async () => {
+    const plugin = new OpenCodianPlugin() as OpenCodianPlugin & {
+      settings: typeof DEFAULT_SETTINGS;
+      agentServiceRegistry: AgentServiceRegistry;
+      openCodeService: {
+        createSession: jest.Mock<Promise<string>, []>;
+      };
+      conversations: Conversation[];
+      storage: { saveConversation: jest.Mock<Promise<void>, [Conversation]> };
+      startConfiguredLocalServerIfNeeded: jest.Mock<Promise<void>, []>;
+      logServerStatusSnapshot: jest.Mock<Promise<void>, [string?]>;
+    };
+    const sdk: ClaudeCodeSdkFacade = {
+      query: jest.fn(() => (async function* () {})()),
+    };
+    const claudeAdapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: DEFAULT_SETTINGS.backendSettings.claudeCode,
+      sdk,
+    });
+
+    plugin.settings = {
+      ...DEFAULT_SETTINGS,
+      enabledBackends: ['claude-code'],
+      activeBackend: 'claude-code',
+    };
+    plugin.agentServiceRegistry = new AgentServiceRegistry();
+    plugin.agentServiceRegistry.register(claudeAdapter);
+    plugin.agentServiceRegistry.setEnabledBackends(['claude-code']);
+    plugin.openCodeService = {
+      createSession: jest.fn().mockResolvedValue('opencode-session'),
+    };
+    plugin.conversations = [];
+    plugin.storage = {
+      saveConversation: jest.fn().mockResolvedValue(undefined),
+    };
+    plugin.startConfiguredLocalServerIfNeeded = jest.fn().mockResolvedValue(undefined);
+    plugin.logServerStatusSnapshot = jest.fn().mockResolvedValue(undefined);
+
+    const conversation = await plugin.createConversation();
+
+    expect(plugin.openCodeService.createSession).not.toHaveBeenCalled();
+    expect(plugin.startConfiguredLocalServerIfNeeded).not.toHaveBeenCalled();
+    expect(conversation.backend).toBe('claude-code');
+    expect(conversation.openCodeSessionId).toBeUndefined();
+    expect(conversation.backendSessionId).toMatch(/^claude-code-/);
+    expect(plugin.storage.saveConversation).toHaveBeenCalledWith(conversation);
+  });
+
+  it('does not fall back to OpenCode when the registered Claude backend lacks createSession', async () => {
+    const plugin = new OpenCodianPlugin() as OpenCodianPlugin & {
+      settings: typeof DEFAULT_SETTINGS;
+      agentServiceRegistry: AgentServiceRegistry;
+      openCodeService: {
+        isReady: jest.Mock<boolean, []>;
+        createSession: jest.Mock<Promise<string>, []>;
+      };
+      conversations: Conversation[];
+      storage: { saveConversation: jest.Mock<Promise<void>, [Conversation]> };
+      startConfiguredLocalServerIfNeeded: jest.Mock<Promise<void>, []>;
+      logServerStatusSnapshot: jest.Mock<Promise<void>, [string?]>;
+    };
+    const opencodeCreateSession = jest.fn().mockResolvedValue('opencode-session');
+    const malformedClaudeSessionAdapter = {
+      kind: 'claude-code' as const,
+      displayName: 'Claude Code',
+      description: 'Malformed Claude Code adapter without createSession',
+      status: 'connected' as const,
+      capabilities: new Set([AgentCapability.Sessions]),
+      hasCapability: jest.fn((cap: AgentCapability) => cap === AgentCapability.Sessions),
+      start: jest.fn().mockResolvedValue(undefined),
+      stop: jest.fn().mockResolvedValue(undefined),
+      dispose: jest.fn(),
+      onStatusChange: jest.fn(() => ({ dispose: jest.fn() })),
+      deleteSession: jest.fn().mockResolvedValue(undefined),
+      updateSessionTitle: jest.fn().mockResolvedValue(undefined),
+    };
+
+    plugin.settings = {
+      ...DEFAULT_SETTINGS,
+      enabledBackends: ['opencode', 'claude-code'],
+      activeBackend: 'claude-code',
+    };
+    plugin.agentServiceRegistry = new AgentServiceRegistry();
+    plugin.agentServiceRegistry.register({
+      kind: 'opencode',
+      displayName: 'OpenCode',
+      description: 'OpenCode test adapter',
+      status: 'connected',
+      capabilities: new Set([AgentCapability.Sessions]),
+      hasCapability: jest.fn((cap: AgentCapability) => cap === AgentCapability.Sessions),
+      start: jest.fn().mockResolvedValue(undefined),
+      stop: jest.fn().mockResolvedValue(undefined),
+      dispose: jest.fn(),
+      onStatusChange: jest.fn(() => ({ dispose: jest.fn() })),
+      createSession: opencodeCreateSession,
+      deleteSession: jest.fn().mockResolvedValue(undefined),
+      updateSessionTitle: jest.fn().mockResolvedValue(undefined),
+    });
+    plugin.agentServiceRegistry.register(malformedClaudeSessionAdapter);
+    plugin.agentServiceRegistry.setEnabledBackends(['opencode', 'claude-code']);
+    plugin.openCodeService = {
+      isReady: jest.fn().mockReturnValue(true),
+      createSession: jest.fn().mockResolvedValue('opencode-session'),
+    };
+    plugin.conversations = [];
+    plugin.storage = {
+      saveConversation: jest.fn().mockResolvedValue(undefined),
+    };
+    plugin.startConfiguredLocalServerIfNeeded = jest.fn().mockResolvedValue(undefined);
+    plugin.logServerStatusSnapshot = jest.fn().mockResolvedValue(undefined);
+
+    await expect(plugin.createConversation()).rejects.toThrow(
+      'Cannot create conversation: active backend does not support sessions',
+    );
+
+    expect(opencodeCreateSession).not.toHaveBeenCalled();
+    expect(plugin.openCodeService.createSession).not.toHaveBeenCalled();
+    expect(plugin.startConfiguredLocalServerIfNeeded).not.toHaveBeenCalled();
+    expect(plugin.logServerStatusSnapshot).not.toHaveBeenCalled();
+    expect(plugin.storage.saveConversation).not.toHaveBeenCalled();
+    expect(plugin.conversations).toEqual([]);
+  });
+
+  it('sanitizes diagnostic reports before export', async () => {
+    const plugin = new OpenCodianPlugin() as OpenCodianPlugin & {
+      settings: typeof DEFAULT_SETTINGS;
+      app: typeof OpenCodianPlugin.prototype.app;
+      openCodeService: {
+        checkHealth: jest.Mock<Promise<boolean>, []>;
+        getServerStatus: jest.Mock<string, []>;
+        isServerProcessRunning: jest.Mock<boolean, []>;
+        getServerDiagnostics: jest.Mock<Record<string, unknown>, []>;
+      };
+      startupCoordinator: { getStartupPerfSummaryLines: jest.Mock<string[], []>; getStartupPerformanceDiagnosisLines: jest.Mock<string[], []> };
+      manifest: { name: string; id: string; version: string };
+    };
+
+    plugin.settings = {
+      ...DEFAULT_SETTINGS,
+      backendSettings: {
+        ...DEFAULT_SETTINGS.backendSettings,
+        claudeCode: {
+          ...DEFAULT_SETTINGS.backendSettings.claudeCode,
+          debugChannels: {
+            ...DEFAULT_SETTINGS.backendSettings.claudeCode.debugChannels,
+            runtime: true,
+          },
+        },
+      },
+    };
+    plugin.app = {
+      vault: {
+        adapter: {
+          basePath: '/vault',
+        },
+      },
+    } as typeof OpenCodianPlugin.prototype.app;
+    plugin.openCodeService = {
+      checkHealth: jest.fn().mockResolvedValue(true),
+      getServerStatus: jest.fn().mockReturnValue('running'),
+      isServerProcessRunning: jest.fn().mockReturnValue(true),
+      getServerDiagnostics: jest.fn().mockReturnValue({ authHeader: 'Bearer secret-token' }),
+    };
+    plugin.startupCoordinator = {
+      getStartupPerfSummaryLines: jest.fn().mockReturnValue([]),
+      getStartupPerformanceDiagnosisLines: jest.fn().mockReturnValue([]),
+    } as unknown as typeof plugin.startupCoordinator;
+    plugin.manifest = { name: 'OpenCodian', id: 'opencodian', version: '1.0.0' };
+
+    jest.spyOn(Date.prototype, 'toISOString').mockReturnValue('2026-05-23T00:00:00.000Z');
+    const report = await plugin.buildDiagnosticReport('copy-diagnostics');
+
+    expect(report).toContain('# OpenCodian Diagnostic Report');
+    expect(report).not.toContain('Bearer secret-token');
+    expect(report).toContain('[REDACTED]');
+    expect(report).toContain(sanitizeDiagnosticReport('Bearer secret-token'));
+  });
+
+  it('does not write openCodeSessionId when creating a conversation from a Claude session', async () => {
+    const plugin = new OpenCodianPlugin() as OpenCodianPlugin & {
+      settings: typeof DEFAULT_SETTINGS;
+      conversations: Conversation[];
+      storage: { saveConversation: jest.Mock<Promise<void>, [Conversation]> };
+      touchConversationFullMessageCache: jest.Mock<void, [string]>;
+      trimConversationFullMessageCache: jest.Mock<void, []>;
+    };
+
+    plugin.settings = {
+      ...DEFAULT_SETTINGS,
+      activeBackend: 'claude-code',
+    };
+    plugin.conversations = [];
+    plugin.storage = {
+      saveConversation: jest.fn().mockResolvedValue(undefined),
+    };
+    plugin.touchConversationFullMessageCache = jest.fn();
+    plugin.trimConversationFullMessageCache = jest.fn();
+
+    const conversation = await plugin.createConversationFromSession('claude-sdk-session');
+
+    expect(conversation.backend).toBe('claude-code');
+    expect(conversation.openCodeSessionId).toBeUndefined();
+    expect(conversation.backendSessionId).toBe('claude-sdk-session');
+    expect(plugin.storage.saveConversation).toHaveBeenCalledWith(conversation);
+  });
+
+  it('prefers explicit backend from initial over settings.activeBackend', async () => {
+    const plugin = new OpenCodianPlugin() as OpenCodianPlugin & {
+      settings: typeof DEFAULT_SETTINGS;
+      conversations: Conversation[];
+      storage: { saveConversation: jest.Mock<Promise<void>, [Conversation]> };
+      touchConversationFullMessageCache: jest.Mock<void, [string]>;
+      trimConversationFullMessageCache: jest.Mock<void, []>;
+    };
+
+    // activeBackend is opencode, but the session actually belongs to claude-code
+    plugin.settings = {
+      ...DEFAULT_SETTINGS,
+      activeBackend: 'opencode',
+    };
+    plugin.conversations = [];
+    plugin.storage = {
+      saveConversation: jest.fn().mockResolvedValue(undefined),
+    };
+    plugin.touchConversationFullMessageCache = jest.fn();
+    plugin.trimConversationFullMessageCache = jest.fn();
+
+    const conversation = await plugin.createConversationFromSession('claude-forked-session', {
+      backend: 'claude-code',
+      title: 'Forked from Claude',
+    });
+
+    expect(conversation.backend).toBe('claude-code');
+    expect(conversation.backendSessionId).toBe('claude-forked-session');
+    expect(conversation.openCodeSessionId).toBeUndefined();
+    expect(plugin.storage.saveConversation).toHaveBeenCalledWith(conversation);
+  });
+
+  it('uses explicit opencode backend from initial even when activeBackend is claude-code', async () => {
+    const plugin = new OpenCodianPlugin() as OpenCodianPlugin & {
+      settings: typeof DEFAULT_SETTINGS;
+      conversations: Conversation[];
+      storage: { saveConversation: jest.Mock<Promise<void>, [Conversation]> };
+      touchConversationFullMessageCache: jest.Mock<void, [string]>;
+      trimConversationFullMessageCache: jest.Mock<void, []>;
+    };
+
+    plugin.settings = {
+      ...DEFAULT_SETTINGS,
+      activeBackend: 'claude-code',
+    };
+    plugin.conversations = [];
+    plugin.storage = {
+      saveConversation: jest.fn().mockResolvedValue(undefined),
+    };
+    plugin.touchConversationFullMessageCache = jest.fn();
+    plugin.trimConversationFullMessageCache = jest.fn();
+
+    const conversation = await plugin.createConversationFromSession('opencode-forked-session', {
+      backend: 'opencode',
+    });
+
+    expect(conversation.backend).toBe('opencode');
+    expect(conversation.backendSessionId).toBe('opencode-forked-session');
+    expect(conversation.openCodeSessionId).toBe('opencode-forked-session');
+  });
+
+  it('deletes conversations through their owning session backend', async () => {
+    const plugin = new OpenCodianPlugin() as OpenCodianPlugin & {
+      agentServiceRegistry: AgentServiceRegistry;
+      openCodeService: {
+        deleteSession: jest.Mock<Promise<void>, [string]>;
+      };
+      conversations: Conversation[];
+      storage: { deleteConversation: jest.Mock<Promise<void>, [string]> };
+      conversationFullMessageCache: { forget: jest.Mock<void, [string]> };
+    };
+    const claudeAdapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: DEFAULT_SETTINGS.backendSettings.claudeCode,
+      sdk: { query: jest.fn(() => (async function* () {})()) },
+    });
+    const sessionId = await claudeAdapter.createSession();
+
+    plugin.agentServiceRegistry = new AgentServiceRegistry();
+    plugin.agentServiceRegistry.register(claudeAdapter);
+    plugin.agentServiceRegistry.setEnabledBackends(['claude-code']);
+    plugin.openCodeService = {
+      deleteSession: jest.fn().mockResolvedValue(undefined),
+    };
+    plugin.conversations = [createConversation('claude', {
+      backend: 'claude-code',
+      openCodeSessionId: undefined,
+      backendSessionId: sessionId,
+    })];
+    plugin.storage = {
+      deleteConversation: jest.fn().mockResolvedValue(undefined),
+    };
+    plugin.conversationFullMessageCache = {
+      forget: jest.fn(),
+    };
+    const deleteSpy = jest.spyOn(claudeAdapter, 'deleteSession');
+
+    await plugin.deleteConversation('claude');
+
+    expect(deleteSpy).toHaveBeenCalledWith(sessionId);
+    expect(plugin.openCodeService.deleteSession).not.toHaveBeenCalled();
+    expect(plugin.storage.deleteConversation).toHaveBeenCalledWith('claude');
   });
 });
 
@@ -797,6 +1253,7 @@ describe('OpenCodianPlugin slash command catalog invalidation', () => {
       applyChatAppearanceSettings: jest.fn(),
       applyChatScrollMode: jest.fn(),
       applyTabBarLayout: jest.fn(),
+      refreshAvailabilityUi: jest.fn(),
       reloadModelCatalog: jest.fn(),
     });
 
@@ -817,6 +1274,7 @@ describe('OpenCodianPlugin slash command catalog invalidation', () => {
     ).runtimeCoordinator.refreshOpenCodianViews({ reloadModels: false, applyUi: true });
 
     expect(openCodianView.applyTabBarLayout).toHaveBeenCalledTimes(1);
+    expect(openCodianView.refreshAvailabilityUi).toHaveBeenCalledTimes(1);
     expect(openCodianView.reloadModelCatalog).not.toHaveBeenCalled();
   });
 

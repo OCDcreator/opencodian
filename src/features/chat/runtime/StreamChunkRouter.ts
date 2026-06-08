@@ -1,4 +1,7 @@
-import type { StreamChunk as CoreStreamChunk } from '../../../core/types';
+import {
+  getConversationBackendSessionId,
+  type StreamChunk as CoreStreamChunk,
+} from '../../../core/types';
 import { createLogger } from '../../../shared';
 import { PendingIndicatorController } from './PendingIndicatorController';
 import { hasVisibleStreamingContent } from './sendPipelineContent';
@@ -23,8 +26,10 @@ export class StreamChunkRouter {
   private streamTimedOut = false;
   private latestErrorMessage: string | null = null;
   private finalizedAssistantMetadata: Extract<CoreStreamChunk, { type: 'message_metadata' }> | null = null;
+  private resolvedUserMessageIdentity: string | null = null;
   private receivedMeaningfulChunk = false;
   private receivedFirstVisibleContent = false;
+  private structuredOutput: unknown | undefined;
 
   constructor(private readonly options: StreamChunkRouterOptions) {
     this.pendingIndicator = new PendingIndicatorController(
@@ -83,6 +88,7 @@ export class StreamChunkRouter {
       cleanupPendingIndicator: () => {
         this.pendingIndicator.clear();
       },
+      structuredOutput: this.structuredOutput,
     };
   }
 
@@ -145,6 +151,15 @@ export class StreamChunkRouter {
       return true;
     }
 
+    if (chunk.type === 'user_message_identity') {
+      this.resolvedUserMessageIdentity = chunk.uuid;
+      this.trace.logStage('user-message-identity-received', {
+        uuid: chunk.uuid,
+        sessionId: chunk.sessionId ?? null,
+      });
+      return true;
+    }
+
     if (chunk.type === 'message_stop') {
       this.streamCompleted = true;
       host.completeTabContextUsageStream(preparedSend.tabId);
@@ -159,6 +174,14 @@ export class StreamChunkRouter {
       this.trace.logStage('file-edited-recorded', {
         file: chunk.file,
         pendingEditedFileCount: this.options.runtime.pendingEditedFiles.size,
+      });
+      return true;
+    }
+
+    if (chunk.type === 'backend_event' && chunk.event === 'structured_output') {
+      this.structuredOutput = chunk.metadata?.structuredOutput;
+      this.trace.logStage('structured-output-received', {
+        hasPayload: chunk.metadata?.structuredOutput !== undefined,
       });
       return true;
     }
@@ -311,14 +334,14 @@ export class StreamChunkRouter {
       this.streamInterrupted = true;
       logger.warn('Stream idle timeout reached, detaching local stream and continuing background sync', {
         conversationId: this.options.preparedSend.conversation.id,
-        sessionId: this.options.preparedSend.conversation.openCodeSessionId,
+        sessionId: getConversationBackendSessionId(this.options.preparedSend.conversation),
         timeoutMs,
         timeoutReason: this.receivedMeaningfulChunk ? 'idle-after-content' : 'no-visible-content',
         hasVisibleAssistantContent: Boolean(this.options.streamController?.getContentBlocks().length),
       });
 
       this.options.streamController?.cancelStream();
-      this.options.host.detachStream(this.options.preparedSend.conversation.openCodeSessionId);
+      this.options.host.detachStream(getConversationBackendSessionId(this.options.preparedSend.conversation));
       this.resetStreamingState();
     }, timeoutMs);
   }
@@ -345,6 +368,8 @@ export class StreamChunkRouter {
       streamTimedOut: this.streamTimedOut,
       latestErrorMessage: this.latestErrorMessage,
       finalizedAssistantMetadata: this.finalizedAssistantMetadata,
+      finalizedBackendSessionId: this.finalizedAssistantMetadata?.sessionId ?? null,
+      resolvedUserMessageIdentity: this.resolvedUserMessageIdentity,
     };
   }
 }

@@ -5,12 +5,26 @@ import type {
 import type {
   ChatMessage,
   Conversation,
+  PromptContextItem,
 } from '../../../../src/core/types';
 import type { ComposerSendContextPort } from '../../../../src/features/chat/services/ComposerContextViewFacade';
 import {
   type MessageSendPreparationHost,
   type MessageSendPreparationHostDependencies,
 } from '../../../../src/features/chat/services/MessageSendPreparationService';
+
+export function createPromptContextItem(overrides: Partial<PromptContextItem> = {}): PromptContextItem {
+  return {
+    id: 'context-1',
+    kind: 'selection',
+    path: 'notes/example.md',
+    label: 'example.md:1-3',
+    mime: 'text/markdown',
+    lineRange: { startLine: 1, endLine: 3 },
+    textSnapshot: 'Selected text',
+    ...overrides,
+  };
+}
 
 export function createConversation(messages: ChatMessage[] = []): Conversation {
   return {
@@ -85,7 +99,7 @@ export function createHost(
     queueFollowUpSend: jest.fn().mockReturnValue(false),
     consumeQueuedFollowUpSend: jest.fn().mockReturnValue(null),
     notifyForegroundBusy: jest.fn().mockImplementation(() => { callOrder.push('notifyForegroundBusy'); }),
-    getServerAvailability: jest.fn().mockResolvedValue('running'),
+    getServerAvailability: jest.fn().mockImplementation(async () => { callOrder.push('getServerAvailability'); return 'running'; }),
     refreshServerStatusBadge: jest.fn().mockResolvedValue(undefined),
     refreshSettingsTabStatus: jest.fn().mockImplementation(() => { callOrder.push('refreshSettingsTabStatus'); }),
     getServerMode: jest.fn().mockReturnValue('local'),
@@ -100,6 +114,9 @@ export function createHost(
     getSendMessageOptions: jest.fn().mockReturnValue({ provider: 'openai', model: 'gpt-5.4' }),
     formatModelId: jest.fn().mockImplementation((model: Partial<{ provider: string; model: string }> | null | undefined) =>
       model?.provider && model?.model ? `${model.provider}/${model.model}` : undefined),
+    shouldUseModelCatalog: jest.fn().mockImplementation((targetConversation: Conversation) =>
+      (targetConversation.backend ?? 'opencode') === 'opencode'
+      || (targetConversation.backend ?? 'opencode') === 'claude-code'),
     ensureSelectedModelAvailable: jest.fn().mockImplementation(async () => { callOrder.push('ensureSelectedModelAvailable'); return true; }),
     appendModelUnavailableNoticeMessage: jest.fn().mockResolvedValue(undefined),
     buildStructuredPromptSendPayload: jest.fn().mockImplementation((content: string) =>

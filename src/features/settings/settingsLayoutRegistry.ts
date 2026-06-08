@@ -5,6 +5,7 @@
  * This registry only owns layout orchestration — no setting save logic lives here.
  */
 
+import type { AgentBackendKind } from '../../core/types/chat';
 import type { TranslationKey } from '../../i18n';
 
 export interface SettingsPrimaryTab {
@@ -12,11 +13,13 @@ export interface SettingsPrimaryTab {
   labelKey: TranslationKey;
   icon: string;
   defaultSecondaryTabId: string;
+  backendRequired?: AgentBackendKind;
 }
 
 export interface SettingsSecondaryTab {
   id: string;
   labelKey: TranslationKey;
+  backendRequired?: AgentBackendKind;
 }
 
 export interface SettingsPrimaryTabDefinition extends SettingsPrimaryTab {
@@ -31,6 +34,21 @@ export const SETTINGS_PRIMARY_TABS: SettingsPrimaryTabDefinition[] = [
     defaultSecondaryTabId: 'basic',
     secondaryTabs: [
       { id: 'basic', labelKey: 'settings.general.tab.basic' },
+      { id: 'agents', labelKey: 'settings.general.tab.agents' },
+    ],
+  },
+  {
+    id: 'claude-code',
+    labelKey: 'settings.claudeCode.title',
+    icon: 'sparkles',
+    defaultSecondaryTabId: 'runtime',
+    backendRequired: 'claude-code',
+    secondaryTabs: [
+      { id: 'runtime', labelKey: 'settings.claudeCode.tab.runtime' },
+      { id: 'model-thinking', labelKey: 'settings.claudeCode.tab.modelThinking' },
+      { id: 'permissions', labelKey: 'settings.claudeCode.tab.permissions' },
+      { id: 'context-sources', labelKey: 'settings.claudeCode.tab.contextSources' },
+      { id: 'tools', labelKey: 'settings.claudeCode.tab.tools' },
     ],
   },
   {
@@ -38,6 +56,7 @@ export const SETTINGS_PRIMARY_TABS: SettingsPrimaryTabDefinition[] = [
     labelKey: 'settings.server.title',
     icon: 'server',
     defaultSecondaryTabId: 'connection',
+    backendRequired: 'opencode',
     secondaryTabs: [
       { id: 'connection', labelKey: 'settings.server.tab.connection' },
       { id: 'auth', labelKey: 'settings.server.tab.auth' },
@@ -49,6 +68,7 @@ export const SETTINGS_PRIMARY_TABS: SettingsPrimaryTabDefinition[] = [
     labelKey: 'settings.model.title',
     icon: 'bot',
     defaultSecondaryTabId: 'common',
+    backendRequired: 'opencode',
     secondaryTabs: [
       { id: 'common', labelKey: 'settings.model.tab.common' },
       { id: 'project-config', labelKey: 'settings.model.tab.projectConfig' },
@@ -60,13 +80,13 @@ export const SETTINGS_PRIMARY_TABS: SettingsPrimaryTabDefinition[] = [
     id: 'conversation',
     labelKey: 'settings.conversation.title',
     icon: 'messages-square',
-    defaultSecondaryTabId: 'title',
+    defaultSecondaryTabId: 'display',
     secondaryTabs: [
       { id: 'title', labelKey: 'settings.conversation.tab.title' },
-      { id: 'compaction', labelKey: 'settings.conversation.tab.compaction' },
-      { id: 'sharing', labelKey: 'settings.conversation.tab.sharing' },
+      { id: 'compaction', labelKey: 'settings.conversation.tab.compaction', backendRequired: 'opencode' },
+      { id: 'sharing', labelKey: 'settings.conversation.tab.sharing', backendRequired: 'opencode' },
       { id: 'display', labelKey: 'settings.conversation.tab.display' },
-      { id: 'questions', labelKey: 'settings.conversation.tab.questions' },
+      { id: 'questions', labelKey: 'settings.conversation.tab.questions', backendRequired: 'opencode' },
     ],
   },
   {
@@ -74,6 +94,7 @@ export const SETTINGS_PRIMARY_TABS: SettingsPrimaryTabDefinition[] = [
     labelKey: 'settings.agents.title',
     icon: 'users',
     defaultSecondaryTabId: 'default',
+    backendRequired: 'opencode',
     secondaryTabs: [
       { id: 'default', labelKey: 'settings.agents.tab.default' },
       { id: 'catalog', labelKey: 'settings.agents.tab.catalog' },
@@ -86,6 +107,7 @@ export const SETTINGS_PRIMARY_TABS: SettingsPrimaryTabDefinition[] = [
     labelKey: 'settings.commands.title',
     icon: 'terminal-square',
     defaultSecondaryTabId: 'mode',
+    backendRequired: 'opencode',
     secondaryTabs: [
       { id: 'mode', labelKey: 'settings.commands.tab.mode' },
       { id: 'editor', labelKey: 'settings.commands.tab.editor' },
@@ -97,6 +119,7 @@ export const SETTINGS_PRIMARY_TABS: SettingsPrimaryTabDefinition[] = [
     labelKey: 'settings.mcp.title',
     icon: 'blocks',
     defaultSecondaryTabId: 'overview',
+    backendRequired: 'opencode',
     secondaryTabs: [
       { id: 'overview', labelKey: 'settings.mcp.tab.overview' },
     ],
@@ -106,6 +129,7 @@ export const SETTINGS_PRIMARY_TABS: SettingsPrimaryTabDefinition[] = [
     labelKey: 'settings.formatter.title',
     icon: 'paintbrush',
     defaultSecondaryTabId: 'overview',
+    backendRequired: 'opencode',
     secondaryTabs: [
       { id: 'overview', labelKey: 'settings.formatter.tab.overview' },
       { id: 'formatter', labelKey: 'settings.formatter.tab.formatter' },
@@ -117,6 +141,7 @@ export const SETTINGS_PRIMARY_TABS: SettingsPrimaryTabDefinition[] = [
     labelKey: 'settings.plugins.title',
     icon: 'package',
     defaultSecondaryTabId: 'overview',
+    backendRequired: 'opencode',
     secondaryTabs: [
       { id: 'overview', labelKey: 'settings.plugins.tab.overview' },
       { id: 'global', labelKey: 'settings.plugins.tab.global' },
@@ -129,6 +154,7 @@ export const SETTINGS_PRIMARY_TABS: SettingsPrimaryTabDefinition[] = [
     labelKey: 'settings.security.title',
     icon: 'shield',
     defaultSecondaryTabId: 'config',
+    backendRequired: 'opencode',
     secondaryTabs: [
       { id: 'config', labelKey: 'settings.security.tab.config' },
       { id: 'safety', labelKey: 'settings.security.tab.safety' },
@@ -163,12 +189,13 @@ export const SETTINGS_PRIMARY_TABS: SettingsPrimaryTabDefinition[] = [
     id: 'debug',
     labelKey: 'settings.debug.title',
     icon: 'bug',
-    defaultSecondaryTabId: 'general',
+    defaultSecondaryTabId: 'plugin',
     secondaryTabs: [
-      { id: 'general', labelKey: 'settings.debug.tab.general' },
-      { id: 'modules', labelKey: 'settings.debug.tab.modules' },
-      { id: 'logs', labelKey: 'settings.debug.tab.logs' },
-      { id: 'actions', labelKey: 'settings.debug.tab.actions' },
+      { id: 'plugin', labelKey: 'settings.debug.tab.plugin' },
+      { id: 'opencode', labelKey: 'settings.debug.tab.opencode' },
+      { id: 'claude-code', labelKey: 'settings.debug.tab.claudeCode' },
+      { id: 'export', labelKey: 'settings.debug.tab.export' },
+      { id: 'capability-lab', labelKey: 'settings.debug.tab.capabilityLab' },
     ],
   },
   {
@@ -187,6 +214,7 @@ export const SETTINGS_PRIMARY_TABS: SettingsPrimaryTabDefinition[] = [
     labelKey: 'settings.skills.title',
     icon: 'brain',
     defaultSecondaryTabId: 'project',
+    backendRequired: 'opencode',
     secondaryTabs: [
       { id: 'project', labelKey: 'settings.skills.tab.project' },
       { id: 'external', labelKey: 'settings.skills.tab.external' },
@@ -197,6 +225,7 @@ export const SETTINGS_PRIMARY_TABS: SettingsPrimaryTabDefinition[] = [
     labelKey: 'settings.tools.title',
     icon: 'wrench',
     defaultSecondaryTabId: 'builtin',
+    backendRequired: 'opencode',
     secondaryTabs: [
       { id: 'builtin', labelKey: 'settings.tools.tab.builtin' },
       { id: 'custom', labelKey: 'settings.tools.tab.custom' },
@@ -207,6 +236,7 @@ export const SETTINGS_PRIMARY_TABS: SettingsPrimaryTabDefinition[] = [
     labelKey: 'settings.acp.title',
     icon: 'radio-tower',
     defaultSecondaryTabId: 'agents',
+    backendRequired: 'opencode',
     secondaryTabs: [
       { id: 'agents', labelKey: 'settings.acp.tab.agents' },
     ],
@@ -220,12 +250,24 @@ const LEGACY_PRIMARY_TAB_ID_MAP: Record<string, string> = {
 const LEGACY_SECONDARY_TAB_ID_MAP: Record<string, Record<string, string>> = {
   general: {
     language: 'basic',
+    backend: 'agents',
   },
   conversation: {
     rendering: 'display',
   },
+  'claude-code': {
+    'mcp-advanced': 'tools',
+    mcpAdvanced: 'tools',
+    limits: 'model-thinking',
+  },
   security: {
     permissions: 'config',
+  },
+  debug: {
+    general: 'plugin',
+    modules: 'plugin',
+    logs: 'export',
+    actions: 'export',
   },
 };
 for (const tab of SETTINGS_PRIMARY_TABS) {

@@ -7,10 +7,12 @@
 
 import { App, PluginSettingTab, Setting } from 'obsidian';
 
+import type { AgentBackendKind } from '../../core/types/chat';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { SettingsAcpSection } from './SettingsAcpSection';
 import { SettingsAgentsSection } from './SettingsAgentsSection';
+import { SettingsClaudeCodeSection } from './SettingsClaudeCodeSection';
 import { SettingsCommandsSection } from './SettingsCommandsSection';
 import { SettingsConversationSection } from './SettingsConversationSection';
 import { SettingsDebugSection } from './SettingsDebugSection';
@@ -60,6 +62,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
   private uiSection: SettingsUiSection | null = null;
   private debugSection: SettingsDebugSection | null = null;
   private serverSection: SettingsServerSection | null = null;
+  private claudeCodeSection: SettingsClaudeCodeSection | null = null;
   private mcpSection: SettingsMcpSection | null = null;
   private securitySection: SettingsSecuritySection | null = null;
   private formatterSection: SettingsFormatterSection | null = null;
@@ -190,6 +193,15 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     this.sectionCoordinator.prepareScrollToSectionOnNextOpen(t('settings.server.title'));
   }
 
+  prepareScrollToClaudeCodeOnNextOpen(): void {
+    if (this.plugin.settings.settingsLayoutMode === 'tabbed') {
+      this.getOrCreateTabbedRenderer().switchToPrimaryTab('claude-code', 'runtime');
+      return;
+    }
+
+    this.sectionCoordinator.prepareScrollToSectionOnNextOpen(t('settings.claudeCode.title'));
+  }
+
   prepareScrollToLspOnNextOpen(): void {
     if (this.plugin.settings.settingsLayoutMode === 'tabbed') {
       this.getOrCreateTabbedRenderer().switchToPrimaryTab('formatter', 'lsp');
@@ -257,11 +269,13 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     this.mcpSection?.dispose();
     this.securitySection?.dispose();
     this.formatterSection?.dispose();
+    this.userSection?.dispose();
     this.userSection = null;
     this.serverSection = null;
     this.mcpSection = null;
     this.securitySection = null;
     this.formatterSection = null;
+    this.claudeCodeSection = null;
     this.refreshModelCatalogStatusCallback = undefined;
   }
 
@@ -277,22 +291,31 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     containerEl.dataset.settingsLayoutMode = 'classic';
 
     this.renderClassicGeneralSection(containerEl);
-    this.addServerSettings(containerEl);
-    this.addModelSettings(containerEl);
+    if (this.isActiveBackend('claude-code')) {
+      this.addClaudeCodeSettings(containerEl);
+    }
+    if (this.isActiveBackend('opencode')) {
+      this.addServerSettings(containerEl);
+      this.addModelSettings(containerEl);
+    }
     this.addConversationSettings(containerEl);
-    this.addAgentsSettings(containerEl);
-    this.addCommandsSettings(containerEl);
-    this.addMcpSettings(containerEl);
-    this.addFormatterSettings(containerEl);
-    this.addPluginSettings(containerEl);
-    this.addSecuritySettings(containerEl);
+    if (this.isActiveBackend('opencode')) {
+      this.addAgentsSettings(containerEl);
+      this.addCommandsSettings(containerEl);
+      this.addMcpSettings(containerEl);
+      this.addFormatterSettings(containerEl);
+      this.addPluginSettings(containerEl);
+      this.addSecuritySettings(containerEl);
+    }
     this.addUISettings(containerEl);
     this.addStyleSettings(containerEl);
     this.addDebugSettings(containerEl);
     this.addUserSettings(containerEl);
-    this.addSkillsSettings(containerEl);
-    this.addToolsSettings(containerEl);
-    this.addAcpSettings(containerEl);
+    if (this.isActiveBackend('opencode')) {
+      this.addSkillsSettings(containerEl);
+      this.addToolsSettings(containerEl);
+      this.addAcpSettings(containerEl);
+    }
 
     this.sectionCoordinator.finishDisplay();
   }
@@ -316,6 +339,17 @@ export class OpenCodianSettingTab extends PluginSettingTab {
 
   private renderPanelTitle(containerEl: HTMLElement): void {
     renderSettingsPanelTitle(containerEl, this.app, this.plugin);
+  }
+
+  private getActiveBackend(): AgentBackendKind | undefined {
+    const activeBackend = this.plugin.settings.activeBackend;
+    return activeBackend && this.plugin.settings.enabledBackends.includes(activeBackend)
+      ? activeBackend
+      : this.plugin.settings.enabledBackends[0];
+  }
+
+  private isActiveBackend(backend: AgentBackendKind): boolean {
+    return this.getActiveBackend() === backend;
   }
 
   // ─── Layout mode control ───────────────────────────────────────────
@@ -385,6 +419,14 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     });
     this.serverSection = serverSection;
     return serverSection.attach(containerEl);
+  }
+
+  private addClaudeCodeSettings(containerEl: HTMLElement): HTMLHeadingElement {
+    this.claudeCodeSection ??= new SettingsClaudeCodeSection({
+      plugin: this.plugin,
+      createSectionHeading: (hostEl, title, tooltip) => this.createSectionHeading(hostEl, title, tooltip),
+    });
+    return this.claudeCodeSection.attach(containerEl);
   }
 
   private addMcpSettings(containerEl: HTMLElement): void {
@@ -571,6 +613,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     this.mcpSection?.dispose();
     this.securitySection?.dispose();
     this.formatterSection?.dispose();
+    this.claudeCodeSection = null;
     this.refreshModelsCallback = undefined;
     this.refreshTitleModelsCallback = undefined;
     super.hide();

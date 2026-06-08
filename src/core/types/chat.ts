@@ -57,6 +57,8 @@ export interface MessageContextAttachment {
 export interface QuestionOption {
   label: string;
   description: string;
+  /** Optional preview text supplied by the Claude Code SDK when AskUserQuestion preview formatting is enabled. */
+  preview?: string;
 }
 
 export interface QuestionPrompt {
@@ -238,6 +240,26 @@ export interface UsageInfo {
   sessionId?: string;
 }
 
+/** Backend session context usage snapshot */
+export interface ContextUsageSnapshot {
+  sessionId: string;
+  sessionTitle: string;
+  createdAt: number;
+  updatedAt: number;
+  compactingAt?: number | null;
+  providerId: string | null;
+  providerName: string | null;
+  modelId: string | null;
+  modelName: string | null;
+  contextWindow: number;
+  inputTokens: number;
+  outputTokens: number;
+  reasoningTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+  totalCost: number;
+}
+
 export type ContextBreakdownKey = 'system' | 'user' | 'assistant' | 'tool' | 'other';
 
 export interface ContextBreakdownSegment {
@@ -312,8 +334,25 @@ export type StreamChunk =
     }
   | { type: 'tool_result'; toolUseId: string; content: string; isError?: boolean }
   | { type: 'file_edited'; file: string }
-  | { type: 'message_metadata'; messageId: string; timestamp: number; modelId?: string }
+  | {
+      type: 'message_metadata';
+      messageId: string;
+      timestamp: number;
+      modelId?: string;
+      sessionId?: string;
+    }
   | { type: 'usage'; inputTokens: number; outputTokens: number; sessionId?: string }
+  | {
+      type: 'backend_event';
+      source: AgentBackendKind;
+      event: 'hook' | 'subagent' | 'tool_progress' | 'structured_output';
+      status?: string;
+      id?: string;
+      name?: string;
+      content?: string;
+      metadata?: Record<string, unknown>;
+      sessionId?: string;
+    }
   | { type: 'error'; content: string; errorClass?: import('../opencode/sdkErrorClassification').SdkErrorClass }
   | { type: 'message_start' }
   | { type: 'message_stop' }
@@ -332,7 +371,12 @@ export type StreamChunk =
         callID: string;
       };
     }
-  | { type: 'question_request'; request: QuestionRequest };
+  | { type: 'question_request'; request: QuestionRequest }
+  | { type: 'prompt_suggestion'; suggestion: string; uuid: string; sessionId?: string }
+  | { type: 'user_message_identity'; uuid: string; sessionId?: string };
+
+/** Logical agent backend identity. Determines which adapter owns a session. */
+export type AgentBackendKind = 'opencode' | 'claude-code' | 'codex' | 'copilot' | 'pi';
 
 /** Conversation metadata */
 export interface ConversationMeta {
@@ -344,6 +388,9 @@ export interface ConversationMeta {
   titleGenerationStatus?: 'pending' | 'success' | 'failed';
   messageCount: number;
   openCodeSessionId?: string;
+  backendSessionId?: string;
+  backendAgentId?: string;
+  backend?: AgentBackendKind;
 }
 
 export interface BackgroundTaskActiveAnchorMetadata {
@@ -366,13 +413,29 @@ export interface Conversation {
   updatedAt: number;
   lastResponseAt?: number;
   titleGenerationStatus?: 'pending' | 'success' | 'failed';
-  openCodeSessionId: string;
+  openCodeSessionId?: string;
+  backendSessionId?: string;
+  backendAgentId?: string;
   messages: ChatMessage[];
   currentNote?: string;
   externalContextPaths?: string[];
   sessionSettings?: ConversationSessionSettings;
   backgroundTaskMetadata?: ConversationBackgroundTaskMetadata;
   transport?: 'opencode' | 'acp';
+  /** Legacy ACP session id retained for persisted compatibility. Use backendSessionId for new code. */
   acpSessionId?: string;
+  /** Legacy ACP agent id retained for persisted compatibility. Use backendAgentId for new code. */
   acpAgentId?: string;
+  /** Which agent backend owns this conversation. Old data defaults to 'opencode'. */
+  backend?: AgentBackendKind;
+}
+
+export function getConversationBackendSessionId(
+  conversation: {
+    backendSessionId?: string | null;
+    openCodeSessionId?: string | null;
+    acpSessionId?: string | null;
+  },
+): string | undefined {
+  return conversation.backendSessionId ?? conversation.openCodeSessionId ?? conversation.acpSessionId ?? undefined;
 }

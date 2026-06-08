@@ -10,7 +10,7 @@
 ## 导入关系
 
 ```text
-上游: obsidian.setIcon, src/i18n
+上游: obsidian.setIcon, src/i18n, src/features/settings/SettingsPopoverController
 下游: ModelPickerModal.ts, ProviderBuiltinIconPickerModal.ts, SettingsModelCatalogPresenter.ts
 ```
 
@@ -32,10 +32,11 @@
 `enhanceSearchInput()` 会：
 
 - 禁用 input 原生 autocomplete
-- 创建历史 popover
+- 创建历史 popover 并通过 `SettingsPopoverController` 将其挂载到 `document.body`（而非 `containerEl`），避免滚动容器裁剪
 - 创建带 `x` 图标的清空按钮
 - 根据焦点和 query 过滤展示历史项
 - 点击历史项后回填 input 并派发 `input` 事件
+- `destroy()` 时通过控制器隐藏并移除 body-level popover
 
 ## 数据流
 
@@ -59,5 +60,7 @@
 
 ## 注意事项
 
-- `destroy()` 只移除 enhancer 创建的 popover 和按钮；调用方仍负责管理 input 本身。
+- `destroy()` 只移除 enhancer 创建的 body-level popover 和按钮；调用方仍负责管理 input 本身。
 - `localStorage` 读写异常会被吞掉，避免隐私模式或存储不可用时破坏设置页。
+- 历史 popover 使用 `SettingsPopoverController` 进行 body-level fixed 定位（z-index 2280），搜索历史状态和防抖逻辑仍由本模块管理。
+- popover 定位自动从 `inputEl` 的最近 `.vertical-tab-content-container` / `.vertical-tab-content` / `.modal-content` 祖先解析钳制边界；调用方也可显式传入 `boundaryEl` 覆盖。当无匹配祖先时回退到视口级钳制。

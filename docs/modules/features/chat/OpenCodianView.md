@@ -2,7 +2,7 @@
 
 > **源码**: `src/features/chat/OpenCodianView.ts`
 > **状态**: [REVIEW]
-> **最近更新**: send pipeline host wiring initialization order
+> **最近更新**: Backend session browser with preview transcript seeding + settings info entry + sandbox badge host wiring
 
 ## 概述
 
@@ -96,17 +96,26 @@ background task completion notice 的 queued-state 则已经完全移出 `TabRun
 - `currentConversation` / `currentConversationRevertState`
 - `services/ChatHeaderPresenter.ts` 的 host seam：server availability、settings/history/new-tab callbacks、status refresh 和 header tab-slot 写回
 - `services/LspStatusRefreshCoordinator.ts` 的 host seam：调用 `OpenCodeService.getLspStatus()`，把 language server connection summary 推送给 header indicator
-- `services/ConversationSessionSettingsCoordinator.ts` 的 host seam：current conversation、global session defaults、active-tab context usage refresh，以及 per-conversation session settings notice/save；当前 OpenCode session 的 share/unshare 由该相邻 owner 通过插件实例解析，避免继续增长 view shell
+- `services/ConversationSessionSettingsCoordinator.ts` 的 host seam：current conversation、global session defaults、active-tab context usage refresh，以及 per-conversation session settings notice/save；view 现在还把 `agentServiceRegistry` 交给 coordinator，用于把当前会话的 share-URL 读取路由到 `readBackendSessionShareUrl()` → backend `getSession(sessionId)` 这条窄 seam。coordinator 按 conversation backend/capability gate 让 Claude Code 会话只显示通用字体/渲染摘要，不暴露 OpenCode-only 的标题生成、问答、压缩或分享 UI；share/unshare 写操作仍由相邻 owner 通过插件实例解析，避免继续增长 view shell
 - 一个面向 settings shell 的公开 bridge：`reapplyCurrentConversationSessionSettings()` 会直接复用上述 coordinator，让 settings/conversation 里的 global session default 修改可以立刻落回当前聊天运行时
 - `services/ConversationHistoryActionsCoordinator.ts` 的 host seam：conversation list/current selection、rename title writeback、delete recovery/reset 与 notice 回调
 - `services/ConversationAuthoritativeSyncCoordinator.ts` 的 host seam：authoritative server sync、latest-user hydration、client-only message preservation、fingerprint/logging 与 hydrated writeback
 - `ConversationWriteSerializationService`：为 send preparation、local stream persistence、message finalization 与 authoritative reload/hydration 提供 per-conversation write ticket + commit boundary；各 view 仍持有本地 service 实例，但默认 shared scope 会让多个 pane 共享同一 conversation 的 ticket/version queue，`OpenCodianView.commitConversationWrite()` 继续是当前保存入口
 - `services/ConversationIdentityRuntime.ts` 的 host seam：conversation sync fingerprint、interrupted-sync preservation log fingerprint、message visual signature，以及 render-list shaping（消息可见性过滤、assistant merge、compaction divider 注入）
 - `services/ChildSessionGraphCoordinator.ts` 的 host seam：从当前活动对话 + `session.children()` live 数据重建 child-session graph，并在消息区底部渲染最小 session tree
-- `services/ChatSelectionControlsCoordinator.ts` 的 host seam：model catalog data source、tab model override/default selection、model-source/server availability 查询、provider icon lookup、permission mode writeback 和 effort selector 联动
+- `services/ChatSelectionControlsCoordinator.ts` 的 host seam：model catalog data source、tab model override/default selection、model-source/server availability 查询、provider icon lookup、permission mode writeback、effort selector 联动。sandbox badge settings provider（`getSandboxSettings` 可选方法）已接入 coordinator，但当前对 Claude Code 后端不可见（badge 挂载依赖 `AgentCapability.Permissions`，而 Claude Code 不声明此 capability）。OpenCode 会继续使用 `ModelConfigService` / server catalog；Claude Code 会使用 `ClaudeCodeModelCatalog` 把官方 aliases 与 SDK `supportedModels()` 投影成 composer model provider，并把 effort selector 切到 Claude Code `low/medium/high/xhigh/max` 语义。
 - `SessionPermissionTracker`：记录“本次会话允许”的临时权限批准；view 在权限卡片返回 `session` 时保存当前 `sessionID` 的 scope，同一会话再次请求相同 scope 时自动回复，并通过 service 边界发送 OpenCode 支持的 `always`
-- `services/ComposerInputShellCoordinator.ts` 的 host seam：input shell DOM 装配、submit gate、textarea 高度同步、composer stack height、Agent selector / toolbar slot mount，以及共享 composer catalog 加载入口
-- `SlashCommandMenuCatalogCache` / `SlashCommandExecutionService` 的 host seam：缓存 runtime commands + skills、项目级 command/agent 配置与 `.opencode/commands/**/*.md` markdown commands 合并后的 composer suggestion catalog；现在还携带 `@agent` mention 和主 Agent selector 的候选 sidecar，并支持由插件入口在设置保存、server 恢复到 `running` 时主动失效。view 还为 synthetic `/compact` command 提供 manual compaction seam，解析当前 session/provider/model 后调用 `OpenCodeService.summarizeSession(..., false)` 并显示 Obsidian notice。
+- Claude Code permission/question bridge 的 view 级 UI context：聊天视图会把当前 active tab id、既有 permission inline card renderer，以及统一的 `QuestionResolutionFlowCoordinator` 注入插件级 `claudeCodePermissionHostContext`；Claude Code adapter 的 `canUseTool` 可复用现有 permission inline card，`AskUserQuestion` 和 MCP `onElicitation` 都会走 inline Question UI 来同步收集答案并在完成后清理临时卡片，避免污染 OpenCode question API 或落入 dock-only 写回路径。证明边界需要分开：`AskUserQuestion` 是已通过普通聊天证明的内置工具路径；MCP `onElicitation` 目前只证明 SDK callback 到共享 question host 的 wiring，真实 pass 还需要 MCP server roundtrip。没有聊天 UI context 时，host 仍返回 `null`，由 bridge 按拒绝/无答案路径处理。
+- send/cancel/title 相关 runtime bridge 现在会通过 `AgentServiceRegistry` 按 conversation owner 解析 chat/session backend；OpenCode conversation 继续走 OpenCode adapter，非 OpenCode conversation 不再静默落回 `openCodeService`。cancel/detach 同样按当前 conversation backend 分流，Claude Code 等非 OpenCode backend 不会再调用 `openCodeService.detachStream()`。
+- user message footer 的 fork / rewind capability 也按当前 conversation owner 解析，而不是读取全局 active backend。这样 active backend 是 OpenCode 时，Claude Code conversation 仍只显示 Claude 声明的 fork，不会把 OpenCode Branching 能力投射成 Claude Rewind；OpenCode conversation 在 OpenCode 声明 Branching 时仍显示 Rewind。
+- active backend 切换由 `AgentServiceRegistry.onActiveChange()` 驱动：view 会阻止加载不属于当前 active backend 的 conversation，并自动切到该 backend 最新 conversation；没有则在当前 tab 创建该 backend 的新 conversation。切换时还会刷新 header backend chrome 和 status 文案，避免 OpenCode-only LSP/server chrome 残留在 Claude Code 会话上。
+- backend/capability 切换还会调用 composer toolbar remount seam：view 先销毁旧 context ring / effort selector / selection controls，再让 `ComposerInputShellCoordinator.refreshToolbarControls()` 按最新 capabilities 重建 toolbar，避免 Claude Code 会话继续显示 OpenCode-only agent selector 或 permission controls。
+- Claude Code `backend_event` 诊断 chunk（hook/subagent/tool progress/structured output）不会转换成渲染层 stream chunk；这些事件只进入 send pipeline 调试摘要，直到对应产品 UI 完成运行期证明。
+- header status badge 的 settings action 按 active backend 路由：OpenCode 继续跳 Server section，Claude Code 则跳 Claude Code runtime section，避免 Claude mode 下露出 OpenCode-only server chrome。
+- non-OpenCode backend 的 chat/server availability 现在会读取 active adapter 的 `status`，再映射成 `running` / `starting` / `offline`；Claude Code 断开时不再被视为默认在线，composer 和 header 会显示真实离线态。
+- `services/ComposerInputShellCoordinator.ts` 的 host seam：input shell DOM 装配、submit gate、textarea 高度同步、composer stack height、Agent selector / toolbar slot mount，以及 `/json` capability chip 显示决策
+- `SlashCommandMenuCatalogCache` / `SlashCommandExecutionService` 的 host seam：缓存 runtime commands + skills、Claude Code `getRuntimeCatalog().commands`、项目级 command/agent 配置与 `.opencode/commands/**/*.md` markdown commands 合并后的 composer suggestion catalog；现在还携带 `@agent` mention 和主 Agent selector 的候选 sidecar，并支持由插件入口在设置保存、server 恢复到 `running` 时主动失效。view 通过 `loadClaudeRuntimeCommands` 可选回调把 Claude adapter 的 sanitized runtime commands 委托给 cache，adapter 不可用时返回 `null`，避免影响 OpenCode 路径。Claude Code 作为 active backend 时，`loadSlashCommandMenuItems()` 也会继续调用 cache（不再提前返回 `[]`），由 cache host 的 `loadClaudeRuntimeCommands` 从 Claude adapter 读取 runtime commands。view 还为 synthetic `/compact` command 提供 manual compaction seam，解析当前 session/provider/model 后调用 `OpenCodeService.summarizeSession(..., false)` 并显示 Obsidian notice。
+- slash command catalog 的后台 warm preload 现在也受 chat-surface availability guard 约束：当 header/composer 已把状态解释为 `disabled` 或 `offline` 时，view 不再提前 `warm()` runtime slash catalog，避免 backend 不可用时额外制造一次预热拒连日志；Claude Code active backend 也支持 `scheduleSlashCommandMenuPreload()`，用于提前 warm Claude runtime command catalog。
 - `services/InputPanelAppearanceCoordinator.ts` 的 host seam：input panel theme class、action button style、SVG filter layer、liquid-glass mount/unmount 与 diagnostics log 去重
 - 由 `ComposerContextViewFacade.create()` 基于独立的 `createComposerContextViewHost()` / `createFocusContextViewHost()` seam 装配出的 `ComposerContextEventBridge`、`ComposerContextCoordinator`、`FocusContextRuntimeService`、`PersistentAssistantNoticeService` 等视图级运行时协作对象
 - theme background 与 experimental demo / glass octahedron 相关 DOM 引用
@@ -122,8 +131,9 @@ background task completion notice 的 queued-state 则已经完全移出 `TabRun
 3. `chatHeaderPresenter.startServerStatusLoop()` 与 `lspStatusRefreshCoordinator.start()` 分别启动 server 和 LSP connection summary 刷新
 4. 在 `messagesShellEl` 上创建 `MarkdownRenderService`
 5. `wireEventHandlers()`，其中 composer/context 相关的 workspace / vault / DOM 事件注册与 retained-selection polling 启动都会转交给 `ComposerContextEventBridge`
-6. 通过 `ConversationSessionSignalRuntime` 统一订阅 session sync event 与 todo/status live signal 更新
-7. `initializeFirstTab()`：恢复持久化 tabs、加载首个对话；如果最终需要新建 conversation，才会经由插件层 `createConversation()` 接管 deferred runtime warmup，避免把已有会话的视图首开也一并阻塞
+6. `wireBackendSurfaceSwitch()` 注册 active-backend change 监听，确保设置页或 agent switcher 切换 backend 后，聊天表面同步切到该 backend 自己的 conversation
+7. 通过 `ConversationSessionSignalRuntime` 统一订阅 session sync event 与 todo/status live signal 更新；只有当前 active backend 确实是启用中的 OpenCode 时才启动，避免 Claude Code-only / 非 OpenCode active 场景继续建立 OpenCode-only signal 订阅并制造离线噪音
+8. `initializeFirstTab()`：只恢复当前 active backend 的持久化 tabs、加载该 backend 的首个对话；如果最终需要新建 conversation，才会经由插件层 `createConversation()` 接管 deferred runtime warmup，避免把已有会话的视图首开也一并阻塞
 
 结束时会输出一条 `[view-open]` 汇总日志，包含各阶段耗时拆分。
 
@@ -176,17 +186,28 @@ header DOM、server status badge、title logo/wordmark、new/current-tab、histo
 - tooltip 标签、plugin asset URL、css-change 注册和 layout/color sync 回调
 - header tab bar slot 写回给 tab bar layout
 
-server status loop、badge class、status label、本地/远端文案判定和 locale refresh 都在 presenter 内部完成；LSP status loop 由相邻的 `LspStatusRefreshCoordinator` 持有并通过 presenter 更新 indicator。view 不再直接持有 header button refs 或 status interval 状态。
+server status loop、badge class、status label、本地/远端文案判定和 locale refresh 都在 presenter 内部完成；LSP status loop 由相邻的 `LspStatusRefreshCoordinator` 持有并通过 presenter 更新 indicator。view 不再直接持有 header button refs 或 status interval 状态。Phase 0/1 backend-capability 收尾还在这个 seam 上补了一层 surface 语义：当 `enabledBackends` 为空，header 会把状态解释为 `disabled`；当当前 active backend 是 Claude Code 等非 OpenCode backend 时，聊天 composer 不再探测 OpenCode server health，而是把 backend 视为可发送，由对应 adapter/auth/query 路径返回真实错误或流式结果。非 OpenCode backend 离线时，header badge 现在也使用 backend-specific offline label（例如 `Claude Code offline`），避免和 OpenCode server offline 混成同一个状态。
 
 ### Conversation history / actions ownership
 
 header 上 history 按钮触发的 conversation history dropdown、rename dialog、delete confirm countdown、dropdown 定位，以及 click-outside / destroy cleanup 现在由 `services/ConversationHistoryActionsCoordinator.ts` 承接。`OpenCodianView` 只保留 coordinator host seam：
 
-- conversation list、current conversation 与 foreground-busy 状态读取
+- conversation list、current conversation、active backend display name 与 foreground-busy 状态读取
 - `loadConversation()`、`updateConversationTitleState()` 与 `ConversationTabLifecycleRecoveryCoordinator` delete/reset 入口
 - title generation cancel 与 notice 回调
 
 因此 view 不再直接持有 history dropdown DOM/state、rename/delete confirm overlay 或 dropdown positioning RAF；delete fallback、rename title sync 到 session，以及 tab cleanup/reset 语义保持不变。
+History dropdown 的实际 conversation 过滤仍由 view host 根据 `settings.activeBackend` 完成；coordinator 只显示 host 提供的 backend scope label，让 Claude / OpenCode 历史过滤在 UI 上明确可见。
+本轮还把 history dropdown 的视觉层级重新拉开：scope label、active/selected 态、标题生成状态 pill、footer action 区和滚动容器都使用更明确的玻璃卡片层次，但仍保留原 class hooks，避免破坏现有 tests。
+
+### backend-aware first-turn title pending
+
+首条 user message 的标题 bootstrap 不再只有 OpenCode 会进入。当前实现是在 send-preparation owner 中按 backend 决定是否继续异步标题生成，并通过 view host seam 暴露 Claude Code `autoTitle` truth：
+
+- OpenCode：只有 `titleMode === 'ai'` 时标记 `pending`
+- Claude Code：只有 `backendSettings.claudeCode.autoTitle === true` 时标记 `pending`
+
+这样 Claude Code 新会话在 auto-title 开启时，也会先显示本地 provisional title，再等待 backend `summary` 回写；后续 `startAiConversationTitleGeneration()` 的 callback 仍复用“只有 fallback title 且状态仍是 `pending` 才覆盖”的保护条件，避免用户手动 rename 后被官方标题抢回。view 本体只新增了一个窄 host getter，把 Claude Code title setting 暴露给相邻的 `MessageSendPreparationService` owner，而没有把更多标题状态判断回灌进 `OpenCodianView.ts`。
 
 ### Composer input shell 抽离
 
@@ -199,6 +220,8 @@ header 上 history 按钮触发的 conversation history dropdown、rename dialog
 - 供后续 glass/theme 逻辑读取的 composer shell / input wrapper DOM refs
 
 稳定聊天视图当前明确只启用 prompt 输入模式：`getComposerInputMode()` 固定返回 `prompt`，意外进入的 shell submission 会被记录并忽略，不会走本地-only shell 状态。后续如果要开启 shell parity，入口必须通过 `OpenCodeService.runSessionShell()` / `session.shell`，并复用 canonical session/message/part projection，而不是在 view 内新增 shell 消息状态。
+
+Phase 0/1 的 backend-empty / backend-offline 收尾还在这个 seam 上新增了一层高阶 composer availability state：`OpenCodianView` 负责把“没有任何 enabled backend”和“OpenCode active 但运行时不可连接”聚合成统一 surface 状态，再交给 `ComposerInputShellCoordinator` 渲染禁用态。Claude Code 等非 OpenCode active backend 不再因为 OpenCode server 离线而禁用 composer。具体 textarea/button 禁用与 availability notice DOM 不回流到 view；coordinator 现在会把说明移出 input wrapper，空会话继续复用消息区 empty-state notice，非空会话则在消息区下缘挂一条 transient warning notice。
 
 这样 view 不再直接维护 textarea Enter-submit、高度同步、`ResizeObserver` / RAF layout 节流或 send/stop button tooltip 状态；toolbar 里的 selector 区域也已经进一步交给专门 owner，input shell 只保留 slot 级挂载职责。
 
@@ -230,15 +253,18 @@ header 上 history 按钮触发的 conversation history dropdown、rename dialog
 `initializeFirstTab()` / `restorePersistedTabs()` / `createNewConversation()` / `loadConversation()` / fork / rewind 这些 conversation lifecycle 入口现在先经由 `services/ConversationLoadRecoveryCoordinator.ts`：它直接承接首开 bootstrap / persisted restore / fallback-create，再分别复用 `ConversationTabOpenCoordinator`、`ConversationTabLifecycleRecoveryCoordinator` 与 `ConversationViewStateService`。消息区的 `renderMessage()` / `renderMessages()`、empty-rewind notice、single-user body rerender、pseudo-stream reveal、full rerender、tail patch 与 append-only 增量更新则统一收束到 `services/ConversationRenderService.ts`，而 conversation fingerprint / visual signature / render-list shaping 则由 `services/ConversationIdentityRuntime.ts` 统一提供。其中 loaded-conversation 的 resolve / reload retry / server-sync 判定先经由 `runtime/ConversationLoadRuntimeBridge.ts` 落回 view host，tab/pane activation 预刷新会先经由 `runtime/TabViewActivationBridge.ts` 落回 view host，active-tab conversation/session 写回则先经由 `runtime/TabConversationActivationBridge.ts` 收束 activation 入口，再复用 `runtime/TabConversationStateBridge.ts` 落回 view host，loaded-conversation 的 preflight cleanup / hydration shell 则先经由 `runtime/ConversationTransitionBridge.ts` 收束，再由 `runtime/ConversationHydrationRenderBridge.ts` 处理 scroll/class restore，而消息装载完成后的 background-task rebuild / message rerender / post-render outcome / baseline 则继续经由 `runtime/ConversationHydrationOutcomeBridge.ts` 收束。主链路仍然保持原来的语义：
 
 - 在切换对话时取消旧对话的标题生成
-- 首条消息后的标题链路仍由 view 发起并接收回调；实际官方标题优先、本地兜底、以及首次 provisional server 写入抑制分别由 `TitleGenerationService` 和 `OpenCodeSessionLifecycleCoordinator` 承接，view 只负责更新本地 conversation/title status 与 tab 标题
+- OpenCode 首条消息后的标题链路仍由 view 发起并接收回调；实际官方标题优先、本地兜底、以及首次 provisional server 写入抑制分别由 `TitleGenerationService` 和 `OpenCodeSessionLifecycleCoordinator` 承接，view 只负责更新本地 conversation/title status 与 tab 标题。Claude Code 当前未接入标题生成，发送准备阶段不会触发 OpenCode title fallback 或 AI title kickoff。
 - 清空当前消息区并重置 turn 状态
-- 把 `openCodeSessionId` 交给 `openCodeService`
+- 把 legacy `openCodeSessionId` 交给 `openCodeService`；发送和 tab runtime 的通用 session identity 逐步迁到 `backendSessionId` / `getConversationBackendSessionId()`，但标题同步、取消流、child session 等 OpenCode-only surface 仍按 backend/capability 分阶段保留 guard
+- `getSessionIdForTab()` / `getOpenCodeSessionIdForConversation()` 的命名仍带历史 OpenCode 语义，但现在通过 `getConversationBackendSessionId()` 为 OpenCode、Claude Code 和 ACP 等所有 backend 解析 backend-agnostic session id。Claude Code runtime 证明使用 `TaskCreate` / `TaskUpdate` 等 CRUD 工具而非 `TodoWrite`；`AgentCapability.Todos` 已重新启用，`SessionTodoCoordinator` 以 backend session id 为作用域推导 Task* 状态，并在 session reset / activation 时从 stored `contentBlocks` replay persisted Task* state。
+- revert / unrevert 的 session control 调用现在通过 `AgentServiceRegistry` 路由到拥有 `AgentCapability.Branching` 的 backend adapter；fork 则通过 `AgentCapability.Fork` 路由到 `AgentForkCapability` adapter；OpenCode 仍走 `openCodeService` 作为 fallback，Claude 等 backend 在未声明对应能力时直接抛错，避免把 Claude session ID 误传入 OpenCode-only 路径
 - 在必要时调用 `syncConversationMessagesFromServer()`
 - 在 load 完成与 authoritative sync 完成后额外调用 `ChildSessionGraphCoordinator.refreshGraph()`，让 child-session tree 跟随当前可见对话的 persisted/live child-session 数据刷新
 - 装载阶段进入 hydration：先重建历史 turn / inline background task，再等待后续 authoritative message sync 决定是否允许 stale 降级
 - 重新渲染消息、背景任务指示器、todo dock、question dock
 - 通过 `ConversationSyncHostAdapter` 组装 `ConversationSyncRuntimeCoordinator` / `ConversationSyncOrchestrationService` / `ConversationSyncBridge`，并通过 `ConversationSessionSignalRuntime` 接入 session sync event + todo/status live signal 的订阅、session→tab 匹配与 cleanup 生命周期
 - 更新模型显示和 context usage
+- Claude Code conversation 的 `loadConversation()` 在 authoritative hydration 之后会调用 `ClaudeUserMessageIdentityBackfillService.backfill()`，从 Claude SDK session history 回填 user message `sourceMessageId`，确保已有 Claude 对话 reload 后 fork 按钮仍然正常显示
 
 后台同步分两路：
 
@@ -256,13 +282,13 @@ signal sync 与后台轮询里的 loop lifecycle、signal debounce、tab / conve
 `ChildSessionGraphCoordinator` 现在 owns child-session tree 的完整生命周期，包括 graph 重建和 DOM 渲染：
 
 - coordinator 的 `render()` 负责在消息区底部创建/复用 `.opencodian-session-tree` 容器，并渲染 `complete`/`partial` graph 的折叠区；`empty` graph 直接隐藏整块
-- 普通 edge 行显示状态点、title/description 与 `Open` 按钮；按钮通过构造函数传入的 `onOpenTaskToolSession` 回调触发，该回调绑定到 `ConversationTabOpenCoordinator.openTaskToolSession`
+- 普通 edge 行显示状态点、title/description 与 `Open` 按钮；按钮通过构造函数传入的 `onOpenTaskToolSession` 回调触发。该回调现在会把 `currentConversation?.backend` 一并透传给 `ConversationTabOpenCoordinator.openTaskToolSession`，确保 child/task session conversation 保留父会话的 backend identity。
 - orphaned session 行固定显示 `Unknown task`，同时标记 partial graph badge，并在 graph 为 `partial` 时显示提醒文案
 - graph state 不落进 `TabRuntimeState`；view 只在 active pane 切换时通过 `coordinator.clearContainer()` / `coordinator.render()` 重建，真正的 graph snapshot 仍留在 coordinator 内部
 - `SESSION_TREE_BASE_CSS` 由 coordinator 导出，view 在 `applyChatAppearanceSettings()` 中注入
 
 `OpenCodianView` 只保留：
-- `createChildSessionGraphCoordinatorHost()` 提供 host seam（`getMessagesContainerEl`）；`onOpenTaskToolSession` 在 coordinator 构造时直接绑定到 `ConversationTabOpenCoordinator.openTaskToolSession`，不再通过 host 接口传递
+- `createChildSessionGraphCoordinatorHost()` 提供 host seam（`getMessagesContainerEl`）；`onOpenTaskToolSession` 在 coordinator 构造时通过 view-local lambda 调用 `ConversationTabOpenCoordinator.openTaskToolSession(sessionId, toolCall, currentConversation?.backend)`，而不是无参 bind，因此 child session graph 和 assistant shell 打开的子会话都不会再盲跟 `settings.activeBackend`
 - 在 conversation load / sync 完成后调用 `coordinator.refreshGraph()`
 - 在 pane 切换时调用 `coordinator.clearContainer()` 和 `coordinator.render(currentGraph)`
 - 在 close / empty-tab 路径上调用 `coordinator.hide()` 和 `coordinator.clearGraph()`
@@ -513,7 +539,7 @@ session todo 这条子链路现在的边界是：
 - `SessionTodoDockCoordinator`：session todo dock 的 slot 生命周期，以及 active/background tab 的 session→dock 渲染选择
 - `QuestionTodoActivationRefreshCoordinator`：activation/open 侧的 question dock render、session todo dock writeback 与 supplemental refresh 编排
 - `QuestionTodoBackgroundTaskActivationHostAdapter` 内联的 background-task activation port：activation/open 侧的 background-task indicator reset、conversation-derived runtime rebuild 与 render trigger 编排
-- `ActiveTabContextUsageCoordinator`：activation/open 侧的 active-tab context usage identity / snapshot writeback 编排，以及 per-tab stream lifecycle、indicator 刷新和详情弹窗打开
+- `ActiveTabContextUsageCoordinator`：activation/open 与相邻 sync 路径的 active-tab context usage identity / snapshot writeback 编排，以及 per-tab stream lifecycle、indicator 刷新和详情弹窗打开；context usage detail modal 的 rawMessageLoader 现通过 `loadBackendSessionMessages()` 路由到 backend-aware session history service。`OpenCodianView.createActiveTabContextUsageCoordinatorHost().getSessionContextUsageSnapshot()` 已后端感知：当当前会话 backend 为 `claude-code` 时，路由到 `ClaudeCodeAdapter.getSessionContextUsageSnapshot()`（调用 `query.getContextUsage()` 并转换为 core-owned `ContextUsageSnapshot`）；当 backend 为 `opencode` 时，仍走 `OpenCodeService.getSessionContextUsageSnapshot()` 原有路径。`OpenCodianView` 只消费 `src/core/types` 导出的 DTO，不从 `ContextUsageService` 反向导入类型，保持 chat view 与 backend owner 的依赖方向清晰
 - `QuestionRuntimeViewHostFactory`：question runtime 相邻的 dock/API/attention late-bound host 派生，以及完整的 runtime bundle 装配（`createQuestionRuntimeBundle`）；`OpenCodianView` 不再直接调用 `createQuestionRuntimeViewHost`、`createQuestionPostResolutionRuntimeHostAdapter` 或 `createQuestionRuntimeServices`
 - `QuestionTodoBackgroundTaskRefreshHostAdapter`：`QuestionTodoStatusRefreshCoordinator`、`PostSyncQuestionTodoRefreshFacade`、`VisibleConversationPostSyncCoordinator` 与 `BackgroundConversationPostSyncHandoffCoordinator` 共用的 refresh-side host factory 与 service bundle 装配
 - `QuestionTodoBackgroundTaskRuntimeServiceBundle`：question/todo/background-task 共享的 host assembly 与 service instantiation 顺序；`OpenCodianView` 不再内联组装 `assembleQuestionTodoBackgroundTaskRuntimeHost()`，改为构造 `QuestionTodoBackgroundTaskRuntimeSeam` 直接传给本模块的 `createQuestionTodoBackgroundTaskRuntimeServiceBundleFromSeam()` 工厂
@@ -584,19 +610,20 @@ effort selector 的 variant 列表继续直接按当前 provider/model 查询 `f
 - `TabConversationActivationBridge`：当前活动 tab 的 empty-state activation / current-tab 新建会话打开路径 shell orchestration 与后续 UI refresh 编排
 - `TabViewActivationBridge`：tab/pane activation 预刷新写回与 streaming / empty-tab activation outcome UI 刷新
 - `TabActivationRuntimeViewHostFactory`：tab activation bridge 全套实例化已通过 `createTabActivationRuntimeAssembly(deps)` 工厂集中到该模块；`OpenCodianView` 不再直接实例化 `TabConversationStateBridge`、`TabViewActivationBridge`、`TabConversationActivationBridge` 或 `TabRuntimeStateBridge`，改为从 assembly 结果中取出 bridge 实例
-- `ActiveTabContextUsageCoordinator`：activation/open 与相邻 sync 路径的 active-tab context usage identity / snapshot writeback，以及 per-tab stream lifecycle（begin/complete/apply-chunk）、indicator 刷新和详情弹窗打开
+- `ActiveTabContextUsageCoordinator`：activation/open 与相邻 sync 路径的 active-tab context usage identity / snapshot writeback，以及 per-tab stream lifecycle（begin/complete/apply-chunk）、indicator 刷新和详情弹窗打开；context usage detail modal 的 rawMessageLoader 现通过 `loadBackendSessionMessages()` 路由到 backend-aware session history service
 - `ConversationTransitionBridge`：loaded-conversation 的 preflight cleanup、消息区 shell 与 hydration lifecycle bridge
 - `ConversationHydrationOutcomeBridge`：loaded-conversation 消息装载后的 background-task rebuild、message rerender、post-render outcome 与 baseline commit
 - `ConversationHydrationRenderBridge`：loaded-conversation hydration 的消息容器 scroll/class shell 与 pane metrics 回写
 - `ConversationHydrationRuntimeViewHostFactory`：通过 `assembleConversationHydrationRuntime` 拥有完整的 hydration bridge assembly 生命周期，view 不再直接调用底层 bridge 构造函数
 - `ConversationLoadRecoveryCoordinator`：通过 `assembleConversationLoadRecovery(deps)` 把 `ConversationViewStateService`、`ConversationTabOpenCoordinator`、`ConversationTabLifecycleRecoveryCoordinator` 与 `ConversationLoadRecoveryCoordinator` 的组装收束到该模块；`OpenCodianView` 的 `createConversationRuntimeWiring` 不再直接实例化这四个服务
 - `ConversationTabRuntimeCoordinator`：通过 `assembleConversationTabRuntime(deps)` 作为 `createConversationTabRuntimeCoordinator` 的同义导出，供 view 调用；`OpenCodianView` 的 `createConversationRuntimeWiring` 不再直接调用 `createConversationTabRuntimeCoordinator`
+- `createBackgroundTaskInfrastructure`：从 `createConversationRuntimeWiring` 中提取的背景任务基础设施（indicator、render port、stream trigger、view host）装配私有方法，减少 `createConversationRuntimeWiring` 的行数并保持背景任务创建逻辑内聚
 - `SendPipelineRuntime`：发送子系统总入口，负责真实 stream 调用、runtime 内部模块装配，以及向 `MessageFinalizationService` 交接
 - `StreamChunkRouter`：发送子系统内部的 stream loop / pending / timeout / chunk router
 - `StreamLocalFinalizer`：发送子系统内部的本地 shell finalization 与第一次本地保存
 - `AssistantShellViewHostAdapter` / `AssistantShellRenderer` / `AssistantNoticeRenderer` / `AssistantErrorRenderer` / `AssistantPlainTextFallbackRenderer` / `AssistantStructuredContentRenderer` / `StreamingInlineCardRenderer` / `PermissionInlineCardRenderer` / `SendPipelineTrace` / `PendingIndicatorController` / `buildLocalStreamOutcome` / `StreamShellFinalizer` / `LocalStreamMessagePersistence`：发送子系统更细粒度的内部协作模块
 - `MessageSendPreparationService`：`sendMessage()` 前半段的 send preflight、optimistic user message 落地，以及 stream-enter 状态编排
-- `MessageFinalizationService`：`sendMessage()` 末段的 final sync、post-sync patch/rerender、todo/save/attention 收尾编排，以及 server-start / server-unavailable 助手错误终结流（`finalizeAssistantMessageWithServerError`、`finalizeAssistantMessageWithServerUnavailableError`）；所有错误分类逻辑（`getFriendlyServerStartErrorMessage`、`getUnavailableServerMessage`）由该服务内部持有；`OpenCodianView` 不再直接调用 `finalizeAssistantMessageWithError`；host 组装通过 `createMessageFinalizationHost(deps)` 工厂完成，`OpenCodianView` 不再拥有 `createMessageFinalizationHost` 私有方法；deps 接口使用原始 owner 子对象（`conversationIdentityRuntime`、`conversationRenderService`、`backgroundTaskHost` 等），不再逐字段包装 lambda
+- `MessageFinalizationService`：`sendMessage()` 末段的 final sync、post-sync patch/rerender、todo/save/attention 收尾编排，以及 server-start / server-unavailable 助手错误终结流（`finalizeAssistantMessageWithServerError`、`finalizeAssistantMessageWithServerUnavailableError`）；所有错误分类逻辑（`getFriendlyServerStartErrorMessage`、`getUnavailableServerMessage`）由该服务内部持有；`OpenCodianView` 不再直接调用 `finalizeAssistantMessageWithError`；host 组装通过 `createMessageFinalizationHost(deps)` 工厂完成，`OpenCodianView` 不再拥有 `createMessageFinalizationHost` 私有方法；deps 接口使用原始 owner 子对象（`conversationIdentityRuntime`、`conversationRenderService`、`backgroundTaskHost` 等），不再逐字段包装 lambda；`promptSuggestionSessionResync` dep 为 scoped prompt-suggestion session resync 提供 tab-level channel 隔离的发射路径
 - `TabManager` / `TabBar`：tab 生命周期和 tab 元数据
 - `MarkdownRenderService`：Markdown 渲染
 - `StreamController`：流式 assistant DOM 更新

@@ -14,6 +14,10 @@
 
 布局模式通过 `settingsLayoutMode` settings 字段持久化，新用户默认 `'tabbed'`，老用户升级默认 `'classic'`。标签模式的标签结构定义在 `settingsLayoutRegistry.ts`，渲染委托给 `SettingsTabbedRenderer`。
 
+classic 和 tabbed 两种布局都必须按当前 active backend 过滤后端专属 section：OpenCode active 时显示 Server / Model / Agents / Commands / MCP / Formatter / Plugins / Security / Skills / Tools / ACP 等 OpenCode-owned 分区；Claude Code active 时只显示 Claude Code 自身分区以及 Conversation / UI / Style / Debug / User 等通用分区。不要仅因为某个 backend 在 `enabledBackends` 中就显示它的专属设置。
+
+聊天 header 和其他 runtime 入口可以通过 settings tab 的 scroll-prep 方法跳到对应 backend owner：OpenCode 跳 Server / connection，Claude Code 跳 Claude Code / runtime；classic 布局滚动到 section 标题，tabbed 布局切换 primary / secondary tab。
+
 ## Settings Layout Contract
 
 标准 settings tab 的根设置容器会暴露稳定布局契约标记：`data-settings-surface="page"` 和 `data-settings-layout-mode="classic|tabbed"`。CSS 与测试应优先使用这些 data marker 做页面 surface / layout mode 的契约检查，而不是只从 `.opencodian-settings--classic` 或 `.opencodian-settings--tabbed` 等视觉 class 推断当前模式。
@@ -38,25 +42,26 @@
 
 ## 主要分区
 
-`display()` 会重建整个设置面板，并依次挂载这些分区：
+`display()` 会重建整个设置面板，并按当前 active backend 挂载这些分区：
 
 - General
-- Server
-- MCP
-- Model
+- Claude Code（仅 Claude Code active）
+- Server（仅 OpenCode active）
+- MCP（仅 OpenCode active）
+- Model（仅 OpenCode active）
 - Conversation
-- Agents
-- Commands
-- Formatter
-- Plugins
-- Security
+- Agents（仅 OpenCode active）
+- Commands（仅 OpenCode active）
+- Formatter（仅 OpenCode active）
+- Plugins（仅 OpenCode active）
+- Security（仅 OpenCode active）
 - UI
 - Style
 - Debug
 - User
-- Skills
-- Tools (Built-in + Custom)
-- ACP Agents
+- Skills（仅 OpenCode active）
+- Tools (Built-in + Custom)（仅 OpenCode active）
+- ACP Agents（仅 OpenCode active）
 
 其中最近变化较大的几块是：
 
@@ -89,6 +94,9 @@
 - **UI**
   - `SettingsUiSection` 现在接管 max tabs、tab position/layout、auto scroll、chat scroll mode 与 open-in-main-tab 的完整 section lifecycle
   - `OpenCodianSettings` 不再直接铺开 UI section 的 dropdown/toggle/slider wiring，只保留 owner 装配
+- **Claude Code**
+  - `SettingsClaudeCodeSection` 现在接管 Claude Code Phase 1 配置基础，包括 executable path、setting sources、permission mode、model/fallback model、thinking/effort、additional directories 与 runtime diagnostics
+  - 该 section 只写入 `backendSettings.claudeCode`；`claude-code` 是否启用由 General / Backend 的 `SettingsBackendSection` 管理，runtime 注册由 `main.ts` 的 backend registry bootstrap 管理
 - **Style**
   - `SettingsStyleSection` 现在接管 theme preset、layout/user/assistant/scrollbar/input/advanced 分组、custom CSS 与 reset / refresh 编排
   - 聊天背景图上传/调参/预览拖拽继续由 `SettingsStyleBackgroundSection` 作为 style owner 的子区块 owner 处理
@@ -97,6 +105,7 @@
 - **Security**
   - config file status / permission mode / restart action 现已委托给 `SettingsSecuritySection`
   - blocklist、external access、export path 与平台 blocked commands 的 section 组装同样收口到专属 owner
+  - security section 当前读写 `.opencode/opencode.json` 并管理 OpenCode permission/restart/blocklist 语义，只能在 OpenCode active 时显示；Claude Code 的 permission mode 属于 `SettingsClaudeCodeSection`
 - **Tools**
   - `SettingsToolSection` 继续管理 built-in tool permission 分组，并新增自定义工具文件管理：可在 `.opencode/tools/` 创建默认 TS 工具模板、编辑/删除项目工具文件、只读展示 `~/.config/opencode/tools` 全局工具，并保留运行时 catalog custom tool 的真实 tool id 权限控制
   - 自定义工具的启用 / 询问 / 拒绝仍写入项目 `.opencode/opencode.json` 的 `permission.<toolName>`；文件管理不直接执行或加载工具
@@ -112,8 +121,9 @@
 
 - DOM 引用会失效
 - section heading / quick-nav / scroll restore 需要在重建后重新接线
+- 每次重建前都必须先释放各 section owner 的副作用；现在 `disposeSections()` 也会显式销毁 `SettingsUserSection`，避免 user prompt / excluded-tags textarea 的 size-memory observer 残留在旧 DOM 上
 
-从 R9 开始，这部分壳层生命周期已委托给 `SettingsSectionCoordinator`：`OpenCodianSettings` 只负责按顺序挂载 General / Server / Model / Conversation / Agents / Commands / MCP / Formatter / Plugins / Security / UI / Style / Debug / User 各 section，本身不再直接持有 quick-nav DOM 组装或滚动恢复定时器细节。tabbed 模式也必须先进入 `beginDisplay({ showQuickNav: false })`，由 coordinator 捕获当前滚动位置后再清空重建内容；不要在调用 `beginDisplay()` 前额外 `empty()` 容器，否则新增/删除格式化器等 tabbed 刷新会先把滚动容器夹回顶部。tabbed 模式只保留标题 + 一级标签栏 + 二级标签栏 + 内容区。
+从 R9 开始，这部分壳层生命周期已委托给 `SettingsSectionCoordinator`：`OpenCodianSettings` 只负责按顺序挂载当前 backend 可见的 General / backend-specific sections / Conversation / UI / Style / Debug / User 等 section，本身不再直接持有 quick-nav DOM 组装或滚动恢复定时器细节。tabbed 模式也必须先进入 `beginDisplay({ showQuickNav: false })`，由 coordinator 捕获当前滚动位置后再清空重建内容；不要在调用 `beginDisplay()` 前额外 `empty()` 容器，否则新增/删除格式化器等 tabbed 刷新会先把滚动容器夹回顶部。tabbed 模式只保留标题 + 一级标签栏 + 二级标签栏 + 内容区。
 
 2026-04-26 的后续导航微调又把 `MCP` 固定到 `Commands` 和 `Formatter` 之间：一级标签顺序、classic section 挂载顺序和 quick-nav 按钮顺序都保持一致，避免在两种布局之间切换时看到不同的导航位置。
 
@@ -209,6 +219,7 @@ provider 开关写回仍遵循 `ModelConfigService` 返回的 `effectiveProvider
 - `SettingsDropdownControl`: 管理设置页 `<select>` / `DropdownComponent` 的跨平台自绘视觉层，底层保存逻辑仍走原 select change 事件
 - `SettingsTabbedRenderer`: 标签模式下的标签栏渲染与内容路由，从 `OpenCodianSettings` 中提取以控制代码行数；用户标签内容通过单一 `renderUserContent` seam 委托给 user section owner
 - `SettingsUserSection`: 用户 profile/prompt/tags 设置的经典 section shell 与 tabbed content routing owner，从 `OpenCodianSettings` 中提取
+- `display()` / `hide()` 生命周期现在会先调用 `disposeSections()`，因此 `SettingsUserSection` 的 textarea size-memory 清理由主设置页 shell 统一触发
 - `settingsLayoutRegistry`: 标签模式的标签结构定义与查找/回退函数
 - `SettingsServerSection`: 管理 server section 的 mode 切换、host/port/remote URL、auth 输入、状态轮询与 start/stop/test/refresh action；`OpenCodianSettings` 只保留 owner 装配与跨 section server-state 同步
 - `SettingsMcpSection`: 管理 MCP 服务器状态概览、逐服务器行渲染、catalog subscription 与显式刷新 action；tabbed 模式下路由到独立一级 `MCP` 标签，classic 模式下紧跟 Server 部分之后并进入 quick-nav

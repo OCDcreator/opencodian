@@ -17,15 +17,18 @@
 ## 核心类型 / 接口
 
 ```typescript
-export type { Logger } from './logger';
+export type { LogChannel, LogEntry, Logger } from './logger';
 export {
   clearRecentLogs,
   createLogger,
   getDebugModuleSettings,
   getDebugRefreshIntervalMs,
+  getClaudeCodeDebugChannelSettings,
   getRecentLogEntries,
   getRecentLogText,
+  getRecentLogTextForEntries,
   resetLogEmissionThrottleState,
+  setClaudeCodeDebugChannelSettings,
   setDebugLoggingEnabled,
   setDebugModuleEnabled,
   setDebugModuleSettings,
@@ -60,7 +63,7 @@ export { getVaultBasePath } from './vault';
 
 ### 横切能力聚合
 
-该 barrel 收口多类通用工具，避免业务层分别深入 `shared/logger`、`shared/obsidianContext` 等路径。虽然聚合面较宽，但导出内容都偏底层辅助能力，不包含 feature-specific 逻辑。
+该 barrel 收口多类通用工具，避免业务层分别深入 `shared/logger`、`shared/obsidianContext` 等路径。虽然聚合面较宽，但导出内容都偏底层辅助能力，不包含 feature-specific 逻辑。诊断密钥净化器（`diagnosticSecretSanitizer`）独立于 Obsidian API，被导出路径复用。
 
 ## 关键方法
 
@@ -69,9 +72,10 @@ export { getVaultBasePath } from './vault';
 | `createLogger()` | 生成带前缀日志器 |
 | `clearRecentLogs()` | 清空最近诊断日志缓存 |
 | `getDebugModuleSettings()` / `setDebugModuleSettings()` | 读取/写入模块级调试开关 |
+| `getClaudeCodeDebugChannelSettings()` / `setClaudeCodeDebugChannelSettings()` | 读取/写入 Claude Code 细分调试通道 |
 | `setDebugModuleEnabled()` | 切换单个 debug module 开关 |
 | `getDebugRefreshIntervalMs()` / `setDebugRefreshIntervalMs()` | 读取/写入高频日志刷新间隔 |
-| `getRecentLogEntries()` / `getRecentLogText()` | 获取最近日志条目或格式化文本 |
+| `getRecentLogEntries()` / `getRecentLogText()` / `getRecentLogTextForEntries()` | 获取最近日志条目或格式化全部/已过滤日志文本 |
 | `resetLogEmissionThrottleState()` / `shouldEmitLogFingerprint()` | 共享高频日志指纹去重与节流 |
 | `setDebugLoggingEnabled()` | 启用/禁用 debug 级别日志 |
 | `setInlineSerializedDebugLogArgsEnabled()` | 控制 debug 日志是否把对象参数内联序列化 |
@@ -93,6 +97,7 @@ export { getVaultBasePath } from './vault';
 | `getNormalizedToolName()` | 获取工具规范名 |
 | `isBuiltinToolName()` | 判断是否属于内置/特殊内建工具 |
 | `getVaultBasePath()` | 解析当前 vault 根路径 |
+| `sanitizeDiagnosticReport()` | 诊断报告导出前的密钥/令牌/密码净化 |
 
 ## 数据流
 
@@ -101,7 +106,7 @@ export { getVaultBasePath } from './vault';
 ## 与其他模块的交互
 
 - 被聊天、设置和主入口广泛依赖
-- 各具体实现文档见 [debugModules.md](debugModules.md)、[logger.md](logger.md)、[obsidianContext.md](obsidianContext.md)、[toolIdentity.md](toolIdentity.md)、[toolExecution.md](toolExecution.md)、[vault.md](vault.md)
+- 各具体实现文档见 [debugModules.md](debugModules.md)、[diagnosticSecretSanitizer.md](diagnosticSecretSanitizer.md)、[logger.md](logger.md)、[obsidianContext.md](obsidianContext.md)、[toolIdentity.md](toolIdentity.md)、[toolExecution.md](toolExecution.md)、[vault.md](vault.md)
 
 ## 配置项
 

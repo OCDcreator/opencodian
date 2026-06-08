@@ -28,7 +28,8 @@ export interface ConversationSyncRuntimeCoordinatorHost {
 export interface ConversationSyncTimeoutDiagnostic {
   readonly tabId: TabId;
   readonly conversationId: string;
-  readonly openCodeSessionId: string;
+  readonly openCodeSessionId?: string;
+  readonly backendSessionId?: string;
   readonly ageMs: number;
   readonly phase: string;
   readonly reason: string | null;
@@ -55,12 +56,13 @@ export class ConversationSyncRuntimeCoordinator {
 ### visible sync 入口
 
 - `runVisibleConversationSync()` 只接受当前 active tab 对应的 conversation
-- 当 active tab 缺失、runtime 正在 streaming / 已有 sync 在飞，或 conversation 没有 `openCodeSessionId` 时，会直接跳过
+- 当 active tab 缺失、runtime 正在 streaming / 已有 sync 在飞，或 conversation 没有任何 backend session id 时，会直接跳过
 - 真正的 sync 回调结束后，无论成功还是抛错，coordinator 都会负责清理 in-flight flag
 - sync lock enter 会调用 `transitionTabSessionLifecycle(tabId, 'syncing', 'conversation-sync-lock')`
 - sync lock release 会调用 `transitionTabSessionLifecycle(tabId, 'idle', 'conversation-sync-lock-release')`
 - `syncing` 现在是 foreground-busy phase，因为 authoritative sync 可能写入 `Conversation.messages` compatibility/cache，必须阻止 foreground send 与其他 lifecycle writes 交错
-- 默认 20 秒 sync timeout diagnostics 只观测 lock：超时时记录 tab/conversation/session identity、lock age、当前 lifecycle phase/reason 与 `isStreaming`；不会自动清理 `isConversationSyncInFlight`
+- 默认 20 秒 sync timeout diagnostics 只观测 lock：超时时记录 tab/conversation/OpenCode legacy session/backend session identity、lock age、当前 lifecycle phase/reason 与 `isStreaming`；不会自动清理 `isConversationSyncInFlight`
+- sync timeout payload 中的 `openCodeSessionId` 现在显式回退到 `undefined`（而不是把 `null` 误传为 truthy），与 `backendSessionId` 共同构成完整的 backend-neutral session identity 诊断字段。
 - timeout timer 会在原始 sync callback settle 后由既有 `finally` 路径清除；真正恢复边界仍是 callback settle 后释放 lock
 
 ### hidden tab sync 入口

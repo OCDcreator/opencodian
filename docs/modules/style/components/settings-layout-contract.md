@@ -16,6 +16,8 @@
 - `.opencodian-settings-section-body` / `.opencodian-settings-block-body`：section 内部纵向 rhythm，普通设置行在这里按 row-card 规则排列。
 - `.opencodian-settings-section .setting-item`：普通设置项的轻量 row-card 样式，和 object-card 等更重实体 surface 区分。
 - `.opencodian-wide-text-setting`：给路径、URL、访问令牌等长文本设置项使用的宽字段 row。它只放宽明确标记的输入，控制列在桌面端限制在 `clamp(320px, 42vw, 520px)`，窄屏退为单列，避免把 host/port/数字类短输入一起拉长。
+- `.opencodian-debug-global-panel` / `.opencodian-debug-modules` / `.opencodian-debug-export` / `.opencodian-debug-workbench`：调试页四个来源子标签统一跟随格式化器子标签的 block + object-row 语法。Plugin 的全局日志开关、Plugin/OpenCode 的模块开关、Claude Code 的 SDK 诊断块、Export 的路径/动作/控制台帮助都使用同宽 `.opencodian-settings-block`，标题到说明保持 `4px`，说明到内容保持 `12px`，不再混用裸 setting row、裸标题说明和局部卡片。
+- `.opencodian-debug-status-strip` / `.opencodian-debug-channel-list` / `.opencodian-debug-log-preview`：Claude Code 调试工作台内部布局。SDK 诊断标题、说明和状态摘要收在同一个 `.opencodian-settings-block` 里；状态摘要只保留轻量 object tiles，不再把 Claude Debug 渲染成单个空 toggle，也不使用 dashboard 式指标卡或嵌套重卡片。
 - `.opencodian-theme-style-card` / `.opencodian-style-input-lock-note` / `.opencodian-debug-help-item`：在本轮只映射到 object token weight，不把样式设置、debug help 等复杂区域完整迁移成统一 object-card。
 
 ## Mode-Aware Hierarchy Taxonomy
@@ -63,7 +65,8 @@ Rule: never apply one hierarchy rule globally across both layout modes. In class
 ## Shared Session Manager Styles
 
 - `.opencodian-share-policy-panel` / `.opencodian-share-policy-*`：Conversation > Sharing 顶部的分享策略控制面板。左侧解释项目级策略，右侧保留 Obsidian dropdown 与帮助按钮，当前模式以低调状态 chip 显示，避免把公开分享配置伪装成普通表单行。
-- `.opencodian-share-diagnostics*`：分享策略面板内的诊断区。按钮会检查项目 share mode、OpenCode 服务健康状态和公共分享主机可达性，用 compact status rows 显示 ok / warning / error。
+- `.opencodian-share-troubleshooting` / `.opencodian-share-troubleshooting-summary`：分享策略面板里包住辅助诊断内容的 `<details>` disclosure。它负责默认折叠、顶部细分隔线、summary hover/expanded 状态，以及“Sharing setup check / 分享连接检查”这类稳定 affordance，不让 troubleshooting rows 一上来就挤占 sharing 主 surface。
+- `.opencodian-share-diagnostics*`：分享策略面板内真正的诊断 rows。按钮会检查项目 share mode、OpenCode 服务健康状态和公共分享主机可达性，用 compact status rows 显示 ok / warning / error；diagnostics rows 本身不再承担顶部边框或折叠标题样式。
 - `.opencodian-shared-sessions` / `.opencodian-shared-sessions-header`：已分享会话管理区，使用标题、说明、公开数量与刷新按钮组成轻量工具头，不复用截图式的单行 setting layout。
 - `.opencodian-shared-session-row`：单个已分享会话的数据行，左侧为标题、更新时间、公开 URL，右侧为复制、预览、取消分享动作；多行共享一个 list surface，窄屏改为单列。
 - `.opencodian-shared-session-preview` / `.opencodian-shared-session-message*`：完整会话预览区域。普通文本直接展开，工具调用和长输出由 `<details>` 默认折叠；消息之间使用 transcript 分隔线，避免在 setting row 内继续嵌套卡片。

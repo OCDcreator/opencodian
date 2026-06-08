@@ -683,6 +683,21 @@ export class OpenCodeService {
     return this.sessionLifecycle.listSessions();
   }
 
+  /**
+   * Get a single session's info by ID.
+   *
+   * Uses the efficient SDK `session.get()` (or legacy `GET /session/{id}`)
+   * instead of listing all sessions and filtering client-side.
+   *
+   * This is NOT a stable cross-backend session-detail contract.
+   * The adapter wraps the return as `unknown | null`; callers that need
+   * backend-neutral session fields should use narrow routing helpers
+   * like `readBackendSessionTitle()` or `readBackendSessionShareUrl()`.
+   */
+  async getSessionInfo(sessionId: string): Promise<Session> {
+    return this.sessionLifecycle.getSessionInfo(sessionId);
+  }
+
   /** Get session messages - OpenCode API returns {info: Message, parts: Part[]}[] */
   async getSessionMessages(sessionId: string): Promise<{ info: Message; parts: Part[] }[]> {
     return this.sessionLifecycle.getSessionMessages(sessionId);

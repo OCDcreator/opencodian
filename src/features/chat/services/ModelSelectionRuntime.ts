@@ -77,8 +77,15 @@ export class ModelSelectionRuntime {
 
   getCurrentSessionModel(): ModelSelectorSelection | null {
     const requestedModel = this.getRequestedSessionModel();
-    if (!this.hasLoadedCatalog || !this.modelCatalogBundle) {
+    if (!this.hasLoadedCatalog) {
       return requestedModel;
+    }
+
+    if (!this.modelCatalogBundle) {
+      return this.resolvePreferredAvailableSnapshotModel(
+        requestedModel?.provider,
+        requestedModel?.model,
+      );
     }
 
     const resolvedModel = resolvePreferredAvailableModel(
@@ -107,13 +114,12 @@ export class ModelSelectionRuntime {
       };
     }
 
-    if (!this.hasLoadedCatalog || !this.modelCatalogBundle) {
-      return {
-        status: 'available',
-        provider: currentModel.provider,
-        model: currentModel.model,
-        ref: formatModelReference(currentModel.provider, currentModel.model),
-      };
+    if (!this.hasLoadedCatalog) {
+      return this.resolveSnapshotModelSelection(currentModel.provider, currentModel.model);
+    }
+
+    if (!this.modelCatalogBundle) {
+      return this.resolveSnapshotModelSelection(currentModel.provider, currentModel.model);
     }
 
     return resolveModelSelection(
@@ -171,7 +177,7 @@ export class ModelSelectionRuntime {
           provider,
           model,
         )
-      : this.getCurrentSessionModelResolution();
+      : this.resolveSnapshotModelSelection(provider, model);
     if (resolution.status !== 'available') {
       return false;
     }
@@ -193,8 +199,8 @@ export class ModelSelectionRuntime {
   }
 
   getModelUnavailableNoticeContent(): ModelUnavailableNoticeContent {
-    const resolution = this.getCurrentSessionModelResolution();
-    if (resolution.status === 'unconfigured') {
+    const requestedModel = this.getRequestedSessionModel();
+    if (!requestedModel?.provider || !requestedModel.model) {
       return {
         title: t('chat.notice.modelUnavailable.unconfiguredTitle'),
         message: t('chat.notice.modelUnavailable.unconfiguredBody'),
@@ -203,6 +209,14 @@ export class ModelSelectionRuntime {
 
     if (this.availableProviders.length === 0) {
       return this.getEmptyCatalogUnavailableNoticeContent();
+    }
+
+    const resolution = this.getCurrentSessionModelResolution();
+    if (resolution.status === 'unconfigured') {
+      return {
+        title: t('chat.notice.modelUnavailable.unconfiguredTitle'),
+        message: t('chat.notice.modelUnavailable.unconfiguredBody'),
+      };
     }
 
     return {
@@ -306,5 +320,80 @@ export class ModelSelectionRuntime {
     return this.availableModels.find(
       (item) => item.provider === provider && item.model === model,
     );
+  }
+
+  private resolvePreferredAvailableSnapshotModel(
+    provider: string | null | undefined,
+    model: string | null | undefined,
+  ): ModelSelectorSelection | null {
+    const requestedProvider = provider?.trim();
+    const requestedModel = model?.trim();
+    if (requestedProvider && requestedModel && this.findAvailableModelInfo(requestedProvider, requestedModel)) {
+      return {
+        provider: requestedProvider,
+        model: requestedModel,
+      };
+    }
+
+    const providerEntry = requestedProvider
+      ? this.availableProviders.find((candidate) => candidate.id === requestedProvider)
+      : undefined;
+    const providerFirstModel = providerEntry?.models.find((candidate) => candidate.id.trim());
+    if (providerEntry && providerFirstModel) {
+      return {
+        provider: providerEntry.id,
+        model: providerFirstModel.id,
+      };
+    }
+
+    const firstAvailable = this.availableModels[0];
+    if (!firstAvailable) {
+      return null;
+    }
+
+    return {
+      provider: firstAvailable.provider,
+      model: firstAvailable.model,
+    };
+  }
+
+  private resolveSnapshotModelSelection(
+    provider: string | null | undefined,
+    model: string | null | undefined,
+  ): ResolvedModelSelection {
+    const ref = formatModelReference(provider, model);
+    const providerId = provider?.trim() ?? '';
+    const modelId = model?.trim() ?? '';
+    if (!ref || !providerId || !modelId) {
+      return {
+        status: 'unconfigured',
+        provider: '',
+        model: '',
+        ref: '',
+      };
+    }
+
+    const availableEntry = this.findAvailableModelInfo(providerId, modelId);
+    if (availableEntry) {
+      return {
+        status: 'available',
+        provider: providerId,
+        model: modelId,
+        ref,
+        providerName: availableEntry.providerName,
+        modelName: availableEntry.modelName,
+        contextWindow: availableEntry.contextWindow,
+      };
+    }
+
+    const providerEntry = this.availableProviders.find((candidate) => candidate.id === providerId);
+    return {
+      status: 'unavailable',
+      provider: providerId,
+      model: modelId,
+      ref,
+      providerName: providerEntry?.name ?? providerId,
+      modelName: modelId,
+    };
   }
 }

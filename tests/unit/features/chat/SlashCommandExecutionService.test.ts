@@ -5,6 +5,8 @@ import type {
 import type { FocusContextPreview } from '../../../../src/features/chat/composerContext';
 import {
   createSlashCommandExecutionHost,
+} from '../../../../src/features/chat/services/SlashCommandExecutionHostFactory';
+import {
   type SlashCommandExecutionHost,
   SlashCommandExecutionService,
 } from '../../../../src/features/chat/services/SlashCommandExecutionService';
@@ -364,6 +366,27 @@ describe('SlashCommandExecutionService', () => {
     }));
   });
 
+  it('consumes runtime commands without OpenCode dispatch for Claude conversations', async () => {
+    const host = createHost({
+      ensureConversationReady: jest.fn().mockResolvedValue(createConversation({
+        backend: 'claude-code',
+        backendSessionId: 'claude-session-1',
+        openCodeSessionId: undefined,
+      })),
+      getRuntimeCommands: jest.fn().mockResolvedValue([
+        { name: 'build', source: 'command' },
+      ]),
+    });
+    const service = new SlashCommandExecutionService(host);
+
+    await expect(service.tryRunSlashCommand('/build --fast')).resolves.toBe(true);
+
+    expect(host.runSessionCommand).not.toHaveBeenCalled();
+    expect(host.startConversationSyncLoop).not.toHaveBeenCalled();
+    expect(host.syncVisibleConversationInBackground).not.toHaveBeenCalled();
+    expect(host.notifySlashCommandFailed).toHaveBeenCalledWith('build', expect.any(Error));
+  });
+
   it('runs skill commands through /skills prefix mode and suppresses direct skill execution', async () => {
     const host = createHost({
       getSlashCommandSkillMode: jest.fn().mockReturnValue('skills-command'),
@@ -382,6 +405,28 @@ describe('SlashCommandExecutionService', () => {
       command: 'skill-review',
       arguments: 'note.md',
     }));
+  });
+
+  it('consumes prefixed skill commands without OpenCode dispatch for Claude conversations', async () => {
+    const host = createHost({
+      ensureConversationReady: jest.fn().mockResolvedValue(createConversation({
+        backend: 'claude-code',
+        backendSessionId: 'claude-session-1',
+        openCodeSessionId: undefined,
+      })),
+      getSlashCommandSkillMode: jest.fn().mockReturnValue('skills-command'),
+      getRuntimeCommands: jest.fn().mockResolvedValue([
+        { name: 'skill-review', source: 'skill' },
+      ]),
+    });
+    const service = new SlashCommandExecutionService(host);
+
+    await expect(service.tryRunSlashCommand('/skills skill-review note.md')).resolves.toBe(true);
+
+    expect(host.runSessionCommand).not.toHaveBeenCalled();
+    expect(host.startConversationSyncLoop).not.toHaveBeenCalled();
+    expect(host.syncVisibleConversationInBackground).not.toHaveBeenCalled();
+    expect(host.notifySlashCommandFailed).toHaveBeenCalledWith('skill-review', expect.any(Error));
   });
 
   it('treats runtime commands backed by runtime skills as /skills-only entries in prefixed mode', async () => {

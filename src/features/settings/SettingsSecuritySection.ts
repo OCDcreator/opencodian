@@ -9,6 +9,8 @@ import type OpenCodianPlugin from '../../main';
 import { createLogger, getVaultBasePath } from '../../shared';
 import { OpencodeConfigModal } from './OpencodeConfigModal';
 import { OpenCodeProjectConfigHelpModal } from './OpenCodeProjectConfigHelpModal';
+import { isOpenCodeSettingsBackendActive } from './settingsBackendGuards';
+import { TextareaSizeMemory } from './TextareaSizeMemory';
 
 const logger = createLogger('SettingsSecuritySection');
 
@@ -211,6 +213,9 @@ export class SettingsSecuritySection {
     permissionMode: PermissionMode,
     refreshConfigStatus: () => Promise<void>,
   ): Promise<void> {
+    if (!this.ensureOpenCodeActive()) {
+      return;
+    }
     this.plugin.settings.permissionMode = permissionMode;
     await this.plugin.saveSettings();
 
@@ -222,6 +227,9 @@ export class SettingsSecuritySection {
   }
 
   private async handlePermissionModeRestart(): Promise<void> {
+    if (!this.ensureOpenCodeActive()) {
+      return;
+    }
     if (!this.plugin.settings.autoRestartOnPermissionChange) {
       new Notice(t('settings.security.autoRestart.manual'));
       return;
@@ -252,6 +260,9 @@ export class SettingsSecuritySection {
         toggle
           .setValue(this.plugin.settings.autoRestartOnPermissionChange)
           .onChange(async (value) => {
+            if (!this.ensureOpenCodeActive()) {
+              return;
+            }
             this.plugin.settings.autoRestartOnPermissionChange = value;
             await this.plugin.saveSettings();
           })
@@ -270,6 +281,9 @@ export class SettingsSecuritySection {
           .setButtonText(t('settings.security.configFile.editBtn'))
           .setTooltip(t('settings.security.configFile.editTooltip'))
           .onClick(() => {
+            if (!this.ensureOpenCodeActive()) {
+              return;
+            }
             new OpencodeConfigModal(this.app, configManager).open();
           });
       })
@@ -284,6 +298,9 @@ export class SettingsSecuritySection {
   }
 
   private async applyConfigRestart(btn: ButtonComponent): Promise<void> {
+    if (!this.ensureOpenCodeActive()) {
+      return;
+    }
     btn.setDisabled(true);
     btn.setButtonText(t('settings.security.configFile.restarting'));
 
@@ -312,6 +329,9 @@ export class SettingsSecuritySection {
   }
 
   private async restartRunningService(): Promise<void> {
+    if (!this.ensureOpenCodeActive()) {
+      return;
+    }
     await this.plugin.openCodeService.stop();
     await new Promise((resolve) => setTimeout(resolve, 1000));
     await this.plugin.openCodeService.start();
@@ -335,6 +355,9 @@ export class SettingsSecuritySection {
         toggle
           .setValue(this.plugin.settings.enableBlocklist)
           .onChange(async (value) => {
+            if (!this.ensureOpenCodeActive()) {
+              return;
+            }
             this.plugin.settings.enableBlocklist = value;
             await this.plugin.saveSettings();
           })
@@ -349,6 +372,9 @@ export class SettingsSecuritySection {
         toggle
           .setValue(this.plugin.settings.allowExternalAccess)
           .onChange(async (value) => {
+            if (!this.ensureOpenCodeActive()) {
+              return;
+            }
             this.plugin.settings.allowExternalAccess = value;
             await this.plugin.saveSettings();
           })
@@ -363,10 +389,14 @@ export class SettingsSecuritySection {
         text
           .setValue(this.plugin.settings.allowedExportPaths.join('\n'))
           .onChange(async (value) => {
+            if (!this.ensureOpenCodeActive()) {
+              return;
+            }
             this.plugin.settings.allowedExportPaths = this.parseNonEmptyLines(value);
             await this.plugin.saveSettings();
           });
         text.inputEl.rows = 3;
+        TextareaSizeMemory.attach(text.inputEl, 'security-allowed-commands');
       });
   }
 
@@ -389,6 +419,9 @@ export class SettingsSecuritySection {
           .setPlaceholder(placeholder)
           .setValue(this.plugin.settings.blockedCommands[platformKey].join('\n'))
           .onChange(async (value) => {
+            if (!this.ensureOpenCodeActive()) {
+              return;
+            }
             const previousBlockedCommands = [...this.plugin.settings.blockedCommands[platformKey]];
             const nextBlockedCommands = this.parseNonEmptyLines(value);
             this.plugin.settings.blockedCommands[platformKey] = nextBlockedCommands;
@@ -397,6 +430,7 @@ export class SettingsSecuritySection {
           });
         text.inputEl.rows = 6;
         text.inputEl.cols = 40;
+        TextareaSizeMemory.attach(text.inputEl, 'security-denied-commands');
       });
     this.addBashPermissionHelpButton(blockedCommandsSetting);
 
@@ -417,6 +451,9 @@ export class SettingsSecuritySection {
           .setPlaceholder('rm -rf\nchmod 777\nmkfs')
           .setValue(this.plugin.settings.blockedCommands.unix.join('\n'))
           .onChange(async (value) => {
+            if (!this.ensureOpenCodeActive()) {
+              return;
+            }
             const previousBlockedCommands = [...this.plugin.settings.blockedCommands.unix];
             const nextBlockedCommands = this.parseNonEmptyLines(value);
             this.plugin.settings.blockedCommands.unix = nextBlockedCommands;
@@ -425,6 +462,7 @@ export class SettingsSecuritySection {
           });
         text.inputEl.rows = 4;
         text.inputEl.cols = 40;
+        TextareaSizeMemory.attach(text.inputEl, 'security-bash-profile');
       });
     this.addBashPermissionHelpButton(blockedCommandsSetting);
   }
@@ -434,6 +472,9 @@ export class SettingsSecuritySection {
     nextBlockedCommands: string[],
     previousBlockedCommands: string[],
   ): Promise<void> {
+    if (!this.ensureOpenCodeActive()) {
+      return;
+    }
     if (!configManager) {
       logger.warn('Cannot sync blocked commands because the OpenCode config manager is unavailable.');
       new Notice(t('settings.security.blockedCommands.syncUnavailable'));
@@ -492,5 +533,17 @@ export class SettingsSecuritySection {
       default:
         return '';
     }
+  }
+
+  private isOpenCodeActive(): boolean {
+    return isOpenCodeSettingsBackendActive(this.plugin.settings);
+  }
+
+  private ensureOpenCodeActive(): boolean {
+    if (this.isOpenCodeActive()) {
+      return true;
+    }
+    new Notice(t('settings.security.notice.openCodeOnly'));
+    return false;
   }
 }

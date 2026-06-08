@@ -23,11 +23,11 @@
 
 ### 筛选
 
-5 个筛选标签：`All`、`Skills`、`Commands`、`Enabled`、`Disabled`。`Skills` 按 `source === 'skill'` 过滤；`Commands` 按 `source === 'command' || source === 'md-command'` 过滤；`Enabled`/`Disabled` 按 `hidden` 过滤。
+5 个筛选标签：`All`、`Skills`、`Commands`、`Enabled`、`Disabled`。`Skills` 按 `source === 'skill'` 过滤；`Commands` 按 `source === 'command' || source === 'md-command'` 过滤（Claude runtime command 仍会出现在 All/Enabled/Disabled 中并带独立来源 chip）；`Enabled`/`Disabled` 按 `hidden` 过滤。
 
 ### 卡片
 
-每个命令卡片包含：多选复选框、`/command-name`、来源芯片（Skill / Command / Project / MD）、内置芯片（Built-in，仅白名单命令显示）、状态芯片（Subtask / Unavailable）、可折叠描述、可见性切换。点击卡片或描述文本切换展开状态。
+每个命令卡片包含：多选复选框、`/command-name`、来源芯片（Skill / Command / Project / MD / Claude）、内置芯片（Built-in，仅白名单命令显示）、状态芯片（Subtask / Unavailable）、可折叠描述、可见性切换。`getSourceChipLabel()` 现在把 `source: 'claude-runtime'` 显示为 `settings.commands.catalog.chip.claudeRuntime`。点击卡片或描述文本切换展开状态。可见性切换的 `label` 包装使用 `data-settings-tooltip` 属性（`SettingsTooltipController` body-level overlay），替代了原来的 `toggleWrap.setAttribute('title', ...)`。
 
 ### 多选批量操作
 
@@ -48,6 +48,7 @@
 
 - `SettingsCommandsSection`: 创建并调用本 renderer，提供命令数据、display ID 回调和 visibility 写回回调
 - `searchInputEnhancer.ts`: 提供搜索历史增强功能
+- `SettingsTooltipController`: 提供可见性切换包装的 body-level tooltip overlay
 - `core/config/slashCommandCatalog.ts`: 提供 `SlashCommandCatalogEntry` 类型和 `SlashCommandCatalogSource` 类型
 - `i18n/locales/*`: 提供搜索占位符、筛选标签、芯片标签、批量操作和无匹配空态文案
 

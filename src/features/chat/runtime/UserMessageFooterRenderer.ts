@@ -11,6 +11,8 @@ const I18N_KEY_ATTR = 'data-i18n-key';
 
 export interface UserMessageFooterRendererHost {
   isStreaming(): boolean;
+  hasForkCapability(): boolean;
+  hasRewindCapability(): boolean;
   handleRewindRequest(message: ChatMessage): Promise<void> | void;
   handleForkRequest(message: ChatMessage): Promise<void> | void;
 }
@@ -20,7 +22,9 @@ export class UserMessageFooterRenderer {
 
   render(messageEl: HTMLElement, message: ChatMessage, copyContent?: string): void {
     const footerEl = messageEl.createDiv({ cls: 'opencodian-user-message-footer' });
-    const hasActions = Boolean(copyContent) || Boolean(message.sourceMessageId);
+    const canFork = Boolean(message.sourceMessageId) && this.host.hasForkCapability();
+    const canRewind = Boolean(message.sourceMessageId) && this.host.hasRewindCapability();
+    const hasActions = Boolean(copyContent) || canFork || canRewind;
 
     if (hasActions) {
       const actionsEl = footerEl.createDiv({ cls: 'opencodian-user-message-actions' });
@@ -29,13 +33,16 @@ export class UserMessageFooterRenderer {
         this.renderCopyButton(actionsEl, copyContent);
       }
 
-      if (message.sourceMessageId) {
+      if (canRewind) {
         this.renderActionButton(actionsEl, {
           i18nKey: 'chat.rewind.button',
           icon: REWIND_ICON,
           isDisabled: this.host.isStreaming(),
           onClick: () => this.host.handleRewindRequest(message),
         });
+      }
+
+      if (canFork) {
         this.renderActionButton(actionsEl, {
           i18nKey: 'chat.fork.button',
           icon: FORK_ICON,

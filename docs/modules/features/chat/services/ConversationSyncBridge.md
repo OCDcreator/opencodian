@@ -19,6 +19,7 @@
 ```typescript
 export interface ConversationSyncBridgeHost {
   getCurrentConversation(): Conversation | null;
+  canSyncConversationWithServer(): Promise<boolean>;
   syncConversationMessagesFromServer(...): Promise<ConversationSyncBridgeSyncResult>;
   syncConversationMessagesFromCanonicalState(...): Promise<ConversationSyncBridgeSyncResult | null>;
 }
@@ -40,6 +41,7 @@ export class ConversationSyncBridge {
 
 - `syncVisibleConversationInBackground()` 先复用 `ConversationSyncRuntimeCoordinator.runVisibleConversationSync()`
 - visible background sync 现在和 signal sync / background-tab polling 一样先尝试 `syncConversationMessagesFromCanonicalState()`，只有 canonical graph 缺失时才回退 `syncConversationMessagesFromServer()` 做 gap recovery
+- 当 chat surface 已明确判定当前没有任何可用 backend（例如全部 backend 禁用）时，visible background sync 不再回退到 `syncConversationMessagesFromServer()`；bridge 会直接跳过这轮 sync，避免对已禁用的 OpenCode runtime 持续发起 `ERR_CONNECTION_REFUSED` 轮询
 - sync 完成后，会把 visible sync context、`previousMessages` 与 `syncResult` 统一委托给 `ConversationSyncVisiblePostSyncRouter`
 - bridge 不再内联 visible post-sync request shaping，也不再直接处理 DOM patch / indicator fallback
 

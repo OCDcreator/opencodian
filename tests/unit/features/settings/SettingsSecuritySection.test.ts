@@ -1,6 +1,7 @@
 /* eslint-disable max-lines, max-lines-per-function -- This settings-section suite keeps the Obsidian Setting mocks, permission config fixtures, and blocked-command sync coverage together. */
 import * as fs from 'fs';
 import type { App, ExtraButtonComponent } from 'obsidian';
+import * as obsidian from 'obsidian';
 import { Setting } from 'obsidian';
 import * as os from 'os';
 import * as path from 'path';
@@ -708,5 +709,78 @@ describe('SettingsSecuritySection', () => {
         '/tmp/*': 'allow',
       },
     });
+  });
+
+  it('blocks stale OpenCode permission mode callbacks after switching to Claude Code', async () => {
+    const noticeSpy = jest.spyOn(obsidian, 'Notice').mockImplementation(() => undefined as never);
+    const { app, plugin } = createPlugin({
+      settings: {
+        activeBackend: 'opencode',
+        enabledBackends: ['opencode', 'claude-code'],
+        autoRestartOnPermissionChange: true,
+      } as Partial<SecuritySectionPlugin['settings']>,
+    });
+    const section = new SettingsSecuritySection({
+      app,
+      plugin: plugin as unknown as OpenCodianPlugin,
+      createSectionHeading,
+    });
+    const containerEl = document.createElement('div');
+
+    section.attach(containerEl);
+    await flushAsync();
+    const permissionModeRecord = dropdownRecords.find(
+      (record) => record.name === t('settings.security.permissionMode.name'),
+    );
+    (plugin.settings as SecuritySectionPlugin['settings'] & { activeBackend: string }).activeBackend = 'claude-code';
+
+    await permissionModeRecord?.onChange?.('plan');
+    await flushAsync();
+
+    expect(plugin.settings.permissionMode).toBe(DEFAULT_SETTINGS.permissionMode);
+    expect(plugin.saveSettings).not.toHaveBeenCalled();
+    expect(plugin.openCodeService.checkHealth).not.toHaveBeenCalled();
+    expect(plugin.openCodeService.stop).not.toHaveBeenCalled();
+    expect(plugin.openCodeService.start).not.toHaveBeenCalled();
+    expect(noticeSpy).toHaveBeenLastCalledWith(t('settings.security.notice.openCodeOnly'));
+  });
+
+  it('blocks stale OpenCode restart and blocked-command sync callbacks after switching to Claude Code', async () => {
+    const noticeSpy = jest.spyOn(obsidian, 'Notice').mockImplementation(() => undefined as never);
+    const { app, configManager, plugin } = createPlugin({
+      settings: {
+        activeBackend: 'opencode',
+        enabledBackends: ['opencode', 'claude-code'],
+        autoRestartOnPermissionChange: true,
+      } as Partial<SecuritySectionPlugin['settings']>,
+    });
+    const syncSpy = jest.spyOn(OpencodeConfigManager.prototype, 'syncManagedBashDenyPatterns');
+    const section = new SettingsSecuritySection({
+      app,
+      plugin: plugin as unknown as OpenCodianPlugin,
+      createSectionHeading,
+    });
+    const containerEl = document.createElement('div');
+
+    section.attach(containerEl);
+    await flushAsync();
+    const applyButtonRecord = buttonRecords.filter(
+      (record) => record.name === t('settings.security.configFile.name'),
+    )[1];
+    const blockedCommandsRecord = textAreaRecords.find(
+      (record) => record.name === t('settings.security.blockedCommands.name', { platform: currentPlatformLabel }),
+    );
+    (plugin.settings as SecuritySectionPlugin['settings'] & { activeBackend: string }).activeBackend = 'claude-code';
+
+    await applyButtonRecord?.onClick?.();
+    await blockedCommandsRecord?.onChange?.('rm -rf');
+    await flushAsync();
+
+    expect(plugin.openCodeService.checkHealth).not.toHaveBeenCalled();
+    expect(plugin.openCodeService.stop).not.toHaveBeenCalled();
+    expect(plugin.openCodeService.start).not.toHaveBeenCalled();
+    expect(syncSpy).not.toHaveBeenCalled();
+    await expect(configManager?.exists()).resolves.toBe(false);
+    expect(noticeSpy).toHaveBeenLastCalledWith(t('settings.security.notice.openCodeOnly'));
   });
 });

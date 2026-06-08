@@ -1,13 +1,21 @@
 # English Locale
 
 > **源码**: `src/i18n/locales/en.ts`
-> **状态**: [REVIEW]
+> **最近更新**: 2026-06-07
 
 ## 概述
 
-OpenCodian 的英文翻译表，导出 `enTranslations` 静态对象。它为设置面板、聊天界面、调试提示、权限交互以及 Liquid Glass 相关帮助文本提供英文文案，也是整个 i18n 系统的键空间基准。最近几轮先后扩展了会话设置弹窗分组布局相关键、project-scoped compaction/share notice 键，以及主设置页 conversation section 的二级分组标题/描述键（conversation title、compaction、sharing、reading/display、question interaction、message rendering）。本轮新增/扩展 `chat.sessionSharing.*` 与 `settings.conversation.share.sharedSessions.*` / `settings.conversation.share.diagnostics.*`，用于当前会话分享状态、分享禁用提示、分享失败归一化说明、分享诊断、已分享会话列表、公开数量、刷新、完整预览、复制链接和取消分享操作；同时保留 `settings.conversation.share.help.*`、`settings.security.blockedCommands.help.*` 与 `settings.projectConfigHelp.*`，用于会话分享模式和 `permission.bash` 帮助弹窗。
+OpenCodian 的英文翻译表，导出 `enTranslations` 静态对象。
+
+2026-06-07：新增并更新 `settings.claudeCode.outputStyle.*` 键（name / desc / placeholder / boundaryNotice / lifecycleNotice），为 Claude Code 输出样式设置提供英文文案；`boundaryNotice` 现说明 fresh diagnostic query live proof 与 active-session 边界。新增 `settings.capabilityLab.proofs.outputStyleLive.*` proof keys，覆盖 Output Style live 行为证明按钮、nonce、styleName、cleanup、pass/fail 和生命周期文案。新增 `chat.claudeCode.permissionMode.*.description` 键（4 个），为 Claude Code 权限模式的聊天选择器提供描述文案。
+
+2026-06-07 Round 11 Codex acceptance：`context.breakdown.note` 从 OpenCode-only wording 改为 backend-neutral wording。上下文详情弹窗现在说明上方 Token 统计优先使用 backend usage snapshot，避免 Claude Code ContextRing / ContextDetailModal 产品化后继续暗示只有 OpenCode usage 是可信来源。
+
+本轮新增并扩展 `chat.backendSessions.*` 键（backend session browser modal：浏览/预览/恢复 backend sessions、preview transcript seeding、detail metadata、完整 transcript、preview/detail 导航）和 `settings.claudeCode.sessionBrowser.*`（settings 侧 browse-only session browser launcher：说明、按钮和 browse-only notice）以及 `settings.claudeCode.projectSettings.*` 键（含 `marketplacesSummary` / `noMarketplaces` / `boundaryNotice` 含 settingSources 要求说明）。 `chat.sessionSharing.*` 与 `settings.conversation.share.sharedSessions.*` / `settings.conversation.share.diagnostics.*`，用于当前会话分享状态、分享禁用提示、分享失败归一化说明、分享诊断、已分享会话列表、公开数量、刷新、完整预览、复制链接和取消分享操作；其中新增 `settings.conversation.share.sharedSessions.previewEmpty`，用于区分“后端不可预览”与“会话目前没有可预览消息”的中性空态。 同时保留 `settings.conversation.share.help.*`、`settings.security.blockedCommands.help.*` 与 `settings.projectConfigHelp.*`，用于会话分享模式和 `permission.bash` 帮助弹窗。
 
 会话设置弹窗本轮还新增了 `chat.sessionSettings.modal.globalDefaultsGroup`、`globalDefaultsDesc` 和 `summary.*` 文案，用于 Display 分组下方的全局默认值摘要行与 “Open settings” 按钮。
+
+本轮 cap-1 更新了 `settings.claudeCode.fallbackModel.desc`，加入 fallback 路径尚未经过运行时验证的诚实性提示，与 `ClaudeCodeBackendSettings` 类型接口上的 `@untested` 标记保持一致。
 
 本轮新增 `chat.agentSelector.*` 键，供聊天输入框下方的主 Agent 下拉框使用，包括 trigger、轻量列表标题、OpenCode default 选项、default badge、description、loading/empty/load-failed 状态以及选中 tooltip。
 
@@ -62,6 +70,68 @@ OpenCodian 的英文翻译表，导出 `enTranslations` 静态对象。它为设
 本轮新增 `slashCommand.init.description`、`slashCommand.review.description`、`slashCommand.help.description`，为 OpenCode 内置运行时命令提供介绍语翻译；文案与 OpenCode 源码中的实际 description 对齐（init: "Guided AGENTS.md setup"、review: "Review changes [commit|branch|pr], defaults to uncommitted"、help: "Show OpenCode help"）。同时更新 `settings.commands.editor.description.placeholder` 为中文占位符。
 
 本轮维护 `settings.model.providerDirectory.*` 键，为 settings/model 目录中的 provider directory 诊断提供英文 summary 与 badge 文案。它只表达 `provider.list()` 的 connected / listed 辅助状态，并把 listed outside catalog 作为诊断计数呈现，不改变 `config.providers()` 驱动的服务器目录或可选模型。
+
+本轮更新 `settings.general.tab.backend` 与 `settings.backend.*` 键，为 Backend Management 面板提供英文标题、默认 backend 下拉、enabled backend 列表、Claude Code 可启用说明和启用状态标签；未来 backend 仍保留 Coming Soon 描述。
+
+本轮还补充 `chat.empty.noBackend.*`、`chat.empty.backendOffline.*`、`chat.serverStatus.disabled` 与 `chat.serverPrompt.enableBackend`，用于聊天区区分“没有任何 enabled backend”与“backend 已启用但当前离线”两类状态，不再把两者都压成 generic offline wording。
+
+本轮更新 `settings.claudeCode.*` 键，为 Claude Code Phase 1/2 配置面板提供英文文案，包括 section 标题/描述、Runtime / Model & Thinking / Permissions / Context & Sources / Tools / Limits 等标签、runtime ecosystem 只读摘要、executable path、authentication/environment hint、setting sources、project source file visibility、next-query/restart boundary、permission mode、model/fallback model、thinking/effort（含 `Extra high`）、additional directories、allowed/disallowed tools、max turns、max budget、env 和 runtime diagnostics；`claude-code` backend 已可在 Backend Management 中显式启用，但发送前仍需要官方 SDK 认证可用。另新增 `chat.serverStatus.backendConnected`、`chat.serverStatus.backendOffline` 和 `chat.serverStatus.openBackendSettings`，用于 Claude 等非 OpenCode backend 的 header 状态文案与 settings tooltip，避免复用 OpenCode server/remote copy。`chat.history.backendScope` 则用于 history dropdown 顶部显示当前 backend 的历史范围。2026-06-07 Round 13 又新增 `settings.claudeCode.additionalDirectories.chatBadge.*`，用于 Claude Code chat toolbar 的 read-only additional directories badge；文案明确这是 requested extra directory scope、next-query lifecycle 和 readback-only boundary，不证明 resolved directory access。
+
+2026-05-23 继续新增并维护 `settings.claudeCode.mcpRuntime.*` 键，用于 Claude Code Tools 标签里的 MCP runtime 状态和刷新按钮；新增 `settings.claudeCode.mcpRuntime.loadedWithNames`，在 adapter 暴露 server names 时只读显示名称。2026-06-01 继续扩展同一键空间，新增 `inspectButton`、`statusLoading`、`statusUnavailable`、`statusFailed`、`statusEmpty`、`statusSummary`、`statusTools`、`statusNoTools` 和 `statusServerInfo`，用于 SDK `mcpServerStatus()` runtime readback。文案明确该操作只读取 runtime status，不 author `.claude/mcp.json`。
+
+同日继续新增并维护 `settings.claudeCode.runtimeEcosystem.*` 键，用于 Claude Code Runtime 标签中的只读 runtime plugins / skills / agent definitions 摘要。文案明确这是 adapter runtime-only options 的状态披露，不提供 skills/plugins/agent-definition authoring。
+
+本轮继续扩展 `settings.claudeCode.runtimeEcosystem.*` 键空间，新增 `agentDefinitions.empty` / `loaded` / `single`，用于 settings Runtime 标签中的只读 runtime agent definitions 摘要，与 plugins / skills 摘要对齐显示。文案明确这是 adapter runtime-only `agent` / `agents` options 的状态披露，不提供 agent authoring。
+
+本轮新增并维护 `settings.claudeCode.runtimeCatalog.*`、`settings.claudeCode.accountInfo.*`、`settings.claudeCode.contextUsage.*` 和 `settings.claudeCode.fileReadback.*` 键，用于 Claude Code Runtime 标签中的只读 runtime catalog / account info / context usage / runtime file readback surface。文案明确这是 sanitized/supporting evidence：runtime catalog 只展示 SDK `supportedCommands()` / `supportedAgents()` 回读的 command/agent 名称、描述、argument hint、aliases/model，不执行 slash command、不创建 agent、不保存 settings、不写 `.claude/**`；file readback 是 Settings UI 默认请求 `maxBytes: 4096`、encoding 使用 `utf-8`（adapter/SDK 可支持 `base64`），可展示 `absPath`、`contents`、`truncated`；这些只读 surface 不执行登录认证、不保存 settings、不写文件、不写 `.claude/**`，也不证明 File Checkpoint / Rewind 或 Fallback Model 行为。2026-06-07 Round 11 Codex acceptance 后，`settings.claudeCode.contextUsage.*` 的 unavailable/summary 文案从 `readback` 调整为 `context usage snapshot`，匹配 Context Usage 已经通过 BUILD_ID 锚定的 settings+chat runtime proof 晋升为 Verified；仍保留 read-only / sanitized evidence 边界，不宣称 context authoring 或预算控制。相关键覆盖 inspect/loading、empty/unavailable/failure、truncated 和 summary 状态。本轮继续新增 `settings.claudeCode.projectSkills.*`、`settings.claudeCode.runtimeCommands.*` 和 `settings.commands.catalog.chip.claudeRuntime`，用于 Runtime 标签只读扫描 `.claude/skills` 项目技能、展示 Claude SDK `supportedCommands()` 命令，并在 commands catalog 中显示 Claude runtime 来源 chip。
+
+本轮更新 `settings.claudeCode.env.desc`，在环境变量描述中加入 POSIX 键名规范提示和未运行时验证的诚实性声明，与 `ClaudeCodeBackendSettings` 类型接口上的 `@untested` 标记保持一致。
+
+本轮更新 `settings.claudeCode.allowedTools.desc` 和 `settings.claudeCode.disallowedTools.desc`，移除过时的“未运行时验证”声明，改为在 Tools 标签通过 `settings.claudeCode.proofStatus.tools` 共享 notice 统一标注 runtime readback verified 状态。`proofStatus.tools` 已更新为更明确的 readback-only 边界文案："Readback verified. Allowed Tools is a pre-allow / auto-approve shortcut — it is not a restrictor. Runtime evidence confirms zero enforcement: init catalog always unfiltered (34 tools), canUseTool non-functional in SDK query() mode. For deterministic built-in tool filtering, use Restricted Built-in Tools."
+
+2026-05-29 本轮更新 `settings.claudeCode.proofStatus.limits`，从 readback 文案改为 behavior-verified 文案："Runtime behavior verified. Both maxTurns and maxBudgetUsd enforcement confirmed via live runtime proof (error_max_turns + error_max_budget_usd signals observed)."，反映 Turn/Budget Limits 已从 `readback` 晋升为 `pass`。对应的 `data-proof-state` 从 `"readback"` 改为 `"pass"`。
+
+2026-05-28 本轮更新 `settings.claudeCode.maxTurns.desc`、`settings.claudeCode.maxBudgetUsd.desc`、`settings.claudeCode.env.desc`，移除过时的“wired but not yet runtime-verified”文案；新增 `settings.claudeCode.proofStatus.tools`、`settings.claudeCode.proofStatus.limits`、`settings.claudeCode.proofStatus.env` 三个共享 proof-status notice 键，用于在 Tools、Model & Thinking、Runtime 标签中 compact 地展示 runtime proof 状态。`proofStatus.env` 已更新为 "Settings→SDK mapping verified (readback supporting evidence). Live behavior proof (env propagation into Claude/Bash subprocesses, Layer 1-4) is verified in Capability Lab. Overall capability: verified (pass)."，反映 Environment Variables stable settings notice 是 readback supporting evidence，live behavior proof 已在 Capability Lab 验证（2026-06-02 truth-sync）。更新 `settings.claudeCode.fallbackModel.desc` 和 `settings.claudeCode.fallbackModel.boundaryNotice`，诚实标注“option wiring and readback are proven; automatic fallback behavior is unproven with the current SDK”。新增 `settings.claudeCode.proofStatus.fallbackModel`，用于 Model & Thinking 标签的 Fallback Model compact proof-status notice（`data-proof-state="readback"`），明确标注选项回读已验证但自动 fallback 行为未验证。2026-05-29 proof-status 从 `wiring` 晋升为 `readback`（`inspectLastDiagnosticSdkOptions()` 确认 model 和 fallbackModel 均正确到达 SDK）；行为 Blocker = SDK 不在 query boundary 验证 model 名称，无效主模型被接受无错误并回显相同无效字符串，未触发 fallback；fallback 是 overload-oriented，无法在本地模拟 real overload。
+
+2026-06-04 新增 `settings.capabilityLab.proofs.systemPromptLive.*` locale keys，覆盖 System Prompt 实时行为证明按钮、运行中提示、标题、三段诚实边界文案、nonce/status/preview 标签，以及 pass/fail/thrown 提示，移除 Capability Lab 中该 proof 的硬编码英文。同步更新 `settings.claudeCode.systemPrompt.boundaryNotice`：稳定设置页现在明确说明 System Prompt 的 `pass` 依赖两类互补证据，而不是把诊断 live proof 误写成对“当前保存字符串本身”的直接 live 执行证明。
+
+2026-05-28 SDK Foundations 诊断表面迁移：新增 `settings.claudeCode.diagnosticStreamMoved.title` / `.desc`，用于在稳定 SDK Foundations 标签中提示用户诊断流控制已迁移到 Capability Lab；新增 `settings.capabilityLab.diagnosticStreamControls.title` / `.description`，用于 Capability Lab 中 Diagnostic Stream Controls 子区的标题和说明。保留原有的 `settings.claudeCode.includeHookEvents.*`、`settings.claudeCode.forwardSubagentText.*`、`settings.claudeCode.agentProgressSummaries.*`，因为这些设置键仍然有效，只是 UI 表面从稳定设置迁移到了诊断面板。
+
+2026-06-02 Continue diagnostic seam 又补了一组 `settings.capabilityLab.proofs.continue.*` 键，把 Continue proof 按钮、运行中提示、诊断边界说明、seed/continue session labels、yes/no 状态、pass/fail 文案和 thrown-error 提示收进 locale，避免在 Capability Lab 继续硬编码新增诊断 UI 文案。
+
+2026-06-06 Continue / Resume Session At Position 边界硬化：`settings.capabilityLab.proofs.continue.boundary` 与 `settings.capabilityLab.proofs.resumeSessionAt.boundary` 已更新，各自列出四条保留诊断状态的明确原因。Continue 的 blockers：(1) adapter 已自动维护普通对话连续性；(2) continue 是隐式标志，与显式会话追踪冲突；(3) 所有真实需求已由稳定界面覆盖；(4) 暴露为用户控件只会增加不确定性。Resume Session At Position 的 blockers：(1) Fork Session 已提供稳定分支界面；(2) resumeSessionAt 原地修改会话状态，无清晰 UX 路径；(3) 与追加式对话历史模型冲突；(4) adapter 已显式将其置于诊断标志之后。取代之前较模糊的 "not a stable product surface" 措辞。
+
+2026-06-06 Stderr Diagnostic Outcome B 审计硬化：`settings.capabilityLab.proofs.stderr.boundary` 已更新，显式标注 2026-06-06 审计结论：无查询能可靠触发 stderr 输出；stderr 是非结构化 CLI 内部输出，非契约性 API 界面；Debug File（pass/verified）已覆盖"捕获调试输出"用例。
+
+2026-06-04 又新增 `settings.capabilityLab.proofs.stderr.*` 键，把 Stderr Diagnostic proof 的按钮、运行中、标题、readback/fail 提示和“隔离诊断查询 / 无持久 raw-log surface / 不写文件”诚实边界文案收进 locale。这样 Capability Lab 在英文和中文下都显示同一组 readback 语义，而不会在中文环境退回硬编码英文。
+
+2026-06-04 继续新增 `settings.capabilityLab.proofs.planModeInstructions.*` 键（18+ proof keys 覆盖中英双语），把 Plan Mode Instructions readback proof 的按钮、运行中、标题、边界文案、生命周期边界、option-wired/permission-mode/setting-value/sdk-option/sdk-value/builder-wiring-nuance/value-match 状态行，以及 readback/fail/thrown 提示全部收进 locale。取代之前的硬编码英文，使 Capability Lab 在中文界面下同样显示明确的 readback 语义和生命周期边界（“Applies on the next query or restarted session only. Active sessions do not update live.”）。
+
+2026-06-04 新增 `settings.capabilityLab.proofs.taskBudget.*` 键（17 个 proof keys，覆盖中英双语），把 Task Budget readback proof 的按钮、运行中、标题、诊断 readback 边界、生命周期边界、option-wired/setting-value/sdk-option/sdk-total/total-match 状态行，以及 readback/fail/thrown 提示全部收进 locale。这样 Capability Lab 在英文和中文界面下都能一致表达 `@alpha`、active-session 不会实时更新、以及“仅验证 settings→SDK option mapping”的诚实边界。
+2026-06-04 继续新增 `settings.capabilityLab.proofs.toolAliases.*` 键（17 个 proof keys，覆盖中英双语），把 Tool Aliases readback proof 的按钮、运行中、标题、诊断 readback 边界、生命周期边界、option-wired/setting-empty/sdk-option/sdk-entry-count/defensive-copy/entries-match 状态行，以及 readback/fail/thrown 提示全部收进 locale，移除 Capability Lab 中该 proof 的硬编码英文。稳定 `settings.claudeCode.toolAliases.*` 文案本轮未改动，因为它已经匹配较新的 readback/lifecycle 诚实模式。
+2026-06-06 审计硬化：`settings.claudeCode.toolAliases.boundaryNotice`、`settings.capabilityLab.proofs.toolAliases.boundary` 和 `settings.capabilityLab.proofs.toolAliases.readback` 已更新，明确引用 SDK 源码审计结果（browser-sdk.js `initialize()` 将 toolAliases 作为单向初始化参数转发，无反馈事件）和流式可观测性缺口（tool_use 块仅暴露解析后名称，无别名元数据），取代之前较模糊的 "internal claim" 措辞。
+
+2026-06-06 AskUserQuestion Preview Format 产品化：新增并扩展 `settings.claudeCode.askUserQuestionPreviewFormat.*` 键（`name`、`desc`、`option.*` 3 个选项标签），以及 `chat.question.preview.*` 键（`labelMarkdown`、`labelHtml`），用于 Claude Code Tools 标签中稳定的 preview format 设置和 Question UI 中按格式标注的预览区。文案明确这是 Claude-only 设置，仅在下次查询或重启后生效，活跃会话不会实时更新；HTML 预览仅作纯文本展示，不做 rich HTML 解析。**2026-06-07 Outcome A 晋升**：`settings.claudeCode.askUserQuestionPreviewFormat.boundaryNotice` 从 "Readback only" 更新为 "Live verified"，引用 BUILD_ID feature-phase0-capability.202606070354 实时验证证据：真实 AskUserQuestion 工具输入到达时携带 `.preview` 字段，内容格式与设置一致（markdown 文本或 HTML 片段），预览在问题对话框中聚焦或悬停时渲染。
+2026-06-07 sandbox expansion: `settings.claudeCode.sandbox.*` and `settings.capabilityLab.proofs.sandbox.*` keys now cover command exclusions, unsandboxed command allowlists, filesystem/network child policies, weaker isolation toggles, ripgrep overrides, and the chat sandbox badge. 2026-06-04 继续新增 `settings.capabilityLab.proofs.sandbox.*` 键（22 个 proof keys，覆盖中英双语），把 Sandbox readback proof 的按钮、运行中、标题、诊断 readback 边界、生命周期边界、option-wired/3 个 setting 状态/SDK option presence/3 个 SDK 子状态/3 个 match 状态，以及 readback/fail/thrown 提示全部收进 locale，移除 Capability Lab 中该 proof 的硬编码英文。同步收紧 `settings.claudeCode.sandbox.boundaryNotice` 与 `.lifecycleNotice`，稳定 Settings 文案现在明确写出“Readback only”与 active-session 不会实时更新的边界。
+2026-06-04 继续新增 `settings.capabilityLab.proofs.debug.*` 键（16 个 proof keys，覆盖中英双语），把 Debug readback proof 的按钮、运行中、标题、诊断 readback 边界、生命周期边界、option-wired/setting-value/sdk-option/sdk-value/value-match 状态行，以及 readback/fail/thrown 提示全部收进 locale，移除 Capability Lab 中该 proof 的硬编码英文。后续又把该 proof 的 lifecycleBoundary 收紧为更保守的 next-query-only，和既有 `settings.claudeCode.debug.lifecycleNotice` 保持一致，不额外发明 restart 语义。2026-06-06 Outcome B 审计硬化：`settings.claudeCode.debug.boundaryNotice` 改为 "Readback only" 模式，明确声明 debug toggle 从属于 debugFile；`settings.capabilityLab.proofs.debug.boundary` 加入 Outcome B 结论和 Debug File 交叉引用；`settings.capabilityLab.proofs.debug.readback` 明确指向 Debug File 作为可验证替代方案。
+2026-06-04 同步收紧 `settings.claudeCode.planModeInstructions.lifecycleNotice`：稳定 Settings 文案不再只写“下次查询或重启后生效”，而是明确补出 active-session 边界，说明不能 live 变更 already-running session。
+2026-06-03 调整 `settings.claudeCode.planModeInstructions.desc` 与 `.boundaryNotice`：稳定设置文案不再暗示插件层按 `permissionMode` 做写入门控，而是明确区分 SDK 使用条件（Plan permission mode）与当前 readback-only 边界（插件只验证 settings→SDK option wiring，实际 plan-mode behavior 未独立运行时验证）。
+
+2026-05-28 文档更正：移除关于 `chat.input.placeholderJsonSuffix` 与 backend-aware composer placeholder 已落地的表述。当前实现未引入该 i18n 键，也未在输入框占位符中追加 `/json` discoverability 文案；discoverability 通过 composer capability hint 落地（`chat.input.capabilityHint.jsonLabel` + `chat.input.capabilityHint.jsonTooltip`，Claude Code backend 对用户显示 `Structured reply`，点击后底层仍插入 `/json `，OpenCode backend 不显示），并且仍然只覆盖固定 schema trigger，不暗示任意 schema authoring。
+
+2026-06-06 Fallback Model 审计硬化：`settings.claudeCode.fallbackModel.boundaryNotice` 更新为显式 "Readback only" 模式，匹配 Allowed Tools 硬化模式。文案现在明确声明：此设置保存一个备用模型名称并传递给 SDK；插件已验证该选项到达 SDK 边界（`--fallback-model` CLI 标志）且同模型校验生效；但自动回退切换行为无法本地验证——需要真实的 API 过载（HTTP 529）信号，无法在本地模拟；请勿将此保存值误解为自动回退生效的证明。相邻 seams（`modelUsage` 被动检测、`query.setModel()` 手动切换、`applyFlagSettings({model})`、`SDKAPIRetryMessage`）经审计后均拒绝产品化为稳定用户界面功能。
+
+2026-06-06 truth-sync：`settings.claudeCode.forwardSubagentText.desc` 和 `settings.claudeCode.agentProgressSummaries.desc` 更新，明确区分稳定聊天 task/subagent 渲染（ToolCallRenderer + background-task UI）与诊断流捕获。`settings.claudeCode.sdkStreamBoundary.desc` 同步更新，明确 subagent transcript/progress 已作为稳定聊天 surface 存在，诊断流开关仅影响额外事件捕获。Subagent Transcript / Progress 矩阵 `userSurface` 从 `diagnostic` 重新分类为 `chat`。
+
+2026-05-24 新增 `settings.claudeCode.sdkStreamBoundary.*` 键，用于 SDK Foundations 中 hook/subagent stream 开关前的 diagnostic boundary notice，明确这些开关只驱动诊断/实验事件流，不提供稳定 hook authoring 或完整 subagent transcript/progress UI。
+
+2026-05-27 新增 `settings.claudeCode.fallbackModel.boundaryNotice` 键，用于 Model & Thinking 标签中 fallback model 控件后的边界提示。文案说明 fallbackModel 的修改需要重启活跃 Claude Code 会话或开始新的查询,无法像主模型一样在已运行的流中实时更新。
+
+本轮更新 `settings.claudeCode.model.desc` 和 `settings.claudeCode.fallbackModel.desc`，在主/备用模型描述中明确区分 live apply 与 restart-only 的产品边界，并提示用户通过下方 quick-select 下拉框选择模型。新增 `settings.claudeCode.model.quickSelectName` / `quickSelectDesc` 和 `settings.claudeCode.fallbackModel.quickSelectName` / `quickSelectDesc` 键，用于 Model & Thinking 标签中模型/备用模型的 quick-select 下拉框；保留 `settings.claudeCode.modelCatalog.quickSelectPlaceholder` 作为下拉框的默认占位文案。旧的 `modelCatalog.*` 系列键（refreshButton、loading、empty、error、useAsMain、useAsFallback）已随分离式目录列表的移除而废弃。
+
+本轮还将 `chat.question.title` 调整为 backend-neutral 的 “Question from agent”，避免 Claude Code 的 AskUserQuestion / elicitation 复用统一 Question UI 时继续显示 OpenCode 专属标题。
+
+2026-05-21 Debug IA 更新新增 `settings.debug.tab.plugin` / `opencode` / `claudeCode` / `export`、`settings.debug.modules.*` 来源分组说明、`settings.debug.modules.claudeCode.*` 和 `settings.debug.export.*` 文案，用于把插件内部诊断、OpenCode 后端诊断、Claude Code SDK 摘要诊断和导出/控制台帮助分开展示。后续 Claude Code 调试工作台又补充 `settings.debug.claude.*`，覆盖状态条、summary-only 隐私说明、模块总开关、六个日志通道、最近日志预览、复制当前 Claude 日志和复制 Claude 专属诊断报告。
 
 ## 导入关系
 
@@ -152,6 +222,7 @@ t('settings.server.started')
 | `settings.ui.*` | UI 设置 |
 | `settings.style.*` | 样式设置（含大量 Liquid Glass 帮助文本） |
 | `settings.debug.*` | 调试设置（含 module toggles、refresh interval、诊断动作与 console help） |
+| `settings.claudeCode.sessionBrowser.*` | Claude Code settings 中的 browse-only backend session browser launcher 文案 |
 | `settings.user.*` | 用户设置 |
 | `settings.plugins.*` | 插件管理 |
 | `settings.quickNav.*` | 快速导航 |
@@ -198,6 +269,15 @@ The per-conversation session settings modal now displays read-only global-defaul
 10. `summary.on`
 11. `summary.off`
 12. `summary.openSettings`
+
+## 2026-06-06 Backend session detail and settings launcher
+
+Backend session browser locale coverage expanded for inline detail mode and the Settings launcher:
+
+1. `chat.backendSessions.detailTitle`, `detailLoading`, `detailMetadataUnavailable`, and `detailField.*` label metadata rows for id/backend/title/summary/timestamps/custom title/git branch/cwd/tag/file size.
+2. `chat.backendSessions.detailTranscriptTitle`, `detailTranscriptNotice`, `detailTranscriptEmpty`, and `detailTranscriptCount` describe the full transcript panel.
+3. `chat.backendSessions.previewNotice`, `viewDetails`, and `backToPreview` distinguish truncated preview mode from the full detail view.
+4. `settings.claudeCode.sessionBrowser.launchName`, `launchDesc`, `launchButton`, and `browseOnlyNotice` power the Settings browse-only launcher.
 
 ## 2026-04-23 Conversation settings grouping
 
@@ -281,3 +361,61 @@ Plugin settings locale keys now cover the install section plus per-entry enable/
 ## 2026-05-17 Command catalog card UI
 
 Added `settings.commands.catalog.*` keys for the card-based command catalog: `searchPlaceholder`, filter pills (`filterAll/filterSkills/filterCommands/filterEnabled/filterDisabled`), source/status chips (`chip.skill/chip.command/chip.project/chip.md-command/chip.subtask/chip.hidden/chip.unavailable`), multi-select batch actions (`selectedCount/batchEnable/batchDisable`), visibility / selection aria labels (`visibility.toggle` / `selection.toggle`), and `noResults` empty state.
+
+## 2026-05-21 Claude Code environment status
+
+Added `settings.claudeCode.environment.status` so the Claude Code Runtime tab can show the authentication/environment row as an explicit read-only SDK environment state instead of an empty setting row.
+
+Added `settings.claudeCode.enableFileCheckpointing.*`, `settings.claudeCode.includeHookEvents.*`, `settings.claudeCode.forwardSubagentText.*`, and `settings.claudeCode.agentProgressSummaries.*` for Claude Code SDK foundation switches. The copy explicitly says these are SDK wiring / diagnostic foundations and that stable rewind, hook authoring, and full subagent transcript UI are not complete.
+
+Claude Code no longer uses the overloaded `settings.claudeCode.tab.mcpAdvanced` label. Its dense advanced controls are split into `settings.claudeCode.tab.tools` and `settings.claudeCode.tab.limits`; diagnostic stream controls now live in Capability Lab, while the runtime ecosystem summary sits in the Runtime tab as a read-only discovery surface.
+
+## 2026-05-22 Capability Lab diagnostic panel
+
+新增 `settings.debug.tab.capabilityLab` 和 `settings.capabilityLab.*` 系列键，为 Debug 分区的 Capability Lab 二级标签提供英文文案。覆盖能力矩阵、JSONL 历史浏览器、子代理浏览器、rewind dry-run 预览、结构化输出实验场、会话分叉诊断探针、会话恢复诊断探针、会话详情检查和发现状态九个诊断面板。新增 `settings.capabilityLab.fork.*` 与 `settings.capabilityLab.resume.*`，明确把 Claude `forkSession()` 和 SDK `resume` 仅作为 provider-owned diagnostic probes 暴露，而不是稳定的跨后端 fork / resume-at UI。所有面板标记为 ⚠️ DIAGNOSTIC / EXPERIMENTAL / NOT STABLE，不连接稳定设置持久化。
+
+新增 `settings.capabilityLab.sessionDetail.*`，为 Session Detail Inspection 诊断探针提供英文文案。该探针展示 `adapter.getSession()` 返回的 raw session 字段，是 provider-owned diagnostic，不代表稳定的跨后端 session-detail object contract。
+
+新增 `settings.capabilityLab.backendRouting.*`，为 Backend Routing Verification 诊断探针提供英文文案。该探针验证后端路由基础设施工作正常，显示活跃后端、已注册适配器和会话后端分布，是 provider-owned diagnostic。**2026-06-06 边界硬化**：路由层是内部基础设施，不是独立产品功能。稳定下游功能（会话浏览器、恢复、分叉、标题读取、分享链接读取、后端种类解析）已各自拥有矩阵行和 stable user surface；不存在独立的 "Backend Routing" 产品界面。
+
+2026-05-24 调整 `settings.capabilityLab.history.description`，明确 JSONL History Browser 只提供 diagnostic store 的 import / mirror / readback probes，不提供稳定 delete 或 restore 操作，避免把 Session Store 诊断证明误读成正式历史管理能力。
+
+## 2026-05-23 Unshare backend guard
+
+新增 `settings.conversation.share.sharedSessions.unshareUnavailable` 键，用于当活跃后端已切换出 OpenCode 时，阻止设置页已分享会话列表中的取消分享操作，并给出用户可理解的提示。
+
+新增 `settings.conversation.projectConfig.openCodeOnly` 键，用于当活跃后端已切换出 OpenCode 时，阻止设置页项目级 compaction / share 配置控件和分享诊断按钮继续执行 OpenCode-only 写入或检查路径；这只是 stale-control 防护，不表示 Claude Code 支持这些项目级 OpenCode 配置。
+
+新增 `settings.server.mcp.notice.openCodeOnly` 键，用于当活跃后端已切换出 OpenCode 时，阻止 MCP settings 中旧 toolbar / server-card callback 继续执行 OpenCode-only runtime 或 project-config 操作；这只是 stale-control 防护，不表示 Claude Code 支持 MCP authoring 或 runtime controls。
+
+新增 `settings.server.notice.openCodeOnly` 键，用于当活跃后端已切换出 OpenCode 时，阻止 Server settings 中旧 connection/auth/status callback 继续改写 OpenCode server settings 或调用 OpenCode server runtime；这只是 stale-control 防护，不表示 Claude Code 使用 OpenCode sidecar 管理面。
+
+新增 `settings.tools.notice.openCodeOnly`、`settings.formatter.notice.openCodeOnly` 和 `settings.security.notice.openCodeOnly` 键，用于当活跃后端已切换出 OpenCode 时，阻止 Tools、Formatter/LSP、Security settings 中旧 callback 或已打开的 tool detail modal 继续执行 OpenCode-only 项目配置、`.opencode/tools` 文件写入/删除、OpenCode permission 同步或 runtime restart 操作；这只是 stale-control 防护，不表示 Claude Code 支持这些 OpenCode-owned 设置面。
+
+## 2026-05-22 Structured output transcript rendering
+
+新增 `chat.structuredOutput.label` 键，为 Claude Code structured output 在普通聊天 transcript 中的可折叠渲染提供标签文案。
+
+
+本轮 capability-hint 现使用三组相关键：`chat.input.capabilityHint.json` 继续表示 capability 本身，`chat.input.capabilityHint.jsonLabel` 用于 Claude Code backend 激活时在 composer footer 的 send 按钮左侧显示 `Structured reply`，`chat.input.capabilityHint.jsonTooltip` 用于悬浮说明“固定结构返回结果、点击不会自动发送”。
+
+- 本轮 prompt-suggestions 新增 `settings.claudeCode.promptSuggestions.name` 和 `settings.claudeCode.promptSuggestions.desc` 键，用于 Capability Lab 诊断流控制区域的 toggle 说明。
+- 2026-06-04 进一步收紧 `settings.claudeCode.promptSuggestions.desc` / `.stableDesc`：稳定设置文案现在明确写成“显示在最后一条 assistant 消息下方”，不再含糊写成 composer/input-area suggestion。
+- 2026-06-04 继续新增 `settings.capabilityLab.proofs.promptSuggestions.*` locale proof keys，把 Prompt Suggestions readback proof 的按钮、运行中、标题、readback/fail 提示、模型状态、blocker note，以及新增的 `lifecycleBoundary` / `uiLifecycleEvidence` 全部收进英文 locale。这样 Capability Lab proof 会明确写出“next query or restarted session only / active sessions do not update live”，并把聊天侧 supporting evidence 限定为 session-scoped chip、new-turn/backend-stop clear、click-insert-only，而不是把这些 UI 现象误写成 SDK behavior pass。
+
+- 2026-06-04 stable settings 清理：`promptSuggestions.desc` 从 smoke-report 语气改为干净的用户面向文案（"Show follow-up suggestions after each assistant reply"），`stableDesc` 同步保留作向后兼容；稳定设置 UI 已不再引用 `stableDesc`，改用 `desc`。
+- 2026-06-06 Prompt Suggestions 分类提升：`promptSuggestions.boundaryNotice` 从 "Readback only" 更新为 "Live verified"，反映整体能力已通过 live proof。`proofs.promptSuggestions.boundary` 文案更新为明确标注整体能力已 live-verified，probe 本身是 readback supporting evidence。矩阵行 `runtimeProof` 从 `'readback'` 晋升为 `'pass'`。
+- 2026-06-06 Sandbox 审计与边界收紧：`sandbox.boundaryNotice` 更新为更精确的 readback 边界——补充 SDK `failIfUnavailable` 默认行为、无 init 事件/工具元数据/stderr 信号可确认激活、`CLAUDE_CODE_SANDBOXED` 环境变量仅限 assistant-worker 路径。分类保持 `readback`（完整 SDK 路径已追踪，无可观测信号）。
+- 2026-06-06 Debug File 分类提升：新增 `runDebugFileLiveProbe()` live probe——创建临时目录、设置 debugFile 到临时路径、运行真实诊断查询、检查 CLI 子进程是否在共享文件系统上创建了非空文件。矩阵行 `runtimeProof` 从 `'readback'` 晋升为 `'pass'`。原有的 `runDebugFileReadbackProbe()` 保留为 supporting evidence。稳定设置 `debugFile.desc` / `debugFile.boundaryNotice` 同步更新为 live-verified 语义；Capability Lab 的 readback/live proof 文案改走 `settings.capabilityLab.proofs.debugFile.*` / `settings.capabilityLab.proofs.debugFileLive.*` locale keys。新增 `DebugFileLiveProbeResult` 类型和 `_diagnosticDebugFile` 请求覆盖字段。
+- 2026-06-06 Task Budget / Load Timeout 审计硬化：`taskBudget.boundaryNotice` 更新为 source-backed readback 边界——SDK 以 `--task-budget` CLI 标志传递、CLI 作为 `output_config.task_budget` + beta header `task-budgets-2026-03-13` 发送、模型用作行为 pacing（非硬性截止）、没有结构化 enforcement 信号。`taskBudget.desc` 也同步收紧为 pacing guidance。`loadTimeoutMs.boundaryNotice` 更新为 source-backed readback 边界——SDK 仅在 `(resume || continue) && sessionStore` 时使用、超时包装器 `C4`（Promise.race + setTimeout）、没有 resume/continue 时超时代码永不执行；`loadTimeoutMs.desc` 也同步改成 sessionStore materialization 语义。两者保持 `readback`。
+- 2026-06-06 Plan Mode Instructions 晋升：新增 `settings.capabilityLab.proofs.planModeInstructionsLive.*` 键（16 个 proof keys，覆盖中英双语）。与 System Prompt Live Proof 同模式：nonce 注入 + 计划权限模式强制 + 自动批准工具调用。Codex Test Vault 验证通过后，`settings.claudeCode.planModeInstructions.boundaryNotice` 也同步更新为“saved-value readback + same-capability live proof”的组合语义，不再停留在 readback-only 文案。新增 `_diagnosticPlanModeInstructions` 请求覆盖字段。
+- 2026-06-06 Strict MCP Config 审计硬化：`strictMcpConfig.boundaryNotice` 更新为 source-backed readback 边界——SDK 以 `--strict-mcp-config` CLI 标志传递、实际验证位于编译后的 CLI binary、没有结构化信号确认严格验证是否已应用、插件侧 MCP adapter 静默丢弃结构性 malformed 条目。分类保持 `readback`。
+- 2026-06-04 stable sharing/server wording 清理：新增 `settings.conversation.share.troubleshooting.summary`，并把 `settings.conversation.share.diagnostics.check` 改成更产品化的 “Check connectivity”；同时收紧 `settings.server.status.local*`、`settings.server.external.*`、`settings.server.conflict.*`、`settings.server.orphanRestarted.*`、`settings.server.status.refresh*` 与 `chat.serverStatus.{external,localManaged,localExternal}`，让 Sharing、Server > Status 和 chat header badge 都使用更稳定的用户语言，而不是 diagnostic-flavored wording。
+
+- 2026-06-06 Fork Session On Resume 边界硬化：`settings.capabilityLab.proofs.forkSession.boundary` 更新为四条明确 blocker——(1) SDK 选项在恢复时 fork 整个会话，稳定聊天 Fork Session 从特定消息点分支，语义不同；(2) 稳定聊天已通过消息底部 fork 按钮提供显式逐消息分支；(3) 自动恢复时 fork 没有服务用户工作流，会产生无意图的大量会话；(4) adapter 持有会话生命周期管理，自动恢复时 fork 会破坏会话跟踪。分类保持 `diagnostic`（Outcome B），不晋升。
+- 2026-06-06 Load Timeout 审计硬化（结果 B）：新增 16 个 `settings.capabilityLab.proofs.loadTimeout.*` locale keys 替代硬编码英文——proof button label、running、title、boundary（Outcome B readback 详情）、lifecycleBoundary、optionWired、settingValue、sdkOptionPresent、sdkValue、valueMatch、readback、fail、defaultError、threw、status.yes/no。Load Timeout 保持 `readback`：SDK 仅在 `(resume || continue) && sessionStore` 时使用 loadTimeoutMs，插件诊断路径不触发该代码路径，无可观察信号确认超时行为。
+- 2026-06-06 Include Hook Events truth-sync：`settings.claudeCode.includeHookEvents.desc` 更新，移除 "Hook authoring remains hidden until runtime proof is complete" 的过时声明。Hook authoring 已通过 Claude 项目设置（`.claude/settings.json` 的 scan/create/open）作为稳定界面提供；`Include Hook Events` 保持 `diagnostic`，仅控制诊断流捕获。
+- 2026-06-06 Allowed Tools 边界硬化：新增 `settings.claudeCode.allowedTools.boundaryNotice`，明确声明 Readback only、零 enforcement 证据（init catalog 始终 34 tools，canUseTool 在 query() 模式下不工作，non-bypass synthetic approval 测试显示 non-allowed tools 穿透到 approval callback），并引导用户改用 Restricted Built-in Tools 进行确定性内置工具过滤。稳定设置页 `renderAllowedToolsSetting()` 现在渲染 `data-claude-code-allowed-tools-boundary="true"` 边界提示。分类保持 `readback`（Outcome B），不晋升。
+- 2026-06-06 Task Budget 独立审计（Outcome B）：矩阵行注释已添加显式 "Audit conclusion: remains readback" 框架，声明无可产品化的相邻 seam，拒绝非确定性的 "shorter response" 观测作为 proof path，并以 "Honest ceiling: readback" 收尾。分类保持 `readback`，无 locale 变更（2026-06-04/06 硬化已完成）。
+- `settings.claudeCode.enableContext1mBeta.boundaryNotice`: hardened with full SDK path trace (setting → CLI `--betas` flag); model-side beta acceptance explicitly marked as unverified
+- 2026-06-06 JS Runtime 审计硬化（Outcome B）：`settings.claudeCode.jsRuntime.boundaryNotice` 收紧为明确的 `Readback only` 模式，说明插件只能证明 `options.executable` 接线，不能观察 CLI 子进程实际选用了哪个运行时；同时新增 16 个 `settings.capabilityLab.proofs.jsRuntime.*` locale keys，覆盖按钮、运行中、标题、边界、生命周期、status yes/no、option-wired / setting-value / sdk-option / sdk-value / value-match 状态行，以及 readback / fail / threw 提示，替换掉 Capability Lab 里的硬编码英文。

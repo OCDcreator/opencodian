@@ -32,13 +32,13 @@ export class OpenCodianSettingsView extends ItemView
 
 ### 编辑区设置视图生命周期
 
-`onOpen()` 调用 `renderSettings()` 构建完整设置界面；`onClose()` 负责销毁 section owner、dropdown enhancer、滚动 coordinator 与待执行的 `requestAnimationFrame` 刷新。该 view 把设置 UI 挂在 `ItemView.contentEl` / `.view-content` 内，而不是直接改写 `.workspace-leaf-content` 外壳；滚动 coordinator 显式以这个内容根节点作为滚动容器，quick-nav 跳转也只滚动 `contentEl`。编辑区设置页维护自己的内存态 `settingsScrollTop`，用于同一 leaf 内的即时重绘恢复，但不会写入标准 settings tab 的 `settingsPanelScrollTop`。
+`onOpen()` 调用 `renderSettings()` 构建完整设置界面；`onClose()` 负责销毁 section owner、dropdown enhancer、滚动 coordinator 与待执行的 `requestAnimationFrame` 刷新。该 view 把设置 UI 挂在 `ItemView.contentEl` / `.view-content` 内，而不是直接改写 `.workspace-leaf-content` 外壳；滚动 coordinator 显式以这个内容根节点作为滚动容器，quick-nav 跳转也只滚动 `contentEl`。编辑区设置页维护自己的内存态 `settingsScrollTop`，用于同一 leaf 内的即时重绘恢复，但不会写入标准 settings tab 的 `settingsPanelScrollTop`。`disposeSections()` 现在也会显式销毁 `SettingsUserSection`，确保 user prompt / excluded-tags textarea 的 size-memory observer 不会在 view 重绘或关闭后残留。
 
 ### Classic / Tabbed 复用
 
 `renderSettings()` 根据 `settingsLayoutMode` 分发到 classic 或 tabbed 布局：
 
-- classic 模式按 General、Server、Model、Conversation、Agents、Commands、MCP、Formatter、Plugin、Security、UI、Style、Debug、User、Skills、Tools、ACP 顺序挂载 section
+- classic 模式按 General、Claude Code、Server、Model、Conversation、Agents、Commands、MCP、Formatter、Plugin、Security、UI、Style、Debug、User、Skills、Tools、ACP 顺序挂载 section
 - tabbed 模式通过 `SettingsTabbedRenderer` 路由一级 / 二级标签内容
 - General 面板额外承载设置布局模式、语言，以及“在编辑区打开设置”的开关
 
@@ -84,6 +84,8 @@ main.ts callback
 - `SettingsSectionCoordinator`: 负责 classic 布局的 heading、quick-nav 与 editor-area 内部滚动生命周期
 - `SettingsPanelChrome`: 提供标题、block、inline code、help button、语言设置等共享设置页壳层
 - 各 `Settings*Section`: 继续拥有具体设置项与业务生命周期，避免该 view 复制 settings tab 的业务逻辑
+- `SettingsUserSection`: 除了继续承接 user/profile/prompt/tags 渲染外，editor-area view 也负责在重绘和 `onClose()` 时调用其 `dispose()`，统一释放 textarea size-memory observer
+- `SettingsClaudeCodeSection`: 提供 Claude Code Phase 1 配置基础与 runtime diagnostics；editor-area view 只负责装配，backend enablement 由 General / Backend 的 `SettingsBackendSection` 管理
 
 ## 配置项
 

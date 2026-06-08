@@ -46,6 +46,7 @@ export class TabConversationStateBridge {
 ## 关键行为
 
 - `applyActiveConversation()` 统一处理 active-tab conversation 引用、`currentConversation`、session id、conversation session settings runtime reapply 与会话级 runtime reset，避免这些写回继续散落在 `OpenCodianView` 的多条 activation/fork/load 路径里
+- session reset 现在使用 `getConversationBackendSessionId()`；只有 conversation 带 legacy `openCodeSessionId` 时才回写 `setOpenCodeSessionId()`，避免非 OpenCode 会话被错误塞进 OpenCode-only runtime slot
 - session id 变化时才清掉 pending question，保持原来的跨 conversation wait-state 语义
 - `resetSessionState` / `clearActiveConversation()` 现在分别复用 host 上的 `resetTabSessionState()` / `clearTabSessionState()`，把 todo/status 双写回折叠到共享 session todo facade 边界
 - `clearActiveConversation()` 在 empty-tab 场景下会同时清空 conversation/session，并把 session settings runtime 恢复到 view 当前的 global default effective state

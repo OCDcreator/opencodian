@@ -2,6 +2,7 @@ import type {
   ChatMessage,
   Conversation,
 } from '../../../core/types';
+import { getConversationBackendSessionId } from '../../../core/types';
 import type { TabId } from '../tabs';
 
 type ConversationRevertState = { messageID: string; partID?: string } | null;
@@ -46,6 +47,7 @@ export class TabConversationStateBridge {
     options: ActivateTabConversationOptions = {},
   ): void {
     const previousSessionId = this.host.getSessionIdForTab(tabId);
+    const backendSessionId = getConversationBackendSessionId(conversation);
 
     this.syncActiveTabConversation(conversation);
     this.host.setCurrentConversation(conversation);
@@ -54,15 +56,17 @@ export class TabConversationStateBridge {
       this.host.setCurrentConversationRevertState(null);
     }
 
-    this.host.setOpenCodeSessionId(conversation.openCodeSessionId);
+    if (conversation.openCodeSessionId) {
+      this.host.setOpenCodeSessionId(conversation.openCodeSessionId);
+    }
     this.host.applyConversationSessionSettings(conversation);
 
-    if (previousSessionId !== conversation.openCodeSessionId) {
+    if (previousSessionId !== backendSessionId) {
       this.host.clearPendingQuestionsForTab(tabId);
     }
 
     if (options.resetSessionState) {
-      this.host.resetTabSessionState(tabId, conversation.openCodeSessionId);
+      this.host.resetTabSessionState(tabId, backendSessionId ?? null);
     }
 
     if (options.resetBackgroundTaskSuppressedFingerprint) {

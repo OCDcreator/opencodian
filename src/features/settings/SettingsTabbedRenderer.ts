@@ -8,10 +8,16 @@
 import type { App } from 'obsidian';
 import { setIcon, Setting } from 'obsidian';
 
+import type { AgentBackendKind } from '../../core/types/chat';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
+import { renderAgentSwitcherChips } from './AgentSwitcherChips';
+import { renderAgentSwitcherFloatingIcons } from './AgentSwitcherFloatingIcons';
 import { SettingsAcpSection } from './SettingsAcpSection';
 import { SettingsAgentsSection } from './SettingsAgentsSection';
+import { SettingsBackendSection } from './SettingsBackendSection';
+import { SettingsCapabilityLabSection } from './SettingsCapabilityLabSection';
+import { SettingsClaudeCodeSection } from './SettingsClaudeCodeSection';
 import { SettingsCommandsSection } from './SettingsCommandsSection';
 import { SettingsConversationSection } from './SettingsConversationSection';
 import { SettingsDebugSection } from './SettingsDebugSection';
@@ -84,17 +90,50 @@ export class SettingsTabbedRenderer {
   }
 
   renderDisplay(containerEl: HTMLElement): void {
-    const activePrimaryId = resolvePrimaryTabId(
+    containerEl.empty();
+    containerEl.classList.add('opencodian-settings-tabbed');
+    const activeBackend = this.getActiveBackend();
+    const visibleTabs = SETTINGS_PRIMARY_TABS.filter((tab) => {
+      if (!tab.backendRequired) return true;
+      return tab.backendRequired === activeBackend;
+    });
+    let activePrimaryId = resolvePrimaryTabId(
       this.deps.plugin.settings.settingsTabbedPrimaryTab,
     );
-    const activeSecondaryId = getActiveSecondaryTabId(
+    if (!visibleTabs.some((tab) => tab.id === activePrimaryId)) {
+      activePrimaryId = 'general';
+    }
+
+    const primaryDef = visibleTabs.find((pt) => pt.id === activePrimaryId);
+    const visibleSecondaryTabs = (primaryDef?.secondaryTabs ?? []).filter((tab) => {
+      if (!tab.backendRequired) return true;
+      return tab.backendRequired === activeBackend;
+    });
+    let activeSecondaryId = getActiveSecondaryTabId(
       activePrimaryId,
       this.deps.plugin.settings.settingsTabbedSecondaryTabByPrimary,
     );
+    if (!visibleSecondaryTabs.some((tab) => tab.id === activeSecondaryId)) {
+      activeSecondaryId = visibleSecondaryTabs[0]?.id ?? primaryDef?.defaultSecondaryTabId ?? 'basic';
+    }
+
+    const enabledAgents = this.getEnabledAgents();
+    const selectedAgent = this.getSelectedAgent(enabledAgents);
+    renderAgentSwitcherFloatingIcons(containerEl, {
+      selectedAgent,
+      enabledAgents,
+      onSelect: (agent) => { this.switchAgent(agent); },
+    });
+
+    renderAgentSwitcherChips(containerEl, {
+      selectedAgent,
+      enabledAgents,
+      onSelect: (agent) => { this.switchAgent(agent); },
+    });
 
     // Primary tab bar
     const primaryBarEl = containerEl.createDiv({ cls: 'opencodian-settings-tabs-primary' });
-    for (const primaryTab of SETTINGS_PRIMARY_TABS) {
+    for (const primaryTab of visibleTabs) {
       const tabEl = primaryBarEl.createEl('button', {
         cls: `opencodian-settings-tab-primary${primaryTab.id === activePrimaryId ? ' opencodian-settings-tab-active' : ''}`,
       });
@@ -112,10 +151,9 @@ export class SettingsTabbedRenderer {
     }
 
     // Secondary tab bar
-    const primaryDef = SETTINGS_PRIMARY_TABS.find((pt) => pt.id === activePrimaryId);
-    if (primaryDef && primaryDef.secondaryTabs.length > 1) {
+    if (primaryDef && visibleSecondaryTabs.length > 1) {
       const secondaryBarEl = containerEl.createDiv({ cls: 'opencodian-settings-tabs-secondary' });
-      for (const secondaryTab of primaryDef.secondaryTabs) {
+      for (const secondaryTab of visibleSecondaryTabs) {
         const tabEl = secondaryBarEl.createEl('button', {
           cls: `opencodian-settings-tab-secondary${secondaryTab.id === activeSecondaryId ? ' opencodian-settings-tab-active' : ''}`,
           text: t(secondaryTab.labelKey),
@@ -157,6 +195,45 @@ export class SettingsTabbedRenderer {
     this.deps.requestDisplayRefresh();
   }
 
+  private switchAgent(agent: AgentBackendKind): void {
+    const agentPrimaryTab = SETTINGS_PRIMARY_TABS.find((tab) => tab.backendRequired === agent);
+    const resolvedPrimary = agentPrimaryTab?.id ?? 'general';
+    const resolvedSecondary = getActiveSecondaryTabId(
+      resolvedPrimary,
+      this.deps.plugin.settings.settingsTabbedSecondaryTabByPrimary,
+    );
+
+    this.deps.plugin.settings.activeBackend = agent;
+    this.deps.plugin.agentServiceRegistry?.setActive(agent);
+    this.deps.plugin.settings.settingsTabbedPrimaryTab = resolvedPrimary;
+    this.deps.plugin.settings.settingsTabbedSecondaryTabByPrimary = {
+      ...this.deps.plugin.settings.settingsTabbedSecondaryTabByPrimary,
+      [resolvedPrimary]: resolvedSecondary,
+    };
+    void this.deps.plugin.saveSettings();
+    this.deps.requestDisplayRefresh();
+  }
+
+  private getEnabledAgents(): AgentBackendKind[] {
+    return this.deps.plugin.settings.enabledBackends;
+  }
+
+  private getSelectedAgent(enabledAgents: AgentBackendKind[]): AgentBackendKind | undefined {
+    const activeBackend = this.getActiveBackend();
+    if (activeBackend && enabledAgents.includes(activeBackend)) {
+      return activeBackend;
+    }
+
+    return enabledAgents[0];
+  }
+
+  private getActiveBackend(): AgentBackendKind | undefined {
+    const activeBackend = this.deps.plugin.settings.activeBackend;
+    return activeBackend && this.deps.plugin.settings.enabledBackends.includes(activeBackend)
+      ? activeBackend
+      : this.deps.plugin.settings.enabledBackends[0];
+  }
+
   private switchSecondaryTab(primaryTabId: string, secondaryTabId: string): void {
     const resolvedSecondary = resolveSecondaryTabId(primaryTabId, secondaryTabId);
     this.deps.plugin.settings.settingsTabbedSecondaryTabByPrimary = {
@@ -178,6 +255,9 @@ export class SettingsTabbedRenderer {
         break;
       case 'server':
         this.renderServerContent(containerEl, secondaryTabId);
+        break;
+      case 'claude-code':
+        this.renderClaudeCodeContent(containerEl, secondaryTabId);
         break;
       case 'model':
         this.renderModelContent(containerEl, secondaryTabId);
@@ -229,7 +309,16 @@ export class SettingsTabbedRenderer {
 
   // ─── Per-section tabbed content ────────────────────────────────────
 
-  private renderGeneralContent(containerEl: HTMLElement, _secondaryTabId: string): void {
+  private renderGeneralContent(containerEl: HTMLElement, secondaryTabId: string): void {
+    if (secondaryTabId === 'agents') {
+      const backendSection = new SettingsBackendSection({
+        plugin: this.deps.plugin,
+        requestDisplayRefresh: () => { this.deps.requestDisplayRefresh(); },
+      });
+      backendSection.attach(containerEl);
+      return;
+    }
+
     const blockBodyEl = containerEl
       .createDiv({
         cls: 'opencodian-settings-block opencodian-settings-section opencodian-settings-general-merged-block',
@@ -273,6 +362,14 @@ export class SettingsTabbedRenderer {
     });
     this.deps.setServerSection(serverSection);
     serverSection.attachTabbed(containerEl, secondaryTabId);
+  }
+
+  private renderClaudeCodeContent(containerEl: HTMLElement, secondaryTabId: string): void {
+    const claudeCodeSection = new SettingsClaudeCodeSection({
+      plugin: this.deps.plugin,
+      createSectionHeading: (hostEl, title, tooltip) => this.deps.createHeading(hostEl, title, tooltip),
+    });
+    claudeCodeSection.attachTabbed(containerEl, secondaryTabId);
   }
 
   private renderModelContent(containerEl: HTMLElement, secondaryTabId: string): void {
@@ -382,6 +479,14 @@ export class SettingsTabbedRenderer {
   }
 
   private renderDebugContent(containerEl: HTMLElement, secondaryTabId: string): void {
+    if (secondaryTabId === 'capability-lab') {
+      const capabilityLabSection = new SettingsCapabilityLabSection({
+        plugin: this.deps.plugin,
+        createSectionHeading: (hostEl, title, tooltip) => this.deps.createHeading(hostEl, title, tooltip),
+      });
+      capabilityLabSection.attachTabbed(containerEl, secondaryTabId);
+      return;
+    }
     const debugSection = new SettingsDebugSection({
       plugin: this.deps.plugin,
       createSectionHeading: (hostEl, title, tooltip) => this.deps.createHeading(hostEl, title, tooltip),

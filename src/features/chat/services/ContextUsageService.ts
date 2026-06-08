@@ -1,5 +1,6 @@
 import {
   type ChatMessage,
+  type ContextUsageSnapshot,
   createEmptyTabContextState,
   getDefaultContextWindow,
   type StreamChunk,
@@ -26,25 +27,7 @@ interface ContextSessionInfo {
   updatedAt?: number | null;
 }
 
-export interface ContextUsageSnapshot {
-  sessionId: string;
-  sessionTitle: string;
-  createdAt: number;
-  updatedAt: number;
-  compactingAt?: number | null;
-  providerId: string | null;
-  providerName: string | null;
-  modelId: string | null;
-  modelName: string | null;
-  contextWindow: number;
-  inputTokens: number;
-  outputTokens: number;
-  reasoningTokens: number;
-  cacheReadTokens: number;
-  cacheWriteTokens: number;
-  totalCost: number;
-}
-
+export type { ContextUsageSnapshot } from '../../../core/types';
 export type { ContextUsageSummary } from './ContextUsageDisplayService';
 
 type TimestampRefreshMode = 'preserve' | 'now' | 'if-missing';

@@ -5,97 +5,20 @@
 
 ## 概述
 
-双模式选择器组件，根据当前模型类型显示不同的推理控制 UI：
-- **自适应推理模型**（OpenAI GPT-5 / o1 / o3 / o4 系列）：显示 Effort Level 选择器（minimal → xhigh）
-- **自定义模型**：显示 Thinking Budget 选择器（Off / 1K / 4K / 8K / 16K tokens）
+`EffortSelector.ts` 是 composer toolbar 里的 thinking / effort variant dropdown。它不自行判断 backend 或模型类型，而是从 `EffortSelectorCallbacks` 读取当前模型、可选 variants、当前 variant，以及是否允许“默认/关闭”选项。
 
-两种模式互斥，通过 `isAdaptiveThinkingModel()` 判断当前模型类型。
+OpenCode 模式下，variants 来自当前 provider model catalog 的 `models[model].variants`，未选择时显示 `chat.effort.disabled`。Claude Code 模式下，`OpenCodianView` 提供固定的官方 effort variants：`low`、`medium`、`high`、`xhigh`、`max`，并禁用默认/关闭选项，因为 Claude Code effort 是 SDK option hint，不是 OpenCode-style variant off switch。
 
-## 导入关系
-上游: `EffortLevel`/`ThinkingBudget`（core/types/settings）、`i18n`
-下游: 被 `OpenCodianView` 在工具栏区域实例化
+## 职责
 
-## 核心类型 / 接口
+- 渲染 compact effort label、当前值和 dropdown options
+- 点击当前值时打开/关闭菜单，点击外部或按 Escape 关闭菜单
+- 以 reverse order 展示 variants，让较高 effort 靠上
+- 在当前模型不存在或 variants 为空时隐藏自身，避免留下空 toolbar 控件
+- 通过 `allowDefaultOption()` 和 `getDefaultOptionLabel()` 支持 backend-specific 默认项语义
 
-```typescript
-const EFFORT_LEVELS: { value: EffortLevel; label: string }[]
-// minimal | low | medium | high | xhigh
+## 维护约束
 
-const THINKING_BUDGETS: { value: ThinkingBudget; label: string; tokens: number }[]
-// 0 | 1024 | 4096 | 8192 | 16384
-
-const DEFAULT_EFFORT_LEVEL: EffortLevel = 'high'
-const DEFAULT_THINKING_BUDGET: ThinkingBudget = 4096
-
-interface EffortSelectorCallbacks {
-  onEffortLevelChange: (effort: EffortLevel) => Promise<void>;
-  onThinkingBudgetChange: (budget: ThinkingBudget) => Promise<void>;
-  getEffortLevel: () => EffortLevel;
-  getThinkingBudget: () => ThinkingBudget;
-  getCurrentModel: () => string;
-}
-
-function isAdaptiveThinkingModel(model: string): boolean
-```
-
-## 核心逻辑
-
-### 模型检测
-
-`isAdaptiveThinkingModel()` 检查模型 ID 是否以 `openai/` 开头且包含 `/gpt-5`、`/o1`、`/o3`、`/o4`。
-
-### 双模式切换
-
-`updateDisplay()` 根据当前模型类型：
-- adaptive → 显示 `effortEl`，隐藏 `budgetEl`
-- 非 adaptive → 隐藏 `effortEl`，显示 `budgetEl`
-
-### 下拉菜单
-
-点击当前值触发 `toggleMenu()`，显示选项列表。选项按 reverse 排序（最大值在前）。点击外部区域或按 Escape 关闭菜单。
-
-## 关键方法
-
-| 方法 | 说明 |
-|------|------|
-| `constructor(parentEl, callbacks)` | 创建容器、两组 DOM（effort + budget），注册 document mousedown/keydown 监听 |
-| `updateDisplay()` | 根据模型类型切换显示模式，重新渲染齿轮按钮 |
-| `renderEffortGears()` | 渲染 effort level 下拉选项 |
-| `renderBudgetGears()` | 渲染 thinking budget 下拉选项，附带 token tooltip |
-| `isEffortModel(model)` | 代理 `isAdaptiveThinkingModel()` |
-| `getElement()` | 返回容器 HTMLElement |
-| `destroy()` | 移除 document 监听、关闭菜单、移除 DOM |
-
-## 数据流
-
-```
-getCurrentModel() → isAdaptiveThinkingModel()
-        ↓
-   adaptive? ──yes──→ renderEffortGears() → onEffortLevelChange()
-        │
-        no
-        ↓
-   renderBudgetGears() → onThinkingBudgetChange()
-```
-
-## 与其他模块的交互
-
-- **OpenCodianView**: 持有实例，通过 `EffortSelectorCallbacks` 读写设置并触发保存
-- **core/types/settings**: `EffortLevel`、`ThinkingBudget` 类型定义
-
-## 配置项
-
-- `DEFAULT_EFFORT_LEVEL = 'high'`
-- `DEFAULT_THINKING_BUDGET = 4096`
-
-## 注意事项
-
-- `tooltipLabelId` 是静态递增计数器，用于无障碍
-- document mousedown/keydown 使用捕获阶段（`true`）确保在其他元素之前处理
-- 两个菜单互斥，`activeMenu` 追踪当前打开的菜单
-
-## 补充说明
-
-- EffortLevel 通过 `OpenCodianView` 保存到 `plugin.settings.effortLevel`，在发送消息时通过 SDK `reasoningEffort` 参数传递给 OpenCode API
-- ThinkingBudget 通过 `plugin.settings.thinkingBudget` 保存，在发送消息时通过 SDK `thinkingBudget` 参数传递
-- 当前 `isAdaptiveThinkingModel()` 仅检测 `openai/` 前缀的模型，其他厂商的自适应推理模型需扩展此函数
+- 该组件只管理 DOM 与选择事件，不保存设置，也不直接读取 backend capability。
+- OpenCode / Claude Code 的 variant 来源与保存策略由 `OpenCodianView` host seam 决定。
+- 新增 backend effort 语义时，优先扩展 callbacks，而不是在组件中硬编码 backend kind。

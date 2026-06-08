@@ -38,6 +38,9 @@ import {
 import {
   buildQuestionResolutionCardRenderPlan,
 } from './QuestionResolutionCardRenderer';
+import {
+  filterDuplicateStructuredOutputContentBlocks,
+} from './sendPipelineContent';
 import type {
   SendPipelineShellPort,
   SendPipelineStreamElements,
@@ -169,6 +172,8 @@ export class AssistantShellViewHostAdapter {
       renderAssistantPlaceholderAsNotice: (messageEl, noticeMessage, reason) =>
         this.renderAssistantPlaceholderAsNotice({ messageEl, noticeMessage, reason }),
       addTimestampWithCopyButton: (options) => this.addTimestampWithCopyButton(options),
+      renderStructuredOutputIfPresent: (messageEl, structuredOutput) =>
+        this.renderStructuredOutputIfPresent(messageEl, structuredOutput),
     };
   }
 
@@ -205,8 +210,15 @@ export class AssistantShellViewHostAdapter {
       });
     }
 
+    // Suppress duplicate raw JSON text blocks when structured output is
+    // present, so hydration/reload does not re-show text that was already
+    // removed during streaming finalization.
+    const contentBlocks = message.structured !== undefined
+      ? filterDuplicateStructuredOutputContentBlocks(message.contentBlocks, message.structured)
+      : message.contentBlocks;
+
     const questionResolutionRenderPlan = buildQuestionResolutionCardRenderPlan({
-      contentBlocks: message.contentBlocks,
+      contentBlocks,
       questionResolution: message.questionResolution,
       shouldRenderQuestionResolutionCard: this.host.shouldRenderQuestionResolutionCards(),
     });
@@ -226,6 +238,10 @@ export class AssistantShellViewHostAdapter {
         markdownService: this.host.getMarkdownService(),
         questionResolutionRenderPlan,
       });
+    }
+
+    if (message.structured !== undefined) {
+      this.renderStructuredOutput(content, message.structured);
     }
   }
 
@@ -320,6 +336,38 @@ export class AssistantShellViewHostAdapter {
       storedStatus: block.toolStatus,
       result: block.toolResult,
     });
+  }
+
+  private renderStructuredOutput(container: HTMLElement, structured: unknown): void {
+    const detailsEl = container.createEl('details', {
+      cls: 'opencodian-structured-output-details',
+    });
+    const summaryEl = detailsEl.createEl('summary', {
+      cls: 'opencodian-structured-output-summary',
+    });
+    summaryEl.setText(t('chat.structuredOutput.label'));
+    const bodyEl = detailsEl.createDiv({ cls: 'opencodian-structured-output-body' });
+    const preEl = bodyEl.createEl('pre', { cls: 'opencodian-structured-output-pre' });
+    const codeEl = preEl.createEl('code', { cls: 'opencodian-structured-output-code' });
+    try {
+      codeEl.setText(JSON.stringify(structured, null, 2));
+    } catch {
+      codeEl.setText(String(structured));
+    }
+  }
+
+  private renderStructuredOutputIfPresent(
+    messageEl: HTMLElement,
+    structuredOutput: unknown,
+  ): void {
+    if (structuredOutput === undefined) {
+      return;
+    }
+    const contentEl = messageEl.querySelector('.opencodian-message-content') as HTMLElement | null;
+    if (!contentEl) {
+      return;
+    }
+    this.renderStructuredOutput(contentEl, structuredOutput);
   }
 
   createAssistantShellContainer(

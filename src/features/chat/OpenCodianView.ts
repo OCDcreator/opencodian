@@ -8,6 +8,22 @@ import type { Editor, EventRef, WorkspaceLeaf } from 'obsidian';
 import { addIcon, Component, ItemView, MarkdownView, normalizePath, Notice, Scope } from 'obsidian';
 
 import {
+  AgentCapability,
+  getActiveBackendCapabilities,
+  hasCapability,
+} from '../../core/agents/AgentCapability';
+import {
+  getConversationChatBackendService,
+  getConversationSessionBackendService,
+  loadBackendSessionMessages,
+} from '../../core/agents/backend/AgentBackendRouting';
+import type { AgentConnectionStatus } from '../../core/agents/backend/AgentService';
+import {
+  buildClaudeCodeModelSelectorProviders,
+  CLAUDE_CODE_EFFORT_VARIANTS,
+  CLAUDE_CODE_PROVIDER_ID,
+} from '../../core/agents/backend/ClaudeCodeModelCatalog';
+import {
   type ResolvedModelSelection,
 } from '../../core/config/modelConfig';
 import type { SlashCommandMenuItem } from '../../core/config/slashCommandCatalog';
@@ -17,13 +33,16 @@ import {
 } from '../../core/opencode';
 import {
   type ChatMessage,
+  type ContextUsageSnapshot,
   type Conversation,
+  getConversationBackendSessionId,
   type PromptContextItem,
   type QuestionRequest,
   type QuestionResolution,
   type SessionTodo,
   VIEW_TYPE_OPENCODIAN,
 } from '../../core/types';
+import type { AgentBackendKind } from '../../core/types/chat';
 import type { PermissionMode } from '../../core/types/settings';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
@@ -268,6 +287,8 @@ import {
 import {
   createSlashCommandExecutionHost,
   executeCompactSession,
+} from './services/SlashCommandExecutionHostFactory';
+import {
   SlashCommandExecutionService,
 } from './services/SlashCommandExecutionService';
 import { SlashCommandMenuCatalogCache } from './services/SlashCommandMenuCatalogCache';
@@ -294,6 +315,7 @@ import {
   previewLogText,
 } from './services/trailingAssistantPatchDebug';
 import type { TabBar, TabId, TabManager } from './tabs';
+import { type BackendSessionBrowserHost,BackendSessionBrowserModal } from './ui/BackendSessionBrowserModal';
 import { ContextDetailModal } from './ui/ContextDetailModal';
 import { ContextRing } from './ui/ContextRing';
 import { EffortSelector } from './ui/EffortSelector';
@@ -457,6 +479,8 @@ export class OpenCodianView extends ItemView {
 
   // Event refs for cleanup
   private eventRefs: EventRef[] = [];
+  private backendActiveChangeDisposable: { dispose(): void } | null = null;
+  private backendSurfaceSwitchPromise: Promise<void> | null = null;
 
   private headerTabBarSlotEl: HTMLElement | null = null;
   private belowHeaderTabBarSlotEl: HTMLElement | null = null;
@@ -513,6 +537,7 @@ export class OpenCodianView extends ItemView {
   private conversationSyncRuntimeCoordinator: ConversationSyncRuntimeCoordinator;
   private conversationSyncBridge: ConversationSyncBridge;
   private readonly conversationIdentityRuntime: ConversationIdentityRuntime;
+  private lastResolvedServerAvailability: ChatServerAvailability | null = null;
   private conversationSyncBridgePorts!: ConversationSyncBridgePorts;
   private tabConversationSyncFingerprintRuntimePort!:
     TabConversationSyncFingerprintRuntimePort;
@@ -549,6 +574,61 @@ export class OpenCodianView extends ItemView {
     return this.questionRuntimeServices.dockCoordinator;
   }
 
+  /** Get current backend capabilities. Phase 0: always OpenCode full set. */
+  private get caps() {
+    return getActiveBackendCapabilities();
+  }
+
+  private isOpenCodeBackendActive(): boolean {
+    return this.plugin.settings.activeBackend === 'opencode'
+      && this.plugin.settings.enabledBackends.includes('opencode');
+  }
+
+  private hasAnyEnabledBackend(): boolean {
+    const enabledBackends = this.plugin.settings.enabledBackends;
+    if (!Array.isArray(enabledBackends)) {
+      return false;
+    }
+    return enabledBackends.length > 0;
+  }
+
+  private hasBackendConnection(): boolean {
+    const enabledBackends = this.plugin.settings.enabledBackends;
+    if (!Array.isArray(enabledBackends)) {
+      return false;
+    }
+    return this.hasAnyEnabledBackend()
+      && enabledBackends.includes(this.plugin.settings.activeBackend ?? 'opencode');
+  }
+
+  private isActiveBackendOpenCode(): boolean {
+    return (this.plugin.settings.activeBackend ?? 'opencode') === 'opencode';
+  }
+
+  private mapAgentConnectionStatusToServerAvailability(
+    status: AgentConnectionStatus,
+  ): ChatServerAvailability {
+    switch (status) {
+      case 'connected':
+        return 'running';
+      case 'connecting':
+        return 'starting';
+      case 'disconnected':
+      case 'error':
+      default:
+        return 'offline';
+    }
+  }
+
+  private async canSyncConversationWithServer(): Promise<boolean> {
+    const availability = await this.getServerAvailability();
+    return availability === 'running' || availability === 'external';
+  }
+
+  private shouldStartConversationSessionSignalRuntime(): boolean {
+    return this.isOpenCodeBackendActive();
+  }
+
   private createChatHeaderPresenterHost(): ChatHeaderPresenterHost {
     return {
       setTooltipLabel: (element, label, position) => {
@@ -566,11 +646,19 @@ export class OpenCodianView extends ItemView {
       },
       resolveServerAvailability: () => this.getServerAvailability(),
       isLocalServerMode: () => this.plugin.settings.server.mode === 'local',
+      isOpenCodeBackend: () => this.isOpenCodeBackendActive(),
+      getActiveBackendDisplayName: () => {
+        const activeBackend = this.plugin.settings.activeBackend ?? 'opencode';
+        return this.plugin.agentServiceRegistry?.get(activeBackend)?.displayName ?? activeBackend;
+      },
       refreshContextUsageIndicator: () => {
         this.activeTabContextUsageCoordinator.refreshContextUsageIndicator();
       },
+      onServerAvailabilityRefreshed: () => {
+        this.updateComposerAvailabilityUi();
+      },
       openServerSettings: () => {
-        this.openPluginSettingsAtServerSection();
+        this.openPluginSettingsAtActiveBackendRuntimeSection();
       },
       createConversationInNewTab: () => this.createNewConversation(),
       createConversationInCurrentTab: () => this.createNewConversationInCurrentTab(),
@@ -599,7 +687,9 @@ export class OpenCodianView extends ItemView {
         }));
       },
       onGraphUpdated: (graph) => {
-        this.childSessionGraphCoordinator.render(graph);
+        if (hasCapability(this.caps, AgentCapability.Subagents)) {
+          this.childSessionGraphCoordinator.render(graph);
+        }
       },
       getMessagesContainerEl: () => this.messagesContainer,
     };
@@ -618,6 +708,9 @@ export class OpenCodianView extends ItemView {
       showNotice: (message) => {
         new Notice(message);
       },
+      supportsSessionSharing: () => hasCapability(this.caps, AgentCapability.Sharing),
+      supportsCompaction: () => hasCapability(this.caps, AgentCapability.Compaction),
+      agentServiceRegistry: this.plugin.agentServiceRegistry,
     };
   }
 
@@ -648,8 +741,14 @@ export class OpenCodianView extends ItemView {
     titleGenerationService: TitleGenerationService,
   ): ConversationHistoryActionsHost {
     return {
-      getConversations: () => this.plugin.getConversations(),
+      getConversations: () => this.plugin.getConversations().filter(
+        (conversation) => (conversation.backend ?? 'opencode') === this.plugin.settings.activeBackend,
+      ),
       getCurrentConversation: () => this.currentConversation,
+      getHistoryBackendDisplayName: () => {
+        const activeBackend = this.plugin.settings.activeBackend ?? 'opencode';
+        return this.plugin.agentServiceRegistry?.get(activeBackend)?.displayName ?? activeBackend;
+      },
       isActiveTabStreaming: () => this.isActiveTabStreaming(),
       loadConversation: (conversationId) => this.loadConversation(conversationId),
       getConversationById: async (conversationId) =>
@@ -671,16 +770,36 @@ export class OpenCodianView extends ItemView {
       showNotice: (message) => {
         new Notice(message);
       },
+      openTitleSettings: () => { const titleSettings = this.appSettings(); this.plugin.settingsTab?.prepareScrollToConversationOnNextOpen('title'); titleSettings.open(); try { titleSettings.openTabById('opencodian'); } catch { /* title settings not ready */ } },
+      openBackendSessionBrowserModal: () => {
+        const modalHost: BackendSessionBrowserHost = {
+          getAgentServiceRegistry: () => this.plugin.agentServiceRegistry ?? null,
+          createConversationFromBackendSession: async (sessionId, title, initialMessages) => {
+            const backend = this.plugin.settings.activeBackend ?? 'opencode';
+            const conversation = await this.plugin.createConversationFromSession(sessionId, { title, backend, messages: initialMessages as ChatMessage[] });
+            return conversation.id;
+          },
+          loadConversation: (conversationId) => this.loadConversation(conversationId),
+          getActiveBackendKind: () => this.plugin.settings.activeBackend ?? null,
+          showNotice: (message) => { new Notice(message); },
+          isStreaming: () => this.isActiveTabStreaming(),
+        };
+        new BackendSessionBrowserModal(this.app, modalHost).open();
+      },
     };
   }
 
   private createComposerInputShellCoordinatorHost(): ComposerInputShellCoordinatorHost {
     return {
       attachSessionTodo: (container) => {
-        this.sessionTodoCoordinator.attach(container);
+        if (hasCapability(this.caps, AgentCapability.Todos)) {
+          this.sessionTodoCoordinator.attach(container);
+        }
       },
       attachQuestionDock: (container) => {
-        this.questionDockSlotCoordinator.attach(container);
+        if (hasCapability(this.caps, AgentCapability.Questions)) {
+          this.questionDockSlotCoordinator.attach(container);
+        }
       },
       setContextRowElement: (element) => {
         this.composerContextViewFacade.setContextRowElement(element);
@@ -693,10 +812,37 @@ export class OpenCodianView extends ItemView {
       addChosenFileContextToActiveTab: async () => {
         await this.composerContextViewFacade.addChosenFileContextToActiveTab();
       },
-      mountSelectionControls: (toolbar) => {
-        this.chatSelectionControlsCoordinator.build(toolbar);
+      mountSelectionControls: (toolbar, options) => {
+        this.chatSelectionControlsCoordinator.build(toolbar, {
+          showModels: options.showModels && hasCapability(this.caps, AgentCapability.Models),
+          showPermissions: options.showPermissions && hasCapability(this.caps, AgentCapability.Permissions),
+        });
+      },
+      shouldMountAgentSelector: () => {
+        // OpenCode: gate on Subagents capability
+        if (!this.isClaudeCodeConversationActive()) {
+          return hasCapability(this.caps, AgentCapability.Subagents);
+        }
+        // Claude: @agent mention menu uses Claude runtime agents; agent selector
+        // shows Claude candidates. Always mount when Claude is active.
+        return true;
+      },
+      getComposerCapabilityHint: () => {
+        // Claude backend: show /json structured-output chip.
+        // OpenCode backend: no hint (uses model selector + permissions instead).
+        if (!this.isClaudeCodeConversationActive()) {
+          return null;
+        }
+        return {
+          text: t('chat.input.capabilityHint.jsonLabel'),
+          tooltip: t('chat.input.capabilityHint.jsonTooltip'),
+          insertText: '/json ',
+        };
       },
       mountContextUsageIndicator: (container) => {
+        if (!hasCapability(this.caps, AgentCapability.Context)) {
+          return;
+        }
         this.contextRingContainerEl = container;
         this.contextRing = new ContextRing(container, () => {
           this.activeTabContextUsageCoordinator.openContextUsageDetails();
@@ -704,27 +850,36 @@ export class OpenCodianView extends ItemView {
         this.activeTabContextUsageCoordinator.refreshContextUsageIndicator();
       },
       mountEffortSelector: (container) => {
+        if (!hasCapability(this.caps, AgentCapability.Thinking)) {
+          return;
+        }
+
         this.effortContainerEl = container;
         this.effortSelector = new EffortSelector(container, {
           getVariants: () => {
+            if (this.isClaudeCodeConversationActive()) {
+              return [...CLAUDE_CODE_EFFORT_VARIANTS];
+            }
             const current = this.getCurrentSessionModel();
             if (!current) return [];
             // eslint-disable-next-line @typescript-eslint/no-unused-vars
             const modelRef = `${current.provider}/${current.model}`;
             return this.findKnownModelInfo({ provider: current.provider, model: current.model })?.variants ?? [];
           },
-          getVariant: () => this.currentVariant,
+          getVariant: () => this.getCurrentEffortVariant(),
           onVariantChange: async (variant: string | undefined) => {
-            this.currentVariant = variant;
             const current = this.getCurrentSessionModel();
+            this.currentVariant = this.normalizeEffortVariantForCurrentBackend(variant);
             if (current) {
-              this.variantStore[`${current.provider}/${current.model}`] = variant;
+              this.variantStore[`${current.provider}/${current.model}`] = this.currentVariant;
             }
           },
           getCurrentModel: () => {
             const current = this.getCurrentSessionModel();
             return current ? `${current.provider}/${current.model}` : '';
           },
+          allowDefaultOption: () => !this.isClaudeCodeConversationActive(),
+          getDefaultOptionLabel: () => t('chat.effort.disabled'),
         });
         this.effortSelector.updateDisplay();
       },
@@ -745,6 +900,7 @@ export class OpenCodianView extends ItemView {
       scheduleSettledScrollToBottomIfNeeded: () => {
         this.scheduleSettledScrollToBottomIfNeeded();
       },
+      getComposerAvailabilityState: () => this.getComposerAvailabilityState(),
     };
   }
 
@@ -770,7 +926,11 @@ export class OpenCodianView extends ItemView {
   }
 
   private loadSlashCommandMenuItems(): Promise<SlashCommandMenuItem[]> {
-    if (!this.plugin.opencodeConfigManager) {
+    if (!this.isOpenCodeBackendActive() && !this.isClaudeCodeConversationActive()) {
+      return Promise.resolve([]);
+    }
+
+    if (!this.plugin.opencodeConfigManager && !this.isClaudeCodeConversationActive()) {
       return Promise.resolve([]);
     }
 
@@ -778,6 +938,10 @@ export class OpenCodianView extends ItemView {
   }
 
   private scheduleSlashCommandMenuPreload(): void {
+    if (!this.isOpenCodeBackendActive() && !this.isClaudeCodeConversationActive()) {
+      return;
+    }
+
     if (this.slashCommandMenuPreloadTimerId !== null) {
       window.clearTimeout(this.slashCommandMenuPreloadTimerId);
     }
@@ -788,7 +952,13 @@ export class OpenCodianView extends ItemView {
         return;
       }
 
-      this.slashCommandMenuCatalogCache.warm();
+      void this.getServerAvailability().then((availability) => {
+        if (availability === 'disabled' || availability === 'offline' || availability === 'checking') {
+          return;
+        }
+
+        this.slashCommandMenuCatalogCache.warm();
+      });
     }, 0);
   }
 
@@ -859,6 +1029,18 @@ export class OpenCodianView extends ItemView {
         this.scope?.register([], 'Escape', handler);
       },
       loadModelCatalogData: async () => {
+        if (this.isClaudeCodeConversationActive()) {
+          const adapter = this.plugin.agentServiceRegistry?.get('claude-code') as {
+            supportedModels?: () => Promise<Array<{ id: string; name: string; provider?: string }>>;
+          } | undefined;
+          const supportedModels = adapter?.supportedModels
+            ? await adapter.supportedModels()
+            : [];
+          return {
+            catalogBundle: null,
+            providers: buildClaudeCodeModelSelectorProviders(supportedModels),
+          };
+        }
         const catalogBundle = this.plugin.modelConfigService
           ? await this.plugin.modelConfigService.getCatalogs(
               this.plugin.settings.modelSourceMode,
@@ -873,7 +1055,7 @@ export class OpenCodianView extends ItemView {
           providers,
         };
       },
-      getActiveTabModelOverride: () => this.tabManager?.getActiveTabModelOverride() ?? null,
+      getActiveTabModelOverride: () => this.getBackendScopedActiveTabModelOverride(),
       setActiveTabModelOverride: (selection) => {
         if (!this.tabManager?.getActiveTab()) {
           return false;
@@ -883,6 +1065,13 @@ export class OpenCodianView extends ItemView {
         return true;
       },
       getDefaultModelSelection: () => {
+        if (this.isClaudeCodeConversationActive()) {
+          const model = this.plugin.settings.backendSettings.claudeCode.model.trim() || 'default';
+          return {
+            provider: CLAUDE_CODE_PROVIDER_ID,
+            model,
+          };
+        }
         if (!this.plugin.settings.defaultProvider || !this.plugin.settings.defaultModel) {
           return null;
         }
@@ -896,11 +1085,14 @@ export class OpenCodianView extends ItemView {
         this.activeTabContextUsageCoordinator.syncIdentity();
       },
       getModelSourceMode: () => this.plugin.settings.modelSourceMode,
-      isModelAvailableOnServer: async (provider, model) => (
-        this.plugin.modelConfigService
+      isModelAvailableOnServer: async (provider, model) => {
+        if (this.isClaudeCodeConversationActive()) {
+          return Boolean(provider && model);
+        }
+        return this.plugin.modelConfigService
           ? this.plugin.modelConfigService.isModelAvailableOnServer(provider, model)
-          : true
-      ),
+          : true;
+      },
       resolveProviderIconUrl: (providerId) =>
         ProviderIconService.resolveIconUrl(
           this.app,
@@ -908,6 +1100,18 @@ export class OpenCodianView extends ItemView {
           this.plugin.settings.providerIconLibrary,
         ),
       updateEffortSelectorDisplay: () => {
+        if (this.isClaudeCodeConversationActive()) {
+          const current = this.getCurrentSessionModel();
+          if (current) {
+            const modelRef = `${current.provider}/${current.model}`;
+            const saved = this.variantStore[modelRef];
+            this.currentVariant = this.normalizeEffortVariantForCurrentBackend(saved);
+          } else {
+            this.currentVariant = undefined;
+          }
+          this.effortSelector?.updateDisplay();
+          return;
+        }
         const current = this.getCurrentSessionModel();
         if (current) {
           const modelRef = `${current.provider}/${current.model}`;
@@ -989,7 +1193,7 @@ export class OpenCodianView extends ItemView {
         this.messagesContainer = messagesEl;
         this.childSessionGraphCoordinator.clearContainer();
         const currentGraph = this.childSessionGraphCoordinator?.getGraph() ?? null;
-        if (currentGraph) {
+        if (currentGraph && hasCapability(this.caps, AgentCapability.Subagents)) {
           this.childSessionGraphCoordinator.render(currentGraph);
         }
       },
@@ -1065,9 +1269,12 @@ export class OpenCodianView extends ItemView {
           }
         },
       }, {
-        onOpenToolSession: this.conversationTabOpenCoordinator.openTaskToolSession.bind(
-          this.conversationTabOpenCoordinator,
-        ),
+        onOpenToolSession: (sessionId, toolCall) =>
+          this.conversationTabOpenCoordinator.openTaskToolSession(
+            sessionId,
+            toolCall,
+            this.currentConversation?.backend,
+          ),
       });
       paneState.runtime.streamController.setCallbacks({
         onToolCallStart: (toolCall) => {
@@ -1123,7 +1330,7 @@ export class OpenCodianView extends ItemView {
     }
 
     if (tabId === this.getActiveTabId()) {
-      return this.currentConversation?.openCodeSessionId ?? null;
+      return this.getOpenCodeSessionIdForConversation(this.currentConversation);
     }
 
     const tab = this.tabManager?.getTab(tabId);
@@ -1132,9 +1339,19 @@ export class OpenCodianView extends ItemView {
     }
 
     const conversation = this.plugin.getConversations().find((item) => item.id === tab.conversationId);
-    return conversation?.openCodeSessionId
+    return this.getOpenCodeSessionIdForConversation(conversation)
       ?? this.getTabRuntimeState(tabId)?.sessionTodoSessionId
       ?? null;
+  }
+
+  private getOpenCodeSessionIdForConversation(
+    conversation: Pick<Conversation, 'backend' | 'openCodeSessionId' | 'backendSessionId' | 'acpSessionId'> | null | undefined,
+  ): string | null {
+    // Use the universal resolver so all backends (OpenCode, Claude Code, ACP)
+    // resolve their authoritative session ID.  The method name is historical;
+    // the resolved value is the backend-agnostic session key used by
+    // SessionTodoCoordinator for snapshot storage.
+    return conversation ? (getConversationBackendSessionId(conversation) ?? null) : null;
   }
 
   private getConversationForTab(tabId: TabId | null = this.getActiveTabId()): Conversation | null {
@@ -1155,7 +1372,9 @@ export class OpenCodianView extends ItemView {
   }
 
   private renderSessionTodoDock(tabId: TabId | null = this.getActiveTabId()): void {
-    this.sessionTodoCoordinator.render(tabId);
+    if (hasCapability(this.caps, AgentCapability.Todos)) {
+      this.sessionTodoCoordinator.render(tabId);
+    }
   }
 
   private beginConversationHydration(tabId: TabId | null = this.getActiveTabId()): void {
@@ -1207,10 +1426,27 @@ export class OpenCodianView extends ItemView {
     this.currentVariant = undefined;
     this.slashCommandMenuCatalogCache = new SlashCommandMenuCatalogCache({
       getHiddenCommandIds: () => this.plugin.settings.hiddenSlashCommands ?? [],
-      loadProjectAgents: async () => this.plugin.opencodeConfigManager?.getAgentConfig() ?? {},
-      loadProjectCommands: async () => this.plugin.opencodeConfigManager?.getCommandConfig() ?? {},
-      loadRuntimeCommands: async () => this.plugin.openCodeService.sdk.command.list(),
-      loadRuntimeSkills: async () => this.plugin.openCodeService.sdk.app.skills(),
+      loadProjectAgents: async () => this.isClaudeCodeConversationActive() ? {} : (this.plugin.opencodeConfigManager?.getAgentConfig() ?? {}),
+      loadProjectCommands: async () => this.isClaudeCodeConversationActive() ? {} : (this.plugin.opencodeConfigManager?.getCommandConfig() ?? {}),
+      loadRuntimeCommands: async () => this.isClaudeCodeConversationActive() ? [] : this.plugin.openCodeService.sdk.command.list(),
+      loadRuntimeSkills: async () => this.isClaudeCodeConversationActive() ? [] : this.plugin.openCodeService.sdk.app.skills(),
+      loadClaudeRuntimeCommands: async () => {
+        if (!this.isClaudeCodeConversationActive()) return null;
+        const adapter = this.plugin.agentServiceRegistry?.get('claude-code') as {
+          getRuntimeCatalog?: () => Promise<{ commands: Array<{ name: string; description?: string }> } | null>;
+        } | undefined;
+        const catalog = await adapter?.getRuntimeCatalog?.();
+        return catalog?.commands ?? null;
+      },
+      loadClaudeRuntimeAgents: async () => {
+        if (!this.isClaudeCodeConversationActive()) return null;
+        const adapter = this.plugin.agentServiceRegistry?.get('claude-code') as {
+          getRuntimeCatalog?: () => Promise<{ agents: Array<{ name: string; description?: string }> } | null>;
+        } | undefined;
+        const catalog = await adapter?.getRuntimeCatalog?.();
+        return catalog?.agents ?? null;
+      },
+      getBackendKey: () => this.isClaudeCodeConversationActive() ? 'claude-code' : 'opencode',
       getVaultPath: () => getVaultBasePath(this.app),
       onWarmLoadFailed: (error) => { logger.debug('Failed to preload slash command menu items:', error); },
     });
@@ -1289,7 +1525,12 @@ export class OpenCodianView extends ItemView {
         },
         renderMarkdownInto: (container, markdown) =>
           this.renderMarkdownInto(container, markdown),
-        renderBackgroundTaskIndicatorIfNeeded: (tabId) => this.backgroundTaskHost.renderBackgroundTaskIndicatorIfNeeded(tabId),
+        renderBackgroundTaskIndicatorIfNeeded: (tabId) => {
+          if (hasCapability(this.caps, AgentCapability.Subagents)) {
+            return this.backgroundTaskHost.renderBackgroundTaskIndicatorIfNeeded(tabId);
+          }
+          return Promise.resolve();
+        },
         syncBackgroundTaskStateFromConversation: (conversation) => {
           this.backgroundTaskHost.syncBackgroundTaskStateFromConversation(conversation);
         },
@@ -1389,6 +1630,50 @@ export class OpenCodianView extends ItemView {
     this.permissionInlineCardRenderer = interactionRuntime.permissionInlineCardRenderer;
     this.questionRuntimeServices = interactionRuntime.questionRuntimeServices;
     this.sendPipelineRuntime = interactionRuntime.sendPipelineRuntime;
+    this.installClaudeCodePermissionHostContext();
+  }
+
+  private installClaudeCodePermissionHostContext(): void {
+    if (!this.plugin.claudeCodePermissionHostContext) {
+      return;
+    }
+
+    this.plugin.claudeCodePermissionHostContext.getActiveTabId = () => this.getActiveTabId();
+    this.plugin.claudeCodePermissionHostContext.permissionCardRenderer = this.permissionInlineCardRenderer;
+    this.plugin.claudeCodePermissionHostContext.questionCardRenderer = {
+      collectResponse: async (request, tabId) => {
+        try {
+          const result = await this.questionRuntimeServices.resolutionFlowCoordinator.showQuestionDialog(
+            request,
+            tabId,
+            { applyResolution: false, forceInline: true },
+          );
+          return result.status === 'answered' ? result.answers : null;
+        } finally {
+          this.questionRuntimeServices.inlineCardRenderer.clear(tabId);
+        }
+      },
+    };
+    this.plugin.claudeCodePermissionHostContext.elicitationCardRenderer = {
+      collectResponse: async (request, tabId) => {
+        try {
+          const result = await this.questionRuntimeServices.resolutionFlowCoordinator.showQuestionDialog(
+            request,
+            tabId,
+            { applyResolution: false, forceInline: true },
+          );
+          if (result.status === 'rejected') {
+            return { action: 'decline' };
+          }
+          if (result.status !== 'answered') {
+            return { action: 'cancel' };
+          }
+          return { action: 'accept', answers: result.answers };
+        } finally {
+          this.questionRuntimeServices.inlineCardRenderer.clear(tabId);
+        }
+      },
+    };
   }
 
   private createSurfaceRuntimeWiring(): OpenCodianViewSurfaceRuntimeWiring {
@@ -1405,7 +1690,9 @@ export class OpenCodianView extends ItemView {
         shouldUseAboveInputQuestionDock: () => this.plugin.settings.questionCardPosition === 'above_input',
       },
       () => {
-        this.questionDockCoordinator.render();
+        if (hasCapability(this.caps, AgentCapability.Questions)) {
+          this.questionDockCoordinator.render();
+        }
       },
     );
     const conversationHistoryActionsCoordinator = new ConversationHistoryActionsCoordinator(
@@ -1448,14 +1735,22 @@ export class OpenCodianView extends ItemView {
       childSessionGraphCoordinator: new ChildSessionGraphCoordinator(
         this.createChildSessionGraphCoordinatorHost(),
         (sessionId) => {
-          void this.conversationTabOpenCoordinator.openTaskToolSession(sessionId);
+          void this.conversationTabOpenCoordinator.openTaskToolSession(
+            sessionId,
+            null,
+            this.currentConversation?.backend,
+          );
         },
       ),
       questionDockSlotCoordinator,
       assistantShellViewHostAdapter: new AssistantShellViewHostAdapter(
         this.createAssistantShellViewHostAdapterHost(),
         (sessionId, toolCall) =>
-          this.conversationTabOpenCoordinator.openTaskToolSession(sessionId, toolCall),
+          this.conversationTabOpenCoordinator.openTaskToolSession(
+            sessionId,
+            toolCall,
+            this.currentConversation?.backend,
+          ),
       ),
     };
   }
@@ -1563,31 +1858,14 @@ export class OpenCodianView extends ItemView {
       this.createConversationSessionSignalRuntimeHost(),
       backgroundTaskRuntime.backgroundTaskLiveSignalCoordinator,
     );
-    const backgroundTaskCompletionNoticeService = new BackgroundTaskCompletionNoticeService(
-      this.createBackgroundTaskCompletionNoticeServiceHost(),
-    );
-    const backgroundTaskInlinePanelRenderer = new BackgroundTaskInlinePanelRenderer(
-      backgroundTaskRuntime.backgroundTaskTimelineService,
-      this.createBackgroundTaskInlinePanelRendererHost(),
-    );
-    const backgroundTaskIndicatorCoordinator = new BackgroundTaskIndicatorCoordinator({
-      inlinePanelRenderer: backgroundTaskInlinePanelRenderer,
-      timelineService: backgroundTaskRuntime.backgroundTaskTimelineService,
-      completionNoticeService: backgroundTaskCompletionNoticeService,
-      liveSignalCoordinator: backgroundTaskRuntime.backgroundTaskLiveSignalCoordinator,
-      tabRuntimeStateBridge,
-      host: this.createBackgroundTaskIndicatorCoordinatorHost(),
-    });
-    this.backgroundTaskHost = createBackgroundTaskViewHost({
-      timelineService: backgroundTaskRuntime.backgroundTaskTimelineService,
-      indicatorRenderPort: backgroundTaskIndicatorCoordinator,
-    });
-    const backgroundTaskStreamTriggerCoordinator = new BackgroundTaskStreamTriggerCoordinator(
+    const {
+      backgroundTaskCompletionNoticeService,
+      backgroundTaskInlinePanelRenderer,
       backgroundTaskIndicatorCoordinator,
-      backgroundTaskRuntime.backgroundTaskTimelineService,
-      backgroundTaskRuntime.backgroundTaskLiveSignalCoordinator,
-      backgroundTaskRuntime.backgroundTaskStreamTriggerViewHost,
-    );
+      backgroundTaskStreamTriggerCoordinator,
+      backgroundTaskHost,
+    } = this.createBackgroundTaskInfrastructure(backgroundTaskRuntime, tabRuntimeStateBridge);
+    this.backgroundTaskHost = backgroundTaskHost;
     const conversationLoadRuntimeBridge = new ConversationLoadRuntimeBridge(
       conversationSyncRuntime.conversationLoadRuntimeBridgeHost,
     );
@@ -1611,14 +1889,12 @@ export class OpenCodianView extends ItemView {
         persistTabState: (options) => { this.persistTabState(options); },
         loadConversations: () => this.plugin.loadConversations(),
         getConversations: () => this.plugin.getConversations(),
+        getActiveBackend: () => this.plugin.settings.activeBackend,
         createConversation: () => this.plugin.createConversation(),
         app: this.app,
-        revertSession: (sessionId, messageId) =>
-          this.plugin.openCodeService.revertSession(sessionId, messageId),
-        unrevertSession: (sessionId) =>
-          this.plugin.openCodeService.unrevertSession(sessionId),
-        forkSession: (sessionId, messageId) =>
-          this.plugin.openCodeService.forkSession(sessionId, messageId),
+        revertSession: (sessionId, messageId) => this.routeConversationRevertSession(sessionId, messageId),
+        unrevertSession: (sessionId) => this.routeConversationUnrevertSession(sessionId),
+        forkSession: (sessionId, messageId) => this.routeConversationForkSession(sessionId, messageId),
         createConversationFromSession: (sessionId, initial) =>
           this.plugin.createConversationFromSession(sessionId, initial),
         deleteConversation: (conversationId) =>
@@ -1668,6 +1944,121 @@ export class OpenCodianView extends ItemView {
       conversationLoadRecoveryCoordinator,
       conversationTabRuntimeCoordinator,
     };
+  }
+
+  private createBackgroundTaskInfrastructure(
+    backgroundTaskRuntime: OpenCodianViewBackgroundTaskRuntimeWiring,
+    tabRuntimeStateBridge: TabRuntimeStateBridge,
+  ): {
+    backgroundTaskCompletionNoticeService: BackgroundTaskCompletionNoticeService;
+    backgroundTaskInlinePanelRenderer: BackgroundTaskInlinePanelRenderer;
+    backgroundTaskIndicatorCoordinator: BackgroundTaskIndicatorCoordinator;
+    backgroundTaskStreamTriggerCoordinator: BackgroundTaskStreamTriggerCoordinator;
+    backgroundTaskHost: BackgroundTaskViewHost;
+  } {
+    const backgroundTaskCompletionNoticeService = new BackgroundTaskCompletionNoticeService(
+      this.createBackgroundTaskCompletionNoticeServiceHost(),
+    );
+    const backgroundTaskInlinePanelRenderer = new BackgroundTaskInlinePanelRenderer(
+      backgroundTaskRuntime.backgroundTaskTimelineService,
+      this.createBackgroundTaskInlinePanelRendererHost(),
+    );
+    const backgroundTaskIndicatorCoordinator = new BackgroundTaskIndicatorCoordinator({
+      inlinePanelRenderer: backgroundTaskInlinePanelRenderer,
+      timelineService: backgroundTaskRuntime.backgroundTaskTimelineService,
+      completionNoticeService: backgroundTaskCompletionNoticeService,
+      liveSignalCoordinator: backgroundTaskRuntime.backgroundTaskLiveSignalCoordinator,
+      tabRuntimeStateBridge,
+      host: this.createBackgroundTaskIndicatorCoordinatorHost(),
+    });
+    const backgroundTaskIndicatorRenderPort = {
+      renderIfNeeded: (tabId?: TabId | null) => {
+        if (hasCapability(this.caps, AgentCapability.Subagents)) {
+          return backgroundTaskIndicatorCoordinator.renderIfNeeded(tabId);
+        }
+        return Promise.resolve();
+      },
+    };
+    const backgroundTaskHost = createBackgroundTaskViewHost({
+      timelineService: backgroundTaskRuntime.backgroundTaskTimelineService,
+      indicatorRenderPort: backgroundTaskIndicatorRenderPort,
+    });
+    const backgroundTaskStreamTriggerCoordinator = new BackgroundTaskStreamTriggerCoordinator(
+      backgroundTaskIndicatorRenderPort,
+      backgroundTaskRuntime.backgroundTaskTimelineService,
+      backgroundTaskRuntime.backgroundTaskLiveSignalCoordinator,
+      backgroundTaskRuntime.backgroundTaskStreamTriggerViewHost,
+    );
+
+    return {
+      backgroundTaskCompletionNoticeService,
+      backgroundTaskInlinePanelRenderer,
+      backgroundTaskIndicatorCoordinator,
+      backgroundTaskStreamTriggerCoordinator,
+      backgroundTaskHost,
+    };
+  }
+
+  private getCurrentConversationForkService():
+    import('../../core/agents/backend/AgentService').AgentForkCapability | null {
+    const conversation = this.currentConversation;
+    const service = getConversationSessionBackendService(
+      this.plugin.agentServiceRegistry,
+      conversation,
+    );
+    if (!service?.hasCapability(AgentCapability.Fork)) {
+      return null;
+    }
+    return service as unknown as import('../../core/agents/backend/AgentService').AgentForkCapability;
+  }
+
+  private getCurrentConversationBranchService():
+    import('../../core/agents/backend/AgentService').AgentBranchCapability | null {
+    const conversation = this.currentConversation;
+    const service = getConversationSessionBackendService(
+      this.plugin.agentServiceRegistry,
+      conversation,
+    );
+    if (!service?.hasCapability(AgentCapability.Branching)) {
+      return null;
+    }
+    return service as unknown as import('../../core/agents/backend/AgentService').AgentBranchCapability;
+  }
+
+  private routeConversationRevertSession(sessionId: string, messageId: string): Promise<boolean> {
+    const backend = this.currentConversation?.backend ?? 'opencode';
+    const branchService = this.getCurrentConversationBranchService();
+    if (branchService) {
+      return branchService.revertSession(sessionId, messageId);
+    }
+    if (backend === 'opencode') {
+      return this.plugin.openCodeService.revertSession(sessionId, messageId);
+    }
+    throw new Error(`Rewind not available for backend "${backend}"`);
+  }
+
+  private routeConversationUnrevertSession(sessionId: string): Promise<boolean> {
+    const backend = this.currentConversation?.backend ?? 'opencode';
+    const branchService = this.getCurrentConversationBranchService();
+    if (branchService) {
+      return branchService.unrevertSession(sessionId);
+    }
+    if (backend === 'opencode') {
+      return this.plugin.openCodeService.unrevertSession(sessionId);
+    }
+    throw new Error(`Restore rewind not available for backend "${backend}"`);
+  }
+
+  private routeConversationForkSession(sessionId: string, messageId: string): Promise<{ id: string; title: string }> {
+    const backend = this.currentConversation?.backend ?? 'opencode';
+    const forkService = this.getCurrentConversationForkService();
+    if (forkService) {
+      return forkService.forkSession(sessionId, messageId);
+    }
+    if (backend === 'opencode') {
+      return this.plugin.openCodeService.forkSession(sessionId, messageId);
+    }
+    throw new Error(`Fork not available for backend "${backend}"`);
   }
 
   private createInteractionRuntimeWiring(
@@ -1740,6 +2131,7 @@ export class OpenCodianView extends ItemView {
         applyFallbackConversationTitle: (conversationId, firstMessage) =>
           this.applyFallbackConversationTitle(conversationId, firstMessage),
         getTitleMode: () => this.plugin.settings.titleMode,
+        getClaudeAutoTitle: () => this.plugin.settings.backendSettings.claudeCode.autoTitle,
         startAiConversationTitleGeneration: (conversationId, firstMessage, modelOptions) => {
           void this.startAiConversationTitleGeneration(conversationId, firstMessage, modelOptions);
         },
@@ -1893,8 +2285,12 @@ export class OpenCodianView extends ItemView {
         this.plugin.openCodeService.getCachedSessionDiffEntries(sessionId),
       appendPersistentNotice: (options) =>
         this.persistentAssistantNoticeService.appendMessage(options),
-      renderBackgroundTaskIndicatorIfNeeded: (tabId) =>
-        this.backgroundTaskHost.renderBackgroundTaskIndicatorIfNeeded(tabId),
+      renderBackgroundTaskIndicatorIfNeeded: (tabId) => {
+        if (hasCapability(this.caps, AgentCapability.Subagents)) {
+          return this.backgroundTaskHost.renderBackgroundTaskIndicatorIfNeeded(tabId);
+        }
+        return Promise.resolve();
+      },
       handleRestoreRewindRequest: () => this.handleRestoreRewindRequest(),
       openPluginSettingsPreservingScroll: () => {
         this.openPluginSettingsPreservingScroll();
@@ -1902,6 +2298,8 @@ export class OpenCodianView extends ItemView {
           this.plugin.settingsTab?.scrollToModelSection();
         }, 50);
       },
+      hasAnyEnabledBackend: () => this.hasAnyEnabledBackend(),
+      hasBackendConnection: () => this.hasBackendConnection(),
     };
   }
 
@@ -1909,7 +2307,7 @@ export class OpenCodianView extends ItemView {
     return {
       getTabRuntimeState: (tabId: TabId | null) => this.getTabRuntimeState(tabId),
       getActiveTabId: () => this.getActiveTabId(),
-      getCurrentConversationSessionId: () => this.currentConversation?.openCodeSessionId ?? null,
+      getCurrentConversationSessionId: () => this.currentConversation ? getConversationBackendSessionId(this.currentConversation) : null,
       getSessionIdForTab: (tabId: TabId | null) => this.getSessionIdForTab(tabId),
       getConversationForTab: (tabId: TabId | null) => this.getConversationForTab(tabId),
       hasMatchingPersistentAssistantNoticeMessage: (
@@ -2031,37 +2429,48 @@ export class OpenCodianView extends ItemView {
         this.tabManager?.setActiveTabContextUsage(contextUsage);
       },
       renderContextUsageIndicator: (state) => {
-        this.contextRing?.update(state);
+        if (hasCapability(this.caps, AgentCapability.Context)) {
+          this.contextRing?.update(state);
+        }
       },
-      getSessionContextUsageSnapshot: (sessionId) =>
-        this.plugin.openCodeService.getSessionContextUsageSnapshot(sessionId),
+      getSessionContextUsageSnapshot: (sessionId) => {
+        const conversation = this.currentConversation;
+        const backend = conversation ? (conversation.backend ?? 'opencode') : 'opencode';
+        if (backend === 'claude-code') {
+          const adapter = this.plugin.agentServiceRegistry?.get('claude-code') as {
+            getSessionContextUsageSnapshot?(sessionId: string): Promise<unknown | null>;
+          } | undefined;
+          if (typeof adapter?.getSessionContextUsageSnapshot === 'function') {
+            return adapter.getSessionContextUsageSnapshot(sessionId).then((result) => {
+              if (result && typeof result === 'object' && 'sessionId' in result) {
+                return result as ContextUsageSnapshot;
+              }
+              return null;
+            });
+          }
+          return Promise.resolve(null);
+        }
+        return this.plugin.openCodeService.getSessionContextUsageSnapshot(sessionId);
+      },
       hasTab: (tabId) => Boolean(this.tabManager?.getTab(tabId)),
       getTabContextUsage: (tabId) => this.tabManager?.getTabContextUsage(tabId) ?? null,
       setTabContextUsage: (tabId, contextUsage) => {
         this.tabManager?.setTabContextUsage(tabId, contextUsage);
       },
       getActiveTabId: () => this.getActiveTabId(),
-      openContextUsageDetailsModal: (contextState) => {
+        openContextUsageDetailsModal: (contextState) => {
         new ContextDetailModal(this.app, {
           conversation: this.currentConversation,
           contextState,
           systemPrompt: this.plugin.settings.systemPrompt,
-          rawMessageLoader: async () => {
-            const sessionId = this.currentConversation?.openCodeSessionId;
-            if (!sessionId) {
-              return [];
-            }
-
-            const messages = await this.plugin.openCodeService.getSessionMessages(sessionId);
-            return messages.map(({ info, parts }) => ({
-              id: info.id,
-              role: info.role,
-              createdAt: info.time.created ?? null,
-              payload: JSON.stringify({
-                message: info,
-                parts,
-              }, null, 2),
-            }));
+          rawMessageLoader: () => {
+            const conversation = this.currentConversation;
+            const sessionId = conversation ? getConversationBackendSessionId(conversation) ?? null : null;
+            return loadBackendSessionMessages(
+              this.plugin.agentServiceRegistry,
+              conversation,
+              sessionId,
+            );
           },
         }).open();
       },
@@ -2136,6 +2545,7 @@ export class OpenCodianView extends ItemView {
       getTabRuntimeState: (tabId: TabId | null) => this.getTabRuntimeState(tabId),
       getConversationSyncFingerprint: (messages) =>
         this.conversationIdentityRuntime.getConversationSyncFingerprint(messages),
+      canSyncConversationWithServer: () => this.canSyncConversationWithServer(),
       syncConversationMessagesFromServer: (conversation, tabId, reason, options) =>
         this.syncConversationMessagesFromServer(conversation, tabId, reason, options),
       syncConversationMessagesFromCanonicalState: (conversation, tabId, reason, options) =>
@@ -2145,8 +2555,12 @@ export class OpenCodianView extends ItemView {
       },
       applySyncedConversationUpdate: (previousMessages, nextMessages) =>
         conversationRenderService.applySyncedConversationUpdate(previousMessages, nextMessages),
-      renderBackgroundTaskIndicatorIfNeeded: (tabId) =>
-        this.backgroundTaskHost.renderBackgroundTaskIndicatorIfNeeded(tabId),
+      renderBackgroundTaskIndicatorIfNeeded: (tabId) => {
+        if (hasCapability(this.caps, AgentCapability.Subagents)) {
+          return this.backgroundTaskHost.renderBackgroundTaskIndicatorIfNeeded(tabId);
+        }
+        return Promise.resolve();
+      },
       hasInterruptedLocalAssistantTail: (messages) => hasInterruptedLocalAssistantTail(messages),
       transitionTabSessionLifecycle: (tabId, phase, reason) =>
         this.conversationTabRuntimeCoordinator.transitionTabSessionLifecycle(tabId, phase, reason),
@@ -2210,8 +2624,12 @@ export class OpenCodianView extends ItemView {
       },
       rerenderSingleUserMessage: (previousMessageId, message) =>
         conversationRenderService.rerenderSingleUserMessage(previousMessageId, message),
-      renderBackgroundTaskIndicatorIfNeeded: (tabId) =>
-        this.backgroundTaskHost.renderBackgroundTaskIndicatorIfNeeded(tabId),
+      renderBackgroundTaskIndicatorIfNeeded: (tabId) => {
+        if (hasCapability(this.caps, AgentCapability.Subagents)) {
+          return this.backgroundTaskHost.renderBackgroundTaskIndicatorIfNeeded(tabId);
+        }
+        return Promise.resolve();
+      },
       summarizeChatMessageForDebug: (message) => summarizeChatMessageForDebug(message),
       ...createDebugLogCallbacks(),
     };
@@ -2296,7 +2714,12 @@ export class OpenCodianView extends ItemView {
   private createBackgroundTaskCompletionNoticeServiceHost(): BackgroundTaskCompletionNoticeServiceHost {
     return {
       getTabRuntimeState: (tabId: TabId | null) => this.getTabRuntimeState(tabId),
-      appendPersistentAssistantNoticeMessage: (options) => this.persistentAssistantNoticeService.appendMessage(options),
+      appendPersistentAssistantNoticeMessage: (options) => {
+        if (hasCapability(this.caps, AgentCapability.Subagents)) {
+          return this.persistentAssistantNoticeService.appendMessage(options);
+        }
+        return Promise.resolve();
+      },
     };
   }
 
@@ -2421,15 +2844,38 @@ export class OpenCodianView extends ItemView {
       transitionTabSessionLifecycle: (tabId, phase, reason) =>
         this.conversationTabRuntimeCoordinator.transitionTabSessionLifecycle(tabId, phase, reason),
       refreshServerStatusBadge: () => this.chatHeaderPresenter.refreshServerStatusBadge(),
-      sendStreamMessage: (content, options) => this.plugin.openCodeService.sendMessage(content, options),
+      sendStreamMessage: (conversation, content, options) => {
+        const backend = getConversationChatBackendService(this.plugin.agentServiceRegistry, conversation);
+        if (!backend) {
+          throw new Error(`Backend ${conversation.backend ?? 'opencode'} does not support chat`);
+        }
+        return backend.sendMessage({
+          sessionId: options.sessionId ?? '',
+          content,
+          options: { ...options },
+        });
+      },
       detachStream: (sessionId) => {
         if (sessionId) {
-          this.plugin.openCodeService.detachStream(sessionId);
+          const conversation = this.currentConversation;
+          const backend = conversation
+            ? getConversationChatBackendService(this.plugin.agentServiceRegistry, conversation)
+            : undefined;
+          const conversationBackend = conversation?.backend ?? 'opencode';
+          if (backend && conversationBackend !== 'opencode') {
+            backend.cancelStream(sessionId);
+          } else {
+            this.plugin.openCodeService.detachStream(sessionId);
+          }
         }
       },
       syncLatestUserMessageFromServer: (conversation, optimisticMessageId, tabId) =>
         this.syncLatestUserMessageFromServer(conversation, optimisticMessageId, tabId),
       beginTabContextUsageStream: (tabId) => {
+        const conversation = this.getConversationForTab(tabId);
+        if (conversation && (conversation.backend ?? 'opencode') !== 'opencode') {
+          return;
+        }
         this.activeTabContextUsageCoordinator.beginTabContextUsageStream(tabId);
       },
       completeTabContextUsageStream: (tabId) => {
@@ -2439,8 +2885,9 @@ export class OpenCodianView extends ItemView {
         this.activeTabContextUsageCoordinator.applyUsageChunkToTab(tabId, chunk);
       },
       showPermissionDialog: (request, tabId) => this.showPermissionDialog(request, tabId),
-      showQuestionDialog: (request, tabId) =>
-        this.questionRuntimeServices.resolutionFlowCoordinator.showQuestionDialog(request, tabId),
+      showQuestionDialog: async (request, tabId) => {
+        await this.questionRuntimeServices.resolutionFlowCoordinator.showQuestionDialog(request, tabId);
+      },
       convertToStreamingChunk: (chunk) => this.convertToStreamingChunk(chunk),
       getFriendlyStreamErrorMessage: (rawMessage) => this.conversationNoticeCoordinator.getFriendlyStreamErrorMessage(rawMessage),
       createSendPipelineShellPort: () => this.assistantShellViewHostAdapter.createSendPipelineShellPort(),
@@ -2467,6 +2914,7 @@ export class OpenCodianView extends ItemView {
   private createUserMessageContentRendererHost(): UserMessageContentRendererHost {
     return {
       getRenderUserMarkupAsCodeBlocks: () => this.plugin.settings.renderUserMarkupAsCodeBlocks,
+      hasCompactionCapability: () => hasCapability(this.caps, AgentCapability.Compaction),
       renderMarkdownInto: (container, markdown) => this.renderMarkdownInto(container, markdown),
       scheduleActiveSettledScrollToBottomIfNeeded: () => {
         this.scheduleActiveSettledScrollToBottomIfNeeded();
@@ -2478,8 +2926,27 @@ export class OpenCodianView extends ItemView {
   }
 
   private createUserMessageFooterRendererHost(): UserMessageFooterRendererHost {
+    const hasCurrentConversationCapability = (capability: AgentCapability): boolean => {
+      const conversation = this.currentConversation;
+      const service = getConversationSessionBackendService(
+        this.plugin.agentServiceRegistry,
+        conversation,
+      );
+      if (service) {
+        return service.hasCapability(capability);
+      }
+      if ((conversation?.backend ?? 'opencode') === 'opencode') {
+        return hasCapability(getActiveBackendCapabilities(), capability);
+      }
+      return false;
+    };
+
     return {
       isStreaming: () => this.isActiveTabStreaming(),
+      hasForkCapability: () =>
+        hasCurrentConversationCapability(AgentCapability.Fork),
+      hasRewindCapability: () =>
+        hasCurrentConversationCapability(AgentCapability.Branching),
       handleRewindRequest: (message) => this.handleRewindRequest(message),
       handleForkRequest: (message) => this.handleForkRequest(message),
     };
@@ -2527,7 +2994,7 @@ export class OpenCodianView extends ItemView {
       getActiveTabId: () => this.getActiveTabId(),
       getTabRuntimeState: (tabId) => this.getTabRuntimeState(tabId),
       ensureTabRuntimeState: (tabId) => this.ensureTabRuntimeState(tabId),
-      getCurrentConversationSessionId: () => this.currentConversation?.openCodeSessionId,
+      getCurrentConversationSessionId: () => this.currentConversation ? getConversationBackendSessionId(this.currentConversation) : null,
       getSessionIdForTab: (tabId) => this.getSessionIdForTab(tabId),
       keepQuestionCardPinnedToBottom: (tabId) => {
         this.keepQuestionCardPinnedToBottom(tabId);
@@ -2581,7 +3048,7 @@ export class OpenCodianView extends ItemView {
           this.plugin.settingsTab?.prepareScrollToLspOnNextOpen();
           const settings = this.appSettings();
           settings.open();
-          settings.openTabById('opencodian');
+          try { settings.openTabById('opencodian'); } catch { /* DOM not ready yet */ }
         },
       );
     });
@@ -2597,8 +3064,13 @@ export class OpenCodianView extends ItemView {
     await measureStep('wireEventHandlers', () => {
       this.wireEventHandlers();
     });
+    await measureStep('wireBackendSurfaceSwitch', () => {
+      this.wireBackendSurfaceSwitch();
+    });
     await measureStep('startConversationSessionSignalRuntime', () => {
-      this.conversationSessionSignalRuntime.start();
+      if (this.shouldStartConversationSessionSignalRuntime()) {
+        this.conversationSessionSignalRuntime.start();
+      }
     });
     await measureStep('initializeFirstTab', () => this.initializeFirstTab());
     this.plugin.registerConversationCachePinProvider(this.conversationCachePinProvider);
@@ -2635,6 +3107,8 @@ export class OpenCodianView extends ItemView {
     this.modifiedFilesSidebarCoordinator.destroy();
     this.chatVisualDemoCoordinator.destroyAll();
     this.permissionInlineCardRenderer.clearSessionApprovals();
+    this.backendActiveChangeDisposable?.dispose();
+    this.backendActiveChangeDisposable = null;
 
     // Cleanup navigation sidebar
     this.conversationTabRuntimeCoordinator.destroyTabSystem();
@@ -2700,6 +3174,7 @@ export class OpenCodianView extends ItemView {
     // Input area
     this.inputContainer = this.chatContainerEl.createDiv({ cls: 'opencodian-input-area' });
     this.composerInputShellCoordinator.build(this.inputContainer);
+    this.updateComposerAvailabilityUi();
     this.applyChatAppearanceSettings();
 
     const outerMountEl = this.contentEl.closest('.workspace-leaf-content[data-type="opencodian-view"]')
@@ -2769,8 +3244,17 @@ export class OpenCodianView extends ItemView {
   }
 
   private refreshModifiedFilesSidebar(): void {
-    const sessionId = this.currentConversation?.openCodeSessionId ?? null;
-    this.modifiedFilesSidebarCoordinator.setVisible(this.plugin.settings.showModifiedFilesSidebar);
+    const conversation = this.currentConversation;
+    const backend = conversation?.backend ?? 'opencode';
+    // Session diff is OpenCode-only.  Claude's rewind/diff surface is not
+    // stable-complete — see status doc §"What Exists But Must Not Be Described As Stable Completion".
+    const sessionId = backend === 'opencode' && conversation
+      ? (conversation.openCodeSessionId ?? null)
+      : null;
+    this.modifiedFilesSidebarCoordinator.setVisible(
+      this.plugin.settings.showModifiedFilesSidebar
+      && hasCapability(this.caps, AgentCapability.Context),
+    );
     this.modifiedFilesSidebarCoordinator.refresh(
       sessionId,
       (id) => this.plugin.openCodeService.getCachedSessionDiffEntries(id),
@@ -2919,39 +3403,126 @@ export class OpenCodianView extends ItemView {
     }
   }
 
+  public refreshAvailabilityUi(): void {
+    void this.chatHeaderPresenter.refreshServerStatusBadge();
+    this.updateComposerAvailabilityUi();
+  }
+
   private openPluginSettingsPreservingScroll(): void {
     const savedScrollTop = this.plugin.settings.settingsPanelScrollTop;
     this.plugin.settingsTab?.prepareRestoreScrollOnNextOpen(savedScrollTop);
     const settings = this.appSettings();
     settings.open();
-    settings.openTabById('opencodian');
+    try { settings.openTabById('opencodian'); } catch { /* DOM not ready yet */ }
   }
 
   private openPluginSettingsAtServerSection(): void {
     this.plugin.settingsTab?.prepareScrollToServerOnNextOpen();
     const settings = this.appSettings();
     settings.open();
-    settings.openTabById('opencodian');
+    try { settings.openTabById('opencodian'); } catch { /* DOM not ready yet */ }
+  }
+
+  private openPluginSettingsAtActiveBackendRuntimeSection(): void {
+    if (this.isActiveBackendOpenCode()) {
+      this.openPluginSettingsAtServerSection();
+      return;
+    }
+
+    this.plugin.settingsTab?.prepareScrollToClaudeCodeOnNextOpen();
+    const settings = this.appSettings();
+    settings.open();
+    try { settings.openTabById('opencodian'); } catch { /* DOM not ready yet */ }
   }
 
   private async getServerAvailability(): Promise<ChatServerAvailability> {
+    if (!this.hasAnyEnabledBackend()) {
+      this.lastResolvedServerAvailability = 'disabled';
+      return 'disabled';
+    }
+
+    if (!this.hasBackendConnection()) {
+      this.lastResolvedServerAvailability = 'disabled';
+      return 'disabled';
+    }
+
+    if (!this.isActiveBackendOpenCode()) {
+      const activeBackend = this.plugin.settings.activeBackend ?? 'opencode';
+      const adapterStatus = this.plugin.agentServiceRegistry?.get(activeBackend)?.status;
+      const availability = adapterStatus
+        ? this.mapAgentConnectionStatusToServerAvailability(adapterStatus)
+        : 'offline';
+      this.lastResolvedServerAvailability = availability;
+      return availability;
+    }
+
     const isHealthy = await this.plugin.openCodeService.checkHealth();
     const internalStatus = this.plugin.openCodeService.getServerStatus();
     const hasManagedProcess = this.plugin.openCodeService.isServerProcessRunning();
 
     if (isHealthy && !hasManagedProcess) {
+      this.lastResolvedServerAvailability = 'external';
       return 'external';
     }
 
     if (isHealthy) {
+      this.lastResolvedServerAvailability = 'running';
       return 'running';
     }
 
     if (internalStatus === 'starting' || internalStatus === 'restarting') {
+      this.lastResolvedServerAvailability = 'starting';
       return 'starting';
     }
 
+    this.lastResolvedServerAvailability = 'offline';
     return 'offline';
+  }
+
+  private getComposerAvailabilityState(): {
+    kind: 'ready' | 'no-backend' | 'backend-offline';
+    title: string;
+    description: string;
+  } {
+    if (!this.hasAnyEnabledBackend()) {
+      return {
+        kind: 'no-backend',
+        title: t('chat.empty.noBackend.title'),
+        description: t('chat.empty.noBackend.description'),
+      };
+    }
+
+    if (!this.hasBackendConnection()) {
+      return {
+        kind: 'backend-offline',
+        title: t('chat.empty.backendOffline.title'),
+        description: t('chat.empty.backendOffline.description'),
+      };
+    }
+
+    if (this.lastResolvedServerAvailability === 'offline' || this.lastResolvedServerAvailability === 'disabled') {
+      return {
+        kind: 'backend-offline',
+        title: t('chat.empty.backendOffline.title'),
+        description: t('chat.empty.backendOffline.description'),
+      };
+    }
+
+    if (this.lastResolvedServerAvailability === 'running' || this.lastResolvedServerAvailability === 'external') {
+      return {
+        kind: 'ready',
+        title: '',
+        description: '',
+      };
+    }
+
+    // null (initial load before first health check) or 'starting'/'checking' — optimistic ready.
+    // The first onServerAvailabilityRefreshed callback will correct the state within one polling cycle.
+    return {
+      kind: 'ready',
+      title: '',
+      description: '',
+    };
   }
 
   public toggleLiquidDiamondDemo(): void {
@@ -3041,9 +3612,86 @@ export class OpenCodianView extends ItemView {
     id: string,
     options: { forceServerSync?: boolean; preserveScrollPosition?: boolean } = {},
   ): Promise<void> {
+    const conversation = await this.plugin.getConversationById(id, { preferCache: true });
+    const activeBackend = this.plugin.settings.activeBackend ?? 'opencode';
+    if (conversation && (conversation.backend ?? 'opencode') !== activeBackend) {
+      logger.warn('Blocked cross-backend conversation load', {
+        conversationId: id,
+        conversationBackend: conversation.backend ?? 'opencode',
+        activeBackend,
+      });
+      await this.ensureActiveBackendConversationSurface(activeBackend);
+      return;
+    }
+
     await this.conversationLoadRecoveryCoordinator.loadConversation(id, options);
     this.refreshModifiedFilesSidebar();
     await this.childSessionGraphCoordinator.refreshGraph();
+  }
+
+  private wireBackendSurfaceSwitch(): void {
+    this.backendActiveChangeDisposable?.dispose();
+    this.backendActiveChangeDisposable = this.plugin.agentServiceRegistry?.onActiveChange((backend) => {
+      void this.ensureActiveBackendConversationSurface(backend ?? undefined);
+    }) ?? null;
+  }
+
+  private async ensureActiveBackendConversationSurface(
+    activeBackend = this.plugin.settings.activeBackend,
+  ): Promise<void> {
+    if (!activeBackend) {
+      return;
+    }
+
+    if (this.backendSurfaceSwitchPromise) {
+      await this.backendSurfaceSwitchPromise;
+      return;
+    }
+
+    this.backendSurfaceSwitchPromise = this.applyActiveBackendConversationSurface(activeBackend)
+      .finally(() => {
+        this.backendSurfaceSwitchPromise = null;
+      });
+    await this.backendSurfaceSwitchPromise;
+  }
+
+  private async applyActiveBackendConversationSurface(activeBackend: AgentBackendKind): Promise<void> {
+    this.chatHeaderPresenter.refreshBackendChrome();
+    this.chatHeaderPresenter.applyLocaleTexts();
+    this.refreshComposerToolbarForActiveBackend();
+    void this.chatHeaderPresenter.refreshServerStatusBadge();
+
+    if ((this.currentConversation?.backend ?? 'opencode') === activeBackend) {
+      return;
+    }
+
+    if (this.isActiveTabStreaming()) {
+      new Notice(t('chat.tab.streamingBlocked'));
+      return;
+    }
+
+    await this.plugin.loadConversations();
+    const targetConversation = this.plugin.getConversations().find(
+      (conversation) => (conversation.backend ?? 'opencode') === activeBackend,
+    );
+
+    if (targetConversation) {
+      await this.loadConversation(targetConversation.id);
+      return;
+    }
+
+    await this.createConversationInCurrentTab();
+  }
+
+  private refreshComposerToolbarForActiveBackend(): void {
+    this.contextRing?.destroy();
+    this.contextRing = null;
+    this.contextRingContainerEl = null;
+    this.effortSelector?.destroy();
+    this.effortSelector = null;
+    this.effortContainerEl = null;
+    this.chatSelectionControlsCoordinator.destroy();
+    this.composerInputShellCoordinator.refreshToolbarControls();
   }
 
   private async deleteConversationsAndCleanupTabs(conversationIds: string[]): Promise<void> {
@@ -3057,10 +3705,13 @@ export class OpenCodianView extends ItemView {
       return;
     }
 
-    // Call service to abort the SSE connection
-    logger.debug('Calling openCodeService.cancelStream()...');
-    if (this.currentConversation?.openCodeSessionId) {
-      this.plugin.openCodeService.cancelStream(this.currentConversation.openCodeSessionId);
+    const currentConversation = this.currentConversation;
+    const backendSessionId = currentConversation
+      ? getConversationBackendSessionId(currentConversation)
+      : null;
+    if (currentConversation && backendSessionId) {
+      const backend = getConversationChatBackendService(this.plugin.agentServiceRegistry, currentConversation);
+      backend?.cancelStream(backendSessionId);
     }
 
     // Update local state
@@ -3075,6 +3726,10 @@ export class OpenCodianView extends ItemView {
   /** Update send button icon based on streaming state */
   private updateSendButtonState() {
     this.composerInputShellCoordinator.updateSendButtonState();
+  }
+
+  private updateComposerAvailabilityUi(): void {
+    this.composerInputShellCoordinator.updateComposerAvailabilityState();
   }
 
   private createUserMessageRenderFrame(message: ChatMessage): ConversationUserMessageRenderFrame | null {
@@ -3242,6 +3897,9 @@ export class OpenCodianView extends ItemView {
     if (this.currentConversation?.id !== conversation.id || this.getActiveTabId() !== tabId) {
       return;
     }
+    if ((conversation.backend ?? 'opencode') !== 'opencode') {
+      return;
+    }
 
     await this.activeTabContextUsageCoordinator.refreshFromServer();
   }
@@ -3322,10 +3980,16 @@ export class OpenCodianView extends ItemView {
 
     if (typeof update.title === 'string') {
       this.tabManager?.syncConversationTitle(conversationId, conversation.title);
-      try {
-        await this.plugin.openCodeService.updateSessionTitle(conversation.openCodeSessionId, conversation.title);
-      } catch (error) {
-        logger.warn('Failed to sync conversation title to server:', error);
+      const backendSessionId = getConversationBackendSessionId(conversation);
+      const backend = this.plugin.agentServiceRegistry
+        ? getConversationSessionBackendService(this.plugin.agentServiceRegistry, conversation)
+        : null;
+      if (backendSessionId && backend) {
+        try {
+          await backend.updateSessionTitle(backendSessionId, conversation.title);
+        } catch (error) {
+          logger.warn('Failed to sync conversation title to server:', error);
+        }
       }
     }
   }
@@ -3419,6 +4083,42 @@ export class OpenCodianView extends ItemView {
     return this.chatSelectionControlsCoordinator.formatModelId(model);
   }
 
+  private isClaudeCodeConversationActive(): boolean {
+    return (
+      this.plugin.settings.activeBackend
+      ?? this.currentConversation?.backend
+      ?? 'opencode'
+    ) === 'claude-code';
+  }
+
+  private getBackendScopedActiveTabModelOverride(): ModelSelectorSelection | null {
+    const override = this.tabManager?.getActiveTabModelOverride() ?? null;
+    if (!override || !this.isClaudeCodeConversationActive()) {
+      return override;
+    }
+
+    return this.isClaudeCodeModelProvider(override.provider) ? override : null;
+  }
+
+  private isClaudeCodeModelProvider(provider: string | undefined): boolean {
+    return provider === CLAUDE_CODE_PROVIDER_ID
+      || provider === 'anthropic'
+      || provider === 'claude';
+  }
+
+  private normalizeEffortVariantForCurrentBackend(variant: string | undefined): string | undefined {
+    if (!this.isClaudeCodeConversationActive()) {
+      return variant;
+    }
+    return variant && CLAUDE_CODE_EFFORT_VARIANTS.some((candidate) => candidate === variant)
+      ? variant
+      : this.plugin.settings.backendSettings.claudeCode.effort;
+  }
+
+  private getCurrentEffortVariant(): string | undefined {
+    return this.normalizeEffortVariantForCurrentBackend(this.currentVariant);
+  }
+
   /** Get model options for sendMessage */
   private getSendMessageOptions(): { provider?: string; model?: string; variant?: string } {
     const current = this.getCurrentSessionModel();
@@ -3429,7 +4129,7 @@ export class OpenCodianView extends ItemView {
     return {
       provider: current.provider,
       model: current.model,
-      variant: this.currentVariant,
+      variant: this.getCurrentEffortVariant(),
     };
   }
 
@@ -3503,6 +4203,7 @@ export class OpenCodianView extends ItemView {
       case 'message_stop':
       case 'message_metadata':
       case 'usage':
+      case 'backend_event':
       case 'content_block_start':
       case 'content_block_stop':
         // These chunks don't need to be converted for rendering
@@ -3553,6 +4254,10 @@ export class OpenCodianView extends ItemView {
     request: Extract<import('../../core/types').StreamChunk, { type: 'permission_request' }>,
     tabId: TabId | null = this.getActiveTabId(),
   ): Promise<void> {
+    if (!hasCapability(this.caps, AgentCapability.Permissions)) {
+      return;
+    }
+
     try {
       const responded = await this.permissionInlineCardRenderer.collectAndRespond(
         request,

@@ -1,4 +1,4 @@
-import type { BackgroundTaskActiveAnchorMetadata, ChatMessage, Conversation } from '../../../core/types';
+import { type BackgroundTaskActiveAnchorMetadata, type ChatMessage, type Conversation,getConversationBackendSessionId } from '../../../core/types';
 import { t } from '../../../i18n';
 import { createLogger } from '../../../shared';
 import type { TabId } from '../tabs';
@@ -322,7 +322,7 @@ export class BackgroundTaskTimelineService {
     if (!state.completionLogged && (diagnostics.sawAllTasksComplete || (diagnostics.pending.length === 0 && diagnostics.completed.length > 0))) {
       logger.debug(`OMO background tasks completed: ${this.stringifyLogPayload({
         conversationId: conversation.id,
-        sessionId: conversation.openCodeSessionId,
+        sessionId: getConversationBackendSessionId(conversation),
         completedTasks: diagnostics.completed.map((task) => ({
           id: task.taskId,
           description: task.description,

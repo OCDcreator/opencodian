@@ -28,6 +28,36 @@ OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings`、`DEFAULT_
 | `OpenCodianSettings` | 完整设置接口（约 40 个字段） |
 | `DEFAULT_SETTINGS` | 默认设置常量对象 |
 
+`OpenCodianSettings` 现在包含 backend 管理字段：`activeBackend` 表示新会话默认 backend，`enabledBackends` 表示设置页当前启用的 backend 集合。Phase 0 默认值固定为 `opencode` / `['opencode']`，非 OpenCode backend 只作为 UI 可见性和后续迁移占位。
+
+`backendSettings.claudeCode` 是 Claude Code 专属设置对象。它包含 executable path、显式 `settingSources`、Claude permission mode、thinking、effort、additional directories、model/fallback model、`allowedTools`/`disallowedTools`（工具策略）、`maxTurns`/`maxBudgetUsd`/`taskBudget`（限制项）、`env`（环境变量），以及 `enableFileCheckpointing`、`includeHookEvents`、`forwardSubagentText`、`agentProgressSummaries` 四个 SDK 诊断/后续能力开关。`fallbackModel` 为 readback only（选项接线和 same-model validation 已证明；自动 fallback 切换无法本地验证——阻塞于真实 API 过载 / HTTP 529 路径；invalid-primary 测试已失效），四个 SDK 诊断开关分别标记 `@experimental` / `@diagnostic`。`allowedTools` 为 readback only（auto-allow 快捷方式，非限制器，runtime options wiring 已证明，零 enforcement）；`disallowedTools` runtime behavior verified（init-catalog 确定性排除已验证）；`maxTurns` / `maxBudgetUsd` runtime behavior verified（`error_max_turns` + `error_max_budget_usd` 信号已观测）；`env` runtime behavior verified（env 传播到 Claude/Bash 子进程已证明，Layer 1-4）。`allowedTools`/`disallowedTools` 在 UI 层通过 `parseToolList()` 校验为 PascalCase 字母数字（`[A-Za-z][A-Za-z0-9]*`），非法名称被静默丢弃。`maxTurns`/`maxBudgetUsd` 在 UI 层通过 `parseNullablePositiveInteger()` / `parseNullablePositiveNumber()` 校验：前者只接受正整数（`/^\d+$/`），后者接受正数（`/^\d+(?:\.\d+)?$/`）；负数、零、非数字和空字符串均被静默丢弃为 `null`。`maxTurns`/`maxBudgetUsd` 与 `env` 已通过 Stable Settings Readback Proof 验证运行时回读（runtime readback verified），即 SDK options 从设置正确构建；`maxTurns`/`maxBudgetUsd` 的行为验证（SDK 实际执行 turn/budget 限制）已通过 2026-05-29 live runtime proof 确认（`error_max_turns` + `error_max_budget_usd` 信号），环境变量的行为验证（env 传播到子进程）已通过 2026-05-28 runtime proof 确认。`taskBudget` 为 readback only（2026-06-06 审计硬化）：SDK `@alpha` option wiring 已证明（`taskBudget: { total: number }` 正确传入 SDK options，以 `--task-budget` CLI 标志传递给子进程）。CLI binary 将其作为 `output_config.task_budget` 连同 beta header `task-budgets-2026-03-13` 发送给 API，模型用作行为 pacing（非硬性截止）。与 `maxTurns`（产生 `error_max_turns`）不同，没有结构化 enforcement 信号，无法独立验证。`debugChannels` 持久化产品级 Claude Code debug workbench 的通道开关：`runtime`、`sessions`、`stream`、`permissions`、`mcp` 默认启用，`experimental` 默认关闭；当前只是数据模型/default/normalizer，不做 UI 或 logger routing。`ClaudeCodeEffort` 跟随官方 CLI/SDK effort 值：`low` / `medium` / `high` / `xhigh` / `max`。默认 `settingSources` 是 `['project']`，但保存的空数组表示显式 none，不能被归一化回默认值。能力开关只证明 options wiring 和 diagnostic stream 接线，不代表 stable rewind、hook authoring、JSONL browser 或 subagent transcript UI 已完成。`enableFileCheckpointing` 注释已更新：`@experimental — SDK option wired but checkpoints never created in query() mode (upstream bug #236). Readback only; no stable rewind UI.`
+
+`sandbox` 持久化 Claude Code sandbox 行为控制（`ClaudeCodeSandboxSettings`）：除 `enabled`、`failIfUnavailable`、`autoAllowBashIfSandboxed` 外，现包含 `excludedCommands`、`allowUnsandboxedCommands`、`filesystem`（allowWrite/denyWrite/denyRead）、`network`（allowedDomains/deniedDomains）、`enableWeakerNestedSandbox`、`enableWeakerNetworkIsolation` 和 `ripgrep`（command/args）。分类为 readback：SDK options wiring 已证明（设置通过 buildClaudeCodeOptions 传入 SDK `sandbox` 选项），OS 级进程隔离（bubblewrap/seccomp）由 CLI binary 内部实现，无法从插件层独立验证。UI 位于 Permissions 标签页。
+
+`planModeInstructions` 为 readback only：当 `permissionMode` 为 `plan` 时，自定义指令通过 `buildClaudeCodeOptions` 传入 SDK `planModeInstructions` 选项，替换默认计划模式工作流内容；SDK 仍强制附加只读前言与 ExitPlanMode 协议尾部。实际计划模式行为无法从插件层独立验证。UI 位于 Permissions 标签页，为文本区域输入，仅在下一次查询或重启会话后生效。
+
+`toolAliases` 为 readback only（2026-06-06 审计硬化）：通过 `buildClaudeCodeOptions` 传入 SDK `toolAliases` 选项，将模型发出的工具名映射到规范工具名，在解析前生效。**SDK 源码审计（browser-sdk.js）确认 toolAliases 是单向初始化参数**：`initialize()` 方法将其作为 `toolAliases: this.initConfig?.toolAliases` 转发给 CLI 子进程，无反馈事件或状态确认。别名解析发生在 CLI binary 的内部工具执行路径中，流式 `tool_use` 块仅暴露解析后的名称，无别名元数据。插件无法区分别名调用与直接规范调用，因此别名解析行为无法从插件层独立验证。默认空对象 `{}`。UI 位于 Tools 标签页，为高级文本区域输入，格式为每行 `key=value`（如 `Fetch=Read`），仅在下一次查询或重启会话后生效。
+
+`debug` 为 readback only：通过 `buildClaudeCodeOptions` 传入 SDK `debug` 选项，要求 CLI 在查询执行期间发出调试日志。实际调试日志输出是 SDK/CLI binary 的内部行为，无法从插件层独立验证。默认 `false`。UI 位于 Runtime 标签页，为 toggle 开关，仅在下一次查询时生效。
+
+`strictMcpConfig` 为 readback only（2026-06-06 审计硬化）：SDK 将其作为 `--strict-mcp-config` CLI 标志传递给子进程；实际验证位于编译后的 CLI binary 中。没有结构化信号确认严格验证是否已应用。插件侧 MCP adapter（ClaudeCodeMcpConfigAdapter.ts）会静默丢弃结构性 malformed 条目（返回 null），因此许多 malformed 配置从未到达 CLI。默认 `false`。UI 位于 Tools 标签页，为 toggle 开关，仅在下一次查询或重启会话时生效。此处不写入 `.claude/mcp.json`，也不提供 MCP 编写界面。
+
+`debugFile` 为 readback only：通过 `buildClaudeCodeOptions` 传入 SDK `debugFile` 选项，要求 SDK 将 CLI 调试日志写入指定文件路径。实际文件写入是 SDK/CLI binary 的内部行为，无法从插件层独立验证。设置调试文件路径会隐式启用调试日志，即使 `debug` toggle 为关闭状态。默认空字符串 `''`。UI 位于 Runtime 标签页，为文本输入，仅在下一次查询或重启会话时生效。插件层不执行路径校验，也不执行文件系统写入。
+
+`enableContext1mBeta` 为 readback only（2026-06-06 审计硬化）：通过 `buildClaudeCodeOptions` 传入 SDK `betas` 选项（值为 `['context-1m-2025-08-07']`），请求 1M 上下文窗口 beta header。完整 SDK 路径：setting → buildClaudeCodeOptions → SDK Options.betas → ProcessTransport.initialize() → CLI `--betas` 标志（sdk.mjs: `if(J&&J.length>0)i.push("--betas",J.join(","))`）。Option wiring 到 CLI 子进程边界已证明。SDK init 消息（`type:'system', subtype:'init'`）含 `betas?: string[]` 但插件未消费。实际 beta 可用性是 SDK/模型/Anthropic 侧的内部行为，无法从插件层独立验证。并非所有模型都支持此 beta。默认 `false`。UI 位于 Model & Thinking 标签页，为 toggle 开关，仅在下一次查询或重启会话时生效。不暴露通用 beta 管理功能。
+
+`outputStyle` 通过 `buildClaudeCodeOptions` 传入 SDK `settings.outputStyle` 选项（值为 `string`），请求 Claude Code 以指定输出样式修改系统提示词。官方内置样式包括 `Default`、`Proactive`、`Explanatory`、`Learning`；用户也可以在 `.claude/output-styles` 或 `~/.claude/output-styles` 中创建自定义样式 markdown 文件。分类为 pass（2026-06-07 live behavior proof）：`runOutputStyleLiveProbe()` 创建临时 custom style file，经 SDK `settings.outputStyle` 选择后，模型回忆出未出现在用户 prompt 中的 nonce，证明 custom output style file 能影响 fresh diagnostic query。诚实边界：不证明 active-session live mutation，也不证明当前已保存的 style name 一定存在或有效。根据 SDK 文档，output style 是系统提示词的一部分，会在会话启动时读取；修改会在 `/clear` 或新的 Claude Code 会话后生效，已有活动或恢复会话可能继续使用原先的系统提示词。默认空字符串 `''`。UI 位于 Model & Thinking 标签页，为文本输入。
+
+`askUserQuestionPreviewFormat` 为 **pass**（2026-06-07 live Obsidian proof，Outcome A — promoted from readback）：通过 `buildClaudeCodeOptions` 传入 SDK `toolConfig.askUserQuestion.previewFormat` 选项（值为 `'markdown' | 'html'`），请求 SDK 为每个 `AskUserQuestion` 选项包含预览文本。空字符串 `''` 表示不请求预览（SDK 默认）。**Live runtime proof (BUILD_ID feature-phase0-capability.202606070354)**：`previewFormat='markdown'` 时真实 AskUserQuestion 工具输入到达时所有选项携带 `.preview` 字段（完整 Markdown 内容）；`previewFormat='html'` 时到达 HTML 片段（`<div>`, `<h3>`, `<ul>/<li>`, inline CSS）。格式选择确实影响预览内容。插件 question UI（inline card 与 dock）会保留并安全显示 SDK 提供的预览文本：以纯文本形式渲染，HTML 不会被当作富 HTML 解析，避免 XSS 风险；预览仅在选项获得焦点或悬停时显示，不常驻在所有选项下方。UI 不依赖 inbound `AskUserQuestion` 输入回显 `previewFormat`，而是对 preview 文本做格式无关的纯文本展示。SDK 通过 `CLAUDE_CODE_QUESTION_PREVIEW_FORMAT` 环境变量将 `previewFormat` 传递给 CLI 子进程，修改模型看到的工具 schema 描述。Caveat：预览是否包含取决于模型——模型不一定会为每个问题都包含预览，但管道和格式差异已验证。默认 `''`（auto）。UI 位于 Tools 标签页，为下拉选择框（None / Markdown / HTML），仅在下一次查询或重启会话时生效。这是 Claude-only 设置，不暴露为 backend-agnostic 能力。
+
+`jsRuntime` 为 readback only（2026-06-06 审计硬化）：通过 `buildClaudeCodeOptions` 传入 SDK `executable` 选项（值为 `'node' | 'bun' | 'deno'`），请求 SDK 使用指定的 JavaScript 运行时。空字符串 `''` 表示 auto（由 SDK 自行选择）。已验证内容：`settings.jsRuntime` → `normalizeClaudeCodeJsRuntime` → `buildClaudeCodeOptions` → SDK `Options.executable` 这一整条 settings→SDK 映射链；空/`node`/`bun`/`deno` 四种值的 normalization 和 readback probe 均已覆盖。未验证内容：插件层没有任何可观察信号确认 CLI 子进程实际使用了哪个运行时；init 消息没有 runtime metadata 字段，stderr 和工具输出也不会回显运行时选择。模型运行在远端，无法检查本地子进程的 `process.execPath`；Bash tool 生成的是新的 shell 进程，不是 CLI 进程本身；主机 PATH 检查只能证明安装，不能证明实际选择。`executablePath` / ProcessResolver 是独立能力，负责 Claude Code 二进制解析，而不是 JS runtime engine 选择。默认 `''`（auto）。UI 位于 Runtime 标签页，为下拉选择框，仅在下一次查询或重启会话时生效。不暴露运行时参数管理功能（`executableArgs`、`extraArgs` 明确未实现）。
+
+`loadTimeoutMs` 为 readback only（2026-06-06 审计硬化）：通过 `buildClaudeCodeOptions` 传入 SDK `loadTimeoutMs` 选项（值为正整数），设置 sessionStore resume/continue 材料化期间 `sessionStore.listSessions()` 的超时时间（毫秒）。`null` 表示使用 SDK 默认超时（60000ms）。SDK 仅在 `(options.resume || options.continue) && options.sessionStore` 为真时使用此值（sdk.mjs `yj$` 函数），超时包装器为 `C4`（Promise.race + setTimeout，offset 154014）。没有 resume/continue + sessionStore 时超时代码路径永不执行。从插件层无法独立验证，因为诊断路径不使用 resume/continue 或 sessionStore。默认 `null`。@alpha。UI 位于 Runtime 标签页，为数字文本输入，仅在下一次查询或重启会话时生效。空输入、非数字、零和负值均归一化为 `null`。
+
+`systemPrompt` 为 pass：通过两层互补证据成立。第一层是 readback proof：`runSystemPromptReadbackProbe()` 验证当前已保存的 `settings.systemPrompt` 会经由 `buildClaudeCodeOptions` 进入 SDK `systemPrompt` 选项；当非空时，使用 preset-with-append 形状 `{ type: 'preset', preset: 'claude_code', append: instructions }`；当为空时，使用默认 `{ type: 'preset', preset: 'claude_code' }`。第二层是 live behavior proof：`runSystemPromptLiveProbe()` 通过 `_diagnosticSystemPrompt` 走同一条 preset-with-append SDK 路径，注入 nonce-bearing diagnostic append，验证该路径确实会影响一次新的诊断查询响应。这是 append-only seam，不会替换官方预设；active session 不会被 live mutate。默认空字符串 `''`。UI 位于 Model & Thinking 标签页，为文本区域输入，仅在下一次查询或重启会话时生效。输入会被 trim，空白输入归一化为空字符串。
+
+`autoTitle` 控制新 Claude Code 会话是否让 SDK 自动生成对话摘要标题。默认 `true`：会话标题为空字符串，首次查询不传 `title`，允许 Claude SDK 自行生成摘要。当 `false` 时，插件在 `createSession` 中存储固定标题 `"New Claude Code chat"`，并在首次查询时通过 `buildClaudeCodeOptions` 传入 SDK `title` 选项，这会跳过 Claude 的自动标题生成。此设置只影响新会话；已有会话不受影响。UI 位于 Conversation 设置的"会话标题"分组，为 toggle 开关。
+
 ### 服务器与安全
 
 | 类型 | 说明 |
@@ -127,6 +157,13 @@ OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings`、`DEFAULT_
 |------|------|
 | `normalizeEffortLevel(value)` | 归一化努力级别，`'max'` → `'xhigh'`，默认 `'high'` |
 | `normalizeThinkingBudget(value)` | 归一化思考预算，支持字符串/数字输入 |
+| `normalizeBackendSettings(value)` | 归一化 backend 专属设置对象，目前包含 Claude Code hidden foundation |
+| `normalizeClaudeCodeBackendSettings(value)` | 归一化 Claude Code executable、setting sources、permission/thinking/effort、additional directories、model、allowedTools/disallowedTools、maxTurns/maxBudgetUsd、env、file checkpoint、hook event、subagent transcript/progress 和 debug channel 开关字段 |
+| `normalizeClaudeCodeDebugChannelSettings(value)` | 归一化 Claude Code debug workbench channel record，未知 channel 丢弃，缺失 channel 回退默认值 |
+| `normalizeClaudeCodeStringArray(value)` | 归一化字符串数组，trim 后去重、过滤空字符串和非字符串条目；用于 allowed/disallowed tools 时避免把带空白的工具名传入 SDK |
+| `normalizeClaudeCodeNullablePositiveInt(value)` | 归一化可为空的正整数（如 maxTurns、taskBudget），返回 `number | null` |
+| `normalizeClaudeCodeNullablePositiveNumber(value)` | 归一化可为空的正数（如 maxBudgetUsd），保留小数 |
+| `normalizeClaudeCodeEnv(value)` | 归一化环境变量对象，过滤非字符串值 |
 | `normalizeTabsEnabled(value)` | 归一化会话标签启用状态；只有明确 `false` 才禁用，未知值默认启用 |
 | `normalizeTabBarPosition(value)` | 归一化标签栏位置 |
 | `normalizeBelowHeaderTabBarLayout(value)` | 归一化下方标签布局 |
@@ -157,6 +194,7 @@ OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings`、`DEFAULT_
 |------|------|
 | `getDefaultChatAppearanceSettings()` | 默认外观设置 |
 | `getDefaultThemeSettings()` | 默认主题设置（`glass-classic`） |
+| `getDefaultClaudeCodeDebugChannelSettings()` | 默认 Claude Code debug channel 开关，runtime/sessions/stream/permissions/mcp 开启，experimental 关闭 |
 | `getDefaultInputPanelGlassRefractionSettings()` | 默认玻璃折射参数 |
 | `getDefaultInputPanelGlassRefractionSvgFilterSettings()` | 默认 SVG 滤镜参数 |
 | `getDefaultInputPanelLiquidGlassSettings()` | 默认液态玻璃参数 |
@@ -176,6 +214,7 @@ OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings`、`DEFAULT_
 | `getCurrentPlatformKey()` | 返回当前平台 key（`'unix' \| 'windows'`） |
 | `getCurrentPlatformBlockedCommands(commands)` | 获取当前平台黑名单 |
 | `getBashToolBlockedCommands(commands)` | 获取 Bash 工具黑名单（Windows 合并两套） |
+| `getEnabledClaudeCodeDebugChannels(settings)` | 按稳定 channel 顺序返回已启用的 Claude Code debug channel ids |
 | `normalizeBaseUrl(value)` | 去除 URL 尾部斜杠 |
 
 ## 最近值得注意的变化
@@ -365,3 +404,5 @@ New normalize functions added:
 - `normalizeSettingsTabbedSecondaryTabByPrimary(value)` — filters to `Record<string, string>` of trimmed non-empty entries, remaps legacy `{ language: 'general' }` memory to `{ general: 'language' }`, and downgrades stale `{ general: 'general' }` to `{ general: 'basic' }`
 
 `DEFAULT_SETTINGS` defaults to `settingsLayoutMode: 'tabbed'` for new installs. Existing users are migrated to `'classic'` in `settingsLoadNormalization.ts` via `resolveInitialLayoutMode()`.
+
+- `ClaudeCodeBackendSettings` 新增 `promptSuggestions: boolean` 字段（默认 false）。JSDoc 标注为 readback：SDK options wiring + pump callback 已证明，端到端建议传递未独立验证。normalization 使用 `candidate.promptSuggestions === true` 严格布尔检查。

@@ -7,6 +7,7 @@ jest.mock('obsidian', () => ({
 
 import type { McpConfigService } from '../../../../src/core/config/McpConfigService';
 import { McpServerEditorModal } from '../../../../src/features/settings/McpServerEditorModal';
+import { TextareaSizeMemory } from '../../../../src/features/settings/TextareaSizeMemory';
 import { setLocale, t } from '../../../../src/i18n';
 import {
   changeText,
@@ -32,6 +33,9 @@ describe('McpServerEditorModal', () => {
     document.body.innerHTML = '';
     clearRecordArrays();
     (Notice as unknown as jest.Mock).mockClear();
+    jest.spyOn(TextareaSizeMemory, 'attach').mockReturnValue({
+      destroy: jest.fn(),
+    } as unknown as TextareaSizeMemory);
     mockSettingPrototype();
   });
 
@@ -104,6 +108,48 @@ describe('McpServerEditorModal', () => {
       command: ['node', 'server.js'],
       enabled: false,
     });
+  });
+
+  it('attaches textarea size memory to local and remote textarea fields', () => {
+    const service = createService();
+
+    const localModal = new McpServerEditorModal({} as App, {
+      mode: 'add',
+      existingNames: [],
+      configService: service as unknown as McpConfigService,
+      onSaved: jest.fn(),
+    });
+    localModal.onOpen();
+
+    expect(TextareaSizeMemory.attach).toHaveBeenCalledWith(
+      getTextAreaRecord(t('settings.server.mcp.add.command'))!.control.inputEl,
+      'mcp-local-command',
+    );
+    expect(TextareaSizeMemory.attach).toHaveBeenCalledWith(
+      getTextAreaRecord(t('settings.server.mcp.add.environment'))!.control.inputEl,
+      'mcp-local-environment',
+    );
+
+    clearRecordArrays();
+    (TextareaSizeMemory.attach as jest.Mock).mockClear();
+
+    const remoteModal = new McpServerEditorModal({} as App, {
+      mode: 'edit',
+      serverName: 'remote',
+      existingEntry: {
+        type: 'remote',
+        url: 'https://example.com/mcp',
+      },
+      existingNames: ['remote'],
+      configService: service as unknown as McpConfigService,
+      onSaved: jest.fn(),
+    });
+    remoteModal.onOpen();
+
+    expect(TextareaSizeMemory.attach).toHaveBeenCalledWith(
+      getTextAreaRecord(t('settings.server.mcp.add.headers'))!.control.inputEl,
+      'mcp-remote-headers',
+    );
   });
 
   it('keeps duplicate name validation scoped to add mode', async () => {

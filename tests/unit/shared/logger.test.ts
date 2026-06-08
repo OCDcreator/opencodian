@@ -2,7 +2,10 @@ import {
   clearRecentLogs,
   createLogger,
   getRecentLogEntries,
+  getRecentLogTextForEntries,
   resetLogEmissionThrottleState,
+  resolveLoggerDebugModuleKey,
+  setClaudeCodeDebugChannelSettings,
   setDebugLoggingEnabled,
   setDebugModuleEnabled,
   setDebugRefreshIntervalMs,
@@ -15,6 +18,7 @@ describe('logger debug argument formatting', () => {
   beforeEach(() => {
     setDebugLoggingEnabled(true);
     setDebugModuleEnabled('contextUsage', true);
+    setClaudeCodeDebugChannelSettings(undefined);
     setInlineSerializedDebugLogArgsEnabled(false);
     setDebugRefreshIntervalMs(DEFAULT_DEBUG_REFRESH_INTERVAL_MS);
     resetLogEmissionThrottleState();
@@ -24,6 +28,7 @@ describe('logger debug argument formatting', () => {
   afterEach(() => {
     setDebugLoggingEnabled(false);
     setDebugModuleEnabled('contextUsage', true);
+    setClaudeCodeDebugChannelSettings(undefined);
     setInlineSerializedDebugLogArgsEnabled(false);
     setDebugRefreshIntervalMs(DEFAULT_DEBUG_REFRESH_INTERVAL_MS);
     resetLogEmissionThrottleState();
@@ -89,6 +94,52 @@ describe('logger debug argument formatting', () => {
       expect.stringContaining('[ActiveTabContextUsageCoordinator] visible info'),
       expect.stringContaining('[ActiveTabContextUsageCoordinator] visible debug'),
     ]);
+  });
+
+  it('routes Claude Code scopes to the Claude Code debug module', () => {
+    expect(resolveLoggerDebugModuleKey('ClaudeCodeAdapter')).toBe('claudeCode');
+    expect(resolveLoggerDebugModuleKey('claude-code-session')).toBe('claudeCode');
+    expect(resolveLoggerDebugModuleKey('Claude Code Stream')).toBe('claudeCode');
+  });
+
+  it('stores optional log channels for diagnostic filtering', () => {
+    const logger = createLogger('ClaudeCodeAdapter', { moduleKey: 'claudeCode', channel: 'runtime' });
+
+    logger.debug('SDK query creation', { source: 'model-catalog' });
+
+    const entries = getRecentLogEntries();
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({
+      scope: 'ClaudeCodeAdapter',
+      moduleKey: 'claudeCode',
+      channel: 'runtime',
+    });
+    expect(getRecentLogTextForEntries(entries)).toContain('[claudeCode] [runtime] [ClaudeCodeAdapter]');
+  });
+
+  it('gates optional Claude Code logs by diagnostic channel', () => {
+    const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const runtimeLogger = createLogger('ClaudeCodeAdapter', { moduleKey: 'claudeCode', channel: 'runtime' });
+    const streamLogger = createLogger('ClaudeCodeStreamNormalizer', { moduleKey: 'claudeCode', channel: 'stream' });
+
+    setClaudeCodeDebugChannelSettings({
+      runtime: false,
+      sessions: true,
+      stream: true,
+      permissions: true,
+      mcp: true,
+      experimental: false,
+    });
+    runtimeLogger.debug('hidden runtime');
+    streamLogger.debug('visible stream');
+
+    const entries = getRecentLogEntries();
+    const logText = entries.map((entry) => entry.message).join('\n');
+    expect(logText).toContain('visible stream');
+    expect(logText).not.toContain('hidden runtime');
+    expect(entries).toEqual([expect.objectContaining({ channel: 'stream' })]);
+    expect(consoleSpy.mock.calls.map((call) => String(call[0])).join('\n')).toContain('visible stream');
+    expect(consoleSpy.mock.calls.map((call) => String(call[0])).join('\n')).not.toContain('hidden runtime');
   });
 
   it('emits always/warn/error even when optional module logs are disabled', () => {

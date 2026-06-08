@@ -1,3 +1,4 @@
+/* eslint-disable max-lines-per-function -- MCP action coverage keeps shared Obsidian Setting and modal mocks together with backend-switch regressions. */
 import { Notice } from 'obsidian';
 
 jest.mock('obsidian', () => ({
@@ -46,6 +47,8 @@ describe('SettingsMcpSection server actions', () => {
     document.body.innerHTML = '';
     clearRecordArrays();
     (Notice as unknown as jest.Mock).mockClear();
+    (McpServerEditorModal as unknown as jest.Mock).mockClear();
+    (McpServerStatusModal as unknown as jest.Mock).mockClear();
     mockSettingPrototype();
   });
 
@@ -130,6 +133,42 @@ describe('SettingsMcpSection server actions', () => {
     expect(plugin.openCodeService.refreshMcpServerStatus).toHaveBeenCalledTimes(1);
   });
 
+  it('blocks stale runtime actions after switching away from OpenCode backend', async () => {
+    const plugin = createPlugin({
+      servers: {
+        connected: { status: 'connected' },
+        disabled: { status: 'disabled' },
+      },
+      updatedAt: 1700000000000,
+    }) as unknown as OpenCodianPlugin & {
+      settings: { activeBackend: string; enabledBackends: string[] };
+    };
+    plugin.settings = {
+      activeBackend: 'opencode',
+      enabledBackends: ['opencode', 'claude-code'],
+    };
+    const section = new SettingsMcpSection({
+      plugin,
+      createSectionHeading,
+      requestDisplayRefresh: jest.fn(),
+    });
+    const containerEl = document.createElement('div');
+
+    section.attachTabbed(containerEl, 'mcp');
+    await flushAsync();
+    (plugin.openCodeService.refreshMcpServerStatus as jest.Mock).mockClear();
+    plugin.settings.activeBackend = 'claude-code';
+
+    await getButtonRecord(t('settings.server.mcp.action.connect'))?.onClick?.();
+    await getButtonRecord(t('settings.server.mcp.action.disconnect'))?.onClick?.();
+    await flushAsync();
+
+    expect(plugin.openCodeService.connectMcpServer).not.toHaveBeenCalled();
+    expect(plugin.openCodeService.disconnectMcpServer).not.toHaveBeenCalled();
+    expect(plugin.openCodeService.refreshMcpServerStatus).not.toHaveBeenCalled();
+    expect(Notice).toHaveBeenLastCalledWith(t('settings.server.mcp.notice.openCodeOnly'));
+  });
+
   it('opens add and monitor modals from the management panel', async () => {
     const plugin = createPlugin({
       servers: { connected: { status: 'connected' } },
@@ -155,6 +194,38 @@ describe('SettingsMcpSection server actions', () => {
       name: 'connected',
       status: { status: 'connected' },
     }));
+  });
+
+  it('blocks stale toolbar refresh and add actions after switching away from OpenCode backend', async () => {
+    const plugin = createPlugin({
+      servers: { connected: { status: 'connected' } },
+      updatedAt: 1700000000000,
+    }) as unknown as OpenCodianPlugin & {
+      settings: { activeBackend: string; enabledBackends: string[] };
+    };
+    plugin.settings = {
+      activeBackend: 'opencode',
+      enabledBackends: ['opencode', 'claude-code'],
+    };
+    const section = new SettingsMcpSection({
+      plugin,
+      createSectionHeading,
+      requestDisplayRefresh: jest.fn(),
+    });
+    const containerEl = document.createElement('div');
+
+    section.attachTabbed(containerEl, 'mcp');
+    await flushAsync();
+    (plugin.openCodeService.refreshMcpServerStatus as jest.Mock).mockClear();
+    plugin.settings.activeBackend = 'claude-code';
+
+    await getButtonRecord(t('settings.server.mcp.refresh'))?.onClick?.();
+    await getButtonRecord(t('settings.server.mcp.add.submit'))?.onClick?.();
+    await flushAsync();
+
+    expect(plugin.openCodeService.refreshMcpServerStatus).not.toHaveBeenCalled();
+    expect(McpServerEditorModal).not.toHaveBeenCalled();
+    expect(Notice).toHaveBeenLastCalledWith(t('settings.server.mcp.notice.openCodeOnly'));
   });
 
   it('redacts sensitive runtime action errors in notices', async () => {
@@ -219,5 +290,49 @@ describe('SettingsMcpSection server actions', () => {
     expect(confirmSpy).toHaveBeenCalled();
     expect(plugin.openCodeService.disconnectMcpServer).toHaveBeenCalledWith('connected');
     expect(plugin.openCodeService.refreshMcpServerStatus).toHaveBeenCalledTimes(2);
+  });
+
+  it('blocks stale project delete after switching away from OpenCode backend', async () => {
+    const plugin = createPlugin({
+      servers: { connected: { status: 'connected' } },
+      updatedAt: 1700000000000,
+    }) as unknown as OpenCodianPlugin & {
+      settings: { activeBackend: string; enabledBackends: string[] };
+    };
+    plugin.settings = {
+      activeBackend: 'opencode',
+      enabledBackends: ['opencode', 'claude-code'],
+    };
+    (plugin.opencodeConfigManager.exists as jest.Mock).mockResolvedValue(false);
+    (plugin.opencodeConfigManager.read as jest.Mock).mockResolvedValue({
+      mcp: {
+        connected: {
+          type: 'remote',
+          url: 'https://mcp.example.com/mcp',
+        },
+      },
+    });
+    const confirmSpy = jest.spyOn(window, 'confirm').mockReturnValue(true);
+    const section = new SettingsMcpSection({
+      plugin,
+      createSectionHeading,
+      requestDisplayRefresh: jest.fn(),
+    });
+    const containerEl = document.createElement('div');
+
+    section.attachTabbed(containerEl, 'mcp');
+    await flushAsync();
+    await flushAsync();
+    (plugin.openCodeService.refreshMcpServerStatus as jest.Mock).mockClear();
+    plugin.settings.activeBackend = 'claude-code';
+
+    await getButtonRecord(t('settings.server.mcp.action.delete'))?.onClick?.();
+    await flushAsync();
+
+    expect(confirmSpy).not.toHaveBeenCalled();
+    expect(plugin.openCodeService.disconnectMcpServer).not.toHaveBeenCalled();
+    expect(plugin.opencodeConfigManager.write).not.toHaveBeenCalled();
+    expect(plugin.openCodeService.refreshMcpServerStatus).not.toHaveBeenCalled();
+    expect(Notice).toHaveBeenLastCalledWith(t('settings.server.mcp.notice.openCodeOnly'));
   });
 });

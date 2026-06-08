@@ -47,6 +47,7 @@ function createSyncResult(
 function createBridgeParts(conversation: Conversation) {
   const host: Mocked<ConversationSyncBridgeHost> = {
     getCurrentConversation: jest.fn().mockReturnValue(conversation),
+    canSyncConversationWithServer: jest.fn().mockResolvedValue(true),
     syncConversationMessagesFromServer: jest.fn().mockResolvedValue(
       createSyncResult(conversation, {
         fingerprint: 'server-after-compaction',
@@ -107,6 +108,13 @@ function createBridgeParts(conversation: Conversation) {
   };
 }
 
+async function flushAsyncSignalSync(): Promise<void> {
+  await Promise.resolve();
+  await Promise.resolve();
+  await Promise.resolve();
+  await Promise.resolve();
+}
+
 describe('ConversationSyncBridge compaction signals', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -135,8 +143,7 @@ describe('ConversationSyncBridge compaction signals', () => {
       type: 'session.compacted',
     });
 
-    await Promise.resolve();
-    await Promise.resolve();
+    await flushAsyncSignalSync();
 
     expect(orchestration.syncConversationFromSignal).toHaveBeenCalledWith(
       'tab-active',
@@ -198,6 +205,7 @@ describe('ConversationSyncBridge compaction signals', () => {
 
     const host: Mocked<ConversationSyncBridgeHost> = {
       getCurrentConversation: jest.fn().mockReturnValue(conversation),
+      canSyncConversationWithServer: jest.fn().mockResolvedValue(true),
       syncConversationMessagesFromServer: jest.fn().mockResolvedValue({
         messages: serverMessages,
         changed: true,
@@ -250,6 +258,9 @@ describe('ConversationSyncBridge compaction signals', () => {
       type: 'session.compacted',
     });
 
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
     await Promise.resolve();
     await Promise.resolve();
 

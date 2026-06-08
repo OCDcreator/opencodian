@@ -63,6 +63,7 @@ function createRoutedStream(
     streamTimedOut: false,
     latestErrorMessage: null,
     finalizedAssistantMetadata: null,
+    finalizedBackendSessionId: null,
     logAssistantFinalizationStage: jest.fn(),
     resetStreamingState: jest.fn(),
     cleanupPendingIndicator: jest.fn(),
@@ -91,7 +92,9 @@ describe('buildLocalStreamOutcome', () => {
         messageId: 'assistant-1',
         timestamp: 42,
         modelId: 'openai/gpt-5.5',
+        sessionId: 'sdk-session-1',
       },
+      finalizedBackendSessionId: 'sdk-session-1',
     });
     const outcome = buildLocalStreamOutcome({
       preparedSend,
@@ -103,6 +106,7 @@ describe('buildLocalStreamOutcome', () => {
     expect(outcome.finalizedTimestamp).toBe(42);
     expect(outcome.finalizedModelId).toBe('openai/gpt-5.5');
     expect(outcome.finalizedAssistantMessageId).toBe('assistant-1');
+    expect(outcome.finalizedBackendSessionId).toBe('sdk-session-1');
     expect(outcome.streamedTextContent).toBe('Hello world');
     expect(outcome.hasStreamContentBlocks).toBe(true);
     expect(outcome.shouldPersistInterruptedState).toBe(false);
@@ -193,6 +197,32 @@ describe('buildLocalStreamOutcome', () => {
     expect(outcome.streamErrorNoticeMessage).toBeNull();
   });
 
+  it('passes structuredOutput from the routed stream into the local outcome', () => {
+    const preparedSend = createPreparedSend();
+    const runtime = createRuntime();
+    const streamController: SendPipelineStreamController = {
+      startStream: jest.fn(),
+      handleChunk: jest.fn(),
+      cancelStream: jest.fn(),
+      getContentBlocks: jest.fn().mockReturnValue([
+        { type: 'text', content: 'Hello' },
+      ]),
+    };
+    const structuredPayload = { result: 'success' };
+    const routedStream = createRoutedStream({
+      streamCompleted: true,
+      structuredOutput: structuredPayload,
+    });
+    const outcome = buildLocalStreamOutcome({
+      preparedSend,
+      runtime,
+      streamController,
+      routedStream,
+    });
+
+    expect(outcome.structuredOutput).toEqual(structuredPayload);
+  });
+
   it('uses the session retry message as an error notice for silent interrupted streams', () => {
     const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(700);
     const preparedSend = createPreparedSend();
@@ -221,5 +251,133 @@ describe('buildLocalStreamOutcome', () => {
     expect(outcome.interruptedNoticeMessage).toBeNull();
     expect(outcome.shouldSyncFromServer).toBe(false);
     nowSpy.mockRestore();
+  });
+});
+
+describe('buildLocalStreamOutcome structured output duplicate suppression', () => {
+  it('filters out duplicate raw JSON text when structured output is present', () => {
+    const preparedSend = createPreparedSend();
+    const runtime = createRuntime();
+    const streamController: SendPipelineStreamController = {
+      startStream: jest.fn(),
+      handleChunk: jest.fn(),
+      cancelStream: jest.fn(),
+      getContentBlocks: jest.fn().mockReturnValue([
+        { type: 'text', content: 'Before' },
+        { type: 'text', content: '{"greeting": "hello"}' },
+      ]),
+    };
+    const routedStream = createRoutedStream({
+      streamCompleted: true,
+      structuredOutput: { response: '{"greeting": "hello"}' },
+    });
+    const outcome = buildLocalStreamOutcome({
+      preparedSend,
+      runtime,
+      streamController,
+      routedStream,
+    });
+
+    expect(outcome.streamedTextContent).toBe('Before');
+    expect(outcome.streamContentBlocks).toEqual([
+      { type: 'text', content: 'Before' },
+    ]);
+    expect(outcome.hasStreamContentBlocks).toBe(true);
+  });
+
+  it('keeps all text blocks when structured output does not duplicate them', () => {
+    const preparedSend = createPreparedSend();
+    const runtime = createRuntime();
+    const streamController: SendPipelineStreamController = {
+      startStream: jest.fn(),
+      handleChunk: jest.fn(),
+      cancelStream: jest.fn(),
+      getContentBlocks: jest.fn().mockReturnValue([
+        { type: 'text', content: 'Hello' },
+        { type: 'text', content: 'world' },
+      ]),
+    };
+    const routedStream = createRoutedStream({
+      streamCompleted: true,
+      structuredOutput: { response: '{"greeting": "hello"}' },
+    });
+    const outcome = buildLocalStreamOutcome({
+      preparedSend,
+      runtime,
+      streamController,
+      routedStream,
+    });
+
+    expect(outcome.streamedTextContent).toBe('Helloworld');
+    expect(outcome.streamContentBlocks).toEqual([
+      { type: 'text', content: 'Hello' },
+      { type: 'text', content: 'world' },
+    ]);
+  });
+
+  it('preserves non-text blocks when filtering duplicate text', () => {
+    const preparedSend = createPreparedSend();
+    const runtime = createRuntime();
+    const streamController: SendPipelineStreamController = {
+      startStream: jest.fn(),
+      handleChunk: jest.fn(),
+      cancelStream: jest.fn(),
+      getContentBlocks: jest.fn().mockReturnValue([
+        { type: 'thinking', content: 'Planning', partId: 'p1', durationSeconds: 2 },
+        { type: 'text', content: '{"greeting": "hello"}' },
+      ]),
+    };
+    const routedStream = createRoutedStream({
+      streamCompleted: true,
+      structuredOutput: { response: '{"greeting": "hello"}' },
+    });
+    const outcome = buildLocalStreamOutcome({
+      preparedSend,
+      runtime,
+      streamController,
+      routedStream,
+    });
+
+    expect(outcome.streamedTextContent).toBe('');
+    expect(outcome.streamContentBlocks).toEqual([
+      { type: 'thinking', content: 'Planning', partId: 'p1', durationSeconds: 2 },
+    ]);
+    expect(outcome.hasStreamContentBlocks).toBe(true);
+  });
+});
+
+describe('buildLocalStreamOutcome backend sync routing', () => {
+  it('keeps completed non-OpenCode streams on the local persistence path', () => {
+    const preparedSend = createPreparedSend({
+      conversation: {
+        id: 'conversation-claude',
+        title: 'Claude',
+        createdAt: 1,
+        updatedAt: 1,
+        backend: 'claude-code',
+        backendSessionId: 'claude-session-1',
+        messages: [],
+      },
+    });
+    const runtime = createRuntime();
+    const streamController: SendPipelineStreamController = {
+      startStream: jest.fn(),
+      handleChunk: jest.fn(),
+      cancelStream: jest.fn(),
+      getContentBlocks: jest.fn().mockReturnValue([
+        { type: 'text', content: 'Claude answer' },
+      ]),
+    };
+    const outcome = buildLocalStreamOutcome({
+      preparedSend,
+      runtime,
+      streamController,
+      routedStream: createRoutedStream({
+        streamCompleted: true,
+      }),
+    });
+
+    expect(outcome.shouldSyncFromServer).toBe(false);
+    expect(outcome.hasStreamContentBlocks).toBe(true);
   });
 });

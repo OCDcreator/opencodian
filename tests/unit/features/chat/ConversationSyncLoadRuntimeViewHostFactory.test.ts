@@ -316,6 +316,26 @@ describe('ConversationSyncLoadRuntimeViewHostFactory load policy', () => {
       ),
     ).toBe(true);
   });
+
+  it('does not route Claude Code conversations through OpenCode authoritative load sync', () => {
+    const fixture = createFixture();
+    const {
+      conversationLoadRuntimeBridgeHost,
+    } = createConversationSyncLoadRuntimeViewHosts(fixture.host);
+    const claudeConversation = createConversation('conversation-claude', {
+      backend: 'claude-code',
+      openCodeSessionId: undefined,
+      backendSessionId: 'claude-code-session',
+      messages: [],
+    });
+
+    expect(
+      conversationLoadRuntimeBridgeHost.shouldSyncConversationFromServer(
+        claudeConversation,
+        { forceServerSync: true },
+      ),
+    ).toBe(false);
+  });
 });
 
 describe('ConversationSyncLoadRuntimeViewHostFactory late binding', () => {

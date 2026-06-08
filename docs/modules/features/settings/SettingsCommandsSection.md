@@ -19,9 +19,9 @@
 
 owner 会并行读取：
 
-- `openCodeService.sdk.command.list()`：当前 runtime scope 的 slash command 目录
-- `OpencodeConfigManager.getCommandConfig()`：当前 vault `.opencode/opencode.json` 里的 project `command` map
-- `OpencodeConfigManager.getAgentConfig()`：当前 vault 里的 project/legacy agent map，用来识别 command-owned hidden agent
+- `openCodeService.sdk.command.list()`: 当前 runtime scope 的 slash command 目录
+- `OpencodeConfigManager.getCommandConfig()`: 当前 vault `.opencode/opencode.json` 里的 project `command` map
+- `OpencodeConfigManager.getAgentConfig()`: 当前 vault 里的 project/legacy agent map，用来识别 command-owned hidden agent
 - 然后把这些输入交给 `mergeSlashCommandCatalog()`，再追加 `appendSyntheticBuiltinCommands()` 注入的合成内置命令（`/compact`、`/undo`、`/redo`、`/new`、`/share`、`/unshare`），避免 settings/chat 再维护两份不同的 merge 规则
 - 合成命令只进入目录可见性列表，不进入 project command editor；editor 使用原始合并列表，防止用户意外将合成命令保存为 project override 而禁用专用执行路径
 
@@ -73,7 +73,7 @@ Commands section 还提供 `slashCommandSkillMode` 下拉选项：
 |------|------|
 | `attach()` | 挂载 Commands section，创建 heading、editor block 与 catalog block，并启动首次异步刷新 |
 | `createSkillModeSetting()` | 渲染 skill invocation mode 下拉框并写回 `slashCommandSkillMode` |
-| `dispose()` | 递增 refresh run id，避免旧异步请求回写已重建的设置页 |
+| `dispose()` | 递增 refresh run id，避免旧异步请求回写已重建的设置页，并释放 `SettingsProjectCommandEditor` 持有的 textarea size-memory observer |
 | `refreshCatalog()` | 并行加载 runtime/project commands，合并后同时刷新 editor 与 catalog |
 | `renderCatalog()` | 先委托 `SettingsProjectCommandEditor` 渲染项目命令表单，再委托 `SlashCommandCatalogRenderer` 渲染卡片式目录 |
 | `updateCommandVisibility()` | 把用户 hide/unhide 操作写回 `hiddenSlashCommands` |
@@ -81,7 +81,7 @@ Commands section 还提供 `slashCommandSkillMode` 下拉选项：
 ## 与其他模块的交互
 
 - `OpenCodianSettings.ts`: 创建并挂载本 owner，把 Commands section 从主设置页中独立出来
-- `OpenCodeService`: 通过 SDK façade 的 `command.list()` 读取 runtime slash command 目录
+- `OpenCodeService`: 通过 SDK facade 的 `command.list()` 读取 runtime slash command 目录
 - `OpencodeConfigManager`: 读取当前 vault 的 project `command` / `agent` 配置，并负责 command-owned hidden agent lifecycle
 - `core/config/slashCommandCatalog.ts`: 提供共享 catalog merge 与 visible-menu projection 规则
 - `SettingsProjectCommandEditor.ts`: 负责 project command 核心字段表单、保存 / 删除 action 与 notice
@@ -91,9 +91,9 @@ Commands section 还提供 `slashCommandSkillMode` 下拉选项：
 
 ## 注意事项
 
-- 不要把 Commands settings ownership 塞回 `OpenCodianSettings.ts`、`OpenCodianView.ts` 或 `OpenCodeService.ts`。
-- project `command` 表单细节现在继续下沉到 companion owner `SettingsProjectCommandEditor`，避免 catalog owner 继续膨胀。
-- `hiddenSlashCommands` 仍然是用户级 slash menu 可见性来源，不要把 project command CRUD 和 visible/hidden 写回混成同一条存储路径。
+- 不要把 Commands settings ownership 塞回 `OpenCodianSettings.ts`、`OpenCodianView.ts` 或 `OpenCodeService.ts`
+- project `command` 表单细节现在继续下沉到 companion owner `SettingsProjectCommandEditor`，避免 catalog owner 继续膨胀
+- `hiddenSlashCommands` 仍然是用户级 slash menu 可见性来源，不要把 project command CRUD 和 visible/hidden 写回混成同一条存储路径
 
 ## 2026-05-17 Card-based catalog with search/filter/multi-select
 
@@ -116,5 +116,5 @@ Added `attachTabbed(containerEl, secondaryTabId)` method for the tabbed settings
 - `catalog` — renders full command catalog with visibility toggles
 
 The classic `attach()` method remains unchanged.
-- `slashCommandSkillMode` 只改变 chat menu/执行入口形态，不改变 OpenCode runtime 的 skill catalog。
-- runtime placeholder expansion、slash execution 与 command-owned hidden agent 已分别落在相邻 seam；如果后续再扩 commands 体验，仍应继续沿着本 owner + editor seam 扩展，而不是绕开现有共享 catalog seam。
+- `slashCommandSkillMode` 只改变 chat menu/执行入口形态，不改变 OpenCode runtime 的 skill catalog
+- runtime placeholder expansion、slash execution 与 command-owned hidden agent 已分别落在相邻 seam；如果后续再扩 commands 体验，仍应继续沿着本 owner + editor seam 扩展，而不是绕开现有共享 catalog seam

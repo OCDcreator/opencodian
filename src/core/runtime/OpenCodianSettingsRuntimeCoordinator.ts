@@ -2,6 +2,7 @@ import type { WorkspaceLeaf } from 'obsidian';
 
 import {
   createLogger,
+  setClaudeCodeDebugChannelSettings,
   setDebugLoggingEnabled,
   setDebugModuleSettings,
   setDebugRefreshIntervalMs,
@@ -33,6 +34,7 @@ export interface OpenCodianSettingsRuntimeCoordinatorHost {
   getVaultBasePath(): string | null;
   refreshOpenCodianViews(options: { reloadModels?: boolean; applyUi?: boolean }): void;
   invalidateSlashCommandMenuCatalogs(options?: { preload?: boolean }): void;
+  scheduleDeferredRuntimeWarmup?(): void;
   applyProviderIconColorMode(): void;
   getOpenCodianLeaves(): WorkspaceLeaf[];
   onSettingsPersistenceBlocked(message: string): void;
@@ -106,6 +108,10 @@ export class OpenCodianSettingsRuntimeCoordinator {
           { healthCheck: () => this.host.getOpenCodeService().checkHealth() },
         );
       }
+    }
+
+    if (this.shouldScheduleDeferredRuntimeWarmup()) {
+      this.host.scheduleDeferredRuntimeWarmup?.();
     }
   }
 
@@ -322,8 +328,16 @@ export class OpenCodianSettingsRuntimeCoordinator {
     const settings = this.host.getSettings();
     setDebugLoggingEnabled(settings.enableDebugLogging);
     setDebugModuleSettings(settings.debugModuleSettings);
+    setClaudeCodeDebugChannelSettings(settings.backendSettings.claudeCode.debugChannels);
     setDebugRefreshIntervalMs(settings.debugRefreshIntervalMs);
     setInlineSerializedDebugLogArgsEnabled(settings.inlineSerializedDebugLogArgs);
+  }
+
+  private shouldScheduleDeferredRuntimeWarmup(): boolean {
+    const settings = this.host.getSettings();
+    return settings.enabledBackends.includes('opencode')
+      && settings.server.mode === 'local'
+      && settings.server.local.autoStart;
   }
 
   async persistSettingsDomains(options: { core?: boolean; ui?: boolean }): Promise<boolean> {

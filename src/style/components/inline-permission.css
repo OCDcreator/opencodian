@@ -270,6 +270,22 @@
   color: var(--text-muted);
 }
 
+.opencodian-question-inline-option-preview {
+  font-size: 11px;
+  color: var(--text-faint, var(--text-muted));
+  background: color-mix(in srgb, var(--background-primary) 62%, transparent);
+  border: 1px dashed color-mix(in srgb, var(--opencodian-glass-border) 56%, transparent);
+  border-radius: 8px;
+  padding: 6px 8px;
+  margin-top: 8px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.opencodian-question-inline-option-preview.is-hidden {
+  display: none;
+}
+
 .opencodian-question-inline-custom {
   width: 100%;
   padding: 8px 10px;

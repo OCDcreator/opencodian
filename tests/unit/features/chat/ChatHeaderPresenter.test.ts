@@ -3,19 +3,18 @@ import {
   type ChatHeaderPresenterHost,
   type ChatServerAvailability,
 } from '../../../../src/features/chat/services/ChatHeaderPresenter';
+import { ConversationRenderService } from '../../../../src/features/chat/services/ConversationRenderService';
 import { t } from '../../../../src/i18n';
 
 function createFixture() {
   let cssChangeListener: (() => void) | null = null;
   let availability: ChatServerAvailability = 'checking';
   let localServerMode = true;
+  let openCodeBackend = true;
 
   const host: jest.Mocked<ChatHeaderPresenterHost> = {
     setTooltipLabel: jest.fn((element, label, position) => {
-      element.setAttribute('data-tooltip', label);
-      if (position) {
-        element.setAttribute('data-tooltip-position', position);
-      }
+      ConversationRenderService.setTooltipLabel(element, label, position);
     }),
     registerCssChangeListener: jest.fn((listener) => {
       cssChangeListener = listener;
@@ -32,6 +31,8 @@ function createFixture() {
     showConversationHistory: jest.fn(),
     openConversationSessionSettings: jest.fn(),
     openSettings: jest.fn(),
+    isOpenCodeBackend: jest.fn(() => openCodeBackend),
+    getActiveBackendDisplayName: jest.fn(() => openCodeBackend ? 'OpenCode' : 'Claude Code'),
   };
 
   const headerEl = document.createElement('div');
@@ -48,6 +49,9 @@ function createFixture() {
     },
     setLocalServerMode: (nextLocalServerMode: boolean) => {
       localServerMode = nextLocalServerMode;
+    },
+    setOpenCodeBackend: (nextOpenCodeBackend: boolean) => {
+      openCodeBackend = nextOpenCodeBackend;
     },
     dispatchCssChange: () => {
       cssChangeListener?.();
@@ -98,6 +102,78 @@ describe('ChatHeaderPresenter', () => {
     expect(fixture.host.openSettings).toHaveBeenCalledTimes(1);
   });
 
+  it('uses backend settings language for the status badge outside OpenCode mode', async () => {
+    const fixture = createFixture();
+    fixture.setOpenCodeBackend(false);
+    fixture.setAvailability('running');
+
+    await fixture.presenter.refreshServerStatusBadge();
+
+    const statusBadgeEl = fixture.headerEl.querySelector<HTMLElement>('.opencodian-server-status-badge');
+    const statusTextEl = fixture.headerEl.querySelector<HTMLElement>('.opencodian-server-status-text');
+    expect(statusTextEl?.textContent).toBe(t('chat.serverStatus.backendConnected', {
+      backend: 'Claude Code',
+    }));
+    expect(statusBadgeEl?.getAttribute('data-tooltip')).toBe(t('chat.serverStatus.openBackendSettings'));
+  });
+
+  it('shows backend-specific offline instead of connected when a non-OpenCode backend is disconnected', async () => {
+    const fixture = createFixture();
+    fixture.setOpenCodeBackend(false);
+    fixture.setAvailability('offline');
+
+    await fixture.presenter.refreshServerStatusBadge();
+
+    const statusTextEl = fixture.headerEl.querySelector<HTMLElement>('.opencodian-server-status-text');
+    const statusBadgeEl = fixture.headerEl.querySelector<HTMLElement>('.opencodian-server-status-badge');
+    expect(statusTextEl?.textContent).toBe(t('chat.serverStatus.backendOffline', {
+      backend: 'Claude Code',
+    }));
+    expect(statusTextEl?.textContent).not.toBe(t('chat.serverStatus.backendConnected', {
+      backend: 'Claude Code',
+    }));
+    expect(statusBadgeEl?.getAttribute('data-tooltip')).toBe(t('chat.serverStatus.openBackendSettings'));
+  });
+
+  it('includes the backend name when a non-OpenCode backend is offline', async () => {
+    const fixture = createFixture();
+    fixture.setOpenCodeBackend(false);
+    fixture.setAvailability('offline');
+
+    await fixture.presenter.refreshServerStatusBadge();
+
+    const statusTextEl = fixture.headerEl.querySelector<HTMLElement>('.opencodian-server-status-text');
+    expect(statusTextEl?.textContent).toBe(t('chat.serverStatus.backendOffline', {
+      backend: 'Claude Code',
+    }));
+  });
+
+  it('exposes stable accessible header action locators', () => {
+    const fixture = createFixture();
+
+    const expectedActions = [
+      ['new-tab', t('chat.tab.newTooltip')],
+      ['new-current-tab', t('chat.tab.newCurrentTooltip')],
+      ['history', t('chat.history.open')],
+      ['session-settings', t('chat.sessionSettings.open')],
+      ['settings', t('chat.settings.open')],
+    ];
+
+    for (const [action, label] of expectedActions) {
+      const buttonEl = fixture.headerEl.querySelector<HTMLButtonElement>(
+        `.opencodian-header-btn[data-action="${action}"]`,
+      );
+      expect(buttonEl).not.toBeNull();
+      expect(buttonEl?.tagName).toBe('BUTTON');
+      expect(buttonEl?.getAttribute('type')).toBe('button');
+      expect(buttonEl?.hasAttribute('aria-label')).toBe(false);
+      expect(buttonEl?.getAttribute('data-tooltip')).toBe(label);
+      const hiddenLabel = buttonEl?.querySelector<HTMLElement>('.opencodian-visually-hidden[data-tooltip-label="true"]');
+      expect(hiddenLabel?.textContent).toBe(label);
+      expect(buttonEl?.getAttribute('aria-labelledby')).toBe(hiddenLabel?.id);
+    }
+  });
+
   it('marks the new-tab action for tab-disabled container CSS', () => {
     const fixture = createFixture();
 
@@ -132,6 +208,32 @@ describe('ChatHeaderPresenter', () => {
 
     expect(statusBadgeEl?.classList.contains('is-external')).toBe(true);
     expect(statusTextEl?.textContent).toBe(t('chat.serverStatus.localExternal'));
+
+    fixture.setAvailability('disabled');
+    await fixture.presenter.refreshServerStatusBadge();
+
+    expect(statusBadgeEl?.classList.contains('is-disabled')).toBe(true);
+    expect(statusTextEl?.textContent).toBe(t('chat.serverStatus.disabled'));
+  });
+
+  it('uses backend-shaped status copy and refreshes OpenCode-only chrome when backend changes', async () => {
+    const fixture = createFixture();
+    const statusTextEl = fixture.headerEl.querySelector<HTMLElement>('.opencodian-server-status-text');
+
+    expect(fixture.headerEl.querySelector('.opencodian-lsp-status')).not.toBeNull();
+
+    fixture.setOpenCodeBackend(false);
+    fixture.setAvailability('running');
+    fixture.presenter.refreshBackendChrome();
+    await fixture.presenter.refreshServerStatusBadge();
+
+    expect(fixture.headerEl.querySelector('.opencodian-lsp-status')).toBeNull();
+    expect(statusTextEl?.textContent).toBe(t('chat.serverStatus.backendConnected', { backend: 'Claude Code' }));
+
+    fixture.setOpenCodeBackend(true);
+    fixture.presenter.refreshBackendChrome();
+
+    expect(fixture.headerEl.querySelector('.opencodian-lsp-status')).not.toBeNull();
   });
 
   it('ignores late server status results after destroy clears header DOM refs', async () => {
@@ -170,5 +272,16 @@ describe('ChatHeaderPresenter', () => {
     expect(logoEl?.innerHTML).toContain('clip0_dark');
     expect(fixture.host.scheduleChatSurfaceColorSync).toHaveBeenCalledTimes(1);
     expect(fixture.host.scheduleComposerLayoutSync).toHaveBeenCalledTimes(1);
+  });
+
+  it('skips the LSP indicator when the active backend is not OpenCode', () => {
+    const fixture = createFixture();
+    fixture.presenter.destroy();
+    fixture.headerEl.innerHTML = '';
+    fixture.setOpenCodeBackend(false);
+
+    fixture.presenter.build(fixture.headerEl);
+
+    expect(fixture.headerEl.querySelector('.opencodian-lsp-status-indicator')).toBeNull();
   });
 });

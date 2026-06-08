@@ -82,6 +82,7 @@ export class SettingsCommandsSection {
 
   dispose(): void {
     this.refreshRunId += 1;
+    this.projectCommandEditor?.dispose();
   }
 
   attach(containerEl: HTMLElement): HTMLHeadingElement {

@@ -120,7 +120,7 @@
 `OpenCodeService` 的 session lifecycle 公开接口与共享 session runtime fallback 现在由 `OpenCodeSessionLifecycleCoordinator` 承担主要 owner；服务层保留 host seam、transport helper、normalizer 与 revert/tool-observation 依赖，并继续作为对外 façade。被 lifecycle coordinator 收束的接口包括：
 
 - `createSession()`
-- `getSessionInfo()`（内部 shared session lookup，含 SDK get fallback）
+- `getSessionInfo()`（public single-session lookup via SDK `session.get()`；含 legacy HTTP fallback。供 `OpenCodeAdapter.getSession()` 使用，避免 O(n) 的 `listSessions()` + 客户端过滤。NOT a stable cross-backend session-detail contract — adapter 层仍返回 `unknown | null`）
 - `abortSession()`（内部 streaming cancel 使用，含 SDK abort fallback）
 - `listSessions()`
 - `getSessionMessages()`

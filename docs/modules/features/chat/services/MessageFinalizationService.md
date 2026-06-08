@@ -36,6 +36,7 @@ export interface MessageFinalizationHostDependencies {
   conversationTabRuntimeCoordinator: {
     updateConversationSyncRuntime(tabId, update: { inFlight?: boolean; fingerprint?: string | null }): void;
     clearPendingEditedFiles(tabId: TabId | null): void;
+    transitionTabSessionLifecycle(tabId: TabId | null, phase: WritableTabSessionPhase, reason: string): boolean;
   };
   setTabNeedsAttention(tabId: TabId | null, needsAttention: boolean): void;
   tabConversationStateBridge: { syncActiveTabConversation(conversation: Conversation): void };
@@ -56,7 +57,7 @@ export function shouldSyncAfterStream(
 export function getFriendlyServerStartErrorMessage(error: unknown): string;
 
 export function getUnavailableServerMessage(
-  availability: 'checking' | 'starting' | 'offline',
+  availability: 'checking' | 'disabled' | 'starting' | 'offline',
 ): string;
 
 export interface FinalizeMessageOptions {
@@ -82,7 +83,7 @@ export class MessageFinalizationService {
   finalizeAssistantMessageWithServerUnavailableError(
     messageEl: HTMLElement,
     contentEl: HTMLElement,
-    availability: 'checking' | 'starting' | 'offline',
+    availability: 'checking' | 'disabled' | 'starting' | 'offline',
   ): Promise<void>;
 }
 ```
@@ -112,9 +113,16 @@ export class MessageFinalizationService {
 ### 收尾时序
 
 - 只有 should-sync 分支才执行最终 canonical/server sync、background indicator 刷新与 turn diff notice
-- 不论是否 should-sync，都会继续刷新 session todos、写最终 save、清空 pending edited files
+- 不论是否 should-sync，都会继续写最终 save、清空 pending edited files；session todos 只在 OpenCode-owned conversation 上刷新，非 OpenCode backend 先跳过 OpenCode-only todo refresh
 - 如果用户在 finalization 期间切走 tab，则不做 foreground patch/rerender 与 active-tab context usage 刷新，而是改为给原 tab 打 attention
 - sync lock 会在 service 自己的 `finally` 中释放，避免 send finalization 途中遗漏解锁
+- tab session lifecycle 也会在同一个 `finally` 中收口到 `idle`，避免本地流或非 server-sync backend 结束后停在 `finalizing` 而阻塞下一次发送
+
+### Claude Code 用户消息身份回填
+
+当 `conversation.backend === 'claude-code'` 时，`finalizeAfterStream()` 在最终保存之前会调用 `ClaudeUserMessageIdentityBackfillService.backfill()`，从 Claude SDK session history 查询 top-level user message UUID 并回填到本地 `sourceMessageId`。这确保 Claude 普通聊天发送后 user message 拥有真实 `sourceMessageId`，使 fork 按钮在消息 footer 正常显示。
+
+回填成功后，如果是前景 tab，service 会在原地调用 `applySyncedConversationUpdate` 触发增量重渲。`ConversationIdentityRuntime.getMessageVisualSignature()` 现在包含 `sourceMessageId`，因此回填前后的视觉签名会不同，增量更新路径可以正确检测到用户消息变化并重渲 footer（显示 fork 按钮），无需用户手动 reload。
 
 ## 与 `OpenCodianView` 的边界
 
@@ -137,6 +145,7 @@ export class MessageFinalizationService {
 纯函数，不依赖 host。将 server 不可用状态分类为用户友好的 i18n 消息：
 
 - `starting` → `chat.error.serverStarting`
+- `disabled` → 复用 chat surface 的 no-backend 引导文案
 - 其他（`offline`、`checking`）→ `chat.error.serverOffline`
 
 ### finalizeAssistantMessageWithError
@@ -159,7 +168,8 @@ export class MessageFinalizationService {
 - `setConversationSyncInFlight(tabId, value)` → `deps.conversationTabRuntimeCoordinator.updateConversationSyncRuntime(tabId, { inFlight: value })`
 - `setLastConversationSyncFingerprint(tabId, fingerprint)` → `deps.conversationTabRuntimeCoordinator.updateConversationSyncRuntime(tabId, { fingerprint })`
 - `clearPendingEditedFiles(tabId)` → `deps.conversationTabRuntimeCoordinator.clearPendingEditedFiles(tabId)`
-- `setActiveTabConversation(conversation)` → `deps.tabConversationStateBridge.syncActiveTabConversation(conversation)`
+- `transitionTabSessionLifecycle(tabId, phase, reason)` → `deps.conversationTabRuntimeCoordinator.transitionTabSessionLifecycle(tabId, phase, reason)`
+- `setActiveTabConversation(conversation, tabId?)` → `deps.tabConversationStateBridge.syncActiveTabConversation(conversation)` + scoped `deps.promptSuggestionSessionResync(tabId, sessionId)` for prompt-suggestion session identity resync
 - `syncActiveTabContextUsageIdentity()` → `deps.activeTabContextUsageCoordinator.syncIdentity()`
 - `refreshActiveTabContextUsageFromServer()` → `deps.activeTabContextUsageCoordinator.refreshFromServer()`
 - `getConversationSyncFingerprint(messages)` → `deps.conversationIdentityRuntime.getConversationSyncFingerprint(messages)`

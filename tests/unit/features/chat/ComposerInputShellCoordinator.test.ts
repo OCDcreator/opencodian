@@ -1,3 +1,10 @@
+/* eslint-disable max-lines -- This suite intentionally keeps shared DOM fixture helpers and coordinator interaction coverage together. */
+import {
+  clearPromptSuggestionSink,
+  emitPromptSuggestionSessionChange,
+  findPromptSuggestionScope,
+  registerPromptSuggestionSink,
+} from '../../../../src/core/agents/backend/promptSuggestionSink';
 import type { SlashCommandMenuItem } from '../../../../src/core/config/slashCommandCatalog';
 import {
   buildComposerInputSubmission,
@@ -43,13 +50,51 @@ function slashItem(id: string, description: string, overrides: Partial<SlashComm
   return { id, description, hasProjectOverride: false, runtimeAvailable: true, source: 'command', subtask: false, ...overrides };
 }
 
-function createFixture() {
+const createdCoordinators: ComposerInputShellCoordinator[] = [];
+
+function createFixture(options: {
+  shouldMountAgentSelector?: boolean;
+  composerAvailabilityState?: { kind: 'ready' | 'no-backend' | 'backend-offline'; title?: string; description?: string };
+  composerCapabilityHint?: { text: string } | null;
+  currentBackendSessionId?: string | null;
+  withAssistantMessage?: boolean;
+  withEmptyStateNotice?: boolean;
+} = {}) {
   let isStreaming = false;
   let isForegroundBusy = false;
   let inputContainerHeight = 88;
   let textareaScrollHeight = 0;
   let slashCommandMenuItems: SlashCommandMenuItem[] = [];
   let slashCommandMenuError: Error | null = null;
+  const surfaceRoot = document.createElement('div');
+  surfaceRoot.className = 'opencodian-container';
+  const headerSettingsBtn = document.createElement('button');
+  headerSettingsBtn.className = 'opencodian-header-btn';
+  headerSettingsBtn.dataset.action = 'settings';
+  headerSettingsBtn.type = 'button';
+  surfaceRoot.appendChild(headerSettingsBtn);
+  const suggestionMountRoot = document.createElement('div');
+  suggestionMountRoot.className = 'opencodian-messages is-active';
+  const suggestionTurnEl = document.createElement('div');
+  suggestionTurnEl.className = 'opencodian-turn opencodian-turn--assistant-only';
+  const suggestionTurnBodyEl = document.createElement('div');
+  suggestionTurnBodyEl.className = 'opencodian-turn-body';
+  const suggestionAssistantMessageEl = document.createElement('div');
+  suggestionAssistantMessageEl.className = 'opencodian-message opencodian-message--assistant';
+  if (options.withAssistantMessage !== false) {
+    suggestionTurnBodyEl.appendChild(suggestionAssistantMessageEl);
+    suggestionTurnEl.appendChild(suggestionTurnBodyEl);
+    suggestionMountRoot.appendChild(suggestionTurnEl);
+  }
+  if (options.withEmptyStateNotice) {
+    const emptyStateMessageEl = document.createElement('div');
+    emptyStateMessageEl.className = 'opencodian-message opencodian-message--assistant opencodian-message--notice';
+    emptyStateMessageEl.dataset.messageId = options.composerAvailabilityState?.kind === 'no-backend'
+      ? 'opencodian-empty-state-no-backend'
+      : 'opencodian-empty-state-backend-offline';
+    suggestionMountRoot.appendChild(emptyStateMessageEl);
+  }
+  surfaceRoot.appendChild(suggestionMountRoot);
 
   const host: jest.Mocked<ComposerInputShellCoordinatorHost> = {
     attachSessionTodo: jest.fn(),
@@ -67,6 +112,7 @@ function createFixture() {
     mountSelectionControls: jest.fn(),
     mountContextUsageIndicator: jest.fn(),
     mountEffortSelector: jest.fn(),
+    shouldMountAgentSelector: jest.fn(() => options.shouldMountAgentSelector ?? true),
     isActiveTabStreaming: jest.fn(() => isStreaming),
     cancelStreaming: jest.fn(),
     isTabForegroundBusy: jest.fn(() => isForegroundBusy),
@@ -82,17 +128,26 @@ function createFixture() {
     }),
     setComposerStackHeight: jest.fn(),
     scheduleSettledScrollToBottomIfNeeded: jest.fn(),
+    getComposerAvailabilityState: jest.fn(() => options.composerAvailabilityState ?? { kind: 'ready' }),
   };
+
+  // Only mock getComposerCapabilityHint when explicitly provided in options.
+  // When absent, the coordinator falls back to deriving the hint from shouldMountAgentSelector.
+  if (options.composerCapabilityHint !== undefined) {
+    host.getComposerCapabilityHint = jest.fn(() => options.composerCapabilityHint);
+  }
 
   const container = document.createElement('div');
   Object.defineProperty(container, 'offsetHeight', {
     configurable: true,
     get: () => inputContainerHeight,
   });
-  document.body.appendChild(container);
+  surfaceRoot.appendChild(container);
+  document.body.appendChild(surfaceRoot);
 
   const coordinator = new ComposerInputShellCoordinator(host);
   coordinator.build(container);
+  createdCoordinators.push(coordinator);
   flushAnimationFrames();
 
   const textarea = container.querySelector<HTMLTextAreaElement>('.opencodian-input');
@@ -113,10 +168,15 @@ function createFixture() {
   return {
     coordinator,
     host,
+    surfaceRoot,
+    headerSettingsBtn,
     container,
     textarea,
     sendBtn,
     addContextBtn,
+    suggestionMountRoot,
+    suggestionTurnBodyEl,
+    suggestionAssistantMessageEl,
     setStreaming(nextValue: boolean) {
       isStreaming = nextValue;
     },
@@ -151,6 +211,10 @@ function installCoordinatorDomMocks(): void {
 }
 
 function restoreCoordinatorDomMocks(originalResizeObserver: typeof ResizeObserver | undefined): void {
+  for (const coordinator of createdCoordinators) {
+    try { coordinator.destroy(); } catch { /* ignore */ }
+  }
+  createdCoordinators.length = 0;
   document.body.innerHTML = '';
   jest.restoreAllMocks();
   ResizeObserverMock.reset();
@@ -196,6 +260,131 @@ describe('ComposerInputShellCoordinator', () => {
     });
     expect(fixture.host.addChosenFileContextToActiveTab).toHaveBeenCalledTimes(1);
     expect(fixture.textarea.value).toBe('');
+  });
+
+  it('keeps the suggestion bar out of the composer footer and mounts it under the assistant turn body', () => {
+    const mockSink = {
+      onPostResultChunk: jest.fn(() => jest.fn()),
+    };
+    registerPromptSuggestionSink(mockSink);
+    const fixture = createFixture();
+
+    const callback = mockSink.onPostResultChunk.mock.calls[0][0];
+    callback({
+      type: 'prompt_suggestion',
+      suggestion: 'Continue this thought',
+      uuid: 'ps-1',
+      sessionId: 'sess-1',
+    });
+    const channelId = findPromptSuggestionScope(fixture.container);
+    emitPromptSuggestionSessionChange('sess-1', channelId);
+
+    const suggestionBar = fixture.container.querySelector('.opencodian-suggestion-bar');
+    const mountedSuggestionBar = fixture.suggestionMountRoot.querySelector('.opencodian-suggestion-bar');
+
+    expect(suggestionBar).toBeNull();
+    expect(mountedSuggestionBar).not.toBeNull();
+    expect(mountedSuggestionBar?.parentElement).toBe(fixture.suggestionTurnBodyEl);
+    expect(mountedSuggestionBar?.previousElementSibling).toBe(fixture.suggestionAssistantMessageEl);
+    expect(fixture.container.querySelector('.opencodian-composer-footer .opencodian-suggestion-bar')).toBeNull();
+  });
+
+  it('removes the empty toolbar when no selector, model, permission, context, or effort controls are mounted', () => {
+    const fixture = createFixture({ shouldMountAgentSelector: false });
+
+    expect(fixture.container.querySelector('.opencodian-input-toolbar')).toBeNull();
+  });
+
+  it('remounts toolbar controls when backend capabilities change', () => {
+    const fixture = createFixture();
+
+    expect(fixture.container.querySelector('.opencodian-agent-selector')).not.toBeNull();
+    expect(fixture.container.querySelector('.opencodian-input-capability-hint')).toBeNull();
+
+    fixture.host.shouldMountAgentSelector.mockReturnValue(false);
+    fixture.coordinator.refreshToolbarControls();
+
+    expect(fixture.container.querySelector('.opencodian-agent-selector')).toBeNull();
+    expect(
+      fixture.container.querySelector('.opencodian-input-capability-hint-text')?.textContent,
+    ).toBe(t('chat.input.capabilityHint.jsonLabel'));
+    expect(fixture.host.mountSelectionControls).toHaveBeenCalledTimes(2);
+    expect(fixture.host.mountContextUsageIndicator).toHaveBeenCalledTimes(2);
+    expect(fixture.host.mountEffortSelector).toHaveBeenCalledTimes(2);
+  });
+
+  it('renders a disabled composer shell when no backend is enabled', () => {
+    const fixture = createFixture({
+      shouldMountAgentSelector: false,
+      composerAvailabilityState: {
+        kind: 'no-backend',
+        title: 'No backend enabled',
+        description: 'Enable at least one backend to start chatting.',
+      },
+    });
+
+    expect(fixture.textarea.disabled).toBe(true);
+    expect(fixture.sendBtn.disabled).toBe(true);
+    expect(fixture.addContextBtn.disabled).toBe(true);
+    expect(fixture.container.querySelector('.opencodian-composer-disabled-state')).toBeNull();
+    expect(fixture.surfaceRoot.querySelector('.opencodian-composer-availability-notice')?.textContent)
+      .toContain('No backend enabled');
+  });
+
+  it('positions the external availability notice above the composer stack and keeps it synced to composer height', () => {
+    const fixture = createFixture({
+      shouldMountAgentSelector: false,
+      composerAvailabilityState: {
+        kind: 'backend-offline',
+        title: 'Backend unavailable',
+        description: 'The current backend is enabled, but it is not connected right now.',
+      },
+    });
+    const resizeObserver = ResizeObserverMock.instances[0];
+    const noticeEl = fixture.surfaceRoot.querySelector<HTMLElement>('.opencodian-composer-availability-notice');
+
+    expect(noticeEl?.style.bottom).toBe('96px');
+
+    fixture.setInputContainerHeight(132);
+    resizeObserver?.trigger();
+    flushAnimationFrames();
+
+    expect(noticeEl?.style.bottom).toBe('140px');
+  });
+
+  it('refreshes composer availability state when locale-driven refresh reapplies texts', () => {
+    const fixture = createFixture();
+
+    fixture.host.getComposerAvailabilityState.mockReturnValue({
+      kind: 'backend-offline',
+      title: 'Backend unavailable',
+      description: 'The current backend is enabled, but it is not connected right now.',
+    });
+
+    fixture.coordinator.applyLocaleTexts();
+
+    expect(fixture.textarea.disabled).toBe(true);
+    expect(fixture.sendBtn.disabled).toBe(true);
+    expect(
+      fixture.surfaceRoot.querySelector('.opencodian-composer-availability-notice')?.textContent,
+    ).toContain('Backend unavailable');
+  });
+
+  it('suppresses the external availability notice when the empty-state notice already covers it', () => {
+    const fixture = createFixture({
+      withAssistantMessage: false,
+      withEmptyStateNotice: true,
+      composerAvailabilityState: {
+        kind: 'backend-offline',
+        title: 'Backend unavailable',
+        description: 'The current backend is enabled, but it is not connected right now.',
+      },
+    });
+
+    fixture.coordinator.updateComposerAvailabilityState();
+
+    expect(fixture.surfaceRoot.querySelector('.opencodian-composer-availability-notice')).toBeNull();
+    expect(fixture.textarea.disabled).toBe(true);
   });
 
   it('keeps submit gating and send/stop affordance inside the coordinator', () => {
@@ -263,6 +452,122 @@ describe('ComposerInputShellCoordinator', () => {
       rawContent: 'npm test',
       command: 'npm test',
     });
+  });
+});
+
+describe('ComposerInputShellCoordinator — capability hint behaviors', () => {
+  const originalResizeObserver = globalThis.ResizeObserver;
+
+  beforeEach(() => {
+    installCoordinatorDomMocks();
+  });
+
+  afterEach(() => {
+    restoreCoordinatorDomMocks(originalResizeObserver);
+  });
+
+  it('derives capability hint from shouldMountAgentSelector=false when host provides no explicit hint', () => {
+    // shouldMountAgentSelector returning false means no Subagents capability → Claude Code backend
+    const fixture = createFixture({ shouldMountAgentSelector: false });
+
+    const hintEl = fixture.container.querySelector<HTMLButtonElement>('.opencodian-input-capability-hint');
+    expect(hintEl).toBeTruthy();
+    expect(hintEl?.querySelector('.opencodian-input-capability-hint-text')?.textContent)
+      .toBe(t('chat.input.capabilityHint.jsonLabel'));
+    expect(hintEl?.getAttribute('data-tooltip')).toBe(t('chat.input.capabilityHint.jsonTooltip'));
+    expect(hintEl?.nextElementSibling).toBe(fixture.sendBtn);
+  });
+
+  it('does not derive capability hint when shouldMountAgentSelector returns true', () => {
+    // shouldMountAgentSelector returning true means Subagents capability → OpenCode or similar
+    const fixture = createFixture({ shouldMountAgentSelector: true });
+
+    const hintEl = fixture.container.querySelector<HTMLElement>('.opencodian-input-capability-hint');
+    expect(hintEl).toBeNull();
+  });
+
+  it('explicit getComposerCapabilityHint takes priority over derived fallback', () => {
+    const fixture = createFixture({
+      shouldMountAgentSelector: false,
+      composerCapabilityHint: null, // explicit null overrides fallback
+    });
+
+    const hintEl = fixture.container.querySelector<HTMLElement>('.opencodian-input-capability-hint');
+    expect(hintEl).toBeNull();
+  });
+
+  it('clicking the derived /json capability chip inserts the structured prefix without auto-send', () => {
+    const fixture = createFixture({ shouldMountAgentSelector: false });
+    fixture.textarea.value = 'summarize this';
+
+    const hintEl = fixture.container.querySelector<HTMLButtonElement>('.opencodian-input-capability-hint');
+    expect(hintEl).toBeTruthy();
+
+    hintEl?.click();
+
+    expect(fixture.textarea.value).toBe('/json summarize this');
+    expect(fixture.host.submitMessage).not.toHaveBeenCalled();
+  });
+});
+
+describe('ComposerInputShellCoordinator — Claude backend: @agent menu + /json hint coexist', () => {
+  const originalResizeObserver = globalThis.ResizeObserver;
+
+  beforeEach(() => {
+    installCoordinatorDomMocks();
+  });
+
+  afterEach(() => {
+    restoreCoordinatorDomMocks(originalResizeObserver);
+  });
+
+  it('shows /json capability hint when host provides explicit getComposerCapabilityHint (even with shouldMountAgentSelector=true)', () => {
+    // Simulates Claude backend: agent selector is mounted (true) but /json hint
+    // is provided via the explicit seam, not the fallback.
+    const fixture = createFixture({
+      shouldMountAgentSelector: true,
+      composerCapabilityHint: {
+        text: t('chat.input.capabilityHint.jsonLabel'),
+      },
+    });
+
+    const hintEl = fixture.container.querySelector<HTMLButtonElement>('.opencodian-input-capability-hint');
+    expect(hintEl).toBeTruthy();
+    expect(hintEl?.querySelector('.opencodian-input-capability-hint-text')?.textContent)
+      .toBe(t('chat.input.capabilityHint.jsonLabel'));
+  });
+
+  it('hides /json hint when host provides explicit null capability hint (Claude without /json)', () => {
+    const fixture = createFixture({
+      shouldMountAgentSelector: true,
+      composerCapabilityHint: null,
+    });
+
+    const hintEl = fixture.container.querySelector<HTMLElement>('.opencodian-input-capability-hint');
+    expect(hintEl).toBeNull();
+  });
+
+  it('no /json hint for OpenCode backend (no explicit hint + agent selector mounted)', () => {
+    // OpenCode backend: no explicit hint, agent selector mounted
+    const fixture = createFixture({
+      shouldMountAgentSelector: true,
+    });
+
+    const hintEl = fixture.container.querySelector<HTMLElement>('.opencodian-input-capability-hint');
+    expect(hintEl).toBeNull();
+  });
+
+  it('agent selector is mounted when shouldMountAgentSelector=true', () => {
+    const fixture = createFixture({
+      shouldMountAgentSelector: true,
+      composerCapabilityHint: {
+        text: t('chat.input.capabilityHint.jsonLabel'),
+      },
+    });
+
+    // Agent selector container is created when shouldMountAgentSelector is true
+    const agentSelector = fixture.container.querySelector('.opencodian-agent-selector');
+    expect(agentSelector).toBeTruthy();
   });
 });
 
@@ -428,6 +733,34 @@ describe('ComposerInputShellCoordinator — slash menu core behaviors', () => {
     expect(resizeObserver?.disconnect).toHaveBeenCalledTimes(1);
     expect(fixture.host.setContextRowElement).toHaveBeenLastCalledWith(null);
   });
+  it('derives capability hint from shouldMountAgentSelector=false when host provides no explicit hint', () => {
+    // shouldMountAgentSelector returning false means no Subagents capability → Claude Code backend
+    const fixture = createFixture({ shouldMountAgentSelector: false });
+
+    const hintEl = fixture.container.querySelector<HTMLElement>('.opencodian-input-capability-hint');
+    expect(hintEl).toBeTruthy();
+    expect(hintEl?.querySelector('.opencodian-input-capability-hint-text')?.textContent)
+      .toBe(t('chat.input.capabilityHint.jsonLabel'));
+  });
+
+  it('does not derive capability hint when shouldMountAgentSelector returns true', () => {
+    // shouldMountAgentSelector returning true means Subagents capability → OpenCode or similar
+    const fixture = createFixture({ shouldMountAgentSelector: true });
+
+    const hintEl = fixture.container.querySelector<HTMLElement>('.opencodian-input-capability-hint');
+    expect(hintEl).toBeNull();
+  });
+
+  it('explicit getComposerCapabilityHint takes priority over derived fallback', () => {
+    const fixture = createFixture({
+      shouldMountAgentSelector: false,
+      composerCapabilityHint: null, // explicit null overrides fallback
+    });
+
+    const hintEl = fixture.container.querySelector<HTMLElement>('.opencodian-input-capability-hint');
+    expect(hintEl).toBeNull();
+  });
+
 });
 
 describe('ComposerInputShellCoordinator — fuzzy matching and dropdown UI', () => {
@@ -593,5 +926,317 @@ describe('ComposerInputShellCoordinator — fuzzy matching and dropdown UI', () 
     expect(
       fixture.container.querySelector('.opencodian-slash-command-menu-item'),
     ).toBeNull();
+  });
+
+  it('renders the composer capability hint when host returns a hint', () => {
+    const fixture = createFixture({
+      composerCapabilityHint: { text: '/json — structured output' },
+    });
+
+    const hintEl = fixture.container.querySelector<HTMLElement>('.opencodian-input-capability-hint');
+    expect(hintEl).toBeTruthy();
+    expect(hintEl?.querySelector('.opencodian-input-capability-hint-text')?.textContent)
+      .toBe('/json — structured output');
+  });
+
+  it('does not render the composer capability hint when host returns null', () => {
+    const fixture = createFixture({ composerCapabilityHint: null });
+
+    const hintEl = fixture.container.querySelector<HTMLElement>('.opencodian-input-capability-hint');
+    expect(hintEl).toBeNull();
+  });
+
+  it('removes the composer capability hint when host switches from hint to null via locale refresh', () => {
+    const fixture = createFixture({
+      composerCapabilityHint: { text: '/json — structured output' },
+    });
+
+    let hintEl = fixture.container.querySelector<HTMLElement>('.opencodian-input-capability-hint');
+    expect(hintEl).toBeTruthy();
+
+    fixture.host.getComposerCapabilityHint.mockReturnValue(null);
+    fixture.coordinator.applyLocaleTexts();
+
+    hintEl = fixture.container.querySelector<HTMLElement>('.opencodian-input-capability-hint');
+    expect(hintEl).toBeNull();
+  });
+
+  it('updates the composer capability hint text when host returns a different hint', () => {
+    const fixture = createFixture({
+      composerCapabilityHint: { text: '/json — structured output' },
+    });
+
+    let hintText = fixture.container.querySelector<HTMLElement>('.opencodian-input-capability-hint-text');
+    expect(hintText?.textContent).toBe('/json — structured output');
+
+    fixture.host.getComposerCapabilityHint.mockReturnValue({ text: '/json — 结构化输出' });
+    fixture.coordinator.applyLocaleTexts();
+
+    // Re-query after applyLocaleTexts() empties and recreates the span element.
+    hintText = fixture.container.querySelector<HTMLElement>('.opencodian-input-capability-hint-text');
+    expect(hintText?.textContent).toBe('/json — 结构化输出');
+  });
+  it('derives capability hint from shouldMountAgentSelector=false when host provides no explicit hint', () => {
+    // shouldMountAgentSelector returning false means no Subagents capability → Claude Code backend
+    const fixture = createFixture({ shouldMountAgentSelector: false });
+
+    const hintEl = fixture.container.querySelector<HTMLElement>('.opencodian-input-capability-hint');
+    expect(hintEl).toBeTruthy();
+    expect(hintEl?.querySelector('.opencodian-input-capability-hint-text')?.textContent)
+      .toBe(t('chat.input.capabilityHint.jsonLabel'));
+  });
+
+  it('does not derive capability hint when shouldMountAgentSelector returns true', () => {
+    // shouldMountAgentSelector returning true means Subagents capability → OpenCode or similar
+    const fixture = createFixture({ shouldMountAgentSelector: true });
+
+    const hintEl = fixture.container.querySelector<HTMLElement>('.opencodian-input-capability-hint');
+    expect(hintEl).toBeNull();
+  });
+
+  it('explicit getComposerCapabilityHint takes priority over derived fallback', () => {
+    const fixture = createFixture({
+      shouldMountAgentSelector: false,
+      composerCapabilityHint: null, // explicit null overrides fallback
+    });
+
+    const hintEl = fixture.container.querySelector<HTMLElement>('.opencodian-input-capability-hint');
+    expect(hintEl).toBeNull();
+  });
+
+});
+
+describe('ComposerInputShellCoordinator — prompt suggestion lifecycle (channel bus)', () => {
+  const originalResizeObserver = globalThis.ResizeObserver;
+
+  beforeEach(() => {
+    installCoordinatorDomMocks();
+    clearPromptSuggestionSink();
+  });
+
+  afterEach(() => {
+    restoreCoordinatorDomMocks(originalResizeObserver);
+    clearPromptSuggestionSink();
+  });
+
+  it('stamps a channel scope on the container during build', () => {
+    const fixture = createFixture();
+
+    const channelId = findPromptSuggestionScope(fixture.container);
+    expect(channelId).toBeDefined();
+    expect(channelId).toMatch(/^ps-ch-/);
+  });
+
+  it('wires prompt suggestion service and receives adapter callbacks via channel bus', () => {
+    const mockSink = {
+      onPostResultChunk: jest.fn(() => jest.fn()),
+    };
+    registerPromptSuggestionSink(mockSink);
+
+    const fixture = createFixture();
+
+    // Coordinator should have subscribed to the sink
+    expect(mockSink.onPostResultChunk).toHaveBeenCalledTimes(1);
+
+    // Simulate receiving a suggestion
+    const callback = mockSink.onPostResultChunk.mock.calls[0][0];
+    callback({
+      type: 'prompt_suggestion',
+      suggestion: 'Write tests',
+      uuid: 'ps-1',
+      sessionId: 'sess-1',
+    });
+
+    // Suggestion is stored but not visible until session is emitted through channel bus
+    expect(fixture.suggestionMountRoot.querySelector('.opencodian-suggestion-chip')).toBeNull();
+
+    // Discover the channel and emit session change through the bus
+    const channelId = findPromptSuggestionScope(fixture.container);
+    emitPromptSuggestionSessionChange('sess-1', channelId);
+
+    // Now the chip is visible
+    expect(fixture.suggestionMountRoot.querySelector('.opencodian-suggestion-chip')).not.toBeNull();
+  });
+
+  it('suggestion can arrive before session writeback, then becomes visible after emission', () => {
+    const mockSink = {
+      onPostResultChunk: jest.fn(() => jest.fn()),
+    };
+    registerPromptSuggestionSink(mockSink);
+
+    const fixture = createFixture();
+
+    const callback = mockSink.onPostResultChunk.mock.calls[0][0];
+
+    // Suggestion arrives before backend session id is known
+    callback({
+      type: 'prompt_suggestion',
+      suggestion: 'Write tests',
+      uuid: 'ps-1',
+      sessionId: 'sdk-sess-1',
+    });
+
+    // Not visible yet
+    expect(fixture.suggestionMountRoot.querySelector('.opencodian-suggestion-chip')).toBeNull();
+
+    // Emit session through channel bus
+    const channelId = findPromptSuggestionScope(fixture.container);
+    emitPromptSuggestionSessionChange('sdk-sess-1', channelId);
+
+    expect(fixture.suggestionMountRoot.querySelector('.opencodian-suggestion-chip')).not.toBeNull();
+  });
+
+  it('clears active suggestion on new user turn', () => {
+    const mockSink = {
+      onPostResultChunk: jest.fn(() => jest.fn()),
+    };
+    registerPromptSuggestionSink(mockSink);
+
+    const fixture = createFixture();
+    const callback = mockSink.onPostResultChunk.mock.calls[0][0];
+
+    callback({
+      type: 'prompt_suggestion',
+      suggestion: 'Write tests',
+      uuid: 'ps-1',
+      sessionId: 'sess-1',
+    });
+    const channelId = findPromptSuggestionScope(fixture.container);
+    emitPromptSuggestionSessionChange('sess-1', channelId);
+    expect(fixture.suggestionMountRoot.querySelector('.opencodian-suggestion-chip')).not.toBeNull();
+
+    // Submit a new message — suggestion should clear
+    fixture.textarea.value = 'new message';
+    fixture.textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    flushAnimationFrames();
+
+    expect(fixture.suggestionMountRoot.querySelector('.opencodian-suggestion-chip')).toBeNull();
+  });
+
+  it('clears prompt suggestion state on destroy and removes channel scope', () => {
+    const mockSink = {
+      onPostResultChunk: jest.fn(() => jest.fn()),
+    };
+    registerPromptSuggestionSink(mockSink);
+
+    const fixture = createFixture();
+    const callback = mockSink.onPostResultChunk.mock.calls[0][0];
+
+    callback({
+      type: 'prompt_suggestion',
+      suggestion: 'Write tests',
+      uuid: 'ps-1',
+      sessionId: 'sess-1',
+    });
+    const channelId = findPromptSuggestionScope(fixture.container);
+    emitPromptSuggestionSessionChange('sess-1', channelId);
+    expect(fixture.suggestionMountRoot.querySelector('.opencodian-suggestion-chip')).not.toBeNull();
+
+    fixture.coordinator.destroy();
+
+    expect(fixture.suggestionMountRoot.querySelector('.opencodian-suggestion-chip')).toBeNull();
+    // Scope should be removed from container
+    expect(findPromptSuggestionScope(fixture.container)).toBeUndefined();
+  });
+
+  it('handles sink-null by clearing all suggestions', () => {
+    const mockSink = {
+      onPostResultChunk: jest.fn(() => jest.fn()),
+    };
+    registerPromptSuggestionSink(mockSink);
+
+    const fixture = createFixture();
+    const callback = mockSink.onPostResultChunk.mock.calls[0][0];
+
+    callback({
+      type: 'prompt_suggestion',
+      suggestion: 'Write tests',
+      uuid: 'ps-1',
+      sessionId: 'sess-1',
+    });
+    const channelId = findPromptSuggestionScope(fixture.container);
+    emitPromptSuggestionSessionChange('sess-1', channelId);
+    expect(fixture.suggestionMountRoot.querySelector('.opencodian-suggestion-chip')).not.toBeNull();
+
+    // Simulate backend stop
+    clearPromptSuggestionSink();
+    expect(fixture.suggestionMountRoot.querySelector('.opencodian-suggestion-chip')).toBeNull();
+  });
+
+  it('does not auto-send when clicking suggestion chip', () => {
+    const mockSink = {
+      onPostResultChunk: jest.fn(() => jest.fn()),
+    };
+    registerPromptSuggestionSink(mockSink);
+
+    const fixture = createFixture();
+    const callback = mockSink.onPostResultChunk.mock.calls[0][0];
+
+    callback({
+      type: 'prompt_suggestion',
+      suggestion: 'Refactor this code',
+      uuid: 'ps-1',
+      sessionId: 'sess-1',
+    });
+    const channelId = findPromptSuggestionScope(fixture.container);
+    emitPromptSuggestionSessionChange('sess-1', channelId);
+
+    const chip = fixture.suggestionMountRoot.querySelector('.opencodian-suggestion-chip') as HTMLElement;
+    expect(chip).not.toBeNull();
+
+    // Click the chip
+    chip.click();
+
+    // Textarea should contain the suggestion text
+    expect(fixture.textarea.value).toBe('Refactor this code');
+    // submitMessage should NOT have been called
+    expect(fixture.host.submitMessage).not.toHaveBeenCalled();
+  });
+
+  it('hides chip on session change to different session', () => {
+    const mockSink = {
+      onPostResultChunk: jest.fn(() => jest.fn()),
+    };
+    registerPromptSuggestionSink(mockSink);
+
+    const fixture = createFixture();
+    const callback = mockSink.onPostResultChunk.mock.calls[0][0];
+
+    callback({
+      type: 'prompt_suggestion',
+      suggestion: 'Write tests',
+      uuid: 'ps-1',
+      sessionId: 'sess-1',
+    });
+    const channelId = findPromptSuggestionScope(fixture.container);
+    emitPromptSuggestionSessionChange('sess-1', channelId);
+    expect(fixture.suggestionMountRoot.querySelector('.opencodian-suggestion-chip')).not.toBeNull();
+
+    // Change session
+    emitPromptSuggestionSessionChange('sess-2', channelId);
+
+    expect(fixture.suggestionMountRoot.querySelector('.opencodian-suggestion-chip')).toBeNull();
+  });
+
+  it('does not render chip when suggestion is for a different session', () => {
+    const mockSink = {
+      onPostResultChunk: jest.fn(() => jest.fn()),
+    };
+    registerPromptSuggestionSink(mockSink);
+
+    const fixture = createFixture();
+    const callback = mockSink.onPostResultChunk.mock.calls[0][0];
+
+    callback({
+      type: 'prompt_suggestion',
+      suggestion: 'Write tests',
+      uuid: 'ps-1',
+      sessionId: 'sess-1',
+    });
+    // Sync to a DIFFERENT session
+    const channelId = findPromptSuggestionScope(fixture.container);
+    emitPromptSuggestionSessionChange('sess-2', channelId);
+
+    expect(fixture.suggestionMountRoot.querySelector('.opencodian-suggestion-chip')).toBeNull();
   });
 });

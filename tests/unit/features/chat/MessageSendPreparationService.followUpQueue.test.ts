@@ -29,7 +29,8 @@ describe('MessageSendPreparationService follow-up queue', () => {
       targetTabId: 'tab-1',
     });
     expect(host.notifyForegroundBusy).not.toHaveBeenCalled();
-    expect(host.getServerAvailability).not.toHaveBeenCalled();
+    // Early disabled-backend guard calls getServerAvailability before the busy check.
+    expect(host.getServerAvailability).toHaveBeenCalledTimes(1);
   });
 
   it('keeps existing busy blocking semantics when a busy tab already has a queued follow-up', async () => {
@@ -48,8 +49,9 @@ describe('MessageSendPreparationService follow-up queue', () => {
       targetTabId: 'tab-1',
     });
     expect(host.notifyForegroundBusy).toHaveBeenCalledTimes(1);
-    expect(host.getServerAvailability).not.toHaveBeenCalled();
-    expect(callOrder).toEqual(['notifyForegroundBusy']);
+    // Early disabled-backend guard calls getServerAvailability before the busy check.
+    expect(host.getServerAvailability).toHaveBeenCalledTimes(1);
+    expect(callOrder).toEqual(['getServerAvailability', 'notifyForegroundBusy']);
   });
 
   it('does not queue when no canonical conversation is available', async () => {
@@ -63,6 +65,27 @@ describe('MessageSendPreparationService follow-up queue', () => {
 
     expect(result).toBeNull();
     expect(host.queueFollowUpSend).not.toHaveBeenCalled();
+  });
+
+  it('does not queue or seed canonical state when a conversation has no backend session id', async () => {
+    const conversation = createConversation();
+    delete conversation.openCodeSessionId;
+    delete conversation.backendSessionId;
+    const host = createHost(conversation, [], {
+      queueFollowUpSend: jest.fn().mockReturnValue(true),
+    });
+    const service = new MessageSendPreparationService(host, createComposerSendContext());
+
+    const result = await service.prepareMessageSend({ content: 'No backend session yet' });
+
+    expect(result).toBeNull();
+    expect(host.queueFollowUpSend).not.toHaveBeenCalled();
+    expect(host.seedCanonicalUserMessage).not.toHaveBeenCalled();
+    expect(host.transitionTabSessionLifecycle).toHaveBeenCalledWith(
+      'tab-1',
+      'idle',
+      'send-preflight-aborted',
+    );
   });
 
   it('abandons pinned follow-up preparation if the original tab is no longer active', async () => {

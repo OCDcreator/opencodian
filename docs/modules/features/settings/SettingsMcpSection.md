@@ -20,6 +20,8 @@
 
 Connect / Disconnect / Authenticate / Clear Auth 仍全部走 `OpenCodeService` 的 MCP runtime seam。卡片里的“Runtime connection”只表达运行时连接/断开，不等同于 project config 的 `enabled` 字段。
 
+这些 runtime 操作、toolbar Refresh/Add、Add/Edit 保存回调，以及 Delete 的 project config 写入都必须在执行前重新确认当前 active backend 仍是 OpenCode。`MCP` 一级设置页本身只会在 OpenCode active 时挂载，但旧按钮 callback 可能在用户切换到 Claude Code 后短暂存活；这种 stale callback 必须显示 OpenCode-only Notice，并且不能调用 `refreshMcpServerStatus()`、connect/disconnect/auth、打开 Add/Edit modal、弹出 Delete confirm，或写 `.opencode/opencode.json`。active backend fallback 由 `settingsBackendGuards.ts` 统一解析，避免 MCP 与其他 OpenCode-owned settings owner 的 stale guard 语义漂移。
+
 ### 项目配置操作
 
 Add/Edit 打开 `McpServerEditorModal`，Delete 只允许 project-owned server。删除前如果当前已连接，会先 best-effort disconnect，再调用 `McpConfigService.deleteServer()` 从当前项目配置中真正移除该 entry。

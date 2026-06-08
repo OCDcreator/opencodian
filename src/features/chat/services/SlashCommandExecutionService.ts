@@ -1,37 +1,26 @@
 import { Notice } from 'obsidian';
 
-import type { ResolvedModelSelection } from '../../../core/config/modelConfig';
 import type {
   SessionCommandInput,
   SessionCommandTemplateContext,
 } from '../../../core/opencode/OpenCodeSessionControlOrchestrator';
-import type {
-  Conversation,
-  OpencodeCommandConfigRecord,
-  SlashCommandSkillMode,
+import {
+  type Conversation,
+  getConversationBackendSessionId,
+  type OpencodeCommandConfigRecord,
+  type SlashCommandSkillMode,
 } from '../../../core/types';
 import { t } from '../../../i18n';
 import { createLogger } from '../../../shared';
 import type { FocusContextPreview } from '../composerContext';
 import type { TabId } from '../tabs';
-import type { ModelSelectorSelection } from '../ui/modelSelector/types';
 import type { CommandMdFile } from './CommandMdFileLoader';
-import { loadCommandsFromConfigDir } from './CommandMdFileLoader';
 import type { SendPreparationServerAvailability } from './MessageSendPreparationService';
 
 const logger = createLogger('SlashCommandExecutionService');
-
 export type SlashCommandServerAvailability = SendPreparationServerAvailability;
-
-export interface SlashCommandRuntimeCatalogEntry {
-  name?: string;
-  source?: string;
-}
-
-export interface SlashCommandRuntimeSkillEntry {
-  name?: string;
-}
-
+export interface SlashCommandRuntimeCatalogEntry { name?: string; source?: string }
+export interface SlashCommandRuntimeSkillEntry { name?: string }
 export interface CompactSessionOpenCodeService {
   getSessionContextUsageSnapshot(sessionId: string): Promise<{
     providerId?: string | null;
@@ -45,30 +34,10 @@ export interface CompactSessionOpenCodeService {
   ): Promise<boolean>;
 }
 
-export async function executeCompactSession(
-  sessionId: string,
-  service: CompactSessionOpenCodeService,
-  getModel: () => ModelSelectorSelection | null,
-  getModelResolution: () => ResolvedModelSelection,
-): Promise<boolean> {
-  const snapshot = await service.getSessionContextUsageSnapshot(sessionId);
-  const currentModel = getModel();
-  const currentModelResolution = getModelResolution();
-  const providerID = snapshot?.providerId ?? currentModel?.provider ?? currentModelResolution.provider ?? '';
-  const modelID = snapshot?.modelId ?? currentModel?.model ?? currentModelResolution.model ?? '';
-  if (!providerID || !modelID) {
-    new Notice(t('slashCommand.compact.noModel'));
-    return false;
-  }
-
-  new Notice(t('slashCommand.compact.starting'));
-  const compacted = await service.summarizeSession(sessionId, providerID, modelID, false);
-  new Notice(t(compacted ? 'slashCommand.compact.success' : 'slashCommand.compact.failed'));
-  return compacted;
-}
-
 export interface SlashCommandExecutionHost {
   ensureConversationReady(): Promise<Conversation | null>;
+  /** Returns the current active conversation without side effects, or null. */
+  getCurrentConversation?(): Conversation | null;
   getActiveTabId(): TabId | null;
   ensureTabRuntime(tabId: TabId | null): boolean;
   isTabForegroundBusy(tabId: TabId | null): boolean;
@@ -155,7 +124,6 @@ function parseSlashCommandInput(content: string): ParsedSlashCommandInput | null
   const trimmedContent = content.trim();
   if (!trimmedContent || trimmedContent.startsWith('//')) return null;
 
-  // Strategy 1: /command at start of text
   if (trimmedContent.startsWith('/')) {
     const commandBody = trimmedContent.slice(1);
     if (!commandBody || /^\s/.test(commandBody)) return null;
@@ -167,13 +135,11 @@ function parseSlashCommandInput(content: string): ParsedSlashCommandInput | null
     return { command, arguments: cleanedArguments, agent };
   }
 
-  // Strategy 2: /command after whitespace (mid-text) — take LAST match
   const midRegex = /\s\/(\S+)/g;
   let lastMidMatch: RegExpExecArray | null = null;
   let currentMatch: RegExpExecArray | null;
   while ((currentMatch = midRegex.exec(trimmedContent)) !== null) lastMidMatch = currentMatch;
   if (!lastMidMatch?.[1]) return null;
-  // Reject //
   if (lastMidMatch.index > 0 && trimmedContent[lastMidMatch.index] === '/') return null;
   const commandName = lastMidMatch[1].trim();
   if (!commandName) return null;
@@ -280,6 +246,7 @@ function shouldUseBuiltInSyntheticCommand(
 export class SlashCommandExecutionService {
   constructor(private readonly host: SlashCommandExecutionHost) {}
 
+  // eslint-disable-next-line complexity -- Slash command dispatch intentionally branches over known commands in one auditable method.
   async tryRunSlashCommand(content: string): Promise<boolean | string> {
     const parsedCommand = parseSlashCommandInput(content);
     if (!parsedCommand) {
@@ -288,6 +255,14 @@ export class SlashCommandExecutionService {
 
     // Mid-text commands always fall through to prompt path
     if (!content.trimStart().startsWith('/')) {
+      return false;
+    }
+
+    // Claude Code backend: all slash commands fall through to raw send.
+    // Claude natively handles its own /commands; intercepting them here
+    // would route through OpenCode's runSessionCommand which rejects non-opencode backends.
+    const currentConversation = this.host.getCurrentConversation?.();
+    if (currentConversation && (currentConversation.backend ?? 'opencode') === 'claude-code') {
       return false;
     }
 
@@ -366,6 +341,14 @@ export class SlashCommandExecutionService {
       if (!conversation) {
         return true;
       }
+      if (!this.ensureOpenCodeConversationForCommand(conversation, executableCommand.command)) {
+        return true;
+      }
+      const sessionId = getConversationBackendSessionId(conversation);
+      if (!sessionId) {
+        this.host.notifySlashCommandFailed(executableCommand.command, new Error('No backend session available'));
+        return true;
+      }
 
       this.host.refreshActiveFocusContextPreview();
       this.host.startConversationSyncLoop();
@@ -377,7 +360,7 @@ export class SlashCommandExecutionService {
       if (executableCommand.agent) {
         commandInput.agent = executableCommand.agent;
       }
-      await this.host.runSessionCommand(conversation.openCodeSessionId, commandInput);
+      await this.host.runSessionCommand(sessionId, commandInput);
       await this.host.syncVisibleConversationInBackground();
       return true;
     } catch (error) {
@@ -385,6 +368,13 @@ export class SlashCommandExecutionService {
       this.host.notifySlashCommandFailed(executableCommand.command, error);
       return true;
     }
+  }
+
+  private ensureOpenCodeConversationForCommand(conversation: Conversation, commandId: string): boolean {
+    const backend = conversation.backend ?? 'opencode';
+    if (backend === 'opencode') return true;
+    this.host.notifySlashCommandFailed(commandId, new Error('No OpenCode session available'));
+    return false;
   }
 
   private async handleSyntheticBuiltinCommand(commandId: string): Promise<boolean> {
@@ -402,20 +392,25 @@ export class SlashCommandExecutionService {
   }
 
   private async handleCompactCommand(): Promise<boolean> {
-    const sessionId = (await this.prepareExecutionContext())?.openCodeSessionId;
-    if (!sessionId) { new Notice(t('slashCommand.compact.noSession')); return true; }
+    const conversation = await this.prepareExecutionContext();
+    const backend = conversation?.backend ?? 'opencode';
+    const sessionId = conversation ? getConversationBackendSessionId(conversation) : undefined;
+    if (!sessionId || backend !== 'opencode') { new Notice(t('slashCommand.compact.noSession')); return true; }
     await this.host.runCompactSession(sessionId);
     return true;
   }
 
   private async handleUndoCommand(): Promise<boolean> {
     const conversation = await this.prepareExecutionContext();
-    if (!conversation?.openCodeSessionId) { new Notice(t('slashCommand.undo.noSession')); return true; }
+    if (!conversation) { return true; }
+    const backend = conversation?.backend ?? 'opencode';
+    const sessionId = getConversationBackendSessionId(conversation);
+    if (!sessionId || backend !== 'opencode') { new Notice(t('slashCommand.undo.noSession')); return true; }
     const lastUserMsg = [...conversation.messages].reverse()
       .find((m) => m.role === 'user' && m.sourceMessageId);
     if (!lastUserMsg?.sourceMessageId) { new Notice(t('slashCommand.undo.noUserMessage')); return true; }
     try {
-      const ok = await this.host.revertSession(conversation.openCodeSessionId, lastUserMsg.sourceMessageId);
+      const ok = await this.host.revertSession(sessionId, lastUserMsg.sourceMessageId);
       new Notice(t(ok ? 'slashCommand.undo.success' : 'slashCommand.undo.failed'));
       if (ok) await this.host.syncVisibleConversationInBackground();
     } catch { new Notice(t('slashCommand.undo.failed')); }
@@ -423,8 +418,11 @@ export class SlashCommandExecutionService {
   }
 
   private async handleRedoCommand(): Promise<boolean> {
-    const sessionId = (await this.prepareExecutionContext())?.openCodeSessionId;
-    if (!sessionId) { new Notice(t('slashCommand.redo.noSession')); return true; }
+    const conversation = await this.prepareExecutionContext();
+    if (!conversation) { return true; }
+    const backend = conversation.backend ?? 'opencode';
+    const sessionId = getConversationBackendSessionId(conversation);
+    if (!sessionId || backend !== 'opencode') { new Notice(t('slashCommand.redo.noSession')); return true; }
     try {
       const ok = await this.host.unrevertSession(sessionId);
       new Notice(t(ok ? 'slashCommand.redo.success' : 'slashCommand.redo.failed'));
@@ -439,8 +437,10 @@ export class SlashCommandExecutionService {
   }
 
   private async handleShareCommand(): Promise<boolean> {
-    const sessionId = (await this.prepareExecutionContext())?.openCodeSessionId;
-    if (!sessionId) { new Notice(t('slashCommand.share.noSession')); return true; }
+    const conversation = await this.prepareExecutionContext();
+    const backend = conversation?.backend ?? 'opencode';
+    const sessionId = conversation ? getConversationBackendSessionId(conversation) : undefined;
+    if (!sessionId || backend !== 'opencode') { new Notice(t('slashCommand.share.noSession')); return true; }
     new Notice(t('slashCommand.share.starting'));
     const url = await this.host.shareSession(sessionId);
     if (url) { await navigator.clipboard.writeText(url); new Notice(t('slashCommand.share.success')); }
@@ -449,8 +449,10 @@ export class SlashCommandExecutionService {
   }
 
   private async handleUnshareCommand(): Promise<boolean> {
-    const sessionId = (await this.prepareExecutionContext())?.openCodeSessionId;
-    if (!sessionId) { new Notice(t('slashCommand.unshare.noSession')); return true; }
+    const conversation = await this.prepareExecutionContext();
+    const backend = conversation?.backend ?? 'opencode';
+    const sessionId = conversation ? getConversationBackendSessionId(conversation) : undefined;
+    if (!sessionId || backend !== 'opencode') { new Notice(t('slashCommand.unshare.noSession')); return true; }
     const ok = await this.host.unshareSession(sessionId);
     new Notice(t(ok ? 'slashCommand.unshare.success' : 'slashCommand.unshare.failed'));
     return true;
@@ -496,61 +498,4 @@ export class SlashCommandExecutionService {
   private resolveCurrentSelection(focusPreview: FocusContextPreview | null): string {
     return focusPreview?.kind === 'selection' ? focusPreview.textSnapshot ?? '' : '';
   }
-}
-
-export function createSlashCommandExecutionHost(
-  deps: SlashCommandExecutionHostDependencies,
-): SlashCommandExecutionHost {
-  return {
-    ensureConversationReady: async () => {
-      if (!deps.getCurrentConversation()) await deps.createNewConversation();
-      return deps.getCurrentConversation();
-    },
-    getActiveTabId: () => deps.getActiveTabId(),
-    ensureTabRuntime: (tabId) => Boolean(tabId && deps.ensureTabRuntimeState(tabId)),
-    isTabForegroundBusy: (tabId) => (tabId ? deps.isTabForegroundBusy(tabId) : false),
-    notifyForegroundBusy: () => deps.notifyForegroundBusy(),
-    getServerAvailability: () => deps.getServerAvailability(),
-    refreshServerStatusBadge: () => deps.chatHeaderPresenter.refreshServerStatusBadge(),
-    ensureServerReadyForChat: (availability) => deps.ensureServerReadyForChat(availability),
-    getProjectCommands: async () => deps.opencodeConfigManager?.getCommandConfig() ?? {},
-    getRuntimeCommands: async () => {
-      const runtimeCommands = await deps.openCodeServiceSdk.command.list();
-      return Array.isArray(runtimeCommands) ? runtimeCommands : [];
-    },
-    getRuntimeSkills: async () => {
-      const runtimeSkills = await deps.openCodeServiceSdk.app.skills();
-      return Array.isArray(runtimeSkills) ? runtimeSkills : [];
-    },
-    getMdFileCommands: async () => loadCommandsFromConfigDir(deps.opencodeConfigManager?.getConfigDir()),
-    getSlashCommandSkillMode: () => deps.getSlashCommandSkillMode(),
-    getVaultPath: () => deps.getVaultPath(),
-    refreshActiveFocusContextPreview: () =>
-      deps.composerContextViewFacade.refreshActiveFocusContextPreview(),
-    getActiveFocusContextPreview: () =>
-      deps.getTabRuntimeState(deps.getActiveTabId())?.focusContextPreview ?? null,
-    runSessionCommand: (sessionId, input) =>
-      deps.openCodeService.runSessionCommand(sessionId, input),
-    runCompactSession: (sessionId) => deps.runCompactSession(sessionId),
-    revertSession: (sessionId, messageID) => deps.openCodeService.revertSession(sessionId, messageID),
-    unrevertSession: (sessionId) => deps.openCodeService.unrevertSession(sessionId),
-    shareSession: async (sessionId) => {
-      try {
-        const s = await deps.openCodeService.shareSession(sessionId);
-        const share = (s as Record<string, unknown>)?.share as Record<string, unknown> | undefined;
-        return share?.url as string ?? null;
-      } catch { return null; }
-    },
-    unshareSession: async (sessionId) => {
-      try { await deps.openCodeService.unshareSession(sessionId); return true; }
-      catch { return false; }
-    },
-    createNewConversation: () => deps.createNewConversation(),
-    startConversationSyncLoop: () =>
-      deps.conversationSyncBridgePorts.getLoopControl().startConversationSyncLoop(),
-    syncVisibleConversationInBackground: () =>
-      deps.conversationSyncBridgePorts.getVisibleSyncFollowUp().syncVisibleConversationInBackground(),
-    notifySlashCommandFailed: (commandId, error) =>
-      deps.notifySlashCommandFailed(commandId, error),
-  };
 }

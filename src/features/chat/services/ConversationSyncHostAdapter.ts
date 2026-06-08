@@ -46,6 +46,7 @@ export interface ConversationSyncViewHost {
   getTabRuntimeState(tabId: TabId | null): ConversationSyncSignalRuntime | null;
   getConversationById(id: string): Promise<Conversation | null>;
   getConversationSyncFingerprint(messages: ChatMessage[]): string;
+  canSyncConversationWithServer(): Promise<boolean>;
   syncConversationMessagesFromServer(
     conversation: Conversation,
     tabId: TabId | null,
@@ -110,6 +111,7 @@ export function createConversationSyncHosts(
     },
     bridgeHost: {
       getCurrentConversation: () => viewHost.getCurrentConversation(),
+      canSyncConversationWithServer: () => viewHost.canSyncConversationWithServer(),
       syncConversationMessagesFromServer: (
         conversation: Conversation,
         tabId: TabId | null,

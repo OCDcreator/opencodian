@@ -15,6 +15,7 @@ import {
   mcpEntryToFormState,
   validateMcpFormState,
 } from './SettingsMcpAddForm';
+import { TextareaSizeMemory } from './TextareaSizeMemory';
 
 export interface McpServerEditorModalOptions {
   mode: 'add' | 'edit';
@@ -33,6 +34,7 @@ export class McpServerEditorModal extends Modal {
   private formState: AddFormState;
   private submitButton: HTMLButtonElement | null = null;
   private dropdownsEnhancer: SettingsDropdownsEnhancerHandle | null = null;
+  private textareaSizeMemories: TextareaSizeMemory[] = [];
   private isSaving = false;
 
   constructor(
@@ -59,12 +61,14 @@ export class McpServerEditorModal extends Modal {
   onClose(): void {
     this.dropdownsEnhancer?.destroy();
     this.dropdownsEnhancer = null;
+    this.destroyTextareaSizeMemories();
     this.contentEl.empty();
   }
 
   private renderForm(): void {
     this.dropdownsEnhancer?.destroy();
     this.dropdownsEnhancer = null;
+    this.destroyTextareaSizeMemories();
     this.contentEl.empty();
     this.submitButton = null;
 
@@ -155,6 +159,7 @@ export class McpServerEditorModal extends Modal {
           .onChange((value) => {
             this.formState.command = value;
           });
+        this.textareaSizeMemories.push(TextareaSizeMemory.attach(text.inputEl, 'mcp-local-command'));
       });
 
     new Setting(container)
@@ -168,6 +173,9 @@ export class McpServerEditorModal extends Modal {
           .onChange((value) => {
             this.formState.environment = value;
           });
+        this.textareaSizeMemories.push(
+          TextareaSizeMemory.attach(text.inputEl, 'mcp-local-environment'),
+        );
       });
   }
 
@@ -194,6 +202,7 @@ export class McpServerEditorModal extends Modal {
           .onChange((value) => {
             this.formState.headers = value;
           });
+        this.textareaSizeMemories.push(TextareaSizeMemory.attach(text.inputEl, 'mcp-remote-headers'));
       });
 
     const oauthGroup = this.createFormGroup(shell, t('settings.server.mcp.add.group.oauth'));
@@ -287,5 +296,12 @@ export class McpServerEditorModal extends Modal {
         ? t('settings.server.mcp.editor.save')
         : t('settings.server.mcp.add.submit');
     this.submitButton.disabled = this.isSaving;
+  }
+
+  private destroyTextareaSizeMemories(): void {
+    for (const memory of this.textareaSizeMemories) {
+      memory.destroy();
+    }
+    this.textareaSizeMemories = [];
   }
 }

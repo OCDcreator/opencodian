@@ -140,6 +140,7 @@ export class ConversationTabRuntimeCoordinator<Runtime extends TabMessagesPaneRu
   setActiveMessagesPane(tabId: TabId): void;
   removeTabMessagesPane(tabId: TabId): void;
   clearTabMessagesPanes(): void;
+  emitPromptSuggestionSessionResync(tabId: TabId | null, sessionId: string | null): void;
   syncPaneScrollMetrics(tabId: TabId | null, messagesEl?: HTMLElement | null): boolean;
   suppressNextLayoutAutoScroll(tabId?: TabId | null): boolean;
   isActiveTabStreaming(): boolean;
@@ -171,6 +172,7 @@ export class ConversationTabRuntimeCoordinator<Runtime extends TabMessagesPaneRu
 - `queueFollowUpSend()` / `consumeQueuedFollowUpSend()` 在 tab runtime 上保存一个最小 send-intent：可见 prompt 内容、synthetic text parts、invocation intent 与目标 tab pin。队列只接受本 tab 正在 streaming 的 follow-up，因此 server-busy、retry 或同 session 其他 tab streaming 仍保持既有 blocked notice 语义；每个 tab 最多保留一个 queued follow-up。缺失 tab runtime 时不会创建队列或伪造消息。
 - `suppressNextLayoutAutoScroll()` 是给 view/render 层的细粒度入口：当 tool / thinking 这类用户主动展开将要引发一次 pane layout 变化时，先把下一次 layout-driven auto-scroll 标记为应跳过
 - pane state、runtime state、active pane、pane cleanup 与 scroll metrics 都继续委托给 `TabMessagesPaneCoordinator`，不在本 coordinator 内复制 pane DOM map
+- `emitPromptSuggestionSessionResync(tabId, sessionId)` 是 prompt-suggestion session resync 的 tab-scoped owner：通过 `getPaneState(tabId)?.messagesEl` 找到 DOM scope，用 `findPromptSuggestionScope` 解析 channel，只在目标 tab 的 channel 上 emit session change。此方法从 `ConversationTabRuntimeCoordinator` 调用而非从 `OpenCodianView`，保证 thick-owner 不长新的 runtime ownership
 
 ## 与 `OpenCodianView` 的边界
 

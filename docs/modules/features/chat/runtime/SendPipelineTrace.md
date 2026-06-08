@@ -26,6 +26,7 @@ export class SendPipelineTrace {
 - 保存最近一条 raw / rendered text chunk 的长度与 preview
 - 对文本增长日志做节流，避免长回复时 debug 日志爆炸
 - 在任意 stage 里补齐 conversation/session/user message/runtime 状态上下文
+- session identity 通过 `getConversationBackendSessionId()` 解析，旧 OpenCode conversation 和只带 `backendSessionId` 的新 backend conversation 都能保留 trace continuity
 
 ## 为什么单独存在
 

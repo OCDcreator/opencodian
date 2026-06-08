@@ -5,21 +5,27 @@
 
 ## 概述
 
-`SettingsUserSection.ts` 提供用户相关设置的独立渲染 owner。从 `OpenCodianSettings.ts` 中提取，以控制主文件的代码行数，并避免主设置页继续持有 user section shell 与 tabbed profile/prompt/tags 路由。
+`SettingsUserSection` 是用户相关设置的独立 owner。它把 classic settings 和 tabbed settings 里的 user/profile/prompt/tags 渲染逻辑从主设置页中抽离出来，并在重建面板时统一管理 textarea 尺寸记忆的生命周期。
 
 ## 职责
 
-- `SettingsUserSection.attach(containerEl)`: 渲染经典布局中的 User section heading，并按 profile、prompt、excluded tags 顺序挂载字段
-- `SettingsUserSection.attachTabbed(containerEl, secondaryTabId)`: 渲染标签布局中的 `profile` / `prompt` / `tags` 单面板内容
-- 保留 leaf-level rendering functions，便于字段级测试或相邻 owner 复用
+- `attach(containerEl)`: 渲染经典布局中的 User section heading，并按 profile、prompt、excluded tags 顺序挂载字段
+- `attachTabbed(containerEl, secondaryTabId)`: 渲染标签布局中的 `profile` / `prompt` / `tags` 单面板内容
+- `dispose()`: 释放当前 section 持有的 `TextareaSizeMemory` observer，避免 settings 重建后残留旧 textarea 监听器
+- 在 owner 内部维护字段级 render 方法，而不是继续向外暴露独立导出函数
 
-## 导出函数
+## 字段行为
 
-- `renderUserProfileSetting(containerEl, plugin)`: 渲染用户名设置
-- `renderUserPromptSetting(containerEl, plugin)`: 渲染系统提示词设置（多行文本区）
-- `renderUserExcludedTagsSetting(containerEl, plugin)`: 渲染排除标签设置（多行文本区，每行一个标签）
+- 用户名字段仍是普通单行 `text` 控件，只负责更新 `settings.userName`
+- 系统提示词字段使用多行 textarea，并通过 `TextareaSizeMemory` 以 `user-system-prompt` 为稳定 key 持久化用户手动拉伸后的高度
+- 排除标签字段使用多行 textarea，并通过 `TextareaSizeMemory` 以 `user-excluded-tags` 为稳定 key 持久化高度；保存时继续按“每行一个 tag”规范写回 `settings.excludedTags`
 
 ## 使用方
 
-- `OpenCodianSettings`: 创建并复用 `SettingsUserSection`，经典模式调用 `attach()`，标签模式通过 `renderUserContent` seam 调用 `attachTabbed()`
-- `SettingsTabbedRenderer`: 只接收单一 user content callback，不再分别持有 profile/prompt/tags leaf render callbacks
+- `OpenCodianSettings` 与 `OpenCodianSettingsView`: 创建并复用该 owner，在 classic / tabbed 两种设置布局之间共享 user section 的渲染与清理逻辑
+- `SettingsTabbedRenderer`: 只接收单一 user content callback，不再分别持有 profile/prompt/tags 的字段级渲染函数
+
+## 注意事项
+
+- `attach()` 与 `attachTabbed()` 都会先调用 `dispose()`，确保旧 DOM 上挂着的 textarea resize observer 会在重渲染前被释放
+- 如果后续再为 user section 增加新的长文本输入，优先继续复用 `TextareaSizeMemory`，并为每个字段分配稳定、唯一的持久化 key

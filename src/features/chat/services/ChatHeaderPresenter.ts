@@ -16,6 +16,7 @@ const TITLE_WORDMARK_LIGHT_ASSET_PATH = 'assets/branding/opencodian-wordmark-lig
 const TITLE_WORDMARK_DARK_ASSET_PATH = 'assets/branding/opencodian-wordmark-dark.svg';
 const SERVER_STATUS_CLASS_NAMES = [
   'is-checking',
+  'is-disabled',
   'is-running',
   'is-starting',
   'is-offline',
@@ -24,6 +25,7 @@ const SERVER_STATUS_CLASS_NAMES = [
 
 type ServerStatusTranslationKey =
   | 'chat.serverStatus.checking'
+  | 'chat.serverStatus.disabled'
   | 'chat.serverStatus.running'
   | 'chat.serverStatus.starting'
   | 'chat.serverStatus.offline'
@@ -31,13 +33,27 @@ type ServerStatusTranslationKey =
 
 const SERVER_STATUS_KEY_BY_AVAILABILITY: Record<ChatServerAvailability, ServerStatusTranslationKey> = {
   checking: 'chat.serverStatus.checking',
+  disabled: 'chat.serverStatus.disabled',
   running: 'chat.serverStatus.running',
   starting: 'chat.serverStatus.starting',
   offline: 'chat.serverStatus.offline',
   external: 'chat.serverStatus.external',
 };
 
-export type ChatServerAvailability = 'checking' | 'running' | 'starting' | 'offline' | 'external';
+interface HeaderActionButtonConfig {
+  actionId: string;
+  iconName: string;
+  getTooltipLabel: () => string;
+  onClick: (event: MouseEvent) => void;
+}
+
+export type ChatServerAvailability =
+  | 'checking'
+  | 'disabled'
+  | 'running'
+  | 'starting'
+  | 'offline'
+  | 'external';
 
 export interface ChatHeaderPresenterHost {
   setTooltipLabel(
@@ -51,7 +67,10 @@ export interface ChatHeaderPresenterHost {
   scheduleComposerLayoutSync(): void;
   resolveServerAvailability(): Promise<ChatServerAvailability>;
   isLocalServerMode(): boolean;
+  isOpenCodeBackend(): boolean;
+  getActiveBackendDisplayName?(): string;
   refreshContextUsageIndicator(): void;
+  onServerAvailabilityRefreshed?(): void;
   openServerSettings(): void;
   openLspSettings?(): void;
   createConversationInNewTab(): Promise<void>;
@@ -67,6 +86,7 @@ export class ChatHeaderPresenter {
   private titleWordmarkEl: HTMLImageElement | null = null;
   private serverStatusBadgeEl: HTMLElement | null = null;
   private serverStatusTextEl: HTMLElement | null = null;
+  private headerActionsEl: HTMLElement | null = null;
   private lspStatusIndicator: LspStatusIndicator | null = null;
   private newConversationBtnEl: HTMLElement | null = null;
   private newConversationCurrentTabBtnEl: HTMLElement | null = null;
@@ -109,53 +129,50 @@ export class ChatHeaderPresenter {
     }
 
     const actionsEl = headerEl.createDiv({ cls: 'opencodian-header-actions' });
+    this.headerActionsEl = actionsEl;
     this.buildStatusBadge(actionsEl);
-    this.lspStatusIndicator = new LspStatusIndicator(actionsEl, {
-      onClick: () => (this.openLspSettingsCallback ?? this.host.openLspSettings)?.(),
-      setTooltipLabel: (element, label, position) => this.host.setTooltipLabel(element, label, position),
-    });
-    this.lspStatusIndicator.load();
-    this.newConversationBtnEl = this.buildActionButton(
-      actionsEl,
-      'opencodian-circle-plus',
-      () => t('chat.tab.newTooltip'),
-      () => {
+    this.refreshBackendChrome();
+    this.newConversationBtnEl = this.buildActionButton(actionsEl, {
+      actionId: 'new-tab',
+      iconName: 'opencodian-circle-plus',
+      getTooltipLabel: () => t('chat.tab.newTooltip'),
+      onClick: () => {
         void this.host.createConversationInNewTab();
       },
-    );
+    });
     this.newConversationBtnEl.addClass('opencodian-header-btn--new-tab');
-    this.newConversationCurrentTabBtnEl = this.buildActionButton(
-      actionsEl,
-      'opencodian-message-square-plus',
-      () => t('chat.tab.newCurrentTooltip'),
-      () => {
+    this.newConversationCurrentTabBtnEl = this.buildActionButton(actionsEl, {
+      actionId: 'new-current-tab',
+      iconName: 'opencodian-message-square-plus',
+      getTooltipLabel: () => t('chat.tab.newCurrentTooltip'),
+      onClick: () => {
         void this.host.createConversationInCurrentTab();
       },
-    );
-    this.historyBtnEl = this.buildActionButton(
-      actionsEl,
-      'history',
-      () => t('chat.history.open'),
-      (event) => {
+    });
+    this.historyBtnEl = this.buildActionButton(actionsEl, {
+      actionId: 'history',
+      iconName: 'history',
+      getTooltipLabel: () => t('chat.history.open'),
+      onClick: (event) => {
         this.host.showConversationHistory(event);
       },
-    );
-    this.conversationSessionSettingsBtnEl = this.buildActionButton(
-      actionsEl,
-      'sliders-horizontal',
-      () => t('chat.sessionSettings.open'),
-      () => {
+    });
+    this.conversationSessionSettingsBtnEl = this.buildActionButton(actionsEl, {
+      actionId: 'session-settings',
+      iconName: 'sliders-horizontal',
+      getTooltipLabel: () => t('chat.sessionSettings.open'),
+      onClick: () => {
         this.host.openConversationSessionSettings();
       },
-    );
-    this.settingsBtnEl = this.buildActionButton(
-      actionsEl,
-      'settings',
-      () => t('chat.settings.open'),
-      () => {
+    });
+    this.settingsBtnEl = this.buildActionButton(actionsEl, {
+      actionId: 'settings',
+      iconName: 'settings',
+      getTooltipLabel: () => t('chat.settings.open'),
+      onClick: () => {
         this.host.openSettings();
       },
-    );
+    });
 
     this.applyLocaleTexts();
   }
@@ -166,31 +183,27 @@ export class ChatHeaderPresenter {
 
   applyLocaleTexts(): void {
     if (this.serverStatusBadgeEl) {
-      this.host.setTooltipLabel(this.serverStatusBadgeEl, t('chat.serverStatus.openSettings'), 'bottom');
+      this.host.setTooltipLabel(this.serverStatusBadgeEl, this.getStatusSettingsTooltip(), 'bottom');
     }
 
     if (this.newConversationBtnEl) {
-      this.host.setTooltipLabel(this.newConversationBtnEl, t('chat.tab.newTooltip'), 'bottom');
+      this.applyActionLabel(this.newConversationBtnEl, t('chat.tab.newTooltip'));
     }
 
     if (this.newConversationCurrentTabBtnEl) {
-      this.host.setTooltipLabel(this.newConversationCurrentTabBtnEl, t('chat.tab.newCurrentTooltip'), 'bottom');
+      this.applyActionLabel(this.newConversationCurrentTabBtnEl, t('chat.tab.newCurrentTooltip'));
     }
 
     if (this.historyBtnEl) {
-      this.host.setTooltipLabel(this.historyBtnEl, t('chat.history.open'), 'bottom');
+      this.applyActionLabel(this.historyBtnEl, t('chat.history.open'));
     }
 
     if (this.conversationSessionSettingsBtnEl) {
-      this.host.setTooltipLabel(
-        this.conversationSessionSettingsBtnEl,
-        t('chat.sessionSettings.open'),
-        'bottom',
-      );
+      this.applyActionLabel(this.conversationSessionSettingsBtnEl, t('chat.sessionSettings.open'));
     }
 
     if (this.settingsBtnEl) {
-      this.host.setTooltipLabel(this.settingsBtnEl, t('chat.settings.open'), 'bottom');
+      this.applyActionLabel(this.settingsBtnEl, t('chat.settings.open'));
     }
 
     if (this.serverStatusTextEl) {
@@ -208,6 +221,13 @@ export class ChatHeaderPresenter {
     getStatus: () => Promise<unknown>,
     openSettings: () => void,
   ): void {
+    if (!this.host.isOpenCodeBackend()) {
+      this.lspStatusRefreshCoordinator?.stop();
+      this.lspStatusRefreshCoordinator = null;
+      this.openLspSettingsCallback = null;
+      return;
+    }
+
     this.openLspSettingsCallback = openSettings;
     this.lspStatusRefreshCoordinator?.stop();
     this.lspStatusRefreshCoordinator = new LspStatusRefreshCoordinator(
@@ -242,6 +262,7 @@ export class ChatHeaderPresenter {
     this.titleWordmarkEl = null;
     this.serverStatusBadgeEl = null;
     this.serverStatusTextEl = null;
+    this.headerActionsEl = null;
     this.lspStatusIndicator?.unload();
     this.lspStatusIndicator = null;
     this.newConversationBtnEl = null;
@@ -251,6 +272,30 @@ export class ChatHeaderPresenter {
     this.settingsBtnEl = null;
     this.isRefreshingServerStatus = false;
     this.lastServerAvailability = null;
+  }
+
+  refreshBackendChrome(): void {
+    if (!this.headerActionsEl) {
+      return;
+    }
+
+    if (!this.host.isOpenCodeBackend()) {
+      this.lspStatusRefreshCoordinator?.stop();
+      this.lspStatusRefreshCoordinator = null;
+      this.openLspSettingsCallback = null;
+      this.lspStatusIndicator?.unload();
+      this.lspStatusIndicator = null;
+      this.headerActionsEl.querySelector('.opencodian-lsp-status')?.remove();
+      return;
+    }
+
+    if (!this.lspStatusIndicator) {
+      this.lspStatusIndicator = new LspStatusIndicator(this.headerActionsEl, {
+        onClick: () => (this.openLspSettingsCallback ?? this.host.openLspSettings)?.(),
+        setTooltipLabel: (element, label, position) => this.host.setTooltipLabel(element, label, position),
+      });
+      this.lspStatusIndicator.load();
+    }
   }
 
   private buildStatusBadge(actionsEl: HTMLElement): void {
@@ -268,17 +313,26 @@ export class ChatHeaderPresenter {
 
   private buildActionButton(
     actionsEl: HTMLElement,
-    iconName: string,
-    getTooltipLabel: () => string,
-    onClick: (event: MouseEvent) => void,
+    config: HeaderActionButtonConfig,
   ): HTMLElement {
-    const buttonEl = actionsEl.createDiv({ cls: 'opencodian-header-btn opencodian-tooltip-trigger' });
-    setIcon(buttonEl, iconName);
-    this.host.setTooltipLabel(buttonEl, getTooltipLabel(), 'bottom');
+    const label = config.getTooltipLabel();
+    const buttonEl = actionsEl.createEl('button', {
+      cls: 'opencodian-header-btn opencodian-tooltip-trigger',
+      attr: {
+        type: 'button',
+        'data-action': config.actionId,
+      },
+    });
+    setIcon(buttonEl, config.iconName);
+    this.applyActionLabel(buttonEl, label);
     buttonEl.addEventListener('click', (event) => {
-      onClick(event);
+      config.onClick(event);
     });
     return buttonEl;
+  }
+
+  private applyActionLabel(buttonEl: HTMLElement, label: string): void {
+    this.host.setTooltipLabel(buttonEl, label, 'bottom');
   }
 
   async refreshServerStatusBadge(): Promise<void> {
@@ -300,14 +354,36 @@ export class ChatHeaderPresenter {
       this.serverStatusBadgeEl.removeClass(...SERVER_STATUS_CLASS_NAMES);
       this.serverStatusBadgeEl.addClass(`is-${availability}`);
       this.serverStatusTextEl.setText(this.getServerStatusLabel(availability));
-      this.host.setTooltipLabel(this.serverStatusBadgeEl, t('chat.serverStatus.openSettings'), 'bottom');
+      this.host.setTooltipLabel(this.serverStatusBadgeEl, this.getStatusSettingsTooltip(), 'bottom');
       this.host.refreshContextUsageIndicator();
+      this.host.onServerAvailabilityRefreshed?.();
     } finally {
       this.isRefreshingServerStatus = false;
     }
   }
 
+  private getStatusSettingsTooltip(): string {
+    return this.host.isOpenCodeBackend()
+      ? t('chat.serverStatus.openSettings')
+      : t('chat.serverStatus.openBackendSettings');
+  }
+
   private getServerStatusLabel(availability: ChatServerAvailability): string {
+    if (!this.host.isOpenCodeBackend()) {
+      const backend = this.host.getActiveBackendDisplayName?.() ?? 'Backend';
+      if (availability === 'running' || availability === 'external') {
+        return t('chat.serverStatus.backendConnected', {
+          backend,
+        });
+      }
+      if (availability === 'offline') {
+        return t('chat.serverStatus.backendOffline', {
+          backend,
+        });
+      }
+      return t(SERVER_STATUS_KEY_BY_AVAILABILITY[availability]);
+    }
+
     if (this.host.isLocalServerMode()) {
       if (availability === 'running') {
         return t('chat.serverStatus.localManaged');

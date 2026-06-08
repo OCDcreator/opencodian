@@ -9,10 +9,10 @@
 
 当前 editor 不再把所有字段平铺到一个长表单里，而是按用途拆成多组：
 
-- `基础信息`：project agent 选择、新建 ID、mode、disable、description
-- `行为定义`：prompt
-- `模型与采样`：model、temperature、top_p、steps
-- `高级配置`：color、`permission.task` allowlist、技能工具/权限覆盖、`options`
+- `基础信息`: project agent 选择、新建 ID、mode、disable、description
+- `行为定义`: prompt
+- `模型与采样`: model、temperature、top_p、steps
+- `高级配置`: color、`permission.task` allowlist、技能工具/权限覆盖、`options`
 
 其中 `高级配置` 默认折叠，避免长文本 area 把整个设置面撑得过长。
 
@@ -34,7 +34,13 @@
 
 commands/slash runtime 与 command-owned hidden agent lifecycle 不属于本 editor，继续留在相邻 command config/runtime owners。
 
-保存/删除后由上层刷新 editor 时，`render()` 会在清空本地表单容器前锁定当前高度并记录 `scrollTop`，重绘后立即恢复滚动、下一帧释放高度，避免长 agent 表单局部闪动。
+保存/删除后由上层刷新 editor 时，`render()` 会在清空本地表单容器前锁定当前高度并记录 `scrollTop`，重绘后立即恢复滚动、下一帧释放高度，避免长 agent 表单局部闪动。长文本字段还会记住用户手动拉伸后的高度：
+
+- `prompt` → `project-agent-prompt`
+- `permission.task` allowlist → `project-agent-task-allowlist`
+- `options` JSON → `project-agent-options`
+
+这些 observer 由 editor 自己持有，并在重渲染或 section dispose 时统一释放。
 
 ## 核心逻辑
 
@@ -66,10 +72,17 @@ commands/slash runtime 与 command-owned hidden agent lifecycle 不属于本 edi
 - 读取已有 `options` 时会格式化成缩进 JSON 回填；保存时会按当前 textarea 内容构造“替换型 patch”，让已删除的嵌套键也能从项目 override 中真正移除
 - 未触碰的未知字段由 `OpencodeConfigManager.upsertAgentConfig()` 的 merge 行为保留
 
+### textarea 尺寸记忆
+
+- `render()` 开始时先调用 `dispose()`，释放上一轮 editor 持有的 textarea resize observer
+- `prompt`、task allowlist、`options` JSON 都使用 `TextareaSizeMemory` 绑定稳定 key
+- 这样切换 agent、刷新 catalog 或关闭后重新打开 settings 时，用户之前调整的 textarea 高度仍会恢复
+
 ## 关键方法
 
 | 方法 | 说明 |
 |------|------|
+| `dispose()` | 销毁当前 editor 持有的 textarea size-memory observer |
 | `render()` | 渲染 project agent picker、字段表单与 save/delete action |
 | `createEditorGroup()` | 创建分组卡片 / 可折叠高级区外壳，并返回字段挂载 body |
 | `saveProjectAgentFromEditor()` | 归一化表单值并写回 project agent override |
@@ -80,10 +93,12 @@ commands/slash runtime 与 command-owned hidden agent lifecycle 不属于本 edi
 - `projectAgentEditorConfig.ts`: 提供表单归一化、`permission.task` allowlist patch、`permission.skill`/`tools.skill` patch 与 `options` JSON 替换型 patch helper
 - `SettingsAgentsSection`: 提供 editor 挂载点、当前 project agent map 与刷新回调
 - `OpencodeConfigManager`: 执行 project `agent.<id>` 的 upsert/remove
+- `TextareaSizeMemory.ts`: 为 prompt / allowlist / options textarea 提供高度恢复与 resize 持久化
 - `i18n/locales/*`: 提供 editor 字段、按钮与错误提示文案
 
 ## 注意事项
 
-- 只写当前 vault 的 `.opencode/opencode.json`；不要扩展到全局 OpenCode 配置。
-- 这是 `SettingsAgentsSection` 的 companion owner，不应接管 runtime agent catalog 或 default primary-agent dropdown。
-- command-owned hidden agent 或 slash runtime 逻辑不应塞进这个 project-agent editor；对应改动优先落在 command config、command settings 或 chat runtime owners。
+- 只写当前 vault 的 `.opencode/opencode.json`；不要扩展到全局 OpenCode 配置
+- 这是 `SettingsAgentsSection` 的 companion owner，不应接管 runtime agent catalog 或 default primary-agent dropdown
+- 如果继续为 agent editor 增加长文本字段，必须把 `dispose()` 释放约束一并维护好，避免 render 切换时叠加多个 observer
+- command-owned hidden agent 或 slash runtime 逻辑不应塞进这个 project-agent editor；对应改动优先落在 command config、command settings 或 chat runtime owners

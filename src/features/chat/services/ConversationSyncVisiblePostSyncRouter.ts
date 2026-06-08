@@ -1,4 +1,5 @@
 import type { ChatMessage } from '../../../core/types';
+import { getConversationBackendSessionId } from '../../../core/types';
 import type { TabId } from '../tabs';
 import type { VisibleConversationSyncContext } from './ConversationSyncRuntimeCoordinator';
 import type {
@@ -39,17 +40,31 @@ export class ConversationSyncVisiblePostSyncRouter {
   async routeVisibleSyncComplete(
     options: VisibleConversationPostSyncRouteOptions,
   ): Promise<void> {
+    const conversation = options.syncContext.conversation;
+
+    // Backend gate: question/todo refresh is an OpenCode-only feature.
+    // Non-OpenCode conversations skip the post-sync question/todo refresh and
+    // apply the synced update directly.
+    const backend = conversation.backend ?? 'opencode';
+    if (backend !== 'opencode') {
+      await this.host.applySyncedConversationUpdate(
+        options.previousMessages,
+        conversation.messages,
+      );
+      return;
+    }
+
     const postSyncOutcome = await this.postSyncCoordinator.handleVisibleConversationSyncComplete({
       tabId: options.syncContext.tabId,
-      expectedConversationId: options.syncContext.conversation.id,
-      questionSessionId: options.syncContext.conversation.openCodeSessionId,
+      expectedConversationId: conversation.id,
+      questionSessionId: getConversationBackendSessionId(conversation),
       syncResult: options.syncResult,
     });
 
     if (postSyncOutcome.shouldApplySyncedConversationUpdate) {
       await this.host.applySyncedConversationUpdate(
         options.previousMessages,
-        options.syncContext.conversation.messages,
+        conversation.messages,
       );
       return;
     }

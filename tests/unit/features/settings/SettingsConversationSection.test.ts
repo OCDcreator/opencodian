@@ -72,6 +72,7 @@ type ConversationSectionPlugin = Pick<
   | 'reapplyConversationSessionDefaults'
   | 'opencodeConfigManager'
   | 'openCodeService'
+  | 'agentServiceRegistry'
 >;
 
 const dropdownRecords: DropdownRecord[] = [];
@@ -174,6 +175,21 @@ function createPlugin(overrides?: Partial<ConversationSectionPlugin['settings']>
   const getSessionMessages = jest.fn().mockResolvedValue([]);
   const unshareSession = jest.fn().mockResolvedValue({ id: 'session-1', title: 'Unshared', time: { created: 1, updated: 2 } });
 
+  // Mock OpenCode adapter that the registry returns.  listSessions and
+  // getSessionMessages point to the SAME jest fns as openCodeService so
+  // existing assertions remain valid while the code routes through the
+  // backend-aware registry layer.
+  const mockOpenCodeAdapter = {
+    kind: 'opencode',
+    hasCapability: jest.fn().mockReturnValue(true),
+    listSessions,
+    getSessionMessages,
+  };
+  const mockRegistry = {
+    getActive: jest.fn().mockReturnValue(mockOpenCodeAdapter),
+    get: jest.fn().mockReturnValue(mockOpenCodeAdapter),
+  };
+
   return {
     settings: {
       ...DEFAULT_SETTINGS,
@@ -199,6 +215,7 @@ function createPlugin(overrides?: Partial<ConversationSectionPlugin['settings']>
       getSessionMessages,
       unshareSession,
     } as never,
+    agentServiceRegistry: mockRegistry as never,
   } as unknown as ConversationSectionPlugin;
 }
 
@@ -413,6 +430,37 @@ describe('SettingsConversationSection', () => {
     expect(plugin.saveSettings).not.toHaveBeenCalled();
   });
 
+  it('blocks stale project compaction saves when the active backend is no longer OpenCode', async () => {
+    const plugin = createPlugin();
+    const { section } = createSection(plugin);
+    const tailTurnsText = findText(t('settings.conversation.compaction.tailTurns.name'));
+    expect(tailTurnsText).toBeDefined();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    plugin.settings.activeBackend = 'claude-code';
+    plugin.settings.enabledBackends = ['opencode', 'claude-code'];
+
+    await tailTurnsText?.onChange?.('5');
+
+    expect(
+      (section as unknown as { currentCompactionState: { tailTurns: number } }).currentCompactionState.tailTurns,
+    ).toBe(2);
+
+    plugin.settings.activeBackend = 'opencode';
+    tailTurnsText!.control.inputEl.value = 'bad';
+    await tailTurnsText?.onChange?.('bad');
+
+    expect(
+      (plugin.opencodeConfigManager as { updateCompactionConfig: jest.Mock }).updateCompactionConfig,
+    ).not.toHaveBeenCalled();
+    expect(
+      (plugin.openCodeService as { reapplyCompactionConfigFromProjectConfig: jest.Mock })
+        .reapplyCompactionConfigFromProjectConfig,
+    ).not.toHaveBeenCalled();
+    expect(tailTurnsText!.control.inputEl.value).toBe('2');
+  });
+
   it('saves project share mode through project config', async () => {
     const plugin = createPlugin();
     createSection(plugin);
@@ -425,6 +473,28 @@ describe('SettingsConversationSection', () => {
     const updateShareConfig = (plugin.opencodeConfigManager as { updateShareConfig: jest.Mock }).updateShareConfig;
     expect(updateShareConfig).toHaveBeenCalledWith('auto');
     expect(plugin.saveSettings).not.toHaveBeenCalled();
+  });
+
+  it('blocks stale project share saves and OpenCode restart when the active backend is no longer OpenCode', async () => {
+    const plugin = createPlugin();
+    (plugin.openCodeService as { checkHealth: jest.Mock }).checkHealth.mockResolvedValue(false);
+    const { containerEl } = createSection(plugin);
+
+    const shareDropdown = findDropdown(t('settings.conversation.share.mode.name'));
+    expect(shareDropdown).toBeDefined();
+    const policyStateEl = containerEl.querySelector<HTMLElement>('.opencodian-share-policy-state');
+    expect(policyStateEl?.textContent).toBe(t('settings.conversation.share.mode.manual'));
+
+    plugin.settings.activeBackend = 'claude-code';
+    plugin.settings.enabledBackends = ['opencode', 'claude-code'];
+
+    await shareDropdown?.onChange?.('auto');
+
+    expect((plugin.opencodeConfigManager as { updateShareConfig: jest.Mock }).updateShareConfig).not.toHaveBeenCalled();
+    expect(plugin.openCodeService.checkHealth).not.toHaveBeenCalled();
+    expect(plugin.openCodeService.stop).not.toHaveBeenCalled();
+    expect(plugin.openCodeService.start).not.toHaveBeenCalled();
+    expect(policyStateEl?.textContent).toBe(t('settings.conversation.share.mode.manual'));
   });
 
   it('lists shared sessions in the project sharing block with copy, preview, and unshare actions', async () => {
@@ -485,6 +555,307 @@ describe('SettingsConversationSection', () => {
     expect((plugin.openCodeService as { unshareSession: jest.Mock }).unshareSession).toHaveBeenCalledWith('session-1');
   });
 
+  it('blocks unshare when the active backend is no longer OpenCode', async () => {
+    const plugin = createPlugin();
+    (plugin.openCodeService as { listSessions: jest.Mock }).listSessions.mockResolvedValue([
+      {
+        id: 'session-1',
+        title: 'Shared research',
+        share: { url: 'https://opencode.ai/s/session-1' },
+        time: { created: 1, updated: 2 },
+      },
+    ]);
+
+    const { containerEl } = createSection(plugin);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // Simulate backend switch while settings page is open
+    plugin.settings.activeBackend = 'claude-code';
+    plugin.settings.enabledBackends = ['opencode', 'claude-code'];
+
+    const rowEl = containerEl.querySelector<HTMLElement>('[data-shared-session-id="session-1"]');
+    rowEl?.querySelector<HTMLButtonElement>('[data-action="unshare-shared-session"]')?.click();
+    await Promise.resolve();
+
+    // unshareSession should NOT be called because OpenCode is no longer active
+    expect((plugin.openCodeService as { unshareSession: jest.Mock }).unshareSession).not.toHaveBeenCalled();
+  });
+
+  it('routes shared sessions list through the backend-aware registry layer', async () => {
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: jest.fn().mockResolvedValue(undefined) },
+    });
+    const plugin = createPlugin();
+    const registry = plugin.agentServiceRegistry as { getActive: jest.Mock };
+    const adapter = registry.getActive();
+
+    // Override the shared listSessions mock with session data
+    (adapter as { listSessions: jest.Mock }).listSessions.mockResolvedValue([
+      {
+        id: 'session-1',
+        title: 'Registry-routed session',
+        share: { url: 'https://opencode.ai/s/session-1' },
+        time: { created: 1, updated: 2 },
+      },
+    ]);
+
+    const { containerEl } = createSection(plugin);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // The registry was consulted for the active backend
+    expect(registry.getActive).toHaveBeenCalled();
+
+    // The adapter's listSessions was called (routing through the registry)
+    expect((adapter as { listSessions: jest.Mock }).listSessions).toHaveBeenCalled();
+
+    // The session data appears in the DOM
+    expect(containerEl.textContent).toContain('Registry-routed session');
+  });
+
+  it('shows empty state when active backend lacks session listing capability', async () => {
+    const plugin = createPlugin();
+    const adapter = (plugin.agentServiceRegistry as { getActive: jest.Mock }).getActive();
+
+    // Remove listSessions from the adapter to simulate a backend without listing support
+    delete (adapter as Record<string, unknown>).listSessions;
+
+    const { containerEl } = createSection(plugin);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // Should show the empty state, not crash
+    expect(containerEl.querySelector('.opencodian-shared-sessions-empty')).toBeTruthy();
+  });
+
+  it('shows preview failure when active backend lacks session history capability', async () => {
+    const plugin = createPlugin();
+    const adapter = (plugin.agentServiceRegistry as { getActive: jest.Mock }).getActive();
+
+    // Adapter has listSessions but NOT getSessionMessages
+    (adapter as { listSessions: jest.Mock }).listSessions.mockResolvedValue([
+      {
+        id: 'session-1',
+        title: 'No-preview session',
+        share: { url: 'https://opencode.ai/s/session-1' },
+        time: { created: 1, updated: 2 },
+      },
+    ]);
+    delete (adapter as Record<string, unknown>).getSessionMessages;
+
+    const { containerEl } = createSection(plugin);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const rowEl = containerEl.querySelector<HTMLElement>('[data-shared-session-id="session-1"]');
+
+    // Click preview button
+    rowEl?.querySelector<HTMLButtonElement>('[data-action="preview-shared-session"]')?.click();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // Should show preview failed message, not crash
+    const previewEl = containerEl.querySelector<HTMLElement>('[data-shared-session-preview="session-1"]');
+    expect(previewEl?.textContent).toBeTruthy(); // preview was rendered
+  });
+
+  it('shows a neutral empty preview message when the backend returns no session messages', async () => {
+    const plugin = createPlugin();
+    const adapter = (plugin.agentServiceRegistry as { getActive: jest.Mock }).getActive();
+
+    (adapter as { listSessions: jest.Mock }).listSessions.mockResolvedValue([
+      {
+        id: 'session-empty',
+        title: 'Empty preview session',
+        share: { url: 'https://opencode.ai/s/session-empty' },
+        time: { created: 1, updated: 2 },
+      },
+    ]);
+    (adapter as { getSessionMessages: jest.Mock }).getSessionMessages.mockResolvedValue([]);
+
+    const { containerEl } = createSection(plugin);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const rowEl = containerEl.querySelector<HTMLElement>('[data-shared-session-id="session-empty"]');
+    rowEl?.querySelector<HTMLButtonElement>('[data-action="preview-shared-session"]')?.click();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const previewEl = containerEl.querySelector<HTMLElement>('[data-shared-session-preview="session-empty"]');
+    expect(previewEl?.textContent).toContain(t('settings.conversation.share.sharedSessions.previewEmpty'));
+  });
+
+  it('routes session message preview through the backend-aware history service', async () => {
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: jest.fn().mockResolvedValue(undefined) },
+    });
+    const plugin = createPlugin();
+    const adapter = (plugin.agentServiceRegistry as { getActive: jest.Mock }).getActive();
+
+    (adapter as { listSessions: jest.Mock }).listSessions.mockResolvedValue([
+      {
+        id: 'session-1',
+        title: 'History-routed session',
+        share: { url: 'https://opencode.ai/s/session-1' },
+        time: { created: 1, updated: 2 },
+      },
+    ]);
+    (adapter as { getSessionMessages: jest.Mock }).getSessionMessages.mockResolvedValue([
+      {
+        info: { id: 'm1', sessionID: 'session-1', role: 'user', time: { created: 1 } },
+        parts: [{ id: 'p1', sessionID: 'session-1', messageID: 'm1', type: 'text', text: 'routed message' }],
+      },
+    ]);
+
+    const { containerEl } = createSection(plugin);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const rowEl = containerEl.querySelector<HTMLElement>('[data-shared-session-id="session-1"]');
+
+    // Click preview
+    rowEl?.querySelector<HTMLButtonElement>('[data-action="preview-shared-session"]')?.click();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // The adapter's getSessionMessages was called through the routing layer
+    expect((adapter as { getSessionMessages: jest.Mock }).getSessionMessages).toHaveBeenCalledWith('session-1');
+
+    // The preview shows the message content
+    const previewEl = containerEl.querySelector<HTMLElement>('[data-shared-session-preview="session-1"]');
+    expect(previewEl?.textContent).toContain('routed message');
+  });
+
+  it('renders generic preview messages through the normalized seam for OpenCode shared rows', async () => {
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: jest.fn().mockResolvedValue(undefined) },
+    });
+    const plugin = createPlugin();
+    const adapter = (plugin.agentServiceRegistry as { getActive: jest.Mock }).getActive();
+
+    // The shared-session surface is OpenCode-only, but the preview seam remains
+    // defensive enough to normalize compatible role/content messages.
+    (adapter as { listSessions: jest.Mock }).listSessions.mockResolvedValue([
+      {
+        id: 'session-gen',
+        title: 'Generic Preview Session',
+        share: { url: 'https://example.com/s/session-gen' },
+        time: { created: 100, updated: 200 },
+      },
+    ]);
+    (adapter as { getSessionMessages: jest.Mock }).getSessionMessages.mockResolvedValue([
+      { role: 'user', content: 'hello from generic backend' },
+      { role: 'assistant', content: 'hi there' },
+    ]);
+
+    const { containerEl } = createSection(plugin);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // Session row should render
+    const rowEl = containerEl.querySelector<HTMLElement>('[data-shared-session-id="session-gen"]');
+    expect(rowEl?.textContent).toContain('Generic Preview Session');
+
+    // Click preview — should NOT crash on missing info/parts
+    rowEl?.querySelector<HTMLButtonElement>('[data-action="preview-shared-session"]')?.click();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const previewEl = containerEl.querySelector<HTMLElement>('[data-shared-session-preview="session-gen"]');
+    // Preview should render the normalized messages without crashing
+    expect(previewEl?.textContent).toContain('hello from generic backend');
+    expect(previewEl?.textContent).toContain('hi there');
+  });
+
+  it('renders Claude-shaped content blocks through the normalized preview seam for OpenCode shared rows', async () => {
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: jest.fn().mockResolvedValue(undefined) },
+    });
+    const plugin = createPlugin();
+    const adapter = (plugin.agentServiceRegistry as { getActive: jest.Mock }).getActive();
+
+    // The row is still an OpenCode shared session; only the preview payload uses
+    // Claude content-block shape so this does not rely on non-OpenCode share URLs.
+    (adapter as { listSessions: jest.Mock }).listSessions.mockResolvedValue([
+      {
+        id: 'session-claude-blocks',
+        title: 'Claude Blocks Session',
+        share: { url: 'https://example.com/s/session-claude-blocks' },
+        time: { created: 1, updated: 2 },
+      },
+    ]);
+    (adapter as { getSessionMessages: jest.Mock }).getSessionMessages.mockResolvedValue([
+      {
+        role: 'user',
+        content: 'hello with blocks',
+      },
+      {
+        role: 'assistant',
+        content: [
+          { type: 'text', text: 'first block' },
+          { type: 'tool_use', text: 'tool call' },
+          { type: 'text', text: 'second block' },
+        ],
+      },
+    ]);
+
+    const { containerEl } = createSection(plugin);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const rowEl = containerEl.querySelector<HTMLElement>('[data-shared-session-id="session-claude-blocks"]');
+    rowEl?.querySelector<HTMLButtonElement>('[data-action="preview-shared-session"]')?.click();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const previewEl = containerEl.querySelector<HTMLElement>('[data-shared-session-preview="session-claude-blocks"]');
+    // Preview element should exist and show user message text
+    expect(previewEl).toBeTruthy();
+    expect(previewEl?.textContent).toContain('hello with blocks');
+    // Text blocks from the content array should render
+    expect(previewEl?.textContent).toContain('first block');
+    expect(previewEl?.textContent).toContain('second block');
+    // Non-text blocks (tool_use) should render inside a collapsed <details>
+    expect(previewEl?.querySelector('details')?.textContent).toContain('tool_use');
+    // getSessionMessages was called through the routing layer with the session id
+    expect((adapter as { getSessionMessages: jest.Mock }).getSessionMessages).toHaveBeenCalledWith('session-claude-blocks');
+  });
+
+  it('renders non-user preview roles verbatim through the normalized seam', async () => {
+    const plugin = createPlugin();
+    const adapter = (plugin.agentServiceRegistry as { getActive: jest.Mock }).getActive();
+
+    (adapter as { listSessions: jest.Mock }).listSessions.mockResolvedValue([
+      {
+        id: 'session-system',
+        title: 'System role session',
+        share: { url: 'https://example.com/s/session-system' },
+        time: { created: 10, updated: 20 },
+      },
+    ]);
+    (adapter as { getSessionMessages: jest.Mock }).getSessionMessages.mockResolvedValue([
+      { role: 'system', content: 'System note' },
+    ]);
+
+    const { containerEl } = createSection(plugin);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const rowEl = containerEl.querySelector<HTMLElement>('[data-shared-session-id="session-system"]');
+    rowEl?.querySelector<HTMLButtonElement>('[data-action="preview-shared-session"]')?.click();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const roleEl = containerEl.querySelector<HTMLElement>('[data-shared-session-preview="session-system"] .opencodian-shared-session-message-role');
+    expect(roleEl?.textContent).toBe('system');
+  });
+
   it('checks share diagnostics from the sharing block', async () => {
     const requestUrl = obsidian.requestUrl as jest.Mock;
     requestUrl.mockResolvedValue({ status: 200, text: '', json: null, headers: {}, arrayBuffer: new ArrayBuffer(0) });
@@ -493,10 +864,13 @@ describe('SettingsConversationSection', () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    const checkButton = containerEl.querySelector<HTMLButtonElement>('[data-action="check-share-diagnostics"]');
-    expect(containerEl.textContent).toContain('Project mode');
-    expect(containerEl.textContent).toContain('Not checked');
+    const detailsEl = containerEl.querySelector<HTMLDetailsElement>('details.opencodian-share-troubleshooting');
+    expect(detailsEl).not.toBeNull();
+    expect(detailsEl?.querySelector('summary')?.textContent).toBe(t('settings.conversation.share.troubleshooting.summary'));
+    expect(detailsEl?.textContent).toContain('Project mode');
+    expect(detailsEl?.textContent).toContain('Not checked');
 
+    const checkButton = detailsEl?.querySelector<HTMLButtonElement>('[data-action="check-share-diagnostics"]');
     checkButton?.click();
     for (let i = 0; i < 6; i += 1) {
       await Promise.resolve();
@@ -508,8 +882,37 @@ describe('SettingsConversationSection', () => {
       method: 'GET',
       throw: false,
     }));
-    expect(containerEl.textContent).toContain('Connected');
-    expect(containerEl.textContent).toContain('Reachable');
+    expect(detailsEl?.textContent).toContain('Connected');
+    expect(detailsEl?.textContent).toContain('Reachable');
+  });
+
+  it('blocks stale share diagnostics when the active backend is no longer OpenCode', async () => {
+    const requestUrl = obsidian.requestUrl as jest.Mock;
+    requestUrl.mockResolvedValue({ status: 200, text: '', json: null, headers: {}, arrayBuffer: new ArrayBuffer(0) });
+    const plugin = createPlugin();
+    const { containerEl } = createSection(plugin);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const checkButton = containerEl.querySelector<HTMLButtonElement>('[data-action="check-share-diagnostics"]');
+    expect(containerEl.textContent).toContain('Not checked');
+
+    plugin.settings.activeBackend = 'claude-code';
+    plugin.settings.enabledBackends = ['opencode', 'claude-code'];
+    requestUrl.mockClear();
+
+    checkButton?.click();
+    for (let i = 0; i < 6; i += 1) {
+      await Promise.resolve();
+    }
+
+    expect(plugin.openCodeService.checkHealth).not.toHaveBeenCalled();
+    expect(requestUrl).not.toHaveBeenCalled();
+    expect(containerEl.textContent).toContain('Not checked');
+    expect(containerEl.textContent).not.toContain('Checking');
+    expect(containerEl.textContent).not.toContain('Connected');
+    expect(containerEl.textContent).not.toContain('Reachable');
+    expect(checkButton?.disabled).toBe(false);
   });
 
   it('shows route guidance when the share host connection closes during TLS', async () => {
@@ -520,13 +923,14 @@ describe('SettingsConversationSection', () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    containerEl.querySelector<HTMLButtonElement>('[data-action="check-share-diagnostics"]')?.click();
+    const detailsEl = containerEl.querySelector<HTMLDetailsElement>('details.opencodian-share-troubleshooting');
+    detailsEl?.querySelector<HTMLButtonElement>('[data-action="check-share-diagnostics"]')?.click();
     for (let i = 0; i < 6; i += 1) {
       await Promise.resolve();
     }
 
-    expect(containerEl.textContent).toContain('TLS');
-    expect(containerEl.textContent).toContain('working proxy');
+    expect(detailsEl?.textContent).toContain('TLS');
+    expect(detailsEl?.textContent).toContain('working proxy');
   });
 
   it('updates the share diagnostics when share mode is disabled', async () => {

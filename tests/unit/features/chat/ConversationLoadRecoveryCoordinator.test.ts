@@ -1,7 +1,10 @@
+/* eslint-disable max-lines -- Conversation recovery coverage keeps initialization, active-backend restore, rewind, fork, and host factory regressions with one shared fixture. */
+
 import type {
   ChatMessage,
   Conversation,
 } from '../../../../src/core/types';
+import type { AgentBackendKind } from '../../../../src/core/types/chat';
 import {
   ConversationLoadRecoveryCoordinator,
   type ConversationLoadRecoveryHost,
@@ -21,6 +24,20 @@ function createConversation(id: string, title = `Chat ${id}`): Conversation {
     openCodeSessionId: `${id}-session`,
     messages: [],
   };
+}
+
+function createBackendConversation(
+  id: string,
+  backend: AgentBackendKind,
+  title = `Chat ${id}`,
+): Conversation {
+  const conversation = createConversation(id, title);
+  conversation.backend = backend;
+  conversation.backendSessionId = `${id}-${backend}-session`;
+  if (backend !== 'opencode') {
+    delete conversation.openCodeSessionId;
+  }
+  return conversation;
 }
 
 function createMessage(
@@ -68,6 +85,7 @@ function createHost(
     persistTabState: jest.fn(),
     loadConversations: jest.fn().mockResolvedValue(undefined),
     getConversations: jest.fn().mockReturnValue([]),
+    getActiveBackend: jest.fn(() => 'opencode'),
     createConversation: jest.fn().mockResolvedValue(createConversation('created')),
     chooseForkTarget: jest.fn().mockResolvedValue('current-tab'),
     confirmRewind: jest.fn(() => true),
@@ -170,6 +188,56 @@ describe('ConversationLoadRecoveryCoordinator initialization', () => {
     expect(port.activateTab).toHaveBeenCalledWith(tabs[0]!.id);
   });
 
+  it('uses only active-backend conversations during first-open bootstrap', async () => {
+    const opencodeConversation = createBackendConversation('opencode-existing', 'opencode');
+    const claudeConversation = createBackendConversation('claude-existing', 'claude-code');
+    const tabManager = new TabManager('New chat', {
+      getMaxTabs: () => 4,
+    });
+    const host = createHost(claudeConversation, {
+      getTabManager: jest.fn().mockReturnValue(tabManager),
+      getActiveBackend: jest.fn(() => 'claude-code'),
+      getConversations: jest.fn().mockReturnValue([opencodeConversation, claudeConversation]),
+    });
+    const port = createPort();
+    const coordinator = new ConversationLoadRecoveryCoordinator(host, port);
+
+    await coordinator.initializeFirstTab();
+
+    const tabs = tabManager.getAllTabs();
+    expect(host.createConversation).not.toHaveBeenCalled();
+    expect(tabs).toHaveLength(1);
+    expect(tabs[0]?.conversationId).toBe(claudeConversation.id);
+  });
+
+  it('restores only active-backend persisted tabs', () => {
+    const opencodeConversation = createBackendConversation('opencode-restored', 'opencode');
+    const claudeConversation = createBackendConversation('claude-restored', 'claude-code');
+    const tabManager = new TabManager('New chat', {
+      getMaxTabs: () => 4,
+    });
+    const host = createHost(claudeConversation, {
+      getTabManager: jest.fn().mockReturnValue(tabManager),
+      getActiveBackend: jest.fn(() => 'claude-code'),
+      getPersistedTabState: jest.fn().mockReturnValue({
+        tabs: [
+          { conversationId: opencodeConversation.id, title: opencodeConversation.title, modelOverride: null },
+          { conversationId: claudeConversation.id, title: claudeConversation.title, modelOverride: null },
+        ],
+        activeTabIndex: 0,
+      }),
+      getConversations: jest.fn().mockReturnValue([opencodeConversation, claudeConversation]),
+    });
+    const port = createPort();
+    const coordinator = new ConversationLoadRecoveryCoordinator(host, port);
+
+    const restoredTabId = coordinator.restorePersistedTabs();
+
+    expect(restoredTabId).toBeTruthy();
+    expect(tabManager.getAllTabs()).toHaveLength(1);
+    expect(tabManager.getActiveTab()?.conversationId).toBe(claudeConversation.id);
+  });
+
   it('creates a new conversation when first open has no persisted tabs or existing conversations', async () => {
     const conversation = createConversation('load-created');
     const createdConversation = createConversation('created-conversation');
@@ -190,6 +258,28 @@ describe('ConversationLoadRecoveryCoordinator initialization', () => {
     expect(host.createConversation).toHaveBeenCalledTimes(1);
     expect(tabs).toHaveLength(1);
     expect(tabs[0]?.conversationId).toBe(createdConversation.id);
+    expect(port.activateTab).toHaveBeenCalledWith(tabs[0]!.id);
+  });
+
+  it('falls back to an empty tab when initial conversation bootstrap fails', async () => {
+    const conversation = createConversation('load-created');
+    const tabManager = new TabManager('New chat', {
+      getMaxTabs: () => 4,
+    });
+    const host = createHost(conversation, {
+      getTabManager: jest.fn().mockReturnValue(tabManager),
+      getConversations: jest.fn().mockReturnValue([]),
+      createConversation: jest.fn().mockRejectedValue(new Error('Cannot create conversation: opencode backend is not enabled')),
+    });
+    const port = createPort();
+    const coordinator = new ConversationLoadRecoveryCoordinator(host, port);
+
+    await expect(coordinator.initializeFirstTab()).resolves.toBeUndefined();
+
+    const tabs = tabManager.getAllTabs();
+    expect(host.createConversation).toHaveBeenCalledTimes(1);
+    expect(tabs).toHaveLength(1);
+    expect(tabs[0]?.conversationId).toBeNull();
     expect(port.activateTab).toHaveBeenCalledWith(tabs[0]!.id);
   });
 
@@ -260,6 +350,150 @@ describe('ConversationLoadRecoveryCoordinator rewind and restore', () => {
       forceServerSync: true,
     });
     expect(host.showNotice).toHaveBeenCalledWith(t('chat.rewind.restoreSuccess'));
+  });
+
+  it('shows streamingBlocked notice when tab is streaming', async () => {
+    const conversation = createConversation('rewind-streaming');
+    const host = createHost(conversation, {
+      isActiveTabStreaming: jest.fn(() => true),
+    });
+    const port = createPort();
+    const coordinator = new ConversationLoadRecoveryCoordinator(host, port);
+
+    await coordinator.handleRewindRequest(createMessage());
+
+    expect(host.showNotice).toHaveBeenCalledWith(t('chat.rewind.streamingBlocked'));
+    expect(host.revertSession).not.toHaveBeenCalled();
+  });
+
+  it('shows unavailable notice when no current conversation', async () => {
+    const conversation = createConversation('rewind-missing-conversation');
+    const host = createHost(conversation, {
+      getCurrentConversation: jest.fn(() => null),
+    });
+    const port = createPort();
+    const coordinator = new ConversationLoadRecoveryCoordinator(host, port);
+
+    await coordinator.handleRewindRequest(createMessage());
+
+    expect(host.showNotice).toHaveBeenCalledWith(t('chat.rewind.unavailable'));
+  });
+
+  it('shows unavailable notice for non-OpenCode backend', async () => {
+    const conversation = createBackendConversation('claude-conv', 'claude-code');
+    const host = createHost(conversation);
+    const port = createPort();
+    const coordinator = new ConversationLoadRecoveryCoordinator(host, port);
+
+    await coordinator.handleRewindRequest(createMessage());
+
+    expect(host.showNotice).toHaveBeenCalledWith(t('chat.rewind.unavailable'));
+    expect(host.revertSession).not.toHaveBeenCalled();
+  });
+
+  it('shows unavailable notice when message has no sourceMessageId', async () => {
+    const conversation = createConversation('rewind-missing-source');
+    const message = createMessage('message-without-source', {
+      sourceMessageId: undefined,
+    });
+    const host = createHost(conversation);
+    const port = createPort();
+    const coordinator = new ConversationLoadRecoveryCoordinator(host, port);
+
+    await coordinator.handleRewindRequest(message);
+
+    expect(host.showNotice).toHaveBeenCalledWith(t('chat.rewind.unavailable'));
+  });
+
+  it('does nothing when user cancels the rewind confirmation', async () => {
+    const conversation = createConversation('rewind-cancelled');
+    const host = createHost(conversation, {
+      confirmRewind: jest.fn(() => false),
+    });
+    const port = createPort();
+    const coordinator = new ConversationLoadRecoveryCoordinator(host, port);
+
+    await coordinator.handleRewindRequest(createMessage());
+
+    expect(host.revertSession).not.toHaveBeenCalled();
+    expect(host.showNotice).not.toHaveBeenCalled();
+  });
+
+  it('shows failed notice when revertSession returns false', async () => {
+    const conversation = createConversation('rewind-revert-false');
+    const host = createHost(conversation, {
+      revertSession: jest.fn().mockResolvedValue(false),
+    });
+    const port = createPort();
+    const coordinator = new ConversationLoadRecoveryCoordinator(host, port);
+
+    await coordinator.handleRewindRequest(createMessage());
+
+    expect(host.showNotice).toHaveBeenCalledWith(t('chat.rewind.failed'));
+    expect(port.loadConversation).not.toHaveBeenCalled();
+  });
+
+  it('shows failed notice when revertSession throws', async () => {
+    const conversation = createConversation('rewind-revert-throws');
+    const host = createHost(conversation, {
+      revertSession: jest.fn().mockRejectedValue(new Error('server error')),
+    });
+    const port = createPort();
+    const coordinator = new ConversationLoadRecoveryCoordinator(host, port);
+
+    await coordinator.handleRewindRequest(createMessage());
+
+    expect(host.showNotice).toHaveBeenCalledWith(t('chat.rewind.failed'));
+  });
+
+  it('shows streamingBlocked notice when tab is streaming during restore', async () => {
+    const conversation = createConversation('restore-streaming');
+    const host = createHost(conversation, {
+      isActiveTabStreaming: jest.fn(() => true),
+    });
+    const port = createPort();
+    const coordinator = new ConversationLoadRecoveryCoordinator(host, port);
+
+    await coordinator.handleRestoreRewindRequest();
+
+    expect(host.showNotice).toHaveBeenCalledWith(t('chat.rewind.streamingBlocked'));
+  });
+
+  it('shows restoreFailed for non-OpenCode backend during restore', async () => {
+    const conversation = createBackendConversation('claude-restore', 'claude-code');
+    const host = createHost(conversation);
+    const port = createPort();
+    const coordinator = new ConversationLoadRecoveryCoordinator(host, port);
+
+    await coordinator.handleRestoreRewindRequest();
+
+    expect(host.showNotice).toHaveBeenCalledWith(t('chat.rewind.restoreFailed'));
+  });
+
+  it('shows restoreFailed when unrevertSession returns false', async () => {
+    const conversation = createConversation('restore-unrevert-false');
+    const host = createHost(conversation, {
+      unrevertSession: jest.fn().mockResolvedValue(false),
+    });
+    const port = createPort();
+    const coordinator = new ConversationLoadRecoveryCoordinator(host, port);
+
+    await coordinator.handleRestoreRewindRequest();
+
+    expect(host.showNotice).toHaveBeenCalledWith(t('chat.rewind.restoreFailed'));
+  });
+
+  it('shows restoreFailed when unrevertSession throws', async () => {
+    const conversation = createConversation('restore-unrevert-throws');
+    const host = createHost(conversation, {
+      unrevertSession: jest.fn().mockRejectedValue(new Error('restore error')),
+    });
+    const port = createPort();
+    const coordinator = new ConversationLoadRecoveryCoordinator(host, port);
+
+    await coordinator.handleRestoreRewindRequest();
+
+    expect(host.showNotice).toHaveBeenCalledWith(t('chat.rewind.restoreFailed'));
   });
 });
 
@@ -404,6 +638,42 @@ describe('ConversationLoadRecoveryCoordinator forking', () => {
       t('chat.fork.maxTabsReached', { count: '1' }),
     );
   });
+
+  it('preserves the source conversation backend when forking a claude-code conversation', async () => {
+    const claudeConversation = createBackendConversation('claude-source', 'claude-code', 'Claude Chat');
+    const beforeMessage = createMessage('msg-before', {
+      content: 'Before fork',
+      sourceMessageId: 'before-source',
+    });
+    const targetMessage = createMessage('msg-target', {
+      content: 'Fork target',
+      sourceMessageId: 'target-source',
+    });
+    claudeConversation.messages = [beforeMessage, targetMessage];
+    claudeConversation.currentNote = 'Daily.md';
+    const tabManager = new TabManager('New chat', { getMaxTabs: () => 4 });
+    tabManager.createTab(claudeConversation);
+    const forkConversation = createBackendConversation('forked-claude', 'claude-code', 'Forked');
+    const host = createHost(claudeConversation, {
+      getTabManager: jest.fn(() => tabManager),
+      createConversationFromSession: jest.fn().mockResolvedValue(forkConversation),
+    });
+    const port = createPort();
+    const coordinator = new ConversationLoadRecoveryCoordinator(host, port);
+
+    await coordinator.handleForkRequest(targetMessage);
+
+    expect(host.forkSession).toHaveBeenCalledWith(
+      'claude-source-claude-code-session',
+      'target-source',
+    );
+    expect(host.createConversationFromSession).toHaveBeenCalledWith('fork-session', {
+      title: 'Fork: Claude Chat',
+      messages: [beforeMessage],
+      currentNote: 'Daily.md',
+      backend: 'claude-code',
+    });
+  });
 });
 
 describe('createConversationLoadRecoveryHost factory', () => {
@@ -425,6 +695,7 @@ describe('createConversationLoadRecoveryHost factory', () => {
       persistTabState: jest.fn(),
       loadConversations: jest.fn().mockResolvedValue(undefined),
       getConversations: jest.fn().mockReturnValue([]),
+      getActiveBackend: jest.fn(() => 'opencode'),
       createConversation: jest.fn().mockResolvedValue(createConversation('created')),
       app: mockApp,
       revertSession: jest.fn().mockResolvedValue(true),

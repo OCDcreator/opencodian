@@ -4,6 +4,7 @@ import { Notice, Setting } from 'obsidian';
 import { t } from '../../i18n';
 import type { OpenCodianPlugin } from '../../main';
 import { getToolIdentity, isBuiltinToolName } from '../../shared/toolIdentity';
+import { isOpenCodeSettingsBackendActive } from './settingsBackendGuards';
 import { ToolDetailModal, type ToolFileInfo, type ToolFileSource } from './SettingsToolDetailModal';
 import { SettingsToolFileService } from './SettingsToolFileService';
 
@@ -379,12 +380,18 @@ export class SettingsToolSection {
   }
 
   private async createProjectTool(): Promise<void> {
+    if (!this.ensureOpenCodeActive()) {
+      return;
+    }
     const targetPath = await this.toolFileService.createProjectTool();
     new Notice(t('settings.tools.custom.notice.saved').replace('{path}', targetPath));
     await this.refresh({ restartLocalService: true });
   }
 
   private async openToolFile(file: ToolFileInfo): Promise<void> {
+    if (!this.ensureOpenCodeActive()) {
+      return;
+    }
     const content = file.content ?? await this.toolFileService.readToolFileContent(file);
     new ToolDetailModal({
       file: { ...file, content },
@@ -396,6 +403,9 @@ export class SettingsToolSection {
   }
 
   private async deleteProjectTool(file: ToolFileInfo): Promise<void> {
+    if (!this.ensureOpenCodeActive()) {
+      return;
+    }
     if (file.source !== 'project') {
       new Notice(t('settings.tools.custom.notice.readOnly'));
       return;
@@ -425,6 +435,9 @@ export class SettingsToolSection {
   }
 
   private async setGlobalToolPermission(selection: GlobalToolPermissionSelection): Promise<void> {
+    if (!this.ensureOpenCodeActive()) {
+      return;
+    }
     const configManager = this.plugin.opencodeConfigManager;
     if (!configManager) {
       return;
@@ -439,6 +452,9 @@ export class SettingsToolSection {
   }
 
   private async setToolPermissionSelection(toolId: string, selection: ToolPermissionSelection): Promise<void> {
+    if (!this.ensureOpenCodeActive()) {
+      return;
+    }
     const configManager = this.plugin.opencodeConfigManager;
     if (!configManager) {
       return;
@@ -467,6 +483,9 @@ export class SettingsToolSection {
   }
 
   private async restartLocalServiceAfterToolCatalogWrite(): Promise<void> {
+    if (!this.ensureOpenCodeActive()) {
+      return;
+    }
     if (this.plugin.settings.server.mode !== 'local') {
       return;
     }
@@ -483,6 +502,9 @@ export class SettingsToolSection {
   }
 
   private async restartLocalServiceAfterPermissionWrite(): Promise<void> {
+    if (!this.ensureOpenCodeActive()) {
+      return;
+    }
     if (this.plugin.settings.server.mode !== 'local') {
       new Notice(t('settings.server.remoteManageUnavailable'));
       return;
@@ -603,5 +625,17 @@ export class SettingsToolSection {
       openCodeCatalogStateStore?: ToolCatalogStoreLike | null;
     };
     return pluginWithCatalogStore.openCodeCatalogStateStore ?? null;
+  }
+
+  private isOpenCodeActive(): boolean {
+    return isOpenCodeSettingsBackendActive(this.plugin.settings);
+  }
+
+  private ensureOpenCodeActive(): boolean {
+    if (this.isOpenCodeActive()) {
+      return true;
+    }
+    new Notice(t('settings.tools.notice.openCodeOnly'));
+    return false;
   }
 }

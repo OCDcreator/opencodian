@@ -15,6 +15,7 @@ import {
   stringifyConfigNumber,
   stringifyConfigText,
 } from './projectAgentEditorConfig';
+import { TextareaSizeMemory } from './TextareaSizeMemory';
 
 const logger = createLogger('SettingsProjectCommandEditor');
 
@@ -87,9 +88,18 @@ interface SettingsProjectCommandEditorRenderOptions {
 }
 
 export class SettingsProjectCommandEditor {
+  private textareaSizeMemories: TextareaSizeMemory[] = [];
+
   constructor(
     private readonly configManager: NonNullable<OpenCodianPlugin['opencodeConfigManager']>,
   ) {}
+
+  dispose(): void {
+    for (const memory of this.textareaSizeMemories) {
+      memory.destroy();
+    }
+    this.textareaSizeMemories = [];
+  }
 
   // eslint-disable-next-line max-lines-per-function -- Project command editing keeps field wiring, validation, and stable local refresh in one stateful form.
   render(options: SettingsProjectCommandEditorRenderOptions): void {
@@ -101,6 +111,7 @@ export class SettingsProjectCommandEditor {
       skillMode = 'direct',
     } = options;
 
+    this.dispose();
     const restoreContainer = this.preserveContainerBeforeRender(containerEl);
     containerEl.replaceChildren();
 
@@ -194,6 +205,9 @@ export class SettingsProjectCommandEditor {
           .onChange((value) => {
             state.template = value;
           });
+        this.textareaSizeMemories.push(
+          TextareaSizeMemory.attach(text.inputEl, 'project-command-template'),
+        );
       });
 
     this.renderPlaceholderReference(containerEl);

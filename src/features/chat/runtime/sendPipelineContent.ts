@@ -48,3 +48,111 @@ export function hasVisibleStreamingContent(chunk: StreamingChunk): boolean {
       || chunk.type === 'tool_use',
   );
 }
+
+/**
+ * Extract the raw inner text from a structured-output payload that is likely
+ * to appear as duplicate visible text before the StructuredOutput tool call.
+ *
+ * For the fixed `/json` schema the payload shape is:
+ *   { response: string }
+ * where `response` is itself a JSON-stringified value.
+ * We parse that string and re-stringify it so formatting differences
+ * (e.g. spaces) are normalised for comparison.
+ */
+export function extractStructuredOutputDuplicateText(structuredOutput: unknown): string | null {
+  if (!structuredOutput || typeof structuredOutput !== 'object') {
+    return null;
+  }
+  const so = structuredOutput as Record<string, unknown>;
+  const response = so['response'];
+  if (typeof response !== 'string') {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(response);
+    return JSON.stringify(parsed);
+  } catch {
+    return response;
+  }
+}
+
+/**
+ * Check whether a raw text chunk contains content that duplicates the
+ * structured-output payload.
+ */
+export function isDuplicateStructuredOutputText(
+  rawText: string,
+  structuredOutput: unknown,
+): boolean {
+  const candidate = extractStructuredOutputDuplicateText(structuredOutput);
+  if (!candidate) {
+    return false;
+  }
+
+  const trimmed = rawText.trim();
+  if (trimmed === candidate.trim()) {
+    return true;
+  }
+
+  // JSON-aware comparison normalises formatting differences.
+  try {
+    const rawParsed = JSON.parse(trimmed);
+    const candidateParsed = JSON.parse(candidate.trim());
+    return JSON.stringify(rawParsed) === JSON.stringify(candidateParsed);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Remove any text block that duplicates the structured-output payload.
+ * The model may emit raw JSON as visible text at any point before the
+ * StructuredOutput tool call, sometimes interleaving thinking blocks or
+ * follow-up prose, so we scan all text blocks rather than only the last.
+ */
+export function filterDuplicateStructuredOutputTextBlocks(
+  blocks: StreamingContentBlock[] | undefined,
+  structuredOutput: unknown,
+): StreamingContentBlock[] | undefined {
+  if (!blocks || blocks.length === 0) {
+    return blocks;
+  }
+
+  const candidate = extractStructuredOutputDuplicateText(structuredOutput);
+  if (!candidate) {
+    return blocks;
+  }
+
+  return blocks.filter((block) => {
+    if (block.type !== 'text') {
+      return true;
+    }
+    return !isDuplicateStructuredOutputText(block.content, structuredOutput);
+  });
+}
+
+/**
+ * Hydration-time variant: works on persisted {@link ContentBlock} arrays
+ * instead of live streaming blocks.  Used when a conversation is reloaded
+ * and assistant messages are reconstructed from storage.
+ */
+export function filterDuplicateStructuredOutputContentBlocks(
+  blocks: ContentBlock[] | undefined,
+  structuredOutput: unknown,
+): ContentBlock[] | undefined {
+  if (!blocks || blocks.length === 0) {
+    return blocks;
+  }
+
+  const candidate = extractStructuredOutputDuplicateText(structuredOutput);
+  if (!candidate) {
+    return blocks;
+  }
+
+  return blocks.filter((block) => {
+    if (block.type !== 'text' || !block.text) {
+      return true;
+    }
+    return !isDuplicateStructuredOutputText(block.text, structuredOutput);
+  });
+}

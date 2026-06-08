@@ -2,6 +2,7 @@ import type {
   ChatMessage,
   Conversation,
 } from '../../../core/types';
+import { getConversationBackendSessionId } from '../../../core/types';
 import {
   buildMessageRenderGroups,
   injectLiveCompactionDivider,
@@ -58,7 +59,7 @@ export class ConversationIdentityRuntime {
   ): string {
     return JSON.stringify({
       conversationId: conversation.id,
-      sessionId: conversation.openCodeSessionId,
+      sessionId: getConversationBackendSessionId(conversation),
       messages: messages.map((message) => ({
         id: message.id,
         sourceMessageId: message.sourceMessageId ?? null,
@@ -78,6 +79,7 @@ export class ConversationIdentityRuntime {
       content: message.content,
       timestamp: message.timestamp,
       modelId: message.modelId ?? null,
+      sourceMessageId: message.sourceMessageId ?? null,
       summaryKind: message.summaryKind ?? null,
       compactionDivider: message.compactionDivider ?? null,
       noticeTitle: message.noticeTitle ?? null,
@@ -106,6 +108,7 @@ export class ConversationIdentityRuntime {
         subagentId: block.subagentId ?? null,
         subagentMode: block.subagentMode ?? null,
       })),
+      structured: message.structured ?? null,
     });
   }
 
@@ -153,7 +156,8 @@ export class ConversationIdentityRuntime {
       || (message.contentBlocks?.length ?? 0) > 0
       || (message.toolCalls?.length ?? 0) > 0
       || message.questionResolution
-      || message.omo,
+      || message.omo
+      || message.structured,
     );
   }
 

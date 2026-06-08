@@ -8,6 +8,7 @@ import {
   ProviderIconService,
 } from '../../utils/icons/ProviderIconService';
 import { ProviderBuiltinIconPickerModal } from './ProviderBuiltinIconPickerModal';
+import { TextareaSizeMemory } from './TextareaSizeMemory';
 
 type ScrollRestoreState = {
   scrollTop: number;
@@ -20,6 +21,7 @@ export class ProviderIconCacheModal extends Modal {
   private readonly providerSections = new Map<string, HTMLElement>();
   private quickJumpEl: HTMLElement | null = null;
   private scrollContainerEl: HTMLElement | null = null;
+  private textareaSizeMemories: TextareaSizeMemory[] = [];
 
   constructor(
     app: App,
@@ -36,6 +38,7 @@ export class ProviderIconCacheModal extends Modal {
   }
 
   onClose(): void {
+    this.destroyTextareaSizeMemories();
     this.quickJumpEl = null;
     this.scrollContainerEl = null;
     this.contentEl.empty();
@@ -48,6 +51,7 @@ export class ProviderIconCacheModal extends Modal {
       this.plugin.settings.providerIconLibrary,
     );
 
+    this.destroyTextareaSizeMemories();
     this.contentEl.empty();
     this.providerSections.clear();
     this.quickJumpEl = null;
@@ -270,6 +274,7 @@ export class ProviderIconCacheModal extends Modal {
         rows: '3',
       },
     });
+    this.textareaSizeMemories.push(TextareaSizeMemory.attach(inputEl, 'provider-icon-cache-input'));
     const addBtn = controlsEl.createEl('button', {
       cls: 'mod-cta',
       text: t('settings.model.iconCache.modal.addButton'),
@@ -503,6 +508,13 @@ export class ProviderIconCacheModal extends Modal {
     const elementRect = element.getBoundingClientRect();
     const containerRect = container.getBoundingClientRect();
     return elementRect.top - containerRect.top + container.scrollTop;
+  }
+
+  private destroyTextareaSizeMemories(): void {
+    for (const memory of this.textareaSizeMemories) {
+      memory.destroy();
+    }
+    this.textareaSizeMemories = [];
   }
 
   private getScrollContainer(): HTMLElement {

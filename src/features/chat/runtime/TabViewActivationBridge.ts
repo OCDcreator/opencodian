@@ -77,7 +77,9 @@ export class TabViewActivationBridge {
   applyStreamingActivationOutcome(tabId: TabId, sessionId: string | null): void {
     this.host.updateModelSelectorDisplay();
     this.activeTabContextUsageCoordinator.syncIdentity();
-    this.questionTodoActivationRefreshCoordinator.applyConversationActivation(tabId, sessionId);
+    if (sessionId) {
+      this.questionTodoActivationRefreshCoordinator.applyConversationActivation(tabId, sessionId);
+    }
     this.host.updateSendButtonState();
   }
 
@@ -93,7 +95,9 @@ export class TabViewActivationBridge {
     sessionId: string | null,
   ): Promise<void> {
     await this.backgroundTaskActivationIndicatorCoordinator.renderLoadedConversationIndicator(tabId);
-    this.questionTodoActivationRefreshCoordinator.applyConversationActivation(tabId, sessionId);
+    if (sessionId) {
+      this.questionTodoActivationRefreshCoordinator.applyConversationActivation(tabId, sessionId);
+    }
   }
 
   applyLoadedConversationHydrationTail(): void {

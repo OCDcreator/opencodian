@@ -20,6 +20,7 @@ import {
   type ProviderInterfaceFormatOption,
 } from './modelConfigWorkspace';
 import { ProviderIconCacheModal } from './ProviderIconCacheModal';
+import { TextareaSizeMemory } from './TextareaSizeMemory';
 
 export type ProviderCheckState =
   | { status: 'idle' }
@@ -72,6 +73,7 @@ interface ModelConfigProviderEditorOptions {
 
 export class ModelConfigProviderEditor {
   private readonly modelListEditor: ModelConfigModelListEditor;
+  private textareaSizeMemories: TextareaSizeMemory[] = [];
 
   constructor(private readonly options: ModelConfigProviderEditorOptions) {
     this.modelListEditor = new ModelConfigModelListEditor({
@@ -88,6 +90,10 @@ export class ModelConfigProviderEditor {
       createSubsectionHeader: (containerEl, title, description) => this.createSubsectionHeader(containerEl, title, description),
       renderKeyValueEditor: (containerEl, config) => this.renderKeyValueEditor(containerEl, config),
     });
+  }
+
+  dispose(): void {
+    this.destroyTextareaSizeMemories();
   }
 
   renderWorkspaceEditor(containerEl: HTMLElement, editorState: SelectedProviderEditorState): void {
@@ -423,6 +429,7 @@ export class ModelConfigProviderEditor {
         spellcheck: 'false',
       },
     });
+    this.textareaSizeMemories.push(TextareaSizeMemory.attach(previewEl, 'model-provider-json-editor'));
     this.options.setPreviewEl(previewEl);
     this.options.updatePreview();
   }
@@ -443,6 +450,7 @@ export class ModelConfigProviderEditor {
         spellcheck: 'false',
       },
     });
+    this.textareaSizeMemories.push(TextareaSizeMemory.attach(previewEl, 'model-provider-json-editor'));
     previewEl.addEventListener('input', () => {
       this.options.setJsonDraftValue(previewEl.value);
       this.options.syncProviderRawFromJsonDraft(provider);
@@ -631,6 +639,7 @@ export class ModelConfigProviderEditor {
           placeholder: valuePlaceholder ?? t('settings.model.visualEditor.fieldValuePlaceholder'),
         },
       });
+      this.textareaSizeMemories.push(TextareaSizeMemory.attach(valueInput, 'model-workspace-keyvalue'));
       this.bindEditableControl(valueInput);
       valueInput.value = field.value;
       valueInput.addEventListener('input', () => {
@@ -692,6 +701,13 @@ export class ModelConfigProviderEditor {
     element.addEventListener('click', (event) => {
       event.stopPropagation();
     });
+  }
+
+  private destroyTextareaSizeMemories(): void {
+    for (const memory of this.textareaSizeMemories) {
+      memory.destroy();
+    }
+    this.textareaSizeMemories = [];
   }
 
   private getProviderCheckClass(state: ProviderCheckState): string {

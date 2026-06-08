@@ -5,7 +5,7 @@
 
 ## 概述
 
-`UserMessageFooterRenderer` 是 user message footer 的 DOM 组装模块。它把 copy / rewind / fork 按钮、tooltip label，以及时间文本的组装从 `OpenCodianView` 中抽出。
+`UserMessageFooterRenderer` 是 user message footer 的 DOM 组装模块。它把 copy / rewind / fork 按钮、tooltip label，以及时间文本的组装从 `OpenCodianView` 中抽出。rewind 与 fork 的 capability 检查已分离：只有 `hasRewindCapability()` 时才渲染 rewind 按钮，只有 `hasForkCapability()` 时才渲染 fork 按钮，允许 Claude Code 等只支持 fork 的 backend 独立暴露 fork 而不假装支持 revert。
 
 ## 公开接口
 

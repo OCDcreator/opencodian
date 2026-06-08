@@ -27,6 +27,7 @@ export interface ConversationSyncViewHost {
   getTabRuntimeState(tabId: TabId | null): ConversationSyncSignalRuntime | null;
   getConversationById(id: string): Promise<Conversation | null>;
   getConversationSyncFingerprint(messages: ChatMessage[]): string;
+  canSyncConversationWithServer(): Promise<boolean>;
   transitionTabSessionLifecycle(...): boolean;
   syncConversationMessagesFromServer(...): Promise<ConversationSyncBridgeSyncResult>;
   syncConversationMessagesFromCanonicalState(...): Promise<ConversationSyncBridgeSyncResult | null>;
@@ -53,6 +54,7 @@ export function assembleConversationSyncRuntime(deps): ConversationSyncRuntimeAs
 - `createConversationSyncHosts()` 从同一个 `ConversationSyncViewHost` 派生出 runtime/orchestration/bridge 三组 host
 - 三组 host 都继续读取同一份 tab runtime、active tab、conversation 查询和 render bridge，避免 view 内部维护重复闭包
 - bridge host 现在同时暴露 `syncConversationMessagesFromServer()` 与 `syncConversationMessagesFromCanonicalState()`，让 `ConversationSyncBridge` 可以在同一套 view seam 上切换 authoritative reload 与 canonical local merge
+- bridge host 也暴露 `canSyncConversationWithServer()`，让 chat-surface owner 能在不改底层 OpenCode service 语义的前提下，阻止 disabled/no-backend 状态继续触发 visible background server fallback
 
 ### sync service bundle
 

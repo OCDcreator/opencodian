@@ -32,6 +32,8 @@ Inline question card 的键盘处理保持在 `QuestionInlineCardRenderer` 本�
 - 这个模块不负责调用 `replyToQuestion()` 或 `rejectQuestion()`；最终 service 回传现在由 `QuestionResolutionFlowCoordinator` 处理
 - 已回答/已拒绝的 resolved question 回顾卡片内容与协调分别由 `QuestionResolutionCardRenderer.ts` / `QuestionResolutionCoordinator.ts` 负责，本模块继续提供共享容器复用与待回答 inline card 交互
 - host wiring 现在通常由 `QuestionRuntimeHostAdapter.ts` 统一提供，不要再把 active tab / runtime / pin-to-bottom 三段回调重新散落回 view
+- Question card root 设置 `data-question-card="true"`，提交和拒绝按钮分别设置 `data-question-action="submit|reject"`，供自动化测试和诊断探针稳定定位卡片与操作
 - 不要在这里复制 streaming shell 查询或 reveal 逻辑，统一继续走 `StreamingInlineCardRenderer`
 - sequential 模式必须复用并清空同一个 question card，避免破坏当前 scroll/pin 行为
 - keyboard 行为必须复用现有 `QuestionInputState` 与 `collectAnswerFromInputState()`，不要引入第二套答案解析
+- `AskUserQuestion` option 如果携带 `preview` 文本，会在选项列表下方放置一个共享的 `.opencodian-question-inline-option-preview` 容器。该容器初始隐藏，仅在选项获得焦点或悬停时显示当前对应 option 的 preview 文本。预览统一以纯文本显示，HTML 不会被解析渲染，也不通过 CSS 伪元素注入未本地化的前缀标签，避免潜在的安全风险

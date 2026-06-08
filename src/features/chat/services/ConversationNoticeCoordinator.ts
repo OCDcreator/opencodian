@@ -30,6 +30,8 @@ export interface ConversationNoticeCoordinatorHost {
   renderBackgroundTaskIndicatorIfNeeded(tabId: TabId | null): Promise<void>;
   handleRestoreRewindRequest(): Promise<void>;
   openPluginSettingsPreservingScroll(): void;
+  hasAnyEnabledBackend(): boolean;
+  hasBackendConnection(): boolean;
 }
 
 export class ConversationNoticeCoordinator {
@@ -49,6 +51,35 @@ export class ConversationNoticeCoordinator {
 
   createEmptyConversationNotice(): ChatMessage {
     const rewound = this.host.isConversationRewound();
+    const hasAnyEnabledBackend = this.host.hasAnyEnabledBackend();
+    const hasBackendConnection = this.host.hasBackendConnection();
+
+    if (!rewound && !hasAnyEnabledBackend) {
+      return {
+        id: 'opencodian-empty-state-no-backend',
+        role: 'assistant',
+        content: t('chat.empty.noBackend.description'),
+        timestamp: Date.now(),
+        displayStyle: 'notice',
+        noticeTitle: t('chat.empty.noBackend.title'),
+        noticeTone: 'warning',
+        noticeActions: [{ type: 'open_model_settings' as const }],
+      };
+    }
+
+    if (!rewound && !hasBackendConnection) {
+      return {
+        id: 'opencodian-empty-state-backend-offline',
+        role: 'assistant',
+        content: t('chat.empty.backendOffline.description'),
+        timestamp: Date.now(),
+        displayStyle: 'notice',
+        noticeTitle: t('chat.empty.backendOffline.title'),
+        noticeTone: 'warning',
+        noticeActions: [{ type: 'open_model_settings' as const }],
+      };
+    }
+
     return {
       id: rewound ? 'opencodian-empty-rewind' : 'opencodian-empty-state',
       role: 'assistant',
@@ -70,7 +101,11 @@ export class ConversationNoticeCoordinator {
     editedFiles: string[],
     tabId: TabId | null = this.host.getActiveTabId(),
   ): Promise<void> {
-    if (!conversation.openCodeSessionId || editedFiles.length === 0) {
+    // Diff notices are OpenCode-only.  The getSessionDiff and
+    // getCachedSessionDiffEntries APIs are OpenCode-specific and do not
+    // have a backend-neutral equivalent yet.
+    const backend = conversation.backend ?? 'opencode';
+    if (!conversation.openCodeSessionId || editedFiles.length === 0 || backend !== 'opencode') {
       return;
     }
 
@@ -135,6 +170,10 @@ export class ConversationNoticeCoordinator {
 
     if (!message) {
       return t('chat.error.serverNoResponse');
+    }
+
+    if (lowerMessage.includes('claude code')) {
+      return `${t('chat.error.sendFailed')}\n${message}`;
     }
 
     if (NETWORK_ERROR_PATTERNS.some((pattern) => lowerMessage.includes(pattern))) {

@@ -1,3 +1,4 @@
+/* eslint-disable max-lines-per-function -- Coordinator test groups tab-open behaviors together so backend-preservation and existing navigation flows stay reviewable in one place. */
 import type { ToolCallInfo } from '../../../../src/core/types';
 import {
   ConversationTabOpenCoordinator,
@@ -267,6 +268,45 @@ describe('ConversationTabOpenCoordinator', () => {
       await coordinator.openTaskToolSession('session-1');
 
       expect(host.showNotice).toHaveBeenCalledWith(t('chat.tab.childOpenFailed'));
+    });
+
+    it('passes the parent backend when opening a task tool session', async () => {
+      const tabManager = new TabManager('New chat', { getMaxTabs: () => 4 });
+      tabManager.createTab(createConversation('parent'));
+      const conversation = createConversation('from-session');
+      const host = createHost({
+        getTabManager: jest.fn().mockReturnValue(tabManager),
+        createConversationFromSession: jest.fn().mockResolvedValue(conversation),
+      });
+      const port = createPort();
+      const coordinator = new ConversationTabOpenCoordinator(host, port);
+
+      await coordinator.openTaskToolSession('session-1', {
+        input: { description: 'Test task' },
+      } as unknown as Pick<ToolCallInfo, 'input'>, 'claude-code');
+
+      expect(host.createConversationFromSession).toHaveBeenCalledWith('session-1', {
+        title: 'Subagent: Test task',
+        backend: 'claude-code',
+      });
+    });
+
+    it('passes undefined backend when no parent backend is specified', async () => {
+      const tabManager = new TabManager('New chat', { getMaxTabs: () => 4 });
+      tabManager.createTab(createConversation('parent'));
+      const conversation = createConversation('from-session');
+      const host = createHost({
+        getTabManager: jest.fn().mockReturnValue(tabManager),
+        createConversationFromSession: jest.fn().mockResolvedValue(conversation),
+      });
+      const port = createPort();
+      const coordinator = new ConversationTabOpenCoordinator(host, port);
+
+      await coordinator.openTaskToolSession('session-1');
+
+      expect(host.createConversationFromSession).toHaveBeenCalledWith('session-1', {
+        title: 'Subagent: session-1',
+      });
     });
   });
 });

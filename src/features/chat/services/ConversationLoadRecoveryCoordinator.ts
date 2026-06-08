@@ -5,7 +5,8 @@ import type {
   Conversation,
   PersistedTabState,
 } from '../../../core/types';
-import { getDefaultPersistedTabState } from '../../../core/types';
+import { getConversationBackendSessionId, getDefaultPersistedTabState } from '../../../core/types';
+import type { AgentBackendKind } from '../../../core/types/chat';
 import { t } from '../../../i18n';
 import {
   createLogger,
@@ -25,6 +26,7 @@ import type {
   TabId,
   TabModelOverride,
 } from '../tabs';
+import { ClaudeUserMessageIdentityBackfillService } from './ClaudeUserMessageIdentityBackfillService';
 import {
   ConversationTabLifecycleRecoveryCoordinator,
   type ConversationTabLifecycleRecoveryHost,
@@ -60,6 +62,7 @@ interface ForkConversationInitialState {
   messages: ChatMessage[];
   currentNote?: string;
   externalContextPaths?: string[];
+  backend?: AgentBackendKind;
 }
 
 export interface ConversationLoadRecoveryHost {
@@ -72,6 +75,7 @@ export interface ConversationLoadRecoveryHost {
   persistTabState(options?: { flush?: boolean }): void;
   loadConversations(): Promise<void>;
   getConversations(): Conversation[];
+  getActiveBackend(): AgentBackendKind | undefined;
   createConversation(): Promise<Conversation>;
   chooseForkTarget(): Promise<ForkTarget | null>;
   confirmRewind(): boolean;
@@ -86,6 +90,7 @@ export interface ConversationLoadRecoveryHost {
   syncActiveTabConversation(conversation: Conversation): void;
   updateModelSelectorDisplay(): void;
   showNotice(message: string): void;
+  backfillClaudeUserMessageIdentities?(conversation: Conversation): Promise<boolean>;
 }
 
 import type { App } from 'obsidian';
@@ -101,6 +106,7 @@ export interface ConversationLoadRecoveryHostDependencies {
   persistTabState(options?: { flush?: boolean }): void;
   loadConversations(): Promise<void>;
   getConversations(): Conversation[];
+  getActiveBackend(): AgentBackendKind | undefined;
   createConversation(): Promise<Conversation>;
   app: App;
   revertSession(sessionId: string, messageId: string): Promise<boolean>;
@@ -113,6 +119,7 @@ export interface ConversationLoadRecoveryHostDependencies {
   deleteConversation(conversationId: string): Promise<void>;
   syncActiveTabConversation(conversation: Conversation): void;
   updateModelSelectorDisplay(): void;
+  backfillClaudeUserMessageIdentities?(conversation: Conversation): Promise<boolean>;
 }
 
 export function createConversationLoadRecoveryHost(
@@ -130,6 +137,7 @@ export function createConversationLoadRecoveryHost(
     persistTabState: (options) => deps.persistTabState(options),
     loadConversations: () => deps.loadConversations(),
     getConversations: () => deps.getConversations(),
+    getActiveBackend: () => deps.getActiveBackend(),
     createConversation: () => deps.createConversation(),
     chooseForkTarget: () => chooseForkTarget(deps.app, {
       allowNewTab: deps.getTabManager()?.areTabsEnabled?.() ?? true,
@@ -146,6 +154,9 @@ export function createConversationLoadRecoveryHost(
     showNotice: (message) => {
       new Notice(message);
     },
+    ...(deps.backfillClaudeUserMessageIdentities
+      ? { backfillClaudeUserMessageIdentities: deps.backfillClaudeUserMessageIdentities }
+      : {}),
   };
 }
 
@@ -181,6 +192,12 @@ export class ConversationLoadRecoveryCoordinator {
     options: LoadConversationOptions = {},
   ): Promise<void> {
     await this.port.loadConversation(id, options);
+    const conversation = this.host.getCurrentConversation();
+    if (conversation?.backend === 'claude-code' && this.host.backfillClaudeUserMessageIdentities) {
+      try {
+        await this.host.backfillClaudeUserMessageIdentities(conversation);
+      } catch { /* best-effort */ }
+    }
   }
 
   async deleteConversationsAndRecover(conversationIds: readonly string[]): Promise<void> {
@@ -221,9 +238,14 @@ export class ConversationLoadRecoveryCoordinator {
       return;
     }
 
-    let initialConversation = this.host.getConversations()[0];
+    let initialConversation: Conversation | null = this.getActiveBackendConversations()[0] ?? null;
     if (!initialConversation) {
-      initialConversation = await measureStep('createConversation', () => this.host.createConversation());
+      try {
+        initialConversation = await measureStep('createConversation', () => this.host.createConversation());
+      } catch (error) {
+        logger.warn('Failed to bootstrap initial conversation; falling back to an empty tab', error);
+        initialConversation = null;
+      }
     }
 
     const tab = await measureStep('createTab', () => tabManager.createTab(initialConversation));
@@ -247,11 +269,21 @@ export class ConversationLoadRecoveryCoordinator {
       return null;
     }
 
+    const activeConversations = this.getActiveBackendConversations();
     const conversationMap = new Map(
-      this.host.getConversations().map((conversation) => [conversation.id, conversation] as const),
+      activeConversations.map((conversation) => [conversation.id, conversation] as const),
     );
+    const activeConversationIds = new Set(conversationMap.keys());
+    const filteredTabs = (savedState.tabs as RestoredTabState[]).filter(
+      (tab) => tab.conversationId && activeConversationIds.has(tab.conversationId),
+    );
+    if (filteredTabs.length === 0) {
+      this.host.resetPersistedTabState();
+      this.host.persistTabState({ flush: true });
+      return null;
+    }
     const restoredTab = tabManager.restoreTabs(
-      savedState.tabs as RestoredTabState[],
+      filteredTabs,
       savedState.activeTabIndex,
       conversationMap,
     );
@@ -265,6 +297,13 @@ export class ConversationLoadRecoveryCoordinator {
     return restoredTab.id;
   }
 
+  private getActiveBackendConversations(): Conversation[] {
+    const activeBackend = this.host.getActiveBackend() ?? 'opencode';
+    return this.host.getConversations().filter(
+      (conversation) => (conversation.backend ?? 'opencode') === activeBackend,
+    );
+  }
+
   async handleRewindRequest(message: ChatMessage): Promise<void> {
     if (this.host.isActiveTabStreaming()) {
       this.host.showNotice(t('chat.rewind.streamingBlocked'));
@@ -272,10 +311,21 @@ export class ConversationLoadRecoveryCoordinator {
     }
 
     const currentConversation = this.host.getCurrentConversation();
-    if (!currentConversation?.openCodeSessionId || !message.sourceMessageId) {
-      logger.debug('Rewind unavailable due to missing identifiers', {
-        conversationId: currentConversation?.id ?? null,
-        sessionId: currentConversation?.openCodeSessionId ?? null,
+    if (!currentConversation) {
+      this.host.showNotice(t('chat.rewind.unavailable'));
+      return;
+    }
+
+    const sessionId = getConversationBackendSessionId(currentConversation);
+    const backend = currentConversation.backend ?? 'opencode';
+
+    // Revert is OpenCode-only until Claude runtime proof justifies it.
+    // See docs/status/claude-code-current-state-2026-05-22.md §"What Exists But Must Not Be Described As Stable Completion".
+    if (!sessionId || !message.sourceMessageId || backend !== 'opencode') {
+      logger.debug('Rewind unavailable due to missing identifiers or unsupported backend', {
+        conversationId: currentConversation.id,
+        sessionId,
+        backend,
         messageId: message.id,
         sourceMessageId: message.sourceMessageId ?? null,
       });
@@ -290,20 +340,21 @@ export class ConversationLoadRecoveryCoordinator {
     try {
       logger.debug('Attempting rewind', {
         conversationId: currentConversation.id,
-        sessionId: currentConversation.openCodeSessionId,
+        sessionId,
+        backend,
         messageId: message.id,
         sourceMessageId: message.sourceMessageId,
         messagePreview: message.content.slice(0, 120),
       });
 
       const reverted = await this.host.revertSession(
-        currentConversation.openCodeSessionId,
+        sessionId,
         message.sourceMessageId,
       );
 
       logger.debug('Rewind API result', {
         conversationId: currentConversation.id,
-        sessionId: currentConversation.openCodeSessionId,
+        sessionId,
         sourceMessageId: message.sourceMessageId,
         reverted,
       });
@@ -311,7 +362,7 @@ export class ConversationLoadRecoveryCoordinator {
       if (!reverted) {
         logger.warn('Rewind API returned false', {
           conversationId: currentConversation.id,
-          sessionId: currentConversation.openCodeSessionId,
+          sessionId,
           sourceMessageId: message.sourceMessageId,
         });
         this.host.showNotice(t('chat.rewind.failed'));
@@ -322,7 +373,7 @@ export class ConversationLoadRecoveryCoordinator {
       const loadedConversation = this.host.getCurrentConversation() ?? currentConversation;
       logger.debug('Rewind reload complete', {
         conversationId: loadedConversation.id,
-        sessionId: loadedConversation.openCodeSessionId,
+        sessionId: getConversationBackendSessionId(loadedConversation),
         messagesAfterReload: loadedConversation.messages.length,
       });
       this.host.showNotice(t('chat.rewind.success'));
@@ -339,13 +390,22 @@ export class ConversationLoadRecoveryCoordinator {
     }
 
     const currentConversation = this.host.getCurrentConversation();
-    if (!currentConversation?.openCodeSessionId) {
+    if (!currentConversation) {
+      this.host.showNotice(t('chat.rewind.restoreFailed'));
+      return;
+    }
+
+    const sessionId = getConversationBackendSessionId(currentConversation);
+    const backend = currentConversation.backend ?? 'opencode';
+
+    // Unrevert is OpenCode-only until Claude runtime proof justifies it.
+    if (!sessionId || backend !== 'opencode') {
       this.host.showNotice(t('chat.rewind.restoreFailed'));
       return;
     }
 
     try {
-      const restored = await this.host.unrevertSession(currentConversation.openCodeSessionId);
+      const restored = await this.host.unrevertSession(sessionId);
       if (!restored) {
         this.host.showNotice(t('chat.rewind.restoreFailed'));
         return;
@@ -367,7 +427,12 @@ export class ConversationLoadRecoveryCoordinator {
 
     const currentConversation = this.host.getCurrentConversation();
     const tabManager = this.host.getTabManager();
-    if (!currentConversation?.openCodeSessionId || !message.sourceMessageId || !tabManager) {
+    if (!currentConversation || !message.sourceMessageId || !tabManager) {
+      this.host.showNotice(t('chat.fork.unavailable'));
+      return;
+    }
+    const sessionId = getConversationBackendSessionId(currentConversation);
+    if (!sessionId) {
       this.host.showNotice(t('chat.fork.unavailable'));
       return;
     }
@@ -380,7 +445,7 @@ export class ConversationLoadRecoveryCoordinator {
     try {
       const activeModelOverride = tabManager.getActiveTabModelOverride();
       const forkedSession = await this.host.forkSession(
-        currentConversation.openCodeSessionId,
+        sessionId,
         message.sourceMessageId,
       );
       const forkConversation = await this.createForkConversation(
@@ -415,6 +480,7 @@ export class ConversationLoadRecoveryCoordinator {
       messages: cloneMessagesBeforeForkTarget(currentConversation.messages, targetMessage),
       currentNote: currentConversation.currentNote,
       externalContextPaths: currentConversation.externalContextPaths,
+      backend: currentConversation.backend,
     });
   }
 
@@ -520,8 +586,13 @@ export function assembleConversationLoadRecovery(
       },
     );
 
+  const claudeBackfillService = new ClaudeUserMessageIdentityBackfillService();
+
   const conversationLoadRecoveryCoordinator = new ConversationLoadRecoveryCoordinator(
-    createConversationLoadRecoveryHost(deps.loadRecoveryHostDeps),
+    {
+      ...createConversationLoadRecoveryHost(deps.loadRecoveryHostDeps),
+      backfillClaudeUserMessageIdentities: (conversation: Conversation) => claudeBackfillService.backfill(conversation),
+    },
     {
       activateTab: (tabId) => conversationViewStateService.activateTab(tabId),
       createConversationInNewTab: () =>

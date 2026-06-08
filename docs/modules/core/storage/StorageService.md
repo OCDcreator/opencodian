@@ -90,13 +90,17 @@ class StorageService {
 - `titleGenerationStatus`
 - `messageCount`
 - `openCodeSessionId`
+- `backendSessionId`
+- `backendAgentId`
 - `currentNote`
 - `externalContextPaths`
 - `sessionSettings`
 - `backgroundTaskMetadata`
 - `messages`
 
-也就是说，保存时不是只存摘要，而是把完整消息数组一起落盘；同时还会额外写一份轻量 sidecar metadata，里面只保留历史列表需要的字段（`title/updatedAt/messageCount/openCodeSessionId` 等）。
+也就是说，保存时不是只存摘要，而是把完整消息数组一起落盘；同时还会额外写一份轻量 sidecar metadata，里面只保留历史列表需要的字段（`title/updatedAt/messageCount/openCodeSessionId/backendSessionId/backendAgentId` 等）。
+
+`backendSessionId` 是 multi-backend 通用会话标识。OpenCode 旧 conversation 仍保留 `openCodeSessionId`，保存时会把 `openCodeSessionId` 回填到 `backendSessionId`；Claude/Codex 等非 OpenCode conversation 可以只持久化 `backendSessionId` 而不写 `openCodeSessionId`。
 
 `backgroundTaskMetadata` 只作为会话级 background-task lifecycle 恢复缓存随完整 session JSON 保存和读取；它不进入 conversation list sidecar，也不承载 assistant 正文、工具输出、结构化 payload 或 `contentBlocks` 真值。
 

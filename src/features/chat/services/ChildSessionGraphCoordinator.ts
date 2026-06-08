@@ -129,7 +129,10 @@ export class ChildSessionGraphCoordinator {
 
   async refreshGraph(): Promise<ChildSessionGraph | null> {
     const conversation = this.host.getCurrentConversation();
-    if (!conversation?.openCodeSessionId) {
+    const backend = conversation?.backend ?? 'opencode';
+    // Session children / subagent graph is OpenCode-only.
+    // Claude's subagent graph surface is not stable-complete.
+    if (!conversation?.openCodeSessionId || backend !== 'opencode') {
       this.currentGraph = null;
       return null;
     }

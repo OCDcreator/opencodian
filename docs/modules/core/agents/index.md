@@ -16,6 +16,7 @@
 | `ChildSessionGraphService` | 类 `ChildSessionGraphService` |
 | `MarkdownAgentWorkspaceService` | 类 `MarkdownAgentWorkspaceService`、常量 `AGENT_FILE_ROOTS`、类型 `AgentFileRoot`、`MarkdownAgentFs`、`MarkdownAgentFileInput`、`MarkdownAgentScanResult` |
 | `SystemAgentGuardService` | 类 `SystemAgentGuardService`、类型 `SystemAgentRiskLabel` |
+| `backend` | `AgentServiceRegistry`、`OpenCodeAdapter`，以及 `AgentService` / capability interfaces / registry 状态相关类型 |
 | `types` | 常量 `SYSTEM_AGENT_IDS`、函数 `isSystemAgentId`、类型 `AgentCatalogInput`、`RuntimeAgentShape`、`SurfaceAgent`、`SurfaceAgentFile`、`SurfaceAgentFileParseStatus`、`SurfaceAgentFileScope`、`SurfaceAgentSource`、`SystemAgentGuardResult`、`SystemAgentId`、`SurfaceInvocationIntent`、`SurfaceInvocationKind`、`AgentMentionIntent`、`SubtaskIntent`、`InvocationPromptPart`、`ResolvedAgentInvocation`、`ChildSessionEdge`、`ChildSessionEdgeStatus`、`ChildSessionGraph`、`ChildSessionGraphInput`、`ChildSessionGraphStatus`、`ChildSessionInfo`、`OrphanedChildSession` |
 
 ## 消费方

@@ -96,6 +96,7 @@ export function createHost(
     renderStreamError: jest.fn(),
     formatCurrentSessionModelId: jest.fn().mockReturnValue('test-model'),
     updateConversationSyncRuntime: jest.fn(),
+    transitionTabSessionLifecycle: jest.fn().mockReturnValue(true),
     scrollToBottom: jest.fn(),
     ...overrides,
   };

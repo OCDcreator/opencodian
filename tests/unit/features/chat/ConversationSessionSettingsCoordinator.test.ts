@@ -36,6 +36,7 @@ describe('ConversationSessionSettingsCoordinator', () => {
   function createCoordinator(options?: {
     currentConversation?: Conversation | null;
     projectShareMode?: 'manual' | 'auto' | 'disabled';
+    supportsSessionSharing?: boolean;
   }) {
     const chatContainerEl = document.createElement('div');
     const saveConversation = jest.fn().mockResolvedValue(undefined);
@@ -53,6 +54,8 @@ describe('ConversationSessionSettingsCoordinator', () => {
       listSessions: jest.fn().mockResolvedValue([]),
       copyText: jest.fn().mockResolvedValue(undefined),
       getProjectShareMode: jest.fn().mockResolvedValue(options?.projectShareMode),
+      supportsSessionSharing: jest.fn().mockReturnValue(options?.supportsSessionSharing ?? false),
+      supportsCompaction: jest.fn().mockReturnValue(false),
     } as jest.Mocked<ConversationSessionSettingsCoordinatorHost>;
 
     return {
@@ -169,6 +172,7 @@ describe('ConversationSessionSettingsCoordinator', () => {
     const conversation = createConversation();
     const { coordinator, host } = createCoordinator({
       currentConversation: conversation,
+      supportsSessionSharing: true,
     });
 
     await coordinator.openCurrentConversationSettings();
@@ -189,8 +193,9 @@ describe('ConversationSessionSettingsCoordinator', () => {
     const conversation = createConversation();
     const { coordinator, host } = createCoordinator({
       currentConversation: conversation,
+      supportsSessionSharing: true,
     });
-    host.listSessions.mockResolvedValue([
+    (host.listSessions as jest.Mock).mockResolvedValue([
       {
         id: 'session-1',
         title: 'Shared session',
@@ -211,6 +216,7 @@ describe('ConversationSessionSettingsCoordinator', () => {
     const { coordinator } = createCoordinator({
       currentConversation: conversation,
       projectShareMode: 'disabled',
+      supportsSessionSharing: true,
     });
 
     await coordinator.openCurrentConversationSettings();
@@ -220,12 +226,31 @@ describe('ConversationSessionSettingsCoordinator', () => {
     expect(modalOptions.shareMode).toBe('disabled');
   });
 
+  it('hides OpenCode-only summaries for Claude Code conversations without host support', async () => {
+    const conversation = createConversation();
+    conversation.backend = 'claude-code';
+    conversation.backendSessionId = 'claude-code-session';
+    delete conversation.openCodeSessionId;
+    const { coordinator } = createCoordinator({
+      currentConversation: conversation,
+    });
+
+    await coordinator.openCurrentConversationSettings();
+    const modalOptions = (jest.requireMock('../../../../src/features/chat/ui/ConversationSessionSettingsModal')
+      .ConversationSessionSettingsModal as jest.Mock).mock.calls.at(-1)[1];
+
+    expect(modalOptions.showTitleSummary).toBe(false);
+    expect(modalOptions.showQuestionsSummary).toBe(false);
+    expect(modalOptions.showCompactionSummary).toBe(false);
+  });
+
   it('normalizes OpenCode share 500 failures into user-facing guidance', async () => {
     const conversation = createConversation();
     const { coordinator, host } = createCoordinator({
       currentConversation: conversation,
+      supportsSessionSharing: true,
     });
-    host.shareSession.mockRejectedValue(new Error('Request failed, status 500'));
+    (host.shareSession as jest.Mock).mockRejectedValue(new Error('Request failed, status 500'));
 
     await coordinator.openCurrentConversationSettings();
     const modalOptions = (jest.requireMock('../../../../src/features/chat/ui/ConversationSessionSettingsModal')

@@ -22,7 +22,7 @@
 
 ### icon rendering host
 
-`applyProviderIcon()` 只调用 `ProviderIconService.resolveIconUrl()`，然后把解析结果渲染到目标 DOM。provider icon fallback order 仍完全由 `ProviderIconService` / `builtinIconRegistry` 管理，本模块不做 ad-hoc matching。
+`applyProviderIcon()` 只调用 `ProviderIconService.resolveIconUrl()`，然后把解析结果渲染到目标 DOM。provider icon fallback order 仍完全由 `ProviderIconService` / `builtinIconRegistry` 管理，本模块不做 ad-hoc matching。无论是 icon URL 路径还是 `bot` fallback 路径，`targetEl` 都会设置 `data-settings-tooltip` 属性（值为 `label`）并通过 `SettingsTooltipController.ensureForDocument()` 注册 body-level tooltip，替代了原来的 `img.title`。`img.alt` 仍保留用于无障碍。
 
 ## 关键方法
 
@@ -32,6 +32,13 @@
 | `refreshProviderIconCache()` | 执行 refresh/warm 并保存 provider icon library |
 | `refreshIconCacheOverview()` | 读取 cache summary 并更新工具区描述 |
 | `applyProviderIcon()` | 复用 `ProviderIconService` 解析并渲染 provider icon |
+
+## 导入关系
+
+```text
+上游: obsidian, ProviderIconService, SettingsTooltipController
+下游: SettingsModelSection, SettingsModelCatalogCoordinator
+```
 
 ## 与其他模块的交互
 

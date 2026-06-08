@@ -37,6 +37,8 @@ export class StreamChunkRouter {
 - `streamTimedOut`
 - `latestErrorMessage`
 - `finalizedAssistantMetadata`
+- `finalizedBackendSessionId`
+- `resolvedUserMessageIdentity`
 - `logAssistantFinalizationStage()`
 - `resetStreamingState()`
 - `cleanupPendingIndicator()`
@@ -47,9 +49,11 @@ export class StreamChunkRouter {
 
 - `message_start`：触发最新 user message authoritative sync，并开始 context usage stream
 - `usage`：更新 tab context usage
-- `message_metadata`：记录最终 assistant message id / timestamp / model id
+- `message_metadata`：记录最终 assistant message id / timestamp / model id，并把可选 `sessionId` 暴露为 backend-neutral finalized session identity
+- `user_message_identity`：捕获 Claude Code stream 中的 user message UUID，保存为 `resolvedUserMessageIdentity` 并随 router result 传给本地持久化层
 - `message_stop`：标记 stream 正常完成，并结束 context usage stream
 - `file_edited`：追加到 tab runtime 的 `pendingEditedFiles`
+- `backend_event` + `structured_output`：捕获 `metadata.structuredOutput` 到 router result，供下游持久化与渲染使用
 
 ### 交互 chunk
 
@@ -62,6 +66,7 @@ export class StreamChunkRouter {
 - 在没有任何 meaningful / 可见 chunk 到达前，router 使用 60 秒 no-visible-content timeout，避免 prompt 被服务端接受但长期没有 assistant 输出时让用户持续等待。
 - 一旦 text / thinking / tool / question / permission 等 meaningful chunk 到达，router 切回 5 分钟 idle timeout，保留长任务和工具调用的耐心窗口。
 - timeout log 会记录 `timeoutReason`，区分 `no-visible-content` 与 `idle-after-content`。
+- timeout detach 使用 `getConversationBackendSessionId()` 解析 session id；这让本地 stream 取消路径不再硬依赖 `openCodeSessionId`，但最终 sync/history 仍按各 backend capability 分阶段迁移。
 
 ### 可渲染 chunk
 

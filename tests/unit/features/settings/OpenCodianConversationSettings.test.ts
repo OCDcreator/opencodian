@@ -1,3 +1,4 @@
+/* eslint-disable max-lines-per-function -- The shared Obsidian Setting mock setup is intentionally colocated with these conversation settings regressions. */
 import type { App } from 'obsidian';
 import * as obsidian from 'obsidian';
 import { Setting } from 'obsidian';
@@ -157,7 +158,7 @@ const toggleRecords: ToggleRecord[] = [];
 const buttonRecords: ButtonRecord[] = [];
 const extraButtonRecords: ExtraButtonRecord[] = [];
 
-function renderConversationSettings() {
+function renderConversationSettings(settings: Partial<typeof DEFAULT_SETTINGS> = {}) {
   const plugin = {
     settings: {
       ...DEFAULT_SETTINGS,
@@ -167,6 +168,7 @@ function renderConversationSettings() {
       showAnsweredQuestionCards: true,
       aiTitleModel: '',
       renderUserMarkupAsCodeBlocks: true,
+      ...settings,
     },
     modelConfigService: null,
     saveSettings: jest.fn().mockResolvedValue(undefined),
@@ -271,6 +273,33 @@ describe('OpenCodian conversation settings', () => {
     expect(showAnsweredCards?.control.setValue).toHaveBeenCalledWith(true);
     expect(renderUserMarkup).toBeDefined();
     expect(renderUserMarkup?.control.setValue).toHaveBeenCalledWith(true);
+  });
+
+  it('shows Claude title controls and hides OpenCode-only controls when Claude Code is active', () => {
+    renderConversationSettings({
+      activeBackend: 'claude-code',
+      enabledBackends: ['opencode', 'claude-code'],
+    });
+
+    const autoTitleToggle = toggleRecords.find(
+      (record) => record.name === t('settings.titleGeneration.claudeAutoTitle.name'),
+    );
+    expect(autoTitleToggle).toBeDefined();
+    expect(autoTitleToggle?.control.setValue).toHaveBeenCalledWith(true);
+    expect(dropdownRecords.find((record) => record.name === t('settings.titleGeneration.mode.name'))).toBeUndefined();
+    expect(buttonRecords.find((record) => record.name === t('settings.titleGeneration.model.name'))).toBeUndefined();
+    expect(
+      dropdownRecords.find((record) => record.name === t('settings.conversation.questionDisplayMode.name')),
+    ).toBeUndefined();
+    expect(
+      dropdownRecords.find((record) => record.name === t('settings.conversation.questionCardPosition.name')),
+    ).toBeUndefined();
+    expect(
+      toggleRecords.find((record) => record.name === t('settings.conversation.showAnsweredQuestionCards.name')),
+    ).toBeUndefined();
+    expect(
+      toggleRecords.find((record) => record.name === t('settings.conversation.userMarkupAsCodeBlocks.name')),
+    ).toBeDefined();
   });
 
   it('saves and refreshes the question UI when question display mode changes', async () => {

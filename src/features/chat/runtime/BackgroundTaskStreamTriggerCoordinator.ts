@@ -153,6 +153,14 @@ export class BackgroundTaskStreamTriggerCoordinator {
   }
 
   private isTodoTool(toolName: string): boolean {
-    return toolName === 'todowrite' || toolName === 'todoread';
+    // OpenCode TodoWrite tools
+    if (toolName === 'todowrite' || toolName === 'todoread') {
+      return true;
+    }
+
+    // Claude Code Task* tools — normalized names (case-insensitive canonicalization)
+    const canonical = toolName.trim().toLowerCase().replace(/[^a-z0-9]+/g, '');
+    return canonical === 'taskcreate' || canonical === 'taskupdate'
+      || canonical === 'tasklist' || canonical === 'taskget';
   }
 }

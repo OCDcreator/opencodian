@@ -2,6 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import * as obsidian from 'obsidian';
 import { Setting } from 'obsidian';
 
 import { SettingsFormatterSection } from '../../../../src/features/settings/SettingsFormatterSection';
@@ -272,6 +273,8 @@ function createPlugin(overrides?: {
   const plugin = {
     opencodeConfigManager: configManager,
     settings: {
+      activeBackend: 'opencode',
+      enabledBackends: ['opencode', 'claude-code'],
       server: {
         mode: overrides?.serverMode ?? 'local',
       },
@@ -525,7 +528,7 @@ describe('SettingsFormatterSection builtin list search', () => {
     inputEl.value = 'pre';
     inputEl.dispatchEvent(new Event('input'));
 
-    const options = Array.from(containerEl.querySelectorAll<HTMLButtonElement>('.opencodian-builtin-list-search-option'));
+    const options = Array.from(document.body.querySelectorAll<HTMLButtonElement>('.opencodian-builtin-list-search-option'));
     expect(options.map((option) => option.dataset.value)).toContain('prettier');
     expect(getBuiltinRow(containerEl, 'prettier').hidden).toBe(false);
     expect(getBuiltinRow(containerEl, 'gofmt').hidden).toBe(true);
@@ -565,7 +568,7 @@ describe('SettingsFormatterSection builtin list search', () => {
     expect(getBuiltinRow(containerEl, 'typescript').hasClass('is-last-visible')).toBe(true);
 
     inputEl.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown' }));
-    expect(containerEl.querySelector('.opencodian-builtin-list-search-option[aria-selected="true"]')?.getAttribute('data-value'))
+    expect(document.body.querySelector('.opencodian-builtin-list-search-option[aria-selected="true"]')?.getAttribute('data-value'))
       .toBe('typescript');
     inputEl.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
 
@@ -575,7 +578,7 @@ describe('SettingsFormatterSection builtin list search', () => {
 
     inputEl.value = 'go';
     inputEl.dispatchEvent(new Event('input'));
-    const popoverEl = containerEl.querySelector<HTMLElement>('.opencodian-builtin-list-search-popover');
+    const popoverEl = document.body.querySelector<HTMLElement>('.opencodian-builtin-list-search-popover');
     expect(popoverEl?.hidden).toBe(false);
 
     inputEl.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
@@ -943,7 +946,7 @@ describe('SettingsFormatterSection LSP settings', () => {
     searchInput!.value = 'bash';
     searchInput!.dispatchEvent(new Event('input'));
 
-    const optionEls = Array.from(containerEl.querySelectorAll<HTMLButtonElement>('.opencodian-builtin-list-search-option'));
+    const optionEls = Array.from(document.body.querySelectorAll<HTMLButtonElement>('.opencodian-builtin-list-search-option'));
     expect(optionEls.map((option) => option.dataset.value)).toContain('shfmt');
     expect(getFormatterRuntimeRowNames(containerEl)).toEqual(['shfmt']);
     expect(containerEl.querySelector('.opencodian-formatter-runtime-panel-meta')?.textContent).toBe('1 / 3');
@@ -951,7 +954,7 @@ describe('SettingsFormatterSection LSP settings', () => {
     searchInput!.value = 'pre';
     searchInput!.dispatchEvent(new Event('input'));
     searchInput!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown' }));
-    expect(containerEl.querySelector('.opencodian-builtin-list-search-option[aria-selected="true"]')?.getAttribute('data-value'))
+    expect(document.body.querySelector('.opencodian-builtin-list-search-option[aria-selected="true"]')?.getAttribute('data-value'))
       .toBe('prettier');
     searchInput!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
 
@@ -1092,6 +1095,32 @@ describe('SettingsFormatterSection LSP settings', () => {
     await flushPromises();
 
     expect(updateLspConfig).not.toHaveBeenCalled();
+  });
+
+  it('blocks stale LSP mode callbacks after switching to Claude Code', async () => {
+    const noticeSpy = jest.spyOn(obsidian, 'Notice').mockImplementation(() => undefined as never);
+    const { plugin, updateLspConfig } = createPlugin();
+    const section = new SettingsFormatterSection({
+      plugin,
+      createSectionHeading,
+      requestDisplayRefresh: displayRefresh,
+    });
+    const containerEl = document.createElement('div');
+    document.body.appendChild(containerEl);
+
+    section.attachTabbed(containerEl, 'lsp');
+    await flushPromises();
+
+    const modeDropdown = findDropdown(t('settings.formatter.lsp.modeSwitch'));
+    (plugin.settings as unknown as { activeBackend: string }).activeBackend = 'claude-code';
+    await modeDropdown?.onChange?.('disabled');
+    await flushPromises();
+
+    expect(updateLspConfig).not.toHaveBeenCalled();
+    expect(plugin.openCodeService.checkHealth).not.toHaveBeenCalled();
+    expect(plugin.openCodeService.stop).not.toHaveBeenCalled();
+    expect(plugin.openCodeService.start).not.toHaveBeenCalled();
+    expect(noticeSpy).toHaveBeenLastCalledWith(t('settings.formatter.notice.openCodeOnly'));
   });
 
 });
@@ -1272,6 +1301,32 @@ describe('SettingsFormatterSection mode switching', () => {
     expect(displayRefresh).not.toHaveBeenCalled();
     expect(findDropdown(t('settings.formatter.config.modeSwitch'))).toBeDefined();
   });
+
+  it('blocks stale formatter mode callbacks after switching to Claude Code', async () => {
+    const noticeSpy = jest.spyOn(obsidian, 'Notice').mockImplementation(() => undefined as never);
+    const { plugin, updateFormatterConfig } = createPlugin();
+    const section = new SettingsFormatterSection({
+      plugin,
+      createSectionHeading,
+      requestDisplayRefresh: displayRefresh,
+    });
+    const containerEl = document.createElement('div');
+    document.body.appendChild(containerEl);
+
+    section.attachTabbed(containerEl, 'config');
+    await flushPromises();
+
+    const modeDropdown = findDropdown(t('settings.formatter.config.modeSwitch'));
+    (plugin.settings as unknown as { activeBackend: string }).activeBackend = 'claude-code';
+    await modeDropdown?.onChange?.('disabled');
+    await flushPromises();
+
+    expect(updateFormatterConfig).not.toHaveBeenCalled();
+    expect(plugin.openCodeService.checkHealth).not.toHaveBeenCalled();
+    expect(plugin.openCodeService.stop).not.toHaveBeenCalled();
+    expect(plugin.openCodeService.start).not.toHaveBeenCalled();
+    expect(noticeSpy).toHaveBeenLastCalledWith(t('settings.formatter.notice.openCodeOnly'));
+  });
 });
 
 describe('SettingsFormatterSection runtime status presentation', () => {
@@ -1374,6 +1429,62 @@ describe('SettingsFormatterSection dispose', () => {
     });
 
     expect(() => section.dispose()).not.toThrow();
+  });
+});
+
+describe('SettingsFormatterSection body-level popover lifecycle', () => {
+  it('does not leak body-level popovers after repeated content refresh cycles', async () => {
+    const { plugin, getFormatterConfig } = createPlugin({
+      formatterConfig: { custom: { command: ['echo'] } },
+      runtimeStatus: [],
+    });
+    const section = new SettingsFormatterSection({
+      plugin,
+      createSectionHeading,
+      requestDisplayRefresh: displayRefresh,
+    });
+    const containerEl = document.createElement('div');
+    document.body.appendChild(containerEl);
+
+    // First render — tabbed config tab (renders builtin formatter search popover).
+    section.attachTabbed(containerEl, 'config');
+    await flushPromises();
+
+    // Simulate user opening the search popover so it gets appended to body.
+    const searchInput = containerEl.querySelector<HTMLInputElement>('[data-search-scope="formatter"]');
+    if (searchInput) {
+      searchInput.value = 'x';
+      searchInput.dispatchEvent(new Event('input'));
+    }
+
+    const popoversAfterFirst = document.body.querySelectorAll('.opencodian-builtin-list-search-popover');
+    const firstRenderCount = popoversAfterFirst.length;
+
+    // Dispose and re-attach to simulate a full refresh cycle.
+    getFormatterConfig.mockResolvedValue({ custom: { command: ['echo', 'hello'] } });
+    section.dispose();
+    expect(document.body.querySelectorAll('.opencodian-builtin-list-search-popover').length).toBe(0);
+
+    section.attachTabbed(containerEl, 'config');
+    await flushPromises();
+
+    // Open the search popover again.
+    const searchInput2 = containerEl.querySelector<HTMLInputElement>('[data-search-scope="formatter"]');
+    if (searchInput2) {
+      searchInput2.value = 'x';
+      searchInput2.dispatchEvent(new Event('input'));
+    }
+
+    const popoversAfterSecond = document.body.querySelectorAll('.opencodian-builtin-list-search-popover');
+
+    // There should be the same number of popovers, not doubled.
+    expect(popoversAfterSecond.length).toBe(firstRenderCount);
+
+    // Final dispose must clean up everything.
+    section.dispose();
+    expect(document.body.querySelectorAll('.opencodian-builtin-list-search-popover').length).toBe(0);
+
+    containerEl.remove();
   });
 });
 
@@ -1909,8 +2020,9 @@ describe('SettingsFormatterSection CSS contract', () => {
     expect(builtinSearchInputFocusRule).toContain('var(--opencodian-settings-focus-ring)');
     expect(builtinSearchCountRule).toContain('border-radius: 999px');
     expect(builtinSearchClearRule).toContain('background: transparent');
-    expect(builtinSearchPopoverRule).toContain('position: absolute');
-    expect(builtinSearchPopoverRule).toContain('max-height: 260px');
+    expect(builtinSearchPopoverRule).toContain('position: fixed');
+    expect(builtinSearchPopoverRule).toContain('z-index: 2280');
+    expect(builtinSearchPopoverRule).toContain('max-height: min(260px, calc(100vh - 24px))');
     expect(builtinSearchOptionRule).toContain('minmax(120px, 180px)');
     expect(builtinSearchOptionRule).toContain('border-radius: var(--opencodian-settings-radius-inline)');
     expect(builtinSearchOptionActiveRule).toContain('var(--interactive-accent)');

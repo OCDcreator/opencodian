@@ -29,7 +29,8 @@ export interface ConversationHydrationOutcomePort {
 
 ## 关键行为
 
-- `applyLoadedConversationOutcome()` 保持原有 loaded-conversation outcome 顺序：先 `syncBackgroundTaskStateFromConversation()`，再把 per-conversation session visual state 重新应用到当前 conversation root，随后 `renderMessages()`，然后委托 `TabViewActivationBridge.applyLoadedConversationPostRenderOutcome()`，最后 `commitConversationSyncBaseline()`
+- `applyLoadedConversationOutcome()` 保持原有 loaded-conversation outcome 顺序：先 `syncBackgroundTaskStateFromConversation()`，再把 per-conversation session visual state 重新应用到当前 conversation root，随后 `renderMessages()`，然后只在当前 conversation 属于 OpenCode 时把 session identity 传给 `TabViewActivationBridge.applyLoadedConversationPostRenderOutcome()`，最后 `commitConversationSyncBaseline()`
+- Claude Code 等非 OpenCode backend 的 loaded conversation 会继续渲染消息和 background-task indicator，但 post-render question/todo activation refresh 会收到 `null` session id，避免把 `claude-code-*` session 误交给 OpenCode-only `session.todo()` 路径
 - background-task runtime rebuild 继续基于当前 conversation 语义，不把 timeline 推导逻辑重新塞回装载服务
 - post-render indicator / dock / status-question-todo lazy refresh 继续复用 `TabViewActivationBridge` 与 `QuestionTodoStatusRefreshCoordinator`
 - sync baseline 提交继续复用 `TabConversationStateBridge`，bridge 自己不重新实现 fingerprint 规则或 sync loop 生命周期
@@ -40,3 +41,7 @@ export interface ConversationHydrationOutcomePort {
 - `ConversationViewStateService` 现在只保留 loaded-conversation 的 resolve / activation / transition / hydration-tail orchestration，不再直接持有消息装载后的 background-task rebuild、message rerender 与 baseline commit
 - `TabViewActivationBridge` 继续负责 UI-only 的 post-render / hydration-tail writeback，但 loaded-conversation 的 post-render outcome 入口现在由本 bridge 统一触发
 - 这条边界推进的是 master plan 的 P1 `tab / pane / conversation activation 与 sync orchestration` ownership 迁移
+
+## Recent Note
+
+- 2026-06-07 的 Claude Task* hydration 修复最终没有把专用 rehydration hook 留在本 bridge。当前源码保持 bridge 只负责 background-task rebuild、visual-state reapply、message render 与 baseline commit；Claude task persisted-history replay 已回收到 `SessionTodoCoordinator` 的会话 reset/activation 路径。

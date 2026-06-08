@@ -145,23 +145,44 @@ function createRefreshCoordinator(
   };
 }
 
+function createBridgeFixture() {
+  const callOrder: string[] = [];
+  const host = createHost(callOrder);
+  const tabConversationStateBridge = createTabConversationStateBridge(callOrder);
+  const tabViewActivationBridge = createTabViewActivationBridge(callOrder);
+  const refreshCoordinator = createRefreshCoordinator(callOrder);
+  const backgroundTaskCoordinator = createBackgroundTaskCoordinator(callOrder);
+  const contextUsageCoordinator = createContextUsageCoordinator(callOrder);
+  const bridge = new TabConversationActivationBridge({
+    host,
+    tabConversationStateBridge,
+    tabViewActivationBridge,
+    questionTodoActivationRefreshCoordinator: refreshCoordinator,
+    backgroundTaskActivationIndicatorCoordinator: backgroundTaskCoordinator,
+    activeTabContextUsageCoordinator: contextUsageCoordinator,
+  });
+
+  return {
+    bridge,
+    callOrder,
+    host,
+    tabConversationStateBridge,
+    tabViewActivationBridge,
+    refreshCoordinator,
+    backgroundTaskCoordinator,
+    contextUsageCoordinator,
+  };
+}
+
 describe('TabConversationActivationBridge', () => {
   it('applies empty-tab activation in bridge order', () => {
-    const callOrder: string[] = [];
-    const host = createHost(callOrder);
-    const tabConversationStateBridge = createTabConversationStateBridge(callOrder);
-    const tabViewActivationBridge = createTabViewActivationBridge(callOrder);
-    const refreshCoordinator = createRefreshCoordinator(callOrder);
-    const backgroundTaskCoordinator = createBackgroundTaskCoordinator(callOrder);
-    const contextUsageCoordinator = createContextUsageCoordinator(callOrder);
-    const bridge = new TabConversationActivationBridge({
-      host,
+    const {
+      bridge,
+      callOrder,
       tabConversationStateBridge,
       tabViewActivationBridge,
-      questionTodoActivationRefreshCoordinator: refreshCoordinator,
-      backgroundTaskActivationIndicatorCoordinator: backgroundTaskCoordinator,
-      activeTabContextUsageCoordinator: contextUsageCoordinator,
-    });
+      refreshCoordinator,
+    } = createBridgeFixture();
 
     bridge.applyEmptyTabActivation('tab-1');
 
@@ -177,22 +198,14 @@ describe('TabConversationActivationBridge', () => {
   });
 
   it('applies streaming activation in bridge order', () => {
-    const callOrder: string[] = [];
     const conversation = createConversation('streaming-conversation');
-    const host = createHost(callOrder);
-    const tabConversationStateBridge = createTabConversationStateBridge(callOrder);
-    const tabViewActivationBridge = createTabViewActivationBridge(callOrder);
-    const refreshCoordinator = createRefreshCoordinator(callOrder);
-    const backgroundTaskCoordinator = createBackgroundTaskCoordinator(callOrder);
-    const contextUsageCoordinator = createContextUsageCoordinator(callOrder);
-    const bridge = new TabConversationActivationBridge({
-      host,
+    const {
+      bridge,
+      callOrder,
       tabConversationStateBridge,
       tabViewActivationBridge,
-      questionTodoActivationRefreshCoordinator: refreshCoordinator,
-      backgroundTaskActivationIndicatorCoordinator: backgroundTaskCoordinator,
-      activeTabContextUsageCoordinator: contextUsageCoordinator,
-    });
+      backgroundTaskCoordinator,
+    } = createBridgeFixture();
 
     bridge.applyStreamingConversationActivation('tab-1', conversation);
 
@@ -219,23 +232,34 @@ describe('TabConversationActivationBridge', () => {
     ]);
   });
 
+  it('applies Claude Code streaming activation without OpenCode question/todo refresh', () => {
+    const conversation = createConversation('streaming-claude-conversation');
+    conversation.backend = 'claude-code';
+    conversation.backendSessionId = 'claude-code-stream-session';
+    delete conversation.openCodeSessionId;
+    const { bridge, callOrder, tabViewActivationBridge } = createBridgeFixture();
+
+    bridge.applyStreamingConversationActivation('tab-1', conversation);
+
+    expect(tabViewActivationBridge.applyStreamingActivationOutcome).toHaveBeenCalledWith(
+      'tab-1',
+      null,
+    );
+    expect(callOrder).toEqual([
+      'applyActiveConversation',
+      'commitConversationSyncBaseline',
+      'applyStreamingActivationOutcome',
+    ]);
+  });
+
   it('applies loaded-conversation activation state through the shared state bridge', () => {
-    const callOrder: string[] = [];
     const conversation = createConversation('loaded-conversation');
-    const host = createHost(callOrder);
-    const tabConversationStateBridge = createTabConversationStateBridge(callOrder);
-    const tabViewActivationBridge = createTabViewActivationBridge(callOrder);
-    const refreshCoordinator = createRefreshCoordinator(callOrder);
-    const backgroundTaskCoordinator = createBackgroundTaskCoordinator(callOrder);
-    const contextUsageCoordinator = createContextUsageCoordinator(callOrder);
-    const bridge = new TabConversationActivationBridge({
-      host,
+    const {
+      bridge,
+      callOrder,
       tabConversationStateBridge,
       tabViewActivationBridge,
-      questionTodoActivationRefreshCoordinator: refreshCoordinator,
-      backgroundTaskActivationIndicatorCoordinator: backgroundTaskCoordinator,
-      activeTabContextUsageCoordinator: contextUsageCoordinator,
-    });
+    } = createBridgeFixture();
 
     bridge.applyLoadedConversationActivation('tab-1', conversation);
 
@@ -256,22 +280,14 @@ describe('TabConversationActivationBridge', () => {
   });
 
   it('opens the current-tab conversation shell in bridge order', () => {
-    const callOrder: string[] = [];
     const conversation = createConversation('next-conversation');
-    const host = createHost(callOrder);
-    const tabConversationStateBridge = createTabConversationStateBridge(callOrder);
-    const tabViewActivationBridge = createTabViewActivationBridge(callOrder);
-    const refreshCoordinator = createRefreshCoordinator(callOrder);
-    const backgroundTaskCoordinator = createBackgroundTaskCoordinator(callOrder);
-    const contextUsageCoordinator = createContextUsageCoordinator(callOrder);
-    const bridge = new TabConversationActivationBridge({
-      host,
+    const {
+      bridge,
+      callOrder,
       tabConversationStateBridge,
-      tabViewActivationBridge,
-      questionTodoActivationRefreshCoordinator: refreshCoordinator,
-      backgroundTaskActivationIndicatorCoordinator: backgroundTaskCoordinator,
-      activeTabContextUsageCoordinator: contextUsageCoordinator,
-    });
+      refreshCoordinator,
+      backgroundTaskCoordinator,
+    } = createBridgeFixture();
 
     bridge.openConversation(conversation);
 
@@ -309,22 +325,12 @@ describe('TabConversationActivationBridge', () => {
   });
 
   it('delegates open-conversation background-task preparation', () => {
-    const callOrder: string[] = [];
     const conversation = createConversation('same-conversation');
-    const host = createHost(callOrder);
-    const tabConversationStateBridge = createTabConversationStateBridge(callOrder);
-    const tabViewActivationBridge = createTabViewActivationBridge(callOrder);
-    const refreshCoordinator = createRefreshCoordinator(callOrder);
-    const backgroundTaskCoordinator = createBackgroundTaskCoordinator(callOrder);
-    const contextUsageCoordinator = createContextUsageCoordinator(callOrder);
-    const bridge = new TabConversationActivationBridge({
-      host,
+    const {
+      bridge,
       tabConversationStateBridge,
-      tabViewActivationBridge,
-      questionTodoActivationRefreshCoordinator: refreshCoordinator,
-      backgroundTaskActivationIndicatorCoordinator: backgroundTaskCoordinator,
-      activeTabContextUsageCoordinator: contextUsageCoordinator,
-    });
+      backgroundTaskCoordinator,
+    } = createBridgeFixture();
 
     bridge.openConversation(conversation);
 
@@ -332,5 +338,30 @@ describe('TabConversationActivationBridge', () => {
     expect(tabConversationStateBridge.commitConversationSyncBaseline).toHaveBeenCalledWith(
       conversation.messages,
     );
+  });
+
+  it('opens Claude Code conversations without OpenCode question/todo activation refresh', () => {
+    const conversation = createConversation('claude-conversation');
+    conversation.backend = 'claude-code';
+    conversation.backendSessionId = 'claude-code-session';
+    delete conversation.openCodeSessionId;
+    const { bridge, callOrder, refreshCoordinator } = createBridgeFixture();
+
+    bridge.openConversation(conversation);
+
+    expect(refreshCoordinator.applyConversationActivation).not.toHaveBeenCalled();
+    expect(callOrder).toEqual([
+      'prepareOpenConversation',
+      'applyActiveConversation',
+      'clearMessagesContainer',
+      'resetTurnState',
+      'commitConversationSyncBaseline',
+      'updateModelSelectorDisplay',
+      'syncActiveTabContextUsageIdentity',
+      'syncOpenConversationState',
+      'renderOpenConversationIndicator',
+      'refreshActiveTabContextUsageFromServer',
+      'scheduleSettledScrollToBottom',
+    ]);
   });
 });

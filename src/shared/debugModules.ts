@@ -2,6 +2,50 @@ export const DEFAULT_DEBUG_REFRESH_INTERVAL_MS = 3000;
 export const MIN_DEBUG_REFRESH_INTERVAL_MS = 250;
 export const MAX_DEBUG_REFRESH_INTERVAL_MS = 30000;
 
+export const CLAUDE_CODE_DEBUG_CHANNEL_IDS = [
+  'runtime',
+  'sessions',
+  'stream',
+  'permissions',
+  'mcp',
+  'experimental',
+] as const;
+
+export type ClaudeCodeDebugChannelId = typeof CLAUDE_CODE_DEBUG_CHANNEL_IDS[number];
+export type ClaudeCodeDebugChannelSettings = Record<ClaudeCodeDebugChannelId, boolean>;
+
+export function getDefaultClaudeCodeDebugChannelSettings(): ClaudeCodeDebugChannelSettings {
+  return {
+    runtime: true,
+    sessions: true,
+    stream: true,
+    permissions: true,
+    mcp: true,
+    experimental: false,
+  };
+}
+
+export function normalizeClaudeCodeDebugChannelSettings(value: unknown): ClaudeCodeDebugChannelSettings {
+  const defaults = getDefaultClaudeCodeDebugChannelSettings();
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return defaults;
+  }
+
+  const candidate = value as Partial<Record<ClaudeCodeDebugChannelId, unknown>>;
+  return Object.fromEntries(
+    CLAUDE_CODE_DEBUG_CHANNEL_IDS.map((channelId) => [
+      channelId,
+      typeof candidate[channelId] === 'boolean' ? candidate[channelId] : defaults[channelId],
+    ]),
+  ) as ClaudeCodeDebugChannelSettings;
+}
+
+export function getEnabledClaudeCodeDebugChannels(
+  settings: ClaudeCodeDebugChannelSettings,
+): ClaudeCodeDebugChannelId[] {
+  return CLAUDE_CODE_DEBUG_CHANNEL_IDS.filter((channelId) => settings[channelId]);
+}
+
 export const DEBUG_MODULE_REGISTRY = [
   {
     key: 'app',
@@ -46,6 +90,12 @@ export const DEBUG_MODULE_REGISTRY = [
     defaultEnabled: true,
   },
   {
+    key: 'claudeCode',
+    labelKey: 'settings.debug.modules.claudeCode.name',
+    descriptionKey: 'settings.debug.modules.claudeCode.desc',
+    defaultEnabled: true,
+  },
+  {
     key: 'tasks',
     labelKey: 'settings.debug.modules.tasks.name',
     descriptionKey: 'settings.debug.modules.tasks.desc',
@@ -82,6 +132,10 @@ const DEBUG_MODULE_SCOPE_PATTERNS: Array<{
   key: DebugModuleKey;
   matches: string[];
 }> = [
+  {
+    key: 'claudeCode',
+    matches: ['ClaudeCode', 'Claude Code', 'claude-code'],
+  },
   {
     key: 'contextUsage',
     matches: ['ContextUsage', 'ContextUsageCoordinator'],
@@ -174,8 +228,11 @@ export function resolveDebugModuleKey(scope: string, explicitModuleKey?: DebugMo
     return explicitModuleKey;
   }
 
+  const normalizedScope = scope.toLowerCase();
   for (const candidate of DEBUG_MODULE_SCOPE_PATTERNS) {
-    if (candidate.matches.some((pattern) => scope.includes(pattern))) {
+    if (candidate.matches.some((pattern) => (
+      scope.includes(pattern) || normalizedScope.includes(pattern.toLowerCase())
+    ))) {
       return candidate.key;
     }
   }

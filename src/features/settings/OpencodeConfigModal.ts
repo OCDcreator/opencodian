@@ -10,6 +10,7 @@ import { OpencodeConfigManager } from '../../core/config';
 import type { OpencodeConfig } from '../../core/types';
 import { t } from '../../i18n';
 import { createLogger } from '../../shared';
+import { TextareaSizeMemory } from './TextareaSizeMemory';
 
 const logger = createLogger('OpencodeConfigModal');
 
@@ -34,6 +35,7 @@ export class OpencodeConfigModal extends Modal {
   private configManager: OpencodeConfigManager;
   private config: OpencodeConfig;
   private editorEl: HTMLTextAreaElement | null = null;
+  private editorSizeMemory: TextareaSizeMemory | null = null;
 
   constructor(app: App, configManager: OpencodeConfigManager) {
     super(app);
@@ -72,6 +74,7 @@ export class OpencodeConfigModal extends Modal {
         placeholder: 'Loading configuration...'
       }
     });
+    this.editorSizeMemory = TextareaSizeMemory.attach(this.editorEl, 'opencode-config-editor');
     
     // Set initial value
     this.updateEditorValue();
@@ -113,6 +116,8 @@ export class OpencodeConfigModal extends Modal {
   }
 
   onClose() {
+    this.editorSizeMemory?.destroy();
+    this.editorSizeMemory = null;
     const { contentEl } = this;
     contentEl.empty();
   }

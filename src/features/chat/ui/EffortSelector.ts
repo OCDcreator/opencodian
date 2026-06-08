@@ -21,6 +21,10 @@ export interface EffortSelectorCallbacks {
   onVariantChange: (variant: string | undefined) => Promise<void>;
   /** Current model reference string (provider/model) */
   getCurrentModel: () => string;
+  /** Whether the menu should offer the backend default / disabled option. */
+  allowDefaultOption?: () => boolean;
+  /** Label used when no explicit variant is selected. */
+  getDefaultOptionLabel?: () => string;
 }
 
 export class EffortSelector {
@@ -71,10 +75,12 @@ export class EffortSelector {
 
     const variants = this.callbacks.getVariants();
     const currentVariant = this.callbacks.getVariant();
+    const allowDefaultOption = this.callbacks.allowDefaultOption?.() ?? true;
+    const defaultLabel = this.callbacks.getDefaultOptionLabel?.() ?? t('chat.effort.disabled');
 
     // Current value display
     const currentEl = this.gearsEl.createDiv({ cls: 'opencodian-effort-current' });
-    currentEl.setText(currentVariant ? formatVariantLabel(currentVariant) : t('chat.effort.disabled'));
+    currentEl.setText(currentVariant ? formatVariantLabel(currentVariant) : defaultLabel);
     currentEl.setAttribute('role', 'button');
     currentEl.setAttribute('tabindex', '0');
     currentEl.setAttribute('aria-haspopup', 'menu');
@@ -93,18 +99,19 @@ export class EffortSelector {
     // Dropdown options
     const optionsEl = this.gearsEl.createDiv({ cls: 'opencodian-effort-options' });
 
-    // "Default" option (no variant)
-    const defaultGear = optionsEl.createDiv({ cls: 'opencodian-effort-gear' });
-    defaultGear.setText(t('chat.effort.disabled'));
-    if (!currentVariant) {
-      defaultGear.addClass('selected');
+    if (allowDefaultOption) {
+      const defaultGear = optionsEl.createDiv({ cls: 'opencodian-effort-gear' });
+      defaultGear.setText(defaultLabel);
+      if (!currentVariant) {
+        defaultGear.addClass('selected');
+      }
+      defaultGear.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        await this.callbacks.onVariantChange(undefined);
+        this.closeMenu();
+        this.updateDisplay();
+      });
     }
-    defaultGear.addEventListener('click', async (e) => {
-      e.stopPropagation();
-      await this.callbacks.onVariantChange(undefined);
-      this.closeMenu();
-      this.updateDisplay();
-    });
 
     // Variant options (reverse order so highest effort is at top)
     for (const variant of [...variants].reverse()) {

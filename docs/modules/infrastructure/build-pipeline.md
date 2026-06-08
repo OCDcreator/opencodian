@@ -74,7 +74,7 @@ esbuild 配置：
 | target | `es2018` |
 | bundle | `true` |
 | treeShaking | `true` |
-| external | `obsidian`, `electron`, `@codemirror/*`, `lezer`, `@lezer/*`, 所有 Node.js builtin |
+| external | `obsidian`, `electron`, `@codemirror/*`, `lezer`, `@lezer/*`, `node:*`, 所有 Node.js builtin |
 | define | `BUILD_ID: JSON.stringify(buildId)` |
 | sourcemap | dev: `'inline'`, prod: `false` |
 | outfile | dev: `'main.js'`, prod: `'dist/main.js'` |
@@ -84,6 +84,9 @@ esbuild 配置：
 2. `fs.copyFileSync('manifest.json', 'dist/manifest.json')`
 3. `fs.copyFileSync('styles.css', 'dist/styles.css')`
 4. `copyDirectoryIfExists('assets', 'dist/assets')`
+5. `copyClaudeAgentSdkRuntime()` 移除旧的 SDK 主包副本，并只复制当前平台 optional binary package 到 `dist/node_modules/@anthropic-ai/`
+
+部署到 Test Vault 时，`dist/node_modules/@anthropic-ai/claude-agent-sdk-<platform>/` 属于 Claude Code backend 的运行时产物，必须和 `dist/main.js` 一起复制。只复制 `main.js` / `manifest.json` / `styles.css` 会让 bundled SDK 在 Obsidian runtime 里解析到插件目录下缺失的平台 binary，并导致 Claude Code model/runtime probes 报 `not-found`。
 
 ### CSS 构建 (`scripts/build-css.mjs`)
 
@@ -117,6 +120,7 @@ npm run build
     → esbuild.context({ ... outfile: 'dist/main.js' })
     → context.rebuild()
     → 复制 manifest.json, styles.css, assets/ 到 dist/
+    → 复制当前平台 Claude Agent SDK bundled binary package 到 dist/node_modules/
 ```
 
 ## 与其他模块的交互
@@ -124,6 +128,7 @@ npm run build
 - **main.ts**: 使用 `BUILD_ID` 全局常量（构建时注入）
 - **package.json**: 定义 npm scripts
 - **Obsidian plugin API**: 产出 `main.js` 作为插件入口
+- **ClaudeCodeSdkLoader**: 运行时通过 literal dynamic import 加载已打进 `main.js` 的官方 SDK 主包；生产构建仍必须复制对应平台 binary package，供 SDK `createRequire(import.meta.url)` 解析 bundled Claude Code executable
 
 ## 配置项
 
@@ -137,7 +142,7 @@ npm run build
 
 - 开发模式输出到根目录 `main.js`（Obsidian 直接加载）
 - 生产模式输出到 `dist/` 目录（需手动部署到 vault）
-- `external` 列表确保不打包 Obsidian 和 CodeMirror 运行时依赖
+- `external` 列表确保不打包 Obsidian 和 CodeMirror 运行时依赖；Claude Agent SDK 主包会随 `main.js` 打包，平台 binary package 通过 `dist/node_modules` 随生产产物复制
 - BUILD_ID 在构建时硬编码，不会在运行时改变
 - `npm run build` 已内置 CSS 合并；若只想刷新根目录样式产物，可单独运行 `npm run build:css`
 - CI 会在构建后检查 `styles.css` 是否仍然干净，因此样式修改需要把生成产物一并提交

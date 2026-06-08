@@ -70,6 +70,7 @@ export class QuestionInlineCardRenderer {
     if (!cardEl) {
       return null;
     }
+    cardEl.setAttribute('data-question-card', 'true');
 
     if (runtime) {
       runtime.questionInlineCardEl = cardEl;
@@ -309,6 +310,7 @@ export class QuestionInlineCardRenderer {
             type: inputType,
             name: `opencodian-question-${request.id}-${index}`,
             value: option.label,
+            ...(option.preview ? { 'data-preview': option.preview } : {}),
           },
         });
         inputState.optionInputs.push(inputEl);
@@ -325,6 +327,11 @@ export class QuestionInlineCardRenderer {
           });
         }
       }
+
+      const previewEl = sectionEl.createDiv({
+        cls: 'opencodian-question-inline-option-preview is-hidden',
+      });
+      this.attachPreviewHandlers(optionsEl, previewEl);
     }
 
     if (question.custom !== false) {
@@ -424,6 +431,46 @@ export class QuestionInlineCardRenderer {
     return key === 'Enter' || key === ' ' || key === 'Spacebar';
   }
 
+  private attachPreviewHandlers(
+    optionsEl: HTMLElement,
+    previewEl: HTMLElement,
+  ): void {
+    const updateForTarget = (target: EventTarget | null): void => {
+      if (!(target instanceof HTMLElement)) {
+        previewEl.addClass('is-hidden');
+        return;
+      }
+      const input = target.closest<HTMLInputElement>('label.opencodian-question-inline-option input');
+      const preview = input?.dataset?.preview;
+      if (preview) {
+        previewEl.setText(preview);
+        previewEl.removeClass('is-hidden');
+      } else {
+        previewEl.addClass('is-hidden');
+      }
+    };
+
+    optionsEl.addEventListener('focusin', (event) => {
+      updateForTarget(event.target);
+    });
+
+    optionsEl.addEventListener('mouseenter', (event) => {
+      updateForTarget(event.target);
+    }, { capture: true });
+
+    optionsEl.addEventListener('focusout', () => {
+      // Defer so the next focusin (if moving to another option in the same
+      // section) can override this hide. If focus left the section entirely,
+      // the preview will stay hidden.
+      window.setTimeout(() => {
+        const active = document.activeElement;
+        if (!active || !optionsEl.contains(active)) {
+          previewEl.addClass('is-hidden');
+        }
+      }, 0);
+    });
+  }
+
   private toggleOptionInput(
     question: QuestionRequest['questions'][number],
     inputState: QuestionInputState,
@@ -447,12 +494,12 @@ export class QuestionInlineCardRenderer {
     const submitBtn = buttonsEl.createEl('button', {
       cls: 'opencodian-question-inline-btn is-submit',
       text: submitText,
-      attr: { type: 'button' },
+      attr: { type: 'button', 'data-question-action': 'submit' },
     });
     const rejectBtn = buttonsEl.createEl('button', {
       cls: 'opencodian-question-inline-btn is-reject',
       text: t('chat.question.reject'),
-      attr: { type: 'button' },
+      attr: { type: 'button', 'data-question-action': 'reject' },
     });
 
     return {

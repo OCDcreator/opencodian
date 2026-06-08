@@ -18,7 +18,8 @@
 
 它不持有聊天视图的 DOM 根状态，也不直接依赖插件实例；所有真实渲染、scroll runtime、background-task UI 和调试日志都通过 `ConversationRenderHost` 回调回到 `OpenCodianView`。其中 persisted assistant shell / pseudo-stream footer / streaming-shell state 收尾由嵌套的 `ConversationAssistantShellRenderPort` 提供，assistant tail 相关的正文签名、正文重渲与 persisted footer 收尾则进一步收束在 `ConversationAssistantTailRenderPort`。canonical session graph 的读取与 OpenCode message hydration 则通过可选的 `ConversationCanonicalRenderSource` 注入，避免 render host 继续扩大。
 
-基础 render contract、消息/伪流式 assistant 渲染 delegate 与 synced append apply delegate 已拆到 `ConversationRenderRuntime`；尾部 assistant patch 的 tab/container、rendered sequence、signature 与 DOM target preflight 已拆到 `ConversationTrailingAssistantPatchPlanner`。canonical turn 组装与 canonical render input 投影都由 `ConversationTurnViewModelBuilder` 承接，`ConversationRenderService` 本身因此只保留 full rerender、synced update 输入选择与 trailing-assistant patch execution/logging 这些高层控制流。
+基础 render contract、消息/伪流式 assistant 渲染 delegate 与 synced append apply delegate 已拆到 `ConversationRenderRuntime`；尾部 assistant patch 的 tab/container、rendered sequence、signature 与 DOM target preflight 已拆到 `ConversationTrailingAssistantPatchPlanner`。canonical turn 组装与 canonical render input 投影都由 `ConversationTurnViewModelBuilder` 承接，`ConversationRenderService` 本身因此只保留 full rerender、synced update 输入选择与 trailing-assistant patch execution/logging 这些高层控制流。full rerender 的 canonical source lookup 现在通过 `getConversationBackendSessionId()` 解析 session id；缺失 backend session 时回退 persisted `Conversation.messages`。`resolveConversationRenderMessages()` 对非 OpenCode 后端有显式 `backend !== 'opencode'` 提前返回，完全跳过 canonical state 路径（`getCanonicalSessionState` / `hydrateOpenCodeMessage` 是 OpenCode 专有概念），而不依赖隐式 null 安全。
+- rerender 的 debug log（`rerender-conversation-messages-start` / `rerender-conversation-messages-complete`）中的 `sessionId` 字段同样通过 `getConversationBackendSessionId()` 解析。
 
 ## 公开接口
 
@@ -143,9 +144,14 @@ export class ConversationRenderService {
 - persisted user/assistant render、single-user rerender、以及 synced assistant pseudo-stream reveal 现在先经由 service 内部的 message-render delegate，再落回 host ports 执行真实 DOM 更新
 - 基础消息 render delegate 与 synced append apply delegate 现在位于 `ConversationRenderRuntime`，service 只委托这些 runtime owner
 
+### Tooltip / copy 辅助
+
+- `setTooltipLabel()` / `attachTooltipLabel()` 现在除了写入 `data-tooltip`、隐藏 label 与 `aria-labelledby` 外，还会确保当前 `Document` 的 `TooltipLayerController` 已注册。这样 header / composer / inline action button 这类共享 tooltip trigger 会统一走 body-level overlay，而不是落回 trigger 伪元素。
+- 这条合同专门规避了 send / stop 按钮这类本身已经占用 `::after` 做视觉装饰的控件，避免 tooltip 和按钮特效抢同一个伪元素。
+
 ### 空壳清理
 
-- `removeEmptyAssistantShells()` 遍历 messagesContainer 内的 assistant shell，跳过 `notice` 和 `background-task` 标记的 shell，移除既无 structured content 又无可见文本的空壳
+- `removeEmptyAssistantShells()` 遍历 messagesContainer 内的 assistant shell，跳过 `notice` 和 `background-task` 标记的 shell，移除既无 structured content 又无可见文本的空壳；**`.opencodian-structured-output-details` 被识别为有效结构化内容**，避免 structured-only assistant shell 被误删
 - 用于 send-pipeline 预清理和 streaming 中断后清理残留空壳
 
 ### 全量重渲

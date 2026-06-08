@@ -29,7 +29,9 @@ OpenCodian 全局类型的主聚合入口。它把聊天、模型、设置、权
 | `ConversationMeta` | type | 会话元数据 |
 | `StreamChunk` | type | 流式事件联合类型（13 种事件） |
 | `TabContextState` | type | 标签页上下文状态 |
+| `ContextUsageSnapshot` | type | backend-neutral session context usage 快照 DTO，供 OpenCode/Claude Code snapshot owner 与 chat context ring 管线共享 |
 | `createEmptyTabContextState` | function | 创建空白上下文状态 |
+| `getConversationBackendSessionId` | function | 按 `backendSessionId → openCodeSessionId → acpSessionId` 解析 backend-neutral session id |
 | `UsageInfo` | type | Token 使用信息 |
 | `ImageAttachment` | type | 图片附件 |
 | `ToolCallInfo` | type | 工具调用信息 |
@@ -54,6 +56,7 @@ OpenCodian 全局类型的主聚合入口。它把聊天、模型、设置、权
 |------|------|------|
 | `OpenCodianSettings` | type | 完整设置接口 |
 | `DEFAULT_SETTINGS` | const | 默认设置常量 |
+| `SandboxFilesystemConfig` / `SandboxNetworkConfig` / `SandboxRipgrepConfig` | type | Claude Code sandbox 子策略类型（filesystem/network/ripgrep） |
 | `ServerMode` / `ServerAuthType` | type | 服务器模式/认证类型 |
 | `ServerConfig` / `LocalServerConfig` / `RemoteServerConfig` | type | 服务器配置 |
 | `PermissionMode` / `ApprovalDecision` | type | 权限模式/审批决策 |
@@ -68,8 +71,9 @@ OpenCodian 全局类型的主聚合入口。它把聊天、模型、设置、权
 | `ThemeSettings` / `ThemePresetId` / `ThemeStyleId` | type | 主题设置 |
 | `PersistedTabState` / `PersistedTabEntry` | type | 标签页持久化 |
 | `ProviderIconEntry` / `ProviderIconLibrary` | type | 提供商图标 |
-| `normalize*` 系列 | function | 归一化函数（约 20+ 个） |
+| `normalize*` 系列 | function | 归一化函数（约 20+ 个），包含 Claude Code 专属的 `normalizeClaudeCodeStringArray`、`normalizeClaudeCodeNullablePositiveInt`、`normalizeClaudeCodeNullablePositiveNumber`、`normalizeClaudeCodeEnv`、`normalizeClaudeCodeDebugChannelSettings`、`normalizeClaudeCodeSandboxSettings` 和 `normalizeClaudeCodeToolAliases` |
 | `getDefault*` 系列 | function | 默认值函数 |
+| `CLAUDE_CODE_DEBUG_CHANNEL_IDS` / `ClaudeCodeDebugChannelSettings` | const/type | Claude Code 调试工作台的 runtime/session/stream/permission/MCP/experimental 通道契约 |
 | `isLocalServerMode` / `getServerBaseUrl` | function | 服务器工具函数 |
 
 ### 来自 `./tools`
@@ -150,6 +154,10 @@ OpenCodian 全局类型的主聚合入口。它把聊天、模型、设置、权
 ## 2026-05-16 Plugin availability settings
 
 Settings exports now include the plugin-side disabled plugin spec fields used by plugin management docs and settings UI.
+
+## 2026-06-07 Sandbox expansion
+
+Settings exports now include `SandboxFilesystemConfig`, `SandboxNetworkConfig`, and `SandboxRipgrepConfig` for the expanded Claude Code sandbox shape.
 
 ## 注意事项
 

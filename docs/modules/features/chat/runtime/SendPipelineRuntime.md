@@ -17,6 +17,20 @@
 
 它不是一个“小 helper”，而是发送子系统的总入口；`OpenCodianView` 现在只保留 host 装配与桥接。
 
+## 结构化输出触发（`/json`）
+
+`SendPipelineRuntime.sendMessage()` 在真正处理 slash command 和 preparation 之前，会先检测内容中的 `/json ` 前缀（不区分大小写）。如果检测到：
+
+- 前缀被剥离，剩余内容进入正常的 preparation / stream 路径
+- 一个固定的 JSON schema（`STRUCTURED_OUTPUT_FIXED_SCHEMA`）被注入到 `PrepareMessageSendOptions.outputFormat`
+- 该 schema 通过 `PreparedMessageSend.modelOptions` 进入 `sendStreamMessage` options，最终到达 `ClaudeCodeAdapter.buildSdkOptions()`
+- 触发是**一次性的**：只影响当前这条消息，不会持久化到设置或影响后续发送
+- 前缀剥离发生在 `tryRunSlashCommand` 之前，因此 slash command 服务看到的是已剥离的内容，不会把 `/json` 误判为未知 slash command
+
+这是结构化输出在普通聊天路径中的最 honest、最小表面触发方式：不新增 UI chrome，不暴露 schema 编辑，只提供一个显式前缀触发。当前只支持 Claude Code backend；OpenCode backend 会忽略未知的 `outputFormat` option。
+
+2026-05-28 更新：prompt hardening 尝试（在 schema 中增加 description 字段）已被 revert，因为运行时 artifact 证明它未能稳定消除 structured output 路径中的额外 prose；该问题目前归为 SDK/model 边界，不是 plugin-side fixable。
+
 ## 公开接口
 
 ```typescript
@@ -63,6 +77,7 @@ export class SendPipelineRuntime {
 - 如果 active tab runtime 在 preparation 之后已经失效，直接中止，不继续发流
 - 进入 streaming 状态后，再创建真实 stream、streaming shell 和 `StreamController`
 - transport 层收到的是 `PreparedMessageSend.contextItems`，也就是“持久路径 + 一次性 composer context”的合并结果，而不是单独的 draft context
+- transport 层接收完整 `PreparedMessageSend.conversation` 和 `sessionId`；`sessionId` 来自 `getConversationBackendSessionId()`，因此 OpenCode 旧会话继续使用 `openCodeSessionId`，非 OpenCode 后端可以只提供 `backendSessionId`
 - transport 层现在还会直接复用 `PreparedMessageSend.messageID` 与 `requestParts`，避免 send preparation 和真正 transport 再各自生成一批不同的 part id
 - 如果 preparation 阶段解析出了显式 main agent，transport 层还会把它透传给 `openCodeService.sendMessage()` 的 top-level `agent`
 - 把 stream、controller、tab runtime 与 prepared send 交给 `StreamChunkRouter`
@@ -97,6 +112,7 @@ chunk router 现在由 `runtime/StreamChunkRouter.ts` 承接，并继续下钻�
   - streaming shell 收尾
   - 本地 assistant message / error notice / interrupted notice 的构建与追加
   - 第一次本地 `saveConversation()`
+- 对 Claude Code 和其他非 OpenCode 后端，正常完成的 completed stream 也会走本地 assistant persistence；OpenCode authoritative sync 仍只适用于 OpenCode/legacy 会话，避免把 Claude 的 `backend_event`、structured output 或文本回复交给无效的 OpenCode sync 路径
 - 最后再把 `shouldSyncFromServer`、`editedFiles` 和调试 logger 一并交给 `MessageFinalizationService`
 - post-stream finalization 完成后，runtime 会消费同一 tab 的一个 queued follow-up；目标 tab 仍 active 时，该 follow-up 再次进入 slash/preparation/transport 的完整 send path，因此不会成为第三个消息真相来源。目标 tab 已不再 active 时，runtime 清掉这条一次性 intent，避免 orphan queue；preparation 层还会再次校验 `targetTabId`，防止 await 间隙中的 tab switch 把 intent 发错 conversation。
 
@@ -113,6 +129,7 @@ chunk router 现在由 `runtime/StreamChunkRouter.ts` 承接，并继续下钻�
 - `OpenCodianView` 只保留 `createSendPipelineHostDependencies()` 扁平依赖工厂，返回 `SendPipelineHostDependencies` 对象供 `createSendPipelineRuntimeHost()` 消费
 - slash command 识别与 `runSessionCommand()` delegation 继续留在专用 `SlashCommandExecutionService`
 - `createSendPipelineRuntimeHost()` 把 `SendPipelineHostDependencies` 按 view / transport / shell / persistence / debug 五类 host 能力分组后再组合成完整 `SendPipelineHost`
+- `sendStreamMessage()` host seam 会收到完整 `Conversation`，由 `OpenCodianView` 根据 conversation backend 选择具体 adapter；runtime 本身只负责传递 owner 信息，不直接知道 OpenCode 或 Claude 的实现细节
 - `MessageSendPreparationService` 只负责“发之前能不能发、optimistic user message 何时落地、何时进入 streaming state”
 - `PreparedMessageSend` 现在是 send preparation 与 transport 之间的稳定 payload handoff，负责把 canonical seed 使用的 `messageID + parts[]` 原样带进 `openCodeService.sendMessage()`
 - `SendPipelineRuntime` 负责“真正发流，并装配 chunk router / local finalizer / post-stream finalizer”

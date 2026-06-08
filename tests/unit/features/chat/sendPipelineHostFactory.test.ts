@@ -126,7 +126,7 @@ describe('createSendPipelineRuntimeHost', () => {
     });
     const host = createSendPipelineRuntimeHost(deps);
 
-    host.sendStreamMessage('hello', {
+    host.sendStreamMessage(createConversation(), 'hello', {
       provider: 'openai', model: 'gpt-5.4',
       contextItems: [], messageID: 'msg-1', requestParts: [],
     });

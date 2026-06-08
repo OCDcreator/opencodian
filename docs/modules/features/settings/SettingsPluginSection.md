@@ -79,3 +79,5 @@ Added `attachTabbed(containerEl, secondaryTabId)` method for the tabbed settings
 - `omo` — renders OMO config management
 
 The classic `attach()` method remains unchanged.
+
+Project plugin config textareas use `TextareaSizeMemory` with stable keys so manual resize height survives settings reloads; `dispose()` cleans the attached observers.
