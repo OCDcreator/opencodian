@@ -2,7 +2,7 @@
 
 > **源码**: `src/core/agents/backend/CodexAdapter.ts`
 > **状态**: [RUNTIME_PROVEN]
-> **Updated**: 2026-06-10 Checkpoint 14H — app-server session discovery / transcript readback integration
+> **Updated**: 2026-06-11 Checkpoint 15F — webSearchMode settings surface productization (settings-only)
 
 ## 概述
 
@@ -20,6 +20,7 @@
 - `updateModelReasoningEffort()` 允许运行时更新 reasoning effort，影响后续 thread 创建/恢复
 - `updateAdditionalDirectories()` 允许运行时更新额外目录，影响后续 thread 创建/恢复
 - `updateNetworkAccessEnabled()` 允许运行时更新网络访问开关，影响后续 thread 创建/恢复
+- `updateWebSearchMode()` 允许运行时更新网页搜索模式（disabled/cached/live），影响后续 thread 创建/恢复
 - **App-server adjunct client** (Checkpoint 14H): `start()` 初始化 `CodexAppServerClient` 用于 persisted session discovery；`listSessions()` 合并 in-memory 与 app-server threads；`getSessionMessages()` 通过 app-server 读取 thread turns 并归一化为 `{ role, content }` 形状供 `AgentBackendRouting` 消费；`getSession()` 优先 in-memory，回退 app-server；`stop()` 清理 app-server client。App-server 为 best-effort：启动失败时自动降级为仅 in-memory sessions，不影响主 SDK chat path。
 
 ## 维护约束

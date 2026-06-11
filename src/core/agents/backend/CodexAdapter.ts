@@ -463,6 +463,13 @@ export class CodexAdapter
     };
   }
 
+  updateWebSearchMode(mode: CodexAdapterOptions['webSearchMode']): void {
+    this.options = {
+      ...this.options,
+      webSearchMode: mode,
+    };
+  }
+
   onStatusChange(handler: StatusChangeHandler): Disposable {
     this.statusHandlers.add(handler);
     return {

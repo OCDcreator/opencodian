@@ -276,7 +276,7 @@ describe('SettingsCodexSection stable surface', () => {
     expect(plugin.saveSettings).toHaveBeenCalled();
   });
 
-  it('does not render webSearchMode control', () => {
+  it('renders webSearchMode control', () => {
     const plugin = createPlugin();
     const section = new SettingsCodexSection({
       plugin: plugin as never,
@@ -285,10 +285,10 @@ describe('SettingsCodexSection stable surface', () => {
     const containerEl = document.createElement('div');
     section.attach(containerEl);
 
-    expect(settingNames).not.toContain(t('settings.codex.webSearch.name'));
+    expect(settingNames).toContain(t('settings.codex.webSearch.name'));
   });
 
-  it('renders exactly 10 setting controls plus connection info and session browser launcher', () => {
+  it('renders exactly 13 setting controls including webSearchMode', () => {
     const plugin = createPlugin();
     const section = new SettingsCodexSection({
       plugin: plugin as never,
@@ -297,7 +297,7 @@ describe('SettingsCodexSection stable surface', () => {
     const containerEl = document.createElement('div');
     section.attach(containerEl);
 
-    expect(settingNames).toHaveLength(12);
+    expect(settingNames).toHaveLength(13);
     expect(settingNames).toEqual([
       t('settings.codex.apiKey.name'),
       t('settings.codex.model.name'),
@@ -305,6 +305,7 @@ describe('SettingsCodexSection stable surface', () => {
       t('settings.codex.reasoning.name'),
       t('settings.codex.additionalDirs.name'),
       t('settings.codex.network.name'),
+      t('settings.codex.webSearch.name'),
       t('settings.codex.connection.name'),
       t('settings.codex.sessionBrowser.launchName'),
       t('settings.codex.accountInfo.name'),
@@ -496,5 +497,91 @@ describe('SettingsCodexSection model reasoning effort', () => {
     await handler('xhigh');
 
     expect(updateModelReasoningEffort).toHaveBeenCalledWith('xhigh');
+  });
+});
+
+describe('SettingsCodexSection web search mode', () => {
+  beforeEach(() => {
+    setLocale('en');
+    settingNames.length = 0;
+    buttonRecords.length = 0;
+    mockSettingPrototype();
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('persists webSearchMode on change', async () => {
+    const plugin = createPlugin();
+    const section = new SettingsCodexSection({
+      plugin: plugin as never,
+      createSectionHeading,
+    });
+    const containerEl = document.createElement('div');
+    section.attach(containerEl);
+
+    const dropdownControl = (Setting.prototype.addDropdown as jest.Mock).mock.calls
+      .find(([cb]) => {
+        const captured: { addOption: jest.Mock; setValue: jest.Mock; onChange: jest.Mock } = {
+          addOption: jest.fn().mockReturnThis(),
+          setValue: jest.fn().mockReturnThis(),
+          onChange: jest.fn().mockReturnThis(),
+        };
+        cb(captured);
+        return captured.addOption.mock.calls.some(([value]) => value === 'cached');
+      });
+    expect(dropdownControl).toBeTruthy();
+
+    const captured: { addOption: jest.Mock; setValue: jest.Mock; onChange: jest.Mock } = {
+      addOption: jest.fn().mockReturnThis(),
+      setValue: jest.fn().mockReturnThis(),
+      onChange: jest.fn().mockReturnThis(),
+    };
+    (dropdownControl as [jest.Mock])[0](captured);
+    const handler = captured.onChange.mock.calls[0][0] as (value: string) => Promise<void>;
+
+    await handler('live');
+
+    expect(plugin.settings.backendSettings.codex.webSearchMode).toBe('live');
+    expect(plugin.saveSettings).toHaveBeenCalled();
+  });
+
+  it('calls updateWebSearchMode on live adapter when webSearchMode changes', async () => {
+    const updateWebSearchMode = jest.fn();
+    const plugin = createPlugin();
+    plugin.agentServiceRegistry.get = jest.fn((backend: string) =>
+      backend === 'codex' ? { updateWebSearchMode } : null,
+    );
+    const section = new SettingsCodexSection({
+      plugin: plugin as never,
+      createSectionHeading,
+    });
+    const containerEl = document.createElement('div');
+    section.attach(containerEl);
+
+    const dropdownControl = (Setting.prototype.addDropdown as jest.Mock).mock.calls
+      .find(([cb]) => {
+        const captured: { addOption: jest.Mock; setValue: jest.Mock; onChange: jest.Mock } = {
+          addOption: jest.fn().mockReturnThis(),
+          setValue: jest.fn().mockReturnThis(),
+          onChange: jest.fn().mockReturnThis(),
+        };
+        cb(captured);
+        return captured.addOption.mock.calls.some(([value]) => value === 'cached');
+      });
+    expect(dropdownControl).toBeTruthy();
+
+    const captured: { addOption: jest.Mock; setValue: jest.Mock; onChange: jest.Mock } = {
+      addOption: jest.fn().mockReturnThis(),
+      setValue: jest.fn().mockReturnThis(),
+      onChange: jest.fn().mockReturnThis(),
+    };
+    (dropdownControl as [jest.Mock])[0](captured);
+    const handler = captured.onChange.mock.calls[0][0] as (value: string) => Promise<void>;
+
+    await handler('live');
+
+    expect(updateWebSearchMode).toHaveBeenCalledWith('live');
   });
 });

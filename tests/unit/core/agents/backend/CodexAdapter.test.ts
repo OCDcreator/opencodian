@@ -1480,4 +1480,54 @@ describe('CodexAdapter', () => {
       expect(threadOpts.networkAccessEnabled).toBeUndefined();
     });
   });
+
+  // -------------------------------------------------------------------------
+  // updateWebSearchMode — runtime web search mode update
+  // -------------------------------------------------------------------------
+
+  describe('updateWebSearchMode', () => {
+    it('updates web search mode used by subsequent thread creation', async () => {
+      const options = createAdapterOptions({ webSearchMode: 'cached' });
+      const adapter = new CodexAdapter(options);
+      await adapter.start();
+      const sessionId = await adapter.createSession();
+
+      options._mockCodex._mockThread.runStreamed.mockResolvedValue({
+        events: (async function* () {
+          yield { type: 'thread.started', thread_id: 't-search-updated' };
+          yield { type: 'turn.started' };
+          yield { type: 'turn.completed', usage: { input_tokens: 1, output_tokens: 1 } };
+        })(),
+      });
+
+      adapter.updateWebSearchMode('live');
+
+      for await (const _ of adapter.sendMessage({ sessionId, content: 'test' })) { void _; }
+
+      const threadOpts = options._mockCodex.startThread.mock.calls[0][0] as Record<string, unknown>;
+      expect(threadOpts.webSearchMode).toBe('live');
+    });
+
+    it('can clear web search mode by passing undefined', async () => {
+      const options = createAdapterOptions({ webSearchMode: 'cached' });
+      const adapter = new CodexAdapter(options);
+      await adapter.start();
+
+      adapter.updateWebSearchMode(undefined);
+
+      const sessionId = await adapter.createSession();
+      options._mockCodex._mockThread.runStreamed.mockResolvedValue({
+        events: (async function* () {
+          yield { type: 'thread.started', thread_id: 't-search-cleared' };
+          yield { type: 'turn.started' };
+          yield { type: 'turn.completed', usage: { input_tokens: 1, output_tokens: 1 } };
+        })(),
+      });
+
+      for await (const _ of adapter.sendMessage({ sessionId, content: 'test' })) { void _; }
+
+      const threadOpts = options._mockCodex.startThread.mock.calls[0][0] as Record<string, unknown>;
+      expect(threadOpts.webSearchMode).toBeUndefined();
+    });
+  });
 });

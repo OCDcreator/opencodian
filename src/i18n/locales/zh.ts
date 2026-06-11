@@ -54,7 +54,7 @@ export const zhTranslations = {
   'settings.codex.network.name': '网络访问',
   'settings.codex.network.desc': '允许 Codex CLI 访问网络。仅在"工作区写入"沙盒模式下有效。下次对话或适配器重启后生效。',
   'settings.codex.webSearch.name': '网页搜索',
-  'settings.codex.webSearch.desc': '控制网页搜索行为。"缓存"模式使用带缓存上下文的搜索结果。',
+  'settings.codex.webSearch.desc': '控制网页搜索行为。"缓存"模式使用带缓存上下文的搜索结果。设置持久化和适配器接线已验证；各模式的运行时行为差异尚未验证。下次对话或适配器重启后生效。',
   'settings.codex.webSearch.disabled': '禁用',
   'settings.codex.webSearch.cached': '缓存',
   'settings.codex.webSearch.live': '实时',

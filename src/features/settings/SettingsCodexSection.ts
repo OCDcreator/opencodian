@@ -8,7 +8,7 @@
 import { Notice, Setting } from 'obsidian';
 
 import type { AgentBackendKind } from '../../core/types/chat';
-import type { CodexReasoningEffort } from '../../core/types/settings';
+import type { CodexReasoningEffort, CodexWebSearchMode } from '../../core/types/settings';
 import {
   getDefaultClaudeCodeBackendSettings,
   getDefaultCodexBackendSettings,
@@ -165,6 +165,23 @@ export class SettingsCodexSection {
           .setValue(this.plugin.settings.backendSettings.codex.networkAccessEnabled)
           .onChange(async (value) => {
             this.plugin.settings.backendSettings.codex.networkAccessEnabled = value;
+            await this.plugin.saveSettings();
+            this.applyCodexRuntimeUpdates();
+          }),
+      );
+
+    // Web search mode
+    new Setting(bodyEl)
+      .setName(t('settings.codex.webSearch.name'))
+      .setDesc(t('settings.codex.webSearch.desc'))
+      .addDropdown((dropdown) =>
+        dropdown
+          .addOption('disabled', t('settings.codex.webSearch.disabled'))
+          .addOption('cached', t('settings.codex.webSearch.cached'))
+          .addOption('live', t('settings.codex.webSearch.live'))
+          .setValue(this.plugin.settings.backendSettings.codex.webSearchMode)
+          .onChange(async (value) => {
+            this.plugin.settings.backendSettings.codex.webSearchMode = value as CodexWebSearchMode;
             await this.plugin.saveSettings();
             this.applyCodexRuntimeUpdates();
           }),
@@ -671,6 +688,11 @@ export class SettingsCodexSection {
     if ('updateModelReasoningEffort' in adapter) {
       (adapter as { updateModelReasoningEffort(e: CodexReasoningEffort): void })
         .updateModelReasoningEffort(codex.modelReasoningEffort);
+    }
+
+    if ('updateWebSearchMode' in adapter) {
+      (adapter as { updateWebSearchMode(m: CodexWebSearchMode): void })
+        .updateWebSearchMode(codex.webSearchMode);
     }
   }
 }

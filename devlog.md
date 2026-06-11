@@ -11,6 +11,50 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-06-11 Codex SDK Checkpoint 15F — webSearchMode Settings Surface Productization
+
+### Scope
+
+Productize `webSearchMode` from `readback` to **settings-only** in the ordinary active-backend Codex settings surface.
+
+All infrastructure pre-existed:
+- Type `CodexWebSearchMode = 'disabled' | 'cached' | 'live'` (settings.ts:100)
+- Default `'cached'` in `getDefaultCodexBackendSettings()` (settings.ts:399)
+- Normalization in `normalizeCodexBackendSettings()` (settings.ts:685-705)
+- Adapter wiring in `AgentAdapterWiring.ts:123-124`
+- CodexAdapter passthrough at `buildThreadOptions()` (CodexAdapter.ts:774-775)
+- Locale strings in both en.ts and zh.ts (lines 56-60)
+
+### Honest Classification
+
+**settings-only** — not `已 pass`. Settings persistence and adapter option wiring are verified. Distinct runtime web-search behavior between `disabled`/`cached`/`live` modes has **not** been end-to-end proven. The settings description explicitly states this proof boundary.
+
+### Changes
+
+1. **`CodexAdapter.ts`**: Added `updateWebSearchMode(mode)` method for live runtime update (same pattern as `updateSandboxMode`/`updateNetworkAccessEnabled`)
+2. **`SettingsCodexSection.ts`**: Added webSearchMode dropdown Setting between `networkAccessEnabled` toggle and auth info; wired onChange to save settings + call `applyCodexRuntimeUpdates()`
+3. **`SettingsCodexSection.ts`**: Added `updateWebSearchMode` call in `applyCodexRuntimeUpdates()` alongside existing adapter calls
+
+### Tests
+
+- `CodexAdapter.updateWebSearchMode` 2/2 (update + clear-undefined)
+- `SettingsCodexSection.webSearchMode` 4/4 (render + persistence + adapter call + exact-count regression)
+- Full verify: 496 suites, 4683 tests, green
+
+### Runtime Verification
+
+- BUILD_ID: `feature-codex-sdk-capability.202606120007`
+- DOM probe: `webSearchSelect.value='cached'`, `parentSettingName='网页搜索'`, options `disabled`/`cached`/`live`
+- Toggle to `live` confirmed; restored to `cached`
+- `dev:errors`: clean; `dev:console level=error`: clean
+- Latest evidence screenshots: `/Volumes/SDD2T/obsidian-vault-write/testvault/.obsidian-debug/15f-r3-01-websearch-settings-visible.png`
+
+### Contracted Surface
+
+Stable ordinary Codex settings surface is now: `apiKey + model + sandboxMode + modelReasoningEffort + additionalDirectories + networkAccessEnabled + webSearchMode`
+
+All 7 `CodexBackendSettings` fields are now exposed in the ordinary settings UI.
+
 ## 2026-06-10 Codex SDK Checkpoint 14I — Persisted Session Row Runtime Proof (Layer 1)
 
 ### Scope

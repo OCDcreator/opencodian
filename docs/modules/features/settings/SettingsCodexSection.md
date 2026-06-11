@@ -24,6 +24,7 @@ Minimal settings panel for the Codex backend adapter. Renders the connection/aut
 | `modelReasoningEffort` | `string` (dropdown) | Yes | **Productized** (Checkpoint 14B) | Dropdown in ordinary settings; persisted to `CodexBackendSettings`; live adapter update via `updateModelReasoningEffort()` for next-thread boundary |
 | `additionalDirectories` | `string` (newline-separated) | Yes | **Productized** (Checkpoint 10A) | Textarea in ordinary settings; persisted to `CodexBackendSettings`; live adapter update via `updateAdditionalDirectories()` for next-thread boundary |
 | `networkAccessEnabled` | `boolean` | Yes | **Productized** (Checkpoint 10A) | Toggle in ordinary settings; persisted to `CodexBackendSettings`; live adapter update via `updateNetworkAccessEnabled()` for next-thread boundary |
+| `webSearchMode` | `string` (dropdown) | Yes | **Settings-only** (Checkpoint 15F) | Dropdown in ordinary settings; persisted to `CodexBackendSettings`; live adapter update via `updateWebSearchMode()` for next-thread boundary. Settings description honestly states distinct runtime behavior between modes is not yet proven. |
 | Authentication info | — | — | Passive | Disabled notice describing auth sources |
 | Session browser launcher | — | Yes | **Productized** (Checkpoint 13E) | Button opening `BackendSessionBrowserModal` with `forcedBackendKind: 'codex'` and `supportsResume: true`; resume is limited to in-memory sessions |
 | Account info readback | — | Yes | **Readback** (Checkpoint 15A) | Button-triggered `codex doctor --json` diagnostic readback; sanitized JSON with secret redaction; `data-codex-account-info-readback` |
@@ -35,7 +36,6 @@ Minimal settings panel for the Codex backend adapter. Renders the connection/aut
 
 | Field | Why hidden |
 |-------|-----------|
-| `webSearchMode` | Mode differentiation (`disabled`/`cached`/`live`) not yet runtime-proven; remains `readback` |
 | Account usage readback | Checkpoint 15E showed the currently bundled `codex-cli 0.137.0` app-server protocol omits `account/usage/read`, so the ordinary settings control was removed rather than leaving a dead button in the public surface |
 
 ## Architecture
@@ -50,8 +50,8 @@ Minimal settings panel for the Codex backend adapter. Renders the connection/aut
 - Only exposes settings that are genuinely wired through to `CodexAdapter`
 - Checkpoint 5A contracted the ordinary settings surface to `apiKey + model + connection info` only, and Checkpoint 10A re-promoted `additionalDirectories` plus `networkAccessEnabled` after focused settings-surface review
 - `modelReasoningEffort` is now exposed in ordinary settings and also remains accessible via the per-conversation session settings modal
-- `sandboxMode`, `modelReasoningEffort`, `additionalDirectories`, and `networkAccessEnabled` are honest next-thread boundaries: the settings UI updates adapter options for future thread creation/resume, not the currently running turn
-- `webSearchMode` remains outside the ordinary settings surface until `disabled` / `cached` / `live` mode differentiation has stronger runtime proof
+- `sandboxMode`, `modelReasoningEffort`, `additionalDirectories`, `networkAccessEnabled`, and `webSearchMode` are honest next-thread boundaries: the settings UI updates adapter options for future thread creation/resume, not the currently running turn
+- `webSearchMode` is productized in ordinary settings as **settings-only** (Checkpoint 15F): dropdown with `disabled`/`cached`/`live` options; persisted to `CodexBackendSettings`; live adapter update via `updateWebSearchMode()`. Settings persistence and adapter wiring verified; distinct runtime web-search behavior between modes is not yet end-to-end proven.
 - account usage stays outside the ordinary settings surface after Checkpoint 15E: the exploratory `CodexAppServerClient.getAccountUsage()` code path remains in the repo, but the public settings control is hidden because the current bundled runtime does not expose a usable `account/usage/read` route
 - Settings-side session browser supports resume for in-memory Codex sessions via `supportsResume: true`; the UI copy explicitly states that resume is limited to live adapter memory and does not discover persisted/external threads
-- Underlying types and adapter wiring for all 7 `CodexBackendSettings` fields are preserved; the ordinary UI still intentionally leaves part of that surface hidden/readback
+- Underlying types and adapter wiring for all 7 `CodexBackendSettings` fields are preserved; all 7 fields are now exposed in the ordinary settings UI

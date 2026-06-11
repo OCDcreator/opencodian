@@ -54,7 +54,7 @@ export const enTranslations = {
   'settings.codex.network.name': 'Network Access',
   'settings.codex.network.desc': 'Allow the Codex CLI to access the network. Only effective in "Workspace Write" sandbox mode. Applies on the next thread or after adapter restart.',
   'settings.codex.webSearch.name': 'Web Search',
-  'settings.codex.webSearch.desc': 'Controls web search behavior. "Cached" uses search results with cached context.',
+  'settings.codex.webSearch.desc': 'Controls web search behavior. "Cached" uses search results with cached context. Settings persistence and adapter wiring are verified; distinct runtime behavior between modes is not yet proven. Applies on the next thread or after adapter restart.',
   'settings.codex.webSearch.disabled': 'Disabled',
   'settings.codex.webSearch.cached': 'Cached',
   'settings.codex.webSearch.live': 'Live',
