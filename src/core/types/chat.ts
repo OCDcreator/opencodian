@@ -2,7 +2,14 @@
  * Chat-related type definitions
  */
 
-import { normalizeChatFontSizePx } from './settings';
+import {
+  type CodexReasoningEffort,
+  type CodexSandboxMode,
+  normalizeChatFontSizePx,
+} from './settings';
+
+const VALID_CODEX_SANDBOX_MODES: readonly CodexSandboxMode[] = ['read-only', 'workspace-write', 'danger-full-access'];
+const VALID_CODEX_REASONING_EFFORTS: readonly CodexReasoningEffort[] = ['minimal', 'low', 'medium', 'high', 'xhigh'];
 
 /** View type constant */
 export const VIEW_TYPE_OPENCODIAN = 'opencodian-view';
@@ -93,6 +100,11 @@ export interface SessionDiffEntry {
 
 export interface ConversationSessionSettings {
   chatFontSizePx?: number | null;
+  codexSandboxMode?: CodexSandboxMode | null;
+  codexModelReasoningEffort?: CodexReasoningEffort | null;
+  codexModelOverride?: string | null;
+  codexAdditionalDirectories?: string[] | null;
+  codexNetworkAccessEnabled?: boolean | null;
 }
 
 export function normalizeConversationSessionSettings(
@@ -111,6 +123,46 @@ export function normalizeConversationSessionSettings(
     if (chatFontSizePx > 0) {
       normalized.chatFontSizePx = chatFontSizePx;
     }
+  }
+
+  if (value.codexSandboxMode === null) {
+    normalized.codexSandboxMode = null;
+  } else if (typeof value.codexSandboxMode === 'string'
+    && VALID_CODEX_SANDBOX_MODES.includes(value.codexSandboxMode)) {
+    normalized.codexSandboxMode = value.codexSandboxMode;
+  }
+
+  if (value.codexModelReasoningEffort === null) {
+    normalized.codexModelReasoningEffort = null;
+  } else if (typeof value.codexModelReasoningEffort === 'string'
+    && VALID_CODEX_REASONING_EFFORTS.includes(value.codexModelReasoningEffort)) {
+    normalized.codexModelReasoningEffort = value.codexModelReasoningEffort;
+  }
+
+  if (value.codexModelOverride === null) {
+    normalized.codexModelOverride = null;
+  } else if (typeof value.codexModelOverride === 'string') {
+    const trimmed = value.codexModelOverride.trim();
+    if (trimmed.length > 0) {
+      normalized.codexModelOverride = trimmed;
+    }
+  }
+
+  if (value.codexAdditionalDirectories === null) {
+    normalized.codexAdditionalDirectories = null;
+  } else if (Array.isArray(value.codexAdditionalDirectories)) {
+    const filtered = value.codexAdditionalDirectories
+      .filter((d): d is string => typeof d === 'string' && d.trim().length > 0)
+      .map((d) => d.trim());
+    if (filtered.length > 0) {
+      normalized.codexAdditionalDirectories = filtered;
+    }
+  }
+
+  if (value.codexNetworkAccessEnabled === null) {
+    normalized.codexNetworkAccessEnabled = null;
+  } else if (typeof value.codexNetworkAccessEnabled === 'boolean') {
+    normalized.codexNetworkAccessEnabled = value.codexNetworkAccessEnabled;
   }
 
   return Object.keys(normalized).length > 0 ? normalized : undefined;
@@ -143,7 +195,7 @@ export interface ChatNoticeAction {
 }
 
 export interface ChatNoticeMeta {
-  kind: 'background-task-completion';
+  kind: 'background-task-completion' | 'codex-provisional-warning';
   conversationId?: string;
   anchorKey?: string;
   sourceReminderIds?: string[];

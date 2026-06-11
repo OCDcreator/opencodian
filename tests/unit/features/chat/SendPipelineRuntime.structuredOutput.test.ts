@@ -65,6 +65,46 @@ describe('SendPipelineRuntime structured output trigger', () => {
     expect(preparationPort.prepareMessageSend).toHaveBeenCalledWith({ content: '/jsontell me a joke' });
   });
 
+  it('produces a schema with additionalProperties:false at root for Codex strict-mode compatibility', async () => {
+    const runtimeState = createTabRuntime();
+    const streamController = createStreamController();
+    const preparationPort = createPreparationPort(createPreparedSend());
+    const finalizationPort = createFinalizationPort();
+    const host = createHost(runtimeState, streamController);
+    const runtime = new SendPipelineRuntime(host, preparationPort, finalizationPort);
+
+    await runtime.sendMessage('/json hello');
+
+    expect(preparationPort.prepareMessageSend).toHaveBeenCalledWith(
+      expect.objectContaining({
+        outputFormat: expect.objectContaining({
+          schema: expect.objectContaining({
+            additionalProperties: false,
+          }),
+        }),
+      }),
+    );
+  });
+
+  it('produces a schema where every property is listed in required for Codex strict-mode compatibility', async () => {
+    const runtimeState = createTabRuntime();
+    const streamController = createStreamController();
+    const preparationPort = createPreparationPort(createPreparedSend());
+    const finalizationPort = createFinalizationPort();
+    const host = createHost(runtimeState, streamController);
+    const runtime = new SendPipelineRuntime(host, preparationPort, finalizationPort);
+
+    await runtime.sendMessage('/json hello');
+
+    const callArg = preparationPort.prepareMessageSend.mock.calls[0][0] as unknown as Record<string, unknown>;
+    const schema = ((callArg.outputFormat as unknown as Record<string, unknown>).schema as unknown as Record<string, unknown>);
+    const properties = schema.properties as Record<string, unknown>;
+    const required = schema.required as string[];
+
+    expect(required).toEqual(expect.arrayContaining(Object.keys(properties)));
+    expect(required.length).toBe(Object.keys(properties).length);
+  });
+
   it('persists completed Claude structured output locally instead of deferring to OpenCode sync', async () => {
     const structuredPayload = {
       status: 'ok',

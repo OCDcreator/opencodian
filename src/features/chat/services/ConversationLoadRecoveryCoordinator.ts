@@ -41,6 +41,7 @@ import {
   ConversationViewStateService,
   type TabViewActivationPort,
 } from './ConversationViewStateService';
+import type { PersistentAssistantNoticeMessageOptions } from './PersistentAssistantNoticeService';
 
 const logger = createLogger('ConversationLoadRecoveryCoordinator');
 
@@ -91,6 +92,13 @@ export interface ConversationLoadRecoveryHost {
   updateModelSelectorDisplay(): void;
   showNotice(message: string): void;
   backfillClaudeUserMessageIdentities?(conversation: Conversation): Promise<boolean>;
+  hasMatchingPersistentNotice?(
+    title: string,
+    content: string,
+    tone: ChatMessage['noticeTone'],
+    conversation?: Conversation | null,
+  ): boolean;
+  appendPersistentNotice?(options: PersistentAssistantNoticeMessageOptions): Promise<void>;
 }
 
 import type { App } from 'obsidian';
@@ -120,6 +128,13 @@ export interface ConversationLoadRecoveryHostDependencies {
   syncActiveTabConversation(conversation: Conversation): void;
   updateModelSelectorDisplay(): void;
   backfillClaudeUserMessageIdentities?(conversation: Conversation): Promise<boolean>;
+  hasMatchingPersistentNotice?(
+    title: string,
+    content: string,
+    tone: ChatMessage['noticeTone'],
+    conversation?: Conversation | null,
+  ): boolean;
+  appendPersistentNotice?(options: PersistentAssistantNoticeMessageOptions): Promise<void>;
 }
 
 export function createConversationLoadRecoveryHost(
@@ -157,6 +172,12 @@ export function createConversationLoadRecoveryHost(
     ...(deps.backfillClaudeUserMessageIdentities
       ? { backfillClaudeUserMessageIdentities: deps.backfillClaudeUserMessageIdentities }
       : {}),
+    ...(deps.hasMatchingPersistentNotice
+      ? { hasMatchingPersistentNotice: deps.hasMatchingPersistentNotice }
+      : {}),
+    ...(deps.appendPersistentNotice
+      ? { appendPersistentNotice: deps.appendPersistentNotice }
+      : {}),
   };
 }
 
@@ -177,6 +198,10 @@ export class ConversationLoadRecoveryCoordinator {
 
   async activateTab(tabId: TabId): Promise<void> {
     await this.port.activateTab(tabId);
+    const conversation = this.host.getCurrentConversation();
+    if (conversation && this.shouldShowCodexProvisionalWarning(conversation)) {
+      await this.appendCodexProvisionalWarningIfNeeded(conversation);
+    }
   }
 
   async createConversationInNewTab(): Promise<void> {
@@ -198,6 +223,47 @@ export class ConversationLoadRecoveryCoordinator {
         await this.host.backfillClaudeUserMessageIdentities(conversation);
       } catch { /* best-effort */ }
     }
+
+    if (conversation && this.shouldShowCodexProvisionalWarning(conversation)) {
+      await this.appendCodexProvisionalWarningIfNeeded(conversation);
+    }
+  }
+
+  private shouldShowCodexProvisionalWarning(conversation: Conversation): boolean {
+    if (conversation.backend !== 'codex') {
+      return false;
+    }
+    const sessionId = getConversationBackendSessionId(conversation);
+    return !!sessionId && sessionId.startsWith('codex-local-');
+  }
+
+  private async appendCodexProvisionalWarningIfNeeded(conversation: Conversation): Promise<void> {
+    if (!this.host.appendPersistentNotice) {
+      return;
+    }
+
+    const title = t('chat.codex.provisionalWarning.title');
+    const content = t('chat.codex.provisionalWarning.description');
+    const tone: ChatMessage['noticeTone'] = 'warning';
+
+    const hasNotice = this.host.hasMatchingPersistentNotice?.(
+      title,
+      content,
+      tone,
+      conversation,
+    ) ?? false;
+
+    if (hasNotice) {
+      return;
+    }
+
+    await this.host.appendPersistentNotice({
+      title,
+      content,
+      tone,
+      conversation,
+      noticeMeta: { kind: 'codex-provisional-warning' },
+    });
   }
 
   async deleteConversationsAndRecover(conversationIds: readonly string[]): Promise<void> {
@@ -231,7 +297,7 @@ export class ConversationLoadRecoveryCoordinator {
 
     const restoredTabId = await measureStep('restorePersistedTabs', () => this.restorePersistedTabs());
     if (restoredTabId) {
-      await measureStep('activateRestoredTab', () => this.port.activateTab(restoredTabId));
+      await measureStep('activateRestoredTab', () => this.activateTab(restoredTabId));
       logger.info(
         `[view-open] initializeFirstTab restored tab in ${formatDurationMs(getPerformanceTimestampMs() - startedAt)} | ${stepSummaries.join(', ')}`,
       );
@@ -250,7 +316,7 @@ export class ConversationLoadRecoveryCoordinator {
 
     const tab = await measureStep('createTab', () => tabManager.createTab(initialConversation));
     if (tab) {
-      await measureStep('activateCreatedTab', () => this.port.activateTab(tab.id));
+      await measureStep('activateCreatedTab', () => this.activateTab(tab.id));
     }
 
     logger.info(

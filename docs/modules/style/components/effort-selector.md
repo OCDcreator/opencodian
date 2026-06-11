@@ -11,6 +11,7 @@
 
 - `.opencodian-effort-selector`、`.opencodian-effort-slot`：选择器容器。
 - `.opencodian-effort-group`、`.opencodian-effort-label`：分组与标签。
+- `.opencodian-effort-boundary-hint`：边界提示文本，显示 effort 变更的作用范围（如 "下次对话生效"）。
 - `.opencodian-effort-gears`、`.opencodian-effort-current`、`.opencodian-effort-options`：当前值与弹出选项。
 - `.opencodian-effort-gear.selected`：已选项高亮态。
 

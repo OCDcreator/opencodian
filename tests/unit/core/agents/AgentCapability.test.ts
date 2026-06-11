@@ -14,7 +14,7 @@ describe('AgentCapability', () => {
       'tools', 'mcp', 'permissions', 'fork', 'branching', 'todos', 'questions',
       'models', 'subagents', 'context', 'providers', 'compaction',
       'cost-tracking', 'thinking', 'hooks', 'config', 'file-ops', 'shell',
-      'sharing', 'export',
+      'sharing', 'export', 'images',
     ];
     expect(Object.values(AgentCapability)).toHaveLength(expected.length);
     for (const cap of expected) {

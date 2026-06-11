@@ -772,3 +772,126 @@ describe('createConversationLoadRecoveryHost factory', () => {
     expect(calledWith).toEqual({ tabs: [], activeTabIndex: 0 });
   });
 });
+
+describe('ConversationLoadRecoveryCoordinator Codex provisional warning', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  function createCodexConversation(id: string, sessionId: string): Conversation {
+    return {
+      id,
+      title: `Codex ${id}`,
+      createdAt: 1,
+      updatedAt: 1,
+      backend: 'codex',
+      backendSessionId: sessionId,
+      messages: [],
+    };
+  }
+
+  it('shows a persistent warning when loading a Codex conversation with a provisional session id', async () => {
+    const conversation = createCodexConversation('codex-prov', 'codex-local-abc-123');
+    const host = createHost(conversation, {
+      getActiveBackend: jest.fn(() => 'codex'),
+      appendPersistentNotice: jest.fn().mockResolvedValue(undefined),
+      hasMatchingPersistentNotice: jest.fn(() => false),
+    });
+    const port = createPort();
+    const coordinator = new ConversationLoadRecoveryCoordinator(host, port);
+
+    await coordinator.loadConversation(conversation.id);
+
+    expect(host.appendPersistentNotice).toHaveBeenCalledWith(expect.objectContaining({
+      title: t('chat.codex.provisionalWarning.title'),
+      content: t('chat.codex.provisionalWarning.description'),
+      tone: 'warning',
+      conversation,
+    }));
+  });
+
+  it('does not show a warning when loading a Codex conversation with a real thread id', async () => {
+    const conversation = createCodexConversation('codex-real', 'thread_abc123');
+    const host = createHost(conversation, {
+      getActiveBackend: jest.fn(() => 'codex'),
+      appendPersistentNotice: jest.fn().mockResolvedValue(undefined),
+      hasMatchingPersistentNotice: jest.fn(() => false),
+    });
+    const port = createPort();
+    const coordinator = new ConversationLoadRecoveryCoordinator(host, port);
+
+    await coordinator.loadConversation(conversation.id);
+
+    expect(host.appendPersistentNotice).not.toHaveBeenCalled();
+  });
+
+  it('does not show a warning for non-Codex backends', async () => {
+    const conversation = createBackendConversation('opencode-conv', 'opencode');
+    const host = createHost(conversation, {
+      appendPersistentNotice: jest.fn().mockResolvedValue(undefined),
+      hasMatchingPersistentNotice: jest.fn(() => false),
+    });
+    const port = createPort();
+    const coordinator = new ConversationLoadRecoveryCoordinator(host, port);
+
+    await coordinator.loadConversation(conversation.id);
+
+    expect(host.appendPersistentNotice).not.toHaveBeenCalled();
+  });
+
+  it('does not duplicate the warning if it already exists', async () => {
+    const conversation = createCodexConversation('codex-dup', 'codex-local-dup-123');
+    const host = createHost(conversation, {
+      getActiveBackend: jest.fn(() => 'codex'),
+      appendPersistentNotice: jest.fn().mockResolvedValue(undefined),
+      hasMatchingPersistentNotice: jest.fn(() => true),
+    });
+    const port = createPort();
+    const coordinator = new ConversationLoadRecoveryCoordinator(host, port);
+
+    await coordinator.loadConversation(conversation.id);
+
+    expect(host.appendPersistentNotice).not.toHaveBeenCalled();
+    expect(host.hasMatchingPersistentNotice).toHaveBeenCalledWith(
+      t('chat.codex.provisionalWarning.title'),
+      t('chat.codex.provisionalWarning.description'),
+      'warning',
+      conversation,
+    );
+  });
+
+  it('shows a persistent warning when activating a tab with a provisional Codex session', async () => {
+    const conversation = createCodexConversation('codex-tab', 'codex-local-tab-123');
+    const host = createHost(conversation, {
+      getActiveBackend: jest.fn(() => 'codex'),
+      appendPersistentNotice: jest.fn().mockResolvedValue(undefined),
+      hasMatchingPersistentNotice: jest.fn(() => false),
+    });
+    const port = createPort();
+    const coordinator = new ConversationLoadRecoveryCoordinator(host, port);
+
+    await coordinator.activateTab('tab-1');
+
+    expect(host.appendPersistentNotice).toHaveBeenCalledWith(expect.objectContaining({
+      title: t('chat.codex.provisionalWarning.title'),
+      content: t('chat.codex.provisionalWarning.description'),
+      tone: 'warning',
+      conversation,
+    }));
+  });
+
+  it('does not show a warning when activating a tab with a real Codex thread id', async () => {
+    const conversation = createCodexConversation('codex-tab-real', 'thread_real123');
+    const host = createHost(conversation, {
+      getActiveBackend: jest.fn(() => 'codex'),
+      appendPersistentNotice: jest.fn().mockResolvedValue(undefined),
+      hasMatchingPersistentNotice: jest.fn(() => false),
+    });
+    const port = createPort();
+    const coordinator = new ConversationLoadRecoveryCoordinator(host, port);
+
+    await coordinator.activateTab('tab-1');
+
+    expect(host.appendPersistentNotice).not.toHaveBeenCalled();
+  });
+});

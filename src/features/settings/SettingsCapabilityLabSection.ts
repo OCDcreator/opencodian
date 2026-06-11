@@ -30,6 +30,7 @@ import type { ClaudeCodePermissionBridge } from '../../core/agents/backend/Claud
 import type { AgentBackendKind } from '../../core/types/chat';
 import {
   getDefaultClaudeCodeBackendSettings,
+  getDefaultCodexBackendSettings,
 } from '../../core/types/settings';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
@@ -429,7 +430,7 @@ export class SettingsCapabilityLabSection {
   dispose(): void {}
 
   private get claudeCodeSettings() {
-    this.plugin.settings.backendSettings ??= { claudeCode: getDefaultClaudeCodeBackendSettings() };
+    this.plugin.settings.backendSettings ??= { claudeCode: getDefaultClaudeCodeBackendSettings(), codex: getDefaultCodexBackendSettings() };
     this.plugin.settings.backendSettings.claudeCode ??= getDefaultClaudeCodeBackendSettings();
     return this.plugin.settings.backendSettings.claudeCode;
   }

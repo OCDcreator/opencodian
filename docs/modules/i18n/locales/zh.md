@@ -1,7 +1,7 @@
 # Chinese Locale
 
 > **源码**: `src/i18n/locales/zh.ts`
-> **最近更新**: 2026-06-07
+> **最近更新**: 2026-06-09 — added Codex settings locale keys
 
 ## 概述
 

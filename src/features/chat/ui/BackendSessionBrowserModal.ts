@@ -26,7 +26,7 @@ export interface BackendSessionPreviewChatMessage {
 
 export interface BackendSessionBrowserHost {
   getAgentServiceRegistry(): AgentServiceRegistry | null;
-  createConversationFromBackendSession(sessionId: string, title: string, initialMessages?: Array<{ id: string; role: 'user' | 'assistant'; content: string; timestamp: number }>): Promise<string | null>;
+  createConversationFromBackendSession(sessionId: string, title: string, initialMessages?: Array<{ id: string; role: 'user' | 'assistant'; content: string; timestamp: number }>, backend?: string): Promise<string | null>;
   loadConversation(conversationId: string): Promise<void>;
   getActiveBackendKind(): string | null;
   showNotice(message: string): void;
@@ -513,7 +513,8 @@ export class BackendSessionBrowserModal extends Modal {
         // Preview load failure is non-blocking; resume with empty messages.
       }
 
-      const conversationId = await this.host.createConversationFromBackendSession(sessionId, title, previewChatMessages);
+      const backend = this.host.forcedBackendKind ?? this.host.getActiveBackendKind() ?? 'opencode';
+      const conversationId = await this.host.createConversationFromBackendSession(sessionId, title, previewChatMessages, backend);
       if (!conversationId) {
         this.host.showNotice(t('chat.backendSessions.createFailed'));
         return;

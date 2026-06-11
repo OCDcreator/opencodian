@@ -17,7 +17,7 @@
 - 在输入以 `/` 开头且光标仍停留在 command token 内时，把 slash autocomplete session 委托给 `SlashCommandMenuCoordinator`；`/skills <query>` 是允许继续显示 nested skill suggestions 的特殊前缀；加载中、无命令、无匹配或加载失败时保持可见状态提示，避免静默消失
 - 在 prompt mode 下把 `@agent` 查询交给 `AgentMentionComposerController`，选中后保留可见 `@name` 文本，并在 submit 时附加 `SurfaceInvocationIntent.mentions`
 - 在 toolbar slot 内挂载 `ChatAgentSelectionCoordinator`，提供 OpenCode default / primary agent 下拉框；提交 prompt 时把该 composer 级选择附加为 `SurfaceInvocationIntent.primaryAgent`，选中后把焦点还给 textarea
-- 统一处理 submit gate、send/stop affordance 和 add-context 按钮事件
+- 统一处理 submit gate、send/stop affordance、add-context 按钮事件，以及 capability-gated 的图片附件按钮事件
 - 通过 `ResizeObserver` + `requestAnimationFrame` 维护 composer stack height，并触发 settled scroll
 - 把 selection controls/context-usage/effort/modified-files toggle 这些既有子控件挂到稳定的 toolbar slot
 - 暴露 `refreshToolbarControls()`，允许 backend/capability 切换后只重挂 toolbar 子控件并同步刷新 capability hint，而不重建 textarea、context row 或 footer
@@ -58,6 +58,8 @@ export interface ComposerInputShellCoordinatorHost {
   };
   /** Backend-specific capability chip rendered near the send action (null = no hint). */
   getComposerCapabilityHint?(): { text: string; tooltip?: string; insertText?: string } | null;
+  /** Whether the active backend supports image input. */
+  hasImageInputCapability?(): boolean;
 }
 
 export class ComposerInputShellCoordinator {

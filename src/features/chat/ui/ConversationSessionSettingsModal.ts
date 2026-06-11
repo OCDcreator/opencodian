@@ -12,10 +12,16 @@ import type {
 import {
   normalizeChatFontSizePx,
 } from '../../../core/types';
+import type { CodexReasoningEffort, CodexSandboxMode } from '../../../core/types/settings';
 import { t } from '../../../i18n';
 
 export interface ConversationSessionSettingsModalDefaults {
   chatFontSizePx: number;
+  codexSandboxMode?: CodexSandboxMode;
+  codexModelReasoningEffort?: CodexReasoningEffort;
+  codexModelOverride?: string;
+  codexAdditionalDirectories?: string[];
+  codexNetworkAccessEnabled?: boolean;
 }
 
 interface ConversationSessionSettingsModalOptions {
@@ -28,6 +34,8 @@ interface ConversationSessionSettingsModalOptions {
   showCompactionSummary?: boolean;
   /** Whether to show question-card global summary rows. Defaults to true. */
   showQuestionsSummary?: boolean;
+  /** Whether to show Codex-specific per-conversation overrides. Only true for Codex conversations. */
+  showCodexControls?: boolean;
   onSave(
     overrides: ConversationSessionSettings | undefined,
   ): Promise<void> | void;
@@ -62,6 +70,11 @@ const CLASSIC_SETTINGS_SCROLL_RETRY_DELAYS_MS = [0, 80, 200, 400] as const;
 
 export class ConversationSessionSettingsModal extends Modal {
   private chatFontSizeInputEl: HTMLInputElement | null = null;
+  private sandboxModeSelectEl: HTMLSelectElement | null = null;
+  private reasoningEffortSelectEl: HTMLSelectElement | null = null;
+  private codexModelOverrideInputEl: HTMLInputElement | null = null;
+  private codexAdditionalDirectoriesTextareaEl: HTMLTextAreaElement | null = null;
+  private codexNetworkAccessEnabledSelectEl: HTMLSelectElement | null = null;
   private errorEl: HTMLElement | null = null;
   private saveButtonEl: HTMLButtonElement | null = null;
   private cancelButtonEl: HTMLButtonElement | null = null;
@@ -103,6 +116,8 @@ export class ConversationSessionSettingsModal extends Modal {
     this.chatFontSizeInputEl.addEventListener('input', () => {
       this.handlePreview();
     });
+
+    this.createCodexSection(bodyEl);
 
     this.createSharingSection(bodyEl);
     this.createSummaryDivider(bodyEl);
@@ -150,6 +165,11 @@ export class ConversationSessionSettingsModal extends Modal {
     this.contentEl.empty();
     this.modalEl.removeClass('opencodian-session-settings-modal');
     this.chatFontSizeInputEl = null;
+    this.sandboxModeSelectEl = null;
+    this.reasoningEffortSelectEl = null;
+    this.codexModelOverrideInputEl = null;
+    this.codexAdditionalDirectoriesTextareaEl = null;
+    this.codexNetworkAccessEnabledSelectEl = null;
     this.errorEl = null;
     this.saveButtonEl = null;
     this.cancelButtonEl = null;
@@ -269,6 +289,212 @@ export class ConversationSessionSettingsModal extends Modal {
     incBtn.addEventListener('click', () => { applyStep(step); });
 
     return inputEl;
+  }
+
+  private createDropdownField(containerEl: HTMLElement, options: {
+    setting: string;
+    name: string;
+    description: string;
+    defaultValue: string;
+    choices: Array<{ value: string; label: string }>;
+    initialValue: string | null | undefined;
+    inheritLabel?: string;
+  }): HTMLSelectElement {
+    const controlEl = this.createFieldShell(containerEl, {
+      name: options.name,
+      description: options.description,
+      defaultValue: options.defaultValue,
+    });
+
+    const selectEl = controlEl.createEl('select', {
+      cls: 'opencodian-session-settings-dropdown',
+      attr: {
+        'data-setting': options.setting,
+      },
+    });
+
+    if (options.inheritLabel === undefined || options.inheritLabel) {
+      selectEl.createEl('option', {
+        text: options.inheritLabel ?? t('chat.sessionSettings.modal.codexInherit'),
+        attr: { value: '' },
+      });
+    }
+
+    for (const choice of options.choices) {
+      selectEl.createEl('option', {
+        text: choice.label,
+        attr: { value: choice.value },
+      });
+    }
+
+    const initialValue = options.initialValue;
+    if (typeof initialValue === 'string' && initialValue.length > 0) {
+      selectEl.value = initialValue;
+    }
+
+    return selectEl;
+  }
+
+  private createTextField(containerEl: HTMLElement, options: {
+    setting: string;
+    name: string;
+    description: string;
+    defaultValue: string;
+    placeholder: string;
+    initialValue: string | null | undefined;
+  }): HTMLInputElement {
+    const controlEl = this.createFieldShell(containerEl, {
+      name: options.name,
+      description: options.description,
+      defaultValue: options.defaultValue,
+    });
+
+    const inputEl = controlEl.createEl('input', {
+      cls: 'opencodian-session-settings-text-input',
+      attr: {
+        type: 'text',
+        placeholder: options.placeholder,
+        'data-setting': options.setting,
+      },
+    });
+    inputEl.value = typeof options.initialValue === 'string'
+      ? options.initialValue
+      : '';
+
+    return inputEl;
+  }
+
+  private createTextareaField(containerEl: HTMLElement, options: {
+    setting: string;
+    name: string;
+    description: string;
+    defaultValue: string;
+    placeholder: string;
+    initialValue: string[] | null | undefined;
+  }): HTMLTextAreaElement {
+    const controlEl = this.createFieldShell(containerEl, {
+      name: options.name,
+      description: options.description,
+      defaultValue: options.defaultValue,
+    });
+
+    const textareaEl = controlEl.createEl('textarea', {
+      cls: 'opencodian-session-settings-textarea-input',
+      attr: {
+        placeholder: options.placeholder,
+        'data-setting': options.setting,
+        rows: '3',
+      },
+    });
+    textareaEl.value = Array.isArray(options.initialValue)
+      ? options.initialValue.join('\n')
+      : '';
+
+    return textareaEl;
+  }
+
+  private createCodexSection(bodyEl: HTMLElement): void {
+    if (!this.options.showCodexControls) {
+      return;
+    }
+
+    const defaults = this.options.defaults;
+    if (!defaults.codexSandboxMode || !defaults.codexModelReasoningEffort) {
+      return;
+    }
+
+    const codexSectionEl = this.createSection(bodyEl, {
+      section: 'codex',
+      title: t('chat.sessionSettings.modal.codexGroup'),
+      description: t('chat.sessionSettings.modal.codexGroupDesc'),
+    });
+
+    codexSectionEl.createDiv({
+      cls: 'opencodian-session-settings-codex-boundary-hint',
+      text: t('chat.sessionSettings.modal.codexBoundaryHint'),
+    });
+
+    this.codexModelOverrideInputEl = this.createTextField(codexSectionEl, {
+      setting: 'codex-model-override',
+      name: t('chat.sessionSettings.modal.codexModelOverride'),
+      description: t('chat.sessionSettings.modal.codexModelOverrideDesc'),
+      defaultValue: defaults.codexModelOverride || t('chat.sessionSettings.modal.codexModelOverrideEmpty'),
+      placeholder: '',
+      initialValue: this.options.initialOverrides?.codexModelOverride,
+    });
+
+    this.codexAdditionalDirectoriesTextareaEl = this.createTextareaField(codexSectionEl, {
+      setting: 'codex-additional-directories',
+      name: t('chat.sessionSettings.modal.codexAdditionalDirectories'),
+      description: t('chat.sessionSettings.modal.codexAdditionalDirectoriesDesc'),
+      defaultValue: defaults.codexAdditionalDirectories?.join('\n') || t('chat.sessionSettings.modal.codexAdditionalDirectoriesEmpty'),
+      placeholder: t('settings.codex.additionalDirs.placeholder'),
+      initialValue: this.options.initialOverrides?.codexAdditionalDirectories,
+    });
+
+    this.sandboxModeSelectEl = this.createDropdownField(codexSectionEl, {
+      setting: 'codex-sandbox-mode',
+      name: t('chat.sessionSettings.modal.codexSandboxMode'),
+      description: t('chat.sessionSettings.modal.codexSandboxModeDesc'),
+      defaultValue: this.sandboxModeLabel(defaults.codexSandboxMode),
+      choices: [
+        { value: 'read-only', label: t('settings.codex.sandbox.readOnly') },
+        { value: 'workspace-write', label: t('settings.codex.sandbox.workspaceWrite') },
+        { value: 'danger-full-access', label: t('settings.codex.sandbox.dangerFullAccess') },
+      ],
+      initialValue: this.options.initialOverrides?.codexSandboxMode,
+    });
+
+    this.reasoningEffortSelectEl = this.createDropdownField(codexSectionEl, {
+      setting: 'codex-reasoning-effort',
+      name: t('chat.sessionSettings.modal.codexReasoningEffort'),
+      description: t('chat.sessionSettings.modal.codexReasoningEffortDesc'),
+      defaultValue: this.effortLabel(defaults.codexModelReasoningEffort),
+      choices: [
+        { value: 'minimal', label: t('settings.codex.reasoning.minimal') },
+        { value: 'low', label: t('settings.codex.reasoning.low') },
+        { value: 'medium', label: t('settings.codex.reasoning.medium') },
+        { value: 'high', label: t('settings.codex.reasoning.high') },
+        { value: 'xhigh', label: t('settings.codex.reasoning.xhigh') },
+      ],
+      initialValue: this.options.initialOverrides?.codexModelReasoningEffort,
+    });
+
+    this.codexNetworkAccessEnabledSelectEl = this.createDropdownField(codexSectionEl, {
+      setting: 'codex-network-access-enabled',
+      name: t('chat.sessionSettings.modal.codexNetworkAccessEnabled'),
+      description: t('chat.sessionSettings.modal.codexNetworkAccessEnabledDesc'),
+      defaultValue: defaults.codexNetworkAccessEnabled === true
+        ? t('chat.sessionSettings.modal.codexNetworkAccessEnabledOn')
+        : t('chat.sessionSettings.modal.codexNetworkAccessEnabledOff'),
+      choices: [
+        { value: 'true', label: t('chat.sessionSettings.modal.codexNetworkAccessEnabledOn') },
+        { value: 'false', label: t('chat.sessionSettings.modal.codexNetworkAccessEnabledOff') },
+      ],
+      initialValue: this.options.initialOverrides?.codexNetworkAccessEnabled === true
+        ? 'true'
+        : this.options.initialOverrides?.codexNetworkAccessEnabled === false
+          ? 'false'
+          : '',
+    });
+  }
+
+  private sandboxModeLabel(mode: CodexSandboxMode): string {
+    switch (mode) {
+      case 'read-only': return t('settings.codex.sandbox.readOnly');
+      case 'workspace-write': return t('settings.codex.sandbox.workspaceWrite');
+      case 'danger-full-access': return t('settings.codex.sandbox.dangerFullAccess');
+    }
+  }
+
+  private effortLabel(effort: CodexReasoningEffort): string {
+    switch (effort) {
+      case 'minimal': return t('settings.codex.reasoning.minimal');
+      case 'low': return t('settings.codex.reasoning.low');
+      case 'medium': return t('settings.codex.reasoning.medium');
+      case 'high': return t('settings.codex.reasoning.high');
+      case 'xhigh': return t('settings.codex.reasoning.xhigh');
+    }
   }
 
   private createSharingSection(containerEl: HTMLElement): void {
@@ -767,6 +993,49 @@ export class ConversationSessionSettingsModal extends Modal {
       overrides.chatFontSizePx = normalizedChatFontSizePx;
     } else {
       overrides.chatFontSizePx = null;
+    }
+
+    if (this.options.showCodexControls) {
+      const sandboxModeValue = this.sandboxModeSelectEl?.value ?? '';
+      if (sandboxModeValue.length > 0) {
+        overrides.codexSandboxMode = sandboxModeValue as CodexSandboxMode;
+      } else {
+        overrides.codexSandboxMode = null;
+      }
+
+      const effortValue = this.reasoningEffortSelectEl?.value ?? '';
+      if (effortValue.length > 0) {
+        overrides.codexModelReasoningEffort = effortValue as CodexReasoningEffort;
+      } else {
+        overrides.codexModelReasoningEffort = null;
+      }
+
+      const modelOverrideValue = this.codexModelOverrideInputEl?.value?.trim() ?? '';
+      if (modelOverrideValue.length > 0) {
+        overrides.codexModelOverride = modelOverrideValue;
+      } else {
+        overrides.codexModelOverride = null;
+      }
+
+      const additionalDirsValue = this.codexAdditionalDirectoriesTextareaEl?.value ?? '';
+      const additionalDirs = additionalDirsValue
+        .split('\n')
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0);
+      if (additionalDirs.length > 0) {
+        overrides.codexAdditionalDirectories = additionalDirs;
+      } else {
+        overrides.codexAdditionalDirectories = null;
+      }
+
+      const networkAccessValue = this.codexNetworkAccessEnabledSelectEl?.value ?? '';
+      if (networkAccessValue === 'true') {
+        overrides.codexNetworkAccessEnabled = true;
+      } else if (networkAccessValue === 'false') {
+        overrides.codexNetworkAccessEnabled = false;
+      } else {
+        overrides.codexNetworkAccessEnabled = null;
+      }
     }
 
     return Object.values(overrides).every((value) => value === null)

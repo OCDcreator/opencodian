@@ -13,13 +13,15 @@ modal 本身只负责 DOM、输入解析和同步校验；真正的会话保存�
 
 本 modal 还显示当前会话的分享动作区：`Share and copy link` 会触发上游 `onShare()`，`Cancel sharing` 会触发 `onUnshare()`。它只负责按钮状态和错误展示，不直接调用 OpenCode SDK。
 
-标题生成、上下文压缩、会话分享和问答卡片摘要都不是 modal 的固有能力；它们必须由 coordinator/host 按当前 backend capability 显式开启。Claude Code 会话当前只显示通用的 Display / Rendering 摘要，避免把尚未接入的 OpenCode-only 标题、问答或分享机制露到会话 UI。
+标题生成、上下文压缩、会话分享和问答卡片摘要都不是 modal 的固有能力；它们必须由 coordinator/host 按当前 backend capability 显式开启。Claude Code 会话当前只显示通用的 Display / Rendering 摘要，避免把尚未接入的 OpenCode-only 标题、问答或分享机制露到会话 UI。Codex 会话在 `showCodexControls` 开启时额外显示 Codex 分组，包含沙盒模式和推理强度两个下拉覆盖。
 
 ## 公开接口
 
 ```typescript
 export interface ConversationSessionSettingsModalDefaults {
   chatFontSizePx: number;
+  codexSandboxMode?: CodexSandboxMode;
+  codexModelReasoningEffort?: CodexReasoningEffort;
 }
 
 type PluginSettingsSummary = {
@@ -43,6 +45,7 @@ class ConversationSessionSettingsModal extends Modal {
       showTitleSummary?: boolean;
       showCompactionSummary?: boolean;
       showQuestionsSummary?: boolean;
+      showCodexControls?: boolean;
       onSave(overrides: ConversationSessionSettings | undefined): Promise<void> | void;
       onPreview?(overrides: ConversationSessionSettings | undefined): void;
       onCancelPreview?(): void;
@@ -59,6 +62,8 @@ class ConversationSessionSettingsModal extends Modal {
 
 - 顶部 hero 区显示当前会话标题、继承说明与“会话覆盖”语义 badge，避免用户把它误认为全局设置
 - modal 主体包含聊天字体大小的单一显示设置
+- `showCodexControls` 开启时，在 Display 分组下方渲染 Codex 分组，包含沙盒模式（read-only / workspace-write / danger-full-access）和推理强度（minimal / low / medium / high / xhigh）两个下拉；分组内含 boundary hint 说明"这些设置在下一个线程生效，不影响当前对话"
+- Codex 下拉选择“Inherit”时回写 `null`（与字体大小行为一致），全字段为 null 时 `buildOverrides()` 返回 `undefined`
 - 分享分组显示当前 session 的分享状态。`shareUrl === null` 时展示 Not shared 并隐藏取消分享；存在 URL 时展示 Shared、公开链接和取消分享动作；`shareMode === "disabled"` 且当前未分享时展示 Sharing disabled、禁用分享按钮，并显示跳转主设置页的 plain-language 提示；`undefined` 保留兼容的未知状态
 - 分享分组提供“分享并复制链接”和“取消分享”两个会话级动作；保存显示设置不会触发分享动作
 - Display 分组下方显示只读摘要：Display / Rendering 始终可见，Title generation / Context compaction / Question cards 只有对应 `show*Summary` option 开启时才出现，每行提供一个 “Open settings” 按钮

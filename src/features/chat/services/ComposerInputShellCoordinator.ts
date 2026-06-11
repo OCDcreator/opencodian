@@ -10,7 +10,7 @@ import {
   stampPromptSuggestionScope,
 } from '../../../core/agents/backend/promptSuggestionSink';
 import type { SlashCommandMenuItem } from '../../../core/config/slashCommandCatalog';
-import type { SlashCommandSkillMode } from '../../../core/types';
+import type { ImageAttachment, SlashCommandSkillMode } from '../../../core/types';
 import { t } from '../../../i18n';
 import { createLogger } from '../../../shared';
 import { type AgentMentionCandidate, AgentMentionComposerController } from './AgentMentionComposerController';
@@ -83,6 +83,8 @@ export interface ComposerInputShellCoordinatorHost {
    * shouldMountAgentSelector when the host does not implement this seam.
    */
   getComposerCapabilityHint?(): ComposerCapabilityHint | null;
+  /** Whether the active backend supports image input. */
+  hasImageInputCapability?(): boolean;
 }
 
 export interface ComposerCapabilityHint {
@@ -126,6 +128,10 @@ export class ComposerInputShellCoordinator {
   private composerAvailabilityObserver: MutationObserver | null = null;
   private composerAvailabilityObserverRootEl: HTMLElement | null = null;
   private composerAvailabilityNoticeSignature: string | null = null;
+  private addImageBtnEl: HTMLButtonElement | null = null;
+  private imageChipContainerEl: HTMLElement | null = null;
+  private attachedImages: ImageAttachment[] = [];
+  private fileInputEl: HTMLInputElement | null = null;
 
   constructor(private readonly host: ComposerInputShellCoordinatorHost) {
     this.agentMentionController = new AgentMentionComposerController({
@@ -232,6 +238,23 @@ export class ComposerInputShellCoordinator {
         this.trySubmitCurrentInput();
       }
     });
+
+    // Clipboard paste of images (capability-gated)
+    if (this.host.hasImageInputCapability?.()) {
+      this.inputTextareaEl.addEventListener('paste', (event) => {
+        const files = event.clipboardData?.files;
+        if (!files || files.length === 0) {
+          return;
+        }
+        const imageFiles = this.filterImageFiles(files);
+        if (imageFiles.length === 0) {
+          return;
+        }
+        event.preventDefault();
+        void this.processImageFiles(imageFiles);
+      });
+    }
+
     this.syncTextareaHeight();
     this.slashCommandMenuEl = this.composerShellEl.createDiv({
       cls: 'opencodian-slash-command-menu is-hidden',
@@ -253,6 +276,67 @@ export class ComposerInputShellCoordinator {
     this.addContextBtnEl.addEventListener('click', () => {
       void this.host.addChosenFileContextToActiveTab();
     });
+
+    // Image attach button (capability-gated)
+    if (this.host.hasImageInputCapability?.()) {
+      this.addImageBtnEl = this.composerFooterLeadingEl.createEl('button', {
+        cls: 'opencodian-composer-image-btn opencodian-tooltip-trigger',
+        attr: {
+          type: 'button',
+          'aria-label': t('chat.image.attachImage'),
+        },
+      });
+      setIcon(this.addImageBtnEl, 'image');
+      this.host.setTooltipLabel(this.addImageBtnEl, t('chat.image.attachImage'), 'top');
+      this.addImageBtnEl.addEventListener('click', () => {
+        this.fileInputEl?.click();
+      });
+
+      // Hidden file input
+      this.fileInputEl = document.createElement('input');
+      this.fileInputEl.type = 'file';
+      this.fileInputEl.accept = 'image/jpeg,image/png,image/gif,image/webp';
+      this.fileInputEl.style.display = 'none';
+      this.fileInputEl.addEventListener('change', (event) => {
+        void this.handleFileSelection(event);
+      });
+      document.body.appendChild(this.fileInputEl);
+
+      // Drag-and-drop of images onto the composer shell (capability-gated)
+      this.composerShellEl.addEventListener('dragover', (event) => {
+        if (this.isComposerInteractionDisabled()) {
+          return;
+        }
+        // Only show drop intent when files contain at least one image
+        const files = event.dataTransfer?.files;
+        if (files && this.filterImageFiles(files).length > 0) {
+          event.preventDefault();
+          event.dataTransfer!.dropEffect = 'copy';
+          this.composerShellEl?.addClass('is-drag-over');
+        }
+      });
+      this.composerShellEl.addEventListener('dragleave', (event) => {
+        if (!this.composerShellEl?.contains(event.relatedTarget as Node)) {
+          this.composerShellEl?.removeClass('is-drag-over');
+        }
+      });
+      this.composerShellEl.addEventListener('drop', (event) => {
+        this.composerShellEl?.removeClass('is-drag-over');
+        if (this.isComposerInteractionDisabled()) {
+          return;
+        }
+        const files = event.dataTransfer?.files;
+        if (!files || files.length === 0) {
+          return;
+        }
+        const imageFiles = this.filterImageFiles(files);
+        if (imageFiles.length === 0) {
+          return;
+        }
+        event.preventDefault();
+        void this.processImageFiles(imageFiles);
+      });
+    }
 
     this.sendBtnEl = this.composerFooterTrailingEl.createEl('button', {
       cls: 'opencodian-send-btn opencodian-tooltip-trigger',
@@ -591,6 +675,11 @@ export class ComposerInputShellCoordinator {
     this.composerAvailabilityNoticeSignature = null;
     this.capabilityHintEl = null;
     this.activeCapabilityHint = null;
+    this.addImageBtnEl = null;
+    this.imageChipContainerEl = null;
+    this.attachedImages = [];
+    this.fileInputEl?.remove();
+    this.fileInputEl = null;
     this.slashCommandMenuEl = null;
     this.slashCommandMenuCatalogItems = null;
     this.suggestionBarEl?.remove();
@@ -687,10 +776,16 @@ export class ComposerInputShellCoordinator {
       return;
     }
 
+    // Attach images to prompt submissions when present
+    if (submission.kind === 'prompt' && this.attachedImages.length > 0) {
+      submission.images = [...this.attachedImages];
+    }
+
     this.promptSuggestionService.clearActiveOnTurnStart();
     void this.host.submitMessage(submission);
     this.inputTextareaEl.value = '';
     this.agentMentionController.clearTrackedMentions();
+    this.clearAttachedImages();
     this.syncTextareaHeight();
     this.syncHighlightBackdrop();
     this.agentMentionController.clear(this.slashCommandMenuEl);
@@ -1182,6 +1277,124 @@ export class ComposerInputShellCoordinator {
     }
 
     backdrop.scrollTop = textarea.scrollTop;
+  }
+
+  // -------------------------------------------------------------------------
+  // Image attachment helpers
+  // -------------------------------------------------------------------------
+
+  private filterImageFiles(files: FileList): File[] {
+    return Array.from(files).filter((file) => this.inferMediaType(file.type) !== null);
+  }
+
+  private async processImageFiles(files: File[]): Promise<void> {
+    for (const file of files) {
+      const mediaType = this.inferMediaType(file.type);
+      if (!mediaType) {
+        continue;
+      }
+      const data = await this.readFileAsBase64(file);
+      this.attachedImages.push({
+        data,
+        mediaType,
+        filename: file.name,
+      });
+    }
+
+    this.renderImageChips();
+    this.scheduleLayoutSync();
+  }
+
+  private async handleFileSelection(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const files = input.files;
+    if (!files || files.length === 0) {
+      return;
+    }
+
+    const imageFiles = this.filterImageFiles(files);
+    if (imageFiles.length > 0) {
+      await this.processImageFiles(imageFiles);
+    }
+    input.value = '';
+  }
+
+  private readFileAsBase64(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        const base64 = result.split(',')[1] ?? '';
+        resolve(base64);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  private inferMediaType(mime: string): ImageAttachment['mediaType'] | null {
+    if (mime === 'image/jpeg') return 'image/jpeg';
+    if (mime === 'image/png') return 'image/png';
+    if (mime === 'image/gif') return 'image/gif';
+    if (mime === 'image/webp') return 'image/webp';
+    return null;
+  }
+
+  private renderImageChips(): void {
+    if (!this.inputWrapperEl) {
+      return;
+    }
+
+    if (!this.imageChipContainerEl) {
+      this.imageChipContainerEl = this.inputWrapperEl.createDiv({
+        cls: 'opencodian-composer-image-chips',
+      });
+      this.inputWrapperEl.insertBefore(
+        this.imageChipContainerEl,
+        this.inputWrapperEl.querySelector('.opencodian-composer-content'),
+      );
+    }
+
+    this.imageChipContainerEl.empty();
+
+    for (let i = 0; i < this.attachedImages.length; i++) {
+      const image = this.attachedImages[i];
+      const chipEl = this.imageChipContainerEl.createDiv({
+        cls: 'opencodian-composer-image-chip',
+      });
+
+      const thumbEl = chipEl.createEl('img', {
+        cls: 'opencodian-composer-image-chip-thumb',
+        attr: {
+          src: `data:${image.mediaType};base64,${image.data}`,
+          alt: image.filename ?? 'Attached image',
+        },
+      });
+      thumbEl.style.width = '48px';
+      thumbEl.style.height = '48px';
+      thumbEl.style.objectFit = 'cover';
+      thumbEl.style.borderRadius = '4px';
+
+      const removeBtn = chipEl.createEl('button', {
+        cls: 'opencodian-composer-image-chip-remove',
+        attr: {
+          type: 'button',
+          'aria-label': t('chat.image.removeImage'),
+        },
+      });
+      setIcon(removeBtn, 'x');
+      removeBtn.addEventListener('click', () => {
+        this.attachedImages.splice(i, 1);
+        this.renderImageChips();
+        this.scheduleLayoutSync();
+      });
+    }
+  }
+
+  private clearAttachedImages(): void {
+    this.attachedImages = [];
+    this.imageChipContainerEl?.remove();
+    this.imageChipContainerEl = null;
   }
 
 }

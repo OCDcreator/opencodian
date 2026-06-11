@@ -36,6 +36,7 @@
 | `refreshQuestionUi()` | 重绘 question dock，并在需要时重绘当前对话 |
 | `invalidateSlashCommandMenuCatalog()` | 立刻清空 slash command menu catalog 缓存，并可选触发一次后台 warm preload |
 | `createConversationInCurrentTab()` | 公开给插件命令层使用，委托 `ConversationLoadRecoveryCoordinator.createConversationInCurrentTab()`，确保全局 `new-conversation` 命令会真正替换当前视图的 active conversation |
+| `loadConversationForExternalHost(conversationId)` | 最小公开 seam，供外部 host（如 settings-side backend session browser）加载已恢复的会话，委托内部 `loadConversation()` |
 | `toggleLiquidDiamondDemo()` | 切换 CPU 版 floating diamond demo |
 | `toggleLiquidDiamondWebGlDemo()` | 切换 WebGL2 版 floating diamond demo |
 | `toggleGlassOctahedron()` | 切换实验性的 glass octahedron overlay |
@@ -596,7 +597,7 @@ background task notice 这条子链路现在的边界是：
 - 会优先解析当前 tab 请求的模型；若它已被开关链路过滤，则自动回退到同 provider 默认模型 / 当前 effective catalog 的其他可用模型
 - 当 effective catalog 为空时，trigger 会回退到默认机器人图标，并保留空 catalog 对应的 tooltip 文案
 
-effort selector 的 variant 列表继续直接按当前 provider/model 查询 `findKnownModelInfo()`；当前局部 `modelRef` 仅保留为既有兼容占位并用行内 lint 注释限制影响，不作为额外 runtime truth。
+effort selector 的 variant 列表按 backend 分支处理：OpenCode 按 provider/model 查询 `findKnownModelInfo()`；Claude Code 使用固定的 `CLAUDE_CODE_EFFORT_VARIANTS`；Codex 使用 `CODEX_EFFORT_VARIANTS` 并通过 `onVariantChange` 写回 `backendSettings.codex.modelReasoningEffort` + 调用 `CodexAdapter.updateModelReasoningEffort()` 更新 adapter options。当前局部 `modelRef` 仅保留为既有兼容占位并用行内 lint 注释限制影响，不作为额外 runtime truth。
 
 ## 直接协作模块
 

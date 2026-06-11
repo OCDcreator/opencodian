@@ -4,6 +4,7 @@ import type {
 import type {
   ChatMessage,
   Conversation,
+  ImageAttachment,
   PromptContextItem,
   QuestionRequest,
   QuestionResolution,
@@ -91,6 +92,7 @@ export interface SendPipelineTransportPort {
       requestParts: PreparedMessageSend['requestParts'];
       /** One-shot structured-output schema for Claude Code `/json` trigger. Not persisted. */
       outputFormat?: Record<string, unknown>;
+      images?: ImageAttachment[];
     },
   ): AsyncGenerator<CoreStreamChunk>;
   detachStream(sessionId: string | undefined): void;

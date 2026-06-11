@@ -1,7 +1,7 @@
 # 智能体管理设置迁移 Spec
 
 > **状态**: `[DRAFT]`
-> **最后更新**: 2026-05-19
+> **最后更新**: 2026-06-09（Codex 设置字段和审批策略值修正）
 > **前置依赖**: 无（前端先行，Phase 0a 共享 Capability 类型）
 > **关联 spec**: `09-chat-surface-migration.md`
 
@@ -98,9 +98,14 @@
 |------|------|
 | enabled | 是否启用 |
 | apiKey | OpenAI API Key（加密存储） |
-| defaultModel | 默认模型 |
-| approvalPolicy | 审批策略（full-auto / auto-edit / suggest） |
-| cliPath | CLI 路径（需单独安装） |
+| model | 默认模型（如 `o3`） |
+| sandboxMode | 沙箱模式（`read-only` / `workspace-write` / `danger-full-access`） |
+| modelReasoningEffort | 推理力度（`minimal` / `low` / `medium` / `high` / `xhigh`） |
+| additionalDirectories | 附加目录（换行分隔） |
+| networkAccessEnabled | 网络访问（boolean，仅 `workspace-write` 模式下生效） |
+| webSearchMode | 网页搜索模式（`disabled` / `cached` / `live`） |
+
+> **注意**：`approvalPolicy`（审批策略）目前在 Codex SDK 中被阻止（BLOCKED），因为 SDK 关闭 stdin 后不支持双向审批通道。旧文档引用的 `full-auto / auto-edit / suggest` 值是错误的，实际 SDK enum 为 `ApprovalMode = "never" | "on-request" | "on-failure" | "untrusted"`。此字段暂不暴露给用户。
 
 **Copilot 设置**（启用后显示）：
 | 字段 | 说明 |
@@ -299,7 +304,7 @@ const DEFAULT_SETTINGS = {
   activeBackend: undefined,            // 无默认智能体，需用户启用后选择
   enabledBackends: [],                  // 默认全部禁用
   claudeCodeAgent: { enabled: false, authMode: 'api-key', defaultModel: 'claude-sonnet-4-20250514' },
-  codexAgent: { enabled: false, defaultModel: 'codex-mini', approvalPolicy: 'suggest' },
+  codexAgent: { enabled: false, model: undefined, sandboxMode: 'workspace-write', modelReasoningEffort: 'medium', webSearchMode: 'cached' },
   copilotAgent: { enabled: false, authMode: 'subscription', defaultModel: 'gpt-4o' },
   piAgent: { enabled: false, provider: 'anthropic', defaultModel: 'claude-sonnet-4-20250514' },
 };
@@ -325,7 +330,7 @@ const DEFAULT_SETTINGS = {
 - 但每个 backend 的映射不同：
   - OpenCode: yolo / normal / plan
   - Claude Code: auto / suggest（通过 allowedTools）
-  - Codex: full-auto / auto-edit / suggest
+   - Codex: never / on-request / on-failure / untrusted（实际 SDK enum `ApprovalMode`；注意旧文档中的 `full-auto/auto-edit/suggest` 是错误的）
   - Copilot: interactive / auto
 - Security 设置显示通用的权限概念，但选项列表根据当前 backend 调整
 

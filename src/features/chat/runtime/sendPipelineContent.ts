@@ -58,6 +58,10 @@ export function hasVisibleStreamingContent(chunk: StreamingChunk): boolean {
  * where `response` is itself a JSON-stringified value.
  * We parse that string and re-stringify it so formatting differences
  * (e.g. spaces) are normalised for comparison.
+ *
+ * Codex emits the whole JSON object directly (whole-object pattern),
+ * so when there is no `response` string field we fall back to
+ * `JSON.stringify(structuredOutput)`.
  */
 export function extractStructuredOutputDuplicateText(structuredOutput: unknown): string | null {
   if (!structuredOutput || typeof structuredOutput !== 'object') {
@@ -65,15 +69,21 @@ export function extractStructuredOutputDuplicateText(structuredOutput: unknown):
   }
   const so = structuredOutput as Record<string, unknown>;
   const response = so['response'];
-  if (typeof response !== 'string') {
-    return null;
+  if (typeof response === 'string') {
+    try {
+      const parsed = JSON.parse(response);
+      return JSON.stringify(parsed);
+    } catch {
+      return response;
+    }
   }
-  try {
-    const parsed = JSON.parse(response);
-    return JSON.stringify(parsed);
-  } catch {
-    return response;
+
+  // Codex / whole-object pattern: the entire object is the structured output
+  if (!('response' in so)) {
+    return JSON.stringify(structuredOutput);
   }
+
+  return null;
 }
 
 /**

@@ -24,7 +24,7 @@ filterDuplicateStructuredOutputContentBlocks(blocks, structuredOutput): ContentB
 - `mapStreamingContentBlocksToMessageContentBlocks()`：把 `StreamController` 的 text / thinking / tool_call block 变成会话持久化使用的 `ContentBlock`，并保留工具卡片的白名单 `toolMetadata` 与 `toolResultVisibility`
 - `getStreamedTextContent()`：只拼接 text block，供 assistant message `content` 字段回填
 - `hasVisibleStreamingContent()`：统一定义“首次可见内容”的判定，供 pending indicator 与 reveal 逻辑复用
-- `extractStructuredOutputDuplicateText()`：从结构化输出 payload 的 `response` 字段提取原始内容，解析并重新序列化以统一格式
+- `extractStructuredOutputDuplicateText()`：从结构化输出 payload 提取可能重复的原始内容。Claude 模式优先读取 `response` 字段并解析其中的 JSON；Codex 整对象模式在没有 `response` 字段时回退到 `JSON.stringify(structuredOutput)`
 - `isDuplicateStructuredOutputText()`：判断一段 raw text 是否与结构化输出的内部内容重复（支持精确匹配与 JSON 语义匹配）
 - `filterDuplicateStructuredOutputTextBlocks()`：过滤掉所有与结构化输出重复的 text block，仅在有结构化输出时生效
 - `filterDuplicateStructuredOutputContentBlocks()`：hydration 时间版，对 persisted `ContentBlock[]` 进行过滤，供消息重新渲染时移除重复内容

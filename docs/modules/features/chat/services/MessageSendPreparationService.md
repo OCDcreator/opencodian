@@ -35,6 +35,8 @@ export function buildOptimisticUserMessage(
   content: string,
   draftContextItems: PromptContextItem[],
   now?: number,
+  structuredSend?: { optimisticUserParts?: PromptRequestPart[] },
+  images?: ImageAttachment[],
 ): ChatMessage;
 
 export class MessageSendPreparationService {

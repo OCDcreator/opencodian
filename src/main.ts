@@ -13,6 +13,7 @@ import {
 } from './core/agents/backend/AgentBackendRouting';
 import { AgentServiceRegistry } from './core/agents/backend/AgentServiceRegistry';
 import { ClaudeCodeAdapter } from './core/agents/backend/ClaudeCodeAdapter';
+import { wireHiddenAdapters } from './core/agents/backend/AgentAdapterWiring';
 import {
   buildClaudeCodeElicitationContent,
   buildClaudeCodeElicitationQuestionRequest,
@@ -31,6 +32,7 @@ import { StorageService } from './core/storage';
 import { ConversationFullMessageCache } from './core/storage/ConversationFullMessageCache';
 import type {
   ChatAppearanceSettings,
+  ChatMessage,
   Conversation,
   OpenCodianSettings,
   ThemePresetDefinition,
@@ -220,12 +222,12 @@ export default class OpenCodianPlugin extends Plugin {
       // Wire agent service registry
       this.agentServiceRegistry = new AgentServiceRegistry();
       const openCodeAdapter = new OpenCodeAdapter(this.openCodeService);
-      this.agentServiceRegistry.register(openCodeAdapter);
+      const userAdapters: import('./core/agents/backend/AgentService').AgentService[] = [openCodeAdapter];
       const vaultPath = getVaultBasePath(this.app);
       if (vaultPath) {
         const permissionHost = createClaudeCodePermissionBridgeHost(() => this.claudeCodePermissionHostContext);
         this.claudeCodePermissionBridge = createClaudeCodePermissionBridge(permissionHost);
-        this.agentServiceRegistry.register(new ClaudeCodeAdapter({
+        userAdapters.push(new ClaudeCodeAdapter({
           vaultPath,
           settings: this.settings.backendSettings.claudeCode,
           pathToClaudeCodeExecutable: this.getBundledClaudeCodeExecutablePath(vaultPath),
@@ -247,11 +249,33 @@ export default class OpenCodianPlugin extends Plugin {
           },
         }));
       }
+      wireHiddenAdapters({
+        registry: this.agentServiceRegistry,
+        adapters: userAdapters,
+        vaultPath: vaultPath ?? undefined,
+        pluginDir: vaultPath
+          ? path.join(vaultPath, this.manifest.dir?.trim() || path.join('.obsidian', 'plugins', this.manifest.id?.trim() || 'opencodian'))
+          : '',
+        codexSettings: this.settings.backendSettings.codex,
+      });
       this.agentServiceRegistry.setEnabledBackends(this.settings.enabledBackends);
       if (this.settings.activeBackend) {
         this.agentServiceRegistry.setActive(this.settings.activeBackend);
       }
       setAgentServiceRegistry(this.agentServiceRegistry);
+
+      // Auto-start the active adapter so it reaches connected state.
+      // OpenCodeAdapter.start() is idempotent (ServerManager returns if already running).
+      // Non-OpenCode adapters (Codex, Claude-Code) create their connection here.
+      const activeKind = this.agentServiceRegistry.getActiveKind();
+      if (activeKind) {
+        const activeAdapter = this.agentServiceRegistry.get(activeKind);
+        if (activeAdapter) {
+          activeAdapter.start().catch(() => {
+            // Best effort: startup continues even if adapter fails to connect.
+          });
+        }
+      }
     });
 
     await this.startupCoordinator.measureStartupStep('configureVaultScopedServices', () => {
@@ -348,9 +372,9 @@ export default class OpenCodianPlugin extends Plugin {
       return;
     }
 
-    // Skip server startup if OpenCode agent is not enabled
-    if (!this.settings.enabledBackends.includes('opencode')) {
-      logger.debug('OpenCode agent disabled — skipping local server startup');
+    // Skip server startup if OpenCode agent is not the active backend
+    if (this.settings.activeBackend !== 'opencode') {
+      logger.debug('OpenCode is not the active backend — skipping local server startup');
       return;
     }
 
@@ -894,6 +918,34 @@ export default class OpenCodianPlugin extends Plugin {
     }
     await this.storage.saveConversation(conversation);
     return conversation;
+  }
+
+  /**
+   * Minimal bridge for external hosts (e.g. settings-side backend session browser)
+   * to resume a backend session into a new conversation.
+   */
+  async createConversationFromBackendSession(
+    sessionId: string,
+    title: string,
+    initialMessages?: Array<{ id: string; role: 'user' | 'assistant'; content: string; timestamp: number }>,
+    backend?: AgentBackendKind,
+  ): Promise<string | null> {
+    const resolvedBackend = backend ?? this.settings.activeBackend ?? 'opencode';
+    const conversation = await this.createConversationFromSession(sessionId, {
+      title,
+      backend: resolvedBackend,
+      messages: initialMessages as ChatMessage[] | undefined,
+    });
+    return conversation.id;
+  }
+
+  /**
+   * Minimal bridge for external hosts to activate the chat view and load
+   * a resumed conversation. Delegates to the active OpenCodianView seam.
+   */
+  async loadBackendSessionConversation(conversationId: string): Promise<void> {
+    await this.activateView();
+    await this.getOpenCodianView()?.loadConversationForExternalHost(conversationId);
   }
 
   async saveConversation(conversation: Conversation): Promise<void> {

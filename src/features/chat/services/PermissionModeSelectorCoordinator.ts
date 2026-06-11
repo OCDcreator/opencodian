@@ -1,6 +1,7 @@
 import { setIcon } from 'obsidian';
 
 import type { ClaudeCodePermissionMode } from '../../../core/types/settings';
+import type { CodexSandboxMode } from '../../../core/types/settings';
 import type { PermissionMode } from '../../../core/types/settings';
 import { t } from '../../../i18n';
 
@@ -22,7 +23,13 @@ export interface PermissionModeConfig {
   /** CSS class names for each mode, used on the trigger element. */
   modeCssClasses: readonly string[];
   /** Stable data attribute value identifying the backend system. */
-  backendLabel: 'opencode' | 'claude-code';
+  backendLabel: 'opencode' | 'claude-code' | 'codex';
+  /**
+   * Optional boundary hint shown as the trigger element title.
+   * Use this to honestly communicate that the selector only affects
+   * subsequent thread creation/resume, not the currently running thread.
+   */
+  boundaryHint?: string;
 }
 
 interface PermissionTriggerDisplayState {
@@ -101,6 +108,42 @@ export function createClaudeCodePermissionConfig(): PermissionModeConfig {
   };
 }
 
+// ─── Factory: Codex sandbox modes ────────────────────────────────────
+
+export function createCodexSandboxConfig(): PermissionModeConfig {
+  return {
+    backendLabel: 'codex',
+    options: [
+      {
+        id: 'read-only',
+        label: t('settings.codex.sandbox.readOnly'),
+        description: t('chat.codex.sandboxMode.readOnly.description')
+          || 'Filesystem reads only; no writes or shell execution',
+      },
+      {
+        id: 'workspace-write',
+        label: t('settings.codex.sandbox.workspaceWrite'),
+        description: t('chat.codex.sandboxMode.workspaceWrite.description')
+          || 'Allow writes within the workspace directory',
+      },
+      {
+        id: 'danger-full-access',
+        label: t('settings.codex.sandbox.dangerFullAccess'),
+        description: t('chat.codex.sandboxMode.dangerFullAccess.description')
+          || 'Full system access without sandbox restrictions',
+      },
+    ],
+    displayMap: {
+      'read-only': 'RO',
+      'workspace-write': 'WS',
+      'danger-full-access': 'FULL',
+    } as Record<CodexSandboxMode, string>,
+    modeCssClasses: ['mode-read-only', 'mode-workspace-write', 'mode-danger-full-access'] as const,
+    boundaryHint: t('chat.codex.sandboxMode.boundaryHint')
+      || 'Sandbox mode applies to the next thread only.',
+  };
+}
+
 export class PermissionModeSelectorCoordinator {
   private containerEl: HTMLElement | null = null;
   private triggerEl: HTMLElement | null = null;
@@ -138,6 +181,11 @@ export class PermissionModeSelectorCoordinator {
     this.dropdownEl.style.display = 'none';
     this.buildDropdown();
     this.updateTriggerDisplay();
+
+    // Set boundary hint title if provided (e.g. "only affects next thread").
+    if (this.config.boundaryHint) {
+      this.triggerEl.setAttribute('title', this.config.boundaryHint);
+    }
 
     this.triggerEl.addEventListener('click', (event) => {
       event.stopPropagation();

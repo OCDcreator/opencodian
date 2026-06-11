@@ -7,7 +7,7 @@
 
 `settingsLayoutRegistry.ts` 定义设置页多级标签分类模式的标签结构。它是一个纯数据 registry，不包含任何设置保存逻辑，但现在也负责把旧的 `language` 一级标签记忆兼容到新的 `general`，并维护二级标签 legacy id 映射，避免用户停留在已重组的设置页时落到空白或错误默认页。
 
-registry 里的 `backendRequired` 是设置 surface 的后端边界声明：OpenCode 专属 tab 只在当前 active backend 是 `opencode` 时出现，Claude Code 专属 tab 只在 active backend 是 `claude-code` 时出现。不要把 `enabledBackends` 里的存在性当作展示条件，否则会把另一个后端尚未接入的能力泄漏到当前 UI。
+registry 里的 `backendRequired` 是设置 surface 的后端边界声明：OpenCode 专属 tab 只在当前 active backend 是 `opencode` 时出现，Claude Code 专属 tab 只在 active backend 是 `claude-code` 时出现，Codex 专属 tab 只在 active backend 是 `codex` 时出现。不要把 `enabledBackends` 里的存在性当作展示条件，否则会把另一个后端尚未接入的能力泄漏到当前 UI。
 
 ## 主要定义
 

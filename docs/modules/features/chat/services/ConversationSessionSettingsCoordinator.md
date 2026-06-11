@@ -22,6 +22,8 @@ coordinator 也是会话设置弹窗的 capability gate。分享和压缩由 hos
 ```typescript
 export interface ResolvedConversationSessionSettings {
   chatFontSizePx: number;
+  codexSandboxMode?: CodexSandboxMode;
+  codexModelReasoningEffort?: CodexReasoningEffort;
 }
 
 export interface ShareInspectionEntry {
@@ -33,6 +35,7 @@ export interface ConversationSessionSettingsCoordinatorHost {
   app: App;
   getCurrentConversation(): Conversation | null;
   getSessionSettingsDefaults(): ResolvedConversationSessionSettings;
+  getCodexGlobalDefaults?(): { sandboxMode: CodexSandboxMode; modelReasoningEffort: CodexReasoningEffort };
   getChatContainerEl(): HTMLElement | null;
   saveConversation(conversation: Conversation): Promise<void>;
   showNotice(message: string): void;
@@ -45,6 +48,7 @@ export interface ConversationSessionSettingsCoordinatorHost {
   supportsTitleGeneration?(): boolean;
   supportsCompaction?(): boolean;
   supportsQuestions?(): boolean;
+  applyCodexRuntimeOverrides?(overrides: { sandboxMode: CodexSandboxMode; modelReasoningEffort: CodexReasoningEffort }): void;
   agentServiceRegistry?: AgentServiceRegistry;
 }
 
@@ -62,10 +66,10 @@ export class ConversationSessionSettingsCoordinator {
 ## 关键行为
 
 - `openCurrentConversationSettings()` 只对当前会话开放；没有 active conversation 时直接给出 notice。打开前会用 `getConversationBackendSessionId()` 解析当前 session，再通过 `readBackendSessionShareUrl()` 路由读取当前 session 的分享链接（通过 registry `getSession(sessionId)` 而不是列出所有 sessions）；如果 host 未提供 `agentServiceRegistry`，则退回 `host.listSessions()` 兜底路径（不再穿透到 `openCodeService.listSessions()`）。同时读取项目级 `share` 模式，把已分享/未分享/禁用状态传给 modal。legacy 兜底路径和 share/unshare 写入路径只使用 `ShareInspectionEntry`（`{ id?, share? }`），不依赖 OpenCode `Session` 类型。
-- `resolveEffectiveSettings()` 使用 plugin-level defaults 作为 base，再让 `Conversation.sessionSettings` 中的 `number / null` 覆盖或显式继承
-- `applyConversationVisualState()` 只负责把 effective `chatFontSizePx` 写到 `--opencodian-chat-font-size`
+- `resolveEffectiveSettings()` 使用 plugin-level defaults 作为 base，再让 `Conversation.sessionSettings` 中的 `number / null` 覆盖或显式继承；Codex conversation 的 `codexSandboxMode` / `codexModelReasoningEffort` 使用 host `getCodexGlobalDefaults()` 作为全局默认值
+- `applyConversationVisualState()` 只负责把 effective `chatFontSizePx` 写到 `--opencodian-chat-font-size`；`applyConversationRuntimeState()` 在此基础上还会把 Codex conversation 的 effective sandbox/reasoning 覆盖通过 host `applyCodexRuntimeOverrides()` 推送到 live adapter
 - modal 输入期间会调用 preview path 临时应用 `chatFontSizePx`，不修改 `Conversation.sessionSettings` 也不触发 save；取消或关闭弹窗时重新应用真实 conversation state
-- `saveConversationOverrides()` 会先归一化并持久化 `Conversation.sessionSettings`，全为 `null` 时会折叠回 `undefined`，避免存储纯"继承"空壳
+- `saveConversationOverrides()` 会先归一化并持久化 `Conversation.sessionSettings`，全为 `null` 时会折叠回 `undefined`，避免存储纯"继承"空壳；保存后对当前活跃会话会调用 `applyConversationRuntimeState()` 以同时更新 visual state 和 Codex runtime overrides
 - `supportsTitleGeneration()` / `supportsQuestions()` / `supportsCompaction()` 控制 modal 中继承摘要行是否出现；它们只影响 UI 可见性，不改变 per-session `chatFontSizePx` 保存语义。标题/问答没有 host override 时，coordinator 会把 OpenCode conversation 视为支持、Claude Code conversation 视为不支持。
 - `shareCurrentConversation()` 只允许 `conversation.backend ?? 'opencode'` 为 `opencode` 时调用 host 或 `OpenCodeService.shareSession()`，从返回的 `ShareInspectionEntry.share.url` 提取公开链接并复制到剪贴板；如果 OpenCode 将分享失败映射成 HTTP 500，coordinator 会把 SDK 原始错误归一化为用户可理解的分享失败说明。分享写入本身仍是 OpenCode-only 能力，即使 modal 被错误/测试强制显示，Claude Code 的 `backendSessionId` 也不能进入 OpenCode write seam。
 - `unshareCurrentConversation()` 同样只允许 OpenCode conversation 调用 host 或 `OpenCodeService.unshareSession()`，用于取消当前会话的公开分享；非 OpenCode backend 复用现有 sharing unavailable 失败文案。

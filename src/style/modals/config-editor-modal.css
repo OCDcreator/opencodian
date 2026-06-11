@@ -607,6 +607,24 @@
   background: color-mix(in srgb, var(--interactive-accent) 7%, var(--background-primary));
 }
 
+.opencodian-session-settings-text-input {
+  width: 100%;
+  min-height: 34px;
+  margin: 0;
+  padding: 0 12px;
+  border: 1px solid color-mix(in srgb, var(--background-modifier-border) 84%, transparent);
+  border-radius: 12px;
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--background-primary) 96%, var(--background-secondary)) 0%,
+      color-mix(in srgb, var(--background-primary) 88%, var(--background-secondary)) 100%
+    );
+  color: var(--text-normal);
+  font-size: 13px;
+  box-sizing: border-box;
+}
+
 .opencodian-session-settings-sharing-actions {
   display: flex;
   flex-wrap: wrap;

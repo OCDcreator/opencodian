@@ -157,7 +157,8 @@ OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings`、`DEFAULT_
 |------|------|
 | `normalizeEffortLevel(value)` | 归一化努力级别，`'max'` → `'xhigh'`，默认 `'high'` |
 | `normalizeThinkingBudget(value)` | 归一化思考预算，支持字符串/数字输入 |
-| `normalizeBackendSettings(value)` | 归一化 backend 专属设置对象，目前包含 Claude Code hidden foundation |
+| `normalizeBackendSettings(value)` | 归一化 backend 专属设置对象，包含 Claude Code 和 Codex 后端设置 |
+| `normalizeCodexBackendSettings(value)` | 归一化 Codex 后端设置（`apiKey` 字段） |
 | `normalizeClaudeCodeBackendSettings(value)` | 归一化 Claude Code executable、setting sources、permission/thinking/effort、additional directories、model、allowedTools/disallowedTools、maxTurns/maxBudgetUsd、env、file checkpoint、hook event、subagent transcript/progress 和 debug channel 开关字段 |
 | `normalizeClaudeCodeDebugChannelSettings(value)` | 归一化 Claude Code debug workbench channel record，未知 channel 丢弃，缺失 channel 回退默认值 |
 | `normalizeClaudeCodeStringArray(value)` | 归一化字符串数组，trim 后去重、过滤空字符串和非字符串条目；用于 allowed/disallowed tools 时避免把带空白的工具名传入 SDK |

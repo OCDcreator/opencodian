@@ -17,6 +17,7 @@ import {
 import type {
   ChatMessage,
   Conversation,
+  ImageAttachment,
   PromptContextItem,
 } from '../../../core/types';
 import { getConversationBackendSessionId } from '../../../core/types';
@@ -54,6 +55,7 @@ export interface PromptComposerSubmission {
   content: string;
   syntheticTextParts?: PromptSyntheticTextPartInput[];
   invocationIntent?: SurfaceInvocationIntent;
+  images?: ImageAttachment[];
 }
 
 export interface CommandComposerSubmission {
@@ -87,6 +89,7 @@ export interface PrepareMessageSendOptions {
   skipSlashCommand?: boolean;
   /** One-shot structured-output schema for Claude Code `/json` trigger. Not persisted. */
   outputFormat?: Record<string, unknown>;
+  images?: ImageAttachment[];
 }
 
 export interface PreparedMessageSend {
@@ -101,16 +104,23 @@ export interface PreparedMessageSend {
   activeModelId?: string;
   userMessage: ChatMessage;
   resolvedAgentInvocation?: ResolvedAgentInvocation;
+  images?: ImageAttachment[];
+}
+
+export interface BuildOptimisticUserMessageOptions {
+  content: string;
+  contextItems: PromptContextItem[];
+  now?: number;
+  structuredSend?: {
+    optimisticUserParts?: PromptRequestPart[];
+  };
+  images?: ImageAttachment[];
 }
 
 export function buildOptimisticUserMessage(
-  content: string,
-  contextItems: PromptContextItem[],
-  now: number = Date.now(),
-  structuredSend?: {
-    optimisticUserParts?: PromptRequestPart[];
-  },
+  options: BuildOptimisticUserMessageOptions,
 ): ChatMessage {
+  const { content, contextItems, now = Date.now(), structuredSend, images } = options;
   const contextAttachments = contextItems.map((item) => buildContextAttachment(item));
 
   return {
@@ -120,6 +130,7 @@ export function buildOptimisticUserMessage(
     timestamp: now,
     contextAttachments: contextAttachments.length > 0 ? contextAttachments : undefined,
     ...(structuredSend?.optimisticUserParts ? { parts: structuredSend.optimisticUserParts } : {}),
+    ...(images && images.length > 0 ? { images } : {}),
   };
 }
 
@@ -372,7 +383,13 @@ export class MessageSendPreparationService {
       // Do not send OpenCode invocationParts to Claude backend — agent mentions are raw text
       ...(!isClaudeBackend && resolvedAgentInvocation.invocationParts.length > 0 ? { invocationParts: resolvedAgentInvocation.invocationParts } : {}),
     });
-    const userMessage = buildOptimisticUserMessage(options.content, contextItems, Date.now(), { optimisticUserParts: structuredSend.optimisticUserParts });
+    const userMessage = buildOptimisticUserMessage({
+      content: options.content,
+      contextItems,
+      now: Date.now(),
+      structuredSend: { optimisticUserParts: structuredSend.optimisticUserParts },
+      images: options.images,
+    });
     const writeTicket = this.host.createConversationWriteTicket(conversation.id);
     const writeApplied = await this.host.commitConversationWrite(
       conversation,
@@ -416,6 +433,7 @@ export class MessageSendPreparationService {
       requestParts: structuredSend.requestParts, optimisticUserParts: structuredSend.optimisticUserParts,
       draftContextItems, contextItems, modelOptions, activeModelId, userMessage,
       resolvedAgentInvocation: resolvedAgentInvocation.invocationParts.length > 0 || resolvedAgentInvocation.agent ? resolvedAgentInvocation : undefined,
+      images: options.images,
     };
   }
 
@@ -464,6 +482,7 @@ export class MessageSendPreparationService {
       content: options.content,
       ...(options.syntheticTextParts ? { syntheticTextParts: [...options.syntheticTextParts] } : {}),
       ...(options.invocationIntent ? { invocationIntent: options.invocationIntent } : {}),
+      ...(options.images ? { images: [...options.images] } : {}),
       targetTabId: tabId,
     });
   }

@@ -11,7 +11,7 @@
  * See docs/requirements/multi-agent-foundation/02-architecture.md §2–3.
  */
 
-import type { AgentBackendKind, StreamChunk } from '../../types/chat';
+import type { AgentBackendKind, ImageAttachment, StreamChunk } from '../../types/chat';
 import type { SessionDiffEntry } from '../../types/chat';
 import type { AgentCapability, BackendCapabilities } from '../AgentCapability';
 
@@ -96,6 +96,7 @@ export interface AgentService {
 export interface AgentChatSendRequest {
   readonly sessionId: string;
   readonly content: string;
+  readonly images?: ImageAttachment[];
   readonly options?: Record<string, unknown>;
 }
 

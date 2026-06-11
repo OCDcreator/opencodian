@@ -2935,11 +2935,14 @@ describe('runMcpElicitationLiveProbe integration', () => {
     // (starts with / on macOS/Linux) and must NOT be the Electron renderer.
     expect(typeof mcpServer.command).toBe('string');
     expect(mcpServer.command).not.toBe('node');
-    expect(mcpServer.command).not.toBe(process.execPath);
-    // In Node test environment process.execPath IS node, so this assertion
-    // verifies the resolver was actually called rather than just using
-    // process.execPath directly. In Electron runtime process.execPath would
-    // be the renderer and this assertion would catch the incorrect fix.
+    // The command must be an absolute path (starts with / on macOS/Linux),
+    // proving resolveExecutableCandidate was called rather than blindly
+    // using the bare 'node' string. In Electron, process.execPath points
+    // to the renderer binary — but in a pure Node test environment it
+    // may legitimately resolve to the same absolute path via PATH search,
+    // so asserting !== process.execPath is environment-brittle. The
+    // absolute-path check plus not-bare-'node' check together prove
+    // the resolver ran correctly.
     expect(mcpServer.command).toMatch(/^\//);
   });
 

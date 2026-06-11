@@ -11,6 +11,7 @@ import {
   getConversationBackendSessionId,
   normalizeConversationSessionSettings,
 } from '../../../core/types';
+import type { CodexReasoningEffort, CodexSandboxMode } from '../../../core/types/settings';
 import { t } from '../../../i18n';
 import {
   ConversationSessionSettingsModal,
@@ -30,6 +31,11 @@ export interface ShareInspectionEntry {
 
 export interface ResolvedConversationSessionSettings {
   chatFontSizePx: number;
+  codexSandboxMode?: CodexSandboxMode;
+  codexModelReasoningEffort?: CodexReasoningEffort;
+  codexModelOverride?: string;
+  codexAdditionalDirectories?: string[];
+  codexNetworkAccessEnabled?: boolean;
 }
 
 export interface ConversationSessionSettingsCoordinatorHost {
@@ -52,6 +58,10 @@ export interface ConversationSessionSettingsCoordinatorHost {
   supportsCompaction?(): boolean;
   /** Whether to show question-card summary rows. OpenCode conversations default to true. */
   supportsQuestions?(): boolean;
+  /** Returns Codex global defaults. Only called for Codex conversations. */
+  getCodexGlobalDefaults?(): { sandboxMode: CodexSandboxMode; modelReasoningEffort: CodexReasoningEffort; model: string; additionalDirectories: string[]; networkAccessEnabled: boolean };
+  /** Pushes Codex runtime overrides to the live adapter for the active conversation. */
+  applyCodexRuntimeOverrides?(overrides: { sandboxMode: CodexSandboxMode; modelReasoningEffort: CodexReasoningEffort; model?: string; additionalDirectories?: string[]; networkAccessEnabled?: boolean }): void;
   /**
    * Optional registry for backend-aware session detail reads.
    * When provided, share-URL reads route through the registry instead of
@@ -76,6 +86,8 @@ export class ConversationSessionSettingsCoordinator {
   private async openConversationSettingsModal(conversation: Conversation): Promise<void> {
     const showSharing = this.host.supportsSessionSharing?.() === true;
     const showCompaction = this.host.supportsCompaction?.() === true;
+    const isCodex = this.isCodexConversation(conversation);
+    const codexDefaults = isCodex ? this.host.getCodexGlobalDefaults?.() : undefined;
 
     const sessionId = getConversationBackendSessionId(conversation);
     const shareUrl = showSharing && sessionId ? await this.getCurrentShareUrl(conversation, sessionId) : undefined;
@@ -83,11 +95,21 @@ export class ConversationSessionSettingsCoordinator {
 
     new ConversationSessionSettingsModal(this.host.app, {
       conversationTitle: conversation.title || t('chat.history.untitled'),
-      defaults: this.resolveEffectiveSettings(conversation),
+      defaults: {
+        ...this.resolveEffectiveSettings(conversation),
+      ...(codexDefaults ? {
+        codexSandboxMode: codexDefaults.sandboxMode,
+        codexModelReasoningEffort: codexDefaults.modelReasoningEffort,
+        codexModelOverride: codexDefaults.model,
+        codexAdditionalDirectories: codexDefaults.additionalDirectories,
+        codexNetworkAccessEnabled: codexDefaults.networkAccessEnabled,
+      } : {}),
+      },
       initialOverrides: conversation.sessionSettings,
       showTitleSummary: this.shouldShowTitleSummary(conversation),
       showCompactionSummary: showCompaction,
       showQuestionsSummary: this.shouldShowQuestionsSummary(conversation),
+      showCodexControls: isCodex,
       shareUrl,
       shareMode,
       onSave: async (overrides) => {
@@ -162,10 +184,38 @@ export class ConversationSessionSettingsCoordinator {
   ): ResolvedConversationSessionSettings {
     const defaults = this.host.getSessionSettingsDefaults();
     const overrides = conversation?.sessionSettings;
-    return {
+    const result: ResolvedConversationSessionSettings = {
       chatFontSizePx:
         overrides?.chatFontSizePx ?? defaults.chatFontSizePx,
     };
+
+    if (this.isCodexConversation(conversation)) {
+      const codexDefaults = this.host.getCodexGlobalDefaults?.();
+      if (codexDefaults) {
+        result.codexSandboxMode =
+          overrides?.codexSandboxMode === null || overrides?.codexSandboxMode === undefined
+            ? codexDefaults.sandboxMode
+            : overrides.codexSandboxMode;
+        result.codexModelReasoningEffort =
+          overrides?.codexModelReasoningEffort === null || overrides?.codexModelReasoningEffort === undefined
+            ? codexDefaults.modelReasoningEffort
+            : overrides.codexModelReasoningEffort;
+        result.codexModelOverride =
+          overrides?.codexModelOverride === null || overrides?.codexModelOverride === undefined
+            ? codexDefaults.model
+            : overrides.codexModelOverride;
+        result.codexAdditionalDirectories =
+          overrides?.codexAdditionalDirectories === null || overrides?.codexAdditionalDirectories === undefined
+            ? codexDefaults.additionalDirectories
+            : overrides.codexAdditionalDirectories;
+        result.codexNetworkAccessEnabled =
+          overrides?.codexNetworkAccessEnabled === null || overrides?.codexNetworkAccessEnabled === undefined
+            ? codexDefaults.networkAccessEnabled
+            : overrides.codexNetworkAccessEnabled;
+      }
+    }
+
+    return result;
   }
 
   applyConversationVisualState(
@@ -182,7 +232,22 @@ export class ConversationSessionSettingsCoordinator {
   async applyConversationRuntimeState(
     conversation: Conversation | null | undefined,
   ): Promise<ResolvedConversationSessionSettings> {
-    return this.applyConversationVisualState(conversation);
+    const effective = this.applyConversationVisualState(conversation);
+
+    if (this.isCodexConversation(conversation)
+      && this.host.applyCodexRuntimeOverrides
+      && effective.codexSandboxMode
+      && effective.codexModelReasoningEffort) {
+      this.host.applyCodexRuntimeOverrides({
+        sandboxMode: effective.codexSandboxMode,
+        modelReasoningEffort: effective.codexModelReasoningEffort,
+        model: effective.codexModelOverride,
+        additionalDirectories: effective.codexAdditionalDirectories,
+        networkAccessEnabled: effective.codexNetworkAccessEnabled,
+      });
+    }
+
+    return effective;
   }
 
   async saveConversationOverrides(
@@ -200,7 +265,7 @@ export class ConversationSessionSettingsCoordinator {
     const isCurrentConversation = this.host.getCurrentConversation()?.id === conversation.id;
 
     if (isCurrentConversation) {
-      this.applyConversationVisualState(conversation);
+      await this.applyConversationRuntimeState(conversation);
     }
 
     this.host.showNotice(t('chat.sessionSettings.saved'));
@@ -335,5 +400,11 @@ export class ConversationSessionSettingsCoordinator {
       return t('chat.sessionSharing.disabledByProjectConfig');
     }
     return t('chat.sessionSharing.shareFailed');
+  }
+
+  private isCodexConversation(
+    conversation: Conversation | null | undefined,
+  ): boolean {
+    return (conversation?.backend ?? 'opencode') === 'codex';
   }
 }

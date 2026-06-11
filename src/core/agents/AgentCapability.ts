@@ -32,6 +32,7 @@ export const AgentCapability = {
   Shell: 'shell',
   Sharing: 'sharing',
   Export: 'export',
+  Images: 'images',
 } as const;
 
 export type AgentCapability = (typeof AgentCapability)[keyof typeof AgentCapability];

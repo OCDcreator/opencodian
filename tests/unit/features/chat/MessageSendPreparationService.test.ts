@@ -20,8 +20,11 @@ describe('buildOptimisticUserMessage', () => {
       { id: 'part-1', type: 'text', text: 'Hello' },
     ];
 
-    const message = buildOptimisticUserMessage('Hello', [contextItem], 123, {
-      optimisticUserParts,
+    const message = buildOptimisticUserMessage({
+      content: 'Hello',
+      contextItems: [contextItem],
+      now: 123,
+      structuredSend: { optimisticUserParts },
     });
 
     expect(message).toEqual({
@@ -42,6 +45,21 @@ describe('buildOptimisticUserMessage', () => {
         textSnapshot: 'Selected text',
       }],
     });
+  });
+
+  it('builds a user message with images', () => {
+    const images = [
+      { data: 'iVBORw0KGgo=', mediaType: 'image/png' as const, filename: 'test.png' },
+    ];
+
+    const message = buildOptimisticUserMessage({
+      content: 'Hello',
+      contextItems: [],
+      now: 123,
+      images,
+    });
+
+    expect(message.images).toEqual(images);
   });
 });
 
@@ -163,6 +181,21 @@ describe('MessageSendPreparationService', () => {
       parts: [{ id: 'part-1', type: 'text', text: 'Hello Claude' }],
       timestamp: result?.userMessage.timestamp,
     });
+  });
+
+  it('preserves images through the preparation pipeline', async () => {
+    const conversation = createConversation();
+    const images = [
+      { data: 'iVBORw0KGgo=', mediaType: 'image/png' as const, filename: 'test.png' },
+    ];
+    const host = createHost(conversation, []);
+    const service = new MessageSendPreparationService(host, createComposerSendContext());
+
+    const result = await service.prepareMessageSend({ content: 'Hello', images });
+
+    expect(result).not.toBeNull();
+    expect(result?.images).toEqual(images);
+    expect(result?.userMessage.images).toEqual(images);
   });
 
   it('merges one-shot outputFormat into modelOptions when provided', async () => {

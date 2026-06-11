@@ -23,7 +23,7 @@ describe('prepareLoadedSettingsBootstrapState backend normalization', () => {
     expect(state.settings.activeBackend).toBe('opencode');
   });
 
-  it('filters unimplemented backends and repairs the active backend', () => {
+  it('preserves implemented backends and repairs the active backend when needed', () => {
     const state = prepareLoadedSettingsBootstrapState({
       core: {
         data: {
@@ -44,8 +44,9 @@ describe('prepareLoadedSettingsBootstrapState backend normalization', () => {
       shouldPersist: false,
     });
 
-    expect(state.settings.enabledBackends).toEqual(['opencode']);
-    expect(state.settings.activeBackend).toBe('opencode');
+    // codex is now an implemented backend — it should be preserved
+    expect(state.settings.enabledBackends).toEqual(['codex', 'opencode']);
+    expect(state.settings.activeBackend).toBe('codex');
   });
 
   it('normalizes Claude Code backend settings and preserves enabled Claude once implemented', () => {

@@ -11,6 +11,333 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-06-10 Codex SDK Checkpoint 14I — Persisted Session Row Runtime Proof (Layer 1)
+
+### Scope
+Runtime verification of **Layer 1 only** for the persisted Codex backend session browser seam: prove that a real persisted Codex thread appears as a row in the existing `BackendSessionBrowserModal` UI.
+
+### Decision
+Keep scope narrow:
+- Do not promote Layer 2 (preview/detail) or Layer 3 (resume).
+- Do not touch approval UX, account/model/profile readback, or new settings surfaces.
+
+Two small runtime fixes were required to make the app-server client work inside Obsidian's renderer:
+- `CodexAppServerClient.waitForWsUrl()` now scans **both stdout and stderr** for the listening URL (Codex CLI emits it on stderr).
+- `CodexAppServerClient` loads Node `ws` from the plugin directory via `require()` because Obsidian's renderer `WebSocket` is blocked for localhost connections.
+
+### Fresh Verification
+- Focused tests: 15/15 pass in `tests/unit/CodexAdapter.app-server.test.ts`; full suite 4606/4606 pass
+- Lint: 0 errors in modified files; 2 pre-existing warnings unrelated to this batch
+- Typecheck clean
+- `npm run check:module-docs`, `check:graphify`, `check:devlog-order` all OK
+- `npm run verify`: blocked by pre-existing owner-guard (`OpenCodianView.ts`, `main.ts`) from earlier branch commits
+- Build: `BUILD_ID feature-codex-sdk-capability.202606102229`
+- Test Vault deploy: verified BUILD_ID in deployed `main.js`; copied new `node_modules/ws` package
+- Runtime proof:
+  - Active backend = `codex`
+  - Opened settings-side backend session browser
+  - Modal rendered **50 persisted Codex session rows** from `~/.codex/sessions`
+  - DOM contains `data-session-id` with real Codex thread UUID (e.g., `019eaa88-a3b5-7e23-9305-978c60b573e1`)
+  - Screenshot: `/Volumes/SDD2T/obsidian-vault-write/testvault/.obsidian-debug/14i-03-browser-with-rows.png`
+  - Console errors: none introduced
+
+### Honest Verdict
+- **Layer 1 persisted session discovery / list row**: promoted from `readback` to `已 pass`
+- **Layer 2 preview/detail transcript readback**: remains `readback`
+- **Layer 3 persisted session resume into chat**: remains `readback`
+
+### Files Changed
+- `src/core/agents/backend/CodexAppServerClient.ts`
+- `src/core/agents/backend/CodexAdapter.ts`
+- `src/core/agents/backend/AgentAdapterWiring.ts`
+- `src/types/ws-shim.d.ts`
+- `scripts/codex-sdk-dist.mjs`
+- `docs/modules/core/agents/backend/CodexAppServerClient.md`
+- `docs/status/codex-sdk-current-state-2026-06-09.md`
+- `docs/status/checkpoint-14i-codex-persisted-session-row-runtime-proof.md`
+- `scripts/check-codex-threads.mjs` (local diagnostic helper)
+
+---
+
+## 2026-06-10 Codex SDK Checkpoint 14H — App-Server Session Discovery / Transcript Readback
+
+### Scope
+Productize the smallest app-server seam from 14G: persisted Codex backend session discovery and preview/detail transcript readback in the existing `BackendSessionBrowserModal`.
+
+### Decision
+Wire `CodexAppServerClient` into `CodexAdapter` as an adjunct client (best-effort, separate from main SDK chat path):
+- `start()` initializes app-server client when `codexPathOverride` is available
+- `listSessions()` merges app-server threads with in-memory sessions, deduplicating by thread ID
+- `getSessionMessages()` reads thread turns via app-server and normalizes to `{ role, content }` for `AgentBackendRouting`
+- `getSession()` falls back from in-memory to app-server
+- `stop()` cleans up app-server client
+- App-server failure at any stage falls back gracefully to in-memory sessions only
+
+### Fresh Verification
+- New tests: 15/15 pass in `tests/unit/CodexAdapter.app-server.test.ts`
+- Full suite: 484 suites, 4606 tests pass; typecheck clean
+- Lint: 0 errors in modified files; 1 pre-existing import-sort error fixed in `CodexAppServerClient.ts`
+- Owner guard: pre-existing failure from earlier branch commits (not 14H)
+- Build: `BUILD_ID feature-codex-sdk-capability.202606102108`
+- Test Vault deploy: verified BUILD_ID in deployed `main.js`
+- Runtime proof:
+  - Active backend = codex
+  - Adapter initializes with app-server client attempt
+  - App-server spawn times out in Test Vault (expected, Electron sandbox); graceful fallback to in-memory confirmed
+  - In-memory session creation/listing still works
+  - No console errors on reload
+
+### Honest Verdict
+- Persisted session discovery via app-server: **wired** (code paths proven, unit tested, builds clean)
+- Preview/detail transcript readback in `BackendSessionBrowserModal`: **wired** (uses existing modal + routing layer)
+- App-server spawn in Obsidian Test Vault: **blocked by timeout** (requires further Electron/subprocess debugging)
+- Resume of persisted app-server sessions: **not verified** — existing in-memory resume path unchanged
+
+### Files Changed
+- `src/core/agents/backend/CodexAdapter.ts`
+- `src/core/agents/backend/CodexAppServerClient.ts` (lint fix)
+- `tests/unit/CodexAdapter.app-server.test.ts` (created)
+- `docs/modules/core/agents/backend/CodexAdapter.md`
+- `docs/status/codex-sdk-current-state-2026-06-09.md`
+- `docs/status/checkpoint-14h-codex-app-server-session-discovery.md` (created)
+
+---
+
+## 2026-06-10 Codex SDK Checkpoint 13E — Settings-Side Resume (In-Memory Only)
+
+### Scope
+Upgrade the settings-side Codex backend session browser launcher from browse-only to in-memory-only resume.
+
+### Decision
+Add the smallest honest bridge: plugin exposes `createConversationFromBackendSession()` + `loadBackendSessionConversation()`; `OpenCodianView` exposes a thin `loadConversationForExternalHost()` seam; `SettingsCodexSection` enables `supportsResume: true` and updates UI copy to explicitly state the in-memory-only boundary.
+
+### Fresh Verification
+- Targeted tests: 16/16 pass in `SettingsCodexSection.test.ts`
+- Full suite: 482 suites, 4587 tests pass; lint/typecheck clean
+- Owner guard approved for minimal seam touches on `OpenCodianView.ts` + `main.ts`
+- Runtime proof in Test Vault:
+  - Active backend = codex
+  - Settings-side launcher opens modal
+  - Modal shows Resume for in-memory session
+  - Resume loads a new Codex conversation in chat view
+  - Follow-up message succeeds; `backendSessionId` promoted from `codex-local-*` to real thread id
+
+### Honest Verdict
+- Settings-side Codex resume (in-memory only): `已 pass`
+- Persisted discovery, transcript preview, external CLI enumeration: still `仍未接入`
+
+### Files Changed
+- `src/features/settings/SettingsCodexSection.ts`
+- `src/main.ts`
+- `src/features/chat/OpenCodianView.ts`
+- `src/i18n/locales/en.ts`, `src/i18n/locales/zh.ts`
+- `tests/unit/features/settings/SettingsCodexSection.test.ts`
+- `docs/modules/features/settings/SettingsCodexSection.md`
+- `docs/modules/features/chat/OpenCodianView.md`
+- `docs/modules/features/chat/runtime/LocalStreamMessagePersistence.md`
+- `docs/modules/features/chat/services/ConversationLoadRecoveryCoordinator.md`
+- `docs/status/codex-sdk-current-state-2026-06-09.md`
+- `docs/status/checkpoint-13e-codex-settings-resume.md` (created)
+
+---
+
+## 2026-06-10 Codex SDK Checkpoint 13D — `webSearchMode` Truth Resolution
+
+### Scope
+Resolve whether `webSearchMode` justifies any stable ordinary chat/settings surface, or should remain `readback`.
+
+### Decision
+**Outcome B — `webSearchMode` remains `readback`. No product code changes.**
+
+### Fresh Verification
+- Re-checked installed SDK types: `WebSearchMode = "disabled" | "cached" | "live"` (unchanged)
+- Re-checked adapter wiring: clean passthrough from settings → adapter → SDK → CLI (unchanged)
+- Reviewed prior comprehensive runtime evidence:
+  - Checkpoint 5E: `disabled` suppression proven (zero visible WebSearch blocks)
+  - Checkpoint 10B: `cached` vs `live` no visible difference in ordinary chat
+  - Checkpoint 10C: semantic distinction is real but below transcript surface
+- Test Vault API key is empty — cannot run fresh authenticated probes, but codebase is unchanged
+
+### Honest Verdict
+No stable ordinary surface is justified because:
+1. The only proven visible distinction is `disabled` vs `cached`/`live`
+2. Binary enabled/disabled would misrepresent `cached`/`live` equivalence
+3. Three-mode dropdown cannot be honestly explained — users cannot see any difference
+4. `networkAccessEnabled` already provides broader network access control
+
+### Files Changed
+- `docs/status/checkpoint-13d-codex-websearchmode-truth.md` (created)
+- `docs/status/codex-sdk-current-state-2026-06-09.md` (updated audit scope and rationale)
+- `devlog.md` (this entry)
+
+### Verification
+- `npm run check:devlog-order`: pass
+- No build or deploy required (no code changes)
+
+---
+
+## 2026-06-10 Codex SDK Checkpoint 13B — Per-Conversation Additional Directories Override (Review Fix)
+
+### Scope
+Add per-conversation `additionalDirectories` override to the Codex session settings modal, with honest global-defaults inheritance semantics.
+
+### Changes (Initial Implementation)
+- Added `codexAdditionalDirectories?: string[] | null` to `ConversationSessionSettings` type
+- Updated `normalizeConversationSessionSettings` to handle the new field
+- Extended `ResolvedConversationSessionSettings` and coordinator/host signatures
+- Added `createTextareaField` helper to modal and rendered it in Codex section
+- Extended `OpenCodianView` to wire `updateAdditionalDirectories()` to adapter
+- Added locale strings with next-thread boundary copy
+- Added 15 new tests across 3 test files
+- Initial build: `BUILD_ID feature-codex-sdk-capability.202606101244`
+
+### Changes (Review Fix Round)
+- **Finding 1 — Global inheritance semantics**:
+  - Extended `getCodexGlobalDefaults` return type to include `additionalDirectories: string[]`
+  - Updated `OpenCodianView.getCodexGlobalDefaults` to parse newline-separated global setting into `string[]`
+  - Fixed `ConversationSessionSettingsCoordinator.resolveEffectiveSettings` to fall back to global defaults when conversation override is null/undefined
+  - Updated modal defaults to pass global `additionalDirectories` so hint shows inherited value
+  - Updated 3 existing tests and added 2 new tests for global inheritance behavior
+- **Finding 2 — Verify documentation honesty**:
+  - Corrected checkpoint documentation to distinguish bare `npm run verify` (FAIL at owner-guard) from `OWNER_GUARD_APPROVED=... npm run verify`
+- Rebuilt and redeployed with `BUILD_ID feature-codex-sdk-capability.202606101328`
+- Runtime proof 1 (per-conversation override): Codex read `/tmp/codex-probe-13b/probe.txt` → `TOKEN-13B-1781066711`
+- Runtime proof 2 (global inheritance): Fresh conversation with no override inherited global `/tmp/codex-global-probe-13b` → `GLOBAL-TOKEN-13B-1781069403`
+
+### Evidence Truth Fix (Round 2)
+- **Finding 3 — Evidence consistency**: Modal screenshot `13b-r1-02-global-session-settings.png` incorrectly showed "13B Probe Test" (with per-conversation override) instead of "13B Global Inherit Test" (without override)
+- Fix: Removed incorrect modal screenshot from evidence; replaced with valid JSON artifact (`13b-r2-global-inherit-artifact.json`) proving `hasSessionSettings: false`, `sessionSettingsKeys: []`, `hasCodexAdditionalDirectoriesKey: false`
+- Retained runtime result screenshot (`13b-r1-03-global-inherit-result.png`) as functional proof
+- Updated `checkpoint-13b-codex-session-additional-directories.md` and `codex-sdk-current-state-2026-06-09.md` evidence lists
+
+### Verify
+- Targeted tests: 51/51 pass (15 new + 34 existing + 3 adjusted)
+- Bare `npm run verify`: FAIL at `check:owner-guard` (guarded thick-owner file modified)
+- `npm run check:module-docs`: FAIL at `check:module-docs:diff` (pre-existing dirty files from earlier checkpoints)
+- `OWNER_GUARD_APPROVED=... npm run verify`: All gates pass except pre-existing module-docs diff
+- Full test suite: green
+- Build: `feature-codex-sdk-capability.202606101328`
+
+---
+
+## 2026-06-10 Codex SDK Checkpoint 10A — Runtime Settings Truth Split
+
+### Scope
+Productize the smallest truthful subset of already-wired Codex runtime settings into the ordinary active-backend settings surface.
+
+### Changes
+- Added `updateAdditionalDirectories()` and `updateNetworkAccessEnabled()` to `CodexAdapter` for next-thread boundary updates
+- Exposed `additionalDirectories` textarea and `networkAccessEnabled` toggle in `SettingsCodexSection`
+- Wired settings onChange to live adapter updates via `applyCodexRuntimeUpdates()`
+- Added explicit next-thread / adapter-restart lifecycle copy to both new controls (en + zh)
+- Left `webSearchMode` out of the ordinary settings UI because `cached` vs `live` differentiation is not yet runtime-proven
+- Added +5 adapter tests and +4 settings-section tests (RED→GREEN)
+- Updated module docs for `CodexAdapter` and `SettingsCodexSection`
+- Added `docs/status/checkpoint-10a-codex-runtime-settings-truth-split.md`
+- Updated `docs/status/codex-sdk-current-state-2026-06-09.md` truth buckets
+
+### Verify
+- Full suite: 479 suites, 4535 tests, 0 errors / 0 warnings
+- Owner guard: `OWNER_GUARD_APPROVED='Checkpoint 10A Codex runtime settings truth split'`
+- Build: `feature-codex-sdk-capability.202606100054`
+- Test Vault deployed, BUILD_ID verified, plugin reloads cleanly
+- DOM proof: Codex settings section shows exactly 5 items (API Key, Model, Additional Directories, Network Access, Authentication info)
+
+### Boundary
+- Both new settings are **next-thread / adapter-restart** boundaries, not live mutation of running turns
+- Actual CLI-level behavioral effect of the options is not independently verified; plugin-side wiring and adapter passthrough are proven
+
+---
+
+## 2026-06-09 Codex SDK Checkpoint 5A — Settings Surface Contraction
+
+### Scope
+Contract the ordinary Codex settings UI to only the reviewed-stable controls: `apiKey + model`.
+
+### Changes
+- Removed 5 controls from `SettingsCodexSection` ordinary UI: `sandboxMode`, `modelReasoningEffort`, `additionalDirectories`, `networkAccessEnabled`, `webSearchMode`
+- Underlying types, adapter wiring, and per-conversation session modal overrides preserved
+- Added 8 focused tests for contracted surface
+- Updated module doc
+
+### Verify
+- 479 suites, 4509 tests, 0 errors / 0 warnings
+- Owner guard: `OWNER_GUARD_APPROVED=codex-sdk-checkpoint5a`
+- Build: `feature-codex-sdk-capability.202606091647`
+- Test Vault deployed, BUILD_ID verified, plugin reloads cleanly
+- DOM proof: Codex settings section shows exactly 3 items (API Key, Model, Authentication info notice)
+
+---
+
+## 2026-06-09 Codex SDK Checkpoint 4B — Per-Conversation Model Override
+
+### Scope
+Productize one narrow Codex seam: per-conversation **model text override** in the existing session settings modal.
+
+### Changes
+- Added `codexModelOverride?: string | null` to `ConversationSessionSettings`
+- Added `updateModel(model?: string)` to `CodexAdapter` (next-thread boundary)
+- Extended coordinator to resolve/save/apply `codexModelOverride` with global `backendSettings.codex.model` as inherited default
+- Added text input field in Codex section of session settings modal
+- Added i18n keys (en + zh) for model override label, description, empty-state hint
+- Added CSS for `.opencodian-session-settings-text-input`
+- Updated OpenCodianView host to pass global Codex model and call `updateModel` on runtime apply
+
+### Testing
+- 20 new tests: 3 normalization, 4 adapter, 5 modal, 8 coordinator
+- Full verify: 478 suites, 4501 tests pass
+- Owner guard: `OWNER_GUARD_APPROVED=codex-sdk-checkpoint4b`
+- Build: `feature-codex-sdk-capability.202606091616`
+
+### Deploy
+- Built and deployed to Test Vault (macOS)
+- BUILD_ID verified in both dist and vault main.js
+- Plugin reloaded, no new errors
+
+### Boundary
+- This is a **next-thread** setting, not live mutation of running turns
+- Model override is writeback-to-adapter only; actual model effect proven at next thread creation/resume boundary
+
+---
+
+## 2026-06-09 Codex SDK Capability Checkpoint 2 — Effort Selector Productization
+
+**Productize `modelReasoningEffort` into the ordinary chat toolbar effort selector when Codex is the active backend.**
+
+This checkpoint adds runtime effort control for Codex backend in the chat toolbar, with honest semantics: the update affects subsequent thread creation/resume only, not mid-stream reconfiguration.
+
+### Changes
+
+- **`ClaudeCodeModelCatalog.ts`**: Added `CODEX_EFFORT_VARIANTS` constant (`minimal`/`low`/`medium`/`high`/`xhigh`) for Codex-specific effort levels
+- **`CodexAdapter.ts`**: Changed `options` from `private readonly` to mutable; added `updateModelReasoningEffort()` method for runtime effort update without adapter recreation
+- **`OpenCodianView.ts`**:
+  - Added `isCodexConversationActive()` helper (parallel to `isClaudeCodeConversationActive()`)
+  - Updated `mountEffortSelector` callbacks to detect Codex backend and return `CODEX_EFFORT_VARIANTS`
+  - `onVariantChange` for Codex writes back to persisted `backendSettings.codex.modelReasoningEffort` and calls `updateCodexAdapterEffort()`
+  - Updated `normalizeEffortVariantForCurrentBackend` to handle Codex effort normalization
+  - Updated `updateEffortSelectorDisplay` to handle Codex backend path
+  - `allowDefaultOption()` returns `false` for Codex (Codex always requires an effort level)
+- **`index.ts` (barrel)**: Export `CODEX_EFFORT_VARIANTS`
+- **Tests**: 3 new adapter tests for `updateModelReasoningEffort`, 3 new catalog tests for `CODEX_EFFORT_VARIANTS`
+
+### Behavioral Notes
+
+- The selector appears in the same shared toolbar surface used by Claude Code and OpenCode
+- No "disabled/default" option for Codex — Codex always uses an explicit effort level
+- The write-back path: toolbar → persisted settings + `CodexAdapter.updateModelReasoningEffort()` → `buildThreadOptions()` → next thread
+- **Honest boundary**: existing running threads are not affected; the update takes effect at the next thread creation/resume boundary
+
+### Module Docs Updated
+
+- `docs/modules/features/chat/ui/EffortSelector.md`
+- `docs/modules/core/agents/backend/CodexAdapter.md`
+- `docs/modules/core/agents/backend/ClaudeCodeModelCatalog.md`
+- `docs/modules/core/agents/backend/index.md`
+
+### Status Doc Updated
+
+- `docs/status/codex-sdk-current-state-2026-06-09.md` §15
+
 ## 2026-06-08 Claude Code Capability Round 24b — MCP Elicitation Promoted to Pass
 
 **Promote MCP Elicitation from `wiring` to `pass` in the capability matrix, product-path proof handler, discovery copy, tests, and docs, based on Codex Test Vault validation of the Round 24 product-path harness.**

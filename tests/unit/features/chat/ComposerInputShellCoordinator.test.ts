@@ -59,6 +59,7 @@ function createFixture(options: {
   currentBackendSessionId?: string | null;
   withAssistantMessage?: boolean;
   withEmptyStateNotice?: boolean;
+  hasImageInputCapability?: boolean;
 } = {}) {
   let isStreaming = false;
   let isForegroundBusy = false;
@@ -130,6 +131,10 @@ function createFixture(options: {
     scheduleSettledScrollToBottomIfNeeded: jest.fn(),
     getComposerAvailabilityState: jest.fn(() => options.composerAvailabilityState ?? { kind: 'ready' }),
   };
+
+  if (options.hasImageInputCapability !== undefined) {
+    host.hasImageInputCapability = jest.fn(() => options.hasImageInputCapability ?? false);
+  }
 
   // Only mock getComposerCapabilityHint when explicitly provided in options.
   // When absent, the coordinator falls back to deriving the hint from shouldMountAgentSelector.
@@ -1238,5 +1243,282 @@ describe('ComposerInputShellCoordinator — prompt suggestion lifecycle (channel
     emitPromptSuggestionSessionChange('sess-2', channelId);
 
     expect(fixture.suggestionMountRoot.querySelector('.opencodian-suggestion-chip')).toBeNull();
+  });
+});
+
+describe('ComposerInputShellCoordinator — image paste and drag-drop', () => {
+  const originalResizeObserver = globalThis.ResizeObserver;
+
+  beforeEach(() => {
+    installCoordinatorDomMocks();
+    // JSDOM does not provide DataTransfer/ClipboardEvent/DragEvent; mock minimal versions.
+    if (typeof DataTransfer === 'undefined') {
+      (globalThis as typeof globalThis & { DataTransfer?: typeof DataTransfer }).DataTransfer =
+        class MockDataTransfer {
+          items = { add: jest.fn() };
+          files: File[] = [];
+        } as unknown as typeof DataTransfer;
+    }
+    if (typeof ClipboardEvent === 'undefined') {
+      (globalThis as typeof globalThis & { ClipboardEvent?: typeof ClipboardEvent }).ClipboardEvent =
+        class MockClipboardEvent extends Event {
+          clipboardData: DataTransfer | null;
+          constructor(type: string, init: { clipboardData?: DataTransfer | null } = {}) {
+            super(type, init);
+            this.clipboardData = init.clipboardData ?? null;
+          }
+        } as unknown as typeof ClipboardEvent;
+    }
+    if (typeof DragEvent === 'undefined') {
+      (globalThis as typeof globalThis & { DragEvent?: typeof DragEvent }).DragEvent =
+        class MockDragEvent extends Event {
+          dataTransfer: DataTransfer | null;
+          constructor(type: string, init: { dataTransfer?: DataTransfer | null } = {}) {
+            super(type, init);
+            this.dataTransfer = init.dataTransfer ?? null;
+          }
+        } as unknown as typeof DragEvent;
+    }
+    // Ensure FileReader resolves synchronously in tests to avoid macrotask timing issues.
+    jest.spyOn(globalThis, 'FileReader').mockImplementation(() => {
+      const reader = {
+        result: '',
+        onload: null as (() => void) | null,
+        onerror: null as ((error: Error) => void) | null,
+        readAsDataURL(file: File) {
+          const content = typeof file === 'object' && 'name' in file
+            ? `data:${file.type};base64,ZmFrZS1pbWFnZS1kYXRh`
+            : '';
+          this.result = content;
+          this.onload?.();
+        },
+      };
+      return reader as unknown as FileReader;
+    });
+  });
+
+  afterEach(() => {
+    restoreCoordinatorDomMocks(originalResizeObserver);
+  });
+
+  function createImageFile(name: string, type: string): File {
+    return new File(['fake-image-data'], name, { type });
+  }
+
+  function buildDataTransfer(files: File[]): DataTransfer {
+    const dt = new DataTransfer();
+    // Override the files property since JSDOM's DataTransfer mock may not populate it
+    Object.defineProperty(dt, 'files', {
+      value: files,
+      writable: false,
+    });
+    return dt;
+  }
+
+  function createPasteEvent(files: File[]): ClipboardEvent {
+    const dataTransfer = buildDataTransfer(files);
+    return new ClipboardEvent('paste', {
+      bubbles: true,
+      cancelable: true,
+      clipboardData: dataTransfer,
+    });
+  }
+
+  function createDropEvent(files: File[]): DragEvent {
+    const dataTransfer = buildDataTransfer(files);
+    return new DragEvent('drop', {
+      bubbles: true,
+      cancelable: true,
+      dataTransfer,
+    });
+  }
+
+  it('attaches pasted image files when backend has image input capability', async () => {
+    const fixture = createFixture({ hasImageInputCapability: true });
+
+    const imageFile = createImageFile('test.png', 'image/png');
+    const pasteEvent = createPasteEvent([imageFile]);
+    fixture.textarea.dispatchEvent(pasteEvent);
+    await flushAsync();
+    flushAnimationFrames();
+
+    const chips = fixture.container.querySelectorAll('.opencodian-composer-image-chip');
+    expect(chips.length).toBe(1);
+    expect(fixture.container.querySelector('.opencodian-composer-image-chip-thumb')?.getAttribute('alt')).toBe('test.png');
+  });
+
+  it('ignores pasted non-image files and allows text paste', async () => {
+    const fixture = createFixture({ hasImageInputCapability: true });
+
+    const textFile = new File(['plain text'], 'notes.txt', { type: 'text/plain' });
+    const pasteEvent = createPasteEvent([textFile]);
+    fixture.textarea.dispatchEvent(pasteEvent);
+    await flushAsync();
+    flushAnimationFrames();
+
+    const chips = fixture.container.querySelectorAll('.opencodian-composer-image-chip');
+    expect(chips.length).toBe(0);
+    // Text paste should not be prevented when no images are in clipboard
+    expect(pasteEvent.defaultPrevented).toBe(false);
+  });
+
+  it('ignores image paste when backend lacks image input capability', async () => {
+    const fixture = createFixture({ hasImageInputCapability: false });
+
+    const imageFile = createImageFile('test.png', 'image/png');
+    const pasteEvent = createPasteEvent([imageFile]);
+    fixture.textarea.dispatchEvent(pasteEvent);
+    await flushAsync();
+    flushAnimationFrames();
+
+    const chips = fixture.container.querySelectorAll('.opencodian-composer-image-chip');
+    expect(chips.length).toBe(0);
+    // Should not prevent default paste behavior
+    expect(pasteEvent.defaultPrevented).toBe(false);
+  });
+
+  it('attaches dropped image files when backend has image input capability', async () => {
+    const fixture = createFixture({ hasImageInputCapability: true });
+
+    const imageFile = createImageFile('drop.jpg', 'image/jpeg');
+    const dropEvent = createDropEvent([imageFile]);
+    const composerShell = fixture.container.querySelector('.opencodian-composer-shell');
+    composerShell?.dispatchEvent(dropEvent);
+    await flushAsync();
+    flushAnimationFrames();
+
+    const chips = fixture.container.querySelectorAll('.opencodian-composer-image-chip');
+    expect(chips.length).toBe(1);
+    expect(fixture.container.querySelector('.opencodian-composer-image-chip-thumb')?.getAttribute('alt')).toBe('drop.jpg');
+    // Drop should be prevented to avoid browser opening the file
+    expect(dropEvent.defaultPrevented).toBe(true);
+  });
+
+  it('ignores dropped non-image files', async () => {
+    const fixture = createFixture({ hasImageInputCapability: true });
+
+    const textFile = new File(['code'], 'script.js', { type: 'application/javascript' });
+    const dropEvent = createDropEvent([textFile]);
+    const composerShell = fixture.container.querySelector('.opencodian-composer-shell');
+    composerShell?.dispatchEvent(dropEvent);
+    await flushAsync();
+    flushAnimationFrames();
+
+    const chips = fixture.container.querySelectorAll('.opencodian-composer-image-chip');
+    expect(chips.length).toBe(0);
+  });
+
+  it('ignores image drop when backend lacks image input capability', async () => {
+    const fixture = createFixture({ hasImageInputCapability: false });
+
+    const imageFile = createImageFile('test.png', 'image/png');
+    const dropEvent = createDropEvent([imageFile]);
+    const composerShell = fixture.container.querySelector('.opencodian-composer-shell');
+    composerShell?.dispatchEvent(dropEvent);
+    await flushAsync();
+    flushAnimationFrames();
+
+    const chips = fixture.container.querySelectorAll('.opencodian-composer-image-chip');
+    expect(chips.length).toBe(0);
+    // Should not prevent default when capability is missing
+    expect(dropEvent.defaultPrevented).toBe(false);
+  });
+
+  it('attaches multiple pasted images and preserves send behavior', async () => {
+    const fixture = createFixture({ hasImageInputCapability: true });
+
+    const image1 = createImageFile('a.png', 'image/png');
+    const image2 = createImageFile('b.webp', 'image/webp');
+    const pasteEvent = createPasteEvent([image1, image2]);
+    fixture.textarea.dispatchEvent(pasteEvent);
+    await flushAsync();
+    flushAnimationFrames();
+
+    const chips = fixture.container.querySelectorAll('.opencodian-composer-image-chip');
+    expect(chips.length).toBe(2);
+
+    // Text input and send should still work
+    fixture.textarea.value = 'Describe these images';
+    fixture.textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    flushAnimationFrames();
+
+    expect(fixture.host.submitMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: 'prompt',
+        content: 'Describe these images',
+        images: expect.arrayContaining([
+          expect.objectContaining({ filename: 'a.png', mediaType: 'image/png' }),
+          expect.objectContaining({ filename: 'b.webp', mediaType: 'image/webp' }),
+        ]),
+      }),
+    );
+  });
+
+  it('attaches multiple dropped images and preserves send behavior', async () => {
+    const fixture = createFixture({ hasImageInputCapability: true });
+
+    const image1 = createImageFile('a.png', 'image/png');
+    const image2 = createImageFile('b.gif', 'image/gif');
+    const dropEvent = createDropEvent([image1, image2]);
+    const composerShell = fixture.container.querySelector('.opencodian-composer-shell');
+    composerShell?.dispatchEvent(dropEvent);
+    await flushAsync();
+    flushAnimationFrames();
+
+    const chips = fixture.container.querySelectorAll('.opencodian-composer-image-chip');
+    expect(chips.length).toBe(2);
+
+    fixture.textarea.value = 'Analyze these';
+    fixture.textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    flushAnimationFrames();
+
+    expect(fixture.host.submitMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: 'prompt',
+        content: 'Analyze these',
+        images: expect.arrayContaining([
+          expect.objectContaining({ filename: 'a.png', mediaType: 'image/png' }),
+          expect.objectContaining({ filename: 'b.gif', mediaType: 'image/gif' }),
+        ]),
+      }),
+    );
+  });
+
+  it('clears attached images on send after paste', async () => {
+    const fixture = createFixture({ hasImageInputCapability: true });
+
+    const imageFile = createImageFile('test.png', 'image/png');
+    const pasteEvent = createPasteEvent([imageFile]);
+    fixture.textarea.dispatchEvent(pasteEvent);
+    await flushAsync();
+    flushAnimationFrames();
+
+    expect(fixture.container.querySelectorAll('.opencodian-composer-image-chip').length).toBe(1);
+
+    fixture.textarea.value = 'check this';
+    fixture.textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    flushAnimationFrames();
+
+    expect(fixture.container.querySelectorAll('.opencodian-composer-image-chip').length).toBe(0);
+  });
+
+  it('removes individual image chips after paste', async () => {
+    const fixture = createFixture({ hasImageInputCapability: true });
+
+    const image1 = createImageFile('a.png', 'image/png');
+    const image2 = createImageFile('b.png', 'image/png');
+    const pasteEvent = createPasteEvent([image1, image2]);
+    fixture.textarea.dispatchEvent(pasteEvent);
+    await flushAsync();
+    flushAnimationFrames();
+
+    const removeButtons = fixture.container.querySelectorAll('.opencodian-composer-image-chip-remove');
+    expect(removeButtons.length).toBe(2);
+
+    removeButtons[0]?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    flushAnimationFrames();
+
+    const chips = fixture.container.querySelectorAll('.opencodian-composer-image-chip');
+    expect(chips.length).toBe(1);
   });
 });

@@ -1,7 +1,7 @@
 # SettingsCapabilityLabSection
 
 > **源码**: `src/features/settings/SettingsCapabilityLabSection.ts`
-> **最近更新**: 2026-06-08 (Round 24 — MCP Elicitation product-path proof harness added)
+> **最近更新**: 2026-06-09 (updated `backendSettings` fallback to include `codex` key)
 
 ## 概述
 
