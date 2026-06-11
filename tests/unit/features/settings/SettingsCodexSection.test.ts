@@ -288,7 +288,7 @@ describe('SettingsCodexSection stable surface', () => {
     expect(settingNames).not.toContain(t('settings.codex.webSearch.name'));
   });
 
-  it('renders exactly 11 setting controls plus connection info and session browser launcher', () => {
+  it('renders exactly 10 setting controls plus connection info and session browser launcher', () => {
     const plugin = createPlugin();
     const section = new SettingsCodexSection({
       plugin: plugin as never,
@@ -297,7 +297,7 @@ describe('SettingsCodexSection stable surface', () => {
     const containerEl = document.createElement('div');
     section.attach(containerEl);
 
-    expect(settingNames).toHaveLength(13);
+    expect(settingNames).toHaveLength(12);
     expect(settingNames).toEqual([
       t('settings.codex.apiKey.name'),
       t('settings.codex.model.name'),
@@ -311,7 +311,6 @@ describe('SettingsCodexSection stable surface', () => {
       t('settings.codex.modelList.name'),
       t('settings.codex.permissionProfiles.name'),
       t('settings.codex.rateLimits.name'),
-      t('settings.codex.accountUsage.name'),
     ]);
   });
 

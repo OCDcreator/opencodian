@@ -191,6 +191,41 @@ describe('CodexAppServerClient.getAccountUsage', () => {
     });
   });
 
+  it('sends account usage request without params payload', async () => {
+    const proc = createMockProcess();
+    mockSpawn.mockReturnValue(proc);
+    emitWsUrl(proc.stdout!);
+
+    setTimeout(() => mockWsInstance.onopen?.(), 10);
+
+    const client = new CodexAppServerClient({ codexPathOverride: '/path/to/codex' });
+
+    let hasParamsField: boolean | null = null;
+
+    mockWsInstance.send.mockImplementation((data: string) => {
+      const msg = JSON.parse(data);
+      if (msg.method === 'initialize') {
+        setTimeout(() => simulateResponse(msg.id, {}), 5);
+      } else if (msg.method === 'account/usage/read') {
+        hasParamsField = 'params' in msg;
+        setTimeout(() => {
+          simulateResponse(msg.id, {
+            summary: {
+              totalTokens: 1,
+            },
+          });
+        }, 5);
+      }
+    });
+
+    await expect(client.getAccountUsage()).resolves.toEqual({
+      summary: {
+        totalTokens: 1,
+      },
+    });
+    expect(hasParamsField).toBe(false);
+  });
+
   it('returns null when response lacks summary', async () => {
     const proc = createMockProcess();
     mockSpawn.mockReturnValue(proc);

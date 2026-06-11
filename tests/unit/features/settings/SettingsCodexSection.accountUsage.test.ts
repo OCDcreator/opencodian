@@ -140,7 +140,7 @@ describe('SettingsCodexSection account usage readback', () => {
     jest.restoreAllMocks();
   });
 
-  it('renders account usage readback control', () => {
+  it('does not render account usage readback control in the ordinary settings surface', () => {
     const plugin = createPlugin();
     const section = new SettingsCodexSection({
       plugin: plugin as never,
@@ -149,162 +149,10 @@ describe('SettingsCodexSection account usage readback', () => {
     const containerEl = document.createElement('div');
     section.attach(containerEl);
 
-    expect(settingNames).toContain(t('settings.codex.accountUsage.name'));
-  });
-
-  it('renders account usage inspect button', () => {
-    const plugin = createPlugin();
-    const section = new SettingsCodexSection({
-      plugin: plugin as never,
-      createSectionHeading,
-    });
-    const containerEl = document.createElement('div');
-    section.attach(containerEl);
-
-    const inspectButton = buttonRecords.find(
-      (r) => r.label === t('settings.codex.accountUsage.inspectButton'),
-    );
-    expect(inspectButton).toBeDefined();
-    expect(inspectButton!.onClick).toBeDefined();
-  });
-
-  it('shows unavailable when adapter does not have getAccountUsage', async () => {
-    const plugin = createPlugin({});
-    const section = new SettingsCodexSection({
-      plugin: plugin as never,
-      createSectionHeading,
-    });
-    const containerEl = document.createElement('div');
-    section.attach(containerEl);
-
-    const inspectButton = buttonRecords.find(
-      (r) => r.label === t('settings.codex.accountUsage.inspectButton'),
-    );
-    await inspectButton!.onClick!();
-
-    const readbackEl = containerEl.querySelector('[data-codex-account-usage-readback]');
-    expect(readbackEl).toBeTruthy();
-    expect(readbackEl!.textContent).toBe(t('settings.codex.accountUsage.unavailable'));
-  });
-
-  it('shows unavailable when getAccountUsage returns null', async () => {
-    const plugin = createPlugin({
-      getAccountUsage: jest.fn().mockResolvedValue(null),
-    });
-    const section = new SettingsCodexSection({
-      plugin: plugin as never,
-      createSectionHeading,
-    });
-    const containerEl = document.createElement('div');
-    section.attach(containerEl);
-
-    const inspectButton = buttonRecords.find(
-      (r) => r.label === t('settings.codex.accountUsage.inspectButton'),
-    );
-    await inspectButton!.onClick!();
-
-    const readbackEl = containerEl.querySelector('[data-codex-account-usage-readback]');
-    expect(readbackEl).toBeTruthy();
-    expect(readbackEl!.textContent).toBe(t('settings.codex.accountUsage.unavailable'));
-  });
-
-  it('shows account usage data when getAccountUsage returns data', async () => {
-    const mockUsage = {
-      summary: {
-        totalTokens: 1234567,
-        totalRequests: 42,
-      },
-      dailyUsageBuckets: [
-        { date: '2026-06-01', tokens: 100000 },
-      ],
-    };
-    const plugin = createPlugin({
-      getAccountUsage: jest.fn().mockResolvedValue(mockUsage),
-    });
-    const section = new SettingsCodexSection({
-      plugin: plugin as never,
-      createSectionHeading,
-    });
-    const containerEl = document.createElement('div');
-    section.attach(containerEl);
-
-    const inspectButton = buttonRecords.find(
-      (r) => r.label === t('settings.codex.accountUsage.inspectButton'),
-    );
-    await inspectButton!.onClick!();
-
-    const readbackEl = containerEl.querySelector('[data-codex-account-usage-readback]');
-    expect(readbackEl).toBeTruthy();
-    expect(readbackEl!.getAttribute('data-proof-state')).toBe('readback');
-    expect(readbackEl!.textContent).toContain(t('settings.codex.accountUsage.summary'));
-    expect(readbackEl!.textContent).toContain('totalTokens');
-  });
-
-  it('formats bigint values safely in account usage readback', async () => {
-    const mockUsage = {
-      summary: {
-        totalCount: BigInt('123456789012345'),
-        totalRequests: 42,
-      },
-    };
-    const plugin = createPlugin({
-      getAccountUsage: jest.fn().mockResolvedValue(mockUsage),
-    });
-    const section = new SettingsCodexSection({
-      plugin: plugin as never,
-      createSectionHeading,
-    });
-    const containerEl = document.createElement('div');
-    section.attach(containerEl);
-
-    const inspectButton = buttonRecords.find(
-      (r) => r.label === t('settings.codex.accountUsage.inspectButton'),
-    );
-    await inspectButton!.onClick!();
-
-    const readbackEl = containerEl.querySelector('[data-codex-account-usage-readback]');
-    expect(readbackEl).toBeTruthy();
-    expect(readbackEl!.textContent).toContain('123456789012345');
-  });
-
-  it('shows failed when getAccountUsage throws', async () => {
-    const plugin = createPlugin({
-      getAccountUsage: jest.fn().mockRejectedValue(new Error('App-server unavailable')),
-    });
-    const section = new SettingsCodexSection({
-      plugin: plugin as never,
-      createSectionHeading,
-    });
-    const containerEl = document.createElement('div');
-    section.attach(containerEl);
-
-    const inspectButton = buttonRecords.find(
-      (r) => r.label === t('settings.codex.accountUsage.inspectButton'),
-    );
-    await inspectButton!.onClick!();
-
-    const readbackEl = containerEl.querySelector('[data-codex-account-usage-readback]');
-    expect(readbackEl).toBeTruthy();
-    expect(readbackEl!.textContent).toBe(t('settings.codex.accountUsage.failed'));
-  });
-
-  it('shows unavailable when adapter registry returns null', async () => {
-    const plugin = createPlugin();
-    plugin.agentServiceRegistry.get = jest.fn(() => null);
-    const section = new SettingsCodexSection({
-      plugin: plugin as never,
-      createSectionHeading,
-    });
-    const containerEl = document.createElement('div');
-    section.attach(containerEl);
-
-    const inspectButton = buttonRecords.find(
-      (r) => r.label === t('settings.codex.accountUsage.inspectButton'),
-    );
-    await inspectButton!.onClick!();
-
-    const readbackEl = containerEl.querySelector('[data-codex-account-usage-readback]');
-    expect(readbackEl).toBeTruthy();
-    expect(readbackEl!.textContent).toBe(t('settings.codex.accountUsage.unavailable'));
+    expect(settingNames).not.toContain(t('settings.codex.accountUsage.name'));
+    expect(
+      buttonRecords.some((r) => r.label === t('settings.codex.accountUsage.inspectButton')),
+    ).toBe(false);
+    expect(containerEl.querySelector('[data-codex-account-usage-readback]')).toBeNull();
   });
 });

@@ -183,7 +183,6 @@ export class SettingsCodexSection {
     this.renderModelListReadbackControls(bodyEl);
     this.renderPermissionProfilesReadbackControls(bodyEl);
     this.renderAccountRateLimitsReadbackControls(bodyEl);
-    this.renderAccountUsageReadbackControls(bodyEl);
   }
 
   private renderBackendSessionBrowserInfo(containerEl: HTMLElement): void {

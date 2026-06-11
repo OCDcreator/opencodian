@@ -69,7 +69,7 @@ interface JsonRpcRequest {
   jsonrpc: '2.0';
   id: number;
   method: string;
-  params: Record<string, unknown>;
+  params?: Record<string, unknown>;
 }
 
 /** JSON-RPC response envelope. */
@@ -269,14 +269,16 @@ export class CodexAppServerClient {
     }
   }
 
-  private request(method: string, params: Record<string, unknown>): Promise<unknown> {
+  private request(method: string, params?: Record<string, unknown>): Promise<unknown> {
     return new Promise((resolve, reject) => {
       if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
         reject(new Error('WebSocket not open'));
         return;
       }
       const id = this.nextId++;
-      const req: JsonRpcRequest = { jsonrpc: '2.0', id, method, params };
+      const req: JsonRpcRequest = params === undefined
+        ? { jsonrpc: '2.0', id, method }
+        : { jsonrpc: '2.0', id, method, params };
       this.pending.set(id, { resolve, reject });
       this.ws.send(JSON.stringify(req));
     });
@@ -331,7 +333,7 @@ export class CodexAppServerClient {
   async getAccountUsage(): Promise<AppServerAccountUsage | null> {
     await this.start();
     try {
-      const result = (await this.request('account/usage/read', {})) as AppServerAccountUsage | undefined;
+      const result = (await this.request('account/usage/read')) as AppServerAccountUsage | undefined;
       if (result && typeof result === 'object' && 'summary' in result) {
         return result as AppServerAccountUsage;
       }

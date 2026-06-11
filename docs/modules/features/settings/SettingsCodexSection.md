@@ -36,6 +36,7 @@ Minimal settings panel for the Codex backend adapter. Renders the connection/aut
 | Field | Why hidden |
 |-------|-----------|
 | `webSearchMode` | Mode differentiation (`disabled`/`cached`/`live`) not yet runtime-proven; remains `readback` |
+| Account usage readback | Checkpoint 15E showed the currently bundled `codex-cli 0.137.0` app-server protocol omits `account/usage/read`, so the ordinary settings control was removed rather than leaving a dead button in the public surface |
 
 ## Architecture
 
@@ -51,5 +52,6 @@ Minimal settings panel for the Codex backend adapter. Renders the connection/aut
 - `modelReasoningEffort` is now exposed in ordinary settings and also remains accessible via the per-conversation session settings modal
 - `sandboxMode`, `modelReasoningEffort`, `additionalDirectories`, and `networkAccessEnabled` are honest next-thread boundaries: the settings UI updates adapter options for future thread creation/resume, not the currently running turn
 - `webSearchMode` remains outside the ordinary settings surface until `disabled` / `cached` / `live` mode differentiation has stronger runtime proof
+- account usage stays outside the ordinary settings surface after Checkpoint 15E: the exploratory `CodexAppServerClient.getAccountUsage()` code path remains in the repo, but the public settings control is hidden because the current bundled runtime does not expose a usable `account/usage/read` route
 - Settings-side session browser supports resume for in-memory Codex sessions via `supportsResume: true`; the UI copy explicitly states that resume is limited to live adapter memory and does not discover persisted/external threads
 - Underlying types and adapter wiring for all 7 `CodexBackendSettings` fields are preserved; the ordinary UI still intentionally leaves part of that surface hidden/readback
