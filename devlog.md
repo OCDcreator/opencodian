@@ -11,6 +11,61 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-06-12 Codex SDK Checkpoint 15H — Capability Lab Codex Matrix Rows
+
+### Scope
+
+Add **minimal, honest Codex Backend diagnostic matrix rows** to Capability Lab without reworking the whole section around ClaudeCodeAdapter assumptions.
+
+### Audit Result
+
+**Feasible minimal slice identified and implemented.**
+
+The Capability Lab matrix (`renderCapabilityMatrix`) was purely ClaudeCodeAdapter-specific with a flat `MatrixRow[]` data model. Adding Codex rows required:
+1. A new `getCodexAdapter()` helper (parallel to existing `getClaudeCodeAdapter()`)
+2. A `buildCodexMatrixRows()` method returning static `MatrixRow[]` — no live probes
+3. A separator row in the matrix table between Claude Code and Codex sections
+4. Expanding `MatrixRow.runtimeProof` union with `'settings-only' | 'hidden' | 'blocked'`
+5. Extracting `renderMatrixRow()` to avoid duplicated row rendering
+
+The smallest honest set: **4 Codex category-summary rows** (one per truth bucket, no umbrella row spans mixed states):
+- `pass`: `Codex: chat, sandbox, effort, image, resume, sessions`
+- `settings-only`: `Codex: webSearchMode (settings-only)`
+- `readback`: `Codex: account, models, permissions, rate-limits`
+- `blocked`: `Codex: usage, approval-policy`
+
+### Implementation
+
+- `SettingsCapabilityLabSection.ts`: Added `getCodexAdapter()`, `buildCodexMatrixRows()`, `renderMatrixRow()`, separator rendering, expanded `MatrixRow` types
+- `settings-capability-lab.css`: Added `.opencodian-capability-lab-chip-blocked`, `.opencodian-capability-lab-chip-settings-only`, `.opencodian-capability-lab-chip-hidden`, `.opencodian-capability-lab-matrix-separator`
+- `SettingsCapabilityLabSection.test.ts`: Updated audit counts (55+4+1=60 rows, 54 pass, 3 readback, 3 hidden), updated Codex-specific test cases for category-summary rows
+- Module docs updated for both files
+
+### Honesty Rules Applied
+
+- No Codex row marked as `pass` without prior checkpoint runtime proof
+- No umbrella row spans mixed truth states — each row is a single truth bucket
+- `webSearchMode` honestly classified as `settings-only` (not `pass`)
+- Account Usage and Approval Policy collapsed into single `blocked` row
+- Readback rows (Permission Profiles, Rate Limits) surface corrected from `diagnostic` to `settings`
+- Capability Lab remains diagnostic — Codex rows are static status summary, not stable settings surface
+
+### Verification
+
+- Correction: shrunk 15 per-capability rows → 4 category-summary rows (one per truth bucket)
+- No umbrella row spans mixed truth states
+- Surface labels corrected: readbacks use `settings` not `diagnostic`
+- Targeted tests: 273 Capability Lab tests pass
+- Build: green, `BUILD_ID`: `feature-codex-sdk-capability.202606120127`
+- Test Vault: deployed, BUILD_ID verified (3 matches), `dev:errors` clean
+- Capability Lab DOM evidence: 60 total rows (55 Claude + 4 Codex + 1 separator)
+  - `Codex: chat, sandbox, effort, image, resume, sessions`: `pass`, surface `settings+chat`
+  - `Codex: webSearchMode (settings-only)`: `settings-only`, surface `settings`
+  - `Codex: account, models, permissions, rate-limits`: `readback`, surface `settings`
+  - `Codex: usage, approval-policy`: `blocked`, surface `hidden`
+- Screenshot: `15h-final-capability-lab-labels.png`
+- DOM evidence: `15h-corrected-dom-evidence.json`
+
 ## 2026-06-12 Codex SDK Checkpoint 15G — Session-Level webSearchMode Override
 
 ### Scope

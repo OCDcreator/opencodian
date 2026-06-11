@@ -9364,10 +9364,33 @@ img.opencodian-model-provider-header-icon {
   color: var(--opencodian-status-warning);
 }
 
-.opencodian-settings .opencodian-capability-lab-chip-fail {
+.opencodian-settings .opencodian-capability-lab-chip-fail,
+.opencodian-settings .opencodian-capability-lab-chip-blocked {
   border-color: var(--opencodian-status-error-border);
   background: var(--opencodian-status-error-subtle);
   color: var(--opencodian-status-error);
+}
+
+.opencodian-settings .opencodian-capability-lab-chip-settings-only {
+  border-color: var(--opencodian-status-info-border);
+  background: var(--opencodian-status-info-subtle);
+  color: var(--opencodian-status-info);
+}
+
+.opencodian-settings .opencodian-capability-lab-chip-hidden {
+  border-style: dashed;
+  color: var(--text-faint);
+}
+
+.opencodian-settings .opencodian-capability-lab-matrix-separator {
+  padding: 10px 10px 6px !important;
+  border-bottom: 2px solid var(--interactive-accent) !important;
+  color: var(--interactive-accent);
+  font-size: 11px !important;
+  font-weight: 750 !important;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  text-align: center;
 }
 
 .opencodian-settings .opencodian-capability-lab-chip-surface-chat {
