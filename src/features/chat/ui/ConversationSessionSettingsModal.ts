@@ -12,7 +12,7 @@ import type {
 import {
   normalizeChatFontSizePx,
 } from '../../../core/types';
-import type { CodexReasoningEffort, CodexSandboxMode } from '../../../core/types/settings';
+import type { CodexReasoningEffort, CodexSandboxMode, CodexWebSearchMode } from '../../../core/types/settings';
 import { t } from '../../../i18n';
 
 export interface ConversationSessionSettingsModalDefaults {
@@ -22,6 +22,7 @@ export interface ConversationSessionSettingsModalDefaults {
   codexModelOverride?: string;
   codexAdditionalDirectories?: string[];
   codexNetworkAccessEnabled?: boolean;
+  codexWebSearchMode?: CodexWebSearchMode;
 }
 
 interface ConversationSessionSettingsModalOptions {
@@ -75,6 +76,7 @@ export class ConversationSessionSettingsModal extends Modal {
   private codexModelOverrideInputEl: HTMLInputElement | null = null;
   private codexAdditionalDirectoriesTextareaEl: HTMLTextAreaElement | null = null;
   private codexNetworkAccessEnabledSelectEl: HTMLSelectElement | null = null;
+  private codexWebSearchModeSelectEl: HTMLSelectElement | null = null;
   private errorEl: HTMLElement | null = null;
   private saveButtonEl: HTMLButtonElement | null = null;
   private cancelButtonEl: HTMLButtonElement | null = null;
@@ -170,6 +172,7 @@ export class ConversationSessionSettingsModal extends Modal {
     this.codexModelOverrideInputEl = null;
     this.codexAdditionalDirectoriesTextareaEl = null;
     this.codexNetworkAccessEnabledSelectEl = null;
+    this.codexWebSearchModeSelectEl = null;
     this.errorEl = null;
     this.saveButtonEl = null;
     this.cancelButtonEl = null;
@@ -477,6 +480,19 @@ export class ConversationSessionSettingsModal extends Modal {
           ? 'false'
           : '',
     });
+
+    this.codexWebSearchModeSelectEl = this.createDropdownField(codexSectionEl, {
+      setting: 'codex-web-search-mode',
+      name: t('chat.sessionSettings.modal.codexWebSearchMode'),
+      description: t('chat.sessionSettings.modal.codexWebSearchModeDesc'),
+      defaultValue: this.webSearchModeLabel(defaults.codexWebSearchMode ?? 'cached'),
+      choices: [
+        { value: 'disabled', label: t('settings.codex.webSearch.disabled') },
+        { value: 'cached', label: t('settings.codex.webSearch.cached') },
+        { value: 'live', label: t('settings.codex.webSearch.live') },
+      ],
+      initialValue: this.options.initialOverrides?.codexWebSearchMode,
+    });
   }
 
   private sandboxModeLabel(mode: CodexSandboxMode): string {
@@ -494,6 +510,14 @@ export class ConversationSessionSettingsModal extends Modal {
       case 'medium': return t('settings.codex.reasoning.medium');
       case 'high': return t('settings.codex.reasoning.high');
       case 'xhigh': return t('settings.codex.reasoning.xhigh');
+    }
+  }
+
+  private webSearchModeLabel(mode: CodexWebSearchMode): string {
+    switch (mode) {
+      case 'disabled': return t('settings.codex.webSearch.disabled');
+      case 'cached': return t('settings.codex.webSearch.cached');
+      case 'live': return t('settings.codex.webSearch.live');
     }
   }
 
@@ -1035,6 +1059,13 @@ export class ConversationSessionSettingsModal extends Modal {
         overrides.codexNetworkAccessEnabled = false;
       } else {
         overrides.codexNetworkAccessEnabled = null;
+      }
+
+      const webSearchValue = this.codexWebSearchModeSelectEl?.value ?? '';
+      if (webSearchValue.length > 0) {
+        overrides.codexWebSearchMode = webSearchValue as CodexWebSearchMode;
+      } else {
+        overrides.codexWebSearchMode = null;
       }
     }
 

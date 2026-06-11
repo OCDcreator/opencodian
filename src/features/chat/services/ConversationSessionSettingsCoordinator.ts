@@ -11,7 +11,7 @@ import {
   getConversationBackendSessionId,
   normalizeConversationSessionSettings,
 } from '../../../core/types';
-import type { CodexReasoningEffort, CodexSandboxMode } from '../../../core/types/settings';
+import type { CodexReasoningEffort, CodexSandboxMode, CodexWebSearchMode } from '../../../core/types/settings';
 import { t } from '../../../i18n';
 import {
   ConversationSessionSettingsModal,
@@ -36,6 +36,7 @@ export interface ResolvedConversationSessionSettings {
   codexModelOverride?: string;
   codexAdditionalDirectories?: string[];
   codexNetworkAccessEnabled?: boolean;
+  codexWebSearchMode?: CodexWebSearchMode;
 }
 
 export interface ConversationSessionSettingsCoordinatorHost {
@@ -59,9 +60,9 @@ export interface ConversationSessionSettingsCoordinatorHost {
   /** Whether to show question-card summary rows. OpenCode conversations default to true. */
   supportsQuestions?(): boolean;
   /** Returns Codex global defaults. Only called for Codex conversations. */
-  getCodexGlobalDefaults?(): { sandboxMode: CodexSandboxMode; modelReasoningEffort: CodexReasoningEffort; model: string; additionalDirectories: string[]; networkAccessEnabled: boolean };
+  getCodexGlobalDefaults?(): { sandboxMode: CodexSandboxMode; modelReasoningEffort: CodexReasoningEffort; model: string; additionalDirectories: string[]; networkAccessEnabled: boolean; webSearchMode: CodexWebSearchMode };
   /** Pushes Codex runtime overrides to the live adapter for the active conversation. */
-  applyCodexRuntimeOverrides?(overrides: { sandboxMode: CodexSandboxMode; modelReasoningEffort: CodexReasoningEffort; model?: string; additionalDirectories?: string[]; networkAccessEnabled?: boolean }): void;
+  applyCodexRuntimeOverrides?(overrides: { sandboxMode: CodexSandboxMode; modelReasoningEffort: CodexReasoningEffort; model?: string; additionalDirectories?: string[]; networkAccessEnabled?: boolean; webSearchMode?: CodexWebSearchMode }): void;
   /**
    * Optional registry for backend-aware session detail reads.
    * When provided, share-URL reads route through the registry instead of
@@ -103,6 +104,7 @@ export class ConversationSessionSettingsCoordinator {
         codexModelOverride: codexDefaults.model,
         codexAdditionalDirectories: codexDefaults.additionalDirectories,
         codexNetworkAccessEnabled: codexDefaults.networkAccessEnabled,
+        codexWebSearchMode: codexDefaults.webSearchMode,
       } : {}),
       },
       initialOverrides: conversation.sessionSettings,
@@ -212,6 +214,10 @@ export class ConversationSessionSettingsCoordinator {
           overrides?.codexNetworkAccessEnabled === null || overrides?.codexNetworkAccessEnabled === undefined
             ? codexDefaults.networkAccessEnabled
             : overrides.codexNetworkAccessEnabled;
+        result.codexWebSearchMode =
+          overrides?.codexWebSearchMode === null || overrides?.codexWebSearchMode === undefined
+            ? codexDefaults.webSearchMode
+            : overrides.codexWebSearchMode;
       }
     }
 
@@ -244,6 +250,7 @@ export class ConversationSessionSettingsCoordinator {
         model: effective.codexModelOverride,
         additionalDirectories: effective.codexAdditionalDirectories,
         networkAccessEnabled: effective.codexNetworkAccessEnabled,
+        webSearchMode: effective.codexWebSearchMode,
       });
     }
 

@@ -1,7 +1,7 @@
 # English Locale
 
 > **源码**: `src/i18n/locales/en.ts`
-> **最近更新**: 2026-06-11 — updated `settings.codex.webSearch.desc` to honestly state runtime proof boundary
+> **最近更新**: 2026-06-12 — added `chat.sessionSettings.modal.codexWebSearchMode` / `codexWebSearchModeDesc` for session-level webSearchMode override
 
 ## 概述
 

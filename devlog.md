@@ -11,6 +11,91 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-06-12 Codex SDK Checkpoint 15G — Session-Level webSearchMode Override
+
+### Scope
+
+Productize **Codex session-level webSearchMode override** in the existing conversation/session settings flow.
+
+### Audit Result
+
+At the global level, all infrastructure pre-existed from 15F:
+- `CodexWebSearchMode` type, `CodexBackendSettings.webSearchMode`, `CodexAdapter.updateWebSearchMode()`, `AgentAdapterWiring` passthrough, settings UI, locale strings
+
+At the session level, nothing was wired:
+- `ConversationSessionSettings` had no `codexWebSearchMode` field
+- `normalizeConversationSessionSettings` had no webSearch normalization
+- Modal had no webSearch dropdown
+- Coordinator had no webSearch in resolved type, defaults, or runtime overrides
+- OpenCodianView host had no webSearch forwarding
+
+### Implementation
+
+Added `codexWebSearchMode` through the full session-level override chain, following the exact pattern of `networkAccessEnabled`:
+
+1. `ConversationSessionSettings.codexWebSearchMode` field (chat.ts)
+2. Normalization in `normalizeConversationSessionSettings` — refactored to extract shared helpers reducing complexity from 23 to acceptable levels (chat.ts)
+3. `ConversationSessionSettingsModalDefaults.codexWebSearchMode` + dropdown + buildOverrides + cleanup (ConversationSessionSettingsModal.ts)
+4. `ResolvedConversationSessionSettings.codexWebSearchMode` (ConversationSessionSettingsCoordinator.ts)
+5. `getCodexGlobalDefaults` now returns `webSearchMode` (ConversationSessionSettingsCoordinator.ts, OpenCodianView.ts)
+6. `applyCodexRuntimeOverrides` now forwards `webSearchMode` to `adapter.updateWebSearchMode()` (ConversationSessionSettingsCoordinator.ts, OpenCodianView.ts)
+7. Locale strings `chat.sessionSettings.modal.codexWebSearchMode` / `codexWebSearchModeDesc` (en.ts, zh.ts)
+
+### Files Changed
+
+- `src/core/types/chat.ts` — added `codexWebSearchMode` to `ConversationSessionSettings`; refactored `normalizeConversationSessionSettings` with shared helpers
+- `src/features/chat/ui/ConversationSessionSettingsModal.ts` — added webSearch dropdown, label helper, build/save, cleanup
+- `src/features/chat/services/ConversationSessionSettingsCoordinator.ts` — added `codexWebSearchMode` to resolved type, defaults, effective merge, runtime apply
+- `src/features/chat/OpenCodianView.ts` — added `webSearchMode` to `getCodexGlobalDefaults` and `applyCodexRuntimeOverrides`
+- `src/i18n/locales/en.ts` — added session-level webSearch locale strings
+- `src/i18n/locales/zh.ts` — added session-level webSearch locale strings
+- `tests/unit/features/chat/ConversationSessionSettingsModal.codex.webSearch.test.ts` — 5 new tests
+- 6 `docs/modules/**` files updated
+
+### Tests
+
+- New: `ConversationSessionSettingsModal.codex.webSearch` — 5/5 pass (render, initial from override, inherit default, save output, null on inherit)
+- Full test suite: 497 suites, 4688 tests pass (5 new)
+- Lint: 0 errors, 4 pre-existing warnings
+- Typecheck: clean
+
+### Build & Deploy
+
+- BUILD_ID: `feature-codex-sdk-capability.202606120028`
+- Deployed to Test Vault, plugin reloaded, `dev:errors` clean
+
+### Runtime Evidence
+
+DOM probe confirms webSearchMode dropdown in Codex session settings modal:
+- `data-setting="codex-web-search-mode"` present
+- Options: 继承 / 禁用 / cached / 实时
+- Label: 网页搜索
+- Description honestly states runtime proof boundary
+- Default hint: 默认值：缓存
+- Persisted `codexWebSearchMode: "live"` correctly round-trips through save/reload
+- Screenshots: `15g-02-session-settings-modal-open.png`, `15g-03-websearch-live-persisted.png`
+- DOM evidence: `15g-dom-evidence.json`
+
+### Honest Proof-State Classification
+
+**settings-only** — same honesty boundary as 15F:
+- Session-level settings persistence is verified
+- Modal render / dropdown / save / reload round-trip verified
+- `applyCodexRuntimeOverrides` forwards to `adapter.updateWebSearchMode()` verified
+- Distinct runtime web-search behavior between `disabled`/`cached`/`live` modes has **not** been end-to-end proven
+
+### Remaining Risks / Intentionally Not Done
+
+- No Capability Lab row
+- No structured reply work
+- No account usage
+- No end-to-end proof that modes produce distinct web-search behavior at runtime
+- Owner-guard detects `OpenCodianView.ts` modification — same pattern as all prior session-override checkpoints
+
+### Git Status
+
+Uncommitted changes in 12 source/test/doc files.
+
 ## 2026-06-11 Codex SDK Checkpoint 15F — webSearchMode Settings Surface Productization
 
 ### Scope

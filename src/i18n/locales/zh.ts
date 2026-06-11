@@ -2149,6 +2149,8 @@ export const zhTranslations = {
   'chat.sessionSettings.modal.codexNetworkAccessEnabledDesc': '允许此会话访问网络。仅在"工作区写入"沙盒模式下有效。下次线程生效。',
   'chat.sessionSettings.modal.codexNetworkAccessEnabledOn': '启用',
   'chat.sessionSettings.modal.codexNetworkAccessEnabledOff': '禁用',
+  'chat.sessionSettings.modal.codexWebSearchMode': '网页搜索',
+  'chat.sessionSettings.modal.codexWebSearchModeDesc': '控制此会话的网页搜索行为。设置持久化和适配器接线已验证；各模式的运行时行为差异尚未验证。下次线程生效。',
   'chat.sessionSettings.validation.chatFontSize': '请输入支持的聊天字体大小',
   'chat.sessionSharing.title': '会话分享',
   'chat.sessionSharing.desc': '为当前对话创建 OpenCode 公开分享链接，或取消已有的公开分享链接。',

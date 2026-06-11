@@ -2149,6 +2149,8 @@ export const enTranslations = {
   'chat.sessionSettings.modal.codexNetworkAccessEnabledDesc': 'Allow this conversation to access the network. Only effective in "Workspace Write" sandbox mode. Applies on the next thread.',
   'chat.sessionSettings.modal.codexNetworkAccessEnabledOn': 'Enabled',
   'chat.sessionSettings.modal.codexNetworkAccessEnabledOff': 'Disabled',
+  'chat.sessionSettings.modal.codexWebSearchMode': 'Web search',
+  'chat.sessionSettings.modal.codexWebSearchModeDesc': 'Controls web search behavior for this conversation. Settings persistence and adapter wiring are verified; distinct runtime behavior between modes is not yet proven. Applies on the next thread.',
   'chat.sessionSettings.validation.chatFontSize': 'Enter a supported chat font size',
   'chat.sessionSharing.title': 'Session sharing',
   'chat.sessionSharing.desc': 'Create a public OpenCode share link for this conversation, or cancel an existing shared link.',

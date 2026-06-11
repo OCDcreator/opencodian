@@ -13,7 +13,7 @@ modal 本身只负责 DOM、输入解析和同步校验；真正的会话保存�
 
 本 modal 还显示当前会话的分享动作区：`Share and copy link` 会触发上游 `onShare()`，`Cancel sharing` 会触发 `onUnshare()`。它只负责按钮状态和错误展示，不直接调用 OpenCode SDK。
 
-标题生成、上下文压缩、会话分享和问答卡片摘要都不是 modal 的固有能力；它们必须由 coordinator/host 按当前 backend capability 显式开启。Claude Code 会话当前只显示通用的 Display / Rendering 摘要，避免把尚未接入的 OpenCode-only 标题、问答或分享机制露到会话 UI。Codex 会话在 `showCodexControls` 开启时额外显示 Codex 分组，包含沙盒模式和推理强度两个下拉覆盖。
+标题生成、上下文压缩、会话分享和问答卡片摘要都不是 modal 的固有能力；它们必须由 coordinator/host 按当前 backend capability 显式开启。Claude Code 会话当前只显示通用的 Display / Rendering 摘要，避免把尚未接入的 OpenCode-only 标题、问答或分享机制露到会话 UI。Codex 会话在 `showCodexControls` 开启时额外显示 Codex 分组，包含模型覆盖、额外目录、沙盒模式、推理强度、网络访问和网页搜索六个下拉/文本覆盖。
 
 ## 公开接口
 
@@ -22,6 +22,10 @@ export interface ConversationSessionSettingsModalDefaults {
   chatFontSizePx: number;
   codexSandboxMode?: CodexSandboxMode;
   codexModelReasoningEffort?: CodexReasoningEffort;
+  codexModelOverride?: string;
+  codexAdditionalDirectories?: string[];
+  codexNetworkAccessEnabled?: boolean;
+  codexWebSearchMode?: CodexWebSearchMode;
 }
 
 type PluginSettingsSummary = {

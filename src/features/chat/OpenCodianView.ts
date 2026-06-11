@@ -714,6 +714,7 @@ export class OpenCodianView extends ItemView {
           .map((line: string) => line.trim())
           .filter((line: string) => line.length > 0),
         networkAccessEnabled: this.plugin.settings.backendSettings.codex.networkAccessEnabled,
+        webSearchMode: this.plugin.settings.backendSettings.codex.webSearchMode,
       }),
       getChatContainerEl: () => this.chatContainerEl,
       saveConversation: (conversation) => this.plugin.saveConversation(conversation),
@@ -744,6 +745,10 @@ export class OpenCodianView extends ItemView {
         if ('updateNetworkAccessEnabled' in adapter) {
           (adapter as { updateNetworkAccessEnabled(v: boolean | undefined): void })
             .updateNetworkAccessEnabled(overrides.networkAccessEnabled);
+        }
+        if ('updateWebSearchMode' in adapter) {
+          (adapter as { updateWebSearchMode(m: string | undefined): void })
+            .updateWebSearchMode(overrides.webSearchMode);
         }
       },
       agentServiceRegistry: this.plugin.agentServiceRegistry,

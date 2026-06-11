@@ -5,11 +5,13 @@
 import {
   type CodexReasoningEffort,
   type CodexSandboxMode,
+  type CodexWebSearchMode,
   normalizeChatFontSizePx,
 } from './settings';
 
 const VALID_CODEX_SANDBOX_MODES: readonly CodexSandboxMode[] = ['read-only', 'workspace-write', 'danger-full-access'];
 const VALID_CODEX_REASONING_EFFORTS: readonly CodexReasoningEffort[] = ['minimal', 'low', 'medium', 'high', 'xhigh'];
+const VALID_CODEX_WEB_SEARCH_MODES: readonly CodexWebSearchMode[] = ['disabled', 'cached', 'live'];
 
 /** View type constant */
 export const VIEW_TYPE_OPENCODIAN = 'opencodian-view';
@@ -105,6 +107,48 @@ export interface ConversationSessionSettings {
   codexModelOverride?: string | null;
   codexAdditionalDirectories?: string[] | null;
   codexNetworkAccessEnabled?: boolean | null;
+  codexWebSearchMode?: CodexWebSearchMode | null;
+}
+
+function normalizeNullableEnum<T extends string>(
+  raw: T | null | undefined,
+  valid: readonly T[],
+): T | null | undefined {
+  if (raw === null) return null;
+  if (typeof raw === 'string' && valid.includes(raw)) return raw;
+  return undefined;
+}
+
+function normalizeNullableString(raw: string | null | undefined): string | null | undefined {
+  if (raw === null) return null;
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim();
+    if (trimmed.length > 0) return trimmed;
+  }
+  return undefined;
+}
+
+function normalizeNullableStringArray(raw: string[] | null | undefined): string[] | null | undefined {
+  if (raw === null) return null;
+  if (Array.isArray(raw)) {
+    const filtered = raw
+      .filter((d): d is string => typeof d === 'string' && d.trim().length > 0)
+      .map((d) => d.trim());
+    if (filtered.length > 0) return filtered;
+  }
+  return undefined;
+}
+
+function normalizeNullableBoolean(raw: boolean | null | undefined): boolean | null | undefined {
+  if (raw === null) return null;
+  if (typeof raw === 'boolean') return raw;
+  return undefined;
+}
+
+function assignIfDefined<T>(target: Record<string, T>, key: string, value: T | undefined): void {
+  if (value !== undefined) {
+    target[key] = value;
+  }
 }
 
 export function normalizeConversationSessionSettings(
@@ -114,7 +158,7 @@ export function normalizeConversationSessionSettings(
     return undefined;
   }
 
-  const normalized: ConversationSessionSettings = {};
+  const normalized: Record<string, unknown> = {};
 
   if (value.chatFontSizePx === null) {
     normalized.chatFontSizePx = null;
@@ -125,47 +169,14 @@ export function normalizeConversationSessionSettings(
     }
   }
 
-  if (value.codexSandboxMode === null) {
-    normalized.codexSandboxMode = null;
-  } else if (typeof value.codexSandboxMode === 'string'
-    && VALID_CODEX_SANDBOX_MODES.includes(value.codexSandboxMode)) {
-    normalized.codexSandboxMode = value.codexSandboxMode;
-  }
+  assignIfDefined(normalized, 'codexSandboxMode', normalizeNullableEnum(value.codexSandboxMode, VALID_CODEX_SANDBOX_MODES));
+  assignIfDefined(normalized, 'codexModelReasoningEffort', normalizeNullableEnum(value.codexModelReasoningEffort, VALID_CODEX_REASONING_EFFORTS));
+  assignIfDefined(normalized, 'codexModelOverride', normalizeNullableString(value.codexModelOverride));
+  assignIfDefined(normalized, 'codexAdditionalDirectories', normalizeNullableStringArray(value.codexAdditionalDirectories));
+  assignIfDefined(normalized, 'codexNetworkAccessEnabled', normalizeNullableBoolean(value.codexNetworkAccessEnabled));
+  assignIfDefined(normalized, 'codexWebSearchMode', normalizeNullableEnum(value.codexWebSearchMode, VALID_CODEX_WEB_SEARCH_MODES));
 
-  if (value.codexModelReasoningEffort === null) {
-    normalized.codexModelReasoningEffort = null;
-  } else if (typeof value.codexModelReasoningEffort === 'string'
-    && VALID_CODEX_REASONING_EFFORTS.includes(value.codexModelReasoningEffort)) {
-    normalized.codexModelReasoningEffort = value.codexModelReasoningEffort;
-  }
-
-  if (value.codexModelOverride === null) {
-    normalized.codexModelOverride = null;
-  } else if (typeof value.codexModelOverride === 'string') {
-    const trimmed = value.codexModelOverride.trim();
-    if (trimmed.length > 0) {
-      normalized.codexModelOverride = trimmed;
-    }
-  }
-
-  if (value.codexAdditionalDirectories === null) {
-    normalized.codexAdditionalDirectories = null;
-  } else if (Array.isArray(value.codexAdditionalDirectories)) {
-    const filtered = value.codexAdditionalDirectories
-      .filter((d): d is string => typeof d === 'string' && d.trim().length > 0)
-      .map((d) => d.trim());
-    if (filtered.length > 0) {
-      normalized.codexAdditionalDirectories = filtered;
-    }
-  }
-
-  if (value.codexNetworkAccessEnabled === null) {
-    normalized.codexNetworkAccessEnabled = null;
-  } else if (typeof value.codexNetworkAccessEnabled === 'boolean') {
-    normalized.codexNetworkAccessEnabled = value.codexNetworkAccessEnabled;
-  }
-
-  return Object.keys(normalized).length > 0 ? normalized : undefined;
+  return Object.keys(normalized).length > 0 ? normalized as ConversationSessionSettings : undefined;
 }
 
 /** Content block in a message */

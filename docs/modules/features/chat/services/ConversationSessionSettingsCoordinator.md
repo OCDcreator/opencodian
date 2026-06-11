@@ -24,6 +24,10 @@ export interface ResolvedConversationSessionSettings {
   chatFontSizePx: number;
   codexSandboxMode?: CodexSandboxMode;
   codexModelReasoningEffort?: CodexReasoningEffort;
+  codexModelOverride?: string;
+  codexAdditionalDirectories?: string[];
+  codexNetworkAccessEnabled?: boolean;
+  codexWebSearchMode?: CodexWebSearchMode;
 }
 
 export interface ShareInspectionEntry {
