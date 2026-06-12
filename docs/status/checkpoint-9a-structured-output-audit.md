@@ -39,9 +39,9 @@ The existing `/json` structured-output path is:
 3. **Claude adapter**: `ClaudeCodeAdapter` extracts `outputFormat` and passes to Claude SDK
 4. **Claude normalizer**: `ClaudeCodeStreamNormalizer` detects structured output in result records and emits `backend_event` with `event: 'structured_output'`
 5. **UI rendering**: `StreamChunkRouter` captures it, `StreamShellFinalizer` renders badge, `AssistantShellViewHostAdapter` shows collapsible JSON
-6. **Composer hint**: `OpenCodianView.getComposerCapabilityHint()` shows `/json` chip — currently Claude-only
+6. **Composer hint**: `OpenCodianView.getComposerCapabilityHint()` shows `/json` chip — **now visible for both Claude Code and Codex** (truth-synced 2026-06-12: code at `OpenCodianView.ts:874` checks `isClaudeCodeConversationActive() || isCodexConversationActive()`)
 
-**Gap for Codex**: The adapter, normalizer, and composer hint all lacked Codex-specific wiring.
+**Historical note (original 9A gap — now resolved)**: At the time of this checkpoint the adapter, normalizer, and composer hint all lacked Codex-specific wiring. These gaps were subsequently closed: `CodexAdapter` now forwards `outputFormat.schema` → `outputSchema` → `thread.runStreamed()`, `CodexStreamNormalizer` promotes completed JSON text to `structured_output` backend_event, and the composer hint checks both Claude Code and Codex.
 
 ### 2.3 Implementation Required
 

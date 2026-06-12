@@ -44,6 +44,6 @@
 - 修改后执行 `npm run build:css`（或完整 `npm run build`）。
 
 
-本轮调整 `.opencodian-input-capability-hint` 与 `.opencodian-input-capability-hint-text`：它们不再占用 textarea 下方的一整行提示，而是作为 footer trailing chip 固定插在 send 按钮左侧。当前唯一 capability chip 仍是 Claude Code backend 的 structured-output affordance，但对用户展示的按钮文案已经改成更直白的“结构化回复”；视觉权重收敛为与 action cluster 同级的小 pill，tooltip 则继续承载完整功能说明。
+本轮调整 `.opencodian-input-capability-hint` 与 `.opencodian-input-capability-hint-text`：它们不再占用 textarea 下方的一整行提示，而是作为 footer trailing chip 固定插在 send 按钮左侧。当前唯一 capability chip 是 Claude Code 和 Codex backend 共用的 structured-output affordance（OpenCode 不显示），对用户展示的按钮文案是更直白的“结构化回复”；视觉权重收敛为与 action cluster 同级的小 pill，tooltip 则继续承载完整功能说明。
 
 本轮同步收口 prompt suggestion chip 样式：`.opencodian-suggestion-bar` 不再挂在 composer footer 或输入区顶部，而是作为最后一条 assistant message 的后继 sibling 插入同一个 turn body，视觉上紧跟该回复本身。`.opencodian-suggestion-chip` 继续是可点击 pill，点击后仅将文本插入 textarea，不会自动发送。这样“结构化回复” capability chip 继续留在 footer trailing，负责固定能力入口；prompt suggestion 则真正回到 assistant follow-up 的语义位置，不再与 add/send action 混成同一层。
