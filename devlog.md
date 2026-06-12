@@ -11,6 +11,47 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-06-12 Codex SDK Checkpoint 15K — `webSearchMode` Bundled-Runtime Audit
+
+### Scope
+
+Re-audit `webSearchMode` using the exact Test Vault/plugin bundled `codex-cli 0.137.0` runtime to determine whether it can be promoted from `settings-only` to `已 pass`.
+
+### Audit Result
+
+**`settings-only` classification retained.**
+
+Using the bundled binary with alternate web-access paths disabled (`--disable browser_use browser_use_external computer_use plugins hooks shell_tool`):
+
+- `--config web_search="disabled"` → **0** built-in `web_search` tool calls.
+- `--config web_search="cached"` → **32** built-in `web_search` tool calls.
+- `--config web_search="live"` → **2** built-in `web_search` tool calls.
+
+This proves the runtime `disabled` vs `enabled` (`cached`/`live`) boundary. However, no observable transcript-level distinction between `cached` and `live` was found in the bundled runtime output. Because the product surface advertises three independent choices, promoting the full ternary control to `已 pass` would overclaim.
+
+### Files Changed
+
+- `docs/status/checkpoint-15k-codex-websearchmode-bundled-runtime-audit.md` (created)
+- `docs/status/codex-sdk-current-state-2026-06-09.md` (updated)
+- `devlog.md` (this entry)
+
+### Evidence
+
+Durable artifacts under `/Volumes/SDD2T/obsidian-vault-write/testvault/.obsidian-debug/`:
+
+- `15k-bundled-websearchmode-divergence-proof.json`
+- `15k-bundled-websearchmode-disabled.jsonl`
+- `15k-bundled-websearchmode-cached.jsonl`
+- `15k-bundled-websearchmode-live.jsonl`
+
+### Verification
+
+- No source code changes.
+- `npm run build`: not required (docs-only).
+- `npm run verify`: not required (docs-only).
+- Test Vault deploy: not required (docs-only).
+- `npm run check:devlog-order`: run and pass.
+
 ## 2026-06-12 Codex SDK Checkpoint 15H — Capability Lab Codex Matrix Rows
 
 ### Scope
