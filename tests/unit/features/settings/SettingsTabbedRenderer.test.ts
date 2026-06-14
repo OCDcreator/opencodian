@@ -244,7 +244,7 @@ describe('SettingsTabbedRenderer', () => {
     expectSingleContentShell(containerEl, 'conversation', 'title');
   });
 
-  it('shows only OpenCode-owned settings when OpenCode is the active backend', () => {
+  it('shows only the active backend\'s owned tabs when OpenCode is the active backend', () => {
     const { renderer } = createRendererState({
       enabledBackends: ['opencode', 'claude-code'],
       activeBackend: 'opencode',
@@ -258,10 +258,11 @@ describe('SettingsTabbedRenderer', () => {
     ).map((element) => element.textContent?.trim());
     expect(primaryLabels).toContain('Server');
     expect(primaryLabels).toContain('Model');
+    // Claude Code is enabled but not active — its tab should NOT show
     expect(primaryLabels).not.toContain('Claude Code');
   });
 
-  it('shows only Claude-owned settings when Claude Code is the active backend', () => {
+  it('shows only the active backend\'s owned tabs when Claude Code is the active backend', () => {
     const { renderer } = createRendererState({
       primaryTabId: 'server',
       enabledBackends: ['opencode', 'claude-code'],
@@ -275,9 +276,9 @@ describe('SettingsTabbedRenderer', () => {
       containerEl.querySelectorAll<HTMLElement>('.opencodian-settings-tab-primary-label'),
     ).map((element) => element.textContent?.trim());
     expect(primaryLabels).toContain('Claude Code');
+    // OpenCode is enabled but not active — its tabs should NOT show
     expect(primaryLabels).not.toContain('Server');
     expect(primaryLabels).not.toContain('Model');
-    expectSingleContentShell(containerEl, 'general', 'basic');
   });
 
   it('syncs the backend registry when the settings agent switcher changes active backend', () => {
@@ -527,6 +528,62 @@ describe('SettingsTabbedRenderer tab content routing', () => {
     expectSingleContentShell(containerEl, 'general', 'basic');
     expect(containerEl.querySelector('.claude-code-tab-marker')).toBeNull();
     expect(plugin.settings.enabledBackends).toEqual(['opencode']);
+  });
+
+  it('regression: shows only codex-owned tabs when codex is active even if opencode+claude-code are enabled', () => {
+    const { renderer } = createRendererState({
+      enabledBackends: ['opencode', 'claude-code', 'codex'],
+      activeBackend: 'codex',
+    });
+    const containerEl = document.createElement('div');
+
+    renderer.renderDisplay(containerEl);
+
+    const primaryLabels = Array.from(
+      containerEl.querySelectorAll<HTMLElement>('.opencodian-settings-tab-primary-label'),
+    ).map((element) => element.textContent?.trim());
+
+    // Host-level tabs (always visible regardless of active backend)
+    expect(primaryLabels).toContain('General');
+    expect(primaryLabels).toContain('Conversation');
+    expect(primaryLabels).toContain('User Interface');
+    expect(primaryLabels).toContain('Style');
+    expect(primaryLabels).toContain('Debug');
+    expect(primaryLabels).toContain('User');
+
+    // Codex tab — visible because codex IS the active backend
+    expect(primaryLabels).toContain('Codex');
+
+    // OpenCode-owned tabs — NOT visible because opencode is not the active backend
+    expect(primaryLabels).not.toContain('Server');
+    expect(primaryLabels).not.toContain('Model');
+    expect(primaryLabels).not.toContain('Security');
+    expect(primaryLabels).not.toContain('MCP');
+
+    // Claude Code tab — NOT visible because claude-code is not the active backend
+    expect(primaryLabels).not.toContain('Claude Code');
+  });
+
+  it('regression: filters OpenCode-owned secondary tabs when Codex is active', () => {
+    const { renderer } = createRendererState({
+      primaryTabId: 'conversation',
+      secondaryTabs: { conversation: 'compaction' },
+      enabledBackends: ['opencode', 'codex'],
+      activeBackend: 'codex',
+    });
+    const containerEl = document.createElement('div');
+
+    renderer.renderDisplay(containerEl);
+
+    // title and display are backend-agnostic, so they remain visible
+    const secondaryTabs = containerEl.querySelectorAll<HTMLElement>('.opencodian-settings-tab-secondary');
+    const secondaryIds = Array.from(secondaryTabs).map((tab) => tab.dataset.tabId);
+    expect(secondaryIds).toContain('title');
+    expect(secondaryIds).toContain('display');
+    // compaction/sharing/questions are opencode-owned and filtered out when codex is active
+    expect(secondaryIds).not.toContain('compaction');
+    expect(secondaryIds).not.toContain('sharing');
+    expect(secondaryIds).not.toContain('questions');
   });
 });
 

@@ -111,6 +111,7 @@ export async function persistLocalStreamOutcome(options: {
     return;
   }
 
+  const previousBackendSessionId = getConversationBackendSessionId(preparedSend.conversation);
   const writeTicket = host.createConversationWriteTicket(preparedSend.conversation.id);
   const writeApplied = await host.commitConversationWrite(
     preparedSend.conversation,
@@ -119,6 +120,11 @@ export async function persistLocalStreamOutcome(options: {
     () => {
       if (outcome.finalizedBackendSessionId) {
         preparedSend.conversation.backendSessionId = outcome.finalizedBackendSessionId;
+        removeCodexProvisionalWarningIfUpgraded(
+          preparedSend.conversation,
+          previousBackendSessionId,
+          outcome.finalizedBackendSessionId,
+        );
       }
       if (outcome.resolvedUserMessageIdentity && !preparedSend.userMessage.sourceMessageId) {
         preparedSend.userMessage.sourceMessageId = outcome.resolvedUserMessageIdentity;
@@ -157,6 +163,7 @@ async function persistBackendSessionIdentityIfNeeded(options: {
     return;
   }
 
+  const previousBackendSessionId = getConversationBackendSessionId(options.preparedSend.conversation);
   const writeTicket = options.host.createConversationWriteTicket(options.preparedSend.conversation.id);
   const writeApplied = await options.host.commitConversationWrite(
     options.preparedSend.conversation,
@@ -165,6 +172,11 @@ async function persistBackendSessionIdentityIfNeeded(options: {
     () => {
       if (needsSessionId) {
         options.preparedSend.conversation.backendSessionId = sessionId;
+        removeCodexProvisionalWarningIfUpgraded(
+          options.preparedSend.conversation,
+          previousBackendSessionId,
+          sessionId!,
+        );
       }
       if (needsUserIdentity) {
         options.preparedSend.userMessage.sourceMessageId = userMessageIdentity;
@@ -248,4 +260,27 @@ function logInterruptedNoticePersistence(
     sessionId: getConversationBackendSessionId(preparedSend.conversation),
     noticeId: message.id,
   })}`);
+}
+
+function removeCodexProvisionalWarningIfUpgraded(
+  conversation: PreparedMessageSend['conversation'],
+  previousSessionId: string | undefined,
+  newSessionId: string,
+): void {
+  const wasProvisional = !!previousSessionId && previousSessionId.startsWith('codex-local-');
+  const isNowReal = !newSessionId.startsWith('codex-local-');
+  if (!wasProvisional || !isNowReal) {
+    return;
+  }
+  const beforeCount = conversation.messages.length;
+  conversation.messages = conversation.messages.filter(
+    (message) => message.noticeMeta?.kind !== 'codex-provisional-warning',
+  );
+  const removedCount = beforeCount - conversation.messages.length;
+  if (removedCount > 0) {
+    logger.info('Removed stale Codex provisional warning after thread upgrade', {
+      conversationId: conversation.id,
+      removedCount,
+    });
+  }
 }

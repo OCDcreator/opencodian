@@ -40,7 +40,7 @@
 | `CompactionDividerMeta` | 结构化 compaction 分界元数据（`auto`, `overflow`, `tailStartId`） |
 | `ContentBlock` | 消息内容块（`type: 'text' \| 'thinking' \| 'tool_use' \| 'tool_result' \| 'subagent'`，工具块可带 `toolKind?`、`toolMetadata?`、`toolResultVisibility?`） |
 | `ToolCallInfo` | 工具调用信息（`id`, `name`, `kind?`, `input`, `toolMetadata?`, `status`, `result?`, `resultVisibility?`, `isExpanded?`） |
-| `ConversationSessionSettings` | 会话级覆盖设置（`chatFontSizePx?`，支持 `null` 表示显式继承）。Compaction 配置已移至项目级 `.opencode/opencode.json`；手动 `session.summarize()` 仍是会话级动作，而不是这里的字段。 |
+| `ConversationSessionSettings` | 会话级覆盖设置（`chatFontSizePx?`，支持 `null` 表示显式继承；`codexSandboxMode?` / `codexModelReasoningEffort?` / `codexModelOverride?` / `codexAdditionalDirectories?` / `codexNetworkAccessEnabled?` / `codexWebSearchMode?` 为 Codex 后端会话的 per-conversation 覆盖）。Compaction 配置已移至项目级 `.opencode/opencode.json`；手动 `session.summarize()` 仍是会话级动作，而不是这里的字段。 |
 | `ConversationBackgroundTaskMetadata` | 会话级 background-task lifecycle 缓存（当前只包含可选 `activeAnchor`，用于 hydration/recovery 恢复 active anchor 生命周期，不承载消息正文、工具输出、结构化 payload 或 `contentBlocks` 真值） |
 | `BackgroundTaskActiveAnchorMetadata` | active background-task anchor 的轻量字段（`startedAt`, `anchorKey`, `modeTag`, `waitingForFollowUp`, `updatedAt`） |
 | `ConversationMeta` | 会话元数据（不含消息体），同时保留 legacy `openCodeSessionId?` 与 backend-neutral `backendSessionId?` / `backendAgentId?` |
@@ -176,7 +176,7 @@
 - `ChatMessage.streamState` 目前仅支持 `'interrupted'`，标记被取消的流
 - `Conversation.openCodeSessionId` 是 OpenCode 服务端的 legacy 会话 ID，与本地 `Conversation.id` 不同；新 backend 会话可以只写 `backendSessionId`，OpenCode 旧数据会在加载和保存时回填到 `backendSessionId`
 - `Conversation.backendAgentId` / legacy `acpAgentId` 用于记录 backend-owned agent identity；新代码应优先读写 `backendAgentId`
-- `normalizeConversationSessionSettings()` 会在会话读写时清理无效 override，并保留 `null` 形式的“显式继承”标记
+- `normalizeConversationSessionSettings()` 会在会话读写时清理无效 override，并保留 `null` 形式的“显式继承”标记；Codex 字段（`codexSandboxMode` / `codexModelReasoningEffort`）会被校验为合法枚举值，无效值会被静默丢弃
 - `ContentBlock.durationSeconds` 仅用于 `thinking` 类型块
 - `toolMetadata` 当前是 UI-safe 白名单字段，主要用于 `task` / subagent 卡片的 child session linkage，不等于原始 OpenCode metadata 全量透传
 - `toolResultVisibility: 'hidden'` 表示工具结果可保留给内部匹配/审计，但不应作为普通工具输出展示；当前主要用于 OpenCode 原生 `task`。

@@ -41,6 +41,13 @@ export interface ConversationLoadRecoveryHost {
   updateModelSelectorDisplay(): void;
   showNotice(message: string): void;
   backfillClaudeUserMessageIdentities?(conversation: Conversation): Promise<boolean>;
+  hasMatchingPersistentNotice?(
+    title: string,
+    content: string,
+    tone: ChatMessage['noticeTone'],
+    conversation?: Conversation | null,
+  ): boolean;
+  appendPersistentNotice?(options: PersistentAssistantNoticeMessageOptions): Promise<void>;
 }
 
 export interface ConversationLoadRecoveryHostDependencies {
@@ -64,6 +71,13 @@ export interface ConversationLoadRecoveryHostDependencies {
   syncActiveTabConversation(conversation: Conversation): void;
   updateModelSelectorDisplay(): void;
   backfillClaudeUserMessageIdentities?(conversation: Conversation): Promise<boolean>;
+  hasMatchingPersistentNotice?(
+    title: string,
+    content: string,
+    tone: ChatMessage['noticeTone'],
+    conversation?: Conversation | null,
+  ): boolean;
+  appendPersistentNotice?(options: PersistentAssistantNoticeMessageOptions): Promise<void>;
   // factory absorbs: showNotice → new Notice(), confirmRewind → window.confirm(t(...)),
   //                  chooseForkTarget → chooseForkTarget(app), resetPersistedTabState → getDefaultPersistedTabState()
 }
@@ -116,6 +130,7 @@ export class ConversationLoadRecoveryCoordinator {
 
 - `createConversationInNewTab()` / `createConversationInCurrentTab()` / `loadConversation()` / `initializeFirstTab()` / `restorePersistedTabs()` / delete recovery 入口现在都先经过这个 coordinator
 - `loadConversation()` 在底层 port 完成 hydration 后，如果当前会话属于 `claude-code` 并且 host 提供了 `backfillClaudeUserMessageIdentities()`，会做一次 best-effort user `sourceMessageId` backfill。这样旧会话、reload 后会话，或其他未在 send-finalization 前景路径中拿到 footer 刷新的 Claude 对话，也能在 load/reopen 时补齐 fork 所需身份。
+- Codex provisional warning：当 `loadConversation()` / `activateTab()` 恢复到一个 `backend === 'codex'` 且 `backendSessionId` 仍为 `codex-local-*` provisional id 的会话时，若 host 提供 `hasMatchingPersistentNotice()` 与 `appendPersistentNotice()`，会追加一条持久化的 assistant notice，提示用户当前会话尚未建立真实后端线程；该 warning 在后续 stream 将 `backendSessionId` 升级为真实 thread id 后由 `LocalStreamMessagePersistence` 自动移除
 - 首开 bootstrap 会先 `loadConversations()`，再处理 persisted tab restore；restore 只允许恢复当前 active backend 拥有的 conversation tab。persisted state 中如果只剩其他 backend 的 tab，会 reset tab state 并立即 `persistTabState({ flush: true })`
 - 没有可恢复的 persisted tabs 时，仍优先复用当前 active backend 的第一条已有 conversation；只有该 backend 完全没有会话时才调用 `createConversation()`
 - 如果首开时 `createConversation()` 因 backend 被禁用或 bootstrap 不可用而失败，coordinator 会记录 warning 并回退为创建一个 empty tab，而不是把整个 view open 流程打断

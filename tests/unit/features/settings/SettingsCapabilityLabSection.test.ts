@@ -10,10 +10,15 @@ import { setLocale, t } from '../../../../src/i18n';
  * Minimal mock plugin that satisfies CapabilityLabDeps.
  * agentServiceRegistry is the only accessed property via getClaudeCodeAdapter().
  */
-function createMockPlugin(adapter: unknown = null, activeKind = adapter ? 'claude-code' : null, settingsOverride?: Record<string, unknown>): never {
-  const registry = adapter
+function createMockPlugin(adapter: unknown = null, activeKind = adapter ? 'claude-code' : null, settingsOverride?: Record<string, unknown>, codexAdapter: unknown = null): never {
+  const getMock = jest.fn((kind: string) => {
+    if (kind === 'codex' && codexAdapter) return codexAdapter;
+    if (kind === 'claude-code' && adapter) return adapter;
+    return null;
+  });
+  const registry = (adapter || codexAdapter)
     ? {
-        get: jest.fn().mockReturnValue(adapter),
+        get: getMock,
         getActive: jest.fn().mockReturnValue(adapter),
         getActiveKind: jest.fn().mockReturnValue(activeKind),
         listAll: jest.fn().mockReturnValue([{ kind: 'claude-code' }]),
@@ -1014,7 +1019,7 @@ describe('SettingsCapabilityLabSection', () => {
 
     const table = containerEl.querySelector('.opencodian-capability-lab-matrix');
     const rows = table!.querySelectorAll('tbody tr');
-    expect(rows.length).toBe(55);
+    expect(rows.length).toBe(60);
   });
 
   it('renders status chips with correct active/inactive classes', () => {
@@ -1065,7 +1070,7 @@ describe('SettingsCapabilityLabSection', () => {
     // Expected honest classifications for every capability row.
     // runtimeProof: 'pass' only when direct SDK smoke proof exists.
     // userSurface: 'settings' for stable settings controls; 'diagnostic' for experimental-only surfaces; 'hidden' for unexposed capabilities.
-    const expected: Record<string, { runtimeProof: 'untested' | 'pass' | 'fail' | 'wiring' | 'boundary' | 'readback'; userSurface: 'settings' | 'diagnostic' | 'hidden' | 'chat' | 'settings+chat' }> = {
+    const expected: Record<string, { runtimeProof: 'untested' | 'pass' | 'fail' | 'wiring' | 'boundary' | 'readback' | 'settings-only' | 'hidden' | 'blocked'; userSurface: 'settings' | 'diagnostic' | 'hidden' | 'chat' | 'settings+chat' }> = {
       Hooks: { runtimeProof: 'pass', userSurface: 'settings' },
       'File Checkpoint / Rewind': { runtimeProof: 'readback', userSurface: 'diagnostic' },
       'JSONL History Browser': { runtimeProof: 'pass', userSurface: 'settings+chat' },
@@ -1121,6 +1126,10 @@ describe('SettingsCapabilityLabSection', () => {
       'Additional Directories': { runtimeProof: 'pass', userSurface: 'settings+chat' },
       'Account Info': { runtimeProof: 'pass', userSurface: 'settings' },
       'Context Usage': { runtimeProof: 'pass', userSurface: 'settings+chat' },
+      'Codex: chat, sandbox, effort, image, resume, sessions': { runtimeProof: 'pass', userSurface: 'settings+chat' },
+      'Codex: webSearchMode (settings-only)': { runtimeProof: 'settings-only', userSurface: 'settings' },
+      'Codex: account, models, permissions, rate-limits': { runtimeProof: 'readback', userSurface: 'settings' },
+      'Codex: usage, approval-policy': { runtimeProof: 'blocked', userSurface: 'hidden' },
     };
 
     for (const [name, expectedValues] of Object.entries(expected)) {
@@ -1135,7 +1144,10 @@ describe('SettingsCapabilityLabSection', () => {
         : proofText.includes('Verified') ? 'pass'
           : proofText.includes('Failed') ? 'fail'
             : proofText.includes('Wiring only') ? 'wiring'
-              : 'untested';
+              : proofText.includes('Settings only') ? 'settings-only'
+                : proofText.includes('Blocked') ? 'blocked'
+                  : proofText.includes('Hidden') ? 'hidden'
+                    : 'untested';
       expect(proofLabel).toBe(expectedValues.runtimeProof);
     }
 
@@ -1150,12 +1162,12 @@ describe('SettingsCapabilityLabSection', () => {
       return firstCell?.textContent ?? '';
     });
     expect(verifiedCapabilities).toEqual(
-      expect.arrayContaining(['MCP Servers', 'Permission Approval', 'AskUserQuestion', 'Structured Output', 'Agent Definitions', 'Include Hook Events', 'Environment Variables', 'Fork Session', 'JSONL History Browser', 'Session Store', 'Import Session to Store', 'Resume Session', 'Session Detail', 'Backend Routing', 'Turn/Budget Limits', 'Skills', 'Agents (Subagents)', 'Subagent Transcript / Progress', 'Hooks', 'Disallowed Tools', 'Plugins', 'Restricted Built-in Tools', '/context Diagnostic', 'Session Title', 'Custom Session ID', 'Continue', 'Resume Session At Position', 'Fork Session On Resume', 'System Prompt', 'Prompt Suggestions', 'Debug File', 'Plan Mode Instructions', 'AskUserQuestion Preview Format', 'Main Model Live Switch', 'Output Style', 'Account Info', 'Context Usage', 'Thinking', 'MCP Elicitation', 'Allowed Tools', 'Fallback Model', 'Warm Startup', 'Sandbox', 'Task Budget', 'Tool Aliases', 'Debug', 'Strict MCP Config', '1M Context Beta', 'JS Runtime', 'Load Timeout', 'Effort', 'Permission Mode Live Switch', 'Additional Directories']),
+      expect.arrayContaining(['MCP Servers', 'Permission Approval', 'AskUserQuestion', 'Structured Output', 'Agent Definitions', 'Include Hook Events', 'Environment Variables', 'Fork Session', 'JSONL History Browser', 'Session Store', 'Import Session to Store', 'Resume Session', 'Session Detail', 'Backend Routing', 'Turn/Budget Limits', 'Skills', 'Agents (Subagents)', 'Subagent Transcript / Progress', 'Hooks', 'Disallowed Tools', 'Plugins', 'Restricted Built-in Tools', '/context Diagnostic', 'Session Title', 'Custom Session ID', 'Continue', 'Resume Session At Position', 'Fork Session On Resume', 'System Prompt', 'Prompt Suggestions', 'Debug File', 'Plan Mode Instructions', 'AskUserQuestion Preview Format', 'Main Model Live Switch', 'Output Style', 'Account Info', 'Context Usage', 'Thinking', 'MCP Elicitation', 'Allowed Tools', 'Fallback Model', 'Warm Startup', 'Sandbox', 'Task Budget', 'Tool Aliases', 'Debug', 'Strict MCP Config', '1M Context Beta', 'JS Runtime', 'Load Timeout', 'Effort', 'Permission Mode Live Switch', 'Additional Directories', 'Codex: chat, sandbox, effort, image, resume, sessions']),
     );
-    expect(verifiedCapabilities.length).toBe(53);
+    expect(verifiedCapabilities.length).toBe(54);
 
-    // Total rows check
-    expect(rows.length).toBe(55);
+    // Total rows = 55 Claude Code + 4 Codex + 1 separator = 60
+    expect(rows.length).toBe(60);
 
     // Honesty rule: readback capabilities must not be in the verified count.
     // File Checkpoint / Rewind (SDK-level broken) and Stderr Diagnostic (unreliable) remain readback.
@@ -1168,9 +1180,9 @@ describe('SettingsCapabilityLabSection', () => {
       return firstCell?.textContent ?? '';
     });
     expect(readbackCapabilities).toEqual(
-      expect.arrayContaining(['File Checkpoint / Rewind', 'Stderr Diagnostic']),
+      expect.arrayContaining(['File Checkpoint / Rewind', 'Stderr Diagnostic', 'Codex: account, models, permissions, rate-limits']),
     );
-    expect(readbackCapabilities.length).toBe(2);
+    expect(readbackCapabilities.length).toBe(3);
 
     const wiringRows = rows.filter((row) => (row.textContent ?? '').includes('Wiring only'));
     const wiringCapabilities = wiringRows.map((row) => row.querySelector('td')?.textContent ?? '');
@@ -1181,7 +1193,7 @@ describe('SettingsCapabilityLabSection', () => {
     const hiddenRows = rows.filter((row) => (
       row.querySelector('[data-surface="hidden"]') !== null
     ));
-    expect(hiddenRows.length).toBe(2); // Session Store, Import Session to Store
+    expect(hiddenRows.length).toBe(3); // Session Store, Import Session to Store, Codex: usage, approval-policy
   });
 
   it('runs the structured output diagnostic probe through the adapter runtime', async () => {
@@ -8795,5 +8807,85 @@ describe('SettingsCapabilityLabSection', () => {
     expect(proofMarker!.classList.contains('opencodian-capability-lab-proof-fail')).toBe(true);
     expect(containerEl.textContent).toContain(t('settings.capabilityLab.proofs.loadTimeout.title'));
     expect(containerEl.textContent).toContain('probe exploded');
+  });
+
+  describe('Codex matrix rows', () => {
+    it('renders Codex separator and rows when codex adapter is available', () => {
+      const codexAdapter = { kind: 'codex' };
+      const containerEl = document.createElement('div');
+      const section = new SettingsCapabilityLabSection({
+        plugin: createMockPlugin(null, null, undefined, codexAdapter),
+        createSectionHeading: createHeadingStub(),
+      });
+
+      section.attachTabbed(containerEl, 'capability-lab');
+
+      const separator = containerEl.querySelector('.opencodian-capability-lab-matrix-separator');
+      expect(separator).toBeTruthy();
+      expect(separator!.textContent).toContain('Codex Backend');
+
+      const matrixBody = containerEl.querySelector('.opencodian-capability-lab-matrix tbody');
+      expect(matrixBody).toBeTruthy();
+      const codexCapabilityCells = Array.from(matrixBody!.querySelectorAll('.opencodian-capability-lab-capability-cell'))
+        .filter((el) => el.textContent?.startsWith('Codex'));
+      expect(codexCapabilityCells.length).toBeGreaterThanOrEqual(4);
+    });
+
+    it('renders honest runtime proof states for Codex rows', () => {
+      const codexAdapter = { kind: 'codex' };
+      const containerEl = document.createElement('div');
+      const section = new SettingsCapabilityLabSection({
+        plugin: createMockPlugin(null, null, undefined, codexAdapter),
+        createSectionHeading: createHeadingStub(),
+      });
+
+      section.attachTabbed(containerEl, 'capability-lab');
+
+      const matrixBody = containerEl.querySelector('.opencodian-capability-lab-matrix tbody');
+      const allChips = Array.from(matrixBody!.querySelectorAll('.opencodian-capability-lab-chip'));
+
+      const chipTexts = allChips.map((el) => el.textContent);
+      expect(chipTexts).toContain('Settings only');
+      expect(chipTexts).toContain('Blocked');
+      expect(chipTexts).toContain('Readback verified');
+    });
+
+    it('renders blocked capabilities row with hidden surface', () => {
+      const codexAdapter = { kind: 'codex' };
+      const containerEl = document.createElement('div');
+      const section = new SettingsCapabilityLabSection({
+        plugin: createMockPlugin(null, null, undefined, codexAdapter),
+        createSectionHeading: createHeadingStub(),
+      });
+
+      section.attachTabbed(containerEl, 'capability-lab');
+
+      const matrixBody = containerEl.querySelector('.opencodian-capability-lab-matrix tbody');
+      const rows = Array.from(matrixBody!.querySelectorAll('tr'));
+
+      const blockedRow = rows.find((tr) => {
+        const capCell = tr.querySelector('.opencodian-capability-lab-capability-cell');
+        return capCell?.textContent === 'Codex: usage, approval-policy';
+      });
+      expect(blockedRow).toBeTruthy();
+
+      const blockedChips = Array.from(blockedRow!.querySelectorAll('.opencodian-capability-lab-chip'));
+      const chipTexts = blockedChips.map((el) => el.textContent);
+      expect(chipTexts).toContain('Blocked');
+    });
+
+    it('renders Codex rows even without a codex adapter (static diagnostic rows)', () => {
+      const containerEl = document.createElement('div');
+      const section = new SettingsCapabilityLabSection({
+        plugin: createMockPlugin(),
+        createSectionHeading: createHeadingStub(),
+      });
+
+      section.attachTabbed(containerEl, 'capability-lab');
+
+      const separator = containerEl.querySelector('.opencodian-capability-lab-matrix-separator');
+      expect(separator).toBeTruthy();
+      expect(separator!.textContent).toContain('Codex Backend');
+    });
   });
 });

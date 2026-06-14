@@ -2,6 +2,7 @@ import { setIcon } from 'obsidian';
 
 import type { ResolvedModelSelection } from '../../../core/config/modelConfig';
 import type { ClaudeCodePermissionMode } from '../../../core/types/settings';
+import type { CodexSandboxMode } from '../../../core/types/settings';
 import type { PermissionMode } from '../../../core/types/settings';
 import { t } from '../../../i18n';
 import { buildModelSelectorDisplayState } from '../ui/modelSelector/ModelSelectorDisplay';
@@ -25,6 +26,7 @@ import {
 } from './ModelSelectionRuntime';
 import {
   createClaudeCodePermissionConfig,
+  createCodexSandboxConfig,
   createOpenCodePermissionConfig,
   PermissionModeSelectorCoordinator,
 } from './PermissionModeSelectorCoordinator';
@@ -47,7 +49,10 @@ const CLAUDE_CODE_PERMISSION_MODES: readonly ClaudeCodePermissionMode[] = [
 interface LiveOpenCodianPlugin {
   settings?: {
     activeBackend?: string;
-    backendSettings?: { claudeCode?: { permissionMode?: ClaudeCodePermissionMode } };
+    backendSettings?: {
+      claudeCode?: { permissionMode?: ClaudeCodePermissionMode };
+      codex?: { sandboxMode?: CodexSandboxMode };
+    };
   };
   saveSettings?: () => Promise<void>;
   agentServiceRegistry?: { get?: (backend: string) => unknown };
@@ -97,6 +102,33 @@ async function switchClaudeCodePermissionModeInPlugin(mode: ClaudeCodePermission
     setPermissionMode?: (nextMode: ClaudeCodePermissionMode) => Promise<void> | void;
   } | undefined;
   await adapter?.setPermissionMode?.(mode);
+}
+
+function readCodexSandboxModeFromPlugin(): CodexSandboxMode {
+  const plugin = readOpenCodianPlugin();
+  const codexSettings = plugin?.settings?.backendSettings?.codex;
+  const mode = codexSettings?.sandboxMode;
+  if (mode === 'read-only' || mode === 'workspace-write' || mode === 'danger-full-access') {
+    return mode;
+  }
+  return 'workspace-write';
+}
+
+async function switchCodexSandboxModeInPlugin(mode: CodexSandboxMode): Promise<void> {
+  const plugin = readOpenCodianPlugin();
+  const codexSettings = plugin?.settings?.backendSettings?.codex;
+  if (!plugin || !codexSettings) {
+    return;
+  }
+
+  codexSettings.sandboxMode = mode;
+  await plugin.saveSettings?.();
+
+  // Push to live adapter so subsequent thread creation uses the new mode.
+  const adapter = plugin.agentServiceRegistry?.get?.('codex') as {
+    updateSandboxMode?: (m: CodexSandboxMode) => void;
+  } | undefined;
+  adapter?.updateSandboxMode?.(mode);
 }
 
 export class ChatSelectionControlsCoordinator {
@@ -630,6 +662,9 @@ export class ChatSelectionControlsCoordinator {
    *
    * - claude-code → Claude Code permission modes (default/acceptEdits/bypassPermissions/plan),
    *   routed through the live plugin settings + adapter.setPermissionMode() seam.
+   * - codex → Codex sandbox modes (read-only/workspace-write/danger-full-access),
+   *   routed through the live plugin settings + adapter.updateSandboxMode() seam.
+   *   Boundary hint: only affects subsequent thread creation/resume.
    * - opencode (default) → OpenCode permission templates (yolo/normal/plan),
    *   routed through host.getPermissionMode() / switchPermissionMode().
    *
@@ -637,9 +672,9 @@ export class ChatSelectionControlsCoordinator {
    * build() invocation with the correct backend active.
    */
   private buildBackendPermissionSelector(containerEl: HTMLElement): void {
-    const isClaudeCode = readActiveBackendFromPlugin() === 'claude-code';
+    const activeBackend = readActiveBackendFromPlugin();
 
-    if (isClaudeCode) {
+    if (activeBackend === 'claude-code') {
       const permissionConfig = createClaudeCodePermissionConfig();
       this.permissionSelector = new PermissionModeSelectorCoordinator(
         {
@@ -647,6 +682,15 @@ export class ChatSelectionControlsCoordinator {
           switchPermissionMode: (mode) => switchClaudeCodePermissionModeInPlugin(mode as ClaudeCodePermissionMode),
         },
         permissionConfig,
+      );
+    } else if (activeBackend === 'codex') {
+      const sandboxConfig = createCodexSandboxConfig();
+      this.permissionSelector = new PermissionModeSelectorCoordinator(
+        {
+          getPermissionMode: () => readCodexSandboxModeFromPlugin(),
+          switchPermissionMode: (mode) => switchCodexSandboxModeInPlugin(mode as CodexSandboxMode),
+        },
+        sandboxConfig,
       );
     } else {
       const permissionConfig = createOpenCodePermissionConfig();

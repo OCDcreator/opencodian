@@ -2,6 +2,7 @@
 
 > **源码**: `src/features/settings/SettingsTabbedRenderer.ts`
 > **状态**: [REVIEW]
+> **Updated**: 2026-06-09 — added `renderCodexContent` for Codex settings tab
 
 ## 概述
 

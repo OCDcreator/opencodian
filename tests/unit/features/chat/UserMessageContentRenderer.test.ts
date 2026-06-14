@@ -271,6 +271,27 @@ describe('UserMessageContentRenderer.renderUserMessageContent', () => {
 
     expect(host.openContextAttachment).toHaveBeenCalledWith('docs/readme.md');
   });
+
+  it('renders attached images in user messages', async () => {
+    const message = {
+      id: 'msg-1',
+      role: 'user' as const,
+      content: 'Describe this',
+      timestamp: 1,
+      images: [
+        { data: 'iVBORw0KGgo=', mediaType: 'image/png' as const, filename: 'test.png' },
+      ],
+    };
+
+    await renderer.renderUserMessageContent(container, message);
+
+    const gallery = container.querySelector('.opencodian-user-image-gallery');
+    expect(gallery).not.toBeNull();
+    const img = gallery?.querySelector('img');
+    expect(img).not.toBeNull();
+    expect(img?.getAttribute('src')).toBe('data:image/png;base64,iVBORw0KGgo=');
+    expect(img?.getAttribute('alt')).toBe('test.png');
+  });
 });
 
 describe('UserMessageContentRenderer.renderUserMessageContent invocation highlights', () => {

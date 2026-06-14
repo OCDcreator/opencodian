@@ -34,8 +34,14 @@ export class PluginSettingTab {
 
 export class Setting {
   settingEl = document.createElement('div');
+  controlEl = document.createElement('div');
   
-  constructor() {}
+  constructor(containerEl?: HTMLElement) {
+    if (containerEl) {
+      containerEl.appendChild(this.settingEl);
+      this.settingEl.appendChild(this.controlEl);
+    }
+  }
   setName() { return this; }
   setDesc() { return this; }
   setHeading() { return this; }

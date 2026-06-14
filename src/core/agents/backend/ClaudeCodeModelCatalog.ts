@@ -1,4 +1,4 @@
-import type { ClaudeCodeEffort } from '../../types/settings';
+import type { ClaudeCodeEffort, CodexReasoningEffort } from '../../types/settings';
 
 export const CLAUDE_CODE_PROVIDER_ID = 'claude-code';
 export const CLAUDE_CODE_PROVIDER_NAME = 'Claude Code';
@@ -9,6 +9,21 @@ export const CLAUDE_CODE_EFFORT_VARIANTS: ClaudeCodeEffort[] = [
   'high',
   'xhigh',
   'max',
+];
+
+/**
+ * Codex reasoning-effort levels.
+ *
+ * These map to CodexBackendSettings.modelReasoningEffort and are presented
+ * in the chat toolbar effort selector when Codex is the active backend.
+ * Order matches the Codex SDK's ModelReasoningEffort type (low→high).
+ */
+export const CODEX_EFFORT_VARIANTS: CodexReasoningEffort[] = [
+  'minimal',
+  'low',
+  'medium',
+  'high',
+  'xhigh',
 ];
 
 export interface ClaudeCodeModelCatalogEntry {

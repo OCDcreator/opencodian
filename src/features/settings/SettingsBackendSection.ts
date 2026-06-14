@@ -68,10 +68,24 @@ export class SettingsBackendSection {
           .setValue(this.plugin.settings.activeBackend ?? '')
           .onChange(async (value) => {
             if (value) {
+              const previousActive = this.plugin.settings.activeBackend;
               this.plugin.settings.activeBackend = value as AgentBackendKind;
               // Sync registry active backend
               this.plugin.agentServiceRegistry?.setActive(value as AgentBackendKind);
               await this.plugin.saveSettings();
+
+              // Stop the previous adapter and start the new one
+              if (previousActive && previousActive !== value) {
+                try {
+                  const prevAdapter = this.plugin.agentServiceRegistry?.get(previousActive as AgentBackendKind);
+                  if (prevAdapter) { await prevAdapter.stop(); }
+                } catch { /* best effort */ }
+              }
+              try {
+                const newAdapter = this.plugin.agentServiceRegistry?.get(value as AgentBackendKind);
+                if (newAdapter) { await newAdapter.start(); }
+              } catch { /* best effort */ }
+
               this.requestDisplayRefresh();
             }
           });
@@ -117,6 +131,8 @@ export class SettingsBackendSection {
 
   private async setBackendEnabled(backend: AgentBackendKind, enabled: boolean): Promise<void> {
     const enabledBackends = new Set(this.getEnabledBackends());
+    const isActive = this.plugin.settings.activeBackend === backend;
+
     if (enabled) {
       enabledBackends.add(backend);
     } else {
@@ -138,32 +154,29 @@ export class SettingsBackendSection {
 
     this.ensureValidBackendState();
 
-    // Stop the OpenCode server when disabling OpenCode backend
-    if (backend === 'opencode' && !enabled) {
-      try {
-        const adapter = this.plugin.agentServiceRegistry?.get('opencode');
+    // Lifecycle: only start/stop the adapter if the backend IS the active backend.
+    // Enabling a non-active backend should NOT start its adapter.
+    // Disabling a non-active backend only needs registry cleanup (done above).
+    try {
+      if (isActive) {
+        const adapter = this.plugin.agentServiceRegistry?.get(backend);
         if (adapter) {
-          await adapter.stop();
-        } else {
-          await this.plugin.openCodeService?.stop();
+          if (enabled) {
+            await adapter.start();
+          } else {
+            await adapter.stop();
+          }
+        } else if (backend === 'opencode') {
+          // Fallback: for OpenCode, the service may exist independently.
+          if (enabled) {
+            await this.plugin.openCodeService?.start();
+          } else {
+            await this.plugin.openCodeService?.stop();
+          }
         }
-      } catch {
-        // Best effort: disabling the setting should still be saved if shutdown fails.
       }
-    }
-
-    // Start the OpenCode server when enabling OpenCode backend
-    if (backend === 'opencode' && enabled) {
-      try {
-        const adapter = this.plugin.agentServiceRegistry?.get('opencode');
-        if (adapter) {
-          await adapter.start();
-        } else {
-          await this.plugin.openCodeService?.start();
-        }
-      } catch {
-        // Best effort: enabling should still be saved if startup fails.
-      }
+    } catch {
+      // Best effort: the setting change should still be saved even if start/stop fails.
     }
   }
 

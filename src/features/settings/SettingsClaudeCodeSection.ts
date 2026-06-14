@@ -34,6 +34,7 @@ import {
   type ClaudeCodeSettingSource,
   type ClaudeCodeThinking,
   getDefaultClaudeCodeBackendSettings,
+  getDefaultCodexBackendSettings,
 } from '../../core/types';
 import { t, type TranslationKey } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
@@ -2839,7 +2840,7 @@ export class SettingsClaudeCodeSection {
   // ─── Shared helpers ───────────────────────────────────────────────
 
   private get settings() {
-    this.plugin.settings.backendSettings ??= { claudeCode: getDefaultClaudeCodeBackendSettings() };
+    this.plugin.settings.backendSettings ??= { claudeCode: getDefaultClaudeCodeBackendSettings(), codex: getDefaultCodexBackendSettings() };
     this.plugin.settings.backendSettings.claudeCode ??= getDefaultClaudeCodeBackendSettings();
     return this.plugin.settings.backendSettings.claudeCode;
   }

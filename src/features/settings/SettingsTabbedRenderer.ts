@@ -18,6 +18,7 @@ import { SettingsAgentsSection } from './SettingsAgentsSection';
 import { SettingsBackendSection } from './SettingsBackendSection';
 import { SettingsCapabilityLabSection } from './SettingsCapabilityLabSection';
 import { SettingsClaudeCodeSection } from './SettingsClaudeCodeSection';
+import { SettingsCodexSection } from './SettingsCodexSection';
 import { SettingsCommandsSection } from './SettingsCommandsSection';
 import { SettingsConversationSection } from './SettingsConversationSection';
 import { SettingsDebugSection } from './SettingsDebugSection';
@@ -203,6 +204,7 @@ export class SettingsTabbedRenderer {
       this.deps.plugin.settings.settingsTabbedSecondaryTabByPrimary,
     );
 
+    const previousActive = this.getActiveBackend();
     this.deps.plugin.settings.activeBackend = agent;
     this.deps.plugin.agentServiceRegistry?.setActive(agent);
     this.deps.plugin.settings.settingsTabbedPrimaryTab = resolvedPrimary;
@@ -211,6 +213,23 @@ export class SettingsTabbedRenderer {
       [resolvedPrimary]: resolvedSecondary,
     };
     void this.deps.plugin.saveSettings();
+
+    // Stop previous adapter and start the new active adapter
+    try {
+      if (previousActive && previousActive !== agent) {
+        const prevAdapter = this.deps.plugin.agentServiceRegistry?.get(previousActive);
+        if (prevAdapter) {
+          prevAdapter.stop().catch(() => { /* best effort */ });
+        }
+      }
+      const newAdapter = this.deps.plugin.agentServiceRegistry?.get(agent);
+      if (newAdapter) {
+        newAdapter.start().catch(() => { /* best effort */ });
+      }
+    } catch {
+      // Best effort: adapter lifecycle should not block the settings switch.
+    }
+
     this.deps.requestDisplayRefresh();
   }
 
@@ -258,6 +277,9 @@ export class SettingsTabbedRenderer {
         break;
       case 'claude-code':
         this.renderClaudeCodeContent(containerEl, secondaryTabId);
+        break;
+      case 'codex':
+        this.renderCodexContent(containerEl, secondaryTabId);
         break;
       case 'model':
         this.renderModelContent(containerEl, secondaryTabId);
@@ -370,6 +392,14 @@ export class SettingsTabbedRenderer {
       createSectionHeading: (hostEl, title, tooltip) => this.deps.createHeading(hostEl, title, tooltip),
     });
     claudeCodeSection.attachTabbed(containerEl, secondaryTabId);
+  }
+
+  private renderCodexContent(containerEl: HTMLElement, secondaryTabId: string): void {
+    const codexSection = new SettingsCodexSection({
+      plugin: this.deps.plugin,
+      createSectionHeading: (hostEl, title, tooltip) => this.deps.createHeading(hostEl, title, tooltip),
+    });
+    codexSection.attachTabbed(containerEl, secondaryTabId);
   }
 
   private renderModelContent(containerEl: HTMLElement, secondaryTabId: string): void {

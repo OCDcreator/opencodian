@@ -134,6 +134,234 @@
   color: var(--color-orange);
 }
 
+.streaming-tool-server-chip {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  margin-left: auto;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--background-modifier-form-field);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-family: var(--font-monospace);
+  line-height: 1.4;
+}
+
+.streaming-tool-server-chip.is-interactive {
+  border: 1px solid var(--background-modifier-border);
+  cursor: pointer;
+  transition: background 100ms ease, border-color 100ms ease, color 100ms ease;
+}
+
+.streaming-tool-server-chip.is-interactive:hover {
+  background: var(--background-modifier-hover);
+  border-color: var(--interactive-accent);
+  color: var(--text-normal);
+}
+
+.streaming-tool-server-chip.is-interactive:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 1px;
+}
+
+.streaming-mcp-server-link {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text-accent);
+  font-size: 12px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.streaming-mcp-server-link:hover {
+  color: var(--text-accent-hover, var(--interactive-accent));
+}
+
+.streaming-tool-auth-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+  margin-left: 4px;
+  padding: 1px 8px;
+  border: 1px solid var(--interactive-accent);
+  border-radius: 4px;
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.4;
+  cursor: pointer;
+  transition: opacity 100ms ease, transform 80ms ease;
+}
+
+.streaming-tool-auth-btn:hover {
+  opacity: 0.88;
+}
+
+.streaming-tool-auth-btn:active {
+  transform: scale(0.97);
+}
+
+.streaming-tool-auth-btn:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 1px;
+}
+
+.streaming-tool-auth-btn-icon {
+  display: inline-flex;
+  align-items: center;
+  --icon-size: 12px;
+}
+
+.streaming-tool-auth-btn-icon svg {
+  width: 12px;
+  height: 12px;
+}
+
+.streaming-mcp-auth-hint {
+  margin-top: 4px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: var(--background-modifier-error);
+  color: var(--text-normal);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.streaming-mcp-auth-hint.is-done {
+  background: var(--background-modifier-success);
+}
+
+.streaming-mcp-auth-hint.is-pending {
+  background: var(--background-modifier-cover);
+}
+
+.streaming-mcp-auth-hint.is-failed {
+  background: var(--background-modifier-error);
+}
+
+.streaming-tool-auth-done {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+  margin-left: 4px;
+  padding: 1px 8px;
+  border: 1px solid var(--color-green, var(--text-success, var(--interactive-accent)));
+  border-radius: 4px;
+  color: var(--text-success, var(--interactive-accent));
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.streaming-tool-auth-done-icon {
+  display: inline-flex;
+  align-items: center;
+  --icon-size: 12px;
+}
+
+.streaming-tool-auth-done-icon svg {
+  width: 12px;
+  height: 12px;
+}
+
+.streaming-tool-retry-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+  margin-left: 4px;
+  padding: 1px 8px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  background: var(--background-secondary);
+  color: var(--text-normal);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.4;
+  cursor: pointer;
+  transition: opacity 100ms ease, transform 80ms ease;
+}
+
+.streaming-tool-retry-btn:hover:not(:disabled) {
+  border-color: var(--interactive-accent);
+  color: var(--interactive-accent);
+}
+
+.streaming-tool-retry-btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.streaming-tool-retry-btn:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 1px;
+}
+
+.streaming-tool-retry-btn.is-busy {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.streaming-tool-retry-btn-icon {
+  display: inline-flex;
+  align-items: center;
+  --icon-size: 12px;
+}
+
+.streaming-tool-retry-btn-icon svg {
+  width: 12px;
+  height: 12px;
+}
+
+.streaming-tool-retry-btn.is-busy .streaming-tool-retry-btn-icon svg {
+  animation: spin 1s linear infinite;
+}
+
+.streaming-tool-retry-result {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  margin-top: 4px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.streaming-tool-retry-result.is-ok {
+  background: var(--background-modifier-success);
+  color: var(--text-normal);
+}
+
+.streaming-tool-retry-result.is-fail {
+  background: var(--background-modifier-error);
+  color: var(--text-normal);
+}
+
+.streaming-tool-retry-result-icon {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  --icon-size: 14px;
+}
+
+.streaming-tool-retry-result-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+.streaming-tool-retry-result-text {
+  flex: 1;
+  word-break: break-word;
+}
+
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }

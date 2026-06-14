@@ -48,7 +48,9 @@ export interface SendPipelineSlashCommandPort {
   tryRunSlashCommand(content: string): Promise<boolean | string>;
 }
 
-/** Fixed JSON schema used for the `/json` ordinary-chat structured-output trigger. */
+/** Fixed JSON schema used for the `/json` ordinary-chat structured-output trigger.
+ *  Normalised for OpenAI strict-mode: every object node has `additionalProperties: false`
+ *  and every property key is listed in `required`. */
 const STRUCTURED_OUTPUT_FIXED_SCHEMA: Record<string, unknown> = {
   type: 'object',
   description: 'Return your complete response ONLY as a JSON object matching this schema. Do not include markdown code blocks, explanations, or conversational text.',
@@ -57,7 +59,8 @@ const STRUCTURED_OUTPUT_FIXED_SCHEMA: Record<string, unknown> = {
     tags: { type: 'array', items: { type: 'string' } },
     confidence: { type: 'number', minimum: 0, maximum: 1 },
   },
-  required: ['response'],
+  required: ['response', 'tags', 'confidence'],
+  additionalProperties: false,
 };
 
 /**
@@ -269,6 +272,7 @@ export class SendPipelineRuntime {
       contextItems: preparedSend.contextItems,
       messageID: preparedSend.messageID,
       requestParts: preparedSend.requestParts,
+      images: preparedSend.images,
     });
     this.messageSendPreparationService.completePreparedStreamStart(preparedSend.tabId);
     const streamElements = this.host.createAssistantMessageElement(preparedSend.tabId, true);

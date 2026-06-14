@@ -84,7 +84,7 @@ interface ToolCallInfo {
 
 ### 渲染器选项
 
-**ToolRendererOptions**: `iconMap?`, `getToolName?`, `getToolSummary?(name, input, toolKind?)`, `renderExpandedContent?`, `onCollapsibleToggle?`, `onOpenToolSession?`
+**ToolRendererOptions**: `iconMap?`, `getToolName?`, `getToolSummary?(name, input, toolKind?)`, `renderExpandedContent?`, `onCollapsibleToggle?`, `onOpenToolSession?`, `onOpenMcpServerDetail?`
 
 **ThinkingRendererOptions**: `collapsedByDefault?`, `showTimer?`, `collapsedLabel?`, `expandedLabel?`, `onCollapsibleToggle?`
 

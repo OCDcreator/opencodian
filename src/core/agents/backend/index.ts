@@ -7,8 +7,12 @@
 
 import type { AgentBackendKind } from '../../types/chat';
 
-export const IMPLEMENTED_AGENT_BACKENDS: readonly AgentBackendKind[] = ['opencode', 'claude-code'];
+export const IMPLEMENTED_AGENT_BACKENDS: readonly AgentBackendKind[] = ['opencode', 'claude-code', 'codex'];
 
+export {
+  wireHiddenAdapters,
+  type WireHiddenAdaptersOptions,
+} from './AgentAdapterWiring';
 export {
   getActiveSessionBackendService,
   getConversationBackendService,
@@ -85,6 +89,7 @@ export {
   CLAUDE_CODE_PROVIDER_NAME,
   type ClaudeCodeModelCatalogEntry,
   type ClaudeCodeModelSelectorProvider,
+  CODEX_EFFORT_VARIANTS,
 } from './ClaudeCodeModelCatalog';
 export {
   buildClaudeCodeOptions,
@@ -145,4 +150,26 @@ export {
   createClaudeProjectSkill,
   discoverClaudeProjectSkills,
 } from './ClaudeProjectSkillDiscovery';
+export {
+  CodexAdapter,
+  type CodexAdapterOptions,
+  type CodexApprovalBridgeHost,
+  type CodexApprovalDecision,
+  type CodexApprovalKind,
+  type CodexApprovalRequest,
+  type CodexFactory,
+} from './CodexAdapter';
+export {
+  buildCodexApprovalQuestionRequest,
+  type CodexApprovalCardRenderer,
+  type CodexApprovalHostContext,
+  type CodexApprovalResolutionResult,
+  createCodexApprovalBridgeHost,
+  mapCodexApprovalResolution,
+} from './CodexDefaultApprovalHost';
+export {
+  CodexStreamNormalizer,
+  type CodexStreamNormalizerOptions,
+  createCodexStreamNormalizer,
+} from './CodexStreamNormalizer';
 export { OpenCodeAdapter } from './OpenCodeAdapter';

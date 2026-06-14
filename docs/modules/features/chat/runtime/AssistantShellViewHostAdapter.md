@@ -27,6 +27,8 @@ body rendering（`renderMessageBody` / `renderContentBlock` / `getAssistantBodyS
 - `createSendPipelineShellPort()`：导出 `SendPipelineRuntime` 需要的 shell port，而不是让 view 自己重新拼一次 notice / footer wiring
 - `AssistantShellViewHostAdapterHost`：只暴露 shell/notice/footer 真正需要的 runtime state、scroll、visibility、copy-button 初始化、notice-card 渲染能力，以及 body rendering 所需的 `shouldRenderQuestionResolutionCards` / `suppressActiveLayoutAutoScrollOnce` / `getMarkdownService` 回调
 - `AssistantShellViewHostAdapterOnOpenTaskToolSession`：工具会话打开回调类型；在 adapter 构造时传入，由 `ToolCallRenderer.onOpenToolSession` 消费，避免通过 host 接口传递
+- `AssistantShellViewHostAdapterOnOpenMcpServerDetail`：MCP server 详情打开回调类型；**16A 重构**：现在通过 `AssistantShellViewHostAdapterMcpCallbacks` 选项对象传入（与 `onAuthenticateMcpServer`、`onRetryMcpToolCall` 一起），由 `ToolCallRenderer.onOpenMcpServerDetail` 消费，用于 Codex chat→`CodexMcpServerDetailModal` 入口
+- `AssistantShellViewHostAdapterMcpCallbacks`：**16A 新增**。MCP 回调选项对象，包含 `onOpenMcpServerDetail`、`onAuthenticateMcpServer`、`onRetryMcpToolCall`。构造函数第 3 个参数（取代先前的独立位置参数），将三个 MCP 相关回调收束到一个对象中以遵守 max-params lint 约束
 
 ## 设计目的
 

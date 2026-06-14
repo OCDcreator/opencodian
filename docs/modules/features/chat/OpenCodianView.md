@@ -2,7 +2,7 @@
 
 > **源码**: `src/features/chat/OpenCodianView.ts`
 > **状态**: [REVIEW]
-> **最近更新**: Backend session browser with preview transcript seeding + settings info entry + sandbox badge host wiring
+> **最近更新**: Backend session browser with preview transcript seeding + settings info entry + sandbox badge host wiring + Codex session webSearchMode override host wiring
 
 ## 概述
 
@@ -36,6 +36,7 @@
 | `refreshQuestionUi()` | 重绘 question dock，并在需要时重绘当前对话 |
 | `invalidateSlashCommandMenuCatalog()` | 立刻清空 slash command menu catalog 缓存，并可选触发一次后台 warm preload |
 | `createConversationInCurrentTab()` | 公开给插件命令层使用，委托 `ConversationLoadRecoveryCoordinator.createConversationInCurrentTab()`，确保全局 `new-conversation` 命令会真正替换当前视图的 active conversation |
+| `loadConversationForExternalHost(conversationId)` | 最小公开 seam，供外部 host（如 settings-side backend session browser）加载已恢复的会话，委托内部 `loadConversation()` |
 | `toggleLiquidDiamondDemo()` | 切换 CPU 版 floating diamond demo |
 | `toggleLiquidDiamondWebGlDemo()` | 切换 WebGL2 版 floating diamond demo |
 | `toggleGlassOctahedron()` | 切换实验性的 glass octahedron overlay |
@@ -106,6 +107,7 @@ background task completion notice 的 queued-state 则已经完全移出 `TabRun
 - `services/ChatSelectionControlsCoordinator.ts` 的 host seam：model catalog data source、tab model override/default selection、model-source/server availability 查询、provider icon lookup、permission mode writeback、effort selector 联动。sandbox badge settings provider（`getSandboxSettings` 可选方法）已接入 coordinator，但当前对 Claude Code 后端不可见（badge 挂载依赖 `AgentCapability.Permissions`，而 Claude Code 不声明此 capability）。OpenCode 会继续使用 `ModelConfigService` / server catalog；Claude Code 会使用 `ClaudeCodeModelCatalog` 把官方 aliases 与 SDK `supportedModels()` 投影成 composer model provider，并把 effort selector 切到 Claude Code `low/medium/high/xhigh/max` 语义。
 - `SessionPermissionTracker`：记录“本次会话允许”的临时权限批准；view 在权限卡片返回 `session` 时保存当前 `sessionID` 的 scope，同一会话再次请求相同 scope 时自动回复，并通过 service 边界发送 OpenCode 支持的 `always`
 - Claude Code permission/question bridge 的 view 级 UI context：聊天视图会把当前 active tab id、既有 permission inline card renderer，以及统一的 `QuestionResolutionFlowCoordinator` 注入插件级 `claudeCodePermissionHostContext`；Claude Code adapter 的 `canUseTool` 可复用现有 permission inline card，`AskUserQuestion` 和 MCP `onElicitation` 都会走 inline Question UI 来同步收集答案并在完成后清理临时卡片，避免污染 OpenCode question API 或落入 dock-only 写回路径。证明边界需要分开：`AskUserQuestion` 是已通过普通聊天证明的内置工具路径；MCP `onElicitation` 目前只证明 SDK callback 到共享 question host 的 wiring，真实 pass 还需要 MCP server roundtrip。没有聊天 UI context 时，host 仍返回 `null`，由 bridge 按拒绝/无答案路径处理。
+- Codex 审批 host context 的 view 级 wiring：`installCodexApprovalHostContext()` 在 `installClaudeCodePermissionHostContext()` 之后调用，把 active tab id 和 `approvalCardRenderer` 注入插件级 `codexApprovalHostContext`。renderer 闭包通过 `buildCodexApprovalQuestionRequest` + `showQuestionDialog(forceInline, applyResolution: false)` + `mapCodexApprovalResolution` 复用现有 question/inline-card 基础设施，把 Codex `execCommandApproval` / `applyPatchApproval` 呈现为三选项 inline card（Approve / Approve for session / Deny）。映射逻辑隔离在 `CodexDefaultApprovalHost.ts`，view 只做 thin wiring。
 - send/cancel/title 相关 runtime bridge 现在会通过 `AgentServiceRegistry` 按 conversation owner 解析 chat/session backend；OpenCode conversation 继续走 OpenCode adapter，非 OpenCode conversation 不再静默落回 `openCodeService`。cancel/detach 同样按当前 conversation backend 分流，Claude Code 等非 OpenCode backend 不会再调用 `openCodeService.detachStream()`。
 - user message footer 的 fork / rewind capability 也按当前 conversation owner 解析，而不是读取全局 active backend。这样 active backend 是 OpenCode 时，Claude Code conversation 仍只显示 Claude 声明的 fork，不会把 OpenCode Branching 能力投射成 Claude Rewind；OpenCode conversation 在 OpenCode 声明 Branching 时仍显示 Rewind。
 - active backend 切换由 `AgentServiceRegistry.onActiveChange()` 驱动：view 会阻止加载不属于当前 active backend 的 conversation，并自动切到该 backend 最新 conversation；没有则在当前 tab 创建该 backend 的新 conversation。切换时还会刷新 header backend chrome 和 status 文案，避免 OpenCode-only LSP/server chrome 残留在 Claude Code 会话上。
@@ -596,7 +598,7 @@ background task notice 这条子链路现在的边界是：
 - 会优先解析当前 tab 请求的模型；若它已被开关链路过滤，则自动回退到同 provider 默认模型 / 当前 effective catalog 的其他可用模型
 - 当 effective catalog 为空时，trigger 会回退到默认机器人图标，并保留空 catalog 对应的 tooltip 文案
 
-effort selector 的 variant 列表继续直接按当前 provider/model 查询 `findKnownModelInfo()`；当前局部 `modelRef` 仅保留为既有兼容占位并用行内 lint 注释限制影响，不作为额外 runtime truth。
+effort selector 的 variant 列表按 backend 分支处理：OpenCode 按 provider/model 查询 `findKnownModelInfo()`；Claude Code 使用固定的 `CLAUDE_CODE_EFFORT_VARIANTS`；Codex 使用 `CODEX_EFFORT_VARIANTS` 并通过 `onVariantChange` 写回 `backendSettings.codex.modelReasoningEffort` + 调用 `CodexAdapter.updateModelReasoningEffort()` 更新 adapter options。当前局部 `modelRef` 仅保留为既有兼容占位并用行内 lint 注释限制影响，不作为额外 runtime truth。
 
 ## 直接协作模块
 

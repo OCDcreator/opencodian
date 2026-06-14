@@ -1,30 +1,30 @@
 import { ToolCallRenderer } from '../../../../src/utils/streaming/ToolCallRenderer';
 
-describe('ToolCallRenderer', () => {
-  const getHeader = (
-    name: string,
-    input: Record<string, unknown>,
-    status: 'running' | 'completed' = 'running',
-    kind?: 'builtin' | 'mcp' | 'custom' | 'task' | 'question' | 'skill' | 'plan' | 'unknown'
-  ) => {
-    const parentEl = document.createElement('div');
-    const renderer = new ToolCallRenderer();
+function getHeader(
+  name: string,
+  input: Record<string, unknown>,
+  status: 'running' | 'completed' = 'running',
+  kind?: 'builtin' | 'mcp' | 'custom' | 'task' | 'question' | 'skill' | 'plan' | 'unknown'
+) {
+  const parentEl = document.createElement('div');
+  const renderer = new ToolCallRenderer();
 
-    renderer.render(parentEl, {
-      id: 'tool-test',
-      name,
-      kind,
-      input,
-      status,
-      result: status === 'completed' ? 'ok' : undefined,
-    });
+  renderer.render(parentEl, {
+    id: 'tool-test',
+    name,
+    kind,
+    input,
+    status,
+    result: status === 'completed' ? 'ok' : undefined,
+  });
 
-    return {
-      name: parentEl.querySelector('.streaming-tool-name')?.textContent,
-      summary: parentEl.querySelector('.streaming-tool-summary')?.textContent,
-    };
+  return {
+    name: parentEl.querySelector('.streaming-tool-name')?.textContent,
+    summary: parentEl.querySelector('.streaming-tool-summary')?.textContent,
   };
+}
 
+describe('ToolCallRenderer summaries', () => {
   it('shows file names for write-style tools across path key variants', () => {
     const parentEl = document.createElement('div');
     const renderer = new ToolCallRenderer();
@@ -32,14 +32,11 @@ describe('ToolCallRenderer', () => {
     renderer.render(parentEl, {
       id: 'tool-1',
       name: 'write',
-      input: {
-        filePath: 'docs/architecture/README.md',
-      },
+      input: { filePath: 'docs/architecture/README.md' },
       status: 'running',
     });
 
-    const summaryEl = parentEl.querySelector('.streaming-tool-summary');
-    expect(summaryEl?.textContent).toBe('README.md');
+    expect(parentEl.querySelector('.streaming-tool-summary')?.textContent).toBe('README.md');
   });
 
   it('shows todo names after progress counts', () => {
@@ -67,23 +64,9 @@ describe('ToolCallRenderer', () => {
   });
 
   it('shows skill names in the toolbar as soon as input arrives', () => {
-    const parentEl = document.createElement('div');
-    const renderer = new ToolCallRenderer();
-
-    renderer.render(parentEl, {
-      id: 'tool-3',
-      name: 'skill',
-      input: {
-        name: 'imagegen',
-      },
-      status: 'running',
-    });
-
-    const nameEl = parentEl.querySelector('.streaming-tool-name');
-    const summaryEl = parentEl.querySelector('.streaming-tool-summary');
-
-    expect(nameEl?.textContent).toBe('Skill');
-    expect(summaryEl?.textContent).toBe('imagegen');
+    const header = getHeader('skill', { name: 'imagegen' });
+    expect(header.name).toBe('Skill');
+    expect(header.summary).toBe('imagegen');
   });
 
   it.each([
@@ -105,7 +88,9 @@ describe('ToolCallRenderer', () => {
     expect(header.name).toBe(expectedName);
     expect(header.summary).toBe(expectedSummary);
   });
+});
 
+describe('ToolCallRenderer MCP tools', () => {
   it('renders MCP brand icon for Claudian MCP tool names', () => {
     const parentEl = document.createElement('div');
     const renderer = new ToolCallRenderer();
@@ -167,6 +152,381 @@ describe('ToolCallRenderer', () => {
     expect(parentEl.querySelector('.streaming-tool-icon svg')?.getAttribute('data-icon')).toBe('layers');
   });
 
+  it('renders MCP server chip in header when toolMetadata.server is present', () => {
+    const parentEl = document.createElement('div');
+    const renderer = new ToolCallRenderer();
+
+    renderer.render(parentEl, {
+      id: 'tool-mcp-server',
+      name: 'mcp__filesystem__read_file',
+      kind: 'mcp',
+      input: { path: '/tmp/demo.md' },
+      status: 'running',
+      toolMetadata: { server: 'filesystem' },
+    });
+
+    const chip = parentEl.querySelector('.streaming-tool-server-chip');
+    expect(chip?.textContent).toBe('filesystem');
+    expect(chip?.getAttribute('title')).toContain('filesystem');
+  });
+
+  it('does not render MCP server chip for non-MCP tools even with toolMetadata.server', () => {
+    const parentEl = document.createElement('div');
+    const renderer = new ToolCallRenderer();
+
+    renderer.render(parentEl, {
+      id: 'tool-read',
+      name: 'read',
+      kind: 'builtin',
+      input: { file_path: 'docs/spec.md' },
+      status: 'running',
+      toolMetadata: { server: 'ignored' },
+    });
+
+    expect(parentEl.querySelector('.streaming-tool-server-chip')).toBeNull();
+  });
+
+  it('shows Server: detail when expanding a completed MCP tool call', () => {
+    const parentEl = document.createElement('div');
+    const renderer = new ToolCallRenderer();
+
+    renderer.render(parentEl, {
+      id: 'tool-mcp-detail',
+      name: 'mcp__web__fetch',
+      kind: 'mcp',
+      input: { url: 'https://example.com' },
+      status: 'completed',
+      result: 'ok',
+      toolMetadata: { server: 'web' },
+    });
+
+    parentEl.querySelector<HTMLElement>('.streaming-tool-header')?.click();
+
+    expect(parentEl.querySelector('.streaming-tool-content')?.textContent).toContain('Server: web');
+  });
+
+  it('renders server chip as a passive span when no onOpenMcpServerDetail callback is provided', () => {
+    const parentEl = document.createElement('div');
+    const renderer = new ToolCallRenderer();
+
+    renderer.render(parentEl, {
+      id: 'tool-mcp-passive',
+      name: 'mcp__fs__read',
+      kind: 'mcp',
+      input: { path: '/tmp' },
+      status: 'running',
+      toolMetadata: { server: 'filesystem' },
+    });
+
+    const chip = parentEl.querySelector('.streaming-tool-server-chip');
+    expect(chip?.tagName).toBe('SPAN');
+    expect(chip?.classList.contains('is-interactive')).toBe(false);
+  });
+
+  it('renders server chip as a clickable button when onOpenMcpServerDetail is provided', () => {
+    const parentEl = document.createElement('div');
+    const onOpenMcpServerDetail = jest.fn();
+    const renderer = new ToolCallRenderer({ onOpenMcpServerDetail });
+
+    renderer.render(parentEl, {
+      id: 'tool-mcp-clickable',
+      name: 'mcp__fs__read',
+      kind: 'mcp',
+      input: { path: '/tmp' },
+      status: 'running',
+      toolMetadata: { server: 'filesystem' },
+    });
+
+    const chip = parentEl.querySelector('.streaming-tool-server-chip');
+    expect(chip?.tagName).toBe('BUTTON');
+    expect(chip?.classList.contains('is-interactive')).toBe(true);
+    expect(chip?.getAttribute('aria-label')).toContain('filesystem');
+  });
+
+  it('calls onOpenMcpServerDetail with server name when interactive chip is clicked', () => {
+    const parentEl = document.createElement('div');
+    const onOpenMcpServerDetail = jest.fn();
+    const onCollapsibleToggle = jest.fn();
+    const renderer = new ToolCallRenderer({ onOpenMcpServerDetail, onCollapsibleToggle });
+
+    renderer.render(parentEl, {
+      id: 'tool-mcp-open',
+      name: 'mcp__fs__read',
+      kind: 'mcp',
+      input: { path: '/tmp' },
+      status: 'running',
+      toolMetadata: { server: 'filesystem' },
+    });
+
+    const chip = parentEl.querySelector<HTMLButtonElement>('.streaming-tool-server-chip');
+    chip?.click();
+
+    expect(onOpenMcpServerDetail).toHaveBeenCalledWith('filesystem');
+    expect(onCollapsibleToggle).not.toHaveBeenCalled();
+  });
+
+  it('shows View server details link in expanded content when callback is provided', () => {
+    const parentEl = document.createElement('div');
+    const onOpenMcpServerDetail = jest.fn();
+    const renderer = new ToolCallRenderer({ onOpenMcpServerDetail });
+
+    renderer.render(parentEl, {
+      id: 'tool-mcp-expand',
+      name: 'mcp__fs__read',
+      kind: 'mcp',
+      input: { path: '/tmp' },
+      status: 'completed',
+      result: 'ok',
+      toolMetadata: { server: 'filesystem' },
+    });
+
+    parentEl.querySelector<HTMLElement>('.streaming-tool-header')?.click();
+
+    const link = parentEl.querySelector('.streaming-mcp-server-link');
+    expect(link).not.toBeNull();
+    expect(link?.textContent).toContain('View server details');
+
+    link?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(onOpenMcpServerDetail).toHaveBeenCalledWith('filesystem');
+  });
+
+  it('does not show View server details link in expanded content when no callback is provided', () => {
+    const parentEl = document.createElement('div');
+    const renderer = new ToolCallRenderer();
+
+    renderer.render(parentEl, {
+      id: 'tool-mcp-no-link',
+      name: 'mcp__fs__read',
+      kind: 'mcp',
+      input: { path: '/tmp' },
+      status: 'completed',
+      result: 'ok',
+      toolMetadata: { server: 'filesystem' },
+    });
+
+    parentEl.querySelector<HTMLElement>('.streaming-tool-header')?.click();
+
+    expect(parentEl.querySelector('.streaming-mcp-server-link')).toBeNull();
+  });
+});
+
+describe('ToolCallRenderer MCP inline auth button', () => {
+  it('renders auth button on failed MCP tool call with auth error result', () => {
+    const parentEl = document.createElement('div');
+    const onAuthenticateMcpServer = jest.fn();
+    const renderer = new ToolCallRenderer({ onAuthenticateMcpServer });
+
+    renderer.render(parentEl, {
+      id: 'tool-mcp-auth',
+      name: 'mcp__linear__get_issue',
+      kind: 'mcp',
+      input: { issueId: 'LIN-123' },
+      status: 'error',
+      result: 'Error: authentication required',
+      toolMetadata: { server: 'linear-test' },
+    });
+
+    const authBtn = parentEl.querySelector('.streaming-tool-auth-btn');
+    expect(authBtn).not.toBeNull();
+    expect(authBtn?.tagName).toBe('BUTTON');
+    expect(authBtn?.textContent).toContain('Authenticate');
+  });
+
+  it('does not render auth button for non-auth errors', () => {
+    const parentEl = document.createElement('div');
+    const onAuthenticateMcpServer = jest.fn();
+    const renderer = new ToolCallRenderer({ onAuthenticateMcpServer });
+
+    renderer.render(parentEl, {
+      id: 'tool-mcp-err',
+      name: 'mcp__fs__read',
+      kind: 'mcp',
+      input: { path: '/tmp' },
+      status: 'error',
+      result: 'File not found',
+      toolMetadata: { server: 'filesystem' },
+    });
+
+    expect(parentEl.querySelector('.streaming-tool-auth-btn')).toBeNull();
+  });
+
+  it('does not render auth button for completed MCP calls', () => {
+    const parentEl = document.createElement('div');
+    const onAuthenticateMcpServer = jest.fn();
+    const renderer = new ToolCallRenderer({ onAuthenticateMcpServer });
+
+    renderer.render(parentEl, {
+      id: 'tool-mcp-ok',
+      name: 'mcp__fs__read',
+      kind: 'mcp',
+      input: { path: '/tmp' },
+      status: 'completed',
+      result: 'ok',
+      toolMetadata: { server: 'filesystem' },
+    });
+
+    expect(parentEl.querySelector('.streaming-tool-auth-btn')).toBeNull();
+  });
+
+  it('does not render auth button when no onAuthenticateMcpServer callback is provided', () => {
+    const parentEl = document.createElement('div');
+    const renderer = new ToolCallRenderer();
+
+    renderer.render(parentEl, {
+      id: 'tool-mcp-no-cb',
+      name: 'mcp__fs__read',
+      kind: 'mcp',
+      input: { path: '/tmp' },
+      status: 'error',
+      result: 'authentication required',
+      toolMetadata: { server: 'filesystem' },
+    });
+
+    expect(parentEl.querySelector('.streaming-tool-auth-btn')).toBeNull();
+  });
+
+  it('does not render auth button for non-MCP tools', () => {
+    const parentEl = document.createElement('div');
+    const onAuthenticateMcpServer = jest.fn();
+    const renderer = new ToolCallRenderer({ onAuthenticateMcpServer });
+
+    renderer.render(parentEl, {
+      id: 'tool-builtin',
+      name: 'read',
+      kind: 'builtin',
+      input: { file_path: '/tmp' },
+      status: 'error',
+      result: 'authentication required',
+    });
+
+    expect(parentEl.querySelector('.streaming-tool-auth-btn')).toBeNull();
+  });
+
+  it('calls onAuthenticateMcpServer with server name when clicked', () => {
+    const parentEl = document.createElement('div');
+    const onAuthenticateMcpServer = jest.fn();
+    const renderer = new ToolCallRenderer({ onAuthenticateMcpServer });
+
+    renderer.render(parentEl, {
+      id: 'tool-mcp-click',
+      name: 'mcp__notion__search',
+      kind: 'mcp',
+      input: { query: 'test' },
+      status: 'error',
+      result: 'Unauthorized: token expired',
+      toolMetadata: { server: 'notion-test' },
+    });
+
+    const authBtn = parentEl.querySelector<HTMLButtonElement>('.streaming-tool-auth-btn');
+    authBtn?.click();
+
+    expect(onAuthenticateMcpServer).toHaveBeenCalledWith('notion-test');
+  });
+
+  it('does not trigger collapsible toggle when auth button is clicked', () => {
+    const parentEl = document.createElement('div');
+    const onAuthenticateMcpServer = jest.fn();
+    const onCollapsibleToggle = jest.fn();
+    const renderer = new ToolCallRenderer({ onAuthenticateMcpServer, onCollapsibleToggle });
+
+    renderer.render(parentEl, {
+      id: 'tool-mcp-stop',
+      name: 'mcp__linear__get_issue',
+      kind: 'mcp',
+      input: { issueId: 'LIN-1' },
+      status: 'error',
+      result: '401 Unauthorized',
+      toolMetadata: { server: 'linear-test' },
+    });
+
+    const authBtn = parentEl.querySelector<HTMLButtonElement>('.streaming-tool-auth-btn');
+    authBtn?.click();
+
+    expect(onCollapsibleToggle).not.toHaveBeenCalled();
+  });
+
+  it('adds auth button dynamically via updateResult when result becomes auth error', () => {
+    const parentEl = document.createElement('div');
+    const onAuthenticateMcpServer = jest.fn();
+    const renderer = new ToolCallRenderer({ onAuthenticateMcpServer });
+
+    renderer.render(parentEl, {
+      id: 'tool-mcp-dynamic',
+      name: 'mcp__linear__search',
+      kind: 'mcp',
+      input: { query: 'test' },
+      status: 'running',
+      toolMetadata: { server: 'linear-test' },
+    });
+
+    expect(parentEl.querySelector('.streaming-tool-auth-btn')).toBeNull();
+
+    renderer.updateResult(parentEl.querySelector('.streaming-tool-call')!, {
+      id: 'tool-mcp-dynamic',
+      name: 'mcp__linear__search',
+      kind: 'mcp',
+      input: { query: 'test' },
+      status: 'error',
+      result: 'authentication required',
+      toolMetadata: { server: 'linear-test' },
+    });
+
+    expect(parentEl.querySelector('.streaming-tool-auth-btn')).not.toBeNull();
+  });
+
+  it('removes auth button via updateResult when result changes to non-auth error', () => {
+    const parentEl = document.createElement('div');
+    const onAuthenticateMcpServer = jest.fn();
+    const renderer = new ToolCallRenderer({ onAuthenticateMcpServer });
+
+    renderer.render(parentEl, {
+      id: 'tool-mcp-remove',
+      name: 'mcp__linear__search',
+      kind: 'mcp',
+      input: { query: 'test' },
+      status: 'error',
+      result: 'authentication required',
+      toolMetadata: { server: 'linear-test' },
+    });
+
+    expect(parentEl.querySelector('.streaming-tool-auth-btn')).not.toBeNull();
+
+    renderer.updateResult(parentEl.querySelector('.streaming-tool-call')!, {
+      id: 'tool-mcp-remove',
+      name: 'mcp__linear__search',
+      kind: 'mcp',
+      input: { query: 'test' },
+      status: 'error',
+      result: 'Connection timeout',
+      toolMetadata: { server: 'linear-test' },
+    });
+
+    expect(parentEl.querySelector('.streaming-tool-auth-btn')).toBeNull();
+  });
+
+  it('shows auth hint in expanded content for auth-failed MCP tool call', () => {
+    const parentEl = document.createElement('div');
+    const renderer = new ToolCallRenderer();
+
+    renderer.render(parentEl, {
+      id: 'tool-mcp-hint',
+      name: 'mcp__linear__get_issue',
+      kind: 'mcp',
+      input: { issueId: 'LIN-1' },
+      status: 'error',
+      result: 'authentication required',
+      toolMetadata: { server: 'linear-test' },
+    });
+
+    parentEl.querySelector<HTMLElement>('.streaming-tool-header')?.click();
+
+    const hint = parentEl.querySelector('.streaming-mcp-auth-hint');
+    expect(hint).not.toBeNull();
+    expect(hint?.textContent).toContain('authentication');
+  });
+});
+
+describe('ToolCallRenderer interactions', () => {
   it('calls the collapsible toggle callback when tool details expand', () => {
     const parentEl = document.createElement('div');
     const onCollapsibleToggle = jest.fn();
@@ -203,7 +563,7 @@ describe('ToolCallRenderer', () => {
       },
       resultVisibility: 'hidden',
       status: 'completed',
-      result: 'task_id: child-session-1\n\n<task_result>\nSecret subagent answer\n</task_result>',
+      result: 'task_id: child-session-1\n\n<task_result\u003e\nSecret subagent answer\n</task_result\u003e',
     });
 
     parentEl.querySelector<HTMLElement>('.streaming-tool-header')?.click();

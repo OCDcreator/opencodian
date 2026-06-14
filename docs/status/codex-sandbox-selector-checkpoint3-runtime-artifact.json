@@ -1,0 +1,126 @@
+{
+  "artifactType": "codex-sandbox-selector-checkpoint3-runtime-snapshot",
+  "captureTimestamp": "2026-06-09T06:53:53.094Z",
+  "buildId": "feature-codex-sdk-capability.202606091448",
+
+  "verifyGate": {
+    "command": "OWNER_GUARD_APPROVED=codex-sdk-checkpoint3 npm run verify",
+    "result": "PASS",
+    "steps": [
+      "check:owner-guard: PASS (ClassB, RULE_1_HOTSPOT_CLASS_B_APPROVED, approval: codex-sdk-checkpoint3)",
+      "check:module-docs: PASS (471 source modules, 471 mapped docs, 17 doc targets updated)",
+      "check:graphify: PASS",
+      "check:devlog-order: PASS (431 dated sections)",
+      "lint: PASS (0 errors, 0 warnings)",
+      "typecheck: PASS",
+      "test: PASS (476 suites, 4464 tests)",
+      "build: PASS → BUILD_ID feature-codex-sdk-capability.202606091448"
+    ]
+  },
+
+  "deployStatus": {
+    "target": "/Volumes/SDD2T/obsidian-vault-write/testvault/.obsidian/plugins/opencodian/",
+    "filesDeployed": ["main.js", "manifest.json", "styles.css"],
+    "deployedBuildId": "feature-codex-sdk-capability.202606091448",
+    "deployedBuildIdConfirmed": true,
+    "pluginReloadedViaCDP": true
+  },
+
+  "runtimeState": {
+    "activeBackend": "codex",
+
+    "persistedCodexSettings": {
+      "sandboxMode": "workspace-write",
+      "model": "",
+      "modelReasoningEffort": "high",
+      "additionalDirectories": "",
+      "networkAccessEnabled": false,
+      "webSearchMode": "cached"
+    },
+
+    "selectorTrigger": {
+      "visible": true,
+      "displayText": "WS",
+      "title": "沙盒模式仅对下一个线程生效。",
+      "cssClasses": "opencodian-permission-trigger mode-workspace-write",
+      "dataBackend": "codex",
+      "role": "button",
+      "ariaExpanded": "false",
+      "ariaHasPopup": "listbox",
+      "tabIndex": "0"
+    },
+
+    "boundaryHint": {
+      "rendered": true,
+      "attribute": "title",
+      "value": "沙盒模式仅对下一个线程生效。",
+      "englishEquivalent": "Sandbox mode applies to the next thread only."
+    },
+
+    "dropdown": {
+      "open": false,
+      "optionCount": 3,
+      "options": [
+        {
+          "id": "read-only",
+          "label": "只读",
+          "description": "仅允许文件系统读取；不允许写入或执行命令",
+          "selected": false,
+          "cssClass": "opencodian-permission-option",
+          "iconSvg": "lucide-shield"
+        },
+        {
+          "id": "workspace-write",
+          "label": "工作区写入",
+          "description": "允许在工作区目录内写入",
+          "selected": true,
+          "cssClass": "opencodian-permission-option is-selected",
+          "iconSvg": "lucide-shield"
+        },
+        {
+          "id": "danger-full-access",
+          "label": "危险：完全访问",
+          "description": "完全系统访问，无沙盒限制",
+          "selected": false,
+          "cssClass": "opencodian-permission-option",
+          "iconSvg": "lucide-shield"
+        }
+      ]
+    },
+
+    "sandboxBadge": {
+      "visible": false,
+      "note": "Sandbox badge is Claude Code backend only; not shown for codex backend."
+    },
+
+    "errorState": {
+      "visibleErrors": 0,
+      "consoleErrors": "none captured",
+      "pluginActive": true
+    }
+  },
+
+  "screenshots": {
+    "dropdownClosed": {
+      "path": "/var/folders/kr/gbgh00qn3m70ff_fjsh7d55h0000gn/T/opencode/codex-sandbox-selector-closed.png",
+      "description": "Codex sandbox selector trigger in closed state, showing 'WS' label with boundary hint tooltip"
+    },
+    "dropdownOpen": {
+      "path": "/var/folders/kr/gbgh00qn3m70ff_fjsh7d55h0000gn/T/opencode/codex-sandbox-selector-open.png",
+      "description": "Codex sandbox selector dropdown open, showing all three options with workspace-write selected"
+    }
+  },
+
+  "sourceFilesChanged": [
+    "src/features/chat/services/ChatSelectionControlsCoordinator.ts",
+    "src/features/chat/services/PermissionModeSelectorCoordinator.ts",
+    "docs/modules/features/chat/services/ChatSelectionControlsCoordinator.md",
+    "docs/modules/features/chat/services/PermissionModeSelectorCoordinator.md"
+  ],
+
+  "provenance": {
+    "checkpoint": "checkpoint-3a",
+    "purpose": "Evidence normalization: full-verify proof path + durable runtime artifact for Codex sandbox selector seam",
+    "worktree": "codex-sdk-capability"
+  }
+}

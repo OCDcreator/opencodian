@@ -23,11 +23,12 @@
 
 - 前缀被剥离，剩余内容进入正常的 preparation / stream 路径
 - 一个固定的 JSON schema（`STRUCTURED_OUTPUT_FIXED_SCHEMA`）被注入到 `PrepareMessageSendOptions.outputFormat`
-- 该 schema 通过 `PreparedMessageSend.modelOptions` 进入 `sendStreamMessage` options，最终到达 `ClaudeCodeAdapter.buildSdkOptions()`
+- 该 schema 通过 `PreparedMessageSend.modelOptions` 进入 `sendStreamMessage` options，最终到达后端适配器（`ClaudeCodeAdapter` 或 `CodexAdapter`）
 - 触发是**一次性的**：只影响当前这条消息，不会持久化到设置或影响后续发送
 - 前缀剥离发生在 `tryRunSlashCommand` 之前，因此 slash command 服务看到的是已剥离的内容，不会把 `/json` 误判为未知 slash command
+- `STRUCTURED_OUTPUT_FIXED_SCHEMA` 已针对 OpenAI Structured Outputs strict 模式规范化：根对象包含 `additionalProperties: false`，且 `properties` 中的每个属性键都在 `required` 中列出。这确保 Codex CLI（底层使用 OpenAI API）不会以 `invalid_json_schema` 拒绝 schema
 
-这是结构化输出在普通聊天路径中的最 honest、最小表面触发方式：不新增 UI chrome，不暴露 schema 编辑，只提供一个显式前缀触发。当前只支持 Claude Code backend；OpenCode backend 会忽略未知的 `outputFormat` option。
+这是结构化输出在普通聊天路径中的最 honest、最小表面触发方式：不新增 UI chrome，不暴露 schema 编辑，只提供一个显式前缀触发。Claude Code 与 Codex backend 均支持；OpenCode backend 会忽略未知的 `outputFormat` option。
 
 2026-05-28 更新：prompt hardening 尝试（在 schema 中增加 description 字段）已被 revert，因为运行时 artifact 证明它未能稳定消除 structured output 路径中的额外 prose；该问题目前归为 SDK/model 边界，不是 plugin-side fixable。
 

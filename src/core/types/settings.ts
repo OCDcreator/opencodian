@@ -84,6 +84,38 @@ export interface ClaudeCodeSandboxSettings {
   ripgrep: SandboxRipgrepConfig;
 }
 
+/**
+ * Codex backend settings.
+ *
+ * Minimal shape: only fields that are genuinely wired through to the Codex
+ * SDK adapter and runtime-proven. Fields not yet wired remain hidden/readback.
+ */
+/** Sandbox mode for Codex CLI. Matches SDK's SandboxMode type. */
+export type CodexSandboxMode = 'read-only' | 'workspace-write' | 'danger-full-access';
+
+/** Reasoning effort for Codex CLI. Matches SDK's ModelReasoningEffort type. */
+export type CodexReasoningEffort = 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
+
+/** Web search mode for Codex CLI. Matches SDK's WebSearchMode type. */
+export type CodexWebSearchMode = 'disabled' | 'cached' | 'live';
+
+export interface CodexBackendSettings {
+  /** OpenAI API key. Falls back to OPENAI_API_KEY env var / Codex CLI login. */
+  apiKey: string;
+  /** Model name passed as ThreadOptions.model → SDK --model CLI arg. Empty string = SDK default. */
+  model: string;
+  /** Sandbox mode passed as ThreadOptions.sandboxMode → SDK --sandbox CLI arg. */
+  sandboxMode: CodexSandboxMode;
+  /** Reasoning effort passed as ThreadOptions.modelReasoningEffort → SDK --config CLI arg. */
+  modelReasoningEffort: CodexReasoningEffort;
+  /** Additional directories passed as ThreadOptions.additionalDirectories → SDK --add-dir per path. Newline-separated in settings. */
+  additionalDirectories: string;
+  /** Network access passed as ThreadOptions.networkAccessEnabled → SDK --config CLI arg. Only meaningful with workspace-write sandbox. */
+  networkAccessEnabled: boolean;
+  /** Web search mode passed as ThreadOptions.webSearchMode → SDK --config CLI arg. */
+  webSearchMode: CodexWebSearchMode;
+}
+
 export interface ClaudeCodeBackendSettings {
   executablePath: string;
   settingSources: ClaudeCodeSettingSource[];
@@ -281,6 +313,7 @@ export interface ClaudeCodeBackendSettings {
 
 export interface BackendSettings {
   claudeCode: ClaudeCodeBackendSettings;
+  codex: CodexBackendSettings;
 }
 
 export function normalizeEffortLevel(value: unknown): EffortLevel {
@@ -351,6 +384,19 @@ export function getDefaultClaudeCodeBackendSettings(): ClaudeCodeBackendSettings
 export function getDefaultBackendSettings(): BackendSettings {
   return {
     claudeCode: getDefaultClaudeCodeBackendSettings(),
+    codex: getDefaultCodexBackendSettings(),
+  };
+}
+
+export function getDefaultCodexBackendSettings(): CodexBackendSettings {
+  return {
+    apiKey: '',
+    model: '',
+    sandboxMode: 'workspace-write',
+    modelReasoningEffort: 'medium',
+    additionalDirectories: '',
+    networkAccessEnabled: false,
+    webSearchMode: 'cached',
   };
 }
 
@@ -625,10 +671,38 @@ export function normalizeClaudeCodeBackendSettings(value: unknown): ClaudeCodeBa
 
 export function normalizeBackendSettings(value: unknown): BackendSettings {
   const candidate = value && typeof value === 'object' && !Array.isArray(value)
-    ? value as { claudeCode?: unknown }
+    ? value as { claudeCode?: unknown; codex?: unknown }
     : {};
   return {
     claudeCode: normalizeClaudeCodeBackendSettings(candidate.claudeCode),
+    codex: normalizeCodexBackendSettings(candidate.codex),
+  };
+}
+
+function normalizeCodexBackendSettings(value: unknown): CodexBackendSettings {
+  const VALID_SANDBOX_MODES: readonly CodexSandboxMode[] = ['read-only', 'workspace-write', 'danger-full-access'];
+  const VALID_EFFORTS: readonly CodexReasoningEffort[] = ['minimal', 'low', 'medium', 'high', 'xhigh'];
+  const VALID_WEB_SEARCH: readonly CodexWebSearchMode[] = ['disabled', 'cached', 'live'];
+  const candidate = value && typeof value === 'object' && !Array.isArray(value)
+    ? value as { apiKey?: unknown; model?: unknown; sandboxMode?: unknown; modelReasoningEffort?: unknown; additionalDirectories?: unknown; networkAccessEnabled?: unknown; webSearchMode?: unknown }
+    : {};
+  const rawSandbox = typeof candidate.sandboxMode === 'string' ? candidate.sandboxMode : '';
+  const rawEffort = typeof candidate.modelReasoningEffort === 'string' ? candidate.modelReasoningEffort : '';
+  const rawWebSearch = typeof candidate.webSearchMode === 'string' ? candidate.webSearchMode : '';
+  return {
+    apiKey: typeof candidate.apiKey === 'string' ? candidate.apiKey : '',
+    model: typeof candidate.model === 'string' ? candidate.model : '',
+    sandboxMode: VALID_SANDBOX_MODES.includes(rawSandbox as CodexSandboxMode)
+      ? (rawSandbox as CodexSandboxMode)
+      : 'workspace-write',
+    modelReasoningEffort: VALID_EFFORTS.includes(rawEffort as CodexReasoningEffort)
+      ? (rawEffort as CodexReasoningEffort)
+      : 'medium',
+    additionalDirectories: typeof candidate.additionalDirectories === 'string' ? candidate.additionalDirectories : '',
+    networkAccessEnabled: candidate.networkAccessEnabled === true,
+    webSearchMode: VALID_WEB_SEARCH.includes(rawWebSearch as CodexWebSearchMode)
+      ? (rawWebSearch as CodexWebSearchMode)
+      : 'cached',
   };
 }
 

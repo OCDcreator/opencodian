@@ -34,6 +34,14 @@
   white-space: nowrap;
 }
 
+.opencodian-effort-boundary-hint {
+  color: var(--text-faint);
+  font-size: 10px;
+  font-weight: 400;
+  white-space: nowrap;
+  opacity: 0.78;
+}
+
 .opencodian-effort-gears {
   position: relative;
   display: flex;

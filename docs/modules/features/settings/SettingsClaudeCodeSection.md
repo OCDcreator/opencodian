@@ -2,6 +2,7 @@
 
 > **源码**: `src/features/settings/SettingsClaudeCodeSection.ts`
 > **状态**: [REVIEW]
+> **Updated**: 2026-06-09 — updated `backendSettings` fallback to include `codex` key
 > **最近更新**: Output Style live proof wording + browse-only session browser launcher + official nested hook config parsing + project settings surface (2026-06-07).
 
 ## 概述

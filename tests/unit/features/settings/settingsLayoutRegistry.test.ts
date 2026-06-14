@@ -27,6 +27,7 @@ describe('SETTINGS_PRIMARY_TABS', () => {
     expect(ids).toEqual([
       'general',
       'claude-code',
+      'codex',
       'server',
       'model',
       'conversation',

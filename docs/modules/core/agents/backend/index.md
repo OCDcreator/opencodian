@@ -1,7 +1,7 @@
 # backend/index
 
 > **源码**: `src/core/agents/backend/index.ts`
-> **最近更新**: 2026-06-07
+> **最近更新**: 2026-06-13
 
 ## 概述
 
@@ -9,17 +9,18 @@
 
 ## 职责
 
-- 导出 `IMPLEMENTED_AGENT_BACKENDS`，作为设置归一化与 UI 过滤的运行时白名单；当前包含 `opencode` 与 `claude-code`
+- 导出 `IMPLEMENTED_AGENT_BACKENDS`，作为设置归一化与 UI 过滤的运行时白名单；当前包含 `opencode`、`claude-code` 与 `codex`
 - 重新导出 `AgentService.ts` 中的核心接口、状态类型、共享 disposable 类型、chat/session 请求类型和可选 capability interface
 - 导出 `OpenCodeAdapter` 作为当前 OpenCode backend 的 adapter 实现
 - 导出 backend routing helper，供入口、聊天视图和发送管线按 conversation owner / active backend 做 capability narrowing
 - 导出 Claude Code adapter、runtime catalog readback 类型、project skill/command/agent/settings discovery helper、model catalog projection、SDK loader、options builder、MCP config adapter、MCP elicitation bridge、process resolver、stream normalizer 与 permission bridge；`claude-code` 已可在设置中显式启用，默认仍保持 OpenCode
 - 导出 `AgentServiceRegistry` 作为 adapter 注册与 active backend 解析 owner
+- 导出 Codex adapter 骨架与 stream normalizer；`codex` 已加入 `IMPLEMENTED_AGENT_BACKENDS`，在 UI 暴露为用户可选后端
 - 保持 type-only 导出与 value 导出分层，避免 barrel 额外引入运行时副作用
 
 ## 公共导出
 
-- `IMPLEMENTED_AGENT_BACKENDS`: 已实现 backend kind 的 readonly tuple，用 `AgentBackendKind` 约束元素类型；当前为 `['opencode', 'claude-code']`。
+- `IMPLEMENTED_AGENT_BACKENDS`: 已实现 backend kind 的 readonly tuple，用 `AgentBackendKind` 约束元素类型；当前为 `['opencode', 'claude-code', 'codex']`。
 - `AgentServiceRegistry`: backend adapter 注册、启用状态和 active backend 解析 owner。
 - `getConversationChatBackendService` / `getConversationSessionBackendService` / `getActiveSessionBackendService`: backend routing helper。
 - `OpenCodeAdapter`: OpenCode backend 的 `AgentService` adapter 实现。
@@ -42,11 +43,15 @@
 - `Context1mBetaReadbackProbeResult`: Claude Code `betas` 选项 readback probe 结果类型；诊断专用，不验证实际 beta 可用性。
 - `JsRuntimeReadbackProbeResult`: Claude Code `executable` 选项 readback probe 结果类型；诊断专用，不验证实际运行时选择行为。
 - `LoadTimeoutReadbackProbeResult`: Claude Code `loadTimeoutMs` 选项 readback probe 结果类型；诊断专用，不验证实际超时行为。
-- `buildClaudeCodeModelSelectorProviders` / `CLAUDE_CODE_EFFORT_VARIANTS`: Claude Code composer model aliases、SDK supported-model projection 与 effort variants helper。
+- `buildClaudeCodeModelSelectorProviders` / `CLAUDE_CODE_EFFORT_VARIANTS` / `CODEX_EFFORT_VARIANTS`: Claude Code composer model aliases、SDK supported-model projection 与 effort variants helper；`CODEX_EFFORT_VARIANTS` 提供 Codex reasoning-effort levels（`minimal`/`low`/`medium`/`high`/`xhigh`）供 chat toolbar effort selector 使用。
 - `loadClaudeCodeSdk` / `buildClaudeCodeOptions` / `adaptMcpConfigForClaude` / `buildClaudeCodeElicitationQuestionRequest` / `resolveClaudeCodeProcess` / `createClaudeCodeStreamNormalizer` / `createClaudeCodePermissionBridge`: Claude Code Phase 1 前置 SDK loading、options、MCP config adapter、MCP elicitation request/content mapping、process、stream 转换与 permission/question bridge helper。
 - `AgentService` / `AgentServiceInfo` / `AgentConnectionStatus` / `Disposable` / `StatusChangeHandler`: backend 抽象层核心契约与共享类型。
 - `AgentChatSendRequest`: backend-neutral chat 发送请求类型。
 - `AgentChatCapability` / `AgentSessionCapability` / `AgentAuthCapability` / `AgentBranchCapability` / `AgentConfigCapability` / `AgentMcpCapability` / `AgentModelCapability` / `AgentPermissionCapability` / `AgentQuestionCapability` / `AgentTodoCapability` / `AgentToolCapability`: 可选 capability interface。
+- `CodexAdapter` / `CodexFactory` / `CodexAdapterOptions`: Codex SDK adapter 骨架，实现 AgentChatCapability + AgentSessionCapability；DI seam 支持测试注入。
+- `CodexApprovalKind` / `CodexApprovalRequest` / `CodexApprovalDecision` / `CodexApprovalBridgeHost`: Codex server-request 审批 bridge 类型（Round 5）。`CodexAdapter.setApprovalHost(host)` 通过这些类型把 `execCommandApproval` / `applyPatchApproval` server-request 接到 UI-facing host 回调；仅 wire 两种最窄审批形状 + 四个标量 ReviewDecision，运行时触发证明仍待后续。
+- `CodexApprovalHostContext` / `CodexApprovalCardRenderer` / `CodexApprovalResolutionResult` / `createCodexApprovalBridgeHost` / `buildCodexApprovalQuestionRequest` / `mapCodexApprovalResolution`: Codex 审批 UI host seam（Round 6）。`createCodexApprovalBridgeHost(getContext)` 返回一个动态读取 context 的 `CodexApprovalBridgeHost`；`buildCodexApprovalQuestionRequest` 把 `CodexApprovalRequest` 翻译为 `QuestionRequest`，`mapCodexApprovalResolution` 把 `showQuestionDialog` 结果映射回 `CodexApprovalDecision`；chat view 通过 `installCodexApprovalHostContext()` 把 `approvalCardRenderer` 挂到 plugin 的 context 上。
+- `CodexStreamNormalizer` / `CodexStreamNormalizerOptions` / `createCodexStreamNormalizer`: Codex SDK ThreadEvent → StreamChunk 转换器。
 
 ## 依赖
 
@@ -66,6 +71,12 @@
 - `src/core/agents/backend/ClaudeCodeProcessResolver.ts`：Claude process/executable 解析 helper
 - `src/core/agents/backend/ClaudeCodeStreamNormalizer.ts`：Claude SDK message 到 `StreamChunk` 的转换 helper
 - `src/core/agents/backend/ClaudeCodePermissionBridge.ts`：Claude `canUseTool` / `AskUserQuestion` 到 OpenCodian permission/question host 的桥接 helper
+- `src/core/agents/backend/CodexAdapter.ts`：Codex SDK adapter 骨架（Chat + Session）
+- `src/core/agents/backend/CodexDefaultApprovalHost.ts`：Codex 审批 bridge 的默认 host 实现；连接 adapter 的 `setApprovalHost` 到 view 的 question/inline-card UI
+- `src/core/agents/backend/CodexStreamNormalizer.ts`：Codex SDK ThreadEvent → StreamChunk 转换器
+- `src/core/agents/backend/CodexAppServerClientTypes.ts`：从 `CodexAppServerClient` 拆出的纯 wire 类型模块（thread/model/account/MCP/review 等），由 `CodexAppServerClient` 通过 `export *` 重新导出
+- `src/core/agents/backend/CodexAppServerTransport.ts`：从 `CodexAppServerClient` 拆出的基类，负责 app-server 进程生命周期与 JSON-RPC 2.0 plumbing；`CodexAppServerClient extends CodexAppServerTransport`
+- `src/core/agents/backend/CodexAppServerClientNormalization.ts`：从 `CodexAppServerClient` 拆出的 transcript 归一化纯函数模块（`normalizeThreadList` / `normalizeTurnsToPreviewMessages`）
 - `src/core/types/chat.ts`：提供 `AgentBackendKind` 类型约束
 
 ## 维护约束

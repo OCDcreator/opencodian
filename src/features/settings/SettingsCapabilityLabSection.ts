@@ -27,9 +27,11 @@ import {
 import type { ClaudeCodeAdapter, ClaudeCodeDiagnosticPromptResult } from '../../core/agents/backend/ClaudeCodeAdapter';
 import { buildClaudeCodeElicitationQuestionRequest } from '../../core/agents/backend/ClaudeCodeElicitationBridge';
 import type { ClaudeCodePermissionBridge } from '../../core/agents/backend/ClaudeCodePermissionBridge';
+import type { CodexAdapter } from '../../core/agents/backend/CodexAdapter';
 import type { AgentBackendKind } from '../../core/types/chat';
 import {
   getDefaultClaudeCodeBackendSettings,
+  getDefaultCodexBackendSettings,
 } from '../../core/types/settings';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
@@ -54,7 +56,7 @@ interface MatrixRow {
   capability: string;
   sdkExposed: boolean;
   adapterWired: boolean;
-  runtimeProof: 'untested' | 'pass' | 'fail' | 'wiring' | 'boundary' | 'readback';
+  runtimeProof: 'untested' | 'pass' | 'fail' | 'wiring' | 'boundary' | 'readback' | 'settings-only' | 'hidden' | 'blocked';
   userSurface: 'settings' | 'diagnostic' | 'hidden' | 'chat' | 'settings+chat';
 }
 
@@ -163,8 +165,15 @@ function getClaudeCodeAdapter(plugin: OpenCodianPlugin): ClaudeCodeAdapter | nul
   if (!registry) return null;
   const adapter = registry.get('claude-code');
   if (!adapter) return null;
-  // Narrow to ClaudeCodeAdapter — it's the only adapter that registers as 'claude-code'.
   return adapter as unknown as ClaudeCodeAdapter;
+}
+
+function getCodexAdapter(plugin: OpenCodianPlugin): CodexAdapter | null {
+  const registry = plugin.agentServiceRegistry;
+  if (!registry) return null;
+  const adapter = registry.get('codex');
+  if (!adapter) return null;
+  return adapter as unknown as CodexAdapter;
 }
 
 function getCapabilityLabState(plugin: OpenCodianPlugin): CapabilityLabPluginState {
@@ -429,7 +438,7 @@ export class SettingsCapabilityLabSection {
   dispose(): void {}
 
   private get claudeCodeSettings() {
-    this.plugin.settings.backendSettings ??= { claudeCode: getDefaultClaudeCodeBackendSettings() };
+    this.plugin.settings.backendSettings ??= { claudeCode: getDefaultClaudeCodeBackendSettings(), codex: getDefaultCodexBackendSettings() };
     this.plugin.settings.backendSettings.claudeCode ??= getDefaultClaudeCodeBackendSettings();
     return this.plugin.settings.backendSettings.claudeCode;
   }
@@ -530,6 +539,7 @@ export class SettingsCapabilityLabSection {
     });
 
     const adapter = getClaudeCodeAdapter(this.plugin);
+    const codexAdapter = getCodexAdapter(this.plugin);
     const shellEl = containerEl.createDiv({
       cls: 'opencodian-capability-lab-table-shell',
       attr: { 'data-diagnostic': 'true' },
@@ -547,30 +557,51 @@ export class SettingsCapabilityLabSection {
     headerRow.createEl('th', { text: 'Runtime Proof' });
     headerRow.createEl('th', { text: 'User Surface' });
 
-    // Build rows
+    // Build Claude Code rows
     const rows = this.buildMatrixRows(adapter);
     const tbody = table.createEl('tbody');
     for (const row of rows) {
-      const tr = tbody.createEl('tr');
-      tr.createEl('td', { cls: 'opencodian-capability-lab-capability-cell', text: row.capability });
-      const sdkCell = tr.createEl('td');
-      createStatusChip(sdkCell, 'SDK', row.sdkExposed);
-      const adapterCell = tr.createEl('td');
-      createStatusChip(adapterCell, 'Adapter', row.adapterWired);
-      const runtimeCell = tr.createEl('td');
-      const proofLabel = row.runtimeProof === 'pass' ? 'Verified'
-        : row.runtimeProof === 'readback' ? 'Readback verified'
-        : row.runtimeProof === 'fail' ? 'Failed'
-        : row.runtimeProof === 'wiring' ? 'Wiring only'
-        : row.runtimeProof === 'boundary' ? 'Boundary hit'
-        : 'Untested';
-      runtimeCell.createSpan({
-        cls: `opencodian-capability-lab-chip opencodian-capability-lab-chip-${row.runtimeProof}`,
-        text: proofLabel,
-      });
-      const uiCell = tr.createEl('td');
-      createSurfaceChip(uiCell, row.userSurface);
+      this.renderMatrixRow(tbody, row);
     }
+
+    // Build Codex rows (honest diagnostic summary)
+    const codexRows = this.buildCodexMatrixRows(codexAdapter);
+    if (codexRows.length > 0) {
+      const separatorTr = tbody.createEl('tr');
+      separatorTr.createEl('td', {
+        cls: 'opencodian-capability-lab-matrix-separator',
+        attr: { colspan: '5' },
+        text: 'Codex Backend',
+      });
+      for (const row of codexRows) {
+        this.renderMatrixRow(tbody, row);
+      }
+    }
+  }
+
+  private renderMatrixRow(tbody: HTMLTableSectionElement, row: MatrixRow): void {
+    const tr = tbody.createEl('tr');
+    tr.createEl('td', { cls: 'opencodian-capability-lab-capability-cell', text: row.capability });
+    const sdkCell = tr.createEl('td');
+    createStatusChip(sdkCell, 'SDK', row.sdkExposed);
+    const adapterCell = tr.createEl('td');
+    createStatusChip(adapterCell, 'Adapter', row.adapterWired);
+    const runtimeCell = tr.createEl('td');
+    const proofLabel = row.runtimeProof === 'pass' ? 'Verified'
+      : row.runtimeProof === 'readback' ? 'Readback verified'
+      : row.runtimeProof === 'fail' ? 'Failed'
+      : row.runtimeProof === 'wiring' ? 'Wiring only'
+      : row.runtimeProof === 'boundary' ? 'Boundary hit'
+      : row.runtimeProof === 'settings-only' ? 'Settings only'
+      : row.runtimeProof === 'hidden' ? 'Hidden'
+      : row.runtimeProof === 'blocked' ? 'Blocked'
+      : 'Untested';
+    runtimeCell.createSpan({
+      cls: `opencodian-capability-lab-chip opencodian-capability-lab-chip-${row.runtimeProof}`,
+      text: proofLabel,
+    });
+    const uiCell = tr.createEl('td');
+    createSurfaceChip(uiCell, row.userSurface);
   }
 
   private buildMatrixRows(adapter: ClaudeCodeAdapter | null): MatrixRow[] {
@@ -1830,6 +1861,43 @@ export class SettingsCapabilityLabSection {
         // /tmp/opencodian-round11-context-detail-2048.png. obsidian dev:errors clean.
         userSurface: 'settings+chat', // Settings tab "Context usage" readback section +
         // chat ContextRing (mounted via AgentCapability.Context) + ContextDetailModal.
+      },
+    ];
+  }
+
+  // =======================================================================
+  // Codex Capability Matrix
+  // =======================================================================
+
+  private buildCodexMatrixRows(_adapter: CodexAdapter | null): MatrixRow[] {
+    return [
+      {
+        capability: 'Codex: chat, sandbox, effort, image, resume, sessions',
+        sdkExposed: true,
+        adapterWired: true,
+        runtimeProof: 'pass',
+        userSurface: 'settings+chat',
+      },
+      {
+        capability: 'Codex: webSearchMode (settings-only)',
+        sdkExposed: true,
+        adapterWired: true,
+        runtimeProof: 'settings-only',
+        userSurface: 'settings',
+      },
+      {
+        capability: 'Codex: account, models, permissions, rate-limits',
+        sdkExposed: true,
+        adapterWired: true,
+        runtimeProof: 'readback',
+        userSurface: 'settings',
+      },
+      {
+        capability: 'Codex: usage, approval-policy',
+        sdkExposed: false,
+        adapterWired: false,
+        runtimeProof: 'blocked',
+        userSurface: 'hidden',
       },
     ];
   }

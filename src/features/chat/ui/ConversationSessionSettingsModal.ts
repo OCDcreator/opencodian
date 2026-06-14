@@ -2,6 +2,8 @@
 import type { App } from 'obsidian';
 import { Modal } from 'obsidian';
 
+import type { CodexModelSummary } from '../../../core/agents/backend/CodexAdapter';
+import type { AppServerReviewResult, AppServerReviewTarget, AppServerThreadGoal } from '../../../core/agents/backend/CodexAppServerClient';
 import type {
   ConversationSessionSettings,
   OpencodeShareMode,
@@ -12,10 +14,19 @@ import type {
 import {
   normalizeChatFontSizePx,
 } from '../../../core/types';
+import type { CodexReasoningEffort, CodexSandboxMode, CodexWebSearchMode } from '../../../core/types/settings';
 import { t } from '../../../i18n';
 
 export interface ConversationSessionSettingsModalDefaults {
   chatFontSizePx: number;
+  codexSandboxMode?: CodexSandboxMode;
+  codexModelReasoningEffort?: CodexReasoningEffort;
+  codexModelOverride?: string;
+  codexAdditionalDirectories?: string[];
+  codexNetworkAccessEnabled?: boolean;
+  codexWebSearchMode?: CodexWebSearchMode;
+  codexAvailableModels?: CodexModelSummary[];
+  codexThreadGoal?: AppServerThreadGoal | null;
 }
 
 interface ConversationSessionSettingsModalOptions {
@@ -28,6 +39,8 @@ interface ConversationSessionSettingsModalOptions {
   showCompactionSummary?: boolean;
   /** Whether to show question-card global summary rows. Defaults to true. */
   showQuestionsSummary?: boolean;
+  /** Whether to show Codex-specific per-conversation overrides. Only true for Codex conversations. */
+  showCodexControls?: boolean;
   onSave(
     overrides: ConversationSessionSettings | undefined,
   ): Promise<void> | void;
@@ -39,6 +52,10 @@ interface ConversationSessionSettingsModalOptions {
   onUnshare?(): Promise<void> | void;
   shareUrl?: string | null;
   shareMode?: OpencodeShareMode;
+  onSetThreadGoal?(objective: string, options?: { tokenBudget?: number }): Promise<AppServerThreadGoal | null>;
+  onClearThreadGoal?(): Promise<boolean>;
+  /** Start a code review on the current Codex thread. Optional — only for Codex. */
+  onStartReview?(target: AppServerReviewTarget): Promise<AppServerReviewResult | null>;
 }
 
 interface PluginSettingsSummary {
@@ -62,6 +79,18 @@ const CLASSIC_SETTINGS_SCROLL_RETRY_DELAYS_MS = [0, 80, 200, 400] as const;
 
 export class ConversationSessionSettingsModal extends Modal {
   private chatFontSizeInputEl: HTMLInputElement | null = null;
+  private sandboxModeSelectEl: HTMLSelectElement | null = null;
+  private reasoningEffortSelectEl: HTMLSelectElement | null = null;
+  private codexModelOverrideSelectEl: HTMLSelectElement | null = null;
+  private codexModelOverrideCustomInputEl: HTMLInputElement | null = null;
+  private codexAdditionalDirectoriesTextareaEl: HTMLTextAreaElement | null = null;
+  private codexNetworkAccessEnabledSelectEl: HTMLSelectElement | null = null;
+  private codexWebSearchModeSelectEl: HTMLSelectElement | null = null;
+  private codexGoalReadbackEl: HTMLElement | null = null;
+  private codexGoalEmptyEl: HTMLElement | null = null;
+  private codexGoalClearBtnEl: HTMLButtonElement | null = null;
+  private codexGoalShellEl: HTMLElement | null = null;
+  private codexReviewStatusEl: HTMLElement | null = null;
   private errorEl: HTMLElement | null = null;
   private saveButtonEl: HTMLButtonElement | null = null;
   private cancelButtonEl: HTMLButtonElement | null = null;
@@ -103,6 +132,8 @@ export class ConversationSessionSettingsModal extends Modal {
     this.chatFontSizeInputEl.addEventListener('input', () => {
       this.handlePreview();
     });
+
+    this.createCodexSection(bodyEl);
 
     this.createSharingSection(bodyEl);
     this.createSummaryDivider(bodyEl);
@@ -150,6 +181,15 @@ export class ConversationSessionSettingsModal extends Modal {
     this.contentEl.empty();
     this.modalEl.removeClass('opencodian-session-settings-modal');
     this.chatFontSizeInputEl = null;
+    this.sandboxModeSelectEl = null;
+    this.reasoningEffortSelectEl = null;
+    this.codexModelOverrideSelectEl = null;
+    this.codexModelOverrideCustomInputEl = null;
+    this.codexAdditionalDirectoriesTextareaEl = null;
+    this.codexNetworkAccessEnabledSelectEl = null;
+    this.codexWebSearchModeSelectEl = null;
+    this.codexGoalReadbackEl = null;
+    this.codexGoalEmptyEl = null;
     this.errorEl = null;
     this.saveButtonEl = null;
     this.cancelButtonEl = null;
@@ -269,6 +309,586 @@ export class ConversationSessionSettingsModal extends Modal {
     incBtn.addEventListener('click', () => { applyStep(step); });
 
     return inputEl;
+  }
+
+  private createDropdownField(containerEl: HTMLElement, options: {
+    setting: string;
+    name: string;
+    description: string;
+    defaultValue: string;
+    choices: Array<{ value: string; label: string }>;
+    initialValue: string | null | undefined;
+    inheritLabel?: string;
+  }): HTMLSelectElement {
+    const controlEl = this.createFieldShell(containerEl, {
+      name: options.name,
+      description: options.description,
+      defaultValue: options.defaultValue,
+    });
+
+    const selectEl = controlEl.createEl('select', {
+      cls: 'opencodian-session-settings-dropdown',
+      attr: {
+        'data-setting': options.setting,
+      },
+    });
+
+    if (options.inheritLabel === undefined || options.inheritLabel) {
+      selectEl.createEl('option', {
+        text: options.inheritLabel ?? t('chat.sessionSettings.modal.codexInherit'),
+        attr: { value: '' },
+      });
+    }
+
+    for (const choice of options.choices) {
+      selectEl.createEl('option', {
+        text: choice.label,
+        attr: { value: choice.value },
+      });
+    }
+
+    const initialValue = options.initialValue;
+    if (typeof initialValue === 'string' && initialValue.length > 0) {
+      selectEl.value = initialValue;
+    }
+
+    return selectEl;
+  }
+
+  private createTextField(containerEl: HTMLElement, options: {
+    setting: string;
+    name: string;
+    description: string;
+    defaultValue: string;
+    placeholder: string;
+    initialValue: string | null | undefined;
+  }): HTMLInputElement {
+    const controlEl = this.createFieldShell(containerEl, {
+      name: options.name,
+      description: options.description,
+      defaultValue: options.defaultValue,
+    });
+
+    const inputEl = controlEl.createEl('input', {
+      cls: 'opencodian-session-settings-text-input',
+      attr: {
+        type: 'text',
+        placeholder: options.placeholder,
+        'data-setting': options.setting,
+      },
+    });
+    inputEl.value = typeof options.initialValue === 'string'
+      ? options.initialValue
+      : '';
+
+    return inputEl;
+  }
+
+  private createTextareaField(containerEl: HTMLElement, options: {
+    setting: string;
+    name: string;
+    description: string;
+    defaultValue: string;
+    placeholder: string;
+    initialValue: string[] | null | undefined;
+  }): HTMLTextAreaElement {
+    const controlEl = this.createFieldShell(containerEl, {
+      name: options.name,
+      description: options.description,
+      defaultValue: options.defaultValue,
+    });
+
+    const textareaEl = controlEl.createEl('textarea', {
+      cls: 'opencodian-session-settings-textarea-input',
+      attr: {
+        placeholder: options.placeholder,
+        'data-setting': options.setting,
+        rows: '3',
+      },
+    });
+    textareaEl.value = Array.isArray(options.initialValue)
+      ? options.initialValue.join('\n')
+      : '';
+
+    return textareaEl;
+  }
+
+  private createCodexModelOverrideField(containerEl: HTMLElement, options: {
+    setting: string;
+    name: string;
+    description: string;
+    defaultValue: string;
+    initialValue: string | null | undefined;
+    models: CodexModelSummary[];
+  }): HTMLSelectElement {
+    const controlEl = this.createFieldShell(containerEl, {
+      name: options.name,
+      description: options.description,
+      defaultValue: options.defaultValue,
+    });
+
+    const selectEl = controlEl.createEl('select', {
+      cls: 'opencodian-session-settings-dropdown',
+      attr: {
+        'data-setting': options.setting,
+      },
+    });
+
+    selectEl.createEl('option', {
+      text: t('chat.sessionSettings.modal.codexInherit'),
+      attr: { value: '' },
+    });
+
+    for (const model of options.models) {
+      selectEl.createEl('option', {
+        text: model.display_name || model.slug,
+        attr: { value: model.slug },
+      });
+    }
+
+    selectEl.createEl('option', {
+      text: t('settings.codex.model.customOption'),
+      attr: { value: '__custom__' },
+    });
+
+    const customInputEl = controlEl.createEl('input', {
+      cls: 'opencodian-session-settings-text-input',
+      attr: {
+        type: 'text',
+        placeholder: t('settings.codex.model.customPlaceholder'),
+        'data-setting': `${options.setting}-custom`,
+      },
+    });
+    customInputEl.style.display = 'none';
+    this.codexModelOverrideCustomInputEl = customInputEl;
+
+    const initialValue = options.initialValue ?? '';
+    const isKnownModel = options.models.some((m) => m.slug === initialValue);
+
+    if (initialValue.length === 0) {
+      selectEl.value = '';
+      customInputEl.value = '';
+      customInputEl.style.display = 'none';
+    } else if (isKnownModel) {
+      selectEl.value = initialValue;
+      customInputEl.value = '';
+      customInputEl.style.display = 'none';
+    } else {
+      selectEl.value = '__custom__';
+      customInputEl.value = initialValue;
+      customInputEl.style.display = 'block';
+    }
+
+    selectEl.addEventListener('change', () => {
+      if (selectEl.value === '__custom__') {
+        customInputEl.style.display = 'block';
+        customInputEl.focus();
+      } else {
+        customInputEl.style.display = 'none';
+        customInputEl.value = '';
+      }
+    });
+
+    return selectEl;
+  }
+
+  private createCodexSection(bodyEl: HTMLElement): void {
+    if (!this.options.showCodexControls) {
+      return;
+    }
+
+    const defaults = this.options.defaults;
+    if (!defaults.codexSandboxMode || !defaults.codexModelReasoningEffort) {
+      return;
+    }
+
+    const codexSectionEl = this.createSection(bodyEl, {
+      section: 'codex',
+      title: t('chat.sessionSettings.modal.codexGroup'),
+      description: t('chat.sessionSettings.modal.codexGroupDesc'),
+    });
+
+    codexSectionEl.createDiv({
+      cls: 'opencodian-session-settings-codex-boundary-hint',
+      text: t('chat.sessionSettings.modal.codexBoundaryHint'),
+    });
+
+    this.codexModelOverrideSelectEl = this.createCodexModelOverrideField(codexSectionEl, {
+      setting: 'codex-model-override',
+      name: t('chat.sessionSettings.modal.codexModelOverride'),
+      description: t('chat.sessionSettings.modal.codexModelOverrideDesc'),
+      defaultValue: defaults.codexModelOverride || t('chat.sessionSettings.modal.codexModelOverrideEmpty'),
+      initialValue: this.options.initialOverrides?.codexModelOverride,
+      models: defaults.codexAvailableModels ?? [],
+    });
+
+    this.codexAdditionalDirectoriesTextareaEl = this.createTextareaField(codexSectionEl, {
+      setting: 'codex-additional-directories',
+      name: t('chat.sessionSettings.modal.codexAdditionalDirectories'),
+      description: t('chat.sessionSettings.modal.codexAdditionalDirectoriesDesc'),
+      defaultValue: defaults.codexAdditionalDirectories?.join('\n') || t('chat.sessionSettings.modal.codexAdditionalDirectoriesEmpty'),
+      placeholder: t('settings.codex.additionalDirs.placeholder'),
+      initialValue: this.options.initialOverrides?.codexAdditionalDirectories,
+    });
+
+    this.sandboxModeSelectEl = this.createDropdownField(codexSectionEl, {
+      setting: 'codex-sandbox-mode',
+      name: t('chat.sessionSettings.modal.codexSandboxMode'),
+      description: t('chat.sessionSettings.modal.codexSandboxModeDesc'),
+      defaultValue: this.sandboxModeLabel(defaults.codexSandboxMode),
+      choices: [
+        { value: 'read-only', label: t('settings.codex.sandbox.readOnly') },
+        { value: 'workspace-write', label: t('settings.codex.sandbox.workspaceWrite') },
+        { value: 'danger-full-access', label: t('settings.codex.sandbox.dangerFullAccess') },
+      ],
+      initialValue: this.options.initialOverrides?.codexSandboxMode,
+    });
+
+    this.reasoningEffortSelectEl = this.createDropdownField(codexSectionEl, {
+      setting: 'codex-reasoning-effort',
+      name: t('chat.sessionSettings.modal.codexReasoningEffort'),
+      description: t('chat.sessionSettings.modal.codexReasoningEffortDesc'),
+      defaultValue: this.effortLabel(defaults.codexModelReasoningEffort),
+      choices: [
+        { value: 'minimal', label: t('settings.codex.reasoning.minimal') },
+        { value: 'low', label: t('settings.codex.reasoning.low') },
+        { value: 'medium', label: t('settings.codex.reasoning.medium') },
+        { value: 'high', label: t('settings.codex.reasoning.high') },
+        { value: 'xhigh', label: t('settings.codex.reasoning.xhigh') },
+      ],
+      initialValue: this.options.initialOverrides?.codexModelReasoningEffort,
+    });
+
+    this.codexNetworkAccessEnabledSelectEl = this.createDropdownField(codexSectionEl, {
+      setting: 'codex-network-access-enabled',
+      name: t('chat.sessionSettings.modal.codexNetworkAccessEnabled'),
+      description: t('chat.sessionSettings.modal.codexNetworkAccessEnabledDesc'),
+      defaultValue: defaults.codexNetworkAccessEnabled === true
+        ? t('chat.sessionSettings.modal.codexNetworkAccessEnabledOn')
+        : t('chat.sessionSettings.modal.codexNetworkAccessEnabledOff'),
+      choices: [
+        { value: 'true', label: t('chat.sessionSettings.modal.codexNetworkAccessEnabledOn') },
+        { value: 'false', label: t('chat.sessionSettings.modal.codexNetworkAccessEnabledOff') },
+      ],
+      initialValue: this.options.initialOverrides?.codexNetworkAccessEnabled === true
+        ? 'true'
+        : this.options.initialOverrides?.codexNetworkAccessEnabled === false
+          ? 'false'
+          : '',
+    });
+
+    this.codexWebSearchModeSelectEl = this.createDropdownField(codexSectionEl, {
+      setting: 'codex-web-search-mode',
+      name: t('chat.sessionSettings.modal.codexWebSearchMode'),
+      description: t('chat.sessionSettings.modal.codexWebSearchModeDesc'),
+      defaultValue: this.webSearchModeLabel(defaults.codexWebSearchMode ?? 'cached'),
+      choices: [
+        { value: 'disabled', label: t('settings.codex.webSearch.disabled') },
+        { value: 'cached', label: t('settings.codex.webSearch.cached') },
+        { value: 'live', label: t('settings.codex.webSearch.live') },
+      ],
+      initialValue: this.options.initialOverrides?.codexWebSearchMode,
+    });
+
+    this.createCodexGoalSection(codexSectionEl);
+    this.createCodexReviewSection(codexSectionEl);
+  }
+
+  private createCodexGoalSection(parentEl: HTMLElement): void {
+    const goal = this.options.defaults.codexThreadGoal;
+
+    const shellEl = parentEl.createDiv({ cls: 'opencodian-session-settings-codex-goal-shell' });
+
+    const fieldEl = shellEl.createDiv({ cls: 'opencodian-session-settings-field' });
+    const infoEl = fieldEl.createDiv({ cls: 'opencodian-session-settings-field-info' });
+    infoEl.createEl('label', {
+      cls: 'opencodian-session-settings-field-label',
+      text: t('chat.sessionSettings.modal.codexThreadGoal'),
+    });
+    infoEl.createDiv({
+      cls: 'opencodian-session-settings-field-description',
+      text: t('chat.sessionSettings.modal.codexThreadGoalDesc'),
+    });
+
+    this.codexGoalReadbackEl = shellEl.createDiv({ cls: 'opencodian-session-settings-codex-goal-readback' });
+
+    if (goal) {
+      this.renderGoalReadback(goal);
+    } else {
+      this.codexGoalReadbackEl.style.display = 'none';
+      this.codexGoalEmptyEl = shellEl.createDiv({
+        cls: 'opencodian-session-settings-codex-goal-empty',
+        text: t('chat.sessionSettings.modal.codexGoalNone'),
+      });
+      this.codexGoalEmptyEl.setAttribute('data-codex-thread-goal', 'empty');
+    }
+
+    this.codexGoalShellEl = shellEl;
+    if (goal && this.options.onClearThreadGoal) {
+      this.ensureClearGoalButton();
+    }
+
+    if (this.options.onSetThreadGoal) {
+      const setInputShell = shellEl.createDiv({ cls: 'opencodian-session-settings-codex-goal-set' });
+      const inputEl = setInputShell.createEl('input', {
+        type: 'text',
+        cls: 'opencodian-session-settings-codex-goal-input',
+        placeholder: t('chat.sessionSettings.modal.codexGoalSetPlaceholder'),
+      });
+      const budgetInputEl = setInputShell.createEl('input', {
+        type: 'number',
+        cls: 'opencodian-session-settings-codex-goal-budget-input',
+        placeholder: t('chat.sessionSettings.modal.codexGoalBudgetPlaceholder'),
+        attr: { min: '0' },
+      });
+      const setBtn = setInputShell.createEl('button', {
+        cls: 'opencodian-session-settings-codex-goal-set-btn',
+        text: t('chat.sessionSettings.modal.codexGoalSet'),
+      });
+      setBtn.addEventListener('click', async () => {
+        const objective = inputEl.value.trim();
+        if (!objective) return;
+        setBtn.disabled = true;
+        const budgetRaw = budgetInputEl.value.trim();
+        const budget = budgetRaw !== '' ? Number(budgetRaw) : undefined;
+        const result = await this.options.onSetThreadGoal!(objective, budget !== undefined && !isNaN(budget) && budget > 0 ? { tokenBudget: budget } : undefined);
+        setBtn.disabled = false;
+        if (result && this.codexGoalReadbackEl) {
+          this.renderGoalReadback(result);
+          this.codexGoalReadbackEl.style.display = '';
+          if (this.codexGoalEmptyEl) {
+            this.codexGoalEmptyEl.remove();
+            this.codexGoalEmptyEl = null;
+          }
+          this.ensureClearGoalButton();
+        }
+        inputEl.value = '';
+        budgetInputEl.value = '';
+      });
+    }
+  }
+
+  private ensureClearGoalButton(): void {
+    if (!this.options.onClearThreadGoal || !this.codexGoalShellEl) return;
+    if (this.codexGoalClearBtnEl) return;
+    const btn = this.codexGoalShellEl.createEl('button', {
+      cls: 'opencodian-session-settings-codex-goal-clear-btn',
+      text: t('chat.sessionSettings.modal.codexGoalClear'),
+    });
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      const cleared = await this.options.onClearThreadGoal!();
+      if (cleared && this.codexGoalReadbackEl) {
+        this.codexGoalReadbackEl.style.display = 'none';
+        this.codexGoalReadbackEl.empty();
+      }
+      btn.remove();
+      this.codexGoalClearBtnEl = null;
+      if (!this.codexGoalEmptyEl && this.codexGoalShellEl) {
+        this.codexGoalEmptyEl = this.codexGoalShellEl.createDiv({
+          cls: 'opencodian-session-settings-codex-goal-empty',
+          text: t('chat.sessionSettings.modal.codexGoalNone'),
+        });
+        this.codexGoalEmptyEl.setAttribute('data-codex-thread-goal', 'empty');
+      }
+      btn.disabled = false;
+    });
+    this.codexGoalClearBtnEl = btn;
+  }
+
+  private createCodexReviewSection(parentEl: HTMLElement): void {
+    if (!this.options.onStartReview) {
+      return;
+    }
+
+    const shellEl = parentEl.createDiv({
+      cls: 'opencodian-session-settings-codex-review-shell',
+      attr: { 'data-codex-review-section': 'true' },
+    });
+
+    const fieldEl = shellEl.createDiv({ cls: 'opencodian-session-settings-field' });
+    const infoEl = fieldEl.createDiv({ cls: 'opencodian-session-settings-field-info' });
+    infoEl.createEl('label', {
+      cls: 'opencodian-session-settings-field-label',
+      text: t('chat.sessionSettings.modal.codexReview'),
+    });
+    infoEl.createDiv({
+      cls: 'opencodian-session-settings-field-description',
+      text: t('chat.sessionSettings.modal.codexReviewDesc'),
+    });
+
+    const controlsEl = shellEl.createDiv({ cls: 'opencodian-session-settings-codex-review-controls' });
+
+    const targetSelect = controlsEl.createEl('select', {
+      cls: 'opencodian-session-settings-codex-review-target dropdown',
+      attr: { 'data-codex-review-target': 'true' },
+    });
+    targetSelect.add(new Option(t('chat.sessionSettings.modal.codexReviewTargetUncommitted'), 'uncommittedChanges'));
+    targetSelect.add(new Option(t('chat.sessionSettings.modal.codexReviewTargetBaseBranch'), 'baseBranch'));
+    targetSelect.add(new Option(t('chat.sessionSettings.modal.codexReviewTargetCommit'), 'commit'));
+    targetSelect.add(new Option(t('chat.sessionSettings.modal.codexReviewTargetCustom'), 'custom'));
+
+    const paramInput = controlsEl.createEl('input', {
+      cls: 'opencodian-session-settings-codex-review-param',
+      attr: {
+        type: 'text',
+        placeholder: t('chat.sessionSettings.modal.codexReviewParamPlaceholder'),
+        'data-codex-review-param': 'true',
+      },
+    });
+    paramInput.style.display = 'none';
+
+    targetSelect.addEventListener('change', () => {
+      paramInput.style.display = targetSelect.value === 'uncommittedChanges' ? 'none' : '';
+      const ph = targetSelect.value === 'baseBranch'
+        ? t('chat.sessionSettings.modal.codexReviewParamBranch')
+        : targetSelect.value === 'commit'
+          ? t('chat.sessionSettings.modal.codexReviewParamCommit')
+          : t('chat.sessionSettings.modal.codexReviewParamCustom');
+      paramInput.placeholder = ph;
+    });
+
+    const startBtn = controlsEl.createEl('button', {
+      cls: 'opencodian-session-settings-codex-review-btn',
+      attr: { 'data-codex-review-start': 'true' },
+      text: t('chat.sessionSettings.modal.codexReviewStart'),
+    });
+
+    this.codexReviewStatusEl = shellEl.createDiv({
+      cls: 'opencodian-session-settings-codex-review-status',
+      attr: { 'data-codex-review-status': 'idle' },
+    });
+
+    startBtn.addEventListener('click', async () => {
+      const targetType = targetSelect.value as AppServerReviewTarget['type'];
+      const paramValue = paramInput.value.trim();
+      let target: AppServerReviewTarget;
+      switch (targetType) {
+        case 'uncommittedChanges':
+          target = { type: 'uncommittedChanges' };
+          break;
+        case 'baseBranch':
+          target = { type: 'baseBranch', branch: paramValue || 'main' };
+          break;
+        case 'commit':
+          target = { type: 'commit', sha: paramValue || 'HEAD' };
+          break;
+        case 'custom':
+          target = { type: 'custom', instructions: paramValue || 'Review changes' };
+          break;
+      }
+      startBtn.disabled = true;
+      this.updateReviewStatus('in_progress');
+      try {
+        const result = await this.options.onStartReview!(target);
+        if (result?.turn) {
+          const normalized = this.normalizeReviewStatus(result.turn.status);
+          const errorMsg = result.turn.error
+            ?? (result.reviewMessages?.length ? undefined : undefined);
+          this.updateReviewStatus(normalized, errorMsg);
+        } else {
+          this.updateReviewStatus('error', t('chat.sessionSettings.modal.codexReviewFailed'));
+        }
+      } catch (err) {
+        this.updateReviewStatus('error', err instanceof Error ? err.message : String(err));
+      } finally {
+        startBtn.disabled = false;
+      }
+    });
+  }
+
+  /**
+   * Normalize app-server turn status strings (camelCase) into the internal
+   * status vocabulary used by `updateReviewStatus` (snake_case).
+   *
+   * The app-server returns `inProgress` for the synchronous response; after
+   * waiting for `turn/completed`, the status is `completed` or `interrupted`.
+   * Unknown values map to `error` as a safe default.
+   */
+  private normalizeReviewStatus(appServerStatus: string | undefined): string {
+    if (!appServerStatus) return 'error';
+    switch (appServerStatus) {
+      case 'inProgress': return 'in_progress';
+      case 'completed': return 'completed';
+      case 'interrupted': return 'interrupted';
+      default: return 'error';
+    }
+  }
+
+  private updateReviewStatus(status: string, errorMessage?: string | null): void {
+    if (!this.codexReviewStatusEl) return;
+    this.codexReviewStatusEl.setAttribute('data-codex-review-status', status);
+    const labelKey = status === 'in_progress'
+      ? 'chat.sessionSettings.modal.codexReviewInProgress'
+      : status === 'completed'
+        ? 'chat.sessionSettings.modal.codexReviewCompleted'
+        : status === 'interrupted'
+          ? 'chat.sessionSettings.modal.codexReviewInterrupted'
+          : 'chat.sessionSettings.modal.codexReviewFailed';
+    let text = t(labelKey);
+    if (errorMessage) {
+      text += `: ${errorMessage}`;
+    }
+    this.codexReviewStatusEl.setText(text);
+  }
+
+  private renderGoalReadback(goal: AppServerThreadGoal): void {
+    if (!this.codexGoalReadbackEl) return;
+    this.codexGoalReadbackEl.empty();
+    this.codexGoalReadbackEl.setAttribute('data-proof-state', 'readback');
+    this.codexGoalReadbackEl.setAttribute('data-codex-thread-goal', 'true');
+
+    const objectiveEl = this.codexGoalReadbackEl.createDiv({ cls: 'opencodian-session-settings-codex-goal-objective' });
+    const truncated = goal.objective.length > 200 ? goal.objective.slice(0, 200) + '…' : goal.objective;
+    objectiveEl.setText(truncated);
+
+    const metaEl = this.codexGoalReadbackEl.createDiv({ cls: 'opencodian-session-settings-codex-goal-meta' });
+    const statusLabel = t(`chat.sessionSettings.modal.codexGoalStatus.${goal.status}`) || goal.status;
+    const parts: string[] = [
+      `${t('chat.sessionSettings.modal.codexGoalStatus.label')}: ${statusLabel}`,
+      `${t('chat.sessionSettings.modal.codexGoalTokens')}: ${goal.tokensUsed.toLocaleString()}`,
+      `${t('chat.sessionSettings.modal.codexGoalTime')}: ${this.formatGoalDuration(goal.timeUsedSeconds)}`,
+    ];
+    if (goal.tokenBudget !== null) {
+      parts.push(`${t('chat.sessionSettings.modal.codexGoalBudget')}: ${goal.tokensUsed.toLocaleString()} / ${goal.tokenBudget.toLocaleString()}`);
+    }
+    metaEl.setText(parts.join(' · '));
+  }
+
+  private formatGoalDuration(seconds: number): string {
+    if (seconds < 60) return `${seconds}s`;
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    if (mins < 60) return `${mins}m ${secs}s`;
+    const hours = Math.floor(mins / 60);
+    const remMins = mins % 60;
+    return `${hours}h ${remMins}m`;
+  }
+
+  private sandboxModeLabel(mode: CodexSandboxMode): string {
+    switch (mode) {
+      case 'read-only': return t('settings.codex.sandbox.readOnly');
+      case 'workspace-write': return t('settings.codex.sandbox.workspaceWrite');
+      case 'danger-full-access': return t('settings.codex.sandbox.dangerFullAccess');
+    }
+  }
+
+  private effortLabel(effort: CodexReasoningEffort): string {
+    switch (effort) {
+      case 'minimal': return t('settings.codex.reasoning.minimal');
+      case 'low': return t('settings.codex.reasoning.low');
+      case 'medium': return t('settings.codex.reasoning.medium');
+      case 'high': return t('settings.codex.reasoning.high');
+      case 'xhigh': return t('settings.codex.reasoning.xhigh');
+    }
+  }
+
+  private webSearchModeLabel(mode: CodexWebSearchMode): string {
+    switch (mode) {
+      case 'disabled': return t('settings.codex.webSearch.disabled');
+      case 'cached': return t('settings.codex.webSearch.cached');
+      case 'live': return t('settings.codex.webSearch.live');
+    }
   }
 
   private createSharingSection(containerEl: HTMLElement): void {
@@ -769,9 +1389,66 @@ export class ConversationSessionSettingsModal extends Modal {
       overrides.chatFontSizePx = null;
     }
 
+    if (this.options.showCodexControls) {
+      this.buildCodexOverrides(overrides);
+    }
+
     return Object.values(overrides).every((value) => value === null)
       ? undefined
       : overrides;
+  }
+
+  private buildCodexOverrides(overrides: ConversationSessionSettings): void {
+    const sandboxModeValue = this.sandboxModeSelectEl?.value ?? '';
+    if (sandboxModeValue.length > 0) {
+      overrides.codexSandboxMode = sandboxModeValue as CodexSandboxMode;
+    } else {
+      overrides.codexSandboxMode = null;
+    }
+
+    const effortValue = this.reasoningEffortSelectEl?.value ?? '';
+    if (effortValue.length > 0) {
+      overrides.codexModelReasoningEffort = effortValue as CodexReasoningEffort;
+    } else {
+      overrides.codexModelReasoningEffort = null;
+    }
+
+    const modelOverrideSelectValue = this.codexModelOverrideSelectEl?.value ?? '';
+    if (modelOverrideSelectValue === '__custom__') {
+      const customValue = this.codexModelOverrideCustomInputEl?.value?.trim() ?? '';
+      overrides.codexModelOverride = customValue.length > 0 ? customValue : null;
+    } else if (modelOverrideSelectValue.length > 0) {
+      overrides.codexModelOverride = modelOverrideSelectValue;
+    } else {
+      overrides.codexModelOverride = null;
+    }
+
+    const additionalDirsValue = this.codexAdditionalDirectoriesTextareaEl?.value ?? '';
+    const additionalDirs = additionalDirsValue
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0);
+    if (additionalDirs.length > 0) {
+      overrides.codexAdditionalDirectories = additionalDirs;
+    } else {
+      overrides.codexAdditionalDirectories = null;
+    }
+
+    const networkAccessValue = this.codexNetworkAccessEnabledSelectEl?.value ?? '';
+    if (networkAccessValue === 'true') {
+      overrides.codexNetworkAccessEnabled = true;
+    } else if (networkAccessValue === 'false') {
+      overrides.codexNetworkAccessEnabled = false;
+    } else {
+      overrides.codexNetworkAccessEnabled = null;
+    }
+
+    const webSearchValue = this.codexWebSearchModeSelectEl?.value ?? '';
+    if (webSearchValue.length > 0) {
+      overrides.codexWebSearchMode = webSearchValue as CodexWebSearchMode;
+    } else {
+      overrides.codexWebSearchMode = null;
+    }
   }
 
   private setBusy(isBusy: boolean): void {

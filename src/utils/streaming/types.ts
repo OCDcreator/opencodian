@@ -173,6 +173,9 @@ export interface ToolRendererOptions {
   renderExpandedContent?: (container: HTMLElement, toolName: string, result: string | undefined) => void;
   onCollapsibleToggle?: () => void;
   onOpenToolSession?: (sessionId: string, toolCall: ToolCallInfo) => void;
+  onOpenMcpServerDetail?: (serverName: string) => void;
+  onAuthenticateMcpServer?: (serverName: string) => void;
+  onRetryMcpToolCall?: (toolCall: ToolCallInfo) => void;
 }
 
 // ============================================

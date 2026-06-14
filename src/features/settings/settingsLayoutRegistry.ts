@@ -52,6 +52,16 @@ export const SETTINGS_PRIMARY_TABS: SettingsPrimaryTabDefinition[] = [
     ],
   },
   {
+    id: 'codex',
+    labelKey: 'settings.codex.title',
+    icon: 'code',
+    defaultSecondaryTabId: 'connection',
+    backendRequired: 'codex',
+    secondaryTabs: [
+      { id: 'connection', labelKey: 'settings.codex.tab.connection' },
+    ],
+  },
+  {
     id: 'server',
     labelKey: 'settings.server.title',
     icon: 'server',

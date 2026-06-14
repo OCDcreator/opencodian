@@ -142,6 +142,39 @@ describe('StreamChunkRouter structured output capture', () => {
   });
 });
 
+describe('StreamChunkRouter stream validation', () => {
+  it('handles non-async-iterable stream by returning error result', async () => {
+    const host = createHost();
+    const runtime: SendPipelineTabRuntime = {
+      isStreaming: true,
+      streamingMessageEl: null,
+      streamingContentEl: null,
+      pendingEditedFiles: new Set(),
+      pendingQuestionResolution: null,
+      isConversationSyncInFlight: false,
+    };
+    const streamController: SendPipelineStreamController = {
+      startStream: jest.fn(),
+      handleChunk: jest.fn().mockResolvedValue(undefined),
+      cancelStream: jest.fn(),
+      getContentBlocks: jest.fn(() => []),
+    };
+
+    const router = new StreamChunkRouter({
+      host,
+      preparedSend: createPreparedSend(),
+      runtime,
+      stream: {} as AsyncGenerator<never>,
+      streamController,
+      contentEl: document.body.createDiv(),
+    });
+
+    const result = await router.consume();
+    expect(result.latestErrorMessage).toContain('Stream is not async iterable');
+    expect(result.streamCompleted).toBe(false);
+  });
+});
+
 describe('StreamChunkRouter timeout handling', () => {
   beforeEach(() => {
     jest.useFakeTimers();

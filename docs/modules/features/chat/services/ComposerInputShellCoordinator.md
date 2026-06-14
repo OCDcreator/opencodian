@@ -17,7 +17,7 @@
 - 在输入以 `/` 开头且光标仍停留在 command token 内时，把 slash autocomplete session 委托给 `SlashCommandMenuCoordinator`；`/skills <query>` 是允许继续显示 nested skill suggestions 的特殊前缀；加载中、无命令、无匹配或加载失败时保持可见状态提示，避免静默消失
 - 在 prompt mode 下把 `@agent` 查询交给 `AgentMentionComposerController`，选中后保留可见 `@name` 文本，并在 submit 时附加 `SurfaceInvocationIntent.mentions`
 - 在 toolbar slot 内挂载 `ChatAgentSelectionCoordinator`，提供 OpenCode default / primary agent 下拉框；提交 prompt 时把该 composer 级选择附加为 `SurfaceInvocationIntent.primaryAgent`，选中后把焦点还给 textarea
-- 统一处理 submit gate、send/stop affordance 和 add-context 按钮事件
+- 统一处理 submit gate、send/stop affordance、add-context 按钮事件，以及 capability-gated 的图片附件按钮事件
 - 通过 `ResizeObserver` + `requestAnimationFrame` 维护 composer stack height，并触发 settled scroll
 - 把 selection controls/context-usage/effort/modified-files toggle 这些既有子控件挂到稳定的 toolbar slot
 - 暴露 `refreshToolbarControls()`，允许 backend/capability 切换后只重挂 toolbar 子控件并同步刷新 capability hint，而不重建 textarea、context row 或 footer
@@ -58,6 +58,8 @@ export interface ComposerInputShellCoordinatorHost {
   };
   /** Backend-specific capability chip rendered near the send action (null = no hint). */
   getComposerCapabilityHint?(): { text: string; tooltip?: string; insertText?: string } | null;
+  /** Whether the active backend supports image input. */
+  hasImageInputCapability?(): boolean;
 }
 
 export class ComposerInputShellCoordinator {
@@ -90,7 +92,7 @@ export class ComposerInputShellCoordinator {
 - `applyLocaleTexts()` 刷新 placeholder overlay 文本、add-context tooltip 和 send/stop tooltip；textarea 不再设置 `aria-label`，避免在 Obsidian Electron 中产生多余的原生 hover tooltip
 - `updateSendButtonState()` 根据 streaming state 切换 send/stop icon 与 class
 - `updateComposerAvailabilityState()` 只消费 host 给出的高层 surface 状态，不直接判断 backend / service；这样“无 backend”和“backend offline”的运行时所有权仍留在 `OpenCodianView`
-- `renderCapabilityHint()` 向 host 查询可选的 `getComposerCapabilityHint()`，若返回非 null 结果则把 `.opencodian-input-capability-hint` 作为 footer trailing chip 插到 send 按钮左侧，并在 `build()`、`applyLocaleTexts()` 与 availability refresh 时刷新；若结果为 null 则移除该 element。host 可选返回 `insertText`，使 hint 变成可点击插入 affordance，而不是单纯文案。当前唯一 fallback hint 是 Claude Code backend 的 structured-output chip：对用户展示为“结构化回复”，tooltip 会解释“固定结构返回结果、便于复制到其他工具、点击不会自动发送”，点击后底层仍只向 textarea 前置 `/json `，结构上不污染 OpenCode-only 路径，也不暗示任意 schema authoring
+- `renderCapabilityHint()` 向 host 查询可选的 `getComposerCapabilityHint()`，若返回非 null 结果则把 `.opencodian-input-capability-hint` 作为 footer trailing chip 插到 send 按钮左侧，并在 `build()`、`applyLocaleTexts()` 与 availability refresh 时刷新；若结果为 null 则移除该 element。host 可选返回 `insertText`，使 hint 变成可点击插入 affordance，而不是单纯文案。当前 fallback hint 是 Claude Code 和 Codex backend 共用的 structured-output chip（OpenCode 不显示）：对用户展示为“结构化回复”，tooltip 会解释“固定结构返回结果、便于复制到其他工具、点击不会自动发送”，点击后底层仍只向 textarea 前置 `/json `，结构上不污染 OpenCode-only 路径，也不暗示任意 schema authoring
 - `refreshSlashCommandMenu()` 只负责调用 `SlashCommandMenuCoordinator.refresh()`；菜单 coordinator 每次 slash query 刷新都会向 host 读取 merged visible menu items，再通过 `slashCommandMenuFilter.ts` 本地过滤。host 背后的 `SlashCommandMenuCatalogCache` 继续负责 TTL / pending promise / hidden-command cache key，因此设置页隐藏命令或切换 skill 模式后不会被 composer 层旧数组挡住，也不会每次按键直接打 SDK
 - slash catalog 首次异步加载完成后，coordinator 会重新执行一次 backdrop 高亮同步，这样输入中的已知 slash item 能在 catalog 到位后立即着色，而未知 token 会自动退回普通文本
 - `SlashCommandMenuCoordinator` 会把 `getSlashCommandSkillMode()` 传给过滤 helper；direct mode 直接展示 skill，prefixed mode 则顶层展示 `/skills` 并在 `/skills <query>` 下展示 nested skill suggestions

@@ -1,7 +1,7 @@
 # Agent 生态调研
 
 > **状态**: `[DRAFT]`
-> **最后更新**: 2026-05-20
+> **最后更新**: 2026-06-09（Codex 接口模式和审批策略值修正）
 
 ## 概述
 
@@ -124,16 +124,14 @@ const message = await query({
 ### 关键接口模式
 
 ```typescript
-import { runStreamed } from '@openai/codex-sdk';
+import { Codex } from '@openai/codex-sdk';
 
-const stream = await runStreamed({
-  prompt: "Fix the bug in auth.ts",
-  model: 'codex-mini',
-  approvalPolicy: 'suggest', // 'full-auto' | 'auto-edit' | 'suggest'
-});
+const codex = new Codex({ apiKey: 'sk-...' });
+const thread = codex.startThread({ model: 'o3' });
 
-for await (const event of stream) {
-  // event types: message, tool_call, tool_output, etc.
+const turn = await thread.runStreamed("Fix the bug in auth.ts");
+for await (const event of turn.events) {
+  // event types: thread.started, turn.started, item.started/updated/completed, turn.completed, turn.failed, error
 }
 ```
 
@@ -266,7 +264,7 @@ Pi:           [Plugin] --direct function calls--> [Agent Loop] --HTTPS--> [Multi
 
 5. **权限模型差异大**：
    - Claude: approval callbacks + hooks
-   - Codex: approvalPolicy (full-auto/auto-edit/suggest)
+   - Codex: approvalPolicy — SDK enum `ApprovalMode = "never" | "on-request" | "on-failure" | "untrusted"`（注意：旧文档引用的 `full-auto/auto-edit/suggest` 是错误的，实际值完全不同）
    - Copilot: onPermissionRequest callback
    - Pi: 未确认
 

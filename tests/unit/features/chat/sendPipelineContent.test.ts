@@ -87,8 +87,13 @@ describe('extractStructuredOutputDuplicateText', () => {
     expect(extractStructuredOutputDuplicateText(undefined)).toBeNull();
   });
 
-  it('returns null when structured output has no response field', () => {
-    expect(extractStructuredOutputDuplicateText({ tags: ['a'] })).toBeNull();
+  it('returns JSON.stringify for whole-object pattern (Codex)', () => {
+    expect(extractStructuredOutputDuplicateText({ tags: ['a'] })).toBe('{"tags":["a"]}');
+  });
+
+  it('returns JSON.stringify for Codex fixed-schema whole object', () => {
+    const structured = { greeting: 'hello', tags: ['a'], confidence: 0.8 };
+    expect(extractStructuredOutputDuplicateText(structured)).toBe('{"greeting":"hello","tags":["a"],"confidence":0.8}');
   });
 
   it('returns null when response is not a string', () => {
@@ -119,6 +124,21 @@ describe('isDuplicateStructuredOutputText', () => {
 
   it('does not match when structured output is undefined', () => {
     expect(isDuplicateStructuredOutputText('{"greeting": "hello"}', undefined)).toBe(false);
+  });
+
+  it('matches Codex whole-object JSON duplicate', () => {
+    const structured = { greeting: 'hello', tags: ['a'], confidence: 0.8 };
+    expect(isDuplicateStructuredOutputText('{"greeting":"hello","tags":["a"],"confidence":0.8}', structured)).toBe(true);
+  });
+
+  it('matches Codex whole-object JSON with formatting differences', () => {
+    const structured = { greeting: 'hello', tags: ['a'], confidence: 0.8 };
+    expect(isDuplicateStructuredOutputText('{"greeting": "hello", "tags": ["a"], "confidence": 0.8}', structured)).toBe(true);
+  });
+
+  it('does not match different Codex whole-object JSON', () => {
+    const structured = { greeting: 'hello', tags: ['a'], confidence: 0.8 };
+    expect(isDuplicateStructuredOutputText('{"greeting":"goodbye","tags":["a"],"confidence":0.8}', structured)).toBe(false);
   });
 });
 
@@ -194,6 +214,18 @@ describe('filterDuplicateStructuredOutputTextBlocks', () => {
       { type: 'text' as const, content: 'Hello' },
     ];
     expect(filterDuplicateStructuredOutputTextBlocks(blocks, undefined)).toEqual(blocks);
+  });
+
+  it('removes Codex whole-object JSON duplicate text block', () => {
+    const blocks = [
+      { type: 'text' as const, content: 'Hello' },
+      { type: 'text' as const, content: '{"greeting":"hello","tags":["a"],"confidence":0.8}' },
+    ];
+    const structured = { greeting: 'hello', tags: ['a'], confidence: 0.8 };
+    const result = filterDuplicateStructuredOutputTextBlocks(blocks, structured);
+    expect(result).toEqual([
+      { type: 'text', content: 'Hello' },
+    ]);
   });
 });
 
@@ -278,5 +310,17 @@ describe('filterDuplicateStructuredOutputContentBlocks', () => {
     const structured = { response: '```json\n{"greeting": "hello"}\n```' };
     const result = filterDuplicateStructuredOutputContentBlocks(blocks, structured);
     expect(result).toEqual([]);
+  });
+
+  it('removes Codex whole-object JSON duplicate content block', () => {
+    const blocks = [
+      { type: 'text' as const, text: 'Hello' },
+      { type: 'text' as const, text: '{"greeting":"hello","tags":["a"],"confidence":0.8}' },
+    ];
+    const structured = { greeting: 'hello', tags: ['a'], confidence: 0.8 };
+    const result = filterDuplicateStructuredOutputContentBlocks(blocks, structured);
+    expect(result).toEqual([
+      { type: 'text', text: 'Hello' },
+    ]);
   });
 });

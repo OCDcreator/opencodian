@@ -51,7 +51,18 @@ export class StreamChunkRouter {
     this.startStreamingUi();
 
     try {
-      for await (const chunk of this.options.stream) {
+      const stream = this.options.stream;
+      if (!stream || typeof stream[Symbol.asyncIterator] !== 'function') {
+        logger.error('Stream is not async iterable', {
+          streamType: typeof stream,
+          streamConstructor: stream?.constructor?.name ?? 'N/A',
+          hasAsyncIterator: typeof stream?.[Symbol.asyncIterator],
+          streamString: String(stream),
+        });
+        throw new TypeError(`Stream is not async iterable (type: ${typeof stream})`);
+      }
+
+      for await (const chunk of stream) {
         this.trace.noteRawChunk(chunk);
         if (!this.options.runtime.isStreaming) {
           logger.debug('Streaming cancelled, breaking loop');

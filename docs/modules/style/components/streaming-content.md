@@ -11,6 +11,10 @@
 
 - `.streaming-thinking-*`：思考区标题、正文、展开态。
 - `.streaming-tool-*`：工具调用头部、状态图标、输出行、截断提示。
+- `.streaming-tool-server-chip`：MCP 工具块头部显示的服务器名 chip（仅 `kind: 'mcp'` 且 `toolMetadata.server` 存在时渲染）。
+- `.streaming-tool-auth-btn`：MCP 认证失败时渲染的内联认证按钮（仅 Codex 聊天）。
+- `.streaming-tool-auth-done`：15Z 新增。认证成功后替换认证按钮的绿色 "Authenticated" 徽章。
+- `.streaming-mcp-auth-hint`（含 `.is-done`/`.is-pending`/`.is-failed` 变体）：15Z 新增。认证后状态提示（成功重试/进行中/失败重试）。
 - `.streaming-error-block`：流式错误信息条。
 - `.opencodian-server-action-card*`：服务启动/确认动作卡片。
 - `.opencodian-pending*`：等待中提示文案。

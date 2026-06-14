@@ -72,6 +72,10 @@ export class UserMessageContentRenderer {
       });
     }
 
+    if (message.images && message.images.length > 0) {
+      this.renderUserMessageImages(container, message.images);
+    }
+
     if (message.contextAttachments && message.contextAttachments.length > 0) {
       this.renderUserContextAttachments(container, message.contextAttachments);
     }
@@ -93,6 +97,24 @@ export class UserMessageContentRenderer {
       visibleText,
       extractUserMessageTextHighlightSpans(visibleText, parts),
     );
+  }
+
+  private renderUserMessageImages(
+    container: HTMLElement,
+    images: NonNullable<ChatMessage['images']>,
+  ): void {
+    const galleryEl = container.createDiv({ cls: 'opencodian-user-image-gallery' });
+
+    for (const image of images) {
+      const wrapperEl = galleryEl.createDiv({ cls: 'opencodian-user-image-wrapper' });
+      wrapperEl.createEl('img', {
+        cls: 'opencodian-user-image-thumb',
+        attr: {
+          src: `data:${image.mediaType};base64,${image.data}`,
+          alt: image.filename ?? 'Attached image',
+        },
+      });
+    }
   }
 
   private renderUserContextAttachments(

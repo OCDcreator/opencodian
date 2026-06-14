@@ -16,9 +16,9 @@
 
 ## 主要类型
 
-- `AgentChatSendRequest`: backend-neutral 发送请求，当前包含 `sessionId`、`content` 和保持本地语义的 `options`，不直接泄漏 OpenCode 或 Claude SDK 形状。
+- `AgentChatSendRequest`: backend-neutral 发送请求，当前包含 `sessionId`、`content`、可选的 `images`（`ImageAttachment[]`）和保持本地语义的 `options`，不直接泄漏 OpenCode 或 Claude SDK 形状。
 - `AgentChatCapability`: 发送消息并取消指定 session stream 的最小 chat runtime 能力。
-- `AgentSessionCapability`: 创建、删除、重命名、读取 backend-owned session 的会话生命周期能力；可选 `listSessions()` / `getSession()` 允许 adapter 暴露 backend 原生 session directory；可选 `getSessionMessages()` 允许 adapter 暴露 backend 原生消息历史，返回 `unknown[]` 由调用方按 backend kind 归一化。
+- `AgentSessionCapability`: 创建、删除、重命名、读取 backend-owned session 的会话生命周期能力；可选 `listSessions()` / `getSession()` 允许 adapter 暴露 backend 原生 session directory；可选 `getSessionMessages()` 允许 adapter 暴露 backend 原生消息历史，返回 `unknown[]` 由调用方按 backend kind 归一化；可选 `archiveSession()` / `unarchiveSession()` 允许 backend 支持 session 归档/取消归档（由 `AgentBackendRouting` 统一路由）
 
 ## 依赖
 

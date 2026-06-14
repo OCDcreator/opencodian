@@ -58,15 +58,36 @@ export type AssistantShellViewHostAdapterOnOpenTaskToolSession = (
   toolCall?: Pick<ToolCallInfo, 'input'> | null,
 ) => Promise<void>;
 
+export type AssistantShellViewHostAdapterOnOpenMcpServerDetail = (
+  serverName: string,
+) => void;
+
+export type AssistantShellViewHostAdapterOnAuthenticateMcpServer = (
+  serverName: string,
+) => void;
+
+export type AssistantShellViewHostAdapterOnRetryMcpToolCall = (
+  toolCall: ToolCallInfo,
+) => void;
+
+export interface AssistantShellViewHostAdapterMcpCallbacks {
+  onOpenMcpServerDetail?: AssistantShellViewHostAdapterOnOpenMcpServerDetail;
+  onAuthenticateMcpServer?: AssistantShellViewHostAdapterOnAuthenticateMcpServer;
+  onRetryMcpToolCall?: AssistantShellViewHostAdapterOnRetryMcpToolCall;
+}
+
 export class AssistantShellViewHostAdapter {
   private readonly shellRenderer: AssistantShellRenderer;
   private readonly footerRenderer: AssistantFooterRenderer;
   private readonly errorRenderer: AssistantErrorRenderer;
+  private readonly mcpCallbacks: AssistantShellViewHostAdapterMcpCallbacks;
 
   constructor(
     private readonly host: AssistantShellViewHostAdapterHost,
     private readonly onOpenTaskToolSession: AssistantShellViewHostAdapterOnOpenTaskToolSession = async () => {},
+    mcpCallbacks: AssistantShellViewHostAdapterMcpCallbacks = {},
   ) {
+    this.mcpCallbacks = mcpCallbacks;
     this.shellRenderer = new AssistantShellRenderer(host);
     this.footerRenderer = new AssistantFooterRenderer(this.shellRenderer);
     this.errorRenderer = new AssistantErrorRenderer(this.footerRenderer);
@@ -302,6 +323,9 @@ export class AssistantShellViewHostAdapter {
             onOpenToolSession: (sessionId, toolCall) => {
               void this.onOpenTaskToolSession(sessionId, toolCall);
             },
+            onOpenMcpServerDetail: (serverName) => this.mcpCallbacks.onOpenMcpServerDetail?.(serverName),
+            onAuthenticateMcpServer: (serverName) => this.mcpCallbacks.onAuthenticateMcpServer?.(serverName),
+            onRetryMcpToolCall: (toolCall) => this.mcpCallbacks.onRetryMcpToolCall?.(toolCall),
           });
           const toolCall: ToolCallInfo = {
             id: block.toolId,

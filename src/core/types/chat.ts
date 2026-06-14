@@ -2,7 +2,16 @@
  * Chat-related type definitions
  */
 
-import { normalizeChatFontSizePx } from './settings';
+import {
+  type CodexReasoningEffort,
+  type CodexSandboxMode,
+  type CodexWebSearchMode,
+  normalizeChatFontSizePx,
+} from './settings';
+
+const VALID_CODEX_SANDBOX_MODES: readonly CodexSandboxMode[] = ['read-only', 'workspace-write', 'danger-full-access'];
+const VALID_CODEX_REASONING_EFFORTS: readonly CodexReasoningEffort[] = ['minimal', 'low', 'medium', 'high', 'xhigh'];
+const VALID_CODEX_WEB_SEARCH_MODES: readonly CodexWebSearchMode[] = ['disabled', 'cached', 'live'];
 
 /** View type constant */
 export const VIEW_TYPE_OPENCODIAN = 'opencodian-view';
@@ -93,6 +102,53 @@ export interface SessionDiffEntry {
 
 export interface ConversationSessionSettings {
   chatFontSizePx?: number | null;
+  codexSandboxMode?: CodexSandboxMode | null;
+  codexModelReasoningEffort?: CodexReasoningEffort | null;
+  codexModelOverride?: string | null;
+  codexAdditionalDirectories?: string[] | null;
+  codexNetworkAccessEnabled?: boolean | null;
+  codexWebSearchMode?: CodexWebSearchMode | null;
+}
+
+function normalizeNullableEnum<T extends string>(
+  raw: T | null | undefined,
+  valid: readonly T[],
+): T | null | undefined {
+  if (raw === null) return null;
+  if (typeof raw === 'string' && valid.includes(raw)) return raw;
+  return undefined;
+}
+
+function normalizeNullableString(raw: string | null | undefined): string | null | undefined {
+  if (raw === null) return null;
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim();
+    if (trimmed.length > 0) return trimmed;
+  }
+  return undefined;
+}
+
+function normalizeNullableStringArray(raw: string[] | null | undefined): string[] | null | undefined {
+  if (raw === null) return null;
+  if (Array.isArray(raw)) {
+    const filtered = raw
+      .filter((d): d is string => typeof d === 'string' && d.trim().length > 0)
+      .map((d) => d.trim());
+    if (filtered.length > 0) return filtered;
+  }
+  return undefined;
+}
+
+function normalizeNullableBoolean(raw: boolean | null | undefined): boolean | null | undefined {
+  if (raw === null) return null;
+  if (typeof raw === 'boolean') return raw;
+  return undefined;
+}
+
+function assignIfDefined<T>(target: Record<string, T>, key: string, value: T | undefined): void {
+  if (value !== undefined) {
+    target[key] = value;
+  }
 }
 
 export function normalizeConversationSessionSettings(
@@ -102,7 +158,7 @@ export function normalizeConversationSessionSettings(
     return undefined;
   }
 
-  const normalized: ConversationSessionSettings = {};
+  const normalized: Record<string, unknown> = {};
 
   if (value.chatFontSizePx === null) {
     normalized.chatFontSizePx = null;
@@ -113,7 +169,14 @@ export function normalizeConversationSessionSettings(
     }
   }
 
-  return Object.keys(normalized).length > 0 ? normalized : undefined;
+  assignIfDefined(normalized, 'codexSandboxMode', normalizeNullableEnum(value.codexSandboxMode, VALID_CODEX_SANDBOX_MODES));
+  assignIfDefined(normalized, 'codexModelReasoningEffort', normalizeNullableEnum(value.codexModelReasoningEffort, VALID_CODEX_REASONING_EFFORTS));
+  assignIfDefined(normalized, 'codexModelOverride', normalizeNullableString(value.codexModelOverride));
+  assignIfDefined(normalized, 'codexAdditionalDirectories', normalizeNullableStringArray(value.codexAdditionalDirectories));
+  assignIfDefined(normalized, 'codexNetworkAccessEnabled', normalizeNullableBoolean(value.codexNetworkAccessEnabled));
+  assignIfDefined(normalized, 'codexWebSearchMode', normalizeNullableEnum(value.codexWebSearchMode, VALID_CODEX_WEB_SEARCH_MODES));
+
+  return Object.keys(normalized).length > 0 ? normalized as ConversationSessionSettings : undefined;
 }
 
 /** Content block in a message */
@@ -143,7 +206,7 @@ export interface ChatNoticeAction {
 }
 
 export interface ChatNoticeMeta {
-  kind: 'background-task-completion';
+  kind: 'background-task-completion' | 'codex-provisional-warning';
   conversationId?: string;
   anchorKey?: string;
   sourceReminderIds?: string[];

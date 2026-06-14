@@ -94,6 +94,7 @@ function createOutcome(overrides: Partial<LocalStreamOutcome> = {}): LocalStream
     streamErrorNoticeMessage: null,
     interruptedNoticeMessage: null,
     shouldSyncFromServer: true,
+    resolvedUserMessageIdentity: null,
     ...overrides,
   };
 }
@@ -161,6 +162,7 @@ describe('persistLocalStreamOutcome canonical cache boundary', () => {
     expect(host.saveConversation).toHaveBeenCalledWith(conversation);
     expect(logStage).toHaveBeenCalledWith('backend-session-id-finalized', {
       backendSessionId: 'sdk-session-1',
+      resolvedUserMessageIdentity: null,
     });
   });
 
@@ -326,5 +328,141 @@ describe('persistLocalStreamOutcome local persistence details', () => {
       status: 'answered',
     });
     expect(host.saveConversation).toHaveBeenCalledWith(conversation);
+  });
+});
+
+describe('persistLocalStreamOutcome provisional warning removal', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('removes the provisional warning when backendSessionId upgrades from provisional to real', async () => {
+    const conversation = createConversation([
+      {
+        id: 'user-1',
+        role: 'user',
+        content: 'Hello',
+        timestamp: 1,
+      },
+      {
+        id: 'assistant-notice-1',
+        role: 'assistant',
+        content: 'Warning text',
+        timestamp: 2,
+        displayStyle: 'notice',
+        noticeTitle: 'Backend continuity not yet established',
+        noticeTone: 'warning',
+        noticeMeta: { kind: 'codex-provisional-warning' },
+      },
+    ]);
+    conversation.backend = 'codex';
+    conversation.backendSessionId = 'codex-local-abc-123';
+    delete conversation.openCodeSessionId;
+
+    const host = createHost();
+    const logStage = jest.fn();
+
+    await persistLocalStreamOutcome({
+      host,
+      preparedSend: createPreparedSend(conversation),
+      runtime: createRuntime(),
+      outcome: createOutcome({
+        finalizedBackendSessionId: 'thread_real_123',
+        shouldSyncFromServer: false,
+      }),
+      logAssistantFinalizationStage: logStage,
+    });
+
+    expect(conversation.backendSessionId).toBe('thread_real_123');
+    expect(conversation.messages).toHaveLength(2);
+    expect(conversation.messages[0]?.id).toBe('user-1');
+    expect(conversation.messages.some((m) => m.noticeMeta?.kind === 'codex-provisional-warning')).toBe(false);
+    expect(host.saveConversation).toHaveBeenCalledWith(conversation);
+  });
+
+  it('keeps the provisional warning when backendSessionId stays provisional', async () => {
+    const conversation = createConversation([
+      {
+        id: 'user-1',
+        role: 'user',
+        content: 'Hello',
+        timestamp: 1,
+      },
+      {
+        id: 'assistant-notice-1',
+        role: 'assistant',
+        content: 'Warning text',
+        timestamp: 2,
+        displayStyle: 'notice',
+        noticeTitle: 'Backend continuity not yet established',
+        noticeTone: 'warning',
+        noticeMeta: { kind: 'codex-provisional-warning' },
+      },
+    ]);
+    conversation.backend = 'codex';
+    conversation.backendSessionId = 'codex-local-abc-123';
+    delete conversation.openCodeSessionId;
+
+    const host = createHost();
+    const logStage = jest.fn();
+
+    await persistLocalStreamOutcome({
+      host,
+      preparedSend: createPreparedSend(conversation),
+      runtime: createRuntime(),
+      outcome: createOutcome({
+        finalizedBackendSessionId: 'codex-local-new-456',
+        shouldSyncFromServer: false,
+      }),
+      logAssistantFinalizationStage: logStage,
+    });
+
+    expect(conversation.backendSessionId).toBe('codex-local-new-456');
+    expect(conversation.messages).toHaveLength(3);
+    expect(conversation.messages.some((m) => m.noticeMeta?.kind === 'codex-provisional-warning')).toBe(true);
+    expect(host.saveConversation).toHaveBeenCalledWith(conversation);
+  });
+
+  it('does not remove unrelated notices when backendSessionId upgrades', async () => {
+    const conversation = createConversation([
+      {
+        id: 'user-1',
+        role: 'user',
+        content: 'Hello',
+        timestamp: 1,
+      },
+      {
+        id: 'assistant-notice-1',
+        role: 'assistant',
+        content: 'Unrelated notice',
+        timestamp: 2,
+        displayStyle: 'notice',
+        noticeTitle: 'Some other notice',
+        noticeTone: 'info',
+        noticeMeta: { kind: 'background-task-completion' },
+      },
+    ]);
+    conversation.backend = 'codex';
+    conversation.backendSessionId = 'codex-local-abc-123';
+    delete conversation.openCodeSessionId;
+
+    const host = createHost();
+    const logStage = jest.fn();
+
+    await persistLocalStreamOutcome({
+      host,
+      preparedSend: createPreparedSend(conversation),
+      runtime: createRuntime(),
+      outcome: createOutcome({
+        finalizedBackendSessionId: 'thread_real_123',
+        shouldSyncFromServer: false,
+      }),
+      logAssistantFinalizationStage: logStage,
+    });
+
+    expect(conversation.backendSessionId).toBe('thread_real_123');
+    expect(conversation.messages).toHaveLength(3);
+    expect(conversation.messages.some((m) => m.noticeMeta?.kind === 'codex-provisional-warning')).toBe(false);
+    expect(conversation.messages.some((m) => m.noticeMeta?.kind === 'background-task-completion')).toBe(true);
   });
 });

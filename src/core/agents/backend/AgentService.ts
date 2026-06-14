@@ -11,7 +11,7 @@
  * See docs/requirements/multi-agent-foundation/02-architecture.md §2–3.
  */
 
-import type { AgentBackendKind, StreamChunk } from '../../types/chat';
+import type { AgentBackendKind, ImageAttachment, StreamChunk } from '../../types/chat';
 import type { SessionDiffEntry } from '../../types/chat';
 import type { AgentCapability, BackendCapabilities } from '../AgentCapability';
 
@@ -96,6 +96,7 @@ export interface AgentService {
 export interface AgentChatSendRequest {
   readonly sessionId: string;
   readonly content: string;
+  readonly images?: ImageAttachment[];
   readonly options?: Record<string, unknown>;
 }
 
@@ -112,6 +113,16 @@ export interface AgentSessionCapability extends AgentService {
   getSession?(sessionId: string): Promise<unknown | null>;
   deleteSession(sessionId: string): Promise<void>;
   updateSessionTitle(sessionId: string, title: string): Promise<void>;
+  /**
+   * Archive a backend session. Optional because not all backends support
+   * session archival.
+   */
+  archiveSession?(sessionId: string): Promise<boolean>;
+  /**
+   * Unarchive a previously archived backend session. Optional because not all
+   * backends support session archival.
+   */
+  unarchiveSession?(sessionId: string): Promise<boolean>;
   /**
    * Read messages from a backend session.
    * Returns backend-specific raw message objects — callers must normalize

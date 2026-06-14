@@ -25,6 +25,12 @@ export interface EffortSelectorCallbacks {
   allowDefaultOption?: () => boolean;
   /** Label used when no explicit variant is selected. */
   getDefaultOptionLabel?: () => string;
+  /**
+   * Returns a short boundary hint explaining when the selected effort
+   * takes effect (e.g. "Applies to next turn"). Returning undefined or
+   * an empty string hides the hint.
+   */
+  getBoundaryHint?: () => string | undefined;
 }
 
 export class EffortSelector {
@@ -32,6 +38,7 @@ export class EffortSelector {
   private container: HTMLElement;
   private gearsEl: HTMLElement | null = null;
   private groupEl: HTMLElement | null = null;
+  private hintEl: HTMLElement | null = null;
   private callbacks: EffortSelectorCallbacks;
   private isMenuOpen = false;
   private readonly handleDocumentMouseDown: (event: MouseEvent) => void;
@@ -64,6 +71,16 @@ export class EffortSelector {
     this.groupEl = this.container.createDiv({ cls: 'opencodian-effort-group' });
     const label = this.groupEl.createSpan({ cls: 'opencodian-effort-label' });
     label.setText(t('chat.effort.label'));
+
+    // Boundary hint: honest text about when the effort change takes effect
+    this.hintEl = null;
+    const hint = this.callbacks.getBoundaryHint?.();
+    if (hint) {
+      this.hintEl = this.groupEl.createSpan({ cls: 'opencodian-effort-boundary-hint' });
+      this.hintEl.setText(hint);
+      this.groupEl.setAttribute('title', hint);
+    }
+
     this.gearsEl = this.groupEl.createDiv({ cls: 'opencodian-effort-gears' });
 
     this.updateDisplay();
@@ -146,6 +163,25 @@ export class EffortSelector {
     if (this.groupEl) {
       this.groupEl.style.display = '';
     }
+
+    // Refresh boundary hint
+    const hint = this.callbacks.getBoundaryHint?.();
+    if (hint && this.groupEl) {
+      if (!this.hintEl) {
+        // Insert hint before the gears element
+        this.hintEl = this.groupEl.createSpan({ cls: 'opencodian-effort-boundary-hint' });
+        if (this.gearsEl) {
+          this.groupEl.insertBefore(this.hintEl, this.gearsEl);
+        }
+      }
+      this.hintEl.setText(hint);
+      this.groupEl.setAttribute('title', hint);
+    } else if (this.hintEl) {
+      this.hintEl.remove();
+      this.hintEl = null;
+      this.groupEl?.removeAttribute('title');
+    }
+
     this.renderGears();
   }
 

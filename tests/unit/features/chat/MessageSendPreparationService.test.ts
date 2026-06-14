@@ -2,7 +2,6 @@ import type {
   PromptRequestPart,
 } from '../../../../src/core/opencode/OpenCodePromptRequestBuilder';
 import {
-  buildOptimisticUserMessage,
   MessageSendPreparationService,
 } from '../../../../src/features/chat/services/MessageSendPreparationService';
 import {
@@ -12,38 +11,6 @@ import {
   createPromptContextItem,
   createStructuredSendPayload,
 } from './MessageSendPreparationService.testSupport';
-
-describe('buildOptimisticUserMessage', () => {
-  it('builds a user message with context attachments', () => {
-    const contextItem = createPromptContextItem();
-    const optimisticUserParts: PromptRequestPart[] = [
-      { id: 'part-1', type: 'text', text: 'Hello' },
-    ];
-
-    const message = buildOptimisticUserMessage('Hello', [contextItem], 123, {
-      optimisticUserParts,
-    });
-
-    expect(message).toEqual({
-      id: 'user-123',
-      role: 'user',
-      content: 'Hello',
-      timestamp: 123,
-      parts: optimisticUserParts,
-      contextAttachments: [{
-        kind: 'selection',
-        path: 'notes/example.md',
-        label: 'example.md:1-3',
-        mime: 'text/markdown',
-        lineRange: {
-          startLine: 1,
-          endLine: 3,
-        },
-        textSnapshot: 'Selected text',
-      }],
-    });
-  });
-});
 
 describe('MessageSendPreparationService', () => {
   beforeEach(() => {
@@ -163,6 +130,21 @@ describe('MessageSendPreparationService', () => {
       parts: [{ id: 'part-1', type: 'text', text: 'Hello Claude' }],
       timestamp: result?.userMessage.timestamp,
     });
+  });
+
+  it('preserves images through the preparation pipeline', async () => {
+    const conversation = createConversation();
+    const images = [
+      { data: 'iVBORw0KGgo=', mediaType: 'image/png' as const, filename: 'test.png' },
+    ];
+    const host = createHost(conversation, []);
+    const service = new MessageSendPreparationService(host, createComposerSendContext());
+
+    const result = await service.prepareMessageSend({ content: 'Hello', images });
+
+    expect(result).not.toBeNull();
+    expect(result?.images).toEqual(images);
+    expect(result?.userMessage.images).toEqual(images);
   });
 
   it('merges one-shot outputFormat into modelOptions when provided', async () => {

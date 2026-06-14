@@ -4,6 +4,7 @@ import process from "process";
 import builtins from "builtin-modules";
 import { buildCss } from "./build-css.mjs";
 import { copyClaudeAgentSdkRuntime } from "./claude-sdk-dist.mjs";
+import { copyCodexRuntime } from "./codex-sdk-dist.mjs";
 import { generateBuildId } from './build-utils.mjs';
 
 const banner =
@@ -90,7 +91,9 @@ if (prod) {
 
   copyDirectoryIfExists('assets', 'dist/assets');
   copyClaudeAgentSdkRuntime(process.cwd(), distDir);
+  copyCodexRuntime(process.cwd(), distDir);
   
+  await context.dispose();
   console.log('Production build complete!');
   process.exit(0);
 } else {

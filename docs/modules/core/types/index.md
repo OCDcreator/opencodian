@@ -2,6 +2,7 @@
 
 > **源码**: `src/core/types/index.ts`
 > **状态**: [REVIEW]
+> **Updated**: 2026-06-09 — added `CodexBackendSettings`, `getDefaultCodexBackendSettings` re-exports
 
 ## 概述
 
