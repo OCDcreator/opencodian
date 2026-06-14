@@ -11,7 +11,6 @@ import { setIcon, Setting } from 'obsidian';
 import type { AgentBackendKind } from '../../core/types/chat';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
-import { renderAgentSwitcherChips } from './AgentSwitcherChips';
 import { renderAgentSwitcherFloatingIcons } from './AgentSwitcherFloatingIcons';
 import { SettingsAcpSection } from './SettingsAcpSection';
 import { SettingsAgentsSection } from './SettingsAgentsSection';
@@ -36,6 +35,7 @@ import { SettingsSecuritySection } from './SettingsSecuritySection';
 import { SettingsServerSection } from './SettingsServerSection';
 import { SettingsSkillSection } from './SettingsSkillSection';
 import { SettingsStyleSection } from './SettingsStyleSection';
+import { refreshSettingsTabbedHeader } from './SettingsTabbedHeader';
 import { SettingsToolSection } from './SettingsToolSection';
 import { SettingsUiSection } from './SettingsUiSection';
 
@@ -91,7 +91,6 @@ export class SettingsTabbedRenderer {
   }
 
   renderDisplay(containerEl: HTMLElement): void {
-    containerEl.empty();
     containerEl.classList.add('opencodian-settings-tabbed');
     const activeBackend = this.getActiveBackend();
     const visibleTabs = SETTINGS_PRIMARY_TABS.filter((tab) => {
@@ -120,13 +119,12 @@ export class SettingsTabbedRenderer {
 
     const enabledAgents = this.getEnabledAgents();
     const selectedAgent = this.getSelectedAgent(enabledAgents);
-    renderAgentSwitcherFloatingIcons(containerEl, {
+    refreshSettingsTabbedHeader(containerEl, {
       selectedAgent,
       enabledAgents,
-      onSelect: (agent) => { this.switchAgent(agent); },
+      onSelectAgent: (agent) => { this.switchAgent(agent); },
     });
-
-    renderAgentSwitcherChips(containerEl, {
+    renderAgentSwitcherFloatingIcons(containerEl, {
       selectedAgent,
       enabledAgents,
       onSelect: (agent) => { this.switchAgent(agent); },

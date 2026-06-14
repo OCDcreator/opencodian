@@ -5,7 +5,7 @@
 
 ## 概述
 
-`AgentSwitcherChips` 渲染 tabbed settings 标题下方的 enabled agent 快速切换 chip 行。它只负责纯前端导航，不启动或切换 runtime。
+`AgentSwitcherChips` 是旧版 tabbed settings 标题下方 enabled agent 快速切换 chip 行 renderer。当前稳定设置页已改为标题行内的 icon-only switcher；本模块保留为兼容实现，不再由 `SettingsTabbedRenderer` 挂载。
 
 ## 职责
 
@@ -16,5 +16,5 @@
 
 ## 集成
 
-- `SettingsTabbedRenderer`: 在一级 tab bar 之前调用本 renderer
+- `SettingsTabbedRenderer`: 不再调用本 renderer；active backend switcher 现在由 `AgentSwitcherFloatingIcons.renderAgentSwitcherHeaderIcons()` 挂在 `.opencodian-settings-panel-title-actions`，并保留 `renderAgentSwitcherFloatingIcons()` 作为左侧可收缩图标 rail
 - `SettingsBackendSection.BACKEND_OPTIONS`: 复用 agent id 与 locale key，避免重复维护显示名称

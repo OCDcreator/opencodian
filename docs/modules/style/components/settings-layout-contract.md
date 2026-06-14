@@ -10,6 +10,7 @@
 ## Surface Contract
 
 - `.opencodian-settings`：设置界面 token 作用域，所有 `--opencodian-settings-*` 变量都从 Obsidian 主题变量派生。
+- `.opencodian-settings-panel-title` / `.opencodian-settings-panel-title-actions`：设置页标题行。左侧保留 `SettingsPanelChrome` 的 OpenCodian logo / wordmark，action slot 右对齐承载 active backend icon switcher；它是标题 row，不是内容卡片。标题行上方 spacing 为 `12px`，品牌块左侧 padding 为 `0`，标题行右侧 padding 为 `56px`，用于避开 Obsidian 设置 modal 的关闭按钮区域。
 - `.opencodian-settings-quick-nav` / `.opencodian-settings-tab-primary` / `.opencodian-settings-tab-secondary`：classic 与 tabbed 的同级 navigation-shell surface。它们可以显示 active / hover / focus 状态，但不承担内容卡片视觉。
 - `.opencodian-settings-content-shell`：布局型内容 shell，用于承载 classic / tabbed 内容，不承担重卡片视觉。
 - `.opencodian-settings-section` / `.opencodian-settings-block.opencodian-settings-section`：共享 section block surface，使用 section 背景、边框与半径 token；legacy `.opencodian-settings-block` 本身保持兼容，不会单独触发契约样式。
@@ -51,6 +52,7 @@ Rule: never apply one hierarchy rule globally across both layout modes. In class
 - 共享设置 surface、spacing、row-card、object-card 和 inline group token 归此模块所有；各 section CSS 不应重复定义一套半径、边框、背景或 row-card 间距。
 - 新的视觉迁移应优先复用这些 token，再按 section 的真实职责增加更具体的 object-card、summary、toolbar 或 state 样式。
 - navigation shell 的 hover / focus 只能改变背景、边框或 outline，不应使用会造成布局错觉的 translate 或重 shadow。
+- 标题行 backend switcher 必须保持 compact icon-only，不应回到标题下方 text chip row，也不应使用左侧 fixed overlay 作为 tabbed settings 的稳定入口。
 - 修改后运行 `npm run build:css` 刷新根目录 `styles.css`。
 
 ## Skill Catalog Styles

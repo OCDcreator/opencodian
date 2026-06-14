@@ -281,25 +281,57 @@ describe('SettingsTabbedRenderer', () => {
     expect(primaryLabels).not.toContain('Model');
   });
 
-  it('syncs the backend registry when the settings agent switcher changes active backend', () => {
+  it('keeps the branded title row and switches backend from header icon buttons', () => {
     const { renderer, plugin, setActive, requestDisplayRefresh } = createRendererState({
       enabledBackends: ['opencode', 'claude-code'],
       activeBackend: 'opencode',
     });
     const containerEl = document.createElement('div');
+    const titleEl = containerEl.createEl('h2', { cls: 'opencodian-settings-panel-title' });
+    titleEl.createSpan({ cls: 'opencodian-title', text: 'OpenCodian' });
 
     renderer.renderDisplay(containerEl);
-    const claudeChip = Array.from(
-      containerEl.querySelectorAll<HTMLButtonElement>('.opencodian-agent-chip'),
-    ).find((element) => element.textContent?.trim() === 'Claude Code');
-    expect(claudeChip).toBeTruthy();
+    const preservedTitleEl = containerEl.querySelector<HTMLElement>('.opencodian-settings-panel-title');
+    const headerActionsEl = preservedTitleEl?.querySelector<HTMLElement>(
+      '.opencodian-settings-panel-title-actions',
+    );
+    const headerButtons = Array.from(
+      preservedTitleEl?.querySelectorAll<HTMLButtonElement>('.opencodian-agent-switcher-header-icon') ?? [],
+    );
+    const claudeButton = headerButtons.find((element) => element.getAttribute('aria-label') === 'Claude Code');
 
-    claudeChip?.click();
+    expect(preservedTitleEl).toBe(titleEl);
+    expect(preservedTitleEl?.querySelector('.opencodian-title')).not.toBeNull();
+    expect(headerActionsEl).not.toBeNull();
+    expect(headerButtons).toHaveLength(2);
+    expect(containerEl.querySelector('.opencodian-agent-chip')).toBeNull();
+    expect(containerEl.querySelector('.opencodian-agent-switcher-hover-zone')).not.toBeNull();
+    expect(document.body.querySelectorAll('.opencodian-agent-switcher-floating')).toHaveLength(1);
+    expect(claudeButton).toBeTruthy();
+
+    claudeButton?.click();
 
     expect(plugin.settings.activeBackend).toBe('claude-code');
     expect(setActive).toHaveBeenCalledWith('claude-code');
     expect(plugin.saveSettings).toHaveBeenCalledTimes(1);
     expect(requestDisplayRefresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not accumulate duplicate floating backend rails across rerenders', () => {
+    const { renderer } = createRendererState({
+      enabledBackends: ['opencode', 'claude-code'],
+      activeBackend: 'opencode',
+    });
+    const containerEl = document.createElement('div');
+    const titleEl = containerEl.createEl('h2', { cls: 'opencodian-settings-panel-title' });
+    titleEl.createSpan({ cls: 'opencodian-title', text: 'OpenCodian' });
+
+    renderer.renderDisplay(containerEl);
+    renderer.renderDisplay(containerEl);
+
+    expect(containerEl.querySelectorAll('.opencodian-agent-switcher-hover-zone')).toHaveLength(1);
+    expect(document.body.querySelectorAll('.opencodian-agent-switcher-floating')).toHaveLength(1);
+    expect(document.body.querySelectorAll('.opencodian-agent-switcher-icon')).toHaveLength(2);
   });
 
   it('renders every primary tab inside one structural content shell', () => {

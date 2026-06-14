@@ -24,7 +24,7 @@ const AGENT_ICON_BY_BACKEND: Record<AgentBackendKind, AgentSwitcherIconConfig> =
   pi: { fallbackIcon: 'cpu', iconId: 'perplexity', variant: 'color' },
 };
 
-interface AgentSwitcherFloatingIconsOptions {
+interface AgentSwitcherOptions {
   selectedAgent: AgentBackendKind | undefined;
   enabledAgents: AgentBackendKind[];
   onSelect: (agent: AgentBackendKind) => void;
@@ -32,12 +32,13 @@ interface AgentSwitcherFloatingIconsOptions {
 
 export function renderAgentSwitcherFloatingIcons(
   containerEl: HTMLElement,
-  options: AgentSwitcherFloatingIconsOptions,
+  options: AgentSwitcherOptions,
 ): void {
   if (options.enabledAgents.length < 2) {
     return;
   }
 
+  removeExistingFloatingSwitcher(containerEl.ownerDocument);
   const anchorEl = containerEl.createDiv({ cls: 'opencodian-agent-switcher-hover-zone' });
   const floatingEl = containerEl.createDiv({ cls: 'opencodian-agent-switcher-floating' });
   pinAgentSwitcherToSettingsEdge(containerEl, floatingEl, anchorEl);
@@ -71,6 +72,58 @@ export function renderAgentSwitcherFloatingIcons(
       options.onSelect(agent);
     });
   });
+}
+
+export function renderAgentSwitcherHeaderIcons(
+  containerEl: HTMLElement,
+  options: AgentSwitcherOptions,
+): void {
+  if (options.enabledAgents.length < 2) {
+    return;
+  }
+
+  const groupEl = containerEl.createSpan({
+    cls: 'opencodian-agent-switcher-header-icons',
+    attr: {
+      'aria-label': t('settings.agent.default'),
+      role: 'group',
+    },
+  });
+
+  for (const agent of options.enabledAgents) {
+    const backendOption = BACKEND_OPTIONS.find((candidate) => candidate.id === agent);
+    if (!backendOption) {
+      continue;
+    }
+
+    const selected = options.selectedAgent === agent;
+    const label = t(backendOption.labelKey);
+    const iconButtonEl = groupEl.createEl('button', {
+      cls: `opencodian-agent-switcher-header-icon${selected ? ' opencodian-agent-switcher-selected' : ''}`,
+      attr: {
+        'aria-label': label,
+        'aria-pressed': selected ? 'true' : 'false',
+        title: label,
+      },
+    });
+    iconButtonEl.type = 'button';
+    renderAgentSwitcherIcon(iconButtonEl, AGENT_ICON_BY_BACKEND[agent]);
+    iconButtonEl.addEventListener('click', () => {
+      iconButtonEl.classList.add('opencodian-agent-switcher-clicked');
+      window.setTimeout(() => {
+        iconButtonEl.classList.remove('opencodian-agent-switcher-clicked');
+      }, 220);
+      options.onSelect(agent);
+    });
+  }
+}
+
+function removeExistingFloatingSwitcher(ownerDocument: Document): void {
+  ownerDocument
+    .querySelectorAll<HTMLElement>('.opencodian-agent-switcher-floating')
+    .forEach((floatingEl) => {
+      floatingEl.remove();
+    });
 }
 
 function pinAgentSwitcherToSettingsEdge(

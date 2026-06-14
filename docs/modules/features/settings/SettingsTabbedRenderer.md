@@ -2,7 +2,7 @@
 
 > **源码**: `src/features/settings/SettingsTabbedRenderer.ts`
 > **状态**: [REVIEW]
-> **Updated**: 2026-06-09 — added `renderCodexContent` for Codex settings tab
+> **Updated**: 2026-06-14 — moved active backend switching into the settings title row
 
 ## 概述
 
@@ -10,7 +10,7 @@
 
 ## 职责
 
-- 渲染标题下方的 agent switcher chips、一级标签栏和更轻量的二级标签栏
+- 渲染标题行里的 agent icon switcher、一级标签栏和更轻量的二级标签栏
 - 根据当前 `activeBackend` 过滤声明了 `backendRequired` 的一级/二级标签，避免启用多个 backend 时互相暴露专属设置
 - 根据当前激活标签路由到对应的 section content panel
 - 处理一级/二级标签切换并持久化停留位置
@@ -32,7 +32,7 @@
 
 ## 标签导航
 
-- `renderDisplay(containerEl)`: 完整渲染标签布局（agent switcher overlay/chips + 一级栏 + 二级栏 + 内容面板）。每次渲染前调用 `containerEl.empty()` 清空旧内容，防止 tab 切换时旧 section DOM 残留导致视觉重叠和截图误判。
+- `renderDisplay(containerEl)`: 完整渲染标签布局（保留 `.opencodian-settings-panel-title`，刷新标题行内 backend icon switcher + 一级栏 + 二级栏 + 内容面板）。每次渲染前只移除 tabbed renderer 自己创建的正文 DOM，并清理旧 `.opencodian-settings-panel-title-actions`，避免 tab 切换时旧 section DOM 残留，同时保留 `SettingsPanelChrome` 生成的 OpenCodian logo / wordmark。
 - `switchToPrimaryTab(primaryTabId, secondaryTabId?)`: 切换一级标签并持久化
 - 内部 `switchSecondaryTab()`: 切换二级标签并持久化
 
@@ -44,4 +44,4 @@
 
 Debug 的 `capability-lab` 二级标签路由到 `SettingsCapabilityLabSection`，提供诊断/实验性 SDK 能力检查界面（能力矩阵、JSONL 历史浏览器、子代理浏览器、rewind dry-run 预览、结构化输出实验场、发现状态），全部标记为 DIAGNOSTIC / EXPERIMENTAL / NOT STABLE，不连接稳定设置持久化。当 `secondaryTabId === 'capability-lab'` 时，`renderDebugContent` 直接创建 `SettingsCapabilityLabSection` 实例并调用 `attachTabbed()`，不经过 `SettingsDebugSection`。
 
-标签内容始终渲染进 `.opencodian-settings-content-shell`。这个 shell 只承担结构职责，并通过 `data-primary-tab` / `data-secondary-tab` 暴露当前路由给样式和测试使用；它不能被设计成重型卡片。可见的内容层级应由 `SettingsPanelChrome.createSettingsBlock()` 生成的共享 settings section block，或兼容的 section-local block 承担。agent switcher 的 floating icons 是容器级绝对定位 overlay，不进入 content shell，也不应影响标签和内容布局流。
+标签内容始终渲染进 `.opencodian-settings-content-shell`。这个 shell 只承担结构职责，并通过 `data-primary-tab` / `data-secondary-tab` 暴露当前路由给样式和测试使用；它不能被设计成重型卡片。可见的内容层级应由 `SettingsPanelChrome.createSettingsBlock()` 生成的共享 settings section block，或兼容的 section-local block 承担。active backend switcher 现在同时挂在 `.opencodian-settings-panel-title-actions` 内的 header icon buttons 与左侧可收缩 floating icon rail；两者共享同一套 `switchAgent()` 持久化、registry 同步与刷新逻辑。不再在标题下方插入 text chips。

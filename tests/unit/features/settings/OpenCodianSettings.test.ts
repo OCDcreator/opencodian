@@ -1036,6 +1036,31 @@ describe('OpenCodianSettingTab title styling', () => {
     expect(headingEl?.querySelector('.opencodian-settings-panel-title-suffix')).toBeNull();
   });
 
+  it('keeps the branded title visible and places backend icons inline in the title row', () => {
+    const { tab } = createSettingsTab('tabbed');
+    tab.plugin.settings.enabledBackends = ['opencode', 'claude-code'];
+    tab.plugin.settings.activeBackend = 'opencode';
+
+    tab.display();
+
+    const headingEl = tab.containerEl.querySelector<HTMLElement>('.opencodian-settings-panel-title');
+    const actionsEl = headingEl?.querySelector<HTMLElement>('.opencodian-settings-panel-title-actions');
+    const iconButtons = Array.from(
+      actionsEl?.querySelectorAll<HTMLButtonElement>('.opencodian-agent-switcher-header-icon') ?? [],
+    );
+
+    expect(headingEl).not.toBeNull();
+    expect(headingEl?.querySelector('.opencodian-title')).not.toBeNull();
+    expect(headingEl?.querySelector('.opencodian-logo')).not.toBeNull();
+    expect(actionsEl).not.toBeNull();
+    expect(iconButtons.map((button) => button.getAttribute('aria-label'))).toEqual([
+      'OpenCode',
+      'Claude Code',
+    ]);
+    expect(iconButtons[0]?.getAttribute('aria-pressed')).toBe('true');
+    expect(tab.containerEl.querySelector('.opencodian-agent-chip')).toBeNull();
+  });
+
   it('styles the settings title flush-left, borderless, and slightly larger', () => {
     const css = readFileSync(
       join(process.cwd(), 'src/style/components/model-selector.css'),
@@ -1047,19 +1072,25 @@ describe('OpenCodianSettingTab title styling', () => {
     );
 
     expect(css).toMatch(
-      /\.opencodian-settings h2\s*\{[\s\S]*margin-left:\s*0;[\s\S]*margin-bottom:\s*12px;[\s\S]*padding-bottom:\s*0;[\s\S]*border-bottom:\s*none;/,
+      /\.opencodian-settings h2\s*\{[\s\S]*margin-top:\s*12px;[\s\S]*margin-left:\s*0;[\s\S]*margin-bottom:\s*12px;[\s\S]*padding-bottom:\s*0;[\s\S]*border-bottom:\s*none;/,
     );
     expect(css).toMatch(
-      /\.opencodian-settings-panel-title\s*\{[\s\S]*gap:\s*0;/,
+      /\.opencodian-settings-panel-title\s*\{[\s\S]*gap:\s*12px;/,
+    );
+    expect(css).toMatch(
+      /\.opencodian-settings\s+\.opencodian-settings-panel-title\s*\{[\s\S]*padding:\s*0\s+56px\s+0\s+0;/,
+    );
+    expect(css).toMatch(
+      /\.opencodian-settings-panel-title \.opencodian-title\s*\{[\s\S]*padding-left:\s*0;/,
     );
     expect(css).toMatch(
       /\.opencodian-settings-panel-title \.opencodian-title-text\s*\{[\s\S]*height:\s*18px;/,
     );
     expect(css).toMatch(
-      /\.opencodian-settings\.opencodian-settings--tabbed\s*\{[\s\S]*padding-top:\s*34px;/,
+      /\.opencodian-settings-panel-title-actions\s*\{[\s\S]*margin-left:\s*auto;/,
     );
     expect(css).toMatch(
-      /\.opencodian-settings\.opencodian-settings--tabbed\s+\.opencodian-settings-panel-title\s*\{[\s\S]*margin-left:\s*-20px;/,
+      /\.opencodian-settings\.opencodian-settings--tabbed\s+\.opencodian-settings-panel-title\s*\{[\s\S]*justify-content:\s*space-between;/,
     );
     expect(css).toMatch(
       /\.workspace-leaf-content\[data-type="opencodian-settings-view"\]\s*>\s*\.view-content\.opencodian-settings\.opencodian-settings--classic\s*\{[\s\S]*padding-top:\s*0\s*!important;/,
