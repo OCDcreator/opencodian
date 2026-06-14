@@ -23,6 +23,8 @@
 
 Claude Code MCP elicitation 的入口处理保留在 `main.ts`：`onElicitation` 会检查 abort signal、查找当前 chat view 注册的 `elicitationCardRenderer`，并把用户 accept/decline/cancel 映射回 SDK `ElicitationResult`。请求和内容形状转换已下沉到 `ClaudeCodeElicitationBridge.ts`，入口层不再内联 schema parsing 或 answer-to-content 逻辑。当前产品状态仍为 wiring：真实 pass 需要 MCP server 发起 elicitation 并消费返回结果的端到端运行时证据。
 
+Codex 审批 host context 的入口级 wiring 保留在 `main.ts`：插件持有 mutable `codexApprovalHostContext`（默认 `getActiveTabId: () => null`），adapter 注册后调用 `codexAdapter.setApprovalHost(createCodexApprovalBridgeHost(() => this.codexApprovalHostContext))`。host factory 动态读取 context，chat view 在 mount 时填充 `approvalCardRenderer`。镜像 Claude 的 `claudeCodePermissionHostContext` 模式。
+
 ## 导入关系
 
 ```text

@@ -13,6 +13,7 @@ import {
   hasCapability,
 } from '../../core/agents/AgentCapability';
 import {
+  getBackendSessionPreview,
   getConversationChatBackendService,
   getConversationSessionBackendService,
   loadBackendSessionMessages,
@@ -24,6 +25,10 @@ import {
   CLAUDE_CODE_PROVIDER_ID,
   CODEX_EFFORT_VARIANTS,
 } from '../../core/agents/backend/ClaudeCodeModelCatalog';
+import {
+  buildCodexApprovalQuestionRequest,
+  mapCodexApprovalResolution,
+} from '../../core/agents/backend/CodexDefaultApprovalHost';
 import {
   type ResolvedModelSelection,
 } from '../../core/config/modelConfig';
@@ -57,9 +62,15 @@ import {
 } from '../../shared';
 import { ProviderIconService } from '../../utils/icons/ProviderIconService';
 import { MarkdownRenderService } from '../../utils/markdown';
+import type { ToolCallInfo } from '../../utils/streaming';
 import {
   StreamController,
 } from '../../utils/streaming';
+import { applyMcpAuthOutcomeToContainer, applyMcpRetryOutcome, getMcpServerName } from '../../utils/streaming/McpToolCallRenderer';
+import {
+  CodexMcpServerDetailModal,
+  createCodexMcpServerDetailHost,
+} from '../settings/CodexMcpServerDetailModal';
 import {
   type FocusContextPreview,
 } from './composerContext';
@@ -752,6 +763,33 @@ export class OpenCodianView extends ItemView {
         }
       },
       agentServiceRegistry: this.plugin.agentServiceRegistry,
+      openBackendSessionAsConversation: async (sessionId, title) => {
+        try {
+          const registry = this.plugin.agentServiceRegistry;
+          let initialMessages: Array<{ id: string; role: 'user' | 'assistant'; content: string; timestamp: number }> | undefined;
+          if (registry) {
+            const preview = await getBackendSessionPreview(registry, sessionId);
+            if (preview && preview.length > 0) {
+              initialMessages = preview.map((msg, idx) => ({
+                id: `review-${idx}-${Date.now()}`,
+                role: (msg.role === 'user' ? 'user' : 'assistant') as 'user' | 'assistant',
+                content: msg.parts
+                  .filter((p) => p.type === 'text' && p.text)
+                  .map((p) => p.text)
+                  .join('\n') || '(empty)',
+                timestamp: Date.now(),
+              }));
+            }
+          }
+          const conversationId = await this.plugin.createConversationFromBackendSession(sessionId, title, initialMessages, 'codex');
+          if (conversationId) {
+            await this.loadConversation(conversationId);
+          }
+          return conversationId;
+        } catch {
+          return null;
+        }
+      },
     };
   }
 
@@ -1344,6 +1382,9 @@ export class OpenCodianView extends ItemView {
             toolCall,
             this.currentConversation?.backend,
           ),
+        onOpenMcpServerDetail: (serverName) => this.openCodexMcpServerDetailFromChat(serverName),
+        onAuthenticateMcpServer: (serverName) => { void this.authenticateMcpServerFromChat(serverName); },
+        onRetryMcpToolCall: (toolCall) => { void this.retryMcpToolCallFromChat(toolCall); },
       });
       paneState.runtime.streamController.setCallbacks({
         onToolCallStart: (toolCall) => {
@@ -1700,6 +1741,7 @@ export class OpenCodianView extends ItemView {
     this.questionRuntimeServices = interactionRuntime.questionRuntimeServices;
     this.sendPipelineRuntime = interactionRuntime.sendPipelineRuntime;
     this.installClaudeCodePermissionHostContext();
+    this.installCodexApprovalHostContext();
   }
 
   private installClaudeCodePermissionHostContext(): void {
@@ -1738,6 +1780,28 @@ export class OpenCodianView extends ItemView {
             return { action: 'cancel' };
           }
           return { action: 'accept', answers: result.answers };
+        } finally {
+          this.questionRuntimeServices.inlineCardRenderer.clear(tabId);
+        }
+      },
+    };
+  }
+
+  private installCodexApprovalHostContext(): void {
+    if (!this.plugin.codexApprovalHostContext) {
+      return;
+    }
+    this.plugin.codexApprovalHostContext.getActiveTabId = () => this.getActiveTabId();
+    this.plugin.codexApprovalHostContext.approvalCardRenderer = {
+      collectResponse: async (request, tabId) => {
+        try {
+          const questionRequest = buildCodexApprovalQuestionRequest(request);
+          const result = await this.questionRuntimeServices.resolutionFlowCoordinator.showQuestionDialog(
+            questionRequest,
+            tabId,
+            { applyResolution: false, forceInline: true },
+          );
+          return mapCodexApprovalResolution(result);
         } finally {
           this.questionRuntimeServices.inlineCardRenderer.clear(tabId);
         }
@@ -1820,6 +1884,11 @@ export class OpenCodianView extends ItemView {
             toolCall,
             this.currentConversation?.backend,
           ),
+        {
+          onOpenMcpServerDetail: (serverName) => this.openCodexMcpServerDetailFromChat(serverName),
+          onAuthenticateMcpServer: (serverName) => { void this.authenticateMcpServerFromChat(serverName); },
+          onRetryMcpToolCall: (toolCall) => { void this.retryMcpToolCallFromChat(toolCall); },
+        },
       ),
     };
   }
@@ -3221,6 +3290,9 @@ export class OpenCodianView extends ItemView {
 
   /** Build the UI structure */
   private buildUI() {
+    if (this.chatContainerEl) {
+      return;
+    }
     this.chatContainerEl = this.contentEl.createDiv({ cls: 'opencodian-container' });
 
     // Header
@@ -4179,6 +4251,139 @@ export class OpenCodianView extends ItemView {
       ?? this.currentConversation?.backend
       ?? 'opencode'
     ) === 'codex';
+  }
+
+  private openCodexMcpServerDetailFromChat(serverName: string): void {
+    if (!this.isCodexConversationActive()) {
+      return;
+    }
+    const adapter = this.plugin.agentServiceRegistry?.get('codex') as {
+      getMcpServerStatus?: () => Promise<unknown[] | null>;
+      reloadMcpServers?: () => Promise<boolean>;
+      triggerMcpServerOAuth?: (name: string, options?: { scopes?: string[]; timeoutSecs?: number; onAuthorizationUrl?: (url: string) => void }) => Promise<import('../../core/agents/backend/CodexAppServerClient').McpOauthLoginResult | null>;
+      readMcpServerResource?: (server: string, uri: string) => Promise<unknown>;
+    } | null;
+    if (!adapter) {
+      return;
+    }
+    new CodexMcpServerDetailModal(
+      this.app,
+      createCodexMcpServerDetailHost(adapter),
+      serverName,
+    ).open();
+  }
+
+  private async authenticateMcpServerFromChat(serverName: string): Promise<void> {
+    if (!this.isCodexConversationActive()) {
+      return;
+    }
+    const adapter = this.plugin.agentServiceRegistry?.get('codex') as {
+      triggerMcpServerOAuth?: (name: string, options?: { scopes?: string[]; timeoutSecs?: number; onAuthorizationUrl?: (url: string) => void }) => Promise<import('../../core/agents/backend/CodexAppServerClient').McpOauthLoginResult | null>;
+    } | null;
+    if (!adapter?.triggerMcpServerOAuth) {
+      return;
+    }
+    new Notice(t('settings.codex.mcpDetail.authenticating'));
+    try {
+      const result = await adapter.triggerMcpServerOAuth(serverName, {
+        onAuthorizationUrl: (url: string) => {
+          new Notice(t('settings.codex.mcpDetail.authBrowserOpened'));
+          window.open(url, '_blank');
+        },
+      });
+      if (!result || result.outcome === 'failed') {
+        new Notice(t('settings.codex.mcpDetail.authFailed'));
+        applyMcpAuthOutcomeToContainer(this.contentEl, serverName, 'failed');
+      } else if (result.outcome === 'completed') {
+        new Notice(t('settings.codex.mcpDetail.authSucceeded'));
+        applyMcpAuthOutcomeToContainer(this.contentEl, serverName, 'completed');
+      } else {
+        new Notice(t('settings.codex.mcpDetail.authPending'));
+        applyMcpAuthOutcomeToContainer(this.contentEl, serverName, 'pending');
+      }
+    } catch {
+      new Notice(t('settings.codex.mcpDetail.authFailed'));
+      applyMcpAuthOutcomeToContainer(this.contentEl, serverName, 'failed');
+    }
+  }
+
+  private async retryMcpToolCallFromChat(toolCall: ToolCallInfo): Promise<void> {
+    if (!this.isCodexConversationActive()) {
+      return;
+    }
+    const serverName = getMcpServerName(toolCall);
+    if (!serverName) {
+      return;
+    }
+    const backendSessionId = this.currentConversation?.backendSessionId;
+    if (!backendSessionId) {
+      applyMcpRetryOutcome(this.contentEl, toolCall.id, {
+        ok: false,
+        text: 'Retry unavailable — no backend thread yet. Re-send your message to continue.',
+      });
+      return;
+    }
+    const adapter = this.plugin.agentServiceRegistry?.get('codex') as {
+      retryMcpToolCall?: (
+        backendSessionId: string,
+        server: string,
+        tool: string,
+        toolArguments: Record<string, unknown>,
+      ) => Promise<import('../../core/agents/backend/CodexAppServerClient').AppServerMcpToolCallResult | null>;
+    } | null;
+    if (!adapter?.retryMcpToolCall) {
+      applyMcpRetryOutcome(this.contentEl, toolCall.id, {
+        ok: false,
+        text: 'Retry unavailable — app-server not reachable.',
+      });
+      return;
+    }
+    try {
+      const result = await adapter.retryMcpToolCall(
+        backendSessionId,
+        serverName,
+        toolCall.name,
+        toolCall.input ?? {},
+      );
+      if (!result) {
+        applyMcpRetryOutcome(this.contentEl, toolCall.id, {
+          ok: false,
+          text: 'Retry failed — app-server not reachable.',
+        });
+        return;
+      }
+      if (result.errorReason) {
+        applyMcpRetryOutcome(this.contentEl, toolCall.id, {
+          ok: false,
+          text: `Retry failed: ${result.errorReason}`,
+        });
+        return;
+      }
+      const text = result.content
+        .map((entry) => entry.text ?? '')
+        .filter((line) => line.length > 0)
+        .join('\n')
+        .trim();
+      if (result.isError) {
+        applyMcpRetryOutcome(this.contentEl, toolCall.id, {
+          ok: false,
+          text: text || 'Retry failed — the tool returned an error. Auth may not be the only issue.',
+        });
+        return;
+      }
+      const preview = text.length > 200 ? `${text.slice(0, 200)}...` : text;
+      applyMcpRetryOutcome(this.contentEl, toolCall.id, {
+        ok: true,
+        text: preview
+          ? `Retry succeeded. ${preview}`
+          : 'Retry succeeded — the tool call works now. Re-send your message to continue.',
+      });
+    } catch {
+      applyMcpRetryOutcome(this.contentEl, toolCall.id, {
+        ok: false,
+        text: 'Retry failed — unexpected error.',
+      });
+    }
   }
 
   private getBackendScopedActiveTabModelOverride(): ModelSelectorSelection | null {

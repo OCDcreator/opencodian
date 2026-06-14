@@ -1,125 +1,46 @@
 import { Setting } from 'obsidian';
 
-import {
-  DEFAULT_SETTINGS,
-  getDefaultCodexBackendSettings,
-} from '../../../../src/core/types';
-import { SettingsCodexSection } from '../../../../src/features/settings/SettingsCodexSection';
+import { SettingsCodexAccountSurface } from '../../../../src/features/settings/SettingsCodexAccountSurface';
 import { setLocale, t } from '../../../../src/i18n';
 import type OpenCodianPlugin from '../../../../src/main';
 
 type TestPlugin = {
   settings: OpenCodianPlugin['settings'];
-  saveSettings: jest.Mock;
-  app: { workspace: Record<string, unknown> };
   agentServiceRegistry: { get: jest.Mock };
-  activateView: jest.Mock;
-  createConversationFromBackendSession: jest.Mock;
-  loadBackendSessionConversation: jest.Mock;
 };
 
-const settingNames: string[] = [];
-const buttonRecords: Array<{ name: string; label?: string; onClick?: () => void }> = [];
+const buttonRecords: Array<{ label?: string; onClick?: () => void }> = [];
 
-function createPlugin(): TestPlugin {
+function createPlugin(adapterOverrides: Record<string, unknown> = {}): TestPlugin {
   return {
-    settings: {
-      ...DEFAULT_SETTINGS,
-      backendSettings: {
-        ...DEFAULT_SETTINGS.backendSettings,
-        codex: {
-          ...getDefaultCodexBackendSettings(),
-          apiKey: 'test-key',
-          model: 'codex-mini-latest',
-        },
-      },
-    },
-    saveSettings: jest.fn().mockResolvedValue(undefined),
-    app: { workspace: {} },
+    settings: {} as OpenCodianPlugin['settings'],
     agentServiceRegistry: {
-      get: jest.fn((backend: string) => backend === 'codex' ? {} : null),
+      get: jest.fn((backend: string) => backend === 'codex' ? adapterOverrides : null),
     },
-    activateView: jest.fn().mockResolvedValue(undefined),
-    createConversationFromBackendSession: jest.fn().mockResolvedValue('conv-resumed-123'),
-    loadBackendSessionConversation: jest.fn().mockResolvedValue(undefined),
   };
 }
 
-function createSectionHeading(containerEl: HTMLElement, title: string): HTMLHeadingElement {
-  const headingEl = document.createElement('h2');
-  headingEl.textContent = title;
-  containerEl.appendChild(headingEl);
-  return headingEl;
+async function flush(): Promise<void> {
+  for (let i = 0; i < 10; i += 1) {
+    await Promise.resolve();
+  }
+  await new Promise((r) => setTimeout(r, 0));
 }
 
 function mockSettingPrototype(): void {
-  jest.spyOn(Setting.prototype, 'setName').mockImplementation(function setName(this: Setting, name: string) {
-    (this as Setting & { __settingName?: string }).__settingName = name;
-    settingNames.push(name);
-    return this;
-  });
+  jest.spyOn(Setting.prototype, 'setName').mockReturnThis();
   jest.spyOn(Setting.prototype, 'setDesc').mockReturnThis();
-  jest.spyOn(Setting.prototype, 'setClass').mockReturnThis();
-  jest.spyOn(Setting.prototype, 'addText').mockImplementation(function addText(
-    this: Setting,
-    callback: (control: { setPlaceholder: jest.Mock; setValue: jest.Mock; onChange: jest.Mock }) => unknown,
-  ) {
-    callback({
-      setPlaceholder: jest.fn().mockReturnThis(),
-      setValue: jest.fn().mockReturnThis(),
-      onChange: jest.fn().mockReturnThis(),
-    });
-    return this;
-  });
-  jest.spyOn(Setting.prototype, 'addDropdown').mockImplementation(function addDropdown(
-    this: Setting,
-    callback: (control: { addOption: jest.Mock; setValue: jest.Mock; onChange: jest.Mock }) => unknown,
-  ) {
-    callback({
-      addOption: jest.fn().mockReturnThis(),
-      setValue: jest.fn().mockReturnThis(),
-      onChange: jest.fn().mockReturnThis(),
-    });
-    return this;
-  });
-  jest.spyOn(Setting.prototype, 'addToggle').mockImplementation(function addToggle(
-    this: Setting,
-    callback: (control: { setValue: jest.Mock; onChange: jest.Mock }) => unknown,
-  ) {
-    callback({
-      setValue: jest.fn().mockReturnThis(),
-      onChange: jest.fn().mockReturnThis(),
-    });
-    return this;
-  });
-  jest.spyOn(Setting.prototype, 'addTextArea').mockImplementation(function addTextArea(
-    this: Setting,
-    callback: (control: { setPlaceholder: jest.Mock; setValue: jest.Mock; onChange: jest.Mock }) => unknown,
-  ) {
-    callback({
-      setPlaceholder: jest.fn().mockReturnThis(),
-      setValue: jest.fn().mockReturnThis(),
-      onChange: jest.fn().mockReturnThis(),
-    });
-    return this;
-  });
+  jest.spyOn(Setting.prototype, 'setTooltip').mockReturnThis();
   jest.spyOn(Setting.prototype, 'addButton').mockImplementation(function addButton(
     this: Setting,
-    callback: (control: { setButtonText: jest.Mock; setDisabled: jest.Mock; onClick: jest.Mock }) => unknown,
+    callback: (control: { setButtonText: jest.Mock; setDisabled: jest.Mock; onClick: jest.Mock; setTooltip: jest.Mock }) => unknown,
   ) {
-    const record: { name: string; label?: string; onClick?: () => void } = {
-      name: (this as Setting & { __settingName?: string }).__settingName ?? '',
-    };
+    const record: { label?: string; onClick?: () => void } = {};
     const control = {
-      setButtonText: jest.fn().mockImplementation((value: string) => {
-        record.label = value;
-        return control;
-      }),
+      setButtonText: jest.fn().mockImplementation((value: string) => { record.label = value; return control; }),
       setDisabled: jest.fn().mockReturnThis(),
-      onClick: jest.fn().mockImplementation((handler: () => void) => {
-        record.onClick = handler;
-        return control;
-      }),
+      setTooltip: jest.fn().mockReturnThis(),
+      onClick: jest.fn().mockImplementation((handler: () => void) => { record.onClick = handler; return control; }),
     };
     buttonRecords.push(record);
     callback(control);
@@ -128,10 +49,9 @@ function mockSettingPrototype(): void {
   jest.spyOn(Setting.prototype, 'then').mockReturnThis();
 }
 
-describe('SettingsCodexSection account info readback', () => {
+describe('SettingsCodexAccountSurface — account identity card', () => {
   beforeEach(() => {
     setLocale('en');
-    settingNames.length = 0;
     buttonRecords.length = 0;
     mockSettingPrototype();
   });
@@ -140,172 +60,124 @@ describe('SettingsCodexSection account info readback', () => {
     jest.restoreAllMocks();
   });
 
-  it('renders account info readback control', () => {
-    const plugin = createPlugin();
-    const section = new SettingsCodexSection({
-      plugin: plugin as never,
-      createSectionHeading,
+  it('mounts the identity card and auto-loads from app-server account/read', async () => {
+    const getAccountInfo = jest.fn().mockResolvedValue({
+      account: { type: 'apiKey' },
+      requiresOpenaiAuth: true,
     });
+    const plugin = createPlugin({ getAccountInfo });
+    const surface = new SettingsCodexAccountSurface({ plugin: plugin as never });
     const containerEl = document.createElement('div');
-    section.attach(containerEl);
+    surface.attach(containerEl, 'plugin-api-key');
+    await flush();
 
-    expect(settingNames).toContain(t('settings.codex.accountInfo.name'));
+    const identityEl = containerEl.querySelector('[data-codex-identity-readback]');
+    expect(identityEl).toBeTruthy();
+    expect(getAccountInfo).toHaveBeenCalled();
+    expect(identityEl!.getAttribute('data-auth-mode')).toBe('apikey');
+    expect(identityEl!.getAttribute('data-auth-source')).toBe('plugin-api-key');
   });
 
-  it('renders account info inspect button', () => {
-    const plugin = createPlugin();
-    const section = new SettingsCodexSection({
-      plugin: plugin as never,
-      createSectionHeading,
+  it('renders a ChatGPT badge, email and plan under ChatGPT auth', async () => {
+    const plugin = createPlugin({
+      getAccountInfo: jest.fn().mockResolvedValue({
+        account: { type: 'chatgpt', email: 'user@example.com', planType: 'pro' },
+        requiresOpenaiAuth: false,
+      }),
     });
+    const surface = new SettingsCodexAccountSurface({ plugin: plugin as never });
     const containerEl = document.createElement('div');
-    section.attach(containerEl);
+    surface.attach(containerEl, 'env-or-chatgpt');
+    await flush();
 
-    const inspectButton = buttonRecords.find(
-      (r) => r.label === t('settings.codex.accountInfo.inspectButton'),
-    );
-    expect(inspectButton).toBeDefined();
-    expect(inspectButton!.onClick).toBeDefined();
+    const identityEl = containerEl.querySelector('[data-codex-identity-readback]')!;
+    expect(identityEl.getAttribute('data-auth-mode')).toBe('chatgpt');
+    expect(identityEl.querySelector('.is-chatgpt')).toBeTruthy();
+    expect(identityEl.textContent).toContain('user@example.com');
+    expect(identityEl.textContent).toContain('Pro');
   });
 
-  it('shows unavailable when adapter does not have getAccountInfo', async () => {
-    const plugin = createPlugin();
-    plugin.agentServiceRegistry.get = jest.fn(() => ({}));
-    const section = new SettingsCodexSection({
-      plugin: plugin as never,
-      createSectionHeading,
+  it('shows an honest ChatGPT-auth-required note and codex login hint under API-key auth', async () => {
+    const plugin = createPlugin({
+      getAccountInfo: jest.fn().mockResolvedValue({ account: { type: 'apiKey' }, requiresOpenaiAuth: true }),
     });
+    const surface = new SettingsCodexAccountSurface({ plugin: plugin as never });
     const containerEl = document.createElement('div');
-    section.attach(containerEl);
+    surface.attach(containerEl, 'plugin-api-key');
+    await flush();
 
-    const inspectButton = buttonRecords.find(
-      (r) => r.label === t('settings.codex.accountInfo.inspectButton'),
-    );
-    await inspectButton!.onClick!();
-
-    const readbackEl = containerEl.querySelector('[data-codex-account-info-readback]');
-    expect(readbackEl).toBeTruthy();
-    expect(readbackEl!.textContent).toBe(t('settings.codex.accountInfo.unavailable'));
+    const identityEl = containerEl.querySelector('[data-codex-identity-readback]')!;
+    const notice = identityEl.querySelector('[data-auth-required-notice]');
+    expect(notice).toBeTruthy();
+    expect(identityEl.textContent).toContain('codex login');
   });
 
-  it('shows unavailable when getAccountInfo returns null', async () => {
-    const plugin = createPlugin();
-    plugin.agentServiceRegistry.get = jest.fn(() => ({
-      getAccountInfo: jest.fn().mockResolvedValue(null),
-    }));
-    const section = new SettingsCodexSection({
-      plugin: plugin as never,
-      createSectionHeading,
+  it('falls back to CLI doctor shape and detects chatgpt mode', async () => {
+    const plugin = createPlugin({
+      getAccountInfo: jest.fn().mockResolvedValue({
+        'stored auth mode': 'chatgpt',
+        'stored API key': 'false',
+        'stored ChatGPT tokens': 'true',
+      }),
     });
+    const surface = new SettingsCodexAccountSurface({ plugin: plugin as never });
     const containerEl = document.createElement('div');
-    section.attach(containerEl);
+    surface.attach(containerEl, 'env-or-chatgpt');
+    await flush();
 
-    const inspectButton = buttonRecords.find(
-      (r) => r.label === t('settings.codex.accountInfo.inspectButton'),
-    );
-    await inspectButton!.onClick!();
-
-    const readbackEl = containerEl.querySelector('[data-codex-account-info-readback]');
-    expect(readbackEl).toBeTruthy();
-    expect(readbackEl!.textContent).toBe(t('settings.codex.accountInfo.unavailable'));
+    const identityEl = containerEl.querySelector('[data-codex-identity-readback]')!;
+    expect(identityEl.getAttribute('data-auth-mode')).toBe('chatgpt');
+    expect(identityEl.querySelector('.is-chatgpt')).toBeTruthy();
   });
 
-  it('shows readback when getAccountInfo returns data', async () => {
-    const mockAccountInfo = {
-      'auth file': '/Users/test/.codex/auth.json',
-      'auth storage mode': 'File',
-      'stored API key': 'false',
-      'stored ChatGPT tokens': 'true',
-      'stored auth mode': 'chatgpt',
-    };
-    const plugin = createPlugin();
-    plugin.agentServiceRegistry.get = jest.fn(() => ({
-      getAccountInfo: jest.fn().mockResolvedValue(mockAccountInfo),
-    }));
-    const section = new SettingsCodexSection({
-      plugin: plugin as never,
-      createSectionHeading,
-    });
+  it('shows an unavailable product state when getAccountInfo returns null', async () => {
+    const plugin = createPlugin({ getAccountInfo: jest.fn().mockResolvedValue(null) });
+    const surface = new SettingsCodexAccountSurface({ plugin: plugin as never });
     const containerEl = document.createElement('div');
-    section.attach(containerEl);
+    surface.attach(containerEl, 'plugin-api-key');
+    await flush();
 
-    const inspectButton = buttonRecords.find(
-      (r) => r.label === t('settings.codex.accountInfo.inspectButton'),
-    );
-    await inspectButton!.onClick!();
-
-    const readbackEl = containerEl.querySelector('[data-codex-account-info-readback]');
-    expect(readbackEl).toBeTruthy();
-    expect(readbackEl!.textContent).toContain(t('settings.codex.accountInfo.summary'));
+    const identityEl = containerEl.querySelector('[data-codex-identity-readback]')!;
+    expect(identityEl.textContent).toContain(t('settings.codex.accountSurface.identity.unavailable'));
   });
 
-  it('sanitizes secret keys in account info readback', async () => {
-    const mockAccountInfo = {
-      'auth file': '/Users/test/.codex/auth.json',
-      'stored API key': 'sk-super-secret-key-value',
-      'stored auth mode': 'chatgpt',
-    };
-    const plugin = createPlugin();
-    plugin.agentServiceRegistry.get = jest.fn(() => ({
-      getAccountInfo: jest.fn().mockResolvedValue(mockAccountInfo),
-    }));
-    const section = new SettingsCodexSection({
-      plugin: plugin as never,
-      createSectionHeading,
-    });
+  it('shows a failed product state when getAccountInfo throws', async () => {
+    const plugin = createPlugin({ getAccountInfo: jest.fn().mockRejectedValue(new Error('boom')) });
+    const surface = new SettingsCodexAccountSurface({ plugin: plugin as never });
     const containerEl = document.createElement('div');
-    section.attach(containerEl);
+    surface.attach(containerEl, 'plugin-api-key');
+    await flush();
 
-    const inspectButton = buttonRecords.find(
-      (r) => r.label === t('settings.codex.accountInfo.inspectButton'),
-    );
-    await inspectButton!.onClick!();
-
-    const readbackEl = containerEl.querySelector('[data-codex-account-info-readback]');
-    expect(readbackEl).toBeTruthy();
-    expect(readbackEl!.textContent).not.toContain('sk-super-secret-key-value');
-    expect(readbackEl!.textContent).toContain('[redacted]');
+    const identityEl = containerEl.querySelector('[data-codex-identity-readback]')!;
+    expect(identityEl.textContent).toContain(t('settings.codex.accountSurface.identity.failed'));
   });
 
-  it('shows failed when getAccountInfo throws', async () => {
-    const plugin = createPlugin();
-    plugin.agentServiceRegistry.get = jest.fn(() => ({
-      getAccountInfo: jest.fn().mockRejectedValue(new Error('CLI not found')),
-    }));
-    const section = new SettingsCodexSection({
-      plugin: plugin as never,
-      createSectionHeading,
-    });
+  it('shows unavailable when the adapter has no getAccountInfo', async () => {
+    const plugin = createPlugin({});
+    const surface = new SettingsCodexAccountSurface({ plugin: plugin as never });
     const containerEl = document.createElement('div');
-    section.attach(containerEl);
+    surface.attach(containerEl, 'plugin-api-key');
+    await flush();
 
-    const inspectButton = buttonRecords.find(
-      (r) => r.label === t('settings.codex.accountInfo.inspectButton'),
-    );
-    await inspectButton!.onClick!();
-
-    const readbackEl = containerEl.querySelector('[data-codex-account-info-readback]');
-    expect(readbackEl).toBeTruthy();
-    expect(readbackEl!.textContent).toBe(t('settings.codex.accountInfo.failed'));
+    const identityEl = containerEl.querySelector('[data-codex-identity-readback]')!;
+    expect(identityEl.textContent).toContain(t('settings.codex.accountSurface.identity.unavailable'));
   });
 
-  it('shows unavailable when adapter registry returns null', async () => {
-    const plugin = createPlugin();
-    plugin.agentServiceRegistry.get = jest.fn(() => null);
-    const section = new SettingsCodexSection({
-      plugin: plugin as never,
-      createSectionHeading,
-    });
+  it('re-reads identity when the card refresh button is clicked', async () => {
+    const getAccountInfo = jest.fn()
+      .mockResolvedValueOnce({ account: { type: 'apiKey' }, requiresOpenaiAuth: true })
+      .mockResolvedValueOnce({ account: { type: 'chatgpt', email: 'a@b.com' } });
+    const plugin = createPlugin({ getAccountInfo });
+    const surface = new SettingsCodexAccountSurface({ plugin: plugin as never });
     const containerEl = document.createElement('div');
-    section.attach(containerEl);
+    surface.attach(containerEl, 'plugin-api-key');
+    await flush();
 
-    const inspectButton = buttonRecords.find(
-      (r) => r.label === t('settings.codex.accountInfo.inspectButton'),
-    );
-    await inspectButton!.onClick!();
+    const refresh = buttonRecords.find((r) => r.label === t('settings.codex.accountSurface.refresh'));
+    expect(refresh?.onClick).toBeDefined();
+    refresh!.onClick!();
+    await flush();
 
-    const readbackEl = containerEl.querySelector('[data-codex-account-info-readback]');
-    expect(readbackEl).toBeTruthy();
-    expect(readbackEl!.textContent).toBe(t('settings.codex.accountInfo.unavailable'));
+    expect(getAccountInfo).toHaveBeenCalledTimes(2);
   });
 });

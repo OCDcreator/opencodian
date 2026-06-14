@@ -121,19 +121,21 @@ describe('CodexAppServerClient.getAccountUsage', () => {
     const usage = await client.getAccountUsage();
 
     expect(usage).toEqual({
-      summary: {
-        totalTokens: 1234567,
-        totalRequests: 42,
-        accountId: 'user-123',
+      usage: {
+        summary: {
+          totalTokens: 1234567,
+          totalRequests: 42,
+          accountId: 'user-123',
+        },
+        dailyUsageBuckets: [
+          { date: '2026-06-01', tokens: 100000, requests: 5 },
+          { date: '2026-06-02', tokens: 200000, requests: 10 },
+        ],
       },
-      dailyUsageBuckets: [
-        { date: '2026-06-01', tokens: 100000, requests: 5 },
-        { date: '2026-06-02', tokens: 200000, requests: 10 },
-      ],
     });
   });
 
-  it('returns null on error', async () => {
+  it('returns errorReason when app-server route fails (e.g. chatgpt auth required)', async () => {
     const proc = createMockProcess();
     mockSpawn.mockReturnValue(proc);
     emitWsUrl(proc.stdout!);
@@ -148,14 +150,20 @@ describe('CodexAppServerClient.getAccountUsage', () => {
         setTimeout(() => simulateResponse(msg.id, {}), 5);
       } else if (msg.method === 'account/usage/read') {
         setTimeout(() => {
-          simulateError(msg.id, { code: -32600, message: 'Invalid request' });
+          simulateError(msg.id, {
+            code: -32600,
+            message: 'chatgpt authentication required to read token usage',
+          });
         }, 5);
       }
     });
 
     const usage = await client.getAccountUsage();
 
-    expect(usage).toBeNull();
+    expect(usage).toEqual({
+      usage: null,
+      errorReason: expect.stringContaining('chatgpt authentication required'),
+    });
   });
 
   it('returns account usage without optional dailyUsageBuckets', async () => {
@@ -185,8 +193,10 @@ describe('CodexAppServerClient.getAccountUsage', () => {
     const usage = await client.getAccountUsage();
 
     expect(usage).toEqual({
-      summary: {
-        totalTokens: 999,
+      usage: {
+        summary: {
+          totalTokens: 999,
+        },
       },
     });
   });
@@ -219,8 +229,10 @@ describe('CodexAppServerClient.getAccountUsage', () => {
     });
 
     await expect(client.getAccountUsage()).resolves.toEqual({
-      summary: {
-        totalTokens: 1,
+      usage: {
+        summary: {
+          totalTokens: 1,
+        },
       },
     });
     expect(hasParamsField).toBe(false);
@@ -250,6 +262,6 @@ describe('CodexAppServerClient.getAccountUsage', () => {
 
     const usage = await client.getAccountUsage();
 
-    expect(usage).toBeNull();
+    expect(usage).toEqual({ usage: null });
   });
 });

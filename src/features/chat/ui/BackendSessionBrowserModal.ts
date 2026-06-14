@@ -1,20 +1,54 @@
 import { App, Modal } from 'obsidian';
 
+import { AgentCapability } from '../../../core/agents/AgentCapability';
 import {
-  getBackendSessionDetail,
+  archiveBackendSession,
+  forkBackendSession,
   getBackendSessionPreview,
   listBackendSessions,
-  type NormalizedSessionDetail,
   type NormalizedSessionPreviewMessage,
-  type NormalizedSessionPreviewPart,
   type NormalizedSessionRow,
+  unarchiveBackendSession,
 } from '../../../core/agents/backend/AgentBackendRouting';
 import type { AgentServiceRegistry } from '../../../core/agents/backend/AgentServiceRegistry';
 import type { AgentBackendKind } from '../../../core/types/chat';
 import { t } from '../../../i18n';
 import { createLogger } from '../../../shared';
+import { renderBackendSessionDetail } from './BackendSessionBrowserDetail';
 
 const logger = createLogger('BackendSessionBrowserModal');
+
+/** Icon prefix for an activity part type. */
+function activityIcon(partType: string): string {
+  switch (partType) {
+    case 'tool_call': return '\u2699'; // gear
+    case 'file_change': return '\u{1F4C4}'; // page facing up
+    case 'web_search': return '\u{1F50D}'; // magnifying glass
+    default: return '\u2022'; // bullet
+  }
+}
+
+/** Render a single activity line (tool call / file change / web search) in preview. */
+function renderPreviewActivityLine(containerEl: HTMLElement, part: { type: string; text: string }): void {
+  const icon = activityIcon(part.type);
+  const label = part.type === 'tool_call'
+    ? t('chat.backendSessions.activityTool')
+    : part.type === 'file_change'
+      ? t('chat.backendSessions.activityFile')
+      : part.type === 'web_search'
+        ? t('chat.backendSessions.activitySearch')
+        : '';
+  const lineEl = containerEl.createDiv({
+    cls: 'opencodian-backend-session-browser-preview-activity',
+    attr: { 'data-activity': part.type },
+  });
+  lineEl.createSpan({ cls: 'opencodian-backend-session-browser-preview-activity-icon', text: icon });
+  if (label) {
+    lineEl.createSpan({ cls: 'opencodian-backend-session-browser-preview-activity-label', text: label });
+  }
+  const textContent = part.text.length > 120 ? part.text.slice(0, 120) + '\u2026' : part.text;
+  lineEl.createSpan({ cls: 'opencodian-backend-session-browser-preview-activity-text', text: textContent });
+}
 
 /** Lightweight chat message used to seed a resumed conversation with preview content. */
 export interface BackendSessionPreviewChatMessage {
@@ -52,6 +86,7 @@ export class BackendSessionBrowserModal extends Modal {
   private footerEl: HTMLElement | null = null;
   private loading = false;
   private viewMode: ViewMode = 'preview';
+  private searchQuery = '';
 
   constructor(
     app: App,
@@ -88,6 +123,22 @@ export class BackendSessionBrowserModal extends Modal {
 
     // Left: session list
     const listContainer = containerEl.createDiv({ cls: 'opencodian-backend-session-browser-list' });
+
+    // Search box at top of list
+    const searchWrapper = listContainer.createDiv({ cls: 'opencodian-backend-session-browser-search' });
+    const searchInput = searchWrapper.createEl('input', {
+      cls: 'opencodian-backend-session-browser-search-input',
+      attr: {
+        type: 'search',
+        placeholder: t('chat.backendSessions.searchPlaceholder'),
+        'aria-label': t('chat.backendSessions.searchPlaceholder'),
+      },
+    });
+    searchInput.addEventListener('input', () => {
+      this.searchQuery = searchInput.value.toLowerCase().trim();
+      this.renderSessionList();
+    });
+
     this.listEl = listContainer.createDiv({ cls: 'opencodian-backend-session-browser-list-inner' });
 
     // Right: preview / detail
@@ -108,6 +159,7 @@ export class BackendSessionBrowserModal extends Modal {
     this.sessions = [];
     this.selectedSessionId = null;
     this.viewMode = 'preview';
+    this.searchQuery = '';
   }
 
   // ─── Footer rendering ────────────────────────────────────────────
@@ -118,13 +170,14 @@ export class BackendSessionBrowserModal extends Modal {
 
     const canResume = this.host.supportsResume?.() ?? true;
     const showResume = canResume && this.viewMode === 'preview';
+    const hasSelection = Boolean(this.selectedSessionId);
 
     if (showResume) {
       const resumeBtn = this.footerEl.createEl('button', {
         cls: 'mod-cta opencodian-backend-session-browser-resume-btn',
         text: t('chat.backendSessions.resumeButton'),
       });
-      resumeBtn.disabled = !this.selectedSessionId || this.host.isStreaming();
+      resumeBtn.disabled = !hasSelection || this.host.isStreaming();
       resumeBtn.addEventListener('click', () => {
         if (this.selectedSessionId) {
           void this.resumeSession(this.selectedSessionId);
@@ -132,13 +185,18 @@ export class BackendSessionBrowserModal extends Modal {
       });
     }
 
+    // Lifecycle actions (fork / archive / unarchive) when the active backend
+    // session service supports them. State-specific: only show the action that
+    // matches the selected session's current archive state.
+    this.renderLifecycleActions(hasSelection, this.host.isStreaming());
+
     // View Details / Back button
     if (this.viewMode === 'preview') {
       const detailBtn = this.footerEl.createEl('button', {
         cls: 'opencodian-backend-session-browser-detail-btn',
         text: t('chat.backendSessions.viewDetails'),
       });
-      detailBtn.disabled = !this.selectedSessionId;
+      detailBtn.disabled = !hasSelection;
       detailBtn.addEventListener('click', () => {
         if (this.selectedSessionId) {
           this.viewMode = 'detail';
@@ -169,6 +227,62 @@ export class BackendSessionBrowserModal extends Modal {
     });
   }
 
+  /**
+   * Render the state-specific lifecycle action buttons (fork / archive /
+   * unarchive). Only the action matching the selected session's current archive
+   * state is shown, and only when the active backend session service advertises
+   * the relevant capability. No-op outside preview mode.
+   */
+  private renderLifecycleActions(hasSelection: boolean, streaming: boolean): void {
+    if (!this.footerEl) return;
+    if (this.viewMode !== 'preview') return;
+
+    const registry = this.getScopedRegistry();
+    const activeService = registry?.getActive() ?? null;
+    const selectedSession = this.sessions.find((s) => s.id === this.selectedSessionId);
+    const selectedArchived = selectedSession?.archived ?? false;
+    const disabled = !hasSelection || streaming;
+
+    if (activeService?.hasCapability(AgentCapability.Fork) && !selectedArchived) {
+      const forkBtn = this.footerEl.createEl('button', {
+        cls: 'opencodian-backend-session-browser-fork-btn',
+        text: t('chat.backendSessions.forkButton'),
+      });
+      forkBtn.disabled = disabled;
+      forkBtn.addEventListener('click', () => {
+        if (this.selectedSessionId) {
+          void this.forkSession(this.selectedSessionId);
+        }
+      });
+    }
+
+    if (activeService?.hasCapability(AgentCapability.Sessions) && hasSelection && !selectedArchived) {
+      const archiveBtn = this.footerEl.createEl('button', {
+        cls: 'opencodian-backend-session-browser-archive-btn',
+        text: t('chat.backendSessions.archiveButton'),
+      });
+      archiveBtn.disabled = disabled;
+      archiveBtn.addEventListener('click', () => {
+        if (this.selectedSessionId) {
+          void this.archiveSession(this.selectedSessionId);
+        }
+      });
+    }
+
+    if (activeService?.hasCapability(AgentCapability.Sessions) && hasSelection && selectedArchived) {
+      const unarchiveBtn = this.footerEl.createEl('button', {
+        cls: 'mod-cta opencodian-backend-session-browser-unarchive-btn',
+        text: t('chat.backendSessions.unarchiveButton'),
+      });
+      unarchiveBtn.disabled = disabled;
+      unarchiveBtn.addEventListener('click', () => {
+        if (this.selectedSessionId) {
+          void this.unarchiveSession(this.selectedSessionId);
+        }
+      });
+    }
+  }
+
   // ─── Session list ────────────────────────────────────────────────
 
   private async loadSessions(): Promise<void> {
@@ -195,6 +309,13 @@ export class BackendSessionBrowserModal extends Modal {
     this.renderFooter();
   }
 
+  private getFilteredSessions(): NormalizedSessionRow[] {
+    if (!this.searchQuery) return this.sessions;
+    return this.sessions.filter((s) =>
+      (s.title || '').toLowerCase().includes(this.searchQuery),
+    );
+  }
+
   private renderSessionList(): void {
     if (!this.listEl) return;
     this.listEl.empty();
@@ -207,7 +328,17 @@ export class BackendSessionBrowserModal extends Modal {
       return;
     }
 
-    for (const session of this.sessions) {
+    const filtered = this.getFilteredSessions();
+
+    if (filtered.length === 0) {
+      this.listEl.createEl('p', {
+        cls: 'opencodian-backend-session-browser-empty',
+        text: t('chat.backendSessions.searchNoMatch'),
+      });
+      return;
+    }
+
+    for (const session of filtered) {
       const itemEl = this.listEl.createDiv({
         cls: 'opencodian-backend-session-browser-item',
         attr: { 'data-session-id': session.id },
@@ -217,10 +348,21 @@ export class BackendSessionBrowserModal extends Modal {
         itemEl.addClass('is-selected');
       }
 
+      if (session.archived) {
+        itemEl.addClass('is-archived');
+      }
+
       itemEl.createDiv({
         cls: 'opencodian-backend-session-browser-item-title',
         text: session.title || t('chat.backendSessions.untitled'),
       });
+
+      if (session.archived) {
+        itemEl.createDiv({
+          cls: 'opencodian-backend-session-browser-item-archived',
+          text: t('chat.backendSessions.archivedLabel'),
+        });
+      }
 
       if (session.updatedAt) {
         itemEl.createDiv({
@@ -295,6 +437,13 @@ export class BackendSessionBrowserModal extends Modal {
     const messagesEl = this.previewEl.createDiv({ cls: 'opencodian-backend-session-browser-preview-messages' });
 
     for (const msg of preview) {
+      if (msg.role === 'activity') {
+        for (const part of msg.parts) {
+          renderPreviewActivityLine(messagesEl, part);
+        }
+        continue;
+      }
+
       // Skip messages that would produce a blank role-only row
       const hasText = msg.parts.some((p) => p.type === 'text' && p.text && p.text.trim().length > 0);
       if (!hasText) continue;
@@ -324,160 +473,7 @@ export class BackendSessionBrowserModal extends Modal {
 
   private async renderDetailView(sessionId: string): Promise<void> {
     if (!this.previewEl) return;
-    this.previewEl.empty();
-    this.previewEl.createEl('p', {
-      cls: 'opencodian-backend-session-browser-preview-loading',
-      text: t('chat.backendSessions.detailLoading'),
-    });
-
-    const registry = this.getScopedRegistry();
-
-    // Fetch metadata and transcript in parallel
-    const [detailResult, transcriptResult] = await Promise.all([
-      getBackendSessionDetail(registry, sessionId).catch(() => null),
-      getBackendSessionPreview(registry, sessionId).catch(() => null),
-    ]);
-
-    this.previewEl.empty();
-
-    // Render metadata card
-    this.renderDetailMetadata(this.previewEl, detailResult);
-
-    // Render full transcript
-    this.renderDetailTranscript(this.previewEl, transcriptResult);
-  }
-
-  private renderDetailMetadata(containerEl: HTMLElement, detail: NormalizedSessionDetail | null): void {
-    const metaEl = containerEl.createDiv({
-      cls: 'opencodian-backend-session-browser-detail-metadata',
-    });
-
-    metaEl.createEl('h4', { text: t('chat.backendSessions.detailTitle') });
-
-    if (!detail) {
-      metaEl.createEl('p', {
-        cls: 'opencodian-backend-session-browser-detail-unavailable',
-        text: t('chat.backendSessions.detailMetadataUnavailable'),
-      });
-      return;
-    }
-
-    const fields: Array<{ label: string; value: string | null }> = [
-      { label: t('chat.backendSessions.detailField.id'), value: detail.id },
-      { label: t('chat.backendSessions.detailField.backend'), value: detail.backendKind },
-      { label: t('chat.backendSessions.detailField.title'), value: detail.title || null },
-      { label: t('chat.backendSessions.detailField.customTitle'), value: detail.customTitle },
-      { label: t('chat.backendSessions.detailField.createdAt'), value: detail.createdAt ? this.formatDateTime(detail.createdAt) : null },
-      { label: t('chat.backendSessions.detailField.updatedAt'), value: detail.updatedAt ? this.formatDateTime(detail.updatedAt) : null },
-      { label: t('chat.backendSessions.detailField.gitBranch'), value: detail.gitBranch },
-      { label: t('chat.backendSessions.detailField.cwd'), value: detail.cwd },
-      { label: t('chat.backendSessions.detailField.tag'), value: detail.tag },
-      { label: t('chat.backendSessions.detailField.fileSize'), value: detail.fileSize !== null ? this.formatFileSize(detail.fileSize) : null },
-    ];
-
-    for (const field of fields) {
-      if (field.value === null) continue;
-      const rowEl = metaEl.createDiv({
-        cls: 'opencodian-backend-session-browser-detail-field',
-        attr: { 'data-detail-field': field.label },
-      });
-      rowEl.createEl('span', {
-        cls: 'opencodian-backend-session-browser-detail-field-label',
-        text: field.label,
-      });
-      rowEl.createEl('span', {
-        cls: 'opencodian-backend-session-browser-detail-field-value',
-        text: field.value,
-      });
-    }
-  }
-
-  private renderDetailTranscript(containerEl: HTMLElement, transcript: NormalizedSessionPreviewMessage[] | null): void {
-    const transcriptEl = containerEl.createDiv({
-      cls: 'opencodian-backend-session-browser-detail-transcript',
-    });
-
-    transcriptEl.createEl('h4', { text: t('chat.backendSessions.detailTranscriptTitle') });
-
-    const noticeEl = transcriptEl.createDiv({
-      cls: 'opencodian-backend-session-browser-detail-transcript-notice',
-    });
-    noticeEl.createEl('p', { text: t('chat.backendSessions.detailTranscriptNotice') });
-
-    if (!transcript || transcript.length === 0) {
-      transcriptEl.createEl('p', {
-        cls: 'opencodian-backend-session-browser-detail-transcript-empty',
-        text: t('chat.backendSessions.detailTranscriptEmpty'),
-      });
-      return;
-    }
-
-    transcriptEl.createEl('p', {
-      cls: 'opencodian-backend-session-browser-detail-transcript-count',
-      text: t('chat.backendSessions.detailTranscriptCount', { count: transcript.length }),
-    });
-
-    const messagesEl = transcriptEl.createDiv({
-      cls: 'opencodian-backend-session-browser-detail-messages',
-    });
-
-    for (const msg of transcript) {
-      // Skip messages that would produce a blank role-only row
-      const hasRenderableContent = msg.parts.some((p) => this.partHasContent(p));
-      if (!hasRenderableContent) continue;
-
-      const msgEl = messagesEl.createDiv({
-        cls: `opencodian-backend-session-browser-detail-msg opencodian-backend-session-browser-detail-msg-${msg.role}`,
-      });
-
-      msgEl.createDiv({
-        cls: 'opencodian-backend-session-browser-detail-msg-role',
-        text: msg.role,
-      });
-
-      for (const part of msg.parts) {
-        this.renderDetailPart(msgEl, part);
-      }
-    }
-  }
-
-  /** Whether a part has renderable content (not empty/whitespace-only). */
-  private partHasContent(part: NormalizedSessionPreviewPart): boolean {
-    if (part.type === 'text') {
-      return !!part.text && part.text.trim().length > 0;
-    }
-    // Non-text parts always have some content (serialized JSON or type label)
-    return true;
-  }
-
-  /** Render a single transcript part — text inline, non-text as a collapsed summary. */
-  private renderDetailPart(containerEl: HTMLElement, part: NormalizedSessionPreviewPart): void {
-    if (part.type === 'text' && part.text && part.text.trim().length > 0) {
-      // No truncation in detail view — full text
-      containerEl.createDiv({
-        cls: 'opencodian-backend-session-browser-detail-msg-text',
-        text: part.text,
-      });
-      return;
-    }
-
-    if (part.type === 'text') {
-      // Empty or whitespace-only text part — skip
-      return;
-    }
-
-    // Non-text part: render as collapsed <details> with type label
-    const detailsEl = containerEl.createEl('details', {
-      cls: 'opencodian-backend-session-browser-detail-part-collapsed',
-    });
-    detailsEl.createEl('summary', {
-      text: t('chat.backendSessions.detailNonTextPart', { type: part.type }),
-    });
-    const content = part.text || t('chat.backendSessions.detailNonTextPartEmpty');
-    detailsEl.createEl('pre', {
-      cls: 'opencodian-backend-session-browser-detail-part-content',
-      text: content,
-    });
+    await renderBackendSessionDetail(this.previewEl, sessionId, this.getScopedRegistry());
   }
 
   // ─── Resume flow ─────────────────────────────────────────────────
@@ -529,6 +525,80 @@ export class BackendSessionBrowserModal extends Modal {
     }
   }
 
+  // ─── Fork flow ───────────────────────────────────────────────────
+
+  private async forkSession(sessionId: string): Promise<void> {
+    if (this.host.isStreaming()) {
+      this.host.showNotice(t('chat.backendSessions.forkBlocked'));
+      return;
+    }
+
+    this.setFooterLoading(true);
+    try {
+      const result = await forkBackendSession(this.getScopedRegistry(), sessionId);
+      if (!result) {
+        this.host.showNotice(t('chat.backendSessions.forkFailed'));
+        return;
+      }
+      this.host.showNotice(t('chat.backendSessions.forked', { title: result.title }));
+      this.selectedSessionId = result.id;
+      await this.loadSessions();
+    } catch (err) {
+      logger.warn('Failed to fork backend session', { sessionId, error: err instanceof Error ? err.message : String(err) });
+      this.host.showNotice(t('chat.backendSessions.forkFailed'));
+    } finally {
+      this.setFooterLoading(false);
+    }
+  }
+
+  // ─── Archive flow ────────────────────────────────────────────────
+
+  private async archiveSession(sessionId: string): Promise<void> {
+    this.setFooterLoading(true);
+    try {
+      const ok = await archiveBackendSession(this.getScopedRegistry(), sessionId);
+      if (!ok) {
+        this.host.showNotice(t('chat.backendSessions.archiveFailed'));
+        return;
+      }
+      this.host.showNotice(t('chat.backendSessions.archived'));
+      await this.loadSessions();
+    } catch (err) {
+      logger.warn('Failed to archive backend session', { sessionId, error: err instanceof Error ? err.message : String(err) });
+      this.host.showNotice(t('chat.backendSessions.archiveFailed'));
+    } finally {
+      this.setFooterLoading(false);
+    }
+  }
+
+  // ─── Unarchive flow ──────────────────────────────────────────────
+
+  private async unarchiveSession(sessionId: string): Promise<void> {
+    this.setFooterLoading(true);
+    try {
+      const ok = await unarchiveBackendSession(this.getScopedRegistry(), sessionId);
+      if (!ok) {
+        this.host.showNotice(t('chat.backendSessions.unarchiveFailed'));
+        return;
+      }
+      this.host.showNotice(t('chat.backendSessions.unarchived'));
+      await this.loadSessions();
+    } catch (err) {
+      logger.warn('Failed to unarchive backend session', { sessionId, error: err instanceof Error ? err.message : String(err) });
+      this.host.showNotice(t('chat.backendSessions.unarchiveFailed'));
+    } finally {
+      this.setFooterLoading(false);
+    }
+  }
+
+  private setFooterLoading(loading: boolean): void {
+    if (!this.footerEl) return;
+    const buttons = this.footerEl.querySelectorAll('button');
+    for (const btn of buttons) {
+      (btn as HTMLButtonElement).disabled = loading;
+    }
+  }
+
   // ─── Formatting helpers ──────────────────────────────────────────
 
   private formatDate(timestamp: number): string {
@@ -547,16 +617,5 @@ export class BackendSessionBrowserModal extends Modal {
     if (diffDays < 7) return t('chat.backendSessions.daysAgo', { count: diffDays });
 
     return date.toLocaleDateString();
-  }
-
-  private formatDateTime(timestamp: number): string {
-    const date = new Date(timestamp);
-    return date.toLocaleString();
-  }
-
-  private formatFileSize(bytes: number): string {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   }
 }

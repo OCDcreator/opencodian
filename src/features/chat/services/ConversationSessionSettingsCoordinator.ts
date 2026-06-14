@@ -1,7 +1,10 @@
+/* eslint-disable max-lines -- This coordinator owns session settings modal orchestration, sharing bridge, Codex overrides + live-thread re-resume, thread goal/review delegation, and effective-settings resolution in one cohesive owner; splitting would add indirection without removing real complexity. */
 import type { App } from 'obsidian';
 
 import { readBackendSessionShareUrl } from '../../../core/agents/backend/AgentBackendRouting';
 import type { AgentServiceRegistry } from '../../../core/agents/backend/AgentServiceRegistry';
+import type { CodexModelSummary } from '../../../core/agents/backend/CodexAdapter';
+import type { AppServerReviewResult, AppServerReviewTarget, AppServerThreadGoal } from '../../../core/agents/backend/CodexAppServerClient';
 import type {
   Conversation,
   ConversationSessionSettings,
@@ -51,27 +54,20 @@ export interface ConversationSessionSettingsCoordinatorHost {
   listSessions?(): Promise<ShareInspectionEntry[]>;
   copyText?(text: string): Promise<void>;
   getProjectShareMode?(): Promise<OpencodeShareMode | undefined>;
-  /** Whether to show session sharing controls. Defaults to false. */
   supportsSessionSharing?(): boolean;
-  /** Whether to show title-generation summary rows. OpenCode conversations default to true. */
   supportsTitleGeneration?(): boolean;
-  /** Whether to show compaction summary row. Defaults to false. */
   supportsCompaction?(): boolean;
-  /** Whether to show question-card summary rows. OpenCode conversations default to true. */
   supportsQuestions?(): boolean;
-  /** Returns Codex global defaults. Only called for Codex conversations. */
   getCodexGlobalDefaults?(): { sandboxMode: CodexSandboxMode; modelReasoningEffort: CodexReasoningEffort; model: string; additionalDirectories: string[]; networkAccessEnabled: boolean; webSearchMode: CodexWebSearchMode };
-  /** Pushes Codex runtime overrides to the live adapter for the active conversation. */
   applyCodexRuntimeOverrides?(overrides: { sandboxMode: CodexSandboxMode; modelReasoningEffort: CodexReasoningEffort; model?: string; additionalDirectories?: string[]; networkAccessEnabled?: boolean; webSearchMode?: CodexWebSearchMode }): void;
-  /**
-   * Optional registry for backend-aware session detail reads.
-   * When provided, share-URL reads route through the registry instead of
-   * falling back to `openCodeService.listSessions()`.
-   */
   agentServiceRegistry?: AgentServiceRegistry;
+  /** Open a backend session as a new conversation in the chat view. */
+  openBackendSessionAsConversation?(sessionId: string, title: string): Promise<string | null>;
 }
 
 export class ConversationSessionSettingsCoordinator {
+  private activeModal: ConversationSessionSettingsModal | null = null;
+
   constructor(private readonly host: ConversationSessionSettingsCoordinatorHost) {}
 
   async openCurrentConversationSettings(): Promise<void> {
@@ -89,12 +85,14 @@ export class ConversationSessionSettingsCoordinator {
     const showCompaction = this.host.supportsCompaction?.() === true;
     const isCodex = this.isCodexConversation(conversation);
     const codexDefaults = isCodex ? this.host.getCodexGlobalDefaults?.() : undefined;
+    const codexAvailableModels = isCodex ? await this.loadCodexModelOptions() : undefined;
+    const codexThreadGoal = isCodex ? await this.loadCodexThreadGoal(conversation) : undefined;
 
     const sessionId = getConversationBackendSessionId(conversation);
     const shareUrl = showSharing && sessionId ? await this.getCurrentShareUrl(conversation, sessionId) : undefined;
     const shareMode = showSharing ? await this.getProjectShareMode() : undefined;
 
-    new ConversationSessionSettingsModal(this.host.app, {
+    const modal = new ConversationSessionSettingsModal(this.host.app, {
       conversationTitle: conversation.title || t('chat.history.untitled'),
       defaults: {
         ...this.resolveEffectiveSettings(conversation),
@@ -105,6 +103,8 @@ export class ConversationSessionSettingsCoordinator {
         codexAdditionalDirectories: codexDefaults.additionalDirectories,
         codexNetworkAccessEnabled: codexDefaults.networkAccessEnabled,
         codexWebSearchMode: codexDefaults.webSearchMode,
+        codexAvailableModels,
+        codexThreadGoal,
       } : {}),
       },
       initialOverrides: conversation.sessionSettings,
@@ -129,7 +129,25 @@ export class ConversationSessionSettingsCoordinator {
       onUnshare: showSharing ? async () => {
         await this.unshareCurrentConversation(conversation);
       } : undefined,
-    }).open();
+      onSetThreadGoal: isCodex ? async (objective: string, options?: { tokenBudget?: number }) => {
+        return this.setCodexThreadGoal(conversation, objective, options);
+      } : undefined,
+      onClearThreadGoal: isCodex ? async () => {
+        return this.clearCodexThreadGoal(conversation);
+      } : undefined,
+      onStartReview: isCodex ? async (target: AppServerReviewTarget) => {
+        return this.startCodexReview(conversation, target);
+      } : undefined,
+    });
+    if (this.activeModal) {
+      this.activeModal.close();
+    }
+    document.querySelectorAll('.modal-container .modal.opencodian-session-settings-modal').forEach((el) => {
+      const container = el.closest('.modal-container');
+      container?.remove();
+    });
+    this.activeModal = modal;
+    modal.open();
   }
 
   private shouldShowTitleSummary(conversation: Conversation): boolean {
@@ -146,6 +164,25 @@ export class ConversationSessionSettingsCoordinator {
       return hostSupport;
     }
     return (conversation.backend ?? 'opencode') === 'opencode';
+  }
+
+  private async loadCodexModelOptions(): Promise<CodexModelSummary[] | undefined> {
+    const registry = this.host.agentServiceRegistry;
+    if (!registry) {
+      return undefined;
+    }
+    const adapter = registry.get('codex') as {
+      getModelList?: () => Promise<CodexModelSummary[] | null>;
+    } | null;
+    if (typeof adapter?.getModelList !== 'function') {
+      return undefined;
+    }
+    try {
+      const models = await adapter.getModelList();
+      return models ?? undefined;
+    } catch {
+      return undefined;
+    }
   }
 
   private async getCurrentShareUrl(conversation: Conversation, sessionId: string): Promise<string | null> {
@@ -252,9 +289,42 @@ export class ConversationSessionSettingsCoordinator {
         networkAccessEnabled: effective.codexNetworkAccessEnabled,
         webSearchMode: effective.codexWebSearchMode,
       });
+      // Drop the cached SDK Thread so the next turn re-resumes the backend
+      // thread with the freshly-updated options. The SDK freezes per-thread
+      // options at Thread creation; without invalidation the live thread
+      // keeps using the old CLI args until a brand-new thread is created.
+      // Only invalidate when the conversation has a real backend session id
+      // (a real Codex thread id), not a provisional-only conversation.
+      this.invalidateCodexLiveThread(conversation);
     }
 
     return effective;
+  }
+
+  /**
+   * Ask the Codex adapter (via the registry the coordinator already holds) to
+   * invalidate the cached SDK Thread for the current conversation's backend
+   * session. No-op for non-Codex conversations, provisional-only conversations,
+   * or when the adapter does not expose `invalidateLiveThread`.
+   */
+  private invalidateCodexLiveThread(conversation: Conversation | null | undefined): void {
+    if (!this.isCodexConversation(conversation)) {
+      return;
+    }
+    const sessionId = conversation ? getConversationBackendSessionId(conversation) : null;
+    if (!sessionId) {
+      return;
+    }
+    const registry = this.host.agentServiceRegistry;
+    if (!registry) {
+      return;
+    }
+    const adapter = registry.get('codex') as {
+      invalidateLiveThread?(id: string): boolean;
+    } | null;
+    if (typeof adapter?.invalidateLiveThread === 'function') {
+      adapter.invalidateLiveThread(sessionId);
+    }
   }
 
   async saveConversationOverrides(
@@ -407,6 +477,103 @@ export class ConversationSessionSettingsCoordinator {
       return t('chat.sessionSharing.disabledByProjectConfig');
     }
     return t('chat.sessionSharing.shareFailed');
+  }
+
+  private async loadCodexThreadGoal(conversation: Conversation): Promise<AppServerThreadGoal | null | undefined> {
+    const sessionId = getConversationBackendSessionId(conversation);
+    if (!sessionId) return undefined;
+    const registry = this.host.agentServiceRegistry;
+    if (!registry) return undefined;
+    const adapter = registry.get('codex') as {
+      getThreadGoal?: (id: string) => Promise<AppServerThreadGoal | null>;
+    } | null;
+    if (typeof adapter?.getThreadGoal !== 'function') return undefined;
+    try {
+      return await adapter.getThreadGoal(sessionId);
+    } catch {
+      return undefined;
+    }
+  }
+
+  private async setCodexThreadGoal(conversation: Conversation, objective: string, options?: { tokenBudget?: number }): Promise<AppServerThreadGoal | null> {
+    const sessionId = getConversationBackendSessionId(conversation);
+    if (!sessionId) return null;
+    const registry = this.host.agentServiceRegistry;
+    if (!registry) return null;
+    const adapter = registry.get('codex') as {
+      setThreadGoal?: (id: string, objective: string, options?: { tokenBudget?: number }) => Promise<AppServerThreadGoal | null>;
+    } | null;
+    if (typeof adapter?.setThreadGoal !== 'function') return null;
+    try {
+      return await adapter.setThreadGoal(sessionId, objective, options);
+    } catch {
+      return null;
+    }
+  }
+
+  private async clearCodexThreadGoal(conversation: Conversation): Promise<boolean> {
+    const sessionId = getConversationBackendSessionId(conversation);
+    if (!sessionId) return false;
+    const registry = this.host.agentServiceRegistry;
+    if (!registry) return false;
+    const adapter = registry.get('codex') as {
+      clearThreadGoal?: (id: string) => Promise<boolean>;
+    } | null;
+    if (typeof adapter?.clearThreadGoal !== 'function') return false;
+    try {
+      return await adapter.clearThreadGoal(sessionId);
+    } catch {
+      return false;
+    }
+  }
+
+  private async startCodexReview(
+    conversation: Conversation,
+    target: AppServerReviewTarget,
+  ): Promise<AppServerReviewResult | null> {
+    const sessionId = getConversationBackendSessionId(conversation);
+    if (!sessionId) return null;
+    const registry = this.host.agentServiceRegistry;
+    if (!registry) return null;
+    const adapter = registry.get('codex') as {
+      startReview?: (id: string, target: AppServerReviewTarget) => Promise<AppServerReviewResult | null>;
+    } | null;
+    if (typeof adapter?.startReview !== 'function') return null;
+    try {
+      const result = await adapter.startReview(sessionId, target);
+      // After the review completes, open the review thread as a real
+      // conversation so the user can see the results in chat — not just a
+      // notice.  `reviewThreadId` is the same thread the review ran on;
+      // the new review turn items are persisted and visible via thread/read.
+      if (result?.turn && result.reviewThreadId) {
+        const status = result.turn.status;
+        if (status === 'completed' || status === 'interrupted') {
+          const reviewTitle = t('chat.sessionSettings.modal.codexReviewConversationTitle');
+          const conversationId = await this.host.openBackendSessionAsConversation?.(result.reviewThreadId, reviewTitle);
+          if (conversationId) {
+            // The review conversation is now loaded in chat; close the
+            // settings modal so the user sees the results immediately.
+            this.activeModal?.close();
+            if (status === 'completed') {
+              this.host.showNotice(t('chat.sessionSettings.modal.codexReviewOpened'));
+            } else {
+              const reason = result.turn.error || t('chat.sessionSettings.modal.codexReviewInterrupted');
+              this.host.showNotice(reason);
+            }
+          } else if (status === 'completed') {
+            const firstMessage = result.reviewMessages?.[0];
+            const base = t('chat.sessionSettings.modal.codexReviewCompleted');
+            this.host.showNotice(firstMessage ? `${base}: ${firstMessage.slice(0, 200)}` : base);
+          } else {
+            const reason = result.turn.error || t('chat.sessionSettings.modal.codexReviewInterrupted');
+            this.host.showNotice(reason);
+          }
+        }
+      }
+      return result;
+    } catch {
+      return null;
+    }
   }
 
   private isCodexConversation(

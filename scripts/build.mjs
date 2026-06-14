@@ -93,6 +93,7 @@ if (prod) {
   copyClaudeAgentSdkRuntime(process.cwd(), distDir);
   copyCodexRuntime(process.cwd(), distDir);
   
+  await context.dispose();
   console.log('Production build complete!');
   process.exit(0);
 } else {

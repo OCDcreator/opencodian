@@ -17,6 +17,7 @@
 
 - `.opencodian-backend-session-browser-item`: 会话列表项
 - `.opencodian-backend-session-browser-item.is-selected`: 选中状态
+- `.opencodian-backend-session-browser-item-archived`: 归档会话 badge
 - `.opencodian-backend-session-browser-preview-notice`: preview 模式说明卡片，提示当前内容不是完整 transcript
 - `.opencodian-backend-session-browser-preview-msg-user` / `-assistant`: 消息角色背景
 - `.opencodian-backend-session-browser-detail-metadata`: detail 模式 metadata card 容器
@@ -25,10 +26,16 @@
 - `.opencodian-backend-session-browser-detail-transcript`: detail 模式完整 transcript 容器
 - `.opencodian-backend-session-browser-detail-message`: transcript 消息块
 - `.opencodian-backend-session-browser-detail-role`: transcript 角色标题
-- `.opencodian-backend-session-browser-detail-text`: 可滚动 transcript 文本区
+- `- `.opencodian-backend-session-browser-detail-text`: 可滚动 transcript 文本区
 - `.opencodian-backend-session-browser-detail-btn.is-disabled`: detail 按钮禁用态
 - `.opencodian-backend-session-browser-footer`: 底部按钮栏
+- `.opencodian-backend-session-browser-resume-btn`: 恢复到聊天按钮
+- `.opencodian-backend-session-browser-fork-btn`: 分叉按钮
+- `.opencodian-backend-session-browser-archive-btn`: 归档按钮
+- `.opencodian-backend-session-browser-unarchive-btn`: 取消归档按钮
+- `.opencodian-backend-session-browser-item.is-archived`: 归档会话行的视觉区分（透明度降低）
 
 ## 维护记录
 
 - 2026-06-06: 增加 preview notice、detail metadata card、detail transcript message/text、detail role header 和 detail button disabled state 样式，支持 `BackendSessionBrowserModal` 的 preview/detail 双模式展示。
+- 2026-06-13: 增加 `.opencodian-backend-session-browser-item-archived` badge、`.is-archived` 行样式和 Fork / Archive / Unarchive 按钮样式。

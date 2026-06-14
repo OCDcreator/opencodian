@@ -1,0 +1,315 @@
+/* Codex account & capability product surface cards.
+   Renders account identity, token usage, rate limits, and provider
+   capabilities as real settings cards — not JSON-dump readbacks. */
+
+.opencodian-codex-account-card {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin: 10px 0;
+  background: var(--background-secondary);
+}
+
+.opencodian-codex-account-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.opencodian-codex-account-card-header .setting-item {
+  border: none;
+  padding: 0;
+}
+
+.opencodian-codex-account-card-title {
+  margin: 0;
+  font-size: var(--font-ui-small);
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+.opencodian-codex-account-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.opencodian-codex-account-card-loading,
+.opencodian-codex-account-card-muted {
+  margin: 4px 0;
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+}
+
+/* Identity summary */
+.opencodian-codex-account-identity-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.opencodian-codex-account-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: var(--font-smallest);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  border: 1px solid transparent;
+}
+
+.opencodian-codex-account-badge.is-chatgpt {
+  background: rgba(var(--color-green-rgb, 76, 175, 80), 0.16);
+  color: var(--color-green, #4caf50);
+  border-color: rgba(var(--color-green-rgb, 76, 175, 80), 0.4);
+}
+
+.opencodian-codex-account-badge.is-apikey {
+  background: var(--background-modifier-hover);
+  color: var(--text-muted);
+  border-color: var(--background-modifier-border);
+}
+
+/* Key/value rows */
+.opencodian-codex-account-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.opencodian-codex-account-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  font-size: var(--font-ui-small);
+  padding: 2px 0;
+}
+
+.opencodian-codex-account-row-label {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.opencodian-codex-account-row-value {
+  color: var(--text-normal);
+  text-align: right;
+  word-break: break-word;
+}
+
+/* Usage stat tiles */
+.opencodian-codex-account-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  gap: 8px;
+}
+
+.opencodian-codex-account-stat-tile {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: var(--background-primary);
+  text-align: center;
+}
+
+.opencodian-codex-account-stat-tile-value {
+  margin: 0;
+  font-size: var(--font-ui-medium);
+  font-weight: 700;
+  color: var(--text-normal);
+}
+
+.opencodian-codex-account-stat-tile-label {
+  margin: 2px 0 0;
+  font-size: var(--font-smallest);
+  color: var(--text-muted);
+}
+
+/* Usage daily buckets bar chart */
+.opencodian-codex-account-usage-buckets {
+  margin-top: 4px;
+}
+
+.opencodian-codex-account-usage-buckets-title {
+  margin: 0 0 6px;
+  font-size: var(--font-smallest);
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.opencodian-codex-account-usage-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 56px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.opencodian-codex-account-usage-bar {
+  flex: 1;
+  min-width: 6px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  position: relative;
+  background: linear-gradient(
+    to top,
+    var(--interactive-accent, var(--color-blue)),
+    rgba(var(--interactive-accent-rgb, 33, 150, 243), 0.5)
+  );
+  border-radius: 3px 3px 0 0;
+  min-height: 6px;
+}
+
+.opencodian-codex-account-usage-bar-label {
+  position: absolute;
+  bottom: -16px;
+  font-size: 8px;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+
+/* Rate-limit tier groups */
+.opencodian-codex-account-rate-limit-groups {
+  margin-top: 8px;
+}
+
+.opencodian-codex-account-rate-limit-group {
+  border-left: 2px solid var(--background-modifier-border);
+  padding-left: 10px;
+  margin-top: 6px;
+}
+
+.opencodian-codex-account-rate-limit-group-title {
+  margin: 0 0 2px;
+  font-size: var(--font-smallest);
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: capitalize;
+}
+
+/* Capability chips */
+.opencodian-codex-account-capability-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.opencodian-codex-account-capability-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 10px;
+  padding: 6px 10px;
+  background: var(--background-primary);
+  min-width: 180px;
+  flex: 1 1 180px;
+}
+
+.opencodian-codex-account-capability-chip.is-enabled {
+  border-color: rgba(var(--color-green-rgb, 76, 175, 80), 0.4);
+}
+
+.opencodian-codex-account-capability-chip.is-disabled {
+  opacity: 0.7;
+}
+
+.opencodian-codex-account-capability-chip-icon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.opencodian-codex-account-capability-chip.is-enabled .opencodian-codex-account-capability-chip-icon {
+  background: rgba(var(--color-green-rgb, 76, 175, 80), 0.2);
+  color: var(--color-green, #4caf50);
+}
+
+.opencodian-codex-account-capability-chip.is-disabled .opencodian-codex-account-capability-chip-icon {
+  background: var(--background-modifier-hover);
+  color: var(--text-muted);
+}
+
+.opencodian-codex-account-capability-chip-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.opencodian-codex-account-capability-chip-label {
+  margin: 0;
+  font-size: var(--font-ui-small);
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+.opencodian-codex-account-capability-chip-desc {
+  margin: 1px 0 0;
+  font-size: var(--font-smallest);
+  color: var(--text-muted);
+}
+
+.opencodian-codex-account-capability-chip-status {
+  font-size: var(--font-smallest);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.opencodian-codex-account-capability-chip.is-enabled .opencodian-codex-account-capability-chip-status {
+  color: var(--color-green, #4caf50);
+}
+
+.opencodian-codex-account-capability-chip.is-disabled .opencodian-codex-account-capability-chip-status {
+  color: var(--text-muted);
+}
+
+/* Auth-required / info notices */
+.opencodian-codex-account-card-notice {
+  border: 1px solid var(--background-modifier-border);
+  border-left: 3px solid var(--color-yellow, #e8a33d);
+  border-radius: 6px;
+  padding: 8px 10px;
+  background: var(--background-primary);
+  font-size: var(--font-ui-small);
+  color: var(--text-normal);
+  margin-top: 4px;
+}
+
+.opencodian-codex-account-card-notice.is-auth-required {
+  border-left-color: var(--color-yellow, #e8a33d);
+}
+
+.opencodian-codex-account-card-notice p {
+  margin: 0 0 4px;
+}
+
+.opencodian-codex-account-card-notice p:last-child {
+  margin-bottom: 0;
+}
+
+.opencodian-codex-account-card-notice-title {
+  font-weight: 600;
+}
+
+.opencodian-codex-account-card-code {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--background-modifier-hover);
+  border: 1px solid var(--background-modifier-border);
+  font-family: var(--font-monospace);
+  font-size: var(--font-smallest);
+  color: var(--text-normal);
+}

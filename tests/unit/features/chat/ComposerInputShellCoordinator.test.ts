@@ -1246,92 +1246,97 @@ describe('ComposerInputShellCoordinator — prompt suggestion lifecycle (channel
   });
 });
 
+// Module-level helpers for the image paste/drag-drop describe below.
+// JSDOM does not provide DataTransfer/ClipboardEvent/DragEvent; mock minimal versions.
+function installImageEventDomMocks(): void {
+  if (typeof DataTransfer === 'undefined') {
+    (globalThis as typeof globalThis & { DataTransfer?: typeof DataTransfer }).DataTransfer =
+      class MockDataTransfer {
+        items = { add: jest.fn() };
+        files: File[] = [];
+      } as unknown as typeof DataTransfer;
+  }
+  if (typeof ClipboardEvent === 'undefined') {
+    (globalThis as typeof globalThis & { ClipboardEvent?: typeof ClipboardEvent }).ClipboardEvent =
+      class MockClipboardEvent extends Event {
+        clipboardData: DataTransfer | null;
+        constructor(type: string, init: { clipboardData?: DataTransfer | null } = {}) {
+          super(type, init);
+          this.clipboardData = init.clipboardData ?? null;
+        }
+      } as unknown as typeof ClipboardEvent;
+  }
+  if (typeof DragEvent === 'undefined') {
+    (globalThis as typeof globalThis & { DragEvent?: typeof DragEvent }).DragEvent =
+      class MockDragEvent extends Event {
+        dataTransfer: DataTransfer | null;
+        constructor(type: string, init: { dataTransfer?: DataTransfer | null } = {}) {
+          super(type, init);
+          this.dataTransfer = init.dataTransfer ?? null;
+        }
+      } as unknown as typeof DragEvent;
+  }
+  // Ensure FileReader resolves synchronously in tests to avoid macrotask timing issues.
+  jest.spyOn(globalThis, 'FileReader').mockImplementation(() => {
+    const reader = {
+      result: '',
+      onload: null as (() => void) | null,
+      onerror: null as ((error: Error) => void) | null,
+      readAsDataURL(file: File) {
+        const content = typeof file === 'object' && 'name' in file
+          ? `data:${file.type};base64,ZmFrZS1pbWFnZS1kYXRh`
+          : '';
+        this.result = content;
+        this.onload?.();
+      },
+    };
+    return reader as unknown as FileReader;
+  });
+}
+
+function createImageFile(name: string, type: string): File {
+  return new File(['fake-image-data'], name, { type });
+}
+
+function buildDataTransfer(files: File[]): DataTransfer {
+  const dt = new DataTransfer();
+  // Override the files property since JSDOM's DataTransfer mock may not populate it
+  Object.defineProperty(dt, 'files', {
+    value: files,
+    writable: false,
+  });
+  return dt;
+}
+
+function createPasteEvent(files: File[]): ClipboardEvent {
+  const dataTransfer = buildDataTransfer(files);
+  return new ClipboardEvent('paste', {
+    bubbles: true,
+    cancelable: true,
+    clipboardData: dataTransfer,
+  });
+}
+
+function createDropEvent(files: File[]): DragEvent {
+  const dataTransfer = buildDataTransfer(files);
+  return new DragEvent('drop', {
+    bubbles: true,
+    cancelable: true,
+    dataTransfer,
+  });
+}
+
 describe('ComposerInputShellCoordinator — image paste and drag-drop', () => {
   const originalResizeObserver = globalThis.ResizeObserver;
 
   beforeEach(() => {
     installCoordinatorDomMocks();
-    // JSDOM does not provide DataTransfer/ClipboardEvent/DragEvent; mock minimal versions.
-    if (typeof DataTransfer === 'undefined') {
-      (globalThis as typeof globalThis & { DataTransfer?: typeof DataTransfer }).DataTransfer =
-        class MockDataTransfer {
-          items = { add: jest.fn() };
-          files: File[] = [];
-        } as unknown as typeof DataTransfer;
-    }
-    if (typeof ClipboardEvent === 'undefined') {
-      (globalThis as typeof globalThis & { ClipboardEvent?: typeof ClipboardEvent }).ClipboardEvent =
-        class MockClipboardEvent extends Event {
-          clipboardData: DataTransfer | null;
-          constructor(type: string, init: { clipboardData?: DataTransfer | null } = {}) {
-            super(type, init);
-            this.clipboardData = init.clipboardData ?? null;
-          }
-        } as unknown as typeof ClipboardEvent;
-    }
-    if (typeof DragEvent === 'undefined') {
-      (globalThis as typeof globalThis & { DragEvent?: typeof DragEvent }).DragEvent =
-        class MockDragEvent extends Event {
-          dataTransfer: DataTransfer | null;
-          constructor(type: string, init: { dataTransfer?: DataTransfer | null } = {}) {
-            super(type, init);
-            this.dataTransfer = init.dataTransfer ?? null;
-          }
-        } as unknown as typeof DragEvent;
-    }
-    // Ensure FileReader resolves synchronously in tests to avoid macrotask timing issues.
-    jest.spyOn(globalThis, 'FileReader').mockImplementation(() => {
-      const reader = {
-        result: '',
-        onload: null as (() => void) | null,
-        onerror: null as ((error: Error) => void) | null,
-        readAsDataURL(file: File) {
-          const content = typeof file === 'object' && 'name' in file
-            ? `data:${file.type};base64,ZmFrZS1pbWFnZS1kYXRh`
-            : '';
-          this.result = content;
-          this.onload?.();
-        },
-      };
-      return reader as unknown as FileReader;
-    });
+    installImageEventDomMocks();
   });
 
   afterEach(() => {
     restoreCoordinatorDomMocks(originalResizeObserver);
   });
-
-  function createImageFile(name: string, type: string): File {
-    return new File(['fake-image-data'], name, { type });
-  }
-
-  function buildDataTransfer(files: File[]): DataTransfer {
-    const dt = new DataTransfer();
-    // Override the files property since JSDOM's DataTransfer mock may not populate it
-    Object.defineProperty(dt, 'files', {
-      value: files,
-      writable: false,
-    });
-    return dt;
-  }
-
-  function createPasteEvent(files: File[]): ClipboardEvent {
-    const dataTransfer = buildDataTransfer(files);
-    return new ClipboardEvent('paste', {
-      bubbles: true,
-      cancelable: true,
-      clipboardData: dataTransfer,
-    });
-  }
-
-  function createDropEvent(files: File[]): DragEvent {
-    const dataTransfer = buildDataTransfer(files);
-    return new DragEvent('drop', {
-      bubbles: true,
-      cancelable: true,
-      dataTransfer,
-    });
-  }
 
   it('attaches pasted image files when backend has image input capability', async () => {
     const fixture = createFixture({ hasImageInputCapability: true });

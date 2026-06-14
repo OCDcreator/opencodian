@@ -1,11 +1,11 @@
 # BackendSessionBrowserModal
 
 > **源码**: `src/features/chat/ui/BackendSessionBrowserModal.ts`
-> **最近更新**: 2026-06-06 (non-text part rendering, forced backend scoping, blank-row elimination)
+> **最近更新**: 2026-06-13 (Codex persisted thread fork/archive/unarchive lifecycle actions; buttons rendered from active backend capabilities instead of host methods)
 
 ## 概述
 
-Obsidian Modal，用于浏览、查看详情和恢复后端 sessions。复用 `AgentBackendRouting` 的 `listBackendSessions()`、`getBackendSessionPreview()` 和 `getBackendSessionDetail()` 实现会话列表、preview transcript、metadata detail 和完整 transcript 展示。
+Obsidian Modal，用于浏览、查看详情、恢复、分叉、归档和取消归档后端 sessions。复用 `AgentBackendRouting` 的 `listBackendSessions()`、`getBackendSessionPreview()`、`getBackendSessionDetail()`、`forkBackendSession()`、`archiveBackendSession()` 和 `unarchiveBackendSession()` 实现会话列表、preview transcript、metadata detail、完整 transcript 展示和生命周期操作。
 
 ## 职责
 
@@ -16,6 +16,12 @@ Obsidian Modal，用于浏览、查看详情和恢复后端 sessions。复用 `A
 - Detail transcript 渲染所有 part 类型：`text` 直接展示，非 text part（`tool_use`、`tool_result`、`thinking` 等）以 collapsed `<details>` 形式展示，避免空白行
 - Preview 模式跳过只有非 text part 的消息以避免空白 role-only 行
 - 点击 "Resume in chat" 后通过 host 创建 conversation 并加载
+- Preview 模式下，根据 active backend 的能力集合和所选 session 的归档状态显示生命周期按钮：
+  - `Fork`：当 backend 声明 `AgentCapability.Fork` 且选中的是非归档 session 时显示
+  - `Archive`：当 backend 声明 `AgentCapability.Sessions` 且选中的是非归档 session 时显示；点击调用 `archiveBackendSession()`，成功后刷新列表
+  - `Unarchive`：当 backend 声明 `AgentCapability.Sessions` 且选中的是归档 session 时显示；点击调用 `unarchiveBackendSession()`，成功后刷新列表
+- 归档的 session 在列表项上渲染 `Archived` badge（`.opencodian-backend-session-browser-item-archived`），并添加 `.is-archived` 类以视觉区分
+- 列表同时加载 active backend 的活跃与归档 sessions；对于 Codex，这通过 `CodexAdapter.listSessions()` 同时请求 `thread/list archived=false` 与 `thread/list archived=true` 并合并实现
 
 ## Host 接口
 
@@ -56,9 +62,11 @@ Obsidian Modal，用于浏览、查看详情和恢复后端 sessions。复用 `A
 ## 维护约束
 
 - 不直接使用 SDK；所有 session 操作通过 `AgentBackendRouting` helper
-- 不提供 `continue` / `resumeSessionAt` / `forkSession` 操作
-- Preview/detail 只读，不修改 session 状态
+- 不提供 `continue` / `resumeSessionAt` 操作
+- Preview/detail 只读，不修改 session 状态；归档/取消归档通过 `AgentBackendRouting` 显式路由
 - `getScopedRegistry()` 使用 `Object.create(registry)` + 覆写 `getActive()` 实现 forced backend scoping，不引入新的 adapter 层
 - Detail transcript 对所有 part 类型诚实渲染：text 直接展示，非 text 用 collapsed `<details>` + `[type]` summary
 - Preview 跳过纯非 text 消息以避免空白行；detail 不跳过非 text 内容，确保 "Full Transcript" 名副其实
 - 当 `forcedBackendKind` 指定但 registry 中该 backend 未注册或未启用时，modal 会显示空列表（符合预期）
+- 生命周期按钮的可见性由 active backend 的 capability 集合和所选 session 的 `archived` 状态共同决定；不再由 host 显式传入
+- 列表必须同时返回归档与非归档 sessions，否则 `Unarchive` 按钮无法通过真实 UI 路径触发；Codex 适配器通过两次 `thread/list` 调用来满足这一点

@@ -1,7 +1,7 @@
 # English Locale
 
 > **源码**: `src/i18n/locales/en.ts`
-> **最近更新**: 2026-06-12 — added `chat.sessionSettings.modal.codexWebSearchMode` / `codexWebSearchModeDesc` for session-level webSearchMode override
+> **最近更新**: 2026-06-12 Checkpoint 15N — added `settings.codex.mcpServers.*` keys for the Codex MCP server status readback surface (inspect + reload) in the ordinary Codex settings panel.
 
 ## 概述
 

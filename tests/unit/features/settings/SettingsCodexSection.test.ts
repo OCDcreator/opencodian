@@ -135,6 +135,42 @@ function mockSettingPrototype(): void {
   jest.spyOn(Setting.prototype, 'then').mockReturnThis();
 }
 
+type DropdownControlCapture = {
+  addOption: jest.Mock;
+  setValue: jest.Mock;
+  onChange: jest.Mock;
+};
+
+function createDropdownControlCapture(): DropdownControlCapture {
+  return {
+    addOption: jest.fn().mockReturnThis(),
+    setValue: jest.fn().mockReturnThis(),
+    onChange: jest.fn().mockReturnThis(),
+  };
+}
+
+/**
+ * Find the onChange handler of the SettingsCodexSection dropdown that offers
+ * `optionValue` as one of its options, mirroring a real user dropdown selection.
+ * Throws when no matching dropdown was registered (i.e. the control vanished).
+ */
+function findCodexDropdownHandler(optionValue: string): (value: string) => Promise<void> {
+  const calls = (Setting.prototype.addDropdown as jest.Mock).mock.calls as Array<
+    [(control: DropdownControlCapture) => unknown]
+  >;
+  const match = calls.find(([cb]) => {
+    const probe = createDropdownControlCapture();
+    cb(probe);
+    return probe.addOption.mock.calls.some(([value]) => value === optionValue);
+  });
+  if (!match) {
+    throw new Error(`No codex dropdown offering "${optionValue}" was registered`);
+  }
+  const captured = createDropdownControlCapture();
+  match[0](captured);
+  return captured.onChange.mock.calls[0][0] as (value: string) => Promise<void>;
+}
+
 describe('SettingsCodexSection stable surface', () => {
   beforeEach(() => {
     setLocale('en');
@@ -288,7 +324,7 @@ describe('SettingsCodexSection stable surface', () => {
     expect(settingNames).toContain(t('settings.codex.webSearch.name'));
   });
 
-  it('renders exactly 13 setting controls including webSearchMode', () => {
+  it('renders the writable setting controls plus the account & capability surface', () => {
     const plugin = createPlugin();
     const section = new SettingsCodexSection({
       plugin: plugin as never,
@@ -297,7 +333,9 @@ describe('SettingsCodexSection stable surface', () => {
     const containerEl = document.createElement('div');
     section.attach(containerEl);
 
-    expect(settingNames).toHaveLength(13);
+    // The four account/capability surfaces were elevated to product cards in
+    // SettingsCodexAccountSurface (each card uses a Setting for its refresh
+    // button but does NOT call setName, so they stay out of settingNames).
     expect(settingNames).toEqual([
       t('settings.codex.apiKey.name'),
       t('settings.codex.model.name'),
@@ -308,11 +346,17 @@ describe('SettingsCodexSection stable surface', () => {
       t('settings.codex.webSearch.name'),
       t('settings.codex.connection.name'),
       t('settings.codex.sessionBrowser.launchName'),
-      t('settings.codex.accountInfo.name'),
       t('settings.codex.modelList.name'),
       t('settings.codex.permissionProfiles.name'),
-      t('settings.codex.rateLimits.name'),
+      t('settings.codex.mcpServers.name'),
+      t('settings.codex.loadedThreads.name'),
     ]);
+    // The account & capability surface mounts four product cards.
+    expect(containerEl.querySelectorAll('[data-codex-account-card]')).toHaveLength(4);
+    expect(containerEl.querySelector('[data-codex-account-card="identity"]')).toBeTruthy();
+    expect(containerEl.querySelector('[data-codex-account-card="usage"]')).toBeTruthy();
+    expect(containerEl.querySelector('[data-codex-account-card="rate-limits"]')).toBeTruthy();
+    expect(containerEl.querySelector('[data-codex-account-card="capabilities"]')).toBeTruthy();
   });
 
   it('renders connection info as disabled passive notice', () => {
@@ -349,25 +393,7 @@ describe('SettingsCodexSection sandbox mode', () => {
     const containerEl = document.createElement('div');
     section.attach(containerEl);
 
-    const dropdownControl = (Setting.prototype.addDropdown as jest.Mock).mock.calls
-      .find(([cb]) => {
-        const captured: { addOption: jest.Mock; setValue: jest.Mock; onChange: jest.Mock } = {
-          addOption: jest.fn().mockReturnThis(),
-          setValue: jest.fn().mockReturnThis(),
-          onChange: jest.fn().mockReturnThis(),
-        };
-        cb(captured);
-        return captured.addOption.mock.calls.some(([value]) => value === 'read-only');
-      });
-    expect(dropdownControl).toBeTruthy();
-
-    const captured: { addOption: jest.Mock; setValue: jest.Mock; onChange: jest.Mock } = {
-      addOption: jest.fn().mockReturnThis(),
-      setValue: jest.fn().mockReturnThis(),
-      onChange: jest.fn().mockReturnThis(),
-    };
-    (dropdownControl as [jest.Mock])[0](captured);
-    const handler = captured.onChange.mock.calls[0][0] as (value: string) => Promise<void>;
+    const handler = findCodexDropdownHandler('read-only');
 
     await handler('danger-full-access');
 
@@ -388,25 +414,7 @@ describe('SettingsCodexSection sandbox mode', () => {
     const containerEl = document.createElement('div');
     section.attach(containerEl);
 
-    const dropdownControl = (Setting.prototype.addDropdown as jest.Mock).mock.calls
-      .find(([cb]) => {
-        const captured: { addOption: jest.Mock; setValue: jest.Mock; onChange: jest.Mock } = {
-          addOption: jest.fn().mockReturnThis(),
-          setValue: jest.fn().mockReturnThis(),
-          onChange: jest.fn().mockReturnThis(),
-        };
-        cb(captured);
-        return captured.addOption.mock.calls.some(([value]) => value === 'read-only');
-      });
-    expect(dropdownControl).toBeTruthy();
-
-    const captured: { addOption: jest.Mock; setValue: jest.Mock; onChange: jest.Mock } = {
-      addOption: jest.fn().mockReturnThis(),
-      setValue: jest.fn().mockReturnThis(),
-      onChange: jest.fn().mockReturnThis(),
-    };
-    (dropdownControl as [jest.Mock])[0](captured);
-    const handler = captured.onChange.mock.calls[0][0] as (value: string) => Promise<void>;
+    const handler = findCodexDropdownHandler('read-only');
 
     await handler('read-only');
 
@@ -435,25 +443,7 @@ describe('SettingsCodexSection model reasoning effort', () => {
     const containerEl = document.createElement('div');
     section.attach(containerEl);
 
-    const dropdownControl = (Setting.prototype.addDropdown as jest.Mock).mock.calls
-      .find(([cb]) => {
-        const captured: { addOption: jest.Mock; setValue: jest.Mock; onChange: jest.Mock } = {
-          addOption: jest.fn().mockReturnThis(),
-          setValue: jest.fn().mockReturnThis(),
-          onChange: jest.fn().mockReturnThis(),
-        };
-        cb(captured);
-        return captured.addOption.mock.calls.some(([value]) => value === 'minimal');
-      });
-    expect(dropdownControl).toBeTruthy();
-
-    const captured: { addOption: jest.Mock; setValue: jest.Mock; onChange: jest.Mock } = {
-      addOption: jest.fn().mockReturnThis(),
-      setValue: jest.fn().mockReturnThis(),
-      onChange: jest.fn().mockReturnThis(),
-    };
-    (dropdownControl as [jest.Mock])[0](captured);
-    const handler = captured.onChange.mock.calls[0][0] as (value: string) => Promise<void>;
+    const handler = findCodexDropdownHandler('minimal');
 
     await handler('high');
 
@@ -474,25 +464,7 @@ describe('SettingsCodexSection model reasoning effort', () => {
     const containerEl = document.createElement('div');
     section.attach(containerEl);
 
-    const dropdownControl = (Setting.prototype.addDropdown as jest.Mock).mock.calls
-      .find(([cb]) => {
-        const captured: { addOption: jest.Mock; setValue: jest.Mock; onChange: jest.Mock } = {
-          addOption: jest.fn().mockReturnThis(),
-          setValue: jest.fn().mockReturnThis(),
-          onChange: jest.fn().mockReturnThis(),
-        };
-        cb(captured);
-        return captured.addOption.mock.calls.some(([value]) => value === 'minimal');
-      });
-    expect(dropdownControl).toBeTruthy();
-
-    const captured: { addOption: jest.Mock; setValue: jest.Mock; onChange: jest.Mock } = {
-      addOption: jest.fn().mockReturnThis(),
-      setValue: jest.fn().mockReturnThis(),
-      onChange: jest.fn().mockReturnThis(),
-    };
-    (dropdownControl as [jest.Mock])[0](captured);
-    const handler = captured.onChange.mock.calls[0][0] as (value: string) => Promise<void>;
+    const handler = findCodexDropdownHandler('minimal');
 
     await handler('xhigh');
 
@@ -521,25 +493,7 @@ describe('SettingsCodexSection web search mode', () => {
     const containerEl = document.createElement('div');
     section.attach(containerEl);
 
-    const dropdownControl = (Setting.prototype.addDropdown as jest.Mock).mock.calls
-      .find(([cb]) => {
-        const captured: { addOption: jest.Mock; setValue: jest.Mock; onChange: jest.Mock } = {
-          addOption: jest.fn().mockReturnThis(),
-          setValue: jest.fn().mockReturnThis(),
-          onChange: jest.fn().mockReturnThis(),
-        };
-        cb(captured);
-        return captured.addOption.mock.calls.some(([value]) => value === 'cached');
-      });
-    expect(dropdownControl).toBeTruthy();
-
-    const captured: { addOption: jest.Mock; setValue: jest.Mock; onChange: jest.Mock } = {
-      addOption: jest.fn().mockReturnThis(),
-      setValue: jest.fn().mockReturnThis(),
-      onChange: jest.fn().mockReturnThis(),
-    };
-    (dropdownControl as [jest.Mock])[0](captured);
-    const handler = captured.onChange.mock.calls[0][0] as (value: string) => Promise<void>;
+    const handler = findCodexDropdownHandler('cached');
 
     await handler('live');
 
@@ -560,25 +514,7 @@ describe('SettingsCodexSection web search mode', () => {
     const containerEl = document.createElement('div');
     section.attach(containerEl);
 
-    const dropdownControl = (Setting.prototype.addDropdown as jest.Mock).mock.calls
-      .find(([cb]) => {
-        const captured: { addOption: jest.Mock; setValue: jest.Mock; onChange: jest.Mock } = {
-          addOption: jest.fn().mockReturnThis(),
-          setValue: jest.fn().mockReturnThis(),
-          onChange: jest.fn().mockReturnThis(),
-        };
-        cb(captured);
-        return captured.addOption.mock.calls.some(([value]) => value === 'cached');
-      });
-    expect(dropdownControl).toBeTruthy();
-
-    const captured: { addOption: jest.Mock; setValue: jest.Mock; onChange: jest.Mock } = {
-      addOption: jest.fn().mockReturnThis(),
-      setValue: jest.fn().mockReturnThis(),
-      onChange: jest.fn().mockReturnThis(),
-    };
-    (dropdownControl as [jest.Mock])[0](captured);
-    const handler = captured.onChange.mock.calls[0][0] as (value: string) => Promise<void>;
+    const handler = findCodexDropdownHandler('cached');
 
     await handler('live');
 

@@ -4,6 +4,8 @@ import { getToolIdentity, MCP_TOOL_ICON_ID } from '../../shared';
 import {
   getMcpToolSummary,
 } from './mcpSummaryConfig';
+import { getMcpServerName, renderMcpExpandedContent, renderMcpServerChip, renderOrUpdateMcpAuthButton, renderOrUpdateMcpRetryButton } from './McpToolCallRenderer';
+import { renderTaskExpandedContent } from './TaskToolCallRenderer';
 import type { ToolCallInfo, ToolCallStatus, ToolRendererOptions } from './types';
 
 const STATUS_ICONS: Record<ToolCallStatus, string> = {
@@ -134,60 +136,25 @@ export class ToolCallRenderer {
     return toolCall.kind === 'task' || getToolIdentity(toolCall.name).normalizedName === 'task';
   }
 
-  private getTaskSessionId(toolCall: Pick<ToolCallInfo, 'toolMetadata'>): string | null {
-    const sessionId = typeof toolCall.toolMetadata?.sessionId === 'string'
-      ? toolCall.toolMetadata.sessionId.trim()
-      : '';
-    return sessionId || null;
-  }
-
   private renderTaskExpandedContent(
     container: HTMLElement,
     toolCall: ToolCallInfo,
   ): void {
-    const detailsEl = container.createDiv({ cls: 'streaming-task-details' });
-    const subagentType = typeof toolCall.input.subagent_type === 'string'
-      ? toolCall.input.subagent_type.trim()
-      : '';
-    const description = typeof toolCall.input.description === 'string'
-      ? toolCall.input.description.trim()
-      : typeof toolCall.input.prompt === 'string'
-        ? toolCall.input.prompt.trim()
-        : '';
-    const sessionId = this.getTaskSessionId(toolCall);
+    renderTaskExpandedContent(container, toolCall, this.options.onOpenToolSession);
+  }
 
-    if (subagentType) {
-      detailsEl.createDiv({ cls: 'streaming-task-field', text: `Agent: ${subagentType}` });
-    }
-    if (description) {
-      detailsEl.createDiv({ cls: 'streaming-task-field', text: `Description: ${description}` });
-    }
-    detailsEl.createDiv({ cls: 'streaming-task-field', text: `Status: ${toolCall.status}` });
+  private renderMcpExpandedContent(
+    container: HTMLElement,
+    toolCall: ToolCallInfo,
+  ): void {
+    renderMcpExpandedContent(container, toolCall, this.options.onOpenMcpServerDetail);
+  }
 
-    if (sessionId) {
-      detailsEl.createDiv({ cls: 'streaming-task-field', text: `Session: ${sessionId}` });
-      const openButton = detailsEl.createEl('button', {
-        cls: 'streaming-task-session-button',
-        text: 'Open subagent session',
-      });
-      openButton.addEventListener('click', (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        this.options.onOpenToolSession?.(sessionId, toolCall);
-      });
-    } else {
-      detailsEl.createDiv({
-        cls: 'streaming-task-field streaming-task-field-muted',
-        text: 'Session unavailable',
-      });
-    }
-
-    detailsEl.createDiv({
-      cls: 'streaming-task-field streaming-task-field-muted',
-      text: toolCall.status === 'error'
-        ? 'Task failed. Open the subagent session for details.'
-        : 'Task result is kept in the subagent session.',
-    });
+  private updateAuthAffordance(toolEl: HTMLElement, toolCall: ToolCallInfo): void {
+    const header = toolEl.querySelector('.streaming-tool-header') as HTMLElement | null;
+    if (!header) return;
+    renderOrUpdateMcpAuthButton(header, toolCall, this.options.onAuthenticateMcpServer);
+    renderOrUpdateMcpRetryButton(header, toolCall, this.options.onRetryMcpToolCall);
   }
 
   private fileNameOnly(filePath: string): string {
@@ -448,11 +415,26 @@ export class ToolCallRenderer {
     statusEl.addClass(`status-${toolCall.status}`);
     this.setStatus(statusEl, toolCall.status);
 
+    const serverName = getMcpServerName(toolCall);
+    if (serverName) {
+      renderMcpServerChip(header, serverName, this.options.onOpenMcpServerDetail);
+    }
+
     const content = toolEl.createDiv({ cls: 'streaming-tool-content' });
     content.style.display = 'none';
 
     if (this.isTaskTool(toolCall)) {
       this.renderTaskExpandedContent(content, toolCall);
+    } else if (toolCall.kind === 'mcp') {
+      this.renderMcpExpandedContent(content, toolCall);
+      if (toolCall.status !== 'pending' && toolCall.status !== 'running') {
+        this.options.renderExpandedContent!(content, toolCall.name, toolCall.result);
+      } else {
+        content.createDiv({
+          cls: 'streaming-tool-pending',
+          text: 'Waiting for result...',
+        });
+      }
     } else if (toolCall.status !== 'pending' && toolCall.status !== 'running') {
       this.options.renderExpandedContent!(content, toolCall.name, toolCall.result);
     } else {
@@ -463,6 +445,7 @@ export class ToolCallRenderer {
     }
 
     this.setupCollapsible(toolEl, header, content);
+    this.updateAuthAffordance(toolEl, toolCall);
 
     return toolEl;
   }
@@ -549,10 +532,14 @@ export class ToolCallRenderer {
       if (this.isTaskTool(toolCall)) {
         this.renderTaskExpandedContent(contentEl, toolCall);
       } else {
+        if (toolCall.kind === 'mcp') {
+          this.renderMcpExpandedContent(contentEl, toolCall);
+        }
         this.options.renderExpandedContent!(contentEl, toolCall.name, toolCall.result);
       }
     }
     this.updateStatus(toolEl, toolCall.status);
+    this.updateAuthAffordance(toolEl, toolCall);
   }
 
   updateHeader(
@@ -574,5 +561,6 @@ export class ToolCallRenderer {
       summaryEl.setText(summaryText);
       summaryEl.title = summaryText;
     }
+    this.updateAuthAffordance(toolEl, toolCall);
   }
 }

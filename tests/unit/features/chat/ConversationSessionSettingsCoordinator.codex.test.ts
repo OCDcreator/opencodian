@@ -48,6 +48,7 @@ function createCoordinator(options?: {
 }) {
   const chatContainerEl = document.createElement('div');
   const applyCodexRuntimeOverrides = jest.fn();
+  const invalidateLiveThread = jest.fn();
   const saveConversation = jest.fn().mockResolvedValue(undefined);
   const host = {
     app: {} as never,
@@ -66,6 +67,11 @@ function createCoordinator(options?: {
     saveConversation,
     showNotice: jest.fn(),
     applyCodexRuntimeOverrides,
+    agentServiceRegistry: {
+      get: jest.fn((backend: string) =>
+        backend === 'codex' ? { invalidateLiveThread } : null,
+      ),
+    } as unknown as jest.Mocked<ConversationSessionSettingsCoordinatorHost['agentServiceRegistry']>,
     supportsSessionSharing: jest.fn().mockReturnValue(false),
     supportsCompaction: jest.fn().mockReturnValue(false),
   } as jest.Mocked<ConversationSessionSettingsCoordinatorHost>;
@@ -76,6 +82,7 @@ function createCoordinator(options?: {
     chatContainerEl,
     saveConversation,
     applyCodexRuntimeOverrides,
+    invalidateLiveThread,
   };
 }
 
@@ -411,5 +418,117 @@ describe('ConversationSessionSettingsCoordinator Codex model override', () => {
       .ConversationSessionSettingsModal as jest.Mock).mock.calls.at(-1)[1];
 
     expect(modalOptions.defaults.codexModelOverride).toBe('codex-mini-latest');
+  });
+
+  it('passes available models to modal when adapter returns a model list', async () => {
+    const conv = createCodexConversation();
+    const { coordinator, host } = createCoordinator({ currentConversation: conv });
+    host.agentServiceRegistry = {
+      get: jest.fn((backend: string) =>
+        backend === 'codex'
+          ? {
+              getModelList: jest.fn().mockResolvedValue([
+                { slug: 'gpt-5.5', display_name: 'GPT-5.5' },
+                { slug: 'gpt-5.4', display_name: 'gpt-5.4' },
+              ]),
+            }
+          : null,
+      ),
+    } as unknown as jest.Mocked<typeof host.agentServiceRegistry>;
+
+    await coordinator.openCurrentConversationSettings();
+
+    const modalOptions = (jest.requireMock('../../../../src/features/chat/ui/ConversationSessionSettingsModal')
+      .ConversationSessionSettingsModal as jest.Mock).mock.calls.at(-1)[1];
+
+    expect(modalOptions.defaults.codexAvailableModels).toEqual([
+      { slug: 'gpt-5.5', display_name: 'GPT-5.5' },
+      { slug: 'gpt-5.4', display_name: 'gpt-5.4' },
+    ]);
+  });
+
+  it('passes undefined available models to modal when adapter has no getModelList', async () => {
+    const conv = createCodexConversation();
+    const { coordinator, host } = createCoordinator({ currentConversation: conv });
+    host.agentServiceRegistry = {
+      get: jest.fn((backend: string) => (backend === 'codex' ? {} : null)),
+    } as unknown as jest.Mocked<typeof host.agentServiceRegistry>;
+
+    await coordinator.openCurrentConversationSettings();
+
+    const modalOptions = (jest.requireMock('../../../../src/features/chat/ui/ConversationSessionSettingsModal')
+      .ConversationSessionSettingsModal as jest.Mock).mock.calls.at(-1)[1];
+
+    expect(modalOptions.defaults.codexAvailableModels).toBeUndefined();
+  });
+
+  describe('invalidateCodexLiveThread (live current-thread re-resume)', () => {
+    it('calls adapter.invalidateLiveThread with backendSessionId after runtime apply', async () => {
+      const conv = createCodexConversation();
+      const { coordinator, invalidateLiveThread } = createCoordinator({ currentConversation: conv });
+
+      await coordinator.applyConversationRuntimeState(conv);
+
+      expect(invalidateLiveThread).toHaveBeenCalledWith('codex-session-1');
+    });
+
+    it('does not call invalidateLiveThread for non-Codex conversations', async () => {
+      const conv = createOpenCodeConversation();
+      const { coordinator, invalidateLiveThread } = createCoordinator({ currentConversation: conv });
+
+      await coordinator.applyConversationRuntimeState(conv);
+
+      expect(invalidateLiveThread).not.toHaveBeenCalled();
+    });
+
+    it('does not call invalidateLiveThread when backendSessionId is absent', async () => {
+      const conv = createCodexConversation();
+      delete conv.backendSessionId;
+      const { coordinator, invalidateLiveThread } = createCoordinator({ currentConversation: conv });
+
+      await coordinator.applyConversationRuntimeState(conv);
+
+      expect(invalidateLiveThread).not.toHaveBeenCalled();
+    });
+
+    it('calls invalidateLiveThread after saveConversationOverrides', async () => {
+      const conv = createCodexConversation();
+      const { coordinator, invalidateLiveThread } = createCoordinator({ currentConversation: conv });
+
+      await coordinator.saveConversationOverrides(conv, { codexSandboxMode: 'read-only' });
+
+      expect(invalidateLiveThread).toHaveBeenCalledWith('codex-session-1');
+    });
+
+    it('does not call invalidateLiveThread when the registry has no codex adapter', async () => {
+      const conv = createCodexConversation();
+      const chatContainerEl = document.createElement('div');
+      const host = {
+        app: {} as never,
+        getCurrentConversation: jest.fn().mockReturnValue(conv),
+        getSessionSettingsDefaults: jest.fn().mockReturnValue({ chatFontSizePx: 13 }),
+        getCodexGlobalDefaults: jest.fn().mockReturnValue({
+          sandboxMode: 'workspace-write' as const,
+          modelReasoningEffort: 'medium' as const,
+          model: 'codex-mini-latest',
+          additionalDirectories: [] as string[],
+          networkAccessEnabled: false,
+        }),
+        getChatContainerEl: jest.fn().mockReturnValue(chatContainerEl),
+        saveConversation: jest.fn().mockResolvedValue(undefined),
+        showNotice: jest.fn(),
+        applyCodexRuntimeOverrides: jest.fn(),
+        agentServiceRegistry: {
+          get: jest.fn(() => null),
+        } as unknown as jest.Mocked<ConversationSessionSettingsCoordinatorHost['agentServiceRegistry']>,
+        supportsSessionSharing: jest.fn().mockReturnValue(false),
+        supportsCompaction: jest.fn().mockReturnValue(false),
+      } as jest.Mocked<ConversationSessionSettingsCoordinatorHost>;
+
+      const coordinator = new ConversationSessionSettingsCoordinator(host);
+      await coordinator.applyConversationRuntimeState(conv);
+      // No throw — the missing adapter is safely skipped.
+      expect(host.applyCodexRuntimeOverrides).toHaveBeenCalled();
+    });
   });
 });

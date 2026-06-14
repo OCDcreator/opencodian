@@ -123,19 +123,21 @@ describe('CodexAppServerClient.getAccountRateLimits', () => {
 
     expect(rateLimits).toEqual({
       rateLimits: {
-        requests_per_minute: 60,
-        tokens_per_minute: 100000,
-      },
-      rateLimitsByLimitId: {
-        default: {
+        rateLimits: {
           requests_per_minute: 60,
           tokens_per_minute: 100000,
+        },
+        rateLimitsByLimitId: {
+          default: {
+            requests_per_minute: 60,
+            tokens_per_minute: 100000,
+          },
         },
       },
     });
   });
 
-  it('returns null on error', async () => {
+  it('returns errorReason when app-server route fails (e.g. chatgpt auth required)', async () => {
     const proc = createMockProcess();
     mockSpawn.mockReturnValue(proc);
     emitWsUrl(proc.stdout!);
@@ -150,14 +152,20 @@ describe('CodexAppServerClient.getAccountRateLimits', () => {
         setTimeout(() => simulateResponse(msg.id, {}), 5);
       } else if (msg.method === 'account/rateLimits/read') {
         setTimeout(() => {
-          simulateError(msg.id, { code: -32600, message: 'Invalid request' });
+          simulateError(msg.id, {
+            code: -32600,
+            message: 'chatgpt authentication required to read rate limits',
+          });
         }, 5);
       }
     });
 
     const rateLimits = await client.getAccountRateLimits();
 
-    expect(rateLimits).toBeNull();
+    expect(rateLimits).toEqual({
+      rateLimits: null,
+      errorReason: expect.stringContaining('chatgpt authentication required'),
+    });
   });
 
   it('returns rate limits without optional rateLimitsByLimitId', async () => {
@@ -188,7 +196,9 @@ describe('CodexAppServerClient.getAccountRateLimits', () => {
 
     expect(rateLimits).toEqual({
       rateLimits: {
-        requests_per_minute: 30,
+        rateLimits: {
+          requests_per_minute: 30,
+        },
       },
     });
   });

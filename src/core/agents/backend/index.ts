@@ -153,8 +153,20 @@ export {
 export {
   CodexAdapter,
   type CodexAdapterOptions,
+  type CodexApprovalBridgeHost,
+  type CodexApprovalDecision,
+  type CodexApprovalKind,
+  type CodexApprovalRequest,
   type CodexFactory,
 } from './CodexAdapter';
+export {
+  buildCodexApprovalQuestionRequest,
+  type CodexApprovalCardRenderer,
+  type CodexApprovalHostContext,
+  type CodexApprovalResolutionResult,
+  createCodexApprovalBridgeHost,
+  mapCodexApprovalResolution,
+} from './CodexDefaultApprovalHost';
 export {
   CodexStreamNormalizer,
   type CodexStreamNormalizerOptions,

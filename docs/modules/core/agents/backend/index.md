@@ -1,7 +1,7 @@
 # backend/index
 
 > **源码**: `src/core/agents/backend/index.ts`
-> **最近更新**: 2026-06-09
+> **最近更新**: 2026-06-13
 
 ## 概述
 
@@ -49,6 +49,8 @@
 - `AgentChatSendRequest`: backend-neutral chat 发送请求类型。
 - `AgentChatCapability` / `AgentSessionCapability` / `AgentAuthCapability` / `AgentBranchCapability` / `AgentConfigCapability` / `AgentMcpCapability` / `AgentModelCapability` / `AgentPermissionCapability` / `AgentQuestionCapability` / `AgentTodoCapability` / `AgentToolCapability`: 可选 capability interface。
 - `CodexAdapter` / `CodexFactory` / `CodexAdapterOptions`: Codex SDK adapter 骨架，实现 AgentChatCapability + AgentSessionCapability；DI seam 支持测试注入。
+- `CodexApprovalKind` / `CodexApprovalRequest` / `CodexApprovalDecision` / `CodexApprovalBridgeHost`: Codex server-request 审批 bridge 类型（Round 5）。`CodexAdapter.setApprovalHost(host)` 通过这些类型把 `execCommandApproval` / `applyPatchApproval` server-request 接到 UI-facing host 回调；仅 wire 两种最窄审批形状 + 四个标量 ReviewDecision，运行时触发证明仍待后续。
+- `CodexApprovalHostContext` / `CodexApprovalCardRenderer` / `CodexApprovalResolutionResult` / `createCodexApprovalBridgeHost` / `buildCodexApprovalQuestionRequest` / `mapCodexApprovalResolution`: Codex 审批 UI host seam（Round 6）。`createCodexApprovalBridgeHost(getContext)` 返回一个动态读取 context 的 `CodexApprovalBridgeHost`；`buildCodexApprovalQuestionRequest` 把 `CodexApprovalRequest` 翻译为 `QuestionRequest`，`mapCodexApprovalResolution` 把 `showQuestionDialog` 结果映射回 `CodexApprovalDecision`；chat view 通过 `installCodexApprovalHostContext()` 把 `approvalCardRenderer` 挂到 plugin 的 context 上。
 - `CodexStreamNormalizer` / `CodexStreamNormalizerOptions` / `createCodexStreamNormalizer`: Codex SDK ThreadEvent → StreamChunk 转换器。
 
 ## 依赖
@@ -70,7 +72,11 @@
 - `src/core/agents/backend/ClaudeCodeStreamNormalizer.ts`：Claude SDK message 到 `StreamChunk` 的转换 helper
 - `src/core/agents/backend/ClaudeCodePermissionBridge.ts`：Claude `canUseTool` / `AskUserQuestion` 到 OpenCodian permission/question host 的桥接 helper
 - `src/core/agents/backend/CodexAdapter.ts`：Codex SDK adapter 骨架（Chat + Session）
+- `src/core/agents/backend/CodexDefaultApprovalHost.ts`：Codex 审批 bridge 的默认 host 实现；连接 adapter 的 `setApprovalHost` 到 view 的 question/inline-card UI
 - `src/core/agents/backend/CodexStreamNormalizer.ts`：Codex SDK ThreadEvent → StreamChunk 转换器
+- `src/core/agents/backend/CodexAppServerClientTypes.ts`：从 `CodexAppServerClient` 拆出的纯 wire 类型模块（thread/model/account/MCP/review 等），由 `CodexAppServerClient` 通过 `export *` 重新导出
+- `src/core/agents/backend/CodexAppServerTransport.ts`：从 `CodexAppServerClient` 拆出的基类，负责 app-server 进程生命周期与 JSON-RPC 2.0 plumbing；`CodexAppServerClient extends CodexAppServerTransport`
+- `src/core/agents/backend/CodexAppServerClientNormalization.ts`：从 `CodexAppServerClient` 拆出的 transcript 归一化纯函数模块（`normalizeThreadList` / `normalizeTurnsToPreviewMessages`）
 - `src/core/types/chat.ts`：提供 `AgentBackendKind` 类型约束
 
 ## 维护约束

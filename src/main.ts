@@ -23,6 +23,8 @@ import { adaptMcpConfigForClaude } from './core/agents/backend/ClaudeCodeMcpConf
 import { type ClaudeCodePermissionBridgeHostContext, createClaudeCodePermissionBridgeHost } from './core/agents/backend/ClaudeCodeDefaultPermissionHost';
 import { ClaudeCodePermissionBridge, createClaudeCodePermissionBridge } from './core/agents/backend/ClaudeCodePermissionBridge';
 import { loadClaudeCodeSdk } from './core/agents/backend/ClaudeCodeSdkLoader';
+import { CodexAdapter } from './core/agents/backend/CodexAdapter';
+import { type CodexApprovalHostContext, createCodexApprovalBridgeHost } from './core/agents/backend/CodexDefaultApprovalHost';
 import { OpenCodeAdapter } from './core/agents/backend/OpenCodeAdapter';
 import { OpenCodeService, SDK_FEATURE_FLAG_ROLLOUT_DEFAULTS } from './core/opencode';
 import { OpenCodianSettingsRuntimeCoordinator } from './core/runtime/OpenCodianSettingsRuntimeCoordinator';
@@ -93,6 +95,7 @@ export default class OpenCodianPlugin extends Plugin {
   agentServiceRegistry: AgentServiceRegistry;
   claudeCodePermissionBridge: ClaudeCodePermissionBridge | null = null;
   claudeCodePermissionHostContext: ClaudeCodePermissionBridgeHostContext = { getActiveTabId: () => null };
+  codexApprovalHostContext: CodexApprovalHostContext = { getActiveTabId: () => null };
   opencodeConfigManager: OpencodeConfigManager | null = null;
   modelConfigService: ModelConfigService | null = null;
   settingsTab?: InstanceType<typeof OpenCodianSettingTab>;
@@ -263,6 +266,15 @@ export default class OpenCodianPlugin extends Plugin {
         this.agentServiceRegistry.setActive(this.settings.activeBackend);
       }
       setAgentServiceRegistry(this.agentServiceRegistry);
+
+      // Wire the Codex approval bridge host to the mutable context the chat
+      // view populates on mount.  Mirrors the Claude permission host wiring.
+      const codexAdapter = this.agentServiceRegistry.get('codex');
+      if (codexAdapter instanceof CodexAdapter) {
+        codexAdapter.setApprovalHost(
+          createCodexApprovalBridgeHost(() => this.codexApprovalHostContext),
+        );
+      }
 
       // Auto-start the active adapter so it reaches connected state.
       // OpenCodeAdapter.start() is idempotent (ServerManager returns if already running).

@@ -47,7 +47,7 @@ describe('CodexAdapter.getAccountRateLimits', () => {
     mockAppServerClientStart.mockClear();
   });
 
-  it('returns rate limits from app-server client when available', async () => {
+  it('passes through rate limits result from app-server client when available', async () => {
     const mockRateLimits = {
       rateLimits: {
         requests_per_minute: 60,
@@ -60,7 +60,8 @@ describe('CodexAdapter.getAccountRateLimits', () => {
         },
       },
     };
-    mockGetAccountRateLimits.mockResolvedValue(mockRateLimits);
+    const expectedResult = { rateLimits: mockRateLimits };
+    mockGetAccountRateLimits.mockResolvedValue(expectedResult);
 
     const mockCodex = createMockCodex();
     const adapter = new CodexAdapter({
@@ -70,11 +71,11 @@ describe('CodexAdapter.getAccountRateLimits', () => {
     await adapter.start();
     const result = await adapter.getAccountRateLimits();
 
-    expect(result).toEqual(mockRateLimits);
+    expect(result).toEqual(expectedResult);
     expect(mockGetAccountRateLimits).toHaveBeenCalled();
   });
 
-  it('returns null when app-server client is not initialized', async () => {
+  it('returns rateLimits null when app-server client is not initialized', async () => {
     const mockCodex = createMockCodex();
     const adapter = new CodexAdapter({
       createCodex: jest.fn().mockResolvedValue(mockCodex),
@@ -83,10 +84,10 @@ describe('CodexAdapter.getAccountRateLimits', () => {
     // No codexPathOverride means no appServerClient
     const result = await adapter.getAccountRateLimits();
 
-    expect(result).toBeNull();
+    expect(result).toEqual({ rateLimits: null });
   });
 
-  it('returns null when app-server client fails', async () => {
+  it('returns errorReason when app-server client throws', async () => {
     mockGetAccountRateLimits.mockRejectedValue(new Error('App-server error'));
 
     const mockCodex = createMockCodex();
@@ -97,11 +98,11 @@ describe('CodexAdapter.getAccountRateLimits', () => {
     await adapter.start();
     const result = await adapter.getAccountRateLimits();
 
-    expect(result).toBeNull();
+    expect(result).toEqual({ rateLimits: null, errorReason: 'App-server error' });
   });
 
-  it('returns null when app-server returns null', async () => {
-    mockGetAccountRateLimits.mockResolvedValue(null);
+  it('passes through null rateLimits when app-server client returns null payload', async () => {
+    mockGetAccountRateLimits.mockResolvedValue({ rateLimits: null });
 
     const mockCodex = createMockCodex();
     const adapter = new CodexAdapter({
@@ -111,6 +112,24 @@ describe('CodexAdapter.getAccountRateLimits', () => {
     await adapter.start();
     const result = await adapter.getAccountRateLimits();
 
-    expect(result).toBeNull();
+    expect(result).toEqual({ rateLimits: null });
+  });
+
+  it('passes through errorReason when app-server client reports chatgpt auth required', async () => {
+    mockGetAccountRateLimits.mockResolvedValue({
+      rateLimits: null,
+      errorReason: 'chatgpt authentication required to read rate limits',
+    });
+
+    const mockCodex = createMockCodex();
+    const adapter = new CodexAdapter({
+      codexPathOverride: '/path/to/codex',
+      createCodex: jest.fn().mockResolvedValue(mockCodex),
+    });
+    await adapter.start();
+    const result = await adapter.getAccountRateLimits();
+
+    expect(result.rateLimits).toBeNull();
+    expect(result.errorReason).toContain('chatgpt authentication required');
   });
 });

@@ -20,10 +20,13 @@
 - 提供 `getActiveSessionHistoryService()` 用于 active backend 的 session 消息读取路由，供无 conversation context 的消费方（如 settings inspection surface）使用
 - 提供 `readBackendSessionTitle()` 用于 backend-aware session 标题读取路由，通过 `getSession(sessionId)` 获取 session 详情并按已 productize 的 backend kind 提取标题字段（OpenCode: `.title`，Claude Code: `.summary`）；未来 backend 在明确字段语义前返回 `null`
 - 提供 `readBackendSessionShareUrl()` 用于 backend-aware session 分享链接读取路由，通过 `getSession(sessionId)` 获取 session 详情并按已 productize 的 backend kind 提取分享 URL（OpenCode: `session.share.url`；Claude Code 及其他 backend 目前无分享概念，返回 `null`）。这是一个**窄的 backend-aware session-detail read seam**，仅用于分享链接读取，不作为 generic stable cross-backend session-detail object contract
-- 提供 `listBackendSessions()` 用于 active backend 的 session 列表路由，调用 `listSessions()` 并将原始结果归一化为 `NormalizedSessionRow[]`（`id`/`title`/`shareUrl`/`updatedAt`），使 settings inspection surface 不再直接依赖 OpenCode `Session` 类型；其中 `shareUrl` 只在 active backend kind 为 `opencode` 时从 `record.share.url` 提取，Claude Code / generic backend 即使返回兼容 `share` 字段也归一化为 `null`
+- 提供 `listBackendSessions()` 用于 active backend 的 session 列表路由，调用 `listSessions()` 并将原始结果归一化为 `NormalizedSessionRow[]`（`id`/`title`/`shareUrl`/`updatedAt`/`archived`），使 settings inspection surface 不再直接依赖 OpenCode `Session` 类型；其中 `shareUrl` 只在 active backend kind 为 `opencode` 时从 `record.share.url` 提取，Claude Code / generic backend 即使返回兼容 `share` 字段也归一化为 `null`；`archived` 字段在 backend 报告为 `true` 时保留，否则省略
 - 提供 `getBackendSessionPreview()` 用于 active backend 的 session 消息预览路由，调用 `getSessionMessages()` 并将原始结果归一化为 `NormalizedSessionPreviewMessage[]`（`role`/`parts[]`），使 settings 预览不再假设 OpenCode `{info, parts}` 消息形状；当 backend 不支持该读取时返回 `null`，当 backend 支持但没有消息时返回空数组
 - 提供 `getBackendSessionDetail()` 用于 active backend 的 session 详情读取路由，通过 `getSession()` 做 best-effort metadata 归一化并返回 `NormalizedSessionDetail`（`id`、`backendKind`、`title`、`summary`、`createdAt`、`updatedAt`、`customTitle`、`gitBranch`、`cwd`、`tag`、`fileSize`），供 settings/chat inspection surface 稳定展示详情；backend 不支持或读取失败时返回 `null`
 - 提供 `loadBackendSessionMessages()` 用于从 backend 加载并归一化原始 session 消息。OpenCode 消息按 `{info, parts}` 形状解析，Claude / 其他 backend 使用 best-effort 通用归一化。当没有 session history service 或 `getSessionMessages` 返回非数组时返回 `[]`，避免在 OpenCode path 上直接对非数组值调用 `.map` 导致 runtime crash
+- 提供 `forkBackendSession()` 用于 active backend 的 session fork 路由；要求 adapter 实现 `AgentForkCapability.forkSession()`，返回新 session 的 `{ id, title }` 或在不支持/失败时返回 `null`
+- 提供 `archiveBackendSession()` 用于 active backend 的 session archive 路由；要求 adapter 在 `AgentSessionCapability` 上可选实现 `archiveSession()`，成功返回 `true`
+- 提供 `unarchiveBackendSession()` 用于 active backend 的 session unarchive 路由；要求 adapter 在 `AgentSessionCapability` 上可选实现 `unarchiveSession()`，成功返回 `true`
 - 提供 `NormalizedSessionRow`、`NormalizedSessionDetail`、`NormalizedSessionMessage`、`NormalizedSessionPreviewMessage`、`NormalizedSessionPreviewPart` 轻量类型，仅供 inspection surface 消费，不作为 stable cross-backend session contract
 
 ## 公共导出
@@ -32,6 +35,9 @@
 |------|------|------|
 | `NormalizedSessionDetail` | interface | Active backend session 详情的 best-effort metadata 归一化结果，字段覆盖标题、摘要、时间、custom title、git branch、cwd、tag 和文件大小 |
 | `getBackendSessionDetail()` | async function | 调用 active backend `getSession()` 并归一化为 `NormalizedSessionDetail`，作为 session detail inspection surface 的稳定 seam；不可用或失败时返回 `null` |
+| `forkBackendSession()` | async function | 调用 active backend `forkSession()` 并返回新 session 的 `{ id, title }`；adapter 不支持或失败时返回 `null` |
+| `archiveBackendSession()` | async function | 调用 active backend `archiveSession()`；不支持或失败时返回 `false` |
+| `unarchiveBackendSession()` | async function | 调用 active backend `unarchiveSession()`；不支持或失败时返回 `false` |
 
 ## 维护约束
 

@@ -5,9 +5,9 @@
  * Only fields that are genuinely wired through to the SDK adapter are exposed.
  */
 
-import { Notice, Setting } from 'obsidian';
+import { DropdownComponent, Setting } from 'obsidian';
 
-import type { AgentBackendKind } from '../../core/types/chat';
+import type { CodexModelSummary } from '../../core/agents/backend/CodexAdapter';
 import type { CodexReasoningEffort, CodexWebSearchMode } from '../../core/types/settings';
 import {
   getDefaultClaudeCodeBackendSettings,
@@ -15,7 +15,8 @@ import {
 } from '../../core/types/settings';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
-import { BackendSessionBrowserModal } from '../chat/ui/BackendSessionBrowserModal';
+import { SettingsCodexAccountSurface } from './SettingsCodexAccountSurface';
+import { SettingsCodexReadbackControls } from './SettingsCodexReadbackControls';
 
 export interface SettingsCodexSectionOptions {
   plugin: OpenCodianPlugin;
@@ -25,10 +26,14 @@ export interface SettingsCodexSectionOptions {
 export class SettingsCodexSection {
   private readonly plugin: OpenCodianPlugin;
   private readonly createSectionHeading: SettingsCodexSectionOptions['createSectionHeading'];
+  private readonly readbackControls: SettingsCodexReadbackControls;
+  private readonly accountSurface: SettingsCodexAccountSurface;
 
   constructor(options: SettingsCodexSectionOptions) {
     this.plugin = options.plugin;
     this.createSectionHeading = options.createSectionHeading;
+    this.readbackControls = new SettingsCodexReadbackControls({ plugin: this.plugin });
+    this.accountSurface = new SettingsCodexAccountSurface({ plugin: this.plugin });
   }
 
   attach(containerEl: HTMLElement): HTMLHeadingElement {
@@ -92,18 +97,56 @@ export class SettingsCodexSection {
       });
 
     // Model
-    new Setting(bodyEl)
+    const modelSetting = new Setting(bodyEl)
       .setName(t('settings.codex.model.name'))
-      .setDesc(t('settings.codex.model.desc'))
-      .addText((text) =>
-        text
-          .setPlaceholder(t('settings.codex.model.placeholder'))
-          .setValue(this.plugin.settings.backendSettings.codex.model)
-          .onChange(async (value) => {
-            this.plugin.settings.backendSettings.codex.model = value;
-            await this.plugin.saveSettings();
-          }),
-      );
+      .setDesc(t('settings.codex.model.desc'));
+
+    let modelDropdown: DropdownComponent | null = null;
+    let modelCustomInputEl: HTMLInputElement | null = null;
+    const currentModel = this.plugin.settings.backendSettings.codex.model;
+
+    modelSetting.addDropdown((dropdown) => {
+      modelDropdown = dropdown;
+      dropdown.selectEl?.setAttribute('data-setting', 'codex-model');
+      dropdown.addOption('__custom__', t('settings.codex.model.customOption'));
+      dropdown.setValue('__custom__');
+      dropdown.onChange(async (value) => {
+        if (value === '__custom__') {
+          if (modelCustomInputEl) {
+            modelCustomInputEl.style.display = 'block';
+            modelCustomInputEl.focus();
+          }
+        } else {
+          if (modelCustomInputEl) {
+            modelCustomInputEl.style.display = 'none';
+            modelCustomInputEl.value = '';
+          }
+          this.plugin.settings.backendSettings.codex.model = value;
+          await this.plugin.saveSettings();
+          this.applyCodexRuntimeUpdates();
+        }
+      });
+    });
+
+    if (modelSetting.controlEl) {
+      modelCustomInputEl = modelSetting.controlEl.createEl('input', {
+        cls: 'opencodian-settings-text-input',
+        attr: {
+          type: 'text',
+          placeholder: t('settings.codex.model.customPlaceholder'),
+          'data-setting': 'codex-model-custom',
+        },
+      });
+      modelCustomInputEl.value = currentModel;
+      modelCustomInputEl.addEventListener('change', async () => {
+        const value = modelCustomInputEl?.value ?? '';
+        this.plugin.settings.backendSettings.codex.model = value;
+        await this.plugin.saveSettings();
+        this.applyCodexRuntimeUpdates();
+      });
+    }
+
+    void this.populateCodexModelDropdown(currentModel, modelDropdown, modelCustomInputEl);
 
     // Sandbox mode
     new Setting(bodyEl)
@@ -188,474 +231,33 @@ export class SettingsCodexSection {
       );
 
     // Authentication info
+    const apiKey = this.plugin.settings.backendSettings.codex.apiKey;
+    const authSourceDesc = apiKey
+      ? t('settings.codex.connection.sourceApiKey')
+      : t('settings.codex.connection.sourceEnvOrChatgpt');
     new Setting(bodyEl)
       .setName(t('settings.codex.connection.name'))
-      .setDesc(t('settings.codex.connection.desc'))
+      .setDesc(authSourceDesc)
       .then((setting) => {
         setting.setDisabled(true);
       });
 
-    this.renderBackendSessionBrowserInfo(bodyEl);
-    this.renderAccountInfoReadbackControls(bodyEl);
-    this.renderModelListReadbackControls(bodyEl);
-    this.renderPermissionProfilesReadbackControls(bodyEl);
-    this.renderAccountRateLimitsReadbackControls(bodyEl);
-  }
+    this.readbackControls.renderBackendSessionBrowserInfo(bodyEl);
+    this.readbackControls.renderModelListReadbackControls(bodyEl);
+    this.readbackControls.renderPermissionProfilesReadbackControls(bodyEl);
+    this.readbackControls.renderMcpServerStatusReadbackControls(bodyEl);
+    this.readbackControls.renderLoadedThreadsReadbackControls(bodyEl);
 
-  private renderBackendSessionBrowserInfo(containerEl: HTMLElement): void {
-    const infoEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice',
-      attr: { 'data-codex-session-browser-info': 'true' },
-    });
-    infoEl.createSpan({ text: t('settings.codex.sessionBrowser.info') });
-
-    new Setting(containerEl)
-      .setName(t('settings.codex.sessionBrowser.launchName'))
-      .setDesc(t('settings.codex.sessionBrowser.launchDesc'))
-      .addButton((button) => {
-        button
-          .setButtonText(t('settings.codex.sessionBrowser.launchButton'))
-          .onClick(() => {
-            const host = {
-              getAgentServiceRegistry: () => this.plugin.agentServiceRegistry ?? null,
-              createConversationFromBackendSession: async (
-                sessionId: string,
-                title: string,
-                initialMessages?: Array<{ id: string; role: 'user' | 'assistant'; content: string; timestamp: number }>,
-                backend?: string,
-              ) => this.plugin.createConversationFromBackendSession(sessionId, title, initialMessages, backend as AgentBackendKind),
-              loadConversation: async (conversationId: string) => this.plugin.loadBackendSessionConversation(conversationId),
-              getActiveBackendKind: () => this.plugin.settings.activeBackend ?? null,
-              showNotice: (msg: string) => { new Notice(msg); },
-              isStreaming: () => false,
-              supportsResume: () => true,
-              forcedBackendKind: 'codex' as const,
-            };
-            new BackendSessionBrowserModal(this.plugin.app, host).open();
-          });
-      });
-
-    const inMemoryEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice',
-      attr: { 'data-codex-session-browser-in-memory': 'true' },
-    });
-    inMemoryEl.createSpan({ text: t('settings.codex.sessionBrowser.inMemoryNotice') });
-  }
-
-  private renderAccountInfoReadbackControls(containerEl: HTMLElement): void {
-    let outputEl: HTMLElement | null = null;
-    const getOutputEl = (): HTMLElement => {
-      outputEl ??= containerEl.createDiv({
-        cls: 'opencodian-settings-inline-notice opencodian-codex-account-info-readback',
-        attr: {
-          'data-codex-account-info-readback': 'true',
-          'data-proof-state': 'readback',
-        },
-      });
-      return outputEl;
-    };
-
-    new Setting(containerEl)
-      .setName(t('settings.codex.accountInfo.name'))
-      .setDesc(t('settings.codex.accountInfo.desc'))
-      .addButton((button) => {
-        button
-          .setButtonText(t('settings.codex.accountInfo.inspectButton'))
-          .onClick(async () => {
-            await this.renderAccountInfoReadback(getOutputEl());
-          });
-      });
-  }
-
-  private async renderAccountInfoReadback(outputEl: HTMLElement): Promise<void> {
-    outputEl.empty();
-    outputEl.setText(t('settings.codex.accountInfo.loading'));
-    const adapter = this.plugin.agentServiceRegistry?.get('codex') as {
-      getAccountInfo?: () => Promise<unknown | null>;
-    } | null;
-    if (typeof adapter?.getAccountInfo !== 'function') {
-      outputEl.setText(t('settings.codex.accountInfo.unavailable'));
-      return;
-    }
-
-    let accountInfo: unknown | null;
-    try {
-      accountInfo = await adapter.getAccountInfo();
-    } catch {
-      outputEl.setText(t('settings.codex.accountInfo.failed'));
-      return;
-    }
-
-    if (accountInfo === null) {
-      outputEl.setText(t('settings.codex.accountInfo.unavailable'));
-      return;
-    }
-
-    outputEl.empty();
-    outputEl.createEl('p', {
-      text: t('settings.codex.accountInfo.summary'),
-    });
-    outputEl.createEl('pre', {
-      text: this.formatAccountInfoReadback(accountInfo),
-    });
-  }
-
-  private formatAccountInfoReadback(accountInfo: unknown): string {
-    try {
-      return JSON.stringify(this.sanitizeAccountInfoValue(accountInfo, '', new WeakSet<object>()), null, 2);
-    } catch {
-      return t('settings.codex.accountInfo.unavailable');
-    }
-  }
-
-  private sanitizeAccountInfoValue(value: unknown, key: string, seen: WeakSet<object>): unknown {
-    if (typeof key === 'string' && /(?:api[_\s-]?key|secret|password|credential|token|authorization|oauth)/i.test(key)) {
-      return '[redacted]';
-    }
-    if (value === null || typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
-      return value;
-    }
-    if (typeof value === 'bigint') {
-      return value.toString();
-    }
-    if (typeof value !== 'object') {
-      return `[${typeof value}]`;
-    }
-    if (seen.has(value)) {
-      return '[circular]';
-    }
-    seen.add(value);
-    if (Array.isArray(value)) {
-      return value.map((item) => this.sanitizeAccountInfoValue(item, key, seen));
-    }
-    return Object.fromEntries(
-      Object.entries(value as Record<string, unknown>).map(([entryKey, entryValue]) => [
-        entryKey,
-        this.sanitizeAccountInfoValue(entryValue, entryKey, seen),
-      ]),
+    // Account & capability product surface — elevated from JSON-dump readbacks.
+    // Renders four product cards: account identity, token usage, rate limits,
+    // and provider capabilities. Each auto-loads and exposes its own refresh.
+    this.createSectionHeading(
+      bodyEl,
+      t('settings.codex.accountSurface.sectionName'),
+      t('settings.codex.accountSurface.sectionDesc'),
     );
-  }
-
-  private renderModelListReadbackControls(containerEl: HTMLElement): void {
-    let outputEl: HTMLElement | null = null;
-    const getOutputEl = (): HTMLElement => {
-      outputEl ??= containerEl.createDiv({
-        cls: 'opencodian-settings-inline-notice opencodian-codex-model-list-readback',
-        attr: {
-          'data-codex-model-list-readback': 'true',
-          'data-proof-state': 'readback',
-        },
-      });
-      return outputEl;
-    };
-
-    new Setting(containerEl)
-      .setName(t('settings.codex.modelList.name'))
-      .setDesc(t('settings.codex.modelList.desc'))
-      .addButton((button) => {
-        button
-          .setButtonText(t('settings.codex.modelList.inspectButton'))
-          .onClick(async () => {
-            await this.renderModelListReadback(getOutputEl());
-          });
-      });
-  }
-
-  private async renderModelListReadback(outputEl: HTMLElement): Promise<void> {
-    outputEl.empty();
-    outputEl.setText(t('settings.codex.modelList.loading'));
-    const adapter = this.plugin.agentServiceRegistry?.get('codex') as {
-      getModelList?: () => Promise<unknown[] | null>;
-    } | null;
-    if (typeof adapter?.getModelList !== 'function') {
-      outputEl.setText(t('settings.codex.modelList.unavailable'));
-      return;
-    }
-
-    let models: unknown[] | null;
-    try {
-      models = await adapter.getModelList();
-    } catch {
-      outputEl.setText(t('settings.codex.modelList.failed'));
-      return;
-    }
-
-    if (models === null || !Array.isArray(models) || models.length === 0) {
-      outputEl.setText(t('settings.codex.modelList.unavailable'));
-      return;
-    }
-
-    outputEl.empty();
-    outputEl.createEl('p', {
-      text: t('settings.codex.modelList.summary'),
-    });
-
-    for (const model of models) {
-      const entry = model as Record<string, unknown>;
-      const name = String(entry.display_name ?? entry.slug ?? 'unknown');
-      const desc = entry.description as string | null | undefined;
-      const label = desc
-        ? t('settings.codex.modelList.modelEntry', { name, description: desc })
-        : t('settings.codex.modelList.modelEntryNoDesc', { name });
-
-      const rowEl = outputEl.createDiv({
-        cls: 'opencodian-codex-model-list-entry',
-        attr: {
-          'data-model-slug': String(entry.slug ?? ''),
-          'data-model-visibility': String(entry.visibility ?? ''),
-          'data-proof-state': 'readback',
-        },
-      });
-
-      rowEl.createEl('p', {
-        cls: 'opencodian-codex-model-list-entry-name',
-        text: label,
-      });
-
-      const metaParts: string[] = [];
-      if (entry.default_reasoning_level) {
-        metaParts.push(`reasoning: ${entry.default_reasoning_level}`);
-      }
-      if (entry.supported_in_api === true) {
-        metaParts.push('API: yes');
-      }
-      if (metaParts.length > 0) {
-        rowEl.createEl('p', {
-          cls: 'opencodian-codex-model-list-entry-meta',
-          text: metaParts.join(' | '),
-        });
-      }
-    }
-  }
-
-  private renderPermissionProfilesReadbackControls(containerEl: HTMLElement): void {
-    let outputEl: HTMLElement | null = null;
-    const getOutputEl = (): HTMLElement => {
-      outputEl ??= containerEl.createDiv({
-        cls: 'opencodian-settings-inline-notice opencodian-codex-permission-profiles-readback',
-        attr: {
-          'data-codex-permission-profiles-readback': 'true',
-          'data-proof-state': 'readback',
-        },
-      });
-      return outputEl;
-    };
-
-    new Setting(containerEl)
-      .setName(t('settings.codex.permissionProfiles.name'))
-      .setDesc(t('settings.codex.permissionProfiles.desc'))
-      .addButton((button) => {
-        button
-          .setButtonText(t('settings.codex.permissionProfiles.inspectButton'))
-          .onClick(async () => {
-            await this.renderPermissionProfilesReadback(getOutputEl());
-          });
-      });
-  }
-
-  private async renderPermissionProfilesReadback(outputEl: HTMLElement): Promise<void> {
-    outputEl.empty();
-    outputEl.setText(t('settings.codex.permissionProfiles.loading'));
-    const adapter = this.plugin.agentServiceRegistry?.get('codex') as {
-      getPermissionProfiles?: () => Promise<unknown[] | null>;
-    } | null;
-    if (typeof adapter?.getPermissionProfiles !== 'function') {
-      outputEl.setText(t('settings.codex.permissionProfiles.unavailable'));
-      return;
-    }
-
-    let profiles: unknown[] | null;
-    try {
-      profiles = await adapter.getPermissionProfiles();
-    } catch {
-      outputEl.setText(t('settings.codex.permissionProfiles.failed'));
-      return;
-    }
-
-    if (profiles === null || !Array.isArray(profiles) || profiles.length === 0) {
-      outputEl.setText(t('settings.codex.permissionProfiles.unavailable'));
-      return;
-    }
-
-    outputEl.empty();
-    outputEl.createEl('p', {
-      text: t('settings.codex.permissionProfiles.summary'),
-    });
-
-    for (const profile of profiles) {
-      const entry = profile as Record<string, unknown>;
-      const id = String(entry.id ?? 'unknown');
-      const desc = entry.description as string | null | undefined;
-      const label = desc
-        ? t('settings.codex.permissionProfiles.profileEntry', { id, description: desc })
-        : t('settings.codex.permissionProfiles.profileEntryNoDesc', { id });
-
-      const rowEl = outputEl.createDiv({
-        cls: 'opencodian-codex-permission-profile-entry',
-        attr: {
-          'data-profile-id': id,
-          'data-proof-state': 'readback',
-        },
-      });
-
-      rowEl.createEl('p', {
-        cls: 'opencodian-codex-permission-profile-entry-name',
-        text: label,
-      });
-    }
-  }
-
-  private renderAccountRateLimitsReadbackControls(containerEl: HTMLElement): void {
-    let outputEl: HTMLElement | null = null;
-    const getOutputEl = (): HTMLElement => {
-      outputEl ??= containerEl.createDiv({
-        cls: 'opencodian-settings-inline-notice opencodian-codex-rate-limits-readback',
-        attr: {
-          'data-codex-rate-limits-readback': 'true',
-          'data-proof-state': 'readback',
-        },
-      });
-      return outputEl;
-    };
-
-    new Setting(containerEl)
-      .setName(t('settings.codex.rateLimits.name'))
-      .setDesc(t('settings.codex.rateLimits.desc'))
-      .addButton((button) => {
-        button
-          .setButtonText(t('settings.codex.rateLimits.inspectButton'))
-          .onClick(async () => {
-            await this.renderAccountRateLimitsReadback(getOutputEl());
-          });
-      });
-  }
-
-  private async renderAccountRateLimitsReadback(outputEl: HTMLElement): Promise<void> {
-    outputEl.empty();
-    outputEl.setText(t('settings.codex.rateLimits.loading'));
-    const adapter = this.plugin.agentServiceRegistry?.get('codex') as {
-      getAccountRateLimits?: () => Promise<unknown | null>;
-    } | null;
-    if (typeof adapter?.getAccountRateLimits !== 'function') {
-      outputEl.setText(t('settings.codex.rateLimits.unavailable'));
-      return;
-    }
-
-    let rateLimits: unknown | null;
-    try {
-      rateLimits = await adapter.getAccountRateLimits();
-    } catch {
-      outputEl.setText(t('settings.codex.rateLimits.failed'));
-      return;
-    }
-
-    if (rateLimits === null) {
-      outputEl.setText(t('settings.codex.rateLimits.unavailable'));
-      return;
-    }
-
-    outputEl.empty();
-    outputEl.createEl('p', {
-      text: t('settings.codex.rateLimits.summary'),
-    });
-    outputEl.createEl('pre', {
-      text: JSON.stringify(rateLimits, null, 2),
-    });
-  }
-
-  private renderAccountUsageReadbackControls(containerEl: HTMLElement): void {
-    let outputEl: HTMLElement | null = null;
-    const getOutputEl = (): HTMLElement => {
-      outputEl ??= containerEl.createDiv({
-        cls: 'opencodian-settings-inline-notice opencodian-codex-account-usage-readback',
-        attr: {
-          'data-codex-account-usage-readback': 'true',
-          'data-proof-state': 'readback',
-        },
-      });
-      return outputEl;
-    };
-
-    new Setting(containerEl)
-      .setName(t('settings.codex.accountUsage.name'))
-      .setDesc(t('settings.codex.accountUsage.desc'))
-      .addButton((button) => {
-        button
-          .setButtonText(t('settings.codex.accountUsage.inspectButton'))
-          .onClick(async () => {
-            await this.renderAccountUsageReadback(getOutputEl());
-          });
-      });
-  }
-
-  private async renderAccountUsageReadback(outputEl: HTMLElement): Promise<void> {
-    outputEl.empty();
-    outputEl.setText(t('settings.codex.accountUsage.loading'));
-    const adapter = this.plugin.agentServiceRegistry?.get('codex') as {
-      getAccountUsage?: () => Promise<unknown | null>;
-    } | null;
-    if (typeof adapter?.getAccountUsage !== 'function') {
-      outputEl.setText(t('settings.codex.accountUsage.unavailable'));
-      return;
-    }
-
-    let accountUsage: unknown | null;
-    try {
-      accountUsage = await adapter.getAccountUsage();
-    } catch {
-      outputEl.setText(t('settings.codex.accountUsage.failed'));
-      return;
-    }
-
-    if (accountUsage === null) {
-      outputEl.setText(t('settings.codex.accountUsage.unavailable'));
-      return;
-    }
-
-    outputEl.empty();
-    outputEl.createEl('p', {
-      text: t('settings.codex.accountUsage.summary'),
-    });
-    outputEl.createEl('pre', {
-      text: this.formatAccountUsageReadback(accountUsage),
-    });
-  }
-
-  private formatAccountUsageReadback(accountUsage: unknown): string {
-    try {
-      return JSON.stringify(this.sanitizeAccountUsageValue(accountUsage, '', new WeakSet<object>()), null, 2);
-    } catch {
-      return t('settings.codex.accountUsage.unavailable');
-    }
-  }
-
-  private sanitizeAccountUsageValue(value: unknown, key: string, seen: WeakSet<object>): unknown {
-    if (typeof key === 'string' && /(?:api[_\s-]?key|secret|password|credential|token|authorization|oauth)/i.test(key)) {
-      return '[redacted]';
-    }
-    if (value === null || typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
-      return value;
-    }
-    if (typeof value === 'bigint') {
-      return value.toString();
-    }
-    if (typeof value !== 'object') {
-      return `[${typeof value}]`;
-    }
-    if (seen.has(value)) {
-      return '[circular]';
-    }
-    seen.add(value);
-    if (Array.isArray(value)) {
-      return value.map((item) => this.sanitizeAccountUsageValue(item, key, seen));
-    }
-
-    return Object.fromEntries(
-      Object.entries(value as Record<string, unknown>).map(([entryKey, entryValue]) => [
-        entryKey,
-        this.sanitizeAccountUsageValue(entryValue, entryKey, seen),
-      ]),
-    );
+    const authSource = apiKey ? 'plugin-api-key' : 'env-or-chatgpt';
+    this.accountSurface.attach(bodyEl, authSource);
   }
 
   private applyCodexRuntimeUpdates(): void {
@@ -693,6 +295,63 @@ export class SettingsCodexSection {
     if ('updateWebSearchMode' in adapter) {
       (adapter as { updateWebSearchMode(m: CodexWebSearchMode): void })
         .updateWebSearchMode(codex.webSearchMode);
+    }
+
+    if ('updateModel' in adapter) {
+      (adapter as { updateModel(m: string | undefined): void })
+        .updateModel(codex.model);
+    }
+  }
+
+  private async populateCodexModelDropdown(
+    currentModel: string,
+    dropdown: DropdownComponent | null,
+    customInputEl: HTMLInputElement | null,
+  ): Promise<void> {
+    if (!dropdown?.selectEl) {
+      return;
+    }
+
+    const models = await this.loadCodexModelOptions();
+
+    dropdown.selectEl.empty();
+
+    if (models && models.length > 0) {
+      for (const model of models) {
+        dropdown.addOption(model.slug, model.display_name || model.slug);
+      }
+    }
+
+    dropdown.addOption('__custom__', t('settings.codex.model.customOption'));
+
+    const isKnownModel = models?.some((m) => m.slug === currentModel) ?? false;
+    if (isKnownModel) {
+      dropdown.setValue(currentModel);
+      if (customInputEl) {
+        customInputEl.style.display = 'none';
+        customInputEl.value = '';
+      }
+    } else {
+      dropdown.setValue('__custom__');
+      if (customInputEl) {
+        customInputEl.style.display = 'block';
+        customInputEl.value = currentModel;
+      }
+    }
+  }
+
+  private async loadCodexModelOptions(): Promise<CodexModelSummary[] | undefined> {
+    const adapter = this.plugin.agentServiceRegistry?.get('codex') as {
+      getModelList?: () => Promise<CodexModelSummary[] | null>;
+    } | null;
+    if (typeof adapter?.getModelList !== 'function') {
+      return undefined;
+    }
+    try {
+      const models = await adapter.getModelList();
+      return models ?? undefined;
+    } catch {
+      return undefined;
     }
   }
 }

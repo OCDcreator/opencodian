@@ -82,6 +82,7 @@ describe('CodexAdapter', () => {
       const caps = adapter.capabilities;
       expect(caps.has(AgentCapability.Chat)).toBe(true);
       expect(caps.has(AgentCapability.Sessions)).toBe(true);
+      expect(caps.has(AgentCapability.Fork)).toBe(true); // app-server thread/fork
       expect(caps.has(AgentCapability.Thinking)).toBe(true);
       expect(caps.has(AgentCapability.FileOps)).toBe(true);
       expect(caps.has(AgentCapability.Shell)).toBe(true);
@@ -95,7 +96,6 @@ describe('CodexAdapter', () => {
       expect(caps.has(AgentCapability.Mcp)).toBe(false);
       expect(caps.has(AgentCapability.Models)).toBe(false);
       expect(caps.has(AgentCapability.Branching)).toBe(false);
-      expect(caps.has(AgentCapability.Fork)).toBe(false);
     });
 
     it('hasCapability() returns true for declared capabilities', () => {

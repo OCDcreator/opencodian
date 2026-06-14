@@ -24,6 +24,7 @@
 - MCP 设置：`.opencodian-mcp-*`（management toolbar + metric cards、server cards、runtime switch label、status/detail modal、editor modal grouped form）。
 - provider 卡片 / 预设卡片：`.opencodian-settings-provider-*`、`.opencodian-preset-*`。
 - 模型选择弹层：`.opencodian-model-picker-*`（列表、搜索、筛选、选项、provider 分组标题与图标、source badge、空状态、响应式折行）。
+- 线程目标 readback + set/clear：`.opencodian-session-settings-codex-goal-*`（shell 容器、readback 卡片、objective 文本、status/token/time 预算 meta、空状态提示、set 输入行 + 按钮、clear 按钮）。
 
 ## 关联 TS 组件
 
@@ -217,3 +218,19 @@ Guardrail: 如果后续继续调整 availability 区，不要再把 `summary / c
 - 模型选项取消外边框，改用 transparent background + hover tonal lift；选中状态只保留勾选与轻边框，避免非悬浮状态下出现绿色背景。
 - 空选项（如“跟随当前会话模型”）选中时同样不铺 accent 背景，保持 subdued。
 - 选项间距从 `8px` 收紧到 `2px`，分组间距保持 `16px`，形成更清晰的“紧凑列表 + 分组留白”节奏。
+
+## 2026-06-12 Thread goal session settings section
+
+Codex 会话设置 modal 新增线程目标 readback + set/clear 区块（仅 Codex 后端可见）：
+
+- `.opencodian-session-settings-codex-goal-shell`：外层容器，`margin-top: 12px`。
+- `.opencodian-session-settings-codex-goal-readback`：readback 卡片，`background-secondary` + `border-radius: 6px` + `border`，承载 objective 文本与 status/token/time meta。
+- `.opencodian-session-settings-codex-goal-objective`：objective 正文，`13px` + `pre-wrap` + `word-break`，最长 200 字符截断。
+- `.opencodian-session-settings-codex-goal-meta`：状态 + 用量元信息，`11px` muted。
+- `.opencodian-session-settings-codex-goal-empty`：无目标时的空状态提示，`12px` faint italic。
+- `.opencodian-session-settings-codex-goal-set`：set 输入行，flex + `6px` gap，包含文本输入框和设定按钮。
+- `.opencodian-session-settings-codex-goal-input`：set 文本输入框，`12px` + flex 1。
+- `.opencodian-session-settings-codex-goal-budget-input`：可选 tokenBudget 数字输入框，`120px` 固定宽度 + `12px`。
+- `.opencodian-session-settings-codex-goal-set-btn` / `.opencodian-session-settings-codex-goal-clear-btn`：操作按钮，`12px` + secondary background + hover lift。
+- 数据由 `ConversationSessionSettingsCoordinator` 通过 `CodexAdapter` -> `CodexAppServerClient` 调用 `thread/goal/get|set|clear` app-server 路由获取。
+- `onSetThreadGoal` 回调现在接受可选 `{ tokenBudget?: number }` 参数，经 coordinator -> adapter -> app-server 全链路传递到 `thread/goal/set`。

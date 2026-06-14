@@ -2,6 +2,7 @@ import type { AgentBackendKind, Conversation } from '../../types/chat';
 import { AgentCapability } from '../AgentCapability';
 import type {
   AgentChatCapability,
+  AgentForkCapability,
   AgentService,
   AgentSessionCapability,
 } from './AgentService';
@@ -30,6 +31,78 @@ export function hasSessionCreationCapability(service: AgentService | null | unde
   return typeof sessionService.createSession === 'function'
     && typeof sessionService.deleteSession === 'function'
     && typeof sessionService.updateSessionTitle === 'function';
+}
+
+/**
+ * Fork a backend session through the active session-capable adapter.
+ *
+ * Requires the adapter to implement AgentForkCapability. Returns the new
+ * session id and title, or null if forking is not supported or failed.
+ */
+export async function forkBackendSession(
+  registry: AgentServiceRegistry | null | undefined,
+  sessionId: string,
+): Promise<{ id: string; title: string } | null> {
+  const active = getActiveSessionBackendService(registry);
+  if (!active) {
+    return null;
+  }
+  const forkService = active as Partial<AgentForkCapability>;
+  if (typeof forkService.forkSession !== 'function') {
+    return null;
+  }
+  try {
+    return await forkService.forkSession(sessionId);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Archive a backend session through the active session-capable adapter.
+ *
+ * Returns true if the adapter supports archiving and the request succeeded.
+ */
+export async function archiveBackendSession(
+  registry: AgentServiceRegistry | null | undefined,
+  sessionId: string,
+): Promise<boolean> {
+  const active = getActiveSessionBackendService(registry);
+  if (!active) {
+    return false;
+  }
+  if (typeof active.archiveSession !== 'function') {
+    return false;
+  }
+  try {
+    return await active.archiveSession(sessionId);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Unarchive a previously archived backend session through the active
+ * session-capable adapter.
+ *
+ * Returns true if the adapter supports unarchiving and the request succeeded.
+ */
+export async function unarchiveBackendSession(
+  registry: AgentServiceRegistry | null | undefined,
+  sessionId: string,
+): Promise<boolean> {
+  const active = getActiveSessionBackendService(registry);
+  if (!active) {
+    return false;
+  }
+  if (typeof active.unarchiveSession !== 'function') {
+    return false;
+  }
+  try {
+    return await active.unarchiveSession(sessionId);
+  } catch {
+    return false;
+  }
 }
 
 export function getConversationBackendService(
@@ -372,6 +445,8 @@ export interface NormalizedSessionRow {
   title: string;
   shareUrl: string | null;
   updatedAt: number | null;
+  /** Best-effort archive flag. True when the backend reports the session as archived. */
+  archived?: boolean;
 }
 
 export interface NormalizedSessionPreviewPart {
@@ -414,29 +489,30 @@ export async function listBackendSessions(
     return [];
   }
 
-  return rawSessions.filter((s): s is Record<string, unknown> => s !== null && typeof s === 'object').map((record, idx) => {
-    let shareUrl: string | null = null;
-    const share = active.kind === 'opencode' && record.share && typeof record.share === 'object'
-      ? record.share as Record<string, unknown>
-      : null;
-    if (share) {
-      const url = share.url;
-      if (typeof url === 'string' && url.trim().length > 0) {
-        shareUrl = url;
+    return rawSessions.filter((s): s is Record<string, unknown> => s !== null && typeof s === 'object').map((record, idx) => {
+      let shareUrl: string | null = null;
+      const share = active.kind === 'opencode' && record.share && typeof record.share === 'object'
+        ? record.share as Record<string, unknown>
+        : null;
+      if (share) {
+        const url = share.url;
+        if (typeof url === 'string' && url.trim().length > 0) {
+          shareUrl = url;
+        }
       }
-    }
 
-    return {
-      id: String(record.id ?? record.sessionId ?? `session-${idx}`),
-      title: String(record.title ?? record.summary ?? ''),
-      shareUrl,
-      updatedAt: typeof record.updatedAt === 'number'
-        ? record.updatedAt
-        : typeof (record.time as Record<string, unknown> | undefined)?.updated === 'number'
-          ? (record.time as Record<string, unknown>).updated as number
-          : null,
-    };
-  });
+      return {
+        id: String(record.id ?? record.sessionId ?? `session-${idx}`),
+        title: String(record.title ?? record.summary ?? ''),
+        shareUrl,
+        updatedAt: typeof record.updatedAt === 'number'
+          ? record.updatedAt
+          : typeof (record.time as Record<string, unknown> | undefined)?.updated === 'number'
+            ? (record.time as Record<string, unknown>).updated as number
+            : null,
+        ...(record.archived === true ? { archived: true } : {}),
+      };
+    });
 }
 
 /**
@@ -448,8 +524,10 @@ function normalizeContentBlocks(blocks: unknown[]): NormalizedSessionPreviewPart
   for (const block of blocks) {
     if (typeof block === 'object' && block !== null) {
       const b = block as Record<string, unknown>;
-      if (b.type === 'text' && typeof b.text === 'string') {
-        parts.push({ type: 'text', text: b.text });
+      if (typeof b.type === 'string' && typeof b.text === 'string') {
+        // Preserve any block that already has { type, text } — this covers
+        // text blocks, tool_call, file_change, web_search activity parts, etc.
+        parts.push({ type: b.type, text: b.text });
       } else {
         parts.push({ type: String(b.type ?? 'block'), text: JSON.stringify(block, null, 2) });
       }

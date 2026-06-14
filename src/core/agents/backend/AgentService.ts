@@ -114,6 +114,16 @@ export interface AgentSessionCapability extends AgentService {
   deleteSession(sessionId: string): Promise<void>;
   updateSessionTitle(sessionId: string, title: string): Promise<void>;
   /**
+   * Archive a backend session. Optional because not all backends support
+   * session archival.
+   */
+  archiveSession?(sessionId: string): Promise<boolean>;
+  /**
+   * Unarchive a previously archived backend session. Optional because not all
+   * backends support session archival.
+   */
+  unarchiveSession?(sessionId: string): Promise<boolean>;
+  /**
    * Read messages from a backend session.
    * Returns backend-specific raw message objects — callers must normalize
    * per backend kind. Optional because not all backends expose message history.

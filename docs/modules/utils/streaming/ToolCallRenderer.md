@@ -5,10 +5,10 @@
 
 ## 概述
 
-渲染 AI 工具调用卡片。显示工具名称、摘要信息、状态图标和可展开的执行结果。`ToolCallRenderer` 现在把 MCP 摘要分类/字段回退委托给 `mcpSummaryConfig.getMcpToolSummary()`，自身只保留 DOM 渲染与 builtin/custom 工具摘要装配；工具名称/图标识别继续统一委托给 `shared/toolIdentity`，兼容 OpenCode 与 Claudian 的不同命名体系。对 OpenCode 原生 `task`，它会切换到专用 subagent 卡片：显示 agent / description / status / child session，并避免默认展开原始 `<task_result>`。
+渲染 AI 工具调用卡片。显示工具名称、摘要信息、状态图标、MCP 服务器名 chip（当 `kind: 'mcp'` 且 `toolMetadata.server` 存在时）和可展开的执行结果。`ToolCallRenderer` 现在把 MCP 摘要分类/字段回退委托给 `mcpSummaryConfig.getMcpToolSummary()`，MCP 服务器 chip 和展开 `Server:` 行委托给 `McpToolCallRenderer`，task/subagent 展开卡片委托给 `TaskToolCallRenderer`；自身只保留 DOM 渲染与 builtin/custom 工具摘要装配；工具名称/图标识别继续统一委托给 `shared/toolIdentity`，兼容 OpenCode 与 Claudian 的不同命名体系。对 OpenCode 原生 `task`，它会切换到专用 subagent 卡片：显示 agent / description / status / child session，并避免默认展开原始 `<task_result>`。
 
 ## 导入关系
-上游: `obsidian` (setIcon), `../../shared` (tool identity), `./mcpSummaryConfig` (MCP summary resolver), `./types` (ToolCallInfo, ToolCallStatus, ToolRendererOptions)
+上游: `obsidian` (setIcon), `../../shared` (tool identity), `./mcpSummaryConfig` (MCP summary resolver), `./McpToolCallRenderer` (MCP server chip/detail), `./TaskToolCallRenderer` (task/subagent expanded card), `./types` (ToolCallInfo, ToolCallStatus, ToolRendererOptions)
 下游: `StreamController` (持有并调用)
 
 ## 核心类型 / 接口
@@ -22,6 +22,7 @@
   renderExpandedContent?: (container, toolName, result) => void;  // 展开内容渲染
   onCollapsibleToggle?: () => void;           // 展开/收起后通知上层
   onOpenToolSession?: (sessionId, toolCall) => void;  // 打开 task/subagent child session
+  onOpenMcpServerDetail?: (serverName: string) => void;  // 打开 MCP server 详情面（Codex chat→modal 入口）
 }
 ```
 
@@ -58,7 +59,9 @@
 | `web_search` / `websearch` / `codesearch` | 查询文本（截断 60 字符） |
 | `web_fetch` / `webfetch` | URL 文本（截断 60 字符） |
 
-对结构化 `kind: 'mcp'` 的工具，`ToolCallRenderer` 直接调用 `src/utils/streaming/mcpSummaryConfig.ts` 中的 `getMcpToolSummary()`；该 helper 继续按“工具名语义优先”执行字段回退，完整对照表见 [mcp-summary-fields.md](C:/Users/lt/Desktop/Write/custom-project/opencodian/docs/modules/utils/streaming/mcp-summary-fields.md)：
+对结构化 `kind: 'mcp'` 的工具，`ToolCallRenderer` 直接调用 `src/utils/streaming/mcpSummaryConfig.ts` 中的 `getMcpToolSummary()`；该 helper 继续按“工具名语义优先”执行字段回退，完整对照表见 [mcp-summary-fields.md](C:/Users/lt/Desktop/Write/custom-project/opencodian/docs/modules/utils/streaming/mcp-summary-fields.md)。
+
+ additionally，当 MCP 工具调用的 `toolMetadata.server` 存在时，header 会渲染 `.streaming-tool-server-chip`。若提供了 `onOpenMcpServerDetail` 回调，chip 渲染为可点击 `<button>`（点击 `stopPropagation` 避免触发 header 展开/折叠），展开详情区也会显示 "View server details" 链接；若未提供回调，chip 保持为被动 `<span>`。该信息仅来自流中已有的 `toolMetadata`；相关逻辑在 `McpToolCallRenderer.ts` 中实现。
 
 1. 先把工具名按 `__` / `_` / `-` / `:` 拆词，并优先取最后一个命中的动作词
 2. 若命中动作词，则按该类别的字段优先级取摘要
@@ -149,7 +152,7 @@
 |------|------|
 | `render(parentEl, toolCall)` | 创建工具调用卡片 DOM |
 | `updateResult(toolEl, toolCall)` | 更新结果内容和状态图标 |
-| `updateHeader(toolEl, toolCall)` | 更新名称和摘要（增量 input） |
+| `updateHeader(toolEl, toolCall)` | 更新名称、摘要和 MCP server chip（增量 input） |
 | `updateStatus(toolEl, status)` | 仅更新状态图标 |
 
 ## 数据流
@@ -158,12 +161,12 @@
 StreamController.handleToolUseChunk(chunk)
   → ToolCallRenderer.render(parentEl, toolCall)
     → .streaming-tool-call
-      → .streaming-tool-header (icon + name + summary + status)
+      → .streaming-tool-header (icon + name + summary + status + MCP server chip)
       → .streaming-tool-content (hidden, "Waiting for result...")
 
 StreamController.handleToolResultChunk(chunk)
   → ToolCallRenderer.updateResult(toolEl, toolCall)
-    → 清空 content → renderExpandedContent
+    → 清空 content → renderExpandedContent / renderTaskExpandedContent / renderMcpExpandedContent
     → updateStatus (completed/error)
 
 用户点击 header → toggle 展开/折叠 content → `onCollapsibleToggle?()`
@@ -183,6 +186,7 @@ StreamController.handleToolResultChunk(chunk)
 - `renderExpandedContent` — 自定义结果渲染
 - `onCollapsibleToggle` — tool 详情切换后通知宿主安排滚动补偿
 - `onOpenToolSession` — task/subagent 卡片请求打开 child session 时的宿主回调
+- `onOpenMcpServerDetail` — MCP server chip/链接被点击时通知宿主打开 server 详情面（Codex chat→modal 入口）；未提供时 chip 为被动 span
 
 ## 注意事项
 

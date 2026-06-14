@@ -1,7 +1,7 @@
 # Chinese Locale
 
 > **源码**: `src/i18n/locales/zh.ts`
-> **最近更新**: 2026-06-12 — added `chat.sessionSettings.modal.codexWebSearchMode` / `codexWebSearchModeDesc` for session-level webSearchMode override
+> **最近更新**: 2026-06-12 Checkpoint 15N — 新增 `settings.codex.mcpServers.*` 键，用于普通 Codex 设置面板中的 MCP 服务器状态回读表面（检查 + 刷新）。
 
 ## 概述
 
