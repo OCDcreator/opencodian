@@ -244,17 +244,18 @@ Codex 会话设置 modal 新增线程目标 readback + set/clear 区块（仅 Co
 Codex MCP 服务器详情弹窗样式重构，支持默认折叠的 server section 与工具二级展开：
 
 - `.opencodian-codex-mcp-detail-modal` 设置固定宽度 `min(720px, calc(100vw - 40px))`，避免默认窄弹窗导致长 server 名被过度截断。
-- `.opencodian-codex-mcp-server-section` 折叠态固定高度 `96px`（`--opencodian-mcp-server-collapsed-height`），`overflow: hidden`，`gap: 0`，padding 为 `12px 16px`；展开态（`.is-expanded`）移除高度限制并恢复 `--opencodian-modal-section-inner-gap` 间距。
-- `.opencodian-codex-mcp-server-section-header` 作为摘要行，使用 flex 布局，标题、计数、auth badge、操作按钮对齐；长 server 名/path 使用 `word-break: break-word` / `overflow-wrap: anywhere` 安全换行，避免横向溢出。
-- `.opencodian-codex-mcp-server-section-counts` 显示 tool/resource 计数，`font-size: 0.82em`，使用 flex wrap 与 `white-space: nowrap` 保持紧凑。
+- `.opencodian-codex-mcp-server-section` 折叠态最小高度 `96px`（`--opencodian-mcp-server-collapsed-height`），`overflow: hidden`，`gap: 0`，section 本身不再承担 padding；header / body 分别负责内边距。展开态（`.is-expanded`）保持 `overflow: visible`，header 下方绘制分隔线。
+- `.opencodian-codex-mcp-server-section-header` 作为摘要行，使用两列 grid：左侧 `.opencodian-codex-mcp-server-section-identity` 承载标题与 short id，右侧 `.opencodian-codex-mcp-server-section-meta` 承载计数、auth badge 和操作按钮；`640px` 以下退化为单列。
+- `.opencodian-codex-mcp-server-section-counts` 显示 tool/resource 计数，`font-size: 0.82em`，使用 flex wrap 与 `white-space: nowrap` 保持紧凑，并由 meta column 右对齐。
 - `.opencodian-codex-mcp-server-section-short-id` 在 server id 与 display name 不同时显示为 muted 小字摘要。
 - `.opencodian-codex-mcp-server-section-body` 为展开内容容器；`.is-hidden` 折叠。
+- `.opencodian-codex-mcp-server-section.is-focused` 只作为深链定位状态，不覆盖 header 的背景、边框或圆角；所有 server header 保持同一张卡片样式。
 - `.opencodian-codex-mcp-server-expand-btn`、`.opencodian-codex-mcp-tool-detail-btn`、`.opencodian-codex-mcp-schema-toggle` 统一为紧凑 pill 按钮，`font-size: 0.78em`，背景使用 `--background-modifier-hover`，hover 时切换为背景修饰边框色。
 - `.opencodian-codex-mcp-tool-details` 为工具详情容器，默认隐藏；展开后显示 description 与 schema toggle。
 - `.opencodian-codex-mcp-tool-schema` 改为复用 `.opencodian-inspection-code` 样式（等宽、自动折行、内部滚动），仍需点击 schema toggle 才显示完整 JSON。
 - h4/h5 保持 `padding-left: 0` / `padding-inline-start: 0`；展开态内容使用 modal spacing token，不引入 nested cards、side-stripe 或营销 hero。
 
-Guardrail: 不要为 MCP detail modal 引入独立卡片层级或装饰性阴影；server section 本身已是 `.opencodian-inspection-section` 卡片，内部只应出现行、列表和折叠 detail，不应再包一层完整卡片。
+Guardrail: 不要为 MCP detail modal 引入独立卡片层级、装饰性阴影或 focus 专属卡片外观；server section 本身保持透明，header 是唯一卡片表面，内部只应出现行、列表和折叠 detail，不应再包一层完整卡片。
 
 ## 2026-06-16 Shared modal layout system
 

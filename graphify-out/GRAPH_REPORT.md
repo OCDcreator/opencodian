@@ -1,7 +1,7 @@
 # Graph Report - /Volumes/SDD2T/obsidian-vault-write/custom-project/opencodian/src  (2026-06-16)
 
 ## Corpus Check
-- 462 files · ~519,666 words
+- 462 files · ~519,674 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
@@ -601,11 +601,11 @@ Nodes (0):
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `t()` connect `Community 0` to `Community 1`, `Community 2`, `Community 3`, `Community 4`, `Community 5`, `Community 6`, `Community 7`, `Community 9`, `Community 10`, `Community 11`, `Community 12`, `Community 13`, `Community 14`, `Community 15`, `Community 16`, `Community 17`, `Community 18`, `Community 19`, `Community 20`, `Community 21`, `Community 22`, `Community 23`, `Community 26`, `Community 28`, `Community 29`, `Community 30`, `Community 31`, `Community 32`, `Community 33`, `Community 35`, `Community 36`, `Community 37`, `Community 40`, `Community 43`, `Community 45`, `Community 46`?**
-  _High betweenness centrality (0.388) - this node is a cross-community bridge._
+  _High betweenness centrality (0.391) - this node is a cross-community bridge._
 - **Why does `OpenCodianView` connect `Community 9` to `Community 1`, `Community 2`, `Community 3`, `Community 5`, `Community 6`, `Community 7`, `Community 40`, `Community 10`, `Community 11`, `Community 14`, `Community 17`, `Community 18`, `Community 20`, `Community 21`, `Community 24`, `Community 29`?**
-  _High betweenness centrality (0.054) - this node is a cross-community bridge._
-- **Why does `OpenCodeService` connect `Community 5` to `Community 0`, `Community 1`, `Community 3`, `Community 4`, `Community 37`, `Community 6`, `Community 8`, `Community 9`, `Community 11`, `Community 18`, `Community 26`, `Community 31`?**
-  _High betweenness centrality (0.037) - this node is a cross-community bridge._
+  _High betweenness centrality (0.085) - this node is a cross-community bridge._
+- **Why does `getConversationBackendSessionId()` connect `Community 2` to `Community 4`, `Community 5`, `Community 6`, `Community 7`, `Community 9`, `Community 11`?**
+  _High betweenness centrality (0.049) - this node is a cross-community bridge._
 - **Are the 828 inferred relationships involving `t()` (e.g. with `.getEmptyConversationTitle()` and `.generateDefaultTitle()`) actually correct?**
   _`t()` has 828 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `WebSocket` to the rest of the system?**

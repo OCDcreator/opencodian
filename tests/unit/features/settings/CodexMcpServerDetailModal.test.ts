@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import type { App } from 'obsidian';
 
 import type { AppServerMcpServerStatus } from '../../../../src/core/agents/backend/CodexAppServerClient';
@@ -453,5 +456,88 @@ describe('CodexMcpServerDetailModal — layout and structure', () => {
     const heading = header!.querySelector('h4');
     expect(heading).not.toBeNull();
     expect(heading!.textContent).toContain('long-name-server');
+  });
+
+  it('groups collapsed summary metadata and actions in the right header column', async () => {
+    const host = createHost({
+      getMcpServerStatus: jest.fn().mockResolvedValue([
+        serverStatus('computer-use', {
+          serverInfo: {
+            name: 'Computer Use',
+            version: '1.0a51766bb4d162ef1eed308e86a0f8f381fbb600896cb92c18ebde998142af',
+          },
+          tools: {
+            click: { name: 'click' },
+            screenshot: { name: 'screenshot' },
+          },
+          authStatus: 'unsupported',
+        }),
+      ]),
+    });
+    const modal = createModal(host);
+
+    modal.onOpen();
+    await new Promise((resolve) => { setTimeout(resolve, 0); });
+
+    const header = modal.contentEl.querySelector('.opencodian-codex-mcp-server-section-header');
+    expect(header).not.toBeNull();
+
+    const identity = header!.querySelector(':scope > .opencodian-codex-mcp-server-section-identity');
+    expect(identity).not.toBeNull();
+    expect(identity?.querySelector('h4')?.textContent).toContain('Computer Use');
+    expect(identity?.querySelector('.opencodian-codex-mcp-server-section-short-id')?.textContent).toBe('computer-use');
+
+    const meta = header!.querySelector(':scope > .opencodian-codex-mcp-server-section-meta');
+    expect(meta).not.toBeNull();
+    expect(meta?.querySelector('.opencodian-codex-mcp-server-section-counts')?.textContent).toContain(
+      t('settings.codex.mcpDetail.toolCount', { count: 2 }),
+    );
+    expect(meta?.querySelector('.opencodian-inspection-section-actions .opencodian-codex-mcp-auth-badge')?.textContent).toBe(
+      t('settings.codex.mcpDetail.authUnsupported'),
+    );
+    expect(meta?.querySelector('.opencodian-inspection-section-actions .opencodian-codex-mcp-server-expand-btn')).not.toBeNull();
+  });
+});
+
+describe('CodexMcpServerDetailModal CSS contract', () => {
+  it('keeps the server card shell on the header instead of the whole section', () => {
+    const css = readFileSync(join(process.cwd(), 'src/style/modals/config-editor-modal.css'), 'utf8');
+
+    const findRule = (selector: string): string => {
+      const pattern = new RegExp(`${selector}\\s*\\{[\\s\\S]*?\\}`, 'g');
+      return Array.from(css.matchAll(pattern)).map((match) => match[0]).find(Boolean) ?? '';
+    };
+
+    const sectionRule = findRule('\\.opencodian-codex-mcp-server-section');
+    const focusedRule = findRule('\\.opencodian-codex-mcp-server-section\\.is-focused::before');
+    const headerRule = findRule('\\.opencodian-codex-mcp-server-section-header');
+    const collapsedHeaderRule = findRule(
+      '\\.opencodian-codex-mcp-server-section:not\\(\\.is-expanded\\) \\.opencodian-codex-mcp-server-section-header',
+    );
+    const collapsedTitleRule = findRule(
+      '\\.opencodian-codex-mcp-server-section:not\\(\\.is-expanded\\) \\.opencodian-codex-mcp-server-section-header h4',
+    );
+    const collapsedShortIdRule = findRule(
+      '\\.opencodian-codex-mcp-server-section:not\\(\\.is-expanded\\) \\.opencodian-codex-mcp-server-section-short-id',
+    );
+    const focusedHeaderRule = findRule(
+      '\\.opencodian-codex-mcp-server-section\\.is-focused \\.opencodian-codex-mcp-server-section-header',
+    );
+
+    expect(sectionRule).toContain('background: transparent');
+    expect(sectionRule).toContain('border: none');
+    expect(sectionRule).toContain('border-radius: 0');
+    expect(focusedRule).toBe('');
+    expect(headerRule).toContain('background: var(--background-secondary');
+    expect(headerRule).toContain('border: 1px solid var(--background-modifier-border)');
+    expect(headerRule).toContain('border-radius: 8px');
+    expect(collapsedHeaderRule).toContain('height: var(--opencodian-mcp-server-collapsed-height)');
+    expect(collapsedHeaderRule).toContain('max-height: var(--opencodian-mcp-server-collapsed-height)');
+    expect(collapsedHeaderRule).toContain('overflow: hidden');
+    expect(collapsedTitleRule).toContain('white-space: nowrap');
+    expect(collapsedTitleRule).toContain('text-overflow: ellipsis');
+    expect(collapsedShortIdRule).toContain('white-space: nowrap');
+    expect(collapsedShortIdRule).toContain('text-overflow: ellipsis');
+    expect(focusedHeaderRule).toBe('');
   });
 });

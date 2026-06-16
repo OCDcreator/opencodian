@@ -1,0 +1,676 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Codex MCP 弹窗布局 ABC 预览</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #15161d;
+      --bg-elevated: #1f212c;
+      --bg-elevated-soft: #232634;
+      --bg-muted: #191b24;
+      --border: #42465f;
+      --border-soft: #323648;
+      --text: #f0f1f5;
+      --muted: #b7bac8;
+      --faint: #848898;
+      --accent: #8aa4ff;
+      --success: #45d879;
+      --warning: #ffbd5a;
+      --danger: #ff626f;
+      --shadow: 0 28px 80px rgba(0, 0, 0, 0.38);
+      --radius: 8px;
+      --font: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        radial-gradient(circle at 12% 0%, rgba(138, 164, 255, 0.13), transparent 28rem),
+        linear-gradient(180deg, #111218 0%, #181923 100%);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    button {
+      font: inherit;
+    }
+
+    .page {
+      width: min(1440px, calc(100vw - 32px));
+      margin: 0 auto;
+      padding: 24px 0 36px;
+    }
+
+    .page-header {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 18px;
+      margin-bottom: 18px;
+    }
+
+    .page-title {
+      margin: 0;
+      font-size: 20px;
+      line-height: 1.25;
+      font-weight: 720;
+      letter-spacing: 0;
+    }
+
+    .page-note {
+      max-width: 76ch;
+      margin: 6px 0 0;
+      color: var(--muted);
+    }
+
+    .preview-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+      align-items: start;
+    }
+
+    .variant {
+      min-width: 0;
+    }
+
+    .variant-label {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin: 0 0 8px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .variant-label strong {
+      color: var(--text);
+      font-size: 13px;
+    }
+
+    .modal {
+      min-height: 680px;
+      padding: 18px;
+      background: rgba(24, 25, 34, 0.96);
+      border: 1px solid #303448;
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .modal-titlebar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 12px;
+    }
+
+    .modal h1 {
+      margin: 0;
+      font-size: 22px;
+      line-height: 1.25;
+      font-weight: 720;
+      letter-spacing: 0;
+    }
+
+    .close {
+      width: 30px;
+      height: 30px;
+      border: 0;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--faint);
+      cursor: default;
+      font-size: 26px;
+      line-height: 1;
+    }
+
+    .intro {
+      margin: 0 0 12px;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    .summary-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 24px;
+      padding: 2px 10px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: var(--bg-elevated-soft);
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 680;
+      white-space: nowrap;
+    }
+
+    .badge.success {
+      border-color: rgba(69, 216, 121, 0.72);
+      color: var(--success);
+      background: rgba(69, 216, 121, 0.12);
+    }
+
+    .badge.danger {
+      border-color: rgba(255, 98, 111, 0.55);
+      color: var(--danger);
+      background: rgba(255, 98, 111, 0.1);
+    }
+
+    .readonly {
+      color: var(--danger);
+      font-size: 13px;
+    }
+
+    .refresh {
+      min-height: 34px;
+      padding: 6px 13px;
+      border: 1px solid rgba(255, 98, 111, 0.78);
+      border-radius: 7px;
+      background: #ff5963;
+      color: #1a1114;
+      font-weight: 700;
+    }
+
+    .server-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: 18px;
+    }
+
+    .server {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+    }
+
+    .server-name {
+      margin: 0;
+      min-width: 0;
+      color: var(--text);
+      font-weight: 720;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+
+    .server-id {
+      margin: 3px 0 0;
+      color: var(--muted);
+      font-family: var(--mono);
+      font-size: 12px;
+      overflow-wrap: anywhere;
+      word-break: break-all;
+    }
+
+    .metric {
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .btn {
+      min-height: 32px;
+      padding: 5px 12px;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      background: #30313a;
+      color: var(--text);
+      font-weight: 650;
+      white-space: nowrap;
+    }
+
+    .btn.subtle {
+      min-height: 28px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+      background: #272a37;
+    }
+
+    .tools {
+      border-top: 1px solid var(--border-soft);
+    }
+
+    .tool-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: center;
+      padding: 9px 0;
+      border-bottom: 1px solid var(--border-soft);
+    }
+
+    .tool-row:last-child {
+      border-bottom: 0;
+    }
+
+    .tool-name {
+      margin: 0;
+      min-width: 0;
+      font-family: var(--mono);
+      font-size: 12px;
+      overflow-wrap: anywhere;
+    }
+
+    .tool-desc {
+      margin: 2px 0 0;
+      color: var(--faint);
+      font-size: 12px;
+      overflow-wrap: anywhere;
+    }
+
+    /* A. Recommended two-column summary layout */
+    .variant-a .server {
+      padding: 0;
+    }
+
+    .variant-a .server-header {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 14px;
+      align-items: center;
+      min-height: 96px;
+      padding: 13px 14px;
+    }
+
+    .variant-a .server-meta {
+      display: grid;
+      grid-template-columns: repeat(2, auto);
+      gap: 7px 12px;
+      align-items: center;
+      justify-content: end;
+    }
+
+    .variant-a .server-actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 8px;
+      grid-column: 1 / -1;
+    }
+
+    .variant-a .tools {
+      padding: 4px 14px 10px;
+    }
+
+    .variant-a .expanded {
+      border-color: rgba(138, 164, 255, 0.58);
+    }
+
+    .variant-a .expanded .server-header {
+      min-height: 82px;
+      border-bottom: 1px solid var(--border-soft);
+    }
+
+    /* B. Conservative stacked layout */
+    .variant-b .server {
+      min-height: 116px;
+      padding: 14px;
+    }
+
+    .variant-b .server-header {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      align-items: stretch;
+    }
+
+    .variant-b .server-meta {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px 12px;
+    }
+
+    .variant-b .server-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .variant-b .tools {
+      margin-top: 12px;
+      padding-top: 6px;
+    }
+
+    /* C. Compact table-like layout */
+    .variant-c .server-list {
+      gap: 0;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      background: var(--bg-elevated);
+    }
+
+    .variant-c .server {
+      display: grid;
+      grid-template-columns: minmax(0, 1.5fr) auto auto auto;
+      gap: 10px;
+      align-items: center;
+      min-height: 68px;
+      padding: 10px 12px;
+      border: 0;
+      border-bottom: 1px solid var(--border-soft);
+      border-radius: 0;
+      background: transparent;
+    }
+
+    .variant-c .server:last-child {
+      border-bottom: 0;
+    }
+
+    .variant-c .server-header {
+      display: contents;
+    }
+
+    .variant-c .server-meta,
+    .variant-c .server-actions {
+      display: contents;
+    }
+
+    .variant-c .server-id {
+      max-width: 230px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      word-break: normal;
+    }
+
+    .variant-c .btn {
+      min-height: 28px;
+      padding: 4px 10px;
+      font-size: 12px;
+    }
+
+    .commentary {
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border-soft);
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .commentary p {
+      margin: 0 0 7px;
+    }
+
+    .commentary p:last-child {
+      margin-bottom: 0;
+    }
+
+    @media (max-width: 1120px) {
+      .preview-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .modal {
+        min-height: 0;
+      }
+    }
+
+    @media (max-width: 560px) {
+      .page {
+        width: min(100vw - 18px, 520px);
+        padding-top: 12px;
+      }
+
+      .page-header,
+      .variant-a .server-header,
+      .variant-c .server {
+        grid-template-columns: 1fr;
+      }
+
+      .page-header {
+        display: block;
+      }
+
+      .modal {
+        padding: 13px;
+      }
+
+      .modal h1 {
+        font-size: 18px;
+      }
+
+      .variant-a .server-meta {
+        justify-content: start;
+      }
+
+      .variant-a .server-actions {
+        justify-content: start;
+      }
+
+      .variant-c .server,
+      .variant-c .server-header,
+      .variant-c .server-meta,
+      .variant-c .server-actions {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="page-header">
+      <div>
+        <h1 class="page-title">Codex MCP 服务器弹窗布局 ABC</h1>
+        <p class="page-note">同一份示例数据：长 server id、认证状态、计数和展开按钮。重点看折叠态摘要行是否稳定、右侧操作是否会贴底或被裁切。</p>
+      </div>
+    </header>
+
+    <section class="preview-grid" aria-label="Layout variants">
+      <article class="variant variant-a">
+        <p class="variant-label"><strong>A 推荐：两列摘要头</strong><span>最接近当前弹窗，修复裁切</span></p>
+        <div class="modal">
+          <div class="modal-titlebar">
+            <h1>Codex MCP 服务器</h1>
+            <button class="close" aria-label="关闭">×</button>
+          </div>
+          <p class="intro">已连接到 Codex 应用服务器的 MCP 服务器，含工具、资源和认证状态。</p>
+          <div class="summary-row">
+            <span class="badge success">2 项</span>
+            <span class="readonly">只读：修改 MCP 配置请使用设置或 Codex CLI。</span>
+          </div>
+          <button class="refresh">刷新</button>
+
+          <div class="server-list">
+            <section class="server">
+              <div class="server-header">
+                <div>
+                  <h2 class="server-name">Computer Use v1.0a51766bb4d162ef1eed308e86a0f8f381fbb600896cb92c18ebde998142af</h2>
+                  <p class="server-id">computer-use</p>
+                </div>
+                <div class="server-meta">
+                  <span class="metric">40 个工具</span>
+                  <span class="metric">无资源</span>
+                  <span class="badge danger">不支持认证</span>
+                  <div class="server-actions">
+                    <button class="btn">展开</button>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section class="server expanded">
+              <div class="server-header">
+                <div>
+                  <h2 class="server-name">rmcp v1.5.0</h2>
+                  <p class="server-id">node_repl</p>
+                </div>
+                <div class="server-meta">
+                  <span class="metric">3 个工具</span>
+                  <span class="metric">无资源</span>
+                  <span class="badge danger">不支持认证</span>
+                  <div class="server-actions">
+                    <button class="btn">收起</button>
+                  </div>
+                </div>
+              </div>
+              <div class="tools">
+                <div class="tool-row">
+                  <div>
+                    <p class="tool-name">js</p>
+                    <p class="tool-desc">Run JavaScript in the persistent Node-backed kernel.</p>
+                  </div>
+                  <button class="btn subtle">工具详情</button>
+                </div>
+                <div class="tool-row">
+                  <div>
+                    <p class="tool-name">js_reset</p>
+                    <p class="tool-desc">Reset top-level bindings and execution state.</p>
+                  </div>
+                  <button class="btn subtle">工具详情</button>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <div class="commentary">
+            <p>优点：折叠态高度稳定，右侧元数据和操作有固定区域，长 id 只影响左侧。</p>
+            <p>取舍：窄弹窗下右侧会换行，信息密度仍然中等。</p>
+          </div>
+        </div>
+      </article>
+
+      <article class="variant variant-b">
+        <p class="variant-label"><strong>B 保守：单列堆叠</strong><span>最不容易挤压，但更高</span></p>
+        <div class="modal">
+          <div class="modal-titlebar">
+            <h1>Codex MCP 服务器</h1>
+            <button class="close" aria-label="关闭">×</button>
+          </div>
+          <p class="intro">已连接到 Codex 应用服务器的 MCP 服务器，含工具、资源和认证状态。</p>
+          <div class="summary-row">
+            <span class="badge success">2 项</span>
+            <span class="readonly">只读：修改 MCP 配置请使用设置或 Codex CLI。</span>
+          </div>
+          <button class="refresh">刷新</button>
+
+          <div class="server-list">
+            <section class="server">
+              <div class="server-header">
+                <div>
+                  <h2 class="server-name">Computer Use v1.0a51766bb4d162ef1eed308e86a0f8f381fbb600896cb92c18ebde998142af</h2>
+                  <p class="server-id">computer-use</p>
+                </div>
+                <div class="server-meta">
+                  <span class="metric">40 个工具</span>
+                  <span class="metric">无资源</span>
+                  <span class="badge danger">不支持认证</span>
+                </div>
+                <div class="server-actions">
+                  <button class="btn">展开</button>
+                </div>
+              </div>
+            </section>
+
+            <section class="server">
+              <div class="server-header">
+                <div>
+                  <h2 class="server-name">rmcp v1.5.0</h2>
+                  <p class="server-id">node_repl</p>
+                </div>
+                <div class="server-meta">
+                  <span class="metric">3 个工具</span>
+                  <span class="metric">无资源</span>
+                  <span class="badge danger">不支持认证</span>
+                </div>
+                <div class="server-actions">
+                  <button class="btn">展开</button>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <div class="commentary">
+            <p>优点：结构朴素，几乎不会发生右侧裁切。</p>
+            <p>取舍：每个 server 占高更多，列表长时滚动成本上升。</p>
+          </div>
+        </div>
+      </article>
+
+      <article class="variant variant-c">
+        <p class="variant-label"><strong>C 紧凑：表格式列表</strong><span>最高密度，管理感更强</span></p>
+        <div class="modal">
+          <div class="modal-titlebar">
+            <h1>Codex MCP 服务器</h1>
+            <button class="close" aria-label="关闭">×</button>
+          </div>
+          <p class="intro">已连接到 Codex 应用服务器的 MCP 服务器，含工具、资源和认证状态。</p>
+          <div class="summary-row">
+            <span class="badge success">2 项</span>
+            <span class="readonly">只读：修改 MCP 配置请使用设置或 Codex CLI。</span>
+          </div>
+          <button class="refresh">刷新</button>
+
+          <div class="server-list">
+            <section class="server">
+              <div class="server-header">
+                <div>
+                  <h2 class="server-name">Computer Use v1.0a51766bb4d162ef1eed308e86a0f8f381fbb600896cb92c18ebde998142af</h2>
+                  <p class="server-id">computer-use</p>
+                </div>
+                <div class="server-meta">
+                  <span class="metric">40 个工具</span>
+                  <span class="metric">无资源</span>
+                  <span class="badge danger">不支持认证</span>
+                </div>
+                <div class="server-actions">
+                  <button class="btn">展开</button>
+                </div>
+              </div>
+            </section>
+
+            <section class="server">
+              <div class="server-header">
+                <div>
+                  <h2 class="server-name">rmcp v1.5.0</h2>
+                  <p class="server-id">node_repl</p>
+                </div>
+                <div class="server-meta">
+                  <span class="metric">3 个工具</span>
+                  <span class="metric">无资源</span>
+                  <span class="badge danger">不支持认证</span>
+                </div>
+                <div class="server-actions">
+                  <button class="btn">展开</button>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <div class="commentary">
+            <p>优点：信息扫描最快，适合很多 MCP server。</p>
+            <p>取舍：长名称必须截断或换行策略更激进，弹窗会更像表格工具。</p>
+          </div>
+        </div>
+      </article>
+    </section>
+  </main>
+</body>
+</html>

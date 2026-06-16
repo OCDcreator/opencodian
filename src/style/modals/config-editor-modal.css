@@ -7242,41 +7242,38 @@
 }
 
 
-.opencodian-codex-mcp-server-section.is-focused {
-  position: relative;
-}
-
-.opencodian-codex-mcp-server-section.is-focused::before {
-  content: '';
-  position: absolute;
-  inset: -8px -10px;
-  border: 1px solid var(--interactive-accent);
-  border-radius: 8px;
-  background: var(--background-modifier-active-hover, rgba(0, 0, 0, 0.04));
-  pointer-events: none;
-  z-index: -1;
-}
-
 /* Collapsed server section: fixed-height summary row, no body content visible. */
 .opencodian-codex-mcp-server-section {
   --opencodian-mcp-server-collapsed-height: 96px;
   min-height: var(--opencodian-mcp-server-collapsed-height);
-  max-height: var(--opencodian-mcp-server-collapsed-height);
+  max-height: none;
   overflow: hidden;
-  padding: 12px 16px;
+  padding: 0;
   gap: 0;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
 }
 
 .opencodian-codex-mcp-server-section.is-expanded {
   min-height: auto;
   max-height: none;
   overflow: visible;
-  gap: var(--opencodian-modal-section-inner-gap, 12px);
+  gap: 0;
 }
 
 .opencodian-codex-mcp-server-section-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  min-height: calc(var(--opencodian-mcp-server-collapsed-height) - 24px);
+  gap: 14px;
+  min-height: var(--opencodian-mcp-server-collapsed-height);
+  padding: 13px 14px;
+  width: 100%;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
 }
 
 .opencodian-codex-mcp-server-section-header h4 {
@@ -7289,6 +7286,32 @@
   overflow-wrap: anywhere;
 }
 
+.opencodian-codex-mcp-server-section:not(.is-expanded) .opencodian-codex-mcp-server-section-header {
+  height: var(--opencodian-mcp-server-collapsed-height);
+  max-height: var(--opencodian-mcp-server-collapsed-height);
+  overflow: hidden;
+}
+
+.opencodian-codex-mcp-server-section:not(.is-expanded) .opencodian-codex-mcp-server-section-header h4 {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  word-break: normal;
+  overflow-wrap: normal;
+}
+
+.opencodian-codex-mcp-server-section.is-expanded .opencodian-codex-mcp-server-section-header {
+  min-height: 82px;
+  height: auto;
+  max-height: none;
+  overflow: visible;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.opencodian-codex-mcp-server-section-identity {
+  min-width: 0;
+}
+
 .opencodian-codex-mcp-server-section-short-id {
   margin: 2px 0 0;
   font-size: 0.82em;
@@ -7298,14 +7321,32 @@
   overflow-wrap: anywhere;
 }
 
+.opencodian-codex-mcp-server-section:not(.is-expanded) .opencodian-codex-mcp-server-section-short-id {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  word-break: normal;
+  overflow-wrap: normal;
+}
+
+.opencodian-codex-mcp-server-section-meta {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(2, auto);
+  gap: 7px 12px;
+  align-items: center;
+  justify-content: end;
+}
+
 .opencodian-codex-mcp-server-section-counts {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 6px 12px;
-  margin-left: auto;
+  justify-content: flex-end;
   font-size: 0.82em;
   color: var(--text-muted);
+  grid-column: 1 / -1;
 }
 
 .opencodian-codex-mcp-server-section-counts > span {
@@ -7316,6 +7357,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--opencodian-modal-section-inner-gap, 12px);
+  padding: 12px 14px 14px;
 }
 
 .opencodian-codex-mcp-server-section-body.is-hidden {
@@ -7345,6 +7387,22 @@
 
 .opencodian-codex-mcp-server-section .opencodian-inspection-section-actions {
   align-items: center;
+  grid-column: 1 / -1;
+  justify-content: flex-end;
+  max-width: none;
+}
+
+@media (max-width: 640px) {
+  .opencodian-codex-mcp-server-section-header {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .opencodian-codex-mcp-server-section-meta,
+  .opencodian-codex-mcp-server-section-counts,
+  .opencodian-codex-mcp-server-section .opencodian-inspection-section-actions {
+    justify-content: flex-start;
+  }
 }
 
 .opencodian-codex-mcp-server-section-body .opencodian-inspection-subsection {
@@ -7540,4 +7598,3 @@
   font-size: 0.8em;
   color: var(--text-muted);
 }
-

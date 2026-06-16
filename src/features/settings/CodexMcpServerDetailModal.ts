@@ -218,7 +218,9 @@ export class CodexMcpServerDetailModal extends Modal {
   private renderServerHeader(sectionEl: HTMLElement, server: AppServerMcpServerStatus, isExpanded: boolean): HTMLElement {
     const headerEl = sectionEl.createDiv({ cls: 'opencodian-codex-mcp-server-section-header opencodian-inspection-section-header' });
 
-    const titleEl = headerEl.createDiv({ cls: 'opencodian-inspection-section-title' });
+    const titleEl = headerEl.createDiv({
+      cls: 'opencodian-codex-mcp-server-section-identity opencodian-inspection-section-title',
+    });
     const displayName = server.serverInfo?.name ?? server.name;
     const version = server.serverInfo?.version;
     const titleParts = [displayName];
@@ -233,7 +235,8 @@ export class CodexMcpServerDetailModal extends Modal {
       });
     }
 
-    const countsEl = headerEl.createDiv({ cls: 'opencodian-codex-mcp-server-section-counts' });
+    const metaEl = headerEl.createDiv({ cls: 'opencodian-codex-mcp-server-section-meta' });
+    const countsEl = metaEl.createDiv({ cls: 'opencodian-codex-mcp-server-section-counts' });
     const tools = server.tools ? Object.entries(server.tools) : [];
     const resources = Array.isArray(server.resources) ? server.resources : [];
     const resourceTemplates = Array.isArray(server.resourceTemplates) ? server.resourceTemplates : [];
@@ -248,7 +251,7 @@ export class CodexMcpServerDetailModal extends Modal {
         : t('settings.codex.mcpDetail.noResources'),
     });
 
-    const actionsEl = headerEl.createDiv({ cls: 'opencodian-inspection-section-actions' });
+    const actionsEl = metaEl.createDiv({ cls: 'opencodian-inspection-section-actions' });
 
     if (server.authStatus) {
       actionsEl.createSpan({

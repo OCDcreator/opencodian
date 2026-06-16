@@ -27,7 +27,7 @@ interface CodexMcpServerDetailModalHost {
 function createCodexMcpServerDetailHost(adapter: CodexMcpServerDetailAdapterLike): CodexMcpServerDetailModalHost;
 ```
 
-构造函数: `new CodexMcpServerDetailModal(app, host, focusServerName?)` — `focusServerName` 在渲染后高亮并滚动到对应 server section（`.is-focused` 类）。
+构造函数: `new CodexMcpServerDetailModal(app, host, focusServerName?)` — `focusServerName` 在渲染后标记对应 server section（`.is-focused` 类）、默认展开并滚动定位；该状态不改变 header 的卡片视觉样式。
 
 ## 核心逻辑
 
@@ -38,7 +38,7 @@ function createCodexMcpServerDetailHost(adapter: CodexMcpServerDetailAdapterLike
 ### 服务器 section 渲染
 
 `renderServerSection()` 委托给三个子方法：
-- `renderServerHeader()`: 标题（名称 + 版本）+ 认证状态徽章 + 条件性"认证"按钮，全部归入 `.opencodian-inspection-section-header`
+- `renderServerHeader()`: 摘要头分成左侧 `.opencodian-codex-mcp-server-section-identity`（名称 + 版本 + short id）与右侧 `.opencodian-codex-mcp-server-section-meta`（工具/资源计数 + auth badge + 认证/展开按钮），右侧操作统一归入 meta column，避免长标题把按钮挤到卡片底部或裁切。
 - `renderServerDescription()`: 描述文本 + 网站 URL 链接
 - `renderServerContent()`: 工具/资源元数据行 + 工具列表（含 schema 展开）+ 资源/模板列表
 
@@ -84,7 +84,7 @@ modal 主类只负责状态（`expanded`、`busy`）与生命周期；渲染细�
 | `isSectionExpanded()` / `toggleSection()` | 折叠/展开状态管理 |
 | `handleReload()` | 刷新 MCP 配置并重新渲染 |
 | `handleAuthenticate()` | 触发 OAuth 认证流程并重新渲染 |
-| `applyFocusServer()` | 渲染后高亮并滚动到 `focusServerName` 对应 section（chat→detail 入口） |
+| `applyFocusServer()` | 渲染后标记并滚动到 `focusServerName` 对应 section（chat→detail 入口），不额外改写卡片边框/背景 |
 
 ## 数据流
 
@@ -128,6 +128,7 @@ MCP 服务器详情弹窗改为默认折叠每个 server section，只露出固�
 
 - 每个 server section 默认折叠，高度固定为 `96px`（CSS token `--opencodian-mcp-server-collapsed-height`）。
 - 摘要行包含：display name + version、server id（当 id 与 display name 不同）、auth badge/auth action、tool/resource count、展开/收起按钮。
+- 摘要行采用两列 grid：左侧 identity 吃满剩余宽度并允许长名称换行；右侧 meta 固定承载计数和操作，小宽度下退化为单列。
 - 折叠态不显示 server 描述、网站 URL、工具列表、工具描述、schema、资源详情。
 - 展开按钮使用原生 `<button>`，带 `aria-expanded` / `aria-controls`，文案走 i18n（`expandServer` / `collapseServer`），不依赖纯图标。
 
@@ -142,7 +143,7 @@ MCP 服务器详情弹窗改为默认折叠每个 server section，只露出固�
 
 ### focus server
 
-- 如果构造时传入 `focusServerName` 且命中，该 section 会添加 `.is-focused` 高亮，并默认展开，保留 chat deep-link 体验。
+- 如果构造时传入 `focusServerName` 且命中，该 section 会添加 `.is-focused`、默认展开并滚动定位；`.is-focused` 不再额外改写 header 边框/背景，避免第一张和后续 server 卡片出现不同视觉样式。
 - 未命中的 server 仍保持默认折叠。
 
 ### 新增/调整的方法
@@ -157,8 +158,10 @@ MCP 服务器详情弹窗改为默认折叠每个 server section，只露出固�
 
 ### DOM / CSS 类更新
 
-- `.opencodian-codex-mcp-server-section` 折叠态使用固定高度 `96px`、`overflow: hidden`、`gap: 0`；展开态移除高度限制并恢复 section 内间距。
-- `.opencodian-codex-mcp-server-section-header` 负责固定高度摘要行，标题 `h4` 保持 `padding-left: 0` / `padding-inline-start: 0`。
+- `.opencodian-codex-mcp-server-section` 折叠态使用固定最小高度 `96px`、`overflow: hidden`、`gap: 0`；section padding 归零，padding 由 header/body 分别承担。
+- `.opencodian-codex-mcp-server-section-header` 负责摘要行，使用 `grid-template-columns: minmax(0, 1fr) auto`；标题 `h4` 保持 `padding-left: 0` / `padding-inline-start: 0`。
+- `.opencodian-codex-mcp-server-section-identity` 为左侧身份列，允许 display name/version/short id 在可用宽度内换行。
+- `.opencodian-codex-mcp-server-section-meta` 为右侧元数据/操作列，包含计数和 `.opencodian-inspection-section-actions`；640px 以下退化为单列并左对齐。
 - `.opencodian-codex-mcp-server-section-counts` 显示 tool/resource count。
 - `.opencodian-codex-mcp-server-section-short-id` 显示 server id 摘要（仅当与 display name 不同）。
 - `.opencodian-codex-mcp-server-section-body` 为展开内容容器，`.is-hidden` 控制显隐。
@@ -175,7 +178,7 @@ MCP 服务器详情弹窗改为默认折叠每个 server section，只露出固�
 - 每个 server 使用 `.opencodian-modal-section.opencodian-inspection-section.opencodian-codex-mcp-server-section`，不再使用 `.opencodian-modal-card` 或 `.opencodian-codex-mcp-server-card`。
 - section header 的 `h4` 使用 `padding-left: 0` / `padding-inline-start: 0`，并配合 `flex-wrap`、`min-width: 0`、`word-break: break-word`、`overflow-wrap: anywhere`，确保长 server id / name 在弹窗宽度内自动换行，不会撑破布局或产生横向滚动。
 - 工具和资源列表使用 `.opencodian-inspection-row` 行布局：主信息左侧，badge/操作右侧，不再嵌套卡片。
-- focus server 高亮改为使用 `::before` 伪元素绘制外框，避免改变 border width 导致布局抖动。
+- focus server 仅保留展开与滚动定位，不再绘制额外外框或覆盖 header 边框，避免命中项和普通项出现两套卡片样式。
 
 ## 2026-06-16 Shared modal layout adoption
 
