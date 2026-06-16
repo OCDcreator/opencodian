@@ -2569,6 +2569,7 @@ describe('ClaudeCodeAdapter', () => {
     const adapter = new ClaudeCodeAdapter({
       vaultPath: '/vault',
       settings: getDefaultClaudeCodeBackendSettings(),
+      pathToClaudeCodeExecutable: '/usr/local/bin/claude',
       sdkLoader,
     });
 
@@ -2588,6 +2589,86 @@ describe('ClaudeCodeAdapter', () => {
     expect(sdkLoader).toHaveBeenCalledTimes(1);
     await collectAsync(adapter.sendMessage({ sessionId, content: 'again' }));
     expect(sdkLoader).toHaveBeenCalledTimes(1);
+  });
+
+  it('requires a resolved external Claude CLI before using the production SDK loader', async () => {
+    const sdk = createSdk([{
+      type: 'assistant',
+      message: {
+        id: 'msg-1',
+        content: [{ type: 'text', text: 'Should not run' }],
+      },
+    }]);
+    const sdkLoader: jest.MockedFunction<ClaudeCodeSdkLoader> = jest.fn().mockResolvedValue(sdk);
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      sdkLoader,
+      processResolver: () => ({
+        mode: 'missing',
+        env: {},
+        shell: false,
+        diagnostics: {
+          configuredPath: null,
+          resolvedExternalPath: null,
+          pathAugmented: false,
+        },
+      }),
+    });
+    const sessionId = await adapter.createSession();
+
+    await expect(collectAsync(adapter.sendMessage({
+      sessionId,
+      content: 'hello',
+    }))).resolves.toEqual([{
+      type: 'error',
+      content: expect.stringContaining('Install Claude Code CLI or configure the Claude Code executable path'),
+    }]);
+
+    expect(sdkLoader).not.toHaveBeenCalled();
+    expect(sdk.query).not.toHaveBeenCalled();
+  });
+
+  it('ignores a legacy bundled SDK executable hint and resolves an external Claude CLI', async () => {
+    const sdk = createSdk([{
+      type: 'assistant',
+      message: {
+        id: 'msg-1',
+        content: [{ type: 'text', text: 'External CLI ready' }],
+      },
+    }]);
+    const sdkLoader: jest.MockedFunction<ClaudeCodeSdkLoader> = jest.fn().mockResolvedValue(sdk);
+    const processResolver = jest.fn(() => ({
+      mode: 'external' as const,
+      pathToClaudeCodeExecutable: '/usr/local/bin/claude',
+      env: { PATH: '/usr/local/bin' },
+      shell: false,
+      diagnostics: {
+        configuredPath: null,
+        resolvedExternalPath: '/usr/local/bin/claude',
+        pathAugmented: true,
+      },
+    }));
+    const adapter = new ClaudeCodeAdapter({
+      vaultPath: '/vault',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      pathToClaudeCodeExecutable: '/vault/.obsidian/plugins/opencodian/node_modules/@anthropic-ai/claude-agent-sdk-darwin-arm64/claude',
+      sdkLoader,
+      processResolver,
+    });
+    const sessionId = await adapter.createSession();
+
+    await expect(collectAsync(adapter.sendMessage({
+      sessionId,
+      content: 'hello',
+    }))).resolves.toEqual([{
+      type: 'text',
+      content: 'External CLI ready',
+    }]);
+
+    expect(processResolver).toHaveBeenCalledWith({ settings: getDefaultClaudeCodeBackendSettings() });
+    expect(sdk.query.mock.calls[0][0].options.pathToClaudeCodeExecutable).toBe('/usr/local/bin/claude');
+    expect(sdk.query.mock.calls[0][0].options.env).toEqual({ PATH: '/usr/local/bin' });
   });
 
   it('injects permission bridge canUseTool into SDK options', async () => {

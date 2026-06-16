@@ -81,7 +81,7 @@ Codex 审批 host context 的入口级 wiring 保留在 `main.ts`：插件持有
 10. 构造 `OpenCodeService`，注入 server status / error / models loaded 回调，以及 `initialManagedServerState`、`SDK_FEATURE_FLAG_ROLLOUT_DEFAULTS` 和 managed server state 持久化回调。
 11. 如果能解析到 vault 路径，就创建 `OpencodeConfigManager` / `ModelConfigService`，并把 vault 路径传给 `openCodeService`。
 12. 在注册视图之前执行 `loadConversations()`，只预热会话元数据；`StorageService` 会优先读取轻量 `session-metas/` sidecar，缺失时再回退完整 session JSON，并把这次 fallback 统计送进 startup diagnosis。
-12a. 构建 `AgentServiceRegistry`：`main.ts` 构造各 adapter 实例（OpenCode、Claude Code），然后调用 `wireHiddenAdapters()`（来自 `AgentAdapterWiring.ts`）统一注册所有 user-facing adapter 和隐藏后端（当前为 Codex）。隐藏后端只注册、不启用、不在 UI 暴露。最后由 `setEnabledBackends()` 激活用户可见后端。
+12a. 构建 `AgentServiceRegistry`：`main.ts` 构造各 adapter 实例（OpenCode、Claude Code），然后调用 `wireHiddenAdapters()`（来自 `AgentAdapterWiring.ts`）统一注册所有 user-facing adapter 和隐藏后端（当前为 Codex）。Claude Code 的 external CLI 解析由 `ClaudeCodeAdapter`/`ClaudeCodeProcessResolver` 在 backend owner 内完成：优先使用用户配置的 executable path，其次查找增强 PATH 中的 `claude`/npm wrapper；入口层只保留兼容旧 bootstrap 形状的 path hint，不把 bundled SDK platform binary package 视为必需 runtime。隐藏后端只注册、不启用、不在 UI 暴露。最后由 `setEnabledBackends()` 激活用户可见后端。
 13. 注册 `OpenCodianView`、自定义品牌 icon（供 ribbon / tab header 复用）、命令与设置页。
 14. 启动结束时输出一行汇总日志；这条汇总同样走 `always`。若检测到失败或明显慢启动，还会额外输出一条 automatic diagnosis。
 15. 最近一次 trace 会暴露给诊断报告；若 debug 已开启，或本次启动被判定为慢启动/失败，还会自动把 `startup-perf-latest.log` 写到 vault 的 `.opencodian/debug/`。诊断报告也会输出 Claude Code backend 设置摘要、debug module 状态和 debug channel 配置，但不会把 Claude Code 能力包装成 full runtime proof。

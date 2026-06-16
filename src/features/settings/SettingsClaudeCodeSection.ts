@@ -2852,7 +2852,10 @@ export class SettingsClaudeCodeSection {
       });
     }
 
-    return t('settings.claudeCode.diagnostics.bundled');
+    const configuredPath = resolution.diagnostics.configuredPath;
+    return configuredPath
+      ? t('settings.claudeCode.diagnostics.missingWithPath', { path: configuredPath })
+      : t('settings.claudeCode.diagnostics.missing');
   }
 
   private async saveSettings(): Promise<void> {

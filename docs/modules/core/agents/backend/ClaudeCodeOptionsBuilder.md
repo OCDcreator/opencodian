@@ -16,8 +16,8 @@
 - 映射 Claude 专属 `permissionMode`、`thinking`、`effort`
 - 当 `permissionMode === 'bypassPermissions'` 时显式写入 SDK 要求的 `allowDangerouslySkipPermissions: true`
 - 将 OpenCodian UI 中的 `thinking.type === 'fixed'` 映射为官方 SDK `thinking: { type: 'enabled', budgetTokens }`
-- 只在用户显式配置时写入 `model`、`fallbackModel`、`additionalDirectories`、`pathToClaudeCodeExecutable`、`canUseTool`、`mcpServers`；`ClaudeCodeOptionsBuilderInput` 现在接受可选 `fallbackModel?: string` 字段，该覆盖值优先级高于 `settings.fallbackModel`；同时接受可选 `model?: string` 字段，该诊断级覆盖值优先级高于 `settings.model`，用于 Capability Lab 的 fallback behavior proof
-- 只在用户显式配置时写入 `env`，使用 `{ ...settings.env }` 防御性复制，与 `additionalDirectories`、`allowedTools`、`disallowedTools`、`restrictedBuiltinTools`、`settingSources` 保持一致；调用者在构建后修改 `settings.env` 不会泄漏到 SDK options 快照
+- 只在用户显式配置时写入 `model`、`fallbackModel`、`additionalDirectories`、`canUseTool`、`mcpServers`；`pathToClaudeCodeExecutable` 只接受 resolver/adapter 注入的已验证 external CLI path，不直接信任 `settings.executablePath` 原始值；`ClaudeCodeOptionsBuilderInput` 现在接受可选 `fallbackModel?: string` 字段，该覆盖值优先级高于 `settings.fallbackModel`；同时接受可选 `model?: string` 字段，该诊断级覆盖值优先级高于 `settings.model`，用于 Capability Lab 的 fallback behavior proof
+- 只在 runtime resolver 或用户显式配置时写入 `env`，先合并 `processEnv`（例如增强后的 PATH），再用 `{ ...settings.env }` 覆盖/补充用户环境变量；调用者在构建后修改 `settings.env` 不会泄漏到 SDK options 快照
 - 只在用户显式开启或 runtime 明确注入时写入 `enableFileCheckpointing`、`includeHookEvents`、`forwardSubagentText`、`agentProgressSummaries`；这些是 SDK 诊断/后续能力 foundation，不等同于稳定 JSONL browser、hook authoring 或 rewind UI。`forwardSubagentText` 和 `agentProgressSummaries` 现在支持 runtime-only 覆盖，让 Capability Lab 的 subagent stream proof 可以在不污染稳定设置的情况下强制打开子代理事件流
 - 只在 `sandbox.enabled === true` 时写入 `sandbox` 到 SDK options；除 `enabled`、`failIfUnavailable`、`autoAllowBashIfSandboxed` 外，还接线 `excludedCommands`、`allowUnsandboxedCommands`、`filesystem`（allowWrite/denyWrite/denyRead）、`network`（allowedDomains/deniedDomains）、`enableWeakerNestedSandbox`、`enableWeakerNetworkIsolation` 和 `ripgrep`（command/args）。分类为 readback：option wiring 已证明，OS 级 sandbox 强制执行无法从插件层独立验证
 - 只在 `title` 非空且非 resume 时写入 `title` 到 SDK options；SDK 文档说明 title 仅在首次 query 生效，resume 时无效果。分类为 readback：option wiring 已证明，CLI subprocess 是否接受该 title 不从插件层独立验证
@@ -55,7 +55,7 @@
 - `persistSession` 也是 runtime 注入项：普通 chat 继续沿用官方默认持久化，Capability Lab 可按需传 `false` 做无痕诊断；不要把它暴露成稳定设置。
 - `enableFileCheckpointing` 支持 runtime-only 显式关闭。Capability Lab 的 sessionStore probe 会用这个 override 把 checkpoint tracing 关掉，避免触发官方 SDK 对 `sessionStore + enableFileCheckpointing` 组合的不支持错误。
 - `hooks`、`sessionStore`、`outputFormat`、`plugins`、`skills`、`agent` 和 `agents` 是 runtime-injected foundation，只能由后续已验证 runtime owner 传入；不要把它们直接保存到 `backendSettings.claudeCode` 或稳定 settings 控件。
-- `abortController` / `spawnClaudeCodeProcess` 是 runtime 注入，不应保存进用户设置。
+- `pathToClaudeCodeExecutable`、`processEnv`、`abortController` / `spawnClaudeCodeProcess` 是 runtime 注入，不应保存进用户设置；`settings.executablePath` 必须先经过 `ClaudeCodeProcessResolver` 验证。
 
 - `promptSuggestions?: boolean` 已加入 Input 和 SDK Shape，wiring 逻辑与 `agentProgressSummaries` 一致（input 或 settings 任一为 true 即传入）。
 - `continue?: boolean` 已加入 Input 和 SDK Shape，wiring 逻辑为：只在 `input.continue === true` 时传入 SDK options。分类为 pass（2026-06-02 live runtime proof：BUILD_ID `feature-phase0-capability.202606022255` 上，两阶段诊断探针确认 SDK 能继续同一 session、session id 精确匹配 `2a3b1082-64ba-4862-96a5-a14a2e01cc49`，并成功回忆前一轮 nonce）。这不是稳定的产品面；普通 chat 路径永远不会使用 continue，session 连续性始终由 adapter 拥有。仅供 Capability Lab 诊断探针使用。与 `resumeSessionId` 和显式 `sessionId` 都不兼容——adapter 会在诊断边界 guard 这两种组合。

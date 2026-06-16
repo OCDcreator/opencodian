@@ -546,6 +546,9 @@ describe('OpenCodianPlugin.onload', () => {
 describe('OpenCodianPlugin backend bootstrap', () => {
   it('registers Claude Code and restores it as the active backend from settings', async () => {
     const vaultPath = fs.mkdtempSync(path.join(os.tmpdir(), 'opencodian-claude-bootstrap-'));
+    const claudePath = path.join(vaultPath, 'bin', 'claude');
+    fs.mkdirSync(path.dirname(claudePath), { recursive: true });
+    fs.writeFileSync(claudePath, '#!/bin/sh\n');
     const plugin = new OpenCodianPlugin() as OpenCodianPlugin & {
       app: {
         vault: { adapter: { basePath: string } };
@@ -565,6 +568,13 @@ describe('OpenCodianPlugin backend bootstrap', () => {
       ...DEFAULT_SETTINGS,
       enabledBackends: ['opencode', 'claude-code'],
       activeBackend: 'claude-code',
+      backendSettings: {
+        ...DEFAULT_SETTINGS.backendSettings,
+        claudeCode: {
+          ...DEFAULT_SETTINGS.backendSettings.claudeCode,
+          executablePath: claudePath,
+        },
+      },
     };
     plugin.storage = {
       saveManagedServerState: jest.fn().mockResolvedValue(undefined),
@@ -580,7 +590,11 @@ describe('OpenCodianPlugin backend bootstrap', () => {
     ).handleBootstrapOpenCodeRuntime(null);
 
     expect(plugin.agentServiceRegistry.get('opencode')).toBeDefined();
-    expect(plugin.agentServiceRegistry.get('claude-code')).toBeDefined();
+    const claudeAdapter = plugin.agentServiceRegistry.get('claude-code') as ClaudeCodeAdapter & {
+      options: { pathToClaudeCodeExecutable?: string };
+    };
+    expect(claudeAdapter).toBeDefined();
+    expect(claudeAdapter.options.pathToClaudeCodeExecutable).toBe(claudePath);
     expect(plugin.agentServiceRegistry.getActiveKind()).toBe('claude-code');
     expect(plugin.claudeCodePermissionBridge).toBeDefined();
     expect(plugin.claudeCodePermissionHostContext).toBeDefined();

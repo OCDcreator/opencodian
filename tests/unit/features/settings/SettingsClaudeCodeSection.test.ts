@@ -398,6 +398,34 @@ describe('SettingsClaudeCodeSection', () => {
     }));
     expect(containerEl.textContent).toContain('/Users/test/bin/claude');
   });
+
+  it('shows install/configure guidance when runtime diagnostics cannot find an external Claude CLI', async () => {
+    const plugin = createPlugin();
+    const containerEl = document.createElement('div');
+    const resolveProcess = jest.fn().mockReturnValue({
+      mode: 'missing',
+      env: {},
+      shell: false,
+      diagnostics: {
+        configuredPath: '/missing/claude',
+        resolvedExternalPath: null,
+        pathAugmented: true,
+      },
+    });
+    const section = new SettingsClaudeCodeSection({
+      plugin: plugin as OpenCodianPlugin,
+      createSectionHeading,
+      resolveProcess,
+    });
+
+    section.attach(containerEl);
+    await findButton(t('settings.claudeCode.diagnostics.button')).onClick?.();
+
+    expect(containerEl.textContent).toContain(t('settings.claudeCode.diagnostics.missingWithPath', {
+      path: '/missing/claude',
+    }));
+    expect(containerEl.textContent).toContain('/missing/claude');
+  });
 });
 
 describe('SettingsClaudeCodeSection multi-tab', () => {

@@ -5,7 +5,7 @@
 
 ## 概述
 
-项目辅助脚本集合，涵盖生产构建、CSS 合并、BUILD_ID 生成、Claude Agent SDK runtime 复制、esbuild 平台检查、版本发布、graphify 刷新/新鲜度检查、devlog 排序验证、模块文档硬约束，以及新的 guarded thick-owner ownership gate。脚本主要为 ESM (.mjs) 格式，通过 npm scripts 调用。纯逻辑函数的单元测试位于 `tests/unit/infrastructure/module-doc-guard-lib.test.mjs`、`tests/unit/infrastructure/owner-guard-lib.test.mjs` 和 `tests/unit/infrastructure/claude-sdk-dist.test.mjs`。
+项目辅助脚本集合，涵盖生产构建、CSS 合并、BUILD_ID 生成、旧 Claude Agent SDK runtime artifact 清理、esbuild 平台检查、版本发布、graphify 刷新/新鲜度检查、devlog 排序验证、模块文档硬约束，以及新的 guarded thick-owner ownership gate。脚本主要为 ESM (.mjs) 格式，通过 npm scripts 调用。纯逻辑函数的单元测试位于 `tests/unit/infrastructure/module-doc-guard-lib.test.mjs`、`tests/unit/infrastructure/owner-guard-lib.test.mjs` 和 `tests/unit/infrastructure/claude-sdk-dist.test.mjs`。
 
 ## 导入关系
 上游: `esbuild`, `child_process`, `fs`, `path`, `process`
@@ -26,15 +26,15 @@
 4. esbuild context 配置（entry: `src/main.ts`, format: `cjs`, target: `es2018`）
 5. `context.rebuild()` 执行构建
 6. 复制 `manifest.json`, `styles.css`, `assets/` 到 `dist/`
-7. 调用 `copyClaudeAgentSdkRuntime()` 移除旧的 SDK 主包副本，并只复制当前平台 optional binary package 到 `dist/node_modules/@anthropic-ai/`
+7. 调用 `pruneClaudeAgentSdkRuntimeArtifacts()` 清理旧的 `dist/node_modules/@anthropic-ai/claude-agent-sdk*` artifact，避免历史平台 binary package 留在发布目录中
 
 esbuild 平台不匹配时输出友好错误提示，引导运行 `npm run doctor:esbuild:fix`。
 
-### claude-sdk-dist.mjs — Claude Agent SDK runtime 复制
+### claude-sdk-dist.mjs — Claude Agent SDK runtime artifact 清理
 
-生产构建把 `@anthropic-ai/claude-agent-sdk` 主包打进 `main.js`，避免 Test Vault 运行时再从插件目录解析 SDK 主包。该脚本根据 `process.platform` / `process.arch` 解析当前平台 optional binary package，先删除 `dist/node_modules/@anthropic-ai/claude-agent-sdk` 的旧副本，再只复制平台包到 `dist/node_modules/@anthropic-ai/`。这样 bundled SDK 代码仍能通过 `createRequire(import.meta.url)` 找到对应 Claude Code executable，同时避免发布目录携带不必要的 SDK 主包副本。
+生产构建仍把 `@anthropic-ai/claude-agent-sdk` TypeScript SDK 主包打进 `main.js`，作为 Claude Code API facade。Claude Code backend 运行时不再依赖 `@anthropic-ai/claude-agent-sdk-<platform>` optional binary package；真正的后端进程来自用户配置的 external CLI 或增强 PATH 中发现的 `claude` / `claude.exe` / npm wrapper。
 
-这个 `dist/node_modules/@anthropic-ai/claude-agent-sdk-<platform>/` 目录是生产 runtime 的一部分。Test Vault 部署、发布打包或人工复制产物时必须包含它；否则 Obsidian 内的 bundled SDK 会尝试从插件目录解析平台 binary，并在 Claude Code runtime/model probes 中报 `not-found`。
+`pruneClaudeAgentSdkRuntimeArtifacts()` 只负责删除 `dist/node_modules/@anthropic-ai/claude-agent-sdk` 和 `dist/node_modules/@anthropic-ai/claude-agent-sdk-*` 的旧目录。它不会复制任何 Anthropic platform binary package。Test Vault 部署、发布打包或人工复制产物时不应再携带 `dist/node_modules/@anthropic-ai/claude-agent-sdk-<platform>/`。
 
 ### build-css.mjs — CSS 合并
 

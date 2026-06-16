@@ -5,7 +5,7 @@
 
 ## 概述
 
-`ClaudeCodeSdkLoader` 把官方 `@anthropic-ai/claude-agent-sdk` 动态加载为 OpenCodian 内部的 `ClaudeCodeSdkFacade`。它是生产 runtime 从 mock facade 过渡到官方 SDK 的唯一入口。生产构建会保留 literal dynamic import，让 esbuild 把 SDK 主包收进 `main.js`；平台 Claude Code binary 仍由构建脚本复制到 `dist/node_modules/@anthropic-ai/claude-agent-sdk-<platform>/`。
+`ClaudeCodeSdkLoader` 把官方 `@anthropic-ai/claude-agent-sdk` 动态加载为 OpenCodian 内部的 `ClaudeCodeSdkFacade`。它是生产 runtime 从 mock facade 过渡到官方 SDK 的唯一入口。生产构建会保留 literal dynamic import，让 esbuild 把 SDK 主包收进 `main.js`；Claude Code executable 不再随插件复制 platform binary package，而是由 `ClaudeCodeProcessResolver` 解析用户本机 external CLI。
 
 ## 职责
 
@@ -21,6 +21,7 @@
 ## 集成
 
 - `ClaudeCodeAdapter` 仍通过构造参数接收 facade；生产注册时调用本 loader，单测继续注入 fake SDK。
+- 生产注册同时会通过 `ClaudeCodeProcessResolver` 向 adapter 传入已解析的 external `claude` executable path；loader 不负责查找或复制 CLI binary。
 - `backend/index.ts` 从 barrel 导出本 loader，供 `main.ts` 或 runtime smoke 使用。
 
 ## 维护约束

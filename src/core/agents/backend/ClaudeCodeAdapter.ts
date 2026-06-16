@@ -29,7 +29,12 @@ import {
   type ClaudeCodeSpawnRequest,
 } from './ClaudeCodeOptionsBuilder';
 import { ClaudeCodePermissionBridge } from './ClaudeCodePermissionBridge';
-import { resolveExecutableCandidate } from './ClaudeCodeProcessResolver';
+import {
+  type ClaudeCodeProcessResolution,
+  type ClaudeCodeProcessResolverOptions,
+  resolveClaudeCodeProcess,
+  resolveExecutableCandidate,
+} from './ClaudeCodeProcessResolver';
 import {
   ClaudeCodeAsyncQueue,
   type ClaudeCodeQueuedPrompt,
@@ -54,6 +59,14 @@ import {
 const runtimeLogger = createLogger('ClaudeCodeAdapter', { moduleKey: 'claudeCode', channel: 'runtime' });
 const sessionLogger = createLogger('ClaudeCodeAdapter', { moduleKey: 'claudeCode', channel: 'sessions' });
 const mcpLogger = createLogger('ClaudeCodeAdapter', { moduleKey: 'claudeCode', channel: 'mcp' });
+
+function isClaudeAgentSdkBundledExecutablePath(candidate: string | undefined): boolean {
+  if (!candidate) {
+    return false;
+  }
+  const normalized = candidate.replace(/\\/g, '/');
+  return /\/node_modules\/@anthropic-ai\/claude-agent-sdk-[^/]+\/claude(?:\.exe)?$/i.test(normalized);
+}
 
 /** Inline MCP stdio server that supports the elicitation protocol for diagnostic probes. */
 const MCP_ELICITATION_PROBE_SERVER_CODE = `#!/usr/bin/env node
@@ -680,6 +693,9 @@ export interface ClaudeCodeAdapterOptions {
   vaultPath: string;
   settings: ClaudeCodeBackendSettings;
   pathToClaudeCodeExecutable?: string;
+  processEnv?: Record<string, string | undefined>;
+  spawnShell?: boolean;
+  processResolver?: (options: ClaudeCodeProcessResolverOptions) => ClaudeCodeProcessResolution;
   sdk?: ClaudeCodeSdkFacade;
   sdkLoader?: ClaudeCodeSdkLoader;
   permissionBridge?: ClaudeCodePermissionBridge;
@@ -1342,8 +1358,24 @@ export class ClaudeCodeAdapter
   private sdkLoadPromise: Promise<ClaudeCodeSdkFacade> | null = null;
   private lastDiagnosticSdkOptions: ClaudeCodeSdkOptionsShape | null = null;
   private readonly postResultCallbacks = new Set<(chunk: StreamChunk) => void>();
+  private readonly options: ClaudeCodeAdapterOptions;
 
-  constructor(private readonly options: ClaudeCodeAdapterOptions) {}
+  constructor(options: ClaudeCodeAdapterOptions) {
+    const bundledPathHint = isClaudeAgentSdkBundledExecutablePath(options.pathToClaudeCodeExecutable);
+    const shouldResolveExternalProcess = !options.sdk
+      && (!options.pathToClaudeCodeExecutable || bundledPathHint);
+    const processResolution = shouldResolveExternalProcess
+      ? (options.processResolver ?? resolveClaudeCodeProcess)({ settings: options.settings })
+      : null;
+
+    this.options = {
+      ...options,
+      pathToClaudeCodeExecutable: processResolution?.pathToClaudeCodeExecutable
+        ?? (bundledPathHint ? undefined : options.pathToClaudeCodeExecutable),
+      processEnv: processResolution?.env ?? options.processEnv,
+      spawnShell: processResolution?.shell ?? options.spawnShell,
+    };
+  }
 
   hasCapability(cap: AgentCapability): boolean {
     return this.capabilities.has(cap);
@@ -1368,6 +1400,13 @@ export class ClaudeCodeAdapter
     await this.loadMcpConfig();
     registerPromptSuggestionSink(this);
     this.setStatus('connected');
+  }
+
+  private assertExternalClaudeCliAvailable(): void {
+    if (this.options.sdk || this.options.pathToClaudeCodeExecutable) {
+      return;
+    }
+    throw new Error('Install Claude Code CLI or configure the Claude Code executable path in settings.');
   }
 
   async stop(): Promise<void> {
@@ -1924,6 +1963,7 @@ export class ClaudeCodeAdapter
       vaultPath: this.options.vaultPath,
       settings: phase1Settings,
       pathToClaudeCodeExecutable: this.options.pathToClaudeCodeExecutable,
+      processEnv: this.options.processEnv,
       abortController: phase1Abort,
       spawnClaudeCodeProcess: this.spawnClaudeCodeProcess,
       enableFileCheckpointing: true,
@@ -1972,6 +2012,7 @@ export class ClaudeCodeAdapter
       vaultPath: this.options.vaultPath,
       settings: phase1Settings,
       pathToClaudeCodeExecutable: this.options.pathToClaudeCodeExecutable,
+      processEnv: this.options.processEnv,
       abortController: phase2Abort,
       spawnClaudeCodeProcess: this.spawnClaudeCodeProcess,
       enableFileCheckpointing: true,
@@ -2360,6 +2401,7 @@ export class ClaudeCodeAdapter
       vaultPath: this.options.vaultPath,
       settings: probeSettings,
       pathToClaudeCodeExecutable: this.options.pathToClaudeCodeExecutable,
+      processEnv: this.options.processEnv,
       abortController,
       spawnClaudeCodeProcess: this.spawnClaudeCodeProcess,
       persistSession: true,
@@ -4689,6 +4731,7 @@ export class ClaudeCodeAdapter
         ...(overrides.effort ? { effort: overrides.effort } : {}),
       },
       pathToClaudeCodeExecutable: this.options.pathToClaudeCodeExecutable,
+      processEnv: this.options.processEnv,
       abortController,
       spawnClaudeCodeProcess: this.spawnClaudeCodeProcess,
       canUseTool: this.options.permissionBridge
@@ -4825,6 +4868,7 @@ export class ClaudeCodeAdapter
       vaultPath: this.options.vaultPath,
       settings: diagnosticSettings,
       pathToClaudeCodeExecutable: this.options.pathToClaudeCodeExecutable,
+      processEnv: this.options.processEnv,
       abortController,
       spawnClaudeCodeProcess: this.spawnClaudeCodeProcess,
       canUseTool: this.resolveDiagnosticCanUseTool(request, bypassPermissions),
@@ -5504,6 +5548,7 @@ export class ClaudeCodeAdapter
   }
 
   private async ensureReadyForQuery(): Promise<void> {
+    this.assertExternalClaudeCliAvailable();
     await this.loadMcpConfig();
     registerPromptSuggestionSink(this);
     this.setStatus('connected');
@@ -5579,6 +5624,7 @@ export class ClaudeCodeAdapter
       cwd: request.cwd,
       stdio: ['pipe', 'pipe', 'pipe'],
       env: request.env as NodeJS.ProcessEnv,
+      shell: this.options.spawnShell === true,
       windowsHide: true,
     });
 

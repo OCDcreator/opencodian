@@ -2,7 +2,26 @@ import { resolveClaudeCodeProcess } from '../../../../../src/core/agents/backend
 import { getDefaultClaudeCodeBackendSettings } from '../../../../../src/core/types';
 
 describe('ClaudeCodeProcessResolver', () => {
-  it('uses the SDK bundled executable path by default while augmenting PATH', () => {
+  it('discovers the external Claude CLI from the augmented PATH by default', () => {
+    const resolution = resolveClaudeCodeProcess({
+      settings: getDefaultClaudeCodeBackendSettings(),
+      platform: 'darwin',
+      env: {
+        PATH: '/usr/bin',
+        HOME: '/Users/test',
+      },
+      existsSync: (candidate) => candidate === '/Users/test/.claude/local/claude',
+    });
+
+    expect(resolution.mode).toBe('external');
+    expect(resolution.pathToClaudeCodeExecutable).toBe('/Users/test/.claude/local/claude');
+    expect(resolution.env.PATH).toContain('/usr/bin');
+    expect(resolution.env.PATH).toContain('/opt/homebrew/bin');
+    expect(resolution.env.PATH).toContain('/Users/test/.claude/local');
+    expect(resolution.diagnostics.pathAugmented).toBe(true);
+  });
+
+  it('reports a missing external Claude CLI instead of falling back to a bundled SDK binary', () => {
     const resolution = resolveClaudeCodeProcess({
       settings: getDefaultClaudeCodeBackendSettings(),
       platform: 'darwin',
@@ -13,12 +32,10 @@ describe('ClaudeCodeProcessResolver', () => {
       existsSync: () => false,
     });
 
-    expect(resolution.mode).toBe('sdk-bundled');
+    expect(resolution.mode).toBe('missing');
     expect(resolution.pathToClaudeCodeExecutable).toBeUndefined();
-    expect(resolution.env.PATH).toContain('/usr/bin');
-    expect(resolution.env.PATH).toContain('/opt/homebrew/bin');
-    expect(resolution.env.PATH).toContain('/Users/test/.claude/local');
-    expect(resolution.diagnostics.pathAugmented).toBe(true);
+    expect(resolution.diagnostics.configuredPath).toBeNull();
+    expect(resolution.diagnostics.resolvedExternalPath).toBeNull();
   });
 
   it('resolves an absolute configured executable path', () => {
@@ -41,7 +58,7 @@ describe('ClaudeCodeProcessResolver', () => {
     expect(resolution.diagnostics.configuredPath).toBe('~/bin/claude');
   });
 
-  it('falls back to SDK bundled mode when a configured executable does not exist', () => {
+  it('reports a missing executable when a configured path does not exist', () => {
     const resolution = resolveClaudeCodeProcess({
       settings: {
         ...getDefaultClaudeCodeBackendSettings(),
@@ -55,17 +72,16 @@ describe('ClaudeCodeProcessResolver', () => {
       existsSync: () => false,
     });
 
-    expect(resolution.mode).toBe('sdk-bundled');
+    expect(resolution.mode).toBe('missing');
     expect(resolution.pathToClaudeCodeExecutable).toBeUndefined();
     expect(resolution.diagnostics.configuredPath).toBe('/missing/claude');
     expect(resolution.diagnostics.resolvedExternalPath).toBeNull();
   });
 
-  it('resolves a Windows command from augmented PATH and uses shell for cmd files', () => {
+  it('resolves the default Windows npm wrapper from augmented PATH and uses shell for cmd files', () => {
     const resolution = resolveClaudeCodeProcess({
       settings: {
         ...getDefaultClaudeCodeBackendSettings(),
-        executablePath: 'claude',
       },
       platform: 'win32',
       env: {

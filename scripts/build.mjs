@@ -3,7 +3,7 @@ import path from "path";
 import process from "process";
 import builtins from "builtin-modules";
 import { buildCss } from "./build-css.mjs";
-import { copyClaudeAgentSdkRuntime } from "./claude-sdk-dist.mjs";
+import { pruneClaudeAgentSdkRuntimeArtifacts } from "./claude-sdk-dist.mjs";
 import { copyCodexRuntime } from "./codex-sdk-dist.mjs";
 import { generateBuildId } from './build-utils.mjs';
 
@@ -90,7 +90,7 @@ if (prod) {
   }
 
   copyDirectoryIfExists('assets', 'dist/assets');
-  copyClaudeAgentSdkRuntime(process.cwd(), distDir);
+  pruneClaudeAgentSdkRuntimeArtifacts(process.cwd(), distDir);
   copyCodexRuntime(process.cwd(), distDir);
   
   await context.dispose();

@@ -35,7 +35,6 @@ describe('ClaudeCodeOptionsBuilder', () => {
       model: 'claude-opus-4-6',
       fallbackModel: 'claude-sonnet-4-5',
       additionalDirectories: ['/outside/context'],
-      pathToClaudeCodeExecutable: '/usr/local/bin/claude',
       canUseTool,
       mcpServers: {
         filesystem: { command: 'npx', args: ['server'] },
@@ -77,6 +76,18 @@ describe('ClaudeCodeOptionsBuilder', () => {
     });
 
     expect(options.pathToClaudeCodeExecutable).toBe('/resolved/claude');
+  });
+
+  it('does not pass the raw configured executable path before process resolution validates it', () => {
+    const options = buildClaudeCodeOptions({
+      vaultPath: '/vault/project',
+      settings: {
+        ...getDefaultClaudeCodeBackendSettings(),
+        executablePath: '/configured/but-unverified/claude',
+      },
+    });
+
+    expect(options).not.toHaveProperty('pathToClaudeCodeExecutable');
   });
 
   it('enables Claude Code preset prompt and default tools for real coding sessions', () => {

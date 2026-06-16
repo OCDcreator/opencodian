@@ -7,6 +7,8 @@
 
 OpenCodian 的简体中文翻译表，导出 `zhTranslations` 静态对象。
 
+2026-06-15：更新 `settings.claudeCode.executablePath.*`、`settings.claudeCode.environment.*` 和 `settings.claudeCode.diagnostics.*` 文案，匹配 Claude Code runtime external CLI 分发策略。诊断现在说明会解析配置路径或增强 PATH 中的外部 `claude` CLI，找不到时提示安装 Claude Code CLI 或配置 executable path，不再描述 SDK bundled 进程解析。
+
 2026-06-07：新增并更新 `settings.claudeCode.outputStyle.*` 键（name / desc / placeholder / boundaryNotice / lifecycleNotice），为 Claude Code 输出样式设置提供中文文案；`boundaryNotice` 现说明 fresh diagnostic query live proof 与 active-session 边界。新增 `settings.capabilityLab.proofs.outputStyleLive.*` proof keys，覆盖 Output Style 行为证明按钮、nonce、styleName、cleanup、pass/fail 和生命周期文案。新增 `chat.claudeCode.permissionMode.*.description` 键（4 个），为 Claude Code 权限模式的聊天选择器提供中文描述文案。
 
 2026-06-07 Round 11 Codex acceptance：`context.breakdown.note` 从 OpenCode-only 文案改为 backend-neutral 文案。上下文详情弹窗现在说明上方 Token 统计优先使用后端返回的 usage 快照，避免 Claude Code ContextRing / ContextDetailModal 产品化后继续暗示只有 OpenCode usage 是可信来源。

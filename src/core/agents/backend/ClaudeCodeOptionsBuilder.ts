@@ -40,6 +40,7 @@ export interface ClaudeCodeOptionsBuilderInput {
   vaultPath: string;
   settings: ClaudeCodeBackendSettings;
   pathToClaudeCodeExecutable?: string;
+  processEnv?: Record<string, string | undefined>;
   canUseTool?: unknown;
   onElicitation?: unknown;
   mcpServers?: Record<string, unknown>;
@@ -200,9 +201,7 @@ function mapThinkingForSdk(settings: ClaudeCodeBackendSettings): ClaudeCodeSdkTh
 export function buildClaudeCodeOptions(
   input: ClaudeCodeOptionsBuilderInput,
 ): ClaudeCodeSdkOptionsShape {
-  const executablePath =
-    trimOptionalString(input.pathToClaudeCodeExecutable)
-    ?? trimOptionalString(input.settings.executablePath);
+  const executablePath = trimOptionalString(input.pathToClaudeCodeExecutable);
   const additionalDirectories = [...input.settings.additionalDirectories];
   const systemPrompt = trimOptionalString(input.settings.systemPrompt);
   const options: ClaudeCodeSdkOptionsShape = {
@@ -304,8 +303,12 @@ export function buildClaudeCodeOptions(
   if (input.settings.taskBudget !== null) {
     options.taskBudget = { total: input.settings.taskBudget };
   }
-  if (Object.keys(input.settings.env).length > 0) {
-    options.env = { ...input.settings.env };
+  const env = {
+    ...(input.processEnv ?? {}),
+    ...input.settings.env,
+  };
+  if (Object.keys(env).length > 0) {
+    options.env = env;
   }
   const shouldEnableFileCheckpointing = input.enableFileCheckpointing === true
     || (input.enableFileCheckpointing !== false && input.settings.enableFileCheckpointing);

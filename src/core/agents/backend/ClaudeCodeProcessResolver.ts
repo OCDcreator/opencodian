@@ -21,7 +21,7 @@ export interface ClaudeCodeProcessResolverOptions {
 }
 
 export interface ClaudeCodeProcessResolution {
-  mode: 'sdk-bundled' | 'external';
+  mode: 'external' | 'missing';
   pathToClaudeCodeExecutable?: string;
   env: NodeJS.ProcessEnv;
   shell: boolean;
@@ -86,6 +86,12 @@ function getAugmentedPath(env: ClaudeCodeProcessResolverEnv, platform: NodeJS.Pl
   return [...new Set(entries)].join(delimiter);
 }
 
+function getDefaultClaudeCliCandidates(platform: NodeJS.Platform): string[] {
+  return platform === 'win32'
+    ? ['claude', 'claude.exe']
+    : ['claude'];
+}
+
 export function resolveExecutableCandidate(
   configuredPath: string,
   options: {
@@ -139,10 +145,13 @@ export function resolveClaudeCodeProcess(
 
   const resolvedExternalPath = configuredPath
     ? resolveExecutableCandidate(configuredPath, { env, existsSync, platform })
-    : null;
+    : getDefaultClaudeCliCandidates(platform)
+      .map((candidate) => resolveExecutableCandidate(candidate, { env, existsSync, platform }))
+      .find((candidate): candidate is string => typeof candidate === 'string' && candidate.length > 0)
+      ?? null;
 
   return {
-    mode: resolvedExternalPath ? 'external' : 'sdk-bundled',
+    mode: resolvedExternalPath ? 'external' : 'missing',
     ...(resolvedExternalPath ? { pathToClaudeCodeExecutable: resolvedExternalPath } : {}),
     env: spawnEnv,
     shell: platform === 'win32'

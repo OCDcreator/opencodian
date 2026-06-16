@@ -74,7 +74,7 @@ Use `npm run doctor:esbuild` only after dependency changes or when build/dev rep
   Deploy to whichever host is available (SSH `desktop-gs1a9np` for Windows, local copy for macOS).
 - If the user asks to “部署到测试库”, treat that as the standard Test Vault deployment flow above; just perform the sequential copy + `BUILD_ID` verification and report the result briefly instead of re-explaining the whole process each time.
 - `npm run build` now includes the CSS merge step automatically; if you only need to refresh the generated root `styles.css`, run `npm run build:css`.
-- When `dist/node_modules/@anthropic-ai/claude-agent-sdk-<platform>/` exists, copy that directory to the same Test Vault plugin directory as well; it is the Claude Code backend runtime binary package that bundled `main.js` resolves at runtime.
+- Claude Code uses the user's external `claude` CLI resolved from the configured executable path or enhanced PATH. Do not copy `dist/node_modules/@anthropic-ai/claude-agent-sdk-<platform>/` for Test Vault deployment; that platform binary package is no longer a required plugin runtime artifact.
 - If the change touches bundled assets (for example `assets/`, provider icons, branding, or other runtime-loaded files), also copy `dist/assets/` into that same Test Vault plugin directory before verification.
 - For pure maintainability refactors outside the deploy-relevant paths above, a successful build does not require Test Vault deployment.
 - Build and copy must be separate sequential steps. Do not chain them with `&&`, do not parallelize them, and do not verify deployment before the copy completes.

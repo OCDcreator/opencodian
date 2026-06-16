@@ -84,14 +84,13 @@ esbuild 配置：
 2. `fs.copyFileSync('manifest.json', 'dist/manifest.json')`
 3. `fs.copyFileSync('styles.css', 'dist/styles.css')`
 4. `copyDirectoryIfExists('assets', 'dist/assets')`
-5. `copyClaudeAgentSdkRuntime()` 移除旧的 SDK 主包副本，并只复制当前平台 optional binary package 到 `dist/node_modules/@anthropic-ai/`
+5. `pruneClaudeAgentSdkRuntimeArtifacts()` 移除旧的 `dist/node_modules/@anthropic-ai/claude-agent-sdk*` runtime artifact，防止历史 platform binary package 被误当成必需产物
 6. `copyCodexRuntime()` 复制 `@openai/codex`（package.json + bin/codex.js）和 `@openai/codex-<platform>-<arch>`（vendor/... 包含 CLI 二进制）到 `dist/node_modules/@openai/`
 
 部署到 Test Vault 时，以下运行时产物必须和 `dist/main.js` 一起复制：
-- `dist/node_modules/@anthropic-ai/claude-agent-sdk-<platform>/` — Claude Code backend 运行时
 - `dist/node_modules/@openai/codex/` + `dist/node_modules/@openai/codex-<platform>-<arch>/` — Codex backend 运行时（191MB CLI 二进制）
 
-只复制 `main.js` / `manifest.json` / `styles.css` 会让 bundled SDK 在 Obsidian runtime 里解析到插件目录下缺失的平台 binary，导致对应 backend 报错。
+Claude Code backend 不再要求复制 `dist/node_modules/@anthropic-ai/claude-agent-sdk-<platform>/`。生产 runtime 保留 `@anthropic-ai/claude-agent-sdk` TypeScript SDK 主包作为 API facade（随 `main.js` 打包），但 Claude Code 后端进程必须来自用户本机安装的 external `claude` CLI：优先使用 `backendSettings.claudeCode.executablePath`，其次在增强 PATH 中查找 `claude` / `claude.exe` / npm wrapper。找不到 CLI 时设置页 runtime diagnostics 会提示安装 Claude Code CLI 或配置 executable path。
 
 ### CSS 构建 (`scripts/build-css.mjs`)
 
@@ -125,7 +124,8 @@ npm run build
     → esbuild.context({ ... outfile: 'dist/main.js' })
     → context.rebuild()
     → 复制 manifest.json, styles.css, assets/ 到 dist/
-    → 复制当前平台 Claude Agent SDK bundled binary package 到 dist/node_modules/
+    → 清理旧的 Claude Agent SDK runtime artifact
+    → 复制 Codex SDK runtime package 到 dist/node_modules/
 ```
 
 ## 与其他模块的交互
@@ -133,7 +133,7 @@ npm run build
 - **main.ts**: 使用 `BUILD_ID` 全局常量（构建时注入）
 - **package.json**: 定义 npm scripts
 - **Obsidian plugin API**: 产出 `main.js` 作为插件入口
-- **ClaudeCodeSdkLoader**: 运行时通过 literal dynamic import 加载已打进 `main.js` 的官方 SDK 主包；生产构建仍必须复制对应平台 binary package，供 SDK `createRequire(import.meta.url)` 解析 bundled Claude Code executable
+- **ClaudeCodeSdkLoader**: 运行时通过 literal dynamic import 加载已打进 `main.js` 的官方 SDK 主包；Claude Code executable 由 `ClaudeCodeProcessResolver` 解析用户配置或增强 PATH 中的外部 CLI，不再由生产构建复制 platform binary package
 
 ## 配置项
 
@@ -147,7 +147,7 @@ npm run build
 
 - 开发模式输出到根目录 `main.js`（Obsidian 直接加载）
 - 生产模式输出到 `dist/` 目录（需手动部署到 vault）
-- `external` 列表确保不打包 Obsidian 和 CodeMirror 运行时依赖；Claude Agent SDK 主包会随 `main.js` 打包，平台 binary package 通过 `dist/node_modules` 随生产产物复制
+- `external` 列表确保不打包 Obsidian 和 CodeMirror 运行时依赖；Claude Agent SDK 主包会随 `main.js` 打包，但平台 binary package 不再通过 `dist/node_modules` 随生产产物复制
 - BUILD_ID 在构建时硬编码，不会在运行时改变
 - `npm run build` 已内置 CSS 合并；若只想刷新根目录样式产物，可单独运行 `npm run build:css`
 - CI 会在构建后检查 `styles.css` 是否仍然干净，因此样式修改需要把生成产物一并提交

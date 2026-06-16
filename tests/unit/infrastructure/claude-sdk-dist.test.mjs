@@ -23,37 +23,32 @@ function callExport(exportName, ...args) {
 }
 
 describe('claude-sdk-dist', () => {
-  it('maps supported Node platforms to Claude Agent SDK optional binary packages', () => {
-    expect(callExport('getClaudeAgentSdkPlatformPackage', 'darwin', 'arm64')).toBe('@anthropic-ai/claude-agent-sdk-darwin-arm64');
-    expect(callExport('getClaudeAgentSdkPlatformPackage', 'darwin', 'x64')).toBe('@anthropic-ai/claude-agent-sdk-darwin-x64');
-    expect(callExport('getClaudeAgentSdkPlatformPackage', 'linux', 'x64')).toBe('@anthropic-ai/claude-agent-sdk-linux-x64');
-    expect(callExport('getClaudeAgentSdkPlatformPackage', 'linux', 'arm64')).toBe('@anthropic-ai/claude-agent-sdk-linux-arm64');
-    expect(callExport('getClaudeAgentSdkPlatformPackage', 'win32', 'x64')).toBe('@anthropic-ai/claude-agent-sdk-win32-x64');
-    expect(callExport('getClaudeAgentSdkPlatformPackage', 'win32', 'arm64')).toBe('@anthropic-ai/claude-agent-sdk-win32-arm64');
-    expect(callExport('getClaudeAgentSdkPlatformPackage', 'freebsd', 'x64')).toBeNull();
-  });
-
-  it('maps platform-specific Claude Code binary names', () => {
-    expect(callExport('getClaudeAgentSdkBinaryName', 'darwin')).toBe('claude');
-    expect(callExport('getClaudeAgentSdkBinaryName', 'linux')).toBe('claude');
-    expect(callExport('getClaudeAgentSdkBinaryName', 'win32')).toBe('claude.exe');
-  });
-
-  it('copies the current platform binary into dist/node_modules', () => {
+  it('removes stale Claude Agent SDK runtime packages from dist/node_modules', () => {
     const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'opencodian-claude-sdk-dist-'));
     const distDir = path.join(tempRoot, 'dist');
-    const platformPackage = callExport('getClaudeAgentSdkPlatformPackage');
-    expect(platformPackage).toBeTruthy();
+    const anthropicDir = path.join(distDir, 'node_modules', '@anthropic-ai');
+    const stalePackages = [
+      '@anthropic-ai/claude-agent-sdk',
+      '@anthropic-ai/claude-agent-sdk-darwin-arm64',
+      '@anthropic-ai/claude-agent-sdk-linux-x64',
+    ];
 
-    for (const packageName of [platformPackage]) {
-      const packageDir = path.join(tempRoot, 'node_modules', ...packageName.split('/'));
+    for (const packageName of stalePackages) {
+      const packageDir = path.join(distDir, 'node_modules', ...packageName.split('/'));
       fs.mkdirSync(packageDir, { recursive: true });
       fs.writeFileSync(path.join(packageDir, 'package.json'), JSON.stringify({ name: packageName }));
     }
+    const unrelatedPackage = path.join(anthropicDir, 'not-claude-agent-sdk');
+    fs.mkdirSync(unrelatedPackage, { recursive: true });
 
-    const copied = callExport('copyClaudeAgentSdkRuntime', tempRoot, distDir);
+    const removed = callExport('pruneClaudeAgentSdkRuntimeArtifacts', tempRoot, distDir);
 
-    expect(copied).toHaveLength(1);
-    expect(fs.existsSync(path.join(distDir, 'node_modules', ...platformPackage.split('/'), 'package.json'))).toBe(true);
+    expect(removed).toEqual(expect.arrayContaining(stalePackages.map((packageName) =>
+      path.join(distDir, 'node_modules', ...packageName.split('/')),
+    )));
+    for (const packageName of stalePackages) {
+      expect(fs.existsSync(path.join(distDir, 'node_modules', ...packageName.split('/')))).toBe(false);
+    }
+    expect(fs.existsSync(unrelatedPackage)).toBe(true);
   });
 });
