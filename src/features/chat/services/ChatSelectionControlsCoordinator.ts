@@ -19,6 +19,7 @@ import type {
   ModelSelectorSelection,
 } from '../ui/modelSelector/types';
 import { AdditionalDirectoriesConfigBadgeCoordinator } from './AdditionalDirectoriesConfigBadgeCoordinator';
+import { CodexRuntimeDefaultsBadgeCoordinator } from './CodexRuntimeDefaultsBadgeCoordinator';
 import {
   ModelSelectionRuntime,
   type ModelSelectionRuntimeHost,
@@ -139,6 +140,8 @@ export class ChatSelectionControlsCoordinator {
   private additionalDirectoriesBadgeContainer: HTMLElement | null = null;
   private readonly sandboxBadge: SandboxConfigBadgeCoordinator;
   private sandboxBadgeContainer: HTMLElement | null = null;
+  private readonly codexRuntimeDefaultsBadge: CodexRuntimeDefaultsBadgeCoordinator;
+  private codexRuntimeDefaultsBadgeContainer: HTMLElement | null = null;
 
   private modelSelectorContainer: HTMLElement | null = null;
   private modelSelectorTrigger: HTMLElement | null = null;
@@ -164,6 +167,7 @@ export class ChatSelectionControlsCoordinator {
     // Sandbox badge reads settings directly from the plugin instance,
     // avoiding coupling to the guarded OpenCodianView.ts host object.
     this.sandboxBadge = new SandboxConfigBadgeCoordinator();
+    this.codexRuntimeDefaultsBadge = new CodexRuntimeDefaultsBadgeCoordinator();
   }
 
   build(toolbarEl: HTMLElement, options?: { showModels?: boolean; showPermissions?: boolean }): void {
@@ -186,6 +190,7 @@ export class ChatSelectionControlsCoordinator {
     // shows or hides the badge without a full rebuild.
     this.syncAdditionalDirectoriesBadge();
     this.syncSandboxBadge();
+    this.syncCodexRuntimeDefaultsBadge();
   }
 
   async reloadModelCatalog(): Promise<void> {
@@ -277,6 +282,7 @@ export class ChatSelectionControlsCoordinator {
     this.permissionSelector?.updateTriggerDisplay();
     this.syncAdditionalDirectoriesBadge();
     this.syncSandboxBadge();
+    this.syncCodexRuntimeDefaultsBadge();
   }
 
   applyLocaleTexts(): void {
@@ -286,6 +292,7 @@ export class ChatSelectionControlsCoordinator {
     this.permissionSelector?.applyLocaleTexts();
     this.syncAdditionalDirectoriesBadge();
     this.syncSandboxBadge();
+    this.syncCodexRuntimeDefaultsBadge();
   }
 
   destroy(): void {
@@ -296,6 +303,8 @@ export class ChatSelectionControlsCoordinator {
     this.additionalDirectoriesBadgeContainer = null;
     this.sandboxBadge.destroy();
     this.sandboxBadgeContainer = null;
+    this.codexRuntimeDefaultsBadge.destroy();
+    this.codexRuntimeDefaultsBadgeContainer = null;
     this.disposeModelSelectorStickyHeaders?.();
     this.disposeModelSelectorStickyHeaders = null;
     this.toolbarEl = null;
@@ -374,6 +383,52 @@ export class ChatSelectionControlsCoordinator {
         this.sandboxBadge.destroy();
         this.sandboxBadgeContainer.remove();
         this.sandboxBadgeContainer = null;
+      }
+    }
+  }
+
+  /**
+   * Synchronize the Codex runtime defaults badge container with the current
+   * active backend.
+   *
+   * On every refresh (build, updatePermissionTriggerDisplay, applyLocaleTexts),
+   * this re-reads the active backend from the live plugin settings:
+   * - codex + no container → mount badge
+   * - codex + existing container → update badge content
+   * - other backend + existing container → remove badge and container
+   * - other backend + no container → noop
+   *
+   * The badge itself is quiet and renders nothing when all Codex defaults are
+   * at their default values, so the container may appear empty until the user
+   * enables network access, web search, or extra directories.
+   */
+  private syncCodexRuntimeDefaultsBadge(): void {
+    if (!this.toolbarEl) {
+      return;
+    }
+
+    const isCodex = readActiveBackendFromPlugin() === 'codex';
+
+    if (isCodex) {
+      if (!this.codexRuntimeDefaultsBadgeContainer) {
+        this.codexRuntimeDefaultsBadgeContainer = this.toolbarEl.createDiv({
+          cls: 'opencodian-codex-runtime-defaults-badge-container',
+        });
+        this.codexRuntimeDefaultsBadge.mount(this.codexRuntimeDefaultsBadgeContainer);
+      } else {
+        this.codexRuntimeDefaultsBadge.update();
+      }
+
+      if (!this.codexRuntimeDefaultsBadgeContainer.querySelector('.opencodian-codex-runtime-defaults-badge')) {
+        this.codexRuntimeDefaultsBadge.destroy();
+        this.codexRuntimeDefaultsBadgeContainer.remove();
+        this.codexRuntimeDefaultsBadgeContainer = null;
+      }
+    } else {
+      if (this.codexRuntimeDefaultsBadgeContainer) {
+        this.codexRuntimeDefaultsBadge.destroy();
+        this.codexRuntimeDefaultsBadgeContainer.remove();
+        this.codexRuntimeDefaultsBadgeContainer = null;
       }
     }
   }

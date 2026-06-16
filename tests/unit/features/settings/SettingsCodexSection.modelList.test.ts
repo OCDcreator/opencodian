@@ -4,9 +4,14 @@ import {
   DEFAULT_SETTINGS,
   getDefaultCodexBackendSettings,
 } from '../../../../src/core/types';
+import { CodexReadbackModal } from '../../../../src/features/settings/CodexReadbackModal';
 import { SettingsCodexSection } from '../../../../src/features/settings/SettingsCodexSection';
 import { setLocale, t } from '../../../../src/i18n';
 import type OpenCodianPlugin from '../../../../src/main';
+
+jest.mock('../../../../src/features/settings/CodexReadbackModal', () => ({
+  CodexReadbackModal: jest.fn().mockImplementation(() => ({ open: jest.fn() })),
+}));
 
 type TestPlugin = {
   settings: OpenCodianPlugin['settings'];
@@ -134,6 +139,7 @@ describe('SettingsCodexSection model list readback', () => {
     settingNames.length = 0;
     buttonRecords.length = 0;
     mockSettingPrototype();
+    (CodexReadbackModal as unknown as jest.Mock).mockClear();
   });
 
   afterEach(() => {
@@ -147,7 +153,7 @@ describe('SettingsCodexSection model list readback', () => {
       createSectionHeading,
     });
     const containerEl = document.createElement('div');
-    section.attach(containerEl);
+    section.attachTabbed(containerEl, 'resume-inspect');
 
     expect(settingNames).toContain(t('settings.codex.modelList.name'));
   });
@@ -159,7 +165,7 @@ describe('SettingsCodexSection model list readback', () => {
       createSectionHeading,
     });
     const containerEl = document.createElement('div');
-    section.attach(containerEl);
+    section.attachTabbed(containerEl, 'resume-inspect');
 
     const inspectButton = buttonRecords.find(
       (r) => r.label === t('settings.codex.modelList.inspectButton'),
@@ -168,47 +174,63 @@ describe('SettingsCodexSection model list readback', () => {
     expect(inspectButton!.onClick).toBeDefined();
   });
 
-  it('shows unavailable when adapter does not have getModelList', async () => {
+  it('opens a modal instead of appending an inline readback card', () => {
+    const plugin = createPlugin();
+    const section = new SettingsCodexSection({
+      plugin: plugin as never,
+      createSectionHeading,
+    });
+    const containerEl = document.createElement('div');
+    section.attachTabbed(containerEl, 'resume-inspect');
+
+    const inspectButton = buttonRecords.find(
+      (r) => r.label === t('settings.codex.modelList.inspectButton'),
+    );
+    inspectButton!.onClick!();
+
+    expect(CodexReadbackModal).toHaveBeenCalledTimes(1);
+    const [optionsArg] = (CodexReadbackModal as unknown as jest.Mock).mock.calls[0];
+    expect(optionsArg.title).toBe(t('settings.codex.modelList.modalTitle'));
+    expect(optionsArg.app).toBe(plugin.app);
+    expect(optionsArg.fetchItems).toBeInstanceOf(Function);
+    expect(optionsArg.renderItems).toBeInstanceOf(Function);
+
+    const readbackEl = containerEl.querySelector('[data-codex-model-list-readback]');
+    expect(readbackEl).toBeFalsy();
+  });
+
+  it('modal fetchItems returns null when adapter does not have getModelList', async () => {
     const plugin = createPlugin({});
-    const section = new SettingsCodexSection({
-      plugin: plugin as never,
-      createSectionHeading,
-    });
-    const containerEl = document.createElement('div');
-    section.attach(containerEl);
+    openModelListModal(plugin);
 
-    const inspectButton = buttonRecords.find(
-      (r) => r.label === t('settings.codex.modelList.inspectButton'),
-    );
-    await inspectButton!.onClick!();
-
-    const readbackEl = containerEl.querySelector('[data-codex-model-list-readback]');
-    expect(readbackEl).toBeTruthy();
-    expect(readbackEl!.textContent).toBe(t('settings.codex.modelList.unavailable'));
+    const [optionsArg] = (CodexReadbackModal as unknown as jest.Mock).mock.calls[0];
+    const result = await optionsArg.fetchItems();
+    expect(result).toBeNull();
   });
 
-  it('shows unavailable when getModelList returns null', async () => {
+  it('modal fetchItems returns data from getModelList', async () => {
+    const mockModels = [{ slug: 'gpt-5.5', display_name: 'GPT-5.5' }];
     const plugin = createPlugin({
-      getModelList: jest.fn().mockResolvedValue(null),
+      getModelList: jest.fn().mockResolvedValue(mockModels),
     });
-    const section = new SettingsCodexSection({
-      plugin: plugin as never,
-      createSectionHeading,
-    });
-    const containerEl = document.createElement('div');
-    section.attach(containerEl);
+    openModelListModal(plugin);
 
-    const inspectButton = buttonRecords.find(
-      (r) => r.label === t('settings.codex.modelList.inspectButton'),
-    );
-    await inspectButton!.onClick!();
-
-    const readbackEl = containerEl.querySelector('[data-codex-model-list-readback]');
-    expect(readbackEl).toBeTruthy();
-    expect(readbackEl!.textContent).toBe(t('settings.codex.modelList.unavailable'));
+    const [optionsArg] = (CodexReadbackModal as unknown as jest.Mock).mock.calls[0];
+    const result = await optionsArg.fetchItems();
+    expect(result).toEqual(mockModels);
   });
 
-  it('shows model entries when getModelList returns data', async () => {
+  it('modal fetchItems throws when getModelList throws', async () => {
+    const plugin = createPlugin({
+      getModelList: jest.fn().mockRejectedValue(new Error('CLI not found')),
+    });
+    openModelListModal(plugin);
+
+    const [optionsArg] = (CodexReadbackModal as unknown as jest.Mock).mock.calls[0];
+    await expect(optionsArg.fetchItems()).rejects.toThrow();
+  });
+
+  it('modal renderItems renders model entries with proof markers', () => {
     const mockModels = [
       {
         slug: 'gpt-5.5',
@@ -230,50 +252,20 @@ describe('SettingsCodexSection model list readback', () => {
     const plugin = createPlugin({
       getModelList: jest.fn().mockResolvedValue(mockModels),
     });
-    const section = new SettingsCodexSection({
-      plugin: plugin as never,
-      createSectionHeading,
-    });
+    openModelListModal(plugin);
+
+    const [optionsArg] = (CodexReadbackModal as unknown as jest.Mock).mock.calls[0];
     const containerEl = document.createElement('div');
-    section.attach(containerEl);
+    optionsArg.renderItems(containerEl, mockModels);
 
-    const inspectButton = buttonRecords.find(
-      (r) => r.label === t('settings.codex.modelList.inspectButton'),
-    );
-    await inspectButton!.onClick!();
-
-    const readbackEl = containerEl.querySelector('[data-codex-model-list-readback]');
-    expect(readbackEl).toBeTruthy();
-    expect(readbackEl!.getAttribute('data-proof-state')).toBe('readback');
-
-    const entries = readbackEl!.querySelectorAll('[data-model-slug]');
+    const entries = containerEl.querySelectorAll('[data-model-slug]');
     expect(entries.length).toBe(2);
     expect(entries[0].getAttribute('data-model-slug')).toBe('gpt-5.5');
     expect(entries[1].getAttribute('data-model-slug')).toBe('gpt-5.4');
+    expect(entries[0].getAttribute('data-proof-state')).toBe('readback');
   });
 
-  it('shows failed when getModelList throws', async () => {
-    const plugin = createPlugin({
-      getModelList: jest.fn().mockRejectedValue(new Error('CLI not found')),
-    });
-    const section = new SettingsCodexSection({
-      plugin: plugin as never,
-      createSectionHeading,
-    });
-    const containerEl = document.createElement('div');
-    section.attach(containerEl);
-
-    const inspectButton = buttonRecords.find(
-      (r) => r.label === t('settings.codex.modelList.inspectButton'),
-    );
-    await inspectButton!.onClick!();
-
-    const readbackEl = containerEl.querySelector('[data-codex-model-list-readback]');
-    expect(readbackEl).toBeTruthy();
-    expect(readbackEl!.textContent).toBe(t('settings.codex.modelList.failed'));
-  });
-
-  it('shows reasoning level meta for models that have it', async () => {
+  it('modal renderItems includes reasoning level badge', () => {
     const mockModels = [
       {
         slug: 'gpt-5.5',
@@ -287,20 +279,28 @@ describe('SettingsCodexSection model list readback', () => {
     const plugin = createPlugin({
       getModelList: jest.fn().mockResolvedValue(mockModels),
     });
-    const section = new SettingsCodexSection({
-      plugin: plugin as never,
-      createSectionHeading,
-    });
-    const containerEl = document.createElement('div');
-    section.attach(containerEl);
+    openModelListModal(plugin);
 
-    const inspectButton = buttonRecords.find(
-      (r) => r.label === t('settings.codex.modelList.inspectButton'),
-    );
-    await inspectButton!.onClick!();
+    const [optionsArg] = (CodexReadbackModal as unknown as jest.Mock).mock.calls[0];
+    const containerEl = document.createElement('div');
+    optionsArg.renderItems(containerEl, mockModels);
 
     const entryEl = containerEl.querySelector('[data-model-slug="gpt-5.5"]');
     expect(entryEl).toBeTruthy();
-    expect(entryEl!.textContent).toContain('reasoning: medium');
+    expect(entryEl!.textContent).toContain('medium');
   });
 });
+
+function openModelListModal(plugin: TestPlugin): void {
+  const section = new SettingsCodexSection({
+    plugin: plugin as never,
+    createSectionHeading,
+  });
+  const containerEl = document.createElement('div');
+  section.attachTabbed(containerEl, 'resume-inspect');
+
+  const inspectButton = buttonRecords.find(
+    (r) => r.label === t('settings.codex.modelList.inspectButton'),
+  );
+  inspectButton!.onClick!();
+}

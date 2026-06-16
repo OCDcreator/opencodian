@@ -5,6 +5,20 @@ import type { TabId } from '../tabs';
 import type { ModelSelectorSelection } from '../ui/modelSelector/types';
 import type { PersistentAssistantNoticeMessageOptions } from './PersistentAssistantNoticeService';
 
+function readActiveBackendDisplayNameFromPlugin(): string {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const plugin = (globalThis as any).app?.plugins?.plugins?.opencodian as {
+      settings?: { activeBackend?: string };
+      agentServiceRegistry?: { get?: (id: string) => { displayName?: string } | null };
+    } | undefined;
+    const activeBackend = plugin?.settings?.activeBackend ?? 'opencode';
+    return plugin?.agentServiceRegistry?.get?.(activeBackend)?.displayName ?? activeBackend;
+  } catch {
+    return 'opencode';
+  }
+}
+
 const NETWORK_ERROR_PATTERNS = [
   'failed to fetch',
   'econnrefused',
@@ -68,13 +82,14 @@ export class ConversationNoticeCoordinator {
     }
 
     if (!rewound && !hasBackendConnection) {
+      const backendName = readActiveBackendDisplayNameFromPlugin();
       return {
         id: 'opencodian-empty-state-backend-offline',
         role: 'assistant',
-        content: t('chat.empty.backendOffline.description'),
+        content: t('chat.empty.backendOffline.descriptionWithBackend', { backend: backendName }),
         timestamp: Date.now(),
         displayStyle: 'notice',
-        noticeTitle: t('chat.empty.backendOffline.title'),
+        noticeTitle: t('chat.empty.backendOffline.titleWithBackend', { backend: backendName }),
         noticeTone: 'warning',
         noticeActions: [{ type: 'open_model_settings' as const }],
       };

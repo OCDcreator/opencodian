@@ -15,6 +15,7 @@
 - 优先从 `lobehubIconManifest.ts` 为 OpenCode、Claude Code、Codex、Copilot 和 Pi 渲染静态 LobeHub 图标，并分别写入 light/dark 图片资源
 - 当 LobeHub manifest 缺少可用静态资源时，回退到 Obsidian `setIcon()` 的 Lucide 图标
 - 将图标组 portal 到 `document.body`，并根据设置页容器 `getBoundingClientRect().left` 写入 `--opencodian-agent-switcher-fixed-left`，让图标组固定在当前设置 pane 左边缘，不随正文滚动
+- 图标组使用 `z-index: 50` 对齐 Obsidian modal layer；当用户从 settings 打开帮助 modal、详情 modal 或其他非 `.mod-settings` 子对话框时，CSS 会隐藏该 body-level rail，避免它压到前景窗口上方
 - 为 entry/click 动画添加短生命周期 CSS class，持久 idle/hover/selected 效果交给 CSS
 - 点击图标后把选中的 agent 回传给 `SettingsTabbedRenderer` 统一持久化与刷新
 

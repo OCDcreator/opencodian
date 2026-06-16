@@ -162,7 +162,7 @@ describe('SettingsCodexSection session browser launcher', () => {
       createSectionHeading,
     });
     const containerEl = document.createElement('div');
-    section.attach(containerEl);
+    section.attachTabbed(containerEl, 'resume-inspect');
 
     const launchButton = findButton(t('settings.codex.sessionBrowser.launchButton'));
     expect(launchButton).toBeDefined();
@@ -176,7 +176,7 @@ describe('SettingsCodexSection session browser launcher', () => {
       createSectionHeading,
     });
     const containerEl = document.createElement('div');
-    section.attach(containerEl);
+    section.attachTabbed(containerEl, 'resume-inspect');
 
     const infoEl = containerEl.querySelector('[data-codex-session-browser-info="true"]');
     expect(infoEl).toBeTruthy();
@@ -189,7 +189,7 @@ describe('SettingsCodexSection session browser launcher', () => {
       createSectionHeading,
     });
     const containerEl = document.createElement('div');
-    section.attach(containerEl);
+    section.attachTabbed(containerEl, 'resume-inspect');
 
     const launchButton = findButton(t('settings.codex.sessionBrowser.launchButton'));
     launchButton.onClick!();
@@ -207,7 +207,7 @@ describe('SettingsCodexSection session browser launcher', () => {
       createSectionHeading,
     });
     const containerEl = document.createElement('div');
-    section.attach(containerEl);
+    section.attachTabbed(containerEl, 'resume-inspect');
 
     const launchButton = findButton(t('settings.codex.sessionBrowser.launchButton'));
     launchButton.onClick!();
@@ -233,7 +233,7 @@ describe('SettingsCodexSection session browser launcher', () => {
       createSectionHeading,
     });
     const containerEl = document.createElement('div');
-    section.attach(containerEl);
+    section.attachTabbed(containerEl, 'resume-inspect');
 
     const launchButton = findButton(t('settings.codex.sessionBrowser.launchButton'));
     launchButton.onClick!();
@@ -251,7 +251,7 @@ describe('SettingsCodexSection session browser launcher', () => {
       createSectionHeading,
     });
     const containerEl = document.createElement('div');
-    section.attach(containerEl);
+    section.attachTabbed(containerEl, 'resume-inspect');
 
     const inMemoryEl = containerEl.querySelector('[data-codex-session-browser-in-memory="true"]');
     expect(inMemoryEl).toBeTruthy();

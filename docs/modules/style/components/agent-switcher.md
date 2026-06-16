@@ -28,6 +28,7 @@
 - `.opencodian-settings-panel-title-actions` 由 settings title 样式负责右对齐，并通过标题行右侧 padding 避开 Obsidian 设置 modal 关闭按钮；agent switcher CSS 只负责内部 icon group，不改变标题行布局。
 - 左侧 hover zone 不再作为整栏命中区；只有固定在 pane 左边缘的悬浮图标列本身 hover/focus 时才滑出，避免鼠标进入设置页左侧空白就弹出图标。
 - 悬浮图标组使用 `position: fixed` 和 `--opencodian-agent-switcher-fixed-left` 对齐设置 pane 内部左边缘，默认只显示 4px 竖向把手，不向设置界面外侧溢出，也不跟随正文内容滚动。
+- 悬浮图标组使用 `z-index: 50` 对齐 Obsidian modal layer：它可见于所属设置页，但当 body 中出现非 `.mod-settings` 的子 modal 时，CSS 会把它设为 `opacity: 0; visibility: hidden; pointer-events: none`，避免左侧竖条压在按钮弹窗上方。
 - hover/focus 时图标组在设置界面内部展开为 40px dock；按钮为 32px，LobeHub 图标为 18px，避免覆盖正文并避免半露图标。
 - LobeHub 图标按 Obsidian 的 `body.theme-dark` 切换 light/dark 静态资源；不要影响设置页一级 tab 图标。
 - entry/click 动画由 TS 临时添加 class 触发，idle/hover/selected 状态由 CSS 长期维护。

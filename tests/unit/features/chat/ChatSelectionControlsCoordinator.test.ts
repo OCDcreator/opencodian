@@ -432,12 +432,113 @@ describe('ChatSelectionControlsCoordinator', () => {
       };
     }
 
-    it('does not mount sandbox badge container when active backend is not claude-code', async () => {
+    function mockCodexBackendWithDefaults(defaults: {
+      networkAccessEnabled?: boolean;
+      webSearchMode?: string;
+      additionalDirectories?: string;
+    }): void {
+      (globalThis as any).app = {
+        plugins: {
+          plugins: {
+            opencodian: {
+              settings: {
+                activeBackend: 'codex',
+                backendSettings: {
+                  codex: {
+                    networkAccessEnabled: defaults.networkAccessEnabled ?? false,
+                    webSearchMode: defaults.webSearchMode ?? 'cached',
+                    additionalDirectories: defaults.additionalDirectories ?? '',
+                  },
+                },
+              },
+            },
+          },
+        },
+      };
+    }
+
+    it('does not mount a visible Codex runtime defaults badge when all Codex defaults are quiet', async () => {
+      mockCodexBackendWithDefaults({});
+
+      const host = createMinimalHost();
+      const toolbarEl = document.createElement('div');
+      document.body.appendChild(toolbarEl);
+
+      const coordinator = new ChatSelectionControlsCoordinator(host);
+      coordinator.build(toolbarEl);
+      await settleAsyncWork();
+
+      const container = toolbarEl.querySelector<HTMLElement>('.opencodian-codex-runtime-defaults-badge-container');
+      // Quiet defaults should not leave an empty toolbar child behind; the
+      // container is recreated later if a non-default setting appears.
+      expect(container).toBeNull();
+      expect(toolbarEl.querySelector('.opencodian-codex-runtime-defaults-badge')).toBeNull();
+    });
+
+    it('mounts Codex runtime defaults badges for non-default network/web/directory settings', async () => {
+      mockCodexBackendWithDefaults({
+        networkAccessEnabled: true,
+        webSearchMode: 'live',
+        additionalDirectories: '/tmp/extra\n~/notes',
+      });
+
+      const host = createMinimalHost();
+      const toolbarEl = document.createElement('div');
+      document.body.appendChild(toolbarEl);
+
+      const coordinator = new ChatSelectionControlsCoordinator(host);
+      coordinator.build(toolbarEl);
+      await settleAsyncWork();
+
+      const container = toolbarEl.querySelector<HTMLElement>('.opencodian-codex-runtime-defaults-badge-container');
+      expect(container).not.toBeNull();
+      expect(container?.style.display).not.toBe('none');
+
+      const badges = toolbarEl.querySelectorAll('.opencodian-codex-runtime-defaults-badge');
+      expect(badges.length).toBe(3);
+      expect(toolbarEl.querySelector('[data-badge-kind="network"]')).not.toBeNull();
+      expect(toolbarEl.querySelector('[data-badge-kind="webSearch"]')).not.toBeNull();
+      expect(toolbarEl.querySelector('[data-badge-kind="additionalDirectories"]')).not.toBeNull();
+    });
+
+    it('removes the Codex runtime defaults badge container when backend hot-switches away from Codex', async () => {
+      mockCodexBackendWithDefaults({ networkAccessEnabled: true });
+
+      const host = createMinimalHost();
+      const toolbarEl = document.createElement('div');
+      document.body.appendChild(toolbarEl);
+
+      const coordinator = new ChatSelectionControlsCoordinator(host);
+      coordinator.build(toolbarEl);
+      await settleAsyncWork();
+
+      expect(toolbarEl.querySelector('.opencodian-codex-runtime-defaults-badge-container')).not.toBeNull();
+      expect(toolbarEl.querySelector('[data-badge-kind="network"]')).not.toBeNull();
+
+      mockOpencodeBackend();
+      coordinator.updatePermissionTriggerDisplay();
+
+      expect(toolbarEl.querySelector('.opencodian-codex-runtime-defaults-badge-container')).toBeNull();
+    });
+
+    it('re-mounts the Codex runtime defaults badge container when backend hot-switches back to Codex', async () => {
       mockOpencodeBackend();
 
-      const fixture = await createFixture();
-      const badgeContainer = fixture.toolbarEl.querySelector('.opencodian-sandbox-badge-container');
-      expect(badgeContainer).toBeNull();
+      const host = createMinimalHost();
+      const toolbarEl = document.createElement('div');
+      document.body.appendChild(toolbarEl);
+
+      const coordinator = new ChatSelectionControlsCoordinator(host);
+      coordinator.build(toolbarEl);
+      await settleAsyncWork();
+
+      expect(toolbarEl.querySelector('.opencodian-codex-runtime-defaults-badge-container')).toBeNull();
+
+      mockCodexBackendWithDefaults({ networkAccessEnabled: true });
+      coordinator.updatePermissionTriggerDisplay();
+
+      expect(toolbarEl.querySelector('.opencodian-codex-runtime-defaults-badge-container')).not.toBeNull();
+      expect(toolbarEl.querySelector('[data-badge-kind="network"]')).not.toBeNull();
     });
 
     it('mounts sandbox badge container when active backend is claude-code', async () => {

@@ -20,6 +20,8 @@
 - 统一处理 submit gate、send/stop affordance、add-context 按钮事件，以及 capability-gated 的图片附件按钮事件
 - 通过 `ResizeObserver` + `requestAnimationFrame` 维护 composer stack height，并触发 settled scroll
 - 把 selection controls/context-usage/effort/modified-files toggle 这些既有子控件挂到稳定的 toolbar slot
+- 根据全局插件设置中的 `activeBackend` 调整 placeholder 文案：Codex backend 活跃时显示 `chat.input.placeholderCodex`，其余 backend 使用 host 提供的 placeholder
+- 当 host 报告的 composer availability state 为 `backend-offline` 时，从全局插件设置读取当前 backend display name，并使用 `chat.empty.backendOffline.titleWithBackend` / `descriptionWithBackend` 渲染带 backend 名称的外部 notice；这样 `OpenCodianView` 只需返回 generic offline state，backend 命名由输入区 owner 本地 decorate
 - 暴露 `refreshToolbarControls()`，允许 backend/capability 切换后只重挂 toolbar 子控件并同步刷新 capability hint，而不重建 textarea、context row 或 footer
 - 拥有 `PromptSuggestionService` 实例，并将 `.opencodian-suggestion-bar` 挂到最后一条 assistant message 后面；该行语义上表示“这条 assistant 回复的下一步建议”，视觉上紧跟消息本身，而不是出现在 composer footer 或输入区顶部。当存在 active suggestion 时显示可点击的 `.opencodian-suggestion-chip`，点击后仅将 suggestion 文本插入 textarea（不会自动提交），并调用 `acceptActiveSuggestion()` 清除该 suggestion
 - 通过**模块级 channel bus** (`promptSuggestionSink.ts`) 与当前会话 backend session id 同步：`build()` 时创建独立 channel (`createPromptSuggestionChannel`)、在 container 上 stamp scope (`stampPromptSuggestionScope`)，并订阅该 channel 的 session 变更 (`onPromptSuggestionSessionChange`)；`TabActivationRuntimeHostProvider` 在 conversation 切换时通过 `findPromptSuggestionScope(messagesContainer)` 发现对应 channel，再经 `emitPromptSuggestionSessionChange(sessionId, channelId)` 推送新值。该设计把 prompt suggestion lifecycle 完全移出 `OpenCodianView`，解决 suggestion 可能早于 `backendSessionId` writeback 到达的 race，同时避免多视图交叉污染
@@ -91,7 +93,7 @@ export class ComposerInputShellCoordinator {
 - `@agent` menu 复用同一个 overlay 容器；当光标前 token 命中 `@query` 时优先展示 agent 候选，离开该 token 后再恢复 slash query 检测
 - `applyLocaleTexts()` 刷新 placeholder overlay 文本、add-context tooltip 和 send/stop tooltip；textarea 不再设置 `aria-label`，避免在 Obsidian Electron 中产生多余的原生 hover tooltip
 - `updateSendButtonState()` 根据 streaming state 切换 send/stop icon 与 class
-- `updateComposerAvailabilityState()` 只消费 host 给出的高层 surface 状态，不直接判断 backend / service；这样“无 backend”和“backend offline”的运行时所有权仍留在 `OpenCodianView`
+- `updateComposerAvailabilityState()` 消费 host 给出的高层 surface 状态；当状态为 `backend-offline` 时，本模块会本地读取 active backend display name 并渲染带名称的 notice，而不需要 `OpenCodianView` 直接提供 backend 名称。这样“无 backend”和“backend offline”的高层运行时所有权仍留在 `OpenCodianView`，但文案装饰下沉到输入区 owner
 - `renderCapabilityHint()` 向 host 查询可选的 `getComposerCapabilityHint()`，若返回非 null 结果则把 `.opencodian-input-capability-hint` 作为 footer trailing chip 插到 send 按钮左侧，并在 `build()`、`applyLocaleTexts()` 与 availability refresh 时刷新；若结果为 null 则移除该 element。host 可选返回 `insertText`，使 hint 变成可点击插入 affordance，而不是单纯文案。当前 fallback hint 是 Claude Code 和 Codex backend 共用的 structured-output chip（OpenCode 不显示）：对用户展示为“结构化回复”，tooltip 会解释“固定结构返回结果、便于复制到其他工具、点击不会自动发送”，点击后底层仍只向 textarea 前置 `/json `，结构上不污染 OpenCode-only 路径，也不暗示任意 schema authoring
 - `refreshSlashCommandMenu()` 只负责调用 `SlashCommandMenuCoordinator.refresh()`；菜单 coordinator 每次 slash query 刷新都会向 host 读取 merged visible menu items，再通过 `slashCommandMenuFilter.ts` 本地过滤。host 背后的 `SlashCommandMenuCatalogCache` 继续负责 TTL / pending promise / hidden-command cache key，因此设置页隐藏命令或切换 skill 模式后不会被 composer 层旧数组挡住，也不会每次按键直接打 SDK
 - slash catalog 首次异步加载完成后，coordinator 会重新执行一次 backdrop 高亮同步，这样输入中的已知 slash item 能在 catalog 到位后立即着色，而未知 token 会自动退回普通文本

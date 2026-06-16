@@ -62,6 +62,21 @@ spacing:
   xl: "12px"
   section: "16px"
   panel: "28px"
+  codex-card-gap: "12px"
+  codex-group-header-gap: "16px"
+  codex-card-title-body-gap: "8px"
+  codex-card-body-gap: "10px"
+  modal-content-padding-x: "22px"
+  modal-content-padding-y: "22px"
+  modal-header-body-gap: "16px"
+  modal-section-gap: "20px"
+  modal-section-inner-gap: "12px"
+  modal-card-gap: "12px"
+  modal-form-row-gap: "12px"
+  modal-form-label-control-gap: "16px"
+  modal-action-gap: "8px"
+  help-modal-max-width: "720px"
+  help-modal-section-gap: "16px"
 components:
   button-ghost:
     backgroundColor: "transparent"
@@ -83,6 +98,20 @@ components:
     textColor: "{colors.ink-graphite}"
     rounded: "{rounded.message}"
     padding: "14px 16px"
+  codex-settings-card:
+    backgroundColor: "var(--background-secondary)"
+    textColor: "var(--text-normal)"
+    rounded: "{rounded.xl}"
+    border: "1px solid var(--background-modifier-border)"
+    padding: "14px 16px"
+  settings-dropdown:
+    triggerWidth: "field-width"
+    menuWidth: "max(trigger-width, content-estimate), clamped to viewport"
+    menuPadding: "5px"
+    optionPadding: "5px 8px 5px 10px"
+    optionFill: "stretch to menu content track"
+    labelOverflow: "wrap only when viewport clamping requires it"
+    scrollBehavior: "hide vertical scrollbar until content exceeds max height"
 ---
 
 # Design System: OpenCodian
@@ -199,11 +228,66 @@ OpenCodian uses a hybrid elevation system. Default Obsidian surfaces are mostly 
 - **Border:** use `var(--background-modifier-border)` or `var(--opencodian-accent-border)` where state matters.
 - **Internal Padding:** 12-16px for cards, 6-10px for compact controls.
 
+### Codex Settings Cards
+
+Codex backend settings use a single, fixed vertical rhythm across the Connection, Resume & Inspect, and Account subtabs. All card-like surfaces (account cards, readback outputs, connection summary) share the same spacing tokens so the three tabs feel like one surface.
+
+- **Group header/description to first card/control stack:** `16px` (`{spacing.codex-group-header-gap}`).
+- **Cards/setting rows inside any Codex subtab group:** `12px` vertical gap (`{spacing.codex-card-gap}`).
+- **Card title/header to body:** `8px` (`{spacing.codex-card-title-body-gap}`).
+- **Card body/readback blocks:** `10px` vertical gap (`{spacing.codex-card-body-gap}`).
+- **Card padding:** `14px 16px` (`{components.codex-settings-card.padding}`).
+- **Card background:** `var(--background-secondary)` with `1px solid var(--background-modifier-border)` and `10px` radius.
+- **Group titles (`h4`) must have `padding-left: 0` / `padding-inline-start: 0` and `margin: 0`; spacing to the description and first control stack comes from the tokens above, not per-element margins.
+- **No nested cards:** a readback card may contain rows, but it must not wrap another full card.
+- **No ad-hoc margins:** spacing comes from the group stack gap and the tokenized title/body gaps, not per-element margins.
+
+### Modal Layout
+
+All settings modals share a single chrome/layout layer instead of per-modal margin hacks. The system is built on Obsidian's `.modal-content` and reusable OpenCodian shell classes.
+
+- **Modal content padding:** `22px` horizontal and vertical (`{spacing.modal-content-padding-x}` / `{spacing.modal-content-padding-y}`).
+- **Header to body:** `16px` (`{spacing.modal-header-body-gap}`).
+- **Sections inside modal body:** `20px` vertical gap (`{spacing.modal-section-gap}`).
+- **Elements inside a section:** `12px` vertical gap (`{spacing.modal-section-inner-gap}`).
+- **Cards inside a section:** `12px` vertical gap (`{spacing.modal-card-gap}`).
+- **Form rows:** `12px` vertical gap (`{spacing.modal-form-row-gap}`); label/control columns use `16px` (`{spacing.modal-form-label-control-gap}`).
+- **Action rows:** `8px` horizontal gap (`{spacing.modal-action-gap}`), top border separator, right-aligned.
+- **Help modals:** max-width `720px`, sections stacked with `16px` gap (`{spacing.help-modal-section-gap}`), compact callouts and lists.
+- **Inspection panels:** readback and MCP detail modals use `.opencodian-inspection-panel` with a compact summary band (intro + meta strip), `.opencodian-inspection-row` for item rows, and `.opencodian-inspection-section` for grouped server sections. Spacing follows the modal tokens above; no nested cards.
+- **No nested card surfaces:** a card may contain rows or lists, but not another full card.
+- **No ad-hoc margins:** spacing comes from the shell/section/card gaps, not per-element margins.
+- **Flush headings:** section headings (`h4`, `h5`) must not carry left padding (`padding-left: 0; padding-inline-start: 0`) so they align with the section content and modal edge.
+
+### MCP Inspection Modal
+
+The Codex MCP server inspection modal follows the shared modal/inspection-panel layout with additional fixed-height collapse rules:
+
+- **Collapsed server section height:** fixed at ~96px (`--opencodian-mcp-server-collapsed-height: 96px`). Use `min-height`/`max-height` or an equivalent fixed summary-row height so every collapsed server section has the same visual footprint.
+- **Collapsed summary content only:** each folded server row shows display name/version, a short server-id summary when the id differs from the display name, auth badge/auth action, tool/resource count, and an expand button. No tool list, tool description, schema, resource detail, or server description is visible.
+- **Expand control:** use a native `<button>` with text labels (i18n `expandServer`/`collapseServer`), `aria-expanded`, and `aria-controls`. Do not rely on icon-only toggles.
+- **Expanded content spacing:** use the modal section/card spacing tokens (`--opencodian-modal-section-inner-gap`, `--opencodian-modal-card-gap`). Keep the expanded body as a flat list of rows; no nested cards, no side-stripes, no marketing hero.
+- **Tool rows:** default to tool name + a "Tool details" button only. Description and input schema are hidden. Clicking "Tool details" reveals the description and a schema toggle; the full JSON schema requires a second click on the schema toggle. This two-level expansion keeps long schemas from overwhelming the list.
+- **Resource rows:** keep the existing view action, but do not expose resource details while the server section is collapsed.
+- **Focus server:** when `focusServerName` matches, expand that section by default and apply the existing `.is-focused` highlight ring so the chat deep-link experience remains intact.
+
 ### Inputs / Fields
 
 - **Style:** transparent or tonal background, 10-12px radius, Obsidian text colors, compact line height.
 - **Focus:** accent outline, border shift, or tonal lift. Do not add large glow.
 - **Error / Disabled:** error color must be visible in both light and dark themes; disabled state should reduce contrast but keep labels readable.
+
+### Settings Dropdowns
+
+Settings dropdown menus may be wider than their trigger when option labels need more room. The trigger remains field-sized; the open menu expands to fit readable option content, then clamps to the viewport. The important alignment contract is inside the menu: every option row must fill the menu content track, without a ragged right-side gap.
+
+- **Trigger width:** follows the settings field layout.
+- **Menu width:** `max(trigger-width, content-estimate)`, clamped by viewport margins.
+- **Menu padding:** `5px`.
+- **Option padding:** `5px 8px 5px 10px`, with each option row `width: 100%` and `justify-self: stretch`.
+- **Label overflow:** option labels may wrap only when viewport clamping leaves no room; do not force normal-width menus to truncate risk labels such as `危险：完全访问`.
+- **No ragged menu rows:** if the menu panel is wider than the trigger, hover and selected option backgrounds still span the full internal menu width.
+- **Scrollbar behavior:** short menus must not reserve a vertical scrollbar gutter; enable internal scrolling only when content exceeds the menu max height.
 
 ### Navigation
 

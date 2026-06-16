@@ -203,6 +203,25 @@ function createFixture(options: {
   };
 }
 
+type MockApp = {
+  plugins?: {
+    plugins?: {
+      opencodian?: {
+        settings?: { activeBackend?: string };
+        agentServiceRegistry?: { get?: (id: string) => { displayName?: string } | null };
+      };
+    };
+  };
+};
+
+function mockGlobalApp(app: MockApp): () => void {
+  const originalApp = (globalThis as { app?: MockApp }).app;
+  (globalThis as { app?: MockApp }).app = app;
+  return () => {
+    (globalThis as { app?: MockApp }).app = originalApp;
+  };
+}
+
 function installCoordinatorDomMocks(): void {
   ResizeObserverMock.reset();
   animationFrameQueue = [];
@@ -318,6 +337,65 @@ describe('ComposerInputShellCoordinator', () => {
     expect(fixture.host.mountEffortSelector).toHaveBeenCalledTimes(2);
   });
 
+});
+
+describe('ComposerInputShellCoordinator placeholder and availability', () => {
+  const originalResizeObserver = globalThis.ResizeObserver;
+
+  beforeEach(() => {
+    installCoordinatorDomMocks();
+  });
+
+  afterEach(() => {
+    restoreCoordinatorDomMocks(originalResizeObserver);
+  });
+
+  it('reflects a Codex-specific placeholder when the active backend is codex', () => {
+    const restoreApp = mockGlobalApp({
+      plugins: {
+        plugins: {
+          opencodian: {
+            settings: { activeBackend: 'codex' },
+          },
+        },
+      },
+    });
+
+    const fixture = createFixture({
+      shouldMountAgentSelector: false,
+    });
+
+    try {
+      const placeholderEl = fixture.container.querySelector<HTMLElement>('.opencodian-input-placeholder-text');
+      expect(placeholderEl?.textContent).toBe(t('chat.input.placeholderCodex'));
+    } finally {
+      restoreApp();
+    }
+  });
+
+  it('keeps the host placeholder for non-Codex backends', () => {
+    const restoreApp = mockGlobalApp({
+      plugins: {
+        plugins: {
+          opencodian: {
+            settings: { activeBackend: 'opencode' },
+          },
+        },
+      },
+    });
+
+    const fixture = createFixture({
+      shouldMountAgentSelector: false,
+    });
+
+    try {
+      const placeholderEl = fixture.container.querySelector<HTMLElement>('.opencodian-input-placeholder-text');
+      expect(placeholderEl?.textContent).toBe(t('chat.input.placeholder'));
+    } finally {
+      restoreApp();
+    }
+  });
+
   it('renders a disabled composer shell when no backend is enabled', () => {
     const fixture = createFixture({
       shouldMountAgentSelector: false,
@@ -334,6 +412,38 @@ describe('ComposerInputShellCoordinator', () => {
     expect(fixture.container.querySelector('.opencodian-composer-disabled-state')).toBeNull();
     expect(fixture.surfaceRoot.querySelector('.opencodian-composer-availability-notice')?.textContent)
       .toContain('No backend enabled');
+  });
+
+  it('names the active backend in the backend-offline availability notice', () => {
+    const restoreApp = mockGlobalApp({
+      plugins: {
+        plugins: {
+          opencodian: {
+            settings: { activeBackend: 'codex' },
+            agentServiceRegistry: {
+              get: jest.fn(() => ({ displayName: 'Codex' })),
+            },
+          },
+        },
+      },
+    });
+
+    const fixture = createFixture({
+      shouldMountAgentSelector: false,
+      composerAvailabilityState: {
+        kind: 'backend-offline',
+        title: 'Backend unavailable',
+        description: 'The current backend is enabled, but it is not connected right now.',
+      },
+    });
+
+    try {
+      const noticeEl = fixture.surfaceRoot.querySelector<HTMLElement>('.opencodian-composer-availability-notice');
+      expect(noticeEl?.textContent).toContain('Codex unavailable');
+      expect(noticeEl?.textContent).toContain('Codex is enabled');
+    } finally {
+      restoreApp();
+    }
   });
 
   it('positions the external availability notice above the composer stack and keeps it synced to composer height', () => {
@@ -358,21 +468,38 @@ describe('ComposerInputShellCoordinator', () => {
   });
 
   it('refreshes composer availability state when locale-driven refresh reapplies texts', () => {
-    const fixture = createFixture();
-
-    fixture.host.getComposerAvailabilityState.mockReturnValue({
-      kind: 'backend-offline',
-      title: 'Backend unavailable',
-      description: 'The current backend is enabled, but it is not connected right now.',
+    const restoreApp = mockGlobalApp({
+      plugins: {
+        plugins: {
+          opencodian: {
+            settings: { activeBackend: 'opencode' },
+            agentServiceRegistry: {
+              get: jest.fn(() => ({ displayName: 'OpenCode' })),
+            },
+          },
+        },
+      },
     });
 
-    fixture.coordinator.applyLocaleTexts();
+    const fixture = createFixture();
 
-    expect(fixture.textarea.disabled).toBe(true);
-    expect(fixture.sendBtn.disabled).toBe(true);
-    expect(
-      fixture.surfaceRoot.querySelector('.opencodian-composer-availability-notice')?.textContent,
-    ).toContain('Backend unavailable');
+    try {
+      fixture.host.getComposerAvailabilityState.mockReturnValue({
+        kind: 'backend-offline',
+        title: 'Backend unavailable',
+        description: 'The current backend is enabled, but it is not connected right now.',
+      });
+
+      fixture.coordinator.applyLocaleTexts();
+
+      expect(fixture.textarea.disabled).toBe(true);
+      expect(fixture.sendBtn.disabled).toBe(true);
+      expect(
+        fixture.surfaceRoot.querySelector('.opencodian-composer-availability-notice')?.textContent,
+      ).toContain('OpenCode unavailable');
+    } finally {
+      restoreApp();
+    }
   });
 
   it('suppresses the external availability notice when the empty-state notice already covers it', () => {
@@ -390,6 +517,19 @@ describe('ComposerInputShellCoordinator', () => {
 
     expect(fixture.surfaceRoot.querySelector('.opencodian-composer-availability-notice')).toBeNull();
     expect(fixture.textarea.disabled).toBe(true);
+  });
+
+});
+
+describe('ComposerInputShellCoordinator submit gating and keyboard', () => {
+  const originalResizeObserver = globalThis.ResizeObserver;
+
+  beforeEach(() => {
+    installCoordinatorDomMocks();
+  });
+
+  afterEach(() => {
+    restoreCoordinatorDomMocks(originalResizeObserver);
   });
 
   it('keeps submit gating and send/stop affordance inside the coordinator', () => {

@@ -1,8 +1,14 @@
 /**
- * SettingsCodexSection — minimal Codex backend settings panel.
+ * SettingsCodexSection — Codex backend settings panel.
  *
- * Renders the connection/authentication settings for the Codex adapter.
- * Only fields that are genuinely wired through to the SDK adapter are exposed.
+ * Organizes Codex configuration into three product-grade groups:
+ *   1. Connection & runtime defaults — genuinely wired SDK options.
+ *   2. Resume & inspect — session browser (action) and diagnostic readbacks.
+ *   3. Account & provider status — live read-only account/capability cards.
+ *
+ * The old disabled "Authentication" setting is replaced by a lightweight
+ * connection summary and the Account surface auth-source row, so the UI never
+ * presents a disabled input as a status indicator.
  */
 
 import { DropdownComponent, Setting } from 'obsidian';
@@ -42,23 +48,24 @@ export class SettingsCodexSection {
       t('settings.codex.title'),
       t('settings.codex.connection.desc'),
     );
-    this.renderConnectionTab(containerEl);
+    this.renderTabContent(containerEl, 'connection');
     return headingEl;
   }
 
-  attachTabbed(containerEl: HTMLElement, _secondaryTabId: string): void {
-    this.renderConnectionTab(containerEl);
+  attachTabbed(containerEl: HTMLElement, secondaryTabId: string): void {
+    this.renderTabContent(containerEl, secondaryTabId);
   }
 
-  // ─── Connection tab ─────────────────────────────────────────────
+  // ─── Tab content ────────────────────────────────────────────────
 
-  private renderConnectionTab(containerEl: HTMLElement): void {
+  private renderTabContent(containerEl: HTMLElement, secondaryTabId: string): void {
+    const resolvedTabId = secondaryTabId || 'connection';
     const blockEl = containerEl.createDiv({
       cls: 'opencodian-settings-block opencodian-settings-section opencodian-settings-codex-block',
       attr: {
         'data-settings-surface': 'section',
-        'data-settings-target': 'codex-connection',
-        'data-codex-section': 'connection',
+        'data-settings-target': `codex-${resolvedTabId}`,
+        'data-codex-section': resolvedTabId,
       },
     });
 
@@ -74,7 +81,72 @@ export class SettingsCodexSection {
     };
     this.plugin.settings.backendSettings.codex ??= getDefaultCodexBackendSettings();
 
-    // API Key
+    if (resolvedTabId === 'resume-inspect') {
+      this.renderResumeAndInspectGroup(bodyEl);
+      return;
+    }
+
+    if (resolvedTabId === 'account') {
+      this.renderAccountAndStatusGroup(bodyEl);
+      return;
+    }
+
+    // Default / 'connection'
+    this.renderConnectionSummary(bodyEl);
+    this.renderRuntimeDefaultsGroup(bodyEl);
+  }
+
+  private renderConnectionSummary(bodyEl: HTMLElement): void {
+    const codex = this.plugin.settings.backendSettings.codex;
+    const summaryEl = bodyEl.createDiv({
+      cls: 'opencodian-settings-codex-connection-summary',
+      attr: { 'data-codex-connection-summary': 'true' },
+    });
+
+    const authSource = codex.apiKey
+      ? t('settings.codex.connection.sourceApiKey')
+      : t('settings.codex.connection.sourceEnvOrChatgpt');
+
+    summaryEl.createSpan({
+      cls: 'opencodian-settings-codex-connection-summary-label',
+      text: t('settings.codex.connection.name'),
+    });
+    summaryEl.createSpan({
+      cls: 'opencodian-settings-codex-connection-summary-value',
+      text: authSource,
+    });
+  }
+
+  private renderRuntimeDefaultsGroup(bodyEl: HTMLElement): void {
+    const groupEl = bodyEl.createDiv({
+      cls: 'opencodian-settings-codex-group opencodian-settings-codex-group--runtime',
+      attr: { 'data-codex-group': 'runtime-defaults' },
+    });
+
+    groupEl.createEl('h4', {
+      cls: 'opencodian-settings-codex-group-title',
+      text: t('settings.codex.groups.runtimeDefaults'),
+    });
+    groupEl.createDiv({
+      cls: 'opencodian-settings-codex-group-desc',
+      text: t('settings.codex.groups.runtimeDefaultsDesc'),
+    });
+
+    const controlsEl = groupEl.createDiv({
+      cls: 'opencodian-settings-codex-group-controls opencodian-settings-codex-group-stack',
+      attr: { 'data-codex-group-controls': 'runtime-defaults' },
+    });
+
+    this.renderApiKeySetting(controlsEl);
+    this.renderModelSetting(controlsEl);
+    this.renderSandboxSetting(controlsEl);
+    this.renderReasoningSetting(controlsEl);
+    this.renderAdditionalDirectoriesSetting(controlsEl);
+    this.renderNetworkAccessSetting(controlsEl);
+    this.renderWebSearchSetting(controlsEl);
+  }
+
+  private renderApiKeySetting(bodyEl: HTMLElement): void {
     new Setting(bodyEl)
       .setName(t('settings.codex.apiKey.name'))
       .setDesc(t('settings.codex.apiKey.desc'))
@@ -88,15 +160,15 @@ export class SettingsCodexSection {
           }),
       )
       .then((setting) => {
-        // Mask the API key input
         const inputEl = setting.controlEl.querySelector('input');
         if (inputEl) {
           inputEl.type = 'password';
           inputEl.autocomplete = 'off';
         }
       });
+  }
 
-    // Model
+  private renderModelSetting(bodyEl: HTMLElement): void {
     const modelSetting = new Setting(bodyEl)
       .setName(t('settings.codex.model.name'))
       .setDesc(t('settings.codex.model.desc'));
@@ -108,8 +180,8 @@ export class SettingsCodexSection {
     modelSetting.addDropdown((dropdown) => {
       modelDropdown = dropdown;
       dropdown.selectEl?.setAttribute('data-setting', 'codex-model');
-      dropdown.addOption('__custom__', t('settings.codex.model.customOption'));
-      dropdown.setValue('__custom__');
+      dropdown.addOption('', t('settings.codex.model.loadingOption'));
+      dropdown.setValue('');
       dropdown.onChange(async (value) => {
         if (value === '__custom__') {
           if (modelCustomInputEl) {
@@ -138,6 +210,7 @@ export class SettingsCodexSection {
         },
       });
       modelCustomInputEl.value = currentModel;
+      modelCustomInputEl.style.display = 'none';
       modelCustomInputEl.addEventListener('change', async () => {
         const value = modelCustomInputEl?.value ?? '';
         this.plugin.settings.backendSettings.codex.model = value;
@@ -147,8 +220,9 @@ export class SettingsCodexSection {
     }
 
     void this.populateCodexModelDropdown(currentModel, modelDropdown, modelCustomInputEl);
+  }
 
-    // Sandbox mode
+  private renderSandboxSetting(bodyEl: HTMLElement): void {
     new Setting(bodyEl)
       .setName(t('settings.codex.sandbox.name'))
       .setDesc(t('settings.codex.sandbox.desc'))
@@ -164,8 +238,9 @@ export class SettingsCodexSection {
             this.applyCodexRuntimeUpdates();
           }),
       );
+  }
 
-    // Model reasoning effort
+  private renderReasoningSetting(bodyEl: HTMLElement): void {
     new Setting(bodyEl)
       .setName(t('settings.codex.reasoning.name'))
       .setDesc(t('settings.codex.reasoning.desc'))
@@ -183,8 +258,9 @@ export class SettingsCodexSection {
             this.applyCodexRuntimeUpdates();
           }),
       );
+  }
 
-    // Additional directories
+  private renderAdditionalDirectoriesSetting(bodyEl: HTMLElement): void {
     new Setting(bodyEl)
       .setName(t('settings.codex.additionalDirs.name'))
       .setDesc(t('settings.codex.additionalDirs.desc'))
@@ -198,8 +274,9 @@ export class SettingsCodexSection {
             this.applyCodexRuntimeUpdates();
           }),
       );
+  }
 
-    // Network access
+  private renderNetworkAccessSetting(bodyEl: HTMLElement): void {
     new Setting(bodyEl)
       .setName(t('settings.codex.network.name'))
       .setDesc(t('settings.codex.network.desc'))
@@ -212,8 +289,9 @@ export class SettingsCodexSection {
             this.applyCodexRuntimeUpdates();
           }),
       );
+  }
 
-    // Web search mode
+  private renderWebSearchSetting(bodyEl: HTMLElement): void {
     new Setting(bodyEl)
       .setName(t('settings.codex.webSearch.name'))
       .setDesc(t('settings.codex.webSearch.desc'))
@@ -229,35 +307,58 @@ export class SettingsCodexSection {
             this.applyCodexRuntimeUpdates();
           }),
       );
+  }
 
-    // Authentication info
-    const apiKey = this.plugin.settings.backendSettings.codex.apiKey;
-    const authSourceDesc = apiKey
-      ? t('settings.codex.connection.sourceApiKey')
-      : t('settings.codex.connection.sourceEnvOrChatgpt');
-    new Setting(bodyEl)
-      .setName(t('settings.codex.connection.name'))
-      .setDesc(authSourceDesc)
-      .then((setting) => {
-        setting.setDisabled(true);
-      });
+  private renderResumeAndInspectGroup(bodyEl: HTMLElement): void {
+    const groupEl = bodyEl.createDiv({
+      cls: 'opencodian-settings-codex-group opencodian-settings-codex-group--resume',
+      attr: { 'data-codex-group': 'resume-and-inspect' },
+    });
 
-    this.readbackControls.renderBackendSessionBrowserInfo(bodyEl);
-    this.readbackControls.renderModelListReadbackControls(bodyEl);
-    this.readbackControls.renderPermissionProfilesReadbackControls(bodyEl);
-    this.readbackControls.renderMcpServerStatusReadbackControls(bodyEl);
-    this.readbackControls.renderLoadedThreadsReadbackControls(bodyEl);
+    groupEl.createEl('h4', {
+      cls: 'opencodian-settings-codex-group-title',
+      text: t('settings.codex.groups.resumeAndInspect'),
+    });
+    groupEl.createDiv({
+      cls: 'opencodian-settings-codex-group-desc',
+      text: t('settings.codex.groups.resumeAndInspectDesc'),
+    });
 
-    // Account & capability product surface — elevated from JSON-dump readbacks.
-    // Renders four product cards: account identity, token usage, rate limits,
-    // and provider capabilities. Each auto-loads and exposes its own refresh.
-    this.createSectionHeading(
-      bodyEl,
-      t('settings.codex.accountSurface.sectionName'),
-      t('settings.codex.accountSurface.sectionDesc'),
-    );
-    const authSource = apiKey ? 'plugin-api-key' : 'env-or-chatgpt';
-    this.accountSurface.attach(bodyEl, authSource);
+    const controlsEl = groupEl.createDiv({
+      cls: 'opencodian-settings-codex-group-controls opencodian-settings-codex-group-stack',
+      attr: { 'data-codex-group-controls': 'resume-and-inspect' },
+    });
+
+    this.readbackControls.renderBackendSessionBrowserInfo(controlsEl);
+    this.readbackControls.renderModelListReadbackControls(controlsEl);
+    this.readbackControls.renderPermissionProfilesReadbackControls(controlsEl);
+    this.readbackControls.renderMcpServerStatusReadbackControls(controlsEl);
+    this.readbackControls.renderLoadedThreadsReadbackControls(controlsEl);
+  }
+
+  private renderAccountAndStatusGroup(bodyEl: HTMLElement): void {
+    const groupEl = bodyEl.createDiv({
+      cls: 'opencodian-settings-codex-group opencodian-settings-codex-group--account',
+      attr: { 'data-codex-group': 'account-and-status' },
+    });
+
+    groupEl.createEl('h4', {
+      cls: 'opencodian-settings-codex-group-title',
+      text: t('settings.codex.accountSurface.sectionName'),
+    });
+    groupEl.createDiv({
+      cls: 'opencodian-settings-codex-group-desc',
+      text: t('settings.codex.accountSurface.sectionDesc'),
+    });
+
+    const authSource = this.plugin.settings.backendSettings.codex.apiKey
+      ? 'plugin-api-key'
+      : 'env-or-chatgpt';
+    const cardsEl = groupEl.createDiv({
+      cls: 'opencodian-settings-codex-group-controls opencodian-settings-codex-group-stack',
+      attr: { 'data-codex-group-controls': 'account' },
+    });
+    this.accountSurface.attach(cardsEl, authSource);
   }
 
   private applyCodexRuntimeUpdates(): void {

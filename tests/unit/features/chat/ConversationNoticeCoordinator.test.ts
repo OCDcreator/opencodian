@@ -15,6 +15,27 @@ const mockOpenPluginSettingsPreservingScroll = jest.fn();
 const mockHasAnyEnabledBackend = jest.fn();
 const mockHasBackendConnection = jest.fn();
 
+let savedApp: MockApp | undefined;
+
+type MockApp = {
+  plugins?: {
+    plugins?: {
+      opencodian?: {
+        settings?: { activeBackend?: string };
+        agentServiceRegistry?: { get?: (id: string) => { displayName?: string } | null };
+      };
+    };
+  };
+};
+
+function mockGlobalApp(app: MockApp): () => void {
+  const originalApp = (globalThis as { app?: MockApp }).app;
+  (globalThis as { app?: MockApp }).app = app;
+  return () => {
+    (globalThis as { app?: MockApp }).app = originalApp;
+  };
+}
+
 function createHost(): ConversationNoticeCoordinatorHost {
   return {
     getCurrentSessionModel: mockGetCurrentSessionModel,
@@ -69,7 +90,14 @@ describe('ConversationNoticeCoordinator stream notices', () => {
 });
 
 describe('ConversationNoticeCoordinator empty conversation notices', () => {
-  beforeEach(resetConversationNoticeMocks);
+  beforeEach(() => {
+    resetConversationNoticeMocks();
+    savedApp = (globalThis as { app?: MockApp }).app;
+  });
+
+  afterEach(() => {
+    (globalThis as { app?: MockApp }).app = savedApp;
+  });
 
   describe('empty conversation notice', () => {
     it('checks rewound state', () => {
@@ -107,6 +135,33 @@ describe('ConversationNoticeCoordinator empty conversation notices', () => {
         noticeTone: 'warning',
       }));
       expect(coordinator.createEmptyConversationNotice().content).not.toBe(t('chat.empty.description'));
+    });
+
+    it('names the active backend in the backend-offline empty conversation notice', () => {
+      mockHasBackendConnection.mockReturnValue(false);
+      const restoreApp = mockGlobalApp({
+        plugins: {
+          plugins: {
+            opencodian: {
+              settings: { activeBackend: 'codex' },
+              agentServiceRegistry: {
+                get: jest.fn(() => ({ displayName: 'Codex' })),
+              },
+            },
+          },
+        },
+      });
+      try {
+
+      const coordinator = new ConversationNoticeCoordinator(createHost());
+      const notice = coordinator.createEmptyConversationNotice();
+
+      expect(notice.id).toBe('opencodian-empty-state-backend-offline');
+      expect(notice.noticeTitle).toBe(t('chat.empty.backendOffline.titleWithBackend', { backend: 'Codex' }));
+      expect(notice.content).toBe(t('chat.empty.backendOffline.descriptionWithBackend', { backend: 'Codex' }));
+      } finally {
+        restoreApp();
+      }
     });
   });
 });

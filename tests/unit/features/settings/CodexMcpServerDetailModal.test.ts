@@ -1,6 +1,6 @@
 import type { App } from 'obsidian';
 
-import type { AppServerMcpResourceReadResult, AppServerMcpServerStatus } from '../../../../src/core/agents/backend/CodexAppServerClient';
+import type { AppServerMcpServerStatus } from '../../../../src/core/agents/backend/CodexAppServerClient';
 import {
   CodexMcpServerDetailModal,
   type CodexMcpServerDetailModalHost,
@@ -106,6 +106,30 @@ describe('CodexMcpServerDetailModal — server list and reload', () => {
     expect(host.reloadMcpServers).toHaveBeenCalledTimes(1);
     expect(host.getMcpServerStatus).toHaveBeenCalledTimes(1);
     expect(modal.contentEl.textContent).toContain('initial-server');
+  });
+
+  it('restores previous content after reload throws', async () => {
+    const host = createHost({
+      getMcpServerStatus: jest.fn().mockResolvedValue([serverStatus('initial-server')]),
+      reloadMcpServers: jest.fn().mockRejectedValue(new Error('reload failed')),
+    });
+    const modal = createModal(host);
+
+    modal.onOpen();
+    await new Promise((resolve) => { setTimeout(resolve, 0); });
+
+    const reloadButton = modal.contentEl.querySelector(
+      '.opencodian-codex-mcp-detail-toolbar button',
+    ) as HTMLButtonElement | null;
+    reloadButton!.click();
+    await new Promise((resolve) => { setTimeout(resolve, 0); });
+
+    const statusValue = modal.contentEl.querySelector('.opencodian-codex-mcp-detail-status-value');
+    expect(host.reloadMcpServers).toHaveBeenCalledTimes(1);
+    expect(host.getMcpServerStatus).toHaveBeenCalledTimes(1);
+    expect(statusValue?.getAttribute('data-mcp-state')).toBe('success');
+    expect(modal.contentEl.textContent).toContain('initial-server');
+    expect(modal.contentEl.textContent).not.toContain(t('settings.codex.mcpDetail.loading'));
   });
 
   it('ignores reload clicks while busy', async () => {
@@ -315,110 +339,119 @@ describe('CodexMcpServerDetailModal — OAuth authentication', () => {
   });
 });
 
-describe('CodexMcpServerDetailModal — resource viewer', () => {
-  it('renders resource entries as clickable rows with view buttons', async () => {
+describe('CodexMcpServerDetailModal — state handling', () => {
+  it('shows loading state immediately on open', () => {
     const host = createHost({
-      getMcpServerStatus: jest.fn().mockResolvedValue([
-        serverStatus('docs-server', {
-          resources: [
-            { uri: 'docs://guide', name: 'Guide', description: 'A guide', mimeType: 'text/markdown' },
-            { uri: 'docs://notes', name: 'Notes', mimeType: 'text/plain' },
-          ],
-        }),
-      ]),
+      getMcpServerStatus: jest.fn().mockImplementation(() => new Promise(() => {})),
     });
     const modal = createModal(host);
 
     modal.onOpen();
-    await new Promise((resolve) => { setTimeout(resolve, 0); });
 
-    const resourceEntries = modal.contentEl.querySelectorAll('.opencodian-codex-mcp-resource-entry');
-    expect(resourceEntries).toHaveLength(2);
-
-    const first = resourceEntries[0];
-    expect(first.getAttribute('data-resource-uri')).toBe('docs://guide');
-    expect(first.querySelector('.opencodian-codex-mcp-resource-name')?.textContent).toBe('Guide');
-    expect(first.querySelector('.opencodian-codex-mcp-resource-desc')?.textContent).toBe('A guide');
-
-    const viewBtns = modal.contentEl.querySelectorAll('.opencodian-codex-mcp-resource-view-btn');
-    expect(viewBtns).toHaveLength(2);
+    const statusValue = modal.contentEl.querySelector('.opencodian-codex-mcp-detail-status-value');
+    expect(statusValue?.getAttribute('data-mcp-state')).toBe('loading');
+    expect(statusValue?.textContent).toBe(t('settings.codex.readback.statusLoading'));
+    expect(modal.contentEl.textContent).toContain(t('settings.codex.mcpDetail.loading'));
   });
 
-  it('fetches and renders text resource content when view is clicked', async () => {
-    const resourceResult: AppServerMcpResourceReadResult = {
-      contents: [{ uri: 'docs://guide', mimeType: 'text/plain', text: '# Title\n\nBody text here.' }],
-    };
-    const readMock = jest.fn().mockResolvedValue(resourceResult);
-    const host = createHost({
-      getMcpServerStatus: jest.fn().mockResolvedValue([
-        serverStatus('docs-server', {
-          resources: [{ uri: 'docs://guide', name: 'Guide', mimeType: 'text/plain' }],
-        }),
-      ]),
-      readMcpServerResource: readMock,
-    });
+  it('shows unavailable state when host returns null', async () => {
+    const host = createHost({ getMcpServerStatus: jest.fn().mockResolvedValue(null) });
     const modal = createModal(host);
 
     modal.onOpen();
     await new Promise((resolve) => { setTimeout(resolve, 0); });
 
-    const viewBtn = modal.contentEl.querySelector('.opencodian-codex-mcp-resource-view-btn') as HTMLButtonElement;
-    viewBtn.click();
-    await new Promise((resolve) => { setTimeout(resolve, 0); });
-
-    expect(readMock).toHaveBeenCalledWith('docs-server', 'docs://guide');
-    const textEl = modal.contentEl.querySelector('.opencodian-codex-mcp-resource-text');
-    expect(textEl).not.toBeNull();
-    expect(textEl?.textContent).toContain('Body text here.');
+    const statusValue = modal.contentEl.querySelector('.opencodian-codex-mcp-detail-status-value');
+    expect(statusValue?.getAttribute('data-mcp-state')).toBe('unavailable');
+    expect(statusValue?.textContent).toBe(t('settings.codex.readback.statusUnavailable'));
+    expect(modal.contentEl.textContent).toContain(t('settings.codex.mcpDetail.unavailable'));
   });
 
-  it('collapses viewer on second view-button click', async () => {
-    const resourceResult: AppServerMcpResourceReadResult = {
-      contents: [{ uri: 'docs://guide', mimeType: 'text/plain', text: 'hello' }],
-    };
+  it('shows failed state when host throws', async () => {
     const host = createHost({
-      getMcpServerStatus: jest.fn().mockResolvedValue([
-        serverStatus('docs-server', {
-          resources: [{ uri: 'docs://guide', name: 'Guide', mimeType: 'text/plain' }],
-        }),
-      ]),
-      readMcpServerResource: jest.fn().mockResolvedValue(resourceResult),
+      getMcpServerStatus: jest.fn().mockRejectedValue(new Error('network')),
     });
     const modal = createModal(host);
 
     modal.onOpen();
     await new Promise((resolve) => { setTimeout(resolve, 0); });
 
-    const viewBtn = modal.contentEl.querySelector('.opencodian-codex-mcp-resource-view-btn') as HTMLButtonElement;
-    viewBtn.click();
-    await new Promise((resolve) => { setTimeout(resolve, 0); });
-    expect(modal.contentEl.querySelector('.opencodian-codex-mcp-resource-viewer')).not.toBeNull();
-
-    viewBtn.click();
-    await new Promise((resolve) => { setTimeout(resolve, 0); });
-    expect(modal.contentEl.querySelector('.opencodian-codex-mcp-resource-viewer')).toBeNull();
+    const statusValue = modal.contentEl.querySelector('.opencodian-codex-mcp-detail-status-value');
+    expect(statusValue?.getAttribute('data-mcp-state')).toBe('failed');
+    expect(statusValue?.textContent).toBe(t('settings.codex.readback.statusFailed'));
+    expect(modal.contentEl.textContent).toContain(t('settings.codex.mcpDetail.failed'));
   });
 
-  it('shows empty message when resource read returns no contents', async () => {
+  it('shows empty state when host returns an empty array', async () => {
+    const host = createHost({ getMcpServerStatus: jest.fn().mockResolvedValue([]) });
+    const modal = createModal(host);
+
+    modal.onOpen();
+    await new Promise((resolve) => { setTimeout(resolve, 0); });
+
+    const statusValue = modal.contentEl.querySelector('.opencodian-codex-mcp-detail-status-value');
+    expect(statusValue?.getAttribute('data-mcp-state')).toBe('empty');
+    expect(statusValue?.textContent).toBe(t('settings.codex.readback.statusEmpty'));
+    expect(modal.contentEl.textContent).toContain(t('settings.codex.mcpDetail.empty'));
+  });
+
+  it('shows success state with server count', async () => {
     const host = createHost({
-      getMcpServerStatus: jest.fn().mockResolvedValue([
-        serverStatus('docs-server', {
-          resources: [{ uri: 'docs://empty', name: 'Empty', mimeType: 'text/plain' }],
-        }),
-      ]),
-      readMcpServerResource: jest.fn().mockResolvedValue({ contents: [], errorReason: 'not found' }),
+      getMcpServerStatus: jest.fn().mockResolvedValue([serverStatus('server-a'), serverStatus('server-b')]),
     });
     const modal = createModal(host);
 
     modal.onOpen();
     await new Promise((resolve) => { setTimeout(resolve, 0); });
 
-    const viewBtn = modal.contentEl.querySelector('.opencodian-codex-mcp-resource-view-btn') as HTMLButtonElement;
-    viewBtn.click();
+    const statusValue = modal.contentEl.querySelector('.opencodian-codex-mcp-detail-status-value');
+    expect(statusValue?.getAttribute('data-mcp-state')).toBe('success');
+    expect(statusValue?.textContent).toBe(t('settings.codex.readback.statusCount', { count: 2 }));
+    expect(modal.contentEl.textContent).toContain('server-a');
+    expect(modal.contentEl.textContent).toContain('server-b');
+  });
+});
+
+describe('CodexMcpServerDetailModal — layout and structure', () => {
+  it('renders servers as sections, not nested cards', async () => {
+    const host = createHost({
+      getMcpServerStatus: jest.fn().mockResolvedValue([
+        serverStatus('server-a'),
+        serverStatus('server-b'),
+      ]),
+    });
+    const modal = createModal(host);
+
+    modal.onOpen();
     await new Promise((resolve) => { setTimeout(resolve, 0); });
 
-    const emptyEl = modal.contentEl.querySelector('.opencodian-codex-mcp-resource-empty');
-    expect(emptyEl).not.toBeNull();
-    expect(emptyEl?.textContent).toContain('not found');
+    const sections = modal.contentEl.querySelectorAll('.opencodian-codex-mcp-server-section');
+    expect(sections).toHaveLength(2);
+
+    const cards = modal.contentEl.querySelectorAll('.opencodian-codex-mcp-server-card');
+    expect(cards).toHaveLength(0);
+
+    for (const section of sections) {
+      expect(section.querySelectorAll('.opencodian-modal-card').length).toBe(0);
+    }
+  });
+
+  it('renders section headers with h4 and no left padding', async () => {
+    const host = createHost({
+      getMcpServerStatus: jest.fn().mockResolvedValue([
+        serverStatus('long-name-server'),
+      ]),
+    });
+    const modal = createModal(host);
+
+    modal.onOpen();
+    await new Promise((resolve) => { setTimeout(resolve, 0); });
+
+    const header = modal.contentEl.querySelector('.opencodian-codex-mcp-server-section-header');
+    expect(header).not.toBeNull();
+
+    const heading = header!.querySelector('h4');
+    expect(heading).not.toBeNull();
+    expect(heading!.textContent).toContain('long-name-server');
   });
 });

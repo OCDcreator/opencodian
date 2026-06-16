@@ -10,7 +10,8 @@
   position: fixed;
   left: var(--opencodian-agent-switcher-fixed-left, 0);
   top: 50%;
-  z-index: 100;
+  /* Match Obsidian's modal layer: visible over the owning settings modal, below later child modals. */
+  z-index: 50;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -34,6 +35,12 @@
     background 140ms ease,
     border-color 140ms ease,
     box-shadow 140ms ease;
+}
+
+body:has(.modal-container .modal:not(.mod-settings)) .opencodian-agent-switcher-floating {
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
 }
 
 .opencodian-agent-switcher-floating:hover,

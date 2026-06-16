@@ -68,3 +68,8 @@ onOpen() → h2(titleText) + h5(i18n heading) + p[] (分段 bodyText)
 
 - 典型 titleText 示例：glass adapter 名称（如 "Shuding" / "Nikdelvin"），bodyText 由 `buildPlainLanguageHelpForAdapter()` 生成，包含该 adapter 的折射参数含义和调优建议
 - 与 glass adapter 参数的对应：bodyText 描述的参数（如 blur radius、displacement scale、opacity）对应 `InputPanelGlassRefractionSettings` 中的 `refractionBlur`、`displacementScale`、`glassOpacity` 等字段
+
+## 2026-06-16 Shared modal layout adoption
+
+- 根元素改用 `.opencodian-help-modal-shell`；正文段落包裹在 `.opencodian-help-modal-section` 中。
+- 移除旧的 `.opencodian-config-help` / `.opencodian-liquid-glass-help` 辅助类，改由共享 help 布局类提供节奏与宽度。

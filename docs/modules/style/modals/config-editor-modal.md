@@ -22,6 +22,8 @@
 - 代理 / 命令设置目录：`.opencodian-agent-editor-*`、`.opencodian-settings-catalog-scroll`、`.opencodian-agent-catalog-scroll`、`.opencodian-command-catalog-scroll`（项目代理编辑器分组卡片、默认折叠的高级区，以及代理 / 命令目录最大高度 + 内部滚动）。
 - 命令目录卡片：`.opencodian-cmd-catalog-*`（搜索栏、筛选标签、按需显示的批量操作栏、两列卡片网格、方形批量选择 checkbox、复用 Obsidian `checkbox-container` 的可见性 switch、来源/状态芯片、可折叠描述、滚动容器）。
 - MCP 设置：`.opencodian-mcp-*`（management toolbar + metric cards、server cards、runtime switch label、status/detail modal、editor modal grouped form）。
+- Codex MCP 服务器详情：`.opencodian-codex-mcp-detail-modal`、`.opencodian-codex-mcp-server-section*`、`.opencodian-codex-mcp-resource-*`、`.opencodian-codex-mcp-tool-*`（顶部摘要 + server sections，工具/资源使用轻量 row/list，无嵌套卡片）。
+- Codex 诊断 readback 弹窗：`.opencodian-codex-readback-modal`、`.opencodian-codex-readback-*`（intro、notes、status bar、content、row、code block）。
 - provider 卡片 / 预设卡片：`.opencodian-settings-provider-*`、`.opencodian-preset-*`。
 - 模型选择弹层：`.opencodian-model-picker-*`（列表、搜索、筛选、选项、provider 分组标题与图标、source badge、空状态、响应式折行）。
 - 线程目标 readback + set/clear：`.opencodian-session-settings-codex-goal-*`（shell 容器、readback 卡片、objective 文本、status/token/time 预算 meta、空状态提示、set 输入行 + 按钮、clear 按钮）。
@@ -39,6 +41,8 @@
 - `src/features/settings/SettingsMcpAddForm.ts`
 - `src/features/settings/McpServerEditorModal.ts`
 - `src/features/settings/McpServerStatusModal.ts`
+- `src/features/settings/CodexMcpServerDetailModal.ts`
+- `src/features/settings/CodexReadbackModal.ts`
 - `src/features/chat/ui/ConversationSessionSettingsModal.ts`
 - `src/features/chat/ui/ContextDetailModal.ts`
 
@@ -234,3 +238,103 @@ Codex 会话设置 modal 新增线程目标 readback + set/clear 区块（仅 Co
 - `.opencodian-session-settings-codex-goal-set-btn` / `.opencodian-session-settings-codex-goal-clear-btn`：操作按钮，`12px` + secondary background + hover lift。
 - 数据由 `ConversationSessionSettingsCoordinator` 通过 `CodexAdapter` -> `CodexAppServerClient` 调用 `thread/goal/get|set|clear` app-server 路由获取。
 - `onSetThreadGoal` 回调现在接受可选 `{ tokenBudget?: number }` 参数，经 coordinator -> adapter -> app-server 全链路传递到 `thread/goal/set`。
+
+## 2026-06-16 MCP detail modal collapsible sections
+
+Codex MCP 服务器详情弹窗样式重构，支持默认折叠的 server section 与工具二级展开：
+
+- `.opencodian-codex-mcp-detail-modal` 设置固定宽度 `min(720px, calc(100vw - 40px))`，避免默认窄弹窗导致长 server 名被过度截断。
+- `.opencodian-codex-mcp-server-section` 折叠态固定高度 `96px`（`--opencodian-mcp-server-collapsed-height`），`overflow: hidden`，`gap: 0`，padding 为 `12px 16px`；展开态（`.is-expanded`）移除高度限制并恢复 `--opencodian-modal-section-inner-gap` 间距。
+- `.opencodian-codex-mcp-server-section-header` 作为摘要行，使用 flex 布局，标题、计数、auth badge、操作按钮对齐；长 server 名/path 使用 `word-break: break-word` / `overflow-wrap: anywhere` 安全换行，避免横向溢出。
+- `.opencodian-codex-mcp-server-section-counts` 显示 tool/resource 计数，`font-size: 0.82em`，使用 flex wrap 与 `white-space: nowrap` 保持紧凑。
+- `.opencodian-codex-mcp-server-section-short-id` 在 server id 与 display name 不同时显示为 muted 小字摘要。
+- `.opencodian-codex-mcp-server-section-body` 为展开内容容器；`.is-hidden` 折叠。
+- `.opencodian-codex-mcp-server-expand-btn`、`.opencodian-codex-mcp-tool-detail-btn`、`.opencodian-codex-mcp-schema-toggle` 统一为紧凑 pill 按钮，`font-size: 0.78em`，背景使用 `--background-modifier-hover`，hover 时切换为背景修饰边框色。
+- `.opencodian-codex-mcp-tool-details` 为工具详情容器，默认隐藏；展开后显示 description 与 schema toggle。
+- `.opencodian-codex-mcp-tool-schema` 改为复用 `.opencodian-inspection-code` 样式（等宽、自动折行、内部滚动），仍需点击 schema toggle 才显示完整 JSON。
+- h4/h5 保持 `padding-left: 0` / `padding-inline-start: 0`；展开态内容使用 modal spacing token，不引入 nested cards、side-stripe 或营销 hero。
+
+Guardrail: 不要为 MCP detail modal 引入独立卡片层级或装饰性阴影；server section 本身已是 `.opencodian-inspection-section` 卡片，内部只应出现行、列表和折叠 detail，不应再包一层完整卡片。
+
+## 2026-06-16 Shared modal layout system
+
+新增一组共享 modal 布局 token 与类，用于统一设置类弹窗的纵向节奏、卡片表面、表单网格和动作行，替代各 modal 各自堆叠的零散 margin 和旧 `.opencodian-config-help*` 辅助类。token 定义在 `.modal .opencodian-modal-shell` / `.opencodian-help-modal-shell` 作用域下，与 `DESIGN.md` spacing 章节保持同步。
+
+表单 / 编辑器 modal 类（`.opencodian-modal-*`）：
+
+- `.opencodian-modal-shell`：根 flex 列容器，提供 section 间距，取代 ad-hoc margin。
+- `.opencodian-modal-section`：相关控件 / 内容分组，纵向 section 内间距。
+- `.opencodian-modal-card`：可复用卡片表面（不允许嵌套卡片）。
+- `.opencodian-modal-form-grid`：单列表单 grid，统一 label/control 行节奏。
+- `.opencodian-modal-actions`：右对齐动作 / footer 行，带 top border 与 `margin-top:auto` 粘底。
+
+帮助 modal 类（`.opencodian-help-modal-*`，`max-width: 720px`）：
+
+- `.opencodian-help-modal-shell`：根 flex 列容器。
+- `.opencodian-help-modal-section` / `-card` / `-list` / `-pre` / `-code` / `-actions`：帮助内容分区、要点列表、代码块、行内 code 与官方链接行的共享表面。
+
+Guardrail: 不要在 `.opencodian-modal-card` 内再嵌套卡片；新增 modal 优先复用上述类，而不是重新引入 modal 专属 spacing。旧 `.opencodian-config-help*` 与 `.opencodian-server-help` 类已被上述 help 类取代（modal 宽度钩子 `.opencodian-server-help` 保留为兼容，新增 `.opencodian-server-setting-help-modal` 作为新根类）。
+
+消费这些共享类的 modal TS 文件：
+
+- `src/features/settings/CodexMcpServerDetailModal.ts`（`.opencodian-modal-shell` / `-section` / `-card` + 新增 `.opencodian-codex-mcp-tool-entry-header` 与 `.is-hidden` schema 切换）
+- `src/features/settings/McpServerEditorModal.ts`（`.opencodian-modal-shell` / `-section` / `-card` / `-form-grid` / `-actions`，`.opencodian-mcp-form-*` 保留为 MCP 专属覆盖）
+- `src/features/settings/ModelConfigJsonModal.ts`（`.opencodian-modal-shell` / `-section` / `-actions` + `.opencodian-help-modal-section` / `-pre`）
+- `src/features/settings/OpencodeConfigModal.ts`（`.opencodian-modal-shell` / `-section` / `-actions` + 完整 `.opencodian-help-modal-*` 帮助 DOM，已弃用 `innerHTML` 帮助注入）
+- `src/features/settings/SettingsToolDetailModal.ts`（`.opencodian-modal-shell` / `-section` / `-actions`）
+- `src/features/settings/ConversationCompactionHelpModal.ts`（`.opencodian-help-modal-shell`）
+- `src/features/settings/ModifiedFilesSidebarHelpModal.ts`（`.opencodian-help-modal-shell`）
+- `src/features/settings/LiquidGlassSettingHelpModal.ts`（`.opencodian-help-modal-shell` / `-section`）
+- `src/features/settings/OpenCodeProjectConfigHelpModal.ts`（`.opencodian-help-modal-shell` / `-list` / `-actions`）
+
+## 2026-06-16 Shared inspection panel classes
+
+新增共享的 `.opencodian-inspection-*` 检查面板类，统一 Codex readback modal 与 MCP detail modal 的布局：
+
+- `.opencodian-inspection-panel`：检查面板根容器，纵向 `20px` 间距（`modal-section-gap`）。
+- `.opencodian-inspection-summary`：顶部摘要带，含用途说明（`.opencodian-inspection-summary-intro`）和 meta strip（`.opencodian-inspection-summary-meta`）。
+- `.opencodian-inspection-summary-meta-item` / `.opencodian-inspection-summary-actions`：meta strip 中的条目与操作按钮组。
+- `.opencodian-inspection-badge`：紧凑状态/元数据徽章。
+- `.opencodian-inspection-state`：loading / unavailable / failed / empty 状态的紧凑提示块。
+- `.opencodian-inspection-content`：主体内容区。
+- `.opencodian-inspection-list`：条目列表。
+- `.opencodian-inspection-row` / `-main` / `-side` / `-title` / `-subtitle` / `-meta` / `-note`：列表行，主信息在左，badge/操作在右，长文本自动折行。
+- `.opencodian-inspection-section` / `-header` / `-title` / `-actions` / `-desc` / `-meta`：分组 section，带背景与边框，标题与操作分两侧。
+- `.opencodian-inspection-subsection` / `-subheader`：section 内子分区。
+- `.opencodian-inspection-detail-toggle`：展开/折叠 detail 的小型按钮。
+- `.opencodian-inspection-detail` / `.is-hidden`：可折叠 detail 块。
+- `.opencodian-inspection-code`：等宽代码块，自动折行，内部滚动。
+
+## 2026-06-16 Codex diagnostic readback modal
+
+Codex readback 弹窗改用共享 inspection-panel 布局：
+
+- `.opencodian-codex-readback-modal`：弹窗根，限制 `.modal-content` 最大高度并启用内部滚动。
+- `.opencodian-codex-readback-intro`：用途说明（现属于 `.opencodian-inspection-summary-intro`）。
+- `.opencodian-codex-readback-notes` / `.opencodian-codex-readback-note`：只读说明与刷新时机说明（现属于 `.opencodian-inspection-summary-meta`）。
+- `.opencodian-codex-readback-status-bar` / `-status-label` 保留为兼容钩子，但视觉上隐藏；状态改为 `.opencodian-codex-readback-status-value.opencodian-inspection-badge`。
+- `.opencodian-codex-readback-status-value` 按 `data-readback-state` 切换语义色与边框色。
+- `.opencodian-codex-readback-content` 取消内部最大高度，改为随 modal 内容滚动。
+- `.opencodian-codex-readback-state-message`：loading / unavailable / failed / empty 状态文案。
+- `.opencodian-codex-readback-row` / `-row-name` / `-row-meta`：列表行，复用 `.opencodian-inspection-row` 节奏。
+- `.opencodian-codex-readback-code`：JSON / 代码证据块，复用 `.opencodian-inspection-code`。
+
+## 2026-06-16 MCP detail modal inspection panel
+
+MCP 详情弹窗改用共享 inspection-panel 布局：
+
+- `.opencodian-codex-mcp-detail-status-bar` / `-status-label` 保留为兼容钩子，视觉上隐藏；状态改为 `.opencodian-codex-mcp-detail-status-value.opencodian-inspection-badge`。
+- `.opencodian-codex-mcp-detail-status-value` 按 `data-mcp-state` 切换语义色与边框色。
+- `.opencodian-codex-mcp-detail-toolbar` 归入 `.opencodian-inspection-summary-actions`。
+- `.opencodian-codex-mcp-detail-summary-section` / `.opencodian-codex-mcp-detail-summary` 不再使用。
+- 每个 server 使用 `.opencodian-inspection-section.opencodian-codex-mcp-server-section`，带背景与边框。
+- `.opencodian-codex-mcp-server-section-header` 复用 `.opencodian-inspection-section-header`：`h4` 使用 `padding-left: 0` / `padding-inline-start: 0`，长 server id / name 自动换行。
+- `.opencodian-codex-mcp-server-section-meta` 复用 `.opencodian-inspection-section-meta`。
+- 工具与资源条目改为 `.opencodian-inspection-row`：主信息左侧，schema/查看按钮右侧。
+- `.opencodian-codex-mcp-tool-entry-header` 不再使用；工具名称与 schema 按钮直接放入行两侧。
+- `.opencodian-codex-mcp-schema-toggle` / `.opencodian-codex-mcp-resource-view-btn` 改为 `.opencodian-inspection-detail-toggle`。
+- `.opencodian-codex-mcp-tool-schema` / `.opencodian-codex-mcp-resource-viewer` 改为 `.opencodian-inspection-detail`。
+- `.opencodian-codex-mcp-resource-text` 复用 `.opencodian-inspection-code`。
+- focus server 高亮仍使用 `::before` 伪元素外框。
+- 保留 auth 徽章颜色变体：`-bearerToken`、`-none`、`-needs_auth`、`-notLoggedIn`、`-unsupported`。
+- `src/features/settings/ServerSettingHelpModal.ts`（`.opencodian-help-modal-shell` / `-section` / `-card` / `-pre` / `-list`，已弃用 `innerHTML` 帮助注入）

@@ -4,9 +4,14 @@ import {
   DEFAULT_SETTINGS,
   getDefaultCodexBackendSettings,
 } from '../../../../src/core/types';
+import { CodexReadbackModal } from '../../../../src/features/settings/CodexReadbackModal';
 import { SettingsCodexSection } from '../../../../src/features/settings/SettingsCodexSection';
 import { setLocale, t } from '../../../../src/i18n';
 import type OpenCodianPlugin from '../../../../src/main';
+
+jest.mock('../../../../src/features/settings/CodexReadbackModal', () => ({
+  CodexReadbackModal: jest.fn().mockImplementation(() => ({ open: jest.fn() })),
+}));
 
 type TestPlugin = {
   settings: OpenCodianPlugin['settings'];
@@ -134,6 +139,7 @@ describe('SettingsCodexSection permission profile readback', () => {
     settingNames.length = 0;
     buttonRecords.length = 0;
     mockSettingPrototype();
+    (CodexReadbackModal as unknown as jest.Mock).mockClear();
   });
 
   afterEach(() => {
@@ -147,7 +153,7 @@ describe('SettingsCodexSection permission profile readback', () => {
       createSectionHeading,
     });
     const containerEl = document.createElement('div');
-    section.attach(containerEl);
+    section.attachTabbed(containerEl, 'resume-inspect');
 
     expect(settingNames).toContain(t('settings.codex.permissionProfiles.name'));
   });
@@ -159,7 +165,7 @@ describe('SettingsCodexSection permission profile readback', () => {
       createSectionHeading,
     });
     const containerEl = document.createElement('div');
-    section.attach(containerEl);
+    section.attachTabbed(containerEl, 'resume-inspect');
 
     const inspectButton = buttonRecords.find(
       (r) => r.label === t('settings.codex.permissionProfiles.inspectButton'),
@@ -168,151 +174,112 @@ describe('SettingsCodexSection permission profile readback', () => {
     expect(inspectButton!.onClick).toBeDefined();
   });
 
-  it('shows unavailable when adapter does not have getPermissionProfiles', async () => {
+  it('opens a modal instead of appending an inline readback card', () => {
+    const plugin = createPlugin();
+    const section = new SettingsCodexSection({
+      plugin: plugin as never,
+      createSectionHeading,
+    });
+    const containerEl = document.createElement('div');
+    section.attachTabbed(containerEl, 'resume-inspect');
+
+    const inspectButton = buttonRecords.find(
+      (r) => r.label === t('settings.codex.permissionProfiles.inspectButton'),
+    );
+    inspectButton!.onClick!();
+
+    expect(CodexReadbackModal).toHaveBeenCalledTimes(1);
+    const [optionsArg] = (CodexReadbackModal as unknown as jest.Mock).mock.calls[0];
+    expect(optionsArg.title).toBe(t('settings.codex.permissionProfiles.modalTitle'));
+    expect(optionsArg.app).toBe(plugin.app);
+    expect(optionsArg.fetchItems).toBeInstanceOf(Function);
+    expect(optionsArg.renderItems).toBeInstanceOf(Function);
+
+    const readbackEl = containerEl.querySelector('[data-codex-permission-profiles-readback]');
+    expect(readbackEl).toBeFalsy();
+  });
+
+  it('modal fetchItems returns null when adapter does not have getPermissionProfiles', async () => {
     const plugin = createPlugin({});
-    const section = new SettingsCodexSection({
-      plugin: plugin as never,
-      createSectionHeading,
-    });
-    const containerEl = document.createElement('div');
-    section.attach(containerEl);
+    openPermissionProfilesModal(plugin);
 
-    const inspectButton = buttonRecords.find(
-      (r) => r.label === t('settings.codex.permissionProfiles.inspectButton'),
-    );
-    await inspectButton!.onClick!();
-
-    const readbackEl = containerEl.querySelector('[data-codex-permission-profiles-readback]');
-    expect(readbackEl).toBeTruthy();
-    expect(readbackEl!.textContent).toBe(t('settings.codex.permissionProfiles.unavailable'));
+    const [optionsArg] = (CodexReadbackModal as unknown as jest.Mock).mock.calls[0];
+    const result = await optionsArg.fetchItems();
+    expect(result).toBeNull();
   });
 
-  it('shows unavailable when getPermissionProfiles returns null', async () => {
+  it('modal fetchItems returns data from getPermissionProfiles', async () => {
+    const mockProfiles = [{ id: 'default', description: 'Default profile' }];
     const plugin = createPlugin({
-      getPermissionProfiles: jest.fn().mockResolvedValue(null),
+      getPermissionProfiles: jest.fn().mockResolvedValue(mockProfiles),
     });
-    const section = new SettingsCodexSection({
-      plugin: plugin as never,
-      createSectionHeading,
-    });
-    const containerEl = document.createElement('div');
-    section.attach(containerEl);
+    openPermissionProfilesModal(plugin);
 
-    const inspectButton = buttonRecords.find(
-      (r) => r.label === t('settings.codex.permissionProfiles.inspectButton'),
-    );
-    await inspectButton!.onClick!();
-
-    const readbackEl = containerEl.querySelector('[data-codex-permission-profiles-readback]');
-    expect(readbackEl).toBeTruthy();
-    expect(readbackEl!.textContent).toBe(t('settings.codex.permissionProfiles.unavailable'));
+    const [optionsArg] = (CodexReadbackModal as unknown as jest.Mock).mock.calls[0];
+    const result = await optionsArg.fetchItems();
+    expect(result).toEqual(mockProfiles);
   });
 
-  it('shows profile entries when getPermissionProfiles returns data', async () => {
+  it('modal fetchItems throws when getPermissionProfiles throws', async () => {
+    const plugin = createPlugin({
+      getPermissionProfiles: jest.fn().mockRejectedValue(new Error('App-server unavailable')),
+    });
+    openPermissionProfilesModal(plugin);
+
+    const [optionsArg] = (CodexReadbackModal as unknown as jest.Mock).mock.calls[0];
+    await expect(optionsArg.fetchItems()).rejects.toThrow();
+  });
+
+  it('modal renderItems renders profile entries with proof markers', () => {
     const mockProfiles = [
-      {
-        id: 'default',
-        description: 'Default profile with standard permissions',
-      },
-      {
-        id: 'strict',
-        description: 'Strict profile with elevated restrictions',
-      },
-      {
-        id: 'permissive',
-      },
+      { id: 'default', description: 'Default profile with standard permissions' },
+      { id: 'strict', description: 'Strict profile with elevated restrictions' },
+      { id: 'permissive' },
     ];
     const plugin = createPlugin({
       getPermissionProfiles: jest.fn().mockResolvedValue(mockProfiles),
     });
-    const section = new SettingsCodexSection({
-      plugin: plugin as never,
-      createSectionHeading,
-    });
+    openPermissionProfilesModal(plugin);
+
+    const [optionsArg] = (CodexReadbackModal as unknown as jest.Mock).mock.calls[0];
     const containerEl = document.createElement('div');
-    section.attach(containerEl);
+    optionsArg.renderItems(containerEl, mockProfiles);
 
-    const inspectButton = buttonRecords.find(
-      (r) => r.label === t('settings.codex.permissionProfiles.inspectButton'),
-    );
-    await inspectButton!.onClick!();
-
-    const readbackEl = containerEl.querySelector('[data-codex-permission-profiles-readback]');
-    expect(readbackEl).toBeTruthy();
-    expect(readbackEl!.getAttribute('data-proof-state')).toBe('readback');
-
-    const entries = readbackEl!.querySelectorAll('[data-profile-id]');
+    const entries = containerEl.querySelectorAll('[data-profile-id]');
     expect(entries.length).toBe(3);
     expect(entries[0].getAttribute('data-profile-id')).toBe('default');
     expect(entries[1].getAttribute('data-profile-id')).toBe('strict');
     expect(entries[2].getAttribute('data-profile-id')).toBe('permissive');
+    expect(entries[0].getAttribute('data-proof-state')).toBe('readback');
   });
 
-  it('shows failed when getPermissionProfiles throws', async () => {
-    const plugin = createPlugin({
-      getPermissionProfiles: jest.fn().mockRejectedValue(new Error('App-server unavailable')),
-    });
-    const section = new SettingsCodexSection({
-      plugin: plugin as never,
-      createSectionHeading,
-    });
-    const containerEl = document.createElement('div');
-    section.attach(containerEl);
-
-    const inspectButton = buttonRecords.find(
-      (r) => r.label === t('settings.codex.permissionProfiles.inspectButton'),
-    );
-    await inspectButton!.onClick!();
-
-    const readbackEl = containerEl.querySelector('[data-codex-permission-profiles-readback]');
-    expect(readbackEl).toBeTruthy();
-    expect(readbackEl!.textContent).toBe(t('settings.codex.permissionProfiles.failed'));
-  });
-
-  it('shows description for profiles that have it', async () => {
-    const mockProfiles = [
-      {
-        id: 'default',
-        description: 'Default profile with standard permissions',
-      },
-    ];
+  it('modal renderItems shows description for profiles that have it', () => {
+    const mockProfiles = [{ id: 'default', description: 'Default profile with standard permissions' }];
     const plugin = createPlugin({
       getPermissionProfiles: jest.fn().mockResolvedValue(mockProfiles),
     });
-    const section = new SettingsCodexSection({
-      plugin: plugin as never,
-      createSectionHeading,
-    });
-    const containerEl = document.createElement('div');
-    section.attach(containerEl);
+    openPermissionProfilesModal(plugin);
 
-    const inspectButton = buttonRecords.find(
-      (r) => r.label === t('settings.codex.permissionProfiles.inspectButton'),
-    );
-    await inspectButton!.onClick!();
+    const [optionsArg] = (CodexReadbackModal as unknown as jest.Mock).mock.calls[0];
+    const containerEl = document.createElement('div');
+    optionsArg.renderItems(containerEl, mockProfiles);
 
     const entryEl = containerEl.querySelector('[data-profile-id="default"]');
     expect(entryEl).toBeTruthy();
     expect(entryEl!.textContent).toContain('Default profile with standard permissions');
   });
-
-  it('shows unavailable when adapter registry returns null', async () => {
-    const plugin = createPlugin();
-    plugin.agentServiceRegistry.get = jest.fn(() => null);
-    const section = new SettingsCodexSection({
-      plugin: plugin as never,
-      createSectionHeading,
-    });
-    const containerEl = document.createElement('div');
-    section.attach(containerEl);
-
-    const inspectButton = buttonRecords.find(
-      (r) => r.label === t('settings.codex.permissionProfiles.inspectButton'),
-    );
-    await inspectButton!.onClick!();
-
-    const readbackEl = containerEl.querySelector('[data-codex-permission-profiles-readback]');
-    expect(readbackEl).toBeTruthy();
-    expect(readbackEl!.textContent).toBe(t('settings.codex.permissionProfiles.unavailable'));
-  });
 });
+
+function openPermissionProfilesModal(plugin: TestPlugin): void {
+  const section = new SettingsCodexSection({
+    plugin: plugin as never,
+    createSectionHeading,
+  });
+  const containerEl = document.createElement('div');
+  section.attachTabbed(containerEl, 'resume-inspect');
+
+  const inspectButton = buttonRecords.find(
+    (r) => r.label === t('settings.codex.permissionProfiles.inspectButton'),
+  );
+  inspectButton!.onClick!();
+}

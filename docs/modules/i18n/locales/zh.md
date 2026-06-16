@@ -1,7 +1,17 @@
 # Chinese Locale
 
 > **源码**: `src/i18n/locales/zh.ts`
-> **最近更新**: 2026-06-12 Checkpoint 15N — 新增 `settings.codex.mcpServers.*` 键，用于普通 Codex 设置面板中的 MCP 服务器状态回读表面（检查 + 刷新）。
+> **最近更新**: 2026-06-16 Codex MCP 详情弹窗折叠/展开 — 新增 `settings.codex.mcpDetail.expandServer`、`collapseServer`、`showToolDetails`、`hideToolDetails`，用于 MCP 检查弹窗新的两级展开交互（server section 折叠 + 工具详情二级展开）。
+>
+> **前次更新**: 2026-06-16 Codex readback modal polish — 新增 `settings.codex.readback.status*` 键，让共享诊断弹窗的状态标签走本地化。
+>
+> **前次更新**: 2026-06-15 Codex 设置子标签页 — 新增 `settings.codex.tab.resumeInspect`、`settings.codex.tab.account` 和 `settings.codex.model.loadingOption`，支持连接 / 恢复与检查 / 账号三个子标签页以及异步模型下拉框的加载状态。
+>
+> **前次更新**: 2026-06-15 Codex settings UI polish 返工 — 清理 `zh.ts` 中残留的用户向“回读/诊断支持证据”措辞，并更新 `chat.sessionSettings.modal.codexWebSearchModeDesc` 文案，移除 bundled-runtime 审计细节。
+>
+> **前次更新**: 2026-06-15 Codex settings UI polish — 新增 `settings.codex.groups.*` 分组键，清理 model/sandbox/reasoning/additionalDirs/network/webSearch 的用户文案，并把 provider/model/permission/rate-limit/usage 等回读文案从“诊断回读”改为“后端实时视图”。
+>
+> **前次更新**: 2026-06-12 Checkpoint 15N — 新增 `settings.codex.mcpServers.*` 键，用于普通 Codex 设置面板中的 MCP 服务器状态回读表面（检查 + 刷新）。
 
 ## 概述
 

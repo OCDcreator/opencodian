@@ -1,5 +1,6 @@
 import { setIcon } from 'obsidian';
 
+import type { AgentBackendKind } from '../../../core/types/chat';
 import { t } from '../../../i18n';
 import { createLogger } from '../../../shared';
 import { LspStatusIndicator, type LspStatusSummary } from '../ui/LspStatusIndicator';
@@ -40,6 +41,29 @@ const SERVER_STATUS_KEY_BY_AVAILABILITY: Record<ChatServerAvailability, ServerSt
   external: 'chat.serverStatus.external',
 };
 
+function readOpenCodianPlugin(): unknown {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (globalThis as any).app?.plugins?.plugins?.opencodian ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function readActiveBackendFromPlugin(): AgentBackendKind {
+  const value = (readOpenCodianPlugin() as { settings?: { activeBackend?: string } } | null)?.settings?.activeBackend;
+  if (
+    value === 'opencode'
+    || value === 'claude-code'
+    || value === 'codex'
+    || value === 'copilot'
+    || value === 'pi'
+  ) {
+    return value;
+  }
+  return 'opencode';
+}
+
 interface HeaderActionButtonConfig {
   actionId: string;
   iconName: string;
@@ -69,6 +93,8 @@ export interface ChatHeaderPresenterHost {
   isLocalServerMode(): boolean;
   isOpenCodeBackend(): boolean;
   getActiveBackendDisplayName?(): string;
+  /** Canonical active backend kind for stable attributes and CSS hooks. Optional; when absent the presenter reads from the live plugin settings. */
+  getActiveBackendKind?(): AgentBackendKind;
   refreshContextUsageIndicator(): void;
   onServerAvailabilityRefreshed?(): void;
   openServerSettings(): void;
@@ -351,6 +377,8 @@ export class ChatHeaderPresenter {
         this.lastServerAvailability = availability;
       }
 
+      this.applyActiveBackendAttribute();
+
       this.serverStatusBadgeEl.removeClass(...SERVER_STATUS_CLASS_NAMES);
       this.serverStatusBadgeEl.addClass(`is-${availability}`);
       this.serverStatusTextEl.setText(this.getServerStatusLabel(availability));
@@ -366,6 +394,15 @@ export class ChatHeaderPresenter {
     return this.host.isOpenCodeBackend()
       ? t('chat.serverStatus.openSettings')
       : t('chat.serverStatus.openBackendSettings');
+  }
+
+  private applyActiveBackendAttribute(): void {
+    if (!this.serverStatusBadgeEl) {
+      return;
+    }
+
+    const kind = this.host.getActiveBackendKind?.() ?? readActiveBackendFromPlugin();
+    this.serverStatusBadgeEl.setAttribute('data-active-backend', kind);
   }
 
   private getServerStatusLabel(availability: ChatServerAvailability): string {

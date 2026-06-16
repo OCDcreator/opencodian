@@ -52,10 +52,13 @@ export class ToolDetailModal extends Modal {
     this.modalEl.addClass('opencodian-tool-detail-modal');
     this.contentEl.empty();
 
-    const shellEl = this.contentEl.createDiv({ cls: 'opencodian-skill-detail-shell opencodian-tool-detail-shell' });
-    this.validationEl = shellEl.createDiv({ cls: 'opencodian-skill-validation opencodian-tool-validation' });
-    shellEl.createDiv({ cls: 'opencodian-skill-preview-label', text: t('settings.tools.custom.modal.source') });
-    this.sourceTextArea = shellEl.createEl('textarea', {
+    const shellEl = this.contentEl.createDiv({
+      cls: 'opencodian-skill-detail-shell opencodian-tool-detail-shell opencodian-modal-shell',
+    });
+    const sectionEl = shellEl.createDiv({ cls: 'opencodian-modal-section' });
+    this.validationEl = sectionEl.createDiv({ cls: 'opencodian-skill-validation opencodian-tool-validation' });
+    sectionEl.createDiv({ cls: 'opencodian-skill-preview-label', text: t('settings.tools.custom.modal.source') });
+    this.sourceTextArea = sectionEl.createEl('textarea', {
       cls: 'opencodian-skill-editor-textarea opencodian-tool-editor-textarea',
       attr: { spellcheck: 'false', wrap: 'soft' },
     }) as HTMLTextAreaElement;
@@ -67,7 +70,9 @@ export class ToolDetailModal extends Modal {
     });
     this.renderValidation();
 
-    const actionsEl = this.contentEl.createDiv({ cls: 'opencodian-skill-detail-actions opencodian-tool-detail-actions' });
+    const actionsEl = shellEl.createDiv({
+      cls: 'opencodian-skill-detail-actions opencodian-tool-detail-actions opencodian-modal-actions',
+    });
     if (this.file.source === 'project') {
       this.createFooterButton(actionsEl, t('settings.tools.custom.modal.save'), async () => {
         await this.save();

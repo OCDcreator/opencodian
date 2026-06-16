@@ -26,73 +26,95 @@ export class ServerSettingHelpModal extends Modal {
   onOpen(): void {
     const { contentEl } = this;
 
+    this.modalEl.addClass('opencodian-server-setting-help-modal');
     contentEl.empty();
-    contentEl.createEl('h2', {
+
+    const shellEl = contentEl.createDiv({
+      cls: 'opencodian-help-modal-shell',
+    });
+    shellEl.createEl('h2', {
       text: this.tr(`settings.server.help.${this.topic}.title`),
     });
 
-    const helpText = contentEl.createEl('div', { cls: 'opencodian-config-help opencodian-server-help' });
-    helpText.innerHTML = this.getHelpContent();
+    const introSection = shellEl.createDiv({
+      cls: 'opencodian-help-modal-section',
+    });
+    introSection.createEl('p', {
+      cls: 'opencodian-help-intro',
+      text: this.tr(`settings.server.help.${this.topic}.intro`),
+    });
+
+    this.appendCardSection(
+      shellEl,
+      t('settings.server.help.whatItMeans'),
+      this.tr(`settings.server.help.${this.topic}.meaning`),
+    );
+    this.appendCardSection(
+      shellEl,
+      t('settings.server.help.howToFill'),
+      this.tr(`settings.server.help.${this.topic}.fill`),
+    );
+
+    const extra = this.tr(`settings.server.help.${this.topic}.extra`);
+    if (extra && !extra.includes(`settings.server.help.${this.topic}.extra`)) {
+      this.appendCardSection(shellEl, t('settings.server.help.moreNotes'), extra);
+    }
+
+    const example = this.tr(`settings.server.help.${this.topic}.example`);
+    if (example && !example.includes(`settings.server.help.${this.topic}.example`)) {
+      this.appendExampleSection(shellEl, example);
+    }
+
+    const tips = [
+      this.tr(`settings.server.help.${this.topic}.tip1`),
+      this.tr(`settings.server.help.${this.topic}.tip2`),
+    ].filter((item) => item && !item.includes(`settings.server.help.${this.topic}.tip`));
+    if (tips.length > 0) {
+      this.appendTipsSection(shellEl, tips);
+    }
   }
 
   onClose(): void {
     this.contentEl.empty();
   }
 
-  private getHelpContent(): string {
-    const example = this.tr(`settings.server.help.${this.topic}.example`);
-    const extra = this.tr(`settings.server.help.${this.topic}.extra`);
-    const tips = [
-      this.tr(`settings.server.help.${this.topic}.tip1`),
-      this.tr(`settings.server.help.${this.topic}.tip2`),
-    ].filter((item) => item && !item.includes(`settings.server.help.${this.topic}.tip`));
+  private appendCardSection(shellEl: HTMLElement, heading: string, body: string): void {
+    const sectionEl = shellEl.createDiv({
+      cls: 'opencodian-help-modal-section',
+    });
+    sectionEl.createEl('h5', { text: heading });
+    const cardEl = sectionEl.createDiv({
+      cls: 'opencodian-help-modal-card',
+    });
+    cardEl.createEl('p', { text: body });
+  }
 
-    return `
-      <div class="opencodian-help-section">
-        <p class="opencodian-help-intro">${this.tr(`settings.server.help.${this.topic}.intro`)}</p>
-      </div>
+  private appendExampleSection(shellEl: HTMLElement, example: string): void {
+    const sectionEl = shellEl.createDiv({
+      cls: 'opencodian-help-modal-section',
+    });
+    sectionEl.createEl('h5', {
+      text: t('settings.server.help.exampleLabel'),
+    });
+    const preEl = sectionEl.createEl('pre', {
+      cls: 'opencodian-help-modal-pre',
+    });
+    preEl.createEl('code', { text: example });
+  }
 
-      <div class="opencodian-help-section">
-        <h5>${t('settings.server.help.whatItMeans')}</h5>
-        <div class="opencodian-help-mode">
-          <p>${this.tr(`settings.server.help.${this.topic}.meaning`)}</p>
-        </div>
-      </div>
-
-      <div class="opencodian-help-section">
-        <h5>${t('settings.server.help.howToFill')}</h5>
-        <div class="opencodian-help-mode">
-          <p>${this.tr(`settings.server.help.${this.topic}.fill`)}</p>
-        </div>
-      </div>
-
-      ${extra && !extra.includes(`settings.server.help.${this.topic}.extra`) ? `
-        <div class="opencodian-help-section">
-          <h5>${t('settings.server.help.moreNotes')}</h5>
-          <div class="opencodian-help-mode">
-            <p>${extra}</p>
-          </div>
-        </div>
-      ` : ''}
-
-      ${example && !example.includes(`settings.server.help.${this.topic}.example`) ? `
-        <div class="opencodian-help-section">
-          <h5>${t('settings.server.help.exampleLabel')}</h5>
-          <div class="opencodian-help-example">
-            <pre><code>${this.escapeHtml(example)}</code></pre>
-          </div>
-        </div>
-      ` : ''}
-
-      ${tips.length > 0 ? `
-        <div class="opencodian-help-section">
-          <h5>${t('settings.server.help.tipsLabel')}</h5>
-          <ul class="opencodian-help-tips">
-            ${tips.map((item) => `<li>${this.escapeHtml(item)}</li>`).join('')}
-          </ul>
-        </div>
-      ` : ''}
-    `;
+  private appendTipsSection(shellEl: HTMLElement, tips: string[]): void {
+    const sectionEl = shellEl.createDiv({
+      cls: 'opencodian-help-modal-section',
+    });
+    sectionEl.createEl('h5', {
+      text: t('settings.server.help.tipsLabel'),
+    });
+    const listEl = sectionEl.createEl('ul', {
+      cls: 'opencodian-help-modal-list',
+    });
+    for (const tip of tips) {
+      listEl.createEl('li', { text: tip });
+    }
   }
 
   private tr(key: string): string {

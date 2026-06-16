@@ -41,3 +41,11 @@
 - Editor modal 是唯一允许用户查看/编辑 secret value 的 MCP UI；status modal 和 cards 必须 redacted 或摘要化
 - 只暴露 approved spec 中列出的 local/remote 字段，不做完整 JSON editor
 - `renderForm()` 会重建 modal 内容，因此必须先销毁旧 dropdown enhancer 和 textarea memories，再对新内容调用 `enhanceSettingsDropdowns()`
+
+## 2026-06-16 Shared modal layout adoption
+
+表单布局改用共享 modal 布局系统，替代旧的 MCP 专属 spacing 规则：
+
+- 表单根元素携带 `.opencodian-modal-shell`；分组使用 `.opencodian-modal-section` + `.opencodian-modal-card`。
+- 分组正文使用 `.opencodian-modal-form-grid`；底部按钮行使用 `.opencodian-modal-actions`。
+- 移除 `.opencodian-mcp-form-group-body` / `.opencodian-mcp-form-actions` 的零散 margin，改由共享 token 控制节奏（`.opencodian-mcp-form-*` 类名保留以承载 MCP 特有覆盖）。

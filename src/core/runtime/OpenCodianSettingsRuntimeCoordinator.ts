@@ -101,7 +101,8 @@ export class OpenCodianSettingsRuntimeCoordinator {
 
     if (syncConfig) {
       const vaultPath = this.host.getVaultBasePath();
-      if (vaultPath) {
+      const activeBackend = this.host.getSettings().activeBackend ?? 'opencode';
+      if (vaultPath && activeBackend === 'opencode') {
         await OpencodeConfigManager.syncPermissionMode(
           vaultPath,
           this.host.getSettings().permissionMode,
@@ -336,6 +337,7 @@ export class OpenCodianSettingsRuntimeCoordinator {
   private shouldScheduleDeferredRuntimeWarmup(): boolean {
     const settings = this.host.getSettings();
     return settings.enabledBackends.includes('opencode')
+      && (settings.activeBackend ?? 'opencode') === 'opencode'
       && settings.server.mode === 'local'
       && settings.server.local.autoStart;
   }

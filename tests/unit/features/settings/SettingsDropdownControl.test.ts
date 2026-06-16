@@ -1,4 +1,18 @@
+import * as fs from 'fs';
+import * as path from 'path';
+
 import { enhanceSettingsSelect } from '../../../../src/features/settings/SettingsDropdownControl';
+
+function readStyleFile(relativePath: string): string {
+  return fs.readFileSync(path.join(process.cwd(), relativePath), 'utf8');
+}
+
+function extractRule(css: string, selector: string): string {
+  const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const match = css.match(new RegExp(`${escapedSelector}\\s*\\{([\\s\\S]*?)\\n\\}`, 'm'));
+  expect(match).not.toBeNull();
+  return match?.[1] ?? '';
+}
 
 function createSelect(): HTMLSelectElement {
   const selectEl = document.createElement('select');
@@ -315,6 +329,28 @@ describe('SettingsDropdownControl portal behavior', () => {
     handle.refresh();
 
     expect(menuEl?.classList.contains('is-hidden')).toBe(true);
+  });
+});
+
+describe('SettingsDropdownControl styles', () => {
+  it('lets menus expand for readable labels while option rows fill the menu track', () => {
+    const css = readStyleFile('src/style/components/settings-dropdown.css');
+    const menuRule = extractRule(css, '.opencodian-settings-dropdown-menu');
+    const scrollableRule = extractRule(css, '.opencodian-settings-dropdown-menu.is-scrollable');
+    const optionRule = extractRule(css, '.opencodian-settings-dropdown-option');
+    const labelRule = extractRule(css, '.opencodian-settings-dropdown-option-label');
+
+    expect(menuRule).toContain('display: grid;');
+    expect(menuRule).toContain('grid-auto-rows: min-content;');
+    expect(menuRule).toContain('gap: 2px;');
+    expect(menuRule).toContain('padding: 5px;');
+    expect(menuRule).toContain('overflow-y: hidden;');
+    expect(scrollableRule).toContain('overflow-y: auto;');
+    expect(optionRule).toContain('width: 100%;');
+    expect(optionRule).toContain('justify-self: stretch;');
+    expect(labelRule).toContain('overflow: visible;');
+    expect(labelRule).toContain('white-space: normal;');
+    expect(labelRule).toContain('overflow-wrap: anywhere;');
   });
 });
 

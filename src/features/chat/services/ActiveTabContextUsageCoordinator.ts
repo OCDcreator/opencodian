@@ -23,6 +23,7 @@ const logger = createLogger('ActiveTabContextUsageCoordinator');
 
 interface ActiveTabContextUsageConversation {
   id: string;
+  backend?: string;
   backendSessionId?: string;
   openCodeSessionId?: string | null;
   title: string;
@@ -92,10 +93,16 @@ export class ActiveTabContextUsageCoordinator {
     const conversation = this.host.getCurrentConversation();
     const expectedConversationId = conversation?.id ?? null;
     const expectedSessionId = conversation ? getConversationBackendSessionId(conversation) ?? null : null;
+    const expectedBackend = conversation?.backend ?? 'opencode';
     const startedAt = getPerformanceTimestampMs();
     let requestElapsedMs: number | null = null;
     let outcome = 'skipped';
-    if (!expectedConversationId || !expectedSessionId || !this.host.hasActiveTab()) {
+    if (
+      !expectedConversationId
+      || !expectedSessionId
+      || !this.canRefreshPreciseUsageFromServer(expectedBackend)
+      || !this.host.hasActiveTab()
+    ) {
       this.logRefreshFromServerOutcome(
         {
           outcome,
@@ -148,6 +155,10 @@ export class ActiveTabContextUsageCoordinator {
 
   private getCurrentState(): TabContextState {
     return this.host.getActiveTabContextUsage() ?? createEmptyTabContextState();
+  }
+
+  private canRefreshPreciseUsageFromServer(backend: string): boolean {
+    return backend === 'opencode' || backend === 'claude-code';
   }
 
   private commitState(contextUsage: TabContextState): void {

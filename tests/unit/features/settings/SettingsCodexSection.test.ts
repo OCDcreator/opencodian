@@ -324,7 +324,7 @@ describe('SettingsCodexSection stable surface', () => {
     expect(settingNames).toContain(t('settings.codex.webSearch.name'));
   });
 
-  it('renders the writable setting controls plus the account & capability surface', () => {
+  it('renders the connection tab with writable runtime-default controls', () => {
     const plugin = createPlugin();
     const section = new SettingsCodexSection({
       plugin: plugin as never,
@@ -333,9 +333,6 @@ describe('SettingsCodexSection stable surface', () => {
     const containerEl = document.createElement('div');
     section.attach(containerEl);
 
-    // The four account/capability surfaces were elevated to product cards in
-    // SettingsCodexAccountSurface (each card uses a Setting for its refresh
-    // button but does NOT call setName, so they stay out of settingNames).
     expect(settingNames).toEqual([
       t('settings.codex.apiKey.name'),
       t('settings.codex.model.name'),
@@ -344,14 +341,41 @@ describe('SettingsCodexSection stable surface', () => {
       t('settings.codex.additionalDirs.name'),
       t('settings.codex.network.name'),
       t('settings.codex.webSearch.name'),
-      t('settings.codex.connection.name'),
+    ]);
+    // The connection tab does not render resume/inspect or account surfaces.
+    expect(containerEl.querySelector('[data-codex-account-card]')).toBeNull();
+    expect(containerEl.querySelector('[data-codex-session-browser-info]')).toBeNull();
+  });
+
+  it('renders the resume & inspect tab with readback controls', () => {
+    const plugin = createPlugin();
+    const section = new SettingsCodexSection({
+      plugin: plugin as never,
+      createSectionHeading,
+    });
+    const containerEl = document.createElement('div');
+    section.attachTabbed(containerEl, 'resume-inspect');
+
+    expect(settingNames).toEqual([
       t('settings.codex.sessionBrowser.launchName'),
       t('settings.codex.modelList.name'),
       t('settings.codex.permissionProfiles.name'),
       t('settings.codex.mcpServers.name'),
       t('settings.codex.loadedThreads.name'),
     ]);
-    // The account & capability surface mounts four product cards.
+    expect(containerEl.querySelector('[data-codex-session-browser-info]')).toBeTruthy();
+  });
+
+  it('renders the account tab with four account/capability cards', () => {
+    const plugin = createPlugin();
+    const section = new SettingsCodexSection({
+      plugin: plugin as never,
+      createSectionHeading,
+    });
+    const containerEl = document.createElement('div');
+    section.attachTabbed(containerEl, 'account');
+
+    // The account surface mounts four product cards.
     expect(containerEl.querySelectorAll('[data-codex-account-card]')).toHaveLength(4);
     expect(containerEl.querySelector('[data-codex-account-card="identity"]')).toBeTruthy();
     expect(containerEl.querySelector('[data-codex-account-card="usage"]')).toBeTruthy();
@@ -359,7 +383,7 @@ describe('SettingsCodexSection stable surface', () => {
     expect(containerEl.querySelector('[data-codex-account-card="capabilities"]')).toBeTruthy();
   });
 
-  it('renders connection info as disabled passive notice', () => {
+  it('renders connection source summary instead of a disabled setting', () => {
     const plugin = createPlugin();
     const section = new SettingsCodexSection({
       plugin: plugin as never,
@@ -368,7 +392,10 @@ describe('SettingsCodexSection stable surface', () => {
     const containerEl = document.createElement('div');
     section.attach(containerEl);
 
-    expect(settingNames).toContain(t('settings.codex.connection.name'));
+    const summaryEl = containerEl.querySelector('[data-codex-connection-summary]');
+    expect(summaryEl).toBeTruthy();
+    expect(summaryEl?.textContent).toContain(t('settings.codex.connection.name'));
+    expect(summaryEl?.textContent).toContain(t('settings.codex.connection.sourceApiKey'));
   });
 });
 

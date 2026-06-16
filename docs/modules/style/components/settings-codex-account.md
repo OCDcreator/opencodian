@@ -9,21 +9,73 @@ Codex 账号与能力产品面的专用样式。把四个官方 app-server 表�
 
 ## 样式规则
 
+### 固定间距体系（Codex 三个子标签页共用）
+
+所有 Codex 设置子标签页（Connection / Resume & Inspect / Account）共享同一组间距 token，定义在 `.opencodian-settings-codex-block` 上：
+
+| Token | 值 | 用途 |
+|-------|-----|------|
+| `--oc-codex-card-gap` | `12px` | 同一分组内卡片/setting 行之间的垂直间距 |
+| `--oc-codex-group-header-gap` | `16px` | 分组标题/描述到第一个卡片/控件堆栈的距离 |
+| `--oc-codex-card-title-body-gap` | `8px` | 卡片标题/头部到卡片主体的距离 |
+| `--oc-codex-card-body-gap` | `10px` | 卡片主体内部各块之间的垂直间距 |
+| `--oc-codex-card-padding` | `14px 16px` | 卡片内部padding |
+
+实现层通过以下 class 落地：
+
+- `.opencodian-settings-codex-group-stack`：`display: flex; flex-direction: column; gap: var(--oc-codex-card-gap)`，每个分组的控件/卡片容器都带这个 class。
+- `.opencodian-settings-codex-group-controls`：`margin-top: var(--oc-codex-group-header-gap)`，承载上述 stack。
+- `.opencodian-codex-account-card-header`：`margin-bottom: var(--oc-codex-card-title-body-gap)`。
+- `.opencodian-codex-account-card-body` / `.opencodian-settings-codex-readback`：`gap: var(--oc-codex-card-body-gap)`。
+
+### `.opencodian-settings-codex-card`、`.opencodian-settings-codex-readback`、`.opencodian-settings-codex-connection-summary`、`.opencodian-codex-account-card`、Codex `.setting-item`
+
+共用卡片基座：次级背景、`1px` 边框、`10px` 圆角、`14px 16px` padding。这样 Connection 的 setting 行与摘要条、Resume & Inspect 的 readback 输出、Account 的产品卡片在视觉上属于同一 family，只是内容不同。
+
+### `.opencodian-settings-codex-group`
+
+Codex 设置面板的三大分组容器（连接与运行默认项 / 恢复与检查 / 账号与 provider 状态）。分组标题使用 `h4`，标题自身左 padding 固定为 `0`（同时设置 `padding-inline-start: 0`，避免主题 heading 缩进），描述使用 muted 文本。分组本身不再使用 `margin` 控制间距，而是依赖内部 stack 和相邻分组选择器（`+`）的 `margin-top: var(--oc-codex-card-gap)`。
+
+### `.opencodian-settings-codex-connection-summary`
+
+连接来源摘要条：flex 行，标签 + 当前来源值。作为卡片基座的一员，它与下方第一个分组的间距由 `margin-bottom: var(--oc-codex-group-header-gap)` 固定为 `16px`。
+
 ### `.opencodian-codex-account-card`
 
-四张产品卡片的容器：圆角边框、次级背景、卡片间距。`data-codex-account-card` 属性区分 `identity` / `usage` / `rate-limits` / `capabilities`。
+四张产品卡片的容器：`data-codex-account-card` 属性区分 `identity` / `usage` / `rate-limits` / `capabilities`。卡片 margin 归零，间距完全由外层 stack 的 gap 提供。
 
 ### `.opencodian-codex-account-card-header` / `.opencodian-codex-account-card-title`
 
 卡片头部：标题 + 右侧 Refresh 按钮的 flex 布局。
 
+### `.opencodian-codex-account-card-refresh`
+
+卡片 Refresh 按钮。直接渲染为原生 `<button>`（带 `opencodian-codex-account-card-refresh` class），不再包裹在 Obsidian `Setting` 行内，避免额外的 `.setting-item` 背景框。`flex-shrink: 0` 保持按钮在头部右侧不被挤压。
+
+### `.opencodian-settings-codex-readback`
+
+Resume & Inspect 标签页中按钮触发的 readback 输出、以及 session browser 信息/内存提示的卡片化容器。与 account cards 共用卡片基座，内部 `flex column` + `gap: var(--oc-codex-card-body-gap)`。`pre` 块带等宽字体与内部边框。
+
+### `.opencodian-settings-codex-group-controls > .setting-item`
+
+分组内的 Obsidian Setting 行覆盖通用 settings-row 样式，使用同一套 Codex 卡片基座（`14px 16px` padding、`10px` 圆角、`1px` 边框、次级背景）。标题与说明之间使用 `--oc-codex-card-title-body-gap`（`8px`），行与行之间由外层 stack 的 `12px` gap 统一控制。
+
 ### `.opencodian-codex-account-badge`
 
-账号认证模式徽章。`.is-chatgpt` 使用绿色系（ChatGPT 登录），`.is-apikey` 使用中性色（API-key 鉴权）。
+账号认证模式徽章。`.is-chatgpt` 使用绿色系（ChatGPT 登录），`.is-apikey` 使用中性色（API-key 鉴权）。身份卡中徽章与主标题并列于 `.opencodian-codex-account-identity-primary`；凭据来源作为 muted 说明放在 `.opencodian-codex-account-identity-detail`，邮箱/套餐以 chip 形式放在 `.opencodian-codex-account-identity-meta`，不再使用横向 key/value 表，也不再显示“需要 ChatGPT 认证：是”字段。
+
+### `.opencodian-codex-account-identity-overview` / `.opencodian-codex-account-identity-primary` / `.opencodian-codex-account-identity-title` / `.opencodian-codex-account-identity-detail` / `.opencodian-codex-account-identity-meta`
+
+账号身份卡的“认证摘要块”布局：
+
+- `.opencodian-codex-account-identity-overview`：垂直 flex 容器，内部块间距使用 `--oc-codex-card-body-gap`（`10px`）。
+- `.opencodian-codex-account-identity-primary`：徽章 + 强主标题（如“API 密钥认证”）的水平行。
+- `.opencodian-codex-account-identity-detail`：主标题下方的 muted 说明，展示“当前来源：…”。
+- `.opencodian-codex-account-identity-meta`：邮箱/套餐 chip 行，使用小号 chip 样式，避免与主状态同权。
 
 ### `.opencodian-codex-account-rows` / `.opencodian-codex-account-row`
 
-键/值行布局（label 左、value 右对齐），用于账号身份字段和速率限制条目。
+键/值行布局。账号身份卡里使用最多两列的字段网格（`repeat(2, minmax(180px, 1fr))`），每个字段内部是 label/value 的紧凑两列，小宽度下折成单列；速率限制条目复用同一行结构。
 
 ### `.opencodian-codex-account-tiles` / `.opencodian-codex-account-stat-tile`
 
@@ -35,7 +87,7 @@ Token 使用量的统计磁贴网格（`auto-fit minmax(96px,1fr)`）。每块�
 
 ### `.opencodian-codex-account-rate-limit-group`
 
-速率限制“按层级”分组：左侧边框缩进，层级标题大写。
+速率限制“按层级”分组：顶部边框分隔，层级标题大写。不再使用左侧色条缩进，避免装饰性 side-stripe。
 
 ### `.opencodian-codex-account-capability-chip`
 
@@ -43,10 +95,13 @@ Provider 能力 chip：图标 + 标签 + 说明 + 状态。`.is-enabled` 绿色�
 
 ### `.opencodian-codex-account-card-notice` / `.opencodian-codex-account-card-code`
 
-auth-required 与信息提示框：黄色左边框，内部 `code` 元素（如 `codex login`）带等宽字体与边框。
+auth-required 与信息提示框：使用完整的 1px 黄色（warning）边框 + 淡黄色背景，而不是左侧色条。内部 `code` 元素（如 `codex login`）带等宽字体与边框。Impeccable 规则禁止 alert/callout 风格的 side-stripe（>1px 的左侧色条），因此此处改为整框边框 + 淡背景以传达 warning 语义。
 
 ## 维护约束
 
-- 这些样式只服务于 `SettingsCodexAccountSurface` 渲染的产品卡片，不要用于普通 settings-row
+- 这些样式服务于 `SettingsCodexSection` 的分组结构、`SettingsCodexAccountSurface` 渲染的产品卡片、`SettingsCodexReadbackControls` 的 readback 输出，以及连接来源摘要条，不要用于普通 settings-row
+- 所有 Codex 子标签页的卡片/setting 行间距统一使用 `--oc-codex-card-gap`（`12px`），不要写 ad-hoc margin
+- 新增 readback/信息卡片优先使用 `.opencodian-settings-codex-readback` 与卡片基座，不要复刻一份 card 样式
 - 颜色优先使用 Obsidian CSS 变量（`--color-green`、`--background-secondary`、`--text-muted` 等），跟随主题
 - 新增账号/能力相关视觉元素优先放入此文件，不要散落到通用 settings 样式中
+- 避免装饰性 side-stripe；分组与层级分隔使用边框间距而非左侧色条

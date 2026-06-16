@@ -141,10 +141,12 @@ export class PluginRuntimeCoordinator {
     const settings = this.host.getSettings();
     const hasEnabledOpenCodeBackend = this.host.hasEnabledBackend?.('opencode')
       ?? Boolean(settings?.enabledBackends?.includes('opencode'));
+    const activeBackend = settings?.activeBackend ?? 'opencode';
     return Boolean(
       this.host.getOpenCodeService()
       && settings
       && hasEnabledOpenCodeBackend
+      && activeBackend === 'opencode'
       && isLocalServerMode(settings.server)
       && settings.server.local.autoStart,
     );

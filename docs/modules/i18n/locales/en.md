@@ -1,7 +1,17 @@
 # English Locale
 
 > **源码**: `src/i18n/locales/en.ts`
-> **最近更新**: 2026-06-12 Checkpoint 15N — added `settings.codex.mcpServers.*` keys for the Codex MCP server status readback surface (inspect + reload) in the ordinary Codex settings panel.
+> **最近更新**: 2026-06-16 Codex MCP detail modal collapse/expand — added `settings.codex.mcpDetail.expandServer`, `collapseServer`, `showToolDetails`, `hideToolDetails` for the new two-level expand interaction (server section + tool details) in the MCP inspection modal.
+>
+> **Previously**: 2026-06-16 Codex readback modal polish — added `settings.codex.readback.status*` keys so shared diagnostic modal status labels are localized.
+>
+> **Previously**: 2026-06-15 Codex settings subtabs — added `settings.codex.tab.resumeInspect`, `settings.codex.tab.account`, and `settings.codex.model.loadingOption` to support the new Connection / Resume & Inspect / Account subtab layout and the async model dropdown loading state.
+>
+> **Previously**: 2026-06-15 Codex settings UI polish rework — cleaned remaining user-facing Codex readback/diagnostic jargon in `zh.ts` and updated `chat.sessionSettings.modal.codexWebSearchModeDesc` to remove bundled-runtime audit details.
+>
+> **Previously**: 2026-06-15 Codex settings UI polish — added `settings.codex.groups.*` keys for the reorganized Codex settings panel groups, cleaned user-facing copy for model/sandbox/reasoning/additionalDirs/network/webSearch descriptions, and reframed provider/model/permission/rate-limit/usage readback copy from "diagnostic readback" to "live backend view".
+>
+> **Previously**: 2026-06-12 Checkpoint 15N — added `settings.codex.mcpServers.*` keys for the Codex MCP server status readback surface (inspect + reload) in the ordinary Codex settings panel.
 
 ## 概述
 
