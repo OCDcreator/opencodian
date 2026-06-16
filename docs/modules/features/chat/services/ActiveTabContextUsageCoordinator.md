@@ -53,7 +53,7 @@ export class ActiveTabContextUsageCoordinator {
 - `syncIdentity()` 保持原有 selector/context usage identity 的回写语义：先读取当前模型解析结果，再把 provider/model/session 元数据同步到 active tab context state；session identity 通过 `getConversationBackendSessionId()` 解析，以兼容旧 OpenCode 和未来非 OpenCode backend
 - `syncIdentity()` 在没有 active tab 时只清空 indicator，不会错误回写旧 tab state
 - `refreshFromServer()` 保持原有 stale guard：snapshot 返回后必须再次确认 current conversation id、backend session id 和 active-tab 仍匹配，才会写回精确 tokens/cost
-- `refreshFromServer()` 使用 core-owned `ContextUsageSnapshot` DTO；OpenCode 与 Claude Code backend owners 都返回同一形状，本 coordinator 不关心 snapshot 来源
+- `refreshFromServer()` 使用 core-owned `ContextUsageSnapshot` DTO；OpenCode 与 Claude Code backend owners 都返回同一形状。本 coordinator 只允许这两个已接入精确 context snapshot 的 backend 发起 server refresh；Codex 等其他 backend 只同步 identity，不触发 OpenCode session API。
 - `refreshFromServer()` 现在也会把 snapshot 里的 `compactingAt` 一起写回，并把该字段纳入 debug 指纹，避免 idle polling 时重复刷相同 compaction log
 - `refreshFromServer()` 复用 `ContextUsageService.syncStateIdentity()` + `applyPreciseUsage()`，不重新实现 token/cost 汇总规则
 - `refreshFromServer()` 会输出 debug 级别耗时日志，并区分 `skipped` / `empty` / `stale` / `committed`

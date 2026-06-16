@@ -5,7 +5,7 @@
 
 ## Purpose
 
-Diagnostic readback rendering helper for the Codex backend settings panel. Owns the remaining button-triggered diagnostic readbacks and the settings-side backend session browser launcher so that `SettingsCodexSection` can stay focused on user-writable settings controls.
+Diagnostic readback rendering helper for the Codex backend settings panel. Owns the button-triggered diagnostic readbacks and the settings-side backend session browser launcher so that `SettingsCodexSection` can stay focused on user-writable settings controls.
 
 > The four account/capability surfaces (`account/read`, `account/usage/read`, `account/rateLimits/read`, `modelProvider/capabilities/read`) were elevated to product-grade cards in `SettingsCodexAccountSurface` and are no longer rendered here.
 
@@ -13,26 +13,54 @@ Diagnostic readback rendering helper for the Codex backend settings panel. Owns 
 
 | Export | Kind | Notes |
 |--------|------|-------|
-| `SettingsCodexReadbackControls` | Class | Renders the remaining readback buttons and the session browser launcher |
+| `SettingsCodexReadbackControls` | Class | Renders the readback buttons and the session browser launcher |
 | `SettingsCodexReadbackControlsOptions` | Interface | Constructor options |
 
 ## Rendered Surfaces
 
-| Surface | Source | DOM markers | Notes |
-|---------|--------|-------------|-------|
-| Backend session browser launcher | `BackendSessionBrowserModal` | `data-codex-session-browser-info`, `data-codex-session-browser-in-memory` | Opens the browser modal restricted to `forcedBackendKind: 'codex'`; resume limited to in-memory sessions |
-| Model catalog readback | `CodexAdapter.getModelList()` → app-server `model/list` or CLI `codex debug models` | `data-codex-model-list-readback`, `data-proof-state="readback"`, per-entry `data-model-slug` | Also the data source for the ordinary `model` selector and session `model` override |
-| Permission profile readback | `CodexAdapter.getPermissionProfiles()` → app-server `permissionProfile/list` | `data-codex-permission-profiles-readback`, `data-proof-state="readback"`, per-entry `data-profile-id` | Diagnostic-only; the three profiles alias existing `sandboxMode` values |
-| MCP server status readback | `CodexAdapter.getMcpServerStatus()` → app-server `mcpServerStatus/list`; `CodexAdapter.reloadMcpServers()` → `config/mcpServer/reload` | `data-codex-mcp-servers-readback`, `data-proof-state="readback"`, per-entry `data-mcp-server-name` | Diagnostic-only; opens the structured `CodexMcpServerDetailModal` for inspection and reload |
-| Loaded threads readback | `CodexAdapter.listLoadedThreads()` → app-server `thread/loaded/list` | `data-codex-loaded-threads-readback`, `data-proof-state="readback"` | Diagnostic-only internal state indicator |
+| Surface | Source | Opens | Notes |
+|---------|--------|-------|-------|
+| Backend session browser launcher | `BackendSessionBrowserModal` | `BackendSessionBrowserModal` | Restricted to `forcedBackendKind: 'codex'`; resume limited to in-memory sessions. Info and in-memory notices are still inline cards. |
+| Model catalog readback | `CodexAdapter.getModelList()` → CLI `codex debug models` | `CodexReadbackModal` | Also the data source for the ordinary `model` selector and session `model` override |
+| Permission profile readback | `CodexAdapter.getPermissionProfiles()` → app-server `permissionProfile/list` | `CodexReadbackModal` | Diagnostic-only; the profiles alias existing `sandboxMode` values |
+| MCP server status readback | `CodexAdapter.getMcpServerStatus()` → app-server `mcpServerStatus/list`; `CodexAdapter.reloadMcpServers()` → `config/mcpServer/reload` | `CodexMcpServerDetailModal` | Diagnostic-only; structured inspection, reload, OAuth, and resource viewer |
+| Loaded threads readback | `CodexAdapter.listLoadedThreads()` → app-server `thread/loaded/list` | `CodexReadbackModal` | Diagnostic-only internal state indicator |
+
+## Behavior
+
+Each of the three readback buttons (model catalog, permission profiles, loaded threads) opens a dedicated `CodexReadbackModal` instead of appending an inline card to the settings panel. The settings page no longer creates `data-codex-model-list-readback`, `data-codex-permission-profiles-readback`, or `data-codex-loaded-threads-readback` elements.
+
+The modal carries:
+- a purpose intro,
+- a compact summary meta strip (status badge, read-only note, refresh note),
+- loading / unavailable / failed / empty / success states, and
+- on success, a structured inspection list.
+
+Model-catalog rows show the display name, slug, description, and side badges for visibility, reasoning level, and API support. Permission-profile rows show the profile id, description, and a "profile" badge. Loaded-thread rows show the thread id with a toggle to reveal the raw JSON record.
 
 ## Architecture
 
-- Instantiated by `SettingsCodexSection` and called from `renderConnectionTab()`
-- Each readback uses a lazy-created output element so the DOM stays empty until the user clicks "Inspect"
-- Account identity / usage / rate limits / provider capabilities rendering moved to `SettingsCodexAccountSurface` (product cards); this module no longer sanitizes secret keys because the only readbacks that handled sensitive data were the account ones, which have migrated
+- Instantiated by `SettingsCodexSection` and called from `renderResumeAndInspectGroup()`.
+- Each readback surface builds a `CodexReadbackModal` configuration and opens it on button click.
+- Data fetching and item rendering are injected into the modal so the modal stays generic.
+- Account identity / usage / rate limits / provider capabilities rendering moved to `SettingsCodexAccountSurface` (product cards); this module no longer sanitizes secret keys because the only readbacks that handled sensitive data were the account ones, which have migrated.
 
 ## Boundaries
 
-- Readbacks are read-only diagnostic surfaces, not settings controls
-- No settings persistence happens here; all writes stay in `SettingsCodexSection`
+- Readbacks are read-only diagnostic surfaces, not settings controls.
+- No settings persistence happens here; all writes stay in `SettingsCodexSection`.
+- MCP reload remains a settings-page action that shows a `Notice`; it does not open a modal.
+
+## Related modules
+
+- `CodexReadbackModal` — generic modal used by model, permission profile, and loaded threads readbacks.
+- `CodexMcpServerDetailModal` — dedicated structured modal for MCP server inspection.
+- `BackendSessionBrowserModal` — session browser launched from the settings panel.
+
+## 2026-06-16 Modal-first readbacks
+
+The model catalog, permission profile, and loaded threads readbacks moved from inline cards to `CodexReadbackModal`. The settings panel now only keeps inline info notices for the session browser launcher.
+
+## 2026-06-16 Inspection panel rows
+
+Model, permission-profile, and loaded-thread readbacks now render as `.opencodian-inspection-row` rows inside `CodexReadbackModal` instead of stacked paragraphs. Proof markers (`data-model-slug`, `data-profile-id`, `data-proof-state`) and the raw JSON code block for threads are preserved.

@@ -147,7 +147,7 @@ describe('SettingsCodexSection MCP server status readback', () => {
       createSectionHeading,
     });
     const containerEl = document.createElement('div');
-    section.attach(containerEl);
+    section.attachTabbed(containerEl, 'resume-inspect');
 
     expect(settingNames).toContain(t('settings.codex.mcpServers.name'));
   });
@@ -159,7 +159,7 @@ describe('SettingsCodexSection MCP server status readback', () => {
       createSectionHeading,
     });
     const containerEl = document.createElement('div');
-    section.attach(containerEl);
+    section.attachTabbed(containerEl, 'resume-inspect');
 
     const inspectButton = buttonRecords.find(
       (r) => r.label === t('settings.codex.mcpServers.inspectButton'),
@@ -180,7 +180,7 @@ describe('SettingsCodexSection MCP server status readback', () => {
       createSectionHeading,
     });
     const containerEl = document.createElement('div');
-    section.attach(containerEl);
+    section.attachTabbed(containerEl, 'resume-inspect');
 
     const inspectButton = buttonRecords.find(
       (r) => r.label === t('settings.codex.mcpServers.inspectButton'),
@@ -198,7 +198,7 @@ describe('SettingsCodexSection MCP server status readback', () => {
       createSectionHeading,
     });
     const containerEl = document.createElement('div');
-    section.attach(containerEl);
+    section.attachTabbed(containerEl, 'resume-inspect');
 
     const inspectButton = buttonRecords.find(
       (r) => r.label === t('settings.codex.mcpServers.inspectButton'),
@@ -235,7 +235,7 @@ describe('SettingsCodexSection MCP server status readback', () => {
       createSectionHeading,
     });
     const containerEl = document.createElement('div');
-    section.attach(containerEl);
+    section.attachTabbed(containerEl, 'resume-inspect');
 
     const inspectButton = buttonRecords.find(
       (r) => r.label === t('settings.codex.mcpServers.inspectButton'),
@@ -253,7 +253,7 @@ describe('SettingsCodexSection MCP server status readback', () => {
       createSectionHeading,
     });
     const containerEl = document.createElement('div');
-    section.attach(containerEl);
+    section.attachTabbed(containerEl, 'resume-inspect');
 
     const inspectButton = buttonRecords.find(
       (r) => r.label === t('settings.codex.mcpServers.inspectButton'),
@@ -278,7 +278,7 @@ describe('SettingsCodexSection MCP server status readback', () => {
       createSectionHeading,
     });
     const containerEl = document.createElement('div');
-    section.attach(containerEl);
+    section.attachTabbed(containerEl, 'resume-inspect');
 
     const reloadButton = buttonRecords.find(
       (r) => r.label === t('settings.codex.mcpServers.reloadButton'),
@@ -297,7 +297,7 @@ describe('SettingsCodexSection MCP server status readback', () => {
       createSectionHeading,
     });
     const containerEl = document.createElement('div');
-    section.attach(containerEl);
+    section.attachTabbed(containerEl, 'resume-inspect');
 
     const reloadButton = buttonRecords.find(
       (r) => r.label === t('settings.codex.mcpServers.reloadButton'),

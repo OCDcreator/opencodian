@@ -218,6 +218,29 @@ describe('ActiveTabContextUsageCoordinator identity and refresh', () => {
     expect(host.renderContextUsageIndicator).not.toHaveBeenCalled();
   });
 
+  it('skips precise server refresh for Codex conversations', async () => {
+    const host = createHost({
+      getCurrentConversation: jest.fn().mockReturnValue({
+        id: 'conversation-codex',
+        backend: 'codex',
+        backendSessionId: 'codex-session-1',
+        title: 'Codex chat',
+        createdAt: 100,
+        updatedAt: 200,
+      }),
+      getSessionContextUsageSnapshot: jest.fn().mockResolvedValue({
+        sessionId: 'codex-session-1',
+      }),
+    });
+    const coordinator = new ActiveTabContextUsageCoordinator(host);
+
+    await coordinator.refreshFromServer();
+
+    expect(host.getSessionContextUsageSnapshot).not.toHaveBeenCalled();
+    expect(host.setActiveTabContextUsage).not.toHaveBeenCalled();
+    expect(host.renderContextUsageIndicator).not.toHaveBeenCalled();
+  });
+
   it('does not spam identical context usage refresh logs while polling an idle tab', async () => {
     const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
     setDebugLoggingEnabled(true);

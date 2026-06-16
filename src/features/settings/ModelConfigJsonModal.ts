@@ -34,12 +34,17 @@ export class ModelConfigJsonModal extends Modal {
     const config = await service.readLocalModelConfig();
 
     contentEl.createEl('h2', { text: t('settings.model.jsonEditor.title') });
-    contentEl.createEl('p', {
+
+    const shell = contentEl.createDiv({ cls: 'opencodian-modal-shell' });
+
+    // Path + editor + options section
+    const editorSection = shell.createDiv({ cls: 'opencodian-modal-section' });
+    editorSection.createEl('p', {
       text: `${t('settings.model.config.path')}: ${service.getConfigPath()}`,
       cls: 'opencodian-config-path',
     });
 
-    this.editorEl = contentEl.createEl('textarea', {
+    this.editorEl = editorSection.createEl('textarea', {
       cls: 'opencodian-config-editor opencodian-model-config-json-editor',
       attr: {
         spellcheck: 'false',
@@ -50,16 +55,18 @@ export class ModelConfigJsonModal extends Modal {
     this.initialEditorValue = this.editorEl.value;
     this.editorSizeMemory = TextareaSizeMemory.attach(this.editorEl, 'model-config-json-editor');
 
-    const optionsEl = contentEl.createDiv({ cls: 'opencodian-model-config-options' });
+    const optionsEl = editorSection.createDiv({ cls: 'opencodian-model-config-options' });
     const restartLabel = optionsEl.createEl('label', { cls: 'opencodian-model-config-checkbox' });
     this.restartToggleEl = restartLabel.createEl('input', { attr: { type: 'checkbox' } });
     this.restartToggleEl.checked = this.plugin.settings.server.mode === 'local';
     restartLabel.createSpan({ text: t('settings.model.config.restart') });
 
-    const helpEl = contentEl.createDiv({ cls: 'opencodian-config-help opencodian-model-config-help' });
+    // Help block
+    const helpEl = shell.createDiv({ cls: 'opencodian-help-modal-section' });
     helpEl.createEl('h4', { text: t('settings.model.jsonEditor.helpTitle') });
     helpEl.createEl('p', { text: t('settings.model.jsonEditor.helpDesc') });
-    helpEl.createEl('pre', {
+    const helpPre = helpEl.createEl('pre', { cls: 'opencodian-help-modal-pre' });
+    helpPre.createEl('code', {
       text: JSON.stringify(
         {
           model: 'myprovider/my-model',
@@ -88,7 +95,9 @@ export class ModelConfigJsonModal extends Modal {
       ),
     });
 
-    const buttonContainer = contentEl.createDiv({ cls: 'opencodian-config-buttons' });
+    const buttonContainer = shell.createDiv({
+      cls: 'opencodian-config-buttons opencodian-modal-actions',
+    });
     const formatButton = buttonContainer.createEl('button', { text: t('settings.model.jsonEditor.format') });
     formatButton.type = 'button';
     formatButton.addEventListener('click', () => this.formatJson());

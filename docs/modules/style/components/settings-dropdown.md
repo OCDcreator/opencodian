@@ -21,6 +21,8 @@
 - 使用 Obsidian 主题变量与 restrained product UI 风格，不引入独立色彩体系。
 - 菜单默认从触发器下方展开，空间不足时自动翻转到上方；极端小视窗下可能自动关闭。
 - 打开菜单可以比触发器更宽，并允许选项文本换行完整显示；触发器仍保持单行省略，避免设置行本身被长文案撑开。
+- 菜单内部使用 grid stack，选项行 `width: 100%` 且 `justify-self: stretch`，确保 hover / selected 背景铺满菜单内容轨道，不在右侧留下空白。
+- 短菜单不预留纵向滚动槽；只有 `.is-scrollable` 状态才启用 `overflow-y: auto`，避免三四个选项的菜单右侧出现空白 gutter。
 - `.is-portal` 的 `z-index: 2001` 是为了高于 Obsidian modal 容器的 `z-index: 1000`，修改时需注意不要降回 1000 或更低。
 - 旧的 model picker / builtin icon picker 原生 select chevron 会在 select 被增强后隐藏，避免双 chevron。
 - 控件尺寸保持紧凑，适配主设置页、modal 表单和顶部筛选条。

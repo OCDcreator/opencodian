@@ -15,12 +15,16 @@ export class LiquidGlassSettingHelpModal extends Modal {
     const { contentEl } = this;
 
     contentEl.empty();
-    contentEl.createEl('h2', { text: this.titleText });
 
-    const helpEl = contentEl.createEl('div', {
-      cls: 'opencodian-config-help opencodian-liquid-glass-help',
+    const shellEl = contentEl.createDiv({
+      cls: 'opencodian-help-modal-shell',
     });
-    helpEl.createEl('h5', {
+    shellEl.createEl('h2', { text: this.titleText });
+
+    const sectionEl = shellEl.createDiv({
+      cls: 'opencodian-help-modal-section',
+    });
+    sectionEl.createEl('h5', {
       text: t('settings.style.input.help.plainLanguageHeading'),
     });
 
@@ -30,7 +34,7 @@ export class LiquidGlassSettingHelpModal extends Modal {
         continue;
       }
 
-      helpEl.createEl('p', { text: trimmedParagraph });
+      sectionEl.createEl('p', { text: trimmedParagraph });
     }
   }
 

@@ -13,7 +13,7 @@ export class ModifiedFilesSidebarHelpModal extends Modal {
     this.modalEl.addClass('opencodian-conversation-compaction-help-modal');
     contentEl.empty();
     const shellEl = contentEl.createDiv({
-      cls: 'opencodian-conversation-compaction-help',
+      cls: 'opencodian-conversation-compaction-help opencodian-help-modal-shell',
     });
     const headerEl = shellEl.createDiv({
       cls: 'opencodian-compaction-help-header',

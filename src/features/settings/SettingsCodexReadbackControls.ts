@@ -17,6 +17,7 @@ import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { BackendSessionBrowserModal } from '../chat/ui/BackendSessionBrowserModal';
 import { CodexMcpServerDetailModal, createCodexMcpServerDetailHost } from './CodexMcpServerDetailModal';
+import { CodexReadbackModal } from './CodexReadbackModal';
 
 export interface SettingsCodexReadbackControlsOptions {
   plugin: OpenCodianPlugin;
@@ -31,7 +32,7 @@ export class SettingsCodexReadbackControls {
 
   renderBackendSessionBrowserInfo(containerEl: HTMLElement): void {
     const infoEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice',
+      cls: 'opencodian-settings-inline-notice opencodian-settings-codex-readback',
       attr: { 'data-codex-session-browser-info': 'true' },
     });
     infoEl.createSpan({ text: t('settings.codex.sessionBrowser.info') });
@@ -63,167 +64,170 @@ export class SettingsCodexReadbackControls {
       });
 
     const inMemoryEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice',
+      cls: 'opencodian-settings-inline-notice opencodian-settings-codex-readback',
       attr: { 'data-codex-session-browser-in-memory': 'true' },
     });
     inMemoryEl.createSpan({ text: t('settings.codex.sessionBrowser.inMemoryNotice') });
   }
 
   renderModelListReadbackControls(containerEl: HTMLElement): void {
-    const outputEl = this.lazyReadbackOutputEl(
-      containerEl,
-      'opencodian-codex-model-list-readback',
-      'data-codex-model-list-readback',
-    );
-
     new Setting(containerEl)
       .setName(t('settings.codex.modelList.name'))
       .setDesc(t('settings.codex.modelList.desc'))
       .addButton((button) => {
         button
           .setButtonText(t('settings.codex.modelList.inspectButton'))
-          .onClick(async () => {
-            await this.renderModelListReadback(outputEl());
+          .onClick(() => {
+            this.openModelListReadbackModal();
           });
       });
   }
 
-  private async renderModelListReadback(outputEl: HTMLElement): Promise<void> {
-    outputEl.empty();
-    outputEl.setText(t('settings.codex.modelList.loading'));
+  private openModelListReadbackModal(): void {
     const adapter = this.plugin.agentServiceRegistry?.get('codex') as {
       getModelList?: () => Promise<unknown[] | null>;
     } | null;
-    if (typeof adapter?.getModelList !== 'function') {
-      outputEl.setText(t('settings.codex.modelList.unavailable'));
-      return;
-    }
 
-    let models: unknown[] | null;
-    try {
-      models = await adapter.getModelList();
-    } catch {
-      outputEl.setText(t('settings.codex.modelList.failed'));
-      return;
-    }
+    new CodexReadbackModal<unknown>({
+      app: this.plugin.app,
+      title: t('settings.codex.modelList.modalTitle'),
+      intro: t('settings.codex.modelList.intro'),
+      readonlyNote: t('settings.codex.modelList.readonlyNote'),
+      refreshNote: t('settings.codex.modelList.refreshNote'),
+      loadingText: t('settings.codex.modelList.loading'),
+      unavailableText: t('settings.codex.modelList.unavailable'),
+      failedText: t('settings.codex.modelList.failed'),
+      emptyText: t('settings.codex.modelList.empty'),
+      fetchItems: async (): Promise<unknown[] | null> => {
+        if (typeof adapter?.getModelList !== 'function') {
+          return null;
+        }
+        try {
+          return await adapter.getModelList();
+        } catch {
+          throw new Error('fetch failed');
+        }
+      },
+      renderItems: (listEl: HTMLElement, models: unknown[]): void => {
+        for (const model of models) {
+          const entry = model as Record<string, unknown>;
+          const slug = String(entry.slug ?? 'unknown');
+          const displayName = String(entry.display_name ?? slug);
+          const description = entry.description as string | null | undefined;
 
-    if (models === null || !Array.isArray(models) || models.length === 0) {
-      outputEl.setText(t('settings.codex.modelList.unavailable'));
-      return;
-    }
+          const rowEl = listEl.createDiv({
+            cls: 'opencodian-codex-readback-row opencodian-inspection-row opencodian-codex-model-list-entry',
+            attr: {
+              'data-model-slug': slug,
+              'data-model-visibility': String(entry.visibility ?? ''),
+              'data-proof-state': 'readback',
+            },
+          });
 
-    outputEl.empty();
-    outputEl.createEl('p', {
-      text: t('settings.codex.modelList.summary'),
-    });
+          const mainEl = rowEl.createDiv({ cls: 'opencodian-inspection-row-main' });
+          mainEl.createEl('p', {
+            cls: 'opencodian-codex-readback-row-name opencodian-inspection-row-title opencodian-codex-model-list-entry-name',
+            text: displayName,
+          });
+          if (description) {
+            mainEl.createEl('p', {
+              cls: 'opencodian-inspection-row-subtitle opencodian-codex-model-list-entry-desc',
+              text: description,
+            });
+          }
+          mainEl.createEl('p', {
+            cls: 'opencodian-codex-readback-row-meta opencodian-inspection-row-meta opencodian-codex-model-list-entry-slug',
+            text: slug,
+          });
 
-    for (const model of models) {
-      const entry = model as Record<string, unknown>;
-      const name = String(entry.display_name ?? entry.slug ?? 'unknown');
-      const desc = entry.description as string | null | undefined;
-      const label = desc
-        ? t('settings.codex.modelList.modelEntry', { name, description: desc })
-        : t('settings.codex.modelList.modelEntryNoDesc', { name });
-
-      const rowEl = outputEl.createDiv({
-        cls: 'opencodian-codex-model-list-entry',
-        attr: {
-          'data-model-slug': String(entry.slug ?? ''),
-          'data-model-visibility': String(entry.visibility ?? ''),
-          'data-proof-state': 'readback',
-        },
-      });
-
-      rowEl.createEl('p', {
-        cls: 'opencodian-codex-model-list-entry-name',
-        text: label,
-      });
-
-      const metaParts: string[] = [];
-      if (entry.default_reasoning_level) {
-        metaParts.push(`reasoning: ${entry.default_reasoning_level}`);
-      }
-      if (entry.supported_in_api === true) {
-        metaParts.push('API: yes');
-      }
-      if (metaParts.length > 0) {
-        rowEl.createEl('p', {
-          cls: 'opencodian-codex-model-list-entry-meta',
-          text: metaParts.join(' | '),
-        });
-      }
-    }
+          const sideEl = rowEl.createDiv({ cls: 'opencodian-inspection-row-side' });
+          const badges: string[] = [];
+          if (entry.visibility) badges.push(String(entry.visibility));
+          if (entry.default_reasoning_level) badges.push(String(entry.default_reasoning_level));
+          if (entry.supported_in_api === true) badges.push('API');
+          for (const badge of badges) {
+            sideEl.createEl('span', {
+              cls: 'opencodian-inspection-badge',
+              text: badge,
+            });
+          }
+        }
+      },
+    }).open();
   }
 
   renderPermissionProfilesReadbackControls(containerEl: HTMLElement): void {
-    const outputEl = this.lazyReadbackOutputEl(
-      containerEl,
-      'opencodian-codex-permission-profiles-readback',
-      'data-codex-permission-profiles-readback',
-    );
-
     new Setting(containerEl)
       .setName(t('settings.codex.permissionProfiles.name'))
       .setDesc(t('settings.codex.permissionProfiles.desc'))
       .addButton((button) => {
         button
           .setButtonText(t('settings.codex.permissionProfiles.inspectButton'))
-          .onClick(async () => {
-            await this.renderPermissionProfilesReadback(outputEl());
+          .onClick(() => {
+            this.openPermissionProfilesReadbackModal();
           });
       });
   }
 
-  private async renderPermissionProfilesReadback(outputEl: HTMLElement): Promise<void> {
-    outputEl.empty();
-    outputEl.setText(t('settings.codex.permissionProfiles.loading'));
+  private openPermissionProfilesReadbackModal(): void {
     const adapter = this.plugin.agentServiceRegistry?.get('codex') as {
       getPermissionProfiles?: () => Promise<unknown[] | null>;
     } | null;
-    if (typeof adapter?.getPermissionProfiles !== 'function') {
-      outputEl.setText(t('settings.codex.permissionProfiles.unavailable'));
-      return;
-    }
 
-    let profiles: unknown[] | null;
-    try {
-      profiles = await adapter.getPermissionProfiles();
-    } catch {
-      outputEl.setText(t('settings.codex.permissionProfiles.failed'));
-      return;
-    }
+    new CodexReadbackModal<unknown>({
+      app: this.plugin.app,
+      title: t('settings.codex.permissionProfiles.modalTitle'),
+      intro: t('settings.codex.permissionProfiles.intro'),
+      readonlyNote: t('settings.codex.permissionProfiles.readonlyNote'),
+      refreshNote: t('settings.codex.permissionProfiles.refreshNote'),
+      loadingText: t('settings.codex.permissionProfiles.loading'),
+      unavailableText: t('settings.codex.permissionProfiles.unavailable'),
+      failedText: t('settings.codex.permissionProfiles.failed'),
+      emptyText: t('settings.codex.permissionProfiles.empty'),
+      fetchItems: async (): Promise<unknown[] | null> => {
+        if (typeof adapter?.getPermissionProfiles !== 'function') {
+          return null;
+        }
+        try {
+          return await adapter.getPermissionProfiles();
+        } catch {
+          throw new Error('fetch failed');
+        }
+      },
+      renderItems: (listEl: HTMLElement, profiles: unknown[]): void => {
+        for (const profile of profiles) {
+          const entry = profile as Record<string, unknown>;
+          const id = String(entry.id ?? 'unknown');
+          const description = entry.description as string | null | undefined;
 
-    if (profiles === null || !Array.isArray(profiles) || profiles.length === 0) {
-      outputEl.setText(t('settings.codex.permissionProfiles.unavailable'));
-      return;
-    }
+          const rowEl = listEl.createDiv({
+            cls: 'opencodian-codex-readback-row opencodian-inspection-row opencodian-codex-permission-profile-entry',
+            attr: {
+              'data-profile-id': id,
+              'data-proof-state': 'readback',
+            },
+          });
 
-    outputEl.empty();
-    outputEl.createEl('p', {
-      text: t('settings.codex.permissionProfiles.summary'),
-    });
+          const mainEl = rowEl.createDiv({ cls: 'opencodian-inspection-row-main' });
+          mainEl.createEl('p', {
+            cls: 'opencodian-codex-readback-row-name opencodian-inspection-row-title opencodian-codex-permission-profile-entry-id',
+            text: id,
+          });
+          if (description) {
+            mainEl.createEl('p', {
+              cls: 'opencodian-inspection-row-subtitle opencodian-codex-permission-profile-entry-desc',
+              text: description,
+            });
+          }
 
-    for (const profile of profiles) {
-      const entry = profile as Record<string, unknown>;
-      const id = String(entry.id ?? 'unknown');
-      const desc = entry.description as string | null | undefined;
-      const label = desc
-        ? t('settings.codex.permissionProfiles.profileEntry', { id, description: desc })
-        : t('settings.codex.permissionProfiles.profileEntryNoDesc', { id });
-
-      const rowEl = outputEl.createDiv({
-        cls: 'opencodian-codex-permission-profile-entry',
-        attr: {
-          'data-profile-id': id,
-          'data-proof-state': 'readback',
-        },
-      });
-
-      rowEl.createEl('p', {
-        cls: 'opencodian-codex-permission-profile-entry-name',
-        text: label,
-      });
-    }
+          const sideEl = rowEl.createDiv({ cls: 'opencodian-inspection-row-side' });
+          sideEl.createEl('span', {
+            cls: 'opencodian-inspection-badge',
+            text: t('settings.codex.permissionProfiles.profileBadge'),
+          });
+        }
+      },
+    }).open();
   }
 
   renderMcpServerStatusReadbackControls(containerEl: HTMLElement): void {
@@ -282,54 +286,77 @@ export class SettingsCodexReadbackControls {
   }
 
   renderLoadedThreadsReadbackControls(containerEl: HTMLElement): void {
-    const outputEl = this.lazyReadbackOutputEl(
-      containerEl,
-      'opencodian-codex-loaded-threads-readback',
-      'data-codex-loaded-threads-readback',
-    );
-
     new Setting(containerEl)
       .setName(t('settings.codex.loadedThreads.name'))
       .setDesc(t('settings.codex.loadedThreads.desc'))
       .addButton((button) => {
         button
           .setButtonText(t('settings.codex.loadedThreads.inspectButton'))
-          .onClick(async () => {
-            const el = outputEl();
-            el.empty();
-            el.setText(t('settings.codex.loadedThreads.loading'));
-            const adapter = this.plugin.agentServiceRegistry?.get('codex') as {
-              listLoadedThreads?: () => Promise<Array<{ id: string }>>;
-            } | null;
-            if (typeof adapter?.listLoadedThreads !== 'function') {
-              el.setText(t('settings.codex.loadedThreads.unavailable'));
-              return;
-            }
-            let threads: Array<{ id: string }>;
-            try { threads = await adapter.listLoadedThreads(); }
-            catch { el.setText(t('settings.codex.loadedThreads.failed')); return; }
-            el.empty();
-            el.createEl('p', { text: t('settings.codex.loadedThreads.summary', { count: threads.length }) });
-            if (threads.length > 0) el.createEl('pre', { text: JSON.stringify(threads, null, 2) });
+          .onClick(() => {
+            this.openLoadedThreadsReadbackModal();
           });
       });
   }
 
-  private lazyReadbackOutputEl(
-    containerEl: HTMLElement,
-    cls: string,
-    attrName: string,
-  ): () => HTMLElement {
-    let outputEl: HTMLElement | null = null;
-    return (): HTMLElement => {
-      outputEl ??= containerEl.createDiv({
-        cls: `opencodian-settings-inline-notice ${cls}`,
-        attr: {
-          [attrName]: 'true',
-          'data-proof-state': 'readback',
-        },
-      });
-      return outputEl;
-    };
+  private openLoadedThreadsReadbackModal(): void {
+    const adapter = this.plugin.agentServiceRegistry?.get('codex') as {
+      listLoadedThreads?: () => Promise<Array<{ id: string }>>;
+    } | null;
+
+    new CodexReadbackModal<{ id: string }>({
+      app: this.plugin.app,
+      title: t('settings.codex.loadedThreads.modalTitle'),
+      intro: t('settings.codex.loadedThreads.intro'),
+      readonlyNote: t('settings.codex.loadedThreads.readonlyNote'),
+      refreshNote: t('settings.codex.loadedThreads.refreshNote'),
+      loadingText: t('settings.codex.loadedThreads.loading'),
+      unavailableText: t('settings.codex.loadedThreads.unavailable'),
+      failedText: t('settings.codex.loadedThreads.failed'),
+      emptyText: t('settings.codex.loadedThreads.empty'),
+      fetchItems: async (): Promise<Array<{ id: string }> | null> => {
+        if (typeof adapter?.listLoadedThreads !== 'function') {
+          return null;
+        }
+        try {
+          return await adapter.listLoadedThreads();
+        } catch {
+          throw new Error('fetch failed');
+        }
+      },
+      renderItems: (listEl: HTMLElement, threads: Array<{ id: string }>): void => {
+        for (const thread of threads) {
+          const rowEl = listEl.createDiv({
+            cls: 'opencodian-codex-readback-row opencodian-inspection-row opencodian-codex-loaded-thread-entry',
+            attr: { 'data-thread-id': thread.id },
+          });
+
+          const mainEl = rowEl.createDiv({ cls: 'opencodian-inspection-row-main' });
+          mainEl.createEl('p', {
+            cls: 'opencodian-codex-readback-row-name opencodian-inspection-row-title opencodian-codex-loaded-thread-entry-id',
+            text: thread.id,
+          });
+
+          const sideEl = rowEl.createDiv({ cls: 'opencodian-inspection-row-side' });
+          const toggleEl = sideEl.createEl('button', {
+            cls: 'opencodian-inspection-detail-toggle',
+            text: t('settings.codex.loadedThreads.showRaw'),
+          });
+
+          const detailEl = rowEl.createDiv({ cls: 'opencodian-inspection-detail is-hidden' });
+          detailEl.createEl('pre', {
+            cls: 'opencodian-codex-readback-code opencodian-inspection-code',
+            text: JSON.stringify(thread, null, 2),
+          });
+
+          toggleEl.addEventListener('click', () => {
+            const visible = !detailEl.hasClass('is-hidden');
+            detailEl.toggleClass('is-hidden', visible);
+            toggleEl.textContent = visible
+              ? t('settings.codex.loadedThreads.showRaw')
+              : t('settings.codex.loadedThreads.hideRaw');
+          });
+        }
+      },
+    }).open();
   }
 }

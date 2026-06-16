@@ -31,3 +31,8 @@ export class ModifiedFilesSidebarHelpModal extends Modal {
 ## 注意事项
 
 - 这个 modal 只解释功能配置，不负责保存或修改设置
+
+## 2026-06-16 Shared modal layout adoption
+
+- 根元素在保留原 compaction-help 类的基础上新增 `.opencodian-help-modal-shell`，纳入共享 help modal 布局系统。
+- 纵向节奏由 `.opencodian-help-modal-shell` 的 section gap 统一控制，移除零散 margin；视觉与信息卡片布局保持一致。

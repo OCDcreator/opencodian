@@ -45,3 +45,8 @@ export class OpenCodeProjectConfigHelpModal extends Modal {
 
 - 本 modal 只解释配置，不读写 `.opencode/opencode.json`，也不触发服务重启
 - 新增 topic 时需要同步 i18n、测试和官方链接列表
+
+## 2026-06-16 Shared modal layout adoption
+
+- 根元素改用 `.opencodian-help-modal-shell`；要点列表改用 `.opencodian-help-modal-list`；官方链接区改用 `.opencodian-help-modal-actions`。
+- 移除旧列表样式与零散 margin，改由共享 help 布局类统一控制节奏与宽度。

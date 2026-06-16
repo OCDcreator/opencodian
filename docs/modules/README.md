@@ -92,6 +92,7 @@ docs/modules/
 │   ├── prompts/
 │   │   └── titleGeneration.md
 │   ├── runtime/
+│   │   ├── OpenCodianSettingsRuntimeCoordinator.md
 │   │   └── PluginRuntimeCoordinator.md
 │   ├── security/
 │   │   ├── index.md
@@ -163,11 +164,13 @@ docs/modules/
 │   │   ├── rendering/
 │   │   │   └── collapsible.md
 │   │   ├── services/
+│   │   │   ├── ActiveTabContextUsageCoordinator.md
 │   │   │   ├── AgentMentionCandidateService.md
 │   │   │   ├── AgentMentionComposerController.md
 │   │   │   ├── AdditionalDirectoriesConfigBadgeCoordinator.md
 │   │   │   ├── ChatHeaderPresenter.md
 │   │   │   ├── ChatVisualDemoCoordinator.md
+│   │   │   ├── CodexRuntimeDefaultsBadgeCoordinator.md
 │   │   │   ├── ChatSelectionControlsCoordinator.md
 │   │   │   ├── ComposerInputShellCoordinator.md
 │   │   │   ├── composerInputParsing.md
@@ -189,6 +192,7 @@ docs/modules/
 │   │   │   ├── ConversationTurnViewModelBuilder.md
 │   │   │   ├── ConversationTrailingAssistantPatchPlanner.md
 │   │   │   ├── ConversationLoadRecoveryCoordinator.md
+│   │   │   ├── ConversationNoticeCoordinator.md
 │   │   │   ├── ConversationTabLifecycleRecoveryCoordinator.md
 │   │   │   ├── ConversationTabOpenCoordinator.md
 │   │   │   ├── ConversationTabRuntimeCoordinator.md
@@ -226,6 +230,8 @@ docs/modules/
 │   │       └── SessionTodoDock.md
 │   └── settings/
 │       ├── index.md
+│       ├── CodexMcpServerDetailModal.md
+│       ├── CodexReadbackModal.md
 │       ├── LiquidGlassSettingHelpModal.md
 │       ├── ModelConfigJsonModal.md
 │       ├── ModelConfigModelListEditor.md
@@ -246,6 +252,9 @@ docs/modules/
 │       ├── SettingsDropdownControl.md
 │       ├── ServerSettingHelpModal.md
 │       ├── SettingsCommandsSection.md
+│       ├── SettingsCodexAccountSurface.md
+│       ├── SettingsCodexReadbackControls.md
+│       ├── SettingsCodexSection.md
 │       ├── SettingsModelCatalogCoordinator.md
 │       ├── SettingsModelCatalogAvailability.md
 │       ├── SettingsModelCatalogPresenter.md
@@ -320,8 +329,12 @@ docs/modules/
 │   └── three.md
 ├── style/
 │   ├── README.md
-│   └── components/
-│       └── settings-claude-code.md
+│   ├── components/
+│   │   ├── permission-mode-selector.md
+│   │   ├── settings-claude-code.md
+│   │   └── settings-codex-account.md
+│   └── features/
+│       └── chat-assistant.md
 └── infrastructure/
     ├── build-pipeline.md
     ├── scripts.md

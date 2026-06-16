@@ -58,3 +58,9 @@ export class ConversationCompactionHelpModal extends Modal {
 
 - 这个 modal 只解释压缩配置，不负责保存配置，也不直接触发压缩
 - “立即生效 / deferred 生效” 只是帮助说明的一部分；真正的保存与热重载仍由 `SettingsConversationSection` + `OpenCodeService.reapplyCompactionConfigFromProjectConfig()` 处理
+
+## 2026-06-16 Shared modal layout adoption
+
+- 根元素在保留原 `.opencodian-conversation-compaction-help` 的基础上，新增 `.opencodian-help-modal-shell`，纳入共享 help modal 布局系统。
+- 纵向节奏改由 `.opencodian-help-modal-shell` 的 section gap 统一控制，移除原先的零散 margin。
+- 视觉与现有 2×2 信息卡布局保持一致，未改变行为。

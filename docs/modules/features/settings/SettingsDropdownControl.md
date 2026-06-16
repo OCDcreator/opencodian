@@ -46,6 +46,8 @@
 - 上下都不足时选空间较大侧，限制 `maxHeight`
 - 水平方向限制在视窗内（`VIEWPORT_MARGIN` 边距）
 - 菜单宽度取 trigger 宽度、最小菜单宽度和选项文本估算宽度的较大值，再限制在视窗内，避免窄设置行把 “允许 / 询问 / 拒绝” 或较长选项截成省略号
+- 菜单可以比 trigger 更宽；展开后每个 option 行必须铺满菜单内部轨道，避免出现右侧空白
+- 短菜单默认不启用纵向滚动槽；只有实际内容高度超过定位阶段算出的 `maxHeight` 时才添加 `.is-scrollable` 并启用内部滚动
 - 极端小视窗下空间低于 `MIN_MENU_HEIGHT` 时自动关闭
 
 滚动和 resize 时通过 capture-phase `document scroll` + `window resize` 监听器（RAF 节流）重新定位；trigger 滚出视窗时自动关闭。

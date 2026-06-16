@@ -50,10 +50,10 @@ export class ConversationNoticeCoordinator {
 ### 空对话与 rewind notice
 
 - `shouldRenderEmptyConversationNotice()` 只读 host 的 rewind 状态
-- `createEmptyConversationNotice()` 现在会先区分三类 chat surface 空状态：
+- `createEmptyConversationNotice()` 现在会先区分四类 chat surface 空状态：
   - rewind：保留原有 rewind warning notice
   - 没有任何 enabled backend：返回 warning notice，引导用户去启用 backend，而不是继续显示“输入消息开始对话”
-  - backend 已启用但当前不可连接：返回 warning notice，引导用户检查 backend / server 设置
+  - backend 已启用但当前不可连接：返回 warning notice，并从全局插件设置读取当前 backend display name，使用 `chat.empty.backendOffline.titleWithBackend` / `descriptionWithBackend` 在文案中点出 backend 名称，引导用户检查对应 backend / server 设置
   - 只有在 backend 可用时才回落到普通 empty-state
 
 ### stream error notice
@@ -81,7 +81,7 @@ export class ConversationNoticeCoordinator {
 | `getFriendlyStreamErrorMessage()` | 将原始流错误字符串映射为用户友好文案 |
 | `createStreamErrorNotice()` | 生成 stream error assistant notice |
 | `shouldRenderEmptyConversationNotice()` | 判断是否应显示 empty notice |
-| `createEmptyConversationNotice()` | 生成 normal / rewind / no-backend / backend-offline empty notice |
+| `createEmptyConversationNotice()` | 生成 normal / rewind / no-backend / backend-offline empty notice；backend-offline 会本地读取 active backend display name 并点出 backend 名称 |
 | `appendTurnDiffNoticeIfNeeded()` | 为编辑过的文件补发 turn diff notice |
 | `formatDiffNoticeMarkdown()` | 格式化 diff notice markdown |
 | `routeNoticeAction()` | 路由 notice action |

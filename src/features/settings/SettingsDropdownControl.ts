@@ -417,6 +417,7 @@ export function enhanceSettingsSelect(selectEl: HTMLSelectElement): SettingsDrop
   };
 
   const positionMenu = (): boolean => {
+    menuEl.removeClass('is-scrollable');
     const pos = computePortalPosition({
       desiredMenuWidth: estimateMenuWidth(options),
       menuScrollHeight: menuEl.scrollHeight,
@@ -434,6 +435,8 @@ export function enhanceSettingsSelect(selectEl: HTMLSelectElement): SettingsDrop
     menuEl.style.left = pos.left;
     menuEl.style.maxHeight = pos.maxHeight;
     menuEl.toggleClass('is-flipped', pos.placement === 'above');
+    const maxHeight = parseFloat(pos.maxHeight);
+    menuEl.toggleClass('is-scrollable', Number.isFinite(maxHeight) && menuEl.scrollHeight > maxHeight);
     return false;
   };
 
@@ -444,6 +447,7 @@ export function enhanceSettingsSelect(selectEl: HTMLSelectElement): SettingsDrop
     menuEl.addClass('is-hidden');
     menuEl.removeClass('is-portal');
     menuEl.removeClass('is-flipped');
+    menuEl.removeClass('is-scrollable');
     triggerEl.setAttribute('aria-expanded', 'false');
     resetPortalStyles();
     portalCleanup?.();

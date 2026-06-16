@@ -34,3 +34,8 @@
 - 该 modal 不执行、加载或解析工具 schema；OpenCode runtime 仍是工具发现和执行的真相源。
 - 校验只做用户友好的基本防呆，不尝试完整 TypeScript/JavaScript 解析。
 - 全局工具文件保持只读，避免一个 vault 的设置页意外修改用户级 OpenCode tools。
+
+## 2026-06-16 Shared modal layout adoption
+
+- 内容 shell 在保留原有 `.opencodian-tool-detail-shell` 类的基础上新增 `.opencodian-modal-shell`，纳入共享 modal 布局系统。
+- 正文区归入 `.opencodian-modal-section`；底部 Save / Delete / Close 按钮行携带 `.opencodian-modal-actions`，由共享 token 提供右对齐与 top-border 分隔。

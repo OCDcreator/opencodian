@@ -72,7 +72,9 @@ export class McpServerEditorModal extends Modal {
     this.contentEl.empty();
     this.submitButton = null;
 
-    const shell = this.contentEl.createDiv({ cls: 'opencodian-mcp-add-form-layout' });
+    const shell = this.contentEl.createDiv({
+      cls: 'opencodian-mcp-add-form-layout opencodian-modal-shell',
+    });
     const basicsGroup = this.createFormGroup(shell, t('settings.server.mcp.add.group.basics'));
 
     new Setting(basicsGroup)
@@ -126,7 +128,9 @@ export class McpServerEditorModal extends Modal {
       this.renderRemoteFields(connectionGroup, shell);
     }
 
-    const actionRow = shell.createDiv({ cls: 'opencodian-mcp-form-actions' });
+    const actionRow = shell.createDiv({
+      cls: 'opencodian-mcp-form-actions opencodian-modal-actions',
+    });
     this.submitButton = actionRow.createEl('button', {
       cls: 'mod-cta',
       text: this.options.mode === 'edit'
@@ -142,9 +146,13 @@ export class McpServerEditorModal extends Modal {
   }
 
   private createFormGroup(parent: HTMLElement, title: string): HTMLElement {
-    const groupEl = parent.createDiv({ cls: 'opencodian-mcp-form-group' });
+    const groupEl = parent.createDiv({
+      cls: 'opencodian-mcp-form-group opencodian-modal-section opencodian-modal-card',
+    });
     groupEl.createDiv({ cls: 'opencodian-mcp-form-group-title', text: title });
-    return groupEl.createDiv({ cls: 'opencodian-mcp-form-group-body' });
+    return groupEl.createDiv({
+      cls: 'opencodian-mcp-form-group-body opencodian-modal-form-grid',
+    });
   }
 
   private renderLocalFields(container: HTMLElement): void {

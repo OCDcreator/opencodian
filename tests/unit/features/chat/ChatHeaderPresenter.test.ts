@@ -6,6 +6,24 @@ import {
 import { ConversationRenderService } from '../../../../src/features/chat/services/ConversationRenderService';
 import { t } from '../../../../src/i18n';
 
+type MockApp = {
+  plugins?: {
+    plugins?: {
+      opencodian?: {
+        settings?: { activeBackend?: string };
+      };
+    };
+  };
+};
+
+function mockGlobalApp(app: MockApp): () => void {
+  const originalApp = (globalThis as { app?: MockApp }).app;
+  (globalThis as { app?: MockApp }).app = app;
+  return () => {
+    (globalThis as { app?: MockApp }).app = originalApp;
+  };
+}
+
 function createFixture() {
   let cssChangeListener: (() => void) | null = null;
   let availability: ChatServerAvailability = 'checking';
@@ -33,6 +51,7 @@ function createFixture() {
     openSettings: jest.fn(),
     isOpenCodeBackend: jest.fn(() => openCodeBackend),
     getActiveBackendDisplayName: jest.fn(() => openCodeBackend ? 'OpenCode' : 'Claude Code'),
+    getActiveBackendKind: jest.fn(() => openCodeBackend ? 'opencode' : 'claude-code'),
   };
 
   const headerEl = document.createElement('div');
@@ -75,8 +94,9 @@ describe('ChatHeaderPresenter', () => {
     jest.clearAllMocks();
   });
 
-  it('builds the header shell and routes header actions through host callbacks', () => {
-    const fixture = createFixture();
+  describe('header shell and actions', () => {
+    it('builds the header shell and routes header actions through host callbacks', () => {
+      const fixture = createFixture();
 
     const tabBarSlotEl = fixture.headerEl.querySelector('.opencodian-tab-bar-slot--header');
     const actionButtons = fixture.headerEl.querySelectorAll<HTMLElement>('.opencodian-header-btn');
@@ -216,6 +236,10 @@ describe('ChatHeaderPresenter', () => {
     expect(statusTextEl?.textContent).toBe(t('chat.serverStatus.disabled'));
   });
 
+  });
+});
+
+describe('ChatHeaderPresenter server status', () => {
   it('uses backend-shaped status copy and refreshes OpenCode-only chrome when backend changes', async () => {
     const fixture = createFixture();
     const statusTextEl = fixture.headerEl.querySelector<HTMLElement>('.opencodian-server-status-text');
@@ -238,16 +262,16 @@ describe('ChatHeaderPresenter', () => {
 
   it('ignores late server status results after destroy clears header DOM refs', async () => {
     const fixture = createFixture();
-    let resolveAvailability: ((value: ChatServerAvailability) => void) | null = null;
+    const resolvers: Array<(value: ChatServerAvailability) => void> = [];
     fixture.host.resolveServerAvailability.mockImplementation(() =>
       new Promise((resolve) => {
-        resolveAvailability = resolve;
+        resolvers.push(resolve);
       })
     );
 
     const refreshPromise = fixture.presenter.refreshServerStatusBadge();
     fixture.presenter.destroy();
-    resolveAvailability?.('running');
+    resolvers.forEach((resolve) => resolve('running'));
     await expect(refreshPromise).resolves.toBeUndefined();
 
     expect(fixture.host.refreshContextUsageIndicator).not.toHaveBeenCalled();
@@ -274,14 +298,54 @@ describe('ChatHeaderPresenter', () => {
     expect(fixture.host.scheduleComposerLayoutSync).toHaveBeenCalledTimes(1);
   });
 
-  it('skips the LSP indicator when the active backend is not OpenCode', () => {
+  it('exposes the canonical active backend kind on the status badge using the host method', async () => {
     const fixture = createFixture();
-    fixture.presenter.destroy();
-    fixture.headerEl.innerHTML = '';
+    await fixture.presenter.refreshServerStatusBadge();
+
+    const statusBadgeEl = fixture.headerEl.querySelector<HTMLElement>('.opencodian-server-status-badge');
+    expect(statusBadgeEl?.getAttribute('data-active-backend')).toBe('opencode');
+
     fixture.setOpenCodeBackend(false);
+    await fixture.presenter.refreshServerStatusBadge();
 
-    fixture.presenter.build(fixture.headerEl);
+    expect(statusBadgeEl?.getAttribute('data-active-backend')).toBe('claude-code');
+  });
 
-    expect(fixture.headerEl.querySelector('.opencodian-lsp-status-indicator')).toBeNull();
+  it('falls back to reading active backend from the global plugin when host method is absent', async () => {
+    const fixture = createFixture();
+    fixture.setOpenCodeBackend(false);
+    delete (fixture.host as Partial<typeof fixture.host>).getActiveBackendKind;
+
+    const restoreApp = mockGlobalApp({
+      plugins: {
+        plugins: {
+          opencodian: {
+            settings: { activeBackend: 'codex' },
+          },
+        },
+      },
+    });
+
+    try {
+      await fixture.presenter.refreshServerStatusBadge();
+
+      const statusBadgeEl = fixture.headerEl.querySelector<HTMLElement>('.opencodian-server-status-badge');
+      expect(statusBadgeEl?.getAttribute('data-active-backend')).toBe('codex');
+    } finally {
+      restoreApp();
+    }
   });
 });
+
+describe('ChatHeaderPresenter backend chrome', () => {
+    it('skips the LSP indicator when the active backend is not OpenCode', () => {
+      const fixture = createFixture();
+      fixture.presenter.destroy();
+      fixture.headerEl.innerHTML = '';
+      fixture.setOpenCodeBackend(false);
+
+      fixture.presenter.build(fixture.headerEl);
+
+      expect(fixture.headerEl.querySelector('.opencodian-lsp-status-indicator')).toBeNull();
+    });
+  });

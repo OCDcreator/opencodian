@@ -609,3 +609,55 @@
 .opencodian-additional-directories-config-badge-text {
   font-weight: 500;
 }
+
+/* ============================================================
+   Codex Runtime Defaults Badge (read-only, chat toolbar)
+   ============================================================ */
+
+.opencodian-codex-runtime-defaults-badge-container {
+  flex-shrink: 1;
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.opencodian-codex-runtime-defaults-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: var(--opencodian-input-toolbar-control-height, 30px);
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: var(--background-modifier-hover);
+  color: var(--text-muted);
+  font-size: 11px;
+  white-space: nowrap;
+  user-select: none;
+  cursor: default;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.opencodian-codex-runtime-defaults-badge-icon {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.opencodian-codex-runtime-defaults-badge-icon svg {
+  width: 12px;
+  height: 12px;
+  color: var(--text-accent);
+}
+
+.opencodian-codex-runtime-defaults-badge-text {
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 360px) {
+  .opencodian-codex-runtime-defaults-badge-text {
+    max-width: 80px;
+  }
+}

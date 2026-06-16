@@ -44,6 +44,28 @@ interface InputHighlightSpan {
   value?: string;
 }
 
+function readOpenCodianPlugin(): unknown {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (globalThis as any).app?.plugins?.plugins?.opencodian ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function readActiveBackendFromPlugin(): string {
+  return (readOpenCodianPlugin() as { settings?: { activeBackend?: string } } | null)?.settings?.activeBackend ?? 'opencode';
+}
+
+function readActiveBackendDisplayNameFromPlugin(): string {
+  const plugin = readOpenCodianPlugin() as {
+    settings?: { activeBackend?: string };
+    agentServiceRegistry?: { get?: (id: string) => { displayName?: string } | null };
+  } | null;
+  const activeBackend = plugin?.settings?.activeBackend ?? 'opencode';
+  return plugin?.agentServiceRegistry?.get?.(activeBackend)?.displayName ?? activeBackend;
+}
+
 export { buildComposerInputSubmission } from './composerInputParsing';
 
 export interface ComposerInputShellCoordinatorHost {
@@ -202,7 +224,7 @@ export class ComposerInputShellCoordinator {
     });
 
     // Custom placeholder overlay (-webkit-line-clamp:2; native placeholder cannot be clamped).
-    const placeholderText = this.host.getInputPlaceholder();
+    const placeholderText = this.resolveInputPlaceholder();
     this.placeholderOverlayEl = highlightContainerEl.createDiv({ cls: 'opencodian-input-placeholder', attr: { 'aria-hidden': 'true' } });
     this.placeholderOverlayEl.createSpan({ cls: 'opencodian-input-placeholder-text', text: placeholderText });
 
@@ -481,7 +503,7 @@ export class ComposerInputShellCoordinator {
       this.host.setTooltipLabel(this.addContextBtnEl, t('chat.context.addContext'), 'top');
     }
 
-    const placeholderText = this.host.getInputPlaceholder();
+    const placeholderText = this.resolveInputPlaceholder();
     // aria-label removed — the custom placeholder overlay already provides the visual cue,
     // and aria-label on the textarea caused an unwanted native tooltip on hover in Obsidian.
     const textSpan = this.placeholderOverlayEl?.querySelector('.opencodian-input-placeholder-text');
@@ -741,6 +763,27 @@ export class ComposerInputShellCoordinator {
     this.host.scheduleSettledScrollToBottomIfNeeded();
   }
 
+  private resolveInputPlaceholder(): string {
+    if (readActiveBackendFromPlugin() === 'codex') {
+      return t('chat.input.placeholderCodex');
+    }
+    return this.host.getInputPlaceholder();
+  }
+
+  private resolveComposerAvailabilityState(): NonNullable<ReturnType<NonNullable<ComposerInputShellCoordinatorHost['getComposerAvailabilityState']>>> {
+    const state = this.host.getComposerAvailabilityState?.() ?? { kind: 'ready' as const };
+    if (state.kind !== 'backend-offline') {
+      return state;
+    }
+
+    const backendName = readActiveBackendDisplayNameFromPlugin();
+    return {
+      kind: 'backend-offline',
+      title: t('chat.empty.backendOffline.titleWithBackend', { backend: backendName }),
+      description: t('chat.empty.backendOffline.descriptionWithBackend', { backend: backendName }),
+    };
+  }
+
   private get shouldHandleAgentFeatures(): boolean {
     return this.host.shouldMountAgentSelector?.() !== false;
   }
@@ -815,7 +858,7 @@ export class ComposerInputShellCoordinator {
   }
 
   updateComposerAvailabilityState(): void {
-    const state = this.host.getComposerAvailabilityState?.() ?? { kind: 'ready' as const };
+    const state = this.resolveComposerAvailabilityState();
     const isDisabled = state.kind !== 'ready';
 
     this.composerShellEl?.toggleClass('is-composer-disabled', isDisabled);
@@ -830,7 +873,7 @@ export class ComposerInputShellCoordinator {
   }
 
   private isComposerInteractionDisabled(): boolean {
-    return (this.host.getComposerAvailabilityState?.().kind ?? 'ready') !== 'ready';
+    return (this.resolveComposerAvailabilityState().kind ?? 'ready') !== 'ready';
   }
 
   private syncPromptSuggestionPlacement(): void {
@@ -883,7 +926,7 @@ export class ComposerInputShellCoordinator {
   }
 
   private renderComposerAvailabilityNotice(
-    state: NonNullable<ReturnType<NonNullable<ComposerInputShellCoordinatorHost['getComposerAvailabilityState']>>>,
+    state: NonNullable<ReturnType<ComposerInputShellCoordinator['resolveComposerAvailabilityState']>>,
   ): boolean {
     if (state.kind === 'ready' || this.shouldSuppressComposerAvailabilityNotice()) {
       const hadNotice = Boolean(this.availabilityNoticeEl?.isConnected);
@@ -1021,7 +1064,7 @@ export class ComposerInputShellCoordinator {
     this.composerAvailabilityObserverRootEl = nextRoot;
     this.composerAvailabilityObserver = new MutationObserver(() => {
       const didMutate = this.renderComposerAvailabilityNotice(
-        this.host.getComposerAvailabilityState?.() ?? { kind: 'ready' },
+        this.resolveComposerAvailabilityState(),
       );
       if (didMutate) {
         this.scheduleLayoutSync();

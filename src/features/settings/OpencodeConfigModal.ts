@@ -56,15 +56,20 @@ export class OpencodeConfigModal extends Modal {
 
     // Modal title
     contentEl.createEl('h2', { text: t('configEditor.title') });
-    
+
+    const shell = contentEl.createDiv({ cls: 'opencodian-modal-shell' });
+
+    // Path + editor section
+    const editorSection = shell.createDiv({ cls: 'opencodian-modal-section' });
+
     // Show config file path
-    contentEl.createEl('p', { 
+    editorSection.createEl('p', {
       text: `${t('configEditor.path')}: ${this.configManager.getConfigPath()}`,
-      cls: 'opencodian-config-path'
+      cls: 'opencodian-config-path',
     });
 
     // Create editor container
-    const editorContainer = contentEl.createDiv({ cls: 'opencodian-config-editor-container' });
+    const editorContainer = editorSection.createDiv({ cls: 'opencodian-config-editor-container' });
 
     // Create textarea for editing
     this.editorEl = editorContainer.createEl('textarea', {
@@ -79,8 +84,13 @@ export class OpencodeConfigModal extends Modal {
     // Set initial value
     this.updateEditorValue();
 
+    // Help content
+    this.renderHelpContent(shell);
+
     // Button container
-    const buttonContainer = contentEl.createDiv({ cls: 'opencodian-config-buttons' });
+    const buttonContainer = shell.createDiv({
+      cls: 'opencodian-config-buttons opencodian-modal-actions',
+    });
 
     // Format button
     const formatBtn = buttonContainer.createEl('button', {
@@ -93,7 +103,6 @@ export class OpencodeConfigModal extends Modal {
     const resetBtn = buttonContainer.createEl('button', {
       text: t('configEditor.reset')
     });
-    resetBtn.style.backgroundColor = 'var(--background-modifier-error)';
     resetBtn.addEventListener('click', () => this.resetToDefault());
 
     // Save button
@@ -101,7 +110,6 @@ export class OpencodeConfigModal extends Modal {
       text: t('configEditor.save'),
       cls: 'mod-cta'
     });
-    saveBtn.style.backgroundColor = 'var(--interactive-accent)';
     saveBtn.addEventListener('click', () => this.saveConfig());
 
     // Close button
@@ -109,10 +117,6 @@ export class OpencodeConfigModal extends Modal {
       text: t('configEditor.close')
     });
     closeBtn.addEventListener('click', () => this.close());
-
-    // Add help text
-    const helpText = contentEl.createEl('div', { cls: 'opencodian-config-help' });
-    helpText.innerHTML = this.getHelpContent();
   }
 
   onClose() {
@@ -122,84 +126,78 @@ export class OpencodeConfigModal extends Modal {
     contentEl.empty();
   }
 
-  private getHelpContent(): string {
-    const yoloExample = JSON.stringify({ permission: "allow" }, null, 2);
-    const safeExample = JSON.stringify({ permission: { "*": "ask" } }, null, 2);
-    const readonlyExample = JSON.stringify({ 
-      permission: { "*": "ask", "read": "allow", "edit": "deny", "write": "deny" } 
+  private renderHelpContent(parent: HTMLElement): void {
+    const yoloExample = JSON.stringify({ permission: 'allow' }, null, 2);
+    const safeExample = JSON.stringify({ permission: { '*': 'ask' } }, null, 2);
+    const readonlyExample = JSON.stringify({
+      permission: { '*': 'ask', read: 'allow', edit: 'deny', write: 'deny' },
     }, null, 2);
-    const customExample = JSON.stringify({ 
-      permission: { "bash": { "*": "ask", "git *": "allow" } } 
+    const customExample = JSON.stringify({
+      permission: { bash: { '*': 'ask', 'git *': 'allow' } },
     }, null, 2);
 
-    return `
-      <h4>${t('configEditor.help.title')}</h4>
-      
-      <div class="opencodian-help-section">
-        <p class="opencodian-help-intro">${t('configEditor.help.intro')}</p>
-        
-        <div class="opencodian-help-mode">
-          <strong>${t('configEditor.help.mode1.title')}</strong>
-          <p>${t('configEditor.help.mode1.desc')}</p>
-        </div>
-        
-        <div class="opencodian-help-mode">
-          <strong>${t('configEditor.help.mode2.title')}</strong>
-          <p>${t('configEditor.help.mode2.desc')}</p>
-        </div>
-        
-        <div class="opencodian-help-mode">
-          <strong>${t('configEditor.help.mode3.title')}</strong>
-          <p>${t('configEditor.help.mode3.desc')}</p>
-        </div>
-      </div>
+    const helpShell = parent.createDiv({ cls: 'opencodian-help-modal-shell' });
+    helpShell.createEl('h4', { text: t('configEditor.help.title') });
 
-      <div class="opencodian-help-section">
-        <h5>${t('configEditor.help.tools.title')}</h5>
-        <ul class="opencodian-help-tools">
-          <li><code>read</code> - ${t('configEditor.help.tools.read')}</li>
-          <li><code>edit</code> - ${t('configEditor.help.tools.edit')}</li>
-          <li><code>bash</code> - ${t('configEditor.help.tools.bash')}</li>
-          <li><code>glob</code> - ${t('configEditor.help.tools.glob')}</li>
-          <li><code>grep</code> - ${t('configEditor.help.tools.grep')}</li>
-        </ul>
-      </div>
+    const modesSection = helpShell.createDiv({ cls: 'opencodian-help-modal-section' });
+    modesSection.createEl('p', { text: t('configEditor.help.intro') });
 
-      <div class="opencodian-help-section">
-        <h5>${t('configEditor.help.examples.title')}</h5>
-        
-        <div class="opencodian-help-example">
-          <p class="opencodian-help-example-title">${t('configEditor.help.examples.yolo')}</p>
-          <pre><code>${this.escapeHtml(yoloExample)}</code></pre>
-        </div>
-        
-        <div class="opencodian-help-example">
-          <p class="opencodian-help-example-title">${t('configEditor.help.examples.safe')}</p>
-          <pre><code>${this.escapeHtml(safeExample)}</code></pre>
-        </div>
-        
-        <div class="opencodian-help-example">
-          <p class="opencodian-help-example-title">${t('configEditor.help.examples.readonly')}</p>
-          <pre><code>${this.escapeHtml(readonlyExample)}</code></pre>
-        </div>
-        
-        <div class="opencodian-help-example">
-          <p class="opencodian-help-example-title">${t('configEditor.help.examples.custom')}</p>
-          <pre><code>${this.escapeHtml(customExample)}</code></pre>
-        </div>
-      </div>
+    const modes = [
+      { titleKey: 'configEditor.help.mode1.title', descKey: 'configEditor.help.mode1.desc' },
+      { titleKey: 'configEditor.help.mode2.title', descKey: 'configEditor.help.mode2.desc' },
+      { titleKey: 'configEditor.help.mode3.title', descKey: 'configEditor.help.mode3.desc' },
+    ] as const;
+    for (const mode of modes) {
+      const modeCard = modesSection.createDiv({ cls: 'opencodian-help-modal-card' });
+      modeCard.createEl('strong', { text: t(mode.titleKey) });
+      modeCard.createEl('p', { text: t(mode.descKey) });
+    }
 
-      <div class="opencodian-help-section">
-        <h5>${t('configEditor.help.tips.title')}</h5>
-        <ul class="opencodian-help-tips">
-          <li>${t('configEditor.help.tips.tip1')}</li>
-          <li>${t('configEditor.help.tips.tip2')}</li>
-          <li>${t('configEditor.help.tips.tip3')}</li>
-        </ul>
-      </div>
+    const toolsSection = helpShell.createDiv({ cls: 'opencodian-help-modal-section' });
+    toolsSection.createEl('h5', { text: t('configEditor.help.tools.title') });
+    const toolsList = toolsSection.createEl('ul', { cls: 'opencodian-help-modal-list' });
+    const tools = [
+      { name: 'read', descKey: 'configEditor.help.tools.read' },
+      { name: 'edit', descKey: 'configEditor.help.tools.edit' },
+      { name: 'bash', descKey: 'configEditor.help.tools.bash' },
+      { name: 'glob', descKey: 'configEditor.help.tools.glob' },
+      { name: 'grep', descKey: 'configEditor.help.tools.grep' },
+    ] as const;
+    for (const tool of tools) {
+      const item = toolsList.createEl('li');
+      item.createEl('code', { cls: 'opencodian-help-modal-code', text: tool.name });
+      item.appendText(` - ${t(tool.descKey)}`);
+    }
 
-      <p class="opencodian-help-footer">${t('configEditor.help.actions')}</p>
-    `;
+    const examplesSection = helpShell.createDiv({ cls: 'opencodian-help-modal-section' });
+    examplesSection.createEl('h5', { text: t('configEditor.help.examples.title') });
+    const examples: ReadonlyArray<{ label: string; json: string }> = [
+      { label: t('configEditor.help.examples.yolo'), json: yoloExample },
+      { label: t('configEditor.help.examples.safe'), json: safeExample },
+      { label: t('configEditor.help.examples.readonly'), json: readonlyExample },
+      { label: t('configEditor.help.examples.custom'), json: customExample },
+    ];
+    for (const example of examples) {
+      examplesSection.createEl('p', { text: example.label });
+      const pre = examplesSection.createEl('pre', { cls: 'opencodian-help-modal-pre' });
+      const codeEl = pre.createEl('code');
+      codeEl.innerHTML = this.escapeHtml(example.json);
+    }
+
+    const tipsSection = helpShell.createDiv({ cls: 'opencodian-help-modal-section' });
+    tipsSection.createEl('h5', { text: t('configEditor.help.tips.title') });
+    const tipsList = tipsSection.createEl('ul', { cls: 'opencodian-help-modal-list' });
+    const tipKeys = [
+      'configEditor.help.tips.tip1',
+      'configEditor.help.tips.tip2',
+      'configEditor.help.tips.tip3',
+    ] as const;
+    for (const tipKey of tipKeys) {
+      tipsList.createEl('li', { text: t(tipKey) });
+    }
+
+    const footer = helpShell.createDiv({ cls: 'opencodian-help-modal-actions' });
+    footer.createEl('span', { text: t('configEditor.help.actions') });
   }
 
   private escapeHtml(text: string): string {

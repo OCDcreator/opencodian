@@ -50,7 +50,7 @@ export class OpenCodeProjectConfigHelpModal extends Modal {
     this.contentEl.empty();
 
     const shellEl = this.contentEl.createDiv({
-      cls: 'opencodian-project-config-help',
+      cls: 'opencodian-help-modal-shell',
     });
     shellEl.createEl('h2', {
       text: this.tr(`${this.baseKey}.title`),
@@ -61,7 +61,7 @@ export class OpenCodeProjectConfigHelpModal extends Modal {
     });
 
     const listEl = shellEl.createEl('ul', {
-      cls: 'opencodian-project-config-help-list',
+      cls: 'opencodian-help-modal-list',
     });
     for (const key of ['point1', 'point2', 'point3'] as const) {
       listEl.createEl('li', {
@@ -70,7 +70,7 @@ export class OpenCodeProjectConfigHelpModal extends Modal {
     }
 
     const linksEl = shellEl.createDiv({
-      cls: 'opencodian-project-config-help-links',
+      cls: 'opencodian-help-modal-actions',
     });
     linksEl.createDiv({
       cls: 'opencodian-project-config-help-links-title',

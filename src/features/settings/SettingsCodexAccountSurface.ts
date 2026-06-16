@@ -19,8 +19,6 @@
  *   - No login/logout/auth.json mutation happens here. Identity is read-only.
  */
 
-import { Setting } from 'obsidian';
-
 import type {
   AppServerAccountRateLimitsResult,
   AppServerAccountUsageResult,
@@ -129,12 +127,12 @@ export class SettingsCodexAccountSurface {
       text: title,
     });
 
-    new Setting(headerEl)
-      .addButton((button) => {
-        button
-          .setButtonText(t('settings.codex.accountSurface.refresh'))
-          .onClick(() => onRefresh());
-      });
+    const refreshButtonEl = headerEl.createEl('button', {
+      cls: 'opencodian-codex-account-card-refresh',
+      text: t('settings.codex.accountSurface.refresh'),
+      attr: { type: 'button' },
+    });
+    refreshButtonEl.addEventListener('click', () => onRefresh());
 
     const bodyEl = cardEl.createDiv({
       cls: 'opencodian-codex-account-card-body',
@@ -226,45 +224,65 @@ export class SettingsCodexAccountSurface {
     el.setAttribute('data-auth-mode', identity.authMode);
     el.setAttribute('data-auth-source', this.authSource);
 
-    const summaryEl = el.createDiv({ cls: 'opencodian-codex-account-identity-summary' });
-
     const isChatgpt = identity.authMode === 'chatgpt';
-    const badgeEl = summaryEl.createDiv({
+    const isApiKey = identity.authMode === 'apikey';
+    const authModeText = isChatgpt
+      ? t('settings.codex.accountSurface.identity.modeChatgpt')
+      : isApiKey
+        ? t('settings.codex.accountSurface.identity.modeApiKey')
+        : t('settings.codex.accountSurface.identity.modeUnknown');
+    const authTitleText = isChatgpt
+      ? t('settings.codex.accountSurface.identity.authTitleChatgpt')
+      : isApiKey
+        ? t('settings.codex.accountSurface.identity.authTitleApiKey')
+        : t('settings.codex.accountSurface.identity.authTitleUnknown');
+
+    const overviewEl = el.createDiv({ cls: 'opencodian-codex-account-identity-overview' });
+
+    const primaryEl = overviewEl.createDiv({ cls: 'opencodian-codex-account-identity-primary' });
+    const badgeEl = primaryEl.createDiv({
       cls: `opencodian-codex-account-badge ${isChatgpt ? 'is-chatgpt' : 'is-apikey'}`,
       attr: { 'data-auth-badge': identity.authMode },
     });
-    badgeEl.createSpan({
-      text: isChatgpt
-        ? t('settings.codex.accountSurface.identity.modeChatgpt')
-        : identity.authMode === 'apikey'
-          ? t('settings.codex.accountSurface.identity.modeApiKey')
-          : t('settings.codex.accountSurface.identity.modeUnknown'),
+    badgeEl.createSpan({ text: authModeText });
+    primaryEl.createEl('h5', {
+      cls: 'opencodian-codex-account-identity-title',
+      text: authTitleText,
     });
 
-    const rowsEl = summaryEl.createDiv({ cls: 'opencodian-codex-account-rows' });
-    this.appendRow(rowsEl, t('settings.codex.accountSurface.identity.authMode'), badgeEl.textContent ?? '');
-    if (identity.email) {
-      this.appendRow(rowsEl, t('settings.codex.accountSurface.identity.email'), identity.email);
-    }
-    if (identity.planType) {
-      this.appendRow(rowsEl, t('settings.codex.accountSurface.identity.plan'), this.formatPlan(identity.planType));
-    }
-    this.appendRow(
-      rowsEl,
-      t('settings.codex.accountSurface.identity.authSource'),
-      this.authSource === 'plugin-api-key'
-        ? t('settings.codex.accountSurface.identity.sourcePluginKey')
-        : t('settings.codex.accountSurface.identity.sourceEnvOrChatgpt'),
-    );
-    if (identity.requiresOpenaiAuth === true) {
-      this.appendRow(
-        rowsEl,
-        t('settings.codex.accountSurface.identity.requiresChatgpt'),
-        t('settings.codex.accountSurface.identity.yes'),
-      );
+    const detailEl = overviewEl.createDiv({ cls: 'opencodian-codex-account-identity-detail' });
+    detailEl.createSpan({
+      cls: 'opencodian-codex-account-identity-detail-label',
+      text: t('settings.codex.accountSurface.identity.sourcePrefix'),
+    });
+    detailEl.createSpan({
+      cls: 'opencodian-codex-account-identity-detail-value',
+      text:
+        this.authSource === 'plugin-api-key'
+          ? t('settings.codex.accountSurface.identity.sourcePluginKey')
+          : t('settings.codex.accountSurface.identity.sourceEnvOrChatgpt'),
+    });
+
+    const hasMeta = identity.email || identity.planType;
+    if (hasMeta) {
+      const metaEl = overviewEl.createDiv({ cls: 'opencodian-codex-account-identity-meta' });
+      if (identity.email) {
+        metaEl.createSpan({
+          cls: 'opencodian-codex-account-identity-chip',
+          attr: { 'data-meta': 'email' },
+          text: identity.email,
+        });
+      }
+      if (identity.planType) {
+        metaEl.createSpan({
+          cls: 'opencodian-codex-account-identity-chip',
+          attr: { 'data-meta': 'plan' },
+          text: this.formatPlan(identity.planType),
+        });
+      }
     }
 
-    if (!isChatgpt) {
+    if (identity.requiresOpenaiAuth === true) {
       const noteEl = el.createDiv({
         cls: 'opencodian-codex-account-card-notice',
         attr: { 'data-auth-required-notice': 'true' },

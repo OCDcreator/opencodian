@@ -78,3 +78,9 @@ i18n keys: settings.server.help.{topic}.{intro|meaning|fill|extra|example|tip1|t
 
 - 各 topic 的帮助内容由 i18n key 提供，具体文本见 `src/i18n/locales/en.ts` 和 `src/i18n/locales/zh.ts` 中 `settings.server.help.{topic}.*` 命名空间
 - `addServerHelpButton()` 定义在 `OpenCodianSettings.ts` 中，为每个服务器设置项创建 `?` 按钮，点击时 `new ServerSettingHelpModal(this.app, topic).open()`
+
+## 2026-06-16 Shared modal layout adoption
+
+- 根元素改用 `.opencodian-help-modal-shell`（替代旧的 `.opencodian-config-help` / `.opencodian-server-help` 类）；modal 宽度钩子相应改为 `.opencodian-server-setting-help-modal`。
+- `getHelpContent()` 与 `innerHTML` 注入已移除；帮助内容现在用显式 DOM 构建，复用 `.opencodian-help-modal-section` / `-card` / `-pre` / `-list` 等共享 help 布局类。
+- 动态文本仍经过 `escapeHtml()` 转义。
