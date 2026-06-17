@@ -1,7 +1,9 @@
 # Chinese Locale
 
 > **源码**: `src/i18n/locales/zh.ts`
-> **最近更新**: 2026-06-17 Claude Code 权限选择器文案 — 更新 `settings.claudeCode.permissionMode.*` 与 `chat.claudeCode.permissionMode.*.description`，让聊天工具栏显示截图式紧凑标签（`变更前确认`、`自动编辑`、`计划模式`、`完全访问`），同时让 `完全访问` 描述继续诚实说明会绕过权限检查。
+> **最近更新**: 2026-06-18 Claude Code 说明文字收敛 — 新增 `settings.claudeCode.help.boundaryLabel` / `.lifecycleLabel` / `.proofLabel` 段落标签，供新的 `ClaudeCodeHelpModal` 把 boundary/lifecycle/proof 长文从密集设置表面收进每个设置项的 help 按钮。
+>
+> **Previously**: 2026-06-17 Claude Code 权限选择器文案 — 更新 `settings.claudeCode.permissionMode.*` 与 `chat.claudeCode.permissionMode.*.description`，让聊天工具栏显示截图式紧凑标签（`变更前确认`、`自动编辑`、`计划模式`、`完全访问`），同时让 `完全访问` 描述继续诚实说明会绕过权限检查。
 >
 > **前次更新**: 2026-06-17 Claude Code 设置分组 — 新增 `settings.claudeCode.groups.*` 标题与描述，用于重组 Runtime / Model & Thinking / Permissions / Context & Sources / Tools 子标签页。
 >

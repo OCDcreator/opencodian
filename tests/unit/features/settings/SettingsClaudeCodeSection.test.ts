@@ -37,6 +37,12 @@ interface MockButtonControl {
   onClick: jest.MockedFunction<(callback: () => void | Promise<void>) => MockButtonControl>;
 }
 
+interface MockExtraButtonControl {
+  setIcon: jest.MockedFunction<(icon: string) => MockExtraButtonControl>;
+  setTooltip: jest.MockedFunction<(tooltip: string) => MockExtraButtonControl>;
+  onClick: jest.MockedFunction<(callback: () => void | Promise<void>) => MockExtraButtonControl>;
+}
+
 interface ControlRecord<TControl> {
   control: TControl;
   name: string;
@@ -51,6 +57,7 @@ const textAreaRecords: Array<ControlRecord<MockTextAreaControl>> = [];
 const dropdownRecords: Array<ControlRecord<MockDropdownControl>> = [];
 const toggleRecords: Array<ControlRecord<MockToggleControl>> = [];
 const buttonRecords: Array<ControlRecord<MockButtonControl> & { label?: string }> = [];
+const extraButtonRecords: Array<ControlRecord<MockExtraButtonControl> & { tooltip?: string; icon?: string }> = [];
 
 function createPlugin(options: {
   existingFiles?: string[];
@@ -137,6 +144,18 @@ function createButtonControl(): MockButtonControl {
   };
   control.setButtonText.mockReturnValue(control);
   control.setDisabled.mockReturnValue(control);
+  control.onClick.mockReturnValue(control);
+  return control;
+}
+
+function createExtraButtonControl(): MockExtraButtonControl {
+  const control: MockExtraButtonControl = {
+    setIcon: jest.fn(),
+    setTooltip: jest.fn(),
+    onClick: jest.fn(),
+  };
+  control.setIcon.mockReturnValue(control);
+  control.setTooltip.mockReturnValue(control);
   control.onClick.mockReturnValue(control);
   return control;
 }
@@ -248,6 +267,30 @@ function mockSettingPrototype(): void {
     callback(record.control);
     return this;
   });
+  jest.spyOn(Setting.prototype, 'addExtraButton').mockImplementation(function addExtraButton(
+    this: Setting,
+    callback: (control: MockExtraButtonControl) => unknown,
+  ) {
+    const record: ControlRecord<MockExtraButtonControl> & { tooltip?: string; icon?: string } = {
+      control: createExtraButtonControl(),
+      name: (this as Setting & { __settingName?: string }).__settingName ?? '',
+    };
+    record.control.setIcon.mockImplementation((icon) => {
+      record.icon = icon;
+      return record.control;
+    });
+    record.control.setTooltip.mockImplementation((tooltip) => {
+      record.tooltip = tooltip;
+      return record.control;
+    });
+    record.control.onClick.mockImplementation((handler) => {
+      record.onClick = handler;
+      return record.control;
+    });
+    extraButtonRecords.push(record);
+    callback(record.control);
+    return this;
+  });
 }
 
 function findText(name: string): ControlRecord<MockTextControl> {
@@ -312,6 +355,7 @@ describe('SettingsClaudeCodeSection', () => {
     dropdownRecords.length = 0;
     toggleRecords.length = 0;
     buttonRecords.length = 0;
+    extraButtonRecords.length = 0;
     mockSettingPrototype();
   });
 
@@ -467,6 +511,7 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
     dropdownRecords.length = 0;
     toggleRecords.length = 0;
     buttonRecords.length = 0;
+    extraButtonRecords.length = 0;
     mockSettingPrototype();
   });
 

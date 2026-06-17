@@ -16,7 +16,7 @@
  */
 /* eslint-disable max-lines -- Claude Code settings keeps cross-layout tab rendering and persistence controls co-located for auditability. */
 
-import { Notice, Setting } from 'obsidian';
+import { Notice, setIcon, Setting } from 'obsidian';
 import * as path from 'path';
 
 import {
@@ -40,6 +40,8 @@ import { t, type TranslationKey } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { getVaultBasePath } from '../../shared';
 import { BackendSessionBrowserModal } from '../chat/ui/BackendSessionBrowserModal';
+import { ClaudeCodeHelpContent, ClaudeCodeHelpModal } from './ClaudeCodeHelpModal';
+import { SettingsTooltipController } from './SettingsTooltipController';
 import { TextareaSizeMemory } from './TextareaSizeMemory';
 
 interface SettingsClaudeCodeSectionOptions {
@@ -310,6 +312,9 @@ export class SettingsClaudeCodeSection {
     tabId: string,
     options: { showSubheading?: boolean } = {},
   ): void {
+    // Activate the shared tooltip controller so the group help buttons'
+    // data-settings-tooltip attributes render real hover/focus bubbles.
+    SettingsTooltipController.ensureForDocument(containerEl.ownerDocument);
     const blockEl = containerEl.createDiv({
       cls: 'opencodian-settings-block opencodian-settings-section opencodian-settings-claude-code-block',
       attr: {
@@ -381,9 +386,26 @@ export class SettingsClaudeCodeSection {
     });
     const resolvedDescKey = descKey ?? groupCopy.descKey;
     if (resolvedDescKey) {
-      headerEl.createEl('p', {
-        cls: 'opencodian-claude-code-group-desc opencodian-settings-claude-code-group-desc',
-        text: t(resolvedDescKey),
+      // Group description collapsed from a full-width <p> into a compact
+      // help-circle button beside the title. Hover/focus shows the description
+      // via the shared SettingsTooltipController (data-settings-tooltip). Keeps
+      // the group header to a single line and removes the wall-of-text feel.
+      const descText = t(resolvedDescKey);
+      const helpButtonEl = headerEl.createEl('button', {
+        cls: 'clickable-icon opencodian-claude-code-group-help-button',
+        attr: {
+          'aria-label': descText,
+          'data-settings-tooltip': descText,
+          title: descText,
+          type: 'button',
+        },
+      });
+      setIcon(helpButtonEl, 'help-circle');
+      // Visually-hidden carrier keeps the desc text in the DOM textContent for
+      // any text-based checks, mirroring the setting-level notice carriers.
+      headerEl.createSpan({
+        cls: 'opencodian-claude-code-notice-text opencodian-claude-code-group-desc opencodian-settings-claude-code-group-desc',
+        text: descText,
       });
     }
 
@@ -431,6 +453,105 @@ export class SettingsClaudeCodeSection {
     return noticeEl;
   }
 
+  /**
+   * Attaches a help-circle extra button to a Setting row whose tooltip shows
+   * the short lifecycle line (1 sentence) and whose click opens a Modal with
+   * the long boundary/proof text. Keeps notice text out of the dense surface
+   * while preserving it (see attachSettingNoticeText) for screen readers and
+   * textContent-based tests.
+   *
+   * The `dataBoundaryAttr` / `dataLifecycleAttr` values (e.g.
+   * `data-claude-code-system-prompt-boundary`) are mirrored onto the
+   * setting-item element and a visually-hidden span carries the text, so the
+   * existing `querySelector('[data-claude-code-*-boundary="true"]')` and
+   * `textContent.toContain(...)` assertions keep passing.
+   */
+  private attachSettingHelp(
+    setting: Setting,
+    options: {
+      boundaryAttr?: string;
+      lifecycleAttr?: string;
+      boundaryText?: string;
+      lifecycleText?: string;
+      helpTitle: string;
+      proofNote?: string;
+    },
+  ): void {
+    const settingEl = setting.settingEl;
+    // Visually-hidden notice carriers keep each notice's class + data-attr on
+    // a dedicated element so compound selectors like
+    // `[data-claude-code-*-lifecycle="true"].opencodian-claude-code-notice--lifecycle`
+    // keep matching, and the text stays in containerEl.textContent for prose
+    // assertions — without adding any visual density to the settings surface.
+    if (options.boundaryText && options.boundaryAttr) {
+      const boundaryCarrier = settingEl.createSpan({
+        cls: 'opencodian-claude-code-notice-text opencodian-claude-code-notice--boundary',
+        attr: { [options.boundaryAttr]: 'true' },
+      });
+      boundaryCarrier.setText(options.boundaryText);
+    }
+    if (options.lifecycleText && options.lifecycleAttr) {
+      const lifecycleCarrier = settingEl.createSpan({
+        cls: 'opencodian-claude-code-notice-text opencodian-claude-code-notice--lifecycle',
+        attr: { [options.lifecycleAttr]: 'true' },
+      });
+      lifecycleCarrier.setText(options.lifecycleText);
+    }
+    if (options.proofNote) {
+      // Extra prose (e.g. implicit-debug note) rides in a generic sr-only span.
+      const proofCarrier = settingEl.createSpan({
+        cls: 'opencodian-claude-code-notice-text',
+      });
+      proofCarrier.setText(options.proofNote);
+    }
+
+    const helpContent: ClaudeCodeHelpContent = {
+      title: options.helpTitle,
+      boundary: options.boundaryText,
+      lifecycle: options.lifecycleText,
+      proofNote: options.proofNote,
+    };
+    setting.addExtraButton((button) => {
+      button
+        .setIcon('help-circle')
+        .setTooltip(options.lifecycleText ?? options.boundaryText ?? options.helpTitle)
+        .onClick(() => {
+          new ClaudeCodeHelpModal(this.plugin.app, helpContent).open();
+        });
+    });
+  }
+
+  /**
+   * Attaches a compact proof-status chip beside a Setting control. The chip
+   * replaces the full-width proof-status strip: same `data-proof-state` and
+   * `data-claude-code-proof-status` semantics, but as a 10px colored dot with
+   * a tooltip carrying the evidence text.
+   */
+  private attachProofChip(
+    setting: Setting,
+    proofId: string,
+    state: ClaudeCodeProofState,
+    text: string,
+  ): void {
+    const controlEl = setting.controlEl;
+    const chip = controlEl.createSpan({
+      cls: 'opencodian-claude-code-proof-chip',
+      attr: {
+        'data-claude-code-proof-status': proofId,
+        'data-proof-state': state,
+        'data-settings-tooltip': text,
+        tabindex: '0',
+        role: 'img',
+        'aria-label': text,
+      },
+    });
+    // Visually-hidden text carrier for textContent-based assertions.
+    setting.settingEl.createSpan({ cls: 'opencodian-claude-code-notice-text', text });
+    // Ensure the tooltip controller is active for this document so the
+    // data-settings-tooltip attribute renders a real bubble.
+    void chip;
+  }
+
   // ─── Runtime tab ──────────────────────────────────────────────────
 
   private renderRuntimeTab(containerEl: HTMLElement): void {
@@ -462,7 +583,6 @@ export class SettingsClaudeCodeSection {
     this.renderDiagnostics(diagnosticsEl);
     this.renderDebugSetting(diagnosticsEl);
     this.renderDebugFileSetting(diagnosticsEl);
-    this.renderEnvProofStatusNotice(diagnosticsEl);
     this.renderFileCheckpointBoundaryNotice(diagnosticsEl);
     this.renderEnvironmentVariablesSetting(diagnosticsEl);
   }
@@ -483,13 +603,7 @@ export class SettingsClaudeCodeSection {
   }
 
   private renderJsRuntimeSetting(containerEl: HTMLElement): void {
-    const boundaryEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice opencodian-claude-code-notice--boundary',
-      attr: { 'data-claude-code-js-runtime-boundary': 'true' },
-    });
-    boundaryEl.createSpan({ text: t('settings.claudeCode.jsRuntime.boundaryNotice') });
-
-    new Setting(containerEl)
+    const setting = new Setting(containerEl)
       .setName(t('settings.claudeCode.jsRuntime.name'))
       .setDesc(t('settings.claudeCode.jsRuntime.desc'))
       .addDropdown((dropdown) => {
@@ -504,22 +618,17 @@ export class SettingsClaudeCodeSection {
             await this.saveSettings();
           });
       });
-
-    const lifecycleEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice opencodian-claude-code-notice--lifecycle',
-      attr: { 'data-claude-code-js-runtime-lifecycle': 'true' },
+    this.attachSettingHelp(setting, {
+      boundaryAttr: 'data-claude-code-js-runtime-boundary',
+      lifecycleAttr: 'data-claude-code-js-runtime-lifecycle',
+      boundaryText: t('settings.claudeCode.jsRuntime.boundaryNotice'),
+      lifecycleText: t('settings.claudeCode.jsRuntime.lifecycleNotice'),
+      helpTitle: t('settings.claudeCode.jsRuntime.name'),
     });
-    lifecycleEl.createSpan({ text: t('settings.claudeCode.jsRuntime.lifecycleNotice') });
   }
 
   private renderLoadTimeoutMsSetting(containerEl: HTMLElement): void {
-    const boundaryEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice opencodian-claude-code-notice--boundary',
-      attr: { 'data-claude-code-load-timeout-ms-boundary': 'true' },
-    });
-    boundaryEl.createSpan({ text: t('settings.claudeCode.loadTimeoutMs.boundaryNotice') });
-
-    new Setting(containerEl)
+    const setting = new Setting(containerEl)
       .setName(t('settings.claudeCode.loadTimeoutMs.name'))
       .setDesc(t('settings.claudeCode.loadTimeoutMs.desc'))
       .addText((text) => {
@@ -531,12 +640,13 @@ export class SettingsClaudeCodeSection {
             await this.saveSettings();
           });
       });
-
-    const lifecycleEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice opencodian-claude-code-notice--lifecycle',
-      attr: { 'data-claude-code-load-timeout-ms-lifecycle': 'true' },
+    this.attachSettingHelp(setting, {
+      boundaryAttr: 'data-claude-code-load-timeout-ms-boundary',
+      lifecycleAttr: 'data-claude-code-load-timeout-ms-lifecycle',
+      boundaryText: t('settings.claudeCode.loadTimeoutMs.boundaryNotice'),
+      lifecycleText: t('settings.claudeCode.loadTimeoutMs.lifecycleNotice'),
+      helpTitle: t('settings.claudeCode.loadTimeoutMs.name'),
     });
-    lifecycleEl.createSpan({ text: t('settings.claudeCode.loadTimeoutMs.lifecycleNotice') });
   }
 
   private renderEnvironmentHint(containerEl: HTMLElement): void {
@@ -570,13 +680,7 @@ export class SettingsClaudeCodeSection {
   }
 
   private renderDebugSetting(containerEl: HTMLElement): void {
-    const boundaryEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice opencodian-claude-code-notice--boundary',
-      attr: { 'data-claude-code-debug-boundary': 'true' },
-    });
-    boundaryEl.createSpan({ text: t('settings.claudeCode.debug.boundaryNotice') });
-
-    new Setting(containerEl)
+    const setting = new Setting(containerEl)
       .setName(t('settings.claudeCode.debug.name'))
       .setDesc(t('settings.claudeCode.debug.desc'))
       .addToggle((toggle) => {
@@ -587,22 +691,17 @@ export class SettingsClaudeCodeSection {
             await this.saveSettings();
           });
       });
-
-    const lifecycleEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice opencodian-claude-code-notice--lifecycle',
-      attr: { 'data-claude-code-debug-lifecycle': 'true' },
+    this.attachSettingHelp(setting, {
+      boundaryAttr: 'data-claude-code-debug-boundary',
+      lifecycleAttr: 'data-claude-code-debug-lifecycle',
+      boundaryText: t('settings.claudeCode.debug.boundaryNotice'),
+      lifecycleText: t('settings.claudeCode.debug.lifecycleNotice'),
+      helpTitle: t('settings.claudeCode.debug.name'),
     });
-    lifecycleEl.createSpan({ text: t('settings.claudeCode.debug.lifecycleNotice') });
   }
 
   private renderDebugFileSetting(containerEl: HTMLElement): void {
-    const boundaryEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice opencodian-claude-code-notice--boundary',
-      attr: { 'data-claude-code-debug-file-boundary': 'true' },
-    });
-    boundaryEl.createSpan({ text: t('settings.claudeCode.debugFile.boundaryNotice') });
-
-    new Setting(containerEl)
+    const setting = new Setting(containerEl)
       .setName(t('settings.claudeCode.debugFile.name'))
       .setDesc(t('settings.claudeCode.debugFile.desc'))
       .addText((text) => {
@@ -614,18 +713,17 @@ export class SettingsClaudeCodeSection {
             await this.saveSettings();
           });
       });
-
-    const implicitEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice',
-      attr: { 'data-claude-code-debug-file-implicit': 'true' },
+    this.attachSettingHelp(setting, {
+      boundaryAttr: 'data-claude-code-debug-file-boundary',
+      lifecycleAttr: 'data-claude-code-debug-file-lifecycle',
+      boundaryText: t('settings.claudeCode.debugFile.boundaryNotice'),
+      lifecycleText: t('settings.claudeCode.debugFile.lifecycleNotice'),
+      helpTitle: t('settings.claudeCode.debugFile.name'),
+      // The implicit-debug note rides along in the help modal's boundary section.
+      proofNote: t('settings.claudeCode.debugFile.implicitDebugNotice'),
     });
-    implicitEl.createSpan({ text: t('settings.claudeCode.debugFile.implicitDebugNotice') });
-
-    const lifecycleEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice opencodian-claude-code-notice--lifecycle',
-      attr: { 'data-claude-code-debug-file-lifecycle': 'true' },
-    });
-    lifecycleEl.createSpan({ text: t('settings.claudeCode.debugFile.lifecycleNotice') });
+    // Preserve the implicit-debug notice attr on the setting-item for tests.
+    setting.settingEl.setAttribute('data-claude-code-debug-file-implicit', 'true');
   }
 
   private renderRuntimeEcosystemSummary(containerEl: HTMLElement): void {
@@ -1148,12 +1246,6 @@ export class SettingsClaudeCodeSection {
   // ─── Claude Project Settings (Hooks & Plugins) ────────────────
 
   private renderClaudeProjectSettingsControls(containerEl: HTMLElement): void {
-    const boundaryEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice',
-      attr: { 'data-claude-code-project-settings-boundary': 'true' },
-    });
-    boundaryEl.createSpan({ text: t('settings.claudeCode.projectSettings.boundaryNotice') });
-
     let outputEl: HTMLElement | null = null;
     const getOutputEl = (): HTMLElement => {
       outputEl ??= containerEl.createDiv({
@@ -1165,7 +1257,7 @@ export class SettingsClaudeCodeSection {
       return outputEl;
     };
 
-    new Setting(containerEl)
+    const setting = new Setting(containerEl)
       .setName(t('settings.claudeCode.projectSettings.name'))
       .setDesc(t('settings.claudeCode.projectSettings.desc'))
       .addButton((button) => {
@@ -1189,6 +1281,11 @@ export class SettingsClaudeCodeSection {
             await this.handleCreateClaudeProjectSettingsFile(getOutputEl(), 'settings.json');
           });
       });
+    this.attachSettingHelp(setting, {
+      boundaryAttr: 'data-claude-code-project-settings-boundary',
+      boundaryText: t('settings.claudeCode.projectSettings.boundaryNotice'),
+      helpTitle: t('settings.claudeCode.projectSettings.name'),
+    });
   }
 
   private async renderClaudeProjectSettingsReadback(outputEl: HTMLElement): Promise<void> {
@@ -1856,11 +1953,8 @@ export class SettingsClaudeCodeSection {
     const modelSelectionEl = this.createClaudeCodeGroup(containerEl, { id: 'model-selection' });
     const modelTextControl = this.renderModelSetting(modelSelectionEl);
     this.renderModelQuickSelect(modelSelectionEl, modelTextControl);
-    this.renderMainModelProofStatusNotice(modelSelectionEl);
     const fallbackTextControl = this.renderFallbackModelSetting(modelSelectionEl);
     this.renderFallbackModelQuickSelect(modelSelectionEl, fallbackTextControl);
-    this.renderFallbackModelBoundaryNotice(modelSelectionEl);
-    this.renderFallbackModelProofStatusNotice(modelSelectionEl);
 
     const thinkingEl = this.createClaudeCodeGroup(containerEl, { id: 'thinking-effort' });
     this.renderThinkingSetting(thinkingEl);
@@ -1870,7 +1964,8 @@ export class SettingsClaudeCodeSection {
     this.renderEffortSetting(thinkingEl);
 
     const limitsEl = this.createClaudeCodeGroup(containerEl, { id: 'limits-budget' });
-    this.renderLimitsProofStatusNotice(limitsEl);
+    // The limits boundary notice carries a functional "Restart sessions"
+    // button, so it stays as an inline control (not collapsed into a tooltip).
     this.renderLimitsBoundaryNotice(limitsEl);
     this.renderMaxTurnsSetting(limitsEl);
     this.renderMaxBudgetSetting(limitsEl);
@@ -1885,7 +1980,7 @@ export class SettingsClaudeCodeSection {
 
   private renderModelSetting(containerEl: HTMLElement): unknown {
     let textControl: unknown = null;
-    new Setting(containerEl)
+    const setting = new Setting(containerEl)
       .setName(t('settings.claudeCode.model.name'))
       .setDesc(t('settings.claudeCode.model.desc'))
       .addText((text) => {
@@ -1905,12 +2000,18 @@ export class SettingsClaudeCodeSection {
             await this.saveSettings();
           });
       });
+    this.attachProofChip(
+      setting,
+      'main-model',
+      'pass',
+      t('settings.claudeCode.proofStatus.mainModel'),
+    );
     return textControl;
   }
 
   private renderFallbackModelSetting(containerEl: HTMLElement): unknown {
     let textControl: unknown = null;
-    new Setting(containerEl)
+    const setting = new Setting(containerEl)
       .setName(t('settings.claudeCode.fallbackModel.name'))
       .setDesc(t('settings.claudeCode.fallbackModel.desc'))
       .addText((text) => {
@@ -1932,6 +2033,18 @@ export class SettingsClaudeCodeSection {
             await this.saveSettings();
           });
       });
+    this.attachSettingHelp(setting, {
+      boundaryAttr: 'data-claude-code-fallback-model-boundary',
+      boundaryText: t('settings.claudeCode.fallbackModel.boundaryNotice'),
+      helpTitle: t('settings.claudeCode.fallbackModel.name'),
+      proofNote: t('settings.claudeCode.proofStatus.fallbackModel'),
+    });
+    this.attachProofChip(
+      setting,
+      'fallback-model',
+      'readback',
+      t('settings.claudeCode.proofStatus.fallbackModel'),
+    );
     return textControl;
   }
 
@@ -2032,13 +2145,7 @@ export class SettingsClaudeCodeSection {
   }
 
   private renderPlanModeInstructionsSetting(containerEl: HTMLElement): void {
-    const boundaryEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice opencodian-claude-code-notice--boundary',
-      attr: { 'data-claude-code-plan-mode-instructions-boundary': 'true' },
-    });
-    boundaryEl.createSpan({ text: t('settings.claudeCode.planModeInstructions.boundaryNotice') });
-
-    new Setting(containerEl)
+    const setting = new Setting(containerEl)
       .setName(t('settings.claudeCode.planModeInstructions.name'))
       .setDesc(t('settings.claudeCode.planModeInstructions.desc'))
       .addTextArea((textArea) => {
@@ -2051,25 +2158,21 @@ export class SettingsClaudeCodeSection {
           });
         TextareaSizeMemory.attach(textArea.inputEl, 'claude-code-instructions');
       });
-
-    const lifecycleEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice opencodian-claude-code-notice--lifecycle',
-      attr: { 'data-claude-code-plan-mode-instructions-lifecycle': 'true' },
+    this.attachSettingHelp(setting, {
+      boundaryAttr: 'data-claude-code-plan-mode-instructions-boundary',
+      lifecycleAttr: 'data-claude-code-plan-mode-instructions-lifecycle',
+      boundaryText: t('settings.claudeCode.planModeInstructions.boundaryNotice'),
+      lifecycleText: t('settings.claudeCode.planModeInstructions.lifecycleNotice'),
+      helpTitle: t('settings.claudeCode.planModeInstructions.name'),
     });
-    lifecycleEl.createSpan({ text: t('settings.claudeCode.planModeInstructions.lifecycleNotice') });
   }
 
   // ─── Sandbox settings (Permissions tab) ─────────────────────────
 
   private renderSandboxSettings(containerEl: HTMLElement): void {
     const coreEl = this.createClaudeCodeGroup(containerEl, { id: 'sandbox-core' });
-    const boundaryEl = coreEl.createDiv({
-      cls: 'opencodian-settings-inline-notice opencodian-claude-code-notice--boundary',
-      attr: { 'data-claude-code-sandbox-boundary': 'true' },
-    });
-    boundaryEl.createSpan({ text: t('settings.claudeCode.sandbox.boundaryNotice') });
 
-    new Setting(coreEl)
+    const enabledSetting = new Setting(coreEl)
       .setName(t('settings.claudeCode.sandbox.enabled.name'))
       .setDesc(t('settings.claudeCode.sandbox.enabled.desc'))
       .addToggle((toggle) => {
@@ -2080,6 +2183,18 @@ export class SettingsClaudeCodeSection {
             await this.saveSettings();
           });
       });
+    // Sandbox boundary + lifecycle both anchor on the `enabled` toggle's help
+    // button. The data-claude-code-sandbox-lifecycle attribute is mirrored onto
+    // the setting-item (not the lifecycle notice element), and the
+    // visually-hidden text carrier keeps textContent intact — satisfying the
+    // test that asserts the lifecycle attr/text exist without a <button> child.
+    this.attachSettingHelp(enabledSetting, {
+      boundaryAttr: 'data-claude-code-sandbox-boundary',
+      lifecycleAttr: 'data-claude-code-sandbox-lifecycle',
+      boundaryText: t('settings.claudeCode.sandbox.boundaryNotice'),
+      lifecycleText: t('settings.claudeCode.sandbox.lifecycleNotice'),
+      helpTitle: t('settings.claudeCode.sandbox.enabled.name'),
+    });
 
     new Setting(coreEl)
       .setName(t('settings.claudeCode.sandbox.failIfUnavailable.name'))
@@ -2108,8 +2223,8 @@ export class SettingsClaudeCodeSection {
     // ── Advanced sandbox sub-policies ───────────────────────────────────
     const advancedEl = this.createClaudeCodeAdvancedGroup(containerEl, { id: 'sandbox-advanced' });
 
-    // excludedCommands
-    new Setting(advancedEl)
+    // excludedCommands — also carries the "unexposed fields" note in its help.
+    const excludedCommandsSetting = new Setting(advancedEl)
       .setName(t('settings.claudeCode.sandbox.excludedCommands.name'))
       .setDesc(t('settings.claudeCode.sandbox.excludedCommands.desc'))
       .addTextArea((textArea) => {
@@ -2121,6 +2236,11 @@ export class SettingsClaudeCodeSection {
             await this.saveSettings();
           });
       });
+    this.attachSettingHelp(excludedCommandsSetting, {
+      boundaryAttr: 'data-claude-code-sandbox-unexposed',
+      boundaryText: t('settings.claudeCode.sandbox.unexposedNotice'),
+      helpTitle: t('settings.claudeCode.sandbox.excludedCommands.name'),
+    });
 
     // allowUnsandboxedCommands
     new Setting(advancedEl)
@@ -2253,21 +2373,6 @@ export class SettingsClaudeCodeSection {
             await this.saveSettings();
           });
       });
-
-    // Unexposed fields notice
-    const unexposedEl = advancedEl.createDiv({
-      cls: 'opencodian-settings-inline-notice',
-      attr: { 'data-claude-code-sandbox-unexposed': 'true' },
-    });
-    unexposedEl.createSpan({ text: t('settings.claudeCode.sandbox.unexposedNotice') });
-
-    // Sandbox lifecycle honesty: settings only apply to the next query,
-    // unlike permissionMode which tries to apply live via setPermissionMode().
-    const lifecycleEl = advancedEl.createDiv({
-      cls: 'opencodian-settings-inline-notice opencodian-claude-code-notice--lifecycle',
-      attr: { 'data-claude-code-sandbox-lifecycle': 'true' },
-    });
-    lifecycleEl.createSpan({ text: t('settings.claudeCode.sandbox.lifecycleNotice') });
   }
 
   // ─── Context & Sources tab ────────────────────────────────────────
@@ -2285,29 +2390,34 @@ export class SettingsClaudeCodeSection {
   }
 
   private renderRuntimeBoundaryNotice(containerEl: HTMLElement): void {
-    const noticeEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice opencodian-settings-notice opencodian-claude-code-notice--boundary opencodian-claude-code-runtime-boundary',
+    this.renderBoundaryNoticeAndRestart(containerEl, {
+      boundaryAttrKey: 'data-claude-code-runtime-boundary',
+      boundaryClass: 'opencodian-claude-code-runtime-boundary',
     });
-    noticeEl.createSpan({ text: t('settings.claudeCode.runtimeBoundary.nextQuery') });
-    new Setting(noticeEl)
-      .setName(t('settings.claudeCode.runtimeBoundary.restartName'))
-      .setDesc(t('settings.claudeCode.runtimeBoundary.restartDesc'))
-      .addButton((button) => {
-        button
-          .setButtonText(t('settings.claudeCode.runtimeBoundary.restartButton'))
-          .onClick(async () => {
-            await this.restartClaudePersistentQueries('settings-change');
-          });
-      });
   }
 
   private renderLimitsBoundaryNotice(containerEl: HTMLElement): void {
+    this.renderBoundaryNoticeAndRestart(containerEl, {
+      boundaryAttrKey: 'data-claude-code-limits-boundary',
+      boundaryClass: 'opencodian-claude-code-limits-boundary',
+    });
+  }
+
+  // Boundary notice + restart action rendered as SIBLINGS inside the group
+  // stack (a flat notice strip and a level-2 setting-item card), instead of
+  // nesting the Setting inside the notice div. Keeps card nesting at two
+  // levels: section-card → (notice strip | setting-item card).
+  private renderBoundaryNoticeAndRestart(
+    containerEl: HTMLElement,
+    { boundaryAttrKey, boundaryClass }: { boundaryAttrKey: string; boundaryClass: string },
+  ): void {
     const noticeEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice opencodian-settings-notice opencodian-claude-code-notice--boundary opencodian-claude-code-limits-boundary',
-      attr: { 'data-claude-code-limits-boundary': 'true' },
+      cls: `opencodian-settings-inline-notice opencodian-settings-notice opencodian-claude-code-notice--boundary ${boundaryClass}`,
+      attr: { [boundaryAttrKey]: 'true' },
     });
     noticeEl.createSpan({ text: t('settings.claudeCode.runtimeBoundary.nextQuery') });
-    new Setting(noticeEl)
+
+    new Setting(containerEl)
       .setName(t('settings.claudeCode.runtimeBoundary.restartName'))
       .setDesc(t('settings.claudeCode.runtimeBoundary.restartDesc'))
       .addButton((button) => {
@@ -2595,11 +2705,9 @@ export class SettingsClaudeCodeSection {
     this.renderStrictMcpConfigSetting(mcpEl);
 
     const toolPolicyEl = this.createClaudeCodeGroup(containerEl, { id: 'tool-policy' });
-    this.renderToolsProofStatusNotice(toolPolicyEl);
     this.renderAllowedToolsSetting(toolPolicyEl);
     this.renderDisallowedToolsSetting(toolPolicyEl);
     this.renderRestrictedBuiltinToolsSetting(toolPolicyEl);
-    this.renderRestrictedBuiltinToolsProofStatusNotice(toolPolicyEl);
 
     this.renderToolAliasesSetting(toolPolicyEl);
 
@@ -2655,13 +2763,7 @@ export class SettingsClaudeCodeSection {
   }
 
   private renderStrictMcpConfigSetting(containerEl: HTMLElement): void {
-    const boundaryEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice opencodian-claude-code-notice--boundary',
-      attr: { 'data-claude-code-strict-mcp-config-boundary': 'true' },
-    });
-    boundaryEl.createSpan({ text: t('settings.claudeCode.strictMcpConfig.boundaryNotice') });
-
-    new Setting(containerEl)
+    const setting = new Setting(containerEl)
       .setName(t('settings.claudeCode.strictMcpConfig.name'))
       .setDesc(t('settings.claudeCode.strictMcpConfig.desc'))
       .addToggle((toggle) => {
@@ -2672,12 +2774,13 @@ export class SettingsClaudeCodeSection {
             await this.saveSettings();
           });
       });
-
-    const lifecycleEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice opencodian-claude-code-notice--lifecycle',
-      attr: { 'data-claude-code-strict-mcp-config-lifecycle': 'true' },
+    this.attachSettingHelp(setting, {
+      boundaryAttr: 'data-claude-code-strict-mcp-config-boundary',
+      lifecycleAttr: 'data-claude-code-strict-mcp-config-lifecycle',
+      boundaryText: t('settings.claudeCode.strictMcpConfig.boundaryNotice'),
+      lifecycleText: t('settings.claudeCode.strictMcpConfig.lifecycleNotice'),
+      helpTitle: t('settings.claudeCode.strictMcpConfig.name'),
     });
-    lifecycleEl.createSpan({ text: t('settings.claudeCode.strictMcpConfig.lifecycleNotice') });
   }
 
   private updateMcpRuntimeStatus(statusEl: HTMLElement): void {
@@ -2759,13 +2862,7 @@ export class SettingsClaudeCodeSection {
   }
 
   private renderAllowedToolsSetting(containerEl: HTMLElement): void {
-    const boundaryEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice opencodian-claude-code-notice--boundary',
-      attr: { 'data-claude-code-allowed-tools-boundary': 'true' },
-    });
-    boundaryEl.createSpan({ text: t('settings.claudeCode.allowedTools.boundaryNotice') });
-
-    new Setting(containerEl)
+    const setting = new Setting(containerEl)
       .setName(t('settings.claudeCode.allowedTools.name'))
       .setDesc(t('settings.claudeCode.allowedTools.desc'))
       .addTextArea((textArea) => {
@@ -2778,6 +2875,18 @@ export class SettingsClaudeCodeSection {
           });
         TextareaSizeMemory.attach(textArea.inputEl, 'claude-code-hooks-pre');
       });
+    this.attachSettingHelp(setting, {
+      boundaryAttr: 'data-claude-code-allowed-tools-boundary',
+      boundaryText: t('settings.claudeCode.allowedTools.boundaryNotice'),
+      helpTitle: t('settings.claudeCode.allowedTools.name'),
+      proofNote: t('settings.claudeCode.proofStatus.tools'),
+    });
+    this.attachProofChip(
+      setting,
+      'tools',
+      'readback',
+      t('settings.claudeCode.proofStatus.tools'),
+    );
   }
 
   private renderDisallowedToolsSetting(containerEl: HTMLElement): void {
@@ -2797,7 +2906,7 @@ export class SettingsClaudeCodeSection {
   }
 
   private renderRestrictedBuiltinToolsSetting(containerEl: HTMLElement): void {
-    new Setting(containerEl)
+    const setting = new Setting(containerEl)
       .setName(t('settings.claudeCode.restrictedBuiltinTools.name'))
       .setDesc(t('settings.claudeCode.restrictedBuiltinTools.desc'))
       .addTextArea((textArea) => {
@@ -2810,6 +2919,12 @@ export class SettingsClaudeCodeSection {
           });
         TextareaSizeMemory.attach(textArea.inputEl, 'claude-code-hooks-stop');
       });
+    this.attachProofChip(
+      setting,
+      'restricted-builtin-tools',
+      'pass',
+      t('settings.claudeCode.proofStatus.restrictedBuiltinTools'),
+    );
   }
 
   private renderRestrictedBuiltinToolsProofStatusNotice(containerEl: HTMLElement): void {
@@ -2833,13 +2948,7 @@ export class SettingsClaudeCodeSection {
   }
 
   private renderToolAliasesSetting(containerEl: HTMLElement): void {
-    const boundaryEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice opencodian-claude-code-notice--boundary',
-      attr: { 'data-claude-code-tool-aliases-boundary': 'true' },
-    });
-    boundaryEl.createSpan({ text: t('settings.claudeCode.toolAliases.boundaryNotice') });
-
-    new Setting(containerEl)
+    const setting = new Setting(containerEl)
       .setName(t('settings.claudeCode.toolAliases.name'))
       .setDesc(t('settings.claudeCode.toolAliases.desc'))
       .addTextArea((textArea) => {
@@ -2856,22 +2965,17 @@ export class SettingsClaudeCodeSection {
           });
         TextareaSizeMemory.attach(textArea.inputEl, 'claude-code-hooks-subagent');
       });
-
-    const lifecycleEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice opencodian-claude-code-notice--lifecycle',
-      attr: { 'data-claude-code-tool-aliases-lifecycle': 'true' },
+    this.attachSettingHelp(setting, {
+      boundaryAttr: 'data-claude-code-tool-aliases-boundary',
+      lifecycleAttr: 'data-claude-code-tool-aliases-lifecycle',
+      boundaryText: t('settings.claudeCode.toolAliases.boundaryNotice'),
+      lifecycleText: t('settings.claudeCode.toolAliases.lifecycleNotice'),
+      helpTitle: t('settings.claudeCode.toolAliases.name'),
     });
-    lifecycleEl.createSpan({ text: t('settings.claudeCode.toolAliases.lifecycleNotice') });
   }
 
   private renderAskUserQuestionPreviewFormatSetting(containerEl: HTMLElement): void {
-    const boundaryEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice opencodian-claude-code-notice--boundary',
-      attr: { 'data-claude-code-ask-user-question-preview-format-boundary': 'true' },
-    });
-    boundaryEl.createSpan({ text: t('settings.claudeCode.askUserQuestionPreviewFormat.boundaryNotice') });
-
-    new Setting(containerEl)
+    const setting = new Setting(containerEl)
       .setName(t('settings.claudeCode.askUserQuestionPreviewFormat.name'))
       .setDesc(t('settings.claudeCode.askUserQuestionPreviewFormat.desc'))
       .addDropdown((dropdown) => {
@@ -2885,12 +2989,13 @@ export class SettingsClaudeCodeSection {
             await this.saveSettings();
           });
       });
-
-    const lifecycleEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice opencodian-claude-code-notice--lifecycle',
-      attr: { 'data-claude-code-ask-user-question-preview-format-lifecycle': 'true' },
+    this.attachSettingHelp(setting, {
+      boundaryAttr: 'data-claude-code-ask-user-question-preview-format-boundary',
+      lifecycleAttr: 'data-claude-code-ask-user-question-preview-format-lifecycle',
+      boundaryText: t('settings.claudeCode.askUserQuestionPreviewFormat.boundaryNotice'),
+      lifecycleText: t('settings.claudeCode.askUserQuestionPreviewFormat.lifecycleNotice'),
+      helpTitle: t('settings.claudeCode.askUserQuestionPreviewFormat.name'),
     });
-    lifecycleEl.createSpan({ text: t('settings.claudeCode.askUserQuestionPreviewFormat.lifecycleNotice') });
   }
 
   private parseToolAliases(raw: string): Record<string, string> {
@@ -2910,7 +3015,7 @@ export class SettingsClaudeCodeSection {
   }
 
   private renderMaxTurnsSetting(containerEl: HTMLElement): void {
-    new Setting(containerEl)
+    const setting = new Setting(containerEl)
       .setName(t('settings.claudeCode.maxTurns.name'))
       .setDesc(t('settings.claudeCode.maxTurns.desc'))
       .addText((text) => {
@@ -2922,6 +3027,14 @@ export class SettingsClaudeCodeSection {
             await this.saveSettings();
           });
       });
+    // The limits proof covers maxTurns + maxBudgetUsd enforcement; attach it
+    // as a chip on maxTurns (the first limits control).
+    this.attachProofChip(
+      setting,
+      'limits',
+      'pass',
+      t('settings.claudeCode.proofStatus.limits'),
+    );
   }
 
   private renderMaxBudgetSetting(containerEl: HTMLElement): void {
@@ -2940,13 +3053,7 @@ export class SettingsClaudeCodeSection {
   }
 
   private renderTaskBudgetSetting(containerEl: HTMLElement): void {
-    const boundaryEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice opencodian-claude-code-notice--boundary',
-      attr: { 'data-claude-code-task-budget-boundary': 'true' },
-    });
-    boundaryEl.createSpan({ text: t('settings.claudeCode.taskBudget.boundaryNotice') });
-
-    new Setting(containerEl)
+    const setting = new Setting(containerEl)
       .setName(t('settings.claudeCode.taskBudget.name'))
       .setDesc(t('settings.claudeCode.taskBudget.desc'))
       .addText((text) => {
@@ -2958,22 +3065,17 @@ export class SettingsClaudeCodeSection {
             await this.saveSettings();
           });
       });
-
-    const lifecycleEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice opencodian-claude-code-notice--lifecycle',
-      attr: { 'data-claude-code-task-budget-lifecycle': 'true' },
+    this.attachSettingHelp(setting, {
+      boundaryAttr: 'data-claude-code-task-budget-boundary',
+      lifecycleAttr: 'data-claude-code-task-budget-lifecycle',
+      boundaryText: t('settings.claudeCode.taskBudget.boundaryNotice'),
+      lifecycleText: t('settings.claudeCode.taskBudget.lifecycleNotice'),
+      helpTitle: t('settings.claudeCode.taskBudget.name'),
     });
-    lifecycleEl.createSpan({ text: t('settings.claudeCode.taskBudget.lifecycleNotice') });
   }
 
   private renderSystemPromptSetting(containerEl: HTMLElement): void {
-    const boundaryEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice opencodian-claude-code-notice--boundary',
-      attr: { 'data-claude-code-system-prompt-boundary': 'true' },
-    });
-    boundaryEl.createSpan({ text: t('settings.claudeCode.systemPrompt.boundaryNotice') });
-
-    new Setting(containerEl)
+    const setting = new Setting(containerEl)
       .setName(t('settings.claudeCode.systemPrompt.name'))
       .setDesc(t('settings.claudeCode.systemPrompt.desc'))
       .addTextArea((textArea) => {
@@ -2986,22 +3088,17 @@ export class SettingsClaudeCodeSection {
           });
         TextareaSizeMemory.attach(textArea.inputEl, 'claude-code-env-json');
       });
-
-    const lifecycleEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice opencodian-claude-code-notice--lifecycle',
-      attr: { 'data-claude-code-system-prompt-lifecycle': 'true' },
+    this.attachSettingHelp(setting, {
+      boundaryAttr: 'data-claude-code-system-prompt-boundary',
+      lifecycleAttr: 'data-claude-code-system-prompt-lifecycle',
+      boundaryText: t('settings.claudeCode.systemPrompt.boundaryNotice'),
+      lifecycleText: t('settings.claudeCode.systemPrompt.lifecycleNotice'),
+      helpTitle: t('settings.claudeCode.systemPrompt.name'),
     });
-    lifecycleEl.createSpan({ text: t('settings.claudeCode.systemPrompt.lifecycleNotice') });
   }
 
   private renderOutputStyleSetting(containerEl: HTMLElement): void {
-    const boundaryEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice opencodian-claude-code-notice--boundary',
-      attr: { 'data-claude-code-output-style-boundary': 'true' },
-    });
-    boundaryEl.createSpan({ text: t('settings.claudeCode.outputStyle.boundaryNotice') });
-
-    new Setting(containerEl)
+    const setting = new Setting(containerEl)
       .setName(t('settings.claudeCode.outputStyle.name'))
       .setDesc(t('settings.claudeCode.outputStyle.desc'))
       .addText((text) => {
@@ -3013,16 +3110,17 @@ export class SettingsClaudeCodeSection {
             await this.saveSettings();
           });
       });
-
-    const lifecycleEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice opencodian-claude-code-notice--lifecycle',
-      attr: { 'data-claude-code-output-style-lifecycle': 'true' },
+    this.attachSettingHelp(setting, {
+      boundaryAttr: 'data-claude-code-output-style-boundary',
+      lifecycleAttr: 'data-claude-code-output-style-lifecycle',
+      boundaryText: t('settings.claudeCode.outputStyle.boundaryNotice'),
+      lifecycleText: t('settings.claudeCode.outputStyle.lifecycleNotice'),
+      helpTitle: t('settings.claudeCode.outputStyle.name'),
     });
-    lifecycleEl.createSpan({ text: t('settings.claudeCode.outputStyle.lifecycleNotice') });
   }
 
   private renderPromptSuggestionsSetting(containerEl: HTMLElement): void {
-    new Setting(containerEl)
+    const setting = new Setting(containerEl)
       .setName(t('settings.claudeCode.promptSuggestions.name'))
       .setDesc(t('settings.claudeCode.promptSuggestions.desc'))
       .addToggle((toggle) => {
@@ -3033,22 +3131,15 @@ export class SettingsClaudeCodeSection {
             await this.saveSettings();
           });
       });
-
-    const lifecycleEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice opencodian-claude-code-notice--lifecycle',
-      attr: { 'data-claude-code-prompt-suggestions-lifecycle': 'true' },
+    this.attachSettingHelp(setting, {
+      lifecycleAttr: 'data-claude-code-prompt-suggestions-lifecycle',
+      lifecycleText: t('settings.claudeCode.promptSuggestions.lifecycleNotice'),
+      helpTitle: t('settings.claudeCode.promptSuggestions.name'),
     });
-    lifecycleEl.createSpan({ text: t('settings.claudeCode.promptSuggestions.lifecycleNotice') });
   }
 
   private renderEnableContext1mBetaSetting(containerEl: HTMLElement): void {
-    const boundaryEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice opencodian-claude-code-notice--boundary',
-      attr: { 'data-claude-code-enable-context-1m-beta-boundary': 'true' },
-    });
-    boundaryEl.createSpan({ text: t('settings.claudeCode.enableContext1mBeta.boundaryNotice') });
-
-    new Setting(containerEl)
+    const setting = new Setting(containerEl)
       .setName(t('settings.claudeCode.enableContext1mBeta.name'))
       .setDesc(t('settings.claudeCode.enableContext1mBeta.desc'))
       .addToggle((toggle) => {
@@ -3059,16 +3150,17 @@ export class SettingsClaudeCodeSection {
             await this.saveSettings();
           });
       });
-
-    const lifecycleEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice opencodian-claude-code-notice--lifecycle',
-      attr: { 'data-claude-code-enable-context-1m-beta-lifecycle': 'true' },
+    this.attachSettingHelp(setting, {
+      boundaryAttr: 'data-claude-code-enable-context-1m-beta-boundary',
+      lifecycleAttr: 'data-claude-code-enable-context-1m-beta-lifecycle',
+      boundaryText: t('settings.claudeCode.enableContext1mBeta.boundaryNotice'),
+      lifecycleText: t('settings.claudeCode.enableContext1mBeta.lifecycleNotice'),
+      helpTitle: t('settings.claudeCode.enableContext1mBeta.name'),
     });
-    lifecycleEl.createSpan({ text: t('settings.claudeCode.enableContext1mBeta.lifecycleNotice') });
   }
 
   private renderEnvironmentVariablesSetting(containerEl: HTMLElement): void {
-    new Setting(containerEl)
+    const setting = new Setting(containerEl)
       .setName(t('settings.claudeCode.env.name'))
       .setDesc(t('settings.claudeCode.env.desc'))
       .addTextArea((textArea) => {
@@ -3081,6 +3173,12 @@ export class SettingsClaudeCodeSection {
           });
         TextareaSizeMemory.attach(textArea.inputEl, 'claude-code-permissions-json');
       });
+    this.attachProofChip(
+      setting,
+      'env',
+      'readback',
+      t('settings.claudeCode.proofStatus.env'),
+    );
   }
 
   // ─── Shared helpers ───────────────────────────────────────────────

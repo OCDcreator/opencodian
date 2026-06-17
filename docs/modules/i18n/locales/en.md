@@ -1,7 +1,9 @@
 # English Locale
 
 > **源码**: `src/i18n/locales/en.ts`
-> **最近更新**: 2026-06-17 Claude Code permission selector copy — updated `settings.claudeCode.permissionMode.*` and `chat.claudeCode.permissionMode.*.description` so the chat toolbar can show screenshot-style compact labels (`Ask first`, `Auto edit`, `Plan mode`, `Full access`) while keeping `Full access` honest about bypassing permission checks.
+> **最近更新**: 2026-06-18 Claude Code notice collapse — added `settings.claudeCode.help.boundaryLabel` / `.lifecycleLabel` / `.proofLabel` section labels for the new `ClaudeCodeHelpModal` that carries boundary/lifecycle/proof text out of the dense settings surface into a per-setting help button.
+>
+> **Previously**: 2026-06-17 Claude Code permission selector copy — updated `settings.claudeCode.permissionMode.*` and `chat.claudeCode.permissionMode.*.description` so the chat toolbar can show screenshot-style compact labels (`Ask first`, `Auto edit`, `Plan mode`, `Full access`) while keeping `Full access` honest about bypassing permission checks.
 >
 > **Previously**: 2026-06-17 Claude Code settings grouping — added `settings.claudeCode.groups.*` titles/descriptions for the reorganized Runtime / Model & Thinking / Permissions / Context & Sources / Tools subtabs.
 >

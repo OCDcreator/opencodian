@@ -36,6 +36,7 @@ data.json
 .gemini/
 .kimi/
 .opencode/
+.zcode/
 .config/opencode/
 
 # Reference projects

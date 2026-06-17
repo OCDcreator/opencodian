@@ -1,27 +1,46 @@
 /* ─── Claude Code settings semantic groups ───────────────────────────── */
+/* Spacing tokens scoped to the Claude Code settings block so all five tabs
+   (Runtime, Model & Thinking, Permissions, Context & Sources, Tools) share
+   the same vertical rhythm. Mirrors the Codex account surface tokens so the
+   two backend settings areas feel like one surface. */
+.opencodian-settings .opencodian-settings-claude-code-block {
+  --oc-claude-card-gap: 12px;
+  --oc-claude-group-header-gap: 16px;
+  --oc-claude-card-title-body-gap: 8px;
+  --oc-claude-card-body-gap: 10px;
+  --oc-claude-card-padding: 14px 16px;
+}
+
 .opencodian-settings .opencodian-claude-code-tab-body,
 .opencodian-settings .opencodian-settings-claude-code-tab-body {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--oc-claude-card-gap);
 }
 
+/* Group is a FLAT semantic container (margin only), not a card.
+   Card base (border + radius + bg + padding) is applied to the
+   setting-items / notices / readbacks inside the group stack, keeping
+   the DOM at two card levels max: section-card → setting-item-card. */
 .opencodian-settings .opencodian-claude-code-group,
 .opencodian-settings .opencodian-settings-claude-code-group {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 14px 16px;
-  border: 1px solid color-mix(in srgb, var(--background-modifier-border) 76%, transparent);
-  border-radius: var(--opencodian-settings-radius-row);
-  background: color-mix(in srgb, var(--background-secondary) 58%, transparent);
+  margin: 0;
+}
+
+.opencodian-settings .opencodian-claude-code-group + .opencodian-claude-code-group,
+.opencodian-settings .opencodian-settings-claude-code-group + .opencodian-settings-claude-code-group {
+  margin-top: var(--oc-claude-card-gap);
 }
 
 .opencodian-settings .opencodian-claude-code-group-header,
 .opencodian-settings .opencodian-settings-claude-code-group-header {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  align-items: center;
   gap: 6px;
+  margin: 0;
 }
 
 .opencodian-settings .opencodian-claude-code-group-title,
@@ -34,6 +53,32 @@
   line-height: 1.35;
 }
 
+/* Group description collapsed into a compact help-circle button beside the
+   title. The full description shows on hover/focus via data-settings-tooltip.
+   Mirrors the opencodian-skill-permission-help-button affordance. */
+.opencodian-settings .opencodian-claude-code-group-help-button {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  color: var(--text-faint);
+  cursor: help;
+}
+
+.opencodian-settings .opencodian-claude-code-group-help-button:hover,
+.opencodian-settings .opencodian-claude-code-group-help-button:focus-visible {
+  color: var(--text-normal);
+}
+
+.opencodian-settings .opencodian-claude-code-group-help-button:focus-visible {
+  outline: 2px solid var(--opencodian-settings-focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--opencodian-settings-radius-inline);
+}
+
 .opencodian-settings .opencodian-claude-code-group-desc,
 .opencodian-settings .opencodian-settings-claude-code-group-desc {
   margin: 0;
@@ -42,11 +87,30 @@
   line-height: 1.45;
 }
 
+/* Group controls (the inner stack) sit one header-gap below the header.
+   setting-items / notices / readbacks inside the stack become the
+   level-2 card surfaces. */
 .opencodian-settings .opencodian-claude-code-stack,
 .opencodian-settings .opencodian-settings-claude-code-group-stack {
   display: flex;
   flex-direction: column;
-  gap: var(--opencodian-settings-space-sm);
+  gap: var(--oc-claude-card-gap);
+  margin-top: var(--oc-claude-group-header-gap);
+}
+
+/* Level-2 card base applied to every control/notice inside a Claude Code
+   group, so they read as the same surface vocabulary as Codex. */
+.opencodian-settings .opencodian-settings-claude-code-block .opencodian-claude-code-stack > .setting-item,
+.opencodian-settings .opencodian-settings-claude-code-block .opencodian-settings-claude-code-group-stack > .setting-item,
+.opencodian-settings .opencodian-settings-claude-code-block .opencodian-settings-proof-status,
+.opencodian-settings .opencodian-settings-claude-code-block .opencodian-settings-readback,
+.opencodian-settings .opencodian-settings-claude-code-block .opencodian-claude-code-readback {
+  margin: 0;
+  padding: var(--oc-claude-card-padding);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--opencodian-settings-radius-row);
+  background: var(--background-secondary);
+  box-shadow: none;
 }
 
 .opencodian-settings .opencodian-claude-code-inline-meta,
@@ -56,11 +120,12 @@
   line-height: 1.45;
 }
 
+/* Advanced sandbox: stays visually de-emphasized via opacity + a muted
+   summary title, but no longer stacks a second border/background on top
+   of the group card (the group itself is now flat). */
 .opencodian-settings .opencodian-claude-code-advanced,
 .opencodian-settings .opencodian-settings-advanced-sandbox {
-  margin-top: var(--opencodian-settings-space-xs);
-  border: 1px solid color-mix(in srgb, var(--background-modifier-border) 78%, transparent);
-  background: color-mix(in srgb, var(--background-secondary) 52%, transparent);
+  margin-top: var(--oc-claude-card-gap);
 }
 
 .opencodian-settings .opencodian-claude-code-advanced-summary {
@@ -79,8 +144,11 @@
 }
 
 /* ─── Claude Code group notices (compact, state-honest) ─────────────── */
+/* Inline notices inside a group stack are level-2 card strips, matching
+   the setting-item card base but with state-tinted fills. */
 .opencodian-settings .opencodian-claude-code-group .opencodian-settings-inline-notice,
 .opencodian-settings .opencodian-settings-claude-code-group .opencodian-settings-inline-notice {
+  margin: 0;
   padding: 6px 10px;
   border-radius: var(--opencodian-settings-radius-inline);
   font-size: 12px;
@@ -132,7 +200,59 @@
 
 .opencodian-settings .opencodian-claude-code-readback,
 .opencodian-settings .opencodian-settings-claude-code-block .opencodian-settings-readback {
-  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--oc-claude-card-body-gap);
+  padding: var(--oc-claude-card-padding);
   background: color-mix(in srgb, var(--text-accent) 4%, var(--opencodian-settings-row-bg));
   border: 1px solid color-mix(in srgb, var(--text-accent) 12%, var(--opencodian-settings-row-border));
+}
+
+/* ─── Collapsed notice text (sr-only carrier) ───────────────────────── */
+/* Boundary/lifecycle/proof notice text was collapsed out of the dense
+   settings surface into help buttons + tooltips. To keep `textContent`
+   assertions and screen readers honest, the text lives in a visually-hidden
+   span attached to the setting-item. CSS visually hides it while keeping
+   the text in the accessibility tree and DOM textContent. */
+.opencodian-settings .opencodian-claude-code-notice-text {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ─── Proof-status chip ─────────────────────────────────────────────── */
+/* Proof-status (pass/readback) collapsed from a full notice strip into a
+   compact colored chip beside the setting control. Green = pass,
+   blue/accent = readback. Tooltip (data-settings-tooltip) carries the
+   evidence text. The data-proof-state attribute is preserved on the chip
+   so proof-status semantics and tests remain stable. */
+.opencodian-settings .opencodian-claude-code-proof-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 10px;
+  height: 10px;
+  margin-inline-start: var(--opencodian-settings-space-sm);
+  border-radius: 999px;
+  background: var(--opencodian-settings-row-border);
+  vertical-align: middle;
+  cursor: help;
+}
+
+.opencodian-settings .opencodian-claude-code-proof-chip[data-proof-state="pass"] {
+  background: var(--text-success, var(--color-green));
+}
+
+.opencodian-settings .opencodian-claude-code-proof-chip[data-proof-state="readback"] {
+  background: var(--text-accent);
+}
+
+.opencodian-settings .opencodian-claude-code-proof-chip[data-proof-state="wiring"] {
+  background: var(--text-warning, var(--color-yellow));
 }
