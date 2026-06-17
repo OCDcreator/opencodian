@@ -14,6 +14,7 @@ export interface PermissionModeOption {
   id: string;
   label: string;
   description: string;
+  icon?: string;
 }
 
 export interface PermissionModeConfig {
@@ -24,6 +25,8 @@ export interface PermissionModeConfig {
   modeCssClasses: readonly string[];
   /** Stable data attribute value identifying the backend system. */
   backendLabel: 'opencode' | 'claude-code' | 'codex';
+  /** Optional visual variant class shared by the container, trigger, and dropdown. */
+  variantClass?: string;
   /**
    * Optional boundary hint shown as the trigger element title.
    * Use this to honestly communicate that the selector only affects
@@ -35,6 +38,7 @@ export interface PermissionModeConfig {
 interface PermissionTriggerDisplayState {
   label: string;
   modeClass: string;
+  icon: string;
 }
 
 // ─── Factory: OpenCode permission templates (yolo/normal/plan) ────────
@@ -78,33 +82,38 @@ export function createClaudeCodePermissionConfig(): PermissionModeConfig {
         label: t('settings.claudeCode.permissionMode.default'),
         description: t('chat.claudeCode.permissionMode.default.description')
           || 'Default permission prompts',
+        icon: 'hand',
       },
       {
         id: 'acceptEdits',
         label: t('settings.claudeCode.permissionMode.acceptEdits'),
         description: t('chat.claudeCode.permissionMode.acceptEdits.description')
           || 'Auto-accept file edits',
-      },
-      {
-        id: 'bypassPermissions',
-        label: t('settings.claudeCode.permissionMode.bypassPermissions'),
-        description: t('chat.claudeCode.permissionMode.bypassPermissions.description')
-          || 'Skip all permission prompts',
+        icon: 'shield-check',
       },
       {
         id: 'plan',
         label: t('settings.claudeCode.permissionMode.plan'),
         description: t('chat.claudeCode.permissionMode.plan.description')
           || 'Plan mode — review before executing',
+        icon: 'clipboard-list',
+      },
+      {
+        id: 'bypassPermissions',
+        label: t('settings.claudeCode.permissionMode.bypassPermissions'),
+        description: t('chat.claudeCode.permissionMode.bypassPermissions.description')
+          || 'Reduce confirmations; bypasses permission checks',
+        icon: 'shield-alert',
       },
     ],
     displayMap: {
-      default: 'DEF',
-      acceptEdits: 'EDIT',
-      bypassPermissions: 'BYP',
-      plan: 'PLAN',
+      default: t('settings.claudeCode.permissionMode.default'),
+      acceptEdits: t('settings.claudeCode.permissionMode.acceptEdits'),
+      bypassPermissions: t('settings.claudeCode.permissionMode.bypassPermissions'),
+      plan: t('settings.claudeCode.permissionMode.plan'),
     } as Record<ClaudeCodePermissionMode, string>,
     modeCssClasses: ['mode-default', 'mode-acceptEdits', 'mode-bypassPermissions', 'mode-plan'] as const,
+    variantClass: 'opencodian-permission-selector--claude-code',
   };
 }
 
@@ -162,8 +171,11 @@ export class PermissionModeSelectorCoordinator {
   mount(containerEl: HTMLElement): void {
     this.destroy();
     this.containerEl = containerEl;
+    if (this.config.variantClass) {
+      this.containerEl.addClass(this.config.variantClass);
+    }
     this.triggerEl = containerEl.createDiv({
-      cls: 'opencodian-permission-trigger',
+      cls: this.joinClasses('opencodian-permission-trigger', this.config.variantClass),
       attr: {
         role: 'button',
         tabindex: '0',
@@ -176,8 +188,12 @@ export class PermissionModeSelectorCoordinator {
     const iconEl = this.triggerEl.createSpan({ cls: 'opencodian-permission-trigger-icon' });
     setIcon(iconEl, 'shield');
     this.triggerEl.createSpan({ cls: 'opencodian-permission-trigger-text' });
+    const chevronEl = this.triggerEl.createSpan({ cls: 'opencodian-permission-trigger-chevron' });
+    setIcon(chevronEl, 'chevron-down');
 
-    this.dropdownEl = containerEl.createDiv({ cls: 'opencodian-permission-dropdown' });
+    this.dropdownEl = containerEl.createDiv({
+      cls: this.joinClasses('opencodian-permission-dropdown', this.config.variantClass),
+    });
     this.dropdownEl.style.display = 'none';
     this.buildDropdown();
     this.updateTriggerDisplay();
@@ -240,9 +256,11 @@ export class PermissionModeSelectorCoordinator {
 
   private getTriggerDisplayState(): PermissionTriggerDisplayState {
     const mode = this.host.getPermissionMode();
+    const option = this.getPermissionModeOptions().find((candidate) => candidate.id === mode);
     return {
       label: this.config.displayMap[mode] || mode,
       modeClass: `mode-${mode}`,
+      icon: option?.icon ?? 'shield',
     };
   }
 
@@ -253,6 +271,11 @@ export class PermissionModeSelectorCoordinator {
     const textEl = triggerEl.querySelector('.opencodian-permission-trigger-text');
     if (textEl) {
       textEl.textContent = displayState.label;
+    }
+
+    const iconEl = triggerEl.querySelector<HTMLElement>('.opencodian-permission-trigger-icon');
+    if (iconEl) {
+      setIcon(iconEl, displayState.icon);
     }
 
     triggerEl.removeClass(...this.config.modeCssClasses);
@@ -273,7 +296,7 @@ export class PermissionModeSelectorCoordinator {
       });
 
       const iconWrapper = optionEl.createSpan({ cls: 'opencodian-permission-option-icon' });
-      setIcon(iconWrapper, 'shield');
+      setIcon(iconWrapper, mode.icon ?? 'shield');
 
       const contentEl = optionEl.createDiv({ cls: 'opencodian-permission-option-content' });
       contentEl.createDiv({ cls: 'opencodian-permission-option-label', text: mode.label });
@@ -293,6 +316,10 @@ export class PermissionModeSelectorCoordinator {
 
   private getPermissionModeOptions(): PermissionModeOption[] {
     return this.config.options;
+  }
+
+  private joinClasses(...classes: Array<string | undefined>): string {
+    return classes.filter(Boolean).join(' ');
   }
 
   private updateDropdownSelection(): void {

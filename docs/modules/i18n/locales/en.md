@@ -1,7 +1,9 @@
 # English Locale
 
 > **源码**: `src/i18n/locales/en.ts`
-> **最近更新**: 2026-06-17 Claude Code settings grouping — added `settings.claudeCode.groups.*` titles/descriptions for the reorganized Runtime / Model & Thinking / Permissions / Context & Sources / Tools subtabs.
+> **最近更新**: 2026-06-17 Claude Code permission selector copy — updated `settings.claudeCode.permissionMode.*` and `chat.claudeCode.permissionMode.*.description` so the chat toolbar can show screenshot-style compact labels (`Ask first`, `Auto edit`, `Plan mode`, `Full access`) while keeping `Full access` honest about bypassing permission checks.
+>
+> **Previously**: 2026-06-17 Claude Code settings grouping — added `settings.claudeCode.groups.*` titles/descriptions for the reorganized Runtime / Model & Thinking / Permissions / Context & Sources / Tools subtabs.
 >
 > **Previously**: 2026-06-16 Codex MCP detail modal collapse/expand — added `settings.codex.mcpDetail.expandServer`, `collapseServer`, `showToolDetails`, `hideToolDetails` for the new two-level expand interaction (server section + tool details) in the MCP inspection modal.
 >
@@ -18,6 +20,8 @@
 ## 概述
 
 OpenCodian 的英文翻译表，导出 `enTranslations` 静态对象。
+
+2026-06-17：更新 Claude Code 权限模式聊天选择器文案。`settings.claudeCode.permissionMode.*` 现在提供截图式紧凑标签（`Ask first` / `Auto edit` / `Plan mode` / `Full access`），`chat.claudeCode.permissionMode.*.description` 提供对应短描述；其中 `Full access` 描述必须保留 bypass permission checks 的风险语义，避免把 SDK `bypassPermissions` 误导成普通少确认。
 
 2026-06-07：新增并更新 `settings.claudeCode.outputStyle.*` 键（name / desc / placeholder / boundaryNotice / lifecycleNotice），为 Claude Code 输出样式设置提供英文文案；`boundaryNotice` 现说明 fresh diagnostic query live proof 与 active-session 边界。新增 `settings.capabilityLab.proofs.outputStyleLive.*` proof keys，覆盖 Output Style live 行为证明按钮、nonce、styleName、cleanup、pass/fail 和生命周期文案。新增 `chat.claudeCode.permissionMode.*.description` 键（4 个），为 Claude Code 权限模式的聊天选择器提供描述文案。
 

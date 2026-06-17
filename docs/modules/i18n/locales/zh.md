@@ -1,7 +1,9 @@
 # Chinese Locale
 
 > **源码**: `src/i18n/locales/zh.ts`
-> **最近更新**: 2026-06-17 Claude Code 设置分组 — 新增 `settings.claudeCode.groups.*` 标题与描述，用于重组 Runtime / Model & Thinking / Permissions / Context & Sources / Tools 子标签页。
+> **最近更新**: 2026-06-17 Claude Code 权限选择器文案 — 更新 `settings.claudeCode.permissionMode.*` 与 `chat.claudeCode.permissionMode.*.description`，让聊天工具栏显示截图式紧凑标签（`变更前确认`、`自动编辑`、`计划模式`、`完全访问`），同时让 `完全访问` 描述继续诚实说明会绕过权限检查。
+>
+> **前次更新**: 2026-06-17 Claude Code 设置分组 — 新增 `settings.claudeCode.groups.*` 标题与描述，用于重组 Runtime / Model & Thinking / Permissions / Context & Sources / Tools 子标签页。
 >
 > **前次更新**: 2026-06-16 Codex MCP 详情弹窗折叠/展开 — 新增 `settings.codex.mcpDetail.expandServer`、`collapseServer`、`showToolDetails`、`hideToolDetails`，用于 MCP 检查弹窗新的两级展开交互（server section 折叠 + 工具详情二级展开）。
 >
@@ -18,6 +20,8 @@
 ## 概述
 
 OpenCodian 的简体中文翻译表，导出 `zhTranslations` 静态对象。
+
+2026-06-17：更新 Claude Code 权限模式聊天选择器文案。`settings.claudeCode.permissionMode.*` 现在提供截图式紧凑标签（`变更前确认` / `自动编辑` / `计划模式` / `完全访问`），`chat.claudeCode.permissionMode.*.description` 提供对应短描述；其中 `完全访问` 只是 UI 标签，描述必须保留 SDK `bypassPermissions` 会绕过权限检查的风险语义。
 
 2026-06-15：更新 `settings.claudeCode.executablePath.*`、`settings.claudeCode.environment.*` 和 `settings.claudeCode.diagnostics.*` 文案，匹配 Claude Code runtime external CLI 分发策略。诊断现在说明会解析配置路径或增强 PATH 中的外部 `claude` CLI，找不到时提示安装 Claude Code CLI 或配置 executable path，不再描述 SDK bundled 进程解析。
 

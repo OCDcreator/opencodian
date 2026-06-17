@@ -5,11 +5,12 @@
 
 ## 职责
 
-定义聊天工具栏权限模式选择器的触发器与下拉选项视觉，并提供模式语义色。OpenCode backend 使用 `yolo` / `normal` / `plan` 模板色；Claude Code backend 使用 `default` / `acceptEdits` / `bypassPermissions` / `plan` SDK mode 色，确保 `DEF`、`EDIT`、`BYP`、`PLAN` 在聊天工具栏里都有可见状态。输入工具栏内的 trigger 使用统一 control height / inline padding（`4px 10px`），与 Agent / model selector 保持同一横向节奏；默认态采用 glass 背景（`background-primary 54%`）+ 内嵌高光边界，`action-buttons-etched` 下切换为透明刻入态。Trigger hover 时带有 `translateY(-1px)` 抬升与柔和阴影，`is-open` 时显示 accent 边框光晕。下拉面板采用统一 glass surface（`blur(40px) saturate(1.22)`，`border-radius: 16px`），选项 hover 时左侧出现 mode-specific 强调边框 + `translateX(2px)` 滑入，selected 状态使用 mode-specific 背景色 + 左侧边框 + `font-weight: 600`。
+定义聊天工具栏权限模式选择器的触发器与下拉选项视觉，并提供模式语义色。OpenCode backend 使用 `yolo` / `normal` / `plan` 模板色；Claude Code backend 使用 `default` / `acceptEdits` / `plan` / `bypassPermissions` SDK mode 色与截图式紧凑菜单；Codex backend 使用 `read-only` / `workspace-write` / `danger-full-access` sandbox 色。输入工具栏内的 trigger 使用统一 control height，与 Agent / model selector 保持同一横向节奏；Claude Code trigger 只显示当前模式图标、短标签和 chevron，避免在 composer 有限空间里塞入大按钮。通用下拉面板仍采用 glass surface；Claude Code 下拉通过 `.opencodian-permission-selector--claude-code` 单独覆盖为平面菜单、无侧边强调条、无玻璃 blur，选中项只显示右侧 checkmark。
 
 ## 关键类名 / CSS 变量
 
 - `.opencodian-permission-selector`：选择器容器。
+- `.opencodian-permission-selector--claude-code`：Claude Code 专属 variant，挂在 container、trigger 与 dropdown 上，用于隔离截图式紧凑菜单。
 - `.opencodian-permission-trigger` + `mode-yolo|mode-normal|mode-default|mode-acceptEdits|mode-bypassPermissions|mode-plan`：当前 backend 模式显示与颜色。
 - `.opencodian-sandbox-config-badge*`：permission trigger 旁的 Claude Code sandbox 配置徽章，用于显示 expanded sandbox 摘要。
 - `.opencodian-additional-directories-config-badge*`：permission trigger 旁的 Claude Code additional directories 配置徽章，用于显示 requested extra directory count；它复用紧凑 toolbar badge 几何，但使用 `folder-plus` 图标与 accent 色。
@@ -25,7 +26,8 @@
 ## 修改注意点
 
 - 模式色语义与行为绑定（OpenCode: 允许/询问/审查；Claude Code: 默认/接受编辑/绕过权限/计划），不要把不同风险等级做成几乎同色。
-- 下拉体验与模型选择器需保持视觉一致（圆角、玻璃态、阴影等级）。
+- 下拉体验与模型选择器需保持视觉一致（圆角、层级、焦点态），但 Claude Code 权限菜单是例外：它使用截图式平面菜单而不是通用 glass 菜单，以减少视觉臃肿并突出权限语义。
+- Claude Code 的 `bypassPermissions` 可以显示为 `完全访问` / `Full access`，但描述与颜色必须保留它会绕过权限检查的风险含义，不得只写成普通的“少确认”。
 - 下拉面板带有 `permission-dropdown-open` 入场动画，由 `.is-open` 类触发。
 - 选项支持 `:focus-visible` 焦点轮廓，确保键盘导航可见。
 - 修改后执行 `npm run build:css`（或完整 `npm run build`）。

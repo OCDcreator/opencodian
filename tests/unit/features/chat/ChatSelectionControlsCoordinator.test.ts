@@ -787,7 +787,7 @@ describe('ChatSelectionControlsCoordinator', () => {
 
       const trigger = toolbarEl.querySelector<HTMLElement>('.opencodian-permission-trigger');
       expect(trigger?.getAttribute('data-permission-backend')).toBe('claude-code');
-      expect(trigger?.querySelector('.opencodian-permission-trigger-text')?.textContent).toBe('EDIT');
+      expect(trigger?.querySelector('.opencodian-permission-trigger-text')?.textContent).toBe('Auto edit');
 
       // Claude Code modes should be available
       trigger?.click();
