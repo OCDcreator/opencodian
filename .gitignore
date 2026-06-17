@@ -35,6 +35,7 @@ data.json
 .copilot/
 .gemini/
 .kimi/
+.zcode/
 .opencode/
 .config/opencode/
 

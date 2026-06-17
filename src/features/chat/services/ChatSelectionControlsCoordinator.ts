@@ -142,6 +142,11 @@ export class ChatSelectionControlsCoordinator {
   private sandboxBadgeContainer: HTMLElement | null = null;
   private readonly codexRuntimeDefaultsBadge: CodexRuntimeDefaultsBadgeCoordinator;
   private codexRuntimeDefaultsBadgeContainer: HTMLElement | null = null;
+  private runtimeOverflowEl: HTMLElement | null = null;
+  private runtimeOverflowTriggerEl: HTMLButtonElement | null = null;
+  private runtimeOverflowPanelEl: HTMLElement | null = null;
+  private runtimeOverflowClickOutsideHandler: ((event: MouseEvent) => void) | null = null;
+  private isRuntimeOverflowOpen = false;
 
   private modelSelectorContainer: HTMLElement | null = null;
   private modelSelectorTrigger: HTMLElement | null = null;
@@ -297,6 +302,7 @@ export class ChatSelectionControlsCoordinator {
 
   destroy(): void {
     this.closeModelDropdown();
+    this.destroyRuntimeOverflow();
     this.permissionSelector?.destroy();
     this.permissionSelector = null;
     this.additionalDirectoriesBadge.destroy();
@@ -328,7 +334,11 @@ export class ChatSelectionControlsCoordinator {
 
     if (isClaudeCode) {
       if (!this.additionalDirectoriesBadgeContainer) {
-        this.additionalDirectoriesBadgeContainer = this.toolbarEl.createDiv({
+        const overflowPanel = this.ensureRuntimeOverflowPanel();
+        if (!overflowPanel) {
+          return;
+        }
+        this.additionalDirectoriesBadgeContainer = overflowPanel.createDiv({
           cls: 'opencodian-additional-directories-badge-container',
         });
         this.additionalDirectoriesBadge.mount(this.additionalDirectoriesBadgeContainer);
@@ -341,6 +351,7 @@ export class ChatSelectionControlsCoordinator {
         this.additionalDirectoriesBadgeContainer.remove();
         this.additionalDirectoriesBadgeContainer = null;
       }
+      this.syncRuntimeOverflowVisibility();
       return;
     }
 
@@ -349,6 +360,7 @@ export class ChatSelectionControlsCoordinator {
       this.additionalDirectoriesBadgeContainer.remove();
       this.additionalDirectoriesBadgeContainer = null;
     }
+    this.syncRuntimeOverflowVisibility();
   }
 
   /**
@@ -373,7 +385,11 @@ export class ChatSelectionControlsCoordinator {
 
     if (isClaudeCode) {
       if (!this.sandboxBadgeContainer) {
-        this.sandboxBadgeContainer = this.toolbarEl.createDiv({ cls: 'opencodian-sandbox-badge-container' });
+        const overflowPanel = this.ensureRuntimeOverflowPanel();
+        if (!overflowPanel) {
+          return;
+        }
+        this.sandboxBadgeContainer = overflowPanel.createDiv({ cls: 'opencodian-sandbox-badge-container' });
         this.sandboxBadge.mount(this.sandboxBadgeContainer);
       } else {
         this.sandboxBadge.update();
@@ -385,6 +401,7 @@ export class ChatSelectionControlsCoordinator {
         this.sandboxBadgeContainer = null;
       }
     }
+    this.syncRuntimeOverflowVisibility();
   }
 
   /**
@@ -411,7 +428,11 @@ export class ChatSelectionControlsCoordinator {
 
     if (isCodex) {
       if (!this.codexRuntimeDefaultsBadgeContainer) {
-        this.codexRuntimeDefaultsBadgeContainer = this.toolbarEl.createDiv({
+        const overflowPanel = this.ensureRuntimeOverflowPanel();
+        if (!overflowPanel) {
+          return;
+        }
+        this.codexRuntimeDefaultsBadgeContainer = overflowPanel.createDiv({
           cls: 'opencodian-codex-runtime-defaults-badge-container',
         });
         this.codexRuntimeDefaultsBadge.mount(this.codexRuntimeDefaultsBadgeContainer);
@@ -431,6 +452,120 @@ export class ChatSelectionControlsCoordinator {
         this.codexRuntimeDefaultsBadgeContainer = null;
       }
     }
+    this.syncRuntimeOverflowVisibility();
+  }
+
+  private ensureRuntimeOverflowPanel(): HTMLElement | null {
+    if (!this.toolbarEl) {
+      return null;
+    }
+
+    if (this.runtimeOverflowPanelEl?.isConnected) {
+      return this.runtimeOverflowPanelEl;
+    }
+
+    this.runtimeOverflowEl = this.toolbarEl.createDiv({ cls: 'opencodian-runtime-overflow' });
+    this.runtimeOverflowTriggerEl = this.runtimeOverflowEl.createEl('button', {
+      cls: 'opencodian-runtime-overflow-trigger',
+      text: '⋯',
+      attr: {
+        type: 'button',
+        'aria-label': t('chat.action.showMore'),
+        'aria-expanded': 'false',
+        'aria-haspopup': 'menu',
+      },
+    });
+    this.runtimeOverflowPanelEl = this.runtimeOverflowEl.createDiv({
+      cls: 'opencodian-runtime-overflow-panel',
+      attr: { role: 'menu' },
+    });
+
+    this.runtimeOverflowTriggerEl.addEventListener('click', (event) => {
+      event.stopPropagation();
+      this.toggleRuntimeOverflow();
+    });
+
+    this.runtimeOverflowClickOutsideHandler = (event: MouseEvent) => {
+      if (!this.runtimeOverflowEl?.contains(event.target as Node)) {
+        this.closeRuntimeOverflow();
+      }
+    };
+
+    return this.runtimeOverflowPanelEl;
+  }
+
+  private syncRuntimeOverflowVisibility(): void {
+    if (!this.runtimeOverflowEl || !this.runtimeOverflowPanelEl) {
+      return;
+    }
+
+    const hasItems = Boolean(this.runtimeOverflowPanelEl.querySelector(
+      [
+        '.opencodian-sandbox-config-badge',
+        '.opencodian-additional-directories-config-badge',
+        '.opencodian-codex-runtime-defaults-badge',
+      ].join(', '),
+    ));
+
+    if (hasItems) {
+      return;
+    }
+
+    this.destroyRuntimeOverflow();
+  }
+
+  private toggleRuntimeOverflow(): void {
+    if (this.isRuntimeOverflowOpen) {
+      this.closeRuntimeOverflow();
+      return;
+    }
+
+    this.openRuntimeOverflow();
+  }
+
+  private openRuntimeOverflow(): void {
+    if (!this.runtimeOverflowEl || !this.runtimeOverflowPanelEl || !this.runtimeOverflowTriggerEl) {
+      return;
+    }
+
+    this.closeModelDropdown();
+    this.permissionSelector?.closeDropdown();
+    this.isRuntimeOverflowOpen = true;
+    this.runtimeOverflowEl.addClass('is-open');
+    this.runtimeOverflowPanelEl.addClass('is-open');
+    this.runtimeOverflowTriggerEl.addClass('is-open');
+    this.runtimeOverflowTriggerEl.setAttribute('aria-expanded', 'true');
+
+    if (this.runtimeOverflowClickOutsideHandler) {
+      document.addEventListener('click', this.runtimeOverflowClickOutsideHandler, true);
+    }
+  }
+
+  private closeRuntimeOverflow(): void {
+    this.isRuntimeOverflowOpen = false;
+    this.runtimeOverflowEl?.removeClass('is-open');
+    this.runtimeOverflowPanelEl?.removeClass('is-open');
+    this.runtimeOverflowTriggerEl?.removeClass('is-open');
+    this.runtimeOverflowTriggerEl?.setAttribute('aria-expanded', 'false');
+
+    if (this.runtimeOverflowClickOutsideHandler) {
+      document.removeEventListener('click', this.runtimeOverflowClickOutsideHandler, true);
+    }
+  }
+
+  private destroyRuntimeOverflow(): void {
+    this.closeRuntimeOverflow();
+    this.runtimeOverflowEl?.remove();
+    this.runtimeOverflowEl = null;
+    this.runtimeOverflowTriggerEl = null;
+    this.runtimeOverflowPanelEl = null;
+    this.runtimeOverflowClickOutsideHandler = null;
+    this.additionalDirectoriesBadge.destroy();
+    this.additionalDirectoriesBadgeContainer = null;
+    this.sandboxBadge.destroy();
+    this.sandboxBadgeContainer = null;
+    this.codexRuntimeDefaultsBadge.destroy();
+    this.codexRuntimeDefaultsBadgeContainer = null;
   }
 
   private registerEscapeHandler(): void {
@@ -440,12 +575,17 @@ export class ChatSelectionControlsCoordinator {
 
     this.hasRegisteredEscapeHandler = true;
     this.host.registerEscapeHandler(() => {
-      if (!this.isModelDropdownOpen && !(this.permissionSelector?.isOpen() ?? false)) {
+      if (
+        !this.isModelDropdownOpen &&
+        !(this.permissionSelector?.isOpen() ?? false) &&
+        !this.isRuntimeOverflowOpen
+      ) {
         return false;
       }
 
       this.closeModelDropdown();
       this.permissionSelector?.closeDropdown();
+      this.closeRuntimeOverflow();
       return true;
     });
   }
@@ -545,6 +685,7 @@ export class ChatSelectionControlsCoordinator {
     }
 
     this.permissionSelector?.closeDropdown();
+    this.closeRuntimeOverflow();
     this.isModelDropdownOpen = true;
     this.modelSelectorDropdown.style.display = 'block';
     this.modelSelectorDropdown.addClass('is-open');

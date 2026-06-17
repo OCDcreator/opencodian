@@ -42,6 +42,10 @@ function createEmptyProviderDirectory(): ModelCatalogBundle['providerDirectory']
   };
 }
 
+function hasDirectChildWithClass(element: HTMLElement, className: string): boolean {
+  return Array.from(element.children).some((child) => child.classList.contains(className));
+}
+
 function createCatalogBundle(
   effectiveProviders: ModelSelectorProvider[],
   baseProviders: ModelSelectorProvider[] = effectiveProviders,
@@ -351,7 +355,7 @@ describe('ChatSelectionControlsCoordinator', () => {
       };
     }
 
-    function mockClaudeCodeBackendWithSandbox(): void {
+    function mockClaudeCodeBackendWithSandbox(enabled = true): void {
       (globalThis as any).app = {
         plugins: {
           plugins: {
@@ -361,7 +365,7 @@ describe('ChatSelectionControlsCoordinator', () => {
                 backendSettings: {
                   claudeCode: {
                     sandbox: {
-                      enabled: true,
+                      enabled,
                       failIfUnavailable: false,
                       autoAllowBashIfSandboxed: false,
                       excludedCommands: [],
@@ -475,7 +479,7 @@ describe('ChatSelectionControlsCoordinator', () => {
       expect(toolbarEl.querySelector('.opencodian-codex-runtime-defaults-badge')).toBeNull();
     });
 
-    it('mounts Codex runtime defaults badges for non-default network/web/directory settings', async () => {
+    it('moves Codex runtime defaults badges into the runtime overflow panel', async () => {
       mockCodexBackendWithDefaults({
         networkAccessEnabled: true,
         webSearchMode: 'live',
@@ -490,11 +494,21 @@ describe('ChatSelectionControlsCoordinator', () => {
       coordinator.build(toolbarEl);
       await settleAsyncWork();
 
-      const container = toolbarEl.querySelector<HTMLElement>('.opencodian-codex-runtime-defaults-badge-container');
+      const overflow = toolbarEl.querySelector<HTMLElement>('.opencodian-runtime-overflow');
+      const overflowButton = toolbarEl.querySelector<HTMLButtonElement>('.opencodian-runtime-overflow-trigger');
+      const panel = toolbarEl.querySelector<HTMLElement>('.opencodian-runtime-overflow-panel');
+      const container = panel?.querySelector<HTMLElement>('.opencodian-codex-runtime-defaults-badge-container');
+
+      expect(overflow).not.toBeNull();
+      expect(overflowButton).not.toBeNull();
+      expect(overflowButton?.textContent).toBe('⋯');
+      expect(panel).not.toBeNull();
       expect(container).not.toBeNull();
       expect(container?.style.display).not.toBe('none');
+      expect(container?.parentElement).toBe(panel);
+      expect(hasDirectChildWithClass(toolbarEl, 'opencodian-codex-runtime-defaults-badge-container')).toBe(false);
 
-      const badges = toolbarEl.querySelectorAll('.opencodian-codex-runtime-defaults-badge');
+      const badges = panel?.querySelectorAll('.opencodian-codex-runtime-defaults-badge') ?? [];
       expect(badges.length).toBe(3);
       expect(toolbarEl.querySelector('[data-badge-kind="network"]')).not.toBeNull();
       expect(toolbarEl.querySelector('[data-badge-kind="webSearch"]')).not.toBeNull();
@@ -512,13 +526,15 @@ describe('ChatSelectionControlsCoordinator', () => {
       coordinator.build(toolbarEl);
       await settleAsyncWork();
 
-      expect(toolbarEl.querySelector('.opencodian-codex-runtime-defaults-badge-container')).not.toBeNull();
+      expect(toolbarEl.querySelector('.opencodian-runtime-overflow')).not.toBeNull();
+      expect(toolbarEl.querySelector('.opencodian-runtime-overflow-panel .opencodian-codex-runtime-defaults-badge-container')).not.toBeNull();
       expect(toolbarEl.querySelector('[data-badge-kind="network"]')).not.toBeNull();
 
       mockOpencodeBackend();
       coordinator.updatePermissionTriggerDisplay();
 
       expect(toolbarEl.querySelector('.opencodian-codex-runtime-defaults-badge-container')).toBeNull();
+      expect(toolbarEl.querySelector('.opencodian-runtime-overflow')).toBeNull();
     });
 
     it('re-mounts the Codex runtime defaults badge container when backend hot-switches back to Codex', async () => {
@@ -537,7 +553,8 @@ describe('ChatSelectionControlsCoordinator', () => {
       mockCodexBackendWithDefaults({ networkAccessEnabled: true });
       coordinator.updatePermissionTriggerDisplay();
 
-      expect(toolbarEl.querySelector('.opencodian-codex-runtime-defaults-badge-container')).not.toBeNull();
+      expect(toolbarEl.querySelector('.opencodian-runtime-overflow')).not.toBeNull();
+      expect(toolbarEl.querySelector('.opencodian-runtime-overflow-panel .opencodian-codex-runtime-defaults-badge-container')).not.toBeNull();
       expect(toolbarEl.querySelector('[data-badge-kind="network"]')).not.toBeNull();
     });
 
@@ -552,8 +569,10 @@ describe('ChatSelectionControlsCoordinator', () => {
       coordinator.build(toolbarEl);
       await settleAsyncWork();
 
-      const badgeContainer = toolbarEl.querySelector('.opencodian-sandbox-badge-container');
+      const overflow = toolbarEl.querySelector<HTMLElement>('.opencodian-runtime-overflow');
+      const badgeContainer = overflow?.querySelector('.opencodian-sandbox-badge-container');
       expect(badgeContainer).not.toBeNull();
+      expect(hasDirectChildWithClass(toolbarEl, 'opencodian-sandbox-badge-container')).toBe(false);
 
       // Badge should be rendered since sandbox is enabled
       const badge = badgeContainer!.querySelector('.opencodian-sandbox-config-badge');
@@ -631,11 +650,61 @@ describe('ChatSelectionControlsCoordinator', () => {
       mockClaudeCodeBackendWithSandbox();
       coordinator.updatePermissionTriggerDisplay();
 
-      expect(toolbarEl.querySelector('.opencodian-sandbox-badge-container')).not.toBeNull();
+      expect(toolbarEl.querySelector('.opencodian-runtime-overflow')).not.toBeNull();
+      expect(toolbarEl.querySelector('.opencodian-runtime-overflow-panel .opencodian-sandbox-badge-container')).not.toBeNull();
+      expect(hasDirectChildWithClass(toolbarEl, 'opencodian-sandbox-badge-container')).toBe(false);
       expect(toolbarEl.querySelector('.opencodian-sandbox-config-badge')).not.toBeNull();
     });
 
-    it('mounts additional directories badge for Claude Code configured scope and keeps readback copy honest', async () => {
+    it('recreates sandbox overflow after a quiet Claude sandbox state becomes enabled', async () => {
+      mockClaudeCodeBackendWithSandbox(false);
+
+      const host = createMinimalHost();
+      const toolbarEl = document.createElement('div');
+      document.body.appendChild(toolbarEl);
+
+      const coordinator = new ChatSelectionControlsCoordinator(host);
+      coordinator.build(toolbarEl);
+      await settleAsyncWork();
+
+      expect(toolbarEl.querySelector('.opencodian-runtime-overflow')).toBeNull();
+      expect(toolbarEl.querySelector('.opencodian-sandbox-config-badge')).toBeNull();
+
+      mockClaudeCodeBackendWithSandbox(true);
+      coordinator.updatePermissionTriggerDisplay();
+
+      expect(toolbarEl.querySelector('.opencodian-runtime-overflow')).not.toBeNull();
+      expect(toolbarEl.querySelector('.opencodian-runtime-overflow-panel .opencodian-sandbox-config-badge')).not.toBeNull();
+      expect(hasDirectChildWithClass(toolbarEl, 'opencodian-sandbox-badge-container')).toBe(false);
+    });
+
+    it('closes runtime overflow when the model dropdown opens', async () => {
+      mockClaudeCodeBackendWithSandbox(true);
+
+      const host = createMinimalHost();
+      const toolbarEl = document.createElement('div');
+      document.body.appendChild(toolbarEl);
+
+      const coordinator = new ChatSelectionControlsCoordinator(host);
+      coordinator.build(toolbarEl);
+      await settleAsyncWork();
+
+      const overflowTrigger = toolbarEl.querySelector<HTMLButtonElement>('.opencodian-runtime-overflow-trigger');
+      const modelTrigger = toolbarEl.querySelector<HTMLElement>('.opencodian-model-trigger');
+      const overflowPanel = toolbarEl.querySelector<HTMLElement>('.opencodian-runtime-overflow-panel');
+
+      overflowTrigger?.click();
+      expect(overflowTrigger?.getAttribute('aria-expanded')).toBe('true');
+      expect(overflowPanel?.classList.contains('is-open')).toBe(true);
+
+      modelTrigger?.click();
+
+      expect(overflowTrigger?.getAttribute('aria-expanded')).toBe('false');
+      expect(overflowPanel?.classList.contains('is-open')).toBe(false);
+      expect(modelTrigger?.classList.contains('is-open')).toBe(true);
+    });
+
+    it('moves additional directories badge into runtime overflow and keeps readback copy honest', async () => {
       mockClaudeCodeBackendWithAdditionalDirectories([
         '/Volumes/workspace/shared',
         '  ',
@@ -650,8 +719,13 @@ describe('ChatSelectionControlsCoordinator', () => {
       coordinator.build(toolbarEl);
       await settleAsyncWork();
 
-      const badge = toolbarEl.querySelector<HTMLElement>('.opencodian-additional-directories-config-badge');
+      const overflow = toolbarEl.querySelector<HTMLElement>('.opencodian-runtime-overflow');
+      const panel = toolbarEl.querySelector<HTMLElement>('.opencodian-runtime-overflow-panel');
+      const badge = panel?.querySelector<HTMLElement>('.opencodian-additional-directories-config-badge');
+      expect(overflow).not.toBeNull();
+      expect(panel).not.toBeNull();
       expect(badge).not.toBeNull();
+      expect(hasDirectChildWithClass(toolbarEl, 'opencodian-additional-directories-badge-container')).toBe(false);
       expect(badge?.dataset.additionalDirectoryCount).toBe('2');
       expect(
         badge?.querySelector<HTMLElement>('.opencodian-additional-directories-config-badge-text')?.textContent,
