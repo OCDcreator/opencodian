@@ -2218,6 +2218,8 @@ export const enTranslations = {
   'chat.effort.disabled': 'Thinking disabled',
   'chat.effort.label': 'Effort',
   'chat.effort.thinking': 'Thinking',
+  'chat.effort.tooltip.description': 'Controls how much reasoning budget the model spends before answering. Higher effort can be slower or costlier, but can help complex tasks.',
+  'chat.effort.optionTooltip': 'Choose {effort} effort. Controls how much reasoning budget the model spends before answering.',
   'chat.effort.boundaryHint.codex': 'Applies to next turn',
   'chat.action.retry': 'Retry',
   'chat.action.delete': 'Delete',

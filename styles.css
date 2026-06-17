@@ -13596,7 +13596,8 @@ img.opencodian-model-provider-header-icon {
 }
 
 .opencodian-input-toolbar .opencodian-effort-slot {
-  margin-left: 0;
+  order: 998;
+  margin-left: auto;
 }
 
 .opencodian-runtime-overflow {
@@ -13604,7 +13605,6 @@ img.opencodian-model-provider-header-icon {
   display: inline-flex;
   align-items: center;
   order: 999;
-  margin-left: auto;
 }
 
 .opencodian-runtime-overflow-trigger {

@@ -2357,7 +2357,8 @@
 }
 
 .opencodian-input-toolbar .opencodian-effort-slot {
-  margin-left: 0;
+  order: 998;
+  margin-left: auto;
 }
 
 .opencodian-runtime-overflow {
@@ -2365,7 +2366,6 @@
   display: inline-flex;
   align-items: center;
   order: 999;
-  margin-left: auto;
 }
 
 .opencodian-runtime-overflow-trigger {

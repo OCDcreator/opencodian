@@ -12,6 +12,13 @@ function extractRule(css: string, selector: string): string {
   return match?.[1] ?? '';
 }
 
+function extractRules(css: string, selector: string): string {
+  const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const matches = Array.from(css.matchAll(new RegExp(`(?:^|\\n)${escapedSelector}\\s*\\{([\\s\\S]*?)\\n\\}`, 'gm')));
+  expect(matches.length).toBeGreaterThan(0);
+  return matches.map(match => match[1] ?? '').join('\n');
+}
+
 describe('composer runtime rail styles', () => {
   it('keeps the runtime toolbar full width so overflow can anchor to the right edge', () => {
     const css = readStyleFile('src/style/features/chat-assistant.css');
@@ -22,10 +29,13 @@ describe('composer runtime rail styles', () => {
 
   it('places the runtime overflow trigger as the final right-side rail affordance', () => {
     const css = readStyleFile('src/style/features/chat-assistant.css');
+    const effortRule = extractRules(css, '.opencodian-input-toolbar .opencodian-effort-slot');
     const overflowRule = extractRule(css, '.opencodian-runtime-overflow');
 
+    expect(effortRule).toContain('order: 998;');
+    expect(effortRule).toContain('margin-left: auto;');
     expect(overflowRule).toContain('order: 999;');
-    expect(overflowRule).toContain('margin-left: auto;');
+    expect(overflowRule).not.toContain('margin-left: auto;');
   });
 
   it('uses a local bundled Newsreader face for composer input text', () => {

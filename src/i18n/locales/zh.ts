@@ -2218,6 +2218,8 @@ export const zhTranslations = {
   'chat.effort.disabled': '关闭思考',
   'chat.effort.label': '思考强度',
   'chat.effort.thinking': '思考预算',
+  'chat.effort.tooltip.description': '控制模型在回答前投入多少推理预算。越高通常更慢、成本更高，但更适合复杂任务。',
+  'chat.effort.optionTooltip': '选择 {effort} 思考强度。控制模型在回答前投入多少推理预算。',
   'chat.effort.boundaryHint.codex': '下次对话生效',
   'chat.action.retry': '重试',
   'chat.action.delete': '删除',
