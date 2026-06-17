@@ -80,6 +80,13 @@ const FONT_DEFINITIONS: readonly InputFontOption[] = [
 
   // ── Serif / 衬线体 ──────────────────────
   {
+    id: 'newsreader',
+    displayName: 'Newsreader',
+    cssFamily: "'OpenCodian Newsreader', 'Newsreader', serif",
+    loadType: 'local',
+    category: 'serif',
+  },
+  {
     id: 'cormorant-garamond',
     displayName: 'Cormorant Garamond',
     cssFamily: "'Cormorant Garamond', serif",
@@ -308,6 +315,14 @@ function extractPrimaryFontName(cssFamily: string): string {
   return match ? match[0].trim() : trimmed.split(',')[0].trim();
 }
 
+function resolveGenericFallback(primaryFontId: string, fallbackFontId: string): 'serif' | 'sans-serif' {
+  const primaryOption = findFontOptionById(primaryFontId) ?? findFontOptionById(fallbackFontId);
+  if (primaryOption?.category === 'serif' && primaryOption.cssFamily.includes('serif')) {
+    return 'serif';
+  }
+  return 'sans-serif';
+}
+
 /**
  * Combine primary and CJK fallback font settings into a single CSS font-family value.
  * Returns empty string when both are inherit (no override needed).
@@ -325,10 +340,16 @@ export function resolveComposerFontFamily(
   const enCss = resolveFontCssFamily(enFontFamily, ALL_FONT_OPTIONS);
   const cnCss = resolveFontCssFamily(cnFontFamily, ALL_FONT_OPTIONS);
   const parts: string[] = [];
-  if (enCss) parts.push(extractPrimaryFontName(enCss));
-  if (cnCss) parts.push(extractPrimaryFontName(cnCss));
+  const appendUnique = (fontName: string): void => {
+    if (fontName && !parts.includes(fontName)) {
+      parts.push(fontName);
+    }
+  };
+  appendUnique(extractPrimaryFontName(enCss));
+  appendUnique(extractPrimaryFontName(cnCss));
   if (parts.length === 0) return '';
-  return parts.join(', ') + ', sans-serif';
+  const fallback = resolveGenericFallback(enFontFamily, cnFontFamily);
+  return parts.join(', ') + `, ${fallback}`;
 }
 
 // ── Dynamic Font Loader ─────────────────────────────────────────

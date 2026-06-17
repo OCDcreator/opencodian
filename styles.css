@@ -246,7 +246,7 @@ body[data-opencodian-provider-icon-mode="color"] {
   --opencodian-input-bg-opacity: 72%;
   --opencodian-input-blur: 18px;
   --opencodian-input-shadow-blur: 28px;
-  --opencodian-composer-font-family: ;
+  --opencodian-composer-font-family: "OpenCodian Newsreader", Georgia, serif;
   /* Layered composer spacing scale (context-strip → textarea → input-row → runtime-dock). */
   --opencodian-composer-gap-xs: 6px;
   --opencodian-composer-gap-sm: 8px;
@@ -7597,21 +7597,6 @@ img.opencodian-model-provider-header-icon {
   border-color: color-mix(in srgb, var(--background-modifier-border) 62%, var(--text-muted));
 }
 
-.opencodian-effort-label {
-  color: color-mix(in srgb, var(--text-muted) 90%, var(--text-normal));
-  font-size: 11px;
-  font-weight: 500;
-  white-space: nowrap;
-}
-
-.opencodian-effort-boundary-hint {
-  color: var(--text-faint);
-  font-size: 10px;
-  font-weight: 400;
-  white-space: nowrap;
-  opacity: 0.78;
-}
-
 .opencodian-effort-gears {
   position: relative;
   display: flex;
@@ -12049,7 +12034,7 @@ img.opencodian-model-provider-header-icon {
   resize: none;
   min-height: 68px;
   max-height: 240px;
-  font-family: inherit;
+  font-family: var(--opencodian-composer-font-family, "OpenCodian Newsreader", Georgia, serif);
   font-size: 14px;
   line-height: 1.5;
   color: transparent;
@@ -12088,7 +12073,7 @@ img.opencodian-model-provider-header-icon {
   right: 0;
   pointer-events: none;
   overflow: hidden;
-  font-family: inherit;
+  font-family: var(--opencodian-composer-font-family, "OpenCodian Newsreader", Georgia, serif);
   font-size: 14px;
   line-height: 1.5;
   padding: 8px 0 4px;
@@ -12113,7 +12098,7 @@ img.opencodian-model-provider-header-icon {
   pointer-events: none;
   color: var(--text-muted);
   opacity: 0.55;
-  font-family: inherit;
+  font-family: var(--opencodian-composer-font-family, "OpenCodian Newsreader", Georgia, serif);
   font-size: 14px;
   line-height: 1.65;
   padding: 12px 6px 10px;
@@ -12285,6 +12270,14 @@ img.opencodian-model-provider-header-icon {
   height: 16px;
 }
 
+@font-face {
+  font-family: "OpenCodian Newsreader";
+  src: url("assets/fonts/newsreader/Newsreader%5Bopsz%2Cwght%5D.ttf") format("truetype");
+  font-weight: 200 800;
+  font-style: normal;
+  font-display: swap;
+}
+
 .opencodian-input-area {
   position: absolute;
   right: 0;
@@ -12297,7 +12290,7 @@ img.opencodian-model-provider-header-icon {
   gap: 8px;
   background: transparent;
   pointer-events: none;
-  font-family: var(--opencodian-composer-font-family, inherit);
+  font-family: inherit;
 }
 
 .opencodian-input-area > * {
@@ -13406,6 +13399,7 @@ img.opencodian-model-provider-header-icon {
   min-width: 0;
   padding: 12px 6px 10px;
   line-height: 1.65;
+  font-family: var(--opencodian-composer-font-family, "OpenCodian Newsreader", Georgia, serif);
   background: transparent !important;
   box-shadow: none !important;
 }
@@ -13562,6 +13556,7 @@ img.opencodian-model-provider-header-icon {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
+  width: 100%;
   row-gap: 4px;
   column-gap: var(--opencodian-input-toolbar-control-gap);
   position: relative;
@@ -13608,6 +13603,8 @@ img.opencodian-model-provider-header-icon {
   position: relative;
   display: inline-flex;
   align-items: center;
+  order: 999;
+  margin-left: auto;
 }
 
 .opencodian-runtime-overflow-trigger {

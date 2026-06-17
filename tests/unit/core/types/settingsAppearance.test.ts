@@ -149,6 +149,30 @@ describe('chat appearance settings', () => {
     expect(normalized.input.contextRingStyle).toBe('classic');
   });
 
+  it('migrates legacy empty input font settings to the bundled Newsreader default', () => {
+    const normalized = normalizeChatAppearanceSettings({
+      input: {
+        enFontFamily: '',
+        cnFontFamily: '',
+      },
+    });
+
+    expect(normalized.input.enFontFamily).toBe('newsreader');
+    expect(normalized.input.cnFontFamily).toBe('');
+  });
+
+  it('preserves explicit input font inheritance', () => {
+    const normalized = normalizeChatAppearanceSettings({
+      input: {
+        enFontFamily: 'inherit',
+        cnFontFamily: 'inherit',
+      },
+    });
+
+    expect(normalized.input.enFontFamily).toBe('inherit');
+    expect(normalized.input.cnFontFamily).toBe('inherit');
+  });
+
   it('normalizes assistant metadata appearance settings', () => {
     const normalized = normalizeChatAppearanceSettings({
       assistant: {
