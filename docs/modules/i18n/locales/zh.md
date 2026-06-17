@@ -1,7 +1,9 @@
 # Chinese Locale
 
 > **源码**: `src/i18n/locales/zh.ts`
-> **最近更新**: 2026-06-16 Codex MCP 详情弹窗折叠/展开 — 新增 `settings.codex.mcpDetail.expandServer`、`collapseServer`、`showToolDetails`、`hideToolDetails`，用于 MCP 检查弹窗新的两级展开交互（server section 折叠 + 工具详情二级展开）。
+> **最近更新**: 2026-06-17 Claude Code 设置分组 — 新增 `settings.claudeCode.groups.*` 标题与描述，用于重组 Runtime / Model & Thinking / Permissions / Context & Sources / Tools 子标签页。
+>
+> **前次更新**: 2026-06-16 Codex MCP 详情弹窗折叠/展开 — 新增 `settings.codex.mcpDetail.expandServer`、`collapseServer`、`showToolDetails`、`hideToolDetails`，用于 MCP 检查弹窗新的两级展开交互（server section 折叠 + 工具详情二级展开）。
 >
 > **前次更新**: 2026-06-16 Codex readback modal polish — 新增 `settings.codex.readback.status*` 键，让共享诊断弹窗的状态标签走本地化。
 >

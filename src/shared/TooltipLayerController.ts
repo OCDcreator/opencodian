@@ -5,9 +5,10 @@ const TOOLTIP_ARROW_SIZE_PX = 8;
 const TOOLTIP_ARROW_MIN_INSET_PX = 10;
 
 type TooltipPlacement = 'top' | 'bottom' | 'left' | 'right';
+type TooltipPlacementPreference = TooltipPlacement | 'auto';
 
 interface TooltipDisplayOptions {
-  preferredPlacement?: TooltipPlacement;
+  preferredPlacement?: TooltipPlacementPreference;
 }
 
 interface TooltipPosition {
@@ -21,7 +22,7 @@ const controllers = new WeakMap<Document, TooltipLayerController>();
 
 export class TooltipLayerController {
   private activeLabel: string | null = null;
-  private activePlacement: TooltipPlacement = 'top';
+  private activePlacement: TooltipPlacementPreference = 'auto';
   private activeTrigger: HTMLElement | null = null;
   private bubbleEl: HTMLElement | null = null;
   private layerEl: HTMLElement | null = null;
@@ -135,7 +136,7 @@ export class TooltipLayerController {
 
     this.activeTrigger = anchorEl;
     this.activeLabel = normalizedLabel;
-    this.activePlacement = options.preferredPlacement ?? 'top';
+    this.activePlacement = options.preferredPlacement ?? 'auto';
     this.positionActiveTooltip();
   }
 
@@ -146,6 +147,7 @@ export class TooltipLayerController {
       return;
     }
 
+    trigger.removeAttribute('title');
     this.show(trigger, label, {
       preferredPlacement: TooltipLayerController.resolvePreferredPlacement(trigger),
     });
@@ -293,7 +295,7 @@ export class TooltipLayerController {
   private resolvePlacement(
     anchorRect: DOMRect,
     size: { height: number; width: number },
-    preferredPlacement: TooltipPlacement,
+    preferredPlacement: TooltipPlacementPreference,
   ): TooltipPlacement {
     const viewportWidth = this.view?.innerWidth ?? this.document.documentElement.clientWidth ?? 0;
     const viewportHeight = this.view?.innerHeight ?? this.document.documentElement.clientHeight ?? 0;
@@ -310,18 +312,18 @@ export class TooltipLayerController {
       }
     };
 
+    const initialPlacement = preferredPlacement === 'auto'
+      ? this.resolveAutomaticPlacement(anchorRect)
+      : preferredPlacement;
     const fallbacks: TooltipPlacement[] = [
-      preferredPlacement,
-      this.flipPlacement(preferredPlacement),
-      'top',
-      'bottom',
-      'right',
-      'left',
+      initialPlacement,
+      this.flipPlacement(initialPlacement),
+      ...this.resolveRemainingPlacements(initialPlacement),
     ];
 
     return fallbacks.find((candidate, index) =>
       fallbacks.indexOf(candidate) === index && fits(candidate)
-    ) ?? preferredPlacement;
+    ) ?? initialPlacement;
   }
 
   private resolveTrigger(target: EventTarget | null): HTMLElement | null {
@@ -350,7 +352,37 @@ export class TooltipLayerController {
     }
   }
 
-  private static resolvePreferredPlacement(trigger: HTMLElement): TooltipPlacement {
+  private resolveAutomaticPlacement(anchorRect: DOMRect): TooltipPlacement {
+    const viewportWidth = this.view?.innerWidth ?? this.document.documentElement.clientWidth ?? 0;
+    const viewportHeight = this.view?.innerHeight ?? this.document.documentElement.clientHeight ?? 0;
+    const anchorCenterX = anchorRect.left + (anchorRect.width / 2);
+    const anchorCenterY = anchorRect.top + (anchorRect.height / 2);
+    const horizontalEdgeBand = Math.max(56, viewportWidth * 0.16);
+    const verticalEdgeBand = Math.max(48, viewportHeight * 0.18);
+
+    if (anchorCenterX >= viewportWidth - horizontalEdgeBand) {
+      return 'left';
+    }
+    if (anchorCenterX <= horizontalEdgeBand) {
+      return 'right';
+    }
+    if (anchorCenterY <= verticalEdgeBand) {
+      return 'bottom';
+    }
+    if (anchorCenterY >= viewportHeight - verticalEdgeBand) {
+      return 'top';
+    }
+    return 'top';
+  }
+
+  private resolveRemainingPlacements(initialPlacement: TooltipPlacement): TooltipPlacement[] {
+    if (initialPlacement === 'left' || initialPlacement === 'right') {
+      return ['top', 'bottom', 'right', 'left'];
+    }
+    return ['right', 'left', 'top', 'bottom'];
+  }
+
+  private static resolvePreferredPlacement(trigger: HTMLElement): TooltipPlacementPreference {
     const explicitPosition = trigger.dataset.tooltipPosition;
     if (
       explicitPosition === 'top'
@@ -366,6 +398,6 @@ export class TooltipLayerController {
       return sideAlignment;
     }
 
-    return 'top';
+    return 'auto';
   }
 }

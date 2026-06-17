@@ -23,12 +23,14 @@ This is a product surface for user awareness, not a behavior proof. It reflects 
 - Read `backendSettings.codex.{networkAccessEnabled, webSearchMode, additionalDirectories}` from the live plugin settings.
 - Render compact chips only for non-default values.
 - Keep tooltip copy explicit about lifecycle and readback boundaries.
+- Attach tooltip copy through the shared `.opencodian-tooltip-trigger[data-tooltip]` overlay and remove native `title` sources.
 - Hide the badge container entirely when all defaults are quiet.
 
 ## Dependencies
 
 - Obsidian `setIcon` for badge icons.
 - `t()` i18n keys under `chat.codex.runtimeDefaultsBadge.*`.
+- `TooltipLayerController` for body-level tooltip placement and stacking.
 - `ChatSelectionControlsCoordinator` owns backend gating and mount/update/destroy timing.
 
 ## Lifecycle
@@ -43,4 +45,5 @@ This is a product surface for user awareness, not a behavior proof. It reflects 
 
 - The badge is intentionally read-only. Authoring remains in Codex settings or the conversation session settings modal.
 - The badge is quiet by default to avoid toolbar clutter; it only speaks when the user has opted into network, web search, or extra directories.
+- Tooltip text lives in `data-tooltip`, not `title`, so each badge shows a single shared tooltip with the same z-index and placement behavior as the rest of chat chrome.
 - The coordinator reads through the same live plugin seam used by nearby Claude Code toolbar badges, avoiding new ownership in `OpenCodianView.ts`.

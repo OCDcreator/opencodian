@@ -577,9 +577,13 @@ describe('SettingsSectionCoordinator quick nav tooltip', () => {
     expect(document.body.querySelector('.opencodian-settings-quick-nav-tooltip-layer')).toBeNull();
   });
 
-  it('keeps quick-nav tooltip overlay center-aligned even for edge buttons', () => {
+  it('places quick-nav tooltip below top-edge buttons and above bottom-edge buttons', () => {
     const { coordinator, containerEl } = createCoordinator();
     document.body.appendChild(containerEl);
+    Object.defineProperty(window, 'innerHeight', {
+      configurable: true,
+      value: 300,
+    });
 
     coordinator.beginDisplay('Settings');
     coordinator.createSectionHeading(containerEl, {
@@ -599,13 +603,13 @@ describe('SettingsSectionCoordinator quick nav tooltip', () => {
       configurable: true,
       value: () => ({
         left: 12,
-        top: 140,
+        top: 8,
         right: 92,
-        bottom: 172,
+        bottom: 40,
         width: 80,
         height: 32,
         x: 12,
-        y: 140,
+        y: 8,
         toJSON: () => '',
       }),
     });
@@ -614,7 +618,29 @@ describe('SettingsSectionCoordinator quick nav tooltip', () => {
 
     const overlay = document.body.querySelector<HTMLElement>('.opencodian-settings-quick-nav-tooltip-layer');
     expect(overlay).not.toBeNull();
-    expect(overlay?.dataset.align ?? 'center').toBe('center');
+    expect(overlay?.dataset.placement).toBe('bottom');
+
+    button?.dispatchEvent(new Event('mouseleave'));
+
+    Object.defineProperty(button as HTMLButtonElement, 'getBoundingClientRect', {
+      configurable: true,
+      value: () => ({
+        left: 12,
+        top: 260,
+        right: 92,
+        bottom: 292,
+        width: 80,
+        height: 32,
+        x: 12,
+        y: 260,
+        toJSON: () => '',
+      }),
+    });
+
+    button?.dispatchEvent(new Event('mouseenter'));
+
+    const bottomOverlay = document.body.querySelector<HTMLElement>('.opencodian-settings-quick-nav-tooltip-layer');
+    expect(bottomOverlay?.dataset.placement).toBe('top');
 
     button?.dispatchEvent(new Event('mouseleave'));
   });
@@ -1110,8 +1136,12 @@ describe('OpenCodianSettingTab title styling', () => {
     expect(css).toMatch(
       /\.opencodian-settings-quick-nav-tooltip-bubble\s*\{[\s\S]*max-width:\s*min\(240px,\s*calc\(100vw\s*-\s*48px\)\);/,
     );
+    expect(css).toMatch(
+      /\.opencodian-settings-quick-nav-tooltip-bubble\s*\{[\s\S]*box-shadow:\s*none;/,
+    );
     expect(css).not.toMatch(/opencodian-settings-quick-nav-tooltip-layer\[data-align="left"\]/);
     expect(css).not.toMatch(/opencodian-settings-quick-nav-tooltip-layer\[data-align="right"\]/);
+    expect(css).not.toMatch(/opencodian-settings-quick-nav-tooltip-bubble\s*\{[\s\S]*backdrop-filter:/);
   });
 
   it('keeps the quick-nav tooltip below the shared settings tooltip and popover layers', () => {

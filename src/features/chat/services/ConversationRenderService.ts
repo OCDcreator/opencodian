@@ -471,7 +471,7 @@ export class ConversationRenderService {
   static setTooltipLabel(
     buttonEl: HTMLElement,
     label: string,
-    position?: 'bottom' | 'top' | 'right',
+    position?: 'bottom' | 'left' | 'right' | 'top',
   ): void {
     buttonEl.classList.add('opencodian-tooltip-trigger');
     TooltipLayerController.ensureForElement(buttonEl);

@@ -11,10 +11,11 @@
 
 - 为每个 `Document` 维护一个 singleton controller（`WeakMap<Document, TooltipLayerController>`）
 - 监听 `mouseover` / `mouseout` / `focusin` / `focusout`
-- 按 `data-tooltip-position` / `data-tooltip-align` 解析首选方位
-- 在 top / bottom / left / right 之间做 fallback / flip
+- 按 `data-tooltip-position` / `data-tooltip-align` 解析显式首选方位；未指定时根据触发器靠近的视口边缘自动选择方向
+- 在 top / bottom / left / right 之间做 fallback / flip，避免 tooltip 压在鼠标和按钮上
 - 把 tooltip layer 作为 `.opencodian-tooltip-layer` 挂到 `document.body`
 - 在 `resize` / capture `scroll` 时重定位当前激活的 tooltip
+- 显示前移除触发器上的 `title`，避免 custom tooltip 与浏览器/Electron 原生 hover tooltip 同时出现
 
 ## 关键方法
 
@@ -32,7 +33,8 @@
 - `VIEWPORT_MARGIN_PX = 12`
 - `TOOLTIP_GAP_PX = 12`
 - `TOOLTIP_ARROW_SIZE_PX = 8`
-- 优先使用 trigger 指定的 placement；空间不足时先翻转到对侧，再回退到其余方向
+- 优先使用 trigger 指定的 placement；没有显式 placement 时，靠右按钮优先向左、靠左按钮优先向右、顶部按钮优先向下、底部按钮优先向上
+- 空间不足时先翻转到对侧，再回退到其余方向
 - top / bottom 方向按 anchor 中心点居中，并约束到视口内
 - left / right 方向按 anchor 垂直中心对齐，并约束到视口内
 
@@ -46,4 +48,5 @@
 
 - 这个 controller 只负责 `.opencodian-tooltip-trigger` 族；settings quick-nav 仍保留自己的一套 overlay owner
 - tooltip 内容来自 `data-tooltip`，无障碍标签仍由各 caller 负责（通常是隐藏 label + `aria-labelledby`）
+- 使用 shared tooltip 的触发器不要再保留 `title`，否则会产生第二个提示框；controller 会在 hover/focus 显示时清掉这个属性作为兜底
 - 若新增新的 tooltip trigger owner，又不走 `ConversationRenderService`，必须显式调用 `ensureForElement()`，否则文档级监听器不会挂载

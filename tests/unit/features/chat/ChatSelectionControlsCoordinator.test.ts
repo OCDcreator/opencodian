@@ -656,11 +656,15 @@ describe('ChatSelectionControlsCoordinator', () => {
       expect(
         badge?.querySelector<HTMLElement>('.opencodian-additional-directories-config-badge-text')?.textContent,
       ).toBe('2 extra dirs');
-      expect(badge?.getAttribute('title')).toContain('requested extra directory scope');
-      expect(badge?.getAttribute('title')).toContain('/Volumes/workspace/shared');
-      expect(badge?.getAttribute('title')).toContain('~/Documents/references');
-      expect(badge?.getAttribute('title')).toContain('next query');
-      expect(badge?.getAttribute('title')).toContain('not independently verified');
+      expect(badge?.hasAttribute('title')).toBe(false);
+      expect(badge?.classList.contains('opencodian-tooltip-trigger')).toBe(true);
+      expect(badge?.getAttribute('data-tooltip-position')).toBe('top');
+      const tooltip = badge?.getAttribute('data-tooltip') ?? '';
+      expect(tooltip).toContain('requested extra directory scope');
+      expect(tooltip).toContain('/Volumes/workspace/shared');
+      expect(tooltip).toContain('~/Documents/references');
+      expect(tooltip).toContain('next query');
+      expect(tooltip).toContain('not independently verified');
     });
 
     it('does not mount additional directories badge for OpenCode or empty Claude Code configuration', async () => {

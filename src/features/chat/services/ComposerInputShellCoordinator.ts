@@ -72,7 +72,7 @@ export interface ComposerInputShellCoordinatorHost {
   attachSessionTodo(container: HTMLElement): void;
   attachQuestionDock(container: HTMLElement): void;
   setContextRowElement(element: HTMLElement | null): void;
-  setTooltipLabel(element: HTMLElement, label: string, position?: 'bottom' | 'top' | 'right'): void;
+  setTooltipLabel(element: HTMLElement, label: string, position?: 'bottom' | 'left' | 'right' | 'top'): void;
   getInputPlaceholder(): string;
   getSlashCommandSkillMode(): SlashCommandSkillMode;
   addChosenFileContextToActiveTab(): Promise<void>;
@@ -122,6 +122,9 @@ export class ComposerInputShellCoordinator {
   private inputWrapperEl: HTMLElement | null = null;
   private composerFooterLeadingEl: HTMLElement | null = null;
   private composerFooterTrailingEl: HTMLElement | null = null;
+  private composerContractEl: HTMLElement | null = null;
+  private composerRuntimeControlsEl: HTMLElement | null = null;
+  private composerSubmitControlsEl: HTMLElement | null = null;
   private addContextBtnEl: HTMLButtonElement | null = null;
   private sendBtnEl: HTMLButtonElement | null = null;
   private inputTextareaEl: HTMLTextAreaElement | null = null;
@@ -284,8 +287,17 @@ export class ComposerInputShellCoordinator {
     this.slashCommandMenuEl.setAttribute('role', 'listbox');
 
     const composerFooterEl = composerContentEl.createDiv({ cls: 'opencodian-composer-footer' });
-    this.composerFooterLeadingEl = composerFooterEl.createDiv({ cls: 'opencodian-composer-footer-leading' });
-    this.composerFooterTrailingEl = composerFooterEl.createDiv({ cls: 'opencodian-composer-footer-trailing' });
+    this.composerContractEl = composerFooterEl.createDiv({ cls: 'opencodian-composer-contract' });
+    this.composerFooterLeadingEl = this.composerContractEl.createDiv({
+      cls: 'opencodian-composer-footer-leading opencodian-composer-context-actions',
+    });
+    this.composerRuntimeControlsEl = this.composerContractEl.createDiv({
+      cls: 'opencodian-composer-runtime-controls',
+    });
+    this.composerFooterTrailingEl = this.composerContractEl.createDiv({
+      cls: 'opencodian-composer-footer-trailing opencodian-composer-submit-controls',
+    });
+    this.composerSubmitControlsEl = this.composerFooterTrailingEl;
     this.addContextBtnEl = this.composerFooterLeadingEl.createEl('button', {
       cls: 'opencodian-composer-add-btn opencodian-tooltip-trigger',
       attr: {
@@ -390,14 +402,18 @@ export class ComposerInputShellCoordinator {
   }
 
   private mountToolbarControls(): void {
-    if (!this.composerShellEl) {
+    if (!this.composerRuntimeControlsEl && !this.composerSubmitControlsEl && !this.composerShellEl) {
       return;
     }
 
     this.agentSelectionController.destroy();
-    this.composerShellEl.querySelector(':scope > .opencodian-input-toolbar')?.remove();
+    this.composerShellEl?.querySelector(':scope > .opencodian-input-toolbar')?.remove();
+    this.composerRuntimeControlsEl?.querySelector(':scope > .opencodian-input-toolbar')?.remove();
+    this.composerSubmitControlsEl?.querySelector(':scope > .opencodian-context-usage-slot')?.remove();
 
-    const toolbarEl = this.composerShellEl.createDiv({ cls: 'opencodian-input-toolbar' });
+    const toolbarEl = document.createElement('div');
+    toolbarEl.className = 'opencodian-input-toolbar';
+    (this.composerRuntimeControlsEl ?? this.composerShellEl)?.appendChild(toolbarEl);
     if (this.host.shouldMountAgentSelector?.() !== false) {
       this.agentSelectionController.mount(toolbarEl.createDiv({ cls: 'opencodian-agent-selector' }));
     }
@@ -405,7 +421,9 @@ export class ComposerInputShellCoordinator {
       showModels: true,   // Host will gate based on capability
       showPermissions: true, // Host will gate based on capability
     });
-    this.host.mountContextUsageIndicator(toolbarEl.createDiv({ cls: 'opencodian-context-usage-slot' }));
+    this.host.mountContextUsageIndicator((this.composerSubmitControlsEl ?? toolbarEl).createDiv({
+      cls: 'opencodian-context-usage-slot',
+    }));
     this.host.mountEffortSelector(toolbarEl.createDiv({ cls: 'opencodian-effort-slot' }));
     this.pruneEmptyToolbar(toolbarEl);
   }
@@ -428,14 +446,14 @@ export class ComposerInputShellCoordinator {
       return;
     }
 
-    if (!this.composerFooterTrailingEl || !this.sendBtnEl) {
+    if (!this.composerFooterLeadingEl) {
       return;
     }
 
     this.activeCapabilityHint = hint;
 
     if (!this.capabilityHintEl) {
-      this.capabilityHintEl = this.composerFooterTrailingEl.createEl('button', {
+      this.capabilityHintEl = this.composerFooterLeadingEl.createEl('button', {
         cls: `${this.capabilityHintHostClass} opencodian-tooltip-trigger`,
         attr: {
           type: 'button',
@@ -444,7 +462,6 @@ export class ComposerInputShellCoordinator {
       this.capabilityHintEl.addEventListener('click', () => {
         this.applyCapabilityHintAction();
       });
-      this.sendBtnEl.before(this.capabilityHintEl);
     }
 
     if (this.capabilityHintEl) {
@@ -688,6 +705,9 @@ export class ComposerInputShellCoordinator {
     this.inputWrapperEl = null;
     this.composerFooterLeadingEl = null;
     this.composerFooterTrailingEl = null;
+    this.composerContractEl = null;
+    this.composerRuntimeControlsEl = null;
+    this.composerSubmitControlsEl = null;
     this.addContextBtnEl = null;
     this.sendBtnEl = null;
     this.inputTextareaEl = null;

@@ -1,7 +1,9 @@
 # English Locale
 
 > **源码**: `src/i18n/locales/en.ts`
-> **最近更新**: 2026-06-16 Codex MCP detail modal collapse/expand — added `settings.codex.mcpDetail.expandServer`, `collapseServer`, `showToolDetails`, `hideToolDetails` for the new two-level expand interaction (server section + tool details) in the MCP inspection modal.
+> **最近更新**: 2026-06-17 Claude Code settings grouping — added `settings.claudeCode.groups.*` titles/descriptions for the reorganized Runtime / Model & Thinking / Permissions / Context & Sources / Tools subtabs.
+>
+> **Previously**: 2026-06-16 Codex MCP detail modal collapse/expand — added `settings.codex.mcpDetail.expandServer`, `collapseServer`, `showToolDetails`, `hideToolDetails` for the new two-level expand interaction (server section + tool details) in the MCP inspection modal.
 >
 > **Previously**: 2026-06-16 Codex readback modal polish — added `settings.codex.readback.status*` keys so shared diagnostic modal status labels are localized.
 >

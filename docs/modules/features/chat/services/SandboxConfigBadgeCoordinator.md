@@ -14,7 +14,7 @@ Read-only sandbox configuration badge that appears in the chat input toolbar nex
 
 - Render a small "Sandbox" badge in the chat toolbar when sandbox is enabled
 - Count active sub-policies (excludedCommands, filesystem paths, network domains, etc.)
-- Display detailed tooltip with full policy configuration
+- Display detailed tooltip with full policy configuration through the shared body-level tooltip overlay
 - Provide readback transparency: badge reflects plugin settings, NOT independently verified OS-level enforcement
 
 ## Dependencies
@@ -22,6 +22,7 @@ Read-only sandbox configuration badge that appears in the chat input toolbar nex
 - `ClaudeCodeSandboxSettings` from `src/core/types/settings`
 - Obsidian `setIcon` for the shield-check icon
 - `t()` i18n for locale strings
+- `TooltipLayerController` for `.opencodian-tooltip-trigger[data-tooltip]`
 
 ## Lifecycle
 
@@ -36,3 +37,4 @@ Read-only sandbox configuration badge that appears in the chat input toolbar nex
 - Tooltip is fully i18n-aware: SDK property names (e.g., `failIfUnavailable`) are preserved as English technical identifiers by design (they map to SDK option keys), but surrounding context (yes/no, blocked, reduces security) is localized.
 - Tooltip explicitly states "readback" boundary — OS-level enforcement is not independently verified
 - Sub-policy count gives users a quick visual indicator of how many advanced policies are active
+- The badge uses `data-tooltip` and removes `title`, so Electron cannot show a second native tooltip on top of the shared overlay.

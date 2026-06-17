@@ -194,6 +194,24 @@ describe('ChatHeaderPresenter', () => {
     }
   });
 
+  it('groups header status, conversation, and configuration actions by workflow', () => {
+    const fixture = createFixture();
+
+    const statusGroup = fixture.headerEl.querySelector<HTMLElement>('.opencodian-header-status-group');
+    const conversationGroup = fixture.headerEl.querySelector<HTMLElement>('.opencodian-header-conversation-group');
+    const configGroup = fixture.headerEl.querySelector<HTMLElement>('.opencodian-header-config-group');
+
+    expect(statusGroup?.querySelector('.opencodian-server-status-badge')).not.toBeNull();
+    expect(
+      Array.from(conversationGroup?.querySelectorAll<HTMLElement>('.opencodian-header-btn') ?? [])
+        .map((button) => button.dataset.action),
+    ).toEqual(['new-current-tab', 'new-tab', 'history']);
+    expect(
+      Array.from(configGroup?.querySelectorAll<HTMLElement>('.opencodian-header-btn') ?? [])
+        .map((button) => button.dataset.action),
+    ).toEqual(['session-settings', 'settings']);
+  });
+
   it('marks the new-tab action for tab-disabled container CSS', () => {
     const fixture = createFixture();
 
@@ -201,7 +219,7 @@ describe('ChatHeaderPresenter', () => {
     const newTabButton = fixture.headerEl.querySelector<HTMLElement>('.opencodian-header-btn--new-tab');
 
     expect(actionButtons).toHaveLength(5);
-    expect(newTabButton).toBe(actionButtons[0]);
+    expect(newTabButton).toBe(actionButtons[1]);
   });
 
   it('refreshes status classes and relabels status when server mode changes', async () => {

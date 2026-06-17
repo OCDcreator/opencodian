@@ -138,6 +138,124 @@ const CLAUDE_PROJECT_SOURCE_FILES = [
   '.claude/settings.local.json',
 ] as const;
 const CLAUDE_CONTEXT_USAGE_SECRET_KEY_PATTERN = /(?:^env$|api[_-]?key|secret|password|credential|authorization|oauth|(?:access|refresh|session|auth)[_-]?token|^token$)/i;
+
+type ClaudeCodeGroupId =
+  | 'connection-runtime'
+  | 'runtime-ecosystem'
+  | 'project-files'
+  | 'runtime-inspection'
+  | 'diagnostics-logs'
+  | 'model-selection'
+  | 'thinking-effort'
+  | 'limits-budget'
+  | 'prompt-behavior'
+  | 'permission-mode'
+  | 'plan-mode'
+  | 'sandbox-core'
+  | 'sandbox-advanced'
+  | 'source-activation'
+  | 'project-source-files'
+  | 'additional-context'
+  | 'mcp-runtime'
+  | 'tool-policy'
+  | 'question-ux';
+
+type ClaudeCodeNoticeKind = 'boundary' | 'lifecycle' | 'proof' | 'readback' | 'inline';
+type ClaudeCodeProofState = 'pass' | 'readback' | 'wiring' | 'blocked' | 'error';
+
+interface ClaudeCodeGroupOptions {
+  id: ClaudeCodeGroupId;
+  titleKey?: TranslationKey;
+  descKey?: TranslationKey;
+  extraClasses?: string[];
+}
+
+interface ClaudeCodeNoticeOptions {
+  kind: ClaudeCodeNoticeKind;
+  proofState?: ClaudeCodeProofState;
+  attrs?: Record<string, string>;
+  text?: string;
+  classes?: string[];
+}
+
+const CLAUDE_CODE_GROUP_COPY: Record<ClaudeCodeGroupId, { titleKey: TranslationKey; descKey: TranslationKey }> = {
+  'connection-runtime': {
+    titleKey: 'settings.claudeCode.groups.connectionRuntime.title',
+    descKey: 'settings.claudeCode.groups.connectionRuntime.desc',
+  },
+  'runtime-ecosystem': {
+    titleKey: 'settings.claudeCode.groups.runtimeEcosystem.title',
+    descKey: 'settings.claudeCode.groups.runtimeEcosystem.desc',
+  },
+  'project-files': {
+    titleKey: 'settings.claudeCode.groups.projectFiles.title',
+    descKey: 'settings.claudeCode.groups.projectFiles.desc',
+  },
+  'runtime-inspection': {
+    titleKey: 'settings.claudeCode.groups.runtimeInspection.title',
+    descKey: 'settings.claudeCode.groups.runtimeInspection.desc',
+  },
+  'diagnostics-logs': {
+    titleKey: 'settings.claudeCode.groups.diagnosticsLogs.title',
+    descKey: 'settings.claudeCode.groups.diagnosticsLogs.desc',
+  },
+  'model-selection': {
+    titleKey: 'settings.claudeCode.groups.modelSelection.title',
+    descKey: 'settings.claudeCode.groups.modelSelection.desc',
+  },
+  'thinking-effort': {
+    titleKey: 'settings.claudeCode.groups.thinkingEffort.title',
+    descKey: 'settings.claudeCode.groups.thinkingEffort.desc',
+  },
+  'limits-budget': {
+    titleKey: 'settings.claudeCode.groups.limitsBudget.title',
+    descKey: 'settings.claudeCode.groups.limitsBudget.desc',
+  },
+  'prompt-behavior': {
+    titleKey: 'settings.claudeCode.groups.promptBehavior.title',
+    descKey: 'settings.claudeCode.groups.promptBehavior.desc',
+  },
+  'permission-mode': {
+    titleKey: 'settings.claudeCode.groups.permissionMode.title',
+    descKey: 'settings.claudeCode.groups.permissionMode.desc',
+  },
+  'plan-mode': {
+    titleKey: 'settings.claudeCode.groups.planMode.title',
+    descKey: 'settings.claudeCode.groups.planMode.desc',
+  },
+  'sandbox-core': {
+    titleKey: 'settings.claudeCode.groups.sandboxCore.title',
+    descKey: 'settings.claudeCode.groups.sandboxCore.desc',
+  },
+  'sandbox-advanced': {
+    titleKey: 'settings.claudeCode.groups.sandboxAdvanced.title',
+    descKey: 'settings.claudeCode.groups.sandboxAdvanced.desc',
+  },
+  'source-activation': {
+    titleKey: 'settings.claudeCode.groups.sourceActivation.title',
+    descKey: 'settings.claudeCode.groups.sourceActivation.desc',
+  },
+  'project-source-files': {
+    titleKey: 'settings.claudeCode.groups.projectSourceFiles.title',
+    descKey: 'settings.claudeCode.groups.projectSourceFiles.desc',
+  },
+  'additional-context': {
+    titleKey: 'settings.claudeCode.groups.additionalContext.title',
+    descKey: 'settings.claudeCode.groups.additionalContext.desc',
+  },
+  'mcp-runtime': {
+    titleKey: 'settings.claudeCode.groups.mcpRuntime.title',
+    descKey: 'settings.claudeCode.groups.mcpRuntime.desc',
+  },
+  'tool-policy': {
+    titleKey: 'settings.claudeCode.groups.toolPolicy.title',
+    descKey: 'settings.claudeCode.groups.toolPolicy.desc',
+  },
+  'question-ux': {
+    titleKey: 'settings.claudeCode.groups.questionUx.title',
+    descKey: 'settings.claudeCode.groups.questionUx.desc',
+  },
+};
 const CLAUDE_ACCOUNT_INFO_SECRET_KEY_PATTERN = /(?:^env$|api[_-]?key|secret|password|credential|authorization|oauth|(?:access|refresh|session|auth)?[_-]?token|token[_-]?source)/i;
 
 const CLAUDE_CLASSIC_TABS = [
@@ -207,8 +325,11 @@ export class SettingsClaudeCodeSection {
       });
     }
     const bodyEl = blockEl.createDiv({
-      cls: 'opencodian-settings-block-body opencodian-settings-section-body',
-      attr: { 'data-settings-surface': 'section-body' },
+      cls: 'opencodian-settings-block-body opencodian-settings-section-body opencodian-claude-code-tab-body opencodian-settings-claude-code-tab-body',
+      attr: {
+        'data-settings-surface': 'tab-body',
+        'data-claude-code-section': tabId,
+      },
     });
 
     switch (tabId) {
@@ -230,31 +351,120 @@ export class SettingsClaudeCodeSection {
     }
   }
 
+  private createClaudeCodeGroup(
+    containerEl: HTMLElement,
+    { id, titleKey, descKey, extraClasses = [] }: ClaudeCodeGroupOptions,
+  ): HTMLElement {
+    const groupCopy = CLAUDE_CODE_GROUP_COPY[id];
+    const groupEl = containerEl.createDiv({
+      cls: ['opencodian-claude-code-group', 'opencodian-settings-claude-code-group', ...extraClasses].join(' '),
+      attr: {
+        'data-settings-surface': 'group',
+        'data-claude-code-group': id,
+      },
+    });
+
+    if (id === 'sandbox-advanced') {
+      groupEl.setAttribute('data-claude-code-advanced-sandbox', 'true');
+    }
+
+    const headerEl = groupEl.createDiv({
+      cls: 'opencodian-claude-code-group-header opencodian-settings-claude-code-group-header',
+    });
+    const titleClasses = ['opencodian-claude-code-group-title', 'opencodian-settings-claude-code-group-title'];
+    if (id === 'sandbox-advanced') {
+      titleClasses.push('opencodian-claude-code-advanced-summary');
+    }
+    headerEl.createEl('h4', {
+      cls: titleClasses.join(' '),
+      text: t(titleKey ?? groupCopy.titleKey),
+    });
+    const resolvedDescKey = descKey ?? groupCopy.descKey;
+    if (resolvedDescKey) {
+      headerEl.createEl('p', {
+        cls: 'opencodian-claude-code-group-desc opencodian-settings-claude-code-group-desc',
+        text: t(resolvedDescKey),
+      });
+    }
+
+    return groupEl.createDiv({
+      cls: 'opencodian-claude-code-stack opencodian-settings-claude-code-group-stack',
+    });
+  }
+
+  private createClaudeCodeAdvancedGroup(
+    containerEl: HTMLElement,
+    options: Omit<ClaudeCodeGroupOptions, 'extraClasses'>,
+  ): HTMLElement {
+    return this.createClaudeCodeGroup(containerEl, {
+      ...options,
+      extraClasses: ['opencodian-claude-code-advanced', 'opencodian-settings-advanced-sandbox'],
+    });
+  }
+
+  private createClaudeCodeNotice(containerEl: HTMLElement, options: ClaudeCodeNoticeOptions): HTMLElement {
+    const classes = ['opencodian-settings-inline-notice', ...(options.classes ?? [])];
+    if (options.kind === 'boundary') {
+      classes.push('opencodian-claude-code-notice--boundary');
+    }
+    if (options.kind === 'lifecycle') {
+      classes.push('opencodian-claude-code-notice--lifecycle');
+    }
+    if (options.kind === 'proof') {
+      classes.push('opencodian-settings-proof-status');
+    }
+    if (options.kind === 'readback' || options.proofState === 'readback') {
+      classes.push('opencodian-settings-readback', 'opencodian-claude-code-readback');
+    }
+
+    const attr = { ...(options.attrs ?? {}) };
+    if (options.proofState) {
+      attr['data-proof-state'] = options.proofState;
+    }
+    const noticeEl = containerEl.createDiv({
+      cls: classes.join(' '),
+      attr,
+    });
+    if (options.text !== undefined) {
+      noticeEl.createSpan({ text: options.text });
+    }
+    return noticeEl;
+  }
+
   // ─── Runtime tab ──────────────────────────────────────────────────
 
   private renderRuntimeTab(containerEl: HTMLElement): void {
-    this.renderRuntimeBoundaryNotice(containerEl);
-    this.renderRuntimeEcosystemSummary(containerEl);
-    this.renderBackendSessionBrowserInfo(containerEl);
-    this.renderClaudeProjectSkillsControls(containerEl);
-    this.renderClaudeProjectCommandsControls(containerEl);
-    this.renderClaudeProjectAgentsControls(containerEl);
-    this.renderClaudeProjectSettingsControls(containerEl);
-    this.renderClaudeRuntimeCommandsControls(containerEl);
-    this.renderRuntimeCatalogReadbackControls(containerEl);
-    this.renderAccountInfoReadbackControls(containerEl);
-    this.renderContextUsageReadbackControls(containerEl);
-    this.renderRuntimeFileReadbackControls(containerEl);
-    this.renderExecutableSetting(containerEl);
-    this.renderJsRuntimeSetting(containerEl);
-    this.renderLoadTimeoutMsSetting(containerEl);
-    this.renderEnvironmentHint(containerEl);
-    this.renderDiagnostics(containerEl);
-    this.renderDebugSetting(containerEl);
-    this.renderDebugFileSetting(containerEl);
-    this.renderEnvProofStatusNotice(containerEl);
-    this.renderFileCheckpointBoundaryNotice(containerEl);
-    this.renderEnvironmentVariablesSetting(containerEl);
+    const connectionEl = this.createClaudeCodeGroup(containerEl, { id: 'connection-runtime' });
+    this.renderRuntimeBoundaryNotice(connectionEl);
+    this.renderExecutableSetting(connectionEl);
+    this.renderJsRuntimeSetting(connectionEl);
+    this.renderLoadTimeoutMsSetting(connectionEl);
+    this.renderEnvironmentHint(connectionEl);
+
+    const ecosystemEl = this.createClaudeCodeGroup(containerEl, { id: 'runtime-ecosystem' });
+    this.renderRuntimeEcosystemSummary(ecosystemEl);
+    this.renderBackendSessionBrowserInfo(ecosystemEl);
+
+    const projectFilesEl = this.createClaudeCodeGroup(containerEl, { id: 'project-files' });
+    this.renderClaudeProjectSkillsControls(projectFilesEl);
+    this.renderClaudeProjectCommandsControls(projectFilesEl);
+    this.renderClaudeProjectAgentsControls(projectFilesEl);
+    this.renderClaudeProjectSettingsControls(projectFilesEl);
+
+    const inspectionEl = this.createClaudeCodeGroup(containerEl, { id: 'runtime-inspection' });
+    this.renderClaudeRuntimeCommandsControls(inspectionEl);
+    this.renderRuntimeCatalogReadbackControls(inspectionEl);
+    this.renderAccountInfoReadbackControls(inspectionEl);
+    this.renderContextUsageReadbackControls(inspectionEl);
+    this.renderRuntimeFileReadbackControls(inspectionEl);
+
+    const diagnosticsEl = this.createClaudeCodeGroup(containerEl, { id: 'diagnostics-logs' });
+    this.renderDiagnostics(diagnosticsEl);
+    this.renderDebugSetting(diagnosticsEl);
+    this.renderDebugFileSetting(diagnosticsEl);
+    this.renderEnvProofStatusNotice(diagnosticsEl);
+    this.renderFileCheckpointBoundaryNotice(diagnosticsEl);
+    this.renderEnvironmentVariablesSetting(diagnosticsEl);
   }
 
   private renderExecutableSetting(containerEl: HTMLElement): void {
@@ -274,7 +484,7 @@ export class SettingsClaudeCodeSection {
 
   private renderJsRuntimeSetting(containerEl: HTMLElement): void {
     const boundaryEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice',
+      cls: 'opencodian-settings-inline-notice opencodian-claude-code-notice--boundary',
       attr: { 'data-claude-code-js-runtime-boundary': 'true' },
     });
     boundaryEl.createSpan({ text: t('settings.claudeCode.jsRuntime.boundaryNotice') });
@@ -296,7 +506,7 @@ export class SettingsClaudeCodeSection {
       });
 
     const lifecycleEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice',
+      cls: 'opencodian-settings-inline-notice opencodian-claude-code-notice--lifecycle',
       attr: { 'data-claude-code-js-runtime-lifecycle': 'true' },
     });
     lifecycleEl.createSpan({ text: t('settings.claudeCode.jsRuntime.lifecycleNotice') });
@@ -304,7 +514,7 @@ export class SettingsClaudeCodeSection {
 
   private renderLoadTimeoutMsSetting(containerEl: HTMLElement): void {
     const boundaryEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice',
+      cls: 'opencodian-settings-inline-notice opencodian-claude-code-notice--boundary',
       attr: { 'data-claude-code-load-timeout-ms-boundary': 'true' },
     });
     boundaryEl.createSpan({ text: t('settings.claudeCode.loadTimeoutMs.boundaryNotice') });
@@ -323,7 +533,7 @@ export class SettingsClaudeCodeSection {
       });
 
     const lifecycleEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice',
+      cls: 'opencodian-settings-inline-notice opencodian-claude-code-notice--lifecycle',
       attr: { 'data-claude-code-load-timeout-ms-lifecycle': 'true' },
     });
     lifecycleEl.createSpan({ text: t('settings.claudeCode.loadTimeoutMs.lifecycleNotice') });
@@ -361,7 +571,7 @@ export class SettingsClaudeCodeSection {
 
   private renderDebugSetting(containerEl: HTMLElement): void {
     const boundaryEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice',
+      cls: 'opencodian-settings-inline-notice opencodian-claude-code-notice--boundary',
       attr: { 'data-claude-code-debug-boundary': 'true' },
     });
     boundaryEl.createSpan({ text: t('settings.claudeCode.debug.boundaryNotice') });
@@ -379,7 +589,7 @@ export class SettingsClaudeCodeSection {
       });
 
     const lifecycleEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice',
+      cls: 'opencodian-settings-inline-notice opencodian-claude-code-notice--lifecycle',
       attr: { 'data-claude-code-debug-lifecycle': 'true' },
     });
     lifecycleEl.createSpan({ text: t('settings.claudeCode.debug.lifecycleNotice') });
@@ -387,7 +597,7 @@ export class SettingsClaudeCodeSection {
 
   private renderDebugFileSetting(containerEl: HTMLElement): void {
     const boundaryEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice',
+      cls: 'opencodian-settings-inline-notice opencodian-claude-code-notice--boundary',
       attr: { 'data-claude-code-debug-file-boundary': 'true' },
     });
     boundaryEl.createSpan({ text: t('settings.claudeCode.debugFile.boundaryNotice') });
@@ -412,7 +622,7 @@ export class SettingsClaudeCodeSection {
     implicitEl.createSpan({ text: t('settings.claudeCode.debugFile.implicitDebugNotice') });
 
     const lifecycleEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice',
+      cls: 'opencodian-settings-inline-notice opencodian-claude-code-notice--lifecycle',
       attr: { 'data-claude-code-debug-file-lifecycle': 'true' },
     });
     lifecycleEl.createSpan({ text: t('settings.claudeCode.debugFile.lifecycleNotice') });
@@ -420,12 +630,13 @@ export class SettingsClaudeCodeSection {
 
   private renderRuntimeEcosystemSummary(containerEl: HTMLElement): void {
     const adapter = this.getClaudeAdapter() as ClaudeCodeRuntimeEcosystemAdapter | null;
-    const summaryEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice opencodian-claude-code-runtime-ecosystem',
-      attr: {
+    const summaryEl = this.createClaudeCodeNotice(containerEl, {
+      kind: 'readback',
+      proofState: 'readback',
+      classes: ['opencodian-claude-code-runtime-ecosystem'],
+      attrs: {
         'data-claude-code-runtime-ecosystem': 'true',
         'data-runtime-only': 'true',
-        'data-proof-state': 'readback',
       },
     });
 
@@ -433,13 +644,13 @@ export class SettingsClaudeCodeSection {
       text: t('settings.claudeCode.runtimeEcosystem.name'),
     });
     summaryEl.createEl('p', {
-      cls: 'opencodian-claude-code-runtime-ecosystem-desc',
+      cls: 'opencodian-settings-inline-meta opencodian-claude-code-inline-meta opencodian-claude-code-runtime-ecosystem-desc',
       text: t('settings.claudeCode.runtimeEcosystem.desc'),
     });
 
     for (const row of this.buildRuntimeEcosystemRows(adapter)) {
       summaryEl.createEl('p', {
-        cls: 'opencodian-claude-code-runtime-ecosystem-row',
+        cls: 'opencodian-settings-inline-meta opencodian-claude-code-inline-meta opencodian-claude-code-runtime-ecosystem-row',
         attr: {
           'data-runtime-ecosystem-kind': row.kind,
           'data-runtime-ecosystem-state': row.state,
@@ -1197,11 +1408,12 @@ export class SettingsClaudeCodeSection {
   private renderRuntimeCatalogReadbackControls(containerEl: HTMLElement): void {
     let outputEl: HTMLElement | null = null;
     const getOutputEl = (): HTMLElement => {
-      outputEl ??= containerEl.createDiv({
-        cls: 'opencodian-settings-inline-notice opencodian-claude-code-runtime-catalog',
-        attr: {
+      outputEl ??= this.createClaudeCodeNotice(containerEl, {
+        kind: 'readback',
+        proofState: 'readback',
+        classes: ['opencodian-claude-code-runtime-catalog'],
+        attrs: {
           'data-claude-code-runtime-catalog': 'true',
-          'data-proof-state': 'readback',
         },
       });
       return outputEl;
@@ -1321,11 +1533,12 @@ export class SettingsClaudeCodeSection {
   private renderAccountInfoReadbackControls(containerEl: HTMLElement): void {
     let outputEl: HTMLElement | null = null;
     const getOutputEl = (): HTMLElement => {
-      outputEl ??= containerEl.createDiv({
-        cls: 'opencodian-settings-inline-notice opencodian-claude-code-account-info-readback',
-        attr: {
+      outputEl ??= this.createClaudeCodeNotice(containerEl, {
+        kind: 'readback',
+        proofState: 'readback',
+        classes: ['opencodian-claude-code-account-info-readback'],
+        attrs: {
           'data-claude-code-account-info-readback': 'true',
-          'data-proof-state': 'readback',
         },
       });
       return outputEl;
@@ -1424,11 +1637,12 @@ export class SettingsClaudeCodeSection {
   private renderContextUsageReadbackControls(containerEl: HTMLElement): void {
     let outputEl: HTMLElement | null = null;
     const getOutputEl = (): HTMLElement => {
-      outputEl ??= containerEl.createDiv({
-        cls: 'opencodian-settings-inline-notice opencodian-claude-code-context-usage-readback',
-        attr: {
+      outputEl ??= this.createClaudeCodeNotice(containerEl, {
+        kind: 'readback',
+        proofState: 'readback',
+        classes: ['opencodian-claude-code-context-usage-readback'],
+        attrs: {
           'data-claude-code-context-usage-readback': 'true',
-          'data-proof-state': 'readback',
         },
       });
       return outputEl;
@@ -1516,11 +1730,12 @@ export class SettingsClaudeCodeSection {
     let outputEl: HTMLElement | null = null;
     let runtimeFilePath = '';
     const getOutputEl = (): HTMLElement => {
-      outputEl ??= containerEl.createDiv({
-        cls: 'opencodian-settings-inline-notice opencodian-claude-code-file-readback',
-        attr: {
+      outputEl ??= this.createClaudeCodeNotice(containerEl, {
+        kind: 'readback',
+        proofState: 'readback',
+        classes: ['opencodian-claude-code-file-readback'],
+        attrs: {
           'data-claude-code-file-readback': 'true',
-          'data-proof-state': 'readback',
         },
       });
       return outputEl;
@@ -1638,27 +1853,34 @@ export class SettingsClaudeCodeSection {
   // ─── Model & Thinking tab ─────────────────────────────────────────
 
   private renderModelThinkingTab(containerEl: HTMLElement): void {
-    const modelTextControl = this.renderModelSetting(containerEl);
-    this.renderModelQuickSelect(containerEl, modelTextControl);
-    this.renderMainModelProofStatusNotice(containerEl);
-    const fallbackTextControl = this.renderFallbackModelSetting(containerEl);
-    this.renderFallbackModelQuickSelect(containerEl, fallbackTextControl);
-    this.renderFallbackModelBoundaryNotice(containerEl);
-    this.renderFallbackModelProofStatusNotice(containerEl);
-    this.renderThinkingSetting(containerEl);
+    const modelSelectionEl = this.createClaudeCodeGroup(containerEl, { id: 'model-selection' });
+    const modelTextControl = this.renderModelSetting(modelSelectionEl);
+    this.renderModelQuickSelect(modelSelectionEl, modelTextControl);
+    this.renderMainModelProofStatusNotice(modelSelectionEl);
+    const fallbackTextControl = this.renderFallbackModelSetting(modelSelectionEl);
+    this.renderFallbackModelQuickSelect(modelSelectionEl, fallbackTextControl);
+    this.renderFallbackModelBoundaryNotice(modelSelectionEl);
+    this.renderFallbackModelProofStatusNotice(modelSelectionEl);
+
+    const thinkingEl = this.createClaudeCodeGroup(containerEl, { id: 'thinking-effort' });
+    this.renderThinkingSetting(thinkingEl);
     if (this.settings.thinking.type === 'fixed') {
-      this.renderThinkingBudgetSetting(containerEl);
+      this.renderThinkingBudgetSetting(thinkingEl);
     }
-    this.renderEffortSetting(containerEl);
-    this.renderLimitsProofStatusNotice(containerEl);
-    this.renderLimitsBoundaryNotice(containerEl);
-    this.renderMaxTurnsSetting(containerEl);
-    this.renderMaxBudgetSetting(containerEl);
-    this.renderTaskBudgetSetting(containerEl);
-    this.renderSystemPromptSetting(containerEl);
-    this.renderOutputStyleSetting(containerEl);
-    this.renderPromptSuggestionsSetting(containerEl);
-    this.renderEnableContext1mBetaSetting(containerEl);
+    this.renderEffortSetting(thinkingEl);
+
+    const limitsEl = this.createClaudeCodeGroup(containerEl, { id: 'limits-budget' });
+    this.renderLimitsProofStatusNotice(limitsEl);
+    this.renderLimitsBoundaryNotice(limitsEl);
+    this.renderMaxTurnsSetting(limitsEl);
+    this.renderMaxBudgetSetting(limitsEl);
+    this.renderTaskBudgetSetting(limitsEl);
+
+    const promptEl = this.createClaudeCodeGroup(containerEl, { id: 'prompt-behavior' });
+    this.renderSystemPromptSetting(promptEl);
+    this.renderOutputStyleSetting(promptEl);
+    this.renderPromptSuggestionsSetting(promptEl);
+    this.renderEnableContext1mBetaSetting(promptEl);
   }
 
   private renderModelSetting(containerEl: HTMLElement): unknown {
@@ -1782,8 +2004,12 @@ export class SettingsClaudeCodeSection {
   // ─── Permissions tab ──────────────────────────────────────────────
 
   private renderPermissionsTab(containerEl: HTMLElement): void {
-    this.renderPermissionModeSetting(containerEl);
-    this.renderPlanModeInstructionsSetting(containerEl);
+    const permissionEl = this.createClaudeCodeGroup(containerEl, { id: 'permission-mode' });
+    this.renderPermissionModeSetting(permissionEl);
+
+    const planModeEl = this.createClaudeCodeGroup(containerEl, { id: 'plan-mode' });
+    this.renderPlanModeInstructionsSetting(planModeEl);
+
     this.renderSandboxSettings(containerEl);
   }
 
@@ -1807,7 +2033,7 @@ export class SettingsClaudeCodeSection {
 
   private renderPlanModeInstructionsSetting(containerEl: HTMLElement): void {
     const boundaryEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice',
+      cls: 'opencodian-settings-inline-notice opencodian-claude-code-notice--boundary',
       attr: { 'data-claude-code-plan-mode-instructions-boundary': 'true' },
     });
     boundaryEl.createSpan({ text: t('settings.claudeCode.planModeInstructions.boundaryNotice') });
@@ -1827,7 +2053,7 @@ export class SettingsClaudeCodeSection {
       });
 
     const lifecycleEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice',
+      cls: 'opencodian-settings-inline-notice opencodian-claude-code-notice--lifecycle',
       attr: { 'data-claude-code-plan-mode-instructions-lifecycle': 'true' },
     });
     lifecycleEl.createSpan({ text: t('settings.claudeCode.planModeInstructions.lifecycleNotice') });
@@ -1836,14 +2062,14 @@ export class SettingsClaudeCodeSection {
   // ─── Sandbox settings (Permissions tab) ─────────────────────────
 
   private renderSandboxSettings(containerEl: HTMLElement): void {
-    containerEl.createEl('h4', { text: t('settings.claudeCode.sandbox.name') });
-    const boundaryEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice',
+    const coreEl = this.createClaudeCodeGroup(containerEl, { id: 'sandbox-core' });
+    const boundaryEl = coreEl.createDiv({
+      cls: 'opencodian-settings-inline-notice opencodian-claude-code-notice--boundary',
       attr: { 'data-claude-code-sandbox-boundary': 'true' },
     });
     boundaryEl.createSpan({ text: t('settings.claudeCode.sandbox.boundaryNotice') });
 
-    new Setting(containerEl)
+    new Setting(coreEl)
       .setName(t('settings.claudeCode.sandbox.enabled.name'))
       .setDesc(t('settings.claudeCode.sandbox.enabled.desc'))
       .addToggle((toggle) => {
@@ -1855,7 +2081,7 @@ export class SettingsClaudeCodeSection {
           });
       });
 
-    new Setting(containerEl)
+    new Setting(coreEl)
       .setName(t('settings.claudeCode.sandbox.failIfUnavailable.name'))
       .setDesc(t('settings.claudeCode.sandbox.failIfUnavailable.desc'))
       .addToggle((toggle) => {
@@ -1867,7 +2093,7 @@ export class SettingsClaudeCodeSection {
           });
       });
 
-    new Setting(containerEl)
+    new Setting(coreEl)
       .setName(t('settings.claudeCode.sandbox.autoAllowBashIfSandboxed.name'))
       .setDesc(t('settings.claudeCode.sandbox.autoAllowBashIfSandboxed.desc'))
       .addToggle((toggle) => {
@@ -1880,14 +2106,10 @@ export class SettingsClaudeCodeSection {
       });
 
     // ── Advanced sandbox sub-policies ───────────────────────────────────
-    containerEl.createEl('h5', { text: t('settings.claudeCode.sandbox.advanced.name') });
-    containerEl.createEl('p', {
-      cls: 'opencodian-settings-inline-notice',
-      text: t('settings.claudeCode.sandbox.advanced.desc'),
-    });
+    const advancedEl = this.createClaudeCodeAdvancedGroup(containerEl, { id: 'sandbox-advanced' });
 
     // excludedCommands
-    new Setting(containerEl)
+    new Setting(advancedEl)
       .setName(t('settings.claudeCode.sandbox.excludedCommands.name'))
       .setDesc(t('settings.claudeCode.sandbox.excludedCommands.desc'))
       .addTextArea((textArea) => {
@@ -1901,7 +2123,7 @@ export class SettingsClaudeCodeSection {
       });
 
     // allowUnsandboxedCommands
-    new Setting(containerEl)
+    new Setting(advancedEl)
       .setName(t('settings.claudeCode.sandbox.allowUnsandboxedCommands.name'))
       .setDesc(t('settings.claudeCode.sandbox.allowUnsandboxedCommands.desc'))
       .addToggle((toggle) => {
@@ -1914,7 +2136,7 @@ export class SettingsClaudeCodeSection {
       });
 
     // Filesystem sub-policy
-    new Setting(containerEl)
+    new Setting(advancedEl)
       .setName(t('settings.claudeCode.sandbox.filesystem.allowWrite.name'))
       .setDesc(t('settings.claudeCode.sandbox.filesystem.allowWrite.desc'))
       .addTextArea((textArea) => {
@@ -1927,7 +2149,7 @@ export class SettingsClaudeCodeSection {
           });
       });
 
-    new Setting(containerEl)
+    new Setting(advancedEl)
       .setName(t('settings.claudeCode.sandbox.filesystem.denyWrite.name'))
       .setDesc(t('settings.claudeCode.sandbox.filesystem.denyWrite.desc'))
       .addTextArea((textArea) => {
@@ -1940,7 +2162,7 @@ export class SettingsClaudeCodeSection {
           });
       });
 
-    new Setting(containerEl)
+    new Setting(advancedEl)
       .setName(t('settings.claudeCode.sandbox.filesystem.denyRead.name'))
       .setDesc(t('settings.claudeCode.sandbox.filesystem.denyRead.desc'))
       .addTextArea((textArea) => {
@@ -1954,7 +2176,7 @@ export class SettingsClaudeCodeSection {
       });
 
     // Network sub-policy
-    new Setting(containerEl)
+    new Setting(advancedEl)
       .setName(t('settings.claudeCode.sandbox.network.allowedDomains.name'))
       .setDesc(t('settings.claudeCode.sandbox.network.allowedDomains.desc'))
       .addTextArea((textArea) => {
@@ -1967,7 +2189,7 @@ export class SettingsClaudeCodeSection {
           });
       });
 
-    new Setting(containerEl)
+    new Setting(advancedEl)
       .setName(t('settings.claudeCode.sandbox.network.deniedDomains.name'))
       .setDesc(t('settings.claudeCode.sandbox.network.deniedDomains.desc'))
       .addTextArea((textArea) => {
@@ -1981,7 +2203,7 @@ export class SettingsClaudeCodeSection {
       });
 
     // Weaker sandbox toggles
-    new Setting(containerEl)
+    new Setting(advancedEl)
       .setName(t('settings.claudeCode.sandbox.enableWeakerNestedSandbox.name'))
       .setDesc(t('settings.claudeCode.sandbox.enableWeakerNestedSandbox.desc'))
       .addToggle((toggle) => {
@@ -1993,7 +2215,7 @@ export class SettingsClaudeCodeSection {
           });
       });
 
-    new Setting(containerEl)
+    new Setting(advancedEl)
       .setName(t('settings.claudeCode.sandbox.enableWeakerNetworkIsolation.name'))
       .setDesc(t('settings.claudeCode.sandbox.enableWeakerNetworkIsolation.desc'))
       .addToggle((toggle) => {
@@ -2006,7 +2228,7 @@ export class SettingsClaudeCodeSection {
       });
 
     // Custom ripgrep
-    new Setting(containerEl)
+    new Setting(advancedEl)
       .setName(t('settings.claudeCode.sandbox.ripgrep.command.name'))
       .setDesc(t('settings.claudeCode.sandbox.ripgrep.command.desc'))
       .addText((text) => {
@@ -2019,7 +2241,7 @@ export class SettingsClaudeCodeSection {
           });
       });
 
-    new Setting(containerEl)
+    new Setting(advancedEl)
       .setName(t('settings.claudeCode.sandbox.ripgrep.args.name'))
       .setDesc(t('settings.claudeCode.sandbox.ripgrep.args.desc'))
       .addTextArea((textArea) => {
@@ -2033,7 +2255,7 @@ export class SettingsClaudeCodeSection {
       });
 
     // Unexposed fields notice
-    const unexposedEl = containerEl.createDiv({
+    const unexposedEl = advancedEl.createDiv({
       cls: 'opencodian-settings-inline-notice',
       attr: { 'data-claude-code-sandbox-unexposed': 'true' },
     });
@@ -2041,8 +2263,8 @@ export class SettingsClaudeCodeSection {
 
     // Sandbox lifecycle honesty: settings only apply to the next query,
     // unlike permissionMode which tries to apply live via setPermissionMode().
-    const lifecycleEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice',
+    const lifecycleEl = advancedEl.createDiv({
+      cls: 'opencodian-settings-inline-notice opencodian-claude-code-notice--lifecycle',
       attr: { 'data-claude-code-sandbox-lifecycle': 'true' },
     });
     lifecycleEl.createSpan({ text: t('settings.claudeCode.sandbox.lifecycleNotice') });
@@ -2051,15 +2273,20 @@ export class SettingsClaudeCodeSection {
   // ─── Context & Sources tab ────────────────────────────────────────
 
   private renderContextSourcesTab(containerEl: HTMLElement): void {
-    this.renderRuntimeBoundaryNotice(containerEl);
-    this.renderSettingSources(containerEl);
-    this.renderProjectSourceStatus(containerEl);
-    this.renderAdditionalDirectories(containerEl);
+    const activationEl = this.createClaudeCodeGroup(containerEl, { id: 'source-activation' });
+    this.renderRuntimeBoundaryNotice(activationEl);
+    this.renderSettingSources(activationEl);
+
+    const projectFilesEl = this.createClaudeCodeGroup(containerEl, { id: 'project-source-files' });
+    this.renderProjectSourceStatus(projectFilesEl);
+
+    const additionalContextEl = this.createClaudeCodeGroup(containerEl, { id: 'additional-context' });
+    this.renderAdditionalDirectories(additionalContextEl);
   }
 
   private renderRuntimeBoundaryNotice(containerEl: HTMLElement): void {
     const noticeEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice opencodian-claude-code-runtime-boundary',
+      cls: 'opencodian-settings-inline-notice opencodian-settings-notice opencodian-claude-code-notice--boundary opencodian-claude-code-runtime-boundary',
     });
     noticeEl.createSpan({ text: t('settings.claudeCode.runtimeBoundary.nextQuery') });
     new Setting(noticeEl)
@@ -2076,7 +2303,7 @@ export class SettingsClaudeCodeSection {
 
   private renderLimitsBoundaryNotice(containerEl: HTMLElement): void {
     const noticeEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice opencodian-claude-code-limits-boundary',
+      cls: 'opencodian-settings-inline-notice opencodian-settings-notice opencodian-claude-code-notice--boundary opencodian-claude-code-limits-boundary',
       attr: { 'data-claude-code-limits-boundary': 'true' },
     });
     noticeEl.createSpan({ text: t('settings.claudeCode.runtimeBoundary.nextQuery') });
@@ -2099,57 +2326,63 @@ export class SettingsClaudeCodeSection {
     // proves query.setModel() works mid-stream on a persistent query.
     // Honest boundary: only applies when an active query exists; does
     // NOT prove fallback model switching.
-    const noticeEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice opencodian-settings-proof-status',
-      attr: { 'data-claude-code-proof-status': 'main-model', 'data-proof-state': 'pass' },
+    const noticeEl = this.createClaudeCodeNotice(containerEl, {
+      kind: 'proof',
+      proofState: 'pass',
+      attrs: { 'data-claude-code-proof-status': 'main-model' },
     });
     noticeEl.createSpan({ text: t('settings.claudeCode.proofStatus.mainModel') });
   }
 
   private renderFallbackModelBoundaryNotice(containerEl: HTMLElement): void {
     const noticeEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice opencodian-claude-code-fallback-model-boundary',
+      cls: 'opencodian-settings-inline-notice opencodian-claude-code-notice--boundary opencodian-claude-code-fallback-model-boundary',
       attr: { 'data-claude-code-fallback-model-boundary': 'true' },
     });
     noticeEl.createSpan({ text: t('settings.claudeCode.fallbackModel.boundaryNotice') });
   }
 
   private renderFallbackModelProofStatusNotice(containerEl: HTMLElement): void {
-    const noticeEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice opencodian-settings-proof-status',
-      attr: { 'data-claude-code-proof-status': 'fallback-model', 'data-proof-state': 'readback' },
+    const noticeEl = this.createClaudeCodeNotice(containerEl, {
+      kind: 'proof',
+      proofState: 'readback',
+      attrs: { 'data-claude-code-proof-status': 'fallback-model' },
     });
     noticeEl.createSpan({ text: t('settings.claudeCode.proofStatus.fallbackModel') });
   }
 
   private renderToolsProofStatusNotice(containerEl: HTMLElement): void {
-    const noticeEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice opencodian-settings-proof-status',
-      attr: { 'data-claude-code-proof-status': 'tools', 'data-proof-state': 'readback' },
+    const noticeEl = this.createClaudeCodeNotice(containerEl, {
+      kind: 'proof',
+      proofState: 'readback',
+      attrs: { 'data-claude-code-proof-status': 'tools' },
     });
     noticeEl.createSpan({ text: t('settings.claudeCode.proofStatus.tools') });
   }
 
   private renderLimitsProofStatusNotice(containerEl: HTMLElement): void {
-    const noticeEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice opencodian-settings-proof-status',
-      attr: { 'data-claude-code-proof-status': 'limits', 'data-proof-state': 'pass' },
+    const noticeEl = this.createClaudeCodeNotice(containerEl, {
+      kind: 'proof',
+      proofState: 'pass',
+      attrs: { 'data-claude-code-proof-status': 'limits' },
     });
     noticeEl.createSpan({ text: t('settings.claudeCode.proofStatus.limits') });
   }
 
   private renderEnvProofStatusNotice(containerEl: HTMLElement): void {
-    const noticeEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice opencodian-settings-proof-status',
-      attr: { 'data-claude-code-proof-status': 'env', 'data-proof-state': 'readback' },
+    const noticeEl = this.createClaudeCodeNotice(containerEl, {
+      kind: 'proof',
+      proofState: 'readback',
+      attrs: { 'data-claude-code-proof-status': 'env' },
     });
     noticeEl.createSpan({ text: t('settings.claudeCode.proofStatus.env') });
   }
 
   private renderFileCheckpointBoundaryNotice(containerEl: HTMLElement): void {
-    const noticeEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice opencodian-settings-proof-status',
-      attr: { 'data-claude-code-proof-status': 'file-checkpointing', 'data-proof-state': 'readback' },
+    const noticeEl = this.createClaudeCodeNotice(containerEl, {
+      kind: 'proof',
+      proofState: 'readback',
+      attrs: { 'data-claude-code-proof-status': 'file-checkpointing' },
     });
     noticeEl.createSpan({ text: t('settings.claudeCode.proofStatus.fileCheckpointing') });
   }
@@ -2291,9 +2524,13 @@ export class SettingsClaudeCodeSection {
   }
 
   private renderProjectSourceStatus(containerEl: HTMLElement): void {
-    const statusEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice opencodian-claude-code-project-sources',
-      attr: { 'data-claude-code-project-sources': 'true' },
+    const statusEl = this.createClaudeCodeNotice(containerEl, {
+      kind: 'readback',
+      proofState: 'readback',
+      classes: ['opencodian-claude-code-project-sources'],
+      attrs: {
+        'data-claude-code-project-sources': 'true',
+      },
     });
     statusEl.createEl('strong', { text: t('settings.claudeCode.projectSources.title') });
     const listEl = statusEl.createEl('ul');
@@ -2352,34 +2589,42 @@ export class SettingsClaudeCodeSection {
   // ─── Tools tab ───────────────────────────────────────────────────
 
   private renderToolsTab(containerEl: HTMLElement): void {
-    this.renderRuntimeBoundaryNotice(containerEl);
-    this.renderMcpRuntimeControls(containerEl);
-    this.renderStrictMcpConfigSetting(containerEl);
-    this.renderToolsProofStatusNotice(containerEl);
-    this.renderAllowedToolsSetting(containerEl);
-    this.renderDisallowedToolsSetting(containerEl);
-    this.renderRestrictedBuiltinToolsSetting(containerEl);
-    this.renderRestrictedBuiltinToolsProofStatusNotice(containerEl);
-    this.renderToolAliasesSetting(containerEl);
-    this.renderAskUserQuestionPreviewFormatSetting(containerEl);
+    const mcpEl = this.createClaudeCodeGroup(containerEl, { id: 'mcp-runtime' });
+    this.renderRuntimeBoundaryNotice(mcpEl);
+    this.renderMcpRuntimeControls(mcpEl);
+    this.renderStrictMcpConfigSetting(mcpEl);
+
+    const toolPolicyEl = this.createClaudeCodeGroup(containerEl, { id: 'tool-policy' });
+    this.renderToolsProofStatusNotice(toolPolicyEl);
+    this.renderAllowedToolsSetting(toolPolicyEl);
+    this.renderDisallowedToolsSetting(toolPolicyEl);
+    this.renderRestrictedBuiltinToolsSetting(toolPolicyEl);
+    this.renderRestrictedBuiltinToolsProofStatusNotice(toolPolicyEl);
+
+    this.renderToolAliasesSetting(toolPolicyEl);
+
+    const previewEl = this.createClaudeCodeGroup(containerEl, { id: 'question-ux' });
+    this.renderAskUserQuestionPreviewFormatSetting(previewEl);
   }
 
   private renderMcpRuntimeControls(containerEl: HTMLElement): void {
-    const statusEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice opencodian-claude-code-mcp-runtime',
-      attr: {
+    const statusEl = this.createClaudeCodeNotice(containerEl, {
+      kind: 'readback',
+      proofState: 'readback',
+      classes: ['opencodian-claude-code-mcp-runtime'],
+      attrs: {
         'data-claude-code-mcp-runtime': 'true',
-        'data-proof-state': 'readback',
       },
     });
     this.updateMcpRuntimeStatus(statusEl);
     let runtimeStatusEl: HTMLElement | null = null;
     const getRuntimeStatusEl = (): HTMLElement => {
-      runtimeStatusEl ??= containerEl.createDiv({
-        cls: 'opencodian-settings-inline-notice opencodian-claude-code-mcp-runtime-status',
-        attr: {
+      runtimeStatusEl ??= this.createClaudeCodeNotice(containerEl, {
+        kind: 'readback',
+        proofState: 'readback',
+        classes: ['opencodian-claude-code-mcp-runtime-status'],
+        attrs: {
           'data-claude-code-mcp-runtime-status': 'true',
-          'data-proof-state': 'readback',
         },
       });
       return runtimeStatusEl;
@@ -2411,7 +2656,7 @@ export class SettingsClaudeCodeSection {
 
   private renderStrictMcpConfigSetting(containerEl: HTMLElement): void {
     const boundaryEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice',
+      cls: 'opencodian-settings-inline-notice opencodian-claude-code-notice--boundary',
       attr: { 'data-claude-code-strict-mcp-config-boundary': 'true' },
     });
     boundaryEl.createSpan({ text: t('settings.claudeCode.strictMcpConfig.boundaryNotice') });
@@ -2429,7 +2674,7 @@ export class SettingsClaudeCodeSection {
       });
 
     const lifecycleEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice',
+      cls: 'opencodian-settings-inline-notice opencodian-claude-code-notice--lifecycle',
       attr: { 'data-claude-code-strict-mcp-config-lifecycle': 'true' },
     });
     lifecycleEl.createSpan({ text: t('settings.claudeCode.strictMcpConfig.lifecycleNotice') });
@@ -2515,7 +2760,7 @@ export class SettingsClaudeCodeSection {
 
   private renderAllowedToolsSetting(containerEl: HTMLElement): void {
     const boundaryEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice',
+      cls: 'opencodian-settings-inline-notice opencodian-claude-code-notice--boundary',
       attr: { 'data-claude-code-allowed-tools-boundary': 'true' },
     });
     boundaryEl.createSpan({ text: t('settings.claudeCode.allowedTools.boundaryNotice') });
@@ -2579,16 +2824,17 @@ export class SettingsClaudeCodeSection {
     //   - Restores original setting
     //   - Built-in tools only: MCP tools always pass through (mcp__ prefix)
     //   - Pass condition: requested tools present, every extra tool has mcp__ prefix
-    const noticeEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice opencodian-settings-proof-status',
-      attr: { 'data-claude-code-proof-status': 'restricted-builtin-tools', 'data-proof-state': 'pass' },
+    const noticeEl = this.createClaudeCodeNotice(containerEl, {
+      kind: 'proof',
+      proofState: 'pass',
+      attrs: { 'data-claude-code-proof-status': 'restricted-builtin-tools' },
     });
     noticeEl.createSpan({ text: t('settings.claudeCode.proofStatus.restrictedBuiltinTools') });
   }
 
   private renderToolAliasesSetting(containerEl: HTMLElement): void {
     const boundaryEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice',
+      cls: 'opencodian-settings-inline-notice opencodian-claude-code-notice--boundary',
       attr: { 'data-claude-code-tool-aliases-boundary': 'true' },
     });
     boundaryEl.createSpan({ text: t('settings.claudeCode.toolAliases.boundaryNotice') });
@@ -2612,7 +2858,7 @@ export class SettingsClaudeCodeSection {
       });
 
     const lifecycleEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice',
+      cls: 'opencodian-settings-inline-notice opencodian-claude-code-notice--lifecycle',
       attr: { 'data-claude-code-tool-aliases-lifecycle': 'true' },
     });
     lifecycleEl.createSpan({ text: t('settings.claudeCode.toolAliases.lifecycleNotice') });
@@ -2620,7 +2866,7 @@ export class SettingsClaudeCodeSection {
 
   private renderAskUserQuestionPreviewFormatSetting(containerEl: HTMLElement): void {
     const boundaryEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice',
+      cls: 'opencodian-settings-inline-notice opencodian-claude-code-notice--boundary',
       attr: { 'data-claude-code-ask-user-question-preview-format-boundary': 'true' },
     });
     boundaryEl.createSpan({ text: t('settings.claudeCode.askUserQuestionPreviewFormat.boundaryNotice') });
@@ -2641,7 +2887,7 @@ export class SettingsClaudeCodeSection {
       });
 
     const lifecycleEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice',
+      cls: 'opencodian-settings-inline-notice opencodian-claude-code-notice--lifecycle',
       attr: { 'data-claude-code-ask-user-question-preview-format-lifecycle': 'true' },
     });
     lifecycleEl.createSpan({ text: t('settings.claudeCode.askUserQuestionPreviewFormat.lifecycleNotice') });
@@ -2695,7 +2941,7 @@ export class SettingsClaudeCodeSection {
 
   private renderTaskBudgetSetting(containerEl: HTMLElement): void {
     const boundaryEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice',
+      cls: 'opencodian-settings-inline-notice opencodian-claude-code-notice--boundary',
       attr: { 'data-claude-code-task-budget-boundary': 'true' },
     });
     boundaryEl.createSpan({ text: t('settings.claudeCode.taskBudget.boundaryNotice') });
@@ -2714,7 +2960,7 @@ export class SettingsClaudeCodeSection {
       });
 
     const lifecycleEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice',
+      cls: 'opencodian-settings-inline-notice opencodian-claude-code-notice--lifecycle',
       attr: { 'data-claude-code-task-budget-lifecycle': 'true' },
     });
     lifecycleEl.createSpan({ text: t('settings.claudeCode.taskBudget.lifecycleNotice') });
@@ -2722,7 +2968,7 @@ export class SettingsClaudeCodeSection {
 
   private renderSystemPromptSetting(containerEl: HTMLElement): void {
     const boundaryEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice',
+      cls: 'opencodian-settings-inline-notice opencodian-claude-code-notice--boundary',
       attr: { 'data-claude-code-system-prompt-boundary': 'true' },
     });
     boundaryEl.createSpan({ text: t('settings.claudeCode.systemPrompt.boundaryNotice') });
@@ -2742,7 +2988,7 @@ export class SettingsClaudeCodeSection {
       });
 
     const lifecycleEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice',
+      cls: 'opencodian-settings-inline-notice opencodian-claude-code-notice--lifecycle',
       attr: { 'data-claude-code-system-prompt-lifecycle': 'true' },
     });
     lifecycleEl.createSpan({ text: t('settings.claudeCode.systemPrompt.lifecycleNotice') });
@@ -2750,7 +2996,7 @@ export class SettingsClaudeCodeSection {
 
   private renderOutputStyleSetting(containerEl: HTMLElement): void {
     const boundaryEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice',
+      cls: 'opencodian-settings-inline-notice opencodian-claude-code-notice--boundary',
       attr: { 'data-claude-code-output-style-boundary': 'true' },
     });
     boundaryEl.createSpan({ text: t('settings.claudeCode.outputStyle.boundaryNotice') });
@@ -2769,7 +3015,7 @@ export class SettingsClaudeCodeSection {
       });
 
     const lifecycleEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice',
+      cls: 'opencodian-settings-inline-notice opencodian-claude-code-notice--lifecycle',
       attr: { 'data-claude-code-output-style-lifecycle': 'true' },
     });
     lifecycleEl.createSpan({ text: t('settings.claudeCode.outputStyle.lifecycleNotice') });
@@ -2789,7 +3035,7 @@ export class SettingsClaudeCodeSection {
       });
 
     const lifecycleEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice',
+      cls: 'opencodian-settings-inline-notice opencodian-claude-code-notice--lifecycle',
       attr: { 'data-claude-code-prompt-suggestions-lifecycle': 'true' },
     });
     lifecycleEl.createSpan({ text: t('settings.claudeCode.promptSuggestions.lifecycleNotice') });
@@ -2797,7 +3043,7 @@ export class SettingsClaudeCodeSection {
 
   private renderEnableContext1mBetaSetting(containerEl: HTMLElement): void {
     const boundaryEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice',
+      cls: 'opencodian-settings-inline-notice opencodian-claude-code-notice--boundary',
       attr: { 'data-claude-code-enable-context-1m-beta-boundary': 'true' },
     });
     boundaryEl.createSpan({ text: t('settings.claudeCode.enableContext1mBeta.boundaryNotice') });
@@ -2815,7 +3061,7 @@ export class SettingsClaudeCodeSection {
       });
 
     const lifecycleEl = containerEl.createDiv({
-      cls: 'opencodian-settings-inline-notice',
+      cls: 'opencodian-settings-inline-notice opencodian-claude-code-notice--lifecycle',
       attr: { 'data-claude-code-enable-context-1m-beta-lifecycle': 'true' },
     });
     lifecycleEl.createSpan({ text: t('settings.claudeCode.enableContext1mBeta.lifecycleNotice') });

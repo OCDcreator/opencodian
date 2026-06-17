@@ -11,7 +11,7 @@ export interface LspStatusSummary {
 
 interface LspStatusIndicatorOptions {
   onClick: () => void;
-  setTooltipLabel?: (element: HTMLElement, label: string, position?: 'bottom' | 'top' | 'right') => void;
+  setTooltipLabel?: (element: HTMLElement, label: string, position?: 'bottom' | 'left' | 'right' | 'top') => void;
 }
 
 type LspStatusTone = 'connected' | 'partial' | 'error';

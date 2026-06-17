@@ -21,6 +21,7 @@ import { setIcon } from 'obsidian';
 
 import type { ClaudeCodeSandboxSettings } from '../../../core/types';
 import { t } from '../../../i18n';
+import { TooltipLayerController } from '../../../shared/TooltipLayerController';
 
 /**
  * Read sandbox settings from the live plugin instance.
@@ -97,7 +98,7 @@ export class SandboxConfigBadgeCoordinator {
       : t('settings.claudeCode.sandbox.chatBadge.basic');
 
     this.badgeEl = this.containerEl.createDiv({
-      cls: 'opencodian-sandbox-config-badge',
+      cls: 'opencodian-sandbox-config-badge opencodian-tooltip-trigger',
       attr: {
         'data-sandbox-enabled': 'true',
         'data-sandbox-sub-policies': String(subPolicyCount),
@@ -115,7 +116,10 @@ export class SandboxConfigBadgeCoordinator {
 
     // Build tooltip with detailed config
     const tooltip = this.buildTooltip(settings);
-    this.badgeEl.setAttribute('title', tooltip);
+    TooltipLayerController.ensureForElement(this.badgeEl);
+    this.badgeEl.setAttribute('data-tooltip', tooltip);
+    this.badgeEl.setAttribute('data-tooltip-position', 'top');
+    this.badgeEl.removeAttribute('title');
   }
 
   private countActiveSubPolicies(settings: ClaudeCodeSandboxSettings): number {

@@ -16,6 +16,7 @@ import { setIcon } from 'obsidian';
 
 import type { CodexWebSearchMode } from '../../../core/types/settings';
 import { t } from '../../../i18n';
+import { TooltipLayerController } from '../../../shared/TooltipLayerController';
 
 interface LiveOpenCodianPlugin {
   settings?: {
@@ -163,7 +164,7 @@ export class CodexRuntimeDefaultsBadgeCoordinator {
     }
 
     const badgeEl = this.containerEl.createDiv({
-      cls: 'opencodian-codex-runtime-defaults-badge',
+      cls: 'opencodian-codex-runtime-defaults-badge opencodian-tooltip-trigger',
       attr: {
         'data-badge-kind': item.kind,
         'aria-label': item.text,
@@ -178,6 +179,9 @@ export class CodexRuntimeDefaultsBadgeCoordinator {
       text: item.text,
     });
 
-    badgeEl.setAttribute('title', item.tooltip);
+    TooltipLayerController.ensureForElement(badgeEl);
+    badgeEl.setAttribute('data-tooltip', item.tooltip);
+    badgeEl.setAttribute('data-tooltip-position', 'top');
+    badgeEl.removeAttribute('title');
   }
 }

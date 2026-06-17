@@ -551,7 +551,7 @@ img.opencodian-model-provider-header-icon {
   white-space: pre-wrap;
   overflow-wrap: break-word;
   word-break: normal;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
+  box-shadow: none;
 }
 
 .opencodian-settings-tooltip-arrow {
@@ -931,7 +931,7 @@ img.opencodian-model-provider-header-icon {
   white-space: pre-wrap;
   overflow-wrap: break-word;
   word-break: normal;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
+  box-shadow: none;
 }
 
 .opencodian-tooltip-arrow {
@@ -980,7 +980,8 @@ img.opencodian-model-provider-header-icon {
   gap: 0;
   opacity: 0;
   pointer-events: none;
-  transform: translate(-50%, -100%);
+  visibility: hidden;
+  transform: translate(-50%, 0);
   transition:
     opacity 0.12s ease,
     transform 0.12s ease;
@@ -989,7 +990,15 @@ img.opencodian-model-provider-header-icon {
 
 .opencodian-settings-quick-nav-tooltip-layer.is-visible {
   opacity: 1;
+  visibility: visible;
+}
+
+.opencodian-settings-quick-nav-tooltip-layer.is-visible[data-placement="top"] {
   transform: translate(-50%, -100%) translateY(-2px);
+}
+
+.opencodian-settings-quick-nav-tooltip-layer.is-visible[data-placement="bottom"] {
+  transform: translate(-50%, 0) translateY(2px);
 }
 
 .opencodian-settings-quick-nav-tooltip-bubble {
@@ -1005,11 +1014,7 @@ img.opencodian-model-provider-header-icon {
   line-height: 1.35;
   text-align: left;
   white-space: normal;
-  backdrop-filter: blur(18px) saturate(1.04);
-  -webkit-backdrop-filter: blur(18px) saturate(1.04);
-  box-shadow:
-    0 12px 28px color-mix(in srgb, var(--text-normal) 14%, transparent),
-    0 1px 0 color-mix(in srgb, var(--background-modifier-hover) 45%, transparent) inset;
+  box-shadow: none;
 }
 
 .opencodian-settings-quick-nav-tooltip-arrow {
@@ -1019,6 +1024,14 @@ img.opencodian-model-provider-header-icon {
   border-right: 1px solid var(--opencodian-border-strong);
   border-bottom: 1px solid var(--opencodian-border-strong);
   transform: rotate(45deg);
+}
+
+.opencodian-settings-quick-nav-tooltip-layer[data-placement="bottom"] .opencodian-settings-quick-nav-tooltip-arrow {
+  order: -1;
+  border-right: 0;
+  border-bottom: 0;
+  border-left: 1px solid var(--opencodian-border-strong);
+  border-top: 1px solid var(--opencodian-border-strong);
 }
 
 .opencodian-settings-section-heading {

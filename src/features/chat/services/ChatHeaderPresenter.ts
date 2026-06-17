@@ -83,7 +83,7 @@ export interface ChatHeaderPresenterHost {
   setTooltipLabel(
     element: HTMLElement,
     label: string,
-    position?: 'bottom' | 'top' | 'right',
+    position?: 'bottom' | 'left' | 'right' | 'top',
   ): void;
   registerCssChangeListener(listener: () => void): void;
   resolveAssetUrl(relativePath: string): string | null;
@@ -113,6 +113,7 @@ export class ChatHeaderPresenter {
   private serverStatusBadgeEl: HTMLElement | null = null;
   private serverStatusTextEl: HTMLElement | null = null;
   private headerActionsEl: HTMLElement | null = null;
+  private headerStatusGroupEl: HTMLElement | null = null;
   private lspStatusIndicator: LspStatusIndicator | null = null;
   private newConversationBtnEl: HTMLElement | null = null;
   private newConversationCurrentTabBtnEl: HTMLElement | null = null;
@@ -156,9 +157,21 @@ export class ChatHeaderPresenter {
 
     const actionsEl = headerEl.createDiv({ cls: 'opencodian-header-actions' });
     this.headerActionsEl = actionsEl;
-    this.buildStatusBadge(actionsEl);
+    const statusGroupEl = actionsEl.createDiv({ cls: 'opencodian-header-action-group opencodian-header-status-group' });
+    const conversationGroupEl = actionsEl.createDiv({ cls: 'opencodian-header-action-group opencodian-header-conversation-group' });
+    const configGroupEl = actionsEl.createDiv({ cls: 'opencodian-header-action-group opencodian-header-config-group' });
+    this.headerStatusGroupEl = statusGroupEl;
+    this.buildStatusBadge(statusGroupEl);
     this.refreshBackendChrome();
-    this.newConversationBtnEl = this.buildActionButton(actionsEl, {
+    this.newConversationCurrentTabBtnEl = this.buildActionButton(conversationGroupEl, {
+      actionId: 'new-current-tab',
+      iconName: 'opencodian-message-square-plus',
+      getTooltipLabel: () => t('chat.tab.newCurrentTooltip'),
+      onClick: () => {
+        void this.host.createConversationInCurrentTab();
+      },
+    });
+    this.newConversationBtnEl = this.buildActionButton(conversationGroupEl, {
       actionId: 'new-tab',
       iconName: 'opencodian-circle-plus',
       getTooltipLabel: () => t('chat.tab.newTooltip'),
@@ -167,15 +180,7 @@ export class ChatHeaderPresenter {
       },
     });
     this.newConversationBtnEl.addClass('opencodian-header-btn--new-tab');
-    this.newConversationCurrentTabBtnEl = this.buildActionButton(actionsEl, {
-      actionId: 'new-current-tab',
-      iconName: 'opencodian-message-square-plus',
-      getTooltipLabel: () => t('chat.tab.newCurrentTooltip'),
-      onClick: () => {
-        void this.host.createConversationInCurrentTab();
-      },
-    });
-    this.historyBtnEl = this.buildActionButton(actionsEl, {
+    this.historyBtnEl = this.buildActionButton(conversationGroupEl, {
       actionId: 'history',
       iconName: 'history',
       getTooltipLabel: () => t('chat.history.open'),
@@ -183,7 +188,7 @@ export class ChatHeaderPresenter {
         this.host.showConversationHistory(event);
       },
     });
-    this.conversationSessionSettingsBtnEl = this.buildActionButton(actionsEl, {
+    this.conversationSessionSettingsBtnEl = this.buildActionButton(configGroupEl, {
       actionId: 'session-settings',
       iconName: 'sliders-horizontal',
       getTooltipLabel: () => t('chat.sessionSettings.open'),
@@ -191,7 +196,7 @@ export class ChatHeaderPresenter {
         this.host.openConversationSessionSettings();
       },
     });
-    this.settingsBtnEl = this.buildActionButton(actionsEl, {
+    this.settingsBtnEl = this.buildActionButton(configGroupEl, {
       actionId: 'settings',
       iconName: 'settings',
       getTooltipLabel: () => t('chat.settings.open'),
@@ -289,6 +294,7 @@ export class ChatHeaderPresenter {
     this.serverStatusBadgeEl = null;
     this.serverStatusTextEl = null;
     this.headerActionsEl = null;
+    this.headerStatusGroupEl = null;
     this.lspStatusIndicator?.unload();
     this.lspStatusIndicator = null;
     this.newConversationBtnEl = null;
@@ -301,7 +307,8 @@ export class ChatHeaderPresenter {
   }
 
   refreshBackendChrome(): void {
-    if (!this.headerActionsEl) {
+    const statusGroupEl = this.headerStatusGroupEl ?? this.headerActionsEl;
+    if (!statusGroupEl) {
       return;
     }
 
@@ -311,12 +318,12 @@ export class ChatHeaderPresenter {
       this.openLspSettingsCallback = null;
       this.lspStatusIndicator?.unload();
       this.lspStatusIndicator = null;
-      this.headerActionsEl.querySelector('.opencodian-lsp-status')?.remove();
+      statusGroupEl.querySelector('.opencodian-lsp-status')?.remove();
       return;
     }
 
     if (!this.lspStatusIndicator) {
-      this.lspStatusIndicator = new LspStatusIndicator(this.headerActionsEl, {
+      this.lspStatusIndicator = new LspStatusIndicator(statusGroupEl, {
         onClick: () => (this.openLspSettingsCallback ?? this.host.openLspSettings)?.(),
         setTooltipLabel: (element, label, position) => this.host.setTooltipLabel(element, label, position),
       });

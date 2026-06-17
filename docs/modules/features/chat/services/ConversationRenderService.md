@@ -125,7 +125,7 @@ export class ConversationRenderService {
   static setTooltipLabel(
     buttonEl: HTMLElement,
     label: string,
-    position?: 'bottom' | 'top' | 'right',
+    position?: 'bottom' | 'left' | 'right' | 'top',
   ): void;
   static attachTooltipLabel(buttonEl: HTMLElement, label: string): void;
   static removeEmptyAssistantShells(messagesContainer: HTMLElement): void;
@@ -147,6 +147,7 @@ export class ConversationRenderService {
 ### Tooltip / copy 辅助
 
 - `setTooltipLabel()` / `attachTooltipLabel()` 现在除了写入 `data-tooltip`、隐藏 label 与 `aria-labelledby` 外，还会确保当前 `Document` 的 `TooltipLayerController` 已注册。这样 header / composer / inline action button 这类共享 tooltip trigger 会统一走 body-level overlay，而不是落回 trigger 伪元素。
+- `setTooltipLabel()` 会移除 `title` / `aria-label`，避免同一个按钮同时出现 shared tooltip 与浏览器/Electron 原生 tooltip。显式 placement 支持 `top` / `bottom` / `left` / `right`。
 - 这条合同专门规避了 send / stop 按钮这类本身已经占用 `::after` 做视觉装饰的控件，避免 tooltip 和按钮特效抢同一个伪元素。
 
 ### 空壳清理

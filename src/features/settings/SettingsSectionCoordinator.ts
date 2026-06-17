@@ -15,6 +15,9 @@ const SETTINGS_SCROLL_RESTORE_OBSERVER_WINDOW_MS = 1200;
 const SETTINGS_SCROLL_RESTORE_SUCCESS_TOLERANCE_PX = 1;
 const SETTINGS_SCROLL_RESTORE_IDLE_SETTLE_MS = 96;
 const SETTINGS_SCROLL_RESTORE_MIN_STABLE_MS = 180;
+const QUICK_NAV_TOOLTIP_GAP_PX = 10;
+const QUICK_NAV_TOOLTIP_MARGIN_PX = 24;
+const QUICK_NAV_TOOLTIP_MAX_WIDTH_PX = 240;
 
 interface SettingsQuickNavSection {
   headingEl: HTMLHeadingElement;
@@ -620,20 +623,37 @@ export class SettingsSectionCoordinator {
     }
 
     const rect = this.quickNavTooltipActiveButton.getBoundingClientRect();
-    const bubbleWidth = Math.max(this.quickNavTooltipBubbleEl.offsetWidth, 0);
-    const tooltipWidth = Math.min(240, bubbleWidth > 0 ? bubbleWidth : 240);
-    const viewportWidth = this.containerEl.ownerDocument.defaultView?.innerWidth ?? 0;
-    const margin = 24;
+    const bubbleRect = this.quickNavTooltipBubbleEl.getBoundingClientRect();
+    const tooltipWidth = Math.min(
+      QUICK_NAV_TOOLTIP_MAX_WIDTH_PX,
+      Math.max(this.quickNavTooltipBubbleEl.offsetWidth, Math.ceil(bubbleRect.width), 0)
+        || QUICK_NAV_TOOLTIP_MAX_WIDTH_PX,
+    );
+    const tooltipHeight = Math.max(this.quickNavTooltipBubbleEl.offsetHeight, Math.ceil(bubbleRect.height), 0);
+    const viewport = this.containerEl.ownerDocument.defaultView;
+    const viewportWidth = viewport?.innerWidth ?? this.containerEl.ownerDocument.documentElement.clientWidth ?? 0;
+    const viewportHeight = viewport?.innerHeight ?? this.containerEl.ownerDocument.documentElement.clientHeight ?? 0;
+    const margin = QUICK_NAV_TOOLTIP_MARGIN_PX;
     const halfWidth = tooltipWidth / 2;
     const centerX = rect.left + (rect.width / 2);
     const left = Math.min(
       Math.max(centerX, margin + halfWidth),
       Math.max(margin + halfWidth, viewportWidth - margin - halfWidth),
     );
+    const fitsAbove = rect.top - QUICK_NAV_TOOLTIP_GAP_PX - tooltipHeight >= margin;
+    const fitsBelow = rect.bottom + QUICK_NAV_TOOLTIP_GAP_PX + tooltipHeight <= viewportHeight - margin;
+    const placement = !fitsAbove && fitsBelow ? 'bottom' : 'top';
+    const rawTop = placement === 'bottom'
+      ? rect.bottom + QUICK_NAV_TOOLTIP_GAP_PX
+      : rect.top - QUICK_NAV_TOOLTIP_GAP_PX;
+    const clampedTop = placement === 'bottom'
+      ? Math.min(rawTop, Math.max(margin, viewportHeight - margin - tooltipHeight))
+      : Math.max(rawTop, margin + tooltipHeight);
 
     this.quickNavTooltipLayerEl.style.left = `${Math.round(left)}px`;
-    this.quickNavTooltipLayerEl.style.top = `${Math.round(rect.top - 10)}px`;
+    this.quickNavTooltipLayerEl.style.top = `${Math.round(clampedTop)}px`;
     this.quickNavTooltipLayerEl.dataset.align = 'center';
+    this.quickNavTooltipLayerEl.dataset.placement = placement;
   }
 
   private bindQuickNavTooltipWindowListeners(): void {

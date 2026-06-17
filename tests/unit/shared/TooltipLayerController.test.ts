@@ -21,11 +21,15 @@ function createTrigger(options: {
   };
   position?: 'top' | 'bottom' | 'right';
   align?: 'left' | 'right';
+  title?: string;
 }): HTMLButtonElement {
   const button = document.createElement('button');
   button.className = 'opencodian-tooltip-trigger';
   button.dataset.tooltip = options.tooltip;
   button.type = 'button';
+  if (options.title) {
+    button.title = options.title;
+  }
   if (options.position) {
     button.dataset.tooltipPosition = options.position;
   }
@@ -115,5 +119,39 @@ describe('TooltipLayerController', () => {
 
     const overlay = document.body.querySelector<HTMLElement>('.opencodian-tooltip-layer');
     expect(overlay?.dataset.placement).toBe('left');
+  });
+
+  it('chooses an edge-aware default placement when no trigger hint is provided', () => {
+    const topButton = createTrigger({
+      tooltip: 'Top toolbar action',
+      rect: { left: 180, top: 8, width: 28, height: 28 },
+    });
+    topButton.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+    expect(document.body.querySelector<HTMLElement>('.opencodian-tooltip-layer')?.dataset.placement)
+      .toBe('bottom');
+
+    topButton.dispatchEvent(new MouseEvent('mouseout', { bubbles: true, relatedTarget: document.body }));
+
+    const rightButton = createTrigger({
+      tooltip: 'Right sidebar action',
+      rect: { left: 386, top: 132, width: 28, height: 28 },
+    });
+    rightButton.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+    expect(document.body.querySelector<HTMLElement>('.opencodian-tooltip-layer')?.dataset.placement)
+      .toBe('left');
+  });
+
+  it('suppresses native title tooltips when a shared tooltip trigger is active', () => {
+    const button = createTrigger({
+      tooltip: 'Custom only',
+      title: 'Native duplicate',
+      rect: { left: 180, top: 180, width: 34, height: 34 },
+    });
+
+    button.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+
+    expect(button.hasAttribute('title')).toBe(false);
+    expect(document.body.querySelector<HTMLElement>('.opencodian-tooltip-layer')?.textContent)
+      .toContain('Custom only');
   });
 });

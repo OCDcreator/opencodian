@@ -46,6 +46,13 @@ function mockCodexSettings(settings: {
   });
 }
 
+function readBadgeTooltip(badge: HTMLElement | null): string {
+  expect(badge?.hasAttribute('title')).toBe(false);
+  expect(badge?.classList.contains('opencodian-tooltip-trigger')).toBe(true);
+  expect(badge?.getAttribute('data-tooltip-position')).toBe('top');
+  return badge?.getAttribute('data-tooltip') ?? '';
+}
+
 describe('CodexRuntimeDefaultsBadgeCoordinator', () => {
   let restoreApp: (() => void) | null = null;
 
@@ -87,6 +94,7 @@ describe('CodexRuntimeDefaultsBadgeCoordinator', () => {
     const badge = container.querySelector<HTMLElement>('.opencodian-codex-runtime-defaults-badge[data-badge-kind="network"]');
     expect(badge).not.toBeNull();
     expect(badge?.textContent).toContain('Network');
+    expect(readBadgeTooltip(badge)).toContain('next Codex thread');
   });
 
   it('shows a web search badge when web search mode differs from the default cached mode', () => {
@@ -138,8 +146,9 @@ describe('CodexRuntimeDefaultsBadgeCoordinator', () => {
     const badge = container.querySelector<HTMLElement>('.opencodian-codex-runtime-defaults-badge[data-badge-kind="additionalDirectories"]');
     expect(badge).not.toBeNull();
     expect(badge?.textContent).toContain('2 extra dir');
-    expect(badge?.getAttribute('title')).toContain('/tmp/context');
-    expect(badge?.getAttribute('title')).toContain('~/notes');
+    const tooltip = readBadgeTooltip(badge);
+    expect(tooltip).toContain('/tmp/context');
+    expect(tooltip).toContain('~/notes');
   });
 
   it('updates badges when settings change', () => {

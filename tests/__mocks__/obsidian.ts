@@ -37,6 +37,8 @@ export class Setting {
   controlEl = document.createElement('div');
   
   constructor(containerEl?: HTMLElement) {
+    this.settingEl.className = 'setting-item';
+    this.controlEl.className = 'setting-item-control';
     if (containerEl) {
       containerEl.appendChild(this.settingEl);
       this.settingEl.appendChild(this.controlEl);

@@ -14,7 +14,8 @@
 - `.opencodian-messages`、`.opencodian-turn*`：消息列表、分轮结构与 sticky header 行为。
 - `.opencodian-tab-bar*`、`.opencodian-tab-bar-parent-breadcrumb*`、`.opencodian-tab-bar-parent-close*`、`.opencodian-tab-overflow-menu*`：多会话标签栏、子会话返回父 tab 面包屑、隐藏子会话关闭按钮与溢出菜单样式。
 - `.opencodian-container--tabs-disabled`：禁用会话标签时隐藏普通 tab bar slot 与 header 的 new-tab 专用按钮；当 slot 带有 `is-parent-only` 时仍显示返回父会话面包屑。它只影响可见控件，不改变内部 active tab / `tabState` 数据。
-- `.opencodian-header-btn`：聊天 header 的 icon action 基础样式。元素现在由 presenter 渲染为真实 `button[type="button"]`，因此这里显式清零 `padding`/`border`、使用透明背景并继承字体，保持原 28px icon button 尺寸和 hover 视觉不被浏览器默认 button 样式污染。
+- `.opencodian-header-action-group`、`.opencodian-header-status-group`、`.opencodian-header-conversation-group`、`.opencodian-header-config-group`：聊天 header 的操作分区。status badge 与 LSP 状态在 status group，`new-current-tab` / `new-tab` / `history` 在 conversation group，session settings / plugin settings 在 config group；group 间距大于组内间距，避免所有按钮同权重挤在一串。
+- `.opencodian-header-btn`：聊天 header 的 icon action 基础样式。元素现在由 presenter 渲染为真实 `button[type="button"]`，因此这里显式清零 `padding`/`border`、使用透明背景并继承字体，保持 28px icon button 尺寸和 hover/focus 视觉不被浏览器默认 button 样式污染。`data-action="new-current-tab"` 是 conversation group 的 primary action，使用更明确的 accent 边框和背景。
 - `.opencodian-server-status-badge.is-disabled`：后端全部禁用时服务器状态徽章的灰色文本样式，与 `.is-checking`/`.is-starting`/`.is-running`/`.is-external`/`.is-offline` 并列。
 - `.opencodian-theme-background-*`：主题背景图层、遮罩、叠加高光。
 - 关键变量组：`--opencodian-glass-*`、`--opencodian-composer-*`、`--opencodian-status-*`、`--opencodian-shadow-*`。

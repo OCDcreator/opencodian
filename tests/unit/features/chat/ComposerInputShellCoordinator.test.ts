@@ -60,6 +60,7 @@ function createFixture(options: {
   withAssistantMessage?: boolean;
   withEmptyStateNotice?: boolean;
   hasImageInputCapability?: boolean;
+  renderHostControls?: boolean;
 } = {}) {
   let isStreaming = false;
   let isForegroundBusy = false;
@@ -110,9 +111,25 @@ function createFixture(options: {
     getInputPlaceholder: jest.fn(() => t('chat.input.placeholder')),
     getSlashCommandSkillMode: jest.fn(() => 'direct'),
     addChosenFileContextToActiveTab: jest.fn().mockResolvedValue(undefined),
-    mountSelectionControls: jest.fn(),
-    mountContextUsageIndicator: jest.fn(),
-    mountEffortSelector: jest.fn(),
+    mountSelectionControls: jest.fn((toolbar) => {
+      if (!options.renderHostControls) {
+        return;
+      }
+      toolbar.createDiv({ cls: 'opencodian-permission-selector', text: 'permission' });
+      toolbar.createDiv({ cls: 'opencodian-model-selector', text: 'model' });
+    }),
+    mountContextUsageIndicator: jest.fn((container) => {
+      if (!options.renderHostControls) {
+        return;
+      }
+      container.createDiv({ cls: 'opencodian-context-usage-ring', text: 'context' });
+    }),
+    mountEffortSelector: jest.fn((container) => {
+      if (!options.renderHostControls) {
+        return;
+      }
+      container.createDiv({ cls: 'opencodian-effort-control', text: 'effort' });
+    }),
     shouldMountAgentSelector: jest.fn(() => options.shouldMountAgentSelector ?? true),
     isActiveTabStreaming: jest.fn(() => isStreaming),
     cancelStreaming: jest.fn(),
@@ -286,6 +303,35 @@ describe('ComposerInputShellCoordinator', () => {
     expect(fixture.textarea.value).toBe('');
   });
 
+  it('organizes the composer into context, runtime, and submit contract clusters', () => {
+    const fixture = createFixture({
+      hasImageInputCapability: true,
+      renderHostControls: true,
+      composerCapabilityHint: {
+        text: t('chat.input.capabilityHint.jsonLabel'),
+        tooltip: t('chat.input.capabilityHint.jsonTooltip'),
+        insertText: '/json ',
+      },
+    });
+
+    const contract = fixture.container.querySelector<HTMLElement>('.opencodian-composer-contract');
+    const contextActions = fixture.container.querySelector<HTMLElement>('.opencodian-composer-context-actions');
+    const runtimeControls = fixture.container.querySelector<HTMLElement>('.opencodian-composer-runtime-controls');
+    const submitControls = fixture.container.querySelector<HTMLElement>('.opencodian-composer-submit-controls');
+
+    expect(contract).toBeTruthy();
+    expect(contextActions?.querySelector('.opencodian-composer-add-btn')).not.toBeNull();
+    expect(contextActions?.querySelector('.opencodian-composer-image-btn')).not.toBeNull();
+    expect(contextActions?.querySelector('.opencodian-input-capability-hint')).not.toBeNull();
+    expect(runtimeControls?.querySelector('.opencodian-agent-selector')).not.toBeNull();
+    expect(runtimeControls?.querySelector('.opencodian-input-toolbar')).not.toBeNull();
+    expect(runtimeControls?.querySelector('.opencodian-model-selector')).not.toBeNull();
+    expect(runtimeControls?.querySelector('.opencodian-permission-selector')).not.toBeNull();
+    expect(submitControls?.querySelector('.opencodian-context-usage-slot')).not.toBeNull();
+    expect(submitControls?.querySelector('.opencodian-context-usage-ring')).not.toBeNull();
+    expect(submitControls?.querySelector('.opencodian-send-btn')).not.toBeNull();
+  });
+
   it('keeps the suggestion bar out of the composer footer and mounts it under the assistant turn body', () => {
     const mockSink = {
       onPostResultChunk: jest.fn(() => jest.fn()),
@@ -335,6 +381,43 @@ describe('ComposerInputShellCoordinator', () => {
     expect(fixture.host.mountSelectionControls).toHaveBeenCalledTimes(2);
     expect(fixture.host.mountContextUsageIndicator).toHaveBeenCalledTimes(2);
     expect(fixture.host.mountEffortSelector).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps a single context usage slot when toolbar controls refresh', () => {
+    const fixture = createFixture({ renderHostControls: true });
+
+    fixture.coordinator.refreshToolbarControls();
+    fixture.coordinator.refreshToolbarControls();
+
+    const submitControls = fixture.container.querySelector<HTMLElement>('.opencodian-composer-submit-controls');
+    expect(submitControls?.querySelectorAll('.opencodian-context-usage-slot')).toHaveLength(1);
+    expect(submitControls?.querySelectorAll('.opencodian-context-usage-ring')).toHaveLength(1);
+    expect(fixture.host.mountContextUsageIndicator).toHaveBeenCalledTimes(3);
+  });
+
+  it('mounts selection, context usage, and effort controls into the new contract clusters', () => {
+    const fixture = createFixture({ renderHostControls: true });
+
+    const toolbar = fixture.container.querySelector<HTMLElement>('.opencodian-input-toolbar');
+    const runtimeControls = fixture.container.querySelector<HTMLElement>('.opencodian-composer-runtime-controls');
+    const submitControls = fixture.container.querySelector<HTMLElement>('.opencodian-composer-submit-controls');
+    const contextUsageSlot = fixture.container.querySelector('.opencodian-context-usage-slot');
+    const selectionControlsTarget = fixture.host.mountSelectionControls.mock.calls[0]?.[0];
+    const effortTarget = fixture.host.mountEffortSelector.mock.calls[0]?.[0];
+    const permissionSelector = fixture.container.querySelector('.opencodian-permission-selector');
+    const modelSelector = fixture.container.querySelector('.opencodian-model-selector');
+    const effortControl = fixture.container.querySelector('.opencodian-effort-control');
+
+    expect(toolbar).toBeTruthy();
+    expect(runtimeControls?.contains(selectionControlsTarget ?? null)).toBe(true);
+    expect(runtimeControls?.contains(effortTarget ?? null)).toBe(true);
+    expect(runtimeControls?.contains(permissionSelector)).toBe(true);
+    expect(runtimeControls?.contains(modelSelector)).toBe(true);
+    expect(runtimeControls?.contains(effortControl)).toBe(true);
+    expect(submitControls?.contains(contextUsageSlot)).toBe(true);
+    expect(fixture.host.mountSelectionControls).toHaveBeenCalledTimes(1);
+    expect(fixture.host.mountContextUsageIndicator).toHaveBeenCalledTimes(1);
+    expect(fixture.host.mountEffortSelector).toHaveBeenCalledTimes(1);
   });
 
 });
@@ -620,7 +703,9 @@ describe('ComposerInputShellCoordinator — capability hint behaviors', () => {
     expect(hintEl?.querySelector('.opencodian-input-capability-hint-text')?.textContent)
       .toBe(t('chat.input.capabilityHint.jsonLabel'));
     expect(hintEl?.getAttribute('data-tooltip')).toBe(t('chat.input.capabilityHint.jsonTooltip'));
-    expect(hintEl?.nextElementSibling).toBe(fixture.sendBtn);
+    expect(hintEl?.parentElement).toBe(
+      fixture.container.querySelector('.opencodian-composer-context-actions'),
+    );
   });
 
   it('does not derive capability hint when shouldMountAgentSelector returns true', () => {

@@ -35,6 +35,13 @@ describe('AdditionalDirectoriesConfigBadgeCoordinator', () => {
     };
   }
 
+  function readBadgeTooltip(badge: HTMLElement | null): string {
+    expect(badge?.hasAttribute('title')).toBe(false);
+    expect(badge?.classList.contains('opencodian-tooltip-trigger')).toBe(true);
+    expect(badge?.getAttribute('data-tooltip-position')).toBe('top');
+    return badge?.getAttribute('data-tooltip') ?? '';
+  }
+
   it('renders a readback badge for non-empty configured directories', () => {
     mockAdditionalDirectories(['/tmp/context', ' ', '~/notes']);
     const container = document.createElement('div');
@@ -49,9 +56,10 @@ describe('AdditionalDirectoriesConfigBadgeCoordinator', () => {
     expect(
       badge?.querySelector<HTMLElement>('.opencodian-additional-directories-config-badge-text')?.textContent,
     ).toBe('2 extra dirs');
-    expect(badge?.getAttribute('title')).toContain('/tmp/context');
-    expect(badge?.getAttribute('title')).toContain('next query');
-    expect(badge?.getAttribute('title')).toContain('not independently verified');
+    const tooltip = readBadgeTooltip(badge);
+    expect(tooltip).toContain('/tmp/context');
+    expect(tooltip).toContain('next query');
+    expect(tooltip).toContain('not independently verified');
   });
 
   it('does not render for empty or malformed settings and removes stale badges on update', () => {

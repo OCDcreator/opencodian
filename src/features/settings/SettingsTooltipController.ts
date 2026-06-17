@@ -6,6 +6,18 @@ const TOOLTIP_ARROW_MIN_INSET_PX = 10;
 
 type SettingsTooltipPlacement = 'top' | 'bottom' | 'left' | 'right';
 
+interface SettingsTooltipPosition {
+  arrowOffset: number;
+  left: number;
+  placement: SettingsTooltipPlacement;
+  top: number;
+}
+
+interface SettingsTooltipViewport {
+  height: number;
+  width: number;
+}
+
 const controllers = new WeakMap<Document, SettingsTooltipController>();
 
 export class SettingsTooltipController {
@@ -111,6 +123,7 @@ export class SettingsTooltipController {
       return;
     }
     this.activeTrigger = trigger;
+    trigger.removeAttribute('title');
     this.ensureLayer();
     if (this.bubbleEl) {
       this.bubbleEl.textContent = label;
@@ -164,51 +177,163 @@ export class SettingsTooltipController {
 
     const viewportWidth = this.view?.innerWidth ?? this.document.documentElement.clientWidth ?? 0;
     const viewportHeight = this.view?.innerHeight ?? this.document.documentElement.clientHeight ?? 0;
+    const placement = this.resolvePlacement(anchorRect, size, viewportWidth, viewportHeight);
+    const position = this.computePosition(anchorRect, size, placement, {
+      height: viewportHeight,
+      width: viewportWidth,
+    });
 
-    // Default placement: top
-    let top = anchorRect.top - size.height - TOOLTIP_GAP_PX;
-    let placement: SettingsTooltipPlacement = 'top';
-
-    // If not enough space above, try below
-    if (top < VIEWPORT_MARGIN_PX) {
-      top = anchorRect.bottom + TOOLTIP_GAP_PX;
-      placement = 'bottom';
-    }
-
-    // Clamp top within viewport
-    top = Math.max(
-      VIEWPORT_MARGIN_PX,
-      Math.min(top, Math.max(VIEWPORT_MARGIN_PX, viewportHeight - VIEWPORT_MARGIN_PX - size.height)),
+    this.layerEl.style.left = `${Math.round(position.left)}px`;
+    this.layerEl.style.top = `${Math.round(position.top)}px`;
+    this.layerEl.dataset.placement = position.placement;
+    this.layerEl.style.setProperty(
+      '--opencodian-settings-tooltip-arrow-offset',
+      `${Math.round(position.arrowOffset)}px`,
     );
-
-    // Center horizontally on anchor
-    const anchorCenterX = anchorRect.left + (anchorRect.width / 2);
-    let left = anchorCenterX - (size.width / 2);
-
-    // Clamp left within viewport
-    left = Math.max(
-      VIEWPORT_MARGIN_PX,
-      Math.min(left, Math.max(VIEWPORT_MARGIN_PX, viewportWidth - VIEWPORT_MARGIN_PX - size.width)),
-    );
-
-    this.layerEl.style.left = `${Math.round(left)}px`;
-    this.layerEl.style.top = `${Math.round(top)}px`;
-    this.layerEl.dataset.placement = placement;
-
-    // Set arrow offset so the arrow points at the anchor center.
-    // Clamp on both sides so the arrow stays inside the bubble.
-    const arrowOffset = this.clamp(
-      Math.round(anchorCenterX - left - (TOOLTIP_ARROW_SIZE_PX / 2)),
-      TOOLTIP_ARROW_MIN_INSET_PX,
-      Math.max(
-        TOOLTIP_ARROW_MIN_INSET_PX,
-        size.width - TOOLTIP_ARROW_MIN_INSET_PX - TOOLTIP_ARROW_SIZE_PX,
-      ),
-    );
-    this.layerEl.style.setProperty('--opencodian-settings-tooltip-arrow-offset', `${arrowOffset}px`);
   }
 
   private clamp(value: number, min: number, max: number): number {
     return Math.min(Math.max(value, min), max);
+  }
+
+  private computePosition(
+    anchorRect: DOMRect,
+    size: { height: number; width: number },
+    placement: SettingsTooltipPlacement,
+    viewport: SettingsTooltipViewport,
+  ): SettingsTooltipPosition {
+    const anchorCenterX = anchorRect.left + (anchorRect.width / 2);
+    const anchorCenterY = anchorRect.top + (anchorRect.height / 2);
+
+    if (placement === 'top' || placement === 'bottom') {
+      const left = this.clamp(
+        anchorCenterX - (size.width / 2),
+        VIEWPORT_MARGIN_PX,
+        Math.max(VIEWPORT_MARGIN_PX, viewport.width - VIEWPORT_MARGIN_PX - size.width),
+      );
+      const top = placement === 'top'
+        ? anchorRect.top - size.height - TOOLTIP_GAP_PX
+        : anchorRect.bottom + TOOLTIP_GAP_PX;
+      const arrowOffset = this.clamp(
+        anchorCenterX - left - (TOOLTIP_ARROW_SIZE_PX / 2),
+        TOOLTIP_ARROW_MIN_INSET_PX,
+        Math.max(
+          TOOLTIP_ARROW_MIN_INSET_PX,
+          size.width - TOOLTIP_ARROW_MIN_INSET_PX - TOOLTIP_ARROW_SIZE_PX,
+        ),
+      );
+
+      return {
+        arrowOffset,
+        left,
+        placement,
+        top: this.clamp(
+          top,
+          VIEWPORT_MARGIN_PX,
+          Math.max(VIEWPORT_MARGIN_PX, viewport.height - VIEWPORT_MARGIN_PX - size.height),
+        ),
+      };
+    }
+
+    const left = placement === 'left'
+      ? anchorRect.left - size.width - TOOLTIP_GAP_PX
+      : anchorRect.right + TOOLTIP_GAP_PX;
+    const top = this.clamp(
+      anchorCenterY - (size.height / 2),
+      VIEWPORT_MARGIN_PX,
+      Math.max(VIEWPORT_MARGIN_PX, viewport.height - VIEWPORT_MARGIN_PX - size.height),
+    );
+    const arrowOffset = this.clamp(
+      anchorCenterY - top - (TOOLTIP_ARROW_SIZE_PX / 2),
+      TOOLTIP_ARROW_MIN_INSET_PX,
+      Math.max(
+        TOOLTIP_ARROW_MIN_INSET_PX,
+        size.height - TOOLTIP_ARROW_MIN_INSET_PX - TOOLTIP_ARROW_SIZE_PX,
+      ),
+    );
+
+    return {
+      arrowOffset,
+      left: this.clamp(
+        left,
+        VIEWPORT_MARGIN_PX,
+        Math.max(VIEWPORT_MARGIN_PX, viewport.width - VIEWPORT_MARGIN_PX - size.width),
+      ),
+      placement,
+      top,
+    };
+  }
+
+  private flipPlacement(placement: SettingsTooltipPlacement): SettingsTooltipPlacement {
+    switch (placement) {
+      case 'top':
+        return 'bottom';
+      case 'bottom':
+        return 'top';
+      case 'left':
+        return 'right';
+      case 'right':
+        return 'left';
+    }
+  }
+
+  private resolveAutomaticPlacement(
+    anchorRect: DOMRect,
+    viewportWidth: number,
+    viewportHeight: number,
+  ): SettingsTooltipPlacement {
+    const anchorCenterX = anchorRect.left + (anchorRect.width / 2);
+    const anchorCenterY = anchorRect.top + (anchorRect.height / 2);
+    const horizontalEdgeBand = Math.max(56, viewportWidth * 0.16);
+    const verticalEdgeBand = Math.max(48, viewportHeight * 0.18);
+
+    if (anchorCenterX >= viewportWidth - horizontalEdgeBand) {
+      return 'left';
+    }
+    if (anchorCenterX <= horizontalEdgeBand) {
+      return 'right';
+    }
+    if (anchorCenterY <= verticalEdgeBand) {
+      return 'bottom';
+    }
+    if (anchorCenterY >= viewportHeight - verticalEdgeBand) {
+      return 'top';
+    }
+    return 'top';
+  }
+
+  private resolvePlacement(
+    anchorRect: DOMRect,
+    size: { height: number; width: number },
+    viewportWidth: number,
+    viewportHeight: number,
+  ): SettingsTooltipPlacement {
+    const fits = (placement: SettingsTooltipPlacement): boolean => {
+      switch (placement) {
+        case 'top':
+          return anchorRect.top - TOOLTIP_GAP_PX - size.height >= VIEWPORT_MARGIN_PX;
+        case 'bottom':
+          return anchorRect.bottom + TOOLTIP_GAP_PX + size.height <= viewportHeight - VIEWPORT_MARGIN_PX;
+        case 'left':
+          return anchorRect.left - TOOLTIP_GAP_PX - size.width >= VIEWPORT_MARGIN_PX;
+        case 'right':
+          return anchorRect.right + TOOLTIP_GAP_PX + size.width <= viewportWidth - VIEWPORT_MARGIN_PX;
+      }
+    };
+
+    const initialPlacement = this.resolveAutomaticPlacement(anchorRect, viewportWidth, viewportHeight);
+    const remainingPlacements: SettingsTooltipPlacement[] =
+      initialPlacement === 'left' || initialPlacement === 'right'
+        ? ['top', 'bottom', 'right', 'left']
+        : ['right', 'left', 'top', 'bottom'];
+    const fallbacks: SettingsTooltipPlacement[] = [
+      initialPlacement,
+      this.flipPlacement(initialPlacement),
+      ...remainingPlacements,
+    ];
+
+    return fallbacks.find((candidate, index) =>
+      fallbacks.indexOf(candidate) === index && fits(candidate)
+    ) ?? initialPlacement;
   }
 }

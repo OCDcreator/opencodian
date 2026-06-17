@@ -8,6 +8,7 @@
 import { setIcon } from 'obsidian';
 
 import { t } from '../../../i18n';
+import { TooltipLayerController } from '../../../shared/TooltipLayerController';
 
 interface LiveOpenCodianPluginWithClaudeDirectories {
   settings?: {
@@ -81,7 +82,7 @@ export class AdditionalDirectoriesConfigBadgeCoordinator {
       : t('settings.claudeCode.additionalDirectories.chatBadge.many', { count: directories.length });
 
     this.badgeEl = this.containerEl.createDiv({
-      cls: 'opencodian-additional-directories-config-badge',
+      cls: 'opencodian-additional-directories-config-badge opencodian-tooltip-trigger',
       attr: {
         'data-additional-directory-count': String(directories.length),
         'aria-label': label,
@@ -98,7 +99,10 @@ export class AdditionalDirectoriesConfigBadgeCoordinator {
       text: label,
     });
 
-    this.badgeEl.setAttribute('title', this.buildTooltip(directories));
+    TooltipLayerController.ensureForElement(this.badgeEl);
+    this.badgeEl.setAttribute('data-tooltip', this.buildTooltip(directories));
+    this.badgeEl.setAttribute('data-tooltip-position', 'top');
+    this.badgeEl.removeAttribute('title');
   }
 
   private buildTooltip(directories: string[]): string {

@@ -105,6 +105,13 @@ function enabledSandbox(overrides?: Partial<ClaudeCodeSandboxSettings>): ClaudeC
   };
 }
 
+function readBadgeTooltip(badge: Element | null): string {
+  expect(badge?.hasAttribute('title')).toBe(false);
+  expect(badge?.classList.contains('opencodian-tooltip-trigger')).toBe(true);
+  expect(badge?.getAttribute('data-tooltip-position')).toBe('top');
+  return badge?.getAttribute('data-tooltip') ?? '';
+}
+
 // Install polyfills and mock global before tests
 beforeAll(() => {
   installObsidianElementHelpers();
@@ -226,13 +233,13 @@ describe('SandboxConfigBadgeCoordinator', () => {
     coordinator.mount(container);
 
     const badge = container.querySelector('.opencodian-sandbox-config-badge');
-    const title = badge?.getAttribute('title') ?? '';
-    expect(title).toContain('docker *');
-    expect(title).toContain('/tmp/build');
-    expect(title).toContain('/etc');
-    expect(title).toContain('~/.aws');
-    expect(title).toContain('github.com');
-    expect(title).toContain('Readback');
+    const tooltip = readBadgeTooltip(badge);
+    expect(tooltip).toContain('docker *');
+    expect(tooltip).toContain('/tmp/build');
+    expect(tooltip).toContain('/etc');
+    expect(tooltip).toContain('~/.aws');
+    expect(tooltip).toContain('github.com');
+    expect(tooltip).toContain('Readback');
   });
 
   it('shows BLOCKED in tooltip when unsandboxed escape is disabled', () => {
@@ -242,8 +249,8 @@ describe('SandboxConfigBadgeCoordinator', () => {
     coordinator.mount(container);
 
     const badge = container.querySelector('.opencodian-sandbox-config-badge');
-    const title = badge?.getAttribute('title') ?? '';
-    expect(title).toContain('BLOCKED');
+    const tooltip = readBadgeTooltip(badge);
+    expect(tooltip).toContain('BLOCKED');
   });
 
   it('removes badge on update when sandbox is disabled', () => {
@@ -299,17 +306,17 @@ describe('SandboxConfigBadgeCoordinator', () => {
     coordinator.mount(container);
 
     const badge = container.querySelector('.opencodian-sandbox-config-badge');
-    const title = badge?.getAttribute('title') ?? '';
+    const tooltip = readBadgeTooltip(badge);
 
     // Readback disclaimer should be present
-    expect(title).toContain('Readback');
+    expect(tooltip).toContain('Readback');
 
     // Must contain the explicit "not independently verified" boundary
-    expect(title).toContain('not independently verified');
+    expect(tooltip).toContain('not independently verified');
 
     // Must NOT claim enforcement is confirmed/independently proven
     // (The readback line itself says "not independently verified" — that's the boundary.)
-    expect(title).not.toContain('enforcement confirmed');
-    expect(title).not.toContain('enforcement verified');
+    expect(tooltip).not.toContain('enforcement confirmed');
+    expect(tooltip).not.toContain('enforcement verified');
   });
 });

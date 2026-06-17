@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { SettingsTooltipController } from '../../../../src/features/settings/SettingsTooltipController';
 
 function mockRect(element: HTMLElement, rect: Partial<DOMRect>): void {
@@ -97,7 +100,7 @@ describe('SettingsTooltipController', () => {
     expect(arrowOffset).toBeGreaterThanOrEqual(10);
   });
 
-  it('only uses top or bottom placement, never left or right', () => {
+  it('keeps the default settings tooltip above or below central buttons', () => {
     SettingsTooltipController.ensureForDocument(document);
     const button = document.createElement('button');
     document.body.appendChild(button);
@@ -108,5 +111,54 @@ describe('SettingsTooltipController', () => {
     const layer = document.body.querySelector<HTMLElement>('.opencodian-settings-tooltip-layer');
     const placement = layer?.dataset.placement;
     expect(placement === 'top' || placement === 'bottom').toBe(true);
+  });
+
+  it('chooses left or right placement for edge-adjacent setting buttons', () => {
+    SettingsTooltipController.ensureForDocument(document);
+    const leftButton = document.createElement('button');
+    document.body.appendChild(leftButton);
+    leftButton.dataset.settingsTooltip = 'Left edge setting';
+    mockRect(leftButton, { left: 6, top: 96, width: 24, height: 24 });
+
+    leftButton.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+    expect(document.body.querySelector<HTMLElement>('.opencodian-settings-tooltip-layer')?.dataset.placement)
+      .toBe('right');
+
+    leftButton.dispatchEvent(new MouseEvent('mouseout', { bubbles: true, relatedTarget: document.body }));
+
+    const rightButton = document.createElement('button');
+    document.body.appendChild(rightButton);
+    rightButton.dataset.settingsTooltip = 'Right edge setting';
+    mockRect(rightButton, { left: 292, top: 96, width: 24, height: 24 });
+
+    rightButton.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+    expect(document.body.querySelector<HTMLElement>('.opencodian-settings-tooltip-layer')?.dataset.placement)
+      .toBe('left');
+  });
+
+  it('removes native title tooltip sources from custom settings tooltip triggers', () => {
+    SettingsTooltipController.ensureForDocument(document);
+    const button = document.createElement('button');
+    button.dataset.settingsTooltip = 'Custom settings tooltip';
+    button.title = 'Native duplicate';
+    document.body.appendChild(button);
+    mockRect(button, { left: 100, top: 96, width: 24, height: 24 });
+
+    button.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+
+    expect(button.hasAttribute('title')).toBe(false);
+    expect(document.body.querySelector<HTMLElement>('.opencodian-settings-tooltip-layer')?.textContent)
+      .toContain('Custom settings tooltip');
+  });
+
+  it('keeps settings tooltip bubbles flat without shadows', () => {
+    const css = readFileSync(
+      join(process.cwd(), 'src/style/components/model-selector.css'),
+      'utf8',
+    );
+
+    expect(css).toMatch(
+      /\.opencodian-settings-tooltip-bubble\s*\{[\s\S]*box-shadow:\s*none;/,
+    );
   });
 });

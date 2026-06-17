@@ -1,4 +1,7 @@
 /* eslint-disable max-lines, max-lines-per-function -- Claude Code settings coverage keeps tabbed/classic layout, diagnostics, thinking, and persistence fixtures together. */
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { Setting } from 'obsidian';
 
 import {
@@ -280,6 +283,20 @@ function findTextArea(name: string): ControlRecord<MockTextAreaControl> {
   return record!;
 }
 
+function expectGroupOrder(containerEl: HTMLElement, expectedGroups: string[]): void {
+  const actualGroups = Array.from(containerEl.querySelectorAll('[data-claude-code-group]'))
+    .map((groupEl) => groupEl.getAttribute('data-claude-code-group'));
+  expect(actualGroups).toEqual(expectedGroups);
+}
+
+function expectClaudeCodeGroupChrome(containerEl: HTMLElement): void {
+  for (const groupEl of Array.from(containerEl.querySelectorAll<HTMLElement>('[data-claude-code-group]'))) {
+    expect(groupEl.querySelector(':scope > .opencodian-claude-code-group-header')).toBeTruthy();
+    expect(groupEl.querySelector(':scope > .opencodian-claude-code-group-header .opencodian-claude-code-group-title')).toBeTruthy();
+    expect(groupEl.querySelector(':scope > .opencodian-claude-code-stack')).toBeTruthy();
+  }
+}
+
 async function flushProjectSourceStatus(): Promise<void> {
   await new Promise<void>((resolve) => {
     setTimeout(resolve, 0);
@@ -325,11 +342,24 @@ describe('SettingsClaudeCodeSection', () => {
     expect(findDropdown(t('settings.claudeCode.permissionMode.name'))).toBeDefined();
     expect(findToggle(t('settings.claudeCode.settingSources.project'))).toBeDefined();
     expect(findTextArea(t('settings.claudeCode.additionalDirectories.name'))).toBeDefined();
-    expect(containerEl.querySelector('[data-settings-target="claude-code-runtime"]')).toBeDefined();
+    expect(containerEl.querySelector('[data-settings-surface="tab-body"][data-claude-code-section="runtime"]')).toBeDefined();
+    expect(containerEl.querySelector('[data-claude-code-group="connection-runtime"]')).toBeDefined();
+    expect(containerEl.querySelector('[data-claude-code-group="runtime-ecosystem"]')).toBeDefined();
+    expect(containerEl.querySelector('[data-claude-code-group="project-files"]')).toBeDefined();
+    expect(containerEl.querySelector('[data-claude-code-group="runtime-inspection"]')).toBeDefined();
+    expect(containerEl.querySelector('[data-claude-code-group="diagnostics-logs"]')).toBeDefined();
     expect(containerEl.querySelector('[data-claude-code-section="model-thinking"]')).toBeDefined();
     expect(containerEl.querySelector('[data-claude-code-section="permissions"]')).toBeDefined();
     expect(containerEl.querySelector('[data-claude-code-section="context-sources"]')).toBeDefined();
     expect(containerEl.querySelector('[data-claude-code-section="tools"]')).toBeDefined();
+    expectClaudeCodeGroupChrome(containerEl);
+
+    const runtimeReadback = containerEl.querySelector('[data-claude-code-runtime-ecosystem="true"]');
+    expect(runtimeReadback).toBeTruthy();
+    expect(runtimeReadback?.getAttribute('data-proof-state')).toBe('readback');
+    expect(runtimeReadback?.classList.contains('opencodian-claude-code-readback')).toBe(true);
+
+    expect(containerEl.querySelector('[data-claude-code-group="connection-runtime"] > .opencodian-claude-code-stack .setting-item')).toBeTruthy();
 
     const renderedNamesLower = [
       ...textRecords,
@@ -446,6 +476,25 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
   });
 
   describe('Model & Thinking tab', () => {
+    it('renders semantic groups in the approved order', () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'model-thinking');
+
+      expectGroupOrder(containerEl, [
+        'model-selection',
+        'thinking-effort',
+        'limits-budget',
+        'prompt-behavior',
+      ]);
+      expectClaudeCodeGroupChrome(containerEl);
+      expect(containerEl.querySelectorAll('[data-claude-code-group]')).toHaveLength(4);
+    });
+
     it('renders with editable controls', () => {
       const plugin = createPlugin();
       const containerEl = document.createElement('div');
@@ -869,6 +918,23 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
   });
 
   describe('context-sources tab', () => {
+    it('renders semantic groups in the approved order', () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'context-sources');
+
+      expectGroupOrder(containerEl, [
+        'source-activation',
+        'project-source-files',
+        'additional-context',
+      ]);
+      expect(containerEl.querySelectorAll('[data-claude-code-group]')).toHaveLength(3);
+    });
+
     it('renders Context & Sources tab with setting source toggles and directories textarea', () => {
       const plugin = createPlugin();
       const containerEl = document.createElement('div');
@@ -909,6 +975,9 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       expect(containerEl.textContent).toContain(
         t('settings.claudeCode.projectSources.present', { file: '.claude/settings.local.json' }),
       );
+      const statusEl = containerEl.querySelector('[data-claude-code-project-sources="true"]');
+      expect(statusEl?.getAttribute('data-proof-state')).toBe('readback');
+      expect(statusEl?.classList.contains('opencodian-claude-code-readback')).toBe(true);
     });
 
     it('shows the next-query boundary for source and directory settings', () => {
@@ -955,6 +1024,43 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
   });
 
   describe('runtime tab', () => {
+    it('renders semantic groups in the approved order', () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'runtime');
+
+      expectGroupOrder(containerEl, [
+        'connection-runtime',
+        'runtime-ecosystem',
+        'project-files',
+        'runtime-inspection',
+        'diagnostics-logs',
+      ]);
+      expectClaudeCodeGroupChrome(containerEl);
+      expect(containerEl.querySelectorAll('[data-claude-code-group]')).toHaveLength(5);
+    });
+
+    it('marks lifecycle notices with the Claude Code lifecycle class', () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'runtime');
+
+      expect(
+        containerEl.querySelector('[data-claude-code-js-runtime-lifecycle="true"].opencodian-claude-code-notice--lifecycle'),
+      ).toBeTruthy();
+      expect(
+        containerEl.querySelector('[data-claude-code-load-timeout-ms-lifecycle="true"].opencodian-claude-code-notice--lifecycle'),
+      ).toBeTruthy();
+    });
+
     it('shows the next-query boundary for environment variables', () => {
       const plugin = createPlugin();
       const containerEl = document.createElement('div');
@@ -1583,6 +1689,24 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
   });
 
   describe('tools tab', () => {
+    it('renders semantic groups in the approved order', () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'tools');
+
+      expectGroupOrder(containerEl, [
+        'mcp-runtime',
+        'tool-policy',
+        'question-ux',
+      ]);
+      expectClaudeCodeGroupChrome(containerEl);
+      expect(containerEl.querySelectorAll('[data-claude-code-group]')).toHaveLength(3);
+    });
+
     it('shows the next-query boundary for tool and MCP settings', () => {
       const plugin = createPlugin();
       const containerEl = document.createElement('div');
@@ -2482,6 +2606,24 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
   });
 
   describe('sandbox settings in Permissions tab', () => {
+    it('renders semantic groups in the approved order', () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'permissions');
+
+      expectGroupOrder(containerEl, [
+        'permission-mode',
+        'plan-mode',
+        'sandbox-core',
+        'sandbox-advanced',
+      ]);
+      expect(containerEl.querySelectorAll('[data-claude-code-group]')).toHaveLength(4);
+    });
+
     it('renders sandbox boundary notice explaining this is not a permission editor', () => {
       const plugin = createPlugin();
       const containerEl = document.createElement('div');
@@ -2511,6 +2653,8 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       expect(findToggle(t('settings.claudeCode.sandbox.allowUnsandboxedCommands.name'))).toBeDefined();
       expect(findToggle(t('settings.claudeCode.sandbox.enableWeakerNestedSandbox.name'))).toBeDefined();
       expect(findToggle(t('settings.claudeCode.sandbox.enableWeakerNetworkIsolation.name'))).toBeDefined();
+      expect(containerEl.querySelector('[data-claude-code-advanced-sandbox="true"]')).toBeTruthy();
+      expect(containerEl.querySelector('.opencodian-claude-code-advanced-summary')).toBeTruthy();
 
       expect(findTextArea(t('settings.claudeCode.sandbox.excludedCommands.name'))).toBeDefined();
       expect(findTextArea(t('settings.claudeCode.sandbox.filesystem.allowWrite.name'))).toBeDefined();
@@ -2780,5 +2924,29 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       expect(browseOnlyEl).toBeTruthy();
       expect(browseOnlyEl?.textContent).toContain(t('settings.claudeCode.sessionBrowser.browseOnlyNotice'));
     });
+  });
+});
+
+describe('SettingsClaudeCodeSection CSS contract', () => {
+  it('keeps Claude Code groups and readback styling semantically distinct from success proof', () => {
+    const css = readFileSync(
+      join(process.cwd(), 'src/style/components/settings-claude-code.css'),
+      'utf8',
+    );
+    const readbackRule = css.match(/\.opencodian-settings\s+\.opencodian-settings-proof-status\[data-proof-state="readback"\]\s*\{[\s\S]*?\}/)?.[0] ?? '';
+    const readbackSurfaceRule = css.match(/\.opencodian-settings\s+\.opencodian-claude-code-readback,[\s\S]*?\}\n/)?.[0] ?? '';
+
+    expect(css).toContain('.opencodian-claude-code-group-header');
+    expect(css).toContain('.opencodian-claude-code-group-title');
+    expect(css).toContain('.opencodian-claude-code-group-desc');
+    expect(css).toContain('.opencodian-claude-code-stack');
+    expect(css).toContain('.opencodian-claude-code-advanced');
+    expect(css).toContain('.opencodian-claude-code-advanced-summary');
+    expect(css).toContain('.opencodian-claude-code-readback');
+    expect(css).toContain('.opencodian-claude-code-notice--boundary');
+    expect(css).toContain('.opencodian-claude-code-notice--lifecycle');
+    expect(readbackRule).toContain('data-proof-state="readback"');
+    expect(readbackRule).not.toContain('var(--text-success');
+    expect(readbackSurfaceRule).not.toContain('var(--text-success');
   });
 });

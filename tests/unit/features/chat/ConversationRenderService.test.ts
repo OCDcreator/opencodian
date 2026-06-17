@@ -213,6 +213,9 @@ describe('ConversationRenderService tooltip / copy utilities', () => {
         /\.opencodian-tooltip-bubble\s*\{[\s\S]*max-width:\s*min\(240px,\s*calc\(100vw\s*-\s*32px\)\);/,
       );
       expect(css).toMatch(
+        /\.opencodian-tooltip-bubble\s*\{[\s\S]*box-shadow:\s*none;/,
+      );
+      expect(css).toMatch(
         /\.opencodian-tooltip-layer\[data-placement="top"\][\s\S]*\.opencodian-tooltip-arrow[\s\S]*bottom:\s*-4px;/,
       );
       expect(css).not.toMatch(

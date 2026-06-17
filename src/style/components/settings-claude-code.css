@@ -1,23 +1,138 @@
-/* ─── Claude Code settings proof-status notices ─────────────────────── */
-.opencodian-settings .opencodian-settings-proof-status {
+/* ─── Claude Code settings semantic groups ───────────────────────────── */
+.opencodian-settings .opencodian-claude-code-tab-body,
+.opencodian-settings .opencodian-settings-claude-code-tab-body {
   display: flex;
-  align-items: center;
-  gap: var(--opencodian-settings-space-sm);
-  padding: 8px 12px;
-  border-radius: var(--opencodian-settings-radius-inline);
-  background: color-mix(in srgb, var(--text-success, var(--color-green)) 6%, var(--opencodian-settings-row-bg));
-  border: 1px solid color-mix(in srgb, var(--text-success, var(--color-green)) 18%, var(--opencodian-settings-row-border));
+  flex-direction: column;
+  gap: 12px;
+}
+
+.opencodian-settings .opencodian-claude-code-group,
+.opencodian-settings .opencodian-settings-claude-code-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  border: 1px solid color-mix(in srgb, var(--background-modifier-border) 76%, transparent);
+  border-radius: var(--opencodian-settings-radius-row);
+  background: color-mix(in srgb, var(--background-secondary) 58%, transparent);
+}
+
+.opencodian-settings .opencodian-claude-code-group-header,
+.opencodian-settings .opencodian-settings-claude-code-group-header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.opencodian-settings .opencodian-claude-code-group-title,
+.opencodian-settings .opencodian-settings-claude-code-group-title {
+  margin: 0;
+  padding-inline-start: 0;
+  color: var(--text-normal);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.opencodian-settings .opencodian-claude-code-group-desc,
+.opencodian-settings .opencodian-settings-claude-code-group-desc {
+  margin: 0;
   color: var(--text-muted);
   font-size: 12px;
   line-height: 1.45;
 }
 
-.opencodian-settings .opencodian-settings-proof-status[data-proof-state="readback"] {
+.opencodian-settings .opencodian-claude-code-stack,
+.opencodian-settings .opencodian-settings-claude-code-group-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--opencodian-settings-space-sm);
+}
+
+.opencodian-settings .opencodian-claude-code-inline-meta,
+.opencodian-settings .opencodian-settings-claude-code-block .opencodian-settings-inline-meta {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.opencodian-settings .opencodian-claude-code-advanced,
+.opencodian-settings .opencodian-settings-advanced-sandbox {
+  margin-top: var(--opencodian-settings-space-xs);
+  border: 1px solid color-mix(in srgb, var(--background-modifier-border) 78%, transparent);
+  background: color-mix(in srgb, var(--background-secondary) 52%, transparent);
+}
+
+.opencodian-settings .opencodian-claude-code-advanced-summary {
+  color: var(--text-normal);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.opencodian-settings .opencodian-claude-code-advanced .setting-item,
+.opencodian-settings .opencodian-claude-code-advanced .opencodian-settings-inline-notice,
+.opencodian-settings .opencodian-claude-code-advanced .opencodian-claude-code-group-desc,
+.opencodian-settings .opencodian-settings-advanced-sandbox .setting-item,
+.opencodian-settings .opencodian-settings-advanced-sandbox .opencodian-settings-inline-notice,
+.opencodian-settings .opencodian-settings-advanced-sandbox .opencodian-settings-claude-code-group-desc {
+  opacity: 0.86;
+}
+
+/* ─── Claude Code group notices (compact, state-honest) ─────────────── */
+.opencodian-settings .opencodian-claude-code-group .opencodian-settings-inline-notice,
+.opencodian-settings .opencodian-settings-claude-code-group .opencodian-settings-inline-notice {
+  padding: 6px 10px;
+  border-radius: var(--opencodian-settings-radius-inline);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.opencodian-settings .opencodian-claude-code-notice--boundary {
+  background: color-mix(in srgb, var(--text-accent) 5%, var(--opencodian-settings-row-bg));
+  border: 1px solid color-mix(in srgb, var(--text-accent) 14%, var(--opencodian-settings-row-border));
+}
+
+.opencodian-settings .opencodian-claude-code-notice--lifecycle {
+  background: color-mix(in srgb, var(--text-warning, var(--color-yellow)) 4%, var(--opencodian-settings-row-bg));
+  border: 1px solid color-mix(in srgb, var(--text-warning, var(--color-yellow)) 12%, var(--opencodian-settings-row-border));
+  color: var(--text-muted);
+}
+
+/* ─── Claude Code settings proof-status notices ─────────────────────── */
+.opencodian-settings .opencodian-settings-proof-status {
+  display: flex;
+  align-items: center;
+  gap: var(--opencodian-settings-space-sm);
+  padding: 6px 10px;
+  border-radius: var(--opencodian-settings-radius-inline);
+  background: var(--opencodian-settings-row-bg);
+  border: 1px solid var(--opencodian-settings-row-border);
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.opencodian-settings .opencodian-settings-proof-status[data-proof-state="pass"] {
   background: color-mix(in srgb, var(--text-success, var(--color-green)) 6%, var(--opencodian-settings-row-bg));
   border-color: color-mix(in srgb, var(--text-success, var(--color-green)) 18%, var(--opencodian-settings-row-border));
+  color: color-mix(in srgb, var(--text-success, var(--color-green)) 84%, var(--text-normal));
+}
+
+.opencodian-settings .opencodian-settings-proof-status[data-proof-state="readback"] {
+  background: color-mix(in srgb, var(--text-accent) 6%, var(--opencodian-settings-row-bg));
+  border-color: color-mix(in srgb, var(--text-accent) 16%, var(--opencodian-settings-row-border));
+  color: color-mix(in srgb, var(--text-accent) 72%, var(--text-normal));
 }
 
 .opencodian-settings .opencodian-settings-proof-status[data-proof-state="wiring"] {
   background: color-mix(in srgb, var(--text-warning, var(--color-yellow)) 6%, var(--opencodian-settings-row-bg));
   border-color: color-mix(in srgb, var(--text-warning, var(--color-yellow)) 18%, var(--opencodian-settings-row-border));
+  color: color-mix(in srgb, var(--text-warning, var(--color-yellow)) 78%, var(--text-normal));
+}
+
+.opencodian-settings .opencodian-claude-code-readback,
+.opencodian-settings .opencodian-settings-claude-code-block .opencodian-settings-readback {
+  padding: 8px 12px;
+  background: color-mix(in srgb, var(--text-accent) 4%, var(--opencodian-settings-row-bg));
+  border: 1px solid color-mix(in srgb, var(--text-accent) 12%, var(--opencodian-settings-row-border));
 }
