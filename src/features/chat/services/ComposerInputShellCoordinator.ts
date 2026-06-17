@@ -79,8 +79,19 @@ export interface ComposerInputShellCoordinatorHost {
   mountSelectionControls(toolbar: HTMLElement, options: { showModels: boolean; showPermissions: boolean }): void;
   mountContextUsageIndicator(container: HTMLElement): void;
   mountEffortSelector(container: HTMLElement): void;
-  /** Whether to mount the agent (@agent) selector and sync agent mentions. Defaults to true. */
+  /**
+   * Whether to mount the agent (@agent) selector dropdown. Gated on the Subagents
+   * capability; Claude Code and Codex lack it, so they hide the dropdown.
+   */
   shouldMountAgentSelector?(): boolean;
+  /**
+   * Whether to handle inline `@agent` mentions (typing `@` in the textarea).
+   * Decoupled from the dropdown: Claude Code keeps the mention menu despite lacking
+   * the Subagents capability, because it has a dedicated runtime-agent catalog and
+   * preserves `@name` text verbatim for the model's Task tool.
+   * Falls back to `shouldMountAgentSelector` when the host does not implement this seam.
+   */
+  shouldHandleAgentMentions?(): boolean;
   isActiveTabStreaming(): boolean;
   cancelStreaming(): void;
   isTabForegroundBusy(): boolean;
@@ -120,11 +131,10 @@ export class ComposerInputShellCoordinator {
   private inputTabBarSlotEl: HTMLElement | null = null;
   private composerShellEl: HTMLElement | null = null;
   private inputWrapperEl: HTMLElement | null = null;
-  private composerFooterLeadingEl: HTMLElement | null = null;
-  private composerFooterTrailingEl: HTMLElement | null = null;
-  private composerContractEl: HTMLElement | null = null;
-  private composerRuntimeControlsEl: HTMLElement | null = null;
+  private composerInputRowEl: HTMLElement | null = null;
+  private composerContextActionsEl: HTMLElement | null = null;
   private composerSubmitControlsEl: HTMLElement | null = null;
+  private composerRuntimeDockEl: HTMLElement | null = null;
   private addContextBtnEl: HTMLButtonElement | null = null;
   private sendBtnEl: HTMLButtonElement | null = null;
   private inputTextareaEl: HTMLTextAreaElement | null = null;
@@ -286,19 +296,19 @@ export class ComposerInputShellCoordinator {
     });
     this.slashCommandMenuEl.setAttribute('role', 'listbox');
 
-    const composerFooterEl = composerContentEl.createDiv({ cls: 'opencodian-composer-footer' });
-    this.composerContractEl = composerFooterEl.createDiv({ cls: 'opencodian-composer-contract' });
-    this.composerFooterLeadingEl = this.composerContractEl.createDiv({
-      cls: 'opencodian-composer-footer-leading opencodian-composer-context-actions',
+    // Layered composer (Obsidian-native input workbench):
+    //   context-row → textarea (focus) → input-row (+/image + ring + send) → runtime-dock
+    // The runtime-dock sits inside the glass shell so the etched action-button style
+    // cascades from `.opencodian-composer-shell--action-buttons-etched` automatically.
+    this.composerInputRowEl = composerContentEl.createDiv({ cls: 'opencodian-composer-input-row' });
+    this.composerContextActionsEl = this.composerInputRowEl.createDiv({
+      cls: 'opencodian-composer-context-actions',
     });
-    this.composerRuntimeControlsEl = this.composerContractEl.createDiv({
-      cls: 'opencodian-composer-runtime-controls',
+    this.composerSubmitControlsEl = this.composerInputRowEl.createDiv({
+      cls: 'opencodian-composer-submit-controls',
     });
-    this.composerFooterTrailingEl = this.composerContractEl.createDiv({
-      cls: 'opencodian-composer-footer-trailing opencodian-composer-submit-controls',
-    });
-    this.composerSubmitControlsEl = this.composerFooterTrailingEl;
-    this.addContextBtnEl = this.composerFooterLeadingEl.createEl('button', {
+    this.composerRuntimeDockEl = composerContentEl.createDiv({ cls: 'opencodian-composer-runtime-dock' });
+    this.addContextBtnEl = this.composerContextActionsEl.createEl('button', {
       cls: 'opencodian-composer-add-btn opencodian-tooltip-trigger',
       attr: {
         type: 'button',
@@ -313,7 +323,7 @@ export class ComposerInputShellCoordinator {
 
     // Image attach button (capability-gated)
     if (this.host.hasImageInputCapability?.()) {
-      this.addImageBtnEl = this.composerFooterLeadingEl.createEl('button', {
+      this.addImageBtnEl = this.composerContextActionsEl.createEl('button', {
         cls: 'opencodian-composer-image-btn opencodian-tooltip-trigger',
         attr: {
           type: 'button',
@@ -372,7 +382,7 @@ export class ComposerInputShellCoordinator {
       });
     }
 
-    this.sendBtnEl = this.composerFooterTrailingEl.createEl('button', {
+    this.sendBtnEl = this.composerSubmitControlsEl.createEl('button', {
       cls: 'opencodian-send-btn opencodian-tooltip-trigger',
       attr: {
         type: 'button',
@@ -402,18 +412,23 @@ export class ComposerInputShellCoordinator {
   }
 
   private mountToolbarControls(): void {
-    if (!this.composerRuntimeControlsEl && !this.composerSubmitControlsEl && !this.composerShellEl) {
+    if (!this.composerRuntimeDockEl && !this.composerSubmitControlsEl && !this.composerShellEl) {
       return;
     }
 
     this.agentSelectionController.destroy();
-    this.composerShellEl?.querySelector(':scope > .opencodian-input-toolbar')?.remove();
-    this.composerRuntimeControlsEl?.querySelector(':scope > .opencodian-input-toolbar')?.remove();
+    this.composerRuntimeDockEl?.querySelector(':scope > .opencodian-input-toolbar')?.remove();
     this.composerSubmitControlsEl?.querySelector(':scope > .opencodian-context-usage-slot')?.remove();
 
+    // Toolbar (model/agent/permission/effort/sandbox) lands in the runtime-dock — a low-weight
+    // status row below the input-row, inside the glass shell so etched style cascades.
+    const toolbarHost = this.composerRuntimeDockEl ?? this.composerShellEl;
+    if (!toolbarHost) {
+      return;
+    }
     const toolbarEl = document.createElement('div');
     toolbarEl.className = 'opencodian-input-toolbar';
-    (this.composerRuntimeControlsEl ?? this.composerShellEl)?.appendChild(toolbarEl);
+    toolbarHost.appendChild(toolbarEl);
     if (this.host.shouldMountAgentSelector?.() !== false) {
       this.agentSelectionController.mount(toolbarEl.createDiv({ cls: 'opencodian-agent-selector' }));
     }
@@ -446,14 +461,14 @@ export class ComposerInputShellCoordinator {
       return;
     }
 
-    if (!this.composerFooterLeadingEl) {
+    if (!this.composerContextActionsEl) {
       return;
     }
 
     this.activeCapabilityHint = hint;
 
     if (!this.capabilityHintEl) {
-      this.capabilityHintEl = this.composerFooterLeadingEl.createEl('button', {
+      this.capabilityHintEl = this.composerContextActionsEl.createEl('button', {
         cls: `${this.capabilityHintHostClass} opencodian-tooltip-trigger`,
         attr: {
           type: 'button',
@@ -703,10 +718,9 @@ export class ComposerInputShellCoordinator {
     this.inputTabBarSlotEl = null;
     this.composerShellEl = null;
     this.inputWrapperEl = null;
-    this.composerFooterLeadingEl = null;
-    this.composerFooterTrailingEl = null;
-    this.composerContractEl = null;
-    this.composerRuntimeControlsEl = null;
+    this.composerInputRowEl = null;
+    this.composerContextActionsEl = null;
+    this.composerRuntimeDockEl = null;
     this.composerSubmitControlsEl = null;
     this.addContextBtnEl = null;
     this.sendBtnEl = null;
@@ -805,6 +819,11 @@ export class ComposerInputShellCoordinator {
   }
 
   private get shouldHandleAgentFeatures(): boolean {
+    // Prefer the dedicated mention seam; fall back to the selector gate so existing
+    // hosts/tests that only implement shouldMountAgentSelector keep working.
+    if (typeof this.host.shouldHandleAgentMentions === 'function') {
+      return this.host.shouldHandleAgentMentions() !== false;
+    }
     return this.host.shouldMountAgentSelector?.() !== false;
   }
 

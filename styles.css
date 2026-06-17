@@ -247,6 +247,10 @@ body[data-opencodian-provider-icon-mode="color"] {
   --opencodian-input-blur: 18px;
   --opencodian-input-shadow-blur: 28px;
   --opencodian-composer-font-family: ;
+  /* Layered composer spacing scale (context-strip → textarea → input-row → runtime-dock). */
+  --opencodian-composer-gap-xs: 6px;
+  --opencodian-composer-gap-sm: 8px;
+  --opencodian-composer-pad-x: 12px;
   --opencodian-gr-glass-bg-alpha: 0.48;
   --opencodian-gr-glass-blur: 26px;
   --opencodian-gr-glass-saturation: 170%;
@@ -12501,26 +12505,34 @@ img.opencodian-model-provider-header-icon {
   font-style: normal;
 }
 
-.opencodian-composer-footer {
-  display: block;
-  padding-top: 4px;
-  border-top: none;
-}
-
-.opencodian-composer-contract {
-  display: grid;
-  grid-template-columns: minmax(0, auto) minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 8px 12px;
-  min-width: 0;
-}
-
-.opencodian-composer-footer-leading,
-.opencodian-composer-footer-trailing,
-.opencodian-composer-runtime-controls {
+/*
+ * Layered composer layout (Obsidian-native input workbench).
+ *
+ *   .opencodian-composer-content
+ *     ├─ .opencodian-composer-context-row      (context strip: files/images/mentions)
+ *     ├─ .opencodian-input-highlight-container (textarea — the focus)
+ *     ├─ .opencodian-composer-input-row         (+/image  |  context-ring + send/stop)
+ *     └─ .opencodian-composer-runtime-dock      (model/agent/permission/effort/sandbox)
+ *
+ * The runtime-dock lives inside the glass shell, so the etched action-button style
+ * (`.opencodian-composer-shell--action-buttons-etched ...`) cascades onto its controls
+ * automatically — no separate etched CSS is needed for the dock.
+ * Layout is narrow-first: the dock wraps naturally instead of relying on a width breakpoint.
+ */
+.opencodian-composer-input-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: space-between;
+  gap: var(--opencodian-composer-gap-sm);
+  min-width: 0;
+  padding-top: 4px;
+}
+
+.opencodian-composer-context-actions,
+.opencodian-composer-submit-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--opencodian-composer-gap-xs);
   min-width: 0;
 }
 
@@ -12529,15 +12541,13 @@ img.opencodian-model-provider-header-icon {
   flex-wrap: nowrap;
 }
 
-.opencodian-composer-runtime-controls {
-  justify-content: center;
-}
-
 .opencodian-composer-submit-controls {
   justify-content: flex-end;
   flex: 0 0 auto;
+  flex-wrap: nowrap;
 }
 
+/* Within submit-controls: context ring first, then send/stop. */
 .opencodian-composer-submit-controls .opencodian-context-usage-slot {
   order: 0;
 }
@@ -12547,26 +12557,24 @@ img.opencodian-model-provider-header-icon {
   order: 1;
 }
 
-@media (max-width: 560px) {
-  .opencodian-composer-contract {
-    grid-template-columns: minmax(0, 1fr) auto;
-  }
+/*
+ * Runtime dock — a low-weight status row for model/agent/permission/effort/sandbox.
+ * Narrow-first: wraps naturally so long model names or many controls never overflow the
+ * (typically narrow) Obsidian sidebar.
+ */
+.opencodian-composer-runtime-dock {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  row-gap: 4px;
+  column-gap: var(--opencodian-composer-gap-sm);
+  min-height: 0;
+  padding-top: 6px;
+  margin-top: 4px;
+}
 
-  .opencodian-composer-runtime-controls {
-    grid-column: 1 / -1;
-    grid-row: 1;
-    justify-content: flex-start;
-  }
-
-  .opencodian-composer-context-actions {
-    grid-column: 1;
-    grid-row: 2;
-  }
-
-  .opencodian-composer-submit-controls {
-    grid-column: 2;
-    grid-row: 2;
-  }
+.opencodian-composer-runtime-dock:empty {
+  display: none;
 }
 
 .opencodian-slash-command-menu {
@@ -13241,7 +13249,8 @@ img.opencodian-model-provider-header-icon {
 }
 
 .opencodian-input-wrapper.is-composer-disabled .opencodian-input-highlight-container,
-.opencodian-input-wrapper.is-composer-disabled .opencodian-composer-footer {
+.opencodian-input-wrapper.is-composer-disabled .opencodian-composer-input-row,
+.opencodian-input-wrapper.is-composer-disabled .opencodian-composer-runtime-dock {
   opacity: 0.48;
   pointer-events: none;
 }
@@ -13364,19 +13373,22 @@ img.opencodian-model-provider-header-icon {
   color: var(--text-normal);
 }
 
+/*
+ * The toolbar holds model/agent/permission/effort controls and lives inside the runtime-dock.
+ * It defines the shared control sizing tokens consumed by the selector CSS files, but defers
+ * wrapping/spacing to the dock (its parent) so the two never fight over layout.
+ */
 .opencodian-input-toolbar {
   --opencodian-input-toolbar-control-gap: 10px;
   --opencodian-input-toolbar-control-height: 30px;
   display: flex;
   align-items: center;
-  justify-content: flex-start;
   flex-wrap: wrap;
-  row-gap: 8px;
+  row-gap: 4px;
   column-gap: var(--opencodian-input-toolbar-control-gap);
-  align-self: stretch;
   position: relative;
   z-index: 4;
-  margin-top: 0;
+  margin: 0;
   padding: 0;
   border-radius: 0;
   background: transparent;
@@ -13396,8 +13408,8 @@ img.opencodian-model-provider-header-icon {
   flex-shrink: 0;
 }
 
-.opencodian-composer-footer .opencodian-send-btn,
-.opencodian-composer-footer .opencodian-stop-btn {
+.opencodian-composer-input-row .opencodian-send-btn,
+.opencodian-composer-input-row .opencodian-stop-btn {
   margin-left: 0;
 }
 

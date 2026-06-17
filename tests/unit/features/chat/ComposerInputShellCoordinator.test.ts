@@ -54,6 +54,7 @@ const createdCoordinators: ComposerInputShellCoordinator[] = [];
 
 function createFixture(options: {
   shouldMountAgentSelector?: boolean;
+  shouldHandleAgentMentions?: boolean;
   composerAvailabilityState?: { kind: 'ready' | 'no-backend' | 'backend-offline'; title?: string; description?: string };
   composerCapabilityHint?: { text: string } | null;
   currentBackendSessionId?: string | null;
@@ -151,6 +152,9 @@ function createFixture(options: {
 
   if (options.hasImageInputCapability !== undefined) {
     host.hasImageInputCapability = jest.fn(() => options.hasImageInputCapability ?? false);
+  }
+  if (options.shouldHandleAgentMentions !== undefined) {
+    host.shouldHandleAgentMentions = jest.fn(() => options.shouldHandleAgentMentions ?? false);
   }
 
   // Only mock getComposerCapabilityHint when explicitly provided in options.
@@ -303,7 +307,7 @@ describe('ComposerInputShellCoordinator', () => {
     expect(fixture.textarea.value).toBe('');
   });
 
-  it('organizes the composer into context, runtime, and submit contract clusters', () => {
+  it('organizes the composer into a layered input-row and runtime-dock', () => {
     const fixture = createFixture({
       hasImageInputCapability: true,
       renderHostControls: true,
@@ -314,19 +318,20 @@ describe('ComposerInputShellCoordinator', () => {
       },
     });
 
-    const contract = fixture.container.querySelector<HTMLElement>('.opencodian-composer-contract');
+    const inputRow = fixture.container.querySelector<HTMLElement>('.opencodian-composer-input-row');
     const contextActions = fixture.container.querySelector<HTMLElement>('.opencodian-composer-context-actions');
-    const runtimeControls = fixture.container.querySelector<HTMLElement>('.opencodian-composer-runtime-controls');
+    const runtimeDock = fixture.container.querySelector<HTMLElement>('.opencodian-composer-runtime-dock');
     const submitControls = fixture.container.querySelector<HTMLElement>('.opencodian-composer-submit-controls');
 
-    expect(contract).toBeTruthy();
+    expect(inputRow).toBeTruthy();
+    expect(runtimeDock).toBeTruthy();
     expect(contextActions?.querySelector('.opencodian-composer-add-btn')).not.toBeNull();
     expect(contextActions?.querySelector('.opencodian-composer-image-btn')).not.toBeNull();
     expect(contextActions?.querySelector('.opencodian-input-capability-hint')).not.toBeNull();
-    expect(runtimeControls?.querySelector('.opencodian-agent-selector')).not.toBeNull();
-    expect(runtimeControls?.querySelector('.opencodian-input-toolbar')).not.toBeNull();
-    expect(runtimeControls?.querySelector('.opencodian-model-selector')).not.toBeNull();
-    expect(runtimeControls?.querySelector('.opencodian-permission-selector')).not.toBeNull();
+    expect(runtimeDock?.querySelector('.opencodian-agent-selector')).not.toBeNull();
+    expect(runtimeDock?.querySelector('.opencodian-input-toolbar')).not.toBeNull();
+    expect(runtimeDock?.querySelector('.opencodian-model-selector')).not.toBeNull();
+    expect(runtimeDock?.querySelector('.opencodian-permission-selector')).not.toBeNull();
     expect(submitControls?.querySelector('.opencodian-context-usage-slot')).not.toBeNull();
     expect(submitControls?.querySelector('.opencodian-context-usage-ring')).not.toBeNull();
     expect(submitControls?.querySelector('.opencodian-send-btn')).not.toBeNull();
@@ -356,7 +361,7 @@ describe('ComposerInputShellCoordinator', () => {
     expect(mountedSuggestionBar).not.toBeNull();
     expect(mountedSuggestionBar?.parentElement).toBe(fixture.suggestionTurnBodyEl);
     expect(mountedSuggestionBar?.previousElementSibling).toBe(fixture.suggestionAssistantMessageEl);
-    expect(fixture.container.querySelector('.opencodian-composer-footer .opencodian-suggestion-bar')).toBeNull();
+    expect(fixture.container.querySelector('.opencodian-composer-input-row .opencodian-suggestion-bar')).toBeNull();
   });
 
   it('removes the empty toolbar when no selector, model, permission, context, or effort controls are mounted', () => {
@@ -383,6 +388,25 @@ describe('ComposerInputShellCoordinator', () => {
     expect(fixture.host.mountEffortSelector).toHaveBeenCalledTimes(2);
   });
 
+  it('hides the agent selector dropdown for the Claude shape while keeping the @agent mention seam wired', () => {
+    // Claude shape: no Subagents capability (dropdown hidden), but mentions stay enabled
+    // via the dedicated shouldHandleAgentMentions seam (loadClaudeRuntimeAgents + verbatim
+    // text retention). The dropdown must disappear; the mention seam must be honored.
+    const fixture = createFixture({
+      shouldMountAgentSelector: false,
+      shouldHandleAgentMentions: true,
+    });
+
+    // Dropdown is hidden: Claude lacks the Subagents capability.
+    expect(fixture.container.querySelector('.opencodian-agent-selector')).toBeNull();
+
+    // The dedicated mention seam is consulted on input (decoupled from the dropdown gate).
+    (fixture.host.shouldHandleAgentMentions as jest.Mock).mockClear();
+    fixture.textarea.value = 'hello @b';
+    fixture.textarea.dispatchEvent(new Event('input'));
+    expect(fixture.host.shouldHandleAgentMentions).toHaveBeenCalled();
+  });
+
   it('keeps a single context usage slot when toolbar controls refresh', () => {
     const fixture = createFixture({ renderHostControls: true });
 
@@ -395,11 +419,11 @@ describe('ComposerInputShellCoordinator', () => {
     expect(fixture.host.mountContextUsageIndicator).toHaveBeenCalledTimes(3);
   });
 
-  it('mounts selection, context usage, and effort controls into the new contract clusters', () => {
+  it('mounts selection, context usage, and effort controls into the runtime-dock and submit cluster', () => {
     const fixture = createFixture({ renderHostControls: true });
 
     const toolbar = fixture.container.querySelector<HTMLElement>('.opencodian-input-toolbar');
-    const runtimeControls = fixture.container.querySelector<HTMLElement>('.opencodian-composer-runtime-controls');
+    const runtimeDock = fixture.container.querySelector<HTMLElement>('.opencodian-composer-runtime-dock');
     const submitControls = fixture.container.querySelector<HTMLElement>('.opencodian-composer-submit-controls');
     const contextUsageSlot = fixture.container.querySelector('.opencodian-context-usage-slot');
     const selectionControlsTarget = fixture.host.mountSelectionControls.mock.calls[0]?.[0];
@@ -409,11 +433,11 @@ describe('ComposerInputShellCoordinator', () => {
     const effortControl = fixture.container.querySelector('.opencodian-effort-control');
 
     expect(toolbar).toBeTruthy();
-    expect(runtimeControls?.contains(selectionControlsTarget ?? null)).toBe(true);
-    expect(runtimeControls?.contains(effortTarget ?? null)).toBe(true);
-    expect(runtimeControls?.contains(permissionSelector)).toBe(true);
-    expect(runtimeControls?.contains(modelSelector)).toBe(true);
-    expect(runtimeControls?.contains(effortControl)).toBe(true);
+    expect(runtimeDock?.contains(selectionControlsTarget ?? null)).toBe(true);
+    expect(runtimeDock?.contains(effortTarget ?? null)).toBe(true);
+    expect(runtimeDock?.contains(permissionSelector)).toBe(true);
+    expect(runtimeDock?.contains(modelSelector)).toBe(true);
+    expect(runtimeDock?.contains(effortControl)).toBe(true);
     expect(submitControls?.contains(contextUsageSlot)).toBe(true);
     expect(fixture.host.mountSelectionControls).toHaveBeenCalledTimes(1);
     expect(fixture.host.mountContextUsageIndicator).toHaveBeenCalledTimes(1);

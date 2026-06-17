@@ -898,13 +898,21 @@ export class OpenCodianView extends ItemView {
         });
       },
       shouldMountAgentSelector: () => {
-        // OpenCode: gate on Subagents capability
-        if (!this.isClaudeCodeConversationActive()) {
-          return hasCapability(this.caps, AgentCapability.Subagents);
-        }
-        // Claude: @agent mention menu uses Claude runtime agents; agent selector
-        // shows Claude candidates. Always mount when Claude is active.
-        return true;
+        // Pure capability gate: only show the primary-agent selector dropdown for
+        // backends that declare the Subagents capability (OpenCode). Claude Code and
+        // Codex lack it — Claude doesn't support choosing a "primary" agent before send
+        // (its subagents are spawned on demand via the Task tool, surfaced through the
+        // `@agent` inline mention, not this dropdown).
+        return hasCapability(this.caps, AgentCapability.Subagents);
+      },
+      shouldHandleAgentMentions: () => {
+        // The inline `@agent` mention menu (typing `@` in the textarea) is decoupled
+        // from the dropdown above. OpenCode gates on Subagents; Claude keeps the mention
+        // menu even though it lacks that capability, because it has a dedicated catalog
+        // source (`loadClaudeRuntimeAgents` → `query.supportedAgents()`) and preserves
+        // `@name` text verbatim in the prompt (MessageSendPreparationService) so the
+        // model can spawn a Task-tool subagent at runtime.
+        return hasCapability(this.caps, AgentCapability.Subagents) || this.isClaudeCodeConversationActive();
       },
       getComposerCapabilityHint: () => {
         // Show /json structured-output chip for backends that support it.

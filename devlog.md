@@ -11,7 +11,51 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
-## 2026-06-14 Codex SDK — Final Docs-Only Truth-Sync Cleanup
+## 2026-06-17 Composer — Hide @agent Dropdown for Claude (Decouple from @mention)
+
+**Objective.** The composer's `@agent` selector dropdown was wrongly shown for the Claude Code backend even though Claude doesn't support choosing a "primary" agent before send (its subagents are spawned on demand via the Task tool, surfaced through the inline `@` mention). Worse, the dropdown's `primaryAgent` selection was silently dropped by `ClaudeCodeAdapter.resolveSendOptionOverrides` (which only extracts `model`/`effort`) — so the button was purely decorative for Claude. The fix: hide the dropdown for Claude while keeping the `@` inline mention working.
+
+**Root cause.** `OpenCodianView.ts` `shouldMountAgentSelector` special-cased Claude to `return true`, bypassing the `AgentCapability.Subagents` capability gate that every other composer control (Context/Thinking/Models/Permissions/Images) respects. Claude's capability set (`CLAUDE_CODE_PHASE1_CAPABILITIES`) deliberately omits `Subagents`. That same return value was also reused by `ComposerInputShellCoordinator.shouldHandleAgentFeatures` to gate the inline `@agent` mention menu — so a naive fix would have disabled the mention feature too.
+
+**Investigation (web + code).** Confirmed via Claude Agent SDK docs that subagents are a real SDK capability, invoked through the Task tool from `@name` text in the prompt — not a pre-send "primary agent" switch. Code trace proved the `@` mention path works end-to-end for Claude: `loadClaudeRuntimeAgents` → `query.supportedAgents()` returns real agents; `MessageSendPreparationService` preserves `@name` text verbatim for Claude (unlike OpenCode which strips mentions into `invocationParts`); the raw text reaches `sdk.query()` unchanged, where the model spawns the Task subagent. So the mention must stay; only the dropdown must go.
+
+**Changes.**
+- `OpenCodianView.ts`: `shouldMountAgentSelector` collapsed to a pure capability gate (`return hasCapability(this.caps, AgentCapability.Subagents)`) — Claude/Codex no longer show the dropdown, OpenCode still does. Added a new `shouldHandleAgentMentions` host seam = `Subagents || isClaudeCodeConversationActive()`, so Claude keeps the inline `@` mention menu despite lacking the capability.
+- `ComposerInputShellCoordinator.ts`: `ComposerInputShellCoordinatorHost` gained optional `shouldHandleAgentMentions?()`. `shouldHandleAgentFeatures` getter now reads it, falling back to `shouldMountAgentSelector` when the host doesn't implement it (preserves existing hosts/tests). Dropdown mount still uses `shouldMountAgentSelector`.
+- Tests: added a Claude-shape contract test (`shouldMountAgentSelector=false` + `shouldHandleAgentMentions=true` → dropdown hidden, mention seam consulted on input). Existing 95 coordinator tests stay green via the fallback.
+- Docs: `docs/modules/features/chat/OpenCodianView.md` and `…/services/ComposerInputShellCoordinator.md` updated to describe the decoupled seams.
+
+**Not done.** Did not touch `ClaudeCodeAdapter.resolveSendOptionOverrides` (the dropdown is now hidden, so `primaryAgent` is never produced for Claude). Did not touch `MessageSendPreparationService` mention retention (correct by design). No settings/schema changes; no change to OpenCode/Codex behavior.
+
+**Verification.** `npm run verify` green (lint + typecheck + 540 suites / 5078 tests via `--runInBand`, avoiding an unrelated jest-worker SIGSEGV in `BackendSessionBrowserModal.search.test.ts` that passes in isolation; added a Claude-shape contract test). Build `main.202606171731`. `owner-guard` passed as `RULE_1_HOTSPOT_CLASS_B_APPROVED` (net-corrective fix to `OpenCodianView.ts`, cannot move to adjacent owner without violating the no-thin-helper rule). `check:devlog-order`, `check:module-docs`, `check:graphify` all green.
+
+---
+
+## 2026-06-17 Composer — Layered Input Workbench Refactor
+
+**Objective.** Refactor the chat composer from a single crowded footer grid into a 4-layer "input workbench" so the textarea becomes the visual focus instead of competing with model/agent/permission/effort/context-ring/send for attention. Behavior, host seams, settings schema, and `OpenCodianView` all untouched — only `ComposerInputShellCoordinator` DOM + CSS + docs.
+
+**Problem.** The composer packed nine controls (textarea, `+`/image, model, agent, permission, effort, sandbox badges, context-ring, send/stop) into one 3-column CSS grid (`.opencodian-composer-contract`, `chat-assistant.css:1417`). Model/agent/permission/effort sat in the middle column, ring+send on the right, so the textarea never became the focus. Two parallel layout systems (new grid + legacy flex `.opencodian-input-toolbar`) coexisted, and all gaps were hardcoded (`8px 12px`/`8px`/`6px`) with no spacing tokens.
+
+**Decision (locked with user).**
+1. 4-layer info architecture: context strip → textarea (focus) → input-row (`+`/image + ring + send) → runtime-dock (model/agent/permission/effort/sandbox).
+2. Dock placed **inside the glass shell at the bottom** (user choice) — etched action-button style cascades from `.opencodian-composer-shell--action-buttons-etched` automatically, zero extra etched CSS/class code.
+3. Reuse the existing `actionButtonStyle` setting (`'default'`=standalone pill / `'etched'`=etched-in-glass muted text) — **no new settings field**, honoring "don't change settings schema for layout".
+4. Narrow-first design — the Obsidian sidebar is the common case, not a fallback; the dock's `flex-wrap` adapts naturally instead of a width breakpoint.
+
+**Changes.**
+- `ComposerInputShellCoordinator.ts` (`build()` + `mountToolbarControls()` + `renderCapabilityHint()` + `destroy()`): replaced the `.opencodian-composer-footer`/`.opencodian-composer-contract` grid with `.opencodian-composer-input-row` (context-actions + submit-controls) and a new `.opencodian-composer-runtime-dock`. Renamed fields `composerFooterLeadingEl`→`composerContextActionsEl`, dropped `composerFooterTrailingEl`/`composerContractEl`/`composerRuntimeControlsEl`, added `composerInputRowEl`/`composerRuntimeDockEl`. `mountToolbarControls()` now mounts the toolbar into the dock; context-usage-slot stays in submit-controls. All host callbacks (`mountSelectionControls`/`mountContextUsageIndicator`/`mountEffortSelector`/`setContextRowElement`/etc.) unchanged.
+- `core.css`: added composer spacing tokens `--opencodian-composer-gap-xs` (6px), `--opencodian-composer-gap-sm` (8px), `--opencodian-composer-pad-x` (12px).
+- `chat-assistant.css`: replaced the footer/grid block (`:1411-1477`, incl. the `@media (max-width:560px)` grid reflow) with `.opencodian-composer-input-row` (space-between flex) + `.opencodian-composer-runtime-dock` (low-weight status row with `flex-wrap`, a faint `border-top`, and `:empty` auto-hide). Migrated `.is-composer-disabled` and send/stop `margin-left` rules from `.opencodian-composer-footer` to the new containers. Simplified `.opencodian-input-toolbar` (dropped `align-self: stretch`/`justify-content`/`row-gap:8px` that fought the dock's own wrapping) while keeping its sizing tokens for the selector CSS files.
+- Docs: `docs/modules/features/chat/services/ComposerInputShellCoordinator.md` and `docs/modules/style/features/chat-assistant.md` updated to describe the layered composer + runtime-dock; the 4 selector docs needed no changes (no stale layout terms).
+
+**Not done (explicit boundaries).** No new "Run as…" composite panel (full version — too much behavior/test churn); no new setting; `OpenCodianView.ts`, host interface, settings schema, and all streaming/submit/context/slash/mention behavior untouched.
+
+**Verification.** `npm run verify` green (lint + typecheck + 540 suites / 5077 tests; updated 2 tests that asserted the old `.opencodian-composer-contract`/`.opencodian-composer-runtime-controls` DOM to query the new `.opencodian-composer-input-row`/`.opencodian-composer-runtime-dock`). Build `main.202606171504`, `styles.css` regenerated. `check:devlog-order`, `check:module-docs`, `check:graphify` all green.
+
+---
+
+
 
 **Objective.** Final truth-sync pass over `docs/status/codex-sdk-current-state-2026-06-09.md`: remove any stale wording that contradicts the accepted truth buckets/evidence. No `src/` changes.
 

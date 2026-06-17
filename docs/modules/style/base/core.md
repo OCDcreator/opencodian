@@ -20,6 +20,7 @@
 - `.opencodian-theme-background-*`：主题背景图层、遮罩、叠加高光。
 - 关键变量组：`--opencodian-glass-*`、`--opencodian-composer-*`、`--opencodian-status-*`、`--opencodian-shadow-*`。
 - 输入区字体默认值由 `--opencodian-composer-font-family` 提供，并可被聊天外观设置生成的容器变量覆盖。
+- Layered composer 间距 token：`--opencodian-composer-gap-xs`（6px）、`--opencodian-composer-gap-sm`（8px）、`--opencodian-composer-pad-x`（12px）统一 context strip → textarea → input-row → runtime-dock 的横向节奏，替代此前 footer/grid 中硬编码的 `8px 12px` / `8px` / `6px`。
 
 ## 关联 TS 组件
 

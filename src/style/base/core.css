@@ -246,6 +246,10 @@ body[data-opencodian-provider-icon-mode="color"] {
   --opencodian-input-blur: 18px;
   --opencodian-input-shadow-blur: 28px;
   --opencodian-composer-font-family: ;
+  /* Layered composer spacing scale (context-strip → textarea → input-row → runtime-dock). */
+  --opencodian-composer-gap-xs: 6px;
+  --opencodian-composer-gap-sm: 8px;
+  --opencodian-composer-pad-x: 12px;
   --opencodian-gr-glass-bg-alpha: 0.48;
   --opencodian-gr-glass-blur: 26px;
   --opencodian-gr-glass-saturation: 170%;
