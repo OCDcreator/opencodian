@@ -5,7 +5,7 @@
 
 ## 职责
 
-定义聊天输入工具栏里的主 Agent 下拉框样式。它覆盖 trigger icon/text/chevron、轻量列表标题、OpenCode default 选项、primary/all agent option、marker/main/meta 紧凑行布局、固定二级描述、loading/empty/error 状态，以及选中态的黄色强调。Trigger 跟随输入工具栏统一高度/间距 token，并在默认态对齐 model selector trigger 的容器几何、边框、背景和 inset highlight；`etched` 时融入 composer 面板。
+定义聊天输入工具栏里的主 Agent 下拉框样式。它覆盖 trigger icon/text/chevron、轻量列表标题、OpenCode default 选项、primary/all agent option、marker/main/meta 紧凑行布局、固定二级描述、loading/empty/error 状态，以及选中态的黄色强调。Trigger 跟随输入工具栏统一高度/间距 token，并在 composer runtime rail 默认态对齐 model selector 的低视觉权重 pill 几何、边框与背景；`etched` 时融入 composer 面板。
 
 ## 关键类名
 
@@ -21,7 +21,7 @@
 
 ## 修改注意点
 
-- trigger 容器应向 model selector 看齐，保持一致的默认边框、内边距、hover/open 反馈和图标尺寸。当前 trigger padding 为 `4px 10px`，与 model selector 一致。
+- trigger 容器应向 model selector 看齐，保持一致的 runtime-chip 边框、内边距、hover/open 反馈和图标尺寸。当前 composer trigger 使用 11px 文本和小图标，不能膨胀成与 send/add action 同权重的大按钮。
 - 下拉框与 model / permission selector 保持同一 popover 视觉语言：`border-radius: 16px`、`blur(40px) saturate(1.22)`、统一分层阴影，并带有 `agent-dropdown-open` 入场动画。
 - 选项支持 `:focus-visible` 焦点轮廓，确保键盘导航可见。
 - trigger 选中态使用 `var(--text-warning)`，对齐 OpenCode 对 agent reference 的黄色/橙色语义。

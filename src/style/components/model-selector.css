@@ -16,32 +16,32 @@
   display: flex;
   align-items: center;
   min-height: var(--opencodian-input-toolbar-control-height, 30px);
-  padding: 4px 10px;
-  border-radius: 8px;
+  padding: 3px 7px;
+  border-radius: 999px;
   cursor: pointer;
-  background: color-mix(in srgb, var(--background-primary) 54%, transparent);
-  border: 1px solid color-mix(in srgb, var(--background-modifier-border) 54%, transparent);
-  box-shadow: 0 1px 0 color-mix(in srgb, var(--opencodian-glass-specular) 30%, transparent) inset;
+  background: color-mix(in srgb, var(--background-secondary) 36%, transparent);
+  border: 1px solid color-mix(in srgb, var(--background-modifier-border) 38%, transparent);
+  box-shadow: none;
   transition: color 0.15s ease-out, opacity 0.15s ease-out, background-color 0.15s ease-out, border-color 0.15s ease-out, box-shadow 0.15s ease-out, transform 0.15s ease-out;
   user-select: none;
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 500;
-  color: var(--text-normal);
+  color: color-mix(in srgb, var(--text-normal) 74%, var(--text-muted));
 }
 
 .opencodian-model-trigger:hover {
-  background: color-mix(in srgb, var(--opencodian-composer-embedded-fill) 24%, var(--background-primary));
-  border-color: color-mix(in srgb, var(--background-modifier-border) 78%, var(--text-muted));
+  background: color-mix(in srgb, var(--background-secondary) 48%, transparent);
+  border-color: color-mix(in srgb, var(--background-modifier-border) 62%, var(--text-muted));
   color: var(--text-normal);
-  transform: translateY(-1px);
-  box-shadow: 0 2px 8px color-mix(in srgb, var(--opencodian-glass-shadow-strong) 20%, transparent), 0 1px 0 color-mix(in srgb, var(--opencodian-glass-specular) 30%, transparent) inset;
+  transform: none;
+  box-shadow: none;
 }
 
 .opencodian-model-trigger.is-open {
-  background: color-mix(in srgb, var(--opencodian-composer-embedded-fill) 24%, transparent);
-  border-color: color-mix(in srgb, var(--interactive-accent) 52%, var(--background-modifier-border));
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--interactive-accent) 14%, transparent), 0 2px 12px color-mix(in srgb, var(--interactive-accent) 10%, transparent), 0 1px 0 color-mix(in srgb, var(--opencodian-glass-specular) 30%, transparent) inset;
-  transform: translateY(-1px);
+  background: color-mix(in srgb, var(--interactive-accent) 8%, transparent);
+  border-color: color-mix(in srgb, var(--interactive-accent) 32%, var(--background-modifier-border));
+  box-shadow: none;
+  transform: none;
 }
 
 .opencodian-model-trigger.is-unavailable {
@@ -62,8 +62,8 @@
 .opencodian-model-trigger-content {
   display: flex;
   align-items: center;
-  gap: 6px;
-  max-width: 180px;
+  gap: 5px;
+  max-width: 150px;
 }
 
 /* Provider Icon - Lobehub SVG icons */
@@ -72,9 +72,9 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  width: 16px;
-  height: 16px;
-  opacity: 0.7;
+  width: 14px;
+  height: 14px;
+  opacity: 0.62;
   transition: opacity 0.15s ease;
 }
 
@@ -84,8 +84,8 @@
 }
 
 .opencodian-model-trigger-icon img {
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
   object-fit: contain;
   /* Invert colors in dark mode for better visibility */
   filter: var(--lobehub-icon-filter, none);
@@ -161,8 +161,8 @@
 }
 
 .opencodian-model-trigger-chevron svg {
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
 }
 
 /* Dropdown - Popover style */

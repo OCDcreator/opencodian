@@ -1414,7 +1414,7 @@
  *   .opencodian-composer-content
  *     ├─ .opencodian-composer-context-row      (context strip: files/images/mentions)
  *     ├─ .opencodian-input-highlight-container (textarea — the focus)
- *     ├─ .opencodian-composer-input-row         (+/image  |  context-ring + send/stop)
+ *     ├─ .opencodian-composer-input-row         (+/image/JSON | context-ring + send/stop)
  *     └─ .opencodian-composer-runtime-dock      (model/agent/permission/effort/sandbox)
  *
  * The runtime-dock lives inside the glass shell, so the etched action-button style
@@ -1422,7 +1422,8 @@
  * automatically — no separate etched CSS is needed for the dock.
  * Layout is narrow-first: the dock wraps naturally instead of relying on a width breakpoint.
  */
-.opencodian-composer-input-row {
+.opencodian-composer-input-row,
+.opencodian-composer-action-zone {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1442,6 +1443,8 @@
 .opencodian-composer-context-actions {
   justify-content: flex-start;
   flex-wrap: nowrap;
+  flex: 1 1 auto;
+  overflow: hidden;
 }
 
 .opencodian-composer-submit-controls {
@@ -1465,15 +1468,17 @@
  * Narrow-first: wraps naturally so long model names or many controls never overflow the
  * (typically narrow) Obsidian sidebar.
  */
-.opencodian-composer-runtime-dock {
+.opencodian-composer-runtime-dock,
+.opencodian-composer-runtime-rail {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   row-gap: 4px;
-  column-gap: var(--opencodian-composer-gap-sm);
+  column-gap: var(--opencodian-composer-gap-xs);
   min-height: 0;
-  padding-top: 6px;
+  padding-top: 5px;
   margin-top: 4px;
+  color: var(--text-muted);
 }
 
 .opencodian-composer-runtime-dock:empty {
@@ -2171,18 +2176,21 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 4px;
   flex: 0 0 auto;
-  max-width: 100%;
-  padding: 4px 10px;
-  border: 1px solid color-mix(in srgb, var(--interactive-accent) 26%, var(--background-modifier-border));
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--interactive-accent) 11%, transparent);
-  font-size: 11px;
-  line-height: 1.4;
+  max-width: min(86px, 38vw);
+  min-height: 28px;
+  padding: 3px 8px;
+  border: 1px solid color-mix(in srgb, var(--interactive-accent) 22%, var(--background-modifier-border));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--interactive-accent) 8%, transparent);
+  font-size: 10.5px;
+  line-height: 1.2;
   color: color-mix(in srgb, var(--text-normal) 70%, var(--interactive-accent));
   cursor: pointer;
   transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease, transform 120ms ease;
   appearance: none;
+  overflow: hidden;
 }
 
 .opencodian-input-capability-hint:hover {
@@ -2208,11 +2216,24 @@
   transform: none;
 }
 
+.opencodian-input-capability-hint-glyph {
+  flex: 0 0 auto;
+  font-family: var(--font-monospace);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0;
+  color: currentColor;
+  opacity: 0.92;
+}
+
 .opencodian-input-capability-hint-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
   font-family: var(--font-monospace);
-  font-weight: 600;
-  letter-spacing: 0.01em;
+  font-weight: 700;
+  letter-spacing: 0;
 }
 
 .opencodian-suggestion-bar {
@@ -2282,8 +2303,8 @@
  * wrapping/spacing to the dock (its parent) so the two never fight over layout.
  */
 .opencodian-input-toolbar {
-  --opencodian-input-toolbar-control-gap: 10px;
-  --opencodian-input-toolbar-control-height: 30px;
+  --opencodian-input-toolbar-control-gap: 6px;
+  --opencodian-input-toolbar-control-height: 26px;
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -2306,9 +2327,17 @@
 .opencodian-input-toolbar .opencodian-sandbox-badge-container,
 .opencodian-input-toolbar .opencodian-additional-directories-badge-container,
 .opencodian-input-toolbar .opencodian-codex-runtime-defaults-badge-container,
-.opencodian-input-toolbar .opencodian-model-selector {
+.opencodian-input-toolbar .opencodian-model-selector,
+.opencodian-input-toolbar .opencodian-effort-slot {
   min-height: var(--opencodian-input-toolbar-control-height);
   flex-shrink: 0;
+}
+
+.opencodian-input-toolbar .opencodian-agent-selector,
+.opencodian-input-toolbar .opencodian-model-selector,
+.opencodian-input-toolbar .opencodian-permission-selector,
+.opencodian-input-toolbar .opencodian-effort-slot {
+  max-width: 100%;
 }
 
 .opencodian-composer-input-row .opencodian-send-btn,

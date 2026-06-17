@@ -322,16 +322,27 @@ describe('ComposerInputShellCoordinator', () => {
     const contextActions = fixture.container.querySelector<HTMLElement>('.opencodian-composer-context-actions');
     const runtimeDock = fixture.container.querySelector<HTMLElement>('.opencodian-composer-runtime-dock');
     const submitControls = fixture.container.querySelector<HTMLElement>('.opencodian-composer-submit-controls');
+    const actionZone = fixture.container.querySelector<HTMLElement>('.opencodian-composer-action-zone');
+    const runtimeRail = fixture.container.querySelector<HTMLElement>('.opencodian-composer-runtime-rail');
 
     expect(inputRow).toBeTruthy();
     expect(runtimeDock).toBeTruthy();
+    expect(actionZone).toBe(inputRow);
+    expect(runtimeRail).toBe(runtimeDock);
     expect(contextActions?.querySelector('.opencodian-composer-add-btn')).not.toBeNull();
     expect(contextActions?.querySelector('.opencodian-composer-image-btn')).not.toBeNull();
     expect(contextActions?.querySelector('.opencodian-input-capability-hint')).not.toBeNull();
+    expect(inputRow?.contains(contextActions)).toBe(true);
+    expect(inputRow?.contains(submitControls)).toBe(true);
+    expect(inputRow?.querySelector('.opencodian-agent-selector')).toBeNull();
+    expect(inputRow?.querySelector('.opencodian-model-selector')).toBeNull();
+    expect(inputRow?.querySelector('.opencodian-permission-selector')).toBeNull();
     expect(runtimeDock?.querySelector('.opencodian-agent-selector')).not.toBeNull();
     expect(runtimeDock?.querySelector('.opencodian-input-toolbar')).not.toBeNull();
     expect(runtimeDock?.querySelector('.opencodian-model-selector')).not.toBeNull();
     expect(runtimeDock?.querySelector('.opencodian-permission-selector')).not.toBeNull();
+    expect(runtimeDock?.querySelector('.opencodian-context-usage-slot')).toBeNull();
+    expect(runtimeDock?.querySelector('.opencodian-send-btn')).toBeNull();
     expect(submitControls?.querySelector('.opencodian-context-usage-slot')).not.toBeNull();
     expect(submitControls?.querySelector('.opencodian-context-usage-ring')).not.toBeNull();
     expect(submitControls?.querySelector('.opencodian-send-btn')).not.toBeNull();
@@ -761,6 +772,21 @@ describe('ComposerInputShellCoordinator — capability hint behaviors', () => {
 
     expect(fixture.textarea.value).toBe('/json summarize this');
     expect(fixture.host.submitMessage).not.toHaveBeenCalled();
+  });
+
+  it('renders the structured reply affordance as a compact JSON chip with explanatory tooltip', () => {
+    const fixture = createFixture({ shouldMountAgentSelector: false });
+
+    const hintEl = fixture.container.querySelector<HTMLButtonElement>('.opencodian-input-capability-hint');
+    const glyphEl = hintEl?.querySelector<HTMLElement>('.opencodian-input-capability-hint-glyph');
+    const textEl = hintEl?.querySelector<HTMLElement>('.opencodian-input-capability-hint-text');
+
+    expect(hintEl).toBeTruthy();
+    expect(glyphEl?.textContent).toBe('{ }');
+    expect(textEl?.textContent).toBe('JSON');
+    expect(hintEl?.textContent).toBe('{ }JSON');
+    expect(hintEl?.getAttribute('aria-label')).toBe(t('chat.input.capabilityHint.jsonTooltip'));
+    expect(hintEl?.getAttribute('data-tooltip')).toBe(t('chat.input.capabilityHint.jsonTooltip'));
   });
 });
 

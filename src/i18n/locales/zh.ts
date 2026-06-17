@@ -1933,7 +1933,7 @@ export const zhTranslations = {
   'chat.input.placeholder': '可向 opencodian 询问任何事，输入 @ 使用自定义代理或提及文件，输入 / 使用命令或技能',
   'chat.input.placeholderCodex': '向 Codex 提问。输入 /json 以使用结构化输出',
   'chat.input.capabilityHint.json': '/json — 结构化输出',
-  'chat.input.capabilityHint.jsonLabel': '结构化回复',
+  'chat.input.capabilityHint.jsonLabel': 'JSON',
   'chat.input.capabilityHint.jsonTooltip': '让这条消息按固定结构返回结果，方便复制到其他工具继续处理。点击后只会插入该模式，不会自动发送。',
   'chat.input.send': '发送',
   'chat.input.sendMessage': '发送消息',

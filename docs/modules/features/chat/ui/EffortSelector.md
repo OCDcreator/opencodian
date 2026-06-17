@@ -17,6 +17,7 @@ OpenCode 模式下，variants 来自当前 provider model catalog 的 `models[mo
 - 在当前模型不存在或 variants 为空时隐藏自身，避免留下空 toolbar 控件
 - 通过 `allowDefaultOption()` 和 `getDefaultOptionLabel()` 支持 backend-specific 默认项语义
 - 通过 `getBoundaryHint()` 回调渲染边界提示文本（boundary hint），诚实告知用户 effort 变更的作用范围
+- 当前值使用 `formatVariantLabel()` 显示完整标签（例如 `medium` → `Medium`），composer 中不得把 thinking effort 压缩成 `M` 或中文一字母式缩写
 
 ## 维护约束
 

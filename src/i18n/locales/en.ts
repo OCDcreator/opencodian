@@ -1933,7 +1933,7 @@ export const enTranslations = {
   'chat.input.placeholder': 'Ask opencodian anything. Type @ to mention agents or files, type / for commands and skills',
   'chat.input.placeholderCodex': 'Ask Codex anything. Type /json for structured output',
   'chat.input.capabilityHint.json': '/json — structured output',
-  'chat.input.capabilityHint.jsonLabel': 'Structured reply',
+  'chat.input.capabilityHint.jsonLabel': 'JSON',
   'chat.input.capabilityHint.jsonTooltip': 'Return this message in a fixed structured format so it is easier to copy into other tools. Clicking only inserts the mode and does not send.',
   'chat.input.send': 'Send',
   'chat.input.sendMessage': 'Send message',

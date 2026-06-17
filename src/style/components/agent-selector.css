@@ -13,38 +13,38 @@
   display: flex;
   align-items: center;
   min-height: var(--opencodian-input-toolbar-control-height, 30px);
-  padding: 4px 10px;
-  border: 1px solid color-mix(in srgb, var(--background-modifier-border) 54%, transparent);
-  border-radius: 8px;
+  padding: 3px 7px;
+  border: 1px solid color-mix(in srgb, var(--background-modifier-border) 38%, transparent);
+  border-radius: 999px;
   cursor: pointer;
-  background: color-mix(in srgb, var(--background-primary) 54%, transparent);
-  box-shadow: 0 1px 0 color-mix(in srgb, var(--opencodian-glass-specular) 30%, transparent) inset;
+  background: color-mix(in srgb, var(--background-secondary) 36%, transparent);
+  box-shadow: none;
   transition:
     background-color 0.15s ease-out,
     border-color 0.15s ease-out,
     box-shadow 0.15s ease-out,
     color 0.15s ease-out;
   user-select: none;
-  font-size: 13px;
-  color: var(--text-normal);
+  font-size: 11px;
+  color: color-mix(in srgb, var(--text-normal) 74%, var(--text-muted));
 }
 
 .opencodian-agent-trigger:hover {
   color: var(--text-normal);
-  background: color-mix(in srgb, var(--opencodian-composer-embedded-fill) 24%, var(--background-primary));
-  border-color: color-mix(in srgb, var(--background-modifier-border) 78%, var(--text-muted));
+  background: color-mix(in srgb, var(--background-secondary) 48%, transparent);
+  border-color: color-mix(in srgb, var(--background-modifier-border) 62%, var(--text-muted));
 }
 
 .opencodian-agent-trigger.is-open {
   color: var(--text-normal);
-  background: color-mix(in srgb, var(--opencodian-composer-embedded-fill) 24%, transparent);
-  border-color: color-mix(in srgb, var(--interactive-accent) 26%, var(--background-modifier-border));
+  background: color-mix(in srgb, var(--interactive-accent) 8%, transparent);
+  border-color: color-mix(in srgb, var(--interactive-accent) 32%, var(--background-modifier-border));
 }
 
 .opencodian-agent-trigger.is-selected {
   color: var(--text-warning);
-  background: color-mix(in srgb, var(--text-warning) 10%, var(--background-primary));
-  border-color: color-mix(in srgb, var(--text-warning) 24%, var(--background-modifier-border));
+  background: color-mix(in srgb, var(--text-warning) 8%, transparent);
+  border-color: color-mix(in srgb, var(--text-warning) 26%, var(--background-modifier-border));
 }
 
 .opencodian-composer-shell--action-buttons-etched .opencodian-agent-trigger {
@@ -90,8 +90,8 @@
 .opencodian-agent-trigger-content {
   display: flex;
   align-items: center;
-  gap: 6px;
-  max-width: 168px;
+  gap: 5px;
+  max-width: 140px;
 }
 
 .opencodian-agent-trigger-icon {
@@ -99,9 +99,9 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  width: 16px;
-  height: 16px;
-  opacity: 0.7;
+  width: 14px;
+  height: 14px;
+  opacity: 0.62;
 }
 
 .opencodian-agent-trigger:hover .opencodian-agent-trigger-icon,
@@ -110,8 +110,8 @@
 }
 
 .opencodian-agent-trigger-icon svg {
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
 }
 
 .opencodian-composer-shell--action-buttons-etched .opencodian-agent-trigger-icon svg {
@@ -140,8 +140,8 @@
 }
 
 .opencodian-agent-trigger-chevron svg {
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
 }
 
 .opencodian-agent-trigger-text {

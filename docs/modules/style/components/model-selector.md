@@ -9,7 +9,7 @@
 
 ## 关键类名 / CSS 变量
 
-- 模型选择器：`.opencodian-model-selector`、`.opencodian-model-trigger*`、`.opencodian-model-dropdown*`、`.opencodian-model-option*`。输入工具栏内的 trigger 使用统一 control height / inline padding，与 Agent / permission selector 保持同一横向节奏；默认态是紧凑按钮，`action-buttons-etched` 下切换为透明刻入态。
+- 模型选择器：`.opencodian-model-selector`、`.opencodian-model-trigger*`、`.opencodian-model-dropdown*`、`.opencodian-model-option*`。输入工具栏内的 trigger 使用统一 control height / inline padding，与 Agent / permission / effort selector 保持同一横向节奏；默认态是低视觉权重 runtime chip，`action-buttons-etched` 下切换为透明刻入态。
 - 选择态：`.is-open`、`.is-unavailable`、`.is-unconfigured`、`.is-highlighted`、`.is-selected`。
 - 设置页通用：`.opencodian-settings*`、`.opencodian-settings-quick-nav*`、`.opencodian-settings-tabs-*`、`.opencodian-settings-tab-*`、`.opencodian-settings-tooltip-layer` / `-bubble` / `-arrow`（`SettingsTooltipController` body-level overlay）、`.opencodian-capability-lab-session-detail`。
 - 编辑区设置页：`.workspace-leaf-content[data-type="opencodian-settings-view"] > .view-content.opencodian-settings` 是 editor-area 专用根选择器；padding、classic quick-nav 顶部贴合、tabbed 标题行对齐都应落在 `.view-content` 上，避免把设置 UI 挂到 Obsidian leaf 外壳。
@@ -18,7 +18,7 @@
 ## 近期行为
 
 - **Flat-clean redesign**（当前）：模型选择器下拉面板采用 Obsidian-native flat 风格，移除所有渐变和 glassmorphism 效果。
-  - 触发器：`padding: 4px 10px`、`font-weight: 500`；hover 时 `translateY(-1px)` + 柔和阴影抬升；`is-open` 态使用 accent 色边框 + 外发光。
+  - 触发器：composer runtime rail 内使用 pill 几何、`11px` 字号、低对比边框和透明/secondary tint 背景，避免和 send/add action 等主按钮同权重；hover/open 只做轻微 tint / border 变化，不再抬升成大按钮。
   - Chevron：`cubic-bezier(0.4, 0, 0.2, 1)` 平滑旋转 180°，hover/open 时颜色递进。
   - 下拉面板：`border-radius: 14px`、flat `var(--background-primary)` 背景、两层简洁阴影；移除了 `backdrop-filter`、线性渐变和径向渐变。`model-dropdown-open` 入场动画改为纯 `translateY(4px)` 上滑。
   - 搜索框：`border-radius: 8px`、`var(--background-secondary)` 填充色、简洁边框；`focus-within` 时仅 accent 边框色变化；移除了内阴影和渐变背景。

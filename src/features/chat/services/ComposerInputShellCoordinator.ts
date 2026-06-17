@@ -300,14 +300,18 @@ export class ComposerInputShellCoordinator {
     //   context-row → textarea (focus) → input-row (+/image + ring + send) → runtime-dock
     // The runtime-dock sits inside the glass shell so the etched action-button style
     // cascades from `.opencodian-composer-shell--action-buttons-etched` automatically.
-    this.composerInputRowEl = composerContentEl.createDiv({ cls: 'opencodian-composer-input-row' });
+    this.composerInputRowEl = composerContentEl.createDiv({
+      cls: 'opencodian-composer-input-row opencodian-composer-action-zone',
+    });
     this.composerContextActionsEl = this.composerInputRowEl.createDiv({
       cls: 'opencodian-composer-context-actions',
     });
     this.composerSubmitControlsEl = this.composerInputRowEl.createDiv({
       cls: 'opencodian-composer-submit-controls',
     });
-    this.composerRuntimeDockEl = composerContentEl.createDiv({ cls: 'opencodian-composer-runtime-dock' });
+    this.composerRuntimeDockEl = composerContentEl.createDiv({
+      cls: 'opencodian-composer-runtime-dock opencodian-composer-runtime-rail',
+    });
     this.addContextBtnEl = this.composerContextActionsEl.createEl('button', {
       cls: 'opencodian-composer-add-btn opencodian-tooltip-trigger',
       attr: {
@@ -485,6 +489,10 @@ export class ComposerInputShellCoordinator {
       this.capabilityHintEl.toggleClass('is-actionable', Boolean(hint.insertText));
       this.capabilityHintEl.setAttribute('aria-label', hint.tooltip ?? hint.text);
       this.host.setTooltipLabel(this.capabilityHintEl, hint.tooltip ?? hint.text, 'top');
+      this.capabilityHintEl.createSpan({
+        cls: `${this.capabilityHintHostClass}-glyph`,
+        text: '{ }',
+      });
       this.capabilityHintEl.createSpan({
         cls: `${this.capabilityHintHostClass}-text`,
         text: hint.text,

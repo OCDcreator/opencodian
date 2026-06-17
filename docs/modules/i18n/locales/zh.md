@@ -421,7 +421,7 @@ Claude Code 不再使用过载的 `settings.claudeCode.tab.mcpAdvanced` 标签�
 新增 `chat.structuredOutput.label` 键，为 Claude Code structured output 在普通聊天 transcript 中的可折叠渲染提供中文标签文案。
 
 
-本轮 capability-hint 现使用三组相关键：`chat.input.capabilityHint.json` 继续表示 capability 本身，`chat.input.capabilityHint.jsonLabel` 用于 Claude Code backend 激活时在 composer footer 的 send 按钮左侧显示“结构化回复”，`chat.input.capabilityHint.jsonTooltip` 用于悬浮说明“固定结构返回结果、点击不会自动发送”。
+本轮 capability-hint 现使用三组相关键：`chat.input.capabilityHint.json` 继续表示 capability 本身，`chat.input.capabilityHint.jsonLabel` 用于 Claude Code / Codex backend 激活时在 composer action zone 的 `{ } JSON` chip 中显示 `JSON`，`chat.input.capabilityHint.jsonTooltip` 用于悬浮说明“固定结构返回结果、点击不会自动发送”。
 
 - 本轮 prompt-suggestions 新增 `settings.claudeCode.promptSuggestions.name`（提示建议）和 `settings.claudeCode.promptSuggestions.desc` 键，用于 Capability Lab 诊断流控制区域的 toggle 说明。
 - 2026-06-04 进一步收紧 `settings.claudeCode.promptSuggestions.desc` / `.stableDesc`：稳定设置文案现在明确写成“显示在最后一条 assistant 消息下方”，不再笼统写成输入框区域建议。

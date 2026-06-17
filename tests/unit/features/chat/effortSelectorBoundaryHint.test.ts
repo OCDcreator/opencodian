@@ -81,4 +81,12 @@ describe('EffortSelector boundary hint', () => {
 
     expect(container.querySelector('.opencodian-effort-boundary-hint')?.textContent).toBe('Next message only');
   });
+
+  it('shows the full Medium effort label in the compact composer control', () => {
+    const { container } = mount(makeCallbacks({
+      getVariant: () => 'medium',
+    }));
+
+    expect(container.querySelector('.opencodian-effort-current')?.textContent).toBe('Medium');
+  });
 });
