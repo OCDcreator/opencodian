@@ -84,4 +84,21 @@ section 直接编辑 `settings.debugRefreshIntervalMs`。logger 侧会用该值�
 
 The classic `attach()` method remains single-page, but it follows the same source order.
 
-All four source tabs now render as formatter-style settings blocks: the Plugin global logging switch is wrapped in its own block, Plugin/OpenCode module groups use the shared debug module block, Claude Code keeps its workbench blocks, and Export wraps refresh/path/action/help controls in one block with object-row controls.
+All four source tabs now render inside `.opencodian-debug-tab-shell`, a shared shadcn-inspired settings shell that provides a compact header, muted description, badge rail, and neutral body stack. Plugin/OpenCode module groups still use shared Setting rows, Claude Code keeps its workbench controls and filtered log preview, and Export keeps refresh/path/action/help controls without changing persistence or copy/export behavior.
+
+In tabbed mode the shell owns the tab title and intro copy. Child blocks must not repeat the same title or description inside the body; module rows, status strips, privacy notes, channel controls, logs, and export actions should start directly after the shell header unless they introduce a genuinely different subsection.
+
+Ordinary Debug rows are intentionally neutral Field rows, not accent/object cards. The global logging switch, module toggles, channel toggles, export inputs, and action rows must not receive purple/violet/accent classes, object-card borders, or fixed-width control columns that can push the settings modal wider than its viewport. Claude Code status entries are muted metadata rows and are not reused as debug tab badges.
+
+## 2026-06-29 Debug five-tab visual refactor
+
+The Debug primary tab has five secondary tabs in `settingsLayoutRegistry.ts`: `plugin`, `opencode`, `claude-code`, `export`, and `capability-lab`. The first four are owned here; `capability-lab` is owned by `SettingsCapabilityLabSection`.
+
+The first four tabs borrow shadcn/Radix component structure as DOM/CSS vocabulary only: Card-like shell, Field rows, Badge chips, Button groups, ScrollArea-like log preview, and Alert-like console/privacy notes. No React, Radix, Tailwind, or shadcn dependency is introduced.
+
+Behavior remains unchanged:
+
+- all tab ids and `[data-section-block]` values are preserved
+- global logging and module/channel toggles write the same settings keys
+- Claude Code copy actions still use the summary-only diagnostic report path
+- export actions still call `buildDiagnosticReport()` / `writeDiagnosticLogFile()` with the same sources

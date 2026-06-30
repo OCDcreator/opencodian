@@ -212,6 +212,51 @@ describe('ChatHeaderPresenter', () => {
     ).toEqual(['session-settings', 'settings']);
   });
 
+  it('renders the server status as a compact expandable status control', () => {
+    const fixture = createFixture();
+
+    const statusBadgeEl = fixture.headerEl.querySelector<HTMLButtonElement>('.opencodian-server-status-badge');
+    const statusTextEl = fixture.headerEl.querySelector<HTMLElement>('.opencodian-server-status-text');
+
+    expect(statusBadgeEl).not.toBeNull();
+    expect(statusBadgeEl?.tagName).toBe('BUTTON');
+    expect(statusBadgeEl?.getAttribute('type')).toBe('button');
+    expect(statusBadgeEl?.getAttribute('data-status-chip')).toBe('collapsed');
+    expect(statusBadgeEl?.getAttribute('aria-expanded')).toBe('false');
+    expect(statusTextEl?.getAttribute('aria-hidden')).toBe('true');
+  });
+
+  it('renders the OpenCode brandmark inside the compact status badge', async () => {
+    const fixture = createFixture();
+
+    await fixture.presenter.refreshServerStatusBadge();
+
+    const statusBadgeEl = fixture.headerEl.querySelector<HTMLElement>('.opencodian-server-status-badge');
+    const statusIconEl = fixture.headerEl.querySelector<HTMLElement>('.opencodian-server-status-icon');
+    const statusStateEl = fixture.headerEl.querySelector<HTMLElement>('.opencodian-server-status-state');
+    expect(statusIconEl).not.toBeNull();
+    expect(statusIconEl?.getAttribute('data-icon')).toBe('inline-start');
+    expect(statusIconEl?.getAttribute('aria-hidden')).toBe('true');
+    expect(statusIconEl?.getAttribute('data-backend-icon')).toBe('opencode');
+    expect(statusIconEl?.classList.contains('has-inline-brandmark')).toBe(true);
+    expect(statusIconEl?.style.getPropertyValue('--opencodian-server-status-icon-url')).toBe('');
+    expect(statusIconEl?.querySelector('.opencodian-server-status-icon-brandmark')?.innerHTML).toContain(
+      'clip0_light',
+    );
+    expect(statusStateEl?.parentElement).toBe(statusBadgeEl);
+
+    fixture.setOpenCodeBackend(false);
+    await fixture.presenter.refreshServerStatusBadge();
+
+    expect(statusIconEl?.getAttribute('data-backend-icon')).toBe('claude-code');
+    expect(statusIconEl?.classList.contains('has-inline-brandmark')).toBe(false);
+    expect(statusIconEl?.classList.contains('has-svg-icon')).toBe(true);
+    expect(statusIconEl?.querySelector('.opencodian-server-status-icon-brandmark')).toBeNull();
+    expect(statusIconEl?.style.getPropertyValue('--opencodian-server-status-icon-url')).toContain(
+      'assets/provider-icons/opencode/anthropic.svg',
+    );
+  });
+
   it('marks the new-tab action for tab-disabled container CSS', () => {
     const fixture = createFixture();
 

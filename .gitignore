@@ -80,6 +80,7 @@ tmp/
 /{outputDir}/
 
 .opencode-loop/
+.kimi-code/
 opencode.json
 automation/**/__pycache__/
 automation/**/*.pyc

@@ -4,11 +4,16 @@
    the same vertical rhythm. Mirrors the Codex account surface tokens so the
    two backend settings areas feel like one surface. */
 .opencodian-settings .opencodian-settings-claude-code-block {
-  --oc-claude-card-gap: 12px;
-  --oc-claude-group-header-gap: 16px;
+  --oc-claude-card-gap: 10px;
+  --oc-claude-group-header-gap: 12px;
   --oc-claude-card-title-body-gap: 8px;
   --oc-claude-card-body-gap: 10px;
-  --oc-claude-card-padding: 14px 16px;
+  --oc-claude-card-padding: 12px 14px;
+  --oc-claude-control-min-width: 220px;
+  --oc-claude-readback-row-bg:
+    color-mix(in srgb, var(--background-primary) 74%, var(--background-secondary));
+  --oc-claude-readback-row-border:
+    color-mix(in srgb, var(--background-modifier-border) 72%, transparent);
 }
 
 .opencodian-settings .opencodian-claude-code-tab-body,
@@ -39,8 +44,9 @@
   display: flex;
   flex-direction: row;
   align-items: center;
-  gap: 6px;
+  gap: var(--opencodian-settings-space-sm);
   margin: 0;
+  padding: 0 2px;
 }
 
 .opencodian-settings .opencodian-claude-code-group-title,
@@ -63,6 +69,8 @@
   justify-content: center;
   width: 22px;
   height: 22px;
+  border-radius: var(--opencodian-settings-radius-inline);
+  background: transparent;
   padding: 0;
   color: var(--text-faint);
   cursor: help;
@@ -70,6 +78,7 @@
 
 .opencodian-settings .opencodian-claude-code-group-help-button:hover,
 .opencodian-settings .opencodian-claude-code-group-help-button:focus-visible {
+  background: var(--opencodian-settings-inline-bg);
   color: var(--text-normal);
 }
 
@@ -107,10 +116,59 @@
 .opencodian-settings .opencodian-settings-claude-code-block .opencodian-claude-code-readback {
   margin: 0;
   padding: var(--oc-claude-card-padding);
-  border: 1px solid var(--background-modifier-border);
+  border: 1px solid var(--opencodian-settings-row-border);
   border-radius: var(--opencodian-settings-radius-row);
-  background: var(--background-secondary);
+  background: var(--opencodian-settings-row-bg);
   box-shadow: none;
+}
+
+.opencodian-settings .opencodian-settings-claude-code-block .opencodian-claude-code-stack > .setting-item,
+.opencodian-settings .opencodian-settings-claude-code-block .opencodian-settings-claude-code-group-stack > .setting-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(var(--oc-claude-control-min-width), max-content);
+  gap: var(--opencodian-settings-space-md) var(--opencodian-settings-space-xl);
+  align-items: center;
+}
+
+.opencodian-settings .opencodian-settings-claude-code-block .setting-item-info {
+  min-width: 0;
+}
+
+.opencodian-settings .opencodian-settings-claude-code-block .setting-item-name {
+  color: var(--text-normal);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.opencodian-settings .opencodian-settings-claude-code-block .setting-item-description {
+  max-width: 72ch;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.opencodian-settings .opencodian-settings-claude-code-block .setting-item-control {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--opencodian-settings-space-sm);
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.opencodian-settings .opencodian-settings-claude-code-block .setting-item-control input[type="text"],
+.opencodian-settings .opencodian-settings-claude-code-block .setting-item-control input[type="password"],
+.opencodian-settings .opencodian-settings-claude-code-block .setting-item-control select {
+  min-height: 30px;
+  border-radius: var(--opencodian-settings-radius-inline);
+}
+
+.opencodian-settings .opencodian-settings-claude-code-block .setting-item-control textarea {
+  width: min(520px, 100%);
+  min-height: 92px;
+  border-radius: var(--opencodian-settings-radius-inline);
+  line-height: 1.5;
+  resize: vertical;
 }
 
 .opencodian-settings .opencodian-claude-code-inline-meta,
@@ -118,6 +176,24 @@
   color: var(--text-muted);
   font-size: 12px;
   line-height: 1.45;
+}
+
+.opencodian-settings .opencodian-settings-claude-code-block h5 {
+  margin: 0;
+  color: var(--text-normal);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.opencodian-settings .opencodian-settings-claude-code-block p,
+.opencodian-settings .opencodian-settings-claude-code-block ul,
+.opencodian-settings .opencodian-settings-claude-code-block pre {
+  margin-block: 0;
+}
+
+.opencodian-settings .opencodian-settings-claude-code-block ul {
+  padding-inline-start: 18px;
 }
 
 /* Advanced sandbox: stays visually de-emphasized via opacity + a muted
@@ -149,7 +225,7 @@
 .opencodian-settings .opencodian-claude-code-group .opencodian-settings-inline-notice,
 .opencodian-settings .opencodian-settings-claude-code-group .opencodian-settings-inline-notice {
   margin: 0;
-  padding: 6px 10px;
+  padding: 8px 10px;
   border-radius: var(--opencodian-settings-radius-inline);
   font-size: 12px;
   line-height: 1.45;
@@ -171,7 +247,7 @@
   display: flex;
   align-items: center;
   gap: var(--opencodian-settings-space-sm);
-  padding: 6px 10px;
+  padding: 8px 10px;
   border-radius: var(--opencodian-settings-radius-inline);
   background: var(--opencodian-settings-row-bg);
   border: 1px solid var(--opencodian-settings-row-border);
@@ -204,8 +280,28 @@
   flex-direction: column;
   gap: var(--oc-claude-card-body-gap);
   padding: var(--oc-claude-card-padding);
+  border-radius: var(--opencodian-settings-radius-row);
   background: color-mix(in srgb, var(--text-accent) 4%, var(--opencodian-settings-row-bg));
   border: 1px solid color-mix(in srgb, var(--text-accent) 12%, var(--opencodian-settings-row-border));
+}
+
+.opencodian-settings .opencodian-settings-claude-code-block .opencodian-claude-code-runtime-ecosystem-row,
+.opencodian-settings .opencodian-settings-claude-code-block .opencodian-claude-code-mcp-runtime-status-row {
+  padding: 8px 10px;
+  border: 1px solid var(--oc-claude-readback-row-border);
+  border-radius: var(--opencodian-settings-radius-inline);
+  background: var(--oc-claude-readback-row-bg);
+}
+
+.opencodian-settings .opencodian-settings-claude-code-block .opencodian-claude-code-runtime-ecosystem-row[data-runtime-ecosystem-state="loaded"],
+.opencodian-settings .opencodian-settings-claude-code-block .opencodian-claude-code-runtime-ecosystem-row[data-runtime-ecosystem-state="all"] {
+  border-color: color-mix(in srgb, var(--text-accent) 18%, var(--oc-claude-readback-row-border));
+}
+
+.opencodian-settings .opencodian-settings-claude-code-block .opencodian-claude-code-mcp-runtime-status-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--opencodian-settings-space-xs);
 }
 
 /* ─── Collapsed notice text (sr-only carrier) ───────────────────────── */
@@ -245,6 +341,11 @@
   cursor: help;
 }
 
+.opencodian-settings .opencodian-claude-code-proof-chip:focus-visible {
+  outline: 2px solid var(--opencodian-settings-focus-ring);
+  outline-offset: 3px;
+}
+
 .opencodian-settings .opencodian-claude-code-proof-chip[data-proof-state="pass"] {
   background: var(--text-success, var(--color-green));
 }
@@ -255,4 +356,22 @@
 
 .opencodian-settings .opencodian-claude-code-proof-chip[data-proof-state="wiring"] {
   background: var(--text-warning, var(--color-yellow));
+}
+
+@media (max-width: 720px) {
+  .opencodian-settings .opencodian-settings-claude-code-block .opencodian-claude-code-stack > .setting-item,
+  .opencodian-settings .opencodian-settings-claude-code-block .opencodian-settings-claude-code-group-stack > .setting-item {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .opencodian-settings .opencodian-settings-claude-code-block .setting-item-control {
+    justify-content: flex-start;
+  }
+
+  .opencodian-settings .opencodian-settings-claude-code-block .setting-item-control input[type="text"],
+  .opencodian-settings .opencodian-settings-claude-code-block .setting-item-control input[type="password"],
+  .opencodian-settings .opencodian-settings-claude-code-block .setting-item-control select,
+  .opencodian-settings .opencodian-settings-claude-code-block .setting-item-control textarea {
+    width: 100%;
+  }
 }

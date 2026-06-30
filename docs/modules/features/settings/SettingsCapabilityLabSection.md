@@ -209,6 +209,14 @@ Discovery 面板在 adapter 可用时调用 `adapter.getMcpServerCount()`、`ada
 
 所有面板和控件使用 `data-diagnostic="true"` 属性标记，便于样式和测试区分诊断性 UI。
 
+## 2026-06-29 Debug tab shell alignment
+
+`attachTabbed()` 现在把 Capability Lab 页面包进和 Debug 其他二级标签一致的 `.opencodian-debug-tab-shell`。这个 shell 只提供紧凑标题、说明和 badge rail；内部 matrix/history/subagent/rewind/structured/fork/resume/session-detail/backend-routing/discovery 诊断 block 仍保持原来的 `data-section-block`、proof marker 和事件处理逻辑。
+
+在 tabbed 模式中，Capability Lab 不再额外调用共享 section heading，也不在 matrix block 内重复 shell 已经展示过的矩阵说明。维护契约是：Debug tab shell 负责页面级标题和 intro copy，内部诊断 block 只保留不同语义的 subsection 标题、表格、proof 控件和状态输出。
+
+这是视觉结构重构，不改变 proof 执行、诊断写入、矩阵分类、locale key 或稳定设置行为。外层保留 `data-section-block="capability-lab"` 方便 Debug 五标签结构测试，内层诊断 block 继续服务现有 Capability Lab 测试和 deep selector。
+
 ## CSS 类命名
 
 样式由 `src/style/components/settings-capability-lab.css` 持有，使用 `opencodian-capability-lab-*` 前缀：

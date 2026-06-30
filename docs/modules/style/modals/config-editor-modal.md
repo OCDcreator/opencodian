@@ -13,7 +13,7 @@
 - 压缩帮助弹窗：`.opencodian-conversation-compaction-help-modal`、`.opencodian-conversation-compaction-help`、`.opencodian-compaction-help-*`（宽桌面卡片式 help modal，避免沿用默认窄容器和内部滚动）。
 - 项目配置帮助弹窗：`.opencodian-project-config-help-modal`、`.opencodian-project-config-help`、`.opencodian-project-config-help-*`（用于 share / permission.bash 这类项目级 OpenCode 配置解释，主体是短列表 + 官方链接区）。
 - 会话设置分享动作：`.opencodian-session-settings-sharing-status`、`.opencodian-session-settings-sharing-url`、`.opencodian-session-settings-sharing-hint`、`.opencodian-session-settings-sharing-actions` 与 `.opencodian-session-settings-sharing-button`，用于当前会话的分享状态、公开链接、禁用提示、share/unshare 操作按钮。
-- 会话设置：`.opencodian-session-settings-*`（中性 hero、分组 card、两栏字段、内容自适应三态 segmented button、数字输入、文本输入、错误提示、sticky footer，以及全局默认值摘要行）。
+- 会话设置：`.opencodian-session-settings-*`（中性 hero、分组 card、两栏字段、内容自适应三态 segmented button、数字输入、文本输入、错误提示、透明 sticky footer，以及全局默认值摘要行）。
 - 上下文统计：`.opencodian-context-breakdown*`、`.opencodian-context-modal-*`、`.opencodian-context-detail-modal*`。
 - 模型开关管理：`.opencodian-model-toggle-*`。
 - 模型 provider directory 诊断：`.opencodian-model-provider-directory-summary`（显示 `provider.list()` connected / listed / listed outside catalog 辅助计数，不承担可选模型目录布局）与 `.opencodian-model-status-badge.is-diagnostic`（provider 行的中性目录诊断 badge）。
@@ -53,6 +53,7 @@
 - 含较多响应式规则（`@media`），改网格列数、工具条折行或 footer 粘底时需同时检查窄屏可读性。
 - `ContextDetailModal` 通过 `.opencodian-context-detail-modal` 直接覆盖 Obsidian 默认 modal 宽度；若切回 `:has(...)` 或改 class 名，需确认 raw message JSON 在宽窗口下不会再次被默认壳层截断。
 - `ConversationCompactionHelpModal` 也通过专用 class 直接放宽 modal 宽度，并把内容做成 2×2 信息卡；如果改回 `.opencodian-config-help` 默认壳层，容易重新出现内容过窄和内部滚动问题。
+- `ConversationSessionSettingsModal` 的 sticky footer 只负责把取消 / 保存按钮固定在底部，不应重新添加独立 top border、渐变遮罩或不透明背景带；按钮区应承接弹窗自身背景，保持会话设置弹窗底部统一。
 - 代理设置相关样式现在混合了静态卡片和 `details/summary` 折叠区；如果修改 `.opencodian-agent-editor-group-summary` 的交互样式，需同时确认默认折叠的“高级配置”仍能看出可展开状态。
 - `model availability` 里的 `.opencodian-model-availability-controls` 现在只负责布局，不再自带分组大卡片壳；如果后续想恢复这层视觉容器，先确认不会重新出现“外层模型 block 里再包一层 controls 大卡片”的双层嵌套感。
 - `opencodian-settings-catalog-scroll` 只负责目录块的内部滚动高度，不应把整个 settings 容器再次改成双滚动。
@@ -85,19 +86,36 @@ Guardrail: 不要在 `.opencodian-model-toggle-provider` / `.opencodian-model-to
 
 MCP management 现在遵守共享 settings hierarchy token：
 
-- management toolbar 使用 inline tokens，不再自成一张本地 toolbar 卡片。
-- overview metrics、server cards、details panels 和 editor form groups 使用 object tokens。
+- `opencodian-mcp-settings-shell` 是 layout-only stack，overview 和 server list 是并列 section，不额外包一层 settings block。
+- `opencodian-mcp-overview-shell` 自己承担 summary card 边界、背景和圆角；内部 `management toolbar` 只做 CardHeader 风格布局层，左侧 title/description，右侧 Refresh / Add Server。
+- overview metrics 改成低调 pill status rail，不再使用 dashboard metric cards。
+- server list 使用共享 ScrollArea root / viewport / content 结构，长列表只在 viewport 内滚动。
+- server cards 使用 neutral form-row tokens；details panels 和 editor form groups 继续使用 object tokens。
 - helper / error / empty rows 使用 row tokens。
 - MCP status badges 保留语义色，因为 runtime connection、auth、failure 和 disabled 状态会影响用户决策。
 
 Guardrail: 不要在 `.opencodian-mcp-*` 管理区重新引入 MCP-only card family，也不要使用渐变、decorative blur、hover lift、side-stripe border 或 shadowed nested cards。
 
+## 2026-06-29 Formatter neutral data row slice
+
+Formatter / LSP builtin and custom rows now follow the Settings Neutral Data Row Surface:
+
+- `.opencodian-formatter-builtin-row` and `.opencodian-formatter-custom-row` use neutral form-row tokens instead of object-card tokens. Ordinary default / override / disabled rows must not use large accent, warning, rose, gradient, or purple-tinted frames.
+- `.opencodian-formatter-row-field` and `.opencodian-formatter-row-control` are stable DOM hooks for the shadcn-style Field layout: name + compact badge on the left, Select/control column on the right.
+- `.opencodian-builtin-row-meta` only carries muted monospace extension metadata. Status chips stay inside `.setting-item-name`.
+- `.opencodian-formatter-field-group` marks expanded override/custom editors. It is a flat FieldGroup with a subtle top separator, not a nested Card.
+- `.opencodian-formatter-add-custom-row` is the custom formatter section footer action row. It must stay transparent and margin-aligned inside the section; it is not a `.opencodian-formatter-custom-row` and must not inherit ordinary setting-card background/border/shadow.
+- `.opencodian-formatter-section-description` renders advanced JSON helper copy as plain muted text. `.opencodian-formatter-json-editor` is the single textarea panel, and `.opencodian-formatter-json-buttons` is a transparent ButtonGroup footer with no nested `.setting-item`.
+- `.opencodian-formatter-inline-empty` applies the shared inline empty-alert surface to builtin/custom Formatter/LSP empty states instead of using a regular Setting row.
+
+Guardrail: Formatter/LSP sections may contain row-cards, flat field groups, editor panels, and inline empty alerts, but must not wrap descriptions, textareas, or button footers in another full `.setting-item` card.
+
 ## 2026-05-12 Formatter density slice
 
 Formatter settings 现在使用共享 settings hierarchy token：
 
-- summary cards、runtime list、builtin rows 和 custom rows 使用 object tokens。
-- runtime table、override fields、custom fields 和 JSON editor 使用 row tokens。
+- summary cards 和 runtime list 使用 object tokens；builtin rows 和 custom rows 使用 neutral form-row tokens。
+- runtime table、JSON editor、override fields 和 custom fields 使用 row / FieldGroup tokens。
 - environment key/value rows 使用 inline tokens。
 - enabled / disabled formatter badges 保留语义状态色。
 - detected formatter 表格的搜索区、sticky 表头、排序按钮、扩展名列和状态列有独立样式钩子，用于保持密集扫读：搜索框内联标签，排序按钮重置 Obsidian 默认 button chrome，扩展名使用 monospace，状态 chip 右对齐。

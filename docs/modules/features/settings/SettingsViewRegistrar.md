@@ -31,7 +31,7 @@ export function broadcastServerStatusToSettingsViews(plugin: OpenCodianPlugin): 
 
 ### 激活编辑区 settings leaf
 
-`activateSettingsView()` 先复用已有 `VIEW_TYPE_OPENCODIAN_SETTINGS` leaf；如果当前没有打开，则通过 `workspace.getLeaf('tab')` 创建新 tab 并设置 view state。最后调用 `workspace.revealLeaf()` 把 settings view 带到前台。
+`activateSettingsView()` 会先关闭前景中的 Obsidian 原生 `.modal.mod-settings`，避免调试流程或命令链留下的原生设置弹窗继续盖住 editor-area OpenCodian 设置页。随后它复用已有 `VIEW_TYPE_OPENCODIAN_SETTINGS` leaf；如果当前没有打开，则通过 `workspace.getLeaf('tab')` 创建新 tab 并设置 view state。最后调用 `workspace.revealLeaf()` 把 settings view 带到前台。
 
 ### 广播运行时刷新
 
@@ -43,6 +43,7 @@ export function broadcastServerStatusToSettingsViews(plugin: OpenCodianPlugin): 
 |-------------|------|
 | `registerSettingsView()` | 注册 editor-area settings view type 与打开命令 |
 | `activateSettingsView()` | 复用或创建 settings view leaf，并 reveal 到前台 |
+| `dismissNativeSettingsModals()` | 关闭 Obsidian 原生 Settings modal，避免它遮挡 editor-area settings |
 | `broadcastModelsLoadedToSettingsViews()` | 通知所有打开的 settings view 刷新模型相关 UI |
 | `broadcastServerStatusToSettingsViews()` | 通知所有打开的 settings view 刷新 server 状态相关 UI |
 
@@ -55,6 +56,7 @@ main.ts onload()
 
 用户执行命令
   -> activateSettingsView(plugin)
+  -> dismissNativeSettingsModals(document)
   -> getLeavesOfType() / getLeaf('tab')
   -> OpenCodianSettingsView
 
@@ -77,5 +79,6 @@ runtime 状态变化
 ## 注意事项
 
 - 命令可见性必须继续受 `settingsInEditorArea` 约束，避免用户关闭功能后仍能从命令面板打开隐藏入口。
+- 只关闭 `.modal.mod-settings`，不要关闭技能详情、工具详情、确认弹窗等 OpenCodian 自己的 modal。
 - 广播函数应保持只遍历已打开 leaf，不主动创建 settings view；主动创建只属于用户命令路径。
 - 若 view type 常量变更，需要同步 `core/types`、本 registrar、相关 locale 文案与模块文档。

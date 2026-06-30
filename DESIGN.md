@@ -83,6 +83,14 @@ components:
     textColor: "{colors.accent-slate}"
     rounded: "{rounded.md}"
     padding: "4px 8px"
+  header-status-chip:
+    collapsedSize: "28px"
+    icon: "active backend identity; OpenCode reuses the title brandmark SVG"
+    stateSignal: "status ring/dot overlay"
+    expandedGap: "{spacing.md}"
+    textPadding: "inline inside badge"
+    textMaxWidth: "220px"
+    motion: "internal width reveal + opacity/transform, 150-160ms; pulse only while checking/starting"
   dropdown-panel:
     backgroundColor: "{colors.canvas-light}"
     textColor: "{colors.ink-graphite}"
@@ -104,6 +112,13 @@ components:
     rounded: "{rounded.xl}"
     border: "1px solid var(--background-modifier-border)"
     padding: "14px 16px"
+  settings-form-row-card:
+    backgroundColor: "var(--opencodian-settings-form-row-bg)"
+    textColor: "var(--text-normal)"
+    rounded: "{rounded.xl}"
+    border: "1px solid var(--opencodian-settings-form-row-border)"
+    padding: "12px 14px"
+    layout: "Field label/description on the left, native Obsidian control column on the right"
   settings-dropdown:
     triggerWidth: "field-width"
     menuWidth: "max(trigger-width, content-estimate), clamped to viewport"
@@ -219,6 +234,7 @@ OpenCodian uses a hybrid elevation system. Default Obsidian surfaces are mostly 
 - **Style:** 9px to 999px radius, compact height, semantic text color, and tonal background.
 - **State:** selection/context chips should truncate safely, show enough path or source identity to be useful, and avoid growing the composer.
 - **Risk:** status chips must preserve warning/error contrast.
+- **Header status chip:** server/backend health in the chat header defaults to a compact 28px shadcn-style badge. At rest it shows the active backend identity plus a small status ring/dot overlay; OpenCode must reuse the same brandmark SVG as the title logo, while other backends may use their provider SVGs. Hover/focus expands the same badge internally to reveal the text label. Connected/running states stay static, checking/starting may use a subtle pulse, and offline/error states change shape/tone without relying on color alone. Do not use vertical divider lines between header action groups; group by rhythm and state behavior instead.
 
 ### Cards / Containers
 
@@ -227,6 +243,18 @@ OpenCodian uses a hybrid elevation system. Default Obsidian surfaces are mostly 
 - **Shadow Strategy:** use `var(--opencodian-shadow)` for cards, stronger glass shadows only for popovers.
 - **Border:** use `var(--background-modifier-border)` or `var(--opencodian-accent-border)` where state matters.
 - **Internal Padding:** 12-16px for cards, 6-10px for compact controls.
+
+### Settings Form Row Card
+
+Ordinary settings rows use a local shadcn-style Card + Field pattern implemented with Obsidian `Setting` DOM and shared CSS tokens. This is the default for Server > Connection, General > Basic, Claude/Codex control rows, and Skills/Tools/ACP ordinary row-card lists.
+
+- **Card root:** `.opencodian-settings-section .setting-item` and ordinary `.opencodian-settings-content-shell .setting-item` descendants are the neutral Card. They use `--opencodian-settings-form-row-bg`, `--opencodian-settings-form-row-border`, `--opencodian-settings-form-row-hover-bg`, `--opencodian-settings-form-row-radius`, and `--opencodian-settings-form-row-shadow`.
+- **Field anatomy:** `.setting-item-info` maps to Field content; `.setting-item-name` is the label/title; `.setting-item-description` is help text; `.setting-item-control` is the fixed control column for Select/Input/Switch/Button controls.
+- **Default surface:** form rows stay neutral and host-themed, with `background-primary` carrying most of the mix. They must not use large-area warning, error, rose, amber, permission, or accent tint.
+- **State scope:** status color belongs in badges, inline error/help text, focus outlines, low-chroma borders, or real Alert/Empty surfaces. A normal row must not become an Alert simply because a permission is ask/deny or inherited/overridden.
+- **Nested-card prohibition:** when a section, row-card, editor panel, or modal card already owns border/background/radius, child ordinary `Setting` rows must become flat Fields. Descriptions, empty states, textareas, and button footers must not be wrapped in another full setting card.
+- **Layout:** desktop rows use two columns, `minmax(0, 1fr)` plus a compact control column; long text rows opt into `.opencodian-wide-text-setting`; below `720px`, rows collapse to one column with controls left-aligned.
+- **Exclusions:** readback/proof/status panels, destructive confirmations, modal editor cards, chat/composer surfaces, permission dialogs, and streaming error blocks keep their owner-specific state styling.
 
 ### Codex Settings Cards
 
@@ -241,6 +269,68 @@ Codex backend settings use a single, fixed vertical rhythm across the Connection
 - **Group titles (`h4`) must have `padding-left: 0` / `padding-inline-start: 0` and `margin: 0`; spacing to the description and first control stack comes from the tokens above, not per-element margins.
 - **No nested cards:** a readback card may contain rows, but it must not wrap another full card.
 - **No ad-hoc margins:** spacing comes from the group stack gap and the tokenized title/body gaps, not per-element margins.
+
+### Claude Code Settings Control Surface
+
+Claude Code backend settings use the same flat-group / row-card hierarchy as Codex, tuned for denser readback-heavy controls. This is the approved first-phase shadcn/Rhea adaptation for Obsidian DOM + CSS: borrow compact Tabs/Card/Badge/Input/Switch/Alert structure, but do not install shadcn, Tailwind, or React components.
+
+- **Group container:** flat semantic group only; no border, background, shadow, or radius.
+- **Group header to controls:** `12px` (`--oc-claude-group-header-gap`).
+- **Rows inside a group:** `10px` gap (`--oc-claude-card-gap`).
+- **Row padding:** `12px 14px` (`--oc-claude-card-padding`), using the shared settings row background, border, and radius tokens.
+- **Desktop row layout:** two columns, `minmax(0, 1fr)` for label/description and `minmax(220px, max-content)` for controls (`--oc-claude-control-min-width`).
+- **Narrow layout:** below `720px`, rows collapse to one column and controls align left.
+- **Readback rows:** runtime ecosystem and MCP status detail rows use lightweight metadata-row tokens (`--oc-claude-readback-row-bg` / `--oc-claude-readback-row-border`) inside the readback surface; they are not nested cards.
+- **Status honesty:** proof chips and readback/proof notices keep `pass`, `readback`, and `wiring` visually distinct. `readback` remains info/accent, never success-green.
+
+### Agent Management Settings Control Surface
+
+Agent management settings use the same shadcn/Radix-inspired structure as the Claude Code settings redesign, adapted for catalog and workspace data. The implementation stays in Obsidian DOM + CSS and must not install shadcn, Radix, Tailwind, or React components.
+
+- **Shell:** `.opencodian-agent-settings-shell` is a layout-only stack. It does not add another card layer.
+- **Backend management:** `General > Agent Management` is part of this surface. Default backend selection uses the same compact control row, and enabled backends render as a quiet list with active/enabled/off badges. Titles must not duplicate status text already present in badges.
+- **Default controls:** default agent and expert mode render as compact Card/Form rows with two desktop columns: copy on the left, Select/Switch on the right.
+- **Catalog list:** the agent catalog is a ScrollArea-style list surface. Each agent row is a compact data row with low-weight Badge chips for mode, source, runtime availability, disabled state, and subagent visibility.
+- **Editor groups:** project agent identity, behavior, model, and advanced settings use flat groups. Form rows use the shared row background, border, radius, and a fixed control column. Long textareas use full-width rows.
+- **Advanced disclosure:** advanced editor settings use a native disclosure pattern with `aria-expanded` and `aria-controls`; do not replace it with a Sheet/Drawer or a nested card.
+- **Workspace:** Markdown agent files render as a toolbar plus compact file rows. Inline editing stays inside a lightweight editor panel, not a modal and not a card inside a card.
+- **Alert/empty states:** catalog load failures and empty catalog/workspace states use a quiet Alert/Empty surface with muted copy and dashed or low-contrast borders.
+- **Responsive:** below `720px`, all control rows collapse to a single column and align controls left.
+
+### Settings Neutral Data Row Surface
+
+Formatter/LSP builtin rows, custom formatter rows, and similar catalog-like settings objects use a quieter shadcn Card + Field + Badge + Select pattern. They are data rows, not alert cards.
+
+- **Root row:** use `--opencodian-settings-form-row-bg`, `--opencodian-settings-form-row-border`, and `--opencodian-settings-form-row-radius` with no heavy shadow, no gradient, and no large accent/warning/error tint.
+- **Field anatomy:** the row header maps to Field content on the left and a fixed Select/control column on the right. The item name and compact status Badge share one baseline.
+- **Metadata:** extensions, paths, commands, and exact ids use muted monospace text below the field row. Metadata does not get its own nested card.
+- **State scope:** default/override/disabled/custom state lives in compact badges or focus outlines. Do not express ordinary state by coloring the whole row border or background.
+- **Expanded editors:** override/custom editors are flat FieldGroups separated by a subtle top separator. They do not introduce another Card inside the row.
+- **Advanced JSON editors:** Formatter and LSP JSON editors use a single editor panel plus a transparent ButtonGroup footer. The description is plain muted copy, not a `Setting` card, and the footer must not contain a nested `.setting-item`.
+- **Exclusions:** true failures, destructive confirmations, warning notices, runtime error output, and permission prompts may still use Alert styling.
+
+### Settings Extension Control Surface
+
+Skills, Tools, and ACP Agents extend the Agent Management settings vocabulary without sharing the Agents-only stylesheet. Their shared contract lives in `settings-layout-contract.css` and borrows shadcn/Radix Card, Badge, Button, Select, Switch, ScrollArea, Alert, and Separator structure through Obsidian DOM + CSS only.
+
+- **Shell:** `.opencodian-settings-extension-shell` and feature shells such as `.opencodian-skill-settings-shell` are layout stacks only. They do not add an outer card.
+- **Toolbar/control group:** Skills permission controls and Tools default permission use compact Card/Form rows with copy on the left and select on the right. Tools custom authoring actions belong to the custom tool files CardHeader action group: `New tool` is primary, `Refresh` and `Docs` are compact utility buttons next to the file-list title, not a second card under default permission. ACP creation uses a shadcn-style create Card: CardHeader copy plus count badge, then a CardContent action rail. `Custom agent` is the primary action; OpenCode, Codex, and Claude Code are compact preset buttons that reuse the Settings backend switcher LobeHub icon renderer. Do not spread these four actions as equal promotional cards.
+- **Row-card lists:** skill rows, tool permission rows, custom tool files, and ACP agent rows use one shared row weight: quiet border, host-themed background, small radius, no heavy shadow, no nested card.
+- **Badges:** source, permission, inherited/override/custom, editable/read-only, and enabled/disabled states use compact low-chroma badges. Badges clarify state but do not replace labels or controls.
+- **Scroll lists:** long Skills, Tools, and ACP lists use ScrollArea-style bounded containers so one catalog cannot dominate the Settings modal.
+- **Empty/alert states:** loading, empty, and failed list states use `.opencodian-settings-inline-empty` as an Alert/Empty surface with muted copy and dashed or low-contrast border.
+- **ACP editor rows:** command, args, cwd, and name remain inline FieldGroup fields inside the same flat row-card group. ACP does not introduce a Sheet/Drawer or replace the existing modal/file workflows.
+- **Responsive:** below `720px`, toolbars, permission rows, row actions, and ACP field grids collapse to one column with controls aligned left.
+
+### Settings ScrollArea Alignment
+
+Settings scroll lists use the shadcn/Radix ScrollArea structure without installing React, Radix, Tailwind, or new runtime dependencies. The root owns the visible width, the viewport owns scrolling, and the content track owns row-card layout.
+
+- **Root:** `.opencodian-settings-scrollarea` is full-width, layout-only, and aligns with sibling toolbar/control rows.
+- **Viewport:** `.opencodian-settings-scrollarea-viewport` is the only element with `overflow: auto`, max-height limits, and `scrollbar-gutter`. Scrollbars belong to this layer, not to the row-card layer.
+- **Content:** `.opencodian-settings-scrollarea-content` renders row-card, badge, empty-alert, and source/group sections on one shared track. Row-card width must match the root/control-panel visual width; scrollbar gutter must not shorten cards.
+- **Measured gutter:** when a classic scrollbar consumes inline space, the owning settings section may measure `offsetWidth - clientWidth` and set `--opencodian-settings-scrollbar-track-width` on the root so the viewport can place the scrollbar outside the content track. Overlay scrollbar platforms should resolve this value to `0px`.
+- **Evidence gate:** runtime QA for these lists should compare toolbar/control panel width, scrollarea root width, first row-card width, viewport clientWidth, scrollWidth, and computed `scrollbar-gutter`. Row-card and control-panel right edges should differ by no more than `1px`.
 
 ### Modal Layout
 

@@ -77,6 +77,8 @@ interface EditorGroupOptions {
   defaultOpen?: boolean;
 }
 
+const ADVANCED_GROUP_CONTENT_ID = 'opencodian-agent-editor-advanced-content';
+
 export class SettingsProjectAgentEditor {
   private textareaSizeMemories: TextareaSizeMemory[] = [];
 
@@ -164,6 +166,7 @@ export class SettingsProjectAgentEditor {
     new Setting(identityBodyEl)
       .setName(t('settings.agents.editor.select.name'))
       .setDesc(t('settings.agents.editor.select.desc'))
+      .setClass('opencodian-agent-editor-row')
       .addDropdown((dropdown) => {
         dropdown.addOption('', t('settings.agents.editor.select.newAgent'));
         for (const agentId of projectAgentIds) {
@@ -209,6 +212,7 @@ export class SettingsProjectAgentEditor {
     new Setting(identityBodyEl)
       .setName(t('settings.agents.editor.id.name'))
       .setDesc(t('settings.agents.editor.id.desc'))
+      .setClass('opencodian-agent-editor-row')
       .addText((text) => {
         idControl = text;
         text
@@ -222,6 +226,7 @@ export class SettingsProjectAgentEditor {
     new Setting(identityBodyEl)
       .setName(t('settings.agents.editor.mode.name'))
       .setDesc(t('settings.agents.editor.mode.desc'))
+      .setClass('opencodian-agent-editor-row')
       .addDropdown((dropdown) => {
         modeDropdown = dropdown;
         dropdown
@@ -237,6 +242,7 @@ export class SettingsProjectAgentEditor {
     new Setting(identityBodyEl)
       .setName(t('settings.agents.editor.disable.name'))
       .setDesc(t('settings.agents.editor.disable.desc'))
+      .setClass('opencodian-agent-editor-row')
       .addToggle((toggle) => {
         disableControl = toggle;
         toggle
@@ -249,6 +255,7 @@ export class SettingsProjectAgentEditor {
     new Setting(identityBodyEl)
       .setName(t('settings.agents.editor.description.name'))
       .setDesc(t('settings.agents.editor.description.desc'))
+      .setClass('opencodian-agent-editor-row')
       .addText((text) => {
         descriptionControl = text;
         text
@@ -259,9 +266,10 @@ export class SettingsProjectAgentEditor {
           });
       });
 
-    new Setting(behaviorBodyEl)
+    const promptSetting = new Setting(behaviorBodyEl)
       .setName(t('settings.agents.editor.prompt.name'))
       .setDesc(t('settings.agents.editor.prompt.desc'))
+      .setClass('opencodian-agent-editor-row')
       .addTextArea((text) => {
         promptControl = text;
         text
@@ -272,10 +280,12 @@ export class SettingsProjectAgentEditor {
           });
         this.textareaSizeMemories.push(TextareaSizeMemory.attach(text.inputEl, 'project-agent-prompt'));
       });
+    promptSetting.settingEl.addClass('opencodian-agent-editor-row-textarea');
 
     new Setting(modelBodyEl)
       .setName(t('settings.agents.editor.model.name'))
       .setDesc(t('settings.agents.editor.model.desc'))
+      .setClass('opencodian-agent-editor-row')
       .addText((text) => {
         modelControl = text;
         text
@@ -289,6 +299,7 @@ export class SettingsProjectAgentEditor {
     new Setting(modelBodyEl)
       .setName(t('settings.agents.editor.temperature.name'))
       .setDesc(t('settings.agents.editor.temperature.desc'))
+      .setClass('opencodian-agent-editor-row')
       .addText((text) => {
         temperatureControl = text;
         text
@@ -302,6 +313,7 @@ export class SettingsProjectAgentEditor {
     new Setting(modelBodyEl)
       .setName(t('settings.agents.editor.topP.name'))
       .setDesc(t('settings.agents.editor.topP.desc'))
+      .setClass('opencodian-agent-editor-row')
       .addText((text) => {
         topPControl = text;
         text
@@ -315,6 +327,7 @@ export class SettingsProjectAgentEditor {
     new Setting(modelBodyEl)
       .setName(t('settings.agents.editor.steps.name'))
       .setDesc(t('settings.agents.editor.steps.desc'))
+      .setClass('opencodian-agent-editor-row')
       .addText((text) => {
         stepsControl = text;
         text
@@ -328,6 +341,7 @@ export class SettingsProjectAgentEditor {
     new Setting(advancedBodyEl)
       .setName(t('settings.agents.editor.color.name'))
       .setDesc(t('settings.agents.editor.color.desc'))
+      .setClass('opencodian-agent-editor-row')
       .addText((text) => {
         colorControl = text;
         text
@@ -483,6 +497,14 @@ export class SettingsProjectAgentEditor {
     detailsEl.open = defaultOpen;
     const summaryEl = detailsEl.createEl('summary', {
       cls: 'opencodian-agent-editor-group-summary',
+      attr: {
+        'aria-controls': ADVANCED_GROUP_CONTENT_ID,
+        'aria-expanded': defaultOpen ? 'true' : 'false',
+        role: 'button',
+      },
+    });
+    detailsEl.addEventListener('toggle', () => {
+      summaryEl.setAttribute('aria-expanded', detailsEl.open ? 'true' : 'false');
     });
     const copyEl = summaryEl.createDiv({ cls: 'opencodian-agent-editor-group-summary-copy' });
     copyEl.createDiv({
@@ -493,7 +515,10 @@ export class SettingsProjectAgentEditor {
       cls: 'opencodian-agent-editor-group-description',
       text: description,
     });
-    return detailsEl.createDiv({ cls: 'opencodian-agent-editor-group-body' });
+    return detailsEl.createDiv({
+      cls: 'opencodian-agent-editor-group-body',
+      attr: { id: ADVANCED_GROUP_CONTENT_ID },
+    });
   }
 
   private async saveProjectAgentFromEditor(
@@ -584,9 +609,10 @@ export class SettingsProjectAgentEditor {
     state: ProjectAgentEditorState,
     setTaskAllowlistControl: (control: TextLikeControl) => void,
   ): void {
-    new Setting(containerEl)
+    const taskAllowlistSetting = new Setting(containerEl)
       .setName(t('settings.agents.editor.taskAllowlist.name'))
       .setDesc(t('settings.agents.editor.taskAllowlist.desc'))
+      .setClass('opencodian-agent-editor-row')
       .addTextArea((text) => {
         setTaskAllowlistControl(text);
         text
@@ -600,6 +626,7 @@ export class SettingsProjectAgentEditor {
           TextareaSizeMemory.attach(text.inputEl, 'project-agent-task-allowlist'),
         );
       });
+    taskAllowlistSetting.settingEl.addClass('opencodian-agent-editor-row-textarea');
   }
 
   private renderSkillControls(
@@ -613,6 +640,7 @@ export class SettingsProjectAgentEditor {
     new Setting(containerEl)
       .setName(t('settings.agents.editor.skillTool.name'))
       .setDesc(t('settings.agents.editor.skillTool.desc'))
+      .setClass('opencodian-agent-editor-row')
       .addDropdown((dropdown) => {
         setControls.setSkillToolDropdown(dropdown);
         dropdown
@@ -629,6 +657,7 @@ export class SettingsProjectAgentEditor {
     new Setting(containerEl)
       .setName(t('settings.agents.editor.skillPermission.name'))
       .setDesc(t('settings.agents.editor.skillPermission.desc'))
+      .setClass('opencodian-agent-editor-row')
       .addDropdown((dropdown) => {
         setControls.setSkillPermissionDropdown(dropdown);
         dropdown
@@ -668,6 +697,7 @@ export class SettingsProjectAgentEditor {
     new Setting(containerEl)
       .setName(t('settings.agents.editor.actions.name'))
       .setDesc(t('settings.agents.editor.actions.desc'))
+      .setClass('opencodian-agent-editor-actions')
       .addButton((button) => {
         button
           .setButtonText(t('settings.agents.editor.actions.save'))
@@ -695,9 +725,10 @@ export class SettingsProjectAgentEditor {
     state: ProjectAgentEditorState,
     setOptionsControl: (control: TextLikeControl) => void,
   ): void {
-    new Setting(containerEl)
+    const optionsSetting = new Setting(containerEl)
       .setName(t('settings.agents.editor.options.name'))
       .setDesc(t('settings.agents.editor.options.desc'))
+      .setClass('opencodian-agent-editor-row')
       .addTextArea((text) => {
         setOptionsControl(text);
         text
@@ -711,6 +742,7 @@ export class SettingsProjectAgentEditor {
           TextareaSizeMemory.attach(text.inputEl, 'project-agent-options'),
         );
       });
+    optionsSetting.settingEl.addClass('opencodian-agent-editor-row-textarea');
   }
 
 }

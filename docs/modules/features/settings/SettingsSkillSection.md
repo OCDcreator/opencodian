@@ -23,17 +23,17 @@
 
 ### 控制面板、二级标签与来源分组
 
-`SettingsSkillSection` 不再把 Skills 标签页包在一个大 settings block 中，而是渲染 `opencodian-skill-settings-shell`。顶部 `opencodian-skill-control-panel` 使用两行分组：第一行专门承载技能默认加载权限，第二行承载当前二级标签的 scope action。项目技能页第二行只保留 `New skill`，外部技能页第二行只保留 `Refresh`，避免在外部只读来源上暴露新建入口，也避免项目页顶部同时出现新建和刷新两种不同心智的动作。权限控件使用自定义 `opencodian-skill-permission-cluster` 和原生 select/help button，让标题/短说明和 dropdown/help 按钮分列排布，避免 Obsidian `Setting.setDesc()` 的默认左右分栏在长文案下遮挡控件，也避免把后续项目技能 controls 挤出面板。权限项短说明会写明它修改 `permission.skill`，选择 inherit 时继续继承全局 `permission`，并提示本地服务会自动重启；说明下方的 `opencodian-skill-permission-global-status` 会读取当前全局 `permission` / `permission['*']`，直接显示“当前全局权限：允许加载 / 询问确认 / 拒绝加载 / 未设置”。默认权限项旁边还有 `help-circle` 解释按钮，会打开 `SkillPermissionHelpModal`，用 plain-language 说明 allow / ask / deny、单技能覆盖、OpenCode pattern 权限和覆盖关系，并提供官方 Skills 文档链接。技能目录则单独进入 `opencodian-skill-list`。列表会先显示 `opencodian-skill-loading`，加载完成后按来源渲染多个 `opencodian-skill-source-section` 分区，每个来源 header 显示来源名和数量。
+`SettingsSkillSection` 不再把 Skills 标签页包在一个大 settings block 中，而是渲染 `opencodian-skill-settings-shell`。顶部 `opencodian-skill-control-panel` 使用两行分组：第一行专门承载技能默认加载权限，第二行承载当前二级标签的 scope action。项目技能页第二行只保留 `New skill`，外部技能页第二行只保留 `Refresh`，避免在外部只读来源上暴露新建入口，也避免项目页顶部同时出现新建和刷新两种不同心智的动作。权限控件使用自定义 `opencodian-skill-permission-cluster` 和原生 select/help button，让标题/短说明和 dropdown/help 按钮分列排布，避免 Obsidian `Setting.setDesc()` 的默认左右分栏在长文案下遮挡控件，也避免把后续项目技能 controls 挤出面板。权限项短说明会写明它修改 `permission.skill`，选择 inherit 时继续继承全局 `permission`，并提示本地服务会自动重启；说明下方的 `opencodian-skill-permission-global-status` 会读取当前全局 `permission` / `permission['*']`，直接显示“当前全局权限：允许加载 / 询问确认 / 拒绝加载 / 未设置”。默认权限项旁边还有 `help-circle` 解释按钮，会打开 `SkillPermissionHelpModal`，用 plain-language 说明 allow / ask / deny、单技能覆盖、OpenCode pattern 权限和覆盖关系，并提供官方 Skills 文档链接。技能目录则单独进入共享 ScrollArea 结构的 `opencodian-skill-list`：root 对齐上方 control panel，viewport 承担滚动，content track 承载 loading / empty / bulk bar / source section，避免滚动条 gutter 让下方 row-card 比上方 control panel 更窄。列表会先显示 `opencodian-skill-loading`，加载完成后按来源渲染多个 flat `opencodian-skill-source-section` 分区，每个来源 header 显示来源名和数量。
 
 Skills 一级设置页现在由设置布局注册表直接提供两个二级标签：`项目技能` 和 `外部技能`，不再在页面内部渲染额外的分段标签。`项目技能` 只显示当前 vault 的 `.opencode/skills/**`，`外部技能` 显示 global / plugin / builtin / claude / agents。项目技能标签支持新建、编辑、单项删除和批量删除；外部技能标签保持只读文件语义，只允许查看和权限覆盖，不显示删除入口。
 
 每个标签顶部都有 `opencodian-skill-bulk-bar`：左侧是批量权限 select 和已选数量，右侧是当前标签可执行的紧凑动作。批量权限不再额外渲染 Apply 按钮；用户选择新值时直接对当前选中的技能复用 `setSkillPermissionPattern()` / `clearSkillPermissionPattern()`，完成后与单技能权限一样自动重启本地 OpenCode 服务。项目技能标签的 bulk card 右侧显示全选、刷新和批量删除；删除前会列出选中技能名并确认。外部技能标签不渲染删除按钮，刷新保留在外部标签顶部，避免把外部只读来源伪装成可管理文件。
 
-顶部权限控制面板和 `opencodian-skill-list` 是独立渲染边界。选择技能、全选、批量权限应用、新建/保存/删除后的目录刷新只重绘列表区域，不重建默认权限 control panel，避免“当前全局权限”状态在 loading 与真实值之间闪烁。列表重绘前会记录 `opencodian-skill-list.scrollTop` 并在下一帧恢复，避免项目技能新增、删除、批量操作或目录刷新时把长列表视角拉回顶部。已解析的全局权限和技能默认权限还会按 plugin 实例弱缓存；在 `项目技能` / `外部技能` 二级标签切换导致 section remount 时，新面板先显示上一轮真实权限值，再异步读取配置校准，避免从 loading 文案起跳。
+顶部权限控制面板和 `opencodian-skill-list` 是独立渲染边界。选择技能、全选、批量权限应用、新建/保存/删除后的目录刷新只重绘列表区域，不重建默认权限 control panel，避免“当前全局权限”状态在 loading 与真实值之间闪烁。列表重绘前会记录 ScrollArea viewport 的 `scrollTop` 并在下一帧恢复，避免项目技能新增、删除、批量操作或目录刷新时把长列表视角拉回顶部。Skills shell/list/viewport 形成完整 flex 高度链，并在渲染后按 viewport 顶部到窗口底部的可用空间写入 `--opencodian-settings-scrollarea-available-height`；外部技能长目录在列表内部滚动，避免 viewport 只显示几行后在下方露出大片空白 pane 背景，也避免列表无界撑高到完整目录高度或让 editor-area 外层滚动条继续滑到 content track 造成的空白区域。已解析的全局权限和技能默认权限还会按 plugin 实例弱缓存；在 `项目技能` / `外部技能` 二级标签切换导致 section remount 时，新面板先显示上一轮真实权限值，再异步读取配置校准，避免从 loading 文案起跳。
 
 ### 内容渲染
 
-技能列表项现在是紧凑行，只显示技能名、描述、来源路径和操作，不在卡片里塞完整 `SKILL.md`。路径被收在内容列并截断，避免长路径挤压描述；描述保持两行以内，供快速扫描。单技能行仍承载该技能自己的权限 select、`Open` 和项目技能 `Delete`；项目目录刷新不在每一行重复出现，而是移入项目技能 bulk card，保持刷新是 catalog-level 操作。点击 `Open` 会打开 `SkillDetailModal`：顶部是全宽格式校验条，中间是会吃掉 modal 剩余高度的双栏工作区，左侧为 Markdown 源文本编辑区，右侧使用 Obsidian `MarkdownRenderer.renderMarkdown()` 渲染完整预览；源码与预览面板本身各自滚动，因此底部操作区不会再被长内容或较矮窗口挤出 modal 可视区。弹窗宽度作用在 Obsidian 外层 modal 上，保证宽屏双栏真正居中可见，而不是让内容从默认窄 modal 中向右溢出。若服务器只返回正文而非完整 frontmatter 文件，弹窗会用目录元数据补齐 `name` / `description` frontmatter，避免把只读技能误判为缺少 frontmatter。详情弹窗仍只允许当前 vault 内可解析的技能保存或删除。
+技能列表项现在是紧凑 row-card，只显示技能名、描述、来源路径、source badge 和操作，不在卡片里塞完整 `SKILL.md`。路径被收在内容列并截断，避免长路径挤压描述；描述保持两行以内，供快速扫描。单技能行仍承载该技能自己的权限 select、`Open` 和项目技能 `Delete`；项目目录刷新不在每一行重复出现，而是移入项目技能 bulk card，保持刷新是 catalog-level 操作。点击 `Open` 会打开 `SkillDetailModal`：顶部是全宽格式校验条，中间是会吃掉 modal 剩余高度的双栏工作区，左侧为 Markdown 源文本编辑区，右侧使用 Obsidian `MarkdownRenderer.renderMarkdown()` 渲染完整预览；源码与预览面板本身各自滚动，因此底部操作区不会再被长内容或较矮窗口挤出 modal 可视区。弹窗宽度作用在 Obsidian 外层 modal 上，保证宽屏双栏真正居中可见，而不是让内容从默认窄 modal 中向右溢出。若服务器只返回正文而非完整 frontmatter 文件，弹窗会用目录元数据补齐 `name` / `description` frontmatter，避免把只读技能误判为缺少 frontmatter。详情弹窗仍只允许当前 vault 内可解析的技能保存或删除。
 
 ### 技能文件与格式校验
 
@@ -58,3 +58,4 @@ Skills 一级设置页现在由设置布局注册表直接提供两个二级标�
 
 - 该 section 当前自包含技能 fetch 逻辑，不依赖 plugin 级 `skillCatalogService` 属性。
 - 若未来把技能文件操作复用于 chat/slash surface，再考虑抽出共享 service；当前只服务设置页，保持 section-local 即可。
+- Skills 视觉层借鉴 shadcn Card、Badge、Button、Select、ScrollArea 和 Alert 结构，但使用 Obsidian DOM + CSS 实现，并由 `settings-layout-contract.css` 统一管理，不放入 Agents 专用 stylesheet。

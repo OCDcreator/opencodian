@@ -7,6 +7,8 @@
 
 `SettingsToolSection` 是设置页工具管理的 section owner。它根据模式渲染工具默认权限、自定义工具文件入口、运行时 custom tool 目录，并为每个工具提供“跟随默认 / allow / ask / deny”下拉框，最终写入当前项目 OpenCode config 的 `permission` 设置。
 
+本轮 UI 收敛后，Tools 继续复用 Skills 的控制面板结构，并把 built-in tool rows、runtime custom tool rows 和 custom tool file rows 压到统一 row-card / badge / scroll-list 视觉语言。实现只增加 DOM class 与状态 badge，不改变权限读写、文件 CRUD、modal 或 OpenCode-only guard 语义。
+
 ## 关键导出
 
 - `SettingsToolSection`: 渲染 builtin/custom 工具 UI，装配项目 `.opencode/tools` 工具文件管理入口，并保存权限变更的 class。
@@ -16,15 +18,17 @@
 ### 内置工具
 
 - `renderBuiltinTools()` 按文件、搜索、执行、网络、智能、元工具和计划工具分组渲染，每组使用 `opencodian-tool-group-panel` 和说明文案呈现。
+- 每个 `opencodian-tool-group-rows` 现在是共享 ScrollArea root，内部 viewport 才负责滚动，content track 承载权限行、文件行和 empty-alert。这样内置工具组、自定义工具文件列表、runtime custom tool 列表不会因为右侧 scrollbar gutter 比顶部默认权限 control panel 短一截。
 - 每个工具先通过 `isBuiltinToolName()` 校验，再用 `getToolIdentity()` 获取标准名称和显示名称。
 - 每个权限行默认显示 `inherit`（跟随默认）；只有存在对应 canonical permission key 时才显示具体 allow / ask / deny 覆盖。
 - Built-in 页签会把 UI tool id 映射到 OpenCode canonical permission key：`write` / `multiedit` / `apply_patch` / `patch` 写入和读取 `edit`，`web_fetch` 写入和读取 `webfetch`，`web_search` 写入和读取 `websearch`。Custom 工具文件和运行时 custom tool catalog 仍按真实 tool id 写入，避免误映射用户自定义工具。
 - 行外层带 `data-tool-id`、`data-tool-permission-key`、`data-tool-permission` 和 `data-tool-permission-source`；`data-tool-id` 保留 UI/运行时展示 id，`data-tool-permission-key` 表达实际读写 key，permission/source 表达 inherited / override / custom 状态，供 CSS 做低调状态提示。
+- 行标题旁会通过 `opencodian-tool-row-badges` 显示两个 compact badge：effective permission（Allow / Ask / Deny / Custom rules）和来源状态（Inherited / Override / Custom）。Badge 只解释当前状态，真实修改仍由右侧 dropdown 完成。
 
 ### 默认权限
 
 - `renderDefaultPermissionPanel()` 在 Built-in 与 Custom 两个 Tools 页签顶部都渲染 `permission["*"]` 控制。
-- 默认权限区复用 Skills 权限区的 control-panel / permission-cluster 视觉结构：标题、说明、状态摘要和右侧 dropdown 的层级与 Skills 保持一致，只替换成 Tools 的 `permission["*"]` 语义。Custom 页签里的 New tool / Refresh / Docs 工具条也放在同一张控制卡下方，对齐 Skills 的“权限 cluster + toolbar”层级。
+- 默认权限区复用 Skills 权限区的 control-panel / permission-cluster 视觉结构：标题、说明、状态摘要和右侧 dropdown 的层级与 Skills 保持一致，只替换成 Tools 的 `permission["*"]` 语义。Custom 页签里的 New tool / Refresh / Docs 不再放在默认权限卡下方；这些目录级动作归属于自定义工具文件 header 的 CardAction 区。
 - 默认权限下拉包含 `OpenCode default`、`allow`、`ask`、`deny`。选择 `OpenCode default` 会调用 `clearToolPermission('*')` 删除全局默认；选择具体值会调用 `setToolPermission('*', value)`。
 - 没有配置 `permission["*"]` 时，面板说明使用 OpenCode 默认值：大多数工具允许，`external_directory` / `doom_loop` 保护先询问。
 - 单工具行选择 `Follow default` 时会删除对应 canonical `permission.<tool>`，回到 `permission["*"]` 或 OpenCode 默认。
@@ -32,11 +36,12 @@
 
 ### 自定义工具
 
-- `renderCustomTools()` 现在分三层：authoring 工具栏、项目/全局工具定义文件列表、运行时 catalog custom tool 权限列表。
-- authoring 工具栏提供 `New tool`、刷新和文档入口；新建工具会写入 `.opencode/tools/new-tool.ts`，并在名称冲突时递增为 `new-tool-2.ts` 等。
+- `renderCustomTools()` 现在分三层：默认权限控制、项目/全局工具定义文件 ScrollArea、运行时 catalog custom tool 权限 ScrollArea。
+- 项目/全局工具定义文件 header 采用 shadcn CardHeader/CardAction 结构：左侧显示标题、说明和文件数量 badge，右侧同一组按钮提供 `New tool`、刷新和文档入口；新建工具会写入 `.opencode/tools/new-tool.ts`，并在名称冲突时递增为 `new-tool-2.ts` 等。
 - 项目/全局工具文件发现与模板创建委托给 `SettingsToolFileService`，避免 UI owner 继续持有文件系统细节。
 - 新建、编辑、删除项目工具文件以及手动刷新 Custom tools 页时，会先重启本地 OpenCode 服务，再重新渲染目录，避免运行时 custom tool catalog 停留在旧快照。
 - 工具文件卡片按来源排序，先项目后全局；文件名作为默认 tool name。对于文档支持的 named exports（运行时名称为 `<filename>_<export>`），文件卡片保留提示，具体运行时 tool id 仍由下方 catalog 权限列表展示。
+- 工具文件行现在在名称旁显示 source chip 与 editable/read-only badge：项目文件显示 Editable 并保留 Delete，global 文件显示 Read-only 且不暴露删除入口。
 - `renderRuntimeCustomTools()` 保留原有 `openCodeCatalogStateStore` 接入，从 registry tool ids 中分出 custom tools，并按真实 tool id 写入权限。
 - 没有运行时 catalog 时不再把整个自定义页显示为空；文件管理功能仍可离线使用。
 
@@ -69,3 +74,4 @@
 - 自定义工具文件可离线管理；运行时 custom tool 列表依赖 OpenCode catalog，服务器未启动时可能为空。
 - 全局工具目录只读，避免一个 vault 的设置页意外修改用户级工具。
 - `getCatalogStore()` 通过可选 runtime seam 读取 catalog store，避免强绑定插件公开类型。
+- Tools 视觉层借鉴 shadcn Card、Badge、Button、Select、ScrollArea 和 Alert 结构，但保持 Obsidian DOM + CSS，不安装 shadcn/Radix/Tailwind，也不替换 `SettingsToolDetailModal`。

@@ -22,6 +22,11 @@ export const BACKEND_OPTIONS = ALL_BACKEND_OPTIONS.filter(
     IMPLEMENTED_AGENT_BACKENDS.includes(option.id),
 );
 
+interface BackendStatusBadge {
+  readonly kind: 'active' | 'enabled' | 'off';
+  readonly label: string;
+}
+
 interface SettingsBackendSectionOptions {
   plugin: OpenCodianPlugin;
   requestDisplayRefresh: () => void;
@@ -38,20 +43,24 @@ export class SettingsBackendSection {
 
   attach(containerEl: HTMLElement): void {
     this.ensureValidBackendState();
-    this.addDefaultBackendSetting(containerEl);
-    this.addEnabledBackendsSettings(containerEl);
+    const shellEl = containerEl.createDiv({ cls: 'opencodian-agent-settings-shell opencodian-backend-agent-surface' });
+    this.addDefaultBackendSetting(shellEl);
+    this.addEnabledBackendsSettings(shellEl);
   }
 
   private addDefaultBackendSetting(containerEl: HTMLElement): void {
     const enabledBackends = this.getEnabledBackends();
     const setting = new Setting(containerEl)
       .setName(t('settings.agent.default'))
-      .setDesc(enabledBackends.length === 0 ? t('settings.agent.default.empty.desc') : t('settings.agent.default.desc'));
+      .setDesc(enabledBackends.length === 0 ? t('settings.agent.default.empty.desc') : t('settings.agent.default.desc'))
+      .setClass('opencodian-agent-settings-control-row');
+    setting.settingEl.addClass('opencodian-backend-agent-default-row');
 
     if (enabledBackends.length === 0) {
       setting.controlEl.createDiv({
-        cls: 'opencodian-settings-inline-notice',
+        cls: 'opencodian-agent-settings-alert',
         text: t('settings.agent.empty.notice'),
+        attr: { 'data-alert-state': 'empty' },
       });
       return;
     }
@@ -93,23 +102,23 @@ export class SettingsBackendSection {
   }
 
   private addEnabledBackendsSettings(containerEl: HTMLElement): void {
-    containerEl.createEl('h4', {
-      cls: 'opencodian-settings-subsection-heading',
+    const groupEl = containerEl.createDiv({ cls: 'opencodian-backend-agent-group' });
+    groupEl.createEl('h4', {
+      cls: 'opencodian-settings-subsection-heading opencodian-backend-agent-group-title',
       text: t('settings.agent.enabled'),
+    });
+    const listEl = groupEl.createDiv({
+      cls: 'opencodian-backend-agent-list',
+      attr: { role: 'list' },
     });
 
     for (const backend of BACKEND_OPTIONS) {
       const enabled = this.getEnabledBackends().includes(backend.id);
       const active = this.plugin.settings.activeBackend === backend.id;
-      const status = active
-        ? t('settings.agent.status.active')
-        : enabled
-          ? t('settings.agent.status.enabled')
-          : '';
-
-      new Setting(containerEl)
-        .setName(status ? `${t(backend.labelKey)} ${status}` : t(backend.labelKey))
+      const setting = new Setting(listEl)
+        .setName(t(backend.labelKey))
         .setDesc(t(backend.descriptionKey))
+        .setClass('opencodian-backend-agent-row')
         .addToggle((toggle) => {
           toggle
             .setValue(enabled)
@@ -120,7 +129,36 @@ export class SettingsBackendSection {
               this.requestDisplayRefresh();
             });
         });
+      setting.settingEl.setAttribute('role', 'listitem');
+      setting.settingEl.setAttribute('data-backend-agent-id', backend.id);
+      setting.settingEl.setAttribute('data-backend-agent-active', active ? 'true' : 'false');
+      setting.settingEl.setAttribute('data-backend-agent-enabled', enabled ? 'true' : 'false');
+      this.decorateBackendRow(setting.settingEl, this.getBackendStatusBadges(enabled, active));
     }
+  }
+
+  private decorateBackendRow(rowEl: HTMLElement, badges: readonly BackendStatusBadge[]): void {
+    const nameEl = rowEl.querySelector<HTMLElement>('.setting-item-name');
+    if (!nameEl) {
+      return;
+    }
+    const badgeStripEl = nameEl.createSpan({ cls: 'opencodian-agent-catalog-badges' });
+    for (const badge of badges) {
+      badgeStripEl.createSpan({
+        cls: `opencodian-agent-badge opencodian-backend-agent-badge opencodian-backend-agent-badge-${badge.kind}`,
+        text: badge.label,
+      });
+    }
+  }
+
+  private getBackendStatusBadges(enabled: boolean, active: boolean): BackendStatusBadge[] {
+    if (active) {
+      return [{ kind: 'active', label: t('settings.agent.status.active') }];
+    }
+    if (enabled) {
+      return [{ kind: 'enabled', label: t('settings.agent.status.enabled') }];
+    }
+    return [{ kind: 'off', label: t('settings.agent.status.disabled') }];
   }
 
   private getEnabledBackends(): AgentBackendKind[] {

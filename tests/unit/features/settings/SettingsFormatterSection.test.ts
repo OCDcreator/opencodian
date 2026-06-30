@@ -710,6 +710,8 @@ describe('SettingsFormatterSection builtin list search', () => {
     ).toBeNull();
     expect(findSettingRecord('gofmt')?.desc).toBeUndefined();
     expect(getBuiltinRow(containerEl, 'gofmt').querySelectorAll('.opencodian-builtin-row-extensions')).toHaveLength(1);
+    expect(getBuiltinRow(containerEl, 'gofmt').querySelector('.opencodian-formatter-row-field')).not.toBeNull();
+    expect(getBuiltinRow(containerEl, 'gofmt').querySelector('.opencodian-formatter-row-control')).not.toBeNull();
   });
 
   it('collapses builtin formatter override fields by clicking the card', async () => {
@@ -733,6 +735,7 @@ describe('SettingsFormatterSection builtin list search', () => {
     const rowEl = getBuiltinRow(containerEl, 'gofmt');
     const fieldsEl = rowEl.querySelector<HTMLElement>('.opencodian-formatter-override-fields');
     expect(rowEl.querySelector('.opencodian-builtin-row-collapse')).toBeNull();
+    expect(fieldsEl?.classList.contains('opencodian-formatter-field-group')).toBe(true);
     expect(rowEl.getAttribute('aria-expanded')).toBe('true');
     expect(fieldsEl?.hidden).toBe(false);
 
@@ -1690,7 +1693,15 @@ describe('SettingsFormatterSection custom formatter list', () => {
     section.attachTabbed(containerEl, 'config');
     await flushPromises();
 
-    expect(findSettingRecordByDesc(t('settings.formatter.config.customList.empty'))).toBeDefined();
+    expect(findSettingRecordByDesc(t('settings.formatter.config.customList.empty'))).toBeUndefined();
+    expect(
+      Array.from(containerEl.querySelectorAll<HTMLElement>('.opencodian-formatter-inline-empty'))
+        .some((emptyEl) => emptyEl.textContent === t('settings.formatter.config.customList.empty')),
+    ).toBe(true);
+    const addRow = containerEl.querySelector<HTMLElement>('.opencodian-formatter-add-custom-row');
+    expect(addRow).not.toBeNull();
+    expect(addRow?.classList.contains('opencodian-formatter-custom-row')).toBe(false);
+    expect(addRow?.closest('.opencodian-formatter-custom-row')).toBeNull();
   });
 
   it('renders custom formatter entries that are not in the builtin list', async () => {
@@ -1733,7 +1744,7 @@ describe('SettingsFormatterSection custom formatter list', () => {
 
     section.attachTabbed(containerEl, 'config');
     await flushPromises();
-    const visibleBeforeSave = containerEl.textContent ?? '';
+    expect(containerEl.querySelector('.opencodian-formatter-json-textarea')).not.toBeNull();
 
     getFormatterConfig.mockResolvedValueOnce({});
     getFormatterConfig.mockResolvedValueOnce({
@@ -1744,7 +1755,7 @@ describe('SettingsFormatterSection custom formatter list', () => {
     const addButton = buttonRecords.find((record) => record.text === t('settings.formatter.config.custom.addButton'));
 
     await addButton?.onClick?.();
-    expect(containerEl.textContent).toBe(visibleBeforeSave);
+    expect(containerEl.querySelector('.opencodian-formatter-json-textarea')).not.toBeNull();
     await flushPromises();
 
     expect(updateFormatterConfig).toHaveBeenCalledWith({
@@ -1803,6 +1814,39 @@ describe('SettingsFormatterSection advanced JSON editor', () => {
 
     const parsed = JSON.parse(textarea!.value);
     expect(parsed).toEqual({ prettier: { disabled: true } });
+  });
+
+  it('renders advanced JSON as a flat editor panel with a button group footer', async () => {
+    const { plugin } = createPlugin({
+      formatterConfig: { prettier: { disabled: true } },
+      runtimeStatus: [{ name: 'prettier', extensions: ['.js'], enabled: true }],
+    });
+    const section = new SettingsFormatterSection({
+      plugin,
+      createSectionHeading,
+      requestDisplayRefresh: displayRefresh,
+    });
+    const containerEl = document.createElement('div');
+    document.body.appendChild(containerEl);
+
+    section.attachTabbed(containerEl, 'config');
+    await flushPromises();
+
+    const descEl = containerEl.querySelector<HTMLElement>('.opencodian-formatter-section-description');
+    const editorEl = containerEl.querySelector<HTMLElement>('.opencodian-formatter-json-editor');
+    const footerEl = containerEl.querySelector<HTMLElement>('.opencodian-formatter-json-buttons');
+    const footerButtons = Array.from(footerEl?.querySelectorAll('button') ?? []);
+
+    expect(descEl?.textContent).toBe(t('settings.formatter.config.advanced.desc'));
+    expect(editorEl?.querySelector('.opencodian-formatter-json-textarea')).not.toBeNull();
+    expect(footerEl?.getAttribute('role')).toBe('group');
+    expect(footerEl?.querySelector('.setting-item')).toBeNull();
+    expect(footerButtons.map((button) => button.textContent)).toEqual([
+      t('settings.formatter.config.advanced.format'),
+      t('settings.formatter.config.advanced.reload'),
+      t('settings.formatter.config.advanced.save'),
+    ]);
+    expect(footerButtons[2]?.classList.contains('mod-cta')).toBe(true);
   });
 
   it('renders the JSON textarea with empty object when formatter is absent', async () => {
@@ -1946,6 +1990,12 @@ describe('SettingsFormatterSection CSS contract', () => {
     );
     const jsonEditorRule = findRule('\\.opencodian-formatter-json-editor', 'background:');
     const buttonBarRule = findRule('\\.opencodian-formatter-json-buttons', 'background:');
+    const jsonButtonNestedSettingRule = findRule(
+      '\\.opencodian-formatter-json-buttons > \\.setting-item',
+      'display:',
+    );
+    const sectionDescriptionRule = findRule('\\.opencodian-formatter-section-description', 'font-size:');
+    const inlineEmptyRule = findRule('\\.opencodian-formatter-inline-empty', 'margin:');
     const classicSummaryGridRule = findRule(
       '\\.opencodian-settings\\[data-settings-layout-mode="classic"\\] \\.opencodian-formatter-summary-cards',
       'border-top:',
@@ -1962,12 +2012,9 @@ describe('SettingsFormatterSection CSS contract', () => {
       '\\.opencodian-settings-block > \\.opencodian-formatter-builtin-row:first-of-type,\\s*\\.opencodian-settings-block > \\.opencodian-formatter-custom-row:first-of-type',
       'margin-top:',
     );
-    const formatterSettingRule = findRule(
-      '\\.opencodian-formatter-builtin-row > \\.setting-item,\\s*\\.opencodian-formatter-custom-row > \\.setting-item',
-      'grid-template-columns:',
-    );
+    const formatterRowFieldRule = findRule('\\.opencodian-formatter-row-field', 'grid-template-columns:');
     const formatterBuiltinNameRule = findRule(
-      '\\.opencodian-formatter-builtin-row > \\.setting-item \\.setting-item-name',
+      '\\.opencodian-formatter-builtin-row > \\.setting-item \\.setting-item-name,\\s*\\.opencodian-formatter-custom-row > \\.setting-item \\.setting-item-name',
       'display:',
     );
     const formatterControlRule = findRule(
@@ -2048,9 +2095,11 @@ describe('SettingsFormatterSection CSS contract', () => {
     expect(formatterSortHeaderDescRule).toContain('rotate(45deg)');
     expect(tableStatusRule).toContain('text-align: right');
     expect(tableExtensionsRule).toContain('var(--font-monospace)');
-    expect(builtinRowRule).toContain('var(--opencodian-settings-object-bg');
+    expect(builtinRowRule).toContain('var(--opencodian-settings-form-row-bg');
+    expect(builtinRowRule).not.toContain('var(--opencodian-settings-object-bg');
     expect(builtinRowRule).toContain('box-shadow: none');
-    expect(fieldsRule).toContain('var(--opencodian-settings-row-bg');
+    expect(fieldsRule).toContain('background: transparent');
+    expect(fieldsRule).toContain('border-top: 1px solid');
     expect(envRowRule).toContain('var(--opencodian-settings-inline-bg');
     expect(fieldSettingRule).toContain('minmax(168px, 0.34fr)');
     expect(fieldSettingRule).toContain('minmax(280px, 1fr)');
@@ -2061,13 +2110,17 @@ describe('SettingsFormatterSection CSS contract', () => {
     expect(responsiveFieldRule).toContain('grid-template-columns: 1fr');
     expect(jsonEditorRule).toContain('var(--opencodian-settings-row-bg');
     expect(buttonBarRule).toContain('background: transparent');
+    expect(buttonBarRule).toContain('border-top: 1px solid');
+    expect(jsonButtonNestedSettingRule).toContain('display: none');
+    expect(sectionDescriptionRule).toContain('font-size: 12px');
+    expect(inlineEmptyRule).toContain('var(--opencodian-settings-space-lg');
     expect(classicSummaryGridRule).toContain('var(--opencodian-settings-object-border');
     expect(classicSummaryGridRule).toContain('var(--opencodian-settings-space-lg');
     expect(formatterSiblingRule).toContain('var(--opencodian-settings-space-md');
     expect(formatterRowRule).toContain('var(--opencodian-settings-space-lg');
     expect(formatterFirstRowRule).toContain('var(--opencodian-settings-space-lg');
-    expect(formatterSettingRule).toContain('minmax(180px, 260px)');
-    expect(formatterSettingRule).toContain('background: transparent');
+    expect(formatterRowFieldRule).toContain('minmax(180px, 260px)');
+    expect(formatterRowFieldRule).toContain('background: transparent');
     expect(formatterBuiltinNameRule).toContain('inline-flex');
     expect(formatterBuiltinNameRule).toContain('flex-wrap: wrap');
     expect(formatterControlRule).toContain('260px');

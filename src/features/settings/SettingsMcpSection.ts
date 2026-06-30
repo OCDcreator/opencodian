@@ -41,6 +41,8 @@ interface McpOverviewCounts {
   failed: number;
 }
 
+type McpOverviewTone = 'neutral' | 'success' | 'accent' | 'danger';
+
 interface McpServerActionContext {
   snapshot: McpServerSnapshot;
   name: string;
@@ -48,6 +50,12 @@ interface McpServerActionContext {
   projectOwned: boolean;
   projectEntry?: OpencodeMcpEntryConfig;
   projectEntryEditable: boolean;
+}
+
+interface SettingsScrollArea {
+  readonly rootEl: HTMLElement;
+  readonly viewportEl: HTMLElement;
+  readonly contentEl: HTMLElement;
 }
 
 function countByStatus(servers: Record<string, McpServerStatus>): McpOverviewCounts {
@@ -182,23 +190,25 @@ export class SettingsMcpSection {
   }
 
   private renderMcpContent(containerEl: HTMLElement): void {
-    const overviewBlock = containerEl.createDiv({ cls: 'opencodian-settings-block' });
-    overviewBlock.createEl('h4', {
+    const shellEl = containerEl.createDiv({ cls: 'opencodian-mcp-settings-shell' });
+    const overviewSection = shellEl.createDiv({ cls: 'opencodian-mcp-overview-section' });
+    const overviewCard = overviewSection.createDiv({ cls: 'opencodian-mcp-overview-shell' });
+    const overviewHeader = overviewCard.createDiv({ cls: 'opencodian-mcp-overview-toolbar' });
+    const overviewCopy = overviewHeader.createDiv({ cls: 'opencodian-mcp-overview-toolbar-copy' });
+    const overviewTitleRow = overviewCopy.createDiv({ cls: 'opencodian-mcp-overview-title-row' });
+    overviewTitleRow.createEl('h4', {
       text: t('settings.server.mcp.overview.title'),
-      cls: 'opencodian-settings-subsection-heading',
+      cls: 'opencodian-settings-subsection-heading opencodian-mcp-overview-title',
     });
-
-    const overviewBody = overviewBlock.createDiv({ cls: 'opencodian-settings-block-body' });
-    const overviewShell = overviewBody.createDiv({ cls: 'opencodian-mcp-overview-shell' });
-    const overviewToolbar = overviewShell.createDiv({ cls: 'opencodian-mcp-overview-toolbar' });
-    overviewToolbar.createDiv({
-      cls: 'opencodian-mcp-overview-toolbar-copy',
+    this.overviewContainerEl = overviewTitleRow.createDiv({
+      cls: 'opencodian-mcp-overview opencodian-mcp-overview--title-rail',
+    });
+    overviewCopy.createDiv({
+      cls: 'opencodian-mcp-overview-description',
       text: t('settings.server.mcp.overview.desc'),
     });
-
-    const toolbarActions = overviewToolbar.createDiv({ cls: 'opencodian-mcp-overview-toolbar-actions' });
-    const addActionEl = toolbarActions.createDiv({ cls: 'opencodian-mcp-toolbar-add' });
-    new Setting(addActionEl)
+    const overviewActions = overviewHeader.createDiv({ cls: 'opencodian-mcp-overview-actions' });
+    new Setting(overviewActions)
       .addButton((button) => {
         this.refreshButton = button;
         button
@@ -208,7 +218,8 @@ export class SettingsMcpSection {
           });
       })
       .settingEl.classList.add('opencodian-mcp-refresh-setting');
-    new Setting(toolbarActions)
+    const addActionEl = overviewActions.createDiv({ cls: 'opencodian-mcp-toolbar-add' });
+    new Setting(addActionEl)
       .addButton((button) => {
         this.actionButtons.push({ button, stickyDisabled: false });
         button
@@ -218,12 +229,23 @@ export class SettingsMcpSection {
           });
       })
       .settingEl.classList.add('opencodian-mcp-toolbar-add-setting');
-    this.overviewContainerEl = overviewShell.createDiv({ cls: 'opencodian-mcp-overview' });
 
-    const serverBlock = containerEl.createDiv({ cls: 'opencodian-settings-block' });
-    const serverBody = serverBlock.createDiv({ cls: 'opencodian-settings-block-body' });
-    const serverListShell = serverBody.createDiv({ cls: 'opencodian-mcp-server-list-shell' });
-    this.serverListContainerEl = serverListShell.createDiv({ cls: 'opencodian-mcp-server-list' });
+    const serverListShell = shellEl.createDiv({ cls: 'opencodian-mcp-server-list-shell' });
+    const serverListHeader = serverListShell.createDiv({ cls: 'opencodian-mcp-server-list-header' });
+    const serverListCopy = serverListHeader.createDiv({ cls: 'opencodian-mcp-server-list-copy' });
+    serverListCopy.createDiv({
+      cls: 'opencodian-mcp-server-list-title',
+      text: t('settings.mcp.title'),
+    });
+    serverListCopy.createDiv({
+      cls: 'opencodian-mcp-server-list-description',
+      text: t('settings.quickNav.mcpDesc'),
+    });
+    const scrollArea = this.createScrollArea(serverListShell, {
+      rootClass: 'opencodian-mcp-server-list',
+      contentClass: 'opencodian-settings-scrollarea-content--mcp',
+    });
+    this.serverListContainerEl = scrollArea.contentEl;
 
     this.renderFromSnapshot(this.plugin.openCodeService.getMcpServerSnapshot());
   }
@@ -270,12 +292,32 @@ export class SettingsMcpSection {
 
       const cardsRow = this.overviewContainerEl!.createDiv({ cls: 'opencodian-mcp-overview-cards' });
 
-      this.renderCountCard(cardsRow, t('settings.server.mcp.overview.total'), counts.total);
-      this.renderCountCard(cardsRow, t('settings.server.mcp.overview.connected'), counts.connected);
-      this.renderCountCard(cardsRow, t('settings.server.mcp.overview.needsAuth'), counts.needsAuth);
-      this.renderCountCard(cardsRow, t('settings.server.mcp.overview.failed'), counts.failed);
+      this.renderCountCard(
+        cardsRow,
+        t('settings.server.mcp.overview.total'),
+        counts.total,
+        'neutral',
+      );
+      this.renderCountCard(
+        cardsRow,
+        t('settings.server.mcp.overview.connected'),
+        counts.connected,
+        'success',
+      );
+      this.renderCountCard(
+        cardsRow,
+        t('settings.server.mcp.overview.needsAuth'),
+        counts.needsAuth,
+        'accent',
+      );
+      this.renderCountCard(
+        cardsRow,
+        t('settings.server.mcp.overview.failed'),
+        counts.failed,
+        'danger',
+      );
 
-      const refreshInfo = this.overviewContainerEl!.createDiv({ cls: 'opencodian-mcp-overview-refresh-info' });
+      const refreshInfo = cardsRow.createDiv({ cls: 'opencodian-mcp-overview-refresh-info' });
       const timeLabel = snapshot.updatedAt
         ? new Date(snapshot.updatedAt).toLocaleTimeString()
         : t('settings.server.mcp.overview.never');
@@ -285,10 +327,18 @@ export class SettingsMcpSection {
     });
   }
 
-  private renderCountCard(parent: HTMLElement, label: string, value: number): void {
-    const card = parent.createDiv({ cls: 'opencodian-mcp-overview-card' });
-    card.createDiv({ cls: 'opencodian-mcp-overview-card-value', text: String(value) });
+  private renderCountCard(
+    parent: HTMLElement,
+    label: string,
+    value: number,
+    tone: McpOverviewTone,
+  ): void {
+    const card = parent.createDiv({
+      cls: `opencodian-mcp-overview-card opencodian-mcp-overview-card--${tone}`,
+    });
+    card.createSpan({ cls: 'opencodian-mcp-overview-card-dot' });
     card.createDiv({ cls: 'opencodian-mcp-overview-card-label', text: label });
+    card.createDiv({ cls: 'opencodian-mcp-overview-card-value', text: String(value) });
   }
 
   private renderServerRows(snapshot: McpServerSnapshot): void {
@@ -349,20 +399,34 @@ export class SettingsMcpSection {
   ): void {
     const projectEntry = this.projectServers[name];
     const projectOwned = Boolean(projectEntry);
-    const row = parent.createDiv({ cls: 'opencodian-mcp-server-card' });
+    const row = parent.createDiv({ cls: 'opencodian-mcp-server-card', attr: { 'data-mcp-server-status': status.status } });
     const rowMain = row.createDiv({ cls: 'opencodian-mcp-server-card-main' });
     const identity = rowMain.createDiv({ cls: 'opencodian-mcp-server-card-identity' });
 
-    identity.createDiv({ cls: 'opencodian-mcp-server-card-name', text: name });
-    identity.createDiv({ cls: 'opencodian-mcp-server-card-endpoint', text: this.getEndpointSummary(projectEntry) });
-    identity.createDiv({ cls: 'opencodian-mcp-server-card-ownership', text: projectOwned ? t('settings.server.mcp.ownership.project') : t('settings.server.mcp.ownership.runtimeOnly') });
-
-    const statusCell = rowMain.createDiv({ cls: 'opencodian-mcp-server-card-status' });
-    statusCell.createSpan({
+    const nameRow = identity.createDiv({ cls: 'opencodian-mcp-server-card-title-row' });
+    nameRow.createDiv({ cls: 'opencodian-mcp-server-card-name', text: name });
+    const chipRail = nameRow.createDiv({ cls: 'opencodian-mcp-server-card-chip-rail' });
+    chipRail.createSpan({
+      cls: 'opencodian-mcp-server-card-ownership-badge',
+      text: projectOwned ? t('settings.server.mcp.ownership.project') : t('settings.server.mcp.ownership.runtimeOnly'),
+    });
+    chipRail.createSpan({
       cls: `opencodian-mcp-badge ${statusBadgeClass(status.status)}`,
       text: statusLabel(status.status),
     });
-    statusCell.createSpan({ cls: 'opencodian-mcp-transport-badge', text: projectEntry ? projectEntry.type === 'remote' ? 'HTTP' : 'STDIO' : t('settings.server.mcp.transportUnknown') });
+    chipRail.createSpan({
+      cls: 'opencodian-mcp-transport-badge',
+      text: projectEntry ? projectEntry.type === 'remote' ? 'HTTP' : 'STDIO' : t('settings.server.mcp.transportUnknown'),
+    });
+    identity.createDiv({ cls: 'opencodian-mcp-server-card-endpoint', text: this.getEndpointSummary(projectEntry) });
+
+    const statusCell = rowMain.createDiv({ cls: 'opencodian-mcp-server-card-status' });
+    statusCell.createDiv({
+      cls: 'opencodian-mcp-server-card-status-summary',
+      text: projectOwned
+        ? t('settings.server.mcp.card.projectHint')
+        : t('settings.server.mcp.card.runtimeOnlyHint'),
+    });
 
     const actionsCell = rowMain.createDiv({ cls: 'opencodian-mcp-server-card-actions' });
     this.renderServerActions(actionsCell, {
@@ -379,8 +443,6 @@ export class SettingsMcpSection {
         cls: 'opencodian-mcp-server-card-helper is-error',
         text: `${t('settings.server.mcp.server.error')}: ${redactMcpSensitiveText(status.error)}`,
       });
-    } else {
-      row.createDiv({ cls: 'opencodian-mcp-server-card-helper', text: projectOwned ? this.isEditableProjectEntry(projectEntry) ? t('settings.server.mcp.card.projectHint') : t('settings.server.mcp.card.overrideOnlyHint') : t('settings.server.mcp.card.runtimeOnlyHint') });
     }
   }
 
@@ -419,10 +481,6 @@ export class SettingsMcpSection {
       projectEntry,
       projectEntryEditable,
     } = context;
-    parent.createDiv({
-      cls: 'opencodian-mcp-runtime-switch-label',
-      text: t('settings.server.mcp.runtimeSwitch.label'),
-    });
     const buttonGrid = parent.createDiv({ cls: 'opencodian-mcp-server-action-grid' });
     const addActionButton = (
       label: string,
@@ -612,5 +670,25 @@ export class SettingsMcpSection {
     }
     new Notice(t('settings.server.mcp.notice.openCodeOnly'));
     return false;
+  }
+
+  private createScrollArea(
+    containerEl: HTMLElement,
+    options: { readonly rootClass: string; readonly contentClass: string },
+  ): SettingsScrollArea {
+    const rootEl = containerEl.createDiv({
+      cls: `opencodian-settings-scrollarea ${options.rootClass}`,
+    });
+    const viewportEl = rootEl.createDiv({
+      cls: 'opencodian-settings-scrollarea-viewport',
+    });
+    const contentEl = viewportEl.createDiv({
+      cls: `opencodian-settings-scrollarea-content ${options.contentClass}`,
+    });
+    rootEl.createDiv({
+      cls: 'opencodian-settings-scrollarea-gutter',
+      attr: { 'aria-hidden': 'true' },
+    });
+    return { rootEl, viewportEl, contentEl };
   }
 }

@@ -2,6 +2,51 @@
  * Mock Obsidian API for testing
  */
 
+type MockDocumentProvider = () => Document | undefined;
+
+let mockDocumentProvider: MockDocumentProvider = () => globalThis.document;
+
+export function __setMockDocumentProvider(provider: MockDocumentProvider): void {
+  mockDocumentProvider = provider;
+}
+
+export function __resetMockDocumentProvider(): void {
+  mockDocumentProvider = () => globalThis.document;
+}
+
+function createMockElement(tagName: string, ownerElement?: HTMLElement): HTMLElement {
+  const activeDocument = mockDocumentProvider() ?? ownerElement?.ownerDocument;
+  if (activeDocument) {
+    return activeDocument.createElement(tagName);
+  }
+
+  return {
+    appendChild() {
+      return this;
+    },
+    className: '',
+    classList: {
+      add() {},
+      remove() {},
+    },
+    createDiv() {
+      return createMockElement('div') as HTMLDivElement;
+    },
+    createEl() {
+      return createMockElement('div');
+    },
+    createSpan() {
+      return createMockElement('span') as HTMLSpanElement;
+    },
+    innerHTML: '',
+    removeClass() {},
+    setText(text: string) {
+      this.textContent = text;
+    },
+    textContent: '',
+  } satisfies Partial<HTMLElement> as HTMLElement;
+}
+
 export class Plugin {
   app = {};
   manifest = {};
@@ -26,17 +71,21 @@ export class Plugin {
 export class PluginSettingTab {
   app = {};
   plugin = {};
-  containerEl = document.createElement('div');
+  containerEl = createMockElement('div');
   
   display() {}
   hide() {}
 }
 
 export class Setting {
-  settingEl = document.createElement('div');
-  controlEl = document.createElement('div');
+  settingEl = createMockElement('div');
+  controlEl = createMockElement('div');
   
   constructor(containerEl?: HTMLElement) {
+    if (containerEl) {
+      this.settingEl = createMockElement('div', containerEl);
+      this.controlEl = createMockElement('div', containerEl);
+    }
     this.settingEl.className = 'setting-item';
     this.controlEl.className = 'setting-item-control';
     if (containerEl) {
@@ -64,9 +113,9 @@ export class Setting {
 
 export class Modal {
   app = {};
-  contentEl = document.createElement('div');
-  modalEl = document.createElement('div');
-  titleEl = document.createElement('div');
+  contentEl = createMockElement('div');
+  modalEl = createMockElement('div');
+  titleEl = createMockElement('div');
   
   open() {}
   close() {}
@@ -167,8 +216,8 @@ export class WorkspaceLeaf {
 
 export class ItemView {
   app = { vault: new Vault(), workspace: new Workspace() };
-  containerEl = document.createElement('div');
-  contentEl = document.createElement('div');
+  containerEl = createMockElement('div');
+  contentEl = createMockElement('div');
   scope = {};
   
   getViewType() { return 'test'; }

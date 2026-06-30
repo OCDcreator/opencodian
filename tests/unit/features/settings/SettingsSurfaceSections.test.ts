@@ -1,4 +1,6 @@
 /* eslint-disable max-lines, max-lines-per-function */
+import { readFileSync } from 'fs';
+
 import { requestUrl, Setting } from 'obsidian';
 
 import { DEFAULT_SETTINGS } from '../../../../src/core/types';
@@ -22,6 +24,7 @@ interface DropdownRecord {
 }
 
 interface MockButtonControl {
+  buttonEl: HTMLButtonElement;
   onClick: jest.MockedFunction<(callback: () => void | Promise<void>) => MockButtonControl>;
   setButtonText: jest.MockedFunction<(text: string) => MockButtonControl>;
 }
@@ -34,6 +37,7 @@ interface ButtonRecord {
 
 const buttonRecords: ButtonRecord[] = [];
 const dropdownRecords: DropdownRecord[] = [];
+const settingsLayoutContractCss = readFileSync('src/style/components/settings-layout-contract.css', 'utf8');
 
 function createPlugin(overrides: Record<string, unknown> = {}) {
   return {
@@ -93,15 +97,18 @@ function createDropdownRecord(name: string): DropdownRecord {
 }
 
 function createButtonRecord(): ButtonRecord {
+  const buttonEl = document.createElement('button');
   const record: ButtonRecord = {
     text: '',
     control: {
+      buttonEl,
       onClick: jest.fn(),
       setButtonText: jest.fn(),
     },
   };
   record.control.setButtonText.mockImplementation((text) => {
     record.text = text;
+    buttonEl.textContent = text;
     return record.control;
   });
   record.control.onClick.mockImplementation((callback) => {
@@ -151,6 +158,7 @@ describe('settings Skills, Tools, and ACP layout surfaces', () => {
     ) {
       const record = createButtonRecord();
       buttonRecords.push(record);
+      this.controlEl.appendChild(record.control.buttonEl);
       callback(record.control);
       return this;
     });
@@ -182,6 +190,22 @@ describe('settings Skills, Tools, and ACP layout surfaces', () => {
 
     expect(containerEl.querySelector('.opencodian-skill-settings-shell')).not.toBeNull();
     expect(containerEl.querySelector('.opencodian-skill-control-panel .opencodian-skill-toolbar')).not.toBeNull();
+    const shellEl = containerEl.querySelector<HTMLElement>('.opencodian-skill-settings-shell');
+    const listEl = containerEl.querySelector<HTMLElement>('.opencodian-skill-list');
+    const viewportEl = listEl?.querySelector<HTMLElement>(':scope > .opencodian-settings-scrollarea-viewport');
+    expect(shellEl).not.toBeNull();
+    expect(listEl).not.toBeNull();
+    expect(viewportEl).not.toBeNull();
+    expect(settingsLayoutContractCss).toContain('.opencodian-skill-settings-shell');
+    expect(settingsLayoutContractCss).toMatch(
+      /\.opencodian-settings \.opencodian-skill-list\s*\{[^}]*flex:\s*1 1 auto;[^}]*min-height:\s*0;[^}]*overflow:\s*hidden;/su,
+    );
+    expect(settingsLayoutContractCss).toMatch(
+      /\.opencodian-settings \.opencodian-skill-list > \.opencodian-settings-scrollarea-viewport\s*\{[^}]*flex:\s*1 1 auto;[^}]*height:\s*var\(--opencodian-settings-scrollarea-available-height/su,
+    );
+    expect(settingsLayoutContractCss).toMatch(
+      /\.opencodian-settings \.opencodian-settings-scrollarea-content--skills\s*\{[^}]*flex:\s*0 0 auto;/su,
+    );
     expect(containerEl.querySelector('.opencodian-skill-source-section')?.getAttribute('data-skill-source')).toBe(
       'builtin',
     );
@@ -281,17 +305,39 @@ describe('settings Skills, Tools, and ACP layout surfaces', () => {
       await flushPromises();
 
       const listEl = containerEl.querySelector<HTMLElement>('.opencodian-skill-list');
+      const viewportEl = listEl?.querySelector<HTMLElement>(':scope > .opencodian-settings-scrollarea-viewport');
+      const contentEl = viewportEl?.querySelector<HTMLElement>(':scope > .opencodian-settings-scrollarea-content');
       expect(listEl).not.toBeNull();
+      expect(viewportEl).not.toBeNull();
+      expect(contentEl).not.toBeNull();
+      if (!viewportEl || !contentEl) {
+        throw new Error('Expected skill list scrollarea viewport and content');
+      }
+      Object.defineProperty(window, 'innerHeight', {
+        configurable: true,
+        value: 960,
+      });
+      viewportEl.getBoundingClientRect = jest.fn(() => ({
+        bottom: 420,
+        height: 360,
+        left: 0,
+        right: 100,
+        top: 420,
+        width: 100,
+        x: 0,
+        y: 420,
+        toJSON: () => ({}),
+      }));
       let scrollTop = 180;
-      Object.defineProperty(listEl, 'scrollTop', {
+      Object.defineProperty(viewportEl, 'scrollTop', {
         configurable: true,
         get: () => scrollTop,
         set: (value: number) => {
           scrollTop = value;
         },
       });
-      const empty = listEl!.empty.bind(listEl);
-      Object.defineProperty(listEl, 'empty', {
+      const empty = contentEl.empty.bind(contentEl);
+      Object.defineProperty(contentEl, 'empty', {
         configurable: true,
         value: () => {
           scrollTop = 0;
@@ -305,7 +351,8 @@ describe('settings Skills, Tools, and ACP layout surfaces', () => {
       await flushPromises();
       await new Promise((resolve) => setTimeout(resolve, 0));
 
-      expect(listEl!.scrollTop).toBe(180);
+      expect(viewportEl.scrollTop).toBe(180);
+      expect(listEl?.style.getPropertyValue('--opencodian-settings-scrollarea-available-height')).toBe('516px');
     } finally {
       window.requestAnimationFrame = originalRequestAnimationFrame;
     }
@@ -734,9 +781,31 @@ describe('settings Skills, Tools, and ACP layout surfaces', () => {
       createSectionHeading: createHeading,
     }).attachTabbed(containerEl, 'agents');
 
-    expect(containerEl.querySelector('.opencodian-acp-preset-rail')).not.toBeNull();
+    const createCardEl = containerEl.querySelector('.opencodian-acp-create-card');
+    expect(createCardEl).not.toBeNull();
+    expect(createCardEl?.querySelector('.opencodian-acp-create-header')).not.toBeNull();
+    expect(createCardEl?.querySelector('.opencodian-acp-create-count-badge')?.textContent).toContain('1');
+    expect(createCardEl?.querySelector('.opencodian-acp-create-desc')?.textContent).not.toContain('1');
+    expect(createCardEl?.querySelector('.opencodian-acp-create-actions')).not.toBeNull();
+    expect(createCardEl?.querySelectorAll(':scope > .opencodian-acp-create-action')).toHaveLength(0);
+    expect(createCardEl?.querySelectorAll('.opencodian-acp-create-actions > .opencodian-acp-create-action')).toHaveLength(4);
+    expect(
+      Array.from(createCardEl?.querySelectorAll('.opencodian-acp-create-action') ?? []).map(
+        (actionEl) => actionEl.getAttribute('data-acp-action-label'),
+      ),
+    ).toEqual(['Custom agent', 'OpenCode', 'Codex', 'Claude Code']);
+    expect(
+      Array.from(createCardEl?.querySelectorAll('.opencodian-agent-switcher-lobehub-icon') ?? []).map(
+        (iconEl) => (iconEl as HTMLElement).dataset.lobehubIcon,
+      ),
+    ).toEqual(['opencode', 'codex', 'claudecode']);
+    expect(containerEl.querySelector('.opencodian-acp-agent-list > .opencodian-settings-scrollarea-viewport')).not.toBeNull();
+    expect(containerEl.querySelector('.opencodian-settings-scrollarea-content--acp')).not.toBeNull();
+    expect(containerEl.querySelector('.opencodian-acp-agent-row-card')).not.toBeNull();
     expect(containerEl.querySelector('.opencodian-acp-agent-card-header')).not.toBeNull();
+    expect(containerEl.querySelector('.opencodian-acp-agent-status-badge')).not.toBeNull();
     expect(containerEl.querySelector('.opencodian-acp-agent-command-summary')?.textContent).toBe('codex acp');
+    expect(containerEl.querySelector('.opencodian-acp-field-group')).not.toBeNull();
     expect(containerEl.querySelectorAll('.opencodian-acp-stacked-field')).toHaveLength(4);
   });
 });

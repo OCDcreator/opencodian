@@ -43,6 +43,12 @@ body:has(.modal-container .modal:not(.mod-settings)) .opencodian-agent-switcher-
   visibility: hidden;
 }
 
+.opencodian-agent-switcher-floating.is-hidden-behind-modal {
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+}
+
 .opencodian-agent-switcher-floating:hover,
 .opencodian-agent-switcher-floating:focus-within {
   width: 40px;

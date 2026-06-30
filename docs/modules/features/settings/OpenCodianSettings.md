@@ -22,6 +22,8 @@ classic 和 tabbed 两种布局都必须按当前 active backend 过滤后端专
 
 标准 settings tab 的根设置容器会暴露稳定布局契约标记：`data-settings-surface="page"` 和 `data-settings-layout-mode="classic|tabbed"`。CSS 与测试应优先使用这些 data marker 做页面 surface / layout mode 的契约检查，而不是只从 `.opencodian-settings--classic` 或 `.opencodian-settings--tabbed` 等视觉 class 推断当前模式。
 
+General 里的设置界面模式、界面语言、在编辑区打开设置，以及由各 section owner 渲染的普通 Obsidian `Setting` 行，都继承 `settings-layout-contract.css` 的 Settings Form Row Card contract。该 contract 借鉴 shadcn `Card + Field`：中性 row-card root、左侧 label/description、右侧 control column；普通设置行不应再用整块 warning/error/accent tint 表达状态。
+
 当前文件的重点不只是“渲染设置项”，还包括：
 
 - 模型 / 样式 / server / security owner 的装配与跨 section 桥接

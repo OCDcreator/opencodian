@@ -1089,6 +1089,9 @@ img.opencodian-model-provider-header-icon {
 
 .opencodian-style-section {
   position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--opencodian-settings-space-md, 8px);
   margin: 24px 0 16px;
   padding: 16px;
   border-radius: var(--opencodian-settings-radius-section, var(--radius-m, 8px));
@@ -1110,6 +1113,7 @@ img.opencodian-model-provider-header-icon {
 .opencodian-style-group-body {
   display: flex;
   flex-direction: column;
+  gap: var(--opencodian-settings-space-md, 8px);
 }
 
 .opencodian-style-input-controls {
@@ -1475,6 +1479,7 @@ img.opencodian-model-provider-header-icon {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 360px;
   column-gap: 20px;
+  row-gap: var(--opencodian-settings-space-md, 8px);
   align-items: center;
 }
 

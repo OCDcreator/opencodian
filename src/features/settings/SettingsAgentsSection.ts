@@ -45,6 +45,11 @@ interface AgentCatalogRenderContext {
   workspaceBodyEl?: HTMLElement;
 }
 
+interface AgentSourceBadge {
+  readonly kind: 'default' | 'info' | 'muted' | 'warning';
+  readonly label: string;
+}
+
 export class SettingsAgentsSection {
   private readonly agentCatalogService = new AgentCatalogService();
   private readonly plugin: OpenCodianPlugin;
@@ -87,9 +92,12 @@ export class SettingsAgentsSection {
     this.ensureProjectAgentEditor(configManager);
 
     let defaultAgentDropdown: DropdownComponent | null = null;
-    new Setting(containerEl)
+    const shellEl = containerEl.createDiv({ cls: 'opencodian-agent-settings-shell' });
+    const defaultBlockEl = shellEl.createDiv({ cls: 'opencodian-agent-settings-default-surface' });
+    new Setting(defaultBlockEl)
       .setName(t('settings.agents.default.name'))
       .setDesc(t('settings.agents.default.desc'))
+      .setClass('opencodian-agent-settings-control-row')
       .addDropdown((dropdown) => {
         defaultAgentDropdown = dropdown;
         dropdown
@@ -99,11 +107,11 @@ export class SettingsAgentsSection {
             await configManager.updateDefaultAgent(value || undefined);
           });
       });
-    const editorBodyEl = this.createProjectAgentEditorBlock(containerEl);
-    const workspaceBodyEl = this.createWorkspaceBlock(containerEl);
-    const catalogBodyEl = this.createCatalogBlock(containerEl);
+    const editorBodyEl = this.createProjectAgentEditorBlock(shellEl);
+    const workspaceBodyEl = this.createWorkspaceBlock(shellEl);
+    const catalogBodyEl = this.createCatalogBlock(shellEl);
 
-    this.renderExpertModeToggle(containerEl, {
+    this.renderExpertModeToggle(defaultBlockEl, {
       configManager,
       currentRunId,
       defaultAgentDropdown,
@@ -142,10 +150,13 @@ export class SettingsAgentsSection {
     this.ensureProjectAgentEditor(configManager);
 
     const defaultBlockEl = containerEl.createDiv({ attr: { 'data-section-block': 'default' } });
+    const defaultShellEl = defaultBlockEl.createDiv({ cls: 'opencodian-agent-settings-shell' });
+    const defaultSurfaceEl = defaultShellEl.createDiv({ cls: 'opencodian-agent-settings-default-surface' });
     let defaultAgentDropdown: DropdownComponent | null = null;
-    new Setting(defaultBlockEl)
+    new Setting(defaultSurfaceEl)
       .setName(t('settings.agents.default.name'))
       .setDesc(t('settings.agents.default.desc'))
+      .setClass('opencodian-agent-settings-control-row')
       .addDropdown((dropdown) => {
         defaultAgentDropdown = dropdown;
         dropdown
@@ -157,14 +168,20 @@ export class SettingsAgentsSection {
       });
 
     const editorBlockEl = containerEl.createDiv({ attr: { 'data-section-block': 'editor' } });
-    const editorBodyEl = this.createProjectAgentEditorBlock(editorBlockEl);
+    const editorBodyEl = this.createProjectAgentEditorBlock(
+      editorBlockEl.createDiv({ cls: 'opencodian-agent-settings-shell' }),
+    );
 
     const catalogBlockEl = containerEl.createDiv({ attr: { 'data-section-block': 'catalog' } });
-    const catalogBodyEl = this.createCatalogBlock(catalogBlockEl);
+    const catalogBodyEl = this.createCatalogBlock(
+      catalogBlockEl.createDiv({ cls: 'opencodian-agent-settings-shell' }),
+    );
 
     const workspaceBlockEl = containerEl.createDiv({ attr: { 'data-section-block': 'workspace' } });
-    const workspaceBodyEl = this.createWorkspaceBlock(workspaceBlockEl);
-    this.renderExpertModeToggle(defaultBlockEl, {
+    const workspaceBodyEl = this.createWorkspaceBlock(
+      workspaceBlockEl.createDiv({ cls: 'opencodian-agent-settings-shell' }),
+    );
+    this.renderExpertModeToggle(defaultSurfaceEl, {
       configManager,
       currentRunId,
       defaultAgentDropdown,
@@ -188,7 +205,7 @@ export class SettingsAgentsSection {
   }
 
   private createCatalogBlock(containerEl: HTMLElement): HTMLElement {
-    const blockEl = containerEl.createDiv({ cls: 'opencodian-plugin-block' });
+    const blockEl = containerEl.createDiv({ cls: 'opencodian-plugin-block opencodian-agent-settings-block' });
     blockEl.createEl('h4', {
       text: t('settings.agents.catalog.title'),
       cls: 'opencodian-settings-subsection-heading',
@@ -197,13 +214,15 @@ export class SettingsAgentsSection {
       cls: 'opencodian-plugin-block-desc',
       text: t('settings.agents.catalog.desc'),
     });
-    return blockEl.createDiv({
-      cls: 'opencodian-plugin-block-body opencodian-settings-catalog-scroll opencodian-agent-catalog-scroll',
+    const bodyEl = blockEl.createDiv({ cls: 'opencodian-plugin-block-body' });
+    return bodyEl.createDiv({
+      cls: 'opencodian-agent-catalog-list opencodian-settings-catalog-scroll opencodian-agent-catalog-scroll',
+      attr: { role: 'list' },
     });
   }
 
   private createProjectAgentEditorBlock(containerEl: HTMLElement): HTMLElement {
-    const blockEl = containerEl.createDiv({ cls: 'opencodian-plugin-block' });
+    const blockEl = containerEl.createDiv({ cls: 'opencodian-plugin-block opencodian-agent-settings-block' });
     blockEl.createEl('h4', {
       text: t('settings.agents.editor.title'),
       cls: 'opencodian-settings-subsection-heading',
@@ -216,7 +235,7 @@ export class SettingsAgentsSection {
   }
 
   private createWorkspaceBlock(containerEl: HTMLElement): HTMLElement {
-    const blockEl = containerEl.createDiv({ cls: 'opencodian-plugin-block' });
+    const blockEl = containerEl.createDiv({ cls: 'opencodian-plugin-block opencodian-agent-settings-block' });
     blockEl.createEl('h4', {
       text: t('settings.agents.workspace.title'),
       cls: 'opencodian-settings-subsection-heading',
@@ -242,6 +261,7 @@ export class SettingsAgentsSection {
     new Setting(containerEl)
       .setName(t('settings.agents.expert.name'))
       .setDesc(t('settings.agents.expert.desc'))
+      .setClass('opencodian-agent-settings-control-row')
       .addToggle((toggle) => {
         toggle
           .setValue(this.getSystemAgentGuard().expertMode)
@@ -390,14 +410,17 @@ export class SettingsAgentsSection {
       catalogBodyEl.replaceChildren();
 
       if (mergedAgents.length === 0) {
-        catalogBodyEl.createDiv({ text: t('settings.agents.catalog.empty') });
+        this.renderInlineAlert(catalogBodyEl, t('settings.agents.catalog.empty'), 'empty');
         return;
       }
 
       for (const agent of mergedAgents) {
         const setting = new Setting(catalogBodyEl)
           .setName(agent.id)
-          .setDesc(this.buildAgentDescription(agent));
+          .setDesc(this.buildAgentDescription(agent))
+          .setClass('opencodian-agent-catalog-row');
+        setting.settingEl.setAttribute('role', 'listitem');
+        this.decorateAgentCatalogRow(setting.settingEl, agent);
 
         if (agent.mode === 'subagent' && !agent.disabled) {
           setting.addToggle((toggle) => {
@@ -425,9 +448,11 @@ export class SettingsAgentsSection {
     this.renderWithPreservedScroll(catalogBodyEl, () => {
       catalogBodyEl.replaceChildren();
       const message = error instanceof Error ? error.message : String(error);
-      new Setting(catalogBodyEl)
+      const setting = new Setting(catalogBodyEl)
         .setName(t('settings.agents.loadFailed.name'))
-        .setDesc(t('settings.agents.loadFailed.desc', { message }));
+        .setDesc(t('settings.agents.loadFailed.desc', { message }))
+        .setClass('opencodian-agent-settings-alert');
+      setting.settingEl.setAttribute('data-alert-state', 'error');
     });
   }
 
@@ -476,6 +501,53 @@ export class SettingsAgentsSection {
     }
 
     return parts.join(' · ');
+  }
+
+  private decorateAgentCatalogRow(rowEl: HTMLElement, agent: SurfaceAgent): void {
+    rowEl.setAttribute('data-agent-mode', agent.mode ?? 'unknown');
+    if (agent.disabled) {
+      rowEl.setAttribute('data-agent-state', 'disabled');
+    } else if (!agent.runtimeAvailable) {
+      rowEl.setAttribute('data-agent-state', 'runtime-unavailable');
+    } else {
+      rowEl.setAttribute('data-agent-state', 'ready');
+    }
+
+    const nameEl = rowEl.querySelector<HTMLElement>('.setting-item-name');
+    if (!nameEl) {
+      return;
+    }
+    const badgeStripEl = nameEl.createSpan({ cls: 'opencodian-agent-catalog-badges' });
+    for (const badge of this.getAgentBadges(agent)) {
+      badgeStripEl.createSpan({
+        cls: `opencodian-agent-badge opencodian-agent-badge-${badge.kind}`,
+        text: badge.label,
+      });
+    }
+  }
+
+  private getAgentBadges(agent: SurfaceAgent): AgentSourceBadge[] {
+    const badges: AgentSourceBadge[] = [
+      { kind: 'default', label: this.getModeLabel(agent.mode) },
+      { kind: 'muted', label: this.getSourceLabel(agent) },
+    ];
+
+    if (!agent.runtimeAvailable) {
+      badges.push({ kind: 'warning', label: t('settings.agents.catalog.status.runtimeUnavailable') });
+    }
+
+    if (agent.disabled) {
+      badges.push({ kind: 'warning', label: t('settings.agents.catalog.status.disabled') });
+    } else if (agent.mode === 'subagent') {
+      badges.push({
+        kind: agent.hidden ? 'muted' : 'info',
+        label: agent.hidden
+          ? t('settings.agents.catalog.visibility.hidden')
+          : t('settings.agents.catalog.visibility.visible'),
+      });
+    }
+
+    return badges;
   }
 
   private getSourceLabel(agent: SurfaceAgent): string {
@@ -681,9 +753,20 @@ export class SettingsAgentsSection {
     } = options;
 
     containerEl.replaceChildren();
-    new Setting(containerEl)
+    const toolbarEl = containerEl.createDiv({ cls: 'opencodian-agent-workspace-toolbar' });
+    const toolbarCopyEl = toolbarEl.createDiv({ cls: 'opencodian-agent-workspace-toolbar-copy' });
+    toolbarCopyEl.createDiv({
+      cls: 'opencodian-agent-workspace-toolbar-title',
+      text: t('settings.agents.workspace.actions.create'),
+    });
+    toolbarCopyEl.createDiv({
+      cls: 'opencodian-agent-workspace-toolbar-desc',
+      text: t('settings.agents.workspace.actions.createDesc'),
+    });
+    new Setting(toolbarEl)
       .setName(t('settings.agents.workspace.actions.create'))
       .setDesc(t('settings.agents.workspace.actions.createDesc'))
+      .setClass('opencodian-agent-workspace-create-setting')
       .addButton((button) => {
         button
           .setButtonText(t('settings.agents.workspace.actions.create'))
@@ -707,14 +790,14 @@ export class SettingsAgentsSection {
           });
       });
 
-    const bodyEl = containerEl.createDiv();
+    const bodyEl = containerEl.createDiv({ cls: 'opencodian-agent-workspace-list', attr: { role: 'list' } });
     if (fileAgents.length === 0) {
-      bodyEl.createDiv({ text: t('settings.agents.workspace.empty') });
+      this.renderInlineAlert(bodyEl, t('settings.agents.workspace.empty'), 'empty');
       return;
     }
 
     for (const file of fileAgents) {
-      new Setting(bodyEl)
+      const setting = new Setting(bodyEl)
         .setName(file.agentId)
         .setDesc([
           t(`settings.agents.workspace.scope.${file.scope}`),
@@ -724,6 +807,7 @@ export class SettingsAgentsSection {
             : t('settings.agents.workspace.status.runtimePending'),
           file.path,
         ].join(' · '))
+        .setClass('opencodian-agent-workspace-row')
         .addButton((button) => {
           button
             .setButtonText(t('settings.agents.workspace.actions.edit'))
@@ -754,7 +838,41 @@ export class SettingsAgentsSection {
               });
             });
         });
+      setting.settingEl.setAttribute('role', 'listitem');
+      setting.settingEl.setAttribute('data-parse-status', file.parseStatus);
+      setting.settingEl.setAttribute('data-runtime-seen', file.runtimeSeen ? 'true' : 'false');
+      this.decorateWorkspaceRow(setting.settingEl, file);
     }
+  }
+
+  private decorateWorkspaceRow(rowEl: HTMLElement, file: SurfaceAgentFile): void {
+    const nameEl = rowEl.querySelector<HTMLElement>('.setting-item-name');
+    if (!nameEl) {
+      return;
+    }
+    const badgesEl = nameEl.createSpan({ cls: 'opencodian-agent-catalog-badges' });
+    badgesEl.createSpan({
+      cls: 'opencodian-agent-badge opencodian-agent-badge-muted',
+      text: t(`settings.agents.workspace.scope.${file.scope}`),
+    });
+    badgesEl.createSpan({
+      cls: `opencodian-agent-badge ${
+        file.parseStatus === 'ok'
+          ? 'opencodian-agent-badge-info'
+          : 'opencodian-agent-badge-warning'
+      }`,
+      text: this.getFileStatusLabel(file.parseStatus),
+    });
+    badgesEl.createSpan({
+      cls: `opencodian-agent-badge ${
+        file.runtimeSeen
+          ? 'opencodian-agent-badge-info'
+          : 'opencodian-agent-badge-muted'
+      }`,
+      text: file.runtimeSeen
+        ? t('settings.agents.workspace.status.runtimeSeen')
+        : t('settings.agents.workspace.status.runtimePending'),
+    });
   }
 
   private getFileStatusLabel(
@@ -789,7 +907,7 @@ export class SettingsAgentsSection {
     }
 
     const editorEl = containerEl.createDiv({
-      cls: 'opencodian-plugin-block opencodian-markdown-agent-editor',
+      cls: 'opencodian-markdown-agent-editor',
       attr: { 'data-markdown-editor': editorId },
     });
 
@@ -806,25 +924,30 @@ export class SettingsAgentsSection {
     let currentFrontmatter = frontmatterText;
     let currentPromptBody = file.promptBody;
 
-    new Setting(editorEl)
+    const frontmatterSetting = new Setting(editorEl)
       .setName(t('settings.agents.workspace.edit.frontmatter'))
+      .setClass('opencodian-agent-workspace-editor-row')
       .addTextArea((text) => {
         text
           .setValue(frontmatterText)
           .onChange((value) => { currentFrontmatter = value; });
         TextareaSizeMemory.attach(text.inputEl, 'agents-user-instructions');
       });
+    frontmatterSetting.settingEl.addClass('opencodian-agent-workspace-editor-row-textarea');
 
-    new Setting(editorEl)
+    const promptBodySetting = new Setting(editorEl)
       .setName(t('settings.agents.workspace.edit.promptBody'))
+      .setClass('opencodian-agent-workspace-editor-row')
       .addTextArea((text) => {
         text
           .setValue(file.promptBody)
           .onChange((value) => { currentPromptBody = value; });
         TextareaSizeMemory.attach(text.inputEl, 'agents-project-instructions');
       });
+    promptBodySetting.settingEl.addClass('opencodian-agent-workspace-editor-row-textarea');
 
     new Setting(editorEl)
+      .setClass('opencodian-agent-workspace-editor-actions')
       .addButton((btn) => {
         btn
           .setButtonText(t('settings.agents.workspace.actions.save'))
@@ -912,6 +1035,14 @@ export class SettingsAgentsSection {
     containerEl.querySelectorAll('[data-section-block]').forEach((el) => {
       const blockEl = el as HTMLElement;
       blockEl.style.display = blockEl.dataset.sectionBlock === activeTabId ? '' : 'none';
+    });
+  }
+
+  private renderInlineAlert(containerEl: HTMLElement, text: string, state: 'empty' | 'error'): HTMLElement {
+    return containerEl.createDiv({
+      cls: 'opencodian-agent-settings-alert',
+      text,
+      attr: { 'data-alert-state': state },
     });
   }
 

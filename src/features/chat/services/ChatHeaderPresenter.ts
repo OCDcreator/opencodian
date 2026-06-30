@@ -41,6 +41,13 @@ const SERVER_STATUS_KEY_BY_AVAILABILITY: Record<ChatServerAvailability, ServerSt
   external: 'chat.serverStatus.external',
 };
 
+const BACKEND_STATUS_ICON_ASSET_PATH_BY_KIND: Partial<Record<AgentBackendKind, string>> = {
+  'claude-code': 'assets/provider-icons/opencode/anthropic.svg',
+  codex: 'assets/provider-icons/opencode/openai.svg',
+  copilot: 'assets/provider-icons/opencode/github-copilot.svg',
+  pi: 'assets/provider-icons/opencode/perplexity.svg',
+};
+
 function readOpenCodianPlugin(): unknown {
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -110,7 +117,8 @@ export class ChatHeaderPresenter {
   private headerTabBarSlotEl: HTMLElement | null = null;
   private logoContainerEl: HTMLElement | null = null;
   private titleWordmarkEl: HTMLImageElement | null = null;
-  private serverStatusBadgeEl: HTMLElement | null = null;
+  private serverStatusBadgeEl: HTMLButtonElement | null = null;
+  private serverStatusIconEl: HTMLElement | null = null;
   private serverStatusTextEl: HTMLElement | null = null;
   private headerActionsEl: HTMLElement | null = null;
   private headerStatusGroupEl: HTMLElement | null = null;
@@ -238,7 +246,7 @@ export class ChatHeaderPresenter {
     }
 
     if (this.serverStatusTextEl) {
-      this.serverStatusTextEl.setText(this.getServerStatusLabel(this.lastServerAvailability ?? 'checking'));
+      this.updateServerStatusLabel(this.getServerStatusLabel(this.lastServerAvailability ?? 'checking'));
     }
 
     this.lspStatusIndicator?.refreshLocale();
@@ -292,6 +300,7 @@ export class ChatHeaderPresenter {
     this.logoContainerEl = null;
     this.titleWordmarkEl = null;
     this.serverStatusBadgeEl = null;
+    this.serverStatusIconEl = null;
     this.serverStatusTextEl = null;
     this.headerActionsEl = null;
     this.headerStatusGroupEl = null;
@@ -332,13 +341,32 @@ export class ChatHeaderPresenter {
   }
 
   private buildStatusBadge(actionsEl: HTMLElement): void {
-    this.serverStatusBadgeEl = actionsEl.createDiv({ cls: 'opencodian-server-status-badge is-checking' });
+    this.serverStatusBadgeEl = actionsEl.createEl('button', {
+      cls: 'opencodian-server-status-badge is-checking',
+      attr: {
+        type: 'button',
+        'data-status-chip': 'collapsed',
+        'aria-expanded': 'false',
+      },
+    });
     this.serverStatusBadgeEl.addClass('opencodian-tooltip-trigger');
-    this.serverStatusBadgeEl.createSpan({ cls: 'opencodian-server-status-dot' });
+    this.serverStatusIconEl = this.serverStatusBadgeEl.createSpan({
+      cls: 'opencodian-server-status-icon',
+      attr: {
+        'aria-hidden': 'true',
+        'data-icon': 'inline-start',
+      },
+    });
+    this.serverStatusIconEl.createSpan({ cls: 'opencodian-server-status-icon-fallback', text: 'O' });
+    this.serverStatusBadgeEl.createSpan({ cls: 'opencodian-server-status-state', attr: { 'aria-hidden': 'true' } });
+    const initialLabel = t('chat.serverStatus.checking');
     this.serverStatusTextEl = this.serverStatusBadgeEl.createSpan({
       cls: 'opencodian-server-status-text',
-      text: t('chat.serverStatus.checking'),
+      text: initialLabel,
     });
+    this.serverStatusTextEl.setAttribute('aria-hidden', 'true');
+    this.updateServerStatusLabel(initialLabel);
+    this.applyActiveBackendAttribute();
     this.serverStatusBadgeEl.addEventListener('click', () => {
       this.host.openServerSettings();
     });
@@ -388,7 +416,7 @@ export class ChatHeaderPresenter {
 
       this.serverStatusBadgeEl.removeClass(...SERVER_STATUS_CLASS_NAMES);
       this.serverStatusBadgeEl.addClass(`is-${availability}`);
-      this.serverStatusTextEl.setText(this.getServerStatusLabel(availability));
+      this.updateServerStatusLabel(this.getServerStatusLabel(availability));
       this.host.setTooltipLabel(this.serverStatusBadgeEl, this.getStatusSettingsTooltip(), 'bottom');
       this.host.refreshContextUsageIndicator();
       this.host.onServerAvailabilityRefreshed?.();
@@ -408,8 +436,41 @@ export class ChatHeaderPresenter {
       return;
     }
 
-    const kind = this.host.getActiveBackendKind?.() ?? readActiveBackendFromPlugin();
+    const kind = this.getActiveBackendKind();
     this.serverStatusBadgeEl.setAttribute('data-active-backend', kind);
+    this.updateServerStatusIcon(kind);
+  }
+
+  private getActiveBackendKind(): AgentBackendKind {
+    return this.host.getActiveBackendKind?.() ?? readActiveBackendFromPlugin();
+  }
+
+  private updateServerStatusIcon(kind: AgentBackendKind): void {
+    if (!this.serverStatusIconEl) {
+      return;
+    }
+
+    this.serverStatusIconEl.setAttribute('data-backend-icon', kind);
+    this.serverStatusIconEl.removeClass('has-svg-icon', 'has-inline-brandmark');
+    this.serverStatusIconEl.style.removeProperty('--opencodian-server-status-icon-url');
+    this.serverStatusIconEl.empty();
+    if (kind === 'opencode') {
+      const brandmarkEl = this.serverStatusIconEl.createSpan({
+        cls: 'opencodian-server-status-icon-brandmark',
+        attr: { 'aria-hidden': 'true' },
+      });
+      brandmarkEl.innerHTML = this.getLogoSvg();
+      this.serverStatusIconEl.addClass('has-inline-brandmark');
+      return;
+    }
+
+    this.serverStatusIconEl.createSpan({ cls: 'opencodian-server-status-icon-fallback', text: 'O' });
+    const iconUrl = this.resolveBackendStatusIconUrl(kind);
+    if (iconUrl) {
+      this.serverStatusIconEl.addClass('has-svg-icon');
+      this.serverStatusIconEl.style.setProperty('--opencodian-server-status-icon-url', `url("${iconUrl}")`);
+      return;
+    }
   }
 
   private getServerStatusLabel(availability: ChatServerAvailability): string {
@@ -444,9 +505,41 @@ export class ChatHeaderPresenter {
     return t(SERVER_STATUS_KEY_BY_AVAILABILITY[availability]);
   }
 
+  private updateServerStatusLabel(label: string): void {
+    if (!this.serverStatusBadgeEl || !this.serverStatusTextEl) {
+      return;
+    }
+
+    this.serverStatusTextEl.setText(label);
+    const visibleGlyphCount = Array.from(label.trim() || label).length;
+    const clampedGlyphCount = Math.min(Math.max(visibleGlyphCount, 2), 22);
+    const expandedWidthPx = Math.min(220, Math.max(72, 48 + clampedGlyphCount * 7));
+    this.serverStatusBadgeEl.style.setProperty(
+      '--opencodian-server-status-label-ch',
+      clampedGlyphCount.toString(),
+    );
+    this.serverStatusBadgeEl.style.setProperty(
+      '--opencodian-server-status-expanded-width',
+      `${expandedWidthPx}px`,
+    );
+  }
+
+  private resolveBackendStatusIconUrl(kind: AgentBackendKind): string | null {
+    const assetPath = BACKEND_STATUS_ICON_ASSET_PATH_BY_KIND[kind];
+    if (!assetPath) {
+      return null;
+    }
+
+    return this.host.resolveAssetUrl(assetPath);
+  }
+
   private syncThemeAssets(): void {
     if (this.logoContainerEl) {
       this.logoContainerEl.innerHTML = this.getLogoSvg();
+    }
+
+    if (this.serverStatusIconEl && this.getActiveBackendKind() === 'opencode') {
+      this.updateServerStatusIcon('opencode');
     }
 
     if (!this.titleWordmarkEl) {

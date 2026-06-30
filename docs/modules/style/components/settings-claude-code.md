@@ -7,6 +7,8 @@
 
 Claude Code 设置面板的专用样式，负责 tab body、语义 group、readback、advanced sandbox 和 proof-status notice 的视觉语义。该文件同时保留新的 `opencodian-claude-code-*` class 与既有 `opencodian-settings-*` alias，避免测试、定位和旧样式契约断裂。
 
+2026-06-28：Claude Code 设置样式吸收 shadcn/Rhea 的紧凑产品界面模式，但仍使用 Obsidian DOM + CSS，不引入 React、Tailwind 或 shadcn 运行时组件。`opencodian-settings-claude-code-block` 新增局部布局 token：`--oc-claude-card-gap`、`--oc-claude-group-header-gap`、`--oc-claude-card-padding`、`--oc-claude-control-min-width`、`--oc-claude-readback-row-bg`、`--oc-claude-readback-row-border`。这些 token 只定义 Claude Code section 的行距、控件列和 readback 内层行；基础颜色/圆角仍来自 `settings-layout-contract.css` 与 Obsidian 主题变量。
+
 核心规则是：`readback` 是运行时回读或 supporting evidence，不是行为通过。只有 `data-proof-state="pass"` 使用 success tint；`readback` 使用 neutral/info tint，`wiring` 与 lifecycle 使用 warning tint。
 
 **卡片层级约束**：Claude Code 设置表面遵循"卡片不超过两层"的视觉契约（与 Codex 设置表面一致）。`data-claude-code-group` 容器是**扁平语义分组**（仅 margin + 标题 + 描述，无 border/bg/radius），card base（border + radius + `--background-secondary` + padding）只作用到组 stack 内的 `setting-item` / notice strip / readback / proof-status 上。最终 DOM 层级为：`section-card → setting-item-card`（两层），notice 与 readback 与 setting-item 平级，不嵌套成卡片。
@@ -15,11 +17,13 @@ Claude Code 设置面板的专用样式，负责 tab body、语义 group、readb
 
 `.opencodian-settings-claude-code-block` 上定义本 surface 专用间距 token（与 Codex `--oc-codex-*` 对齐，使两个 backend 设置区视觉一致）：
 
-- `--oc-claude-card-gap: 12px` — 组间与组内卡片间垂直间距
-- `--oc-claude-group-header-gap: 16px` — 组 header 到控件 stack 的间距
+- `--oc-claude-card-gap: 10px` — 组间与组内卡片间垂直间距
+- `--oc-claude-group-header-gap: 12px` — 组 header 到控件 stack 的间距
 - `--oc-claude-card-title-body-gap: 8px` — 组 title 到 desc 的间距
 - `--oc-claude-card-body-gap: 10px` — readback 卡片内部块间距
-- `--oc-claude-card-padding: 14px 16px` — 卡片内边距
+- `--oc-claude-card-padding: 12px 14px` — 卡片内边距
+- `--oc-claude-control-min-width: 220px` — 桌面 setting row 控件列最小宽度
+- `--oc-claude-readback-row-bg` / `--oc-claude-readback-row-border` — readback 内层 metadata row 的轻量 surface token
 
 ## 样式规则
 
@@ -28,7 +32,7 @@ Claude Code 设置面板的专用样式，负责 tab body、语义 group、readb
 `.opencodian-claude-code-tab-body` / `.opencodian-settings-claude-code-tab-body`
 
 - 使用 flex column 布局
-- group 之间固定 `--oc-claude-card-gap` (12px) 间距
+- group 之间固定 `--oc-claude-card-gap` (10px) 间距
 
 ### Group Chrome
 
@@ -38,8 +42,24 @@ Claude Code 设置面板的专用样式，负责 tab body、语义 group、readb
 - **扁平**：无 border / background / radius / padding，仅 margin；组间用 `+` 选择器加 `--oc-claude-card-gap` 上间距
 - header 是 `flex-direction: row`，让 h4 标题与 help 按钮横排成单行
 - `h4` title 使用 `.opencodian-claude-code-group-title` / `.opencodian-settings-claude-code-group-title`
+
+### Row Layout
+
+`.opencodian-settings-claude-code-block .opencodian-claude-code-stack > .setting-item`
+
+- 桌面使用 `grid-template-columns: minmax(0, 1fr) minmax(var(--oc-claude-control-min-width), max-content)`，让说明和控件保持成熟设置页的 control-surface 节奏。
+- `.setting-item-control` 可换行并右对齐，多个按钮、proof chip、dropdown 不再撑破行宽。
+- 文本输入、密码输入和 select 使用 30px 紧凑高度与 shared inline radius；textarea 使用稳定宽度和垂直 resize。
+- `@media (max-width: 720px)` 下折叠为单列，控件左对齐并可占满宽度，避免中文说明与控件重叠。
+
+### Readback Inner Rows
+
+`.opencodian-claude-code-runtime-ecosystem-row` 与 `.opencodian-claude-code-mcp-runtime-status-row`
+
+- readback 容器仍是唯一 card surface；内部 runtime ecosystem / MCP status detail 只使用轻量 metadata row。
+- loaded/all runtime ecosystem rows 只增加轻量 accent border，不使用 success 色，保持 readback 与 pass 语义分离。
 - **组描述已收进标题旁的 help 按钮**：`.opencodian-claude-code-group-help-button`（22×22 `clickable-icon`，`help-circle` 图标），hover/focus 通过 `data-settings-tooltip` 显示组描述全文；描述文字同时以 sr-only `.opencodian-claude-code-group-desc` span 保留在 DOM 中（维持 textContent 可达）。不再渲染整行 `<p>` 描述段落
-- 控件 stack 使用 `.opencodian-claude-code-stack` / `.opencodian-settings-claude-code-group-stack`，与 header 间隔 `--oc-claude-group-header-gap` (16px)
+- 控件 stack 使用 `.opencodian-claude-code-stack` / `.opencodian-settings-claude-code-group-stack`，与 header 间隔 `--oc-claude-group-header-gap` (12px)
 
 ### Level-2 Card Base
 

@@ -16,6 +16,15 @@
 
 其中 `高级配置` 默认折叠，避免长文本 area 把整个设置面撑得过长。
 
+2026-06-28 UI 重构后，editor 的视觉层级改为 flat group + row-card control surface：
+
+- `.opencodian-agent-editor-layout`：editor 内部纵向布局。
+- `.opencodian-agent-editor-group`：身份、行为、模型、高级配置四个 flat group，不再承担重卡片背景。
+- `.opencodian-agent-editor-row`：普通表单行，桌面端使用 copy/control 两列，窄屏退为单列。
+- `.opencodian-agent-editor-row-textarea`：prompt、task allowlist、options 等长文本行，控制区 full-width。
+- `.opencodian-agent-editor-group-summary`：高级配置的 Radix-style native disclosure，带 `aria-expanded` 和 `aria-controls`。
+- `.opencodian-agent-editor-actions`：保存/删除 footer row，和表单主体用轻量分隔线区分。
+
 这个 editor 覆盖 project agent 表单字段：
 
 - `mode`
@@ -52,6 +61,13 @@ commands/slash runtime 与 command-owned hidden agent lifecycle 不属于本 edi
 - 未选择条目时，表单保持“新建 project agent”状态
 - `syncEditorControls()` 仍统一回填全部 control；分组只影响展示结构，不改变 state ownership
 
+### group / disclosure DOM contract
+
+- identity / behavior / model group 使用普通 heading copy + row stack。
+- advanced group 使用原生 `<details>` / `<summary>`，默认关闭；summary 带 `role="button"`、`aria-expanded`、`aria-controls="opencodian-agent-editor-advanced-content"`。
+- disclosure 只影响高级字段可见性，不改变 state、保存 patch、delete guard 或 textarea resize memory。
+- 不能把高级配置改成 Sheet/Drawer 或 modal；Settings 页内编辑上下文必须保持连续。
+
 ### 保存与删除
 
 - 保存统一走 `OpencodeConfigManager.upsertAgentConfig()`
@@ -84,7 +100,7 @@ commands/slash runtime 与 command-owned hidden agent lifecycle 不属于本 edi
 |------|------|
 | `dispose()` | 销毁当前 editor 持有的 textarea size-memory observer |
 | `render()` | 渲染 project agent picker、字段表单与 save/delete action |
-| `createEditorGroup()` | 创建分组卡片 / 可折叠高级区外壳，并返回字段挂载 body |
+| `createEditorGroup()` | 创建 flat group / 可折叠高级区外壳，并返回字段挂载 body |
 | `saveProjectAgentFromEditor()` | 归一化表单值并写回 project agent override |
 | `deleteSelectedProjectAgent()` | 删除当前选中的 project agent override |
 
@@ -94,6 +110,7 @@ commands/slash runtime 与 command-owned hidden agent lifecycle 不属于本 edi
 - `SettingsAgentsSection`: 提供 editor 挂载点、当前 project agent map 与刷新回调
 - `OpencodeConfigManager`: 执行 project `agent.<id>` 的 upsert/remove
 - `TextareaSizeMemory.ts`: 为 prompt / allowlist / options textarea 提供高度恢复与 resize 持久化
+- `src/style/components/settings-agents.css`: 提供 editor group、row、textarea、disclosure 和 action footer 样式
 - `i18n/locales/*`: 提供 editor 字段、按钮与错误提示文案
 
 ## 注意事项

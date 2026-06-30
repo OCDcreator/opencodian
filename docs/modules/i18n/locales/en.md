@@ -1,7 +1,11 @@
 # English Locale
 
 > **源码**: `src/i18n/locales/en.ts`
-> **最近更新**: 2026-06-18 Claude Code notice collapse — added `settings.claudeCode.help.boundaryLabel` / `.lifecycleLabel` / `.proofLabel` section labels for the new `ClaudeCodeHelpModal` that carries boundary/lifecycle/proof text out of the dense settings surface into a per-setting help button.
+> **最近更新**: 2026-06-28 Settings extension badges — added `settings.tools.permission.source.*`, `settings.tools.custom.status.*`, and `settings.acp.count` for Skills / Tools / ACP settings row-card badges and toolbar count text.
+>
+> **Previously**: 2026-06-28 Agent management UI badges — added `settings.agent.status.disabled` so `General > Agent Management` can show active/enabled/disabled backend state as compact badges without duplicating status text in row titles.
+>
+> **Previously**: 2026-06-18 Claude Code notice collapse — added `settings.claudeCode.help.boundaryLabel` / `.lifecycleLabel` / `.proofLabel` section labels for the new `ClaudeCodeHelpModal` that carries boundary/lifecycle/proof text out of the dense settings surface into a per-setting help button.
 >
 > **Previously**: 2026-06-17 Claude Code permission selector copy — updated `settings.claudeCode.permissionMode.*` and `chat.claudeCode.permissionMode.*.description` so the chat toolbar can show screenshot-style compact labels (`Ask first`, `Auto edit`, `Plan mode`, `Full access`) while keeping `Full access` honest about bypassing permission checks.
 >
@@ -22,6 +26,8 @@
 ## 概述
 
 OpenCodian 的英文翻译表，导出 `enTranslations` 静态对象。
+
+2026-06-28：新增 `settings.tools.permission.source.*`、`settings.tools.custom.status.*` 和 `settings.acp.count`，用于 Tools 权限行 inherited / override / custom badge、自定义工具文件 editable / read-only badge，以及 ACP preset toolbar 的配置数量。此前同日新增 `settings.agent.status.disabled`，用于 backend management / 智能体管理列表里的 disabled badge。上述键只补齐 UI 状态标签，不改变工具权限、工具文件 CRUD、ACP agent 保存或 backend 启用保存语义。
 
 2026-06-17：更新 Claude Code 权限模式聊天选择器文案。`settings.claudeCode.permissionMode.*` 现在提供截图式紧凑标签（`Ask first` / `Auto edit` / `Plan mode` / `Full access`），`chat.claudeCode.permissionMode.*.description` 提供对应短描述；其中 `Full access` 描述必须保留 bypass permission checks 的风险语义，避免把 SDK `bypassPermissions` 误导成普通少确认。
 

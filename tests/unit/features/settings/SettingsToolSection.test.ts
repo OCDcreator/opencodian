@@ -111,6 +111,32 @@ async function flushPromises(): Promise<void> {
   await Promise.resolve();
 }
 
+function installSettingControlMocks(): void {
+  jest.spyOn(Setting.prototype, 'setName').mockImplementation(function setName(this: Setting, name: string) {
+    (this as Setting & { __settingName?: string }).__settingName = name;
+    return this;
+  });
+  jest.spyOn(Setting.prototype, 'addButton').mockImplementation(function addButton(
+    this: Setting,
+    callback: (control: MockButtonControl) => unknown,
+  ) {
+    const record = createButtonRecord();
+    buttonRecords.push(record);
+    callback(record.control);
+    return this;
+  });
+  jest.spyOn(Setting.prototype, 'addDropdown').mockImplementation(function addDropdown(
+    this: Setting,
+    callback: (control: MockDropdownControl) => unknown,
+  ) {
+    const name = (this as Setting & { __settingName?: string }).__settingName ?? '';
+    const record = createDropdownRecord(name);
+    dropdownRecords.push(record);
+    callback(record.control);
+    return this;
+  });
+}
+
 describe('SettingsToolSection custom tool authoring', () => {
   beforeEach(() => {
     setLocale('en');
@@ -118,29 +144,7 @@ describe('SettingsToolSection custom tool authoring', () => {
     buttonRecords.length = 0;
     dropdownRecords.length = 0;
     jest.restoreAllMocks();
-    jest.spyOn(Setting.prototype, 'setName').mockImplementation(function setName(this: Setting, name: string) {
-      (this as Setting & { __settingName?: string }).__settingName = name;
-      return this;
-    });
-    jest.spyOn(Setting.prototype, 'addButton').mockImplementation(function addButton(
-      this: Setting,
-      callback: (control: MockButtonControl) => unknown,
-    ) {
-      const record = createButtonRecord();
-      buttonRecords.push(record);
-      callback(record.control);
-      return this;
-    });
-    jest.spyOn(Setting.prototype, 'addDropdown').mockImplementation(function addDropdown(
-      this: Setting,
-      callback: (control: MockDropdownControl) => unknown,
-    ) {
-      const name = (this as Setting & { __settingName?: string }).__settingName ?? '';
-      const record = createDropdownRecord(name);
-      dropdownRecords.push(record);
-      callback(record.control);
-      return this;
-    });
+    installSettingControlMocks();
   });
 
   it('renders project custom tool files with create, edit, delete, and permission controls', async () => {
@@ -157,8 +161,19 @@ describe('SettingsToolSection custom tool authoring', () => {
 
     await new SettingsToolSection(containerEl, plugin as never, 'custom').render();
 
-    expect(containerEl.querySelector('.opencodian-tool-control-panel .opencodian-tool-authoring-actions')).not.toBeNull();
+    expect(containerEl.querySelector('.opencodian-tool-control-panel .opencodian-tool-authoring-actions')).toBeNull();
+    const actionsEl = containerEl.querySelector('.opencodian-tool-files-actions');
+    expect(actionsEl).not.toBeNull();
+    expect(actionsEl?.querySelectorAll('.setting-item')).toHaveLength(3);
+    expect(buttonRecords.filter((record) => ['New tool', 'Refresh', 'Docs'].includes(record.text)).map((record) => record.text)).toEqual([
+      'New tool',
+      'Refresh',
+      'Docs',
+    ]);
+    expect(containerEl.querySelector('.opencodian-tool-group-rows > .opencodian-settings-scrollarea-viewport')).not.toBeNull();
+    expect(containerEl.querySelector('.opencodian-settings-scrollarea-content--tools')).not.toBeNull();
     expect(buttonRecords.some((record) => record.text === 'New tool')).toBe(true);
+    expect(containerEl.querySelector('.opencodian-tool-files-count-badge')?.textContent).toContain('1');
     expect(containerEl.querySelector('.opencodian-tool-file-card')?.textContent).toContain('database');
     expect(containerEl.querySelector('.opencodian-tool-source-chip')?.textContent).toBe('Project');
     expect(containerEl.querySelector('.opencodian-tool-file-path')?.textContent).toBe('.opencode/tools/database.ts');
@@ -177,6 +192,7 @@ describe('SettingsToolSection custom tool authoring', () => {
     const defaultDropdown = containerEl.querySelector<HTMLSelectElement>('.opencodian-tool-default-select');
     expect(containerEl.querySelector('.opencodian-tool-control-panel.opencodian-skill-control-panel')).not.toBeNull();
     expect(containerEl.querySelector('.opencodian-tool-default-cluster.opencodian-skill-permission-cluster')).not.toBeNull();
+    expect(containerEl.querySelector('.opencodian-tool-group-rows > .opencodian-settings-scrollarea-viewport')).not.toBeNull();
     expect(defaultDropdown?.value).toBe('ask');
     expect(readDropdown?.control.setValue).toHaveBeenCalledWith('inherit');
     expect(bashDropdown?.control.setValue).toHaveBeenCalledWith('deny');

@@ -79,6 +79,12 @@ function createHeadingStub(): jest.Mock {
   });
 }
 
+function countTextMatches(rootEl: Element, expectedText: string): number {
+  return Array.from(rootEl.querySelectorAll('h3, h4, p, .opencodian-settings-block-desc'))
+    .filter((el) => el.textContent === expectedText)
+    .length;
+}
+
 async function flushUi(): Promise<void> {
   for (let index = 0; index < 5; index += 1) {
     await Promise.resolve();
@@ -111,6 +117,45 @@ describe('SettingsCapabilityLabSection', () => {
     expect(banner!.textContent).toContain('DIAGNOSTIC');
     expect(banner!.textContent).toContain('EXPERIMENTAL');
     expect(banner!.textContent).toContain('NOT STABLE');
+  });
+
+  it('renders inside the shared debug tab shell without removing diagnostic blocks', () => {
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+
+    const shellEl = containerEl.querySelector('[data-debug-tab-shell="true"]');
+    expect(shellEl).toBeTruthy();
+    expect(shellEl?.classList.contains('opencodian-capability-lab-shell')).toBe(true);
+    expect(shellEl?.getAttribute('data-section-block')).toBe('capability-lab');
+    expect(shellEl?.querySelector('.opencodian-debug-tab-header')?.textContent).toContain(
+      t('settings.capabilityLab.title'),
+    );
+    expect(shellEl?.querySelector('.opencodian-debug-tab-body')).not.toBeNull();
+    expect(shellEl?.querySelector('.opencodian-debug-tab-badge')).not.toBeNull();
+    expect(shellEl?.querySelector('[data-section-block="matrix"]')).not.toBeNull();
+    expect(shellEl?.querySelector('[data-section-block="discovery"]')).not.toBeNull();
+  });
+
+  it('renders the Capability Lab tab title and intro copy only once in tabbed mode', () => {
+    const containerEl = document.createElement('div');
+    const headingStub = createHeadingStub();
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(),
+      createSectionHeading: headingStub,
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+
+    const shellEl = containerEl.querySelector('[data-section-block="capability-lab"]');
+    expect(shellEl).not.toBeNull();
+    expect(headingStub).not.toHaveBeenCalled();
+    expect(countTextMatches(shellEl!, t('settings.capabilityLab.title'))).toBe(1);
+    expect(countTextMatches(shellEl!, t('settings.capabilityLab.matrix.description'))).toBe(1);
   });
 
   it('renders diagnostic stream controls in Discovery section with toggles backed by plugin settings', async () => {

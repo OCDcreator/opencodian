@@ -5,6 +5,10 @@ import {
 } from '../../../../src/features/settings/AgentSwitcherFloatingIcons';
 
 describe('renderAgentSwitcherFloatingIcons', () => {
+  beforeEach(() => {
+    document.body.innerHTML = '';
+  });
+
   it('renders settings left agent switcher buttons with LobeHub light and dark icons', () => {
     const containerEl = document.createElement('div');
     document.body.appendChild(containerEl);
@@ -51,6 +55,45 @@ describe('renderAgentSwitcherFloatingIcons', () => {
 
     containerEl.remove();
     floatingEl?.remove();
+  });
+
+  it('hides the editor-area switcher while an unrelated Obsidian settings modal is in front', async () => {
+    const containerEl = document.createElement('div');
+    document.body.appendChild(containerEl);
+
+    renderAgentSwitcherFloatingIcons(containerEl, {
+      selectedAgent: 'claude-code',
+      enabledAgents: ['opencode', 'claude-code'],
+      onSelect: jest.fn(),
+    });
+
+    const floatingEl = document.body.querySelector<HTMLElement>('.opencodian-agent-switcher-floating');
+    expect(floatingEl?.getAttribute('aria-hidden')).toBe('false');
+
+    const modalEl = document.body.createDiv({ cls: 'modal mod-settings' });
+    modalEl.createDiv({ text: 'Obsidian settings' });
+    await Promise.resolve();
+
+    expect(floatingEl?.getAttribute('aria-hidden')).toBe('true');
+
+    modalEl.remove();
+    await Promise.resolve();
+
+    expect(floatingEl?.getAttribute('aria-hidden')).toBe('false');
+  });
+
+  it('does not render the floating rail inside the Obsidian settings modal', () => {
+    const modalEl = document.body.createDiv({ cls: 'modal mod-settings' });
+    const containerEl = modalEl.createDiv();
+
+    renderAgentSwitcherFloatingIcons(containerEl, {
+      selectedAgent: 'claude-code',
+      enabledAgents: ['opencode', 'claude-code'],
+      onSelect: jest.fn(),
+    });
+
+    expect(document.body.querySelector('.opencodian-agent-switcher-floating')).toBeNull();
+    expect(modalEl.querySelector('.opencodian-agent-switcher-hover-zone')).toBeNull();
   });
 });
 

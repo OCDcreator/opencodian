@@ -197,6 +197,12 @@ function findButton(label: string): ButtonRecord | undefined {
   return buttonRecords.find((record) => record.label === label);
 }
 
+function countTextMatches(rootEl: Element, expectedText: string): number {
+  return Array.from(rootEl.querySelectorAll('h4, .opencodian-settings-block-desc'))
+    .filter((el) => el.textContent === expectedText)
+    .length;
+}
+
 function mockClipboard(): void {
   Object.defineProperty(navigator, 'clipboard', {
     configurable: true,
@@ -277,6 +283,21 @@ describe('SettingsDebugSection', () => {
     globalWithRequire.require = originalRequire;
   });
 
+  it('keeps Obsidian Setting mock usable after jsdom document teardown', () => {
+    jest.restoreAllMocks();
+    obsidian.__setMockDocumentProvider(() => undefined);
+
+    try {
+      const setting = new Setting();
+      expect(setting.settingEl).toBeDefined();
+      expect(setting.controlEl).toBeDefined();
+      expect(() => setting.setName('Late async setting')).not.toThrow();
+    } finally {
+      obsidian.__resetMockDocumentProvider();
+      mockSettingPrototype();
+    }
+  });
+
   it('renders debug help and saves debug toggles with existing semantics', async () => {
     const plugin = createPlugin();
     const { headingEl, containerEl } = createSection(plugin);
@@ -352,6 +373,88 @@ describe('SettingsDebugSection', () => {
     expect(containerEl.querySelector('[data-section-block="export"] h4')?.textContent).toBe(
       t('settings.debug.export.title'),
     );
+  });
+
+  it('renders every tabbed debug source inside the shared settings shell', () => {
+    const { containerEl } = createTabbedSection('plugin');
+    const shellEls = Array.from(containerEl.querySelectorAll('[data-debug-tab-shell="true"]'));
+
+    expect(shellEls.map((el) => (el as HTMLElement).dataset.sectionBlock)).toEqual([
+      'plugin',
+      'opencode',
+      'claude-code',
+      'export',
+    ]);
+    for (const shellEl of shellEls) {
+      expect(shellEl.classList.contains('opencodian-debug-tab-shell')).toBe(true);
+      expect(shellEl.querySelector('.opencodian-debug-tab-header')).not.toBeNull();
+      expect(shellEl.querySelector('.opencodian-debug-tab-body')).not.toBeNull();
+      expect(shellEl.querySelector('.opencodian-debug-tab-badge')).not.toBeNull();
+    }
+    expect(containerEl.querySelector('[data-section-block="plugin"]')?.textContent).toContain(
+      t('settings.debug.modules.plugin.desc'),
+    );
+  });
+
+  it('renders each tabbed debug shell title and description only once', () => {
+    const { containerEl } = createTabbedSection('plugin');
+    const tabCopy = [
+      {
+        id: 'plugin',
+        title: t('settings.debug.modules.plugin.title'),
+        description: t('settings.debug.modules.plugin.desc'),
+      },
+      {
+        id: 'opencode',
+        title: t('settings.debug.modules.opencode.title'),
+        description: t('settings.debug.modules.opencode.desc'),
+      },
+      {
+        id: 'claude-code',
+        title: t('settings.debug.modules.claudeCode.title'),
+        description: t('settings.debug.modules.claudeCode.groupDesc'),
+      },
+      {
+        id: 'export',
+        title: t('settings.debug.export.title'),
+        description: t('settings.debug.export.desc'),
+      },
+    ] as const;
+
+    for (const copy of tabCopy) {
+      const shellEl = containerEl.querySelector(`[data-section-block="${copy.id}"]`);
+      expect(shellEl).not.toBeNull();
+      expect(countTextMatches(shellEl!, copy.title)).toBe(1);
+      expect(countTextMatches(shellEl!, copy.description)).toBe(1);
+    }
+  });
+
+  it('keeps ordinary debug setting rows neutral instead of badge or diagnostic card rows', () => {
+    const { containerEl } = createTabbedSection('claude-code');
+    const ordinaryRows = Array.from(
+      containerEl.querySelectorAll<HTMLElement>(
+        '.opencodian-debug-global-panel > .setting-item, '
+          + '.opencodian-debug-modules > .setting-item, '
+          + '.opencodian-debug-export > .setting-item, '
+          + '.opencodian-debug-channel-list .setting-item',
+      ),
+    );
+    const statusItems = Array.from(
+      containerEl.querySelectorAll<HTMLElement>('.opencodian-debug-status-item'),
+    );
+
+    expect(ordinaryRows.length).toBeGreaterThan(0);
+    for (const rowEl of ordinaryRows) {
+      expect(rowEl.classList.contains('opencodian-debug-tab-badge')).toBe(false);
+      expect(rowEl.classList.contains('opencodian-debug-status-item')).toBe(false);
+      expect(rowEl.className).not.toContain('object');
+      expect(rowEl.className).not.toContain('accent');
+      expect(rowEl.className).not.toContain('purple');
+      expect(rowEl.className).not.toContain('violet');
+    }
+    for (const statusEl of statusItems) {
+      expect(statusEl.classList.contains('opencodian-debug-tab-badge')).toBe(false);
+    }
   });
 
   it('renders a Claude Code debug workbench with channel controls and filtered logs', async () => {

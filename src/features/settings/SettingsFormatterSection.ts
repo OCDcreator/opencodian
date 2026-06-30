@@ -1185,7 +1185,7 @@ export class SettingsFormatterSection {
     });
 
     if (builtinDefinitions.length === 0) {
-      new Setting(sectionEl).setDesc(t('settings.formatter.config.builtinList.empty'));
+      this.renderFormatterInlineEmpty(sectionEl, t('settings.formatter.config.builtinList.empty'));
       return;
     }
 
@@ -1238,6 +1238,7 @@ export class SettingsFormatterSection {
           await this.handleBuiltinActionChange(name, value as BuiltinEntryAction);
         });
       });
+    this.decorateFormatterRowSetting(setting);
 
     this.renderBuiltinRowStatusChip(setting, rowEl, name, action);
     this.renderBuiltinRowMeta(rowEl, runtimeStatus?.extensions ?? definition.extensions);
@@ -1389,7 +1390,9 @@ export class SettingsFormatterSection {
     name: string,
     entry: OpencodeFormatterEntryConfig,
   ): HTMLElement {
-    const fieldsEl = rowEl.createDiv({ cls: 'opencodian-formatter-override-fields' });
+    const fieldsEl = rowEl.createDiv({
+      cls: 'opencodian-formatter-override-fields opencodian-formatter-field-group',
+    });
 
     const commandStr = (entry.command ?? []).join(' ');
     new Setting(fieldsEl)
@@ -1556,7 +1559,7 @@ export class SettingsFormatterSection {
     );
 
     if (customEntries.length === 0) {
-      new Setting(sectionEl).setDesc(t('settings.formatter.config.customList.empty'));
+      this.renderFormatterInlineEmpty(sectionEl, t('settings.formatter.config.customList.empty'));
     } else {
       for (const [name, entry] of customEntries) {
         this.renderCustomFormatterRow(sectionEl, name, entry);
@@ -1576,11 +1579,17 @@ export class SettingsFormatterSection {
     const commandStr = (entry.command ?? []).join(' ');
     const extensionsStr = (entry.extensions ?? []).join(' ');
 
-    new Setting(rowEl)
+    const setting = new Setting(rowEl)
       .setName(name)
       .setDesc(`${commandStr}${extensionsStr ? ` · ${extensionsStr}` : ''}`);
+    this.decorateFormatterRowSetting(setting);
 
     this.renderCustomEditorFields(rowEl, name, entry);
+  }
+
+  private decorateFormatterRowSetting(setting: Setting): void {
+    setting.settingEl.addClass('opencodian-formatter-row-field');
+    setting.controlEl.addClass('opencodian-formatter-row-control');
   }
 
   private renderCustomEditorFields(
@@ -1588,7 +1597,9 @@ export class SettingsFormatterSection {
     name: string,
     entry: OpencodeFormatterEntryConfig,
   ): void {
-    const fieldsEl = rowEl.createDiv({ cls: 'opencodian-formatter-custom-fields' });
+    const fieldsEl = rowEl.createDiv({
+      cls: 'opencodian-formatter-custom-fields opencodian-formatter-field-group',
+    });
 
     const commandStr = (entry.command ?? []).join(' ');
     new Setting(fieldsEl)
@@ -1716,7 +1727,7 @@ export class SettingsFormatterSection {
   ): void {
     let nameInput: HTMLInputElement | null = null;
 
-    new Setting(parentEl)
+    const addSetting = new Setting(parentEl)
       .setName(t('settings.formatter.config.custom.addName'))
       .addText((text) => {
         text.setPlaceholder(t('settings.formatter.config.custom.addNamePlaceholder'));
@@ -1758,6 +1769,7 @@ export class SettingsFormatterSection {
             }
           });
       });
+    addSetting.settingEl.addClass('opencodian-formatter-add-custom-row');
   }
 
   private renderAdvancedJsonEditor(containerEl: HTMLElement): void {
@@ -1766,43 +1778,36 @@ export class SettingsFormatterSection {
       text: t('settings.formatter.config.advanced.title'),
       cls: 'opencodian-settings-subsection-heading',
     });
+    this.renderFormatterSectionDescription(sectionEl, t('settings.formatter.config.advanced.desc'));
 
-    new Setting(sectionEl)
-      .setDesc(t('settings.formatter.config.advanced.desc'));
-
-    const editorContainer = sectionEl.createDiv({ cls: 'opencodian-formatter-json-editor' });
-    const textareaEl = editorContainer.createEl('textarea', {
-      cls: 'opencodian-formatter-json-textarea',
-    });
-    textareaEl.rows = 12;
-    textareaEl.spellcheck = false;
-    this.textareaSizeMemories.push(TextareaSizeMemory.attach(textareaEl, 'formatter-json-editor'));
+    const textareaEl = this.createFormatterJsonTextarea(sectionEl, 'formatter-json-editor');
 
     void this.loadJsonEditorContent(textareaEl);
 
-    const buttonBar = sectionEl.createDiv({ cls: 'opencodian-formatter-json-buttons' });
-
-    new Setting(buttonBar)
-      .addButton((btn) => {
-        btn.setButtonText(t('settings.formatter.config.advanced.format'))
-          .onClick(() => {
-            this.formatJsonEditor(textareaEl);
-          });
-      })
-      .addButton((btn) => {
-        btn.setButtonText(t('settings.formatter.config.advanced.reload'))
-          .onClick(async () => {
-            await this.loadJsonEditorContent(textareaEl);
-            new Notice(t('settings.formatter.config.advanced.reloaded'));
-          });
-      })
-      .addButton((btn) => {
-        btn.setButtonText(t('settings.formatter.config.advanced.save'))
-          .setCta()
-          .onClick(async () => {
-            await this.saveJsonEditorContent(textareaEl);
-          });
-      });
+    const buttonBar = this.createFormatterJsonButtonBar(sectionEl);
+    this.createFormatterJsonButton(
+      buttonBar,
+      t('settings.formatter.config.advanced.format'),
+      () => {
+        this.formatJsonEditor(textareaEl);
+      },
+    );
+    this.createFormatterJsonButton(
+      buttonBar,
+      t('settings.formatter.config.advanced.reload'),
+      async () => {
+        await this.loadJsonEditorContent(textareaEl);
+        new Notice(t('settings.formatter.config.advanced.reloaded'));
+      },
+    );
+    this.createFormatterJsonButton(
+      buttonBar,
+      t('settings.formatter.config.advanced.save'),
+      async () => {
+        await this.saveJsonEditorContent(textareaEl);
+      },
+      { cta: true },
+    );
   }
 
   private async loadJsonEditorContent(textareaEl: HTMLTextAreaElement): Promise<void> {
@@ -2077,6 +2082,7 @@ export class SettingsFormatterSection {
             await this.handleBuiltinLspActionChange(definition.id, value as BuiltinEntryAction);
           });
         });
+      this.decorateFormatterRowSetting(setting);
 
       this.renderBuiltinRowStatusChip(setting, rowEl, definition.id, action);
       this.renderBuiltinRowMeta(rowEl, definition.extensions);
@@ -2412,15 +2418,16 @@ export class SettingsFormatterSection {
     const customEntries = Object.entries(configObj).filter(([key]) => !builtinIds.has(key));
 
     if (customEntries.length === 0) {
-      new Setting(sectionEl).setDesc(t('settings.formatter.lsp.customList.empty'));
+      this.renderFormatterInlineEmpty(sectionEl, t('settings.formatter.lsp.customList.empty'));
       return;
     }
 
     for (const [name, entry] of customEntries) {
       const rowEl = sectionEl.createDiv({ cls: 'opencodian-formatter-custom-row' });
-      new Setting(rowEl)
+      const setting = new Setting(rowEl)
         .setName(name)
         .setDesc((entry.command ?? []).join(' '));
+      this.decorateFormatterRowSetting(setting);
       this.renderLspEditorFields(rowEl, name, entry, false);
     }
   }
@@ -2431,7 +2438,9 @@ export class SettingsFormatterSection {
     entry: OpencodeLspEntryConfig,
     builtin: boolean,
   ): HTMLElement {
-    const fieldsEl = rowEl.createDiv({ cls: 'opencodian-formatter-custom-fields' });
+    const fieldsEl = rowEl.createDiv({
+      cls: 'opencodian-formatter-custom-fields opencodian-formatter-field-group',
+    });
 
     new Setting(fieldsEl)
       .setName(t('settings.formatter.lsp.command'))
@@ -2580,38 +2589,86 @@ export class SettingsFormatterSection {
       text: t('settings.formatter.lsp.advanced.title'),
       cls: 'opencodian-settings-subsection-heading',
     });
+    this.renderFormatterSectionDescription(sectionEl, t('settings.formatter.lsp.advanced.desc'));
 
-    new Setting(sectionEl)
-      .setDesc(t('settings.formatter.lsp.advanced.desc'));
+    const textareaEl = this.createFormatterJsonTextarea(sectionEl, 'lsp-json-editor');
+    void this.loadLspJsonEditorContent(textareaEl);
 
-    const editorContainer = sectionEl.createDiv({ cls: 'opencodian-formatter-json-editor' });
+    const buttonBar = this.createFormatterJsonButtonBar(sectionEl);
+    this.createFormatterJsonButton(
+      buttonBar,
+      t('settings.formatter.lsp.advanced.format'),
+      () => this.formatJsonEditor(textareaEl),
+    );
+    this.createFormatterJsonButton(
+      buttonBar,
+      t('settings.formatter.lsp.advanced.reload'),
+      async () => {
+        await this.loadLspJsonEditorContent(textareaEl);
+      },
+    );
+    this.createFormatterJsonButton(
+      buttonBar,
+      t('settings.formatter.lsp.advanced.save'),
+      async () => {
+        await this.saveLspJsonEditorContent(textareaEl);
+      },
+      { cta: true },
+    );
+  }
+
+  private renderFormatterSectionDescription(parentEl: HTMLElement, text: string): HTMLElement {
+    return parentEl.createDiv({
+      cls: 'opencodian-formatter-section-description',
+      text,
+    });
+  }
+
+  private renderFormatterInlineEmpty(parentEl: HTMLElement, text: string): HTMLElement {
+    return parentEl.createDiv({
+      cls: 'opencodian-settings-inline-empty opencodian-formatter-inline-empty',
+      text,
+    });
+  }
+
+  private createFormatterJsonTextarea(
+    parentEl: HTMLElement,
+    memoryKey: string,
+  ): HTMLTextAreaElement {
+    const editorContainer = parentEl.createDiv({ cls: 'opencodian-formatter-json-editor' });
     const textareaEl = editorContainer.createEl('textarea', {
       cls: 'opencodian-formatter-json-textarea',
     });
     textareaEl.rows = 12;
     textareaEl.spellcheck = false;
-    this.textareaSizeMemories.push(TextareaSizeMemory.attach(textareaEl, 'lsp-json-editor'));
-    void this.loadLspJsonEditorContent(textareaEl);
+    this.textareaSizeMemories.push(TextareaSizeMemory.attach(textareaEl, memoryKey));
+    return textareaEl;
+  }
 
-    const buttonBar = sectionEl.createDiv({ cls: 'opencodian-formatter-json-buttons' });
-    new Setting(buttonBar)
-      .addButton((btn) => {
-        btn.setButtonText(t('settings.formatter.lsp.advanced.format'))
-          .onClick(() => this.formatJsonEditor(textareaEl));
-      })
-      .addButton((btn) => {
-        btn.setButtonText(t('settings.formatter.lsp.advanced.reload'))
-          .onClick(async () => {
-            await this.loadLspJsonEditorContent(textareaEl);
-          });
-      })
-      .addButton((btn) => {
-        btn.setButtonText(t('settings.formatter.lsp.advanced.save'))
-          .setCta()
-          .onClick(async () => {
-            await this.saveLspJsonEditorContent(textareaEl);
-          });
-      });
+  private createFormatterJsonButtonBar(parentEl: HTMLElement): HTMLElement {
+    return parentEl.createDiv({
+      cls: 'opencodian-formatter-json-buttons opencodian-settings-action-footer',
+      attr: { role: 'group' },
+    });
+  }
+
+  private createFormatterJsonButton(
+    parentEl: HTMLElement,
+    label: string,
+    onClick: () => void | Promise<void>,
+    options: { cta?: boolean } = {},
+  ): HTMLButtonElement {
+    const buttonEl = parentEl.createEl('button', {
+      text: label,
+    });
+    buttonEl.type = 'button';
+    if (options.cta) {
+      buttonEl.addClass('mod-cta');
+    }
+    buttonEl.addEventListener('click', () => {
+      void onClick();
+    });
+    return buttonEl;
   }
 
   private async loadLspJsonEditorContent(textareaEl: HTMLTextAreaElement): Promise<void> {

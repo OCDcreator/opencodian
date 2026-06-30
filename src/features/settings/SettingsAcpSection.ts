@@ -4,9 +4,11 @@
 
 import { Setting } from 'obsidian';
 
+import type { AgentBackendKind } from '../../core/types/chat';
 import type { AcpAgentConfig } from '../../core/types/settings';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
+import { renderAgentSwitcherBackendIcon } from './AgentSwitcherFloatingIcons';
 
 interface SettingsAcpSectionOptions {
   plugin: OpenCodianPlugin;
@@ -24,10 +26,47 @@ interface AcpStackedFieldOptions {
   placeholder?: string;
 }
 
-const ACP_PRESETS: Array<Omit<AcpAgentConfig, 'id'>> = [
-  { name: 'OpenCode', command: 'opencode', args: ['acp'], env: {}, enabled: true },
-  { name: 'Codex', command: 'codex', args: ['acp'], env: {}, enabled: true },
-  { name: 'Claude Code', command: 'claude', args: ['acp'], env: {}, enabled: true },
+interface SettingsScrollArea {
+  readonly rootEl: HTMLElement;
+  readonly viewportEl: HTMLElement;
+  readonly contentEl: HTMLElement;
+}
+
+interface AcpActionConfig {
+  readonly label: string;
+  readonly backendIcon: AgentBackendKind | null;
+  readonly priority: 'primary' | 'preset';
+}
+
+interface AcpPresetActionConfig extends AcpActionConfig {
+  readonly agent: Omit<AcpAgentConfig, 'id'>;
+}
+
+const ACP_CUSTOM_ACTION: AcpActionConfig = {
+  label: 'Custom agent',
+  backendIcon: null,
+  priority: 'primary',
+};
+
+const ACP_PRESETS: readonly AcpPresetActionConfig[] = [
+  {
+    label: 'OpenCode',
+    backendIcon: 'opencode',
+    priority: 'preset',
+    agent: { name: 'OpenCode', command: 'opencode', args: ['acp'], env: {}, enabled: true },
+  },
+  {
+    label: 'Codex',
+    backendIcon: 'codex',
+    priority: 'preset',
+    agent: { name: 'Codex', command: 'codex', args: ['acp'], env: {}, enabled: true },
+  },
+  {
+    label: 'Claude Code',
+    backendIcon: 'claude-code',
+    priority: 'preset',
+    agent: { name: 'Claude Code', command: 'claude', args: ['acp'], env: {}, enabled: true },
+  },
 ];
 
 export class SettingsAcpSection {
@@ -51,9 +90,11 @@ export class SettingsAcpSection {
   }
 
   private render(containerEl: HTMLElement): void {
-    const blockEl = containerEl.createDiv({ cls: 'opencodian-settings-block' });
-    this.bodyEl = blockEl.createDiv({ cls: 'opencodian-settings-block-body' });
-    this.renderAddButtons(this.bodyEl);
+    this.bodyEl = containerEl.createDiv({
+      cls: 'opencodian-settings-extension-shell opencodian-acp-settings-shell',
+      attr: { 'data-settings-extension-surface': 'acp' },
+    });
+    this.renderCreateCard(this.bodyEl);
     this.renderAgentList(this.bodyEl);
   }
 
@@ -65,45 +106,94 @@ export class SettingsAcpSection {
     const scrollContainer = this.resolveScrollContainer(this.bodyEl);
     const previousScrollTop = scrollContainer?.scrollTop ?? 0;
     this.bodyEl.empty();
-    this.renderAddButtons(this.bodyEl);
+    this.renderCreateCard(this.bodyEl);
     this.renderAgentList(this.bodyEl);
     this.restoreScrollTopAfterRender(scrollContainer, previousScrollTop);
   }
 
-  private renderAddButtons(containerEl: HTMLElement): void {
-    const presetBarEl = containerEl.createDiv({ cls: 'opencodian-acp-preset-rail' });
-    const introEl = presetBarEl.createDiv({ cls: 'opencodian-acp-preset-intro' });
-    introEl.createEl('strong', { text: t('settings.acp.addAgent') });
-    introEl.createDiv({ text: t('settings.acp.preset.desc'), cls: 'opencodian-acp-preset-desc' });
+  private renderCreateCard(containerEl: HTMLElement): void {
+    const createCardEl = containerEl.createDiv({
+      cls: 'opencodian-acp-create-card opencodian-acp-preset-rail',
+    });
+    const headerEl = createCardEl.createDiv({ cls: 'opencodian-acp-create-header' });
+    const introEl = headerEl.createDiv({ cls: 'opencodian-acp-create-copy opencodian-acp-preset-intro' });
+    introEl.createEl('strong', { cls: 'opencodian-acp-create-title', text: t('settings.acp.addAgent') });
+    introEl.createDiv({
+      text: t('settings.acp.preset.desc'),
+      cls: 'opencodian-acp-create-desc opencodian-acp-preset-desc',
+    });
 
-    new Setting(presetBarEl)
-      .setClass('opencodian-acp-preset-action')
-      .addButton((button) => {
-        button
-          .setButtonText(t('settings.acp.customAgent'))
-          .onClick(() => {
-            void this.addAgent({
-              id: this.createAgentId(),
-              name: 'New Agent',
-              command: '',
-              args: [],
-              env: {},
-              enabled: true,
-            });
-          });
+    headerEl.createSpan({
+      cls: 'opencodian-acp-create-count-badge',
+      text: this.formatAgentCount(),
+    });
+
+    const actionsEl = createCardEl.createDiv({
+      cls: 'opencodian-acp-create-actions opencodian-acp-preset-actions',
+    });
+
+    this.createAcpActionButton(actionsEl, {
+      label: t('settings.acp.customAgent'),
+      backendIcon: ACP_CUSTOM_ACTION.backendIcon,
+      priority: ACP_CUSTOM_ACTION.priority,
+    }, () => {
+      void this.addAgent({
+        id: this.createAgentId(),
+        name: 'New Agent',
+        command: '',
+        args: [],
+        env: {},
+        enabled: true,
       });
+    });
 
     for (const preset of ACP_PRESETS) {
-      new Setting(presetBarEl)
-        .setClass('opencodian-acp-preset-action')
-        .addButton((button) => {
-          button
-            .setButtonText(preset.name)
-            .onClick(() => {
-              void this.addAgent({ id: this.createAgentId(), ...preset });
-            });
-        });
+      this.createAcpActionButton(actionsEl, preset, () => {
+        void this.addAgent({ id: this.createAgentId(), ...preset.agent });
+      });
     }
+  }
+
+  private createAcpActionButton(
+    containerEl: HTMLElement,
+    action: AcpActionConfig,
+    onClick: () => void,
+  ): Setting {
+    const setting = new Setting(containerEl).setClass('opencodian-acp-create-action');
+    setting.settingEl.addClass('opencodian-acp-create-action');
+    setting.settingEl.addClass('opencodian-acp-preset-action');
+    setting.settingEl.addClass(`opencodian-acp-create-action--${action.priority}`);
+    setting.settingEl.setAttribute('data-acp-action-label', action.label);
+    setting.settingEl.setAttribute('data-acp-action-priority', action.priority);
+    setting.addButton((button) => {
+      button
+        .setButtonText(action.label)
+        .onClick(onClick);
+      if (button.buttonEl instanceof HTMLButtonElement) {
+        this.decorateAcpActionButton(button.buttonEl, action);
+      }
+    });
+    return setting;
+  }
+
+  private decorateAcpActionButton(buttonEl: HTMLButtonElement, action: AcpActionConfig): void {
+    buttonEl.empty();
+    buttonEl.addClass('opencodian-acp-create-action-button');
+    buttonEl.addClass(`opencodian-acp-create-action-button--${action.priority}`);
+    buttonEl.setAttribute('aria-label', action.label);
+
+    const iconEl = buttonEl.createSpan({ cls: 'opencodian-acp-create-action-icon' });
+    iconEl.setAttribute('aria-hidden', 'true');
+    if (action.backendIcon) {
+      renderAgentSwitcherBackendIcon(iconEl, action.backendIcon);
+    } else {
+      iconEl.createSpan({ cls: 'opencodian-acp-create-action-icon-fallback', text: '+' });
+    }
+
+    buttonEl.createSpan({
+      cls: 'opencodian-acp-create-action-label',
+      text: action.label,
+    });
   }
 
   private renderAgentList(containerEl: HTMLElement): void {
@@ -113,27 +203,51 @@ export class SettingsAcpSection {
       return;
     }
 
-    const listEl = containerEl.createDiv({ cls: 'opencodian-acp-agent-list' });
+    const listArea = this.createScrollArea(containerEl, {
+      rootClass: 'opencodian-acp-agent-list',
+      contentClass: 'opencodian-settings-scrollarea-content--acp',
+    });
+    const listEl = listArea.rootEl;
+    listEl.setAttribute('role', 'list');
     for (const agent of agents) {
-      this.renderAgentCard(listEl, agent);
+      this.renderAgentCard(listArea.contentEl, agent);
     }
   }
 
   private renderAgentCard(containerEl: HTMLElement, agent: AcpAgentConfig): void {
-    const cardEl = containerEl.createDiv({ cls: 'opencodian-acp-agent-card' });
+    const cardEl = containerEl.createDiv({
+      cls: 'opencodian-acp-agent-row-card opencodian-acp-agent-card',
+      attr: {
+        role: 'listitem',
+        'data-acp-agent-id': agent.id,
+        'data-acp-agent-enabled': agent.enabled ? 'true' : 'false',
+      },
+    });
     const headerEl = cardEl.createDiv({ cls: 'opencodian-acp-agent-card-header' });
     const identityEl = headerEl.createDiv({ cls: 'opencodian-acp-agent-identity' });
-    identityEl.createEl('strong', { text: agent.name || t('settings.acp.agentName') });
+    const titleRowEl = identityEl.createDiv({ cls: 'opencodian-acp-agent-title-row' });
+    titleRowEl.createEl('strong', { text: agent.name || t('settings.acp.agentName') });
+    const statusBadgeEl = titleRowEl.createSpan({
+      cls: [
+        'opencodian-acp-agent-status-badge',
+        agent.enabled ? 'opencodian-acp-agent-status-badge-enabled' : 'opencodian-acp-agent-status-badge-disabled',
+      ].join(' '),
+      text: agent.enabled ? t('settings.acp.agentEnabled') : t('settings.agent.status.disabled'),
+    });
     identityEl.createDiv({
       cls: 'opencodian-acp-agent-command-summary',
       text: this.formatAgentCommand(agent),
     });
 
-    new Setting(headerEl)
+    const actionSetting = new Setting(headerEl)
       .setClass('opencodian-acp-agent-actions')
       .addToggle((toggle) => {
         toggle.setValue(agent.enabled).onChange(async (value) => {
           agent.enabled = value;
+          cardEl.setAttribute('data-acp-agent-enabled', value ? 'true' : 'false');
+          statusBadgeEl.setText(value ? t('settings.acp.agentEnabled') : t('settings.agent.status.disabled'));
+          statusBadgeEl.toggleClass('opencodian-acp-agent-status-badge-enabled', value);
+          statusBadgeEl.toggleClass('opencodian-acp-agent-status-badge-disabled', !value);
           await this.saveSettings();
         });
       })
@@ -148,9 +262,10 @@ export class SettingsAcpSection {
             this.rerender();
           });
       });
+    actionSetting.settingEl.addClass('opencodian-settings-extension-actions');
 
     // Stacked form fields: label above input, full width
-    const fieldsEl = cardEl.createDiv({ cls: 'opencodian-acp-agent-fields' });
+    const fieldsEl = cardEl.createDiv({ cls: 'opencodian-acp-field-group opencodian-acp-agent-fields' });
 
     this.renderStackedField(fieldsEl, {
       label: t('settings.acp.agentName'),
@@ -213,6 +328,38 @@ export class SettingsAcpSection {
     });
   }
 
+  private createScrollArea(
+    containerEl: HTMLElement,
+    options: { readonly rootClass: string; readonly contentClass: string },
+  ): SettingsScrollArea {
+    const rootEl = containerEl.createDiv({
+      cls: `opencodian-settings-scrollarea ${options.rootClass}`,
+    });
+    const viewportEl = rootEl.createDiv({
+      cls: 'opencodian-settings-scrollarea-viewport',
+    });
+    const contentEl = viewportEl.createDiv({
+      cls: `opencodian-settings-scrollarea-content ${options.contentClass}`,
+    });
+    rootEl.createDiv({
+      cls: 'opencodian-settings-scrollarea-gutter',
+      attr: { 'aria-hidden': 'true' },
+    });
+    this.syncScrollAreaGutter(rootEl, viewportEl);
+    return { rootEl, viewportEl, contentEl };
+  }
+
+  private syncScrollAreaGutter(rootEl: HTMLElement, viewportEl: HTMLElement): void {
+    window.requestAnimationFrame(() => {
+      if (!rootEl.isConnected || !viewportEl.isConnected) {
+        return;
+      }
+
+      const gutterWidth = Math.max(0, viewportEl.offsetWidth - viewportEl.clientWidth);
+      rootEl.style.setProperty('--opencodian-settings-scrollbar-track-width', `${gutterWidth}px`);
+    });
+  }
+
   private async addAgent(agent: AcpAgentConfig): Promise<void> {
     this.plugin.settings.acpAgents = [...this.plugin.settings.acpAgents, agent];
     await this.saveSettings();
@@ -264,6 +411,10 @@ export class SettingsAcpSection {
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-|-$/g, '');
+  }
+
+  private formatAgentCount(): string {
+    return t('settings.acp.count').replace('{count}', String(this.plugin.settings.acpAgents.length));
   }
 
   private formatAgentCommand(agent: AcpAgentConfig): string {

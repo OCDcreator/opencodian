@@ -39,6 +39,10 @@ export function renderAgentSwitcherFloatingIcons(
   }
 
   removeExistingFloatingSwitcher(containerEl.ownerDocument);
+  if (containerEl.closest('.modal.mod-settings')) {
+    return;
+  }
+
   const anchorEl = containerEl.createDiv({ cls: 'opencodian-agent-switcher-hover-zone' });
   const floatingEl = containerEl.createDiv({ cls: 'opencodian-agent-switcher-floating' });
   pinAgentSwitcherToSettingsEdge(containerEl, floatingEl, anchorEl);
@@ -120,9 +124,9 @@ export function renderAgentSwitcherHeaderIcons(
 
 function removeExistingFloatingSwitcher(ownerDocument: Document): void {
   ownerDocument
-    .querySelectorAll<HTMLElement>('.opencodian-agent-switcher-floating')
-    .forEach((floatingEl) => {
-      floatingEl.remove();
+    .querySelectorAll<HTMLElement>('.opencodian-agent-switcher-floating, .opencodian-agent-switcher-hover-zone')
+    .forEach((switcherEl) => {
+      switcherEl.remove();
     });
 }
 
@@ -139,8 +143,14 @@ function pinAgentSwitcherToSettingsEdge(
       `${Math.max(0, Math.round(rect.left))}px`,
     );
   };
+  const syncModalVisibility = () => {
+    const modalInFront = isUnrelatedSettingsModalOpen(ownerDocument, containerEl);
+    floatingEl.toggleClass('is-hidden-behind-modal', modalInFront);
+    floatingEl.setAttribute('aria-hidden', modalInFront ? 'true' : 'false');
+  };
 
   syncPosition();
+  syncModalVisibility();
   ownerDocument.body.appendChild(floatingEl);
 
   if (!ownerDocument.body.contains(floatingEl)) {
@@ -165,7 +175,9 @@ function pinAgentSwitcherToSettingsEdge(
   const mutationObserver = new MutationObserver(() => {
     if (!ownerDocument.body.contains(anchorEl)) {
       cleanup();
+      return;
     }
+    syncModalVisibility();
   });
 
   window.addEventListener('resize', syncPosition);
@@ -174,6 +186,11 @@ function pinAgentSwitcherToSettingsEdge(
     childList: true,
     subtree: true,
   });
+}
+
+function isUnrelatedSettingsModalOpen(ownerDocument: Document, containerEl: HTMLElement): boolean {
+  return Array.from(ownerDocument.querySelectorAll<HTMLElement>('.modal.mod-settings'))
+    .some((modalEl) => !modalEl.contains(containerEl));
 }
 
 function renderAgentSwitcherIcon(buttonEl: HTMLElement, icon: AgentSwitcherIconConfig): void {
@@ -194,6 +211,10 @@ function renderAgentSwitcherIcon(buttonEl: HTMLElement, icon: AgentSwitcherIconC
   });
   renderThemeIconImage(iconEl, urls.light, 'light');
   renderThemeIconImage(iconEl, urls.dark, 'dark');
+}
+
+export function renderAgentSwitcherBackendIcon(containerEl: HTMLElement, backend: AgentBackendKind): void {
+  renderAgentSwitcherIcon(containerEl, AGENT_ICON_BY_BACKEND[backend]);
 }
 
 function renderThemeIconImage(

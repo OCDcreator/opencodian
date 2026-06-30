@@ -32,6 +32,23 @@ interface ClaudeCodeStatusItem {
   value: string;
 }
 
+interface DebugTabShellConfig {
+  id: DebugSectionBlockId;
+  title: string;
+  description: string;
+  badges: readonly string[];
+}
+
+interface DebugRenderOptions {
+  includeIntro: boolean;
+}
+
+interface DebugModuleGroupConfig extends DebugRenderOptions {
+  moduleKeys: readonly DebugModuleKey[];
+  titleKey: Parameters<typeof t>[0];
+  descriptionKey: Parameters<typeof t>[0];
+}
+
 const DEBUG_MODULE_GROUPS: Record<Exclude<DebugSectionBlockId, 'export'>, readonly DebugModuleKey[]> = {
   plugin: [
     'app',
@@ -129,50 +146,129 @@ export class SettingsDebugSection {
   attachTabbed(containerEl: HTMLElement, secondaryTabId: string): void {
     const platformKey = getCurrentPlatformKey();
 
-    const pluginBlockEl = containerEl.createDiv({ attr: { 'data-section-block': 'plugin' } });
-    this.addPluginDebugSettings(pluginBlockEl);
-
-    const opencodeBlockEl = containerEl.createDiv({ attr: { 'data-section-block': 'opencode' } });
-    this.addOpenCodeDebugSettings(opencodeBlockEl);
-
-    const claudeCodeBlockEl = containerEl.createDiv({ attr: { 'data-section-block': 'claude-code' } });
-    this.addClaudeCodeDebugSettings(claudeCodeBlockEl);
-
-    const exportBlockEl = containerEl.createDiv({
-      cls: 'opencodian-debug-actions',
-      attr: { 'data-section-block': 'export' },
+    const pluginBlockEl = this.createDebugTabShell(containerEl, {
+      id: 'plugin',
+      title: t('settings.debug.modules.plugin.title'),
+      description: t('settings.debug.modules.plugin.desc'),
+      badges: [t('settings.debug.logging.name'), String(DEBUG_MODULE_GROUPS.plugin.length)],
     });
-    this.addExportDebugSettings(exportBlockEl, platformKey);
+    this.addPluginDebugSettings(pluginBlockEl, { includeIntro: false });
+
+    const opencodeBlockEl = this.createDebugTabShell(containerEl, {
+      id: 'opencode',
+      title: t('settings.debug.modules.opencode.title'),
+      description: t('settings.debug.modules.opencode.desc'),
+      badges: ['OpenCode', String(DEBUG_MODULE_GROUPS.opencode.length)],
+    });
+    this.addOpenCodeDebugSettings(opencodeBlockEl, { includeIntro: false });
+
+    const claudeCodeBlockEl = this.createDebugTabShell(containerEl, {
+      id: 'claude-code',
+      title: t('settings.debug.modules.claudeCode.title'),
+      description: t('settings.debug.modules.claudeCode.groupDesc'),
+      badges: ['Claude Code', String(CLAUDE_CODE_DEBUG_CHANNEL_IDS.length)],
+    });
+    this.addClaudeCodeDebugSettings(claudeCodeBlockEl, { includeIntro: false });
+
+    const exportBlockEl = this.createDebugTabShell(containerEl, {
+      id: 'export',
+      title: t('settings.debug.export.title'),
+      description: t('settings.debug.export.desc'),
+      badges: [this.getDebugPathPlatformLabel(platformKey), 'BUILD_ID'],
+    });
+    this.addExportDebugSettings(exportBlockEl, platformKey, { includeIntro: false });
 
     this.showActiveBlock(containerEl, secondaryTabId);
   }
 
-  private addPluginDebugSettings(containerEl: HTMLElement): void {
+  private createDebugTabShell(containerEl: HTMLElement, config: DebugTabShellConfig): HTMLElement {
+    const shellEl = containerEl.createDiv({
+      cls: `opencodian-debug-tab-shell opencodian-debug-tab-shell-${config.id}`,
+      attr: {
+        'data-section-block': config.id,
+        'data-debug-tab-shell': 'true',
+      },
+    });
+    const headerEl = shellEl.createDiv({ cls: 'opencodian-debug-tab-header' });
+    const copyEl = headerEl.createDiv({ cls: 'opencodian-debug-tab-copy' });
+    copyEl.createEl('h4', {
+      cls: 'opencodian-settings-subsection-heading',
+      text: config.title,
+    });
+    copyEl.createDiv({
+      cls: 'opencodian-settings-block-desc opencodian-debug-tab-desc',
+      text: config.description,
+    });
+
+    const badgesEl = headerEl.createDiv({ cls: 'opencodian-debug-tab-badges' });
+    for (const badge of config.badges) {
+      badgesEl.createSpan({ cls: 'opencodian-debug-tab-badge', text: badge });
+    }
+
+    return shellEl.createDiv({ cls: 'opencodian-debug-tab-body' });
+  }
+
+  private addPluginDebugSettings(
+    containerEl: HTMLElement,
+    options: DebugRenderOptions = { includeIntro: true },
+  ): void {
     this.addDebugLoggingSetting(containerEl);
     this.addDebugModuleSettings(
       containerEl,
-      DEBUG_MODULE_GROUPS.plugin,
-      'settings.debug.modules.plugin.title',
-      'settings.debug.modules.plugin.desc',
+      {
+        moduleKeys: DEBUG_MODULE_GROUPS.plugin,
+        titleKey: 'settings.debug.modules.plugin.title',
+        descriptionKey: 'settings.debug.modules.plugin.desc',
+        includeIntro: options.includeIntro,
+      },
     );
   }
 
-  private addOpenCodeDebugSettings(containerEl: HTMLElement): void {
+  private addOpenCodeDebugSettings(
+    containerEl: HTMLElement,
+    options: DebugRenderOptions = { includeIntro: true },
+  ): void {
     this.addDebugModuleSettings(
       containerEl,
-      DEBUG_MODULE_GROUPS.opencode,
-      'settings.debug.modules.opencode.title',
-      'settings.debug.modules.opencode.desc',
+      {
+        moduleKeys: DEBUG_MODULE_GROUPS.opencode,
+        titleKey: 'settings.debug.modules.opencode.title',
+        descriptionKey: 'settings.debug.modules.opencode.desc',
+        includeIntro: options.includeIntro,
+      },
     );
   }
 
-  private addClaudeCodeDebugSettings(containerEl: HTMLElement): void {
+  private addClaudeCodeDebugSettings(
+    containerEl: HTMLElement,
+    options: DebugRenderOptions = { includeIntro: true },
+  ): void {
     const workbenchEl = containerEl.createDiv({
       cls: 'opencodian-debug-workbench',
       attr: { 'data-debug-workbench': 'claude-code' },
     });
 
-    const headerEl = workbenchEl.createDiv({
+    const statusContainerEl = options.includeIntro
+      ? this.createClaudeCodeWorkbenchHeader(workbenchEl)
+      : workbenchEl;
+
+    this.addClaudeCodeStatusStrip(statusContainerEl);
+    this.addClaudeCodePrivacyNote(workbenchEl);
+    this.addDebugModuleSettings(
+      workbenchEl,
+      {
+        moduleKeys: DEBUG_MODULE_GROUPS['claude-code'],
+        titleKey: 'settings.debug.claude.module.title',
+        descriptionKey: 'settings.debug.claude.module.desc',
+        includeIntro: true,
+      },
+    );
+    this.addClaudeCodeChannelSettings(workbenchEl);
+    this.addClaudeCodeLogPreview(workbenchEl);
+  }
+
+  private createClaudeCodeWorkbenchHeader(containerEl: HTMLElement): HTMLElement {
+    const headerEl = containerEl.createDiv({
       cls: 'opencodian-debug-workbench-header opencodian-settings-block',
     });
     headerEl.createEl('h4', {
@@ -183,17 +279,7 @@ export class SettingsDebugSection {
       cls: 'opencodian-settings-block-desc',
       text: t('settings.debug.modules.claudeCode.groupDesc'),
     });
-
-    this.addClaudeCodeStatusStrip(headerEl);
-    this.addClaudeCodePrivacyNote(workbenchEl);
-    this.addDebugModuleSettings(
-      workbenchEl,
-      DEBUG_MODULE_GROUPS['claude-code'],
-      'settings.debug.claude.module.title',
-      'settings.debug.claude.module.desc',
-    );
-    this.addClaudeCodeChannelSettings(workbenchEl);
-    this.addClaudeCodeLogPreview(workbenchEl);
+    return headerEl;
   }
 
   private addClaudeCodeStatusStrip(containerEl: HTMLElement): void {
@@ -353,16 +439,19 @@ export class SettingsDebugSection {
   private addExportDebugSettings(
     containerEl: HTMLElement,
     platformKey: DebugPlatformKey,
+    options: DebugRenderOptions = { includeIntro: true },
   ): void {
     const exportEl = containerEl.createDiv({ cls: 'opencodian-settings-block opencodian-debug-export' });
-    exportEl.createEl('h4', {
-      cls: 'opencodian-settings-subsection-heading',
-      text: t('settings.debug.export.title'),
-    });
-    exportEl.createDiv({
-      cls: 'opencodian-settings-block-desc',
-      text: t('settings.debug.export.desc'),
-    });
+    if (options.includeIntro) {
+      exportEl.createEl('h4', {
+        cls: 'opencodian-settings-subsection-heading',
+        text: t('settings.debug.export.title'),
+      });
+      exportEl.createDiv({
+        cls: 'opencodian-settings-block-desc',
+        text: t('settings.debug.export.desc'),
+      });
+    }
 
     this.addDebugRefreshIntervalSetting(exportEl);
     this.addInlineSerializedArgsSetting(exportEl);
@@ -407,21 +496,21 @@ export class SettingsDebugSection {
 
   private addDebugModuleSettings(
     containerEl: HTMLElement,
-    moduleKeys: readonly DebugModuleKey[],
-    titleKey: Parameters<typeof t>[0],
-    descriptionKey: Parameters<typeof t>[0],
+    config: DebugModuleGroupConfig,
   ): void {
     const modulesEl = containerEl.createDiv({ cls: 'opencodian-settings-block opencodian-debug-modules' });
-    modulesEl.createEl('h4', {
-      cls: 'opencodian-settings-subsection-heading',
-      text: t(titleKey),
-    });
-    modulesEl.createDiv({
-      cls: 'opencodian-settings-block-desc',
-      text: t(descriptionKey),
-    });
+    if (config.includeIntro) {
+      modulesEl.createEl('h4', {
+        cls: 'opencodian-settings-subsection-heading',
+        text: t(config.titleKey),
+      });
+      modulesEl.createDiv({
+        cls: 'opencodian-settings-block-desc',
+        text: t(config.descriptionKey),
+      });
+    }
 
-    const visibleModuleKeys = new Set<DebugModuleKey>(moduleKeys);
+    const visibleModuleKeys = new Set<DebugModuleKey>(config.moduleKeys);
     for (const debugModule of DEBUG_MODULE_REGISTRY) {
       if (!visibleModuleKeys.has(debugModule.key)) {
         continue;

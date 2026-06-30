@@ -32,6 +32,8 @@ export function registerSettingsView(plugin: OpenCodianPlugin): void {
 }
 
 export async function activateSettingsView(plugin: OpenCodianPlugin): Promise<void> {
+  dismissNativeSettingsModals(document);
+
   const { workspace } = plugin.app;
   let leaf = workspace.getLeavesOfType(VIEW_TYPE_OPENCODIAN_SETTINGS)[0];
 
@@ -49,6 +51,14 @@ export async function activateSettingsView(plugin: OpenCodianPlugin): Promise<vo
   if (leaf) {
     workspace.revealLeaf(leaf);
   }
+}
+
+export function dismissNativeSettingsModals(ownerDocument: Document): void {
+  ownerDocument
+    .querySelectorAll<HTMLElement>('.modal.mod-settings .modal-close-button')
+    .forEach((closeButtonEl) => {
+      closeButtonEl.click();
+    });
 }
 
 /** Broadcast model-loaded refresh to all active editor-area settings views */

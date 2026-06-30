@@ -35,6 +35,15 @@
 
 commands/slash runtime 与 command-owned hidden-agent flows 不属于本 owner；它们分别由 command config、Commands settings 和 chat runtime seams 维护。
 
+2026-06-28 的 UI 重构把本 owner 渲染成和基础 Settings / Claude Code Settings 一致的 shadcn/Radix-inspired control surface，但没有引入 React、Tailwind、shadcn 或 Radix 依赖。新的视觉结构由 `src/style/components/settings-agents.css` 承接，核心 class 包括：
+
+- `.opencodian-agent-settings-shell`：Agents 四个二级表面的布局 shell，不承担卡片视觉。
+- `.opencodian-agent-settings-control-row`：Default agent 与 Expert mode 的两列 control row。
+- `.opencodian-agent-catalog-list` / `.opencodian-agent-catalog-row`：ScrollArea 风格 agent catalog list 与 compact row。
+- `.opencodian-agent-badge*`：mode/source/runtime/visibility 等低调 badge。
+- `.opencodian-agent-workspace-toolbar` / `.opencodian-agent-workspace-list` / `.opencodian-agent-workspace-row`：Markdown workspace 的 toolbar + list surface。
+- `.opencodian-agent-settings-alert`：catalog load failure、empty catalog 和 empty workspace 的 quiet Alert/Empty surface。
+
 ## 核心逻辑
 
 ### runtime + config + file catalog 合并
@@ -81,10 +90,21 @@ owner 会并行读取：
 
 ### agent catalog shell height
 
-- agent 目录 block body 现在额外挂 `opencodian-settings-catalog-scroll` / `opencodian-agent-catalog-scroll`
-- 目录区使用最大高度 + 内部滚动，避免大量代理把整个 settings 页拉得过长
+- agent 目录 block body 现在额外挂 `opencodian-settings-catalog-scroll` / `opencodian-agent-catalog-scroll`，并包在 `.opencodian-agent-catalog-list`
+- 目录区使用最大高度 + 内部滚动，避免大量代理把整个 settings 页拉得过长；列表本身是单层 row surface，不再把每个 agent 渲染成重卡片
 - catalog 局部刷新会先捕获目录 body 的 `scrollTop`，重建 DOM 后在下一帧恢复，避免用户切换 subagent 可见性时目录子页跳回顶部
 - 这一层只负责 catalog 可滚动外壳和滚动位置稳定，不改变 runtime/project agent merge 语义
+- 每个 row 继续由 Obsidian `Setting` 创建以保留现有 toggle/write 流程，但 TS 会给 row 增加 `role="listitem"`、`data-agent-mode`、`data-agent-state` 和 badge strip，方便 CSS 与运行时 DOM 证据定位
+
+### Agent management visual hierarchy
+
+Agents section follows the design audit in `docs/status/settings-agents-ui-audit-2026-06-28.md`:
+
+- default agent 与 expert mode 是 default surface 内的同级 Card/Form rows；
+- catalog 是 bounded ScrollArea list，agent mode/source/status/visibility 通过 badge strip 承载；
+- load failure 与 empty state 使用 `.opencodian-agent-settings-alert`，避免裸文本或高噪音 warning card；
+- workspace 顶部创建入口是 toolbar，Markdown 文件是 compact rows；
+- inline Markdown editor 是轻量 editor panel，不打开 modal，不嵌套重卡片。
 
 ### 项目 agent 核心字段编辑器 / disable / task allowlist 写回
 
@@ -136,6 +156,7 @@ owner 现在在同一分区内提供一个 project agent editor：
 - `projectAgentEditorConfig.ts`: 为 project agent editor 提供字段归一化与 delete-aware patch helper
 - `core/types/opencodeConfig.ts`: 提供 `OpencodeAgentConfig` / `OpencodeAgentMode` 类型
 - `i18n/locales/*`: 提供 Agents section 标题、目录来源、mode、状态与错误文案
+- `src/style/components/settings-agents.css`: 提供 Agents section 专属 settings control surface 样式，复用共享 settings tokens
 
 ## 注意事项
 

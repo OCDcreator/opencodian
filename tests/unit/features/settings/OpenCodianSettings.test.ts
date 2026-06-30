@@ -966,9 +966,22 @@ describe('OpenCodianSettingTab layout shell', () => {
     expect(contractCss).toContain('--opencodian-settings-section-bg');
     expect(contractCss).toContain('--opencodian-settings-row-bg');
     expect(contractCss).toContain('--opencodian-settings-object-bg');
+    expect(contractCss).toContain('--opencodian-settings-form-row-bg');
+    expect(contractCss).toContain('--opencodian-settings-form-row-border');
+    expect(contractCss).toContain('--opencodian-settings-form-row-hover-bg');
+    expect(contractCss).toMatch(
+      /--opencodian-settings-row-bg:\s*var\(--opencodian-settings-form-row-bg\)/,
+    );
     expect(contractCss).toMatch(/\.opencodian-settings\s+\.opencodian-settings-quick-nav/);
     expect(contractCss).toMatch(/\.opencodian-settings\s+\.opencodian-settings-tab-primary/);
-    expect(contractCss).toMatch(/\.opencodian-settings\s+\.opencodian-settings-section\s+\.setting-item/);
+    const ordinaryRowBlock = contractCss.match(
+      /\.opencodian-settings\s+\.opencodian-settings-section\s+\.setting-item,\s*[\s\S]*?\.opencodian-settings\s+\.opencodian-settings-content-shell\s+\.setting-item\s*\{[^}]*\}/,
+    )?.[0] ?? '';
+
+    expect(ordinaryRowBlock).toContain('grid-template-columns: minmax(0, 1fr) minmax(180px, max-content)');
+    expect(ordinaryRowBlock).toContain('background: var(--opencodian-settings-form-row-bg)');
+    expect(contractCss).toMatch(/\.opencodian-settings\s+\.opencodian-settings-content-shell\s+\.setting-item/);
+    expect(contractCss).not.toMatch(/\.opencodian-settings\s+\.opencodian-settings-content-shell\s*>\s*\.setting-item/);
     expect(contractCss).toMatch(
       /\.opencodian-settings\s+\.opencodian-wide-text-setting\.setting-item\s*\{[\s\S]*minmax\(280px,\s*clamp\(320px,\s*42vw,\s*520px\)\)/,
     );
@@ -984,6 +997,22 @@ describe('OpenCodianSettingTab layout shell', () => {
 
     expect(legacyCss).not.toMatch(/\.opencodian-settings-tab-panel\s*\{[^}]*box-shadow:/);
     expect(legacyCss).not.toMatch(/\.opencodian-style-section\s*\{[^}]*border-left:\s*[2-9]px/);
+  });
+
+  it('keeps ordinary settings row cards neutral instead of using status-tinted fills', () => {
+    const contractCss = readFileSync(
+      join(process.cwd(), 'src/style/components/settings-layout-contract.css'),
+      'utf8',
+    );
+    const overrideRowBlock = contractCss.match(
+      /\.opencodian-settings\s+\.opencodian-tool-permission-row\[data-tool-permission-source='override'\]\s+\.setting-item\s*\{[^}]*\}/,
+    )?.[0] ?? '';
+
+    expect(overrideRowBlock).toContain('background: var(--opencodian-settings-form-row-bg)');
+    expect(overrideRowBlock).not.toMatch(/background:\s*color-mix\(in srgb,[^}]*var\(--interactive-accent\)/);
+    expect(contractCss).toMatch(
+      /\.opencodian-settings\s+\.opencodian-skill-card,\s*[\s\S]*\.opencodian-settings\s+\.opencodian-acp-agent-row-card\s*\{[\s\S]*background:\s*var\(--opencodian-settings-form-row-bg\)/,
+    );
   });
 
   it('documents mode-aware settings hierarchy rules after the regression audit', () => {

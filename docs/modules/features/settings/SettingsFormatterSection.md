@@ -41,14 +41,15 @@ Owns the top-level `Formatter & LSP` settings page in both classic and tabbed la
 - `formatter` secondary tab: mode switch dropdown, then when custom mode active:
   - Builtin formatter editors sourced from the upstream builtin catalog, so they still render even when runtime status is offline
   - Builtin formatter rows live in a fixed-height internal scroll region; the custom search combobox and status filter stay sticky at the top of the section
+  - Builtin formatter rows use the Settings Neutral Data Row Surface: a quiet shadcn-style Card + Field row with the formatter name and compact status badge on the left, the action dropdown on the right, muted monospace extensions below, and flat FieldGroup override editors separated by a subtle top rule
   - Custom formatter list with add/edit/delete
-  - Advanced JSON textarea with format/reload/save
+  - Advanced JSON editor with plain description copy, a single textarea panel, and a transparent footer ButtonGroup for format/reload/save
 - `lsp` secondary tab: mode switch dropdown, then when custom mode active:
   - Builtin LSP editors sourced from a repo-maintained upstream catalog plus runtime-discovered entries
-  - Builtin LSP rows use the same fixed-height internal scroll region and sticky search/status filter controls as formatter rows
+  - Builtin LSP rows use the same fixed-height internal scroll region, sticky search/status filter controls, neutral row-card surface, compact badges, and flat override FieldGroup behavior as formatter rows
   - Custom LSP list with add/edit/delete
   - `initialization` JSON field per entry
-  - Advanced JSON textarea with format/reload/save
+  - Advanced JSON editor with the same flat editor panel and footer ButtonGroup contract as formatter
 
 Tabbed formatter / LSP panes intentionally avoid an extra outer `.opencodian-settings-block` wrapper because the secondary-tab shell already provides the top-level grouping; only meaningful inner groups keep object-card treatment.
 
@@ -71,7 +72,7 @@ Tabbed formatter / LSP panes intentionally avoid an extra outer `.opencodian-set
 
 ## Builtin Formatter Editing
 
-Each builtin formatter (from the upstream builtin catalog, with runtime badges merged in when available) shows an action dropdown:
+Each builtin formatter (from the upstream builtin catalog, with runtime badges merged in when available) shows an action dropdown. The row is intentionally neutral: default / project override / project disabled state is carried by `.opencodian-builtin-row-status-chip[data-status]`, not by coloring the whole card border or background.
 
 | Action | Config Effect |
 |--------|--------------|
@@ -93,16 +94,21 @@ Custom formatters are config entries whose key does not match any builtin catalo
 - Edit: command, environment, and extensions fields; save updates the entry
 - Delete: removes the entry from formatter config
 - Command is required; save rejects if empty
+- The add-new row is a shadcn-style CardFooter / Field action row inside the custom formatter section, not a nested formatter row-card. `.opencodian-formatter-add-custom-row` stays transparent with only a subtle top separator and section margins so it does not touch the parent card edge.
 
 ## Advanced JSON Editor
 
-A textarea shows the current `formatter` subtree as formatted JSON. Actions:
+A textarea shows the current `formatter` subtree as formatted JSON. LSP uses the same structure for the `lsp` subtree. The editor is intentionally not a stack of nested `Setting` cards: `.opencodian-formatter-section-description` renders the description as plain muted copy, `.opencodian-formatter-json-editor` is the only editor panel boundary, and `.opencodian-formatter-json-buttons` is a transparent `role="group"` footer with native buttons.
+
+Actions:
 
 - **Format**: parses and re-stringifies; shows notice on invalid JSON
 - **Reload from disk**: re-reads config and replaces textarea content
 - **Save**: validates JSON structure (must be object or `false`), then writes via `updateFormatterConfig`; refreshes display on success
 
 Unknown fields in formatter entries are preserved through both visual editors and the JSON editor.
+
+Empty custom formatter / LSP lists and no-match builtin search states use quiet inline empty surfaces rather than ordinary setting cards. This keeps section panels from becoming card-within-card stacks while preserving the same copy and i18n keys.
 
 Successful formatter custom add/edit/delete, builtin action changes, mode switches, and advanced JSON saves first write project config, then restart the local OpenCode service when the settings page is managing a local server. After that they call the section-local content refresh path instead of `requestDisplayRefresh()`. If the section is already detached, the code falls back to the parent display refresh as a safety net.
 

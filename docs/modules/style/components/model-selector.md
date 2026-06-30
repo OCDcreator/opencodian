@@ -37,6 +37,7 @@
 - settings layout visible unification 后，此文件保留 settings 旧类名的兼容样式，但不再承担共享层级合同：
   - `.opencodian-settings-tab-panel` 只保留 `display: contents`，避免重 tab panel 再包一层 section card。
   - `.opencodian-style-section` 去掉粗 `border-left` 侧边条，改用 `--opencodian-settings-section-*` token fallback，使样式设置 section 不再像另一个局部设计系统。
+  - `.opencodian-style-section` 和 `.opencodian-style-group-body` 也负责 Style 二级标签内容的纵向 stack gap，避免 tabbed style 子页里的 section/card/setting row 贴在一起。
   - quick-nav、tabs、section、ordinary setting row 的可见层级现在由 `settings-layout-contract.css` 统一覆盖。
 - `.opencodian-style-setting-long-text` 只用于高级 custom CSS declarations 这类长文本控件。它把样式设置默认 `360px` 控制列放宽到最多 `520px`，但仍沿用 900px 以下单列响应式规则，避免普通数值/颜色控件被一起拉长。
 - `.opencodian-settings-tabs-primary` 现在使用 `flex-wrap: nowrap` + `overflow-x: auto` 实现水平滚动（而非换行），配合 `::after` 右侧渐变遮罩提示可滚动。当标签数量超过可视宽度时，用户可横向滚动查看更多标签。

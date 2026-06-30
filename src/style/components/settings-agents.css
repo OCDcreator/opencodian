@@ -1,0 +1,460 @@
+.opencodian-settings .opencodian-agent-settings-shell {
+  --oc-agent-row-gap: 10px;
+  --oc-agent-group-gap: 14px;
+  --oc-agent-row-padding: 12px 14px;
+  --oc-agent-control-min-width: 220px;
+  --oc-agent-list-max-height: min(52vh, 520px);
+  display: flex;
+  flex-direction: column;
+  gap: var(--oc-agent-group-gap);
+  min-width: 0;
+}
+
+.opencodian-settings .opencodian-agent-settings-default-surface {
+  display: flex;
+  flex-direction: column;
+  gap: var(--oc-agent-row-gap);
+}
+
+.opencodian-settings .opencodian-backend-agent-surface {
+  gap: var(--opencodian-settings-space-xl);
+}
+
+.opencodian-settings .opencodian-agent-settings-block {
+  margin: 0;
+}
+
+.opencodian-settings .opencodian-agent-settings-block > .opencodian-settings-subsection-heading {
+  margin: 0;
+  padding: 0;
+}
+
+.opencodian-settings .opencodian-agent-settings-block > .opencodian-plugin-block-desc {
+  margin-top: 4px;
+  padding: 0;
+  max-width: 78ch;
+}
+
+.opencodian-settings .opencodian-agent-settings-block > .opencodian-plugin-block-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--oc-agent-row-gap);
+  margin-top: 12px;
+  padding: 0;
+}
+
+.opencodian-settings .opencodian-agent-settings-control-row.setting-item,
+.opencodian-settings .opencodian-backend-agent-row.setting-item,
+.opencodian-settings .opencodian-agent-catalog-row.setting-item,
+.opencodian-settings .opencodian-agent-workspace-row.setting-item,
+.opencodian-settings .opencodian-agent-editor-row.setting-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(var(--oc-agent-control-min-width), max-content);
+  gap: var(--opencodian-settings-space-md) var(--opencodian-settings-space-xl);
+  align-items: center;
+  margin: 0;
+  padding: var(--oc-agent-row-padding);
+  border: 1px solid var(--opencodian-settings-row-border);
+  border-radius: var(--opencodian-settings-radius-row);
+  background: var(--opencodian-settings-row-bg);
+  box-shadow: none;
+}
+
+.opencodian-settings .opencodian-agent-catalog-row.setting-item {
+  border-radius: var(--opencodian-settings-radius-inline);
+  background: transparent;
+}
+
+.opencodian-settings .opencodian-backend-agent-row.setting-item {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.opencodian-settings .opencodian-backend-agent-row.setting-item + .opencodian-backend-agent-row.setting-item,
+.opencodian-settings .opencodian-agent-catalog-row.setting-item + .opencodian-agent-catalog-row.setting-item,
+.opencodian-settings .opencodian-agent-workspace-row.setting-item + .opencodian-agent-workspace-row.setting-item {
+  border-top: 1px solid var(--opencodian-settings-row-border);
+}
+
+.opencodian-settings .opencodian-backend-agent-row .setting-item-info,
+.opencodian-settings .opencodian-agent-catalog-row .setting-item-info,
+.opencodian-settings .opencodian-agent-workspace-row .setting-item-info,
+.opencodian-settings .opencodian-agent-editor-row .setting-item-info,
+.opencodian-settings .opencodian-agent-settings-control-row .setting-item-info {
+  min-width: 0;
+}
+
+.opencodian-settings .opencodian-agent-settings-control-row .setting-item-name,
+.opencodian-settings .opencodian-backend-agent-row .setting-item-name,
+.opencodian-settings .opencodian-agent-catalog-row .setting-item-name,
+.opencodian-settings .opencodian-agent-workspace-row .setting-item-name,
+.opencodian-settings .opencodian-agent-editor-row .setting-item-name {
+  color: var(--text-normal);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.opencodian-settings .opencodian-agent-settings-control-row .setting-item-description,
+.opencodian-settings .opencodian-backend-agent-row .setting-item-description,
+.opencodian-settings .opencodian-agent-catalog-row .setting-item-description,
+.opencodian-settings .opencodian-agent-workspace-row .setting-item-description,
+.opencodian-settings .opencodian-agent-editor-row .setting-item-description {
+  margin-top: 4px;
+  max-width: 78ch;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.opencodian-settings .opencodian-agent-settings-control-row .setting-item-control,
+.opencodian-settings .opencodian-backend-agent-row .setting-item-control,
+.opencodian-settings .opencodian-agent-catalog-row .setting-item-control,
+.opencodian-settings .opencodian-agent-workspace-row .setting-item-control,
+.opencodian-settings .opencodian-agent-editor-row .setting-item-control {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--opencodian-settings-space-sm);
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.opencodian-settings .opencodian-agent-settings-control-row select,
+.opencodian-settings .opencodian-agent-editor-row select,
+.opencodian-settings .opencodian-agent-editor-row input[type="text"] {
+  min-height: 30px;
+  border-radius: var(--opencodian-settings-radius-inline);
+}
+
+.opencodian-settings .opencodian-backend-agent-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.opencodian-settings .opencodian-backend-agent-group-title {
+  margin: 0;
+  padding: 0 2px;
+}
+
+.opencodian-settings .opencodian-backend-agent-list {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--opencodian-settings-row-border);
+  border-radius: var(--opencodian-settings-radius-row);
+  background: var(--opencodian-settings-row-bg);
+}
+
+.opencodian-settings .opencodian-backend-agent-row[data-backend-agent-active="true"] {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--interactive-accent) 24%, transparent);
+}
+
+.opencodian-settings .opencodian-agent-catalog-list,
+.opencodian-settings .opencodian-agent-workspace-list {
+  display: flex;
+  flex-direction: column;
+  max-height: var(--oc-agent-list-max-height);
+  overflow: auto;
+  border: 1px solid var(--opencodian-settings-row-border);
+  border-radius: var(--opencodian-settings-radius-row);
+  background: var(--opencodian-settings-row-bg);
+  scroll-padding: var(--opencodian-settings-space-md);
+}
+
+.opencodian-settings .opencodian-agent-catalog-list {
+  padding: 4px;
+}
+
+.opencodian-settings .opencodian-agent-workspace-list {
+  padding: 0;
+}
+
+.opencodian-settings .opencodian-agent-catalog-row[data-agent-state="disabled"],
+.opencodian-settings .opencodian-agent-catalog-row[data-agent-state="runtime-unavailable"] {
+  border-color: color-mix(in srgb, var(--text-warning, var(--color-yellow)) 24%, var(--opencodian-settings-row-border));
+}
+
+.opencodian-settings .opencodian-agent-catalog-badges {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-inline-start: var(--opencodian-settings-space-sm);
+  vertical-align: middle;
+}
+
+.opencodian-settings .opencodian-agent-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 18px;
+  padding: 2px 6px;
+  border: 1px solid var(--opencodian-settings-inline-border);
+  border-radius: var(--opencodian-settings-radius-inline);
+  background: var(--opencodian-settings-inline-bg);
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.opencodian-settings .opencodian-agent-badge-default {
+  color: var(--text-normal);
+}
+
+.opencodian-settings .opencodian-agent-badge-info {
+  border-color: color-mix(in srgb, var(--text-accent) 18%, var(--opencodian-settings-inline-border));
+  background: color-mix(in srgb, var(--text-accent) 6%, var(--opencodian-settings-inline-bg));
+  color: color-mix(in srgb, var(--text-accent) 72%, var(--text-normal));
+}
+
+.opencodian-settings .opencodian-agent-badge-warning {
+  border-color: color-mix(in srgb, var(--text-warning, var(--color-yellow)) 22%, var(--opencodian-settings-inline-border));
+  background: color-mix(in srgb, var(--text-warning, var(--color-yellow)) 7%, var(--opencodian-settings-inline-bg));
+  color: color-mix(in srgb, var(--text-warning, var(--color-yellow)) 78%, var(--text-normal));
+}
+
+.opencodian-settings .opencodian-backend-agent-badge-active {
+  border-color: color-mix(in srgb, var(--interactive-accent) 22%, var(--opencodian-settings-inline-border));
+  background: color-mix(in srgb, var(--interactive-accent) 8%, var(--opencodian-settings-inline-bg));
+  color: color-mix(in srgb, var(--interactive-accent) 78%, var(--text-normal));
+}
+
+.opencodian-settings .opencodian-backend-agent-badge-enabled {
+  border-color: color-mix(in srgb, var(--text-success, var(--color-green)) 18%, var(--opencodian-settings-inline-border));
+  background: color-mix(in srgb, var(--text-success, var(--color-green)) 6%, var(--opencodian-settings-inline-bg));
+  color: color-mix(in srgb, var(--text-success, var(--color-green)) 76%, var(--text-normal));
+}
+
+.opencodian-settings .opencodian-backend-agent-badge-off {
+  color: var(--text-faint);
+}
+
+.opencodian-settings .opencodian-agent-settings-alert {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px dashed var(--opencodian-settings-inline-border);
+  border-radius: var(--opencodian-settings-radius-row);
+  background: color-mix(in srgb, var(--background-secondary) 48%, transparent);
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.opencodian-settings .opencodian-agent-settings-alert[data-alert-state="error"] {
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--text-error) 26%, var(--opencodian-settings-row-border));
+  background: color-mix(in srgb, var(--text-error) 6%, var(--opencodian-settings-row-bg));
+}
+
+.opencodian-settings .opencodian-agent-editor-layout {
+  display: flex;
+  flex-direction: column;
+  gap: var(--oc-agent-group-gap);
+  min-width: 0;
+}
+
+.opencodian-settings .opencodian-agent-editor-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-width: 0;
+}
+
+.opencodian-settings .opencodian-agent-editor-group-header,
+.opencodian-settings .opencodian-agent-editor-group-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  gap: var(--opencodian-settings-space-md);
+  align-items: center;
+  margin: 0;
+  padding: 0 2px;
+}
+
+.opencodian-settings .opencodian-agent-editor-group-summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.opencodian-settings .opencodian-agent-editor-group-summary::-webkit-details-marker {
+  display: none;
+}
+
+.opencodian-settings .opencodian-agent-editor-group-summary::after {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-right: 1.5px solid var(--text-muted);
+  border-bottom: 1.5px solid var(--text-muted);
+  transform: rotate(45deg);
+  transition: transform 150ms ease-out;
+}
+
+.opencodian-settings details[open] > .opencodian-agent-editor-group-summary::after {
+  transform: rotate(225deg);
+}
+
+.opencodian-settings .opencodian-agent-editor-group-summary:focus-visible {
+  outline: 2px solid var(--opencodian-settings-focus-ring);
+  outline-offset: 3px;
+  border-radius: var(--opencodian-settings-radius-inline);
+}
+
+.opencodian-settings .opencodian-agent-editor-group-title {
+  color: var(--text-normal);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.opencodian-settings .opencodian-agent-editor-group-description {
+  margin-top: 3px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.opencodian-settings .opencodian-agent-editor-group-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--oc-agent-row-gap);
+  margin-top: 12px;
+}
+
+.opencodian-settings .opencodian-agent-editor-row-textarea.setting-item {
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
+}
+
+.opencodian-settings .opencodian-agent-editor-row-textarea .setting-item-control {
+  width: 100%;
+  justify-content: stretch;
+}
+
+.opencodian-settings .opencodian-agent-editor-row textarea,
+.opencodian-settings .opencodian-agent-workspace-editor-row textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 96px;
+  border-radius: var(--opencodian-settings-radius-inline);
+  font-family: var(--font-monospace);
+  font-size: 12px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.opencodian-settings .opencodian-agent-editor-actions.setting-item,
+.opencodian-settings .opencodian-agent-workspace-editor-actions.setting-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  gap: var(--opencodian-settings-space-lg);
+  align-items: center;
+  margin: 0;
+  padding: 12px 0 0;
+  border: 0;
+  border-top: 1px solid var(--opencodian-settings-row-border);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.opencodian-settings .opencodian-agent-editor-actions .setting-item-control,
+.opencodian-settings .opencodian-agent-workspace-editor-actions .setting-item-control {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--opencodian-settings-space-sm);
+  justify-content: flex-end;
+}
+
+.opencodian-settings .opencodian-agent-workspace-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  gap: var(--opencodian-settings-space-lg);
+  align-items: center;
+  padding: var(--oc-agent-row-padding);
+  border: 1px solid var(--opencodian-settings-row-border);
+  border-radius: var(--opencodian-settings-radius-row);
+  background: var(--opencodian-settings-row-bg);
+}
+
+.opencodian-settings .opencodian-agent-workspace-toolbar-copy {
+  min-width: 0;
+}
+
+.opencodian-settings .opencodian-agent-workspace-toolbar-title {
+  color: var(--text-normal);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.opencodian-settings .opencodian-agent-workspace-toolbar-desc {
+  margin-top: 4px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.opencodian-settings .opencodian-agent-workspace-create-setting.setting-item {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.opencodian-settings .opencodian-agent-workspace-create-setting .setting-item-info {
+  display: none;
+}
+
+.opencodian-settings .opencodian-agent-workspace-create-setting .setting-item-control {
+  justify-content: flex-end;
+}
+
+.opencodian-settings .opencodian-markdown-agent-editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--oc-agent-row-gap);
+  margin: 10px 0 12px;
+  padding: 12px;
+  border: 1px solid var(--opencodian-settings-inline-border);
+  border-radius: var(--opencodian-settings-radius-row);
+  background: color-mix(in srgb, var(--background-primary) 66%, transparent);
+}
+
+.opencodian-settings .opencodian-agent-workspace-editor-row.setting-item {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--opencodian-settings-space-sm);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+@media (max-width: 720px) {
+  .opencodian-settings .opencodian-agent-settings-control-row.setting-item,
+  .opencodian-settings .opencodian-backend-agent-row.setting-item,
+  .opencodian-settings .opencodian-agent-catalog-row.setting-item,
+  .opencodian-settings .opencodian-agent-workspace-row.setting-item,
+  .opencodian-settings .opencodian-agent-editor-row.setting-item,
+  .opencodian-settings .opencodian-agent-editor-actions.setting-item,
+  .opencodian-settings .opencodian-agent-workspace-toolbar,
+  .opencodian-settings .opencodian-agent-workspace-editor-actions.setting-item {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .opencodian-settings .opencodian-agent-settings-control-row .setting-item-control,
+  .opencodian-settings .opencodian-backend-agent-row .setting-item-control,
+  .opencodian-settings .opencodian-agent-catalog-row .setting-item-control,
+  .opencodian-settings .opencodian-agent-workspace-row .setting-item-control,
+  .opencodian-settings .opencodian-agent-editor-row .setting-item-control,
+  .opencodian-settings .opencodian-agent-editor-actions .setting-item-control,
+  .opencodian-settings .opencodian-agent-workspace-create-setting .setting-item-control,
+  .opencodian-settings .opencodian-agent-workspace-editor-actions .setting-item-control {
+    justify-content: flex-start;
+  }
+}

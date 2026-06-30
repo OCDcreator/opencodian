@@ -74,13 +74,51 @@ describe('SettingsMcpSection', () => {
     section.attachTabbed(containerEl, 'mcp');
     await flushAsync();
 
+    expect(containerEl.querySelector('.opencodian-mcp-settings-shell')).not.toBeNull();
     expect(containerEl.querySelector('.opencodian-mcp-overview-shell')).not.toBeNull();
     expect(containerEl.querySelector('.opencodian-mcp-overview-toolbar')).not.toBeNull();
+    expect(containerEl.querySelector('.opencodian-mcp-overview-title-row')).not.toBeNull();
+    expect(containerEl.querySelector('.opencodian-mcp-overview-title')).not.toBeNull();
+    expect(containerEl.querySelector('.opencodian-mcp-overview-description')).not.toBeNull();
+    expect(containerEl.querySelector('.opencodian-mcp-overview-actions')).not.toBeNull();
     expect(containerEl.querySelector('.opencodian-mcp-toolbar-add')).not.toBeNull();
     expect(containerEl.querySelector('.opencodian-mcp-server-list-shell')).not.toBeNull();
+    expect(containerEl.querySelector('.opencodian-mcp-server-list-header')).not.toBeNull();
+    expect(containerEl.querySelector('.opencodian-mcp-server-list > .opencodian-settings-scrollarea-viewport')).not.toBeNull();
+    expect(containerEl.querySelector('.opencodian-settings-scrollarea-content--mcp')).not.toBeNull();
     expect(containerEl.querySelector('.opencodian-mcp-server-card-actions')).not.toBeNull();
     expect(containerEl.querySelector('.opencodian-mcp-server-action-grid')).not.toBeNull();
     expect(containerEl.querySelector('.opencodian-mcp-add-form-layout')).toBeNull();
+  });
+
+  it('renders overview chips with tone dots and in-card refresh info', async () => {
+    const plugin = createPlugin({
+      servers: {
+        connected: { status: 'connected' },
+        auth: { status: 'needs_auth' },
+        failed: { status: 'failed', error: 'boom' },
+      },
+      updatedAt: 1700000000000,
+    });
+    const section = new SettingsMcpSection({
+      plugin: plugin as unknown as OpenCodianPlugin,
+      createSectionHeading,
+      requestDisplayRefresh: jest.fn(),
+    });
+    const containerEl = document.createElement('div');
+
+    section.attachTabbed(containerEl, 'mcp');
+    await flushAsync();
+
+    expect(containerEl.querySelectorAll('.opencodian-mcp-overview-card-dot')).toHaveLength(4);
+    expect(containerEl.querySelector('.opencodian-mcp-overview-card--success')).not.toBeNull();
+    expect(containerEl.querySelector('.opencodian-mcp-overview-card--accent')).not.toBeNull();
+    expect(containerEl.querySelector('.opencodian-mcp-overview-card--danger')).not.toBeNull();
+    expect(containerEl.querySelector('.opencodian-mcp-overview-refresh-info')?.textContent).toContain(
+      t('settings.server.mcp.overview.lastRefresh'),
+    );
+    const titleRow = containerEl.querySelector('.opencodian-mcp-overview-title-row');
+    expect(titleRow?.querySelector('.opencodian-mcp-overview--title-rail')).not.toBeNull();
   });
 
   it('marks runtime-only servers as unknown transport', async () => {
@@ -99,6 +137,49 @@ describe('SettingsMcpSection', () => {
     await flushAsync();
 
     expect(containerEl.textContent).toContain(t('settings.server.mcp.transportUnknown'));
+  });
+
+  it('groups ownership, status, and transport chips together beside the server name', async () => {
+    const plugin = createPlugin({
+      servers: { inherited: { status: 'connected' } },
+      updatedAt: null,
+    });
+    const section = new SettingsMcpSection({
+      plugin: plugin as unknown as OpenCodianPlugin,
+      createSectionHeading,
+      requestDisplayRefresh: jest.fn(),
+    });
+    const containerEl = document.createElement('div');
+
+    section.attachTabbed(containerEl, 'mcp');
+    await flushAsync();
+
+    const chipRail = containerEl.querySelector('.opencodian-mcp-server-card-chip-rail');
+    expect(chipRail).not.toBeNull();
+    expect(chipRail?.textContent).toContain(t('settings.server.mcp.ownership.runtimeOnly'));
+    expect(chipRail?.textContent).toContain(t('settings.server.mcp.status.connected'));
+    expect(chipRail?.textContent).toContain(t('settings.server.mcp.transportUnknown'));
+  });
+
+  it('does not render the wrapped helper hint for runtime-only servers without errors', async () => {
+    const plugin = createPlugin({
+      servers: { inherited: { status: 'connected' } },
+      updatedAt: null,
+    });
+    const section = new SettingsMcpSection({
+      plugin: plugin as unknown as OpenCodianPlugin,
+      createSectionHeading,
+      requestDisplayRefresh: jest.fn(),
+    });
+    const containerEl = document.createElement('div');
+
+    section.attachTabbed(containerEl, 'mcp');
+    await flushAsync();
+
+    expect(containerEl.querySelector('.opencodian-mcp-server-card-status-summary')?.textContent).toContain(
+      t('settings.server.mcp.card.runtimeOnlyHint'),
+    );
+    expect(containerEl.querySelector('.opencodian-mcp-server-card-helper')).toBeNull();
   });
 
   it('registers a classic settings section heading when attached outside tabbed mode', async () => {
@@ -311,14 +392,14 @@ describe('SettingsMcpSection subscriptions and status', () => {
       await flushAsync();
       jest.advanceTimersByTime(1);
 
-      const listEl = containerEl.querySelector<HTMLElement>('.opencodian-mcp-server-list');
-      expect(listEl).not.toBeNull();
-      Object.defineProperty(listEl!, 'offsetHeight', {
+      const listContentEl = containerEl.querySelector<HTMLElement>('.opencodian-settings-scrollarea-content--mcp');
+      expect(listContentEl).not.toBeNull();
+      Object.defineProperty(listContentEl!, 'offsetHeight', {
         configurable: true,
         value: 360,
       });
       let scrollTop = 120;
-      Object.defineProperty(listEl!, 'scrollTop', {
+      Object.defineProperty(listContentEl!, 'scrollTop', {
         configurable: true,
         get: () => scrollTop,
         set: (value: number) => {
@@ -336,13 +417,13 @@ describe('SettingsMcpSection subscriptions and status', () => {
         },
       });
 
-      expect(listEl!.style.minHeight).toBe('360px');
-      expect(listEl!.scrollTop).toBe(120);
+      expect(listContentEl!.style.minHeight).toBe('360px');
+      expect(listContentEl!.scrollTop).toBe(120);
 
       jest.advanceTimersByTime(1);
 
-      expect(listEl!.style.minHeight).toBe('');
-      expect(listEl!.scrollTop).toBe(120);
+      expect(listContentEl!.style.minHeight).toBe('');
+      expect(listContentEl!.scrollTop).toBe(120);
     } finally {
       window.requestAnimationFrame = originalRequestAnimationFrame;
       window.cancelAnimationFrame = originalCancelAnimationFrame;
@@ -456,11 +537,15 @@ describe('SettingsMcpSection CSS contract', () => {
     );
 
     const toolbarRule = findRule('\\.opencodian-mcp-overview-toolbar', 'background:');
+    const shellRule = findRule('\\.opencodian-mcp-settings-shell,\\s*\\.opencodian-mcp-add-form-layout', 'gap:');
+    const overviewShellRule = findRule('\\.opencodian-mcp-overview-shell', 'background:');
     const overviewCardRule = findRule('\\.opencodian-mcp-overview-card', 'background:');
     const serverCardRule = findRule(
       '\\.opencodian-mcp-server-row,\\s*\\.opencodian-mcp-server-card',
       'background:',
     );
+    const serverListRule = findRule('\\.opencodian-mcp-server-list', 'overflow:');
+    const mcpScrollContentRule = findRule('\\.opencodian-settings-scrollarea-content--mcp', 'gap:');
     const actionSettingRule = findRule(
       '\\.opencodian-mcp-server-row-actions \\.setting-item,\\s*\\.opencodian-mcp-server-card-actions \\.setting-item',
       'box-shadow:',
@@ -496,22 +581,27 @@ describe('SettingsMcpSection CSS contract', () => {
       '',
     );
 
-    expect(toolbarRule).toContain('var(--opencodian-settings-inline-bg');
-    expect(toolbarRule).toContain('var(--opencodian-settings-radius-inline');
-    expect(overviewCardRule).toContain('var(--opencodian-settings-object-bg');
-    expect(overviewCardRule).toContain('var(--opencodian-settings-radius-row');
+    expect(shellRule).toContain('var(--opencodian-settings-space-lg');
+    expect(overviewShellRule).toContain('var(--opencodian-settings-inline-bg');
+    expect(overviewShellRule).toContain('var(--opencodian-settings-radius-row');
+    expect(toolbarRule).toContain('background: transparent');
+    expect(toolbarRule).toContain('border: none');
+    expect(overviewCardRule).toContain('var(--opencodian-settings-inline-border');
+    expect(overviewCardRule).toContain('border-radius: 999px');
     expect(overviewCardRule).toContain('box-shadow: none');
-    expect(serverCardRule).toContain('var(--opencodian-settings-object-bg');
-    expect(serverCardRule).toContain('var(--opencodian-settings-radius-row');
+    expect(serverCardRule).toContain('var(--opencodian-settings-form-row-bg');
+    expect(serverCardRule).toContain('var(--opencodian-settings-form-row-radius');
     expect(serverCardRule).toContain('box-shadow: none');
+    expect(serverListRule).toContain('overflow: hidden');
+    expect(mcpScrollContentRule).toContain('var(--opencodian-settings-space-md');
     expect(actionSettingRule).toContain('background: transparent');
     expect(helperRule).toContain('var(--opencodian-settings-row-bg');
     expect(emptyRule).toContain('var(--opencodian-settings-row-bg');
     expect(detailsRule).toContain('var(--opencodian-settings-object-bg');
     expect(formGroupRule).toContain('var(--opencodian-settings-object-bg');
-    expect(classicOverviewShellRule).toContain('var(--opencodian-settings-space-lg');
-    expect(classicServerListShellRule).toContain('var(--opencodian-settings-object-border');
-    expect(classicServerListRule).toContain('var(--opencodian-settings-space-md');
+    expect(classicOverviewShellRule).toBe('');
+    expect(classicServerListShellRule).toBe('');
+    expect(classicServerListRule).toBe('');
     expect(mcpCssWithoutBadges).not.toContain('linear-gradient');
     expect(mcpCssWithoutBadges).not.toContain('backdrop-filter');
     expect(mcpCssWithoutBadges).not.toContain('transform: translateY');

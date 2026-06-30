@@ -1,3 +1,11 @@
+.opencodian-settings .opencodian-capability-lab-shell {
+  gap: var(--opencodian-settings-space-lg);
+}
+
+.opencodian-settings .opencodian-capability-lab-body {
+  gap: var(--opencodian-settings-space-lg);
+}
+
 .opencodian-settings .opencodian-capability-lab-banner {
   margin: 0;
   padding: 12px 14px;
@@ -31,7 +39,7 @@
   padding: 8px 10px;
   border: 1px solid var(--opencodian-settings-inline-border);
   border-radius: var(--opencodian-settings-radius-inline);
-  background: var(--opencodian-settings-object-bg);
+  background: var(--opencodian-settings-inline-bg);
 }
 
 .opencodian-settings .opencodian-capability-lab-summary-label {
@@ -248,8 +256,8 @@
 
 .opencodian-settings .opencodian-capability-lab-matrix-separator {
   padding: 10px 10px 6px !important;
-  border-bottom: 2px solid var(--interactive-accent) !important;
-  color: var(--interactive-accent);
+  border-bottom: 1px solid var(--opencodian-settings-inline-border) !important;
+  color: var(--text-muted);
   font-size: 11px !important;
   font-weight: 750 !important;
   letter-spacing: 0.05em;

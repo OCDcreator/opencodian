@@ -9,13 +9,14 @@
 
 ## 关键类名
 
+- `.opencodian-capability-lab-shell`, `.opencodian-capability-lab-body`: Capability Lab 在 Debug 五标签体系中的 shared tab shell 对齐层。外层复用 `settings-layout-contract.css` 的 `.opencodian-debug-tab-shell` 结构，内层保持 Capability Lab 自己的诊断 block、矩阵、proof marker 和 `data-section-block` 语义。
 - `.opencodian-capability-lab-banner`: 顶部实验性警告横幅，使用 warning token 明确 DIAGNOSTIC / EXPERIMENTAL / NOT STABLE。
-- `.opencodian-capability-lab-summary`: 三列诊断边界摘要，说明面板只用于诊断、运行时证明不持久化、写操作只读或 dry-run。
+- `.opencodian-capability-lab-summary`: 三列诊断边界摘要，说明面板只用于诊断、运行时证明不持久化、写操作只读或 dry-run；摘要项使用 muted inline surface，不再使用 object-card weight 或高饱和边框。
 - `.opencodian-capability-lab-table-shell`: 能力矩阵横向滚动容器，防止窄宽度下 header 和状态芯片互相挤压。
 - `.opencodian-capability-lab-matrix`: 能力矩阵表格，最后一列为 `User Surface`，以 `Settings` / `Diagnostic` / `Hidden` / `Chat` / `Settings + Chat` 区分用户可见程度。
 - `.opencodian-capability-lab-chip`: SDK、adapter、runtime proof、surface 等状态芯片的共享基线。
 - `.opencodian-capability-lab-output`, `.opencodian-capability-lab-status`, `.opencodian-capability-lab-subagent-list`: 诊断输出和只读列表 surface。
-- `.opencodian-capability-lab-matrix-separator`: Codex Backend 矩阵分隔行，使用 interactive-accent 颜色和大写字母标题区分 Claude Code 行和 Codex 行。
+- `.opencodian-capability-lab-matrix-separator`: Codex Backend 矩阵分隔行，使用中性 separator 与 muted 文本区分 Claude Code 行和 Codex 行，不使用 `interactive-accent` 或紫色装饰线。
 - `.opencodian-capability-lab-preview-list`, `.opencodian-capability-lab-preview-row`, `.opencodian-capability-lab-preview-meta`, `.opencodian-capability-lab-preview-text`: history browser 的紧凑消息预览行，避免 Capability Lab 退化成整块 JSON dump。
 - `.opencodian-capability-lab-chip-surface-chat`: 用户表面列中 `Chat` 表面类型的分类芯片，使用 info-border / info-subtle / info 颜色，表示该能力已在普通聊天界面作为稳定功能暴露。
 - `.opencodian-capability-lab-chip-surface-settings-chat`: 用户表面列中 `Settings + Chat` 混合表面类型的分类芯片，使用 success 和 info 双色渐变背景，表示该能力同时从设置页（只读/浏览）和普通聊天界面可用。

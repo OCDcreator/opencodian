@@ -48,6 +48,12 @@ interface SkillPermissionDisplayCache {
   skillPermission?: SkillPermissionSelection;
 }
 
+interface SettingsScrollArea {
+  readonly rootEl: HTMLElement;
+  readonly viewportEl: HTMLElement;
+  readonly contentEl: HTMLElement;
+}
+
 interface SettingsSkillSectionOptions {
   plugin: OpenCodianPlugin;
   createSectionHeading: (
@@ -88,7 +94,10 @@ export class SettingsSkillSection {
   private render(containerEl: HTMLElement): void {
     this.bodyEl = containerEl.createDiv({ cls: 'opencodian-skill-settings-shell' });
     this.renderToolbar(this.bodyEl);
-    this.listEl = this.bodyEl.createDiv({ cls: 'opencodian-skill-list' });
+    this.listEl = this.createScrollArea(this.bodyEl, {
+      rootClass: 'opencodian-skill-list',
+      contentClass: 'opencodian-settings-scrollarea-content--skills',
+    }).rootEl;
     void this.renderSkillList(this.listEl);
   }
 
@@ -289,12 +298,13 @@ export class SettingsSkillSection {
   }
 
   private async renderSkillList(listEl: HTMLElement, forceRefresh = false): Promise<void> {
-    const previousScrollTop = listEl.scrollTop;
+    const scrollArea = this.resolveScrollArea(listEl);
+    const previousScrollTop = scrollArea.viewportEl.scrollTop;
     const restoreScrollTop = () => {
-      this.restoreScrollTopAfterRender(listEl, previousScrollTop);
+      this.restoreScrollTopAfterRender(scrollArea.viewportEl, previousScrollTop);
     };
-    listEl.empty();
-    listEl.createDiv({
+    scrollArea.contentEl.empty();
+    scrollArea.contentEl.createDiv({
       cls: 'opencodian-settings-inline-empty opencodian-skill-loading',
       text: t('settings.skills.loading'),
     });
@@ -302,7 +312,7 @@ export class SettingsSkillSection {
     try {
       const skills = forceRefresh || !this.cachedSkills ? await this.fetchSkills(forceRefresh) : this.cachedSkills;
       this.cachedSkills = skills;
-      listEl.empty();
+      scrollArea.contentEl.empty();
       const groups = this.groupBySource(skills);
       const projectSkills = groups.project;
       const externalSources = (Object.keys(SOURCE_LABEL_KEYS) as Array<keyof SkillSourceGroups>).filter(
@@ -312,21 +322,24 @@ export class SettingsSkillSection {
       this.pruneSelectedSkillKeys(skills);
 
       if (this.activeTab === 'project') {
-        this.renderSkillBatchBar(listEl, projectSkills, { allowDelete: true, allowRefresh: true });
+        this.renderSkillBatchBar(scrollArea.contentEl, projectSkills, { allowDelete: true, allowRefresh: true });
         if (projectSkills.length === 0) {
-          listEl.createDiv({ cls: 'opencodian-settings-inline-empty', text: t('settings.skills.empty.project') });
+          scrollArea.contentEl.createDiv({ cls: 'opencodian-settings-inline-empty', text: t('settings.skills.empty.project') });
+          this.syncScrollAreaGutter(scrollArea.rootEl, scrollArea.viewportEl);
           restoreScrollTop();
           return;
         }
-        this.renderSkillSourceSection(listEl, 'project', projectSkills);
+        this.renderSkillSourceSection(scrollArea.contentEl, 'project', projectSkills);
+        this.syncScrollAreaGutter(scrollArea.rootEl, scrollArea.viewportEl);
         restoreScrollTop();
         return;
       }
 
       const externalSkills = externalSources.flatMap((source) => groups[source]);
-      this.renderSkillBatchBar(listEl, externalSkills, { allowDelete: false, allowRefresh: false });
+      this.renderSkillBatchBar(scrollArea.contentEl, externalSkills, { allowDelete: false, allowRefresh: false });
       if (externalCount === 0) {
-        listEl.createDiv({ cls: 'opencodian-settings-inline-empty', text: t('settings.skills.empty.external') });
+        scrollArea.contentEl.createDiv({ cls: 'opencodian-settings-inline-empty', text: t('settings.skills.empty.external') });
+        this.syncScrollAreaGutter(scrollArea.rootEl, scrollArea.viewportEl);
         restoreScrollTop();
         return;
       }
@@ -336,13 +349,15 @@ export class SettingsSkillSection {
         if (sourceSkills.length === 0) {
           continue;
         }
-        this.renderSkillSourceSection(listEl, source, sourceSkills);
+        this.renderSkillSourceSection(scrollArea.contentEl, source, sourceSkills);
       }
+      this.syncScrollAreaGutter(scrollArea.rootEl, scrollArea.viewportEl);
       restoreScrollTop();
     } catch (error) {
-      listEl.empty();
+      scrollArea.contentEl.empty();
       logger.error('Failed to render skills:', error);
-      listEl.createDiv({ cls: 'opencodian-settings-inline-empty', text: t('settings.skills.empty') });
+      scrollArea.contentEl.createDiv({ cls: 'opencodian-settings-inline-empty', text: t('settings.skills.empty') });
+      this.syncScrollAreaGutter(scrollArea.rootEl, scrollArea.viewportEl);
       restoreScrollTop();
       if (forceRefresh) {
         new Notice(t('settings.skills.empty'));
@@ -362,6 +377,50 @@ export class SettingsSkillSection {
 
       containerEl.scrollTop = scrollTop;
     });
+  }
+
+  private syncScrollAreaGutter(rootEl: HTMLElement, viewportEl: HTMLElement): void {
+    window.requestAnimationFrame(() => {
+      if (!rootEl.isConnected || !viewportEl.isConnected) {
+        return;
+      }
+
+      const gutterWidth = Math.max(0, viewportEl.offsetWidth - viewportEl.clientWidth);
+      rootEl.style.setProperty('--opencodian-settings-scrollbar-track-width', `${gutterWidth}px`);
+      const viewportTop = viewportEl.getBoundingClientRect().top;
+      const availableHeight = Math.max(280, Math.floor(window.innerHeight - viewportTop - 24));
+      rootEl.style.setProperty('--opencodian-settings-scrollarea-available-height', `${availableHeight}px`);
+    });
+  }
+
+  private createScrollArea(
+    containerEl: HTMLElement,
+    options: { readonly rootClass: string; readonly contentClass: string },
+  ): SettingsScrollArea {
+    const rootEl = containerEl.createDiv({
+      cls: `opencodian-settings-scrollarea ${options.rootClass}`,
+    });
+    const viewportEl = rootEl.createDiv({
+      cls: 'opencodian-settings-scrollarea-viewport',
+    });
+    const contentEl = viewportEl.createDiv({
+      cls: `opencodian-settings-scrollarea-content ${options.contentClass}`,
+    });
+    rootEl.createDiv({
+      cls: 'opencodian-settings-scrollarea-gutter',
+      attr: { 'aria-hidden': 'true' },
+    });
+    this.syncScrollAreaGutter(rootEl, viewportEl);
+    return { rootEl, viewportEl, contentEl };
+  }
+
+  private resolveScrollArea(rootEl: HTMLElement): SettingsScrollArea {
+    const viewportEl = rootEl.querySelector<HTMLElement>(':scope > .opencodian-settings-scrollarea-viewport');
+    const contentEl = viewportEl?.querySelector<HTMLElement>(':scope > .opencodian-settings-scrollarea-content');
+    if (viewportEl && contentEl) {
+      return { rootEl, viewportEl, contentEl };
+    }
+    return { rootEl, viewportEl: rootEl, contentEl: rootEl };
   }
 
   private resolveSkillCatalogTab(tabId: string): SkillCatalogTab {

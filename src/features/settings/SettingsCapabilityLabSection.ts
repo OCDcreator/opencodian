@@ -448,79 +448,98 @@ export class SettingsCapabilityLabSection {
   }
 
   attachTabbed(containerEl: HTMLElement, _secondaryTabId: string): void {
-    this.createSectionHeading(
-      containerEl,
-      t('settings.capabilityLab.title'),
-    );
+    const shellEl = containerEl.createDiv({
+      cls: 'opencodian-debug-tab-shell opencodian-debug-tab-shell-capability-lab opencodian-capability-lab-shell',
+      attr: {
+        'data-section-block': 'capability-lab',
+        'data-debug-tab-shell': 'true',
+      },
+    });
+    const headerEl = shellEl.createDiv({ cls: 'opencodian-debug-tab-header' });
+    const copyEl = headerEl.createDiv({ cls: 'opencodian-debug-tab-copy' });
+    copyEl.createEl('h4', {
+      cls: 'opencodian-settings-subsection-heading',
+      text: t('settings.capabilityLab.title'),
+    });
+    copyEl.createDiv({
+      cls: 'opencodian-settings-block-desc opencodian-debug-tab-desc',
+      text: t('settings.capabilityLab.matrix.description'),
+    });
+    const badgesEl = headerEl.createDiv({ cls: 'opencodian-debug-tab-badges' });
+    badgesEl.createSpan({ cls: 'opencodian-debug-tab-badge', text: 'Diagnostic' });
+    badgesEl.createSpan({ cls: 'opencodian-debug-tab-badge', text: 'Experimental' });
+    badgesEl.createSpan({ cls: 'opencodian-debug-tab-badge', text: 'Readback' });
 
-    experimentalBanner(containerEl);
-    createDiagnosticSummary(containerEl);
+    const bodyEl = shellEl.createDiv({ cls: 'opencodian-debug-tab-body opencodian-capability-lab-body' });
+
+    experimentalBanner(bodyEl);
+    createDiagnosticSummary(bodyEl);
 
     // ── Capability Matrix ──────────────────────────────────────────────
-    const matrixBlock = containerEl.createDiv({
+    const matrixBlock = bodyEl.createDiv({
       cls: 'opencodian-settings-block',
       attr: { 'data-section-block': 'matrix' },
     });
-    this.renderCapabilityMatrix(matrixBlock);
+    this.renderCapabilityMatrix(matrixBlock, { includeDescription: false });
 
     // ── JSONL History Browser (read-only) ──────────────────────────────
-    const historyBlock = containerEl.createDiv({
+    const historyBlock = bodyEl.createDiv({
       cls: 'opencodian-settings-block',
       attr: { 'data-section-block': 'history' },
     });
     this.renderHistoryBrowser(historyBlock);
 
     // ── Subagent Browser (read-only) ───────────────────────────────────
-    const subagentBlock = containerEl.createDiv({
+    const subagentBlock = bodyEl.createDiv({
       cls: 'opencodian-settings-block',
       attr: { 'data-section-block': 'subagents' },
     });
     this.renderSubagentBrowser(subagentBlock);
 
     // ── Rewind Dry-Run Preview ────────────────────────────────────────
-    const rewindBlock = containerEl.createDiv({
+    const rewindBlock = bodyEl.createDiv({
       cls: 'opencodian-settings-block',
       attr: { 'data-section-block': 'rewind' },
     });
     this.renderRewindDryRun(rewindBlock);
 
     // ── Structured Output Playground ───────────────────────────────────
-    const structuredBlock = containerEl.createDiv({
+    const structuredBlock = bodyEl.createDiv({
       cls: 'opencodian-settings-block',
       attr: { 'data-section-block': 'structured' },
     });
     this.renderStructuredOutputPlayground(structuredBlock);
 
     // ── Fork Session Diagnostic (provider-owned, diagnostic only) ─────
-    const forkBlock = containerEl.createDiv({
+    const forkBlock = bodyEl.createDiv({
       cls: 'opencodian-settings-block',
       attr: { 'data-section-block': 'fork' },
     });
     this.renderForkProbe(forkBlock);
 
     // ── Resume Session Diagnostic (provider-owned, diagnostic only) ───
-    const resumeBlock = containerEl.createDiv({
+    const resumeBlock = bodyEl.createDiv({
       cls: 'opencodian-settings-block',
       attr: { 'data-section-block': 'resume' },
     });
     this.renderResumeProbe(resumeBlock);
 
     // ── Session Detail Diagnostic (provider-owned, diagnostic only) ──
-    const sessionDetailBlock = containerEl.createDiv({
+    const sessionDetailBlock = bodyEl.createDiv({
       cls: 'opencodian-settings-block',
       attr: { 'data-section-block': 'session-detail' },
     });
     this.renderSessionDetailProbe(sessionDetailBlock);
 
     // ── Backend Routing Diagnostic (provider-owned, diagnostic only) ──
-    const backendRoutingBlock = containerEl.createDiv({
+    const backendRoutingBlock = bodyEl.createDiv({
       cls: 'opencodian-settings-block',
       attr: { 'data-section-block': 'backend-routing' },
     });
     this.renderBackendRoutingProbe(backendRoutingBlock);
 
     // ── Discovery / Status ─────────────────────────────────────────────
-    const discoveryBlock = containerEl.createDiv({
+    const discoveryBlock = bodyEl.createDiv({
       cls: 'opencodian-settings-block',
       attr: { 'data-section-block': 'discovery' },
     });
@@ -531,12 +550,17 @@ export class SettingsCapabilityLabSection {
   // Capability Matrix
   // =======================================================================
 
-  private renderCapabilityMatrix(containerEl: HTMLElement): void {
+  private renderCapabilityMatrix(
+    containerEl: HTMLElement,
+    options: { includeDescription: boolean } = { includeDescription: true },
+  ): void {
     containerEl.createEl('h4', { text: t('settings.capabilityLab.matrix.title') });
-    containerEl.createEl('p', {
-      cls: 'opencodian-capability-lab-description',
-      text: t('settings.capabilityLab.matrix.description'),
-    });
+    if (options.includeDescription) {
+      containerEl.createEl('p', {
+        cls: 'opencodian-capability-lab-description',
+        text: t('settings.capabilityLab.matrix.description'),
+      });
+    }
 
     const adapter = getClaudeCodeAdapter(this.plugin);
     const codexAdapter = getCodexAdapter(this.plugin);

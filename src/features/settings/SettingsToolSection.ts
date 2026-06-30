@@ -12,6 +12,7 @@ type ToolPermissionAction = 'allow' | 'deny' | 'ask';
 type ToolPermissionSelection = ToolPermissionAction | 'inherit' | 'custom';
 type GlobalToolPermissionSelection = ToolPermissionAction | 'opencode-default';
 type ToolPermissionMap = Record<string, unknown>;
+type ToolPermissionSource = 'inherit' | 'override' | 'custom';
 
 interface ToolCatalogStoreLike {
   classifyToolIds(toolIds: string[]): { builtin: string[]; custom: string[] };
@@ -24,6 +25,12 @@ interface ToolRowRenderOptions {
   displayName: string;
   currentPermissions: ToolPermissionMap;
   permissionKey?: string;
+}
+
+interface SettingsScrollArea {
+  readonly rootEl: HTMLElement;
+  readonly viewportEl: HTMLElement;
+  readonly contentEl: HTMLElement;
 }
 
 const TOOL_GROUPS: Array<{ labelKey: string; descKey: string; toolNames: string[] }> = [
@@ -92,7 +99,7 @@ export class SettingsToolSection {
     const currentPermissions = await this.readCurrentPermissions();
 
     if (this.mode === 'builtin') {
-      this.renderToolControlPanel(currentPermissions, false);
+      this.renderToolControlPanel(currentPermissions);
       await this.renderBuiltinTools(currentPermissions);
       return;
     }
@@ -108,7 +115,10 @@ export class SettingsToolSection {
       headerEl.createEl('h3', { text: t(group.labelKey as any) });
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       headerEl.createDiv({ cls: 'opencodian-tool-group-desc', text: t(group.descKey as any) });
-      const rowsEl = groupEl.createDiv({ cls: 'opencodian-tool-group-rows' });
+      const rowsEl = this.createScrollArea(groupEl, {
+        rootClass: 'opencodian-tool-group-rows',
+        contentClass: 'opencodian-settings-scrollarea-content--tools',
+      }).contentEl;
 
       for (const toolName of group.toolNames) {
         if (!isBuiltinToolName(toolName)) {
@@ -127,15 +137,10 @@ export class SettingsToolSection {
     }
   }
 
-  private renderToolControlPanel(currentPermissions: ToolPermissionMap, includeAuthoring: boolean): void {
+  private renderToolControlPanel(currentPermissions: ToolPermissionMap): void {
     const selection = this.getGlobalPermissionSelection(currentPermissions);
     const panelEl = this.containerEl.createDiv({
-      cls: [
-        'opencodian-tool-control-panel',
-        'opencodian-skill-control-panel',
-        'opencodian-settings-section',
-        includeAuthoring ? 'opencodian-tool-control-panel--with-toolbar' : '',
-      ].filter(Boolean).join(' '),
+      cls: 'opencodian-tool-control-panel opencodian-skill-control-panel opencodian-settings-section',
       attr: { 'data-settings-surface': 'section' },
     });
     const clusterEl = panelEl.createDiv({
@@ -172,10 +177,6 @@ export class SettingsToolSection {
     dropdownEl.addEventListener('change', () => {
       void this.setGlobalToolPermission(this.normalizeGlobalPermissionSelection(dropdownEl.value));
     });
-
-    if (includeAuthoring) {
-      this.renderCustomToolsToolbar(panelEl);
-    }
   }
 
   private addPermissionOption(selectEl: HTMLSelectElement, value: string, label: string): void {
@@ -183,37 +184,8 @@ export class SettingsToolSection {
     optionEl.value = value;
   }
 
-  private renderCustomToolsToolbar(panelEl: HTMLElement): void {
-    const toolbarEl = panelEl.createDiv({ cls: 'opencodian-tool-authoring-actions opencodian-skill-toolbar' });
-    new Setting(toolbarEl)
-      .setName(t('settings.tools.custom.create.label'))
-      .setDesc(t('settings.tools.custom.create.desc'))
-      .addButton((button) => {
-        button
-          .setButtonText(t('settings.tools.custom.create.button'))
-          .onClick(async () => {
-            await this.createProjectTool();
-          });
-      });
-    new Setting(toolbarEl)
-      .addButton((button) => {
-        button
-          .setButtonText(t('settings.tools.refresh'))
-          .onClick(async () => {
-            await this.refresh({ restartLocalService: true });
-          });
-      })
-      .addButton((button) => {
-        button
-          .setButtonText(t('settings.tools.custom.docs'))
-          .onClick(() => {
-            window.open(TOOL_DOC_URL);
-          });
-      });
-  }
-
   private async renderCustomTools(currentPermissions: ToolPermissionMap): Promise<void> {
-    this.renderToolControlPanel(currentPermissions, true);
+    this.renderToolControlPanel(currentPermissions);
     await this.renderToolFiles(currentPermissions);
     await this.renderRuntimeCustomTools(currentPermissions);
   }
@@ -223,13 +195,23 @@ export class SettingsToolSection {
     const panelEl = this.containerEl.createDiv({
       cls: 'opencodian-tool-group-panel opencodian-tool-file-panel',
     });
-    const headerEl = panelEl.createDiv({ cls: 'opencodian-tool-group-header' });
-    headerEl.createEl('h3', { text: t('settings.tools.custom.files.title') });
-    headerEl.createDiv({
-      cls: 'opencodian-tool-group-desc',
+    const headerEl = panelEl.createDiv({ cls: 'opencodian-tool-group-header opencodian-tool-files-header' });
+    const copyEl = headerEl.createDiv({ cls: 'opencodian-tool-files-copy' });
+    const titleRowEl = copyEl.createDiv({ cls: 'opencodian-tool-files-title-row' });
+    titleRowEl.createEl('h3', { text: t('settings.tools.custom.files.title') });
+    titleRowEl.createEl('span', {
+      cls: 'opencodian-tool-files-count-badge',
       text: t('settings.tools.custom.files.desc').replace('{count}', String(files.length)),
     });
-    const rowsEl = panelEl.createDiv({ cls: 'opencodian-tool-group-rows' });
+    copyEl.createDiv({
+      cls: 'opencodian-tool-group-desc',
+      text: t('settings.tools.custom.create.desc'),
+    });
+    this.renderCustomToolFileActions(headerEl);
+    const rowsEl = this.createScrollArea(panelEl, {
+      rootClass: 'opencodian-tool-group-rows',
+      contentClass: 'opencodian-settings-scrollarea-content--tools',
+    }).contentEl;
 
     if (files.length === 0) {
       rowsEl.createDiv({
@@ -242,6 +224,42 @@ export class SettingsToolSection {
     for (const file of files) {
       this.renderToolFileCard(rowsEl, file, currentPermissions);
     }
+  }
+
+  private renderCustomToolFileActions(containerEl: HTMLElement): void {
+    const actionsEl = containerEl.createDiv({ cls: 'opencodian-tool-files-actions' });
+    const createSetting = new Setting(actionsEl)
+      .setClass('opencodian-tool-files-action')
+      .setName(t('settings.tools.custom.create.label'))
+      .addButton((button) => {
+        button
+          .setButtonText(t('settings.tools.custom.create.button'))
+          .onClick(async () => {
+            await this.createProjectTool();
+          });
+      });
+    createSetting.settingEl.addClass('opencodian-tool-files-action--primary');
+    new Setting(actionsEl)
+      .setClass('opencodian-tool-files-action')
+      .setName(t('settings.tools.refresh'))
+      .addButton((button) => {
+        button
+          .setButtonText(t('settings.tools.refresh'))
+          .onClick(async () => {
+            await this.refresh({ restartLocalService: true });
+          });
+      });
+    const docsSetting = new Setting(actionsEl)
+      .setClass('opencodian-tool-files-action')
+      .setName(t('settings.tools.custom.docs'))
+      .addButton((button) => {
+        button
+          .setButtonText(t('settings.tools.custom.docs'))
+          .onClick(() => {
+            window.open(TOOL_DOC_URL);
+          });
+      });
+    docsSetting.settingEl.addClass('opencodian-tool-files-action--link');
   }
 
   private renderToolFileCard(containerEl: HTMLElement, file: ToolFileInfo, currentPermissions: ToolPermissionMap): void {
@@ -257,6 +275,15 @@ export class SettingsToolSection {
     titleRowEl.createEl('small', {
       cls: 'opencodian-tool-source-chip',
       text: this.formatToolSource(file.source),
+    });
+    titleRowEl.createEl('small', {
+      cls: [
+        'opencodian-tool-status-badge',
+        file.source === 'project' ? 'opencodian-tool-status-badge-editable' : 'opencodian-tool-status-badge-readonly',
+      ].join(' '),
+      text: file.source === 'project'
+        ? t('settings.tools.custom.status.editable')
+        : t('settings.tools.custom.status.readOnly'),
     });
     contentEl.createEl('small', { cls: 'opencodian-tool-file-path', text: file.path });
     contentEl.createDiv({ cls: 'opencodian-tool-file-hint', text: t('settings.tools.custom.fileHint') });
@@ -326,7 +353,10 @@ export class SettingsToolSection {
       cls: 'opencodian-tool-group-desc',
       text: t('settings.tools.custom.desc').replace('{count}', String(custom.length)),
     });
-    const rowsEl = panelEl.createDiv({ cls: 'opencodian-tool-group-rows' });
+    const rowsEl = this.createScrollArea(panelEl, {
+      rootClass: 'opencodian-tool-group-rows',
+      contentClass: 'opencodian-settings-scrollarea-content--tools',
+    }).contentEl;
 
     for (const toolId of custom.sort((left, right) => left.localeCompare(right))) {
       const identity = getToolIdentity(toolId, identityContext);
@@ -344,7 +374,11 @@ export class SettingsToolSection {
     const permissionKey = options.permissionKey ?? toolId;
     const permission = this.getEffectivePermissionForTool(currentPermissions, permissionKey);
     const selection = this.getExplicitPermissionSelection(currentPermissions, permissionKey);
-    const permissionSource = selection === 'inherit' ? 'inherit' : selection === 'custom' ? 'custom' : 'override';
+    const permissionSource: ToolPermissionSource = selection === 'inherit'
+      ? 'inherit'
+      : selection === 'custom'
+        ? 'custom'
+        : 'override';
     const rowEl = containerEl.createDiv({
       cls: 'opencodian-tool-permission-row',
       attr: {
@@ -355,7 +389,7 @@ export class SettingsToolSection {
       },
     });
 
-    new Setting(rowEl)
+    const setting = new Setting(rowEl)
       .setName(displayName)
       .setDesc(toolId)
       .addDropdown((dropdown) => {
@@ -370,12 +404,45 @@ export class SettingsToolSection {
             await this.setToolPermissionSelection(permissionKey, this.normalizePermissionSelection(value));
           });
       });
+    this.decorateToolPermissionRow(setting.settingEl, permission, permissionSource);
   }
 
   private renderEmptyState(): void {
     this.containerEl.createDiv({
       cls: 'opencodian-settings-inline-empty opencodian-tool-empty',
       text: t('settings.tools.empty'),
+    });
+  }
+
+  private createScrollArea(
+    containerEl: HTMLElement,
+    options: { readonly rootClass: string; readonly contentClass: string },
+  ): SettingsScrollArea {
+    const rootEl = containerEl.createDiv({
+      cls: `opencodian-settings-scrollarea ${options.rootClass}`,
+    });
+    const viewportEl = rootEl.createDiv({
+      cls: 'opencodian-settings-scrollarea-viewport',
+    });
+    const contentEl = viewportEl.createDiv({
+      cls: `opencodian-settings-scrollarea-content ${options.contentClass}`,
+    });
+    rootEl.createDiv({
+      cls: 'opencodian-settings-scrollarea-gutter',
+      attr: { 'aria-hidden': 'true' },
+    });
+    this.syncScrollAreaGutter(rootEl, viewportEl);
+    return { rootEl, viewportEl, contentEl };
+  }
+
+  private syncScrollAreaGutter(rootEl: HTMLElement, viewportEl: HTMLElement): void {
+    window.requestAnimationFrame(() => {
+      if (!rootEl.isConnected || !viewportEl.isConnected) {
+        return;
+      }
+
+      const gutterWidth = Math.max(0, viewportEl.offsetWidth - viewportEl.clientWidth);
+      rootEl.style.setProperty('--opencodian-settings-scrollbar-track-width', `${gutterWidth}px`);
     });
   }
 
@@ -614,6 +681,44 @@ export class SettingsToolSection {
     }
 
     return 'allow';
+  }
+
+  private decorateToolPermissionRow(
+    settingEl: HTMLElement,
+    permission: ToolPermissionAction | 'custom',
+    source: ToolPermissionSource,
+  ): void {
+    const nameEl = settingEl.querySelector<HTMLElement>('.setting-item-name');
+    if (!nameEl) {
+      return;
+    }
+
+    const badgesEl = nameEl.createSpan({ cls: 'opencodian-tool-row-badges' });
+    badgesEl.createSpan({
+      cls: `opencodian-tool-badge opencodian-tool-badge-permission opencodian-tool-badge-${permission}`,
+      text: this.formatToolPermissionBadge(permission),
+    });
+    badgesEl.createSpan({
+      cls: `opencodian-tool-badge opencodian-tool-badge-source opencodian-tool-badge-source-${source}`,
+      text: this.formatToolPermissionSource(source),
+    });
+  }
+
+  private formatToolPermissionBadge(permission: ToolPermissionAction | 'custom'): string {
+    if (permission === 'custom') {
+      return t('settings.tools.permission.custom');
+    }
+    return this.formatPermissionAction(permission);
+  }
+
+  private formatToolPermissionSource(source: ToolPermissionSource): string {
+    if (source === 'custom') {
+      return t('settings.tools.permission.source.custom');
+    }
+    if (source === 'override') {
+      return t('settings.tools.permission.source.override');
+    }
+    return t('settings.tools.permission.source.inherit');
   }
 
   private getBuiltinPermissionKey(toolId: string): string {

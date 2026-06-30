@@ -1,7 +1,11 @@
 # Chinese Locale
 
 > **源码**: `src/i18n/locales/zh.ts`
-> **最近更新**: 2026-06-18 Claude Code 说明文字收敛 — 新增 `settings.claudeCode.help.boundaryLabel` / `.lifecycleLabel` / `.proofLabel` 段落标签，供新的 `ClaudeCodeHelpModal` 把 boundary/lifecycle/proof 长文从密集设置表面收进每个设置项的 help 按钮。
+> **最近更新**: 2026-06-28 Settings extension badges — 新增 `settings.tools.permission.source.*`、`settings.tools.custom.status.*` 和 `settings.acp.count`，用于 Skills / Tools / ACP 设置 row-card badge 与 toolbar 数量文案。
+>
+> **前次更新**: 2026-06-28 智能体管理 UI badge — 新增 `settings.agent.status.disabled`，让 `通用 > 智能体管理` 可以用 compact badge 展示使用中/已启用/已停用状态，而不是把状态重复拼进行标题。
+>
+> **前次更新**: 2026-06-18 Claude Code 说明文字收敛 — 新增 `settings.claudeCode.help.boundaryLabel` / `.lifecycleLabel` / `.proofLabel` 段落标签，供新的 `ClaudeCodeHelpModal` 把 boundary/lifecycle/proof 长文从密集设置表面收进每个设置项的 help 按钮。
 >
 > **Previously**: 2026-06-17 Claude Code 权限选择器文案 — 更新 `settings.claudeCode.permissionMode.*` 与 `chat.claudeCode.permissionMode.*.description`，让聊天工具栏显示截图式紧凑标签（`变更前确认`、`自动编辑`、`计划模式`、`完全访问`），同时让 `完全访问` 描述继续诚实说明会绕过权限检查。
 >
@@ -22,6 +26,8 @@
 ## 概述
 
 OpenCodian 的简体中文翻译表，导出 `zhTranslations` 静态对象。
+
+2026-06-28：新增 `settings.tools.permission.source.*`、`settings.tools.custom.status.*` 和 `settings.acp.count`，用于 Tools 权限行“继承 / 覆盖 / 自定义”badge、自定义工具文件“可编辑 / 只读”badge，以及 ACP preset toolbar 的配置数量。此前同日新增 `settings.agent.status.disabled`，用于 backend management / 智能体管理列表里的“已停用”badge。上述键只补齐 UI 状态标签，不改变工具权限、工具文件 CRUD、ACP agent 保存或 backend 启用保存语义。
 
 2026-06-17：更新 Claude Code 权限模式聊天选择器文案。`settings.claudeCode.permissionMode.*` 现在提供截图式紧凑标签（`变更前确认` / `自动编辑` / `计划模式` / `完全访问`），`chat.claudeCode.permissionMode.*.description` 提供对应短描述；其中 `完全访问` 只是 UI 标签，描述必须保留 SDK `bypassPermissions` 会绕过权限检查的风险语义。
 
