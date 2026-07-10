@@ -31,6 +31,7 @@
 - `./OpenCodeContextPartSerializer`
 - `./OpenCodeEventSubscriptionCoordinator`
 - `./OpenCodeMessageNormalizationMapper`
+- `./OpenCodeSdkCapabilityDiscoveryCoordinator`
 - `./OpenCodePromptRequestBuilder`
 - `./OpenCodeQuestionPermissionHub`
 - `./OpenCodeSessionControlOrchestrator`
@@ -61,6 +62,7 @@
 - `syncEventRuntime`: `OpenCodeSyncEventRuntimeCoordinator` 实例，负责 session todo/status/message sync event 的监听集合、wanted state、SDK 订阅生命周期、reducer-ready payload 归一化，以及把 sync mutation 先写入 `sessionStateStore` 后再广播给外部 listener。
 - `catalogState`: `OpenCodeCatalogStateStore` 实例，负责 registry tool ids、tool schema cache、observed external tool names、MCP server status、catalog snapshot 构造与 catalog listener lifecycle。
 - `catalogQueries`: `OpenCodeCatalogQueryCoordinator` 实例，负责 directory-scoped provider/model/config lookup、tool registry/schema cache、MCP status/auth 写回，以及 provider/project/file/find/path/VCS/formatter/LSP query/admin surface。
+- `capabilityDiscovery`: `OpenCodeSdkCapabilityDiscoveryCoordinator` 实例，负责把 SDK capability registry 与 live server discovery 结合，产出 typed `OpenCodeSdkCapabilitySnapshot`；`getSdkCapabilitySnapshot()` / `refreshSdkCapabilities()` / `requireSdkCapability()` 三个公开方法委托给它。能力 gate 独立于既有六个 SDK migration flag，不会影响 stable prompt/stream/abort/questions/sync 主链。
 - `contextPartSerializer`: `OpenCodeContextPartSerializer` 实例，负责 prompt 输入文本、本地/远程 context item 与 image part 的 request-part 序列化。
 - `diagnostics`: `OpenCodeSdkFacade` 模块提供的 diagnostics owner，负责 transient connectivity suppression、assistant/probe 错误文本整形，以及 assistant finalization debug payload 日志，并继续复用 façade 集中的 SDK error formatter。
 - `messageNormalizationMapper`: `OpenCodeMessageNormalizationMapper` singleton，负责 question request normalization、历史 message → `ChatMessage` hydration、tool kind 归类、context attachment 提取与 OMO/system reminder 归一化；session response 归一化（`normalizeSessionId` / `normalizeSessionMessages` / `normalizeSessionTodos` / `normalizeSessionStatuses`）现在也由 mapper 承担，构造函数中的回调注入直接委托给静态 mapper 实例。

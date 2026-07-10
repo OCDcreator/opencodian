@@ -100,4 +100,56 @@ describe('OpenCodeService SDK compatibility wrappers', () => {
     await expect(service.respondToPermission('permission-1', 'once', 'Allow once')).resolves.toBeUndefined();
     await expect(service.respondToSessionPermission('session-1', 'permission-1', 'always')).resolves.toBeUndefined();
   });
+
+  describe('SDK capability snapshot', () => {
+    beforeEach(() => {
+      ({ service } = createOpenCodeServiceSdkCompatContext());
+    });
+
+    it('getSdkCapabilitySnapshot returns a snapshot with capability entries', () => {
+      const snapshot = service.getSdkCapabilitySnapshot();
+      expect(snapshot.generatedAt).toBeGreaterThan(0);
+      expect(snapshot.entries.length).toBeGreaterThan(0);
+      // every entry has the required shape
+      for (const entry of snapshot.entries) {
+        expect(typeof entry.id).toBe('string');
+        expect(entry.availability).toBeDefined();
+        expect(entry.definition).toBeDefined();
+      }
+    });
+
+    it('refreshSdkCapabilities re-probes and returns a fresh snapshot', async () => {
+      const before = service.getSdkCapabilitySnapshot();
+      const refreshed = await service.refreshSdkCapabilities();
+      expect(refreshed.entries.length).toBeGreaterThan(0);
+      expect(refreshed.generatedAt).toBeGreaterThanOrEqual(before.generatedAt);
+      // the refreshed snapshot is now cached
+      expect(service.getSdkCapabilitySnapshot()).toBe(refreshed);
+    });
+
+    it('requireSdkCapability returns an availability result for a known v2 capability', async () => {
+      // refresh first so the read-probe runs against the mock facade
+      await service.refreshSdkCapabilities();
+      const result = service.requireSdkCapability('v2.health.get');
+      // The mock client has no v2 namespace, so the facade cannot resolve the
+      // method; the coordinator reports the path as not present on the connected
+      // client. We assert the well-formed shape rather than a specific kind,
+      // since the outcome depends on whether the mock exposes the v2 namespace.
+      expect(result).toMatchObject({
+        capabilityId: 'v2.health.get',
+      });
+      expect(result).toHaveProperty('kind');
+      expect(['unsupported-by-sdk', 'unsupported-by-server', 'unknown', 'disabled-by-user'])
+        .toContain((result as { kind: string }).kind);
+    });
+
+    it('requireSdkCapability returns a typed unsupported result for an unknown id', () => {
+      const result = service.requireSdkCapability('does.not.exist');
+      expect(result).toMatchObject({
+        supported: false,
+        capabilityId: 'does.not.exist',
+        kind: 'unsupported-by-sdk',
+      });
+    });
+  });
 });

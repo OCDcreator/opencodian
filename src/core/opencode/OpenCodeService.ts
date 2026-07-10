@@ -51,6 +51,12 @@ import {
   OpenCodeQuestionPermissionHub,
 } from './OpenCodeQuestionPermissionHub';
 import {
+  type OpenCodeSdkCapabilityAvailability,
+  OpenCodeSdkCapabilityDiscoveryCoordinator,
+  type OpenCodeSdkCapabilitySnapshot,
+  type OpenCodeUnsupportedCapabilityResult,
+} from './OpenCodeSdkCapabilityDiscoveryCoordinator';
+import {
   OpenCodeSdkFacade,
   OpenCodeServiceDiagnostics,
 } from './OpenCodeSdkFacade';
@@ -247,6 +253,7 @@ export class OpenCodeService {
   private syncEventRuntime: OpenCodeSyncEventRuntimeCoordinator;
   private catalogState: OpenCodeCatalogStateStore;
   private catalogQueries: OpenCodeCatalogQueryCoordinator;
+  private capabilityDiscovery: OpenCodeSdkCapabilityDiscoveryCoordinator;
   private contextPartSerializer: OpenCodeContextPartSerializer;
   private promptRequestBuilder: OpenCodePromptRequestBuilder;
   private readonly sessionStateStore = new OpenCodeSessionStateStore();
@@ -343,6 +350,13 @@ export class OpenCodeService {
         this.openCodeEventRuntime.stopSubscriptions();
       },
     });
+    this.capabilityDiscovery = new OpenCodeSdkCapabilityDiscoveryCoordinator(
+      undefined,
+      {
+        getFacade: () => this.sdk,
+        resolveGate: (_id, definition) => definition.defaultGate,
+      },
+    );
     this.catalogQueries = new OpenCodeCatalogQueryCoordinator(this.catalogState, {
       shouldUseSdkCrud: () => this.shouldUseSdk('sdkCrud'),
       getSdkFacade: (options = {}) => options.includeDirectory === false
@@ -558,17 +572,17 @@ export class OpenCodeService {
       method: 'GET',
       headers: this.getRequestHeaders(),
     });
-    
+
     // Check for error status codes
     if (response.status >= 400) {
       const errorText = response.text?.substring(0, 200) ?? 'Unknown error';
       throw new Error(`HTTP ${response.status} from ${path}: ${errorText}`);
     }
-    
+
     if (typeof response.json === 'object' && response.json !== null) {
       return response.json as T;
     }
-    
+
     // If response is not JSON, try to parse it
     try {
       return JSON.parse(response.text) as T;
@@ -587,22 +601,22 @@ export class OpenCodeService {
       headers: this.getRequestHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(body),
     });
-    
+
     // Check for error status codes
     if (response.status >= 400) {
       const errorText = response.text?.substring(0, 200) ?? 'Unknown error';
       throw new Error(`HTTP ${response.status} from ${path}: ${errorText}`);
     }
-    
+
     // For 204 No Content, return empty object
     if (response.status === 204) {
       return {} as T;
     }
-    
+
     if (typeof response.json === 'object' && response.json !== null) {
       return response.json as T;
     }
-    
+
     // If response is not JSON, try to parse it
     try {
       return JSON.parse(response.text) as T;
@@ -1459,6 +1473,32 @@ export class OpenCodeService {
 
   getCapabilitySnapshot(): OpenCodeCapabilitySnapshot {
     return this.catalogState.getCapabilitySnapshot();
+  }
+
+  /**
+   * Returns the cached SDK capability snapshot (SDK presence + server support +
+   * user gate resolution). Does not re-probe the server; use
+   * `refreshSdkCapabilities()` to re-check server support.
+   */
+  getSdkCapabilitySnapshot(): OpenCodeSdkCapabilitySnapshot {
+    return this.capabilityDiscovery.getSnapshot();
+  }
+
+  /**
+   * Re-checks server support for every registered SDK capability without
+   * changing user gates. Returns the fresh snapshot.
+   */
+  async refreshSdkCapabilities(): Promise<OpenCodeSdkCapabilitySnapshot> {
+    return this.capabilityDiscovery.refresh();
+  }
+
+  /**
+   * Returns the availability of a single capability, or a typed redacted
+   * unsupported result that callers can display. Never throws for a missing
+   * capability id.
+   */
+  requireSdkCapability(id: string): OpenCodeSdkCapabilityAvailability | OpenCodeUnsupportedCapabilityResult {
+    return this.capabilityDiscovery.requireCapability(id);
   }
 
   subscribeToOpenCodeEvents(listener: OpenCodeEventListener): () => void {
