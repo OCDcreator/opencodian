@@ -438,6 +438,21 @@ export class OpenCodeSdkFacade implements OpenCodeSdkFacadeClient {
           return nested;
         }
 
+        if (rawValue === undefined) {
+          // The SDK namespace/method does not exist on the connected client
+          // (older server or unsupported capability). Return a thunk that throws
+          // a normalized error when invoked, instead of leaking a raw TypeError
+          // ("... is not a function") to callers.
+          const unavailablePath = nextPath.join('.');
+          const errorThunk = async (..._args: unknown[]): Promise<never> => {
+            throw normalizeSdkError(
+              new Error(`OpenCode SDK path ${unavailablePath} is unavailable`),
+            );
+          };
+          memberCache.set(propertyKey, errorThunk);
+          return errorThunk;
+        }
+
         return rawValue;
       },
       ownKeys: () => {
