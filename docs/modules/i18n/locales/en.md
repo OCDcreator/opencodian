@@ -447,3 +447,7 @@ Claude Code no longer uses the overloaded `settings.claudeCode.tab.mcpAdvanced` 
 ## SDK capability disclosure locale keys
 
 新增 `capabilities.status.*`（available/unsupportedByServer/disabledByUser/unsupportedBySdk/unknown）、`capabilities.recheck`、`settings.<section>.capabilityStatus` 以及 `capabilities.label.*` 显示名称键，用于 Settings 能力披露行。
+
+## Chat capability gating locale keys
+
+新增 `chat.context.filePicker.serverHint` 等键，用于 Chat 能力 gating 与 server-side read-only hint。

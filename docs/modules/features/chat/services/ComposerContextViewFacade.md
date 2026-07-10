@@ -67,3 +67,7 @@ class ComposerContextViewFacade {
 - send-preparation 只应消费 `sendContext` 端口，避免重新依赖完整 composer facade 或重新装配上下文 builder
 - 新增 composer/context 入口时，优先判断是否属于现有 facade 的 host-facing职责；若需要多个内部 service 协作，再考虑继续下沉到 services 层
 - 若未来其它 runtime bridge 只需要 focus-preview refresh 端口，可直接复用 facade，而不必重新把 `FocusContextPreviewCoordinator` 暴露给 `OpenCodianView`
+
+### Server reference context passthrough
+
+向 `ComposerContextPickerActionService` 传递可选的 `ServerReferenceContextService`，用于 context picker 的 server-side read-only hint。

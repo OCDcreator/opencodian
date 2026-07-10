@@ -1979,6 +1979,7 @@ export const zhTranslations = {
   'chat.context.filePicker.filterAll': '全部',
   'chat.context.filePicker.results': '当前匹配 {visible} / {total} 个文件，筛选：{suffix}',
   'chat.context.filePicker.summary': '当前先显示 {shown} / {total} 个匹配文件，可继续搜索缩小范围。',
+  'chat.context.filePicker.serverHint': '已连接的 OpenCode 服务器可浏览服务器端文件与引用。',
   'chat.question.title': 'Agent 提问',
   'chat.question.progress': '第 {current} / {total} 题',
   'chat.question.overallProgress': '已回答 {answered} / {total} 题',

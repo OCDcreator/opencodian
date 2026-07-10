@@ -82,6 +82,12 @@ export interface OpenCodeSessionControlOrchestratorHost {
   getAvailableModels(): Promise<AvailableModelDirectory>;
   logServiceWarning(key: string, message: string, error: unknown): void;
   logServiceError(key: string, message: string, error: unknown): void;
+  /**
+   * Optional: resolve a capability id to a support result. When omitted (or when
+   * the method is unavailable on the host), `isCapabilitySupported` defaults to
+   * `true`, preserving pre-existing behavior for orchestrator consumers.
+   */
+  requireCapability?(id: string): { supported: boolean; reason?: string };
 }
 
 const SESSION_COMMAND_PLACEHOLDER_PATTERN =
@@ -138,6 +144,20 @@ export function expandSessionCommandTemplate(
 
 export class OpenCodeSessionControlOrchestrator {
   constructor(private readonly host: OpenCodeSessionControlOrchestratorHost) {}
+
+  /**
+   * Returns whether the host reports a capability id as supported. When the host
+   * does not provide `requireCapability`, defaults to `true` to preserve
+   * pre-existing behavior. Callers should re-check before rendering AND before
+   * acting on a capability-gated affordance.
+   */
+  isCapabilitySupported(capabilityId: string): boolean {
+    const result = this.host.requireCapability?.(capabilityId);
+    if (!result) {
+      return true;
+    }
+    return result.supported === true;
+  }
 
   async getSessionContextUsageSnapshot(sessionId: string): Promise<SessionContextUsageSnapshot | null> {
     if (!sessionId) {

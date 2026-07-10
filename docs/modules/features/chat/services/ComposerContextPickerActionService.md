@@ -50,3 +50,7 @@ class ComposerContextPickerActionService {
 
 - service 不直接依赖 `OpenCodianView` 或 tab runtime；draft item 去重与 active-tab rerender 仍由 shared runtime store 统一维护
 - host 必须保证 begin/complete 成对出现时不会重复写 UI，避免 picker cancel 与异常路径留下 stale preview
+
+### Server reference context (optional port)
+
+现在接受可选的 `ServerReferenceContextService` 注入，用于在 context picker 中显示 server-side read-only hint。不影响 vault 文件选择行为。

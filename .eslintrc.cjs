@@ -31,6 +31,7 @@ const justifiedMaxLinesFiles = [
   'src/utils/streaming/StreamController.ts',
   'tests/unit/core/opencode/OpenCodeStreamingFinalizationCoordinator.test.ts',
   'tests/unit/core/opencode/OpenCodeStreamingRuntimeCoordinator.test.ts',
+  'tests/unit/core/opencode/OpenCodeSessionControlOrchestrator.test.ts',
   'src/features/chat/services/ChatSelectionControlsCoordinator.ts',
   'tests/unit/core/agents/backend/ClaudeCodeOptionsBuilder.settings.test.ts',
   'tests/unit/core/storage/StorageService.test.ts',

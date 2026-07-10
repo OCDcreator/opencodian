@@ -292,6 +292,7 @@ import {
 import {
   SettledScrollScheduler,
 } from './services/ScrollManager';
+import { ServerReferenceContextService } from './services/ServerReferenceContextService';
 import {
   createSessionTodoCoordinator,
   type SessionTodoCoordinator,
@@ -342,6 +343,27 @@ import { NavigationSidebar } from './ui/NavigationSidebar';
 const logger = createLogger('OpenCodianView');
 
 const OPENCODIAN_APP_ICON = 'opencodian-app-icon';
+
+/**
+ * Pure capability-availability lookup. Accepts the bound `requireSdkCapability`
+ * function and returns whether the capability id is supported. Absorbs lookup
+ * failures as `false` so callers (cache keys, gating) never throw. Exported for
+ * unit testing of the cache-key/gating logic in isolation.
+ */
+export function isSdkCapabilitySupportedByLookup(
+  requireCapability: (id: string) => { supported: boolean; reason?: string } | { kind: string } | unknown,
+  capabilityId: string,
+): boolean {
+  try {
+    const availability = requireCapability(capabilityId);
+    if (availability && typeof availability === 'object' && 'supported' in availability) {
+      return (availability as { supported: unknown }).supported === true;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 interface ConversationRevertState {
   messageID: string;
@@ -691,6 +713,13 @@ export class OpenCodianView extends ItemView {
     return {
       getCurrentConversation: () => this.currentConversation,
       getSessionChildren: async (sessionId) => {
+        // Re-check the stable session read capability before action. Defaults to
+        // supported for non-OpenCode backends and transient lookup failures, so
+        // the Chat main chain (concurrent streaming, hydration, sync) is never
+        // blocked by a capability probe.
+        if (!this.isSessionCapabilityAvailable('v2.session.get')) {
+          return [];
+        }
         const sessions = await this.plugin.openCodeService.getSessionChildren(sessionId);
         return sessions.map((session) => ({
           id: session.id,
@@ -1565,6 +1594,24 @@ export class OpenCodianView extends ItemView {
         return catalog?.agents ?? null;
       },
       getBackendKey: () => this.isClaudeCodeConversationActive() ? 'claude-code' : 'opencode',
+      getSlashCommandCapabilityKey: () => {
+        // Fold the current v2.command.list / v2.skill.list capability
+        // availability into the cache key. When server support flips, the key
+        // mismatches and the next load() rebuilds the catalog. Defaults to a
+        // stable constant for non-OpenCode backends or when the service is
+        // unavailable, so existing behavior is preserved.
+        if (this.isClaudeCodeConversationActive()) {
+          return 'claude-code';
+        }
+        const service = this.plugin.openCodeService;
+        const requireCapability = service?.requireSdkCapability?.bind(service);
+        if (typeof requireCapability !== 'function') {
+          return 'default';
+        }
+        const commandSupported = isSdkCapabilitySupportedByLookup(requireCapability, 'v2.command.list');
+        const skillSupported = isSdkCapabilitySupportedByLookup(requireCapability, 'v2.skill.list');
+        return `cmd:${commandSupported ? '1' : '0'}:skill:${skillSupported ? '1' : '0'}`;
+      },
       getVaultPath: () => getVaultBasePath(this.app),
       onWarmLoadFailed: (error) => { logger.debug('Failed to preload slash command menu items:', error); },
     });
@@ -1818,12 +1865,31 @@ export class OpenCodianView extends ItemView {
   }
 
   private createSurfaceRuntimeWiring(): OpenCodianViewSurfaceRuntimeWiring {
+    // Read-only server-side fs/reference context surface. Only resolves support
+    // for the v2 fs/reference capability family; never throws, so the Chat
+    // context picker remains unaffected when the capability is absent.
+    const serverReferenceContextService = this.plugin.openCodeService
+      ? new ServerReferenceContextService({
+          requireCapability: (id) => {
+            try {
+              const availability = this.plugin.openCodeService.requireSdkCapability(id);
+              if (availability && 'supported' in availability && availability.supported === false) {
+                return { supported: false, reason: availability.reason };
+              }
+              return { supported: true };
+            } catch {
+              return { supported: false };
+            }
+          },
+        })
+      : undefined;
     const composerContextViewFacade = ComposerContextViewFacade.create({
       app: this.app,
       getServerMode: () => this.plugin.settings.server.mode,
       viewHost: this.createComposerContextViewHost(),
       focusRuntimeViewHost: this.createFocusContextRuntimeViewHost(),
       focusPreviewWritebackHost: this.createFocusContextPreviewWritebackHost(),
+      serverContext: serverReferenceContextService,
     });
     const titleGenerationService = new TitleGenerationService(this.plugin);
     const questionDockSlotCoordinator = new QuestionDockSlotCoordinator(
@@ -4259,6 +4325,34 @@ export class OpenCodianView extends ItemView {
       ?? this.currentConversation?.backend
       ?? 'opencode'
     ) === 'codex';
+  }
+
+  /**
+   * Checks whether an OpenCode SDK capability is available before rendering OR
+   * acting on a session/fs/reference affordance. Non-OpenCode backends and any
+   * transient lookup failure default to `true` (preserves existing behavior and
+   * never blocks the Chat main chain). Callers MUST re-check before action.
+   */
+  private isSessionCapabilityAvailable(capabilityId: string): boolean {
+    if (!this.isOpenCodeBackendActive()) {
+      return true;
+    }
+    const service = this.plugin.openCodeService;
+    const requireCapability = service?.requireSdkCapability?.bind(service);
+    if (typeof requireCapability !== 'function') {
+      return true;
+    }
+    // Optimistic on lookup failure: never block the Chat main chain (streaming,
+    // hydration, sync) due to a transient capability probe error.
+    try {
+      const availability = requireCapability(capabilityId);
+      if (availability && 'supported' in availability && availability.supported === false) {
+        return false;
+      }
+      return true;
+    } catch {
+      return true;
+    }
   }
 
   private openCodexMcpServerDetailFromChat(serverName: string): void {

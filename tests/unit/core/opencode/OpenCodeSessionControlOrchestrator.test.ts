@@ -24,6 +24,7 @@ type MockHost = OpenCodeSessionControlOrchestratorHost & {
   getAvailableModels: jest.Mock<Promise<ModelDirectory>, []>;
   logServiceWarning: jest.Mock<void, [string, string, unknown]>;
   logServiceError: jest.Mock<void, [string, string, unknown]>;
+  requireCapability?: jest.Mock<{ supported: boolean; reason?: string }, [string]>;
 };
 
 function createSessionSdk(
@@ -514,4 +515,33 @@ it('expands session command arguments before delegating to the SDK', async () =>
       model: { providerID: 'openai', modelID: 'gpt-5' },
       messageID: 'shell-message-1',
     });
+  });
+
+it('isCapabilitySupported returns true when the host reports the capability as supported', () => {
+    const host = createHost(createSessionSdk(), createPartSdk(), {
+      requireCapability: jest.fn(() => ({ supported: true })),
+    });
+    const orchestrator = new OpenCodeSessionControlOrchestrator(host);
+
+    expect(orchestrator.isCapabilitySupported('v2.session.history')).toBe(true);
+    expect(host.requireCapability).toHaveBeenCalledWith('v2.session.history');
+  });
+
+it('isCapabilitySupported returns false when the host reports the capability as unsupported', () => {
+    const host = createHost(createSessionSdk(), createPartSdk(), {
+      requireCapability: jest.fn(() => ({
+        supported: false,
+        reason: 'The connected OpenCode server does not expose this endpoint.',
+      })),
+    });
+    const orchestrator = new OpenCodeSessionControlOrchestrator(host);
+
+    expect(orchestrator.isCapabilitySupported('v2.session.events')).toBe(false);
+  });
+
+it('isCapabilitySupported defaults to true when the host omits requireCapability (backward compat)', () => {
+    const host = createHost(createSessionSdk(), createPartSdk());
+    const orchestrator = new OpenCodeSessionControlOrchestrator(host);
+
+    expect(orchestrator.isCapabilitySupported('v2.session.message')).toBe(true);
   });

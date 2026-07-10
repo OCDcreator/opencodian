@@ -7,12 +7,23 @@ import type { ContextFileCatalog, ContextFileEntry } from '../services/ContextFi
 const MAX_RENDERED_FILES = 200;
 const ALL_EXTENSION_FILTER = '__all__';
 
+export interface ContextFilePickerOptions {
+  /**
+   * When true, the picker shows a read-only hint that the connected OpenCode
+   * server can browse server-side files/references. The hint is informational
+   * only and does not add a duplicate filesystem browser; vault file selection
+   * behavior is unchanged.
+   */
+  serverContextAvailable?: boolean;
+}
+
 export function chooseContextFile(
   app: App,
   loadCatalog: () => ContextFileCatalog | Promise<ContextFileCatalog>,
+  options?: ContextFilePickerOptions,
 ): Promise<TFile | null> {
   return new Promise((resolve) => {
-    new ContextFilePickerModal(app, loadCatalog, resolve).open();
+    new ContextFilePickerModal(app, loadCatalog, resolve, options).open();
   });
 }
 
@@ -35,6 +46,7 @@ class ContextFilePickerModal extends Modal {
     app: App,
     loadCatalog: () => ContextFileCatalog | Promise<ContextFileCatalog>,
     onResolve: (file: TFile | null) => void,
+    private readonly options?: ContextFilePickerOptions,
   ) {
     super(app);
     this.loadCatalog = loadCatalog;
@@ -45,6 +57,17 @@ class ContextFilePickerModal extends Modal {
     this.titleEl.setText(t('chat.context.filePicker.title'));
     this.contentEl.empty();
     this.modalEl.addClass('opencodian-context-file-modal');
+
+    // Read-only informational hint shown when the connected OpenCode server
+    // advertises the v2 fs/reference capability family. This does not add a
+    // duplicate server filesystem browser; it only surfaces that server-side
+    // context is reachable. Vault file selection behavior is unchanged.
+    if (this.options?.serverContextAvailable) {
+      this.contentEl.createDiv({
+        cls: 'opencodian-context-file-server-hint',
+        text: t('chat.context.filePicker.serverHint'),
+      });
+    }
 
     const searchSectionEl = this.contentEl.createDiv({ cls: 'opencodian-context-file-search-section' });
     this.searchInput = this.contentEl.createEl('input', {

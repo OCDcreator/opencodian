@@ -42,6 +42,15 @@ export interface SlashCommandMenuCatalogCacheHost {
   loadClaudeRuntimeAgents?(): Promise<Array<{ name: string; description?: string }> | null | undefined>;
   /** Optional: returns a short backend discriminator for cache key partitioning. Return different values for different backends (e.g. 'opencode', 'claude-code'). */
   getBackendKey?(): string;
+  /**
+   * Optional: returns a short discriminator encoding the current server-side
+   * slash-command/skill capability availability (e.g. whether `v2.command.list`
+   * and `v2.skill.list` are supported). When the capability availability
+   * changes, the returned value must change so the cache key mismatches and a
+   * fresh load is forced. Returning a constant or omitting this method disables
+   * capability-driven invalidation (backward-compatible).
+   */
+  getSlashCommandCapabilityKey?(): string;
   getVaultPath(): string | null;
   now?(): number;
   onWarmLoadFailed?(error: unknown): void;
@@ -326,7 +335,11 @@ export class SlashCommandMenuCatalogCache {
   private buildCacheKey(): string {
     const hiddenKey = buildHiddenCommandCacheKey(this.host.getHiddenCommandIds());
     const backendKey = this.host.getBackendKey?.() ?? 'default';
-    return `${hiddenKey}:${backendKey}`;
+    // Fold the current slash-command/skill capability availability into the
+    // cache key. When `v2.command.list`/`v2.skill.list` support flips, the key
+    // mismatches and the next `load()` rebuilds the catalog.
+    const capabilityKey = this.host.getSlashCommandCapabilityKey?.() ?? 'default';
+    return `${hiddenKey}:${backendKey}:${capabilityKey}`;
   }
 
   private now(): number {

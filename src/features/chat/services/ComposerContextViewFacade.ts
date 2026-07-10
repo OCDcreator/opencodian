@@ -7,7 +7,7 @@ import { ComposerContextActionService } from './ComposerContextActionService';
 import { ComposerContextChipActionService } from './ComposerContextChipActionService';
 import { ComposerContextCoordinator } from './ComposerContextCoordinator';
 import { ComposerContextEventBridge } from './ComposerContextEventBridge';
-import { ComposerContextPickerActionService } from './ComposerContextPickerActionService';
+import { ComposerContextPickerActionService, type ComposerContextPickerServerContextPort } from './ComposerContextPickerActionService';
 import {
   type ComposerContextRuntimeState,
   ComposerContextRuntimeStore,
@@ -93,6 +93,8 @@ export interface ComposerContextServiceDependencies {
   viewHost: ComposerContextViewHost;
   focusRuntimeViewHost: FocusContextRuntimeViewHost;
   focusPreviewWritebackHost: FocusContextPreviewWritebackHost;
+  /** Optional read-only server-side context capability port (v2 fs/reference). */
+  serverContext?: ComposerContextPickerServerContextPort;
 }
 
 export interface ComposerContextViewFacadeCreateOptions {
@@ -101,6 +103,8 @@ export interface ComposerContextViewFacadeCreateOptions {
   viewHost: ComposerContextViewHost;
   focusRuntimeViewHost: FocusContextRuntimeViewHost;
   focusPreviewWritebackHost: FocusContextPreviewWritebackHost;
+  /** Optional read-only server-side context capability port (v2 fs/reference). */
+  serverContext?: ComposerContextPickerServerContextPort;
 }
 
 export interface ComposerSendContextPort {
@@ -142,6 +146,7 @@ export class ComposerContextViewFacade {
       viewHost: options.viewHost,
       focusRuntimeViewHost: options.focusRuntimeViewHost,
       focusPreviewWritebackHost: options.focusPreviewWritebackHost,
+      serverContext: options.serverContext,
     }).viewFacade;
   }
 
@@ -232,6 +237,7 @@ export function createComposerContextServices(
     dependencies.contextAttachmentBuilder,
     dependencies.contextFileCatalogService,
     viewHostAdapter.createPickerActionServiceHost(contextPickerInteractionBridge),
+    { serverContext: dependencies.serverContext },
   );
   const chipActionService = new ComposerContextChipActionService(
     dependencies.contextAttachmentBuilder,

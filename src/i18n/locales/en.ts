@@ -1979,6 +1979,7 @@ export const enTranslations = {
   'chat.context.filePicker.filterAll': 'All',
   'chat.context.filePicker.results': '{visible} of {total} files match. Filter: {suffix}',
   'chat.context.filePicker.summary': 'Showing the first {shown} of {total} matching files. Keep typing to narrow the list.',
+  'chat.context.filePicker.serverHint': 'The connected OpenCode server can browse server-side files and references.',
   'chat.question.title': 'Question from agent',
   'chat.question.progress': 'Question {current} of {total}',
   'chat.question.overallProgress': '{answered} of {total} answered',

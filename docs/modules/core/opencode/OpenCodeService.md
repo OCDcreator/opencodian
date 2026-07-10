@@ -479,3 +479,7 @@ Compaction config is now project-scoped (`.opencode/opencode.json`). Ownership f
 1. Compaction config source of truth is `.opencode/opencode.json`, not plugin settings or conversation session settings.
 2. `applyCompactionConfig()` was removed from `OpenCodeService`; compaction is now written by `SettingsConversationSection` via `OpencodeConfigManager.updateCompactionConfig()`, then applied via `reapplyCompactionConfigFromProjectConfig()`.
 3. Manual `session.summarize()` remains a per-session action available through `OpenCodeService` session control, not managed by the compaction configuration surface.
+
+### SDK capability gating for session orchestrator
+
+`OpenCodeService` 现在把 `requireCapability` 注入 `OpenCodeSessionControlOrchestrator` host，把 `requireSdkCapability(id)` 结果映射为 `{ supported: boolean; reason?: string }`。这让 Chat 可以在渲染或执行 session 相关操作前检查能力可用性。

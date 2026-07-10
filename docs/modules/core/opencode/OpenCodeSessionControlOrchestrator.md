@@ -96,3 +96,7 @@ graph TD
 - command template placeholder expansion 继续留在 `runSessionCommand()` 所在的 session control seam；不要把这层 ownership 重新塞回 `OpenCodeService` 或 settings editor。
 - 不要在这里混入 question/permission negotiation 或 broad query gateway；那是 roadmap 的后续 queue。
 - 只读 diff 仍允许 SDK→legacy fallback；session mutation 与 message/part SDK wrappers 保持既有 transport 语义，不在这里引入额外回退分支。
+
+### SDK capability availability check
+
+新增 `isCapabilitySupported(capabilityId)` 方法，通过 host 的可选 `requireCapability(id)` 检查能力可用性。当 host 未提供 `requireCapability` 时默认返回 true（向后兼容）。Chat 在渲染 session 相关 affordance 前调用此方法。

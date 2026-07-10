@@ -327,6 +327,13 @@ export class OpenCodeService {
       getAvailableModels: () => this.catalogQueries.getAvailableModels(),
       logServiceWarning,
       logServiceError,
+      requireCapability: (id) => {
+        const availability = this.requireSdkCapability(id);
+        if ('supported' in availability && availability.supported === false) {
+          return { supported: false, reason: availability.reason };
+        }
+        return { supported: true };
+      },
     });
     this.questionPermissionHub = new OpenCodeQuestionPermissionHub({
       shouldUseSdkQuestions: () => this.shouldUseSdk('sdkQuestions'),

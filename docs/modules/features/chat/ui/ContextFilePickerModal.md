@@ -103,3 +103,7 @@ render() → 文件按钮列表
 
 - Catalog 构建逻辑：`ContextFileCatalogService` 遍历 `app.vault.getFiles()`，排除以 `.` 开头的路径段（隐藏文件/目录），按扩展名统计 `ContextFileExtensionBucket[]`，生成 `ContextFileEntry[]` 并缓存
 - 隐藏路径排除规则：路径中任意段以 `.` 开头（如 `.obsidian/config`）会被过滤；该逻辑位于 `ContextFileCatalogService`，不在 Modal 中
+
+### Server-side read-only hint
+
+当 server 支持 `v2.fs` / `v2.reference` 时，显示只读 informational hint banner。vault 文件选择行为不变；不创建独立的 filesystem 浏览器。

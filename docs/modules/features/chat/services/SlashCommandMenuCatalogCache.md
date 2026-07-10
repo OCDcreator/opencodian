@@ -51,3 +51,7 @@ project-only command 仍会参与 merge 以提供 override/source 信息，但�
 - 不要在输入每个字符时绕过 view 层 cache 直接调用 `sdk.command.list()`；composer 可以重新请求 host catalog，但 host 必须继续走本 cache，让 hidden command key、TTL、pending promise 和 warm preload 语义保持集中。
 - 不要把 `@agent` 候选回退成纯文本解析；composer 只使用 selected mention 形成 `SurfaceInvocationIntent.mentions`，主 Agent 下拉框只形成 `SurfaceInvocationIntent.primaryAgent`。
 - 如果后续 project command editor 需要即时刷新 chat menu，可调用 view 侧的 cache invalidation seam，而不是复制 catalog 合并逻辑。
+
+### Capability-aware cache key
+
+新增可选 `getSlashCommandCapabilityKey?()` host 方法，纳入 cache key。Chat 传入基于 `v2.command.list` / `v2.skill.list` 可用性的 key，能力变化时自然触发 cache-key mismatch + reload。

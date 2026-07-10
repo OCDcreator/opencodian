@@ -405,3 +405,36 @@ describe('SlashCommandMenuCatalogCache — project-only filtering', () => {
     ]);
   });
 });
+
+describe('SlashCommandMenuCatalogCache — capability-change invalidation', () => {
+  it('rebuilds the catalog when the slash-command/skill capability key changes', async () => {
+    const host = createHost({
+      getSlashCommandCapabilityKey: jest.fn(() => 'cmd:1:skill:1'),
+    });
+    const cache = new SlashCommandMenuCatalogCache(host);
+
+    const first = await cache.load();
+    expect(host.loadRuntimeCommands).toHaveBeenCalledTimes(1);
+
+    // Same capability key → cache hit, no reload.
+    const cached = await cache.load();
+    expect(cached).toBe(first);
+    expect(host.loadRuntimeCommands).toHaveBeenCalledTimes(1);
+
+    // Capability availability flips → cache key mismatches → forced reload.
+    host.getSlashCommandCapabilityKey = jest.fn(() => 'cmd:0:skill:0');
+    const rebuilt = await cache.load();
+    expect(rebuilt).toEqual(first);
+    expect(host.loadRuntimeCommands).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not invalidate when getSlashCommandCapabilityKey is omitted (backward compat)', async () => {
+    const host = createHost();
+    const cache = new SlashCommandMenuCatalogCache(host);
+
+    const first = await cache.load();
+    const second = await cache.load();
+    expect(second).toBe(first);
+    expect(host.loadRuntimeCommands).toHaveBeenCalledTimes(1);
+  });
+});
