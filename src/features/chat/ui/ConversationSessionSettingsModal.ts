@@ -50,6 +50,7 @@ interface ConversationSessionSettingsModalOptions {
   onCancelPreview?(): void;
   onShare?(): Promise<void> | void;
   onUnshare?(): Promise<void> | void;
+  onOpenExperimentalActions?(): void;
   shareUrl?: string | null;
   shareMode?: OpencodeShareMode;
   onSetThreadGoal?(objective: string, options?: { tokenBudget?: number }): Promise<AppServerThreadGoal | null>;
@@ -136,6 +137,7 @@ export class ConversationSessionSettingsModal extends Modal {
     this.createCodexSection(bodyEl);
 
     this.createSharingSection(bodyEl);
+    this.createExperimentalActionsSection(bodyEl);
     this.createSummaryDivider(bodyEl);
 
     const globalSectionEl = this.createSection(bodyEl, {
@@ -958,6 +960,26 @@ export class ConversationSessionSettingsModal extends Modal {
         void this.runSharingAction(unshareButtonEl, this.options.onUnshare);
       });
     }
+  }
+
+  private createExperimentalActionsSection(containerEl: HTMLElement): void {
+    if (!this.options.onOpenExperimentalActions) {
+      return;
+    }
+
+    const sectionEl = this.createSection(containerEl, {
+      section: 'experimental-actions',
+      title: t('chat.experimentalActions.launcher.title'),
+      description: t('chat.experimentalActions.launcher.desc'),
+    });
+    const buttonEl = sectionEl.createEl('button', {
+      cls: 'opencodian-session-settings-sharing-button',
+      text: t('chat.experimentalActions.launcher.open'),
+      attr: { type: 'button', 'data-action': 'open-experimental-actions' },
+    });
+    buttonEl.addEventListener('click', () => {
+      this.options.onOpenExperimentalActions?.();
+    });
   }
 
   private async runSharingAction(

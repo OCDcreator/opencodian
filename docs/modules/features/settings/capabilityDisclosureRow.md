@@ -18,3 +18,5 @@ Shared helper that renders read-only SDK capability disclosure rows inside exist
 
 - 被 `SettingsServerSection`、`SettingsAgentsSection`、`SettingsCommandsSection`、`SettingsSkillSection`、`SettingsSecuritySection`、`SettingsMcpSection`、`SettingsModelSection` 调用。
 - 通过 `OpenCodeService.requireSdkCapability()` 与 `refreshSdkCapabilities()` 获取能力真相。
+
+`describeCapabilityAvailability()` 是 Server/Conversation experimental gate 与 disclosure row 共用的格式化路径。它只组合 availability 的 redacted reason 和 optional minimum-server hint；available capability 留给调用方显示本地的确认边界说明。

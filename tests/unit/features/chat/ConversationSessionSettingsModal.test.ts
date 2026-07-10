@@ -166,6 +166,22 @@ describe('ConversationSessionSettingsModal', () => {
     expect(onUnshare).toHaveBeenCalledTimes(1);
   });
 
+  it('shows the experimental action launcher only when the Chat capability gate has already passed', () => {
+    const onOpenExperimentalActions = jest.fn();
+    const modal = new ConversationSessionSettingsModal({} as never, {
+      conversationTitle: 'Research thread',
+      defaults: { chatFontSizePx: 15 },
+      onSave: jest.fn(),
+      onOpenExperimentalActions,
+    });
+
+    modal.onOpen();
+    const launcher = modal.contentEl.querySelector<HTMLButtonElement>('[data-action="open-experimental-actions"]');
+    expect(launcher).not.toBeNull();
+    launcher?.click();
+    expect(onOpenExperimentalActions).toHaveBeenCalledTimes(1);
+  });
+
   it('shows shared status and hides unshare until the current session has a share link', () => {
     const modal = new ConversationSessionSettingsModal({} as never, {
       conversationTitle: 'Research thread',

@@ -483,3 +483,7 @@ Compaction config is now project-scoped (`.opencode/opencode.json`). Ownership f
 ### SDK capability gating for session orchestrator
 
 `OpenCodeService` 现在把 `requireCapability` 注入 `OpenCodeSessionControlOrchestrator` host，把 `requireSdkCapability(id)` 结果映射为 `{ supported: boolean; reason?: string }`。这让 Chat 可以在渲染或执行 session 相关操作前检查能力可用性。
+
+### SDK 1.17.18 experimental action boundary
+
+`runExperimentalAction()` 在每次调用前刷新生产 capability snapshot，再委托 `OpenCodeSdkExperimentalActionCoordinator`。Service 保持唯一 SDK 使用边界：它将已确认请求映射为 facade 的 PTY、project copy、control-plane 或 background endpoint，并将任何失败收敛为 coordinator 的脱敏结果。正常 session create 不走这个实验执行面。

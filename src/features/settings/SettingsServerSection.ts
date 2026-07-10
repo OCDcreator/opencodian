@@ -2,14 +2,19 @@
 import type { App, ButtonComponent, TextComponent } from 'obsidian';
 import { Notice, Setting } from 'obsidian';
 
+import { OPENCODE_CAPABILITY_SETTINGS_SCHEMA_VERSION } from '../../core/opencode/OpenCodeCapabilitySettingsMigration';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
-import { renderCapabilityDisclosureRows } from './capabilityDisclosureRow';
+import {
+  describeCapabilityAvailability,
+  renderCapabilityDisclosureRows,
+} from './capabilityDisclosureRow';
 import { type ServerHelpTopic, ServerSettingHelpModal } from './ServerSettingHelpModal';
 import { isOpenCodeSettingsBackendActive } from './settingsBackendGuards';
 
 type OpenCodeServerDiagnostics = ReturnType<OpenCodianPlugin['openCodeService']['getServerDiagnostics']>;
 type OpenCodeServerStatus = ReturnType<OpenCodianPlugin['openCodeService']['getServerStatus']>;
+type LocaleKey = Parameters<typeof t>[0];
 
 interface SettingsServerSectionOptions {
   app: App;
@@ -76,6 +81,7 @@ export class SettingsServerSection {
     this.renderStatusSetting(containerEl);
     this.registerContainerCleanup(containerEl);
     this.renderCapabilityDisclosure(containerEl);
+    this.renderExperimentalGates(containerEl);
 
     void this.refreshStatus();
     this.statusIntervalId = window.setInterval(() => void this.refreshStatus(), 2000);
@@ -96,6 +102,7 @@ export class SettingsServerSection {
       case 'status':
         this.renderStatusSetting(containerEl);
         this.registerContainerCleanup(containerEl);
+        this.renderExperimentalGates(containerEl);
         void this.refreshStatus();
         this.statusIntervalId = window.setInterval(() => void this.refreshStatus(), 2000);
     }
@@ -615,5 +622,77 @@ export class SettingsServerSection {
         'v2.location.get': 'capabilities.label.v2.location.get',
       },
     });
+  }
+
+  private renderExperimentalGates(containerEl: HTMLElement): void {
+    const sectionEl = containerEl.createDiv({ cls: 'opencodian-experimental-capability-gates' });
+    sectionEl.createEl('h4', {
+      text: t('settings.server.experimental.title'),
+      cls: 'opencodian-settings-subsection-heading',
+    });
+
+    this.addExperimentalGate(
+      sectionEl,
+      'v2.pty.create',
+      'settings.server.experimental.pty.name',
+      'settings.server.experimental.pty.desc',
+    );
+    this.addExperimentalGate(
+      sectionEl,
+      'experimental.controlPlane.moveSession',
+      'settings.server.experimental.controlPlane.name',
+      'settings.server.experimental.controlPlane.desc',
+    );
+    this.addExperimentalGate(
+      sectionEl,
+      'v2.projectCopy.create',
+      'settings.server.experimental.projectCopy.name',
+      'settings.server.experimental.projectCopy.desc',
+    );
+  }
+
+  private addExperimentalGate(
+    containerEl: HTMLElement,
+    capabilityId: string,
+    nameKey: LocaleKey,
+    descriptionKey: LocaleKey,
+  ): void {
+    const availability = this.plugin.openCodeService.requireSdkCapability(capabilityId);
+    const availabilityDetail = describeCapabilityAvailability(availability)
+      ?? t('settings.experimental.confirmationRequired');
+
+    new Setting(containerEl)
+      .setName(t(nameKey))
+      .setDesc(`${t(descriptionKey)} ${availabilityDetail}`)
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.isExperimentalGateEnabled(capabilityId))
+          .onChange(async (enabled) => {
+            if (!this.ensureOpenCodeActive()) {
+              toggle.setValue(this.isExperimentalGateEnabled(capabilityId));
+              return;
+            }
+            await this.setExperimentalGate(capabilityId, enabled);
+          }),
+      );
+  }
+
+  private isExperimentalGateEnabled(capabilityId: string): boolean {
+    return this.plugin.settings.opencodeCapabilities?.experimentalGates[capabilityId] ?? false;
+  }
+
+  private async setExperimentalGate(capabilityId: string, enabled: boolean): Promise<void> {
+    const current = this.plugin.settings.opencodeCapabilities;
+    this.plugin.settings.opencodeCapabilities = {
+      schemaVersion: current?.schemaVersion ?? OPENCODE_CAPABILITY_SETTINGS_SCHEMA_VERSION,
+      experimentalGates: {
+        ...current?.experimentalGates,
+        [capabilityId]: enabled,
+      },
+      preferences: { ...current?.preferences },
+      ...(current?.migrationReport ? { migrationReport: current.migrationReport } : {}),
+    };
+    await this.plugin.saveSettings();
+    await this.plugin.openCodeService.refreshSdkCapabilities();
   }
 }

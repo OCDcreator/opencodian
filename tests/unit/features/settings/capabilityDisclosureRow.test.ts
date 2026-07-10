@@ -191,6 +191,7 @@ describe('renderCapabilityDisclosureRows', () => {
     expect(serverRow.desc).toContain(t('capabilities.status.unsupportedByServer'));
     // Reason text rendered (never raw server errors).
     expect(serverRow.desc).toContain('does not expose this endpoint');
+    expect(serverRow.desc).toContain('OpenCode server 1.17+');
     expect(serverRow.classes).toContain('opencodian-capability-row--disabled');
     expect(serverRow.buttons[0]!.control.buttonEl.getAttribute('data-capability-tone')).toBe('disabled');
 

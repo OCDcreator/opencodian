@@ -9,6 +9,7 @@ import {
 
 jest.mock('../../../../src/features/chat/ui/ConversationSessionSettingsModal', () => ({
   ConversationSessionSettingsModal: jest.fn().mockImplementation((_app, options) => ({
+    close: jest.fn(),
     open: jest.fn(),
     options,
   })),
@@ -37,6 +38,7 @@ describe('ConversationSessionSettingsCoordinator', () => {
     currentConversation?: Conversation | null;
     projectShareMode?: 'manual' | 'auto' | 'disabled';
     supportsSessionSharing?: boolean;
+    canOpenExperimentalActions?: boolean;
   }) {
     const chatContainerEl = document.createElement('div');
     const saveConversation = jest.fn().mockResolvedValue(undefined);
@@ -56,6 +58,8 @@ describe('ConversationSessionSettingsCoordinator', () => {
       getProjectShareMode: jest.fn().mockResolvedValue(options?.projectShareMode),
       supportsSessionSharing: jest.fn().mockReturnValue(options?.supportsSessionSharing ?? false),
       supportsCompaction: jest.fn().mockReturnValue(false),
+      canOpenExperimentalActions: jest.fn().mockReturnValue(options?.canOpenExperimentalActions ?? false),
+      openExperimentalActions: jest.fn(),
     } as jest.Mocked<ConversationSessionSettingsCoordinatorHost>;
 
     return {

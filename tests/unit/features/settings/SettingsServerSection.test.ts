@@ -296,6 +296,60 @@ describe('SettingsServerSection', () => {
     jest.restoreAllMocks();
   });
 
+  it('keeps server-owned experimental gates default-off and persists an explicit opt-in', async () => {
+    const plugin = createPlugin();
+    const section = new SettingsServerSection({
+      app: {} as App,
+      plugin: plugin as unknown as OpenCodianPlugin,
+      createSectionHeading,
+      notifyModelCatalogStatus: jest.fn(),
+      onServerStateChange: jest.fn(),
+      requestDisplayRefresh: jest.fn(),
+    });
+
+    section.attach(document.createElement('div'));
+
+    const ptyGate = toggleRecords.find((record) => record.name === t('settings.server.experimental.pty.name'));
+    expect(ptyGate).toBeDefined();
+    expect(ptyGate?.control.setValue).toHaveBeenCalledWith(false);
+
+    await ptyGate?.onChange?.(true);
+    expect(plugin.settings.opencodeCapabilities?.experimentalGates['v2.pty.create']).toBe(true);
+    expect(plugin.saveSettings).toHaveBeenCalledTimes(1);
+    expect(plugin.openCodeService.refreshSdkCapabilities).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the redacted server incompatibility and minimum-version hint for an experimental gate', () => {
+    const plugin = createPlugin();
+    (plugin.openCodeService.requireSdkCapability as jest.Mock).mockImplementation((capabilityId: string) => {
+      if (capabilityId === 'v2.pty.create') {
+        return {
+          kind: 'unsupported-by-server',
+          reason: 'The connected OpenCode server does not expose this endpoint.',
+          minimumServerHint: 'OpenCode server 1.17+',
+        };
+      }
+      return { kind: 'available' };
+    });
+    const section = new SettingsServerSection({
+      app: {} as App,
+      plugin: plugin as unknown as OpenCodianPlugin,
+      createSectionHeading,
+      notifyModelCatalogStatus: jest.fn(),
+      onServerStateChange: jest.fn(),
+      requestDisplayRefresh: jest.fn(),
+    });
+
+    section.attach(document.createElement('div'));
+
+    const ptyDescription = descRecords.find(
+      (record) => record.name === t('settings.server.experimental.pty.name'),
+    )?.text;
+    expect(ptyDescription).toContain('does not expose this endpoint');
+    expect(ptyDescription).toContain('OpenCode server 1.17+');
+    expect(ptyDescription).not.toContain(t('settings.experimental.confirmationRequired'));
+  });
+
   function findLastStatusDesc(): string | undefined {
     const statusName = t('settings.server.status.name');
     const matches = descRecords.filter((record) => record.name === statusName);
@@ -323,7 +377,12 @@ describe('SettingsServerSection', () => {
       t('settings.server.mode.name'),
       t('settings.server.auth.name'),
     ]);
-    expect(toggleRecords.map((record) => record.name)).toEqual([t('settings.server.autoStart.name')]);
+    expect(toggleRecords.map((record) => record.name)).toEqual([
+      t('settings.server.autoStart.name'),
+      t('settings.server.experimental.pty.name'),
+      t('settings.server.experimental.controlPlane.name'),
+      t('settings.server.experimental.projectCopy.name'),
+    ]);
     expect(textRecords.map((record) => record.name)).toEqual([
       t('settings.server.executablePath.name'),
       t('settings.server.host.name'),

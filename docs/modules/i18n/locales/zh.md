@@ -459,3 +459,7 @@ Claude Code 不再使用过载的 `settings.claudeCode.tab.mcpAdvanced` 标签�
 ## Chat capability gating locale keys
 
 新增 `chat.context.filePicker.serverHint` 等键，用于 Chat 能力 gating 与 server-side read-only hint。
+
+## SDK 1.17.18 experimental-action locale keys
+
+新增 `settings.server.experimental.*`、`settings.conversation.experimental.*` 与 `chat.experimentalActions.*`。这些键覆盖默认关闭的 gate、最终确认、PTY cleanup、project-copy preview、control-plane 目标位置和后台会话 inline status；文案不把 SDK presence 误写成可执行保证。

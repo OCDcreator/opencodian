@@ -188,13 +188,13 @@ export const OPENCODE_SDK_CAPABILITY_REGISTRY: readonly OpenCodeSdkCapabilityDef
   readOnlyEntry({ id: 'app.skills', category: 'top-level-app', surface: 'settings', description: 'List OpenCode skills.' }, path('app', 'skills')),
 
   // ---------- experimental.* ----------
-  stateChangingEntry({ id: 'experimental.controlPlane.moveSession', category: 'experimental', surface: 'diagnostic', description: 'Move a session between locations.' }, path('experimental.controlPlane', 'moveSession'), 'state-changing'),
+  stateChangingEntry({ id: 'experimental.controlPlane.moveSession', category: 'experimental', surface: 'diagnostic', description: 'Move a session between locations.', minimumServerHint: MINIMUM_SERVER_HINT_117 }, path('experimental.controlPlane', 'moveSession'), 'state-changing'),
   readOnlyEntry({ id: 'experimental.capabilities.get', category: 'experimental', surface: 'diagnostic', description: 'Read server-advertised experimental capability flags.' }, path('experimental.capabilities', 'get')),
   readOnlyEntry({ id: 'experimental.console.get', category: 'experimental', surface: 'diagnostic', description: 'Read active Console provider metadata.' }, path('experimental.console', 'get')),
   readOnlyEntry({ id: 'experimental.console.listOrgs', category: 'experimental', surface: 'diagnostic', description: 'List switchable Console organizations.' }, path('experimental.console', 'listOrgs')),
   stateChangingEntry({ id: 'experimental.console.switchOrg', category: 'experimental', surface: 'diagnostic', description: 'Switch the active Console organization.' }, path('experimental.console', 'switchOrg'), 'state-changing'),
   readOnlyEntry({ id: 'experimental.session.list', category: 'experimental', surface: 'diagnostic', description: 'List experimental sessions.' }, path('experimental.session', 'list')),
-  stateChangingEntry({ id: 'experimental.session.background', category: 'experimental', surface: 'diagnostic', description: 'Detach synchronous subagents into the background.' }, path('experimental.session', 'background'), 'state-changing'),
+  stateChangingEntry({ id: 'experimental.session.background', category: 'experimental', surface: 'diagnostic', description: 'Detach synchronous subagents into the background.', minimumServerHint: MINIMUM_SERVER_HINT_117 }, path('experimental.session', 'background'), 'state-changing'),
   readOnlyEntry({ id: 'experimental.resource.list', category: 'experimental', surface: 'diagnostic', description: 'List MCP resources.' }, path('experimental.resource', 'list')),
   presenceEntry({ id: 'experimental.projectCopy.generateName', category: 'experimental', surface: 'diagnostic', description: 'Generate a project-copy name from task context.' }, path('experimental.projectCopy', 'generateName'), 'experimental-action'),
   readOnlyEntry({ id: 'experimental.workspace.adapter.list', category: 'experimental', surface: 'diagnostic', description: 'List workspace adapters.' }, path('experimental.workspace.adapter', 'list')),

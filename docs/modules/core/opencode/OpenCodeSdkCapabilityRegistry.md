@@ -19,3 +19,7 @@
 - `OpenCodeSdkCapabilityDiscoveryCoordinator` 以此注册表为输入，对每个 entry 解析 SDK presence 与服务端支持。
 - `OpenCodeService.getSdkCapabilitySnapshot()` / `requireSdkCapability()` 间接消费此注册表。
 - Settings 与 Chat 通过 service 返回的 snapshot 渲染稳定 / 禁用 / 实验状态，不直接读注册表。
+
+### 1.17 experimental action metadata
+
+`v2.pty.create`、`v2.projectCopy.create`、`experimental.controlPlane.moveSession` 与 `experimental.session.background` 都保留 `OpenCode server 1.17+` minimum hint。它们的实际执行仍是 default-off 的 product gate，不因 registry 或 SDK presence 自动暴露。

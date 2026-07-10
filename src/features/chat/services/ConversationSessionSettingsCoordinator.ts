@@ -58,6 +58,8 @@ export interface ConversationSessionSettingsCoordinatorHost {
   supportsTitleGeneration?(): boolean;
   supportsCompaction?(): boolean;
   supportsQuestions?(): boolean;
+  canOpenExperimentalActions?(): boolean;
+  openExperimentalActions?(): void;
   getCodexGlobalDefaults?(): { sandboxMode: CodexSandboxMode; modelReasoningEffort: CodexReasoningEffort; model: string; additionalDirectories: string[]; networkAccessEnabled: boolean; webSearchMode: CodexWebSearchMode };
   applyCodexRuntimeOverrides?(overrides: { sandboxMode: CodexSandboxMode; modelReasoningEffort: CodexReasoningEffort; model?: string; additionalDirectories?: string[]; networkAccessEnabled?: boolean; webSearchMode?: CodexWebSearchMode }): void;
   agentServiceRegistry?: AgentServiceRegistry;
@@ -83,6 +85,8 @@ export class ConversationSessionSettingsCoordinator {
   private async openConversationSettingsModal(conversation: Conversation): Promise<void> {
     const showSharing = this.host.supportsSessionSharing?.() === true;
     const showCompaction = this.host.supportsCompaction?.() === true;
+    const showExperimentalActions = this.isOpenCodeConversation(conversation)
+      && this.host.canOpenExperimentalActions?.() === true;
     const isCodex = this.isCodexConversation(conversation);
     const codexDefaults = isCodex ? this.host.getCodexGlobalDefaults?.() : undefined;
     const codexAvailableModels = isCodex ? await this.loadCodexModelOptions() : undefined;
@@ -129,6 +133,9 @@ export class ConversationSessionSettingsCoordinator {
       onUnshare: showSharing ? async () => {
         await this.unshareCurrentConversation(conversation);
       } : undefined,
+      onOpenExperimentalActions: showExperimentalActions
+        ? () => this.host.openExperimentalActions?.()
+        : undefined,
       onSetThreadGoal: isCodex ? async (objective: string, options?: { tokenBudget?: number }) => {
         return this.setCodexThreadGoal(conversation, objective, options);
       } : undefined,
@@ -155,6 +162,10 @@ export class ConversationSessionSettingsCoordinator {
     if (hostSupport !== undefined) {
       return hostSupport;
     }
+    return (conversation.backend ?? 'opencode') === 'opencode';
+  }
+
+  private isOpenCodeConversation(conversation: Conversation): boolean {
     return (conversation.backend ?? 'opencode') === 'opencode';
   }
 

@@ -1,7 +1,6 @@
 import {
   migrateOpenCodeCapabilitySettings,
   normalizeOpenCodeCapabilitySettings,
-  type OpenCodeCapabilitySettings,
   type OpenCodeCapabilityMigrationResult,
 } from '../../../../src/core/opencode/OpenCodeCapabilitySettingsMigration';
 

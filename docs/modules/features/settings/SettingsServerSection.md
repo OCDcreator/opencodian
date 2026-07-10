@@ -72,3 +72,7 @@ The classic `attach()` method remains unchanged for the classic flat layout.
 ### SDK capability disclosure
 
 该 section 现在调用 `renderCapabilityDisclosureRows()`（来自 `capabilityDisclosureRow.ts`）渲染只读能力状态行，显示该 section 拥有的 SDK capability 的 available / unsupported-by-server / disabled-by-user / unknown 状态与脱敏原因，并提供 Re-check 按钮。不重复已有配置编辑器。
+
+### Experimental server-action gates
+
+Server section 拥有 PTY、control-plane session relocation 与 project-copy 的 default-off 开关。每次保存后重新刷新 capability snapshot；即使开关已启用，Chat 仍需要当前 server 支持和操作前确认。不可用行显示脱敏原因与 minimum-server hint，而不会把 raw server error 暴露给用户。

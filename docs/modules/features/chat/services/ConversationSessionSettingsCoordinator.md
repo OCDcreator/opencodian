@@ -97,3 +97,7 @@ Compaction config is now project-scoped (`.opencode/opencode.json`). Ownership f
 1. Compaction config source of truth is `.opencode/opencode.json`, not plugin settings or conversation session settings.
 2. This coordinator no longer owns compaction fields; it only manages `chatFontSizePx`. `applyCompactionConfig()` and `applyConversationRuntimeState()` compaction logic were removed.
 3. Manual `session.summarize()` remains a per-session action available through `OpenCodeService` session control, not managed by this coordinator.
+
+### Experimental action launcher
+
+host 可选提供 `canOpenExperimentalActions()` 与 `openExperimentalActions()`。coordinator 仅在当前 OpenCode conversation 且 host 已确认存在可用 action 时把 launcher callback 交给 modal；它不读取 gate、不调用 OpenCode SDK，也不会为其他 backend 展示入口。

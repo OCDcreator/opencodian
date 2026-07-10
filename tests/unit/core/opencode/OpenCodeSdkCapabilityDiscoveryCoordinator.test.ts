@@ -11,6 +11,9 @@ import type { OpenCodeSdkCapabilityDefinition } from '../../../../src/core/openc
  * call counts (state-changing probes must never invoke their action).
  */
 interface FakeFacade {
+  global: {
+    health: jest.Mock;
+  };
   v2: {
     health: { get: jest.Mock };
     location: { get: jest.Mock };
@@ -20,6 +23,7 @@ interface FakeFacade {
       list: jest.Mock;
     };
     event: { subscribe: jest.Mock };
+    pty: { create: jest.Mock };
   };
 }
 
@@ -32,18 +36,22 @@ function buildFakeFacade(): { facade: FakeFacade; calls: Record<string, jest.Moc
   const sessionCreate = jest.fn().mockResolvedValue({ id: 'session-1' });
   const sessionList = jest.fn().mockResolvedValue([]);
   const eventSubscribe = jest.fn().mockResolvedValue({ stream: (async function* () { /* noop */ })() });
+  const globalHealth = jest.fn().mockResolvedValue({ healthy: true, version: '1.17.18' });
+  const ptyCreate = jest.fn().mockResolvedValue({ id: 'pty-1' });
 
-  calls.read.push(healthGet, locationGet, capabilitiesGet, sessionList);
-  calls.stateChanging.push(sessionCreate);
+  calls.read.push(globalHealth, healthGet, locationGet, capabilitiesGet, sessionList);
+  calls.stateChanging.push(sessionCreate, ptyCreate);
   calls.presence.push(eventSubscribe);
 
   const facade: FakeFacade = {
+    global: { health: globalHealth },
     v2: {
       health: { get: healthGet },
       location: { get: locationGet },
       capabilities: { get: capabilitiesGet },
       session: { create: sessionCreate, list: sessionList },
       event: { subscribe: eventSubscribe },
+      pty: { create: ptyCreate },
     },
   };
   return { facade, calls };
@@ -51,12 +59,14 @@ function buildFakeFacade(): { facade: FakeFacade; calls: Record<string, jest.Moc
 
 function buildTestRegistry(): OpenCodeSdkCapabilityDefinition[] {
   return [
+    { id: 'global.health', sdkPath: ['global', 'health'], category: 'top-level-runtime', surface: 'settings', risk: 'read-only', defaultGate: true, serverProbe: 'read', fallbackPolicy: 'legacy-fallback', minimumServerHint: undefined, description: 'Read global health.' },
     { id: 'v2.health.get', sdkPath: ['v2', 'health', 'get'], category: 'v2-core', surface: 'settings', risk: 'read-only', defaultGate: true, serverProbe: 'read', fallbackPolicy: 'legacy-fallback', minimumServerHint: 'OpenCode server 1.17+', description: 'Read v2 server health.' },
     { id: 'v2.location.get', sdkPath: ['v2', 'location', 'get'], category: 'v2-core', surface: 'settings', risk: 'read-only', defaultGate: true, serverProbe: 'read', fallbackPolicy: 'legacy-fallback', minimumServerHint: 'OpenCode server 1.17+', description: 'Read v2 location.' },
     { id: 'experimental.capabilities.get', sdkPath: ['v2', 'capabilities', 'get'], category: 'experimental', surface: 'diagnostic', risk: 'read-only', defaultGate: true, serverProbe: 'read', fallbackPolicy: 'unsupported-visible', minimumServerHint: undefined, description: 'Read capabilities.' },
     { id: 'v2.session.list', sdkPath: ['v2', 'session', 'list'], category: 'v2-session', surface: 'chat', risk: 'read-only', defaultGate: true, serverProbe: 'read', fallbackPolicy: 'legacy-fallback', minimumServerHint: 'OpenCode server 1.17+', description: 'List v2 sessions.' },
     { id: 'v2.session.create', sdkPath: ['v2', 'session', 'create'], category: 'v2-session', surface: 'chat', risk: 'state-changing', defaultGate: false, serverProbe: 'none', fallbackPolicy: 'experimental-gated', minimumServerHint: 'OpenCode server 1.17+', description: 'Create a v2 session.' },
     { id: 'v2.event.subscribe', sdkPath: ['v2', 'event', 'subscribe'], category: 'v2-runtime', surface: 'chat', risk: 'stream', defaultGate: false, serverProbe: 'presence', fallbackPolicy: 'legacy-fallback', minimumServerHint: 'OpenCode server 1.17+', description: 'Subscribe to v2 events.' },
+    { id: 'v2.pty.create', sdkPath: ['v2', 'pty', 'create'], category: 'v2-runtime', surface: 'chat', risk: 'state-changing', defaultGate: false, serverProbe: 'none', fallbackPolicy: 'experimental-gated', minimumServerHint: 'OpenCode server 1.17+', description: 'Create a PTY.' },
   ];
 }
 
@@ -73,9 +83,10 @@ describe('OpenCodeSdkCapabilityDiscoveryCoordinator', () => {
     it('queries read methods (health, location, capabilities, session.list) during refresh', async () => {
       const coordinator = new OpenCodeSdkCapabilityDiscoveryCoordinator(buildTestRegistry(), { getFacade: accessor });
       const snapshot = await coordinator.refresh();
-      expect(snapshot.entries).toHaveLength(6);
+      expect(snapshot.entries).toHaveLength(8);
 
       // All four read-probe methods must have been invoked exactly once.
+      expect(facade.global.health).toHaveBeenCalledTimes(1);
       expect(facade.v2.health.get).toHaveBeenCalledTimes(1);
       expect(facade.v2.location.get).toHaveBeenCalledTimes(1);
       expect(facade.v2.capabilities.get).toHaveBeenCalledTimes(1);
@@ -137,6 +148,29 @@ describe('OpenCodeSdkCapabilityDiscoveryCoordinator', () => {
       expect(create?.availability.kind).toBe('unknown');
       expect(facade.v2.session.create).not.toHaveBeenCalled();
     });
+
+    it('uses confirmed 1.17 global health as non-invasive support evidence for an enabled experimental action', async () => {
+      const coordinator = new OpenCodeSdkCapabilityDiscoveryCoordinator(buildTestRegistry(), {
+        getFacade: accessor,
+        resolveGate: () => true,
+      });
+      const snapshot = await coordinator.refresh();
+      const pty = snapshot.entries.find((entry) => entry.id === 'v2.pty.create');
+      expect(pty?.availability.kind).toBe('available');
+      expect(facade.v2.session.create).not.toHaveBeenCalled();
+    });
+
+    it('marks an enabled experimental action unsupported when global health is older than 1.17', async () => {
+      facade.global.health.mockResolvedValueOnce({ healthy: true, version: '1.16.9' });
+      const coordinator = new OpenCodeSdkCapabilityDiscoveryCoordinator(buildTestRegistry(), {
+        getFacade: accessor,
+        resolveGate: () => true,
+      });
+      const snapshot = await coordinator.refresh();
+      const pty = snapshot.entries.find((entry) => entry.id === 'v2.pty.create');
+      expect(pty?.availability.kind).toBe('unsupported-by-server');
+      expect(facade.v2.session.create).not.toHaveBeenCalled();
+    });
   });
 
   describe('stream / presence entries', () => {
@@ -190,10 +224,21 @@ describe('OpenCodeSdkCapabilityDiscoveryCoordinator', () => {
     it('getSnapshot builds a presence-only snapshot before the first refresh', () => {
       const coordinator = new OpenCodeSdkCapabilityDiscoveryCoordinator(buildTestRegistry(), { getFacade: accessor });
       const snapshot = coordinator.getSnapshot();
-      expect(snapshot.entries.length).toBe(6);
+      expect(snapshot.entries.length).toBe(8);
       // read-probe entries show unknown server support until refreshed
       const health = snapshot.entries.find((e) => e.id === 'v2.health.get');
       expect(health?.availability.kind).toBe('unknown');
+    });
+
+    it('does not infer enabled experimental-action server support before a safe refresh', () => {
+      const coordinator = new OpenCodeSdkCapabilityDiscoveryCoordinator(buildTestRegistry(), {
+        getFacade: accessor,
+        resolveGate: () => true,
+      });
+      const snapshot = coordinator.getSnapshot();
+      const pty = snapshot.entries.find((entry) => entry.id === 'v2.pty.create');
+      expect(pty?.availability.kind).toBe('unknown');
+      expect(facade.global.health).not.toHaveBeenCalled();
     });
 
     it('invalidate forces the next getSnapshot to rebuild', async () => {

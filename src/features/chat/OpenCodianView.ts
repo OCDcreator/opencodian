@@ -338,6 +338,7 @@ import type {
   ModelSelectorSelection,
 } from './ui/modelSelector/types';
 import { NavigationSidebar } from './ui/NavigationSidebar';
+import { OpenCodeExperimentalActionModal } from './ui/OpenCodeExperimentalActionModal';
 
 
 const logger = createLogger('OpenCodianView');
@@ -763,6 +764,8 @@ export class OpenCodianView extends ItemView {
       },
       supportsSessionSharing: () => hasCapability(this.caps, AgentCapability.Sharing),
       supportsCompaction: () => hasCapability(this.caps, AgentCapability.Compaction),
+      canOpenExperimentalActions: () => this.getAvailableExperimentalActionIds().length > 0,
+      openExperimentalActions: () => this.openExperimentalActionsForCurrentConversation(),
       applyCodexRuntimeOverrides: (overrides) => {
         const adapter = this.plugin.agentServiceRegistry?.get('codex');
         if (!adapter) return;
@@ -4352,6 +4355,81 @@ export class OpenCodianView extends ItemView {
       return true;
     } catch {
       return true;
+    }
+  }
+
+  private getAvailableExperimentalActionIds(): string[] {
+    if (!this.isOpenCodeBackendActive()) {
+      return [];
+    }
+
+    const actions = [
+      ['pty.create', 'v2.pty.create'],
+      ['control-plane.move-session', 'experimental.controlPlane.moveSession'],
+      ['session.background', 'experimental.session.background'],
+      ['project-copy.create', 'v2.projectCopy.create'],
+    ] as const;
+    return actions.flatMap(([action, capabilityId]) => {
+      const availability = this.plugin.openCodeService.requireSdkCapability(capabilityId);
+      return availability.kind === 'available' ? [action] : [];
+    });
+  }
+
+  private async openExperimentalActionsForCurrentConversation(): Promise<void> {
+    const conversation = this.currentConversation;
+    const sessionId = conversation ? getConversationBackendSessionId(conversation) : null;
+    const defaultDirectory = getVaultBasePath(this.app);
+    if (!sessionId || !defaultDirectory) {
+      new Notice(t('chat.experimentalActions.noSessionScope'));
+      return;
+    }
+
+    const availableActions = new Set(this.getAvailableExperimentalActionIds());
+    if (availableActions.size === 0) {
+      return;
+    }
+
+    const projectId = availableActions.has('project-copy.create')
+      ? await this.plugin.openCodeService.getCurrentProjectId()
+      : null;
+    if (!projectId) {
+      availableActions.delete('project-copy.create');
+    }
+
+    if (availableActions.size === 0) {
+      return;
+    }
+
+    new OpenCodeExperimentalActionModal(this.app, {
+      sessionId,
+      defaultDirectory,
+      projectId,
+      availableActions,
+      runAction: (request) => this.plugin.openCodeService.runExperimentalAction(request),
+      onBackgroundActionCompleted: () => {
+        this.handleExperimentalBackgroundActionCompleted();
+      },
+    }).open();
+  }
+
+  private handleExperimentalBackgroundActionCompleted(): void {
+    const tabId = this.getActiveTabId();
+    const runtime = this.getTabRuntimeState(tabId);
+    if (!runtime) {
+      return;
+    }
+
+    const latestUserMessage = this.currentConversation?.messages
+      .filter((message) => message.role === 'user')
+      .at(-1);
+    const anchorKey = latestUserMessage ? this.getMessageAnchorKey(latestUserMessage) : null;
+    const turnBodyEl = anchorKey ? runtime.turnBodyByAnchorKey.get(anchorKey) : null;
+    if (turnBodyEl?.isConnected) {
+      const statusEl = turnBodyEl.createDiv({
+        cls: 'opencodian-experimental-background-status',
+        text: t('chat.experimentalActions.background.inlineCompleted'),
+      });
+      statusEl.dataset.experimentalBackgroundStatus = 'completed';
     }
   }
 

@@ -211,6 +211,8 @@ function createPlugin(overrides?: Partial<ConversationSectionPlugin['settings']>
       checkHealth: jest.fn().mockResolvedValue(true),
       start: jest.fn().mockResolvedValue(undefined),
       stop: jest.fn().mockResolvedValue(undefined),
+      requireSdkCapability: jest.fn().mockReturnValue({ kind: 'available' }),
+      refreshSdkCapabilities: jest.fn().mockResolvedValue({ entries: [], generatedAt: 0 }),
       listSessions,
       getSessionMessages,
       unshareSession,
@@ -358,6 +360,20 @@ describe('SettingsConversationSection', () => {
   afterEach(() => {
     jest.restoreAllMocks();
     document.body.innerHTML = '';
+  });
+
+  it('keeps the experimental background-session gate default-off and persists an explicit opt-in', async () => {
+    const plugin = createPlugin();
+    createSection(plugin);
+
+    const backgroundGate = toggleRecords.find((record) => record.name === t('settings.conversation.experimental.background.name'));
+    expect(backgroundGate).toBeDefined();
+    expect(backgroundGate?.control.setValue).toHaveBeenCalledWith(false);
+
+    await backgroundGate?.onChange?.(true);
+    expect(plugin.settings.opencodeCapabilities?.experimentalGates['experimental.session.background']).toBe(true);
+    expect(plugin.saveSettings).toHaveBeenCalledTimes(1);
+    expect((plugin.openCodeService as { refreshSdkCapabilities: jest.Mock }).refreshSdkCapabilities).toHaveBeenCalledTimes(1);
   });
 
   it('dispose clears any registered title-model refresh callback', () => {
@@ -987,6 +1003,10 @@ describe('SettingsConversationSection', () => {
         description: t('settings.conversation.share.projectNoteDesc'),
       },
       {
+        title: t('settings.conversation.experimental.title'),
+        description: t('settings.conversation.experimental.groupDesc'),
+      },
+      {
         title: t('settings.conversation.display.title'),
         description: t('settings.conversation.display.desc'),
       },
@@ -1007,6 +1027,7 @@ describe('SettingsConversationSection', () => {
       'conversation-title',
       'conversation-compaction',
       'conversation-sharing',
+      'conversation-experimental',
       'conversation-display',
       'conversation-questions',
       'conversation-rendering',

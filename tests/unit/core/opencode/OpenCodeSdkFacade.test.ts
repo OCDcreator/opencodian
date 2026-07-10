@@ -10,8 +10,7 @@ import {
   SDK_FACADE_NAMESPACE_NAMES,
 } from '../../../../src/core/opencode/OpenCodeSdkFacade';
 
-describe('OpenCodeSdkFacade', () => {
-  const createFacade = (clientOverrides: Record<string, unknown> = {}) => {
+const createFacade = (clientOverrides: Record<string, unknown> = {}) => {
     const client = {
       app: {
         agents: jest.fn().mockResolvedValue({ data: ['agent'] }),
@@ -116,8 +115,9 @@ describe('OpenCodeSdkFacade', () => {
         () => client as never,
       ),
     };
-  };
+};
 
+describe('OpenCodeSdkFacade', () => {
   it('exposes all expected SDK namespaces', () => {
     const { facade } = createFacade();
     expect(SDK_FACADE_NAMESPACE_NAMES.every((name) => name in facade)).toBe(true);

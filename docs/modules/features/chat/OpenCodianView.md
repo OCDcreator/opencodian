@@ -722,3 +722,7 @@ Compaction config is now project-scoped (`.opencode/opencode.json`). Ownership f
 ### SDK capability gating
 
 Chat 现在在渲染 session 相关操作前检查 `requireSdkCapability(id)`。新增 `isSessionCapabilityAvailable(capabilityId)` helper：对 OpenCode backend 检查能力，对非 OpenCode backend 或 transient 失败默认返回 true。child session graph fetch 会先检查 `v2.session.get`，unsupported 时返回空数组而非抛异常。
+
+### Experimental OpenCode actions
+
+会话设置入口只在 OpenCode conversation 且至少一个实验 capability 同时满足用户 gate 与生产 availability 时显示。view 只装配 `OpenCodeExperimentalActionModal`，不直接使用 SDK。background 完成只在最新用户 turn 下追加 inline status；它不得写入 `isStreaming`、foreground `sessionStatus` 或现有 background-task 生命周期。

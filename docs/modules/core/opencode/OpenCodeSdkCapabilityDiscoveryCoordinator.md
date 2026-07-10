@@ -24,3 +24,7 @@
 - `OpenCodeService` 在构造器中创建此 coordinator，传入 `getFacade: () => this.sdk`。
 - `OpenCodeService.getSdkCapabilitySnapshot()` / `refreshSdkCapabilities()` / `requireSdkCapability()` 委托给它。
 - 测试注入 fake facade 与注入时钟，验证 read-probe 顺序、endpoint-not-found → unsupported-by-server、transport failure → unknown、state-changing entry 不被调用。
+
+### 1.17 experimental action evidence
+
+针对 PTY、project copy、control-plane move-session 与 background session，coordinator 可以安全读取 `global.health.version` 作为 1.17+ 的支持证据。它不会为此调用 state-changing endpoint；health 不可用时仍保留 `unknown`，旧 server 明确低于 1.17 时才显示 `unsupported-by-server` 和 minimum-server hint。

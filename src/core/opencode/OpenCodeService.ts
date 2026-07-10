@@ -57,6 +57,13 @@ import {
   type OpenCodeUnsupportedCapabilityResult,
 } from './OpenCodeSdkCapabilityDiscoveryCoordinator';
 import {
+  type OpenCodeExperimentalActionAvailability,
+  type OpenCodeExperimentalActionExecution,
+  type OpenCodeExperimentalActionRequest,
+  type OpenCodeExperimentalActionResult,
+  OpenCodeSdkExperimentalActionCoordinator,
+} from './OpenCodeSdkExperimentalActionCoordinator';
+import {
   OpenCodeSdkFacade,
   OpenCodeServiceDiagnostics,
 } from './OpenCodeSdkFacade';
@@ -114,6 +121,54 @@ export type { SessionActivityStatus, SessionSyncEventUpdate } from './OpenCodeSy
 
 function cloneSettings(settings: OpenCodianSettings): OpenCodianSettings {
   return JSON.parse(JSON.stringify(settings)) as OpenCodianSettings;
+}
+
+type OpenCodeExperimentalSdkFacade = {
+  readonly experimental: {
+    readonly controlPlane: {
+      moveSession(input: unknown): Promise<unknown>;
+    };
+    readonly session: {
+      background(input: unknown): Promise<unknown>;
+    };
+  };
+  readonly v2: {
+    readonly pty: {
+      create(input: unknown): Promise<unknown>;
+      remove(input: { ptyID: string }): Promise<unknown>;
+    };
+    readonly projectCopy: {
+      create(input: unknown): Promise<unknown>;
+    };
+  };
+};
+
+function getCreatedPtyId(value: unknown): string | undefined {
+  if (!value || typeof value !== 'object') {
+    return undefined;
+  }
+
+  const record = value as Record<string, unknown>;
+  if (typeof record.id === 'string' && record.id) {
+    return record.id;
+  }
+
+  const data = record.data;
+  if (!data || typeof data !== 'object') {
+    return undefined;
+  }
+
+  const nestedId = (data as Record<string, unknown>).id;
+  return typeof nestedId === 'string' && nestedId ? nestedId : undefined;
+}
+
+function getRecordId(value: unknown): string | null {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+
+  const id = (value as Record<string, unknown>).id;
+  return typeof id === 'string' && id ? id : null;
 }
 
 /** Service events */
@@ -254,6 +309,7 @@ export class OpenCodeService {
   private catalogState: OpenCodeCatalogStateStore;
   private catalogQueries: OpenCodeCatalogQueryCoordinator;
   private capabilityDiscovery: OpenCodeSdkCapabilityDiscoveryCoordinator;
+  private experimentalActionCoordinator: OpenCodeSdkExperimentalActionCoordinator;
   private contextPartSerializer: OpenCodeContextPartSerializer;
   private promptRequestBuilder: OpenCodePromptRequestBuilder;
   private readonly sessionStateStore = new OpenCodeSessionStateStore();
@@ -361,9 +417,17 @@ export class OpenCodeService {
       undefined,
       {
         getFacade: () => this.sdk,
-        resolveGate: (_id, definition) => definition.defaultGate,
+        resolveGate: (id, definition) =>
+          this.settings.opencodeCapabilities?.experimentalGates[id] ?? definition.defaultGate,
       },
     );
+    this.experimentalActionCoordinator = new OpenCodeSdkExperimentalActionCoordinator({
+      getCapability: (capabilityId) => this.getExperimentalActionAvailability(capabilityId),
+      actionFacade: {
+        execute: (request) => this.executeExperimentalSdkAction(request),
+        cleanupPty: (ptyId) => this.removeExperimentalPty(ptyId),
+      },
+    });
     this.catalogQueries = new OpenCodeCatalogQueryCoordinator(this.catalogState, {
       shouldUseSdkCrud: () => this.shouldUseSdk('sdkCrud'),
       getSdkFacade: (options = {}) => options.includeDirectory === false
@@ -1343,6 +1407,8 @@ export class OpenCodeService {
   /** Update settings */
   async updateSettings(settings: OpenCodianSettings): Promise<void> {
     await this.serviceLifecycle.updateSettings(settings);
+    this.settings = settings;
+    this.capabilityDiscovery.invalidate();
   }
 
   async getSessionContextUsageSnapshot(sessionId: string): Promise<SessionContextUsageSnapshot | null> {
@@ -1508,6 +1574,66 @@ export class OpenCodeService {
     return this.capabilityDiscovery.requireCapability(id);
   }
 
+  /**
+   * Runs an experimental state-changing action after the production capability
+   * gate and a caller-supplied confirmation have both passed. The result is
+   * intentionally redacted and never contains raw SDK/server data.
+   */
+  async runExperimentalAction(
+    request: OpenCodeExperimentalActionRequest,
+  ): Promise<OpenCodeExperimentalActionResult> {
+    await this.refreshSdkCapabilities();
+    return this.experimentalActionCoordinator.runExperimentalAction(request);
+  }
+
+  private getExperimentalActionAvailability(
+    capabilityId: string,
+  ): OpenCodeExperimentalActionAvailability {
+    const availability = this.requireSdkCapability(capabilityId);
+    if ('supported' in availability && availability.supported === false) {
+      return { kind: availability.kind };
+    }
+    return availability;
+  }
+
+  private async executeExperimentalSdkAction(
+    request: OpenCodeExperimentalActionRequest,
+  ): Promise<OpenCodeExperimentalActionExecution> {
+    const sdk = this.sdk as unknown as OpenCodeExperimentalSdkFacade;
+    try {
+      switch (request.action) {
+        case 'pty.create': {
+          const created = await sdk.v2.pty.create(request.input);
+          return { kind: 'completed', createdPtyId: getCreatedPtyId(created) };
+        }
+        case 'pty.remove': {
+          const ptyId = getPtyId(request.input);
+          if (!ptyId) {
+            return { kind: 'failed' };
+          }
+          await sdk.v2.pty.remove({ ptyID: ptyId });
+          return { kind: 'completed' };
+        }
+        case 'project-copy.create':
+          await sdk.v2.projectCopy.create(request.input);
+          return { kind: 'completed' };
+        case 'control-plane.move-session':
+          await sdk.experimental.controlPlane.moveSession(request.input);
+          return { kind: 'completed' };
+        case 'session.background':
+          await sdk.experimental.session.background(request.input);
+          return { kind: 'completed' };
+      }
+    } catch {
+      return { kind: 'failed' };
+    }
+  }
+
+  private async removeExperimentalPty(ptyId: string): Promise<void> {
+    const sdk = this.sdk as unknown as OpenCodeExperimentalSdkFacade;
+    await sdk.v2.pty.remove({ ptyID: ptyId });
+  }
+
   subscribeToOpenCodeEvents(listener: OpenCodeEventListener): () => void {
     return this.openCodeEventRuntime.subscribeToOpenCodeEvents(listener);
   }
@@ -1631,6 +1757,14 @@ export class OpenCodeService {
     return this.catalogQueries.getCurrentProject();
   }
 
+  async getCurrentProjectId(): Promise<string | null> {
+    try {
+      return getRecordId(await this.getCurrentProject());
+    } catch {
+      return null;
+    }
+  }
+
   async initializeProjectGit(): Promise<unknown> {
     return this.catalogQueries.initializeProjectGit();
   }
@@ -1707,6 +1841,14 @@ export class OpenCodeService {
     return this.questionPermissionHub.respondToPermission(requestID, reply, message);
   }
 
+}
+
+function getPtyId(value: unknown): string | undefined {
+  if (!value || typeof value !== 'object') {
+    return undefined;
+  }
+  const ptyId = (value as Record<string, unknown>).ptyID;
+  return typeof ptyId === 'string' && ptyId ? ptyId : undefined;
 }
 
 // Extend QueryOptions to include sessionId and images

@@ -154,3 +154,7 @@ Added `attachTabbed(containerEl, secondaryTabId)` method for the tabbed settings
 - `rendering` — renders user markup render toggle
 
 The classic `attach()` method remains the full-list owner, but both classic and tabbed paths now apply the same active-backend visibility rules.
+
+### Experimental background-session gate
+
+后台会话有独立 `conversation-experimental` target。开关默认关闭、保存后刷新 capability snapshot；支持未知或不支持时仍保留 toggle 和脱敏原因/minimum-server hint，但不会让 Chat 提前暴露操作。

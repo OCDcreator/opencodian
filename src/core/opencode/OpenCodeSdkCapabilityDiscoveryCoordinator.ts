@@ -87,6 +87,13 @@ export interface OpenCodeSdkCapabilityDiscoveryHost {
 }
 
 const UNAVAILABLE_ENDPOINT_PATTERN = /is unavailable/i;
+const MINIMUM_SERVER_VERSION_117_PATTERN = /^OpenCode server 1\.17\+$/;
+const VERSION_EVIDENCE_EXPERIMENTAL_ACTION_IDS = new Set([
+  'v2.pty.create',
+  'v2.projectCopy.create',
+  'experimental.controlPlane.moveSession',
+  'experimental.session.background',
+]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object';
@@ -118,6 +125,31 @@ function classifyProbeFailure(error: unknown): RedactedFailureClass {
   const message = error instanceof Error ? error.message : String(error);
   return UNAVAILABLE_ENDPOINT_PATTERN.test(message) ? 'endpoint-unavailable' : 'transport';
 }
+
+function isVersionAtLeast117(value: unknown): boolean {
+  if (typeof value !== 'string') {
+    return false;
+  }
+
+  const match = /^(\d+)\.(\d+)/.exec(value.trim());
+  if (!match) {
+    return false;
+  }
+
+  const major = Number(match[1]);
+  const minor = Number(match[2]);
+  return major > 1 || (major === 1 && minor >= 17);
+}
+
+function hasMinimumServer117Hint(definition: OpenCodeSdkCapabilityDefinition): boolean {
+  return definition.minimumServerHint !== undefined
+    && MINIMUM_SERVER_VERSION_117_PATTERN.test(definition.minimumServerHint);
+}
+
+type GlobalHealthEvidence =
+  | { readonly kind: 'responded'; readonly supports117: boolean }
+  | { readonly kind: 'unsupported' }
+  | { readonly kind: 'unknown' };
 
 export class OpenCodeSdkCapabilityDiscoveryCoordinator {
   private readonly registry: readonly OpenCodeSdkCapabilityDefinition[];
@@ -189,8 +221,9 @@ export class OpenCodeSdkCapabilityDiscoveryCoordinator {
   async refresh(): Promise<OpenCodeSdkCapabilitySnapshot> {
     const generatedAt = this.now();
     const facade = this.getFacade();
+    const globalHealthEvidence = await this.probeGlobalHealth(facade);
     const entries = await Promise.all(
-      this.registry.map((definition) => this.buildEntry(definition, facade, generatedAt)),
+      this.registry.map((definition) => this.buildEntry(definition, facade, generatedAt, globalHealthEvidence)),
     );
     const snapshot: OpenCodeSdkCapabilitySnapshot = { entries, generatedAt };
     this.cachedSnapshot = snapshot;
@@ -228,9 +261,10 @@ export class OpenCodeSdkCapabilityDiscoveryCoordinator {
     definition: OpenCodeSdkCapabilityDefinition,
     facade: unknown | null,
     generatedAt: number,
+    globalHealthEvidence: GlobalHealthEvidence,
   ): Promise<OpenCodeSdkCapabilitySnapshotEntry> {
     const sdkPresent = this.isSdkPresent(facade, definition);
-    const server = await this.probeServerSupport(definition, facade, sdkPresent);
+    const server = await this.probeServerSupport(definition, facade, sdkPresent, globalHealthEvidence);
     const availability = this.enrichAvailability(
       resolveCapabilityAvailability({
         sdk: sdkPresent,
@@ -288,7 +322,9 @@ export class OpenCodeSdkCapabilityDiscoveryCoordinator {
     if (definition.serverProbe === 'read') {
       return 'unknown';
     }
-    // presence / none entries: infer support from SDK presence.
+    if (definition.serverProbe === 'none') {
+      return 'unknown';
+    }
     return sdkPresent ? true : false;
   }
 
@@ -302,6 +338,7 @@ export class OpenCodeSdkCapabilityDiscoveryCoordinator {
     definition: OpenCodeSdkCapabilityDefinition,
     facade: unknown | null,
     sdkPresent: boolean,
+    globalHealthEvidence: GlobalHealthEvidence,
   ): Promise<boolean | 'unknown'> {
     if (!sdkPresent) {
       return false;
@@ -311,7 +348,13 @@ export class OpenCodeSdkCapabilityDiscoveryCoordinator {
       // State-changing / experimental: cannot safely probe. Report unknown so
       // the resolver yields 'unknown' (gate permitting) rather than silently
       // advertising availability.
-      return 'unknown';
+      if (!this.canUseGlobalHealthEvidence(definition)) {
+        return 'unknown';
+      }
+      if (globalHealthEvidence.kind === 'responded') {
+        return globalHealthEvidence.supports117;
+      }
+      return globalHealthEvidence.kind === 'unsupported' ? false : 'unknown';
     }
 
     if (definition.serverProbe === 'presence') {
@@ -320,8 +363,43 @@ export class OpenCodeSdkCapabilityDiscoveryCoordinator {
       return true;
     }
 
+    if (definition.id === 'global.health') {
+      if (globalHealthEvidence.kind === 'responded') {
+        return true;
+      }
+      return globalHealthEvidence.kind === 'unsupported' ? false : 'unknown';
+    }
+
     // serverProbe === 'read': invoke the safe read method.
     return this.invokeReadProbe(facade, definition);
+  }
+
+  private canUseGlobalHealthEvidence(definition: OpenCodeSdkCapabilityDefinition): boolean {
+    return VERSION_EVIDENCE_EXPERIMENTAL_ACTION_IDS.has(definition.id)
+      && hasMinimumServer117Hint(definition);
+  }
+
+  private async probeGlobalHealth(facade: unknown | null): Promise<GlobalHealthEvidence> {
+    if (!facade) {
+      return { kind: 'unsupported' };
+    }
+
+    const health = resolvePath(facade, ['global', 'health']);
+    if (!isFunction(health)) {
+      return { kind: 'unsupported' };
+    }
+
+    try {
+      const result = await health.call(facade);
+      if (!isRecord(result)) {
+        return { kind: 'unknown' };
+      }
+      return { kind: 'responded', supports117: isVersionAtLeast117(result.version) };
+    } catch (error) {
+      return classifyProbeFailure(error) === 'endpoint-unavailable'
+        ? { kind: 'unsupported' }
+        : { kind: 'unknown' };
+    }
   }
 
   private async invokeReadProbe(

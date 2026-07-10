@@ -12,6 +12,7 @@ import {
   parseModelReference,
   resolveModelSelection,
 } from '../../core/config/modelConfig';
+import { OPENCODE_CAPABILITY_SETTINGS_SCHEMA_VERSION } from '../../core/opencode/OpenCodeCapabilitySettingsMigration';
 import type {
   OpencodeCompactionConfig,
   OpencodeShareMode,
@@ -26,6 +27,7 @@ import type { AgentBackendKind } from '../../core/types/chat';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { createLogger } from '../../shared';
+import { describeCapabilityAvailability } from './capabilityDisclosureRow';
 import {
   ConversationCompactionHelpModal,
   type ConversationCompactionHelpTopic,
@@ -218,6 +220,15 @@ export class SettingsConversationSection {
     if (sharingBodyEl) {
       this.markSettingsTarget(sharingBodyEl, 'sharing');
     }
+    const experimentalBodyEl = isOpenCodeActive
+      ? this.createSettingsBlock(containerEl, {
+          title: t('settings.conversation.experimental.title'),
+          description: t('settings.conversation.experimental.groupDesc'),
+        })
+      : null;
+    if (experimentalBodyEl) {
+      this.markSettingsTarget(experimentalBodyEl, 'experimental');
+    }
     const displayBodyEl = this.createSettingsBlock(containerEl, {
       title: t('settings.conversation.display.title'),
       description: t('settings.conversation.display.desc'),
@@ -245,6 +256,9 @@ export class SettingsConversationSection {
     if (sharingBodyEl) {
       this.renderSharingBlock(sharingBodyEl);
     }
+    if (experimentalBodyEl) {
+      this.renderExperimentalBlock(experimentalBodyEl);
+    }
     this.renderDisplayBlock(displayBodyEl);
     if (questionBodyEl) {
       this.renderQuestionsBlock(questionBodyEl);
@@ -266,6 +280,7 @@ export class SettingsConversationSection {
         ? [
             { id: 'compaction', render: (el: HTMLElement) => this.renderCompactionBlock(el) },
             { id: 'sharing', render: (el: HTMLElement) => this.renderSharingBlock(el) },
+            { id: 'experimental', render: (el: HTMLElement) => this.renderExperimentalBlock(el) },
           ]
         : []),
       { id: 'display', render: (el) => this.renderDisplayTabBlock(el) },
@@ -327,6 +342,48 @@ export class SettingsConversationSection {
 
   private renderSharingBlock(containerEl: HTMLElement): void {
     this.addProjectShareSettings(containerEl);
+  }
+
+  private renderExperimentalBlock(containerEl: HTMLElement): void {
+    const capabilityId = 'experimental.session.background';
+    const availability = this.plugin.openCodeService.requireSdkCapability(capabilityId);
+    const availabilityDetail = describeCapabilityAvailability(availability)
+      ?? t('settings.experimental.confirmationRequired');
+
+    new Setting(containerEl)
+      .setName(t('settings.conversation.experimental.background.name'))
+      .setDesc(`${t('settings.conversation.experimental.background.desc')} ${availabilityDetail}`)
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.isExperimentalGateEnabled(capabilityId))
+          .onChange(async (enabled) => {
+            if (!this.isOpenCodeActive()) {
+              toggle.setValue(this.isExperimentalGateEnabled(capabilityId));
+              new Notice(t('settings.conversation.projectConfig.openCodeOnly'));
+              return;
+            }
+            await this.setExperimentalGate(capabilityId, enabled);
+          }),
+      );
+  }
+
+  private isExperimentalGateEnabled(capabilityId: string): boolean {
+    return this.plugin.settings.opencodeCapabilities?.experimentalGates[capabilityId] ?? false;
+  }
+
+  private async setExperimentalGate(capabilityId: string, enabled: boolean): Promise<void> {
+    const current = this.plugin.settings.opencodeCapabilities;
+    this.plugin.settings.opencodeCapabilities = {
+      schemaVersion: current?.schemaVersion ?? OPENCODE_CAPABILITY_SETTINGS_SCHEMA_VERSION,
+      experimentalGates: {
+        ...current?.experimentalGates,
+        [capabilityId]: enabled,
+      },
+      preferences: { ...current?.preferences },
+      ...(current?.migrationReport ? { migrationReport: current.migrationReport } : {}),
+    };
+    await this.plugin.saveSettings();
+    await this.plugin.openCodeService.refreshSdkCapabilities();
   }
 
   private renderDisplayBlock(containerEl: HTMLElement): void {

@@ -38,6 +38,20 @@ interface ResolvedCapabilityRow {
   readonly reason?: string;
 }
 
+export function describeCapabilityAvailability(
+  result: OpenCodeSdkCapabilityAvailability | OpenCodeUnsupportedCapabilityResult,
+): string | undefined {
+  if (result.kind === 'available') {
+    return undefined;
+  }
+
+  const details = [result.reason];
+  if ('minimumServerHint' in result && typeof result.minimumServerHint === 'string') {
+    details.push(result.minimumServerHint);
+  }
+  return details.join(' ');
+}
+
 export interface CapabilityDisclosureRowOptions {
   /**
    * Optional locale-key-per-capability-id labels. When a label is missing
@@ -96,11 +110,11 @@ function resolveRow(
       kind,
       tone: toneForKind(kind),
       statusLabel: t(STATUS_LABEL_KEYS[kind]),
-      reason: result.reason,
+      reason: describeCapabilityAvailability(result),
     };
   }
 
-  const reason = result.kind === 'available' ? undefined : result.reason;
+  const reason = describeCapabilityAvailability(result);
 
   return {
     capabilityId,
