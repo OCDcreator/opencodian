@@ -27,6 +27,7 @@ import { CodexAdapter } from './core/agents/backend/CodexAdapter';
 import { type CodexApprovalHostContext, createCodexApprovalBridgeHost } from './core/agents/backend/CodexDefaultApprovalHost';
 import { OpenCodeAdapter } from './core/agents/backend/OpenCodeAdapter';
 import { OpenCodeService, SDK_FEATURE_FLAG_ROLLOUT_DEFAULTS } from './core/opencode';
+import { migrateOpenCodeCapabilitySettings } from './core/opencode/OpenCodeCapabilitySettingsMigration';
 import { OpenCodianSettingsRuntimeCoordinator } from './core/runtime/OpenCodianSettingsRuntimeCoordinator';
 import { OpenCodianStartupCoordinator } from './core/runtime/OpenCodianStartupCoordinator';
 import { PluginRuntimeCoordinator } from './core/runtime/PluginRuntimeCoordinator';
@@ -579,6 +580,8 @@ export default class OpenCodianPlugin extends Plugin {
     this.getSettingsRuntimeCoordinator().initialize(this.settingsPersistenceWritable);
 
     this.reportSettingsLoadState(loadState.persistedSettings);
+
+    await this.migrateOpenCodeCapabilitySettingsEnvelope(loadState.settings.opencodeCapabilities);
 
     if (loadState.shouldPersistNormalizedSettings) {
       await this.startupCoordinator.measureStartupStep(
@@ -1160,6 +1163,36 @@ export default class OpenCodianPlugin extends Plugin {
         ?? result.ui.message
         ?? 'OpenCodian could not recover saved settings. Persistence is temporarily disabled to avoid overwriting data.',
       );
+    }
+  }
+
+  /**
+   * Run the versioned OpenCode capability settings migration on the loaded
+   * envelope and surface a startup notice. When the migration cannot safely
+   * map a field, the unmodified raw value is snapshotted to a backup path via
+   * StorageService before the normalized envelope is kept. The notice never
+   * exposes raw backup content or secret values.
+   */
+  private async migrateOpenCodeCapabilitySettingsEnvelope(raw: unknown): Promise<void> {
+    const migration = migrateOpenCodeCapabilitySettings(raw, Date.now());
+    this.settings = { ...this.settings, opencodeCapabilities: migration.normalized };
+
+    if (migration.requiresBackup) {
+      await this.storage.snapshotRawCapabilitySettings(raw);
+      const impossibleCount = migration.report.entries.filter((e) => e.outcome === 'impossible').length;
+      const message = impossibleCount > 0
+        ? `OpenCodian preserved ${impossibleCount} capability preference field(s) in a backup; some legacy values could not be auto-migrated.`
+        : 'OpenCodian updated capability preferences and kept a backup of the previous values.';
+      logger.warn(message, { entryCount: migration.report.entries.length });
+      new Notice(message, 6000);
+      return;
+    }
+
+    const migratedCount = migration.report.entries.filter((e) => e.outcome === 'migrated').length;
+    if (migratedCount > 0) {
+      const message = `OpenCodian migrated ${migratedCount} capability preference field(s) to the current schema.`;
+      logger.info(message);
+      new Notice(message, 5000);
     }
   }
 

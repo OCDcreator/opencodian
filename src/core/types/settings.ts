@@ -14,6 +14,7 @@ import {
   normalizeDebugModuleSettings,
   normalizeDebugRefreshIntervalMs,
 } from '../../shared/debugModules';
+import type { OpenCodeCapabilitySettings } from '../opencode/OpenCodeCapabilitySettingsMigration';
 import type { AgentBackendKind } from './chat';
 
 /** Permission mode for tool execution */
@@ -2498,6 +2499,13 @@ export interface OpenCodianSettings {
 
   // ACP client (agent configs)
   acpAgents: AcpAgentConfig[];
+
+  /**
+   * Versioned envelope for OpenCode SDK capability preferences and experimental
+   * gates. Optional because the normalizer handles defaults; persisted only
+   * when the user has overrides or a migration report to keep.
+   */
+  opencodeCapabilities?: OpenCodeCapabilitySettings;
 }
 
 export type SettingsLayoutMode = 'classic' | 'tabbed';
@@ -2655,6 +2663,10 @@ export const DEFAULT_SETTINGS: OpenCodianSettings = {
   skillCatalogCacheTtl: 30000,
   toolCatalogCacheTtl: 30000,
   acpAgents: [],
+
+  // Capability settings envelope is intentionally undefined; the normalizer in
+  // OpenCodeCapabilitySettingsMigration supplies defaults on first load.
+  opencodeCapabilities: undefined,
 };
 
 export function normalizeQuestionCardSettings(

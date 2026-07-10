@@ -288,3 +288,5 @@ graph TD
 - `measureStartupStep()` 现已由 `OpenCodianStartupCoordinator` 持有，但 `main.ts` 中的 handler 方法仍然可以调用 coordinator 的 `measureStartupStep()` 来给子步骤继续嵌套打点。
 - 慢启动自动快照不依赖用户先打开 debug；只要启动失败，或顶层总耗时 / 主导 phase 超过阈值，就会把 trace 写到 `.opencodian/debug/startup-perf-latest.log`。
 - `onunload()` 当前没有显式调用 `clearSettingsUiStateSaveTimer()`；卸载时只清除了 chat appearance timer 与 model refresh 帧请求。
+
+- `loadSettings()` 现在在归一化后调用 `migrateOpenCodeCapabilitySettingsEnvelope()`，对 `opencodeCapabilities` envelope 执行 versioned migration；不可映射字段会先通过 `StorageService.snapshotRawCapabilitySettings()` 备份原始值，再展示 startup notice（不暴露原始备份内容或 secret）。

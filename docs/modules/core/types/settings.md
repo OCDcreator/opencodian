@@ -407,3 +407,5 @@ New normalize functions added:
 `DEFAULT_SETTINGS` defaults to `settingsLayoutMode: 'tabbed'` for new installs. Existing users are migrated to `'classic'` in `settingsLoadNormalization.ts` via `resolveInitialLayoutMode()`.
 
 - `ClaudeCodeBackendSettings` 新增 `promptSuggestions: boolean` 字段（默认 false）。JSDoc 标注为 readback：SDK options wiring + pump callback 已证明，端到端建议传递未独立验证。normalization 使用 `candidate.promptSuggestions === true` 严格布尔检查。
+
+- `OpenCodianSettings` 新增可选 `opencodeCapabilities?: OpenCodeCapabilitySettings` 字段（来自 `OpenCodeCapabilitySettingsMigration`），承载 SDK capability preferences 与 experimental gates。`DEFAULT_SETTINGS` 默认为 `undefined`，由 normalizer 处理默认值。不存储 live server availability、secrets 或原始 server payload。

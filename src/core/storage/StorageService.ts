@@ -34,6 +34,7 @@ const CORE_SETTINGS_FILE = `${STORAGE_DIR}/settings.core.json`;
 const UI_SETTINGS_FILE = `${STORAGE_DIR}/settings.ui.json`;
 const CORE_SETTINGS_BACKUP_FILE = `${CORE_SETTINGS_FILE}.bak`;
 const UI_SETTINGS_BACKUP_FILE = `${UI_SETTINGS_FILE}.bak`;
+const CAPABILITY_SETTINGS_BACKUP_FILE = `${STORAGE_DIR}/settings.capabilities.json.bak`;
 const RUNTIME_FILE = `${STORAGE_DIR}/runtime.json`;
 const SETTINGS_SCHEMA_VERSION = 1;
 const logger = createLogger('StorageService');
@@ -355,6 +356,42 @@ export class StorageService {
 
   async saveUiSettings(settings: PersistedUiSettings): Promise<void> {
     await this.saveSettingsProfile(UI_SETTINGS_PROFILE, settings);
+  }
+
+  /**
+   * Snapshot the unmodified raw capability settings envelope into a dedicated
+   * backup path before a non-trivial migration overwrites the live value.
+   *
+   * Called only when {@link migrateOpenCodeCapabilitySettings} returns
+   * `requiresBackup: true`. The raw value is written verbatim so user intent is
+   * never silently reinterpreted or lost. Secrets in the raw value are handled
+   * by the migration report (which strips them); this backup preserves the
+   * user's original file content for manual recovery only.
+   *
+   * Failures are logged and swallowed: a backup write failure must not block
+   * persisting the normalized envelope.
+   */
+  async snapshotRawCapabilitySettings(raw: unknown): Promise<void> {
+    try {
+      await this.app.vault.adapter.write(
+        normalizePath(CAPABILITY_SETTINGS_BACKUP_FILE),
+        JSON.stringify(
+          {
+            schemaVersion: SETTINGS_SCHEMA_VERSION,
+            updatedAt: Date.now(),
+            source: 'settings.core',
+            kind: 'opencodeCapabilities.rawPreMigration',
+            data: raw,
+          },
+          null,
+          2,
+        ),
+      );
+    } catch (error) {
+      logger.warn('Failed to snapshot raw capability settings before migration', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
 
   async loadPersistedSettings(): Promise<SettingsLoadResult> {

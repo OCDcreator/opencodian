@@ -300,3 +300,7 @@ Settings UI now supports dual-layout mode (classic flat / tabbed primary+seconda
 - `settingsTabbedSecondaryTabByPrimary` — saved secondary tab IDs keyed by primary tab ID
 
 These are persisted in `settings.ui.json` alongside existing UI state (tab state, scroll position, model section open states). The split persists — core settings go to `settings.core.json`, UI-only state (including layout preferences) to `settings.ui.json`.
+
+### Capability settings backup
+
+`snapshotRawCapabilitySettings(raw)` writes the unmodified raw capability settings envelope to `settings.capabilities.json.bak` before non-trivial migration. The backup preserves `schemaVersion`, `updatedAt`, `source: 'settings.core'`, and `kind: 'opencodeCapabilities.rawPreMigration'`. Write failures are logged and swallowed so they never block persisting the normalized envelope. Called by `main.ts` when `migrateOpenCodeCapabilitySettings` reports `requiresBackup: true`.
