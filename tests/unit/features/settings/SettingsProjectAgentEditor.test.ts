@@ -332,7 +332,9 @@ describe('SettingsProjectAgentEditor layout and creation', () => {
       'project-agent-options',
     );
   });
+});
 
+describe('SettingsProjectAgentEditor field writing', () => {
   it('creates a project agent with editable core fields', async () => {
     const { configManager } = renderEditor();
 
