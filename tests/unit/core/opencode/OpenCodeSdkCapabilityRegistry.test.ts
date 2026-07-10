@@ -144,6 +144,12 @@ describe('OpenCodeSdkCapabilityRegistry', () => {
       expect(health?.risk).toBe('read-only');
       expect(health?.defaultGate).toBe(true);
     });
+
+    it('uses the production experimental namespace for capability advertisement', () => {
+      const capabilities = registry.find((entry) => entry.id === 'experimental.capabilities.get');
+      expect(capabilities?.sdkPath).toEqual(['experimental', 'capabilities', 'get']);
+      expect(capabilities?.risk).toBe('read-only');
+    });
   });
 
   describe('definition shape', () => {

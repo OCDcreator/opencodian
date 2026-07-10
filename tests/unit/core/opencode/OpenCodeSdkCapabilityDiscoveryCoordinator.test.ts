@@ -19,13 +19,15 @@ jest.mock('@opencode-ai/sdk/v2/client', () => ({
  */
 interface FakeFacade {
   getConnectionSignature: jest.Mock;
+  experimental: {
+    capabilities: { get: jest.Mock };
+  };
   global: {
     health: jest.Mock;
   };
   v2: {
     health: { get: jest.Mock };
     location: { get: jest.Mock };
-    capabilities: { get: jest.Mock };
     session: {
       create: jest.Mock;
       list: jest.Mock;
@@ -53,11 +55,11 @@ function buildFakeFacade(): { facade: FakeFacade; calls: Record<string, jest.Moc
 
   const facade: FakeFacade = {
     getConnectionSignature: jest.fn(() => 'connection-1'),
+    experimental: { capabilities: { get: capabilitiesGet } },
     global: { health: globalHealth },
     v2: {
       health: { get: healthGet },
       location: { get: locationGet },
-      capabilities: { get: capabilitiesGet },
       session: { create: sessionCreate, list: sessionList },
       event: { subscribe: eventSubscribe },
       pty: { create: ptyCreate },
@@ -71,7 +73,7 @@ function buildTestRegistry(): OpenCodeSdkCapabilityDefinition[] {
     { id: 'global.health', sdkPath: ['global', 'health'], category: 'top-level-runtime', surface: 'settings', risk: 'read-only', defaultGate: true, serverProbe: 'read', fallbackPolicy: 'legacy-fallback', minimumServerHint: undefined, description: 'Read global health.' },
     { id: 'v2.health.get', sdkPath: ['v2', 'health', 'get'], category: 'v2-core', surface: 'settings', risk: 'read-only', defaultGate: true, serverProbe: 'read', fallbackPolicy: 'legacy-fallback', minimumServerHint: 'OpenCode server 1.17+', description: 'Read v2 server health.' },
     { id: 'v2.location.get', sdkPath: ['v2', 'location', 'get'], category: 'v2-core', surface: 'settings', risk: 'read-only', defaultGate: true, serverProbe: 'read', fallbackPolicy: 'legacy-fallback', minimumServerHint: 'OpenCode server 1.17+', description: 'Read v2 location.' },
-    { id: 'experimental.capabilities.get', sdkPath: ['v2', 'capabilities', 'get'], category: 'experimental', surface: 'diagnostic', risk: 'read-only', defaultGate: true, serverProbe: 'read', fallbackPolicy: 'unsupported-visible', minimumServerHint: undefined, description: 'Read capabilities.' },
+    { id: 'experimental.capabilities.get', sdkPath: ['experimental', 'capabilities', 'get'], category: 'experimental', surface: 'diagnostic', risk: 'read-only', defaultGate: true, serverProbe: 'read', fallbackPolicy: 'unsupported-visible', minimumServerHint: undefined, description: 'Read capabilities.' },
     { id: 'v2.session.list', sdkPath: ['v2', 'session', 'list'], category: 'v2-session', surface: 'chat', risk: 'read-only', defaultGate: true, serverProbe: 'read', fallbackPolicy: 'legacy-fallback', minimumServerHint: 'OpenCode server 1.17+', description: 'List v2 sessions.' },
     { id: 'v2.session.create', sdkPath: ['v2', 'session', 'create'], category: 'v2-session', surface: 'chat', risk: 'state-changing', defaultGate: false, serverProbe: 'none', fallbackPolicy: 'experimental-gated', minimumServerHint: 'OpenCode server 1.17+', description: 'Create a v2 session.' },
     { id: 'v2.event.subscribe', sdkPath: ['v2', 'event', 'subscribe'], category: 'v2-runtime', surface: 'chat', risk: 'stream', defaultGate: false, serverProbe: 'presence', fallbackPolicy: 'legacy-fallback', minimumServerHint: 'OpenCode server 1.17+', description: 'Subscribe to v2 events.' },
@@ -98,7 +100,7 @@ describe('OpenCodeSdkCapabilityDiscoveryCoordinator', () => {
       expect(facade.global.health).toHaveBeenCalledTimes(1);
       expect(facade.v2.health.get).toHaveBeenCalledTimes(1);
       expect(facade.v2.location.get).toHaveBeenCalledTimes(1);
-      expect(facade.v2.capabilities.get).toHaveBeenCalledTimes(1);
+      expect(facade.experimental.capabilities.get).toHaveBeenCalledTimes(1);
       expect(facade.v2.session.list).toHaveBeenCalledTimes(1);
     });
 

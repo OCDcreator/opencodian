@@ -303,7 +303,7 @@ Each row below has exactly one final status:
 | Final status | Count | Meaning |
 |---|:---:|---|
 | `productized` | 1 | Used by the production capability-discovery path, with no state-changing UI action. |
-| `diagnostic-only` | 28 | Visible through the existing Settings/Chat owner or Capability Lab as a guarded diagnostic/readback; not promoted to a new raw-endpoint product path. |
+| `diagnostic-only` | 28 | A guarded readback, availability guard, or explicit no-ordinary-UI diagnostic. It is not promoted to a new raw-endpoint product path. |
 | `deferred-by-safety` | 28 | State-changing, streaming, secret-bearing, process, session, or copy operation kept default-off or unexposed until a dedicated product path has stronger runtime proof. |
 | `unsupported-with-reason` | 0 | No SDK method is intrinsically unsupported; a connected older server is represented at runtime by the existing typed visible unsupported row. |
 | `obsolete` | 0 | The SDK diff removed no methods. |
@@ -311,84 +311,84 @@ Each row below has exactly one final status:
 **Evidence codes used in the matrix**
 
 - `S` — the published npm declaration diff and `OpenCodeSdkFacade` path-resolution tests prove that the SDK method exists. This is not a server claim.
-- `R` — `OpenCodeSdkCapabilityDiscoveryCoordinator` is allowed to run a safe read probe. It records only `advertised`, redacted `unsupported`, or redacted transient failure; it never turns a failure into support.
-- `P` — no action probe is permitted. The production snapshot records presence/gate state only, so this code deliberately makes no claim that an arbitrary server supports or executed the method.
+- `R` — a safe read probe is permitted. The live result is intentionally not retained per row in this handoff, so it remains **unknown for the recorded Test Vault server** unless separately marked `T`; at runtime the coordinator records only `advertised`, redacted `unsupported`, or redacted transient failure.
+- `P` — no action probe is permitted. Server support is **unknown**; the production snapshot may use non-invasive version evidence for the four gated actions, but that is not endpoint execution proof.
 - `T` — Test Vault proof: OpenCode `1.17.15` at `127.0.0.1:4196`, Test Vault build `codex-opencode-sdk-full-productization.202607110305`, with the Task 9 artifacts named below. This proof applies only to the PTY create/cancel/remove scenario, not to sibling endpoints.
 
 **Policy codes used in the matrix**
 
-- `Read` — no user gate or capability-settings migration is needed; existing Settings disclosure remains visible on an older server and the existing HTTP/SSE or owner fallback is retained.
-- `Hold` — no new raw endpoint is exposed and no migration mapping is created; any pre-existing owner behavior remains unchanged.
-- `Gate` — the named capability setting is default-off, persisted through the versioned envelope/migration, requires server support and a final confirmation. Settings can show the disabled reason; Chat cannot show the action until all gates pass.
+- `Read` — no user gate or capability-settings migration is needed; an existing Settings/Chat owner may show an availability guard or disclosure. Unsupported rows remain visible at runtime, and current HTTP/SSE or owner fallback is retained.
+- `Hold` — no new raw endpoint is exposed, no ordinary UI proof is claimed, and no migration mapping is created; any pre-existing owner behavior remains unchanged.
+- `Gate` — the named capability setting is default-off, persisted through the versioned envelope/migration, and requires server support plus a final confirmation before Chat exposes the action. `T` is required before describing any specific execution as live-proven.
 
 ### 9.2 Final 57-method matrix
 
 | SDK path | Final status | Owner and ordinary UI proof path | Server evidence | Gate, migration, fallback | Residual risk |
 |---|---|---|---|---|---|
-| `v2.health.get` | diagnostic-only | `SettingsServerSection` capability disclosure and Re-check; Capability Lab snapshot | S+R | Read; legacy health path retained | Snapshot can be stale between refreshes. |
-| `v2.location.get` | diagnostic-only | `SettingsServerSection` disclosure and Re-check | S+R | Read; directory-scoped legacy behavior retained | Wrong directory scope can mislead a readback. |
-| `v2.agent.list` | diagnostic-only | `SettingsAgentsSection` disclosure | S+R | Read; existing catalog owner remains canonical | Catalog content is not a full agent-action proof. |
-| `v2.session.active` | diagnostic-only | Chat session/status guard; Capability Lab evidence | S+R | Read; existing session lifecycle fallback remains | No dedicated v2 active-session UI proof. |
-| `v2.session.create` | deferred-by-safety | Existing session lifecycle remains owner; no raw v2 launcher | S+P | Hold; current create flow/fallback unchanged | New v2 create parameters have no product-path proof. |
-| `v2.session.get` | diagnostic-only | Chat hydration guard and Capability Lab evidence | S+P | Read; authoritative existing hydration remains | Fixture-dependent request is not a general read proof. |
-| `v2.session.history` | diagnostic-only | Chat history/sync guard | S+P | Read; authoritative hydration and legacy fallback remain | Event/history ordering has no dedicated v2 runtime proof. |
-| `v2.session.events` | diagnostic-only | Chat sync-freshness guard | S+P | Read; existing global event/polling fallback remains | A v2 event stream is not promoted from presence alone. |
-| `v2.session.interrupt` | deferred-by-safety | Existing abort owner remains authoritative | S+P | Hold; existing abort semantics/fallback retained | New interrupt path could alter foreground-runner semantics. |
-| `v2.session.message` | diagnostic-only | Chat message hydration guard | S+P | Read; canonical message sync remains | Session/message fixture scope is not runtime-proven. |
-| `v2.session.switchAgent` | deferred-by-safety | No raw v2 Chat action | S+P | Hold; current model/agent flows unchanged | Could change active session behavior unexpectedly. |
-| `v2.session.switchModel` | deferred-by-safety | No raw v2 Chat action | S+P | Hold; existing selector path unchanged | Could change active session/model consistency. |
-| `v2.integration.list` | diagnostic-only | Capability Lab production snapshot; Settings has no credential action | S+R | Read; no new integration UI | Integration catalog is not credential-flow proof. |
-| `v2.integration.get` | diagnostic-only | Capability Lab production snapshot | S+P | Read; no new integration UI | Requires a fixture; no secret-bearing response is rendered. |
-| `v2.integration.attempt.status` | diagnostic-only | Capability Lab production snapshot | S+P | Read; no OAuth action surfaced | Requires an OAuth attempt fixture. |
-| `v2.integration.attempt.cancel` | deferred-by-safety | No raw Settings action | S+P | Hold; no migration or invocation | Cancelling an OAuth attempt is state-changing. |
-| `v2.integration.attempt.complete` | deferred-by-safety | No raw Settings action | S+P | Hold; no migration or invocation | Completion can bind an account/credential. |
-| `v2.integration.connect.key` | deferred-by-safety | No raw Settings action | S+P | Hold; no credential is persisted/logged by this path | Secret-bearing input requires dedicated secure UX. |
-| `v2.integration.connect.oauth` | deferred-by-safety | No raw Settings action | S+P | Hold; no migration or invocation | OAuth start needs callback and consent lifecycle proof. |
-| `v2.credential.remove` | deferred-by-safety | No raw Settings action | S+P | Hold; no migration or invocation | Credential removal is irreversible. |
-| `v2.credential.update` | deferred-by-safety | No raw Settings action | S+P | Hold; no credential/raw error exposure | Credential metadata semantics are not product-proven. |
-| `v2.permission.request.list` | diagnostic-only | `SettingsSecuritySection` disclosure; Chat permission guard | S+R | Read; existing permission hub/fallback remains | Listing does not prove reply semantics. |
-| `v2.permission.saved.list` | diagnostic-only | `SettingsSecuritySection` disclosure and Re-check | S+R | Read; unsupported row stays visible | Saved-rule scope may differ by server directory. |
-| `v2.permission.saved.remove` | deferred-by-safety | No raw Settings delete action | S+P | Hold; existing permission behavior unchanged | Removing a saved rule changes future execution. |
-| `v2.session.permission.create` | deferred-by-safety | Existing permission hub remains owner | S+P | Hold; no raw v2 action | Creates execution-affecting permission state. |
-| `v2.session.permission.get` | diagnostic-only | Chat permission-card hydration guard | S+P | Read; existing permission hub/fallback remains | Fixture-specific data is not product proof. |
-| `v2.session.permission.list` | diagnostic-only | Chat permission-card hydration guard | S+P | Read; existing permission hub/fallback remains | Listing is not a response-flow proof. |
-| `v2.session.permission.reply` | deferred-by-safety | Existing permission response flow remains owner | S+P | Hold; no raw v2 action | A reply can authorize a tool action. |
-| `v2.fs.list` | diagnostic-only | `ServerReferenceContextService` Chat guard | S+R | Read; vault picker and old context flow remain | Server filesystem scope can differ from vault scope. |
-| `v2.fs.read` | diagnostic-only | Context/read guard; no raw file viewer | S+P | Read; no payload is exposed by Lab | File-content disclosure needs per-path policy proof. |
-| `v2.fs.find` | diagnostic-only | Context/search guard; no raw finder UI | S+P | Read; existing picker/search remains | Search query scope and result privacy are unproven. |
-| `v2.command.list` | diagnostic-only | `SettingsCommandsSection` disclosure; slash-cache capability key | S+R | Read; existing command catalog fallback remains | New v2 catalog data is not directly rendered. |
-| `v2.skill.list` | diagnostic-only | `SettingsSkillSection` disclosure; slash-cache capability key | S+R | Read; existing skill catalog fallback remains | New v2 catalog data is not directly rendered. |
-| `v2.event.subscribe` | diagnostic-only | Chat sync-freshness guard | S+P | Read; global event/polling fallback remains | Stream ordering and reconnect behavior lack v2 runtime proof. |
-| `v2.pty.list` | diagnostic-only | Capability Lab production snapshot only | S+R | Read; no terminal list UI | A list may expose process metadata, so payload stays out of UI. |
-| `v2.pty.get` | diagnostic-only | Capability Lab production snapshot only | S+P | Read; no terminal details UI | Requires a PTY fixture and may expose process metadata. |
+| `v2.health.get` | diagnostic-only | `SettingsServerSection` disclosure and Re-check; ordinary UI proves only the guard | S+R (server unknown) | Read; legacy health path retained | Snapshot can be stale between refreshes. |
+| `v2.location.get` | diagnostic-only | `SettingsServerSection` disclosure and Re-check; ordinary UI proves only the guard | S+R (server unknown) | Read; directory-scoped legacy behavior retained | Wrong directory scope can mislead a readback. |
+| `v2.agent.list` | diagnostic-only | `SettingsAgentsSection` disclosure; ordinary UI proves only the guard | S+R (server unknown) | Read; existing catalog owner remains canonical | Catalog content is not a full agent-action proof. |
+| `v2.session.active` | diagnostic-only | Chat session/status guard; no dedicated v2 action UI | S+R (server unknown) | Read; existing session lifecycle fallback remains | No dedicated v2 active-session UI proof. |
+| `v2.session.create` | deferred-by-safety | Existing session lifecycle remains owner; no raw v2 launcher | S+P (server unknown) | Hold; current create flow/fallback unchanged | New v2 create parameters have no product-path proof. |
+| `v2.session.get` | diagnostic-only | Chat hydration guard; no dedicated v2 read UI | S+P (server unknown) | Read; authoritative existing hydration remains | Fixture-dependent request is not a general read proof. |
+| `v2.session.history` | diagnostic-only | Chat history/sync guard; no dedicated v2 history UI | S+P (server unknown) | Read; authoritative hydration and legacy fallback remain | Event/history ordering has no dedicated v2 runtime proof. |
+| `v2.session.events` | diagnostic-only | Chat sync-freshness guard; no dedicated v2 stream UI | S+P (server unknown) | Read; existing global event/polling fallback remains | A v2 event stream is not promoted from presence alone. |
+| `v2.session.interrupt` | deferred-by-safety | Existing abort owner remains authoritative; no raw v2 action | S+P (server unknown) | Hold; existing abort semantics/fallback retained | New interrupt path could alter foreground-runner semantics. |
+| `v2.session.message` | diagnostic-only | Chat message hydration guard; no dedicated v2 read UI | S+P (server unknown) | Read; canonical message sync remains | Session/message fixture scope is not runtime-proven. |
+| `v2.session.switchAgent` | deferred-by-safety | No raw v2 Chat action | S+P (server unknown) | Hold; current model/agent flows unchanged | Could change active session behavior unexpectedly. |
+| `v2.session.switchModel` | deferred-by-safety | No raw v2 Chat action | S+P (server unknown) | Hold; existing selector path unchanged | Could change active session/model consistency. |
+| `v2.integration.list` | diagnostic-only | No ordinary Settings/Chat UI; Capability Lab snapshot only | S+R (server unknown) | Read; no new integration UI | Integration catalog is not credential-flow proof. |
+| `v2.integration.get` | diagnostic-only | No ordinary Settings/Chat UI; diagnostic-only | S+P (server unknown) | Read; no new integration UI | Requires a fixture; no secret-bearing response is rendered. |
+| `v2.integration.attempt.status` | diagnostic-only | No ordinary Settings/Chat UI; diagnostic-only | S+P (server unknown) | Read; no OAuth action surfaced | Requires an OAuth attempt fixture. |
+| `v2.integration.attempt.cancel` | deferred-by-safety | No raw Settings action | S+P (server unknown) | Hold; no migration or invocation | Cancelling an OAuth attempt is state-changing. |
+| `v2.integration.attempt.complete` | deferred-by-safety | No raw Settings action | S+P (server unknown) | Hold; no migration or invocation | Completion can bind an account/credential. |
+| `v2.integration.connect.key` | deferred-by-safety | No raw Settings action | S+P (server unknown) | Hold; no credential is persisted/logged by this path | Secret-bearing input requires dedicated secure UX. |
+| `v2.integration.connect.oauth` | deferred-by-safety | No raw Settings action | S+P (server unknown) | Hold; no migration or invocation | OAuth start needs callback and consent lifecycle proof. |
+| `v2.credential.remove` | deferred-by-safety | No raw Settings action | S+P (server unknown) | Hold; no migration or invocation | Credential removal is irreversible. |
+| `v2.credential.update` | deferred-by-safety | No raw Settings action | S+P (server unknown) | Hold; no credential/raw error exposure | Credential metadata semantics are not product-proven. |
+| `v2.permission.request.list` | diagnostic-only | `SettingsSecuritySection` disclosure; Chat guard only | S+R (server unknown) | Read; existing permission hub/fallback remains | Listing does not prove reply semantics. |
+| `v2.permission.saved.list` | diagnostic-only | `SettingsSecuritySection` disclosure and Re-check; guard only | S+R (server unknown) | Read; unsupported row stays visible | Saved-rule scope may differ by server directory. |
+| `v2.permission.saved.remove` | deferred-by-safety | No raw Settings delete action | S+P (server unknown) | Hold; existing permission behavior unchanged | Removing a saved rule changes future execution. |
+| `v2.session.permission.create` | deferred-by-safety | Existing permission hub remains owner; no raw v2 action | S+P (server unknown) | Hold; no raw v2 action | Creates execution-affecting permission state. |
+| `v2.session.permission.get` | diagnostic-only | Chat permission-card hydration guard; no dedicated v2 read UI | S+P (server unknown) | Read; existing permission hub/fallback remains | Fixture-specific data is not product proof. |
+| `v2.session.permission.list` | diagnostic-only | Chat permission-card hydration guard; no dedicated v2 list UI | S+P (server unknown) | Read; existing permission hub/fallback remains | Listing is not a response-flow proof. |
+| `v2.session.permission.reply` | deferred-by-safety | Existing permission response flow remains owner; no raw v2 action | S+P (server unknown) | Hold; no raw v2 action | A reply can authorize a tool action. |
+| `v2.fs.list` | diagnostic-only | `ServerReferenceContextService` Chat guard; no raw browser UI | S+R (server unknown) | Read; vault picker and old context flow remain | Server filesystem scope can differ from vault scope. |
+| `v2.fs.read` | diagnostic-only | No ordinary raw-file UI; diagnostic guard only | S+P (server unknown) | Read; no payload is exposed by Lab | File-content disclosure needs per-path policy proof. |
+| `v2.fs.find` | diagnostic-only | No ordinary raw-search UI; diagnostic guard only | S+P (server unknown) | Read; existing picker/search remains | Search query scope and result privacy are unproven. |
+| `v2.command.list` | diagnostic-only | `SettingsCommandsSection` disclosure and slash-cache guard | S+R (server unknown) | Read; existing command catalog fallback remains | New v2 catalog data is not directly rendered. |
+| `v2.skill.list` | diagnostic-only | `SettingsSkillSection` disclosure and slash-cache guard | S+R (server unknown) | Read; existing skill catalog fallback remains | New v2 catalog data is not directly rendered. |
+| `v2.event.subscribe` | diagnostic-only | Chat sync-freshness guard; no dedicated v2 stream UI | S+P (server unknown) | Read; global event/polling fallback remains | Stream ordering and reconnect behavior lack v2 runtime proof. |
+| `v2.pty.list` | diagnostic-only | No ordinary terminal-list UI; diagnostic-only | S+R (server unknown) | Read; no terminal list UI | A list may expose process metadata, so payload stays out of UI. |
+| `v2.pty.get` | diagnostic-only | No ordinary terminal-detail UI; diagnostic-only | S+P (server unknown) | Read; no terminal details UI | Requires a PTY fixture and may expose process metadata. |
 | `v2.pty.create` | deferred-by-safety | `SettingsServerSection` gate; Chat experimental modal | S+P+T | Gate `v2.pty.create`; default-off, final confirmation, coordinator-owned cleanup | Runtime proof covers `pwd` only; arbitrary commands remain dangerous. |
-| `v2.pty.update` | deferred-by-safety | No raw terminal-control UI | S+P | Hold; never auto-start/modify a PTY | Can mutate external-process state. |
+| `v2.pty.update` | deferred-by-safety | No raw terminal-control UI | S+P (server unknown) | Hold; never auto-start/modify a PTY | Can mutate external-process state. |
 | `v2.pty.remove` | deferred-by-safety | Chat modal exposes removal only for coordinator-owned PTYs | S+P+T | Gate cleanup exception for owned PTY; no external PTY removal; migration uses the PTY gate | Proof is limited to the PTY created in the scenario. |
-| `v2.pty.connect` | deferred-by-safety | No raw terminal stream UI | S+P | Hold; no websocket stream exposure | Terminal I/O is an execution surface. |
-| `v2.pty.connectToken` | deferred-by-safety | No raw token UI | S+P | Hold; token never rendered/logged | Token lifecycle has no secure product UX. |
-| `v2.question.request.list` | diagnostic-only | Chat question-card guard and Capability Lab evidence | S+R | Read; existing question hub/fallback remains | Global request list is not response-flow proof. |
-| `v2.session.question.list` | diagnostic-only | Session-scoped question-card hydration guard | S+P | Read; existing question hub/fallback remains | Session fixture required; no raw payload shown. |
-| `v2.session.question.reply` | deferred-by-safety | Existing question reply flow remains owner | S+P | Hold; no raw v2 reply action | Reply changes an agent's execution path. |
-| `v2.session.question.reject` | deferred-by-safety | Existing question rejection flow remains owner | S+P | Hold; no raw v2 reject action | Rejection changes an agent's execution path. |
-| `v2.reference.list` | diagnostic-only | `ServerReferenceContextService` Chat guard | S+R | Read; existing context picker remains | Reference scope/content has no direct product-path proof. |
-| `v2.projectCopy.create` | deferred-by-safety | `SettingsServerSection` gate; Chat experimental modal preview | S+P | Gate `v2.projectCopy.create`; default-off and final confirmation | Copy target/source preservation is not live-proven. |
-| `v2.projectCopy.refresh` | deferred-by-safety | No raw Settings/Chat action | S+P | Hold; no invocation | Refresh can mutate an existing copy. |
-| `v2.projectCopy.remove` | deferred-by-safety | No raw Settings/Chat action | S+P | Hold; no invocation | Removal is destructive. |
-| `experimental.capabilities.get` | productized | `OpenCodeSdkCapabilityDiscoveryCoordinator` -> `OpenCodeService` -> Settings/Capability Lab snapshot | S+R | Read; no migration; every later action still checks its own availability and gate | Advertisement alone cannot authorize an action. |
-| `experimental.controlPlane.moveSession` | deferred-by-safety | `SettingsServerSection` gate; Chat experimental modal | S+P | Gate `experimental.controlPlane.moveSession`; default-off and final confirmation | Moving a session can alter location/ownership. |
-| `experimental.projectCopy.generateName` | diagnostic-only | Capability Lab production snapshot only | S+P | Read; no name-generation action surfaced | Generated output is not a copy-safety proof. |
-| `experimental.session.background` | deferred-by-safety | `SettingsConversationSection` gate; Chat modal and per-turn inline status | S+P | Gate `experimental.session.background`; default-off and final confirmation | Must not overwrite foreground stream status. |
-| `project.directories` | diagnostic-only | Capability Lab/Settings project disclosure | S+R | Read; existing project scope remains canonical | Directory list may be stale or differently scoped. |
-| `session.revert.stage` | deferred-by-safety | Existing session lifecycle remains owner; no new raw v2 UI | S+P | Hold; legacy revert behavior remains unchanged | Staging can affect user-visible history. |
-| `session.revert.clear` | deferred-by-safety | Existing session lifecycle remains owner; no new raw v2 UI | S+P | Hold; legacy revert behavior remains unchanged | Clearing staged work can lose intent. |
-| `session.revert.commit` | deferred-by-safety | Existing session lifecycle remains owner; no new raw v2 UI | S+P | Hold; legacy revert behavior remains unchanged | Commit can destructively rewrite session state. |
+| `v2.pty.connect` | deferred-by-safety | No raw terminal stream UI | S+P (server unknown) | Hold; no websocket stream exposure | Terminal I/O is an execution surface. |
+| `v2.pty.connectToken` | deferred-by-safety | No raw token UI | S+P (server unknown) | Hold; token never rendered/logged | Token lifecycle has no secure product UX. |
+| `v2.question.request.list` | diagnostic-only | Chat question-card guard; no dedicated v2 list UI | S+R (server unknown) | Read; existing question hub/fallback remains | Global request list is not response-flow proof. |
+| `v2.session.question.list` | diagnostic-only | Session-scoped question-card guard; no dedicated v2 list UI | S+P (server unknown) | Read; existing question hub/fallback remains | Session fixture required; no raw payload shown. |
+| `v2.session.question.reply` | deferred-by-safety | Existing question reply flow remains owner; no raw v2 action | S+P (server unknown) | Hold; no raw v2 reply action | Reply changes an agent's execution path. |
+| `v2.session.question.reject` | deferred-by-safety | Existing question rejection flow remains owner; no raw v2 action | S+P (server unknown) | Hold; no raw v2 reject action | Rejection changes an agent's execution path. |
+| `v2.reference.list` | diagnostic-only | `ServerReferenceContextService` Chat guard; no raw reference UI | S+R (server unknown) | Read; existing context picker remains | Reference scope/content has no direct product-path proof. |
+| `v2.projectCopy.create` | deferred-by-safety | Settings gate and Chat modal are unit-tested; no Test Vault action proof | S+P (server unknown) | Gate `v2.projectCopy.create`; default-off and final confirmation | Copy target/source preservation is not live-proven. |
+| `v2.projectCopy.refresh` | deferred-by-safety | No raw Settings/Chat action | S+P (server unknown) | Hold; no invocation | Refresh can mutate an existing copy. |
+| `v2.projectCopy.remove` | deferred-by-safety | No raw Settings/Chat action | S+P (server unknown) | Hold; no invocation | Removal is destructive. |
+| `experimental.capabilities.get` | productized | `OpenCodeSdkCapabilityDiscoveryCoordinator` -> `OpenCodeService` -> Settings/Capability Lab snapshot | S+R (server unknown) | Read; no migration; every later action still checks its own availability and gate | Advertisement is productized as a guarded snapshot, not as action authorization. |
+| `experimental.controlPlane.moveSession` | deferred-by-safety | Settings gate and Chat modal are unit-tested; no Test Vault action proof | S+P (server unknown) | Gate `experimental.controlPlane.moveSession`; default-off and final confirmation | Moving a session can alter location/ownership. |
+| `experimental.projectCopy.generateName` | diagnostic-only | No ordinary Settings/Chat UI; diagnostic-only | S+P (server unknown) | Read; no name-generation action surfaced | Generated output is not a copy-safety proof. |
+| `experimental.session.background` | deferred-by-safety | Settings gate and Chat modal are unit-tested; no Test Vault action proof | S+P (server unknown) | Gate `experimental.session.background`; default-off and final confirmation | Must not overwrite foreground stream status. |
+| `project.directories` | diagnostic-only | No dedicated ordinary disclosure UI; diagnostic-only | S+R (server unknown) | Read; existing project scope remains canonical | Directory list may be stale or differently scoped. |
+| `v2.session.revert.stage` | deferred-by-safety | Existing session lifecycle remains owner; no new raw v2 UI | S+P (server unknown) | Hold; legacy revert behavior remains unchanged | Staging can affect user-visible history. |
+| `v2.session.revert.clear` | deferred-by-safety | Existing session lifecycle remains owner; no new raw v2 UI | S+P (server unknown) | Hold; legacy revert behavior remains unchanged | Clearing staged work can lose intent. |
+| `v2.session.revert.commit` | deferred-by-safety | Existing session lifecycle remains owner; no new raw v2 UI | S+P (server unknown) | Hold; legacy revert behavior remains unchanged | Commit can destructively rewrite session state. |
 
 ### 9.3 Runtime and migration evidence retained with the handoff
 
 - **Runtime deployment:** Test Vault received build
   `codex-opencode-sdk-full-productization.202607110323`; the latest full local
   `npm run verify` build was
-  `codex-opencode-sdk-full-productization.202607110347`.
+  `codex-opencode-sdk-full-productization.202607110403`.
 - **Test Vault scenario:** the live service was OpenCode `1.17.15` at
   `127.0.0.1:4196`. PTY was hidden while its gate was off; after the Settings
   gate was enabled and server support was available, cancellation made zero
