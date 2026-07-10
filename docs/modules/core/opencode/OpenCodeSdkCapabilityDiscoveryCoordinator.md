@@ -19,6 +19,10 @@
 - `requireCapability(id)` 返回单个 entry 的 availability 或 typed redacted `OpenCodeUnsupportedCapabilityResult`，对未知 id 不抛异常。
 - 所有错误原因都脱敏为粗粒度 class label，绝不持久化或记录 token、credential 或原始错误体。
 
+### Evidence contract
+
+每个 snapshot entry 同时带一个独立于 availability 的 `evidence`：SDK 缺失或明确 endpoint unavailable 为 `unsupported`；成功 safe-read 为 `advertised`；transport / transient failure 为 `failed`；未调用的 presence entry 为 `present`；任何 `serverProbe: 'none'` 的 state-changing entry 都是 `skipped(state-changing-no-probe)`，包括第一次同步 snapshot。仅 registry 中已经保存 Test Vault `runtimeProof` 的条目可显示 `runtime-proven`。这些 evidence 不包含 raw response、token、credential 或原始 error body。
+
 ## 与其他模块的交互
 
 - `OpenCodeService` 在构造器中创建此 coordinator，传入 `getFacade: () => this.sdk`。

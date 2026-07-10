@@ -27,6 +27,8 @@
 
 OpenCodian 的英文翻译表，导出 `enTranslations` 静态对象。
 
+2026-07-11：新增 `settings.capabilityLab.openCodeSdk.*` 文案，为 Capability Lab 的 OpenCode SDK 证据表提供本地化标题、证据状态、safe refresh、脱敏 JSON copy 与失败通知。描述明确这是 production snapshot 的诊断只读视图，不能打开 gate 或执行 action。
+
 2026-06-28：新增 `settings.tools.permission.source.*`、`settings.tools.custom.status.*` 和 `settings.acp.count`，用于 Tools 权限行 inherited / override / custom badge、自定义工具文件 editable / read-only badge，以及 ACP preset toolbar 的配置数量。此前同日新增 `settings.agent.status.disabled`，用于 backend management / 智能体管理列表里的 disabled badge。上述键只补齐 UI 状态标签，不改变工具权限、工具文件 CRUD、ACP agent 保存或 backend 启用保存语义。
 
 2026-06-17：更新 Claude Code 权限模式聊天选择器文案。`settings.claudeCode.permissionMode.*` 现在提供截图式紧凑标签（`Ask first` / `Auto edit` / `Plan mode` / `Full access`），`chat.claudeCode.permissionMode.*.description` 提供对应短描述；其中 `Full access` 描述必须保留 bypass permission checks 的风险语义，避免把 SDK `bypassPermissions` 误导成普通少确认。

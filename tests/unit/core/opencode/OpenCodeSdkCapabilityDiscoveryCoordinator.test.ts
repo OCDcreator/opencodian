@@ -98,6 +98,7 @@ describe('OpenCodeSdkCapabilityDiscoveryCoordinator', () => {
       const snapshot = await coordinator.refresh();
       const health = snapshot.entries.find((e) => e.id === 'v2.health.get');
       expect(health?.availability.kind).toBe('available');
+      expect(health?.evidence).toEqual({ kind: 'advertised' });
     });
   });
 
@@ -111,6 +112,7 @@ describe('OpenCodeSdkCapabilityDiscoveryCoordinator', () => {
       const unavailable = health?.availability as { reason?: string; minimumServerHint?: string };
       expect(typeof unavailable.reason).toBe('string');
       expect(unavailable.minimumServerHint).toBe('OpenCode server 1.17+');
+      expect(health?.evidence).toEqual({ kind: 'unsupported' });
     });
 
     it('treats a transport/transient probe error as unknown (not unsupported)', async () => {
@@ -119,6 +121,7 @@ describe('OpenCodeSdkCapabilityDiscoveryCoordinator', () => {
       const snapshot = await coordinator.refresh();
       const location = snapshot.entries.find((e) => e.id === 'v2.location.get');
       expect(location?.availability.kind).toBe('unknown');
+      expect(location?.evidence).toEqual({ kind: 'failed', reason: 'transport' });
     });
   });
 
@@ -136,6 +139,7 @@ describe('OpenCodeSdkCapabilityDiscoveryCoordinator', () => {
       const create = snapshot.entries.find((e) => e.id === 'v2.session.create');
       // gate is false by default → disabled-by-user takes precedence over the unknown server
       expect(create?.availability.kind).toBe('disabled-by-user');
+      expect(create?.evidence).toEqual({ kind: 'skipped', reason: 'state-changing-no-probe' });
     });
 
     it('still reports unknown (not available) for a state-changing entry when gate is open', async () => {
@@ -184,6 +188,7 @@ describe('OpenCodeSdkCapabilityDiscoveryCoordinator', () => {
       // presence-only: not invoked
       expect(facade.v2.event.subscribe).not.toHaveBeenCalled();
       expect(eventSub?.availability.kind).toBe('available');
+      expect(eventSub?.evidence).toEqual({ kind: 'present' });
     });
   });
 
@@ -195,6 +200,7 @@ describe('OpenCodeSdkCapabilityDiscoveryCoordinator', () => {
       const snapshot = await coordinator.refresh();
       for (const entry of snapshot.entries) {
         expect(entry.availability.kind).toBe('unsupported-by-sdk');
+        expect(entry.evidence).toEqual({ kind: 'unsupported' });
       }
     });
 
@@ -228,6 +234,7 @@ describe('OpenCodeSdkCapabilityDiscoveryCoordinator', () => {
       // read-probe entries show unknown server support until refreshed
       const health = snapshot.entries.find((e) => e.id === 'v2.health.get');
       expect(health?.availability.kind).toBe('unknown');
+      expect(health?.evidence).toEqual({ kind: 'present' });
     });
 
     it('does not infer enabled experimental-action server support before a safe refresh', () => {
@@ -238,7 +245,33 @@ describe('OpenCodeSdkCapabilityDiscoveryCoordinator', () => {
       const snapshot = coordinator.getSnapshot();
       const pty = snapshot.entries.find((entry) => entry.id === 'v2.pty.create');
       expect(pty?.availability.kind).toBe('unknown');
+      expect(pty?.evidence).toEqual({ kind: 'skipped', reason: 'state-changing-no-probe' });
       expect(facade.global.health).not.toHaveBeenCalled();
+    });
+
+    it('preserves retained runtime-proof metadata without invoking an action', async () => {
+      const registry = buildTestRegistry().map((entry) => entry.id === 'v2.health.get'
+        ? {
+            ...entry,
+            runtimeProof: {
+              verifiedAt: 1739232000000,
+              buildId: 'opencode-sdk-proof',
+              artifactPath: '.obsidian-debug/proof.json',
+            },
+          }
+        : entry,
+      );
+      const coordinator = new OpenCodeSdkCapabilityDiscoveryCoordinator(registry, { getFacade: accessor });
+
+      const snapshot = await coordinator.refresh();
+
+      expect(snapshot.entries.find((entry) => entry.id === 'v2.health.get')?.evidence).toEqual({
+        kind: 'runtime-proven',
+        verifiedAt: 1739232000000,
+        buildId: 'opencode-sdk-proof',
+        artifactPath: '.obsidian-debug/proof.json',
+      });
+      expect(facade.v2.health.get).toHaveBeenCalledTimes(1);
     });
 
     it('invalidate forces the next getSnapshot to rebuild', async () => {

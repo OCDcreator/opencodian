@@ -38,12 +38,26 @@ import { createLogger } from '../../shared';
 
 const logger = createLogger('OpenCodeSdkCapabilityDiscovery');
 
+export type OpenCodeSdkCapabilityEvidence =
+  | { readonly kind: 'present' }
+  | { readonly kind: 'advertised' }
+  | {
+      readonly kind: 'runtime-proven';
+      readonly verifiedAt: number;
+      readonly buildId: string;
+      readonly artifactPath: string;
+    }
+  | { readonly kind: 'skipped'; readonly reason: 'state-changing-no-probe' }
+  | { readonly kind: 'unsupported' }
+  | { readonly kind: 'failed'; readonly reason: 'transport' };
+
 /**
  * A single entry in the cached capability snapshot.
  */
 export interface OpenCodeSdkCapabilitySnapshotEntry {
   readonly id: string;
   readonly availability: OpenCodeSdkCapabilityAvailability;
+  readonly evidence: OpenCodeSdkCapabilityEvidence;
   readonly definition: OpenCodeSdkCapabilityDefinition;
   /** Epoch ms when this entry's server support was last probed. */
   readonly lastChecked?: number;
@@ -250,7 +264,12 @@ export class OpenCodeSdkCapabilityDiscoveryCoordinator {
         }),
         definition,
       );
-      return { id: definition.id, availability, definition };
+      return {
+        id: definition.id,
+        availability,
+        evidence: this.resolveEvidence(definition, sdkPresent, server, false),
+        definition,
+      };
     });
     const snapshot: OpenCodeSdkCapabilitySnapshot = { entries, generatedAt };
     this.cachedSnapshot = snapshot;
@@ -277,6 +296,7 @@ export class OpenCodeSdkCapabilityDiscoveryCoordinator {
     return {
       id: definition.id,
       availability,
+      evidence: this.resolveEvidence(definition, sdkPresent, server, true),
       definition,
       lastChecked: generatedAt,
     };
@@ -295,6 +315,35 @@ export class OpenCodeSdkCapabilityDiscoveryCoordinator {
       return { ...availability, minimumServerHint: definition.minimumServerHint };
     }
     return availability;
+  }
+
+  private resolveEvidence(
+    definition: OpenCodeSdkCapabilityDefinition,
+    sdkPresent: boolean,
+    server: boolean | 'unknown',
+    didProbe: boolean,
+  ): OpenCodeSdkCapabilityEvidence {
+    if (!sdkPresent || server === false) {
+      return { kind: 'unsupported' };
+    }
+    if (definition.runtimeProof) {
+      return {
+        kind: 'runtime-proven',
+        verifiedAt: definition.runtimeProof.verifiedAt,
+        buildId: definition.runtimeProof.buildId,
+        artifactPath: definition.runtimeProof.artifactPath,
+      };
+    }
+    if (definition.serverProbe === 'none') {
+      return { kind: 'skipped', reason: 'state-changing-no-probe' };
+    }
+    if (!didProbe || definition.serverProbe === 'presence') {
+      return { kind: 'present' };
+    }
+    if (server === true) {
+      return { kind: 'advertised' };
+    }
+    return { kind: 'failed', reason: 'transport' };
   }
 
   /**

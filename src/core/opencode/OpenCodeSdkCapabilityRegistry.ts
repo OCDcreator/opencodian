@@ -67,6 +67,12 @@ export type OpenCodeSdkCapabilityFallbackPolicy =
   | 'experimental-gated'
   | 'none';
 
+export interface OpenCodeSdkCapabilityRuntimeProof {
+  readonly verifiedAt: number;
+  readonly buildId: string;
+  readonly artifactPath: string;
+}
+
 export interface OpenCodeSdkCapabilityDefinition {
   /** Stable capability id, e.g. `v2.health.get`. */
   readonly id: string;
@@ -82,6 +88,7 @@ export interface OpenCodeSdkCapabilityDefinition {
   readonly fallbackPolicy: OpenCodeSdkCapabilityFallbackPolicy;
   /** Minimum server version hint surfaced when the endpoint is missing. */
   readonly minimumServerHint: string | undefined;
+  readonly runtimeProof?: OpenCodeSdkCapabilityRuntimeProof;
   readonly description: string;
 }
 
@@ -91,6 +98,7 @@ interface OpenCodeSdkCapabilityBaseSpec {
   readonly surface: OpenCodeSdkCapabilitySurface;
   readonly description: string;
   readonly minimumServerHint?: string;
+  readonly runtimeProof?: OpenCodeSdkCapabilityRuntimeProof;
 }
 
 const MINIMUM_SERVER_HINT_117 = 'OpenCode server 1.17+';
@@ -109,6 +117,7 @@ function readOnlyEntry(
     serverProbe: 'read',
     fallbackPolicy: spec.surface === 'diagnostic' ? 'unsupported-visible' : 'legacy-fallback',
     minimumServerHint: spec.minimumServerHint,
+    runtimeProof: spec.runtimeProof,
     description: spec.description,
   };
 }
@@ -127,6 +136,7 @@ function streamEntry(
     serverProbe: 'presence',
     fallbackPolicy: 'legacy-fallback',
     minimumServerHint: spec.minimumServerHint,
+    runtimeProof: spec.runtimeProof,
     description: spec.description,
   };
 }
@@ -146,6 +156,7 @@ function presenceEntry(
     serverProbe: 'presence',
     fallbackPolicy: 'experimental-gated',
     minimumServerHint: spec.minimumServerHint,
+    runtimeProof: spec.runtimeProof,
     description: spec.description,
   };
 }
@@ -165,6 +176,7 @@ function stateChangingEntry(
     serverProbe: 'none',
     fallbackPolicy: 'experimental-gated',
     minimumServerHint: spec.minimumServerHint,
+    runtimeProof: spec.runtimeProof,
     description: spec.description,
   };
 }
@@ -435,7 +447,15 @@ let cachedRegistryCopy: readonly OpenCodeSdkCapabilityDefinition[] | null = null
  */
 export function getOpenCodeSdkCapabilityRegistry(): OpenCodeSdkCapabilityDefinition[] {
   if (cachedRegistryCopy === null) {
-    cachedRegistryCopy = OPENCODE_SDK_CAPABILITY_REGISTRY.map((entry) => ({ ...entry }));
+    cachedRegistryCopy = OPENCODE_SDK_CAPABILITY_REGISTRY.map((entry) => ({
+      ...entry,
+      sdkPath: [...entry.sdkPath],
+      ...(entry.runtimeProof ? { runtimeProof: { ...entry.runtimeProof } } : {}),
+    }));
   }
-  return cachedRegistryCopy.map((entry) => ({ ...entry }));
+  return cachedRegistryCopy.map((entry) => ({
+    ...entry,
+    sdkPath: [...entry.sdkPath],
+    ...(entry.runtimeProof ? { runtimeProof: { ...entry.runtimeProof } } : {}),
+  }));
 }

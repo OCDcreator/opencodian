@@ -48,7 +48,9 @@ describe('OpenCodeSdkCapabilityRegistry', () => {
       expect(first.length).toBe(second.length);
       // mutating the copy must not affect subsequent reads
       first.push({ ...(first[0] as OpenCodeSdkCapabilityDefinition) });
+      (first[0].sdkPath as string[])[0] = 'mutated';
       expect(getOpenCodeSdkCapabilityRegistry().length).toBe(second.length);
+      expect(getOpenCodeSdkCapabilityRegistry()[0].sdkPath[0]).not.toBe('mutated');
     });
 
     it('the frozen source constant has the same length as the getter', () => {

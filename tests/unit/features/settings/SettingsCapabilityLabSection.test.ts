@@ -61,6 +61,10 @@ function createMockPlugin(adapter: unknown = null, activeKind = adapter ? 'claud
   return {
     agentServiceRegistry: registry,
     getConversations: jest.fn().mockReturnValue([]),
+    openCodeService: {
+      getSdkCapabilitySnapshot: jest.fn().mockReturnValue({ entries: [], generatedAt: 0 }),
+      refreshSdkCapabilities: jest.fn().mockResolvedValue({ entries: [], generatedAt: 0 }),
+    },
     settings: {
       backendSettings: {
         claudeCode: {
@@ -117,6 +121,129 @@ describe('SettingsCapabilityLabSection', () => {
     expect(banner!.textContent).toContain('DIAGNOSTIC');
     expect(banner!.textContent).toContain('EXPERIMENTAL');
     expect(banner!.textContent).toContain('NOT STABLE');
+  });
+
+  it('renders the production OpenCode snapshot and refreshes only safe discovery evidence', async () => {
+    const snapshot = {
+      generatedAt: 1,
+      entries: [
+        {
+          id: 'v2.health.get',
+          availability: { kind: 'available' },
+          evidence: { kind: 'advertised' },
+          definition: {
+            id: 'v2.health.get',
+            sdkPath: ['v2', 'health', 'get'],
+            category: 'v2-core',
+            surface: 'settings',
+            risk: 'read-only',
+            defaultGate: true,
+            serverProbe: 'read',
+            fallbackPolicy: 'legacy-fallback',
+            description: 'Health readback',
+          },
+        },
+      ],
+    };
+    const plugin = createMockPlugin() as unknown as {
+      saveSettings: jest.Mock;
+      openCodeService: {
+        getSdkCapabilitySnapshot: jest.Mock;
+        refreshSdkCapabilities: jest.Mock;
+        runExperimentalAction: jest.Mock;
+      };
+    };
+    plugin.openCodeService = {
+      getSdkCapabilitySnapshot: jest.fn().mockReturnValue(snapshot),
+      refreshSdkCapabilities: jest.fn().mockResolvedValue(snapshot),
+      runExperimentalAction: jest.fn(),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: plugin as never,
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+
+    const block = containerEl.querySelector<HTMLElement>('[data-section-block="opencode-sdk-capabilities"]');
+    expect(block).not.toBeNull();
+    expect(block?.textContent).toContain('v2.health.get');
+    expect(block?.querySelector('[data-experimental-action]')).toBeNull();
+    expect(block?.querySelector('[data-action="open-experimental-actions"]')).toBeNull();
+
+    block?.querySelector<HTMLButtonElement>('[data-opencode-sdk-action="refresh"]')?.click();
+    await flushUi();
+
+    expect(plugin.openCodeService.refreshSdkCapabilities).toHaveBeenCalledTimes(1);
+    expect(plugin.openCodeService.getSdkCapabilitySnapshot).toHaveBeenCalledTimes(2);
+    expect(plugin.openCodeService.runExperimentalAction).not.toHaveBeenCalled();
+    expect(plugin.saveSettings).not.toHaveBeenCalled();
+  });
+
+  it('exports only the sanitized production capability evidence', async () => {
+    const writeText = jest.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    });
+    const snapshot = {
+      generatedAt: 1,
+      entries: [
+        {
+          id: 'v2.health.get',
+          availability: { kind: 'unknown', reason: 'Capability support could not be confirmed.' },
+          evidence: { kind: 'failed', reason: 'transport' },
+          definition: {
+            id: 'v2.health.get',
+            sdkPath: ['v2', 'health', 'get'],
+            description: 'server payload must not leave the diagnostic boundary',
+            rawError: 'Bearer secret-token',
+          },
+        },
+      ],
+    };
+    const plugin = createMockPlugin() as unknown as {
+      openCodeService: {
+        getSdkCapabilitySnapshot: jest.Mock;
+        refreshSdkCapabilities: jest.Mock;
+        runExperimentalAction: jest.Mock;
+      };
+      saveSettings: jest.Mock;
+    };
+    plugin.openCodeService = {
+      getSdkCapabilitySnapshot: jest.fn().mockReturnValue(snapshot),
+      refreshSdkCapabilities: jest.fn().mockResolvedValue(snapshot),
+      runExperimentalAction: jest.fn(),
+    };
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: plugin as never,
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    containerEl.querySelector<HTMLButtonElement>('[data-opencode-sdk-action="copy-evidence"]')?.click();
+    await flushUi();
+
+    expect(writeText).toHaveBeenCalledTimes(1);
+    const exported = String(writeText.mock.calls[0][0]);
+    expect(JSON.parse(exported)).toEqual({
+      generatedAt: 1,
+      entries: [
+        {
+          id: 'v2.health.get',
+          availability: 'unknown',
+          evidence: { kind: 'failed', reason: 'transport' },
+        },
+      ],
+    });
+    expect(exported).not.toContain('secret-token');
+    expect(exported).not.toContain('Capability support could not be confirmed.');
+    expect(exported).not.toContain('sdkPath');
+    expect(exported).not.toContain('description');
+    expect(plugin.openCodeService.runExperimentalAction).not.toHaveBeenCalled();
+    expect(plugin.saveSettings).not.toHaveBeenCalled();
   });
 
   it('renders inside the shared debug tab shell without removing diagnostic blocks', () => {

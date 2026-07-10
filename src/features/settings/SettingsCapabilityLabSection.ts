@@ -28,6 +28,10 @@ import type { ClaudeCodeAdapter, ClaudeCodeDiagnosticPromptResult } from '../../
 import { buildClaudeCodeElicitationQuestionRequest } from '../../core/agents/backend/ClaudeCodeElicitationBridge';
 import type { ClaudeCodePermissionBridge } from '../../core/agents/backend/ClaudeCodePermissionBridge';
 import type { CodexAdapter } from '../../core/agents/backend/CodexAdapter';
+import type {
+  OpenCodeSdkCapabilityEvidence,
+  OpenCodeSdkCapabilitySnapshot,
+} from '../../core/opencode/OpenCodeSdkCapabilityDiscoveryCoordinator';
 import type { AgentBackendKind } from '../../core/types/chat';
 import {
   getDefaultClaudeCodeBackendSettings,
@@ -482,6 +486,12 @@ export class SettingsCapabilityLabSection {
     });
     this.renderCapabilityMatrix(matrixBlock, { includeDescription: false });
 
+    const openCodeSdkBlock = bodyEl.createDiv({
+      cls: 'opencodian-settings-block',
+      attr: { 'data-section-block': 'opencode-sdk-capabilities' },
+    });
+    this.renderOpenCodeSdkCapabilities(openCodeSdkBlock);
+
     // ── JSONL History Browser (read-only) ──────────────────────────────
     const historyBlock = bodyEl.createDiv({
       cls: 'opencodian-settings-block',
@@ -601,6 +611,107 @@ export class SettingsCapabilityLabSection {
         this.renderMatrixRow(tbody, row);
       }
     }
+  }
+
+  private renderOpenCodeSdkCapabilities(containerEl: HTMLElement): void {
+    containerEl.empty();
+    containerEl.createEl('h4', { text: t('settings.capabilityLab.openCodeSdk.title') });
+    containerEl.createEl('p', {
+      cls: 'opencodian-capability-lab-description',
+      text: t('settings.capabilityLab.openCodeSdk.description'),
+    });
+
+    const snapshot = this.plugin.openCodeService.getSdkCapabilitySnapshot();
+    if (snapshot.entries.length === 0) {
+      containerEl.createEl('p', { text: t('settings.capabilityLab.openCodeSdk.empty') });
+      return;
+    }
+
+    const table = containerEl.createEl('table', {
+      cls: 'opencodian-capability-lab-opencode-sdk',
+      attr: { 'data-diagnostic': 'true' },
+    });
+    const headerRow = table.createEl('thead').createEl('tr');
+    headerRow.createEl('th', { text: t('settings.capabilityLab.openCodeSdk.capability') });
+    headerRow.createEl('th', { text: t('settings.capabilityLab.openCodeSdk.availability') });
+    headerRow.createEl('th', { text: t('settings.capabilityLab.openCodeSdk.evidence') });
+
+    const tbody = table.createEl('tbody');
+    for (const entry of snapshot.entries) {
+      const row = tbody.createEl('tr', {
+        attr: {
+          'data-opencode-sdk-capability': entry.id,
+          'data-opencode-sdk-evidence': entry.evidence.kind,
+        },
+      });
+      row.createEl('td', { text: entry.id });
+      row.createEl('td', { text: entry.availability.kind });
+      row.createEl('td', { text: this.getOpenCodeSdkEvidenceLabel(entry.evidence) });
+    }
+
+    const actionsEl = containerEl.createDiv({ cls: 'opencodian-capability-lab-controls' });
+    const refreshButton = actionsEl.createEl('button', {
+      text: t('settings.capabilityLab.openCodeSdk.refresh'),
+      attr: { type: 'button', 'data-opencode-sdk-action': 'refresh' },
+    });
+    refreshButton.addEventListener('click', () => {
+      void this.refreshOpenCodeSdkCapabilities(containerEl, refreshButton);
+    });
+    const copyButton = actionsEl.createEl('button', {
+      text: t('settings.capabilityLab.openCodeSdk.copyEvidence'),
+      attr: { type: 'button', 'data-opencode-sdk-action': 'copy-evidence' },
+    });
+    copyButton.addEventListener('click', () => {
+      void this.copyOpenCodeSdkEvidence();
+    });
+  }
+
+  private getOpenCodeSdkEvidenceLabel(evidence: OpenCodeSdkCapabilityEvidence): string {
+    const labels: Record<OpenCodeSdkCapabilityEvidence['kind'], Parameters<typeof t>[0]> = {
+      present: 'settings.capabilityLab.openCodeSdk.evidence.present',
+      advertised: 'settings.capabilityLab.openCodeSdk.evidence.advertised',
+      'runtime-proven': 'settings.capabilityLab.openCodeSdk.evidence.runtimeProven',
+      skipped: 'settings.capabilityLab.openCodeSdk.evidence.skipped',
+      unsupported: 'settings.capabilityLab.openCodeSdk.evidence.unsupported',
+      failed: 'settings.capabilityLab.openCodeSdk.evidence.failed',
+    };
+    return t(labels[evidence.kind]);
+  }
+
+  private async refreshOpenCodeSdkCapabilities(
+    containerEl: HTMLElement,
+    buttonEl: HTMLButtonElement,
+  ): Promise<void> {
+    buttonEl.disabled = true;
+    try {
+      await this.plugin.openCodeService.refreshSdkCapabilities();
+      this.renderOpenCodeSdkCapabilities(containerEl);
+    } catch {
+      buttonEl.disabled = false;
+      new Notice(t('settings.capabilityLab.openCodeSdk.refreshFailed'));
+    }
+  }
+
+  private async copyOpenCodeSdkEvidence(): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(this.serializeOpenCodeSdkEvidence(
+        this.plugin.openCodeService.getSdkCapabilitySnapshot(),
+      ));
+      new Notice(t('settings.capabilityLab.openCodeSdk.copySuccess'));
+    } catch {
+      new Notice(t('settings.capabilityLab.openCodeSdk.copyFailed'));
+    }
+  }
+
+  private serializeOpenCodeSdkEvidence(snapshot: OpenCodeSdkCapabilitySnapshot): string {
+    return JSON.stringify({
+      generatedAt: snapshot.generatedAt,
+      entries: snapshot.entries.map((entry) => ({
+        id: entry.id,
+        availability: entry.availability.kind,
+        evidence: entry.evidence,
+      })),
+    }, null, 2);
   }
 
   private renderMatrixRow(tbody: HTMLTableSectionElement, row: MatrixRow): void {
