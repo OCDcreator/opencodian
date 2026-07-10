@@ -171,6 +171,10 @@ function renderConversationSettings(settings: Partial<typeof DEFAULT_SETTINGS> =
       ...settings,
     },
     modelConfigService: null,
+    openCodeService: {
+      requireSdkCapability: jest.fn().mockReturnValue({ kind: 'available' }),
+      refreshSdkCapabilities: jest.fn().mockResolvedValue({ entries: [], generatedAt: 0 }),
+    },
     saveSettings: jest.fn().mockResolvedValue(undefined),
     refreshConversationRendering: jest.fn(),
     refreshQuestionUi: jest.fn(),
@@ -402,6 +406,10 @@ describe('OpenCodian conversation settings', () => {
         aiTitleModel: 'openai/gpt-4.1',
       },
       modelConfigService,
+      openCodeService: {
+        requireSdkCapability: jest.fn().mockReturnValue({ kind: 'available' }),
+        refreshSdkCapabilities: jest.fn().mockResolvedValue({ entries: [], generatedAt: 0 }),
+      },
       saveSettings: jest.fn().mockResolvedValue(undefined),
       refreshConversationRendering: jest.fn(),
       refreshQuestionUi: jest.fn(),

@@ -71,6 +71,8 @@ function createPlugin(overrides?: Partial<ConversationSectionPlugin['settings']>
     } as never,
     openCodeService: {
       reapplyCompactionConfigFromProjectConfig: jest.fn().mockResolvedValue({ status: 'applied' }),
+      requireSdkCapability: jest.fn().mockReturnValue({ kind: 'available' }),
+      refreshSdkCapabilities: jest.fn().mockResolvedValue({ entries: [], generatedAt: 0 }),
     } as never,
   } as unknown as ConversationSectionPlugin;
 }

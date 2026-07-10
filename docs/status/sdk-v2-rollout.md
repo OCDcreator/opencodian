@@ -1,12 +1,32 @@
 # OpenCodeService 与 SDK v2 当前集成状态
 
-> 更新时间：2026-04-09
+> 更新时间：2026-07-11
 >
 > 依据：当前仓库 `src/` 代码实现。
 >
 > 如果这份文档与旧说明冲突，以代码为准；如果与 SDK 行为有疑问，以 `reference-projects/opencode/packages/sdk/js/src/v2` 为准。
 >
-> 本次更新基于代码审查，以及 `@opencode-ai/sdk` 升级到 `1.4.1` 后的 build / 定向 SDK 回归验证。
+> 本次更新基于代码审查、`@opencode-ai/sdk@1.17.18` 的 capability inventory、定向回归与生产 capability snapshot contract。更早的 `1.4.1` 叙述保留为历史背景，不能覆盖本节的当前状态。
+
+## 0. 1.17.18 当前权威快照
+
+- 插件 SDK 精确固定为 `@opencode-ai/sdk@1.17.18`；npm integrity、上游 reference commit `08096b5e61c9227a6b52aacc745a1a51c6385284`、57 个 post-1.15.3 methods 与 14 个新增 `v2.*` namespace 的完整证据见 `docs/status/opencode-sdk-1.17.18-capability-inventory.md`。
+- `OpenCodeSdkFacade` 仍是唯一 raw SDK namespace/request/unwrap/error boundary。Chat 和 Settings 只经由 `OpenCodeService` 读取 `getSdkCapabilitySnapshot()`、刷新 `refreshSdkCapabilities()`，或请求 typed redacted `requireSdkCapability()` 结果。
+- 每个 capability 都由 SDK presence、safe server probe、user gate 与 risk class 共同解析。可用性与 evidence 分离：safe-read 成功是 `advertised`，transport failure 是 `failed`，SDK/endpoint 缺失是 `unsupported`，state-changing no-probe 是 `skipped`；只有带 Test Vault 元数据的条目才可标为 `runtime-proven`。
+- Settings 的稳定 capability disclosure 永远保留 unsupported 行与 minimum-server hint，并提供 Re-check；不会仅因旧 server 不支持而隐藏已知 SDK capability。旧 HTTP/SSE fallback、`ServerManager` 进程 ownership 与目录 scope 规则保持不变。
+- capability settings envelope schemaVersion=1 以 default-off `experimentalGates` 保存 PTY、control-plane、project-copy、background gate。等价旧字段自动映射；不可能映射会保留 raw backup 并只显示脱敏 migration report，绝不删除或重解释用户配置。
+- PTY/control-plane/project-copy/background 只在 **Settings 显式开启 + 当前 server availability=available + 每次操作最终确认** 后进入 Chat。动作走 `OpenCodeSdkExperimentalActionCoordinator`，PTY 仅管理 coordinator 自己创建的实例，取消/失败/关闭时 best-effort cleanup；后台完成只追加 inline status，绝不改写前台 stream status。
+- Capability Lab 不是更高权限的旁路：它只读取 production snapshot、只触发 safe refresh，并只复制 `id`、availability kind、evidence 的脱敏 JSON。不会保存 gate、调用实验动作、显示 Chat launcher，或导出 raw payload/error/token/credential/backup。
+
+### 0.1 当前产品化边界
+
+| 能力族 | 当前 owner | 已支持路径 | 旧/不支持 server 的行为 |
+| --- | --- | --- | --- |
+| health/location、agents/models、commands/skills、MCP/security | 既有 Settings sections | disclosure + Re-check；既有 catalog/config owner | 行仍可见，显示脱敏 reason/hint，旧链路保持原有 fallback |
+| session/context/reference/event | 既有 Chat owner | snapshot guard、session UI、context/reference 与 sync freshness 的既有 owner | action 不提升；旧 HTTP/SSE/polling fallback 继续存在 |
+| capability settings migration | `StorageService` + `main.ts` | idempotent normalization、raw backup、startup migration notice | impossible mapping 保留 backup 并披露原因 |
+| PTY/control-plane/project-copy/background | Settings gate + experimental action coordinator + Chat modal | default-off、re-check、最终确认、redacted result、PTY cleanup | gate/offline/unknown 时 Chat 不显示入口；unsupported Settings toggle 仍显示原因 |
+| Capability Lab | Debug > Capability Lab | production snapshot evidence、safe refresh、sanitized copy | 仅诊断，不绕过 gate 或执行 endpoint |
 
 ## 1. 结论先行
 

@@ -6,6 +6,23 @@
 >
 > 本文档只描述建议验收项，不代表这些步骤已在本次 docs 更新中重新执行。
 
+## 0. SDK 1.17.18 capability productization gate
+
+先使用 `docs/status/opencode-sdk-1.17.18-capability-inventory.md` 对照当前 SDK pin。每次验收必须保存当前 `BUILD_ID`、server version、server mode 和 vault directory；不要将 SDK method presence 当作 server support 或 runtime proof。
+
+| 产品能力族 | supported scenario | unsupported / disabled scenario |
+| --- | --- | --- |
+| Server discovery（health/location） | Settings > Server 显示可用状态；点击 Re-check 后只执行 safe read，状态更新且控制台无 raw error | 将 server 指向缺少 v2 endpoint 的旧实例或断网；health/location row 仍可见，显示脱敏 reason/minimum hint，不出现 raw payload |
+| Catalog disclosure（agents/models/commands/skills/MCP/security） | 对每个已有 Settings owner 执行 Re-check，确认 catalog 与当前 directory scope 一致 | 连接旧 server；该 owner 的 capability row 保留、action disabled，provider directory 不被 `provider.list()` 或 cache 误替代 |
+| Chat stable guards（session/context/reference/event） | 打开聊天、发送普通 prompt、添加 context、打开 slash menu，并确认既有 session/event 路径仍正常 | 使用不支持关联 v2 capability 的 server；Chat 不渲染危险新入口，既有 legacy HTTP/SSE/polling fallback 继续可用 |
+| Migration envelope | 从安全 legacy-shaped settings 启动一次并 reload，确认等价 gate/pref 保留且 migration notice 不泄露原值 | 用 impossible gate/value fixture；确认 raw backup 存在、报告仅含 field/outcome/reason，原始 backup 内容不显示或复制 |
+| Capability Lab evidence | Debug > Capability Lab 显示 production snapshot；Refresh safe probes 后 copy JSON 仅含 id/availability kind/evidence | 对 state-changing entry 验证 evidence=`skipped`，Lab 没有 gate、Chat launcher 或 action control；无 raw reason/token/credential/export |
+| PTY | 默认 gate off 时 Chat 无 PTY action；开启 gate、server supported 后打开 action modal，确认 scope/target 和最终浏览器确认，再运行可移除命令 | gate off、old server 或取消确认时不创建 PTY；关闭 modal/失败后只移除 coordinator-owned PTY，不触碰外部 PTY |
+| Control-plane/project copy | 开启对应 gate 后确认 Chat 仅展示有 server support 的 action；先检查 destination/copy preview，再最终确认 | gate off/unsupported 时入口隐藏；取消/invalid target 时不写 destination、不移动 session、不复制 project |
+| Background session | 开启 gate 后确认背景操作需要最终确认，完成后只出现当前 turn 的 inline status | gate off/unsupported/取消时不执行；后台完成不得将前台 `isStreaming`/foreground status 改为 completed |
+
+每一行都应使用 Obsidian Plugin Autodebug 保存 DOM、console/errors 和截图证据；Task 9 将执行该 runtime gate。
+
 ## 1. 验收前准备
 
 - 确认插件已部署到 Test Vault：`C:\Users\lt\Desktop\Write\testvault\.obsidian\plugins\opencodian\`
