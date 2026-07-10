@@ -56,7 +56,7 @@ describe('SettingsMcpSection server actions', () => {
     jest.restoreAllMocks();
   });
 
-  it('shows card actions and runtime connection switch per server card', async () => {
+  it('shows card actions and runtime status per server card', async () => {
     const plugin = createPlugin({
       servers: {
         connected: { status: 'connected' },
@@ -82,9 +82,10 @@ describe('SettingsMcpSection server actions', () => {
     expect(buttonRecords.filter((record) => record.label === t('settings.server.mcp.action.monitor'))).toHaveLength(5);
     expect(getButtonRecord(t('settings.server.mcp.action.authenticate'))).toBeDefined();
     expect(getButtonRecord(t('settings.server.mcp.action.clearAuth'))).toBeDefined();
-    expect(containerEl.textContent).toContain(t('settings.server.mcp.runtimeSwitch.label'));
+    expect(containerEl.textContent).toContain(t('settings.server.mcp.card.runtimeOnlyHint'));
 
     expect(containerEl.querySelectorAll('.opencodian-mcp-server-card')).toHaveLength(5);
+    expect(containerEl.querySelectorAll('.opencodian-mcp-server-card-actions')).toHaveLength(5);
   });
 
   it('connect action calls service and refreshes runtime status', async () => {
