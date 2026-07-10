@@ -76,3 +76,7 @@ Added `attachTabbed(containerEl, secondaryTabId)` method for the tabbed settings
 - `tools` — renders provider icon cache tools
 
 The classic `attach()` method remains unchanged.
+
+### SDK capability disclosure
+
+该 section 现在调用 `renderCapabilityDisclosureRows()`（来自 `capabilityDisclosureRow.ts`）渲染只读能力状态行，显示该 section 拥有的 SDK capability 的 available / unsupported-by-server / disabled-by-user / unknown 状态与脱敏原因，并提供 Re-check 按钮。不重复已有配置编辑器。

@@ -12,6 +12,7 @@ import type OpenCodianPlugin from '../../main';
 import { createLogger } from '../../shared';
 import { normalizeContextPath } from '../../shared/contextPath';
 import type { SkillInfo, SkillSourceGroups } from '../chat/services/SkillCatalogService';
+import { renderCapabilityDisclosureRows } from './capabilityDisclosureRow';
 
 const logger = createLogger('SettingsSkillSection');
 const OPENCODE_SKILLS_DOC_URL = 'https://opencode.ai/docs/zh-cn/skills/';
@@ -83,6 +84,7 @@ export class SettingsSkillSection {
   attach(containerEl: HTMLElement): HTMLHeadingElement {
     const heading = this.createSectionHeading(containerEl, t('settings.skills.title'));
     this.render(containerEl);
+    this.renderCapabilityDisclosure(containerEl);
     return heading;
   }
 
@@ -99,6 +101,14 @@ export class SettingsSkillSection {
       contentClass: 'opencodian-settings-scrollarea-content--skills',
     }).rootEl;
     void this.renderSkillList(this.listEl);
+  }
+
+  private renderCapabilityDisclosure(containerEl: HTMLElement): void {
+    const disclosureEl = containerEl.createDiv({ cls: 'opencodian-capability-disclosure-host' });
+    renderCapabilityDisclosureRows(disclosureEl, this.plugin, ['v2.skill.list'], {
+      headingKey: 'settings.skills.capabilityStatus',
+      labels: { 'v2.skill.list': 'capabilities.label.v2.skill.list' },
+    });
   }
 
   private renderToolbar(containerEl: HTMLElement): void {

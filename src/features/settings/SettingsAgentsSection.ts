@@ -14,6 +14,7 @@ import type { OpencodeAgentConfig, OpencodeAgentConfigRecord, OpencodeAgentMode 
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { createLogger } from '../../shared';
+import { renderCapabilityDisclosureRows } from './capabilityDisclosureRow';
 import { SettingsProjectAgentEditor } from './SettingsProjectAgentEditor';
 import { TextareaSizeMemory } from './TextareaSizeMemory';
 
@@ -131,7 +132,17 @@ export class SettingsAgentsSection {
       });
     }
 
+    this.renderCapabilityDisclosure(containerEl);
+
     return headingEl;
+  }
+
+  private renderCapabilityDisclosure(containerEl: HTMLElement): void {
+    const disclosureEl = containerEl.createDiv({ cls: 'opencodian-capability-disclosure-host' });
+    renderCapabilityDisclosureRows(disclosureEl, this.plugin, ['v2.agent.list'], {
+      headingKey: 'settings.agents.capabilityStatus',
+      labels: { 'v2.agent.list': 'capabilities.label.v2.agent.list' },
+    });
   }
 
   attachTabbed(containerEl: HTMLElement, secondaryTabId: string): void {

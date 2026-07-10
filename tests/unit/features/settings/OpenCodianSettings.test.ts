@@ -668,6 +668,10 @@ function createSettingsTab(layoutMode: 'classic' | 'tabbed' = 'classic') {
     },
     saveSettings: jest.fn().mockResolvedValue(undefined),
     scheduleSettingsUiStateSave: jest.fn(),
+    openCodeService: {
+      requireSdkCapability: jest.fn().mockReturnValue({ kind: 'available' }),
+      refreshSdkCapabilities: jest.fn().mockResolvedValue({ entries: [], generatedAt: 0 }),
+    },
   };
   const tab = new OpenCodianSettingTab(app as never, plugin as never);
   document.body.appendChild(tab.containerEl);

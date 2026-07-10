@@ -12,6 +12,7 @@ import type { OpencodeMcpConfigRecord, OpencodeMcpEntryConfig } from '../../core
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { createLogger } from '../../shared';
+import { renderCapabilityDisclosureRows } from './capabilityDisclosureRow';
 import { McpServerEditorModal } from './McpServerEditorModal';
 import {
   McpServerStatusModal,
@@ -155,6 +156,15 @@ export class SettingsMcpSection {
     this.renderMcpContent(containerEl);
     this.subscribeToCatalog();
     void this.triggerRefresh();
+    this.renderCapabilityDisclosure(containerEl);
+  }
+
+  private renderCapabilityDisclosure(containerEl: HTMLElement): void {
+    const disclosureEl = containerEl.createDiv({ cls: 'opencodian-capability-disclosure-host' });
+    renderCapabilityDisclosureRows(disclosureEl, this.plugin, ['mcp.status'], {
+      headingKey: 'settings.mcp.capabilityStatus',
+      labels: { 'mcp.status': 'capabilities.label.mcp.status' },
+    });
   }
 
   dispose(): void {

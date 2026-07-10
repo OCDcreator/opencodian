@@ -16,6 +16,7 @@ import {
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { createLogger } from '../../shared';
+import { renderCapabilityDisclosureRows } from './capabilityDisclosureRow';
 import {
   SettingsProjectCommandEditor,
 } from './SettingsProjectCommandEditor';
@@ -100,6 +101,7 @@ export class SettingsCommandsSection {
       new Setting(containerEl)
         .setName(t('settings.commands.unavailable.name'))
         .setDesc(t('settings.commands.unavailable.desc'));
+      this.renderCapabilityDisclosure(containerEl);
       return headingEl;
     }
 
@@ -114,7 +116,17 @@ export class SettingsCommandsSection {
       editorBodyEl,
     });
 
+    this.renderCapabilityDisclosure(containerEl);
+
     return headingEl;
+  }
+
+  private renderCapabilityDisclosure(containerEl: HTMLElement): void {
+    const disclosureEl = containerEl.createDiv({ cls: 'opencodian-capability-disclosure-host' });
+    renderCapabilityDisclosureRows(disclosureEl, this.plugin, ['v2.command.list'], {
+      headingKey: 'settings.commands.capabilityStatus',
+      labels: { 'v2.command.list': 'capabilities.label.v2.command.list' },
+    });
   }
 
   attachTabbed(containerEl: HTMLElement, secondaryTabId: string): void {

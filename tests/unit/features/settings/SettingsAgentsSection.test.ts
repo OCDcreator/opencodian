@@ -196,6 +196,8 @@ function createPlugin(options: {
           agents: jest.fn().mockResolvedValue(options.runtimeAgents ?? []),
         },
       },
+      requireSdkCapability: jest.fn().mockReturnValue({ kind: 'available' }),
+      refreshSdkCapabilities: jest.fn().mockResolvedValue({ entries: [], generatedAt: 0 }),
     },
     opencodeConfigManager: {
       getAgentConfig: jest.fn().mockResolvedValue(options.projectAgents ?? {}),

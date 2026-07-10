@@ -59,3 +59,7 @@ Skills 一级设置页现在由设置布局注册表直接提供两个二级标�
 - 该 section 当前自包含技能 fetch 逻辑，不依赖 plugin 级 `skillCatalogService` 属性。
 - 若未来把技能文件操作复用于 chat/slash surface，再考虑抽出共享 service；当前只服务设置页，保持 section-local 即可。
 - Skills 视觉层借鉴 shadcn Card、Badge、Button、Select、ScrollArea 和 Alert 结构，但使用 Obsidian DOM + CSS 实现，并由 `settings-layout-contract.css` 统一管理，不放入 Agents 专用 stylesheet。
+
+### SDK capability disclosure
+
+该 section 现在调用 `renderCapabilityDisclosureRows()`（来自 `capabilityDisclosureRow.ts`）渲染只读能力状态行，显示该 section 拥有的 SDK capability 的 available / unsupported-by-server / disabled-by-user / unknown 状态与脱敏原因，并提供 Re-check 按钮。不重复已有配置编辑器。

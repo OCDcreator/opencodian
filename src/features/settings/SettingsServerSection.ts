@@ -4,6 +4,7 @@ import { Notice, Setting } from 'obsidian';
 
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
+import { renderCapabilityDisclosureRows } from './capabilityDisclosureRow';
 import { type ServerHelpTopic, ServerSettingHelpModal } from './ServerSettingHelpModal';
 import { isOpenCodeSettingsBackendActive } from './settingsBackendGuards';
 
@@ -74,6 +75,7 @@ export class SettingsServerSection {
     this.renderAuthSettings(containerEl);
     this.renderStatusSetting(containerEl);
     this.registerContainerCleanup(containerEl);
+    this.renderCapabilityDisclosure(containerEl);
 
     void this.refreshStatus();
     this.statusIntervalId = window.setInterval(() => void this.refreshStatus(), 2000);
@@ -602,5 +604,16 @@ export class SettingsServerSection {
       this.dispose();
     };
     containerEl.addEventListener('unload', this.cleanupHandler, { once: true });
+  }
+
+  private renderCapabilityDisclosure(containerEl: HTMLElement): void {
+    const disclosureEl = containerEl.createDiv({ cls: 'opencodian-capability-disclosure-host' });
+    renderCapabilityDisclosureRows(disclosureEl, this.plugin, ['v2.health.get', 'v2.location.get'], {
+      headingKey: 'settings.server.capabilityStatus',
+      labels: {
+        'v2.health.get': 'capabilities.label.v2.health.get',
+        'v2.location.get': 'capabilities.label.v2.location.get',
+      },
+    });
   }
 }

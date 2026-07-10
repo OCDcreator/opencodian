@@ -451,3 +451,7 @@ Claude Code 不再使用过载的 `settings.claudeCode.tab.mcpAdvanced` 标签�
 - 2026-06-06 Task Budget 独立审计（Outcome B）：矩阵行注释已添加显式 "Audit conclusion: remains readback" 框架，声明无可产品化的相邻 seam，拒绝非确定性的 "shorter response" 观测作为 proof path，并以 "Honest ceiling: readback" 收尾。分类保持 `readback`，无 locale 变更（2026-06-04/06 硬化已完成）。
 - `settings.claudeCode.enableContext1mBeta.boundaryNotice`: 硬化完整 SDK 路径追踪（setting → CLI `--betas` 标志）；模型侧 beta 接受明确标记为未验证
 - 2026-06-06 JS Runtime 审计硬化（Outcome B）：`settings.claudeCode.jsRuntime.boundaryNotice` 收紧为明确的“仅回读”模式，说明插件只能证明 `options.executable` 接线，不能观察 CLI 子进程实际选用了哪个运行时；同时新增 16 个 `settings.capabilityLab.proofs.jsRuntime.*` 中文 locale keys，覆盖按钮、运行中、标题、边界、生命周期、status yes/no、option-wired / setting-value / sdk-option / sdk-value / value-match 状态行，以及 readback / fail / threw 提示，替换掉 Capability Lab 里的硬编码英文。
+
+## SDK capability disclosure locale keys
+
+新增 `capabilities.status.*`（available/unsupportedByServer/disabledByUser/unsupportedBySdk/unknown）、`capabilities.recheck`、`settings.<section>.capabilityStatus` 以及 `capabilities.label.*` 显示名称键，用于 Settings 能力披露行。

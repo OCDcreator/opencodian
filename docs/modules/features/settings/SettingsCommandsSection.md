@@ -118,3 +118,7 @@ Added `attachTabbed(containerEl, secondaryTabId)` method for the tabbed settings
 The classic `attach()` method remains unchanged.
 - `slashCommandSkillMode` 只改变 chat menu/执行入口形态，不改变 OpenCode runtime 的 skill catalog
 - runtime placeholder expansion、slash execution 与 command-owned hidden agent 已分别落在相邻 seam；如果后续再扩 commands 体验，仍应继续沿着本 owner + editor seam 扩展，而不是绕开现有共享 catalog seam
+
+### SDK capability disclosure
+
+该 section 现在调用 `renderCapabilityDisclosureRows()`（来自 `capabilityDisclosureRow.ts`）渲染只读能力状态行，显示该 section 拥有的 SDK capability 的 available / unsupported-by-server / disabled-by-user / unknown 状态与脱敏原因，并提供 Re-check 按钮。不重复已有配置编辑器。

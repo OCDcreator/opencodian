@@ -52,3 +52,7 @@ Add/Edit 打开 `McpServerEditorModal`，Delete 只允许 project-owned server�
 - 不要展示 resources/prompts，也不要伪造工具数量或 per-server tool list。
 - 技术详情默认 redacted；headers、environment values、OAuth client secret 不应明文显示在 editor 之外。
 - MCP 主界面借鉴 shadcn Card、Badge、Button、ScrollArea 和 Alert 结构，但不要引入 React、Radix 或 Tailwind，也不要把 overview 恢复成大型 dashboard 指标卡。
+
+### SDK capability disclosure
+
+该 section 现在调用 `renderCapabilityDisclosureRows()`（来自 `capabilityDisclosureRow.ts`）渲染只读能力状态行，显示该 section 拥有的 SDK capability 的 available / unsupported-by-server / disabled-by-user / unknown 状态与脱敏原因，并提供 Re-check 按钮。不重复已有配置编辑器。

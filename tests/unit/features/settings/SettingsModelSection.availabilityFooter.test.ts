@@ -14,6 +14,10 @@ describe('SettingsModelSection availability footer', () => {
           modelToolsSectionOpen: true,
         },
         scheduleSettingsUiStateSave: jest.fn(),
+        openCodeService: {
+          requireSdkCapability: jest.fn().mockReturnValue({ kind: 'available' }),
+          refreshSdkCapabilities: jest.fn().mockResolvedValue({ entries: [], generatedAt: 0 }),
+        },
       } as never,
       createSectionHeading: (hostEl, title) => hostEl.createEl('h2', { text: title }),
       createSettingsBlock,

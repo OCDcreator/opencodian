@@ -43,6 +43,10 @@ describe('SettingsModelSection', () => {
         modelConfigService: null,
         settings: {},
         scheduleSettingsUiStateSave: jest.fn(),
+        openCodeService: {
+          requireSdkCapability: jest.fn().mockReturnValue({ kind: 'available' }),
+          refreshSdkCapabilities: jest.fn().mockResolvedValue({ entries: [], generatedAt: 0 }),
+        },
       } as never,
       createSectionHeading: (hostEl, title) => {
         const headingEl = hostEl.createEl('h2');
@@ -156,6 +160,8 @@ describe('SettingsModelSection', () => {
         openCodeService: {
           checkHealth: jest.fn().mockResolvedValue(false),
           getServerStatus: jest.fn().mockReturnValue('stopped'),
+          requireSdkCapability: jest.fn().mockReturnValue({ kind: 'available' }),
+          refreshSdkCapabilities: jest.fn().mockResolvedValue({ entries: [], generatedAt: 0 }),
         },
         settings: {
           modelSourceMode: 'merge',

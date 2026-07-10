@@ -4,6 +4,7 @@ import { ModelCatalogStateService } from '../../core/config';
 import type { ModelSourceMode } from '../../core/types';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
+import { renderCapabilityDisclosureRows } from './capabilityDisclosureRow';
 import {
   type OpenCodeServerStatus,
   SettingsModelCatalogCoordinator,
@@ -141,6 +142,7 @@ export class SettingsModelSection {
       new Setting(containerEl)
         .setName(t('settings.model.config.unavailableTitle'))
         .setDesc(t('settings.model.config.unavailable'));
+      this.renderCapabilityDisclosure(containerEl);
       return headingEl;
     }
 
@@ -152,8 +154,20 @@ export class SettingsModelSection {
     this.catalogCoordinator.updateSmallModelButton();
     void this.iconCacheManager.refreshIconCacheOverview();
     void this.bootstrapModelSection();
+    this.renderCapabilityDisclosure(containerEl);
 
     return headingEl;
+  }
+
+  private renderCapabilityDisclosure(containerEl: HTMLElement): void {
+    const disclosureEl = containerEl.createDiv({ cls: 'opencodian-capability-disclosure-host' });
+    renderCapabilityDisclosureRows(disclosureEl, this.plugin, ['v2.model.list', 'v2.provider.list'], {
+      headingKey: 'settings.model.capabilityStatus',
+      labels: {
+        'v2.model.list': 'capabilities.label.v2.model.list',
+        'v2.provider.list': 'capabilities.label.v2.provider.list',
+      },
+    });
   }
 
   attachTabbed(containerEl: HTMLElement, secondaryTabId: string): void {

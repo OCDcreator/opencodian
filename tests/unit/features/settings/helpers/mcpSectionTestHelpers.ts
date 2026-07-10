@@ -232,6 +232,8 @@ export function createPlugin(snapshot?: Partial<McpServerSnapshot>): McpSectionP
       authenticateMcp: jest.fn().mockResolvedValue({ status: 'connected' }),
       removeMcpAuth: jest.fn().mockResolvedValue({ success: true }),
       subscribeToCatalogUpdates: jest.fn().mockReturnValue(jest.fn()),
+      requireSdkCapability: jest.fn().mockReturnValue({ kind: 'available' }),
+      refreshSdkCapabilities: jest.fn().mockResolvedValue({ entries: [], generatedAt: 0 }),
     } as unknown as McpSectionPlugin['openCodeService'],
   };
 }

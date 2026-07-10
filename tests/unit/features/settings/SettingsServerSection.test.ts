@@ -198,6 +198,8 @@ function createPlugin(overrides?: Partial<ServerSectionPlugin['settings']['serve
       isServerProcessRunning: jest.fn().mockReturnValue(true),
       start: jest.fn().mockResolvedValue(undefined),
       stop: jest.fn().mockResolvedValue(undefined),
+      requireSdkCapability: jest.fn().mockReturnValue({ kind: 'available' }),
+      refreshSdkCapabilities: jest.fn().mockResolvedValue({ entries: [], generatedAt: 0 }),
     },
   } as unknown as ServerSectionPlugin;
 }

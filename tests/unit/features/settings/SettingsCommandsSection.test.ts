@@ -204,6 +204,8 @@ function createPlugin(options: {
           list: jest.fn().mockResolvedValue(options.runtimeCommands ?? []),
         },
       },
+      requireSdkCapability: jest.fn().mockReturnValue({ kind: 'available' }),
+      refreshSdkCapabilities: jest.fn().mockResolvedValue({ entries: [], generatedAt: 0 }),
     },
     opencodeConfigManager: {
       getCommandConfig: jest.fn().mockResolvedValue(options.projectCommands ?? {}),

@@ -312,6 +312,8 @@ function createPlugin(options?: {
       checkHealth: jest.fn().mockResolvedValue(true),
       start: jest.fn().mockResolvedValue(undefined),
       stop: jest.fn().mockResolvedValue(undefined),
+      requireSdkCapability: jest.fn().mockReturnValue({ kind: 'available' }),
+      refreshSdkCapabilities: jest.fn().mockResolvedValue({ entries: [], generatedAt: 0 }),
     },
   } as unknown as SecuritySectionPlugin;
 

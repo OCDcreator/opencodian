@@ -68,3 +68,7 @@ Added `attachTabbed(containerEl, secondaryTabId)` method for the tabbed settings
 - `status` — renders status display with polling interval
 
 The classic `attach()` method remains unchanged for the classic flat layout.
+
+### SDK capability disclosure
+
+该 section 现在调用 `renderCapabilityDisclosureRows()`（来自 `capabilityDisclosureRow.ts`）渲染只读能力状态行，显示该 section 拥有的 SDK capability 的 available / unsupported-by-server / disabled-by-user / unknown 状态与脱敏原因，并提供 Re-check 按钮。不重复已有配置编辑器。

@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- Security section owns permission config status, safety toggles, blocklist sync, and SDK capability disclosure together. */
 import type { App, ButtonComponent } from 'obsidian';
 import { Notice, Setting } from 'obsidian';
 
@@ -7,6 +8,7 @@ import type { PermissionAction, PermissionConfig } from '../../core/types/permis
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { createLogger, getVaultBasePath } from '../../shared';
+import { renderCapabilityDisclosureRows } from './capabilityDisclosureRow';
 import { OpencodeConfigModal } from './OpencodeConfigModal';
 import { OpenCodeProjectConfigHelpModal } from './OpenCodeProjectConfigHelpModal';
 import { isOpenCodeSettingsBackendActive } from './settingsBackendGuards';
@@ -58,6 +60,7 @@ export class SettingsSecuritySection {
     const vaultPath = getVaultBasePath(this.plugin.app);
     if (!vaultPath) {
       this.renderUnavailableConfigStatus(containerEl);
+      this.renderCapabilityDisclosure(containerEl);
       return headingEl;
     }
 
@@ -75,8 +78,25 @@ export class SettingsSecuritySection {
     this.renderAutoRestartSetting(containerEl);
     this.renderConfigFileSetting(containerEl, configManager);
     this.renderBlocklistSettings(containerEl, configManager);
+    this.renderCapabilityDisclosure(containerEl);
 
     return headingEl;
+  }
+
+  private renderCapabilityDisclosure(containerEl: HTMLElement): void {
+    const disclosureEl = containerEl.createDiv({ cls: 'opencodian-capability-disclosure-host' });
+    renderCapabilityDisclosureRows(
+      disclosureEl,
+      this.plugin,
+      ['v2.permission.request.list', 'v2.permission.saved.list'],
+      {
+        headingKey: 'settings.security.capabilityStatus',
+        labels: {
+          'v2.permission.request.list': 'capabilities.label.v2.permission.request.list',
+          'v2.permission.saved.list': 'capabilities.label.v2.permission.saved.list',
+        },
+      },
+    );
   }
 
   attachTabbed(containerEl: HTMLElement, secondaryTabId: string): void {

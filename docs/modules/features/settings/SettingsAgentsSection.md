@@ -186,3 +186,7 @@ Added `attachTabbed(containerEl, secondaryTabId)` method for the tabbed settings
 The classic `attach()` method now renders the same surfaces in a stacked layout.
 
 Project agent prompt, options, and task allowlist textareas use `TextareaSizeMemory` with stable settings keys so manual resize height survives settings reloads; `dispose()` cleans the attached observers.
+
+### SDK capability disclosure
+
+该 section 现在调用 `renderCapabilityDisclosureRows()`（来自 `capabilityDisclosureRow.ts`）渲染只读能力状态行，显示该 section 拥有的 SDK capability 的 available / unsupported-by-server / disabled-by-user / unknown 状态与脱敏原因，并提供 Re-check 按钮。不重复已有配置编辑器。
