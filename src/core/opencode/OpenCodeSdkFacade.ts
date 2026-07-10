@@ -285,6 +285,50 @@ export interface OpenCodeSdkFacadeOptionsProvider {
   (): CreateSdkClientOptions;
 }
 
+interface OpenCodeSdkConnectionIdentity {
+  readonly baseUrl: string;
+  readonly directory: string | undefined;
+  readonly authHeadersFingerprint: string;
+}
+
+function fingerprintAuthHeaders(headers: Record<string, string> | undefined, salt: number): string {
+  const canonicalHeaders = Object.entries(headers ?? {})
+    .map(([name, value]) => [name.toLowerCase(), value] as const)
+    .sort(([leftName, leftValue], [rightName, rightValue]) => {
+      const nameOrder = leftName.localeCompare(rightName);
+      return nameOrder !== 0 ? nameOrder : leftValue.localeCompare(rightValue);
+    });
+  let hash = salt;
+  for (const [name, value] of canonicalHeaders) {
+    const component = `${name}\u0000${value}\u0000`;
+    for (let index = 0; index < component.length; index += 1) {
+      hash = Math.imul(hash ^ component.charCodeAt(index), 16777619);
+    }
+  }
+  return (hash >>> 0).toString(36);
+}
+
+function createConnectionIdentity(
+  options: CreateSdkClientOptions,
+  salt: number,
+): OpenCodeSdkConnectionIdentity {
+  return {
+    baseUrl: options.baseUrl,
+    directory: options.directory,
+    authHeadersFingerprint: fingerprintAuthHeaders(options.authHeaders, salt),
+  };
+}
+
+function hasSameConnectionIdentity(
+  previous: OpenCodeSdkConnectionIdentity | null,
+  next: OpenCodeSdkConnectionIdentity,
+): boolean {
+  return previous !== null
+    && previous.baseUrl === next.baseUrl
+    && previous.directory === next.directory
+    && previous.authHeadersFingerprint === next.authHeadersFingerprint;
+}
+
 /**
  * Thin runtime façade over the OpenCode SDK client.
  *
@@ -320,6 +364,9 @@ export class OpenCodeSdkFacade implements OpenCodeSdkFacadeClient {
   readonly worktree: OpenCodeSdkFacadeNamespace<'worktree'>;
 
   private readonly namespaceCache = new Map<string, unknown>();
+  private readonly connectionSalt = Math.floor(Math.random() * 0xFFFFFFFF) >>> 0;
+  private connectionIdentity: OpenCodeSdkConnectionIdentity | null = null;
+  private connectionGeneration = 0;
 
   constructor(
     private readonly optionsProvider: OpenCodeSdkFacadeOptionsProvider,
@@ -353,6 +400,19 @@ export class OpenCodeSdkFacade implements OpenCodeSdkFacadeClient {
     this.worktree = this.createNamespaceFacade('worktree');
   }
 
+  getConnectionSignature(): string {
+    this.observeConnectionIdentity();
+    return `connection-${this.connectionGeneration}`;
+  }
+
+  private observeConnectionIdentity(): void {
+    const identity = createConnectionIdentity(this.optionsProvider(), this.connectionSalt);
+    if (!hasSameConnectionIdentity(this.connectionIdentity, identity)) {
+      this.connectionIdentity = identity;
+      this.connectionGeneration += 1;
+    }
+  }
+
   private getClient(): SdkOpencodeClient {
     return this.clientFactory(this.optionsProvider());
   }
@@ -375,6 +435,7 @@ export class OpenCodeSdkFacade implements OpenCodeSdkFacadeClient {
     functionPath: string[],
     args: unknown[],
   ): Promise<unknown> {
+    this.observeConnectionIdentity();
     const parentObject = this.resolveValue(parentPath);
     const rawValue = this.resolveValue(functionPath);
     if (typeof rawValue !== 'function' || !parentObject || typeof parentObject !== 'object') {

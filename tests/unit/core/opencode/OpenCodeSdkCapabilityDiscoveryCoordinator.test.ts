@@ -1,8 +1,15 @@
+import type { CreateSdkClientOptions } from '../../../../src/core/opencode/createSdkClient';
 import {
   OpenCodeSdkCapabilityDiscoveryCoordinator,
   type OpenCodeSdkCapabilityFacadeAccessor,
 } from '../../../../src/core/opencode/OpenCodeSdkCapabilityDiscoveryCoordinator';
 import type { OpenCodeSdkCapabilityDefinition } from '../../../../src/core/opencode/OpenCodeSdkCapabilityRegistry';
+import { OpenCodeSdkFacade } from '../../../../src/core/opencode/OpenCodeSdkFacade';
+import type { SdkOpencodeClient } from '../../../../src/core/opencode/sdkTypes';
+
+jest.mock('@opencode-ai/sdk/v2/client', () => ({
+  createOpencodeClient: jest.fn(),
+}), { virtual: true });
 
 /**
  * Build a tiny fake facade + a minimal registry subset so we can assert the
@@ -11,6 +18,7 @@ import type { OpenCodeSdkCapabilityDefinition } from '../../../../src/core/openc
  * call counts (state-changing probes must never invoke their action).
  */
 interface FakeFacade {
+  getConnectionSignature: jest.Mock;
   global: {
     health: jest.Mock;
   };
@@ -44,6 +52,7 @@ function buildFakeFacade(): { facade: FakeFacade; calls: Record<string, jest.Moc
   calls.presence.push(eventSubscribe);
 
   const facade: FakeFacade = {
+    getConnectionSignature: jest.fn(() => 'connection-1'),
     global: { health: globalHealth },
     v2: {
       health: { get: healthGet },
@@ -215,7 +224,128 @@ describe('OpenCodeSdkCapabilityDiscoveryCoordinator', () => {
     });
   });
 
+});
+
+describe('OpenCodeSdkCapabilityDiscoveryCoordinator snapshot caching', () => {
+  let accessor: OpenCodeSdkCapabilityFacadeAccessor;
+  let facade: FakeFacade;
+
+  beforeEach(() => {
+    ({ facade } = buildFakeFacade());
+    accessor = () => facade;
+  });
+
   describe('snapshot caching', () => {
+    it('keeps the latest refresh result when overlapping refreshes finish out of order', async () => {
+      let releaseFirstHealthProbe: ((value: { healthy: boolean; version: string }) => void) | undefined;
+      facade.global.health.mockImplementationOnce(() => new Promise<{ healthy: boolean; version: string }>((resolve) => {
+        releaseFirstHealthProbe = resolve;
+      }));
+      facade.v2.health.get.mockRejectedValueOnce(new Error('OpenCode SDK path v2.health.get is unavailable'));
+      const coordinator = new OpenCodeSdkCapabilityDiscoveryCoordinator(buildTestRegistry(), { getFacade: accessor });
+
+      const firstRefresh = coordinator.refresh();
+      expect(facade.global.health).toHaveBeenCalledTimes(1);
+
+      const latestRefresh = await coordinator.refresh();
+      expect(latestRefresh.entries.find((entry) => entry.id === 'v2.health.get')?.availability.kind)
+        .toBe('unsupported-by-server');
+
+      if (!releaseFirstHealthProbe) {
+        throw new Error('Expected the first global health probe to be pending.');
+      }
+      releaseFirstHealthProbe({ healthy: true, version: '1.17.18' });
+
+      expect(await firstRefresh).toBe(latestRefresh);
+      expect(coordinator.getSnapshot()).toBe(latestRefresh);
+    });
+
+    it('keeps the latest refresh result when an older probe observes a connection change', async () => {
+      let releaseFirstHealthProbe: ((value: { healthy: boolean; version: string }) => void) | undefined;
+      facade.global.health.mockImplementationOnce(() => new Promise<{ healthy: boolean; version: string }>((resolve) => {
+        releaseFirstHealthProbe = resolve;
+      }));
+      facade.v2.health.get.mockRejectedValueOnce(new Error('OpenCode SDK path v2.health.get is unavailable'));
+      let connectionSignature = 'connection-1';
+      facade.getConnectionSignature.mockImplementation(() => connectionSignature);
+      const coordinator = new OpenCodeSdkCapabilityDiscoveryCoordinator(buildTestRegistry(), { getFacade: accessor });
+
+      const firstRefresh = coordinator.refresh();
+      connectionSignature = 'connection-2';
+      const latestRefresh = await coordinator.refresh();
+
+      if (!releaseFirstHealthProbe) {
+        throw new Error('Expected the first global health probe to be pending.');
+      }
+      releaseFirstHealthProbe({ healthy: true, version: '1.17.18' });
+
+      expect(await firstRefresh).toBe(latestRefresh);
+      expect(coordinator.getSnapshot()).toBe(latestRefresh);
+      expect(latestRefresh.entries.find((entry) => entry.id === 'v2.health.get')?.availability.kind)
+        .toBe('unsupported-by-server');
+    });
+
+    it('discards an in-flight refresh after the connection changes and returns to its original signature', async () => {
+      let releaseHealthProbe: ((value: { healthy: boolean; version: string }) => void) | undefined;
+      facade.global.health.mockImplementationOnce(() => new Promise<{ healthy: boolean; version: string }>((resolve) => {
+        releaseHealthProbe = resolve;
+      }));
+      let connectionSignature = 'connection-1';
+      facade.getConnectionSignature.mockImplementation(() => connectionSignature);
+      const coordinator = new OpenCodeSdkCapabilityDiscoveryCoordinator(buildTestRegistry(), {
+        getFacade: accessor,
+        resolveGate: () => true,
+      });
+
+      const refreshPromise = coordinator.refresh();
+      connectionSignature = 'connection-2';
+      coordinator.invalidate();
+      connectionSignature = 'connection-1';
+      coordinator.invalidate();
+
+      if (!releaseHealthProbe) {
+        throw new Error('Expected the delayed global health probe to be pending.');
+      }
+      releaseHealthProbe({ healthy: true, version: '1.17.18' });
+
+      const snapshot = await refreshPromise;
+      const pty = snapshot.entries.find((entry) => entry.id === 'v2.pty.create');
+      expect(pty?.availability.kind).toBe('unknown');
+      expect(pty?.evidence).toEqual({ kind: 'skipped', reason: 'state-changing-no-probe' });
+    });
+
+    it('rebuilds presence-only evidence when the connection changes during an in-flight refresh', async () => {
+      let releaseHealthProbe: ((value: { healthy: boolean; version: string }) => void) | undefined;
+      facade.global.health.mockImplementationOnce(() => new Promise<{ healthy: boolean; version: string }>((resolve) => {
+        releaseHealthProbe = resolve;
+      }));
+      let connectionSignature = 'connection-1';
+      facade.getConnectionSignature.mockImplementation(() => connectionSignature);
+      const coordinator = new OpenCodeSdkCapabilityDiscoveryCoordinator(buildTestRegistry(), {
+        getFacade: accessor,
+        resolveGate: () => true,
+      });
+
+      const refreshPromise = coordinator.refresh();
+      expect(facade.global.health).toHaveBeenCalledTimes(1);
+
+      connectionSignature = 'connection-2';
+      if (!releaseHealthProbe) {
+        throw new Error('Expected the delayed global health probe to be pending.');
+      }
+      releaseHealthProbe({ healthy: true, version: '1.17.18' });
+
+      const snapshot = await refreshPromise;
+      const pty = snapshot.entries.find((entry) => entry.id === 'v2.pty.create');
+      const health = snapshot.entries.find((entry) => entry.id === 'v2.health.get');
+
+      expect(pty?.availability.kind).toBe('unknown');
+      expect(pty?.evidence).toEqual({ kind: 'skipped', reason: 'state-changing-no-probe' });
+      expect(health?.availability.kind).toBe('unknown');
+      expect(health?.evidence).toEqual({ kind: 'present' });
+      expect(coordinator.getSnapshot()).toBe(snapshot);
+    });
+
     it('getSnapshot returns the cached refresh result without re-probing', async () => {
       const coordinator = new OpenCodeSdkCapabilityDiscoveryCoordinator(buildTestRegistry(), { getFacade: accessor });
       const first = await coordinator.refresh();
@@ -274,12 +404,74 @@ describe('OpenCodeSdkCapabilityDiscoveryCoordinator', () => {
       expect(facade.v2.health.get).toHaveBeenCalledTimes(1);
     });
 
-    it('invalidate forces the next getSnapshot to rebuild', async () => {
+    it('preserves verified evidence when invalidate finds an unchanged runtime signature', async () => {
       const coordinator = new OpenCodeSdkCapabilityDiscoveryCoordinator(buildTestRegistry(), { getFacade: accessor });
       const first = await coordinator.refresh();
       coordinator.invalidate();
-      const rebuilt = coordinator.getSnapshot();
-      expect(rebuilt).not.toBe(first);
+      expect(coordinator.getSnapshot()).toBe(first);
     });
+  });
+});
+
+describe('OpenCodeSdkCapabilityDiscoveryCoordinator facade connection tracking', () => {
+  it('discards mixed probe evidence when a facade call crosses A to B to A without settings invalidation', async () => {
+    let releaseGlobalHealth: (() => void) | undefined;
+    let releaseV2Health: (() => void) | undefined;
+    let signalV2HealthStarted: (() => void) | undefined;
+    const v2HealthStarted = new Promise<void>((resolve) => {
+      signalV2HealthStarted = resolve;
+    });
+    const globalHealth = jest.fn(() => new Promise<{ healthy: boolean; version: string }>((resolve) => {
+      releaseGlobalHealth = () => resolve({ healthy: true, version: '1.17.18' });
+    }));
+    const v2Health = jest.fn(() => new Promise<{ status: string }>((resolve) => {
+      releaseV2Health = () => resolve({ status: 'ok' });
+      signalV2HealthStarted?.();
+    }));
+    let options: CreateSdkClientOptions = {
+      baseUrl: 'http://127.0.0.1:4196',
+      directory: '/vault-a',
+      authHeaders: { Authorization: 'Bearer initial-secret' },
+    };
+    const facade = new OpenCodeSdkFacade(
+      () => options,
+      () => ({
+        global: { health: globalHealth },
+        v2: {
+          health: { get: v2Health },
+          pty: { create: jest.fn() },
+        },
+      } as SdkOpencodeClient),
+    );
+    const registry: OpenCodeSdkCapabilityDefinition[] = [
+      { id: 'global.health', sdkPath: ['global', 'health'], category: 'top-level-runtime', surface: 'settings', risk: 'read-only', defaultGate: true, serverProbe: 'read', fallbackPolicy: 'legacy-fallback', description: 'Read global health.' },
+      { id: 'v2.health.get', sdkPath: ['v2', 'health', 'get'], category: 'v2-core', surface: 'settings', risk: 'read-only', defaultGate: true, serverProbe: 'read', fallbackPolicy: 'legacy-fallback', description: 'Read v2 health.' },
+      { id: 'v2.pty.create', sdkPath: ['v2', 'pty', 'create'], category: 'v2-runtime', surface: 'chat', risk: 'state-changing', defaultGate: false, serverProbe: 'none', fallbackPolicy: 'experimental-gated', minimumServerHint: 'OpenCode server 1.17+', description: 'Create a PTY.' },
+    ];
+    const coordinator = new OpenCodeSdkCapabilityDiscoveryCoordinator(registry, {
+      getFacade: () => facade,
+      resolveGate: () => true,
+    });
+
+    const refreshPromise = coordinator.refresh();
+    expect(globalHealth).toHaveBeenCalledTimes(1);
+
+    options = { ...options, directory: '/vault-b' };
+    if (!releaseGlobalHealth) {
+      throw new Error('Expected the global health probe to be pending.');
+    }
+    releaseGlobalHealth();
+    await v2HealthStarted;
+    expect(v2Health).toHaveBeenCalledTimes(1);
+
+    options = { ...options, directory: '/vault-a' };
+    if (!releaseV2Health) {
+      throw new Error('Expected the v2 health probe to be pending.');
+    }
+    releaseV2Health();
+
+    const snapshot = await refreshPromise;
+    expect(snapshot.entries.find((entry) => entry.id === 'v2.health.get')?.availability.kind).toBe('unknown');
+    expect(snapshot.entries.find((entry) => entry.id === 'v2.pty.create')?.availability.kind).toBe('unknown');
   });
 });

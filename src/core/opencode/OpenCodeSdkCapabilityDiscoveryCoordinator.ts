@@ -29,11 +29,15 @@ import {
 } from './OpenCodeSdkCapabilityRegistry';
 import {
   type OpenCodeSdkCapabilityAvailability,
+  type OpenCodeSdkCapabilityReasonCode,
   resolveCapabilityAvailability,
 } from './OpenCodeSdkCapabilityState';
 
 export type { OpenCodeSdkCapabilityDefinition } from './OpenCodeSdkCapabilityRegistry';
-export type { OpenCodeSdkCapabilityAvailability } from './OpenCodeSdkCapabilityState';
+export type {
+  OpenCodeSdkCapabilityAvailability,
+  OpenCodeSdkCapabilityReasonCode,
+} from './OpenCodeSdkCapabilityState';
 import { createLogger } from '../../shared';
 
 const logger = createLogger('OpenCodeSdkCapabilityDiscovery');
@@ -79,6 +83,7 @@ export interface OpenCodeUnsupportedCapabilityResult {
   readonly capabilityId: string;
   readonly kind: OpenCodeSdkCapabilityAvailability['kind'];
   readonly reason: string;
+  readonly reasonCode?: OpenCodeSdkCapabilityReasonCode;
   readonly minimumServerHint?: string;
 }
 
@@ -171,6 +176,9 @@ export class OpenCodeSdkCapabilityDiscoveryCoordinator {
   private readonly resolveGate: (id: string, definition: OpenCodeSdkCapabilityDefinition) => boolean;
   private readonly now: () => number;
   private cachedSnapshot: OpenCodeSdkCapabilitySnapshot | null = null;
+  private cachedRuntimeSignature: string | null = null;
+  private observedRuntimeSignature: string | null = null;
+  private refreshGeneration = 0;
 
   constructor(
     registry: readonly OpenCodeSdkCapabilityDefinition[] = getOpenCodeSdkCapabilityRegistry(),
@@ -189,6 +197,7 @@ export class OpenCodeSdkCapabilityDiscoveryCoordinator {
    * {@link refresh} completes.
    */
   getSnapshot(): OpenCodeSdkCapabilitySnapshot {
+    this.reconcileCachedSnapshot();
     if (this.cachedSnapshot) {
       return this.cachedSnapshot;
     }
@@ -220,6 +229,7 @@ export class OpenCodeSdkCapabilityDiscoveryCoordinator {
       capabilityId: id,
       kind: availability.kind,
       reason: availability.reason,
+      reasonCode: availability.reasonCode,
     };
     if (availability.kind === 'unsupported-by-server' && availability.minimumServerHint) {
       return { ...result, minimumServerHint: availability.minimumServerHint };
@@ -233,6 +243,9 @@ export class OpenCodeSdkCapabilityDiscoveryCoordinator {
    * encoded per-entry as `server: 'unknown'`.
    */
   async refresh(): Promise<OpenCodeSdkCapabilitySnapshot> {
+    const refreshGeneration = ++this.refreshGeneration;
+    const runtimeSignatureAtStart = this.resolveRuntimeSignature();
+    this.observedRuntimeSignature = runtimeSignatureAtStart;
     const generatedAt = this.now();
     const facade = this.getFacade();
     const globalHealthEvidence = await this.probeGlobalHealth(facade);
@@ -240,13 +253,63 @@ export class OpenCodeSdkCapabilityDiscoveryCoordinator {
       this.registry.map((definition) => this.buildEntry(definition, facade, generatedAt, globalHealthEvidence)),
     );
     const snapshot: OpenCodeSdkCapabilitySnapshot = { entries, generatedAt };
+    if (refreshGeneration !== this.refreshGeneration) {
+      return this.getSnapshot();
+    }
+    if (runtimeSignatureAtStart !== this.resolveRuntimeSignature()) {
+      return this.buildPresenceOnlySnapshot();
+    }
     this.cachedSnapshot = snapshot;
+    this.cachedRuntimeSignature = runtimeSignatureAtStart;
     return snapshot;
   }
 
-  /** Discard the cached snapshot (next `getSnapshot` rebuilds from presence). */
   invalidate(): void {
+    const currentSignature = this.resolveRuntimeSignature();
+    if (currentSignature === null) {
+      this.refreshGeneration += 1;
+      this.clearCachedSnapshot();
+      return;
+    }
+    if (currentSignature !== this.observedRuntimeSignature) {
+      this.refreshGeneration += 1;
+      this.observedRuntimeSignature = currentSignature;
+    }
+    if (this.cachedRuntimeSignature === null || currentSignature !== this.cachedRuntimeSignature) {
+      this.clearCachedSnapshot();
+    }
+  }
+
+  private clearCachedSnapshot(): void {
     this.cachedSnapshot = null;
+    this.cachedRuntimeSignature = null;
+  }
+
+  private reconcileCachedSnapshot(): void {
+    if (!this.cachedSnapshot || !this.cachedRuntimeSignature) {
+      return;
+    }
+    const currentSignature = this.resolveRuntimeSignature();
+    if (currentSignature === this.cachedRuntimeSignature) {
+      return;
+    }
+    this.clearCachedSnapshot();
+  }
+
+  private resolveRuntimeSignature(): string | null {
+    const facade = this.getFacade();
+    if (!facade || typeof facade !== 'object') {
+      return null;
+    }
+    const getConnectionSignature = (facade as { getConnectionSignature?: unknown }).getConnectionSignature;
+    if (typeof getConnectionSignature !== 'function') {
+      return null;
+    }
+    const gates = this.registry.map((definition) => [
+      definition.id,
+      this.resolveGate(definition.id, definition),
+    ]);
+    return `${getConnectionSignature.call(facade)}|${JSON.stringify(gates)}`;
   }
 
   private buildPresenceOnlySnapshot(): OpenCodeSdkCapabilitySnapshot {
@@ -273,6 +336,8 @@ export class OpenCodeSdkCapabilityDiscoveryCoordinator {
     });
     const snapshot: OpenCodeSdkCapabilitySnapshot = { entries, generatedAt };
     this.cachedSnapshot = snapshot;
+    this.cachedRuntimeSignature = this.resolveRuntimeSignature();
+    this.observedRuntimeSignature = this.cachedRuntimeSignature;
     return snapshot;
   }
 

@@ -15,8 +15,10 @@
   - `presence`：仅确认 SDK presence，不调用（适用于 stream / 诊断）。
   - `none`：state-changing / experimental entry 绝不作为 probe 调用，server 支持记为 `unknown`。
 - 失败分类（脱敏）：抛出 "is unavailable" → `server: false`（→ `unsupported-by-server`）；任何其他失败 → `server: 'unknown'`（→ 永不静默升级为 unsupported）。
-- `getSnapshot()` 在无缓存时同步构建 presence-only snapshot（不发起网络请求）；`refresh()` 异步探测全部 entry 并缓存结果；`invalidate()` 清除缓存。
+- `getSnapshot()` 在无缓存时同步构建 presence-only snapshot（不发起网络请求）；`refresh()` 异步探测全部 entry 并缓存结果；设置保存会调用 `invalidate()`，但 coordinator 仅在 facade 连接签名或 registry gate 签名实际变化时才丢弃已验证 evidence。若连接或 gate 在异步 probe 期间变化，旧 probe 结果不会写入新签名的 cache，而是立即回退为当前签名的 presence-only snapshot。重叠 refresh 使用单调代次，较早请求完成时只返回当前快照，不能覆盖较晚请求的证据。
 - `requireCapability(id)` 返回单个 entry 的 availability 或 typed redacted `OpenCodeUnsupportedCapabilityResult`，对未知 id 不抛异常。
+- 对 resolver 产生的固定 availability 原因，`requireCapability(id)` 同时透传 `reasonCode`；Settings 用 code 本地化固定解释，未知 capability 和其他动态脱敏 reason 不携带 code，保留原始安全文本。
+- 无关 UI/偏好保存会保留最近一次安全 health evidence，避免 Chat 入口从 `available` 错误降级为 `unknown`；endpoint、有效认证头或 capability gate 变化则会让下次读取降级为 presence-only 结果，等待安全 refresh。
 - 所有错误原因都脱敏为粗粒度 class label，绝不持久化或记录 token、credential 或原始错误体。
 
 ### Evidence contract

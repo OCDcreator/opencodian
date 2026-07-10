@@ -18,6 +18,7 @@
 - `gate` 优先于 `server === 'unknown'`：用户主动关闭某能力时，即使服务端支持不确定也应尊重用户意图。
 - safety 分类：`read-only`、`state-changing`、`experimental-action`、`stream`，仅作为元数据传入，不改变解析优先级。
 - `OpenCodeSdkCapabilityAvailabilityInput.server` 接受 `boolean | 'unknown'`，让协调器能把 transport 失败与确定的 endpoint-not-found 区分开。
+- 非 `available` 结果同时保留英文 `reason` 与稳定的 `reasonCode`：非 UI 调用方可安全使用诊断文本，Settings 则可按 code 本地化固定解释，避免依赖英文文本匹配。
 
 ## 与其他模块的交互
 

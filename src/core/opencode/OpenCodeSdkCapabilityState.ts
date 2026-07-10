@@ -36,16 +36,35 @@ export interface OpenCodeSdkCapabilityAvailabilityInput {
   readonly safety: OpenCodeSdkCapabilitySafety;
 }
 
+export type OpenCodeSdkCapabilityReasonCode =
+  | 'unsupported-by-sdk'
+  | 'unsupported-by-server'
+  | 'disabled-by-user'
+  | 'unknown';
+
 export type OpenCodeSdkCapabilityAvailability =
   | { readonly kind: 'available' }
-  | { readonly kind: 'unsupported-by-sdk'; readonly reason: string }
+  | {
+      readonly kind: 'unsupported-by-sdk';
+      readonly reason: string;
+      readonly reasonCode: 'unsupported-by-sdk';
+    }
   | {
       readonly kind: 'unsupported-by-server';
       readonly reason: string;
+      readonly reasonCode: 'unsupported-by-server';
       readonly minimumServerHint?: string;
     }
-  | { readonly kind: 'disabled-by-user'; readonly reason: string }
-  | { readonly kind: 'unknown'; readonly reason: string };
+  | {
+      readonly kind: 'disabled-by-user';
+      readonly reason: string;
+      readonly reasonCode: 'disabled-by-user';
+    }
+  | {
+      readonly kind: 'unknown';
+      readonly reason: string;
+      readonly reasonCode: 'unknown';
+    };
 
 const REASONS = {
   unsupportedBySdk: 'Capability is not present in the installed OpenCode SDK client.',
@@ -63,19 +82,35 @@ export function resolveCapabilityAvailability(
   input: OpenCodeSdkCapabilityAvailabilityInput,
 ): OpenCodeSdkCapabilityAvailability {
   if (!input.sdk) {
-    return { kind: 'unsupported-by-sdk', reason: REASONS.unsupportedBySdk };
+    return {
+      kind: 'unsupported-by-sdk',
+      reason: REASONS.unsupportedBySdk,
+      reasonCode: 'unsupported-by-sdk',
+    };
   }
 
   if (input.server === false) {
-    return { kind: 'unsupported-by-server', reason: REASONS.unsupportedByServer };
+    return {
+      kind: 'unsupported-by-server',
+      reason: REASONS.unsupportedByServer,
+      reasonCode: 'unsupported-by-server',
+    };
   }
 
   if (!input.gate) {
-    return { kind: 'disabled-by-user', reason: REASONS.disabledByUser };
+    return {
+      kind: 'disabled-by-user',
+      reason: REASONS.disabledByUser,
+      reasonCode: 'disabled-by-user',
+    };
   }
 
   if (input.server === 'unknown') {
-    return { kind: 'unknown', reason: REASONS.unknown };
+    return {
+      kind: 'unknown',
+      reason: REASONS.unknown,
+      reasonCode: 'unknown',
+    };
   }
 
   return { kind: 'available' };

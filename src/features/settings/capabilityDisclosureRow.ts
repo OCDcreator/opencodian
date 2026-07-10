@@ -18,6 +18,7 @@ import { Setting } from 'obsidian';
 
 import type {
   OpenCodeSdkCapabilityAvailability,
+  OpenCodeSdkCapabilityReasonCode,
   OpenCodeUnsupportedCapabilityResult,
 } from '../../core/opencode/OpenCodeSdkCapabilityDiscoveryCoordinator';
 import { t, type TranslationKey } from '../../i18n';
@@ -45,7 +46,7 @@ export function describeCapabilityAvailability(
     return undefined;
   }
 
-  const details = [result.reason];
+  const details = [localizeCapabilityReason(result)];
   if ('minimumServerHint' in result && typeof result.minimumServerHint === 'string') {
     details.push(result.minimumServerHint);
   }
@@ -76,6 +77,23 @@ const STATUS_LABEL_KEYS: Record<AvailabilityKind, TranslationKey> = {
   'unsupported-by-sdk': 'capabilities.status.unsupportedBySdk',
   unknown: 'capabilities.status.unknown',
 };
+
+const AVAILABILITY_REASON_KEYS: Record<OpenCodeSdkCapabilityReasonCode, TranslationKey> = {
+  'unsupported-by-sdk': 'capabilities.reason.unsupportedBySdk',
+  'unsupported-by-server': 'capabilities.reason.unsupportedByServer',
+  'disabled-by-user': 'capabilities.reason.disabledByUser',
+  unknown: 'capabilities.reason.unknown',
+};
+
+function localizeCapabilityReason(
+  result: Exclude<OpenCodeSdkCapabilityAvailability, { readonly kind: 'available' }>
+    | OpenCodeUnsupportedCapabilityResult,
+): string {
+  if (result.reasonCode) {
+    return t(AVAILABILITY_REASON_KEYS[result.reasonCode]);
+  }
+  return result.reason;
+}
 
 function toneForKind(kind: AvailabilityKind): CapabilityStatusTone {
   if (kind === 'available') {

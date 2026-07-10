@@ -8,6 +8,7 @@
 `OpenCodeSdkFacade` 是覆盖 OpenCode SDK v2 全 namespace 的薄包装层。它不改变 SDK 的 namespace 结构，只统一做三件事：
 
 - 以当前 `baseUrl` / 认证头 / `directory` 作用域创建客户端
+- 提供不含连接或认证原文的内存代次，供 capability discovery 判断已缓存的服务端证据是否仍对应当前连接
 - 兼容 unwrap 直接数据与 `{ data }` 形状
 - 把非标准错误统一归一化成 `Error`
 - 在 `app.skills()` 结果上附带同一 app namespace 的 `app.agents()` promise sidecar，供 chat composer catalog 在不加厚 view host 的情况下复用 runtime agent truth
@@ -19,6 +20,7 @@
 
 - 顶层与嵌套 namespace 都通过递归 `Proxy` 暴露，例如 `global.syncEvent.subscribe()`、`mcp.auth.start()`、`provider.oauth.callback()`。
 - 每次方法调用都会重新解析当前客户端实例，因此 `OpenCodeService` 更新 `baseUrl`、认证或 `directory` 后不需要重建整个 façade。
+- `getConnectionSignature()` 仅返回 opaque 内存代次；连接身份仅在 facade 私有内存中比较，URL、directory 和所有认证 header 的大小写无关 salted fingerprint 均不会被返回、持久化或记录到日志。每次 SDK 调用也会观察该身份，因而异步 probe 中经过临时连接后即使回到原配置，也不会把混合 evidence 当作原连接结果缓存。任何有效 endpoint、directory 或认证变化都会令 capability coordinator 下次读取时重建 presence-only snapshot。
 - `extractSdkErrorMessage()` / `describeSdkError()` 与 `normalizeSdkError()` 共用同一套 message/status 解析规则；`OpenCodeServiceDiagnostics` 也直接复用这套 helper，而不是在 service/local owner 里重复定义。
 - `OpenCodeAppCatalogSidecar.getAttachedOpenCodeAppAgents()` 只读取 façade 在 `app.skills()` 返回值上附带的不可枚举 sidecar；如果 `app.agents()` 失败，sidecar promise 会安全回退为空数组，不影响原始 skills 结果。
 - `OpenCodeServiceDiagnostics` 额外集中处理 transient connectivity suppression、assistant finalization debug payload 与 probe/assistant error 文本；它仍然使用 `OpenCodeService` logger 名称，避免改变现有日志来源标签。

@@ -5,6 +5,7 @@ import type {
   OpenCodeSdkCapabilityAvailability,
   OpenCodeUnsupportedCapabilityResult,
 } from '../../../../src/core/opencode/OpenCodeSdkCapabilityDiscoveryCoordinator';
+import { resolveCapabilityAvailability } from '../../../../src/core/opencode/OpenCodeSdkCapabilityState';
 import { renderCapabilityDisclosureRows } from '../../../../src/features/settings/capabilityDisclosureRow';
 import { setLocale, t } from '../../../../src/i18n';
 import type OpenCodianPlugin from '../../../../src/main';
@@ -229,6 +230,71 @@ describe('renderCapabilityDisclosureRows', () => {
     expect(serverRow.buttons[0]!.control.buttonEl.getAttribute('disabled')).toBe('true');
     // Reason text is rendered.
     expect(serverRow.desc).toContain('missing endpoint');
+  });
+
+  it('localizes fixed availability reasons without replacing dynamic redacted detail', () => {
+    setLocale('zh');
+    const requireImpl = (id: string): RequireResult => {
+      switch (id) {
+        case 'cap.sdk':
+          return resolveCapabilityAvailability({
+            sdk: false,
+            server: true,
+            gate: true,
+            safety: 'read-only',
+          });
+        case 'cap.server':
+          return resolveCapabilityAvailability({
+            sdk: true,
+            server: false,
+            gate: true,
+            safety: 'read-only',
+          });
+        case 'cap.gate':
+          return resolveCapabilityAvailability({
+            sdk: true,
+            server: true,
+            gate: false,
+            safety: 'experimental-action',
+          });
+        case 'cap.unknown':
+          return resolveCapabilityAvailability({
+            sdk: true,
+            server: 'unknown',
+            gate: true,
+            safety: 'read-only',
+          });
+        case 'cap.dynamic':
+          return {
+            supported: false,
+            capabilityId: id,
+            kind: 'unsupported-by-server',
+            reason: 'redacted server-specific detail',
+            minimumServerHint: 'OpenCode server 1.17+',
+          };
+        default:
+          throw new Error(`unexpected id ${id}`);
+      }
+    };
+    const { plugin } = createPlugin(requireImpl, () => Promise.resolve({ entries: [], generatedAt: 0 }));
+
+    const containerEl = document.createElement('div');
+    renderCapabilityDisclosureRows(
+      containerEl,
+      plugin as unknown as OpenCodianPlugin,
+      ['cap.sdk', 'cap.server', 'cap.gate', 'cap.unknown', 'cap.dynamic'],
+    );
+
+    expect(findSettingByName('cap.sdk')!.desc).toContain(t('capabilities.reason.unsupportedBySdk'));
+    expect(findSettingByName('cap.server')!.desc).toContain(t('capabilities.reason.unsupportedByServer'));
+    const gateRow = findSettingByName('cap.gate')!;
+    expect(gateRow.desc).toContain(t('capabilities.reason.disabledByUser'));
+    expect(gateRow.desc).not.toContain('Capability is disabled by the user opt-in gate.');
+    expect(findSettingByName('cap.unknown')!.desc).toContain(t('capabilities.reason.unknown'));
+
+    const dynamicRow = findSettingByName('cap.dynamic')!;
+    expect(dynamicRow.desc).toContain('redacted server-specific detail');
+    expect(dynamicRow.desc).toContain('OpenCode server 1.17+');
   });
 
   it('calls refreshSdkCapabilities when Re-check is clicked and re-renders', async () => {

@@ -20,7 +20,7 @@ describe('OpenCodeSdkCapabilityState', () => {
     it('returns disabled-by-user when gate is false for experimental-action', () => {
       expect(
         resolveCapabilityAvailability({ sdk: true, server: true, gate: false, safety: 'experimental-action' }),
-      ).toMatchObject({ kind: 'disabled-by-user' });
+      ).toMatchObject({ kind: 'disabled-by-user', reasonCode: 'disabled-by-user' });
     });
 
     it('returns unsupported-by-sdk when sdk is false', () => {
