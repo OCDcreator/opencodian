@@ -136,3 +136,14 @@ When runtime status fetch fails:
 - Overview meta cards use stable DOM contracts under `.opencodian-formatter-overview-meta-*`
 - Card content is split into label / primary value / optional description / optional pills so CSS can improve scanability without changing config or runtime semantics
 - Combined runtime health intentionally stays read-only and separated from project config state; pill colors communicate runtime success/failure, while formatter/LSP config editors remain the place for project intent
+
+## Tab Hierarchy Contract
+
+- The three secondary tabs now share one explicit settings rhythm instead of mixing summary and editor weight ad hoc.
+- `overview` is summary-first. Its shell uses `.opencodian-formatter-overview-shell`, and high-value readback sits inside `.opencodian-formatter-overview-summary-band`; it does not mount formatter/LSP mode dropdowns or editor-heavy builtin/custom sections.
+- `formatter` and `lsp` are structurally parallel. Their tabbed and classic bodies now route through `.opencodian-formatter-tab-config-shell`, with a top `.opencodian-formatter-tab-summary-band` for mode/runtime intent and a lower `.opencodian-formatter-tab-content-shell` for editable content.
+- Editable content stays split by responsibility:
+  - `.opencodian-formatter-builtin-list-shell` for builtin row-card lists and inline override editors
+  - `.opencodian-formatter-custom-list-shell` for custom formatter/LSP entry lists
+  - `.opencodian-formatter-advanced-editor-shell` for the JSON editor panel
+- Builtin override editors remain inline field groups inside the row owner. `.opencodian-formatter-builtin-editor-shell` is a structural alias on the existing override-field container, not a new nested-card surface.

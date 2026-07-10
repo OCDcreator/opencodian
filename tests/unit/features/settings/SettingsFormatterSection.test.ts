@@ -448,6 +448,40 @@ describe('SettingsFormatterSection attachTabbed (tabbed layout)', () => {
     expect(headings[0]?.textContent).toBe(t('settings.formatter.tab.overview'));
   });
 
+  it('keeps overview summary-first without rendering editor-heavy formatter or lsp blocks', async () => {
+    const { plugin } = createPlugin({
+      formatterConfig: {
+        prettier: { cmd: ['prettier', '--write'] },
+      },
+      lspConfig: {
+        deno: { cmd: ['deno', 'lsp'], extensions: ['.ts'] },
+      },
+      runtimeStatus: [{ name: 'prettier', extensions: ['.ts'], enabled: true }],
+      lspRuntimeStatus: [{ id: 'deno', root: '/vault', status: 'ready' }],
+    });
+    const section = new SettingsFormatterSection({
+      plugin,
+      createSectionHeading,
+      requestDisplayRefresh: displayRefresh,
+    });
+    const containerEl = document.createElement('div');
+    document.body.appendChild(containerEl);
+
+    section.attachTabbed(containerEl, 'overview');
+    await flushPromises();
+
+    expect(containerEl.querySelector('.opencodian-formatter-overview-summary-band')).not.toBeNull();
+    expect(containerEl.querySelector('.opencodian-formatter-tab-config-shell')).toBeNull();
+    expect(containerEl.querySelector('.opencodian-formatter-builtin-list-shell')).toBeNull();
+    expect(containerEl.querySelector('.opencodian-formatter-custom-list-shell')).toBeNull();
+    expect(dropdownRecords.map((record) => record.name)).not.toContain(
+      t('settings.formatter.config.modeSwitch'),
+    );
+    expect(dropdownRecords.map((record) => record.name)).not.toContain(
+      t('settings.formatter.lsp.modeSwitch'),
+    );
+  });
+
   it('renders formatter block for formatter tab', () => {
     const { plugin } = createPlugin();
     const section = new SettingsFormatterSection({
@@ -538,6 +572,44 @@ describe('SettingsFormatterSection builtin list search', () => {
     expect(inputEl.value).toBe('prettier');
     expect(getBuiltinRow(containerEl, 'prettier').hidden).toBe(false);
     expect(getBuiltinRow(containerEl, 'gofmt').hidden).toBe(true);
+  });
+
+  it('gives formatter and lsp tabs the same top-level shell rhythm', async () => {
+    const { plugin } = createPlugin({
+      formatterConfig: {
+        prettier: { cmd: ['prettier', '--write'] },
+      },
+      lspConfig: {
+        deno: { cmd: ['deno', 'lsp'], extensions: ['.ts'] },
+      },
+      runtimeStatus: [{ name: 'prettier', extensions: ['.ts'], enabled: true }],
+      lspRuntimeStatus: [{ id: 'deno', root: '/vault', status: 'ready' }],
+    });
+    const section = new SettingsFormatterSection({
+      plugin,
+      createSectionHeading,
+      requestDisplayRefresh: displayRefresh,
+    });
+
+    const formatterContainerEl = document.createElement('div');
+    document.body.appendChild(formatterContainerEl);
+    section.attachTabbed(formatterContainerEl, 'formatter');
+    await flushPromises();
+
+    expect(formatterContainerEl.querySelector('.opencodian-formatter-tab-heading')).not.toBeNull();
+    expect(formatterContainerEl.querySelector('.opencodian-formatter-tab-summary-band')).not.toBeNull();
+    expect(formatterContainerEl.querySelector('.opencodian-formatter-tab-config-shell')).not.toBeNull();
+    expect(formatterContainerEl.querySelector('.opencodian-formatter-builtin-list-shell')).not.toBeNull();
+
+    const lspContainerEl = document.createElement('div');
+    document.body.appendChild(lspContainerEl);
+    section.attachTabbed(lspContainerEl, 'lsp');
+    await flushPromises();
+
+    expect(lspContainerEl.querySelector('.opencodian-formatter-tab-heading')).not.toBeNull();
+    expect(lspContainerEl.querySelector('.opencodian-formatter-tab-summary-band')).not.toBeNull();
+    expect(lspContainerEl.querySelector('.opencodian-formatter-tab-config-shell')).not.toBeNull();
+    expect(lspContainerEl.querySelector('.opencodian-formatter-builtin-list-shell')).not.toBeNull();
   });
 
   it('filters builtin language server rows and supports keyboard selection from fuzzy suggestions', async () => {
@@ -712,6 +784,31 @@ describe('SettingsFormatterSection builtin list search', () => {
     expect(getBuiltinRow(containerEl, 'gofmt').querySelectorAll('.opencodian-builtin-row-extensions')).toHaveLength(1);
     expect(getBuiltinRow(containerEl, 'gofmt').querySelector('.opencodian-formatter-row-field')).not.toBeNull();
     expect(getBuiltinRow(containerEl, 'gofmt').querySelector('.opencodian-formatter-row-control')).not.toBeNull();
+});
+
+  it('keeps builtin formatter rows compact like settings rows instead of large object cards', async () => {
+    const { plugin } = createPlugin({
+      formatterConfig: {
+        gofmt: { disabled: false },
+      },
+      runtimeStatus: [],
+    });
+    const section = new SettingsFormatterSection({
+      plugin,
+      createSectionHeading,
+      requestDisplayRefresh: displayRefresh,
+    });
+    const containerEl = document.createElement('div');
+    document.body.appendChild(containerEl);
+
+    section.attachTabbed(containerEl, 'formatter');
+    await flushPromises();
+
+    const rowEl = getBuiltinRow(containerEl, 'gofmt');
+    expect(rowEl.querySelector('.setting-item-name .opencodian-builtin-row-status-chip')).not.toBeNull();
+    expect(rowEl.querySelector('.opencodian-builtin-row-meta')?.textContent).toContain('.go');
+    expect(rowEl.querySelector('.opencodian-formatter-row-field')).not.toBeNull();
+    expect(rowEl.querySelector('.opencodian-formatter-row-control')).not.toBeNull();
   });
 
   it('collapses builtin formatter override fields by clicking the card', async () => {
@@ -851,6 +948,36 @@ describe('SettingsFormatterSection builtin list search', () => {
     expect(rowEl.getAttribute('aria-expanded')).toBe('false');
     expect(fieldsEl?.hidden).toBe(true);
   });
+});
+
+it('keeps expanded builtin editors inline inside the row shell instead of nested cards', async () => {
+  const { plugin } = createPlugin({
+    formatterConfig: {
+      prettier: {
+        cmd: ['prettier', '--write', '$FILE'],
+        extensions: ['.js', '.ts', '.md'],
+      },
+    },
+    runtimeStatus: [],
+  });
+  const section = new SettingsFormatterSection({
+    plugin,
+    createSectionHeading,
+    requestDisplayRefresh: displayRefresh,
+  });
+  const containerEl = document.createElement('div');
+  document.body.appendChild(containerEl);
+
+  section.attachTabbed(containerEl, 'formatter');
+  await flushPromises();
+
+  const rowEl = getBuiltinRow(containerEl, 'prettier');
+  rowEl.click();
+  const editorShellEl = rowEl.querySelector('.opencodian-formatter-builtin-editor-shell');
+
+  expect(editorShellEl).not.toBeNull();
+  expect(editorShellEl?.closest('.opencodian-formatter-builtin-row')).toBe(rowEl);
+  expect(editorShellEl?.classList.contains('opencodian-formatter-field-group')).toBe(true);
 });
 
 describe('SettingsFormatterSection LSP settings', () => {
@@ -2098,6 +2225,7 @@ describe('SettingsFormatterSection CSS contract', () => {
     expect(builtinRowRule).toContain('var(--opencodian-settings-form-row-bg');
     expect(builtinRowRule).not.toContain('var(--opencodian-settings-object-bg');
     expect(builtinRowRule).toContain('box-shadow: none');
+    expect(builtinRowRule).toContain('padding: 9px 12px');
     expect(fieldsRule).toContain('background: transparent');
     expect(fieldsRule).toContain('border-top: 1px solid');
     expect(envRowRule).toContain('var(--opencodian-settings-inline-bg');
@@ -2119,11 +2247,12 @@ describe('SettingsFormatterSection CSS contract', () => {
     expect(formatterSiblingRule).toContain('var(--opencodian-settings-space-md');
     expect(formatterRowRule).toContain('var(--opencodian-settings-space-lg');
     expect(formatterFirstRowRule).toContain('var(--opencodian-settings-space-lg');
-    expect(formatterRowFieldRule).toContain('minmax(180px, 260px)');
+    expect(formatterRowFieldRule).toContain('minmax(220px, 260px)');
     expect(formatterRowFieldRule).toContain('background: transparent');
     expect(formatterBuiltinNameRule).toContain('inline-flex');
     expect(formatterBuiltinNameRule).toContain('flex-wrap: wrap');
     expect(formatterControlRule).toContain('260px');
+    expect(formatterRowRule).toContain('grid-template-columns: minmax(0, 1fr) minmax(220px, 260px)');
     expect(formatterCss).not.toContain('linear-gradient');
     expect(formatterCss).not.toContain('backdrop-filter');
     expect(formatterCss).not.toContain('transform: translateY');

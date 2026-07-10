@@ -124,6 +124,7 @@ export class SettingsConversationSection {
   private projectCompactionReservedControl: TextValueControl | null = null;
   private projectShareModeControl: DropdownValueControl | null = null;
   private shareModeDiagnosticValueEl: HTMLElement | null = null;
+  private shareHostDiagnosticStatusEl: HTMLElement | null = null;
   private sharedSessionsContainerEl: HTMLElement | null = null;
   private projectConfigWatcher: ProjectConfigFileWatcher | null = null;
   private currentCompactionState: {
@@ -158,6 +159,7 @@ export class SettingsConversationSection {
     this.projectCompactionReservedControl = null;
     this.projectShareModeControl = null;
     this.shareModeDiagnosticValueEl = null;
+    this.shareHostDiagnosticStatusEl = null;
     this.sharedSessionsContainerEl = null;
   }
 
@@ -687,12 +689,26 @@ export class SettingsConversationSection {
     const detailsEl = containerEl.createEl('details', {
       cls: 'opencodian-share-troubleshooting',
     });
-    detailsEl.createEl('summary', {
+    const summaryEl = detailsEl.createEl('summary', {
       cls: 'opencodian-share-troubleshooting-summary',
+    });
+    summaryEl.createSpan({
+      cls: 'opencodian-share-troubleshooting-label',
       text: t('settings.conversation.share.troubleshooting.summary'),
     });
+    const statusEl = summaryEl.createSpan({
+      cls: 'opencodian-share-troubleshooting-status',
+      text: t('settings.conversation.share.diagnostics.notChecked'),
+      attr: { 'data-state': 'pending' },
+    });
+    this.shareHostDiagnosticStatusEl = statusEl;
     const diagnosticsEl = detailsEl.createDiv({
       cls: 'opencodian-share-diagnostics',
+    });
+    const checkButtonEl = diagnosticsEl.createEl('button', {
+      cls: 'opencodian-share-diagnostics-button',
+      text: t('settings.conversation.share.diagnostics.check'),
+      attr: { type: 'button', 'data-action': 'check-share-diagnostics' },
     });
     const rowsEl = diagnosticsEl.createDiv({
       cls: 'opencodian-share-diagnostics-rows',
@@ -713,17 +729,13 @@ export class SettingsConversationSection {
       value: t('settings.conversation.share.diagnostics.notChecked'),
       state: 'pending',
     });
-    const checkButtonEl = diagnosticsEl.createEl('button', {
-      cls: 'opencodian-share-diagnostics-button',
-      text: t('settings.conversation.share.diagnostics.check'),
-      attr: { type: 'button', 'data-action': 'check-share-diagnostics' },
-    });
     checkButtonEl.addEventListener('click', () => {
       void (async () => {
         if (!this.canSaveOpenCodeProjectConversationConfig()) {
           return;
         }
         checkButtonEl.disabled = true;
+        this.setShareDiagnosticValue(statusEl, t('settings.conversation.share.diagnostics.checking'), 'pending');
         this.setShareDiagnosticValue(modeValueEl, this.getShareModeDiagnosticText(), this.currentShareMode === 'disabled' ? 'error' : 'ok');
         this.setShareDiagnosticValue(serviceValueEl, t('settings.conversation.share.diagnostics.checking'), 'pending');
         this.setShareDiagnosticValue(networkValueEl, t('settings.conversation.share.diagnostics.checking'), 'pending');
@@ -741,6 +753,16 @@ export class SettingsConversationSection {
           );
           this.setShareDiagnosticValue(
             networkValueEl,
+            shareHost.reachable
+              ? t('settings.conversation.share.diagnostics.networkOk')
+              : t('settings.conversation.share.diagnostics.networkError', {
+                host: OPENCODE_PUBLIC_SHARE_HOST,
+                detail: shareHost.detail ?? t('settings.conversation.share.diagnostics.networkUnknownError'),
+              }),
+            shareHost.reachable ? 'ok' : 'warning',
+          );
+          this.setShareDiagnosticValue(
+            statusEl,
             shareHost.reachable
               ? t('settings.conversation.share.diagnostics.networkOk')
               : t('settings.conversation.share.diagnostics.networkError', {

@@ -110,13 +110,16 @@ export class SettingsProjectAgentEditor {
       containerEl.style.minHeight = `${measuredHeight}px`;
     }
     containerEl.replaceChildren();
-    const layoutEl = containerEl.createDiv({ cls: 'opencodian-agent-editor-layout' });
+    const layoutEl = containerEl.createDiv({
+      cls: 'opencodian-agent-editor-layout opencodian-agent-editor-card',
+    });
+    const contentEl = layoutEl.createDiv({ cls: 'opencodian-agent-editor-card-content' });
     const {
       advancedBodyEl,
       behaviorBodyEl,
       identityBodyEl,
       modelBodyEl,
-    } = this.createEditorGroups(layoutEl);
+    } = this.createEditorGroups(contentEl);
     const mergedAgentById = new Map((mergedAgents ?? []).map((agent) => [agent.id, agent]));
     const projectAgentIds = Object.keys(projectAgents).sort((left, right) => left.localeCompare(right));
     const state = this.createProjectAgentEditorState('', undefined);
@@ -163,10 +166,9 @@ export class SettingsProjectAgentEditor {
       syncDeleteButton();
     };
 
-    new Setting(identityBodyEl)
+    this.createEditorSetting(identityBodyEl)
       .setName(t('settings.agents.editor.select.name'))
       .setDesc(t('settings.agents.editor.select.desc'))
-      .setClass('opencodian-agent-editor-row')
       .addDropdown((dropdown) => {
         dropdown.addOption('', t('settings.agents.editor.select.newAgent'));
         for (const agentId of projectAgentIds) {
@@ -209,10 +211,9 @@ export class SettingsProjectAgentEditor {
         });
       });
 
-    new Setting(identityBodyEl)
+    this.createEditorSetting(identityBodyEl)
       .setName(t('settings.agents.editor.id.name'))
       .setDesc(t('settings.agents.editor.id.desc'))
-      .setClass('opencodian-agent-editor-row')
       .addText((text) => {
         idControl = text;
         text
@@ -223,10 +224,9 @@ export class SettingsProjectAgentEditor {
           });
       });
 
-    new Setting(identityBodyEl)
+    this.createEditorSetting(identityBodyEl)
       .setName(t('settings.agents.editor.mode.name'))
       .setDesc(t('settings.agents.editor.mode.desc'))
-      .setClass('opencodian-agent-editor-row')
       .addDropdown((dropdown) => {
         modeDropdown = dropdown;
         dropdown
@@ -239,10 +239,9 @@ export class SettingsProjectAgentEditor {
           });
       });
 
-    new Setting(identityBodyEl)
+    this.createEditorSetting(identityBodyEl)
       .setName(t('settings.agents.editor.disable.name'))
       .setDesc(t('settings.agents.editor.disable.desc'))
-      .setClass('opencodian-agent-editor-row')
       .addToggle((toggle) => {
         disableControl = toggle;
         toggle
@@ -252,10 +251,9 @@ export class SettingsProjectAgentEditor {
           });
       });
 
-    new Setting(identityBodyEl)
+    this.createEditorSetting(identityBodyEl)
       .setName(t('settings.agents.editor.description.name'))
       .setDesc(t('settings.agents.editor.description.desc'))
-      .setClass('opencodian-agent-editor-row')
       .addText((text) => {
         descriptionControl = text;
         text
@@ -266,10 +264,9 @@ export class SettingsProjectAgentEditor {
           });
       });
 
-    const promptSetting = new Setting(behaviorBodyEl)
+    const promptSetting = this.createEditorSetting(behaviorBodyEl)
       .setName(t('settings.agents.editor.prompt.name'))
       .setDesc(t('settings.agents.editor.prompt.desc'))
-      .setClass('opencodian-agent-editor-row')
       .addTextArea((text) => {
         promptControl = text;
         text
@@ -282,10 +279,9 @@ export class SettingsProjectAgentEditor {
       });
     promptSetting.settingEl.addClass('opencodian-agent-editor-row-textarea');
 
-    new Setting(modelBodyEl)
+    this.createEditorSetting(modelBodyEl)
       .setName(t('settings.agents.editor.model.name'))
       .setDesc(t('settings.agents.editor.model.desc'))
-      .setClass('opencodian-agent-editor-row')
       .addText((text) => {
         modelControl = text;
         text
@@ -296,10 +292,9 @@ export class SettingsProjectAgentEditor {
           });
       });
 
-    new Setting(modelBodyEl)
+    this.createEditorSetting(modelBodyEl)
       .setName(t('settings.agents.editor.temperature.name'))
       .setDesc(t('settings.agents.editor.temperature.desc'))
-      .setClass('opencodian-agent-editor-row')
       .addText((text) => {
         temperatureControl = text;
         text
@@ -310,10 +305,9 @@ export class SettingsProjectAgentEditor {
           });
       });
 
-    new Setting(modelBodyEl)
+    this.createEditorSetting(modelBodyEl)
       .setName(t('settings.agents.editor.topP.name'))
       .setDesc(t('settings.agents.editor.topP.desc'))
-      .setClass('opencodian-agent-editor-row')
       .addText((text) => {
         topPControl = text;
         text
@@ -324,10 +318,9 @@ export class SettingsProjectAgentEditor {
           });
       });
 
-    new Setting(modelBodyEl)
+    this.createEditorSetting(modelBodyEl)
       .setName(t('settings.agents.editor.steps.name'))
       .setDesc(t('settings.agents.editor.steps.desc'))
-      .setClass('opencodian-agent-editor-row')
       .addText((text) => {
         stepsControl = text;
         text
@@ -338,10 +331,9 @@ export class SettingsProjectAgentEditor {
           });
       });
 
-    new Setting(advancedBodyEl)
+    this.createEditorSetting(advancedBodyEl)
       .setName(t('settings.agents.editor.color.name'))
       .setDesc(t('settings.agents.editor.color.desc'))
-      .setClass('opencodian-agent-editor-row')
       .addText((text) => {
         colorControl = text;
         text
@@ -398,6 +390,31 @@ export class SettingsProjectAgentEditor {
       }
       containerEl.style.minHeight = previousMinHeight;
     });
+  }
+
+  private createEditorSetting(containerEl: HTMLElement): Setting {
+    return this.createClassedSetting(
+      containerEl,
+      'opencodian-agent-editor-row opencodian-agent-editor-field',
+    );
+  }
+
+  private createActionsSetting(containerEl: HTMLElement): Setting {
+    return this.createClassedSetting(
+      containerEl,
+      'opencodian-agent-editor-actions opencodian-agent-editor-footer',
+    );
+  }
+
+  private createClassedSetting(containerEl: HTMLElement, className: string): Setting {
+    const setting = new Setting(containerEl);
+    for (const cls of className.split(' ')) {
+      if (!cls) {
+        continue;
+      }
+      setting.settingEl.addClass(cls);
+    }
+    return setting;
   }
 
   private createProjectAgentEditorState(
@@ -476,7 +493,7 @@ export class SettingsProjectAgentEditor {
 
     if (!collapsible) {
       const groupEl = containerEl.createDiv({
-        cls: 'opencodian-agent-editor-group',
+        cls: 'opencodian-agent-editor-group opencodian-agent-editor-field-group',
         attr: { 'data-group': key },
       });
       const headerEl = groupEl.createDiv({ cls: 'opencodian-agent-editor-group-header' });
@@ -491,7 +508,11 @@ export class SettingsProjectAgentEditor {
       return groupEl.createDiv({ cls: 'opencodian-agent-editor-group-body' });
     }
     const detailsEl = containerEl.createEl('details', {
-      cls: 'opencodian-agent-editor-group opencodian-agent-editor-group-collapsible',
+      cls: [
+        'opencodian-agent-editor-group',
+        'opencodian-agent-editor-field-group',
+        'opencodian-agent-editor-group-collapsible',
+      ].join(' '),
       attr: { 'data-group': key },
     });
     detailsEl.open = defaultOpen;
@@ -609,10 +630,9 @@ export class SettingsProjectAgentEditor {
     state: ProjectAgentEditorState,
     setTaskAllowlistControl: (control: TextLikeControl) => void,
   ): void {
-    const taskAllowlistSetting = new Setting(containerEl)
+    const taskAllowlistSetting = this.createEditorSetting(containerEl)
       .setName(t('settings.agents.editor.taskAllowlist.name'))
       .setDesc(t('settings.agents.editor.taskAllowlist.desc'))
-      .setClass('opencodian-agent-editor-row')
       .addTextArea((text) => {
         setTaskAllowlistControl(text);
         text
@@ -637,10 +657,9 @@ export class SettingsProjectAgentEditor {
       setSkillToolDropdown: (control: { setValue(value: string): unknown }) => void;
     },
   ): void {
-    new Setting(containerEl)
+    this.createEditorSetting(containerEl)
       .setName(t('settings.agents.editor.skillTool.name'))
       .setDesc(t('settings.agents.editor.skillTool.desc'))
-      .setClass('opencodian-agent-editor-row')
       .addDropdown((dropdown) => {
         setControls.setSkillToolDropdown(dropdown);
         dropdown
@@ -654,10 +673,9 @@ export class SettingsProjectAgentEditor {
           });
       });
 
-    new Setting(containerEl)
+    this.createEditorSetting(containerEl)
       .setName(t('settings.agents.editor.skillPermission.name'))
       .setDesc(t('settings.agents.editor.skillPermission.desc'))
-      .setClass('opencodian-agent-editor-row')
       .addDropdown((dropdown) => {
         setControls.setSkillPermissionDropdown(dropdown);
         dropdown
@@ -694,10 +712,9 @@ export class SettingsProjectAgentEditor {
       setDeleteButton,
     } = options;
 
-    new Setting(containerEl)
+    this.createActionsSetting(containerEl)
       .setName(t('settings.agents.editor.actions.name'))
       .setDesc(t('settings.agents.editor.actions.desc'))
-      .setClass('opencodian-agent-editor-actions')
       .addButton((button) => {
         button
           .setButtonText(t('settings.agents.editor.actions.save'))
@@ -725,10 +742,9 @@ export class SettingsProjectAgentEditor {
     state: ProjectAgentEditorState,
     setOptionsControl: (control: TextLikeControl) => void,
   ): void {
-    const optionsSetting = new Setting(containerEl)
+    const optionsSetting = this.createEditorSetting(containerEl)
       .setName(t('settings.agents.editor.options.name'))
       .setDesc(t('settings.agents.editor.options.desc'))
-      .setClass('opencodian-agent-editor-row')
       .addTextArea((text) => {
         setOptionsControl(text);
         text

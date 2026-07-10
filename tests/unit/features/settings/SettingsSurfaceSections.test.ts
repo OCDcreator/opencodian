@@ -1,6 +1,5 @@
 /* eslint-disable max-lines, max-lines-per-function */
 import { readFileSync } from 'fs';
-
 import { requestUrl, Setting } from 'obsidian';
 
 import { DEFAULT_SETTINGS } from '../../../../src/core/types';

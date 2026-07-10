@@ -866,7 +866,8 @@ describe('SettingsConversationSection', () => {
 
     const detailsEl = containerEl.querySelector<HTMLDetailsElement>('details.opencodian-share-troubleshooting');
     expect(detailsEl).not.toBeNull();
-    expect(detailsEl?.querySelector('summary')?.textContent).toBe(t('settings.conversation.share.troubleshooting.summary'));
+    expect(detailsEl?.querySelector('.opencodian-share-troubleshooting-label')?.textContent).toBe(t('settings.conversation.share.troubleshooting.summary'));
+    expect(detailsEl?.querySelector('.opencodian-share-troubleshooting-status')?.textContent).toBe(t('settings.conversation.share.diagnostics.notChecked'));
     expect(detailsEl?.textContent).toContain('Project mode');
     expect(detailsEl?.textContent).toContain('Not checked');
 

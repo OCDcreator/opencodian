@@ -229,6 +229,21 @@ provider / model 管理区在交换 actions 与 search 行顺序后，纵向节�
 
 Guardrail: 如果后续继续调整 availability 区，不要再把 `summary / controls / provider list` 的纵向空隙拆回多个 margin。优先让外层 stack 决定主节奏，让 catalogs 子容器决定内部节奏。
 
+### 2026-06-30 model provider card neutralization
+
+- `Provider & Model Management` 的 `.opencodian-model-toggle-provider`、`.opencodian-model-toggle-model`、preset provider cards 和 model workspace provider rows 现在共享 neutral shadcn-style Card tokens：低权重 `background-modifier-border` 边框、安静背景、hover/focus 只做轻微边框和背景变化。
+- 普通 provider/model cards 不再使用紫色/interactive-accent 边框、紫色 glow 或大面积强调态；真正的启用、禁用、warning、error 状态继续收敛在 badge、probe 文案和 inline status 中。
+- `.opencodian-help-mode` 移除 3px accent side-stripe，改为完整低权重边框，保持 `$impeccable` 的 no side-stripe 约束。
+
+Guardrail: 后续不要把 provider/model row 的普通 hover、selected 或卡片边框重新绑定到 `interactive-accent`。如果需要表达状态，优先使用 badge / inline text / focus ring，而不是给整张卡片上紫色边框。
+
+### 2026-06-30 formatter/lsp tab hierarchy pass
+
+- `Formatter & LSP` 的三个 secondary tabs 现在共享更明确的壳层语法：`.opencodian-formatter-overview-shell` / `.opencodian-formatter-tab-config-shell` 负责纵向主节奏，`.opencodian-formatter-overview-summary-band`、`.opencodian-formatter-tab-summary-band`、`.opencodian-formatter-tab-content-shell` 分开 summary 与 editor 内容区。
+- `overview` meta cards 仍沿用 `.opencodian-formatter-overview-meta-*` 合同，但基底背景收轻，避免它继续像第二套编辑卡片；视觉上是 quiet summary，不是并行 control surface。
+- builtin/custom/advanced editor 三类编辑块现在各自有稳定壳层：`.opencodian-formatter-builtin-list-shell`、`.opencodian-formatter-custom-list-shell`、`.opencodian-formatter-advanced-editor-shell`。这些 class 只表达层级和节奏，不改变既有 row-card / search / inline editor 行为。
+- builtin override editor 继续使用现有 `.opencodian-formatter-override-fields` field-group DOM，但额外带 `.opencodian-formatter-builtin-editor-shell` 结构别名，明确它是 inline editor shell，不是新的 nested card。
+
 ## 2026-05-13 Model picker visual refresh
 
 模型选择弹层（`ModelPickerModal`）进行视觉重构：

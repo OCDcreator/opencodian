@@ -44,6 +44,16 @@ commands/slash runtime 与 command-owned hidden-agent flows 不属于本 owner�
 - `.opencodian-agent-workspace-toolbar` / `.opencodian-agent-workspace-list` / `.opencodian-agent-workspace-row`：Markdown workspace 的 toolbar + list surface。
 - `.opencodian-agent-settings-alert`：catalog load failure、empty catalog 和 empty workspace 的 quiet Alert/Empty surface。
 
+2026-07-01 的代理编辑器一致性切片把 Project Agent Editor 收口成 shadcn-style Card/Field 结构：
+
+- `.opencodian-agent-editor-card` 是外层语义锚点，不绘制大卡片。
+- `.opencodian-agent-editor-card-content` 对应 CardContent，包含 identity / behavior / model / advanced 四个 FieldGroup。
+- `.opencodian-agent-editor-field-group` 标记每个 FieldGroup；identity / behavior / model / advanced 四个组各自呈现为中性 Card，advanced 同时保持 native Accordion。
+- `.opencodian-agent-editor-field` 标记普通 Field row，旧的 `.opencodian-agent-editor-row` 保留。
+- `.opencodian-agent-editor-footer` 对应 CardFooter，save/delete action 不再表现成独立字段卡片。
+
+该切片只调整 project agent editor 的 DOM class 和 CSS 层级，不改变 agent config schema、保存/删除逻辑、catalog merge、Markdown workspace 或 `@agent` autocomplete invalidation。
+
 ## 核心逻辑
 
 ### runtime + config + file catalog 合并

@@ -437,8 +437,10 @@ export class SettingsFormatterSection {
     return 'default';
   }
 
-  private async renderOverviewBlock(containerEl: HTMLElement): Promise<void> {
-    const overviewEl = containerEl.createDiv({ cls: 'opencodian-settings-block' });
+private async renderOverviewBlock(containerEl: HTMLElement): Promise<void> {
+const overviewEl = containerEl.createDiv({
+cls: 'opencodian-settings-block opencodian-formatter-overview-shell',
+});
     overviewEl.createEl('h4', {
       text: t('settings.formatter.tab.overview'),
       cls: 'opencodian-settings-subsection-heading',
@@ -496,7 +498,8 @@ export class SettingsFormatterSection {
       runtimeTone: OverviewMetaCardOptions['tone'];
     },
   ): void {
-    const gridEl = containerEl.createDiv({ cls: 'opencodian-formatter-overview-meta-grid' });
+const summaryBandEl = containerEl.createDiv({ cls: 'opencodian-formatter-overview-summary-band' });
+const gridEl = summaryBandEl.createDiv({ cls: 'opencodian-formatter-overview-meta-grid' });
     this.addOverviewMetaCard(gridEl, {
       label: t('settings.formatter.overview.modeLabel'),
       value: values.formatterMode,
@@ -1110,9 +1113,11 @@ export class SettingsFormatterSection {
     const configEl = containerEl.createDiv({ cls: 'opencodian-settings-block' });
     configEl.createEl('h4', {
       text: t('settings.formatter.tab.formatter'),
-      cls: 'opencodian-settings-subsection-heading',
+      cls: 'opencodian-settings-subsection-heading opencodian-formatter-tab-heading',
     });
-    const bodyEl = configEl.createDiv({ cls: 'opencodian-settings-block-body' });
+    const bodyEl = configEl.createDiv({
+      cls: 'opencodian-settings-block-body opencodian-formatter-tab-config-shell',
+    });
 
     await this.renderFormatterConfigContent(bodyEl);
   }
@@ -1130,7 +1135,8 @@ export class SettingsFormatterSection {
       text: t('settings.formatter.tab.formatter'),
       cls: 'opencodian-settings-subsection-heading opencodian-formatter-tab-heading',
     });
-    await this.renderFormatterConfigContent(containerEl);
+    const shellEl = containerEl.createDiv({ cls: 'opencodian-formatter-tab-config-shell' });
+    await this.renderFormatterConfigContent(shellEl);
   }
 
   private async renderFormatterConfigContent(containerEl: HTMLElement): Promise<void> {
@@ -1140,7 +1146,10 @@ export class SettingsFormatterSection {
     ]);
     const mode = this.resolveFormatterMode(formatterConfig);
 
-    const modeSetting = new Setting(containerEl)
+    const summaryBandEl = containerEl.createDiv({ cls: 'opencodian-formatter-tab-summary-band' });
+    const contentEl = containerEl.createDiv({ cls: 'opencodian-formatter-tab-content-shell' });
+
+    const modeSetting = new Setting(summaryBandEl)
       .setName(t('settings.formatter.config.modeSwitch'))
       .setDesc(t('settings.formatter.config.modeSwitchDesc'))
       .addDropdown((dropdown) => {
@@ -1155,7 +1164,7 @@ export class SettingsFormatterSection {
     this.addFormatterLspHelpButton(modeSetting);
 
     if (runtimeState.fetchFailed) {
-      new Setting(containerEl)
+      new Setting(contentEl)
         .setDesc(t('settings.formatter.config.runtimeOfflineNote'));
     }
 
@@ -1167,9 +1176,9 @@ export class SettingsFormatterSection {
     const builtinDefinitions = this.resolveBuiltinDefinitions(runtimeState.items);
     const builtinNames = new Set(builtinDefinitions.map((item) => item.name));
 
-    this.renderBuiltinFormatterEditors(containerEl, builtinDefinitions, configObj, runtimeState);
-    this.renderCustomFormatterList(containerEl, builtinNames, configObj);
-    this.renderAdvancedJsonEditor(containerEl);
+    this.renderBuiltinFormatterEditors(contentEl, builtinDefinitions, configObj, runtimeState);
+    this.renderCustomFormatterList(contentEl, builtinNames, configObj);
+    this.renderAdvancedJsonEditor(contentEl);
   }
 
   private renderBuiltinFormatterEditors(
@@ -1178,7 +1187,9 @@ export class SettingsFormatterSection {
     configObj: Record<string, OpencodeFormatterEntryConfig>,
     runtimeState: FormatterRuntimeState,
   ): void {
-    const sectionEl = containerEl.createDiv({ cls: 'opencodian-settings-block' });
+    const sectionEl = containerEl.createDiv({
+      cls: 'opencodian-settings-block opencodian-formatter-builtin-list-shell',
+    });
     sectionEl.createEl('h4', {
       text: t('settings.formatter.config.builtinList.title'),
       cls: 'opencodian-settings-subsection-heading',
@@ -1391,7 +1402,8 @@ export class SettingsFormatterSection {
     entry: OpencodeFormatterEntryConfig,
   ): HTMLElement {
     const fieldsEl = rowEl.createDiv({
-      cls: 'opencodian-formatter-override-fields opencodian-formatter-field-group',
+      cls:
+        'opencodian-formatter-override-fields opencodian-formatter-builtin-editor-shell opencodian-formatter-field-group',
     });
 
     const commandStr = (entry.command ?? []).join(' ');
@@ -1548,7 +1560,9 @@ export class SettingsFormatterSection {
     builtinNames: Set<string>,
     configObj: Record<string, OpencodeFormatterEntryConfig>,
   ): void {
-    const sectionEl = containerEl.createDiv({ cls: 'opencodian-settings-block' });
+    const sectionEl = containerEl.createDiv({
+      cls: 'opencodian-settings-block opencodian-formatter-custom-list-shell',
+    });
     sectionEl.createEl('h4', {
       text: t('settings.formatter.config.customList.title'),
       cls: 'opencodian-settings-subsection-heading',
@@ -1773,7 +1787,9 @@ export class SettingsFormatterSection {
   }
 
   private renderAdvancedJsonEditor(containerEl: HTMLElement): void {
-    const sectionEl = containerEl.createDiv({ cls: 'opencodian-settings-block' });
+    const sectionEl = containerEl.createDiv({
+      cls: 'opencodian-settings-block opencodian-formatter-advanced-editor-shell',
+    });
     sectionEl.createEl('h4', {
       text: t('settings.formatter.config.advanced.title'),
       cls: 'opencodian-settings-subsection-heading',
@@ -1986,9 +2002,11 @@ export class SettingsFormatterSection {
     const configEl = containerEl.createDiv({ cls: 'opencodian-settings-block' });
     configEl.createEl('h4', {
       text: t('settings.formatter.tab.lsp'),
-      cls: 'opencodian-settings-subsection-heading',
+      cls: 'opencodian-settings-subsection-heading opencodian-formatter-tab-heading',
     });
-    const bodyEl = configEl.createDiv({ cls: 'opencodian-settings-block-body' });
+    const bodyEl = configEl.createDiv({
+      cls: 'opencodian-settings-block-body opencodian-formatter-tab-config-shell',
+    });
 
     await this.renderLspConfigContent(bodyEl);
   }
@@ -1998,7 +2016,8 @@ export class SettingsFormatterSection {
       text: t('settings.formatter.tab.lsp'),
       cls: 'opencodian-settings-subsection-heading opencodian-formatter-tab-heading',
     });
-    await this.renderLspConfigContent(containerEl);
+    const shellEl = containerEl.createDiv({ cls: 'opencodian-formatter-tab-config-shell' });
+    await this.renderLspConfigContent(shellEl);
   }
 
   private async renderLspConfigContent(containerEl: HTMLElement): Promise<void> {
@@ -2008,7 +2027,10 @@ export class SettingsFormatterSection {
     ]);
     const mode = this.resolveFormatterMode(lspConfig);
 
-    const modeSetting = new Setting(containerEl)
+    const summaryBandEl = containerEl.createDiv({ cls: 'opencodian-formatter-tab-summary-band' });
+    const contentEl = containerEl.createDiv({ cls: 'opencodian-formatter-tab-content-shell' });
+
+    const modeSetting = new Setting(summaryBandEl)
       .setName(t('settings.formatter.lsp.modeSwitch'))
       .setDesc(t('settings.formatter.lsp.modeSwitchDesc'))
       .addDropdown((dropdown) => {
@@ -2023,7 +2045,7 @@ export class SettingsFormatterSection {
     this.addFormatterLspHelpButton(modeSetting);
 
     if (runtimeState.fetchFailed) {
-      new Setting(containerEl)
+      new Setting(contentEl)
         .setDesc(t('settings.formatter.lsp.runtimeOfflineNote'));
     }
 
@@ -2035,9 +2057,9 @@ export class SettingsFormatterSection {
     const builtinDefinitions = this.resolveLspBuiltinDefinitions(runtimeState.items);
     const builtinIds = new Set(builtinDefinitions.map((item) => item.id));
 
-    this.renderBuiltinLspEditors(containerEl, builtinDefinitions, configObj);
-    this.renderCustomLspList(containerEl, builtinIds, configObj);
-    this.renderLspAdvancedJsonEditor(containerEl);
+    this.renderBuiltinLspEditors(contentEl, builtinDefinitions, configObj);
+    this.renderCustomLspList(contentEl, builtinIds, configObj);
+    this.renderLspAdvancedJsonEditor(contentEl);
   }
 
   private renderBuiltinLspEditors(
@@ -2045,7 +2067,9 @@ export class SettingsFormatterSection {
     builtinDefinitions: readonly LspBuiltinDefinition[],
     configObj: Record<string, OpencodeLspEntryConfig>,
   ): void {
-    const sectionEl = containerEl.createDiv({ cls: 'opencodian-settings-block' });
+    const sectionEl = containerEl.createDiv({
+      cls: 'opencodian-settings-block opencodian-formatter-builtin-list-shell',
+    });
     sectionEl.createEl('h4', {
       text: t('settings.formatter.lsp.builtinList.title'),
       cls: 'opencodian-settings-subsection-heading',
@@ -2409,7 +2433,9 @@ export class SettingsFormatterSection {
     builtinIds: Set<string>,
     configObj: Record<string, OpencodeLspEntryConfig>,
   ): void {
-    const sectionEl = containerEl.createDiv({ cls: 'opencodian-settings-block' });
+    const sectionEl = containerEl.createDiv({
+      cls: 'opencodian-settings-block opencodian-formatter-custom-list-shell',
+    });
     sectionEl.createEl('h4', {
       text: t('settings.formatter.lsp.customList.title'),
       cls: 'opencodian-settings-subsection-heading',
@@ -2584,7 +2610,9 @@ export class SettingsFormatterSection {
   }
 
   private renderLspAdvancedJsonEditor(containerEl: HTMLElement): void {
-    const sectionEl = containerEl.createDiv({ cls: 'opencodian-settings-block' });
+    const sectionEl = containerEl.createDiv({
+      cls: 'opencodian-settings-block opencodian-formatter-advanced-editor-shell',
+    });
     sectionEl.createEl('h4', {
       text: t('settings.formatter.lsp.advanced.title'),
       cls: 'opencodian-settings-subsection-heading',

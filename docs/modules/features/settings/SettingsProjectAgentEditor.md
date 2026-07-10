@@ -16,14 +16,17 @@
 
 其中 `高级配置` 默认折叠，避免长文本 area 把整个设置面撑得过长。
 
-2026-06-28 UI 重构后，editor 的视觉层级改为 flat group + row-card control surface：
+2026-07-01 UI 一致性切片后，editor 使用 shadcn-style Card/Field DOM 语义，但不绘制外层大卡片。`基础信息`、`行为定义`、`模型与采样`、`高级配置` 四个组各自呈现为中性 Card；`高级配置` 同时保持 native Accordion/FieldGroup 行为：
 
-- `.opencodian-agent-editor-layout`：editor 内部纵向布局。
-- `.opencodian-agent-editor-group`：身份、行为、模型、高级配置四个 flat group，不再承担重卡片背景。
-- `.opencodian-agent-editor-row`：普通表单行，桌面端使用 copy/control 两列，窄屏退为单列。
+- `.opencodian-agent-editor-layout` / `.opencodian-agent-editor-card`：editor root 与 Card 语义锚点，不绘制外层大卡片。
+- `.opencodian-agent-editor-card-content`：CardContent 语义锚点，承载四个字段组。
+- `.opencodian-agent-editor-group` / `.opencodian-agent-editor-field-group`：身份、行为、模型、高级配置四个 FieldGroup；每个组使用 Card chrome，标题区域对应 CardHeader，字段区对应 CardContent。
+- `.opencodian-agent-editor-row` / `.opencodian-agent-editor-field`：普通 Field row，桌面端使用 copy/control 两列，窄屏退为单列。
 - `.opencodian-agent-editor-row-textarea`：prompt、task allowlist、options 等长文本行，控制区 full-width。
 - `.opencodian-agent-editor-group-summary`：高级配置的 Radix-style native disclosure，带 `aria-expanded` 和 `aria-controls`。
-- `.opencodian-agent-editor-actions`：保存/删除 footer row，和表单主体用轻量分隔线区分。
+- `.opencodian-agent-editor-actions` / `.opencodian-agent-editor-footer`：保存/删除 CardFooter 语义锚点，和表单主体用轻量分隔线区分。
+
+`createEditorSetting()` / `createActionsSetting()` 会给真实 `settingEl` 补 class，保证 Obsidian runtime 与单元测试 DOM 都能定位新的 Card/Field/Footer 结构。旧 class 保留，避免现有测试、文档和调试脚本断裂。
 
 这个 editor 覆盖 project agent 表单字段：
 
@@ -63,7 +66,7 @@ commands/slash runtime 与 command-owned hidden agent lifecycle 不属于本 edi
 
 ### group / disclosure DOM contract
 
-- identity / behavior / model group 使用普通 heading copy + row stack。
+- identity / behavior / model / advanced group 使用 shadcn-style CardHeader + CardContent 语义：中性边框、低对比背景、header 与字段区之间用轻 separator。
 - advanced group 使用原生 `<details>` / `<summary>`，默认关闭；summary 带 `role="button"`、`aria-expanded`、`aria-controls="opencodian-agent-editor-advanced-content"`。
 - disclosure 只影响高级字段可见性，不改变 state、保存 patch、delete guard 或 textarea resize memory。
 - 不能把高级配置改成 Sheet/Drawer 或 modal；Settings 页内编辑上下文必须保持连续。
@@ -101,6 +104,8 @@ commands/slash runtime 与 command-owned hidden agent lifecycle 不属于本 edi
 | `dispose()` | 销毁当前 editor 持有的 textarea size-memory observer |
 | `render()` | 渲染 project agent picker、字段表单与 save/delete action |
 | `createEditorGroup()` | 创建 flat group / 可折叠高级区外壳，并返回字段挂载 body |
+| `createEditorSetting()` | 创建普通 Field row，同时保留旧 row class 和新 field class |
+| `createActionsSetting()` | 创建 CardFooter action row，同时保留旧 actions class 和新 footer class |
 | `saveProjectAgentFromEditor()` | 归一化表单值并写回 project agent override |
 | `deleteSelectedProjectAgent()` | 删除当前选中的 project agent override |
 

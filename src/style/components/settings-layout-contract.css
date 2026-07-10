@@ -221,6 +221,18 @@
   min-width: 0;
 }
 
+.opencodian-settings .opencodian-settings-content-shell[data-primary-tab="conversation"] > [data-section-block] {
+  display: flex;
+  flex-direction: column;
+  gap: var(--opencodian-settings-space-lg);
+  min-width: 0;
+}
+
+.opencodian-settings .opencodian-settings-content-shell[data-primary-tab="conversation"] .opencodian-share-policy-panel,
+.opencodian-settings .opencodian-settings-content-shell[data-primary-tab="conversation"] .opencodian-shared-sessions {
+  margin: 0;
+}
+
 .opencodian-settings .opencodian-debug-tab-shell {
   box-sizing: border-box;
   display: flex;
@@ -707,11 +719,12 @@
 .opencodian-settings .opencodian-share-policy-panel {
   display: flex;
   flex-direction: column;
-  gap: var(--opencodian-settings-space-lg);
-  padding: 14px;
+  gap: 0;
+  overflow: hidden;
+  padding: 0;
   border: 1px solid var(--opencodian-settings-row-border);
   border-radius: var(--opencodian-settings-radius-row);
-  background: color-mix(in srgb, var(--interactive-accent) 5%, var(--opencodian-settings-row-bg));
+  background: var(--opencodian-settings-row-bg);
 }
 
 .opencodian-settings .opencodian-share-policy-header {
@@ -719,6 +732,7 @@
   grid-template-columns: minmax(0, 1fr) max-content;
   gap: var(--opencodian-settings-space-lg);
   align-items: start;
+  padding: 14px 14px 0;
 }
 
 .opencodian-settings .opencodian-share-policy-copy {
@@ -759,6 +773,7 @@
 .opencodian-settings .opencodian-share-policy-control {
   display: flex;
   justify-content: flex-end;
+  padding: var(--opencodian-settings-space-lg) 14px 14px;
 }
 
 .opencodian-settings .opencodian-share-policy-setting.setting-item {
@@ -781,11 +796,92 @@
   min-width: min(260px, 100%);
 }
 
-.opencodian-settings .opencodian-share-diagnostics {
+.opencodian-settings .opencodian-share-troubleshooting {
+  border-top: 1px solid var(--opencodian-settings-inline-border);
+  background: color-mix(in srgb, var(--background-secondary) 42%, transparent);
+}
+
+.opencodian-settings .opencodian-share-troubleshooting[open] {
+  background: color-mix(in srgb, var(--background-secondary) 54%, transparent);
+}
+
+.opencodian-settings .opencodian-share-troubleshooting-summary {
   display: grid;
   grid-template-columns: minmax(0, 1fr) max-content;
+  gap: var(--opencodian-settings-space-md);
+  align-items: center;
+  min-height: 44px;
+  padding: 9px 14px;
+  color: var(--text-normal);
+  cursor: pointer;
+  list-style: none;
+}
+
+.opencodian-settings .opencodian-share-troubleshooting-summary::-webkit-details-marker {
+  display: none;
+}
+
+.opencodian-settings .opencodian-share-troubleshooting-summary::marker {
+  content: "";
+}
+
+.opencodian-settings .opencodian-share-troubleshooting-summary:hover {
+  background: var(--opencodian-settings-inline-bg);
+}
+
+.opencodian-settings .opencodian-share-troubleshooting-summary:focus-visible {
+  outline: 2px solid var(--opencodian-settings-focus-ring);
+  outline-offset: -2px;
+}
+
+.opencodian-settings .opencodian-share-troubleshooting-label {
+  min-width: 0;
+  color: var(--text-normal);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.opencodian-settings .opencodian-share-troubleshooting-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 24px;
+  max-width: 260px;
+  padding: 3px 8px;
+  border: 1px solid var(--opencodian-settings-inline-border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--background-primary) 70%, transparent);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.opencodian-settings .opencodian-share-troubleshooting-status[data-state="ok"] {
+  border-color: color-mix(in srgb, var(--text-success) 34%, var(--opencodian-settings-inline-border));
+  color: var(--text-success);
+}
+
+.opencodian-settings .opencodian-share-troubleshooting-status[data-state="warning"] {
+  border-color: color-mix(in srgb, var(--text-warning) 34%, var(--opencodian-settings-inline-border));
+  color: var(--text-warning);
+}
+
+.opencodian-settings .opencodian-share-troubleshooting-status[data-state="error"] {
+  border-color: color-mix(in srgb, var(--text-error) 34%, var(--opencodian-settings-inline-border));
+  color: var(--text-error);
+}
+
+.opencodian-settings .opencodian-share-diagnostics {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
   gap: var(--opencodian-settings-space-md) var(--opencodian-settings-space-lg);
   align-items: start;
+  padding: 0 14px 14px;
 }
 
 .opencodian-settings .opencodian-share-diagnostics-rows {
@@ -1135,32 +1231,17 @@
     justify-content: flex-start;
   }
 
-.opencodian-settings .opencodian-share-troubleshooting {
-  border-top: 1px solid var(--opencodian-settings-inline-border);
-  padding-top: var(--opencodian-settings-space-sm);
-}
+  .opencodian-settings .opencodian-share-troubleshooting-summary {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+  }
 
-.opencodian-settings .opencodian-share-troubleshooting-summary {
-  display: list-item;
-  cursor: pointer;
-  color: var(--text-faint);
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 1.5;
-  padding: 4px 0;
-  user-select: none;
-}
+  .opencodian-settings .opencodian-share-troubleshooting-status {
+    justify-self: start;
+    max-width: 100%;
+  }
 
-.opencodian-settings .opencodian-share-troubleshooting-summary:hover {
-  color: var(--text-muted);
-}
-
-.opencodian-settings .opencodian-share-troubleshooting[open] > .opencodian-share-troubleshooting-summary {
-  margin-bottom: var(--opencodian-settings-space-sm);
-  color: var(--text-muted);
-}
-
-.opencodian-settings .opencodian-share-diagnostics {
+  .opencodian-settings .opencodian-share-diagnostics {
     grid-template-columns: minmax(0, 1fr);
   }
 

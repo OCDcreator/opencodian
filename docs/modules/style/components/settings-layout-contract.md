@@ -17,6 +17,7 @@
 - `.opencodian-settings-section` / `.opencodian-settings-block.opencodian-settings-section`：共享 section block surface，使用 section 背景、边框与半径 token；legacy `.opencodian-settings-block` 本身保持兼容，不会单独触发契约样式。
 - `.opencodian-settings-section-body` / `.opencodian-settings-block-body`：section 内部纵向 rhythm，普通设置行在这里按 row-card 规则排列。
 - `.opencodian-settings-section .setting-item` / `.opencodian-settings-content-shell .setting-item`：普通设置项的轻量 row-card 样式，采用 shadcn `Card` + `Field` 的信息结构。前者覆盖 section body 内 rows，后者覆盖 tabbed content shell 内所有 ordinary setting descendants，例如 Server、Conversation、Commands、Formatter、Style、Debug 等嵌套设置行。左侧 `.setting-item-info` 放 label / description，右侧 `.setting-item-control` 放 dropdown、input、switch 或按钮。它和 object-card、readback、alert 等更重或更强状态 surface 区分。
+- `.opencodian-settings-content-shell[data-primary-tab="conversation"] > [data-section-block]`：会话标签页的二级内容容器。Tabbed conversation 没有 classic block body 外层，因此这里显式提供 `12px` 垂直 rhythm，保证“标题 / 压缩 / 分享 / 显示与渲染 / 提问”各二级页中的 row-card 和自定义 sharing 面板都按同一 Card/Field 间距排列，而不是贴边堆叠。
 - `.opencodian-wide-text-setting`：给路径、URL、访问令牌等长文本设置项使用的宽字段 row。它只放宽明确标记的输入，控制列在桌面端限制在 `clamp(320px, 42vw, 520px)`，窄屏退为单列，避免把 host/port/数字类短输入一起拉长。
 - `.opencodian-debug-tab-shell` / `.opencodian-debug-tab-header` / `.opencodian-debug-tab-body` / `.opencodian-debug-tab-badge`：Debug 五个二级标签共享的 shadcn-inspired settings shell。它提供紧凑标题、说明、badge rail 和中性内容栈；不引入 React/Radix/Tailwind，也不改变 tab id 或设置保存语义。
 - `.opencodian-debug-global-panel` / `.opencodian-debug-modules` / `.opencodian-debug-export` / `.opencodian-debug-workbench`：调试页四个来源子标签统一跟随 Debug tab shell + neutral Field row 语法。Plugin 的全局日志开关、Plugin/OpenCode 的模块开关、Claude Code 的 SDK 诊断块、Export 的路径/动作/控制台帮助都位于同宽 shell body 内，不再混用裸 setting row、外边距扩宽、object-card 或局部卡片。
@@ -81,8 +82,8 @@ Rule: never apply one hierarchy rule globally across both layout modes. In class
 
 ## Shared Session Manager Styles
 
-- `.opencodian-share-policy-panel` / `.opencodian-share-policy-*`：Conversation > Sharing 顶部的分享策略控制面板。左侧解释项目级策略，右侧保留 Obsidian dropdown 与帮助按钮，当前模式以低调状态 chip 显示，避免把公开分享配置伪装成普通表单行。
-- `.opencodian-share-troubleshooting` / `.opencodian-share-troubleshooting-summary`：分享策略面板里包住辅助诊断内容的 `<details>` disclosure。它负责默认折叠、顶部细分隔线、summary hover/expanded 状态，以及“Sharing setup check / 分享连接检查”这类稳定 affordance，不让 troubleshooting rows 一上来就挤占 sharing 主 surface。
+- `.opencodian-share-policy-panel` / `.opencodian-share-policy-*`：Conversation > Sharing 顶部的分享策略控制面板，采用 shadcn Card + Field + Footer 语义。上层是安静的设置卡片主体：左侧解释项目级策略，右侧保留 Obsidian dropdown 与帮助按钮，当前模式以低调状态 chip 显示，避免把公开分享配置伪装成普通表单行。
+- `.opencodian-share-troubleshooting` / `.opencodian-share-troubleshooting-summary`：分享策略面板底部的诊断 footer，仍使用 `<details>` disclosure 维持键盘与折叠语义，但移除默认 disclosure 箭头。summary 行左侧显示“Sharing setup check / 分享连接检查”按钮式文本，右侧显示诊断状态 chip；展开后才显示 troubleshooting rows，不让诊断内容一上来挤占 sharing 主 surface。
 - `.opencodian-share-diagnostics*`：分享策略面板内真正的诊断 rows。按钮会检查项目 share mode、OpenCode 服务健康状态和公共分享主机可达性，用 compact status rows 显示 ok / warning / error；diagnostics rows 本身不再承担顶部边框或折叠标题样式。
 - `.opencodian-shared-sessions` / `.opencodian-shared-sessions-header`：已分享会话管理区，使用标题、说明、公开数量与刷新按钮组成轻量工具头，不复用截图式的单行 setting layout。
 - `.opencodian-shared-session-row`：单个已分享会话的数据行，左侧为标题、更新时间、公开 URL，右侧为复制、预览、取消分享动作；多行共享一个 list surface，窄屏改为单列。

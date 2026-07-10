@@ -534,7 +534,7 @@
   padding: 12px;
   background: var(--background-primary);
   border-radius: 6px;
-  border-left: 3px solid var(--interactive-accent);
+  border: 1px solid color-mix(in srgb, var(--background-modifier-border) 82%, transparent);
 }
 
 .opencodian-help-mode strong {
@@ -1767,7 +1767,7 @@
   width: 14px;
   height: 14px;
   flex: 0 0 auto;
-  color: color-mix(in srgb, var(--interactive-accent) 54%, var(--text-muted));
+  color: var(--text-muted);
   pointer-events: none;
 }
 
@@ -1794,9 +1794,9 @@
 }
 
 .opencodian-model-availability-search-container:focus-within {
-  border-color: var(--opencodian-settings-nav-active-border, var(--background-modifier-border-hover));
-  background: color-mix(in srgb, var(--interactive-accent) 5%, var(--opencodian-settings-inline-bg, var(--background-secondary)));
-  box-shadow: 0 0 0 2px var(--opencodian-settings-focus-ring, color-mix(in srgb, var(--interactive-accent) 18%, transparent));
+  border-color: color-mix(in srgb, var(--background-modifier-border-hover) 82%, transparent);
+  background: color-mix(in srgb, var(--background-primary) 84%, var(--opencodian-settings-inline-bg, var(--background-secondary)));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--background-modifier-border-hover) 18%, transparent);
 }
 
 .opencodian-model-availability-filter-toggle {
@@ -1831,6 +1831,21 @@
 }
 
 .opencodian-settings .opencodian-settings-section .opencodian-model-toggle-management {
+  --opencodian-model-card-border: color-mix(in srgb, var(--background-modifier-border) 86%, transparent);
+  --opencodian-model-card-border-hover: color-mix(in srgb, var(--background-modifier-border) 96%, var(--text-muted) 4%);
+  --opencodian-model-card-bg: color-mix(in srgb, var(--background-secondary) 88%, var(--background-primary));
+  --opencodian-model-card-bg-hover: color-mix(in srgb, var(--background-primary) 82%, var(--background-secondary));
+  --opencodian-model-card-ring: color-mix(in srgb, var(--background-modifier-border-hover) 18%, transparent);
+  --opencodian-settings-object-border:
+    var(--opencodian-model-card-border);
+  --opencodian-settings-inline-border:
+    color-mix(in srgb, var(--background-modifier-border) 72%, transparent);
+  --opencodian-settings-nav-active-border:
+    var(--opencodian-model-card-border-hover);
+  --opencodian-settings-nav-active-bg:
+    var(--opencodian-model-card-bg-hover);
+  --opencodian-settings-focus-ring:
+    var(--opencodian-model-card-ring);
   margin: 0;
   gap: var(--opencodian-settings-space-lg, 12px);
   padding-bottom: 0;
@@ -1841,20 +1856,11 @@
 }
 
 .opencodian-model-toggle-block {
-  border: 1px solid color-mix(in srgb, var(--background-modifier-border) 72%, transparent);
+  border: 1px solid var(--opencodian-model-card-border, var(--background-modifier-border));
   border-radius: 18px;
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--background-secondary) 86%, var(--background-primary)) 0%,
-      color-mix(in srgb, var(--background-secondary) 94%, var(--background-primary)) 100%
-    );
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: var(--opencodian-model-card-bg, var(--background-secondary));
   padding: 18px;
-  box-shadow:
-    inset 0 1px 0 color-mix(in srgb, var(--background-modifier-border) 22%, transparent),
-    0 14px 34px color-mix(in srgb, black 12%, transparent);
+  box-shadow: none;
 }
 
 .opencodian-settings[data-settings-layout-mode="classic"] .opencodian-model-toggle-block {
@@ -1992,9 +1998,9 @@
 .opencodian-model-toggle-provider {
   margin-top: 0;
   padding: 12px 14px;
-  border: 1px solid var(--opencodian-settings-object-border, var(--background-modifier-border));
+  border: 1px solid var(--opencodian-model-card-border, var(--opencodian-settings-object-border, var(--background-modifier-border)));
   border-radius: var(--opencodian-settings-radius-row, 10px);
-  background: var(--opencodian-settings-object-bg, var(--background-secondary));
+  background: var(--opencodian-model-card-bg, var(--opencodian-settings-object-bg, var(--background-secondary)));
   box-shadow: none;
   transition: border-color 0.16s ease, background 0.16s ease;
 }
@@ -2013,13 +2019,13 @@
 
 .opencodian-model-toggle-provider:first-of-type,
 .opencodian-model-toggle-provider.is-provider-disabled:first-of-type {
-  border-top: 1px solid var(--opencodian-settings-object-border, var(--background-modifier-border));
+  border-top: 1px solid var(--opencodian-model-card-border, var(--opencodian-settings-object-border, var(--background-modifier-border)));
   padding-top: 12px;
 }
 
 .opencodian-model-toggle-provider:hover {
-  border-color: var(--opencodian-settings-nav-active-border, var(--background-modifier-border-hover));
-  background: color-mix(in srgb, var(--interactive-accent) 5%, var(--opencodian-settings-object-bg, var(--background-secondary)));
+  border-color: var(--opencodian-model-card-border-hover, var(--background-modifier-border-hover));
+  background: var(--opencodian-model-card-bg-hover, var(--opencodian-settings-object-bg, var(--background-secondary)));
   box-shadow: none;
 }
 
@@ -2062,8 +2068,8 @@
 .opencodian-model-toggle-provider-expand:hover,
 .opencodian-model-toggle-provider-expand:focus-visible {
   border-color: transparent;
-  background: var(--opencodian-settings-inline-bg, color-mix(in srgb, var(--background-primary) 54%, transparent));
-  box-shadow: 0 0 0 2px var(--opencodian-settings-focus-ring, color-mix(in srgb, var(--interactive-accent) 14%, transparent));
+  background: color-mix(in srgb, var(--background-primary) 70%, transparent);
+  box-shadow: 0 0 0 2px var(--opencodian-model-card-ring, var(--opencodian-settings-focus-ring, color-mix(in srgb, var(--background-modifier-border-hover) 18%, transparent)));
   outline: none;
 }
 
@@ -2085,9 +2091,9 @@
 
 .opencodian-model-toggle-provider-expand:hover .opencodian-model-toggle-provider-chevron,
 .opencodian-model-toggle-provider-expand:focus-visible .opencodian-model-toggle-provider-chevron {
-  color: color-mix(in srgb, var(--interactive-accent) 76%, var(--text-normal));
-  border-color: var(--opencodian-settings-nav-active-border, var(--background-modifier-border-hover));
-  background: var(--opencodian-settings-nav-active-bg, color-mix(in srgb, var(--interactive-accent) 10%, var(--background-primary)));
+  color: var(--text-normal);
+  border-color: color-mix(in srgb, var(--background-modifier-border-hover) 82%, transparent);
+  background: color-mix(in srgb, var(--background-primary) 84%, var(--background-modifier-hover));
 }
 
 .opencodian-model-toggle-provider-chevron svg {
@@ -2247,8 +2253,8 @@
 
 .opencodian-model-toggle-provider-test-button:hover,
 .opencodian-model-toggle-provider-test-button:focus-visible {
-  border-color: var(--opencodian-settings-nav-active-border, var(--background-modifier-border-hover));
-  background: var(--opencodian-settings-nav-active-bg, color-mix(in srgb, var(--interactive-accent) 8%, var(--background-primary)));
+  border-color: color-mix(in srgb, var(--background-modifier-border-hover) 82%, transparent);
+  background: color-mix(in srgb, var(--background-primary) 84%, var(--background-secondary));
   outline: none;
 }
 
@@ -2323,8 +2329,8 @@
 }
 
 .opencodian-model-toggle-model:hover {
-  border-color: var(--opencodian-settings-nav-active-border, var(--background-modifier-border-hover));
-  background: color-mix(in srgb, var(--interactive-accent) 5%, var(--opencodian-settings-row-bg, var(--background-primary)));
+  border-color: color-mix(in srgb, var(--background-modifier-border-hover) 82%, transparent);
+  background: color-mix(in srgb, var(--background-primary) 82%, var(--opencodian-settings-row-bg, var(--background-primary)));
 }
 
 .opencodian-model-toggle-provider.is-provider-disabled .opencodian-model-toggle-provider-name,
@@ -3718,8 +3724,23 @@
   gap: var(--opencodian-settings-space-lg);
 }
 
+.opencodian-formatter-overview-shell,
+.opencodian-formatter-tab-config-shell {
+  display: flex;
+  flex-direction: column;
+  gap: var(--opencodian-settings-space-md);
+}
+
 .opencodian-formatter-tab-heading {
   margin: 0;
+}
+
+.opencodian-formatter-overview-summary-band,
+.opencodian-formatter-tab-summary-band,
+.opencodian-formatter-tab-content-shell {
+  display: flex;
+  flex-direction: column;
+  gap: var(--opencodian-settings-space-md);
 }
 
 .opencodian-formatter-overview-meta-grid {
@@ -3736,7 +3757,11 @@
   padding: 14px 16px;
   border: 1px solid var(--opencodian-settings-object-border);
   border-radius: var(--opencodian-settings-radius-row);
-  background: var(--opencodian-settings-object-bg);
+  background: color-mix(
+    in srgb,
+    var(--opencodian-settings-object-bg) 78%,
+    var(--background-primary) 22%
+  );
   box-shadow: none;
 }
 
@@ -3773,6 +3798,14 @@
   flex-direction: column;
   gap: 8px;
   min-width: 0;
+}
+
+.opencodian-formatter-builtin-list-shell,
+.opencodian-formatter-custom-list-shell,
+.opencodian-formatter-advanced-editor-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .opencodian-formatter-overview-meta-value {
@@ -4423,7 +4456,7 @@
 
 .opencodian-formatter-builtin-row,
 .opencodian-formatter-custom-row {
-  padding: 11px 13px;
+  padding: 9px 12px;
   border: 1px solid var(--opencodian-settings-form-row-border, var(--opencodian-settings-row-border));
   border-radius: var(--opencodian-settings-form-row-radius, var(--opencodian-settings-radius-row));
   background: var(--opencodian-settings-form-row-bg, var(--opencodian-settings-row-bg));
@@ -4534,6 +4567,8 @@
 .opencodian-settings-block > .opencodian-formatter-builtin-row,
 .opencodian-formatter-builtin-scroll > .opencodian-formatter-builtin-row,
 .opencodian-settings-block > .opencodian-formatter-custom-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 260px);
   margin-right: var(--opencodian-settings-space-lg);
   margin-left: var(--opencodian-settings-space-lg);
 }
@@ -4559,8 +4594,8 @@
 .opencodian-formatter-builtin-row > .opencodian-formatter-row-field,
 .opencodian-formatter-custom-row > .opencodian-formatter-row-field {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(180px, 260px);
-  gap: var(--opencodian-settings-space-lg);
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 260px);
+  gap: 12px;
   align-items: center;
   margin: 0;
   padding: 0;
@@ -4572,8 +4607,8 @@
 
 .opencodian-formatter-row-field {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(180px, 260px);
-  gap: var(--opencodian-settings-space-lg);
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 260px);
+  gap: 12px;
   align-items: center;
   margin: 0;
   padding: 0;
@@ -5163,8 +5198,8 @@
   border-radius: var(--opencodian-settings-radius-row, 8px);
   appearance: none;
   -webkit-appearance: none;
-  background: var(--opencodian-settings-object-bg, var(--background-primary));
-  border: 1px solid var(--opencodian-settings-object-border, var(--background-modifier-border-hover));
+  background: var(--opencodian-model-card-bg, var(--opencodian-settings-object-bg, var(--background-primary)));
+  border: 1px solid var(--opencodian-model-card-border, var(--opencodian-settings-object-border, var(--background-modifier-border)));
   box-shadow: none;
   text-align: left;
   cursor: pointer;
@@ -5172,24 +5207,24 @@
 }
 
 .opencodian-model-catalog-summary-card:hover {
-  border-color: color-mix(in srgb, var(--interactive-accent) 28%, var(--background-modifier-border));
-  background: color-mix(in srgb, var(--interactive-accent) 6%, var(--background-primary));
+  border-color: var(--opencodian-model-card-border-hover, color-mix(in srgb, var(--background-modifier-border-hover) 82%, transparent));
+  background: var(--opencodian-model-card-bg-hover, color-mix(in srgb, var(--background-primary) 82%, var(--background-secondary)));
 }
 
 .opencodian-model-catalog-summary-card:focus-visible {
   outline: none;
-  border-color: color-mix(in srgb, var(--interactive-accent) 48%, var(--background-modifier-border));
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--interactive-accent) 10%, transparent);
+  border-color: var(--opencodian-model-card-border-hover, color-mix(in srgb, var(--background-modifier-border-hover) 82%, transparent));
+  box-shadow: 0 0 0 3px var(--opencodian-model-card-ring, color-mix(in srgb, var(--background-modifier-border-hover) 18%, transparent));
 }
 
 .opencodian-model-catalog-summary-card.is-active {
-  border-color: color-mix(in srgb, var(--interactive-accent) 62%, var(--background-modifier-border));
-  background: color-mix(in srgb, var(--interactive-accent) 12%, var(--background-primary));
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--interactive-accent) 16%, transparent);
+  border-color: var(--opencodian-model-card-border-hover, color-mix(in srgb, var(--background-modifier-border-hover) 82%, transparent));
+  background: var(--opencodian-model-card-bg-hover, color-mix(in srgb, var(--background-primary) 82%, var(--background-secondary)));
+  box-shadow: inset 0 0 0 1px var(--opencodian-model-card-ring, color-mix(in srgb, var(--background-modifier-border-hover) 18%, transparent));
 }
 
 .opencodian-model-catalog-summary-card.is-active .opencodian-model-catalog-summary-card-title {
-  color: color-mix(in srgb, var(--interactive-accent) 76%, var(--text-normal));
+  color: var(--text-normal);
 }
 
 .opencodian-model-catalog-summary-card-title {
@@ -5923,13 +5958,8 @@
   padding: 14px;
   text-align: left;
   border-radius: 16px;
-  border: 1px solid color-mix(in srgb, var(--background-modifier-border) 85%, transparent);
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--background-primary) 96%, transparent) 0%,
-      color-mix(in srgb, var(--background-secondary) 88%, transparent) 100%
-    );
+  border: 1px solid var(--opencodian-model-card-border, color-mix(in srgb, var(--background-modifier-border) 85%, transparent));
+  background: var(--opencodian-model-card-bg, color-mix(in srgb, var(--background-secondary) 88%, var(--background-primary)));
   transition:
     border-color 120ms ease,
     box-shadow 120ms ease,
@@ -5939,10 +5969,9 @@
 
 .opencodian-preset-card:hover,
 .opencodian-preset-card:focus-visible {
-  border-color: color-mix(in srgb, var(--interactive-accent) 48%, var(--background-modifier-border));
-  box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--interactive-accent) 16%, transparent),
-    0 10px 24px color-mix(in srgb, var(--interactive-accent) 8%, transparent);
+  border-color: var(--opencodian-model-card-border-hover, color-mix(in srgb, var(--background-modifier-border-hover) 82%, transparent));
+  background: var(--opencodian-model-card-bg-hover, color-mix(in srgb, var(--background-primary) 82%, var(--background-secondary)));
+  box-shadow: 0 0 0 1px var(--opencodian-model-card-ring, color-mix(in srgb, var(--background-modifier-border-hover) 18%, transparent));
   transform: translateY(-1px);
 }
 
@@ -6170,13 +6199,8 @@
   text-align: left;
   padding: 13px;
   border-radius: 14px;
-  border: 1px solid color-mix(in srgb, var(--background-modifier-border) 85%, transparent);
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--background-primary) 96%, transparent) 0%,
-      color-mix(in srgb, var(--background-secondary) 88%, transparent) 100%
-    );
+  border: 1px solid var(--opencodian-model-card-border, color-mix(in srgb, var(--background-modifier-border) 85%, transparent));
+  background: var(--opencodian-model-card-bg, color-mix(in srgb, var(--background-secondary) 88%, var(--background-primary)));
   transition:
     border-color 120ms ease,
     box-shadow 120ms ease,
@@ -6185,15 +6209,15 @@
 }
 
 .opencodian-model-workspace-provider-item.is-selected {
-  border-color: var(--interactive-accent);
-  box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--interactive-accent) 26%, transparent),
-    0 10px 22px color-mix(in srgb, var(--interactive-accent) 10%, transparent);
+  border-color: var(--opencodian-model-card-border-hover, color-mix(in srgb, var(--background-modifier-border-hover) 82%, transparent));
+  background: var(--opencodian-model-card-bg-hover, color-mix(in srgb, var(--background-primary) 82%, var(--background-secondary)));
+  box-shadow: 0 0 0 1px var(--opencodian-model-card-ring, color-mix(in srgb, var(--background-modifier-border-hover) 18%, transparent));
   transform: translateY(-1px);
 }
 
 .opencodian-model-workspace-provider-item:hover {
-  border-color: color-mix(in srgb, var(--interactive-accent) 42%, var(--background-modifier-border));
+  border-color: var(--opencodian-model-card-border-hover, color-mix(in srgb, var(--background-modifier-border-hover) 82%, transparent));
+  background: var(--opencodian-model-card-bg-hover, color-mix(in srgb, var(--background-primary) 82%, var(--background-secondary)));
 }
 
 .opencodian-model-workspace-provider-item.is-disabled {
@@ -6255,15 +6279,10 @@
   display: flex;
   flex-direction: column;
   gap: 0;
-  border: 1px solid var(--background-modifier-border);
-  border-radius: 18px;
+  border: 1px solid var(--opencodian-model-card-border, var(--background-modifier-border));
+  border-radius: 14px;
   padding: 2px 18px;
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--background-secondary) 82%, transparent) 0%,
-      color-mix(in srgb, var(--background-primary) 98%, transparent) 100%
-    );
+  background: var(--opencodian-model-card-bg, color-mix(in srgb, var(--background-secondary) 88%, var(--background-primary)));
 }
 
 .opencodian-model-workspace-editor-header,
@@ -6389,15 +6408,10 @@
 .opencodian-model-workspace-model-card,
 .opencodian-model-workspace-import-panel,
 .opencodian-model-workspace-subsection {
-  border: 1px solid color-mix(in srgb, var(--background-modifier-border-hover) 80%, transparent);
-  border-radius: 14px;
+  border: 1px solid var(--opencodian-model-card-border, color-mix(in srgb, var(--background-modifier-border) 85%, transparent));
+  border-radius: 10px;
   padding: 16px;
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--background-primary) 98%, transparent) 0%,
-      color-mix(in srgb, var(--background-secondary) 88%, transparent) 100%
-    );
+  background: color-mix(in srgb, var(--background-primary) 90%, var(--background-secondary));
 }
 
 .opencodian-model-workspace-model-card.is-disabled {

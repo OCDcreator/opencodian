@@ -284,6 +284,12 @@ describe('SettingsProjectAgentEditor layout and creation', () => {
   it('renders grouped editor sections and keeps advanced settings collapsed by default', () => {
     const { containerEl } = renderEditor();
 
+    expect(containerEl.querySelector('.opencodian-agent-editor-card')).not.toBeNull();
+    expect(containerEl.querySelector('.opencodian-agent-editor-card-content')).not.toBeNull();
+    expect(containerEl.querySelector('.opencodian-agent-editor-footer')).not.toBeNull();
+    expect(containerEl.querySelector('.opencodian-agent-editor-row')).not.toBeNull();
+    expect(containerEl.querySelector('.opencodian-agent-editor-field')).not.toBeNull();
+
     const groups = Array.from(
       containerEl.querySelectorAll<HTMLElement>('.opencodian-agent-editor-group'),
     );
@@ -294,6 +300,7 @@ describe('SettingsProjectAgentEditor layout and creation', () => {
       'model',
       'advanced',
     ]);
+    expect(groups.every((group) => group.classList.contains('opencodian-agent-editor-field-group'))).toBe(true);
 
     const advancedGroup = containerEl.querySelector<HTMLDetailsElement>(
       '.opencodian-agent-editor-group[data-group="advanced"]',
