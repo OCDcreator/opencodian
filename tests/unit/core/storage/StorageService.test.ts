@@ -840,7 +840,7 @@ describe('StorageService persisted core settings', () => {
 describe('StorageService persisted ui settings', () => {
   describe('persisted settings', () => {
     it('writes ui settings as a versioned envelope', async () => {
-      const { ui } = splitPersistedSettings({
+      const { core, ui } = splitPersistedSettings({
         userName: 'Test User',
         server: {
           mode: 'local',
@@ -956,6 +956,7 @@ describe('StorageService persisted ui settings', () => {
           customCss: '',
         },
         settingsPanelScrollTop: 42,
+        capabilityLabSelectedBackend: 'claude-code',
         modelAvailabilitySectionOpen: true,
         modelToolsSectionOpen: false,
         settingsLayoutMode: 'tabbed',
@@ -1000,6 +1001,11 @@ describe('StorageService persisted ui settings', () => {
         '.opencodian/settings.ui.json',
         expect.stringContaining('"settingsTabbedSecondaryTabByPrimary"'),
       );
+      expect(mockAdapter.write).toHaveBeenCalledWith(
+        '.opencodian/settings.ui.json',
+        expect.stringContaining('"capabilityLabSelectedBackend": "claude-code"'),
+      );
+      expect(core).not.toHaveProperty('capabilityLabSelectedBackend');
     });
   });
 });

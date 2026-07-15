@@ -47,6 +47,7 @@ type StoredConversationRecord = Conversation & { messageCount?: number };
 
 export type PersistedUiSettingsKey =
   | 'tabState'
+  | 'capabilityLabSelectedBackend'
   | 'settingsPanelScrollTop'
   | 'modelAvailabilitySectionOpen'
   | 'modelToolsSectionOpen'
@@ -104,6 +105,7 @@ export interface SettingsLoadResult {
 
 const PERSISTED_UI_SETTINGS_KEYS = [
   'tabState',
+  'capabilityLabSelectedBackend',
   'settingsPanelScrollTop',
   'modelAvailabilitySectionOpen',
   'modelToolsSectionOpen',
@@ -117,6 +119,7 @@ function extractPersistedUiSettings(
 ): Partial<PersistedUiSettings> {
   return {
     tabState: settings.tabState,
+    capabilityLabSelectedBackend: settings.capabilityLabSelectedBackend,
     settingsPanelScrollTop: settings.settingsPanelScrollTop,
     modelAvailabilitySectionOpen: settings.modelAvailabilitySectionOpen,
     modelToolsSectionOpen: settings.modelToolsSectionOpen,

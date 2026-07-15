@@ -16,6 +16,7 @@ import {
   getInputPanelThemeIdForLiquidGlassAdapter,
   getLiquidGlassAdapterIdForInputPanelTheme,
   normalizeBelowHeaderTabBarLayout,
+  normalizeCapabilityLabSelectedBackend,
   normalizeChatFontSizePx,
   normalizeCompactionReservedTokens,
   normalizeContextRingStyleId,
@@ -39,10 +40,8 @@ import {
   normalizeTabBarPosition,
   normalizeTabsEnabled,
 } from '../../../../src/core/types/settings';
-import {
-  DEBUG_MODULE_REGISTRY,
-  DEFAULT_DEBUG_REFRESH_INTERVAL_MS,
-} from '../../../../src/shared/debugModules';
+import { DEBUG_MODULE_REGISTRY, DEFAULT_DEBUG_REFRESH_INTERVAL_MS } from '../../../../src/shared/debugModules';
+it('defaults and normalizes the Capability Lab backend preference', () => { expect(DEFAULT_SETTINGS.capabilityLabSelectedBackend).toBeUndefined(); expect(normalizeCapabilityLabSelectedBackend('  codex  ')).toBe('codex'); expect(normalizeCapabilityLabSelectedBackend('unknown')).toBeUndefined(); expect(normalizeCapabilityLabSelectedBackend(null)).toBeUndefined(); });
 
   describe('provider icon variants', () => {
     it('defaults provider icon variant to auto', () => {

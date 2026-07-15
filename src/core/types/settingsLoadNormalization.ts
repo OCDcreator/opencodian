@@ -17,6 +17,7 @@ import {
   getDefaultThemeSettings,
   normalizeBackendSettings,
   normalizeBelowHeaderTabBarLayout,
+  normalizeCapabilityLabSelectedBackend,
   normalizeChatAppearanceSettings,
   normalizeChatFontSizePx,
   normalizeEffortLevel,
@@ -487,6 +488,9 @@ function normalizeLoadedPluginSettings(savedSettings: LoadedSettingsSnapshot | n
       ...normalizedSettings,
       activeBackend: normalizedActiveBackend,
       enabledBackends: normalizedEnabledBackends,
+      capabilityLabSelectedBackend: normalizeCapabilityLabSelectedBackend(
+        normalizedSettings?.capabilityLabSelectedBackend,
+      ),
       backendSettings: normalizedSettings?.backendSettings ?? DEFAULT_SETTINGS.backendSettings,
       server: context.normalizedServer,
       enableTabs: normalizedSettings?.enableTabs ?? DEFAULT_SETTINGS.enableTabs,

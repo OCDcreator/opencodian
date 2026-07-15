@@ -23,6 +23,48 @@ describe('prepareLoadedSettingsBootstrapState backend normalization', () => {
     expect(state.settings.activeBackend).toBe('opencode');
   });
 
+  it('preserves a valid Capability Lab backend selection from the UI settings envelope', () => {
+    const state = prepareLoadedSettingsBootstrapState({
+      core: {
+        data: null,
+        filePath: '.opencodian/settings.core.json',
+        source: 'missing',
+        shouldPersist: false,
+      },
+      ui: {
+        data: { capabilityLabSelectedBackend: ' opencode ' },
+        filePath: '.opencodian/settings.ui.json',
+        source: 'primary',
+        shouldPersist: false,
+      },
+      writable: true,
+      shouldPersist: false,
+    });
+
+    expect(state.settings.capabilityLabSelectedBackend).toBe('opencode');
+  });
+
+  it('cleans stale Capability Lab backend selections during bootstrap normalization', () => {
+    const state = prepareLoadedSettingsBootstrapState({
+      core: {
+        data: null,
+        filePath: '.opencodian/settings.core.json',
+        source: 'missing',
+        shouldPersist: false,
+      },
+      ui: {
+        data: { capabilityLabSelectedBackend: 'stale-backend' },
+        filePath: '.opencodian/settings.ui.json',
+        source: 'primary',
+        shouldPersist: false,
+      },
+      writable: true,
+      shouldPersist: false,
+    });
+
+    expect(state.settings.capabilityLabSelectedBackend).toBeUndefined();
+  });
+
   it('preserves implemented backends and repairs the active backend when needed', () => {
     const state = prepareLoadedSettingsBootstrapState({
       core: {
