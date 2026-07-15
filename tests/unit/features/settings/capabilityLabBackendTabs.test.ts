@@ -121,6 +121,7 @@ describe('createCapabilityLabBackendTabs', () => {
     const panels = Array.from(rootEl.querySelectorAll<HTMLElement>('[role="tabpanel"]'));
 
     expect(tablist).not.toBeNull();
+    expect(tablist?.getAttribute('data-capability-backend-tablist')).toBe('true');
     expect(tablist?.getAttribute('aria-label')).toBe('Capability Lab backends');
     expect(tabs).toHaveLength(3);
     expect(panels).toHaveLength(3);

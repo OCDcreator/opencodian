@@ -76,6 +76,7 @@ export function createCapabilityLabBackendTabs(
   const tablistEl = document.createElement('div');
   tablistEl.setAttribute('role', 'tablist');
   tablistEl.setAttribute('aria-label', options.tablistLabel);
+  tablistEl.dataset.capabilityBackendTablist = 'true';
   tablistEl.setAttribute('data-capability-backend-tablist', 'true');
   rootEl.appendChild(tablistEl);
 
