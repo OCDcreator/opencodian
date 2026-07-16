@@ -213,7 +213,8 @@ import { DEBUG_MODULE_REGISTRY, DEFAULT_DEBUG_REFRESH_INTERVAL_MS } from '../../
       expect(DEFAULT_SETTINGS.settingsLayoutMode).toBe('tabbed');
       expect(DEFAULT_SETTINGS.settingsTabbedPrimaryTab).toBe('server');
       expect(DEFAULT_SETTINGS.settingsTabbedSecondaryTabByPrimary).toEqual({});
-      expect([DEFAULT_SETTINGS.capabilityLabSelectedBackend, normalizeCapabilityLabSelectedBackend('  codex  '), normalizeCapabilityLabSelectedBackend('unknown'), normalizeCapabilityLabSelectedBackend(null)]).toEqual([undefined, 'codex', undefined, undefined]);
+      expect([DEFAULT_SETTINGS.capabilityLabSelectedBackend, normalizeCapabilityLabSelectedBackend('  codex  '), normalizeCapabilityLabSelectedBackend('  copilot  '), normalizeCapabilityLabSelectedBackend('   '), normalizeCapabilityLabSelectedBackend(null)])
+        .toEqual([undefined, 'codex', 'copilot', undefined, undefined]);
     });
   });
 

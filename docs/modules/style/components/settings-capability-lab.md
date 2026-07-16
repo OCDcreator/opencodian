@@ -9,7 +9,7 @@
 
 ## 关键类名
 
-- `.opencodian-capability-lab-shell`, `.opencodian-capability-lab-body`: Capability Lab 在 Debug 五标签体系中的 shared tab shell 对齐层。Capability Lab 专属 outer shell 覆盖为透明、无边框、无圆角的布局层，页头继续复用 shared rhythm；内部保持诊断 block、矩阵、proof marker 和 `data-section-block` 语义。
+- `.opencodian-capability-lab-shell`, `.opencodian-capability-lab-body`: Capability Lab 在 Debug 五标签体系中的 shared tab shell 对齐层。Capability Lab 专属 outer shell 覆盖为透明、无边框、无圆角的布局层，页头继续复用 shared rhythm；outer shell 通过 `capability-lab-shell` container query 管理直接子级页头，内部 body 继续通过 `capability-lab` container query 管理 backend workspace。这样即使 Settings modal 视口仍大于媒体查询断点，320px 等窄 Capability Lab 容器也会把标题/说明与诊断 badges 折叠为单列，避免中文逐字成列。内部保持诊断 block、矩阵、proof marker 和 `data-section-block` 语义。
 - `[data-capability-backend-tablist]`: backend tab rail。使用单行 `flex-wrap: nowrap` 和本地 `overflow-x: auto`，只拥有底部分隔线，不使用 card background/radius/shadow。rail 的 block/inline padding 和 `scroll-padding-inline` 使用 `space-sm`，为外置 2px + 2px offset focus ring 留出完整四边 clearance。
 - `[data-capability-backend-tab]`: 固定 13px、normal letter spacing、32px 最小高度的紧凑 tab；active 使用 `interactive-accent` 2px underline，focus-visible 使用共享 2px settings focus ring，transition 仅 color / border-color / background-color 150ms。
 - `[data-capability-backend-panel][hidden]`: 原生 hidden panel 强制 `display:none`。panel/root 使用 `min-width:0`，避免长 Claude 内容把整个 Settings 页面撑宽。
@@ -49,7 +49,7 @@
 - `Diagnostic`、`Hidden`、`Untested` 等状态不能被弱化成完成态；未验证能力不得通过样式看起来像稳定功能。
 - sessionStore import / mirror proof 虽然是诊断性写入，但视觉上仍必须强调它们是 isolated diagnostic actions，而不是 stable restore/import UI。
 - 横向滚动只用于矩阵和发现表，其他控件在窄屏换行或占满宽度。
-- Capability Lab body 使用 container query；560px 以下 backend header 与操作栏改为单列。320px 等窄容器中 tab rail 保持单行并局部滚动；页面和 workspace 不横向溢出。整个 CSS 中只有 tab rail 与 `.opencodian-capability-lab-table-shell` 可拥有 `overflow-x:auto`。
+- Capability Lab outer shell 与 body 分别使用 container query；560px 以下 outer header、backend header 与操作栏都改为单列。320px 等窄容器中标题/说明保留可读行宽，tab rail 保持单行并局部滚动；页面和 workspace 不横向溢出。整个 CSS 中只有 tab rail 与 `.opencodian-capability-lab-table-shell` 可拥有 `overflow-x:auto`。
 - probe toolbar 和 probe status grid 在 720px 以下窄屏退化为单列，按钮和 select 占满宽度。
 
 ## 修改注意点

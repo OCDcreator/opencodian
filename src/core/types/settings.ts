@@ -23,19 +23,13 @@ export type PermissionMode = 'yolo' | 'plan' | 'normal';
 /** Effort level for adaptive thinking models */
 export type EffortLevel = 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
 
-const CAPABILITY_LAB_BACKEND_IDS: readonly AgentBackendKind[] = [
-  'claude-code',
-  'opencode',
-  'codex',
-];
-
-export function normalizeCapabilityLabSelectedBackend(value: unknown): AgentBackendKind | undefined {
+export function normalizeCapabilityLabSelectedBackend(value: unknown): string | undefined {
   if (typeof value !== 'string') {
     return undefined;
   }
 
-  const normalized = value.trim() as AgentBackendKind;
-  return CAPABILITY_LAB_BACKEND_IDS.includes(normalized) ? normalized : undefined;
+  const normalized = value.trim();
+  return normalized.length > 0 ? normalized : undefined;
 }
 
 /** Thinking budget for custom models */
@@ -2425,7 +2419,7 @@ export interface OpenCodianSettings {
   /** List of enabled backends. It can be empty when all agents are disabled. */
   enabledBackends: AgentBackendKind[];
 
-  capabilityLabSelectedBackend: AgentBackendKind | undefined;
+  capabilityLabSelectedBackend: string | undefined;
 
   /** Backend-specific settings that should not be flattened into OpenCode fields. */
   backendSettings: BackendSettings;

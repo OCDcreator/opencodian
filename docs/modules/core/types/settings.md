@@ -133,7 +133,7 @@ OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings`、`DEFAULT_
 | `PersistedTabState` | `{ tabs: PersistedTabEntry[], activeTabIndex }` |
 | `PersistedTabEntry` | `{ id?, parentTabId?, conversationId, title, modelOverride }` |
 | `PersistedTabModelOverride` | `{ provider, model }` |
-| `capabilityLabSelectedBackend` | Capability Lab 独立 UI preference：`claude-code | opencode | codex | undefined`。它不改变 `activeBackend` 或运行时 backend。 |
+| `capabilityLabSelectedBackend` | Capability Lab 独立 UI preference：非空 descriptor id 字符串或 `undefined`。它不改变 `activeBackend` 或运行时 backend；当前 descriptor 集负责判断持久化 id 是否可选，使未来 backend 只需新增 descriptor 与 renderer 即可保留选择。 |
 
 ### Provider 图标
 

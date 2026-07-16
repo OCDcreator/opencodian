@@ -228,6 +228,20 @@ describe('SettingsCapabilityLabSection', () => {
     expect(plugin.saveSettings).toHaveBeenCalled();
   });
 
+  it('shares one automatic session list read when Claude diagnostics first mount', async () => {
+    const listSessions = jest.fn().mockResolvedValue([]);
+    const plugin = createMockPlugin({ listSessions });
+    selectCapabilityBackend(plugin, 'opencode');
+    const containerEl = document.body.createDiv();
+    const section = new SettingsCapabilityLabSection({ plugin, createSectionHeading: createHeadingStub() });
+    section.attachTabbed(containerEl, 'capability-lab');
+
+    containerEl.querySelector<HTMLButtonElement>('[data-capability-backend-tab="claude-code"]')?.click();
+    await flushUi();
+
+    expect(listSessions).toHaveBeenCalledTimes(1);
+  });
+
   it('persists a Codex pointer activation without changing the active backend', () => {
     const plugin = createMockPlugin(
       { listSessions: jest.fn().mockResolvedValue([]) },
@@ -535,6 +549,52 @@ describe('SettingsCapabilityLabSection', () => {
     expect(refreshedButton?.disabled).toBe(false);
 
     containerEl.remove();
+  });
+
+  it('keeps focus on the selected backend when OpenCode refresh finishes while hidden', async () => {
+    const refresh = createDeferred<void>();
+    const availableSnapshot = {
+      generatedAt: 2,
+      entries: [
+        {
+          id: 'v2.health.get',
+          availability: { kind: 'available' },
+          evidence: RUNTIME_PROVEN_EVIDENCE,
+          definition: {},
+        },
+      ],
+    };
+    const plugin = createMockPlugin() as unknown as {
+      openCodeService: {
+        getSdkCapabilitySnapshot: jest.Mock;
+        refreshSdkCapabilities: jest.Mock;
+      };
+    };
+    plugin.openCodeService.getSdkCapabilitySnapshot
+      .mockReturnValueOnce({ generatedAt: 0, entries: [] })
+      .mockReturnValue(availableSnapshot);
+    plugin.openCodeService.refreshSdkCapabilities.mockReturnValue(refresh.promise);
+    const containerEl = document.body.createDiv();
+    const section = new SettingsCapabilityLabSection({
+      plugin: plugin as never,
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    activateCapabilityBackend(containerEl, 'opencode');
+    const workspace = containerEl.querySelector<HTMLElement>('[data-capability-backend="opencode"]');
+    const refreshButton = workspace?.querySelector<HTMLButtonElement>('[data-backend-action="refresh"]');
+    refreshButton?.focus();
+    refreshButton?.click();
+    activateCapabilityBackend(containerEl, 'codex');
+    const codexTab = containerEl.querySelector<HTMLButtonElement>('[data-capability-backend-tab="codex"]');
+
+    refresh.resolve(undefined);
+    await flushUi();
+
+    expect(document.activeElement).toBe(codexTab);
+    expect(workspace?.hasAttribute('aria-busy')).toBe(false);
+    expect(workspace?.querySelector<HTMLButtonElement>('[data-backend-action="refresh"]')?.disabled).toBe(false);
   });
 
   it('exports only the sanitized production capability evidence', async () => {

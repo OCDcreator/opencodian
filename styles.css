@@ -11486,6 +11486,8 @@ img.opencodian-model-provider-header-icon {
 /* components/settings-capability-lab.css */
 .opencodian-settings .opencodian-capability-lab-shell {
   gap: var(--opencodian-settings-space-lg);
+  container-name: capability-lab-shell;
+  container-type: inline-size;
 }
 
 .opencodian-settings .opencodian-debug-tab-shell-capability-lab {
@@ -12277,6 +12279,16 @@ img.opencodian-model-provider-header-icon {
 
   .opencodian-settings [data-capability-backend] .opencodian-capability-lab-controls > button {
     width: 100%;
+  }
+}
+
+@container capability-lab-shell (max-width: 560px) {
+  .opencodian-settings .opencodian-capability-lab-shell > .opencodian-debug-tab-header {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .opencodian-settings .opencodian-capability-lab-shell > .opencodian-debug-tab-header .opencodian-debug-tab-badges {
+    justify-content: flex-start;
   }
 }
 

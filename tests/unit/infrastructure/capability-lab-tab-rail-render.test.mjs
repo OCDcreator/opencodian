@@ -6,6 +6,103 @@ const puppeteer = require('puppeteer');
 jest.setTimeout(30000);
 
 describe('Capability Lab backend tab rail rendered contract', () => {
+  it('stacks the outer header and preserves readable CJK copy in a 320px container', async () => {
+    const capabilityLabCss = readFileSync(
+      join(process.cwd(), 'src/style/components/settings-capability-lab.css'),
+      'utf8',
+    );
+    const layoutCss = readFileSync(
+      join(process.cwd(), 'src/style/components/settings-layout-contract.css'),
+      'utf8',
+    );
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: ['--disable-setuid-sandbox', '--no-sandbox'],
+    });
+
+    try {
+      const page = await browser.newPage();
+      await page.setViewport({ width: 1280, height: 720, deviceScaleFactor: 1 });
+      await page.setContent(`
+        <style>
+          :root {
+            --font-interface: system-ui, sans-serif;
+            --text-normal: #202020;
+            --text-muted: #5c5c5c;
+            --background-primary: #fff;
+            --opencodian-settings-space-sm: 6px;
+            --opencodian-settings-space-md: 8px;
+            --opencodian-settings-space-lg: 10px;
+            --opencodian-settings-space-xl: 12px;
+            --opencodian-settings-inline-border: #c9c9c9;
+            --opencodian-settings-section-border: #c9c9c9;
+            --opencodian-settings-section-bg: #fff;
+            --opencodian-settings-radius-section: 8px;
+          }
+          * { box-sizing: border-box; }
+          html, body { width: 1280px; margin: 0; }
+          .opencodian-settings { width: 320px; margin: 16px; }
+          ${layoutCss}
+          ${capabilityLabCss}
+        </style>
+        <main class="opencodian-settings">
+          <section class="opencodian-debug-tab-shell opencodian-debug-tab-shell-capability-lab opencodian-capability-lab-shell">
+            <header class="opencodian-debug-tab-header">
+              <div class="opencodian-debug-tab-copy">
+                <h3 class="opencodian-settings-subsection-heading">能力实验室</h3>
+                <p class="opencodian-debug-tab-desc">按后端检查可用能力、诊断证据与安全边界。</p>
+              </div>
+              <div class="opencodian-debug-tab-badges">
+                <span>诊断专用</span>
+                <span>安全只读</span>
+              </div>
+            </header>
+            <div class="opencodian-debug-tab-body opencodian-capability-lab-body"></div>
+          </section>
+        </main>
+      `);
+
+      const evidence = await page.evaluate(() => {
+        const shell = document.querySelector('.opencodian-capability-lab-shell');
+        const header = document.querySelector('.opencodian-debug-tab-header');
+        const copy = document.querySelector('.opencodian-debug-tab-copy');
+        const title = document.querySelector('.opencodian-settings-subsection-heading');
+        const description = document.querySelector('.opencodian-debug-tab-desc');
+        if (!(shell instanceof HTMLElement)
+          || !(header instanceof HTMLElement)
+          || !(copy instanceof HTMLElement)
+          || !(title instanceof HTMLElement)
+          || !(description instanceof HTMLElement)) {
+          return null;
+        }
+        const headerStyle = getComputedStyle(header);
+        const shellStyle = getComputedStyle(shell);
+        const copyRect = copy.getBoundingClientRect();
+        const titleRect = title.getBoundingClientRect();
+        const descriptionRect = description.getBoundingClientRect();
+        return {
+          columns: headerStyle.gridTemplateColumns.split(' ').filter(Boolean).length,
+          shellContainerType: shellStyle.containerType,
+          copyWidth: copyRect.width,
+          titleWidth: titleRect.width,
+          descriptionWidth: descriptionRect.width,
+          shellWidth: shell.getBoundingClientRect().width,
+          pageOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        };
+      });
+
+      expect(evidence).not.toBeNull();
+      expect(evidence.columns).toBe(1);
+      expect(evidence.shellContainerType).toContain('inline-size');
+      expect(evidence.copyWidth).toBeGreaterThanOrEqual(evidence.shellWidth * 0.75);
+      expect(evidence.titleWidth).toBeGreaterThanOrEqual(160);
+      expect(evidence.descriptionWidth).toBeGreaterThanOrEqual(160);
+      expect(evidence.pageOverflow).toBeLessThanOrEqual(0);
+    } finally {
+      await browser.close();
+    }
+  });
+
   it('keeps the keyboard focus ring visible while the 320px rail scrolls locally', async () => {
     const css = readFileSync(
       join(process.cwd(), 'src/style/components/settings-capability-lab.css'),

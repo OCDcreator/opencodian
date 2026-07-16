@@ -102,6 +102,8 @@ interface CapabilityLabProbeShell {
   statusEl: HTMLElement | null;
 }
 
+type CapabilityLabClaudeSessions = Awaited<ReturnType<ClaudeCodeAdapter['listSessions']>>;
+
 const BLACK_BOX_CONTRACT_PASS_CAPABILITIES = new Set<string>([
   'Allowed Tools',
   'Fallback Model',
@@ -513,7 +515,7 @@ export class SettingsCapabilityLabSection {
       tablistLabel: t('settings.capabilityLab.tabs.label'),
       panelLoadError: t('settings.capabilityLab.tabs.loadFailed'),
       onPersist: (id) => {
-        this.plugin.settings.capabilityLabSelectedBackend = id as AgentBackendKind;
+        this.plugin.settings.capabilityLabSelectedBackend = id;
         return this.plugin.saveSettings();
       },
       descriptors: [
@@ -554,6 +556,9 @@ export class SettingsCapabilityLabSection {
     const adapter = getClaudeCodeAdapter(this.plugin);
     const state = this.getAdapterBackendTabState(adapter);
     const canWriteAsyncResult = createCapabilityLabAsyncWriteGuard(panelEl, context);
+    const initialSessions = typeof adapter?.listSessions === 'function'
+      ? adapter.listSessions()
+      : undefined;
     const workspace = createCapabilityLabBackendWorkspace({
       containerEl: panelEl,
       backend: 'claude-code',
@@ -571,13 +576,13 @@ export class SettingsCapabilityLabSection {
     );
 
     const blocks = [
-      ['history', (el: HTMLElement) => this.renderHistoryBrowser(el, canWriteAsyncResult)],
-      ['subagents', (el: HTMLElement) => this.renderSubagentBrowser(el, canWriteAsyncResult)],
-      ['rewind', (el: HTMLElement) => this.renderRewindDryRun(el, canWriteAsyncResult)],
+      ['history', (el: HTMLElement) => this.renderHistoryBrowser(el, canWriteAsyncResult, initialSessions)],
+      ['subagents', (el: HTMLElement) => this.renderSubagentBrowser(el, canWriteAsyncResult, initialSessions)],
+      ['rewind', (el: HTMLElement) => this.renderRewindDryRun(el, canWriteAsyncResult, initialSessions)],
       ['structured', (el: HTMLElement) => this.renderStructuredOutputPlayground(el)],
-      ['fork', (el: HTMLElement) => this.renderForkProbe(el, canWriteAsyncResult)],
-      ['resume', (el: HTMLElement) => this.renderResumeProbe(el, canWriteAsyncResult)],
-      ['session-detail', (el: HTMLElement) => this.renderSessionDetailProbe(el, canWriteAsyncResult)],
+      ['fork', (el: HTMLElement) => this.renderForkProbe(el, canWriteAsyncResult, initialSessions)],
+      ['resume', (el: HTMLElement) => this.renderResumeProbe(el, canWriteAsyncResult, initialSessions)],
+      ['session-detail', (el: HTMLElement) => this.renderSessionDetailProbe(el, canWriteAsyncResult, initialSessions)],
       ['backend-routing', (el: HTMLElement) => this.renderBackendRoutingProbe(el)],
       ['discovery', (el: HTMLElement) => this.renderDiscoveryStatus(el)],
     ] as const;
@@ -794,9 +799,10 @@ export class SettingsCapabilityLabSection {
     } finally {
       if (!context || context.isCurrent()) {
         const activeButton = containerEl.querySelector<HTMLButtonElement>('[data-backend-action="refresh"]');
+        const activePanel = workspaceEl.closest<HTMLElement>('[data-capability-backend-panel]');
         if (activeButton) activeButton.disabled = false;
         workspaceEl.removeAttribute('aria-busy');
-        if (shouldRestoreFocus) activeButton?.focus();
+        if (shouldRestoreFocus && activePanel?.hidden === false) activeButton?.focus();
       }
     }
   }
@@ -2168,7 +2174,11 @@ export class SettingsCapabilityLabSection {
   // JSONL History Browser (read-only)
   // =======================================================================
 
-  private renderHistoryBrowser(containerEl: HTMLElement, canWriteAsyncResult: () => boolean): void {
+  private renderHistoryBrowser(
+    containerEl: HTMLElement,
+    canWriteAsyncResult: () => boolean,
+    initialSessions?: Promise<CapabilityLabClaudeSessions>,
+  ): void {
     containerEl.createEl('h4', { text: t('settings.capabilityLab.history.title') });
     containerEl.createEl('p', {
       cls: 'opencodian-capability-lab-description',
@@ -2232,16 +2242,16 @@ export class SettingsCapabilityLabSection {
     let sessionLoadRequestId = 0;
 
     // Load sessions
-    const loadSessions = async (): Promise<void> => {
+    const loadSessions = async (sessionSource?: Promise<CapabilityLabClaudeSessions>): Promise<void> => {
       const requestId = sessionLoadRequestId + 1;
       sessionLoadRequestId = requestId;
       try {
         sessionSelect.innerHTML = '';
         sessionSelect.createEl('option', { text: '— Select a session —', attr: { value: '' } });
         const useStore = sourceSelect.value === 'store';
-        const sessions = await adapter.listSessions(
+        const sessions = await (sessionSource ?? adapter.listSessions(
           useStore ? { sessionStore: state.sessionStore } : undefined,
-        );
+        ));
         if (requestId !== sessionLoadRequestId || !canWriteAsyncResult()) {
           return;
         }
@@ -2317,7 +2327,7 @@ export class SettingsCapabilityLabSection {
     });
 
     // Auto-load on first render
-    void loadSessions();
+    void loadSessions(initialSessions);
   }
 
   private async loadSessionMessages(
@@ -2479,7 +2489,11 @@ export class SettingsCapabilityLabSection {
   // Subagent Browser (read-only)
   // =======================================================================
 
-  private renderSubagentBrowser(containerEl: HTMLElement, canWriteAsyncResult: () => boolean): void {
+  private renderSubagentBrowser(
+    containerEl: HTMLElement,
+    canWriteAsyncResult: () => boolean,
+    initialSessions?: Promise<CapabilityLabClaudeSessions>,
+  ): void {
     containerEl.createEl('h4', { text: t('settings.capabilityLab.subagents.title') });
     containerEl.createEl('p', {
       cls: 'opencodian-capability-lab-description',
@@ -2525,11 +2539,11 @@ export class SettingsCapabilityLabSection {
       attr: { 'data-diagnostic': 'true' },
     });
 
-    const loadSessions = async (): Promise<void> => {
+    const loadSessions = async (sessionSource?: Promise<CapabilityLabClaudeSessions>): Promise<void> => {
       try {
         sessionSelect.innerHTML = '';
         sessionSelect.createEl('option', { text: '— Select a session —', attr: { value: '' } });
-        const sessions = await adapter.listSessions();
+        const sessions = await (sessionSource ?? adapter.listSessions());
         if (!canWriteAsyncResult()) return;
         for (const session of sessions) {
           const option = sessionSelect.createEl('option', {
@@ -2565,7 +2579,7 @@ export class SettingsCapabilityLabSection {
       void this.loadSubagents(adapter, sessionId, subagentListEl, subagentOutputEl);
     });
 
-    void loadSessions();
+    void loadSessions(initialSessions);
   }
 
   private async loadSubagents(
@@ -2650,7 +2664,11 @@ export class SettingsCapabilityLabSection {
   // Rewind Dry-Run Preview (no actual restore)
   // =======================================================================
 
-  private renderRewindDryRun(containerEl: HTMLElement, canWriteAsyncResult: () => boolean): void {
+  private renderRewindDryRun(
+    containerEl: HTMLElement,
+    canWriteAsyncResult: () => boolean,
+    initialSessions?: Promise<CapabilityLabClaudeSessions>,
+  ): void {
     containerEl.createEl('h4', { text: t('settings.capabilityLab.rewind.title') });
     containerEl.createEl('p', {
       cls: 'opencodian-capability-lab-description',
@@ -2696,11 +2714,11 @@ export class SettingsCapabilityLabSection {
 
     // No actual restore button — this is intentionally omitted.
 
-    const loadSessions = async (): Promise<void> => {
+    const loadSessions = async (sessionSource?: Promise<CapabilityLabClaudeSessions>): Promise<void> => {
       try {
         sessionSelect.innerHTML = '';
         sessionSelect.createEl('option', { text: '— Select a session —', attr: { value: '' } });
-        const sessions = await adapter.listSessions();
+        const sessions = await (sessionSource ?? adapter.listSessions());
         if (!canWriteAsyncResult()) return;
         for (const session of sessions) {
           const option = sessionSelect.createEl('option', {
@@ -2728,7 +2746,7 @@ export class SettingsCapabilityLabSection {
       void this.runRewindDryRun(adapter, sessionId, userMessageId, outputEl);
     });
 
-    void loadSessions();
+    void loadSessions(initialSessions);
   }
 
   private async runRewindDryRun(
@@ -2842,7 +2860,11 @@ export class SettingsCapabilityLabSection {
     });
   }
 
-  private renderForkProbe(containerEl: HTMLElement, canWriteAsyncResult: () => boolean): void {
+  private renderForkProbe(
+    containerEl: HTMLElement,
+    canWriteAsyncResult: () => boolean,
+    initialSessions?: Promise<CapabilityLabClaudeSessions>,
+  ): void {
     const shell = this.createProbeShell(
       containerEl,
       t('settings.capabilityLab.fork.title'),
@@ -2874,11 +2896,11 @@ export class SettingsCapabilityLabSection {
     });
     const { outputEl } = shell;
 
-    const loadSessions = async (): Promise<void> => {
+    const loadSessions = async (sessionSource?: Promise<CapabilityLabClaudeSessions>): Promise<void> => {
       try {
         sessionSelect.innerHTML = '';
         sessionSelect.createEl('option', { text: '— Select a session —', attr: { value: '' } });
-        const sessions = await adapter.listSessions();
+        const sessions = await (sessionSource ?? adapter.listSessions());
         if (!canWriteAsyncResult()) return;
         for (const session of sessions) {
           const option = sessionSelect.createEl('option', {
@@ -2905,7 +2927,7 @@ export class SettingsCapabilityLabSection {
       void this.runForkDiagnostic(adapter, sessionId, outputEl);
     });
 
-    void loadSessions();
+    void loadSessions(initialSessions);
   }
 
   private async runForkDiagnostic(
@@ -2986,7 +3008,11 @@ export class SettingsCapabilityLabSection {
   // Resume Session Diagnostic Probe (provider-owned, diagnostic only)
   // =======================================================================
 
-  private renderResumeProbe(containerEl: HTMLElement, canWriteAsyncResult: () => boolean): void {
+  private renderResumeProbe(
+    containerEl: HTMLElement,
+    canWriteAsyncResult: () => boolean,
+    initialSessions?: Promise<CapabilityLabClaudeSessions>,
+  ): void {
     const shell = this.createProbeShell(
       containerEl,
       t('settings.capabilityLab.resume.title'),
@@ -3018,11 +3044,11 @@ export class SettingsCapabilityLabSection {
     });
     const { outputEl } = shell;
 
-    const loadSessions = async (): Promise<void> => {
+    const loadSessions = async (sessionSource?: Promise<CapabilityLabClaudeSessions>): Promise<void> => {
       try {
         sessionSelect.innerHTML = '';
         sessionSelect.createEl('option', { text: '— Select a session —', attr: { value: '' } });
-        const sessions = await adapter.listSessions();
+        const sessions = await (sessionSource ?? adapter.listSessions());
         if (!canWriteAsyncResult()) return;
         for (const session of sessions) {
           const option = sessionSelect.createEl('option', {
@@ -3049,7 +3075,7 @@ export class SettingsCapabilityLabSection {
       void this.runResumeDiagnostic(adapter, sessionId, outputEl);
     });
 
-    void loadSessions();
+    void loadSessions(initialSessions);
   }
 
   private async runResumeDiagnostic(
@@ -3115,7 +3141,11 @@ export class SettingsCapabilityLabSection {
   // Session Detail Diagnostic Probe (provider-owned, diagnostic only)
   // =======================================================================
 
-  private renderSessionDetailProbe(containerEl: HTMLElement, canWriteAsyncResult: () => boolean): void {
+  private renderSessionDetailProbe(
+    containerEl: HTMLElement,
+    canWriteAsyncResult: () => boolean,
+    initialSessions?: Promise<CapabilityLabClaudeSessions>,
+  ): void {
     const shell = this.createProbeShell(
       containerEl,
       t('settings.capabilityLab.sessionDetail.title'),
@@ -3147,11 +3177,11 @@ export class SettingsCapabilityLabSection {
     });
     const { outputEl } = shell;
 
-    const loadSessions = async (): Promise<void> => {
+    const loadSessions = async (sessionSource?: Promise<CapabilityLabClaudeSessions>): Promise<void> => {
       try {
         sessionSelect.innerHTML = '';
         sessionSelect.createEl('option', { text: '— Select a session —', attr: { value: '' } });
-        const sessions = await adapter.listSessions();
+        const sessions = await (sessionSource ?? adapter.listSessions());
         if (!canWriteAsyncResult()) return;
         for (const session of sessions) {
           const option = sessionSelect.createEl('option', {
@@ -3178,7 +3208,7 @@ export class SettingsCapabilityLabSection {
       void this.runSessionDetailDiagnostic(adapter, sessionId, outputEl);
     });
 
-    void loadSessions();
+    void loadSessions(initialSessions);
   }
 
   private async runSessionDetailDiagnostic(

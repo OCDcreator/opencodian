@@ -1,7 +1,7 @@
 # SettingsCapabilityLabSection
 
 > **源码**: `src/features/settings/SettingsCapabilityLabSection.ts`
-> **最近更新**: 2026-07-16（Claude Code / OpenCode / Codex 能力改为持久化 backend tabs）
+> **最近更新**: 2026-07-16（持久化 backend tabs + Claude 诊断首载共享会话读取）
 
 ## 概述
 
@@ -256,6 +256,8 @@ Discovery 面板在 adapter 可用时调用 `adapter.getMcpServerCount()`、`ada
 - Backend Routing 诊断探针读取已注册适配器时使用 `AgentServiceRegistry.listAll()` 公开接口，不再依赖 registry 私有 `adapters` map 的实现细节
 - Rewind Dry-Run 预览的 `runRewindDryRun()` 方法调用 `adapter.rewindFiles(sessionId, userMessageId, { dryRun: true })` 并根据结果内容进行诚实分类：`canRewind:true` + 非空 `filesChanged` → `pass`（真实回退行为）；`canRewind:false` 或 `canRewind:true` + 空 `filesChanged` → `readback`（API 可调用但无真实回退证据）；异常 → `fail`。该调用路径已有单元测试覆盖（pass + readback canRewind:false + readback empty filesChanged + 失败错误提示），不改变 rewind 仅诊断、非稳定产品的事实
 - Subagent Browser 的 `loadSubagents()` 和 `loadSubagentMessages()` 方法已有完整单元测试覆盖：会话刷新、子代理列表渲染、空列表处理、列表加载失败、子代理消息加载、消息加载失败、运行时证明 pass/fail，共 8 个测试用例
+- Claude Code panel 首次挂载时，History、Subagent、Rewind、Fork、Resume、Session Detail 六个只读诊断区共享同一个 `listSessions()` Promise，避免同一 SDK runtime 并发注册监听器并触发 `MaxListenersExceededWarning`。共享范围只覆盖自动首载；用户点击 Refresh、切换 History 数据源或主动运行诊断时仍执行新的 adapter 读取。回归测试锁定首次挂载只调用一次 `listSessions()`。
+- OpenCode safe refresh 在后台完成时仍会清除所属 workspace 的 `aria-busy` 并恢复按钮可用状态，但只有 OpenCode panel 仍可见时才把焦点恢复到重建后的 Refresh 按钮；若用户已切换到 Claude Code 或 Codex，当前 backend tab 保持焦点，不会被隐藏 panel 抢走。
 - Discovery 面板里的 Hooks / Agent Definitions / Session Store 条目保持 `Discovery Only`，只表示诊断观察，不是稳定产品面；Hook proof 现在会同时展示 SessionStart 事件和 hook event timeline，但 verdict 已分离：`runHookProof()` 只更新 Hooks verdict（readback/fail），不再驱动 Include Hook Events verdict。`Include Hook Events` 保持自己的独立 pass 证据（静态矩阵行 + 独立 stream 验证）。`Include Hook Events` 标记为 pass 是诚实的：该 proof 显式设置 `includeHookEvents: true`，然后真实捕获到 `backend_event` + `event: 'hook'` 的流事件；如果没有 `includeHookEvents`，这些 hook 事件不会出现在诊断输出中，因此这是真正的运行时依赖证明
 - Discovery 面板里的 Plugins 条目使用 `adapter.getPluginCount()/getPluginsList()` 显示 programmatic adapter 选项（dead-letter at runtime），不是 marketplace 运行时插件——措辞已明确区分。状态保持 `Discovery Only`，不使用 exposed chip。`runPluginsProof()` 验证 marketplace plugin→skills 链：SDK init 消息显示 36 plugin-provided skills 以 `pluginName:skillName` 格式出现在 init.skills（pass 锚定于此）。2 plugin-provided MCP servers status `"failed"` 仅是注册证据。Plugins 已晋升为 `pass`
 - Discovery 面板里的 Skills 条目使用 `adapter.getSkillCount()` 动态显示配置/发现状态：有 skills 时显示计数和名称列表，`skills: 'all'` 时显示 "All skills enabled"，但状态仍是 "Discovery Only"；该检测为只读，不提供 skill authoring，也不是 runtime proof

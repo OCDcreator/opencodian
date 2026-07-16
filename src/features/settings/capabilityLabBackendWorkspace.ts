@@ -1,4 +1,4 @@
-export type CapabilityLabBackendId = 'claude-code' | 'opencode' | 'codex';
+export type CapabilityLabBackendId = string;
 
 export type CapabilityLabBackendState = 'available' | 'empty' | 'unconfigured' | 'unknown';
 
@@ -20,7 +20,12 @@ export interface CapabilityLabBackendWorkspace {
 export function createCapabilityLabBackendWorkspace(
   options: CapabilityLabBackendWorkspaceOptions,
 ): CapabilityLabBackendWorkspace {
-  const titleId = `opencodian-capability-lab-${options.backend}-title`;
+  const backendIdFragment = options.backend
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, '-')
+    .replace(/^-+|-+$/g, '') || 'backend';
+  const titleId = `opencodian-capability-lab-${backendIdFragment}-title`;
   const rootEl = options.containerEl.createEl('section', {
     cls: 'opencodian-capability-lab-backend-workspace',
     attr: {

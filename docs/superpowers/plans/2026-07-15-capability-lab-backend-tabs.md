@@ -416,11 +416,11 @@ git commit -m "Polish and document Capability Lab backend tabs"
 - Consumes: the production build produced by `npm run verify`.
 - Produces: BUILD_ID, deployment hashes, DOM/focus/overflow assertions, console evidence, screenshots, and independent review verdicts.
 
-- [ ] **Step 1: Run Obsidian Plugin Autodebug preflight.**
+- [x] **Step 1: Run Obsidian Plugin Autodebug preflight.**
 
 Use the repo-local or skill-provided doctor command to verify Test Vault path, plugin id, Obsidian control channel, and screenshot support. Record the output in the evidence directory.
 
-- [ ] **Step 2: Build, then deploy sequentially to the macOS Test Vault.**
+- [x] **Step 2: Build, then deploy sequentially to the macOS Test Vault.**
 
 Run `npm run build`. After it succeeds, copy these files in separate sequential operations to `/Volumes/SDD2T/obsidian-vault-write/testvault/.obsidian/plugins/opencodian/`:
 
@@ -432,7 +432,7 @@ dist/styles.css
 
 Do not chain build and copy. Verify the deployed `main.js` contains the new `BUILD_ID` and compare source/destination hashes.
 
-- [ ] **Step 3: Reload and verify navigation behavior.**
+- [x] **Step 3: Reload and verify navigation behavior.**
 
 Open Debug > Capability Lab and prove:
 
@@ -444,11 +444,11 @@ Open Debug > Capability Lab and prove:
 - The selected backend survives Settings close/reopen and Obsidian reload.
 - Unconfigured backends remain selectable.
 
-- [ ] **Step 4: Verify lazy loading and OpenCode safety.**
+- [x] **Step 4: Verify lazy loading and OpenCode safety.**
 
 Start on OpenCode or Codex and use DOM/API counters or observable loading markers to prove Claude History/Subagent content has not mounted. Activate Claude and prove it mounts once. In OpenCode, run safe refresh and sanitized evidence export; verify selection remains OpenCode, `aria-busy` clears, one feedback node exists, and no raw error or credential appears.
 
-- [ ] **Step 5: Verify responsive and theme behavior.**
+- [x] **Step 5: Verify responsive and theme behavior.**
 
 Capture light and dark screenshots at normal Settings width and a 320px-equivalent narrow width. Assert:
 
@@ -458,10 +458,10 @@ Capture light and dark screenshots at normal Settings width and a 320px-equivale
 - CJK labels and state text do not overlap, clip, or orphan unnaturally.
 - Focus rings and active underline remain visible in both themes.
 
-- [ ] **Step 6: Run independent GPT-5.6 sol reviews.**
+- [x] **Step 6: Run independent GPT-5.6 sol reviews.**
 
 Dispatch two fresh read-only reviewers in parallel: one for design-system/functional integrity and one for visual/CJK/accessibility precision. Give them the complete fresh screenshot set, DOM/computed-style assertions, BUILD_ID, and source paths. Fix all blocking product findings, rebuild, redeploy, recapture, and repeat until both pass on the same current build.
 
-- [ ] **Step 7: Run final verification and report.**
+- [x] **Step 7: Run final verification and report.**
 
 Re-run the focused tests affected by any QA fixes, `npm run graphify:update:src` if source changed, and `npm run verify`. Report final commits, test counts, BUILD_ID, deployment hashes, evidence directory, screenshot paths, independent review verdicts, and residual risks. Do not commit `.obsidian-debug/` evidence.

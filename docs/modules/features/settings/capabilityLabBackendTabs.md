@@ -16,7 +16,7 @@ Capability Lab backend tabs 的 descriptor-driven DOM controller。它只负责�
 
 ## 选择与持久化
 
-初始选择顺序是：合法 persisted id → 当前 `activeBackend` → descriptor 第一项。生产 descriptor 第一项固定为 Claude Code。点击或 Enter/Space 激活时调用 `onPersist(id)`，只更新 `capabilityLabSelectedBackend`，不修改 `activeBackend`、enabled backends、实验 gate 或运行时配置。
+初始选择顺序是：当前 descriptor 集中存在的 persisted id → 当前 `activeBackend` → descriptor 第一项。生产 descriptor 第一项固定为 Claude Code。点击或 Enter/Space 激活时调用 `onPersist(id)`，只更新开放字符串型 `capabilityLabSelectedBackend`，不修改 `activeBackend`、enabled backends、实验 gate 或运行时配置。新增未来 backend 只需新增 descriptor 与 renderer；启动归一化不会再因固定白名单丢弃它的持久化 id。
 
 ## 可访问性与生命周期
 
