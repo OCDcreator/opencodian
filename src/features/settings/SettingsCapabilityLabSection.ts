@@ -2,10 +2,8 @@
 /**
  * Capability Lab — diagnostic / experimental workbench for Claude Code SDK parity.
  *
- * All UI surfaces in this file are intentionally:
- *   - Read-only, dry-run, or isolated diagnostic-store writes only
- *   - Labelled ⚠️ DIAGNOSTIC / EXPERIMENTAL / NOT STABLE
- *   - NOT connected to stable settings persistence
+ * Capability probes are read-only, dry-run, or isolated diagnostic-store writes.
+ * The selected backend tab and explicit Claude diagnostic controls are UI settings.
  *
  * See openspec/phase1-capability-lab.md for design rationale.
  */
@@ -40,6 +38,16 @@ import {
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { createLogger, getVaultBasePath } from '../../shared';
+import {
+  type CapabilityLabBackendTabRenderContext,
+  type CapabilityLabBackendTabsController,
+  createCapabilityLabBackendTabs,
+} from './capabilityLabBackendTabs';
+import {
+  type CapabilityLabBackendState,
+  createCapabilityLabBackendWorkspace,
+  updateCapabilityLabBackendState,
+} from './capabilityLabBackendWorkspace';
 
 const labLogger = createLogger('CapabilityLab');
 
@@ -200,7 +208,7 @@ function experimentalBanner(containerEl: HTMLElement): void {
   banner.createEl('br');
   banner.createSpan({
     text: 'This panel exposes unverified SDK capabilities for diagnostic inspection only. ' +
-      'Some probes may mirror data into an isolated diagnostic store, but nothing here changes stable plugin behavior or persists settings. Do not rely on these features.',
+      'Probes are read-only, dry-run, or isolated-store operations. Backend tab selection and explicit Claude diagnostic controls may persist UI settings. Do not rely on experimental capability evidence as a stable contract.',
   });
 }
 
@@ -213,7 +221,7 @@ function createDiagnosticSummary(containerEl: HTMLElement): void {
   const items = [
     ['Boundary', 'Diagnostic only'],
     ['Runtime proof', 'Per-action, not persisted'],
-    ['Writes', 'Isolated diagnostic only'],
+    ['Writes', 'UI settings + isolated diagnostics'],
   ] as const;
 
   for (const [label, value] of items) {
@@ -221,6 +229,20 @@ function createDiagnosticSummary(containerEl: HTMLElement): void {
     itemEl.createSpan({ cls: 'opencodian-capability-lab-summary-label', text: label });
     itemEl.createSpan({ cls: 'opencodian-capability-lab-summary-value', text: value });
   }
+}
+
+function createCapabilityLabAsyncWriteGuard(
+  panelEl: HTMLElement,
+  context: CapabilityLabBackendTabRenderContext,
+): () => boolean {
+  let wasConnected = panelEl.isConnected;
+  return () => {
+    if (panelEl.isConnected) {
+      wasConnected = true;
+      return context.isCurrent();
+    }
+    return !wasConnected;
+  };
 }
 
 function createStatusChip(containerEl: HTMLElement, label: string, active: boolean): void {
@@ -433,13 +455,17 @@ function renderMessagePreviewList(
 export class SettingsCapabilityLabSection {
   private readonly plugin: OpenCodianPlugin;
   private readonly createSectionHeading: CapabilityLabDeps['createSectionHeading'];
+  private backendTabsController: CapabilityLabBackendTabsController | null = null;
 
   constructor(deps: CapabilityLabDeps) {
     this.plugin = deps.plugin;
     this.createSectionHeading = deps.createSectionHeading;
   }
 
-  dispose(): void {}
+  dispose(): void {
+    this.backendTabsController?.dispose();
+    this.backendTabsController = null;
+  }
 
   private get claudeCodeSettings() {
     this.plugin.settings.backendSettings ??= { claudeCode: getDefaultClaudeCodeBackendSettings(), codex: getDefaultCodexBackendSettings() };
@@ -452,6 +478,7 @@ export class SettingsCapabilityLabSection {
   }
 
   attachTabbed(containerEl: HTMLElement, _secondaryTabId: string): void {
+    this.dispose();
     const shellEl = containerEl.createDiv({
       cls: 'opencodian-debug-tab-shell opencodian-debug-tab-shell-capability-lab opencodian-capability-lab-shell',
       attr: {
@@ -479,81 +506,123 @@ export class SettingsCapabilityLabSection {
     experimentalBanner(bodyEl);
     createDiagnosticSummary(bodyEl);
 
-    // ── Capability Matrix ──────────────────────────────────────────────
-    const matrixBlock = bodyEl.createDiv({
-      cls: 'opencodian-settings-block',
-      attr: { 'data-section-block': 'matrix' },
+    this.backendTabsController = createCapabilityLabBackendTabs({
+      containerEl: bodyEl,
+      persistedId: this.plugin.settings.capabilityLabSelectedBackend,
+      activeBackend: this.plugin.settings.activeBackend,
+      tablistLabel: t('settings.capabilityLab.tabs.label'),
+      panelLoadError: t('settings.capabilityLab.tabs.loadFailed'),
+      onPersist: (id) => {
+        this.plugin.settings.capabilityLabSelectedBackend = id as AgentBackendKind;
+        return this.plugin.saveSettings();
+      },
+      descriptors: [
+        {
+          id: 'claude-code',
+          label: t('settings.capabilityLab.tabs.claudeCode'),
+          getState: () => this.getAdapterBackendTabState(getClaudeCodeAdapter(this.plugin)),
+          render: (panelEl, context) => { this.renderClaudeCodePanel(panelEl, context); },
+        },
+        {
+          id: 'opencode',
+          label: t('settings.capabilityLab.tabs.openCode'),
+          getState: () => {
+            const state = this.getOpenCodeBackendState(this.plugin.openCodeService.getSdkCapabilitySnapshot());
+            return { state, label: this.getBackendStateLabel(state) };
+          },
+          render: (panelEl, context) => { this.renderOpenCodePanel(panelEl, context); },
+        },
+        {
+          id: 'codex',
+          label: t('settings.capabilityLab.tabs.codex'),
+          getState: () => this.getAdapterBackendTabState(getCodexAdapter(this.plugin)),
+          render: (panelEl) => { this.renderCodexPanel(panelEl); },
+        },
+      ],
     });
-    this.renderCapabilityMatrix(matrixBlock, { includeDescription: false });
+  }
 
-    const openCodeSdkBlock = bodyEl.createDiv({
-      cls: 'opencodian-settings-block',
-      attr: { 'data-section-block': 'opencode-sdk-capabilities' },
-    });
-    this.renderOpenCodeSdkCapabilities(openCodeSdkBlock);
+  private getAdapterBackendTabState(adapter: unknown): { state: CapabilityLabBackendState; label: string } {
+    const state: CapabilityLabBackendState = adapter ? 'available' : 'unconfigured';
+    return { state, label: this.getBackendStateLabel(state) };
+  }
 
-    // ── JSONL History Browser (read-only) ──────────────────────────────
-    const historyBlock = bodyEl.createDiv({
-      cls: 'opencodian-settings-block',
-      attr: { 'data-section-block': 'history' },
+  private renderClaudeCodePanel(
+    panelEl: HTMLElement,
+    context: CapabilityLabBackendTabRenderContext,
+  ): void {
+    const adapter = getClaudeCodeAdapter(this.plugin);
+    const state = this.getAdapterBackendTabState(adapter);
+    const canWriteAsyncResult = createCapabilityLabAsyncWriteGuard(panelEl, context);
+    const workspace = createCapabilityLabBackendWorkspace({
+      containerEl: panelEl,
+      backend: 'claude-code',
+      sectionBlock: 'claude-code-capabilities',
+      title: t('settings.capabilityLab.backends.claudeCode.title'),
+      description: t('settings.capabilityLab.backends.claudeCode.description'),
+      state: state.state,
+      stateLabel: state.label,
     });
-    this.renderHistoryBrowser(historyBlock);
+    this.renderCapabilityMatrix(
+      workspace.contentEl,
+      'claude-code',
+      this.buildMatrixRows(adapter),
+      t('settings.capabilityLab.matrix.claudeCodeLabel'),
+    );
 
-    // ── Subagent Browser (read-only) ───────────────────────────────────
-    const subagentBlock = bodyEl.createDiv({
-      cls: 'opencodian-settings-block',
-      attr: { 'data-section-block': 'subagents' },
-    });
-    this.renderSubagentBrowser(subagentBlock);
+    const blocks = [
+      ['history', (el: HTMLElement) => this.renderHistoryBrowser(el, canWriteAsyncResult)],
+      ['subagents', (el: HTMLElement) => this.renderSubagentBrowser(el, canWriteAsyncResult)],
+      ['rewind', (el: HTMLElement) => this.renderRewindDryRun(el, canWriteAsyncResult)],
+      ['structured', (el: HTMLElement) => this.renderStructuredOutputPlayground(el)],
+      ['fork', (el: HTMLElement) => this.renderForkProbe(el, canWriteAsyncResult)],
+      ['resume', (el: HTMLElement) => this.renderResumeProbe(el, canWriteAsyncResult)],
+      ['session-detail', (el: HTMLElement) => this.renderSessionDetailProbe(el, canWriteAsyncResult)],
+      ['backend-routing', (el: HTMLElement) => this.renderBackendRoutingProbe(el)],
+      ['discovery', (el: HTMLElement) => this.renderDiscoveryStatus(el)],
+    ] as const;
+    for (const [sectionBlock, render] of blocks) {
+      const blockEl = panelEl.createDiv({
+        cls: 'opencodian-settings-block',
+        attr: { 'data-section-block': sectionBlock },
+      });
+      render(blockEl);
+    }
+  }
 
-    // ── Rewind Dry-Run Preview ────────────────────────────────────────
-    const rewindBlock = bodyEl.createDiv({
-      cls: 'opencodian-settings-block',
-      attr: { 'data-section-block': 'rewind' },
+  private renderOpenCodePanel(panelEl: HTMLElement, context: CapabilityLabBackendTabRenderContext): void {
+    const snapshot = this.plugin.openCodeService.getSdkCapabilitySnapshot();
+    const state = this.getOpenCodeBackendState(snapshot);
+    const workspace = createCapabilityLabBackendWorkspace({
+      containerEl: panelEl,
+      backend: 'opencode',
+      sectionBlock: 'opencode-sdk-capabilities',
+      title: t('settings.capabilityLab.openCodeSdk.title'),
+      description: t('settings.capabilityLab.openCodeSdk.description'),
+      state,
+      stateLabel: this.getBackendStateLabel(state),
     });
-    this.renderRewindDryRun(rewindBlock);
+    this.renderOpenCodeSdkCapabilities(workspace.contentEl, workspace.rootEl, snapshot, context);
+  }
 
-    // ── Structured Output Playground ───────────────────────────────────
-    const structuredBlock = bodyEl.createDiv({
-      cls: 'opencodian-settings-block',
-      attr: { 'data-section-block': 'structured' },
+  private renderCodexPanel(panelEl: HTMLElement): void {
+    const adapter = getCodexAdapter(this.plugin);
+    const state = this.getAdapterBackendTabState(adapter);
+    const workspace = createCapabilityLabBackendWorkspace({
+      containerEl: panelEl,
+      backend: 'codex',
+      sectionBlock: 'codex-capabilities',
+      title: t('settings.capabilityLab.backends.codex.title'),
+      description: t('settings.capabilityLab.backends.codex.description'),
+      state: state.state,
+      stateLabel: state.label,
     });
-    this.renderStructuredOutputPlayground(structuredBlock);
-
-    // ── Fork Session Diagnostic (provider-owned, diagnostic only) ─────
-    const forkBlock = bodyEl.createDiv({
-      cls: 'opencodian-settings-block',
-      attr: { 'data-section-block': 'fork' },
-    });
-    this.renderForkProbe(forkBlock);
-
-    // ── Resume Session Diagnostic (provider-owned, diagnostic only) ───
-    const resumeBlock = bodyEl.createDiv({
-      cls: 'opencodian-settings-block',
-      attr: { 'data-section-block': 'resume' },
-    });
-    this.renderResumeProbe(resumeBlock);
-
-    // ── Session Detail Diagnostic (provider-owned, diagnostic only) ──
-    const sessionDetailBlock = bodyEl.createDiv({
-      cls: 'opencodian-settings-block',
-      attr: { 'data-section-block': 'session-detail' },
-    });
-    this.renderSessionDetailProbe(sessionDetailBlock);
-
-    // ── Backend Routing Diagnostic (provider-owned, diagnostic only) ──
-    const backendRoutingBlock = bodyEl.createDiv({
-      cls: 'opencodian-settings-block',
-      attr: { 'data-section-block': 'backend-routing' },
-    });
-    this.renderBackendRoutingProbe(backendRoutingBlock);
-
-    // ── Discovery / Status ─────────────────────────────────────────────
-    const discoveryBlock = bodyEl.createDiv({
-      cls: 'opencodian-settings-block',
-      attr: { 'data-section-block': 'discovery' },
-    });
-    this.renderDiscoveryStatus(discoveryBlock);
+    this.renderCapabilityMatrix(
+      workspace.contentEl,
+      'codex',
+      this.buildCodexMatrixRows(adapter),
+      t('settings.capabilityLab.matrix.codexLabel'),
+    );
   }
 
   // =======================================================================
@@ -562,104 +631,110 @@ export class SettingsCapabilityLabSection {
 
   private renderCapabilityMatrix(
     containerEl: HTMLElement,
-    options: { includeDescription: boolean } = { includeDescription: true },
+    backend: 'claude-code' | 'codex',
+    rows: readonly MatrixRow[],
+    accessibleLabel: string,
   ): void {
-    containerEl.createEl('h4', { text: t('settings.capabilityLab.matrix.title') });
-    if (options.includeDescription) {
-      containerEl.createEl('p', {
-        cls: 'opencodian-capability-lab-description',
-        text: t('settings.capabilityLab.matrix.description'),
-      });
-    }
-
-    const adapter = getClaudeCodeAdapter(this.plugin);
-    const codexAdapter = getCodexAdapter(this.plugin);
     const shellEl = containerEl.createDiv({
       cls: 'opencodian-capability-lab-table-shell',
       attr: { 'data-diagnostic': 'true' },
     });
     const table = shellEl.createEl('table', {
       cls: 'opencodian-capability-lab-matrix',
+      attr: {
+        'aria-label': accessibleLabel,
+        'data-capability-matrix': backend,
+      },
     });
 
-    // Header
     const thead = table.createEl('thead');
     const headerRow = thead.createEl('tr');
-    headerRow.createEl('th', { text: 'Capability' });
-    headerRow.createEl('th', { text: 'SDK' });
-    headerRow.createEl('th', { text: 'Adapter' });
-    headerRow.createEl('th', { text: 'Runtime Proof' });
-    headerRow.createEl('th', { text: 'User Surface' });
+    headerRow.createEl('th', { text: t('settings.capabilityLab.matrix.capability'), attr: { scope: 'col' } });
+    headerRow.createEl('th', { text: t('settings.capabilityLab.matrix.sdk'), attr: { scope: 'col' } });
+    headerRow.createEl('th', { text: t('settings.capabilityLab.matrix.adapter'), attr: { scope: 'col' } });
+    headerRow.createEl('th', { text: t('settings.capabilityLab.matrix.runtimeProof'), attr: { scope: 'col' } });
+    headerRow.createEl('th', { text: t('settings.capabilityLab.matrix.userSurface'), attr: { scope: 'col' } });
 
-    // Build Claude Code rows
-    const rows = this.buildMatrixRows(adapter);
     const tbody = table.createEl('tbody');
     for (const row of rows) {
       this.renderMatrixRow(tbody, row);
     }
-
-    // Build Codex rows (honest diagnostic summary)
-    const codexRows = this.buildCodexMatrixRows(codexAdapter);
-    if (codexRows.length > 0) {
-      const separatorTr = tbody.createEl('tr');
-      separatorTr.createEl('td', {
-        cls: 'opencodian-capability-lab-matrix-separator',
-        attr: { colspan: '5' },
-        text: 'Codex Backend',
-      });
-      for (const row of codexRows) {
-        this.renderMatrixRow(tbody, row);
-      }
-    }
   }
 
-  private renderOpenCodeSdkCapabilities(containerEl: HTMLElement): void {
+  private renderOpenCodeSdkCapabilities(
+    containerEl: HTMLElement,
+    workspaceEl: HTMLElement,
+    snapshot: OpenCodeSdkCapabilitySnapshot,
+    context?: CapabilityLabBackendTabRenderContext,
+  ): void {
     containerEl.empty();
-    containerEl.createEl('h4', { text: t('settings.capabilityLab.openCodeSdk.title') });
-    containerEl.createEl('p', {
-      cls: 'opencodian-capability-lab-description',
-      text: t('settings.capabilityLab.openCodeSdk.description'),
-    });
 
-    const snapshot = this.plugin.openCodeService.getSdkCapabilitySnapshot();
     if (snapshot.entries.length === 0) {
-      containerEl.createEl('p', { text: t('settings.capabilityLab.openCodeSdk.empty') });
-      return;
-    }
-
-    const table = containerEl.createEl('table', {
-      cls: 'opencodian-capability-lab-opencode-sdk',
-      attr: { 'data-diagnostic': 'true' },
-    });
-    const headerRow = table.createEl('thead').createEl('tr');
-    headerRow.createEl('th', { text: t('settings.capabilityLab.openCodeSdk.capability') });
-    headerRow.createEl('th', { text: t('settings.capabilityLab.openCodeSdk.availability') });
-    headerRow.createEl('th', { text: t('settings.capabilityLab.openCodeSdk.evidence') });
-
-    const tbody = table.createEl('tbody');
-    for (const entry of snapshot.entries) {
-      const row = tbody.createEl('tr', {
+      containerEl.createEl('p', {
+        cls: 'opencodian-capability-lab-backend-empty',
+        text: t('settings.capabilityLab.openCodeSdk.empty'),
+      });
+    } else {
+      const shellEl = containerEl.createDiv({ cls: 'opencodian-capability-lab-table-shell' });
+      const table = shellEl.createEl('table', {
+        cls: 'opencodian-capability-lab-opencode-sdk',
         attr: {
-          'data-opencode-sdk-capability': entry.id,
-          'data-opencode-sdk-evidence': entry.evidence.kind,
+          'aria-label': t('settings.capabilityLab.openCodeSdk.title'),
+          'data-diagnostic': 'true',
         },
       });
-      row.createEl('td', { text: entry.id });
-      row.createEl('td', { text: entry.availability.kind });
-      row.createEl('td', { text: this.getOpenCodeSdkEvidenceLabel(entry.evidence) });
+      const headerRow = table.createEl('thead').createEl('tr');
+      headerRow.createEl('th', {
+        text: t('settings.capabilityLab.openCodeSdk.capability'),
+        attr: { scope: 'col' },
+      });
+      headerRow.createEl('th', {
+        text: t('settings.capabilityLab.openCodeSdk.availability'),
+        attr: { scope: 'col' },
+      });
+      headerRow.createEl('th', {
+        text: t('settings.capabilityLab.openCodeSdk.evidence'),
+        attr: { scope: 'col' },
+      });
+
+      const tbody = table.createEl('tbody');
+      for (const entry of snapshot.entries) {
+        const row = tbody.createEl('tr', {
+          attr: {
+            'data-opencode-sdk-capability': entry.id,
+            'data-opencode-sdk-evidence': entry.evidence.kind,
+          },
+        });
+        const capabilityCell = row.createEl('td');
+        const idFragments = entry.id.split(/(?<=\.)|(?=[A-Z])/u);
+        idFragments.forEach((fragment, index) => {
+          capabilityCell.append(fragment);
+          if (index < idFragments.length - 1) capabilityCell.createEl('wbr');
+        });
+        row.createEl('td', { text: entry.availability.kind });
+        row.createEl('td', { text: this.getOpenCodeSdkEvidenceLabel(entry.evidence) });
+      }
     }
 
     const actionsEl = containerEl.createDiv({ cls: 'opencodian-capability-lab-controls' });
     const refreshButton = actionsEl.createEl('button', {
       text: t('settings.capabilityLab.openCodeSdk.refresh'),
-      attr: { type: 'button', 'data-opencode-sdk-action': 'refresh' },
+      attr: {
+        type: 'button',
+        'data-backend-action': 'refresh',
+        'data-opencode-sdk-action': 'refresh',
+      },
     });
     refreshButton.addEventListener('click', () => {
-      void this.refreshOpenCodeSdkCapabilities(containerEl, refreshButton);
+      void this.refreshOpenCodeSdkCapabilities(containerEl, workspaceEl, refreshButton, context);
     });
     const copyButton = actionsEl.createEl('button', {
       text: t('settings.capabilityLab.openCodeSdk.copyEvidence'),
-      attr: { type: 'button', 'data-opencode-sdk-action': 'copy-evidence' },
+      attr: {
+        type: 'button',
+        'data-backend-action': 'copy-evidence',
+        'data-opencode-sdk-action': 'copy-evidence',
+      },
     });
     copyButton.addEventListener('click', () => {
       void this.copyOpenCodeSdkEvidence();
@@ -680,16 +755,66 @@ export class SettingsCapabilityLabSection {
 
   private async refreshOpenCodeSdkCapabilities(
     containerEl: HTMLElement,
+    workspaceEl: HTMLElement,
     buttonEl: HTMLButtonElement,
+    context?: CapabilityLabBackendTabRenderContext,
   ): Promise<void> {
+    const shouldRestoreFocus = document.activeElement === buttonEl;
     buttonEl.disabled = true;
+    workspaceEl.setAttribute('aria-busy', 'true');
+    containerEl.querySelector('[data-opencode-sdk-refresh-feedback]')?.remove();
     try {
       await this.plugin.openCodeService.refreshSdkCapabilities();
-      this.renderOpenCodeSdkCapabilities(containerEl);
+      if (context && !context.isCurrent()) return;
+      const snapshot = this.plugin.openCodeService.getSdkCapabilitySnapshot();
+      const state = this.getOpenCodeBackendState(snapshot);
+      updateCapabilityLabBackendState(workspaceEl, state, this.getBackendStateLabel(state));
+      this.renderOpenCodeSdkCapabilities(containerEl, workspaceEl, snapshot, context);
+      context?.refreshState();
+      containerEl.createDiv({
+        cls: 'opencodian-capability-lab-sr-status',
+        text: t('settings.capabilityLab.openCodeSdk.refreshSuccess'),
+        attr: {
+          'aria-live': 'polite',
+          'data-opencode-sdk-refresh-feedback': 'success',
+          role: 'status',
+        },
+      });
     } catch {
-      buttonEl.disabled = false;
+      if (context && !context.isCurrent()) return;
+      containerEl.createDiv({
+        cls: 'opencodian-capability-lab-error',
+        text: t('settings.capabilityLab.openCodeSdk.refreshFailed'),
+        attr: {
+          'data-opencode-sdk-refresh-feedback': 'error',
+          role: 'alert',
+        },
+      });
       new Notice(t('settings.capabilityLab.openCodeSdk.refreshFailed'));
+    } finally {
+      if (!context || context.isCurrent()) {
+        const activeButton = containerEl.querySelector<HTMLButtonElement>('[data-backend-action="refresh"]');
+        if (activeButton) activeButton.disabled = false;
+        workspaceEl.removeAttribute('aria-busy');
+        if (shouldRestoreFocus) activeButton?.focus();
+      }
     }
+  }
+
+  private getOpenCodeBackendState(snapshot: OpenCodeSdkCapabilitySnapshot): CapabilityLabBackendState {
+    if (snapshot.entries.some((entry) => entry.availability.kind === 'available')) return 'available';
+    if (snapshot.entries.some((entry) => entry.availability.kind === 'unknown')) return 'unknown';
+    return snapshot.generatedAt > 0 ? 'empty' : 'unknown';
+  }
+
+  private getBackendStateLabel(state: CapabilityLabBackendState): string {
+    const keys: Record<CapabilityLabBackendState, Parameters<typeof t>[0]> = {
+      available: 'settings.capabilityLab.backends.state.available',
+      empty: 'settings.capabilityLab.backends.state.empty',
+      unconfigured: 'settings.capabilityLab.backends.state.unconfigured',
+      unknown: 'settings.capabilityLab.backends.state.unknown',
+    };
+    return t(keys[state]);
   }
 
   private async copyOpenCodeSdkEvidence(): Promise<void> {
@@ -709,7 +834,9 @@ export class SettingsCapabilityLabSection {
       entries: snapshot.entries.map((entry) => ({
         id: entry.id,
         availability: entry.availability.kind,
-        evidence: entry.evidence,
+        evidence: entry.evidence.kind === 'failed'
+          ? { kind: entry.evidence.kind, reason: entry.evidence.reason }
+          : { kind: entry.evidence.kind },
       })),
     }, null, 2);
   }
@@ -2041,7 +2168,7 @@ export class SettingsCapabilityLabSection {
   // JSONL History Browser (read-only)
   // =======================================================================
 
-  private renderHistoryBrowser(containerEl: HTMLElement): void {
+  private renderHistoryBrowser(containerEl: HTMLElement, canWriteAsyncResult: () => boolean): void {
     containerEl.createEl('h4', { text: t('settings.capabilityLab.history.title') });
     containerEl.createEl('p', {
       cls: 'opencodian-capability-lab-description',
@@ -2115,7 +2242,7 @@ export class SettingsCapabilityLabSection {
         const sessions = await adapter.listSessions(
           useStore ? { sessionStore: state.sessionStore } : undefined,
         );
-        if (requestId !== sessionLoadRequestId) {
+        if (requestId !== sessionLoadRequestId || !canWriteAsyncResult()) {
           return;
         }
         loadedSessions = sessions;
@@ -2131,7 +2258,7 @@ export class SettingsCapabilityLabSection {
           text: `Loaded ${sessions.length} ${useStore ? 'store' : 'local'} session(s).`,
         });
       } catch (err) {
-        if (requestId !== sessionLoadRequestId) {
+        if (requestId !== sessionLoadRequestId || !canWriteAsyncResult()) {
           return;
         }
         outputEl.empty();
@@ -2352,7 +2479,7 @@ export class SettingsCapabilityLabSection {
   // Subagent Browser (read-only)
   // =======================================================================
 
-  private renderSubagentBrowser(containerEl: HTMLElement): void {
+  private renderSubagentBrowser(containerEl: HTMLElement, canWriteAsyncResult: () => boolean): void {
     containerEl.createEl('h4', { text: t('settings.capabilityLab.subagents.title') });
     containerEl.createEl('p', {
       cls: 'opencodian-capability-lab-description',
@@ -2403,6 +2530,7 @@ export class SettingsCapabilityLabSection {
         sessionSelect.innerHTML = '';
         sessionSelect.createEl('option', { text: '— Select a session —', attr: { value: '' } });
         const sessions = await adapter.listSessions();
+        if (!canWriteAsyncResult()) return;
         for (const session of sessions) {
           const option = sessionSelect.createEl('option', {
             text: truncate(`${session.sessionId.slice(0, 8)}… ${session.summary}`, 80),
@@ -2415,6 +2543,7 @@ export class SettingsCapabilityLabSection {
         outputEl.empty();
         outputEl.createEl('p', { text: `Loaded ${sessions.length} sessions.` });
       } catch (err) {
+        if (!canWriteAsyncResult()) return;
         outputEl.empty();
         outputEl.createEl('p', {
           cls: 'opencodian-capability-lab-error',
@@ -2521,7 +2650,7 @@ export class SettingsCapabilityLabSection {
   // Rewind Dry-Run Preview (no actual restore)
   // =======================================================================
 
-  private renderRewindDryRun(containerEl: HTMLElement): void {
+  private renderRewindDryRun(containerEl: HTMLElement, canWriteAsyncResult: () => boolean): void {
     containerEl.createEl('h4', { text: t('settings.capabilityLab.rewind.title') });
     containerEl.createEl('p', {
       cls: 'opencodian-capability-lab-description',
@@ -2572,6 +2701,7 @@ export class SettingsCapabilityLabSection {
         sessionSelect.innerHTML = '';
         sessionSelect.createEl('option', { text: '— Select a session —', attr: { value: '' } });
         const sessions = await adapter.listSessions();
+        if (!canWriteAsyncResult()) return;
         for (const session of sessions) {
           const option = sessionSelect.createEl('option', {
             text: truncate(`${session.sessionId.slice(0, 8)}… ${session.summary}`, 80),
@@ -2580,6 +2710,7 @@ export class SettingsCapabilityLabSection {
           option.value = session.sessionId;
         }
       } catch (err) {
+        if (!canWriteAsyncResult()) return;
         outputEl.createEl('p', {
           cls: 'opencodian-capability-lab-error',
           text: `Error: ${err instanceof Error ? err.message : String(err)}`,
@@ -2711,7 +2842,7 @@ export class SettingsCapabilityLabSection {
     });
   }
 
-  private renderForkProbe(containerEl: HTMLElement): void {
+  private renderForkProbe(containerEl: HTMLElement, canWriteAsyncResult: () => boolean): void {
     const shell = this.createProbeShell(
       containerEl,
       t('settings.capabilityLab.fork.title'),
@@ -2748,6 +2879,7 @@ export class SettingsCapabilityLabSection {
         sessionSelect.innerHTML = '';
         sessionSelect.createEl('option', { text: '— Select a session —', attr: { value: '' } });
         const sessions = await adapter.listSessions();
+        if (!canWriteAsyncResult()) return;
         for (const session of sessions) {
           const option = sessionSelect.createEl('option', {
             text: truncate(`${session.sessionId.slice(0, 8)}… ${session.summary}`, 80),
@@ -2756,6 +2888,7 @@ export class SettingsCapabilityLabSection {
           option.value = session.sessionId;
         }
       } catch (err) {
+        if (!canWriteAsyncResult()) return;
         outputEl.createEl('p', {
           cls: 'opencodian-capability-lab-error',
           text: `Error: ${err instanceof Error ? err.message : String(err)}`,
@@ -2853,7 +2986,7 @@ export class SettingsCapabilityLabSection {
   // Resume Session Diagnostic Probe (provider-owned, diagnostic only)
   // =======================================================================
 
-  private renderResumeProbe(containerEl: HTMLElement): void {
+  private renderResumeProbe(containerEl: HTMLElement, canWriteAsyncResult: () => boolean): void {
     const shell = this.createProbeShell(
       containerEl,
       t('settings.capabilityLab.resume.title'),
@@ -2890,6 +3023,7 @@ export class SettingsCapabilityLabSection {
         sessionSelect.innerHTML = '';
         sessionSelect.createEl('option', { text: '— Select a session —', attr: { value: '' } });
         const sessions = await adapter.listSessions();
+        if (!canWriteAsyncResult()) return;
         for (const session of sessions) {
           const option = sessionSelect.createEl('option', {
             text: truncate(`${session.sessionId.slice(0, 8)}… ${session.summary}`, 80),
@@ -2898,6 +3032,7 @@ export class SettingsCapabilityLabSection {
           option.value = session.sessionId;
         }
       } catch (err) {
+        if (!canWriteAsyncResult()) return;
         outputEl.createEl('p', {
           cls: 'opencodian-capability-lab-error',
           text: `Error: ${err instanceof Error ? err.message : String(err)}`,
@@ -2980,7 +3115,7 @@ export class SettingsCapabilityLabSection {
   // Session Detail Diagnostic Probe (provider-owned, diagnostic only)
   // =======================================================================
 
-  private renderSessionDetailProbe(containerEl: HTMLElement): void {
+  private renderSessionDetailProbe(containerEl: HTMLElement, canWriteAsyncResult: () => boolean): void {
     const shell = this.createProbeShell(
       containerEl,
       t('settings.capabilityLab.sessionDetail.title'),
@@ -3017,6 +3152,7 @@ export class SettingsCapabilityLabSection {
         sessionSelect.innerHTML = '';
         sessionSelect.createEl('option', { text: '— Select a session —', attr: { value: '' } });
         const sessions = await adapter.listSessions();
+        if (!canWriteAsyncResult()) return;
         for (const session of sessions) {
           const option = sessionSelect.createEl('option', {
             text: truncate(`${session.sessionId.slice(0, 8)}… ${session.summary}`, 80),
@@ -3025,6 +3161,7 @@ export class SettingsCapabilityLabSection {
           option.value = session.sessionId;
         }
       } catch (err) {
+        if (!canWriteAsyncResult()) return;
         outputEl.createEl('p', {
           cls: 'opencodian-capability-lab-error',
           text: `Error: ${err instanceof Error ? err.message : String(err)}`,

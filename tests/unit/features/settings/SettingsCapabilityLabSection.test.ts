@@ -5,12 +5,22 @@ import { join } from 'node:path';
 
 import { SettingsCapabilityLabSection } from '../../../../src/features/settings/SettingsCapabilityLabSection';
 import { setLocale, t } from '../../../../src/i18n';
+import type OpenCodianPlugin from '../../../../src/main';
+
+type CapabilityLabTestPlugin = OpenCodianPlugin & {
+  readonly openCodeService: OpenCodianPlugin['openCodeService'] & {
+    readonly getSdkCapabilitySnapshot: jest.Mock;
+    readonly refreshSdkCapabilities: jest.Mock;
+    readonly runExperimentalAction: jest.Mock;
+  };
+  readonly saveSettings: jest.Mock;
+};
 
 /**
  * Minimal mock plugin that satisfies CapabilityLabDeps.
  * agentServiceRegistry is the only accessed property via getClaudeCodeAdapter().
  */
-function createMockPlugin(adapter: unknown = null, activeKind = adapter ? 'claude-code' : null, settingsOverride?: Record<string, unknown>, codexAdapter: unknown = null): never {
+function createMockPlugin(adapter: unknown = null, activeKind = adapter ? 'claude-code' : null, settingsOverride?: Record<string, unknown>, codexAdapter: unknown = null): CapabilityLabTestPlugin {
   const getMock = jest.fn((kind: string) => {
     if (kind === 'codex' && codexAdapter) return codexAdapter;
     if (kind === 'claude-code' && adapter) return adapter;
@@ -64,8 +74,11 @@ function createMockPlugin(adapter: unknown = null, activeKind = adapter ? 'claud
     openCodeService: {
       getSdkCapabilitySnapshot: jest.fn().mockReturnValue({ entries: [], generatedAt: 0 }),
       refreshSdkCapabilities: jest.fn().mockResolvedValue({ entries: [], generatedAt: 0 }),
+      runExperimentalAction: jest.fn(),
     },
     settings: {
+      activeBackend: activeKind ?? (codexAdapter ? 'codex' : adapter ? 'claude-code' : undefined),
+      capabilityLabSelectedBackend: undefined,
       backendSettings: {
         claudeCode: {
           ...defaultClaudeSettings,
@@ -74,7 +87,7 @@ function createMockPlugin(adapter: unknown = null, activeKind = adapter ? 'claud
       },
     },
     saveSettings: jest.fn().mockResolvedValue(undefined),
-  } as never;
+  } as CapabilityLabTestPlugin;
 }
 
 function createHeadingStub(): jest.Mock {
@@ -93,6 +106,39 @@ async function flushUi(): Promise<void> {
   for (let index = 0; index < 5; index += 1) {
     await Promise.resolve();
   }
+}
+
+function createDeferred<T>(): {
+  readonly promise: Promise<T>;
+  resolve(value: T): void;
+} {
+  let resolvePromise: ((value: T) => void) | undefined;
+  const promise = new Promise<T>((resolve) => {
+    resolvePromise = resolve;
+  });
+  return {
+    promise,
+    resolve: (value) => { resolvePromise?.(value); },
+  };
+}
+
+const RUNTIME_PROVEN_EVIDENCE = {
+  kind: 'runtime-proven',
+  verifiedAt: 2,
+  buildId: 'test-build',
+  artifactPath: '.obsidian-debug/capability-lab-test.json',
+} as const;
+
+function selectCapabilityBackend(
+  plugin: CapabilityLabTestPlugin,
+  backend: 'claude-code' | 'opencode' | 'codex',
+): void {
+  plugin.settings.capabilityLabSelectedBackend = backend;
+}
+
+function activateCapabilityBackend(containerEl: HTMLElement, backend: 'claude-code' | 'opencode' | 'codex'): void {
+  if (!containerEl.isConnected) document.body.appendChild(containerEl);
+  containerEl.querySelector<HTMLButtonElement>(`[data-capability-backend-tab="${backend}"]`)?.click();
 }
 
 // eslint-disable-next-line max-lines-per-function -- Capability Lab DOM coverage intentionally exercises one dense diagnostic surface end to end.
@@ -121,6 +167,177 @@ describe('SettingsCapabilityLabSection', () => {
     expect(banner!.textContent).toContain('DIAGNOSTIC');
     expect(banner!.textContent).toContain('EXPERIMENTAL');
     expect(banner!.textContent).toContain('NOT STABLE');
+  });
+
+  it('renders one active backend panel and lazily mounts only the default Claude Code workspace', () => {
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+
+    const tabs = Array.from(containerEl.querySelectorAll<HTMLElement>('[data-capability-backend-tab]'));
+    const panels = Array.from(containerEl.querySelectorAll<HTMLElement>('[data-capability-backend-panel]'));
+    expect(tabs.map((tab) => tab.dataset.capabilityBackendTab)).toEqual(['claude-code', 'opencode', 'codex']);
+    expect(tabs.filter((tab) => tab.getAttribute('aria-selected') === 'true')[0]?.dataset.capabilityBackendTab)
+      .toBe('claude-code');
+    expect(panels.filter((panel) => !panel.hidden)).toHaveLength(1);
+    expect(containerEl.querySelector('[data-capability-backend="claude-code"]')).not.toBeNull();
+    expect(containerEl.querySelector('[data-capability-backend="opencode"]')).toBeNull();
+    expect(containerEl.querySelector('[data-capability-backend="codex"]')).toBeNull();
+  });
+
+  it('uses the persisted OpenCode selection without mounting Claude diagnostic readers', () => {
+    const adapter = { listSessions: jest.fn().mockResolvedValue([]) };
+    const plugin = createMockPlugin(adapter);
+    selectCapabilityBackend(plugin, 'opencode');
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({ plugin, createSectionHeading: createHeadingStub() });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+
+    expect(containerEl.querySelector('[data-capability-backend-tab="opencode"]')?.getAttribute('aria-selected'))
+      .toBe('true');
+    expect(containerEl.querySelector('[data-capability-backend="opencode"]')).not.toBeNull();
+    expect(containerEl.querySelector('[data-section-block="history"]')).toBeNull();
+    expect(adapter.listSessions).not.toHaveBeenCalled();
+  });
+
+  it('moves tab focus without mounting Claude diagnostics until manual activation', () => {
+    const adapter = { listSessions: jest.fn().mockResolvedValue([]) };
+    const plugin = createMockPlugin(adapter);
+    selectCapabilityBackend(plugin, 'opencode');
+    const containerEl = document.body.createDiv();
+    const section = new SettingsCapabilityLabSection({ plugin, createSectionHeading: createHeadingStub() });
+    section.attachTabbed(containerEl, 'capability-lab');
+    const openCodeTab = containerEl.querySelector<HTMLButtonElement>('[data-capability-backend-tab="opencode"]')!;
+    const claudeTab = containerEl.querySelector<HTMLButtonElement>('[data-capability-backend-tab="claude-code"]')!;
+
+    openCodeTab.focus();
+    openCodeTab.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
+    expect(document.activeElement).toBe(claudeTab);
+    expect(adapter.listSessions).not.toHaveBeenCalled();
+    expect(containerEl.querySelector('[data-section-block="history"]')).toBeNull();
+
+    claudeTab.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    expect(adapter.listSessions).toHaveBeenCalled();
+    expect(containerEl.querySelector('[data-section-block="history"]')).not.toBeNull();
+    expect(plugin.settings.capabilityLabSelectedBackend).toBe('claude-code');
+    expect(plugin.saveSettings).toHaveBeenCalled();
+  });
+
+  it('persists a Codex pointer activation without changing the active backend', () => {
+    const plugin = createMockPlugin(
+      { listSessions: jest.fn().mockResolvedValue([]) },
+      'claude-code',
+      undefined,
+      { kind: 'codex' },
+    );
+    const containerEl = document.body.createDiv();
+    const section = new SettingsCapabilityLabSection({
+      plugin,
+      createSectionHeading: createHeadingStub(),
+    });
+    section.attachTabbed(containerEl, 'capability-lab');
+    plugin.saveSettings.mockClear();
+
+    containerEl.querySelector<HTMLButtonElement>('[data-capability-backend-tab="codex"]')?.click();
+
+    expect(plugin.settings.capabilityLabSelectedBackend).toBe('codex');
+    expect(plugin.settings.activeBackend).toBe('claude-code');
+    expect(plugin.saveSettings).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps every Claude-owned diagnostic block inside the Claude panel', () => {
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(),
+      createSectionHeading: createHeadingStub(),
+    });
+    section.attachTabbed(containerEl, 'capability-lab');
+    const claudePanel = containerEl.querySelector<HTMLElement>('[data-capability-backend-panel="claude-code"]');
+
+    const claudeBlocks = [
+      'history',
+      'subagents',
+      'rewind',
+      'structured',
+      'fork',
+      'resume',
+      'session-detail',
+      'backend-routing',
+      'discovery',
+    ] as const;
+    for (const sectionBlock of claudeBlocks) {
+      const block = containerEl.querySelector<HTMLElement>(`[data-section-block="${sectionBlock}"]`);
+      expect(block).not.toBeNull();
+      expect(block?.closest('[data-capability-backend-panel]')).toBe(claudePanel);
+    }
+  });
+
+  it('ignores pending Claude auto-read results after its connected tab root detaches', async () => {
+    const sessions = createDeferred<Array<{ sessionId: string; summary: string; lastModified: number }>>();
+    const adapter = { listSessions: jest.fn().mockReturnValue(sessions.promise) };
+    const containerEl = document.body.createDiv();
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(adapter),
+      createSectionHeading: createHeadingStub(),
+    });
+    section.attachTabbed(containerEl, 'capability-lab');
+    const claudePanel = containerEl.querySelector<HTMLElement>('[data-capability-backend-panel="claude-code"]');
+    const sessionSelects = Array.from(claudePanel?.querySelectorAll<HTMLSelectElement>('select') ?? []);
+    const optionCountsBeforeDetach = sessionSelects.map((select) => select.options.length);
+    expect(adapter.listSessions).toHaveBeenCalled();
+    expect(sessionSelects.length).toBeGreaterThan(0);
+
+    containerEl.remove();
+    sessions.resolve([{ sessionId: 'stale-session', summary: 'Must not render', lastModified: 1 }]);
+    await flushUi();
+
+    expect(sessionSelects.map((select) => select.options.length)).toEqual(optionCountsBeforeDetach);
+    expect(claudePanel?.textContent).not.toContain('stale-session');
+  });
+
+  it('keeps Codex content isolated from Claude deep diagnostics', () => {
+    const plugin = createMockPlugin(null, null, undefined, { kind: 'codex' });
+    selectCapabilityBackend(plugin, 'codex');
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({ plugin, createSectionHeading: createHeadingStub() });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+
+    const panel = containerEl.querySelector('[data-capability-backend-panel="codex"]');
+    expect(panel?.querySelector('[data-capability-backend="codex"]')).not.toBeNull();
+    expect(panel?.querySelector('[data-capability-matrix="codex"]')).not.toBeNull();
+    expect(panel?.querySelector('[data-section-block="history"]')).toBeNull();
+    expect(panel?.querySelector('[data-section-block="backend-routing"]')).toBeNull();
+  });
+
+  it('refreshes the OpenCode tab state without replacing the tablist or changing selection', async () => {
+    const availableSnapshot = {
+      generatedAt: 2,
+      entries: [{ id: 'v2.health.get', availability: { kind: 'available' }, evidence: RUNTIME_PROVEN_EVIDENCE, definition: {} }],
+    };
+    const plugin = createMockPlugin();
+    plugin.settings.capabilityLabSelectedBackend = 'opencode';
+    plugin.openCodeService.getSdkCapabilitySnapshot
+      .mockReturnValueOnce({ generatedAt: 0, entries: [] })
+      .mockReturnValue(availableSnapshot);
+    plugin.openCodeService.refreshSdkCapabilities.mockResolvedValue(availableSnapshot);
+    const containerEl = document.body.createDiv();
+    const section = new SettingsCapabilityLabSection({ plugin, createSectionHeading: createHeadingStub() });
+    section.attachTabbed(containerEl, 'capability-lab');
+    const tablist = containerEl.querySelector('[data-capability-backend-tablist]');
+    const openCodeTab = containerEl.querySelector('[data-capability-backend-tab="opencode"]');
+
+    containerEl.querySelector<HTMLButtonElement>('[data-backend-action="refresh"]')?.click();
+    await flushUi();
+
+    expect(containerEl.querySelector('[data-capability-backend-tablist]')).toBe(tablist);
+    expect(openCodeTab?.getAttribute('aria-selected')).toBe('true');
+    expect(openCodeTab?.getAttribute('aria-label')).toContain(t('settings.capabilityLab.backends.state.available'));
   });
 
   it('renders the production OpenCode snapshot and refreshes only safe discovery evidence', async () => {
@@ -165,6 +382,7 @@ describe('SettingsCapabilityLabSection', () => {
     });
 
     section.attachTabbed(containerEl, 'capability-lab');
+    activateCapabilityBackend(containerEl, 'opencode');
 
     const block = containerEl.querySelector<HTMLElement>('[data-section-block="opencode-sdk-capabilities"]');
     expect(block).not.toBeNull();
@@ -172,6 +390,8 @@ describe('SettingsCapabilityLabSection', () => {
     expect(block?.querySelector('[data-experimental-action]')).toBeNull();
     expect(block?.querySelector('[data-action="open-experimental-actions"]')).toBeNull();
 
+    plugin.openCodeService.getSdkCapabilitySnapshot.mockClear();
+    plugin.saveSettings.mockClear();
     block?.querySelector<HTMLButtonElement>('[data-opencode-sdk-action="refresh"]')?.click();
     await flushUi();
 
@@ -179,6 +399,142 @@ describe('SettingsCapabilityLabSection', () => {
     expect(plugin.openCodeService.getSdkCapabilitySnapshot).toHaveBeenCalledTimes(2);
     expect(plugin.openCodeService.runExperimentalAction).not.toHaveBeenCalled();
     expect(plugin.saveSettings).not.toHaveBeenCalled();
+  });
+
+  it('marks a non-empty all-unknown OpenCode snapshot as unknown', () => {
+    const plugin = createMockPlugin() as unknown as {
+      openCodeService: {
+        getSdkCapabilitySnapshot: jest.Mock;
+        refreshSdkCapabilities: jest.Mock;
+      };
+    };
+    plugin.openCodeService.getSdkCapabilitySnapshot.mockReturnValue({
+      generatedAt: 1,
+      entries: [
+        {
+          id: 'v2.health.get',
+          availability: { kind: 'unknown', reason: 'transport' },
+          evidence: { kind: 'failed' },
+          definition: {},
+        },
+      ],
+    });
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: plugin as never,
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    activateCapabilityBackend(containerEl, 'opencode');
+
+    const workspace = containerEl.querySelector<HTMLElement>('[data-capability-backend="opencode"]');
+    expect(workspace?.dataset.backendState).toBe('unknown');
+    expect(workspace?.querySelector('[data-backend-status]')?.textContent).toBe(
+      t('settings.capabilityLab.backends.state.unknown'),
+    );
+  });
+
+  it('keeps one refresh failure alert and clears it after OpenCode recovery', async () => {
+    const availableSnapshot = {
+      generatedAt: 2,
+      entries: [
+        {
+          id: 'v2.health.get',
+          availability: { kind: 'available' },
+          evidence: RUNTIME_PROVEN_EVIDENCE,
+          definition: {},
+        },
+      ],
+    };
+    const plugin = createMockPlugin() as unknown as {
+      openCodeService: {
+        getSdkCapabilitySnapshot: jest.Mock;
+        refreshSdkCapabilities: jest.Mock;
+      };
+    };
+    plugin.openCodeService.getSdkCapabilitySnapshot
+      .mockReturnValueOnce({ generatedAt: 0, entries: [] })
+      .mockReturnValue(availableSnapshot);
+    plugin.openCodeService.refreshSdkCapabilities
+      .mockRejectedValueOnce(new Error('offline'))
+      .mockRejectedValueOnce(new Error('still offline'))
+      .mockResolvedValueOnce(availableSnapshot);
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: plugin as never,
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    activateCapabilityBackend(containerEl, 'opencode');
+    const workspace = containerEl.querySelector<HTMLElement>('[data-capability-backend="opencode"]');
+    const refreshButton = workspace?.querySelector<HTMLButtonElement>('[data-backend-action="refresh"]');
+
+    refreshButton?.click();
+    await flushUi();
+    refreshButton?.click();
+    await flushUi();
+
+    expect(workspace?.querySelectorAll('[data-opencode-sdk-refresh-feedback]')).toHaveLength(1);
+    expect(workspace?.querySelector('[data-opencode-sdk-refresh-feedback]')?.getAttribute('role')).toBe('alert');
+    expect(workspace?.hasAttribute('aria-busy')).toBe(false);
+    expect(refreshButton?.disabled).toBe(false);
+
+    refreshButton?.click();
+    await flushUi();
+
+    expect(workspace?.querySelectorAll('.opencodian-capability-lab-error')).toHaveLength(0);
+    expect(workspace?.querySelectorAll('[data-opencode-sdk-refresh-feedback]')).toHaveLength(1);
+    expect(workspace?.querySelector('[data-opencode-sdk-refresh-feedback]')?.getAttribute('role')).toBe('status');
+    expect(workspace?.dataset.backendState).toBe('available');
+    expect(workspace?.hasAttribute('aria-busy')).toBe(false);
+    expect(workspace?.querySelector<HTMLButtonElement>('[data-backend-action="refresh"]')?.disabled).toBe(false);
+  });
+
+  it('restores focus to the refreshed OpenCode action after successful rerender', async () => {
+    const availableSnapshot = {
+      generatedAt: 2,
+      entries: [
+        {
+          id: 'v2.health.get',
+          availability: { kind: 'available' },
+          evidence: RUNTIME_PROVEN_EVIDENCE,
+          definition: {},
+        },
+      ],
+    };
+    const plugin = createMockPlugin() as unknown as {
+      openCodeService: {
+        getSdkCapabilitySnapshot: jest.Mock;
+        refreshSdkCapabilities: jest.Mock;
+      };
+    };
+    plugin.openCodeService.getSdkCapabilitySnapshot
+      .mockReturnValueOnce({ generatedAt: 0, entries: [] })
+      .mockReturnValue(availableSnapshot);
+    plugin.openCodeService.refreshSdkCapabilities.mockResolvedValue(availableSnapshot);
+    const containerEl = document.createElement('div');
+    document.body.appendChild(containerEl);
+    const section = new SettingsCapabilityLabSection({
+      plugin: plugin as never,
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    activateCapabilityBackend(containerEl, 'opencode');
+    const initialButton = containerEl.querySelector<HTMLButtonElement>('[data-backend-action="refresh"]');
+    initialButton?.focus();
+    initialButton?.click();
+    await flushUi();
+
+    const refreshedButton = containerEl.querySelector<HTMLButtonElement>('[data-backend-action="refresh"]');
+    expect(initialButton?.isConnected).toBe(false);
+    expect(refreshedButton).not.toBe(initialButton);
+    expect(document.activeElement).toBe(refreshedButton);
+    expect(refreshedButton?.disabled).toBe(false);
+
+    containerEl.remove();
   });
 
   it('exports only the sanitized production capability evidence', async () => {
@@ -200,6 +556,12 @@ describe('SettingsCapabilityLabSection', () => {
             description: 'server payload must not leave the diagnostic boundary',
             rawError: 'Bearer secret-token',
           },
+        },
+        {
+          id: 'v2.session.messages',
+          availability: { kind: 'available' },
+          evidence: RUNTIME_PROVEN_EVIDENCE,
+          definition: {},
         },
       ],
     };
@@ -223,6 +585,8 @@ describe('SettingsCapabilityLabSection', () => {
     });
 
     section.attachTabbed(containerEl, 'capability-lab');
+    activateCapabilityBackend(containerEl, 'opencode');
+    plugin.saveSettings.mockClear();
     containerEl.querySelector<HTMLButtonElement>('[data-opencode-sdk-action="copy-evidence"]')?.click();
     await flushUi();
 
@@ -236,12 +600,20 @@ describe('SettingsCapabilityLabSection', () => {
           availability: 'unknown',
           evidence: { kind: 'failed', reason: 'transport' },
         },
+        {
+          id: 'v2.session.messages',
+          availability: 'available',
+          evidence: { kind: 'runtime-proven' },
+        },
       ],
     });
     expect(exported).not.toContain('secret-token');
     expect(exported).not.toContain('Capability support could not be confirmed.');
     expect(exported).not.toContain('sdkPath');
     expect(exported).not.toContain('description');
+    expect(exported).not.toContain('artifactPath');
+    expect(exported).not.toContain('buildId');
+    expect(exported).not.toContain('.obsidian-debug/capability-lab-test.json');
     expect(plugin.openCodeService.runExperimentalAction).not.toHaveBeenCalled();
     expect(plugin.saveSettings).not.toHaveBeenCalled();
   });
@@ -264,8 +636,12 @@ describe('SettingsCapabilityLabSection', () => {
     );
     expect(shellEl?.querySelector('.opencodian-debug-tab-body')).not.toBeNull();
     expect(shellEl?.querySelector('.opencodian-debug-tab-badge')).not.toBeNull();
-    expect(shellEl?.querySelector('[data-section-block="matrix"]')).not.toBeNull();
+    expect(shellEl?.querySelector('[data-section-block="claude-code-capabilities"]')).not.toBeNull();
     expect(shellEl?.querySelector('[data-section-block="discovery"]')).not.toBeNull();
+    activateCapabilityBackend(containerEl, 'opencode');
+    expect(shellEl?.querySelector('[data-section-block="opencode-sdk-capabilities"]')).not.toBeNull();
+    activateCapabilityBackend(containerEl, 'codex');
+    expect(shellEl?.querySelector('[data-section-block="codex-capabilities"]')).not.toBeNull();
   });
 
   it('renders the Capability Lab tab title and intro copy only once in tabbed mode', () => {
@@ -283,6 +659,125 @@ describe('SettingsCapabilityLabSection', () => {
     expect(headingStub).not.toHaveBeenCalled();
     expect(countTextMatches(shellEl!, t('settings.capabilityLab.title'))).toBe(1);
     expect(countTextMatches(shellEl!, t('settings.capabilityLab.matrix.description'))).toBe(1);
+  });
+
+  it('labels each backend workspace and its capability table accessibly', () => {
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(),
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+
+    for (const backend of ['claude-code', 'opencode', 'codex'] as const) {
+      activateCapabilityBackend(containerEl, backend);
+      const workspace = containerEl.querySelector<HTMLElement>(`[data-capability-backend="${backend}"]`);
+      const titleId = workspace?.getAttribute('aria-labelledby');
+      expect(titleId).toBeTruthy();
+      expect(workspace?.querySelector(`#${titleId}`)).not.toBeNull();
+      expect(workspace?.querySelector('[data-backend-status]')?.textContent?.trim()).toBeTruthy();
+    }
+
+    activateCapabilityBackend(containerEl, 'claude-code');
+    expect(containerEl.querySelector('[data-capability-matrix="claude-code"]')?.getAttribute('aria-label')).toBeTruthy();
+    activateCapabilityBackend(containerEl, 'codex');
+    expect(containerEl.querySelector('[data-capability-matrix="codex"]')?.getAttribute('aria-label')).toBeTruthy();
+  });
+
+  it('keeps the Capability Lab outer shell flat around backend workspaces', () => {
+    const css = readFileSync(
+      join(process.cwd(), 'src/style/components/settings-capability-lab.css'),
+      'utf8',
+    );
+    const shellRule = css.match(
+      /\.opencodian-settings \.opencodian-debug-tab-shell-capability-lab\s*\{[^}]*\}/,
+    )?.[0] ?? '';
+    const workspaceRule = css.match(
+      /\.opencodian-settings \.opencodian-capability-lab-backend-workspace\s*\{[^}]*\}/,
+    )?.[0] ?? '';
+
+    expect(shellRule).toContain('background: transparent');
+    expect(shellRule).toContain('border: 0');
+    expect(workspaceRule).toContain('var(--opencodian-settings-section-border)');
+    expect(css).not.toContain('linear-gradient');
+  });
+
+  it('renders semantic break opportunities for long OpenCode capability ids', () => {
+    const plugin = createMockPlugin() as unknown as {
+      openCodeService: {
+        getSdkCapabilitySnapshot: jest.Mock;
+      };
+    };
+    plugin.openCodeService.getSdkCapabilitySnapshot.mockReturnValue({
+      generatedAt: 1,
+      entries: [
+        {
+          id: 'experimental.projectCopy.generateName',
+          availability: { kind: 'available' },
+          evidence: { kind: 'advertised' },
+          definition: {},
+        },
+      ],
+    });
+    const containerEl = document.createElement('div');
+    const section = new SettingsCapabilityLabSection({
+      plugin: plugin as never,
+      createSectionHeading: createHeadingStub(),
+    });
+
+    section.attachTabbed(containerEl, 'capability-lab');
+    activateCapabilityBackend(containerEl, 'opencode');
+
+    const capabilityCell = containerEl.querySelector('[data-opencode-sdk-capability] td:first-child');
+    expect(capabilityCell?.textContent).toBe('experimental.projectCopy.generateName');
+    expect(capabilityCell?.innerHTML).toBe(
+      'experimental.<wbr>project<wbr>Copy.<wbr>generate<wbr>Name',
+    );
+  });
+
+  it('keeps semantic OpenCode capability id fragments intact in CSS', () => {
+    const css = readFileSync(
+      join(process.cwd(), 'src/style/components/settings-capability-lab.css'),
+      'utf8',
+    );
+    const capabilityCellRule = css.match(
+      /\.opencodian-settings \.opencodian-capability-lab-opencode-sdk td:first-child\s*\{[^}]*\}/,
+    )?.[0] ?? '';
+
+    expect(capabilityCellRule).toContain('overflow-wrap: normal');
+    expect(capabilityCellRule).toContain('word-break: normal');
+    expect(capabilityCellRule).not.toContain('overflow-wrap: anywhere');
+  });
+
+  it('balances short History and Subagents descriptions at narrow widths', () => {
+    const css = readFileSync(
+      join(process.cwd(), 'src/style/components/settings-capability-lab.css'),
+      'utf8',
+    );
+
+    expect(css).toMatch(
+      /\[data-section-block="history"\][^}]*\.opencodian-capability-lab-description[\s\S]*\[data-section-block="subagents"\][^}]*\.opencodian-capability-lab-description\s*\{[^}]*text-wrap: balance/,
+    );
+  });
+
+  it('keeps Hidden chips readable and backend actions visibly keyboard-focused', () => {
+    const css = readFileSync(
+      join(process.cwd(), 'src/style/components/settings-capability-lab.css'),
+      'utf8',
+    );
+    const hiddenRule = css.match(
+      /\.opencodian-settings \.opencodian-capability-lab-chip-hidden\s*,[\s\S]*?\.opencodian-settings \.opencodian-capability-lab-chip-surface-hidden\s*\{[^}]*\}/,
+    )?.[0] ?? '';
+    const focusRule = css.match(
+      /\.opencodian-settings \[data-backend-action\]:focus-visible\s*\{[^}]*\}/,
+    )?.[0] ?? '';
+
+    expect(hiddenRule).toContain('color: var(--text-muted)');
+    expect(hiddenRule).toContain('border-color: var(--text-muted)');
+    expect(hiddenRule).not.toContain('color: var(--text-faint)');
+    expect(focusRule).toContain('outline: 2px solid var(--opencodian-settings-focus-ring)');
+    expect(focusRule).toContain('outline-offset: 2px');
   });
 
   it('renders diagnostic stream controls in Discovery section with toggles backed by plugin settings', async () => {
@@ -363,14 +858,18 @@ describe('SettingsCapabilityLabSection', () => {
 
     const blocks = containerEl.querySelectorAll('[data-section-block]');
     const blockIds = Array.from(blocks).map((el) => el.getAttribute('data-section-block'));
-    expect(blockIds).toContain('matrix');
+    expect(blockIds).toContain('claude-code-capabilities');
     expect(blockIds).toContain('history');
     expect(blockIds).toContain('subagents');
     expect(blockIds).toContain('rewind');
+    expect(blockIds).toContain('structured');
     expect(blockIds).toContain('fork');
     expect(blockIds).toContain('resume');
     expect(blockIds).toContain('session-detail');
     expect(blockIds).toContain('backend-routing');
+    expect(blockIds).toContain('discovery');
+    expect(blockIds).not.toContain('opencode-sdk-capabilities');
+    expect(blockIds).not.toContain('codex-capabilities');
     expect(blockIds).toContain('structured');
     expect(blockIds).toContain('discovery');
   });
@@ -398,6 +897,7 @@ describe('SettingsCapabilityLabSection', () => {
     });
 
     section.attachTabbed(containerEl, 'capability-lab');
+    activateCapabilityBackend(containerEl, 'codex');
 
     const rows = Array.from(containerEl.querySelectorAll('.opencodian-capability-lab-matrix tbody tr'));
     const getRow = (label: string) => rows.find((row) => row.textContent?.includes(label));
@@ -1048,7 +1548,19 @@ describe('SettingsCapabilityLabSection', () => {
     expect(summary).toBeTruthy();
     expect(summary!.getAttribute('data-diagnostic')).toBe('true');
     expect(summary!.textContent).toContain('Diagnostic only');
-    expect(summary!.textContent).toContain('Isolated diagnostic only');
+    expect(summary!.textContent).toContain('UI settings + isolated diagnostics');
+  });
+
+  it('lets the diagnostic summary reflow without ellipsis in a narrow container', () => {
+    const css = readFileSync(
+      join(process.cwd(), 'src/style/components/settings-capability-lab.css'),
+      'utf8',
+    );
+    const narrowContainerRule = css.slice(css.indexOf('@container capability-lab (max-width: 560px)'));
+    expect(narrowContainerRule).toContain('grid-template-columns: 1fr');
+    expect(narrowContainerRule).toContain('overflow-wrap: anywhere');
+    expect(narrowContainerRule).toContain('text-overflow: clip');
+    expect(narrowContainerRule).toContain('white-space: normal');
   });
 
   it('shows unavailable message when adapter is not present', () => {
@@ -1179,8 +1691,7 @@ describe('SettingsCapabilityLabSection', () => {
     expect(diagnosticElements.length).toBeGreaterThan(0);
   });
 
-  it('buildMatrixRows returns all expected capabilities', () => {
-    // We test this indirectly by counting matrix table rows
+  it('renders all expected Claude Code capability rows in its own matrix', () => {
     const containerEl = document.createElement('div');
     const section = new SettingsCapabilityLabSection({
       plugin: createMockPlugin(),
@@ -1191,7 +1702,7 @@ describe('SettingsCapabilityLabSection', () => {
 
     const table = containerEl.querySelector('.opencodian-capability-lab-matrix');
     const rows = table!.querySelectorAll('tbody tr');
-    expect(rows.length).toBe(60);
+    expect(rows.length).toBe(55);
   });
 
   it('renders status chips with correct active/inactive classes', () => {
@@ -1235,6 +1746,7 @@ describe('SettingsCapabilityLabSection', () => {
     });
 
     section.attachTabbed(containerEl, 'capability-lab');
+    activateCapabilityBackend(containerEl, 'codex');
 
     const rows = Array.from(containerEl.querySelectorAll('.opencodian-capability-lab-matrix tbody tr'));
     const getRow = (label: string) => rows.find((row) => row.textContent?.includes(label));
@@ -1338,8 +1850,7 @@ describe('SettingsCapabilityLabSection', () => {
     );
     expect(verifiedCapabilities.length).toBe(54);
 
-    // Total rows = 55 Claude Code + 4 Codex + 1 separator = 60
-    expect(rows.length).toBe(60);
+    expect(rows.length).toBe(59);
 
     // Honesty rule: readback capabilities must not be in the verified count.
     // File Checkpoint / Rewind (SDK-level broken) and Stderr Diagnostic (unreliable) remain readback.
@@ -2215,6 +2726,7 @@ describe('SettingsCapabilityLabSection', () => {
     });
 
     section.attachTabbed(containerEl, 'capability-lab');
+    activateCapabilityBackend(containerEl, 'claude-code');
     await flushUi();
 
     const forkBlock = containerEl.querySelector('[data-section-block="fork"]') as HTMLElement | null;
@@ -2758,6 +3270,7 @@ describe('SettingsCapabilityLabSection', () => {
     });
 
     section.attachTabbed(containerEl, 'capability-lab');
+    activateCapabilityBackend(containerEl, 'claude-code');
     await flushUi();
 
     const resumeBlock = containerEl.querySelector('[data-section-block="resume"]') as HTMLElement | null;
@@ -2992,6 +3505,7 @@ describe('SettingsCapabilityLabSection', () => {
     });
 
     section.attachTabbed(containerEl, 'capability-lab');
+    activateCapabilityBackend(containerEl, 'claude-code');
     await flushUi();
 
     const resumeBlock = containerEl.querySelector('[data-section-block="resume"]') as HTMLElement | null;
@@ -8982,23 +9496,62 @@ describe('SettingsCapabilityLabSection', () => {
   });
 
   describe('Codex matrix rows', () => {
-    it('renders Codex separator and rows when codex adapter is available', () => {
+    it('renders Claude Code, OpenCode, and Codex capabilities in separate peer workspaces', () => {
       const codexAdapter = { kind: 'codex' };
+      const plugin = createMockPlugin(null, null, undefined, codexAdapter) as unknown as {
+        openCodeService: {
+          getSdkCapabilitySnapshot: jest.Mock;
+          refreshSdkCapabilities: jest.Mock;
+        };
+      };
+      plugin.openCodeService.getSdkCapabilitySnapshot.mockReturnValue({
+        generatedAt: 1,
+        entries: [],
+      });
       const containerEl = document.createElement('div');
       const section = new SettingsCapabilityLabSection({
-        plugin: createMockPlugin(null, null, undefined, codexAdapter),
+        plugin: plugin as never,
         createSectionHeading: createHeadingStub(),
       });
 
       section.attachTabbed(containerEl, 'capability-lab');
+      const tabs = Array.from(containerEl.querySelectorAll<HTMLElement>('[data-capability-backend-tab]'));
+      expect(tabs.map((tab) => tab.dataset.capabilityBackendTab)).toEqual([
+        'claude-code',
+        'opencode',
+        'codex',
+      ]);
+      activateCapabilityBackend(containerEl, 'claude-code');
+      activateCapabilityBackend(containerEl, 'opencode');
+      activateCapabilityBackend(containerEl, 'codex');
 
-      const separator = containerEl.querySelector('.opencodian-capability-lab-matrix-separator');
-      expect(separator).toBeTruthy();
-      expect(separator!.textContent).toContain('Codex Backend');
+      const workspaces = Array.from(containerEl.querySelectorAll<HTMLElement>('[data-capability-backend]'));
+      expect(workspaces.map((workspace) => workspace.dataset.capabilityBackend)).toEqual([
+        'claude-code',
+        'opencode',
+        'codex',
+      ]);
+      expect(workspaces.every((workspace) => workspace.parentElement?.hasAttribute('data-capability-backend-panel')))
+        .toBe(true);
+      expect(containerEl.querySelector('[data-capability-backend] [data-capability-backend]')).toBeNull();
+      expect(containerEl.querySelector('.opencodian-capability-lab-matrix-separator')).toBeNull();
+      expect(workspaces.map((workspace) => workspace.dataset.backendState)).toEqual([
+        'unconfigured',
+        'empty',
+        'available',
+      ]);
 
-      const matrixBody = containerEl.querySelector('.opencodian-capability-lab-matrix tbody');
-      expect(matrixBody).toBeTruthy();
-      const codexCapabilityCells = Array.from(matrixBody!.querySelectorAll('.opencodian-capability-lab-capability-cell'))
+      const claudeWorkspace = containerEl.querySelector<HTMLElement>('[data-capability-backend="claude-code"]');
+      const openCodeWorkspace = containerEl.querySelector<HTMLElement>('[data-capability-backend="opencode"]');
+      const codexWorkspace = containerEl.querySelector<HTMLElement>('[data-capability-backend="codex"]');
+      expect(claudeWorkspace?.querySelector('.opencodian-capability-lab-matrix')).not.toBeNull();
+      expect(openCodeWorkspace?.querySelector('.opencodian-capability-lab-opencode-sdk')).toBeNull();
+      expect(openCodeWorkspace?.textContent).toContain(t('settings.capabilityLab.openCodeSdk.empty'));
+      expect(codexWorkspace?.querySelector('.opencodian-capability-lab-matrix')).not.toBeNull();
+      expect(openCodeWorkspace?.querySelector('[data-backend-action="refresh"]')).not.toBeNull();
+      expect(openCodeWorkspace?.querySelector('[data-backend-action="copy-evidence"]')).not.toBeNull();
+
+      const codexCapabilityCells = Array.from(codexWorkspace!.querySelectorAll('.opencodian-capability-lab-capability-cell'))
         .filter((el) => el.textContent?.startsWith('Codex'));
       expect(codexCapabilityCells.length).toBeGreaterThanOrEqual(4);
     });
@@ -9013,7 +9566,7 @@ describe('SettingsCapabilityLabSection', () => {
 
       section.attachTabbed(containerEl, 'capability-lab');
 
-      const matrixBody = containerEl.querySelector('.opencodian-capability-lab-matrix tbody');
+      const matrixBody = containerEl.querySelector('[data-capability-backend="codex"] .opencodian-capability-lab-matrix tbody');
       const allChips = Array.from(matrixBody!.querySelectorAll('.opencodian-capability-lab-chip'));
 
       const chipTexts = allChips.map((el) => el.textContent);
@@ -9032,7 +9585,7 @@ describe('SettingsCapabilityLabSection', () => {
 
       section.attachTabbed(containerEl, 'capability-lab');
 
-      const matrixBody = containerEl.querySelector('.opencodian-capability-lab-matrix tbody');
+      const matrixBody = containerEl.querySelector('[data-capability-backend="codex"] .opencodian-capability-lab-matrix tbody');
       const rows = Array.from(matrixBody!.querySelectorAll('tr'));
 
       const blockedRow = rows.find((tr) => {
@@ -9054,10 +9607,11 @@ describe('SettingsCapabilityLabSection', () => {
       });
 
       section.attachTabbed(containerEl, 'capability-lab');
+      activateCapabilityBackend(containerEl, 'codex');
 
-      const separator = containerEl.querySelector('.opencodian-capability-lab-matrix-separator');
-      expect(separator).toBeTruthy();
-      expect(separator!.textContent).toContain('Codex Backend');
+      const codexWorkspace = containerEl.querySelector('[data-capability-backend="codex"]');
+      expect(codexWorkspace).toBeTruthy();
+      expect(codexWorkspace?.textContent).toContain('Codex');
     });
   });
 });
