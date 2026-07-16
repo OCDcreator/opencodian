@@ -5,6 +5,7 @@ import type { ClaudeCodePermissionMode } from '../../../core/types/settings';
 import type { CodexSandboxMode } from '../../../core/types/settings';
 import type { PermissionMode } from '../../../core/types/settings';
 import { t } from '../../../i18n';
+import { AnchoredOverlayLayoutController } from '../ui/AnchoredOverlayLayoutController';
 import { buildModelSelectorDisplayState } from '../ui/modelSelector/ModelSelectorDisplay';
 import {
   highlightModelOption as highlightRenderedModelOption,
@@ -43,6 +44,9 @@ export interface ChatSelectionControlsCoordinatorHost extends ModelSelectionRunt
 }
 
 const MODEL_SEARCH_PLACEHOLDER = 'Search models...';
+const MODEL_DROPDOWN_PREFERRED_WIDTH = 340;
+const MODEL_DROPDOWN_MINIMUM_WIDTH = 280;
+const MODEL_DROPDOWN_SAFE_INSET = 8;
 const CLAUDE_CODE_PERMISSION_MODES: readonly ClaudeCodePermissionMode[] = [
   'default', 'acceptEdits', 'bypassPermissions', 'plan',
 ];
@@ -154,6 +158,7 @@ export class ChatSelectionControlsCoordinator {
   private modelDropdownClickOutsideHandler: ((event: MouseEvent) => void) | null = null;
   private currentModelTriggerIconUrl: string | null = null;
   private modelSelectorIconRequestId = 0;
+  private modelDropdownLayoutController: AnchoredOverlayLayoutController | null = null;
 
   private hasRegisteredEscapeHandler = false;
 
@@ -307,6 +312,8 @@ export class ChatSelectionControlsCoordinator {
     this.codexRuntimeDefaultsBadgeContainer = null;
     this.disposeModelSelectorStickyHeaders?.();
     this.disposeModelSelectorStickyHeaders = null;
+    this.modelDropdownLayoutController?.destroy();
+    this.modelDropdownLayoutController = null;
     this.toolbarEl = null;
     this.modelSelectorContainer = null;
     this.modelSelectorTrigger = null;
@@ -470,6 +477,7 @@ export class ChatSelectionControlsCoordinator {
     this.modelSelectorDropdown = containerEl.createDiv({ cls: 'opencodian-model-dropdown' });
     this.modelSelectorDropdown.style.display = 'none';
     this.buildModelDropdown();
+    this.mountModelDropdownLayoutController();
 
     void this.reloadModelCatalog();
     this.updateModelSelectorDisplay();
@@ -531,6 +539,26 @@ export class ChatSelectionControlsCoordinator {
     this.renderModelList();
   }
 
+  private mountModelDropdownLayoutController(): void {
+    this.modelDropdownLayoutController?.destroy();
+    this.modelDropdownLayoutController = null;
+    if (!this.modelSelectorContainer || !this.modelSelectorDropdown) {
+      return;
+    }
+
+    this.modelDropdownLayoutController = new AnchoredOverlayLayoutController({
+      anchorEl: this.modelSelectorContainer,
+      overlayEl: this.modelSelectorDropdown,
+      resolveBoundary: () => this.modelSelectorContainer?.closest<HTMLElement>('.opencodian-container') ?? null,
+      alignment: 'start',
+      preferredWidth: MODEL_DROPDOWN_PREFERRED_WIDTH,
+      minimumWidth: MODEL_DROPDOWN_MINIMUM_WIDTH,
+      safeInset: MODEL_DROPDOWN_SAFE_INSET,
+      isOpen: () => this.isModelDropdownOpen,
+    });
+    this.modelDropdownLayoutController.observe();
+  }
+
   private toggleModelDropdown(): void {
     if (this.isModelDropdownOpen) {
       this.closeModelDropdown();
@@ -547,6 +575,8 @@ export class ChatSelectionControlsCoordinator {
     this.permissionSelector?.closeDropdown();
     this.isModelDropdownOpen = true;
     this.modelSelectorDropdown.style.display = 'block';
+    this.modelDropdownLayoutController?.observe();
+    this.modelDropdownLayoutController?.sync();
     this.modelSelectorDropdown.addClass('is-open');
     this.modelSelectorTrigger.addClass('is-open');
     this.modelSelectorTrigger.setAttribute('aria-expanded', 'true');

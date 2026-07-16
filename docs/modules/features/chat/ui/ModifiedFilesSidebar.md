@@ -15,6 +15,7 @@
 ## 核心逻辑
 
 - constructor 创建 `opencodian-modified-files-sidebar-host` 和 `opencodian-modified-files-sidebar`，随后加载 Obsidian `Component` lifecycle。
+- 面板由 CSS 限制为 `min(280px, calc(100% - 16px))`，在窄 workspace leaf 中保持左右至少 8px；展开 hover zone 同步限制为 `min(300px, calc(100% - 8px))`，保留左侧退出区域。
 - `updateEntries(entries)` 复制传入的 `SessionDiffEntry[]`，避免 UI 层持有可变服务缓存引用。
 - `toggle()` 控制 `visible` / `collapsed` class，CSS 负责右侧滑入/淡出动画。
 - `render()` 空状态显示 `modifiedFiles.empty`；有内容时渲染可点击路径、`+N`/`-N` 统计和状态 badge；列表项使用随 DOM 替换一起释放的元素级 click listener，避免重复 render 积累 Component 级事件注册。

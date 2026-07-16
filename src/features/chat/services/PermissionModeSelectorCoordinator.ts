@@ -4,6 +4,11 @@ import type { ClaudeCodePermissionMode } from '../../../core/types/settings';
 import type { CodexSandboxMode } from '../../../core/types/settings';
 import type { PermissionMode } from '../../../core/types/settings';
 import { t } from '../../../i18n';
+import { AnchoredOverlayLayoutController } from '../ui/AnchoredOverlayLayoutController';
+
+const PERMISSION_DROPDOWN_PREFERRED_WIDTH = 280;
+const PERMISSION_DROPDOWN_MINIMUM_WIDTH = 220;
+const PERMISSION_DROPDOWN_SAFE_INSET = 8;
 
 export interface PermissionModeSelectorHost {
   getPermissionMode(): string;
@@ -160,6 +165,7 @@ export class PermissionModeSelectorCoordinator {
   private isDropdownOpen = false;
   private clickOutsideHandler: ((event: MouseEvent) => void) | null = null;
   private config: PermissionModeConfig;
+  private dropdownLayoutController: AnchoredOverlayLayoutController | null = null;
 
   constructor(
     private readonly host: PermissionModeSelectorHost,
@@ -196,6 +202,7 @@ export class PermissionModeSelectorCoordinator {
     });
     this.dropdownEl.style.display = 'none';
     this.buildDropdown();
+    this.mountDropdownLayoutController();
     this.updateTriggerDisplay();
 
     // Set boundary hint title if provided (e.g. "only affects next thread").
@@ -249,6 +256,8 @@ export class PermissionModeSelectorCoordinator {
 
   destroy(): void {
     this.closeDropdown();
+    this.dropdownLayoutController?.destroy();
+    this.dropdownLayoutController = null;
     this.containerEl = null;
     this.triggerEl = null;
     this.dropdownEl = null;
@@ -262,6 +271,26 @@ export class PermissionModeSelectorCoordinator {
       modeClass: `mode-${mode}`,
       icon: option?.icon ?? 'shield',
     };
+  }
+
+  private mountDropdownLayoutController(): void {
+    this.dropdownLayoutController?.destroy();
+    this.dropdownLayoutController = null;
+    if (!this.containerEl || !this.dropdownEl) {
+      return;
+    }
+
+    this.dropdownLayoutController = new AnchoredOverlayLayoutController({
+      anchorEl: this.containerEl,
+      overlayEl: this.dropdownEl,
+      resolveBoundary: () => this.containerEl?.closest<HTMLElement>('.opencodian-container') ?? null,
+      alignment: 'start',
+      preferredWidth: PERMISSION_DROPDOWN_PREFERRED_WIDTH,
+      minimumWidth: PERMISSION_DROPDOWN_MINIMUM_WIDTH,
+      safeInset: PERMISSION_DROPDOWN_SAFE_INSET,
+      isOpen: () => this.isDropdownOpen,
+    });
+    this.dropdownLayoutController.observe();
   }
 
   private applyTriggerDisplay(
@@ -353,6 +382,8 @@ export class PermissionModeSelectorCoordinator {
 
     this.isDropdownOpen = true;
     this.dropdownEl.style.display = 'block';
+    this.dropdownLayoutController?.observe();
+    this.dropdownLayoutController?.sync();
     this.dropdownEl.addClass('is-open');
     this.triggerEl.addClass('is-open');
     this.triggerEl.setAttribute('aria-expanded', 'true');

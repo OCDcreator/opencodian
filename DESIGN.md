@@ -244,6 +244,10 @@ OpenCodian uses a hybrid elevation system. Default Obsidian surfaces are mostly 
 - **Border:** use `var(--background-modifier-border)` or `var(--opencodian-accent-border)` where state matters.
 - **Internal Padding:** 12-16px for cards, 6-10px for compact controls.
 
+### Chat Floating Overlay Boundary
+
+Model, Agent, Permission, and Effort popovers are local Chat overlays. Their horizontal boundary is the nearest `.opencodian-container`, never the viewport. Preserve an 8px inset on both sides; preferred and minimum widths must yield to that inset when the sidebar becomes narrower. Measured popovers use `box-sizing: border-box`, synchronize when opened and while the Chat container resizes, and retain their existing CSS positioning only as a fallback when runtime geometry is unavailable. The Modified files hover sidebar follows the same container-first rule through CSS sizing and must leave an 8px non-hover exit strip in narrow panes.
+
 ### Settings Form Row Card
 
 Ordinary settings rows use a local shadcn-style Card + Field pattern implemented with Obsidian `Setting` DOM and shared CSS tokens. This is the default for Server > Connection, General > Basic, Claude/Codex control rows, and Skills/Tools/ACP ordinary row-card lists.

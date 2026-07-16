@@ -4,6 +4,17 @@ import {
   type ChatAgentSelectionCoordinatorHost,
 } from '../../../../src/features/chat/services/ChatAgentSelectionCoordinator';
 
+class ResizeObserverMock {
+  static readonly instances: ResizeObserverMock[] = [];
+
+  readonly observe = jest.fn();
+  readonly disconnect = jest.fn();
+
+  constructor(_callback: ResizeObserverCallback) {
+    ResizeObserverMock.instances.push(this);
+  }
+}
+
 async function settleAsyncWork(): Promise<void> {
   await Promise.resolve();
   await Promise.resolve();
@@ -47,7 +58,15 @@ function createFixture(candidates: AgentSelectionCandidate[] = [
 }
 
 describe('ChatAgentSelectionCoordinator', () => {
+  const originalResizeObserver = globalThis.ResizeObserver;
+
+  beforeEach(() => {
+    ResizeObserverMock.instances.length = 0;
+    globalThis.ResizeObserver = ResizeObserverMock as unknown as typeof ResizeObserver;
+  });
+
   afterEach(() => {
+    globalThis.ResizeObserver = originalResizeObserver;
     document.body.innerHTML = '';
     jest.clearAllMocks();
   });
@@ -77,6 +96,47 @@ describe('ChatAgentSelectionCoordinator', () => {
     expect(trigger?.textContent).toBe('Build');
     expect(trigger?.hasClass('is-selected')).toBe(true);
     expect(fixture.host.restoreInputFocus).toHaveBeenCalledTimes(1);
+  });
+
+  it('clamps the agent dropdown to the chat boundary when it opens', () => {
+    const boundary = document.createElement('div');
+    boundary.className = 'opencodian-container';
+    document.body.appendChild(boundary);
+    const fixture = createFixture();
+    boundary.appendChild(fixture.container);
+
+    jest.spyOn(boundary, 'getBoundingClientRect').mockReturnValue({
+      left: 100, right: 320, top: 0, bottom: 800, width: 220, height: 800, x: 100, y: 0, toJSON: () => ({}),
+    });
+    jest.spyOn(fixture.container, 'getBoundingClientRect').mockReturnValue({
+      left: 120, right: 180, top: 700, bottom: 730, width: 60, height: 30, x: 120, y: 700, toJSON: () => ({}),
+    });
+
+    fixture.container.querySelector<HTMLElement>('.opencodian-agent-trigger')?.click();
+
+    const dropdown = fixture.container.querySelector<HTMLElement>('.opencodian-agent-dropdown');
+    expect(dropdown?.style.left).toBe('-12px');
+    expect(dropdown?.style.width).toBe('204px');
+    expect(dropdown?.style.minWidth).toBe('204px');
+  });
+
+  it('disconnects the previous boundary observer when remounted', () => {
+    const boundary = document.createElement('div');
+    boundary.className = 'opencodian-container';
+    document.body.appendChild(boundary);
+    const fixture = createFixture();
+    boundary.appendChild(fixture.container);
+    fixture.coordinator.mount(fixture.container);
+    const firstObserver = ResizeObserverMock.instances[0];
+
+    const nextContainer = document.createElement('div');
+    boundary.appendChild(nextContainer);
+    fixture.coordinator.mount(nextContainer);
+
+    expect(firstObserver?.disconnect).toHaveBeenCalledTimes(1);
+    expect(ResizeObserverMock.instances).toHaveLength(2);
+    fixture.coordinator.destroy();
+    expect(ResizeObserverMock.instances[1]?.disconnect).toHaveBeenCalledTimes(1);
   });
 
   it('renders the dropdown as an accessible compact agent list without row detail toggles', async () => {

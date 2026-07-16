@@ -171,6 +171,8 @@
   bottom: 100%;
   left: 0;
   margin-bottom: 6px;
+  box-sizing: border-box;
+  width: 340px;
   min-width: 280px;
   max-width: 340px;
   max-height: 360px;

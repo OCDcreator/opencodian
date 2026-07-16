@@ -29,6 +29,7 @@
 - 下拉体验与模型选择器需保持视觉一致（圆角、层级、焦点态），但 Claude Code 权限菜单是例外：它使用截图式平面菜单而不是通用 glass 菜单，以减少视觉臃肿并突出权限语义。
 - Claude Code 的 `bypassPermissions` 可以显示为 `完全访问` / `Full access`，但描述与颜色必须保留它会绕过权限检查的风险含义，不得只写成普通的“少确认”。
 - 下拉面板带有 `permission-dropdown-open` 入场动画，由 `.is-open` 类触发。
+- dropdown 使用 `box-sizing: border-box`，280px CSS 宽度只作为无边界控制器时的回退；运行时由共享控制器限制在 Chat 容器左右 8px 安全区。
 - 选项支持 `:focus-visible` 焦点轮廓，确保键盘导航可见。
 - 修改后执行 `npm run build:css`（或完整 `npm run build`）。
 - 2026-06-07 新增 sandbox badge 样式，覆盖 enabled/disabled/readback 状态和 expanded sandbox 子策略摘要。

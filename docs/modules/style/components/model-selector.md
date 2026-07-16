@@ -21,6 +21,7 @@
   - 触发器：`padding: 4px 10px`、`font-weight: 500`；hover 时 `translateY(-1px)` + 柔和阴影抬升；`is-open` 态使用 accent 色边框 + 外发光。
   - Chevron：`cubic-bezier(0.4, 0, 0.2, 1)` 平滑旋转 180°，hover/open 时颜色递进。
   - 下拉面板：`border-radius: 14px`、flat `var(--background-primary)` 背景、两层简洁阴影；移除了 `backdrop-filter`、线性渐变和径向渐变。`model-dropdown-open` 入场动画改为纯 `translateY(4px)` 上滑。
+  - 下拉面板的 340px 首选宽度使用 `box-sizing: border-box`，实际水平位置和窄容器收缩由共享 `AnchoredOverlayLayoutController` 计算，确保相对聊天容器左右各保留 8px 安全间距，不再因固定 `left: 0` 被右侧边界裁剪。
   - 搜索框：`border-radius: 8px`、`var(--background-secondary)` 填充色、简洁边框；`focus-within` 时仅 accent 边框色变化；移除了内阴影和渐变背景。
   - Provider header：`11px` 大写标签、`font-weight: 700`；包含 provider icon（`.opencodian-model-provider-header-icon`），通过 `ProviderIconService` 获取 Lobehub CDN 图标；sticky 时 `var(--background-primary)` 纯色背景 + 6px 渐变淡出。
   - 选项：`padding: 5px 12px`、`font-weight: 450`；hover/highlighted 时仅 `var(--background-modifier-hover)` 背景变化；selected 态使用 accent 背景 tint + `font-weight: 600`；移除了左侧竖线装饰和 `translateX` 位移。

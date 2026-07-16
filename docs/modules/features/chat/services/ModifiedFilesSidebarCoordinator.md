@@ -21,7 +21,7 @@ export class ModifiedFilesSidebarCoordinator {
 ## 关键行为
 
 - `mountToggle()` rebuilds the composer toolbar toggle, wires the click handler, and owns the badge DOM reference.
-- `mountSidebar()` replaces any existing `ModifiedFilesSidebar` before mounting into the workspace-leaf host.
+- `mountSidebar()` replaces any existing `ModifiedFilesSidebar` before mounting into the nearest Chat `.opencodian-container`, so its percentage sizing and right inset resolve against the sidebar boundary rather than the wider workspace leaf.
 - `refresh()` reads entries through the injected session lookup and updates both the sidebar list and badge count.
 - `destroy()` clears the sidebar and all DOM references for view close or navigation sidebar rebuild.
 

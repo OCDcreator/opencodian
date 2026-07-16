@@ -15,6 +15,7 @@
 - 在 permission selector 旁集成 sandbox badge 容器（仅 Claude Code backend），用于显示 Claude Code sandbox 配置摘要
 - 在 permission selector 旁集成 Codex runtime defaults badge 容器（仅 Codex backend），用于显示网络、网页搜索与额外目录等非默认 Codex 运行默认项
 - 维护 model selector 的搜索、keyboard navigation、sticky header cleanup 与 provider icon 刷新
+- model dropdown 通过共享 `AnchoredOverlayLayoutController` 按 Chat 容器边界同步 340px 首选宽度、280px 最小宽度与 8px 安全区
 - 统一更新当前模型显示、unavailable / unconfigured class、switch-model override 写回结果、unavailable notice 文案与 effort selector 连动；trigger tooltip 明确这是当前标签的发送覆盖，不是持久化 `ConversationSessionSettings`
 - 委托 `PermissionModeSelectorCoordinator` 维护 permission selector 的 mode label、selected state 与 dropdown open/close lifecycle
 - 通过共享 escape handler 收束两个 selector 的关闭行为
@@ -64,6 +65,7 @@ export class ChatSelectionControlsCoordinator {
 - Codex runtime defaults badge 通过 `syncCodexRuntimeDefaultsBadge()` 在每次刷新时重新读取 active backend：仅 Codex backend 且存在网络访问启用、网页搜索非默认或额外目录非空时保留容器并渲染芯片；quiet defaults 会移除空容器，避免 toolbar 留下不可见占位或后续渲染到已移除节点。该 badge 是只读提示，不验证 Codex CLI 是否按配置执行。
 - model dropdown 的 outside-click listener 使用 capture 阶段注册，确保点击其他 toolbar dropdown trigger 时当前 dropdown 能被正确关闭
 - model selector trigger 现在携带 `role="button"`、`tabindex="0"`、`aria-haspopup="listbox"` 与 `aria-expanded`，dropdown 打开/关闭时同步更新这些属性并添加/移除 `is-open` 类以触发 CSS 动画
+- model dropdown 打开时会按最近的 `.opencodian-container` 边界重新计算宽度与水平偏移：默认保持 340px，左右预留 8px 安全区；窄于 296px 的聊天容器会继续收缩 dropdown，避免固定左对齐把右侧内容送进 `overflow: hidden` 裁剪区。容器尺寸变化时由 `ResizeObserver` 在 dropdown 打开状态下重新定位。
 - `destroy()` 关闭 dropdown、移除 document click listener，并释放 sticky header cleanup
 
 ## 与 `OpenCodianView` 的边界

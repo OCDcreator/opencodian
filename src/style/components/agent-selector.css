@@ -158,8 +158,10 @@
   display: flex;
   flex-direction: column;
   gap: 1px;
-  width: min(340px, calc(100vw - 32px));
+  box-sizing: border-box;
+  width: 340px;
   min-width: 272px;
+  max-width: 340px;
   max-height: 320px;
   margin-bottom: 6px;
   background:

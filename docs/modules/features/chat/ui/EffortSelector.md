@@ -17,6 +17,7 @@ OpenCode 模式下，variants 来自当前 provider model catalog 的 `models[mo
 - 在当前模型不存在或 variants 为空时隐藏自身，避免留下空 toolbar 控件
 - 通过 `allowDefaultOption()` 和 `getDefaultOptionLabel()` 支持 backend-specific 默认项语义
 - 通过 `getBoundaryHint()` 回调渲染边界提示文本（boundary hint），诚实告知用户 effort 变更的作用范围
+- dropdown 使用 `AnchoredOverlayLayoutController` 从当前值右边缘向左展开，以菜单实际内容宽度为首选、60px 为最小值，并相对最近的 Chat 容器保留左右 8px 安全区
 
 ## 维护约束
 
@@ -25,3 +26,4 @@ OpenCode 模式下，variants 来自当前 provider model catalog 的 `models[mo
 - Codex effort 写回路径：`onVariantChange` → `plugin.settings.backendSettings.codex.modelReasoningEffort` + `CodexAdapter.updateModelReasoningEffort()`。仅影响后续 thread 创建，不改变正在运行的 thread。该边界通过 `getBoundaryHint()` 回调在 UI 上显示 "Applies to next turn" / "下次对话生效" 提示文本，并设置 `title` 属性作为 hover tooltip。
 - 新增 backend effort 语义时，优先扩展 callbacks，而不是在组件中硬编码 backend kind。
 - Boundary hint 作为 `.opencodian-effort-boundary-hint` span 渲染在 label 和 gears 之间，CSS 样式在 `effort-selector.css` 中定义。
+- 每次 variants 更新并重建 options DOM 时必须重建浮层控制器；destroy 时断开 observer，避免继续持有旧菜单节点。

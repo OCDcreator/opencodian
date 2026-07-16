@@ -1,7 +1,12 @@
 import { setIcon } from 'obsidian';
 
 import { t } from '../../../i18n';
+import { AnchoredOverlayLayoutController } from '../ui/AnchoredOverlayLayoutController';
 import type { AgentSelectionCandidate } from './AgentMentionCandidateService';
+
+const AGENT_DROPDOWN_PREFERRED_WIDTH = 340;
+const AGENT_DROPDOWN_MINIMUM_WIDTH = 272;
+const AGENT_DROPDOWN_SAFE_INSET = 8;
 
 export interface ChatAgentSelectionCoordinatorHost {
   loadAgentSelectionCandidates(): Promise<AgentSelectionCandidate[]>;
@@ -19,6 +24,7 @@ export class ChatAgentSelectionCoordinator {
   private status: 'idle' | 'loading' | 'ready' | 'failed' = 'idle';
   private loadRunId = 0;
   private clickOutsideHandler: ((event: MouseEvent) => void) | null = null;
+  private dropdownLayoutController: AnchoredOverlayLayoutController | null = null;
 
   constructor(private readonly host: ChatAgentSelectionCoordinatorHost) {}
 
@@ -46,6 +52,7 @@ export class ChatAgentSelectionCoordinator {
     this.dropdownEl.setAttribute('role', 'listbox');
     this.dropdownEl.setAttribute('aria-hidden', 'true');
     this.dropdownEl.style.display = 'none';
+    this.mountDropdownLayoutController();
     this.renderList();
     this.updateDisplay();
 
@@ -133,6 +140,8 @@ export class ChatAgentSelectionCoordinator {
 
   destroy(): void {
     this.closeDropdown();
+    this.dropdownLayoutController?.destroy();
+    this.dropdownLayoutController = null;
     this.containerEl = null;
     this.triggerEl = null;
     this.dropdownEl = null;
@@ -160,6 +169,26 @@ export class ChatAgentSelectionCoordinator {
         : t('chat.agentSelector.defaultTitle'),
     );
     this.updateDropdownSelection();
+  }
+
+  private mountDropdownLayoutController(): void {
+    this.dropdownLayoutController?.destroy();
+    this.dropdownLayoutController = null;
+    if (!this.containerEl || !this.dropdownEl) {
+      return;
+    }
+
+    this.dropdownLayoutController = new AnchoredOverlayLayoutController({
+      anchorEl: this.containerEl,
+      overlayEl: this.dropdownEl,
+      resolveBoundary: () => this.containerEl?.closest<HTMLElement>('.opencodian-container') ?? null,
+      alignment: 'start',
+      preferredWidth: AGENT_DROPDOWN_PREFERRED_WIDTH,
+      minimumWidth: AGENT_DROPDOWN_MINIMUM_WIDTH,
+      safeInset: AGENT_DROPDOWN_SAFE_INSET,
+      isOpen: () => this.isDropdownOpen,
+    });
+    this.dropdownLayoutController.observe();
   }
 
   private renderList(): void {
@@ -313,6 +342,8 @@ export class ChatAgentSelectionCoordinator {
     }
     this.isDropdownOpen = true;
     this.dropdownEl.style.display = 'block';
+    this.dropdownLayoutController?.observe();
+    this.dropdownLayoutController?.sync();
     this.dropdownEl.addClass('is-open');
     this.dropdownEl.setAttribute('aria-hidden', 'false');
     this.triggerEl.addClass('is-open');

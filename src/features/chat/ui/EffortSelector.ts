@@ -11,6 +11,10 @@
  */
 
 import { t } from '../../../i18n';
+import { AnchoredOverlayLayoutController } from './AnchoredOverlayLayoutController';
+
+const EFFORT_DROPDOWN_MINIMUM_WIDTH = 60;
+const EFFORT_DROPDOWN_SAFE_INSET = 8;
 
 export interface EffortSelectorCallbacks {
   /** Available variant names for the current model */
@@ -41,6 +45,7 @@ export class EffortSelector {
   private hintEl: HTMLElement | null = null;
   private callbacks: EffortSelectorCallbacks;
   private isMenuOpen = false;
+  private dropdownLayoutController: AnchoredOverlayLayoutController | null = null;
   private readonly handleDocumentMouseDown: (event: MouseEvent) => void;
   private readonly handleDocumentKeyDown: (event: KeyboardEvent) => void;
 
@@ -115,6 +120,7 @@ export class EffortSelector {
 
     // Dropdown options
     const optionsEl = this.gearsEl.createDiv({ cls: 'opencodian-effort-options' });
+    this.mountDropdownLayoutController(optionsEl);
 
     if (allowDefaultOption) {
       const defaultGear = optionsEl.createDiv({ cls: 'opencodian-effort-gear' });
@@ -195,6 +201,8 @@ export class EffortSelector {
     doc.removeEventListener('mousedown', this.handleDocumentMouseDown, true);
     doc.removeEventListener('keydown', this.handleDocumentKeyDown, true);
     this.closeMenu();
+    this.dropdownLayoutController?.destroy();
+    this.dropdownLayoutController = null;
     this.container.remove();
   }
 
@@ -206,11 +214,33 @@ export class EffortSelector {
     this.closeMenu();
     this.isMenuOpen = true;
     this.gearsEl?.addClass('is-open');
+    this.dropdownLayoutController?.observe();
+    this.dropdownLayoutController?.sync();
   }
 
   private closeMenu(): void {
     this.isMenuOpen = false;
     this.gearsEl?.removeClass('is-open');
+  }
+
+  private mountDropdownLayoutController(optionsEl: HTMLElement): void {
+    this.dropdownLayoutController?.destroy();
+    this.dropdownLayoutController = null;
+    if (!this.gearsEl) {
+      return;
+    }
+
+    this.dropdownLayoutController = new AnchoredOverlayLayoutController({
+      anchorEl: this.gearsEl,
+      overlayEl: optionsEl,
+      resolveBoundary: () => this.container.closest<HTMLElement>('.opencodian-container'),
+      alignment: 'end',
+      preferredWidth: () => Math.max(optionsEl.scrollWidth, EFFORT_DROPDOWN_MINIMUM_WIDTH),
+      minimumWidth: EFFORT_DROPDOWN_MINIMUM_WIDTH,
+      safeInset: EFFORT_DROPDOWN_SAFE_INSET,
+      isOpen: () => this.isMenuOpen,
+    });
+    this.dropdownLayoutController.observe();
   }
 }
 

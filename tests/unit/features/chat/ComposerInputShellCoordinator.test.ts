@@ -30,6 +30,12 @@ class ResizeObserverMock {
   static reset(): void {
     ResizeObserverMock.instances = [];
   }
+
+  static findObserving(element: Element): ResizeObserverMock | undefined {
+    return ResizeObserverMock.instances.find((instance) => (
+      instance.observe.mock.calls.some(([observed]) => observed === element)
+    ));
+  }
 }
 
 let animationFrameQueue: FrameRequestCallback[] = [];
@@ -562,7 +568,7 @@ describe('ComposerInputShellCoordinator placeholder and availability', () => {
         description: 'The current backend is enabled, but it is not connected right now.',
       },
     });
-    const resizeObserver = ResizeObserverMock.instances[0];
+    const resizeObserver = ResizeObserverMock.findObserving(fixture.container);
     const noticeEl = fixture.surfaceRoot.querySelector<HTMLElement>('.opencodian-composer-availability-notice');
 
     expect(noticeEl?.style.bottom).toBe('96px');
@@ -969,7 +975,7 @@ describe('ComposerInputShellCoordinator — slash menu core behaviors', () => {
 
   it('syncs textarea height and composer layout metrics, then tears them down on destroy', () => {
     const fixture = createFixture();
-    const resizeObserver = ResizeObserverMock.instances[0];
+    const resizeObserver = ResizeObserverMock.findObserving(fixture.container);
 
     fixture.setTextareaScrollHeight(420);
     fixture.textarea.dispatchEvent(new Event('input', { bubbles: true }));

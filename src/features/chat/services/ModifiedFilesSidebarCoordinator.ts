@@ -8,7 +8,10 @@ export class ModifiedFilesSidebarCoordinator {
 
   mountSidebar(parentEl: HTMLElement, app: App): void {
     this.sidebar?.destroy();
-    this.sidebar = new ModifiedFilesSidebar(app, parentEl);
+    const boundaryEl = parentEl.matches('.opencodian-container')
+      ? parentEl
+      : parentEl.querySelector<HTMLElement>('.opencodian-container') ?? parentEl;
+    this.sidebar = new ModifiedFilesSidebar(app, boundaryEl);
   }
 
   refresh(sessionId: string | null, getEntries: (id: string) => SessionDiffEntry[]): void {

@@ -66,6 +66,7 @@ export class PermissionModeSelectorCoordinator {
 - 选中 option 后先调用 `host.switchPermissionMode()`，再刷新 trigger/selected state 并关闭 dropdown
 - click-outside listener 使用 capture 阶段注册，与 agent selector 保持一致，确保点击其他 toolbar dropdown trigger 时当前 dropdown 能被正确关闭
 - click-outside listener 只在 dropdown open 时注册，close/destroy 时移除
+- dropdown 使用 `AnchoredOverlayLayoutController` 按最近的 `.opencodian-container` 计算 280px 首选宽度、220px 最小宽度和左右 8px 安全区；侧栏 resize 时仅在菜单打开状态重新同步
 - trigger 现在携带 `role="button"`、`tabindex="0"`、`aria-haspopup="listbox"` 与 `aria-expanded`，dropdown 打开/关闭时同步更新这些属性并添加/移除 `is-open` 类以触发 CSS 动画
 
 ## 与 `ChatSelectionControlsCoordinator` 的边界

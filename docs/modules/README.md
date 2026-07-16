@@ -215,6 +215,7 @@ docs/modules/
 │   │   │   ├── TabManager.md
 │   │   │   └── types.md
 │   │   └── ui/
+│   │       ├── AnchoredOverlayLayoutController.md
 │   │       ├── ContextDetailModal.md
 │   │       ├── ContextFilePickerModal.md
 │   │       ├── ContextRing.md

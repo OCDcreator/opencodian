@@ -70,6 +70,7 @@
   position: absolute;
   bottom: calc(100% + 4px);
   right: 0;
+  box-sizing: border-box;
   display: none;
   flex-direction: column;
   gap: 2px;

@@ -303,6 +303,8 @@
   bottom: 100%;
   left: 0;
   margin-bottom: 4px;
+  box-sizing: border-box;
+  width: 280px;
   min-width: 220px;
   max-width: 280px;
   background:
@@ -553,8 +555,6 @@
 }
 
 .opencodian-permission-dropdown.opencodian-permission-selector--claude-code {
-  min-width: min(320px, calc(100vw - 28px));
-  max-width: min(320px, calc(100vw - 28px));
   padding: 8px;
   border-radius: 18px;
   background: color-mix(in srgb, var(--background-primary) 92%, var(--background-secondary));

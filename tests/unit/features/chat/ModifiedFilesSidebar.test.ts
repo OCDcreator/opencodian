@@ -1,5 +1,6 @@
 import type { App } from 'obsidian';
 
+import { ModifiedFilesSidebarCoordinator } from '../../../../src/features/chat/services/ModifiedFilesSidebarCoordinator';
 import { ModifiedFilesSidebar } from '../../../../src/features/chat/ui/ModifiedFilesSidebar';
 import { t } from '../../../../src/i18n';
 
@@ -87,5 +88,23 @@ describe('ModifiedFilesSidebar', () => {
     expect(buttonEl?.getAttribute('data-tooltip')).toBe(t('modifiedFiles.toggleTooltip'));
     expect(hiddenLabel?.textContent).toBe(t('modifiedFiles.toggleTooltip'));
     expect(buttonEl?.getAttribute('aria-labelledby')).toBe(hiddenLabel?.id);
+  });
+
+  it('mounts inside the Chat container when the caller provides the wider workspace leaf', () => {
+    const workspaceLeafEl = document.createElement('div') as ObsidianLikeElement;
+    const chatContainerEl = workspaceLeafEl.createDiv({ cls: 'opencodian-container' });
+    document.body.appendChild(workspaceLeafEl);
+    const coordinator = new ModifiedFilesSidebarCoordinator();
+
+    coordinator.mountSidebar(workspaceLeafEl, {
+      workspace: {
+        openLinkText: jest.fn(),
+      },
+    } as unknown as App);
+
+    expect(chatContainerEl.querySelector('.opencodian-modified-files-sidebar-host')).not.toBeNull();
+    expect(Array.from(workspaceLeafEl.children).some((child) => (
+      child.classList.contains('opencodian-modified-files-sidebar-host')
+    ))).toBe(false);
   });
 });

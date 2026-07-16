@@ -218,6 +218,50 @@ describe('ChatSelectionControlsCoordinator', () => {
     expect(modelTrigger?.hasClass('is-open')).toBe(false);
   });
 
+  it('repositions the model dropdown from visible geometry when it opens', async () => {
+    const fixture = await createFixture();
+    const boundary = document.createElement('div');
+    boundary.className = 'opencodian-container';
+    document.body.insertBefore(boundary, fixture.toolbarEl);
+    boundary.appendChild(fixture.toolbarEl);
+
+    const selector = fixture.toolbarEl.querySelector<HTMLElement>('.opencodian-model-selector');
+    const trigger = fixture.toolbarEl.querySelector<HTMLElement>('.opencodian-model-trigger');
+    const dropdown = fixture.toolbarEl.querySelector<HTMLElement>('.opencodian-model-dropdown');
+    if (!selector || !trigger || !dropdown) {
+      throw new Error('expected mounted model selector');
+    }
+
+    jest.spyOn(boundary, 'getBoundingClientRect').mockReturnValue({
+      left: 924.5,
+      right: 1440,
+      top: 52,
+      bottom: 921,
+      width: 515.5,
+      height: 869,
+      x: 924.5,
+      y: 52,
+      toJSON: () => ({}),
+    });
+    jest.spyOn(selector, 'getBoundingClientRect').mockReturnValue({
+      left: 1112.2,
+      right: 1304.2,
+      top: 869,
+      bottom: 899,
+      width: 192,
+      height: 30,
+      x: 1112.2,
+      y: 869,
+      toJSON: () => ({}),
+    });
+
+    trigger.click();
+
+    expect(dropdown.style.left).toBe('-20.2px');
+    expect(dropdown.style.width).toBe('340px');
+    expect(dropdown.style.minWidth).toBe('280px');
+  });
+
   it('resolves requested models against the loaded catalog and preserves base-catalog metadata lookups', async () => {
     const effectiveProviders: ModelSelectorProvider[] = [
       {

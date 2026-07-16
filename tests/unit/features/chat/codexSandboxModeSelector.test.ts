@@ -79,6 +79,31 @@ describe('Codex sandbox mode selector', () => {
       coordinator.destroy();
     });
 
+    it('clamps the permission dropdown to the chat boundary when it opens', () => {
+      const boundary = document.createElement('div');
+      boundary.className = 'opencodian-container';
+      const container = document.createElement('div');
+      boundary.appendChild(container);
+      document.body.appendChild(boundary);
+      const coordinator = new PermissionModeSelectorCoordinator(host, createCodexSandboxConfig());
+      coordinator.mount(container);
+
+      jest.spyOn(boundary, 'getBoundingClientRect').mockReturnValue({
+        left: 100, right: 360, top: 0, bottom: 800, width: 260, height: 800, x: 100, y: 0, toJSON: () => ({}),
+      });
+      jest.spyOn(container, 'getBoundingClientRect').mockReturnValue({
+        left: 120, right: 180, top: 700, bottom: 730, width: 60, height: 30, x: 120, y: 700, toJSON: () => ({}),
+      });
+
+      container.querySelector<HTMLElement>('.opencodian-permission-trigger')?.click();
+
+      const dropdown = container.querySelector<HTMLElement>('.opencodian-permission-dropdown');
+      expect(dropdown?.style.left).toBe('-12px');
+      expect(dropdown?.style.width).toBe('244px');
+      expect(dropdown?.style.minWidth).toBe('220px');
+      coordinator.destroy();
+    });
+
     it('shows the correct mode class', () => {
       const container = document.createElement('div');
       const config = createCodexSandboxConfig();

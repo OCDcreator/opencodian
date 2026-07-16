@@ -23,5 +23,6 @@
 ## 修改注意点
 
 - 下拉显示依赖 `.is-open` 和 `:has(:hover)`，改交互时要同步验证键盘/鼠标两种路径。
+- options 使用 `box-sizing: border-box`；运行时从 trigger 右边缘锚定，并由共享控制器限制在 Chat 容器左右 8px 安全区。
 - 控件位于输入工具栏，宽度与字号改动会影响模型/权限选择器排布。
 - 修改后执行 `npm run build:css`（或完整 `npm run build`）。
