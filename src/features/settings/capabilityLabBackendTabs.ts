@@ -156,7 +156,7 @@ export function createCapabilityLabBackendTabs(
     id: string,
     activationOptions: { readonly focus?: boolean; readonly persist?: boolean } = {},
   ): void => {
-    if (disposed) return;
+    if (disposed || !rootEl.isConnected) return;
     const entry = findEntry(id);
     if (!entry) return;
     activeId = id;

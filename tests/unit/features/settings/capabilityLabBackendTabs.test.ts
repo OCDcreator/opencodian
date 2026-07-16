@@ -326,6 +326,24 @@ describe('createCapabilityLabBackendTabs', () => {
     expect(getState).toHaveBeenCalledTimes(1);
   });
 
+  it('ignores activation after the tab root is detached', () => {
+    const renderSecond = jest.fn();
+    const { rootEl, controller, onPersist } = createController({
+      descriptors: [
+        createDescriptor({ id: 'first' }),
+        createDescriptor({ id: 'second', render: renderSecond }),
+      ],
+      initialId: 'first',
+    });
+
+    rootEl.remove();
+    controller.activate('second', { focus: true, persist: true });
+
+    expect(controller.getActiveId()).toBe('first');
+    expect(renderSecond).not.toHaveBeenCalled();
+    expect(onPersist).not.toHaveBeenCalled();
+  });
+
   it('renders the supplied sanitized error when a panel renderer fails', () => {
     const render = jest.fn(() => {
       throw new Error('raw backend payload');
