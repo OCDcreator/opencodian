@@ -40,6 +40,8 @@
 4. 生成最终 `OpenCodianSettings`；
 5. 决定本次启动是否需要把归一化结果立即写回磁盘。
 
+Capability Lab 的 `capabilityLabSelectedBackend` 在最终 settings merge 时通过 `normalizeCapabilityLabSelectedBackend()` 清洗。合法的 `claude-code` / `opencode` / `codex` UI preference 保留；陈旧值回退 `undefined`，由 tabs controller 再按 `activeBackend` → Claude Code 解析初始选择。该字段不会参与 active backend 或 enabled backend 归一化。
+
 最终 settings merge 会用 `IMPLEMENTED_AGENT_BACKENDS` 过滤 `enabledBackends`，并在 `activeBackend` 不在 enabled 列表中时回退到第一个 enabled backend。当前实现只保留 `opencode`，避免旧快照或手写设置启用尚未接入的 backend。`backendSettings.claudeCode` 仍会归一化并持久保留，作为隐藏 foundation，不能因此把 Claude 暴露成已实现 backend。
 
 ### server / theme / input-panel 迁移

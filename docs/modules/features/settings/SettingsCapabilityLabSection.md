@@ -1,13 +1,17 @@
 # SettingsCapabilityLabSection
 
 > **源码**: `src/features/settings/SettingsCapabilityLabSection.ts`
-> **最近更新**: 2026-06-12 (added Codex Backend matrix rows with honest diagnostic truth states)
+> **最近更新**: 2026-07-16（Claude Code / OpenCode / Codex 能力改为持久化 backend tabs）
 
 ## 概述
 
-`SettingsCapabilityLabSection` 是 Debug 分区 `capability-lab` 二级标签的诊断/实验面板 owner。它提供十个诊断面板，用于检查 Claude Code SDK 能力对等状态，所有面板均标记为 ⚠️ DIAGNOSTIC / EXPERIMENTAL / NOT STABLE，不连接稳定设置持久化。大多数交互仍是只读或 dry-run；sessionStore proof 只会写入插件内存里的 diagnostic store，并通过 Diagnostic Store 列表和 readback 证明隔离路径可读，不会改稳定设置或普通 chat UI。
+`SettingsCapabilityLabSection` 是 Debug 分区 `capability-lab` 二级标签的诊断/实验面板 owner。它提供 Claude Code 深诊断、OpenCode production capability snapshot 和 Codex capability matrix，所有实验内容均标记为 ⚠️ DIAGNOSTIC / EXPERIMENTAL / NOT STABLE。大多数探针仍是只读或 dry-run；sessionStore proof 只写插件内存里的 diagnostic store。例外是 UI 偏好和显式 Claude 诊断开关：backend tab 选择会写入 `capabilityLabSelectedBackend`，诊断开关继续写入 Claude backend settings，但不会改变 `activeBackend` 或绕过实验 gate。
 
-OpenCode SDK 1.17.18 同步后，本节额外展示一张 **OpenCode SDK capability evidence** 诊断表。该表只读取生产 `OpenCodeService.getSdkCapabilitySnapshot()`，刷新也只调用 `refreshSdkCapabilities()` 的 safe-read discovery；它没有实验 gate、PTY/control-plane/project-copy/background action、Chat launcher 或 settings save 的入口。复制功能只导出 `id`、availability kind 与 evidence 的 JSON，不导出 availability reason、SDK path、原始 server payload、token、credential、原始错误或 migration backup。state-changing 条目会明确显示为安全跳过，而非尝试调用 endpoint。
+页面顶部在警告和诊断摘要后渲染 `Claude Code → OpenCode → Codex` 固定顺序的 backend tab rail。初始选择按 persisted preference → `activeBackend` → Claude Code 回退；Arrow/Home/End 只移动焦点，Enter/Space/点击才激活。每个 tabpanel 首次激活时惰性挂载，之后缓存并复用，未访问 Claude panel 时不会触发 History/Subagent/Rewind 等读取。隐藏 panel 使用原生 `hidden`，同一时刻仅一个 panel 可见。
+
+Claude Code panel 拥有 Claude matrix、History、Subagents、Rewind、Structured Output、Fork、Resume、Session Detail、Backend Routing 与 Discovery/Status；OpenCode panel 只拥有 production snapshot、安全刷新和脱敏导出；Codex panel 只拥有 Codex matrix。每个 `[data-capability-backend]` workspace 是对应 panel 唯一的 border/background/radius owner，内部标题、状态、表格和操作栏保持扁平。adapter 缺失显示“未配置”。OpenCode workspace 只有在 snapshot 至少包含一个 `available` entry 时才标记为 `available`；首轮尚未完成或任一 entry 为 `unknown` 时标记为 `unknown`；已完成探测但没有可用 entry 时标记为 `empty`。
+
+OpenCode SDK 1.17.18 同步后，本节额外展示一张 **OpenCode SDK capability evidence** 诊断表。该表只读取生产 `OpenCodeService.getSdkCapabilitySnapshot()`，刷新也只调用 `refreshSdkCapabilities()` 的 safe-read discovery；它没有实验 gate、PTY/control-plane/project-copy/background action 或 Chat launcher。刷新期间 workspace 使用 `aria-busy`，完成后统一清理；失败和成功反馈复用唯一 `data-opencode-sdk-refresh-feedback` 节点，连续失败不会堆叠 alert。刷新成功重建 capability table 与 controls 后会恢复刷新按钮焦点，并只同步 OpenCode tab state，不重建 tablist 或改变选择。复制功能只导出 `id`、availability kind 和 evidence allowlist；`runtime-proven` 只导出 kind，不导出 `artifactPath`、`buildId`、`verifiedAt`、availability reason、SDK path、原始 payload、token、credential、原始错误或 migration backup。
 
 设计原则：不把未验证能力包装成稳定 UI。允许最小的 diagnostic-only runtime proof，但不能把 hooks / sessionStore 伪装成 stable/completed。structured output 的 transcript 渲染与持久化已稳定，普通聊天 `/json` trigger 与 composer capability chip 也已落地；但自定义 schema authoring 仍为 diagnostic-only，Capability Lab 只证明边界，不把诊断态升级成正式产品面。Claude-native Skills / Agent Definitions 的稳定设置页入口已落地（Runtime tab: discovery + create/open actions）。Agent Definitions 同时有 `@agent` mention menu 的 backend-aware 支持。Hooks 和 Plugins 已从 `hidden` 升格为 `settings`：项目设置文件（`.claude/settings.json` + `.claude/settings.local.json`）提供 scan/create/open 入口，用户直接编辑 JSON 文件配置 hooks 和 enabledPlugins。**重要边界**：hooks 在 `.claude/settings.local.json` 中仅在 `settingSources` 包含 `'local'` 时才会被 SDK 子进程读取执行；默认 `settingSources` 为 `['project']`，只读取 `.claude/settings.json`。用户需在 Context & Sources 标签页启用 `'local'` 才能激活 `settings.local.json` 中的 hooks。Hook proof 报告现已诚实区分 Layer 1（JS callback）和 Layer 3（shell hook from config file），并在 Layer 3 未触发时报告当前 `settingSources` 配置。Include Hook Events 仍为 `diagnostic`（流式诊断事件，非用户面）。Fork 已从 diagnostic-only 升格为稳定 chat surface（`UserMessageFooterRenderer` + `ConversationLoadRecoveryCoordinator`），Capability Lab 保留 fork 诊断探针用于 adapter 级别验证。Prompt Suggestions 是稳定 chat surface（composer 下方 suggestion chip），settings 有 stable toggle，且已通过 2026-06-06 Test Vault 普通聊天 live proof 晋升为 `pass`；Capability Lab 中保留的 readback proof 仅作为 settings→SDK option mapping 的辅助证据。
 
@@ -17,13 +21,13 @@ OpenCode SDK 1.17.18 同步后，本节额外展示一张 **OpenCode SDK capabil
 - `JSONL History Browser` → `settings+chat`：settings launcher 和 chat launcher 都能浏览、预览和查看会话详情；settings 端为 browse-only（无 resume）。
 - `Resume Session` → `chat`：仅 chat 端支持 resume（settings launcher 显式设置 `supportsResume: false`）。
 - `Session Detail` → `settings+chat`：detail view（元数据 + 完整转录）在 chat 和 settings 两个表面都可用。
-新增的 `settings+chat` surface chip 使用渐变样式（success + info 双色），表示能力跨越设置页只读发现和普通聊天交互两个表面。此变更不新增任何 UI 功能，仅让矩阵分类与现有代码行为保持一致。
+新增的 `settings+chat` surface chip 使用单一 success 语义色和明确文本，表示能力跨越设置页只读发现和普通聊天交互两个表面。此变更不新增任何 UI 功能，仅让矩阵分类与现有代码行为保持一致。
 
 ## 诊断面板
 
 | 面板 | 功能 | 数据来源 |
 |------|------|----------|
-| Capability Matrix | 静态 SDK 能力对等矩阵；`userSurface` 支持 `settings`（稳定设置控制）、`diagnostic`（实验性表面）、`hidden`（未暴露）、`chat`（普通聊天交互表面）和 `settings+chat`（设置页只读发现 + 聊天交互表面同时可用）五种分类 | 代码检查 + `getClaudeCodeAdapter()` |
+| Backend capability tabs | Claude Code、OpenCode、Codex 三个同级 tabs，同一时刻只显示一个已选 panel；Claude/Codex 各自拥有独立矩阵，OpenCode 展示 production capability snapshot 与 safe refresh/export | descriptor controller + backend adapter + `OpenCodeService.getSdkCapabilitySnapshot()` |
 | JSONL History Browser | 浏览本地 JSONL 或 diagnostic store 会话历史，支持 import / mirror proof。会话元数据（sessionId / summary / lastModified）不再通过 `<option title>` 显示，而是选择会话后渲染到固定可见的 `data-capability-history-session-detail` 详情区域 | `adapter.listSessions()` / `getSessionMessages()` / `importSessionToStore()` / `runDiagnosticPrompt()` |
 | Subagent Browser | 列出/检查子代理转录 | `adapter.listSubagents()` / `getSubagentMessages()` |
 | Rewind Dry-Run Preview | 预览文件检查点回退（不执行）；手动选择 session + message ID 执行 `rewindFiles(dryRun:true)`。readback 分类显示 source-backed blocker hint。静态矩阵标为 `Readback`（source-backed blocker: `isInteractive:false` 硬编码于 `_T()` (sdk.mjs ~line 280170)，零 `isInteractive=true` 存在于打包 SDK，snapshot 创建被 React `useState` setter 门控，`rewindFiles()` 发送 `sdk_rewind_files` 到子进程检查始终空的 file history）。探针新增 `sdkFilesPersistedEventCount`（预期 0）和 `applyFlagSettings` seam 探测（在 Phase 1 首个 assistant 消息后调用 `query.applyFlagSettings({ fileCheckpointingEnabled: true })` 测试运行时设置注入）。**2026-06-06 re-audit (Outcome B)**：blocker 确认未变。SDK #236 自 2026-03-17 开放至今无 maintainer 回复。SDK 0.3.145 安装；0.3.158 测试结果相同（10/10 canRewind:false）。adjacent seams 全部拒绝（enableFileCheckpointing toggle 仅设标志位、applyFlagSettings 为 dead-end、sessionStore 互斥、extraArgs 不影响 snapshot 创建、Fork Session 语义不同不恢复文件状态）。这是最高用户价值但仍被上游阻塞的 seam。promotion path 需 Anthropic 将 snapshot 创建从 React/Ink UI 解耦到 non-interactive code path | `adapter.rewindFiles(dryRun: true)` / `adapter.runCheckpointRewindProbe()` |
@@ -174,7 +178,8 @@ Discovery 面板在 adapter 可用时调用 `adapter.getMcpServerCount()`、`ada
 | `constructor(deps)` | 接收 `CapabilityLabDeps` |
 | `dispose()` | 空实现，预留清理 |
 | `attachTabbed(containerEl, secondaryTabId)` | 渲染完整诊断面板 |
-| `renderCapabilityMatrix()` | 渲染能力矩阵表格 |
+| `renderCapabilityMatrix()` | 在指定 Claude Code 或 Codex workspace 内渲染独立能力矩阵 |
+| `renderOpenCodeSdkCapabilities()` | 在 OpenCode workspace 内渲染生产 capability snapshot、空态与安全操作 |
 | `buildMatrixRows(adapter)` | 构建静态能力矩阵行 |
 | `renderHistoryBrowser()` | 渲染 JSONL 历史浏览器 |
 | `renderSubagentBrowser()` | 渲染子代理浏览器 |

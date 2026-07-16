@@ -133,6 +133,7 @@ OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings`、`DEFAULT_
 | `PersistedTabState` | `{ tabs: PersistedTabEntry[], activeTabIndex }` |
 | `PersistedTabEntry` | `{ id?, parentTabId?, conversationId, title, modelOverride }` |
 | `PersistedTabModelOverride` | `{ provider, model }` |
+| `capabilityLabSelectedBackend` | Capability Lab 独立 UI preference：`claude-code | opencode | codex | undefined`。它不改变 `activeBackend` 或运行时 backend。 |
 
 ### Provider 图标
 
@@ -166,6 +167,7 @@ OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings`、`DEFAULT_
 | `normalizeClaudeCodeNullablePositiveNumber(value)` | 归一化可为空的正数（如 maxBudgetUsd），保留小数 |
 | `normalizeClaudeCodeEnv(value)` | 归一化环境变量对象，过滤非字符串值 |
 | `normalizeTabsEnabled(value)` | 归一化会话标签启用状态；只有明确 `false` 才禁用，未知值默认启用 |
+| `normalizeCapabilityLabSelectedBackend(value)` | trim 后只接受 Claude Code、OpenCode、Codex 三个 backend id；未知或陈旧值回退 `undefined` |
 | `normalizeTabBarPosition(value)` | 归一化标签栏位置 |
 | `normalizeBelowHeaderTabBarLayout(value)` | 归一化下方标签布局 |
 | `normalizeTitleMode(value)` | 归一化标题模式 |

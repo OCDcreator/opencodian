@@ -256,6 +256,18 @@ Ordinary settings rows use a local shadcn-style Card + Field pattern implemented
 - **Layout:** desktop rows use two columns, `minmax(0, 1fr)` plus a compact control column; long text rows opt into `.opencodian-wide-text-setting`; below `720px`, rows collapse to one column with controls left-aligned.
 - **Exclusions:** readback/proof/status panels, destructive confirmations, modal editor cards, chat/composer surfaces, permission dialogs, and streaming error blocks keep their owner-specific state styling.
 
+### Capability Lab Backend Tabs
+
+Capability Lab uses a compact manual-activation tab rail to separate Claude Code, OpenCode, and Codex without turning backend selection into another card layer.
+
+- **Rail anatomy:** one flat, single-line `tablist` beneath the diagnostic summary. The rail owns a bottom separator and local horizontal overflow only; it has no card background, radius, shadow, or pill container.
+- **Tab typography:** fixed 13px interface text, 600 weight, normal letter spacing, and a compact 32px minimum visual height. Backend state remains visible as restrained 11px supporting text and is included in the tab accessible name.
+- **Selected state:** selected tabs use `var(--text-normal)` plus a 2px underline in `var(--interactive-accent)`. Inactive tabs remain muted; hover may add a low-chroma tonal background but must not lift, scale, or become a rounded segmented control.
+- **Focus:** keyboard focus uses the shared 2px settings focus ring with 2px offset. The scrolling rail reserves at least one `space-sm` inset on every edge so overflow clipping never cuts the ring. Manual activation is required: arrows/Home/End move focus; Enter/Space activates.
+- **Motion:** transition only color, border-color, and background-color for about 150ms. Panel contents do not slide or animate.
+- **Responsive behavior:** the rail never wraps, including around 320px. It scrolls horizontally inside its own box and the focused or active tab scrolls into view. The page and backend workspaces must not gain horizontal overflow; table shells remain the only other horizontal scroll owners.
+- **Panel relationship:** exactly one panel is visible. The selected panel keeps the existing single backend workspace surface; no card may wrap the rail and no backend workspace may nest inside another.
+
 ### Codex Settings Cards
 
 Codex backend settings use a single, fixed vertical rhythm across the Connection, Resume & Inspect, and Account subtabs. All card-like surfaces (account cards, readback outputs, connection summary) share the same spacing tokens so the three tabs feel like one surface.

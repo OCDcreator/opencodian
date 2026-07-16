@@ -2,8 +2,171 @@
   gap: var(--opencodian-settings-space-lg);
 }
 
+.opencodian-settings .opencodian-debug-tab-shell-capability-lab {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
 .opencodian-settings .opencodian-capability-lab-body {
   gap: var(--opencodian-settings-space-lg);
+  min-width: 0;
+  container-name: capability-lab;
+  container-type: inline-size;
+}
+
+.opencodian-settings [data-capability-backend-tabs],
+.opencodian-settings [data-capability-backend-panel] {
+  min-width: 0;
+}
+
+.opencodian-settings [data-capability-backend-tablist] {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: var(--opencodian-settings-space-xs);
+  align-items: stretch;
+  min-width: 0;
+  margin: 0;
+  padding: var(--opencodian-settings-space-sm);
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-inline: contain;
+  scroll-padding-inline: var(--opencodian-settings-space-sm);
+  border-bottom: 1px solid var(--opencodian-settings-inline-border);
+  background: transparent;
+}
+
+.opencodian-settings [data-capability-backend-tab] {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: var(--opencodian-settings-space-sm);
+  align-items: center;
+  min-height: 32px;
+  margin: 0;
+  padding: 6px 8px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: var(--opencodian-settings-radius-inline) var(--opencodian-settings-radius-inline) 0 0;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: var(--font-interface);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0;
+  line-height: 1.35;
+  white-space: nowrap;
+  transition:
+    color 150ms ease-out,
+    border-color 150ms ease-out,
+    background-color 150ms ease-out;
+}
+
+.opencodian-settings [data-capability-backend-tab]:hover {
+  background: var(--opencodian-settings-inline-bg);
+  color: var(--text-normal);
+}
+
+.opencodian-settings [data-capability-backend-tab]:active {
+  background: var(--background-modifier-hover);
+}
+
+.opencodian-settings [data-capability-backend-tab][aria-selected="true"] {
+  border-color: var(--interactive-accent);
+  color: var(--text-normal);
+}
+
+.opencodian-settings [data-capability-backend-tab]:focus-visible {
+  position: relative;
+  z-index: 1;
+  outline: 2px solid var(--opencodian-settings-focus-ring);
+  outline-offset: 2px;
+}
+
+.opencodian-settings [data-capability-backend-tab-state] {
+  color: var(--text-faint);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.opencodian-settings [data-capability-backend-tab][aria-selected="true"] [data-capability-backend-tab-state] {
+  color: var(--text-muted);
+}
+
+.opencodian-settings [data-capability-backend-panel][hidden] {
+  display: none;
+}
+
+.opencodian-settings .opencodian-capability-lab-backend-workspace {
+  display: flex;
+  flex-direction: column;
+  gap: var(--opencodian-settings-space-lg);
+  min-width: 0;
+  margin: 0;
+  padding: 14px;
+  overflow: hidden;
+  border: 1px solid var(--opencodian-settings-section-border);
+  border-radius: var(--opencodian-settings-radius-section);
+  background: var(--opencodian-settings-section-bg);
+}
+
+.opencodian-settings .opencodian-capability-lab-backend-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--opencodian-settings-space-lg);
+  align-items: start;
+}
+
+.opencodian-settings .opencodian-capability-lab-backend-copy,
+.opencodian-settings .opencodian-capability-lab-backend-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--opencodian-settings-space-md);
+  min-width: 0;
+}
+
+.opencodian-settings .opencodian-capability-lab-backend-copy > h4 {
+  margin: 0;
+  color: var(--text-normal);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.opencodian-settings .opencodian-capability-lab-backend-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 3px 8px;
+  border: 1px solid var(--opencodian-settings-inline-border);
+  border-radius: 999px;
+  background: var(--opencodian-settings-inline-bg);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+.opencodian-settings [data-backend-state="available"] > .opencodian-capability-lab-backend-header .opencodian-capability-lab-backend-status {
+  border-color: var(--opencodian-status-success-border);
+  background: var(--opencodian-status-success-subtle);
+  color: var(--opencodian-status-success);
+}
+
+.opencodian-settings [data-backend-state="empty"] > .opencodian-capability-lab-backend-header .opencodian-capability-lab-backend-status,
+.opencodian-settings [data-backend-state="unknown"] > .opencodian-capability-lab-backend-header .opencodian-capability-lab-backend-status {
+  border-color: var(--opencodian-status-warning-border);
+  background: var(--opencodian-status-warning-subtle);
+  color: var(--opencodian-status-warning);
+}
+
+.opencodian-settings .opencodian-capability-lab-backend-empty {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .opencodian-settings .opencodian-capability-lab-banner {
@@ -62,7 +225,6 @@
   white-space: nowrap;
 }
 
-.opencodian-settings [data-section-block="matrix"],
 .opencodian-settings [data-section-block="history"],
 .opencodian-settings [data-section-block="subagents"],
 .opencodian-settings [data-section-block="rewind"],
@@ -82,7 +244,6 @@
   background: var(--opencodian-settings-section-bg);
 }
 
-.opencodian-settings [data-section-block="matrix"] > h4,
 .opencodian-settings [data-section-block="history"] > h4,
 .opencodian-settings [data-section-block="subagents"] > h4,
 .opencodian-settings [data-section-block="rewind"] > h4,
@@ -116,13 +277,29 @@
   background: var(--opencodian-settings-row-bg);
 }
 
+.opencodian-settings [data-capability-backend] .opencodian-capability-lab-table-shell {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
 .opencodian-settings .opencodian-capability-lab-matrix,
+.opencodian-settings .opencodian-capability-lab-opencode-sdk,
 .opencodian-settings .opencodian-capability-lab-discovery {
   width: 100%;
   min-width: 680px;
   margin: 0;
   border-collapse: collapse;
   table-layout: fixed;
+}
+
+.opencodian-settings .opencodian-capability-lab-opencode-sdk {
+  min-width: 560px;
+}
+
+.opencodian-settings .opencodian-capability-lab-opencode-sdk td:first-child {
+  overflow-wrap: normal;
+  word-break: normal;
 }
 
 .opencodian-settings .opencodian-capability-lab-discovery {
@@ -135,6 +312,8 @@
 
 .opencodian-settings .opencodian-capability-lab-matrix th,
 .opencodian-settings .opencodian-capability-lab-matrix td,
+.opencodian-settings .opencodian-capability-lab-opencode-sdk th,
+.opencodian-settings .opencodian-capability-lab-opencode-sdk td,
 .opencodian-settings .opencodian-capability-lab-discovery th,
 .opencodian-settings .opencodian-capability-lab-discovery td {
   padding: 8px 10px;
@@ -147,6 +326,7 @@
 }
 
 .opencodian-settings .opencodian-capability-lab-matrix th,
+.opencodian-settings .opencodian-capability-lab-opencode-sdk th,
 .opencodian-settings .opencodian-capability-lab-discovery th {
   background: color-mix(in srgb, var(--background-secondary) 70%, var(--background-primary));
   color: var(--text-normal);
@@ -158,6 +338,7 @@
 }
 
 .opencodian-settings .opencodian-capability-lab-matrix tbody tr:last-child td,
+.opencodian-settings .opencodian-capability-lab-opencode-sdk tbody tr:last-child td,
 .opencodian-settings .opencodian-capability-lab-discovery tbody tr:last-child td {
   border-bottom: 0;
 }
@@ -249,20 +430,11 @@
   color: var(--opencodian-status-info);
 }
 
-.opencodian-settings .opencodian-capability-lab-chip-hidden {
+.opencodian-settings .opencodian-capability-lab-chip-hidden,
+.opencodian-settings .opencodian-capability-lab-chip-surface-hidden {
+  border-color: var(--text-muted);
   border-style: dashed;
-  color: var(--text-faint);
-}
-
-.opencodian-settings .opencodian-capability-lab-matrix-separator {
-  padding: 10px 10px 6px !important;
-  border-bottom: 1px solid var(--opencodian-settings-inline-border) !important;
   color: var(--text-muted);
-  font-size: 11px !important;
-  font-weight: 750 !important;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  text-align: center;
 }
 
 .opencodian-settings .opencodian-capability-lab-chip-surface-chat {
@@ -273,13 +445,13 @@
 
 .opencodian-settings .opencodian-capability-lab-chip-surface-settings-chat {
   border-color: var(--opencodian-status-success-border);
-  background: linear-gradient(135deg, var(--opencodian-status-success-subtle) 50%, var(--opencodian-status-info-subtle) 50%);
+  background: var(--opencodian-status-success-subtle);
   color: var(--opencodian-status-success);
 }
 
-.opencodian-settings .opencodian-capability-lab-chip-surface-hidden {
-  border-style: dashed;
-  color: var(--text-faint);
+.opencodian-settings [data-backend-action]:focus-visible {
+  outline: 2px solid var(--opencodian-settings-focus-ring);
+  outline-offset: 2px;
 }
 
 .opencodian-settings .opencodian-capability-lab-probe-header {
@@ -320,11 +492,32 @@
   line-height: 1.55;
 }
 
+.opencodian-settings [data-section-block="history"] > .opencodian-capability-lab-description,
+.opencodian-settings [data-section-block="subagents"] > .opencodian-capability-lab-description {
+  text-wrap: balance;
+}
+
 .opencodian-settings .opencodian-capability-lab-controls {
   display: flex;
   flex-wrap: wrap;
   gap: var(--opencodian-settings-space-sm);
   align-items: center;
+}
+
+.opencodian-settings [data-capability-backend] .opencodian-capability-lab-controls {
+  padding-top: var(--opencodian-settings-space-md);
+  border-top: 1px solid var(--opencodian-settings-inline-border);
+}
+
+.opencodian-settings .opencodian-capability-lab-sr-status {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .opencodian-settings .opencodian-capability-lab-probe-toolbar {
@@ -568,5 +761,35 @@
 
   .opencodian-settings .opencodian-capability-lab-preview-row {
     grid-template-columns: 1fr;
+  }
+}
+
+@container capability-lab (max-width: 560px) {
+  .opencodian-settings .opencodian-capability-lab-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .opencodian-settings .opencodian-capability-lab-summary-value {
+    overflow: visible;
+    overflow-wrap: anywhere;
+    text-overflow: clip;
+    white-space: normal;
+  }
+
+  .opencodian-settings .opencodian-capability-lab-backend-header {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .opencodian-settings .opencodian-capability-lab-backend-status {
+    justify-self: start;
+    white-space: normal;
+  }
+
+  .opencodian-settings [data-capability-backend] .opencodian-capability-lab-controls {
+    align-items: stretch;
+  }
+
+  .opencodian-settings [data-capability-backend] .opencodian-capability-lab-controls > button {
+    width: 100%;
   }
 }

@@ -39,7 +39,7 @@
 - Produces: `normalizeCapabilityLabSelectedBackend(value: unknown): AgentBackendKind | undefined`.
 - Persists the field in `.opencodian/settings.ui.json`, not `settings.core.json`.
 
-- [ ] **Step 1: Add failing default and normalization tests.**
+- [x] **Step 1: Add failing default and normalization tests.**
 
 Add assertions equivalent to:
 
@@ -52,11 +52,11 @@ expect(normalizeCapabilityLabSelectedBackend(null)).toBeUndefined();
 
 Add bootstrap cases proving a saved `opencode` value survives and a stale value normalizes to `undefined`.
 
-- [ ] **Step 2: Add a failing UI-envelope persistence assertion.**
+- [x] **Step 2: Add a failing UI-envelope persistence assertion.**
 
 Extend the existing `saveUiSettings` fixture with `capabilityLabSelectedBackend: 'claude-code'` and assert the serialized UI envelope contains the field while core extraction excludes it.
 
-- [ ] **Step 3: Run the focused tests and verify the expected red state.**
+- [x] **Step 3: Run the focused tests and verify the expected red state.**
 
 Run:
 
@@ -66,7 +66,7 @@ npm test -- --runInBand tests/unit/core/types/settings.test.ts tests/unit/core/t
 
 Expected: failures because the setting, normalizer, and persisted UI key do not exist.
 
-- [ ] **Step 4: Implement the typed setting and normalizer.**
+- [x] **Step 4: Implement the typed setting and normalizer.**
 
 In `settings.ts`, add:
 
@@ -86,7 +86,7 @@ export function normalizeCapabilityLabSelectedBackend(value: unknown): AgentBack
 
 Add the optional field to `OpenCodianSettings` and set its default to `undefined`.
 
-- [ ] **Step 5: Normalize and persist the field.**
+- [x] **Step 5: Normalize and persist the field.**
 
 Set the final bootstrap value with:
 
@@ -98,11 +98,11 @@ capabilityLabSelectedBackend: normalizeCapabilityLabSelectedBackend(
 
 Add the key to `PersistedUiSettingsKey`, `PERSISTED_UI_SETTINGS_KEYS`, and `extractPersistedUiSettings()`.
 
-- [ ] **Step 6: Run the focused tests and verify green.**
+- [x] **Step 6: Run the focused tests and verify green.**
 
 Run the Step 3 command. Expected: all selected suites pass.
 
-- [ ] **Step 7: Review and commit Task 1.**
+- [x] **Step 7: Review and commit Task 1.**
 
 Stage only the six Task 1 files and commit with:
 
@@ -151,15 +151,15 @@ export interface CapabilityLabBackendTabsController {
 }
 ```
 
-- [ ] **Step 1: Write failing descriptor and fallback tests.**
+- [x] **Step 1: Write failing descriptor and fallback tests.**
 
 Prove descriptor order drives tab order, a synthetic fourth descriptor appears without controller changes, and initial selection resolves as persisted id, then active backend, then Claude Code.
 
-- [ ] **Step 2: Write failing ARIA and manual keyboard tests.**
+- [x] **Step 2: Write failing ARIA and manual keyboard tests.**
 
 Assert `tablist`, `tab`, `tabpanel`, `aria-selected`, `aria-controls`, `aria-labelledby`, roving `tabindex`, native `hidden`, Arrow wrapping, Home/End, Enter/Space activation, and pointer activation.
 
-- [ ] **Step 3: Write failing lazy-mount and cache tests.**
+- [x] **Step 3: Write failing lazy-mount and cache tests.**
 
 Use `jest.fn()` descriptor renderers and prove:
 
@@ -173,7 +173,7 @@ expect(renderClaude).toHaveBeenCalledTimes(1);
 expect(renderClaude).toHaveBeenCalledTimes(1);
 ```
 
-- [ ] **Step 4: Run the new test suite and verify red.**
+- [x] **Step 4: Run the new test suite and verify red.**
 
 Run:
 
@@ -183,7 +183,7 @@ npm test -- --runInBand tests/unit/features/settings/capabilityLabBackendTabs.te
 
 Expected: failure because `capabilityLabBackendTabs.ts` does not exist.
 
-- [ ] **Step 5: Implement the controller with no backend-specific branches.**
+- [x] **Step 5: Implement the controller with no backend-specific branches.**
 
 Create all tabs and empty panel shells up front. Mount only the selected panel. Keep per-panel `mounted` and render generation state, set `data-capability-panel-mounted="true"` after successful render, and render a localized caller-supplied error string on failure.
 
@@ -203,11 +203,11 @@ if (event.key === 'Enter' || event.key === ' ') {
 
 Call `scrollIntoView({ block: 'nearest', inline: 'nearest' })` only when available, so jsdom and Obsidian both remain stable.
 
-- [ ] **Step 6: Run the new suite and verify green.**
+- [x] **Step 6: Run the new suite and verify green.**
 
 Run the Step 4 command. Expected: all controller tests pass.
 
-- [ ] **Step 7: Review and commit Task 2.**
+- [x] **Step 7: Review and commit Task 2.**
 
 Commit the controller and its tests with:
 
@@ -231,11 +231,11 @@ git commit -m "Add accessible Capability Lab backend tabs"
 - Consumes: existing `createCapabilityLabBackendWorkspace()` and OpenCode snapshot methods.
 - Produces: three descriptors with strict backend content ownership.
 
-- [ ] **Step 1: Adapt integration tests to activate the owning panel.**
+- [x] **Step 1: Adapt integration tests to activate the owning panel.**
 
 Add helpers that click or keyboard-activate a backend tab before querying its workspace. Assert one selected tab and one visible panel. Replace assertions that expect all backend workspaces or all diagnostics to exist immediately.
 
-- [ ] **Step 2: Add failing ownership and lazy-load tests.**
+- [x] **Step 2: Add failing ownership and lazy-load tests.**
 
 Prove:
 
@@ -246,11 +246,11 @@ Prove:
 - Backend Routing remains inside Claude Code.
 - Unconfigured backends remain selectable.
 
-- [ ] **Step 3: Add failing persistence and refresh-state tests.**
+- [x] **Step 3: Add failing persistence and refresh-state tests.**
 
 Click Codex and assert `plugin.settings.capabilityLabSelectedBackend === 'codex'` and `saveSettings()` is called. Refresh OpenCode and assert its tab state label updates without replacing the tablist or changing selection.
 
-- [ ] **Step 4: Run the focused integration suite and verify red.**
+- [x] **Step 4: Run the focused integration suite and verify red.**
 
 Run:
 
@@ -260,7 +260,7 @@ npm test -- --runInBand tests/unit/features/settings/SettingsCapabilityLabSectio
 
 Expected: failures because the current implementation renders one consecutive long page.
 
-- [ ] **Step 5: Build three local descriptors in `attachTabbed()`.**
+- [x] **Step 5: Build three local descriptors in `attachTabbed()`.**
 
 After the warning and summary, call the tab controller with descriptors in this order:
 
@@ -274,23 +274,23 @@ After the warning and summary, call the tab controller with descriptors in this 
 
 Resolve the initial id from `capabilityLabSelectedBackend`, then `activeBackend`, then `claude-code`. Persist activation by updating only `capabilityLabSelectedBackend` and calling `saveSettings()` without awaiting the navigation change.
 
-- [ ] **Step 6: Move all Claude-owned blocks into the Claude renderer.**
+- [x] **Step 6: Move all Claude-owned blocks into the Claude renderer.**
 
 Create the Claude workspace and matrix first, followed by History, Subagents, Rewind, Structured Output, Fork, Resume, Session Detail, Backend Routing, and Discovery/Status as descendants of the Claude panel. Do not invoke any of these renderers before Claude activation.
 
-- [ ] **Step 7: Keep OpenCode and Codex renderers narrow.**
+- [x] **Step 7: Keep OpenCode and Codex renderers narrow.**
 
 OpenCode creates only its workspace, snapshot table, safe refresh, and sanitized export. Its refresh completion calls the render context's `refreshState()` after updating the workspace. Codex creates only its workspace and matrix.
 
-- [ ] **Step 8: Add localized tablist, tab state, and load-failure copy.**
+- [x] **Step 8: Add localized tablist, tab state, and load-failure copy.**
 
 Add English and Chinese keys for the tablist accessible label, backend tab labels, tab state accessible label, and sanitized panel load failure. Do not add emoji or expose raw error messages.
 
-- [ ] **Step 9: Correct the Capability Lab boundary copy.**
+- [x] **Step 9: Correct the Capability Lab boundary copy.**
 
 Update the file comment and banner text so they no longer claim that nothing persists. State that backend selection and explicit Claude diagnostic controls are settings writes, while capability probes remain read-only, dry-run, or isolated diagnostic-store operations.
 
-- [ ] **Step 10: Run the controller and integration suites.**
+- [x] **Step 10: Run the controller and integration suites.**
 
 Run:
 
@@ -300,7 +300,7 @@ npm test -- --runInBand tests/unit/features/settings/capabilityLabBackendTabs.te
 
 Expected: both suites pass, including existing OpenCode refresh/export/focus coverage.
 
-- [ ] **Step 11: Review and commit Task 3.**
+- [x] **Step 11: Review and commit Task 3.**
 
 This commit intentionally includes the preserved uncommitted backend workspace baseline because the tabs are its final product composition. Stage only the five Task 3 files plus the already existing workspace helper and commit with:
 
@@ -331,7 +331,7 @@ git commit -m "Separate Capability Lab backends into tabs"
 - Consumes: stable tab and panel data attributes from Tasks 2-3.
 - Produces: compact underline tab rail, narrow-width local scrolling, synchronized module docs and generated artifacts.
 
-- [ ] **Step 1: Add CSS contract assertions before CSS changes.**
+- [x] **Step 1: Add CSS contract assertions before CSS changes.**
 
 Extend the existing style tests or source assertions to require:
 
@@ -343,15 +343,15 @@ Extend the existing style tests or source assertions to require:
 - No card background/radius/shadow on the tablist.
 - Only table shells and tab rail own horizontal overflow.
 
-- [ ] **Step 2: Run the focused suite and verify the CSS assertions fail.**
+- [x] **Step 2: Run the focused suite and verify the CSS assertions fail.**
 
 Run the Capability Lab integration suite. Expected: failure because the tab CSS does not exist.
 
-- [ ] **Step 3: Implement the compact tab rail.**
+- [x] **Step 3: Implement the compact tab rail.**
 
 Use the existing design tokens and Obsidian variables. Keep transitions limited to color, border-color, and background-color at approximately 150ms. At narrow widths, preserve a single line and local scrolling; do not reduce font size with viewport width.
 
-- [ ] **Step 4: Regenerate the root CSS bundle.**
+- [x] **Step 4: Regenerate the root CSS bundle.**
 
 Run:
 
@@ -361,11 +361,11 @@ npm run build:css
 
 Expected: `styles.css` contains the new Capability Lab tab selectors.
 
-- [ ] **Step 5: Synchronize module documentation.**
+- [x] **Step 5: Synchronize module documentation.**
 
 Document descriptor ownership, persisted selection fallback, ARIA/manual activation, lazy mounting, backend content ownership, safe OpenCode refresh, selectors, and 320px overflow rules. Correct any old module wording that says all diagnostics are purely non-persistent.
 
-- [ ] **Step 6: Run focused tests, lint, and typecheck.**
+- [x] **Step 6: Run focused tests, lint, and typecheck.**
 
 Run:
 
@@ -377,7 +377,7 @@ npm run typecheck
 
 Expected: all commands exit 0 with zero warnings.
 
-- [ ] **Step 7: Refresh Graphify before repository verification.**
+- [x] **Step 7: Refresh Graphify before repository verification.**
 
 Run:
 
@@ -387,7 +387,7 @@ npm run graphify:update:src
 
 Expected: committed graph metadata reflects the current source tree and no transient `src/graphify-out/` remains.
 
-- [ ] **Step 8: Run the full repository gate.**
+- [x] **Step 8: Run the full repository gate.**
 
 Run:
 
@@ -397,7 +397,7 @@ npm run verify
 
 Expected: module docs, graph freshness, devlog order, lint, typecheck, all Jest suites, and production build pass.
 
-- [ ] **Step 9: Review and commit Task 4.**
+- [x] **Step 9: Review and commit Task 4.**
 
 Stage the Task 4 style, docs, generated CSS, graph artifacts, and completed plan checkboxes. Commit with:
 

@@ -166,7 +166,9 @@ class StorageService {
 设置不再整份覆盖写到单个文件，而是拆成两个 envelope 文件：
 
 - `settings.core.json`: 关键用户设置（模型、权限、主题外观、语言、`providerIconLibrary`、`disabledModelRefs` 等）
-- `settings.ui.json`: 临时 UI 状态（`tabState`、设置页滚动位置、模型设置展开状态）
+- `settings.ui.json`: 临时 UI 状态（`tabState`、设置页滚动位置、模型设置展开状态、`capabilityLabSelectedBackend`）
+
+`capabilityLabSelectedBackend` 只进入 UI envelope，`extractPersistedCoreSettings()` 不包含该字段。这样 Capability Lab 的 backend tab 选择可以跨 Settings 重开和 Obsidian 重载恢复，同时不会混入核心 runtime 配置或改变 `activeBackend`。
 
 每个文件都保存为：
 

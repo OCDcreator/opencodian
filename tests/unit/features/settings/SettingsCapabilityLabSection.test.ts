@@ -703,6 +703,48 @@ describe('SettingsCapabilityLabSection', () => {
     expect(css).not.toContain('linear-gradient');
   });
 
+  it('keeps the backend tab rail compact, flat, focusable, and locally scrollable', () => {
+    const css = readFileSync(
+      join(process.cwd(), 'src/style/components/settings-capability-lab.css'),
+      'utf8',
+    );
+    const tablistRule = css.match(
+      /\.opencodian-settings \[data-capability-backend-tablist\]\s*\{[^}]*\}/,
+    )?.[0] ?? '';
+    const tabRule = css.match(
+      /\.opencodian-settings \[data-capability-backend-tab\]\s*\{[^}]*\}/,
+    )?.[0] ?? '';
+    const selectedRule = css.match(
+      /\.opencodian-settings \[data-capability-backend-tab\]\[aria-selected="true"\]\s*\{[^}]*\}/,
+    )?.[0] ?? '';
+    const focusRule = css.match(
+      /\.opencodian-settings \[data-capability-backend-tab\]:focus-visible\s*\{[^}]*\}/,
+    )?.[0] ?? '';
+    const hiddenPanelRule = css.match(
+      /\.opencodian-settings \[data-capability-backend-panel\]\[hidden\]\s*\{[^}]*\}/,
+    )?.[0] ?? '';
+
+    expect(tablistRule).toContain('overflow-x: auto');
+    expect(tablistRule).toContain('flex-wrap: nowrap');
+    expect(tablistRule).toContain('background: transparent');
+    expect(tablistRule).not.toMatch(/border-radius|box-shadow/);
+    expect(tabRule).toContain('font-size: 13px');
+    expect(tabRule).toContain('letter-spacing: 0');
+    expect(selectedRule).toContain('border-color: var(--interactive-accent)');
+    expect(focusRule).toContain('outline: 2px solid var(--opencodian-settings-focus-ring)');
+    expect(hiddenPanelRule).toContain('display: none');
+
+    const horizontalScrollOwners = Array.from(css.matchAll(/([^{}]+)\{[^{}]*overflow-x:\s*auto/g), (match) => match[1].trim());
+    expect(horizontalScrollOwners).toEqual(expect.arrayContaining([
+      '.opencodian-settings [data-capability-backend-tablist]',
+      '.opencodian-settings .opencodian-capability-lab-table-shell',
+    ]));
+    expect(horizontalScrollOwners.every((selector) => (
+      selector === '.opencodian-settings [data-capability-backend-tablist]'
+      || selector === '.opencodian-settings .opencodian-capability-lab-table-shell'
+    ))).toBe(true);
+  });
+
   it('renders semantic break opportunities for long OpenCode capability ids', () => {
     const plugin = createMockPlugin() as unknown as {
       openCodeService: {
