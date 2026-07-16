@@ -16,6 +16,7 @@
 - `renderAgentSwitcherBackendIcon()` 为其他 settings surfaces 提供同源 backend 图标渲染入口，例如 ACP preset buttons 可以复用标题行/后端选择器的 LobeHub 图标身份，而不是重新指定一套 provider SVG 资产
 - 当 LobeHub manifest 缺少可用静态资源时，回退到 Obsidian `setIcon()` 的 Lucide 图标
 - 将图标组 portal 到 `document.body`，并根据设置页容器 `getBoundingClientRect().left` 写入 `--opencodian-agent-switcher-fixed-left`，让图标组固定在当前设置 pane 左边缘，不随正文滚动
+- editor-area 设置页可能先在 detached DOM 中完成渲染、随后才接入 workspace；floating rail 会等待锚点第一次真正连接后再启用断开销毁判定，并在首次连接时重新同步左边缘位置，避免初始化阶段被 MutationObserver 误清理
 - 当设置页运行在 Obsidian 原生 `.modal.mod-settings` 内时，不渲染 legacy floating rail；该场景只使用标题行 backend switcher，避免 body-level fixed rail 压到 Obsidian 设置左侧插件列表
 - 图标组使用 `z-index: 50` 对齐 Obsidian modal layer；当用户从 settings 打开帮助 modal、详情 modal、其他非 `.mod-settings` 子对话框，或调试/Obsidian 原生设置打开了与当前 editor-area settings 无关的 `.mod-settings` 前景窗口时，rail 会写入 `aria-hidden="true"` / `.is-hidden-behind-modal` 并隐藏，避免 body-level rail 穿到前景窗口上方
 - 为 entry/click 动画添加短生命周期 CSS class，持久 idle/hover/selected 效果交给 CSS

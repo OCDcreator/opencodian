@@ -95,6 +95,31 @@ describe('renderAgentSwitcherFloatingIcons', () => {
     expect(document.body.querySelector('.opencodian-agent-switcher-floating')).toBeNull();
     expect(modalEl.querySelector('.opencodian-agent-switcher-hover-zone')).toBeNull();
   });
+
+  it('keeps the floating rail until an initially detached settings page is connected', async () => {
+    const containerEl = document.createElement('div');
+
+    renderAgentSwitcherFloatingIcons(containerEl, {
+      selectedAgent: 'opencode',
+      enabledAgents: ['opencode', 'claude-code'],
+      onSelect: jest.fn(),
+    });
+    const floatingEl = document.body.querySelector<HTMLElement>('.opencodian-agent-switcher-floating');
+
+    await Promise.resolve();
+    expect(floatingEl?.isConnected).toBe(true);
+
+    document.body.appendChild(containerEl);
+    await Promise.resolve();
+
+    expect(floatingEl?.isConnected).toBe(true);
+    expect(floatingEl?.style.getPropertyValue('--opencodian-agent-switcher-fixed-left')).toBe('0px');
+
+    containerEl.remove();
+    await Promise.resolve();
+
+    expect(floatingEl?.isConnected).toBe(false);
+  });
 });
 
 describe('renderAgentSwitcherHeaderIcons', () => {

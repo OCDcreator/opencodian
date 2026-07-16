@@ -158,6 +158,7 @@ function pinAgentSwitcherToSettingsEdge(
   }
 
   let cleanedUp = false;
+  let anchorWasConnected = ownerDocument.body.contains(anchorEl);
   const cleanup = () => {
     if (cleanedUp) {
       return;
@@ -173,7 +174,14 @@ function pinAgentSwitcherToSettingsEdge(
     ? new ResizeObserver(syncPosition)
     : null;
   const mutationObserver = new MutationObserver(() => {
-    if (!ownerDocument.body.contains(anchorEl)) {
+    const anchorIsConnected = ownerDocument.body.contains(anchorEl);
+    if (!anchorWasConnected && anchorIsConnected) {
+      anchorWasConnected = true;
+      syncPosition();
+      syncModalVisibility();
+      return;
+    }
+    if (anchorWasConnected && !anchorIsConnected) {
       cleanup();
       return;
     }
