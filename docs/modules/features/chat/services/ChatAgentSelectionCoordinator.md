@@ -22,7 +22,7 @@ export class ChatAgentSelectionCoordinator {
   reloadCatalog(): Promise<void>;
   applyLocaleTexts(): void;
   isOpen(): boolean;
-  closeDropdown(): void;
+  closeDropdown(options: { restoreTriggerFocus?: boolean }): void;
   destroy(): void;
 }
 ```
