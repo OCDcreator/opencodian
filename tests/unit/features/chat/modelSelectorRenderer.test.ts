@@ -127,8 +127,14 @@ describe('ModelSelectorRenderer', () => {
     const options = Array.from(scrollContainer.querySelectorAll<HTMLElement>('.opencodian-model-option'));
     expect(options).toHaveLength(2);
     expect(options[0].dataset.value).toBe('openai::gpt-5');
+    expect(options[0].getAttribute('role')).toBe('option');
+    expect(options[0].getAttribute('aria-selected')).toBe('true');
+    expect(options[0].tabIndex).toBe(-1);
+    expect(options[0].hasClass('opencodian-composer-popover-option')).toBe(true);
     expect(options[0].hasClass('is-selected')).toBe(true);
+    expect(options[1].getAttribute('aria-selected')).toBe('false');
     expect(options[1].hasClass('is-highlighted')).toBe(true);
+    expect(scrollContainer.querySelector('.opencodian-model-provider-header')?.textContent).toContain('OpenAI');
 
     options[1].dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
     expect(onHighlight).toHaveBeenCalledWith('openai::gpt-4.1');

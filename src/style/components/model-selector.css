@@ -175,37 +175,26 @@
   width: 340px;
   min-width: 280px;
   max-width: 340px;
+  z-index: 1000;
+}
+
+.opencodian-model-dropdown .opencodian-composer-popover-frame {
   max-height: 360px;
   display: flex;
   flex-direction: column;
-  background: var(--background-primary);
-  border: 1px solid var(--background-modifier-border);
-  border-radius: 12px;
-  box-shadow:
-    0 10px 28px color-mix(in srgb, var(--text-normal) 9%, transparent),
-    0 2px 8px color-mix(in srgb, var(--text-normal) 5%, transparent);
-  z-index: 1000;
-  overflow: hidden;
-  animation: model-dropdown-open 0.14s ease-out;
 }
 
-@keyframes model-dropdown-open {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.opencodian-model-dropdown .opencodian-composer-popover-content {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
 }
 
 /* Search Section */
 .opencodian-model-dropdown-search {
   flex-shrink: 0;
   padding: 10px 12px;
-  background: var(--background-primary);
   border-bottom: 1px solid var(--background-modifier-border);
 }
 
@@ -372,48 +361,17 @@ img.opencodian-model-provider-header-icon {
 
 /* Model Option */
 .opencodian-model-option {
-  display: flex;
-  align-items: center;
   width: 100%;
-  min-height: 30px;
-  padding: 6px 12px 6px 28px;
-  gap: 8px;
-  position: relative;
-  border-left: 3px solid transparent;
-  background: transparent;
   color: var(--text-normal);
   cursor: pointer;
   font-size: 13px;
   font-weight: 400;
   line-height: 1.35;
-  outline: none;
   user-select: none;
-  transition:
-    background-color 0.12s ease,
-    border-color 0.12s ease,
-    color 0.12s ease;
 }
 
-.opencodian-model-option:hover,
 .opencodian-model-option.is-highlighted {
   background: var(--background-modifier-hover);
-}
-
-.opencodian-model-option.is-selected {
-  background: color-mix(in srgb, var(--interactive-accent) 13%, var(--background-primary));
-  border-left-color: var(--interactive-accent);
-  color: var(--interactive-accent);
-  font-weight: 600;
-}
-
-.opencodian-model-option.is-selected:hover,
-.opencodian-model-option.is-selected.is-highlighted {
-  background: color-mix(in srgb, var(--interactive-accent) 18%, var(--background-primary));
-}
-
-.opencodian-model-option:focus-visible {
-  outline: 2px solid var(--interactive-accent);
-  outline-offset: -2px;
 }
 
 .opencodian-model-option-name {
@@ -1774,20 +1732,14 @@ img.opencodian-model-provider-header-icon {
 
 /* Reduced motion support */
 @media (prefers-reduced-motion: reduce) {
-  .opencodian-model-dropdown,
   .opencodian-model-dropdown-search-container,
   .opencodian-model-dropdown-scroll::-webkit-scrollbar-thumb,
   .opencodian-model-provider-header,
-  .opencodian-model-option,
   .opencodian-model-option-check,
   .opencodian-model-trigger,
   .opencodian-model-trigger-chevron {
     transition: none !important;
     animation: none !important;
-  }
-
-  .opencodian-model-dropdown {
-    transform: none !important;
   }
 
   .opencodian-model-trigger:hover {

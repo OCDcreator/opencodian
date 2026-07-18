@@ -17,16 +17,15 @@
 
 ## 近期行为
 
-- **Flat-clean redesign**（当前）：模型选择器下拉面板采用 Obsidian-native flat 风格，移除所有渐变和 glassmorphism 效果。
+- **Composer card unification**（当前）：Model 继续保留 search、scroll、provider sticky headers 与 current-tab override，但 outer card、title/`Esc`/footer、共享 option geometry、selected/focus/reduced-motion 均由 `composer-popover-frame.css` 统一提供。
   - 触发器：`padding: 4px 10px`、`font-weight: 500`；hover 时 `translateY(-1px)` + 柔和阴影抬升；`is-open` 态使用 accent 色边框 + 外发光。
   - Chevron：`cubic-bezier(0.4, 0, 0.2, 1)` 平滑旋转 180°，hover/open 时颜色递进。
-  - 下拉面板：`border-radius: 14px`、flat `var(--background-primary)` 背景、两层简洁阴影；移除了 `backdrop-filter`、线性渐变和径向渐变。`model-dropdown-open` 入场动画改为纯 `translateY(4px)` 上滑。
+  - 下拉外层只保留 340px/280px 宽度和 anchored placement；卡片表面不再在本文件重复声明背景、border、radius、shadow 或 animation。
   - 下拉面板的 340px 首选宽度使用 `box-sizing: border-box`，实际水平位置和窄容器收缩由共享 `AnchoredOverlayLayoutController` 计算，确保相对聊天容器左右各保留 8px 安全间距，不再因固定 `left: 0` 被右侧边界裁剪。
   - 搜索框：`border-radius: 8px`、`var(--background-secondary)` 填充色、简洁边框；`focus-within` 时仅 accent 边框色变化；移除了内阴影和渐变背景。
   - Provider header：`11px` 大写标签、`font-weight: 700`；包含 provider icon（`.opencodian-model-provider-header-icon`），通过 `ProviderIconService` 获取 Lobehub CDN 图标；sticky 时 `var(--background-primary)` 纯色背景 + 6px 渐变淡出。
-  - 选项：`padding: 5px 12px`、`font-weight: 450`；hover/highlighted 时仅 `var(--background-modifier-hover)` 背景变化；selected 态使用 accent 背景 tint + `font-weight: 600`；移除了左侧竖线装饰和 `translateX` 位移。
-  - 动画简化：选项入场仅为 `opacity` 淡入，移除了按 provider group 交错延迟和 `translateX(-6px)` 滑入。
-  - 全链路 `prefers-reduced-motion: reduce` 兜底。
+  - Model row 叠加共享 `opencodian-composer-popover-option`，得到统一的 48px geometry、selected accent 和 focus ring；Model-specific `is-highlighted` 只保留搜索箭头导航的视觉反馈。
+  - shared card 的 reduced-motion 策略统一生效，Model-specific CSS 仅保留搜索/scroll/header/icon 规则。
 - classic 设置页 quick-nav 的 tooltip 现在不再依赖 `.opencodian-settings-quick-nav-btn` 的伪元素，而是用 `.opencodian-settings-quick-nav-tooltip-layer` / `-bubble` / `-arrow` 这组 body-level overlay 样式。这样提示层可以真正越过 settings 滚动容器，不再受容器裁切影响。quick-nav tooltip z-index 为 2260，并会按按钮上下空间切换 top/bottom placement。
 - chat / tabs / sidebar / composer 这套共享 tooltip 也已经从 trigger 伪元素迁到 `.opencodian-tooltip-layer` / `-bubble` / `-arrow` 这组 body-level overlay 样式，由 `TooltipLayerController` 在运行时挂到 `document.body`。这样可以同时避开三类老问题：按钮自身 `::after` 冲突、祖先 `overflow: hidden` 裁切、以及局部 stacking context 导致的遮挡。触发器显示时会清理 `title`，避免同一按钮出现 custom + native 两个提示框。
 - 新共享 tooltip overlay 的层级合同是 `z-index: 2300`，高于聊天面板与 quick-nav 自身局部层级，但不再依赖给 trigger 临时抬 `z-index` 才能显示。气泡继续使用 `max-width: min(240px, calc(100vw - 32px))`、`white-space: pre-wrap` 和 `overflow-wrap: break-word`，兼顾长英文与中文提示文案；tooltip bubble 现在保持 flat `box-shadow: none`，用边框和 placement 箭头表达层级。

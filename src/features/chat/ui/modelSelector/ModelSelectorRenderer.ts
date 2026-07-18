@@ -109,8 +109,13 @@ export function renderModelList({
     for (const model of provider.models) {
       const modelValue = buildModelOptionValue(provider.id, model.id);
       const modelOption = groupEl.createDiv({
-        cls: 'opencodian-model-option',
-        attr: { 'data-value': modelValue },
+        cls: 'opencodian-model-option opencodian-composer-popover-option',
+        attr: {
+          'data-value': modelValue,
+          role: 'option',
+          'aria-selected': String(modelValue === currentValue),
+          tabindex: '-1',
+        },
       });
 
       if (modelValue === currentValue) {

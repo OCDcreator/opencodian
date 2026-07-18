@@ -48,7 +48,7 @@ export class ModelSelectionRuntime {
   formatModelId(model: Partial<ModelSelectorSelection> | null | undefined): string | undefined;
   ensureSelectedModelAvailable(provider: string | undefined, model: string | undefined): Promise<boolean>;
   getModelUnavailableNoticeContent(): ModelUnavailableNoticeContent;
-  switchModel(provider: string, model: string): void;
+  switchModel(provider: string, model: string): boolean;
 }
 ```
 
@@ -59,7 +59,7 @@ export class ModelSelectionRuntime {
 - `getCurrentSessionModel()` 在无 bundle 的 snapshot 模式下只返回 snapshot 中已知的模型；若 requested model 不存在，会回退到同 provider 首个模型或首个可用模型
 - `findKnownModelInfo()` 优先返回 currently available model metadata，找不到时回落到 base catalog metadata
 - `ensureSelectedModelAvailable()` 保留原有 resolution gate 与 server availability fallback；在 snapshot 模式下会先验证 provider/model 是否存在于 snapshot，未知模型不会进入 server availability seam
-- `switchModel()` 只在 active-tab override writeback 被 host 接受时同步 context usage identity 并显示 switch notice
+- `switchModel()` 返回 active-tab override writeback 是否被 host 接受；成功时同步 context usage identity 并显示 switch notice，调用方据此决定是否关闭卡片和恢复 composer focus
 
 ## 与 `ChatSelectionControlsCoordinator` 的边界
 

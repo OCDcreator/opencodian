@@ -6,6 +6,11 @@ import type { CodexSandboxMode } from '../../../core/types/settings';
 import type { PermissionMode } from '../../../core/types/settings';
 import { t } from '../../../i18n';
 import { AnchoredOverlayLayoutController } from '../ui/AnchoredOverlayLayoutController';
+import {
+  type ComposerPopoverFrameHandle,
+  type ComposerPopoverFrameTexts,
+  mountComposerPopoverFrame,
+} from '../ui/ComposerPopoverFrame';
 import { buildModelSelectorDisplayState } from '../ui/modelSelector/ModelSelectorDisplay';
 import {
   highlightModelOption as highlightRenderedModelOption,
@@ -44,7 +49,6 @@ export interface ChatSelectionControlsCoordinatorHost extends ModelSelectionRunt
   switchPermissionMode(mode: PermissionMode): Promise<boolean>;
 }
 
-const MODEL_SEARCH_PLACEHOLDER = 'Search models...';
 const MODEL_DROPDOWN_PREFERRED_WIDTH = 340;
 const MODEL_DROPDOWN_MINIMUM_WIDTH = 280;
 const MODEL_DROPDOWN_SAFE_INSET = 8;
@@ -153,6 +157,7 @@ export class ChatSelectionControlsCoordinator {
   private modelSelectorContainer: HTMLElement | null = null;
   private modelSelectorTrigger: HTMLElement | null = null;
   private modelSelectorDropdown: HTMLElement | null = null;
+  private modelPopoverFrame: ComposerPopoverFrameHandle | null = null;
   private modelSelectorSearchInput: HTMLInputElement | null = null;
   private modelSelectorScrollContainer: HTMLElement | null = null;
   private disposeModelSelectorStickyHeaders: (() => void) | null = null;
@@ -294,7 +299,8 @@ export class ChatSelectionControlsCoordinator {
   }
 
   applyLocaleTexts(): void {
-    this.modelSelectorSearchInput?.setAttribute('placeholder', MODEL_SEARCH_PLACEHOLDER);
+    this.modelPopoverFrame?.refresh(this.getModelPopoverFrameTexts());
+    this.modelSelectorSearchInput?.setAttribute('placeholder', t('chat.composerPopover.modelSearchPlaceholder'));
     this.refreshModelOptions();
     this.updateModelSelectorDisplay();
     this.permissionSelector?.applyLocaleTexts();
@@ -321,6 +327,7 @@ export class ChatSelectionControlsCoordinator {
     this.modelSelectorContainer = null;
     this.modelSelectorTrigger = null;
     this.modelSelectorDropdown = null;
+    this.modelPopoverFrame = null;
     this.modelSelectorSearchInput = null;
     this.modelSelectorScrollContainer = null;
     this.modelFilterQuery = '';
@@ -477,7 +484,10 @@ export class ChatSelectionControlsCoordinator {
     setIcon(iconWrapper, 'bot');
     triggerContent.createSpan({ cls: 'opencodian-model-trigger-text' });
 
-    this.modelSelectorDropdown = containerEl.createDiv({ cls: 'opencodian-model-dropdown' });
+    this.modelSelectorDropdown = containerEl.createDiv({
+      cls: 'opencodian-model-dropdown',
+      attr: { role: 'listbox' },
+    });
     this.modelSelectorDropdown.style.display = 'none';
     this.buildModelDropdown();
     this.mountModelDropdownLayoutController();
@@ -503,8 +513,12 @@ export class ChatSelectionControlsCoordinator {
     }
 
     this.modelSelectorDropdown.empty();
+    this.modelPopoverFrame = mountComposerPopoverFrame(
+      this.modelSelectorDropdown,
+      this.getModelPopoverFrameTexts(),
+    );
 
-    const searchWrapper = this.modelSelectorDropdown.createDiv({ cls: 'opencodian-model-dropdown-search' });
+    const searchWrapper = this.modelPopoverFrame.contentEl.createDiv({ cls: 'opencodian-model-dropdown-search' });
     const searchContainer = searchWrapper.createDiv({ cls: 'opencodian-model-dropdown-search-container' });
     const searchIcon = searchContainer.createSpan({ cls: 'opencodian-model-dropdown-search-icon' });
     setIcon(searchIcon, 'search');
@@ -513,7 +527,7 @@ export class ChatSelectionControlsCoordinator {
       cls: 'opencodian-model-dropdown-search-input',
       attr: {
         type: 'text',
-        placeholder: MODEL_SEARCH_PLACEHOLDER,
+        placeholder: t('chat.composerPopover.modelSearchPlaceholder'),
       },
     });
 
@@ -524,7 +538,7 @@ export class ChatSelectionControlsCoordinator {
 
     this.modelSelectorSearchInput.addEventListener('keydown', (event) => {
       if (event.key === 'Escape') {
-        this.closeModelDropdown();
+        this.closeModelDropdown({ restoreTriggerFocus: true });
         event.preventDefault();
       } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
         this.navigateModelList(event.key === 'ArrowDown' ? 1 : -1);
@@ -535,7 +549,7 @@ export class ChatSelectionControlsCoordinator {
       }
     });
 
-    this.modelSelectorScrollContainer = this.modelSelectorDropdown.createDiv({
+    this.modelSelectorScrollContainer = this.modelPopoverFrame.contentEl.createDiv({
       cls: 'opencodian-model-dropdown-scroll',
     });
 
@@ -600,7 +614,7 @@ export class ChatSelectionControlsCoordinator {
     }
   }
 
-  private closeModelDropdown(): void {
+  private closeModelDropdown(options: { restoreTriggerFocus?: boolean } = {}): void {
     this.isModelDropdownOpen = false;
     if (this.modelSelectorDropdown) {
       this.modelSelectorDropdown.removeClass('is-open');
@@ -611,6 +625,10 @@ export class ChatSelectionControlsCoordinator {
 
     if (this.modelDropdownClickOutsideHandler) {
       document.removeEventListener('click', this.modelDropdownClickOutsideHandler, true);
+    }
+
+    if (options.restoreTriggerFocus) {
+      this.modelSelectorTrigger?.focus();
     }
   }
 
@@ -632,14 +650,16 @@ export class ChatSelectionControlsCoordinator {
       highlightedValue,
       previousStickyHeadersCleanup: this.disposeModelSelectorStickyHeaders,
       texts: {
-        loading: 'Loading models...',
-        noModels: t('settings.model.noModels'),
-        noModelsFound: 'No models found',
-        noModelsAvailable: 'No models available',
+        loading: t('chat.composerPopover.modelLoading'),
+        noModels: t('chat.composerPopover.modelNoModels'),
+        noModelsFound: t('chat.composerPopover.modelNoResults'),
+        noModelsAvailable: t('chat.composerPopover.modelNoModels'),
       },
       onSelect: (provider, model) => {
-        this.selectModel(provider, model);
-        this.closeModelDropdown();
+        if (this.selectModel(provider, model)) {
+          this.closeModelDropdown();
+          this.host.restoreComposerInputFocus();
+        }
       },
       onHighlight: (value) => {
         this.highlightModelOption(value);
@@ -670,15 +690,15 @@ export class ChatSelectionControlsCoordinator {
       return;
     }
 
-    const didSelect = selectRenderedHighlightedModel(
+    selectRenderedHighlightedModel(
       this.modelSelectorScrollContainer,
       (provider, model) => {
-        this.selectModel(provider, model);
+        if (this.selectModel(provider, model)) {
+          this.closeModelDropdown();
+          this.host.restoreComposerInputFocus();
+        }
       },
     );
-    if (didSelect) {
-      this.closeModelDropdown();
-    }
   }
 
   private scrollToCurrentModel(): void {
@@ -689,9 +709,22 @@ export class ChatSelectionControlsCoordinator {
     scrollRenderedCurrentModel(this.modelSelectorScrollContainer, this.getCurrentSessionModel());
   }
 
-  private selectModel(provider: string, model: string): void {
-    this.modelSelectionRuntime.switchModel(provider, model);
+  private selectModel(provider: string, model: string): boolean {
+    const didSwitch = this.modelSelectionRuntime.switchModel(provider, model);
+    if (!didSwitch) {
+      return false;
+    }
     this.updateModelSelectorDisplay();
+    return true;
+  }
+
+  private getModelPopoverFrameTexts(): ComposerPopoverFrameTexts {
+    return {
+      title: t('chat.composerPopover.modelTitle'),
+      escapeKey: 'Esc',
+      navigateHint: t('chat.composerPopover.navigateHint'),
+      selectHint: t('chat.composerPopover.selectHint'),
+    };
   }
 
   private async updateModelSelectorIcon(providerId: string | null, iconLabel: string): Promise<void> {

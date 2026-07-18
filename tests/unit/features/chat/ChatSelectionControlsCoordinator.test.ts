@@ -169,6 +169,10 @@ async function createFixture(options: FixtureOptions = {}) {
 }
 
 describe('ChatSelectionControlsCoordinator', () => {
+  beforeEach(() => {
+    HTMLElement.prototype.scrollIntoView = jest.fn();
+  });
+
   afterEach(() => {
     document.body.innerHTML = '';
     jest.clearAllMocks();
@@ -200,11 +204,25 @@ describe('ChatSelectionControlsCoordinator', () => {
       throw new Error('expected model search input');
     }
 
+    const frame = fixture.toolbarEl.querySelector<HTMLElement>(
+      '.opencodian-model-dropdown .opencodian-composer-popover-frame',
+    );
+    const scrollContainer = fixture.toolbarEl.querySelector<HTMLElement>('.opencodian-model-dropdown-scroll');
+    expect(frame?.querySelector('.opencodian-composer-popover-title')?.textContent).toBe('Choose model');
+    expect(frame?.querySelector('kbd')?.textContent).toBe('Esc');
+    expect(frame?.querySelector('.opencodian-composer-popover-footer')?.textContent).toContain('Navigate');
+    expect(frame?.querySelector('.opencodian-composer-popover-footer')?.textContent).toContain('Select');
+    expect(frame?.contains(searchInput)).toBe(true);
+    expect(frame?.contains(scrollContainer ?? null)).toBe(true);
+
+    await new Promise((resolve) => window.setTimeout(resolve, 0));
+    expect(document.activeElement).toBe(searchInput);
+
     searchInput.value = 'o4';
     searchInput.dispatchEvent(new Event('input', { bubbles: true }));
 
-    const option = fixture.toolbarEl.querySelector<HTMLElement>('[data-value="openai::o4-mini"]');
-    option?.click();
+    searchInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    searchInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
     await settleAsyncWork();
 
     expect(fixture.host.setActiveTabModelOverride).toHaveBeenCalledWith({
@@ -218,6 +236,31 @@ describe('ChatSelectionControlsCoordinator', () => {
     expect(fixture.host.updateEffortSelectorDisplay).toHaveBeenCalled();
     expect(fixture.host.syncActiveTabContextUsageIdentity).toHaveBeenCalledTimes(2);
     expect(modelTrigger?.hasClass('is-open')).toBe(false);
+    expect(fixture.host.restoreComposerInputFocus).toHaveBeenCalledTimes(1);
+  });
+
+  it('closes the model card from search Escape and restores trigger focus', async () => {
+    const fixture = await createFixture();
+    const trigger = fixture.toolbarEl.querySelector<HTMLElement>('.opencodian-model-trigger');
+    trigger?.click();
+    const searchInput = fixture.toolbarEl.querySelector<HTMLInputElement>('.opencodian-model-dropdown-search-input');
+
+    searchInput?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+
+    expect(trigger?.getAttribute('aria-expanded')).toBe('false');
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  it('keeps the model card open when the active-tab override refuses the write', async () => {
+    const fixture = await createFixture({ allowActiveTabModelOverrideWrite: false });
+    const trigger = fixture.toolbarEl.querySelector<HTMLElement>('.opencodian-model-trigger');
+    trigger?.click();
+
+    fixture.toolbarEl.querySelector<HTMLElement>('[data-value="openai::o4-mini"]')?.click();
+    await settleAsyncWork();
+
+    expect(trigger?.getAttribute('aria-expanded')).toBe('true');
+    expect(fixture.host.restoreComposerInputFocus).not.toHaveBeenCalled();
   });
 
   it('repositions the model dropdown from visible geometry when it opens', async () => {

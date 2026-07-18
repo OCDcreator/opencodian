@@ -9,7 +9,7 @@
 
 - loading / empty state
 - provider 分组与 option 列表
-- selected / highlighted class 应用
+- selected / highlighted class、共享 popover option class 与 `role="option"` / `aria-selected` / `tabindex="-1"` 应用
 - option click / hover 回调挂接
 - sticky header cleanup 的重绑入口
 
@@ -25,5 +25,5 @@ export function renderModelList(options: RenderModelListOptions): RenderModelLis
 
 - 每次重渲都会先执行 `previousStickyHeadersCleanup`
 - provider header 的 stuck 监听仍复用 `ui/modelSelectorStickyHeaders.ts`
-- 本模块只负责列表区；trigger、搜索框、dropdown 开关仍由 `OpenCodianView` 持有
+- 本模块只负责列表区；trigger、共享 frame content slot、搜索框与 dropdown 开关仍由 `ChatSelectionControlsCoordinator` 持有
 - provider header 现在包含 provider icon，通过 `ProviderIconService.createIconElement()` 同步获取 Lobehub CDN 图标，失败时静默跳过（header 仅显示文本）
