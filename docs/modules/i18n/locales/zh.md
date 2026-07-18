@@ -27,6 +27,8 @@
 
 OpenCodian 的简体中文翻译表，导出 `zhTranslations` 静态对象。
 
+2026-07-18：新增 `chat.composerPopover.*`，为共享 Composer popover frame 提供键盘提示、Agent / 权限 / 模型标题，以及模型搜索、加载和空态中文文案；这些键只提供卡片框架 copy，不改动既有 Agent 默认项、权限描述或 backend-specific sandbox 字符串。
+
 2026-07-11：新增 `capabilities.reason.*`，为 SDK capability availability 的四类固定原因提供 Settings 本地化文案。动态的脱敏服务端说明和 minimum-server hint 不使用这些键，仍保留原文以保住诊断上下文。
 
 2026-07-11：新增 `settings.capabilityLab.openCodeSdk.*` 中文文案，为 Capability Lab 的 OpenCode SDK 证据表提供标题、证据状态、安全刷新、脱敏 JSON 复制与失败通知。描述明确该表只读取 production snapshot，不能打开实验 gate 或执行 action。

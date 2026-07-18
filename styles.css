@@ -2148,6 +2148,133 @@ body[data-opencodian-provider-icon-mode="color"] {
 
 
 
+/* components/composer-popover-frame.css */
+.opencodian-composer-popover-frame {
+  overflow: hidden;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 14px;
+  background: var(--background-primary);
+  box-shadow: 0 12px 28px var(--background-modifier-box-shadow);
+}
+
+.opencodian-composer-popover-header,
+.opencodian-composer-popover-footer {
+  display: flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 12px;
+  color: var(--text-muted);
+}
+
+.opencodian-composer-popover-header {
+  justify-content: space-between;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.opencodian-composer-popover-title,
+.opencodian-composer-popover-section {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.opencodian-composer-popover-footer {
+  gap: 10px;
+  border-top: 1px solid var(--background-modifier-border);
+  font-size: 11px;
+}
+
+.opencodian-composer-popover-escape-key {
+  padding: 1px 5px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  font: inherit;
+}
+
+.opencodian-composer-popover-content {
+  min-width: 0;
+}
+
+.opencodian-composer-popover-section,
+.opencodian-composer-popover-state {
+  padding: 8px 12px;
+}
+
+.opencodian-composer-popover-state {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.opencodian-composer-popover-option {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) 18px;
+  align-items: center;
+  column-gap: 8px;
+  min-height: 48px;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+}
+
+.opencodian-composer-popover-option:hover {
+  background: var(--background-modifier-hover);
+}
+
+.opencodian-composer-popover-option:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: -2px;
+}
+
+.opencodian-composer-popover-option.is-selected {
+  background: color-mix(in srgb, var(--interactive-accent) 12%, transparent);
+  border-color: color-mix(in srgb, var(--interactive-accent) 36%, var(--background-modifier-border));
+  box-shadow: inset 3px 0 0 var(--interactive-accent);
+}
+
+.opencodian-composer-popover-option-icon,
+.opencodian-composer-popover-option-check {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  color: var(--text-muted);
+}
+
+.opencodian-composer-popover-option-main,
+.opencodian-composer-popover-option-text {
+  min-width: 0;
+}
+
+.opencodian-composer-popover-option-title,
+.opencodian-composer-popover-option-description {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.opencodian-composer-popover-option-title {
+  color: var(--text-normal);
+}
+
+.opencodian-composer-popover-option-description {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .opencodian-composer-popover-frame,
+  .opencodian-composer-popover-option {
+    scroll-behavior: auto;
+    transition: none;
+  }
+}
+
+
 /* components/agent-selector.css */
 /* ============================================================
    Agent Selector
