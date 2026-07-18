@@ -63,6 +63,7 @@ describe('ChatAgentSelectionCoordinator', () => {
   beforeEach(() => {
     ResizeObserverMock.instances.length = 0;
     globalThis.ResizeObserver = ResizeObserverMock as unknown as typeof ResizeObserver;
+    HTMLElement.prototype.scrollIntoView = jest.fn();
   });
 
   afterEach(() => {
@@ -151,12 +152,18 @@ describe('ChatAgentSelectionCoordinator', () => {
     await settleAsyncWork();
 
     const dropdown = fixture.container.querySelector<HTMLElement>('.opencodian-agent-dropdown');
+    const frame = fixture.container.querySelector<HTMLElement>('.opencodian-composer-popover-frame');
     const heading = fixture.container.querySelector<HTMLElement>('.opencodian-agent-dropdown-heading');
     const defaultOption = fixture.container.querySelector<HTMLElement>('[data-agent-id=""]');
     const buildOption = fixture.container.querySelector<HTMLElement>('[data-agent-id="build"]');
 
     expect(trigger?.getAttribute('aria-expanded')).toBe('true');
     expect(dropdown?.getAttribute('role')).toBe('listbox');
+    expect(fixture.container.querySelectorAll('.opencodian-composer-popover-frame')).toHaveLength(1);
+    expect(frame?.querySelector('.opencodian-composer-popover-title')?.textContent).toBe('Choose primary agent');
+    expect(frame?.querySelector('kbd')?.textContent).toBe('Esc');
+    expect(frame?.querySelector('.opencodian-composer-popover-footer')?.textContent).toContain('Navigate');
+    expect(frame?.querySelector('.opencodian-composer-popover-footer')?.textContent).toContain('Select');
     expect(heading?.textContent).toBe('Choose primary agent');
     expect(heading?.getAttribute('role')).toBe('presentation');
     expect(defaultOption?.getAttribute('role')).toBe('option');
@@ -169,6 +176,7 @@ describe('ChatAgentSelectionCoordinator', () => {
       'Let OpenCode choose the project default primary agent.',
     );
     expect(buildOption?.getAttribute('role')).toBe('option');
+    expect(buildOption?.hasClass('opencodian-composer-popover-option')).toBe(true);
     expect(buildOption?.getAttribute('aria-selected')).toBe('false');
     expect(buildOption?.querySelector('.opencodian-agent-option-main')).not.toBeNull();
     expect(buildOption?.querySelector('.opencodian-agent-option-meta')).not.toBeNull();
@@ -246,5 +254,104 @@ describe('ChatAgentSelectionCoordinator', () => {
     expect(nextBuildOption?.textContent).toContain('Build');
     expect(nextBuildOption?.textContent).toContain('Builds changes');
     expect(nextBuildOption?.querySelector('.opencodian-agent-option-detail-toggle')).toBeNull();
+  });
+});
+
+describe('ChatAgentSelectionCoordinator keyboard navigation', () => {
+  const originalResizeObserver = globalThis.ResizeObserver;
+
+  beforeEach(() => {
+    ResizeObserverMock.instances.length = 0;
+    globalThis.ResizeObserver = ResizeObserverMock as unknown as typeof ResizeObserver;
+    HTMLElement.prototype.scrollIntoView = jest.fn();
+  });
+
+  afterEach(() => {
+    globalThis.ResizeObserver = originalResizeObserver;
+    document.body.innerHTML = '';
+    jest.clearAllMocks();
+  });
+
+  it('focuses the selected default agent after keyboard opening settles', async () => {
+    const fixture = createFixture();
+    const trigger = fixture.container.querySelector<HTMLElement>('.opencodian-agent-trigger');
+
+    trigger?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    await settleAsyncWork();
+
+    const defaultOption = fixture.container.querySelector<HTMLElement>('[data-agent-id=""]');
+    const options = fixture.container.querySelectorAll<HTMLElement>('.opencodian-agent-option');
+    expect(document.activeElement).toBe(defaultOption);
+    expect(defaultOption?.tabIndex).toBe(0);
+    expect(Array.from(options).filter((option) => option.tabIndex === 0)).toHaveLength(1);
+  });
+
+  it('wraps roving agent focus in both directions', async () => {
+    const fixture = createFixture();
+    const trigger = fixture.container.querySelector<HTMLElement>('.opencodian-agent-trigger');
+
+    trigger?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    await settleAsyncWork();
+    const dropdown = fixture.container.querySelector<HTMLElement>('.opencodian-agent-dropdown');
+
+    dropdown?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
+    expect(document.activeElement).toBe(fixture.container.querySelector('[data-agent-id="planner"]'));
+
+    dropdown?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    const defaultOption = fixture.container.querySelector<HTMLElement>('[data-agent-id=""]');
+    const options = fixture.container.querySelectorAll<HTMLElement>('.opencodian-agent-option');
+    expect(document.activeElement).toBe(defaultOption);
+    expect(Array.from(options).filter((option) => option.tabIndex === 0)).toHaveLength(1);
+  });
+
+  it('selects the focused agent with Enter and restores composer focus once', async () => {
+    const fixture = createFixture();
+    const trigger = fixture.container.querySelector<HTMLElement>('.opencodian-agent-trigger');
+
+    trigger?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    await settleAsyncWork();
+    const dropdown = fixture.container.querySelector<HTMLElement>('.opencodian-agent-dropdown');
+    dropdown?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    dropdown?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+
+    expect(fixture.coordinator.getSelectedAgentId()).toBe('build');
+    expect(fixture.coordinator.isOpen()).toBe(false);
+    expect(fixture.host.restoreInputFocus).toHaveBeenCalledTimes(1);
+  });
+
+  it('closes from list Escape and returns focus to the trigger', async () => {
+    const fixture = createFixture();
+    const trigger = fixture.container.querySelector<HTMLElement>('.opencodian-agent-trigger');
+
+    trigger?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    await settleAsyncWork();
+    const dropdown = fixture.container.querySelector<HTMLElement>('.opencodian-agent-dropdown');
+    dropdown?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+
+    expect(fixture.coordinator.isOpen()).toBe(false);
+    expect(document.activeElement).toBe(trigger);
+    expect(
+      Array.from(fixture.container.querySelectorAll<HTMLElement>('.opencodian-agent-option'))
+        .filter((option) => option.tabIndex === 0),
+    ).toHaveLength(0);
+  });
+
+  it.each([
+    ['empty', async () => [] as AgentSelectionCandidate[]],
+    ['failed', async () => Promise.reject(new Error('catalog unavailable'))],
+  ])('keeps the %s async catalog state open without focusing its state line', async (_name, loadCandidates) => {
+    const fixture = createFixture();
+    fixture.host.loadAgentSelectionCandidates.mockImplementation(loadCandidates);
+    const trigger = fixture.container.querySelector<HTMLElement>('.opencodian-agent-trigger');
+
+    trigger?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    await settleAsyncWork();
+
+    const stateEl = fixture.container.querySelector<HTMLElement>('.opencodian-agent-dropdown-state');
+    expect(fixture.coordinator.isOpen()).toBe(true);
+    expect(document.activeElement).not.toBe(stateEl);
+    expect(stateEl?.tabIndex).toBe(-1);
+    fixture.coordinator.closeDropdown();
+    expect(fixture.coordinator.isOpen()).toBe(false);
   });
 });

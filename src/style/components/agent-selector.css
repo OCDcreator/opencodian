@@ -155,37 +155,15 @@
   position: absolute;
   bottom: 100%;
   left: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
   box-sizing: border-box;
   width: 340px;
   min-width: 272px;
   max-width: 340px;
   max-height: 320px;
   margin-bottom: 6px;
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--background-primary) 96%, rgba(255, 255, 255, 0.06)) 0%,
-      color-mix(in srgb, var(--background-primary) 88%, var(--background-secondary)) 100%
-    ),
-    radial-gradient(
-      circle at top,
-      color-mix(in srgb, var(--opencodian-glass-specular-soft) 52%, transparent) 0%,
-      transparent 68%
-    );
-  border: 1px solid color-mix(in srgb, var(--opencodian-glass-border-strong) 82%, var(--background-modifier-border));
-  border-radius: 16px;
-  backdrop-filter: blur(40px) saturate(1.22);
-  -webkit-backdrop-filter: blur(40px) saturate(1.22);
-  box-shadow:
-    0 22px 44px color-mix(in srgb, var(--opencodian-glass-shadow-strong) 88%, transparent),
-    0 1px 0 color-mix(in srgb, var(--opencodian-glass-specular) 42%, transparent) inset;
   z-index: 1000;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 6px;
   animation: agent-dropdown-open 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -211,47 +189,11 @@
 }
 
 .opencodian-agent-option {
-  display: grid;
-  grid-template-columns: 6px minmax(0, 1fr) 18px;
   align-items: start;
-  width: 100%;
-  gap: 10px;
-  min-height: 42px;
-  padding: 7px 8px 7px 9px;
-  border: 1px solid transparent;
-  border-radius: 7px;
   cursor: pointer;
   font-size: 13px;
   color: var(--text-normal);
-  transition:
-    background-color 0.15s ease-out,
-    border-color 0.15s ease-out;
-  outline: none;
   user-select: none;
-  position: relative;
-}
-
-.opencodian-agent-option:hover {
-  background: color-mix(in srgb, var(--opencodian-highlight) 72%, transparent);
-}
-
-.opencodian-agent-option.is-selected {
-  background: color-mix(in srgb, var(--text-warning) 8%, var(--background-primary));
-  border-color: color-mix(in srgb, var(--text-warning) 18%, var(--background-modifier-border));
-}
-
-.opencodian-agent-option.is-default {
-  background: transparent;
-}
-
-.opencodian-agent-option.is-default.is-selected {
-  background: color-mix(in srgb, var(--text-warning) 7%, var(--background-primary));
-  border-color: color-mix(in srgb, var(--text-warning) 15%, var(--background-modifier-border));
-}
-
-.opencodian-agent-option:focus-visible {
-  outline: 2px solid var(--text-warning);
-  outline-offset: -2px;
 }
 
 .opencodian-agent-option-marker,
@@ -361,7 +303,7 @@
 
 .opencodian-agent-option-check {
   margin-top: 1px;
-  color: var(--text-warning);
+  color: var(--interactive-accent);
   opacity: 0;
 }
 
