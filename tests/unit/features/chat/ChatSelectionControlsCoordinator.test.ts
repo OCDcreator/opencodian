@@ -139,7 +139,9 @@ async function createFixture(options: FixtureOptions = {}) {
     getPermissionMode: jest.fn(() => permissionMode),
     switchPermissionMode: jest.fn(async (mode) => {
       permissionMode = mode;
+      return true;
     }),
+    restoreComposerInputFocus: jest.fn(),
   };
 
   const toolbarEl = document.createElement('div');
@@ -353,6 +355,30 @@ describe('ChatSelectionControlsCoordinator', () => {
     expect(permissionTrigger?.hasClass('is-open')).toBe(false);
   });
 
+  it('restores the composer input only after a successful OpenCode permission write', async () => {
+    const fixture = await createFixture();
+    const trigger = fixture.toolbarEl.querySelector<HTMLElement>('.opencodian-permission-trigger');
+
+    trigger?.click();
+    fixture.toolbarEl.querySelector<HTMLElement>('[data-mode="plan"]')?.click();
+    await settleAsyncWork();
+
+    expect(fixture.host.restoreComposerInputFocus).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the OpenCode permission card open when its write fails', async () => {
+    const fixture = await createFixture();
+    fixture.host.switchPermissionMode.mockResolvedValueOnce(false);
+    const trigger = fixture.toolbarEl.querySelector<HTMLElement>('.opencodian-permission-trigger');
+
+    trigger?.click();
+    fixture.toolbarEl.querySelector<HTMLElement>('[data-mode="plan"]')?.click();
+    await settleAsyncWork();
+
+    expect(trigger?.getAttribute('aria-expanded')).toBe('true');
+    expect(fixture.host.restoreComposerInputFocus).not.toHaveBeenCalled();
+  });
+
   describe('sandbox badge gating', () => {
     /* eslint-disable @typescript-eslint/no-explicit-any */
     let savedApp: any;
@@ -471,8 +497,9 @@ describe('ChatSelectionControlsCoordinator', () => {
         isModelAvailableOnServer: jest.fn(async () => true),
         resolveProviderIconUrl: jest.fn(async () => null),
         updateEffortSelectorDisplay: jest.fn(),
+        restoreComposerInputFocus: jest.fn(),
         getPermissionMode: jest.fn(() => 'normal'),
-        switchPermissionMode: jest.fn(async () => {}),
+        switchPermissionMode: jest.fn(async () => true),
       };
     }
 
@@ -764,8 +791,9 @@ describe('ChatSelectionControlsCoordinator', () => {
         isModelAvailableOnServer: jest.fn(async () => true),
         resolveProviderIconUrl: jest.fn(async () => null),
         updateEffortSelectorDisplay: jest.fn(),
+        restoreComposerInputFocus: jest.fn(),
         getPermissionMode: jest.fn(() => 'yolo' as PermissionMode),
-        switchPermissionMode: jest.fn(async () => {}),
+        switchPermissionMode: jest.fn(async () => true),
       } as unknown as ChatSelectionControlsCoordinatorHost;
 
       const toolbarEl = document.createElement('div');
@@ -818,8 +846,9 @@ describe('ChatSelectionControlsCoordinator', () => {
         isModelAvailableOnServer: jest.fn(async () => true),
         resolveProviderIconUrl: jest.fn(async () => null),
         updateEffortSelectorDisplay: jest.fn(),
+        restoreComposerInputFocus: jest.fn(),
         getPermissionMode: jest.fn(() => 'normal' as PermissionMode),
-        switchPermissionMode: jest.fn(async () => {}),
+        switchPermissionMode: jest.fn(async () => true),
       } as unknown as ChatSelectionControlsCoordinatorHost;
 
       const toolbarEl = document.createElement('div');
@@ -878,8 +907,9 @@ describe('ChatSelectionControlsCoordinator', () => {
         isModelAvailableOnServer: jest.fn(async () => true),
         resolveProviderIconUrl: jest.fn(async () => null),
         updateEffortSelectorDisplay: jest.fn(),
+        restoreComposerInputFocus: jest.fn(),
         getPermissionMode: jest.fn(() => 'normal' as PermissionMode),
-        switchPermissionMode: jest.fn(async () => {}),
+        switchPermissionMode: jest.fn(async () => true),
       } as unknown as ChatSelectionControlsCoordinatorHost;
 
       const toolbarEl = document.createElement('div');
@@ -920,8 +950,9 @@ describe('ChatSelectionControlsCoordinator', () => {
         isModelAvailableOnServer: jest.fn(async () => true),
         resolveProviderIconUrl: jest.fn(async () => null),
         updateEffortSelectorDisplay: jest.fn(),
+        restoreComposerInputFocus: jest.fn(),
         getPermissionMode: jest.fn(() => 'normal' as PermissionMode),
-        switchPermissionMode: jest.fn(async () => {}),
+        switchPermissionMode: jest.fn(async () => true),
       } as unknown as ChatSelectionControlsCoordinatorHost;
 
       const toolbarEl = document.createElement('div');

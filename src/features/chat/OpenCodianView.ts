@@ -1270,6 +1270,7 @@ export class OpenCodianView extends ItemView {
         }
         this.effortSelector?.updateDisplay();
       },
+      restoreComposerInputFocus: () => this.composerInputShellCoordinator.focusInput(),
       getPermissionMode: () => this.plugin.settings.permissionMode,
       switchPermissionMode: (mode) => this.switchPermissionMode(mode),
     };
@@ -4709,7 +4710,7 @@ export class OpenCodianView extends ItemView {
   }
 
   /** Switch permission mode and restart OpenCode service */
-  private async switchPermissionMode(mode: PermissionMode): Promise<void> {
+  private async switchPermissionMode(mode: PermissionMode): Promise<boolean> {
     try {
       // Update setting
       this.plugin.settings.permissionMode = mode;
@@ -4728,9 +4729,11 @@ export class OpenCodianView extends ItemView {
 
       notice.hide();
       new Notice(t('settings.security.autoRestart.success'));
+      return true;
     } catch (error) {
       logger.error('Failed to switch permission mode:', error);
       new Notice(t('settings.security.autoRestart.failed'));
+      return false;
     }
   }
 

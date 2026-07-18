@@ -313,6 +313,15 @@ describe('ComposerInputShellCoordinator', () => {
     expect(fixture.textarea.value).toBe('');
   });
 
+  it('focuses the composer textarea through its public focus seam', () => {
+    const fixture = createFixture();
+    fixture.addContextBtn.focus();
+
+    fixture.coordinator.focusInput();
+
+    expect(document.activeElement).toBe(fixture.textarea);
+  });
+
   it('organizes the composer into a layered input-row and runtime-dock', () => {
     const fixture = createFixture({
       hasImageInputCapability: true,

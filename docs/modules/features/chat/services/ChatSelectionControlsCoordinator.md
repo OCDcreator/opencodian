@@ -27,8 +27,9 @@ export interface ChatSelectionControlsCoordinatorHost extends ModelSelectionRunt
   registerEscapeHandler(handler: () => boolean): void;
   resolveProviderIconUrl(providerId: string): Promise<string | null>;
   updateEffortSelectorDisplay(): void;
+  restoreComposerInputFocus(): void;
   getPermissionMode(): PermissionMode;
-  switchPermissionMode(mode: PermissionMode): Promise<void>;
+  switchPermissionMode(mode: PermissionMode): Promise<boolean>;
 }
 
 export class ChatSelectionControlsCoordinator {
@@ -53,7 +54,7 @@ export class ChatSelectionControlsCoordinator {
 ## 关键行为
 
 - `build()` 一次性挂载 model selector，并通过 `buildBackendPermissionSelector()` 按当前 active backend 创建 permission selector；selector 不再在 constructor 中固定创建，避免 backend hot-switch 后保留错误的 option set / host seam
-- `buildBackendPermissionSelector()` 在 build time 选择 backend-appropriate config：OpenCode 使用 host 的 `getPermissionMode()` / `switchPermissionMode()`，Claude Code 则由本 coordinator 读取 live plugin 的 `backendSettings.claudeCode.permissionMode`，写回设置并调用 `adapter.setPermissionMode()`；Codex 则读取 `backendSettings.codex.sandboxMode`，写回设置并调用 `adapter.updateSandboxMode()`。三种路径均避免把 backend-specific ownership 回灌到 guarded `OpenCodianView.ts`
+- `buildBackendPermissionSelector()` 在 build time 选择 backend-appropriate config：OpenCode 使用 host 的 `getPermissionMode()` / `switchPermissionMode()`，Claude Code 则由本 coordinator 读取 live plugin 的 `backendSettings.claudeCode.permissionMode`，写回设置并调用 `adapter.setPermissionMode()`；Codex 则读取 `backendSettings.codex.sandboxMode`，写回设置并调用 `adapter.updateSandboxMode()`。每条写入路径都返回 boolean outcome，并将成功后的 composer focus 通过 `restoreComposerInputFocus()` 传入 permission selector；三种路径均避免把 backend-specific ownership 回灌到 guarded `OpenCodianView.ts`
 - `build()` 仍通过 `syncAdditionalDirectoriesBadge()` / `syncSandboxBadge()` / `syncCodexRuntimeDefaultsBadge()` 根据 active backend 决定是否挂载对应的只读配置 badge
 - `reloadModelCatalog()` 触发 runtime data reload，重建 available provider/model cache，并同步 active-tab context-usage identity
 - `getCurrentSessionModel()` / `getCurrentSessionModelResolution()` 通过 `ModelSelectionRuntime` 完成 requested/current/resolved selection 推导，不再要求 view 直接维护 catalog 分支

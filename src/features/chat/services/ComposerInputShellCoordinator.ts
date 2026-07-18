@@ -530,6 +530,10 @@ export class ComposerInputShellCoordinator {
     return this.inputWrapperEl;
   }
 
+  focusInput(): void {
+    this.inputTextareaEl?.focus();
+  }
+
   applyLocaleTexts(): void {
     if (this.addContextBtnEl) {
       this.host.setTooltipLabel(this.addContextBtnEl, t('chat.context.addContext'), 'top');

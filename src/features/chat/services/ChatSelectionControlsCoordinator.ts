@@ -38,9 +38,10 @@ export interface ChatSelectionControlsCoordinatorHost extends ModelSelectionRunt
   registerEscapeHandler(handler: () => boolean): void;
   resolveProviderIconUrl(providerId: string): Promise<string | null>;
   updateEffortSelectorDisplay(): void;
+  restoreComposerInputFocus(): void;
   /** OpenCode permission template mode (yolo/normal/plan). */
   getPermissionMode(): PermissionMode;
-  switchPermissionMode(mode: PermissionMode): Promise<void>;
+  switchPermissionMode(mode: PermissionMode): Promise<boolean>;
 }
 
 const MODEL_SEARCH_PLACEHOLDER = 'Search models...';
@@ -93,11 +94,11 @@ function readClaudeCodePermissionModeFromPlugin(): ClaudeCodePermissionMode {
   );
 }
 
-async function switchClaudeCodePermissionModeInPlugin(mode: ClaudeCodePermissionMode): Promise<void> {
+async function switchClaudeCodePermissionModeInPlugin(mode: ClaudeCodePermissionMode): Promise<boolean> {
   const plugin = readOpenCodianPlugin();
   const claudeSettings = plugin?.settings?.backendSettings?.claudeCode;
   if (!plugin || !claudeSettings) {
-    return;
+    return false;
   }
 
   claudeSettings.permissionMode = mode;
@@ -107,6 +108,7 @@ async function switchClaudeCodePermissionModeInPlugin(mode: ClaudeCodePermission
     setPermissionMode?: (nextMode: ClaudeCodePermissionMode) => Promise<void> | void;
   } | undefined;
   await adapter?.setPermissionMode?.(mode);
+  return true;
 }
 
 function readCodexSandboxModeFromPlugin(): CodexSandboxMode {
@@ -119,11 +121,11 @@ function readCodexSandboxModeFromPlugin(): CodexSandboxMode {
   return 'workspace-write';
 }
 
-async function switchCodexSandboxModeInPlugin(mode: CodexSandboxMode): Promise<void> {
+async function switchCodexSandboxModeInPlugin(mode: CodexSandboxMode): Promise<boolean> {
   const plugin = readOpenCodianPlugin();
   const codexSettings = plugin?.settings?.backendSettings?.codex;
   if (!plugin || !codexSettings) {
-    return;
+    return false;
   }
 
   codexSettings.sandboxMode = mode;
@@ -134,6 +136,7 @@ async function switchCodexSandboxModeInPlugin(mode: CodexSandboxMode): Promise<v
     updateSandboxMode?: (m: CodexSandboxMode) => void;
   } | undefined;
   adapter?.updateSandboxMode?.(mode);
+  return true;
 }
 
 export class ChatSelectionControlsCoordinator {
@@ -765,6 +768,7 @@ export class ChatSelectionControlsCoordinator {
         {
           getPermissionMode: () => readClaudeCodePermissionModeFromPlugin(),
           switchPermissionMode: (mode) => switchClaudeCodePermissionModeInPlugin(mode as ClaudeCodePermissionMode),
+          restoreInputFocus: () => this.host.restoreComposerInputFocus(),
         },
         permissionConfig,
       );
@@ -774,6 +778,7 @@ export class ChatSelectionControlsCoordinator {
         {
           getPermissionMode: () => readCodexSandboxModeFromPlugin(),
           switchPermissionMode: (mode) => switchCodexSandboxModeInPlugin(mode as CodexSandboxMode),
+          restoreInputFocus: () => this.host.restoreComposerInputFocus(),
         },
         sandboxConfig,
       );
@@ -783,6 +788,7 @@ export class ChatSelectionControlsCoordinator {
         {
           getPermissionMode: () => this.host.getPermissionMode(),
           switchPermissionMode: (mode) => this.host.switchPermissionMode(mode as PermissionMode),
+          restoreInputFocus: () => this.host.restoreComposerInputFocus(),
         },
         permissionConfig,
       );

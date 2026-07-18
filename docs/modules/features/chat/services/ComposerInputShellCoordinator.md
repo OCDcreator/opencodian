@@ -71,6 +71,7 @@ export class ComposerInputShellCoordinator {
   getTabBarSlotEl(): HTMLElement | null;
   getComposerShellEl(): HTMLElement | null;
   getInputWrapperEl(): HTMLElement | null;
+  focusInput(): void;
   applyLocaleTexts(): void;
   updateSendButtonState(): void;
   scheduleLayoutSync(): void;
@@ -92,6 +93,7 @@ export class ComposerInputShellCoordinator {
 - `buildComposerInputSubmission()` 继续从本模块 re-export，但实现已下沉到 `composerInputParsing.ts`；它会把当前 textarea 文本归一化成结构化 submission：普通文本 -> `prompt`、`/command ...` -> `command`、shell mode -> `shell`
 - slash menu 作为 `opencodian-composer-shell` 的 overlay 子节点挂载，用 CSS `bottom: calc(100% + 8px)` 显示在输入框上方，而不是插入 textarea/footer 的内部内容流
 - `@agent` menu 复用同一个 overlay 容器；当光标前 token 命中 `@query` 时优先展示 agent 候选，离开该 token 后再恢复 slash query 检测
+- `focusInput()` 是唯一的公开 textarea focus seam，供权限和模型选择在成功写入后恢复 composer 输入焦点；它不接管各 selector 的选择或持久化逻辑
 - `applyLocaleTexts()` 刷新 placeholder overlay 文本、add-context tooltip 和 send/stop tooltip；textarea 不再设置 `aria-label`，避免在 Obsidian Electron 中产生多余的原生 hover tooltip；host tooltip placement 支持 top/bottom/left/right，composer 当前主要使用 top 以避开鼠标和底部工具栏
 - `updateSendButtonState()` 根据 streaming state 切换 send/stop icon 与 class
 - `updateComposerAvailabilityState()` 消费 host 给出的高层 surface 状态；当状态为 `backend-offline` 时，本模块会本地读取 active backend display name 并渲染带名称的 notice，而不需要 `OpenCodianView` 直接提供 backend 名称。这样“无 backend”和“backend offline”的高层运行时所有权仍留在 `OpenCodianView`，但文案装饰下沉到输入区 owner
