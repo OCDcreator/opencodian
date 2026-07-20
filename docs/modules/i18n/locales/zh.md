@@ -113,7 +113,7 @@ Composer popover 新增 `chat.composerPopover.closeHint`，并与既有 navigate
 
 本轮还补充 `chat.empty.noBackend.*`、`chat.empty.backendOffline.*`、`chat.serverStatus.disabled` 与 `chat.serverPrompt.enableBackend`，让聊天区可以明确区分“尚未启用任何 backend”和“backend 已启用但当前离线”两类状态，而不是继续共用笼统的离线文案。
 
-本轮更新 `settings.claudeCode.*` 键，为 Claude Code Phase 1/2 配置面板提供中文文案，包括 section 标题/描述、运行时 / 模型与思考 / 权限 / 上下文与来源 / 工具 / 限制等标签、runtime ecosystem 只读摘要、可执行文件路径、认证与环境提示、设置来源、项目来源文件可见性、下一次 query / 重启边界、权限模式、模型/备用模型、thinking/effort（含“特高”）、额外目录、allowed/disallowed tools、max turns、max budget、env 和运行时诊断；`claude-code` backend 已可在 Backend Management 中显式启用，但发送前仍需要官方 SDK 认证可用。本轮还补充 `chat.serverStatus.backendOffline` 和 `chat.serverStatus.openBackendSettings`，用于 Claude 等非 OpenCode backend 的 header 离线状态与 tooltip，避免继续写成 OpenCode server 文案。`chat.history.backendScope` 则用于 history dropdown 顶部显示当前 backend 的历史范围。2026-06-07 Round 13 又新增 `settings.claudeCode.additionalDirectories.chatBadge.*`，用于 Claude Code 聊天工具栏的只读额外目录 badge；文案明确这是 requested extra directory scope、next-query lifecycle 和 readback-only boundary，不证明 resolved directory access。
+本轮更新 `settings.claudeCode.*` 键，为 Claude Code Phase 1/2 配置面板提供中文文案，包括 section 标题/描述、运行时 / 模型与思考 / 权限 / 上下文与来源 / 工具 / 限制等标签、runtime ecosystem 只读摘要、可执行文件路径、认证与环境提示、设置来源、项目来源文件可见性、下一次 query / 重启边界、权限模式、模型/备用模型、thinking/effort（含“特高”）、额外目录、allowed/disallowed tools、max turns、max budget、env 和运行时诊断；`claude-code` backend 已可在 Backend Management 中显式启用，但发送前仍需要官方 SDK 认证可用。本轮还补充 `chat.serverStatus.backendOffline` 和 `chat.serverStatus.openBackendSettings`，用于 Claude 等非 OpenCode backend 的 header 离线状态与 tooltip，避免继续写成 OpenCode server 文案。`chat.history.backendScope` 则用于 history dropdown 顶部显示当前 backend 的历史范围。2026-06-07 Round 13 又新增 `settings.claudeCode.additionalDirectories.chatBadge.*`，用于 Claude Code 聊天工具栏的只读额外目录 badge；文案明确这是 requested extra directory scope、next-query lifecycle 和 readback-only boundary，不证明 resolved directory access。Composer 思考强度 tooltip 新增 `chat.effort.tooltip.description` 与 `chat.effort.optionTooltip`，用中文解释推理预算 / 速度 / 成本取舍，并让下拉菜单项 hover 时显示各自说明。
 
 2026-05-24 新增 `settings.claudeCode.sdkStreamBoundary.*` 键，用于 SDK Foundations 中 hook/子代理 stream 开关前的诊断边界提示，明确这些设置只驱动诊断/实验事件流，不提供稳定 hook authoring 或完整子代理 transcript/progress UI。
 
@@ -441,7 +441,7 @@ Claude Code 不再使用过载的 `settings.claudeCode.tab.mcpAdvanced` 标签�
 新增 `chat.structuredOutput.label` 键，为 Claude Code structured output 在普通聊天 transcript 中的可折叠渲染提供中文标签文案。
 
 
-本轮 capability-hint 现使用三组相关键：`chat.input.capabilityHint.json` 继续表示 capability 本身，`chat.input.capabilityHint.jsonLabel` 用于 Claude Code backend 激活时在 composer footer 的 send 按钮左侧显示“结构化回复”，`chat.input.capabilityHint.jsonTooltip` 用于悬浮说明“固定结构返回结果、点击不会自动发送”。
+本轮 capability-hint 现使用三组相关键：`chat.input.capabilityHint.json` 继续表示 capability 本身，`chat.input.capabilityHint.jsonLabel` 用于 Claude Code / Codex backend 激活时在 composer action zone 的 `{ } JSON` chip 中显示 `JSON`，`chat.input.capabilityHint.jsonTooltip` 用于悬浮说明“固定结构返回结果、点击不会自动发送”。
 
 - 本轮 prompt-suggestions 新增 `settings.claudeCode.promptSuggestions.name`（提示建议）和 `settings.claudeCode.promptSuggestions.desc` 键，用于 Capability Lab 诊断流控制区域的 toggle 说明。
 - 2026-06-04 进一步收紧 `settings.claudeCode.promptSuggestions.desc` / `.stableDesc`：稳定设置文案现在明确写成“显示在最后一条 assistant 消息下方”，不再笼统写成输入框区域建议。

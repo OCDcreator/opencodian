@@ -32,14 +32,26 @@ function mockRect(element: HTMLElement, left: number, right: number): void {
 }
 
 describe('EffortSelector boundary hint', () => {
-  it('renders a boundary hint when getBoundaryHint returns a string', () => {
+  it('keeps the effort label and boundary hint in the custom tooltip instead of visible toolbar text', () => {
     const { container } = mount(makeCallbacks({
       getBoundaryHint: () => 'Applies to next turn',
     }));
 
-    const hint = container.querySelector('.opencodian-effort-boundary-hint');
-    expect(hint).not.toBeNull();
-    expect(hint?.textContent).toBe('Applies to next turn');
+    const group = container.querySelector('.opencodian-effort-group');
+    const current = container.querySelector('.opencodian-effort-current');
+    expect(container.querySelector('.opencodian-effort-label')).toBeNull();
+    expect(container.querySelector('.opencodian-effort-boundary-hint')).toBeNull();
+    expect(current?.textContent).toBe('Medium');
+    expect(group?.getAttribute('aria-label')).toBe(
+      'Effort: Medium. Controls how much reasoning budget the model spends before answering. Higher effort can be slower or costlier, but can help complex tasks. Applies to next turn',
+    );
+    expect(group?.getAttribute('data-tooltip')).toBeNull();
+    expect(current?.getAttribute('data-tooltip')).toBe(
+      'Effort: Medium. Controls how much reasoning budget the model spends before answering. Higher effort can be slower or costlier, but can help complex tasks. Applies to next turn',
+    );
+    expect(current?.getAttribute('data-tooltip-position')).toBe('top');
+    expect(group?.getAttribute('title')).toBeNull();
+    expect(current?.getAttribute('title')).toBeNull();
   });
 
   it('does not render a boundary hint when getBoundaryHint is undefined', () => {
@@ -58,20 +70,32 @@ describe('EffortSelector boundary hint', () => {
     expect(hint).toBeNull();
   });
 
-  it('sets title attribute on the group element when boundary hint is provided', () => {
+  it('sets accessible metadata without native title when boundary hint is provided', () => {
     const { container } = mount(makeCallbacks({
       getBoundaryHint: () => 'Applies to next turn',
     }));
 
     const group = container.querySelector('.opencodian-effort-group');
-    expect(group?.getAttribute('title')).toBe('Applies to next turn');
+    const current = container.querySelector('.opencodian-effort-current');
+    const expected = 'Effort: Medium. Controls how much reasoning budget the model spends before answering. Higher effort can be slower or costlier, but can help complex tasks. Applies to next turn';
+    expect(group?.getAttribute('aria-label')).toBe(expected);
+    expect(group?.getAttribute('data-tooltip')).toBeNull();
+    expect(current?.getAttribute('data-tooltip')).toBe(expected);
+    expect(group?.getAttribute('title')).toBeNull();
+    expect(current?.getAttribute('title')).toBeNull();
   });
 
-  it('does not set title attribute when no boundary hint is provided', () => {
+  it('still exposes the effort meaning through accessible metadata when no boundary hint is provided', () => {
     const { container } = mount(makeCallbacks());
 
     const group = container.querySelector('.opencodian-effort-group');
-    expect(group?.getAttribute('title')).toBeFalsy();
+    const current = container.querySelector('.opencodian-effort-current');
+    const expected = 'Effort: Medium. Controls how much reasoning budget the model spends before answering. Higher effort can be slower or costlier, but can help complex tasks.';
+    expect(group?.getAttribute('aria-label')).toBe(expected);
+    expect(group?.getAttribute('data-tooltip')).toBeNull();
+    expect(current?.getAttribute('data-tooltip')).toBe(expected);
+    expect(group?.getAttribute('title')).toBeNull();
+    expect(current?.getAttribute('title')).toBeNull();
   });
 
   it('updates the hint after updateDisplay when boundary hint changes', () => {
@@ -80,12 +104,39 @@ describe('EffortSelector boundary hint', () => {
       getBoundaryHint: () => hintText,
     }));
 
-    expect(container.querySelector('.opencodian-effort-boundary-hint')?.textContent).toBe('Applies to next turn');
+    expect(container.querySelector('.opencodian-effort-current')?.getAttribute('data-tooltip')).toBe(
+      'Effort: Medium. Controls how much reasoning budget the model spends before answering. Higher effort can be slower or costlier, but can help complex tasks. Applies to next turn',
+    );
 
     hintText = 'Next message only';
     selector.updateDisplay();
 
-    expect(container.querySelector('.opencodian-effort-boundary-hint')?.textContent).toBe('Next message only');
+    expect(container.querySelector('.opencodian-effort-current')?.getAttribute('data-tooltip')).toBe(
+      'Effort: Medium. Controls how much reasoning budget the model spends before answering. Higher effort can be slower or costlier, but can help complex tasks. Next message only',
+    );
+  });
+
+  it('shows the full Medium effort label in the compact composer control', () => {
+    const { container } = mount(makeCallbacks({
+      getVariant: () => 'medium',
+    }));
+
+    expect(container.querySelector('.opencodian-effort-current')?.textContent).toBe('Medium');
+  });
+
+  it('gives each dropdown option its own tooltip so hover changes the shared tooltip content', () => {
+    const { container } = mount(makeCallbacks());
+
+    const gears = Array.from(container.querySelectorAll<HTMLElement>('.opencodian-effort-gear'));
+
+    expect(gears.map(gear => gear.textContent)).toEqual(['High', 'Medium', 'Low']);
+    expect(gears.map(gear => gear.getAttribute('data-tooltip'))).toEqual([
+      'Choose High effort. Controls how much reasoning budget the model spends before answering.',
+      'Choose Medium effort. Controls how much reasoning budget the model spends before answering.',
+      'Choose Low effort. Controls how much reasoning budget the model spends before answering.',
+    ]);
+    expect(gears.every(gear => gear.classList.contains('opencodian-tooltip-trigger'))).toBe(true);
+    expect(gears.every(gear => gear.getAttribute('data-tooltip-position') === 'left')).toBe(true);
   });
 
   it('clamps the effort menu from its right edge when opened with the keyboard', () => {

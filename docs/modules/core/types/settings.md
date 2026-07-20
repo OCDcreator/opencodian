@@ -115,6 +115,8 @@ OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings`、`DEFAULT_
 | `ChatAppearanceScrollbarSettings` | 滚动条（`width`, `radius`, `trackOpacity`, `thumbOpacity`, `thumbHoverOpacity`, `edgePadding`, `shadowOpacity`） |
 | `ChatAppearanceAdvancedSettings` | 高级（`customCssDeclarations`） |
 
+`getDefaultChatAppearanceSettings().input.enFontFamily` 当前默认为 `newsreader`，让新装输入文本层使用 bundled Newsreader serif 字体；`cnFontFamily` 默认为空，继续由系统/Obsidian CJK fallback 接管。`normalizeFontFamilyValue()` 只做字符串清洗和长度限制，不强制 unknown id 回退，因此用户仍可在外观设置中选择 inherit、注册字体或自定义 font-family。
+
 ### 玻璃效果
 
 | 类型 | 说明 |

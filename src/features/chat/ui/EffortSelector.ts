@@ -11,6 +11,7 @@
  */
 
 import { t } from '../../../i18n';
+import { TooltipLayerController } from '../../../shared/TooltipLayerController';
 import { AnchoredOverlayLayoutController } from './AnchoredOverlayLayoutController';
 
 const EFFORT_DROPDOWN_MINIMUM_WIDTH = 60;
@@ -38,11 +39,9 @@ export interface EffortSelectorCallbacks {
 }
 
 export class EffortSelector {
-  private static tooltipLabelId = 0;
   private container: HTMLElement;
   private gearsEl: HTMLElement | null = null;
   private groupEl: HTMLElement | null = null;
-  private hintEl: HTMLElement | null = null;
   private callbacks: EffortSelectorCallbacks;
   private isMenuOpen = false;
   private dropdownLayoutController: AnchoredOverlayLayoutController | null = null;
@@ -52,6 +51,7 @@ export class EffortSelector {
   constructor(parentEl: HTMLElement, callbacks: EffortSelectorCallbacks) {
     this.callbacks = callbacks;
     this.container = parentEl.createDiv({ cls: 'opencodian-effort-selector' });
+    TooltipLayerController.ensureForElement(this.container);
     const doc = this.container.ownerDocument;
     this.handleDocumentMouseDown = (event: MouseEvent) => {
       const target = event.target;
@@ -74,17 +74,6 @@ export class EffortSelector {
     this.container.empty();
 
     this.groupEl = this.container.createDiv({ cls: 'opencodian-effort-group' });
-    const label = this.groupEl.createSpan({ cls: 'opencodian-effort-label' });
-    label.setText(t('chat.effort.label'));
-
-    // Boundary hint: honest text about when the effort change takes effect
-    this.hintEl = null;
-    const hint = this.callbacks.getBoundaryHint?.();
-    if (hint) {
-      this.hintEl = this.groupEl.createSpan({ cls: 'opencodian-effort-boundary-hint' });
-      this.hintEl.setText(hint);
-      this.groupEl.setAttribute('title', hint);
-    }
 
     this.gearsEl = this.groupEl.createDiv({ cls: 'opencodian-effort-gears' });
 
@@ -99,13 +88,16 @@ export class EffortSelector {
     const currentVariant = this.callbacks.getVariant();
     const allowDefaultOption = this.callbacks.allowDefaultOption?.() ?? true;
     const defaultLabel = this.callbacks.getDefaultOptionLabel?.() ?? t('chat.effort.disabled');
+    const currentLabel = currentVariant ? formatVariantLabel(currentVariant) : defaultLabel;
 
     // Current value display
     const currentEl = this.gearsEl.createDiv({ cls: 'opencodian-effort-current' });
-    currentEl.setText(currentVariant ? formatVariantLabel(currentVariant) : defaultLabel);
+    currentEl.setText(currentLabel);
     currentEl.setAttribute('role', 'button');
     currentEl.setAttribute('tabindex', '0');
     currentEl.setAttribute('aria-haspopup', 'menu');
+    currentEl.addClass('opencodian-tooltip-trigger');
+    currentEl.setAttribute('data-tooltip-position', 'top');
     currentEl.addEventListener('click', (event) => {
       event.preventDefault();
       event.stopPropagation();
@@ -125,6 +117,10 @@ export class EffortSelector {
     if (allowDefaultOption) {
       const defaultGear = optionsEl.createDiv({ cls: 'opencodian-effort-gear' });
       defaultGear.setText(defaultLabel);
+      defaultGear.addClass('opencodian-tooltip-trigger');
+      defaultGear.setAttribute('data-tooltip-position', 'left');
+      defaultGear.setAttribute('data-tooltip', this.buildOptionTooltip(defaultLabel));
+      defaultGear.removeAttribute('title');
       if (!currentVariant) {
         defaultGear.addClass('selected');
       }
@@ -139,7 +135,12 @@ export class EffortSelector {
     // Variant options (reverse order so highest effort is at top)
     for (const variant of [...variants].reverse()) {
       const gearEl = optionsEl.createDiv({ cls: 'opencodian-effort-gear' });
-      gearEl.setText(formatVariantLabel(variant));
+      const optionLabel = formatVariantLabel(variant);
+      gearEl.setText(optionLabel);
+      gearEl.addClass('opencodian-tooltip-trigger');
+      gearEl.setAttribute('data-tooltip-position', 'left');
+      gearEl.setAttribute('data-tooltip', this.buildOptionTooltip(optionLabel));
+      gearEl.removeAttribute('title');
 
       if (variant === currentVariant) {
         gearEl.addClass('selected');
@@ -163,6 +164,7 @@ export class EffortSelector {
       if (this.groupEl) {
         this.groupEl.style.display = 'none';
       }
+      this.syncAccessibleLabel('');
       return;
     }
 
@@ -170,25 +172,8 @@ export class EffortSelector {
       this.groupEl.style.display = '';
     }
 
-    // Refresh boundary hint
-    const hint = this.callbacks.getBoundaryHint?.();
-    if (hint && this.groupEl) {
-      if (!this.hintEl) {
-        // Insert hint before the gears element
-        this.hintEl = this.groupEl.createSpan({ cls: 'opencodian-effort-boundary-hint' });
-        if (this.gearsEl) {
-          this.groupEl.insertBefore(this.hintEl, this.gearsEl);
-        }
-      }
-      this.hintEl.setText(hint);
-      this.groupEl.setAttribute('title', hint);
-    } else if (this.hintEl) {
-      this.hintEl.remove();
-      this.hintEl = null;
-      this.groupEl?.removeAttribute('title');
-    }
-
     this.renderGears();
+    this.syncAccessibleLabel(this.getCurrentDisplayLabel());
   }
 
   /** Get the container element */
@@ -241,6 +226,44 @@ export class EffortSelector {
       isOpen: () => this.isMenuOpen,
     });
     this.dropdownLayoutController.observe();
+  }
+
+  private getCurrentDisplayLabel(): string {
+    const currentVariant = this.callbacks.getVariant();
+    if (currentVariant) {
+      return formatVariantLabel(currentVariant);
+    }
+    return this.callbacks.getDefaultOptionLabel?.() ?? t('chat.effort.disabled');
+  }
+
+  private syncAccessibleLabel(currentLabel: string): void {
+    if (!this.groupEl) {
+      return;
+    }
+
+    if (!currentLabel) {
+      this.groupEl.removeAttribute('aria-label');
+      this.groupEl.removeAttribute('data-tooltip');
+      this.groupEl.removeAttribute('title');
+      return;
+    }
+
+    const label = t('chat.effort.label');
+    const hint = this.callbacks.getBoundaryHint?.()?.trim();
+    const description = t('chat.effort.tooltip.description');
+    const accessibleLabel = hint
+      ? `${label}: ${currentLabel}. ${description} ${hint}`
+      : `${label}: ${currentLabel}. ${description}`;
+    this.groupEl.setAttribute('aria-label', accessibleLabel);
+    this.groupEl.removeAttribute('data-tooltip');
+    this.groupEl.removeAttribute('title');
+    const currentEl = this.gearsEl?.querySelector<HTMLElement>('.opencodian-effort-current');
+    currentEl?.setAttribute('data-tooltip', accessibleLabel);
+    currentEl?.removeAttribute('title');
+  }
+
+  private buildOptionTooltip(label: string): string {
+    return t('chat.effort.optionTooltip', { effort: label });
   }
 }
 

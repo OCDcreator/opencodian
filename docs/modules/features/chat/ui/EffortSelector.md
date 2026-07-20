@@ -11,19 +11,20 @@ OpenCode 模式下，variants 来自当前 provider model catalog 的 `models[mo
 
 ## 职责
 
-- 渲染 compact effort label、当前值和 dropdown options
+- 渲染 compact 当前值和 dropdown options；`Effort` / `思考强度` 只通过 group `aria-label`、当前值 custom tooltip 与菜单项 tooltip 暴露，不在 toolbar 内占可见宽度
 - 点击当前值时打开/关闭菜单，点击外部或按 Escape 关闭菜单
 - 以 reverse order 展示 variants，让较高 effort 靠上
 - 在当前模型不存在或 variants 为空时隐藏自身，避免留下空 toolbar 控件
 - 通过 `allowDefaultOption()` 和 `getDefaultOptionLabel()` 支持 backend-specific 默认项语义
-- 通过 `getBoundaryHint()` 回调渲染边界提示文本（boundary hint），诚实告知用户 effort 变更的作用范围
+- 通过 `getBoundaryHint()` 回调把边界提示拼入 custom tooltip，诚实告知用户 effort 变更的作用范围
+- 当前值使用 `formatVariantLabel()` 显示完整标签（例如 `medium` → `Medium`），composer 中不得把 thinking effort 压缩成 `M` 或中文一字母式缩写
 - dropdown 使用 `AnchoredOverlayLayoutController` 从当前值右边缘向左展开，以菜单实际内容宽度为首选、60px 为最小值，并相对最近的 Chat 容器保留左右 8px 安全区
 
 ## 维护约束
 
 - 该组件只管理 DOM 与选择事件，不保存设置，也不直接读取 backend capability。
 - OpenCode / Claude Code / Codex 的 variant 来源与保存策略由 `OpenCodianView` host seam 决定。
-- Codex effort 写回路径：`onVariantChange` → `plugin.settings.backendSettings.codex.modelReasoningEffort` + `CodexAdapter.updateModelReasoningEffort()`。仅影响后续 thread 创建，不改变正在运行的 thread。该边界通过 `getBoundaryHint()` 回调在 UI 上显示 "Applies to next turn" / "下次对话生效" 提示文本，并设置 `title` 属性作为 hover tooltip。
+- Codex effort 写回路径：`onVariantChange` → `plugin.settings.backendSettings.codex.modelReasoningEffort` + `CodexAdapter.updateModelReasoningEffort()`。仅影响后续 thread 创建，不改变正在运行的 thread。该边界通过 `getBoundaryHint()` 回调进入当前值 `data-tooltip` 与 group `aria-label`（例如 `Effort: Medium. Controls how much reasoning budget... Applies to next turn`），避免在输入框有限空间里显示 `思考强度` 长标签，也避免原生 `title` 和全局 custom tooltip 重复。
 - 新增 backend effort 语义时，优先扩展 callbacks，而不是在组件中硬编码 backend kind。
-- Boundary hint 作为 `.opencodian-effort-boundary-hint` span 渲染在 label 和 gears 之间，CSS 样式在 `effort-selector.css` 中定义。
+- `.opencodian-effort-label` 与 `.opencodian-effort-boundary-hint` 不再渲染；`.opencodian-effort-current` 是主 tooltip trigger，`.opencodian-effort-gear` 每一项也有独立 tooltip，鼠标在弹出菜单内移动时 tooltip 文案会随 hover 项更新，而不是停留在父级说明。
 - 每次 variants 更新并重建 options DOM 时必须重建浮层控制器；destroy 时断开 observer，避免继续持有旧菜单节点。

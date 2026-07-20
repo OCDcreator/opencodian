@@ -795,7 +795,7 @@
   resize: none;
   min-height: 68px;
   max-height: 240px;
-  font-family: inherit;
+  font-family: var(--opencodian-composer-font-family, "OpenCodian Newsreader", Georgia, serif);
   font-size: 14px;
   line-height: 1.5;
   color: transparent;
@@ -834,7 +834,7 @@
   right: 0;
   pointer-events: none;
   overflow: hidden;
-  font-family: inherit;
+  font-family: var(--opencodian-composer-font-family, "OpenCodian Newsreader", Georgia, serif);
   font-size: 14px;
   line-height: 1.5;
   padding: 8px 0 4px;
@@ -859,7 +859,7 @@
   pointer-events: none;
   color: var(--text-muted);
   opacity: 0.55;
-  font-family: inherit;
+  font-family: var(--opencodian-composer-font-family, "OpenCodian Newsreader", Georgia, serif);
   font-size: 14px;
   line-height: 1.65;
   padding: 12px 6px 10px;
@@ -1031,6 +1031,14 @@
   height: 16px;
 }
 
+@font-face {
+  font-family: "OpenCodian Newsreader";
+  src: url("assets/fonts/newsreader/Newsreader%5Bopsz%2Cwght%5D.ttf") format("truetype");
+  font-weight: 200 800;
+  font-style: normal;
+  font-display: swap;
+}
+
 .opencodian-input-area {
   position: absolute;
   right: 0;
@@ -1043,7 +1051,7 @@
   gap: 8px;
   background: transparent;
   pointer-events: none;
-  font-family: var(--opencodian-composer-font-family, inherit);
+  font-family: inherit;
 }
 
 .opencodian-input-area > * {
@@ -1414,7 +1422,7 @@
  *   .opencodian-composer-content
  *     ├─ .opencodian-composer-context-row      (context strip: files/images/mentions)
  *     ├─ .opencodian-input-highlight-container (textarea — the focus)
- *     ├─ .opencodian-composer-input-row         (+/image  |  context-ring + send/stop)
+ *     ├─ .opencodian-composer-input-row         (+/image/JSON | context-ring + send/stop)
  *     └─ .opencodian-composer-runtime-dock      (model/agent/permission/effort/sandbox)
  *
  * The runtime-dock lives inside the glass shell, so the etched action-button style
@@ -1422,7 +1430,8 @@
  * automatically — no separate etched CSS is needed for the dock.
  * Layout is narrow-first: the dock wraps naturally instead of relying on a width breakpoint.
  */
-.opencodian-composer-input-row {
+.opencodian-composer-input-row,
+.opencodian-composer-action-zone {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1442,6 +1451,8 @@
 .opencodian-composer-context-actions {
   justify-content: flex-start;
   flex-wrap: nowrap;
+  flex: 1 1 auto;
+  overflow: hidden;
 }
 
 .opencodian-composer-submit-controls {
@@ -1465,15 +1476,17 @@
  * Narrow-first: wraps naturally so long model names or many controls never overflow the
  * (typically narrow) Obsidian sidebar.
  */
-.opencodian-composer-runtime-dock {
+.opencodian-composer-runtime-dock,
+.opencodian-composer-runtime-rail {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   row-gap: 4px;
-  column-gap: var(--opencodian-composer-gap-sm);
+  column-gap: var(--opencodian-composer-gap-xs);
   min-height: 0;
-  padding-top: 6px;
+  padding-top: 5px;
   margin-top: 4px;
+  color: var(--text-muted);
 }
 
 .opencodian-composer-runtime-dock:empty {
@@ -2147,6 +2160,7 @@
   min-width: 0;
   padding: 12px 6px 10px;
   line-height: 1.65;
+  font-family: var(--opencodian-composer-font-family, "OpenCodian Newsreader", Georgia, serif);
   background: transparent !important;
   box-shadow: none !important;
 }
@@ -2171,18 +2185,21 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 4px;
   flex: 0 0 auto;
-  max-width: 100%;
-  padding: 4px 10px;
-  border: 1px solid color-mix(in srgb, var(--interactive-accent) 26%, var(--background-modifier-border));
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--interactive-accent) 11%, transparent);
-  font-size: 11px;
-  line-height: 1.4;
+  max-width: min(86px, 38vw);
+  min-height: 28px;
+  padding: 3px 8px;
+  border: 1px solid color-mix(in srgb, var(--interactive-accent) 22%, var(--background-modifier-border));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--interactive-accent) 8%, transparent);
+  font-size: 10.5px;
+  line-height: 1.2;
   color: color-mix(in srgb, var(--text-normal) 70%, var(--interactive-accent));
   cursor: pointer;
   transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease, transform 120ms ease;
   appearance: none;
+  overflow: hidden;
 }
 
 .opencodian-input-capability-hint:hover {
@@ -2208,11 +2225,24 @@
   transform: none;
 }
 
+.opencodian-input-capability-hint-glyph {
+  flex: 0 0 auto;
+  font-family: var(--font-monospace);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0;
+  color: currentColor;
+  opacity: 0.92;
+}
+
 .opencodian-input-capability-hint-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
   font-family: var(--font-monospace);
-  font-weight: 600;
-  letter-spacing: 0.01em;
+  font-weight: 700;
+  letter-spacing: 0;
 }
 
 .opencodian-suggestion-bar {
@@ -2282,11 +2312,12 @@
  * wrapping/spacing to the dock (its parent) so the two never fight over layout.
  */
 .opencodian-input-toolbar {
-  --opencodian-input-toolbar-control-gap: 10px;
-  --opencodian-input-toolbar-control-height: 30px;
+  --opencodian-input-toolbar-control-gap: 6px;
+  --opencodian-input-toolbar-control-height: 26px;
   display: flex;
   align-items: center;
   flex-wrap: wrap;
+  width: 100%;
   row-gap: 4px;
   column-gap: var(--opencodian-input-toolbar-control-gap);
   position: relative;
@@ -2306,9 +2337,18 @@
 .opencodian-input-toolbar .opencodian-sandbox-badge-container,
 .opencodian-input-toolbar .opencodian-additional-directories-badge-container,
 .opencodian-input-toolbar .opencodian-codex-runtime-defaults-badge-container,
-.opencodian-input-toolbar .opencodian-model-selector {
+.opencodian-input-toolbar .opencodian-model-selector,
+.opencodian-input-toolbar .opencodian-effort-slot,
+.opencodian-input-toolbar .opencodian-runtime-overflow {
   min-height: var(--opencodian-input-toolbar-control-height);
   flex-shrink: 0;
+}
+
+.opencodian-input-toolbar .opencodian-agent-selector,
+.opencodian-input-toolbar .opencodian-model-selector,
+.opencodian-input-toolbar .opencodian-permission-selector,
+.opencodian-input-toolbar .opencodian-effort-slot {
+  max-width: 100%;
 }
 
 .opencodian-composer-input-row .opencodian-send-btn,
@@ -2317,7 +2357,116 @@
 }
 
 .opencodian-input-toolbar .opencodian-effort-slot {
-  margin-left: 0;
+  order: 998;
+  margin-left: auto;
+}
+
+.opencodian-runtime-overflow {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  order: 999;
+}
+
+.opencodian-runtime-overflow-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--opencodian-input-toolbar-control-height, 26px);
+  min-height: var(--opencodian-input-toolbar-control-height, 26px);
+  padding: 0 7px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--background-modifier-border) 38%, transparent);
+  background: color-mix(in srgb, var(--background-secondary) 36%, transparent);
+  box-shadow: none;
+  color: color-mix(in srgb, var(--text-normal) 74%, var(--text-muted));
+  cursor: pointer;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 650;
+  line-height: 1;
+  transition:
+    background-color 0.15s ease-out,
+    border-color 0.15s ease-out,
+    color 0.15s ease-out,
+    box-shadow 0.15s ease-out;
+}
+
+.opencodian-runtime-overflow-trigger:hover,
+.opencodian-runtime-overflow-trigger.is-open {
+  background: color-mix(in srgb, var(--background-secondary) 48%, transparent);
+  border-color: color-mix(in srgb, var(--background-modifier-border) 62%, var(--text-muted));
+  color: var(--text-normal);
+}
+
+.opencodian-runtime-overflow-trigger:focus-visible {
+  outline: 2px solid var(--background-modifier-border-focus);
+  outline-offset: 2px;
+}
+
+.opencodian-runtime-overflow-panel {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 6px);
+  z-index: 1000;
+  display: none;
+  align-items: stretch;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 156px;
+  max-width: min(260px, calc(100vw - 32px));
+  padding: 5px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--opencodian-glass-border-strong) 70%, var(--background-modifier-border));
+  background: color-mix(in srgb, var(--background-primary) 94%, var(--background-secondary));
+  box-shadow:
+    0 16px 28px color-mix(in srgb, var(--opencodian-glass-shadow-strong) 72%, transparent),
+    0 1px 0 color-mix(in srgb, var(--opencodian-glass-specular) 34%, transparent) inset;
+}
+
+.opencodian-runtime-overflow-panel.is-open {
+  display: flex;
+}
+
+.opencodian-runtime-overflow-panel .opencodian-sandbox-badge-container,
+.opencodian-runtime-overflow-panel .opencodian-additional-directories-badge-container,
+.opencodian-runtime-overflow-panel .opencodian-codex-runtime-defaults-badge-container {
+  display: flex;
+  align-items: stretch;
+  min-height: 0;
+  width: 100%;
+}
+
+.opencodian-runtime-overflow-panel .opencodian-sandbox-config-badge,
+.opencodian-runtime-overflow-panel .opencodian-additional-directories-config-badge,
+.opencodian-runtime-overflow-panel .opencodian-codex-runtime-defaults-badge {
+  width: 100%;
+  max-width: 100%;
+  min-height: 26px;
+  justify-content: flex-start;
+  border-radius: 7px;
+}
+
+.opencodian-composer-shell--action-buttons-etched .opencodian-runtime-overflow-trigger {
+  padding: 0 5px;
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  color: color-mix(in srgb, var(--text-normal) 78%, var(--text-muted));
+}
+
+.opencodian-composer-shell--action-buttons-etched .opencodian-runtime-overflow-trigger:hover,
+.opencodian-composer-shell--action-buttons-etched .opencodian-runtime-overflow-trigger.is-open {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  color: var(--text-normal);
+  filter: brightness(1.04) saturate(1.02);
+}
+
+.opencodian-composer-shell--action-buttons-etched .opencodian-runtime-overflow-trigger:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--interactive-accent) 58%, transparent);
+  outline-offset: 3px;
 }
 
 @font-face {

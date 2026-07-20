@@ -5,7 +5,7 @@
 
 ## 职责
 
-定义聊天输入工具栏里的主 Agent 专属样式。它覆盖 trigger icon/text/chevron、紧凑列表标题、OpenCode default 与 primary/all agent 的 label/meta 布局以及 loading/empty/error 状态。Popover 外卡片、通用 option 几何、hover、focus、neutral selected 背景、600 字重和 reduced-motion 都由共享 `composer-popover-frame.css` 负责；Agent trigger 的 warning-selected 外观保持不变。
+定义聊天输入工具栏里的主 Agent 专属样式。它覆盖 trigger icon/text/chevron、紧凑列表标题、OpenCode default 与 primary/all agent 的 label/meta 布局以及 loading/empty/error 状态。Popover 外卡片、通用 option 几何、hover、focus、neutral selected 背景、600 字重和 reduced-motion 都由共享 `composer-popover-frame.css` 负责；Agent trigger 保留 warning-selected 语义，并在 runtime rail 中使用低视觉权重的紧凑 pill 几何。
 
 ## 关键类名
 
@@ -21,8 +21,8 @@
 
 ## 修改注意点
 
-- trigger 容器应向 model selector 看齐，保持一致的默认边框、内边距、hover/open 反馈和图标尺寸。当前 trigger padding 为 `4px 10px`，与 model selector 一致。
-- 下拉框只保留定位、既有 340px / 272px 尺寸约束、320px 最大高度、滚动溢出和 `agent-dropdown-open` 入场动画；共享 frame 提供背景、边框、圆角和阴影。reduced-motion 下会同时禁用 dropdown animation 与 option/trigger transition。
+- trigger 容器应向 model selector 看齐，保持一致的 runtime-chip 边框、紧凑内边距、11px 文本和小图标，不能膨胀成与 send/add action 同权重的大按钮。
+- 下拉框只保留定位、既有 340px / 272px 尺寸约束、320px 最大高度和滚动溢出；共享 frame 提供背景、边框、圆角、阴影与 reduced-motion。
 - 下拉框使用 `box-sizing: border-box`；实际宽度与水平偏移由 `AnchoredOverlayLayoutController` 钳制到 Chat 容器 8px 安全区内，不要重新引入 `100vw` 宽度判断。
 - 通用选项的 `:focus-visible` 与 selected 状态使用共享 Command 中性背景 + 600 字重；Agent CSS 不再覆盖为黄色选中行，也不再渲染彩色 marker dot（`.opencodian-agent-option-marker` 已通过 `display: none` 隐藏，default 状态改由 `.is-default-mode` 文字 badge 表达）。
 - trigger 选中态使用 `var(--text-warning)`，对齐 OpenCode 对 agent reference 的黄色/橙色语义。

@@ -245,7 +245,7 @@ body[data-opencodian-provider-icon-mode="color"] {
   --opencodian-input-bg-opacity: 72%;
   --opencodian-input-blur: 18px;
   --opencodian-input-shadow-blur: 28px;
-  --opencodian-composer-font-family: ;
+  --opencodian-composer-font-family: "OpenCodian Newsreader", Georgia, serif;
   /* Layered composer spacing scale (context-strip → textarea → input-row → runtime-dock). */
   --opencodian-composer-gap-xs: 6px;
   --opencodian-composer-gap-sm: 8px;

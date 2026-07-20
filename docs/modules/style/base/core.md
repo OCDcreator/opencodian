@@ -19,7 +19,7 @@
 - `.opencodian-server-status-badge`：聊天 header 的 server/backend 状态按钮。默认为 28px 紧凑 shadcn-style badge，内部的 `.opencodian-server-status-icon` 用 active backend identity 表达后端；OpenCode 使用与标题 logo 同源的 inline brandmark，非 OpenCode backend 使用 provider SVG mask。`.opencodian-server-status-state` 是 badge 级右下角 ring/dot，不参与图标居中；`.opencodian-server-status-text` 留在同一个按钮内部，hover / focus-visible 时用短宽度展开 + opacity/transform 显示，避免长 backend 名称常驻占用右上角工具栏宽度。`.is-disabled` 是后端全部禁用时的灰色状态，与 `.is-checking`/`.is-starting`/`.is-running`/`.is-external`/`.is-offline` 并列。
 - `.opencodian-theme-background-*`：主题背景图层、遮罩、叠加高光。
 - 关键变量组：`--opencodian-glass-*`、`--opencodian-composer-*`、`--opencodian-status-*`、`--opencodian-shadow-*`。
-- 输入区字体默认值由 `--opencodian-composer-font-family` 提供，并可被聊天外观设置生成的容器变量覆盖。
+- 输入文本层字体默认值由 `--opencodian-composer-font-family` 提供，并可被聊天外观设置生成的容器变量覆盖；当前默认设置选择 bundled `newsreader`，实际 fallback font-face 在 `chat-assistant.css` 中声明。该变量用于 textarea/highlight/placeholder，不用于 runtime toolbar 控件字体。
 - Layered composer 间距 token：`--opencodian-composer-gap-xs`（6px）、`--opencodian-composer-gap-sm`（8px）、`--opencodian-composer-pad-x`（12px）统一 context strip → textarea → input-row → runtime-dock 的横向节奏，替代此前 footer/grid 中硬编码的 `8px 12px` / `8px` / `6px`。
 
 ## 关联 TS 组件

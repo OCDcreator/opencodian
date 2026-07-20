@@ -410,6 +410,18 @@
   height: 14px;
 }
 
+.opencodian-permission-option[data-mode="yolo"] .opencodian-permission-option-icon {
+  color: color-mix(in srgb, var(--background-modifier-success) 78%, var(--text-muted));
+}
+
+.opencodian-permission-option[data-mode="plan"] .opencodian-permission-option-icon {
+  color: color-mix(in srgb, var(--background-modifier-error) 78%, var(--text-muted));
+}
+
+.opencodian-permission-option[data-mode="normal"] .opencodian-permission-option-icon {
+  color: color-mix(in srgb, var(--interactive-accent) 78%, var(--text-muted));
+}
+
 /* Stagger animation for options on dropdown open */
 /* Custom thin scrollbar for dropdown */
 .opencodian-permission-dropdown {

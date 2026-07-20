@@ -9,7 +9,7 @@
 
 ## 关键类名 / CSS 变量
 
-- 模型选择器：`.opencodian-model-selector`、`.opencodian-model-trigger*`、`.opencodian-model-dropdown*`、`.opencodian-model-option*`。输入工具栏内的 trigger 使用统一 control height / inline padding，与 Agent / permission selector 保持同一横向节奏；默认态是紧凑按钮，`action-buttons-etched` 下切换为透明刻入态。
+- 模型选择器：`.opencodian-model-selector`、`.opencodian-model-trigger*`、`.opencodian-model-dropdown*`、`.opencodian-model-option*`。输入工具栏内的 trigger 使用统一 control height / inline padding，与 Agent / permission / effort selector 保持同一横向节奏；默认态是低视觉权重 runtime chip，`action-buttons-etched` 下切换为透明刻入态。
 - 选择态：`.is-open`、`.is-unavailable`、`.is-unconfigured`、`.is-highlighted`、`.is-selected`。
 - configured-only 禁用态：`.opencodian-model-option.is-configured-only` 与 `.opencodian-model-option-availability`，使用中性 muted 样式、稳定 badge 最小宽度，并覆盖 hover/highlight 背景。
 - 设置页通用：`.opencodian-settings*`、`.opencodian-settings-quick-nav*`、`.opencodian-settings-tabs-*`、`.opencodian-settings-tab-*`、`.opencodian-settings-tooltip-layer` / `-bubble` / `-arrow`（`SettingsTooltipController` body-level overlay）、`.opencodian-capability-lab-session-detail`。
@@ -18,8 +18,7 @@
 
 ## 近期行为
 
-- **Composer card unification**（当前）：Model 继续保留 search、scroll、provider sticky headers 与 current-tab override，但 outer card、title/`Esc`/footer、共享 option geometry、selected/focus/reduced-motion 均由 `composer-popover-frame.css` 统一提供；三张卡共享 shadcn `Popover + Command` anatomy，未引入 shadcn/Radix/cmdk/Tailwind/Web font。
-  - 触发器：`padding: 4px 10px`、`font-weight: 500`；hover 时 `translateY(-1px)` + 柔和阴影抬升；`is-open` 态使用 accent 色边框 + 外发光。
+- **Composer card unification + compact rail**（当前）：Model 继续保留 search、scroll、provider sticky headers 与 current-tab override，但 outer card、title/`Esc`/footer、共享 option geometry、selected/focus/reduced-motion 均由 `composer-popover-frame.css` 统一提供；composer runtime rail 内的 trigger 使用 pill 几何、`11px` 字号、小图标和低视觉权重尺寸，未引入 shadcn/Radix/cmdk/Tailwind/Web font。
   - Chevron：`cubic-bezier(0.4, 0, 0.2, 1)` 平滑旋转 180°，hover/open 时颜色递进。
   - 下拉外层只保留 340px/280px 宽度和 anchored placement；卡片表面不再在本文件重复声明背景、border、radius、shadow 或 animation。
   - 下拉面板的 340px 首选宽度使用 `box-sizing: border-box`，实际水平位置和窄容器收缩由共享 `AnchoredOverlayLayoutController` 计算，确保相对聊天容器左右各保留 8px 安全间距，不再因固定 `left: 0` 被右侧边界裁剪。

@@ -10,36 +10,21 @@
 .opencodian-effort-group {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 5px;
   min-height: var(--opencodian-input-toolbar-control-height, 30px);
   padding: 3px 7px;
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--background-primary) 54%, transparent);
-  border: 1px solid color-mix(in srgb, var(--background-modifier-border) 54%, transparent);
-  box-shadow: 0 1px 0 color-mix(in srgb, var(--opencodian-glass-specular) 30%, transparent) inset;
-  font-size: 12px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--background-secondary) 36%, transparent);
+  border: 1px solid color-mix(in srgb, var(--background-modifier-border) 38%, transparent);
+  box-shadow: none;
+  font-size: 11px;
   transition: background-color 0.15s ease-out, border-color 0.15s ease-out, box-shadow 0.15s ease-out;
 }
 
 .opencodian-effort-group:hover,
 .opencodian-effort-group:has(.opencodian-effort-gears.is-open) {
-  background: color-mix(in srgb, var(--opencodian-composer-embedded-fill) 24%, var(--background-primary));
-  border-color: color-mix(in srgb, var(--background-modifier-border) 78%, var(--text-muted));
-}
-
-.opencodian-effort-label {
-  color: var(--text-muted);
-  font-size: 11px;
-  font-weight: 500;
-  white-space: nowrap;
-}
-
-.opencodian-effort-boundary-hint {
-  color: var(--text-faint);
-  font-size: 10px;
-  font-weight: 400;
-  white-space: nowrap;
-  opacity: 0.78;
+  background: color-mix(in srgb, var(--background-secondary) 48%, transparent);
+  border-color: color-mix(in srgb, var(--background-modifier-border) 62%, var(--text-muted));
 }
 
 .opencodian-effort-gears {
@@ -53,12 +38,14 @@
   padding: 1px 0;
   border-radius: 5px;
   background: transparent;
-  color: var(--text-normal);
+  color: color-mix(in srgb, var(--text-normal) 82%, var(--text-muted));
   font-weight: 650;
   cursor: pointer;
   transition: color 0.15s ease, background 0.15s ease;
-  min-width: 32px;
+  min-width: 48px;
+  max-width: 74px;
   text-align: center;
+  white-space: nowrap;
 }
 
 .opencodian-effort-current:hover {
@@ -82,7 +69,7 @@
     0 16px 28px color-mix(in srgb, var(--opencodian-glass-shadow-strong) 72%, transparent),
     0 1px 0 color-mix(in srgb, var(--opencodian-glass-specular) 34%, transparent) inset;
   z-index: 100;
-  min-width: 60px;
+  min-width: 72px;
 }
 
 .opencodian-effort-gears.is-open .opencodian-effort-options,
@@ -134,6 +121,7 @@
 
 .opencodian-composer-shell--action-buttons-etched .opencodian-effort-current {
   color: color-mix(in srgb, var(--text-normal) 86%, var(--text-muted));
+  min-width: 48px;
 }
 
 .opencodian-composer-shell--action-buttons-etched .opencodian-effort-current:focus-visible {

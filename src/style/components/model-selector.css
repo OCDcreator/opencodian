@@ -14,15 +14,15 @@
   display: flex;
   align-items: center;
   min-height: var(--opencodian-input-toolbar-control-height, 30px);
-  padding: 4px 10px;
-  border-radius: 8px;
+  padding: 3px 7px;
+  border-radius: 999px;
   cursor: pointer;
   background: color-mix(in srgb, var(--background-primary) 54%, transparent);
   border: 1px solid color-mix(in srgb, var(--background-modifier-border) 54%, transparent);
   box-shadow: 0 1px 0 color-mix(in srgb, var(--opencodian-glass-specular) 30%, transparent) inset;
   transition: color 0.15s ease-out, opacity 0.15s ease-out, background-color 0.15s ease-out, border-color 0.15s ease-out, box-shadow 0.15s ease-out, transform 0.15s ease-out;
   user-select: none;
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 500;
   color: var(--text-normal);
 }
@@ -60,8 +60,8 @@
 .opencodian-model-trigger-content {
   display: flex;
   align-items: center;
-  gap: 6px;
-  max-width: 180px;
+  gap: 5px;
+  max-width: 150px;
 }
 
 /* Provider Icon - Lobehub SVG icons */
@@ -70,8 +70,8 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   opacity: 0.7;
   transition: opacity 0.15s ease;
 }
@@ -82,8 +82,8 @@
 }
 
 .opencodian-model-trigger-icon img {
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
   object-fit: contain;
   /* Invert colors in dark mode for better visibility */
   filter: var(--lobehub-icon-filter, none);
@@ -159,8 +159,8 @@
 }
 
 .opencodian-model-trigger-chevron svg {
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
 }
 
 /* Dropdown - Popover style */

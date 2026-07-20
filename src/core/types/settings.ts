@@ -1580,7 +1580,7 @@ export function getDefaultChatAppearanceSettings(): ChatAppearanceSettings {
       shadowBlur: 28,
       actionButtonStyle: 'default',
       contextRingStyle: 'classic',
-      enFontFamily: '',
+      enFontFamily: 'newsreader',
       cnFontFamily: '',
     },
     scrollbar: {
@@ -2227,7 +2227,7 @@ function normalizeChatAppearanceInputSettings(
     ...(input ?? {}),
     actionButtonStyle: normalizeInputPanelActionButtonStyleId(input?.actionButtonStyle),
     contextRingStyle: normalizeContextRingStyleId(input?.contextRingStyle),
-    enFontFamily: normalizeFontFamilyValue(input?.enFontFamily),
+    enFontFamily: normalizeFontFamilyValue(input?.enFontFamily) || defaults.enFontFamily,
     cnFontFamily: normalizeFontFamilyValue(input?.cnFontFamily),
   };
 }

@@ -1,3 +1,4 @@
+import { DEFAULT_SETTINGS } from '../../../../src/core/types';
 import {
   findFontOptionById,
   InputFontLoader,
@@ -7,6 +8,10 @@ import {
 } from '../../../../src/features/settings/InputFontRegistry';
 
 describe('InputFontRegistry', () => {
+  it('uses bundled Newsreader as the default composer primary font', () => {
+    expect(DEFAULT_SETTINGS.chatAppearance.input.enFontFamily).toBe('newsreader');
+  });
+
   describe('resolveFontCssFamily', () => {
     it('returns empty string for empty input', () => {
       expect(resolveFontCssFamily('', UNIFIED_FONT_OPTIONS)).toBe('');
@@ -23,10 +28,21 @@ describe('InputFontRegistry', () => {
     it("returns empty string for the 'inherit' id", () => {
       expect(resolveFontCssFamily('inherit', UNIFIED_FONT_OPTIONS)).toBe('');
     });
+
+    it('registers bundled Newsreader as the elegant local serif option', () => {
+      expect(resolveFontCssFamily('newsreader', UNIFIED_FONT_OPTIONS)).toBe(
+        "'OpenCodian Newsreader', 'Newsreader', serif",
+      );
+      expect(findFontOptionById('newsreader')).toMatchObject({
+        displayName: 'Newsreader',
+        loadType: 'local',
+        category: 'serif',
+      });
+    });
   });
 
   describe('resolveComposerFontFamily', () => {
-    it('returns empty string when both en and cn are empty or inherit', () => {
+    it('returns empty string for raw empty or explicit inherit values before settings normalization', () => {
       expect(resolveComposerFontFamily('', '')).toBe('');
       expect(resolveComposerFontFamily('inherit', 'inherit')).toBe('');
     });
@@ -75,10 +91,15 @@ describe('InputFontRegistry', () => {
       );
     });
 
+    it('preserves the serif generic fallback for the bundled Newsreader default', () => {
+      expect(resolveComposerFontFamily('newsreader', '')).toBe(
+        "'OpenCodian Newsreader', serif",
+      );
+    });
+
     it('same font in both slots deduplicates', () => {
-      // Same font in both slots should still produce valid output
       expect(resolveComposerFontFamily('poppins', 'poppins')).toBe(
-        "'Poppins', 'Poppins', sans-serif",
+        "'Poppins', sans-serif",
       );
     });
   });
@@ -137,7 +158,7 @@ describe('InputFontRegistry', () => {
     it('ensureLoaded is a no-op for local fonts', () => {
       const loader = new InputFontLoader();
 
-      loader.ensureLoaded('microsoft-yahei');
+      loader.ensureLoaded('newsreader');
 
       expect(createElementSpy).not.toHaveBeenCalled();
       expect(appendChildSpy).not.toHaveBeenCalled();
@@ -179,7 +200,7 @@ describe('InputFontRegistry', () => {
       const loader = new InputFontLoader();
 
       expect(loader.isLoaded('arial')).toBe(true);
-      expect(loader.isLoaded('microsoft-yahei')).toBe(true);
+      expect(loader.isLoaded('newsreader')).toBe(true);
       expect(createElementSpy).not.toHaveBeenCalled();
       expect(appendChildSpy).not.toHaveBeenCalled();
     });
