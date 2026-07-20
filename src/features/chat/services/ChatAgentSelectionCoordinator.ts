@@ -2,6 +2,17 @@ import { setIcon } from 'obsidian';
 
 import { t } from '../../../i18n';
 import { AnchoredOverlayLayoutController } from '../ui/AnchoredOverlayLayoutController';
+import {
+  type ComposerPopoverFrameHandle,
+  type ComposerPopoverFrameTexts,
+  mountComposerPopoverFrame,
+} from '../ui/ComposerPopoverFrame';
+import {
+  focusPopoverOption,
+  getPopoverOptions,
+  getSelectedPopoverOptionIndex,
+  movePopoverOptionFocus,
+} from '../ui/ComposerPopoverListNavigation';
 import type { AgentSelectionCandidate } from './AgentMentionCandidateService';
 
 const AGENT_DROPDOWN_PREFERRED_WIDTH = 340;
@@ -12,12 +23,14 @@ export interface ChatAgentSelectionCoordinatorHost {
   loadAgentSelectionCandidates(): Promise<AgentSelectionCandidate[]>;
   closePeerDropdowns(): void;
   restoreInputFocus(): void;
+  registerEscapeHandler(handler: () => boolean): void;
 }
 
 export class ChatAgentSelectionCoordinator {
   private containerEl: HTMLElement | null = null;
   private triggerEl: HTMLElement | null = null;
   private dropdownEl: HTMLElement | null = null;
+  private frame: ComposerPopoverFrameHandle | null = null;
   private candidates: AgentSelectionCandidate[] = [];
   private selectedAgentId: string | null = null;
   private isDropdownOpen = false;
@@ -25,11 +38,15 @@ export class ChatAgentSelectionCoordinator {
   private loadRunId = 0;
   private clickOutsideHandler: ((event: MouseEvent) => void) | null = null;
   private dropdownLayoutController: AnchoredOverlayLayoutController | null = null;
+  private openedWithKeyboard = false;
+  private focusedOptionIndex: number | null = null;
+  private hasRegisteredEscapeHandler = false;
 
   constructor(private readonly host: ChatAgentSelectionCoordinatorHost) {}
 
   mount(containerEl: HTMLElement): void {
     this.destroy();
+    this.registerEscapeHandler();
     this.containerEl = containerEl;
     this.triggerEl = containerEl.createDiv({
       cls: 'opencodian-agent-trigger',
@@ -52,24 +69,59 @@ export class ChatAgentSelectionCoordinator {
     this.dropdownEl.setAttribute('role', 'listbox');
     this.dropdownEl.setAttribute('aria-hidden', 'true');
     this.dropdownEl.style.display = 'none';
+    this.frame = mountComposerPopoverFrame(this.dropdownEl, this.getFrameTexts());
     this.mountDropdownLayoutController();
     this.renderList();
     this.updateDisplay();
 
     this.triggerEl.addEventListener('click', (event) => {
       event.stopPropagation();
-      this.toggleDropdown();
+      this.toggleDropdown(false);
     });
     this.triggerEl.addEventListener('keydown', (event) => {
       if (event.key === 'Enter' || event.key === ' ') {
         event.preventDefault();
-        this.toggleDropdown();
+        this.toggleDropdown(true);
+        return;
+      }
+
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault();
+        if (this.isDropdownOpen) {
+          this.openedWithKeyboard = true;
+          if (this.status !== 'loading') {
+            this.focusSelectedOption();
+          }
+          return;
+        }
+        this.openDropdown(true);
         return;
       }
 
       if (event.key === 'Escape') {
         event.preventDefault();
         this.closeDropdown();
+      }
+    });
+    this.dropdownEl.addEventListener('keydown', (event) => {
+      if (!this.frame) {
+        return;
+      }
+
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        this.focusedOptionIndex = movePopoverOptionFocus(
+          this.frame.contentEl,
+          '.opencodian-agent-option',
+          this.focusedOptionIndex,
+          event.key === 'ArrowDown' ? 1 : -1,
+        );
+        event.preventDefault();
+      } else if (event.key === 'Enter' && this.focusedOptionIndex !== null) {
+        this.getOptionElements()[this.focusedOptionIndex]?.click();
+        event.preventDefault();
+      } else if (event.key === 'Escape') {
+        this.closeDropdown({ restoreTriggerFocus: true });
+        event.preventDefault();
       }
     });
 
@@ -111,19 +163,29 @@ export class ChatAgentSelectionCoordinator {
 
     this.renderList();
     this.updateDisplay();
+    this.focusSelectedOptionAfterCatalogReload();
   }
 
   applyLocaleTexts(): void {
+    this.frame?.refresh(this.getFrameTexts());
     this.renderList();
     this.updateDisplay();
+    if (this.status !== 'loading') {
+      this.focusSelectedOptionAfterCatalogReload();
+    }
   }
 
   isOpen(): boolean {
     return this.isDropdownOpen;
   }
 
-  closeDropdown(): void {
+  closeDropdown(options: { restoreTriggerFocus?: boolean } = {}): void {
     this.isDropdownOpen = false;
+    this.openedWithKeyboard = false;
+    this.focusedOptionIndex = null;
+    for (const optionEl of this.getOptionElements()) {
+      optionEl.tabIndex = -1;
+    }
     if (this.dropdownEl) {
       this.dropdownEl.removeClass('is-open');
       this.dropdownEl.style.display = 'none';
@@ -136,6 +198,9 @@ export class ChatAgentSelectionCoordinator {
       document.removeEventListener('click', this.clickOutsideHandler, true);
     }
 
+    if (options.restoreTriggerFocus) {
+      this.triggerEl?.focus({ preventScroll: true });
+    }
   }
 
   destroy(): void {
@@ -145,9 +210,26 @@ export class ChatAgentSelectionCoordinator {
     this.containerEl = null;
     this.triggerEl = null;
     this.dropdownEl = null;
+    this.frame = null;
     this.candidates = [];
     this.status = 'idle';
     this.loadRunId += 1;
+  }
+
+  private registerEscapeHandler(): void {
+    if (this.hasRegisteredEscapeHandler) {
+      return;
+    }
+
+    this.hasRegisteredEscapeHandler = true;
+    this.host.registerEscapeHandler(() => {
+      if (!this.isDropdownOpen) {
+        return false;
+      }
+
+      this.closeDropdown({ restoreTriggerFocus: true });
+      return true;
+    });
   }
 
   private updateDisplay(): void {
@@ -192,12 +274,12 @@ export class ChatAgentSelectionCoordinator {
   }
 
   private renderList(): void {
-    if (!this.dropdownEl) {
+    if (!this.frame) {
       return;
     }
 
-    this.dropdownEl.empty();
-    this.dropdownEl.createDiv({
+    this.frame.contentEl.empty();
+    this.frame.contentEl.createDiv({
       cls: 'opencodian-agent-dropdown-heading',
       text: t('chat.agentSelector.heading'),
       attr: {
@@ -212,19 +294,19 @@ export class ChatAgentSelectionCoordinator {
     });
 
     if (this.status === 'loading') {
-      this.dropdownEl.createDiv({ cls: 'opencodian-agent-dropdown-state', text: t('chat.agentSelector.loading') });
+      this.frame.contentEl.createDiv({ cls: 'opencodian-agent-dropdown-state', text: t('chat.agentSelector.loading') });
       this.updateDropdownSelection();
       return;
     }
 
     if (this.status === 'failed') {
-      this.dropdownEl.createDiv({ cls: 'opencodian-agent-dropdown-state', text: t('chat.agentSelector.loadFailed') });
+      this.frame.contentEl.createDiv({ cls: 'opencodian-agent-dropdown-state', text: t('chat.agentSelector.loadFailed') });
       this.updateDropdownSelection();
       return;
     }
 
     if (this.candidates.length === 0) {
-      this.dropdownEl.createDiv({ cls: 'opencodian-agent-dropdown-state', text: t('chat.agentSelector.empty') });
+      this.frame.contentEl.createDiv({ cls: 'opencodian-agent-dropdown-state', text: t('chat.agentSelector.empty') });
       this.updateDropdownSelection();
       return;
     }
@@ -247,14 +329,15 @@ export class ChatAgentSelectionCoordinator {
     description: string;
     mode: AgentSelectionCandidate['mode'];
   }): void {
-    if (!this.dropdownEl) {
+    if (!this.frame) {
       return;
     }
 
-    const optionEl = this.dropdownEl.createDiv({
-      cls: `opencodian-agent-option${input.agentId ? '' : ' is-default'}`,
+    const optionEl = this.frame.contentEl.createDiv({
+      cls: `opencodian-composer-popover-option opencodian-agent-option${input.agentId ? '' : ' is-default'}`,
       attr: {
         role: 'option',
+        tabindex: '-1',
         'aria-selected': 'false',
         'data-agent-id': input.agentId ?? '',
         'data-agent-kind': input.agentId ? 'agent' : 'default',
@@ -306,13 +389,8 @@ export class ChatAgentSelectionCoordinator {
   }
 
   private updateDropdownSelection(): void {
-    if (!this.dropdownEl) {
-      return;
-    }
-
     const selectedAgentId = this.selectedAgentId ?? '';
-    this.dropdownEl.querySelectorAll('.opencodian-agent-option').forEach((option) => {
-      const optionEl = option as HTMLElement;
+    for (const optionEl of this.getOptionElements()) {
       if (optionEl.dataset.agentId === selectedAgentId) {
         optionEl.addClass('is-selected');
         optionEl.setAttribute('aria-selected', 'true');
@@ -320,23 +398,24 @@ export class ChatAgentSelectionCoordinator {
         optionEl.removeClass('is-selected');
         optionEl.setAttribute('aria-selected', 'false');
       }
-    });
-  }
-
-  private toggleDropdown(): void {
-    if (this.isDropdownOpen) {
-      this.closeDropdown();
-    } else {
-      this.openDropdown();
     }
   }
 
-  private openDropdown(): void {
+  private toggleDropdown(openedWithKeyboard: boolean): void {
+    if (this.isDropdownOpen) {
+      this.closeDropdown();
+    } else {
+      this.openDropdown(openedWithKeyboard);
+    }
+  }
+
+  private openDropdown(openedWithKeyboard: boolean): void {
     if (!this.dropdownEl || !this.triggerEl) {
       return;
     }
 
     this.host.closePeerDropdowns();
+    this.openedWithKeyboard = openedWithKeyboard;
     if (this.status === 'idle') {
       void this.reloadCatalog();
     }
@@ -349,6 +428,9 @@ export class ChatAgentSelectionCoordinator {
     this.triggerEl.addClass('is-open');
     this.triggerEl.setAttribute('aria-expanded', 'true');
     this.updateDropdownSelection();
+    if (openedWithKeyboard && this.status !== 'loading') {
+      this.focusSelectedOption();
+    }
 
     if (this.clickOutsideHandler) {
       document.addEventListener('click', this.clickOutsideHandler, true);
@@ -360,5 +442,38 @@ export class ChatAgentSelectionCoordinator {
     this.updateDisplay();
     this.closeDropdown();
     this.host.restoreInputFocus();
+  }
+
+  private getFrameTexts(): ComposerPopoverFrameTexts {
+    return {
+      title: t('chat.composerPopover.agentTitle'),
+      escapeKey: 'Esc',
+      navigateHint: t('chat.composerPopover.navigateHint'),
+      selectHint: t('chat.composerPopover.selectHint'),
+      closeHint: t('chat.composerPopover.closeHint'),
+    };
+  }
+
+  private getOptionElements(): HTMLElement[] {
+    return this.frame ? getPopoverOptions(this.frame.contentEl, '.opencodian-agent-option') : [];
+  }
+
+  private focusSelectedOptionAfterCatalogReload(): void {
+    if (this.isDropdownOpen && this.openedWithKeyboard) {
+      this.focusSelectedOption();
+    }
+  }
+
+  private focusSelectedOption(): void {
+    if (!this.frame) {
+      return;
+    }
+
+    const selectedIndex = getSelectedPopoverOptionIndex(this.frame.contentEl, '.opencodian-agent-option') ?? 0;
+    this.focusedOptionIndex = focusPopoverOption(
+      this.frame.contentEl,
+      '.opencodian-agent-option',
+      selectedIndex,
+    );
   }
 }

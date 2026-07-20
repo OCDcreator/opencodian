@@ -5,6 +5,16 @@ import type { CodexSandboxMode } from '../../../core/types/settings';
 import type { PermissionMode } from '../../../core/types/settings';
 import { t } from '../../../i18n';
 import { AnchoredOverlayLayoutController } from '../ui/AnchoredOverlayLayoutController';
+import {
+  type ComposerPopoverFrameHandle,
+  type ComposerPopoverFrameTexts,
+  mountComposerPopoverFrame,
+} from '../ui/ComposerPopoverFrame';
+import {
+  focusPopoverOption,
+  getSelectedPopoverOptionIndex,
+  movePopoverOptionFocus,
+} from '../ui/ComposerPopoverListNavigation';
 
 const PERMISSION_DROPDOWN_PREFERRED_WIDTH = 280;
 const PERMISSION_DROPDOWN_MINIMUM_WIDTH = 220;
@@ -12,7 +22,8 @@ const PERMISSION_DROPDOWN_SAFE_INSET = 8;
 
 export interface PermissionModeSelectorHost {
   getPermissionMode(): string;
-  switchPermissionMode(mode: string): Promise<void>;
+  switchPermissionMode(mode: string): Promise<boolean>;
+  restoreInputFocus(): void;
 }
 
 export interface PermissionModeOption {
@@ -163,6 +174,9 @@ export class PermissionModeSelectorCoordinator {
   private triggerEl: HTMLElement | null = null;
   private dropdownEl: HTMLElement | null = null;
   private isDropdownOpen = false;
+  private frame: ComposerPopoverFrameHandle | null = null;
+  private openedWithKeyboard = false;
+  private focusedOptionIndex: number | null = null;
   private clickOutsideHandler: ((event: MouseEvent) => void) | null = null;
   private config: PermissionModeConfig;
   private dropdownLayoutController: AnchoredOverlayLayoutController | null = null;
@@ -172,6 +186,10 @@ export class PermissionModeSelectorCoordinator {
     config?: PermissionModeConfig,
   ) {
     this.config = config ?? createOpenCodePermissionConfig();
+  }
+
+  private get optionContentEl(): HTMLElement | null {
+    return this.frame?.contentEl ?? this.dropdownEl;
   }
 
   mount(containerEl: HTMLElement): void {
@@ -199,6 +217,7 @@ export class PermissionModeSelectorCoordinator {
 
     this.dropdownEl = containerEl.createDiv({
       cls: this.joinClasses('opencodian-permission-dropdown', this.config.variantClass),
+      attr: { role: 'listbox' },
     });
     this.dropdownEl.style.display = 'none';
     this.buildDropdown();
@@ -212,7 +231,39 @@ export class PermissionModeSelectorCoordinator {
 
     this.triggerEl.addEventListener('click', (event) => {
       event.stopPropagation();
-      this.toggleDropdown();
+      this.toggleDropdown(false);
+    });
+
+    this.triggerEl.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter' && event.key !== ' ' && event.key !== 'ArrowDown' && event.key !== 'ArrowUp') {
+        return;
+      }
+
+      this.toggleDropdown(true);
+      event.preventDefault();
+    });
+
+    this.dropdownEl.addEventListener('keydown', (event) => {
+      const contentEl = this.frame?.contentEl;
+      if (!contentEl) {
+        return;
+      }
+
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        this.focusedOptionIndex = movePopoverOptionFocus(
+          contentEl,
+          '.opencodian-permission-option',
+          this.focusedOptionIndex,
+          event.key === 'ArrowDown' ? 1 : -1,
+        );
+        event.preventDefault();
+      } else if (event.key === 'Enter' && this.focusedOptionIndex !== null) {
+        this.getOptionElements()[this.focusedOptionIndex]?.click();
+        event.preventDefault();
+      } else if (event.key === 'Escape') {
+        this.closeDropdown({ restoreTriggerFocus: true });
+        event.preventDefault();
+      }
     });
 
     this.clickOutsideHandler = (event: MouseEvent) => {
@@ -225,6 +276,9 @@ export class PermissionModeSelectorCoordinator {
   applyLocaleTexts(): void {
     this.buildDropdown();
     this.updateTriggerDisplay();
+    if (this.isDropdownOpen && this.openedWithKeyboard) {
+      this.focusSelectedOption();
+    }
   }
 
   updateTriggerDisplay(): void {
@@ -240,8 +294,13 @@ export class PermissionModeSelectorCoordinator {
     return this.isDropdownOpen;
   }
 
-  closeDropdown(): void {
+  closeDropdown(options: { restoreTriggerFocus?: boolean } = {}): void {
     this.isDropdownOpen = false;
+    this.openedWithKeyboard = false;
+    this.focusedOptionIndex = null;
+    for (const optionEl of this.getOptionElements()) {
+      optionEl.tabIndex = -1;
+    }
     if (this.dropdownEl) {
       this.dropdownEl.removeClass('is-open');
       this.dropdownEl.style.display = 'none';
@@ -252,6 +311,10 @@ export class PermissionModeSelectorCoordinator {
     if (this.clickOutsideHandler) {
       document.removeEventListener('click', this.clickOutsideHandler, true);
     }
+
+    if (options.restoreTriggerFocus) {
+      this.triggerEl?.focus();
+    }
   }
 
   destroy(): void {
@@ -261,6 +324,7 @@ export class PermissionModeSelectorCoordinator {
     this.containerEl = null;
     this.triggerEl = null;
     this.dropdownEl = null;
+    this.frame = null;
   }
 
   private getTriggerDisplayState(): PermissionTriggerDisplayState {
@@ -317,11 +381,18 @@ export class PermissionModeSelectorCoordinator {
     }
 
     this.dropdownEl.empty();
+    this.frame = mountComposerPopoverFrame(this.dropdownEl, this.getFrameTexts());
 
     for (const mode of this.getPermissionModeOptions()) {
-      const optionEl = this.dropdownEl.createDiv({
-        cls: 'opencodian-permission-option',
-        attr: { 'data-mode': mode.id },
+      const optionEl = this.frame.contentEl.createDiv({
+        cls: 'opencodian-permission-option opencodian-composer-popover-option',
+        attr: {
+          'data-mode': mode.id,
+          'data-permission-semantic': this.getPermissionSemantic(mode.id),
+          role: 'option',
+          tabindex: '-1',
+          'aria-selected': String(mode.id === this.host.getPermissionMode()),
+        },
       });
 
       const iconWrapper = optionEl.createSpan({ cls: 'opencodian-permission-option-icon' });
@@ -352,35 +423,63 @@ export class PermissionModeSelectorCoordinator {
   }
 
   private updateDropdownSelection(): void {
-    if (!this.dropdownEl) {
+    const contentEl = this.optionContentEl;
+    if (!contentEl) {
       return;
     }
 
     const currentMode = this.host.getPermissionMode();
-    this.dropdownEl.querySelectorAll('.opencodian-permission-option').forEach((option) => {
+    contentEl.querySelectorAll('.opencodian-permission-option').forEach((option) => {
       const mode = option.getAttribute('data-mode');
       if (mode === currentMode) {
         option.addClass('is-selected');
+        option.setAttribute('aria-selected', 'true');
       } else {
         option.removeClass('is-selected');
+        option.setAttribute('aria-selected', 'false');
       }
     });
   }
 
-  private toggleDropdown(): void {
+  private getFrameTexts(): ComposerPopoverFrameTexts {
+    return {
+      title: t('chat.composerPopover.permissionTitle'),
+      escapeKey: 'Esc',
+      navigateHint: t('chat.composerPopover.navigateHint'),
+      selectHint: t('chat.composerPopover.selectHint'),
+      closeHint: t('chat.composerPopover.closeHint'),
+    };
+  }
+
+  private getPermissionSemantic(mode: string): 'danger' | 'safe' | 'neutral' {
+    if (mode === 'yolo' || mode === 'bypassPermissions' || mode === 'danger-full-access') {
+      return 'danger';
+    }
+    if (mode === 'plan' || mode === 'read-only') {
+      return 'safe';
+    }
+    return 'neutral';
+  }
+
+  private getOptionElements(): HTMLElement[] {
+    return Array.from(this.optionContentEl?.querySelectorAll<HTMLElement>('.opencodian-permission-option') ?? []);
+  }
+
+  private toggleDropdown(openedWithKeyboard: boolean): void {
     if (this.isDropdownOpen) {
       this.closeDropdown();
     } else {
-      this.openDropdown();
+      this.openDropdown(openedWithKeyboard);
     }
   }
 
-  private openDropdown(): void {
+  private openDropdown(openedWithKeyboard: boolean): void {
     if (!this.dropdownEl || !this.triggerEl) {
       return;
     }
 
     this.isDropdownOpen = true;
+    this.openedWithKeyboard = openedWithKeyboard;
     this.dropdownEl.style.display = 'block';
     this.dropdownLayoutController?.observe();
     this.dropdownLayoutController?.sync();
@@ -388,6 +487,9 @@ export class PermissionModeSelectorCoordinator {
     this.triggerEl.addClass('is-open');
     this.triggerEl.setAttribute('aria-expanded', 'true');
     this.updateDropdownSelection();
+    if (this.openedWithKeyboard) {
+      this.focusSelectedOption();
+    }
 
     if (this.clickOutsideHandler) {
       document.addEventListener('click', this.clickOutsideHandler, true);
@@ -395,8 +497,26 @@ export class PermissionModeSelectorCoordinator {
   }
 
   private async selectPermissionMode(mode: string): Promise<void> {
-    await this.host.switchPermissionMode(mode);
+    const didSwitch = await this.host.switchPermissionMode(mode);
+    if (!didSwitch) {
+      return;
+    }
     this.updateTriggerDisplay();
     this.closeDropdown();
+    this.host.restoreInputFocus();
+  }
+
+  private focusSelectedOption(): void {
+    const contentEl = this.frame?.contentEl;
+    if (!contentEl) {
+      return;
+    }
+
+    const selectedIndex = getSelectedPopoverOptionIndex(contentEl, '.opencodian-permission-option');
+    this.focusedOptionIndex = focusPopoverOption(
+      contentEl,
+      '.opencodian-permission-option',
+      selectedIndex ?? 0,
+    );
   }
 }

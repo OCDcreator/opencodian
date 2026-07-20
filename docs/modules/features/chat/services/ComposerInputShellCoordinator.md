@@ -39,6 +39,7 @@ export interface ComposerInputShellCoordinatorHost {
   getInputPlaceholder(): string;
   getSlashCommandSkillMode(): SlashCommandSkillMode;
   addChosenFileContextToActiveTab(): Promise<void>;
+  registerEscapeHandler(handler: () => boolean): void;
   mountSelectionControls(toolbar: HTMLElement, options: { showModels: boolean; showPermissions: boolean }): void;
   mountContextUsageIndicator(container: HTMLElement): void;
   mountEffortSelector(container: HTMLElement): void;
@@ -71,6 +72,7 @@ export class ComposerInputShellCoordinator {
   getTabBarSlotEl(): HTMLElement | null;
   getComposerShellEl(): HTMLElement | null;
   getInputWrapperEl(): HTMLElement | null;
+  focusInput(): void;
   applyLocaleTexts(): void;
   updateSendButtonState(): void;
   scheduleLayoutSync(): void;
@@ -92,6 +94,7 @@ export class ComposerInputShellCoordinator {
 - `buildComposerInputSubmission()` 继续从本模块 re-export，但实现已下沉到 `composerInputParsing.ts`；它会把当前 textarea 文本归一化成结构化 submission：普通文本 -> `prompt`、`/command ...` -> `command`、shell mode -> `shell`
 - slash menu 作为 `opencodian-composer-shell` 的 overlay 子节点挂载，用 CSS `bottom: calc(100% + 8px)` 显示在输入框上方，而不是插入 textarea/footer 的内部内容流
 - `@agent` menu 复用同一个 overlay 容器；当光标前 token 命中 `@query` 时优先展示 agent 候选，离开该 token 后再恢复 slash query 检测
+- `focusInput()` 是唯一的公开 textarea focus seam，供权限和模型选择在成功写入后恢复 composer 输入焦点；它不接管各 selector 的选择或持久化逻辑
 - `applyLocaleTexts()` 刷新 placeholder overlay 文本、add-context tooltip 和 send/stop tooltip；textarea 不再设置 `aria-label`，避免在 Obsidian Electron 中产生多余的原生 hover tooltip；host tooltip placement 支持 top/bottom/left/right，composer 当前主要使用 top 以避开鼠标和底部工具栏
 - `updateSendButtonState()` 根据 streaming state 切换 send/stop icon 与 class
 - `updateComposerAvailabilityState()` 消费 host 给出的高层 surface 状态；当状态为 `backend-offline` 时，本模块会本地读取 active backend display name 并渲染带名称的 notice，而不需要 `OpenCodianView` 直接提供 backend 名称。这样“无 backend”和“backend offline”的高层运行时所有权仍留在 `OpenCodianView`，但文案装饰下沉到输入区 owner
@@ -118,7 +121,7 @@ export class ComposerInputShellCoordinator {
 - `OpenCodianView` 只创建 coordinator、提供 host callbacks，并把 shell DOM refs 暴露给相邻的 `InputPanelAppearanceCoordinator`
 - merged runtime+project composer catalog 由 `OpenCodianView` host seam 通过 `SlashCommandMenuCatalogCache` 预热/缓存后传入，本模块自己不接 project config / SDK merge 细节
 - `@agent` 候选由 `SlashCommandMenuCatalogCache` 携带的 sidecar 或测试/扩展用 direct host seam 提供；本模块不直接调用 SDK 或读取 config manager
-- 主 Agent selector 由 `ChatAgentSelectionCoordinator` 拥有，并复用 `SlashCommandMenuCatalogCache` 的 default-candidate sidecar；本模块只在 submit 边界读取 selected agent id 并合并进 invocation intent
+- 主 Agent selector 由 `ChatAgentSelectionCoordinator` 拥有，并复用 `SlashCommandMenuCatalogCache` 的 default-candidate sidecar；本模块只在 submit 边界读取 selected agent id 并合并进 invocation intent，并把 Obsidian Scope 的 Escape 注册 seam 透传给它，确保 Agent / permission / model 卡共享同一优先级的关闭通道
 - slash menu fuzzy scoring 已下沉到 `slashCommandMenuFilter.ts`，状态行/menu DOM 渲染已下沉到 `slashCommandMenuRenderer.ts`，菜单状态/选中/应用行为已下沉到 `SlashCommandMenuCoordinator.ts`；本模块只提供 textarea、menu element、catalog cache 和 layout/highlight callbacks
 - shell mode 目前仍是一个 typed seam：coordinator 能产出 `shell` submission，但 stable UI host 还没有把它暴露成默认输入模式
 - 既有 send pipeline、question/todo runtime 没有迁入本模块；model / permission selector 状态机 已进一步交给 `ChatSelectionControlsCoordinator`

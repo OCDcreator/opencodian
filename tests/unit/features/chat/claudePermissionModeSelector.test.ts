@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+
 import type { ClaudeCodePermissionMode } from '../../../../src/core/types/settings';
 import {
   createClaudeCodePermissionConfig,
@@ -6,6 +8,15 @@ import {
 } from '../../../../src/features/chat/services/PermissionModeSelectorCoordinator';
 
 describe('Claude Code permission mode selector', () => {
+  beforeEach(() => {
+    HTMLElement.prototype.scrollIntoView = jest.fn();
+  });
+
+  afterEach(() => {
+    document.body.innerHTML = '';
+    jest.restoreAllMocks();
+  });
+
   describe('createClaudeCodePermissionConfig', () => {
     it('keeps the Claude SDK-supported permission modes in the compact menu order', () => {
       const config = createClaudeCodePermissionConfig();
@@ -51,11 +62,14 @@ describe('Claude Code permission mode selector', () => {
       getPermissionMode: () => currentMode,
       switchPermissionMode: async (mode: string) => {
         currentMode = mode as ClaudeCodePermissionMode;
+        return true;
       },
+      restoreInputFocus: jest.fn(),
     };
 
     beforeEach(() => {
       currentMode = 'bypassPermissions';
+      jest.clearAllMocks();
     });
 
     it('mounts Claude-specific chrome and shows the selected full label in the trigger', () => {
@@ -106,6 +120,111 @@ describe('Claude Code permission mode selector', () => {
       expect(selected?.querySelector('.opencodian-permission-option-check svg')?.getAttribute('data-icon')).toBe('check');
 
       coordinator.destroy();
+    });
+
+    it('uses the shared card frame and wraps keyboard focus through Claude permission options', async () => {
+      const container = document.createElement('div');
+      document.body.appendChild(container);
+      const coordinator = new PermissionModeSelectorCoordinator(host, createClaudeCodePermissionConfig());
+      coordinator.mount(container);
+      const trigger = container.querySelector<HTMLElement>('.opencodian-permission-trigger');
+
+      trigger?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+
+      const dropdown = container.querySelector<HTMLElement>('.opencodian-permission-dropdown');
+      const frame = container.querySelector<HTMLElement>('.opencodian-composer-popover-frame');
+      const selectedOption = container.querySelector<HTMLElement>('[data-mode="bypassPermissions"]');
+      expect(frame?.querySelector('.opencodian-composer-popover-title')?.textContent).toBe('Permission mode');
+      expect(frame?.querySelector('kbd')?.textContent).toBe('Esc');
+      expect(frame?.querySelector('.opencodian-composer-popover-footer')?.textContent).toContain('Navigate');
+      expect(frame?.querySelector('.opencodian-composer-popover-footer')?.textContent).toContain('Select');
+      expect(selectedOption?.getAttribute('data-permission-semantic')).toBe('danger');
+      expect(document.activeElement).toBe(selectedOption);
+
+      dropdown?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+      expect(document.activeElement).toBe(container.querySelector('[data-mode="default"]'));
+
+      dropdown?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
+      expect(document.activeElement).toBe(selectedOption);
+
+      dropdown?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      expect(trigger?.getAttribute('aria-expanded')).toBe('false');
+      expect(document.activeElement).toBe(trigger);
+      expect(Array.from(container.querySelectorAll<HTMLElement>('.opencodian-permission-option'))
+        .filter((option) => option.tabIndex === 0)).toHaveLength(0);
+
+      coordinator.destroy();
+    });
+
+    it('selects the focused permission mode and restores composer focus once', async () => {
+      const container = document.createElement('div');
+      document.body.appendChild(container);
+      const coordinator = new PermissionModeSelectorCoordinator(host, createClaudeCodePermissionConfig());
+      coordinator.mount(container);
+      const trigger = container.querySelector<HTMLElement>('.opencodian-permission-trigger');
+
+      trigger?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+      const dropdown = container.querySelector<HTMLElement>('.opencodian-permission-dropdown');
+      dropdown?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
+      dropdown?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(currentMode).toBe('plan');
+      expect(trigger?.getAttribute('aria-expanded')).toBe('false');
+      expect(host.restoreInputFocus).toHaveBeenCalledTimes(1);
+
+      coordinator.destroy();
+    });
+
+    it('keeps a failed permission write open with the current selection intact', async () => {
+      const failedHost: PermissionModeSelectorHost = {
+        getPermissionMode: () => 'default',
+        switchPermissionMode: jest.fn(async () => false),
+        restoreInputFocus: jest.fn(),
+      };
+      const container = document.createElement('div');
+      const coordinator = new PermissionModeSelectorCoordinator(failedHost, createClaudeCodePermissionConfig());
+      coordinator.mount(container);
+      const trigger = container.querySelector<HTMLElement>('.opencodian-permission-trigger');
+
+      trigger?.click();
+      container.querySelector<HTMLElement>('[data-mode="acceptEdits"]')?.click();
+      await Promise.resolve();
+
+      expect(trigger?.getAttribute('aria-expanded')).toBe('true');
+      expect(container.querySelector<HTMLElement>('[data-mode="default"]')?.hasClass('is-selected')).toBe(true);
+      expect(failedHost.restoreInputFocus).not.toHaveBeenCalled();
+
+      coordinator.destroy();
+    });
+
+    it('scopes semantic danger and safe colors to icon and check without flooding the row', () => {
+      const css = readFileSync('src/style/components/permission-mode-selector.css', 'utf8');
+
+      const dangerRowRule = css.match(
+        /\[data-permission-semantic=['"]danger['"]\]\.is-selected\s*\{[^}]*\}/,
+      );
+      const safeRowRule = css.match(
+        /\[data-permission-semantic=['"]safe['"]\]\.is-selected\s*\{[^}]*\}/,
+      );
+
+      expect(dangerRowRule).toBeNull();
+      expect(safeRowRule).toBeNull();
+
+      expect(css).toMatch(
+        /\[data-permission-semantic=['"]danger['"]\]\s*\{[^}]*--background-modifier-error/,
+      );
+      expect(css).toMatch(
+        /\[data-permission-semantic=['"]safe['"]\]\s*\{[^}]*--background-modifier-success/,
+      );
+
+      expect(css).toMatch(
+        /\.is-selected \.opencodian-permission-option-(?:icon|check|label)[^}]*var\(--opencodian-permission-option-accent/,
+      );
+
+      expect(css).not.toMatch(/\[data-mode=['"]yolo['"]\]\.is-selected \.opencodian-permission-option-check/);
+      expect(css).not.toMatch(/\[data-mode=['"]plan['"]\]\.is-selected \.opencodian-permission-option-check/);
     });
   });
 });

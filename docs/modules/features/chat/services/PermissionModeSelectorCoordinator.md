@@ -19,7 +19,8 @@
 ```typescript
 export interface PermissionModeSelectorHost {
   getPermissionMode(): string;
-  switchPermissionMode(mode: string): Promise<void>;
+  switchPermissionMode(mode: string): Promise<boolean>;
+  restoreInputFocus(): void;
 }
 
 export interface PermissionModeOption {
@@ -47,7 +48,7 @@ export class PermissionModeSelectorCoordinator {
   applyLocaleTexts(): void;
   updateTriggerDisplay(): void;
   isOpen(): boolean;
-  closeDropdown(): void;
+  closeDropdown(options?: { restoreTriggerFocus?: boolean }): void;
   destroy(): void;
 }
 ```
@@ -60,14 +61,15 @@ export class PermissionModeSelectorCoordinator {
 - trigger 文案按 active backend 映射：OpenCode 继续显示 `YOLO` / `ASK` / `PLAN`，Claude Code 显示完整紧凑标签（`Ask first` / `Auto edit` / `Plan mode` / `Full access`，中文为 `变更前确认` / `自动编辑` / `计划模式` / `完全访问`），Codex 显示 `RO` / `WS` / `FULL`，并保留 `mode-*` class
 - trigger 携带 `data-permission-backend="opencode|claude-code|codex"`，用于运行时验证当前 selector 属于哪个 backend
 - `icon` 可选属性为每个 backend/mode 提供 lucide 图标；Claude Code 当前使用 `hand`、`shield-check`、`clipboard-list`、`shield-alert`，trigger 会随当前 mode 切换图标
-- `variantClass` 可选属性把同一个 backend-specific class 挂到 container、trigger 与 dropdown。Claude Code 使用 `opencodian-permission-selector--claude-code` 来隔离截图式紧凑菜单样式，不影响 OpenCode/Codex selector
+- 三种 backend 都把各自的内容挂入共享 `ComposerPopoverFrame`：统一的本地化标题、Esc keycap 与 Arrow / Enter / Esc footer 只负责呈现，backend mode catalog 与写回责任仍留在本 coordinator / host seam
 - `boundaryHint` 可选属性：若 config 提供了 `boundaryHint`，则 mount 时将其写入 trigger 的 `title` 属性，用于传达 selector 只影响后续 thread 创建的边界语义（Codex sandbox selector 默认启用此 hint）
 - option labels/descriptions 按 config 提供，OpenCode 仍复用 `settings.security.permissionMode.*` locale keys 与 fallback 文案；Claude Code 复用 `settings.claudeCode.permissionMode.*` labels 与 `chat.claudeCode.permissionMode.*` descriptions，其中 `bypassPermissions` 的 UI 可显示为 `完全访问` / `Full access`，但 description 必须保留它会绕过权限检查的语义；Codex 复用 `settings.codex.sandbox.*` labels 与 `chat.codex.sandboxMode.*` description locale keys
-- 选中 option 后先调用 `host.switchPermissionMode()`，再刷新 trigger/selected state 并关闭 dropdown
+- 选中 option 后先调用 `host.switchPermissionMode()`；仅当其返回 `true` 时才刷新 trigger/selected state、关闭 dropdown 并通过 `restoreInputFocus()` 回到 Composer。失败时卡片和当前 selected state 保持打开，继续让既有 backend error feedback 告知用户
 - click-outside listener 使用 capture 阶段注册，与 agent selector 保持一致，确保点击其他 toolbar dropdown trigger 时当前 dropdown 能被正确关闭
 - click-outside listener 只在 dropdown open 时注册，close/destroy 时移除
 - dropdown 使用 `AnchoredOverlayLayoutController` 按最近的 `.opencodian-container` 计算 280px 首选宽度、220px 最小宽度和左右 8px 安全区；侧栏 resize 时仅在菜单打开状态重新同步
-- trigger 现在携带 `role="button"`、`tabindex="0"`、`aria-haspopup="listbox"` 与 `aria-expanded`，dropdown 打开/关闭时同步更新这些属性并添加/移除 `is-open` 类以触发 CSS 动画
+- trigger 保留 `role="button"`、`tabindex="0"`、`aria-haspopup="listbox"` 与准确的 `aria-expanded`；每个实际 mode row 使用 `role="option"`、`aria-selected` 和 roving `tabIndex`。键盘打开时聚焦当前 mode，ArrowUp / ArrowDown 首尾循环，Enter 复用既有选择路径，Escape 关闭并把焦点还给 trigger
+- mode row 写入 `data-permission-semantic="danger|safe|neutral"`。danger（YOLO / bypassPermissions / danger-full-access）和 safe（plan / read-only）统一覆盖 selected row、icon 与 checkmark 的 error/success 语义色；neutral 保持产品 accent/default，描述文本继续给出明确风险提示
 
 ## 与 `ChatSelectionControlsCoordinator` 的边界
 

@@ -76,6 +76,7 @@ export interface ComposerInputShellCoordinatorHost {
   getInputPlaceholder(): string;
   getSlashCommandSkillMode(): SlashCommandSkillMode;
   addChosenFileContextToActiveTab(): Promise<void>;
+  registerEscapeHandler(handler: () => boolean): void;
   mountSelectionControls(toolbar: HTMLElement, options: { showModels: boolean; showPermissions: boolean }): void;
   mountContextUsageIndicator(container: HTMLElement): void;
   mountEffortSelector(container: HTMLElement): void;
@@ -189,6 +190,7 @@ export class ComposerInputShellCoordinator {
         this.agentMentionController.clear(this.slashCommandMenuEl);
       },
       restoreInputFocus: () => this.inputTextareaEl?.focus(),
+      registerEscapeHandler: (handler) => this.host.registerEscapeHandler(handler),
     });
     this.slashCommandMenuController = new SlashCommandMenuCoordinator({
       getTextarea: () => this.inputTextareaEl,
@@ -528,6 +530,10 @@ export class ComposerInputShellCoordinator {
 
   getInputWrapperEl(): HTMLElement | null {
     return this.inputWrapperEl;
+  }
+
+  focusInput(): void {
+    this.inputTextareaEl?.focus();
   }
 
   applyLocaleTexts(): void {

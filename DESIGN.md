@@ -248,6 +248,18 @@ OpenCodian uses a hybrid elevation system. Default Obsidian surfaces are mostly 
 
 Model, Agent, Permission, and Effort popovers are local Chat overlays. Their horizontal boundary is the nearest `.opencodian-container`, never the viewport. Preserve an 8px inset on both sides; preferred and minimum widths must yield to that inset when the sidebar becomes narrower. Measured popovers use `box-sizing: border-box`, synchronize when opened and while the Chat container resizes, and retain their existing CSS positioning only as a fallback when runtime geometry is unavailable. The Modified files hover sidebar follows the same container-first rule through CSS sizing and must leave an 8px non-hover exit strip in narrow panes.
 
+### Composer Command Popovers
+
+Agent, Permission, and Model remain three independent Chat overlays, but share a single shadcn `Popover + Command` visual primitive implemented with existing Obsidian DOM and CSS only. The reference anatomy is: a quiet Popover surface, compact title/keycap strip, Command input only for Model, Command group headings, Command items, and a compact shortcut rail. Do not install shadcn, Radix, cmdk, Tailwind, or a web font; borrow the anatomy and interaction hierarchy while preserving existing TypeScript event, ARIA, focus, scroll, and localization owners.
+
+- **Surface:** one `var(--background-primary)` sheet, one `var(--background-modifier-border)` border, 10px radius, and a restrained host-shadow. No glass, gradient, nested card, colored left rail, or full-row semantic tint.
+- **Shared spacing:** 4px list inset; 8px Command item horizontal padding; 6px row radius; 32px compact rows; 44px only when an Agent or Permission description needs two text lines; 36px header/footer and search height.
+- **Header/footer:** sentence-case title at 12px/600; muted 11px keycap; shortcut labels are compact metadata, separated by space rather than visually competing with content.
+- **Command item:** default is transparent; hover, roving highlight, and selected use the same low-chroma `var(--background-modifier-hover)` surface. Selected state has no extra border, box-shadow, or decorative rail; a checkmark and 600 label weight establish selection.
+- **Model input/group:** Search is a full-width CommandInput-like strip with only a bottom separator. Provider headings are sticky, 11px muted labels on the popover surface, with no repeated full-width borders or imported font.
+- **Permission semantics:** danger/safe remain explicit through icon/check/compact label color and accessible text. Neutral selected background remains shared with all cards; semantic color must never flood a whole row or the enclosing card.
+- **Accessibility/motion:** preserve the existing trigger focus restoration, roving focus, `aria-activedescendant`, and 280px Model scroll owner. Focus uses a visible 2px Obsidian accent outline. Motion is at most 120ms opacity/transform and is removed under `prefers-reduced-motion`.
+
 ### Settings Form Row Card
 
 Ordinary settings rows use a local shadcn-style Card + Field pattern implemented with Obsidian `Setting` DOM and shared CSS tokens. This is the default for Server > Connection, General > Basic, Claude/Codex control rows, and Skills/Tools/ACP ordinary row-card lists.

@@ -14,12 +14,12 @@
 - 在 permission selector 旁集成 Claude Code additional directories configured-scope badge，用于显示额外目录请求状态
 - 在 permission selector 旁集成 sandbox badge 容器（仅 Claude Code backend），用于显示 Claude Code sandbox 配置摘要
 - 在 permission selector 旁集成 Codex runtime defaults badge 容器（仅 Codex backend），用于显示网络、网页搜索与额外目录等非默认 Codex 运行默认项
-- 维护 model selector 的搜索、keyboard navigation、sticky header cleanup 与 provider icon 刷新
+- 把 Model 的 search-first controls 与 scroll list 挂到共享 `ComposerPopoverFrame` content slot，维护每实例唯一的 combobox/listbox/option id、仅在打开态写入的 active-descendant、keyboard navigation、sticky header cleanup 与 provider icon 刷新，并保留 280px 列表视口
 - 为 configured-only option 提供本地化 badge/tooltip 文案；鼠标与 Enter 选择、上下键导航均由 renderer/interaction helper 按禁用语义处理
 - model dropdown 通过共享 `AnchoredOverlayLayoutController` 按 Chat 容器边界同步 340px 首选宽度、280px 最小宽度与 8px 安全区
 - 统一更新当前模型显示、unavailable / unconfigured class、switch-model override 写回结果、unavailable notice 文案与 effort selector 连动；trigger tooltip 明确这是当前标签的发送覆盖，不是持久化 `ConversationSessionSettings`
 - 委托 `PermissionModeSelectorCoordinator` 维护 permission selector 的 mode label、selected state 与 dropdown open/close lifecycle
-- 通过共享 escape handler 收束两个 selector 的关闭行为
+- 通过共享 escape handler 收束两个 selector 的关闭行为；Scope Escape 会关闭实际打开的卡片并把焦点还给它的 trigger，避免落回 Obsidian app root
 
 ## 公开接口
 
@@ -28,8 +28,9 @@ export interface ChatSelectionControlsCoordinatorHost extends ModelSelectionRunt
   registerEscapeHandler(handler: () => boolean): void;
   resolveProviderIconUrl(providerId: string): Promise<string | null>;
   updateEffortSelectorDisplay(): void;
+  restoreComposerInputFocus(): void;
   getPermissionMode(): PermissionMode;
-  switchPermissionMode(mode: PermissionMode): Promise<void>;
+  switchPermissionMode(mode: PermissionMode): Promise<boolean>;
 }
 
 export class ChatSelectionControlsCoordinator {
@@ -54,12 +55,12 @@ export class ChatSelectionControlsCoordinator {
 ## 关键行为
 
 - `build()` 一次性挂载 model selector，并通过 `buildBackendPermissionSelector()` 按当前 active backend 创建 permission selector；selector 不再在 constructor 中固定创建，避免 backend hot-switch 后保留错误的 option set / host seam
-- `buildBackendPermissionSelector()` 在 build time 选择 backend-appropriate config：OpenCode 使用 host 的 `getPermissionMode()` / `switchPermissionMode()`，Claude Code 则由本 coordinator 读取 live plugin 的 `backendSettings.claudeCode.permissionMode`，写回设置并调用 `adapter.setPermissionMode()`；Codex 则读取 `backendSettings.codex.sandboxMode`，写回设置并调用 `adapter.updateSandboxMode()`。三种路径均避免把 backend-specific ownership 回灌到 guarded `OpenCodianView.ts`
+- `buildBackendPermissionSelector()` 在 build time 选择 backend-appropriate config：OpenCode 使用 host 的 `getPermissionMode()` / `switchPermissionMode()`，Claude Code 则由本 coordinator 读取 live plugin 的 `backendSettings.claudeCode.permissionMode`，写回设置并调用 `adapter.setPermissionMode()`；Codex 则读取 `backendSettings.codex.sandboxMode`，写回设置并调用 `adapter.updateSandboxMode()`。每条写入路径都返回 boolean outcome，并将成功后的 composer focus 通过 `restoreComposerInputFocus()` 传入 permission selector；三种路径均避免把 backend-specific ownership 回灌到 guarded `OpenCodianView.ts`
 - `build()` 仍通过 `syncAdditionalDirectoriesBadge()` / `syncSandboxBadge()` / `syncCodexRuntimeDefaultsBadge()` 根据 active backend 决定是否挂载对应的只读配置 badge
 - `reloadModelCatalog()` 触发 runtime data reload，重建 available provider/model cache，并同步 active-tab context-usage identity
 - `getCurrentSessionModel()` / `getCurrentSessionModelResolution()` 通过 `ModelSelectionRuntime` 完成 requested/current/resolved selection 推导，不再要求 view 直接维护 catalog 分支
 - `ensureSelectedModelAvailable()` / `getModelUnavailableNoticeContent()` 把 send 前 availability follow-up 与 notice copy 判定委托到 selection runtime
-- `refreshModelOptions()` / `updateModelSelectorDisplay()` 把 list 渲染、trigger/icon 刷新与 unavailable/unconfigured state 收束到同一个 owner
+- `refreshModelOptions()` / `updateModelSelectorDisplay()` 把 list 渲染、trigger/icon 刷新与 unavailable/unconfigured state 收束到同一个 owner。Model 卡片保留 search-first 键盘路径：Arrow key 仍由 `ModelSelectorInteractions` 以边界钳制方式高亮，Enter 仅在 current-tab override 成功时关闭卡片并恢复 Composer focus，Escape 从 search 关闭并把焦点还给 Model trigger
 - `updatePermissionTriggerDisplay()` / `applyLocaleTexts()` 继续作为 view-facing 入口，但 permission mode 文案与 selected state 刷新会委托给当前 build 创建的 `PermissionModeSelectorCoordinator`；同时通过配置 badge 同步入口确保 Claude Code additional directories / sandbox badge 与 Codex runtime defaults badge 在 backend hot-switch 后同步显示/隐藏
 - additional directories badge 通过 `syncAdditionalDirectoriesBadge()` 在每次刷新时重新读取 active backend 和 `backendSettings.claudeCode.additionalDirectories`：仅 Claude Code backend 且存在非空目录时显示，其他 backend 或空配置会自动移除。该 badge 只表示 "requested extra directory scope" 会传给下一次 query，不验证 CLI 是否解析或实际访问这些路径。
 - sandbox badge 通过 `syncSandboxBadge()` 在每次刷新时重新读取 active backend：仅 Claude Code backend 显示 badge，其他 backend 自动移除。该检查在 `build()`、`updatePermissionTriggerDisplay()` 和 `applyLocaleTexts()` 三个入口都会执行，确保同一活跃界面内 backend 切换后 badge 状态立即正确。badge 用于反映 expanded sandbox 设置（命令例外、filesystem/network 子策略和 ripgrep override）的当前状态。

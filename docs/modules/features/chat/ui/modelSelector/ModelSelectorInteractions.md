@@ -35,4 +35,4 @@ export function scrollToCurrentModel(
 - helper 只操作传入容器，不缓存外部状态
 - model dropdown 的水平边界计算已由相邻的 `AnchoredOverlayLayoutController` 统一负责
 - `navigateModelList()` 跳过 `aria-disabled="true"` 的 configured-only option，并在可用项集合内保持原有边界夹紧语义，不做循环导航
-- `selectHighlightedModel()` 拒绝 disabled 高亮项；成功选择后是否关闭 dropdown 仍由调用方决定
+- `selectHighlightedModel()` 拒绝 disabled 高亮项并只负责解析与回调；调用方只会在 current-tab override 成功时关闭 card 并恢复 Composer focus

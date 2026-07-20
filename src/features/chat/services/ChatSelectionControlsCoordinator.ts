@@ -6,6 +6,11 @@ import type { CodexSandboxMode } from '../../../core/types/settings';
 import type { PermissionMode } from '../../../core/types/settings';
 import { t } from '../../../i18n';
 import { AnchoredOverlayLayoutController } from '../ui/AnchoredOverlayLayoutController';
+import {
+  type ComposerPopoverFrameHandle,
+  type ComposerPopoverFrameTexts,
+  mountComposerPopoverFrame,
+} from '../ui/ComposerPopoverFrame';
 import { buildModelSelectorDisplayState } from '../ui/modelSelector/ModelSelectorDisplay';
 import {
   highlightModelOption as highlightRenderedModelOption,
@@ -38,15 +43,16 @@ export interface ChatSelectionControlsCoordinatorHost extends ModelSelectionRunt
   registerEscapeHandler(handler: () => boolean): void;
   resolveProviderIconUrl(providerId: string): Promise<string | null>;
   updateEffortSelectorDisplay(): void;
+  restoreComposerInputFocus(): void;
   /** OpenCode permission template mode (yolo/normal/plan). */
   getPermissionMode(): PermissionMode;
-  switchPermissionMode(mode: PermissionMode): Promise<void>;
+  switchPermissionMode(mode: PermissionMode): Promise<boolean>;
 }
 
-const MODEL_SEARCH_PLACEHOLDER = 'Search models...';
 const MODEL_DROPDOWN_PREFERRED_WIDTH = 340;
 const MODEL_DROPDOWN_MINIMUM_WIDTH = 280;
 const MODEL_DROPDOWN_SAFE_INSET = 8;
+let modelSelectorInstanceSequence = 0;
 const CLAUDE_CODE_PERMISSION_MODES: readonly ClaudeCodePermissionMode[] = [
   'default', 'acceptEdits', 'bypassPermissions', 'plan',
 ];
@@ -93,20 +99,28 @@ function readClaudeCodePermissionModeFromPlugin(): ClaudeCodePermissionMode {
   );
 }
 
-async function switchClaudeCodePermissionModeInPlugin(mode: ClaudeCodePermissionMode): Promise<void> {
+async function switchClaudeCodePermissionModeInPlugin(mode: ClaudeCodePermissionMode): Promise<boolean> {
   const plugin = readOpenCodianPlugin();
   const claudeSettings = plugin?.settings?.backendSettings?.claudeCode;
   if (!plugin || !claudeSettings) {
-    return;
+    return false;
   }
 
-  claudeSettings.permissionMode = mode;
-  await plugin.saveSettings?.();
+  const previousMode = normalizeClaudeCodePermissionMode(claudeSettings.permissionMode);
+  try {
+    claudeSettings.permissionMode = mode;
+    await plugin.saveSettings?.();
 
-  const adapter = plugin.agentServiceRegistry?.get?.('claude-code') as {
-    setPermissionMode?: (nextMode: ClaudeCodePermissionMode) => Promise<void> | void;
-  } | undefined;
-  await adapter?.setPermissionMode?.(mode);
+    const adapter = plugin.agentServiceRegistry?.get?.('claude-code') as {
+      setPermissionMode?: (nextMode: ClaudeCodePermissionMode) => Promise<void> | void;
+    } | undefined;
+    await adapter?.setPermissionMode?.(mode);
+    return true;
+  } catch {
+    claudeSettings.permissionMode = previousMode;
+    await plugin.saveSettings?.().catch(() => undefined);
+    return false;
+  }
 }
 
 function readCodexSandboxModeFromPlugin(): CodexSandboxMode {
@@ -119,26 +133,35 @@ function readCodexSandboxModeFromPlugin(): CodexSandboxMode {
   return 'workspace-write';
 }
 
-async function switchCodexSandboxModeInPlugin(mode: CodexSandboxMode): Promise<void> {
+async function switchCodexSandboxModeInPlugin(mode: CodexSandboxMode): Promise<boolean> {
   const plugin = readOpenCodianPlugin();
   const codexSettings = plugin?.settings?.backendSettings?.codex;
   if (!plugin || !codexSettings) {
-    return;
+    return false;
   }
 
-  codexSettings.sandboxMode = mode;
-  await plugin.saveSettings?.();
+  const previousMode = readCodexSandboxModeFromPlugin();
+  try {
+    codexSettings.sandboxMode = mode;
+    await plugin.saveSettings?.();
 
-  // Push to live adapter so subsequent thread creation uses the new mode.
-  const adapter = plugin.agentServiceRegistry?.get?.('codex') as {
-    updateSandboxMode?: (m: CodexSandboxMode) => void;
-  } | undefined;
-  adapter?.updateSandboxMode?.(mode);
+    // Push to live adapter so subsequent thread creation uses the new mode.
+    const adapter = plugin.agentServiceRegistry?.get?.('codex') as {
+      updateSandboxMode?: (m: CodexSandboxMode) => void;
+    } | undefined;
+    adapter?.updateSandboxMode?.(mode);
+    return true;
+  } catch {
+    codexSettings.sandboxMode = previousMode;
+    await plugin.saveSettings?.().catch(() => undefined);
+    return false;
+  }
 }
 
 export class ChatSelectionControlsCoordinator {
   private toolbarEl: HTMLElement | null = null;
   private readonly modelSelectionRuntime: ModelSelectionRuntime;
+  private readonly modelSelectorInstanceId = 'opencodian-model-selector-' + modelSelectorInstanceSequence++;
   private permissionSelector: PermissionModeSelectorCoordinator | null = null;
   private readonly additionalDirectoriesBadge: AdditionalDirectoriesConfigBadgeCoordinator;
   private additionalDirectoriesBadgeContainer: HTMLElement | null = null;
@@ -150,6 +173,7 @@ export class ChatSelectionControlsCoordinator {
   private modelSelectorContainer: HTMLElement | null = null;
   private modelSelectorTrigger: HTMLElement | null = null;
   private modelSelectorDropdown: HTMLElement | null = null;
+  private modelPopoverFrame: ComposerPopoverFrameHandle | null = null;
   private modelSelectorSearchInput: HTMLInputElement | null = null;
   private modelSelectorScrollContainer: HTMLElement | null = null;
   private disposeModelSelectorStickyHeaders: (() => void) | null = null;
@@ -291,7 +315,8 @@ export class ChatSelectionControlsCoordinator {
   }
 
   applyLocaleTexts(): void {
-    this.modelSelectorSearchInput?.setAttribute('placeholder', MODEL_SEARCH_PLACEHOLDER);
+    this.modelPopoverFrame?.refresh(this.getModelPopoverFrameTexts());
+    this.modelSelectorSearchInput?.setAttribute('placeholder', t('chat.composerPopover.modelSearchPlaceholder'));
     this.refreshModelOptions();
     this.updateModelSelectorDisplay();
     this.permissionSelector?.applyLocaleTexts();
@@ -318,6 +343,7 @@ export class ChatSelectionControlsCoordinator {
     this.modelSelectorContainer = null;
     this.modelSelectorTrigger = null;
     this.modelSelectorDropdown = null;
+    this.modelPopoverFrame = null;
     this.modelSelectorSearchInput = null;
     this.modelSelectorScrollContainer = null;
     this.modelFilterQuery = '';
@@ -447,13 +473,17 @@ export class ChatSelectionControlsCoordinator {
 
     this.hasRegisteredEscapeHandler = true;
     this.host.registerEscapeHandler(() => {
-      if (!this.isModelDropdownOpen && !(this.permissionSelector?.isOpen() ?? false)) {
-        return false;
+      if (this.isModelDropdownOpen) {
+        this.closeModelDropdown({ restoreTriggerFocus: true });
+        return true;
       }
 
-      this.closeModelDropdown();
-      this.permissionSelector?.closeDropdown();
-      return true;
+      if (this.permissionSelector?.isOpen()) {
+        this.permissionSelector.closeDropdown({ restoreTriggerFocus: true });
+        return true;
+      }
+
+      return false;
     });
   }
 
@@ -474,7 +504,9 @@ export class ChatSelectionControlsCoordinator {
     setIcon(iconWrapper, 'bot');
     triggerContent.createSpan({ cls: 'opencodian-model-trigger-text' });
 
-    this.modelSelectorDropdown = containerEl.createDiv({ cls: 'opencodian-model-dropdown' });
+    this.modelSelectorDropdown = containerEl.createDiv({
+      cls: 'opencodian-model-dropdown',
+    });
     this.modelSelectorDropdown.style.display = 'none';
     this.buildModelDropdown();
     this.mountModelDropdownLayoutController();
@@ -500,8 +532,12 @@ export class ChatSelectionControlsCoordinator {
     }
 
     this.modelSelectorDropdown.empty();
+    this.modelPopoverFrame = mountComposerPopoverFrame(
+      this.modelSelectorDropdown,
+      this.getModelPopoverFrameTexts(),
+    );
 
-    const searchWrapper = this.modelSelectorDropdown.createDiv({ cls: 'opencodian-model-dropdown-search' });
+    const searchWrapper = this.modelPopoverFrame.contentEl.createDiv({ cls: 'opencodian-model-dropdown-search' });
     const searchContainer = searchWrapper.createDiv({ cls: 'opencodian-model-dropdown-search-container' });
     const searchIcon = searchContainer.createSpan({ cls: 'opencodian-model-dropdown-search-icon' });
     setIcon(searchIcon, 'search');
@@ -510,7 +546,11 @@ export class ChatSelectionControlsCoordinator {
       cls: 'opencodian-model-dropdown-search-input',
       attr: {
         type: 'text',
-        placeholder: MODEL_SEARCH_PLACEHOLDER,
+        placeholder: t('chat.composerPopover.modelSearchPlaceholder'),
+        role: 'combobox',
+        'aria-autocomplete': 'list',
+        'aria-controls': this.modelSelectorInstanceId + '-options',
+        'aria-expanded': 'false',
       },
     });
 
@@ -521,7 +561,7 @@ export class ChatSelectionControlsCoordinator {
 
     this.modelSelectorSearchInput.addEventListener('keydown', (event) => {
       if (event.key === 'Escape') {
-        this.closeModelDropdown();
+        this.closeModelDropdown({ restoreTriggerFocus: true });
         event.preventDefault();
       } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
         this.navigateModelList(event.key === 'ArrowDown' ? 1 : -1);
@@ -532,8 +572,13 @@ export class ChatSelectionControlsCoordinator {
       }
     });
 
-    this.modelSelectorScrollContainer = this.modelSelectorDropdown.createDiv({
+    this.modelSelectorScrollContainer = this.modelPopoverFrame.contentEl.createDiv({
       cls: 'opencodian-model-dropdown-scroll',
+      attr: {
+        id: this.modelSelectorInstanceId + '-options',
+        role: 'listbox',
+        'aria-label': t('chat.composerPopover.modelTitle'),
+      },
     });
 
     this.renderModelList();
@@ -580,6 +625,7 @@ export class ChatSelectionControlsCoordinator {
     this.modelSelectorDropdown.addClass('is-open');
     this.modelSelectorTrigger.addClass('is-open');
     this.modelSelectorTrigger.setAttribute('aria-expanded', 'true');
+    this.modelSelectorSearchInput?.setAttribute('aria-expanded', 'true');
 
     this.modelFilterQuery = '';
     if (this.modelSelectorSearchInput) {
@@ -597,7 +643,7 @@ export class ChatSelectionControlsCoordinator {
     }
   }
 
-  private closeModelDropdown(): void {
+  private closeModelDropdown(options: { restoreTriggerFocus?: boolean } = {}): void {
     this.isModelDropdownOpen = false;
     if (this.modelSelectorDropdown) {
       this.modelSelectorDropdown.removeClass('is-open');
@@ -605,9 +651,15 @@ export class ChatSelectionControlsCoordinator {
     }
     this.modelSelectorTrigger?.removeClass('is-open');
     this.modelSelectorTrigger?.setAttribute('aria-expanded', 'false');
+    this.modelSelectorSearchInput?.setAttribute('aria-expanded', 'false');
+    this.modelSelectorSearchInput?.removeAttribute('aria-activedescendant');
 
     if (this.modelDropdownClickOutsideHandler) {
       document.removeEventListener('click', this.modelDropdownClickOutsideHandler, true);
+    }
+
+    if (options.restoreTriggerFocus) {
+      this.modelSelectorTrigger?.focus();
     }
   }
 
@@ -622,6 +674,7 @@ export class ChatSelectionControlsCoordinator {
 
     const renderResult = renderModelSelectorList({
       scrollContainer: this.modelSelectorScrollContainer,
+      optionIdPrefix: this.modelSelectorInstanceId + '-option',
       providers: this.getAvailableProviders(),
       hasLoadedModelCatalog: this.hasLoadedModelCatalog(),
       filterQuery: this.modelFilterQuery,
@@ -629,16 +682,18 @@ export class ChatSelectionControlsCoordinator {
       highlightedValue,
       previousStickyHeadersCleanup: this.disposeModelSelectorStickyHeaders,
       texts: {
-        loading: 'Loading models...',
-        noModels: t('settings.model.noModels'),
-        noModelsFound: 'No models found',
-        noModelsAvailable: 'No models available',
+        loading: t('chat.composerPopover.modelLoading'),
+        noModels: t('chat.composerPopover.modelNoModels'),
+        noModelsFound: t('chat.composerPopover.modelNoResults'),
+        noModelsAvailable: t('chat.composerPopover.modelNoModels'),
         configuredOnlyBadge: t('chat.modelSelector.configuredOnlyBadge'),
         configuredOnlyTitle: t('chat.modelSelector.configuredOnlyTitle'),
       },
       onSelect: (provider, model) => {
-        this.selectModel(provider, model);
-        this.closeModelDropdown();
+        if (this.selectModel(provider, model)) {
+          this.closeModelDropdown();
+          this.host.restoreComposerInputFocus();
+        }
       },
       onHighlight: (value) => {
         this.highlightModelOption(value);
@@ -646,6 +701,7 @@ export class ChatSelectionControlsCoordinator {
     });
 
     this.disposeModelSelectorStickyHeaders = renderResult.disposeStickyHeaders;
+    this.syncModelSearchActiveDescendant();
   }
 
   private navigateModelList(direction: 1 | -1): void {
@@ -654,6 +710,7 @@ export class ChatSelectionControlsCoordinator {
     }
 
     navigateRenderedModelList(this.modelSelectorScrollContainer, direction);
+    this.syncModelSearchActiveDescendant();
   }
 
   private highlightModelOption(value: string): void {
@@ -662,6 +719,22 @@ export class ChatSelectionControlsCoordinator {
     }
 
     highlightRenderedModelOption(this.modelSelectorScrollContainer, value);
+    this.syncModelSearchActiveDescendant();
+  }
+
+  private syncModelSearchActiveDescendant(): void {
+    if (!this.isModelDropdownOpen) {
+      this.modelSelectorSearchInput?.removeAttribute('aria-activedescendant');
+      return;
+    }
+
+    const highlightedOption = this.modelSelectorScrollContainer
+      ?.querySelector<HTMLElement>('.opencodian-model-option.is-highlighted');
+    if (highlightedOption?.id) {
+      this.modelSelectorSearchInput?.setAttribute('aria-activedescendant', highlightedOption.id);
+    } else {
+      this.modelSelectorSearchInput?.removeAttribute('aria-activedescendant');
+    }
   }
 
   private selectHighlightedModel(): void {
@@ -669,15 +742,15 @@ export class ChatSelectionControlsCoordinator {
       return;
     }
 
-    const didSelect = selectRenderedHighlightedModel(
+    selectRenderedHighlightedModel(
       this.modelSelectorScrollContainer,
       (provider, model) => {
-        this.selectModel(provider, model);
+        if (this.selectModel(provider, model)) {
+          this.closeModelDropdown();
+          this.host.restoreComposerInputFocus();
+        }
       },
     );
-    if (didSelect) {
-      this.closeModelDropdown();
-    }
   }
 
   private scrollToCurrentModel(): void {
@@ -688,9 +761,23 @@ export class ChatSelectionControlsCoordinator {
     scrollRenderedCurrentModel(this.modelSelectorScrollContainer, this.getCurrentSessionModel());
   }
 
-  private selectModel(provider: string, model: string): void {
-    this.modelSelectionRuntime.switchModel(provider, model);
+  private selectModel(provider: string, model: string): boolean {
+    const didSwitch = this.modelSelectionRuntime.switchModel(provider, model);
+    if (!didSwitch) {
+      return false;
+    }
     this.updateModelSelectorDisplay();
+    return true;
+  }
+
+  private getModelPopoverFrameTexts(): ComposerPopoverFrameTexts {
+    return {
+      title: t('chat.composerPopover.modelTitle'),
+      escapeKey: 'Esc',
+      navigateHint: t('chat.composerPopover.navigateHint'),
+      selectHint: t('chat.composerPopover.selectHint'),
+      closeHint: t('chat.composerPopover.closeHint'),
+    };
   }
 
   private async updateModelSelectorIcon(providerId: string | null, iconLabel: string): Promise<void> {
@@ -767,6 +854,7 @@ export class ChatSelectionControlsCoordinator {
         {
           getPermissionMode: () => readClaudeCodePermissionModeFromPlugin(),
           switchPermissionMode: (mode) => switchClaudeCodePermissionModeInPlugin(mode as ClaudeCodePermissionMode),
+          restoreInputFocus: () => this.host.restoreComposerInputFocus(),
         },
         permissionConfig,
       );
@@ -776,6 +864,7 @@ export class ChatSelectionControlsCoordinator {
         {
           getPermissionMode: () => readCodexSandboxModeFromPlugin(),
           switchPermissionMode: (mode) => switchCodexSandboxModeInPlugin(mode as CodexSandboxMode),
+          restoreInputFocus: () => this.host.restoreComposerInputFocus(),
         },
         sandboxConfig,
       );
@@ -785,6 +874,7 @@ export class ChatSelectionControlsCoordinator {
         {
           getPermissionMode: () => this.host.getPermissionMode(),
           switchPermissionMode: (mode) => this.host.switchPermissionMode(mode as PermissionMode),
+          restoreInputFocus: () => this.host.restoreComposerInputFocus(),
         },
         permissionConfig,
       );

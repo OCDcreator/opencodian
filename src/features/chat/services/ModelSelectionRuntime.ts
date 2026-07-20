@@ -215,10 +215,10 @@ export class ModelSelectionRuntime {
     };
   }
 
-  switchModel(provider: string, model: string): void {
+  switchModel(provider: string, model: string): boolean {
     const didSetOverride = this.host.setActiveTabModelOverride({ provider, model });
     if (!didSetOverride) {
-      return;
+      return false;
     }
 
     this.host.syncActiveTabContextUsageIdentity();
@@ -226,6 +226,7 @@ export class ModelSelectionRuntime {
     const modelInfo = this.findAvailableModelInfo(provider, model);
     const modelName = modelInfo?.modelName || model;
     new Notice(`Model switched to: ${modelName}`);
+    return true;
   }
 
   private applyCatalogData(

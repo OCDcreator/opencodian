@@ -60,7 +60,9 @@ describe('Codex sandbox mode selector', () => {
       getPermissionMode: () => currentMode,
       switchPermissionMode: async (mode: string) => {
         currentMode = mode as CodexSandboxMode;
+        return true;
       },
+      restoreInputFocus: jest.fn(),
     };
 
     beforeEach(() => {
@@ -166,6 +168,27 @@ describe('Codex sandbox mode selector', () => {
 
       const ids = Array.from(options).map((el) => el.getAttribute('data-mode'));
       expect(ids).toEqual(['read-only', 'workspace-write', 'danger-full-access']);
+
+      coordinator.destroy();
+    });
+
+    it('marks safe and danger sandbox modes with shared semantic data', () => {
+      const container = document.createElement('div');
+      const coordinator = new PermissionModeSelectorCoordinator(host, createCodexSandboxConfig());
+      coordinator.mount(container);
+
+      expect(container.querySelector('[data-mode="read-only"]')?.getAttribute('data-permission-semantic')).toBe('safe');
+      expect(container.querySelector('[data-mode="danger-full-access"]')?.getAttribute('data-permission-semantic')).toBe('danger');
+
+      coordinator.destroy();
+    });
+
+    it('marks the neutral sandbox mode separately from safe and danger modes', () => {
+      const container = document.createElement('div');
+      const coordinator = new PermissionModeSelectorCoordinator(host, createCodexSandboxConfig());
+      coordinator.mount(container);
+
+      expect(container.querySelector('[data-mode="workspace-write"]')?.getAttribute('data-permission-semantic')).toBe('neutral');
 
       coordinator.destroy();
     });

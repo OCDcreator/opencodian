@@ -1,6 +1,7 @@
 import type { ModelCatalogBundle } from '../../../../src/core/config';
 import type { ModelCatalogProvider } from '../../../../src/core/config/modelConfig';
 import type { ClaudeCodePermissionMode, ModelSourceMode, PermissionMode } from '../../../../src/core/types/settings';
+import { OpenCodianView } from '../../../../src/features/chat/OpenCodianView';
 import {
   ChatSelectionControlsCoordinator,
   type ChatSelectionControlsCoordinatorHost,
@@ -139,7 +140,9 @@ async function createFixture(options: FixtureOptions = {}) {
     getPermissionMode: jest.fn(() => permissionMode),
     switchPermissionMode: jest.fn(async (mode) => {
       permissionMode = mode;
+      return true;
     }),
+    restoreComposerInputFocus: jest.fn(),
   };
 
   const toolbarEl = document.createElement('div');
@@ -167,6 +170,10 @@ async function createFixture(options: FixtureOptions = {}) {
 }
 
 describe('ChatSelectionControlsCoordinator', () => {
+  beforeEach(() => {
+    HTMLElement.prototype.scrollIntoView = jest.fn();
+  });
+
   afterEach(() => {
     document.body.innerHTML = '';
     jest.clearAllMocks();
@@ -198,11 +205,33 @@ describe('ChatSelectionControlsCoordinator', () => {
       throw new Error('expected model search input');
     }
 
+    const frame = fixture.toolbarEl.querySelector<HTMLElement>(
+      '.opencodian-model-dropdown .opencodian-composer-popover-frame',
+    );
+    const scrollContainer = fixture.toolbarEl.querySelector<HTMLElement>('.opencodian-model-dropdown-scroll');
+    expect(frame?.querySelector('.opencodian-composer-popover-title')?.textContent).toBe('Choose model');
+    expect(frame?.querySelector('kbd')?.textContent).toBe('Esc');
+    expect(frame?.querySelector('.opencodian-composer-popover-footer')?.textContent).toContain('↑↓ Navigate');
+    expect(frame?.querySelector('.opencodian-composer-popover-footer')?.textContent).toContain('Enter Select');
+    expect(frame?.querySelector('.opencodian-composer-popover-footer')?.textContent).toContain('Esc Close');
+    expect(frame?.contains(searchInput)).toBe(true);
+    expect(frame?.contains(scrollContainer ?? null)).toBe(true);
+    expect(searchInput.getAttribute('role')).toBe('combobox');
+    expect(searchInput.getAttribute('aria-controls')).toBe(scrollContainer?.id);
+    expect(scrollContainer?.getAttribute('role')).toBe('listbox');
+    expect(scrollContainer?.id).toMatch(/^opencodian-model-selector-\d+-options$/);
+
+    await new Promise((resolve) => window.setTimeout(resolve, 0));
+    expect(document.activeElement).toBe(searchInput);
+
     searchInput.value = 'o4';
     searchInput.dispatchEvent(new Event('input', { bubbles: true }));
 
-    const option = fixture.toolbarEl.querySelector<HTMLElement>('[data-value="openai::o4-mini"]');
-    option?.click();
+    searchInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    expect(searchInput.getAttribute('aria-activedescendant')).toMatch(
+      /^opencodian-model-selector-\d+-option-openai%3A%3Ao4-mini$/,
+    );
+    searchInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
     await settleAsyncWork();
 
     expect(fixture.host.setActiveTabModelOverride).toHaveBeenCalledWith({
@@ -216,6 +245,89 @@ describe('ChatSelectionControlsCoordinator', () => {
     expect(fixture.host.updateEffortSelectorDisplay).toHaveBeenCalled();
     expect(fixture.host.syncActiveTabContextUsageIdentity).toHaveBeenCalledTimes(2);
     expect(modelTrigger?.hasClass('is-open')).toBe(false);
+    expect(fixture.host.restoreComposerInputFocus).toHaveBeenCalledTimes(1);
+  });
+
+  it('closes the model card from search Escape and restores trigger focus', async () => {
+    const fixture = await createFixture();
+    const trigger = fixture.toolbarEl.querySelector<HTMLElement>('.opencodian-model-trigger');
+    trigger?.click();
+    const searchInput = fixture.toolbarEl.querySelector<HTMLInputElement>('.opencodian-model-dropdown-search-input');
+
+    searchInput?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+
+    expect(trigger?.getAttribute('aria-expanded')).toBe('false');
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  it('restores the corresponding trigger when shared Escape closes a permission or model card', async () => {
+    const fixture = await createFixture();
+    const permissionTrigger = fixture.toolbarEl.querySelector<HTMLElement>('.opencodian-permission-trigger');
+    const modelTrigger = fixture.toolbarEl.querySelector<HTMLElement>('.opencodian-model-trigger');
+    const escapeHandler = fixture.getEscapeHandler();
+
+    permissionTrigger?.click();
+    expect(escapeHandler?.()).toBe(true);
+    expect(document.activeElement).toBe(permissionTrigger);
+
+    modelTrigger?.click();
+    expect(escapeHandler?.()).toBe(true);
+    expect(document.activeElement).toBe(modelTrigger);
+  });
+
+  it('keeps each model combobox scoped to its own listbox and highlighted option', async () => {
+    const first = await createFixture();
+    const second = await createFixture();
+    const firstTrigger = first.toolbarEl.querySelector<HTMLElement>('.opencodian-model-trigger');
+    const secondTrigger = second.toolbarEl.querySelector<HTMLElement>('.opencodian-model-trigger');
+
+    firstTrigger?.click();
+    const firstSearch = first.toolbarEl.querySelector<HTMLInputElement>('.opencodian-model-dropdown-search-input');
+    const secondSearch = second.toolbarEl.querySelector<HTMLInputElement>('.opencodian-model-dropdown-search-input');
+    const firstListbox = first.toolbarEl.querySelector<HTMLElement>('.opencodian-model-dropdown-scroll');
+    const secondListbox = second.toolbarEl.querySelector<HTMLElement>('.opencodian-model-dropdown-scroll');
+
+    firstSearch?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+
+    const firstHighlighted = firstListbox?.querySelector<HTMLElement>('.opencodian-model-option.is-highlighted');
+    expect(firstListbox?.id).not.toBe(secondListbox?.id);
+    expect(firstSearch?.getAttribute('aria-controls')).toBe(firstListbox?.id);
+    expect(secondSearch?.getAttribute('aria-controls')).toBe(secondListbox?.id);
+    expect(firstSearch?.getAttribute('aria-activedescendant')).toBe(firstHighlighted?.id);
+    expect(document.getElementById(firstHighlighted?.id ?? '')).toBe(firstHighlighted);
+
+    secondTrigger?.click();
+    secondSearch?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    const secondHighlighted = secondListbox?.querySelector<HTMLElement>('.opencodian-model-option.is-highlighted');
+
+    expect(secondSearch?.getAttribute('aria-activedescendant')).toBe(secondHighlighted?.id);
+    expect(document.getElementById(secondHighlighted?.id ?? '')).toBe(secondHighlighted);
+  });
+
+  it('keeps active descendant clear after closing and later refreshing model options', async () => {
+    const fixture = await createFixture();
+    const trigger = fixture.toolbarEl.querySelector<HTMLElement>('.opencodian-model-trigger');
+    trigger?.click();
+    const searchInput = fixture.toolbarEl.querySelector<HTMLInputElement>('.opencodian-model-dropdown-search-input');
+
+    searchInput?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    searchInput?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    fixture.coordinator.refreshModelOptions();
+
+    expect(searchInput?.getAttribute('aria-expanded')).toBe('false');
+    expect(searchInput?.hasAttribute('aria-activedescendant')).toBe(false);
+  });
+
+  it('keeps the model card open when the active-tab override refuses the write', async () => {
+    const fixture = await createFixture({ allowActiveTabModelOverrideWrite: false });
+    const trigger = fixture.toolbarEl.querySelector<HTMLElement>('.opencodian-model-trigger');
+    trigger?.click();
+
+    fixture.toolbarEl.querySelector<HTMLElement>('[data-value="openai::o4-mini"]')?.click();
+    await settleAsyncWork();
+
+    expect(trigger?.getAttribute('aria-expanded')).toBe('true');
+    expect(fixture.host.restoreComposerInputFocus).not.toHaveBeenCalled();
   });
 
   it('repositions the model dropdown from visible geometry when it opens', async () => {
@@ -353,6 +465,61 @@ describe('ChatSelectionControlsCoordinator', () => {
     expect(permissionTrigger?.hasClass('is-open')).toBe(false);
   });
 
+  it('restores the composer input only after a successful OpenCode permission write', async () => {
+    const fixture = await createFixture();
+    const trigger = fixture.toolbarEl.querySelector<HTMLElement>('.opencodian-permission-trigger');
+
+    trigger?.click();
+    fixture.toolbarEl.querySelector<HTMLElement>('[data-mode="plan"]')?.click();
+    await settleAsyncWork();
+
+    expect(fixture.host.restoreComposerInputFocus).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the OpenCode permission card open when its write fails', async () => {
+    const fixture = await createFixture();
+    fixture.host.switchPermissionMode.mockResolvedValueOnce(false);
+    const trigger = fixture.toolbarEl.querySelector<HTMLElement>('.opencodian-permission-trigger');
+
+    trigger?.click();
+    fixture.toolbarEl.querySelector<HTMLElement>('[data-mode="plan"]')?.click();
+    await settleAsyncWork();
+
+    expect(trigger?.getAttribute('aria-expanded')).toBe('true');
+    expect(fixture.host.restoreComposerInputFocus).not.toHaveBeenCalled();
+  });
+
+  it('rolls back the OpenCode setting and persistence when restart fails', async () => {
+    const order: string[] = [];
+    const settings = { permissionMode: 'normal' as PermissionMode };
+    const saveSettings = jest.fn(async () => {
+      order.push(`save:${settings.permissionMode}`);
+    });
+    const view = Object.assign(Object.create(OpenCodianView.prototype), {
+      plugin: {
+        settings,
+        saveSettings,
+        openCodeService: {
+          checkHealth: jest.fn(async () => false),
+          stop: jest.fn(async () => {}),
+          start: jest.fn(async () => {
+            order.push(`start:${settings.permissionMode}`);
+            throw new Error('restart failed');
+          }),
+        },
+      },
+    }) as OpenCodianView & {
+      switchPermissionMode(mode: PermissionMode): Promise<boolean>;
+    };
+
+    const didSwitch = await view.switchPermissionMode('plan');
+
+    expect(didSwitch).toBe(false);
+    expect(order).toEqual(['save:plan', 'start:plan', 'save:normal']);
+    expect(settings.permissionMode).toBe('normal');
+    expect(saveSettings).toHaveBeenCalledTimes(2);
+  });
+
   describe('sandbox badge gating', () => {
     /* eslint-disable @typescript-eslint/no-explicit-any */
     let savedApp: any;
@@ -471,8 +638,9 @@ describe('ChatSelectionControlsCoordinator', () => {
         isModelAvailableOnServer: jest.fn(async () => true),
         resolveProviderIconUrl: jest.fn(async () => null),
         updateEffortSelectorDisplay: jest.fn(),
+        restoreComposerInputFocus: jest.fn(),
         getPermissionMode: jest.fn(() => 'normal'),
-        switchPermissionMode: jest.fn(async () => {}),
+        switchPermissionMode: jest.fn(async () => true),
       };
     }
 
@@ -764,8 +932,9 @@ describe('ChatSelectionControlsCoordinator', () => {
         isModelAvailableOnServer: jest.fn(async () => true),
         resolveProviderIconUrl: jest.fn(async () => null),
         updateEffortSelectorDisplay: jest.fn(),
+        restoreComposerInputFocus: jest.fn(),
         getPermissionMode: jest.fn(() => 'yolo' as PermissionMode),
-        switchPermissionMode: jest.fn(async () => {}),
+        switchPermissionMode: jest.fn(async () => true),
       } as unknown as ChatSelectionControlsCoordinatorHost;
 
       const toolbarEl = document.createElement('div');
@@ -784,6 +953,9 @@ describe('ChatSelectionControlsCoordinator', () => {
       expect(toolbarEl.querySelector('[data-mode="yolo"]')).not.toBeNull();
       expect(toolbarEl.querySelector('[data-mode="normal"]')).not.toBeNull();
       expect(toolbarEl.querySelector('[data-mode="plan"]')).not.toBeNull();
+      expect(toolbarEl.querySelector('[data-mode="yolo"]')?.getAttribute('data-permission-semantic')).toBe('danger');
+      expect(toolbarEl.querySelector('[data-mode="normal"]')?.getAttribute('data-permission-semantic')).toBe('neutral');
+      expect(toolbarEl.querySelector('[data-mode="plan"]')?.getAttribute('data-permission-semantic')).toBe('safe');
       // Claude modes should NOT be available
       expect(toolbarEl.querySelector('[data-mode="acceptEdits"]')).toBeNull();
       expect(toolbarEl.querySelector('[data-mode="bypassPermissions"]')).toBeNull();
@@ -818,8 +990,9 @@ describe('ChatSelectionControlsCoordinator', () => {
         isModelAvailableOnServer: jest.fn(async () => true),
         resolveProviderIconUrl: jest.fn(async () => null),
         updateEffortSelectorDisplay: jest.fn(),
+        restoreComposerInputFocus: jest.fn(),
         getPermissionMode: jest.fn(() => 'normal' as PermissionMode),
-        switchPermissionMode: jest.fn(async () => {}),
+        switchPermissionMode: jest.fn(async () => true),
       } as unknown as ChatSelectionControlsCoordinatorHost;
 
       const toolbarEl = document.createElement('div');
@@ -878,8 +1051,9 @@ describe('ChatSelectionControlsCoordinator', () => {
         isModelAvailableOnServer: jest.fn(async () => true),
         resolveProviderIconUrl: jest.fn(async () => null),
         updateEffortSelectorDisplay: jest.fn(),
+        restoreComposerInputFocus: jest.fn(),
         getPermissionMode: jest.fn(() => 'normal' as PermissionMode),
-        switchPermissionMode: jest.fn(async () => {}),
+        switchPermissionMode: jest.fn(async () => true),
       } as unknown as ChatSelectionControlsCoordinatorHost;
 
       const toolbarEl = document.createElement('div');
@@ -904,6 +1078,129 @@ describe('ChatSelectionControlsCoordinator', () => {
       expect(host.switchPermissionMode).not.toHaveBeenCalled();
     });
 
+    it('rolls back a failed Claude adapter write without closing or focusing the composer', async () => {
+      const order: string[] = [];
+      const claudeSettings = { permissionMode: 'default' as ClaudeCodePermissionMode };
+      const saveSettings = jest.fn(async () => {
+        order.push(`save:${claudeSettings.permissionMode}`);
+      });
+      const setPermissionMode = jest.fn(async (mode: ClaudeCodePermissionMode) => {
+        order.push(`adapter:${mode}`);
+        throw new Error('adapter failed');
+      });
+      (globalThis as any).app = {
+        plugins: {
+          plugins: {
+            opencodian: {
+              settings: {
+                activeBackend: 'claude-code',
+                backendSettings: { claudeCode: claudeSettings },
+              },
+              saveSettings,
+              agentServiceRegistry: {
+                get: jest.fn(() => ({ setPermissionMode })),
+              },
+            },
+          },
+        },
+      };
+
+      const host = {
+        registerEscapeHandler: jest.fn(),
+        loadModelCatalogData: jest.fn(async () => ({ catalogBundle: null, providers: [] })),
+        getActiveTabModelOverride: jest.fn(() => null),
+        setActiveTabModelOverride: jest.fn(() => true),
+        getDefaultModelSelection: jest.fn(() => null),
+        syncActiveTabContextUsageIdentity: jest.fn(),
+        getModelSourceMode: jest.fn(() => 'merge'),
+        isModelAvailableOnServer: jest.fn(async () => true),
+        resolveProviderIconUrl: jest.fn(async () => null),
+        updateEffortSelectorDisplay: jest.fn(),
+        restoreComposerInputFocus: jest.fn(),
+        getPermissionMode: jest.fn(() => 'normal' as PermissionMode),
+        switchPermissionMode: jest.fn(async () => true),
+      } as unknown as ChatSelectionControlsCoordinatorHost;
+      const toolbarEl = document.createElement('div');
+      document.body.appendChild(toolbarEl);
+      const coordinator = new ChatSelectionControlsCoordinator(host);
+      coordinator.build(toolbarEl);
+      await settleAsyncWork();
+
+      const trigger = toolbarEl.querySelector<HTMLElement>('.opencodian-permission-trigger');
+      trigger?.click();
+      toolbarEl.querySelector<HTMLElement>('[data-mode="plan"]')?.click();
+      await settleAsyncWork();
+
+      expect(order).toEqual(['save:plan', 'adapter:plan', 'save:default']);
+      expect(claudeSettings.permissionMode).toBe('default');
+      expect(trigger?.getAttribute('aria-expanded')).toBe('true');
+      expect(toolbarEl.querySelector<HTMLElement>('[data-mode="default"]')?.hasClass('is-selected')).toBe(true);
+      expect(host.restoreComposerInputFocus).not.toHaveBeenCalled();
+    });
+
+    it('rolls back a failed Codex save without calling the adapter or rejecting the click path', async () => {
+      const order: string[] = [];
+      const codexSettings = { sandboxMode: 'workspace-write' as const };
+      const saveSettings = jest.fn()
+        .mockImplementationOnce(async () => {
+          order.push(`save:${codexSettings.sandboxMode}`);
+          throw new Error('save failed');
+        })
+        .mockImplementationOnce(async () => {
+          order.push(`save:${codexSettings.sandboxMode}`);
+        });
+      const updateSandboxMode = jest.fn((mode: string) => order.push(`adapter:${mode}`));
+      (globalThis as any).app = {
+        plugins: {
+          plugins: {
+            opencodian: {
+              settings: {
+                activeBackend: 'codex',
+                backendSettings: { codex: codexSettings },
+              },
+              saveSettings,
+              agentServiceRegistry: {
+                get: jest.fn(() => ({ updateSandboxMode })),
+              },
+            },
+          },
+        },
+      };
+
+      const host = {
+        registerEscapeHandler: jest.fn(),
+        loadModelCatalogData: jest.fn(async () => ({ catalogBundle: null, providers: [] })),
+        getActiveTabModelOverride: jest.fn(() => null),
+        setActiveTabModelOverride: jest.fn(() => true),
+        getDefaultModelSelection: jest.fn(() => null),
+        syncActiveTabContextUsageIdentity: jest.fn(),
+        getModelSourceMode: jest.fn(() => 'merge'),
+        isModelAvailableOnServer: jest.fn(async () => true),
+        resolveProviderIconUrl: jest.fn(async () => null),
+        updateEffortSelectorDisplay: jest.fn(),
+        restoreComposerInputFocus: jest.fn(),
+        getPermissionMode: jest.fn(() => 'normal' as PermissionMode),
+        switchPermissionMode: jest.fn(async () => true),
+      } as unknown as ChatSelectionControlsCoordinatorHost;
+      const toolbarEl = document.createElement('div');
+      document.body.appendChild(toolbarEl);
+      const coordinator = new ChatSelectionControlsCoordinator(host);
+      coordinator.build(toolbarEl);
+      await settleAsyncWork();
+
+      const trigger = toolbarEl.querySelector<HTMLElement>('.opencodian-permission-trigger');
+      trigger?.click();
+      toolbarEl.querySelector<HTMLElement>('[data-mode="danger-full-access"]')?.click();
+      await settleAsyncWork();
+
+      expect(order).toEqual(['save:danger-full-access', 'save:workspace-write']);
+      expect(codexSettings.sandboxMode).toBe('workspace-write');
+      expect(updateSandboxMode).not.toHaveBeenCalled();
+      expect(trigger?.getAttribute('aria-expanded')).toBe('true');
+      expect(toolbarEl.querySelector<HTMLElement>('[data-mode="workspace-write"]')?.hasClass('is-selected')).toBe(true);
+      expect(host.restoreComposerInputFocus).not.toHaveBeenCalled();
+    });
+
     it('routes OpenCode mode selection through switchPermissionMode', async () => {
       (globalThis as any).app = {
         plugins: { plugins: { opencodian: { settings: { activeBackend: 'opencode' } } } },
@@ -920,8 +1217,9 @@ describe('ChatSelectionControlsCoordinator', () => {
         isModelAvailableOnServer: jest.fn(async () => true),
         resolveProviderIconUrl: jest.fn(async () => null),
         updateEffortSelectorDisplay: jest.fn(),
+        restoreComposerInputFocus: jest.fn(),
         getPermissionMode: jest.fn(() => 'normal' as PermissionMode),
-        switchPermissionMode: jest.fn(async () => {}),
+        switchPermissionMode: jest.fn(async () => true),
       } as unknown as ChatSelectionControlsCoordinatorHost;
 
       const toolbarEl = document.createElement('div');

@@ -1,5 +1,6 @@
 @import 'base/core.css';
 @import 'utils/markdown.css';
+@import 'components/composer-popover-frame.css';
 @import 'components/agent-selector.css';
 @import 'components/agent-switcher.css';
 @import 'components/model-selector.css';

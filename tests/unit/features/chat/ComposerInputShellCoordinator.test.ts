@@ -118,6 +118,7 @@ function createFixture(options: {
     getInputPlaceholder: jest.fn(() => t('chat.input.placeholder')),
     getSlashCommandSkillMode: jest.fn(() => 'direct'),
     addChosenFileContextToActiveTab: jest.fn().mockResolvedValue(undefined),
+    registerEscapeHandler: jest.fn(),
     mountSelectionControls: jest.fn((toolbar) => {
       if (!options.renderHostControls) {
         return;
@@ -311,6 +312,21 @@ describe('ComposerInputShellCoordinator', () => {
     });
     expect(fixture.host.addChosenFileContextToActiveTab).toHaveBeenCalledTimes(1);
     expect(fixture.textarea.value).toBe('');
+  });
+
+  it('focuses the composer textarea through its public focus seam', () => {
+    const fixture = createFixture();
+    fixture.addContextBtn.focus();
+
+    fixture.coordinator.focusInput();
+
+    expect(document.activeElement).toBe(fixture.textarea);
+  });
+
+  it('registers the Agent card Escape handler through the view scope seam', () => {
+    const fixture = createFixture();
+
+    expect(fixture.host.registerEscapeHandler).toHaveBeenCalledTimes(1);
   });
 
   it('organizes the composer into a layered input-row and runtime-dock', () => {

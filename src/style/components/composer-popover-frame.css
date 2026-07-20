@@ -1,0 +1,156 @@
+/*
+ * Shared Composer Popover + Command frame
+ *
+ * One quiet sheet: background-primary, 1px background-modifier-border,
+ * 10px radius, restrained host shadow. No glass, gradients, nested
+ * cards, colored rails, or selected-row outlines. Default, hover,
+ * keyboard-highlight, and selected rows all share the same low-sat
+ * background-modifier-hover surface; selection is communicated by the
+ * per-selector checkmark and label weight, never by border, shadow,
+ * or left color rail.
+ */
+
+.opencodian-composer-popover-frame {
+  overflow: hidden;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 10px;
+  background: var(--background-primary);
+  box-shadow: 0 4px 14px var(--background-modifier-box-shadow);
+}
+
+.opencodian-composer-popover-header,
+.opencodian-composer-popover-footer {
+  display: flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 12px;
+  color: var(--text-muted);
+}
+
+.opencodian-composer-popover-header {
+  justify-content: space-between;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.opencodian-composer-popover-title {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  text-transform: none;
+  white-space: nowrap;
+}
+
+.opencodian-composer-popover-section {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.opencodian-composer-popover-footer {
+  gap: 10px;
+  border-top: 1px solid var(--background-modifier-border);
+  font-size: 11px;
+}
+
+.opencodian-composer-popover-escape-key {
+  padding: 1px 5px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 4px;
+  font: inherit;
+}
+
+.opencodian-composer-popover-content {
+  min-width: 0;
+}
+
+.opencodian-composer-popover-section,
+.opencodian-composer-popover-state {
+  padding: 8px 12px;
+}
+
+.opencodian-composer-popover-state {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+/*
+ * Command item row. Compact by default; rows that render a description
+ * grow naturally with their content. Transparent at rest; one quiet
+ * hover/keyboard/selected surface. Selection is signaled by the
+ * per-selector checkmark and label weight only.
+ */
+.opencodian-composer-popover-option {
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) 18px;
+  align-items: center;
+  column-gap: 8px;
+  min-height: 32px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: transparent;
+}
+
+.opencodian-composer-popover-option:hover,
+.opencodian-composer-popover-option.is-highlighted,
+.opencodian-composer-popover-option.is-selected {
+  background: var(--background-modifier-hover);
+}
+
+.opencodian-composer-popover-option:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: -2px;
+}
+
+.opencodian-composer-popover-option-icon,
+.opencodian-composer-popover-option-check {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  color: var(--text-muted);
+}
+
+.opencodian-composer-popover-option-main,
+.opencodian-composer-popover-option-text {
+  min-width: 0;
+}
+
+.opencodian-composer-popover-option-title {
+  overflow: hidden;
+  color: var(--text-normal);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.opencodian-composer-popover-option.is-selected .opencodian-composer-popover-option-title,
+.opencodian-composer-popover-option.is-selected .opencodian-agent-option-label,
+.opencodian-composer-popover-option.is-selected .opencodian-permission-option-label,
+.opencodian-composer-popover-option.is-selected .opencodian-model-option-name {
+  font-weight: 600;
+}
+
+.opencodian-composer-popover-option-description {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .opencodian-composer-popover-frame,
+  .opencodian-composer-popover-option {
+    scroll-behavior: auto;
+    transition: none;
+  }
+}
