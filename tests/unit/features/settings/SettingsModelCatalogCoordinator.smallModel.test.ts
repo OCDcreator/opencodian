@@ -70,6 +70,7 @@ function createRuntime(writeLocalModelConfig = jest.fn().mockResolvedValue(undef
       ],
     }],
     commonSummaryEl: document.createElement('div'),
+    catalogComparisonEl: document.createElement('div'),
     configBodyEl: document.createElement('div'),
     availabilityManagementEl: document.createElement('div'),
     defaultModelButton: null,
@@ -96,7 +97,11 @@ function createCoordinator(runtime: ReturnType<typeof createRuntime>) {
     refreshTitleModels: jest.fn(),
     getServerState: () => ({ healthy: true, status: 'running' }),
     setServerState: jest.fn(),
-    getPresenter: () => null,
+    getPresenter: () => ({
+      getCatalogModelCount: (catalog: { providers: Array<{ models: unknown[] }> }) => (
+        catalog.providers.reduce((count, provider) => count + provider.models.length, 0)
+      ),
+    }) as never,
     getRuntime: () => runtime as never,
     isRuntimeActive: () => true,
     refreshIconCacheOverview: jest.fn().mockResolvedValue(undefined),
@@ -117,6 +122,35 @@ describe('SettingsModelCatalogCoordinator small_model picker', () => {
     coordinator.updateSmallModelButton();
 
     expect(runtime.smallModelButton.buttonEl.textContent).toBe('OpenAI / GPT-4.1 Mini');
+  });
+
+  it('renders a neutral V2 drift summary without exposing detailed IDs', () => {
+    const runtime = createRuntime();
+    runtime.catalogs = {
+      effective: { providers: [], defaults: {} },
+    } as never;
+    runtime.catalogState = {
+      catalogComparison: {
+        status: 'drift',
+        legacyProviderCount: 1,
+        legacyModelCount: 2,
+        v2ProviderCount: 2,
+        v2ModelCount: 3,
+        legacyOnlyProviderIds: ['private-provider'],
+        v2OnlyProviderIds: ['new-provider'],
+        legacyOnlyModelRefs: [],
+        v2OnlyModelRefs: ['new-provider/new-model'],
+      },
+    } as never;
+    const coordinator = createCoordinator(runtime);
+
+    coordinator.updateCommonSummary();
+
+    expect(runtime.catalogComparisonEl.textContent).toBe(
+      'V2 catalog differs · stable-only 1 provider / 0 models · V2-only 1 provider / 1 models',
+    );
+    expect(runtime.catalogComparisonEl.classList.contains('is-drift')).toBe(true);
+    expect(runtime.catalogComparisonEl.textContent).not.toContain('private-provider');
   });
 
   it('writes selected small_model to local OpenCode config', async () => {

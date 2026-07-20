@@ -1,6 +1,7 @@
 import type { ModelCatalogProvider } from '../../../../src/core/config/modelConfig';
 import {
   describeModelAvailabilitySummary,
+  describeModelCatalogComparison,
   describeProviderAvailabilityProbe,
   describeProviderDirectorySummary,
   describeProviderModels,
@@ -48,6 +49,49 @@ function createDisplayState(
 }
 
 describe('SettingsModelCatalogAvailability', () => {
+  it('describes matching, drifting, and unavailable V2 catalog comparisons without exposing IDs', () => {
+    expect(describeModelCatalogComparison({
+      status: 'match',
+      legacyProviderCount: 2,
+      legacyModelCount: 5,
+      v2ProviderCount: 2,
+      v2ModelCount: 5,
+      legacyOnlyProviderIds: [],
+      v2OnlyProviderIds: [],
+      legacyOnlyModelRefs: [],
+      v2OnlyModelRefs: [],
+    })).toEqual({
+      text: 'V2 catalog matches the stable runtime directory · 2 providers · 5 models',
+      className: 'is-match',
+    });
+
+    const drift = describeModelCatalogComparison({
+      status: 'drift',
+      legacyProviderCount: 2,
+      legacyModelCount: 5,
+      v2ProviderCount: 3,
+      v2ModelCount: 7,
+      legacyOnlyProviderIds: ['private-provider'],
+      v2OnlyProviderIds: ['new-provider'],
+      legacyOnlyModelRefs: ['private-provider/private-model'],
+      v2OnlyModelRefs: ['new-provider/new-model', 'openai/new-model'],
+    });
+    expect(drift).toEqual({
+      text: 'V2 catalog differs · stable-only 1 provider / 1 models · V2-only 1 provider / 2 models',
+      className: 'is-drift',
+    });
+    expect(drift.text).not.toContain('private-provider');
+    expect(drift.text).not.toContain('new-provider');
+
+    expect(describeModelCatalogComparison({
+      status: 'unavailable',
+      reason: 'HTTP 404',
+    })).toEqual({
+      text: 'V2 catalog is unavailable; the stable runtime directory remains in use',
+      className: 'is-unavailable',
+    });
+  });
+
   it('prioritizes project-disabled provider presentation over server-disabled scope', () => {
     const provider = createProvider({ disabledScopes: ['global', 'project'] });
     const state = createDisplayState({

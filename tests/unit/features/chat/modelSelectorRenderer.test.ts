@@ -3,6 +3,10 @@ jest.mock('../../../../src/features/chat/ui/modelSelectorStickyHeaders', () => (
 }));
 
 import { renderModelList } from '../../../../src/features/chat/ui/modelSelector/ModelSelectorRenderer';
+import type {
+  ModelSelectorProvider,
+  ModelSelectorRenderTexts,
+} from '../../../../src/features/chat/ui/modelSelector/types';
 import { bindModelSelectorStickyHeaders } from '../../../../src/features/chat/ui/modelSelectorStickyHeaders';
 
 const mockedBindModelSelectorStickyHeaders = bindModelSelectorStickyHeaders as jest.MockedFunction<
@@ -10,6 +14,15 @@ const mockedBindModelSelectorStickyHeaders = bindModelSelectorStickyHeaders as j
 >;
 
 describe('ModelSelectorRenderer', () => {
+  const configuredOnlyTexts = {
+    loading: 'Loading models...',
+    noModels: 'No models available',
+    noModelsFound: 'No models found',
+    noModelsAvailable: 'No models available',
+    configuredOnlyBadge: 'Configured only',
+    configuredOnlyTitle: 'Configured locally but unavailable in the runtime catalog',
+  } as ModelSelectorRenderTexts;
+
   beforeEach(() => {
     jest.clearAllMocks();
   });
@@ -29,6 +42,8 @@ describe('ModelSelectorRenderer', () => {
         noModels: 'No models available',
         noModelsFound: 'No models found',
         noModelsAvailable: 'No models available',
+        configuredOnlyBadge: 'Configured only',
+        configuredOnlyTitle: 'Configured locally but unavailable in the runtime catalog',
       },
       onSelect: jest.fn(),
       onHighlight: jest.fn(),
@@ -53,6 +68,8 @@ describe('ModelSelectorRenderer', () => {
         noModels: 'No models available',
         noModelsFound: 'No models found',
         noModelsAvailable: 'No models available',
+        configuredOnlyBadge: 'Configured only',
+        configuredOnlyTitle: 'Configured locally but unavailable in the runtime catalog',
       },
       onSelect: jest.fn(),
       onHighlight: jest.fn(),
@@ -78,6 +95,8 @@ describe('ModelSelectorRenderer', () => {
         noModels: 'No models available',
         noModelsFound: 'No models found',
         noModelsAvailable: 'No models available',
+        configuredOnlyBadge: 'Configured only',
+        configuredOnlyTitle: 'Configured locally but unavailable in the runtime catalog',
       },
       onSelect: jest.fn(),
       onHighlight: jest.fn(),
@@ -115,6 +134,8 @@ describe('ModelSelectorRenderer', () => {
         noModels: 'No models available',
         noModelsFound: 'No models found',
         noModelsAvailable: 'No models available',
+        configuredOnlyBadge: 'Configured only',
+        configuredOnlyTitle: 'Configured locally but unavailable in the runtime catalog',
       },
       onSelect,
       onHighlight,
@@ -135,5 +156,49 @@ describe('ModelSelectorRenderer', () => {
 
     options[1].dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(onSelect).toHaveBeenCalledWith('openai', 'gpt-4.1');
+  });
+
+  it('renders configured-only models as labelled disabled options', () => {
+    const scrollContainer = document.createElement('div');
+    const onSelect = jest.fn();
+    const onHighlight = jest.fn();
+    const providers = [{
+      id: 'local',
+      name: 'Local',
+      models: [{
+        id: 'custom',
+        name: 'Custom',
+        availability: 'configured-only',
+        availabilityLabel: 'Configured only',
+      }],
+    }] as unknown as ModelSelectorProvider[];
+
+    renderModelList({
+      scrollContainer,
+      providers,
+      hasLoadedModelCatalog: true,
+      filterQuery: '',
+      currentSelection: null,
+      highlightedValue: 'local::custom',
+      texts: configuredOnlyTexts,
+      onSelect,
+      onHighlight,
+    });
+
+    const option = scrollContainer.querySelector<HTMLElement>('.opencodian-model-option');
+    expect(option).not.toBeNull();
+    expect(option?.hasClass('is-configured-only')).toBe(true);
+    expect(option?.getAttribute('aria-disabled')).toBe('true');
+    expect(option?.getAttribute('title')).toBe(
+      'Configured locally but unavailable in the runtime catalog',
+    );
+    expect(option?.hasClass('is-highlighted')).toBe(false);
+    expect(option?.querySelector('.opencodian-model-option-availability')?.textContent)
+      .toBe('Configured only');
+
+    option?.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
+    option?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(onHighlight).not.toHaveBeenCalled();
+    expect(onSelect).not.toHaveBeenCalled();
   });
 });

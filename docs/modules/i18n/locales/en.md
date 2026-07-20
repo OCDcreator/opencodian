@@ -27,6 +27,8 @@
 
 OpenCodian 的英文翻译表，导出 `enTranslations` 静态对象。
 
+2026-07-20：新增 `settings.model.catalogComparison.*` 与 `chat.modelSelector.configuredOnly*`，用于 V2 影子目录三态摘要，以及聊天模型选择器的 configured-only badge/tooltip。不可比较状态保持中性，不暗示 provider 故障。
+
 2026-07-11：新增 `capabilities.reason.*`，为 SDK capability availability 的四类固定原因提供 Settings 本地化文案。动态的脱敏服务端说明和 minimum-server hint 不使用这些键，仍保留原文以保住诊断上下文。
 
 2026-07-11：新增 `settings.capabilityLab.openCodeSdk.*` 文案，为 Capability Lab 的 OpenCode SDK 证据表提供本地化标题、证据状态、safe refresh、脱敏 JSON copy 与失败通知。描述明确这是 production snapshot 的诊断只读视图，不能打开 gate 或执行 action。

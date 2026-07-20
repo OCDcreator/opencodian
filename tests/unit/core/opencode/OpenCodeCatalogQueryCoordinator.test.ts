@@ -72,6 +72,14 @@ function createHost(
         callback: jest.fn(),
       },
     },
+    v2: {
+      model: {
+        list: jest.fn(),
+      },
+      provider: {
+        list: jest.fn(),
+      },
+    },
     tool: {
       ids: jest.fn(),
       list: jest.fn(),
@@ -111,6 +119,60 @@ function createHost(
 }
 
 describe('OpenCodeCatalogQueryCoordinator', () => {
+  it('normalizes the V2 provider and model location responses for shadow comparison', async () => {
+    const { coordinator, sdkFacade } = createHost();
+    sdkFacade.v2.provider.list.mockResolvedValue({
+      location: { directory: '/vault' },
+      data: [
+        { id: 'openai', name: 'OpenAI' },
+        { id: 'anthropic', name: 'Anthropic' },
+      ],
+    });
+    sdkFacade.v2.model.list.mockResolvedValue({
+      location: { directory: '/vault' },
+      data: [
+        { id: 'gpt-4.1', providerID: 'openai' },
+        { id: 'claude-sonnet-4', providerID: 'anthropic' },
+        { id: 'gpt-4.1', providerID: 'openai' },
+      ],
+    });
+
+    await expect(coordinator.getV2CatalogSnapshot()).resolves.toEqual({
+      status: 'available',
+      providerIds: ['anthropic', 'openai'],
+      modelRefs: ['anthropic/claude-sonnet-4', 'openai/gpt-4.1'],
+    });
+  });
+
+  it('keeps V2 catalog failures isolated from the stable catalog path', async () => {
+    const { coordinator, host, sdkFacade } = createHost();
+    sdkFacade.v2.provider.list.mockRejectedValue(new Error('HTTP 404'));
+    sdkFacade.v2.model.list.mockResolvedValue({ location: { directory: '/vault' }, data: [] });
+
+    await expect(coordinator.getV2CatalogSnapshot()).resolves.toEqual({
+      status: 'unavailable',
+      reason: 'HTTP 404',
+    });
+    expect(host.getLegacy).not.toHaveBeenCalled();
+  });
+
+  it('treats V2 responses without location metadata as unavailable', async () => {
+    const { coordinator, host, sdkFacade } = createHost();
+    sdkFacade.v2.provider.list.mockResolvedValue({
+      data: [{ id: 'openai', name: 'OpenAI' }],
+    } as never);
+    sdkFacade.v2.model.list.mockResolvedValue({
+      location: { directory: '/vault' },
+      data: [{ id: 'gpt-4.1', providerID: 'openai' }],
+    });
+
+    await expect(coordinator.getV2CatalogSnapshot()).resolves.toEqual({
+      status: 'unavailable',
+      reason: 'Invalid V2 catalog response',
+    });
+    expect(host.getLegacy).not.toHaveBeenCalled();
+  });
+
   it('keeps MCP status mutations and auth normalization inside the catalog owner', async () => {
     const { coordinator, catalogState, sdkFacade } = createHost();
     const normalizeSpy = jest.spyOn(catalogState, 'normalizeMcpServerStatusMap');

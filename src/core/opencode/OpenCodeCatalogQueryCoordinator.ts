@@ -67,6 +67,7 @@ export interface OpenCodeCatalogQueryCoordinatorHost {
     | 'project'
     | 'provider'
     | 'tool'
+    | 'v2'
     | 'vcs'
   >;
   getLegacy<T>(path: string, options?: { includeDirectory?: boolean }): Promise<T>;
@@ -75,6 +76,15 @@ export interface OpenCodeCatalogQueryCoordinatorHost {
   getDebugMetadata(): OpenCodeCatalogQueryCoordinatorDebugMetadata;
   getToolCatalogScopeKey(): string;
 }
+
+export type OpenCodeV2CatalogSnapshot = {
+  status: 'available';
+  providerIds: string[];
+  modelRefs: string[];
+} | {
+  status: 'unavailable';
+  reason: string;
+};
 
 type OpenCodeSdkMcpConfig = NonNullable<Parameters<OpenCodeSdkFacade['mcp']['add']>[0]>['config'];
 type OpenCodeSdkFileListInput = Parameters<OpenCodeSdkFacade['file']['list']>[0];
@@ -89,6 +99,53 @@ export class OpenCodeCatalogQueryCoordinator {
     private readonly catalogState: OpenCodeCatalogStateStore,
     private readonly host: OpenCodeCatalogQueryCoordinatorHost,
   ) {}
+
+  async getV2CatalogSnapshot(
+    options: { includeDirectory?: boolean } = {},
+  ): Promise<OpenCodeV2CatalogSnapshot> {
+    if (!this.host.shouldUseSdkCrud()) {
+      return {
+        status: 'unavailable',
+        reason: 'OpenCode SDK catalog queries are disabled',
+      };
+    }
+
+    try {
+      const sdk = this.host.getSdkFacade({ includeDirectory: options.includeDirectory ?? true });
+      const [providerResponse, modelResponse] = await Promise.all([
+        sdk.v2.provider.list(),
+        sdk.v2.model.list(),
+      ]);
+      const providerData = this.getV2LocationData(providerResponse);
+      const modelData = this.getV2LocationData(modelResponse);
+      if (!providerData || !modelData) {
+        return {
+          status: 'unavailable',
+          reason: 'Invalid V2 catalog response',
+        };
+      }
+
+      const providerIds = this.normalizeStringSet(providerData.map((entry) => (
+        this.readRecordString(entry, 'id')
+      )));
+      const modelRefs = this.normalizeStringSet(modelData.map((entry) => {
+        const providerId = this.readRecordString(entry, 'providerID');
+        const modelId = this.readRecordString(entry, 'id');
+        return providerId && modelId ? `${providerId}/${modelId}` : null;
+      }));
+
+      return {
+        status: 'available',
+        providerIds,
+        modelRefs,
+      };
+    } catch (error) {
+      return {
+        status: 'unavailable',
+        reason: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }
 
   async getAvailableModels(
     options: { includeDirectory?: boolean; debugReason?: string | null } = {},
@@ -546,6 +603,35 @@ export class OpenCodeCatalogQueryCoordinator {
         ? source.connected.filter((item): item is string => typeof item === 'string')
         : [],
     };
+  }
+
+  private getV2LocationData(response: unknown): unknown[] | null {
+    if (!response || typeof response !== 'object' || Array.isArray(response)) {
+      return null;
+    }
+
+    const location = (response as { location?: unknown }).location;
+    if (!location || typeof location !== 'object' || Array.isArray(location)) {
+      return null;
+    }
+
+    const data = (response as { data?: unknown }).data;
+    return Array.isArray(data) ? data : null;
+  }
+
+  private readRecordString(value: unknown, key: string): string | null {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      return null;
+    }
+
+    const field = (value as Record<string, unknown>)[key];
+    return typeof field === 'string' && field.trim() ? field.trim() : null;
+  }
+
+  private normalizeStringSet(values: Array<string | null>): string[] {
+    return [...new Set(values.filter((value): value is string => Boolean(value)))].sort((left, right) => (
+      left.localeCompare(right)
+    ));
   }
 
   private normalizeResolvedModelConfigData(data: unknown): OpencodeModelConfigSubset {

@@ -12,6 +12,7 @@
 - 派生 provider directory / connected 诊断状态，但不把 directory-only provider 加进展示目录
 - 收束 provider availability 批量写回和 model availability 的 `disabledModelRefs` 归并
 - 继续复用 `ModelConfigService.testProviderAvailability()` 做逐 provider probe
+- 仅在 settings state 构建时请求 V2 影子目录比较，并把结果放入不持久化的 `catalogComparison`
 
 这样 settings UI 只消费 `ModelCatalogState`，不再自己重建 `baseEffective` / `effective` / `currentEnabledProviderIds` 的组合语义。
 
@@ -34,6 +35,7 @@ export interface ModelCatalogState {
   displayCatalogs: Record<ModelCatalogStateMode, ModelCatalog>;
   providerStatusCatalogs: Record<ModelCatalogStateMode, ModelCatalog>;
   providerDirectoryStatuses: Record<string, ProviderDirectoryStatus>;
+  catalogComparison: ModelCatalogComparison;
 }
 ```
 
@@ -41,6 +43,7 @@ export interface ModelCatalogState {
 - `providerStatusCatalogs`: 与展示视图平行的状态视图；provider/model 会带上当前轮次计算后的 `disabledScopes`
 - `providerDirectoryStatuses`: 从 `catalogs.providerDirectory` 派生的只读诊断状态，记录 provider 是否在 `provider.list()` 目录中、是否 connected、directory model 数，以及是否已经存在于 server / effective catalog。它不参与 `displayCatalogs` 构建。
 - `disabledModelRefs`: 进入本轮 catalog state API 前已经规范化的插件侧 model disable 集合
+- `catalogComparison`: 当前 `server` runtime catalog 与 V2 provider/model list 的只读比较结果；不进入 `ModelCatalogBundle`，也不驱动聊天可用性
 
 ## 关键行为
 
@@ -85,3 +88,4 @@ service 会同时生成：
 - 这个 service 负责“catalog state 语义”，不是 DOM owner；不要把 settings markup、probe badge 文案或搜索状态移进来。
 - `baseEffective` 与 filtered `effective` 的区分必须保留；service 只是在其上加一层 settings 可消费的状态视图。
 - provider discovery 仍然以 `ModelConfigService` / `config.providers(directory)` 为准；`provider.list()` 只可作为 `providerDirectoryStatuses` 的辅助诊断信号，不要用它扩展 server / effective catalog。
+- V2 comparison 不可用时返回 `unavailable`，settings 仍继续使用旧 runtime catalog；不要把它解释为 provider 故障。

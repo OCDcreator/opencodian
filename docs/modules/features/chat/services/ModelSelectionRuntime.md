@@ -10,6 +10,7 @@
 它负责：
 
 - 加载 host 提供的 model catalog bundle 与 provider 列表，并生成 selector 可用的 provider/model snapshot
+- 用 `catalogBundle.server` 的 provider/model 引用集合标记 `runtime` 与 `configured-only`；不依赖 `existsInServer` 字段
 - 根据 active-tab override 与 default selection 推导 requested/current/resolved model
 - 当 backend 只有轻量 provider snapshot、没有完整 `ModelCatalogBundle` 时，仍会用 snapshot 做 exact validation 与 fallback，避免旧 tab override 把未知 provider/model 直接送入发送管线
 - 在 disabled model filtering 后保留 base catalog metadata，用于 unavailable/known model display
@@ -55,7 +56,9 @@ export class ModelSelectionRuntime {
 ## 关键行为
 
 - `reloadModelCatalog()` 只更新 model selection runtime snapshot；dropdown rerender 与 trigger/icon refresh 仍由 `ChatSelectionControlsCoordinator` 编排
-- `getCurrentSessionModel()` 对 requested override/default selection 应用 effective catalog fallback，保持 disabled model filtering 语义
+- `getCurrentSessionModel()` 只在 runtime 可用子集内解析 requested override/default selection；默认值指向 configured-only 时回退到同 provider 的 runtime 模型或全局首个 runtime 模型
+- selector provider snapshot 保留 configured-only 条目供 UI 展示，但内部 `availableModels` 只包含 runtime 条目
+- `catalogBundle === null` 的 Claude Code 等轻量快照默认全部视为 runtime，保持跨 backend 兼容
 - `getCurrentSessionModel()` 在无 bundle 的 snapshot 模式下只返回 snapshot 中已知的模型；若 requested model 不存在，会回退到同 provider 首个模型或首个可用模型
 - `findKnownModelInfo()` 优先返回 currently available model metadata，找不到时回落到 base catalog metadata
 - `ensureSelectedModelAvailable()` 保留原有 resolution gate 与 server availability fallback；在 snapshot 模式下会先验证 provider/model 是否存在于 snapshot，未知模型不会进入 server availability seam

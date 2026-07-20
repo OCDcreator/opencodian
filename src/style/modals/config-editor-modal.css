@@ -1735,6 +1735,30 @@
   line-height: 1.5;
 }
 
+.opencodian-model-catalog-comparison {
+  display: flex;
+  align-items: center;
+  min-height: 28px;
+  margin: -4px 0 14px;
+  padding: 5px 8px;
+  border-left: 2px solid var(--background-modifier-border);
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.opencodian-model-catalog-comparison.is-match {
+  border-left-color: var(--color-green);
+}
+
+.opencodian-model-catalog-comparison.is-drift {
+  border-left-color: var(--color-yellow);
+}
+
+.opencodian-model-catalog-comparison.is-unavailable {
+  border-left-color: var(--text-faint);
+}
+
 .opencodian-model-availability-controls {
   display: grid;
   grid-template-columns: minmax(220px, 1fr) auto auto auto;

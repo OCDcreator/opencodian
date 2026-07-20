@@ -38,6 +38,7 @@ export interface ModelCatalogBundle {
 - `serverConfig`: 插件使用的“继承层 provider 配置”。本地模式优先来自本机磁盘配置，远程模式回退到服务端默认作用域 `config.get()`；它用于标注服务端禁用状态和 provider 开关继承值。
 - `effectiveProviderConfig`: 以 `serverConfig` 为继承基线，再叠加当前项目 `.opencode/opencode.json` 的 provider 可用性覆盖；本地数组按字段替换继承数组。
 - `providerDirectory`: 当前 vault 作用域下 `provider.list()` 返回的辅助 provider directory 快照，包含 directory catalog、connected provider ID 和 defaults。它只用于设置页诊断 / 连接状态展示，不参与 `server`、`baseEffective` 或 `effective` 的模型目录扩展。
+- V2 provider/model list 不属于 `ModelCatalogBundle`。`getV2CatalogComparison(serverCatalog)` 只读获取影子快照并与传入的 `server` catalog 比较，不改变主目录。
 - `serverConfig`、`effectiveProviderConfig` 与 `currentEnabledProviderIds` 现在来自同一个 inherited-config resolution seam，避免服务层重复手写 scope merge / enablement 条件。
 
 ## 关键行为
@@ -155,6 +156,7 @@ provider 开关继承规则依然保留在 `effectiveProviderConfig` 里，按�
 | `getLocalCatalog()` | 从本地配置构建 catalog |
 | `getServerCatalog()` | 从 OpenCode 服务端构建 catalog |
 | `getCatalogs(mode, disabledModelRefs?)` | 返回 `local/server/baseEffective/effective` 四套视图 |
+| `getV2CatalogComparison(serverCatalog)` | 比较当前 runtime server catalog 与 V2 provider/model list；失败返回不可比较状态 |
 | `isModelAvailableOnServer(provider, model)` | 校验服务端是否存在某模型 |
 | `testProviderAvailability(providerId)` | 探测当前 vault 作用域下某 provider 的真实可用性；允许时会做一次最小真实发送 |
 | `getLocalProviderIds()` | 从本地配置反推出启用 provider 列表 |
@@ -201,6 +203,7 @@ providerId + localConfig + runtime/server catalog + inherited resolution
 
 - `OpenCodianSettings.ts`：同时消费 `baseEffective` 和 `effective`，以便区分“存在但被禁用/不可用”和“完全不存在”。
 - `ModelCatalogStateService.ts`：把 `local/server/baseEffective/effective/currentEnabledProviderIds` 组合成 settings 侧稳定可消费的 catalog state API。
+- `ModelCatalogStateService.ts`：仅在 settings state 构建时请求 V2 影子比较；聊天目录加载不会调用该方法。
 - `OpenCodianView.ts`：使用 `effective` 约束聊天发送，但需要 `baseEffective` 保留展示元数据。
 - `TitleGenerationService.ts`：解析 `aiTitleModel` 时会先在 `baseEffective/effective` 上做 availability-aware 校验；显式配置的标题模型一旦不可用，会直接阻止标题生效。
 - `ModelConfigModal.ts` / `ModelConfigJsonModal.ts`：通过它读写本地模型配置。

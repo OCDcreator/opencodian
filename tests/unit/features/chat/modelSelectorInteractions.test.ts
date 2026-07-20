@@ -13,6 +13,11 @@ function createOption(value: string): HTMLElement {
   return option;
 }
 
+function disableOption(option: HTMLElement): HTMLElement {
+  option.setAttribute('aria-disabled', 'true');
+  return option;
+}
+
 describe('ModelSelectorInteractions', () => {
   it('moves keyboard highlight and clamps at list boundaries', () => {
     const scrollContainer = document.createElement('div');
@@ -30,6 +35,24 @@ describe('ModelSelectorInteractions', () => {
 
     navigateModelList(scrollContainer, 1);
     expect(second.hasClass('is-highlighted')).toBe(true);
+
+    navigateModelList(scrollContainer, -1);
+    expect(first.hasClass('is-highlighted')).toBe(true);
+  });
+
+  it('skips disabled options during keyboard navigation', () => {
+    const scrollContainer = document.createElement('div');
+    const first = createOption('openai::gpt-5');
+    const disabled = disableOption(createOption('local::custom'));
+    const third = createOption('anthropic::claude-sonnet');
+    scrollContainer.append(first, disabled, third);
+
+    navigateModelList(scrollContainer, 1);
+    expect(first.hasClass('is-highlighted')).toBe(true);
+
+    navigateModelList(scrollContainer, 1);
+    expect(disabled.hasClass('is-highlighted')).toBe(false);
+    expect(third.hasClass('is-highlighted')).toBe(true);
 
     navigateModelList(scrollContainer, -1);
     expect(first.hasClass('is-highlighted')).toBe(true);
@@ -60,6 +83,17 @@ describe('ModelSelectorInteractions', () => {
 
     expect(didSelect).toBe(true);
     expect(onSelect).toHaveBeenCalledWith('openai', 'gpt-5');
+  });
+
+  it('refuses to select a disabled highlighted option', () => {
+    const scrollContainer = document.createElement('div');
+    const highlighted = disableOption(createOption('local::custom'));
+    highlighted.addClass('is-highlighted');
+    scrollContainer.appendChild(highlighted);
+    const onSelect = jest.fn();
+
+    expect(selectHighlightedModel(scrollContainer, onSelect)).toBe(false);
+    expect(onSelect).not.toHaveBeenCalled();
   });
 
   it('scrolls the current model into view only when the option exists', () => {

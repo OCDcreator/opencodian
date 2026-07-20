@@ -1,4 +1,5 @@
 import type { ModelSourceMode, OpencodeModelConfigSubset } from '../types';
+import type { ModelCatalogComparison } from './modelCatalogComparison';
 import {
   collectConfiguredProviderIds,
   formatModelReference,
@@ -34,6 +35,7 @@ export interface ModelCatalogState {
   displayCatalogs: Record<ModelCatalogStateMode, ModelCatalog>;
   providerStatusCatalogs: Record<ModelCatalogStateMode, ModelCatalog>;
   providerDirectoryStatuses: Record<string, ProviderDirectoryStatus>;
+  catalogComparison: ModelCatalogComparison;
 }
 
 export class ModelCatalogStateService {
@@ -43,6 +45,7 @@ export class ModelCatalogStateService {
     const normalizedDisabledModelRefs = this.normalizeModelRefs(disabledModelRefs);
     const localModelConfig = await this.modelConfigService.readLocalModelConfig();
     const catalogs = await this.modelConfigService.getCatalogs(mode, normalizedDisabledModelRefs);
+    const catalogComparison = await this.modelConfigService.getV2CatalogComparison(catalogs.server);
     const statusCatalogs = this.buildProviderStatusCatalogs(catalogs, localModelConfig);
 
     return {
@@ -57,6 +60,7 @@ export class ModelCatalogStateService {
       },
       providerStatusCatalogs: statusCatalogs,
       providerDirectoryStatuses: this.buildProviderDirectoryStatuses(catalogs),
+      catalogComparison,
     };
   }
 

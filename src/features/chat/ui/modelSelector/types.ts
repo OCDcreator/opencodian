@@ -3,11 +3,15 @@ export interface ModelSelectorSelection {
   model: string;
 }
 
+export type ModelSelectorModelAvailability = 'runtime' | 'configured-only';
+
 export interface ModelSelectorModel {
   id: string;
   name: string;
   contextWindow?: number;
   variants?: string[];
+  availability?: ModelSelectorModelAvailability;
+  availabilityLabel?: string;
 }
 
 export interface ModelSelectorProvider {
@@ -50,4 +54,6 @@ export interface ModelSelectorRenderTexts {
   noModels: string;
   noModelsFound: string;
   noModelsAvailable: string;
+  configuredOnlyBadge: string;
+  configuredOnlyTitle: string;
 }
