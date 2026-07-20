@@ -319,17 +319,33 @@
   user-select: none;
 }
 
-/* Mode-specific selected option states */
-.opencodian-permission-option[data-permission-semantic='danger'].is-selected {
-  background: color-mix(in srgb, var(--background-modifier-error) 12%, transparent);
-  border-color: color-mix(in srgb, var(--background-modifier-error) 42%, var(--background-modifier-border));
-  box-shadow: inset 3px 0 0 var(--background-modifier-error);
+/*
+ * Permission semantics: danger/safe only color the icon, check, and
+ * compact label — never the full row. The selected row shares the
+ * same neutral `--background-modifier-hover` surface as every other
+ * Command item; no rail, outline, box-shadow, or row tint is allowed.
+ *
+ * The accent color is exposed as a CSS variable on the semantic scope
+ * and consumed by `.is-selected` descendants, so the danger/safe tint
+ * never depends on combining `data-permission-semantic` and the
+ * selected state in a single selector.
+ */
+.opencodian-permission-option[data-permission-semantic='danger'] {
+  --opencodian-permission-option-accent: var(--background-modifier-error);
 }
 
-.opencodian-permission-option[data-permission-semantic='safe'].is-selected {
-  background: color-mix(in srgb, var(--background-modifier-success) 12%, transparent);
-  border-color: color-mix(in srgb, var(--background-modifier-success) 42%, var(--background-modifier-border));
-  box-shadow: inset 3px 0 0 var(--background-modifier-success);
+.opencodian-permission-option[data-permission-semantic='safe'] {
+  --opencodian-permission-option-accent: var(--background-modifier-success);
+}
+
+.opencodian-permission-option.is-selected .opencodian-permission-option-icon,
+.opencodian-permission-option.is-selected .opencodian-permission-option-check,
+.opencodian-permission-option.is-selected .opencodian-permission-option-label {
+  color: var(--opencodian-permission-option-accent, var(--interactive-accent));
+}
+
+.opencodian-permission-option.is-selected .opencodian-permission-option-label {
+  font-weight: 600;
 }
 
 .opencodian-permission-option-icon {
@@ -382,40 +398,16 @@
   height: 16px;
   color: var(--interactive-accent);
   opacity: 0;
-  transform: scale(0.6);
-  transition: opacity 0.2s ease, transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: opacity 0.12s ease;
 }
 
 .opencodian-permission-option.is-selected .opencodian-permission-option-check {
   opacity: 1;
-  transform: scale(1);
 }
 
 .opencodian-permission-option-check svg {
   width: 14px;
   height: 14px;
-}
-
-/* Mode-specific checkmark colors */
-.opencodian-permission-option[data-mode="yolo"].is-selected .opencodian-permission-option-check {
-  color: var(--background-modifier-success);
-}
-
-.opencodian-permission-option[data-mode="plan"].is-selected .opencodian-permission-option-check {
-  color: var(--background-modifier-error);
-}
-
-/* Mode-specific icon colors - more vibrant */
-.opencodian-permission-option[data-mode="yolo"] .opencodian-permission-option-icon {
-  color: color-mix(in srgb, var(--background-modifier-success) 78%, var(--text-muted));
-}
-
-.opencodian-permission-option[data-mode="plan"] .opencodian-permission-option-icon {
-  color: color-mix(in srgb, var(--background-modifier-error) 78%, var(--text-muted));
-}
-
-.opencodian-permission-option[data-mode="normal"] .opencodian-permission-option-icon {
-  color: color-mix(in srgb, var(--interactive-accent) 78%, var(--text-muted));
 }
 
 /* Stagger animation for options on dropdown open */
@@ -461,10 +453,6 @@
 
   .opencodian-permission-trigger.is-open {
     transform: none !important;
-  }
-
-  .opencodian-permission-option.is-selected .opencodian-permission-option-check {
-    transform: scale(1) !important;
   }
 }
 

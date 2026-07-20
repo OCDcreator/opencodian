@@ -1955,6 +1955,7 @@ export const enTranslations = {
   'chat.agentSelector.loadFailed': 'Failed to load agents.',
   'chat.composerPopover.navigateHint': 'Navigate',
   'chat.composerPopover.selectHint': 'Select',
+  'chat.composerPopover.closeHint': 'Close',
   'chat.composerPopover.agentTitle': 'Choose primary agent',
   'chat.composerPopover.permissionTitle': 'Permission mode',
   'chat.composerPopover.modelTitle': 'Choose model',

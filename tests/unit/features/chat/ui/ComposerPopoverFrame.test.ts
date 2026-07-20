@@ -8,12 +8,15 @@ describe('mountComposerPopoverFrame', () => {
       escapeKey: 'Esc',
       navigateHint: 'Navigate',
       selectHint: 'Select',
+      closeHint: 'Close',
     });
 
     expect(dropdown.querySelector('.opencodian-composer-popover-frame')).not.toBeNull();
     expect(dropdown.querySelector('.opencodian-composer-popover-title')?.textContent).toBe('Choose model');
     expect(dropdown.querySelector('kbd')?.textContent).toBe('Esc');
-    expect(dropdown.querySelector('.opencodian-composer-popover-footer')?.textContent).toContain('Navigate');
+    expect(dropdown.querySelector('.opencodian-composer-popover-footer')?.textContent).toContain('↑↓ Navigate');
+    expect(dropdown.querySelector('.opencodian-composer-popover-footer')?.textContent).toContain('Enter Select');
+    expect(dropdown.querySelector('.opencodian-composer-popover-footer')?.textContent).toContain('Esc Close');
     expect(Array.from(dropdown.firstElementChild?.children ?? []).map((child) => child.className)).toEqual([
       'opencodian-composer-popover-header',
       'opencodian-composer-popover-content',
@@ -29,6 +32,7 @@ describe('mountComposerPopoverFrame', () => {
       escapeKey: 'Esc',
       navigateHint: 'Navigate',
       selectHint: 'Select',
+      closeHint: 'Close',
     });
     const child = frame.contentEl.createDiv({ text: 'catalog' });
 
@@ -37,12 +41,14 @@ describe('mountComposerPopoverFrame', () => {
       escapeKey: 'Esc',
       navigateHint: '导航',
       selectHint: '选择',
+      closeHint: '关闭',
     });
 
     expect(frame.contentEl.contains(child)).toBe(true);
     expect(dropdown.querySelector('.opencodian-composer-popover-title')?.textContent).toBe('选择模型');
     expect(dropdown.querySelector('kbd')?.textContent).toBe('Esc');
-    expect(dropdown.querySelector('.opencodian-composer-popover-footer')?.textContent).toContain('导航');
-    expect(dropdown.querySelector('.opencodian-composer-popover-footer')?.textContent).toContain('选择');
+    expect(dropdown.querySelector('.opencodian-composer-popover-footer')?.textContent).toContain('↑↓ 导航');
+    expect(dropdown.querySelector('.opencodian-composer-popover-footer')?.textContent).toContain('Enter 选择');
+    expect(dropdown.querySelector('.opencodian-composer-popover-footer')?.textContent).toContain('Esc 关闭');
   });
 });

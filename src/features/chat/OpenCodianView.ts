@@ -516,6 +516,7 @@ export class OpenCodianView extends ItemView {
   // Event refs for cleanup
   private eventRefs: EventRef[] = [];
   private backendActiveChangeDisposable: { dispose(): void } | null = null;
+  private escapeHandlers: Array<() => boolean> = [];
   private backendSurfaceSwitchPromise: Promise<void> | null = null;
 
   private headerTabBarSlotEl: HTMLElement | null = null;
@@ -902,6 +903,9 @@ export class OpenCodianView extends ItemView {
 
   private createComposerInputShellCoordinatorHost(): ComposerInputShellCoordinatorHost {
     return {
+      registerEscapeHandler: (handler) => {
+        this.escapeHandlers.push(handler);
+      },
       attachSessionTodo: (container) => {
         if (hasCapability(this.caps, AgentCapability.Todos)) {
           this.sessionTodoCoordinator.attach(container);
@@ -1167,7 +1171,7 @@ export class OpenCodianView extends ItemView {
   private createChatSelectionControlsCoordinatorHost(): ChatSelectionControlsCoordinatorHost {
     return {
       registerEscapeHandler: (handler) => {
-        this.scope?.register([], 'Escape', handler);
+        this.escapeHandlers.push(handler);
       },
       loadModelCatalogData: async () => {
         if (this.isClaudeCodeConversationActive()) {
@@ -3253,6 +3257,9 @@ export class OpenCodianView extends ItemView {
       }
     };
 
+    await measureStep('wireEventHandlers', () => {
+      this.wireEventHandlers();
+    });
     await measureStep('buildUI', () => {
       this.buildUI();
     });
@@ -3281,9 +3288,6 @@ export class OpenCodianView extends ItemView {
           container: this.messagesShellEl,
         });
       }
-    });
-    await measureStep('wireEventHandlers', () => {
-      this.wireEventHandlers();
     });
     await measureStep('wireBackendSurfaceSwitch', () => {
       this.wireBackendSurfaceSwitch();
@@ -3804,9 +3808,13 @@ export class OpenCodianView extends ItemView {
 
   /** Wire event handlers */
   private wireEventHandlers() {
-    // Escape to cancel streaming
     this.scope = new Scope(this.app.scope);
     this.scope.register([], 'Escape', () => {
+      for (const handler of this.escapeHandlers) {
+        if (handler()) {
+          return false;
+        }
+      }
       if (this.isActiveTabStreaming()) {
         this.cancelStreaming();
       }
@@ -4711,6 +4719,7 @@ export class OpenCodianView extends ItemView {
 
   /** Switch permission mode and restart OpenCode service */
   private async switchPermissionMode(mode: PermissionMode): Promise<boolean> {
+    const previousMode = this.plugin.settings.permissionMode;
     try {
       // Update setting
       this.plugin.settings.permissionMode = mode;
@@ -4731,6 +4740,12 @@ export class OpenCodianView extends ItemView {
       new Notice(t('settings.security.autoRestart.success'));
       return true;
     } catch (error) {
+      this.plugin.settings.permissionMode = previousMode;
+      try {
+        await this.plugin.saveSettings();
+      } catch (rollbackError) {
+        logger.error('Failed to persist permission mode rollback:', rollbackError);
+      }
       logger.error('Failed to switch permission mode:', error);
       new Notice(t('settings.security.autoRestart.failed'));
       return false;

@@ -1955,6 +1955,7 @@ export const zhTranslations = {
   'chat.agentSelector.loadFailed': '加载代理失败。',
   'chat.composerPopover.navigateHint': '导航',
   'chat.composerPopover.selectHint': '选择',
+  'chat.composerPopover.closeHint': '关闭',
   'chat.composerPopover.agentTitle': '选择主 Agent',
   'chat.composerPopover.permissionTitle': '权限模式',
   'chat.composerPopover.modelTitle': '选择模型',

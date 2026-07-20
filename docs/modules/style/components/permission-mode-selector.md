@@ -17,7 +17,7 @@
 - `.opencodian-codex-runtime-defaults-badge*`：permission trigger 旁的 Codex runtime defaults 徽章，仅在网络访问启用、网页搜索未禁用或额外目录非空时渲染，使用紧凑 toolbar badge 几何与 ellipsis 截断。
 - `.opencodian-permission-dropdown`：弹出菜单容器。
 - `.opencodian-permission-option*`：选项项、图标、描述与选中勾选。
-- `[data-permission-semantic="danger|safe|neutral"]`：只覆盖 shared selected row 的风险语义色；图标和描述仍用具体 `data-mode` 保留明确风险信息。
+- `[data-permission-semantic="danger|safe|neutral"]`：danger/safe 只在 selected 状态下染色 icon、check 与 label 文字（使用 `--background-modifier-error` / `--background-modifier-success`）；整行背景、边框、左侧 rail 与 box-shadow 仍归共享 Command 中性表面所有，不得染满。description 仍保留明确风险信息。
 
 ## 关联 TS 组件
 
@@ -31,6 +31,7 @@
 - 帧级动效与 reduced-motion 策略由共享 `composer-popover-frame.css` 统一拥有。
 - dropdown 使用 `box-sizing: border-box`，280px CSS 宽度只作为无边界控制器时的回退；运行时由共享控制器限制在 Chat 容器左右 8px 安全区。
 - 选项支持 `:focus-visible` 焦点轮廓，确保键盘导航可见。
+- `[data-permission-semantic]` 的 danger/safe 染色仅落在 icon/check/label；不得回到整行 tint + 左侧 rail 的旧形态。
 - 修改后执行 `npm run build:css`（或完整 `npm run build`）。
 - 2026-06-07 新增 sandbox badge 样式，覆盖 enabled/disabled/readback 状态和 expanded sandbox 子策略摘要。
 - 2026-06-07 Round 13 扩展为 Claude Code config badges，同一几何也覆盖 additional directories read-only badge。该 badge 只表示下一次 query 请求的额外目录作用域，不表示 SDK/CLI 已解析或实际可访问这些路径。

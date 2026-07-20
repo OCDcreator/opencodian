@@ -44,6 +44,7 @@ function createFixture() {
     getInputPlaceholder: jest.fn(() => t('chat.input.placeholder')),
     getSlashCommandSkillMode: jest.fn(() => skillMode),
     addChosenFileContextToActiveTab: jest.fn().mockResolvedValue(undefined),
+    registerEscapeHandler: jest.fn(),
     mountSelectionControls: jest.fn(),
     mountContextUsageIndicator: jest.fn(),
     mountEffortSelector: jest.fn(),

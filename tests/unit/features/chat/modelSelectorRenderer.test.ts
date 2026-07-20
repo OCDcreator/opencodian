@@ -19,6 +19,7 @@ describe('ModelSelectorRenderer', () => {
 
     const result = renderModelList({
       scrollContainer,
+      optionIdPrefix: 'test-option',
       providers: [],
       hasLoadedModelCatalog: false,
       filterQuery: '',
@@ -43,6 +44,7 @@ describe('ModelSelectorRenderer', () => {
     const emptyCatalogContainer = document.createElement('div');
     renderModelList({
       scrollContainer: emptyCatalogContainer,
+      optionIdPrefix: 'empty-catalog-option',
       providers: [],
       hasLoadedModelCatalog: true,
       filterQuery: '',
@@ -62,6 +64,7 @@ describe('ModelSelectorRenderer', () => {
     const noMatchContainer = document.createElement('div');
     renderModelList({
       scrollContainer: noMatchContainer,
+      optionIdPrefix: 'no-match-option',
       providers: [
         {
           id: 'openai',
@@ -109,6 +112,7 @@ describe('ModelSelectorRenderer', () => {
       filterQuery: '',
       currentSelection: { provider: 'openai', model: 'gpt-5' },
       highlightedValue: 'openai::gpt-4.1',
+      optionIdPrefix: 'first-model-option',
       previousStickyHeadersCleanup: previousStickyCleanup,
       texts: {
         loading: 'Loading models...',
@@ -132,14 +136,71 @@ describe('ModelSelectorRenderer', () => {
     expect(options[0].tabIndex).toBe(-1);
     expect(options[0].hasClass('opencodian-composer-popover-option')).toBe(true);
     expect(options[0].hasClass('is-selected')).toBe(true);
+    expect(options[0].id).toBe('first-model-option-openai%3A%3Agpt-5');
+    expect(options[0].querySelector('.opencodian-model-option-icon')?.getAttribute('aria-hidden')).toBe('true');
+    expect(options[0].querySelector('.opencodian-model-option-main')?.textContent).toBe('GPT-5');
+    expect(options[0].querySelector('.opencodian-model-option-check')).not.toBeNull();
     expect(options[1].getAttribute('aria-selected')).toBe('false');
     expect(options[1].hasClass('is-highlighted')).toBe(true);
-    expect(scrollContainer.querySelector('.opencodian-model-provider-header')?.textContent).toContain('OpenAI');
+
+    const group = scrollContainer.querySelector('.opencodian-model-group');
+    expect(group).not.toBeNull();
+    expect(group?.getAttribute('role')).toBe('group');
+    const labelledBy = group?.getAttribute('aria-labelledby');
+    expect(labelledBy).toBeTruthy();
+    const headerLabel = labelledBy ? scrollContainer.querySelector<HTMLElement>(`[id="${labelledBy}"]`) : null;
+    expect(headerLabel?.textContent).toContain('OpenAI');
+    expect(headerLabel?.getAttribute('role')).not.toBe('option');
 
     options[1].dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
     expect(onHighlight).toHaveBeenCalledWith('openai::gpt-4.1');
 
     options[1].dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(onSelect).toHaveBeenCalledWith('openai', 'gpt-4.1');
+  });
+
+  it('renders provider identity once per group and leaves model icon slots empty', () => {
+    const scrollContainer = document.createElement('div');
+
+    renderModelList({
+      scrollContainer,
+      optionIdPrefix: 'icon-contract-option',
+      providers: [
+        {
+          id: 'openai',
+          name: 'OpenAI',
+          models: [
+            { id: 'gpt-5', name: 'GPT-5' },
+            { id: 'gpt-4.1', name: 'GPT-4.1' },
+          ],
+        },
+      ],
+      hasLoadedModelCatalog: true,
+      filterQuery: '',
+      currentSelection: null,
+      highlightedValue: null,
+      texts: {
+        loading: 'Loading models...',
+        noModels: 'No models available',
+        noModelsFound: 'No models found',
+        noModelsAvailable: 'No models available',
+      },
+      onSelect: jest.fn(),
+      onHighlight: jest.fn(),
+    });
+
+    const group = scrollContainer.querySelector('.opencodian-model-group');
+    const headerIcons = group?.querySelectorAll(':scope > .opencodian-model-provider-header .opencodian-model-provider-header-icon');
+    expect((headerIcons?.length ?? 0)).toBeLessThanOrEqual(1);
+
+    const modelIcons = scrollContainer.querySelectorAll('.opencodian-model-option-icon img, .opencodian-model-option-icon svg');
+    expect(modelIcons.length).toBe(0);
+
+    for (const option of scrollContainer.querySelectorAll<HTMLElement>('.opencodian-model-option')) {
+      const iconSlot = option.querySelector('.opencodian-model-option-icon');
+      expect(iconSlot).not.toBeNull();
+      expect(iconSlot?.getAttribute('aria-hidden')).toBe('true');
+      expect(iconSlot?.childElementCount).toBe(0);
+    }
   });
 });

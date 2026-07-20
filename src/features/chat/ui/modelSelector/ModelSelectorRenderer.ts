@@ -11,6 +11,7 @@ import type {
 
 export interface RenderModelListOptions {
   scrollContainer: HTMLElement;
+  optionIdPrefix: string;
   providers: readonly ModelSelectorProvider[];
   hasLoadedModelCatalog: boolean;
   filterQuery: string;
@@ -26,8 +27,13 @@ export interface RenderModelListResult {
   disposeStickyHeaders: (() => void) | null;
 }
 
+function buildModelOptionId(prefix: string, value: string): string {
+  return prefix + '-' + encodeURIComponent(value);
+}
+
 export function renderModelList({
   scrollContainer,
+  optionIdPrefix,
   providers,
   hasLoadedModelCatalog,
   filterQuery,
@@ -85,8 +91,13 @@ export function renderModelList({
   const headers: HTMLElement[] = [];
 
   for (const provider of filteredProviders) {
+    const providerLabelId = buildModelOptionId(optionIdPrefix, provider.id) + '-label';
     const groupEl = groupsContainer.createDiv({
       cls: 'opencodian-model-group',
+      attr: {
+        role: 'group',
+        'aria-labelledby': providerLabelId,
+      },
     });
 
     const header = groupEl.createDiv({
@@ -102,15 +113,23 @@ export function renderModelList({
       header.appendChild(iconEl);
     }
 
-    const headerText = header.createSpan({ cls: 'opencodian-model-provider-header-text' });
+    const headerText = header.createSpan({
+      cls: 'opencodian-model-provider-header-text',
+      attr: { id: providerLabelId },
+    });
     headerText.setText(provider.name);
     headers.push(header);
 
+    const optionsEl = groupEl.createDiv({
+      cls: 'opencodian-model-group-options',
+    });
+
     for (const model of provider.models) {
       const modelValue = buildModelOptionValue(provider.id, model.id);
-      const modelOption = groupEl.createDiv({
+      const modelOption = optionsEl.createDiv({
         cls: 'opencodian-model-option opencodian-composer-popover-option',
         attr: {
+          id: buildModelOptionId(optionIdPrefix, modelValue),
           'data-value': modelValue,
           role: 'option',
           'aria-selected': String(modelValue === currentValue),
@@ -125,10 +144,21 @@ export function renderModelList({
         modelOption.addClass('is-highlighted');
       }
 
-      const nameSpan = modelOption.createSpan({ cls: 'opencodian-model-option-name' });
+      // The shared 22px leading slot stays empty so the model row reads as a
+      // child of the provider group while keeping Command row alignment.
+      modelOption.createSpan({
+        cls: 'opencodian-model-option-icon opencodian-composer-popover-option-icon',
+        attr: { 'aria-hidden': 'true' },
+      });
+
+      const nameSpan = modelOption.createSpan({
+        cls: 'opencodian-model-option-name opencodian-model-option-main opencodian-composer-popover-option-main',
+      });
       nameSpan.setText(model.name);
 
-      const checkmark = modelOption.createSpan({ cls: 'opencodian-model-option-check' });
+      const checkmark = modelOption.createSpan({
+        cls: 'opencodian-model-option-check opencodian-composer-popover-option-check',
+      });
       setIcon(checkmark, 'check');
 
       modelOption.addEventListener('click', (event) => {

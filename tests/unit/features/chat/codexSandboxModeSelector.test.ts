@@ -183,6 +183,16 @@ describe('Codex sandbox mode selector', () => {
       coordinator.destroy();
     });
 
+    it('marks the neutral sandbox mode separately from safe and danger modes', () => {
+      const container = document.createElement('div');
+      const coordinator = new PermissionModeSelectorCoordinator(host, createCodexSandboxConfig());
+      coordinator.mount(container);
+
+      expect(container.querySelector('[data-mode="workspace-write"]')?.getAttribute('data-permission-semantic')).toBe('neutral');
+
+      coordinator.destroy();
+    });
+
     it('marks the current mode as selected in the dropdown', () => {
       currentMode = 'read-only';
       const container = document.createElement('div');

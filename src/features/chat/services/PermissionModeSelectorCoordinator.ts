@@ -447,6 +447,7 @@ export class PermissionModeSelectorCoordinator {
       escapeKey: 'Esc',
       navigateHint: t('chat.composerPopover.navigateHint'),
       selectHint: t('chat.composerPopover.selectHint'),
+      closeHint: t('chat.composerPopover.closeHint'),
     };
   }
 

@@ -14,11 +14,11 @@
 - 在 permission selector 旁集成 Claude Code additional directories configured-scope badge，用于显示额外目录请求状态
 - 在 permission selector 旁集成 sandbox badge 容器（仅 Claude Code backend），用于显示 Claude Code sandbox 配置摘要
 - 在 permission selector 旁集成 Codex runtime defaults badge 容器（仅 Codex backend），用于显示网络、网页搜索与额外目录等非默认 Codex 运行默认项
-- 把 Model 的 search-first controls 与 scroll list 挂到共享 `ComposerPopoverFrame` content slot，维护搜索、keyboard navigation、sticky header cleanup 与 provider icon 刷新
+- 把 Model 的 search-first controls 与 scroll list 挂到共享 `ComposerPopoverFrame` content slot，维护每实例唯一的 combobox/listbox/option id、仅在打开态写入的 active-descendant、keyboard navigation、sticky header cleanup 与 provider icon 刷新，并保留 280px 列表视口
 - model dropdown 通过共享 `AnchoredOverlayLayoutController` 按 Chat 容器边界同步 340px 首选宽度、280px 最小宽度与 8px 安全区
 - 统一更新当前模型显示、unavailable / unconfigured class、switch-model override 写回结果、unavailable notice 文案与 effort selector 连动；trigger tooltip 明确这是当前标签的发送覆盖，不是持久化 `ConversationSessionSettings`
 - 委托 `PermissionModeSelectorCoordinator` 维护 permission selector 的 mode label、selected state 与 dropdown open/close lifecycle
-- 通过共享 escape handler 收束两个 selector 的关闭行为
+- 通过共享 escape handler 收束两个 selector 的关闭行为；Scope Escape 会关闭实际打开的卡片并把焦点还给它的 trigger，避免落回 Obsidian app root
 
 ## 公开接口
 

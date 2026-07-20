@@ -2149,12 +2149,24 @@ body[data-opencodian-provider-icon-mode="color"] {
 
 
 /* components/composer-popover-frame.css */
+/*
+ * Shared Composer Popover + Command frame
+ *
+ * One quiet sheet: background-primary, 1px background-modifier-border,
+ * 10px radius, restrained host shadow. No glass, gradients, nested
+ * cards, colored rails, or selected-row outlines. Default, hover,
+ * keyboard-highlight, and selected rows all share the same low-sat
+ * background-modifier-hover surface; selection is communicated by the
+ * per-selector checkmark and label weight, never by border, shadow,
+ * or left color rail.
+ */
+
 .opencodian-composer-popover-frame {
   overflow: hidden;
   border: 1px solid var(--background-modifier-border);
-  border-radius: 14px;
+  border-radius: 10px;
   background: var(--background-primary);
-  box-shadow: 0 12px 28px var(--background-modifier-box-shadow);
+  box-shadow: 0 4px 14px var(--background-modifier-box-shadow);
 }
 
 .opencodian-composer-popover-header,
@@ -2171,7 +2183,17 @@ body[data-opencodian-provider-icon-mode="color"] {
   border-bottom: 1px solid var(--background-modifier-border);
 }
 
-.opencodian-composer-popover-title,
+.opencodian-composer-popover-title {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-overflow: ellipsis;
+  text-transform: none;
+  white-space: nowrap;
+}
+
 .opencodian-composer-popover-section {
   overflow: hidden;
   color: var(--text-muted);
@@ -2210,30 +2232,33 @@ body[data-opencodian-provider-icon-mode="color"] {
   font-size: 12px;
 }
 
+/*
+ * Command item row. Compact by default; rows that render a description
+ * grow naturally with their content. Transparent at rest; one quiet
+ * hover/keyboard/selected surface. Selection is signaled by the
+ * per-selector checkmark and label weight only.
+ */
 .opencodian-composer-popover-option {
+  box-sizing: border-box;
   display: grid;
   grid-template-columns: 22px minmax(0, 1fr) 18px;
   align-items: center;
   column-gap: 8px;
-  min-height: 48px;
+  min-height: 32px;
   padding: 6px 8px;
-  border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: 6px;
+  background: transparent;
 }
 
-.opencodian-composer-popover-option:hover {
+.opencodian-composer-popover-option:hover,
+.opencodian-composer-popover-option.is-highlighted,
+.opencodian-composer-popover-option.is-selected {
   background: var(--background-modifier-hover);
 }
 
 .opencodian-composer-popover-option:focus-visible {
   outline: 2px solid var(--interactive-accent);
   outline-offset: -2px;
-}
-
-.opencodian-composer-popover-option.is-selected {
-  background: color-mix(in srgb, var(--interactive-accent) 12%, transparent);
-  border-color: color-mix(in srgb, var(--interactive-accent) 36%, var(--background-modifier-border));
-  box-shadow: inset 3px 0 0 var(--interactive-accent);
 }
 
 .opencodian-composer-popover-option-icon,
@@ -2250,20 +2275,27 @@ body[data-opencodian-provider-icon-mode="color"] {
   min-width: 0;
 }
 
-.opencodian-composer-popover-option-title,
-.opencodian-composer-popover-option-description {
+.opencodian-composer-popover-option-title {
   overflow: hidden;
+  color: var(--text-normal);
+  font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.opencodian-composer-popover-option-title {
-  color: var(--text-normal);
+.opencodian-composer-popover-option.is-selected .opencodian-composer-popover-option-title,
+.opencodian-composer-popover-option.is-selected .opencodian-agent-option-label,
+.opencodian-composer-popover-option.is-selected .opencodian-permission-option-label,
+.opencodian-composer-popover-option.is-selected .opencodian-model-option-name {
+  font-weight: 600;
 }
 
 .opencodian-composer-popover-option-description {
+  overflow: hidden;
   color: var(--text-muted);
   font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -2457,13 +2489,13 @@ body[data-opencodian-provider-icon-mode="color"] {
 }
 
 .opencodian-agent-dropdown-heading {
-  padding: 4px 8px 6px 9px;
+  padding: 6px 10px 2px;
   color: var(--text-faint);
-  font-size: 10px;
-  font-weight: 700;
+  font-size: 11px;
+  font-weight: 600;
   line-height: 1.2;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: normal;
+  text-transform: none;
 }
 
 .opencodian-agent-option {
@@ -2474,31 +2506,26 @@ body[data-opencodian-provider-icon-mode="color"] {
   user-select: none;
 }
 
-.opencodian-agent-option-marker,
+/*
+ * Command items: the marker dot is hidden. Selection is expressed by
+ * the shared checkmark and 600 label weight only; "default" is still
+ * labeled by the compact default badge.
+ */
+.opencodian-agent-option-marker {
+  display: none;
+}
+
 .opencodian-agent-option-check {
+  grid-column: 3;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-}
-
-.opencodian-agent-option-marker {
-  width: 6px;
-  height: 6px;
-  margin-top: 8px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--text-warning) 74%, var(--background-primary));
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--text-warning) 10%, transparent);
-}
-
-.opencodian-agent-option.is-default .opencodian-agent-option-marker {
-  background: color-mix(in srgb, var(--text-muted) 60%, var(--background-primary));
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--text-muted) 8%, transparent);
-}
-
-.opencodian-agent-option-check {
   width: 16px;
   height: 16px;
+  margin-top: 1px;
+  color: var(--interactive-accent);
+  opacity: 0;
 }
 
 .opencodian-agent-option-check svg {
@@ -2506,7 +2533,17 @@ body[data-opencodian-provider-icon-mode="color"] {
   height: 14px;
 }
 
+.opencodian-agent-option.is-selected .opencodian-agent-option-check {
+  color: var(--text-normal);
+  opacity: 1;
+}
+
+.opencodian-agent-option.is-selected .opencodian-agent-option-label {
+  font-weight: 600;
+}
+
 .opencodian-agent-option-content {
+  grid-column: 2;
   min-width: 0;
   flex: 1 1 auto;
   display: flex;
@@ -2522,7 +2559,7 @@ body[data-opencodian-provider-icon-mode="color"] {
 .opencodian-agent-option-label-row {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   min-width: 0;
 }
 
@@ -2531,7 +2568,7 @@ body[data-opencodian-provider-icon-mode="color"] {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-weight: 600;
+  font-weight: 500;
   line-height: 1.3;
 }
 
@@ -2548,11 +2585,12 @@ body[data-opencodian-provider-icon-mode="color"] {
   flex-shrink: 0;
   padding: 0 5px 1px;
   border-radius: 5px;
-  background: color-mix(in srgb, var(--text-warning) 10%, transparent);
-  color: color-mix(in srgb, var(--text-warning) 88%, var(--text-normal));
+  background: color-mix(in srgb, var(--text-muted) 12%, transparent);
+  color: var(--text-muted);
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.4;
+  letter-spacing: 0.02em;
 }
 
 .opencodian-agent-option-mode.is-default-mode {
@@ -2561,7 +2599,7 @@ body[data-opencodian-provider-icon-mode="color"] {
   text-overflow: ellipsis;
   white-space: nowrap;
   background: color-mix(in srgb, var(--text-muted) 10%, transparent);
-  color: color-mix(in srgb, var(--text-muted) 90%, var(--text-normal));
+  color: var(--text-muted);
 }
 
 .opencodian-agent-option-desc,
@@ -2579,28 +2617,22 @@ body[data-opencodian-provider-icon-mode="color"] {
   -webkit-line-clamp: 2;
 }
 
-.opencodian-agent-option-check {
-  margin-top: 1px;
-  color: var(--interactive-accent);
-  opacity: 0;
-}
-
-.opencodian-agent-option.is-selected .opencodian-agent-option-check {
-  opacity: 1;
-}
-
 .opencodian-agent-dropdown-state {
-  margin: 2px 0 0;
-  padding: 9px 8px 8px 35px;
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--background-secondary) 46%, transparent);
+  margin: 2px 4px 0;
+  padding: 8px 10px;
+  border-radius: 6px;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .opencodian-agent-trigger,
   .opencodian-agent-trigger-chevron,
-  .opencodian-agent-option {
+  .opencodian-agent-option,
+  .opencodian-agent-dropdown {
     transition: none;
+  }
+
+  .opencodian-agent-dropdown {
+    animation: none;
   }
 }
 
@@ -2852,8 +2884,6 @@ body.theme-dark .opencodian-agent-switcher-lobehub-img--dark {
    Model Selector - Opencode Style
    ============================================================ */
 
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@700&display=swap');
-
 .opencodian-model-selector {
   flex-shrink: 0;
   position: relative;
@@ -3029,7 +3059,7 @@ body.theme-dark .opencodian-agent-switcher-lobehub-img--dark {
 }
 
 .opencodian-model-dropdown .opencodian-composer-popover-frame {
-  max-height: 360px;
+  max-height: 432px;
   display: flex;
   flex-direction: column;
 }
@@ -3039,32 +3069,27 @@ body.theme-dark .opencodian-agent-switcher-lobehub-img--dark {
   min-height: 0;
   flex: 1 1 auto;
   flex-direction: column;
+  padding: 0;
 }
 
-/* Search Section */
+/*
+ * CommandInput strip: one full-width row with a bottom separator.
+ * No inner rounded card, no secondary surface; the input shares the
+ * shared frame surface directly.
+ */
 .opencodian-model-dropdown-search {
   flex-shrink: 0;
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--background-modifier-border);
-}
-
-.opencodian-model-dropdown-search-container {
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 32px;
-  padding: 0 10px;
-  border-radius: 8px;
-  background: var(--background-secondary);
-  border: 1px solid var(--background-modifier-border);
-  transition:
-    background-color 0.12s ease,
-    border-color 0.12s ease;
+  min-height: 36px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--background-modifier-border);
+  background: transparent;
 }
 
-.opencodian-model-dropdown-search-container:focus-within {
-  background: var(--background-primary);
-  border-color: var(--interactive-accent);
+.opencodian-model-dropdown-search-container {
+  display: contents;
 }
 
 .opencodian-model-dropdown-search-icon {
@@ -3099,12 +3124,19 @@ body.theme-dark .opencodian-agent-switcher-lobehub-img--dark {
   font-weight: 400;
 }
 
+.opencodian-model-dropdown .opencodian-model-dropdown-search-input {
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
 /* Scrollable List Container */
 .opencodian-model-dropdown-scroll {
   flex: 1 1 auto;
   min-height: 0;
   max-height: 280px;
-  padding: 4px 0;
+  padding: 0;
   position: relative;
   overflow-y: auto;
   overflow-x: hidden;
@@ -3152,6 +3184,15 @@ body.theme-dark .opencodian-agent-switcher-lobehub-img--dark {
 /* Groups Container */
 .opencodian-model-groups {
   display: block;
+  /*
+   * Vertical breathing room lives on the inner groups wrapper, not on the
+   * scroll container. A scroll-container padding-top would push the
+   * sticky provider header's inset to the content-box edge (y=4px),
+   * exposing a transparent strip at the scrollport top where model rows
+   * bleed through during scroll. Keeping the scrollport edge flush with
+   * the first header lets position:sticky clamp to y=0 reliably.
+   */
+  padding: 4px 0;
 }
 
 /* Model Group */
@@ -3159,7 +3200,17 @@ body.theme-dark .opencodian-agent-switcher-lobehub-img--dark {
   display: block;
 }
 
-/* Provider Header - Sticky section label */
+/*
+ * Provider group heading: sticky shadcn CommandGroupHeading-style label.
+ * It must read as a group heading, not as a selectable model row and not
+ * as placeholder text. Direction A flattens the heading onto the popover
+ * surface with a fully opaque --background-primary background and no
+ * tonal band or full-width separator; hierarchy comes from icon
+ * ownership, the empty shared leading slot, whitespace, and typography.
+ * Text uses --text-muted (never --text-faint, which is reserved for the
+ * search placeholder) so the provider label stays legible even in
+ * pink/saturated light themes.
+ */
 .opencodian-model-provider-header {
   position: sticky;
   top: 0;
@@ -3167,22 +3218,20 @@ body.theme-dark .opencodian-agent-switcher-lobehub-img--dark {
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 30px;
-  padding: 0 12px;
-  background: var(--background-secondary);
-  border-top: 1px solid var(--background-modifier-border);
-  border-bottom: 1px solid var(--background-modifier-border);
+  min-height: 26px;
+  padding: 5px 12px 4px;
+  background: var(--background-primary);
   color: var(--text-muted);
-  font-family: 'DM Sans', system-ui, sans-serif;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  letter-spacing: 0;
+  text-transform: none;
 }
 
-.opencodian-model-group:first-child .opencodian-model-provider-header {
-  border-top: none;
+.opencodian-model-group-options {
+  display: block;
+  padding: 0 4px;
 }
 
 .opencodian-model-provider-header-icon {
@@ -3190,15 +3239,17 @@ body.theme-dark .opencodian-agent-switcher-lobehub-img--dark {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  width: 16px;
-  height: 16px;
-  opacity: 0.82;
+  width: 12px;
+  height: 12px;
+  opacity: 0.55;
 }
 
 .opencodian-model-provider-header-icon img,
 img.opencodian-model-provider-header-icon {
-  width: 14px;
-  height: 14px;
+  /* The renderer injects 14px inline styles; keep the header icon at the
+   * contracted 12px spec without touching the TypeScript renderer. */
+  width: 12px !important;
+  height: 12px !important;
   object-fit: contain;
   filter: var(--lobehub-icon-filter, none);
 }
@@ -3220,19 +3271,21 @@ img.opencodian-model-provider-header-icon {
   user-select: none;
 }
 
-.opencodian-model-option.is-highlighted {
-  background: var(--background-modifier-hover);
-}
-
 .opencodian-model-option-name {
-  flex: 1;
+  grid-column: 2;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-weight: 400;
+}
+
+.opencodian-model-option.is-selected .opencodian-model-option-name {
+  font-weight: 600;
 }
 
 .opencodian-model-option-check {
+  grid-column: 3;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3241,15 +3294,15 @@ img.opencodian-model-provider-header-icon {
   height: 16px;
   color: var(--interactive-accent);
   opacity: 0;
-  transform: scale(0.85);
-  transition:
-    opacity 0.12s ease,
-    transform 0.12s ease;
 }
 
 .opencodian-model-option.is-selected .opencodian-model-option-check {
+  color: var(--text-normal);
   opacity: 1;
-  transform: scale(1);
+}
+
+.opencodian-model-option-icon {
+  grid-column: 1;
 }
 
 /* Settings */
@@ -4797,7 +4850,6 @@ img.opencodian-model-provider-header-icon {
 }
 
 
-
 /* components/permission-mode-selector.css */
 /* ============================================================
    Permission Mode Selector
@@ -5120,17 +5172,33 @@ img.opencodian-model-provider-header-icon {
   user-select: none;
 }
 
-/* Mode-specific selected option states */
-.opencodian-permission-option[data-permission-semantic='danger'].is-selected {
-  background: color-mix(in srgb, var(--background-modifier-error) 12%, transparent);
-  border-color: color-mix(in srgb, var(--background-modifier-error) 42%, var(--background-modifier-border));
-  box-shadow: inset 3px 0 0 var(--background-modifier-error);
+/*
+ * Permission semantics: danger/safe only color the icon, check, and
+ * compact label — never the full row. The selected row shares the
+ * same neutral `--background-modifier-hover` surface as every other
+ * Command item; no rail, outline, box-shadow, or row tint is allowed.
+ *
+ * The accent color is exposed as a CSS variable on the semantic scope
+ * and consumed by `.is-selected` descendants, so the danger/safe tint
+ * never depends on combining `data-permission-semantic` and the
+ * selected state in a single selector.
+ */
+.opencodian-permission-option[data-permission-semantic='danger'] {
+  --opencodian-permission-option-accent: var(--background-modifier-error);
 }
 
-.opencodian-permission-option[data-permission-semantic='safe'].is-selected {
-  background: color-mix(in srgb, var(--background-modifier-success) 12%, transparent);
-  border-color: color-mix(in srgb, var(--background-modifier-success) 42%, var(--background-modifier-border));
-  box-shadow: inset 3px 0 0 var(--background-modifier-success);
+.opencodian-permission-option[data-permission-semantic='safe'] {
+  --opencodian-permission-option-accent: var(--background-modifier-success);
+}
+
+.opencodian-permission-option.is-selected .opencodian-permission-option-icon,
+.opencodian-permission-option.is-selected .opencodian-permission-option-check,
+.opencodian-permission-option.is-selected .opencodian-permission-option-label {
+  color: var(--opencodian-permission-option-accent, var(--interactive-accent));
+}
+
+.opencodian-permission-option.is-selected .opencodian-permission-option-label {
+  font-weight: 600;
 }
 
 .opencodian-permission-option-icon {
@@ -5183,40 +5251,16 @@ img.opencodian-model-provider-header-icon {
   height: 16px;
   color: var(--interactive-accent);
   opacity: 0;
-  transform: scale(0.6);
-  transition: opacity 0.2s ease, transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: opacity 0.12s ease;
 }
 
 .opencodian-permission-option.is-selected .opencodian-permission-option-check {
   opacity: 1;
-  transform: scale(1);
 }
 
 .opencodian-permission-option-check svg {
   width: 14px;
   height: 14px;
-}
-
-/* Mode-specific checkmark colors */
-.opencodian-permission-option[data-mode="yolo"].is-selected .opencodian-permission-option-check {
-  color: var(--background-modifier-success);
-}
-
-.opencodian-permission-option[data-mode="plan"].is-selected .opencodian-permission-option-check {
-  color: var(--background-modifier-error);
-}
-
-/* Mode-specific icon colors - more vibrant */
-.opencodian-permission-option[data-mode="yolo"] .opencodian-permission-option-icon {
-  color: color-mix(in srgb, var(--background-modifier-success) 78%, var(--text-muted));
-}
-
-.opencodian-permission-option[data-mode="plan"] .opencodian-permission-option-icon {
-  color: color-mix(in srgb, var(--background-modifier-error) 78%, var(--text-muted));
-}
-
-.opencodian-permission-option[data-mode="normal"] .opencodian-permission-option-icon {
-  color: color-mix(in srgb, var(--interactive-accent) 78%, var(--text-muted));
 }
 
 /* Stagger animation for options on dropdown open */
@@ -5262,10 +5306,6 @@ img.opencodian-model-provider-header-icon {
 
   .opencodian-permission-trigger.is-open {
     transform: none !important;
-  }
-
-  .opencodian-permission-option.is-selected .opencodian-permission-option-check {
-    transform: scale(1) !important;
   }
 }
 

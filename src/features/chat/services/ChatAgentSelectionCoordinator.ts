@@ -23,6 +23,7 @@ export interface ChatAgentSelectionCoordinatorHost {
   loadAgentSelectionCandidates(): Promise<AgentSelectionCandidate[]>;
   closePeerDropdowns(): void;
   restoreInputFocus(): void;
+  registerEscapeHandler(handler: () => boolean): void;
 }
 
 export class ChatAgentSelectionCoordinator {
@@ -39,11 +40,13 @@ export class ChatAgentSelectionCoordinator {
   private dropdownLayoutController: AnchoredOverlayLayoutController | null = null;
   private openedWithKeyboard = false;
   private focusedOptionIndex: number | null = null;
+  private hasRegisteredEscapeHandler = false;
 
   constructor(private readonly host: ChatAgentSelectionCoordinatorHost) {}
 
   mount(containerEl: HTMLElement): void {
     this.destroy();
+    this.registerEscapeHandler();
     this.containerEl = containerEl;
     this.triggerEl = containerEl.createDiv({
       cls: 'opencodian-agent-trigger',
@@ -76,9 +79,22 @@ export class ChatAgentSelectionCoordinator {
       this.toggleDropdown(false);
     });
     this.triggerEl.addEventListener('keydown', (event) => {
-      if (event.key === 'Enter' || event.key === ' ' || event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      if (event.key === 'Enter' || event.key === ' ') {
         event.preventDefault();
         this.toggleDropdown(true);
+        return;
+      }
+
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault();
+        if (this.isDropdownOpen) {
+          this.openedWithKeyboard = true;
+          if (this.status !== 'loading') {
+            this.focusSelectedOption();
+          }
+          return;
+        }
+        this.openDropdown(true);
         return;
       }
 
@@ -154,6 +170,9 @@ export class ChatAgentSelectionCoordinator {
     this.frame?.refresh(this.getFrameTexts());
     this.renderList();
     this.updateDisplay();
+    if (this.status !== 'loading') {
+      this.focusSelectedOptionAfterCatalogReload();
+    }
   }
 
   isOpen(): boolean {
@@ -195,6 +214,22 @@ export class ChatAgentSelectionCoordinator {
     this.candidates = [];
     this.status = 'idle';
     this.loadRunId += 1;
+  }
+
+  private registerEscapeHandler(): void {
+    if (this.hasRegisteredEscapeHandler) {
+      return;
+    }
+
+    this.hasRegisteredEscapeHandler = true;
+    this.host.registerEscapeHandler(() => {
+      if (!this.isDropdownOpen) {
+        return false;
+      }
+
+      this.closeDropdown({ restoreTriggerFocus: true });
+      return true;
+    });
   }
 
   private updateDisplay(): void {
@@ -415,6 +450,7 @@ export class ChatAgentSelectionCoordinator {
       escapeKey: 'Esc',
       navigateHint: t('chat.composerPopover.navigateHint'),
       selectHint: t('chat.composerPopover.selectHint'),
+      closeHint: t('chat.composerPopover.closeHint'),
     };
   }
 

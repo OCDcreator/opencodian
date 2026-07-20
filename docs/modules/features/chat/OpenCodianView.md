@@ -8,6 +8,8 @@
 
 `OpenCodianView` 是聊天功能的主集成点。它继承 `ItemView`，负责把下列能力装配到同一个 Obsidian 视图里：
 
+- 在构建 composer 前创建 View 的 Obsidian `Scope`；Agent、permission 与 model card 的 Escape handler 都通过 host seam 存入单一分发器。Scope 收到 Escape 时先逐个请求已打开卡片关闭，只有没有卡片消费按键时才取消流式输出，避免注册顺序使流式 handler 抢先吞掉 Escape 或局部 DOM listener 收不到按键
+
 - 对话加载、发送、流式渲染和后台同步
 - 多标签页和按 tab 隔离的运行时状态
 - 模型、权限、effort、context usage 等工具栏控件
@@ -105,6 +107,7 @@ background task completion notice 的 queued-state 则已经完全移出 `TabRun
 - `services/ConversationIdentityRuntime.ts` 的 host seam：conversation sync fingerprint、interrupted-sync preservation log fingerprint、message visual signature，以及 render-list shaping（消息可见性过滤、assistant merge、compaction divider 注入）
 - `services/ChildSessionGraphCoordinator.ts` 的 host seam：从当前活动对话 + `session.children()` live 数据重建 child-session graph，并在消息区底部渲染最小 session tree
 - `services/ChatSelectionControlsCoordinator.ts` 的 host seam：model catalog data source、tab model override/default selection、model-source/server availability 查询、provider icon lookup、permission mode writeback、成功写入后的 `restoreComposerInputFocus()`、effort selector 联动。OpenCode permission write/restart 现在返回 boolean：失败保留 permission card 上下文，成功后由该 seam 聚焦 `ComposerInputShellCoordinator.focusInput()`。sandbox badge settings provider（`getSandboxSettings` 可选方法）已接入 coordinator，但当前对 Claude Code 后端不可见（badge 挂载依赖 `AgentCapability.Permissions`，而 Claude Code 不声明此 capability）。OpenCode 会继续使用 `ModelConfigService` / server catalog；Claude Code 会使用 `ClaudeCodeModelCatalog` 把官方 aliases 与 SDK `supportedModels()` 投影成 composer model provider，并把 effort selector 切到 Claude Code `low/medium/high/xhigh/max` 语义。
+- OpenCode permission mode 写入先保存、再按原有顺序重启服务；任一保存或重启阶段失败时，view 恢复先前 mode 并尽力持久化回滚值，再返回 false。因此 Permission card 可以可靠地保持打开、保留旧 selection，而不会把失败写入泄漏为未处理的点击 promise。
 - `SessionPermissionTracker`：记录“本次会话允许”的临时权限批准；view 在权限卡片返回 `session` 时保存当前 `sessionID` 的 scope，同一会话再次请求相同 scope 时自动回复，并通过 service 边界发送 OpenCode 支持的 `always`
 - Claude Code permission/question bridge 的 view 级 UI context：聊天视图会把当前 active tab id、既有 permission inline card renderer，以及统一的 `QuestionResolutionFlowCoordinator` 注入插件级 `claudeCodePermissionHostContext`；Claude Code adapter 的 `canUseTool` 可复用现有 permission inline card，`AskUserQuestion` 和 MCP `onElicitation` 都会走 inline Question UI 来同步收集答案并在完成后清理临时卡片，避免污染 OpenCode question API 或落入 dock-only 写回路径。证明边界需要分开：`AskUserQuestion` 是已通过普通聊天证明的内置工具路径；MCP `onElicitation` 目前只证明 SDK callback 到共享 question host 的 wiring，真实 pass 还需要 MCP server roundtrip。没有聊天 UI context 时，host 仍返回 `null`，由 bridge 按拒绝/无答案路径处理。
 - Codex 审批 host context 的 view 级 wiring：`installCodexApprovalHostContext()` 在 `installClaudeCodePermissionHostContext()` 之后调用，把 active tab id 和 `approvalCardRenderer` 注入插件级 `codexApprovalHostContext`。renderer 闭包通过 `buildCodexApprovalQuestionRequest` + `showQuestionDialog(forceInline, applyResolution: false)` + `mapCodexApprovalResolution` 复用现有 question/inline-card 基础设施，把 Codex `execCommandApproval` / `applyPatchApproval` 呈现为三选项 inline card（Approve / Approve for session / Deny）。映射逻辑隔离在 `CodexDefaultApprovalHost.ts`，view 只做 thin wiring。

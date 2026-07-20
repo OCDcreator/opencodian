@@ -14,4 +14,4 @@
 
 ## DOM 合约
 
-frame 内部顺序固定为 header（title、Esc keycap）、content、footer（navigate、select）。调用方仍是 dropdown/listbox 的所有者：frame 不设置 listbox 角色，也不改变触发器、overlay 布局或 option 选择逻辑。
+frame 内部顺序固定为 header（title、Esc keycap）、content、footer（本地化的 `↑↓ Navigate`、`Enter Select`、`Esc Close` 提示）。调用方仍是 dropdown/listbox 的所有者：frame 不设置 listbox 角色，也不改变触发器、overlay 布局或 option 选择逻辑。

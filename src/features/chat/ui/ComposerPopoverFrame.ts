@@ -3,6 +3,7 @@ export interface ComposerPopoverFrameTexts {
   escapeKey: string;
   navigateHint: string;
   selectHint: string;
+  closeHint: string;
 }
 
 export interface ComposerPopoverFrameHandle {
@@ -22,12 +23,14 @@ export function mountComposerPopoverFrame(
   const footerEl = frameEl.createDiv({ cls: 'opencodian-composer-popover-footer' });
   const navigateEl = footerEl.createSpan({ cls: 'opencodian-composer-popover-footer-navigate' });
   const selectEl = footerEl.createSpan({ cls: 'opencodian-composer-popover-footer-select' });
+  const closeEl = footerEl.createSpan({ cls: 'opencodian-composer-popover-footer-close' });
 
   const refresh = (nextTexts: ComposerPopoverFrameTexts): void => {
     titleEl.textContent = nextTexts.title;
     escapeKeyEl.textContent = nextTexts.escapeKey;
-    navigateEl.textContent = nextTexts.navigateHint;
-    selectEl.textContent = nextTexts.selectHint;
+    navigateEl.textContent = `↑↓ ${nextTexts.navigateHint}`;
+    selectEl.textContent = `Enter ${nextTexts.selectHint}`;
+    closeEl.textContent = `${nextTexts.escapeKey} ${nextTexts.closeHint}`;
   };
 
   refresh(texts);

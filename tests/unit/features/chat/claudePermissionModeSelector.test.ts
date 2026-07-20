@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+
 import type { ClaudeCodePermissionMode } from '../../../../src/core/types/settings';
 import {
   createClaudeCodePermissionConfig,
@@ -195,6 +197,34 @@ describe('Claude Code permission mode selector', () => {
       expect(failedHost.restoreInputFocus).not.toHaveBeenCalled();
 
       coordinator.destroy();
+    });
+
+    it('scopes semantic danger and safe colors to icon and check without flooding the row', () => {
+      const css = readFileSync('src/style/components/permission-mode-selector.css', 'utf8');
+
+      const dangerRowRule = css.match(
+        /\[data-permission-semantic=['"]danger['"]\]\.is-selected\s*\{[^}]*\}/,
+      );
+      const safeRowRule = css.match(
+        /\[data-permission-semantic=['"]safe['"]\]\.is-selected\s*\{[^}]*\}/,
+      );
+
+      expect(dangerRowRule).toBeNull();
+      expect(safeRowRule).toBeNull();
+
+      expect(css).toMatch(
+        /\[data-permission-semantic=['"]danger['"]\]\s*\{[^}]*--background-modifier-error/,
+      );
+      expect(css).toMatch(
+        /\[data-permission-semantic=['"]safe['"]\]\s*\{[^}]*--background-modifier-success/,
+      );
+
+      expect(css).toMatch(
+        /\.is-selected \.opencodian-permission-option-(?:icon|check|label)[^}]*var\(--opencodian-permission-option-accent/,
+      );
+
+      expect(css).not.toMatch(/\[data-mode=['"]yolo['"]\]\.is-selected \.opencodian-permission-option-check/);
+      expect(css).not.toMatch(/\[data-mode=['"]plan['"]\]\.is-selected \.opencodian-permission-option-check/);
     });
   });
 });

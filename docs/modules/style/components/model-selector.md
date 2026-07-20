@@ -17,14 +17,15 @@
 
 ## 近期行为
 
-- **Composer card unification**（当前）：Model 继续保留 search、scroll、provider sticky headers 与 current-tab override，但 outer card、title/`Esc`/footer、共享 option geometry、selected/focus/reduced-motion 均由 `composer-popover-frame.css` 统一提供。
+- **Composer card unification**（当前）：Model 继续保留 search、scroll、provider sticky headers 与 current-tab override，但 outer card、title/`Esc`/footer、共享 option geometry、selected/focus/reduced-motion 均由 `composer-popover-frame.css` 统一提供；三张卡共享 shadcn `Popover + Command` anatomy，未引入 shadcn/Radix/cmdk/Tailwind/Web font。
   - 触发器：`padding: 4px 10px`、`font-weight: 500`；hover 时 `translateY(-1px)` + 柔和阴影抬升；`is-open` 态使用 accent 色边框 + 外发光。
   - Chevron：`cubic-bezier(0.4, 0, 0.2, 1)` 平滑旋转 180°，hover/open 时颜色递进。
   - 下拉外层只保留 340px/280px 宽度和 anchored placement；卡片表面不再在本文件重复声明背景、border、radius、shadow 或 animation。
   - 下拉面板的 340px 首选宽度使用 `box-sizing: border-box`，实际水平位置和窄容器收缩由共享 `AnchoredOverlayLayoutController` 计算，确保相对聊天容器左右各保留 8px 安全间距，不再因固定 `left: 0` 被右侧边界裁剪。
-  - 搜索框：`border-radius: 8px`、`var(--background-secondary)` 填充色、简洁边框；`focus-within` 时仅 accent 边框色变化；移除了内阴影和渐变背景。
-  - Provider header：`11px` 大写标签、`font-weight: 700`；包含 provider icon（`.opencodian-model-provider-header-icon`），通过 `ProviderIconService` 获取 Lobehub CDN 图标；sticky 时 `var(--background-primary)` 纯色背景 + 6px 渐变淡出。
-  - Model row 叠加共享 `opencodian-composer-popover-option`，得到统一的 48px geometry、selected accent 和 focus ring；Model-specific `is-highlighted` 只保留搜索箭头导航的视觉反馈。
+  - 搜索区是 shadcn CommandInput 风格的单一整宽 strip：`.opencodian-model-dropdown-search` 直接落在共享 surface 上，仅有一条底部 `background-modifier-border` 分隔线；`.opencodian-model-dropdown-search-container` 改为 `display: contents` 的纯布局包装，不再渲染自己的圆角卡 / 背景 / 边框。Model `dropdown-content` 的 padding 被本文件覆盖为 `0`，以便搜索条满宽。
+  - Provider header：sticky shadcn `CommandGroupHeading` 风格的 11px / 600 分组标题，使用 `--text-muted`（明确禁止使用 `--text-faint`，避免在粉色主题下与搜索 placeholder 或未配置模型状态混淆），letter-spacing 为 `0`。Direction A 将 heading 直接落在共享 popover 表面上，背景为不透明 `var(--background-primary)`，并移除了旧的 tonal band 与全宽底部分隔线；层级完全由 provider icon 归属、模型行前导空槽、间距与排版来表达。最小高度 26px，内边距 `5px 12px 4px`，`position: sticky; top: 0; z-index: 10` 保持不变，确保滚动时不会露出背后模型行。provider header icon 为 12px / 0.55 opacity。移除了外部 DM Sans 字体、`text-transform: uppercase`、上下重复 border 等历史装饰。滚动容器本身保持无顶部内边距，4px 的呼吸间距由内部 `.opencodian-model-groups` 承担。模型 option 包裹在 `.opencodian-model-group-options` 中，保持共享 Command 几何与选中 checkmark + 600 字重。provider header 与 model option 的视觉层级关系由 `tests/unit/infrastructure/model-popover-provider-hierarchy.test.mjs` 在 light + dark 双主题下守卫，源样式契约要求 provider header 规则必须写 `background: var(--background-primary);`、`color: var(--text-muted);`，且不得出现 `color: var(--text-faint);`、tonal `color-mix` 背景或 `border-bottom`。
+  - Model row 叠加共享 `opencodian-composer-popover-option`，以 provider icon / flex text / check 显式占据 22px / flexible / 18px 三列，得到统一的 Command 几何、选中 checkmark + 600 字重和 focus ring；hover/highlight/selected 共享同一中性 `--background-modifier-hover` 背景，不再有彩色 tint / box-shadow / scale 弹跳动画。
+  - shared frame 的高度预算包含 header/footer/search，同时保留原有 280px model scroll viewport（由 Chromium rendered-layout 测试守卫）；search 作为 combobox 控制其实例专属 listbox，并只在打开态用 active descendant 暴露当前 Arrow highlight。
   - shared card 的 reduced-motion 策略统一生效，Model-specific CSS 仅保留搜索/scroll/header/icon 规则。
 - classic 设置页 quick-nav 的 tooltip 现在不再依赖 `.opencodian-settings-quick-nav-btn` 的伪元素，而是用 `.opencodian-settings-quick-nav-tooltip-layer` / `-bubble` / `-arrow` 这组 body-level overlay 样式。这样提示层可以真正越过 settings 滚动容器，不再受容器裁切影响。quick-nav tooltip z-index 为 2260，并会按按钮上下空间切换 top/bottom placement。
 - chat / tabs / sidebar / composer 这套共享 tooltip 也已经从 trigger 伪元素迁到 `.opencodian-tooltip-layer` / `-bubble` / `-arrow` 这组 body-level overlay 样式，由 `TooltipLayerController` 在运行时挂到 `document.body`。这样可以同时避开三类老问题：按钮自身 `::after` 冲突、祖先 `overflow: hidden` 裁切、以及局部 stacking context 导致的遮挡。触发器显示时会清理 `title`，避免同一按钮出现 custom + native 两个提示框。

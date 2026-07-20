@@ -52,6 +52,7 @@ export interface ChatSelectionControlsCoordinatorHost extends ModelSelectionRunt
 const MODEL_DROPDOWN_PREFERRED_WIDTH = 340;
 const MODEL_DROPDOWN_MINIMUM_WIDTH = 280;
 const MODEL_DROPDOWN_SAFE_INSET = 8;
+let modelSelectorInstanceSequence = 0;
 const CLAUDE_CODE_PERMISSION_MODES: readonly ClaudeCodePermissionMode[] = [
   'default', 'acceptEdits', 'bypassPermissions', 'plan',
 ];
@@ -105,14 +106,21 @@ async function switchClaudeCodePermissionModeInPlugin(mode: ClaudeCodePermission
     return false;
   }
 
-  claudeSettings.permissionMode = mode;
-  await plugin.saveSettings?.();
+  const previousMode = normalizeClaudeCodePermissionMode(claudeSettings.permissionMode);
+  try {
+    claudeSettings.permissionMode = mode;
+    await plugin.saveSettings?.();
 
-  const adapter = plugin.agentServiceRegistry?.get?.('claude-code') as {
-    setPermissionMode?: (nextMode: ClaudeCodePermissionMode) => Promise<void> | void;
-  } | undefined;
-  await adapter?.setPermissionMode?.(mode);
-  return true;
+    const adapter = plugin.agentServiceRegistry?.get?.('claude-code') as {
+      setPermissionMode?: (nextMode: ClaudeCodePermissionMode) => Promise<void> | void;
+    } | undefined;
+    await adapter?.setPermissionMode?.(mode);
+    return true;
+  } catch {
+    claudeSettings.permissionMode = previousMode;
+    await plugin.saveSettings?.().catch(() => undefined);
+    return false;
+  }
 }
 
 function readCodexSandboxModeFromPlugin(): CodexSandboxMode {
@@ -132,20 +140,28 @@ async function switchCodexSandboxModeInPlugin(mode: CodexSandboxMode): Promise<b
     return false;
   }
 
-  codexSettings.sandboxMode = mode;
-  await plugin.saveSettings?.();
+  const previousMode = readCodexSandboxModeFromPlugin();
+  try {
+    codexSettings.sandboxMode = mode;
+    await plugin.saveSettings?.();
 
-  // Push to live adapter so subsequent thread creation uses the new mode.
-  const adapter = plugin.agentServiceRegistry?.get?.('codex') as {
-    updateSandboxMode?: (m: CodexSandboxMode) => void;
-  } | undefined;
-  adapter?.updateSandboxMode?.(mode);
-  return true;
+    // Push to live adapter so subsequent thread creation uses the new mode.
+    const adapter = plugin.agentServiceRegistry?.get?.('codex') as {
+      updateSandboxMode?: (m: CodexSandboxMode) => void;
+    } | undefined;
+    adapter?.updateSandboxMode?.(mode);
+    return true;
+  } catch {
+    codexSettings.sandboxMode = previousMode;
+    await plugin.saveSettings?.().catch(() => undefined);
+    return false;
+  }
 }
 
 export class ChatSelectionControlsCoordinator {
   private toolbarEl: HTMLElement | null = null;
   private readonly modelSelectionRuntime: ModelSelectionRuntime;
+  private readonly modelSelectorInstanceId = 'opencodian-model-selector-' + modelSelectorInstanceSequence++;
   private permissionSelector: PermissionModeSelectorCoordinator | null = null;
   private readonly additionalDirectoriesBadge: AdditionalDirectoriesConfigBadgeCoordinator;
   private additionalDirectoriesBadgeContainer: HTMLElement | null = null;
@@ -457,13 +473,17 @@ export class ChatSelectionControlsCoordinator {
 
     this.hasRegisteredEscapeHandler = true;
     this.host.registerEscapeHandler(() => {
-      if (!this.isModelDropdownOpen && !(this.permissionSelector?.isOpen() ?? false)) {
-        return false;
+      if (this.isModelDropdownOpen) {
+        this.closeModelDropdown({ restoreTriggerFocus: true });
+        return true;
       }
 
-      this.closeModelDropdown();
-      this.permissionSelector?.closeDropdown();
-      return true;
+      if (this.permissionSelector?.isOpen()) {
+        this.permissionSelector.closeDropdown({ restoreTriggerFocus: true });
+        return true;
+      }
+
+      return false;
     });
   }
 
@@ -486,7 +506,6 @@ export class ChatSelectionControlsCoordinator {
 
     this.modelSelectorDropdown = containerEl.createDiv({
       cls: 'opencodian-model-dropdown',
-      attr: { role: 'listbox' },
     });
     this.modelSelectorDropdown.style.display = 'none';
     this.buildModelDropdown();
@@ -528,6 +547,10 @@ export class ChatSelectionControlsCoordinator {
       attr: {
         type: 'text',
         placeholder: t('chat.composerPopover.modelSearchPlaceholder'),
+        role: 'combobox',
+        'aria-autocomplete': 'list',
+        'aria-controls': this.modelSelectorInstanceId + '-options',
+        'aria-expanded': 'false',
       },
     });
 
@@ -551,6 +574,11 @@ export class ChatSelectionControlsCoordinator {
 
     this.modelSelectorScrollContainer = this.modelPopoverFrame.contentEl.createDiv({
       cls: 'opencodian-model-dropdown-scroll',
+      attr: {
+        id: this.modelSelectorInstanceId + '-options',
+        role: 'listbox',
+        'aria-label': t('chat.composerPopover.modelTitle'),
+      },
     });
 
     this.renderModelList();
@@ -597,6 +625,7 @@ export class ChatSelectionControlsCoordinator {
     this.modelSelectorDropdown.addClass('is-open');
     this.modelSelectorTrigger.addClass('is-open');
     this.modelSelectorTrigger.setAttribute('aria-expanded', 'true');
+    this.modelSelectorSearchInput?.setAttribute('aria-expanded', 'true');
 
     this.modelFilterQuery = '';
     if (this.modelSelectorSearchInput) {
@@ -622,6 +651,8 @@ export class ChatSelectionControlsCoordinator {
     }
     this.modelSelectorTrigger?.removeClass('is-open');
     this.modelSelectorTrigger?.setAttribute('aria-expanded', 'false');
+    this.modelSelectorSearchInput?.setAttribute('aria-expanded', 'false');
+    this.modelSelectorSearchInput?.removeAttribute('aria-activedescendant');
 
     if (this.modelDropdownClickOutsideHandler) {
       document.removeEventListener('click', this.modelDropdownClickOutsideHandler, true);
@@ -643,6 +674,7 @@ export class ChatSelectionControlsCoordinator {
 
     const renderResult = renderModelSelectorList({
       scrollContainer: this.modelSelectorScrollContainer,
+      optionIdPrefix: this.modelSelectorInstanceId + '-option',
       providers: this.getAvailableProviders(),
       hasLoadedModelCatalog: this.hasLoadedModelCatalog(),
       filterQuery: this.modelFilterQuery,
@@ -667,6 +699,7 @@ export class ChatSelectionControlsCoordinator {
     });
 
     this.disposeModelSelectorStickyHeaders = renderResult.disposeStickyHeaders;
+    this.syncModelSearchActiveDescendant();
   }
 
   private navigateModelList(direction: 1 | -1): void {
@@ -675,6 +708,7 @@ export class ChatSelectionControlsCoordinator {
     }
 
     navigateRenderedModelList(this.modelSelectorScrollContainer, direction);
+    this.syncModelSearchActiveDescendant();
   }
 
   private highlightModelOption(value: string): void {
@@ -683,6 +717,22 @@ export class ChatSelectionControlsCoordinator {
     }
 
     highlightRenderedModelOption(this.modelSelectorScrollContainer, value);
+    this.syncModelSearchActiveDescendant();
+  }
+
+  private syncModelSearchActiveDescendant(): void {
+    if (!this.isModelDropdownOpen) {
+      this.modelSelectorSearchInput?.removeAttribute('aria-activedescendant');
+      return;
+    }
+
+    const highlightedOption = this.modelSelectorScrollContainer
+      ?.querySelector<HTMLElement>('.opencodian-model-option.is-highlighted');
+    if (highlightedOption?.id) {
+      this.modelSelectorSearchInput?.setAttribute('aria-activedescendant', highlightedOption.id);
+    } else {
+      this.modelSelectorSearchInput?.removeAttribute('aria-activedescendant');
+    }
   }
 
   private selectHighlightedModel(): void {
@@ -724,6 +774,7 @@ export class ChatSelectionControlsCoordinator {
       escapeKey: 'Esc',
       navigateHint: t('chat.composerPopover.navigateHint'),
       selectHint: t('chat.composerPopover.selectHint'),
+      closeHint: t('chat.composerPopover.closeHint'),
     };
   }
 

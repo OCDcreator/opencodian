@@ -214,6 +214,17 @@ export class WorkspaceLeaf {
   getViewState() { return {}; }
 }
 
+export class Scope {
+  readonly registeredHandlers: Array<{ key: string | null; func: (event: KeyboardEvent) => false | void }> = [];
+
+  constructor(_parent?: Scope) {}
+
+  register(_modifiers: unknown, key: string | null, func: (event: KeyboardEvent) => false | void) {
+    this.registeredHandlers.push({ key, func });
+    return { scope: this, key, func };
+  }
+}
+
 export class ItemView {
   app = { vault: new Vault(), workspace: new Workspace() };
   containerEl = createMockElement('div');
@@ -229,6 +240,8 @@ export class ItemView {
   onOpen() { return Promise.resolve(); }
   onClose() { return Promise.resolve(); }
   onPaneMenu() {}
+  registerEvent() { return this; }
+  registerDomEvent() { return this; }
   addAction() { return this; }
 }
 
