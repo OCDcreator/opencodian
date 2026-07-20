@@ -633,6 +633,8 @@ export class ChatSelectionControlsCoordinator {
         noModels: t('settings.model.noModels'),
         noModelsFound: 'No models found',
         noModelsAvailable: 'No models available',
+        configuredOnlyBadge: t('chat.modelSelector.configuredOnlyBadge'),
+        configuredOnlyTitle: t('chat.modelSelector.configuredOnlyTitle'),
       },
       onSelect: (provider, model) => {
         this.selectModel(provider, model);

@@ -27,6 +27,10 @@ function createModelConfigServiceMock(overrides: Partial<{
       effectiveProviderConfig: {},
       providerDirectory: createEmptyProviderDirectory(),
     }),
+    getV2CatalogComparison: jest.fn().mockResolvedValue({
+      status: 'unavailable',
+      reason: 'V2 catalog unsupported',
+    }),
     writeLocalModelConfig: jest.fn().mockResolvedValue(undefined),
     testProviderAvailability: jest.fn().mockResolvedValue({
       providerId: 'openai',
@@ -46,6 +50,56 @@ function createModelConfigServiceMock(overrides: Partial<{
 }
 
 describe('ModelCatalogStateService', () => {
+  it('adds a settings-only V2 comparison without changing the stable catalogs', async () => {
+    const serverCatalog = {
+      providers: [{
+        id: 'openai',
+        name: 'OpenAI',
+        source: 'server' as const,
+        existsInLocal: false,
+        existsInServer: true,
+        models: [{
+          id: 'gpt-4.1',
+          name: 'GPT-4.1',
+          source: 'server' as const,
+          existsInLocal: false,
+          existsInServer: true,
+        }],
+      }],
+      defaults: {},
+    };
+    const comparison = {
+      status: 'match' as const,
+      legacyProviderCount: 1,
+      legacyModelCount: 1,
+      v2ProviderCount: 1,
+      v2ModelCount: 1,
+      legacyOnlyProviderIds: [],
+      v2OnlyProviderIds: [],
+      legacyOnlyModelRefs: [],
+      v2OnlyModelRefs: [],
+    };
+    const modelConfigService = createModelConfigServiceMock({
+      getCatalogs: jest.fn().mockResolvedValue({
+        local: { providers: [], defaults: {} },
+        server: serverCatalog,
+        baseEffective: serverCatalog,
+        effective: serverCatalog,
+        currentEnabledProviderIds: ['openai'],
+        serverConfig: {},
+        effectiveProviderConfig: {},
+        providerDirectory: createEmptyProviderDirectory(),
+      }),
+      getV2CatalogComparison: jest.fn().mockResolvedValue(comparison),
+    });
+
+    const state = await new ModelCatalogStateService(modelConfigService as never).getCatalogState('server');
+
+    expect(modelConfigService.getV2CatalogComparison).toHaveBeenCalledWith(serverCatalog);
+    expect(state.catalogComparison).toEqual(comparison);
+    expect(state.catalogs.server).toBe(serverCatalog);
+  });
+
   it('builds the disabled display catalog from provider and model availability state', async () => {
     const modelConfigService = createModelConfigServiceMock({
       readLocalModelConfig: jest.fn().mockResolvedValue({

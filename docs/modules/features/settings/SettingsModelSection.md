@@ -23,6 +23,7 @@
 - 创建 common / config / availability / tools 四个 block
 - availability block 使用共享 `createSettingsBlock()` 的 footer description 模式：标题保留在可点击折叠头部，说明文案常驻在整张卡片底部；折叠后只保留标题与这条底部说明。
 - 装配默认聊天模型 picker、source mode 切换与手动 refresh 的入口控制；默认聊天模型是 OpenCodian 发请求时的默认值，不会自动写入 OpenCode 项目级 `model`
+- 在 Common summary 下创建独立的 V2 catalog comparison 状态行，具体文案与状态 class 由 catalog coordinator 更新
 - 装配 OpenCode 顶层 `small_model` 的 Common-tab 入口，让轻量备用模型不再只藏在项目配置弹窗里；它与 OpenCodian 的备用标题模型设置保持独立
 - 把 project provider workspace 卡片与 JSON 入口交给 `SettingsModelCatalogCoordinator`
 - 把 availability catalog DOM host 交给 `SettingsModelCatalogPresenter`

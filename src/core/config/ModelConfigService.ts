@@ -6,6 +6,10 @@ import { createLogger } from '../../shared';
 import type { OpenCodeService } from '../opencode';
 import type { ModelSourceMode, OpencodeModelConfigSubset } from '../types';
 import {
+  compareModelCatalogs,
+  type ModelCatalogComparison,
+} from './modelCatalogComparison';
+import {
   applyModelConfig,
   assembleModelCatalog,
   assembleServerModelCatalog,
@@ -146,6 +150,11 @@ export class ModelConfigService {
       effective: assembledCatalog.effective,
     };
     return bundle;
+  }
+
+  async getV2CatalogComparison(serverCatalog: ModelCatalog): Promise<ModelCatalogComparison> {
+    const snapshot = await this.openCodeService.getV2CatalogSnapshot({ includeDirectory: true });
+    return compareModelCatalogs(serverCatalog, snapshot);
   }
 
   async isModelAvailableOnServer(provider: string, model: string): Promise<boolean> {

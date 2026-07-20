@@ -5,7 +5,7 @@
 
 ## 概述
 
-`src/core/config/index.ts` 是 `core/config` 目录的 barrel。它现在聚合 4 组配置层 service / state owner 导出：
+`src/core/config/index.ts` 是 `core/config` 目录的 barrel。它聚合配置层 service / state owner，并公开模型目录影子比较的稳定类型与纯函数。
 
 - `ModelConfigService`
 - `ModelCatalogStateService`
@@ -28,6 +28,8 @@ export { ModelConfigService } from './ModelConfigService';
 export type { ModelCatalogBundle, ProviderDirectorySnapshot } from './ModelConfigService';
 export type { ModelCatalogState, ModelCatalogStateMode, ProviderDirectoryStatus } from './ModelCatalogStateService';
 export { ModelCatalogStateService } from './ModelCatalogStateService';
+export type { ModelCatalogComparison } from './modelCatalogComparison';
+export { compareModelCatalogs, createUnavailableModelCatalogComparison } from './modelCatalogComparison';
 export { OpencodeConfigManager } from './OpencodeConfigManager';
 export { PluginManagementService } from './PluginManagementService';
 ```
@@ -55,6 +57,8 @@ barrel 没有转发 `commandScopedAgent.ts`、`formatterConfig.ts`、`modelConfi
 `ProviderDirectorySnapshot` 跟随 `ModelCatalogBundle` 从 `ModelConfigService` 暴露，供设置页读取 provider directory / connected 诊断状态。它不是 `modelConfig.ts` 的通用 helper，也不应被用来扩展聊天模型选择目录。
 
 `ProviderDirectoryStatus` 跟随 `ModelCatalogState` 暴露，表达设置页已派生好的 listed / connected / directory-only 状态，调用方不需要直接读取 `providerDirectory` 快照。
+
+`ModelCatalogComparison` 与两个比较 helper 也从 barrel 暴露，供 settings 状态层消费；它们只比较 provider ID 与 `provider/model` 引用，不携带认证、provider options 或模型参数。
 
 ## 注意事项
 

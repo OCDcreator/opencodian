@@ -108,31 +108,52 @@ export function renderModelList({
 
     for (const model of provider.models) {
       const modelValue = buildModelOptionValue(provider.id, model.id);
+      const isConfiguredOnly = model.availability === 'configured-only';
       const modelOption = groupEl.createDiv({
         cls: 'opencodian-model-option',
-        attr: { 'data-value': modelValue },
+        attr: {
+          'data-value': modelValue,
+          ...(isConfiguredOnly
+            ? {
+                'aria-disabled': 'true',
+                title: texts.configuredOnlyTitle,
+              }
+            : {}),
+        },
       });
+      if (isConfiguredOnly) {
+        modelOption.addClass('is-configured-only');
+      }
 
       if (modelValue === currentValue) {
         modelOption.addClass('is-selected');
       }
-      if (modelValue === highlightedValue) {
+      if (!isConfiguredOnly && modelValue === highlightedValue) {
         modelOption.addClass('is-highlighted');
       }
 
       const nameSpan = modelOption.createSpan({ cls: 'opencodian-model-option-name' });
       nameSpan.setText(model.name);
 
+      if (isConfiguredOnly) {
+        const availability = modelOption.createSpan({
+          cls: 'opencodian-model-option-availability',
+        });
+        availability.setText(model.availabilityLabel ?? texts.configuredOnlyBadge);
+      }
+
       const checkmark = modelOption.createSpan({ cls: 'opencodian-model-option-check' });
       setIcon(checkmark, 'check');
 
-      modelOption.addEventListener('click', (event) => {
-        event.stopPropagation();
-        onSelect(provider.id, model.id);
-      });
-      modelOption.addEventListener('mouseenter', () => {
-        onHighlight(modelValue);
-      });
+      if (!isConfiguredOnly) {
+        modelOption.addEventListener('click', (event) => {
+          event.stopPropagation();
+          onSelect(provider.id, model.id);
+        });
+        modelOption.addEventListener('mouseenter', () => {
+          onHighlight(modelValue);
+        });
+      }
     }
   }
 

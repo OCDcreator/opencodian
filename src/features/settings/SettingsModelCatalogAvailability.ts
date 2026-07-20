@@ -1,4 +1,5 @@
 import {
+  type ModelCatalogComparison,
   type ModelCatalogStateMode,
   type ProviderAvailabilityProbe,
   type ProviderDirectoryStatus,
@@ -20,6 +21,37 @@ export interface ProviderAvailabilityDisplayState {
   disabledCount: number;
   primaryDisabledReason: ProviderDisabledReason;
   mode: ModelCatalogStateMode;
+}
+
+export function describeModelCatalogComparison(
+  comparison: ModelCatalogComparison,
+): { text: string; className: 'is-match' | 'is-drift' | 'is-unavailable' } {
+  if (comparison.status === 'unavailable') {
+    return {
+      text: t('settings.model.catalogComparison.unavailable'),
+      className: 'is-unavailable',
+    };
+  }
+
+  if (comparison.status === 'match') {
+    return {
+      text: t('settings.model.catalogComparison.match', {
+        providers: String(comparison.legacyProviderCount),
+        models: String(comparison.legacyModelCount),
+      }),
+      className: 'is-match',
+    };
+  }
+
+  return {
+    text: t('settings.model.catalogComparison.drift', {
+      legacyProviders: String(comparison.legacyOnlyProviderIds.length),
+      legacyModels: String(comparison.legacyOnlyModelRefs.length),
+      v2Providers: String(comparison.v2OnlyProviderIds.length),
+      v2Models: String(comparison.v2OnlyModelRefs.length),
+    }),
+    className: 'is-drift',
+  };
 }
 
 export function describeModelAvailabilitySummary(

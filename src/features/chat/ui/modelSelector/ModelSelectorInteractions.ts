@@ -29,7 +29,9 @@ export function navigateModelList(
   scrollContainer: HTMLElement,
   direction: 1 | -1,
 ): string | null {
-  const options = Array.from(scrollContainer.querySelectorAll<HTMLElement>('.opencodian-model-option'));
+  const options = Array.from(
+    scrollContainer.querySelectorAll<HTMLElement>('.opencodian-model-option'),
+  ).filter((option) => option.getAttribute('aria-disabled') !== 'true');
   if (options.length === 0) {
     return null;
   }
@@ -75,6 +77,9 @@ export function selectHighlightedModel(
   onSelect: (provider: string, model: string) => void,
 ): boolean {
   const highlighted = scrollContainer.querySelector<HTMLElement>('.opencodian-model-option.is-highlighted');
+  if (highlighted?.getAttribute('aria-disabled') === 'true') {
+    return false;
+  }
   const selection = parseModelOptionValue(highlighted?.dataset.value);
   if (!selection) {
     return false;

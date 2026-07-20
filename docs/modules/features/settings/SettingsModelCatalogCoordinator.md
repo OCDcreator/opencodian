@@ -23,7 +23,7 @@
 - 拉取当前 `ModelCatalogState`
 - 同步 `defaultProvider` / `defaultModel` 与 `effective` catalog
 - 生成 model picker groups
-- 刷新 common summary、默认模型按钮、`small_model` 按钮、workspace cards、availability host 和 title model callback
+- 刷新 common summary、V2 catalog comparison 状态行、默认模型按钮、`small_model` 按钮、workspace cards、availability host 和 title model callback
 - 在 dirty 或强制刷新时触发 `saveSettings({ reloadModels: true, applyUi: true })`
 
 ### Common 模型 picker
@@ -33,6 +33,8 @@
 ### workspace 与 availability 写回
 
 workspace 保存、source mode 变化、provider/model availability toggle 和手动 refresh 都复用同一条 catalog refresh 主链。provider icon 解析仍通过 `SettingsModelIconCacheManager` 注入的 `applyProviderIcon` callback 完成，避免在 catalog coordinator 里重新实现 icon fallback 顺序。
+
+当 comparison 为 drift 时，普通 UI 只渲染差异数量，完整 legacy-only / V2-only provider/model 引用写入结构化 debug 日志；unavailable 使用中性诊断样式，不标记 provider 故障。
 
 ## 关键方法
 

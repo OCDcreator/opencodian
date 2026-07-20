@@ -42,16 +42,18 @@ function createEmptyProviderDirectory(): ModelCatalogBundle['providerDirectory']
 function createCatalogBundle(
   effectiveProviders: ModelSelectorProvider[],
   baseProviders: ModelSelectorProvider[] = effectiveProviders,
+  serverProviders: ModelSelectorProvider[] = baseProviders,
 ): ModelCatalogBundle {
   const effectiveCatalogProviders = effectiveProviders.map(createModelCatalogProvider);
   const baseCatalogProviders = baseProviders.map(createModelCatalogProvider);
+  const serverCatalogProviders = serverProviders.map(createModelCatalogProvider);
   return {
     local: {
       providers: [],
       defaults: {},
     },
     server: {
-      providers: baseCatalogProviders,
+      providers: serverCatalogProviders,
       defaults: {},
     },
     baseEffective: {
@@ -140,11 +142,11 @@ function createRuntimeFixture(options: FixtureOptions = {}) {
   };
 }
 
-describe('ModelSelectionRuntime', () => {
-  afterEach(() => {
-    jest.restoreAllMocks();
-  });
+afterEach(() => {
+  jest.restoreAllMocks();
+});
 
+describe('ModelSelectionRuntime', () => {
   it('resolves requested models against the effective catalog while preserving base metadata', async () => {
     const effectiveProviders: ModelSelectorProvider[] = [
       {
@@ -197,7 +199,95 @@ describe('ModelSelectionRuntime', () => {
       contextWindow: 200000,
     });
   });
+});
 
+describe('ModelSelectionRuntime catalog availability', () => {
+  it('keeps configured-only models visible but falls back to the runtime catalog', async () => {
+    const configuredOnlyProvider: ModelSelectorProvider = {
+      id: 'local',
+      name: 'Local',
+      models: [{ id: 'custom', name: 'Custom' }],
+    };
+    const runtimeProvider: ModelSelectorProvider = {
+      id: 'openai',
+      name: 'OpenAI',
+      models: [{ id: 'gpt-4.1', name: 'GPT-4.1' }],
+    };
+    const effectiveProviders = [configuredOnlyProvider, runtimeProvider];
+    const { runtime } = createRuntimeFixture({
+      defaultModelSelection: { provider: 'local', model: 'custom' },
+      loadModelCatalogData: {
+        catalogBundle: createCatalogBundle(
+          effectiveProviders,
+          effectiveProviders,
+          [runtimeProvider],
+        ),
+        providers: effectiveProviders,
+      },
+    });
+
+    await runtime.reloadModelCatalog();
+
+    expect(runtime.getAvailableProviders()).toEqual([
+      {
+        ...configuredOnlyProvider,
+        models: [{
+          ...configuredOnlyProvider.models[0],
+          availability: 'configured-only',
+          availabilityLabel: t('chat.modelSelector.configuredOnlyBadge'),
+        }],
+      },
+      {
+        ...runtimeProvider,
+        models: [{
+          ...runtimeProvider.models[0],
+          availability: 'runtime',
+        }],
+      },
+    ]);
+    expect(runtime.getCurrentSessionModel()).toEqual({
+      provider: 'openai',
+      model: 'gpt-4.1',
+    });
+    expect(runtime.getCurrentSessionModelResolution()).toMatchObject({
+      status: 'available',
+      provider: 'openai',
+      model: 'gpt-4.1',
+    });
+  });
+
+  it('treats a local-source model as runtime selectable when its ref exists in the server catalog', async () => {
+    const provider: ModelSelectorProvider = {
+      id: 'openai',
+      name: 'OpenAI',
+      models: [{ id: 'gpt-4.1', name: 'GPT-4.1' }],
+    };
+    const catalogBundle = createCatalogBundle([provider], [provider], [provider]);
+    catalogBundle.effective.providers[0].existsInServer = false;
+    catalogBundle.effective.providers[0].models[0].existsInServer = false;
+    const { runtime } = createRuntimeFixture({
+      defaultModelSelection: { provider: 'openai', model: 'gpt-4.1' },
+      loadModelCatalogData: {
+        catalogBundle,
+        providers: [provider],
+      },
+      modelSourceMode: 'local',
+    });
+
+    await runtime.reloadModelCatalog();
+
+    expect(runtime.getAvailableProviders()[0].models[0]).toMatchObject({
+      id: 'gpt-4.1',
+      availability: 'runtime',
+    });
+    expect(runtime.getCurrentSessionModel()).toEqual({
+      provider: 'openai',
+      model: 'gpt-4.1',
+    });
+  });
+});
+
+describe('ModelSelectionRuntime selection behavior', () => {
   it('writes selected models through the active-tab override seam only when accepted', async () => {
     const noticeSpy = jest.spyOn(obsidian, 'Notice').mockImplementation(() => undefined as never);
     const acceptedFixture = createRuntimeFixture();

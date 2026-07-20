@@ -27,7 +27,10 @@ import type {
 } from '../types';
 import type { OpenCodianSettings } from '../types/settings';
 import { getServerBaseUrl } from '../types/settings';
-import { OpenCodeCatalogQueryCoordinator } from './OpenCodeCatalogQueryCoordinator';
+import {
+  OpenCodeCatalogQueryCoordinator,
+  type OpenCodeV2CatalogSnapshot,
+} from './OpenCodeCatalogQueryCoordinator';
 import {
   type CatalogUpdateListener,
   OpenCodeCatalogStateStore,
@@ -1396,6 +1399,12 @@ export class OpenCodeService {
     connected: string[];
   }> {
     return this.catalogQueries.getProviderDirectory(options);
+  }
+
+  async getV2CatalogSnapshot(
+    options: { includeDirectory?: boolean } = {},
+  ): Promise<OpenCodeV2CatalogSnapshot> {
+    return this.catalogQueries.getV2CatalogSnapshot(options);
   }
 
   async getResolvedModelConfig(

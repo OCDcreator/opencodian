@@ -284,6 +284,10 @@ export class SettingsModelSection {
       localModelConfig: null,
       modelPickerGroups: [],
       commonSummaryEl: commonBodyEl.createDiv({ cls: 'opencodian-model-common-summary' }),
+      catalogComparisonEl: commonBodyEl.createDiv({
+        cls: 'opencodian-model-catalog-comparison is-unavailable',
+        text: t('settings.model.catalogComparison.loading'),
+      }),
       configBodyEl,
       availabilityManagementEl: availabilityBodyEl,
       iconCacheOverviewSetting: null,

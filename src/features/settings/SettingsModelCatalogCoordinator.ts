@@ -24,6 +24,7 @@ import {
   type ModelPickerGroup,
 } from './modelPicker';
 import { ModelPickerModal } from './ModelPickerModal';
+import { describeModelCatalogComparison } from './SettingsModelCatalogAvailability';
 import type { SettingsModelCatalogPresenter } from './SettingsModelCatalogPresenter';
 
 const logger = createLogger('SettingsModelCatalogCoordinator');
@@ -38,6 +39,7 @@ export interface SettingsModelCatalogRuntimeState {
   localModelConfig: OpencodeModelConfigSubset | null;
   modelPickerGroups: ModelPickerGroup[];
   commonSummaryEl: HTMLElement;
+  catalogComparisonEl: HTMLElement;
   configBodyEl: HTMLElement;
   availabilityManagementEl: HTMLElement;
   defaultModelButton: ButtonComponent | null;
@@ -70,9 +72,7 @@ export class SettingsModelCatalogCoordinator {
   updateCommonSummary(): void {
     const runtime = this.options.getRuntime();
     const modelCatalogPresenter = this.options.getPresenter();
-    if (!runtime || !modelCatalogPresenter) {
-      return;
-    }
+    if (!runtime || !modelCatalogPresenter) return;
 
     if (!runtime.catalogs) {
       runtime.commonSummaryEl.setText(t('settings.model.common.summaryLoading'));
@@ -80,9 +80,16 @@ export class SettingsModelCatalogCoordinator {
     }
 
     runtime.commonSummaryEl.setText(t('settings.model.common.summary', {
-      providers: String(runtime.catalogs.effective.providers.length),
-      models: String(modelCatalogPresenter.getCatalogModelCount(runtime.catalogs.effective)),
+      providers: String(runtime.catalogs.effective.providers.length), models: String(modelCatalogPresenter.getCatalogModelCount(runtime.catalogs.effective)),
     }));
+    const comparison = runtime.catalogState?.catalogComparison;
+    const description = comparison
+      ? describeModelCatalogComparison(comparison)
+      : { text: t('settings.model.catalogComparison.loading'), className: 'is-unavailable' as const };
+    runtime.catalogComparisonEl.setText(description.text);
+    runtime.catalogComparisonEl.classList.remove('is-match', 'is-drift', 'is-unavailable');
+    runtime.catalogComparisonEl.addClass(description.className);
+    if (comparison?.status === 'drift') logger.debug('V2 model catalog shadow comparison drift', comparison);
   }
   openModelWorkspace(options?: ConstructorParameters<typeof ModelConfigModal>[2]): void {
     new ModelConfigModal(this.options.app, this.options.plugin, {

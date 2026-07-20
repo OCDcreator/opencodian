@@ -2,6 +2,11 @@
  * Configuration management for OpenCodian
  */
 
+export type { ModelCatalogComparison } from './modelCatalogComparison';
+export {
+  compareModelCatalogs,
+  createUnavailableModelCatalogComparison,
+} from './modelCatalogComparison';
 export type {
   ModelCatalogState,
   ModelCatalogStateMode,

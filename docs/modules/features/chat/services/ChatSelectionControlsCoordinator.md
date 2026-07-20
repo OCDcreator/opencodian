@@ -15,6 +15,7 @@
 - 在 permission selector 旁集成 sandbox badge 容器（仅 Claude Code backend），用于显示 Claude Code sandbox 配置摘要
 - 在 permission selector 旁集成 Codex runtime defaults badge 容器（仅 Codex backend），用于显示网络、网页搜索与额外目录等非默认 Codex 运行默认项
 - 维护 model selector 的搜索、keyboard navigation、sticky header cleanup 与 provider icon 刷新
+- 为 configured-only option 提供本地化 badge/tooltip 文案；鼠标与 Enter 选择、上下键导航均由 renderer/interaction helper 按禁用语义处理
 - model dropdown 通过共享 `AnchoredOverlayLayoutController` 按 Chat 容器边界同步 340px 首选宽度、280px 最小宽度与 8px 安全区
 - 统一更新当前模型显示、unavailable / unconfigured class、switch-model override 写回结果、unavailable notice 文案与 effort selector 连动；trigger tooltip 明确这是当前标签的发送覆盖，不是持久化 `ConversationSessionSettings`
 - 委托 `PermissionModeSelectorCoordinator` 维护 permission selector 的 mode label、selected state 与 dropdown open/close lifecycle

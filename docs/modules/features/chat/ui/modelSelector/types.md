@@ -11,6 +11,7 @@
 
 - `ModelSelectorSelection`：当前 provider/model 选择
 - `ModelSelectorModel` / `ModelSelectorProvider`：下拉列表渲染输入
+- `ModelSelectorModelAvailability`：`runtime | configured-only`；轻量 backend 未提供时按 runtime 兼容处理
 - `ModelSelectorAvailableModelInfo`：`availableModels` 缓存项
 - `ModelSelectorOptionValue`：`provider::model` DOM value 形状
 - `ModelSelectorDisplayResolution` / `ModelSelectorDisplayState`：trigger 展示推导输入与输出

@@ -82,6 +82,7 @@
 另外，tool/MCP 目录状态与 directory-scoped config/tool-catalog 查询现在分别集中在 `catalogState` 与 `catalogQueries`：
 
 - `catalogQueries` 统一承接 `getAvailableModels()` / `getProviderDirectory()` / `getResolvedModelConfig()` 的 SDK-first/legacy fallback，以及 `refreshToolIds()` / `listTools()` 的 scope-aware cache lifecycle
+- `getV2CatalogSnapshot()` 也委托给 `catalogQueries`，但它是 provider/model V2 list 的只读影子查询，不使用 legacy fallback，不改变 `getAvailableModels()` 或 runtime catalog。
 - 运行时可见的外部工具键名会被记录到 observed external tools 集合
 - `refreshToolIds()` / `listTools()` 继续通过同一个 state store 更新 tool snapshot；`refreshMcpServerStatus()` 与 MCP server/auth mutation 现在也经由 `OpenCodeCatalogQueryCoordinator` 写回 MCP snapshot 与 listener 广播
 - 流式 `tool_use` 与历史 message hydration 继续复用同一套 `shared/toolIdentity` 规则写入结构化 `toolKind`

@@ -7,6 +7,8 @@
 
 `OpenCodeCatalogQueryCoordinator` 是 `OpenCodeService` 内部的 catalog/query owner。它把 directory-scoped provider/model runtime 查询、connect-provider 目录查询、resolved model config 读取、tool registry/schema cache，以及 provider auth、project/file/find/path/VCS/formatter/LSP 与 MCP status/auth 的 SDK query/admin surface 集中到一个较厚 coordinator 中，同时保留 `OpenCodeService` 作为对外 façade。
 
+模型目录主链继续使用 `getAvailableModels()` 的 `config.providers()` SDK-first/legacy fallback。`getV2CatalogSnapshot()` 是独立影子读路径：并行调用 `v2.provider.list()` 与 `v2.model.list()`，只规范化 provider ID 和 `provider/model` 引用，不回退 legacy，也不影响主目录。
+
 R36 的目标不是再拆出 `ConfigProvider`、`ToolCatalogCache`、`ProviderDirectoryAdapter`、`McpAuthGateway` 之类薄层，而是把这组共享目录作用域、catalog state、SDK query surface、debug logging 与 cache invalidation 语义的查询链收束到一个可以单独推理的边界里。
 
 ## 导入关系
@@ -39,6 +41,8 @@ coordinator 现在统一承接三条模型目录链路：
 - `getAvailableModels()`: SDK `config.providers()` 优先，失败时回退 legacy `/config/providers`，并统一 string-array/object 两种 provider model 形状。
 - `getProviderDirectory()`: SDK `provider.list()` 优先，失败时回退 legacy `/provider`，保留 `connected`、`default` 与宽 provider 目录语义。
 - `getResolvedModelConfig()`: SDK `config.get()` 优先，失败时回退 legacy `/config`，只提取模型相关配置字段。
+
+此外，`getV2CatalogSnapshot()` 只用于 settings 诊断比较。404、不支持、网络失败或无效 `{ location, data }` 结构都会返回 `unavailable`，不会阻断上述三条既有链路。
 
 这三条链继续共享：
 
@@ -103,6 +107,9 @@ graph TD
 - `ServerManager` 只通过 host debug metadata / scope invalidation 间接受影响，本轮没有改它的生命周期规则。
 
 ## 注意事项
+
+- 不要把 V2 snapshot 接入 `getAvailableModels()` 的 fallback 或结果合并。
+- V2 snapshot 不包含认证信息、provider options 或模型参数。
 
 - 不要再把本模块拆成 `ModelsDirectoryLookup`、`ProviderDirectoryLookup`、`ToolCatalogCache`、`ProviderGateway`、`McpAuthGateway` 之类薄 wrapper；R36 明确要求保留较厚 owner。
 - `getAvailableModels()` 与 `getProviderDirectory()` 语义不同：前者接近 `opencode models`，后者是 connect-provider 目录总览。

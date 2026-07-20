@@ -16,6 +16,7 @@
 - `getProviderServerConstraintBadge()`：在 effective/disabled 视图中单独表达 inherited server-disabled 约束，避免把 server default disabled 与 project disabled 混为一谈。
 - `getProviderAvailabilityProbeBadge()` / `describeProviderAvailabilityProbe()`：把 provider probe 运行态、错误态与 ready 结果转换成 badge/detail 展示描述。
 - `describeProviderDirectorySummary()` / `getProviderDirectoryBadge()`：把 `provider.list()` 的 listed / connected 辅助状态转换成设置页 summary 与 provider 行诊断 badge；它们只描述诊断信号，不改变 provider/model 可选性，也不把 listed outside catalog 的 provider 变成可操作项。
+- `describeModelCatalogComparison()`：把 V2 影子比较转换成 match/drift/unavailable 中性状态行；drift 只输出双方独有数量，不暴露完整 ID。
 - `describeModelAvailabilitySummary()`、`describeProviderModels()`、`getCatalogPlaceholderReason()`：为 provider header 与空模型列表提供 summary / preview / placeholder reason。
 
 ## 与其他模块的交互

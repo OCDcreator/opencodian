@@ -37,7 +37,7 @@
 - `src/**/*.ts(x)`: 当前共有 331 个 TypeScript 源码模块（不含 `*.d.ts`）
 - `src/style/**/*.css`: 当前共有 16 个样式模块（不含 `src/style/index.css` 聚合入口）
 - `module-docs.config.json`: 当前映射 347 个源码模块到 347 篇模块文档
-- `docs/modules/**/*.md`: 当前共有 355 篇模块与基础设施文档
+- `docs/modules/**/*.md`: 当前共有 356 篇模块与基础设施文档
 
 ## 文档结构
 
@@ -60,6 +60,7 @@ docs/modules/
 │   ├── config/
 │   │   ├── index.md
 │   │   ├── commandScopedAgent.md
+│   │   ├── modelCatalogComparison.md
 │   │   ├── ModelConfigService.md
 │   │   ├── OpencodeConfigManager.md
 │   │   ├── PluginManagementService.md

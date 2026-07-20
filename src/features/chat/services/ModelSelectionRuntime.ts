@@ -5,7 +5,6 @@ import {
   formatModelReference,
   type ResolvedModelSelection,
   resolveModelSelection,
-  resolvePreferredAvailableModel,
 } from '../../../core/config/modelConfig';
 import type { ModelSourceMode } from '../../../core/types/settings';
 import { t } from '../../../i18n';
@@ -88,19 +87,10 @@ export class ModelSelectionRuntime {
       );
     }
 
-    const resolvedModel = resolvePreferredAvailableModel(
-      this.modelCatalogBundle.effective,
+    return this.resolvePreferredAvailableSnapshotModel(
       requestedModel?.provider,
       requestedModel?.model,
     );
-    if (!resolvedModel) {
-      return null;
-    }
-
-    return {
-      provider: resolvedModel.provider,
-      model: resolvedModel.model,
-    };
   }
 
   getCurrentSessionModelResolution(): ResolvedModelSelection {
@@ -242,24 +232,45 @@ export class ModelSelectionRuntime {
     catalogBundle: ModelCatalogBundle | null,
     providers: readonly ModelSelectorProvider[],
   ): void {
-    const snapshot = this.createCatalogSnapshot(providers);
+    const snapshot = this.createCatalogSnapshot(providers, catalogBundle);
     this.hasLoadedCatalog = true;
     this.modelCatalogBundle = catalogBundle;
     this.availableModels = snapshot.availableModels;
     this.availableProviders = snapshot.availableProviders;
   }
 
-  private createCatalogSnapshot(providers: readonly ModelSelectorProvider[]): ModelCatalogSnapshot {
+  private createCatalogSnapshot(
+    providers: readonly ModelSelectorProvider[],
+    catalogBundle: ModelCatalogBundle | null,
+  ): ModelCatalogSnapshot {
     const availableModels: ModelSelectorAvailableModelInfo[] = [];
+    const serverModelRefs = catalogBundle
+      ? new Set(catalogBundle.server.providers.flatMap((provider) =>
+        provider.models.map((model) => formatModelReference(provider.id, model.id)),
+      ).filter((ref): ref is string => Boolean(ref)))
+      : null;
     const availableProviders = providers.map((provider) => {
-      const providerModels = provider.models.map((model) => ({
-        id: model.id,
-        name: model.name,
-        contextWindow: model.contextWindow,
-        variants: model.variants,
-      }));
+      const providerModels = provider.models.map((model) => {
+        const ref = formatModelReference(provider.id, model.id);
+        const availability = !serverModelRefs || (ref ? serverModelRefs.has(ref) : false)
+          ? 'runtime'
+          : 'configured-only';
+        return {
+          id: model.id,
+          name: model.name,
+          contextWindow: model.contextWindow,
+          variants: model.variants,
+          availability,
+          ...(availability === 'configured-only'
+            ? { availabilityLabel: t('chat.modelSelector.configuredOnlyBadge') }
+            : {}),
+        } as const;
+      });
 
       for (const model of providerModels) {
+        if (model.availability !== 'runtime') {
+          continue;
+        }
         availableModels.push({
           provider: provider.id,
           model: model.id,
@@ -335,14 +346,13 @@ export class ModelSelectionRuntime {
       };
     }
 
-    const providerEntry = requestedProvider
-      ? this.availableProviders.find((candidate) => candidate.id === requestedProvider)
+    const providerFirstModel = requestedProvider
+      ? this.availableModels.find((candidate) => candidate.provider === requestedProvider)
       : undefined;
-    const providerFirstModel = providerEntry?.models.find((candidate) => candidate.id.trim());
-    if (providerEntry && providerFirstModel) {
+    if (providerFirstModel) {
       return {
-        provider: providerEntry.id,
-        model: providerFirstModel.id,
+        provider: providerFirstModel.provider,
+        model: providerFirstModel.model,
       };
     }
 

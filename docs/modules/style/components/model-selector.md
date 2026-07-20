@@ -11,6 +11,7 @@
 
 - 模型选择器：`.opencodian-model-selector`、`.opencodian-model-trigger*`、`.opencodian-model-dropdown*`、`.opencodian-model-option*`。输入工具栏内的 trigger 使用统一 control height / inline padding，与 Agent / permission selector 保持同一横向节奏；默认态是紧凑按钮，`action-buttons-etched` 下切换为透明刻入态。
 - 选择态：`.is-open`、`.is-unavailable`、`.is-unconfigured`、`.is-highlighted`、`.is-selected`。
+- configured-only 禁用态：`.opencodian-model-option.is-configured-only` 与 `.opencodian-model-option-availability`，使用中性 muted 样式、稳定 badge 最小宽度，并覆盖 hover/highlight 背景。
 - 设置页通用：`.opencodian-settings*`、`.opencodian-settings-quick-nav*`、`.opencodian-settings-tabs-*`、`.opencodian-settings-tab-*`、`.opencodian-settings-tooltip-layer` / `-bubble` / `-arrow`（`SettingsTooltipController` body-level overlay）、`.opencodian-capability-lab-session-detail`。
 - 编辑区设置页：`.workspace-leaf-content[data-type="opencodian-settings-view"] > .view-content.opencodian-settings` 是 editor-area 专用根选择器；padding、classic quick-nav 顶部贴合、tabbed 标题行对齐都应落在 `.view-content` 上，避免把设置 UI 挂到 Obsidian leaf 外壳。
 - 样式面板通用：`.opencodian-style-*`、`.opencodian-theme-*`、滚动条规则（含 `.opencodian-history-scroll` 皮肤）。
