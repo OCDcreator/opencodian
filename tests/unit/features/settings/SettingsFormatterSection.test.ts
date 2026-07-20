@@ -499,6 +499,29 @@ describe('SettingsFormatterSection attachTabbed (tabbed layout)', () => {
     expect(headings[0]?.textContent).toBe(t('settings.formatter.tab.formatter'));
   });
 
+  it('renders a compact default-mode state instead of leaving the formatter tab empty', async () => {
+    const { plugin } = createPlugin({
+      formatterConfig: undefined,
+      runtimeStatus: [{ name: 'prettier', extensions: ['.js'], enabled: true }],
+    });
+    const section = new SettingsFormatterSection({
+      plugin,
+      createSectionHeading,
+      requestDisplayRefresh: displayRefresh,
+    });
+    const containerEl = document.createElement('div');
+    document.body.appendChild(containerEl);
+
+    section.attachTabbed(containerEl, 'formatter');
+    await flushPromises();
+
+    const stateEl = containerEl.querySelector<HTMLElement>('.opencodian-formatter-mode-state');
+    expect(stateEl?.dataset.kind).toBe('formatter');
+    expect(stateEl?.dataset.mode).toBe('default');
+    expect(stateEl?.textContent).toContain(t('settings.formatter.mode.defaultDesc'));
+    expect(containerEl.querySelector('.opencodian-formatter-runtime-panel')).not.toBeNull();
+  });
+
   it('renders lsp block for lsp tab', () => {
     const { plugin } = createPlugin();
     const section = new SettingsFormatterSection({
@@ -514,6 +537,29 @@ describe('SettingsFormatterSection attachTabbed (tabbed layout)', () => {
     const headings = containerEl.querySelectorAll('.opencodian-settings-subsection-heading');
     expect(headings.length).toBeGreaterThanOrEqual(1);
     expect(headings[0]?.textContent).toBe(t('settings.formatter.tab.lsp'));
+  });
+
+  it('renders a compact disabled-mode state instead of leaving the lsp tab empty', async () => {
+    const { plugin } = createPlugin({
+      lspConfig: false,
+      lspRuntimeStatus: [],
+    });
+    const section = new SettingsFormatterSection({
+      plugin,
+      createSectionHeading,
+      requestDisplayRefresh: displayRefresh,
+    });
+    const containerEl = document.createElement('div');
+    document.body.appendChild(containerEl);
+
+    section.attachTabbed(containerEl, 'lsp');
+    await flushPromises();
+
+    const stateEl = containerEl.querySelector<HTMLElement>('.opencodian-formatter-mode-state');
+    expect(stateEl?.dataset.kind).toBe('lsp');
+    expect(stateEl?.dataset.mode).toBe('disabled');
+    expect(stateEl?.textContent).toContain(t('settings.formatter.lsp.mode.disabledDesc'));
+    expect(containerEl.querySelector('.opencodian-formatter-runtime-panel')).not.toBeNull();
   });
 });
 

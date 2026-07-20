@@ -1,10 +1,12 @@
 .opencodian-settings-native-select {
-  position: absolute;
+  position: fixed !important;
+  inset: 0 auto auto 0 !important;
   width: 1px !important;
   height: 1px !important;
   margin: 0 !important;
   padding: 0 !important;
   border: 0 !important;
+  overflow: hidden !important;
   opacity: 0 !important;
   pointer-events: none !important;
 }

@@ -491,6 +491,19 @@ describe('SettingsConversationSection', () => {
     expect(plugin.saveSettings).not.toHaveBeenCalled();
   });
 
+  it('keeps the share mode control in the policy header without a duplicate state chip', () => {
+    const plugin = createPlugin();
+    const { containerEl } = createSection(plugin);
+
+    const policyHeaderEl = containerEl.querySelector('.opencodian-share-policy-header');
+    const shareSettingEl = containerEl.querySelector('.opencodian-share-policy-setting');
+
+    expect(policyHeaderEl).not.toBeNull();
+    expect(shareSettingEl).not.toBeNull();
+    expect(policyHeaderEl?.contains(shareSettingEl)).toBe(true);
+    expect(containerEl.querySelector('.opencodian-share-policy-state')).toBeNull();
+  });
+
   it('blocks stale project share saves and OpenCode restart when the active backend is no longer OpenCode', async () => {
     const plugin = createPlugin();
     (plugin.openCodeService as { checkHealth: jest.Mock }).checkHealth.mockResolvedValue(false);
@@ -498,8 +511,7 @@ describe('SettingsConversationSection', () => {
 
     const shareDropdown = findDropdown(t('settings.conversation.share.mode.name'));
     expect(shareDropdown).toBeDefined();
-    const policyStateEl = containerEl.querySelector<HTMLElement>('.opencodian-share-policy-state');
-    expect(policyStateEl?.textContent).toBe(t('settings.conversation.share.mode.manual'));
+    expect(containerEl.querySelector('.opencodian-share-policy-state')).toBeNull();
 
     plugin.settings.activeBackend = 'claude-code';
     plugin.settings.enabledBackends = ['opencode', 'claude-code'];
@@ -510,7 +522,7 @@ describe('SettingsConversationSection', () => {
     expect(plugin.openCodeService.checkHealth).not.toHaveBeenCalled();
     expect(plugin.openCodeService.stop).not.toHaveBeenCalled();
     expect(plugin.openCodeService.start).not.toHaveBeenCalled();
-    expect(policyStateEl?.textContent).toBe(t('settings.conversation.share.mode.manual'));
+    expect(shareDropdown?.control.setValue).toHaveBeenLastCalledWith('manual');
   });
 
   it('lists shared sessions in the project sharing block with copy, preview, and unshare actions', async () => {

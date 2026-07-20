@@ -1169,6 +1169,14 @@ const gridEl = summaryBandEl.createDiv({ cls: 'opencodian-formatter-overview-met
     }
 
     if (mode !== 'custom') {
+      this.renderNonCustomModeState(contentEl, {
+        kind: 'formatter',
+        mode,
+        description: this.getModeDescription(mode),
+        runtimeCount: runtimeState.items.length,
+        runtimeFetchFailed: runtimeState.fetchFailed,
+      });
+      this.renderFormatterList(contentEl, runtimeState);
       return;
     }
 
@@ -1926,6 +1934,7 @@ const gridEl = summaryBandEl.createDiv({ cls: 'opencodian-formatter-overview-met
     containerEl: HTMLElement,
     lspConfig: OpencodeLspConfig | undefined,
     runtimeState: LspRuntimeState,
+    options: { includeMode?: boolean } = {},
   ): void {
     const sectionEl = containerEl.createDiv({ cls: 'opencodian-formatter-runtime-panel' });
     const headerEl = sectionEl.createDiv({
@@ -1947,10 +1956,12 @@ const gridEl = summaryBandEl.createDiv({ cls: 'opencodian-formatter-overview-met
           : 'settings.formatter.lsp.overview.runtimeOnline',
       ));
 
-    const mode = this.resolveFormatterMode(lspConfig);
-    new Setting(bodyEl)
-      .setName(t('settings.formatter.lsp.overview.modeLabel'))
-      .setDesc(`${this.getModeLabel(mode)} — ${this.getLspModeDescription(mode)}`);
+    if (options.includeMode !== false) {
+      const mode = this.resolveFormatterMode(lspConfig);
+      new Setting(bodyEl)
+        .setName(t('settings.formatter.lsp.overview.modeLabel'))
+        .setDesc(`${this.getModeLabel(mode)} — ${this.getLspModeDescription(mode)}`);
+    }
 
     if (runtimeState.fetchFailed) {
       new Setting(bodyEl).setDesc(t('settings.formatter.lsp.overview.noRuntime'));
@@ -2050,6 +2061,14 @@ const gridEl = summaryBandEl.createDiv({ cls: 'opencodian-formatter-overview-met
     }
 
     if (mode !== 'custom') {
+      this.renderNonCustomModeState(contentEl, {
+        kind: 'lsp',
+        mode,
+        description: this.getLspModeDescription(mode),
+        runtimeCount: runtimeState.items.length,
+        runtimeFetchFailed: runtimeState.fetchFailed,
+      });
+      this.renderLspOverview(contentEl, lspConfig, runtimeState, { includeMode: false });
       return;
     }
 
@@ -2060,6 +2079,41 @@ const gridEl = summaryBandEl.createDiv({ cls: 'opencodian-formatter-overview-met
     this.renderBuiltinLspEditors(contentEl, builtinDefinitions, configObj);
     this.renderCustomLspList(contentEl, builtinIds, configObj);
     this.renderLspAdvancedJsonEditor(contentEl);
+  }
+
+  private renderNonCustomModeState(
+    containerEl: HTMLElement,
+    options: {
+      kind: 'formatter' | 'lsp';
+      mode: Exclude<FormatterMode, 'custom'>;
+      description: string;
+      runtimeCount: number;
+      runtimeFetchFailed: boolean;
+    },
+  ): void {
+    const stateEl = containerEl.createDiv({
+      cls: 'opencodian-formatter-mode-state',
+      attr: {
+        'data-kind': options.kind,
+        'data-mode': options.mode,
+      },
+    });
+    const copyEl = stateEl.createDiv({ cls: 'opencodian-formatter-mode-state-copy' });
+    copyEl.createDiv({
+      cls: 'opencodian-formatter-mode-state-title',
+      text: this.getModeLabel(options.mode),
+    });
+    copyEl.createDiv({
+      cls: 'opencodian-formatter-mode-state-description',
+      text: options.description,
+    });
+    const statusEl = stateEl.createSpan({
+      cls: 'opencodian-formatter-mode-state-status',
+      text: options.runtimeFetchFailed
+        ? t('settings.formatter.overview.runtimeError')
+        : t('settings.formatter.overview.summary.detected', { count: String(options.runtimeCount) }),
+    });
+    statusEl.dataset.tone = options.runtimeFetchFailed ? 'danger' : 'neutral';
   }
 
   private renderBuiltinLspEditors(

@@ -38,13 +38,13 @@ Owns the top-level `Formatter & LSP` settings page in both classic and tabbed la
   - runtime table cells expose compact styling hooks (`opencodian-formatter-table-name`, `-extensions`, `-status`, and column header classes), allowing CSS to keep extensions monospace, status chips right-aligned, and the sortable header controls visually native instead of inheriting Obsidian's full button chrome
   - detected formatter search now uses the same custom fuzzy combobox vocabulary as builtin formatter / LSP search: inline label, count chip, clear button, styled suggestions popover, arrow-key movement, Enter selection, Escape dismissal, and mouse selection
   - the formatter and LSP runtime blocks share the same panel-header vocabulary and body spacing, so both cards use the same title / meta chip hierarchy even though only the formatter table is collapsible
-- `formatter` secondary tab: mode switch dropdown, then when custom mode active:
+- `formatter` secondary tab: mode switch dropdown. Default and disabled modes render a compact read-only mode state plus any detected runtime formatter list instead of leaving the rest of the tab blank. When custom mode is active:
   - Builtin formatter editors sourced from the upstream builtin catalog, so they still render even when runtime status is offline
   - Builtin formatter rows live in a fixed-height internal scroll region; the custom search combobox and status filter stay sticky at the top of the section
   - Builtin formatter rows use the Settings Neutral Data Row Surface: a quiet shadcn-style Card + Field row with the formatter name and compact status badge on the left, the action dropdown on the right, muted monospace extensions below, and flat FieldGroup override editors separated by a subtle top rule
   - Custom formatter list with add/edit/delete
   - Advanced JSON editor with plain description copy, a single textarea panel, and a transparent footer ButtonGroup for format/reload/save
-- `lsp` secondary tab: mode switch dropdown, then when custom mode active:
+- `lsp` secondary tab: mode switch dropdown. Default and disabled modes render the same compact mode state plus the current LSP runtime panel instead of leaving the rest of the tab blank. When custom mode is active:
   - Builtin LSP editors sourced from a repo-maintained upstream catalog plus runtime-discovered entries
   - Builtin LSP rows use the same fixed-height internal scroll region, sticky search/status filter controls, neutral row-card surface, compact badges, and flat override FieldGroup behavior as formatter rows
   - Custom LSP list with add/edit/delete
@@ -142,6 +142,7 @@ When runtime status fetch fails:
 - The three secondary tabs now share one explicit settings rhythm instead of mixing summary and editor weight ad hoc.
 - `overview` is summary-first. Its shell uses `.opencodian-formatter-overview-shell`, and high-value readback sits inside `.opencodian-formatter-overview-summary-band`; it does not mount formatter/LSP mode dropdowns or editor-heavy builtin/custom sections.
 - `formatter` and `lsp` are structurally parallel. Their tabbed and classic bodies now route through `.opencodian-formatter-tab-config-shell`, with a top `.opencodian-formatter-tab-summary-band` for mode/runtime intent and a lower `.opencodian-formatter-tab-content-shell` for editable content.
+- When either config tab is not in `custom` mode, `.opencodian-formatter-mode-state` occupies the lower content shell with the resolved mode description and runtime count/readback. Existing runtime panels remain available, while builtin/custom/advanced editors stay unmounted.
 - Editable content stays split by responsibility:
   - `.opencodian-formatter-builtin-list-shell` for builtin row-card lists and inline override editors
   - `.opencodian-formatter-custom-list-shell` for custom formatter/LSP entry lists

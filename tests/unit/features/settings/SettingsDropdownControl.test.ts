@@ -333,6 +333,15 @@ describe('SettingsDropdownControl portal behavior', () => {
 });
 
 describe('SettingsDropdownControl styles', () => {
+  it('keeps hidden native selects from extending settings scroll geometry', () => {
+    const css = readStyleFile('src/style/components/settings-dropdown.css');
+    const nativeSelectRule = extractRule(css, '.opencodian-settings-native-select');
+
+    expect(nativeSelectRule).toContain('position: fixed !important;');
+    expect(nativeSelectRule).toContain('inset: 0 auto auto 0 !important;');
+    expect(nativeSelectRule).toContain('overflow: hidden !important;');
+  });
+
   it('lets menus expand for readable labels while option rows fill the menu track', () => {
     const css = readStyleFile('src/style/components/settings-dropdown.css');
     const menuRule = extractRule(css, '.opencodian-settings-dropdown-menu');

@@ -698,11 +698,7 @@ export class SettingsConversationSection {
       cls: 'opencodian-share-policy-desc',
       text: t('settings.conversation.share.mode.desc'),
     });
-    const policyStateEl = policyHeaderEl.createDiv({
-      cls: 'opencodian-share-policy-state',
-      text: this.getShareModeLabel(this.currentShareMode),
-    });
-    const policyControlEl = policyEl.createDiv({
+    const policyControlEl = policyHeaderEl.createDiv({
       cls: 'opencodian-share-policy-control',
     });
     const shareSetting = new Setting(policyControlEl)
@@ -721,7 +717,6 @@ export class SettingsConversationSection {
               return;
             }
             this.currentShareMode = value as OpencodeShareMode;
-            policyStateEl.setText(this.getShareModeLabel(this.currentShareMode));
             if (this.shareModeDiagnosticValueEl) {
               this.setShareDiagnosticValue(
                 this.shareModeDiagnosticValueEl,
@@ -734,7 +729,7 @@ export class SettingsConversationSection {
       });
     shareSetting.settingEl.classList.add('opencodian-share-policy-setting');
     this.addProjectConfigHelpButton(shareSetting, 'share');
-    this.addShareDiagnostics(policyEl, policyStateEl);
+    this.addShareDiagnostics(policyEl);
 
     this.sharedSessionsContainerEl = containerEl.createDiv({
       cls: 'opencodian-shared-sessions',
@@ -742,7 +737,7 @@ export class SettingsConversationSection {
     void this.renderSharedSessionsList();
   }
 
-  private addShareDiagnostics(containerEl: HTMLElement, policyStateEl: HTMLElement): void {
+  private addShareDiagnostics(containerEl: HTMLElement): void {
     const detailsEl = containerEl.createEl('details', {
       cls: 'opencodian-share-troubleshooting',
     });
@@ -829,7 +824,6 @@ export class SettingsConversationSection {
             shareHost.reachable ? 'ok' : 'warning',
           );
         } finally {
-          policyStateEl.setText(this.getShareModeLabel(this.currentShareMode));
           checkButtonEl.disabled = false;
         }
       })();

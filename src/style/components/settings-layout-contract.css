@@ -729,10 +729,10 @@
 
 .opencodian-settings .opencodian-share-policy-header {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) max-content;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 280px);
   gap: var(--opencodian-settings-space-lg);
-  align-items: start;
-  padding: 14px 14px 0;
+  align-items: center;
+  padding: 14px;
 }
 
 .opencodian-settings .opencodian-share-policy-copy {
@@ -755,7 +755,6 @@
   line-height: 1.5;
 }
 
-.opencodian-settings .opencodian-share-policy-state,
 .opencodian-settings .opencodian-shared-sessions-count {
   display: inline-flex;
   align-items: center;
@@ -773,11 +772,12 @@
 .opencodian-settings .opencodian-share-policy-control {
   display: flex;
   justify-content: flex-end;
-  padding: var(--opencodian-settings-space-lg) 14px 14px;
+  min-width: 0;
 }
 
 .opencodian-settings .opencodian-share-policy-setting.setting-item {
-  width: min(100%, 430px);
+  display: block;
+  width: 100%;
   padding: 0;
   border: 0;
   background: transparent;
@@ -793,7 +793,8 @@
 }
 
 .opencodian-settings .opencodian-share-policy-setting select {
-  min-width: min(260px, 100%);
+  min-width: 0;
+  width: min(220px, 100%);
 }
 
 .opencodian-settings .opencodian-share-troubleshooting {
@@ -1229,6 +1230,10 @@
   .opencodian-settings .opencodian-share-troubleshooting,
   .opencodian-settings .opencodian-shared-sessions-tools {
     justify-content: flex-start;
+  }
+
+  .opencodian-settings .opencodian-share-policy-setting select {
+    width: 100%;
   }
 
   .opencodian-settings .opencodian-share-troubleshooting-summary {

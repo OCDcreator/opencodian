@@ -24,7 +24,7 @@
 
 其中“上下文压缩（项目级）”分组现在为每个压缩字段都挂了帮助按钮，点击后会打开 `ConversationCompactionHelpModal`，用通俗语言解释字段语义、OpenCode 默认策略和调参影响。
 
-“会话分享（项目级）”分组使用独立的分享策略面板承载 share mode，而不是普通单行 setting。该面板保留项目配置帮助按钮，点击后打开 `OpenCodeProjectConfigHelpModal`。该弹窗说明分享会创建公开链接、不是 Markdown 导出，并链接 OpenCode share / config 官方文档。策略面板内还提供分享诊断区，可检查当前项目模式、OpenCode 服务健康状态，以及公共分享主机 `https://opncd.ai` 的网络可达性。策略面板下方是已分享会话管理区，显示公开会话数量、刷新动作、复制链接、预览和取消分享。
+“会话分享（项目级）”分组使用独立的分享策略面板承载 share mode，而不是普通单行 setting。策略说明位于左列，dropdown 与项目配置帮助按钮位于同一标题行右列，不再额外重复当前 dropdown 值；窄屏时控制列换行并占满可用宽度。帮助按钮会打开 `OpenCodeProjectConfigHelpModal`，说明分享会创建公开链接、不是 Markdown 导出，并链接 OpenCode share / config 官方文档。策略面板内还提供分享诊断区，可检查当前项目模式、OpenCode 服务健康状态，以及公共分享主机 `https://opncd.ai` 的网络可达性。策略面板下方是已分享会话管理区，显示公开会话数量、刷新动作、复制链接、预览和取消分享。
 
 每个 conversation 二级分组都会标记稳定 `data-settings-target="conversation-{title|compaction|sharing|display|questions|rendering}"`，供会话设置弹窗和调试断言做深链定位；不要只依赖本地化标题文本匹配。
 

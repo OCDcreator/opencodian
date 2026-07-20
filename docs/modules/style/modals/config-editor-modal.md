@@ -244,6 +244,12 @@ Guardrail: 后续不要把 provider/model row 的普通 hover、selected 或卡�
 - builtin/custom/advanced editor 三类编辑块现在各自有稳定壳层：`.opencodian-formatter-builtin-list-shell`、`.opencodian-formatter-custom-list-shell`、`.opencodian-formatter-advanced-editor-shell`。这些 class 只表达层级和节奏，不改变既有 row-card / search / inline editor 行为。
 - builtin override editor 继续使用现有 `.opencodian-formatter-override-fields` field-group DOM，但额外带 `.opencodian-formatter-builtin-editor-shell` 结构别名，明确它是 inline editor shell，不是新的 nested card。
 
+### 2026-07-20 formatter/lsp non-custom mode state
+
+- `.opencodian-formatter-mode-state` 为 formatter / LSP 的 default 与 disabled 模式提供紧凑只读状态块，左侧显示当前模式和现有说明，右侧显示检测数量或运行态错误。
+- 状态块只填补原先 mode row 后直接 return 造成的空页面，不挂载 builtin/custom/advanced 编辑器；formatter 继续复用 detected runtime list，LSP 继续复用静态 runtime panel。
+- 窄屏下状态块退为单列，状态 chip 左对齐，不增加固定高度或页面级填充。
+
 ## 2026-05-13 Model picker visual refresh
 
 模型选择弹层（`ModelPickerModal`）进行视觉重构：
