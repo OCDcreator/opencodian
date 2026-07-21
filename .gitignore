@@ -93,6 +93,7 @@ graphify-out/.graphify_python
 graphify-out/cache/
 graphify-out/manifest.json
 graphify-out/cost.json
+graphify-out/*.bak.*
 src/graphify-out/
 
 # Logs
