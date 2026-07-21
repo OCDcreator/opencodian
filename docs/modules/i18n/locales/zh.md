@@ -1,7 +1,9 @@
 # Chinese Locale
 
 > **源码**: `src/i18n/locales/zh.ts`
-> **最近更新**: 2026-06-28 Settings extension badges — 新增 `settings.tools.permission.source.*`、`settings.tools.custom.status.*` 和 `settings.acp.count`，用于 Skills / Tools / ACP 设置 row-card badge 与 toolbar 数量文案。
+> **最近更新**: 2026-07-21 子代理嵌套深度 — 新增 `settings.agents.subagentDepth.name` / `.desc` / `.useDefault` / `.disableAll`，用于 Settings → Agents 新增的下拉控件，写入 OpenCode 1.18.3 `subagent_depth` 字段（空 = 服务端默认 1，0 = 完全禁用子代理，1-5 = 显式嵌套层数）。
+>
+> **Previously**: 2026-06-28 Settings extension badges — 新增 `settings.tools.permission.source.*`、`settings.tools.custom.status.*` 和 `settings.acp.count`，用于 Skills / Tools / ACP 设置 row-card badge 与 toolbar 数量文案。
 >
 > **前次更新**: 2026-06-28 智能体管理 UI badge — 新增 `settings.agent.status.disabled`，让 `通用 > 智能体管理` 可以用 compact badge 展示使用中/已启用/已停用状态，而不是把状态重复拼进行标题。
 >

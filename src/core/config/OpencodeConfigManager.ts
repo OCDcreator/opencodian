@@ -235,6 +235,31 @@ export class OpencodeConfigManager {
     await this.write(config);
   }
 
+  /**
+   * Returns the configured subagent nesting depth, or undefined when the field
+   * is absent (OpenCode server defaults to 1).
+   */
+  async getSubagentDepth(): Promise<number | undefined> {
+    const { subagent_depth } = await this.read();
+    return typeof subagent_depth === 'number' && Number.isFinite(subagent_depth) && subagent_depth >= 0
+      ? Math.floor(subagent_depth)
+      : undefined;
+  }
+
+  /**
+   * Writes `subagent_depth`. Pass undefined/null to clear the field and let the
+   * OpenCode server fall back to its default of 1.
+   */
+  async updateSubagentDepth(depth: number | null | undefined): Promise<void> {
+    const config = await this.read();
+    if (typeof depth === 'number' && Number.isFinite(depth) && depth >= 0) {
+      config.subagent_depth = Math.floor(depth);
+    } else {
+      delete config.subagent_depth;
+    }
+    await this.write(config);
+  }
+
   async getAgentConfig(): Promise<OpencodeAgentConfigRecord> {
     const config = await this.read();
     const legacyAgents = this.cloneConfigRecord<OpencodeAgentConfig>(config.mode);

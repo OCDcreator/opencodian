@@ -120,6 +120,7 @@ export class SettingsAgentsSection {
       catalogBodyEl,
       workspaceBodyEl,
     });
+    this.attachSubagentDepthControl(defaultBlockEl, configManager);
 
     if (defaultAgentDropdown) {
       void this.refreshCatalog({
@@ -200,6 +201,7 @@ export class SettingsAgentsSection {
       catalogBodyEl,
       workspaceBodyEl,
     });
+    this.attachSubagentDepthControl(defaultSurfaceEl, configManager);
 
     this.showActiveBlock(containerEl, secondaryTabId);
 
@@ -289,6 +291,54 @@ export class SettingsAgentsSection {
               editorBodyEl: context.editorBodyEl,
               workspaceBodyEl: context.workspaceBodyEl ?? undefined,
             });
+          });
+      });
+  }
+
+  /**
+   * Renders the `subagent_depth` dropdown and asynchronously hydrates its
+   * current value from `.opencode/opencode.json`. Options follow the OpenCode
+   * server semantics: blank entry falls back to the server default (1), 0
+   * disables all subagents, and 2+ allows additional nesting levels.
+   */
+  private attachSubagentDepthControl(
+    containerEl: HTMLElement,
+    configManager: NonNullable<OpenCodianPlugin['opencodeConfigManager']>,
+  ): void {
+    // Allowed depths and their UI labels. Labels are built from i18n templates
+    // so descriptions stay short and localized; option values stay numeric so
+    // `onChange` keeps parsing them as numbers.
+    const SUBAGENT_DEPTH_VALUES = [0, 1, 2, 3, 4, 5] as const;
+    new Setting(containerEl)
+      .setName(t('settings.agents.subagentDepth.name'))
+      .setDesc(t('settings.agents.subagentDepth.desc'))
+      .setClass('opencodian-agent-settings-control-row')
+      .addDropdown((dropdown) => {
+        dropdown.addOption('', t('settings.agents.subagentDepth.useDefault'));
+        for (const depth of SUBAGENT_DEPTH_VALUES) {
+          const label = depth === 0
+            ? t('settings.agents.subagentDepth.optionDisable')
+            : depth === 1
+              ? t('settings.agents.subagentDepth.optionOne')
+              : t('settings.agents.subagentDepth.optionMany', { n: depth });
+          dropdown.addOption(String(depth), label);
+        }
+        dropdown
+          .setValue('')
+          .onChange(async (value) => {
+            try {
+              await configManager.updateSubagentDepth(value === '' ? undefined : Number(value));
+            } catch (error) {
+              logger.error('Failed to update subagent_depth:', error);
+            }
+          });
+        void configManager
+          .getSubagentDepth()
+          .then((depth) => {
+            dropdown.setValue(typeof depth === 'number' ? String(depth) : '');
+          })
+          .catch((error) => {
+            logger.error('Failed to read subagent_depth:', error);
           });
       });
   }

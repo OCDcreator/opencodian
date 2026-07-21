@@ -13,6 +13,7 @@
 - 用 `OpencodeConfigManager.getDefaultAgent()` 初始化默认主代理下拉框
 - 在 classic / tabbed 两种 layout 中都渲染 system-agent `expert mode` toggle
 - 通过 `updateDefaultAgent()` 写回项目级 `default_agent`
+- 通过 `attachSubagentDepthControl()` 渲染 `subagent_depth` dropdown（OpenCode 1.18.3 新增）：空选项回退服务端默认 `1`、`0` 完全禁用子代理、`1-5` 显式嵌套层数；写入走 `OpencodeConfigManager.updateSubagentDepth()`
 - 为 `mode: 'subagent'` 的条目提供基础 `@` 菜单可见性开关
 - 通过 `upsertAgentConfig()` / `removeAgentConfig()` 写回或清理 `agent.<id>.hidden`
 - 提供项目 agent 编辑器，支持从 project override 或 runtime/system 条目出发创建 / 编辑 / 删除以下核心字段：

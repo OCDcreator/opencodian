@@ -45,14 +45,14 @@
 | `OpencodeMcpConfigRecord` | `Record<string, OpencodeMcpEntryConfig>` — 项目 MCP server map |
 | `OpencodeToolConfig` | `Record<string, boolean>` — top-level 工具开关 |
 | `OpencodeModelConfigSubset` | 模型相关配置子集（`model?`, `small_model?`, `provider?`, `enabled_providers?`, `disabled_providers?`） |
-| `OpencodeConfig` | 完整配置（继承 ModelConfigSubset + `$schema?`, `permission?`, `plugin?`, `agent?`, `command?`, `default_agent?`, `share?`, `compaction?`, `formatter?`, `lsp?`, deprecated `mode?`, `tools?`, `[key: string]: unknown`） |
+| `OpencodeConfig` | 完整配置（继承 ModelConfigSubset + `$schema?`, `permission?`, `plugin?`, `agent?`, `command?`, `default_agent?`, `subagent_depth?`, `share?`, `compaction?`, `formatter?`, `lsp?`, deprecated `mode?`, `tools?`, `[key: string]: unknown`） |
 
 ## 核心逻辑
 
 ### 配置层级
 
 - `OpencodeModelConfigSubset` — 仅模型/提供商相关字段，供 `ModelConfigService` 局部读写
-- `OpencodeConfig` — 完整配置，增加 `permission`、`plugin`、`agent`、`command`、`default_agent`、`share`、`compaction`、`formatter`、`lsp`、`mcp`、deprecated `mode` / top-level `tools`、`$schema` 等顶层字段
+- `OpencodeConfig` — 完整配置，增加 `permission`、`plugin`、`agent`、`command`、`default_agent`、`subagent_depth`、`share`、`compaction`、`formatter`、`lsp`、`mcp`、deprecated `mode` / top-level `tools`、`$schema` 等顶层字段
 
 ### 插件声明格式
 
@@ -215,6 +215,7 @@ Ownership facts:
 | `agent` | `Record<string, OpencodeAgentConfig>?` | 代理配置 |
 | `command` | `Record<string, OpencodeCommandConfig>?` | 命令配置；OpenCodian 会消费 `temperature` / `top_p` patch 并转换成 command-owned hidden agent |
 | `default_agent` | `string?` | 默认 primary agent |
+| `subagent_depth` | `number?` | 子代理最大嵌套深度；服务端默认 `1`，禁止子代理再启动子代理（OpenCode 1.18.3 起新增）。通过 `OpencodeConfigManager.getSubagentDepth` / `updateSubagentDepth` 读写，并在 Settings → Agents section 通过 dropdown 暴露：空 = 用服务端默认、`0` = 完全禁用、`1-5` = 显式嵌套层数 |
 | `share` | `OpencodeShareMode?` | 会话分享模式；缺失时 OpenCode 默认 `manual` |
 | `compaction` | `OpencodeCompactionConfig?` | 压缩配置 |
 | `formatter` | `OpencodeFormatterConfig?` | 项目级 formatter 配置；缺失表示默认自动探测，`false` 表示全部禁用，对象表示 per-formatter 覆盖 |

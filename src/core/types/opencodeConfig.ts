@@ -180,6 +180,8 @@ export interface OpencodeConfig extends OpencodeModelConfigSubset {
   agent?: OpencodeAgentConfigRecord;
   command?: OpencodeCommandConfigRecord;
   default_agent?: string;
+  /** Maximum subagent nesting depth. Defaults to 1 on the server (added in OpenCode 1.18.3). */
+  subagent_depth?: number;
   share?: OpencodeShareMode;
   compaction?: OpencodeCompactionConfig;
   formatter?: OpencodeFormatterConfig;

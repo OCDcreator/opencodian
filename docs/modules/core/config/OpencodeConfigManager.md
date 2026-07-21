@@ -42,6 +42,8 @@ class OpencodeConfigManager {
   updateShareConfig(share: OpencodeShareMode | null | undefined): Promise<void>;
   getDefaultAgent(): Promise<string | undefined>;
   updateDefaultAgent(defaultAgent: string | null | undefined): Promise<void>;
+  getSubagentDepth(): Promise<number | undefined>;
+  updateSubagentDepth(depth: number | null | undefined): Promise<void>;
   getAgentConfig(): Promise<OpencodeAgentConfigRecord>;
   updateAgentConfig(agents: OpencodeAgentConfigRecord): Promise<void>;
   upsertAgentConfig(agentId: string, agent: OpencodeAgentConfig): Promise<void>;
@@ -150,6 +152,7 @@ manager 内提供了更细粒度的项目配置 helper，供当前 session setti
 - `getFormatterConfig()` / `updateFormatterConfig()`：读写 `formatter`，具体 exact-write 规则委托给 `formatterConfig.ts`，允许删除 formatter 条目并保留 formatter entry 内未知字段
 - `getLspConfig()` / `updateLspConfig()`：读写 `lsp`，与 formatter 使用同样的 exact-write 规则，允许删除 language server 条目并保留 LSP entry 内未知字段
 - `getDefaultAgent()` / `updateDefaultAgent()`：读写并 trim `default_agent`，空字符串会删除字段
+- `getSubagentDepth()` / `updateSubagentDepth()`：读写 `subagent_depth`（OpenCode 1.18.3 新增）；只接受非负整数，`undefined` / `null` / 负数会删除字段，让服务端回退到默认值 `1`
 - `getAgentConfig()`：把 native `agent` 与 deprecated `mode` 合并成单个 map，读取时优先返回 native `agent`
 - `upsertAgentConfig()`：写入 native `agent` 条目时，会先吸收同名 deprecated `mode` 条目，再递归 merge，避免丢失未知字段 / `tools` / `options`
 - `removeAgentConfig()`：删除 native `agent` 的同时，也会删除 deprecated `mode` 中的同名 legacy 条目，避免 helper 读取时被“复活”
@@ -192,6 +195,7 @@ manager 内提供了更细粒度的项目配置 helper，供当前 session setti
 | `getFormatterConfig()` / `updateFormatterConfig()` | 读写 `formatter`，具体 exact subtree write 规则委托给 `formatterConfig.ts` |
 | `getLspConfig()` / `updateLspConfig()` | 读写 `lsp`，使用和 formatter 相同的 exact subtree write 规则 |
 | `getDefaultAgent()` / `updateDefaultAgent()` | 读写 `default_agent`，空值时删除 |
+| `getSubagentDepth()` / `updateSubagentDepth()` | 读写 `subagent_depth`（OpenCode 1.18.3 新增），只接受非负整数，非法值会删除字段 |
 | `getAgentConfig()` / `upsertAgentConfig()` / `removeAgentConfig()` | 兼容 deprecated `mode` 导入的 agent helper |
 | `getCommandConfig()` / `upsertCommandConfig()` / `removeCommandConfig()` | 命令 map 的细粒度 helper，必要时维护 command-owned hidden agent |
 | `getCommandScopedAgentId()` | 返回命令级隐藏 agent 的稳定 ID |

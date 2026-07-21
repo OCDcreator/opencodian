@@ -1,7 +1,9 @@
 # English Locale
 
 > **源码**: `src/i18n/locales/en.ts`
-> **最近更新**: 2026-06-28 Settings extension badges — added `settings.tools.permission.source.*`, `settings.tools.custom.status.*`, and `settings.acp.count` for Skills / Tools / ACP settings row-card badges and toolbar count text.
+> **最近更新**: 2026-07-21 Subagent nesting depth — added `settings.agents.subagentDepth.name` / `.desc` / `.useDefault` / `.disableAll` for the new Settings → Agents dropdown that writes the OpenCode 1.18.3 `subagent_depth` field (blank = server default 1, 0 = disable all subagents, 1-5 = explicit nesting).
+>
+> **Previously**: 2026-06-28 Settings extension badges — added `settings.tools.permission.source.*`, `settings.tools.custom.status.*`, and `settings.acp.count` for Skills / Tools / ACP settings row-card badges and toolbar count text.
 >
 > **Previously**: 2026-06-28 Agent management UI badges — added `settings.agent.status.disabled` so `General > Agent Management` can show active/enabled/disabled backend state as compact badges without duplicating status text in row titles.
 >

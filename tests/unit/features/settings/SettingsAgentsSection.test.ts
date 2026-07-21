@@ -164,6 +164,7 @@ function createPlugin(options: {
   runtimeAgents?: RuntimeAgent[];
   projectAgents?: OpencodeAgentConfigRecord;
   defaultAgent?: string | undefined;
+  subagentDepth?: number | undefined;
   fileContents?: Record<string, string>;
   fileMtims?: Record<string, number>;
   listResults?: Record<string, { files: string[]; folders: string[] }>;
@@ -203,6 +204,8 @@ function createPlugin(options: {
       getAgentConfig: jest.fn().mockResolvedValue(options.projectAgents ?? {}),
       getDefaultAgent: jest.fn().mockResolvedValue(options.defaultAgent),
       updateDefaultAgent: jest.fn().mockResolvedValue(undefined),
+      getSubagentDepth: jest.fn().mockResolvedValue(options.subagentDepth ?? undefined),
+      updateSubagentDepth: jest.fn().mockResolvedValue(undefined),
       upsertAgentConfig: jest.fn().mockResolvedValue(undefined),
       removeAgentConfig: jest.fn().mockResolvedValue(undefined),
     },
@@ -736,5 +739,64 @@ describe('SettingsAgentsSection tabbed workspace', () => {
     await findButton(t('settings.agents.workspace.actions.delete'))?.onClick?.();
     await flushAsync();
     expect(plugin.app.vault.adapter.remove).toHaveBeenCalledWith('.opencode/agents/researcher.md');
+  });
+});
+
+describe('SettingsAgentsSection subagent depth dropdown', () => {
+  it('hydrates the dropdown with the configured value', async () => {
+    const plugin = createPlugin({ subagentDepth: 2 });
+
+    createSection(plugin);
+    await flushAsync();
+
+    const dropdown = findDropdown(t('settings.agents.subagentDepth.name'));
+    expect(dropdown?.control.setValue).toHaveBeenCalledWith('2');
+    expect(plugin.opencodeConfigManager?.getSubagentDepth).toHaveBeenCalled();
+  });
+
+  it('falls back to the blank option when subagent_depth is unset', async () => {
+    const plugin = createPlugin();
+
+    createSection(plugin);
+    await flushAsync();
+
+    const dropdown = findDropdown(t('settings.agents.subagentDepth.name'));
+    expect(dropdown?.control.setValue).toHaveBeenCalledWith('');
+  });
+
+  it('writes the chosen depth through updateSubagentDepth', async () => {
+    const plugin = createPlugin();
+
+    createSection(plugin);
+    await flushAsync();
+
+    const dropdown = findDropdown(t('settings.agents.subagentDepth.name'));
+    await dropdown?.onChange?.('3');
+    await flushAsync();
+
+    expect(plugin.opencodeConfigManager?.updateSubagentDepth).toHaveBeenCalledWith(3);
+  });
+
+  it('clears the field when the blank option is selected', async () => {
+    const plugin = createPlugin({ subagentDepth: 2 });
+
+    createSection(plugin);
+    await flushAsync();
+
+    const dropdown = findDropdown(t('settings.agents.subagentDepth.name'));
+    await dropdown?.onChange?.('');
+    await flushAsync();
+
+    expect(plugin.opencodeConfigManager?.updateSubagentDepth).toHaveBeenCalledWith(undefined);
+  });
+
+  it('renders in the tabbed default surface too', async () => {
+    const plugin = createPlugin({ subagentDepth: 0 });
+
+    createTabbedSection('default', plugin);
+    await flushAsync();
+
+    const dropdown = findDropdown(t('settings.agents.subagentDepth.name'));
+    expect(dropdown?.control.setValue).toHaveBeenCalledWith('0');
   });
 });
