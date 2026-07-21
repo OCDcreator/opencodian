@@ -11293,6 +11293,8 @@ img.opencodian-model-provider-header-icon {
 }
 
 .opencodian-settings .opencodian-agent-workspace-create-setting.setting-item {
+  display: flex;
+  justify-self: end;
   margin: 0;
   padding: 0;
   border: 0;

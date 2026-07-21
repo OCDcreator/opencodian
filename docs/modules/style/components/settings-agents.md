@@ -21,7 +21,7 @@
 - `.opencodian-agent-catalog-row`：agent catalog compact data row。TS 会补 `role="listitem"`、`data-agent-mode` 和 `data-agent-state`。
 - `.opencodian-agent-badge*`：mode/source/status/visibility chip。状态只使用低调 tonal border/background，不使用大色块。
 - `.opencodian-agent-editor-*`：project agent editor 的 flat groups、two-column rows、textarea rows、advanced disclosure、action footer。
-- `.opencodian-agent-workspace-*`：Markdown workspace toolbar、file list、file row、inline editor panel。
+- `.opencodian-agent-workspace-*`：Markdown workspace toolbar、file list、file row、inline editor panel；toolbar 内的 create `Setting` 收缩为按钮宽度并固定在右侧，不能继承普通双列 field grid 后停在中间。
 - `.opencodian-agent-settings-alert`：catalog load failure、empty catalog、empty workspace 的 Alert/Empty surface。
 
 ## Project Agent Editor card contract
