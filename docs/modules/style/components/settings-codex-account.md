@@ -48,9 +48,13 @@ Codex 设置面板的三大分组容器（连接与运行默认项 / 恢复与�
 
 卡片头部：标题 + 右侧 Refresh 按钮的 flex 布局。
 
-### `.opencodian-codex-account-card-refresh`
+### `.opencodian-codex-account-card-refresh` / `.opencodian-codex-account-refresh-all`
 
-卡片 Refresh 按钮。直接渲染为原生 `<button>`（带 `opencodian-codex-account-card-refresh` class），不再包裹在 Obsidian `Setting` 行内，避免额外的 `.setting-item` 背景框。`flex-shrink: 0` 保持按钮在头部右侧不被挤压。
+卡片 Refresh 按钮与组级「全部刷新」按钮共享同一套 ghost 样式：透明背景、muted 文字、hover 时 tonal 底色、`focus-visible` 2px accent 描边，避免多个重复按钮与 readback 内容争夺视觉权重。两者都直接渲染为原生 `<button>`（不包裹在 Obsidian `Setting` 行内），并带 `title`/`aria-label`（分别来自 `refreshTooltip` / `refreshAllTooltip` 文案）。`flex-shrink: 0` 保持按钮在头部右侧不被挤压。
+
+### `.opencodian-settings-codex-group-header`
+
+账号分组头部 flex 行：左侧 `.opencodian-settings-codex-group-header-text` 承载标题 + 一句话描述，右侧放置组级「全部刷新」按钮。分组到卡片栈的间距仍由 `.opencodian-settings-codex-group-controls` 的 `--oc-codex-group-header-gap` 提供。
 
 ### `.opencodian-settings-codex-readback`
 
@@ -79,11 +83,11 @@ Resume & Inspect 标签页中按钮触发的 readback 输出、以及 session br
 
 ### `.opencodian-codex-account-tiles` / `.opencodian-codex-account-stat-tile`
 
-Token 使用量的统计磁贴网格（`auto-fit minmax(96px,1fr)`）。每块显示格式化后的值（K/M、时长、天数）和标签。
+Token 使用量的扁平统计行（flex wrap，间距分组）：每对是 value-over-label（`--font-ui-medium` 700 值 + `--font-smallest` muted 标签），没有磁贴边框/背景/圆角——卡片内部不再嵌套卡片，数字本身承担层级。
 
-### `.opencodian-codex-account-usage-bars` / `.opencodian-codex-account-usage-bar`
+### `.opencodian-codex-account-usage-bars` / `.opencodian-codex-account-usage-bar` / `.opencodian-codex-account-usage-labels`
 
-最近每日用量的柱状图：flex 底对齐，柱高按比例，accent 色渐变。
+最近每日用量的柱状图：flex 底对齐，柱高按最近窗口归一化，实色 `var(--interactive-accent)`（无渐变），hover 时提升到全不透明；每根柱子带 `title`（`日期 · tokens`）tooltip。日期标签在独立的 `.opencodian-codex-account-usage-labels` 行中与柱子一一对齐（9px `--text-faint`），不再使用 8px 绝对定位溢出标签。图表区通过 `border-top` 与统计行分隔。
 
 ### `.opencodian-codex-account-rate-limit-group`
 
@@ -91,11 +95,11 @@ Token 使用量的统计磁贴网格（`auto-fit minmax(96px,1fr)`）。每块�
 
 ### `.opencodian-codex-account-capability-chip`
 
-Provider 能力 chip：图标 + 标签 + 说明 + 状态。`.is-enabled` 绿色边框，`.is-disabled` 降透明度。
+Provider 能力行：垂直扁平列表，行间 `border-top` 细分隔线。每行是状态圆点图标 + 标签 + 说明 + 右侧 pill 状态 badge（`.is-enabled` 绿色 tonal，`.is-disabled` 中性 tonal）。不再使用嵌套卡片的边框/背景/降透明度。
 
 ### `.opencodian-codex-account-card-notice` / `.opencodian-codex-account-card-code`
 
-auth-required 与信息提示框：使用完整的 1px 黄色（warning）边框 + 淡黄色背景，而不是左侧色条。内部 `code` 元素（如 `codex login`）带等宽字体与边框。Impeccable 规则禁止 alert/callout 风格的 side-stripe（>1px 的左侧色条），因此此处改为整框边框 + 淡背景以传达 warning 语义。
+auth-required 与信息提示框：使用完整的 1px 黄色（warning）边框 + 淡黄色背景，而不是左侧色条。内部 `code` 元素（如 `codex login`）带等宽字体与边框。Impeccable 规则禁止 alert/callout 风格的 side-stripe（>1px 的左侧色条），因此此处改为整框边框 + 淡背景以传达 warning 语义。完整块级形式只出现在身份卡（权威说明，每页一次）；Token 使用量与速率限制卡使用 `.is-compact` 单行变体（标题 + 提示 + `codex login` code），不重复长文案。
 
 ## 维护约束
 

@@ -350,14 +350,27 @@ export class SettingsCodexSection {
       attr: { 'data-codex-group': 'account-and-status' },
     });
 
-    groupEl.createEl('h4', {
+    const headerEl = groupEl.createDiv({
+      cls: 'opencodian-settings-codex-group-header',
+    });
+    const headerTextEl = headerEl.createDiv({
+      cls: 'opencodian-settings-codex-group-header-text',
+    });
+    headerTextEl.createEl('h4', {
       cls: 'opencodian-settings-codex-group-title',
       text: t('settings.codex.accountSurface.sectionName'),
     });
-    groupEl.createDiv({
+    headerTextEl.createDiv({
       cls: 'opencodian-settings-codex-group-desc',
       text: t('settings.codex.accountSurface.sectionDesc'),
     });
+    const refreshAllTooltip = t('settings.codex.accountSurface.refreshAllTooltip');
+    const refreshAllButtonEl = headerEl.createEl('button', {
+      cls: 'opencodian-codex-account-refresh-all',
+      text: t('settings.codex.accountSurface.refreshAll'),
+      attr: { type: 'button', title: refreshAllTooltip, 'aria-label': refreshAllTooltip },
+    });
+    refreshAllButtonEl.addEventListener('click', () => this.accountSurface.refreshAllNow());
 
     const authSource = this.plugin.settings.backendSettings.codex.apiKey
       ? 'plugin-api-key'
@@ -367,7 +380,20 @@ export class SettingsCodexSection {
       attr: { 'data-codex-group-controls': 'account' },
     });
     this.accountSurface.attach(cardsEl, authSource);
-    renderCostEstimateSettingsRow(cardsEl, this.plugin, 'codex');
+
+    const costGroupEl = bodyEl.createDiv({
+      cls: 'opencodian-settings-codex-group opencodian-settings-codex-group--cost',
+      attr: { 'data-codex-group': 'cost-estimate' },
+    });
+    costGroupEl.createEl('h4', {
+      cls: 'opencodian-settings-codex-group-title',
+      text: t('settings.cost.group.title'),
+    });
+    const costControlsEl = costGroupEl.createDiv({
+      cls: 'opencodian-settings-codex-group-controls opencodian-settings-codex-group-stack',
+      attr: { 'data-codex-group-controls': 'cost-estimate' },
+    });
+    renderCostEstimateSettingsRow(costControlsEl, this.plugin, 'codex');
   }
 
   private applyCodexRuntimeUpdates(): void {

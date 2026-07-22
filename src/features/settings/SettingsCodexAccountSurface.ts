@@ -143,10 +143,11 @@ export class SettingsCodexAccountSurface {
       text: title,
     });
 
+    const refreshTooltip = t('settings.codex.accountSurface.refreshTooltip');
     const refreshButtonEl = headerEl.createEl('button', {
       cls: 'opencodian-codex-account-card-refresh',
       text: t('settings.codex.accountSurface.refresh'),
-      attr: { type: 'button' },
+      attr: { type: 'button', title: refreshTooltip, 'aria-label': `${refreshTooltip}: ${title}` },
     });
     refreshButtonEl.addEventListener('click', () => onRefresh());
 
@@ -167,6 +168,11 @@ export class SettingsCodexAccountSurface {
   }
 
   // ─── Refresh orchestration ──────────────────────────────────────
+
+  /** Public entry for the group-level "refresh all" action. */
+  refreshAllNow(): void {
+    void this.refreshAll();
+  }
 
   private async refreshAll(): Promise<void> {
     void this.refreshIdentity();
@@ -398,22 +404,24 @@ export class SettingsCodexAccountSurface {
       text: t('settings.codex.accountSurface.usage.recentDays'),
     });
     const barsEl = wrapEl.createDiv({ cls: 'opencodian-codex-account-usage-bars' });
-    const values = buckets.map((b) => this.readNumber(b.tokens) ?? 0);
-    const max = Math.max(1, ...values);
+    const labelsEl = wrapEl.createDiv({ cls: 'opencodian-codex-account-usage-labels' });
     const recent = buckets.slice(-14);
+    const values = recent.map((b) => this.readNumber(b.tokens) ?? 0);
+    const max = Math.max(1, ...values);
     for (const bucket of recent) {
       const tokens = this.readNumber(bucket.tokens) ?? 0;
       const date = typeof bucket.startDate === 'string' ? bucket.startDate : '';
       const heightPct = Math.max(4, Math.round((tokens / max) * 100));
-      const barEl = barsEl.createDiv({
+      barsEl.createDiv({
         cls: 'opencodian-codex-account-usage-bar',
         attr: {
           'data-bucket-date': date,
           'data-bucket-tokens': String(tokens),
+          title: `${date} · ${tokens.toLocaleString()}`,
           style: `height:${heightPct}%`,
         },
       });
-      barEl.createSpan({
+      labelsEl.createSpan({
         cls: 'opencodian-codex-account-usage-bar-label',
         text: date.length >= 5 ? date.slice(5) : date,
       });
@@ -429,7 +437,6 @@ export class SettingsCodexAccountSurface {
       this.renderAuthRequiredNotice(
         el,
         t('settings.codex.accountSurface.usage.authRequiredTitle'),
-        t('settings.codex.accountSurface.usage.authRequiredBody'),
       );
       return;
     }
@@ -535,7 +542,6 @@ export class SettingsCodexAccountSurface {
       this.renderAuthRequiredNotice(
         el,
         t('settings.codex.accountSurface.rateLimits.authRequiredTitle'),
-        t('settings.codex.accountSurface.rateLimits.authRequiredBody'),
       );
       return;
     }
@@ -651,16 +657,24 @@ export class SettingsCodexAccountSurface {
     });
   }
 
-  private renderAuthRequiredNotice(el: HTMLElement, title: string, body: string): void {
+  /**
+   * Compact one-line auth-required notice. The identity card carries the
+   * authoritative long-form explanation; usage/rate-limits only need the
+   * title plus the `codex login` hint.
+   */
+  private renderAuthRequiredNotice(el: HTMLElement, title: string): void {
     const noticeEl = el.createDiv({
-      cls: 'opencodian-codex-account-card-notice is-auth-required',
+      cls: 'opencodian-codex-account-card-notice is-auth-required is-compact',
       attr: { 'data-auth-required-notice': 'true' },
     });
-    noticeEl.createEl('p', {
+    noticeEl.createEl('span', {
       cls: 'opencodian-codex-account-card-notice-title',
       text: title,
     });
-    noticeEl.createEl('p', { text: body });
+    noticeEl.createEl('span', {
+      cls: 'opencodian-codex-account-card-notice-hint',
+      text: t('settings.codex.accountSurface.authRequiredHint'),
+    });
     const codeEl = noticeEl.createEl('code', {
       cls: 'opencodian-codex-account-card-code',
       text: 'codex login',

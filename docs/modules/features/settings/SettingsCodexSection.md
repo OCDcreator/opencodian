@@ -19,7 +19,7 @@ The Context Ring is not configured from Account usage. It becomes available only
 
 ## Cost estimates
 
-The Account tab also exposes the shared cost-estimate entry. It uses the app-server's authoritative session tokens but not account usage. By default the returned model ID matches models.dev automatically; custom Codex providers only need the optional pricing Provider ID / Base URL when their gateway price differs or the model ID is ambiguous. These fields identify prices only and never write `~/.codex/config.toml`, `model_provider`, or `openai_base_url`.
+The Account tab also exposes the shared cost-estimate entry as its own sub-group (`data-codex-group="cost-estimate"`, headed by `settings.cost.group.title`) below the read-only account cards, so writable pricing fields are visually separated from the readback surface. It uses the app-server's authoritative session tokens but not account usage. By default the returned model ID matches models.dev automatically; custom Codex providers only need the optional pricing Provider ID / Base URL when their gateway price differs or the model ID is ambiguous. These fields identify prices only and never write `~/.codex/config.toml`, `model_provider`, or `openai_base_url`.
 
 ## Exports
 
@@ -66,6 +66,7 @@ The Account tab also exposes the shared cost-estimate entry. It uses the app-ser
 - Renders a lightweight connection-source summary instead of a disabled "Authentication" setting
 - Delegates the remaining live runtime readbacks to `SettingsCodexReadbackControls` inside the **Resume & inspect** tab
 - Mounts the four account/capability product cards via `SettingsCodexAccountSurface` inside the **Account** tab, passing the inferred `authSource` derived from the plugin `apiKey` field; the section disposes the account surface during settings re-render so its Codex connection subscription cannot outlive the visible tab
+- The Account group header is a flex row (`.opencodian-settings-codex-group-header`): title + one-line description on the left, a ghost "Refresh all" button (`.opencodian-codex-account-refresh-all` → `SettingsCodexAccountSurface.refreshAllNow()`) on the right
 
 ## Boundaries
 
@@ -81,10 +82,11 @@ The Account tab also exposes the shared cost-estimate entry. It uses the app-ser
 
 All three Codex secondary tabs share a single spacing system documented in `DESIGN.md` under **Codex Settings Cards** and implemented in `src/style/components/settings-codex-account.css`.
 
-- Each group renders its title + description, then a `.opencodian-settings-codex-group-controls.opencodian-settings-codex-group-stack` container.
+- Each group renders its title + description, then a `.opencodian-settings-codex-group-controls.opencodian-settings-codex-group-stack` container. The Account group wraps title + description + the group-level "Refresh all" action in a `.opencodian-settings-codex-group-header` flex row.
 - The stack provides `12px` vertical gaps between cards or Setting rows.
 - The group's controls container is `16px` below the description.
 - Account cards, session-browser info notices, and the connection summary share the same card base (`14px 16px` padding, `10px` radius, `var(--background-secondary)` background, `1px` border). Readback outputs have moved into dedicated modals and are no longer inline cards in the settings panel.
+- Card interiors stay flat: usage stats are borderless value-over-label pairs, capability entries are hairline-separated rows with a status badge, and the usage chart uses solid accent bars with a dedicated label row. No nested card surfaces inside a card.
 - No per-element ad-hoc margins are used for the main rhythm; spacing comes from the stack gap and tokenized header/body gaps.
 - Setting rows inside Codex stacks have their default padding/border removed so the stack gap is the only spacing signal.
 
