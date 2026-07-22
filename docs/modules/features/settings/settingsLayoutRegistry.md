@@ -32,7 +32,7 @@ registry 里的 `backendRequired` 是设置 surface 的后端边界声明：Open
 | `commands` | `mode`, `editor`, `catalog` |
 | `mcp` | `overview` |
 | `formatter` | `overview`, `formatter`, `lsp` |
-| `plugins` | `overview`, `global`, `project-directory`, `omo` |
+| `plugins` | `overview`, `config-sources`, `project-plugins`, `omo` |
 | `security` | `config`, `permissions`, `safety` |
 | `ui` | `general` |
 | `style` | `presets`, `background`, `layout`, `user`, `assistant`, `input`, `scrollbar`, `advanced` |
@@ -60,3 +60,5 @@ Codex 的二级标签拆成 `connection`（连接来源摘要与运行时默认�
 Conversation 的默认二级标签是 `display`，因为聊天字号和用户消息渲染属于后端无关的显示设置。`title` 二级标签对所有后端可见，因为标题设置块内部已根据 active backend 做自适应（OpenCode 时展示模式与模型选择器，Claude Code 时展示 `autoTitle` 开关），因此不再标记 `backendRequired: 'opencode'`。`compaction`、`sharing`、`questions` 仍依赖 OpenCode SDK / `.opencode/opencode.json` / OpenCode session API，继续标记为 `backendRequired: 'opencode'`，直到对应 Claude Code 能力真实接入。
 
 Debug 的默认二级标签是 `plugin`，因为总开关和插件内部模块开关是最通用入口。旧的 `debug/general`、`debug/modules` 会迁移到 `plugin`，旧的 `debug/logs`、`debug/actions` 会迁移到 `export`；`opencode` 与 `claude-code` 是新的来源分区，分别承载 OpenCode 后端诊断和 Claude Code SDK 诊断。`capability-lab` 是诊断/实验面板，提供 SDK 能力矩阵、JSONL 历史浏览器、子代理浏览器、rewind dry-run 预览、结构化输出实验场和发现状态，均标记为 ⚠️ DIAGNOSTIC / EXPERIMENTAL / NOT STABLE，不连接稳定设置持久化。
+
+Plugins 的二级标签 `overview` / `config-sources` / `project-plugins` / `omo` 在 2026-07-21 重命名：旧的 `global` 会迁移到 `config-sources`（新的"配置来源"页同时展示全局与项目配置来源，并通过 segmented filter 按 scope 收窄，避免旧标签与实际渲染范围语义不一致）；旧的 `project-directory` 会迁移到 `project-plugins`（聚焦项目本地插件文件，与配置来源分离）。新增或移除二级标签时需要同步 `SettingsPluginSection.attachTabbed()` 与 locale key。

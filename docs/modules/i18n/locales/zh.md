@@ -1,7 +1,9 @@
 # Chinese Locale
 
 > **源码**: `src/i18n/locales/zh.ts`
-> **最近更新**: 2026-07-21 子代理嵌套深度 — 新增 `settings.agents.subagentDepth.name` / `.desc` / `.useDefault` / `.disableAll`，用于 Settings → Agents 新增的下拉控件，写入 OpenCode 1.18.3 `subagent_depth` 字段（空 = 服务端默认 1，0 = 完全禁用子代理，1-5 = 显式嵌套层数）。
+> **最近更新**: 2026-07-21 SDK 1.18.3 插件证据文案精修 — 修正 `settings.plugins.evidence.effectiveConfigTitle` 为自然中文“SDK 生效配置证据”，新增 `settings.plugins.evidence.fetchRefreshing` 以诚实区分进行中的 `config.get()` 刷新与空闲/就绪/错误状态；其余 `settings.plugins.evidence.*` 仍用于 effective config / runtime IDs / transport 状态，`settings.plugins.source.*` 用于配置来源 provenance，`settings.plugins.remoteNotice` / `settings.plugins.localOnly.label` 用于远程模式诚实性提示。
+>
+> **Previously**: 2026-07-21 子代理嵌套深度 — 新增 `settings.agents.subagentDepth.name` / `.desc` / `.useDefault` / `.disableAll`，用于 Settings → Agents 新增的下拉控件，写入 OpenCode 1.18.3 `subagent_depth` 字段（空 = 服务端默认 1，0 = 完全禁用子代理，1-5 = 显式嵌套层数）。
 >
 > **Previously**: 2026-06-28 Settings extension badges — 新增 `settings.tools.permission.source.*`、`settings.tools.custom.status.*` 和 `settings.acp.count`，用于 Skills / Tools / ACP 设置 row-card badge 与 toolbar 数量文案。
 >

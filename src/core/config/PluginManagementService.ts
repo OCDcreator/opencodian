@@ -16,6 +16,10 @@ export type PluginEntryKind = 'npm' | 'local';
 export type PluginEntryScope = 'global' | 'project';
 export type PluginEntrySource = 'config' | 'directory';
 
+export interface PluginEntryProvenance {
+  sourcePath: string;
+}
+
 export interface PluginEntry {
   kind: PluginEntryKind;
   scope: PluginEntryScope;
@@ -25,6 +29,19 @@ export interface PluginEntry {
   fullPath?: string;
   options?: OpencodePluginOptions;
   disabled: boolean;
+  provenance?: PluginEntryProvenance;
+}
+
+export type PluginConfigSourceScope = 'global' | 'project';
+
+export interface PluginConfigSourceSnapshot {
+  scope: PluginConfigSourceScope;
+  path: string;
+  exists: boolean;
+  editable: boolean;
+  specs: OpencodePluginSpec[];
+  plugins: PluginEntry[];
+  error?: string;
 }
 
 export interface PluginDirectorySnapshot {
@@ -54,10 +71,11 @@ export interface PluginEnvironmentSnapshot {
   globalInfluenceDetected: boolean;
   omoConfigPath: string;
   omoConfigExists: boolean;
+  configSources?: PluginConfigSourceSnapshot[];
 }
 
-const DIRECTORY_PLUGIN_FOLDERS = ['plugins'] as const;
-const DIRECTORY_PLUGIN_EXTENSIONS = new Set(['.js', '.ts', '.mjs', '.cjs']);
+const DIRECTORY_PLUGIN_FOLDERS = ['plugin', 'plugins'] as const;
+const DIRECTORY_PLUGIN_EXTENSIONS = new Set(['.js', '.ts']);
 const DISABLED_EXTENSION_SUFFIX = '.disabled';
 const DEFAULT_OMO_TEMPLATE = `{
   // Project-level oh-my-opencode config
@@ -81,15 +99,20 @@ export class PluginManagementService {
     isolationMode: PluginIsolationMode,
     disabledPluginSpecs: readonly string[] = [],
   ): Promise<PluginEnvironmentSnapshot> {
-    const [globalConfig, projectConfig, globalDirectories, projectDirectories] = await Promise.all([
-      this.readConfigFile(this.getGlobalConfigPath()),
-      this.configManager.read(),
+    const globalConfigPath = this.getGlobalConfigPath();
+    const projectConfigPath = this.configManager.getConfigPath();
+
+    const [globalDirectories, projectDirectories, configSources] = await Promise.all([
       this.listDirectoryPlugins(this.globalConfigDir, 'global'),
       this.listDirectoryPlugins(this.configManager.getConfigDir(), 'project'),
+      this.inventoryConfigSources(),
     ]);
 
-    const globalConfigPlugins = this.extractConfigPlugins(globalConfig, 'global');
-    const projectConfigPlugins = this.extractConfigPlugins(projectConfig, 'project');
+    const globalSource = configSources.find((source) => source.path === globalConfigPath);
+    const projectSource = configSources.find((source) => source.path === projectConfigPath);
+
+    const globalConfigPlugins = globalSource?.plugins ?? [];
+    const projectConfigPlugins = projectSource?.plugins ?? [];
     const globalDirectoryPlugins = this.flattenActiveDirectoryPlugins(globalDirectories, 'global');
     const projectDirectoryPlugins = this.flattenActiveDirectoryPlugins(projectDirectories, 'project');
     const disabledProjectDirectoryPlugins = this.flattenDisabledDirectoryPlugins(projectDirectories, 'project');
@@ -100,10 +123,10 @@ export class PluginManagementService {
       serviceMode,
       isolationMode,
       vaultConfigDir: this.configManager.getConfigDir(),
-      globalConfigPath: this.getGlobalConfigPath(),
-      projectConfigPath: this.configManager.getConfigPath(),
-      globalConfigSpecs: Array.isArray(globalConfig.plugin) ? [...globalConfig.plugin] : [],
-      projectConfigSpecs: Array.isArray(projectConfig.plugin) ? [...projectConfig.plugin] : [],
+      globalConfigPath,
+      projectConfigPath,
+      globalConfigSpecs: globalSource?.specs ?? [],
+      projectConfigSpecs: projectSource?.specs ?? [],
       globalConfigPlugins,
       globalDirectoryPlugins,
       projectConfigPlugins,
@@ -112,9 +135,10 @@ export class PluginManagementService {
       disabledProjectDirectoryPlugins,
       globalDirectories,
       projectDirectories,
-      globalInfluenceDetected: globalConfigPlugins.length > 0 || globalDirectoryPlugins.length > 0,
+      globalInfluenceDetected: this.detectGlobalInfluence(configSources, globalDirectories),
       omoConfigPath,
       omoConfigExists: fs.existsSync(omoConfigPath),
+      configSources,
     };
   }
 
@@ -287,13 +311,93 @@ export class PluginManagementService {
     return path.join(this.globalConfigDir, 'opencode.json');
   }
 
-  private async readConfigFile(targetPath: string): Promise<OpencodeConfig> {
+  private getGlobalConfigCandidatePaths(): string[] {
+    return [
+      path.join(this.globalConfigDir, 'config.json'),
+      path.join(this.globalConfigDir, 'opencode.json'),
+      path.join(this.globalConfigDir, 'opencode.jsonc'),
+    ];
+  }
+
+  private getProjectConfigCandidatePaths(): Array<{ path: string; editable: boolean }> {
+    const configDir = this.configManager.getConfigDir();
+    return [
+      { path: path.join(this.vaultPath, 'opencode.json'), editable: false },
+      { path: path.join(this.vaultPath, 'opencode.jsonc'), editable: false },
+      { path: path.join(configDir, 'opencode.json'), editable: true },
+      { path: path.join(configDir, 'opencode.jsonc'), editable: false },
+    ];
+  }
+
+  private async inventoryConfigSources(): Promise<PluginConfigSourceSnapshot[]> {
+    const globalSources = await Promise.all(
+      this.getGlobalConfigCandidatePaths().map((candidatePath) =>
+        this.readConfigSource(candidatePath, 'global', false),
+      ),
+    );
+
+    const projectSources = await Promise.all(
+      this.getProjectConfigCandidatePaths().map((candidate) =>
+        this.readConfigSource(candidate.path, 'project', candidate.editable),
+      ),
+    );
+
+    return [...globalSources, ...projectSources];
+  }
+
+  private async readConfigSource(
+    targetPath: string,
+    scope: PluginConfigSourceScope,
+    editable: boolean,
+  ): Promise<PluginConfigSourceSnapshot> {
     if (!fs.existsSync(targetPath)) {
-      return {};
+      return {
+        scope,
+        path: targetPath,
+        exists: false,
+        editable,
+        specs: [],
+        plugins: [],
+      };
     }
 
-    const content = await fs.promises.readFile(targetPath, 'utf-8');
-    return parseOpencodeConfigText(content);
+    try {
+      const content = await fs.promises.readFile(targetPath, 'utf-8');
+      const config = parseOpencodeConfigText(content);
+      const specs = Array.isArray(config.plugin) ? [...config.plugin] : [];
+      const plugins = this.extractConfigPlugins(config, scope as PluginEntryScope, targetPath);
+      return {
+        scope,
+        path: targetPath,
+        exists: true,
+        editable,
+        specs,
+        plugins,
+      };
+    } catch (error) {
+      return {
+        scope,
+        path: targetPath,
+        exists: true,
+        editable,
+        specs: [],
+        plugins: [],
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }
+
+  private detectGlobalInfluence(
+    configSources: PluginConfigSourceSnapshot[],
+    globalDirectories: PluginDirectorySnapshot[],
+  ): boolean {
+    const anyGlobalConfigPlugin = configSources.some(
+      (source) => source.scope === 'global' && source.plugins.length > 0,
+    );
+    const anyGlobalDirectoryPlugin = globalDirectories.some(
+      (directory) => directory.files.length > 0,
+    );
+    return anyGlobalConfigPlugin || anyGlobalDirectoryPlugin;
   }
 
   private async listDirectoryPlugins(
@@ -356,7 +460,11 @@ export class PluginManagementService {
     return snapshots;
   }
 
-  private extractConfigPlugins(config: OpencodeConfig, scope: PluginEntryScope): PluginEntry[] {
+  private extractConfigPlugins(
+    config: OpencodeConfig,
+    scope: PluginEntryScope,
+    sourcePath: string,
+  ): PluginEntry[] {
     if (!Array.isArray(config.plugin)) {
       return [];
     }
@@ -375,6 +483,7 @@ export class PluginManagementService {
         displayName: parsed.specifier,
         options: parsed.options,
         disabled: false,
+        provenance: { sourcePath },
       }];
     });
   }

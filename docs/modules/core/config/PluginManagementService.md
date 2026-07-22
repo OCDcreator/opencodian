@@ -10,7 +10,7 @@
 服务同时覆盖 3 类对象：
 
 - 配置文件里的 `plugin` 数组
-- 官方 `plugins/` 目录下的脚本文件
+- 官方 `plugin/` 与 `plugins/` 目录下的脚本文件
 - 项目级 `oh-my-opencode.jsonc`
 
 ## 导入关系
@@ -27,6 +27,10 @@ export type PluginEntryKind = 'npm' | 'local';
 export type PluginEntryScope = 'global' | 'project';
 export type PluginEntrySource = 'config' | 'directory';
 
+export interface PluginEntryProvenance {
+  sourcePath: string;
+}
+
 export interface PluginEntry {
   kind: PluginEntryKind;
   scope: PluginEntryScope;
@@ -36,6 +40,19 @@ export interface PluginEntry {
   disabled: boolean;
   fullPath?: string;
   options?: OpencodePluginOptions;
+  provenance?: PluginEntryProvenance;
+}
+
+export type PluginConfigSourceScope = 'global' | 'project';
+
+export interface PluginConfigSourceSnapshot {
+  scope: PluginConfigSourceScope;
+  path: string;
+  exists: boolean;
+  editable: boolean;
+  specs: OpencodePluginSpec[];
+  plugins: PluginEntry[];
+  error?: string;
 }
 
 export interface PluginDirectorySnapshot {
@@ -65,6 +82,7 @@ export interface PluginEnvironmentSnapshot {
   globalInfluenceDetected: boolean;
   omoConfigPath: string;
   omoConfigExists: boolean;
+  configSources?: PluginConfigSourceSnapshot[];
 }
 ```
 
@@ -72,12 +90,16 @@ export interface PluginEnvironmentSnapshot {
 
 ### 环境快照组装
 
-`inspect(serviceMode, isolationMode, disabledPluginSpecs)` 会并发读取 4 组数据：
+`inspect(serviceMode, isolationMode, disabledPluginSpecs)` 会并发读取多组数据：
 
-1. 全局配置文件 `<home>/.config/opencode/opencode.json`
-2. 项目配置文件 `<vault>/.opencode/opencode.json`
-3. 全局 `plugins/` 目录扫描结果
-4. 项目 `plugins/` 目录扫描结果
+1. 全局配置文件 `<home>/.config/opencode/opencode.json`（保留为 `globalConfigPath` / `globalConfigSpecs`）
+2. 项目配置文件 `<vault>/.opencode/opencode.json`（保留为 `projectConfigPath` / `projectConfigSpecs`）
+3. 全局 `plugin/`、`plugins/` 目录扫描结果
+4. 项目 `plugin/`、`plugins/` 目录扫描结果
+5. **所有已知配置来源的清查**（`configSources`），共 7 个：
+   - 全局配置目录：`config.json`、`opencode.json`、`opencode.jsonc`
+   - Vault 根目录：`opencode.json`、`opencode.jsonc`
+   - Vault `.opencode/`：`opencode.json`（可编辑）、`opencode.jsonc`（只读）
 
 之后它会把配置式插件和目录式插件分别标准化，再组合成 `PluginEnvironmentSnapshot`。`disabledPluginSpecs` 代表插件侧保存的项目插件禁用清单，`inspect()` 会用它给项目级 config / directory entries 标记 `disabled`，并派生禁用条目集合。快照里同时保留：
 
@@ -87,19 +109,40 @@ export interface PluginEnvironmentSnapshot {
 - 项目级配置插件 / 目录插件的禁用条目列表
 - 是否检测到全局插件影响
 - OMO 配置文件路径与存在状态
+- **所有配置来源的 provenance 清查**（`configSources`），包括 scope、path、exists、editable、specs、plugins、可选 error
+
+### 配置来源与可编辑性边界
+
+`PluginManagementService` 把配置来源分为两类：
+
+| 来源 | 路径示例 | 可编辑 |
+|---|---|:---:|
+| 全局 `config.json` | `<home>/.config/opencode/config.json` | ❌ 只读 |
+| 全局 `opencode.json` | `<home>/.config/opencode/opencode.json` | ❌ 只读 |
+| 全局 `opencode.jsonc` | `<home>/.config/opencode/opencode.jsonc` | ❌ 只读 |
+| Vault 根 `opencode.json` | `<vault>/opencode.json` | ❌ 只读 |
+| Vault 根 `opencode.jsonc` | `<vault>/opencode.jsonc` | ❌ 只读 |
+| **Vault `.opencode/opencode.json`** | `<vault>/.opencode/opencode.json` | ✅ 可编辑 |
+| Vault `.opencode/opencode.jsonc` | `<vault>/.opencode/opencode.jsonc` | ❌ 只读 |
+
+**只有 `.opencode/opencode.json` 是 OpenCodian 的 canonical 可编辑来源**。所有 `updateProjectConfigPlugins`、`installConfigPlugin`、`uninstallConfigPlugin` 等写入操作都通过 `OpencodeConfigManager` 写回该文件。
+
+`globalConfigSpecs` 与 `projectConfigSpecs` 仍分别只代表上述 canonical 全局/项目文件的 `plugin` 数组，**不是**所有来源的 hand-rolled merge。真正的 OpenCode effective config 由后端通过 `sdk.config.get()` 在运行时给出，未来会在事件接入层单独展示。
 
 ### 目录插件扫描规则
 
-目录扫描固定检查 OpenCode 当前官方文档里的 `plugins` 文件夹名：
+目录扫描同时检查 `plugin/` 与 `plugins/` 两个文件夹名，与 OpenCode 后端自动发现规则一致：
 
-只收录以下扩展名的文件：
+只收录以下扩展名的活动文件：
 
 - `.js`
 - `.ts`
-- `.mjs`
-- `.cjs`
 
-子目录不会递归展开，只有当前目录下的文件会被记录。
+对应的禁用形式 `.js.disabled`、`.ts.disabled` 也会被识别并放入 `disabledFiles`。以下文件会被忽略：
+
+- `.mjs`、`.cjs` 及其 `.disabled` 形式
+- 子目录及其内容（非递归）
+- 其他非插件文件
 
 `PluginDirectorySnapshot.disabledFiles` 记录同一目录下被插件侧禁用的文件名；对应的 `projectDirectoryPlugins` 条目也会带上 `disabled: true`，供设置页在行内切换状态。
 
@@ -109,7 +152,7 @@ export interface PluginEnvironmentSnapshot {
 
 | 方法 | 行为 |
 |------|------|
-| `updateProjectConfigPlugins(plugins)` | 通过 `OpencodeConfigManager` 更新项目配置的 `plugin` 字段 |
+| `updateProjectConfigPlugins(plugins)` | 通过 `OpencodeConfigManager` 更新项目配置 canonical 文件的 `plugin` 字段 |
 | `ensureProjectPluginDirectory()` | 创建 `<vault>/.opencode/plugins` |
 | `ensureProjectOmoConfig()` | 创建 `<vault>/.opencode/oh-my-opencode.jsonc`，若不存在则写入占位模板 |
 | `applyConfigPluginAvailabilityChange(specifier, disabled)` | 写回插件侧禁用清单中某个项目 config plugin 的可用状态，不直接改写 `plugin` 数组 |
@@ -159,20 +202,32 @@ export interface PluginEnvironmentSnapshot {
 | `getProjectOmoConfigRelativePath()` | 返回固定相对路径 `.opencode/oh-my-opencode.jsonc` |
 | `formatPluginSpec(spec)` | 将字符串或 tuple 规格化为展示文本 |
 | `parsePluginSpecLines(text)` | 把多行文本解析成 `OpencodePluginSpec[]` |
+| `inventoryConfigSources()` | 内部方法：并发读取所有已知配置来源 |
+| `readConfigSource(path, scope, editable)` | 内部方法：读取单个配置来源，出错时返回带 `error` 的快照 |
+| `detectGlobalInfluence(sources, directories)` | 内部方法：综合所有全局来源与目录判断是否存在全局插件影响 |
 
 ## 数据流
 
 ```text
-global opencode.json + project opencode.json
-  -> 配置式 plugin 解析
+global config.json / opencode.json / opencode.jsonc
+  -> configSources (read-only provenance)
 
-global/project plugins 目录
+vault root opencode.json / opencode.jsonc
+  -> configSources (read-only provenance)
+
+vault .opencode/opencode.json (canonical editable)
+  -> projectConfigSpecs / projectConfigPlugins
+
+global opencode.json (canonical for global legacy fields)
+  -> globalConfigSpecs / globalConfigPlugins
+
+global/project plugin/ + plugins/ 目录
   -> 目录式 plugin 扫描
 
 disabledPluginSpecs
   -> 项目级 config/directory plugin disabled 标记
 
-两类结果
+各类结果
   -> inspect()
   -> PluginEnvironmentSnapshot
   -> OpenCodianSettings 插件管理区
@@ -183,7 +238,7 @@ disabledPluginSpecs
 - `src/features/settings/OpenCodianSettings.ts` 是这个服务当前的实际消费方，用它展示插件来源、编辑项目级 `plugin` 列表、创建项目插件目录和 OMO 配置。
 - `SettingsPluginSection` 会调用 install / uninstall / toggle / delete 系列方法管理项目插件行；服务层负责统一清理 `disabledPluginSpecs`，避免 UI 自己维护重复真相。
 - `OpencodeConfigManager` 负责项目配置文件读写，`PluginManagementService` 在其之上做插件视图整合。
-- `modelConfig.parseOpencodeConfigText()` 被复用于全局配置文件读取，因此全局 `opencode.json` 也支持带注释 JSON。
+- `modelConfig.parseOpencodeConfigText()` 被复用于全局配置文件读取，因此全局 `opencode.json`/`opencode.jsonc` 也支持带注释 JSON。
 
 ## 注意事项
 
@@ -192,3 +247,7 @@ disabledPluginSpecs
 - `ensureProjectOmoConfig()` 首次创建时只写入一个非常小的占位模板，不会注入更完整的默认配置。
 - 目录扫描仅记录文件，不记录目录，也不会读取插件文件内容。
 - `PluginEntry.disabled` 表达 OpenCodian 插件侧禁用状态，不代表 OpenCode 全局配置或 runtime catalog 已移除该插件。
+- `PluginEntry.provenance` 仅在条目来自配置式来源时存在，用于把 entry 归因到具体配置文件；目录式或禁用记忆条目不带 provenance。
+- 任何单个配置文件解析失败都会记录在该来源的 `PluginConfigSourceSnapshot.error` 中，不会导致整个 `inspect()` 失败；对应的 canonical 全局/项目 legacy 数组会变为空，但其他来源和目录扫描正常返回。
+- `globalInfluenceDetected` 在全局任意配置来源声明了插件，或任意全局 `plugin/` / `plugins/` 目录包含活动（非禁用）插件文件时为 `true`；仅含 `.disabled` 文件不会使其为 `true`。
+- `configSources` 是 Round 1 新增的 additive 字段，用于声明式来源 provenance 清查；Round 2/3 由 `OpenCodeService` / `OpenCodeEventSubscriptionCoordinator` 独立捕获 `plugin.added` runtime evidence 与 `sdk.config.get()` effective config evidence，`PluginManagementService` 不合并这两者。

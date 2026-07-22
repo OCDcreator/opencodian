@@ -1,5 +1,10 @@
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
+
 import { DEFAULT_SETTINGS } from '../../../../src/core/types';
 import { OpenCodianSettingsView } from '../../../../src/features/settings/OpenCodianSettingsView';
+import { SettingsPluginSection } from '../../../../src/features/settings/SettingsPluginSection';
 import { setLocale } from '../../../../src/i18n';
 
 function createSettingsView(layoutMode: 'classic' | 'tabbed' = 'classic') {
@@ -411,5 +416,65 @@ describe('OpenCodianSettingsView tabbed layout', () => {
     expect(view.contentEl.querySelector('.opencodian-settings-content-shell')).not.toBeNull();
     expect(view.contentEl.querySelector('.opencodian-settings-tab-panel')).toBeNull();
     expect(renderDisplay).toHaveBeenCalledTimes(1);
+  });
+
+  it('writes the tabbed plugin section back to the view and disposes it on switch/redraw/close without leaking observers', async () => {
+    const vaultBase = fs.mkdtempSync(path.join(os.tmpdir(), 'ocd-settings-view-'));
+
+    try {
+      const { view, plugin } = createSettingsView('tabbed');
+      plugin.settings.settingsTabbedPrimaryTab = 'plugins';
+      plugin.settings.settingsTabbedSecondaryTabByPrimary = {
+        ...plugin.settings.settingsTabbedSecondaryTabByPrimary,
+        plugins: 'overview',
+      };
+
+      (plugin.app.vault.adapter as unknown as { basePath: string }).basePath = vaultBase;
+      (view as unknown as { app: typeof plugin.app }).app = plugin.app;
+
+      const activeUnsubscribes = new Set<() => void>();
+      const subscribeMock = jest.fn(() => {
+        const unsubscribe = jest.fn(() => {
+          activeUnsubscribes.delete(unsubscribe);
+        });
+        activeUnsubscribes.add(unsubscribe);
+        return unsubscribe;
+      });
+      (plugin as unknown as { openCodeService: { subscribeToOpenCodeEvents: jest.Mock } }).openCodeService = {
+        subscribeToOpenCodeEvents: subscribeMock,
+      };
+
+      await view.onOpen();
+
+      const firstPluginSection = (view as unknown as { pluginSection: SettingsPluginSection | null }).pluginSection;
+      expect(firstPluginSection).not.toBeNull();
+      expect(subscribeMock).toHaveBeenCalledTimes(1);
+      expect(activeUnsubscribes.size).toBe(1);
+
+      // Switch away from the Plugins tab: this triggers a full display refresh.
+      const generalTabButton = view.contentEl.querySelector<HTMLButtonElement>('[data-tab-id="general"]');
+      expect(generalTabButton).not.toBeNull();
+      generalTabButton!.click();
+
+      expect(activeUnsubscribes.size).toBe(0);
+
+      // Switch back to Plugins: a new section is created and wired back.
+      const pluginsTabButton = view.contentEl.querySelector<HTMLButtonElement>('[data-tab-id="plugins"]');
+      expect(pluginsTabButton).not.toBeNull();
+      pluginsTabButton!.click();
+
+      const secondPluginSection = (view as unknown as { pluginSection: SettingsPluginSection | null }).pluginSection;
+      expect(secondPluginSection).not.toBeNull();
+      expect(secondPluginSection).not.toBe(firstPluginSection);
+      expect(subscribeMock).toHaveBeenCalledTimes(2);
+      expect(activeUnsubscribes.size).toBe(1);
+
+      // Closing the view disposes the current plugin section.
+      await view.onClose();
+
+      expect(activeUnsubscribes.size).toBe(0);
+    } finally {
+      fs.rmSync(vaultBase, { recursive: true, force: true });
+    }
   });
 });

@@ -1,16 +1,18 @@
 # OpenCodeService 与 SDK v2 当前集成状态
 
-> 更新时间：2026-07-11
+> 更新时间：2026-07-21
 >
 > 依据：当前仓库 `src/` 代码实现。
 >
-> 如果这份文档与旧说明冲突，以代码为准；如果与 SDK 行为有疑问，以 `reference-projects/opencode/packages/sdk/js/src/v2` 为准。
+> 如果这份文档与旧说明冲突，以代码为准；如果与 SDK 精确 declaration 行为有疑问，以 npm `@opencode-ai/sdk@1.18.3` tarball 中的 generated declarations（`dist/v2/gen/*.d.ts`）为准。`reference-projects/opencode/packages/sdk/js/src/v2` 只用于上游实现背景参考，其 `packages/sdk/js/package.json` 当前为 `1.17.17`，不是 1.18.3 的精确源码。
 >
-> 本次更新基于代码审查、`@opencode-ai/sdk@1.17.18` 的 capability inventory、定向回归与生产 capability snapshot contract。更早的 `1.4.1` 叙述保留为历史背景，不能覆盖本节的当前状态。
+> 本次更新基于代码审查、`@opencode-ai/sdk@1.18.3` 的 capability delta、定向回归与生产 capability snapshot contract。`1.17.18` 及更早的 `1.4.1` 叙述保留为历史背景，不能覆盖本节的当前状态。
 
-## 0. 1.17.18 当前权威快照
+## 0. 1.18.3 当前权威快照
 
-- 插件 SDK 精确固定为 `@opencode-ai/sdk@1.17.18`；npm integrity、上游 reference commit `08096b5e61c9227a6b52aacc745a1a51c6385284`、57 个 post-1.15.3 methods 与 14 个新增 `v2.*` namespace 的完整证据见 `docs/status/opencode-sdk-1.17.18-capability-inventory.md`。
+- 插件 SDK 精确固定为 `@opencode-ai/sdk@1.18.3`；npm integrity `sha512-Mevo4e6kQwbvto9E+42KSIVMhp+JBu+SwQhC5AomAvrV6Xkio3U249T+xDILDCXhl5Z/Hi/DlAuVLzpGnuh0gg==`、上游 reference commit `08096b5e61c9227a6b52aacc745a1a51c6385284`。权威 delta 见 `docs/status/opencode-sdk-1.18.3-capability-delta.md`；历史 1.17.18 完整 method inventory 见 `docs/status/opencode-sdk-1.17.18-capability-inventory.md`。
+- 相对 1.17.18，1.18.3 的 `dist/v2/gen/sdk.gen.d.ts` 完全不变，`dist/v2/gen/types.gen.d.ts` 唯一新增为 `Config.subagent_depth?: number`。57 个 post-1.15.3 methods 与 14 个新增 `v2.*` namespace 保持不变。
+- Plugin contract：`OpencodeClient` 没有 `plugin` namespace；effective plugin 只通过 directory-scoped `sdk.config.get()` 读取；runtime 证据只有非持久的 `plugin.added { properties: { id: string } }`；不存在 `plugin.removed` / `plugin.load-error`。OpenCodian 把本地声明、effective config、runtime observation 分三层展示，不做自动匹配，也不把本地文件编辑写成远端 mutation。
 - `OpenCodeSdkFacade` 仍是唯一 raw SDK namespace/request/unwrap/error boundary。Chat 和 Settings 只经由 `OpenCodeService` 读取 `getSdkCapabilitySnapshot()`、刷新 `refreshSdkCapabilities()`，或请求 typed redacted `requireSdkCapability()` 结果。
 - 每个 capability 都由 SDK presence、safe server probe、user gate 与 risk class 共同解析。可用性与 evidence 分离：safe-read 成功是 `advertised`，transport failure 是 `failed`，SDK/endpoint 缺失是 `unsupported`，state-changing no-probe 是 `skipped`；只有带 Test Vault 元数据的条目才可标为 `runtime-proven`。
 - Settings 的稳定 capability disclosure 永远保留 unsupported 行与 minimum-server hint，并提供 Re-check；不会仅因旧 server 不支持而隐藏已知 SDK capability。旧 HTTP/SSE fallback、`ServerManager` 进程 ownership 与目录 scope 规则保持不变。

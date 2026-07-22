@@ -98,6 +98,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         setServerSection: (section) => { this.serverSection = section; },
         setMcpSection: (section) => { this.mcpSection = section; },
         setModelSection: (section) => { this.modelSection = section; },
+        setPluginSection: (section) => { this.pluginSection = section; },
         setSecuritySection: (section) => { this.securitySection = section; },
         getRefreshModelsCallback: () => this.refreshModelsCallback,
         getRefreshTitleModelsCallback: () => this.refreshTitleModelsCallback,

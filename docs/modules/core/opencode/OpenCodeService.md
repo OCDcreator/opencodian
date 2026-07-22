@@ -74,7 +74,7 @@
 - `sessionControl`: `OpenCodeSessionControlOrchestrator` 实例，负责 fork/revert/unrevert/diff、context usage snapshot、session message control、command/shell 与 message-part operations。
 - `serviceLifecycle`: `OpenCodeServiceLifecycleCoordinator` 实例，负责 initialize/start/stop/dispose、server running 后的 model/catalog bootstrap、SDK health response normalization / health probe fallback、vault path scope refresh、server status/diagnostics proxy，以及 settings update / rollback 与 sync/open-code event subscription 的 lifecycle 编排；其与 `ServerManager` 的共享装配由 `createLifecycleAssembly()` 私有方法集中调用 `OpenCodeServiceLifecycleCoordinator.createAssembly()` 完成。
 - `questionPermissionHub`: `OpenCodeQuestionPermissionHub` 实例，负责 pending questions/reply/reject、pending permissions/respond，以及 session permission responder 的 negotiation lifecycle。
-- `openCodeEventRuntime`: `OpenCodeEventSubscriptionCoordinator` 实例，负责 open-code event listener registry、`event` / `global` 订阅生命周期，以及 catalog-relevant payload 到 `catalogState` 的刷新/广播触发。
+- `openCodeEventRuntime`: `OpenCodeEventSubscriptionCoordinator` 实例，负责 open-code event listener registry、`event` / `global` 订阅生命周期，catalog-relevant payload 到 `catalogState` 的刷新/广播触发，以及 SDK 1.18.3 plugin evidence（effective config + `plugin.added` runtime evidence）的捕获与快照。Service 不再为此新增独立公开方法；Settings 侧通过既有 `subscribeToOpenCodeEvents` 传入 observer 对象接入。
 - `vaultPath`: 用于 SDK `directory` 注入、上下文文件绝对路径解析，以及 `ServerManager` 工作目录设置；OpenCode directory scope 和 context file path 的跨平台规范化委托给 `shared/contextPath`。
 
 `responseHandlers` 字段虽然仍然存在，但当前公开的主流式接口已经是 `AsyncGenerator<StreamChunk>`。
@@ -407,7 +407,7 @@ graph TD
 
 - `ServerManager`: 负责本地/远程服务生命周期与健康检查。
 - `OpenCodeSyncEventRuntimeCoordinator`: 负责基于 SDK `global.event()` 的 session todo/status/message sync event listener registry、订阅重启和 transient connectivity recovery 循环。
-- `OpenCodeEventSubscriptionCoordinator`: 负责 `event.subscribe()` / `global.event()` 的 open-code event listener registry、catalog-relevant payload routing、双路订阅重启与 catalog listener emit。
+- `OpenCodeEventSubscriptionCoordinator`: 负责 `event.subscribe()` / `global.event()` 的 open-code event listener registry、catalog-relevant payload routing、双路订阅重启、catalog listener emit，以及 SDK 1.18.3 `plugin.added` runtime evidence 与 directory-scoped `config.get()` effective config evidence 的捕获。`OpenCodeService` 只保留既有的 `subscribeToOpenCodeEvents` 薄转发，不拥有 plugin evidence state，也不新增 plugin evidence 专属公开方法。
 - `OpenCodeCatalogQueryCoordinator`: 负责 directory-scoped provider/model/config lookup、tool registry/schema cache、MCP status/auth 写回，以及 provider/project/file/find/path/VCS/formatter/LSP query surface。
 - `OpenCodeStreamingRuntimeCoordinator`: 负责 active stream registry、session-scoped abort controllers、part metadata tracking、stream mutation 应用顺序，以及 cancel/detach 的 runtime lifecycle；stream mutation 的 canonical reducer 已落到 `OpenCodeSessionStateStore`。
 - `OpenCodeStreamEventTransformer`: 负责 SDK / legacy stream event → `StreamChunk + OpenCodeStreamMutation` 的转换、part-type/message-id-aware delta routing，以及 SSE parser。

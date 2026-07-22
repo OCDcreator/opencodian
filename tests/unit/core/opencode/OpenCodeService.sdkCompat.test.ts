@@ -152,4 +152,5 @@ describe('OpenCodeService SDK compatibility wrappers', () => {
       });
     });
   });
+
 });

@@ -32,7 +32,7 @@ export class OpenCodianSettingsView extends ItemView
 
 ### 编辑区设置视图生命周期
 
-`onOpen()` 调用 `renderSettings()` 构建完整设置界面；`onClose()` 负责销毁 section owner、dropdown enhancer、滚动 coordinator 与待执行的 `requestAnimationFrame` 刷新。该 view 把设置 UI 挂在 `ItemView.contentEl` / `.view-content` 内，而不是直接改写 `.workspace-leaf-content` 外壳；滚动 coordinator 显式以这个内容根节点作为滚动容器，quick-nav 跳转也只滚动 `contentEl`。编辑区设置页维护自己的内存态 `settingsScrollTop`，用于同一 leaf 内的即时重绘恢复，但不会写入标准 settings tab 的 `settingsPanelScrollTop`。`disposeSections()` 现在也会显式销毁 `SettingsUserSection`，确保 user prompt / excluded-tags textarea 的 size-memory observer 不会在 view 重绘或关闭后残留。
+`onOpen()` 调用 `renderSettings()` 构建完整设置界面；`onClose()` 负责销毁 section owner、dropdown enhancer、滚动 coordinator 与待执行的 `requestAnimationFrame` 刷新。该 view 把设置 UI 挂在 `ItemView.contentEl` / `.view-content` 内，而不是直接改写 `.workspace-leaf-content` 外壳；滚动 coordinator 显式以这个内容根节点作为滚动容器，quick-nav 跳转也只滚动 `contentEl`。编辑区设置页维护自己的内存态 `settingsScrollTop`，用于同一 leaf 内的即时重绘恢复，但不会写入标准 settings tab 的 `settingsPanelScrollTop`。`disposeSections()` 现在也会显式销毁 `SettingsUserSection`，确保 user prompt / excluded-tags textarea 的 size-memory observer 不会在 view 重绘或关闭后残留；`SettingsTabbedRenderer` 创建的 plugin owner 同样通过依赖回调注册到 `pluginSection`，让 tab 切换和 view 关闭都能释放 SDK plugin evidence observer。
 
 ### Classic / Tabbed 复用
 

@@ -5085,6 +5085,9 @@
 }
 
 .opencodian-plugin-source-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--opencodian-settings-space-sm);
   padding: 12px 0;
   border-top: 1px solid var(--opencodian-settings-row-border);
 }
@@ -5099,6 +5102,7 @@
   gap: var(--opencodian-settings-space-sm);
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
 }
 
 .opencodian-plugin-source-title {
@@ -5106,6 +5110,13 @@
   font-size: 13px;
   font-weight: 600;
   color: var(--text-normal);
+}
+
+.opencodian-plugin-source-badges {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--opencodian-settings-space-xs);
 }
 
 .opencodian-plugin-source-count {
@@ -5122,19 +5133,42 @@
   text-align: center;
 }
 
+.opencodian-plugin-source-scope-badge,
+.opencodian-plugin-source-access-badge {
+  flex: 0 0 auto;
+  padding: 1px 8px;
+  border: 1px solid var(--opencodian-settings-inline-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.55;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.opencodian-plugin-source-scope-badge[data-scope="project"],
+.opencodian-plugin-source-access-badge[data-access="editable"] {
+  color: var(--text-normal);
+  border-color: color-mix(in srgb, var(--interactive-accent) 38%, var(--background-modifier-border));
+}
+
 .opencodian-plugin-source-path {
   display: flex;
-  flex-direction: column;
-  gap: var(--opencodian-settings-space-xs);
-  margin-top: var(--opencodian-settings-space-sm);
-  padding: 8px 10px;
-  border: 1px solid var(--opencodian-settings-inline-border);
-  border-radius: var(--opencodian-settings-radius-inline);
-  background: var(--opencodian-settings-inline-bg);
+  flex-direction: row;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--opencodian-settings-space-sm);
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   font-size: 12px;
   line-height: 1.55;
   color: var(--text-muted);
-  word-break: break-word;
+  word-break: break-all;
 }
 
 .opencodian-plugin-source-path-row {
@@ -5146,50 +5180,282 @@
 
 .opencodian-plugin-source-path-label {
   min-width: 0;
+  font-family: var(--font-monospace);
+  font-size: 11.5px;
+  color: var(--text-muted);
 }
 
 .opencodian-plugin-source-path-status {
+  flex: 0 0 auto;
   padding: 0 6px;
   border: 1px solid var(--opencodian-settings-inline-border);
   border-radius: 999px;
-  background: var(--background-modifier-hover);
+  background: transparent;
   color: var(--text-muted);
   font-size: 10px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.6;
+  letter-spacing: 0.02em;
   white-space: nowrap;
 }
 
-.opencodian-plugin-source-path-row[data-path-status="available"] .opencodian-plugin-source-path-status {
-  color: var(--text-accent);
+.opencodian-plugin-source-path[data-path-status="available"] .opencodian-plugin-source-path-status {
+  color: var(--text-muted);
 }
 
-.opencodian-plugin-source-path-row[data-path-status="missing"] .opencodian-plugin-source-path-status {
+.opencodian-plugin-source-path[data-path-status="missing"] .opencodian-plugin-source-path-status {
+  color: var(--text-faint);
+  border-color: var(--background-modifier-border);
+}
+
+.opencodian-plugin-source-path[data-path-status="error"] .opencodian-plugin-source-path-status {
+  color: var(--text-error, #e11d48);
+  border-color: color-mix(in srgb, var(--text-error, #e11d48) 40%, var(--background-modifier-border));
+}
+
+.opencodian-plugin-source-path[data-path-status="error"] .opencodian-plugin-source-path-label {
+  color: var(--text-normal);
+}
+
+.opencodian-plugin-source-meta {
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 2px;
+}
+
+.opencodian-plugin-source-meta-row {
+  display: grid;
+  grid-template-columns: minmax(110px, 140px) minmax(0, 1fr);
+  gap: var(--opencodian-settings-space-sm);
+  align-items: baseline;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.opencodian-plugin-source-meta-label {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.opencodian-plugin-source-meta-value {
+  margin: 0;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--text-normal);
+  word-break: break-word;
+}
+
+.opencodian-plugin-source-meta-row.is-error .opencodian-plugin-source-meta-value {
+  color: var(--text-error, #e11d48);
+}
+
+.opencodian-plugin-source-meta-note {
+  grid-column: 1 / -1;
+  margin-top: var(--opencodian-settings-space-xs);
+  padding: 0;
+  font-size: 11px;
+  font-style: italic;
   color: var(--text-faint);
 }
 
 .opencodian-plugin-source-list {
-  margin-top: var(--opencodian-settings-space-md);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-top: var(--opencodian-settings-space-sm);
+  padding-top: var(--opencodian-settings-space-sm);
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.opencodian-plugin-source-list:empty {
+  display: none;
 }
 
 .opencodian-plugin-source-path + .opencodian-plugin-source-empty {
-  margin-top: var(--opencodian-settings-space-md);
+  margin-top: var(--opencodian-settings-space-sm);
 }
 
-.opencodian-plugin-source-item,
-.opencodian-plugin-source-empty {
-  padding: 10px 12px;
-  border: 1px solid var(--opencodian-settings-object-border);
-  border-radius: var(--opencodian-settings-radius-row);
-  background: var(--opencodian-settings-object-bg);
+.opencodian-plugin-source-item {
+  padding: 8px 0;
+  border: 0;
+  border-bottom: 1px solid var(--background-modifier-border);
+  border-radius: 0;
+  background: transparent;
   box-shadow: none;
   font-size: 12px;
   line-height: 1.6;
   word-break: break-word;
 }
 
+.opencodian-plugin-source-item:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
 .opencodian-plugin-source-empty {
+  padding: 6px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
   color: var(--text-faint);
+  font-size: 12px;
+  font-style: italic;
+  line-height: 1.55;
+}
+
+/* Source scope filter (All / Global / Project) */
+.opencodian-plugin-source-filter {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--opencodian-settings-radius-inline);
+  /* Shrink to fit content on wide screens (shadcn TabsList compact form).
+   * The filter host is a column flex parent whose children stretch by
+   * default; align-self + width:fit-content keeps the bar left-aligned
+   * and compact instead of occupying the full row. */
+  align-self: flex-start;
+  width: fit-content;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+  background: var(--background-secondary);
+}
+
+.opencodian-plugin-source-filter-button {
+  appearance: none;
+  border: 1px solid transparent;
+  border-radius: var(--opencodian-settings-radius-inline);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.5;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: background-color 120ms ease-out, color 120ms ease-out, border-color 120ms ease-out;
+}
+
+.opencodian-plugin-source-filter-button:hover {
+  color: var(--text-normal);
+  background: var(--background-modifier-hover);
+}
+
+.opencodian-plugin-source-filter-button:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 1px;
+}
+
+.opencodian-plugin-source-filter-button.is-active {
+  background: var(--interactive-accent);
+  border-color: var(--interactive-accent);
+  color: var(--text-on-accent, var(--background-primary));
+}
+
+.opencodian-plugin-source-filter-host {
+  display: flex;
+  flex-direction: column;
+  gap: var(--opencodian-settings-space-sm);
+}
+
+.opencodian-plugin-source-filter-host:empty {
+  display: none;
+}
+
+/* Filter visibility: hide non-matching scopes without re-rendering the DOM. */
+.opencodian-plugin-source-filter-host[data-source-filter="global"] [data-source-scope="project"],
+.opencodian-plugin-source-filter-host[data-source-filter="project"] [data-source-scope="global"] {
+  display: none;
+}
+
+/*
+ * Per-scope empty placeholders.
+ *
+ * The placeholder is only emitted when its scope has zero sources, so the
+ * `:has([data-source-scope="X"])` guard is technically redundant here — but
+ * it is intentionally kept as defense-in-depth: if a future code path ever
+ * renders both a real source and a placeholder for the same scope, the CSS
+ * will still hide the placeholder.
+ */
+.opencodian-plugin-source-scope-empty {
+  display: none;
+  padding: 6px 0;
+  color: var(--text-faint);
+  font-size: 12px;
+  font-style: italic;
+  line-height: 1.55;
+}
+
+.opencodian-plugin-source-filter-host[data-source-filter="global"]:not(:has([data-source-scope="global"])) [data-empty-scope="global"],
+.opencodian-plugin-source-filter-host[data-source-filter="project"]:not(:has([data-source-scope="project"])) [data-empty-scope="project"] {
+  display: block;
+}
+
+@media (max-width: 480px) {
+  .opencodian-plugin-source-filter {
+    display: flex;
+    width: 100%;
+  }
+
+  .opencodian-plugin-source-filter-button {
+    flex: 1 1 0;
+    min-width: 0;
+    text-align: center;
+  }
+
+  /* Collapse the two-column metadata grid into a single column at narrow
+   * widths so long labels and long values do not overflow horizontally.
+   * The label becomes a leading muted line above its value. */
+  .opencodian-plugin-source-meta-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+
+  .opencodian-plugin-source-meta-label {
+    text-transform: none;
+    letter-spacing: 0;
+  }
+
+  /* Path stacks label over status badge instead of side-by-side.
+   * This covers both the current source-panel DOM (.opencodian-plugin-source-path
+   * with flex-direction: row by default) and the legacy .opencodian-plugin-source-path-row
+   * grid layout used by renderPluginEntryGroup/renderManagedEntryGroup fallbacks. */
+  .opencodian-plugin-source-path {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+  }
+
+  .opencodian-plugin-source-path-status {
+    align-self: flex-start;
+  }
+
+  .opencodian-plugin-source-path-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* Header: title and badges wrap onto separate lines on narrow widths. */
+  .opencodian-plugin-source-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--opencodian-settings-space-xs);
+  }
+
+  .opencodian-plugin-source-badges {
+    width: 100%;
+    flex-wrap: wrap;
+  }
 }
 
 /* Managed plugin entry row with toggle and delete */
@@ -5201,7 +5467,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 12px;
+  padding: 8px 0;
 }
 
 .opencodian-plugin-toggle {
@@ -5250,6 +5516,123 @@
 .opencodian-plugin-entry-delete:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+/* SDK plugin evidence panel */
+.opencodian-plugin-evidence-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--opencodian-settings-space-sm);
+  padding: 12px 0;
+  border-top: 1px solid var(--opencodian-settings-row-border);
+}
+
+.opencodian-plugin-evidence-section:first-child {
+  padding-top: 0;
+  border-top: none;
+}
+
+.opencodian-plugin-evidence-section-title {
+  margin: 0;
+  padding: 0;
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--text-normal);
+  line-height: 1.35;
+}
+
+.opencodian-plugin-evidence-section-desc {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--text-muted);
+}
+
+.opencodian-plugin-evidence-empty {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-faint);
+  font-style: italic;
+}
+
+.opencodian-plugin-evidence-subsection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--opencodian-settings-space-xs);
+  margin-top: var(--opencodian-settings-space-xs);
+}
+
+.opencodian-plugin-evidence-subsection-title {
+  margin: 0;
+  padding: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.opencodian-plugin-evidence-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--opencodian-settings-space-xs);
+}
+
+.opencodian-plugin-evidence-item {
+  padding: 8px 10px;
+  border: 1px solid var(--opencodian-settings-object-border);
+  border-radius: var(--opencodian-settings-radius-row);
+  background: var(--opencodian-settings-object-bg);
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.opencodian-plugin-evidence-code {
+  font-family: var(--font-monospace);
+  font-size: 12px;
+  color: var(--text-normal);
+}
+
+.opencodian-plugin-evidence-meta {
+  margin-top: 4px;
+  font-family: var(--font-monospace);
+  font-size: 11px;
+  color: var(--text-faint);
+  line-height: 1.5;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.opencodian-plugin-remote-notice {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--text-warning) 30%, var(--background-modifier-border));
+  border-radius: var(--opencodian-settings-radius-row);
+  background: color-mix(in srgb, var(--text-warning) 7%, var(--background-secondary));
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.opencodian-plugin-remote-notice-label {
+  font-weight: 650;
+  color: var(--text-warning);
+}
+
+.opencodian-plugin-local-only-label {
+  margin-top: 6px;
+  padding: 2px 8px;
+  border: 1px solid var(--opencodian-settings-inline-border);
+  border-radius: 999px;
+  background: var(--opencodian-settings-inline-bg);
+  color: var(--text-faint);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+  width: fit-content;
 }
 
 .opencodian-model-catalog-panel {

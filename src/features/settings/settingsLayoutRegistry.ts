@@ -156,8 +156,8 @@ export const SETTINGS_PRIMARY_TABS: SettingsPrimaryTabDefinition[] = [
     backendRequired: 'opencode',
     secondaryTabs: [
       { id: 'overview', labelKey: 'settings.plugins.tab.overview' },
-      { id: 'global', labelKey: 'settings.plugins.tab.global' },
-      { id: 'project-directory', labelKey: 'settings.plugins.tab.projectDirectory' },
+      { id: 'config-sources', labelKey: 'settings.plugins.tab.configSources' },
+      { id: 'project-plugins', labelKey: 'settings.plugins.tab.projectPlugins' },
       { id: 'omo', labelKey: 'settings.plugins.tab.omo' },
     ],
   },
@@ -280,6 +280,10 @@ const LEGACY_SECONDARY_TAB_ID_MAP: Record<string, Record<string, string>> = {
     modules: 'plugin',
     logs: 'export',
     actions: 'export',
+  },
+  plugins: {
+    global: 'config-sources',
+    'project-directory': 'project-plugins',
   },
 };
 for (const tab of SETTINGS_PRIMARY_TABS) {

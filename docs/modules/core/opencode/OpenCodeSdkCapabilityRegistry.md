@@ -12,7 +12,8 @@
 - 注册表覆盖顶层 namespace（`app`、`auth`、`config`、`session`、`mcp`、`project`、`pty`、`vcs` 等）以及全部 14 个新 `client.v2.*` 子 namespace（`v2.health`、`v2.location`、`v2.agent`、`v2.session`、`v2.model`、`v2.provider`、`v2.integration`、`v2.credential`、`v2.permission`、`v2.fs`、`v2.command`、`v2.skill`、`v2.event`、`v2.pty`、`v2.question`、`v2.reference`、`v2.projectCopy`）。
 - risk 映射 gate/probe：`read-only` → defaultGate true + read probe；`state-changing` → defaultGate false + `none` probe（绝不调用）；`experimental-action` → defaultGate false + presence probe；`stream` → defaultGate false + presence probe。
 - `getOpenCodeSdkCapabilityRegistry()` 深拷贝数组、entry、`sdkPath` 和可选 `runtimeProof`，防止调用方篡改后续 snapshot 的定义或已有 runtime proof。
-- 来源事实见 `docs/status/opencode-sdk-1.17.18-capability-inventory.md`。
+- 当前 pin 来源事实见 `docs/status/opencode-sdk-1.18.3-capability-delta.md`；历史 1.17.18 method inventory 见 `docs/status/opencode-sdk-1.17.18-capability-inventory.md`。
+- 本注册表只登记 callable SDK namespace/method。`plugin.added` 是事件而非可调用的 SDK capability，因此不登记为 registry entry。
 
 ## 与其他模块的交互
 

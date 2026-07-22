@@ -2,6 +2,17 @@
  * Test setup file
  */
 
+jest.mock('@opencode-ai/sdk/v2/client', () => ({
+  createOpencodeClient: jest.fn().mockReturnValue({
+    config: {
+      get: jest.fn().mockResolvedValue({ plugin: [] }),
+    },
+    global: {
+      event: jest.fn().mockResolvedValue({ stream: (async function* () {})() }),
+    },
+  }),
+}), { virtual: true });
+
 // Mock Obsidian API globals
 global.document = document;
 global.window = window;

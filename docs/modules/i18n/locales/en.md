@@ -1,7 +1,9 @@
 # English Locale
 
 > **源码**: `src/i18n/locales/en.ts`
-> **最近更新**: 2026-07-21 Subagent nesting depth — added `settings.agents.subagentDepth.name` / `.desc` / `.useDefault` / `.disableAll` for the new Settings → Agents dropdown that writes the OpenCode 1.18.3 `subagent_depth` field (blank = server default 1, 0 = disable all subagents, 1-5 = explicit nesting).
+> **最近更新**: 2026-07-21 SDK 1.18.3 plugin evidence copy refinement — added `settings.plugins.evidence.fetchRefreshing` to honestly distinguish in-flight `config.get()` refresh from idle/ready/error; `settings.plugins.evidence.*` keys remain for effective config / runtime IDs / transport state, `settings.plugins.source.*` for config source provenance, and `settings.plugins.remoteNotice` / `settings.plugins.localOnly.label` for remote-mode honesty.
+>
+> **Previously**: 2026-07-21 Subagent nesting depth — added `settings.agents.subagentDepth.name` / `.desc` / `.useDefault` / `.disableAll` for the new Settings → Agents dropdown that writes the OpenCode 1.18.3 `subagent_depth` field (blank = server default 1, 0 = disable all subagents, 1-5 = explicit nesting).
 >
 > **Previously**: 2026-06-28 Settings extension badges — added `settings.tools.permission.source.*`, `settings.tools.custom.status.*`, and `settings.acp.count` for Skills / Tools / ACP settings row-card badges and toolbar count text.
 >

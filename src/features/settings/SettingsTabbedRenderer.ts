@@ -69,6 +69,7 @@ export interface TabRendererDependencies {
   setServerSection: (section: SettingsServerSection | null) => void;
   setMcpSection: (section: SettingsMcpSection | null) => void;
   setModelSection: (section: SettingsModelSection | null) => void;
+  setPluginSection: (section: SettingsPluginSection | null) => void;
   setSecuritySection: (section: SettingsSecuritySection | null) => void;
   getRefreshModelsCallback: () => (() => void) | undefined;
   getRefreshTitleModelsCallback: () => (() => void) | undefined;
@@ -474,6 +475,7 @@ export class SettingsTabbedRenderer {
       setSettingNameWithFormatting: (setting, text) => { this.deps.setSettingNameWithFormatting(setting, text); },
       setSettingDescWithFormatting: (setting, text) => { this.deps.setSettingDescWithFormatting(setting, text); },
     });
+    this.deps.setPluginSection(pluginSection);
     pluginSection.attachTabbed(containerEl, secondaryTabId);
   }
 

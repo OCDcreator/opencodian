@@ -83,6 +83,7 @@ function createRendererState(options?: {
     setServerSection: () => undefined,
     setMcpSection: () => undefined,
     setModelSection: () => undefined,
+    setPluginSection: () => undefined,
     setSecuritySection: () => undefined,
     getRefreshModelsCallback: () => undefined,
     getRefreshTitleModelsCallback: () => undefined,

@@ -328,6 +328,24 @@ describe('SettingsPluginSection', () => {
     expect(noticeSpy).toHaveBeenCalledWith(t('settings.plugins.refresh.success'));
   });
 
+  it('does not duplicate OMO summary rows on repeated refresh', async () => {
+    jest.spyOn(PluginManagementService.prototype, 'inspect').mockResolvedValue(createSnapshot());
+    const { containerEl } = createSection();
+    await flushAsync();
+
+    const omoBlock = Array.from(containerEl.querySelectorAll('.opencodian-plugin-block')).find(
+      (block) => block.querySelector('h4')?.textContent === t('settings.plugins.omo.title'),
+    ) as HTMLElement;
+    const omoBody = omoBlock.querySelector('.opencodian-plugin-block-body') as HTMLElement;
+    expect(omoBody.querySelectorAll('.opencodian-plugin-summary-row').length).toBe(3);
+
+    const refreshButton = findButton(t('settings.plugins.actions.refresh'));
+    await refreshButton?.onClick?.();
+    await flushAsync();
+
+    expect(omoBody.querySelectorAll('.opencodian-plugin-summary-row').length).toBe(3);
+  });
+
   it('saves project plugin specs and shows the restart notice', async () => {
     jest
       .spyOn(PluginManagementService.prototype, 'inspect')
@@ -479,15 +497,17 @@ describe('Settings plugin/catalog CSS contract', () => {
     );
     const agentGroupRule = findRule('\\.opencodian-agent-editor-group', 'background:');
     const summaryRule = findRule('\\.opencodian-plugin-summary-row', 'background:');
-    const sourcePathRule = findRule('\\.opencodian-plugin-source-path', 'background:');
-    const sourceItemRule = findRule(
-      '\\.opencodian-plugin-source-item,\\s*\\.opencodian-plugin-source-empty',
-      'background:',
-    );
+    // Source path is now a flat muted code line, NOT a card.
+    const sourcePathRule = findRule('\\.opencodian-plugin-source-path\\b(?![-])', 'background:');
+    // Source items are flat rows separated by border-bottom, NOT cards.
+    const sourceItemRule = findRule('\\.opencodian-plugin-source-item\\b(?![-])', 'background:');
+    const sourceEmptyRule = findRule('\\.opencodian-plugin-source-empty\\b(?![-])', 'background:');
     const sourceEmptySpacingRule = findRule(
       '\\.opencodian-plugin-source-path \\+ \\.opencodian-plugin-source-empty',
       'margin-top:',
     );
+    const sourceMetaRule = findRule('\\.opencodian-plugin-source-meta\\b(?![-])', 'display:');
+    const sourceFilterRule = findRule('\\.opencodian-plugin-source-filter-button\\.is-active', 'background:');
     const pluginCatalogCss = css.slice(
       css.indexOf('.opencodian-plugin-block'),
       css.indexOf('.opencodian-mcp-overview-shell'),
@@ -511,9 +531,20 @@ describe('Settings plugin/catalog CSS contract', () => {
     expect(agentGroupRule).toContain('var(--opencodian-settings-object-bg');
     expect(agentGroupRule).toContain('box-shadow: none');
     expect(summaryRule).toContain('var(--opencodian-settings-row-bg');
-    expect(sourcePathRule).toContain('var(--opencodian-settings-inline-bg');
-    expect(sourceItemRule).toContain('var(--opencodian-settings-object-bg');
-    expect(sourceEmptySpacingRule).toContain('var(--opencodian-settings-space-md');
+    // Source path must be flat: transparent background and no border/radius.
+    expect(sourcePathRule).toContain('background: transparent');
+    expect(sourcePathRule).toContain('border: 0');
+    expect(sourcePathRule).toContain('border-radius: 0');
+    // Source items must be flat rows, not object-bg cards.
+    expect(sourceItemRule).toContain('background: transparent');
+    expect(sourceItemRule).toContain('border: 0');
+    expect(sourceItemRule).toContain('border-radius: 0');
+    expect(sourceEmptyRule).toContain('background: transparent');
+    // Source meta must use semantic dl-style grid layout (not cards).
+    expect(sourceMetaRule).toContain('display: grid');
+    // Filter active button uses interactive-accent (premium subdued indicator).
+    expect(sourceFilterRule).toContain('var(--interactive-accent)');
+    expect(sourceEmptySpacingRule).toContain('var(--opencodian-settings-space-sm');
     expect(pluginCatalogCss).not.toContain('linear-gradient');
     expect(pluginCatalogCss).not.toContain('backdrop-filter');
     expect(pluginCatalogCss).not.toContain('transform: translateY');

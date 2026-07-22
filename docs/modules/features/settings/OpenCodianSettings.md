@@ -123,7 +123,7 @@ General 里的设置界面模式、界面语言、在编辑区打开设置，以
 
 - DOM 引用会失效
 - section heading / quick-nav / scroll restore 需要在重建后重新接线
-- 每次重建前都必须先释放各 section owner 的副作用；现在 `disposeSections()` 也会显式销毁 `SettingsUserSection`，避免 user prompt / excluded-tags textarea 的 size-memory observer 残留在旧 DOM 上
+- 每次重建前都必须先释放各 section owner 的副作用；现在 `disposeSections()` 也会显式销毁 `SettingsUserSection`，避免 user prompt / excluded-tags textarea 的 size-memory observer 残留在旧 DOM 上；tabbed plugin owner 也必须由 renderer 注册回 `pluginSection`，确保离开 Plugin Overview 时释放 SDK evidence observer
 
 从 R9 开始，这部分壳层生命周期已委托给 `SettingsSectionCoordinator`：`OpenCodianSettings` 只负责按顺序挂载当前 backend 可见的 General / backend-specific sections / Conversation / UI / Style / Debug / User 等 section，本身不再直接持有 quick-nav DOM 组装或滚动恢复定时器细节。tabbed 模式也必须先进入 `beginDisplay({ showQuickNav: false })`，由 coordinator 捕获当前滚动位置后再清空重建内容；不要在调用 `beginDisplay()` 前额外 `empty()` 容器，否则新增/删除格式化器等 tabbed 刷新会先把滚动容器夹回顶部。tabbed 模式只保留标题 + 一级标签栏 + 二级标签栏 + 内容区。
 

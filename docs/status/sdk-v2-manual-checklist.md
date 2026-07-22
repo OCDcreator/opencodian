@@ -6,9 +6,19 @@
 >
 > 本文档只描述建议验收项，不代表这些步骤已在本次 docs 更新中重新执行。
 
-## 0. SDK 1.17.18 capability productization gate
+## 0. SDK 1.18.3 capability productization gate
 
-先使用 `docs/status/opencode-sdk-1.17.18-capability-inventory.md` 对照当前 SDK pin。每次验收必须保存当前 `BUILD_ID`、server version、server mode 和 vault directory；不要将 SDK method presence 当作 server support 或 runtime proof。
+当前 SDK pin 为 `@opencode-ai/sdk@1.18.3`。先使用 `docs/status/opencode-sdk-1.18.3-capability-delta.md` 对照当前 pin，历史 1.17.18 method inventory 保留在 `docs/status/opencode-sdk-1.17.18-capability-inventory.md` 作为基线。每次验收必须保存当前 `BUILD_ID`、server version、server mode 和 vault directory；不要将 SDK method presence 当作 server support 或 runtime proof。
+
+| 产品能力族 | supported scenario | unsupported / disabled scenario |
+| --- | --- | --- |
+| Plugin evidence — directory-scoped effective config | Settings > Plugins 显示 SDK effective config evidence；fetch 状态诚实显示 idle/refreshing/ready/error | 使用不支持 v2 config 的旧 server；effective config 区显示 fetch error，不伪造 entry-level load error |
+| Plugin evidence — `plugin.added` observation | 连接后端后观察到 `plugin.added` 事件，runtime IDs 以 unattributed evidence 展示 | 订阅前事件丢失或断线；空 runtime 列表只代表当前 capture window 无事件，不代表没有插件加载 |
+| Plugin evidence — Settings subscription scope | Classic Plugins 页和 tabbed `overview` 同时 inspect 本地声明并刷新一次 SDK evidence；`overview` 订阅 plugin evidence | Tabbed `global` / `project-directory` / `omo` 只 inspect 本地声明，不订阅也不额外请求 SDK evidence |
+| Plugin evidence — stale/unknown / no replay | 断线/重启后旧 evidence 标 stale；新 generation 开始新 capture | 不把 stale evidence 恢复为 current；不伪造 replay |
+| Plugin evidence — latest-started-wins | 并发刷新时只采纳最新一次请求的结果 | 旧慢请求不会覆盖新请求的 evidence |
+| Plugin evidence — remote local-only | 远程模式下本地文件编辑/托管条目均标 local-only；不调用 `config.update()` | 不暗示本地保存已同步到远端后端 |
+| Plugin evidence — no invented events | 只消费 `plugin.added` | 不显示 `plugin.removed` 或 `plugin.load-error`；不把 runtime id 自动匹配到 declaration |
 
 | 产品能力族 | supported scenario | unsupported / disabled scenario |
 | --- | --- | --- |

@@ -4,6 +4,7 @@ import { join } from 'node:path';
 
 import { DEFAULT_SETTINGS } from '../../../../src/core/types';
 import { OpenCodianSettingTab } from '../../../../src/features/settings/OpenCodianSettings';
+import { SettingsPluginSection } from '../../../../src/features/settings/SettingsPluginSection';
 import { SettingsSectionCoordinator } from '../../../../src/features/settings/SettingsSectionCoordinator';
 import { setLocale } from '../../../../src/i18n';
 import { setDebugLoggingEnabled } from '../../../../src/shared';
@@ -763,6 +764,23 @@ describe('OpenCodianSettingTab layout shell', () => {
   afterEach(() => {
     jest.restoreAllMocks();
     document.body.innerHTML = '';
+  });
+
+  it('disposes the active tabbed plugin section before rendering another plugin subtab', () => {
+    const { plugin, tab } = createSettingsTab('tabbed');
+    plugin.settings.settingsTabbedPrimaryTab = 'plugins';
+    plugin.settings.settingsTabbedSecondaryTabByPrimary = { plugins: 'overview' };
+    const attachSpy = jest
+      .spyOn(SettingsPluginSection.prototype, 'attachTabbed')
+      .mockImplementation(() => undefined);
+    const disposeSpy = jest.spyOn(SettingsPluginSection.prototype, 'dispose');
+
+    tab.display();
+    plugin.settings.settingsTabbedSecondaryTabByPrimary = { plugins: 'global' };
+    tab.display();
+
+    expect(attachSpy).toHaveBeenCalledTimes(2);
+    expect(disposeSpy).toHaveBeenCalledTimes(1);
   });
 
   it('uses General as the first classic quick-nav section', () => {

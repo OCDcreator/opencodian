@@ -379,3 +379,22 @@ MCP 详情弹窗改用共享 inspection-panel 布局：
 - focus server 高亮仍使用 `::before` 伪元素外框。
 - 保留 auth 徽章颜色变体：`-bearerToken`、`-none`、`-needs_auth`、`-notLoggedIn`、`-unsupported`。
 - `src/features/settings/ServerSettingHelpModal.ts`（`.opencodian-help-modal-shell` / `-section` / `-card` / `-pre` / `-list`，已弃用 `innerHTML` 帮助注入）
+
+## 2026-07-21 Plugin evidence surface
+
+新增 SDK 1.18.3 plugin evidence 分层展示样式，复用 settings 共享层级 token：
+
+- `.opencodian-plugin-evidence-section`：evidence 区外壳，使用 object tokens 作为轻量 section panel，避免嵌套卡片网格。
+- `.opencodian-plugin-evidence-section-title` / `.opencodian-plugin-evidence-section-desc`：区标题与说明。
+- `.opencodian-plugin-evidence-subsection`：当前 / 过期 effective specs 或 runtime IDs 子区。
+- `.opencodian-plugin-evidence-subsection-title`：子区标题。
+- `.opencodian-plugin-evidence-empty`：空态 / 未获取提示。
+- `.opencodian-plugin-evidence-list`：spec / runtime ID 列表容器。
+- `.opencodian-plugin-evidence-item`：单个 spec 或 runtime ID 条目。
+- `.opencodian-plugin-evidence-code`：specifier / runtime ID 的 monospace 文本。
+- `.opencodian-plugin-evidence-meta`：generation、timestamp、sources 等元信息，低调小号字。
+- `.opencodian-plugin-remote-notice`：远程模式诚实性提示条，使用警告色调但保持克制。
+- `.opencodian-plugin-remote-notice-label`：提示条加粗标签。
+- `.opencodian-plugin-local-only-label`：本地文件操作旁的 local-only 小标签。
+
+Guardrail: plugin evidence 区不引入渐变、玻璃、彩色侧边条或装饰动画；ID / generation / path 使用 monospace，状态使用低色度 badge 并附带非颜色文本。

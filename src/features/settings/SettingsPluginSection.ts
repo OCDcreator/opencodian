@@ -6,11 +6,14 @@ import * as path from 'path';
 
 import { OpencodeConfigManager, PluginManagementService } from '../../core/config';
 import type { PluginEntry, PluginEnvironmentSnapshot } from '../../core/config/PluginManagementService';
+import type { PluginEvidenceSnapshot } from '../../core/opencode/OpenCodeEventSubscriptionCoordinator';
 import type { PluginIsolationMode } from '../../core/types';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { createLogger, getVaultBasePath } from '../../shared';
 import { OpencodeConfigModal } from './OpencodeConfigModal';
+import { SettingsPluginEvidenceCoordinator } from './SettingsPluginEvidenceCoordinator';
+import { SettingsPluginEvidencePresenter } from './SettingsPluginEvidencePresenter';
 import { TextareaSizeMemory } from './TextareaSizeMemory';
 
 const logger = createLogger('SettingsPluginSection');
@@ -18,6 +21,14 @@ const logger = createLogger('SettingsPluginSection');
 interface PluginSourcePathRenderModel {
   label: string;
   status?: 'available' | 'missing';
+}
+
+type PluginSourceFilter = 'all' | 'global' | 'project';
+
+interface ConfigSourceRenderContext {
+  pluginService: PluginManagementService;
+  currentRunId: number;
+  fullRefresh?: () => Promise<void>;
 }
 
 interface SettingsPluginSectionOptions {
@@ -44,7 +55,11 @@ export class SettingsPluginSection {
   private readonly applyInlineCodeText: (targetEl: HTMLElement | null, text: string) => void;
   private readonly setSettingNameWithFormatting: (setting: Setting, text: string) => void;
   private readonly setSettingDescWithFormatting: (setting: Setting, text: string) => void;
+  private readonly evidencePresenter: SettingsPluginEvidencePresenter;
+  private evidenceCoordinator: SettingsPluginEvidenceCoordinator | null = null;
   private refreshRunId = 0;
+  private lastPluginEvidenceSnapshot: PluginEvidenceSnapshot | null = null;
+  private configSourceFilter: PluginSourceFilter = 'all';
 
   constructor(options: SettingsPluginSectionOptions) {
     this.app = options.app;
@@ -53,10 +68,52 @@ export class SettingsPluginSection {
     this.applyInlineCodeText = options.applyInlineCodeText;
     this.setSettingNameWithFormatting = options.setSettingNameWithFormatting;
     this.setSettingDescWithFormatting = options.setSettingDescWithFormatting;
+    this.evidencePresenter = new SettingsPluginEvidencePresenter({
+      applyInlineCodeText: this.applyInlineCodeText,
+    });
+  }
+
+  private ensureEvidenceCoordinator(): SettingsPluginEvidenceCoordinator {
+    if (!this.evidenceCoordinator) {
+      this.evidenceCoordinator = new SettingsPluginEvidenceCoordinator({
+        openCodeService: this.plugin.openCodeService,
+        getSettings: () => this.plugin.settings,
+        vaultPath: getVaultBasePath(this.plugin.app) ?? undefined,
+      });
+    }
+    return this.evidenceCoordinator;
   }
 
   dispose(): void {
     this.refreshRunId += 1;
+    this.lastPluginEvidenceSnapshot = null;
+    this.evidenceCoordinator?.dispose();
+    this.evidenceCoordinator = null;
+  }
+
+  private subscribeToPluginEvidence(currentRunId: number, overviewEl: HTMLElement): void {
+    const coordinator = this.ensureEvidenceCoordinator();
+    coordinator.dispose();
+
+    coordinator.subscribe((snapshot) => {
+      if (currentRunId !== this.refreshRunId) {
+        return;
+      }
+      this.lastPluginEvidenceSnapshot = snapshot;
+      this.evidencePresenter.updateSdkEvidence(overviewEl, snapshot);
+    });
+  }
+
+  private async refreshPluginEvidence(): Promise<void> {
+    const coordinator = this.ensureEvidenceCoordinator();
+    try {
+      const snapshot = await coordinator.refresh();
+      if (snapshot) {
+        this.lastPluginEvidenceSnapshot = snapshot;
+      }
+    } catch (error) {
+      logger.error('Failed to refresh plugin evidence:', error);
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -98,23 +155,76 @@ export class SettingsPluginSection {
             });
         });
       this.setSettingDescWithFormatting(installSetting, t('settings.plugins.install.desc'));
+      this.renderLocalOnlyLabel(installSetting.settingEl);
     }
 
     if (secondaryTabId === 'overview') {
       const overviewEl = containerEl.createDiv({ attr: { 'data-section-block': 'overview' } });
-      this.createPluginSubsection(overviewEl, t('settings.plugins.overview.title'), t('settings.plugins.overview.desc'));
-    } else if (secondaryTabId === 'global') {
-      const globalSourcesEl = containerEl.createDiv({ attr: { 'data-section-block': 'global' } });
-      this.createPluginSubsection(globalSourcesEl, t('settings.plugins.global.title'), t('settings.plugins.global.desc'));
-    } else if (secondaryTabId === 'project-directory') {
-      const projectDirEl = containerEl.createDiv({ attr: { 'data-section-block': 'project-directory' } });
-      this.createPluginSubsection(projectDirEl, t('settings.plugins.projectDirectory.title'), t('settings.plugins.projectDirectory.desc'));
+      const overviewBodyEl = this.createPluginSubsection(overviewEl, t('settings.plugins.overview.title'), t('settings.plugins.overview.desc'));
+      this.subscribeToPluginEvidence(currentRunId, overviewBodyEl);
+    } else if (secondaryTabId === 'config-sources') {
+      const sourcesEl = containerEl.createDiv({ attr: { 'data-section-block': 'config-sources' } });
+      const sourcesBodyEl = this.createPluginSubsection(
+        sourcesEl,
+        t('settings.plugins.configSources.title'),
+        t('settings.plugins.configSources.desc'),
+      );
+      this.renderConfigSourceFilter(sourcesBodyEl);
+    } else if (secondaryTabId === 'project-plugins') {
+      const projectPluginsEl = containerEl.createDiv({ attr: { 'data-section-block': 'project-plugins' } });
+      this.createPluginSubsection(
+        projectPluginsEl,
+        t('settings.plugins.projectPlugins.title'),
+        t('settings.plugins.projectPlugins.desc'),
+      );
     } else if (secondaryTabId === 'omo') {
       const omoEl = containerEl.createDiv({ attr: { 'data-section-block': 'omo' } });
       this.createPluginSubsection(omoEl, t('settings.plugins.omo.title'), t('settings.plugins.omo.desc'));
     }
 
     void refreshPluginSnapshot(false);
+  }
+
+  private renderConfigSourceFilter(containerEl: HTMLElement): void {
+    const filterBarEl = containerEl.createDiv({
+      cls: 'opencodian-plugin-source-filter',
+      attr: { role: 'group', 'aria-label': t('settings.plugins.source.filterLabel') },
+    });
+    const filters: ReadonlyArray<{ id: PluginSourceFilter; labelKey: 'settings.plugins.source.filterAll' | 'settings.plugins.source.filterGlobal' | 'settings.plugins.source.filterProject' }> = [
+      { id: 'all', labelKey: 'settings.plugins.source.filterAll' },
+      { id: 'global', labelKey: 'settings.plugins.source.filterGlobal' },
+      { id: 'project', labelKey: 'settings.plugins.source.filterProject' },
+    ];
+    for (const filter of filters) {
+      const isActive = this.configSourceFilter === filter.id;
+      const buttonEl = filterBarEl.createEl('button', {
+        cls: `opencodian-plugin-source-filter-button${isActive ? ' is-active' : ''}`,
+        attr: {
+          type: 'button',
+          'aria-pressed': String(isActive),
+          'data-source-filter': filter.id,
+        },
+        text: t(filter.labelKey),
+      });
+      buttonEl.addEventListener('click', () => {
+        if (this.configSourceFilter === filter.id) return;
+        this.configSourceFilter = filter.id;
+        for (const sibling of Array.from(filterBarEl.children)) {
+          const siblingButton = sibling as HTMLButtonElement;
+          const siblingActive = siblingButton.dataset.sourceFilter === filter.id;
+          siblingButton.classList.toggle('is-active', siblingActive);
+          siblingButton.setAttribute('aria-pressed', String(siblingActive));
+        }
+        const hostEl = containerEl.querySelector('.opencodian-plugin-source-filter-host');
+        if (hostEl instanceof HTMLElement) {
+          hostEl.dataset.sourceFilter = filter.id;
+        }
+      });
+    }
+    containerEl.createDiv({
+      cls: 'opencodian-plugin-source-filter-host',
+      attr: { 'data-source-filter': this.configSourceFilter },
+    });
   }
 
   // ---------------------------------------------------------------------------
@@ -158,12 +268,14 @@ export class SettingsPluginSection {
           });
       });
     this.setSettingDescWithFormatting(installSetting, t('settings.plugins.install.desc'));
+    this.renderLocalOnlyLabel(installSetting.settingEl);
 
     const overviewEl = this.createPluginSubsection(
       containerEl,
       t('settings.plugins.overview.title'),
       t('settings.plugins.overview.desc'),
     );
+    this.subscribeToPluginEvidence(currentRunId, overviewEl);
     const globalSourcesEl = this.createPluginSubsection(
       containerEl,
       t('settings.plugins.global.title'),
@@ -182,11 +294,14 @@ export class SettingsPluginSection {
 
     const refreshPluginSnapshot = async (showNotice = false) => {
       try {
-        const snapshot = await pluginService.inspect(
-          this.plugin.settings.server.mode,
-          this.plugin.settings.pluginIsolationMode,
-          this.plugin.settings.disabledPluginSpecs,
-        );
+        const [snapshot] = await Promise.all([
+          pluginService.inspect(
+            this.plugin.settings.server.mode,
+            this.plugin.settings.pluginIsolationMode,
+            this.plugin.settings.disabledPluginSpecs,
+          ),
+          this.refreshPluginEvidence(),
+        ]);
         if (currentRunId !== this.refreshRunId) {
           return;
         }
@@ -197,7 +312,7 @@ export class SettingsPluginSection {
             .join('\n');
         }
 
-        this.renderPluginOverview(overviewEl, snapshot);
+        this.renderPluginOverview(overviewEl, snapshot, this.lastPluginEvidenceSnapshot);
         this.renderPluginSources(globalSourcesEl, snapshot, { pluginService, currentRunId, fullRefresh: async () => { await refreshPluginSnapshot(false); } });
         this.renderPluginProjectDirectory(projectDirectoryEl, snapshot, pluginService, currentRunId);
         this.renderPluginOmoSection(omoEl, snapshot);
@@ -273,6 +388,7 @@ export class SettingsPluginSection {
       });
     this.setSettingNameWithFormatting(projectPluginSetting, t('settings.plugins.projectConfig.name'));
     this.setSettingDescWithFormatting(projectPluginSetting, t('settings.plugins.projectConfig.desc'));
+    this.renderLocalOnlyLabel(projectPluginSetting.settingEl);
 
     const isolationSetting = new Setting(containerEl)
       .setName(t('settings.plugins.isolation.name'))
@@ -306,6 +422,7 @@ export class SettingsPluginSection {
       pluginDirectorySetting,
       t('settings.plugins.projectDirectory.manageDesc'),
     );
+    this.renderLocalOnlyLabel(pluginDirectorySetting.settingEl);
 
     const omoSetting = new Setting(containerEl)
       .setName(t('settings.plugins.omo.manageName'))
@@ -462,25 +579,36 @@ export class SettingsPluginSection {
     pluginService: PluginManagementService,
     containerEl: HTMLElement,
     currentRunId: number,
-    _secondaryTabId: string,
+    secondaryTabId: string,
   ): (showNotice: boolean) => Promise<void> {
     return async (showNotice = false) => {
       try {
-        const snapshot = await pluginService.inspect(
-          this.plugin.settings.server.mode,
-          this.plugin.settings.pluginIsolationMode,
-          this.plugin.settings.disabledPluginSpecs,
-        );
+        const includeSdkEvidence = secondaryTabId === 'overview';
+        const [snapshot] = await Promise.all([
+          pluginService.inspect(
+            this.plugin.settings.server.mode,
+            this.plugin.settings.pluginIsolationMode,
+            this.plugin.settings.disabledPluginSpecs,
+          ),
+          includeSdkEvidence ? this.refreshPluginEvidence() : Promise.resolve(),
+        ]);
         if (currentRunId !== this.refreshRunId) return;
 
         const overviewEl = containerEl.querySelector('[data-section-block="overview"] .opencodian-plugin-block-body') as HTMLElement;
-        const globalSourcesEl = containerEl.querySelector('[data-section-block="global"] .opencodian-plugin-block-body') as HTMLElement;
-        const projectDirEl = containerEl.querySelector('[data-section-block="project-directory"] .opencodian-plugin-block-body') as HTMLElement;
+        const sourcesEl = containerEl.querySelector('[data-section-block="config-sources"] .opencodian-plugin-block-body') as HTMLElement;
+        const projectPluginsEl = containerEl.querySelector('[data-section-block="project-plugins"] .opencodian-plugin-block-body') as HTMLElement;
         const omoEl = containerEl.querySelector('[data-section-block="omo"] .opencodian-plugin-block-body') as HTMLElement;
 
-        if (overviewEl) this.renderPluginOverview(overviewEl, snapshot);
-        if (globalSourcesEl) this.renderPluginSources(globalSourcesEl, snapshot, { pluginService, currentRunId });
-        if (projectDirEl) this.renderPluginProjectDirectory(projectDirEl, snapshot, pluginService, currentRunId);
+        if (overviewEl) this.renderPluginOverview(overviewEl, snapshot, this.lastPluginEvidenceSnapshot);
+        if (sourcesEl) {
+          const filterHostEl = sourcesEl.querySelector('.opencodian-plugin-source-filter-host') as HTMLElement | null;
+          if (filterHostEl) {
+            this.renderPluginSources(filterHostEl, snapshot, { pluginService, currentRunId });
+          } else {
+            this.renderPluginSources(sourcesEl, snapshot, { pluginService, currentRunId });
+          }
+        }
+        if (projectPluginsEl) this.renderPluginProjectDirectory(projectPluginsEl, snapshot, pluginService, currentRunId);
         if (omoEl) this.renderPluginOmoSection(omoEl, snapshot);
 
         if (showNotice) new Notice(t('settings.plugins.refresh.success'));
@@ -505,100 +633,330 @@ export class SettingsPluginSection {
     return blockEl.createDiv({ cls: 'opencodian-plugin-block-body' });
   }
 
-  private renderPluginOverview(containerEl: HTMLElement, snapshot: PluginEnvironmentSnapshot): void {
-    const totalProjectPlugins =
-      snapshot.projectConfigPlugins.length
-      + snapshot.disabledProjectConfigPlugins.length;
-    const totalDirPlugins =
-      snapshot.projectDirectoryPlugins.length
-      + snapshot.disabledProjectDirectoryPlugins.length;
-
-    const rows = [
-      {
-        label: t('settings.plugins.overview.serviceMode'),
-        value: snapshot.serviceMode === 'local'
-          ? t('settings.plugins.overview.serviceModeLocal')
-          : t('settings.plugins.overview.serviceModeRemote'),
-      },
-      {
-        label: t('settings.plugins.overview.isolationMode'),
-        value: snapshot.isolationMode === 'pure'
-          ? t('settings.plugins.isolation.pure')
-          : t('settings.plugins.isolation.default'),
-      },
-      {
-        label: t('settings.plugins.overview.vaultConfigDir'),
-        value: snapshot.vaultConfigDir,
-      },
-      {
-        label: t('settings.plugins.overview.globalInfluence'),
-        value: snapshot.globalInfluenceDetected
-          ? t('settings.plugins.overview.globalInfluenceYes')
-          : t('settings.plugins.overview.globalInfluenceNo'),
-      },
-      {
-        label: t('settings.plugins.overview.projectConfigCount'),
-        value: String(totalProjectPlugins),
-      },
-      {
-        label: t('settings.plugins.overview.projectDirectoryCount'),
-        value: String(totalDirPlugins),
-      },
-    ];
-
-    this.renderPluginKeyValueRows(containerEl, rows);
+  private renderPluginOverview(
+    containerEl: HTMLElement,
+    snapshot: PluginEnvironmentSnapshot,
+    evidence: PluginEvidenceSnapshot | null,
+  ): void {
+    this.evidencePresenter.renderOverview(containerEl, snapshot, evidence);
   }
 
   private renderPluginSources(
     containerEl: HTMLElement,
     snapshot: PluginEnvironmentSnapshot,
-    ctx: {
-      pluginService: PluginManagementService;
-      currentRunId: number;
-      fullRefresh?: () => Promise<void>;
-    },
+    ctx: ConfigSourceRenderContext,
   ): void {
     const { pluginService, currentRunId, fullRefresh } = ctx;
     containerEl.empty();
 
-    // Global sources — read-only
-    this.renderPluginEntryGroup(containerEl, {
-      title: t('settings.plugins.global.configTitle'),
-      paths: this.createSingleSourcePath(snapshot.globalConfigPath),
-      entries: snapshot.globalConfigPlugins,
-      emptyText: t('settings.plugins.none'),
-    });
-    this.renderPluginEntryGroup(containerEl, {
-      title: t('settings.plugins.global.directoryTitle'),
-      paths: this.createDirectorySourcePaths(snapshot.globalDirectories),
-      entries: snapshot.globalDirectoryPlugins,
-      emptyText: t('settings.plugins.none'),
+    const configSources = snapshot.configSources ?? [];
+    const hasConfigSources = configSources.length > 0;
+
+    if (hasConfigSources) {
+      // Invariant: always render every config source group into the filter host.
+      // Visibility is governed exclusively by the host's `data-source-filter`
+      // attribute via CSS — never by pre-filtering the DOM in JS. This keeps
+      // the panel stable across refreshes triggered by managed actions: the
+      // refresh rebuilds the full DOM, and All/Global/Project filters only
+      // toggle CSS hiding without needing a re-render.
+      for (const source of configSources) {
+        const isCanonicalProjectConfig = source.path === snapshot.projectConfigPath;
+        const refresh = fullRefresh ?? (async () => {
+          if (currentRunId !== this.refreshRunId) return;
+          const snap = await pluginService.inspect(
+            this.plugin.settings.server.mode,
+            this.plugin.settings.pluginIsolationMode,
+            this.plugin.settings.disabledPluginSpecs,
+          );
+          if (currentRunId !== this.refreshRunId) return;
+          this.renderPluginSources(containerEl, snap, ctx);
+        });
+
+        this.renderConfigSourceGroup(containerEl, source, {
+          managed: isCanonicalProjectConfig,
+          activeEntries: isCanonicalProjectConfig ? snapshot.projectConfigPlugins : source.plugins,
+          disabledEntries: isCanonicalProjectConfig ? snapshot.disabledProjectConfigPlugins : [],
+          pluginService,
+          refresh,
+        });
+      }
+
+      // Per-scope empty placeholders. Rendered only when a scope has zero
+      // sources; CSS reveals the right one based on the active filter without
+      // touching the DOM again. This preserves the all-sources-in-DOM
+      // invariant because the placeholder is only emitted when there is
+      // nothing else to render for that scope.
+      this.renderScopeEmptyPlaceholders(containerEl, configSources);
+    } else {
+      // Legacy fallback for older fixtures without configSources inventory
+      this.renderPluginEntryGroup(containerEl, {
+        title: t('settings.plugins.global.configTitle'),
+        paths: this.createSingleSourcePath(snapshot.globalConfigPath),
+        entries: snapshot.globalConfigPlugins,
+        emptyText: t('settings.plugins.none'),
+      });
+      this.renderPluginEntryGroup(containerEl, {
+        title: t('settings.plugins.global.directoryTitle'),
+        paths: this.createDirectorySourcePaths(snapshot.globalDirectories),
+        entries: snapshot.globalDirectoryPlugins,
+        emptyText: t('settings.plugins.none'),
+      });
+
+      const refresh = fullRefresh ?? (async () => {
+        if (currentRunId !== this.refreshRunId) return;
+        const snap = await pluginService.inspect(
+          this.plugin.settings.server.mode,
+          this.plugin.settings.pluginIsolationMode,
+          this.plugin.settings.disabledPluginSpecs,
+        );
+        if (currentRunId !== this.refreshRunId) return;
+        this.renderPluginSources(containerEl, snap, ctx);
+      });
+
+      this.renderManagedEntryGroup(containerEl, {
+        title: t('settings.plugins.projectConfig.title'),
+        paths: this.createSingleSourcePath(snapshot.projectConfigPath),
+        activeEntries: snapshot.projectConfigPlugins,
+        disabledEntries: snapshot.disabledProjectConfigPlugins,
+        emptyText: t('settings.plugins.none'),
+        kind: 'config',
+        pluginService,
+        refresh,
+      });
+    }
+  }
+
+  private renderScopeEmptyPlaceholders(
+    containerEl: HTMLElement,
+    configSources: Array<import('../../core/config/PluginManagementService').PluginConfigSourceSnapshot>,
+  ): void {
+    const hasGlobal = configSources.some((source) => source.scope === 'global');
+    const hasProject = configSources.some((source) => source.scope === 'project');
+
+    // Each placeholder is rendered only when its scope has zero sources, so
+    // it never duplicates a real source group. The placeholder carries
+    // `data-empty-scope` only — never `data-source-scope`, because the
+    // CSS visibility rules use `:has([data-source-scope="X"])` to detect
+    // whether a real source of scope X exists.
+    if (!hasGlobal) {
+      const emptyEl = containerEl.createDiv({
+        cls: 'opencodian-plugin-source-scope-empty',
+        attr: { 'data-empty-scope': 'global' },
+      });
+      this.applyInlineCodeText(emptyEl, t('settings.plugins.source.emptyGlobal'));
+    }
+    if (!hasProject) {
+      const emptyEl = containerEl.createDiv({
+        cls: 'opencodian-plugin-source-scope-empty',
+        attr: { 'data-empty-scope': 'project' },
+      });
+      this.applyInlineCodeText(emptyEl, t('settings.plugins.source.emptyProject'));
+    }
+  }
+
+  private describeSourceIdentity(sourcePath: string): string {
+    const basename = sourcePath.split(/[/\\]/).filter(Boolean).pop();
+    return basename && basename.length > 0 ? basename : t('settings.plugins.source.identityUnknown');
+  }
+
+  private describeSourceStatus(
+    source: import('../../core/config/PluginManagementService').PluginConfigSourceSnapshot,
+  ): { status: 'available' | 'missing' | 'error'; labelKey: 'settings.plugins.source.statusAvailable' | 'settings.plugins.source.statusMissing' | 'settings.plugins.source.statusError' } {
+    if (source.error) return { status: 'error', labelKey: 'settings.plugins.source.statusError' };
+    if (!source.exists) return { status: 'missing', labelKey: 'settings.plugins.source.statusMissing' };
+    return { status: 'available', labelKey: 'settings.plugins.source.statusAvailable' };
+  }
+
+  private renderConfigSourceGroup(
+    containerEl: HTMLElement,
+    source: import('../../core/config/PluginManagementService').PluginConfigSourceSnapshot,
+    options: {
+      managed: boolean;
+      activeEntries?: PluginEntry[];
+      disabledEntries?: PluginEntry[];
+      pluginService?: PluginManagementService;
+      refresh?: () => Promise<void>;
+    },
+  ): void {
+    const { managed, activeEntries, disabledEntries, pluginService, refresh } = options;
+    const allEntries = managed
+      ? [...(activeEntries ?? []), ...(disabledEntries ?? [])]
+      : source.plugins;
+
+    const groupEl = containerEl.createDiv({
+      cls: 'opencodian-plugin-source-group',
+      attr: {
+        'data-source-scope': source.scope,
+        'data-source-access': source.editable ? 'editable' : 'read-only',
+        'data-source-path': source.path,
+      },
     });
 
-    // Project config — managed (toggle + delete)
-    // Use fullRefresh (which also updates the textarea editor) if available;
-    // fall back to a sources-only re-render for tabbed layout.
-    const refresh = fullRefresh ?? (async () => {
-      if (currentRunId !== this.refreshRunId) return;
-      const snap = await pluginService.inspect(
-        this.plugin.settings.server.mode,
-        this.plugin.settings.pluginIsolationMode,
-        this.plugin.settings.disabledPluginSpecs,
-      );
-      if (currentRunId !== this.refreshRunId) return;
-      this.renderPluginSources(containerEl, snap, ctx);
-    });
+    this.renderSourcePanelHeader(groupEl, source, allEntries.length);
+    this.renderSourcePanelPath(groupEl, source);
+    this.renderSourcePanelMeta(groupEl, source);
 
-    this.renderManagedEntryGroup(containerEl, {
-      title: t('settings.plugins.projectConfig.title'),
-      paths: this.createSingleSourcePath(snapshot.projectConfigPath),
-      activeEntries: snapshot.projectConfigPlugins,
-      disabledEntries: snapshot.disabledProjectConfigPlugins,
-      emptyText: t('settings.plugins.none'),
-      kind: 'config',
-      pluginService,
-      refresh,
+    if (managed && pluginService && refresh) {
+      this.renderManagedEntryList({
+        groupEl,
+        activeEntries: activeEntries ?? [],
+        disabledEntries: disabledEntries ?? [],
+        kind: 'config',
+        pluginService,
+        refresh,
+      });
+    } else {
+      this.renderReadOnlyEntryList(groupEl, source.plugins);
+    }
+  }
+
+  private renderSourcePanelHeader(
+    groupEl: HTMLElement,
+    source: import('../../core/config/PluginManagementService').PluginConfigSourceSnapshot,
+    count: number,
+  ): void {
+    const headerEl = groupEl.createDiv({ cls: 'opencodian-plugin-source-header' });
+    const titleEl = headerEl.createDiv({
+      cls: 'opencodian-plugin-source-title',
+      attr: { 'data-source-identity': this.describeSourceIdentity(source.path) },
     });
+    titleEl.textContent = this.describeSourceIdentity(source.path);
+
+    const badgesEl = headerEl.createDiv({ cls: 'opencodian-plugin-source-badges' });
+    badgesEl.createSpan({
+      cls: 'opencodian-plugin-source-count',
+      attr: { 'aria-label': t('settings.plugins.detectedCount') },
+      text: String(count),
+    });
+    badgesEl.createSpan({
+      cls: `opencodian-plugin-source-scope-badge`,
+      attr: { 'data-scope': source.scope },
+      text: source.scope === 'global'
+        ? t('settings.plugins.source.scopeGlobal')
+        : t('settings.plugins.source.scopeProject'),
+    });
+    badgesEl.createSpan({
+      cls: `opencodian-plugin-source-access-badge`,
+      attr: { 'data-access': source.editable ? 'editable' : 'read-only' },
+      text: source.editable
+        ? t('settings.plugins.source.editable')
+        : t('settings.plugins.source.readOnly'),
+    });
+  }
+
+  private renderSourcePanelPath(
+    groupEl: HTMLElement,
+    source: import('../../core/config/PluginManagementService').PluginConfigSourceSnapshot,
+  ): void {
+    const statusInfo = this.describeSourceStatus(source);
+    const pathRowEl = groupEl.createDiv({
+      cls: 'opencodian-plugin-source-path',
+      attr: {
+        'data-path-status': statusInfo.status,
+        'data-source-state': statusInfo.status,
+      },
+    });
+    const labelEl = pathRowEl.createSpan({
+      cls: 'opencodian-plugin-source-path-label',
+      attr: { 'aria-label': t('settings.plugins.source.pathLabel') },
+    });
+    this.applyInlineCodeText(labelEl, source.path);
+    pathRowEl.createSpan({
+      cls: 'opencodian-plugin-source-path-status',
+      text: t(statusInfo.labelKey),
+    });
+  }
+
+  private renderSourcePanelMeta(
+    groupEl: HTMLElement,
+    source: import('../../core/config/PluginManagementService').PluginConfigSourceSnapshot,
+  ): void {
+    const metaEl = groupEl.createEl('dl', { cls: 'opencodian-plugin-source-meta' });
+    this.appendMetaRow(metaEl, t('settings.plugins.source.scope'),
+      source.scope === 'global'
+        ? t('settings.plugins.source.scopeGlobal')
+        : t('settings.plugins.source.scopeProject'),
+    );
+    this.appendMetaRow(metaEl, t('settings.plugins.source.access'),
+      source.editable
+        ? t('settings.plugins.source.editable')
+        : t('settings.plugins.source.readOnly'),
+    );
+
+    if (source.error) {
+      this.appendMetaRow(metaEl, t('settings.plugins.source.error'), source.error, { isError: true });
+    } else if (!source.exists) {
+      const noteEl = metaEl.createDiv({
+        cls: 'opencodian-plugin-source-meta-note',
+        attr: { 'data-note-kind': 'missing' },
+      });
+      this.applyInlineCodeText(noteEl, t('settings.plugins.source.missingHelp'));
+    }
+  }
+
+  private appendMetaRow(
+    metaEl: HTMLElement,
+    label: string,
+    value: string,
+    options: { isError?: boolean } = {},
+  ): void {
+    const rowEl = metaEl.createDiv({
+      cls: `opencodian-plugin-source-meta-row${options.isError ? ' is-error' : ''}`,
+    });
+    const labelEl = rowEl.createEl('dt', { cls: 'opencodian-plugin-source-meta-label' });
+    this.applyInlineCodeText(labelEl, `${label}:`);
+    const valueEl = rowEl.createEl('dd', { cls: 'opencodian-plugin-source-meta-value' });
+    this.applyInlineCodeText(valueEl, value);
+  }
+
+  private renderManagedEntryList(options: {
+    groupEl: HTMLElement;
+    activeEntries: PluginEntry[];
+    disabledEntries: PluginEntry[];
+    kind: 'config' | 'directory';
+    pluginService: PluginManagementService;
+    refresh: () => Promise<void>;
+  }): void {
+    const { groupEl, activeEntries, disabledEntries, kind, pluginService, refresh } = options;
+    const allEntries = [...activeEntries, ...disabledEntries];
+    if (allEntries.length === 0) {
+      this.renderSourcePanelEmpty(groupEl, t('settings.plugins.source.empty'));
+      return;
+    }
+
+    this.renderLocalOnlyLabel(groupEl);
+
+    const listEl = groupEl.createDiv({ cls: 'opencodian-plugin-source-list' });
+    for (const entry of activeEntries) {
+      this.renderManagedEntryRow(listEl, { entry, disabled: false, kind, pluginService, refresh });
+    }
+    for (const entry of disabledEntries) {
+      this.renderManagedEntryRow(listEl, { entry, disabled: true, kind, pluginService, refresh });
+    }
+  }
+
+  private renderReadOnlyEntryList(
+    groupEl: HTMLElement,
+    entries: PluginEntry[],
+  ): void {
+    if (entries.length === 0) {
+      this.renderSourcePanelEmpty(groupEl, t('settings.plugins.source.empty'));
+      return;
+    }
+
+    const listEl = groupEl.createDiv({ cls: 'opencodian-plugin-source-list' });
+    for (const entry of entries) {
+      const itemEl = listEl.createDiv({ cls: 'opencodian-plugin-source-item' });
+      this.applyInlineCodeText(itemEl, this.describePluginEntry(entry));
+    }
+  }
+
+  private renderSourcePanelEmpty(groupEl: HTMLElement, message: string): void {
+    const emptyEl = groupEl.createDiv({
+      cls: 'opencodian-plugin-source-empty',
+      attr: { 'data-empty-kind': 'no-entries' },
+    });
+    this.applyInlineCodeText(emptyEl, message);
   }
 
   private renderPluginProjectDirectory(
@@ -633,6 +991,8 @@ export class SettingsPluginSection {
   }
 
   private renderPluginOmoSection(containerEl: HTMLElement, snapshot: PluginEnvironmentSnapshot): void {
+    containerEl.empty();
+
     const rows = [
       {
         label: t('settings.plugins.omo.pathLabel'),
@@ -659,8 +1019,8 @@ export class SettingsPluginSection {
     containerEl: HTMLElement,
     rows: Array<{ label: string; value: string }>,
   ): void {
-    containerEl.empty();
-    const listEl = containerEl.createDiv({ cls: 'opencodian-plugin-summary-list' });
+    const hostEl = containerEl.createDiv({ cls: 'opencodian-plugin-summary-list-host' });
+    const listEl = hostEl.createDiv({ cls: 'opencodian-plugin-summary-list' });
     for (const row of rows) {
       const rowEl = listEl.createDiv({ cls: 'opencodian-plugin-summary-row' });
       const labelEl = rowEl.createSpan({ cls: 'opencodian-plugin-summary-label' });
@@ -715,10 +1075,7 @@ export class SettingsPluginSection {
     }
 
     if (entries.length === 0) {
-      const emptyEl = groupEl.createDiv({
-        cls: 'opencodian-plugin-source-empty',
-      });
-      this.applyInlineCodeText(emptyEl, emptyText);
+      this.renderSourcePanelEmpty(groupEl, emptyText);
       return;
     }
 
@@ -782,12 +1139,11 @@ export class SettingsPluginSection {
     }
 
     if (allEntries.length === 0) {
-      const emptyEl = groupEl.createDiv({
-        cls: 'opencodian-plugin-source-empty',
-      });
-      this.applyInlineCodeText(emptyEl, emptyText);
+      this.renderSourcePanelEmpty(groupEl, emptyText);
       return;
     }
+
+    this.renderLocalOnlyLabel(groupEl);
 
     const listEl = groupEl.createDiv({ cls: 'opencodian-plugin-source-list' });
 
@@ -800,6 +1156,17 @@ export class SettingsPluginSection {
     for (const entry of disabledEntries) {
       this.renderManagedEntryRow(listEl, { entry, disabled: true, kind, pluginService, refresh });
     }
+  }
+
+  private renderLocalOnlyLabel(containerEl: HTMLElement): void {
+    if (this.plugin.settings.server.mode !== 'remote') {
+      return;
+    }
+    containerEl.createDiv({
+      cls: 'opencodian-plugin-local-only-label',
+      attr: { 'data-local-only': 'true' },
+      text: t('settings.plugins.localOnly.label'),
+    });
   }
 
   private renderManagedEntryRow(
@@ -816,6 +1183,7 @@ export class SettingsPluginSection {
     const rowEl = listEl.createDiv({
       cls: `opencodian-plugin-source-item${disabled ? ' is-plugin-disabled' : ''}`,
     });
+    this.renderLocalOnlyLabel(rowEl);
 
     // Toggle checkbox
     const toggleLabel = rowEl.createEl('label', { cls: 'opencodian-plugin-toggle' });
