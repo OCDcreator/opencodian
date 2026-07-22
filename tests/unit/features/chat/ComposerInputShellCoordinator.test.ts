@@ -740,6 +740,60 @@ describe('ComposerInputShellCoordinator submit gating and keyboard', () => {
   });
 });
 
+describe('ComposerInputShellCoordinator — image preview and drag feedback', () => {
+  const originalResizeObserver = globalThis.ResizeObserver;
+
+  beforeEach(() => {
+    installCoordinatorDomMocks();
+    installImageEventDomMocks();
+  });
+
+  afterEach(() => {
+    restoreCoordinatorDomMocks(originalResizeObserver);
+  });
+
+  it('clears the release affordance when an image leaves the conversation surface', () => {
+    const fixture = createFixture({ hasImageInputCapability: true });
+    const imageFile = createImageFile('leave.png', 'image/png');
+
+    fixture.surfaceRoot.dispatchEvent(createDragEvent('dragover', [imageFile]));
+    expect(fixture.surfaceRoot.classList.contains('is-image-drag-over')).toBe(true);
+
+    fixture.surfaceRoot.dispatchEvent(new DragEvent('dragleave', { bubbles: true }));
+    expect(fixture.surfaceRoot.classList.contains('is-image-drag-over')).toBe(false);
+  });
+
+  it('opens a preview from a composer image chip and restores focus on Escape', async () => {
+    const fixture = createFixture({ hasImageInputCapability: true });
+    fixture.textarea.dispatchEvent(createPasteEvent([createImageFile('preview.png', 'image/png')]));
+    await flushAsync();
+    flushAnimationFrames();
+
+    const previewButton = fixture.container.querySelector<HTMLButtonElement>(
+      '.opencodian-composer-image-chip-preview',
+    );
+    previewButton?.focus();
+    previewButton?.click();
+
+    const preview = document.querySelector<HTMLElement>('.opencodian-image-preview-backdrop');
+    expect(preview?.querySelector('img')?.getAttribute('alt')).toBe('preview.png');
+    const closeButton = preview?.querySelector<HTMLButtonElement>('.opencodian-image-preview-close');
+    expect(document.activeElement).toBe(closeButton);
+
+    // Obsidian consumes Escape on window before the event reaches document.
+    // The overlay must listen on the same capture target and still close.
+    window.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    }, { capture: true, once: true });
+    closeButton?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(document.querySelector('.opencodian-image-preview-backdrop')).toBeNull();
+    expect(document.activeElement).toBe(previewButton);
+  });
+});
+
 describe('ComposerInputShellCoordinator — capability hint behaviors', () => {
   const originalResizeObserver = globalThis.ResizeObserver;
 
@@ -1615,8 +1669,12 @@ function createPasteEvent(files: File[]): ClipboardEvent {
 }
 
 function createDropEvent(files: File[]): DragEvent {
+  return createDragEvent('drop', files);
+}
+
+function createDragEvent(type: string, files: File[]): DragEvent {
   const dataTransfer = buildDataTransfer(files);
-  return new DragEvent('drop', {
+  return new DragEvent(type, {
     bubbles: true,
     cancelable: true,
     dataTransfer,
@@ -1694,6 +1752,28 @@ describe('ComposerInputShellCoordinator — image paste and drag-drop', () => {
     expect(fixture.container.querySelector('.opencodian-composer-image-chip-thumb')?.getAttribute('alt')).toBe('drop.jpg');
     // Drop should be prevented to avoid browser opening the file
     expect(dropEvent.defaultPrevented).toBe(true);
+  });
+
+  it('accepts image drops anywhere in the conversation surface and shows the release affordance', async () => {
+    const fixture = createFixture({ hasImageInputCapability: true });
+    const imageFile = createImageFile('whole-surface.png', 'image/png');
+    const dragOverEvent = createDragEvent('dragover', [imageFile]);
+
+    fixture.surfaceRoot.dispatchEvent(dragOverEvent);
+
+    expect(dragOverEvent.defaultPrevented).toBe(true);
+    expect(fixture.surfaceRoot.classList.contains('opencodian-image-drop-surface')).toBe(true);
+    expect(fixture.surfaceRoot.classList.contains('is-image-drag-over')).toBe(true);
+    expect(fixture.surfaceRoot.dataset.imageDropLabel).toBe('Release to attach image');
+
+    const dropEvent = createDropEvent([imageFile]);
+    fixture.surfaceRoot.dispatchEvent(dropEvent);
+    await flushAsync();
+    flushAnimationFrames();
+
+    expect(dropEvent.defaultPrevented).toBe(true);
+    expect(fixture.surfaceRoot.classList.contains('is-image-drag-over')).toBe(false);
+    expect(fixture.container.querySelectorAll('.opencodian-composer-image-chip')).toHaveLength(1);
   });
 
   it('ignores dropped non-image files', async () => {
@@ -1802,6 +1882,24 @@ describe('ComposerInputShellCoordinator — image paste and drag-drop', () => {
     flushAnimationFrames();
 
     expect(fixture.container.querySelectorAll('.opencodian-composer-image-chip').length).toBe(0);
+  });
+
+  it('sends an image-only prompt without requiring placeholder text', async () => {
+    const fixture = createFixture({ hasImageInputCapability: true });
+    const imageFile = createImageFile('image-only.png', 'image/png');
+    fixture.textarea.dispatchEvent(createPasteEvent([imageFile]));
+    await flushAsync();
+    flushAnimationFrames();
+
+    fixture.textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    flushAnimationFrames();
+
+    expect(fixture.host.submitMessage).toHaveBeenCalledWith(expect.objectContaining({
+      kind: 'prompt',
+      content: '',
+      images: [expect.objectContaining({ filename: 'image-only.png', mediaType: 'image/png' })],
+    }));
+    expect(fixture.container.querySelectorAll('.opencodian-composer-image-chip')).toHaveLength(0);
   });
 
   it('removes individual image chips after paste', async () => {

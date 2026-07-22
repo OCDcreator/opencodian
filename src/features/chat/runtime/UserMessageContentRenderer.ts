@@ -1,6 +1,7 @@
 import type { ChatMessage, CompactionDividerMeta } from '../../../core/types';
 import { t } from '../../../i18n';
 import { type CollapsibleState,setupCollapsible } from '../rendering/collapsible';
+import { openImagePreview } from '../ui/ImagePreviewOverlay';
 import {
   applyUserMessageTextHighlightSpans,
   extractUserMessageTextHighlightSpans,
@@ -106,13 +107,26 @@ export class UserMessageContentRenderer {
     const galleryEl = container.createDiv({ cls: 'opencodian-user-image-gallery' });
 
     for (const image of images) {
-      const wrapperEl = galleryEl.createDiv({ cls: 'opencodian-user-image-wrapper' });
+      const wrapperEl = galleryEl.createEl('button', {
+        cls: 'opencodian-user-image-wrapper',
+        attr: {
+          type: 'button',
+          'aria-label': t('chat.image.openPreview'),
+        },
+      });
+      const src = `data:${image.mediaType};base64,${image.data}`;
       wrapperEl.createEl('img', {
         cls: 'opencodian-user-image-thumb',
         attr: {
-          src: `data:${image.mediaType};base64,${image.data}`,
-          alt: image.filename ?? 'Attached image',
+          src,
+          alt: image.filename ?? t('chat.image.untitledImage'),
         },
+      });
+      wrapperEl.addEventListener('click', () => {
+        openImagePreview({
+          src,
+          alt: image.filename ?? t('chat.image.untitledImage'),
+        });
       });
     }
   }

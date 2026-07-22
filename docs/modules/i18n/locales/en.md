@@ -173,6 +173,10 @@ Composer popover 新增 `chat.composerPopover.closeHint`，并与既有 navigate
 
 2026-05-21 Debug IA 更新新增 `settings.debug.tab.plugin` / `opencode` / `claudeCode` / `export`、`settings.debug.modules.*` 来源分组说明、`settings.debug.modules.claudeCode.*` 和 `settings.debug.export.*` 文案，用于把插件内部诊断、OpenCode 后端诊断、Claude Code SDK 摘要诊断和导出/控制台帮助分开展示。后续 Claude Code 调试工作台又补充 `settings.debug.claude.*`，覆盖状态条、summary-only 隐私说明、模块总开关、六个日志通道、最近日志预览、复制当前 Claude 日志和复制 Claude 专属诊断报告。
 
+## 2026-07-22 Image attachment copy
+
+新增 `chat.image.*` 键：附加/移除图片、打开/关闭预览、会话级拖放释放提示、读取失败与未命名图片替代文本。文案与中文 locale 保持一一对应，并为 icon-only 预览/关闭按钮提供 aria label。
+
 ## 导入关系
 
 ```text

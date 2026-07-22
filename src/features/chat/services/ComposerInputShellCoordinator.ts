@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- This owner keeps composer textarea, @agent selector, slash menu, and layout sync together because they share DOM, focus, and overlay lifecycle. */
-import { setIcon } from 'obsidian';
+import { Notice, setIcon } from 'obsidian';
 
 import {
   createPromptSuggestionChannel,
@@ -13,6 +13,7 @@ import type { SlashCommandMenuItem } from '../../../core/config/slashCommandCata
 import type { ImageAttachment, SlashCommandSkillMode } from '../../../core/types';
 import { t } from '../../../i18n';
 import { createLogger } from '../../../shared';
+import { openImagePreview } from '../ui/ImagePreviewOverlay';
 import { type AgentMentionCandidate, AgentMentionComposerController } from './AgentMentionComposerController';
 import { ChatAgentSelectionCoordinator } from './ChatAgentSelectionCoordinator';
 import {
@@ -168,6 +169,7 @@ export class ComposerInputShellCoordinator {
   private imageChipContainerEl: HTMLElement | null = null;
   private attachedImages: ImageAttachment[] = [];
   private fileInputEl: HTMLInputElement | null = null;
+  private imageDropSurfaceEl: HTMLElement | null = null;
 
   constructor(private readonly host: ComposerInputShellCoordinatorHost) {
     this.agentMentionController = new AgentMentionComposerController({
@@ -352,40 +354,10 @@ export class ComposerInputShellCoordinator {
       });
       document.body.appendChild(this.fileInputEl);
 
-      // Drag-and-drop of images onto the composer shell (capability-gated)
-      this.composerShellEl.addEventListener('dragover', (event) => {
-        if (this.isComposerInteractionDisabled()) {
-          return;
-        }
-        // Only show drop intent when files contain at least one image
-        const files = event.dataTransfer?.files;
-        if (files && this.filterImageFiles(files).length > 0) {
-          event.preventDefault();
-          event.dataTransfer!.dropEffect = 'copy';
-          this.composerShellEl?.addClass('is-drag-over');
-        }
-      });
-      this.composerShellEl.addEventListener('dragleave', (event) => {
-        if (!this.composerShellEl?.contains(event.relatedTarget as Node)) {
-          this.composerShellEl?.removeClass('is-drag-over');
-        }
-      });
-      this.composerShellEl.addEventListener('drop', (event) => {
-        this.composerShellEl?.removeClass('is-drag-over');
-        if (this.isComposerInteractionDisabled()) {
-          return;
-        }
-        const files = event.dataTransfer?.files;
-        if (!files || files.length === 0) {
-          return;
-        }
-        const imageFiles = this.filterImageFiles(files);
-        if (imageFiles.length === 0) {
-          return;
-        }
-        event.preventDefault();
-        void this.processImageFiles(imageFiles);
-      });
+      // The entire conversation surface accepts images, not just the compact
+      // composer card. It is intentionally mounted on the chat root so users
+      // can drop while reading a turn and receive an explicit release affordance.
+      this.installImageDropSurface();
     }
 
     this.sendBtnEl = this.composerSubmitControlsEl.createEl('button', {
@@ -715,6 +687,7 @@ export class ComposerInputShellCoordinator {
 
   destroy(): void {
     this.clearScheduledLayoutSync();
+    this.teardownImageDropSurface();
     this.inputContainerResizeObserver?.disconnect();
     this.inputContainerResizeObserver = null;
     this.syncComposerAvailabilityObserver(false);
@@ -867,8 +840,12 @@ export class ComposerInputShellCoordinator {
       this.host.getComposerInputMode(),
       mentionIntents,
       selectedAgentId,
+    ) ?? (
+      this.host.getComposerInputMode() === 'prompt' && this.attachedImages.length > 0
+        ? { kind: 'prompt' as const, content: '' }
+        : null
     );
-    if (!submission) {
+    if (submission === null) {
       return;
     }
 
@@ -1389,12 +1366,17 @@ export class ComposerInputShellCoordinator {
       if (!mediaType) {
         continue;
       }
-      const data = await this.readFileAsBase64(file);
-      this.attachedImages.push({
-        data,
-        mediaType,
-        filename: file.name,
-      });
+      try {
+        const data = await this.readFileAsBase64(file);
+        this.attachedImages.push({
+          data,
+          mediaType,
+          filename: file.name,
+        });
+      } catch (error) {
+        logger.warn('Failed to read image attachment', { filename: file.name, error });
+        new Notice(t('chat.image.readFailed'));
+      }
     }
 
     this.renderImageChips();
@@ -1459,17 +1441,26 @@ export class ComposerInputShellCoordinator {
         cls: 'opencodian-composer-image-chip',
       });
 
-      const thumbEl = chipEl.createEl('img', {
+      const previewButton = chipEl.createEl('button', {
+        cls: 'opencodian-composer-image-chip-preview',
+        attr: {
+          type: 'button',
+          'aria-label': t('chat.image.openPreview'),
+        },
+      });
+      previewButton.createEl('img', {
         cls: 'opencodian-composer-image-chip-thumb',
         attr: {
           src: `data:${image.mediaType};base64,${image.data}`,
-          alt: image.filename ?? 'Attached image',
+          alt: image.filename ?? t('chat.image.untitledImage'),
         },
       });
-      thumbEl.style.width = '48px';
-      thumbEl.style.height = '48px';
-      thumbEl.style.objectFit = 'cover';
-      thumbEl.style.borderRadius = '4px';
+      previewButton.addEventListener('click', () => {
+        openImagePreview({
+          src: `data:${image.mediaType};base64,${image.data}`,
+          alt: image.filename ?? t('chat.image.untitledImage'),
+        });
+      });
 
       const removeBtn = chipEl.createEl('button', {
         cls: 'opencodian-composer-image-chip-remove',
@@ -1492,6 +1483,76 @@ export class ComposerInputShellCoordinator {
     this.imageChipContainerEl?.remove();
     this.imageChipContainerEl = null;
   }
+
+  private installImageDropSurface(): void {
+    const surface = this.inputContainerEl?.parentElement ?? this.inputContainerEl;
+    if (!surface) {
+      return;
+    }
+
+    this.imageDropSurfaceEl = surface;
+    surface.addClass('opencodian-image-drop-surface');
+    surface.dataset.imageDropLabel = t('chat.image.dropToAttach');
+    surface.addEventListener('dragover', this.handleImageDropDragOver);
+    surface.addEventListener('dragleave', this.handleImageDropDragLeave);
+    surface.addEventListener('drop', this.handleImageDrop);
+  }
+
+  private teardownImageDropSurface(): void {
+    const surface = this.imageDropSurfaceEl;
+    if (!surface) {
+      return;
+    }
+
+    surface.removeEventListener('dragover', this.handleImageDropDragOver);
+    surface.removeEventListener('dragleave', this.handleImageDropDragLeave);
+    surface.removeEventListener('drop', this.handleImageDrop);
+    surface.removeClass('opencodian-image-drop-surface', 'is-image-drag-over');
+    delete surface.dataset.imageDropLabel;
+    this.imageDropSurfaceEl = null;
+  }
+
+  private readonly handleImageDropDragOver = (event: DragEvent): void => {
+    if (this.isComposerInteractionDisabled()) {
+      return;
+    }
+
+    const files = event.dataTransfer?.files;
+    if (!files || this.filterImageFiles(files).length === 0) {
+      return;
+    }
+
+    event.preventDefault();
+    event.dataTransfer!.dropEffect = 'copy';
+    this.imageDropSurfaceEl?.addClass('is-image-drag-over');
+  };
+
+  private readonly handleImageDropDragLeave = (event: DragEvent): void => {
+    const surface = this.imageDropSurfaceEl;
+    if (!surface?.contains(event.relatedTarget as Node)) {
+      surface?.removeClass('is-image-drag-over');
+    }
+  };
+
+  private readonly handleImageDrop = (event: DragEvent): void => {
+    this.imageDropSurfaceEl?.removeClass('is-image-drag-over');
+    if (this.isComposerInteractionDisabled()) {
+      return;
+    }
+
+    const files = event.dataTransfer?.files;
+    if (!files || files.length === 0) {
+      return;
+    }
+
+    const imageFiles = this.filterImageFiles(files);
+    if (imageFiles.length === 0) {
+      return;
+    }
+
+    event.preventDefault();
+    void this.processImageFiles(imageFiles);
+  };
 
 }
 

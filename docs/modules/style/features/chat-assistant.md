@@ -25,6 +25,13 @@
 - Structured Output 可折叠渲染：`.opencodian-structured-output-details`、`.opencodian-structured-output-summary`、`.opencodian-structured-output-body`、`.opencodian-structured-output-pre`、`.opencodian-structured-output-code`，用于在 assistant message 底部展示从 `backend_event` 捕获的结构化输出 JSON。
 - 动画：`opencodian-spin`、`opencodian-todo-pulse`、若干玻璃态 hover 过渡。
 
+## 图片附件样式（2026-07-22）
+
+- `.opencodian-composer-image-chips`、`.opencodian-composer-image-chip-*`：输入框内紧凑、可预览且可移除的缩略图；图片按钮有明确 focus-visible 状态。
+- `.opencodian-user-image-gallery`、`.opencodian-user-image-wrapper`：已发送图片的自适应 gallery，不超过消息可用宽度。
+- `.opencodian-image-drop-surface.is-image-drag-over::after`：会话区域的 release-to-attach affordance；overlay 不截获拖放事件，并在 reduced-motion 下禁用过渡。
+- `.opencodian-image-preview-*`：body 层 dialog/backdrop，支持窄侧栏、原图 contain 和关闭按钮，不受 chat 滚动容器裁切。
+
 ## 关联 TS 组件
 
 - `src/features/chat/OpenCodianView.ts`

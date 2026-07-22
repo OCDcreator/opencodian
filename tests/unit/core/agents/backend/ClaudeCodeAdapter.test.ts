@@ -193,6 +193,7 @@ describe('ClaudeCodeAdapter', () => {
     // getSessionContextUsageSnapshot() converts raw SDK getContextUsage() to
     // ContextUsageSnapshot for the existing chat ContextRing pipeline.
     expect(adapter.hasCapability(AgentCapability.Context)).toBe(true);
+    expect(adapter.hasCapability(AgentCapability.Images)).toBe(true);
   });
 
   it('returns normalized supported models from the SDK', async () => {
@@ -1167,6 +1168,7 @@ describe('ClaudeCodeAdapter', () => {
     }));
     await expect(collectAsync(call.prompt)).resolves.toEqual([{
       type: 'user',
+      parent_tool_use_id: null,
       message: { role: 'user', content: 'hello' },
     }]);
 
@@ -1377,6 +1379,7 @@ describe('ClaudeCodeAdapter', () => {
     const prompts = await collectAsync(call.prompt);
     expect(prompts).toEqual([{
       type: 'user',
+      parent_tool_use_id: null,
       message: {
         role: 'user',
         content: 'You MUST return your complete response ONLY through the StructuredOutput tool using the provided JSON schema. Do NOT output markdown code blocks, JSON fences, explanations, or any conversational text outside the structured output.\n\nsay hello',
@@ -1408,6 +1411,7 @@ describe('ClaudeCodeAdapter', () => {
     const prompts = await collectAsync(call.prompt);
     expect(prompts).toEqual([{
       type: 'user',
+      parent_tool_use_id: null,
       message: { role: 'user', content: 'say hello' },
     }]);
   });
@@ -1443,6 +1447,7 @@ describe('ClaudeCodeAdapter', () => {
     await expect(nextFrom(prompts[0])).resolves.toEqual({
       value: {
         type: 'user',
+        parent_tool_use_id: null,
         message: { role: 'user', content: 'first' },
       },
       done: false,
@@ -1471,6 +1476,7 @@ describe('ClaudeCodeAdapter', () => {
     await expect(nextFrom(prompts[1])).resolves.toEqual({
       value: {
         type: 'user',
+        parent_tool_use_id: null,
         message: { role: 'user', content: 'second' },
       },
       done: false,
@@ -1518,6 +1524,7 @@ describe('ClaudeCodeAdapter', () => {
     await expect(nextFrom(prompts[0])).resolves.toEqual({
       value: {
         type: 'user',
+        parent_tool_use_id: null,
         message: { role: 'user', content: 'first' },
       },
       done: false,
@@ -1552,6 +1559,7 @@ describe('ClaudeCodeAdapter', () => {
     await expect(nextFrom(prompts[0])).resolves.toEqual({
       value: {
         type: 'user',
+        parent_tool_use_id: null,
         message: { role: 'user', content: 'second' },
       },
       done: false,

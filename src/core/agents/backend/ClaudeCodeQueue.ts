@@ -4,9 +4,35 @@
  * @module claude-code-queue
  */
 
-export interface ClaudeCodeQueuedPrompt {
+import type { SDKUserMessage } from '@anthropic-ai/claude-agent-sdk';
+
+import type { ImageAttachment } from '../../types';
+
+type ClaudeCodeImagePromptBlock = {
+  type: 'image';
+  source: {
+    type: 'base64';
+    media_type: ImageAttachment['mediaType'];
+    data: string;
+  };
+};
+
+type ClaudeCodeTextPromptBlock = {
+  type: 'text';
+  text: string;
+};
+
+export type ClaudeCodePromptContent = string | Array<ClaudeCodeTextPromptBlock | ClaudeCodeImagePromptBlock>;
+
+/**
+ * The narrow, SDK-compatible subset that OpenCodian places on a persistent
+ * Claude Agent SDK input stream. Images use Anthropic's base64 content block
+ * format, so ordinary text-only turns retain the SDK's string fast path.
+ */
+export interface ClaudeCodeQueuedPrompt extends SDKUserMessage {
   type: 'user';
-  message: { role: 'user'; content: string };
+  message: { role: 'user'; content: ClaudeCodePromptContent };
+  parent_tool_use_id: null;
 }
 
 export interface ClaudeCodeSessionRuntime {
@@ -88,13 +114,31 @@ export function createSessionId(): string {
   return `claude-code-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-export function createUserPrompt(prompt: string): ClaudeCodeQueuedPrompt {
+export function createUserPrompt(
+  prompt: string,
+  images: readonly ImageAttachment[] = [],
+): ClaudeCodeQueuedPrompt {
+  const content: ClaudeCodePromptContent = images.length === 0
+    ? prompt
+    : [
+      ...(prompt.length > 0 ? [{ type: 'text' as const, text: prompt }] : []),
+      ...images.map((image): ClaudeCodeImagePromptBlock => ({
+        type: 'image',
+        source: {
+          type: 'base64',
+          media_type: image.mediaType,
+          data: image.data,
+        },
+      })),
+    ];
+
   return {
     type: 'user',
     message: {
       role: 'user',
-      content: prompt,
+      content,
     },
+    parent_tool_use_id: null,
   };
 }
 

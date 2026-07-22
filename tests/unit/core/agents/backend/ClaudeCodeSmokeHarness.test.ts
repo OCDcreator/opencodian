@@ -230,6 +230,42 @@ describe('ClaudeCode smoke harness', () => {
     }));
   });
 
+  it('encodes an image-only turn as official Claude SDK base64 content blocks', async () => {
+    const sdk = createMockSdk([
+      systemInit('sdk-session-image'),
+      resultSuccess('sdk-session-image'),
+    ]);
+    const { adapter, sessionId } = await createStartedAdapter(sdk);
+
+    await collectChunks(adapter.sendMessage({
+      sessionId,
+      content: '',
+      images: [{
+        data: 'aW1hZ2UtYnl0ZXM=',
+        mediaType: 'image/png',
+        filename: 'diagram.png',
+      }],
+    }));
+
+    const input = sdk.query.mock.calls[0]?.[0].prompt as AsyncIterable<unknown>;
+    const queuedPrompt = await input[Symbol.asyncIterator]().next();
+    expect(queuedPrompt.value).toEqual({
+      type: 'user',
+      parent_tool_use_id: null,
+      message: {
+        role: 'user',
+        content: [{
+          type: 'image',
+          source: {
+            type: 'base64',
+            media_type: 'image/png',
+            data: 'aW1hZ2UtYnl0ZXM=',
+          },
+        }],
+      },
+    });
+  });
+
   it('streams thinking before final text', async () => {
     const sdk = createMockSdk([
       systemInit('sdk-session-thinking'),

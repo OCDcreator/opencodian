@@ -7,6 +7,10 @@
 
 `UserMessageContentRenderer` 是 user message body 的 DOM 组装模块。它把 visible text 渲染、context attachment chips、attached image gallery、OMO user injection 面板，以及 compaction divider 的渲染从 `OpenCodianView` 中抽出。
 
+## 已发送图片（2026-07-22）
+
+`renderUserMessageContent()` 在消息持久化的 `images` 存在时渲染 gallery。每张缩略图都是有可访问名称的按钮，点击复用 `ImagePreviewOverlay` 打开 data-URI 原图预览；这不会影响上下文附件 chip 或用户文本渲染。
+
 ## 公开接口
 
 - `UserMessageContentRenderer.renderUserMessageContent(container, message)`：在指定 content 容器内组装 user message body，返回 visible text

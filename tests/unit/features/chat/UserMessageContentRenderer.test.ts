@@ -291,6 +291,12 @@ describe('UserMessageContentRenderer.renderUserMessageContent', () => {
     expect(img).not.toBeNull();
     expect(img?.getAttribute('src')).toBe('data:image/png;base64,iVBORw0KGgo=');
     expect(img?.getAttribute('alt')).toBe('test.png');
+
+    (gallery?.querySelector<HTMLButtonElement>('.opencodian-user-image-wrapper'))?.click();
+    const preview = document.querySelector<HTMLElement>('.opencodian-image-preview-backdrop');
+    expect(preview?.querySelector('img')?.getAttribute('src')).toBe('data:image/png;base64,iVBORw0KGgo=');
+    preview?.querySelector<HTMLButtonElement>('.opencodian-image-preview-close')?.click();
+    expect(document.querySelector('.opencodian-image-preview-backdrop')).toBeNull();
   });
 });
 

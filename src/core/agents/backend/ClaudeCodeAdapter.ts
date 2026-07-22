@@ -253,7 +253,7 @@ rl.on('line', (line) => {
 `;
 
 export interface ClaudeCodeSdkQueryInput {
-  prompt: string | AsyncIterable<unknown>;
+  prompt: string | AsyncIterable<ClaudeCodeQueuedPrompt>;
   options: ClaudeCodeSdkOptionsShape;
 }
 
@@ -976,6 +976,10 @@ const CLAUDE_CODE_PHASE1_CAPABILITIES: BackendCapabilities = Object.freeze(
     AgentCapability.Thinking,
     AgentCapability.FileOps,
     AgentCapability.Shell,
+    // The official Claude Agent SDK accepts SDKUserMessage.message.content as
+    // Anthropic base64 image blocks. Keep this capability aligned with the
+    // ClaudeCodeQueue transport so the shared composer can expose image input.
+    AgentCapability.Images,
     // Productized 2026-06-07: Claude uses TaskCreate/TaskUpdate/TaskList/TaskGet/
     // TaskOutput/TaskStop (NOT TodoWrite). The SessionTodoCoordinator derives
     // task state from TaskCreate/TaskUpdate tool traffic and feeds the existing
@@ -4594,7 +4598,7 @@ export class ClaudeCodeAdapter
     const promptContent = hasOutputFormat
       ? `You MUST return your complete response ONLY through the StructuredOutput tool using the provided JSON schema. Do NOT output markdown code blocks, JSON fences, explanations, or any conversational text outside the structured output.\n\n${request.content}`
       : request.content;
-    const prompt = createUserPrompt(promptContent);
+    const prompt = createUserPrompt(promptContent, request.images);
     session.messages.push(prompt);
     let runtime: ClaudeCodeSessionRuntime;
     try {

@@ -28,6 +28,14 @@
 - `destroy()` 时移除 stamped scope (`removePromptSuggestionScope`) 并删除 channel (`deletePromptSuggestionChannel`)，防止 teardown 后残留 DOM attribute 导致 stale cross-talk
 - suggestion chip 在以下路径自动隐藏：新用户 turn（`trySubmitCurrentInput` 调用 `clearActiveOnTurnStart`）、sink/backend 清除（`clearPromptSuggestionSink` 触发 `clearAll` + `renderSuggestionBar`）、coordinator destroy、session/conversation 切换
 
+## 图片附件（2026-07-22）
+
+- 仅在 active backend 声明图片能力时挂载图片按钮、文件选择、输入框粘贴和拖放监听。
+- 支持 JPEG、PNG、GIF、WebP；读取为 base64 后展示可移除的缩略图。单张读取失败只显示本地 notice，不会丢弃已成功附加的图片。
+- 会话级 drop surface 挂在 composer 输入区域的父容器，而不是小型 composer card；图片拖入时显示“松开以附加图片”，离开、销毁或放下后清理状态。
+- prompt 模式中，含图片但文字为空也会提交；图片由 `MessageSendPreparationService` 随同 prompt 进入 backend-aware send pipeline。
+- 缩略图为 button，点击交由 `ImagePreviewOverlay`；删除按钮保持独立，避免预览和移除互相抢占。
+
 ## 公开接口
 
 ```typescript
