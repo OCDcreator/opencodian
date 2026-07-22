@@ -43,6 +43,10 @@ export class SettingsCodexSection {
     this.accountSurface = new SettingsCodexAccountSurface({ plugin: this.plugin });
   }
 
+  dispose(): void {
+    this.accountSurface.dispose();
+  }
+
   attach(containerEl: HTMLElement): HTMLHeadingElement {
     const headingEl = this.createSectionHeading(
       containerEl,

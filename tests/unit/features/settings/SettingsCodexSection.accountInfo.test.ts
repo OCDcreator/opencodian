@@ -143,6 +143,90 @@ describe('SettingsCodexAccountSurface — account identity card', () => {
     expect(identityEl.textContent).toContain(t('settings.codex.accountSurface.identity.unavailable'));
   });
 
+  it('re-reads account cards when Codex becomes connected after the tab opens', async () => {
+    const statusHandlers = new Set<(status: string) => void>();
+    const getAccountInfo = jest.fn()
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ account: { type: 'chatgpt', email: 'ready@example.com' } });
+    const getAccountUsage = jest.fn()
+      .mockResolvedValueOnce({ usage: null })
+      .mockResolvedValueOnce({
+        usage: {
+          summary: { lifetimeTokens: 42 },
+          dailyUsageBuckets: [],
+        },
+      });
+    const getAccountRateLimits = jest.fn()
+      .mockResolvedValueOnce({ rateLimits: null })
+      .mockResolvedValueOnce({ rateLimits: { rateLimits: { requests_per_minute: 60 } } });
+    const getModelProviderCapabilities = jest.fn()
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ webSearch: true, imageGeneration: false, namespaceTools: true });
+    const plugin = createPlugin({
+      getAccountInfo,
+      getAccountUsage,
+      getAccountRateLimits,
+      getModelProviderCapabilities,
+      onStatusChange: jest.fn((handler: (status: string) => void) => {
+        statusHandlers.add(handler);
+        return { dispose: () => statusHandlers.delete(handler) };
+      }),
+    });
+    const surface = new SettingsCodexAccountSurface({ plugin: plugin as never });
+    const containerEl = document.createElement('div');
+    surface.attach(containerEl, 'env-or-chatgpt');
+    await flush();
+
+    const identityEl = containerEl.querySelector('[data-codex-identity-readback]')!;
+    const usageEl = containerEl.querySelector('[data-codex-usage-readback]')!;
+    const rateLimitsEl = containerEl.querySelector('[data-codex-rate-limits-readback]')!;
+    const capabilitiesEl = containerEl.querySelector('[data-codex-capabilities-readback]')!;
+    expect(identityEl.textContent).toContain(t('settings.codex.accountSurface.identity.unavailable'));
+    expect(usageEl.getAttribute('data-usage-state')).toBe('unavailable');
+    expect(rateLimitsEl.getAttribute('data-rate-limits-state')).toBe('unavailable');
+    expect(capabilitiesEl.getAttribute('data-capabilities-state')).toBe('unavailable');
+
+    for (const handler of statusHandlers) {
+      handler('connected');
+    }
+    await flush();
+
+    expect(getAccountInfo).toHaveBeenCalledTimes(2);
+    expect(getAccountUsage).toHaveBeenCalledTimes(2);
+    expect(getAccountRateLimits).toHaveBeenCalledTimes(2);
+    expect(getModelProviderCapabilities).toHaveBeenCalledTimes(2);
+    expect(identityEl.getAttribute('data-auth-mode')).toBe('chatgpt');
+    expect(identityEl.textContent).toContain('ready@example.com');
+    expect(usageEl.getAttribute('data-usage-state')).toBe('data');
+    expect(rateLimitsEl.getAttribute('data-rate-limits-state')).toBe('data');
+    expect(capabilitiesEl.getAttribute('data-capabilities-state')).toBe('data');
+  });
+
+  it('stops listening for Codex connection changes when the account tab is disposed', async () => {
+    const statusHandlers = new Set<(status: string) => void>();
+    const subscriptionDispose = jest.fn(() => statusHandlers.clear());
+    const getAccountInfo = jest.fn().mockResolvedValue(null);
+    const plugin = createPlugin({
+      getAccountInfo,
+      onStatusChange: jest.fn((handler: (status: string) => void) => {
+        statusHandlers.add(handler);
+        return { dispose: subscriptionDispose };
+      }),
+    });
+    const surface = new SettingsCodexAccountSurface({ plugin: plugin as never });
+    surface.attach(document.createElement('div'), 'env-or-chatgpt');
+    await flush();
+
+    surface.dispose();
+    for (const handler of statusHandlers) {
+      handler('connected');
+    }
+    await flush();
+
+    expect(subscriptionDispose).toHaveBeenCalledTimes(1);
+    expect(getAccountInfo).toHaveBeenCalledTimes(1);
+  });
+
   it('re-reads identity when the card refresh button is clicked', async () => {
     const getAccountInfo = jest.fn()
       .mockResolvedValueOnce({ account: { type: 'apiKey' }, requiresOpenaiAuth: true })

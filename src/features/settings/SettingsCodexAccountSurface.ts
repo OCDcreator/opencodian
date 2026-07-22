@@ -19,6 +19,7 @@
  *   - No login/logout/auth.json mutation happens here. Identity is read-only.
  */
 
+import type { AgentConnectionStatus, Disposable } from '../../core/agents/backend/AgentService';
 import type {
   AppServerAccountRateLimitsResult,
   AppServerAccountUsageResult,
@@ -55,6 +56,9 @@ type RateLimitsAdapter = {
 type CapabilitiesAdapter = {
   getModelProviderCapabilities?: () => Promise<AppServerModelProviderCapabilities | null>;
 };
+type StatusAwareAdapter = {
+  onStatusChange?: (handler: (status: AgentConnectionStatus) => void) => Disposable;
+};
 
 export class SettingsCodexAccountSurface {
   private readonly plugin: OpenCodianPlugin;
@@ -62,6 +66,7 @@ export class SettingsCodexAccountSurface {
   private usageOutputEl: HTMLElement | null = null;
   private rateLimitsOutputEl: HTMLElement | null = null;
   private capabilitiesOutputEl: HTMLElement | null = null;
+  private statusSubscription: Disposable | null = null;
 
   constructor(options: SettingsCodexAccountSurfaceOptions) {
     this.plugin = options.plugin;
@@ -72,6 +77,7 @@ export class SettingsCodexAccountSurface {
    * `authSource` is inferred once by the caller from the plugin apiKey field.
    */
   attach(containerEl: HTMLElement, authSource: CodexAuthSource): void {
+    this.dispose();
     this.identityOutputEl = this.createCard(
       containerEl,
       'identity',
@@ -98,7 +104,17 @@ export class SettingsCodexAccountSurface {
     );
 
     this.authSource = authSource;
+    this.subscribeToCodexConnection();
     void this.refreshAll();
+  }
+
+  dispose(): void {
+    this.statusSubscription?.dispose();
+    this.statusSubscription = null;
+    this.identityOutputEl = null;
+    this.usageOutputEl = null;
+    this.rateLimitsOutputEl = null;
+    this.capabilitiesOutputEl = null;
   }
 
   private authSource: CodexAuthSource = 'env-or-chatgpt';
@@ -157,6 +173,18 @@ export class SettingsCodexAccountSurface {
     void this.refreshCapabilities();
     void this.refreshUsage();
     void this.refreshRateLimits();
+  }
+
+  private subscribeToCodexConnection(): void {
+    const adapter = this.plugin.agentServiceRegistry?.get('codex') as StatusAwareAdapter | null;
+    if (typeof adapter?.onStatusChange !== 'function') {
+      return;
+    }
+    this.statusSubscription = adapter.onStatusChange((status) => {
+      if (status === 'connected') {
+        void this.refreshAll();
+      }
+    });
   }
 
   // ─── Identity card ──────────────────────────────────────────────

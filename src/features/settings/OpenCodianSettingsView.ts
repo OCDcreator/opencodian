@@ -17,6 +17,7 @@ import type OpenCodianPlugin from '../../main';
 import { SettingsAcpSection } from './SettingsAcpSection';
 import { SettingsAgentsSection } from './SettingsAgentsSection';
 import { SettingsClaudeCodeSection } from './SettingsClaudeCodeSection';
+import { SettingsCodexSection } from './SettingsCodexSection';
 import { SettingsCommandsSection } from './SettingsCommandsSection';
 import { SettingsConversationSection } from './SettingsConversationSection';
 import { SettingsDebugSection } from './SettingsDebugSection';
@@ -68,6 +69,7 @@ export class OpenCodianSettingsView extends ItemView {
   private uiSection: SettingsUiSection | null = null;
   private debugSection: SettingsDebugSection | null = null;
   private serverSection: SettingsServerSection | null = null;
+  private codexSection: SettingsCodexSection | null = null;
   private claudeCodeSection: SettingsClaudeCodeSection | null = null;
   private mcpSection: SettingsMcpSection | null = null;
   private securitySection: SettingsSecuritySection | null = null;
@@ -240,6 +242,7 @@ export class OpenCodianSettingsView extends ItemView {
       notifyModelCatalogStatus: () => { this.refreshModelCatalogStatusCallback?.(); },
       setModelCatalogStatusCallback: (cb) => { this.refreshModelCatalogStatusCallback = cb; },
       setServerSection: (section) => { this.serverSection = section; },
+      setCodexSection: (section) => { this.codexSection = section; },
       setMcpSection: (section) => { this.mcpSection = section; },
       setModelSection: (section) => { this.modelSection = section; },
       setPluginSection: (section) => { this.pluginSection = section; },
@@ -534,12 +537,14 @@ export class OpenCodianSettingsView extends ItemView {
     this.uiSection?.dispose();
     this.debugSection?.dispose();
     this.serverSection?.dispose();
+    this.codexSection?.dispose();
     this.mcpSection?.dispose();
     this.securitySection?.dispose();
     this.formatterSection?.dispose();
     this.userSection?.dispose();
     this.userSection = null;
     this.serverSection = null;
+    this.codexSection = null;
     this.mcpSection = null;
     this.securitySection = null;
     this.formatterSection = null;

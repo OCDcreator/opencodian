@@ -67,6 +67,7 @@ export interface TabRendererDependencies {
   notifyModelCatalogStatus: () => void;
   setModelCatalogStatusCallback: (cb: (() => void) | undefined) => void;
   setServerSection: (section: SettingsServerSection | null) => void;
+  setCodexSection: (section: SettingsCodexSection | null) => void;
   setMcpSection: (section: SettingsMcpSection | null) => void;
   setModelSection: (section: SettingsModelSection | null) => void;
   setPluginSection: (section: SettingsPluginSection | null) => void;
@@ -403,6 +404,7 @@ export class SettingsTabbedRenderer {
       plugin: this.deps.plugin,
       createSectionHeading: (hostEl, title, tooltip) => this.deps.createHeading(hostEl, title, tooltip),
     });
+    this.deps.setCodexSection(codexSection);
     codexSection.attachTabbed(containerEl, secondaryTabId);
   }
 

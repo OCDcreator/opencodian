@@ -65,7 +65,7 @@ The Account tab also exposes the shared cost-estimate entry. It uses the app-ser
 - Owns the wired settings controls (`apiKey`, `model`, `sandboxMode`, `modelReasoningEffort`, `additionalDirectories`, `networkAccessEnabled`, `webSearchMode`) inside the **Connection** tab and applies live adapter updates via `applyCodexRuntimeUpdates()`
 - Renders a lightweight connection-source summary instead of a disabled "Authentication" setting
 - Delegates the remaining live runtime readbacks to `SettingsCodexReadbackControls` inside the **Resume & inspect** tab
-- Mounts the four account/capability product cards via `SettingsCodexAccountSurface` inside the **Account** tab, passing the inferred `authSource` derived from the plugin `apiKey` field
+- Mounts the four account/capability product cards via `SettingsCodexAccountSurface` inside the **Account** tab, passing the inferred `authSource` derived from the plugin `apiKey` field; the section disposes the account surface during settings re-render so its Codex connection subscription cannot outlive the visible tab
 
 ## Boundaries
 
