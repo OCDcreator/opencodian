@@ -47,7 +47,10 @@ describe('Chat header status chip style contract', () => {
     expect(badgeRule).toMatch(/position:\s*absolute/);
     expect(badgeRule).toMatch(/inset-inline-end:\s*calc\(100%\s*-\s*28px\)/);
     expect(badgeTooltipRule).toMatch(/position:\s*absolute/);
-    expect(expandedBadgeRule).toMatch(/width:\s*min\(220px,\s*48vw\)/);
+    expect(expandedBadgeRule).toMatch(
+      /width:\s*min\(var\(--opencodian-server-status-expanded-width\),\s*220px,\s*48vw\)/,
+    );
+    expect(expandedBadgeRule).toMatch(/padding-inline:\s*8px\s+14px/);
     expect(expandedBadgeRule).toMatch(/z-index:\s*8/);
   });
 
@@ -61,6 +64,8 @@ describe('Chat header status chip style contract', () => {
 
     expect(statusTextRule).not.toMatch(/text-overflow:\s*ellipsis/);
     expect(statusTextRule).toMatch(/max-width\s+0\.16s/);
-    expect(expandedTextRule).toMatch(/max-width:\s*calc\(min\(220px,\s*48vw\)\s*-\s*44px\)/);
+    expect(expandedTextRule).toMatch(
+      /max-width:\s*calc\(\s*min\(var\(--opencodian-server-status-expanded-width\),\s*220px,\s*48vw\)\s*-\s*var\(--opencodian-server-status-inline-chrome-width\)\s*\)/,
+    );
   });
 });

@@ -41,12 +41,10 @@ const SERVER_STATUS_KEY_BY_AVAILABILITY: Record<ChatServerAvailability, ServerSt
   offline: 'chat.serverStatus.offline',
   external: 'chat.serverStatus.external',
 };
-
-const BACKEND_STATUS_ICON_ASSET_PATH_BY_KIND: Partial<Record<AgentBackendKind, string>> = {
-  codex: 'assets/provider-icons/opencode/openai.svg',
-  copilot: 'assets/provider-icons/opencode/github-copilot.svg',
-  pi: 'assets/provider-icons/opencode/perplexity.svg',
-};
+const SERVER_STATUS_LABEL_FALLBACK_GLYPH_WIDTH_PX = 7;
+const SERVER_STATUS_INLINE_CHROME_WIDTH_PX = 46;
+const SERVER_STATUS_MIN_EXPANDED_WIDTH_PX = 72;
+const SERVER_STATUS_MAX_EXPANDED_WIDTH_PX = 220;
 
 function readOpenCodianPlugin(): unknown {
   try {
@@ -452,27 +450,8 @@ export class ChatHeaderPresenter {
     this.serverStatusIconEl.removeClass('has-svg-icon', 'has-inline-brandmark', 'has-lobehub-icon');
     this.serverStatusIconEl.style.removeProperty('--opencodian-server-status-icon-url');
     this.serverStatusIconEl.empty();
-    if (kind === 'opencode') {
-      const brandmarkEl = this.serverStatusIconEl.createSpan({
-        cls: 'opencodian-server-status-icon-brandmark',
-        attr: { 'aria-hidden': 'true' },
-      });
-      brandmarkEl.innerHTML = this.getLogoSvg();
-      this.serverStatusIconEl.addClass('has-inline-brandmark');
-      return;
-    }
-    if (kind === 'claude-code') {
-      renderAgentSwitcherBackendIcon(this.serverStatusIconEl, kind);
-      this.serverStatusIconEl.addClass('has-lobehub-icon');
-      return;
-    }
-    this.serverStatusIconEl.createSpan({ cls: 'opencodian-server-status-icon-fallback', text: 'O' });
-    const iconUrl = this.resolveBackendStatusIconUrl(kind);
-    if (iconUrl) {
-      this.serverStatusIconEl.addClass('has-svg-icon');
-      this.serverStatusIconEl.style.setProperty('--opencodian-server-status-icon-url', `url("${iconUrl}")`);
-      return;
-    }
+    renderAgentSwitcherBackendIcon(this.serverStatusIconEl, kind);
+    this.serverStatusIconEl.addClass('has-lobehub-icon');
   }
 
   private getServerStatusLabel(availability: ChatServerAvailability): string {
@@ -515,7 +494,16 @@ export class ChatHeaderPresenter {
     this.serverStatusTextEl.setText(label);
     const visibleGlyphCount = Array.from(label.trim() || label).length;
     const clampedGlyphCount = Math.min(Math.max(visibleGlyphCount, 2), 22);
-    const expandedWidthPx = Math.min(220, Math.max(72, 48 + clampedGlyphCount * 7));
+    const measuredTextWidthPx = this.serverStatusTextEl.scrollWidth;
+    const fallbackTextWidthPx = clampedGlyphCount * SERVER_STATUS_LABEL_FALLBACK_GLYPH_WIDTH_PX;
+    const intrinsicTextWidthPx = measuredTextWidthPx > 0 ? measuredTextWidthPx : fallbackTextWidthPx;
+    const expandedWidthPx = Math.min(
+      SERVER_STATUS_MAX_EXPANDED_WIDTH_PX,
+      Math.max(
+        SERVER_STATUS_MIN_EXPANDED_WIDTH_PX,
+        Math.ceil(intrinsicTextWidthPx) + SERVER_STATUS_INLINE_CHROME_WIDTH_PX,
+      ),
+    );
     this.serverStatusBadgeEl.style.setProperty(
       '--opencodian-server-status-label-ch',
       clampedGlyphCount.toString(),
@@ -526,22 +514,9 @@ export class ChatHeaderPresenter {
     );
   }
 
-  private resolveBackendStatusIconUrl(kind: AgentBackendKind): string | null {
-    const assetPath = BACKEND_STATUS_ICON_ASSET_PATH_BY_KIND[kind];
-    if (!assetPath) {
-      return null;
-    }
-
-    return this.host.resolveAssetUrl(assetPath);
-  }
-
   private syncThemeAssets(): void {
     if (this.logoContainerEl) {
       this.logoContainerEl.innerHTML = this.getLogoSvg();
-    }
-
-    if (this.serverStatusIconEl && this.getActiveBackendKind() === 'opencode') {
-      this.updateServerStatusIcon('opencode');
     }
 
     if (!this.titleWordmarkEl) {

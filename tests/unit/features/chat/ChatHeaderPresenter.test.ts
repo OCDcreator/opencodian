@@ -78,23 +78,22 @@ function createFixture() {
   };
 }
 
-describe('ChatHeaderPresenter', () => {
-  beforeEach(() => {
+beforeEach(() => {
     HTMLElement.prototype.hide = jest.fn(function (this: HTMLElement) {
       this.style.display = 'none';
     });
     HTMLElement.prototype.show = jest.fn(function (this: HTMLElement) {
       this.style.display = '';
     });
-  });
+});
 
-  afterEach(() => {
+afterEach(() => {
     document.body.innerHTML = '';
     document.body.classList.remove('theme-dark');
     jest.clearAllMocks();
-  });
+});
 
-  describe('header shell and actions', () => {
+describe('ChatHeaderPresenter header shell and actions', () => {
     it('builds the header shell and routes header actions through host callbacks', () => {
       const fixture = createFixture();
 
@@ -226,7 +225,7 @@ describe('ChatHeaderPresenter', () => {
     expect(statusTextEl?.getAttribute('aria-hidden')).toBe('true');
   });
 
-  it('renders the OpenCode brandmark inside the compact status badge', async () => {
+  it('reuses Settings LobeHub backend icons inside the compact status badge', async () => {
     const fixture = createFixture();
 
     await fixture.presenter.refreshServerStatusBadge();
@@ -238,14 +237,16 @@ describe('ChatHeaderPresenter', () => {
     expect(statusIconEl?.getAttribute('data-icon')).toBe('inline-start');
     expect(statusIconEl?.getAttribute('aria-hidden')).toBe('true');
     expect(statusIconEl?.getAttribute('data-backend-icon')).toBe('opencode');
-    expect(statusIconEl?.classList.contains('has-inline-brandmark')).toBe(true);
+    expect(statusIconEl?.classList.contains('has-inline-brandmark')).toBe(false);
+    expect(statusIconEl?.classList.contains('has-svg-icon')).toBe(false);
+    expect(statusIconEl?.classList.contains('has-lobehub-icon')).toBe(true);
+    expect(statusIconEl?.querySelector('.opencodian-server-status-icon-brandmark')).toBeNull();
     expect(statusIconEl?.style.getPropertyValue('--opencodian-server-status-icon-url')).toBe('');
-    expect(statusIconEl?.querySelector('.opencodian-server-status-icon-brandmark')?.innerHTML).toContain(
-      'clip0_light',
-    );
+    const openCodeIconEl = statusIconEl?.querySelector<HTMLElement>('.opencodian-agent-switcher-lobehub-icon');
+    expect(openCodeIconEl?.dataset.lobehubIcon).toBe('opencode');
     expect(statusStateEl?.parentElement).toBe(statusBadgeEl);
 
-    fixture.setOpenCodeBackend(false);
+    fixture.host.getActiveBackendKind.mockReturnValue('claude-code');
     await fixture.presenter.refreshServerStatusBadge();
 
     expect(statusIconEl?.getAttribute('data-backend-icon')).toBe('claude-code');
@@ -262,6 +263,18 @@ describe('ChatHeaderPresenter', () => {
     expect(
       claudeCodeIconEl?.querySelector<HTMLImageElement>('.opencodian-agent-switcher-lobehub-img--dark')?.src,
     ).toBe('https://unpkg.com/@lobehub/icons-static-webp@latest/dark/claudecode-color.webp');
+
+    fixture.host.getActiveBackendKind.mockReturnValue('codex');
+    await fixture.presenter.refreshServerStatusBadge();
+
+    expect(statusIconEl?.getAttribute('data-backend-icon')).toBe('codex');
+    expect(statusIconEl?.classList.contains('has-inline-brandmark')).toBe(false);
+    expect(statusIconEl?.classList.contains('has-svg-icon')).toBe(false);
+    expect(statusIconEl?.classList.contains('has-lobehub-icon')).toBe(true);
+    expect(statusIconEl?.querySelector('.opencodian-server-status-icon-brandmark')).toBeNull();
+    expect(statusIconEl?.style.getPropertyValue('--opencodian-server-status-icon-url')).toBe('');
+    const codexIconEl = statusIconEl?.querySelector<HTMLElement>('.opencodian-agent-switcher-lobehub-icon');
+    expect(codexIconEl?.dataset.lobehubIcon).toBe('codex');
   });
 
   it('marks the new-tab action for tab-disabled container CSS', () => {
@@ -306,6 +319,36 @@ describe('ChatHeaderPresenter', () => {
     expect(statusTextEl?.textContent).toBe(t('chat.serverStatus.disabled'));
   });
 
+});
+
+describe('ChatHeaderPresenter status-chip width', () => {
+  it('sizes the expanded status chip from the rendered label width instead of glyph count', async () => {
+    const fixture = createFixture();
+    const statusBadgeEl = fixture.headerEl.querySelector<HTMLElement>('.opencodian-server-status-badge');
+    const statusTextEl = fixture.headerEl.querySelector<HTMLElement>('.opencodian-server-status-text');
+    const codexConnected = t('chat.serverStatus.backendConnected', { backend: 'Codex' });
+    const claudeCodeConnected = t('chat.serverStatus.backendConnected', { backend: 'Claude Code' });
+
+    Object.defineProperty(statusTextEl, 'scrollWidth', {
+      configurable: true,
+      get: () => statusTextEl?.textContent === codexConnected ? 75 : 114,
+    });
+    fixture.setOpenCodeBackend(false);
+    fixture.host.getActiveBackendKind.mockReturnValue('codex');
+    fixture.host.getActiveBackendDisplayName?.mockReturnValue('Codex');
+    fixture.setAvailability('running');
+
+    await fixture.presenter.refreshServerStatusBadge();
+
+    expect(statusTextEl?.textContent).toBe(codexConnected);
+    expect(statusBadgeEl?.style.getPropertyValue('--opencodian-server-status-expanded-width')).toBe('121px');
+
+    fixture.host.getActiveBackendKind.mockReturnValue('claude-code');
+    fixture.host.getActiveBackendDisplayName?.mockReturnValue('Claude Code');
+    await fixture.presenter.refreshServerStatusBadge();
+
+    expect(statusTextEl?.textContent).toBe(claudeCodeConnected);
+    expect(statusBadgeEl?.style.getPropertyValue('--opencodian-server-status-expanded-width')).toBe('160px');
   });
 });
 
