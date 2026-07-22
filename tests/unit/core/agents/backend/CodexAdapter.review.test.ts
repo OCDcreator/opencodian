@@ -110,6 +110,7 @@ describe('CodexAdapter.startReview', () => {
 
   it('returns null when no app-server client is available', async () => {
     const adapter = new CodexAdapter({
+      createAppServerClient: () => null,
       createCodex: jest.fn().mockResolvedValue(createMockCodex()),
     });
     await adapter.start();

@@ -20,6 +20,7 @@
 @import 'components/settings-capability-lab.css';
 @import 'components/settings-claude-code.css';
 @import 'components/settings-codex-account.css';
+@import 'components/settings-model-pricing.css';
 @import 'features/chat-user.css';
 @import 'features/chat-assistant.css';
 @import 'modals/delete-confirm-dialog.css';

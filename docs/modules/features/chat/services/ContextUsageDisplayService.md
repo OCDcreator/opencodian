@@ -14,6 +14,7 @@
 - 生成 display token breakdown（precise 优先，estimated fallback）
 - 根据 system prompt、messages、parts 与 content blocks 估算输入侧 context breakdown
 - 在估算 token 超过真实 input tokens 时按比例缩放，并补齐 `other`
+- 精确状态优先使用 backend 的 `preciseTokens.total` 作为圆环分子；未知 cache-write/cost 显示 `-`，不会显示为 `0`
 
 ## 公开接口
 

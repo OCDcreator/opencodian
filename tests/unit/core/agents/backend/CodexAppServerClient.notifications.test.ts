@@ -162,4 +162,35 @@ describe('CodexAppServerClient notification handlers', () => {
 
     expect(handler).not.toHaveBeenCalled();
   });
+
+  it('subscribes only to notifications for its requested thread and disposes cleanly', async () => {
+    const client = await createInitializedClient();
+    const handler = jest.fn();
+    const subscription = client.subscribeToThreadNotifications('thread-1', handler);
+
+    mockWsInstance.onmessage?.({ data: JSON.stringify({
+      jsonrpc: '2.0',
+      method: 'thread/tokenUsage/updated',
+      params: { threadId: 'other-thread', tokenUsage: {} },
+    }) });
+    mockWsInstance.onmessage?.({ data: JSON.stringify({
+      jsonrpc: '2.0',
+      method: 'thread/tokenUsage/updated',
+      params: { threadId: 'thread-1', tokenUsage: { total: { totalTokens: 42 } } },
+    }) });
+
+    expect(handler).toHaveBeenCalledTimes(1);
+    expect(handler).toHaveBeenCalledWith({
+      method: 'thread/tokenUsage/updated',
+      params: { threadId: 'thread-1', tokenUsage: { total: { totalTokens: 42 } } },
+    });
+
+    subscription.dispose();
+    mockWsInstance.onmessage?.({ data: JSON.stringify({
+      jsonrpc: '2.0',
+      method: 'turn/completed',
+      params: { threadId: 'thread-1', turn: { id: 'turn-1' } },
+    }) });
+    expect(handler).toHaveBeenCalledTimes(1);
+  });
 });

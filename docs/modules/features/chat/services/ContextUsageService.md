@@ -26,14 +26,21 @@ export interface ContextUsageSnapshot {
   providerId: string | null;
   modelId: string | null;
   contextWindow: number;
+  totalTokens: number;
   inputTokens: number;
   outputTokens: number;
   reasoningTokens: number;
   cacheReadTokens: number;
-  cacheWriteTokens: number;
-  totalCost: number;
+  cacheWriteTokens: number | null;
+  totalCost: number | null;
+  costDetails?: ContextCostDetails | null;
+  billingUsage?: ContextBillingUsage | null;
 }
 ```
+
+`totalTokens` 是后端明确提供时的权威累计数，优先于各分项合成；`null` 表示 backend 没有报告 cache-write 或 cost。身份同步一旦发现 session ID 变化，就清除旧 session 的 precise/estimated/cost 状态，随后才可能恢复新 conversation 持久化的快照。
+
+`billingUsage` 是和 context-window 计数分离的可计费 request ledger，当前由 Claude Code 的 terminal result 填充；`costDetails` 保留 backend-reported、models.dev、user-override 或 unavailable 的来源、完整度与可选计费 endpoint。服务不自行决定单价，而是让 coordinator 的 pricing owner 传回 enriched snapshot。
 
 `ContextUsageSummary` 仍从本模块 re-export，但实际由 `ContextUsageDisplayService` 定义和生成。
 
@@ -55,8 +62,11 @@ export interface ContextUsageSnapshot {
 `contextWindow` 优先级是：
 
 1. 显式传入的 `contextWindow`
-2. `getDefaultContextWindow(modelId)`
-3. `0`
+2. 同一模型下已保存的正数窗口（例如 Codex app-server 的权威快照在插件重载后恢复）
+3. 模型切换或空窗口时的 `getDefaultContextWindow(modelId)`
+4. `0`
+
+因此，模型 hydration 只传回 model ID 而没有新的正数窗口时，不能把已恢复的 app-server 权威值覆盖成插件本地的模型默认值；模型确实变化时才允许重新采用新模型的默认窗口。
 
 ### streaming 增量
 
@@ -71,7 +81,7 @@ export interface ContextUsageSnapshot {
 - `estimatedInputTokens = input + cacheRead + cacheWrite`
 - `estimatedOutputTokens = output + reasoning`
 
-如果有 `totalCost`，也会同步到 state。`applyUsageSnapshot()` 先同步 identity（含 `compactingAt`），再复用这条 precise usage 路径。
+如果有 `totalCost`，也会同步到 state。`applyUsageSnapshot()` 先同步 identity（含 `compactingAt`），再复用这条 precise usage 路径。`applyBillingUsage()` 对 request ID 去重并累加 Claude 的分类 token，`applyCostSnapshot()` 只写入由 pricing owner 计算完成的成本字段，避免把 context-window 的累计 input 误当账单 input。
 
 ### compaction live state
 

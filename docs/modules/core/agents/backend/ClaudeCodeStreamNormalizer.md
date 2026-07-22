@@ -11,6 +11,7 @@
 
 - 接收 SDK-style `system`、`assistant`、`user`、`content_block_delta`、`result` message/event
 - 将文本、thinking、tool use、tool result、usage、error 映射到现有 `StreamChunk`
+- 对终态 `result.total_usage`，除保留上下文 usage chunk 外，还生成 `billingUsage` 分类（input、raw output、reasoning、cache read/write）；它是成本估算的独立 request ledger，不能用 assistant message 的上下文累计数替代。非终态 usage 不生成 ledger，避免重复计费。
 - 将 SDK message 上的 `session_id` 写入 `message_metadata.sessionId`，供 adapter 和发送持久化链路捕获真实 Claude session identity
 - 遇到带 `uuid` 字段的 SDK `type: 'user'` message 时，通过 `appendUserMessageIdentityChunk()` 产出 `user_message_identity` chunk，把 Claude SDK user message identity 传给发送持久化链路
 - 将 SDK `prompt_suggestion` 消息映射为 `StreamChunk { type: 'prompt_suggestion', suggestion, uuid, sessionId }`，供后结果回调通道使用

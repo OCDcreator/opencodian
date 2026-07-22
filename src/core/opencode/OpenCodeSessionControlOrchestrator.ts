@@ -200,6 +200,12 @@ export class OpenCodeSessionControlOrchestrator {
       // Fall back to raw IDs when model catalog is unavailable
     }
 
+    const inputTokens = session.tokens?.input ?? 0;
+    const outputTokens = session.tokens?.output ?? 0;
+    const reasoningTokens = session.tokens?.reasoning ?? 0;
+    const cacheReadTokens = session.tokens?.cache?.read ?? 0;
+    const cacheWriteTokens = session.tokens?.cache?.write ?? null;
+
     return {
       sessionId,
       sessionTitle: session.title,
@@ -211,12 +217,13 @@ export class OpenCodeSessionControlOrchestrator {
       modelId: rawMId,
       modelName,
       contextWindow,
-      inputTokens: session.tokens?.input ?? 0,
-      outputTokens: session.tokens?.output ?? 0,
-      reasoningTokens: session.tokens?.reasoning ?? 0,
-      cacheReadTokens: session.tokens?.cache?.read ?? 0,
-      cacheWriteTokens: session.tokens?.cache?.write ?? 0,
-      totalCost: session.cost ?? 0,
+      totalTokens: inputTokens + outputTokens + reasoningTokens + cacheReadTokens + (cacheWriteTokens ?? 0),
+      inputTokens,
+      outputTokens,
+      reasoningTokens,
+      cacheReadTokens,
+      cacheWriteTokens,
+      totalCost: typeof session.cost === 'number' ? session.cost : null,
     };
   }
 
@@ -229,10 +236,10 @@ export class OpenCodeSessionControlOrchestrator {
       this.host.getAvailableModels(),
     ]);
 
-    const totalCost = messages.reduce(
-      (sum, message) => sum + (message.info.role === 'assistant' ? (message.info.cost ?? 0) : 0),
-      0,
-    );
+    const assistantMessages = messages.filter((message) => message.info.role === 'assistant');
+    const totalCost = assistantMessages.every((message) => typeof message.info.cost === 'number')
+      ? assistantMessages.reduce((sum, message) => sum + (message.info.cost ?? 0), 0)
+      : null;
 
     const latestAssistantWithTokens = OpenCodeSessionControlOrchestrator.findLatestAssistantWithTokens(messages);
     const rawPId = latestAssistantWithTokens?.info.providerID ?? null;
@@ -240,6 +247,12 @@ export class OpenCodeSessionControlOrchestrator {
     const provider = rawPId ? providersResult.providers.find((p) => p.id === rawPId) : undefined;
     const model = provider && rawMId ? provider.models.find((m) => m.id === rawMId) : undefined;
     const tokens = latestAssistantWithTokens?.info.tokens;
+
+    const inputTokens = tokens?.input ?? 0;
+    const outputTokens = tokens?.output ?? 0;
+    const reasoningTokens = tokens?.reasoning ?? 0;
+    const cacheReadTokens = tokens?.cache?.read ?? 0;
+    const cacheWriteTokens = tokens?.cache?.write ?? null;
 
     return {
       sessionId,
@@ -252,11 +265,12 @@ export class OpenCodeSessionControlOrchestrator {
       modelId: rawMId,
       modelName: model?.name ?? rawMId,
       contextWindow: model?.contextWindow ?? 0,
-      inputTokens: tokens?.input ?? 0,
-      outputTokens: tokens?.output ?? 0,
-      reasoningTokens: tokens?.reasoning ?? 0,
-      cacheReadTokens: tokens?.cache?.read ?? 0,
-      cacheWriteTokens: tokens?.cache?.write ?? 0,
+      totalTokens: inputTokens + outputTokens + reasoningTokens + cacheReadTokens + (cacheWriteTokens ?? 0),
+      inputTokens,
+      outputTokens,
+      reasoningTokens,
+      cacheReadTokens,
+      cacheWriteTokens,
       totalCost,
     };
   }

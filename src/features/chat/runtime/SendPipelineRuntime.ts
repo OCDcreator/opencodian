@@ -101,6 +101,7 @@ export interface SendPipelineHostDependencies {
   beginTabContextUsageStream(tabId: import('../tabs').TabId | null): void;
   completeTabContextUsageStream(tabId: import('../tabs').TabId | null): void;
   applyUsageChunkToTab: SendPipelineHost['applyUsageChunkToTab'];
+  applyContextUsageSnapshotToTab: SendPipelineHost['applyContextUsageSnapshotToTab'];
   showPermissionDialog: SendPipelineHost['showPermissionDialog'];
   showQuestionDialog: SendPipelineHost['showQuestionDialog'];
   convertToStreamingChunk: SendPipelineHost['convertToStreamingChunk'];
@@ -141,6 +142,8 @@ export function createSendPipelineRuntimeHost(deps: SendPipelineHostDependencies
     beginTabContextUsageStream: (tabId) => deps.beginTabContextUsageStream(tabId),
     completeTabContextUsageStream: (tabId) => deps.completeTabContextUsageStream(tabId),
     applyUsageChunkToTab: (tabId, chunk) => deps.applyUsageChunkToTab(tabId, chunk),
+    applyContextUsageSnapshotToTab: (tabId, snapshot) =>
+      deps.applyContextUsageSnapshotToTab(tabId, snapshot),
     showPermissionDialog: (request, tabId) => deps.showPermissionDialog(request, tabId),
     showQuestionDialog: (request, tabId) => deps.showQuestionDialog(request, tabId),
     convertToStreamingChunk: (chunk) => deps.convertToStreamingChunk(chunk),

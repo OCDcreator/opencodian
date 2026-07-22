@@ -1,6 +1,8 @@
 # English Locale
 
 > **源码**: `src/i18n/locales/en.ts`
+> **Updated**: 2026-07-22 local cost estimates — models.dev automatically refreshes on first/stale use and model IDs match by default; Provider + optional Base URL + model support exact third-party price overrides without changing Claude/Codex request routing.
+> **最近更新**: 2026-07-22 Codex context availability — added upgrade guidance explaining that only an app-server with thread token-usage notifications can enable the real per-session Context Ring; account usage remains a separate surface.
 > **最近更新**: 2026-07-21 SDK 1.18.3 plugin evidence copy refinement — added `settings.plugins.evidence.fetchRefreshing` to honestly distinguish in-flight `config.get()` refresh from idle/ready/error; `settings.plugins.evidence.*` keys remain for effective config / runtime IDs / transport state, `settings.plugins.source.*` for config source provenance, and `settings.plugins.remoteNotice` / `settings.plugins.localOnly.label` for remote-mode honesty.
 >
 > **Previously**: 2026-07-21 Subagent nesting depth — added `settings.agents.subagentDepth.name` / `.desc` / `.useDefault` / `.disableAll` for the new Settings → Agents dropdown that writes the OpenCode 1.18.3 `subagent_depth` field (blank = server default 1, 0 = disable all subagents, 1-5 = explicit nesting).

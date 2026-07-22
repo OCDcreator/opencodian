@@ -13,6 +13,14 @@ Codex backend settings panel. Uses three secondary tabs under the Codex primary 
 
 The old disabled "Authentication" setting is replaced by the connection-source summary and an auth-source row inside the Account surface, so the UI never presents a disabled input as a status indicator.
 
+## Context availability
+
+The Context Ring is not configured from Account usage. It becomes available only after the local Codex app-server accepts the experimental API negotiation and can publish `thread/tokenUsage/updated`; otherwise the settings copy explains that upgrading Codex enables real session-context usage while SDK chat remains available.
+
+## Cost estimates
+
+The Account tab also exposes the shared cost-estimate entry. It uses the app-server's authoritative session tokens but not account usage. By default the returned model ID matches models.dev automatically; custom Codex providers only need the optional pricing Provider ID / Base URL when their gateway price differs or the model ID is ambiguous. These fields identify prices only and never write `~/.codex/config.toml`, `model_provider`, or `openai_base_url`.
+
 ## Exports
 
 | Export | Kind | Notes |

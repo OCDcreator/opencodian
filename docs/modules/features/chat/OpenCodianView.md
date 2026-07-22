@@ -13,6 +13,7 @@
 - 对话加载、发送、流式渲染和后台同步
 - 多标签页和按 tab 隔离的运行时状态
 - 模型、权限、effort、context usage 等工具栏控件
+- 动态 backend capability 刷新：Codex app-server 协商成功才挂载 Context Ring；协议不支持时会销毁旧 slot，保留聊天但不展示误导性的上下文百分比
 - 当前 session modified files 右侧浮动面板与 toolbar toggle 的 coordinator 装配；coordinator 会把浮动面板约束到 `.opencodian-container`，并在 tab/session 切换或 conversation load 后刷新当前 session diff entries
 - 文件/选区上下文附件、选区高亮保留
 - question / todo / background task / OMO notice 等辅助交互

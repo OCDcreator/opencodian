@@ -20,6 +20,7 @@ import type {
 const logger = createLogger('AgentServiceRegistry');
 
 type ActiveChangeHandler = (kind: AgentBackendKind | null) => void;
+type CapabilityChangeHandler = (kind: AgentBackendKind) => void;
 
 export class AgentServiceRegistry {
   private adapters = new Map<AgentBackendKind, AgentService>();
@@ -27,6 +28,8 @@ export class AgentServiceRegistry {
   private activeKind: AgentBackendKind | null = null;
 
   private activeChangeHandlers = new Set<ActiveChangeHandler>();
+  private capabilityChangeHandlers = new Set<CapabilityChangeHandler>();
+  private capabilitySubscriptions = new Map<AgentBackendKind, Disposable>();
 
   // -------------------------------------------------------------------------
   // Registration
@@ -45,8 +48,16 @@ export class AgentServiceRegistry {
       } catch {
         // Swallow cleanup errors on replace
       }
+      this.capabilitySubscriptions.get(adapter.kind)?.dispose();
+      this.capabilitySubscriptions.delete(adapter.kind);
     }
     this.adapters.set(adapter.kind, adapter);
+    if (adapter.onCapabilitiesChange) {
+      this.capabilitySubscriptions.set(
+        adapter.kind,
+        adapter.onCapabilitiesChange(() => this.notifyCapabilitiesChange(adapter.kind)),
+      );
+    }
     logger.debug(`Registered adapter: ${adapter.kind}`);
   }
 
@@ -63,6 +74,8 @@ export class AgentServiceRegistry {
       }
     }
     this.adapters.delete(kind);
+    this.capabilitySubscriptions.get(kind)?.dispose();
+    this.capabilitySubscriptions.delete(kind);
     this.enabledKinds.delete(kind);
     if (this.activeKind === kind) {
       this.activeKind = this.pickDefaultActive();
@@ -218,6 +231,11 @@ export class AgentServiceRegistry {
     return { dispose: () => this.activeChangeHandlers.delete(handler) };
   }
 
+  onCapabilitiesChange(handler: CapabilityChangeHandler): Disposable {
+    this.capabilityChangeHandlers.add(handler);
+    return { dispose: () => this.capabilityChangeHandlers.delete(handler) };
+  }
+
   // -------------------------------------------------------------------------
   // Dispose
   // -------------------------------------------------------------------------
@@ -231,9 +249,14 @@ export class AgentServiceRegistry {
       }
     }
     this.adapters.clear();
+    for (const subscription of this.capabilitySubscriptions.values()) {
+      subscription.dispose();
+    }
+    this.capabilitySubscriptions.clear();
     this.enabledKinds.clear();
     this.activeKind = null;
     this.activeChangeHandlers.clear();
+    this.capabilityChangeHandlers.clear();
   }
 
   // -------------------------------------------------------------------------
@@ -257,6 +280,16 @@ export class AgentServiceRegistry {
         handler(this.activeKind);
       } catch {
         // Swallow handler errors
+      }
+    }
+  }
+
+  private notifyCapabilitiesChange(kind: AgentBackendKind): void {
+    for (const handler of this.capabilityChangeHandlers) {
+      try {
+        handler(kind);
+      } catch {
+        // A UI subscriber must not break adapter lifecycle propagation.
       }
     }
   }

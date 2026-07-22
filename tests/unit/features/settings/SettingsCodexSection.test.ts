@@ -358,6 +358,7 @@ describe('SettingsCodexSection stable surface', () => {
 
     expect(settingNames).toEqual([
       t('settings.codex.sessionBrowser.launchName'),
+      t('settings.codex.contextUsage.name'),
       t('settings.codex.modelList.name'),
       t('settings.codex.permissionProfiles.name'),
       t('settings.codex.mcpServers.name'),

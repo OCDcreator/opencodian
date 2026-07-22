@@ -1666,12 +1666,13 @@ export class ClaudeCodeAdapter
       modelId: model,
       modelName: model,
       contextWindow: maxTokens,
+      totalTokens,
       inputTokens: totalTokens,
       outputTokens: 0,
       reasoningTokens: 0,
       cacheReadTokens: 0,
-      cacheWriteTokens: 0,
-      totalCost: 0,
+      cacheWriteTokens: null,
+      totalCost: null,
     };
   }
 

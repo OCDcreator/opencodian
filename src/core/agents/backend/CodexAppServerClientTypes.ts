@@ -25,6 +25,72 @@ export interface AppServerThread {
 export interface AppServerTurn {
   id: string;
   items: AppServerItem[];
+  status?: string;
+  error?: unknown;
+}
+
+/** Exact token figures supplied by `thread/tokenUsage/updated`. */
+export interface AppServerTokenUsageBreakdown {
+  totalTokens: number;
+  inputTokens: number;
+  cachedInputTokens: number;
+  outputTokens: number;
+  reasoningOutputTokens: number;
+}
+
+/** Per-thread token usage notification payload from the experimental API. */
+export interface AppServerThreadTokenUsage {
+  total: AppServerTokenUsageBreakdown;
+  last: AppServerTokenUsageBreakdown;
+  modelContextWindow: number | null;
+}
+
+export interface AppServerThreadTokenUsageUpdatedNotification {
+  threadId: string;
+  turnId: string;
+  tokenUsage: AppServerThreadTokenUsage;
+}
+
+export interface AppServerThreadStartOptions {
+  model?: string;
+  cwd?: string;
+  sandbox?: 'read-only' | 'workspace-write' | 'danger-full-access';
+  approvalPolicy?: 'untrusted' | 'on-request' | 'never';
+  config?: Record<string, unknown>;
+}
+
+export type AppServerThreadResumeOptions = AppServerThreadStartOptions;
+
+export interface AppServerTurnStartOptions {
+  threadId: string;
+  input: Array<
+    | { type: 'text'; text: string; text_elements: [] }
+    | { type: 'localImage'; path: string }
+  >;
+  cwd?: string;
+  approvalPolicy?: 'untrusted' | 'on-request' | 'never';
+  sandboxPolicy?:
+    | { type: 'dangerFullAccess' }
+    | { type: 'readOnly'; networkAccess: boolean }
+    | {
+      type: 'workspaceWrite';
+      writableRoots: string[];
+      networkAccess: boolean;
+      excludeTmpdirEnvVar: boolean;
+      excludeSlashTmp: boolean;
+    };
+  model?: string;
+  effort?: 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
+  outputSchema?: unknown;
+}
+
+export interface AppServerThreadNotification {
+  method: string;
+  params: unknown;
+}
+
+export interface AppServerNotificationSubscription {
+  dispose(): void;
 }
 
 /** Model shape from app-server model/list. */

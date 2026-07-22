@@ -116,6 +116,7 @@ describe('CodexAdapter.listSessions', () => {
   it('returns only in-memory sessions when app-server client is unavailable', async () => {
     const mockCodex = createMockCodex();
     const adapter = new CodexAdapter({
+      createAppServerClient: () => null,
       createCodex: jest.fn().mockResolvedValue(mockCodex),
     });
     await adapter.start();

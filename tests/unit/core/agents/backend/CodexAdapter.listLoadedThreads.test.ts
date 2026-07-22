@@ -69,6 +69,7 @@ describe('CodexAdapter.listLoadedThreads', () => {
   it('returns empty array when app-server client is not initialized', async () => {
     const mockCodex = createMockCodex();
     const adapter = new CodexAdapter({
+      createAppServerClient: () => null,
       createCodex: jest.fn().mockResolvedValue(mockCodex),
     });
     await adapter.start();

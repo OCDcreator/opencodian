@@ -30,6 +30,7 @@ async function createStartedAdapter(options?: { skipAppServer?: boolean }): Prom
   const mockCodex = createMockCodex();
   const adapter = new CodexAdapter({
     codexPathOverride: options?.skipAppServer ? undefined : '/path/to/codex',
+    createAppServerClient: options?.skipAppServer ? () => null : undefined,
     createCodex: async () => mockCodex as unknown as import('@openai/codex-sdk').Codex,
   });
   await adapter.start();

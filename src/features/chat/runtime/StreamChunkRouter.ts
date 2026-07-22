@@ -154,6 +154,14 @@ export class StreamChunkRouter {
       return true;
     }
 
+    if (chunk.type === 'context_usage') {
+      host.applyContextUsageSnapshotToTab(preparedSend.tabId, {
+        ...chunk.snapshot,
+        sessionTitle: chunk.snapshot.sessionTitle || preparedSend.conversation.title,
+      });
+      return true;
+    }
+
     if (chunk.type === 'message_metadata') {
       this.finalizedAssistantMetadata = chunk;
       this.trace.logStage('message-metadata-received', {

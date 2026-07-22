@@ -51,12 +51,15 @@ describe('CodexAdapter — app-server start/stop lifecycle', () => {
     expect(MockedCodexAppServerClient).toHaveBeenCalledWith({ codexPathOverride: '/mock/codex' });
   });
 
-  it('does not initialize app-server client when codexPathOverride is missing', async () => {
+  it('initializes app-server client with the default Codex binary when no override is configured', async () => {
     adapter = new CodexAdapter({
       createCodex: async () => ({}) as any,
     });
     await adapter.start();
-    expect(MockedCodexAppServerClient).not.toHaveBeenCalled();
+    expect(MockedCodexAppServerClient).toHaveBeenCalledWith({
+      codexPathOverride: undefined,
+      pluginDir: undefined,
+    });
   });
 
   it('continues even if app-server client fails to start', async () => {
@@ -211,4 +214,3 @@ describe('CodexAdapter — listSessions()', () => {
     expect((sessions[0] as any).id).toBe(sessionId);
   });
 });
-

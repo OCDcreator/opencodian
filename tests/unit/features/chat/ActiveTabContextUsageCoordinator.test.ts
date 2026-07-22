@@ -1,5 +1,8 @@
+/* eslint-disable max-lines-per-function -- Coordinator tests exercise one host contract across identity, snapshot persistence, and pricing enrichment. */
+
 import type { ResolvedModelSelection } from '../../../../src/core/config/modelConfig';
 import {
+  type ContextUsageSnapshot,
   createEmptyTabContextState,
   type TabContextState,
 } from '../../../../src/core/types';
@@ -72,6 +75,7 @@ function createHost(
     setTabContextUsage: jest.fn(),
     getActiveTabId: jest.fn().mockReturnValue('tab-1'),
     openContextUsageDetailsModal: jest.fn(),
+    persistContextUsageSnapshot: jest.fn().mockResolvedValue(undefined),
     ...overrides,
   };
 }
@@ -145,6 +149,7 @@ describe('ActiveTabContextUsageCoordinator identity and refresh', () => {
         modelId: 'gpt-5.4',
         modelName: 'GPT-5.4',
         contextWindow: 128000,
+        totalTokens: 189,
         inputTokens: 123,
         outputTokens: 45,
         reasoningTokens: 6,
@@ -171,6 +176,58 @@ describe('ActiveTabContextUsageCoordinator identity and refresh', () => {
     });
     expect(nextState.totalCost).toBe(0.12);
     expect(host.renderContextUsageIndicator).toHaveBeenCalledWith(nextState);
+  });
+
+  it('enriches authoritative snapshots before rendering and persisting a local cost estimate', () => {
+    const host = createHost({
+      enrichContextUsageSnapshot: jest.fn((snapshot) => ({
+        ...snapshot,
+        totalCost: 0.125,
+        costDetails: {
+          source: 'models-dev',
+          completeness: 'complete',
+          providerId: 'openai',
+          endpoint: null,
+          modelId: 'gpt-5.4',
+          rates: {
+            inputPerMillion: 1,
+            outputPerMillion: 2,
+            cacheReadPerMillion: 0.5,
+            cacheWritePerMillion: null,
+          },
+          catalogFetchedAt: 300,
+          usesBaseTier: false,
+          unavailableTokenKinds: [],
+        },
+      })),
+    });
+    const coordinator = new ActiveTabContextUsageCoordinator(host);
+
+    coordinator.applyContextUsageSnapshotToTab('tab-1', {
+      sessionId: 'session-1',
+      sessionTitle: 'Chat 1',
+      createdAt: 100,
+      updatedAt: 250,
+      compactingAt: null,
+      providerId: 'openai',
+      providerName: 'OpenAI',
+      modelId: 'gpt-5.4',
+      modelName: 'GPT-5.4',
+      contextWindow: 128000,
+      totalTokens: 20,
+      inputTokens: 10,
+      outputTokens: 10,
+      reasoningTokens: 0,
+      cacheReadTokens: 0,
+      cacheWriteTokens: null,
+      totalCost: null,
+    });
+
+    expect(host.enrichContextUsageSnapshot).toHaveBeenCalledTimes(1);
+    expect(host.setTabContextUsage).toHaveBeenCalledWith('tab-1', expect.objectContaining({
+      totalCost: 0.125,
+      costDetails: expect.objectContaining({ source: 'models-dev' }),
+    }));
   });
 
   it('ignores stale snapshots after the active conversation changes', async () => {
@@ -202,6 +259,7 @@ describe('ActiveTabContextUsageCoordinator identity and refresh', () => {
         modelId: 'gpt-5.4',
         modelName: 'GPT-5.4',
         contextWindow: 128000,
+        totalTokens: 189,
         inputTokens: 123,
         outputTokens: 45,
         reasoningTokens: 6,
@@ -218,7 +276,7 @@ describe('ActiveTabContextUsageCoordinator identity and refresh', () => {
     expect(host.renderContextUsageIndicator).not.toHaveBeenCalled();
   });
 
-  it('skips precise server refresh for Codex conversations', async () => {
+  it('restores the latest app-server-authoritative snapshot for Codex conversations', async () => {
     const host = createHost({
       getCurrentConversation: jest.fn().mockReturnValue({
         id: 'conversation-codex',
@@ -230,15 +288,31 @@ describe('ActiveTabContextUsageCoordinator identity and refresh', () => {
       }),
       getSessionContextUsageSnapshot: jest.fn().mockResolvedValue({
         sessionId: 'codex-session-1',
+        sessionTitle: 'Codex chat',
+        createdAt: 100,
+        updatedAt: 250,
+        providerId: 'openai',
+        providerName: 'OpenAI',
+        modelId: 'gpt-5.4',
+        modelName: 'GPT-5.4',
+        contextWindow: 128000,
+        totalTokens: 480,
+        inputTokens: 300,
+        outputTokens: 120,
+        reasoningTokens: 40,
+        cacheReadTokens: 20,
+        cacheWriteTokens: null,
+        totalCost: null,
       }),
     });
     const coordinator = new ActiveTabContextUsageCoordinator(host);
 
     await coordinator.refreshFromServer();
 
-    expect(host.getSessionContextUsageSnapshot).not.toHaveBeenCalled();
-    expect(host.setActiveTabContextUsage).not.toHaveBeenCalled();
-    expect(host.renderContextUsageIndicator).not.toHaveBeenCalled();
+    expect(host.getSessionContextUsageSnapshot).toHaveBeenCalledWith('codex-session-1');
+    const nextState = getCommittedState(host);
+    expect(nextState.preciseTokens?.total).toBe(480);
+    expect(nextState.percentage).toBe(0);
   });
 
   it('does not spam identical context usage refresh logs while polling an idle tab', async () => {
@@ -257,6 +331,7 @@ describe('ActiveTabContextUsageCoordinator identity and refresh', () => {
         modelId: 'gpt-5.4',
         modelName: 'GPT-5.4',
         contextWindow: 128000,
+        totalTokens: 189,
         inputTokens: 123,
         outputTokens: 45,
         reasoningTokens: 6,
@@ -415,5 +490,69 @@ describe('ActiveTabContextUsageCoordinator stream lifecycle', () => {
 
       expect(host.renderContextUsageIndicator).toHaveBeenCalledWith(null);
     });
+  });
+});
+
+describe('ActiveTabContextUsageCoordinator exact snapshot persistence', () => {
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  const snapshot: ContextUsageSnapshot = {
+    sessionId: 'session-1',
+    sessionTitle: 'Chat 1',
+    createdAt: 100,
+    updatedAt: 300,
+    providerId: 'openai',
+    providerName: 'OpenAI',
+    modelId: 'gpt-5.4',
+    modelName: 'GPT-5.4',
+    contextWindow: 128000,
+    totalTokens: 700,
+    inputTokens: 400,
+    outputTokens: 200,
+    reasoningTokens: 70,
+    cacheReadTokens: 30,
+    cacheWriteTokens: null,
+    totalCost: null,
+  };
+
+  it('persists the latest exact snapshot for the tab after throttling', () => {
+    jest.useFakeTimers();
+    const host = createHost();
+    const coordinator = new ActiveTabContextUsageCoordinator(host);
+
+    coordinator.applyContextUsageSnapshotToTab('tab-1', snapshot);
+    coordinator.applyContextUsageSnapshotToTab('tab-1', {
+      ...snapshot,
+      totalTokens: 760,
+      updatedAt: 350,
+    });
+    jest.runOnlyPendingTimers();
+
+    expect(host.persistContextUsageSnapshot).toHaveBeenCalledWith('tab-1', expect.objectContaining({
+      sessionId: 'session-1',
+      totalTokens: 760,
+    }));
+  });
+
+  it('uses a persisted snapshot during identity sync before the next app-server notification', () => {
+    const host = createHost({
+      getCurrentConversation: jest.fn().mockReturnValue({
+        id: 'conversation-1',
+        openCodeSessionId: 'session-1',
+        title: 'Chat 1',
+        createdAt: 100,
+        updatedAt: 200,
+        lastContextUsage: snapshot,
+      }),
+    });
+    const coordinator = new ActiveTabContextUsageCoordinator(host);
+
+    coordinator.syncIdentity();
+
+    const nextState = getCommittedState(host);
+    expect(nextState.preciseTokens?.total).toBe(700);
+    expect(nextState.totalCost).toBeNull();
   });
 });

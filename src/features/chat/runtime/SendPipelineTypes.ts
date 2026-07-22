@@ -107,6 +107,10 @@ export interface SendPipelineTransportPort {
     tabId: TabId | null,
     chunk: Extract<CoreStreamChunk, { type: 'usage' }>,
   ): void;
+  applyContextUsageSnapshotToTab(
+    tabId: TabId | null,
+    snapshot: Extract<CoreStreamChunk, { type: 'context_usage' }>['snapshot'],
+  ): void;
   showPermissionDialog(
     request: Extract<CoreStreamChunk, { type: 'permission_request' }>,
     tabId: TabId | null,
@@ -188,6 +192,7 @@ export type StreamChunkRouterHost =
     | 'beginTabContextUsageStream'
     | 'completeTabContextUsageStream'
     | 'applyUsageChunkToTab'
+    | 'applyContextUsageSnapshotToTab'
     | 'showPermissionDialog'
     | 'showQuestionDialog'
     | 'convertToStreamingChunk'

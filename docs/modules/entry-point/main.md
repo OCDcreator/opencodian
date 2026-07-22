@@ -8,7 +8,7 @@
 `main.ts` 定义 `OpenCodianPlugin`，是 Obsidian 侧的总装配点。它负责：
 
 - 初始化 `StorageService`，并通过 `src/core/types/settingsLoadNormalization.ts` 加载/迁移持久化设置
-- 创建 `OpenCodeService`、`OpencodeConfigManager`、`ModelConfigService`
+- 创建 `OpenCodeService`、`OpencodeConfigManager`、`ModelConfigService`、`ModelPricingService`
 - 在 `OpenCodianView` 注册前预加载会话元数据
 - 注册 ribbon、明暗主题自适应品牌图标、命令、设置页与视图
 - 协调主题外观、日志、诊断导出和本地 `.opencode` 权限配置同步
@@ -56,6 +56,7 @@ Codex 审批 host context 的入口级 wiring 保留在 `main.ts`：插件持有
 - `storage`: vault 侧持久化入口。
 - `openCodeService`: OpenCode 运行时门面。
 - `opencodeConfigManager` / `modelConfigService`: 只有拿到 vault 路径后才创建。
+- `modelPricingService`: 读取手动刷新的 models.dev 本地缓存，并为没有 backend 实际成本的 token snapshot 添加 API 等价估算；启动只读缓存，不自动联网。
 - `conversations`: 只在内存里缓存会话元数据；正文按需从 `StorageService.loadFullConversation()` 读取。
 - `themeBackgroundDataUrlCache` / `themeBackgroundDataUrlRequests`: 聊天背景图 data URL 缓存与并发去重。
 - `chatAppearanceSaveTimeoutId` / `settingsUiStateSaveTimeoutId`: 插件级设置保存节流句柄。
@@ -74,6 +75,7 @@ Codex 审批 host context 的入口级 wiring 保留在 `main.ts`：插件持有
 3. 注册品牌 icon。
 4. 创建并初始化 `StorageService`。
 5. 调用 `loadSettings()`，完成设置归一化与历史字段迁移。
+5a. 创建并加载 `ModelPricingService` 的缓存目录。该步骤只读取本地 `.opencodian/model-pricing.models-dev.json`；价格刷新必须由用户从 Settings 显式触发。
 6. 注册内置 glass adapter，并按设置启用/关闭调试日志。
 7. 设置 i18n locale。
 8. 从存储中读取上次保存的 `ManagedServerState`。

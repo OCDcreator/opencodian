@@ -12,6 +12,8 @@
 - 分层插件设置 JSON
 - 运行时状态 JSON
 - 主题背景图片资产（通过内部 `ThemeBackgroundStorage` owner）
+- 每个 conversation 最后一次已验证的 `lastContextUsage` 快照；它让插件重载后先显示可信的上下文数据，直到后端下一次权威通知覆盖
+- 自动更新且可手动刷新的 models.dev 模型价格目录；它只保存公开费率缓存，不保存 API key、账号用量或订阅信息
 
 源码里没有把这些数据写到 `.obsidian/plugins/opencodian/`；实际相对路径都是以 vault 根目录为基准。为了排查冷启动和首个 tab 打开过慢的问题，模块现在还会同时承担两件事：
 
@@ -65,6 +67,7 @@ class StorageService {
   settings.ui.json.bak
   settings.json
   runtime.json
+  model-pricing.models-dev.json
   sessions/
     {conversationId}.json
   session-metas/
@@ -81,6 +84,8 @@ class StorageService {
 - `.opencodian/theme-backgrounds`
 
 `settings.core.json` / `settings.ui.json` / `runtime.json` 都是按需首次写入时创建。
+
+`model-pricing.models-dev.json` 也按需创建，由 `loadModelPricingCatalog()` / `saveModelPricingCatalog()` 读写。`ModelPricingService` 会在首次使用和超过 24 小时时自动更新它，缓存独立于 settings envelope：用户覆盖仍属于 `settings.core.json`，目录刷新不会覆盖用户的单价。
 
 ### 会话持久化
 

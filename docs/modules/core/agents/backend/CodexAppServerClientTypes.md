@@ -10,6 +10,8 @@
 ## 职责
 
 - 定义 app-server JSON-RPC 路由的请求/响应 wire 类型（thread、model、permission、account、MCP、review、thread-goal 等）
+- 定义实验主聊天的 `AppServerThreadStartOptions`、`AppServerThreadResumeOptions`、`AppServerTurnStartOptions` 与 `AppServerThreadNotification`
+- 定义 `AppServerThreadTokenUsageUpdatedNotification`：`total` 是累计权威 token，`last` 是当前回合 token，`modelContextWindow` 是 Context Ring 分母
 - 定义 `AppServerItem` union（verified against real Codex app-server output）
 - 定义 `AppServerServerRequestHandler`（服务端发起 JSON-RPC 请求的 handler 签名，供 `CodexAppServerTransport` 使用）
 

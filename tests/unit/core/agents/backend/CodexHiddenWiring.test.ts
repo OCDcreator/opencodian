@@ -170,6 +170,7 @@ describe('Codex hidden wiring', () => {
       const mockCodex = createMockCodex();
       const adapter = new CodexAdapter({
         workingDirectory: '/tmp/vault',
+        createAppServerClient: () => null,
         createCodex: async () => mockCodex as unknown as import('@openai/codex-sdk').Codex,
       });
 
@@ -184,6 +185,7 @@ describe('Codex hidden wiring', () => {
       const mockCodex = createMockCodex();
       const adapter = new CodexAdapter({
         workingDirectory: '/tmp/vault',
+        createAppServerClient: () => null,
         createCodex: async () => mockCodex as unknown as import('@openai/codex-sdk').Codex,
       });
 

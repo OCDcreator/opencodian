@@ -103,6 +103,7 @@ describe('CodexAdapter approval bridge wiring', () => {
 
   it('does not register handlers when there is no app-server client', async () => {
     const adapter = new CodexAdapter({
+      createAppServerClient: () => null,
       createCodex: jest.fn().mockResolvedValue(createMockCodex()),
     });
     adapter.setApprovalHost({ collectApproval: jest.fn().mockResolvedValue(null) });

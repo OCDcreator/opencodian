@@ -30,6 +30,7 @@ function createAdapterOptions(
 ): CodexAdapterOptions & { _mockCodex: ReturnType<typeof createMockCodex> } {
   const mockCodex = createMockCodex();
   return {
+    createAppServerClient: () => null,
     createCodex: jest.fn().mockResolvedValue(mockCodex),
     ...overrides,
     _mockCodex: mockCodex,

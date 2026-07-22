@@ -34,6 +34,9 @@ export interface Disposable {
 /** Handler for adapter status changes. */
 export type StatusChangeHandler = (status: AgentConnectionStatus) => void;
 
+/** Handler for runtime capability changes (for example an optional protocol becoming ready). */
+export type CapabilityChangeHandler = (capabilities: BackendCapabilities) => void;
+
 /** Light-weight session summary returned by the registry. */
 export interface AgentServiceInfo {
   readonly kind: AgentBackendKind;
@@ -86,6 +89,12 @@ export interface AgentService {
 
   /** Subscribe to connection status changes. */
   onStatusChange(handler: StatusChangeHandler): Disposable;
+
+  /**
+   * Optional because most backends have a static capability set. Dynamic
+   * backends (Codex app-server) use this to let composer slots refresh.
+   */
+  onCapabilitiesChange?(handler: CapabilityChangeHandler): Disposable;
 }
 
 // ---------------------------------------------------------------------------

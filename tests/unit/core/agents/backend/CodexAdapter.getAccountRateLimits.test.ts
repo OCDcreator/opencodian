@@ -78,10 +78,10 @@ describe('CodexAdapter.getAccountRateLimits', () => {
   it('returns rateLimits null when app-server client is not initialized', async () => {
     const mockCodex = createMockCodex();
     const adapter = new CodexAdapter({
+      createAppServerClient: () => null,
       createCodex: jest.fn().mockResolvedValue(mockCodex),
     });
     await adapter.start();
-    // No codexPathOverride means no appServerClient
     const result = await adapter.getAccountRateLimits();
 
     expect(result).toEqual({ rateLimits: null });

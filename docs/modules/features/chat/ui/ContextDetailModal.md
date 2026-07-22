@@ -7,6 +7,8 @@
 
 Obsidian Modal，展示当前会话的上下文使用详情。包括会话元信息（标题、provider、model）、消息统计（总数/用户/助手）、Token 明细（input/output/reasoning/cache/cost）、上下文分段条形图（breakdown）、异步加载的原始消息区，以及时间戳。统计数据来源于 `ContextUsageService` 的 `summarize()`、`getDisplayTokenBreakdown()`、`getContextBreakdown()` 三个方法；原始消息由调用方通过懒加载回调提供。
 
+当后端没有报告 cache-write 或 cost 时，modal 将它们显示为 `-`。成本来源行会区分 OpenCode 已上报、models.dev 本地估算、本地单价覆盖、部分估算和基础档近似；有第三方计费身份时还显示 Base URL。Claude/Codex 的本地数值不是订阅账单。Codex 的 total/context window 均来自 app-server 的 thread token-usage 通知，不混入账号日/周用量。
+
 ## 导入关系
 上游: `obsidian`（Modal）、`Conversation`/`TabContextState`/`ContextBreakdownSegment`（core/types）、`i18n`、`ContextUsageService`
 下游: 被 `OpenCodianView` 或 `ContextRing` 的点击回调打开

@@ -8,6 +8,7 @@
 `src/core/config/index.ts` 是 `core/config` 目录的 barrel。它聚合配置层 service / state owner，并公开模型目录影子比较的稳定类型与纯函数。
 
 - `ModelConfigService`
+- `ModelPricingService`
 - `ModelCatalogStateService`
 - `OpencodeConfigManager`
 - `PluginManagementService`
@@ -26,6 +27,8 @@
 ```typescript
 export { ModelConfigService } from './ModelConfigService';
 export type { ModelCatalogBundle, ProviderDirectorySnapshot } from './ModelConfigService';
+export { ModelPricingService } from './ModelPricingService';
+export type { ModelPricingOverrideDraft, ModelPricingServiceOptions, ModelPricingStatus } from './ModelPricingService';
 export type { ModelCatalogState, ModelCatalogStateMode, ProviderDirectoryStatus } from './ModelCatalogStateService';
 export { ModelCatalogStateService } from './ModelCatalogStateService';
 export type { ModelCatalogComparison } from './modelCatalogComparison';
@@ -44,6 +47,8 @@ barrel 没有转发 `commandScopedAgent.ts`、`formatterConfig.ts`、`modelConfi
 - `src/core/config/formatterConfig.ts`
 - `src/core/config/modelConfig.ts`
 - `src/core/config/slashCommandCatalog.ts`
+
+`ModelPricingService` 是例外：它被 `main.ts`、上下文使用协调器和 Settings 的共用单价弹窗消费，因此从 barrel 暴露。它只维护手动刷新的 models.dev 目录和本地估算，不取代 OpenCode 上报的 session cost，也不读取订阅账单。
 - `src/core/config/PluginManagementService.ts`
 
 ### 作为配置层稳定入口

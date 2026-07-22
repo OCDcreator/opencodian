@@ -16,6 +16,7 @@ import {
 } from '../../shared/debugModules';
 import type { OpenCodeCapabilitySettings } from '../opencode/OpenCodeCapabilitySettingsMigration';
 import type { AgentBackendKind } from './chat';
+import type { ModelPricingOverride } from './pricing';
 
 /** Permission mode for tool execution */
 export type PermissionMode = 'yolo' | 'plan' | 'normal';
@@ -114,6 +115,13 @@ export interface CodexBackendSettings {
   apiKey: string;
   /** Model name passed as ThreadOptions.model → SDK --model CLI arg. Empty string = SDK default. */
   model: string;
+  /**
+   * Optional pricing-provider alias for a custom Codex model provider. This
+   * only identifies rates; Codex connection configuration stays in config.toml.
+   */
+  pricingProviderId: string;
+  /** Optional pricing endpoint identity for a Codex proxy or reseller. Does not change traffic. */
+  pricingEndpoint: string;
   /** Sandbox mode passed as ThreadOptions.sandboxMode → SDK --sandbox CLI arg. */
   sandboxMode: CodexSandboxMode;
   /** Reasoning effort passed as ThreadOptions.modelReasoningEffort → SDK --config CLI arg. */
@@ -134,6 +142,10 @@ export interface ClaudeCodeBackendSettings {
   effort: ClaudeCodeEffort;
   additionalDirectories: string[];
   model: string;
+  /** Optional pricing-provider alias for an ANTHROPIC_BASE_URL-compatible gateway. */
+  pricingProviderId: string;
+  /** Optional pricing endpoint identity. It is not forwarded to Claude Code. */
+  pricingEndpoint: string;
   /** Fallback model used when the main model is unavailable. Readback only: option wiring and same-model validation proven; automatic fallback switching not locally provable (blocked on real API overload / HTTP 529; invalid-primary test undermined). */
   fallbackModel: string;
   /** Tool names that are auto-allowed without prompting. Not a sandbox, not a restrictor. Readback only: runtime options wiring proven, zero enforcement observed (init catalog always unfiltered, canUseTool non-functional in SDK query() mode). Validated as PascalCase alphanumeric. */
@@ -350,6 +362,8 @@ export function getDefaultClaudeCodeBackendSettings(): ClaudeCodeBackendSettings
     effort: 'medium',
     additionalDirectories: [],
     model: '',
+    pricingProviderId: '',
+    pricingEndpoint: '',
     fallbackModel: '',
     allowedTools: [],
     disallowedTools: [],
@@ -402,6 +416,8 @@ export function getDefaultCodexBackendSettings(): CodexBackendSettings {
   return {
     apiKey: '',
     model: '',
+    pricingProviderId: '',
+    pricingEndpoint: '',
     sandboxMode: 'workspace-write',
     modelReasoningEffort: 'medium',
     additionalDirectories: '',
@@ -641,6 +657,12 @@ export function normalizeClaudeCodeBackendSettings(value: unknown): ClaudeCodeBa
     effort: normalizeClaudeCodeEffort(candidate.effort),
     additionalDirectories: normalizeClaudeCodeAdditionalDirectories(candidate.additionalDirectories),
     model: typeof candidate.model === 'string' ? candidate.model.trim() : defaults.model,
+    pricingProviderId: typeof candidate.pricingProviderId === 'string'
+      ? candidate.pricingProviderId.trim().toLowerCase()
+      : defaults.pricingProviderId,
+    pricingEndpoint: typeof candidate.pricingEndpoint === 'string'
+      ? candidate.pricingEndpoint.trim().replace(/\/+$/, '')
+      : defaults.pricingEndpoint,
     fallbackModel: typeof candidate.fallbackModel === 'string' ? candidate.fallbackModel.trim() : defaults.fallbackModel,
     allowedTools: normalizeClaudeCodeStringArray(candidate.allowedTools),
     disallowedTools: normalizeClaudeCodeStringArray(candidate.disallowedTools),
@@ -694,7 +716,7 @@ function normalizeCodexBackendSettings(value: unknown): CodexBackendSettings {
   const VALID_EFFORTS: readonly CodexReasoningEffort[] = ['minimal', 'low', 'medium', 'high', 'xhigh'];
   const VALID_WEB_SEARCH: readonly CodexWebSearchMode[] = ['disabled', 'cached', 'live'];
   const candidate = value && typeof value === 'object' && !Array.isArray(value)
-    ? value as { apiKey?: unknown; model?: unknown; sandboxMode?: unknown; modelReasoningEffort?: unknown; additionalDirectories?: unknown; networkAccessEnabled?: unknown; webSearchMode?: unknown }
+    ? value as { apiKey?: unknown; model?: unknown; pricingProviderId?: unknown; pricingEndpoint?: unknown; sandboxMode?: unknown; modelReasoningEffort?: unknown; additionalDirectories?: unknown; networkAccessEnabled?: unknown; webSearchMode?: unknown }
     : {};
   const rawSandbox = typeof candidate.sandboxMode === 'string' ? candidate.sandboxMode : '';
   const rawEffort = typeof candidate.modelReasoningEffort === 'string' ? candidate.modelReasoningEffort : '';
@@ -702,6 +724,12 @@ function normalizeCodexBackendSettings(value: unknown): CodexBackendSettings {
   return {
     apiKey: typeof candidate.apiKey === 'string' ? candidate.apiKey : '',
     model: typeof candidate.model === 'string' ? candidate.model : '',
+    pricingProviderId: typeof candidate.pricingProviderId === 'string'
+      ? candidate.pricingProviderId.trim().toLowerCase()
+      : '',
+    pricingEndpoint: typeof candidate.pricingEndpoint === 'string'
+      ? candidate.pricingEndpoint.trim().replace(/\/+$/, '')
+      : '',
     sandboxMode: VALID_SANDBOX_MODES.includes(rawSandbox as CodexSandboxMode)
       ? (rawSandbox as CodexSandboxMode)
       : 'workspace-write',
@@ -1306,6 +1334,70 @@ export function normalizeDisabledModelRefs(value: unknown): string[] {
         }),
     ),
   );
+}
+
+function normalizeModelPricingIdentifier(value: unknown): string | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  return normalized.length > 0 ? normalized : null;
+}
+
+function normalizeModelPricingEndpoint(value: unknown): string | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const normalized = value.trim().replace(/\/+$/, '');
+  return normalized.length > 0 ? normalized : null;
+}
+
+function normalizeModelPricingRate(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0
+    ? value
+    : null;
+}
+
+/** Keeps only structurally valid, latest-per-model local pricing overrides. */
+export function normalizeModelPricingOverrides(value: unknown): ModelPricingOverride[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const overrides = new Map<string, ModelPricingOverride>();
+  for (const candidate of value) {
+    if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) {
+      continue;
+    }
+
+    const record = candidate as Record<string, unknown>;
+    const providerId = normalizeModelPricingIdentifier(record.providerId);
+    const endpoint = normalizeModelPricingEndpoint(record.endpoint);
+    const modelId = normalizeModelPricingIdentifier(record.modelId);
+    if (!providerId || !modelId) {
+      continue;
+    }
+
+    const override: ModelPricingOverride = {
+      providerId,
+      endpoint,
+      modelId,
+      inputPerMillion: normalizeModelPricingRate(record.inputPerMillion),
+      outputPerMillion: normalizeModelPricingRate(record.outputPerMillion),
+      cacheReadPerMillion: normalizeModelPricingRate(record.cacheReadPerMillion),
+      cacheWritePerMillion: normalizeModelPricingRate(record.cacheWritePerMillion),
+      updatedAt: typeof record.updatedAt === 'number' && Number.isFinite(record.updatedAt)
+        ? Math.max(0, Math.round(record.updatedAt))
+        : 0,
+    };
+    overrides.set(`${providerId}/${endpoint ?? ''}/${modelId}`, override);
+  }
+
+  return [...overrides.values()]
+    .sort((left, right) => `${left.providerId}/${left.endpoint ?? ''}/${left.modelId}`
+      .localeCompare(`${right.providerId}/${right.endpoint ?? ''}/${right.modelId}`));
 }
 
 /**
@@ -2451,6 +2543,8 @@ export interface OpenCodianSettings {
   providerIconLibrary: ProviderIconLibrary;
   providerIconColorMode: ProviderIconColorMode;
   providerIconDefaultVariant: LobehubIconVariant;
+  /** Local per-provider/model USD-per-million overrides for cost estimates. */
+  modelPricingOverrides: ModelPricingOverride[];
   effortLevel: EffortLevel;
   thinkingBudget: ThinkingBudget;
 
@@ -2629,6 +2723,7 @@ export const DEFAULT_SETTINGS: OpenCodianSettings = {
   providerIconLibrary: {},
   providerIconColorMode: 'system',
   providerIconDefaultVariant: 'auto',
+  modelPricingOverrides: [],
   effortLevel: 'high',
   thinkingBudget: 4096,
 
@@ -2711,6 +2806,7 @@ export function normalizeModelProviderPluginDebugSettings(
     | 'providerIconLibrary'
     | 'providerIconColorMode'
     | 'providerIconDefaultVariant'
+    | 'modelPricingOverrides'
     | 'modelAvailabilitySectionOpen'
     | 'modelToolsSectionOpen'
     | 'inlineSerializedDebugLogArgs'
@@ -2730,6 +2826,7 @@ export function normalizeModelProviderPluginDebugSettings(
   | 'providerIconLibrary'
   | 'providerIconColorMode'
   | 'providerIconDefaultVariant'
+  | 'modelPricingOverrides'
   | 'modelAvailabilitySectionOpen'
   | 'modelToolsSectionOpen'
   | 'inlineSerializedDebugLogArgs'
@@ -2765,6 +2862,7 @@ export function normalizeModelProviderPluginDebugSettings(
     providerIconLibrary: normalizeProviderIconLibrary(value?.providerIconLibrary),
     providerIconColorMode: normalizeProviderIconColorMode(value?.providerIconColorMode),
     providerIconDefaultVariant: normalizeLobehubIconVariant(value?.providerIconDefaultVariant),
+    modelPricingOverrides: normalizeModelPricingOverrides(value?.modelPricingOverrides),
     modelAvailabilitySectionOpen: normalizeBoolean(
       value?.modelAvailabilitySectionOpen,
       DEFAULT_SETTINGS.modelAvailabilitySectionOpen,

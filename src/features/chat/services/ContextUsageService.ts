@@ -1,5 +1,8 @@
 import {
   type ChatMessage,
+  type ContextBillingUsage,
+  type ContextBillingUsageUpdate,
+  type ContextCostDetails,
   type ContextUsageSnapshot,
   createEmptyTabContextState,
   getDefaultContextWindow,
@@ -47,14 +50,33 @@ export class ContextUsageService {
   ): TabContextState {
     const next = this.cloneState(state);
     const previousSessionId = next.sessionId;
-    const modelId = modelInfo?.model ?? next.model;
+    const nextSessionId = sessionInfo?.sessionId ?? next.sessionId;
+    const sessionChanged = typeof nextSessionId === 'string'
+      && nextSessionId !== previousSessionId;
+    const previousModelId = next.model;
+    const modelChanged = typeof modelInfo?.model === 'string'
+      && modelInfo.model !== previousModelId;
+
+    // A tab may be rebound from one conversation to another. Precise usage is
+    // authoritative only for its originating backend session, so clear it and
+    // its derived estimates/cost at that identity boundary.
+    if (sessionChanged) {
+      next.estimatedInputTokens = 0;
+      next.estimatedOutputTokens = 0;
+      next.streamInputTokens = 0;
+      next.streamOutputTokens = 0;
+      next.preciseTokens = null;
+      next.totalCost = null;
+      next.costDetails = null;
+      next.billingUsage = null;
+    }
 
     next.provider = modelInfo?.provider ?? next.provider;
     next.providerName = modelInfo?.providerName ?? next.providerName ?? next.provider;
     next.model = modelInfo?.model ?? next.model;
     next.modelName = modelInfo?.modelName ?? next.modelName ?? next.model;
-    next.contextWindow = this.resolveContextWindow(modelInfo?.contextWindow, modelId);
-    next.sessionId = sessionInfo?.sessionId ?? next.sessionId;
+    this.syncContextWindow(next, modelInfo, modelChanged);
+    next.sessionId = nextSessionId;
     next.sessionTitle = sessionInfo?.sessionTitle ?? next.sessionTitle;
     next.createdAt = sessionInfo?.createdAt ?? next.createdAt;
     next.updatedAt = sessionInfo?.updatedAt ?? next.updatedAt;
@@ -62,8 +84,7 @@ export class ContextUsageService {
       next.compactingAt = sessionInfo.compactingAt ?? null;
     } else if (
       sessionInfo
-      && typeof sessionInfo.sessionId === 'string'
-      && sessionInfo.sessionId !== previousSessionId
+      && sessionChanged
     ) {
       next.compactingAt = null;
     }
@@ -102,19 +123,39 @@ export class ContextUsageService {
   static applyPreciseUsage(
     state: TabContextState | null | undefined,
     usage: {
+      total?: number | null;
       input: number;
       output: number;
       reasoning: number;
       cacheRead: number;
-      cacheWrite: number;
+      cacheWrite: number | null;
       totalCost?: number | null;
+      costDetails?: ContextCostDetails | null;
+      billingUsage?: ContextBillingUsage | null;
     },
   ): TabContextState {
     const next = this.cloneState(state);
     next.preciseTokens = this.buildPreciseTokens(usage);
-    next.estimatedInputTokens = next.preciseTokens.input + next.preciseTokens.cacheRead + next.preciseTokens.cacheWrite;
+    next.estimatedInputTokens = next.preciseTokens.input
+      + next.preciseTokens.cacheRead
+      + (next.preciseTokens.cacheWrite ?? 0);
     next.estimatedOutputTokens = next.preciseTokens.output + next.preciseTokens.reasoning;
-    next.totalCost = typeof usage.totalCost === 'number' ? usage.totalCost : next.totalCost;
+    next.totalCost = typeof usage.totalCost === 'number' ? usage.totalCost : null;
+    next.costDetails = usage.costDetails
+      ?? (typeof usage.totalCost === 'number'
+        ? {
+            source: 'backend-reported',
+            completeness: 'complete',
+            providerId: next.provider,
+            endpoint: null,
+            modelId: next.model,
+            rates: null,
+            catalogFetchedAt: null,
+            usesBaseTier: false,
+            unavailableTokenKinds: [],
+          }
+        : null);
+    next.billingUsage = usage.billingUsage ?? next.billingUsage;
     return this.finalizeState(next, 'if-missing');
   }
 
@@ -141,14 +182,89 @@ export class ContextUsageService {
         },
       ),
       {
+        total: snapshot.totalTokens,
         input: snapshot.inputTokens,
         output: snapshot.outputTokens,
         reasoning: snapshot.reasoningTokens,
         cacheRead: snapshot.cacheReadTokens,
         cacheWrite: snapshot.cacheWriteTokens,
         totalCost: snapshot.totalCost,
+        costDetails: snapshot.costDetails,
+        billingUsage: snapshot.billingUsage,
       },
     );
+  }
+
+  static applyBillingUsage(
+    state: TabContextState | null | undefined,
+    usage: ContextBillingUsageUpdate,
+  ): TabContextState {
+    const next = this.cloneState(state);
+    const previous = next.billingUsage;
+    if (previous?.requestIds.includes(usage.requestId)) {
+      return next;
+    }
+
+    const previousRequestIds = previous?.requestIds ?? [];
+    next.billingUsage = {
+      requestIds: [...previousRequestIds, usage.requestId],
+      providerId: usage.providerId ?? previous?.providerId ?? next.provider,
+      modelId: usage.modelId ?? previous?.modelId ?? next.model,
+      inputTokens: (previous?.inputTokens ?? 0) + Math.max(0, usage.inputTokens),
+      outputTokens: (previous?.outputTokens ?? 0) + Math.max(0, usage.outputTokens),
+      reasoningTokens: (previous?.reasoningTokens ?? 0) + Math.max(0, usage.reasoningTokens),
+      cacheReadTokens: this.mergeOptionalBillableTokenCount(
+        previous?.cacheReadTokens,
+        usage.cacheReadTokens,
+      ),
+      cacheWriteTokens: this.mergeOptionalBillableTokenCount(
+        previous?.cacheWriteTokens,
+        usage.cacheWriteTokens,
+      ),
+    };
+    return this.finalizeState(next, 'now');
+  }
+
+  /** Builds a persistence-safe view of current state for a cost-only billing update. */
+  static createUsageSnapshot(state: TabContextState | null | undefined): ContextUsageSnapshot | null {
+    if (!state?.sessionId) {
+      return null;
+    }
+
+    const tokens = this.getDisplayTokenBreakdown(state);
+    const isBackendReportedCost = state.costDetails?.source === 'backend-reported';
+    return {
+      sessionId: state.sessionId,
+      sessionTitle: state.sessionTitle ?? '',
+      createdAt: state.createdAt ?? Date.now(),
+      updatedAt: state.updatedAt ?? Date.now(),
+      compactingAt: state.compactingAt ?? null,
+      providerId: state.provider,
+      providerName: state.providerName,
+      modelId: state.model,
+      modelName: state.modelName,
+      contextWindow: state.contextWindow,
+      totalTokens: tokens.total,
+      inputTokens: tokens.input,
+      outputTokens: tokens.output,
+      reasoningTokens: tokens.reasoning,
+      cacheReadTokens: tokens.cacheRead,
+      cacheWriteTokens: tokens.cacheWrite,
+      totalCost: isBackendReportedCost ? state.totalCost : null,
+      costDetails: isBackendReportedCost ? state.costDetails : null,
+      billingUsage: state.billingUsage,
+    };
+  }
+
+  static applyCostSnapshot(
+    state: TabContextState | null | undefined,
+    snapshot: Pick<ContextUsageSnapshot, 'totalCost' | 'costDetails' | 'billingUsage'>,
+  ): TabContextState {
+    const next = this.cloneState(state);
+    next.totalCost = typeof snapshot.totalCost === 'number' ? snapshot.totalCost : null;
+    next.costDetails = snapshot.costDetails ?? null;
+    next.billingUsage = snapshot.billingUsage ?? next.billingUsage;
+    return this.finalizeState(next, 'now');
   }
 
   static summarize(state: TabContextState | null | undefined): ContextUsageSummary {
@@ -168,7 +284,7 @@ export class ContextUsageService {
     output: number;
     reasoning: number;
     cacheRead: number;
-    cacheWrite: number;
+    cacheWrite: number | null;
     total: number;
   } {
     return ContextUsageDisplayService.getDisplayTokenBreakdown(state);
@@ -199,6 +315,28 @@ export class ContextUsageService {
     }
 
     return 0;
+  }
+
+  /**
+   * Keeps an app-server-reported window authoritative until the caller
+   * explicitly replaces it or switches to a different model.
+   */
+  private static syncContextWindow(
+    state: TabContextState,
+    modelInfo: ContextModelInfo | undefined,
+    modelChanged: boolean,
+  ): void {
+    const explicitContextWindow = modelInfo?.contextWindow;
+    if (typeof explicitContextWindow === 'number' && explicitContextWindow > 0) {
+      state.contextWindow = explicitContextWindow;
+      return;
+    }
+
+    if (!modelChanged && state.contextWindow > 0) {
+      return;
+    }
+
+    state.contextWindow = this.resolveContextWindow(undefined, modelInfo?.model ?? state.model);
   }
 
   private static calculatePercentage(totalTokens: number, contextWindow: number): number {
@@ -236,25 +374,41 @@ export class ContextUsageService {
   }
 
   private static buildPreciseTokens(usage: {
+    total?: number | null;
     input: number;
     output: number;
     reasoning: number;
     cacheRead: number;
-    cacheWrite: number;
+    cacheWrite: number | null;
   }): NonNullable<TabContextState['preciseTokens']> {
     const input = Math.max(0, usage.input);
     const output = Math.max(0, usage.output);
     const reasoning = Math.max(0, usage.reasoning);
     const cacheRead = Math.max(0, usage.cacheRead);
-    const cacheWrite = Math.max(0, usage.cacheWrite);
+    const cacheWrite = typeof usage.cacheWrite === 'number'
+      ? Math.max(0, usage.cacheWrite)
+      : null;
+    const calculatedTotal = input + output + reasoning + cacheRead + (cacheWrite ?? 0);
 
     return {
-      total: input + output + reasoning + cacheRead + cacheWrite,
+      total: typeof usage.total === 'number' && usage.total >= 0
+        ? usage.total
+        : calculatedTotal,
       input,
       output,
       reasoning,
       cacheRead,
       cacheWrite,
     };
+  }
+
+  private static mergeOptionalBillableTokenCount(
+    previous: number | null | undefined,
+    next: number | null,
+  ): number | null {
+    if (previous === null || next === null) {
+      return null;
+    }
+    return (previous ?? 0) + Math.max(0, next);
   }
 }

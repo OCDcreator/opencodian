@@ -1,4 +1,9 @@
-import { createEmptyTabContextState } from '../../../../src/core/types';
+/* eslint-disable max-lines-per-function -- Context usage tests keep identity, snapshot, billing-ledger, and cost-provenance assertions together as one state contract. */
+
+import {
+  createEmptyTabContextState,
+  getDefaultContextWindow,
+} from '../../../../src/core/types';
 import { ContextUsageService } from '../../../../src/features/chat/services/ContextUsageService';
 
 describe('ContextUsageService identity and totals', () => {
@@ -114,6 +119,53 @@ describe('ContextUsageService identity and totals', () => {
     });
   });
 
+  it('preserves a restored authoritative context window when the model is unchanged', () => {
+    const restored = ContextUsageService.applyUsageSnapshot(
+      createEmptyTabContextState(),
+      {
+        sessionId: 'codex-thread-1',
+        sessionTitle: 'Codex task',
+        createdAt: 100,
+        updatedAt: 200,
+        providerId: 'openai',
+        providerName: 'OpenAI',
+        modelId: 'gpt-5.4',
+        modelName: 'GPT-5.4',
+        contextWindow: 950000,
+        totalTokens: 13812,
+        inputTokens: 13778,
+        outputTokens: 34,
+        reasoningTokens: 24,
+        cacheReadTokens: 1920,
+        cacheWriteTokens: null,
+        totalCost: null,
+      },
+    );
+
+    const hydrated = ContextUsageService.syncStateIdentity(restored, {
+      model: 'gpt-5.4',
+    });
+
+    expect(hydrated.contextWindow).toBe(950000);
+    expect(ContextUsageService.summarize(hydrated).percentage).toBe(1);
+  });
+
+  it('uses the new model default when a restored snapshot changes models without a new window', () => {
+    const restored = ContextUsageService.syncStateIdentity(
+      createEmptyTabContextState(),
+      {
+        model: 'gpt-5.4',
+        contextWindow: 950000,
+      },
+    );
+
+    const switched = ContextUsageService.syncStateIdentity(restored, {
+      model: 'gpt-5',
+    });
+
+    expect(switched.contextWindow).toBe(getDefaultContextWindow('gpt-5'));
+  });
+
   it('surfaces live compaction state from refreshed snapshots', () => {
     const state = ContextUsageService.applyUsageSnapshot(
       createEmptyTabContextState(),
@@ -144,9 +196,135 @@ describe('ContextUsageService identity and totals', () => {
     expect(summary.ringLabel).toBe('…');
     expect(summary.tooltip).toContain('Compacting context');
   });
+
+  it('keeps a separate billable request ledger without changing context-window token totals', () => {
+    const base = ContextUsageService.applyUsageSnapshot(
+      createEmptyTabContextState(),
+      {
+        sessionId: 'claude-session-1',
+        sessionTitle: 'Claude task',
+        createdAt: 1,
+        updatedAt: 2,
+        providerId: 'anthropic',
+        providerName: 'Anthropic',
+        modelId: 'claude-test',
+        modelName: 'Claude Test',
+        contextWindow: 1000,
+        totalTokens: 600,
+        inputTokens: 600,
+        outputTokens: 0,
+        reasoningTokens: 0,
+        cacheReadTokens: 0,
+        cacheWriteTokens: null,
+        totalCost: null,
+      },
+    );
+    const updated = ContextUsageService.applyBillingUsage(base, {
+      requestId: 'turn-1',
+      providerId: 'anthropic',
+      modelId: 'claude-test',
+      inputTokens: 300,
+      outputTokens: 120,
+      reasoningTokens: 20,
+      cacheReadTokens: 50,
+      cacheWriteTokens: null,
+    });
+    const deduplicated = ContextUsageService.applyBillingUsage(updated, {
+      requestId: 'turn-1',
+      providerId: 'anthropic',
+      modelId: 'claude-test',
+      inputTokens: 300,
+      outputTokens: 120,
+      reasoningTokens: 20,
+      cacheReadTokens: 50,
+      cacheWriteTokens: null,
+    });
+
+    expect(ContextUsageService.getDisplayTokenBreakdown(updated).total).toBe(600);
+    expect(updated.billingUsage).toMatchObject({
+      requestIds: ['turn-1'],
+      inputTokens: 300,
+      outputTokens: 120,
+      reasoningTokens: 20,
+      cacheReadTokens: 50,
+      cacheWriteTokens: null,
+    });
+    expect(deduplicated.billingUsage).toEqual(updated.billingUsage);
+  });
 });
 
 describe('ContextUsageService breakdown and formatting', () => {
+  it('uses the authoritative backend total instead of recomputing it from visible categories', () => {
+    const state = ContextUsageService.applyUsageSnapshot(
+      createEmptyTabContextState(),
+      {
+        sessionId: 'codex-thread-1',
+        sessionTitle: 'Codex task',
+        createdAt: 100,
+        updatedAt: 200,
+        providerId: 'openai',
+        providerName: 'OpenAI',
+        modelId: 'gpt-5',
+        modelName: 'GPT-5',
+        contextWindow: 1000,
+        totalTokens: 225,
+        inputTokens: 100,
+        outputTokens: 50,
+        reasoningTokens: 25,
+        cacheReadTokens: 25,
+        cacheWriteTokens: null,
+        totalCost: null,
+      },
+    );
+
+    expect(state.preciseTokens).toEqual({
+      total: 225,
+      input: 100,
+      output: 50,
+      reasoning: 25,
+      cacheRead: 25,
+      cacheWrite: null,
+    });
+    expect(ContextUsageService.summarize(state).percentage).toBe(23);
+    expect(ContextUsageService.getDisplayTokenBreakdown(state).cacheWrite).toBeNull();
+    expect(ContextUsageService.formatCurrency(state.totalCost)).toBe('-');
+  });
+
+  it('drops a previous session snapshot before adopting a different conversation identity', () => {
+    const previous = ContextUsageService.applyUsageSnapshot(
+      createEmptyTabContextState(),
+      {
+        sessionId: 'thread-old',
+        sessionTitle: 'Old task',
+        createdAt: 100,
+        updatedAt: 200,
+        providerId: 'openai',
+        providerName: 'OpenAI',
+        modelId: 'gpt-5',
+        modelName: 'GPT-5',
+        contextWindow: 1000,
+        totalTokens: 500,
+        inputTokens: 300,
+        outputTokens: 100,
+        reasoningTokens: 50,
+        cacheReadTokens: 50,
+        cacheWriteTokens: null,
+        totalCost: 0.5,
+      },
+    );
+
+    const next = ContextUsageService.syncStateIdentity(previous, undefined, {
+      sessionId: 'thread-new',
+      sessionTitle: 'New task',
+    });
+
+    expect(next.sessionId).toBe('thread-new');
+    expect(next.preciseTokens).toBeNull();
+    expect(next.estimatedInputTokens).toBe(0);
+    expect(next.estimatedOutputTokens).toBe(0);
+    expect(next.totalCost).toBeNull();
+  });
+
   it('estimates context breakdown from messages and system prompt', () => {
     const state = ContextUsageService.applyPreciseUsage(
       ContextUsageService.syncStateIdentity(

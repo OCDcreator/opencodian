@@ -134,6 +134,8 @@ describe('prepareLoadedSettingsBootstrapState backend normalization', () => {
       effort: 'max',
       additionalDirectories: ['/tmp/context'],
       model: 'claude-opus-4-6',
+      pricingProviderId: '',
+      pricingEndpoint: '',
       outputStyle: '',
       fallbackModel: 'claude-sonnet-4-5',
       allowedTools: [],

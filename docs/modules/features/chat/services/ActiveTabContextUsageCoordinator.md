@@ -17,6 +17,8 @@
 
 > **注意（更新）**：stream lifecycle 方法（`beginTabContextUsageStream`、`completeTabContextUsageStream`、`applyUsageChunkToTab`）、详情弹窗打开（`openContextUsageDetails`）和 indicator 刷新（`refreshContextUsageIndicator`）现已从 `OpenCodianView` 移入本 coordinator。Host 接口相应扩展了 per-tab 操作和 modal 委托端口。
 
+2026-07-22 起，`applyContextUsageSnapshotToTab()` 还接收后端权威快照并立即刷新 active ring，同时按 backend session 独立限频（1 秒）持久化。每个延迟写入都保留 tab ID，因此后台标签页不会把快照写入当前前台 conversation。`syncIdentity()` 会在同一 session 的新通知到达前恢复 `Conversation.lastContextUsage`；没有该快照的旧 Codex 会话保持无精确表盘。
+
 ## 公开接口
 
 ```typescript

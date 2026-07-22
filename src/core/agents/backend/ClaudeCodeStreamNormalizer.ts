@@ -73,6 +73,10 @@ function readUsage(record: JsonRecord): JsonRecord | null {
     usage.output,
     usage.reasoning_tokens,
     usage.reasoningTokens,
+    usage.cache_read_input_tokens,
+    usage.cacheReadInputTokens,
+    usage.cache_creation_input_tokens,
+    usage.cacheCreationInputTokens,
   ].some((value) => typeof value === 'number');
   return hasTokenCounters ? usage : null;
 }
@@ -84,15 +88,44 @@ function readInputTokenCount(usage: JsonRecord): number {
     ?? 0;
 }
 
+function readReasoningTokenCount(usage: JsonRecord): number {
+  return readNumber(usage.reasoning_tokens)
+    ?? readNumber(usage.reasoningTokens)
+    ?? 0;
+}
+
 function readOutputTokenCount(usage: JsonRecord): number {
   const output = readNumber(usage.output_tokens)
     ?? readNumber(usage.outputTokens)
     ?? readNumber(usage.output)
     ?? 0;
-  const thinking = readNumber(usage.reasoning_tokens)
-    ?? readNumber(usage.reasoningTokens)
+  return output + readReasoningTokenCount(usage);
+}
+
+function readRawOutputTokenCount(usage: JsonRecord): number {
+  return readNumber(usage.output_tokens)
+    ?? readNumber(usage.outputTokens)
+    ?? readNumber(usage.output)
     ?? 0;
-  return output + thinking;
+}
+
+function readOptionalUsageTokenCount(usage: JsonRecord, keys: string[]): number | null {
+  for (const key of keys) {
+    const value = readNumber(usage[key]);
+    if (value !== undefined) {
+      return Math.max(0, value);
+    }
+  }
+  return null;
+}
+
+function resolveBillingUsageId(record: JsonRecord, sessionId: string | undefined, usage: JsonRecord): string {
+  return readNonEmptyString(record.uuid)
+    ?? readNonEmptyString(record.result_id)
+    ?? readNonEmptyString(record.resultId)
+    ?? readNonEmptyString(record.request_id)
+    ?? readNonEmptyString(record.requestId)
+    ?? `${sessionId ?? 'claude'}:${resolveMessageId(record)}:${readInputTokenCount(usage)}:${readRawOutputTokenCount(usage)}`;
 }
 
 function stringifyContent(value: unknown): string {
@@ -270,12 +303,42 @@ function appendUsageChunk(record: JsonRecord, chunks: StreamChunk[], sessionId?:
     return;
   }
 
-  chunks.push({
+  const inputTokens = readInputTokenCount(usage);
+  const outputTokens = readOutputTokenCount(usage);
+  const chunk: Extract<StreamChunk, { type: 'usage' }> = {
     type: 'usage',
-    inputTokens: readInputTokenCount(usage),
-    outputTokens: readOutputTokenCount(usage),
+    inputTokens,
+    outputTokens,
     ...(sessionId ? { sessionId } : {}),
-  });
+  };
+
+  if (readString(record.type) === 'result') {
+    const modelId = readNonEmptyString(record.model)
+      ?? readNonEmptyString(readRecord(record.message)?.model);
+    chunk.billingUsage = {
+      requestId: resolveBillingUsageId(record, sessionId, usage),
+      ...(modelId ? { modelId } : {}),
+      inputTokens,
+      outputTokens: readRawOutputTokenCount(usage),
+      reasoningTokens: readReasoningTokenCount(usage),
+      cacheReadTokens: readOptionalUsageTokenCount(usage, [
+        'cache_read_input_tokens',
+        'cacheReadInputTokens',
+        'cache_read_tokens',
+        'cacheReadTokens',
+      ]),
+      cacheWriteTokens: readOptionalUsageTokenCount(usage, [
+        'cache_creation_input_tokens',
+        'cacheCreationInputTokens',
+        'cache_write_input_tokens',
+        'cacheWriteInputTokens',
+        'cache_write_tokens',
+        'cacheWriteTokens',
+      ]),
+    };
+  }
+
+  chunks.push(chunk);
 }
 
 function summarizeMetadataKeys(value: unknown): string[] {

@@ -21,6 +21,7 @@ import {
 } from '../../core/types/settings';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
+import { renderCostEstimateSettingsRow } from './CostEstimateSettingsRow';
 import { SettingsCodexAccountSurface } from './SettingsCodexAccountSurface';
 import { SettingsCodexReadbackControls } from './SettingsCodexReadbackControls';
 
@@ -330,6 +331,9 @@ export class SettingsCodexSection {
     });
 
     this.readbackControls.renderBackendSessionBrowserInfo(controlsEl);
+    new Setting(controlsEl)
+      .setName(t('settings.codex.contextUsage.name'))
+      .setDesc(t('settings.codex.contextUsage.desc'));
     this.readbackControls.renderModelListReadbackControls(controlsEl);
     this.readbackControls.renderPermissionProfilesReadbackControls(controlsEl);
     this.readbackControls.renderMcpServerStatusReadbackControls(controlsEl);
@@ -359,6 +363,7 @@ export class SettingsCodexSection {
       attr: { 'data-codex-group-controls': 'account' },
     });
     this.accountSurface.attach(cardsEl, authSource);
+    renderCostEstimateSettingsRow(cardsEl, this.plugin, 'codex');
   }
 
   private applyCodexRuntimeUpdates(): void {

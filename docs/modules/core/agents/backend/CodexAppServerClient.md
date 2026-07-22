@@ -6,7 +6,7 @@
 
 ## 概述
 
-`CodexAppServerClient` 是 Codex 本地 app-server 的轻量级 adjunct 客户端，仅用于 persisted session discovery 和 transcript readback。主 chat send/stream 路径仍走 TypeScript SDK 路由。
+`CodexAppServerClient` 是 Codex 本地 app-server 的类型化客户端。2026-07-22 起，实验 API 协商成功时它也是 Codex 的主 chat send/stream 路径；协商失败时 `CodexAdapter` 才保持 SDK 聊天回退且不挂载会话 Context Ring。
 
 进程生命周期与 JSON-RPC plumbing 已拆入基类 `CodexAppServerTransport`；wire 类型拆入 `CodexAppServerClientTypes`（本文件通过 `export *` 重新导出）；transcript 归一化纯函数拆入 `CodexAppServerClientNormalization`（本文件保留向后兼容的静态 delegate）。本文件只保留类型化的 app-server API wrapper。
 
@@ -17,6 +17,9 @@
 - `stop()`: 关闭 WebSocket，终止子进程，清理 pending requests
 - `listThreads(options?)`: 调用 `thread/list` 获取 persisted thread 列表。支持 `limit` 与 `archived` 过滤：`archived: true` 仅返回归档 threads，`archived: false` 仅返回非归档 threads；不传 `archived` 时由服务器默认返回非归档 threads
 - `readThread(threadId, includeTurns)`: 调用 `thread/read` 获取单个 thread 的元数据和 turns
+- `startThread(options)` / `resumeThread(threadId, options)`: 通过实验 API 新建或恢复主聊天 thread；当前模型、cwd、sandbox、审批和 web-search config 在此边界生效
+- `startTurn(options)` / `interruptTurn(threadId, turnId)`: 启动/取消 app-server 回合；输出经异步通知到达，不能以 SDK 错误作为静默切换信号
+- `subscribeToThreadNotifications(threadId, handler)`: 订阅并按 thread ID 隔离 `thread/tokenUsage/updated`、turn、item、warning/error 通知，支持并发 Codex 会话
 - `listPermissionProfiles(options)`: 调用 `permissionProfile/list` 获取可用权限配置文件列表（Checkpoint 15C）；支持可选 `cwd`、`limit`、`cursor` 参数；返回 `AppServerPermissionProfile[]`（含 `id` 和可选 `description`）
 - `getAccountRateLimits()`: 调用 `account/rateLimits/read` 获取账号速率限制信息（Checkpoint 15D / 15R）；返回 `AppServerAccountRateLimitsResult { rateLimits, errorReason? }`。环境相关（与 `account/usage/read` 相同）：ChatGPT 鉴权账号返回真实 `AppServerRateLimits`（含 `rateLimits` 和可选 `rateLimitsByLimitId`），API-key 鉴权返回 `chatgpt authentication required to read rate limits` 错误；`errorReason` 透传给 UI 以显示精确原因（含 `codex login` 提示），而不是笼统的 "unavailable"
 - `getAccountRead()`: 调用 `account/read` 获取账号/认证信息（Round 3）；返回 app-server 响应（含 `account.type`、`account.email`、`account.planType`、`requiresOpenaiAuth` 等），错误或不可用时返回 `null`
@@ -34,7 +37,7 @@
 
 ## 维护约束
 
-- 这是 **adjunct client**，不是主 chat 路径。主路径仍通过 `@openai/codex-sdk` 的 `Codex` / `Thread` API。
+- 主聊天仅在 `initialize.capabilities.experimentalApi=true` 成功协商后使用该客户端；协商失败才回退 `@openai/codex-sdk`，并且回退模式不得展示估算为精确的 Codex 上下文百分比。
 - App-server 生命周期由 `CodexAdapter` 管理：`start()` 时初始化，`stop()` 时清理。
 - App-server 启动是 best-effort：如果子进程 spawn 失败或 WebSocket 连接超时，`CodexAdapter` 会捕获异常并降级为仅使用 in-memory sessions。
 - 协议生成的类型 (`AppServerThread`, `AppServerTurn`, `AppServerItem`) 基于本地 `codex app-server generate-ts` 输出，但在此文件中做了最小化内联以避免额外的生成步骤依赖。

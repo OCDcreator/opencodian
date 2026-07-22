@@ -29,6 +29,7 @@ interface ActiveTabContextUsageConversation {
   title: string;
   createdAt: number;
   updatedAt: number;
+  lastContextUsage?: ContextUsageSnapshot;
 }
 
 export interface ActiveTabContextUsageCoordinatorHost {
@@ -46,9 +47,18 @@ export interface ActiveTabContextUsageCoordinatorHost {
   setTabContextUsage(tabId: TabId | null, contextUsage: TabContextState): void;
   getActiveTabId(): TabId | null;
   openContextUsageDetailsModal(contextState: TabContextState | null): void;
+  persistContextUsageSnapshot(tabId: TabId | null, snapshot: ContextUsageSnapshot): Promise<void>;
+  /** Adds local cost provenance after a backend emits an authoritative token snapshot. */
+  enrichContextUsageSnapshot?(snapshot: ContextUsageSnapshot): ContextUsageSnapshot;
 }
 
 export class ActiveTabContextUsageCoordinator {
+  private readonly lastPersistedAtBySession = new Map<string, number>();
+  private readonly pendingSnapshotsBySession = new Map<
+    string,
+    { tabId: TabId | null; snapshot: ContextUsageSnapshot; timer: number | null }
+  >();
+
   constructor(private readonly host: ActiveTabContextUsageCoordinatorHost) {}
 
   syncIdentity(): void {
@@ -57,11 +67,17 @@ export class ActiveTabContextUsageCoordinator {
       return;
     }
 
+    const conversation = this.host.getCurrentConversation();
+    this.commitState(this.restorePersistedSnapshot(this.createIdentityState(conversation), conversation));
+  }
+
+  private createIdentityState(
+    conversation: ActiveTabContextUsageConversation | null,
+  ): TabContextState {
     const currentModel = this.host.getCurrentSessionModel();
     const resolution = this.host.getCurrentSessionModelResolution();
     const modelInfo = this.host.findKnownModelInfo(currentModel);
-    const conversation = this.host.getCurrentConversation();
-    const nextState = ContextUsageService.syncStateIdentity(
+    return ContextUsageService.syncStateIdentity(
       this.getCurrentState(),
       {
         provider: currentModel?.provider ?? null,
@@ -86,7 +102,18 @@ export class ActiveTabContextUsageCoordinator {
       },
     );
 
-    this.commitState(nextState);
+  }
+
+  private restorePersistedSnapshot(
+    identityState: TabContextState,
+    conversation: ActiveTabContextUsageConversation | null,
+  ): TabContextState {
+    const restoredSnapshot = conversation?.lastContextUsage;
+    return restoredSnapshot
+      && !identityState.preciseTokens
+      && restoredSnapshot.sessionId === (conversation ? getConversationBackendSessionId(conversation) ?? null : null)
+      ? ContextUsageService.applyUsageSnapshot(identityState, restoredSnapshot)
+      : identityState;
   }
 
   async refreshFromServer(): Promise<void> {
@@ -139,8 +166,9 @@ export class ActiveTabContextUsageCoordinator {
       return;
     }
 
+    const enrichedSnapshot = this.enrichSnapshot(snapshot, this.getCurrentState());
     outcome = 'committed';
-    this.commitState(ContextUsageService.applyUsageSnapshot(this.getCurrentState(), snapshot));
+    this.commitState(ContextUsageService.applyUsageSnapshot(this.getCurrentState(), enrichedSnapshot));
     this.logRefreshFromServerOutcome(
       {
         outcome,
@@ -148,7 +176,7 @@ export class ActiveTabContextUsageCoordinator {
         conversationId: expectedConversationId,
         sessionId: expectedSessionId,
         requestElapsedMs,
-        snapshot,
+          snapshot: enrichedSnapshot,
       },
     );
   }
@@ -158,7 +186,7 @@ export class ActiveTabContextUsageCoordinator {
   }
 
   private canRefreshPreciseUsageFromServer(backend: string): boolean {
-    return backend === 'opencode' || backend === 'claude-code';
+    return backend === 'opencode' || backend === 'claude-code' || backend === 'codex';
   }
 
   private commitState(contextUsage: TabContextState): void {
@@ -202,14 +230,44 @@ export class ActiveTabContextUsageCoordinator {
       return;
     }
 
-    const nextState = ContextUsageService.applyUsageChunk(
+    let nextState = ContextUsageService.applyUsageChunk(
       this.host.getTabContextUsage(tabId) ?? createEmptyTabContextState(),
       chunk,
+    );
+    if (chunk.billingUsage) {
+      nextState = ContextUsageService.applyBillingUsage(nextState, chunk.billingUsage);
+      const usageSnapshot = ContextUsageService.createUsageSnapshot(nextState);
+      if (usageSnapshot) {
+        const estimatedSnapshot = this.enrichSnapshot(usageSnapshot, nextState);
+        nextState = ContextUsageService.applyCostSnapshot(nextState, estimatedSnapshot);
+        this.scheduleSnapshotPersistence(tabId, estimatedSnapshot);
+      }
+    }
+    this.host.setTabContextUsage(tabId, nextState);
+    if (tabId === this.host.getActiveTabId()) {
+      this.refreshContextUsageIndicator();
+    }
+  }
+
+  applyContextUsageSnapshotToTab(
+    tabId: TabId | null,
+    snapshot: ContextUsageSnapshot,
+  ): void {
+    if (!this.host.hasTab(tabId ?? '')) {
+      return;
+    }
+
+    const currentState = this.host.getTabContextUsage(tabId) ?? createEmptyTabContextState();
+    const enrichedSnapshot = this.enrichSnapshot(snapshot, currentState);
+    const nextState = ContextUsageService.applyUsageSnapshot(
+      currentState,
+      enrichedSnapshot,
     );
     this.host.setTabContextUsage(tabId, nextState);
     if (tabId === this.host.getActiveTabId()) {
       this.refreshContextUsageIndicator();
     }
+    this.scheduleSnapshotPersistence(tabId, enrichedSnapshot);
   }
 
   openContextUsageDetails(): void {
@@ -220,6 +278,39 @@ export class ActiveTabContextUsageCoordinator {
   refreshContextUsageIndicator(): void {
     const state = this.host.getActiveTabContextUsage() ?? null;
     this.host.renderContextUsageIndicator(state);
+  }
+
+  private scheduleSnapshotPersistence(tabId: TabId | null, snapshot: ContextUsageSnapshot): void {
+    const sessionId = snapshot.sessionId;
+    const existing = this.pendingSnapshotsBySession.get(sessionId);
+    if (existing) {
+      existing.tabId = tabId;
+      existing.snapshot = snapshot;
+      return;
+    }
+
+    const elapsed = Date.now() - (this.lastPersistedAtBySession.get(sessionId) ?? 0);
+    const delay = Math.max(0, 1000 - elapsed);
+    const pending = { tabId, snapshot, timer: null as number | null };
+    pending.timer = window.setTimeout(() => {
+      const latest = this.pendingSnapshotsBySession.get(sessionId);
+      this.pendingSnapshotsBySession.delete(sessionId);
+      if (!latest) {
+        return;
+      }
+      this.lastPersistedAtBySession.set(sessionId, Date.now());
+      void this.host.persistContextUsageSnapshot(latest.tabId, latest.snapshot);
+    }, delay);
+    this.pendingSnapshotsBySession.set(sessionId, pending);
+  }
+
+  private enrichSnapshot(
+    snapshot: ContextUsageSnapshot,
+    state?: TabContextState | null,
+  ): ContextUsageSnapshot {
+    const billingUsage = snapshot.billingUsage ?? state?.billingUsage ?? this.getCurrentState().billingUsage;
+    const enrichedInput = billingUsage ? { ...snapshot, billingUsage } : snapshot;
+    return this.host.enrichContextUsageSnapshot?.(enrichedInput) ?? enrichedInput;
   }
 
   private logRefreshFromServerOutcome({
@@ -248,6 +339,7 @@ export class ActiveTabContextUsageCoordinator {
       reasoningTokens: snapshot?.reasoningTokens ?? null,
       cacheReadTokens: snapshot?.cacheReadTokens ?? null,
       cacheWriteTokens: snapshot?.cacheWriteTokens ?? null,
+      totalTokens: snapshot?.totalTokens ?? null,
       totalCost: snapshot?.totalCost ?? null,
     };
 

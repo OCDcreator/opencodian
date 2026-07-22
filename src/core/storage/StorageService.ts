@@ -18,6 +18,7 @@ import {
   normalizeConversationSessionSettings,
   type OpenCodianSettings,
 } from '../types';
+import type { ModelPricingCatalog } from '../types/pricing';
 import {
   buildConversationMetaFromStoredRecord,
   cloneConversationListDiagnostics,
@@ -36,6 +37,7 @@ const CORE_SETTINGS_BACKUP_FILE = `${CORE_SETTINGS_FILE}.bak`;
 const UI_SETTINGS_BACKUP_FILE = `${UI_SETTINGS_FILE}.bak`;
 const CAPABILITY_SETTINGS_BACKUP_FILE = `${STORAGE_DIR}/settings.capabilities.json.bak`;
 const RUNTIME_FILE = `${STORAGE_DIR}/runtime.json`;
+const MODEL_PRICING_CATALOG_FILE = `${STORAGE_DIR}/model-pricing.models-dev.json`;
 const SETTINGS_SCHEMA_VERSION = 1;
 const logger = createLogger('StorageService');
 
@@ -210,6 +212,7 @@ export class StorageService {
       currentNote: persistedConversation.currentNote,
       externalContextPaths: persistedConversation.externalContextPaths,
       sessionSettings: normalizeConversationSessionSettings(persistedConversation.sessionSettings),
+      lastContextUsage: persistedConversation.lastContextUsage,
       backgroundTaskMetadata: persistedConversation.backgroundTaskMetadata,
       messages: persistedConversation.messages,  // Save full messages with contentBlocks
     };
@@ -433,6 +436,35 @@ export class StorageService {
 
   async readThemeBackgroundDataUrl(storedPath: string, hintedMimeType?: string): Promise<string | null> {
     return this.themeBackgroundStorage.readDataUrl(storedPath, hintedMimeType);
+  }
+
+  /** Loads the last manually refreshed models.dev pricing catalogue. */
+  async loadModelPricingCatalog(): Promise<ModelPricingCatalog | null> {
+    const result = await this.readJsonFile<ModelPricingCatalog>(
+      MODEL_PRICING_CATALOG_FILE,
+      (value) => {
+        if (!value || typeof value !== 'object' || Array.isArray(value)) {
+          return null;
+        }
+
+        const candidate = value as Partial<ModelPricingCatalog>;
+        return candidate.schemaVersion === 1
+          && typeof candidate.fetchedAt === 'number'
+          && Number.isFinite(candidate.fetchedAt)
+          && Array.isArray(candidate.entries)
+          ? candidate as ModelPricingCatalog
+          : null;
+      },
+    );
+    return result.data;
+  }
+
+  /** Stores only normalized public price fields, never provider credentials or account data. */
+  async saveModelPricingCatalog(catalog: ModelPricingCatalog): Promise<void> {
+    await this.app.vault.adapter.write(
+      normalizePath(MODEL_PRICING_CATALOG_FILE),
+      JSON.stringify(catalog, null, 2),
+    );
   }
 
   /** Ensure directory exists */

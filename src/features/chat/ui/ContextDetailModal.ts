@@ -82,6 +82,13 @@ export class ContextDetailModal extends Modal {
       t('context.usage.model'),
       this.contextState?.modelName ?? this.contextState?.model ?? '-',
     );
+    if (this.contextState?.costDetails?.endpoint) {
+      this.renderRow(
+        gridEl,
+        t('context.usage.pricingEndpoint'),
+        this.contextState.costDetails.endpoint,
+      );
+    }
     this.renderRow(gridEl, t('context.usage.messages'), ContextUsageService.formatNumber(messageCount));
     this.renderRow(gridEl, t('context.usage.userMessages'), ContextUsageService.formatNumber(userMessageCount));
     this.renderRow(gridEl, t('context.usage.assistantMessages'), ContextUsageService.formatNumber(assistantMessageCount));
@@ -109,12 +116,17 @@ export class ContextDetailModal extends Modal {
     this.renderRow(
       gridEl,
       t('context.usage.cacheTokens'),
-      `${ContextUsageService.formatNumber(tokens.cacheRead)} / ${ContextUsageService.formatNumber(tokens.cacheWrite)}`,
+      `${ContextUsageService.formatNumber(tokens.cacheRead)} / ${this.formatOptionalTokenCount(tokens.cacheWrite)}`,
     );
     this.renderRow(
       gridEl,
       t('context.usage.cost'),
       ContextUsageService.formatCurrency(this.contextState?.totalCost),
+    );
+    this.renderRow(
+      gridEl,
+      t('context.usage.costSource'),
+      this.formatCostDetails(),
     );
     this.renderRow(
       gridEl,
@@ -169,6 +181,28 @@ export class ContextDetailModal extends Modal {
     const rowEl = containerEl.createDiv({ cls: 'opencodian-context-modal-row' });
     rowEl.createDiv({ cls: 'opencodian-context-modal-label', text: label });
     rowEl.createDiv({ cls: 'opencodian-context-modal-value', text: value });
+  }
+
+  private formatOptionalTokenCount(value: number | null): string {
+    return typeof value === 'number' ? ContextUsageService.formatNumber(value) : '-';
+  }
+
+  private formatCostDetails(): string {
+    const details = this.contextState?.costDetails;
+    if (!details || details.source === 'unavailable') {
+      return t('context.usage.costUnavailable');
+    }
+
+    const source = details.source === 'backend-reported'
+      ? t('context.usage.costSourceReported')
+      : details.source === 'user-override'
+        ? t('context.usage.costSourceOverride')
+        : t('context.usage.costSourceModelsDev');
+    const completeness = details.completeness === 'partial'
+      ? t('context.usage.costPartial')
+      : t('context.usage.costComplete');
+    const tier = details.usesBaseTier ? t('context.usage.costBaseTier') : '';
+    return [source, completeness, tier].filter(Boolean).join(' · ');
   }
 
   private renderBreakdown(containerEl: HTMLElement, segments: ContextBreakdownSegment[]): void {

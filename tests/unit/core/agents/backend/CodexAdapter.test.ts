@@ -9,6 +9,13 @@
 
 /* eslint-disable max-lines-per-function -- Adapter test suite keeps lifecycle, session, DI, and sendMessage tests in one cohesive describe block. */
 
+jest.mock('../../../../../src/core/agents/backend/CodexAppServerClient', () => ({
+  CodexAppServerClient: jest.fn().mockImplementation(() => ({
+    start: jest.fn().mockRejectedValue(new Error('app-server disabled in SDK adapter unit tests')),
+    stop: jest.fn(),
+  })),
+}));
+
 import { AgentCapability } from '../../../../../src/core/agents/AgentCapability';
 import {
   CodexAdapter,
@@ -40,6 +47,7 @@ function createAdapterOptions(
 ): CodexAdapterOptions & { _mockCodex: ReturnType<typeof createMockCodex> } {
   const mockCodex = createMockCodex();
   return {
+    createAppServerClient: () => null,
     createCodex: jest.fn().mockResolvedValue(mockCodex),
     ...overrides,
     _mockCodex: mockCodex,

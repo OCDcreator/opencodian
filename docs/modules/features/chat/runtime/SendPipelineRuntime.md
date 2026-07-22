@@ -17,6 +17,10 @@
 
 它不是一个“小 helper”，而是发送子系统的总入口；`OpenCodianView` 现在只保留 host 装配与桥接。
 
+### 2026-07-22 精确 context usage 端口
+
+runtime host 把 `applyContextUsageSnapshotToTab` 从 view 透传到 `StreamChunkRouter`。这条窄端口仅处理 Codex app-server 等后端的权威 `context_usage` 通知；原有 `usage` 端口继续服务兼容后端的逐流增量。
+
 ## 结构化输出触发（`/json`）
 
 `SendPipelineRuntime.sendMessage()` 在真正处理 slash command 和 preparation 之前，会先检测内容中的 `/json ` 前缀（不区分大小写）。如果检测到：

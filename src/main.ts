@@ -5,7 +5,7 @@ import type { Editor, MarkdownView } from 'obsidian';
 import { addIcon, Notice, Plugin } from 'obsidian';
 import * as path from 'path';
 
-import { ModelConfigService, OpencodeConfigManager } from './core/config';
+import { ModelConfigService, ModelPricingService, OpencodeConfigManager } from './core/config';
 import { setAgentServiceRegistry } from './core/agents/AgentCapability';
 import {
   getConversationSessionBackendService,
@@ -99,6 +99,7 @@ export default class OpenCodianPlugin extends Plugin {
   codexApprovalHostContext: CodexApprovalHostContext = { getActiveTabId: () => null };
   opencodeConfigManager: OpencodeConfigManager | null = null;
   modelConfigService: ModelConfigService | null = null;
+  modelPricingService: ModelPricingService | null = null;
   settingsTab?: InstanceType<typeof OpenCodianSettingTab>;
 
   private conversations: Conversation[] = [];
@@ -176,6 +177,13 @@ export default class OpenCodianPlugin extends Plugin {
     this.storage = new StorageService(this);
     await coordinator.measureStartupStep('storage.initialize', () => this.storage.initialize());
     await coordinator.measureStartupStep('loadSettings', () => this.loadSettings());
+    await coordinator.measureStartupStep('loadModelPricingCatalog', async () => {
+      this.modelPricingService = new ModelPricingService({
+        storage: this.storage,
+        getOverrides: () => this.settings.modelPricingOverrides,
+      });
+      await this.modelPricingService.load();
+    });
     await coordinator.measureStartupStep('applyLoadedSettingsStartupEffects', () => {
       this.applyLoadedSettingsStartupEffects();
     });

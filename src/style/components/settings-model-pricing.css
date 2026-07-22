@@ -1,0 +1,119 @@
+.opencodian-model-pricing-modal .modal-content {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.opencodian-model-pricing-intro,
+.opencodian-model-pricing-section-desc,
+.opencodian-model-pricing-source-hint,
+.opencodian-model-pricing-empty {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+  line-height: 1.45;
+}
+
+.opencodian-model-pricing-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 10px;
+  background: var(--background-primary);
+}
+
+.opencodian-model-pricing-section-header,
+.opencodian-model-pricing-override-row,
+.opencodian-model-pricing-form-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.opencodian-model-pricing-section h3 {
+  margin: 0;
+  font-size: var(--font-ui-medium);
+}
+
+.opencodian-model-pricing-status {
+  display: grid;
+  gap: 3px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+}
+
+.opencodian-model-pricing-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.opencodian-model-pricing-field {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.opencodian-model-pricing-field label {
+  color: var(--text-muted);
+  font-size: var(--font-smallest);
+}
+
+.opencodian-model-pricing-field input {
+  width: 100%;
+  min-width: 0;
+}
+
+.opencodian-model-pricing-override-list {
+  display: grid;
+  gap: 8px;
+}
+
+.opencodian-model-pricing-override-row {
+  align-items: flex-start;
+  padding-top: 8px;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.opencodian-model-pricing-override-row:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.opencodian-model-pricing-override-identity {
+  min-width: 0;
+}
+
+.opencodian-model-pricing-override-model {
+  color: var(--text-normal);
+  font-family: var(--font-monospace);
+  font-size: var(--font-ui-small);
+  overflow-wrap: anywhere;
+}
+
+.opencodian-model-pricing-override-rates {
+  margin-top: 3px;
+  color: var(--text-muted);
+  font-size: var(--font-smallest);
+  line-height: 1.45;
+}
+
+.opencodian-model-pricing-override-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 4px;
+}
+
+@media (max-width: 520px) {
+  .opencodian-model-pricing-form {
+    grid-template-columns: 1fr;
+  }
+
+  .opencodian-model-pricing-override-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

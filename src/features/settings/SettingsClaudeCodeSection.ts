@@ -41,6 +41,7 @@ import type OpenCodianPlugin from '../../main';
 import { getVaultBasePath } from '../../shared';
 import { BackendSessionBrowserModal } from '../chat/ui/BackendSessionBrowserModal';
 import { ClaudeCodeHelpContent, ClaudeCodeHelpModal } from './ClaudeCodeHelpModal';
+import { renderCostEstimateSettingsRow } from './CostEstimateSettingsRow';
 import { SettingsTooltipController } from './SettingsTooltipController';
 import { TextareaSizeMemory } from './TextareaSizeMemory';
 
@@ -1955,6 +1956,7 @@ export class SettingsClaudeCodeSection {
     this.renderModelQuickSelect(modelSelectionEl, modelTextControl);
     const fallbackTextControl = this.renderFallbackModelSetting(modelSelectionEl);
     this.renderFallbackModelQuickSelect(modelSelectionEl, fallbackTextControl);
+    renderCostEstimateSettingsRow(modelSelectionEl, this.plugin, 'claude-code');
 
     const thinkingEl = this.createClaudeCodeGroup(containerEl, { id: 'thinking-effort' });
     this.renderThinkingSetting(thinkingEl);

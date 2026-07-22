@@ -16,6 +16,8 @@
 - 记录发送链路调试 trace 与 progress checkpoint
 - 返回 stream 完成/中断/超时/error/metadata 状态，供 `StreamLocalFinalizer` 使用
 
+`context_usage` 不进入文本渲染：router 将其发送给 tab-context coordinator，并在 app-server 未提供标题时补用当前 conversation 标题，防止精确快照覆盖 UI 标题为空。真实 backend session ID 仍通过 `message_metadata` 交给收尾持久化逻辑。
+
 第二刀后，router 自己也只保留流程编排；pending UI、trace 和内容可见性规则分别下放到：
 
 - `PendingIndicatorController`

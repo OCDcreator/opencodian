@@ -6,12 +6,13 @@ const repoRoot = process.cwd();
 const sourceRoot = join(repoRoot, 'src');
 const scopedOutputDir = join(sourceRoot, 'graphify-out');
 const committedOutputDir = join(repoRoot, 'graphify-out');
+const graphifyUpdateRunner = join(repoRoot, 'scripts', 'run-graphify-update.py');
 
 function resolveGraphifyCommand() {
   if (process.platform === 'win32') {
     return {
       command: 'py',
-      args: ['-m', 'graphify', 'update', 'src'],
+      args: [graphifyUpdateRunner, 'src'],
     };
   }
 
@@ -26,7 +27,7 @@ function resolveGraphifyCommand() {
     if (probe.status === 0) {
       return {
         command,
-        args: ['-m', 'graphify', 'update', 'src'],
+        args: [graphifyUpdateRunner, 'src'],
       };
     }
   }

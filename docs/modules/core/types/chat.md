@@ -7,6 +7,10 @@
 
 聊天系统的核心数据模型，定义了消息、会话、流式事件、上下文附件、OMO 元数据、权限请求等类型。同时导出视图类型常量 `VIEW_TYPE_OPENCODIAN`。整个聊天 UI、存储层和流式渲染管道都依赖此模块的类型定义。
 
+### 2026-07-22 精确上下文 DTO
+
+`ContextUsageSnapshot` 新增权威 `totalTokens`（优先于可见分项的合成值），并把 `cacheWriteTokens` 与 `totalCost` 设为可空。`StreamChunk` 新增 `context_usage`，仅承载会话级快照；`Conversation.lastContextUsage` 持久化最后一次已验证快照。账号额度数据不复用此 DTO。
+
 ## 导入关系
 
 上游: 无外部依赖

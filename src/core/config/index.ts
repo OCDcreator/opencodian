@@ -20,5 +20,11 @@ export type {
   ProviderDirectorySnapshot,
 } from './ModelConfigService';
 export { ModelConfigService } from './ModelConfigService';
+export {
+  type ModelPricingOverrideDraft,
+  ModelPricingService,
+  type ModelPricingServiceOptions,
+  type ModelPricingStatus,
+} from './ModelPricingService';
 export { OpencodeConfigManager } from './OpencodeConfigManager';
 export { PluginManagementService } from './PluginManagementService';

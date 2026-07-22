@@ -2,6 +2,7 @@
  * Chat-related type definitions
  */
 
+import type { ContextCostDetails } from './pricing';
 import {
   type CodexReasoningEffort,
   type CodexSandboxMode,
@@ -315,12 +316,49 @@ export interface ContextUsageSnapshot {
   modelId: string | null;
   modelName: string | null;
   contextWindow: number;
+  /**
+   * Authoritative cumulative token count when the backend exposes one.
+   * It can intentionally differ from the visible category sum (for example,
+   * Codex reports a server-side total that includes protocol-only overhead).
+   */
+  totalTokens: number;
   inputTokens: number;
   outputTokens: number;
   reasoningTokens: number;
   cacheReadTokens: number;
-  cacheWriteTokens: number;
-  totalCost: number;
+  /** `null` means this backend does not report cache writes. */
+  cacheWriteTokens: number | null;
+  /** `null` means the backend does not report a cost; never manufacture $0. */
+  totalCost: number | null;
+  /** Cost provenance for a reported value or local estimate. */
+  costDetails?: ContextCostDetails | null;
+  /** Optional request-ledger used for cost only; it is distinct from context-window token totals. */
+  billingUsage?: ContextBillingUsage | null;
+}
+
+/** Cumulative billable request tokens, currently populated by Claude Code stream results. */
+export interface ContextBillingUsage {
+  requestIds: string[];
+  providerId: string | null;
+  modelId: string | null;
+  inputTokens: number;
+  outputTokens: number;
+  reasoningTokens: number;
+  /** `null` means at least one billable response did not disclose this category. */
+  cacheReadTokens: number | null;
+  /** `null` means at least one billable response did not disclose this category. */
+  cacheWriteTokens: number | null;
+}
+
+export interface ContextBillingUsageUpdate {
+  requestId: string;
+  providerId?: string | null;
+  modelId?: string | null;
+  inputTokens: number;
+  outputTokens: number;
+  reasoningTokens: number;
+  cacheReadTokens: number | null;
+  cacheWriteTokens: number | null;
 }
 
 export type ContextBreakdownKey = 'system' | 'user' | 'assistant' | 'tool' | 'other';
@@ -344,9 +382,11 @@ export interface TabContextState {
     output: number;
     reasoning: number;
     cacheRead: number;
-    cacheWrite: number;
+    cacheWrite: number | null;
   } | null;
   totalCost: number | null;
+  costDetails: ContextCostDetails | null;
+  billingUsage: ContextBillingUsage | null;
   contextWindow: number;
   percentage: number;
   provider: string | null;
@@ -368,6 +408,8 @@ export function createEmptyTabContextState(): TabContextState {
     streamOutputTokens: 0,
     preciseTokens: null,
     totalCost: null,
+    costDetails: null,
+    billingUsage: null,
     contextWindow: 0,
     percentage: 0,
     provider: null,
@@ -404,7 +446,18 @@ export type StreamChunk =
       modelId?: string;
       sessionId?: string;
     }
-  | { type: 'usage'; inputTokens: number; outputTokens: number; sessionId?: string }
+  | {
+      type: 'usage';
+      inputTokens: number;
+      outputTokens: number;
+      sessionId?: string;
+      billingUsage?: ContextBillingUsageUpdate;
+    }
+  | {
+      /** A backend-authoritative session context snapshot (not account usage). */
+      type: 'context_usage';
+      snapshot: ContextUsageSnapshot;
+    }
   | {
       type: 'backend_event';
       source: AgentBackendKind;
@@ -483,6 +536,8 @@ export interface Conversation {
   currentNote?: string;
   externalContextPaths?: string[];
   sessionSettings?: ConversationSessionSettings;
+  /** Last verified backend context snapshot, retained for a useful reload state. */
+  lastContextUsage?: ContextUsageSnapshot;
   backgroundTaskMetadata?: ConversationBackgroundTaskMetadata;
   transport?: 'opencode' | 'acp';
   /** Legacy ACP session id retained for persisted compatibility. Use backendSessionId for new code. */

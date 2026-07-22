@@ -10,6 +10,7 @@
 ## 职责
 
 - `start()` / `doStart()` / `waitForWsUrl()`: 启动 `codex app-server --listen ws://127.0.0.1:0` 子进程，从 stdout/stderr 扫描 WebSocket URL，连接并初始化 JSON-RPC 会话
+- initialize 声明 `experimentalApi: true` 与 `requestAttestation: false`；此协商是否成功决定 Codex adapter 是否能启用真实会话上下文能力
 - `stop()`: 关闭 WebSocket，终止子进程，清理 pending requests
 - `handleMessage()`: JSON-RPC 三路分发（普通响应 / 通知 / 服务端请求），此前服务端请求被误当响应并静默丢弃，现已修正
 - `handleServerRequest()` / `sendServerRequestReply()`: 服务端发起 JSON-RPC 请求（带 `method`+`id`）的 dispatch + JSON-RPC 回写（成功回 `result`，缺 handler 回 `-32601`，handler 抛错回 `-32603`）

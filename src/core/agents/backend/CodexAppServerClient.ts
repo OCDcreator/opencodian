@@ -1,8 +1,11 @@
 /**
  * CodexAppServerClient — typed app-server API wrappers + transcript readback.
  *
- * This client is used ONLY for persisted session discovery and transcript readback.
- * The main chat send/stream path remains on the TypeScript SDK route.
+ * This client is the preferred Codex chat transport once experimental API
+ * negotiation succeeds: it owns persisted thread lifecycle, turn streaming,
+ * and authoritative `thread/tokenUsage/updated` context snapshots. The
+ * TypeScript SDK remains the compatibility fallback when that negotiation
+ * cannot be established.
  *
  * Process lifecycle and JSON-RPC plumbing live in the base `CodexAppServerTransport`;
  * this class adds the typed wrappers for thread/account/model/MCP/review routes
@@ -11,6 +14,7 @@
  * Wire types live in `CodexAppServerClientTypes` and are re-exported here so
  * existing `import { ... } from './CodexAppServerClient'` calls keep working.
  */
+/* eslint-disable max-lines -- This is the single typed app-server RPC facade; splitting endpoint wrappers into one-use adapters would weaken the protocol boundary. */
 
 import { createLogger } from '../../../shared';
 import {
@@ -29,13 +33,18 @@ import type {
   AppServerMcpToolCallResult,
   AppServerModel,
   AppServerModelProviderCapabilities,
+  AppServerNotificationSubscription,
   AppServerPermissionProfile,
   AppServerRateLimits,
   AppServerReviewResult,
   AppServerReviewTarget,
   AppServerThread,
   AppServerThreadGoal,
+  AppServerThreadNotification,
+  AppServerThreadResumeOptions,
+  AppServerThreadStartOptions,
   AppServerTurn,
+  AppServerTurnStartOptions,
   McpOauthLoginResult,
 } from './CodexAppServerClientTypes';
 import { CodexAppServerTransport } from './CodexAppServerTransport';
@@ -70,6 +79,114 @@ export class CodexAppServerClient extends CodexAppServerTransport {
       logger.warn('Failed to read thread', { threadId, error: err instanceof Error ? err.message : String(err) });
       return null;
     }
+  }
+
+  /** Start a new persisted app-server thread using experimental API options. */
+  async startThread(options: AppServerThreadStartOptions = {}): Promise<AppServerThread | null> {
+    await this.start();
+    try {
+      const result = (await this.request(
+        'thread/start',
+        options as unknown as Record<string, unknown>,
+        30000,
+      )) as { thread?: AppServerThread } | undefined;
+      return result?.thread ?? null;
+    } catch (err) {
+      logger.warn('Failed to start thread via app-server', { error: err instanceof Error ? err.message : String(err) });
+      return null;
+    }
+  }
+
+  /** Resume an existing thread and apply the current backend options. */
+  async resumeThread(threadId: string, options: AppServerThreadResumeOptions = {}): Promise<AppServerThread | null> {
+    await this.start();
+    try {
+      const result = (await this.request('thread/resume', { threadId, ...options }, 30000)) as { thread: AppServerThread } | undefined;
+      return result?.thread ?? null;
+    } catch (err) {
+      logger.warn('Failed to resume thread via app-server', {
+        threadId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return null;
+    }
+  }
+
+  /** Start a turn. Progress arrives exclusively through async notifications. */
+  async startTurn(options: AppServerTurnStartOptions): Promise<AppServerTurn | null> {
+    await this.start();
+    try {
+      const result = (await this.request(
+        'turn/start',
+        options as unknown as Record<string, unknown>,
+        30000,
+      )) as { turn?: AppServerTurn } | undefined;
+      return result?.turn ?? null;
+    } catch (err) {
+      logger.warn('Failed to start turn via app-server', {
+        threadId: options.threadId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return null;
+    }
+  }
+
+  async interruptTurn(threadId: string, turnId: string): Promise<boolean> {
+    await this.start();
+    try {
+      await this.request('turn/interrupt', { threadId, turnId }, 30000);
+      return true;
+    } catch (err) {
+      logger.warn('Failed to interrupt turn via app-server', {
+        threadId,
+        turnId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return false;
+    }
+  }
+
+  /**
+   * Subscribe to notifications belonging to one thread. The app-server sends
+   * all streaming output on this socket, so filtering at this boundary keeps
+   * concurrent Codex conversations isolated.
+   */
+  subscribeToThreadNotifications(
+    threadId: string,
+    handler: (event: AppServerThreadNotification) => void,
+  ): AppServerNotificationSubscription {
+    const methods = [
+      'thread/tokenUsage/updated',
+      'turn/completed',
+      'item/started',
+      'item/completed',
+      'item/agentMessage/delta',
+      'item/reasoning/textDelta',
+      'item/commandExecution/outputDelta',
+      'item/fileChange/patchUpdated',
+      'item/mcpToolCall/progress',
+      'warning',
+      'error',
+    ];
+    const handlers = methods.map((method) => ({
+      method,
+      listener: (params: unknown) => {
+        const candidate = params as { threadId?: unknown } | null;
+        if (candidate?.threadId === threadId) {
+          handler({ method, params });
+        }
+      },
+    }));
+    for (const entry of handlers) {
+      this.addNotificationHandler(entry.method, entry.listener);
+    }
+    return {
+      dispose: () => {
+        for (const entry of handlers) {
+          this.removeNotificationHandler(entry.method, entry.listener);
+        }
+      },
+    };
   }
 
   async listPermissionProfiles(options?: { cwd?: string; limit?: number; cursor?: string }): Promise<AppServerPermissionProfile[]> {
@@ -412,20 +529,6 @@ export class CodexAppServerClient extends CodexAppServerTransport {
    *
    * Returns the loaded thread shape on success, or null on failure.
    */
-  async resumeThread(threadId: string): Promise<AppServerThread | null> {
-    await this.start();
-    try {
-      const result = (await this.request('thread/resume', { threadId }, 30000)) as { thread: AppServerThread } | undefined;
-      return result?.thread ?? null;
-    } catch (err) {
-      logger.warn('Failed to resume thread via app-server', {
-        threadId,
-        error: err instanceof Error ? err.message : String(err),
-      });
-      return null;
-    }
-  }
-
   /**
    * Start a code review on a loaded thread.
    *

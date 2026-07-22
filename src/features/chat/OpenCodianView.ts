@@ -516,6 +516,7 @@ export class OpenCodianView extends ItemView {
   // Event refs for cleanup
   private eventRefs: EventRef[] = [];
   private backendActiveChangeDisposable: { dispose(): void } | null = null;
+  private backendCapabilityChangeDisposable: { dispose(): void } | null = null;
   private escapeHandlers: Array<() => boolean> = [];
   private backendSurfaceSwitchPromise: Promise<void> | null = null;
 
@@ -2674,6 +2675,20 @@ export class OpenCodianView extends ItemView {
           }
           return Promise.resolve(null);
         }
+        if (backend === 'codex') {
+          const adapter = this.plugin.agentServiceRegistry?.get('codex') as {
+            getContextUsageSnapshot?(sessionId: string): Promise<unknown | null>;
+          } | undefined;
+          if (typeof adapter?.getContextUsageSnapshot === 'function') {
+            return adapter.getContextUsageSnapshot(sessionId).then((result) => {
+              if (result && typeof result === 'object' && 'sessionId' in result) {
+                return result as ContextUsageSnapshot;
+              }
+              return null;
+            });
+          }
+          return Promise.resolve(null);
+        }
         return this.plugin.openCodeService.getSessionContextUsageSnapshot(sessionId);
       },
       hasTab: (tabId) => Boolean(this.tabManager?.getTab(tabId)),
@@ -2682,7 +2697,7 @@ export class OpenCodianView extends ItemView {
         this.tabManager?.setTabContextUsage(tabId, contextUsage);
       },
       getActiveTabId: () => this.getActiveTabId(),
-        openContextUsageDetailsModal: (contextState) => {
+      openContextUsageDetailsModal: (contextState) => {
         new ContextDetailModal(this.app, {
           conversation: this.currentConversation,
           contextState,
@@ -2697,6 +2712,32 @@ export class OpenCodianView extends ItemView {
             );
           },
         }).open();
+      },
+      persistContextUsageSnapshot: async (tabId, snapshot) => {
+        const conversation = this.getConversationForTab(tabId);
+        if (!conversation) {
+          return;
+        }
+        const backendSessionId = getConversationBackendSessionId(conversation);
+        const canFinalizeProvisionalCodexSession = (conversation.backend ?? 'opencode') === 'codex'
+          && typeof backendSessionId === 'string'
+          && backendSessionId.startsWith('codex-local-');
+        if (backendSessionId !== snapshot.sessionId && !canFinalizeProvisionalCodexSession) {
+          return;
+        }
+        if (canFinalizeProvisionalCodexSession) {
+          conversation.backendSessionId = snapshot.sessionId;
+        }
+        conversation.lastContextUsage = snapshot;
+        await this.plugin.saveConversation(conversation);
+      },
+      enrichContextUsageSnapshot: (snapshot) => {
+        const service = this.plugin.modelPricingService;
+        const backend = this.currentConversation?.backend ?? 'opencode';
+        return service?.enrichContextUsageSnapshot(
+          snapshot,
+          service.getBackendPricingIdentityHint(backend, this.plugin.settings.backendSettings),
+        ) ?? snapshot;
       },
     };
   }
@@ -3109,6 +3150,9 @@ export class OpenCodianView extends ItemView {
       applyUsageChunkToTab: (tabId, chunk) => {
         this.activeTabContextUsageCoordinator.applyUsageChunkToTab(tabId, chunk);
       },
+      applyContextUsageSnapshotToTab: (tabId, snapshot) => {
+        this.activeTabContextUsageCoordinator.applyContextUsageSnapshotToTab(tabId, snapshot);
+      },
       showPermissionDialog: (request, tabId) => this.showPermissionDialog(request, tabId),
       showQuestionDialog: async (request, tabId) => {
         await this.questionRuntimeServices.resolutionFlowCoordinator.showQuestionDialog(request, tabId);
@@ -3334,6 +3378,8 @@ export class OpenCodianView extends ItemView {
     this.permissionInlineCardRenderer.clearSessionApprovals();
     this.backendActiveChangeDisposable?.dispose();
     this.backendActiveChangeDisposable = null;
+    this.backendCapabilityChangeDisposable?.dispose();
+    this.backendCapabilityChangeDisposable = null;
 
     // Cleanup navigation sidebar
     this.conversationTabRuntimeCoordinator.destroyTabSystem();
@@ -3873,6 +3919,14 @@ export class OpenCodianView extends ItemView {
     this.backendActiveChangeDisposable?.dispose();
     this.backendActiveChangeDisposable = this.plugin.agentServiceRegistry?.onActiveChange((backend) => {
       void this.ensureActiveBackendConversationSurface(backend ?? undefined);
+    }) ?? null;
+    this.backendCapabilityChangeDisposable?.dispose();
+    this.backendCapabilityChangeDisposable = this.plugin.agentServiceRegistry?.onCapabilitiesChange((backend) => {
+      if (backend !== this.plugin.agentServiceRegistry?.getActiveKind()) {
+        return;
+      }
+      this.refreshComposerToolbarForActiveBackend();
+      this.activeTabContextUsageCoordinator.syncIdentity();
     }) ?? null;
   }
 

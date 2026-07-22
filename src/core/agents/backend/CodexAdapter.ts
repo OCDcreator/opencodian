@@ -20,7 +20,7 @@ import { join } from 'node:path';
 import type { Codex, Thread, ThreadEvent, ThreadOptions, UserInput } from '@openai/codex-sdk';
 
 import { createLogger } from '../../../shared';
-import type { AgentBackendKind, ImageAttachment, StreamChunk } from '../../types/chat';
+import type { AgentBackendKind, ContextUsageSnapshot, ImageAttachment, StreamChunk } from '../../types/chat';
 import { AgentCapability, type BackendCapabilities } from '../AgentCapability';
 import type {
   AgentChatCapability,
@@ -29,10 +29,33 @@ import type {
   AgentForkCapability,
   AgentService,
   AgentSessionCapability,
+  CapabilityChangeHandler,
   Disposable,
   StatusChangeHandler,
 } from './AgentService';
-import { type AppServerAccountRateLimitsResult, type AppServerAccountUsageResult, type AppServerMcpResourceReadResult, type AppServerMcpServerStatus, type AppServerMcpToolCallResult, type AppServerModel, type AppServerModelProviderCapabilities, type AppServerPermissionProfile, type AppServerReviewResult, type AppServerReviewTarget, type AppServerThreadGoal, CodexAppServerClient,type McpOauthLoginResult } from './CodexAppServerClient';
+import {
+  type AppServerAccountRateLimitsResult,
+  type AppServerAccountUsageResult,
+  type AppServerMcpResourceReadResult,
+  type AppServerMcpServerStatus,
+  type AppServerMcpToolCallResult,
+  type AppServerModel,
+  type AppServerModelProviderCapabilities,
+  type AppServerPermissionProfile,
+  type AppServerReviewResult,
+  type AppServerReviewTarget,
+  type AppServerThread,
+  type AppServerThreadGoal,
+  type AppServerThreadStartOptions,
+  type AppServerTurnStartOptions,
+  CodexAppServerClient,
+  type McpOauthLoginResult,
+} from './CodexAppServerClient';
+import {
+  type AppServerStreamState,
+  mapAppServerNotification,
+  readAppServerTurnError,
+} from './CodexAppServerStreamMapper';
 import { CodexStreamNormalizer } from './CodexStreamNormalizer';
 
 const logger = createLogger('CodexAdapter');
@@ -43,6 +66,12 @@ const logger = createLogger('CodexAdapter');
 
 /** Factory function for creating a Codex SDK instance. */
 export type CodexFactory = () => Promise<Codex>;
+
+/**
+ * Optional app-server construction seam. Returning `null` explicitly models
+ * a failed/unavailable negotiation while preserving the SDK chat fallback.
+ */
+export type CodexAppServerClientFactory = () => CodexAppServerClient | null;
 
 export interface CodexAdapterOptions {
   /** OpenAI API key. Falls back to CODEX_API_KEY / OPENAI_API_KEY env vars. */
@@ -76,6 +105,8 @@ export interface CodexAdapterOptions {
   pluginDir?: string;
   /** DI seam: override the Codex SDK instance factory. */
   createCodex?: CodexFactory;
+  /** DI seam: provide or deliberately disable the local app-server client. */
+  createAppServerClient?: CodexAppServerClientFactory;
 }
 
 export interface CodexModelSummary {
@@ -224,18 +255,22 @@ export class CodexAdapter
   readonly kind: AgentBackendKind = 'codex';
   readonly displayName = 'Codex';
   readonly description = 'OpenAI Codex coding agent';
-  readonly capabilities = CODEX_CAPABILITIES;
+  private readonly capabilitySet = new Set<AgentCapability>(CODEX_CAPABILITIES);
+  get capabilities(): BackendCapabilities { return this.capabilitySet; }
 
   private _status: AgentConnectionStatus = 'disconnected';
   private codex: Codex | null = null;
   private sessions = new Map<string, CodexSessionEntry>();
   private threadAlias = new Map<string, string>(); // threadId → provisionalId
   private activeControllers = new Map<string, AbortController>();
+  private activeAppServerTurns = new Map<string, { threadId: string; turnId: string | null }>();
+  private appServerContextSnapshots = new Map<string, ContextUsageSnapshot>();
   private statusHandlers = new Set<StatusChangeHandler>();
+  private capabilityHandlers = new Set<CapabilityChangeHandler>();
   /**
-   * Adjunct app-server client for persisted session discovery and
-   * transcript readback.  Kept separate from the main TypeScript SDK
-   * chat path per the multi-route architecture.
+   * Primary local app-server transport. It owns the chat turn whenever the
+   * experimental protocol negotiates successfully, because that is where
+   * Codex publishes authoritative thread context usage notifications.
    */
   private appServerClient: CodexAppServerClient | null = null;
 
@@ -296,24 +331,31 @@ export class CodexAdapter
         });
       }
 
-      // Start the adjunct app-server client for persisted session discovery.
-      // This is best-effort: if the app-server fails to start, the adapter
-      // still works for in-memory sessions and the main SDK chat path.
-      if (this.options.codexPathOverride) {
-        try {
-          this.appServerClient = new CodexAppServerClient({
+      // The app-server is the primary Codex chat transport because it is the
+      // only local protocol that publishes authoritative context usage. The
+      // SDK remains a compatibility fallback solely when negotiation fails.
+      try {
+        const appServerClient = this.options.createAppServerClient
+          ? this.options.createAppServerClient()
+          : new CodexAppServerClient({
             codexPathOverride: this.options.codexPathOverride,
             pluginDir: this.options.pluginDir,
           });
+        if (appServerClient) {
+          this.appServerClient = appServerClient;
           await this.appServerClient.start();
+          this.setContextCapabilityAvailable(true);
           // Wire approval handlers if a host was set before start.
           this.registerApprovalHandlers();
-        } catch (err) {
-          logger.warn('Codex app-server client failed to start; falling back to in-memory sessions only', {
-            error: err instanceof Error ? err.message : String(err),
-          });
-          this.appServerClient = null;
+        } else {
+          this.setContextCapabilityAvailable(false);
         }
+      } catch (err) {
+        logger.warn('Codex app-server negotiation failed; preserving SDK chat without context usage', {
+          error: err instanceof Error ? err.message : String(err),
+        });
+        this.appServerClient = null;
+        this.setContextCapabilityAvailable(false);
       }
 
       this.setStatus('connected');
@@ -328,6 +370,8 @@ export class CodexAdapter
       controller.abort();
     }
     this.activeControllers.clear();
+    this.activeAppServerTurns.clear();
+    this.appServerContextSnapshots.clear();
     this.codex = null;
     if (this.appServerClient) {
       try {
@@ -338,6 +382,7 @@ export class CodexAdapter
       }
       this.appServerClient = null;
     }
+    this.setContextCapabilityAvailable(false);
     this.setStatus('disconnected');
   }
 
@@ -1046,6 +1091,11 @@ export class CodexAdapter
     };
   }
 
+  onCapabilitiesChange(handler: CapabilityChangeHandler): Disposable {
+    this.capabilityHandlers.add(handler);
+    return { dispose: () => this.capabilityHandlers.delete(handler) };
+  }
+
   // -------------------------------------------------------------------------
   // AgentChatCapability
   // -------------------------------------------------------------------------
@@ -1056,6 +1106,15 @@ export class CodexAdapter
       return;
     }
 
+    if (this.canUseAppServerChat()) {
+      yield* this.sendMessageViaAppServer(request);
+      return;
+    }
+
+    yield* this.sendMessageViaSdk(request);
+  }
+
+  private async *sendMessageViaSdk(request: AgentChatSendRequest): AsyncGenerator<StreamChunk> {
     let thread: Thread | null;
     try {
       thread = this.resolveOrCreateThread(request.sessionId);
@@ -1120,6 +1179,233 @@ export class CodexAdapter
     }
   }
 
+  /**
+   * Primary app-server chat path. A successful protocol negotiation never
+   * silently falls through to SDK chat on a turn error: the same thread owns
+   * messages, approvals, cancellation, and authoritative context snapshots.
+   */
+  private async *sendMessageViaAppServer(request: AgentChatSendRequest): AsyncGenerator<StreamChunk> {
+    const client = this.appServerClient;
+    if (!client) {
+      yield { type: 'error', content: 'Codex app-server is not available' };
+      return;
+    }
+
+    const outputFormat = request.options?.outputFormat;
+    const outputSchema = outputFormat && typeof outputFormat === 'object' && 'schema' in outputFormat
+      ? outputFormat.schema
+      : undefined;
+    let tempDir: string | undefined;
+    let subscription: { dispose(): void } | null = null;
+    const controller = new AbortController();
+    this.activeControllers.set(request.sessionId, controller);
+
+    const pending: StreamChunk[] = [];
+    const streamedAgentMessageItemIds = new Set<string>();
+    const streamedReasoningItemIds = new Set<string>();
+    const streamState: AppServerStreamState = {
+      streamedAgentMessageItemIds,
+      streamedReasoningItemIds,
+      startedTodoItemIds: new Set<string>(),
+      outputSchema,
+    };
+    let wake: (() => void) | null = null;
+    let completed = false;
+    const enqueue = (chunk: StreamChunk): void => {
+      pending.push(chunk);
+      const resolve = wake;
+      wake = null;
+      resolve?.();
+    };
+
+    try {
+      const thread = await this.resolveOrStartAppServerThread(request.sessionId);
+      if (!thread) {
+        yield { type: 'error', content: `Failed to resolve Codex session: ${request.sessionId}` };
+        return;
+      }
+      this.aliasSession(request.sessionId, thread.id);
+
+      subscription = client.subscribeToThreadNotifications(thread.id, (event) => {
+        const mapping = mapAppServerNotification({
+          event,
+          modelId: this.options.model ?? null,
+          sessionId: request.sessionId,
+          streamState,
+          threadId: thread.id,
+        });
+        if (mapping.contextUsageSnapshot) {
+          this.appServerContextSnapshots.set(thread.id, mapping.contextUsageSnapshot);
+        }
+        for (const chunk of mapping.chunks) {
+          enqueue(chunk);
+        }
+        const params = event.params as { turn?: { id?: string; error?: unknown } } | null;
+        const completedTurn = params?.turn;
+        const active = this.activeAppServerTurns.get(request.sessionId);
+        if (
+          event.method === 'turn/completed'
+          && (!active?.turnId || completedTurn?.id === active.turnId)
+        ) {
+          const error = readAppServerTurnError(completedTurn?.error);
+          if (error) {
+            enqueue({ type: 'error', content: error });
+          }
+          completed = true;
+          const resolve = wake;
+          wake = null;
+          resolve?.();
+        }
+      });
+
+      const input = this.buildAppServerInput(request.content, request.images);
+      tempDir = input.tempDir;
+      const turnOptions: AppServerTurnStartOptions = {
+        threadId: thread.id,
+        input: input.payload,
+        ...this.buildAppServerTurnOptions(outputSchema),
+      };
+      const turn = await client.startTurn(turnOptions);
+      if (!turn?.id) {
+        yield { type: 'error', content: 'Codex app-server did not start a turn' };
+        return;
+      }
+      this.activeAppServerTurns.set(request.sessionId, { threadId: thread.id, turnId: turn.id });
+      if (controller.signal.aborted) {
+        await client.interruptTurn(thread.id, turn.id);
+      }
+
+      yield { type: 'message_start' };
+      yield {
+        type: 'message_metadata',
+        messageId: `${thread.id}::${crypto.randomUUID()}`,
+        timestamp: Date.now(),
+        sessionId: thread.id,
+        ...(this.options.model ? { modelId: this.options.model } : {}),
+      };
+      while (!completed && !controller.signal.aborted) {
+        if (pending.length === 0) {
+          await new Promise<void>((resolve) => { wake = resolve; });
+        }
+        while (pending.length > 0) {
+          yield pending.shift()!;
+        }
+      }
+      while (pending.length > 0) {
+        yield pending.shift()!;
+      }
+      if (!controller.signal.aborted) {
+        yield { type: 'message_stop' };
+      }
+    } catch (err) {
+      yield { type: 'error', content: err instanceof Error ? err.message : String(err) };
+    } finally {
+      subscription?.dispose();
+      this.activeControllers.delete(request.sessionId);
+      this.activeAppServerTurns.delete(request.sessionId);
+      if (tempDir) {
+        this.safeRemoveTempDir(tempDir);
+      }
+    }
+  }
+
+  private canUseAppServerChat(): boolean {
+    return Boolean(
+      this.appServerClient
+      && this.capabilitySet.has(AgentCapability.Context)
+      && typeof this.appServerClient.startThread === 'function'
+      && typeof this.appServerClient.startTurn === 'function',
+    );
+  }
+
+  private async resolveOrStartAppServerThread(sessionId: string): Promise<AppServerThread | null> {
+    const client = this.appServerClient;
+    if (!client) {
+      return null;
+    }
+    const entry = this.resolveSession(sessionId);
+    const knownThreadId = entry?.threadId
+      ?? (!this.isProvisionalId(sessionId) ? sessionId : null);
+    const options = this.buildAppServerThreadOptions();
+    const thread = knownThreadId
+      ? await client.resumeThread(knownThreadId, options)
+      : await client.startThread(options);
+    if (!thread?.id) {
+      return null;
+    }
+    const provisionalId = entry?.provisionalId ?? sessionId;
+    const existing = this.sessions.get(provisionalId);
+    if (existing) {
+      existing.threadId = thread.id;
+      existing.thread = null;
+    } else {
+      this.sessions.set(provisionalId, { provisionalId, threadId: thread.id, thread: null });
+    }
+    return thread;
+  }
+
+  private buildAppServerThreadOptions(): AppServerThreadStartOptions {
+    const config: Record<string, unknown> = {};
+    if (this.options.webSearchMode) {
+      config.web_search = this.options.webSearchMode;
+    }
+    return {
+      ...(this.options.model ? { model: this.options.model } : {}),
+      ...(this.options.workingDirectory ? { cwd: this.options.workingDirectory } : {}),
+      ...(this.options.sandboxMode ? { sandbox: this.options.sandboxMode } : {}),
+      approvalPolicy: 'on-request',
+      ...(Object.keys(config).length > 0 ? { config } : {}),
+    };
+  }
+
+  private buildAppServerTurnOptions(outputSchema: unknown): Omit<AppServerTurnStartOptions, 'threadId' | 'input'> {
+    const writableRoots = [this.options.workingDirectory, ...(this.options.additionalDirectories ?? [])]
+      .filter((path): path is string => typeof path === 'string' && path.trim().length > 0)
+      .filter((path, index, paths) => paths.indexOf(path) === index);
+    const networkAccess = this.options.networkAccessEnabled === true;
+    const sandboxPolicy = this.options.sandboxMode === 'danger-full-access'
+      ? { type: 'dangerFullAccess' as const }
+      : this.options.sandboxMode === 'read-only'
+        ? { type: 'readOnly' as const, networkAccess }
+        : {
+          type: 'workspaceWrite' as const,
+          writableRoots,
+          networkAccess,
+          excludeTmpdirEnvVar: false,
+          excludeSlashTmp: false,
+        };
+    return {
+      ...(this.options.workingDirectory ? { cwd: this.options.workingDirectory } : {}),
+      approvalPolicy: 'on-request',
+      sandboxPolicy,
+      ...(this.options.model ? { model: this.options.model } : {}),
+      ...(this.options.modelReasoningEffort ? { effort: this.options.modelReasoningEffort } : {}),
+      ...(outputSchema !== undefined ? { outputSchema } : {}),
+    };
+  }
+
+  private buildAppServerInput(
+    content: string,
+    images: ImageAttachment[] | undefined,
+  ): {
+    payload: AppServerTurnStartOptions['input'];
+    tempDir?: string;
+  } {
+    if (!images || images.length === 0) {
+      return { payload: [{ type: 'text', text: content, text_elements: [] }] };
+    }
+    const tempDir = mkdtempSync(join(tmpdir(), 'opencodian-codex-image-'));
+    const payload: AppServerTurnStartOptions['input'] = [{ type: 'text', text: content, text_elements: [] }];
+    for (const image of images) {
+      const ext = this.mediaTypeToExtension(image.mediaType);
+      const fileName = image.filename ?? `image-${Date.now()}.${ext}`;
+      const filePath = join(tempDir, fileName);
+      writeFileSync(filePath, Buffer.from(image.data, 'base64'));
+      payload.push({ type: 'localImage', path: filePath });
+    }
+    return { payload, tempDir };
+  }
+
   // -------------------------------------------------------------------------
   // Image input helpers
   // -------------------------------------------------------------------------
@@ -1174,11 +1460,22 @@ export class CodexAdapter
   }
 
   cancelStream(sessionId: string): void {
+    const activeTurn = this.activeAppServerTurns.get(sessionId);
+    if (activeTurn?.turnId && this.appServerClient) {
+      void this.appServerClient.interruptTurn(activeTurn.threadId, activeTurn.turnId);
+    }
     const controller = this.activeControllers.get(sessionId);
     if (controller) {
       controller.abort();
       this.activeControllers.delete(sessionId);
     }
+  }
+
+  /** Return the most recent app-server-authoritative context snapshot. */
+  async getContextUsageSnapshot(sessionId: string): Promise<ContextUsageSnapshot | null> {
+    const entry = this.resolveSession(sessionId);
+    const threadId = entry?.threadId ?? (!this.isProvisionalId(sessionId) ? sessionId : null);
+    return threadId ? this.appServerContextSnapshots.get(threadId) ?? null : null;
   }
 
   // -------------------------------------------------------------------------
@@ -1452,6 +1749,25 @@ export class CodexAdapter
         handler(status);
       } catch {
         // Swallow handler errors — must not break status propagation.
+      }
+    }
+  }
+
+  private setContextCapabilityAvailable(available: boolean): void {
+    const changed = available
+      ? !this.capabilitySet.has(AgentCapability.Context)
+      : this.capabilitySet.delete(AgentCapability.Context);
+    if (available) {
+      this.capabilitySet.add(AgentCapability.Context);
+    }
+    if (!changed) {
+      return;
+    }
+    for (const handler of this.capabilityHandlers) {
+      try {
+        handler(new Set(this.capabilitySet));
+      } catch {
+        // Capability changes must not be blocked by a UI subscriber.
       }
     }
   }

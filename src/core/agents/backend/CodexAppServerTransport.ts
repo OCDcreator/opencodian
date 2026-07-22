@@ -134,6 +134,10 @@ export class CodexAppServerTransport {
     // Initialize the JSON-RPC session
     await this.request('initialize', {
       clientInfo: { name: 'opencodian', version: '1.0.0' },
+      capabilities: {
+        experimentalApi: true,
+        requestAttestation: false,
+      },
     });
 
     // Send initialized notification

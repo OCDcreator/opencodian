@@ -4,6 +4,8 @@ export {
   type ChatMessage,
   type CompactionDividerMeta,
   type ContentBlock,
+  type ContextBillingUsage,
+  type ContextBillingUsageUpdate,
   type ContextBreakdownKey,
   type ContextBreakdownSegment,
   type ContextUsageSnapshot,
@@ -37,6 +39,18 @@ export {
   VIEW_TYPE_OPENCODIAN,
   VIEW_TYPE_OPENCODIAN_SETTINGS,
 } from './chat';
+
+// Local model pricing and cost-estimate provenance
+export {
+  type ContextCostCompleteness,
+  type ContextCostDetails,
+  type ContextCostSource,
+  type ContextCostTokenKind,
+  type ModelPricingCatalog,
+  type ModelPricingCatalogEntry,
+  type ModelPricingOverride,
+  type ModelPricingRates,
+} from './pricing';
 
 // Model types
 export {

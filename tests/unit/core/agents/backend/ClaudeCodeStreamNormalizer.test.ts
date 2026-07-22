@@ -226,6 +226,47 @@ describe('ClaudeCodeStreamNormalizer', () => {
       inputTokens: 7,
       outputTokens: 2,
       sessionId: 'claude-session-3',
+      billingUsage: {
+        requestId: 'claude-session-3:claude-message:7:2',
+        inputTokens: 7,
+        outputTokens: 2,
+        reasoningTokens: 0,
+        cacheReadTokens: null,
+        cacheWriteTokens: null,
+      },
+    }]);
+  });
+
+  it('emits exact cache billing categories only from terminal result usage', () => {
+    const normalizer = createClaudeCodeStreamNormalizer({ sessionId: 'claude-session-4' });
+
+    const chunks = normalizer.transformSDKMessage({
+      type: 'result',
+      uuid: 'turn-4',
+      model: 'claude-opus-4-1',
+      total_usage: {
+        input_tokens: 100,
+        output_tokens: 20,
+        reasoning_tokens: 5,
+        cache_read_input_tokens: 40,
+        cache_creation_input_tokens: 30,
+      },
+    });
+
+    expect(chunks).toEqual([{
+      type: 'usage',
+      inputTokens: 100,
+      outputTokens: 25,
+      sessionId: 'claude-session-4',
+      billingUsage: {
+        requestId: 'turn-4',
+        modelId: 'claude-opus-4-1',
+        inputTokens: 100,
+        outputTokens: 20,
+        reasoningTokens: 5,
+        cacheReadTokens: 40,
+        cacheWriteTokens: 30,
+      },
     }]);
   });
 
@@ -317,6 +358,14 @@ describe('ClaudeCodeStreamNormalizer', () => {
       inputTokens: 1,
       outputTokens: 2,
       sessionId: 'claude-session-structured-output',
+      billingUsage: {
+        requestId: 'claude-session-structured-output:claude-message:1:2',
+        inputTokens: 1,
+        outputTokens: 2,
+        reasoningTokens: 0,
+        cacheReadTokens: null,
+        cacheWriteTokens: null,
+      },
     }]);
   });
 

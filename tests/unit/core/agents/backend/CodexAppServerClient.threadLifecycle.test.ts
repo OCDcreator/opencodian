@@ -63,17 +63,19 @@ const SAMPLE_THREAD = {
   updatedAt: 1781346265,
 };
 
+function resetAppServerMocks(): void {
+  jest.clearAllMocks();
+  mockWsInstance.send.mockClear();
+  mockWsInstance.close.mockClear();
+  mockWsInstance.readyState = 1;
+  mockWsInstance.onopen = null;
+  mockWsInstance.onmessage = null;
+  mockWsInstance.onerror = null;
+  mockWsInstance.onclose = null;
+}
+
 describe('CodexAppServerClient thread lifecycle methods', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-    mockWsInstance.send.mockClear();
-    mockWsInstance.close.mockClear();
-    mockWsInstance.readyState = 1;
-    mockWsInstance.onopen = null;
-    mockWsInstance.onmessage = null;
-    mockWsInstance.onerror = null;
-    mockWsInstance.onclose = null;
-  });
+  beforeEach(resetAppServerMocks);
 
   describe('listThreads', () => {
     it('passes archived=true to thread/list when requested', async () => {
@@ -122,6 +124,60 @@ describe('CodexAppServerClient thread lifecycle methods', () => {
       expect(result[0].archived).toBe(false);
     });
   });
+
+  it('negotiates experimental API and exposes thread/turn chat lifecycle wrappers', async () => {
+    const proc = createMockProcess();
+    mockSpawn.mockReturnValue(proc);
+    emitWsUrl(proc.stdout!);
+    setTimeout(() => mockWsInstance.onopen?.(), 10);
+    const client = new CodexAppServerClient({ codexPathOverride: '/path/to/codex' });
+    const requests: Array<{ method: string; params: Record<string, unknown> }> = [];
+
+    mockWsInstance.send.mockImplementation((data: string) => {
+      const msg = JSON.parse(data) as { id?: number; method?: string; params?: Record<string, unknown> };
+      if (!msg.method) return;
+      requests.push({ method: msg.method, params: msg.params ?? {} });
+      if (msg.method === 'initialize') {
+        setTimeout(() => simulateResponse(msg.id!, {}), 5);
+      } else if (msg.method === 'thread/start') {
+        setTimeout(() => simulateResponse(msg.id!, { thread: { ...SAMPLE_THREAD, id: 'thread-new' } }), 5);
+      } else if (msg.method === 'thread/resume') {
+        setTimeout(() => simulateResponse(msg.id!, { thread: { ...SAMPLE_THREAD, id: 'thread-existing' } }), 5);
+      } else if (msg.method === 'turn/start') {
+        setTimeout(() => simulateResponse(msg.id!, { turn: { id: 'turn-1', items: [] } }), 5);
+      } else if (msg.method === 'turn/interrupt') {
+        setTimeout(() => simulateResponse(msg.id!, {}), 5);
+      }
+    });
+
+    await expect(client.startThread({ model: 'gpt-5', cwd: '/vault' })).resolves.toMatchObject({ id: 'thread-new' });
+    await expect(client.resumeThread('thread-existing', { sandbox: 'workspace-write' })).resolves.toMatchObject({ id: 'thread-existing' });
+    await expect(client.startTurn({
+      threadId: 'thread-existing',
+      input: [{ type: 'text', text: 'hello', text_elements: [] }],
+    })).resolves.toMatchObject({ id: 'turn-1' });
+    await expect(client.interruptTurn('thread-existing', 'turn-1')).resolves.toBe(true);
+
+    expect(requests).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        method: 'initialize',
+        params: expect.objectContaining({
+          capabilities: { experimentalApi: true, requestAttestation: false },
+        }),
+      }),
+      { method: 'thread/start', params: { model: 'gpt-5', cwd: '/vault' } },
+      { method: 'thread/resume', params: { threadId: 'thread-existing', sandbox: 'workspace-write' } },
+      expect.objectContaining({
+        method: 'turn/start',
+        params: expect.objectContaining({ threadId: 'thread-existing' }),
+      }),
+      { method: 'turn/interrupt', params: { threadId: 'thread-existing', turnId: 'turn-1' } },
+    ]));
+  });
+});
+
+describe('CodexAppServerClient persisted thread actions', () => {
+  beforeEach(resetAppServerMocks);
 
   describe('forkThread', () => {
     it('returns the forked thread from app-server response', async () => {

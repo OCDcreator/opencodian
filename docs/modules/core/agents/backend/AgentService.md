@@ -11,6 +11,7 @@
 
 - 暴露 `AgentService`，定义 backend kind、显示信息、连接状态、能力集合、生命周期和状态订阅契约
 - 定义 `AgentConnectionStatus`、`AgentServiceInfo`、`Disposable`、`StatusChangeHandler` 等共享类型
+- `onCapabilitiesChange?()` 是可选的动态能力订阅：例如 Codex app-server 协商就绪/失效时，可通知 composer 重新挂载或移除 Context slot
 - 暴露 chat、session、fork、branching、todo、question、permission、model、MCP、config、tools、auth 等可选 capability interface
 - 约束调用方先通过 `hasCapability()` / capability 集合判断，再按具体能力接口访问扩展方法
 

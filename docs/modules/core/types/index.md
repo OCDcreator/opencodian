@@ -2,7 +2,7 @@
 
 > **源码**: `src/core/types/index.ts`
 > **状态**: [REVIEW]
-> **Updated**: 2026-06-09 — added `CodexBackendSettings`, `getDefaultCodexBackendSettings` re-exports
+> **Updated**: 2026-07-22 — added local model pricing and cost-provenance type re-exports; local estimates remain distinct from backend-reported and subscription billing values.
 
 ## 概述
 
@@ -11,7 +11,7 @@ OpenCodian 全局类型的主聚合入口。它把聊天、模型、设置、权
 ## 导入关系
 
 ```text
-上游: ./chat, ./models, ./settings, ./tools, ./permission, ./opencodeConfig
+上游: ./chat, ./pricing, ./models, ./settings, ./tools, ./permission, ./opencodeConfig
 下游: 几乎所有业务模块，尤其是 main.ts、OpenCodianView、OpenCodeService、设置 UI
 ```
 
@@ -31,6 +31,9 @@ OpenCodian 全局类型的主聚合入口。它把聊天、模型、设置、权
 | `StreamChunk` | type | 流式事件联合类型（13 种事件） |
 | `TabContextState` | type | 标签页上下文状态 |
 | `ContextUsageSnapshot` | type | backend-neutral session context usage 快照 DTO，供 OpenCode/Claude Code snapshot owner 与 chat context ring 管线共享 |
+| `ContextCostDetails` | type | 成本的来源、完整度、有效本地费率与 tier 提示 |
+| `ModelPricingRates` / `ModelPricingOverride` | type | USD/百万 Token 单价与用户覆盖 |
+| `ModelPricingCatalog` | type | 手动刷新的 models.dev 本地缓存 |
 | `createEmptyTabContextState` | function | 创建空白上下文状态 |
 | `getConversationBackendSessionId` | function | 按 `backendSessionId → openCodeSessionId → acpSessionId` 解析 backend-neutral session id |
 | `UsageInfo` | type | Token 使用信息 |
@@ -120,6 +123,7 @@ OpenCodian 全局类型的主聚合入口。它把聊天、模型、设置、权
 - **chat**: 消息、会话、流式事件、上下文附件、OMO 元数据、待办、差异
 - **models**: 模型提供商与上下文窗口信息
 - **settings**: 默认设置、normalize 工具、主题与服务器配置（约 40+ 个字段）
+- **pricing**: models.dev 目录、用户单价覆盖和本地估算 provenance；不表示供应商账单
 - **tools**: 工具调用数据结构
 - **permission**: 权限请求与审批结构
 - **opencodeConfig**: 本地 OpenCode 配置文件 schema，以及 agent / command / share / compaction / formatter / LSP / MCP / legacy tools typing

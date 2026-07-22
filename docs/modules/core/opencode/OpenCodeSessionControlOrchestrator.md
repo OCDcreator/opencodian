@@ -7,6 +7,10 @@
 
 `OpenCodeSessionControlOrchestrator` 是 `OpenCodeService` 内部的 session control / message-operation owner。它把 fork/revert/unrevert/diff、context-usage snapshot、session tree/share/summarize、message command/shell，以及 message/part 的更新删除操作收束到同一个较厚 orchestrator 里，让 `OpenCodeService` 退回为 transport seam 与对外 façade。
 
+### 2026-07-22 context snapshot compatibility
+
+`ContextUsageSnapshot` 现含 `totalTokens`。OpenCode 仍从可用的 input/output/reasoning/cache 分项合成它；未由后端报告的 cache-write 或 cost 保持 `null`，而非伪造为零，以便 Context UI 与 Codex 的精确数据共用同一 DTO。
+
 它不改变 `OpenCodeService` 的公开 API：上层仍然通过 `OpenCodeService.forkSession()`、`revertSession()`、`getSessionDiff()`、`getSessionContextUsageSnapshot()`、`runSessionCommand()`、`updateMessagePart()` 等方法访问这条链路。
 
 ## 导入关系

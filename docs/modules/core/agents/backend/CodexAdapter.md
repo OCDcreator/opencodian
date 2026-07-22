@@ -8,12 +8,16 @@
 
 `CodexAdapter.ts` 是 OpenAI Codex SDK 接入的 AgentService 适配器。它实现 `AgentChatCapability` 和 `AgentSessionCapability`，把 Codex SDK 的 `Codex` / `Thread` API 包装为统一的 agent 后端接口。
 
+### 2026-07-22：app-server 主聊天与精确上下文
+
+协议协商成功后，主聊天改由本机 `codex app-server` 的 `thread/start` / `thread/resume` / `turn/start` 承担；只有协商失败才使用 SDK 聊天回退。`thread/tokenUsage/updated` 是唯一的会话上下文权威来源：其累计 `totalTokens` 与 `modelContextWindow` 驱动 Context Ring，账号 `account/usage/read` 永不参与该 UI。adapter 将图片、sandbox、网络、web search、effort、JSON schema、审批、工具/文件/todo 通知映射回既有 `StreamChunk` 管道，并在取消时调用 `turn/interrupt`。每一轮也发出含真实 thread ID 的 `message_metadata`，使本地 provisional ID 能收敛为可恢复的后台会话 ID。
+
 ## 职责
 
 - 实现 `AgentService` 核心：kind=`'codex'`、identity、status lifecycle、status change handlers
 - 实现 `AgentChatCapability`：通过 `thread.runStreamed()` 提供异步流式聊天，经由 `CodexStreamNormalizer` 转换事件
 - 实现 `AgentSessionCapability`：基于 provisional local ID + thread ID aliasing 的会话管理
-- 提供 DI seam (`CodexFactory`)：测试时注入 mock Codex 实例，无需真实 API key 或网络
+- 提供 DI seam（`CodexFactory` 与 `CodexAppServerClientFactory`）：测试时可分别注入 mock SDK、mock app-server，或显式返回 `null` 验证协商失败后的 SDK 回退，无需真实 API key、网络或本机 Codex 状态库
 - 仅声明有 smoke-test 证据的能力：Chat、Sessions、Thinking、FileOps、Shell
 - 使用 bundled `import('@openai/codex-sdk')` (esbuild 打包进 main.js)
 - `sendMessage` 在 `resolveOrCreateThread` 阶段捕获异常并降级为 error chunk
@@ -21,7 +25,7 @@
 - `updateAdditionalDirectories()` 允许运行时更新额外目录，影响后续 thread 创建/恢复
 - `updateNetworkAccessEnabled()` 允许运行时更新网络访问开关，影响后续 thread 创建/恢复
 - `updateWebSearchMode()` 允许运行时更新网页搜索模式（disabled/cached/live），影响后续 thread 创建/恢复
-- **App-server adjunct client** (Checkpoint 14H): `start()` 初始化 `CodexAppServerClient` 用于 persisted session discovery；`listSessions()` 合并 in-memory 与 app-server threads，现在会同时请求 `thread/list archived=false` 与 `thread/list archived=true` 并合并，使 `BackendSessionBrowserModal` 能同时展示活跃与归档 threads；`getSessionMessages()` 通过 app-server 读取 thread turns 并归一化为 `{ role, content }` 形状供 `AgentBackendRouting` 消费；`getSession()` 优先 in-memory，回退 app-server；`stop()` 清理 app-server client。App-server 为 best-effort：启动失败时自动降级为仅 in-memory sessions，不影响主 SDK chat path。
+- `CodexAppServerClient` 也负责 persisted session discovery；`listSessions()` 合并 in-memory 与 app-server threads，现在会同时请求 `thread/list archived=false` 与 `thread/list archived=true` 并合并，使 `BackendSessionBrowserModal` 能同时展示活跃与归档 threads；`getSessionMessages()` 通过 app-server 读取 thread turns 并归一化为 `{ role, content }` 形状供 `AgentBackendRouting` 消费；`getSession()` 优先 in-memory，回退 app-server；`stop()` 清理 app-server client。
 - 实现 `AgentForkCapability`：`forkSession()` / `archiveSession()` / `unarchiveSession()` 通过 app-server `thread/fork`、`thread/archive`、`thread/unarchive` 操作 persisted threads
 - **Server-request approval bridge** (Round 5): `setApprovalHost(host)` 注入 UI 回调；当 app-server client 可用且 host 提供 `collectApproval` 时，在 `start()` 后注册 `execCommandApproval` / `applyPatchApproval` 处理器。处理器把服务端 params 归一化为 `CodexApprovalRequest`（`kind`、`summary`、`command?`、`cwd?`、`changeCount?`、`raw`），交给 host 回调收集 `CodexApprovalDecision`（`approved` / `approved_for_session` / `denied` / `abort`），返回 `{ decision }` 由已落地的 bridge 基础设施回写为 JSON-RPC result。host 缺失/抛错/返回 null 时安全降级为 `denied`。`stop()` 注销处理器。导出类型：`CodexApprovalKind`、`CodexApprovalRequest`、`CodexApprovalDecision`、`CodexApprovalBridgeHost`
 

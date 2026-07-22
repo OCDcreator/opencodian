@@ -90,6 +90,7 @@ describe('CodexAdapter MCP server readback — getMcpServerStatus', () => {
   it('returns null when app-server client is not initialized', async () => {
     const mockCodex = createMockCodex();
     const adapter = new CodexAdapter({
+      createAppServerClient: () => null,
       createCodex: jest.fn().mockResolvedValue(mockCodex),
     });
     await adapter.start();
@@ -147,6 +148,7 @@ describe('CodexAdapter MCP server readback — reloadMcpServers', () => {
   it('returns false for reload when app-server client is not initialized', async () => {
     const mockCodex = createMockCodex();
     const adapter = new CodexAdapter({
+      createAppServerClient: () => null,
       createCodex: jest.fn().mockResolvedValue(mockCodex),
     });
     await adapter.start();
@@ -204,6 +206,7 @@ describe('CodexAdapter MCP server readback — triggerMcpServerOAuth', () => {
   it('returns null for OAuth when app-server client is not initialized', async () => {
     const mockCodex = createMockCodex();
     const adapter = new CodexAdapter({
+      createAppServerClient: () => null,
       createCodex: jest.fn().mockResolvedValue(mockCodex),
     });
     await adapter.start();
@@ -250,6 +253,7 @@ describe('CodexAdapter MCP server readback — readMcpServerResource', () => {
   it('returns null for readMcpServerResource when app-server client is not initialized', async () => {
     const mockCodex = createMockCodex();
     const adapter = new CodexAdapter({
+      createAppServerClient: () => null,
       createCodex: jest.fn().mockResolvedValue(mockCodex),
     });
     await adapter.start();
@@ -298,6 +302,7 @@ describe('CodexAdapter MCP server readback — retryMcpToolCall', () => {
   it('returns null for retryMcpToolCall when app-server client is not initialized', async () => {
     const mockCodex = createMockCodex();
     const adapter = new CodexAdapter({
+      createAppServerClient: () => null,
       createCodex: jest.fn().mockResolvedValue(mockCodex),
     });
     await adapter.start();

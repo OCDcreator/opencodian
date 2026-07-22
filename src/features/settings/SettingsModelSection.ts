@@ -5,6 +5,7 @@ import type { ModelSourceMode } from '../../core/types';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { renderCapabilityDisclosureRows } from './capabilityDisclosureRow';
+import { renderCostEstimateSettingsRow } from './CostEstimateSettingsRow';
 import {
   type OpenCodeServerStatus,
   SettingsModelCatalogCoordinator,
@@ -359,6 +360,8 @@ export class SettingsModelSection {
       });
     this.setSettingDescWithFormatting(smallModelSetting, t('settings.model.smallModel.desc'));
     this.catalogCoordinator.updateSmallModelButton();
+
+    renderCostEstimateSettingsRow(commonBodyEl, this.plugin, 'opencode');
 
     new Setting(commonBodyEl)
       .setName(t('settings.model.refresh.name'))

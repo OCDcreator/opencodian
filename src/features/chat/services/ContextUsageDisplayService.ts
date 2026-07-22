@@ -22,7 +22,7 @@ interface ContextDisplayTokenBreakdown {
   output: number;
   reasoning: number;
   cacheRead: number;
-  cacheWrite: number;
+  cacheWrite: number | null;
   total: number;
 }
 
@@ -104,7 +104,7 @@ export class ContextUsageDisplayService {
     output: number;
     reasoning: number;
     cacheRead: number;
-    cacheWrite: number;
+    cacheWrite: number | null;
     total: number;
   } {
     return this.getDisplaySnapshot(state).tokens;
