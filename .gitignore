@@ -104,3 +104,7 @@ yarn-debug.log*
 yarn-error.log*
 dev-debug.log
 .worktrees/
+
+# Kimi debug session artifacts
+_kimi_dbg/
+kimi-debug-session_*.zip
