@@ -8251,6 +8251,73 @@ img.opencodian-model-provider-header-icon {
   margin-top: 0;
 }
 
+/* Project command advanced values stay in the editor flow as a disclosure, not a nested card. */
+.opencodian-settings .opencodian-command-editor-advanced {
+  margin-top: var(--opencodian-settings-space-lg);
+}
+
+.opencodian-settings .opencodian-command-editor-advanced > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--opencodian-settings-space-md);
+  min-height: 40px;
+  padding: var(--opencodian-settings-space-md) var(--opencodian-settings-space-lg);
+  border-radius: var(--opencodian-settings-radius-inline);
+  color: var(--text-normal);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.4;
+  cursor: pointer;
+  list-style: none;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.opencodian-settings .opencodian-command-editor-advanced > summary::-webkit-details-marker {
+  display: none;
+}
+
+.opencodian-settings .opencodian-command-editor-advanced > summary::after {
+  content: "";
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  margin-inline-start: auto;
+  border-right: 1.5px solid var(--text-muted);
+  border-bottom: 1.5px solid var(--text-muted);
+  transform: rotate(-45deg);
+  transition: transform 150ms ease-out;
+}
+
+.opencodian-settings .opencodian-command-editor-advanced[open] > summary::after {
+  transform: rotate(45deg);
+}
+
+.opencodian-settings .opencodian-command-editor-advanced > summary:hover {
+  background: var(--opencodian-settings-inline-bg);
+}
+
+.opencodian-settings .opencodian-command-editor-advanced > summary:focus-visible {
+  outline: 2px solid var(--opencodian-settings-focus-ring);
+  outline-offset: 2px;
+}
+
+.opencodian-settings .opencodian-command-editor-advanced-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--opencodian-settings-space-md);
+  padding-top: var(--opencodian-settings-space-xs);
+}
+
+.opencodian-settings .opencodian-command-editor-advanced-body > .setting-item {
+  padding: var(--opencodian-settings-space-md) var(--opencodian-settings-space-lg);
+}
+
+.opencodian-settings .opencodian-command-editor-advanced-body > .setting-item input[type="text"] {
+  width: min(220px, 100%);
+  min-height: 30px;
+  border-radius: var(--opencodian-settings-radius-inline);
+}
+
 .opencodian-settings .opencodian-settings-section .setting-item-info,
 .opencodian-settings .opencodian-settings-content-shell .setting-item .setting-item-info {
   min-width: 0;
@@ -9327,6 +9394,13 @@ img.opencodian-model-provider-header-icon {
   .opencodian-settings .opencodian-shared-session-actions {
     justify-content: flex-start;
     max-width: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .opencodian-settings .opencodian-command-editor-advanced > summary,
+  .opencodian-settings .opencodian-command-editor-advanced > summary::after {
+    transition: none;
   }
 }
 
