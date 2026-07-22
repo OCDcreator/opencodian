@@ -687,6 +687,28 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       expect(containerEl.textContent).toContain(t('settings.claudeCode.proofStatus.fallbackModel'));
     });
 
+    it('gives every Claude Code custom-tooltip trigger one accessible non-native label source', () => {
+      const plugin = createPlugin();
+      const containerEl = document.createElement('div');
+      const section = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      section.attachTabbed(containerEl, 'model-thinking');
+
+      const triggers = Array.from(containerEl.querySelectorAll<HTMLElement>('[data-settings-tooltip]'));
+      expect(triggers.length).toBeGreaterThan(0);
+
+      for (const trigger of triggers) {
+        expect(trigger.hasAttribute('title')).toBe(false);
+        expect(trigger.hasAttribute('aria-label')).toBe(false);
+        const labelId = trigger.getAttribute('aria-labelledby');
+        expect(labelId).toBeTruthy();
+        expect(containerEl.querySelector<HTMLElement>(`#${labelId}`)?.textContent)
+          .toBe(trigger.dataset.settingsTooltip);
+      }
+    });
+
     it('renders 1M context beta boundary notice in model-thinking tab', () => {
       const plugin = createPlugin();
       const containerEl = document.createElement('div');

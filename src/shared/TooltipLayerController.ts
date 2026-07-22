@@ -3,6 +3,8 @@ const VIEWPORT_MARGIN_PX = 12;
 const TOOLTIP_GAP_PX = 12;
 const TOOLTIP_ARROW_SIZE_PX = 8;
 const TOOLTIP_ARROW_MIN_INSET_PX = 10;
+const CONTROLLER_SLOT = Symbol.for('opencodian.sharedTooltipLayerController');
+let accessibleLabelId = 0;
 
 type TooltipPlacement = 'top' | 'bottom' | 'left' | 'right';
 type TooltipPlacementPreference = TooltipPlacement | 'auto';
@@ -17,6 +19,12 @@ interface TooltipPosition {
   placement: TooltipPlacement;
   top: number;
 }
+
+interface ControllerHandle {
+  destroy(): void;
+}
+
+type DocumentControllerSlots = Document & { [key: symbol]: unknown };
 
 const controllers = new WeakMap<Document, TooltipLayerController>();
 
@@ -96,8 +104,13 @@ export class TooltipLayerController {
       return existing;
     }
 
+    const slots = document as DocumentControllerSlots;
+    const staleController = slots[CONTROLLER_SLOT] as Partial<ControllerHandle> | undefined;
+    staleController?.destroy?.();
+
     const controller = new TooltipLayerController(document);
     controllers.set(document, controller);
+    slots[CONTROLLER_SLOT] = controller;
     return controller;
   }
 
@@ -114,6 +127,10 @@ export class TooltipLayerController {
     this.view?.removeEventListener('resize', this.handleViewportChange);
     this.view?.removeEventListener('scroll', this.handleViewportChange, true);
     controllers.delete(this.document);
+    const slots = this.document as DocumentControllerSlots;
+    if (slots[CONTROLLER_SLOT] === this) {
+      delete slots[CONTROLLER_SLOT];
+    }
   }
 
   hide(trigger?: HTMLElement): void {
@@ -148,6 +165,19 @@ export class TooltipLayerController {
     }
 
     trigger.removeAttribute('title');
+    const nativeAccessibleLabel = trigger.getAttribute('aria-label')?.trim();
+    if (nativeAccessibleLabel && !trigger.hasAttribute('aria-labelledby')) {
+      const labelId = `opencodian-tooltip-label-${++accessibleLabelId}`;
+      const labelEl = this.document.createElement('span');
+      labelEl.className = 'opencodian-visually-hidden';
+      labelEl.id = labelId;
+      labelEl.textContent = nativeAccessibleLabel;
+      labelEl.setAttribute('data-tooltip-label', 'true');
+      trigger.appendChild(labelEl);
+      trigger.setAttribute('aria-labelledby', labelId);
+    }
+    trigger.removeAttribute('aria-label');
+    this.removeStaleLayers();
     this.show(trigger, label, {
       preferredPlacement: TooltipLayerController.resolvePreferredPlacement(trigger),
     });
@@ -157,6 +187,14 @@ export class TooltipLayerController {
     this.layerEl?.remove();
     this.layerEl = null;
     this.bubbleEl = null;
+  }
+
+  private removeStaleLayers(): void {
+    for (const layerEl of this.document.querySelectorAll<HTMLElement>('.opencodian-tooltip-layer')) {
+      if (layerEl !== this.layerEl) {
+        layerEl.remove();
+      }
+    }
   }
 
   private ensureLayer(): HTMLElement {

@@ -1,5 +1,22 @@
 import { TooltipLayerController } from '../../../src/shared/TooltipLayerController';
 
+interface IsolatedTooltipLayerControllerModule {
+  TooltipLayerController: {
+    ensureForDocument(document: Document): { destroy(): void };
+  };
+}
+
+function loadTooltipLayerControllerInIsolatedModule(): IsolatedTooltipLayerControllerModule {
+  let isolatedModule: IsolatedTooltipLayerControllerModule | null = null;
+  jest.isolateModules(() => {
+    isolatedModule = jest.requireActual('../../../src/shared/TooltipLayerController') as IsolatedTooltipLayerControllerModule;
+  });
+  if (!isolatedModule) {
+    throw new Error('Could not load an isolated TooltipLayerController module');
+  }
+  return isolatedModule;
+}
+
 function setViewportSize(width: number, height: number): void {
   Object.defineProperty(window, 'innerWidth', {
     configurable: true,
@@ -22,6 +39,7 @@ function createTrigger(options: {
   position?: 'top' | 'bottom' | 'right';
   align?: 'left' | 'right';
   title?: string;
+  ariaLabel?: string;
 }): HTMLButtonElement {
   const button = document.createElement('button');
   button.className = 'opencodian-tooltip-trigger';
@@ -29,6 +47,9 @@ function createTrigger(options: {
   button.type = 'button';
   if (options.title) {
     button.title = options.title;
+  }
+  if (options.ariaLabel) {
+    button.setAttribute('aria-label', options.ariaLabel);
   }
   if (options.position) {
     button.dataset.tooltipPosition = options.position;
@@ -141,17 +162,42 @@ describe('TooltipLayerController', () => {
       .toBe('left');
   });
 
-  it('suppresses native title tooltips when a shared tooltip trigger is active', () => {
+  it('suppresses native title and aria-label tooltips when a shared tooltip trigger is active', () => {
     const button = createTrigger({
       tooltip: 'Custom only',
       title: 'Native duplicate',
+      ariaLabel: 'Native duplicate',
       rect: { left: 180, top: 180, width: 34, height: 34 },
     });
 
     button.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
 
     expect(button.hasAttribute('title')).toBe(false);
+    expect(button.hasAttribute('aria-label')).toBe(false);
+    const labelId = button.getAttribute('aria-labelledby');
+    expect(document.getElementById(labelId ?? '')?.textContent).toBe('Native duplicate');
     expect(document.body.querySelector<HTMLElement>('.opencodian-tooltip-layer')?.textContent)
       .toContain('Custom only');
+  });
+
+  it('replaces a shared tooltip controller left by a prior plugin bundle reload', () => {
+    const previousModule = loadTooltipLayerControllerInIsolatedModule();
+    const reloadedModule = loadTooltipLayerControllerInIsolatedModule();
+    const previousController = previousModule.TooltipLayerController.ensureForDocument(document);
+    const reloadedController = reloadedModule.TooltipLayerController.ensureForDocument(document);
+
+    try {
+      const button = createTrigger({
+        tooltip: 'Reload-safe tooltip',
+        rect: { left: 180, top: 180, width: 34, height: 34 },
+      });
+
+      button.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+
+      expect(document.body.querySelectorAll('.opencodian-tooltip-layer')).toHaveLength(1);
+    } finally {
+      reloadedController.destroy();
+      previousController.destroy();
+    }
   });
 });

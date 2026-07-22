@@ -392,22 +392,23 @@ export class SettingsClaudeCodeSection {
       // via the shared SettingsTooltipController (data-settings-tooltip). Keeps
       // the group header to a single line and removes the wall-of-text feel.
       const descText = t(resolvedDescKey);
+      const descLabelId = `opencodian-claude-code-group-desc-${id}`;
       const helpButtonEl = headerEl.createEl('button', {
         cls: 'clickable-icon opencodian-claude-code-group-help-button',
         attr: {
-          'aria-label': descText,
+          'aria-labelledby': descLabelId,
           'data-settings-tooltip': descText,
-          title: descText,
           type: 'button',
         },
       });
       setIcon(helpButtonEl, 'help-circle');
       // Visually-hidden carrier keeps the desc text in the DOM textContent for
       // any text-based checks, mirroring the setting-level notice carriers.
-      headerEl.createSpan({
+      const descCarrier = headerEl.createSpan({
         cls: 'opencodian-claude-code-notice-text opencodian-claude-code-group-desc opencodian-settings-claude-code-group-desc',
         text: descText,
       });
+      descCarrier.id = descLabelId;
     }
 
     return groupEl.createDiv({
@@ -535,6 +536,7 @@ export class SettingsClaudeCodeSection {
     text: string,
   ): void {
     const controlEl = setting.controlEl;
+    const labelId = `opencodian-claude-code-proof-${proofId}-label`;
     const chip = controlEl.createSpan({
       cls: 'opencodian-claude-code-proof-chip',
       attr: {
@@ -543,11 +545,12 @@ export class SettingsClaudeCodeSection {
         'data-settings-tooltip': text,
         tabindex: '0',
         role: 'img',
-        'aria-label': text,
+        'aria-labelledby': labelId,
       },
     });
     // Visually-hidden text carrier for textContent-based assertions.
-    setting.settingEl.createSpan({ cls: 'opencodian-claude-code-notice-text', text });
+    const labelCarrier = setting.settingEl.createSpan({ cls: 'opencodian-claude-code-notice-text', text });
+    labelCarrier.id = labelId;
     // Ensure the tooltip controller is active for this document so the
     // data-settings-tooltip attribute renders a real bubble.
     void chip;

@@ -3,6 +3,8 @@ const VIEWPORT_MARGIN_PX = 12;
 const TOOLTIP_GAP_PX = 12;
 const TOOLTIP_ARROW_SIZE_PX = 8;
 const TOOLTIP_ARROW_MIN_INSET_PX = 10;
+const CONTROLLER_SLOT = Symbol.for('opencodian.settingsTooltipController');
+let accessibleLabelId = 0;
 
 type SettingsTooltipPlacement = 'top' | 'bottom' | 'left' | 'right';
 
@@ -17,6 +19,12 @@ interface SettingsTooltipViewport {
   height: number;
   width: number;
 }
+
+interface ControllerHandle {
+  destroy(): void;
+}
+
+type DocumentControllerSlots = Document & { [key: symbol]: unknown };
 
 const controllers = new WeakMap<Document, SettingsTooltipController>();
 
@@ -41,8 +49,14 @@ export class SettingsTooltipController {
     if (existing) {
       return existing;
     }
+
+    const slots = document as DocumentControllerSlots;
+    const staleController = slots[CONTROLLER_SLOT] as Partial<ControllerHandle> | undefined;
+    staleController?.destroy?.();
+
     const controller = new SettingsTooltipController(document);
     controllers.set(document, controller);
+    slots[CONTROLLER_SLOT] = controller;
     return controller;
   }
 
@@ -55,6 +69,10 @@ export class SettingsTooltipController {
     this.view?.removeEventListener('resize', this.handleViewportChange);
     this.view?.removeEventListener('scroll', this.handleViewportChange, true);
     controllers.delete(this.document);
+    const slots = this.document as DocumentControllerSlots;
+    if (slots[CONTROLLER_SLOT] === this) {
+      delete slots[CONTROLLER_SLOT];
+    }
   }
 
   private readonly handleFocusIn = (event: FocusEvent): void => {
@@ -124,6 +142,23 @@ export class SettingsTooltipController {
     }
     this.activeTrigger = trigger;
     trigger.removeAttribute('title');
+    const nativeAccessibleLabel = trigger.getAttribute('aria-label')?.trim();
+    if (nativeAccessibleLabel && !trigger.hasAttribute('aria-labelledby')) {
+      const labelId = `opencodian-settings-tooltip-label-${++accessibleLabelId}`;
+      const labelEl = this.document.createElement('span');
+      labelEl.className = 'opencodian-visually-hidden';
+      labelEl.id = labelId;
+      labelEl.textContent = nativeAccessibleLabel;
+      labelEl.setAttribute('data-tooltip-label', 'true');
+      trigger.appendChild(labelEl);
+      trigger.setAttribute('aria-labelledby', labelId);
+    }
+    // Obsidian's native tooltip owner also treats aria-label as a delayed
+    // hover source. The custom layer owns this trigger, so remove both native
+    // sources before its delay elapses while retaining a hidden accessible
+    // label for legacy controls that previously used aria-label directly.
+    trigger.removeAttribute('aria-label');
+    this.removeStaleLayers();
     this.ensureLayer();
     if (this.bubbleEl) {
       this.bubbleEl.textContent = label;
@@ -137,6 +172,14 @@ export class SettingsTooltipController {
     this.layerEl?.remove();
     this.layerEl = null;
     this.bubbleEl = null;
+  }
+
+  private removeStaleLayers(): void {
+    for (const layerEl of this.document.querySelectorAll<HTMLElement>('.opencodian-settings-tooltip-layer')) {
+      if (layerEl !== this.layerEl) {
+        layerEl.remove();
+      }
+    }
   }
 
   private ensureLayer(): HTMLElement {

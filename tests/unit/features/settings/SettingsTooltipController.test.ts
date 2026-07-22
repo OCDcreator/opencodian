@@ -3,6 +3,23 @@ import { join } from 'node:path';
 
 import { SettingsTooltipController } from '../../../../src/features/settings/SettingsTooltipController';
 
+interface IsolatedSettingsTooltipControllerModule {
+  SettingsTooltipController: {
+    ensureForDocument(document: Document): { destroy(): void };
+  };
+}
+
+function loadSettingsTooltipControllerInIsolatedModule(): IsolatedSettingsTooltipControllerModule {
+  let isolatedModule: IsolatedSettingsTooltipControllerModule | null = null;
+  jest.isolateModules(() => {
+    isolatedModule = jest.requireActual('../../../../src/features/settings/SettingsTooltipController') as IsolatedSettingsTooltipControllerModule;
+  });
+  if (!isolatedModule) {
+    throw new Error('Could not load an isolated SettingsTooltipController module');
+  }
+  return isolatedModule;
+}
+
 function mockRect(element: HTMLElement, rect: Partial<DOMRect>): void {
   Object.defineProperty(element, 'getBoundingClientRect', {
     configurable: true,
@@ -136,19 +153,44 @@ describe('SettingsTooltipController', () => {
       .toBe('left');
   });
 
-  it('removes native title tooltip sources from custom settings tooltip triggers', () => {
+  it('removes native title and aria-label tooltip sources from custom settings tooltip triggers', () => {
     SettingsTooltipController.ensureForDocument(document);
     const button = document.createElement('button');
     button.dataset.settingsTooltip = 'Custom settings tooltip';
     button.title = 'Native duplicate';
+    button.setAttribute('aria-label', 'Native duplicate');
     document.body.appendChild(button);
     mockRect(button, { left: 100, top: 96, width: 24, height: 24 });
 
     button.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
 
     expect(button.hasAttribute('title')).toBe(false);
+    expect(button.hasAttribute('aria-label')).toBe(false);
+    const labelId = button.getAttribute('aria-labelledby');
+    expect(document.getElementById(labelId ?? '')?.textContent).toBe('Native duplicate');
     expect(document.body.querySelector<HTMLElement>('.opencodian-settings-tooltip-layer')?.textContent)
       .toContain('Custom settings tooltip');
+  });
+
+  it('replaces a settings tooltip controller left by a prior plugin bundle reload', () => {
+    const previousModule = loadSettingsTooltipControllerInIsolatedModule();
+    const reloadedModule = loadSettingsTooltipControllerInIsolatedModule();
+    const previousController = previousModule.SettingsTooltipController.ensureForDocument(document);
+    const reloadedController = reloadedModule.SettingsTooltipController.ensureForDocument(document);
+
+    try {
+      const button = document.createElement('button');
+      button.dataset.settingsTooltip = 'Reload-safe tooltip';
+      document.body.appendChild(button);
+      mockRect(button, { left: 100, top: 96, width: 24, height: 24 });
+
+      button.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+
+      expect(document.body.querySelectorAll('.opencodian-settings-tooltip-layer')).toHaveLength(1);
+    } finally {
+      reloadedController.destroy();
+      previousController.destroy();
+    }
   });
 
   it('keeps settings tooltip bubbles flat without shadows', () => {

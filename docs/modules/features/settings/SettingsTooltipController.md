@@ -19,7 +19,8 @@ Settings-local passive tooltip owner. Listens for `[data-settings-tooltip]` trig
 - 空值或缺失属性不会触发 tooltip
 - 通过 `mouseover`、`focusin` 显示；`mouseout`、`focusout` 隐藏
 - `relatedTarget` 保护: 鼠标/焦点移至同一触发器内部不隐藏
-- 显示前会移除触发器上的 `title`，避免 settings 自定义 tooltip 与原生 hover tooltip 同时出现
+- 显示前会移除触发器上的 `title` 与 `aria-label`，避免 settings 自定义 tooltip 与 Obsidian 原生延迟 hover tooltip 同时出现；已有 `aria-label` 会迁移为指向自动插入 sr-only carrier 的 `aria-labelledby`，显式 `aria-labelledby` 则原样保留
+- controller 同时登记到 Document 的 `Symbol.for('opencodian.settingsTooltipController')` 槽位；插件热重载时新 bundle 会销毁旧实例，并在第一次显示时移除遗留 layer，避免多个 module-local WeakMap owner 对同一 hover 重复渲染
 
 ## 几何行为
 

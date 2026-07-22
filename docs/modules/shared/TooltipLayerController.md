@@ -15,7 +15,8 @@
 - 在 top / bottom / left / right 之间做 fallback / flip，避免 tooltip 压在鼠标和按钮上
 - 把 tooltip layer 作为 `.opencodian-tooltip-layer` 挂到 `document.body`
 - 在 `resize` / capture `scroll` 时重定位当前激活的 tooltip
-- 显示前移除触发器上的 `title`，避免 custom tooltip 与浏览器/Electron 原生 hover tooltip 同时出现
+- 显示前移除触发器上的 `title` 与 `aria-label`，避免 custom tooltip 与浏览器/Electron/Obsidian 原生延迟 hover tooltip 同时出现；已有 `aria-label` 会迁移为自动插入 sr-only carrier 的 `aria-labelledby`，现有显式 `aria-labelledby` 不会被改写
+- controller 通过 Document 上的 `Symbol.for('opencodian.sharedTooltipLayerController')` 跨 bundle 保持唯一；热重载时先销毁旧 controller，并在显示前清理遗留 overlay，避免旧 module 的事件监听器制造重叠气泡
 
 ## 关键方法
 
