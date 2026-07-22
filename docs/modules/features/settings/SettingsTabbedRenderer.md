@@ -34,6 +34,7 @@
 
 - `renderDisplay(containerEl)`: 完整渲染标签布局（保留 `.opencodian-settings-panel-title`，刷新标题行内 backend icon switcher + 一级栏 + 二级栏 + 内容面板）。每次渲染前只移除 tabbed renderer 自己创建的正文 DOM，并清理旧 `.opencodian-settings-panel-title-actions`，避免 tab 切换时旧 section DOM 残留，同时保留 `SettingsPanelChrome` 生成的 OpenCodian logo / wordmark。
 - `switchToPrimaryTab(primaryTabId, secondaryTabId?)`: 切换一级标签并持久化
+- `syncToActiveBackend(activeBackend)`: 定位到该 backend 的专属一级标签并恢复已保存的二级标签；只更新内存态，供统一重绘前调用
 - 内部 `switchSecondaryTab()`: 切换二级标签并持久化
 
 ## 内容路由
@@ -43,6 +44,8 @@
 Tabbed plugin 内容创建 `SettingsPluginSection` 后，必须通过 `setPluginSection()` 把 owner 注册回标准 settings tab 或 editor-area settings view。这样下一次一级/二级标签重绘会先调用旧 owner 的 `dispose()`，释放唯一的 SDK plugin evidence observer；不能只替换 DOM，否则再次进入 Overview 会触发重复 observer 拒绝。
 
 `backendRequired` 在 tabbed layout 中表达的是“active-backend 所属设置面”，不是“enabled-backends 中任一启用即可显示”。因此 OpenCode active 时会显示 OpenCode 专属的 server/model/agents/commands/MCP 等设置并隐藏 Claude Code；Claude Code active 时会显示 Claude Code 设置并隐藏 OpenCode 专属设置。agent switcher 切换时必须同时写入 `settings.activeBackend` 和 registry active backend，让聊天 view 的 active-backend change 监听能够切换会话表面。
+
+同一个 registry 事件也会刷新已打开的 editor-area settings view：每个 leaf 在重绘前调用 `syncToActiveBackend()`，因此 Claude Code 的 `tools` 页面切到 Codex 时会进入 Codex 已保存的二级页（或 `connection` 默认页），不会因旧页不可见而退回 General。
 
 当 `secondaryTabId === 'capability-lab'` 时，`renderDebugContent` 直接创建 `SettingsCapabilityLabSection` 实例并调用 `attachTabbed()`，不经过 `SettingsDebugSection`。实验内容继续标记为 DIAGNOSTIC / EXPERIMENTAL / NOT STABLE；backend tab 选择会作为独立 UI preference 持久化，但不会改变 `activeBackend`、enabled backends 或实验 gate。
 

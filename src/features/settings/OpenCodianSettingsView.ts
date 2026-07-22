@@ -11,6 +11,7 @@
 import type { App } from 'obsidian';
 import { ItemView, Setting } from 'obsidian';
 
+import type { AgentBackendKind } from '../../core/types/chat';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { SettingsAcpSection } from './SettingsAcpSection';
@@ -135,6 +136,16 @@ export class OpenCodianSettingsView extends ItemView {
   refreshServerStatusDisplay(): void {
     void this.serverSection?.refreshStatus();
     this.refreshModelCatalogStatusCallback?.();
+  }
+
+  /** Called when the active backend changes while this editor-area settings view is open. */
+  handleActiveBackendChange(backend: AgentBackendKind): void {
+    if (this.plugin.settings.settingsLayoutMode !== 'tabbed') {
+      return;
+    }
+
+    this.getOrCreateTabbedRenderer().syncToActiveBackend(backend);
+    this.renderSettings();
   }
 
   /** Full re-render — mirrors OpenCodianSettingTab.display() */

@@ -21,13 +21,14 @@ export function registerSettingsView(plugin: OpenCodianPlugin): void
 export async function activateSettingsView(plugin: OpenCodianPlugin): Promise<void>
 export function broadcastModelsLoadedToSettingsViews(plugin: OpenCodianPlugin): void
 export function broadcastServerStatusToSettingsViews(plugin: OpenCodianPlugin): void
+export function broadcastActiveBackendChangeToSettingsViews(plugin: OpenCodianPlugin, backend: AgentBackendKind): void
 ```
 
 ## 核心逻辑
 
 ### 注册 view 与命令
 
-`registerSettingsView()` 使用 `VIEW_TYPE_OPENCODIAN_SETTINGS` 注册 `OpenCodianSettingsView`。同时它注册 `open-settings-in-editor-area` 命令，并通过 `checkCallback` 读取 `settingsInEditorArea`：开关关闭时命令不可用，开关打开后才会激活或创建 settings leaf。
+`registerSettingsView()` 使用 `VIEW_TYPE_OPENCODIAN_SETTINGS` 注册 `OpenCodianSettingsView`。同时它注册 `open-settings-in-editor-area` 命令，并通过 `checkCallback` 读取 `settingsInEditorArea`：开关关闭时命令不可用，开关打开后才会激活或创建 settings leaf。注册时还订阅 `AgentServiceRegistry.onActiveChange()`，并把 subscription 交给 plugin 生命周期释放；因此事件路由留在 settings owner，而不扩大 `main.ts` 的运行时职责。
 
 ### 激活编辑区 settings leaf
 
@@ -35,7 +36,7 @@ export function broadcastServerStatusToSettingsViews(plugin: OpenCodianPlugin): 
 
 ### 广播运行时刷新
 
-`broadcastModelsLoadedToSettingsViews()` 和 `broadcastServerStatusToSettingsViews()` 遍历当前 workspace 中所有 settings view leaf，并只对真实的 `OpenCodianSettingsView` 实例调用刷新方法。这样多个编辑区 settings tab 可以同时跟随模型目录和 server 状态变化。
+`broadcastModelsLoadedToSettingsViews()`、`broadcastServerStatusToSettingsViews()` 和 `broadcastActiveBackendChangeToSettingsViews()` 遍历当前 workspace 中所有 settings view leaf，并只对真实的 `OpenCodianSettingsView` 实例调用刷新方法。这样多个编辑区 settings tab 可以同时跟随模型目录、server 状态和 active backend 变化；backend 广播不会主动创建 leaf。
 
 ## 关键方法
 
@@ -46,6 +47,7 @@ export function broadcastServerStatusToSettingsViews(plugin: OpenCodianPlugin): 
 | `dismissNativeSettingsModals()` | 关闭 Obsidian 原生 Settings modal，避免它遮挡 editor-area settings |
 | `broadcastModelsLoadedToSettingsViews()` | 通知所有打开的 settings view 刷新模型相关 UI |
 | `broadcastServerStatusToSettingsViews()` | 通知所有打开的 settings view 刷新 server 状态相关 UI |
+| `broadcastActiveBackendChangeToSettingsViews()` | 通知所有打开的 tabbed settings view 跳至新 active backend 的专属页 |
 
 ## 数据流
 

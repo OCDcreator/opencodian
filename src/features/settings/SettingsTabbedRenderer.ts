@@ -195,22 +195,27 @@ export class SettingsTabbedRenderer {
     this.deps.requestDisplayRefresh();
   }
 
-  private switchAgent(agent: AgentBackendKind): void {
-    const agentPrimaryTab = SETTINGS_PRIMARY_TABS.find((tab) => tab.backendRequired === agent);
-    const resolvedPrimary = agentPrimaryTab?.id ?? 'general';
+  /** Align the tabbed settings route with the active backend without refreshing or persisting it. */
+  syncToActiveBackend(activeBackend: AgentBackendKind): void {
+    const backendPrimaryTab = SETTINGS_PRIMARY_TABS.find((tab) => tab.backendRequired === activeBackend);
+    const resolvedPrimary = backendPrimaryTab?.id ?? 'general';
     const resolvedSecondary = getActiveSecondaryTabId(
       resolvedPrimary,
       this.deps.plugin.settings.settingsTabbedSecondaryTabByPrimary,
     );
 
-    const previousActive = this.getActiveBackend();
-    this.deps.plugin.settings.activeBackend = agent;
-    this.deps.plugin.agentServiceRegistry?.setActive(agent);
     this.deps.plugin.settings.settingsTabbedPrimaryTab = resolvedPrimary;
     this.deps.plugin.settings.settingsTabbedSecondaryTabByPrimary = {
       ...this.deps.plugin.settings.settingsTabbedSecondaryTabByPrimary,
       [resolvedPrimary]: resolvedSecondary,
     };
+  }
+
+  private switchAgent(agent: AgentBackendKind): void {
+    const previousActive = this.getActiveBackend();
+    this.syncToActiveBackend(agent);
+    this.deps.plugin.settings.activeBackend = agent;
+    this.deps.plugin.agentServiceRegistry?.setActive(agent);
     void this.deps.plugin.saveSettings();
 
     // Stop previous adapter and start the new active adapter

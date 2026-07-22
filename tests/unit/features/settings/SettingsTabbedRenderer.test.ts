@@ -318,6 +318,28 @@ describe('SettingsTabbedRenderer', () => {
     expect(requestDisplayRefresh).toHaveBeenCalledTimes(1);
   });
 
+  it('focuses the newly active backend tab while retaining its saved secondary tab', () => {
+    const { renderer, plugin, requestDisplayRefresh } = createRendererState({
+      primaryTabId: 'claude-code',
+      secondaryTabs: {
+        'claude-code': 'tools',
+        codex: 'account',
+      },
+      enabledBackends: ['claude-code', 'codex'],
+      activeBackend: 'claude-code',
+    });
+
+    renderer.syncToActiveBackend('codex');
+
+    expect(plugin.settings.settingsTabbedPrimaryTab).toBe('codex');
+    expect(plugin.settings.settingsTabbedSecondaryTabByPrimary).toEqual({
+      'claude-code': 'tools',
+      codex: 'account',
+    });
+    expect(plugin.saveSettings).not.toHaveBeenCalled();
+    expect(requestDisplayRefresh).not.toHaveBeenCalled();
+  });
+
   it('does not accumulate duplicate floating backend rails across rerenders', () => {
     const { renderer } = createRendererState({
       enabledBackends: ['opencode', 'claude-code'],

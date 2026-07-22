@@ -44,7 +44,7 @@ export class OpenCodianSettingsView extends ItemView
 
 ### 跨 section 状态桥接
 
-模块保存模型刷新 callback、标题模型刷新 callback、模型目录状态 callback，以及最近一次 server 健康状态。`onModelsLoaded()` 和 `refreshServerStatusDisplay()` 由 registrar 广播调用，用来刷新所有已打开 editor-area settings view 的模型与 server 状态展示。
+模块保存模型刷新 callback、标题模型刷新 callback、模型目录状态 callback，以及最近一次 server 健康状态。`onModelsLoaded()` 和 `refreshServerStatusDisplay()` 由 registrar 广播调用，用来刷新所有已打开 editor-area settings view 的模型与 server 状态展示。`handleActiveBackendChange()` 在 tabbed 模式下先让 `SettingsTabbedRenderer` 对齐 backend 专属的主/次标签，再重绘当前 leaf；classic 模式没有专属导航页，因此不强行跳转。
 
 ## 关键方法
 
@@ -57,6 +57,7 @@ export class OpenCodianSettingsView extends ItemView
 | `onClose()` | 清理 section、dropdown enhancer、滚动与延迟刷新 |
 | `onModelsLoaded()` | 模型加载后延迟刷新模型与标题模型 UI |
 | `refreshServerStatusDisplay()` | 刷新 server section 与模型目录状态 |
+| `handleActiveBackendChange()` | 已打开的 tabbed leaf 跟随 registry active backend 跳至对应专属设置页 |
 | `renderSettings()` | 根据当前布局模式重建 settings view |
 
 ## 数据流
@@ -75,6 +76,15 @@ main.ts / SettingsViewRegistrar
 main.ts callback
   -> broadcastModelsLoadedToSettingsViews() / broadcastServerStatusToSettingsViews()
   -> 每个 OpenCodianSettingsView 刷新已挂载 section
+```
+
+切换 active backend 时：
+
+```text
+AgentServiceRegistry.onActiveChange()
+  -> broadcastActiveBackendChangeToSettingsViews()
+  -> handleActiveBackendChange()
+  -> SettingsTabbedRenderer.syncToActiveBackend() + renderSettings()
 ```
 
 ## 与其他模块的交互

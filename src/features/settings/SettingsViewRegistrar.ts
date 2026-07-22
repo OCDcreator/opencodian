@@ -6,6 +6,7 @@
  */
 
 import { VIEW_TYPE_OPENCODIAN_SETTINGS } from '../../core/types';
+import type { AgentBackendKind } from '../../core/types/chat';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { OpenCodianSettingsView } from './OpenCodianSettingsView';
@@ -29,6 +30,15 @@ export function registerSettingsView(plugin: OpenCodianPlugin): void {
       void activateSettingsView(plugin);
     },
   });
+
+  const activeBackendChangeSubscription = plugin.agentServiceRegistry?.onActiveChange((backend) => {
+    if (backend) {
+      broadcastActiveBackendChangeToSettingsViews(plugin, backend);
+    }
+  });
+  if (activeBackendChangeSubscription) {
+    plugin.register(() => activeBackendChangeSubscription.dispose());
+  }
 }
 
 export async function activateSettingsView(plugin: OpenCodianPlugin): Promise<void> {
@@ -72,6 +82,16 @@ export function broadcastModelsLoadedToSettingsViews(plugin: OpenCodianPlugin): 
 export function broadcastServerStatusToSettingsViews(plugin: OpenCodianPlugin): void {
   for (const view of getSettingsViews(plugin)) {
     view.refreshServerStatusDisplay();
+  }
+}
+
+/** Broadcast an active-backend change to all open editor-area settings views. */
+export function broadcastActiveBackendChangeToSettingsViews(
+  plugin: OpenCodianPlugin,
+  backend: AgentBackendKind,
+): void {
+  for (const view of getSettingsViews(plugin)) {
+    view.handleActiveBackendChange(backend);
   }
 }
 

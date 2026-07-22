@@ -418,6 +418,27 @@ describe('OpenCodianSettingsView tabbed layout', () => {
     expect(renderDisplay).toHaveBeenCalledTimes(1);
   });
 
+  it('syncs an already-open tabbed editor settings view to an externally activated backend', async () => {
+    const { view } = createSettingsView('tabbed');
+    const renderDisplay = jest.fn();
+    const syncToActiveBackend = jest.fn();
+
+    Object.assign(view as unknown as Record<string, unknown>, {
+      getOrCreateTabbedRenderer: () => ({
+        renderDisplay,
+        switchToPrimaryTab: jest.fn(),
+        syncToActiveBackend,
+      }),
+    });
+
+    await view.onOpen();
+    (view as unknown as { handleActiveBackendChange: (backend: 'codex') => void })
+      .handleActiveBackendChange('codex');
+
+    expect(syncToActiveBackend).toHaveBeenCalledWith('codex');
+    expect(renderDisplay).toHaveBeenCalledTimes(2);
+  });
+
   it('writes the tabbed plugin section back to the view and disposes it on switch/redraw/close without leaking observers', async () => {
     const vaultBase = fs.mkdtempSync(path.join(os.tmpdir(), 'ocd-settings-view-'));
 
