@@ -452,6 +452,14 @@ body[data-opencodian-provider-icon-mode="color"] {
 .opencodian-header-status-group {
   position: relative;
   min-width: 28px;
+  overflow: visible;
+}
+
+.opencodian-header-status-group::before {
+  content: '';
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
 }
 
 .opencodian-header-conversation-group,
@@ -466,11 +474,14 @@ body[data-opencodian-provider-icon-mode="color"] {
   align-items: center;
   gap: 0;
   justify-content: center;
-  position: relative;
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-end: calc(100% - 28px);
   width: 28px;
   min-width: 28px;
   max-width: min(220px, 48vw);
   height: 28px;
+  box-sizing: border-box;
   padding: 0;
   margin: 0;
   isolation: isolate;
@@ -506,12 +517,18 @@ body[data-opencodian-provider-icon-mode="color"] {
     width 0.16s ease;
 }
 
+/* The shared tooltip trigger is positioned relatively; keep this badge as the local overlay owner. */
+.opencodian-server-status-badge.opencodian-tooltip-trigger {
+  position: absolute;
+}
+
 .opencodian-server-status-badge:hover,
 .opencodian-server-status-badge:focus-visible {
-  width: var(--opencodian-server-status-expanded-width);
+  width: min(220px, 48vw);
   justify-content: flex-start;
   gap: 6px;
   padding-inline: 8px 10px;
+  z-index: 8;
   color: var(--text-normal);
   border-color: var(--opencodian-glass-border-strong);
   box-shadow:
@@ -585,6 +602,16 @@ body[data-opencodian-provider-icon-mode="color"] {
   display: none;
 }
 
+.opencodian-server-status-icon.has-lobehub-icon::before {
+  display: none;
+}
+
+.opencodian-server-status-icon.has-lobehub-icon .opencodian-agent-switcher-lobehub-icon,
+.opencodian-server-status-icon.has-lobehub-icon .opencodian-agent-switcher-lobehub-img {
+  width: 16px;
+  height: 16px;
+}
+
 .opencodian-server-status-icon-brandmark {
   display: flex;
   align-items: center;
@@ -621,7 +648,7 @@ body[data-opencodian-provider-icon-mode="color"] {
 
 .opencodian-server-status-text {
   display: inline-block;
-  flex: 0 1 auto;
+  flex: 1 1 auto;
   min-width: 0;
   max-width: 0;
   color: currentColor;
@@ -630,18 +657,19 @@ body[data-opencodian-provider-icon-mode="color"] {
   line-height: 1;
   white-space: nowrap;
   overflow: hidden;
-  text-overflow: ellipsis;
+  text-overflow: clip;
   opacity: 0;
   pointer-events: none;
   transform: translate3d(-4px, 0, 0);
   transition:
+    max-width 0.16s ease,
     opacity 0.16s ease,
     transform 0.16s ease;
 }
 
 .opencodian-server-status-badge:hover .opencodian-server-status-text,
 .opencodian-server-status-badge:focus-visible .opencodian-server-status-text {
-  max-width: calc(var(--opencodian-server-status-expanded-width) - 44px);
+  max-width: calc(min(220px, 48vw) - 44px);
   opacity: 1;
   transform: translate3d(0, 0, 0);
 }

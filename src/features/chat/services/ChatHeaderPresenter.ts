@@ -3,6 +3,7 @@ import { setIcon } from 'obsidian';
 import type { AgentBackendKind } from '../../../core/types/chat';
 import { t } from '../../../i18n';
 import { createLogger } from '../../../shared';
+import { renderAgentSwitcherBackendIcon } from '../../settings/AgentSwitcherFloatingIcons';
 import { LspStatusIndicator, type LspStatusSummary } from '../ui/LspStatusIndicator';
 import { LspStatusRefreshCoordinator } from './LspStatusRefreshCoordinator';
 
@@ -42,7 +43,6 @@ const SERVER_STATUS_KEY_BY_AVAILABILITY: Record<ChatServerAvailability, ServerSt
 };
 
 const BACKEND_STATUS_ICON_ASSET_PATH_BY_KIND: Partial<Record<AgentBackendKind, string>> = {
-  'claude-code': 'assets/provider-icons/opencode/anthropic.svg',
   codex: 'assets/provider-icons/opencode/openai.svg',
   copilot: 'assets/provider-icons/opencode/github-copilot.svg',
   pi: 'assets/provider-icons/opencode/perplexity.svg',
@@ -446,12 +446,10 @@ export class ChatHeaderPresenter {
   }
 
   private updateServerStatusIcon(kind: AgentBackendKind): void {
-    if (!this.serverStatusIconEl) {
-      return;
-    }
+    if (!this.serverStatusIconEl) return;
 
     this.serverStatusIconEl.setAttribute('data-backend-icon', kind);
-    this.serverStatusIconEl.removeClass('has-svg-icon', 'has-inline-brandmark');
+    this.serverStatusIconEl.removeClass('has-svg-icon', 'has-inline-brandmark', 'has-lobehub-icon');
     this.serverStatusIconEl.style.removeProperty('--opencodian-server-status-icon-url');
     this.serverStatusIconEl.empty();
     if (kind === 'opencode') {
@@ -463,7 +461,11 @@ export class ChatHeaderPresenter {
       this.serverStatusIconEl.addClass('has-inline-brandmark');
       return;
     }
-
+    if (kind === 'claude-code') {
+      renderAgentSwitcherBackendIcon(this.serverStatusIconEl, kind);
+      this.serverStatusIconEl.addClass('has-lobehub-icon');
+      return;
+    }
     this.serverStatusIconEl.createSpan({ cls: 'opencodian-server-status-icon-fallback', text: 'O' });
     const iconUrl = this.resolveBackendStatusIconUrl(kind);
     if (iconUrl) {

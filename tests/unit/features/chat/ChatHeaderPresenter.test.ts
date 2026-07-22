@@ -250,11 +250,18 @@ describe('ChatHeaderPresenter', () => {
 
     expect(statusIconEl?.getAttribute('data-backend-icon')).toBe('claude-code');
     expect(statusIconEl?.classList.contains('has-inline-brandmark')).toBe(false);
-    expect(statusIconEl?.classList.contains('has-svg-icon')).toBe(true);
+    expect(statusIconEl?.classList.contains('has-svg-icon')).toBe(false);
+    expect(statusIconEl?.classList.contains('has-lobehub-icon')).toBe(true);
     expect(statusIconEl?.querySelector('.opencodian-server-status-icon-brandmark')).toBeNull();
-    expect(statusIconEl?.style.getPropertyValue('--opencodian-server-status-icon-url')).toContain(
-      'assets/provider-icons/opencode/anthropic.svg',
-    );
+    expect(statusIconEl?.style.getPropertyValue('--opencodian-server-status-icon-url')).toBe('');
+    const claudeCodeIconEl = statusIconEl?.querySelector<HTMLElement>('.opencodian-agent-switcher-lobehub-icon');
+    expect(claudeCodeIconEl?.dataset.lobehubIcon).toBe('claudecode');
+    expect(
+      claudeCodeIconEl?.querySelector<HTMLImageElement>('.opencodian-agent-switcher-lobehub-img--light')?.src,
+    ).toBe('https://unpkg.com/@lobehub/icons-static-webp@latest/light/claudecode-color.webp');
+    expect(
+      claudeCodeIconEl?.querySelector<HTMLImageElement>('.opencodian-agent-switcher-lobehub-img--dark')?.src,
+    ).toBe('https://unpkg.com/@lobehub/icons-static-webp@latest/dark/claudecode-color.webp');
   });
 
   it('marks the new-tab action for tab-disabled container CSS', () => {
