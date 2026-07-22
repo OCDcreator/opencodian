@@ -166,7 +166,12 @@
 .opencodian-settings .opencodian-settings-section .setting-item,
 .opencodian-settings .opencodian-settings-content-shell .setting-item {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(180px, max-content);
+  /* Both tracks carry container-relative floors: a fixed-max control
+     track always wins free space over an fr label track, so without a
+     real min on the label column it collapses to 0 (text disappears)
+     whenever the settings pane is narrow but the viewport stays above
+     the 720px single-column breakpoint. */
+  grid-template-columns: minmax(min(160px, 45%), 1fr) minmax(min(180px, 50%), max-content);
   gap: var(--opencodian-settings-space-md) var(--opencodian-settings-space-xl);
   align-items: center;
   margin: 0;
@@ -511,7 +516,12 @@
 
 .opencodian-settings .opencodian-wide-text-setting.setting-item {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(280px, clamp(320px, 42vw, 520px));
+  /* Container-relative floors on both tracks: the control column can
+     still grow to 520px on wide panes, but the label column keeps a
+     min(200px, 45%) floor so it can never collapse to zero width (text
+     hidden behind the input) in narrow settings panes where the
+     viewport-based 720px media query never fires. */
+  grid-template-columns: minmax(min(200px, 45%), 1fr) minmax(min(280px, 50%), min(clamp(320px, 42vw, 520px), 100%));
   gap: var(--opencodian-settings-space-md) var(--opencodian-settings-space-lg);
   align-items: center;
 }
@@ -667,7 +677,7 @@
 .opencodian-settings .opencodian-debug-export > .setting-item {
   box-sizing: border-box;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(160px, max-content);
+  grid-template-columns: minmax(min(140px, 45%), 1fr) minmax(min(160px, 50%), max-content);
   gap: var(--opencodian-settings-space-md) var(--opencodian-settings-space-lg);
   align-items: center;
   width: 100%;
@@ -683,7 +693,7 @@
 .opencodian-settings .opencodian-debug-channel-list .setting-item {
   box-sizing: border-box;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(160px, max-content);
+  grid-template-columns: minmax(min(140px, 45%), 1fr) minmax(min(160px, 50%), max-content);
   gap: var(--opencodian-settings-space-md) var(--opencodian-settings-space-lg);
   align-items: center;
   width: 100%;
@@ -715,7 +725,7 @@
 }
 
 .opencodian-settings .opencodian-debug-export > .opencodian-wide-text-setting.setting-item {
-  grid-template-columns: minmax(0, 1fr) minmax(160px, max-content);
+  grid-template-columns: minmax(min(140px, 45%), 1fr) minmax(min(160px, 50%), max-content);
 }
 
 .opencodian-settings .opencodian-debug-export > .opencodian-wide-text-setting .setting-item-control {
@@ -796,7 +806,7 @@
 
 .opencodian-settings .opencodian-share-policy-header {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(220px, 280px);
+  grid-template-columns: minmax(min(160px, 45%), 1fr) minmax(min(220px, 50%), min(280px, 100%));
   gap: var(--opencodian-settings-space-lg);
   align-items: center;
   padding: 14px;
@@ -2575,7 +2585,7 @@
 
 .opencodian-settings .opencodian-tool-permission-row > .setting-item {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(160px, max-content);
+  grid-template-columns: minmax(min(140px, 45%), 1fr) minmax(min(160px, 50%), max-content);
   gap: var(--opencodian-settings-space-md);
   align-items: center;
 }

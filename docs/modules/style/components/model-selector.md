@@ -41,6 +41,7 @@
   - `.opencodian-style-section` 和 `.opencodian-style-group-body` 也负责 Style 二级标签内容的纵向 stack gap，避免 tabbed style 子页里的 section/card/setting row 贴在一起。
   - quick-nav、tabs、section、ordinary setting row 的可见层级现在由 `settings-layout-contract.css` 统一覆盖。
 - `.opencodian-style-setting-long-text` 只用于高级 custom CSS declarations 这类长文本控件。它把样式设置默认 `360px` 控制列放宽到最多 `520px`，但仍沿用 900px 以下单列响应式规则，避免普通数值/颜色控件被一起拉长。
+- 2026-07-22 窄面板修复：`.opencodian-style-setting` 的网格轨道改为容器相对（label 列 `min(180px, 45%)` 下限，control 列 `min(360px, 55%)` 下限、上限仍为 `360px` / 长文本 `min(520px, 100%)`），control 元素改为 `width: 100%; max-width: 360px`。选择器提升到 (0,4,0)（覆盖 section/content-shell 内的普通 form-row 契约），桌面端保持 360px 统一控制列不变，窄面板（视口仍大于 900px 媒体查询时）label 不再被压成 0。
 - `.opencodian-settings-tabs-primary` 现在使用 `flex-wrap: nowrap` + `overflow-x: auto` 实现水平滚动（而非换行），配合 `::after` 右侧渐变遮罩提示可滚动。当标签数量超过可视宽度时，用户可横向滚动查看更多标签。
 
 

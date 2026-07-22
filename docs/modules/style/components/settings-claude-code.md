@@ -47,7 +47,7 @@ Claude Code 设置面板的专用样式，负责 tab body、语义 group、readb
 
 `.opencodian-settings-claude-code-block .opencodian-claude-code-stack > .setting-item`
 
-- 桌面使用 `grid-template-columns: minmax(0, 1fr) minmax(var(--oc-claude-control-min-width), max-content)`，让说明和控件保持成熟设置页的 control-surface 节奏。
+- 桌面使用 `grid-template-columns: minmax(min(160px, 45%), 1fr) minmax(min(var(--oc-claude-control-min-width), 50%), max-content)`，让说明和控件保持成熟设置页的 control-surface 节奏；2026-07-22 起两条轨道带容器相对下限，窄面板（视口仍大于 720px 单列断点）下 label 列不再塌缩为 0。
 - `.setting-item-control` 可换行并右对齐，多个按钮、proof chip、dropdown 不再撑破行宽。
 - 文本输入、密码输入和 select 使用 30px 紧凑高度与 shared inline radius；textarea 使用稳定宽度和垂直 resize。
 - `@media (max-width: 720px)` 下折叠为单列，控件左对齐并可占满宽度，避免中文说明与控件重叠。

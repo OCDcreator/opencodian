@@ -55,7 +55,10 @@
 .opencodian-settings .opencodian-agent-workspace-row.setting-item,
 .opencodian-settings .opencodian-agent-editor-row.setting-item {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(var(--oc-agent-control-min-width), max-content);
+  /* Container-relative floors keep the label column from collapsing to
+     zero width when the settings pane is narrow (see settings-layout-
+     contract.css form-row contract for the same pattern). */
+  grid-template-columns: minmax(min(160px, 45%), 1fr) minmax(min(var(--oc-agent-control-min-width), 50%), max-content);
   gap: var(--opencodian-settings-space-md) var(--opencodian-settings-space-xl);
   align-items: center;
   margin: 0;

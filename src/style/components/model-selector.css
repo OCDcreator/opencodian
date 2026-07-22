@@ -1488,16 +1488,24 @@ img.opencodian-model-provider-header-icon {
   text-align: left;
 }
 
-.opencodian-style-setting {
+/* The (0,4,0) selector variants keep these columns authoritative inside
+   settings sections/content shells, where the general form-row contract
+   (0,3,0) would otherwise override them. Container-relative floors keep
+   the label column from collapsing to zero width in narrow panes. */
+.opencodian-style-setting,
+.opencodian-settings .opencodian-settings-section .opencodian-style-setting.setting-item,
+.opencodian-settings .opencodian-settings-content-shell .opencodian-style-setting.setting-item {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 360px;
+  grid-template-columns: minmax(min(180px, 45%), 1fr) minmax(min(360px, 55%), 360px);
   column-gap: 20px;
   row-gap: var(--opencodian-settings-space-md, 8px);
   align-items: center;
 }
 
-.opencodian-style-setting.opencodian-style-setting-long-text {
-  grid-template-columns: minmax(0, 1fr) minmax(360px, 520px);
+.opencodian-style-setting.opencodian-style-setting-long-text,
+.opencodian-settings .opencodian-settings-section .opencodian-style-setting.opencodian-style-setting-long-text.setting-item,
+.opencodian-settings .opencodian-settings-content-shell .opencodian-style-setting.opencodian-style-setting-long-text.setting-item {
+  grid-template-columns: minmax(min(180px, 45%), 1fr) minmax(min(360px, 55%), min(520px, 100%));
 }
 
 .opencodian-style-setting .setting-item-control {
@@ -1505,8 +1513,8 @@ img.opencodian-model-provider-header-icon {
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
-  width: 360px;
-  min-width: 360px;
+  width: 100%;
+  min-width: 0;
   max-width: 360px;
 }
 

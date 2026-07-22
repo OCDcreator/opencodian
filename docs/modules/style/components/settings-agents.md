@@ -15,7 +15,7 @@
 - `.opencodian-backend-agent-surface`：`General > Agent Management` 的 backend 管理 surface，包含默认 backend control row 和 enabled backend list。
 - `.opencodian-backend-agent-list` / `.opencodian-backend-agent-row`：backend 管理 compact list。TS 会补 `role="listitem"`、`data-backend-agent-id`、`data-backend-agent-active` 和 `data-backend-agent-enabled`，状态通过 badge 表达。
 - `.opencodian-agent-settings-default-surface`：Default tab / classic default 区域的 control stack。
-- `.opencodian-agent-settings-control-row`：默认主代理和 expert mode 的 shadcn-style Form/Card row，桌面端 copy/control 两列，窄屏单列。
+- `.opencodian-agent-settings-control-row`：默认主代理和 expert mode 的 shadcn-style Form/Card row，桌面端 copy/control 两列，窄屏单列。2026-07-22 起两列轨道带容器相对下限（label `min(160px, 45%)`、control `min(var(--oc-agent-control-min-width), 50%)`），窄面板下 label 列不再塌缩为 0。
 - `.opencodian-agent-settings-block`：Agents section 子块，重置 legacy plugin block 的多余 padding，让标题、说明、body 跟共享 Settings rhythm 对齐。
 - `.opencodian-agent-catalog-list`：bounded ScrollArea-style list，保留 `.opencodian-settings-catalog-scroll` / `.opencodian-agent-catalog-scroll` 以维持滚动位置测试和现有 DOM 证据路径。
 - `.opencodian-agent-catalog-row`：agent catalog compact data row。TS 会补 `role="listitem"`、`data-agent-mode` 和 `data-agent-state`。

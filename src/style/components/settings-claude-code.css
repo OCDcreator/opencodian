@@ -125,7 +125,10 @@
 .opencodian-settings .opencodian-settings-claude-code-block .opencodian-claude-code-stack > .setting-item,
 .opencodian-settings .opencodian-settings-claude-code-block .opencodian-settings-claude-code-group-stack > .setting-item {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(var(--oc-claude-control-min-width), max-content);
+  /* Container-relative floors: without a real min on the label track the
+     fixed-floor control track wins all free space and the label collapses
+     to 0 in narrow settings panes (viewport may still be above 720px). */
+  grid-template-columns: minmax(min(160px, 45%), 1fr) minmax(min(var(--oc-claude-control-min-width), 50%), max-content);
   gap: var(--opencodian-settings-space-md) var(--opencodian-settings-space-xl);
   align-items: center;
 }

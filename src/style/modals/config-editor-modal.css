@@ -4908,7 +4908,10 @@
 
 .opencodian-settings .opencodian-settings-content-shell .opencodian-formatter-add-custom-row.setting-item {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 520px);
+  /* Container-relative floors keep the label column visible when the
+     formatter settings pane is narrow (fixed-max tracks otherwise win
+     all free space over a 0-min fr label track). */
+  grid-template-columns: minmax(min(180px, 45%), 1fr) minmax(min(280px, 50%), min(520px, 100%));
   gap: var(--opencodian-settings-space-lg);
   align-items: center;
   margin: var(--opencodian-settings-space-sm) var(--opencodian-settings-space-lg) var(--opencodian-settings-space-lg);
