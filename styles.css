@@ -13663,6 +13663,7 @@ img.opencodian-model-provider-header-icon {
 }
 
 .opencodian-claude-resource-delete svg {
+  flex: 0 0 14px;
   width: 14px;
   height: 14px;
 }

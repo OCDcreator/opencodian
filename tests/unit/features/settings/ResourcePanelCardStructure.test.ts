@@ -136,6 +136,18 @@ describe('resource panel card structure (unified Claude + Codex)', () => {
     );
   });
 
+  it('keeps the Claude resource delete icon from flex-shrinking into a blank button', () => {
+    const css = readFileSync(
+      join(process.cwd(), 'src/style/components/settings-claude-resources.css'),
+      'utf8',
+    );
+    const rule = css.match(/\.opencodian-claude-resource-delete svg\s*\{[\s\S]*?\}/u)?.[0] ?? '';
+
+    expect(rule).toContain('width: 14px;');
+    expect(rule).toContain('height: 14px;');
+    expect(rule).toContain('flex: 0 0 14px;');
+  });
+
   it('Codex renders independent per-type group cards (skills, agents)', () => {
     const containerEl = document.createElement('div');
     const section = new SettingsCodexResourcesSection({

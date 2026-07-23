@@ -15,6 +15,7 @@ Claude 资源管理设置面板的样式，与 `settings-codex-resources.css` �
 
 - scope badge 一律低色度 tonal（project = accent 12% 底，global = 中性 hover 底，global-disabled = warning 14% 底），不用实心 accent 填充或斜体。
 - Claude `skills-commands` 与 `agents` 的 resource group card 和 row card 均使用 14px inline padding，对齐其余 Claude settings card 的左右内容留白；只改变 inline inset，保留资源列表更紧凑的 vertical padding，也不影响共享的 Codex resource card。
+- 删除按钮继续使用 Obsidian 的 `trash` SVG；该 SVG 固定为 `flex: 0 0 14px`，防止 host SVG 规则将其压缩成 0px 宽的空白按钮。
 - 组头使用 `justify-content: space-between` 保持 h4 在左、primary 新建操作在右；`align-items: center` 使两者稳定垂直居中。标题规则必须由 `.opencodian-settings` 限定作用域，并以 `margin: 0; padding: 0` 覆盖宿主 h4 的默认间距。
 - 行卡复用 `--opencodian-settings-form-row-*` token；间距使用 `--opencodian-settings-space-*`，不写 ad-hoc em margin。
 - `[data-claude-code-section='agents']` 只覆盖 Agents 的 ScrollArea viewport：使用 `--opencodian-settings-scrollarea-available-height` 填充剩余窗口高度，同时维持 viewport 内滚动；不能放宽 Skills & Commands 或 Codex 的列表上限。
