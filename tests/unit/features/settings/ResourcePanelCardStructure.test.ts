@@ -122,6 +122,20 @@ describe('resource panel card structure (unified Claude + Codex)', () => {
     }
   });
 
+  it('aligns the horizontal resource-card inset with other Claude settings only for Skills & Commands and Agents', () => {
+    const css = readFileSync(
+      join(process.cwd(), 'src/style/components/settings-claude-resources.css'),
+      'utf8',
+    );
+
+    expect(css).toMatch(
+      /\[data-claude-code-section='skills-commands'\]\s*>\s*\.opencodian-resource-group-card,[\s\S]*?\[data-claude-code-section='agents'\]\s*>\s*\.opencodian-resource-group-card\s*\{[\s\S]*?padding-inline:\s*14px;/u,
+    );
+    expect(css).toMatch(
+      /\[data-claude-code-section='skills-commands'\]\s+\.opencodian-claude-resource-row,[\s\S]*?\[data-claude-code-section='agents'\]\s+\.opencodian-claude-resource-row\s*\{[\s\S]*?padding-inline:\s*14px;/u,
+    );
+  });
+
   it('Codex renders independent per-type group cards (skills, agents)', () => {
     const containerEl = document.createElement('div');
     const section = new SettingsCodexResourcesSection({

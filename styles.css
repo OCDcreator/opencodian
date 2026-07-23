@@ -13515,6 +13515,12 @@ img.opencodian-model-provider-header-icon {
   margin-top: var(--opencodian-settings-space-lg, 12px);
 }
 
+/* Claude resource tabs use the same 14px inline card inset as other Claude settings. */
+.opencodian-settings [data-claude-code-section='skills-commands'] > .opencodian-resource-group-card,
+.opencodian-settings [data-claude-code-section='agents'] > .opencodian-resource-group-card {
+  padding-inline: 14px;
+}
+
 /* Group header: title stays left; its primary create action stays right. */
 .opencodian-claude-resource-group-header {
   display: flex;
@@ -13583,6 +13589,11 @@ img.opencodian-model-provider-header-icon {
   border: 1px solid var(--opencodian-settings-form-row-border, var(--background-modifier-border));
   border-radius: var(--opencodian-settings-form-row-radius, 10px);
   background: var(--opencodian-settings-form-row-bg, var(--background-secondary));
+}
+
+.opencodian-settings [data-claude-code-section='skills-commands'] .opencodian-claude-resource-row,
+.opencodian-settings [data-claude-code-section='agents'] .opencodian-claude-resource-row {
+  padding-inline: 14px;
 }
 
 .opencodian-claude-resource-row-header {
