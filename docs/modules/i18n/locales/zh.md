@@ -1,6 +1,7 @@
 # Chinese Locale
 
 > **源码**: `src/i18n/locales/zh.ts`
+> **最近更新**: 2026-07-23 资源标签精简 — 删除未使用的 `settings.claudeCode.resources.title`；拆分后的 tab 与资源类型组标题承担可见层级。
 > **最近更新**: 2026-07-23 Claude 项目级 Providers — 新增 `settings.claudeCode.providers.*`，覆盖 local-source 门禁、预设编辑器、脱敏配置视图、行内校验与来源优先级提示；并补齐 Providers、MCP、Skills & Commands、Agents 子标签文案。
 > **最近更新**: Codex/Claude 资源管理 + Codex 技能菜单 — 新增 `chat.codex.agentMentionUnavailable.*`、`settings.codex.resources.*`、`settings.codex.tab.resources`，以及 `settings.claudeCode.resources.*` / `settings.claudeCode.tab.resources` 键组。
 > **最近更新**: 2026-07-22 Codex 账号页重设计 — `settings.codex.accountSurface.sectionDesc` 精简为一行；新增 `refreshAll` / `refreshAllTooltip`（组级全部刷新）、`authRequiredHint`（紧凑 auth 提示）和 `settings.cost.group.title`（成本估算子组标题）；移除不再使用的 `usage.authRequiredBody` / `rateLimits.authRequiredBody` 长文案（身份卡保留唯一权威说明）。

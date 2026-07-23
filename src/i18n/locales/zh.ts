@@ -4214,7 +4214,6 @@ export const zhTranslations = {
   'settings.claudeCode.providers.field.haikuModel.desc': '写入 ANTHROPIC_DEFAULT_HAIKU_MODEL。',
   'settings.claudeCode.providers.field.extraEnv': '额外环境变量',
   'settings.claudeCode.providers.field.extraEnvDesc': '每行一个 KEY=value。受管 Anthropic 键不可在此填写。',
-  'settings.claudeCode.resources.title': 'Claude 资源',
   'settings.claudeCode.resources.description': '管理项目级 Claude 命令、技能与 Agent。全局资源为只读。',
   'settings.claudeCode.resources.commands': '命令',
   'settings.claudeCode.resources.skills': '技能',

@@ -4215,7 +4215,6 @@ export const enTranslations = {
   'settings.claudeCode.providers.field.haikuModel.desc': 'Written as ANTHROPIC_DEFAULT_HAIKU_MODEL.',
   'settings.claudeCode.providers.field.extraEnv': 'Extra environment variables',
   'settings.claudeCode.providers.field.extraEnvDesc': 'One KEY=value pair per line. Managed Anthropic keys are reserved.',
-  'settings.claudeCode.resources.title': 'Claude resources',
   'settings.claudeCode.resources.description': 'Manage project Claude commands, skills, and agents. Global resources are read-only.',
   'settings.claudeCode.resources.commands': 'Commands',
   'settings.claudeCode.resources.skills': 'Skills',

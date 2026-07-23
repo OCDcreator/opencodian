@@ -56,7 +56,6 @@ export type ClaudeResourceKind = 'command' | 'skill' | 'agent';
 
 export interface SettingsClaudeResourcesSectionOptions {
   plugin: OpenCodianPlugin;
-  createSectionHeading: (containerEl: HTMLElement, title: string, tooltip?: string) => HTMLHeadingElement;
   /** Invoked after a successful project mutation to invalidate the runtime/menu catalog. */
   onAfterMutation?: () => void;
   /** Restricts this instance to focused resource tabs while preserving shared CRUD behavior. */
@@ -119,12 +118,6 @@ export class SettingsClaudeResourcesSection {
     const vaultPath = getVaultBasePath(plugin.app);
     const homePath = os.homedir();
     const userSourceEnabled = this.isUserSourceEnabled();
-
-    this.options.createSectionHeading(
-      bodyEl,
-      t('settings.claudeCode.resources.title'),
-      t('settings.claudeCode.resources.description'),
-    );
 
     if (!userSourceEnabled) {
       const noticeEl = bodyEl.createDiv({ cls: 'opencodian-claude-resource-source-notice' });

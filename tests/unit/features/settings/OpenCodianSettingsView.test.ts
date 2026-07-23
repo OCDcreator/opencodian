@@ -242,8 +242,6 @@ describe('OpenCodianSettingsView classic layout', () => {
       'General',
       'Claude Code',
       'Project providers',
-      'Claude resources',
-      'Claude resources',
       'Server',
       'Model',
       'Conversation',

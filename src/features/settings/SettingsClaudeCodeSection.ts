@@ -390,7 +390,6 @@ export class SettingsClaudeCodeSection {
     if (!section) {
       section = new SettingsClaudeResourcesSection({
         plugin: this.plugin,
-        createSectionHeading: (hostEl, title, tooltip) => this.createSectionHeading(hostEl, title, tooltip),
         onAfterMutation: () => {
           // Invalidate the Claude runtime / slash-command menu catalog so the
           // next `/` open reflects project changes. Runtime

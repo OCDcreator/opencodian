@@ -78,7 +78,6 @@ describe('resource panel card structure (unified Claude + Codex)', () => {
         app: makeApp(),
         settings: { backendSettings: { claudeCode: { settingSources: ['project'] } } },
       } as any,
-      createSectionHeading: (hostEl: HTMLElement) => hostEl.createEl('h3'),
     });
 
     section.render(containerEl);
@@ -87,5 +86,6 @@ describe('resource panel card structure (unified Claude + Codex)', () => {
     expect(cards.length).toBe(3);
     const kinds = Array.from(cards).map((c) => (c as HTMLElement).dataset.claudeResourceGroup);
     expect(kinds).toEqual(expect.arrayContaining(['command', 'skill', 'agent']));
+    expect(containerEl.querySelector('h3')).toBeNull();
   });
 });
