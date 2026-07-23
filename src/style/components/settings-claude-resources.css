@@ -1,0 +1,266 @@
+/* Claude resource management panel (project editable / global read-only).
+   Structured row-card lists inside a bounded ScrollArea, quiet group
+   headers with the create action on the right, tonal scope badges.
+   Shares the Settings Extension Surface vocabulary (skills/tools rows). */
+
+/* Claude resource management panel (project editable / global read-only).
+   No outer section card: each resource type (commands / skills / agents) is
+   an independent card (opencodian-resource-group-card), sharing the unified
+   resource-card vocabulary with the Codex resources panel. */
+
+/* Independent per-type resource card (shared across Claude + Codex). */
+.opencodian-resource-group-card {
+  background: var(--background-secondary, var(--background-modifier-form-background, transparent));
+  border: 1px solid var(--background-modifier-border, var(--background-modifier-box-border));
+  border-radius: var(--opencodian-settings-form-row-radius, 10px);
+  padding: var(--opencodian-settings-space-md, 12px);
+}
+
+.opencodian-claude-resource-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+}
+
+.opencodian-claude-resource-group + .opencodian-claude-resource-group {
+  margin-top: var(--opencodian-settings-space-lg, 12px);
+}
+
+/* Group header: title on the left, primary create action on the right. */
+.opencodian-claude-resource-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.opencodian-claude-resource-group-title {
+  margin: 0;
+  padding-left: 0;
+  padding-inline-start: 0;
+  font-size: var(--font-ui-small);
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+.opencodian-claude-resource-create {
+  flex-shrink: 0;
+  appearance: none;
+  border: 1px solid var(--interactive-accent);
+  border-radius: 6px;
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  font-size: var(--font-ui-smaller);
+  font-weight: 600;
+  line-height: 1.4;
+  padding: 3px 10px;
+  cursor: pointer;
+  transition: filter 150ms ease-out;
+}
+
+.opencodian-claude-resource-create:hover {
+  filter: brightness(1.08);
+}
+
+.opencodian-claude-resource-create:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 2px;
+}
+
+.opencodian-claude-resource-group-summary {
+  margin: 0;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+}
+
+/* Bounded list: ScrollArea contract with a per-group max height. */
+.opencodian-claude-resource-scroll > .opencodian-settings-scrollarea-viewport {
+  max-height: min(38vh, 360px);
+}
+
+/* Resource row-card: name + scope badge + actions / description / mono path. */
+.opencodian-claude-resource-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--opencodian-settings-form-row-border, var(--background-modifier-border));
+  border-radius: var(--opencodian-settings-form-row-radius, 10px);
+  background: var(--opencodian-settings-form-row-bg, var(--background-secondary));
+}
+
+.opencodian-claude-resource-row-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.opencodian-claude-resource-row-name {
+  min-width: 0;
+  font-size: var(--font-ui-small);
+  font-weight: 600;
+  color: var(--text-normal);
+  overflow-wrap: anywhere;
+}
+
+.opencodian-claude-resource-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.opencodian-claude-resource-edit,
+.opencodian-claude-resource-view {
+  appearance: none;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  font-weight: 500;
+  line-height: 1.4;
+  padding: 2px 8px;
+  cursor: pointer;
+  transition: color 150ms ease-out, background-color 150ms ease-out;
+}
+
+.opencodian-claude-resource-edit:hover,
+.opencodian-claude-resource-view:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.opencodian-claude-resource-delete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  appearance: none;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 150ms ease-out, background-color 150ms ease-out;
+}
+
+.opencodian-claude-resource-delete:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-error, #e11d48);
+}
+
+.opencodian-claude-resource-delete svg {
+  width: 14px;
+  height: 14px;
+}
+
+.opencodian-claude-resource-edit:focus-visible,
+.opencodian-claude-resource-view:focus-visible,
+.opencodian-claude-resource-delete:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .opencodian-claude-resource-create,
+  .opencodian-claude-resource-edit,
+  .opencodian-claude-resource-view,
+  .opencodian-claude-resource-delete {
+    transition: none;
+  }
+}
+
+.opencodian-claude-resource-row-desc {
+  margin: 0;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.opencodian-claude-resource-path {
+  margin: 0;
+  font-family: var(--font-monospace);
+  font-size: 11px;
+  color: var(--text-faint);
+  word-break: break-all;
+}
+
+/* Tonal scope badges (low-chroma; state lives in the badge, not the row). */
+.opencodian-claude-resource-scope {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: var(--font-smallest, 11px);
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.opencodian-claude-resource-scope.is-project {
+  background: color-mix(in srgb, var(--interactive-accent) 12%, transparent);
+  color: color-mix(in srgb, var(--interactive-accent) 82%, var(--text-normal));
+}
+
+.opencodian-claude-resource-scope.is-global {
+  background: var(--background-modifier-hover);
+  color: var(--text-muted);
+}
+
+/* Create / editor modal. */
+.opencodian-claude-resource-modal .opencodian-claude-resource-editor {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 320px;
+  font-family: var(--font-monospace);
+  font-size: 12px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.opencodian-claude-resource-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+/* Global-but-disabled scope (user setting source off): warning tonal. */
+.opencodian-claude-resource-scope.is-global-disabled {
+  background: color-mix(in srgb, var(--text-warning, #e8a33d) 14%, transparent);
+  color: var(--text-warning, #b87700);
+}
+
+/* User-source notice: quiet full-border alert, no side-stripe. */
+.opencodian-claude-resource-source-notice {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid var(--text-warning, #e8a33d);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--text-warning, #e8a33d) 10%, transparent);
+  font-size: var(--font-ui-small);
+  line-height: 1.45;
+}
+
+.opencodian-claude-resource-source-notice-title {
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+.opencodian-claude-resource-source-notice-desc {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+}

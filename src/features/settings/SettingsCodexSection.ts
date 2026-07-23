@@ -24,6 +24,7 @@ import type OpenCodianPlugin from '../../main';
 import { renderCostEstimateSettingsRow } from './CostEstimateSettingsRow';
 import { SettingsCodexAccountSurface } from './SettingsCodexAccountSurface';
 import { SettingsCodexReadbackControls } from './SettingsCodexReadbackControls';
+import { SettingsCodexResourcesSection } from './SettingsCodexResourcesSection';
 
 export interface SettingsCodexSectionOptions {
   plugin: OpenCodianPlugin;
@@ -35,12 +36,31 @@ export class SettingsCodexSection {
   private readonly createSectionHeading: SettingsCodexSectionOptions['createSectionHeading'];
   private readonly readbackControls: SettingsCodexReadbackControls;
   private readonly accountSurface: SettingsCodexAccountSurface;
+  private readonly resourcesSurface: SettingsCodexResourcesSection;
 
   constructor(options: SettingsCodexSectionOptions) {
     this.plugin = options.plugin;
     this.createSectionHeading = options.createSectionHeading;
     this.readbackControls = new SettingsCodexReadbackControls({ plugin: this.plugin });
     this.accountSurface = new SettingsCodexAccountSurface({ plugin: this.plugin });
+    this.resourcesSurface = new SettingsCodexResourcesSection({
+      plugin: this.plugin,
+      createSectionHeading: options.createSectionHeading,
+      onAfterMutation: () => {
+        // Invalidate the Codex runtime / slash-command menu catalog so the
+        // next `/` or `$` open reflects project changes immediately (not via
+        // skills/changed or the 120s TTL). Runtime skills/list remains the
+        // final menu truth.
+        this.plugin.invalidateSlashCommandCatalog();
+        // The app-server does not always emit `skills/changed` for files the
+        // plugin wrote itself, so force the next runtime `skills/list` to
+        // bypass the server cache. One-shot; normal menu opens keep caching.
+        const adapter = this.plugin.agentServiceRegistry?.get('codex') as {
+          forceNextRuntimeSkillsReload?(): void;
+        } | undefined;
+        adapter?.forceNextRuntimeSkillsReload?.();
+      },
+    });
   }
 
   dispose(): void {
@@ -65,6 +85,29 @@ export class SettingsCodexSection {
 
   private renderTabContent(containerEl: HTMLElement, secondaryTabId: string): void {
     const resolvedTabId = secondaryTabId || 'connection';
+
+    // Ensure codex settings object exists
+    this.plugin.settings.backendSettings ??= {
+      claudeCode: getDefaultClaudeCodeBackendSettings(),
+      codex: getDefaultCodexBackendSettings(),
+    };
+    this.plugin.settings.backendSettings.codex ??= getDefaultCodexBackendSettings();
+
+    // Resources renders as independent per-type cards (skills / agents) with no
+    // enclosing section card, keeping global-readonly / project-editable /
+    // empty-state semantics. A borderless host preserves settings targeting.
+    if (resolvedTabId === 'resources') {
+      const resourcesHost = containerEl.createDiv({
+        attr: {
+          'data-settings-surface': 'section',
+          'data-settings-target': `codex-${resolvedTabId}`,
+          'data-codex-section': resolvedTabId,
+        },
+      });
+      this.resourcesSurface.render(resourcesHost);
+      return;
+    }
+
     const blockEl = containerEl.createDiv({
       cls: 'opencodian-settings-block opencodian-settings-section opencodian-settings-codex-block',
       attr: {
@@ -78,13 +121,6 @@ export class SettingsCodexSection {
       cls: 'opencodian-settings-block-body opencodian-settings-section-body',
       attr: { 'data-settings-surface': 'section-body' },
     });
-
-    // Ensure codex settings object exists
-    this.plugin.settings.backendSettings ??= {
-      claudeCode: getDefaultClaudeCodeBackendSettings(),
-      codex: getDefaultCodexBackendSettings(),
-    };
-    this.plugin.settings.backendSettings.codex ??= getDefaultCodexBackendSettings();
 
     if (resolvedTabId === 'resume-inspect') {
       this.renderResumeAndInspectGroup(bodyEl);

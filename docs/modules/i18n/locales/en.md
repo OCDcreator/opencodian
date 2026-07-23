@@ -1,6 +1,7 @@
 # English Locale
 
 > **源码**: `src/i18n/locales/en.ts`
+> **Updated**: Codex/Claude resource management + Codex skill menu — added `chat.codex.agentMentionUnavailable.*`, `settings.codex.resources.*`, `settings.codex.tab.resources`, and `settings.claudeCode.resources.*` / `settings.claudeCode.tab.resources` key groups.
 > **Updated**: 2026-07-22 Codex account tab redesign — shortened `settings.codex.accountSurface.sectionDesc` to one line; added `refreshAll` / `refreshAllTooltip` (group-level action), `authRequiredHint` (compact auth notice), and `settings.cost.group.title` (cost sub-group heading); removed the now-unused `usage.authRequiredBody` / `rateLimits.authRequiredBody` long-form bodies (the identity card keeps the single authoritative explanation).
 > **Updated**: 2026-07-22 local cost estimates — models.dev automatically refreshes on first/stale use and model IDs match by default; Provider + optional Base URL + model support exact third-party price overrides without changing Claude/Codex request routing.
 > **最近更新**: 2026-07-22 Codex context availability — added upgrade guidance explaining that only an app-server with thread token-usage notifications can enable the real per-session Context Ring; account usage remains a separate surface.

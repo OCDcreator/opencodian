@@ -109,6 +109,7 @@ export {
   createClaudeCodePermissionBridge,
 } from './ClaudeCodePermissionBridge';
 export {
+  type ClaudeCodeProcessMissingReason,
   type ClaudeCodeProcessResolution,
   type ClaudeCodeProcessResolverEnv,
   type ClaudeCodeProcessResolverOptions,
@@ -127,14 +128,28 @@ export {
   createClaudeCodeStreamNormalizer,
 } from './ClaudeCodeStreamNormalizer';
 export {
+  type ClaudeAgentWriteResult,
   type ClaudeProjectAgentInfo,
   createClaudeProjectAgent,
+  defaultClaudeAgentContent,
+  deleteClaudeProjectAgent,
+  discoverClaudeGlobalAgents,
   discoverClaudeProjectAgents,
+  readClaudeAgentContent,
+  updateClaudeProjectAgent,
+  validateClaudeAgentContent,
 } from './ClaudeProjectAgentDiscovery';
 export {
+  type ClaudeCommandWriteResult,
   type ClaudeProjectCommandInfo,
   createClaudeProjectCommand,
+  defaultClaudeCommandContent,
+  deleteClaudeProjectCommand,
+  discoverClaudeGlobalCommands,
   discoverClaudeProjectCommands,
+  readClaudeCommandContent,
+  updateClaudeProjectCommand,
+  validateClaudeCommandContent,
 } from './ClaudeProjectCommandDiscovery';
 export {
   type ClaudeHookEntry,
@@ -147,8 +162,15 @@ export {
 } from './ClaudeProjectSettingsDiscovery';
 export {
   type ClaudeProjectSkillInfo,
+  type ClaudeSkillWriteResult,
   createClaudeProjectSkill,
+  defaultClaudeSkillContent,
+  deleteClaudeProjectSkill,
+  discoverClaudeGlobalSkills,
   discoverClaudeProjectSkills,
+  readClaudeSkillContent,
+  updateClaudeProjectSkill,
+  validateClaudeSkillContent,
 } from './ClaudeProjectSkillDiscovery';
 export {
   CodexAdapter,
@@ -168,8 +190,37 @@ export {
   mapCodexApprovalResolution,
 } from './CodexDefaultApprovalHost';
 export {
+  type CodexAgentInfo,
+  type CodexResourceWriteError,
+  type CodexResourceWriteResult,
+  type CodexSkillInfo,
+  createCodexProjectAgent,
+  createCodexProjectSkill,
+  defaultCodexAgentContent,
+  defaultCodexSkillContent,
+  deleteCodexProjectAgent,
+  deleteCodexProjectSkill,
+  discoverCodexGlobalAgents,
+  discoverCodexGlobalSkills,
+  discoverCodexProjectAgents,
+  discoverCodexProjectSkills,
+  readCodexAgentContent,
+  readCodexSkillContent,
+  updateCodexProjectAgent,
+  updateCodexProjectSkill,
+  validateCodexAgentContent,
+  validateCodexSkillContent,
+} from './CodexProjectResourceDiscovery';
+export {
   CodexStreamNormalizer,
   type CodexStreamNormalizerOptions,
   createCodexStreamNormalizer,
 } from './CodexStreamNormalizer';
 export { OpenCodeAdapter } from './OpenCodeAdapter';
+export {
+  assertWithinRoot,
+  atomicWriteFile,
+  isSafeResourceName,
+  type ProjectResourceWriteError,
+  toWriteErrorCode,
+} from './ProjectResourceSecureWrite';

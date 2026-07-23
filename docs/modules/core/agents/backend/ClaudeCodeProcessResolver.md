@@ -3,6 +3,8 @@
 > **源码**: `src/core/agents/backend/ClaudeCodeProcessResolver.ts`
 > **状态**: [REVIEW]
 
+> **更新**: macOS PATH fallback 现包含 `~/.local/bin`（用户本机 Claude CLI 实际安装位置）。`diagnostics` 新增可选 `reason`（`configured-path-not-found` / `cli-not-on-path`），供状态表面给出可操作的下一步。
+
 ## 概述
 
 `ClaudeCodeProcessResolver.ts` 负责 Claude Code SDK 进程环境的前置解析。它默认优先使用用户本机安装的 external Claude Code CLI：先解析 `backendSettings.claudeCode.executablePath`，没有配置时再从增强 PATH 中查找 `claude` / `claude.exe` / npm wrapper，并输出 `pathToClaudeCodeExecutable`、增强后的 env 和 Windows shell 标志。

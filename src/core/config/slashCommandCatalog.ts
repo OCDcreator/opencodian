@@ -13,7 +13,7 @@ import {
 } from './commandScopedAgent';
 
 export type SlashCommandCatalogSource = 'command' | 'skill' | 'project' | 'md-command' | 'claude-runtime';
-export type SlashCommandMenuItemSource = SlashCommandCatalogSource | 'skills-command';
+export type SlashCommandMenuItemSource = SlashCommandCatalogSource | 'skills-command' | 'codex-skill';
 
 /** Known built-in command IDs that come from OpenCode itself (not user-defined). */
 export const BUILTIN_COMMAND_IDS = new Set([

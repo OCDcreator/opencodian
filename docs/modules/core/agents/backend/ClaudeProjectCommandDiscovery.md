@@ -3,6 +3,8 @@
 > **源码**: `src/core/agents/backend/ClaudeProjectCommandDiscovery.ts`
 > **状态**: [ACTIVE]
 
+> **更新**: 新增 `updateClaudeProjectCommand` / `deleteClaudeProjectCommand` / `discoverClaudeGlobalCommands`（只读）/ `readClaudeCommandContent` / `validateClaudeCommandContent` / `defaultClaudeCommandContent`；`ClaudeProjectCommandInfo` 增加 `readonly`、`scope`。写入经共享 `ProjectResourceSecureWrite`（原子写 + 路径穿越保护）。`createClaudeProjectCommand` 保持返回 `string|null`（向后兼容），内部改走安全写。
+
 ## 概述
 
 `ClaudeProjectCommandDiscovery.ts` 是 Claude Code 项目命令的文件系统扫描与创建 helper。它读取当前 vault 下的 `.claude/commands/*.md`，提取最小展示 metadata，供 Claude Code settings 显示项目命令；同时提供 `createClaudeProjectCommand()` 用于创建新命令文件。不依赖 Claude SDK query。

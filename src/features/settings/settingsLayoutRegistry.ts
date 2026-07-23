@@ -49,6 +49,7 @@ export const SETTINGS_PRIMARY_TABS: SettingsPrimaryTabDefinition[] = [
       { id: 'permissions', labelKey: 'settings.claudeCode.tab.permissions' },
       { id: 'context-sources', labelKey: 'settings.claudeCode.tab.contextSources' },
       { id: 'tools', labelKey: 'settings.claudeCode.tab.tools' },
+      { id: 'resources', labelKey: 'settings.claudeCode.tab.resources' },
     ],
   },
   {
@@ -61,6 +62,7 @@ export const SETTINGS_PRIMARY_TABS: SettingsPrimaryTabDefinition[] = [
       { id: 'connection', labelKey: 'settings.codex.tab.connection' },
       { id: 'resume-inspect', labelKey: 'settings.codex.tab.resumeInspect' },
       { id: 'account', labelKey: 'settings.codex.tab.account' },
+      { id: 'resources', labelKey: 'settings.codex.tab.resources' },
     ],
   },
   {

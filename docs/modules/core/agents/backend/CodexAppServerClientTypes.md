@@ -3,6 +3,8 @@
 > **源码**: `src/core/agents/backend/CodexAppServerClientTypes.ts`
 > **状态**: [RUNTIME_ADJUNCT]
 
+> **新增类型**: `AppServerSkill`（name/description?/path?/enabled?/scope?）与 `AppServerListSkillsOptions`（cwd?/forceReload?），描述 app-server `skills/list` 只读结果。插件永不写入全局 Codex skills。
+
 ## 概述
 
 从 `CodexAppServerClient` 拆出的纯类型模块，集中存放 Codex app-server 的所有 wire shapes（`export interface` / `export type`）。`CodexAppServerClient.ts` 通过 `export *` 重新导出这些类型，保持 `import { ... } from './CodexAppServerClient'` 的向后兼容。

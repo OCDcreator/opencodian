@@ -198,6 +198,7 @@ OpenCode server status 回调也不再只刷新设置页状态：当本地/远�
 | `onunload()` | 停止 `OpenCodeService`，清除 chat appearance timer 与模型刷新帧请求 |
 | `loadSettings()` | 读取并迁移历史设置，生成当前版本的归一化配置 |
 | `saveSettings()` | 同步服务层、写回存储、刷新所有视图、同步 `.opencode` 权限配置 |
+| `invalidateSlashCommandCatalog({preload?})` | 失效 slash 命令/runtime 菜单 catalog（Claude/Codex 项目资源保存后调用，使下次 `/` 刷新；runtime supportedCommands()/supportedAgents() 仍为最终真相） |
 | `activateView()` | 打开或定位 `OpenCodianView` |
 | `startNewConversationForCurrentView()` | 激活聊天视图并在当前视图/当前 tab 打开新会话 |
 | `loadConversations()` | 预加载会话元数据，保证视图恢复前数据已就绪 |

@@ -1,6 +1,7 @@
 # Chinese Locale
 
 > **源码**: `src/i18n/locales/zh.ts`
+> **最近更新**: Codex/Claude 资源管理 + Codex 技能菜单 — 新增 `chat.codex.agentMentionUnavailable.*`、`settings.codex.resources.*`、`settings.codex.tab.resources`，以及 `settings.claudeCode.resources.*` / `settings.claudeCode.tab.resources` 键组。
 > **最近更新**: 2026-07-22 Codex 账号页重设计 — `settings.codex.accountSurface.sectionDesc` 精简为一行；新增 `refreshAll` / `refreshAllTooltip`（组级全部刷新）、`authRequiredHint`（紧凑 auth 提示）和 `settings.cost.group.title`（成本估算子组标题）；移除不再使用的 `usage.authRequiredBody` / `rateLimits.authRequiredBody` 长文案（身份卡保留唯一权威说明）。
 > **最近更新**: 2026-07-22 本地成本估算 — models.dev 目录首次/过期自动更新，模型 ID 默认自动匹配；支持 Provider + 可选 Base URL + model 的第三方精确单价覆盖，且明确这些字段绝不改变 Claude/Codex 请求路由。
 > **最近更新**: 2026-07-22 Codex 上下文可用性 — 新增升级说明：只有能发布 thread token-usage 通知的 app-server 才启用真实单会话 Context Ring；账号用量保持独立页面。

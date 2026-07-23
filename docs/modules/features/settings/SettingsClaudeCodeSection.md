@@ -3,6 +3,8 @@
 > **源码**: `src/features/settings/SettingsClaudeCodeSection.ts`
 > **状态**: [REVIEW]
 > **Updated**: 2026-06-28 — Claude Code 设置第一阶段 UI 重塑：保持现有 DOM/data hooks、保存逻辑和 i18n 不变，将行级控件收敛为 shadcn/Rhea 风格的紧凑 control surface（桌面双列、窄屏单列），readback/runtime 输出改为轻量内层 row rhythm，并记录审计于 `docs/status/settings-claude-code-ui-audit-2026-06-28.md`。
+
+> **更新**: 新增 `resources` 二级 tab，委托给 `SettingsClaudeResourcesSection` 渲染 Claude 项目/全局 commands/skills/agents 管理（项目可编辑、全局只读），保存后经 `plugin.invalidateSlashCommandCatalog()` 失效 runtime/menu catalog。
 > **最近更新**: 扁平化卡片层级（组容器退化为扁平语义分组；同日）+ Output Style live proof wording + browse-only session browser launcher + official nested hook config parsing + project settings surface (2026-06-07).
 
 ## 概述

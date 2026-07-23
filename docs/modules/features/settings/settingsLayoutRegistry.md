@@ -3,6 +3,8 @@
 > **源码**: `src/features/settings/settingsLayoutRegistry.ts`
 > **状态**: [REVIEW]
 
+> **更新**: Codex primary tab 新增 `resources` 二级 tab；Claude Code primary tab 新增 `resources` 二级 tab。
+
 ## 概述
 
 `settingsLayoutRegistry.ts` 定义设置页多级标签分类模式的标签结构。它是一个纯数据 registry，不包含任何设置保存逻辑，但现在也负责把旧的 `language` 一级标签记忆兼容到新的 `general`，并维护二级标签 legacy id 映射，避免用户停留在已重组的设置页时落到空白或错误默认页。

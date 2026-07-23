@@ -3,6 +3,8 @@
 > **源码**: `src/core/config/slashCommandCatalog.ts`
 > **状态**: [REVIEW]
 
+> **新增 source**: `SlashCommandMenuItemSource` 增加 `'codex-skill'`，用于 Codex 运行时 skills 菜单项（选中插入原始 `$skill-name ` 文本，不走 OpenCode session-command）。
+
 ## 概述
 
 `slashCommandCatalog.ts` 是 commands item 6 新抽出的共享 helper owner。它把 settings/catalog 与 chat/slash menu 都会复用的 slash command 合并规则收口到同一处，避免 `SettingsCommandsSection` 与输入区 autocomplete 再各自维护一套 runtime+project merge 逻辑；同时把“settings 可见的 merged catalog”与“chat 真正可执行的 runtime-backed menu projection”明确分开。

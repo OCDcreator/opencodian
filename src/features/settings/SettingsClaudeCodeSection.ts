@@ -42,6 +42,7 @@ import { getVaultBasePath } from '../../shared';
 import { BackendSessionBrowserModal } from '../chat/ui/BackendSessionBrowserModal';
 import { ClaudeCodeHelpContent, ClaudeCodeHelpModal } from './ClaudeCodeHelpModal';
 import { renderCostEstimateSettingsRow } from './CostEstimateSettingsRow';
+import { SettingsClaudeResourcesSection } from './SettingsClaudeResourcesSection';
 import { SettingsTooltipController } from './SettingsTooltipController';
 import { TextareaSizeMemory } from './TextareaSizeMemory';
 
@@ -283,6 +284,7 @@ export class SettingsClaudeCodeSection {
   private readonly resolveProcess: (options: ClaudeCodeProcessResolverOptions) => ClaudeCodeProcessResolution;
   private cachedModelCatalog: Array<{ id: string; name: string; provider: string }> | null = null;
   private modelCatalogLoadPromise: Promise<Array<{ id: string; name: string; provider: string }>> | null = null;
+  private resourcesSection: SettingsClaudeResourcesSection | null = null;
 
   constructor(options: SettingsClaudeCodeSectionOptions) {
     this.plugin = options.plugin;
@@ -316,6 +318,23 @@ export class SettingsClaudeCodeSection {
     // Activate the shared tooltip controller so the group help buttons'
     // data-settings-tooltip attributes render real hover/focus bubbles.
     SettingsTooltipController.ensureForDocument(containerEl.ownerDocument);
+
+    // Resources renders as independent per-type cards (commands / skills /
+    // agents) with no enclosing section card, keeping global-readonly /
+    // project-editable / empty-state semantics. A borderless host preserves
+    // settings targeting.
+    if (tabId === 'resources') {
+      const resourcesHost = containerEl.createDiv({
+        attr: {
+          'data-settings-surface': 'section',
+          'data-settings-target': `claude-code-${tabId}`,
+          'data-claude-code-section': tabId,
+        },
+      });
+      this.renderResourcesTab(resourcesHost);
+      return;
+    }
+
     const blockEl = containerEl.createDiv({
       cls: 'opencodian-settings-block opencodian-settings-section opencodian-settings-claude-code-block',
       attr: {
@@ -355,6 +374,22 @@ export class SettingsClaudeCodeSection {
         this.renderRuntimeTab(bodyEl);
         break;
     }
+  }
+
+  private renderResourcesTab(bodyEl: HTMLElement): void {
+    if (!this.resourcesSection) {
+      this.resourcesSection = new SettingsClaudeResourcesSection({
+        plugin: this.plugin,
+        createSectionHeading: (hostEl, title, tooltip) => this.createSectionHeading(hostEl, title, tooltip),
+        onAfterMutation: () => {
+          // Invalidate the Claude runtime / slash-command menu catalog so the
+          // next `/` open reflects project changes. Runtime
+          // supportedCommands()/supportedAgents() remains the final menu truth.
+          this.plugin.invalidateSlashCommandCatalog?.();
+        },
+      });
+    }
+    this.resourcesSection.render(bodyEl);
   }
 
   private createClaudeCodeGroup(

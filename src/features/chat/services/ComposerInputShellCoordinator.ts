@@ -18,6 +18,7 @@ import { type AgentMentionCandidate, AgentMentionComposerController } from './Ag
 import { ChatAgentSelectionCoordinator } from './ChatAgentSelectionCoordinator';
 import {
   buildComposerInputSubmissionWithAgentIntents,
+  getCodexSkillMenuQuery,
   getSlashCommandMenuQuery,
   isCommandComposerText,
 } from './composerInputParsing';
@@ -76,6 +77,22 @@ export interface ComposerInputShellCoordinatorHost {
   setTooltipLabel(element: HTMLElement, label: string, position?: 'bottom' | 'left' | 'right' | 'top'): void;
   getInputPlaceholder(): string;
   getSlashCommandSkillMode(): SlashCommandSkillMode;
+  /**
+   * Whether the Codex backend is the active conversation backend. Drives the
+   * runtime-only Codex skill menu (`/skills` browser + `$skill-name` insert).
+   * Never persists or alters `slashCommandSkillMode`.
+   */
+  isCodexBackendActive?(): boolean;
+  /**
+   * Invoked once per `@` token when the Codex backend is active, because Codex
+   * has no native agent dispatch API and cannot produce @agent candidates.
+   * The host shows an actionable notice (no native dispatch + a link into the
+   * Codex resource management settings). Implementations must debounce so the
+   * notice does not repeat on every keystroke.
+   */
+  onCodexAgentMentionUnavailable?(): void;
+  /** Invoked when the Codex skill selector is opened but has no skills. */
+  onCodexSkillsEmpty?(): void;
   addChosenFileContextToActiveTab(): Promise<void>;
   registerEscapeHandler(handler: () => boolean): void;
   mountSelectionControls(toolbar: HTMLElement, options: { showModels: boolean; showPermissions: boolean }): void;
@@ -150,6 +167,12 @@ export class ComposerInputShellCoordinator {
   private layoutSyncFrameId: number | null = null;
   private inputContainerResizeObserver: ResizeObserver | null = null;
   private slashCommandMenuCatalogItems: SlashCommandMenuItem[] | null = null;
+  /**
+   * Tracks the raw input length at which the Codex agent-mention notice was
+   * last shown, so the actionable notice fires once per `@` token rather than
+   * on every keystroke.
+   */
+  private codexAgentNoticeInputSignature: string | null = null;
   private readonly agentMentionController: AgentMentionComposerController;
   private readonly agentSelectionController: ChatAgentSelectionCoordinator;
   private readonly slashCommandMenuController: SlashCommandMenuCoordinator;
@@ -201,6 +224,12 @@ export class ComposerInputShellCoordinator {
       setCatalogItems: (items) => { this.slashCommandMenuCatalogItems = items; },
       loadItems: () => this.host.loadSlashCommandMenuItems(),
       getSkillMode: () => this.host.getSlashCommandSkillMode(),
+      ...(typeof this.host.isCodexBackendActive === 'function'
+        ? { isCodexSkillMode: () => this.host.isCodexBackendActive!() }
+        : {}),
+      ...(typeof this.host.onCodexSkillsEmpty === 'function'
+        ? { onCodexSkillsEmpty: () => this.host.onCodexSkillsEmpty!() }
+        : {}),
       onMenuLoadFailed: (error) => { logger.debug('Failed to load slash command menu items:', error); },
       onCatalogStateChanged: () => this.syncHighlightBackdrop(),
       onMenuItemApplied: () => {
@@ -1148,10 +1177,36 @@ export class ComposerInputShellCoordinator {
     }
 
     const slashQuery = getSlashCommandMenuQuery(textarea);
-    if (slashQuery !== null) {
+    // Codex `$skill-name` is a first-class trigger that opens the SAME skill
+    // selector as `/`. Detect it here and route to the slash menu exactly like
+    // `/` so no intermediate agent/command logic can clear the textarea or hide
+    // the menu. This must run before any input-state reset.
+    const codexSkillQuery = this.host.isCodexBackendActive?.()
+      ? getCodexSkillMenuQuery(textarea)
+      : null;
+    if (slashQuery !== null || codexSkillQuery !== null) {
       this.agentMentionController.clear(this.slashCommandMenuEl);
       await this.refreshSlashCommandMenu();
       return;
+    }
+
+    // Codex has no native agent dispatch API and cannot produce @agent
+    // candidates. When the user types `@`, surface an actionable notice once
+    // per token (pointing to the Codex resource settings) instead of silently
+    // doing nothing.
+    if (this.host.isCodexBackendActive?.() && typeof this.host.onCodexAgentMentionUnavailable === 'function') {
+      const codexAgentQuery = this.agentMentionController.getQuery(textarea);
+      if (codexAgentQuery) {
+        const signature = `${textarea.value.length}:${textarea.selectionStart ?? textarea.value.length}`;
+        if (this.codexAgentNoticeInputSignature !== signature) {
+          this.codexAgentNoticeInputSignature = signature;
+          this.host.onCodexAgentMentionUnavailable();
+        }
+      } else {
+        this.codexAgentNoticeInputSignature = null;
+      }
+    } else {
+      this.codexAgentNoticeInputSignature = null;
     }
 
     // Check agent mention query before isCommandComposerText, so that typing
@@ -1164,7 +1219,8 @@ export class ComposerInputShellCoordinator {
     const agentQuery = this.shouldHandleAgentFeatures
       ? this.agentMentionController.getQuery(textarea)
       : null;
-    const isSelectingSlashCommand = getSlashCommandMenuQuery(textarea) !== null;
+    const isSelectingSlashCommand = getSlashCommandMenuQuery(textarea) !== null
+      || codexSkillQuery !== null;
     if (agentQuery && !isSelectingSlashCommand) {
       this.clearSlashCommandMenu();
       await this.agentMentionController.refresh(agentQuery, this.slashCommandMenuEl);

@@ -44,6 +44,7 @@ import {
   type AppServerPermissionProfile,
   type AppServerReviewResult,
   type AppServerReviewTarget,
+  type AppServerSkill,
   type AppServerThread,
   type AppServerThreadGoal,
   type AppServerThreadStartOptions,
@@ -286,6 +287,24 @@ export class CodexAdapter
   private approvalHandlersRegistered = false;
 
   /**
+   * Handlers notified when the Codex app-server emits `skills/changed`. The
+   * chat slash-command menu cache subscribes to this so it can invalidate
+   * immediately instead of waiting for the 120s TTL.
+   */
+  private skillsChangedHandlers = new Set<() => void>();
+  /** Unsubscribe function for the `skills/changed` notification, or null. */
+  private skillsChangedUnsubscribe: (() => void) | null = null;
+  /**
+   * One-shot flag: when set, the next `getRuntimeSkills()` call passes
+   * `forceReload: true` to `skills/list` (bypassing the app-server's cache)
+   * and then clears the flag. Set by `forceNextRuntimeSkillsReload()` after a
+   * plugin-authored project skill mutation (create/update/delete), because the
+   * app-server does not always emit `skills/changed` for files the plugin
+   * wrote itself. Normal menu opens leave this false and keep caching.
+   */
+  private forceReloadNextSkills = false;
+
+  /**
    * Mutable options reference. Most fields are set once at construction,
    * but `modelReasoningEffort` supports runtime updates from the chat
    * toolbar effort selector without re-creating the adapter.
@@ -340,6 +359,9 @@ export class CodexAdapter
           : new CodexAppServerClient({
             codexPathOverride: this.options.codexPathOverride,
             pluginDir: this.options.pluginDir,
+            // Spawn the owned app-server inside the vault so project-scoped
+            // skills/agents resolve. Injected factories manage their own cwd.
+            ...(this.options.workingDirectory ? { workingDirectory: this.options.workingDirectory } : {}),
           });
         if (appServerClient) {
           this.appServerClient = appServerClient;
@@ -347,6 +369,9 @@ export class CodexAdapter
           this.setContextCapabilityAvailable(true);
           // Wire approval handlers if a host was set before start.
           this.registerApprovalHandlers();
+          // Subscribe to skills/changed so the chat menu cache can invalidate
+          // immediately instead of relying solely on the 120s TTL.
+          this.subscribeToAppServerSkillsChanged();
         } else {
           this.setContextCapabilityAvailable(false);
         }
@@ -376,6 +401,7 @@ export class CodexAdapter
     if (this.appServerClient) {
       try {
         this.unregisterApprovalHandlers();
+        this.unsubscribeFromAppServerSkillsChanged();
         this.appServerClient.stop();
       } catch {
         // Best-effort cleanup
@@ -500,6 +526,48 @@ export class CodexAdapter
         }
       });
     });
+  }
+
+  /**
+   * Read-only runtime skill discovery via the app-server `skills/list` route.
+   *
+   * Returns the skills Codex resolves for the current vault cwd, scoped by
+   * `options.workingDirectory`. Each entry carries name/description/path/
+   * enabled/scope. This is the sole runtime truth for the Codex chat `/skills`
+   * and `$` menu — the plugin never invents candidates or writes global skills.
+   *
+   * Returns null when the app-server client is unavailable (e.g. negotiation
+   * failed and the adapter fell back to SDK-only chat). Returns an empty array
+   * when the route is reachable but reports no skills.
+   */
+  /**
+   * Force the next `getRuntimeSkills()` to bypass the app-server cache
+   * (`forceReload: true`). Used after a plugin-authored project skill mutation
+   * so the next `/skills` or `$` menu open reflects the change even when the
+   * app-server did not emit `skills/changed` for the plugin's own file write.
+   * One-shot: only the next read is affected; normal menu opens keep caching.
+   */
+  forceNextRuntimeSkillsReload(): void {
+    this.forceReloadNextSkills = true;
+  }
+
+  async getRuntimeSkills(): Promise<AppServerSkill[] | null> {
+    if (!this.appServerClient) {
+      // Still clear the one-shot flag so a later client attach doesn't carry it.
+      this.forceReloadNextSkills = false;
+      return null;
+    }
+    const forceReload = this.forceReloadNextSkills;
+    this.forceReloadNextSkills = false;
+    try {
+      return await this.appServerClient.listSkills({
+        ...(this.options.workingDirectory ? { cwd: this.options.workingDirectory } : {}),
+        ...(forceReload ? { forceReload: true } : {}),
+      });
+    } catch (err) {
+      logger.warn('App-server skills/list failed', { error: err instanceof Error ? err.message : String(err) });
+      return null;
+    }
   }
 
   /**
@@ -1094,6 +1162,52 @@ export class CodexAdapter
   onCapabilitiesChange(handler: CapabilityChangeHandler): Disposable {
     this.capabilityHandlers.add(handler);
     return { dispose: () => this.capabilityHandlers.delete(handler) };
+  }
+
+  /**
+   * Register a handler invoked when the Codex app-server signals that its
+   * skill catalog changed (`skills/changed`). The handler receives no payload
+   * — it is a pure invalidation signal. Returns a Disposable that removes the
+   * handler. The chat slash-command menu cache uses this to drop stale entries
+   * immediately instead of waiting for the 120s TTL.
+   *
+   * No-op (returns a disposed Disposable) if there is no app-server client;
+   * the subscription is established lazily in `start()` once the client exists.
+   */
+  onSkillsChanged(handler: () => void): Disposable {
+    this.skillsChangedHandlers.add(handler);
+    return { dispose: () => this.skillsChangedHandlers.delete(handler) };
+  }
+
+  private notifySkillsChanged(): void {
+    for (const handler of this.skillsChangedHandlers) {
+      try {
+        handler();
+      } catch (err) {
+        logger.warn('skills/changed handler threw', { error: err instanceof Error ? err.message : String(err) });
+      }
+    }
+  }
+
+  private subscribeToAppServerSkillsChanged(): void {
+    if (!this.appServerClient || this.skillsChangedUnsubscribe) {
+      return;
+    }
+    if (typeof this.appServerClient.subscribeToSkillsChanged !== 'function') {
+      return;
+    }
+    this.skillsChangedUnsubscribe = this.appServerClient.subscribeToSkillsChanged(() => this.notifySkillsChanged());
+  }
+
+  private unsubscribeFromAppServerSkillsChanged(): void {
+    if (this.skillsChangedUnsubscribe) {
+      try {
+        this.skillsChangedUnsubscribe();
+      } catch (err) {
+        logger.warn('Failed to unsubscribe from skills/changed', { error: err instanceof Error ? err.message : String(err) });
+      }
+      this.skillsChangedUnsubscribe = null;
+    }
   }
 
   // -------------------------------------------------------------------------

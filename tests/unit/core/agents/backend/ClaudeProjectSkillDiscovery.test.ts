@@ -54,6 +54,8 @@ describe('ClaudeProjectSkillDiscovery', () => {
         description: 'Write Tests',
         skillMdPath: path.join(tempRoot, '.claude', 'skills', 'write-tests', 'SKILL.md'),
         relativePath: path.join('.claude', 'skills', 'write-tests'),
+        readonly: false,
+        scope: 'project',
       },
     ]);
   });
@@ -83,6 +85,8 @@ describe('ClaudeProjectSkillDiscovery', () => {
         description: 'Valid Skill',
         skillMdPath: path.join(tempRoot, '.claude', 'skills', 'valid-skill', 'SKILL.md'),
         relativePath: path.join('.claude', 'skills', 'valid-skill'),
+        readonly: false,
+        scope: 'project',
       },
     ]);
   });

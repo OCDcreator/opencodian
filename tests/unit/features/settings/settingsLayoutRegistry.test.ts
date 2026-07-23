@@ -127,6 +127,7 @@ describe('SETTINGS_PRIMARY_TABS', () => {
       'permissions',
       'context-sources',
       'tools',
+      'resources',
     ]);
   });
 

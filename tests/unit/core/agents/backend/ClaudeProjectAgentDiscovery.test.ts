@@ -45,12 +45,16 @@ describe('ClaudeProjectAgentDiscovery', () => {
         description: 'Code Reviewer',
         filePath: path.join(tempRoot, '.claude', 'agents', 'code-reviewer.md'),
         relativePath: path.join('.claude', 'agents', 'code-reviewer.md'),
+        readonly: false,
+        scope: 'project',
       },
       {
         name: 'summarizer',
         description: 'Summarize current context.',
         filePath: path.join(tempRoot, '.claude', 'agents', 'summarizer.md'),
         relativePath: path.join('.claude', 'agents', 'summarizer.md'),
+        readonly: false,
+        scope: 'project',
       },
     ]);
   });

@@ -3,6 +3,8 @@
 > **源码**: `src/core/agents/backend/ClaudeProjectAgentDiscovery.ts`
 > **状态**: [ACTIVE]
 
+> **更新**: 新增 `updateClaudeProjectAgent` / `deleteClaudeProjectAgent` / `discoverClaudeGlobalAgents`（只读）/ `readClaudeAgentContent` / `validateClaudeAgentContent` / `defaultClaudeAgentContent`；`ClaudeProjectAgentInfo` 增加 `readonly`、`scope`。写入经共享 `ProjectResourceSecureWrite`（原子写 + 路径穿越保护）。`createClaudeProjectAgent` 保持返回 `string|null`（向后兼容）。
+
 ## 概述
 
 `ClaudeProjectAgentDiscovery.ts` 是 Claude Code 项目代理定义的文件系统扫描与创建 helper。它读取当前 vault 下的 `.claude/agents/*.md`，提取最小展示 metadata，供 Claude Code settings 显示项目代理；同时提供 `createClaudeProjectAgent()` 用于创建新代理定义文件。不依赖 Claude SDK query。

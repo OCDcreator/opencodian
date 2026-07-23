@@ -179,6 +179,7 @@ import {
   ChildSessionGraphCoordinator,
   type ChildSessionGraphCoordinatorHost,
 } from './services/ChildSessionGraphCoordinator';
+import { CodexChatSurfaceBinding } from './services/CodexChatSurfaceBinding';
 import {
   ComposerContextViewFacade,
   type ComposerContextViewHost,
@@ -517,6 +518,7 @@ export class OpenCodianView extends ItemView {
   private eventRefs: EventRef[] = [];
   private backendActiveChangeDisposable: { dispose(): void } | null = null;
   private backendCapabilityChangeDisposable: { dispose(): void } | null = null;
+  private readonly codexChatSurfaceBinding: CodexChatSurfaceBinding;
   private escapeHandlers: Array<() => boolean> = [];
   private backendSurfaceSwitchPromise: Promise<void> | null = null;
 
@@ -925,6 +927,9 @@ export class OpenCodianView extends ItemView {
       },
       getInputPlaceholder: () => this.getInputPlaceholder(),
       getSlashCommandSkillMode: () => this.plugin.settings.slashCommandSkillMode,
+      isCodexBackendActive: () => this.isCodexConversationActive(),
+      onCodexAgentMentionUnavailable: () => this.codexChatSurfaceBinding.notifyAgentMentionUnavailable(),
+      onCodexSkillsEmpty: () => this.codexChatSurfaceBinding.notifySkillsEmpty(),
       addChosenFileContextToActiveTab: async () => {
         await this.composerContextViewFacade.addChosenFileContextToActiveTab();
       },
@@ -1072,11 +1077,13 @@ export class OpenCodianView extends ItemView {
   }
 
   private loadSlashCommandMenuItems(): Promise<SlashCommandMenuItem[]> {
-    if (!this.isOpenCodeBackendActive() && !this.isClaudeCodeConversationActive()) {
+    if (!this.isOpenCodeBackendActive() && !this.isClaudeCodeConversationActive() && !this.isCodexConversationActive()) {
       return Promise.resolve([]);
     }
 
-    if (!this.plugin.opencodeConfigManager && !this.isClaudeCodeConversationActive()) {
+    // Codex skills come from the app-server via the cache host's
+    // loadCodexRuntimeSkills seam, so Codex does not require opencodeConfigManager.
+    if (!this.plugin.opencodeConfigManager && !this.isClaudeCodeConversationActive() && !this.isCodexConversationActive()) {
       return Promise.resolve([]);
     }
 
@@ -1084,7 +1091,7 @@ export class OpenCodianView extends ItemView {
   }
 
   private scheduleSlashCommandMenuPreload(): void {
-    if (!this.isOpenCodeBackendActive() && !this.isClaudeCodeConversationActive()) {
+    if (!this.isOpenCodeBackendActive() && !this.isClaudeCodeConversationActive() && !this.isCodexConversationActive()) {
       return;
     }
 
@@ -1582,10 +1589,10 @@ export class OpenCodianView extends ItemView {
     this.currentVariant = undefined;
     this.slashCommandMenuCatalogCache = new SlashCommandMenuCatalogCache({
       getHiddenCommandIds: () => this.plugin.settings.hiddenSlashCommands ?? [],
-      loadProjectAgents: async () => this.isClaudeCodeConversationActive() ? {} : (this.plugin.opencodeConfigManager?.getAgentConfig() ?? {}),
-      loadProjectCommands: async () => this.isClaudeCodeConversationActive() ? {} : (this.plugin.opencodeConfigManager?.getCommandConfig() ?? {}),
-      loadRuntimeCommands: async () => this.isClaudeCodeConversationActive() ? [] : this.plugin.openCodeService.sdk.command.list(),
-      loadRuntimeSkills: async () => this.isClaudeCodeConversationActive() ? [] : this.plugin.openCodeService.sdk.app.skills(),
+      loadProjectAgents: async () => (this.isClaudeCodeConversationActive() || this.isCodexConversationActive()) ? {} : (this.plugin.opencodeConfigManager?.getAgentConfig() ?? {}),
+      loadProjectCommands: async () => (this.isClaudeCodeConversationActive() || this.isCodexConversationActive()) ? {} : (this.plugin.opencodeConfigManager?.getCommandConfig() ?? {}),
+      loadRuntimeCommands: async () => (this.isClaudeCodeConversationActive() || this.isCodexConversationActive()) ? [] : this.plugin.openCodeService.sdk.command.list(),
+      loadRuntimeSkills: async () => (this.isClaudeCodeConversationActive() || this.isCodexConversationActive()) ? [] : this.plugin.openCodeService.sdk.app.skills(),
       loadClaudeRuntimeCommands: async () => {
         if (!this.isClaudeCodeConversationActive()) return null;
         const adapter = this.plugin.agentServiceRegistry?.get('claude-code') as {
@@ -1602,7 +1609,15 @@ export class OpenCodianView extends ItemView {
         const catalog = await adapter?.getRuntimeCatalog?.();
         return catalog?.agents ?? null;
       },
-      getBackendKey: () => this.isClaudeCodeConversationActive() ? 'claude-code' : 'opencode',
+      loadCodexRuntimeSkills: async () => {
+        if (!this.isCodexConversationActive()) return null;
+        const adapter = this.plugin.agentServiceRegistry?.get('codex') as {
+          getRuntimeSkills?: () => Promise<Array<{ name: string; description?: string; enabled?: boolean; scope?: string }> | null>;
+        } | undefined;
+        const skills = await adapter?.getRuntimeSkills?.();
+        return skills ?? null;
+      },
+      getBackendKey: () => this.isClaudeCodeConversationActive() ? 'claude-code' : (this.isCodexConversationActive() ? 'codex' : 'opencode'),
       getSlashCommandCapabilityKey: () => {
         // Fold the current v2.command.list / v2.skill.list capability
         // availability into the cache key. When server support flips, the key
@@ -1611,6 +1626,9 @@ export class OpenCodianView extends ItemView {
         // unavailable, so existing behavior is preserved.
         if (this.isClaudeCodeConversationActive()) {
           return 'claude-code';
+        }
+        if (this.isCodexConversationActive()) {
+          return 'codex';
         }
         const service = this.plugin.openCodeService;
         const requireCapability = service?.requireSdkCapability?.bind(service);
@@ -1623,6 +1641,14 @@ export class OpenCodianView extends ItemView {
       },
       getVaultPath: () => getVaultBasePath(this.app),
       onWarmLoadFailed: (error) => { logger.debug('Failed to preload slash command menu items:', error); },
+    });
+    this.codexChatSurfaceBinding = new CodexChatSurfaceBinding({
+      getCodexAdapter: () => this.plugin.agentServiceRegistry?.get('codex') as {
+        onSkillsChanged?(handler: () => void): { dispose(): void };
+      } | null ?? null,
+      invalidateSlashCommandMenuCache: () => this.slashCommandMenuCatalogCache.invalidate(),
+      openPluginSettings: () => this.openPluginSettingsPreservingScroll(),
+      isCodexActive: () => this.isCodexConversationActive(),
     });
     const surfaceRuntime = this.createSurfaceRuntimeWiring();
     this.titleGenerationService = surfaceRuntime.titleGenerationService;
@@ -3335,6 +3361,7 @@ export class OpenCodianView extends ItemView {
     });
     await measureStep('wireBackendSurfaceSwitch', () => {
       this.wireBackendSurfaceSwitch();
+      this.codexChatSurfaceBinding.syncSkillsChangedSubscription();
     });
     await measureStep('startConversationSessionSignalRuntime', () => {
       if (this.shouldStartConversationSessionSignalRuntime()) {
@@ -3380,6 +3407,7 @@ export class OpenCodianView extends ItemView {
     this.backendActiveChangeDisposable = null;
     this.backendCapabilityChangeDisposable?.dispose();
     this.backendCapabilityChangeDisposable = null;
+    this.codexChatSurfaceBinding.dispose();
 
     // Cleanup navigation sidebar
     this.conversationTabRuntimeCoordinator.destroyTabSystem();
@@ -3927,6 +3955,7 @@ export class OpenCodianView extends ItemView {
       }
       this.refreshComposerToolbarForActiveBackend();
       this.activeTabContextUsageCoordinator.syncIdentity();
+      this.codexChatSurfaceBinding.syncSkillsChangedSubscription();
     }) ?? null;
   }
 

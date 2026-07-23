@@ -295,6 +295,35 @@ export interface McpOauthLoginResult {
   errorReason?: string;
 }
 
+/**
+ * A skill exposed by the Codex app-server `skills/list` route.
+ *
+ * Fields mirror the verified app-server output shape and are intentionally
+ * permissive: the server may omit `description`, `path`, `enabled`, or
+ * `scope` depending on the Codex version. Callers must treat all optional
+ * fields as potentially absent.
+ *
+ * The plugin never writes global Codex skills; this type is read-only and
+ * only describes runtime-discovered skills for display in the chat menu and
+ * resource settings.
+ */
+export interface AppServerSkill {
+  name: string;
+  description?: string;
+  path?: string;
+  enabled?: boolean;
+  /** Best-effort scope label from the server (e.g. "project", "global", "user"). */
+  scope?: string;
+}
+
+/** Params accepted by `CodexAppServerClient.listSkills()`. */
+export interface AppServerListSkillsOptions {
+  /** Working directory to scope the skill query (the current vault cwd). */
+  cwd?: string;
+  /** Bypass any server-side cache and force a fresh read. */
+  forceReload?: boolean;
+}
+
 /** Union of possible item types in a turn (verified against real Codex app-server output). */
 export type AppServerItem =
   | { type: 'userMessage'; id: string; content: Array<{ type: string; text?: string }> }

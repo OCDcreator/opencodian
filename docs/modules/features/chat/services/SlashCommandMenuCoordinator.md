@@ -3,6 +3,8 @@
 > **源码**: `src/features/chat/services/SlashCommandMenuCoordinator.ts`
 > **状态**: [REVIEW]
 
+> **新增（Codex）**: host 可选 `isCodexSkillMode?()` 与 `onCodexSkillsEmpty?()`；`refresh()` 在 Codex 模式优先用 `getCodexSkillMenuQuery`（`$` 触发），`filterItems` 透传 `codexSkillMode`。选中 `/skills` capability 项时若 Codex 且 catalog 无 `codex-skill` 项 → 调 `onCodexSkillsEmpty`(可操作空态) 并 `clear()`，绝不留空白菜单。
+
 ## 概述
 
 `SlashCommandMenuCoordinator` 承接 chat composer slash autocomplete 的状态机。它拥有当前 query、加载状态、可见候选、键盘选中项、hover/click selection，以及 `/skills` 顶层入口选中后的 nested skill 列表刷新。这样 `ComposerInputShellCoordinator` 继续负责输入 shell / textarea / submit lifecycle，而 slash menu 的可变状态不再留在 shell owner 内膨胀。

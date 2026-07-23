@@ -4,6 +4,8 @@
 > **状态**: [RUNTIME_ADJUNCT]
 > **Updated**: 2026-06-14 — split wire types into `CodexAppServerClientTypes`, transport/lifecycle into `CodexAppServerTransport`, normalization helpers into `CodexAppServerClientNormalization`; `CodexAppServerClient extends CodexAppServerTransport` and re-exports types via `export *`
 
+> **新增（skills）**: `listSkills({ cwd, forceReload? })` 调用 app-server `skills/list`，返回扁平 `AppServerSkill[]`（name/description/path/enabled/scope）。结果经导出的纯函数 `normalizeSkillsListResult` 归一：接受扁平数组、`{data}` 包装、单个/多个 `{cwd, skills, errors}` group envelope（真实服务器形态），丢弃无 `name` 的畸形项，**绝不伪造** skills。`subscribeToSkillsChanged(handler)` 包装 `skills/changed` 通知订阅，返回 unsubscribe 函数。
+
 ## 概述
 
 `CodexAppServerClient` 是 Codex 本地 app-server 的类型化客户端。2026-07-22 起，实验 API 协商成功时它也是 Codex 的主 chat send/stream 路径；协商失败时 `CodexAdapter` 才保持 SDK 聊天回退且不挂载会话 Context Ring。

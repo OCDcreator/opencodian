@@ -165,9 +165,19 @@ function renderSlashCommandMenuItem(itemEl: HTMLElement, item: SlashCommandMenuI
   const titleRowEl = itemEl.createDiv({
     cls: 'opencodian-slash-command-menu-title-row',
   });
+  // Source-aware title: a direct Codex skill candidate's displayId already
+  // starts with `$` (e.g. `$code-review`), so prefixing `/` would render the
+  // misleading `/$code-review`. Show it verbatim. Codex skills reached via the
+  // `/skills` prefix carry a `skills <name>` displayId, which the `/` prefix
+  // renders truthfully as `/skills <name>`. Ordinary slash commands are
+  // unaffected.
+  const displayId = item.displayId ?? item.id;
+  const title = item.source === 'codex-skill' && displayId.startsWith('$')
+    ? displayId
+    : `/${displayId}`;
   titleRowEl.createDiv({
     cls: 'opencodian-slash-command-menu-title',
-    text: `/${item.displayId ?? item.id}`,
+    text: title,
   });
 
   const sourceBadge = buildSourceBadge(item);
@@ -250,7 +260,7 @@ function getAgentMentionMenuStateText(status: SlashCommandMenuStatus): string | 
 }
 
 function buildSourceBadge(item: SlashCommandMenuItem): SlashCommandSourceBadge | null {
-  const badge = item.source === 'skill' || item.source === 'skills-command'
+  const badge = item.source === 'skill' || item.source === 'skills-command' || item.source === 'codex-skill'
     ? { key: 'slashCommand.sourceBadge.skill' as const, cls: 'opencodian-slash-command-menu-badge--skill' }
     : item.runtimeAvailable && item.hasProjectOverride
       ? { key: 'slashCommand.sourceBadge.override' as const, cls: 'opencodian-slash-command-menu-badge--override' }

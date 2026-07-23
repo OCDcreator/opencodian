@@ -3,6 +3,8 @@
 > **源码**: `src/features/chat/services/ComposerInputShellCoordinator.ts`
 > **状态**: [REVIEW]
 
+> **新增（Codex）**: host 可选 `isCodexBackendActive?()`、`onCodexAgentMentionUnavailable?()` 与 `onCodexSkillsEmpty?()`；`refreshComposerSuggestionMenu` 将 Codex `$skill-name` 作为**一等触发**（与 `/` 同级优先）——检测到 `getCodexSkillMenuQuery` 非 null 即路由 `refreshSlashCommandMenu`，任何中间 agent/command/input-reset 逻辑都不会清空 textarea 或隐藏菜单。`onCodexAgentMentionUnavailable` 在 `@` 时触发；`onCodexSkillsEmpty` 在 skill 选择器无 skills 时触发。
+
 ## 概述
 
 `ComposerInputShellCoordinator` 承接聊天输入区 shell 的 DOM 与 layout lifecycle，避免 `OpenCodianView` 继续直接维护 textarea、自适应高度、send/stop 按钮、slash autocomplete / `@agent` menu 和 composer stack metrics。

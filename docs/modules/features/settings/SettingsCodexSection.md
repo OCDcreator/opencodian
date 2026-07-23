@@ -3,6 +3,8 @@
 **File:** `src/features/settings/SettingsCodexSection.ts`
 **Status:** ACTIVE
 
+> **更新**: 新增 `resources` 二级 tab，委托给 `SettingsCodexResourcesSection` 渲染 Codex 项目/全局 skills 与 agents 管理（项目可编辑、全局只读）。
+
 ## Purpose
 
 Codex backend settings panel. Uses three secondary tabs under the Codex primary tab to avoid piling unrelated settings into a single flat card stack:

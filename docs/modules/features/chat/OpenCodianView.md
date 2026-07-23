@@ -4,6 +4,8 @@
 > **状态**: [REVIEW]
 > **最近更新**: Backend session browser with preview transcript seeding + settings info entry + sandbox badge host wiring + Codex session webSearchMode override host wiring
 
+> **新增（Codex 资源/技能）**: cache host 提供 `loadCodexRuntimeSkills`、`getBackendKey` 返回 `'codex'`；`syncCodexSkillsChangedSubscription()` 订阅 Codex adapter `onSkillsChanged` → 立即失效 slash 菜单缓存；`notifyCodexAgentMentionUnavailable()` 在 Codex `@` 时显示无原生派发提示并提供设置入口。
+
 ## 概述
 
 `OpenCodianView` 是聊天功能的主集成点。它继承 `ItemView`，负责把下列能力装配到同一个 Obsidian 视图里：

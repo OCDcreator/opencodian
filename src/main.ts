@@ -605,6 +605,16 @@ export default class OpenCodianPlugin extends Plugin {
     return this.getSettingsRuntimeCoordinator().saveSettings(options);
   }
 
+  /**
+   * Invalidate the slash-command / runtime menu catalog so the next `/` or
+   * resource open reflects project-level changes (e.g. Claude/Codex project
+   * commands/skills/agents edited in the resource settings). Runtime
+   * supportedCommands()/supportedAgents() remains the final menu truth.
+   */
+  invalidateSlashCommandCatalog(options: { preload?: boolean } = {}): void {
+    this.runtimeCoordinator.invalidateSlashCommandMenuCatalogs(options);
+  }
+
   private applyLoggerSettings(): void {
     const settings = this.settings;
     setDebugLoggingEnabled(settings.enableDebugLogging);

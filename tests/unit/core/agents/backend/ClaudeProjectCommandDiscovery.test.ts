@@ -44,6 +44,8 @@ describe('ClaudeProjectCommandDiscovery', () => {
         description: 'Write Summary',
         filePath: path.join(tempRoot, '.claude', 'commands', 'write-summary.md'),
         relativePath: path.join('.claude', 'commands', 'write-summary.md'),
+        readonly: false,
+        scope: 'project',
       },
     ]);
   });

@@ -96,4 +96,58 @@ describe('ClaudeCodeProcessResolver', () => {
     expect(resolution.pathToClaudeCodeExecutable).toBe('C:\\Users\\test\\AppData\\Roaming/npm/claude.cmd');
     expect(resolution.shell).toBe(true);
   });
+
+  it('discovers the Claude CLI from ~/.local/bin fallback on macOS', () => {
+    const resolution = resolveClaudeCodeProcess({
+      settings: getDefaultClaudeCodeBackendSettings(),
+      platform: 'darwin',
+      env: {
+        PATH: '/usr/bin',
+        HOME: '/Users/test',
+      },
+      existsSync: (candidate) => candidate === '/Users/test/.local/bin/claude',
+    });
+
+    expect(resolution.mode).toBe('external');
+    expect(resolution.pathToClaudeCodeExecutable).toBe('/Users/test/.local/bin/claude');
+    expect(resolution.env.PATH).toContain('/Users/test/.local/bin');
+    expect(resolution.diagnostics.pathAugmented).toBe(true);
+  });
+
+  it('reports cli-not-on-path reason when no CLI is configured or discovered', () => {
+    const resolution = resolveClaudeCodeProcess({
+      settings: getDefaultClaudeCodeBackendSettings(),
+      platform: 'darwin',
+      env: { PATH: '/usr/bin', HOME: '/Users/test' },
+      existsSync: () => false,
+    });
+
+    expect(resolution.mode).toBe('missing');
+    expect(resolution.diagnostics.reason).toBe('cli-not-on-path');
+    expect(resolution.diagnostics.configuredPath).toBeNull();
+  });
+
+  it('reports configured-path-not-found reason when a configured path is missing', () => {
+    const resolution = resolveClaudeCodeProcess({
+      settings: { ...getDefaultClaudeCodeBackendSettings(), executablePath: '/missing/claude' },
+      platform: 'darwin',
+      env: { PATH: '/usr/bin', HOME: '/Users/test' },
+      existsSync: () => false,
+    });
+
+    expect(resolution.mode).toBe('missing');
+    expect(resolution.diagnostics.reason).toBe('configured-path-not-found');
+  });
+
+  it('omits reason when the CLI resolves successfully', () => {
+    const resolution = resolveClaudeCodeProcess({
+      settings: getDefaultClaudeCodeBackendSettings(),
+      platform: 'darwin',
+      env: { PATH: '/usr/bin', HOME: '/Users/test' },
+      existsSync: (candidate) => candidate === '/Users/test/.claude/local/claude',
+    });
+
+    expect(resolution.mode).toBe('external');
+    expect(resolution.diagnostics.reason).toBeUndefined();
+  });
 });

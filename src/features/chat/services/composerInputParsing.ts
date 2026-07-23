@@ -231,7 +231,6 @@ export function getSlashCommandMenuQuery(textarea: HTMLTextAreaElement): SlashCo
   if (slashIndex > 0 && beforeCursor[slashIndex - 1] === '/') {
     return null;
   }
-
   const searchText = beforeCursor.slice(slashIndex + 1);
   if (/\s/.test(searchText) && !/^skills(?:\s+\S*)?$/i.test(searchText)) {
     return null;
@@ -240,6 +239,55 @@ export function getSlashCommandMenuQuery(textarea: HTMLTextAreaElement): SlashCo
   return {
     query: searchText,
     isMidText: isSlashCommandMidText(beforeCursor, slashIndex),
+  };
+}
+
+/**
+ * Detect a Codex `$skill-name` invocation token at the cursor, mirroring
+ * `getSlashCommandMenuQuery` but for the `$` trigger. Used only when the Codex
+ * backend is active so the same runtime skill catalog can be filtered/selected
+ * by typing `$`. Returns the text after `$` (or empty when only `$` is typed),
+ * or null when no `$` token is present at the cursor.
+ */
+export function getCodexSkillMenuQuery(textarea: HTMLTextAreaElement): SlashCommandMenuQuery | null {
+  const selectionStart = textarea.selectionStart ?? textarea.value.length;
+  const selectionEnd = textarea.selectionEnd ?? selectionStart;
+  if (selectionStart !== selectionEnd) {
+    return null;
+  }
+
+  const beforeCursor = textarea.value.slice(0, selectionStart);
+
+  let dollarIndex = -1;
+  for (let i = beforeCursor.length - 1; i >= 0; i--) {
+    const ch = beforeCursor[i];
+    if (ch === '$') {
+      dollarIndex = i;
+      break;
+    }
+    if (/\s/.test(ch)) {
+      break;
+    }
+  }
+
+  if (dollarIndex < 0) {
+    return null;
+  }
+
+  // The `$` must sit at a token boundary (start of input or after whitespace).
+  if (dollarIndex > 0 && !/\s/.test(beforeCursor[dollarIndex - 1])) {
+    return null;
+  }
+
+  const searchText = beforeCursor.slice(dollarIndex + 1);
+  // A space ends the skill name; Codex `$skill` takes no further args here.
+  if (/\s/.test(searchText)) {
+    return null;
+  }
+
+  return {
+    query: searchText,
+    isMidText: dollarIndex > 0,
   };
 }
 
@@ -272,7 +320,9 @@ export function replaceSlashTokenAtCursor(
   let slashIndex = -1;
   for (let i = beforeCursor.length - 1; i >= 0; i--) {
     const ch = beforeCursor[i];
-    if (ch === '/') {
+    // Treat both `/` and `$` as trigger characters so the Codex `$skill-name`
+    // token is replaced correctly when a menu item is applied.
+    if (ch === '/' || ch === '$') {
       slashIndex = i;
       break;
     }

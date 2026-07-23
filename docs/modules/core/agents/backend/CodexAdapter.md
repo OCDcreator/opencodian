@@ -4,6 +4,8 @@
 > **状态**: [RUNTIME_PROVEN]
 > **Updated**: 2026-06-14 Checkpoint 15T — landed `invalidateLiveThread(sessionId)` live current-thread re-resume mechanism (drops cached SDK Thread so next turn re-resumes the same backendSessionId with updated CLI args, preserving conversation history)
 
+> **新增（skills runtime truth）**: `getRuntimeSkills()` 通过 app-server `skills/list`（scoped to `workingDirectory`）返回 Codex 当前 vault 的 runtime skills，作为聊天 `/skills` 与 `$` 菜单的唯一 runtime 真相；app-server 不可用时返回 null。`forceNextRuntimeSkillsReload()` 设置一次性标志，使**下一次** `getRuntimeSkills()` 传 `forceReload: true` 绕过 app-server 缓存（用于插件自身的项目 skill 写入后，app-server 不一定发 `skills/changed`），随即清除标志；正常菜单打开保持缓存。`onSkillsChanged(handler)` 暴露 `skills/changed` 失效信号 Disposable；`start()` 时订阅、`stop()` 时取消订阅。聊天菜单缓存订阅此信号以立即失效，而非仅靠 120s TTL。
+
 ## 概述
 
 `CodexAdapter.ts` 是 OpenAI Codex SDK 接入的 AgentService 适配器。它实现 `AgentChatCapability` 和 `AgentSessionCapability`，把 Codex SDK 的 `Codex` / `Thread` API 包装为统一的 agent 后端接口。

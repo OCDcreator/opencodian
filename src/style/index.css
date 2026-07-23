@@ -20,6 +20,8 @@
 @import 'components/settings-capability-lab.css';
 @import 'components/settings-claude-code.css';
 @import 'components/settings-codex-account.css';
+@import 'components/settings-codex-resources.css';
+@import 'components/settings-claude-resources.css';
 @import 'components/settings-model-pricing.css';
 @import 'features/chat-user.css';
 @import 'features/chat-assistant.css';

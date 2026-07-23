@@ -2,6 +2,7 @@ import type { SlashCommandMenuItem } from '../../../core/config/slashCommandCata
 import type { SlashCommandSkillMode } from '../../../core/types';
 import { t } from '../../../i18n';
 import {
+  getCodexSkillMenuQuery,
   getSlashCommandMenuQuery,
   replaceSlashTokenAtCursor,
   type SlashCommandMenuQuery,
@@ -16,6 +17,20 @@ export interface SlashCommandMenuCoordinatorHost {
   setCatalogItems(items: SlashCommandMenuItem[] | null): void;
   loadItems(): Promise<SlashCommandMenuItem[]>;
   getSkillMode(): SlashCommandSkillMode;
+  /**
+   * Optional: returns true when the Codex backend is active, so the filter
+   * routes `codex-skill` items through the `/skills` browser and inserts the
+   * raw `$skill-name ` text. Runtime-only — never persists or alters
+   * `slashCommandSkillMode`.
+   */
+  isCodexSkillMode?(): boolean;
+  /**
+   * Invoked when the user selects the `/skills` capability entry (or `$`)
+   * under the Codex backend but there are no runtime skills to show. The host
+   * shows an actionable notice (reason + a link into Codex resource
+   * management settings). Prevents a blank empty menu.
+   */
+  onCodexSkillsEmpty?(): void;
   onMenuLoadFailed(error: unknown): void;
   onCatalogStateChanged(): void;
   onMenuItemApplied(): void;
@@ -85,7 +100,11 @@ export class SlashCommandMenuCoordinator {
       return;
     }
 
-    const query = getSlashCommandMenuQuery(textarea);
+    // When the Codex backend is active, also honor the `$skill-name` trigger
+    // so users can filter/select the same runtime skills by typing `$`.
+    const query = this.host.isCodexSkillMode?.()
+      ? (getCodexSkillMenuQuery(textarea) ?? getSlashCommandMenuQuery(textarea))
+      : getSlashCommandMenuQuery(textarea);
     if (query === null) {
       this.clear();
       return;
@@ -184,6 +203,17 @@ export class SlashCommandMenuCoordinator {
     textarea.setSelectionRange(nextCursorPos, nextCursorPos);
     this.host.onMenuItemApplied();
     if (item.source === 'skills-command') {
+      // Codex: selecting `/skills` with zero runtime skills must not leave a
+      // blank menu — surface an actionable empty state instead.
+      if (this.host.isCodexSkillMode?.()) {
+        const catalog = this.host.getCatalogItems() ?? [];
+        const hasCodexSkills = catalog.some((entry) => entry.source === 'codex-skill');
+        if (!hasCodexSkills) {
+          this.host.onCodexSkillsEmpty?.();
+          this.clear();
+          return;
+        }
+      }
       void this.refresh();
       return;
     }
@@ -245,6 +275,7 @@ export class SlashCommandMenuCoordinator {
       skillMode: this.host.getSkillMode(),
       skillsCommandDescription: t('slashCommand.skillsCommand.description'),
       isMidText: query.isMidText,
+      ...(this.host.isCodexSkillMode?.() ? { codexSkillMode: true } : {}),
     });
   }
 

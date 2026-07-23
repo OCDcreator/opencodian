@@ -3,6 +3,8 @@
 > **源码**: `src/features/chat/services/composerInputParsing.ts`
 > **状态**: [REVIEW]
 
+> **新增（Codex `$` 触发）**: `getCodexSkillMenuQuery(textarea)` 镜像 `/` 检测但识别 `$` token；`replaceSlashTokenAtCursor` 现在同时把 `/` 与 `$` 视为触发边界，使 Codex `$skill-name` 选中后正确替换。
+
 ## 概述
 
 `composerInputParsing.ts` 是 chat composer 的纯解析 helper。它把 textarea 文本归类为 prompt / slash command / shell submission，并提供 slash autocomplete 的 token 查询解析，让 `ComposerInputShellCoordinator` 继续专注 DOM、layout 与菜单状态编排。

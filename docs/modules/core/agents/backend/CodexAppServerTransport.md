@@ -3,6 +3,8 @@
 > **源码**: `src/core/agents/backend/CodexAppServerTransport.ts`
 > **状态**: [RUNTIME_ADJUNCT]
 
+> **更新**: 构造函数新增可选 `workingDirectory`；`doStart` 的 `spawn` 在提供时以此作为 `cwd` 启动 owned app-server 进程，使项目级资源(`.agents/skills`、`.codex/agents`)相对 vault 解析。未提供时继承插件进程 cwd（向后兼容）。
+
 ## 概述
 
 从 `CodexAppServerClient` 拆出的基类，负责 Codex app-server 的进程生命周期与 JSON-RPC 2.0 plumbing。`CodexAppServerClient extends CodexAppServerTransport` 并在此基类之上添加类型化的 app-server API wrapper。

@@ -3,6 +3,12 @@
 > **源码**: `src/features/chat/services/slashCommandMenuFilter.ts`
 > **状态**: [REVIEW]
 
+> **新增（Codex mode）**: `SlashCommandMenuFilterOptions` 增加可选运行时 `codexSkillMode`。启用时:
+- **始终包含 `/skills` capability 入口**(即使 `skills/list` 返回空),确保菜单永不空白;
+- `/skills <x>` 展开匹配 codex skills(无匹配仍保留 `/skills` 入口);
+- 空 `/` 或 `$x` 触发:匹配 codex skills 直接插入 `$name ` + `/skills` 入口;
+- 永不持久化或改动 `slashCommandSkillMode`,不入 OpenCode session-command。
+
 ## 概述
 
 `slashCommandMenuFilter.ts` 是聊天输入区 slash autocomplete 的纯过滤 helper。它把命令 ID 和描述的 fuzzy scoring 从 `ComposerInputShellCoordinator` 中移出，避免输入区 DOM/layout owner 继续膨胀。

@@ -62,10 +62,18 @@ export class CodexAppServerTransport {
   protected codexPathOverride?: string;
   /** Absolute path to the Obsidian plugin directory (for resolving `ws`). */
   protected pluginDir?: string;
+  /**
+   * Working directory the owned app-server process is spawned with. When set
+   * to the active vault path, project-scoped resources (e.g. `.agents/skills`)
+   * are resolved relative to the vault; otherwise the server inherits the
+   * plugin process cwd and project resources are invisible.
+   */
+  protected workingDirectory?: string;
 
-  constructor(options?: { codexPathOverride?: string; pluginDir?: string }) {
+  constructor(options?: { codexPathOverride?: string; pluginDir?: string; workingDirectory?: string }) {
     this.codexPathOverride = options?.codexPathOverride;
     this.pluginDir = options?.pluginDir;
+    this.workingDirectory = options?.workingDirectory;
   }
 
   // ---------------------------------------------------------------------------
@@ -82,10 +90,14 @@ export class CodexAppServerTransport {
 
   private async doStart(): Promise<void> {
     const codexPath = this.codexPathOverride ?? 'codex';
-    logger.info('Starting Codex app-server', { codexPath });
+    logger.info('Starting Codex app-server', { codexPath, cwd: this.workingDirectory ?? '(inherited)' });
 
     this.process = spawn(codexPath, ['app-server', '--listen', 'ws://127.0.0.1:0'], {
       stdio: ['ignore', 'pipe', 'pipe'],
+      // Spawn the owned app-server inside the active vault so project-scoped
+      // resources (.agents/skills, .codex/agents) resolve correctly. Omit cwd
+      // only when no working directory is known (inherit plugin process cwd).
+      ...(this.workingDirectory ? { cwd: this.workingDirectory } : {}),
     });
 
     // Parse the WebSocket URL from stdout

@@ -26,6 +26,7 @@ import type {
   AppServerAccountUsage,
   AppServerAccountUsageResult,
   AppServerForkResult,
+  AppServerListSkillsOptions,
   AppServerMcpResourceContent,
   AppServerMcpResourceReadResult,
   AppServerMcpServerStatus,
@@ -38,6 +39,7 @@ import type {
   AppServerRateLimits,
   AppServerReviewResult,
   AppServerReviewTarget,
+  AppServerSkill,
   AppServerThread,
   AppServerThreadGoal,
   AppServerThreadNotification,
@@ -53,6 +55,94 @@ import { CodexAppServerTransport } from './CodexAppServerTransport';
 export * from './CodexAppServerClientTypes';
 
 const logger = createLogger('CodexAppServerClient');
+
+/**
+ * A group envelope returned by the Codex app-server `skills/list` route. The
+ * real server replies with an array of these (one per resolved scope/cwd),
+ * each carrying its own `skills` list — NOT a flat `AppServerSkill[]`. This
+ * shape is best-effort and permissive: fields may be absent.
+ */
+interface AppServerSkillGroupEnvelope {
+  cwd?: string;
+  skills?: unknown[];
+  errors?: unknown[];
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isGroupEnvelope(entry: unknown): entry is AppServerSkillGroupEnvelope {
+  return isPlainObject(entry) && Array.isArray(entry.skills);
+}
+
+function isAppServerSkill(entry: unknown): entry is AppServerSkill {
+  return isPlainObject(entry) && typeof entry.name === 'string' && entry.name.length > 0;
+}
+
+/** Preserve only known AppServerSkill fields, dropping unexpected extras. */
+function pickSkillFields(entry: AppServerSkill): AppServerSkill {
+  const out: AppServerSkill = { name: entry.name };
+  if (entry.description !== undefined) {
+    out.description = entry.description;
+  }
+  if (entry.path !== undefined) {
+    out.path = entry.path;
+  }
+  if (entry.enabled !== undefined) {
+    out.enabled = entry.enabled;
+  }
+  if (entry.scope !== undefined) {
+    out.scope = entry.scope;
+  }
+  return out;
+}
+
+/**
+ * Normalize the raw `skills/list` reply into a flat `AppServerSkill[]`.
+ *
+ * Accepts every observed runtime shape defensively, never fabricating skills:
+ *   - a flat `AppServerSkill[]`;
+ *   - a `{ data: AppServerSkill[] }` wrapper;
+ *   - a single top-level group envelope `{ cwd, skills, errors }`;
+ *   - an array of group envelopes `[{ cwd, skills, errors }, …]` (the actual
+ *     current server shape).
+ *
+ * Malformed entries (no string `name`) are dropped. Group `errors` are ignored
+ * (the menu only surfaces discovered skills; the empty-skill notice handles the
+ * "none found" case).
+ */
+export function normalizeSkillsListResult(result: unknown): AppServerSkill[] {
+  let candidates: unknown[] | undefined;
+  if (Array.isArray(result)) {
+    candidates = result;
+  } else if (isPlainObject(result)) {
+    if (Array.isArray(result.data)) {
+      candidates = result.data;
+    } else if (Array.isArray(result.skills)) {
+      // Single top-level group envelope.
+      candidates = result.skills;
+    }
+  }
+
+  if (!candidates) {
+    return [];
+  }
+
+  const flattened: AppServerSkill[] = [];
+  for (const entry of candidates) {
+    if (isGroupEnvelope(entry)) {
+      for (const inner of entry.skills ?? []) {
+        if (isAppServerSkill(inner)) {
+          flattened.push(pickSkillFields(inner));
+        }
+      }
+    } else if (isAppServerSkill(entry)) {
+      flattened.push(pickSkillFields(entry));
+    }
+  }
+  return flattened;
+}
 
 export class CodexAppServerClient extends CodexAppServerTransport {
   // ---------------------------------------------------------------------------
@@ -268,6 +358,56 @@ export class CodexAppServerClient extends CodexAppServerTransport {
       logger.warn('Failed to read model provider capabilities', { error: err instanceof Error ? err.message : String(err) });
       return null;
     }
+  }
+
+  /**
+   * List skills exposed by the Codex app-server via the `skills/list` route.
+   *
+   * Params: `{ cwd?, forceReload? }`. `cwd` scopes the query to the current
+   * vault working directory (Codex resolves project-scoped skills relative to
+   * it); `forceReload` asks the server to bypass its cache. Returns
+   * `AppServerSkill[]` (name/description/path/enabled/scope) or an empty array
+   * when the route is unreachable on the current Codex version.
+   *
+   * This is read-only: the plugin never writes global Codex skills. The
+   * returned entries only describe runtime-discovered skills for the chat
+   * menu and resource settings.
+   */
+   async listSkills(options?: AppServerListSkillsOptions): Promise<AppServerSkill[]> {
+    await this.start();
+    try {
+      const params: Record<string, unknown> = {};
+      if (options?.cwd) {
+        params.cwd = options.cwd;
+      }
+      if (options?.forceReload) {
+        params.forceReload = true;
+      }
+      const result = await this.request('skills/list', params);
+      return normalizeSkillsListResult(result);
+    } catch (err) {
+      logger.warn('Failed to list skills from app-server', { error: err instanceof Error ? err.message : String(err) });
+      return [];
+    }
+  }
+
+  /**
+   * Subscribe to `skills/changed` notifications. The Codex app-server emits
+   * this when its skill catalog changes (skill files added/removed/edited on
+   * disk, or a project-scoped reload). The handler receives no useful payload
+   * — it is purely a signal to invalidate any cached skill catalog and
+   * re-fetch via `listSkills()`.
+   *
+   * Returns an unsubscribe function. Use it on teardown to avoid leaking the
+   * handler (the same pattern as `addNotificationHandler` /
+   * `removeNotificationHandler`, which this wraps).
+   */
+  subscribeToSkillsChanged(handler: () => void): () => void {
+    const wrapped = (): void => handler();
+    this.addNotificationHandler('skills/changed', wrapped);
+    return () => {
+      this.removeNotificationHandler('skills/changed', wrapped);
+    };
   }
 
   async listMcpServerStatus(): Promise<AppServerMcpServerStatus[]> {

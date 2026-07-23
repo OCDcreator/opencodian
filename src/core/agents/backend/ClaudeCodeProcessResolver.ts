@@ -29,8 +29,26 @@ export interface ClaudeCodeProcessResolution {
     configuredPath: string | null;
     resolvedExternalPath: string | null;
     pathAugmented: boolean;
+    /**
+     * Actionable reason for the current mode. Lets status surfaces tell the
+     * user exactly what to do next (configure a path, enable a source, install
+     * the CLI). Only populated for actionable situations.
+     */
+    reason?: ClaudeCodeProcessMissingReason;
   };
 }
+
+/**
+ * Why the Claude process could not be resolved to an external CLI. Consumers
+ * map these to actionable status/settings copy. This never reports a path the
+ * plugin could write to under `~/.claude`, `~/.agents`, or `~/.codex` — the
+ * plugin must not manage global Claude resources.
+ */
+export type ClaudeCodeProcessMissingReason =
+  /** A path was configured in settings but the file does not exist there. */
+  | 'configured-path-not-found'
+  /** No path configured and the `claude` CLI was not found on the augmented PATH. */
+  | 'cli-not-on-path';
 
 function expandHomeDirectory(candidate: string, env: ClaudeCodeProcessResolverEnv): string {
   const home = env.HOME || env.USERPROFILE;
@@ -68,6 +86,7 @@ function getPathFallbacks(env: ClaudeCodeProcessResolverEnv, platform: NodeJS.Pl
 
   return [
     home ? path.join(home, '.claude', 'local') : '',
+    home ? path.join(home, '.local', 'bin') : '',
     home ? path.join(home, '.npm-global', 'bin') : '',
     home ? path.join(home, '.nvm', 'current', 'bin') : '',
     '/opt/homebrew/bin',
@@ -150,6 +169,11 @@ export function resolveClaudeCodeProcess(
       .find((candidate): candidate is string => typeof candidate === 'string' && candidate.length > 0)
       ?? null;
 
+  let reason: ClaudeCodeProcessMissingReason | undefined;
+  if (!resolvedExternalPath) {
+    reason = configuredPath ? 'configured-path-not-found' : 'cli-not-on-path';
+  }
+
   return {
     mode: resolvedExternalPath ? 'external' : 'missing',
     ...(resolvedExternalPath ? { pathToClaudeCodeExecutable: resolvedExternalPath } : {}),
@@ -161,6 +185,7 @@ export function resolveClaudeCodeProcess(
       configuredPath: configuredPath || null,
       resolvedExternalPath,
       pathAugmented: augmentedPath !== getPathValue(env),
+      ...(reason ? { reason } : {}),
     },
   };
 }

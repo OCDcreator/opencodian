@@ -4,6 +4,7 @@ import * as path from 'path';
 import {
   buildRuntimeSkillSourceMap,
   buildVisibleSlashCommandMenuItems,
+  type MdCommandEntry,
   mergeSlashCommandCatalog,
   type SlashCommandCatalogEntry,
   type SlashCommandMenuItem,
@@ -40,7 +41,15 @@ export interface SlashCommandMenuCatalogCacheHost {
   loadClaudeRuntimeCommands?(): Promise<Array<{ name: string; description?: string }> | null | undefined>;
   /** Optional: load Claude Code runtime agents for the @agent mention menu. Returns null or undefined when not applicable. */
   loadClaudeRuntimeAgents?(): Promise<Array<{ name: string; description?: string }> | null | undefined>;
-  /** Optional: returns a short backend discriminator for cache key partitioning. Return different values for different backends (e.g. 'opencode', 'claude-code'). */
+  /**
+   * Optional: load Codex runtime skills (from the app-server `skills/list`
+   * route) for the Codex `/skills` and `$` menu. Returns null or undefined
+   * when the active backend is not Codex or the app-server is unavailable.
+   * Each entry carries name/description/path/enabled/scope. The plugin never
+   * writes global Codex skills; this is read-only runtime discovery.
+   */
+  loadCodexRuntimeSkills?(): Promise<Array<{ name: string; description?: string; enabled?: boolean; scope?: string }> | null | undefined>;
+  /** Optional: returns a short backend discriminator for cache key partitioning. Return different values for different backends (e.g. 'opencode', 'claude-code', 'codex'). */
   getBackendKey?(): string;
   /**
    * Optional: returns a short discriminator encoding the current server-side
@@ -61,6 +70,22 @@ interface SlashCommandMenuCatalogCacheEntry {
   key: string;
   loadedAt: number;
 }
+
+/**
+ * Tuple of parallel catalog load results, backend-aware. Codex backends yield
+ * empty placeholders for the OpenCode/Claude slots; the corresponding
+ * `codexSkillsResult` slot carries the runtime Codex skill list.
+ */
+type SlashCommandCatalogLoadInputs = [
+  unknown,
+  unknown,
+  OpencodeCommandConfigRecord,
+  OpencodeAgentConfigRecord,
+  MdCommandEntry[] | undefined,
+  Array<{ name: string; description?: string }> | null | undefined,
+  Array<{ name: string; description?: string }> | null | undefined,
+  Array<{ name: string; description?: string; enabled?: boolean; scope?: string }> | null | undefined,
+];
 
 interface SlashCommandMenuCatalogPendingLoad {
   key: string;
@@ -276,6 +301,35 @@ function normalizeClaudeRuntimeAgents(
   );
 }
 
+/**
+ * Build slash-menu items for Codex runtime skills. Each item inserts the raw
+ * `$skill-name ` text that the Codex app-server interprets natively. These
+ * items are runtime-only and never enter the OpenCode session-command path.
+ */
+function buildCodexSkillMenuItems(
+  skills: Array<{ name: string; description?: string; enabled?: boolean; scope?: string }>,
+): SlashCommandMenuItem[] {
+  return skills
+    .filter((skill) => typeof skill.name === 'string' && skill.name.trim().length > 0)
+    .map((skill) => {
+      const name = skill.name.trim();
+      const description = skill.description?.trim() || name;
+      const scope = skill.scope === 'project' ? 'project' : 'custom';
+      return {
+        id: name,
+        displayId: `$${name}`,
+        description,
+        hasProjectOverride: false,
+        insertText: `$${name} `,
+        runtimeAvailable: skill.enabled !== false,
+        source: 'codex-skill' as const,
+        skillSource: { kind: scope },
+        subtask: false,
+        isBuiltin: false,
+      };
+    });
+}
+
 export class SlashCommandMenuCatalogCache {
   private cacheEntry: SlashCommandMenuCatalogCacheEntry | null = null;
   private generation = 0;
@@ -346,27 +400,48 @@ export class SlashCommandMenuCatalogCache {
     return this.host.now?.() ?? Date.now();
   }
 
+  /**
+   * Build the parallel catalog load inputs, backend-aware. Codex skips all
+   * OpenCode/Claude loaders; Claude skips OpenCode md-file commands but keeps
+   * its own runtime command/agent loaders; OpenCode loads everything.
+   */
+  private async loadCatalogInputs(
+    isClaudeBackend: boolean,
+    isCodexBackend: boolean,
+  ): Promise<SlashCommandCatalogLoadInputs> {
+    const skipNonCodex = isCodexBackend;
+    return Promise.all([
+      skipNonCodex ? Promise.resolve([]) : this.host.loadRuntimeCommands(),
+      skipNonCodex ? Promise.resolve([]) : this.host.loadRuntimeSkills().catch(() => []),
+      skipNonCodex ? Promise.resolve({}) : this.host.loadProjectCommands(),
+      skipNonCodex ? Promise.resolve({}) : this.host.loadProjectAgents(),
+      // Do not load .opencode/commands/*.md for Claude or Codex backend
+      (isClaudeBackend || isCodexBackend)
+        ? Promise.resolve([])
+        : Promise.resolve(loadCommandsFromConfigDir(resolveProjectConfigDir(this.host.getVaultPath()))).catch(() => []),
+      (isClaudeBackend && !isCodexBackend)
+        ? (this.host.loadClaudeRuntimeCommands?.().catch(() => null) ?? null)
+        : null,
+      // Load Claude runtime agents for @agent menu (null when not applicable)
+      (isClaudeBackend && !isCodexBackend)
+        ? (this.host.loadClaudeRuntimeAgents?.().catch(() => null) ?? null)
+        : null,
+      // Load Codex runtime skills (null when not applicable)
+      isCodexBackend
+        ? (this.host.loadCodexRuntimeSkills?.().catch(() => null) ?? null)
+        : null,
+    ]) as Promise<SlashCommandCatalogLoadInputs>;
+  }
+
   private startLoad(key: string): Promise<SlashCommandMenuItem[]> {
     const generation = this.generation;
     const token = Symbol('slash-command-menu-catalog-load');
-    const isClaudeBackend = (this.host.getBackendKey?.() ?? 'opencode') === 'claude-code';
+    const backendKey = this.host.getBackendKey?.() ?? 'opencode';
+    const isClaudeBackend = backendKey === 'claude-code';
+    const isCodexBackend = backendKey === 'codex';
 
     const promise = (async () => {
-      const [runtimeCommandsResult, runtimeSkillsResult, projectCommands, projectAgents, mdFileCommands, claudeRuntimeResult, claudeRuntimeAgentsResult] = await Promise.all([
-        this.host.loadRuntimeCommands(),
-        this.host.loadRuntimeSkills().catch(() => []),
-        this.host.loadProjectCommands(),
-        this.host.loadProjectAgents(),
-        // Do not load .opencode/commands/*.md for Claude backend
-        isClaudeBackend
-          ? Promise.resolve([])
-          : Promise.resolve(loadCommandsFromConfigDir(resolveProjectConfigDir(this.host.getVaultPath()))).catch(() => []),
-        this.host.loadClaudeRuntimeCommands?.().catch(() => null) ?? null,
-        // Load Claude runtime agents for @agent menu (null when not applicable)
-        isClaudeBackend
-          ? (this.host.loadClaudeRuntimeAgents?.().catch(() => null) ?? null)
-          : null,
-      ]);
+      const [runtimeCommandsResult, runtimeSkillsResult, projectCommands, projectAgents, mdFileCommands, claudeRuntimeResult, claudeRuntimeAgentsResult, codexSkillsResult] = await this.loadCatalogInputs(isClaudeBackend, isCodexBackend);
       const runtimeSkills = normalizeRuntimeSkills(runtimeSkillsResult);
       const runtimeSkillSources = buildRuntimeSkillSourceMap(
         runtimeSkills,
@@ -436,6 +511,14 @@ export class SlashCommandMenuCatalogCache {
       // Do not append OpenCode synthetic builtins for Claude backend
       const finalCatalog = isClaudeBackend ? mergedCatalog : appendSyntheticBuiltinCommands(mergedCatalog, hiddenCommandIds);
       const items = buildVisibleSlashCommandMenuItems(finalCatalog);
+      // Append Codex runtime skills as menu items. These are runtime-only:
+      // they are never persisted and never enter the OpenCode session-command
+      // path. Selecting one inserts the raw `$skill-name ` text that Codex
+      // interprets natively.
+      if (isCodexBackend && codexSkillsResult && Array.isArray(codexSkillsResult)) {
+        const codexItems = buildCodexSkillMenuItems(codexSkillsResult);
+        items.push(...codexItems);
+      }
       attachAgentMentionCandidatesToSlashCommandMenuItems(items, agentMentionCandidates);
       attachAgentSelectionCandidatesToSlashCommandMenuItems(items, agentSelectionCandidates);
 

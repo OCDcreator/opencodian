@@ -10,6 +10,13 @@ export interface SlashCommandMenuFilterOptions {
   skillMode: SlashCommandSkillMode;
   skillsCommandDescription: string;
   isMidText?: boolean;
+  /**
+   * Runtime-only Codex skill mode. When true, `codex-skill` items are exposed
+   * through a `/skills` prefix (selecting one inserts the raw `$skill-name `
+   * text). This is never persisted and never affects `skillMode` for the
+   * OpenCode/Claude paths.
+   */
+  codexSkillMode?: boolean;
 }
 
 function fuzzyScore(text: string, query: string): number {
@@ -93,23 +100,70 @@ function buildPrefixedSkillMenuItem(item: SlashCommandMenuItem): SlashCommandMen
   };
 }
 
+/**
+ * Build a Codex `/skills`-prefixed skill item. Selecting it inserts the raw
+ * `$skill-name ` text that the Codex app-server interprets natively. The
+ * displayId mirrors the OpenCode `/skills name` shape for visual consistency,
+ * but the inserted text uses the Codex `$` invocation.
+ */
+function buildCodexPrefixedSkillMenuItem(item: SlashCommandMenuItem): SlashCommandMenuItem {
+  return {
+    ...item,
+    displayId: `skills ${item.id}`,
+    insertText: `$${item.id} `,
+  };
+}
+
 export function filterSlashCommandMenuItems(
   items: SlashCommandMenuItem[],
   query: string,
   options?: SlashCommandMenuFilterOptions,
 ): SlashCommandMenuItem[] {
   const isMidText = options?.isMidText === true;
+  const isCodex = options?.codexSkillMode === true;
   const skillItems = items.filter((item) => item.source === 'skill');
+  const codexSkillItems = isCodex ? items.filter((item) => item.source === 'codex-skill') : [];
+  const prefixBuilder = isCodex ? buildCodexPrefixedSkillMenuItem : buildPrefixedSkillMenuItem;
+  const activeSkillItems = isCodex ? codexSkillItems : skillItems;
 
   if (isMidText) {
     const filteredSkillItems = filterFuzzySlashCommandMenuItems(
-      skillItems,
+      activeSkillItems,
       isSkillsPrefixQuery(query) ? extractSkillsQuery(query) : query,
     );
 
-    return options?.skillMode === 'skills-command'
-      ? filteredSkillItems.map(buildPrefixedSkillMenuItem)
-      : filteredSkillItems;
+    if (options?.skillMode === 'skills-command') {
+      const mapped = filteredSkillItems.map(prefixBuilder);
+      // Codex mid-text (`$x` or `/skills x`) with no matches: keep the
+      // capability entry so the menu is never blank.
+      return isCodex && mapped.length === 0
+        ? [buildSkillsCommandMenuItem(options.skillsCommandDescription)]
+        : mapped;
+    }
+    // Codex direct mid-text with no matches: still show the capability entry.
+    if (isCodex && filteredSkillItems.length === 0) {
+      return [buildSkillsCommandMenuItem(options.skillsCommandDescription)];
+    }
+    return filteredSkillItems;
+  }
+
+  // Codex backend: the `/skills` capability entry is ALWAYS offered (even with
+  // zero runtime skills) so the menu is never blank. Selecting it expands
+  // matching skills (inserting raw `$skill-name`), or — when no skills exist —
+  // the coordinator surfaces an actionable empty state. The `$name` trigger
+  // filters codex skills directly AND keeps the `/skills` entry visible.
+  if (isCodex) {
+    const skillsEntry = buildSkillsCommandMenuItem(options.skillsCommandDescription);
+    if (isSkillsPrefixQuery(query)) {
+      const matched = filterFuzzySlashCommandMenuItems(codexSkillItems, extractSkillsQuery(query)).map(prefixBuilder);
+      // Under `/skills <x>` with no matches, keep the capability entry so the
+      // user reaches the empty state rather than a blank menu.
+      return matched.length > 0 ? matched : [skillsEntry];
+    }
+    // Empty query or `$name` trigger: matching codex skills first, then the
+    // always-present `/skills` entry.
+    const matchingSkills = filterFuzzySlashCommandMenuItems(codexSkillItems, query);
+    return [...matchingSkills, skillsEntry];
   }
 
   if (options?.skillMode !== 'skills-command') {
@@ -120,7 +174,7 @@ export function filterSlashCommandMenuItems(
     return filterFuzzySlashCommandMenuItems(
       items.filter((item) => item.source === 'skill'),
       extractSkillsQuery(query),
-    ).map(buildPrefixedSkillMenuItem);
+    ).map(prefixBuilder);
   }
 
   return filterFuzzySlashCommandMenuItems(

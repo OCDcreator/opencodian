@@ -3,6 +3,8 @@
 > **源码**: `src/core/agents/backend/index.ts`
 > **最近更新**: 2026-06-13
 
+> **新增导出**: `CodexProjectResourceDiscovery`（Codex 项目/全局 skills+agents discovery 与安全 CRUD）、`ClaudeCodeProcessMissingReason`、`AppServerSkill`/`AppServerListSkillsOptions`（经 CodexAppServerClient re-export）。
+
 ## 概述
 
 `backend/index.ts` 是 agent backend 抽象层的 barrel 入口。它集中导出当前已实现 backend 列表、`AgentService` 契约、OpenCode adapter、Claude Code adapter 和 registry，供上层 runtime 与 UI 通过一个稳定路径接入多代理 backend 能力。

@@ -3,6 +3,8 @@
 > **源码**: `src/features/chat/services/SlashCommandMenuCatalogCache.ts`
 > **状态**: [REVIEW]
 
+> **新增（Codex）**: host 可选 `loadCodexRuntimeSkills?()` 提供 app-server `skills/list` 结果；Codex backend 下 cache 跳过 OpenCode/Claude loaders，把 Codex skills 构建为 `source: 'codex-skill'` 菜单项（`insertText: '$name '`）。
+
 ## 概述
 
 `SlashCommandMenuCatalogCache` 是 chat composer suggestion catalog 的加载缓存。它把较慢的 runtime `sdk.command.list()`、`sdk.app.skills()`、Claude runtime commands、project command 配置、`.opencode/commands/**/*.md` markdown command 文件和 command-owned hidden agent 配置合并成 chat 侧 `SlashCommandMenuItem[]`，同时把同一 `sdk.app.skills()` 调用侧带的 runtime `app.agents()` 与 project agent config 投影成 composer agent sidecar。

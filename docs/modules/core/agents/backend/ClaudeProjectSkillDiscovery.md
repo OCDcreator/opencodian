@@ -3,6 +3,8 @@
 > **源码**: `src/core/agents/backend/ClaudeProjectSkillDiscovery.ts`
 > **状态**: [ACTIVE]
 
+> **更新**: 新增 `updateClaudeProjectSkill` / `deleteClaudeProjectSkill` / `discoverClaudeGlobalSkills`（只读）/ `readClaudeSkillContent` / `validateClaudeSkillContent` / `defaultClaudeSkillContent`；`ClaudeProjectSkillInfo` 增加 `readonly`、`scope`。写入经共享 `ProjectResourceSecureWrite`（原子写 + 路径穿越保护）。`createClaudeProjectSkill` 保持返回 `string|null`（向后兼容）。
+
 ## 概述
 
 `ClaudeProjectSkillDiscovery.ts` 是 Claude Code 项目技能的文件系统扫描 helper。它只读取当前 vault 下的 `.claude/skills/<name>/SKILL.md`，提取最小展示 metadata，供 Claude Code settings 与 slash-command 发现表面显示项目技能；不依赖 Claude SDK query，也不写入 `.claude/**`。

@@ -1000,18 +1000,18 @@ describe('OpenCodianSettingTab layout shell', () => {
       /\.opencodian-settings\s+\.opencodian-settings-section\s+\.setting-item,\s*[\s\S]*?\.opencodian-settings\s+\.opencodian-settings-content-shell\s+\.setting-item\s*\{[^}]*\}/,
     )?.[0] ?? '';
 
-    expect(ordinaryRowBlock).toContain('grid-template-columns: minmax(0, 1fr) minmax(180px, max-content)');
+    expect(ordinaryRowBlock).toContain('grid-template-columns: minmax(min(160px, 45%), 1fr) minmax(min(180px, 50%), max-content)');
     expect(ordinaryRowBlock).toContain('background: var(--opencodian-settings-form-row-bg)');
     expect(contractCss).toMatch(/\.opencodian-settings\s+\.opencodian-settings-content-shell\s+\.setting-item/);
     expect(contractCss).not.toMatch(/\.opencodian-settings\s+\.opencodian-settings-content-shell\s*>\s*\.setting-item/);
     expect(contractCss).toMatch(
-      /\.opencodian-settings\s+\.opencodian-wide-text-setting\.setting-item\s*\{[\s\S]*minmax\(280px,\s*clamp\(320px,\s*42vw,\s*520px\)\)/,
+      /\.opencodian-settings\s+\.opencodian-wide-text-setting\.setting-item\s*\{[\s\S]*minmax\(min\(280px,\s*50%\),\s*min\(clamp\(320px,\s*42vw,\s*520px\),\s*100%\)\)/,
     );
     expect(contractCss).toMatch(
       /\.opencodian-settings\s+\.opencodian-wide-text-setting\s+\.setting-item-control\s*\{[\s\S]*width:\s*100%;[\s\S]*min-width:\s*0;/,
     );
     expect(legacyCss).toMatch(
-      /\.opencodian-style-setting\.opencodian-style-setting-long-text\s*\{[\s\S]*minmax\(360px,\s*520px\)/,
+      /\.opencodian-style-setting\.opencodian-style-setting-long-text(?:\.setting-item)?\s*(?:,|\{)[\s\S]*minmax\(min\(360px,\s*55%\),\s*min\(520px,\s*100%\)\)/,
     );
     expect(legacyCss).toMatch(
       /\.opencodian-style-setting\.opencodian-style-setting-long-text\s+\.setting-item-control\s*\{[\s\S]*max-width:\s*520px;/,
