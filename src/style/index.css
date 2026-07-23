@@ -17,6 +17,7 @@
 @import 'components/settings-dropdown.css';
 @import 'components/settings-layout-contract.css';
 @import 'components/settings-agents.css';
+@import 'components/settings-capability-disclosure.css';
 @import 'components/settings-capability-lab.css';
 @import 'components/settings-claude-code.css';
 @import 'components/settings-codex-account.css';

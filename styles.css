@@ -11485,6 +11485,69 @@ img.opencodian-model-provider-header-icon {
 }
 
 
+/* components/settings-capability-disclosure.css */
+/*
+ * Capability disclosure + experimental gates containers.
+ *
+ * These wrappers (`.opencodian-capability-disclosure-host` /
+ * `.opencodian-capability-disclosure` emitted by capabilityDisclosureRow.ts,
+ * reused by 7+ settings sections, and `.opencodian-experimental-capability-
+ * gates` emitted by SettingsServerSection) previously had no layout CSS. Their
+ * cardified `.setting-item` children fell back to the global
+ * `.setting-item + .setting-item { margin-top: 0 }` override, which made
+ * adjacent cards touch with zero gap.
+ *
+ * The fix mirrors the established `[data-section-block]` contract in
+ * settings-capability-lab.css: a bordered section card with flex-column +
+ * `--opencodian-settings-space-md` gap so the inner cardified rows breathe,
+ * matching every other grouped settings container in this panel.
+ */
+
+.opencodian-settings .opencodian-capability-disclosure-host,
+.opencodian-settings .opencodian-experimental-capability-gates {
+  display: flex;
+  flex-direction: column;
+  gap: var(--opencodian-settings-space-md);
+  margin: 0;
+  padding: 14px;
+  border: 1px solid var(--opencodian-settings-section-border);
+  border-radius: var(--opencodian-settings-radius-section);
+  background: var(--opencodian-settings-section-bg);
+}
+
+/* `.opencodian-capability-disclosure-host` wraps the inner `.opencodian-
+   capability-disclosure` produced by renderCapabilityDisclosureRows. Avoid a
+   double card border by making the host a transparent layout-only shell. */
+.opencodian-settings .opencodian-capability-disclosure-host {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.opencodian-settings .opencodian-capability-disclosure {
+  display: flex;
+  flex-direction: column;
+  gap: var(--opencodian-settings-space-md);
+  margin: 0;
+}
+
+.opencodian-settings .opencodian-experimental-capability-gates > .opencodian-settings-subsection-heading,
+.opencodian-settings .opencodian-capability-disclosure-heading {
+  margin: 0;
+  color: var(--text-normal);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+/* The disclosure footer holds the shared Re-check action; keep it visually
+   distinct from the status rows above it without breaking the card rhythm. */
+.opencodian-settings .opencodian-capability-disclosure-footer {
+  margin-top: var(--opencodian-settings-space-xs);
+}
+
+
 /* components/settings-capability-lab.css */
 .opencodian-settings .opencodian-capability-lab-shell {
   gap: var(--opencodian-settings-space-lg);
