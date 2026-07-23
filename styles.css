@@ -11031,23 +11031,6 @@ img.opencodian-model-provider-header-icon {
   padding: 0;
 }
 
-.opencodian-settings .opencodian-agent-catalog-row.setting-item {
-  border-radius: var(--opencodian-settings-radius-inline);
-  background: transparent;
-}
-
-.opencodian-settings .opencodian-backend-agent-row.setting-item {
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-}
-
-.opencodian-settings .opencodian-backend-agent-row.setting-item + .opencodian-backend-agent-row.setting-item,
-.opencodian-settings .opencodian-agent-catalog-row.setting-item + .opencodian-agent-catalog-row.setting-item,
-.opencodian-settings .opencodian-agent-workspace-row.setting-item + .opencodian-agent-workspace-row.setting-item {
-  border-top: 1px solid var(--opencodian-settings-row-border);
-}
-
 .opencodian-settings .opencodian-backend-agent-row .setting-item-info,
 .opencodian-settings .opencodian-agent-catalog-row .setting-item-info,
 .opencodian-settings .opencodian-agent-workspace-row .setting-item-info,
@@ -11112,10 +11095,8 @@ img.opencodian-model-provider-header-icon {
 .opencodian-settings .opencodian-backend-agent-list {
   display: flex;
   flex-direction: column;
-  overflow: hidden;
-  border: 1px solid var(--opencodian-settings-row-border);
-  border-radius: var(--opencodian-settings-radius-row);
-  background: var(--opencodian-settings-row-bg);
+  gap: var(--opencodian-settings-space-md);
+  min-width: 0;
 }
 
 .opencodian-settings .opencodian-backend-agent-row[data-backend-agent-active="true"] {
@@ -11126,20 +11107,12 @@ img.opencodian-model-provider-header-icon {
 .opencodian-settings .opencodian-agent-workspace-list {
   display: flex;
   flex-direction: column;
+  gap: var(--opencodian-settings-space-md);
   max-height: var(--oc-agent-list-max-height);
   overflow: auto;
-  border: 1px solid var(--opencodian-settings-row-border);
-  border-radius: var(--opencodian-settings-radius-row);
-  background: var(--opencodian-settings-row-bg);
+  padding: var(--opencodian-settings-space-sm);
+  min-width: 0;
   scroll-padding: var(--opencodian-settings-space-md);
-}
-
-.opencodian-settings .opencodian-agent-catalog-list {
-  padding: 4px;
-}
-
-.opencodian-settings .opencodian-agent-workspace-list {
-  padding: 0;
 }
 
 .opencodian-settings .opencodian-agent-catalog-row[data-agent-state="disabled"],
