@@ -11,7 +11,7 @@
 
 ## 导入关系
 
-上游: Node `fs/promises`, Node `path`
+上游: Node `fs`（静态 `existsSync` 探测）、Node `fs/promises`、Node `path`
 下游: Settings (via dynamic import), `backend/index`
 
 ## 核心类型
@@ -41,3 +41,4 @@
 - Settings 直接使用 `discoverClaudeProjectCommands` 动态导入而非通过 `ClaudeCodeAdapter`，以避免 owner-guard 耦合。
 - 不要把该扫描结果当作 SDK runtime truth；Claude Code runtime 会自行发现 `.claude/commands/` 中的命令。
 - 保持错误吞掉并返回空数组的语义。
+- 项目资源的 create / update / delete 在模块顶层静态导入 `existsSync`；不要改为动态 `import('fs')`，否则 Obsidian 的渲染器无法解析该 Node 内建模块并会把实际写入前的异常归一为通用写入失败。

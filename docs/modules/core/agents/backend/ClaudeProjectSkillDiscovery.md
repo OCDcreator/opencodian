@@ -11,7 +11,7 @@
 
 ## 导入关系
 
-上游: Node `fs/promises`, Node `path`
+上游: Node `fs`（静态 `existsSync` 探测）、Node `fs/promises`、Node `path`
 下游: `ClaudeCodeAdapter`, `backend/index`
 
 ## 核心类型
@@ -40,3 +40,4 @@
 - 这是 read-only discovery seam，不是 skills authoring；新增创建/编辑/删除能力应由独立 owner 和明确的写入权限控制承接。
 - 不要把该扫描结果当作 SDK runtime truth；SDK `options.skills` 和 `supportedCommands()` 仍由 Claude Code runtime 自己决定。
 - 保持错误吞掉并返回空数组的语义，避免 settings 或 slash menu 因项目目录缺失而失败。
+- 项目资源的 create / update / delete 在模块顶层静态导入 `existsSync`；不要改为动态 `import('fs')`，否则 Obsidian 的渲染器无法解析该 Node 内建模块并会把实际写入前的异常归一为通用写入失败。

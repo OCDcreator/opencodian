@@ -9,6 +9,7 @@
  */
 
 import type { Dirent } from 'fs';
+import { existsSync } from 'fs';
 import { readdir, readFile, rm } from 'fs/promises';
 import * as path from 'path';
 
@@ -222,7 +223,6 @@ async function createClaudeProjectSkillTyped(
   const skillMdPath = skillMdPathFor(vaultPath, trimmed);
   try {
     await assertWithinRoot(vaultPath, skillMdPath);
-    const { existsSync } = await import('fs');
     if (existsSync(skillMdPath)) {
       return { ok: false, reason: 'duplicate', path: skillMdPath };
     }
@@ -251,7 +251,6 @@ export async function updateClaudeProjectSkill(
   const skillMdPath = skillMdPathFor(vaultPath, trimmed);
   try {
     await assertWithinRoot(vaultPath, skillMdPath);
-    const { existsSync } = await import('fs');
     if (!existsSync(skillMdPath)) {
       return { ok: false, reason: 'not-found' };
     }
@@ -276,7 +275,6 @@ export async function deleteClaudeProjectSkill(
   const skillDir = path.join(vaultPath, CLAUDE_SKILLS_DIR, trimmed);
   try {
     await assertWithinRoot(vaultPath, skillDir);
-    const { existsSync } = await import('fs');
     if (!existsSync(skillDir)) {
       return { ok: false, reason: 'not-found' };
     }

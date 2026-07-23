@@ -8,6 +8,7 @@
  * Does NOT depend on the SDK or any runtime query — pure filesystem scan.
  */
 
+import { existsSync } from 'fs';
 import { readdir, readFile, unlink } from 'fs/promises';
 import * as path from 'path';
 
@@ -213,7 +214,6 @@ async function createClaudeProjectCommandTyped(
   const filePath = commandFilePath(vaultPath, trimmed);
   try {
     await assertWithinRoot(vaultPath, filePath);
-    const { existsSync } = await import('fs');
     if (existsSync(filePath)) {
       return { ok: false, reason: 'duplicate', path: filePath };
     }
@@ -243,7 +243,6 @@ export async function updateClaudeProjectCommand(
   const filePath = commandFilePath(vaultPath, trimmed);
   try {
     await assertWithinRoot(vaultPath, filePath);
-    const { existsSync } = await import('fs');
     if (!existsSync(filePath)) {
       return { ok: false, reason: 'not-found' };
     }
@@ -268,7 +267,6 @@ export async function deleteClaudeProjectCommand(
   const filePath = commandFilePath(vaultPath, trimmed);
   try {
     await assertWithinRoot(vaultPath, filePath);
-    const { existsSync } = await import('fs');
     if (!existsSync(filePath)) {
       return { ok: false, reason: 'not-found' };
     }

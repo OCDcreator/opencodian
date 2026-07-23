@@ -40,6 +40,22 @@ function writeFile(root: string, rel: string, body: string): void {
   fs.writeFileSync(abs, body, 'utf-8');
 }
 
+describe('Claude resource discovery — Obsidian fs loader compatibility', () => {
+  it('uses statically resolvable fs availability probes in every writable resource owner', () => {
+    const sourcePaths = [
+      'src/core/agents/backend/ClaudeProjectAgentDiscovery.ts',
+      'src/core/agents/backend/ClaudeProjectCommandDiscovery.ts',
+      'src/core/agents/backend/ClaudeProjectSkillDiscovery.ts',
+    ];
+
+    for (const sourcePath of sourcePaths) {
+      const source = fs.readFileSync(sourcePath, 'utf-8');
+      expect(source).toContain("import { existsSync } from 'fs';");
+      expect(source).not.toContain("await import('fs')");
+    }
+  });
+});
+
 describe('Claude resource discovery — commands CRUD + global readonly', () => {
   it('discovers, creates, updates, and deletes project commands', async () => {
     const vault = tmpVault();
