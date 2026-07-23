@@ -1,313 +1,335 @@
 # Graph Report - src  (2026-07-23)
 
 ## Corpus Check
-- 493 files · ~574,155 words
+- 493 files · ~574,244 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 11483 nodes · 33124 edges · 299 communities (243 shown, 56 thin omitted)
+- 11484 nodes · 33126 edges · 324 communities (257 shown, 67 thin omitted)
 - Extraction: 99% EXTRACTED · 1% INFERRED · 0% AMBIGUOUS · INFERRED: 205 edges (avg confidence: 0.7)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `05707705`
+- Built from commit: `3b666af9`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
 ## Community Hubs (Navigation)
 - OpenCodeService
 - types/index.ts
-- ConversationSyncHostAdapter.ts
-- t
-- OpenCodianView.ts
-- TabId
+- SettingsClaudeCodeSection
 - backend/index.ts
 - OpenCodeServiceLifecycleCoordinator
-- SessionTodo
 - SettingsFormatterSection
-- ChatMessage
-- OpenCodeCatalogQueryCoordinator
-- BackgroundTaskTimelineAssemblyService
-- ComposerInputShellCoordinator
-- TabMessagesPaneCoordinator
+- ConversationSyncHostAdapter.ts
+- TabId
 - ConversationRenderService.ts
-- tabs/index.ts
-- QuestionTodoBackgroundTaskRefreshHostAdapter.ts
-- MessageFinalizationHost.ts
-- AgentService.ts
-- OpenCodianSettingsView.ts
+- ChatMessage
+- BackgroundTaskTimelineService.ts
 - QuestionTodoBackgroundTaskRuntimeServiceBundle.ts
+- OpenCodeCatalogQueryCoordinator
+- BackgroundConversationPostSyncHandoffHostAdapter.ts
+- SettingsSkillSection
+- OpenCodeService.ts
+- t
+- SettingsStyleSection
+- ClaudeCodeAdapter
+- MessageFinalizationHost.ts
+- SettingsClaudeCodeSection.ts
+- SessionTodo
+- SlashCommandExecutionService.ts
+- ChatHeaderPresenter
+- CodexAppServerClient.ts
+- OpenCodianSettingTab
+- AgentService.ts
+- i18n/index.ts
+- Conversation
 - ServerManager
 - OpenCodeSdkFacade.ts
-- SettingsStyleSection
-- .getSdk
-- OpenCodeService.ts
-- ChatHeaderPresenter
-- OpenCodeSessionControlOrchestrator
-- ClaudeCodeAdapter
-- CodexProjectResourceDiscovery.ts
-- CodexAppServerClient.ts
-- SettingsStyleInputPanelSection.ts
-- OpenCodianView
-- OpenCodianPlugin
-- SlashCommandExecutionService.ts
-- main.ts
-- OpencodeConfigManager
-- InputPanelThemeRuntime.ts
-- shudingDiamond.ts
-- OpenCodianSettingsRuntimeCoordinator
-- FocusContextPreview
-- ClaudeCodeStreamNormalizer.ts
-- modelConfigAssembly.ts
-- agents/index.ts
-- SettingsCapabilityLabSection.ts
-- ConversationLoadRecoveryHost
-- CodexAdapter
-- ClaudeProjectProviderConfig.ts
-- nikdelvin.ts
-- Conversation
-- UserMessageContentRenderer.ts
-- MessageSendPreparationHost
-- SettingsSkillSection
-- FocusContextRuntimeService
 - ComposerContextViewFacade.ts
-- SettingsDebugSection
-- .updateRuntimeProof
-- i18n/index.ts
+- shudingDiamond.ts
 - SettingsConversationSection
-- ModelPricingService.ts
-- getConversationBackendSessionId
-- AgentBackendKind
+- OpenCodianView.ts
+- .getSdk
+- logger.ts
+- QuestionRuntimeHostAdapter.ts
+- CodexAdapter
+- SettingsFormatterSection.ts
+- OpenCodianSettingsRuntimeCoordinator
+- OpenCodianView
 - SendPipelineTypes.ts
+- ClaudeCodeStreamNormalizer.ts
+- SettingsCapabilityLabSection.ts
+- OpenCodeEventSubscriptionCoordinator.ts
+- ConversationLoadRecoveryHost
+- CodexProjectResourceDiscovery.ts
+- OpenCodianPlugin
+- agents/index.ts
+- ClaudeProjectProviderConfig.ts
+- OpenCodeStreamEventTransformer
+- FocusContextRuntimeService
+- TabMessagesPaneCoordinator
+- MessageSendPreparationHost
+- OpenCodeSdkCapabilityDiscoveryCoordinator.ts
+- SettingsCapabilityLabSection
+- CodexMcpServerDetailModal
+- UserMessageContentRenderer.ts
+- tabs/index.ts
 - trailingAssistantPatchDebug.ts
 - shuding.ts
-- ComposerInputShellCoordinator.ts
-- shared/index.ts
-- OpenCodianSettingTab
-- .createInteractionRuntimeWiring
-- OpenCodeStreamEventTransformer
-- SettingsAgentsSection
-- SlashCommandMenuCatalogCache.ts
-- QuestionRuntimeHostAdapter.ts
-- SettingsMcpSection.ts
-- TabContextState
-- QuestionRequest
-- SettingsCapabilityLabSection
-- glassOctahedronDemoRefraction.ts
-- providerIconAssetCache.ts
-- StorageService.ts
-- createTabActivationRuntimeBridgeHosts
-- OpenCodeQuestionPermissionHub.ts
-- OpenCodeStreamingRuntimeCoordinator.ts
-- SettingsToolSection.ts
-- OpenCodeSessionLifecycleCoordinator.ts
-- ContextFileCatalogIndex
-- SettingsSectionCoordinator
-- SettingsModelCatalogPresenter
-- SessionDiffEntry
-- SettingsToolSection
-- StreamChunk
-- CodexMcpServerDetailModal
-- obsidianContext.ts
-- ChatSelectionControlsCoordinator
-- ModelSelectorSelection
-- trailingAssistantPatchTypes.ts
-- SettingsClaudeCodeSection.ts
-- OpenCodeSdkCapabilityDiscoveryCoordinator.ts
-- ConversationSessionSettingsModal
-- TabActivationRuntimeViewHostFactory.ts
-- QuestionDockResolutionActionFacade.ts
-- QuestionResolutionExecutionFacade.ts
-- ModelConfigModal
-- MarkdownRenderService
-- SettingsClaudeResourcesSection.ts
-- AssistantFooterPayload.ts
-- trailingAssistantPatchExecution.ts
-- SettingsCommandsSection.ts
-- OpenCodeStreamingFinalizationCoordinator.ts
-- ChatSelectionControlsCoordinator.ts
-- liquidDiamondDemo.ts
-- ConversationTabRuntimeCoordinator.ts
-- BackgroundTaskNoticeStateService.ts
+- ComposerInputShellCoordinator
 - ClaudeCodePermissionBridge.ts
-- OpencodeModelConfigSubset
-- builtinIconRegistry.ts
-- TitleGenerationService.ts
-- AgentMentionComposerController.ts
+- SlashCommandMenuCatalogCache.ts
+- ConversationSessionSettingsModal
+- QuestionDisplayMode
+- ContextFileCatalogIndex
+- ModelPricingService.ts
+- SettingsMcpSection.ts
+- QuestionRequest
+- SettingsTabbedRenderer
+- ModelSelectorSelection
+- OpencodeConfigManager
+- obsidianContext.ts
+- ConversationSyncBridge
+- getConversationBackendSessionId
+- SettingsStyleInputPanelSection.ts
+- ProviderIconService
+- glassOctahedronDemoRefraction.ts
+- shared/index.ts
+- InputPanelThemeRuntime.ts
+- createTabActivationRuntimeBridgeHosts
+- OpenCodeStreamingRuntimeCoordinator.ts
+- TabActivationRuntimeViewHostFactory.ts
+- ModelConfigService.ts
+- OpenCodeQuestionPermissionHub.ts
+- ChatSelectionControlsCoordinator
+- SettingsToolSection
+- main.ts
+- slashCommandCatalog.ts
+- ModelPickerModal.ts
+- BackgroundTaskTimelineAssemblyService
+- nikdelvin.ts
+- .message
+- ConversationNoticeCoordinator.ts
+- trailingAssistantPatchTypes.ts
+- SettingsAgentsSection
+- SessionActivityStatus
+- ConversationTransitionBridge.ts
+- QuestionDockResolutionActionFacade.ts
+- ModelConfigModal
+- SettingsModelCatalogPresenter
+- MarkdownRenderService
+- AgentBackendRouting.ts
+- MessageSendPreparationService.ts
+- ConversationTabRuntimeCoordinator.ts
+- AssistantFooterPayload.ts
 - streaming/index.ts
-- OpenCodeEventSubscriptionCoordinator
-- OpenCodeSdkExperimentalActionCoordinator.ts
-- CodexAdapter.ts
+- trailingAssistantPatchExecution.ts
+- StreamChunk
+- OpenCodeMessageNormalizationMapper.ts
+- OpenCodeStreamingFinalizationCoordinator.ts
+- ConversationLoadRecoveryCoordinator.ts
+- liquidDiamondDemo.ts
+- SettingsSectionCoordinator
+- AgentMentionComposerController.ts
+- chat.ts
+- OpenCodeSessionControlOrchestrator
+- OpenCodianSettingsView
+- TitleGenerationService.ts
+- StorageService
+- ContextUsageSnapshot
+- SettingsToolSection.ts
+- SettingsModelCatalogPresenter.ts
+- ConversationTabRuntimeCoordinatorHost
+- LocalSidecarLauncher
 - LocalProcessProbe
+- ChatSelectionControlsCoordinator.ts
 - SettingsCodexAccountSurface
 - SettingsProjectAgentEditor.ts
-- OpenCodeMessageNormalizationMapper.ts
-- MessageSendPreparationService.ts
-- .constructor
 - OpenCodeSyncEventRuntimeCoordinator
-- LobehubIconVariant
-- chat.ts
+- AgentBackendKind
+- settingsLoadNormalization.ts
+- InputPanelAppearanceCoordinator
 - RetainedSelectionHighlightService
-- SettingsPluginSection
-- StreamController
-- SettingsModelCatalogPresenter.ts
-- ContextUsageSnapshot
-- PromptContextItem
-- ProviderIconService
+- CodexAdapter.ts
+- modelConfigShared.ts
 - GlassOctahedronDemoController
-- BackgroundTaskIndicatorCoordinator.ts
-- SettingsCodexSection
+- ComposerInputShellCoordinatorHost
 - ToolCallRenderer
-- ConversationSessionSettingsCoordinator.ts
-- SettingsMcpSection
-- StorageService
+- OpenCodeSessionControlOrchestrator.ts
+- OpenCodeSessionLifecycleCoordinatorHost
 - SettingsAcpSection
-- QuestionDisplayMode
 - AssistantShellViewHostAdapter
 - ChatAgentSelectionCoordinator
-- ConversationHistoryActionsCoordinator
-- createConversationRenderHost
 - EffortSelector
-- SettingsSecuritySection.ts
-- OpenCodeCapabilitySettingsMigration.ts
-- SessionSyncEventUpdate
+- SettingsTabbedRenderer.ts
+- SlashCommandMenuItem
+- liquidDiamondDemoWebgl.ts
+- createConversationRenderHost
+- ConversationTabLifecycleRecoveryHost
+- providerIconAssetCache.ts
 - providerIconCustomSources.ts
+- StreamController
 - CodexAppServerStreamMapper.ts
-- PluginManagementService
-- LocalSidecarLauncher
 - OpenCodeSessionStateStore
-- PluginRuntimeCoordinator.ts
+- BackgroundTaskStreamTriggerCoordinator.ts
+- composerContext.ts
+- ConversationHistoryActionsCoordinator
 - ConversationWriteSerializationService.ts
 - ProviderFormState
-- searchInputEnhancer.ts
 - BackendSessionBrowserModal
-- slashCommandCatalog.ts
-- OpencodeConfigManager.ts
-- BackgroundTaskStreamTriggerCoordinator.ts
-- liquidDiamondDemoWebgl.ts
-- SettingsSecuritySection
+- TabContextState
+- ProviderIconService.ts
+- SettingsAgentsSection.ts
 - SettingsServerSection
-- AgentBackendRouting.ts
-- .message
+- providerIconBuiltinSelection.ts
+- opencodeConfig.ts
+- SettingsModelCatalogCoordinator.ts
+- ConversationTabOpenCoordinator.ts
 - PermissionModeSelectorCoordinator
-- AgentSwitcherFloatingIcons.ts
-- InputPanelAppearanceCoordinator
-- ContextUsageDisplayService
-- .openTaskToolSession
-- ModelPricingModal
+- SettingsSecuritySection
+- builtinIconRegistry.ts
+- PermissionAction
+- ComposerInputShellCoordinator.ts
+- ConversationSyncOrchestrationService
 - ModelConfigProviderEditor
 - traceDiamondRay
-- ContextDetailModal
-- SettingsFormatterSection.ts
+- MarkdownAgentWorkspaceService.ts
 - ModelConfigModal.ts
 - TooltipLayerController
+- .createConversationRuntimeWiring
 - CodexAppServerTransport
-- MarkdownAgentWorkspaceService.ts
-- SettingsPluginSection.ts
-- normalizeContextPath
+- PluginRuntimeCoordinator
+- ConversationMetadataCache.ts
+- SettingsStylePresetSection.ts
+- ContextDetailModal
+- QuestionResolution
 - createConversationLoadRecoveryHost
-- QuestionRuntimeViewHostAdapter.ts
-- TabBar
-- SettingsProjectCommandEditor.ts
-- OpenCodeEventSubscriptionCoordinator.ts
+- McpServerEditorModal.ts
+- PluginManagementService
+- SettingsPluginSection
 - glassOctahedronDemo.ts
+- .createChatHeaderPresenterHost
+- ContextUsageDisplayService
+- TabBar
 - modelConfigWorkspace.ts
 - ToolCallRenderer.ts
+- Disposable
+- OpencodeModelConfigSubset
+- OpenCodeCapabilitySettingsMigration.ts
 - OpenCodeLegacySseStreamReader
 - ConversationTurnViewModelBuilder.ts
-- SettingsStylePresetSection.ts
 - PermissionInlineCardRenderer.ts
+- SettingsCommandsSection.ts
 - AssistantShellViewHostAdapter.ts
 - QuestionInlineCardRenderer
 - PromptSuggestionService
-- ProviderIconService.ts
 - AcpClientManager
-- AgentServiceRegistry
+- promptSuggestionSink.ts
+- OpenCodePromptRequestBuilder
+- SessionDiffEntry
 - SkillContentExpander.ts
+- StorageService.ts
+- PromptContextItem
+- OpencodeAgentConfigRecord
 - ChatVisualDemoCoordinator
+- renderGroups.ts
 - TabConversationStateBridgeHost
 - TooltipLayerController.ts
-- SettingsSkillSection.ts
-- Disposable
-- ModelConfigService
-- ConversationSyncLoadRuntimeViewHostFactory.ts
+- BackgroundTaskNoticeStateService
+- ProviderIconCacheModal
+- .attach
+- OpenCodeExperimentalActionModal
+- formatDurationMs
+- QuestionDockSlotCoordinator
 - ChatSurfaceAppearanceCoordinator
 - modelConfigStructuredOptions.ts
-- ProviderIconCacheModal
-- SettingsModelCatalogCoordinator
-- SettingsModelSection.ts
-- SettingsProjectAgentEditor
-- formatDurationMs
+- ModelPricingModal
+- SettingsCodexSection
+- SettingsSkillSection.ts
+- ModelConfigService
 - ThemeBackgroundStorage
 - createProjectedFaces
 - StreamChunkRouter
+- GlassEffectAdapter
 - ClaudeProjectSettingsDiscovery.ts
+- SettingsCodexAccountSurface.ts
+- PluginEvidenceSnapshot
+- ContextUsageService.ts
 - glassOctahedronDemoThree.ts
+- TabRuntimeStateBridge.ts
+- RetainedSelectionRuntimeCoordinator
+- SettingsDropdownControl.ts
+- ClaudeCodeSdkFacade
+- SlashCommandSkillMode
 - createSendPipelineRuntimeHost
 - .ensureForElement
-- slashCommandMenuRenderer.ts
 - capabilityLabBackendTabs.ts
 - SettingsStyleBackgroundSection
 - SlashCommandExecutionHostFactory.ts
+- OpenCodeSdkExperimentalActionCoordinator.ts
+- OpenCodeSessionControlOrchestratorHost
+- AgentMentionCandidateService.ts
+- PermissionModeSelectorCoordinator.ts
 - CodexRuntimeDefaultsBadgeCoordinator.ts
 - QuestionRuntimeViewHost
+- slashCommandMenuRenderer.ts
 - ThinkingBlockRenderer
+- OpenCodeSessionLifecycleCoordinator.ts
 - OpenCodeSyncEventRuntimeCoordinator.ts
-- OpencodeAgentConfigRecord
 - sendPipelineContent.ts
 - QuestionResolutionCardRenderer.ts
-- PermissionModeSelectorCoordinator.ts
-- .renderSyncedAssistantMessageWithReveal
 - NavigationSidebar
-- capabilityDisclosureRow.ts
 - ProjectConfigFileWatcher
-- SkillDetailModal
+- SettingsPopoverController
+- SettingsProjectCommandEditor
 - SettingsUiSection
-- ClaudeCodeDefaultPermissionHost.ts
-- McpConfigService
-- SlashCommandSkillMode
+- updateBaseLayers
+- SurfaceAgentBuilder
+- OpencodeConfigManager.ts
+- BackgroundTaskLiveSignalCoordinator
 - AssistantShellRenderer
 - ChildSessionGraphCoordinator
-- RetainedSelectionRuntimeCoordinator
-- SurfaceAgentBuilder
-- ClaudeCodeOptionsBuilder.ts
-- promptSuggestionSink.ts
-- OpenCodeSdkCapabilityRegistry.ts
-- QuestionDockSlotCoordinator
-- BackgroundTaskLiveSignalCoordinator
-- SkillCatalogService.ts
-- BackendSessionBrowserDetail.ts
-- commandScopedAgent.ts
+- QuestionDockRenderStateFacade.ts
+- SettingsModelIconCacheManager
+- normalizeFiniteNumberInRange
 - formatModelReference
-- PluginEntry
+- sdkFetch.ts
 - ConversationFullMessageCache.ts
 - SandboxConfigBadgeCoordinator.ts
-- BackgroundTaskInlinePanelRenderer.ts
+- ServerReferenceContextService
 - LocalStreamMessagePersistence.ts
 - StreamChunk
 - LocalStreamOutcome
 - ComposerContextPickerActionService.ts
 - buildTrailingAssistantPatchTailOutcomePlansFromExecutionTailPlanningContext
-- SettingsCodexReadbackControls.ts
-- listBackendSessions
-- PluginManagementService.ts
+- SettingsDebugSection.ts
+- ClaudeUserMessageIdentityBackfillService.ts
+- ClaudeCodeProcessResolver.ts
 - QuestionPostResolutionRuntimeFacadeHost
+- ToolDetailModal
+- PluginManagementService.ts
 - .start
-- QuestionDockRenderStateFacadeHost
-- ModelConfigJsonModal
 - SettingsBackendSection
+- SettingsModelSection
+- AgentSessionCapability
+- ClaudeCodeQueue.ts
 - providerPresets.ts
-- PendingIndicatorController.ts
+- SettingsUiSection.ts
+- OpencodeConfigModal
 - ServerSettingHelpModal
+- SettingsModelSection.ts
 - SettingsPluginEvidenceCoordinator
 - applyEdgeBulge
-- .createAssistantShellViewHostAdapterHost
+- .handleChipClick
+- ComposerContextEventBridge
 - SendPipelineDebugPort
-- ConversationCompactionHelpModal
-- ModifiedFilesSidebarHelpModal
 - .runFallbackModelProof
-- createCodexMcpServerDetailHost
+- .updateMessagePart
 - jsx-shim.ts
+- ClaudeCodeSpawnedProcess
+- QuestionDockSlotCoordinator.ts
+- ClaudeCodeHelpModal
 - ForkTargetModal
 - .validateDiagnosticResumeSession
 - BlocklistChecker.ts
@@ -329,16 +351,16 @@
   src/core/agents/backend/ClaudeCodeStreamNormalizer.ts → src/core/types/chat.ts
 - `mapFileChangePaths()` --indirect_call--> `path()`  [INFERRED]
   src/core/agents/backend/CodexAppServerStreamMapper.ts → src/core/opencode/OpenCodeSdkCapabilityRegistry.ts
-- `SettingsModelCatalogPresenterRenderState` --references--> `ModelCatalogState`  [EXTRACTED]
-  src/features/settings/SettingsModelCatalogPresenter.ts → src/core/config/ModelCatalogStateService.ts
 - `SettingsModelCatalogPresenterOptions` --references--> `ModelCatalogStateService`  [EXTRACTED]
   src/features/settings/SettingsModelCatalogPresenter.ts → src/core/config/ModelCatalogStateService.ts
+- `PermissionConfigSummary` --references--> `PermissionMode`  [EXTRACTED]
+  src/core/config/OpencodeConfigManager.ts → src/core/types/settings.ts
 - `PluginConfigSourceSnapshot` --references--> `OpencodePluginSpec`  [EXTRACTED]
   src/core/config/PluginManagementService.ts → src/core/types/opencodeConfig.ts
 
 ## Import Cycles
-- 3-file cycle: `src/core/runtime/PluginRuntimeCoordinator.ts -> src/features/chat/OpenCodianView.ts -> src/main.ts -> src/core/runtime/PluginRuntimeCoordinator.ts`
 - 3-file cycle: `src/core/storage/StorageService.ts -> src/main.ts -> src/core/storage/index.ts -> src/core/storage/StorageService.ts`
+- 3-file cycle: `src/core/runtime/PluginRuntimeCoordinator.ts -> src/features/chat/OpenCodianView.ts -> src/main.ts -> src/core/runtime/PluginRuntimeCoordinator.ts`
 - 3-file cycle: `src/features/chat/runtime/ConversationSyncLoadRuntimeHostAdapter.ts -> src/features/chat/services/ConversationSyncHostAdapter.ts -> src/features/chat/services/ConversationSyncLoadRuntimeViewHostFactory.ts -> src/features/chat/runtime/ConversationSyncLoadRuntimeHostAdapter.ts`
 - 3-file cycle: `src/features/chat/services/BackgroundTaskLiveSignalCoordinator.ts -> src/features/chat/services/BackgroundTaskTimelineService.ts -> src/features/chat/services/BackgroundTaskTimelineLaunchService.ts -> src/features/chat/services/BackgroundTaskLiveSignalCoordinator.ts`
 - 3-file cycle: `src/core/opencode/OpenCodeLegacySseStreamReader.ts -> src/core/opencode/OpenCodeStreamEventTransformer.ts -> src/core/opencode/OpenCodeStreamingRuntimeCoordinator.ts -> src/core/opencode/OpenCodeLegacySseStreamReader.ts`
@@ -346,395 +368,387 @@
 - 3-file cycle: `src/core/opencode/OpenCodeSessionLifecycleCoordinator.ts -> src/core/opencode/OpenCodeSyncEventRuntimeCoordinator.ts -> src/core/opencode/types.ts -> src/core/opencode/OpenCodeSessionLifecycleCoordinator.ts`
 - 3-file cycle: `src/core/agents/AgentCapability.ts -> src/core/agents/backend/AgentServiceRegistry.ts -> src/core/agents/backend/AgentService.ts -> src/core/agents/AgentCapability.ts`
 - 4-file cycle: `src/core/runtime/OpenCodianSettingsRuntimeCoordinator.ts -> src/core/storage/index.ts -> src/core/storage/StorageService.ts -> src/main.ts -> src/core/runtime/OpenCodianSettingsRuntimeCoordinator.ts`
-- 4-file cycle: `src/core/runtime/PluginRuntimeCoordinator.ts -> src/features/chat/OpenCodianView.ts -> src/features/chat/services/TitleGenerationService.ts -> src/main.ts -> src/core/runtime/PluginRuntimeCoordinator.ts`
 - 4-file cycle: `src/core/storage/StorageService.ts -> src/main.ts -> src/core/types/settingsLoadNormalization.ts -> src/core/storage/index.ts -> src/core/storage/StorageService.ts`
+- 4-file cycle: `src/core/runtime/PluginRuntimeCoordinator.ts -> src/features/chat/OpenCodianView.ts -> src/features/chat/services/TitleGenerationService.ts -> src/main.ts -> src/core/runtime/PluginRuntimeCoordinator.ts`
 - 4-file cycle: `src/features/chat/services/BackgroundTaskLiveSignalCoordinator.ts -> src/features/chat/services/BackgroundTaskTimelineService.ts -> src/features/chat/services/BackgroundTaskTimelineAssemblyService.ts -> src/features/chat/services/BackgroundTaskTimelineLaunchService.ts -> src/features/chat/services/BackgroundTaskLiveSignalCoordinator.ts`
 - 4-file cycle: `src/features/chat/runtime/SendPipelineDebugSummaries.ts -> src/features/chat/runtime/SendPipelineTypes.ts -> src/features/chat/services/MessageFinalizationService.ts -> src/features/chat/services/MessageFinalizationHost.ts -> src/features/chat/runtime/SendPipelineDebugSummaries.ts`
 - 5-file cycle: `src/core/config/ModelPricingService.ts -> src/core/storage/index.ts -> src/core/storage/StorageService.ts -> src/main.ts -> src/core/config/index.ts -> src/core/config/ModelPricingService.ts`
 
-## Communities (299 total, 56 thin omitted)
+## Communities (324 total, 67 thin omitted)
 
 ### Community 0 - "OpenCodeService"
 Cohesion: 0.02
-Nodes (15): mapServerStatus(), OpenCodeAdapter, OpenCodeExperimentalActionAvailability, AssistantMessageResponse, cloneSettings(), getDebugTextPreview(), getRecordId(), OpenCodeService (+7 more)
+Nodes (17): mapServerStatus(), OpenCodeAdapter, path(), OpenCodeExperimentalActionAvailability, AssistantMessageResponse, cloneSettings(), getDebugTextPreview(), getRecordId() (+9 more)
 
 ### Community 1 - "types/index.ts"
-Cohesion: 0.03
-Nodes (168): IMPLEMENTED_AGENT_BACKENDS, DEFAULT_CONTEXT_WINDOWS, ModelInfo, ModelProvider, ApprovalDecision, BackendSettings, BelowHeaderTabBarLayout, ChatAppearanceAdvancedSettings (+160 more)
-
-### Community 2 - "ConversationSyncHostAdapter.ts"
-Cohesion: 0.03
-Nodes (54): BackgroundTaskPostSyncResult, BackgroundTabConversationPostSyncRouteOptions, ConversationSyncBackgroundPostSyncHandoffPort, ConversationSyncBackgroundPostSyncRouter, ConversationSyncBackgroundPostSyncRouterHost, ConversationSyncBackgroundPostSyncRouterRuntime, SignalConversationPostSyncRouteOptions, ConversationSyncBridge (+46 more)
-
-### Community 3 - "t"
-Cohesion: 0.05
-Nodes (7): ConversationHistoryDialogService, getFriendlyServerStartErrorMessage(), getUnavailableServerMessage(), UnavailableServerAvailability, SettingsClaudeCodeSection, SkillPermissionHelpModal, t()
-
-### Community 4 - "OpenCodianView.ts"
-Cohesion: 0.03
-Nodes (64): ConversationRevertState, DeferredQuestionRequest, logger, OpenCodianViewConversationRuntimeWiring, OpenCodianViewSurfaceRuntimeWiring, QuestionTodoBackgroundTaskRuntimeCoordinators, TabPaneState, BackgroundTaskIndicatorCoordinator (+56 more)
-
-### Community 5 - "TabId"
 Cohesion: 0.04
-Nodes (12): SendPipelineTransportPort, SendPipelineViewPort, BackgroundTaskLiveSignalCoordinatorHost, createBackgroundTaskLiveSignalCoordinatorHost(), BackgroundTaskViewHost, ConversationSyncSignalSchedulerPort, ConversationTabRuntimeCoordinator, ConversationTabRuntimeCoordinatorHost (+4 more)
+Nodes (121): DEFAULT_CONTEXT_WINDOWS, ModelInfo, ModelProvider, ApprovalDecision, BackendSettings, BelowHeaderTabBarLayout, ChatAppearanceAdvancedSettings, ChatAppearanceAssistantSettings (+113 more)
 
-### Community 6 - "backend/index.ts"
-Cohesion: 0.02
-Nodes (107): CheckpointCandidateResult, CheckpointPhase1RewindResult, CheckpointPhase1StreamResult, CheckpointPhase2StreamResult, CheckpointRewindActualResult, CheckpointRewindProbeResult, CLAUDE_CODE_EFFORT_VALUES, CLAUDE_CODE_PHASE1_CAPABILITIES (+99 more)
-
-### Community 7 - "OpenCodeServiceLifecycleCoordinator"
+### Community 3 - "backend/index.ts"
 Cohesion: 0.03
-Nodes (21): OpenCodeCatalogQueryCoordinatorDebugMetadata, AvailableModelsResult, cloneSettings(), deepClonePlain(), deepCloneValue(), isPlainRecord(), logger, ModelSummary (+13 more)
+Nodes (111): CheckpointCandidateResult, CheckpointPhase1RewindResult, CheckpointPhase1StreamResult, CheckpointPhase2StreamResult, CheckpointRewindActualResult, CheckpointRewindProbeResult, CLAUDE_CODE_EFFORT_VALUES, CLAUDE_CODE_PHASE1_CAPABILITIES (+103 more)
 
-### Community 8 - "SessionTodo"
-Cohesion: 0.04
-Nodes (22): SessionActivityStatus, SessionTodo, ClaudeTaskSessionState, ClaudeTaskStatus, logger, SessionTodoCoordinator, SessionTodoCoordinatorHost, SessionTodoCoordinatorRuntimeState (+14 more)
+### Community 4 - "OpenCodeServiceLifecycleCoordinator"
+Cohesion: 0.03
+Nodes (19): AvailableModelsResult, cloneSettings(), deepClonePlain(), deepCloneValue(), isPlainRecord(), logger, ModelSummary, OpenCodeServiceLifecycleAssembly (+11 more)
 
-### Community 9 - "SettingsFormatterSection"
+### Community 5 - "SettingsFormatterSection"
 Cohesion: 0.05
 Nodes (7): OpencodeFormatterConfig, OpencodeFormatterEntryConfig, OpencodeFormatterStatus, OpencodeLspEntryConfig, BuiltinStatusFilter, FormatterRuntimeState, SettingsFormatterSection
 
-### Community 10 - "ChatMessage"
-Cohesion: 0.04
-Nodes (23): ChatMessage, buildMessageRenderGroups(), extractTextContent(), flattenContentBlocks(), injectLiveCompactionDivider(), isMergeableAssistantMessage(), LiveCompactionDividerInjectionOptions, mergeAssistantMessagesForRender() (+15 more)
-
-### Community 11 - "OpenCodeCatalogQueryCoordinator"
-Cohesion: 0.04
-Nodes (20): logger, OpenCodeAvailableModelsResult, OpenCodeCatalogModelEntry, OpenCodeCatalogProviderEntry, OpenCodeCatalogQueryCoordinator, OpenCodeCatalogQueryCoordinatorHost, OpenCodeCatalogResponseLogContext, OpenCodeProviderDirectoryResult (+12 more)
-
-### Community 12 - "BackgroundTaskTimelineAssemblyService"
-Cohesion: 0.05
-Nodes (24): BackgroundTaskActiveAnchorMetadata, BackgroundTaskStreamTriggerRuntime, BackgroundTaskLiveSignalLaunchInfo, BackgroundTaskLiveSignalRuntime, logger, BackgroundTaskCompletionInfo, BackgroundTaskDiagnostics, BackgroundTaskSegment (+16 more)
-
-### Community 13 - "ComposerInputShellCoordinator"
-Cohesion: 0.05
-Nodes (7): deletePromptSuggestionChannel(), removePromptSuggestionScope(), ComposerInputShellCoordinator, ComposerInputShellCoordinatorHost, escapeHtmlAttribute(), escapeHtmlContent(), ComposerInputMode
-
-### Community 14 - "TabMessagesPaneCoordinator"
-Cohesion: 0.04
-Nodes (29): applyPassiveScrollMeasurement(), applyUserScrollIntent(), AutoScrollSnapshot, getDistanceFromBottom(), getProgrammaticScrollGuardDelayMs(), hasProgrammaticScrollGuard(), isNearBottom(), ScrollMetrics (+21 more)
-
-### Community 15 - "ConversationRenderService.ts"
-Cohesion: 0.04
-Nodes (35): getLogPreview(), summarizeChatMessageForDebug(), summarizeContentBlocksForDebug(), summarizeCoreStreamChunkForDebug(), summarizeRenderedStreamChunkForDebug(), ConversationMessageRenderDelegate, ConversationRenderHost, ConversationRenderRuntimeState (+27 more)
-
-### Community 16 - "tabs/index.ts"
-Cohesion: 0.06
-Nodes (21): cloneMessagesBeforeForkTarget(), ConversationLoadRecoveryAssemblyResult, logger, ConversationTabLifecycleRecoveryCoordinator, ConversationTabLifecycleRecoveryHost, ConversationTabLifecycleRecoveryPort, ConversationTabLifecycleRecoveryTabManager, Tab (+13 more)
-
-### Community 17 - "QuestionTodoBackgroundTaskRefreshHostAdapter.ts"
-Cohesion: 0.05
-Nodes (44): BackgroundConversationPostSyncHandoffCoordinator, BackgroundConversationPostSyncHandoffCoordinatorHost, BackgroundConversationPostSyncRefreshPort, BackgroundTabPostSyncOptions, BackgroundTaskPostSyncBaseOptions, SignalBackgroundTaskPostSyncOptions, BackgroundConversationPostSyncHandoffServices, BackgroundConversationPostSyncHandoffViewHost (+36 more)
-
-### Community 18 - "MessageFinalizationHost.ts"
-Cohesion: 0.05
-Nodes (34): getAgentServiceRegistry(), ClaudeUserMessageIdentityBackfillHost, ClaudeUserMessageIdentityBackfillService, ClaudeUserMessageIdentityResolver, logger, setBackfillPersistenceHost(), HydratedOptimisticUserMessageUpdate, ConversationWriteTicket (+26 more)
-
-### Community 19 - "AgentService.ts"
+### Community 6 - "ConversationSyncHostAdapter.ts"
 Cohesion: 0.03
-Nodes (23): AgentCapability, EMPTY_CAPABILITIES, getActiveBackendCapabilities(), OPENCODE_FULL_CAPABILITIES, resolveCodexBinaryPath(), wireHiddenAdapters(), WireHiddenAdaptersOptions, AgentAuthCapability (+15 more)
+Nodes (48): ConversationLoadRuntimeBridgeHost, ConversationSyncLoadRuntimeHostAdapterHost, ConversationSyncLoadRuntimeHosts, createConversationSyncLoadRuntimeHosts(), BackgroundTaskPostSyncResult, BackgroundTabConversationPostSyncRouteOptions, ConversationSyncBackgroundPostSyncHandoffPort, ConversationSyncBackgroundPostSyncRouter (+40 more)
 
-### Community 20 - "OpenCodianSettingsView.ts"
-Cohesion: 0.06
-Nodes (34): OpenCodianSettingsView, addSettingsDropdown(), advanceHighlight(), attachPortalListeners(), computePortalPosition(), DropdownKeydownContext, enhancedSelects, enhanceSettingsDropdownComponent() (+26 more)
-
-### Community 21 - "QuestionTodoBackgroundTaskRuntimeServiceBundle.ts"
+### Community 7 - "TabId"
 Cohesion: 0.04
-Nodes (42): BackgroundConversationPostSyncHandoffViewHostAdapterDependencies, BackgroundConversationPostSyncHandoffViewHostAdapterHost, createBackgroundConversationPostSyncHandoffViewHostAdapter(), QuestionTodoActivationRefreshCoordinator, QuestionTodoActivationRefreshCoordinatorHost, createQuestionTodoBackgroundTaskActivationHosts(), createQuestionTodoBackgroundTaskActivationServices(), createQuestionTodoBackgroundTaskActivationViewHostAdapter() (+34 more)
+Nodes (13): BackgroundTaskIndicatorCoordinatorHost, SendPipelineTransportPort, SendPipelineViewPort, BackgroundTaskLiveSignalCoordinatorHost, createBackgroundTaskLiveSignalCoordinatorHost(), BackgroundTaskViewHost, ConversationTabRuntimeCoordinator, ConversationTabRuntimeCoordinatorPorts (+5 more)
 
-### Community 22 - "ServerManager"
-Cohesion: 0.06
-Nodes (23): ExistingServerProcessInfo, LocalSidecarEndpointResolver, LocalSidecarEndpointResolverRuntime, ManagedServerAdoptionOutcome, OccupiedLocalEndpointResolution, SidecarCommandClassification, LOCAL_SERVER_SANITIZED_ENV_KEYS, LocalServerLaunch (+15 more)
-
-### Community 23 - "OpenCodeSdkFacade.ts"
+### Community 8 - "ConversationRenderService.ts"
 Cohesion: 0.04
-Nodes (52): createSdkClient(), CreateSdkClientOptions, attachOpenCodeAppAgents(), OPEN_CODE_APP_AGENTS_PROMISE_KEY, OpenCodeAppAgentsCarrier, appendSdkErrorStatus(), createConnectionIdentity(), describeSdkError() (+44 more)
+Nodes (33): ConversationMessageRenderDelegate, ConversationRenderHost, ConversationRenderRuntimeState, ConversationSyncedUpdateApplyContext, ConversationSyncedUpdateApplyDelegate, ConversationSyncedUpdatePatchPort, ConversationUserMessageRenderFrame, getIncrementalRenderedMessageUpdate() (+25 more)
 
-### Community 24 - "SettingsStyleSection"
+### Community 9 - "ChatMessage"
+Cohesion: 0.04
+Nodes (18): ChatMessage, ConversationSyncResult, ConversationAuthoritativeMessageMergeCoordinator, ConversationAuthoritativeMessageMergeHost, ConversationAuthoritativeSyncCoordinator, ConversationAuthoritativeSyncHost, HydratedOptimisticUserMessageUpdate, HydratedUserMessageMismatchContext (+10 more)
+
+### Community 10 - "BackgroundTaskTimelineService.ts"
+Cohesion: 0.04
+Nodes (44): BackgroundTaskActiveAnchorMetadata, BackgroundTaskIndicatorCompletionNoticePort, BackgroundTaskIndicatorCoordinatorDependencies, BackgroundTaskIndicatorInlinePanelPort, BackgroundTaskIndicatorLiveSignalPort, BackgroundTaskIndicatorTabRuntimePort, BackgroundTaskIndicatorTimelinePort, BackgroundTaskInlinePanelRenderer (+36 more)
+
+### Community 11 - "QuestionTodoBackgroundTaskRuntimeServiceBundle.ts"
+Cohesion: 0.04
+Nodes (51): BackgroundConversationPostSyncHandoffViewHostAdapterDependencies, BackgroundConversationPostSyncHandoffViewHostAdapterHost, createBackgroundConversationPostSyncHandoffServices(), createBackgroundConversationPostSyncHandoffViewHostAdapter(), ConversationSyncVisiblePostSyncResult, createPostSyncQuestionTodoRefreshHosts(), createPostSyncQuestionTodoRefreshServices(), PostSyncQuestionTodoRefreshViewHost (+43 more)
+
+### Community 12 - "OpenCodeCatalogQueryCoordinator"
+Cohesion: 0.05
+Nodes (6): OpenCodeCatalogQueryCoordinator, OpenCodeCatalogQueryCoordinatorHost, OpenCodeCatalogStateStore, OpenCodeCatalogStateStoreHost, McpServerStatus, ToolCatalogEntry
+
+### Community 13 - "BackgroundConversationPostSyncHandoffHostAdapter.ts"
+Cohesion: 0.04
+Nodes (41): BackgroundConversationPostSyncHandoffCoordinator, BackgroundConversationPostSyncHandoffCoordinatorHost, BackgroundConversationPostSyncRefreshPort, BackgroundTabPostSyncOptions, BackgroundTaskPostSyncBaseOptions, SignalBackgroundTaskPostSyncOptions, BackgroundConversationPostSyncHandoffServices, BackgroundConversationPostSyncHandoffViewHost (+33 more)
+
+### Community 14 - "SettingsSkillSection"
+Cohesion: 0.06
+Nodes (10): logger, SkillCatalogService, SkillCatalogServiceHost, SkillInfo, SkillSourceGroups, queueSkillServiceRestart(), restartLocalServiceAfterSkillCatalogWrite(), SettingsSkillSection (+2 more)
+
+### Community 15 - "OpenCodeService.ts"
+Cohesion: 0.04
+Nodes (66): logger, OpenCodeAvailableModelsResult, OpenCodeCatalogModelEntry, OpenCodeCatalogProviderEntry, OpenCodeCatalogQueryCoordinatorDebugMetadata, OpenCodeCatalogResponseLogContext, OpenCodeProviderDirectoryResult, OpenCodeSdkFileListInput (+58 more)
+
+### Community 16 - "t"
+Cohesion: 0.06
+Nodes (13): ConversationHistoryDialogService, getFriendlyServerStartErrorMessage(), getUnavailableServerMessage(), UnavailableServerAvailability, ImagePreviewOverlayOptions, openImagePreview(), ModelConfigJsonModal, SettingsCodexReadbackControls (+5 more)
+
+### Community 17 - "SettingsStyleSection"
 Cohesion: 0.06
 Nodes (5): ChatAppearanceStyleGroup, ColorStyleControlConfig, SettingsStyleControls, SettingsStyleSection, SettingsTooltipController
 
-### Community 25 - ".getSdk"
+### Community 18 - "ClaudeCodeAdapter"
 Cohesion: 0.05
-Nodes (16): resolveDiagnosticSessionId(), resolveSendOptionOverrides(), summarizeError(), summarizeSendOptions(), ClaudeCodeAsyncQueue, ClaudeCodeImagePromptBlock, ClaudeCodePromptContent, ClaudeCodeRuntimeOutput (+8 more)
+Nodes (6): ClaudeCodeAdapter, isClaudeAgentSdkBundledExecutablePath(), resolveDiagnosticSessionId(), ClaudeCodeSdkOptionsShape, clearPromptSuggestionSink(), registerPromptSuggestionSink()
 
-### Community 26 - "OpenCodeService.ts"
+### Community 19 - "MessageFinalizationHost.ts"
 Cohesion: 0.05
-Nodes (46): CatalogUpdateListener, logger, BuiltPromptSendPayload, LegacyPromptRequestBody, OpenCodePromptRequestBuilder, OpenCodePromptRequestBuilderHost, PromptBuildInput, PromptModelSelection (+38 more)
+Nodes (32): getLogPreview(), summarizeChatMessageForDebug(), summarizeContentBlocksForDebug(), summarizeCoreStreamChunkForDebug(), summarizeRenderedStreamChunkForDebug(), setBackfillPersistenceHost(), appendTurnDiffNoticeIfNeeded(), applySyncedConversationUpdate() (+24 more)
 
-### Community 27 - "ChatHeaderPresenter"
+### Community 20 - "SettingsClaudeCodeSection.ts"
+Cohesion: 0.05
+Nodes (60): CLAUDE_AGENTS_DIR, ClaudeAgentWriteResult, ClaudeProjectAgentInfo, CODE_FENCE_MARKER, createClaudeProjectAgent(), defaultClaudeAgentContent(), discoverClaudeGlobalAgents(), discoverClaudeProjectAgents() (+52 more)
+
+### Community 21 - "SessionTodo"
+Cohesion: 0.06
+Nodes (18): SessionTodo, ClaudeTaskSessionState, ClaudeTaskStatus, logger, SessionTodoCoordinatorRuntimeState, SessionTodoNoticeMessageOptions, SessionTodoDockCoordinator, SessionTodoDockCoordinatorHost (+10 more)
+
+### Community 22 - "SlashCommandExecutionService.ts"
+Cohesion: 0.05
+Nodes (21): SessionCommandInput, FocusContextPreview, SendPreparationServerAvailability, collectRuntimeSkillNames(), expandMdFileCommandTemplate(), extractAgentFromArguments(), findMdFileCommand(), hasProjectCommand() (+13 more)
+
+### Community 23 - "ChatHeaderPresenter"
 Cohesion: 0.05
 Nodes (15): ChatHeaderPresenter, ChatHeaderPresenterHost, HeaderActionButtonConfig, logger, readActiveBackendFromPlugin(), readOpenCodianPlugin(), SERVER_STATUS_CLASS_NAMES, SERVER_STATUS_KEY_BY_AVAILABILITY (+7 more)
 
-### Community 28 - "OpenCodeSessionControlOrchestrator"
-Cohesion: 0.05
-Nodes (15): AvailableModelDirectory, expandSessionCommandTemplate(), logger, normalizeSessionCommandExternalContextPaths(), normalizeSessionCommandPath(), normalizeSessionCommandText(), OpenCodeSessionControlOrchestrator, OpenCodeSessionControlOrchestratorHost (+7 more)
-
-### Community 29 - "ClaudeCodeAdapter"
-Cohesion: 0.05
-Nodes (4): BackendCapabilities, ClaudeCodeAdapter, ClaudeCodeSdkOptionsShape, clearPromptSuggestionSink()
-
-### Community 30 - "CodexProjectResourceDiscovery.ts"
-Cohesion: 0.09
-Nodes (59): agentFilePath(), CLAUDE_AGENTS_DIR, CODE_FENCE_MARKER, createClaudeProjectAgentTyped(), defaultClaudeAgentContent(), deleteClaudeProjectAgent(), isSafeAgentName(), updateClaudeProjectAgent() (+51 more)
-
-### Community 31 - "CodexAppServerClient.ts"
+### Community 24 - "CodexAppServerClient.ts"
 Cohesion: 0.05
 Nodes (40): AppServerSkillGroupEnvelope, CodexAppServerClient, isAppServerSkill(), isGroupEnvelope(), isPlainObject(), logger, normalizeSkillsListResult(), pickSkillFields() (+32 more)
 
-### Community 32 - "SettingsStyleInputPanelSection.ts"
+### Community 25 - "OpenCodianSettingTab"
+Cohesion: 0.07
+Nodes (17): OpenCodianSettingTab, enhanceSettingsDropdowns(), SettingsDropdownsEnhancerHandle, addSettingHelpButton(), applyInlineCodeText(), buildInlineCodeFragment(), createSettingsBlock(), renderLanguageSetting() (+9 more)
+
+### Community 26 - "AgentService.ts"
+Cohesion: 0.04
+Nodes (19): AgentCapability, BackendCapabilities, EMPTY_CAPABILITIES, getActiveBackendCapabilities(), OPENCODE_FULL_CAPABILITIES, setAgentServiceRegistry(), AgentAuthCapability, AgentBranchCapability (+11 more)
+
+### Community 27 - "i18n/index.ts"
+Cohesion: 0.04
+Nodes (44): ConversationCompactionHelpModal, ConversationCompactionHelpTopic, LiquidGlassSettingHelpModal, logger, SettingsConversationSectionOptions, ShareDiagnosticState, ShareHostDiagnosticResult, TextValueControl (+36 more)
+
+### Community 28 - "Conversation"
+Cohesion: 0.07
+Nodes (9): Conversation, OpencodeShareMode, BackgroundTaskIndicatorCoordinator, ConversationHydrationOutcomeBridgeHost, getOpenCodeActivationSessionId(), ConversationHydrationRuntimeViewHosts, ConversationSessionSettingsCoordinator, ConversationSessionSettingsCoordinatorHost (+1 more)
+
+### Community 29 - "ServerManager"
+Cohesion: 0.08
+Nodes (15): ExistingServerProcessInfo, LocalSidecarEndpointResolver, LocalSidecarEndpointResolverRuntime, ManagedServerAdoptionOutcome, OccupiedLocalEndpointResolution, SidecarCommandClassification, logger, ManagedServerShutdownPlan (+7 more)
+
+### Community 30 - "OpenCodeSdkFacade.ts"
 Cohesion: 0.05
-Nodes (41): isValidChatAppearanceCustomCssDeclarations(), buildChatAppearanceCustomCss(), fontLoader, getChatAppearanceBackgroundSizeValue(), getChatAppearanceCssVariables(), CN_FONT_OPTIONS, EN_FONT_OPTIONS, extractPrimaryFontName() (+33 more)
+Nodes (41): createSdkClient(), CreateSdkClientOptions, attachOpenCodeAppAgents(), OPEN_CODE_APP_AGENTS_PROMISE_KEY, OpenCodeAppAgentsCarrier, appendSdkErrorStatus(), createConnectionIdentity(), describeSdkError() (+33 more)
 
-### Community 34 - "OpenCodianPlugin"
-Cohesion: 0.06
-Nodes (14): setAgentServiceRegistry(), SettingsCodexSectionOptions, SettingsModelIconCacheManagerOptions, SettingsUiSectionOptions, activateSettingsView(), broadcastActiveBackendChangeToSettingsViews(), broadcastModelsLoadedToSettingsViews(), broadcastServerStatusToSettingsViews() (+6 more)
-
-### Community 35 - "SlashCommandExecutionService.ts"
+### Community 31 - "ComposerContextViewFacade.ts"
 Cohesion: 0.05
-Nodes (20): SessionCommandTemplateContext, SendPreparationServerAvailability, collectRuntimeSkillNames(), expandMdFileCommandTemplate(), extractAgentFromArguments(), findMdFileCommand(), hasProjectCommand(), isRunnableRuntimeCommand() (+12 more)
+Nodes (28): ComposerContextActionService, ComposerContextActionServiceHost, ComposerContextChipActionService, ComposerContextCoordinator, ComposerContextCoordinatorHost, ComposerContextPickerServerContextPort, ComposerContextRuntimeState, ComposerContextActionPort (+20 more)
 
-### Community 36 - "main.ts"
-Cohesion: 0.06
-Nodes (65): buildClaudeCodeElicitationContent(), buildClaudeCodeElicitationQuestionRequest(), coerceElicitationScalarAnswer(), ElicitationContent, ElicitationScalarContent, ElicitationSchemaProperty, getHeader(), getSchemaProperties() (+57 more)
-
-### Community 37 - "OpencodeConfigManager"
-Cohesion: 0.09
-Nodes (5): OpencodeConfigManager, OpencodeCompactionConfig, PermissionAction, PermissionConfig, ToolPermission
-
-### Community 38 - "InputPanelThemeRuntime.ts"
-Cohesion: 0.06
-Nodes (35): getLiquidGlassAdapterIdForInputPanelTheme(), InputPanelActionButtonStyleId, InputPanelGlassRefractionSvgFilterSettings, InputPanelThemeId, LiquidGlassAdapterId, LiquidGlassAncestorDiagnostic, LiquidGlassBackdropOverlapDiagnostics, LiquidGlassBackdropPointSample (+27 more)
-
-### Community 39 - "shudingDiamond.ts"
+### Community 32 - "shudingDiamond.ts"
 Cohesion: 0.05
-Nodes (66): adapter, applyFilterLayerState(), BASE_PYRAMID_VERTICES, bounds2(), buildBackdropFilterValue(), buildFallbackBackdropFilterValue(), buildHullEdges(), CAMERA (+58 more)
+Nodes (64): adapter, applyFilterLayerState(), BASE_PYRAMID_VERTICES, bounds2(), buildBackdropFilterValue(), buildFallbackBackdropFilterValue(), buildHullEdges(), CAMERA (+56 more)
+
+### Community 33 - "SettingsConversationSection"
+Cohesion: 0.08
+Nodes (4): listBackendSessions(), DropdownValueControl, parseNonNegativeInteger(), SettingsConversationSection
+
+### Community 34 - "OpenCodianView.ts"
+Cohesion: 0.05
+Nodes (41): ConversationRevertState, DeferredQuestionRequest, logger, OpenCodianViewConversationRuntimeWiring, QuestionTodoBackgroundTaskRuntimeCoordinators, TabPaneState, ConversationHydrationOutcomeBridge, TabConversationStatePort (+33 more)
+
+### Community 35 - ".getSdk"
+Cohesion: 0.07
+Nodes (7): resolveSendOptionOverrides(), summarizeError(), summarizeSendOptions(), ClaudeCodeAsyncQueue, ClaudeCodeSessionRuntime, createUserPrompt(), isTurnBoundaryMessage()
+
+### Community 36 - "logger.ts"
+Cohesion: 0.07
+Nodes (55): logger, CLAUDE_CODE_DEBUG_CHANNEL_IDS, ClaudeCodeDebugChannelId, ClaudeCodeDebugChannelSettings, DEBUG_MODULE_KEYS, DEBUG_MODULE_REGISTRY, DEBUG_MODULE_SCOPE_PATTERNS, DebugModuleDefinition (+47 more)
+
+### Community 37 - "QuestionRuntimeHostAdapter.ts"
+Cohesion: 0.06
+Nodes (31): OpenCodianViewInteractionRuntimeWiring, QuestionInlineCardRuntimeState, QuestionInputState, SingleQuestionAction, SingleQuestionPromptOptions, StreamingInlineCardRenderer, StreamingInlineCardRendererHost, StreamingInlineCardRuntimeState (+23 more)
+
+### Community 38 - "CodexAdapter"
+Cohesion: 0.05
+Nodes (7): CodexAdapter, CodexAdapterOptions, isRecordLike(), readCommandString(), QueryOptions, ImageAttachment, BuildOptimisticUserMessageOptions
+
+### Community 39 - "SettingsFormatterSection.ts"
+Cohesion: 0.04
+Nodes (40): SlashCommandCatalogSource, OpencodeLspStatus, logger, AppWithPluginRegistry, checkHealth(), logger, start(), stop() (+32 more)
 
 ### Community 40 - "OpenCodianSettingsRuntimeCoordinator"
-Cohesion: 0.08
-Nodes (25): logger, OpenCodianSettingsRuntimeCoordinator, OpenCodianSettingsRuntimeCoordinatorHost, areChatAppearanceSettingsEqual(), BUILTIN_THEME_PRESETS, diffObject(), FLAT_APPEARANCE, getBuiltinThemePresets() (+17 more)
+Cohesion: 0.09
+Nodes (23): OpenCodianSettingsRuntimeCoordinator, OpenCodianSettingsRuntimeCoordinatorHost, areChatAppearanceSettingsEqual(), BUILTIN_THEME_PRESETS, diffObject(), FLAT_APPEARANCE, getThemeAppearanceOverridesFromBase(), getThemePresetDefinition() (+15 more)
 
-### Community 41 - "FocusContextPreview"
+### Community 42 - "SendPipelineTypes.ts"
 Cohesion: 0.07
-Nodes (21): buildComposerContextChipStates(), ComposerContextChipState, FocusContextPreview, getContextTargetKey(), getPromptContextTargetKey(), removeDraftContextItemsByTarget(), upsertDraftContextItem(), ComposerContextChipActionAttachmentBuilderPort (+13 more)
+Nodes (29): PENDING_MESSAGES, PendingIndicatorController, extractStructuredOutputTrigger(), SendPipelineRuntime, SendPipelineSlashCommandPort, STRUCTURED_OUTPUT_FIXED_SCHEMA, SendPipelineTraceOptions, PendingIndicatorHost (+21 more)
 
-### Community 42 - "ClaudeCodeStreamNormalizer.ts"
+### Community 43 - "ClaudeCodeStreamNormalizer.ts"
 Cohesion: 0.10
 Nodes (47): AppendToolUseChunkContext, appendUsageChunk(), ClaudeCodeStreamNormalizer, ClaudeCodeStreamNormalizerOptions, ClaudeCodeStreamNormalizerState, createClaudeCodeStreamNormalizer(), isRecord(), isTextBlock() (+39 more)
 
-### Community 43 - "modelConfigAssembly.ts"
-Cohesion: 0.07
-Nodes (49): assembleModelCatalog(), assembleServerModelCatalog(), filterCatalogToProviderIds(), ModelCatalogAssemblyResult, ModelServerCatalogAssemblyResult, projectEffectiveCatalog(), ProviderAvailabilityProbePlan, ProviderAvailabilityProbePlanStatus (+41 more)
-
-### Community 44 - "agents/index.ts"
-Cohesion: 0.09
-Nodes (30): AgentInvocationPromptPart, AgentInvocationService, AgentInvocationSource, EMPTY_RESOLVED, ChildSessionGraphService, SystemAgentGuardService, SystemAgentRiskLabel, AgentCatalogInput (+22 more)
-
-### Community 45 - "SettingsCapabilityLabSection.ts"
+### Community 44 - "SettingsCapabilityLabSection.ts"
 Cohesion: 0.05
 Nodes (35): OpenCodeSdkCapabilityEvidence, OpenCodeSdkCapabilitySnapshot, CapabilityLabBackendTabRenderContext, CapabilityLabBackendId, CapabilityLabBackendState, CapabilityLabBackendWorkspace, CapabilityLabBackendWorkspaceOptions, createCapabilityLabBackendWorkspace() (+27 more)
+
+### Community 45 - "OpenCodeEventSubscriptionCoordinator.ts"
+Cohesion: 0.07
+Nodes (23): CatalogRelevantEventPayload, deepCloneJsonLike(), EVENT_SOURCES, isPlainRecord(), logger, OpenCodeEventListener, OpenCodeEventSource, OpenCodeEventSubscriptionCoordinator (+15 more)
 
 ### Community 46 - "ConversationLoadRecoveryHost"
 Cohesion: 0.07
 Nodes (6): assembleConversationLoadRecovery(), ConversationLoadRecoveryCoordinator, ConversationLoadRecoveryHost, ConversationLoadRecoveryPort, ConversationLoadRecoveryTabManager, LoadConversationOptions
 
-### Community 47 - "CodexAdapter"
-Cohesion: 0.05
-Nodes (6): AgentConnectionStatus, CodexAdapter, CodexAdapterOptions, QueryOptions, ImageAttachment, BuildOptimisticUserMessageOptions
+### Community 47 - "CodexProjectResourceDiscovery.ts"
+Cohesion: 0.11
+Nodes (46): agentFilePath(), createClaudeProjectAgentTyped(), deleteClaudeProjectAgent(), isSafeAgentName(), updateClaudeProjectAgent(), commandFilePath(), createClaudeProjectCommandTyped(), deleteClaudeProjectCommand() (+38 more)
 
-### Community 48 - "ClaudeProjectProviderConfig.ts"
-Cohesion: 0.08
-Nodes (37): applyClaudeProviderPreset(), ApplyClaudeProviderPresetResult, ClaudeProviderConfigLayer, ClaudeProviderConfigSnapshot, ClaudeProviderPresetValidation, cloneJsonRecord(), findBackupPath(), isMissingFileError() (+29 more)
+### Community 48 - "OpenCodianPlugin"
+Cohesion: 0.07
+Nodes (3): SettingsModelIconCacheManagerOptions, OpenCodianPlugin, getVaultBasePath()
 
-### Community 49 - "nikdelvin.ts"
-Cohesion: 0.08
-Nodes (58): applyBackdropFilterValue(), applyGlassTint(), applyInstanceMarker(), applyShellInteractiveStyles(), buildFallbackBackdropFilterValue(), buildSvgBackdropFilterValue(), clamp(), cleanupInstanceArtifacts() (+50 more)
-
-### Community 50 - "Conversation"
+### Community 49 - "agents/index.ts"
 Cohesion: 0.09
-Nodes (5): Conversation, OpencodeShareMode, ConversationSessionSettingsCoordinator, ConversationSessionSettingsCoordinatorHost, ConversationSyncRuntimeCoordinator
+Nodes (27): AgentInvocationPromptPart, AgentInvocationService, AgentInvocationSource, EMPTY_RESOLVED, ChildSessionGraphService, SystemAgentGuardService, SystemAgentRiskLabel, AgentCatalogInput (+19 more)
 
-### Community 51 - "UserMessageContentRenderer.ts"
-Cohesion: 0.06
-Nodes (28): CollapsibleOptions, CollapsibleState, setupCollapsible(), SetupCollapsibleOptions, AssistantNoticeCardRenderer, AssistantNoticeCardRendererHost, NoticeActionType, UserMessageContentRenderer (+20 more)
+### Community 50 - "ClaudeProjectProviderConfig.ts"
+Cohesion: 0.08
+Nodes (35): applyClaudeProviderPreset(), ApplyClaudeProviderPresetResult, ClaudeProviderConfigLayer, ClaudeProviderConfigSnapshot, ClaudeProviderPresetValidation, cloneJsonRecord(), findBackupPath(), isMissingFileError() (+27 more)
 
-### Community 53 - "SettingsSkillSection"
-Cohesion: 0.09
-Nodes (4): SkillInfo, SkillSourceGroups, SettingsSkillSection, SKILL_CATALOG_RETRY_DELAYS_MS
+### Community 51 - "OpenCodeStreamEventTransformer"
+Cohesion: 0.07
+Nodes (8): extractStructuredErrorMessage(), extractStructuredErrorName(), inferSseEventName(), OpenCodeStreamEventTransformer, OpenCodeStreamEventTransformerHost, OpenCodeStreamPartTypeState, parseJsonRecord(), resolveReasoningDurationSeconds()
 
-### Community 54 - "FocusContextRuntimeService"
+### Community 52 - "FocusContextRuntimeService"
 Cohesion: 0.07
 Nodes (17): createFocusContextPreview(), resolveFocusContextPreview(), ComposerContextServices, ContextPickerFocusPreviewPort, ContextPickerFocusRuntimePort, ContextPickerInteractionBridge, FocusContextServices, FocusContextMarkdownViewLocator (+9 more)
 
-### Community 55 - "ComposerContextViewFacade.ts"
-Cohesion: 0.05
-Nodes (24): ComposerContextEventBridge, ComposerContextLifecycleBridge, ComposerContextPickerServerContextPort, ComposerContextActionPort, ComposerContextAttachmentBuilderPort, ComposerContextCoordinatorPort, ComposerContextFileCatalogPort, ComposerContextLifecyclePort (+16 more)
-
-### Community 56 - "SettingsDebugSection"
+### Community 53 - "TabMessagesPaneCoordinator"
 Cohesion: 0.07
-Nodes (18): getCurrentPlatformDebugLogPath(), getCurrentPlatformKey(), ClaudeCodeStatusItem, DEBUG_MODULE_GROUPS, DebugModuleGroupConfig, DebugPlatformKey, DebugRenderOptions, DebugSectionBlockId (+10 more)
+Nodes (18): applyPassiveScrollMeasurement(), applyUserScrollIntent(), AutoScrollSnapshot, getDistanceFromBottom(), getProgrammaticScrollGuardDelayMs(), hasProgrammaticScrollGuard(), isNearBottom(), ScrollMetrics (+10 more)
 
-### Community 58 - "i18n/index.ts"
+### Community 55 - "OpenCodeSdkCapabilityDiscoveryCoordinator.ts"
+Cohesion: 0.08
+Nodes (30): classifyProbeFailure(), GlobalHealthEvidence, hasMinimumServer117Hint(), isFunction(), isRecord(), isVersionAtLeast117(), logger, OpenCodeSdkCapabilityDiscoveryCoordinator (+22 more)
+
+### Community 56 - "SettingsCapabilityLabSection"
+Cohesion: 0.10
+Nodes (8): formatJsonPreview(), getClaudeCodeAdapter(), isHookBackendEventChunk(), MatrixRow, readMessagePreview(), renderMessagePreviewList(), SettingsCapabilityLabSection, truncate()
+
+### Community 57 - "CodexMcpServerDetailModal"
 Cohesion: 0.07
-Nodes (26): logger, ConversationCompactionHelpTopic, logger, buildModelPickerGroups(), filterModelPickerGroups(), findModelPickerOption(), findModelPickerOptionByRef(), ModelPickerGroup (+18 more)
+Nodes (20): AppServerMcpResource, AppServerMcpResourceReadResult, AppServerMcpServerStatus, McpOauthLoginResult, CodexMcpServerDetailAdapterLike, CodexMcpServerDetailModal, CodexMcpServerDetailModalHost, createCodexMcpServerDetailHost() (+12 more)
 
-### Community 59 - "SettingsConversationSection"
-Cohesion: 0.09
-Nodes (3): DropdownValueControl, parseNonNegativeInteger(), SettingsConversationSection
+### Community 58 - "UserMessageContentRenderer.ts"
+Cohesion: 0.07
+Nodes (26): CollapsibleOptions, CollapsibleState, setupCollapsible(), SetupCollapsibleOptions, AssistantNoticeCardRenderer, AssistantNoticeCardRendererHost, NoticeActionType, UserMessageContentRenderer (+18 more)
 
-### Community 60 - "ModelPricingService.ts"
-Cohesion: 0.08
-Nodes (29): addPricedTokens(), buildBackendReportedCostDetails(), buildUnavailableCostDetails(), CostAccumulator, EffectivePricing, hasConfiguredRate(), inferProviderId(), isRecord() (+21 more)
+### Community 59 - "tabs/index.ts"
+Cohesion: 0.11
+Nodes (11): Tab, TabManager, CloseTabResult, CloseTabsResult, generateTabId(), RestoredTabState, TabConversationLike, TabCreateOptions (+3 more)
 
-### Community 61 - "getConversationBackendSessionId"
-Cohesion: 0.08
-Nodes (24): getConversationBackendSessionId(), supportsOpenCodeActivationRefresh(), ConversationAuthoritativeReloadCoordinator, ConversationAuthoritativeReloadCoordinatorDependencies, ConversationAuthoritativeReloadHost, ConversationServerMessages, ConversationServerSyncContext, ConversationServerSyncMergeResult (+16 more)
-
-### Community 62 - "AgentBackendKind"
-Cohesion: 0.09
-Nodes (22): AgentBackendKind, DeleteConfirmOptions, ForkConversationInitialState, CapabilityDisclosureRowOptions, ClaudeCodeGroupOptions, getActiveSecondaryTabId(), getPrimaryTabDefinition(), LEGACY_PRIMARY_TAB_ID_MAP (+14 more)
-
-### Community 63 - "SendPipelineTypes.ts"
-Cohesion: 0.08
-Nodes (26): extractStructuredOutputTrigger(), SendPipelineRuntime, SendPipelineSlashCommandPort, STRUCTURED_OUTPUT_FIXED_SCHEMA, SendPipelineTraceOptions, SendPipelineDebugContentBlock, SendPipelineExecutionHost, SendPipelineFinalizationPort (+18 more)
-
-### Community 64 - "trailingAssistantPatchDebug.ts"
+### Community 60 - "trailingAssistantPatchDebug.ts"
 Cohesion: 0.06
 Nodes (53): ASSISTANT_DEBUG_STAGE_ALLOWLIST, buildTrailingAssistantPatchCompletionDebugLogPlan(), buildTrailingAssistantPatchCompletionDebugPayloadInputs(), buildTrailingAssistantPatchCompletionDebugPayloadPlan(), buildTrailingAssistantPatchDebugFinalLogInputs(), buildTrailingAssistantPatchDebugFinalLogInputsContract(), buildTrailingAssistantPatchDebugFinalLogPayload(), buildTrailingAssistantPatchDebugFinalLogPayloadContractFromInputs() (+45 more)
 
-### Community 65 - "shuding.ts"
+### Community 61 - "shuding.ts"
 Cohesion: 0.08
 Nodes (53): applyFilterLayerStyles(), applyShellStyles(), buildBackdropFilterValue(), buildEdgeBandWeight(), buildFallbackBackdropFilterValue(), buildFilterLayerBoxShadow(), captureDatasetSnapshot(), captureStyleSnapshot() (+45 more)
 
-### Community 66 - "ComposerInputShellCoordinator.ts"
-Cohesion: 0.09
-Nodes (25): SlashCommandMenuItem, buildComposerInputSubmission(), buildComposerInputSubmissionWithAgentIntents(), decoratePromptSubmissionWithAgentMentions(), decoratePromptSubmissionWithPrimaryAgent(), getCodexSkillMenuQuery(), getExistingMentions(), getSlashCommandMenuQuery() (+17 more)
-
-### Community 67 - "shared/index.ts"
-Cohesion: 0.08
-Nodes (41): extractRenderableToolMetadata(), OpenCodeClassifiedToolPart, OpenCodeStreamEventTransformerHost, OpenCodeStreamingEventHandler, OpenCodeStreamingEventHandlerContext, OpenCodeStreamingPartUpdatedHandler, OpenCodeStreamingPartUpdatedHandlerContext, OpenCodeStreamingTextDeltaDebugState (+33 more)
-
-### Community 69 - ".createInteractionRuntimeWiring"
-Cohesion: 0.08
-Nodes (3): hasCapability(), ConversationSyncBridgePorts, ConversationSyncRuntimeAssembly
-
-### Community 70 - "OpenCodeStreamEventTransformer"
+### Community 63 - "ClaudeCodePermissionBridge.ts"
 Cohesion: 0.07
-Nodes (8): extractStructuredErrorMessage(), extractStructuredErrorName(), getDebugTextPreview(), inferSseEventName(), OpenCodeStreamEventTransformer, OpenCodeStreamPartTypeState, parseJsonRecord(), resolveReasoningDurationSeconds()
+Nodes (40): ClaudeCodeElicitationCardRenderer, ClaudeCodePermissionBridgeHostContext, ClaudeCodePermissionCardRenderer, ClaudeCodeQuestionCardRenderer, createClaudeCodePermissionBridgeHost(), PermissionRequestChunk, buildAskUserQuestionInput(), ClaudeCodeApprovalDecision (+32 more)
 
-### Community 71 - "SettingsAgentsSection"
-Cohesion: 0.09
-Nodes (11): SurfaceAgent, SurfaceAgentFile, path(), OpencodeAgentMode, AGENT_MODE_SORT_ORDER, AgentCatalogRenderContext, AgentSourceBadge, logger (+3 more)
-
-### Community 72 - "SlashCommandMenuCatalogCache.ts"
+### Community 64 - "SlashCommandMenuCatalogCache.ts"
 Cohesion: 0.07
-Nodes (26): buildRuntimeSkillSourceMap(), buildVisibleSlashCommandMenuItems(), getAttachedOpenCodeAppAgents(), AGENT_MENTION_CANDIDATES_PROMISE_KEY, AGENT_SELECTION_CANDIDATES_PROMISE_KEY, appendSyntheticBuiltinCommands(), attachAgentMentionCandidatesToSlashCommandMenuItems(), attachAgentSelectionCandidatesToSlashCommandMenuItems() (+18 more)
+Nodes (27): buildRuntimeSkillSourceMap(), buildVisibleSlashCommandMenuItems(), getAttachedOpenCodeAppAgents(), AGENT_MENTION_CANDIDATES_PROMISE_KEY, AGENT_SELECTION_CANDIDATES_PROMISE_KEY, appendSyntheticBuiltinCommands(), attachAgentMentionCandidatesToSlashCommandMenuItems(), attachAgentSelectionCandidatesToSlashCommandMenuItems() (+19 more)
 
-### Community 73 - "QuestionRuntimeHostAdapter.ts"
+### Community 65 - "ConversationSessionSettingsModal"
 Cohesion: 0.08
-Nodes (26): QuestionResolution, OpenCodianViewInteractionRuntimeWiring, QuestionInlineCardRuntimeState, QuestionInputState, SingleQuestionAction, SingleQuestionPromptOptions, QuestionResolutionCoordinator, QuestionResolutionCoordinatorHost (+18 more)
+Nodes (3): ConversationSessionSettings, ConversationSessionSettingsModal, ConversationSessionSettingsModalOptions
 
-### Community 74 - "SettingsMcpSection.ts"
+### Community 66 - "QuestionDisplayMode"
+Cohesion: 0.11
+Nodes (28): QuestionPrompt, QuestionDisplayMode, applyQuestionDockSelection(), getQuestionDockActiveInteractionState(), getQuestionDockDraftAnswers(), QuestionDockActiveInteractionState, sanitizeQuestionDockAnswer(), selectQuestionDockGroup() (+20 more)
+
+### Community 67 - "ContextFileCatalogIndex"
+Cohesion: 0.08
+Nodes (14): ContextFileCatalogBuildRunner, ContextFileCatalogBuildRunnerOptions, ContextFileCatalogEventBridge, ContextFileCatalogEventBridgeHost, ContextFileCatalogEventPort, compareContextFileEntries(), ContextFileCatalog, ContextFileCatalogIndex (+6 more)
+
+### Community 69 - "ModelPricingService.ts"
 Cohesion: 0.09
-Nodes (32): McpServerOwnership, McpServerOwnershipMap, OpencodeMcpEntryConfig, McpServerEditorModal, McpServerEditorModalOptions, McpServerStatusModal, McpServerStatusModalOptions, redactMcpSensitiveText() (+24 more)
+Nodes (27): addPricedTokens(), buildBackendReportedCostDetails(), buildUnavailableCostDetails(), CostAccumulator, EffectivePricing, hasConfiguredRate(), inferProviderId(), isRecord() (+19 more)
 
-### Community 75 - "TabContextState"
-Cohesion: 0.10
-Nodes (11): ContextBillingUsage, ContextBillingUsageUpdate, createEmptyTabContextState(), TabContextState, getDefaultContextWindow(), ContextUsageSummary, ContextModelInfo, ContextSessionInfo (+3 more)
+### Community 70 - "SettingsMcpSection.ts"
+Cohesion: 0.09
+Nodes (19): McpServerSnapshot, McpServerStatusModal, redactMcpSensitiveText(), redactMcpTechnicalDetails(), redactUnknownSecretValues(), SENSITIVE_INLINE_PATTERNS, statusLabel(), summarizeCommand() (+11 more)
 
-### Community 76 - "QuestionRequest"
+### Community 71 - "QuestionRequest"
 Cohesion: 0.08
 Nodes (14): QuestionRequest, logger, QuestionDockCoordinator, QuestionDockCoordinatorHost, QuestionDockPendingRequestCommitOptions, QuestionDockPort, QuestionDockPresentationSyncOptions, QuestionDockQueueDeferredRequest (+6 more)
 
-### Community 77 - "SettingsCapabilityLabSection"
-Cohesion: 0.11
-Nodes (6): formatJsonPreview(), getClaudeCodeAdapter(), isHookBackendEventChunk(), readMessagePreview(), SettingsCapabilityLabSection, truncate()
+### Community 72 - "SettingsTabbedRenderer"
+Cohesion: 0.09
+Nodes (18): logger, DeleteConfirmOptions, CapabilityDisclosureRowOptions, ClaudeCodeGroupOptions, getActiveSecondaryTabId(), getPrimaryTabDefinition(), LEGACY_PRIMARY_TAB_ID_MAP, LEGACY_SECONDARY_TAB_ID_MAP (+10 more)
 
-### Community 78 - "glassOctahedronDemoRefraction.ts"
+### Community 73 - "ModelSelectorSelection"
+Cohesion: 0.09
+Nodes (18): ResolvedModelSelection, logger, ModelCatalogSnapshot, ModelSelectionRuntime, ModelSelectionRuntimeHost, ModelUnavailableNoticeContent, buildModelSelectorDisplayState(), BuildModelSelectorDisplayStateOptions (+10 more)
+
+### Community 74 - "OpencodeConfigManager"
+Cohesion: 0.12
+Nodes (4): OpencodeConfigManager, OpencodeCompactionConfig, OpencodeLspConfig, OpencodeConfig
+
+### Community 75 - "obsidianContext.ts"
+Cohesion: 0.09
+Nodes (26): OpenCodeMessageContextOmoAssembler, OpenCodeMessageContextOmoAssembly, CompactionDividerMeta, MessageContextAttachment, PromptContextKind, PromptContextLineRange, FileContextKind, basename() (+18 more)
+
+### Community 76 - "ConversationSyncBridge"
+Cohesion: 0.09
+Nodes (11): SessionSyncEventUpdate, ConversationSessionSignalBackgroundTaskPort, ConversationSessionSignalRuntime, ConversationSessionSignalRuntimeHost, ConversationSessionTabResolutionPort, ConversationSessionTabResolver, ConversationSessionTabResolverHost, ConversationSyncBridge (+3 more)
+
+### Community 77 - "getConversationBackendSessionId"
+Cohesion: 0.09
+Nodes (19): getConversationBackendSessionId(), supportsOpenCodeActivationRefresh(), ConversationAuthoritativeReloadCoordinator, ConversationAuthoritativeReloadCoordinatorDependencies, ConversationAuthoritativeReloadHost, ConversationServerMessages, ConversationServerSyncContext, ConversationServerSyncMergeResult (+11 more)
+
+### Community 78 - "SettingsStyleInputPanelSection.ts"
+Cohesion: 0.07
+Nodes (30): getInputPanelGlassRefractionVariantId(), getInputPanelThemeIdForLiquidGlassAdapter(), getLiquidGlassAdapterIdForInputPanelTheme(), InputPanelGlassRefractionSvgFilterPresetId, InputPanelGlassRefractionVariantId, isValidChatAppearanceCustomCssDeclarations(), normalizeGlassRefractionInputPanelThemeId(), buildChatAppearanceCustomCss() (+22 more)
+
+### Community 79 - "ProviderIconService"
+Cohesion: 0.10
+Nodes (24): LobehubIconVariant, ProviderIconColorMode, ProviderIconLibrary, ProviderIconResolvedFormat, StaticLobehubIconVariant, LOBEHUB_ICON_VARIANT_OPTIONS, ProviderBuiltinIconPickerModal, ProviderBuiltinIconPickerModalOptions (+16 more)
+
+### Community 80 - "glassOctahedronDemoRefraction.ts"
 Cohesion: 0.07
 Nodes (48): buildClipPath(), CAMERA_FORWARD, CAMERA_RIGHT, CAMERA_TAN_HALF_FOV, CAMERA_UP, clamp(), computeBounds(), convexHull() (+40 more)
 
-### Community 79 - "providerIconAssetCache.ts"
-Cohesion: 0.11
-Nodes (47): parseBuiltinSource(), assetToDataUrl(), createResolvedAsset(), failedIconIds, getCachePathForEntry(), getEntryRuntimeKey(), getProviderCacheEntries(), inFlightIconLoads (+39 more)
+### Community 81 - "shared/index.ts"
+Cohesion: 0.08
+Nodes (41): extractRenderableToolMetadata(), getDebugTextPreview(), OpenCodeClassifiedToolPart, OpenCodeStreamingEventHandler, OpenCodeStreamingEventHandlerContext, OpenCodeStreamingPartUpdatedHandler, OpenCodeStreamingPartUpdatedHandlerContext, OpenCodeStreamingTextDeltaDebugState (+33 more)
 
-### Community 80 - "StorageService.ts"
-Cohesion: 0.07
-Nodes (31): buildConversationMetaFromStoredRecord(), cloneConversationListDiagnostics(), ConversationListDiagnosticEntry, ConversationListDiagnostics, ConversationMetadataAdapter, ConversationMetadataCache, ConversationMetaEnvelope, getUtf8ByteLength() (+23 more)
+### Community 82 - "InputPanelThemeRuntime.ts"
+Cohesion: 0.09
+Nodes (18): InputPanelActionButtonStyleId, InputPanelGlassRefractionSvgFilterSettings, InputPanelThemeId, LiquidGlassAdapterId, createComposerGlassFilterElement(), createSvgElement(), ensureComposerGlassSvgDefs(), ensureComposerGlassSvgRootElement() (+10 more)
 
-### Community 81 - "createTabActivationRuntimeBridgeHosts"
+### Community 83 - "createTabActivationRuntimeBridgeHosts"
 Cohesion: 0.07
 Nodes (11): createTabActivationBridgeHosts(), TabActivationBridgeHostFactoryHost, TabActivationBridgeHosts, ConversationRevertState, createTabActivationRuntimeBridgeHosts(), TabActivationRuntimeBridgeHosts, TabActivationRuntimeBridgeTabManager, TabActivationRuntimeHostAdapterHost (+3 more)
 
-### Community 82 - "OpenCodeQuestionPermissionHub.ts"
-Cohesion: 0.08
-Nodes (17): isTransientQuestionMutationError(), logger, normalizePermissionRequest(), normalizePermissionResponse(), normalizePermissionToolReference(), normalizeStringArray(), OpenCodePermissionSdk, OpenCodePermissionWireReply (+9 more)
-
-### Community 83 - "OpenCodeStreamingRuntimeCoordinator.ts"
+### Community 84 - "OpenCodeStreamingRuntimeCoordinator.ts"
 Cohesion: 0.08
 Nodes (12): OpenCodeStreamEvent, OpenCodeStreamEventOutcome, logger, OpenCodeStreamingLegacyStreamRequest, OpenCodeStreamingRuntimeAbortRequest, OpenCodeStreamingRuntimeContext, OpenCodeStreamingRuntimeCoordinator, OpenCodeStreamingRuntimeCoordinatorHost (+4 more)
 
-### Community 84 - "SettingsToolSection.ts"
-Cohesion: 0.09
-Nodes (20): isOpenCodeSettingsBackendActive(), resolveSettingsActiveBackend(), SettingsBackendStateLike, ToolDetailModal, ToolDetailModalOptions, ToolFileInfo, ToolFileSource, validateToolSource() (+12 more)
-
-### Community 85 - "OpenCodeSessionLifecycleCoordinator.ts"
-Cohesion: 0.09
-Nodes (7): logger, OpenCodeSessionLifecycleCoordinator, OpenCodeSessionLifecycleCoordinatorHost, OpenCodeSessionLifecycleSdk, OpenCodeSessionLifecycleSyncRuntime, SessionStatusUpdate, SessionTodoUpdate
-
-### Community 86 - "ContextFileCatalogIndex"
-Cohesion: 0.09
-Nodes (14): ContextFileCatalogBuildRunner, ContextFileCatalogBuildRunnerOptions, compareContextFileEntries(), ContextFileCatalog, ContextFileCatalogIndex, ContextFileEntry, ContextFileExtensionBucket, createContextFileEntry() (+6 more)
-
-### Community 87 - "SettingsSectionCoordinator"
-Cohesion: 0.09
-Nodes (9): BeginDisplayOptions, logger, SETTINGS_SCROLL_CONTAINER_SELECTOR, SETTINGS_SCROLL_CONTAINER_SELECTORS, SETTINGS_SCROLL_RESTORE_RETRY_DELAYS, SettingsQuickNavSection, SettingsSectionCoordinator, SettingsSectionCoordinatorOptions (+1 more)
-
-### Community 89 - "SessionDiffEntry"
+### Community 85 - "TabActivationRuntimeViewHostFactory.ts"
 Cohesion: 0.07
-Nodes (7): SessionDiffEntry, ConversationNoticeCoordinator, ConversationNoticeCoordinatorHost, NETWORK_ERROR_PATTERNS, readActiveBackendDisplayNameFromPlugin(), ModifiedFilesSidebarCoordinator, ModifiedFilesSidebar
+Nodes (29): emitPromptSuggestionSessionChange(), findPromptSuggestionScope(), createTabActivationRuntimeViewHostFactoryHost(), TabActivationBackgroundTaskPort, TabActivationConversationStatePort, TabActivationConversationSyncPort, TabActivationQuestionTodoPort, TabActivationRuntimeHostProviderHost (+21 more)
 
-### Community 91 - "StreamChunk"
-Cohesion: 0.09
-Nodes (14): AcpNotification, AcpTransportOwner, translateAcpMessageChunk(), translateAcpToolCall(), translateAcpToolCallUpdate(), AgentChatSendRequest, CodexStreamNormalizer, CodexStreamNormalizerOptions (+6 more)
-
-### Community 92 - "CodexMcpServerDetailModal"
-Cohesion: 0.09
-Nodes (17): AppServerMcpResource, AppServerMcpResourceReadResult, AppServerMcpServerStatus, CodexMcpServerDetailModal, CodexMcpServerDetailModalHost, McpModalState, ExpandedState, handleViewResource() (+9 more)
-
-### Community 93 - "obsidianContext.ts"
+### Community 86 - "ModelConfigService.ts"
 Cohesion: 0.10
-Nodes (21): OpenCodeAgentPart, OpenCodeAgentSourceSpan, OpenCodeFilePart, OpenCodeMessageContextOmoAssembler, OpenCodeMessageContextOmoAssembly, OpenCodeTextPart, CompactionDividerMeta, MessageContextAttachment (+13 more)
+Nodes (37): compareModelCatalogs(), createUnavailableModelCatalogComparison(), difference(), ModelCatalogComparison, sortedSet(), ProviderDirectoryStatus, assembleModelCatalog(), assembleServerModelCatalog() (+29 more)
 
-### Community 95 - "ModelSelectorSelection"
+### Community 87 - "OpenCodeQuestionPermissionHub.ts"
+Cohesion: 0.08
+Nodes (17): isTransientQuestionMutationError(), logger, normalizePermissionRequest(), normalizePermissionResponse(), normalizePermissionToolReference(), normalizeStringArray(), OpenCodePermissionSdk, OpenCodePermissionWireReply (+9 more)
+
+### Community 90 - "main.ts"
+Cohesion: 0.08
+Nodes (30): buildClaudeCodeElicitationContent(), buildClaudeCodeElicitationQuestionRequest(), coerceElicitationScalarAnswer(), ElicitationContent, ElicitationScalarContent, ElicitationSchemaProperty, getHeader(), getSchemaProperties() (+22 more)
+
+### Community 91 - "slashCommandCatalog.ts"
 Cohesion: 0.10
-Nodes (14): ModelCatalogSnapshot, ModelSelectionRuntime, ModelSelectionRuntimeHost, buildModelSelectorDisplayState(), BuildModelSelectorDisplayStateOptions, ModelSelectorAvailableModelInfo, ModelSelectorDisplayResolution, ModelSelectorDisplayState (+6 more)
+Nodes (41): buildCommandScopedAgent(), cloneConfigObject(), cloneConfigValue(), getCommandScopedAgentId(), getCommandScopedAgentMetadata(), isCommandScopedAgentForCommand(), isCommandScopedAgentId(), mergeConfigObjects() (+33 more)
 
-### Community 96 - "trailingAssistantPatchTypes.ts"
+### Community 92 - "ModelPickerModal.ts"
+Cohesion: 0.10
+Nodes (20): SlashCommandCatalogEntry, filterModelPickerGroups(), ModelPickerGroup, ModelPickerOption, ModelPickerModal, ModelPickerModalOptions, commitHistoryValue(), enhanceSearchInput() (+12 more)
+
+### Community 94 - "nikdelvin.ts"
+Cohesion: 0.10
+Nodes (43): applyInstanceMarker(), clamp(), cleanupInstanceArtifacts(), clearFilterDefinition(), clearFilterLayerDecorations(), createBackgroundImageElement(), createLayerElement(), createState() (+35 more)
+
+### Community 96 - "ConversationNoticeCoordinator.ts"
+Cohesion: 0.08
+Nodes (9): OpenCodianViewSurfaceRuntimeWiring, ConversationNoticeCoordinator, ConversationNoticeCoordinatorHost, NETWORK_ERROR_PATTERNS, readActiveBackendDisplayNameFromPlugin(), PersistentAssistantNoticeMessageOptions, PersistentAssistantNoticeService, PersistentAssistantNoticeServiceHost (+1 more)
+
+### Community 97 - "trailingAssistantPatchTypes.ts"
 Cohesion: 0.09
 Nodes (41): buildTrailingAssistantPatchCompletionDebugPlan(), buildTrailingAssistantPatchCompletionDebugPlanFromTailOutcomePlanningContext(), buildTrailingAssistantPatchCompletionDebugPlanningContext(), buildTrailingAssistantPatchCompletionDebugPlanningContextInputs(), buildTrailingAssistantPatchCompletionDebugPlanningContextShape(), buildTrailingAssistantPatchCompletionDebugPlanningContextSourceContract(), buildTrailingAssistantPatchCompletionDebugSourceContractFromTailOutcomePlanningContext(), buildTrailingAssistantPatchCompletionDebugSummaryPlan() (+33 more)
 
-### Community 97 - "SettingsClaudeCodeSection.ts"
-Cohesion: 0.07
-Nodes (35): ClaudeCodeAdapterOptions, ClaudeCodeDiagnosticPromptRequest, ClaudeCodeOptionsBuilderInput, ClaudeCodeProcessMissingReason, ClaudeCodeProcessResolution, ClaudeCodeProcessResolverEnv, ClaudeCodeProcessResolverOptions, expandHomeDirectory() (+27 more)
-
-### Community 98 - "OpenCodeSdkCapabilityDiscoveryCoordinator.ts"
+### Community 98 - "SettingsAgentsSection"
 Cohesion: 0.12
-Nodes (22): classifyProbeFailure(), GlobalHealthEvidence, hasMinimumServer117Hint(), isFunction(), isRecord(), isVersionAtLeast117(), logger, OpenCodeSdkCapabilityDiscoveryCoordinator (+14 more)
+Nodes (6): SurfaceAgent, SurfaceAgentFile, OpencodeAgentMode, AgentCatalogRenderContext, SettingsAgentsSection, SettingsProjectAgentEditorRenderOptions
 
-### Community 100 - "TabActivationRuntimeViewHostFactory.ts"
+### Community 99 - "SessionActivityStatus"
+Cohesion: 0.10
+Nodes (4): SessionActivityStatus, SessionTodoCoordinator, SessionTodoCoordinatorHost, VALID_CLAUDE_TASK_STATUSES
+
+### Community 100 - "ConversationTransitionBridge.ts"
 Cohesion: 0.08
-Nodes (28): emitPromptSuggestionSessionChange(), findPromptSuggestionScope(), createTabActivationRuntimeViewHostFactoryHost(), TabActivationBackgroundTaskPort, TabActivationConversationStatePort, TabActivationConversationSyncPort, TabActivationQuestionTodoPort, TabActivationRuntimeHostProviderHost (+20 more)
+Nodes (11): ConversationHydrationRenderBridge, ConversationHydrationRenderBridgeHost, ConversationHydrationRenderContext, ConversationHydrationRenderPort, ConversationTransitionBridge, ConversationTransitionBridgeHost, ConversationTransitionSnapshot, LoadedConversationTransitionContext (+3 more)
 
 ### Community 101 - "QuestionDockResolutionActionFacade.ts"
-Cohesion: 0.11
-Nodes (27): QuestionPrompt, applyQuestionDockSelection(), getQuestionDockActiveInteractionState(), getQuestionDockDraftAnswers(), QuestionDockInteractionRuntimeState, sanitizeQuestionDockAnswer(), selectQuestionDockGroup(), selectQuestionDockQuestion() (+19 more)
-
-### Community 102 - "QuestionResolutionExecutionFacade.ts"
 Cohesion: 0.08
-Nodes (21): QuestionInlineCardAction, logger, QuestionInlineCardActionPort, QuestionInlineResolutionActionFacade, QuestionInlineResolutionActionFacadeHost, createQuestionRejectExecutionAction(), createQuestionReplyExecutionAction(), logger (+13 more)
+Nodes (22): QuestionInlineCardAction, QuestionDockActiveRequestPort, QuestionDockResolutionAction, QuestionDockResolutionActionFacade, QuestionDockResolutionActionFacadeHost, QuestionDockResolutionActionRuntimeState, logger, QuestionInlineCardActionPort (+14 more)
 
-### Community 103 - "ModelConfigModal"
+### Community 102 - "ModelConfigModal"
 Cohesion: 0.14
 Nodes (5): ModelConfigModal, resolveModelConfigJsonDraftValue(), createEmptyProvider(), PROVIDER_INTERFACE_FORMAT_OPTIONS, ProviderPreset
 
@@ -742,205 +756,193 @@ Nodes (5): ModelConfigModal, resolveModelConfigJsonDraftValue(), createEmptyProv
 Cohesion: 0.12
 Nodes (29): buildFragmentWithLinks(), createWikilinkElement(), createWikilinkPattern(), extractLinkTarget(), fileExistsInVault(), findWikilinks(), processFileLinks(), ProcessFileLinksOptions (+21 more)
 
-### Community 105 - "SettingsClaudeResourcesSection.ts"
-Cohesion: 0.11
-Nodes (27): ClaudeProjectAgentInfo, createClaudeProjectAgent(), discoverClaudeGlobalAgents(), discoverClaudeProjectAgents(), extractDescription(), readClaudeAgentContent(), scanAgents(), ClaudeProjectCommandInfo (+19 more)
+### Community 105 - "AgentBackendRouting.ts"
+Cohesion: 0.10
+Nodes (36): archiveBackendSession(), extractSessionDetailFields(), extractTimestamp(), extractTitleSummary(), forkBackendSession(), getActiveSessionBackendService(), getActiveSessionHistoryService(), getBackendSessionDetail() (+28 more)
 
-### Community 106 - "AssistantFooterPayload.ts"
+### Community 106 - "MessageSendPreparationService.ts"
+Cohesion: 0.09
+Nodes (33): InvocationPromptPart, SurfaceInvocationIntent, BuiltPromptSendPayload, PromptSyntheticTextPartInput, SendPipelineStreamElements, armBackgroundTaskIndicatorForUserMessage(), beginTabContextUsageStream(), buildOptimisticUserMessage() (+25 more)
+
+### Community 107 - "ConversationTabRuntimeCoordinator.ts"
+Cohesion: 0.09
+Nodes (24): TabRuntimeState, closeTabAndRecover(), ConversationTabRuntimeCoordinatorDependencies, ConversationTabRuntimeCoordinatorHostSource, ConversationTabRuntimeCoordinatorPortDependencies, ConversationTabRuntimeState, createConversationTabRuntimeCoordinator(), createConversationTabRuntimeCoordinatorHost() (+16 more)
+
+### Community 108 - "AssistantFooterPayload.ts"
 Cohesion: 0.09
 Nodes (22): AssistantCopyContentSource, extractAssistantStructuredTextCopyContent(), resolveAssistantCopyContent(), AssistantErrorFooterPayloadOptions, AssistantFooterPayload, AssistantNoticeFooterPayloadOptions, AssistantPseudoStreamFooterPayloadOptions, buildErrorAssistantFooterPayload() (+14 more)
 
-### Community 107 - "trailingAssistantPatchExecution.ts"
+### Community 109 - "streaming/index.ts"
+Cohesion: 0.11
+Nodes (31): formatMcpSummaryField(), getFirstScalarMcpFallback(), getMcpSummaryFromFields(), getMcpToolSummary(), getPathTail(), MCP_ARGUMENT_FIELDS, MCP_GENERIC_SUMMARY_FIELDS, MCP_PATH_LIKE_FIELDS (+23 more)
+
+### Community 110 - "trailingAssistantPatchExecution.ts"
 Cohesion: 0.07
 Nodes (39): applyTrailingAssistantPatchTailState(), buildTrailingAssistantPatchExecutionPlan(), buildTrailingAssistantPatchExecutionPlanFromExecutionTailPlanningContext(), buildTrailingAssistantPatchExecutionTailInputs(), buildTrailingAssistantPatchExecutionTailPlanningContext(), buildTrailingAssistantPatchExecutionTailPlanningContextFromInputs(), buildTrailingAssistantPatchExecutionTailPlanParts(), buildTrailingAssistantPatchExecutionTailPlanPartsFromExecutionTailPlanningContext() (+31 more)
 
-### Community 108 - "SettingsCommandsSection.ts"
-Cohesion: 0.11
-Nodes (12): MergeSlashCommandCatalogOptions, SlashCommandCatalogEntry, OpencodeCommandConfigRecord, SYNTHETIC_BUILTIN_COMMAND_IDS, buildNextHiddenSlashCommands(), CommandCatalogRenderContext, logger, SettingsCommandsSection (+4 more)
+### Community 111 - "StreamChunk"
+Cohesion: 0.10
+Nodes (13): AcpNotification, AcpTransportOwner, translateAcpMessageChunk(), translateAcpToolCall(), translateAcpToolCallUpdate(), AgentChatSendRequest, CodexStreamNormalizer, CodexStreamNormalizerOptions (+5 more)
 
-### Community 109 - "OpenCodeStreamingFinalizationCoordinator.ts"
+### Community 112 - "OpenCodeMessageNormalizationMapper.ts"
+Cohesion: 0.10
+Nodes (19): OpenCodeCatalogToolIdentityContext, OpenCodeAgentPart, OpenCodeAgentSourceSpan, OpenCodeChatRole, OpenCodeFilePart, OpenCodeMessagePart, OpenCodeTextPart, extractRenderableToolMetadata() (+11 more)
+
+### Community 113 - "OpenCodeStreamingFinalizationCoordinator.ts"
 Cohesion: 0.11
 Nodes (14): OpenCodeStreamEventState, extractStructuredErrorMessage(), getDebugTextPreview(), logAssistantFinalizationDebug(), logger, OpenCodeStreamingAssistantSummary, OpenCodeStreamingAssistantTailLookupOptions, OpenCodeStreamingFinalizationCoordinator (+6 more)
 
-### Community 110 - "ChatSelectionControlsCoordinator.ts"
-Cohesion: 0.10
-Nodes (28): ClaudeCodePermissionMode, ChatSelectionControlsCoordinatorHost, CLAUDE_CODE_PERMISSION_MODES, LiveOpenCodianPlugin, normalizeClaudeCodePermissionMode(), readActiveBackendFromPlugin(), readClaudeCodePermissionModeFromPlugin(), readCodexSandboxModeFromPlugin() (+20 more)
+### Community 114 - "ConversationLoadRecoveryCoordinator.ts"
+Cohesion: 0.09
+Nodes (20): cloneMessagesBeforeForkTarget(), ConversationHydrationOutcomePort, ConversationLoadRuntimeBridge, ConversationLoadRuntimeOptions, ConversationLoadRuntimePort, ResolveConversationOptions, ConversationTransitionPort, ConversationLoadRecoveryAssemblyDependencies (+12 more)
 
-### Community 111 - "liquidDiamondDemo.ts"
+### Community 115 - "liquidDiamondDemo.ts"
 Cohesion: 0.11
 Nodes (38): applyDisplacementSnapshot(), applyHostTransform(), buildBackdropFilterValue(), buildFallbackBackdropFilterValue(), clamp(), createFaceSvgElement(), createStageLayerElement(), createState() (+30 more)
 
-### Community 112 - "ConversationTabRuntimeCoordinator.ts"
-Cohesion: 0.09
-Nodes (23): TabRuntimeState, closeTabAndRecover(), ConversationTabRuntimeCoordinatorDependencies, ConversationTabRuntimeCoordinatorHostSource, ConversationTabRuntimeCoordinatorPortDependencies, ConversationTabRuntimeState, createConversationTabRuntimeCoordinator(), createConversationTabRuntimeCoordinatorHost() (+15 more)
+### Community 116 - "SettingsSectionCoordinator"
+Cohesion: 0.11
+Nodes (3): SETTINGS_SCROLL_CONTAINER_SELECTORS, SettingsSectionCoordinator, SettingsSectionHeadingOptions
 
-### Community 113 - "BackgroundTaskNoticeStateService.ts"
-Cohesion: 0.09
-Nodes (13): BackgroundTaskCompletionNoticeMessageOptions, BackgroundTaskCompletionNoticeRuntime, BackgroundTaskCompletionNoticeService, BackgroundTaskCompletionNoticeServiceHost, BackgroundTaskCompletionEvent, BackgroundTaskCompletionNoticeSegment, BackgroundTaskNoticeLaunchInfo, BackgroundTaskNoticeMessageOptions (+5 more)
-
-### Community 114 - "ClaudeCodePermissionBridge.ts"
-Cohesion: 0.12
-Nodes (31): buildAskUserQuestionInput(), ClaudeCodePermissionBridge, ClaudeCodePermissionBridgeHost, ClaudeCodePermissionBridgeOptions, ClaudeCodePermissionResult, ClaudeCodePermissionUpdate, cloneInput(), createAllowResult() (+23 more)
-
-### Community 115 - "OpencodeModelConfigSubset"
-Cohesion: 0.15
-Nodes (17): compareModelCatalogs(), createUnavailableModelCatalogComparison(), difference(), ModelCatalogComparison, sortedSet(), ModelCatalogStateService, ProviderDirectoryStatus, ProviderDirectorySnapshot (+9 more)
-
-### Community 116 - "builtinIconRegistry.ts"
+### Community 117 - "AgentMentionComposerController.ts"
 Cohesion: 0.10
-Nodes (35): buildLobehubDefinitions(), buildOpencodeDefinitions(), BUILTIN_ICON_BY_SOURCE, BUILTIN_ICON_DEFINITIONS, BuiltinIconDefinition, computeMatchScore(), createDefinition(), findBuiltinIcon() (+27 more)
+Nodes (16): AgentMentionIntent, AgentMentionComposerController, AgentMentionComposerControllerHost, AgentMentionMode, AgentMentionPillSpan, AgentMentionQuery, filterAgentMentionCandidates(), findSingleTextEdit() (+8 more)
 
-### Community 117 - "TitleGenerationService.ts"
+### Community 118 - "chat.ts"
+Cohesion: 0.08
+Nodes (35): classifyReminderType(), detectOmoMessageMeta(), detectSystemReminder(), detectUserInjection(), getFirstMeaningfulLine(), normalizeMultilineText(), parseCompletedBackgroundTasks(), parseReminderTasks() (+27 more)
+
+### Community 121 - "TitleGenerationService.ts"
 Cohesion: 0.10
 Nodes (12): readBackendSessionTitle(), buildTitleGenerationPrompt(), buildTitleGenerationSystemPrompt(), normalizeTitleGenerationLocale(), TITLE_GENERATION_SYSTEM_PROMPT, TITLE_LANGUAGE_LABELS, TitleGenerationLocale, TITLE_GENERATION_OUTPUT_FORMAT (+4 more)
 
-### Community 118 - "AgentMentionComposerController.ts"
+### Community 122 - "StorageService"
+Cohesion: 0.09
+Nodes (4): cloneConversationListDiagnostics(), ConversationListDiagnostics, StorageService, ModelPricingCatalog
+
+### Community 123 - "ContextUsageSnapshot"
+Cohesion: 0.15
+Nodes (6): ContextUsageSnapshot, createEmptyTabContextState(), ActiveTabContextUsageConversation, ActiveTabContextUsageCoordinator, ActiveTabContextUsageCoordinatorHost, logger
+
+### Community 124 - "SettingsToolSection.ts"
 Cohesion: 0.11
-Nodes (15): AgentMentionComposerController, AgentMentionComposerControllerHost, AgentMentionMode, AgentMentionPillSpan, AgentMentionQuery, filterAgentMentionCandidates(), findSingleTextEdit(), getEmptyAgentMentionMenuStatus() (+7 more)
+Nodes (18): isOpenCodeSettingsBackendActive(), resolveSettingsActiveBackend(), SettingsBackendStateLike, ToolDetailModalOptions, ToolFileInfo, ToolFileSource, VaultAdapterLike, SettingsToolFileService (+10 more)
 
-### Community 119 - "streaming/index.ts"
-Cohesion: 0.12
-Nodes (30): formatMcpSummaryField(), getFirstScalarMcpFallback(), getMcpSummaryFromFields(), getMcpToolSummary(), getPathTail(), MCP_ARGUMENT_FIELDS, MCP_GENERIC_SUMMARY_FIELDS, MCP_PATH_LIKE_FIELDS (+22 more)
-
-### Community 120 - "OpenCodeEventSubscriptionCoordinator"
+### Community 125 - "SettingsModelCatalogPresenter.ts"
 Cohesion: 0.13
-Nodes (5): deepCloneJsonLike(), isPlainRecord(), OpenCodeEventSubscriptionCoordinator, OpenCodeEventSubscriptionCoordinatorHost, SdkEventEnvelope
+Nodes (29): ModelCatalogState, ModelCatalogStateMode, ModelCatalogProvider, describeModelAvailabilitySummary(), describeProviderAvailabilityProbe(), describeProviderDirectorySummary(), describeProviderModels(), getCatalogPlaceholderReason() (+21 more)
 
-### Community 121 - "OpenCodeSdkExperimentalActionCoordinator.ts"
-Cohesion: 0.12
-Nodes (15): ACTION_CAPABILITY_IDS, cleanupPty(), execute(), isRecord(), matchesConfirmedTarget(), OpenCodeExperimentalAction, OpenCodeExperimentalActionCleanup, OpenCodeExperimentalActionConfirmation (+7 more)
+### Community 127 - "LocalSidecarLauncher"
+Cohesion: 0.11
+Nodes (7): LOCAL_SERVER_SANITIZED_ENV_KEYS, LocalServerLaunch, LocalServerLaunchSnapshot, LocalSidecarLauncher, LocalSidecarLaunchRuntimeOptions, LocalSidecarLaunchRuntimeResult, logger
 
-### Community 122 - "CodexAdapter.ts"
-Cohesion: 0.06
-Nodes (22): AgentForkCapability, CapabilityChangeHandler, CODEX_CAPABILITIES, CodexApprovalKind, CodexAppServerClientFactory, CodexFactory, CodexSessionEntry, isRecordLike() (+14 more)
-
-### Community 123 - "LocalProcessProbe"
+### Community 128 - "LocalProcessProbe"
 Cohesion: 0.11
 Nodes (3): LocalProcessProbe, LocalSidecarProcessInspector, logger
 
-### Community 125 - "SettingsProjectAgentEditor.ts"
+### Community 129 - "ChatSelectionControlsCoordinator.ts"
+Cohesion: 0.11
+Nodes (24): ClaudeCodePermissionMode, ChatSelectionControlsCoordinatorHost, CLAUDE_CODE_PERMISSION_MODES, LiveOpenCodianPlugin, normalizeClaudeCodePermissionMode(), readClaudeCodePermissionModeFromPlugin(), readCodexSandboxModeFromPlugin(), readOpenCodianPlugin() (+16 more)
+
+### Community 131 - "SettingsProjectAgentEditor.ts"
 Cohesion: 0.16
 Nodes (29): isRecord(), OpencodeAgentConfig, buildObjectReplacementPatch(), buildProjectAgentOptionsPatch(), buildProjectAgentPermissionPatch(), buildProjectAgentToolsPatch(), buildTaskAllowlistPermission(), cloneJsonValue() (+21 more)
 
-### Community 126 - "OpenCodeMessageNormalizationMapper.ts"
-Cohesion: 0.12
-Nodes (15): OpenCodeCatalogToolIdentityContext, OpenCodeChatRole, OpenCodeMessagePart, extractRenderableToolMetadata(), OpenCodeMessageNormalizationMapper, OpenCodeMessageRecord, OpenCodeToolContentAssembler, OpenCodeToolContentAssembly (+7 more)
-
-### Community 127 - "MessageSendPreparationService.ts"
-Cohesion: 0.11
-Nodes (31): PromptSyntheticTextPartInput, SendPipelineStreamElements, armBackgroundTaskIndicatorForUserMessage(), beginTabContextUsageStream(), buildOptimisticUserMessage(), buildStructuredPromptSendPayload(), clearPendingEditedFiles(), CommandComposerSubmission (+23 more)
-
-### Community 128 - ".constructor"
-Cohesion: 0.09
-Nodes (4): isSdkCapabilitySupportedByLookup(), ServerReferenceContextAvailability, ServerReferenceContextCapabilityHost, ServerReferenceContextService
-
-### Community 129 - "OpenCodeSyncEventRuntimeCoordinator"
+### Community 132 - "OpenCodeSyncEventRuntimeCoordinator"
 Cohesion: 0.13
 Nodes (3): OpenCodeSyncEventRuntimeCoordinator, OpenCodeSyncEventRuntimeCoordinatorHost, resolveSessionId()
 
-### Community 130 - "LobehubIconVariant"
-Cohesion: 0.14
-Nodes (21): LobehubIconVariant, ProviderIconColorMode, ProviderIconEntry, ProviderIconResolvedFormat, StaticLobehubIconVariant, LOBEHUB_ICON_VARIANT_OPTIONS, ProviderBuiltinIconPickerModal, ProviderBuiltinIconPickerModalOptions (+13 more)
+### Community 133 - "AgentBackendKind"
+Cohesion: 0.12
+Nodes (11): resolveCodexBinaryPath(), wireHiddenAdapters(), WireHiddenAdaptersOptions, AgentServiceInfo, ActiveChangeHandler, AgentServiceRegistry, CapabilityChangeHandler, logger (+3 more)
 
-### Community 132 - "chat.ts"
-Cohesion: 0.10
-Nodes (31): classifyReminderType(), detectOmoMessageMeta(), detectSystemReminder(), detectUserInjection(), getFirstMeaningfulLine(), normalizeMultilineText(), parseCompletedBackgroundTasks(), parseReminderTasks() (+23 more)
+### Community 134 - "settingsLoadNormalization.ts"
+Cohesion: 0.12
+Nodes (32): IMPLEMENTED_AGENT_BACKENDS, getDefaultInputPanelGlassRefractionSettings(), getDefaultInputPanelLiquidGlassSettings(), normalizeBackendSettings(), normalizeBelowHeaderTabBarLayout(), normalizeCapabilityLabSelectedBackend(), normalizeChatFontSizePx(), normalizeCodexBackendSettings() (+24 more)
 
-### Community 133 - "RetainedSelectionHighlightService"
+### Community 135 - "InputPanelAppearanceCoordinator"
+Cohesion: 0.11
+Nodes (9): getInputPanelGlassRefractionCssVariables(), InputPanelAppearanceCoordinator, InputPanelAppearanceCoordinatorHost, LiquidGlassAncestorDiagnostic, LiquidGlassBackdropOverlapDiagnostics, LiquidGlassBackdropPointSample, LiquidGlassDiagnosticElementDescriptor, LiquidGlassOverlapElementDiagnostic (+1 more)
+
+### Community 136 - "RetainedSelectionHighlightService"
 Cohesion: 0.12
 Nodes (11): logger, RetainedSelectionHighlight, RetainedSelectionHighlightService, RetainedSelectionHighlightServiceHost, ensureSelectionHighlightField(), hideHighlightEffect, hideSelectionHighlight(), installedEditors (+3 more)
 
-### Community 135 - "StreamController"
-Cohesion: 0.18
-Nodes (3): StreamController, ContentBlock, StreamEventCallbacks
+### Community 137 - "CodexAdapter.ts"
+Cohesion: 0.12
+Nodes (18): CODEX_CAPABILITIES, CodexApprovalKind, CodexAppServerClientFactory, CodexFactory, CodexModelSummary, CodexSessionEntry, logger, AppServerReviewResult (+10 more)
 
-### Community 136 - "SettingsModelCatalogPresenter.ts"
-Cohesion: 0.14
-Nodes (28): ModelCatalogStateMode, ModelCatalogProvider, describeModelAvailabilitySummary(), describeProviderAvailabilityProbe(), describeProviderDirectorySummary(), describeProviderModels(), getCatalogPlaceholderReason(), getProviderAvailabilityProbeBadge() (+20 more)
+### Community 138 - "modelConfigShared.ts"
+Cohesion: 0.13
+Nodes (25): ModelServerCatalogAssemblyResult, collectCurrentEnabledProviderIds(), getEnabledProviderIds(), InheritedModelConfigResolution, InheritedModelConfigSource, mergeProviderAvailabilityConfig(), resolveInheritedConfig(), resolveInheritedModelConfigResolution() (+17 more)
 
-### Community 137 - "ContextUsageSnapshot"
-Cohesion: 0.14
-Nodes (7): ResolvedModelSelection, ContextUsageSnapshot, ActiveTabContextUsageConversation, ActiveTabContextUsageCoordinator, ActiveTabContextUsageCoordinatorHost, logger, getPerformanceTimestampMs()
+### Community 140 - "ComposerInputShellCoordinatorHost"
+Cohesion: 0.08
+Nodes (3): ComposerInputShellCoordinatorHost, ComposerInputMode, ComposerInputSubmission
 
-### Community 138 - "PromptContextItem"
-Cohesion: 0.14
-Nodes (10): PromptContextItem, PromptContextKind, ComposerContextActionAttachmentBuilderPort, ComposerContextActionService, ComposerContextActionServiceHost, ContextAttachmentBuilder, ContextAttachmentBuilderOptions, FileContextKind (+2 more)
-
-### Community 139 - "ProviderIconService"
-Cohesion: 0.11
-Nodes (7): ProviderIconLibrary, SettingsModelIconCacheManager, clearProviderIconCache(), ProviderIconService, ProviderIconCacheSummary, ResolveIconUrlOptions, SelectBuiltinIconRequest
-
-### Community 141 - "BackgroundTaskIndicatorCoordinator.ts"
-Cohesion: 0.09
-Nodes (13): BackgroundTaskIndicatorCompletionNoticePort, BackgroundTaskIndicatorCoordinatorDependencies, BackgroundTaskIndicatorCoordinatorHost, BackgroundTaskIndicatorInlinePanelPort, BackgroundTaskIndicatorLiveSignalPort, BackgroundTaskIndicatorTabRuntimePort, BackgroundTaskIndicatorTimelinePort, TabRuntimeStateBridge (+5 more)
-
-### Community 143 - "ToolCallRenderer"
+### Community 141 - "ToolCallRenderer"
 Cohesion: 0.15
 Nodes (3): ToolCallRenderer, ToolCallInfo, ToolCallStatus
 
-### Community 144 - "ConversationSessionSettingsCoordinator.ts"
-Cohesion: 0.14
-Nodes (14): CodexModelSummary, AppServerReviewResult, AppServerReviewTarget, AppServerThreadGoal, ConversationSessionSettings, CodexReasoningEffort, CodexSandboxMode, CodexWebSearchMode (+6 more)
+### Community 142 - "OpenCodeSessionControlOrchestrator.ts"
+Cohesion: 0.13
+Nodes (21): logger, OpenCodeContextPartSerializer, OpenCodeContextPartSerializerHost, PromptRequestPart, AvailableModelDirectory, expandSessionCommandTemplate(), logger, normalizeSessionCommandExternalContextPaths() (+13 more)
 
-### Community 145 - "SettingsMcpSection"
-Cohesion: 0.16
-Nodes (5): McpServerSnapshot, countByStatus(), SettingsMcpSection, statusBadgeClass(), statusLabel()
-
-### Community 147 - "SettingsAcpSection"
+### Community 144 - "SettingsAcpSection"
 Cohesion: 0.13
 Nodes (9): AcpAgentConfig, ACP_CUSTOM_ACTION, ACP_PRESETS, AcpActionConfig, AcpPresetActionConfig, AcpStackedFieldOptions, SettingsAcpSection, SettingsAcpSectionOptions (+1 more)
 
-### Community 148 - "QuestionDisplayMode"
-Cohesion: 0.14
-Nodes (11): QuestionDisplayMode, QuestionDockActiveInteractionState, QuestionDockRenderPayload, QuestionDockPort, QuestionDockSlotCoordinatorHost, QuestionDock, QuestionDockCallbacks, QuestionDockHeaderOptions (+3 more)
-
-### Community 149 - "AssistantShellViewHostAdapter"
+### Community 145 - "AssistantShellViewHostAdapter"
 Cohesion: 0.11
 Nodes (5): AssistantShellViewHostAdapter, AssistantShellViewHostAdapterHost, AssistantShellViewHostAdapterMcpCallbacks, renderAssistantStructuredContent(), buildQuestionResolutionCardRenderPlan()
 
-### Community 150 - "ChatAgentSelectionCoordinator"
+### Community 146 - "ChatAgentSelectionCoordinator"
 Cohesion: 0.16
 Nodes (3): AgentSelectionCandidate, ChatAgentSelectionCoordinator, ChatAgentSelectionCoordinatorHost
 
-### Community 151 - "ConversationHistoryActionsCoordinator"
-Cohesion: 0.14
-Nodes (3): ConversationHistoryActionsCoordinator, ConversationHistoryActionsHost, logger
-
-### Community 152 - "createConversationRenderHost"
-Cohesion: 0.12
-Nodes (3): ConversationRenderHostDependencies, createConversationRenderHost(), TrailingAssistantPatchExecutionPlan
-
-### Community 153 - "EffortSelector"
+### Community 147 - "EffortSelector"
 Cohesion: 0.13
 Nodes (10): AnchoredOverlayLayout, AnchoredOverlayLayoutController, AnchoredOverlayLayoutInput, AnchoredOverlayLayoutOptions, calculateAnchoredOverlayLayout(), OverlayHorizontalAlignment, roundGeometry(), EffortSelector (+2 more)
 
-### Community 154 - "SettingsSecuritySection.ts"
-Cohesion: 0.10
-Nodes (12): AppWithPluginRegistry, checkHealth(), logger, OpencodeConfigModal, start(), stop(), CONFIG_STATUS_CLASSES, ConfigStatusClass (+4 more)
+### Community 148 - "SettingsTabbedRenderer.ts"
+Cohesion: 0.12
+Nodes (26): AgentSwitcherChipsOptions, renderAgentSwitcherChips(), AGENT_ICON_BY_BACKEND, AgentSwitcherIconConfig, AgentSwitcherOptions, isUnrelatedSettingsModalOpen(), LOBEHUB_ICON_MANIFEST_BY_ID, pinAgentSwitcherToSettingsEdge() (+18 more)
 
-### Community 155 - "OpenCodeCapabilitySettingsMigration.ts"
-Cohesion: 0.11
-Nodes (27): coercePreferenceString(), coerceStringBoolean(), containsSecretValue(), EMPTY_GATES, EMPTY_PREFERENCES, isObject(), looksLikeSecretKey(), looksLikeSecretValue() (+19 more)
+### Community 150 - "SlashCommandMenuItem"
+Cohesion: 0.17
+Nodes (6): SlashCommandMenuItem, replaceSlashTokenAtCursor(), SlashCommandMenuQuery, SlashCommandMenuCoordinator, SlashCommandMenuCoordinatorHost, SlashCommandMenuStatus
 
-### Community 156 - "SessionSyncEventUpdate"
-Cohesion: 0.14
-Nodes (7): SessionSyncEventUpdate, ConversationSessionSignalBackgroundTaskPort, ConversationSessionSignalRuntime, ConversationSessionSignalRuntimeHost, ConversationSessionTabResolutionPort, ConversationSessionTabResolver, ConversationSessionTabResolverHost
+### Community 151 - "liquidDiamondDemoWebgl.ts"
+Cohesion: 0.09
+Nodes (29): BASE_PYRAMID_VERTICES, CAMERA, clamp(), compileGlShader(), createGlProgram(), createLiquidDiamondDemoWebGlRenderer(), createPlane(), cross3() (+21 more)
 
-### Community 157 - "providerIconCustomSources.ts"
+### Community 153 - "ConversationTabLifecycleRecoveryHost"
+Cohesion: 0.13
+Nodes (4): ConversationTabLifecycleRecoveryCoordinator, ConversationTabLifecycleRecoveryHost, ConversationTabLifecycleRecoveryPort, ConversationTabLifecycleRecoveryTabManager
+
+### Community 154 - "providerIconAssetCache.ts"
+Cohesion: 0.17
+Nodes (29): parseBuiltinSource(), assetToDataUrl(), createResolvedAsset(), failedIconIds, getCachePathForEntry(), getEntryRuntimeKey(), getProviderCacheEntries(), inFlightIconLoads (+21 more)
+
+### Community 155 - "providerIconCustomSources.ts"
 Cohesion: 0.14
 Nodes (29): ALLOWED_ICON_MIME_TYPES, assertByteLength(), buildCustomCacheFileName(), createCachedCustomEntry(), CreateCachedCustomEntryOptions, createEntryId(), detectIconMimeType(), getMimeTypeFromHeader() (+21 more)
 
-### Community 158 - "CodexAppServerStreamMapper.ts"
+### Community 157 - "CodexAppServerStreamMapper.ts"
 Cohesion: 0.12
 Nodes (22): AppServerStreamMapResult, AppServerStreamState, asRecord(), ItemMapper, itemMappers, mapAgentMessageDelta(), mapAgentMessageItem(), mapAppServerNotification() (+14 more)
 
-### Community 161 - "OpenCodeSessionStateStore"
+### Community 158 - "OpenCodeSessionStateStore"
 Cohesion: 0.17
 Nodes (8): cloneMessage(), clonePart(), cloneState(), compareById(), isPlainRecord(), OpenCodeSessionStateStore, OpenCodeStreamMutation, OpenCodeCanonicalSessionState
 
-### Community 162 - "PluginRuntimeCoordinator.ts"
-Cohesion: 0.12
-Nodes (6): logger, PluginRuntimeCoordinator, PluginRuntimeCoordinatorHost, RuntimeRefreshOptions, RuntimeWarmupSource, SlashCommandCatalogInvalidationOptions
+### Community 159 - "BackgroundTaskStreamTriggerCoordinator.ts"
+Cohesion: 0.13
+Nodes (12): TOOL_NAMES, ToolName, TOOL_NAMES, ToolCallInfo, ToolCallStatus, ToolName, BackgroundTaskIndicatorRenderPort, BackgroundTaskStreamLiveSignalPort (+4 more)
+
+### Community 160 - "composerContext.ts"
+Cohesion: 0.15
+Nodes (10): buildComposerContextChipStates(), ComposerContextChipState, getContextTargetKey(), getPromptContextTargetKey(), removeDraftContextItemsByTarget(), upsertDraftContextItem(), ComposerContextRuntimeStore, ComposerContextRuntimeStoreHost (+2 more)
 
 ### Community 163 - "ConversationWriteSerializationService.ts"
 Cohesion: 0.13
@@ -950,389 +952,453 @@ Nodes (14): ConversationWriteCommitOptions, ConversationWriteCommitResult, Conve
 Cohesion: 0.18
 Nodes (16): createModelConfigKeyValueState(), ModelConfigModalFlow, ModelConfigModalSnapshotInput, ModelConfigKeyValueEditorConfig, ModelConfigModelListEditor, ModelConfigModelListEditorOptions, ModelConfigSelectFieldConfig, ModelConfigSelectFieldOption (+8 more)
 
-### Community 165 - "searchInputEnhancer.ts"
-Cohesion: 0.11
-Nodes (17): commitHistoryValue(), enhanceSearchInput(), pendingCommitTimeouts, pendingCommitValues, readHistory(), resolveBoundary(), SearchInputEnhancerHandle, SearchInputEnhancerOptions (+9 more)
-
-### Community 166 - "BackendSessionBrowserModal"
+### Community 165 - "BackendSessionBrowserModal"
 Cohesion: 0.19
 Nodes (3): NormalizedSessionRow, BackendSessionBrowserHost, BackendSessionBrowserModal
 
-### Community 167 - "slashCommandCatalog.ts"
-Cohesion: 0.15
-Nodes (27): getCommandScopedAgentMetadata(), BUILTIN_COMMAND_IDS, ClaudeRuntimeCommand, extractPluginSkillName(), getSourceSortRank(), inferSkillSource(), isCatalogRuntimeCommand(), isPathWithinRoot() (+19 more)
+### Community 166 - "TabContextState"
+Cohesion: 0.19
+Nodes (3): TabContextState, ContextCostDetails, ContextUsageService
 
-### Community 168 - "OpencodeConfigManager.ts"
-Cohesion: 0.11
-Nodes (24): cloneFormatterConfigValue(), readFormatterConfigValue(), readLspConfigValue(), writeFormatterConfigValue(), writeLspConfigValue(), logger, NORMAL_PERMISSION_TEMPLATE, PERMISSION_MODE_TEMPLATES (+16 more)
+### Community 167 - "ProviderIconService.ts"
+Cohesion: 0.17
+Nodes (24): ProviderIconEntry, getProviderIconCacheState(), resolveProviderIconUrl(), warmProviderIcons(), writeProviderIconCacheAsset(), getSelectedBuiltinSource(), selectBuiltinIcon(), areEquivalentProviderIconEntries() (+16 more)
 
-### Community 169 - "BackgroundTaskStreamTriggerCoordinator.ts"
-Cohesion: 0.13
-Nodes (12): TOOL_NAMES, ToolName, TOOL_NAMES, ToolCallInfo, ToolCallStatus, ToolName, BackgroundTaskIndicatorRenderPort, BackgroundTaskStreamLiveSignalPort (+4 more)
-
-### Community 170 - "liquidDiamondDemoWebgl.ts"
+### Community 168 - "SettingsAgentsSection.ts"
 Cohesion: 0.10
-Nodes (27): BASE_PYRAMID_VERTICES, CAMERA, clamp(), compileGlShader(), createGlProgram(), createLiquidDiamondDemoWebGlRenderer(), createPlane(), cross3() (+19 more)
+Nodes (24): AVAILABILITY_REASON_KEYS, AvailabilityKind, CapabilityStatusTone, describeCapabilityAvailability(), isUnsupportedResult(), localizeCapabilityReason(), queryCapabilities(), renderCapabilityDisclosureRows() (+16 more)
 
-### Community 173 - "AgentBackendRouting.ts"
+### Community 170 - "providerIconBuiltinSelection.ts"
 Cohesion: 0.13
-Nodes (25): archiveBackendSession(), extractSessionDetailFields(), extractTimestamp(), extractTitleSummary(), forkBackendSession(), getActiveSessionBackendService(), getActiveSessionHistoryService(), getBackendSessionPreview() (+17 more)
+Nodes (26): LOBEHUB_ICON_MANIFEST, LobehubManifestEntry, LobehubManifestFormat, LobehubManifestGroup, LobehubManifestVariant, LobehubManifestVariantEntry, ALL_VARIANT_OPTIONS, getActiveColorMode() (+18 more)
 
-### Community 176 - "AgentSwitcherFloatingIcons.ts"
-Cohesion: 0.13
-Nodes (23): AgentSwitcherChipsOptions, renderAgentSwitcherChips(), AGENT_ICON_BY_BACKEND, AgentSwitcherIconConfig, AgentSwitcherOptions, isUnrelatedSettingsModalOpen(), LOBEHUB_ICON_MANIFEST_BY_ID, pinAgentSwitcherToSettingsEdge() (+15 more)
+### Community 171 - "opencodeConfig.ts"
+Cohesion: 0.14
+Nodes (13): McpConfigService, McpServerOwnership, McpServerOwnershipMap, OpencodeCommandConfig, OpencodeMcpConfigRecord, OpencodeMcpEntryConfig, OpencodeMcpOAuthConfig, OpencodeMcpTransportType (+5 more)
 
-### Community 177 - "InputPanelAppearanceCoordinator"
-Cohesion: 0.15
-Nodes (3): getInputPanelGlassRefractionCssVariables(), InputPanelAppearanceCoordinator, InputPanelAppearanceCoordinatorHost
+### Community 172 - "SettingsModelCatalogCoordinator.ts"
+Cohesion: 0.19
+Nodes (7): buildModelPickerGroups(), findModelPickerOption(), findModelPickerOptionByRef(), describeModelCatalogComparison(), logger, SettingsModelCatalogCoordinator, SettingsModelCatalogCoordinatorOptions
 
-### Community 179 - ".openTaskToolSession"
+### Community 173 - "ConversationTabOpenCoordinator.ts"
 Cohesion: 0.15
 Nodes (4): ConversationTabOpenCoordinator, ConversationTabOpenHost, ConversationTabOpenPort, ConversationTabOpenTabManager
 
-### Community 180 - "ModelPricingModal"
-Cohesion: 0.14
-Nodes (11): BACKEND_DESCRIPTION_KEYS, CostEstimateBackend, getBackendPricingSettings(), renderCostEstimateSettingsRow(), renderThirdPartyPricingIdentity(), formatRate(), formatTimestamp(), ModelPricingModal (+3 more)
+### Community 176 - "builtinIconRegistry.ts"
+Cohesion: 0.16
+Nodes (25): buildLobehubDefinitions(), buildOpencodeDefinitions(), BUILTIN_ICON_BY_SOURCE, BUILTIN_ICON_DEFINITIONS, BuiltinIconDefinition, computeMatchScore(), createDefinition(), findBuiltinIcon() (+17 more)
 
-### Community 181 - "ModelConfigProviderEditor"
+### Community 177 - "PermissionAction"
+Cohesion: 0.14
+Nodes (8): OpencodeConfig, PermissionAction, PermissionConfig, PermissionMode, PermissionReplyInput, PermissionSettings, ToolPermission, PermissionMode
+
+### Community 178 - "ComposerInputShellCoordinator.ts"
+Cohesion: 0.13
+Nodes (20): buildComposerInputSubmission(), buildComposerInputSubmissionWithAgentIntents(), decoratePromptSubmissionWithAgentMentions(), decoratePromptSubmissionWithPrimaryAgent(), getCodexSkillMenuQuery(), getExistingMentions(), getSlashCommandMenuQuery(), isCommandComposerText() (+12 more)
+
+### Community 179 - "ConversationSyncOrchestrationService"
+Cohesion: 0.14
+Nodes (5): ConversationSyncServices, ConversationSyncOrchestrationHost, ConversationSyncOrchestrationRuntime, ConversationSyncOrchestrationService, ConversationSyncScheduler
+
+### Community 180 - "ModelConfigProviderEditor"
 Cohesion: 0.22
 Nodes (3): ModelConfigProviderEditor, ModelConfigProviderEditorOptions, ProviderInterfaceFormatId
 
-### Community 182 - "traceDiamondRay"
+### Community 181 - "traceDiamondRay"
 Cohesion: 0.16
 Nodes (26): add3(), buildDisplacementTrace(), createPlane(), createProjectedFaces(), createProjectedHull(), cross3(), dot3(), intersectCrystalFaces() (+18 more)
 
-### Community 183 - "ContextDetailModal"
-Cohesion: 0.13
-Nodes (8): ContextBreakdownKey, ContextBreakdownSegment, ContextBreakdownCharCounts, ContextBreakdownTokenMap, ContextDisplayTokenBreakdown, ContextDetailModal, ContextRawMessageItem, getLocale()
-
-### Community 184 - "SettingsFormatterSection.ts"
-Cohesion: 0.09
-Nodes (18): OpencodeLspStatus, HELP_LINKS, OpenCodeProjectConfigHelpModal, OpenCodeProjectConfigHelpTopic, BuiltinEntryAction, BuiltinSearchController, BuiltinSearchEntry, BuiltinSearchScope (+10 more)
-
-### Community 185 - "ModelConfigModal.ts"
-Cohesion: 0.16
-Nodes (23): OpencodeProviderConfig, logger, ModelConfigModalOpenOptions, createModelConfigModalSnapshot(), isBlankProviderState(), parseAddProviderJsonDraft(), tryParseAddProviderJsonDraft(), buildAddProviderSavePlan() (+15 more)
-
-### Community 187 - "CodexAppServerTransport"
-Cohesion: 0.12
-Nodes (7): AppServerServerRequestHandler, CodexAppServerTransport, JsonRpcInbound, JsonRpcRequest, logger, WebSocket, ws
-
-### Community 188 - "MarkdownAgentWorkspaceService.ts"
+### Community 182 - "MarkdownAgentWorkspaceService.ts"
 Cohesion: 0.12
 Nodes (11): AGENT_FILE_ROOT_PATTERNS, AGENT_FILE_ROOTS, AgentFileRoot, agentIdFromPath(), logger, MarkdownAgentFileInput, MarkdownAgentFs, MarkdownAgentScanResult (+3 more)
 
-### Community 189 - "SettingsPluginSection.ts"
-Cohesion: 0.19
-Nodes (9): PluginEnvironmentSnapshot, PluginEvidenceSnapshot, SettingsPluginEvidencePresenter, SettingsPluginEvidencePresenterOptions, ConfigSourceRenderContext, logger, PluginSourceFilter, PluginSourcePathRenderModel (+1 more)
+### Community 183 - "ModelConfigModal.ts"
+Cohesion: 0.16
+Nodes (23): OpencodeProviderConfig, logger, ModelConfigModalOpenOptions, createModelConfigModalSnapshot(), isBlankProviderState(), parseAddProviderJsonDraft(), tryParseAddProviderJsonDraft(), buildAddProviderSavePlan() (+15 more)
 
-### Community 190 - "normalizeContextPath"
-Cohesion: 0.18
-Nodes (15): logger, OpenCodeContextPartSerializer, OpenCodeContextPartSerializerHost, PromptRequestPart, contextPathFromFileUrl(), isAbsoluteContextPath(), isWindowsDrivePath(), normalizeContextAttachmentPath() (+7 more)
+### Community 185 - ".createConversationRuntimeWiring"
+Cohesion: 0.11
+Nodes (3): getConversationBackendService(), getConversationChatBackendService(), getConversationSessionBackendService()
 
-### Community 191 - "createConversationLoadRecoveryHost"
+### Community 186 - "CodexAppServerTransport"
+Cohesion: 0.12
+Nodes (7): AppServerServerRequestHandler, CodexAppServerTransport, JsonRpcInbound, JsonRpcRequest, logger, WebSocket, ws
+
+### Community 188 - "ConversationMetadataCache.ts"
+Cohesion: 0.15
+Nodes (10): buildConversationMetaFromStoredRecord(), ConversationListDiagnosticEntry, ConversationMetadataAdapter, ConversationMetadataCache, ConversationMetaEnvelope, getUtf8ByteLength(), logger, MutableConversationListDiagnostics (+2 more)
+
+### Community 189 - "SettingsStylePresetSection.ts"
+Cohesion: 0.16
+Nodes (11): getBuiltinThemePresets(), hasThemeAppearanceOverrides(), normalizePartialChatAppearanceSettings(), normalizePartialNestedObject(), ThemePresetDefinition, ThemeStyleId, logger, SettingsStylePresetSection (+3 more)
+
+### Community 190 - "ContextDetailModal"
 Cohesion: 0.14
+Nodes (4): ContextBreakdownSegment, ContextDetailModal, ContextRawMessageItem, getLocale()
+
+### Community 191 - "QuestionResolution"
+Cohesion: 0.13
+Nodes (9): QuestionResolution, QuestionResolutionCoordinator, QuestionResolutionCoordinatorHost, QuestionResolutionCoordinatorRuntimeState, QuestionResolutionInlineCardPort, QuestionResolutionApplyContext, QuestionResolutionExecutionFacade, QuestionResolutionExecutionFacadeHost (+1 more)
+
+### Community 192 - "createConversationLoadRecoveryHost"
+Cohesion: 0.15
 Nodes (3): PersistedTabState, ConversationLoadRecoveryHostDependencies, createConversationLoadRecoveryHost()
 
-### Community 192 - "QuestionRuntimeViewHostAdapter.ts"
+### Community 193 - "McpServerEditorModal.ts"
+Cohesion: 0.18
+Nodes (12): McpServerEditorModal, AddFormState, buildMcpConfigFromFormState(), createDefaultMcpFormState(), isStringRecord(), mcpEntryToFormState(), McpFormValidationOptions, parseMcpKvPairs() (+4 more)
+
+### Community 194 - "PluginManagementService"
 Cohesion: 0.15
-Nodes (10): createQuestionRuntimeViewHostAdapter(), QuestionDockSlotCoordinatorPort, QuestionRuntimeQuestionApiPort, QuestionRuntimeSettingsPort, QuestionRuntimeTabAttentionPort, QuestionRuntimeViewHostAdapterDependencies, QuestionRuntimeViewHostAdapterHost, createQuestionRuntimeBundle() (+2 more)
-
-### Community 193 - "TabBar"
-Cohesion: 0.25
-Nodes (4): TabBar, TabBarCallbacks, TabBarItem, TabBarLayoutMode
-
-### Community 194 - "SettingsProjectCommandEditor.ts"
-Cohesion: 0.14
-Nodes (8): SlashCommandCatalogSource, DisableableControl, logger, OPEN_CODIAN_COMMAND_PLACEHOLDERS, ProjectCommandEditorSource, ProjectCommandEditorState, SettingsProjectCommandEditor, TextLikeControl
-
-### Community 195 - "OpenCodeEventSubscriptionCoordinator.ts"
-Cohesion: 0.10
-Nodes (18): CatalogRelevantEventPayload, EVENT_SOURCES, logger, OpenCodeEventListener, OpenCodeEventSource, OpenCodeEventSubscriptionInput, OpenCodeEventUnsubscribe, OpenCodePluginEvidenceObserver (+10 more)
+Nodes (3): DIRECTORY_PLUGIN_EXTENSIONS, PluginManagementService, ConfigSourceRenderContext
 
 ### Community 196 - "glassOctahedronDemo.ts"
 Cohesion: 0.13
 Nodes (17): createStageLayerElement(), createSvgElement(), elasticPosition(), estimateProjectionDelta(), formatNumber(), generateFilterId(), logger, maxRenderQuality() (+9 more)
 
-### Community 197 - "modelConfigWorkspace.ts"
+### Community 197 - ".createChatHeaderPresenterHost"
+Cohesion: 0.13
+Nodes (4): ChatServerAvailability, createDebugLogCallbacks(), logAssistantFinalizationDebug(), stringifyLogPayload()
+
+### Community 199 - "TabBar"
+Cohesion: 0.26
+Nodes (4): TabBar, TabBarCallbacks, TabBarItem, TabBarLayoutMode
+
+### Community 200 - "modelConfigWorkspace.ts"
 Cohesion: 0.22
 Nodes (21): readModelLimitNumber(), readProviderOptionString(), syncProviderFormFromJsonDraft(), createEmptyModel(), extractModelExtraFields(), extractModelOptions(), extractModelVariants(), extractProviderExtraOptions() (+13 more)
 
-### Community 198 - "ToolCallRenderer.ts"
+### Community 201 - "ToolCallRenderer.ts"
 Cohesion: 0.15
 Nodes (19): AUTH_ERROR_PATTERNS, detectMcpAuthError(), applyMcpAuthOutcome(), applyMcpAuthOutcomeToContainer(), applyMcpRetryOutcome(), cssEscape(), getMcpServerName(), McpAuthOutcome (+11 more)
 
-### Community 199 - "OpenCodeLegacySseStreamReader"
+### Community 202 - "Disposable"
+Cohesion: 0.13
+Nodes (5): CapabilityChangeHandler, Disposable, StatusChangeHandler, CodexChatSurfaceBinding, CodexChatSurfaceBindingHost
+
+### Community 203 - "OpencodeModelConfigSubset"
+Cohesion: 0.26
+Nodes (6): ModelCatalogStateService, ProviderDirectorySnapshot, ModelCatalog, ModelCatalogBundle, OpencodeModelConfigSubset, SettingsModelCatalogRuntimeState
+
+### Community 204 - "OpenCodeCapabilitySettingsMigration.ts"
+Cohesion: 0.17
+Nodes (21): coercePreferenceString(), coerceStringBoolean(), containsSecretValue(), EMPTY_GATES, EMPTY_PREFERENCES, isObject(), looksLikeSecretKey(), looksLikeSecretValue() (+13 more)
+
+### Community 205 - "OpenCodeLegacySseStreamReader"
 Cohesion: 0.19
 Nodes (5): OpenCodeLegacySseStreamReader, OpenCodeLegacySseStreamReaderHost, OpenCodeSseReadState, OpenCodeSseStreamContext, OpenCodeSSEEvent
 
-### Community 200 - "ConversationTurnViewModelBuilder.ts"
+### Community 206 - "ConversationTurnViewModelBuilder.ts"
 Cohesion: 0.22
 Nodes (11): OpenCodeCanonicalMessageInfo, OpenCodeCanonicalPart, ConversationCanonicalRenderInput, ConversationTurnMessageHydrator, ConversationTurnViewModel, ConversationTurnViewModelBuilder, getMessageParentId(), getRecordString() (+3 more)
 
-### Community 201 - "SettingsStylePresetSection.ts"
-Cohesion: 0.18
-Nodes (9): hasThemeAppearanceOverrides(), normalizePartialChatAppearanceSettings(), normalizePartialNestedObject(), ThemePresetDefinition, ThemeStyleId, logger, SettingsStylePresetSection, SettingsStylePresetSectionOptions (+1 more)
-
-### Community 202 - "PermissionInlineCardRenderer.ts"
+### Community 207 - "PermissionInlineCardRenderer.ts"
 Cohesion: 0.13
 Nodes (7): SessionPermissionTracker, PermissionInlineCardButtons, PermissionInlineCardRenderer, PermissionInlineCardResult, PermissionRequestChunk, PermissionResponder, NOTE: The OpenCode SDK does not have a 'session' permission level.
 
-### Community 203 - "AssistantShellViewHostAdapter.ts"
+### Community 208 - "SettingsCommandsSection.ts"
+Cohesion: 0.19
+Nodes (5): normalizeSlashCommandSkillMode(), buildNextHiddenSlashCommands(), logger, SettingsCommandsSection, SettingsCommandsSectionOptions
+
+### Community 209 - "AssistantShellViewHostAdapter.ts"
 Cohesion: 0.15
 Nodes (12): AssistantErrorRenderer, AssistantErrorRendererHost, AssistantStreamErrorRenderOptions, AssistantErrorFooterOptions, AssistantNoticeRenderHost, renderAssistantNoticeCardAndFooter(), renderAssistantPlaceholderAsNotice(), renderPersistedAssistantNotice() (+4 more)
 
-### Community 204 - "QuestionInlineCardRenderer"
+### Community 210 - "QuestionInlineCardRenderer"
 Cohesion: 0.19
 Nodes (3): QuestionInlineCardRenderer, QuestionInlineCardRendererHost, QuestionRuntimeHosts
 
-### Community 205 - "PromptSuggestionService"
+### Community 211 - "PromptSuggestionService"
 Cohesion: 0.13
 Nodes (7): BarRefreshCallback, ClearCallback, logger, PromptSuggestionAdapter, PromptSuggestionData, PromptSuggestionService, SuggestionCallback
 
-### Community 206 - "ProviderIconService.ts"
-Cohesion: 0.23
-Nodes (20): getProviderIconCacheState(), resolveProviderIconUrl(), warmProviderIcons(), selectBuiltinIcon(), areEquivalentProviderIconEntries(), createBuiltinEntry(), getCanonicalProviderKey(), getDefaultProviderIconEntry() (+12 more)
-
-### Community 207 - "AcpClientManager"
+### Community 212 - "AcpClientManager"
 Cohesion: 0.14
 Nodes (11): AcpClientManager, AcpManagedAgent, logger, AcpAgentConfig, AcpAgentRuntime, AcpConnectionState, AcpPermissionRequest, AcpPromptOptions (+3 more)
 
-### Community 209 - "SkillContentExpander.ts"
+### Community 213 - "promptSuggestionSink.ts"
+Cohesion: 0.11
+Nodes (12): channelCallbacks, createPromptSuggestionChannel(), deletePromptSuggestionChannel(), globalSessionCallbacks, onPromptSuggestionSessionChange(), onPromptSuggestionSinkChange(), PromptSuggestionSink, removePromptSuggestionScope() (+4 more)
+
+### Community 215 - "SessionDiffEntry"
+Cohesion: 0.15
+Nodes (3): SessionDiffEntry, ModifiedFilesSidebarCoordinator, ModifiedFilesSidebar
+
+### Community 216 - "SkillContentExpander.ts"
 Cohesion: 0.12
 Nodes (7): logger, SkillContentExpander, SkillContentExpanderHost, SkillExpansionResult, SkillRecord, SkillSyntheticPart, ComposerSendContextPort
 
-### Community 210 - "ChatVisualDemoCoordinator"
+### Community 217 - "StorageService.ts"
+Cohesion: 0.13
+Nodes (19): CORE_SETTINGS_PROFILE, extractPersistedCoreSettings(), extractPersistedUiSettings(), LoadSettingsFileOptions, logger, PersistedCoreSettings, PersistedSettingsFileProfile, PersistedUiSettings (+11 more)
+
+### Community 218 - "PromptContextItem"
+Cohesion: 0.21
+Nodes (3): PromptContextItem, ComposerContextActionAttachmentBuilderPort, ContextAttachmentBuilder
+
+### Community 219 - "OpencodeAgentConfigRecord"
+Cohesion: 0.20
+Nodes (4): OpencodeAgentConfigRecord, DisableableControl, SettingsProjectAgentEditor, TextLikeControl
+
+### Community 220 - "ChatVisualDemoCoordinator"
 Cohesion: 0.17
 Nodes (3): LiquidDiamondDemoController, ChatVisualDemoCoordinator, ChatVisualDemoCoordinatorHost
 
-### Community 212 - "TooltipLayerController.ts"
+### Community 221 - "renderGroups.ts"
+Cohesion: 0.17
+Nodes (11): buildMessageRenderGroups(), extractTextContent(), flattenContentBlocks(), injectLiveCompactionDivider(), isMergeableAssistantMessage(), LiveCompactionDividerInjectionOptions, mergeAssistantMessagesForRender(), MessageRenderGroup (+3 more)
+
+### Community 223 - "TooltipLayerController.ts"
 Cohesion: 0.13
 Nodes (12): AdditionalDirectoriesConfigBadgeCoordinator, LiveOpenCodianPluginWithClaudeDirectories, readAdditionalDirectoriesFromPlugin(), readOpenCodianPlugin(), CONTROLLER_SLOT, ControllerHandle, controllers, DocumentControllerSlots (+4 more)
 
-### Community 213 - "SettingsSkillSection.ts"
-Cohesion: 0.13
-Nodes (20): ALLOWED_SKILL_FRONTMATTER_KEYS, logger, parseSimpleFrontmatter(), queueSkillServiceRestart(), restartLocalSkillService(), SettingsScrollArea, SettingsSkillSectionOptions, SKILL_RESTART_RETRY_DELAYS_MS (+12 more)
+### Community 227 - "OpenCodeExperimentalActionModal"
+Cohesion: 0.26
+Nodes (5): OpenCodeExperimentalActionRequest, OpenCodeExperimentalActionResult, ExperimentalActionId, OpenCodeExperimentalActionModal, OpenCodeExperimentalActionModalOptions
 
-### Community 214 - "Disposable"
-Cohesion: 0.15
-Nodes (4): Disposable, StatusChangeHandler, CodexChatSurfaceBinding, CodexChatSurfaceBindingHost
+### Community 228 - "formatDurationMs"
+Cohesion: 0.22
+Nodes (7): logger, OpenCodianStartupCoordinator, StartupExecuteOptions, StartupPerfEntry, StartupPerfTrace, formatDurationMs(), getRecentLogText()
 
-### Community 215 - "ModelConfigService"
-Cohesion: 0.19
-Nodes (3): ProviderDirectoryRuntimeResult, buildCatalogFromConfig(), ModelConfigService
+### Community 229 - "QuestionDockSlotCoordinator"
+Cohesion: 0.11
+Nodes (3): ConversationSyncBridgePorts, ConversationSyncRuntimeAssembly, QuestionDockSlotCoordinator
 
-### Community 216 - "ConversationSyncLoadRuntimeViewHostFactory.ts"
-Cohesion: 0.18
-Nodes (10): ConversationLoadRuntimeBridgeHost, ConversationSyncLoadRuntimeHostAdapterHost, ConversationSyncLoadRuntimeHosts, createConversationSyncLoadRuntimeHosts(), ConversationSyncLoadBridgePort, ConversationSyncLoadConversationStorePort, ConversationSyncLoadRuntimeViewHost, ConversationSyncLoadTabRuntimePort (+2 more)
-
-### Community 218 - "modelConfigStructuredOptions.ts"
+### Community 231 - "modelConfigStructuredOptions.ts"
 Cohesion: 0.25
 Nodes (14): ModelConfigTextFieldConfig, getStructuredModelOptionsState(), readStringArrayOption(), readStringOption(), readThinkingObject(), setStructuredModelOption(), setStructuredStringArrayOption(), setStructuredThinkingBudget() (+6 more)
 
-### Community 220 - "SettingsModelCatalogCoordinator"
-Cohesion: 0.26
-Nodes (3): describeModelCatalogComparison(), SettingsModelCatalogCoordinator, SettingsModelCatalogCoordinatorOptions
+### Community 232 - "ModelPricingModal"
+Cohesion: 0.18
+Nodes (6): formatRate(), formatTimestamp(), ModelPricingModal, parseRate(), PRICE_FIELDS, PriceField
 
-### Community 221 - "SettingsModelSection.ts"
-Cohesion: 0.12
-Nodes (16): OpenCodeServerStatus, logger, SettingsModelIconCacheRuntimeState, ModelConfigService, SettingsModelBlockOptions, SettingsModelSectionActiveRuntime, SettingsModelSectionBodies, SettingsModelSectionOptions (+8 more)
+### Community 234 - "SettingsSkillSection.ts"
+Cohesion: 0.13
+Nodes (19): ALLOWED_SKILL_FRONTMATTER_KEYS, logger, parseSimpleFrontmatter(), restartLocalSkillService(), SettingsScrollArea, SettingsSkillSectionOptions, SKILL_RESTART_RETRY_DELAYS_MS, SkillCatalogTab (+11 more)
 
-### Community 222 - "SettingsProjectAgentEditor"
-Cohesion: 0.21
-Nodes (3): DisableableControl, SettingsProjectAgentEditor, TextLikeControl
-
-### Community 223 - "formatDurationMs"
-Cohesion: 0.23
-Nodes (6): logger, OpenCodianStartupCoordinator, StartupExecuteOptions, StartupPerfEntry, StartupPerfTrace, formatDurationMs()
-
-### Community 224 - "ThemeBackgroundStorage"
+### Community 236 - "ThemeBackgroundStorage"
 Cohesion: 0.17
 Nodes (3): StoredThemeBackgroundAsset, THEME_BACKGROUND_MIME_TO_EXTENSION, ThemeBackgroundStorage
 
-### Community 225 - "createProjectedFaces"
+### Community 237 - "createProjectedFaces"
 Cohesion: 0.28
 Nodes (19): add3(), buildDisplacementTrace(), createFace(), createProjectedFaces(), cross3(), dot3(), intersectRayTriangle(), mul3() (+11 more)
 
-### Community 226 - "StreamChunkRouter"
+### Community 238 - "StreamChunkRouter"
 Cohesion: 0.23
 Nodes (3): hasVisibleStreamingContent(), StreamChunkRouterHost, StreamChunkRouter
 
-### Community 227 - "ClaudeProjectSettingsDiscovery.ts"
+### Community 239 - "GlassEffectAdapter"
+Cohesion: 0.13
+Nodes (11): adapter, adapter, ShudingState, DiamondState, registerBuiltinGlassAdapters(), getGlassAdapter(), glassAdapterRegistry, registerGlassAdapter() (+3 more)
+
+### Community 240 - "ClaudeProjectSettingsDiscovery.ts"
 Cohesion: 0.19
 Nodes (17): CLAUDE_SETTINGS_FILE_NAMES, ClaudeHookEntry, ClaudeHookGroup, ClaudeHooksConfig, ClaudeProjectSettingsFileName, ClaudeProjectSettingsInfo, countHooks(), createClaudeProjectSettingsFile() (+9 more)
 
-### Community 228 - "glassOctahedronDemoThree.ts"
+### Community 241 - "SettingsCodexAccountSurface.ts"
+Cohesion: 0.11
+Nodes (11): AppServerAccountRateLimitsResult, AppServerAccountUsageResult, AppServerModelProviderCapabilities, AccountInfoAdapter, CapabilitiesAdapter, CodexAuthSource, NormalizedAccountIdentity, RateLimitsAdapter (+3 more)
+
+### Community 242 - "PluginEvidenceSnapshot"
+Cohesion: 0.29
+Nodes (4): PluginEnvironmentSnapshot, PluginEvidenceSnapshot, SettingsPluginEvidencePresenter, SettingsPluginEvidencePresenterOptions
+
+### Community 243 - "ContextUsageService.ts"
+Cohesion: 0.12
+Nodes (12): ContextBillingUsage, ContextBillingUsageUpdate, ContextBreakdownKey, getDefaultContextWindow(), ContextBreakdownCharCounts, ContextBreakdownTokenMap, ContextDisplayTokenBreakdown, ContextUsageSummary (+4 more)
+
+### Community 244 - "glassOctahedronDemoThree.ts"
 Cohesion: 0.14
 Nodes (16): GlassOctahedronQualityTier, addObject(), CameraNode, createEnvironmentScene(), createGlassOctahedronThreeRenderer(), disposeSceneResources(), EulerLike, FresnelMaterialNode (+8 more)
 
-### Community 231 - "slashCommandMenuRenderer.ts"
-Cohesion: 0.19
-Nodes (12): AgentMentionMenuItem, buildSkillSourceText(), buildSourceBadge(), getAgentMentionMenuStateText(), getSlashCommandMenuStateText(), renderAgentMentionMenu(), renderAgentMentionMenuItem(), RenderAgentMentionMenuOptions (+4 more)
+### Community 245 - "TabRuntimeStateBridge.ts"
+Cohesion: 0.18
+Nodes (4): TabRuntimeStateBridgeHost, TabRuntimeStateBridgeRuntime, TabRuntimeStateBridgeTabManager, syncUserMessageStreamingActionState()
 
-### Community 232 - "capabilityLabBackendTabs.ts"
+### Community 247 - "SettingsDropdownControl.ts"
+Cohesion: 0.18
+Nodes (17): addSettingsDropdown(), advanceHighlight(), attachPortalListeners(), computePortalPosition(), DropdownKeydownContext, enhancedSelects, enhanceSettingsDropdownComponent(), enhanceSettingsSelect() (+9 more)
+
+### Community 248 - "ClaudeCodeSdkFacade"
+Cohesion: 0.14
+Nodes (6): ClaudeCodeSdkFacade, ClaudeAgentSdkImporter, ClaudeAgentSdkModule, ClaudeCodeSdkLoaderOptions, loadClaudeCodeSdk(), WarmQueryHandle
+
+### Community 249 - "SlashCommandSkillMode"
+Cohesion: 0.16
+Nodes (11): SlashCommandSkillMode, RuntimeCommandMatchOptions, buildSkillsCommandMenuItem(), extractSkillsQuery(), filterFuzzySlashCommandMenuItems(), filterSlashCommandMenuItems(), FuzzyMatchResult, fuzzyScore() (+3 more)
+
+### Community 252 - "capabilityLabBackendTabs.ts"
 Cohesion: 0.18
 Nodes (10): CapabilityLabBackendTabDescriptor, CapabilityLabBackendTabsController, CapabilityLabBackendTabsOptions, CapabilityLabBackendTabState, createCapabilityLabBackendTabs(), createStableId(), isPromiseLike(), resolveInitialId() (+2 more)
 
-### Community 234 - "SlashCommandExecutionHostFactory.ts"
+### Community 254 - "SlashCommandExecutionHostFactory.ts"
 Cohesion: 0.20
 Nodes (11): MdCommandEntry, collectMarkdownFiles(), CommandMdFile, loadCommandsFromConfigDir(), loadCommandsFromMdFiles(), logger, parseFrontmatter(), createSlashCommandExecutionHost() (+3 more)
 
-### Community 236 - "CodexRuntimeDefaultsBadgeCoordinator.ts"
+### Community 255 - "OpenCodeSdkExperimentalActionCoordinator.ts"
+Cohesion: 0.20
+Nodes (10): ACTION_CAPABILITY_IDS, cleanupPty(), execute(), isRecord(), matchesConfirmedTarget(), OpenCodeExperimentalAction, OpenCodeExperimentalActionCleanup, OpenCodeExperimentalActionConfirmation (+2 more)
+
+### Community 257 - "AgentMentionCandidateService.ts"
+Cohesion: 0.24
+Nodes (6): AgentMentionCandidateService, AgentMentionCandidateServiceHost, compareAgentCandidates(), normalizeRuntimeAgents(), AgentMentionCandidate, AgentMentionMenuItem
+
+### Community 258 - "PermissionModeSelectorCoordinator.ts"
+Cohesion: 0.29
+Nodes (11): createCodexSandboxConfig(), PermissionModeConfig, PermissionModeOption, PermissionTriggerDisplayState, ComposerPopoverFrameHandle, ComposerPopoverFrameTexts, mountComposerPopoverFrame(), focusPopoverOption() (+3 more)
+
+### Community 259 - "CodexRuntimeDefaultsBadgeCoordinator.ts"
 Cohesion: 0.23
 Nodes (8): BadgeItem, BadgeKind, CodexRuntimeDefaultsBadgeCoordinator, LiveOpenCodianPlugin, readAdditionalDirectories(), readNetworkAccessEnabled(), readOpenCodianPlugin(), readWebSearchMode()
 
-### Community 238 - "ThinkingBlockRenderer"
+### Community 261 - "slashCommandMenuRenderer.ts"
+Cohesion: 0.21
+Nodes (11): buildSkillSourceText(), buildSourceBadge(), getAgentMentionMenuStateText(), getSlashCommandMenuStateText(), renderAgentMentionMenu(), renderAgentMentionMenuItem(), RenderAgentMentionMenuOptions, renderSlashCommandMenu() (+3 more)
+
+### Community 262 - "ThinkingBlockRenderer"
 Cohesion: 0.27
 Nodes (6): DEFAULT_OPTIONS, formatDurationSeconds(), normalizeDurationSeconds(), ThinkingBlockRenderer, ThinkingBlockState, ThinkingRendererOptions
 
-### Community 239 - "OpenCodeSyncEventRuntimeCoordinator.ts"
+### Community 263 - "OpenCodeSessionLifecycleCoordinator.ts"
+Cohesion: 0.17
+Nodes (5): logger, OpenCodeSessionLifecycleCoordinator, OpenCodeSessionLifecycleSyncRuntime, SessionStatusUpdate, SessionTodoUpdate
+
+### Community 264 - "OpenCodeSyncEventRuntimeCoordinator.ts"
 Cohesion: 0.17
 Nodes (13): logger, normalizeDiffEntries(), normalizeDiffEntry(), normalizeMessageInfo(), normalizePart(), RawSyncEvent, RawSyncEventProperties, resolveStringProperty() (+5 more)
 
-### Community 240 - "OpencodeAgentConfigRecord"
-Cohesion: 0.30
-Nodes (6): OpencodeAgentConfigRecord, AgentMentionCandidateService, AgentMentionCandidateServiceHost, compareAgentCandidates(), normalizeRuntimeAgents(), AgentMentionCandidate
-
-### Community 241 - "sendPipelineContent.ts"
+### Community 266 - "sendPipelineContent.ts"
 Cohesion: 0.28
 Nodes (12): buildInterruptedAssistantNotice(), buildStreamErrorNotice(), buildLocalStreamOutcome(), extractStructuredOutputDuplicateText(), filterDuplicateStructuredOutputContentBlocks(), filterDuplicateStructuredOutputTextBlocks(), getStreamedTextContent(), isDuplicateStructuredOutputText() (+4 more)
 
-### Community 242 - "QuestionResolutionCardRenderer.ts"
+### Community 267 - "QuestionResolutionCardRenderer.ts"
 Cohesion: 0.24
 Nodes (12): AssistantPlainTextFallbackRenderOptions, renderAssistantPlainTextFallbackContent(), AssistantStructuredContentRenderOptions, appendQuestionResolutionCard(), appendQuestionResolutionCardFromRenderPlan(), buildQuestionAnswerMarkdown(), buildQuestionRejectedMarkdown(), getQuestionResolutionAnswerText() (+4 more)
 
-### Community 243 - "PermissionModeSelectorCoordinator.ts"
-Cohesion: 0.32
-Nodes (10): PermissionModeConfig, PermissionModeOption, PermissionTriggerDisplayState, ComposerPopoverFrameHandle, ComposerPopoverFrameTexts, mountComposerPopoverFrame(), focusPopoverOption(), getPopoverOptions() (+2 more)
-
-### Community 246 - "capabilityDisclosureRow.ts"
-Cohesion: 0.21
-Nodes (14): AVAILABILITY_REASON_KEYS, AvailabilityKind, CapabilityStatusTone, describeCapabilityAvailability(), isUnsupportedResult(), localizeCapabilityReason(), queryCapabilities(), renderCapabilityDisclosureRows() (+6 more)
-
-### Community 247 - "ProjectConfigFileWatcher"
+### Community 269 - "ProjectConfigFileWatcher"
 Cohesion: 0.26
 Nodes (3): logger, ProjectConfigFileWatcher, ProjectConfigFileWatcherOptions
 
-### Community 250 - "ClaudeCodeDefaultPermissionHost.ts"
-Cohesion: 0.14
-Nodes (9): ClaudeCodeElicitationCardRenderer, ClaudeCodePermissionBridgeHostContext, ClaudeCodePermissionCardRenderer, ClaudeCodeQuestionCardRenderer, createClaudeCodePermissionBridgeHost(), PermissionRequestChunk, ClaudeCodeApprovalDecision, ClaudeCodeCanUseToolContext (+1 more)
-
-### Community 252 - "SlashCommandSkillMode"
+### Community 270 - "SettingsPopoverController"
 Cohesion: 0.21
-Nodes (10): SlashCommandSkillMode, RuntimeCommandMatchOptions, buildSkillsCommandMenuItem(), extractSkillsQuery(), filterFuzzySlashCommandMenuItems(), filterSlashCommandMenuItems(), FuzzyMatchResult, fuzzyScore() (+2 more)
+Nodes (5): controllers, SCROLL_INTENT_KEYS, SettingsPopoverController, SettingsPopoverDisplayOptions, SettingsPopoverPlacement
 
-### Community 257 - "ClaudeCodeOptionsBuilder.ts"
-Cohesion: 0.19
-Nodes (8): buildClaudeCodeOptions(), ClaudeCodeSdkThinking, ClaudeCodeSpawnClaudeCodeProcess, ClaudeCodeSpawnedProcess, ClaudeCodeSpawnRequest, cloneSettingSources(), mapThinkingForSdk(), trimOptionalString()
+### Community 273 - "updateBaseLayers"
+Cohesion: 0.22
+Nodes (15): applyBackdropFilterValue(), applyGlassTint(), applyShellInteractiveStyles(), buildFallbackBackdropFilterValue(), buildSvgBackdropFilterValue(), formatNumber(), NikdelvinState, resolveBackgroundSource() (+7 more)
 
-### Community 258 - "promptSuggestionSink.ts"
-Cohesion: 0.19
-Nodes (9): channelCallbacks, createPromptSuggestionChannel(), globalSessionCallbacks, onPromptSuggestionSessionChange(), onPromptSuggestionSinkChange(), SessionCallback, SinkChangeCallback, sinkChangeCallbacks (+1 more)
+### Community 275 - "OpencodeConfigManager.ts"
+Cohesion: 0.23
+Nodes (12): cloneFormatterConfigValue(), readFormatterConfigValue(), readLspConfigValue(), writeFormatterConfigValue(), writeLspConfigValue(), logger, NORMAL_PERMISSION_TEMPLATE, PERMISSION_MODE_TEMPLATES (+4 more)
 
-### Community 259 - "OpenCodeSdkCapabilityRegistry.ts"
-Cohesion: 0.15
-Nodes (8): getOpenCodeSdkCapabilityRegistry(), OPENCODE_SDK_CAPABILITY_REGISTRY, OpenCodeSdkCapabilityBaseSpec, OpenCodeSdkCapabilityCategory, OpenCodeSdkCapabilityFallbackPolicy, OpenCodeSdkCapabilityRuntimeProof, OpenCodeSdkCapabilityServerProbe, OpenCodeSdkCapabilitySurface
-
-### Community 261 - "BackgroundTaskLiveSignalCoordinator"
-Cohesion: 0.28
+### Community 276 - "BackgroundTaskLiveSignalCoordinator"
+Cohesion: 0.25
 Nodes (6): OpenCodianViewBackgroundTaskRuntimeWiring, BackgroundTaskLiveSignalCoordinator, BackgroundTaskLiveSignalCoordinatorHostBuilderHost, BackgroundTaskLiveSignalNoticePort, BackgroundTaskLiveSignalTimelinePort, BackgroundTaskLiveSignalTodoPort
 
-### Community 262 - "SkillCatalogService.ts"
+### Community 279 - "QuestionDockRenderStateFacade.ts"
+Cohesion: 0.23
+Nodes (5): QuestionDockInteractionRuntimeState, QuestionDockRenderStateFacade, QuestionDockRenderStateFacadeHost, QuestionDockRenderStateRuntimeState, QuestionDockResolvedRenderState
+
+### Community 280 - "SettingsModelIconCacheManager"
+Cohesion: 0.22
+Nodes (3): SettingsModelIconCacheManager, clearProviderIconCache(), ResolveIconUrlOptions
+
+### Community 281 - "normalizeFiniteNumberInRange"
 Cohesion: 0.24
-Nodes (3): logger, SkillCatalogService, SkillCatalogServiceHost
+Nodes (13): isValidCssColorValue(), normalizeBoolean(), normalizeChatAppearanceAssistantSettings(), normalizeChatAppearanceLayoutSettings(), normalizeChatAppearanceUserSettings(), normalizeCssColorValue(), normalizeFiniteNumber(), normalizeFiniteNumberInRange() (+5 more)
 
-### Community 263 - "BackendSessionBrowserDetail.ts"
-Cohesion: 0.30
-Nodes (11): getBackendSessionDetail(), NormalizedSessionDetail, activityIcon(), formatDateTime(), formatFileSize(), partHasContent(), renderBackendSessionDetail(), renderDetailActivityLine() (+3 more)
-
-### Community 264 - "commandScopedAgent.ts"
-Cohesion: 0.36
-Nodes (11): buildCommandScopedAgent(), cloneConfigObject(), cloneConfigValue(), getCommandScopedAgentId(), isCommandScopedAgentForCommand(), isCommandScopedAgentId(), mergeConfigObjects(), normalizeCommandSamplingValue() (+3 more)
-
-### Community 265 - "formatModelReference"
+### Community 282 - "formatModelReference"
 Cohesion: 0.39
 Nodes (11): findCatalogModel(), findCatalogProvider(), ModelReference, pickCatalogDefaultModel(), pickCatalogProviderDefaultModel(), pickCatalogProviderFirstModel(), pickFirstCatalogModel(), ResolvedModelSelectionStatus (+3 more)
 
-### Community 267 - "ConversationFullMessageCache.ts"
+### Community 283 - "sdkFetch.ts"
+Cohesion: 0.30
+Nodes (11): createSdkFetch(), headersToRecord(), isSseRequest(), normalizeDirectoryPath(), normalizeScopedHeaderValue(), requestBodyToText(), responseBodyToText(), responseHeadersToHeaders() (+3 more)
+
+### Community 284 - "ConversationFullMessageCache.ts"
 Cohesion: 0.21
 Nodes (5): cloneConversationMetadataOnly(), ConversationFullMessageCache, ConversationFullMessageCacheOptions, ConversationFullMessageCacheSnapshot, hasFullMessages()
 
-### Community 268 - "SandboxConfigBadgeCoordinator.ts"
+### Community 285 - "SandboxConfigBadgeCoordinator.ts"
 Cohesion: 0.30
 Nodes (4): ClaudeCodeSandboxSettings, DEFAULT_SANDBOX_SETTINGS, readSandboxSettingsFromPlugin(), SandboxConfigBadgeCoordinator
 
-### Community 269 - "BackgroundTaskInlinePanelRenderer.ts"
-Cohesion: 0.26
-Nodes (4): BackgroundTaskInlinePanelRenderer, BackgroundTaskInlinePanelRendererHost, BackgroundTaskInlinePanelRuntimeState, BackgroundTaskInlineTimelinePort
+### Community 286 - "ServerReferenceContextService"
+Cohesion: 0.21
+Nodes (4): isSdkCapabilitySupportedByLookup(), ServerReferenceContextAvailability, ServerReferenceContextCapabilityHost, ServerReferenceContextService
 
-### Community 270 - "LocalStreamMessagePersistence.ts"
+### Community 287 - "LocalStreamMessagePersistence.ts"
 Cohesion: 0.35
 Nodes (11): appendNoticeMessage(), logger, logInterruptedAssistantPersistence(), logInterruptedNoticePersistence(), persistBackendSessionIdentityIfNeeded(), persistLocalStreamOutcome(), removeCodexProvisionalWarningIfUpgraded(), shouldPersistLocalAssistantMessage() (+3 more)
 
-### Community 273 - "ComposerContextPickerActionService.ts"
+### Community 290 - "ComposerContextPickerActionService.ts"
 Cohesion: 0.26
 Nodes (6): ComposerContextPickerActionService, ComposerContextPickerActionServiceHost, ComposerContextPickerActionServiceOptions, ComposerContextPickerAttachmentBuilderPort, ComposerContextPickerCatalogPort, chooseContextFile()
 
-### Community 274 - "buildTrailingAssistantPatchTailOutcomePlansFromExecutionTailPlanningContext"
+### Community 291 - "buildTrailingAssistantPatchTailOutcomePlansFromExecutionTailPlanningContext"
 Cohesion: 0.17
 Nodes (12): buildTrailingAssistantPatchTailOutcomeExecutionTailPlanSourceContract(), buildTrailingAssistantPatchTailOutcomePlanningContext(), buildTrailingAssistantPatchTailOutcomePlanningContextInputs(), buildTrailingAssistantPatchTailOutcomePlanningContextShape(), buildTrailingAssistantPatchTailOutcomePlanParts(), buildTrailingAssistantPatchTailOutcomePlans(), buildTrailingAssistantPatchTailOutcomePlansFromChildPlans(), buildTrailingAssistantPatchTailOutcomePlansFromExecutionTailPlanningContext() (+4 more)
 
-### Community 275 - "SettingsCodexReadbackControls.ts"
-Cohesion: 0.24
-Nodes (4): CodexReadbackModal, CodexReadbackModalOptions, CodexReadbackModalState, SettingsCodexReadbackControlsOptions
-
-### Community 276 - "listBackendSessions"
-Cohesion: 0.20
-Nodes (3): listBackendSessions(), NormalizedSessionPreviewMessage, NormalizedSessionPreviewPart
-
-### Community 277 - "PluginManagementService.ts"
+### Community 292 - "SettingsDebugSection.ts"
 Cohesion: 0.18
-Nodes (10): DIRECTORY_PLUGIN_EXTENSIONS, DIRECTORY_PLUGIN_FOLDERS, PluginConfigSourceScope, PluginConfigSourceSnapshot, PluginDirectorySnapshot, PluginEntryKind, PluginEntryProvenance, PluginEntryScope (+2 more)
+Nodes (11): ClaudeCodeStatusItem, DEBUG_MODULE_GROUPS, DebugModuleGroupConfig, DebugPlatformKey, DebugRenderOptions, DebugSectionBlockId, DebugTabShellConfig, ElectronDialogModule (+3 more)
 
-### Community 279 - ".start"
+### Community 293 - "ClaudeUserMessageIdentityBackfillService.ts"
+Cohesion: 0.25
+Nodes (5): getAgentServiceRegistry(), ClaudeUserMessageIdentityBackfillHost, ClaudeUserMessageIdentityBackfillService, ClaudeUserMessageIdentityResolver, logger
+
+### Community 294 - "ClaudeCodeProcessResolver.ts"
+Cohesion: 0.36
+Nodes (10): ClaudeCodeProcessMissingReason, ClaudeCodeProcessResolverEnv, expandHomeDirectory(), getAugmentedPath(), getDefaultClaudeCliCandidates(), getPathDelimiter(), getPathFallbacks(), getPathValue() (+2 more)
+
+### Community 297 - "PluginManagementService.ts"
+Cohesion: 0.20
+Nodes (9): DIRECTORY_PLUGIN_FOLDERS, PluginConfigSourceScope, PluginConfigSourceSnapshot, PluginDirectorySnapshot, PluginEntryKind, PluginEntryProvenance, PluginEntryScope, PluginEntrySource (+1 more)
+
+### Community 299 - ".start"
 Cohesion: 0.27
 Nodes (4): FocusContextEventBridge, FocusContextEventBridgeHost, FocusContextEventPreviewPort, FocusContextEventRuntimePort
 
-### Community 283 - "providerPresets.ts"
+### Community 303 - "ClaudeCodeQueue.ts"
+Cohesion: 0.25
+Nodes (7): ClaudeCodeImagePromptBlock, ClaudeCodePromptContent, ClaudeCodeRuntimeOutput, ClaudeCodeTextPromptBlock, createSessionId(), isPromptSuggestionMessage(), isRecord()
+
+### Community 304 - "providerPresets.ts"
 Cohesion: 0.33
 Nodes (8): OpencodeProviderModelConfig, createKeyValueField(), createModelRaw(), nextPresetUid(), presetToFormState(), PROVIDER_PRESET_CATEGORY_ORDER, PROVIDER_PRESETS, ProviderPresetCategory
 
-### Community 284 - "PendingIndicatorController.ts"
+### Community 308 - "SettingsModelSection.ts"
 Cohesion: 0.28
-Nodes (3): PENDING_MESSAGES, PendingIndicatorController, PendingIndicatorHost
+Nodes (8): OpenCodeServerStatus, SettingsModelIconCacheRuntimeState, ModelConfigService, SettingsModelBlockOptions, SettingsModelSectionActiveRuntime, SettingsModelSectionBodies, SettingsModelSectionOptions, SettingsModelSectionRuntimeState
 
-### Community 287 - "applyEdgeBulge"
+### Community 310 - "applyEdgeBulge"
 Cohesion: 0.32
 Nodes (8): measureDisplacementRangeAtUv(), applyEdgeBulge(), clamp(), length2(), pointEdgeDistance(), readNumberSetting(), renderDisplacementMap(), smoothStep()
 
-### Community 288 - ".createAssistantShellViewHostAdapterHost"
-Cohesion: 0.33
-Nodes (3): createDebugLogCallbacks(), logAssistantFinalizationDebug(), stringifyLogPayload()
-
-### Community 294 - "jsx-shim.ts"
+### Community 316 - "jsx-shim.ts"
 Cohesion: 0.33
 Nodes (5): Element, ElementClass, ElementType, IntrinsicElements, JSX
 
 ## Knowledge Gaps
 - **996 isolated node(s):** `logger`, `AcpNotification`, `AcpAgentRuntime`, `AcpPromptOptions`, `AcpToolCall` (+991 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **56 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **67 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `t()` connect `t` to `types/index.ts`, `OpenCodianView.ts`, `TabId`, `SessionTodo`, `SettingsFormatterSection`, `BackgroundTaskTimelineAssemblyService`, `ComposerInputShellCoordinator`, `tabs/index.ts`, `MessageFinalizationHost.ts`, `OpenCodianSettingsView.ts`, `SettingsStyleSection`, `ChatHeaderPresenter`, `ClaudeCodeAdapter`, `CodexProjectResourceDiscovery.ts`, `SettingsStyleInputPanelSection.ts`, `OpenCodianView`, `OpenCodianPlugin`, `SlashCommandExecutionService.ts`, `main.ts`, `OpencodeConfigManager`, `agents/index.ts`, `SettingsCapabilityLabSection.ts`, `ConversationLoadRecoveryHost`, `ClaudeProjectProviderConfig.ts`, `Conversation`, `UserMessageContentRenderer.ts`, `MessageSendPreparationHost`, `SettingsSkillSection`, `SettingsDebugSection`, `.updateRuntimeProof`, `i18n/index.ts`, `SettingsConversationSection`, `AgentBackendKind`, `ComposerInputShellCoordinator.ts`, `OpenCodianSettingTab`, `.createInteractionRuntimeWiring`, `SettingsAgentsSection`, `SlashCommandMenuCatalogCache.ts`, `QuestionRuntimeHostAdapter.ts`, `SettingsMcpSection.ts`, `TabContextState`, `QuestionRequest`, `SettingsCapabilityLabSection`, `SettingsToolSection.ts`, `ContextFileCatalogIndex`, `SettingsSectionCoordinator`, `SettingsModelCatalogPresenter`, `SessionDiffEntry`, `SettingsToolSection`, `CodexMcpServerDetailModal`, `ChatSelectionControlsCoordinator`, `ModelSelectorSelection`, `SettingsClaudeCodeSection.ts`, `ConversationSessionSettingsModal`, `QuestionResolutionExecutionFacade.ts`, `ModelConfigModal`, `SettingsClaudeResourcesSection.ts`, `AssistantFooterPayload.ts`, `SettingsCommandsSection.ts`, `ChatSelectionControlsCoordinator.ts`, `ConversationTabRuntimeCoordinator.ts`, `BackgroundTaskNoticeStateService.ts`, `TitleGenerationService.ts`, `OpenCodeSdkExperimentalActionCoordinator.ts`, `CodexAdapter.ts`, `SettingsCodexAccountSurface`, `SettingsProjectAgentEditor.ts`, `MessageSendPreparationService.ts`, `LobehubIconVariant`, `.createComposerInputShellCoordinatorHost`, `SettingsPluginSection`, `SettingsModelCatalogPresenter.ts`, `PromptContextItem`, `ProviderIconService`, `SettingsCodexSection`, `ConversationSessionSettingsCoordinator.ts`, `SettingsMcpSection`, `SettingsAcpSection`, `QuestionDisplayMode`, `AssistantShellViewHostAdapter`, `ChatAgentSelectionCoordinator`, `ConversationHistoryActionsCoordinator`, `EffortSelector`, `SettingsSecuritySection.ts`, `OpenCodeCapabilitySettingsMigration.ts`, `PluginManagementService`, `PluginRuntimeCoordinator.ts`, `ProviderFormState`, `searchInputEnhancer.ts`, `BackendSessionBrowserModal`, `slashCommandCatalog.ts`, `SettingsSecuritySection`, `SettingsServerSection`, `AgentBackendRouting.ts`, `.message`, `PermissionModeSelectorCoordinator`, `AgentSwitcherFloatingIcons.ts`, `ContextUsageDisplayService`, `.openTaskToolSession`, `ModelPricingModal`, `ModelConfigProviderEditor`, `ContextDetailModal`, `SettingsFormatterSection.ts`, `ModelConfigModal.ts`, `SettingsPluginSection.ts`, `createConversationLoadRecoveryHost`, `TabBar`, `SettingsProjectCommandEditor.ts`, `modelConfigWorkspace.ts`, `SettingsStylePresetSection.ts`, `PermissionInlineCardRenderer.ts`, `AssistantShellViewHostAdapter.ts`, `QuestionInlineCardRenderer`, `TooltipLayerController.ts`, `SettingsSkillSection.ts`, `Disposable`, `modelConfigStructuredOptions.ts`, `ProviderIconCacheModal`, `SettingsModelCatalogCoordinator`, `SettingsModelSection.ts`, `SettingsProjectAgentEditor`, `.ensureForElement`, `slashCommandMenuRenderer.ts`, `SettingsStyleBackgroundSection`, `SlashCommandExecutionHostFactory.ts`, `.createConversationSessionSettingsCoordinatorHost`, `CodexRuntimeDefaultsBadgeCoordinator.ts`, `sendPipelineContent.ts`, `QuestionResolutionCardRenderer.ts`, `PermissionModeSelectorCoordinator.ts`, `NavigationSidebar`, `capabilityDisclosureRow.ts`, `SkillDetailModal`, `SettingsUiSection`, `ChildSessionGraphCoordinator`, `BackendSessionBrowserDetail.ts`, `PluginEntry`, `SandboxConfigBadgeCoordinator.ts`, `SettingsCodexReadbackControls.ts`, `listBackendSessions`, `ModelConfigJsonModal`, `SettingsBackendSection`, `providerPresets.ts`, `ServerSettingHelpModal`, `ConversationCompactionHelpModal`, `ModifiedFilesSidebarHelpModal`, `ForkTargetModal`?**
-  _High betweenness centrality (0.216) - this node is a cross-community bridge._
-- **Why does `TabId` connect `TabId` to `.constructor`, `ConversationSyncHostAdapter.ts`, `.createComposerInputShellCoordinatorHost`, `OpenCodianView.ts`, `BackgroundTaskLiveSignalCoordinator`, `SessionTodo`, `ContextUsageSnapshot`, `ChatMessage`, `BackgroundTaskTimelineAssemblyService`, `BackgroundTaskIndicatorCoordinator.ts`, `BackgroundTaskInlinePanelRenderer.ts`, `TabMessagesPaneCoordinator`, `tabs/index.ts`, `QuestionTodoBackgroundTaskRefreshHostAdapter.ts`, `MessageFinalizationHost.ts`, `ConversationRenderService.ts`, `AssistantShellViewHostAdapter`, `QuestionTodoBackgroundTaskRuntimeServiceBundle.ts`, `QuestionPostResolutionRuntimeFacadeHost`, `createConversationRenderHost`, `QuestionDockRenderStateFacadeHost`, `PendingIndicatorController.ts`, `SessionSyncEventUpdate`, `.createAssistantShellViewHostAdapterHost`, `OpenCodianView`, `SlashCommandExecutionService.ts`, `BackgroundTaskStreamTriggerCoordinator.ts`, `FocusContextPreview`, `.message`, `ConversationLoadRecoveryHost`, `Conversation`, `.openTaskToolSession`, `MessageSendPreparationHost`, `ComposerContextViewFacade.ts`, `getConversationBackendSessionId`, `SendPipelineTypes.ts`, `QuestionRuntimeViewHostAdapter.ts`, `trailingAssistantPatchDebug.ts`, `TabBar`, `.createInteractionRuntimeWiring`, `QuestionRuntimeHostAdapter.ts`, `PermissionInlineCardRenderer.ts`, `AssistantShellViewHostAdapter.ts`, `QuestionInlineCardRenderer`, `TabContextState`, `QuestionRequest`, `createTabActivationRuntimeBridgeHosts`, `SkillContentExpander.ts`, `TabConversationStateBridgeHost`, `ConversationSyncLoadRuntimeViewHostFactory.ts`, `SessionDiffEntry`, `trailingAssistantPatchTypes.ts`, `QuestionDockResolutionActionFacade.ts`, `QuestionResolutionExecutionFacade.ts`, `AssistantFooterPayload.ts`, `.createConversationSessionSettingsCoordinatorHost`, `SlashCommandExecutionHostFactory.ts`, `QuestionRuntimeViewHost`, `trailingAssistantPatchExecution.ts`, `ConversationTabRuntimeCoordinator.ts`, `BackgroundTaskNoticeStateService.ts`, `AssistantShellRenderer`, `MessageSendPreparationService.ts`?**
-  _High betweenness centrality (0.111) - this node is a cross-community bridge._
-- **Why does `createLogger()` connect `i18n/index.ts` to `ConversationSyncHostAdapter.ts`, `OpenCodianView.ts`, `backend/index.ts`, `OpenCodeServiceLifecycleCoordinator`, `SessionTodo`, `OpenCodeCatalogQueryCoordinator`, `BackgroundTaskTimelineAssemblyService`, `tabs/index.ts`, `MessageFinalizationHost.ts`, `AgentService.ts`, `ServerManager`, `OpenCodeSdkFacade.ts`, `OpenCodeService.ts`, `ChatHeaderPresenter`, `OpenCodeSessionControlOrchestrator`, `CodexAppServerClient.ts`, `SettingsStyleInputPanelSection.ts`, `SlashCommandExecutionService.ts`, `main.ts`, `InputPanelThemeRuntime.ts`, `OpenCodianSettingsRuntimeCoordinator`, `ClaudeCodeStreamNormalizer.ts`, `SettingsCapabilityLabSection.ts`, `SettingsDebugSection`, `getConversationBackendSessionId`, `SendPipelineTypes.ts`, `trailingAssistantPatchDebug.ts`, `ComposerInputShellCoordinator.ts`, `shared/index.ts`, `SettingsAgentsSection`, `SettingsMcpSection.ts`, `QuestionRequest`, `providerIconAssetCache.ts`, `StorageService.ts`, `OpenCodeQuestionPermissionHub.ts`, `OpenCodeStreamingRuntimeCoordinator.ts`, `OpenCodeSessionLifecycleCoordinator.ts`, `SettingsSectionCoordinator`, `OpenCodeSdkCapabilityDiscoveryCoordinator.ts`, `QuestionResolutionExecutionFacade.ts`, `SettingsCommandsSection.ts`, `OpenCodeStreamingFinalizationCoordinator.ts`, `BackgroundTaskNoticeStateService.ts`, `ClaudeCodePermissionBridge.ts`, `OpencodeModelConfigSubset`, `streaming/index.ts`, `CodexAdapter.ts`, `LocalProcessProbe`, `SettingsProjectAgentEditor.ts`, `MessageSendPreparationService.ts`, `RetainedSelectionHighlightService`, `SettingsModelCatalogPresenter.ts`, `ContextUsageSnapshot`, `ConversationHistoryActionsCoordinator`, `SettingsSecuritySection.ts`, `PluginRuntimeCoordinator.ts`, `ConversationWriteSerializationService.ts`, `OpencodeConfigManager.ts`, `liquidDiamondDemoWebgl.ts`, `AgentBackendRouting.ts`, `ModelConfigModal.ts`, `CodexAppServerTransport`, `MarkdownAgentWorkspaceService.ts`, `SettingsPluginSection.ts`, `normalizeContextPath`, `SettingsProjectCommandEditor.ts`, `OpenCodeEventSubscriptionCoordinator.ts`, `glassOctahedronDemo.ts`, `SettingsStylePresetSection.ts`, `PromptSuggestionService`, `ProviderIconService.ts`, `AcpClientManager`, `SkillContentExpander.ts`, `SettingsSkillSection.ts`, `SettingsModelSection.ts`, `formatDurationMs`, `SlashCommandExecutionHostFactory.ts`, `OpenCodeSyncEventRuntimeCoordinator.ts`, `ProjectConfigFileWatcher`, `SkillCatalogService.ts`, `LocalStreamMessagePersistence.ts`?**
-  _High betweenness centrality (0.066) - this node is a cross-community bridge._
+- **Why does `t()` connect `t` to `SettingsClaudeCodeSection`, `SettingsFormatterSection`, `BackgroundTaskTimelineService.ts`, `SettingsSkillSection`, `SettingsStyleSection`, `ClaudeCodeAdapter`, `MessageFinalizationHost.ts`, `SettingsClaudeCodeSection.ts`, `SessionTodo`, `SlashCommandExecutionService.ts`, `ChatHeaderPresenter`, `OpenCodianSettingTab`, `i18n/index.ts`, `Conversation`, `SettingsConversationSection`, `OpenCodianView.ts`, `QuestionRuntimeHostAdapter.ts`, `SettingsFormatterSection.ts`, `OpenCodianView`, `SettingsCapabilityLabSection.ts`, `ConversationLoadRecoveryHost`, `CodexProjectResourceDiscovery.ts`, `agents/index.ts`, `ClaudeProjectProviderConfig.ts`, `MessageSendPreparationHost`, `SettingsCapabilityLabSection`, `CodexMcpServerDetailModal`, `UserMessageContentRenderer.ts`, `tabs/index.ts`, `ComposerInputShellCoordinator`, `SlashCommandMenuCatalogCache.ts`, `ConversationSessionSettingsModal`, `QuestionDisplayMode`, `ContextFileCatalogIndex`, `.updateRuntimeProof`, `SettingsMcpSection.ts`, `QuestionRequest`, `SettingsTabbedRenderer`, `ModelSelectorSelection`, `obsidianContext.ts`, `SettingsStyleInputPanelSection.ts`, `ProviderIconService`, `InputPanelThemeRuntime.ts`, `ChatSelectionControlsCoordinator`, `SettingsToolSection`, `main.ts`, `slashCommandCatalog.ts`, `ModelPickerModal.ts`, `BackgroundTaskTimelineAssemblyService`, `.message`, `ConversationNoticeCoordinator.ts`, `SettingsAgentsSection`, `SessionActivityStatus`, `QuestionDockResolutionActionFacade.ts`, `ModelConfigModal`, `SettingsModelCatalogPresenter`, `AgentBackendRouting.ts`, `MessageSendPreparationService.ts`, `ConversationTabRuntimeCoordinator.ts`, `AssistantFooterPayload.ts`, `ConversationLoadRecoveryCoordinator.ts`, `SettingsSectionCoordinator`, `OpenCodianSettingsView`, `TitleGenerationService.ts`, `SettingsToolSection.ts`, `SettingsModelCatalogPresenter.ts`, `ConversationTabRuntimeCoordinatorHost`, `ChatSelectionControlsCoordinator.ts`, `SettingsCodexAccountSurface`, `SettingsProjectAgentEditor.ts`, `CodexAdapter.ts`, `ComposerInputShellCoordinatorHost`, `SettingsAcpSection`, `AssistantShellViewHostAdapter`, `ChatAgentSelectionCoordinator`, `EffortSelector`, `SettingsTabbedRenderer.ts`, `SlashCommandMenuItem`, `ConversationTabLifecycleRecoveryHost`, `.createComposerInputShellCoordinatorHost`, `ConversationHistoryActionsCoordinator`, `ProviderFormState`, `BackendSessionBrowserModal`, `TabContextState`, `SettingsAgentsSection.ts`, `SettingsServerSection`, `SettingsModelCatalogCoordinator.ts`, `ConversationTabOpenCoordinator.ts`, `PermissionModeSelectorCoordinator`, `SettingsSecuritySection`, `PermissionAction`, `ComposerInputShellCoordinator.ts`, `ModelConfigProviderEditor`, `ModelConfigModal.ts`, `PluginRuntimeCoordinator`, `SettingsStylePresetSection.ts`, `ContextDetailModal`, `QuestionResolution`, `createConversationLoadRecoveryHost`, `McpServerEditorModal.ts`, `SettingsPluginSection`, `.createChatHeaderPresenterHost`, `ContextUsageDisplayService`, `TabBar`, `modelConfigWorkspace.ts`, `Disposable`, `PermissionInlineCardRenderer.ts`, `SettingsCommandsSection.ts`, `AssistantShellViewHostAdapter.ts`, `QuestionInlineCardRenderer`, `SessionDiffEntry`, `PromptContextItem`, `OpencodeAgentConfigRecord`, `TooltipLayerController.ts`, `BackgroundTaskNoticeStateService`, `ProviderIconCacheModal`, `.attach`, `OpenCodeExperimentalActionModal`, `modelConfigStructuredOptions.ts`, `ModelPricingModal`, `SettingsCodexSection`, `SettingsSkillSection.ts`, `SettingsCodexAccountSurface.ts`, `PluginEvidenceSnapshot`, `ContextUsageService.ts`, `.ensureForElement`, `SettingsStyleBackgroundSection`, `SlashCommandExecutionHostFactory.ts`, `PermissionModeSelectorCoordinator.ts`, `CodexRuntimeDefaultsBadgeCoordinator.ts`, `slashCommandMenuRenderer.ts`, `.createConversationSessionSettingsCoordinatorHost`, `sendPipelineContent.ts`, `QuestionResolutionCardRenderer.ts`, `NavigationSidebar`, `SettingsProjectCommandEditor`, `SettingsUiSection`, `ChildSessionGraphCoordinator`, `SettingsModelIconCacheManager`, `SandboxConfigBadgeCoordinator.ts`, `SettingsDebugSection.ts`, `ToolDetailModal`, `.handleConfigPluginToggle`, `SettingsBackendSection`, `SettingsModelSection`, `providerPresets.ts`, `SettingsUiSection.ts`, `OpencodeConfigModal`, `ServerSettingHelpModal`, `SettingsModelSection.ts`, `ClaudeCodeHelpModal`, `ForkTargetModal`?**
+  _High betweenness centrality (0.219) - this node is a cross-community bridge._
+- **Why does `TabId` connect `TabId` to `QuestionRuntimeViewHost`, `ConversationSyncHostAdapter.ts`, `ConversationRenderService.ts`, `ChatMessage`, `BackgroundTaskTimelineService.ts`, `QuestionTodoBackgroundTaskRuntimeServiceBundle.ts`, `BackgroundConversationPostSyncHandoffHostAdapter.ts`, `AssistantShellViewHostAdapter`, `MessageFinalizationHost.ts`, `BackgroundTaskLiveSignalCoordinator`, `.constructor`, `AssistantShellRenderer`, `QuestionDockRenderStateFacade.ts`, `createConversationRenderHost`, `ConversationTabLifecycleRecoveryHost`, `SessionTodo`, `SlashCommandExecutionService.ts`, `Conversation`, `BackgroundTaskStreamTriggerCoordinator.ts`, `composerContext.ts`, `.createComposerInputShellCoordinatorHost`, `OpenCodianView.ts`, `ComposerContextViewFacade.ts`, `QuestionRuntimeHostAdapter.ts`, `TabContextState`, `QuestionPostResolutionRuntimeFacadeHost`, `OpenCodianView`, `SendPipelineTypes.ts`, `ConversationTabOpenCoordinator.ts`, `ConversationLoadRecoveryHost`, `ConversationSyncOrchestrationService`, `TabMessagesPaneCoordinator`, `MessageSendPreparationHost`, `.createConversationRuntimeWiring`, `tabs/index.ts`, `trailingAssistantPatchDebug.ts`, `QuestionResolution`, `QuestionRequest`, `TabBar`, `ConversationSyncBridge`, `getConversationBackendSessionId`, `PermissionInlineCardRenderer.ts`, `AssistantShellViewHostAdapter.ts`, `QuestionInlineCardRenderer`, `createTabActivationRuntimeBridgeHosts`, `SkillContentExpander.ts`, `BackgroundTaskTimelineAssemblyService`, `TabConversationStateBridgeHost`, `.message`, `BackgroundTaskNoticeStateService`, `renderGroups.ts`, `ConversationNoticeCoordinator.ts`, `SessionActivityStatus`, `ConversationTransitionBridge.ts`, `QuestionDockSlotCoordinator`, `QuestionDockResolutionActionFacade.ts`, `trailingAssistantPatchTypes.ts`, `MessageSendPreparationService.ts`, `ConversationTabRuntimeCoordinator.ts`, `AssistantFooterPayload.ts`, `trailingAssistantPatchExecution.ts`, `ConversationLoadRecoveryCoordinator.ts`, `TabRuntimeStateBridge.ts`, `ContextUsageSnapshot`, `SlashCommandExecutionHostFactory.ts`?**
+  _High betweenness centrality (0.112) - this node is a cross-community bridge._
+- **Why does `createLogger()` connect `i18n/index.ts` to `backend/index.ts`, `OpenCodeServiceLifecycleCoordinator`, `ConversationSyncHostAdapter.ts`, `ChatMessage`, `BackgroundTaskTimelineService.ts`, `SettingsSkillSection`, `OpenCodeService.ts`, `SessionTodo`, `SlashCommandExecutionService.ts`, `ChatHeaderPresenter`, `CodexAppServerClient.ts`, `ServerManager`, `OpenCodeSdkFacade.ts`, `OpenCodianView.ts`, `logger.ts`, `SettingsFormatterSection.ts`, `SendPipelineTypes.ts`, `ClaudeCodeStreamNormalizer.ts`, `SettingsCapabilityLabSection.ts`, `OpenCodeEventSubscriptionCoordinator.ts`, `OpenCodeSdkCapabilityDiscoveryCoordinator.ts`, `trailingAssistantPatchDebug.ts`, `ClaudeCodePermissionBridge.ts`, `SettingsMcpSection.ts`, `QuestionRequest`, `SettingsTabbedRenderer`, `ModelSelectorSelection`, `getConversationBackendSessionId`, `ProviderIconService`, `shared/index.ts`, `OpenCodeStreamingRuntimeCoordinator.ts`, `ModelConfigService.ts`, `OpenCodeQuestionPermissionHub.ts`, `main.ts`, `QuestionDockResolutionActionFacade.ts`, `AgentBackendRouting.ts`, `MessageSendPreparationService.ts`, `streaming/index.ts`, `OpenCodeStreamingFinalizationCoordinator.ts`, `ConversationLoadRecoveryCoordinator.ts`, `chat.ts`, `ContextUsageSnapshot`, `SettingsModelCatalogPresenter.ts`, `LocalSidecarLauncher`, `LocalProcessProbe`, `SettingsProjectAgentEditor.ts`, `AgentBackendKind`, `InputPanelAppearanceCoordinator`, `RetainedSelectionHighlightService`, `CodexAdapter.ts`, `OpenCodeSessionControlOrchestrator.ts`, `liquidDiamondDemoWebgl.ts`, `providerIconAssetCache.ts`, `ConversationWriteSerializationService.ts`, `ProviderIconService.ts`, `SettingsAgentsSection.ts`, `SettingsModelCatalogCoordinator.ts`, `ComposerInputShellCoordinator.ts`, `MarkdownAgentWorkspaceService.ts`, `ModelConfigModal.ts`, `CodexAppServerTransport`, `ConversationMetadataCache.ts`, `SettingsStylePresetSection.ts`, `glassOctahedronDemo.ts`, `SettingsCommandsSection.ts`, `PromptSuggestionService`, `AcpClientManager`, `SkillContentExpander.ts`, `StorageService.ts`, `formatDurationMs`, `SettingsSkillSection.ts`, `SlashCommandExecutionHostFactory.ts`, `OpenCodeSessionLifecycleCoordinator.ts`, `OpenCodeSyncEventRuntimeCoordinator.ts`, `ProjectConfigFileWatcher`, `OpencodeConfigManager.ts`, `LocalStreamMessagePersistence.ts`, `SettingsDebugSection.ts`, `ClaudeUserMessageIdentityBackfillService.ts`?**
+  _High betweenness centrality (0.064) - this node is a cross-community bridge._
 - **What connects `logger`, `AcpNotification`, `AcpAgentRuntime` to the rest of the system?**
   _996 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `OpenCodeService` be split into smaller, more focused modules?**
-  _Cohesion score 0.019275806161052064 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.01945595388218339 - nodes in this community are weakly interconnected._
 - **Should `types/index.ts` be split into smaller, more focused modules?**
-  _Cohesion score 0.02824858757062147 - nodes in this community are weakly interconnected._
-- **Should `ConversationSyncHostAdapter.ts` be split into smaller, more focused modules?**
-  _Cohesion score 0.02917933130699088 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.03562054743157105 - nodes in this community are weakly interconnected._
+- **Should `SettingsClaudeCodeSection` be split into smaller, more focused modules?**
+  _Cohesion score 0.047658402203856746 - nodes in this community are weakly interconnected._

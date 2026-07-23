@@ -27,7 +27,7 @@
 
 ## 核心行为
 
-- `render()` 同时发现项目 + 全局 commands/skills/agents，按类型分组渲染。每组是扁平语义组：组头行（h4 标题 + 右侧 compact primary「新建」按钮）+ muted 计数行（`groupSummary`）+ ScrollArea 有界列表（viewport max-height `min(38vh, 360px)`）。
+- `render()` 同时发现项目 + 全局 commands/skills/agents，按类型分组渲染。每组是扁平语义组：组头行（h4 标题 + 右侧 compact primary「新建」按钮）+ muted 计数行（`groupSummary`）+ ScrollArea 有界列表。Skills & Commands 保持 viewport max-height `min(38vh, 360px)`；独立 Agents tab 在首帧和异步 discovery 完成后各测量一次 viewport 顶部，将最终剩余设置窗口高度写入 `--opencodian-settings-scrollarea-available-height`，由其 viewport 填充且继续在内部滚动。
 - 读取 `plugin.settings.backendSettings.claudeCode.settingSources` 判定 `user` 来源是否启用（不改 source 开关运行时语义）。
 - 全局资源始终只读列出；状态徽章区分：`user` 启用→「全局 · 已启用」(`is-global`)，未启用→「全局 · 已发现，未启用」(`is-global-disabled`)。`user` 未启用时额外显示来源提示（整框 1px warning 边框 + tonal 底的 quiet Alert，不再使用左侧色条）。
 - 项目资源始终为「项目」(`is-project`)，绝不误标 global/disabled。

@@ -13566,6 +13566,13 @@ img.opencodian-model-provider-header-icon {
   max-height: min(38vh, 360px);
 }
 
+/* Agents is a standalone tab, so its single list fills the remaining settings pane. */
+.opencodian-settings [data-claude-code-section='agents'] .opencodian-claude-resource-scroll > .opencodian-settings-scrollarea-viewport {
+  flex: 1 1 auto;
+  height: var(--opencodian-settings-scrollarea-available-height, auto);
+  max-height: var(--opencodian-settings-scrollarea-available-height, min(58vh, 640px));
+}
+
 /* Resource row-card: name + scope badge + actions / description / mono path. */
 .opencodian-claude-resource-row {
   display: flex;

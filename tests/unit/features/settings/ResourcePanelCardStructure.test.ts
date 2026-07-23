@@ -56,6 +56,72 @@ describe('resource panel card structure (unified Claude + Codex)', () => {
     }
   });
 
+  it('lets only the standalone Claude Agents list consume the measured remaining settings height', async () => {
+    const css = readFileSync(
+      join(process.cwd(), 'src/style/components/settings-claude-resources.css'),
+      'utf8',
+    );
+    expect(css).toContain('max-height: min(38vh, 360px);');
+    expect(css).toMatch(
+      /\[data-claude-code-section='agents'\][\s\S]*?\.opencodian-settings-scrollarea-viewport\s*\{[\s\S]*?flex:\s*1 1 auto;[\s\S]*?height:\s*var\(--opencodian-settings-scrollarea-available-height, auto\);[\s\S]*?max-height:\s*var\(--opencodian-settings-scrollarea-available-height, min\(58vh, 640px\)\);/u,
+    );
+
+    const originalRequestAnimationFrame = window.requestAnimationFrame;
+    const originalInnerHeight = window.innerHeight;
+    const animationFrames: FrameRequestCallback[] = [];
+    window.requestAnimationFrame = ((callback: FrameRequestCallback): number => {
+      animationFrames.push(callback);
+      return animationFrames.length;
+    }) as typeof window.requestAnimationFrame;
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 960 });
+    const containerEl = document.createElement('div');
+    containerEl.dataset.claudeCodeSection = 'agents';
+    document.body.appendChild(containerEl);
+
+    try {
+      const section = new SettingsClaudeResourcesSection({
+        plugin: {
+          app: makeApp(),
+          settings: { backendSettings: { claudeCode: { settingSources: ['project'] } } },
+        } as any,
+        kinds: ['agent'],
+      });
+      section.render(containerEl);
+
+      const scrollEl = containerEl.querySelector<HTMLElement>('.opencodian-claude-resource-scroll');
+      const viewportEl = scrollEl?.querySelector<HTMLElement>(':scope > .opencodian-settings-scrollarea-viewport');
+      expect(scrollEl).not.toBeNull();
+      expect(viewportEl).not.toBeNull();
+      if (!scrollEl || !viewportEl) {
+        throw new Error('Expected Claude Agents scrollarea');
+      }
+      let viewportTop = 800;
+      viewportEl.getBoundingClientRect = jest.fn(() => ({
+        bottom: 420,
+        height: 360,
+        left: 0,
+        right: 100,
+        top: viewportTop,
+        width: 100,
+        x: 0,
+        y: viewportTop,
+        toJSON: () => ({}),
+      }));
+
+      animationFrames.shift()?.(Date.now());
+      expect(scrollEl.style.getPropertyValue('--opencodian-settings-scrollarea-available-height')).toBe('280px');
+      await new Promise((resolve) => window.setTimeout(resolve, 0));
+      viewportTop = 420;
+      expect(animationFrames).toHaveLength(1);
+      animationFrames.shift()?.(Date.now());
+      expect(scrollEl.style.getPropertyValue('--opencodian-settings-scrollarea-available-height')).toBe('516px');
+    } finally {
+      window.requestAnimationFrame = originalRequestAnimationFrame;
+      Object.defineProperty(window, 'innerHeight', { configurable: true, value: originalInnerHeight });
+      containerEl.remove();
+    }
+  });
+
   it('Codex renders independent per-type group cards (skills, agents)', () => {
     const containerEl = document.createElement('div');
     const section = new SettingsCodexResourcesSection({

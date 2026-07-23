@@ -203,6 +203,7 @@ export class SettingsClaudeResourcesSection {
     const listEl = viewportEl.createDiv({
       cls: 'opencodian-settings-scrollarea-content opencodian-claude-resource-list',
     });
+    this.syncAgentScrollAreaHeight(bodyEl, scrollEl, viewportEl);
 
     if (!context.vaultPath) {
       summaryEl.remove();
@@ -224,11 +225,33 @@ export class SettingsClaudeResourcesSection {
           cls: 'opencodian-settings-inline-empty',
           text: t('settings.claudeCode.resources.empty'),
         });
+      } else {
+        for (const item of items) {
+          this.renderResourceRow(listEl, item, context);
+        }
+      }
+      this.syncAgentScrollAreaHeight(bodyEl, scrollEl, viewportEl);
+    });
+  }
+
+  /**
+   * The standalone Agents tab has one resource group, so its ScrollArea can
+   * safely take the remaining settings-window height. Skills & Commands keeps
+   * its per-group cap to prevent either list from monopolizing the panel.
+   */
+  private syncAgentScrollAreaHeight(bodyEl: HTMLElement, scrollEl: HTMLElement, viewportEl: HTMLElement): void {
+    if (bodyEl.dataset.claudeCodeSection !== 'agents') {
+      return;
+    }
+
+    window.requestAnimationFrame(() => {
+      if (!scrollEl.isConnected || !viewportEl.isConnected) {
         return;
       }
-      for (const item of items) {
-        this.renderResourceRow(listEl, item, context);
-      }
+
+      const viewportTop = viewportEl.getBoundingClientRect().top;
+      const availableHeight = Math.max(280, Math.floor(window.innerHeight - viewportTop - 24));
+      scrollEl.style.setProperty('--opencodian-settings-scrollarea-available-height', `${availableHeight}px`);
     });
   }
 
