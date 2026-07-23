@@ -13153,10 +13153,11 @@ img.opencodian-model-provider-header-icon {
   min-width: 0;
 }
 
-.opencodian-settings-codex-group-title {
+.opencodian-settings .opencodian-settings-codex-group-title {
   margin: 0 0 4px;
-  padding-left: 0;
-  padding-inline-start: 0;
+  /* Beat Obsidian's `.vertical-tab-content h4` horizontal padding so the
+     title text starts at the same edge as the group description. */
+  padding: 0;
   font-size: var(--font-ui-small);
   font-weight: 600;
   color: var(--text-normal);
@@ -13256,11 +13257,11 @@ img.opencodian-model-provider-header-icon {
   margin-top: var(--opencodian-settings-space-lg, 12px);
 }
 
-/* Group header: title on the left, primary create action on the right. */
+/* Group header: title and its primary create action stay as one compact pair. */
 .opencodian-codex-resource-group-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 8px;
 }
 
@@ -13515,11 +13516,11 @@ img.opencodian-model-provider-header-icon {
   margin-top: var(--opencodian-settings-space-lg, 12px);
 }
 
-/* Group header: title on the left, primary create action on the right. */
+/* Group header: title and its primary create action stay as one compact pair. */
 .opencodian-claude-resource-group-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 8px;
 }
 

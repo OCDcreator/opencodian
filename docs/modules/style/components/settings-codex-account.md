@@ -34,7 +34,7 @@ Codex 账号与能力产品面的专用样式。把四个官方 app-server 表�
 
 ### `.opencodian-settings-codex-group`
 
-Codex 设置面板的三大分组容器（连接与运行默认项 / 恢复与检查 / 账号与 provider 状态）。分组标题使用 `h4`，标题自身左 padding 固定为 `0`（同时设置 `padding-inline-start: 0`，避免主题 heading 缩进），描述使用 muted 文本。分组本身不再使用 `margin` 控制间距，而是依赖内部 stack 和相邻分组选择器（`+`）的 `margin-top: var(--oc-codex-card-gap)`。
+Codex 设置面板的三大分组容器（连接与运行默认项 / 恢复与检查 / 账号与 provider 状态）。分组标题使用 `h4`；`.opencodian-settings .opencodian-settings-codex-group-title` 以更高特异性设置 `padding: 0`，覆盖 Obsidian `.vertical-tab-content h4` 的水平 padding，使标题文本与 muted 描述左缘对齐。分组本身不再使用 `margin` 控制间距，而是依赖内部 stack 和相邻分组选择器（`+`）的 `margin-top: var(--oc-codex-card-gap)`。
 
 ### `.opencodian-settings-codex-connection-summary`
 

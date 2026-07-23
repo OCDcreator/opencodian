@@ -472,10 +472,11 @@
   min-width: 0;
 }
 
-.opencodian-settings-codex-group-title {
+.opencodian-settings .opencodian-settings-codex-group-title {
   margin: 0 0 4px;
-  padding-left: 0;
-  padding-inline-start: 0;
+  /* Beat Obsidian's `.vertical-tab-content h4` horizontal padding so the
+     title text starts at the same edge as the group description. */
+  padding: 0;
   font-size: var(--font-ui-small);
   font-weight: 600;
   color: var(--text-normal);

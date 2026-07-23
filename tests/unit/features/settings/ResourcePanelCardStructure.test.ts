@@ -9,6 +9,9 @@
  */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { SettingsClaudeResourcesSection } from '../../../../src/features/settings/SettingsClaudeResourcesSection';
 import { SettingsCodexResourcesSection } from '../../../../src/features/settings/SettingsCodexResourcesSection';
 
@@ -30,6 +33,24 @@ function makeApp() {
 }
 
 describe('resource panel card structure (unified Claude + Codex)', () => {
+  it('keeps each resource group heading and create action as a compact aligned pair', () => {
+    for (const [fileName, selector] of [
+      ['settings-claude-resources.css', '.opencodian-claude-resource-group-header'],
+      ['settings-codex-resources.css', '.opencodian-codex-resource-group-header'],
+    ] as const) {
+      const css = readFileSync(
+        join(process.cwd(), 'src/style/components', fileName),
+        'utf8',
+      );
+      const rule = css.match(new RegExp(`${selector.replaceAll('.', '\\.')}\\s*\\{[\\s\\S]*?\\}`))?.[0] ?? '';
+
+      expect(rule).toContain('display: flex;');
+      expect(rule).toContain('align-items: center;');
+      expect(rule).toContain('justify-content: flex-start;');
+      expect(rule).toContain('gap: 8px;');
+    }
+  });
+
   it('Codex renders independent per-type group cards (skills, agents)', () => {
     const containerEl = document.createElement('div');
     const section = new SettingsCodexResourcesSection({

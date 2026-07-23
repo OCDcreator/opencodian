@@ -27,11 +27,11 @@
   margin-top: var(--opencodian-settings-space-lg, 12px);
 }
 
-/* Group header: title on the left, primary create action on the right. */
+/* Group header: title and its primary create action stay as one compact pair. */
 .opencodian-codex-resource-group-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 8px;
 }
 

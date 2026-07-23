@@ -1195,6 +1195,17 @@ describe('OpenCodianSettingTab title styling', () => {
     expect(css).not.toMatch(/opencodian-settings-quick-nav-tooltip-bubble\s*\{[\s\S]*backdrop-filter:/);
   });
 
+  it('keeps Codex group heading text flush with its description inside Obsidian tab content', () => {
+    const css = readFileSync(
+      join(process.cwd(), 'src/style/components/settings-codex-account.css'),
+      'utf8',
+    );
+
+    expect(css).toMatch(
+      /\.opencodian-settings\s+\.opencodian-settings-codex-group-title\s*\{[\s\S]*padding:\s*0;/,
+    );
+  });
+
   it('keeps the quick-nav tooltip below the shared settings tooltip and popover layers', () => {
     const overlayCss = readFileSync(
       join(process.cwd(), 'src/style/components/model-selector.css'),
