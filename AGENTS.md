@@ -132,6 +132,7 @@ This project is indexed by GitNexus as **opencodian** (36969 symbols, 83730 rela
 
 - **MUST run impact analysis before editing any symbol.** Before modifying a function, class, or method, run `impact({target: "symbolName", direction: "upstream"})` and report the blast radius (direct callers, affected processes, risk level) to the user.
 - **MUST run `detect_changes()` before committing** to verify your changes only affect expected symbols and execution flows. For regression review, compare against the default branch: `detect_changes({scope: "compare", base_ref: "main"})`.
+- **Large-diff resilience for `detect_changes()`:** Run it after source changes but before `npm run graphify:update:src` or staging generated `graphify-out/` output. The generated `graph.json` can create a huge hunk diff that triggers GitNexus/LadybugDB `Transport closed`. Retry once only with a narrow source-only scope; if it closes again, report the analysis infrastructure failure separately and use `git diff --check`, CLI index status, and the independent repository validation gates.
 - **MUST warn the user** if impact analysis returns HIGH or CRITICAL risk before proceeding with edits.
 - When exploring unfamiliar code, use `query({search_query: "concept"})` to find execution flows instead of grepping. It returns process-grouped results ranked by relevance.
 - When you need full context on a specific symbol — callers, callees, which execution flows it participates in — use `context({name: "symbolName"})`.

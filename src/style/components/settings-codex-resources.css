@@ -27,18 +27,17 @@
   margin-top: var(--opencodian-settings-space-lg, 12px);
 }
 
-/* Group header: title and its primary create action stay as one compact pair. */
+/* Group header: title stays left; its primary create action stays right. */
 .opencodian-codex-resource-group-header {
   display: flex;
   align-items: center;
-  justify-content: flex-start;
+  justify-content: space-between;
   gap: 8px;
 }
 
-.opencodian-codex-resource-group-title {
+.opencodian-settings .opencodian-codex-resource-group-title {
   margin: 0;
-  padding-left: 0;
-  padding-inline-start: 0;
+  padding: 0;
   font-size: var(--font-ui-small);
   font-weight: 600;
   color: var(--text-normal);

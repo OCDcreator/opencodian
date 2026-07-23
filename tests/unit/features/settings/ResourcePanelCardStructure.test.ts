@@ -33,7 +33,7 @@ function makeApp() {
 }
 
 describe('resource panel card structure (unified Claude + Codex)', () => {
-  it('keeps each resource group heading and create action as a compact aligned pair', () => {
+  it('keeps each resource group title left and create action right while vertically aligned', () => {
     for (const [fileName, selector] of [
       ['settings-claude-resources.css', '.opencodian-claude-resource-group-header'],
       ['settings-codex-resources.css', '.opencodian-codex-resource-group-header'],
@@ -46,8 +46,13 @@ describe('resource panel card structure (unified Claude + Codex)', () => {
 
       expect(rule).toContain('display: flex;');
       expect(rule).toContain('align-items: center;');
-      expect(rule).toContain('justify-content: flex-start;');
+      expect(rule).toContain('justify-content: space-between;');
       expect(rule).toContain('gap: 8px;');
+
+      const titleSelector = selector.replace('-group-header', '-group-title');
+      const titleRule = css.match(new RegExp(`\\.opencodian-settings\\s+${titleSelector.replaceAll('.', '\\.')}\\s*\\{[\\s\\S]*?\\}`))?.[0] ?? '';
+      expect(titleRule).toContain('margin: 0;');
+      expect(titleRule).toContain('padding: 0;');
     }
   });
 
