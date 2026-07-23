@@ -52,13 +52,15 @@ import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { getVaultBasePath } from '../../shared';
 
-type ClaudeResourceKind = 'command' | 'skill' | 'agent';
+export type ClaudeResourceKind = 'command' | 'skill' | 'agent';
 
 export interface SettingsClaudeResourcesSectionOptions {
   plugin: OpenCodianPlugin;
   createSectionHeading: (containerEl: HTMLElement, title: string, tooltip?: string) => HTMLHeadingElement;
   /** Invoked after a successful project mutation to invalidate the runtime/menu catalog. */
   onAfterMutation?: () => void;
+  /** Restricts this instance to focused resource tabs while preserving shared CRUD behavior. */
+  kinds?: readonly ClaudeResourceKind[];
 }
 
 export interface ClaudeResourceScopeStatus {
@@ -138,44 +140,37 @@ export class SettingsClaudeResourcesSection {
 
     const ctx = { vaultPath, onReload: () => this.render(bodyEl), userSourceEnabled };
 
-    this.renderResourceGroup(
-      bodyEl,
-      t('settings.claudeCode.resources.commands'),
-      {
+    const kinds = this.options.kinds ?? ['command', 'skill', 'agent'];
+    if (kinds.includes('command')) {
+      this.renderResourceGroup(bodyEl, t('settings.claudeCode.resources.commands'), {
         kind: 'command',
         discover: async () => [
           ...(await discoverClaudeProjectCommands(vaultPath)),
           ...(await discoverClaudeGlobalCommands(homePath)),
         ],
         ...ctx,
-      },
-    );
-
-    this.renderResourceGroup(
-      bodyEl,
-      t('settings.claudeCode.resources.skills'),
-      {
+      });
+    }
+    if (kinds.includes('skill')) {
+      this.renderResourceGroup(bodyEl, t('settings.claudeCode.resources.skills'), {
         kind: 'skill',
         discover: async () => [
           ...(await discoverClaudeProjectSkills(vaultPath)),
           ...(await discoverClaudeGlobalSkills(homePath)),
         ],
         ...ctx,
-      },
-    );
-
-    this.renderResourceGroup(
-      bodyEl,
-      t('settings.claudeCode.resources.agents'),
-      {
+      });
+    }
+    if (kinds.includes('agent')) {
+      this.renderResourceGroup(bodyEl, t('settings.claudeCode.resources.agents'), {
         kind: 'agent',
         discover: async () => [
           ...(await discoverClaudeProjectAgents(vaultPath)),
           ...(await discoverClaudeGlobalAgents(homePath)),
         ],
         ...ctx,
-      },
-    );
+      });
+    }
   }
 
   private renderResourceGroup(

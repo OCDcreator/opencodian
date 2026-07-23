@@ -220,6 +220,28 @@ describe('ClaudeCodeOptionsBuilder runtime injections', () => {
 
     expect(options.fallbackModel).toBe('claude-sonnet-4-5');
   });
+
+  it('omits persisted default model options after provider migration while preserving an explicit session override', () => {
+    const settings = getDefaultClaudeCodeBackendSettings();
+    settings.providers.modelMigrationDone = true;
+    const defaultOptions = buildClaudeCodeOptions({
+      vaultPath: '/vault/project',
+      settings,
+    });
+    const sessionOverrideOptions = buildClaudeCodeOptions({
+      vaultPath: '/vault/project',
+      settings,
+      model: 'claude-opus-4-5',
+      fallbackModel: 'claude-haiku-4-5',
+    });
+
+    expect(defaultOptions).not.toHaveProperty('model');
+    expect(defaultOptions).not.toHaveProperty('fallbackModel');
+    expect(sessionOverrideOptions).toMatchObject({
+      model: 'claude-opus-4-5',
+      fallbackModel: 'claude-haiku-4-5',
+    });
+  });
 });
 
 describe('ClaudeCodeOptionsBuilder sandbox', () => {

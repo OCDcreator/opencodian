@@ -205,6 +205,50 @@ describe('normalizeClaudeCodeBackendSettings (new fields)', () => {
   });
 });
 
+describe('normalizeClaudeProviderSettings', () => {
+  it('always restores the immutable official preset and removes reserved extra env keys', () => {
+    const result = normalizeClaudeCodeBackendSettings({
+      providers: {
+        activePresetId: 'gateway',
+        modelMigrationDone: true,
+        lastAppliedManagedEnvKeys: ['FOO', 'ANTHROPIC_AUTH_TOKEN'],
+        presets: [
+          { id: 'official', name: 'Edited official', baseUrl: 'https://bad.example', extraEnv: {} },
+          {
+            id: 'gateway',
+            name: ' Gateway ',
+            baseUrl: 'https://gateway.example.com/',
+            authToken: ' token ',
+            model: ' model ',
+            fallbackModel: ' fallback ',
+            haikuModel: ' haiku ',
+            extraEnv: { FOO: '1', ANTHROPIC_AUTH_TOKEN: 'must-not-survive' },
+          },
+        ],
+      },
+    });
+
+    expect(result.providers).toEqual({
+      activePresetId: 'gateway',
+      modelMigrationDone: true,
+      lastAppliedManagedEnvKeys: ['FOO'],
+      presets: [
+        expect.objectContaining({ id: 'official', name: 'Anthropic Official', baseUrl: '' }),
+        {
+          id: 'gateway',
+          name: 'Gateway',
+          baseUrl: 'https://gateway.example.com',
+          authToken: 'token',
+          model: 'model',
+          fallbackModel: 'fallback',
+          haikuModel: 'haiku',
+          extraEnv: { FOO: '1' },
+        },
+      ],
+    });
+  });
+});
+
 describe('normalizeClaudeCodeSandboxSettings', () => {
   it('returns default sandbox policy for undefined', () => {
     const defaults = getDefaultClaudeCodeBackendSettings();

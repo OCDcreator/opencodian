@@ -55,7 +55,7 @@ registry 里的 `backendRequired` 是设置 surface 的后端边界声明：Open
 
 `settingsLayoutMode` 为 `'classic'` 时不使用本 registry。为 `'tabbed'` 时，`SettingsTabbedRenderer` 读取本 registry 构建标签栏并路由内容面板。带 `backendRequired` 的标签只在对应 backend 是当前 `activeBackend` 时显示，而不是只要该 backend 出现在 `enabledBackends` 就显示。OpenCode 专属标签因此不会在 Claude Code active 时露出，`claude-code` 标签也不会在 OpenCode active 时露出。
 
-Claude Code 的二级标签拆成 `runtime`、`model-thinking`、`permissions`、`context-sources`、`tools`，分别承载运行时/环境变量、模型与思考配置及轮数/预算限制、权限模式、上下文来源与额外目录、工具 allow/block。旧的 `mcp-advanced` 二级标签会迁移到 `tools`，旧的 `limits` 二级标签会迁移到 `model-thinking`，旧的 `sdk-foundations` 已移除（实验性/诊断性控制移至 Capability Lab）；避免用户停留在已移除标签时回到空白或默认页；新增或移除二级标签时需要同步 `SettingsClaudeCodeSection.renderTabContent()` 与 locale key。
+Claude Code 的二级标签为 `runtime`、`providers`、`model-thinking`、`permissions`、`context-sources`、`tools`、`mcp`、`skills-commands`、`agents`。`model-thinking` 只承载 thinking/effort；query limits 与 prompt behavior 在 `runtime`；`tools` 只承载 tool policy + question UX；MCP runtime 在 `mcp`。旧 `mcp-advanced` 迁移到 `mcp`、旧 `limits` 迁移到 `runtime`、旧 `resources` 迁移到 `skills-commands`，避免持久化选择落入空白页；新增或移除二级标签时需要同步 `SettingsClaudeCodeSection.renderTabContent()` 与 locale key。
 
 Codex 的二级标签拆成 `connection`（连接来源摘要与运行时默认值）、`resume-inspect`（会话恢复与后端实时回读）、`account`（账号身份、用量、速率限制与 provider 能力）。新增或移除二级标签时需要同步 `SettingsCodexSection.renderTabContent()` 与 locale key。
 

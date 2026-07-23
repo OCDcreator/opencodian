@@ -1,7 +1,7 @@
 # backend/index
 
 > **源码**: `src/core/agents/backend/index.ts`
-> **最近更新**: 2026-06-13
+> **最近更新**: 2026-07-23 — 新增 `ClaudeProjectProviderConfig`：唯一可写边界为 `<vault>/.claude/settings.local.json`，用户层与 shell 配置只读展示。
 
 > **新增导出**: `CodexProjectResourceDiscovery`（Codex 项目/全局 skills+agents discovery 与安全 CRUD）、`ClaudeCodeProcessMissingReason`、`AppServerSkill`/`AppServerListSkillsOptions`（经 CodexAppServerClient re-export）。
 
@@ -31,6 +31,8 @@
 - `ClaudeProjectSkillInfo` / `discoverClaudeProjectSkills`: Claude 项目 `.claude/skills/<name>/SKILL.md` 的只读文件系统 discovery 类型与扫描函数；用于 settings/chat discovery，不代表 SDK runtime 已加载或允许执行该 skill。
 - `ClaudeProjectCommandInfo` / `discoverClaudeProjectCommands`: Claude 项目 `.claude/commands/<name>.md` 的只读文件系统 discovery 类型与扫描函数；用于 settings discovery。
 - `ClaudeProjectAgentInfo` / `discoverClaudeProjectAgents`: Claude 项目 `.claude/agents/<name>.md` 的只读文件系统 discovery 类型与扫描函数；用于 settings discovery 和 `@agent` mention 候选来源。
+- `readClaudeProviderConfigSnapshot` / `maskClaudeProviderConfigSnapshot` / `resolveClaudeProviderGlobalEffectiveValue`: 读取并掩码 user/project/local 三个 Claude settings 层及受限 shell 环境；只提供只读对照，不会写入 `~/.claude/**`。
+- `applyClaudeProviderPreset` / `migrateClaudeProviderModels` / `validateClaudeProviderPreset`: 项目 provider preset 的受管键投影、单次旧 model migration 与行内校验。写入仅经安全原子写入落到 vault 的 local settings 文件，并保留未知键。
 - `PromptSuggestionsReadbackProbeResult`: Claude Code `promptSuggestions` 选项 readback probe 结果类型；诊断专用，不验证实际 SDK emission。
 - `SystemPromptLiveProbeResult`: Claude Code `systemPrompt` 选项 live behavior probe 结果类型；通过 nonce-bearing diagnostic query 验证同一条 preset-with-append SDK 路径确实影响模型响应。2026-06-04 将 System Prompt 矩阵分类从 `readback` 晋升为 `pass`，但最终 `pass` 依赖 readback wiring + same-path live proof 两层互补证据。
 - `SystemPromptReadbackProbeResult`: Claude Code `systemPrompt` 选项 readback probe 结果类型；诊断专用，验证 settings→SDK option mapping，不声称行为验证。

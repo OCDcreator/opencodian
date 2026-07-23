@@ -21,6 +21,10 @@ OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings`、`DEFAULT_
 
 ## 核心类型 / 接口
 
+### Claude project provider presets（2026-07-23）
+
+`ClaudeCodeBackendSettings.providers` 保存 `ClaudeProviderSettings`：不可变的 `Anthropic Official` preset、active preset id、上次受管 extra-env 键和一次性 model migration 标志。`ClaudeProviderPreset` 的 `fallbackModel` 是可选字符串；normalizer 会恢复官方 preset、清理重复/无效项，并拒绝 extra-env 覆盖 `ANTHROPIC_BASE_URL`、`ANTHROPIC_AUTH_TOKEN`、`ANTHROPIC_DEFAULT_HAIKU_MODEL`。旧 `model` / `fallbackModel` 字段仅为 local-source gate 解除后的单次迁移保留；迁移完成后为空，使 OptionsBuilder 自动省略持久默认 SDK model/fallback option。
+
 ### 顶层设置
 
 | 类型 | 说明 |

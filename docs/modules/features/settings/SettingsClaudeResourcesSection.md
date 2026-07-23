@@ -5,6 +5,10 @@
 
 ## 概述
 
+### 2026-07-23 标签拆分
+
+构造参数 `kinds` 允许 host 只渲染指定资源种类：Claude `skills-commands` 传 `['skill', 'command']`，`agents` 传 `['agent']`。项目可写、全局只读、来源 badge 和 mutation 后的 catalog 失效语义不变；原 Claude `resources` tab 不再存在。
+
 `SettingsClaudeResourcesSection.ts` 是 Claude 资源管理设置面板的渲染 owner。它在 Claude Code 设置的 `resources` 二级 tab 下展示项目（可编辑）与全局（只读）的 Claude commands（`.claude/commands/<name>.md`）、skills（`.claude/skills/<name>/SKILL.md`）和 agents（`.claude/agents/<name>.md`），并提供创建/编辑/删除项目资源的入口。
 
 本模块是纯渲染薄层，所有写入逻辑与校验都委托给经过测试的 Claude discovery CRUD 函数；本模块不包含任何写逻辑。

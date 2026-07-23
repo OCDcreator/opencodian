@@ -152,6 +152,20 @@ export {
   validateClaudeCommandContent,
 } from './ClaudeProjectCommandDiscovery';
 export {
+  applyClaudeProviderPreset,
+  type ApplyClaudeProviderPresetResult,
+  type ClaudeProviderConfigLayer,
+  type ClaudeProviderConfigSnapshot,
+  type ClaudeProviderPresetValidation,
+  maskClaudeProviderConfigSnapshot,
+  maskClaudeProviderValue,
+  migrateClaudeProviderModels,
+  type MigrateClaudeProviderModelsResult,
+  readClaudeProviderConfigSnapshot,
+  resolveClaudeProviderGlobalEffectiveValue,
+  validateClaudeProviderPreset,
+} from './ClaudeProjectProviderConfig';
+export {
   type ClaudeHookEntry,
   type ClaudeHookGroup,
   type ClaudeHooksConfig,

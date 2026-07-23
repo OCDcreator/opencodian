@@ -52,6 +52,58 @@ export {
   normalizeClaudeCodeDebugChannelSettings,
 };
 
+/** A project-scoped Anthropic-compatible provider profile. */
+export interface ClaudeProviderPreset {
+  /** Stable local identifier. The built-in profile always uses `official`. */
+  id: string;
+  name: string;
+  baseUrl: string;
+  authToken: string;
+  model: string;
+  /** Optional single fallback model, written as the Claude settings array shape. Readback covers settings projection only; automatic fallback switching remains unverified. */
+  fallbackModel: string;
+  haikuModel: string;
+  extraEnv: Record<string, string>;
+}
+
+/** Persisted state for the project-level provider preset surface. */
+export interface ClaudeProviderSettings {
+  presets: ClaudeProviderPreset[];
+  activePresetId: string;
+  /** Extra environment keys owned by the last successful preset apply. */
+  lastAppliedManagedEnvKeys: string[];
+  /** Guards the one-time migration from legacy plugin model fields. */
+  modelMigrationDone: boolean;
+}
+
+/** Environment keys which are controlled by dedicated provider fields. */
+export const CLAUDE_PROVIDER_MANAGED_ENV_KEYS = [
+  'ANTHROPIC_BASE_URL',
+  'ANTHROPIC_AUTH_TOKEN',
+  'ANTHROPIC_DEFAULT_HAIKU_MODEL',
+] as const;
+
+/** Immutable built-in restore target. Always materialize a fresh copy before persisting. */
+export const CLAUDE_OFFICIAL_PROVIDER_PRESET: Readonly<ClaudeProviderPreset> = Object.freeze({
+  id: 'official',
+  name: 'Anthropic Official',
+  baseUrl: '',
+  authToken: '',
+  model: '',
+  fallbackModel: '',
+  haikuModel: '',
+  extraEnv: {},
+});
+
+export function getDefaultClaudeProviderSettings(): ClaudeProviderSettings {
+  return {
+    presets: [{ ...CLAUDE_OFFICIAL_PROVIDER_PRESET, extraEnv: {} }],
+    activePresetId: 'official',
+    lastAppliedManagedEnvKeys: [],
+    modelMigrationDone: false,
+  };
+}
+
 export interface SandboxFilesystemConfig {
   /** Additional paths where sandboxed commands can write. Merged across all settings scopes. */
   allowWrite: string[];
@@ -148,6 +200,8 @@ export interface ClaudeCodeBackendSettings {
   pricingEndpoint: string;
   /** Fallback model used when the main model is unavailable. Readback only: option wiring and same-model validation proven; automatic fallback switching not locally provable (blocked on real API overload / HTTP 529; invalid-primary test undermined). */
   fallbackModel: string;
+  /** Project-level Anthropic-compatible provider presets. */
+  providers: ClaudeProviderSettings;
   /** Tool names that are auto-allowed without prompting. Not a sandbox, not a restrictor. Readback only: runtime options wiring proven, zero enforcement observed (init catalog always unfiltered, canUseTool non-functional in SDK query() mode). Validated as PascalCase alphanumeric. */
   allowedTools: string[];
   /** Tool names that are removed from context entirely. Runtime behavior verified: SDK init-catalog filtering deterministically excludes listed tools. Validated as PascalCase alphanumeric. */
@@ -365,6 +419,7 @@ export function getDefaultClaudeCodeBackendSettings(): ClaudeCodeBackendSettings
     pricingProviderId: '',
     pricingEndpoint: '',
     fallbackModel: '',
+    providers: getDefaultClaudeProviderSettings(),
     allowedTools: [],
     disallowedTools: [],
     restrictedBuiltinTools: [],
@@ -640,6 +695,69 @@ export function normalizeClaudeCodeToolAliases(value: unknown): Record<string, s
   return result;
 }
 
+function normalizeClaudeProviderPreset(value: unknown): ClaudeProviderPreset | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return null;
+  }
+
+  const candidate = value as Record<string, unknown>;
+  const id = typeof candidate.id === 'string' ? candidate.id.trim() : '';
+  const name = typeof candidate.name === 'string' ? candidate.name.trim() : '';
+  if (!id || !name || id === 'official') {
+    return null;
+  }
+
+  const extraEnv = normalizeClaudeCodeEnv(candidate.extraEnv);
+  for (const key of CLAUDE_PROVIDER_MANAGED_ENV_KEYS) {
+    delete extraEnv[key];
+  }
+
+  return {
+    id,
+    name,
+    baseUrl: typeof candidate.baseUrl === 'string' ? candidate.baseUrl.trim().replace(/\/+$/, '') : '',
+    authToken: typeof candidate.authToken === 'string' ? candidate.authToken.trim() : '',
+    model: typeof candidate.model === 'string' ? candidate.model.trim() : '',
+    fallbackModel: typeof candidate.fallbackModel === 'string' ? candidate.fallbackModel.trim() : '',
+    haikuModel: typeof candidate.haikuModel === 'string' ? candidate.haikuModel.trim() : '',
+    extraEnv,
+  };
+}
+
+export function normalizeClaudeProviderSettings(value: unknown): ClaudeProviderSettings {
+  const defaults = getDefaultClaudeProviderSettings();
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return defaults;
+  }
+
+  const candidate = value as Record<string, unknown>;
+  const seenIds = new Set<string>(['official']);
+  const presets: ClaudeProviderPreset[] = [{ ...CLAUDE_OFFICIAL_PROVIDER_PRESET, extraEnv: {} }];
+  if (Array.isArray(candidate.presets)) {
+    for (const rawPreset of candidate.presets) {
+      const preset = normalizeClaudeProviderPreset(rawPreset);
+      if (preset && !seenIds.has(preset.id)) {
+        seenIds.add(preset.id);
+        presets.push(preset);
+      }
+    }
+  }
+
+  const activePresetId = typeof candidate.activePresetId === 'string'
+    && seenIds.has(candidate.activePresetId.trim())
+    ? candidate.activePresetId.trim()
+    : defaults.activePresetId;
+  const lastAppliedManagedEnvKeys = normalizeClaudeCodeStringArray(candidate.lastAppliedManagedEnvKeys)
+    .filter((key) => !CLAUDE_PROVIDER_MANAGED_ENV_KEYS.includes(key as typeof CLAUDE_PROVIDER_MANAGED_ENV_KEYS[number]));
+
+  return {
+    presets,
+    activePresetId,
+    lastAppliedManagedEnvKeys,
+    modelMigrationDone: candidate.modelMigrationDone === true,
+  };
+}
+
 export function normalizeClaudeCodeBackendSettings(value: unknown): ClaudeCodeBackendSettings {
   const defaults = getDefaultClaudeCodeBackendSettings();
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -664,6 +782,7 @@ export function normalizeClaudeCodeBackendSettings(value: unknown): ClaudeCodeBa
       ? candidate.pricingEndpoint.trim().replace(/\/+$/, '')
       : defaults.pricingEndpoint,
     fallbackModel: typeof candidate.fallbackModel === 'string' ? candidate.fallbackModel.trim() : defaults.fallbackModel,
+    providers: normalizeClaudeProviderSettings(candidate.providers),
     allowedTools: normalizeClaudeCodeStringArray(candidate.allowedTools),
     disallowedTools: normalizeClaudeCodeStringArray(candidate.disallowedTools),
     restrictedBuiltinTools: normalizeClaudeCodeStringArray(candidate.restrictedBuiltinTools),

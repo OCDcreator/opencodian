@@ -1,0 +1,97 @@
+/* Project-scoped Claude provider configuration. */
+.opencodian-claude-provider-gate,
+.opencodian-claude-provider-card,
+.opencodian-claude-provider-config-layer {
+  border: 1px solid var(--opencodian-settings-form-row-border, var(--background-modifier-border));
+  border-radius: var(--opencodian-settings-form-row-radius, 10px);
+  background: var(--opencodian-settings-form-row-bg, var(--background-primary));
+}
+
+.opencodian-claude-provider-gate {
+  padding: 12px 14px;
+  color: var(--text-normal);
+  background: color-mix(in srgb, var(--background-primary) 88%, var(--color-yellow) 12%);
+}
+
+.opencodian-claude-provider-gate p,
+.opencodian-claude-provider-card p {
+  margin: 6px 0 0;
+}
+
+.opencodian-claude-provider-list {
+  display: grid;
+  gap: 10px;
+  margin: 12px 0;
+}
+
+.opencodian-claude-provider-card {
+  padding: 12px 14px;
+}
+
+.opencodian-claude-provider-card-heading,
+.opencodian-claude-provider-card-actions,
+.opencodian-claude-provider-modal-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.opencodian-claude-provider-card-heading {
+  justify-content: space-between;
+}
+
+.opencodian-claude-provider-card-actions {
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.opencodian-claude-provider-active-badge {
+  padding: 2px 6px;
+  border-radius: var(--radius-s, 4px);
+  color: var(--text-accent);
+  background: color-mix(in srgb, var(--interactive-accent) 14%, transparent);
+  font-size: var(--font-ui-smaller);
+}
+
+.opencodian-claude-provider-warning {
+  color: var(--text-error);
+}
+
+.opencodian-claude-provider-info,
+.opencodian-claude-provider-global-summary,
+.opencodian-claude-provider-config-path {
+  color: var(--text-muted);
+}
+
+.opencodian-claude-provider-global-summary {
+  display: grid;
+  gap: 3px;
+  margin-top: 10px;
+}
+
+.opencodian-claude-provider-config-modal .opencodian-claude-provider-config-layer {
+  margin: 12px 0;
+  padding: 12px;
+}
+
+.opencodian-claude-provider-config-modal pre {
+  max-height: min(38vh, 320px);
+  overflow: auto;
+  margin: 8px 0 0;
+  padding: 8px;
+  border-radius: var(--radius-s, 4px);
+  background: var(--background-secondary);
+  font-size: 11px;
+}
+
+.opencodian-claude-provider-modal-actions {
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
+@media (max-width: 720px) {
+  .opencodian-claude-provider-card-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

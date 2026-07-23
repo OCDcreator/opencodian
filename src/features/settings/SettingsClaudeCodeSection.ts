@@ -2,14 +2,15 @@
  * Claude Code settings section.
  *
  * Renders backend-specific settings across multiple secondary tabs:
- *   - Runtime: executable path, environment hint, diagnostics
- *   - Model & Thinking: model, fallback model, thinking type/budget, effort, max turns, budget
+ *   - Runtime: executable path, query limits/prompt behavior, environment hint, diagnostics
+ *   - Providers: project-scoped Anthropic-compatible provider presets
+ *   - Model & Thinking: thinking type/budget and effort only
  *   - Permissions: permission mode
  *   - Context & Sources: setting sources, additional directories
  *   - Tools: allowed/disallowed tool names
  *
- * The Model & Thinking tab includes the next-query/restart boundary notice
- * because max-turns and max-budget changes only take effect on the next query.
+ * Query limits and prompt behavior include the next-query/restart boundary
+ * notice because those options only take effect on a newly created query.
  *
  * Only controls backed by real adapter wiring and focused tests are exposed
  * as editable. Unverified capabilities remain hidden or read-only.
@@ -41,7 +42,7 @@ import type OpenCodianPlugin from '../../main';
 import { getVaultBasePath } from '../../shared';
 import { BackendSessionBrowserModal } from '../chat/ui/BackendSessionBrowserModal';
 import { ClaudeCodeHelpContent, ClaudeCodeHelpModal } from './ClaudeCodeHelpModal';
-import { renderCostEstimateSettingsRow } from './CostEstimateSettingsRow';
+import { SettingsClaudeProvidersSection } from './SettingsClaudeProvidersSection';
 import { SettingsClaudeResourcesSection } from './SettingsClaudeResourcesSection';
 import { SettingsTooltipController } from './SettingsTooltipController';
 import { TextareaSizeMemory } from './TextareaSizeMemory';
@@ -149,7 +150,6 @@ type ClaudeCodeGroupId =
   | 'project-files'
   | 'runtime-inspection'
   | 'diagnostics-logs'
-  | 'model-selection'
   | 'thinking-effort'
   | 'limits-budget'
   | 'prompt-behavior'
@@ -202,10 +202,6 @@ const CLAUDE_CODE_GROUP_COPY: Record<ClaudeCodeGroupId, { titleKey: TranslationK
   'diagnostics-logs': {
     titleKey: 'settings.claudeCode.groups.diagnosticsLogs.title',
     descKey: 'settings.claudeCode.groups.diagnosticsLogs.desc',
-  },
-  'model-selection': {
-    titleKey: 'settings.claudeCode.groups.modelSelection.title',
-    descKey: 'settings.claudeCode.groups.modelSelection.desc',
   },
   'thinking-effort': {
     titleKey: 'settings.claudeCode.groups.thinkingEffort.title',
@@ -264,27 +260,34 @@ const CLAUDE_ACCOUNT_INFO_SECRET_KEY_PATTERN = /(?:^env$|api[_-]?key|secret|pass
 
 const CLAUDE_CLASSIC_TABS = [
   'runtime',
+  'providers',
   'model-thinking',
   'permissions',
   'context-sources',
   'tools',
+  'mcp',
+  'skills-commands',
+  'agents',
 ] as const;
 
 const CLAUDE_TAB_LABEL_KEYS: Record<typeof CLAUDE_CLASSIC_TABS[number], TranslationKey> = {
   runtime: 'settings.claudeCode.tab.runtime',
+  providers: 'settings.claudeCode.tab.providers',
   'model-thinking': 'settings.claudeCode.tab.modelThinking',
   permissions: 'settings.claudeCode.tab.permissions',
   'context-sources': 'settings.claudeCode.tab.contextSources',
   tools: 'settings.claudeCode.tab.tools',
+  mcp: 'settings.claudeCode.tab.mcp',
+  'skills-commands': 'settings.claudeCode.tab.skillsCommands',
+  agents: 'settings.claudeCode.tab.agents',
 };
 
 export class SettingsClaudeCodeSection {
   private readonly plugin: OpenCodianPlugin;
   private readonly createSectionHeading: SettingsClaudeCodeSectionOptions['createSectionHeading'];
   private readonly resolveProcess: (options: ClaudeCodeProcessResolverOptions) => ClaudeCodeProcessResolution;
-  private cachedModelCatalog: Array<{ id: string; name: string; provider: string }> | null = null;
-  private modelCatalogLoadPromise: Promise<Array<{ id: string; name: string; provider: string }>> | null = null;
-  private resourcesSection: SettingsClaudeResourcesSection | null = null;
+  private readonly resourcesSections = new Map<string, SettingsClaudeResourcesSection>();
+  private providersSection: SettingsClaudeProvidersSection | null = null;
 
   constructor(options: SettingsClaudeCodeSectionOptions) {
     this.plugin = options.plugin;
@@ -319,11 +322,10 @@ export class SettingsClaudeCodeSection {
     // data-settings-tooltip attributes render real hover/focus bubbles.
     SettingsTooltipController.ensureForDocument(containerEl.ownerDocument);
 
-    // Resources renders as independent per-type cards (commands / skills /
-    // agents) with no enclosing section card, keeping global-readonly /
+    // Resources render as independent per-type cards with no enclosing section card, keeping global-readonly /
     // project-editable / empty-state semantics. A borderless host preserves
     // settings targeting.
-    if (tabId === 'resources') {
+    if (tabId === 'skills-commands' || tabId === 'agents') {
       const resourcesHost = containerEl.createDiv({
         attr: {
           'data-settings-surface': 'section',
@@ -331,7 +333,7 @@ export class SettingsClaudeCodeSection {
           'data-claude-code-section': tabId,
         },
       });
-      this.renderResourcesTab(resourcesHost);
+      this.renderResourcesTab(resourcesHost, tabId === 'skills-commands' ? ['skill', 'command'] : ['agent']);
       return;
     }
 
@@ -358,6 +360,9 @@ export class SettingsClaudeCodeSection {
     });
 
     switch (tabId) {
+      case 'providers':
+        this.renderProvidersTab(bodyEl);
+        break;
       case 'model-thinking':
         this.renderModelThinkingTab(bodyEl);
         break;
@@ -370,15 +375,20 @@ export class SettingsClaudeCodeSection {
       case 'tools':
         this.renderToolsTab(bodyEl);
         break;
+      case 'mcp':
+        this.renderMcpTab(bodyEl);
+        break;
       default:
         this.renderRuntimeTab(bodyEl);
         break;
     }
   }
 
-  private renderResourcesTab(bodyEl: HTMLElement): void {
-    if (!this.resourcesSection) {
-      this.resourcesSection = new SettingsClaudeResourcesSection({
+  private renderResourcesTab(bodyEl: HTMLElement, kinds: readonly ('skill' | 'command' | 'agent')[]): void {
+    const key = kinds.join(',');
+    let section = this.resourcesSections.get(key);
+    if (!section) {
+      section = new SettingsClaudeResourcesSection({
         plugin: this.plugin,
         createSectionHeading: (hostEl, title, tooltip) => this.createSectionHeading(hostEl, title, tooltip),
         onAfterMutation: () => {
@@ -387,9 +397,20 @@ export class SettingsClaudeCodeSection {
           // supportedCommands()/supportedAgents() remains the final menu truth.
           this.plugin.invalidateSlashCommandCatalog?.();
         },
+        kinds,
       });
+      this.resourcesSections.set(key, section);
     }
-    this.resourcesSection.render(bodyEl);
+    section.render(bodyEl);
+  }
+
+  private renderProvidersTab(bodyEl: HTMLElement): void {
+    this.providersSection ??= new SettingsClaudeProvidersSection({
+      plugin: this.plugin,
+      createSectionHeading: (hostEl, title, tooltip) => this.createSectionHeading(hostEl, title, tooltip),
+      onAfterMutation: () => this.plugin.invalidateSlashCommandCatalog?.(),
+    });
+    this.providersSection.render(bodyEl);
   }
 
   private createClaudeCodeGroup(
@@ -600,6 +621,18 @@ export class SettingsClaudeCodeSection {
     this.renderJsRuntimeSetting(connectionEl);
     this.renderLoadTimeoutMsSetting(connectionEl);
     this.renderEnvironmentHint(connectionEl);
+
+    const queryBehaviorEl = this.createClaudeCodeGroup(containerEl, { id: 'limits-budget' });
+    this.renderLimitsBoundaryNotice(queryBehaviorEl);
+    this.renderMaxTurnsSetting(queryBehaviorEl);
+    this.renderMaxBudgetSetting(queryBehaviorEl);
+    this.renderTaskBudgetSetting(queryBehaviorEl);
+
+    const promptEl = this.createClaudeCodeGroup(containerEl, { id: 'prompt-behavior' });
+    this.renderSystemPromptSetting(promptEl);
+    this.renderOutputStyleSetting(promptEl);
+    this.renderPromptSuggestionsSetting(promptEl);
+    this.renderEnableContext1mBetaSetting(promptEl);
 
     const ecosystemEl = this.createClaudeCodeGroup(containerEl, { id: 'runtime-ecosystem' });
     this.renderRuntimeEcosystemSummary(ecosystemEl);
@@ -1989,103 +2022,12 @@ export class SettingsClaudeCodeSection {
   // ─── Model & Thinking tab ─────────────────────────────────────────
 
   private renderModelThinkingTab(containerEl: HTMLElement): void {
-    const modelSelectionEl = this.createClaudeCodeGroup(containerEl, { id: 'model-selection' });
-    const modelTextControl = this.renderModelSetting(modelSelectionEl);
-    this.renderModelQuickSelect(modelSelectionEl, modelTextControl);
-    const fallbackTextControl = this.renderFallbackModelSetting(modelSelectionEl);
-    this.renderFallbackModelQuickSelect(modelSelectionEl, fallbackTextControl);
-    renderCostEstimateSettingsRow(modelSelectionEl, this.plugin, 'claude-code');
-
     const thinkingEl = this.createClaudeCodeGroup(containerEl, { id: 'thinking-effort' });
     this.renderThinkingSetting(thinkingEl);
     if (this.settings.thinking.type === 'fixed') {
       this.renderThinkingBudgetSetting(thinkingEl);
     }
     this.renderEffortSetting(thinkingEl);
-
-    const limitsEl = this.createClaudeCodeGroup(containerEl, { id: 'limits-budget' });
-    // The limits boundary notice carries a functional "Restart sessions"
-    // button, so it stays as an inline control (not collapsed into a tooltip).
-    this.renderLimitsBoundaryNotice(limitsEl);
-    this.renderMaxTurnsSetting(limitsEl);
-    this.renderMaxBudgetSetting(limitsEl);
-    this.renderTaskBudgetSetting(limitsEl);
-
-    const promptEl = this.createClaudeCodeGroup(containerEl, { id: 'prompt-behavior' });
-    this.renderSystemPromptSetting(promptEl);
-    this.renderOutputStyleSetting(promptEl);
-    this.renderPromptSuggestionsSetting(promptEl);
-    this.renderEnableContext1mBetaSetting(promptEl);
-  }
-
-  private renderModelSetting(containerEl: HTMLElement): unknown {
-    let textControl: unknown = null;
-    const setting = new Setting(containerEl)
-      .setName(t('settings.claudeCode.model.name'))
-      .setDesc(t('settings.claudeCode.model.desc'))
-      .addText((text) => {
-        textControl = text;
-        text
-          .setPlaceholder(t('settings.claudeCode.model.placeholder'))
-          .setValue(this.settings.model)
-          .onChange(async (value) => {
-            const model = value.trim();
-            this.settings.model = model;
-            // If model now matches fallbackModel, clear fallback to avoid guaranteed SDK error
-            if (model && this.settings.fallbackModel && model === this.settings.fallbackModel) {
-              this.settings.fallbackModel = '';
-              new Notice(t('settings.claudeCode.fallbackModel.clearedByModelChange'));
-            }
-            await this.applyClaudeModel(model || undefined).catch(() => undefined);
-            await this.saveSettings();
-          });
-      });
-    this.attachProofChip(
-      setting,
-      'main-model',
-      'pass',
-      t('settings.claudeCode.proofStatus.mainModel'),
-    );
-    return textControl;
-  }
-
-  private renderFallbackModelSetting(containerEl: HTMLElement): unknown {
-    let textControl: unknown = null;
-    const setting = new Setting(containerEl)
-      .setName(t('settings.claudeCode.fallbackModel.name'))
-      .setDesc(t('settings.claudeCode.fallbackModel.desc'))
-      .addText((text) => {
-        textControl = text;
-        text
-          .setPlaceholder(t('settings.claudeCode.fallbackModel.placeholder'))
-          .setValue(this.settings.fallbackModel)
-          .onChange(async (value) => {
-            const trimmed = value.trim();
-            if (trimmed && trimmed === this.settings.model) {
-              // SDK throws on same-model fallback; reject and revert
-              new Notice(t('settings.claudeCode.fallbackModel.sameModelWarning'));
-              if (typeof (textControl as { setValue?: (v: string) => unknown }).setValue === 'function') {
-                (textControl as { setValue: (v: string) => unknown }).setValue(this.settings.fallbackModel);
-              }
-              return;
-            }
-            this.settings.fallbackModel = trimmed;
-            await this.saveSettings();
-          });
-      });
-    this.attachSettingHelp(setting, {
-      boundaryAttr: 'data-claude-code-fallback-model-boundary',
-      boundaryText: t('settings.claudeCode.fallbackModel.boundaryNotice'),
-      helpTitle: t('settings.claudeCode.fallbackModel.name'),
-      proofNote: t('settings.claudeCode.proofStatus.fallbackModel'),
-    });
-    this.attachProofChip(
-      setting,
-      'fallback-model',
-      'readback',
-      t('settings.claudeCode.proofStatus.fallbackModel'),
-    );
-    return textControl;
   }
 
   private renderThinkingSetting(containerEl: HTMLElement): void {
@@ -2537,93 +2479,6 @@ export class SettingsClaudeCodeSection {
     noticeEl.createSpan({ text: t('settings.claudeCode.proofStatus.fileCheckpointing') });
   }
 
-  private renderModelQuickSelect(containerEl: HTMLElement, textControl: unknown): void {
-    new Setting(containerEl)
-      .setName(t('settings.claudeCode.model.quickSelectName'))
-      .setDesc(t('settings.claudeCode.model.quickSelectDesc'))
-      .addDropdown((dropdown) => {
-        dropdown.addOption('', t('settings.claudeCode.modelCatalog.quickSelectPlaceholder'));
-        dropdown.setValue('');
-
-        void this.loadModelCatalog().then((models) => {
-          for (const model of models) {
-            dropdown.addOption(model.id, model.name || model.id);
-          }
-        });
-
-        dropdown.onChange(async (value) => {
-          if (!value) return;
-          this.settings.model = value;
-          if (textControl && typeof (textControl as { setValue?: (v: string) => unknown }).setValue === 'function') {
-            (textControl as { setValue: (v: string) => unknown }).setValue(value);
-          }
-          // If model now matches fallbackModel, clear fallback to avoid guaranteed SDK error
-          if (this.settings.fallbackModel && value === this.settings.fallbackModel) {
-            this.settings.fallbackModel = '';
-            new Notice(t('settings.claudeCode.fallbackModel.clearedByModelChange'));
-          }
-          await this.applyClaudeModel(value).catch(() => undefined);
-          await this.saveSettings();
-        });
-      });
-  }
-
-  private renderFallbackModelQuickSelect(containerEl: HTMLElement, textControl: unknown): void {
-    new Setting(containerEl)
-      .setName(t('settings.claudeCode.fallbackModel.quickSelectName'))
-      .setDesc(t('settings.claudeCode.fallbackModel.quickSelectDesc'))
-      .addDropdown((dropdown) => {
-        dropdown.addOption('', t('settings.claudeCode.modelCatalog.quickSelectPlaceholder'));
-        dropdown.setValue('');
-
-        void this.loadModelCatalog().then((models) => {
-          for (const model of models) {
-            dropdown.addOption(model.id, model.name || model.id);
-          }
-        });
-
-        dropdown.onChange(async (value) => {
-          if (!value) return;
-          if (value === this.settings.model) {
-            // SDK throws on same-model fallback; reject and revert
-            new Notice(t('settings.claudeCode.fallbackModel.sameModelWarning'));
-            dropdown.setValue('');
-            return;
-          }
-          this.settings.fallbackModel = value;
-          if (textControl && typeof (textControl as { setValue?: (v: string) => unknown }).setValue === 'function') {
-            (textControl as { setValue: (v: string) => unknown }).setValue(value);
-          }
-          await this.saveSettings();
-        });
-      });
-  }
-
-  private async loadModelCatalog(): Promise<Array<{ id: string; name: string; provider: string }>> {
-    if (this.cachedModelCatalog !== null) {
-      return this.cachedModelCatalog;
-    }
-    if (this.modelCatalogLoadPromise !== null) {
-      return this.modelCatalogLoadPromise;
-    }
-
-    this.modelCatalogLoadPromise = (async () => {
-      try {
-        const adapter = this.getClaudeAdapter() as {
-          supportedModels?: () => Promise<Array<{ id: string; name: string; provider: string }>>;
-        } | null;
-        const models = await adapter?.supportedModels?.() ?? [];
-        this.cachedModelCatalog = models;
-        return models;
-      } catch {
-        this.cachedModelCatalog = [];
-        return [];
-      }
-    })();
-
-    return this.modelCatalogLoadPromise;
-  }
-
   private renderSettingSources(containerEl: HTMLElement): void {
     const currentSources = new Set(this.settings.settingSources);
     new Setting(containerEl)
@@ -2739,11 +2594,6 @@ export class SettingsClaudeCodeSection {
   // ─── Tools tab ───────────────────────────────────────────────────
 
   private renderToolsTab(containerEl: HTMLElement): void {
-    const mcpEl = this.createClaudeCodeGroup(containerEl, { id: 'mcp-runtime' });
-    this.renderRuntimeBoundaryNotice(mcpEl);
-    this.renderMcpRuntimeControls(mcpEl);
-    this.renderStrictMcpConfigSetting(mcpEl);
-
     const toolPolicyEl = this.createClaudeCodeGroup(containerEl, { id: 'tool-policy' });
     this.renderAllowedToolsSetting(toolPolicyEl);
     this.renderDisallowedToolsSetting(toolPolicyEl);
@@ -2753,6 +2603,13 @@ export class SettingsClaudeCodeSection {
 
     const previewEl = this.createClaudeCodeGroup(containerEl, { id: 'question-ux' });
     this.renderAskUserQuestionPreviewFormatSetting(previewEl);
+  }
+
+  private renderMcpTab(containerEl: HTMLElement): void {
+    const mcpEl = this.createClaudeCodeGroup(containerEl, { id: 'mcp-runtime' });
+    this.renderRuntimeBoundaryNotice(mcpEl);
+    this.renderMcpRuntimeControls(mcpEl);
+    this.renderStrictMcpConfigSetting(mcpEl);
   }
 
   private renderMcpRuntimeControls(containerEl: HTMLElement): void {
@@ -3248,11 +3105,6 @@ export class SettingsClaudeCodeSection {
 
   private getClaudeAdapter(): unknown {
     return this.plugin.agentServiceRegistry?.get('claude-code') ?? null;
-  }
-
-  private async applyClaudeModel(model: string | undefined): Promise<void> {
-    const adapter = this.getClaudeAdapter() as { setModel?: (model?: string) => Promise<void> | void } | null;
-    await adapter?.setModel?.(model);
   }
 
   private async applyClaudePermissionMode(mode: ClaudeCodePermissionMode): Promise<void> {

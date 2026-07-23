@@ -381,7 +381,8 @@ describe('SettingsClaudeCodeSection', () => {
       .toHaveBeenCalledWith(true);
     expect(findButton(t('settings.claudeCode.diagnostics.button'))).toBeDefined();
 
-    expect(findText(t('settings.claudeCode.model.name'))).toBeDefined();
+    expect(textRecords.some((record) => record.name === t('settings.claudeCode.model.name'))).toBe(false);
+    expect(textRecords.some((record) => record.name === t('settings.claudeCode.fallbackModel.name'))).toBe(false);
     expect(findDropdown(t('settings.claudeCode.thinking.name'))).toBeDefined();
     expect(findDropdown(t('settings.claudeCode.permissionMode.name'))).toBeDefined();
     expect(findToggle(t('settings.claudeCode.settingSources.project'))).toBeDefined();
@@ -396,6 +397,11 @@ describe('SettingsClaudeCodeSection', () => {
     expect(containerEl.querySelector('[data-claude-code-section="permissions"]')).toBeDefined();
     expect(containerEl.querySelector('[data-claude-code-section="context-sources"]')).toBeDefined();
     expect(containerEl.querySelector('[data-claude-code-section="tools"]')).toBeDefined();
+    expect(containerEl.querySelector('[data-claude-code-section="mcp"]')).toBeDefined();
+    expect(containerEl.querySelector('[data-claude-code-section="providers"]')).toBeDefined();
+    expect(containerEl.querySelector('[data-claude-code-section="skills-commands"]')).toBeDefined();
+    expect(containerEl.querySelector('[data-claude-code-section="agents"]')).toBeDefined();
+    expect(containerEl.querySelector('[data-claude-code-section="resources"]')).toBeNull();
     expectClaudeCodeGroupChrome(containerEl);
 
     const runtimeReadback = containerEl.querySelector('[data-claude-code-runtime-ecosystem="true"]');
@@ -530,17 +536,12 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       });
       section.attachTabbed(containerEl, 'model-thinking');
 
-      expectGroupOrder(containerEl, [
-        'model-selection',
-        'thinking-effort',
-        'limits-budget',
-        'prompt-behavior',
-      ]);
+      expectGroupOrder(containerEl, ['thinking-effort']);
       expectClaudeCodeGroupChrome(containerEl);
-      expect(containerEl.querySelectorAll('[data-claude-code-group]')).toHaveLength(4);
+      expect(containerEl.querySelectorAll('[data-claude-code-group]')).toHaveLength(1);
     });
 
-    it('renders with editable controls', () => {
+    it('keeps only thinking and effort controls; provider models are not SDK settings', () => {
       const plugin = createPlugin();
       const containerEl = document.createElement('div');
       const section = new SettingsClaudeCodeSection({
@@ -549,142 +550,12 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       });
       section.attachTabbed(containerEl, 'model-thinking');
 
-      expect(findText(t('settings.claudeCode.model.name')).control.setValue)
-        .toHaveBeenCalledWith('claude-sonnet-4-5');
-      expect(findText(t('settings.claudeCode.fallbackModel.name')).control.setValue)
-        .toHaveBeenCalledWith('');
       expect(findDropdown(t('settings.claudeCode.thinking.name'))).toBeDefined();
       expect(findDropdown(t('settings.claudeCode.effort.name'))).toBeDefined();
-    });
-
-    it('renders max turns and budget limits alongside the next-query boundary notice', () => {
-      const plugin = createPlugin();
-      const containerEl = document.createElement('div');
-      const section = new SettingsClaudeCodeSection({
-        plugin: plugin as OpenCodianPlugin,
-        createSectionHeading,
-      });
-      section.attachTabbed(containerEl, 'model-thinking');
-
-      expect(findText(t('settings.claudeCode.maxTurns.name'))).toBeDefined();
-      expect(findText(t('settings.claudeCode.maxBudgetUsd.name'))).toBeDefined();
-      expect(findText(t('settings.claudeCode.taskBudget.name'))).toBeDefined();
-      expect(containerEl.querySelector('[data-claude-code-limits-boundary="true"]')).toBeTruthy();
-      expect(containerEl.textContent).toContain(t('settings.claudeCode.runtimeBoundary.nextQuery'));
-      expect(findButton(t('settings.claudeCode.runtimeBoundary.restartButton'))).toBeDefined();
-    });
-
-    it('regression: limits boundary notice is present whenever max turns and budget controls render', () => {
-      const plugin = createPlugin();
-      const containerEl = document.createElement('div');
-      const section = new SettingsClaudeCodeSection({
-        plugin: plugin as OpenCodianPlugin,
-        createSectionHeading,
-      });
-      section.attachTabbed(containerEl, 'model-thinking');
-
-      const hasLimitsBoundary = containerEl.querySelector('[data-claude-code-limits-boundary="true"]');
-      const hasMaxTurns = textRecords.some((r) => r.name === t('settings.claudeCode.maxTurns.name'));
-      const hasMaxBudget = textRecords.some((r) => r.name === t('settings.claudeCode.maxBudgetUsd.name'));
-      expect(hasMaxTurns).toBe(true);
-      expect(hasMaxBudget).toBe(true);
-      expect(hasLimitsBoundary).toBeTruthy();
-    });
-
-    it('renders prompt suggestions toggle in model-thinking tab', () => {
-      const plugin = createPlugin();
-      const containerEl = document.createElement('div');
-      const section = new SettingsClaudeCodeSection({
-        plugin: plugin as OpenCodianPlugin,
-        createSectionHeading,
-      });
-      section.attachTabbed(containerEl, 'model-thinking');
-
-      const toggle = toggleRecords.find((r) => r.name === t('settings.claudeCode.promptSuggestions.name'));
-      expect(toggle).toBeDefined();
-      expect(toggle!.control.setValue).toHaveBeenCalledWith(false);
-    });
-
-    it('persists prompt suggestions toggle changes from model-thinking tab', async () => {
-      const plugin = createPlugin();
-      const containerEl = document.createElement('div');
-      const section = new SettingsClaudeCodeSection({
-        plugin: plugin as OpenCodianPlugin,
-        createSectionHeading,
-      });
-      section.attachTabbed(containerEl, 'model-thinking');
-
-      const toggle = toggleRecords.find((r) => r.name === t('settings.claudeCode.promptSuggestions.name'));
-      expect(toggle).toBeDefined();
-      expect(toggle!.onChange).toBeDefined();
-      await toggle!.onChange!(true as never);
-      expect(plugin.settings.backendSettings?.claudeCode?.promptSuggestions).toBe(true);
-      expect(plugin.saveSettings).toHaveBeenCalled();
-    });
-
-    it('renders prompt suggestions setting without boundary notice in model-thinking tab', () => {
-      const plugin = createPlugin();
-      const containerEl = document.createElement('div');
-      const section = new SettingsClaudeCodeSection({
-        plugin: plugin as OpenCodianPlugin,
-        createSectionHeading,
-      });
-      section.attachTabbed(containerEl, 'model-thinking');
-
-      // Boundary notice was removed in stable-surface cleanup
-      const boundaryEl = containerEl.querySelector('[data-claude-code-prompt-suggestions-boundary="true"]');
-      expect(boundaryEl).toBeNull();
-
-      // Lifecycle notice should still exist (confirms the setting item was rendered)
-      const lifecycleEl = containerEl.querySelector('[data-claude-code-prompt-suggestions-lifecycle="true"]');
-      expect(lifecycleEl).toBeTruthy();
-      expect(containerEl.textContent).toContain(t('settings.claudeCode.promptSuggestions.lifecycleNotice'));
-    });
-
-    it('renders prompt suggestions lifecycle notice in model-thinking tab', () => {
-      const plugin = createPlugin();
-      const containerEl = document.createElement('div');
-      const section = new SettingsClaudeCodeSection({
-        plugin: plugin as OpenCodianPlugin,
-        createSectionHeading,
-      });
-      section.attachTabbed(containerEl, 'model-thinking');
-
-      const lifecycleEl = containerEl.querySelector('[data-claude-code-prompt-suggestions-lifecycle="true"]');
-      expect(lifecycleEl).toBeTruthy();
-      expect(containerEl.textContent).toContain(t('settings.claudeCode.promptSuggestions.lifecycleNotice'));
-    });
-
-    it('renders fallback model boundary notice in model-thinking tab', () => {
-      const plugin = createPlugin();
-      const containerEl = document.createElement('div');
-      const section = new SettingsClaudeCodeSection({
-        plugin: plugin as OpenCodianPlugin,
-        createSectionHeading,
-      });
-      section.attachTabbed(containerEl, 'model-thinking');
-
-      const boundaryEl = containerEl.querySelector('[data-claude-code-fallback-model-boundary="true"]');
-      expect(boundaryEl).toBeTruthy();
-      expect(containerEl.textContent).toContain(t('settings.claudeCode.fallbackModel.boundaryNotice'));
-      expect(boundaryEl!.textContent).toContain('Readback only');
-      expect(boundaryEl!.textContent).toContain('--fallback-model');
-      expect(boundaryEl!.textContent).toContain('HTTP 529');
-    });
-
-    it('renders fallback model proof status notice with readback state in model-thinking tab', () => {
-      const plugin = createPlugin();
-      const containerEl = document.createElement('div');
-      const section = new SettingsClaudeCodeSection({
-        plugin: plugin as OpenCodianPlugin,
-        createSectionHeading,
-      });
-      section.attachTabbed(containerEl, 'model-thinking');
-
-      const noticeEl = containerEl.querySelector('[data-claude-code-proof-status="fallback-model"]');
-      expect(noticeEl).toBeTruthy();
-      expect(noticeEl?.getAttribute('data-proof-state')).toBe('readback');
-      expect(containerEl.textContent).toContain(t('settings.claudeCode.proofStatus.fallbackModel'));
+      expect(textRecords.some((record) => record.name === t('settings.claudeCode.model.name'))).toBe(false);
+      expect(textRecords.some((record) => record.name === t('settings.claudeCode.fallbackModel.name'))).toBe(false);
+      expect(textRecords.some((record) => record.name === t('settings.claudeCode.maxTurns.name'))).toBe(false);
+      expect(toggleRecords.some((record) => record.name === t('settings.claudeCode.promptSuggestions.name'))).toBe(false);
     });
 
     it('gives every Claude Code custom-tooltip trigger one accessible non-native label source', () => {
@@ -707,53 +578,6 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
         expect(containerEl.querySelector<HTMLElement>(`#${labelId}`)?.textContent)
           .toBe(trigger.dataset.settingsTooltip);
       }
-    });
-
-    it('renders 1M context beta boundary notice in model-thinking tab', () => {
-      const plugin = createPlugin();
-      const containerEl = document.createElement('div');
-      const section = new SettingsClaudeCodeSection({
-        plugin: plugin as OpenCodianPlugin,
-        createSectionHeading,
-      });
-      section.attachTabbed(containerEl, 'model-thinking');
-
-      const boundaryEl = containerEl.querySelector('[data-claude-code-enable-context-1m-beta-boundary="true"]');
-      expect(boundaryEl).toBeTruthy();
-      expect(boundaryEl!.textContent).toContain(t('settings.claudeCode.enableContext1mBeta.boundaryNotice'));
-      expect(boundaryEl!.textContent).toContain('Readback only');
-      expect(boundaryEl!.textContent).toContain('--betas');
-      expect(boundaryEl!.textContent).toContain('API key eligibility');
-    });
-
-    it('renders main-model proof status notice with pass state in model-thinking tab', () => {
-      const plugin = createPlugin();
-      const containerEl = document.createElement('div');
-      const section = new SettingsClaudeCodeSection({
-        plugin: plugin as OpenCodianPlugin,
-        createSectionHeading,
-      });
-      section.attachTabbed(containerEl, 'model-thinking');
-
-      const noticeEl = containerEl.querySelector('[data-claude-code-proof-status="main-model"]');
-      expect(noticeEl).toBeTruthy();
-      expect(noticeEl?.getAttribute('data-proof-state')).toBe('pass');
-      expect(containerEl.textContent).toContain(t('settings.claudeCode.proofStatus.mainModel'));
-    });
-
-    it('renders limits proof status notice with readback state in model-thinking tab', () => {
-      const plugin = createPlugin();
-      const containerEl = document.createElement('div');
-      const section = new SettingsClaudeCodeSection({
-        plugin: plugin as OpenCodianPlugin,
-        createSectionHeading,
-      });
-      section.attachTabbed(containerEl, 'model-thinking');
-
-      const noticeEl = containerEl.querySelector('[data-claude-code-proof-status="limits"]');
-      expect(noticeEl).toBeTruthy();
-      expect(noticeEl?.getAttribute('data-proof-state')).toBe('pass');
-      expect(containerEl.textContent).toContain(t('settings.claudeCode.proofStatus.limits'));
     });
 
     it('does not render an inert thinking budget input for adaptive thinking', () => {
@@ -785,39 +609,6 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       expect(plugin.settings.backendSettings.claudeCode.thinking).toEqual({ type: 'fixed', budgetTokens: 8192 });
     });
 
-    it('persists model changes from Model & Thinking tab', async () => {
-      const claudeAdapter = { setModel: jest.fn().mockResolvedValue(undefined) };
-      const plugin = createPlugin({ claudeAdapter });
-      const containerEl = document.createElement('div');
-      const section = new SettingsClaudeCodeSection({
-        plugin: plugin as OpenCodianPlugin,
-        createSectionHeading,
-      });
-      section.attachTabbed(containerEl, 'model-thinking');
-
-      await findText(t('settings.claudeCode.model.name')).onChange?.('claude-opus-4-5' as never);
-      expect(plugin.settings.backendSettings.claudeCode.model).toBe('claude-opus-4-5');
-      expect(claudeAdapter.setModel).toHaveBeenCalledWith('claude-opus-4-5');
-      expect(plugin.saveSettings).toHaveBeenCalled();
-    });
-
-    it('still persists model changes when live adapter model update fails', async () => {
-      const claudeAdapter = { setModel: jest.fn().mockRejectedValue(new Error('sdk busy')) };
-      const plugin = createPlugin({ claudeAdapter });
-      const containerEl = document.createElement('div');
-      const section = new SettingsClaudeCodeSection({
-        plugin: plugin as OpenCodianPlugin,
-        createSectionHeading,
-      });
-      section.attachTabbed(containerEl, 'model-thinking');
-
-      await findText(t('settings.claudeCode.model.name')).onChange?.('claude-opus-4-5' as never);
-
-      expect(plugin.settings.backendSettings.claudeCode.model).toBe('claude-opus-4-5');
-      expect(claudeAdapter.setModel).toHaveBeenCalledWith('claude-opus-4-5');
-      expect(plugin.saveSettings).toHaveBeenCalled();
-    });
-
     it('persists effort changes from Model & Thinking tab', async () => {
       const plugin = createPlugin();
       const containerEl = document.createElement('div');
@@ -830,94 +621,6 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       await findDropdown(t('settings.claudeCode.effort.name')).onChange?.('high' as never);
       expect(plugin.settings.backendSettings.claudeCode.effort).toBe('high');
       expect(plugin.saveSettings).toHaveBeenCalled();
-    });
-
-    it('renders model quick-select dropdowns in model-thinking tab', () => {
-      const plugin = createPlugin();
-      const containerEl = document.createElement('div');
-      const section = new SettingsClaudeCodeSection({
-        plugin: plugin as OpenCodianPlugin,
-        createSectionHeading,
-      });
-      section.attachTabbed(containerEl, 'model-thinking');
-
-      expect(findDropdown(t('settings.claudeCode.model.quickSelectName'))).toBeDefined();
-      expect(findDropdown(t('settings.claudeCode.fallbackModel.quickSelectName'))).toBeDefined();
-    });
-
-    it('selects a model from the quick-select dropdown and updates the model field', async () => {
-      const claudeAdapter = {
-        supportedModels: jest.fn().mockResolvedValue([
-          { id: 'claude-sonnet-4-5', name: 'Claude Sonnet 4.5', provider: 'anthropic' },
-          { id: 'claude-opus-4-5', name: 'Claude Opus 4.5', provider: 'anthropic' },
-        ]),
-        setModel: jest.fn().mockResolvedValue(undefined),
-      };
-      const plugin = createPlugin({ claudeAdapter });
-      const containerEl = document.createElement('div');
-      const section = new SettingsClaudeCodeSection({
-        plugin: plugin as OpenCodianPlugin,
-        createSectionHeading,
-      });
-      section.attachTabbed(containerEl, 'model-thinking');
-
-      // Wait for async catalog load
-      await new Promise<void>((resolve) => { setTimeout(resolve, 0); });
-
-      expect(claudeAdapter.supportedModels).toHaveBeenCalled();
-
-      await findDropdown(t('settings.claudeCode.model.quickSelectName')).onChange?.('claude-opus-4-5' as never);
-
-      expect(plugin.settings.backendSettings.claudeCode.model).toBe('claude-opus-4-5');
-      expect(claudeAdapter.setModel).toHaveBeenCalledWith('claude-opus-4-5');
-      expect(plugin.saveSettings).toHaveBeenCalled();
-    });
-
-    it('selects a fallback model from the quick-select dropdown', async () => {
-      const claudeAdapter = {
-        supportedModels: jest.fn().mockResolvedValue([
-          { id: 'claude-sonnet-4-5', name: 'Claude Sonnet 4.5', provider: 'anthropic' },
-          { id: 'claude-opus-4-5', name: 'Claude Opus 4.5', provider: 'anthropic' },
-        ]),
-      };
-      const plugin = createPlugin({ claudeAdapter });
-      const containerEl = document.createElement('div');
-      const section = new SettingsClaudeCodeSection({
-        plugin: plugin as OpenCodianPlugin,
-        createSectionHeading,
-      });
-      section.attachTabbed(containerEl, 'model-thinking');
-
-      // Wait for async catalog load
-      await new Promise<void>((resolve) => { setTimeout(resolve, 0); });
-
-      await findDropdown(t('settings.claudeCode.fallbackModel.quickSelectName')).onChange?.('claude-opus-4-5' as never);
-
-      expect(plugin.settings.backendSettings.claudeCode.fallbackModel).toBe('claude-opus-4-5');
-      expect(plugin.saveSettings).toHaveBeenCalled();
-    });
-
-    it('ignores empty selection in quick-select dropdowns', async () => {
-      const claudeAdapter = {
-        supportedModels: jest.fn().mockResolvedValue([
-          { id: 'claude-sonnet-4-5', name: 'Claude Sonnet 4.5', provider: 'anthropic' },
-        ]),
-      };
-      const plugin = createPlugin({ claudeAdapter });
-      const containerEl = document.createElement('div');
-      const section = new SettingsClaudeCodeSection({
-        plugin: plugin as OpenCodianPlugin,
-        createSectionHeading,
-      });
-      section.attachTabbed(containerEl, 'model-thinking');
-
-      // Wait for async catalog load
-      await new Promise<void>((resolve) => { setTimeout(resolve, 0); });
-
-      const originalModel = plugin.settings.backendSettings.claudeCode.model;
-      await findDropdown(t('settings.claudeCode.model.quickSelectName')).onChange?.('' as never);
-
-      expect(plugin.settings.backendSettings.claudeCode.model).toBe(originalModel);
     });
 
     it('persists thinking type changes from Model & Thinking tab', async () => {
@@ -1102,13 +805,15 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
 
       expectGroupOrder(containerEl, [
         'connection-runtime',
+        'limits-budget',
+        'prompt-behavior',
         'runtime-ecosystem',
         'project-files',
         'runtime-inspection',
         'diagnostics-logs',
       ]);
       expectClaudeCodeGroupChrome(containerEl);
-      expect(containerEl.querySelectorAll('[data-claude-code-group]')).toHaveLength(5);
+      expect(containerEl.querySelectorAll('[data-claude-code-group]')).toHaveLength(7);
     });
 
     it('marks lifecycle notices with the Claude Code lifecycle class', () => {
@@ -1766,15 +1471,14 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       section.attachTabbed(containerEl, 'tools');
 
       expectGroupOrder(containerEl, [
-        'mcp-runtime',
         'tool-policy',
         'question-ux',
       ]);
       expectClaudeCodeGroupChrome(containerEl);
-      expect(containerEl.querySelectorAll('[data-claude-code-group]')).toHaveLength(3);
+      expect(containerEl.querySelectorAll('[data-claude-code-group]')).toHaveLength(2);
     });
 
-    it('shows the next-query boundary for tool and MCP settings', () => {
+    it('keeps MCP runtime controls out of the tools tab', () => {
       const plugin = createPlugin();
       const containerEl = document.createElement('div');
       const section = new SettingsClaudeCodeSection({
@@ -1783,8 +1487,8 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       });
       section.attachTabbed(containerEl, 'tools');
 
-      expect(containerEl.textContent).toContain(t('settings.claudeCode.runtimeBoundary.nextQuery'));
-      expect(findButton(t('settings.claudeCode.runtimeBoundary.restartButton'))).toBeDefined();
+      expect(containerEl.querySelector('[data-claude-code-mcp-runtime="true"]')).toBeNull();
+      expect(toggleRecords.some((record) => record.name === t('settings.claudeCode.strictMcpConfig.name'))).toBe(false);
     });
 
     it('renders and persists tool allow/block lists', async () => {
@@ -2007,14 +1711,14 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       expect(lifecycleEl!.textContent).toContain(t('settings.claudeCode.askUserQuestionPreviewFormat.lifecycleNotice'));
     });
 
-    it('renders strictMcpConfig boundary and lifecycle notices', () => {
+    it('renders strictMcpConfig boundary and lifecycle notices in the MCP tab', () => {
       const plugin = createPlugin();
       const containerEl = document.createElement('div');
       const section = new SettingsClaudeCodeSection({
         plugin: plugin as OpenCodianPlugin,
         createSectionHeading,
       });
-      section.attachTabbed(containerEl, 'tools');
+      section.attachTabbed(containerEl, 'mcp');
 
       const boundaryEl = containerEl.querySelector('[data-claude-code-strict-mcp-config-boundary="true"]');
       expect(boundaryEl).toBeTruthy();
@@ -2025,14 +1729,14 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       expect(lifecycleEl!.textContent).toContain(t('settings.claudeCode.strictMcpConfig.lifecycleNotice'));
     });
 
-    it('persists strictMcpConfig changes in tools tab', async () => {
+    it('persists strictMcpConfig changes in the MCP tab', async () => {
       const plugin = createPlugin();
       const containerEl = document.createElement('div');
       const section = new SettingsClaudeCodeSection({
         plugin: plugin as OpenCodianPlugin,
         createSectionHeading,
       });
-      section.attachTabbed(containerEl, 'tools');
+      section.attachTabbed(containerEl, 'mcp');
 
       const toggle = findToggle(t('settings.claudeCode.strictMcpConfig.name'));
       expect(toggle).toBeDefined();
@@ -2044,7 +1748,7 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       expect(plugin.saveSettings).toHaveBeenCalled();
     });
 
-    it('shows MCP runtime status and refreshes the active Claude adapter config', async () => {
+    it('shows MCP runtime status and refreshes the active Claude adapter config in the MCP tab', async () => {
       const claudeAdapter = {
         getMcpServerCount: jest.fn()
           .mockReturnValueOnce(2)
@@ -2060,7 +1764,7 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
         plugin: plugin as OpenCodianPlugin,
         createSectionHeading,
       });
-      section.attachTabbed(containerEl, 'tools');
+      section.attachTabbed(containerEl, 'mcp');
 
       const statusEl = containerEl.querySelector('[data-claude-code-mcp-runtime="true"]');
       expect(statusEl).toBeTruthy();
@@ -2093,7 +1797,7 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       );
     });
 
-    it('renders SDK MCP runtime status readback on demand without authoring config', async () => {
+    it('renders SDK MCP runtime status readback on demand without authoring config in the MCP tab', async () => {
       const claudeAdapter = {
         getMcpServerCount: jest.fn().mockReturnValue(2),
         getMcpServerNames: jest.fn().mockReturnValue(['alpha-mcp', 'beta-mcp']),
@@ -2123,7 +1827,7 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
         plugin: plugin as OpenCodianPlugin,
         createSectionHeading,
       });
-      section.attachTabbed(containerEl, 'tools');
+      section.attachTabbed(containerEl, 'mcp');
 
       await findButton(t('settings.claudeCode.mcpRuntime.inspectButton')).onClick?.();
 
@@ -2151,7 +1855,7 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       ].some((record) => record.name.toLowerCase().includes('mcp'))).toBe(false);
     });
 
-    it('renders the MCP runtime empty state as read-only discovery', () => {
+    it('renders the MCP runtime empty state as read-only discovery in the MCP tab', () => {
       const claudeAdapter = {
         getMcpServerCount: jest.fn().mockReturnValue(0),
         getMcpServerNames: jest.fn().mockReturnValue([]),
@@ -2163,7 +1867,7 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
         plugin: plugin as OpenCodianPlugin,
         createSectionHeading,
       });
-      section.attachTabbed(containerEl, 'tools');
+      section.attachTabbed(containerEl, 'mcp');
 
       const statusEl = containerEl.querySelector('[data-claude-code-mcp-runtime="true"]');
       expect(statusEl).toBeTruthy();
@@ -2173,7 +1877,7 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       expect(buttonRecords.some((record) => record.label === t('settings.claudeCode.mcpRuntime.inspectButton'))).toBe(true);
     });
 
-    it('keeps the MCP runtime refresh failure visible', async () => {
+    it('keeps the MCP runtime refresh failure visible in the MCP tab', async () => {
       const claudeAdapter = {
         getMcpServerCount: jest.fn().mockReturnValue(2),
         getMcpServerNames: jest.fn().mockReturnValue(['alpha-mcp', 'beta-mcp']),
@@ -2185,7 +1889,7 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
         plugin: plugin as OpenCodianPlugin,
         createSectionHeading,
       });
-      section.attachTabbed(containerEl, 'tools');
+      section.attachTabbed(containerEl, 'mcp');
 
       await findButton(t('settings.claudeCode.mcpRuntime.refreshButton')).onClick?.();
 
@@ -2277,15 +1981,15 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
     });
   });
 
-  describe('limits (now in model-thinking tab)', () => {
-    it('renders turn and budget limit controls in model-thinking tab', async () => {
+  describe('runtime query limits', () => {
+    it('renders turn and budget limit controls in runtime tab', async () => {
       const plugin = createPlugin();
       const containerEl = document.createElement('div');
       const section = new SettingsClaudeCodeSection({
         plugin: plugin as OpenCodianPlugin,
         createSectionHeading,
       });
-      section.attachTabbed(containerEl, 'model-thinking');
+      section.attachTabbed(containerEl, 'runtime');
 
       expect(findText(t('settings.claudeCode.maxTurns.name'))).toBeDefined();
       expect(findText(t('settings.claudeCode.maxBudgetUsd.name'))).toBeDefined();
@@ -2307,7 +2011,7 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
         plugin: plugin as OpenCodianPlugin,
         createSectionHeading,
       });
-      section.attachTabbed(containerEl, 'model-thinking');
+      section.attachTabbed(containerEl, 'runtime');
 
       await findText(t('settings.claudeCode.maxTurns.name')).onChange?.('12abc' as never);
       await findText(t('settings.claudeCode.maxBudgetUsd.name')).onChange?.('5usd' as never);
@@ -2326,7 +2030,7 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
         plugin: plugin as OpenCodianPlugin,
         createSectionHeading,
       });
-      section.attachTabbed(containerEl, 'model-thinking');
+      section.attachTabbed(containerEl, 'runtime');
 
       await findText(t('settings.claudeCode.maxTurns.name')).onChange?.('-5' as never);
       await findText(t('settings.claudeCode.maxBudgetUsd.name')).onChange?.('0' as never);
@@ -2344,7 +2048,7 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
         plugin: plugin as OpenCodianPlugin,
         createSectionHeading,
       });
-      section.attachTabbed(containerEl, 'model-thinking');
+      section.attachTabbed(containerEl, 'runtime');
 
       await findText(t('settings.claudeCode.maxTurns.name')).onChange?.('12.5' as never);
       await findText(t('settings.claudeCode.maxBudgetUsd.name')).onChange?.('12.5' as never);
@@ -2365,7 +2069,7 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
         plugin: plugin as OpenCodianPlugin,
         createSectionHeading,
       });
-      section.attachTabbed(containerEl, 'model-thinking');
+      section.attachTabbed(containerEl, 'runtime');
 
       await findText(t('settings.claudeCode.maxTurns.name')).onChange?.('' as never);
       await findText(t('settings.claudeCode.maxBudgetUsd.name')).onChange?.('' as never);
@@ -2377,15 +2081,15 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
     });
   });
 
-  describe('system prompt appended instructions (model-thinking tab)', () => {
-    it('renders systemPrompt text area in model-thinking tab', () => {
+  describe('runtime prompt behavior', () => {
+    it('renders systemPrompt text area in runtime tab', () => {
       const plugin = createPlugin();
       const containerEl = document.createElement('div');
       const section = new SettingsClaudeCodeSection({
         plugin: plugin as OpenCodianPlugin,
         createSectionHeading,
       });
-      section.attachTabbed(containerEl, 'model-thinking');
+      section.attachTabbed(containerEl, 'runtime');
 
       const record = textAreaRecords.find((r) => r.name === t('settings.claudeCode.systemPrompt.name'));
       expect(record).toBeDefined();
@@ -2400,7 +2104,7 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
         plugin: plugin as OpenCodianPlugin,
         createSectionHeading,
       });
-      section.attachTabbed(containerEl, 'model-thinking');
+      section.attachTabbed(containerEl, 'runtime');
 
       const record = textAreaRecords.find((r) => r.name === t('settings.claudeCode.systemPrompt.name'));
       expect(record).toBeDefined();
@@ -2417,7 +2121,7 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
         plugin: plugin as OpenCodianPlugin,
         createSectionHeading,
       });
-      section.attachTabbed(containerEl, 'model-thinking');
+      section.attachTabbed(containerEl, 'runtime');
 
       const record = textAreaRecords.find((r) => r.name === t('settings.claudeCode.systemPrompt.name'));
       expect(record).toBeDefined();
@@ -2433,7 +2137,7 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
         plugin: plugin as OpenCodianPlugin,
         createSectionHeading,
       });
-      section.attachTabbed(containerEl, 'model-thinking');
+      section.attachTabbed(containerEl, 'runtime');
 
       const boundaryEl = containerEl.querySelector('[data-claude-code-system-prompt-boundary="true"]');
       expect(boundaryEl).toBeTruthy();
@@ -2447,21 +2151,21 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
         plugin: plugin as OpenCodianPlugin,
         createSectionHeading,
       });
-      section.attachTabbed(containerEl, 'model-thinking');
+      section.attachTabbed(containerEl, 'runtime');
 
       const lifecycleEl = containerEl.querySelector('[data-claude-code-system-prompt-lifecycle="true"]');
       expect(lifecycleEl).toBeTruthy();
       expect(containerEl.textContent).toContain(t('settings.claudeCode.systemPrompt.lifecycleNotice'));
     });
 
-    it('renders outputStyle text input in model-thinking tab', () => {
+    it('renders outputStyle text input in runtime tab', () => {
       const plugin = createPlugin();
       const containerEl = document.createElement('div');
       const section = new SettingsClaudeCodeSection({
         plugin: plugin as OpenCodianPlugin,
         createSectionHeading,
       });
-      section.attachTabbed(containerEl, 'model-thinking');
+      section.attachTabbed(containerEl, 'runtime');
 
       const record = textRecords.find((r) => r.name === t('settings.claudeCode.outputStyle.name'));
       expect(record).toBeDefined();
@@ -2476,7 +2180,7 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
         plugin: plugin as OpenCodianPlugin,
         createSectionHeading,
       });
-      section.attachTabbed(containerEl, 'model-thinking');
+      section.attachTabbed(containerEl, 'runtime');
 
       const record = textRecords.find((r) => r.name === t('settings.claudeCode.outputStyle.name'));
       expect(record).toBeDefined();
@@ -2493,7 +2197,7 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
         plugin: plugin as OpenCodianPlugin,
         createSectionHeading,
       });
-      section.attachTabbed(containerEl, 'model-thinking');
+      section.attachTabbed(containerEl, 'runtime');
 
       const record = textRecords.find((r) => r.name === t('settings.claudeCode.outputStyle.name'));
       expect(record).toBeDefined();
@@ -2509,7 +2213,7 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
         plugin: plugin as OpenCodianPlugin,
         createSectionHeading,
       });
-      section.attachTabbed(containerEl, 'model-thinking');
+      section.attachTabbed(containerEl, 'runtime');
 
       const boundaryEl = containerEl.querySelector('[data-claude-code-output-style-boundary="true"]');
       expect(boundaryEl).toBeTruthy();
@@ -2523,7 +2227,7 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
         plugin: plugin as OpenCodianPlugin,
         createSectionHeading,
       });
-      section.attachTabbed(containerEl, 'model-thinking');
+      section.attachTabbed(containerEl, 'runtime');
 
       const lifecycleEl = containerEl.querySelector('[data-claude-code-output-style-lifecycle="true"]');
       expect(lifecycleEl).toBeTruthy();
@@ -2537,7 +2241,7 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
         plugin: plugin as OpenCodianPlugin,
         createSectionHeading,
       });
-      section.attachTabbed(containerEl, 'model-thinking');
+      section.attachTabbed(containerEl, 'runtime');
 
       const boundaryEl = containerEl.querySelector('[data-claude-code-task-budget-boundary="true"]');
       expect(boundaryEl).toBeTruthy();
@@ -2551,124 +2255,11 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
         plugin: plugin as OpenCodianPlugin,
         createSectionHeading,
       });
-      section.attachTabbed(containerEl, 'model-thinking');
+      section.attachTabbed(containerEl, 'runtime');
 
       const lifecycleEl = containerEl.querySelector('[data-claude-code-task-budget-lifecycle="true"]');
       expect(lifecycleEl).toBeTruthy();
       expect(containerEl.textContent).toContain(t('settings.claudeCode.taskBudget.lifecycleNotice'));
-    });
-  });
-
-  describe('same-model fallback guard', () => {
-    it('rejects fallback model text input when value matches main model', async () => {
-      const plugin = createPlugin();
-      // model is 'claude-sonnet-4-5' by default
-      const containerEl = document.createElement('div');
-      const section = new SettingsClaudeCodeSection({
-        plugin: plugin as OpenCodianPlugin,
-        createSectionHeading,
-      });
-      section.attachTabbed(containerEl, 'model-thinking');
-
-      const fallbackControl = findText(t('settings.claudeCode.fallbackModel.name'));
-      await fallbackControl.onChange?.('claude-sonnet-4-5' as never);
-
-      // Should NOT update fallbackModel
-      expect(plugin.settings.backendSettings.claudeCode.fallbackModel).toBe('');
-      // Should NOT save
-      expect(plugin.saveSettings).not.toHaveBeenCalled();
-    });
-
-    it('rejects fallback model quick-select when value matches main model', async () => {
-      const claudeAdapter = {
-        supportedModels: jest.fn().mockResolvedValue([
-          { id: 'claude-sonnet-4-5', name: 'Claude Sonnet 4.5', provider: 'anthropic' },
-          { id: 'claude-opus-4-5', name: 'Claude Opus 4.5', provider: 'anthropic' },
-        ]),
-      };
-      const plugin = createPlugin({ claudeAdapter });
-      const containerEl = document.createElement('div');
-      const section = new SettingsClaudeCodeSection({
-        plugin: plugin as OpenCodianPlugin,
-        createSectionHeading,
-      });
-      section.attachTabbed(containerEl, 'model-thinking');
-
-      await new Promise<void>((resolve) => { setTimeout(resolve, 0); });
-
-      // Try to select same model as main model (claude-sonnet-4-5)
-      await findDropdown(t('settings.claudeCode.fallbackModel.quickSelectName')).onChange?.('claude-sonnet-4-5' as never);
-
-      // Should NOT update fallbackModel
-      expect(plugin.settings.backendSettings.claudeCode.fallbackModel).toBe('');
-    });
-
-    it('clears fallback model when model text input is changed to match fallback', async () => {
-      const plugin = createPlugin();
-      plugin.settings.backendSettings.claudeCode.fallbackModel = 'claude-haiku-4-5';
-      const containerEl = document.createElement('div');
-      const section = new SettingsClaudeCodeSection({
-        plugin: plugin as OpenCodianPlugin,
-        createSectionHeading,
-      });
-      section.attachTabbed(containerEl, 'model-thinking');
-
-      // Change main model to match fallback
-      const modelControl = findText(t('settings.claudeCode.model.name'));
-      await modelControl.onChange?.('claude-haiku-4-5' as never);
-
-      // Fallback should be cleared
-      expect(plugin.settings.backendSettings.claudeCode.fallbackModel).toBe('');
-      // Model should be updated
-      expect(plugin.settings.backendSettings.claudeCode.model).toBe('claude-haiku-4-5');
-      // Should save
-      expect(plugin.saveSettings).toHaveBeenCalled();
-    });
-
-    it('clears fallback model when model quick-select is changed to match fallback', async () => {
-      const claudeAdapter = {
-        supportedModels: jest.fn().mockResolvedValue([
-          { id: 'claude-sonnet-4-5', name: 'Claude Sonnet 4.5', provider: 'anthropic' },
-          { id: 'claude-haiku-4-5', name: 'Claude Haiku 4.5', provider: 'anthropic' },
-        ]),
-        setModel: jest.fn().mockResolvedValue(undefined),
-      };
-      const plugin = createPlugin({ claudeAdapter });
-      plugin.settings.backendSettings.claudeCode.fallbackModel = 'claude-haiku-4-5';
-      const containerEl = document.createElement('div');
-      const section = new SettingsClaudeCodeSection({
-        plugin: plugin as OpenCodianPlugin,
-        createSectionHeading,
-      });
-      section.attachTabbed(containerEl, 'model-thinking');
-
-      await new Promise<void>((resolve) => { setTimeout(resolve, 0); });
-
-      // Select model that matches fallback
-      await findDropdown(t('settings.claudeCode.model.quickSelectName')).onChange?.('claude-haiku-4-5' as never);
-
-      // Fallback should be cleared
-      expect(plugin.settings.backendSettings.claudeCode.fallbackModel).toBe('');
-      // Model should be updated
-      expect(plugin.settings.backendSettings.claudeCode.model).toBe('claude-haiku-4-5');
-    });
-
-    it('allows fallback model text input when value differs from main model', async () => {
-      const plugin = createPlugin();
-      const containerEl = document.createElement('div');
-      const section = new SettingsClaudeCodeSection({
-        plugin: plugin as OpenCodianPlugin,
-        createSectionHeading,
-      });
-      section.attachTabbed(containerEl, 'model-thinking');
-
-      const fallbackControl = findText(t('settings.claudeCode.fallbackModel.name'));
-      await fallbackControl.onChange?.('claude-haiku-4-5' as never);
-
-      // Should update fallbackModel
-      expect(plugin.settings.backendSettings.claudeCode.fallbackModel).toBe('claude-haiku-4-5');
-      // Should save
-      expect(plugin.saveSettings).toHaveBeenCalled();
     });
   });
 

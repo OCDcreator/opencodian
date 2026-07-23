@@ -241,6 +241,9 @@ describe('OpenCodianSettingsView classic layout', () => {
     )).toEqual([
       'General',
       'Claude Code',
+      'Project providers',
+      'Claude resources',
+      'Claude resources',
       'Server',
       'Model',
       'Conversation',

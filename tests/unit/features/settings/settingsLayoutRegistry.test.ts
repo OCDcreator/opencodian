@@ -123,12 +123,16 @@ describe('SETTINGS_PRIMARY_TABS', () => {
     expect(claudeTab!.defaultSecondaryTabId).toBe('runtime');
     expect(claudeTab!.secondaryTabs.map((secondaryTab) => secondaryTab.id)).toEqual([
       'runtime',
+      'providers',
       'model-thinking',
       'permissions',
       'context-sources',
       'tools',
-      'resources',
+      'mcp',
+      'skills-commands',
+      'agents',
     ]);
+    expect(claudeTab!.secondaryTabs.some((secondaryTab) => secondaryTab.id === 'resources')).toBe(false);
   });
 
   it('splits formatter settings into formatter and language server secondary tabs', () => {
@@ -195,8 +199,9 @@ describe('resolveSecondaryTabId', () => {
     expect(resolveSecondaryTabId('general', 'backend')).toBe('agents');
     expect(resolveSecondaryTabId('conversation', 'rendering')).toBe('display');
     expect(resolveSecondaryTabId('security', 'permissions')).toBe('config');
-    expect(resolveSecondaryTabId('claude-code', 'mcp-advanced')).toBe('tools');
-    expect(resolveSecondaryTabId('claude-code', 'limits')).toBe('model-thinking');
+    expect(resolveSecondaryTabId('claude-code', 'mcp-advanced')).toBe('mcp');
+    expect(resolveSecondaryTabId('claude-code', 'limits')).toBe('runtime');
+    expect(resolveSecondaryTabId('claude-code', 'resources')).toBe('skills-commands');
     expect(resolveSecondaryTabId('debug', 'general')).toBe('plugin');
     expect(resolveSecondaryTabId('debug', 'modules')).toBe('plugin');
     expect(resolveSecondaryTabId('debug', 'logs')).toBe('export');
@@ -249,10 +254,10 @@ describe('getActiveSecondaryTabId', () => {
     expect(getActiveSecondaryTabId('server', { ...saved, model: 'tools' })).toBe('auth');
   });
 
-  it('regression: persisted limits selection migrates to model-thinking', () => {
+  it('regression: persisted limits selection migrates to runtime', () => {
     const saved = { 'claude-code': 'limits' };
     const result = getActiveSecondaryTabId('claude-code', saved);
-    expect(result).toBe('model-thinking');
+    expect(result).toBe('runtime');
   });
 });
 

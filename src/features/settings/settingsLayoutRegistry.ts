@@ -45,11 +45,14 @@ export const SETTINGS_PRIMARY_TABS: SettingsPrimaryTabDefinition[] = [
     backendRequired: 'claude-code',
     secondaryTabs: [
       { id: 'runtime', labelKey: 'settings.claudeCode.tab.runtime' },
+      { id: 'providers', labelKey: 'settings.claudeCode.tab.providers' },
       { id: 'model-thinking', labelKey: 'settings.claudeCode.tab.modelThinking' },
       { id: 'permissions', labelKey: 'settings.claudeCode.tab.permissions' },
       { id: 'context-sources', labelKey: 'settings.claudeCode.tab.contextSources' },
       { id: 'tools', labelKey: 'settings.claudeCode.tab.tools' },
-      { id: 'resources', labelKey: 'settings.claudeCode.tab.resources' },
+      { id: 'mcp', labelKey: 'settings.claudeCode.tab.mcp' },
+      { id: 'skills-commands', labelKey: 'settings.claudeCode.tab.skillsCommands' },
+      { id: 'agents', labelKey: 'settings.claudeCode.tab.agents' },
     ],
   },
   {
@@ -270,9 +273,10 @@ const LEGACY_SECONDARY_TAB_ID_MAP: Record<string, Record<string, string>> = {
     rendering: 'display',
   },
   'claude-code': {
-    'mcp-advanced': 'tools',
-    mcpAdvanced: 'tools',
-    limits: 'model-thinking',
+    'mcp-advanced': 'mcp',
+    mcpAdvanced: 'mcp',
+    limits: 'runtime',
+    resources: 'skills-commands',
   },
   security: {
     permissions: 'config',

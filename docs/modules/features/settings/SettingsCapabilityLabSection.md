@@ -5,6 +5,10 @@
 
 ## 概述
 
+### 2026-07-23 Provider 配置边界
+
+Capability Lab 的历史 `setModel` / fallback probes 仍是诊断证据，不再代表稳定设置页可实时切换默认模型。项目 provider preset 的 model/fallback 写入 `.claude/settings.local.json`，只在新 query 或重启会话后生效；聊天中的显式模型选择仍是独立的会话 override。
+
 `SettingsCapabilityLabSection` 是 Debug 分区 `capability-lab` 二级标签的诊断/实验面板 owner。它提供 Claude Code 深诊断、OpenCode production capability snapshot 和 Codex capability matrix，所有实验内容均标记为 ⚠️ DIAGNOSTIC / EXPERIMENTAL / NOT STABLE。大多数探针仍是只读或 dry-run；sessionStore proof 只写插件内存里的 diagnostic store。例外是 UI 偏好和显式 Claude 诊断开关：backend tab 选择会写入 `capabilityLabSelectedBackend`，诊断开关继续写入 Claude backend settings，但不会改变 `activeBackend` 或绕过实验 gate。
 
 页面顶部在警告和诊断摘要后渲染 `Claude Code → OpenCode → Codex` 固定顺序的 backend tab rail。初始选择按 persisted preference → `activeBackend` → Claude Code 回退；Arrow/Home/End 只移动焦点，Enter/Space/点击才激活。每个 tabpanel 首次激活时惰性挂载，之后缓存并复用，未访问 Claude panel 时不会触发 History/Subagent/Rewind 等读取。隐藏 panel 使用原生 `hidden`，同一时刻仅一个 panel 可见。

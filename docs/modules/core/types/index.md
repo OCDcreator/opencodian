@@ -2,7 +2,7 @@
 
 > **源码**: `src/core/types/index.ts`
 > **状态**: [REVIEW]
-> **Updated**: 2026-07-22 — added local model pricing and cost-provenance type re-exports; local estimates remain distinct from backend-reported and subscription billing values.
+> **Updated**: 2026-07-23 — added Claude project provider preset types and normalization exports; provider credentials are projected only to project-local Claude settings.
 
 ## 概述
 
@@ -60,6 +60,9 @@ OpenCodian 全局类型的主聚合入口。它把聊天、模型、设置、权
 |------|------|------|
 | `OpenCodianSettings` | type | 完整设置接口 |
 | `DEFAULT_SETTINGS` | const | 默认设置常量 |
+| `ClaudeProviderPreset` / `ClaudeProviderSettings` | type | Claude 项目级 provider preset、活动 preset 与迁移状态；官方 preset 不可编辑 |
+| `CLAUDE_OFFICIAL_PROVIDER_PRESET` / `CLAUDE_PROVIDER_MANAGED_ENV_KEYS` | const | 官方 preset 及 `settings.local.json` 受管环境变量键白名单 |
+| `getDefaultClaudeProviderSettings` / `normalizeClaudeProviderSettings` | function | 恢复官方 preset、清理无效 preset 与禁止 extra-env 覆盖受管 Anthropic 键 |
 | `SandboxFilesystemConfig` / `SandboxNetworkConfig` / `SandboxRipgrepConfig` | type | Claude Code sandbox 子策略类型（filesystem/network/ripgrep） |
 | `ServerMode` / `ServerAuthType` | type | 服务器模式/认证类型 |
 | `ServerConfig` / `LocalServerConfig` / `RemoteServerConfig` | type | 服务器配置 |
