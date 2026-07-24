@@ -82,18 +82,92 @@ describe('renderAgentSwitcherFloatingIcons', () => {
     expect(floatingEl?.getAttribute('aria-hidden')).toBe('false');
   });
 
-  it('does not render the floating rail inside the Obsidian settings modal', () => {
-    const modalEl = document.body.createDiv({ cls: 'modal mod-settings' });
-    const containerEl = modalEl.createDiv();
+  it('keeps independent editor and native settings modal rails through modal lifecycle', async () => {
+    const editorContainerEl = document.body.createDiv();
+    const editorOnSelect = jest.fn();
+    const modalOnSelect = jest.fn();
+    const renderOptions = {
+      selectedAgent: 'claude-code' as const,
+      enabledAgents: ['opencode', 'claude-code'] as const,
+      onSelect: editorOnSelect,
+    };
 
-    renderAgentSwitcherFloatingIcons(containerEl, {
-      selectedAgent: 'claude-code',
-      enabledAgents: ['opencode', 'claude-code'],
-      onSelect: jest.fn(),
+    renderAgentSwitcherFloatingIcons(editorContainerEl, renderOptions);
+    const editorFloatingEl = document.body.querySelector<HTMLElement>('.opencodian-agent-switcher-floating');
+
+    expect(editorFloatingEl).not.toBeNull();
+
+    const modalEl = document.body.createDiv({ cls: 'modal mod-settings' });
+    const modalContainerEl = modalEl.createDiv();
+    renderAgentSwitcherFloatingIcons(modalContainerEl, {
+      ...renderOptions,
+      onSelect: modalOnSelect,
     });
 
-    expect(document.body.querySelector('.opencodian-agent-switcher-floating')).toBeNull();
-    expect(modalEl.querySelector('.opencodian-agent-switcher-hover-zone')).toBeNull();
+    await Promise.resolve();
+    const floatingRails = Array.from(
+      document.body.querySelectorAll<HTMLElement>('.opencodian-agent-switcher-floating'),
+    );
+    const modalFloatingEl = floatingRails[1];
+
+    expect(floatingRails).toHaveLength(2);
+    expect(floatingRails[0]).toBe(editorFloatingEl);
+    expect(modalFloatingEl).not.toBe(editorFloatingEl);
+    expect(editorFloatingEl?.getAttribute('aria-hidden')).toBe('true');
+    expect(modalFloatingEl?.getAttribute('aria-hidden')).toBe('false');
+    expect(modalContainerEl.querySelector('.opencodian-agent-switcher-hover-zone')).not.toBeNull();
+    expect(modalFloatingEl?.querySelectorAll('.opencodian-agent-switcher-icon')).toHaveLength(2);
+
+    modalFloatingEl?.querySelector<HTMLButtonElement>('.opencodian-agent-switcher-icon')?.click();
+    expect(modalOnSelect).toHaveBeenCalledWith('opencode' satisfies AgentBackendKind);
+    expect(editorOnSelect).not.toHaveBeenCalled();
+
+    modalEl.remove();
+    await Promise.resolve();
+
+    expect(modalFloatingEl?.isConnected).toBe(false);
+    expect(document.body.querySelectorAll('.opencodian-agent-switcher-floating')).toHaveLength(1);
+    expect(editorFloatingEl?.isConnected).toBe(true);
+    expect(editorFloatingEl?.getAttribute('aria-hidden')).toBe('false');
+  });
+
+  it('cleans repeated renders per owner without removing the other surface rail', () => {
+    const editorContainerEl = document.body.createDiv();
+    const modalEl = document.body.createDiv({ cls: 'modal mod-settings' });
+    const modalContainerEl = modalEl.createDiv();
+    const renderOptions = {
+      selectedAgent: 'claude-code' as const,
+      enabledAgents: ['opencode', 'claude-code'] as const,
+      onSelect: jest.fn(),
+    };
+
+    renderAgentSwitcherFloatingIcons(editorContainerEl, renderOptions);
+    const firstEditorFloatingEl = document.body.querySelector<HTMLElement>('.opencodian-agent-switcher-floating');
+    renderAgentSwitcherFloatingIcons(modalContainerEl, renderOptions);
+    const firstModalFloatingEl = document.body.querySelectorAll<HTMLElement>(
+      '.opencodian-agent-switcher-floating',
+    )[1];
+
+    renderAgentSwitcherFloatingIcons(editorContainerEl, renderOptions);
+    const secondEditorFloatingEl = document.body.querySelectorAll<HTMLElement>(
+      '.opencodian-agent-switcher-floating',
+    )[1];
+
+    expect(firstEditorFloatingEl?.isConnected).toBe(false);
+    expect(secondEditorFloatingEl).not.toBe(firstEditorFloatingEl);
+    expect(firstModalFloatingEl?.isConnected).toBe(true);
+    expect(editorContainerEl.querySelectorAll('.opencodian-agent-switcher-hover-zone')).toHaveLength(1);
+    expect(document.body.querySelectorAll('.opencodian-agent-switcher-floating')).toHaveLength(2);
+
+    renderAgentSwitcherFloatingIcons(modalContainerEl, renderOptions);
+    const floatingRails = Array.from(
+      document.body.querySelectorAll<HTMLElement>('.opencodian-agent-switcher-floating'),
+    );
+
+    expect(firstModalFloatingEl?.isConnected).toBe(false);
+    expect(floatingRails).toHaveLength(2);
+    expect(floatingRails).toContain(secondEditorFloatingEl);
+    expect(modalContainerEl.querySelectorAll('.opencodian-agent-switcher-hover-zone')).toHaveLength(1);
   });
 
   it('keeps the floating rail until an initially detached settings page is connected', async () => {

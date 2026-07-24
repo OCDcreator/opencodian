@@ -30,22 +30,28 @@ interface AgentSwitcherOptions {
   onSelect: (agent: AgentBackendKind) => void;
 }
 
+type FloatingSwitcherCleanup = () => void;
+
+const FLOATING_SWITCHER_CLEANUP_BY_OWNER = new WeakMap<HTMLElement, FloatingSwitcherCleanup>();
+
 export function renderAgentSwitcherFloatingIcons(
   containerEl: HTMLElement,
   options: AgentSwitcherOptions,
 ): void {
-  if (options.enabledAgents.length < 2) {
-    return;
-  }
+  removeExistingFloatingSwitcher(containerEl);
 
-  removeExistingFloatingSwitcher(containerEl.ownerDocument);
-  if (containerEl.closest('.modal.mod-settings')) {
+  if (options.enabledAgents.length < 2) {
     return;
   }
 
   const anchorEl = containerEl.createDiv({ cls: 'opencodian-agent-switcher-hover-zone' });
   const floatingEl = containerEl.createDiv({ cls: 'opencodian-agent-switcher-floating' });
-  pinAgentSwitcherToSettingsEdge(containerEl, floatingEl, anchorEl);
+  const pinCleanup = pinAgentSwitcherToSettingsEdge(containerEl, floatingEl, anchorEl);
+  const cleanup: FloatingSwitcherCleanup = () => {
+    pinCleanup();
+    anchorEl.remove();
+  };
+  FLOATING_SWITCHER_CLEANUP_BY_OWNER.set(containerEl, cleanup);
 
   options.enabledAgents.forEach((agent, index) => {
     const backendOption = BACKEND_OPTIONS.find((candidate) => candidate.id === agent);
@@ -122,19 +128,21 @@ export function renderAgentSwitcherHeaderIcons(
   }
 }
 
-function removeExistingFloatingSwitcher(ownerDocument: Document): void {
-  ownerDocument
-    .querySelectorAll<HTMLElement>('.opencodian-agent-switcher-floating, .opencodian-agent-switcher-hover-zone')
-    .forEach((switcherEl) => {
-      switcherEl.remove();
-    });
+function removeExistingFloatingSwitcher(ownerContainer: HTMLElement): void {
+  const cleanup = FLOATING_SWITCHER_CLEANUP_BY_OWNER.get(ownerContainer);
+  if (!cleanup) {
+    return;
+  }
+
+  cleanup();
+  FLOATING_SWITCHER_CLEANUP_BY_OWNER.delete(ownerContainer);
 }
 
 function pinAgentSwitcherToSettingsEdge(
   containerEl: HTMLElement,
   floatingEl: HTMLElement,
   anchorEl: HTMLElement,
-): void {
+): FloatingSwitcherCleanup {
   const ownerDocument = containerEl.ownerDocument;
   const syncPosition = () => {
     const rect = containerEl.getBoundingClientRect();
@@ -151,28 +159,12 @@ function pinAgentSwitcherToSettingsEdge(
 
   syncPosition();
   syncModalVisibility();
-  ownerDocument.body.appendChild(floatingEl);
-
-  if (!ownerDocument.body.contains(floatingEl)) {
-    return;
-  }
-
   let cleanedUp = false;
-  let anchorWasConnected = ownerDocument.body.contains(anchorEl);
-  const cleanup = () => {
-    if (cleanedUp) {
-      return;
-    }
-
-    cleanedUp = true;
-    window.removeEventListener('resize', syncPosition);
-    resizeObserver?.disconnect();
-    mutationObserver.disconnect();
-    floatingEl.remove();
-  };
   const resizeObserver = typeof ResizeObserver !== 'undefined'
     ? new ResizeObserver(syncPosition)
     : null;
+  let anchorWasConnected = ownerDocument.body.contains(anchorEl);
+  let cleanup: FloatingSwitcherCleanup = () => {};
   const mutationObserver = new MutationObserver(() => {
     const anchorIsConnected = ownerDocument.body.contains(anchorEl);
     if (!anchorWasConnected && anchorIsConnected) {
@@ -188,12 +180,31 @@ function pinAgentSwitcherToSettingsEdge(
     syncModalVisibility();
   });
 
+  cleanup = () => {
+    if (cleanedUp) {
+      return;
+    }
+
+    cleanedUp = true;
+    window.removeEventListener('resize', syncPosition);
+    resizeObserver?.disconnect();
+    mutationObserver.disconnect();
+    floatingEl.remove();
+  };
+
+  ownerDocument.body.appendChild(floatingEl);
+  if (!ownerDocument.body.contains(floatingEl)) {
+    return cleanup;
+  }
+
   window.addEventListener('resize', syncPosition);
   resizeObserver?.observe(containerEl);
   mutationObserver.observe(ownerDocument.body, {
     childList: true,
     subtree: true,
   });
+
+  return cleanup;
 }
 
 function isUnrelatedSettingsModalOpen(ownerDocument: Document, containerEl: HTMLElement): boolean {
