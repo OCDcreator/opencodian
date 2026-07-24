@@ -14,7 +14,7 @@ import type {
 import {
   normalizeChatFontSizePx,
 } from '../../../core/types';
-import type { CodexReasoningEffort, CodexSandboxMode, CodexWebSearchMode } from '../../../core/types/settings';
+import type { CodexApprovalPolicy, CodexReasoningEffort, CodexSandboxMode, CodexWebSearchMode } from '../../../core/types/settings';
 import { t } from '../../../i18n';
 
 export interface ConversationSessionSettingsModalDefaults {
@@ -25,6 +25,7 @@ export interface ConversationSessionSettingsModalDefaults {
   codexAdditionalDirectories?: string[];
   codexNetworkAccessEnabled?: boolean;
   codexWebSearchMode?: CodexWebSearchMode;
+  codexApprovalPolicy?: CodexApprovalPolicy;
   codexAvailableModels?: CodexModelSummary[];
   codexThreadGoal?: AppServerThreadGoal | null;
 }
@@ -87,6 +88,7 @@ export class ConversationSessionSettingsModal extends Modal {
   private codexAdditionalDirectoriesTextareaEl: HTMLTextAreaElement | null = null;
   private codexNetworkAccessEnabledSelectEl: HTMLSelectElement | null = null;
   private codexWebSearchModeSelectEl: HTMLSelectElement | null = null;
+  private codexApprovalPolicySelectEl: HTMLSelectElement | null = null;
   private codexGoalReadbackEl: HTMLElement | null = null;
   private codexGoalEmptyEl: HTMLElement | null = null;
   private codexGoalClearBtnEl: HTMLButtonElement | null = null;
@@ -190,6 +192,7 @@ export class ConversationSessionSettingsModal extends Modal {
     this.codexAdditionalDirectoriesTextareaEl = null;
     this.codexNetworkAccessEnabledSelectEl = null;
     this.codexWebSearchModeSelectEl = null;
+    this.codexApprovalPolicySelectEl = null;
     this.codexGoalReadbackEl = null;
     this.codexGoalEmptyEl = null;
     this.errorEl = null;
@@ -592,6 +595,24 @@ export class ConversationSessionSettingsModal extends Modal {
       initialValue: this.options.initialOverrides?.codexWebSearchMode,
     });
 
+    this.codexApprovalPolicySelectEl = this.createDropdownField(codexSectionEl, {
+      setting: 'codex-approval-policy',
+      name: t('chat.sessionSettings.modal.codexApprovalPolicy'),
+      description: t('chat.sessionSettings.modal.codexApprovalPolicyDesc'),
+      defaultValue: this.approvalPolicyLabel(defaults.codexApprovalPolicy ?? 'inherit'),
+      // The blank option means "no per-session override = use the global setting"
+      // (null), distinct from the explicit "inherit" choice below which forces
+      // the backend default regardless of the global policy.
+      inheritLabel: t('chat.sessionSettings.modal.codexApprovalPolicyUseGlobal'),
+      choices: [
+        { value: 'inherit', label: t('settings.codex.approvalPolicy.inherit') },
+        { value: 'untrusted', label: t('settings.codex.approvalPolicy.untrusted') },
+        { value: 'on-request', label: t('settings.codex.approvalPolicy.onRequest') },
+        { value: 'never', label: t('settings.codex.approvalPolicy.never') },
+      ],
+      initialValue: this.options.initialOverrides?.codexApprovalPolicy,
+    });
+
     this.createCodexGoalSection(codexSectionEl);
     this.createCodexReviewSection(codexSectionEl);
   }
@@ -890,6 +911,15 @@ export class ConversationSessionSettingsModal extends Modal {
       case 'disabled': return t('settings.codex.webSearch.disabled');
       case 'cached': return t('settings.codex.webSearch.cached');
       case 'live': return t('settings.codex.webSearch.live');
+    }
+  }
+
+  private approvalPolicyLabel(policy: CodexApprovalPolicy): string {
+    switch (policy) {
+      case 'inherit': return t('settings.codex.approvalPolicy.inherit');
+      case 'untrusted': return t('settings.codex.approvalPolicy.untrusted');
+      case 'on-request': return t('settings.codex.approvalPolicy.onRequest');
+      case 'never': return t('settings.codex.approvalPolicy.never');
     }
   }
 
@@ -1470,6 +1500,13 @@ export class ConversationSessionSettingsModal extends Modal {
       overrides.codexWebSearchMode = webSearchValue as CodexWebSearchMode;
     } else {
       overrides.codexWebSearchMode = null;
+    }
+
+    const approvalPolicyValue = this.codexApprovalPolicySelectEl?.value ?? '';
+    if (approvalPolicyValue.length > 0) {
+      overrides.codexApprovalPolicy = approvalPolicyValue as CodexApprovalPolicy;
+    } else {
+      overrides.codexApprovalPolicy = null;
     }
   }
 

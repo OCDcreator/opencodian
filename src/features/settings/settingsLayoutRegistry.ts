@@ -63,6 +63,7 @@ export const SETTINGS_PRIMARY_TABS: SettingsPrimaryTabDefinition[] = [
     backendRequired: 'codex',
     secondaryTabs: [
       { id: 'connection', labelKey: 'settings.codex.tab.connection' },
+      { id: 'permissions', labelKey: 'settings.codex.tab.permissions' },
       { id: 'resume-inspect', labelKey: 'settings.codex.tab.resumeInspect' },
       { id: 'account', labelKey: 'settings.codex.tab.account' },
       { id: 'resources', labelKey: 'settings.codex.tab.resources' },

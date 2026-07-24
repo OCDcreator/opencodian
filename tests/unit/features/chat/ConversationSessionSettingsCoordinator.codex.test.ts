@@ -1,3 +1,4 @@
+/* eslint-disable max-lines, max-lines-per-function -- Covers Codex override resolution/apply, model/thread-goal/review delegation, share routing, and approval-policy inheritance across many scenarios in cohesive describe blocks. */
 import type {
   Conversation,
   ConversationSessionSettings,
@@ -43,11 +44,22 @@ function createOpenCodeConversation(
   };
 }
 
+const CODEX_GLOBAL_DEFAULTS = {
+  sandboxMode: 'workspace-write' as const,
+  modelReasoningEffort: 'medium' as const,
+  model: 'codex-mini-latest',
+  additionalDirectories: [] as string[],
+  networkAccessEnabled: false,
+  webSearchMode: 'disabled' as const,
+  approvalPolicy: 'inherit' as const,
+};
+
 function createCoordinator(options?: {
   currentConversation?: Conversation | null;
 }) {
   const chatContainerEl = document.createElement('div');
   const applyCodexRuntimeOverrides = jest.fn();
+  const updateApprovalPolicy = jest.fn();
   const invalidateLiveThread = jest.fn();
   const saveConversation = jest.fn().mockResolvedValue(undefined);
   const host = {
@@ -56,20 +68,14 @@ function createCoordinator(options?: {
     getSessionSettingsDefaults: jest.fn().mockReturnValue({
       chatFontSizePx: 13,
     }),
-    getCodexGlobalDefaults: jest.fn().mockReturnValue({
-      sandboxMode: 'workspace-write' as const,
-      modelReasoningEffort: 'medium' as const,
-      model: 'codex-mini-latest',
-      additionalDirectories: [] as string[],
-      networkAccessEnabled: false,
-    }),
+    getCodexGlobalDefaults: jest.fn().mockReturnValue(CODEX_GLOBAL_DEFAULTS),
     getChatContainerEl: jest.fn().mockReturnValue(chatContainerEl),
     saveConversation,
     showNotice: jest.fn(),
     applyCodexRuntimeOverrides,
     agentServiceRegistry: {
       get: jest.fn((backend: string) =>
-        backend === 'codex' ? { invalidateLiveThread } : null,
+        backend === 'codex' ? { invalidateLiveThread, updateApprovalPolicy } : null,
       ),
     } as unknown as jest.Mocked<ConversationSessionSettingsCoordinatorHost['agentServiceRegistry']>,
     supportsSessionSharing: jest.fn().mockReturnValue(false),
@@ -82,6 +88,7 @@ function createCoordinator(options?: {
     chatContainerEl,
     saveConversation,
     applyCodexRuntimeOverrides,
+    updateApprovalPolicy,
     invalidateLiveThread,
   };
 }
@@ -154,7 +161,21 @@ describe('ConversationSessionSettingsCoordinator Codex overrides', () => {
       model: 'codex-mini-latest',
       additionalDirectories: [],
       networkAccessEnabled: false,
+      webSearchMode: 'disabled',
     });
+  });
+
+  it('applies approval policy through the coordinator-owned Codex adapter path', async () => {
+    const conv = createCodexConversation({
+      codexSandboxMode: 'read-only',
+      codexModelReasoningEffort: 'high',
+      codexApprovalPolicy: 'on-request',
+    });
+    const { coordinator, updateApprovalPolicy } = createCoordinator({ currentConversation: conv });
+
+    await coordinator.applyConversationRuntimeState(conv);
+
+    expect(updateApprovalPolicy).toHaveBeenCalledWith('on-request');
   });
 
   it('applies inherited Codex defaults when overrides are null', async () => {
@@ -174,6 +195,7 @@ describe('ConversationSessionSettingsCoordinator Codex overrides', () => {
       model: 'codex-mini-latest',
       additionalDirectories: [],
       networkAccessEnabled: false,
+      webSearchMode: 'disabled',
     });
   });
 
@@ -197,6 +219,7 @@ describe('ConversationSessionSettingsCoordinator Codex overrides', () => {
       model: 'codex-mini-latest',
       additionalDirectories: [],
       networkAccessEnabled: false,
+      webSearchMode: 'disabled',
     });
   });
 
@@ -530,5 +553,156 @@ describe('ConversationSessionSettingsCoordinator Codex model override', () => {
       // No throw — the missing adapter is safely skipped.
       expect(host.applyCodexRuntimeOverrides).toHaveBeenCalled();
     });
+  });
+});
+
+describe('ConversationSessionSettingsCoordinator Codex approval policy override', () => {
+  function createApprovalCoordinator(globalApproval: 'inherit' | 'untrusted' | 'on-request' | 'never') {
+    const applyCodexRuntimeOverrides = jest.fn();
+    const updateApprovalPolicy = jest.fn();
+    const invalidateLiveThread = jest.fn();
+    const chatContainerEl = document.createElement('div');
+    const host = {
+      app: {} as never,
+      getCurrentConversation: jest.fn(),
+      getSessionSettingsDefaults: jest.fn().mockReturnValue({ chatFontSizePx: 13 }),
+      getCodexGlobalDefaults: jest.fn().mockReturnValue({
+        sandboxMode: 'workspace-write' as const,
+        modelReasoningEffort: 'medium' as const,
+        model: 'codex-mini-latest',
+        additionalDirectories: [] as string[],
+        networkAccessEnabled: false,
+        webSearchMode: 'disabled' as const,
+        approvalPolicy: globalApproval,
+      }),
+      getChatContainerEl: jest.fn().mockReturnValue(chatContainerEl),
+      saveConversation: jest.fn().mockResolvedValue(undefined),
+      showNotice: jest.fn(),
+      applyCodexRuntimeOverrides,
+      agentServiceRegistry: {
+        get: jest.fn((backend: string) =>
+          backend === 'codex' ? { invalidateLiveThread, updateApprovalPolicy } : null,
+        ),
+      } as unknown as jest.Mocked<ConversationSessionSettingsCoordinatorHost['agentServiceRegistry']>,
+      supportsSessionSharing: jest.fn().mockReturnValue(false),
+      supportsCompaction: jest.fn().mockReturnValue(false),
+    } as jest.Mocked<ConversationSessionSettingsCoordinatorHost>;
+    return { coordinator: new ConversationSessionSettingsCoordinator(host), host, applyCodexRuntimeOverrides, updateApprovalPolicy };
+  }
+
+  it('routes the resolved approval policy through the coordinator-owned adapter path', async () => {
+    const conv = createCodexConversation({
+      codexSandboxMode: 'read-only',
+      codexModelReasoningEffort: 'high',
+      codexApprovalPolicy: 'on-request',
+    });
+    const { coordinator, applyCodexRuntimeOverrides, updateApprovalPolicy } = createApprovalCoordinator('never');
+    await coordinator.applyConversationRuntimeState(conv);
+    expect(updateApprovalPolicy).toHaveBeenCalledWith('on-request');
+    expect(applyCodexRuntimeOverrides).not.toHaveBeenCalledWith(
+      expect.objectContaining({ approvalPolicy: expect.anything() }),
+    );
+  });
+
+  it('null/undefined session override inherits the REAL global policy (each policy), no bleed/reset', async () => {
+    // Two conversations against TWO different global values, alternating so an
+    // accidental stale/singleton state cannot masquerade as correct.
+    const globals: Array<'untrusted' | 'never' | 'on-request'> = ['untrusted', 'never', 'on-request'];
+    for (const g of globals) {
+      const convNull = createCodexConversation({
+        codexSandboxMode: 'read-only',
+        codexModelReasoningEffort: 'high',
+        codexApprovalPolicy: null,
+      });
+      const convUndefined = createCodexConversation({
+        codexSandboxMode: 'read-only',
+        codexModelReasoningEffort: 'high',
+      });
+      const { coordinator } = createApprovalCoordinator(g);
+      const effectiveNull = coordinator.resolveEffectiveSettings(convNull);
+      const effectiveUndefined = coordinator.resolveEffectiveSettings(convUndefined);
+      expect(effectiveNull.codexApprovalPolicy).toBe(g);
+      expect(effectiveUndefined.codexApprovalPolicy).toBe(g);
+    }
+  });
+
+  it('explicit per-session policy overrides the global without resetting it', async () => {
+    const convExplicit = createCodexConversation({
+      codexSandboxMode: 'read-only',
+      codexModelReasoningEffort: 'high',
+      codexApprovalPolicy: 'inherit',
+    });
+    const convInherit = createCodexConversation({
+      codexSandboxMode: 'read-only',
+      codexModelReasoningEffort: 'high',
+      codexApprovalPolicy: null,
+    });
+    const { coordinator } = createApprovalCoordinator('never');
+    // Explicit "inherit" forces backend default; it does NOT fall back to global "never".
+    expect(coordinator.resolveEffectiveSettings(convExplicit).codexApprovalPolicy).toBe('inherit');
+    // Null still inherits the real global.
+    expect(coordinator.resolveEffectiveSettings(convInherit).codexApprovalPolicy).toBe('never');
+  });
+
+  it('resolves codexApprovalPolicy to inherit when the global default is absent', () => {
+    const conv = createCodexConversation({ codexApprovalPolicy: null });
+    const chatContainerEl = document.createElement('div');
+    const host = {
+      app: {} as never,
+      getCurrentConversation: jest.fn().mockReturnValue(conv),
+      getSessionSettingsDefaults: jest.fn().mockReturnValue({ chatFontSizePx: 13 }),
+      getCodexGlobalDefaults: jest.fn().mockReturnValue({
+        sandboxMode: 'workspace-write' as const,
+        modelReasoningEffort: 'medium' as const,
+        model: 'codex-mini-latest',
+        additionalDirectories: [] as string[],
+        networkAccessEnabled: false,
+      }),
+      getChatContainerEl: jest.fn().mockReturnValue(chatContainerEl),
+      saveConversation: jest.fn().mockResolvedValue(undefined),
+      showNotice: jest.fn(),
+      applyCodexRuntimeOverrides: jest.fn(),
+      agentServiceRegistry: { get: jest.fn(() => null) } as never,
+      supportsSessionSharing: jest.fn().mockReturnValue(false),
+      supportsCompaction: jest.fn().mockReturnValue(false),
+    } as jest.Mocked<ConversationSessionSettingsCoordinatorHost>;
+    const coordinator = new ConversationSessionSettingsCoordinator(host);
+    expect(coordinator.resolveEffectiveSettings(conv).codexApprovalPolicy).toBe('inherit');
+  });
+
+  it('reads the real global approval policy from plugin settings without growing OpenCodianView', () => {
+    const conv = createCodexConversation({ codexApprovalPolicy: null });
+    const host = {
+      app: {
+        plugins: {
+          plugins: {
+            opencodian: {
+              settings: { backendSettings: { codex: { approvalPolicy: 'never' } } },
+            },
+          },
+        },
+      } as never,
+      getCurrentConversation: jest.fn().mockReturnValue(conv),
+      getSessionSettingsDefaults: jest.fn().mockReturnValue({ chatFontSizePx: 13 }),
+      getCodexGlobalDefaults: jest.fn().mockReturnValue({
+        sandboxMode: 'workspace-write' as const,
+        modelReasoningEffort: 'medium' as const,
+        model: 'codex-mini-latest',
+        additionalDirectories: [] as string[],
+        networkAccessEnabled: false,
+        webSearchMode: 'disabled' as const,
+      }),
+      getChatContainerEl: jest.fn().mockReturnValue(document.createElement('div')),
+      saveConversation: jest.fn().mockResolvedValue(undefined),
+      showNotice: jest.fn(),
+      applyCodexRuntimeOverrides: jest.fn(),
+      agentServiceRegistry: { get: jest.fn(() => null) } as never,
+      supportsSessionSharing: jest.fn().mockReturnValue(false),
+      supportsCompaction: jest.fn().mockReturnValue(false),
+    } as jest.Mocked<ConversationSessionSettingsCoordinatorHost>;
+
+    const coordinator = new ConversationSessionSettingsCoordinator(host);
+
+    expect(coordinator.resolveEffectiveSettings(conv).codexApprovalPolicy).toBe('never');
   });
 });

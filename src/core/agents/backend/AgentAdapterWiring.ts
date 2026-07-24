@@ -123,6 +123,9 @@ export function wireHiddenAdapters(options: WireHiddenAdaptersOptions): void {
       ...(codexSettings?.webSearchMode
         ? { webSearchMode: codexSettings.webSearchMode }
         : {}),
+      ...(codexSettings?.approvalPolicy
+        ? { approvalPolicy: codexSettings.approvalPolicy }
+        : {}),
       ...(codexPathOverride ? { codexPathOverride } : {}),
     }));
   }

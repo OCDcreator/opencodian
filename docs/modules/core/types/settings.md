@@ -2,6 +2,7 @@
 
 > **源码**: `src/core/types/settings.ts`
 > **状态**: [REVIEW]
+> **Updated**: 2026-07-24 — added `CodexApprovalPolicy` type (`'inherit'|'untrusted'|'on-request'|'never'`), `CodexBackendSettings.approvalPolicy` (default `'inherit'`), and normalization (missing/unknown → `'inherit'`, no migration to `on-request`).
 
 ## 概述
 

@@ -3,15 +3,17 @@
 **File:** `src/features/settings/SettingsCodexSection.ts`
 **Status:** ACTIVE
 
-> **更新**: 新增 `resources` 二级 tab，委托给 `SettingsCodexResourcesSection` 渲染 Codex 项目/全局 skills 与 agents 管理（项目可编辑、全局只读）。
+> **更新**: 新增 `resources` 二级 tab，委托给 `SettingsCodexResourcesSection` 渲染 Codex 项目/全局 skills 与 agents 管理（当前 P0 UI 项目可编辑、全局只读；P1 通过共享 `allowlisted-root` 契约开放全局 CRUD）。
 
 ## Purpose
 
-Codex backend settings panel. Uses three secondary tabs under the Codex primary tab to avoid piling unrelated settings into a single flat card stack:
+Codex backend settings panel. Uses five secondary tabs under the Codex primary tab to avoid piling unrelated settings into a single flat card stack, grouped by *what* a setting controls (Source Grouping, see `CONTEXT.md`):
 
-1. **Connection** — genuinely wired SDK options (`apiKey`, `model`, `sandboxMode`, `modelReasoningEffort`, `additionalDirectories`, `networkAccessEnabled`, `webSearchMode`) plus a lightweight connection-source summary.
-2. **Resume & inspect** — the backend session browser and live runtime readbacks (model catalog, permission profiles, MCP servers, loaded threads).
-3. **Account** — live read-only account/capability cards rendered by `SettingsCodexAccountSurface`.
+1. **Connection** — genuinely wired SDK options (`apiKey`, `model`, `modelReasoningEffort`, `webSearchMode`) plus a lightweight connection-source summary. Model and reasoning stay here.
+2. **Permissions** — approval/sandbox boundary: `approvalPolicy` (`CodexApprovalPolicy`), `sandboxMode`, `networkAccessEnabled`, `additionalDirectories`. `approvalPolicy` default `inherit` omits the override; `untrusted`/`on-request` fail closed in `CodexAdapter` without the app-server + bridge; `never` may use the SDK fallback.
+3. **Resume & inspect** — the backend session browser and live runtime readbacks (model catalog, permission profiles, MCP servers, loaded threads).
+4. **Account** — live read-only account/capability cards rendered by `SettingsCodexAccountSurface`.
+5. **Resources** — delegated to `SettingsCodexResourcesSection` (project skills/agents; global resources are read-only in P0, with CRUD deferred to P1's allowlisted-root contract).
 
 The old disabled "Authentication" setting is replaced by the connection-source summary and an auth-source row inside the Account surface, so the UI never presents a disabled input as a status indicator.
 
@@ -43,10 +45,11 @@ The Account tab also exposes the shared cost-estimate entry as its own sub-group
 |-------|------|-------|--------|-------|
 | `apiKey` | `string` | Yes | Connection tab | Visible in the ordinary settings UI; runtime auth effect is not re-proven by checkpoint 5A itself |
 | `model` | `string` (dropdown + custom) | Yes | Connection tab | Async dropdown populated from app-server `model/list` with CLI `codex debug models` fallback, plus a "Loading models..." placeholder and "Custom..." fallback text input; the underlying `CodexBackendSettings.model` → `adapter.updateModel()` write path was already accepted before Round 2; live adapter update via `updateModel()` for next-thread boundary |
-| `sandboxMode` | `string` (dropdown) | Yes | Connection tab | Dropdown in ordinary settings; persisted to `CodexBackendSettings`; live adapter update via `updateSandboxMode()` for next-thread boundary |
+| `sandboxMode` | `string` (dropdown) | Yes | Permissions tab | Dropdown in ordinary settings; persisted to `CodexBackendSettings`; live adapter update via `updateSandboxMode()` for next-thread boundary |
 | `modelReasoningEffort` | `string` (dropdown) | Yes | Connection tab | Dropdown in ordinary settings; persisted to `CodexBackendSettings`; live adapter writeback via `updateModelReasoningEffort()` for next-thread boundary |
-| `additionalDirectories` | `string` (newline-separated) | Yes | Connection tab | Textarea in ordinary settings; persisted to `CodexBackendSettings`; live adapter update via `updateAdditionalDirectories()` for next-thread boundary |
-| `networkAccessEnabled` | `boolean` | Yes | Connection tab | Toggle in ordinary settings; persisted to `CodexBackendSettings`; live adapter update via `updateNetworkAccessEnabled()` for next-thread boundary |
+| `additionalDirectories` | `string` (newline-separated) | Yes | Permissions tab | Textarea in ordinary settings; persisted to `CodexBackendSettings`; live adapter update via `updateAdditionalDirectories()` for next-thread boundary |
+| `networkAccessEnabled` | `boolean` | Yes | Permissions tab | Toggle in ordinary settings; persisted to `CodexBackendSettings`; live adapter update via `updateNetworkAccessEnabled()` for next-thread boundary |
+| `approvalPolicy` | `string` (dropdown) | Yes | Permissions tab | `CodexApprovalPolicy` dropdown (inherit/untrusted/on-request/never); persisted to `CodexBackendSettings` (default `inherit`); live adapter update via `updateApprovalPolicy()`. `inherit` omits the override; `untrusted`/`on-request` require the app-server + approval bridge and fail closed in the adapter; `never` may use the SDK fallback. |
 | `webSearchMode` | `string` (dropdown) | Yes | Connection tab | Dropdown in ordinary settings; persisted to `CodexBackendSettings`; live adapter update via `updateWebSearchMode()` for next-thread boundary. Settings description honestly states distinct runtime behavior between modes is not yet proven. |
 | Connection source summary | — | — | Connection tab | Lightweight read-only strip showing dynamic auth source description: "API key from plugin settings" when configured, "OPENAI_API_KEY env or ChatGPT login" when not. No write control. |
 | Session browser launcher | — | Yes | Resume & inspect tab | Button opening `BackendSessionBrowserModal` with `forcedBackendKind: 'codex'` and `supportsResume: true`; resume is limited to in-memory sessions. Rendered by `SettingsCodexReadbackControls`. |
@@ -62,9 +65,9 @@ The Account tab also exposes the shared cost-estimate entry as its own sub-group
 
 - Instantiated by `SettingsTabbedRenderer.renderCodexContent()`
 - Reads/writes `plugin.settings.backendSettings.codex`
-- Registered as primary tab `codex` with `backendRequired: 'codex'` in `settingsLayoutRegistry`; secondary tabs are `connection` (default), `resume-inspect`, and `account`
+- Registered as primary tab `codex` with `backendRequired: 'codex'` in `settingsLayoutRegistry`; secondary tabs are `connection` (default), `permissions`, `resume-inspect`, `account`, and `resources` (5 tabs)
 - Follows the same `attach()` / `attachTabbed()` pattern as `SettingsClaudeCodeSection`
-- Owns the wired settings controls (`apiKey`, `model`, `sandboxMode`, `modelReasoningEffort`, `additionalDirectories`, `networkAccessEnabled`, `webSearchMode`) inside the **Connection** tab and applies live adapter updates via `applyCodexRuntimeUpdates()`
+- Owns the wired settings controls grouped by Source Grouping (see `CONTEXT.md`): **Connection** tab owns `apiKey`, `model`, `modelReasoningEffort`, `webSearchMode`; **Permissions** tab owns `approvalPolicy`, `sandboxMode`, `additionalDirectories`, `networkAccessEnabled` (8 writable fields total). Both tabs apply live adapter updates via `applyCodexRuntimeUpdates()`
 - Renders a lightweight connection-source summary instead of a disabled "Authentication" setting
 - Delegates the remaining live runtime readbacks to `SettingsCodexReadbackControls` inside the **Resume & inspect** tab
 - Mounts the four account/capability product cards via `SettingsCodexAccountSurface` inside the **Account** tab, passing the inferred `authSource` derived from the plugin `apiKey` field; the section disposes the account surface during settings re-render so its Codex connection subscription cannot outlive the visible tab
@@ -78,11 +81,11 @@ The Account tab also exposes the shared cost-estimate entry as its own sub-group
 - `sandboxMode`, `model`, `modelReasoningEffort`, `additionalDirectories`, `networkAccessEnabled`, and `webSearchMode` are honest next-thread boundaries: the settings UI updates adapter options for future thread creation/resume, not the currently running turn
 - `webSearchMode` is productized in ordinary settings as **settings-only** (Checkpoint 15F): dropdown with `disabled`/`cached`/`live` options; persisted to `CodexBackendSettings`; live adapter update via `updateWebSearchMode()`. Settings persistence and adapter wiring verified; distinct runtime web-search behavior between modes is not yet end-to-end proven.
 - Settings-side session browser supports resume for in-memory Codex sessions via `supportsResume: true`; the UI copy explicitly states that resume is limited to live adapter memory and does not discover persisted/external threads
-- Underlying types and adapter wiring for all 7 `CodexBackendSettings` fields are preserved; all 7 fields are now exposed in the ordinary settings UI
+- Underlying types and adapter wiring for all 8 `CodexBackendSettings` fields are preserved; all 8 fields are now exposed across the Connection and Permissions tabs
 
 ## Visual Rhythm
 
-All three Codex secondary tabs share a single spacing system documented in `DESIGN.md` under **Codex Settings Cards** and implemented in `src/style/components/settings-codex-account.css`.
+All five Codex secondary tabs share a single spacing system documented in `DESIGN.md` under **Codex Settings Cards** and implemented in `src/style/components/settings-codex-account.css`.
 
 - Each group renders its title + description, then a `.opencodian-settings-codex-group-controls.opencodian-settings-codex-group-stack` container. The Account group wraps title + description + the group-level "Refresh all" action in a `.opencodian-settings-codex-group-header` flex row.
 - The stack provides `12px` vertical gaps between cards or Setting rows.

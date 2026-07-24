@@ -4,6 +4,7 @@
 
 import type { ContextCostDetails } from './pricing';
 import {
+  type CodexApprovalPolicy,
   type CodexReasoningEffort,
   type CodexSandboxMode,
   type CodexWebSearchMode,
@@ -13,6 +14,7 @@ import {
 const VALID_CODEX_SANDBOX_MODES: readonly CodexSandboxMode[] = ['read-only', 'workspace-write', 'danger-full-access'];
 const VALID_CODEX_REASONING_EFFORTS: readonly CodexReasoningEffort[] = ['minimal', 'low', 'medium', 'high', 'xhigh'];
 const VALID_CODEX_WEB_SEARCH_MODES: readonly CodexWebSearchMode[] = ['disabled', 'cached', 'live'];
+const VALID_CODEX_APPROVAL_POLICIES: readonly CodexApprovalPolicy[] = ['inherit', 'untrusted', 'on-request', 'never'];
 
 /** View type constant */
 export const VIEW_TYPE_OPENCODIAN = 'opencodian-view';
@@ -109,6 +111,8 @@ export interface ConversationSessionSettings {
   codexAdditionalDirectories?: string[] | null;
   codexNetworkAccessEnabled?: boolean | null;
   codexWebSearchMode?: CodexWebSearchMode | null;
+  /** Nullable per-session override; null/undefined inherits the global policy. */
+  codexApprovalPolicy?: CodexApprovalPolicy | null;
 }
 
 function normalizeNullableEnum<T extends string>(
@@ -176,6 +180,7 @@ export function normalizeConversationSessionSettings(
   assignIfDefined(normalized, 'codexAdditionalDirectories', normalizeNullableStringArray(value.codexAdditionalDirectories));
   assignIfDefined(normalized, 'codexNetworkAccessEnabled', normalizeNullableBoolean(value.codexNetworkAccessEnabled));
   assignIfDefined(normalized, 'codexWebSearchMode', normalizeNullableEnum(value.codexWebSearchMode, VALID_CODEX_WEB_SEARCH_MODES));
+  assignIfDefined(normalized, 'codexApprovalPolicy', normalizeNullableEnum(value.codexApprovalPolicy, VALID_CODEX_APPROVAL_POLICIES));
 
   return Object.keys(normalized).length > 0 ? normalized as ConversationSessionSettings : undefined;
 }

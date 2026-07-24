@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- Covers the full Codex settings surface across connection/permissions/resume-inspect/account tabs; splitting would fragment the per-tab routing and control-persistence coverage. */
 import { Setting } from 'obsidian';
 
 import {
@@ -203,7 +204,7 @@ describe('SettingsCodexSection stable surface', () => {
       createSectionHeading,
     });
     const containerEl = document.createElement('div');
-    section.attach(containerEl);
+    section.attachTabbed(containerEl, 'permissions');
 
     expect(settingNames).toContain(t('settings.codex.sandbox.name'));
   });
@@ -227,7 +228,7 @@ describe('SettingsCodexSection stable surface', () => {
       createSectionHeading,
     });
     const containerEl = document.createElement('div');
-    section.attach(containerEl);
+    section.attachTabbed(containerEl, 'permissions');
 
     expect(settingNames).toContain(t('settings.codex.additionalDirs.name'));
   });
@@ -239,7 +240,7 @@ describe('SettingsCodexSection stable surface', () => {
       createSectionHeading,
     });
     const containerEl = document.createElement('div');
-    section.attach(containerEl);
+    section.attachTabbed(containerEl, 'permissions');
 
     const textAreaControl = (Setting.prototype.addTextArea as jest.Mock).mock.calls
       .find(([cb]) => {
@@ -274,7 +275,7 @@ describe('SettingsCodexSection stable surface', () => {
       createSectionHeading,
     });
     const containerEl = document.createElement('div');
-    section.attach(containerEl);
+    section.attachTabbed(containerEl, 'permissions');
 
     expect(settingNames).toContain(t('settings.codex.network.name'));
   });
@@ -286,7 +287,7 @@ describe('SettingsCodexSection stable surface', () => {
       createSectionHeading,
     });
     const containerEl = document.createElement('div');
-    section.attach(containerEl);
+    section.attachTabbed(containerEl, 'permissions');
 
     const toggleControl = (Setting.prototype.addToggle as jest.Mock).mock.calls
       .find(([cb]) => {
@@ -333,13 +334,12 @@ describe('SettingsCodexSection stable surface', () => {
     const containerEl = document.createElement('div');
     section.attach(containerEl);
 
+    // Connection owns apiKey, model, reasoning and web search. Sandbox,
+    // network, and additional directories moved to the Permissions tab.
     expect(settingNames).toEqual([
       t('settings.codex.apiKey.name'),
       t('settings.codex.model.name'),
-      t('settings.codex.sandbox.name'),
       t('settings.codex.reasoning.name'),
-      t('settings.codex.additionalDirs.name'),
-      t('settings.codex.network.name'),
       t('settings.codex.webSearch.name'),
     ]);
     // The connection tab does not render resume/inspect or account surfaces.
@@ -400,6 +400,71 @@ describe('SettingsCodexSection stable surface', () => {
   });
 });
 
+describe('SettingsCodexSection permissions tab', () => {
+  beforeEach(() => {
+    setLocale('en');
+    settingNames.length = 0;
+    buttonRecords.length = 0;
+    mockSettingPrototype();
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('renders the permissions tab with approval/sandbox/network/additional-dirs', () => {
+    const plugin = createPlugin();
+    const section = new SettingsCodexSection({
+      plugin: plugin as never,
+      createSectionHeading,
+    });
+    const containerEl = document.createElement('div');
+    section.attachTabbed(containerEl, 'permissions');
+
+    expect(settingNames).toEqual([
+      t('settings.codex.approvalPolicy.name'),
+      t('settings.codex.sandbox.name'),
+      t('settings.codex.network.name'),
+      t('settings.codex.additionalDirs.name'),
+    ]);
+  });
+
+  it('persists approvalPolicy on change', async () => {
+    const plugin = createPlugin();
+    const section = new SettingsCodexSection({
+      plugin: plugin as never,
+      createSectionHeading,
+    });
+    const containerEl = document.createElement('div');
+    section.attachTabbed(containerEl, 'permissions');
+
+    const handler = findCodexDropdownHandler('inherit');
+    await handler('never');
+
+    expect(plugin.settings.backendSettings.codex.approvalPolicy).toBe('never');
+    expect(plugin.saveSettings).toHaveBeenCalled();
+  });
+
+  it('calls updateApprovalPolicy on live adapter when approvalPolicy changes', async () => {
+    const updateApprovalPolicy = jest.fn();
+    const plugin = createPlugin();
+    plugin.agentServiceRegistry.get = jest.fn((backend: string) =>
+      backend === 'codex' ? { updateApprovalPolicy } : null,
+    );
+    const section = new SettingsCodexSection({
+      plugin: plugin as never,
+      createSectionHeading,
+    });
+    const containerEl = document.createElement('div');
+    section.attachTabbed(containerEl, 'permissions');
+
+    const handler = findCodexDropdownHandler('inherit');
+    await handler('untrusted');
+
+    expect(updateApprovalPolicy).toHaveBeenCalledWith('untrusted');
+  });
+});
+
 describe('SettingsCodexSection sandbox mode', () => {
   beforeEach(() => {
     setLocale('en');
@@ -419,7 +484,7 @@ describe('SettingsCodexSection sandbox mode', () => {
       createSectionHeading,
     });
     const containerEl = document.createElement('div');
-    section.attach(containerEl);
+    section.attachTabbed(containerEl, 'permissions');
 
     const handler = findCodexDropdownHandler('read-only');
 
@@ -440,7 +505,7 @@ describe('SettingsCodexSection sandbox mode', () => {
       createSectionHeading,
     });
     const containerEl = document.createElement('div');
-    section.attach(containerEl);
+    section.attachTabbed(containerEl, 'permissions');
 
     const handler = findCodexDropdownHandler('read-only');
 

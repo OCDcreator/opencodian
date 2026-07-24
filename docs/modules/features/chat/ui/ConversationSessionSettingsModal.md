@@ -2,6 +2,7 @@
 
 > **源码**: `src/features/chat/ui/ConversationSessionSettingsModal.ts`
 > **状态**: [REVIEW]
+> **Updated**: 2026-07-24 — added an Approval Policy dropdown to the Codex section (inherit/untrusted/on-request/never). The blank option means "Use global setting" (null override, inherits the real global); the explicit "inherit" choice forces the backend default (no override). Persisted as the nullable `codexApprovalPolicy` session override.
 
 ## 概述
 
@@ -26,6 +27,7 @@ export interface ConversationSessionSettingsModalDefaults {
   codexAdditionalDirectories?: string[];
   codexNetworkAccessEnabled?: boolean;
   codexWebSearchMode?: CodexWebSearchMode;
+  codexApprovalPolicy?: CodexApprovalPolicy;
   /** Available Codex models for the session selector; empty/undefined falls back to a plain text input. */
   codexAvailableModels?: CodexModelSummary[];
 }
@@ -69,7 +71,8 @@ class ConversationSessionSettingsModal extends Modal {
 
 - 顶部 hero 区显示当前会话标题、继承说明与“会话覆盖”语义 badge，避免用户把它误认为全局设置
 - modal 主体包含聊天字体大小的单一显示设置
-- `showCodexControls` 开启时，在 Display 分组下方渲染 Codex 分组，包含模型覆盖（下拉，含“Inherit”、可用模型和“Custom...”自定义输入）、沙盒模式（read-only / workspace-write / danger-full-access）和推理强度（minimal / low / medium / high / xhigh）等下拉；分组内含 boundary hint 说明"这些设置在下一个线程生效，不影响当前对话"
+- `showCodexControls` 开启时，在 Display 分组下方渲染 Codex 分组，包含模型覆盖（下拉，含“Inherit”、可用模型和“Custom...”自定义输入）、沙盒模式（read-only / workspace-write / danger-full-access）、推理强度（minimal / low / medium / high / xhigh）、审批策略（Use global setting / inherit / untrusted / on-request / never）等下拉；分组内含 boundary hint 说明"这些设置在下一个线程生效，不影响当前对话"
+- Codex 审批策略下拉：空值表示「Use global setting」（null 覆盖，继承真实全局值）；显式「inherit」强制后端默认（不覆盖）。二者语义不同，UI 与 `buildOverrides` 明确区分
 - Codex 下拉选择“Inherit”时回写 `null`（与字体大小行为一致），全字段为 null 时 `buildOverrides()` 返回 `undefined`
 - 分享分组显示当前 session 的分享状态。`shareUrl === null` 时展示 Not shared 并隐藏取消分享；存在 URL 时展示 Shared、公开链接和取消分享动作；`shareMode === "disabled"` 且当前未分享时展示 Sharing disabled、禁用分享按钮，并显示跳转主设置页的 plain-language 提示；`undefined` 保留兼容的未知状态
 - 分享分组提供“分享并复制链接”和“取消分享”两个会话级动作；保存显示设置不会触发分享动作
@@ -93,7 +96,7 @@ class ConversationSessionSettingsModal extends Modal {
 | `createSummaryRows()` | 创建当前 backend capability 允许展示的全局默认摘要 |
 | `createSummaryRow()` | 渲染单行标签、摘要 chip 与 “Open settings” 动作 |
 | `createCodexModelOverrideField()` | 渲染会话级模型覆盖下拉：Inherit / 可用模型 / Custom...，附带自定义输入框 |
-| `createCodexSection()` | 渲染 Codex 分组（模型、目录、沙盒、推理、网络、网页搜索、线程目标） |
+| `createCodexSection()` | 渲染 Codex 分组（模型、目录、沙盒、推理、审批策略、网络、网页搜索、线程目标） |
 | `createCodexGoalSection()` | 渲染线程目标区块：readback（objective + status + tokens + time + budget）、set（objective + 可选 tokenBudget 输入 + 设定按钮）、clear |
 | `prepareSettingsTarget()` | 在打开全局设置页前同步 tabbed layout 的目标 primary/secondary tab，或准备 classic layout 的滚动定位 |
 | `runSharingAction()` | 执行分享 / 取消分享回调，期间禁用当前按钮并把 coordinator 归一化后的错误显示在 modal 内 |

@@ -2,6 +2,7 @@
 
 > **源码**: `src/core/types/chat.ts`
 > **状态**: [REVIEW]
+> **Updated**: 2026-07-24 — `ConversationSessionSettings` gained a nullable `codexApprovalPolicy` per-session override (null/undefined inherits global); `normalizeConversationSessionSettings` validates it against `VALID_CODEX_APPROVAL_POLICIES`.
 
 ## 概述
 

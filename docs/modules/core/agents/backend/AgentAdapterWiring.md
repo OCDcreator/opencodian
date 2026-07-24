@@ -3,6 +3,7 @@
 > **源码**: `src/core/agents/backend/AgentAdapterWiring.ts`
 > **状态**: [STABLE]
 > **Updated**: 2026-06-09 Checkpoint 4 — Codex now public, accepts `codexSettings`
+> **Updated**: 2026-07-24 — Codex adapter construction now forwards `approvalPolicy` from `CodexBackendSettings` (default `inherit`)
 
 ## 概述
 

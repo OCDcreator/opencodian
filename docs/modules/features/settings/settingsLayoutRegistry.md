@@ -4,6 +4,7 @@
 > **状态**: [REVIEW]
 
 > **更新**: Codex primary tab 新增 `resources` 二级 tab；Claude Code primary tab 新增 `resources` 二级 tab。
+> **更新（2026-07-24）**: Codex primary tab 新增 `permissions` 二级 tab（Approval Policy / Sandbox / Network Access / Additional Directories）。
 
 ## 概述
 
@@ -26,7 +27,7 @@ registry 里的 `backendRequired` 是设置 surface 的后端边界声明：Open
 |---------|---------|
 | `general` | `basic`, `backend` |
 | `claude-code` | `runtime`, `model-thinking`, `permissions`, `context-sources`, `tools` |
-| `codex` | `connection`, `resume-inspect`, `account` |
+| `codex` | `connection`, `permissions`, `resume-inspect`, `account`, `resources` |
 | `server` | `connection`, `auth`, `status` |
 | `model` | `common`, `project-config`, `availability`, `tools` |
 | `conversation` | `display`, `title`, plus OpenCode-only `compaction`, `sharing`, `questions` |
@@ -57,7 +58,7 @@ registry 里的 `backendRequired` 是设置 surface 的后端边界声明：Open
 
 Claude Code 的二级标签为 `runtime`、`providers`、`model-thinking`、`permissions`、`context-sources`、`tools`、`mcp`、`skills-commands`、`agents`。`model-thinking` 只承载 thinking/effort；query limits 与 prompt behavior 在 `runtime`；`tools` 只承载 tool policy + question UX；MCP runtime 在 `mcp`。旧 `mcp-advanced` 迁移到 `mcp`、旧 `limits` 迁移到 `runtime`、旧 `resources` 迁移到 `skills-commands`，避免持久化选择落入空白页；新增或移除二级标签时需要同步 `SettingsClaudeCodeSection.renderTabContent()` 与 locale key。
 
-Codex 的二级标签拆成 `connection`（连接来源摘要与运行时默认值）、`resume-inspect`（会话恢复与后端实时回读）、`account`（账号身份、用量、速率限制与 provider 能力）。新增或移除二级标签时需要同步 `SettingsCodexSection.renderTabContent()` 与 locale key。
+Codex 的二级标签拆成五个：`connection`（连接来源摘要与运行时默认值）、`permissions`（Approval Policy、Sandbox、Network Access、Additional Directories）、`resume-inspect`（会话恢复与后端实时回读）、`account`（账号身份、用量、速率限制与 provider 能力）和 `resources`（项目资源管理；当前 P0 UI 的全局资源只读）。全局资源 CRUD 属于 P1，必须通过共享 `allowlisted-root` 契约；新增或移除二级标签时需要同步 `SettingsCodexSection.renderTabContent()` 与 locale key。
 
 Conversation 的默认二级标签是 `display`，因为聊天字号和用户消息渲染属于后端无关的显示设置。`title` 二级标签对所有后端可见，因为标题设置块内部已根据 active backend 做自适应（OpenCode 时展示模式与模型选择器，Claude Code 时展示 `autoTitle` 开关），因此不再标记 `backendRequired: 'opencode'`。`compaction`、`sharing`、`questions` 仍依赖 OpenCode SDK / `.opencode/opencode.json` / OpenCode session API，继续标记为 `backendRequired: 'opencode'`，直到对应 Claude Code 能力真实接入。
 

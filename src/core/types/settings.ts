@@ -162,6 +162,22 @@ export type CodexReasoningEffort = 'minimal' | 'low' | 'medium' | 'high' | 'xhig
 /** Web search mode for Codex CLI. Matches SDK's WebSearchMode type. */
 export type CodexWebSearchMode = 'disabled' | 'cached' | 'live';
 
+/**
+ * Approval policy for Codex, surfaced at the plugin/settings layer.
+ *
+ *   - inherit:    plugin-only; omits approvalPolicy from app-server/SDK
+ *                 overrides so the backend uses its own default policy.
+ *   - untrusted:  requires an available app-server AND an approval bridge;
+ *                 fails closed if either is unavailable.
+ *   - on-request: same availability requirement as untrusted.
+ *   - never:      may use the existing SDK fallback path.
+ *
+ * The on-failure/granular SDK variants are intentionally NOT in P0; they
+ * remain a future advanced-TOML concern. The app-server wire union stays
+ * 'untrusted' | 'on-request' | 'never'.
+ */
+export type CodexApprovalPolicy = 'inherit' | 'untrusted' | 'on-request' | 'never';
+
 export interface CodexBackendSettings {
   /** OpenAI API key. Falls back to OPENAI_API_KEY env var / Codex CLI login. */
   apiKey: string;
@@ -184,6 +200,12 @@ export interface CodexBackendSettings {
   networkAccessEnabled: boolean;
   /** Web search mode passed as ThreadOptions.webSearchMode → SDK --config CLI arg. */
   webSearchMode: CodexWebSearchMode;
+  /**
+   * Approval policy. Defaults to 'inherit' (omit the override). Missing or
+   * unknown values normalize to 'inherit'; old users are NOT migrated to
+   * on-request.
+   */
+  approvalPolicy: CodexApprovalPolicy;
 }
 
 export interface ClaudeCodeBackendSettings {
@@ -478,6 +500,7 @@ export function getDefaultCodexBackendSettings(): CodexBackendSettings {
     additionalDirectories: '',
     networkAccessEnabled: false,
     webSearchMode: 'cached',
+    approvalPolicy: 'inherit',
   };
 }
 
@@ -834,12 +857,14 @@ function normalizeCodexBackendSettings(value: unknown): CodexBackendSettings {
   const VALID_SANDBOX_MODES: readonly CodexSandboxMode[] = ['read-only', 'workspace-write', 'danger-full-access'];
   const VALID_EFFORTS: readonly CodexReasoningEffort[] = ['minimal', 'low', 'medium', 'high', 'xhigh'];
   const VALID_WEB_SEARCH: readonly CodexWebSearchMode[] = ['disabled', 'cached', 'live'];
+  const VALID_APPROVAL_POLICY: readonly CodexApprovalPolicy[] = ['inherit', 'untrusted', 'on-request', 'never'];
   const candidate = value && typeof value === 'object' && !Array.isArray(value)
-    ? value as { apiKey?: unknown; model?: unknown; pricingProviderId?: unknown; pricingEndpoint?: unknown; sandboxMode?: unknown; modelReasoningEffort?: unknown; additionalDirectories?: unknown; networkAccessEnabled?: unknown; webSearchMode?: unknown }
+    ? value as { apiKey?: unknown; model?: unknown; pricingProviderId?: unknown; pricingEndpoint?: unknown; sandboxMode?: unknown; modelReasoningEffort?: unknown; additionalDirectories?: unknown; networkAccessEnabled?: unknown; webSearchMode?: unknown; approvalPolicy?: unknown }
     : {};
   const rawSandbox = typeof candidate.sandboxMode === 'string' ? candidate.sandboxMode : '';
   const rawEffort = typeof candidate.modelReasoningEffort === 'string' ? candidate.modelReasoningEffort : '';
   const rawWebSearch = typeof candidate.webSearchMode === 'string' ? candidate.webSearchMode : '';
+  const rawApprovalPolicy = typeof candidate.approvalPolicy === 'string' ? candidate.approvalPolicy : '';
   return {
     apiKey: typeof candidate.apiKey === 'string' ? candidate.apiKey : '',
     model: typeof candidate.model === 'string' ? candidate.model : '',
@@ -860,6 +885,10 @@ function normalizeCodexBackendSettings(value: unknown): CodexBackendSettings {
     webSearchMode: VALID_WEB_SEARCH.includes(rawWebSearch as CodexWebSearchMode)
       ? (rawWebSearch as CodexWebSearchMode)
       : 'cached',
+    // Missing/unknown normalizes directly to 'inherit' (no migration to on-request).
+    approvalPolicy: VALID_APPROVAL_POLICY.includes(rawApprovalPolicy as CodexApprovalPolicy)
+      ? (rawApprovalPolicy as CodexApprovalPolicy)
+      : 'inherit',
   };
 }
 

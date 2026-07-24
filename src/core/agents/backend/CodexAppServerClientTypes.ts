@@ -61,6 +61,56 @@ export interface AppServerThreadStartOptions {
 
 export type AppServerThreadResumeOptions = AppServerThreadStartOptions;
 
+/**
+ * Effective settings defensively captured from a `thread/start` or
+ * `thread/resume` response. Every field is optional because older Codex
+ * app-server versions omit some or all of them; absence means the runtime
+ * readback for that axis is *unavailable*, not verified. These are the only
+ * honest runtime-evidence fields — request-side `TurnStartOptions` are NOT
+ * verified readback.
+ *
+ * Shapes match the Codex 0.144.1 generated bindings:
+ *   - sandbox is a discriminated SandboxPolicy object (not a string)
+ *   - activePermissionProfile is { id, extends? }
+ *   - approvalPolicy may be a known scalar OR a granular object
+ */
+
+/** Effective sandbox policy as reported by the server (discriminated by `type`). */
+export type AppServerSandboxPolicy =
+  | { readonly type: 'dangerFullAccess' }
+  | { readonly type: 'readOnly'; readonly networkAccess?: boolean }
+  | {
+    readonly type: 'workspaceWrite';
+    readonly writableRoots?: readonly string[];
+    readonly networkAccess?: boolean;
+    readonly excludeTmpdirEnvVar?: boolean;
+    readonly excludeSlashTmp?: boolean;
+  }
+  // Forward-compatible: an unknown variant still carries its raw shape.
+  | { readonly type: string; readonly [key: string]: unknown };
+
+/** Effective permission profile as reported by the server (distinct from the permissionProfile/list entry). */
+export interface AppServerEffectivePermissionProfile {
+  readonly id: string;
+  readonly extends?: string | null;
+}
+
+/** Effective approval policy: a known scalar or a granular object. */
+export type AppServerApprovalPolicyEffective = string | Readonly<Record<string, unknown>>;
+
+export interface AppServerThreadEffectiveSettings {
+  readonly model?: string;
+  readonly modelProvider?: string;
+  readonly cwd?: string;
+  readonly runtimeWorkspaceRoots?: readonly string[];
+  readonly instructionSources?: readonly string[];
+  readonly approvalPolicy?: AppServerApprovalPolicyEffective;
+  readonly approvalsReviewer?: string;
+  readonly sandbox?: AppServerSandboxPolicy;
+  readonly activePermissionProfile?: AppServerEffectivePermissionProfile;
+  readonly reasoningEffort?: string;
+}
+
 export interface AppServerTurnStartOptions {
   threadId: string;
   input: Array<
@@ -303,9 +353,11 @@ export interface McpOauthLoginResult {
  * `scope` depending on the Codex version. Callers must treat all optional
  * fields as potentially absent.
  *
- * The plugin never writes global Codex skills; this type is read-only and
- * only describes runtime-discovered skills for display in the chat menu and
- * resource settings.
+ * This is readback metadata only: it describes runtime-discovered skills for
+ * display in the chat menu and resource settings. The current P0 surface has
+ * no global mutation API; that read-only type does not prohibit a future P1
+ * controlled owner, which would require the shared secure-file contract with
+ * allowlisted-root validation.
  */
 export interface AppServerSkill {
   name: string;

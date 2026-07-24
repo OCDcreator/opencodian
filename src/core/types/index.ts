@@ -88,6 +88,7 @@ export {
   type ClaudeCodeThinking,
   type ClaudeProviderPreset,
   type ClaudeProviderSettings,
+  type CodexApprovalPolicy,
   type CodexBackendSettings,
   type ContextRingStyleId,
   DEFAULT_SETTINGS,

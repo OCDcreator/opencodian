@@ -628,6 +628,124 @@ export class SettingsCapabilityLabSection {
       this.buildCodexMatrixRows(adapter),
       t('settings.capabilityLab.matrix.codexLabel'),
     );
+    this.renderCodexEffectiveReadback(workspace.contentEl, adapter);
+  }
+
+  /**
+   * Minimal production consumer of the three-axis runtime evidence: shows the
+   * most recently started/resumed Codex session's effective-settings readback
+   * (per-field persistence/application/runtime). Reuses the existing Capability
+   * Lab result area — no new Archive page, no P1–P3 surface.
+   */
+  private renderCodexEffectiveReadback(containerEl: HTMLElement, adapter: ReturnType<typeof getCodexAdapter>): void {
+    const sectionEl = containerEl.createDiv({
+      cls: 'opencodian-capability-lab-effective-readback',
+      attr: { 'data-capability-lab-section': 'codex-effective-readback' },
+    });
+    sectionEl.createEl('h4', { text: t('settings.capabilityLab.effectiveReadback.title') });
+    sectionEl.createDiv({
+      cls: 'opencodian-capability-lab-effective-readback-desc',
+      text: t('settings.capabilityLab.effectiveReadback.desc'),
+    });
+
+    if (!adapter || typeof adapter.getLatestThreadEffectiveEvidence !== 'function') {
+      sectionEl.createDiv({
+        cls: 'opencodian-capability-lab-effective-readback-empty',
+        text: t('settings.capabilityLab.effectiveReadback.unavailable'),
+        attr: { 'data-effective-readback': 'unavailable' },
+      });
+      return;
+    }
+    const latest = adapter.getLatestThreadEffectiveEvidence();
+    if (!latest) {
+      sectionEl.createDiv({
+        cls: 'opencodian-capability-lab-effective-readback-empty',
+        text: t('settings.capabilityLab.effectiveReadback.noSession'),
+        attr: { 'data-effective-readback': 'no-session' },
+      });
+      return;
+    }
+
+    sectionEl.createDiv({
+      cls: 'opencodian-capability-lab-effective-readback-session',
+      text: t('settings.capabilityLab.effectiveReadback.sessionLabel') + latest.sessionId,
+    });
+    const fields = [
+      { key: 'approvalPolicy', labelKey: 'settings.capabilityLab.effectiveReadback.field.approvalPolicy' },
+      { key: 'sandbox', labelKey: 'settings.capabilityLab.effectiveReadback.field.sandbox' },
+      { key: 'cwd', labelKey: 'settings.capabilityLab.effectiveReadback.field.cwd' },
+      { key: 'model', labelKey: 'settings.capabilityLab.effectiveReadback.field.model' },
+      { key: 'modelProvider', labelKey: 'settings.capabilityLab.effectiveReadback.field.modelProvider' },
+      { key: 'reasoningEffort', labelKey: 'settings.capabilityLab.effectiveReadback.field.reasoningEffort' },
+      { key: 'activePermissionProfile', labelKey: 'settings.capabilityLab.effectiveReadback.field.activePermissionProfile' },
+    ] as const;
+    for (const field of fields) {
+      const evidence = latest.evidence[field.key];
+      const rowEl = sectionEl.createDiv({
+        cls: 'opencodian-capability-lab-effective-readback-row',
+        attr: {
+          'data-effective-field': field.key,
+          'data-effective-application': evidence.application,
+          'data-effective-runtime': evidence.runtime,
+          'data-effective-persistence': evidence.persistence,
+        },
+      });
+      rowEl.createSpan({ cls: 'opencodian-capability-lab-effective-field-name', text: t(field.labelKey) });
+      // Visible, labeled three-axis status badges (not hidden attributes).
+      const axes: ReadonlyArray<readonly ['persistence' | 'application' | 'runtime', 'settings.capabilityLab.effectiveReadback.axisLabel.persistence' | 'settings.capabilityLab.effectiveReadback.axisLabel.application' | 'settings.capabilityLab.effectiveReadback.axisLabel.runtime']> = [
+        ['persistence', 'settings.capabilityLab.effectiveReadback.axisLabel.persistence'],
+        ['application', 'settings.capabilityLab.effectiveReadback.axisLabel.application'],
+        ['runtime', 'settings.capabilityLab.effectiveReadback.axisLabel.runtime'],
+      ];
+      for (const [axis, axisLabelKey] of axes) {
+        const status = evidence[axis];
+        const badgeEl = rowEl.createSpan({
+          cls: `opencodian-capability-lab-effective-axis opencodian-capability-lab-effective-axis--${axis} opencodian-capability-lab-effective-status--${status}`,
+          attr: { 'data-effective-axis': axis, 'data-effective-axis-status': status },
+        });
+        badgeEl.createSpan({ cls: 'opencodian-capability-lab-effective-axis-label', text: `${t(axisLabelKey)}:` });
+        badgeEl.createSpan({ text: t(`settings.capabilityLab.effectiveReadback.status.${status}`) });
+      }
+      // The server-confirmed value for this field (safe, secret-free summary).
+      const valueText = this.formatEffectiveValue(field.key, latest.settings ? latest.settings[field.key] : undefined);
+      rowEl.createSpan({
+        cls: 'opencodian-capability-lab-effective-value',
+        attr: { 'data-effective-value': field.key },
+        text: `${t('settings.capabilityLab.effectiveReadback.valueLabel')}: ${valueText}`,
+      });
+      if (evidence.detail) {
+        rowEl.createSpan({ cls: 'opencodian-capability-lab-effective-readback-detail', text: evidence.detail });
+      }
+    }
+  }
+
+  /** Format a server-confirmed effective value as a stable, secret-free summary. */
+  private formatEffectiveValue(
+    field: 'approvalPolicy' | 'sandbox' | 'cwd' | 'model' | 'modelProvider' | 'reasoningEffort' | 'activePermissionProfile',
+    value: unknown,
+  ): string {
+    if (value === undefined || value === null) {
+      return t('settings.capabilityLab.effectiveReadback.noValue');
+    }
+    switch (field) {
+      case 'sandbox': {
+        if (typeof value === 'object' && value !== null && typeof (value as { type?: unknown }).type === 'string') {
+          return (value as { type: string }).type;
+        }
+        return t('settings.capabilityLab.effectiveReadback.noValue');
+      }
+      case 'approvalPolicy':
+        return typeof value === 'string' ? value : t('settings.capabilityLab.effectiveReadback.granular');
+      case 'activePermissionProfile': {
+        if (typeof value === 'object' && value !== null && typeof (value as { id?: unknown }).id === 'string') {
+          const profile = value as { id: string; extends?: string | null };
+          return profile.extends ? `${profile.id} (${profile.extends})` : profile.id;
+        }
+        return t('settings.capabilityLab.effectiveReadback.noValue');
+      }
+      default:
+        return typeof value === 'string' ? value : String(value);
+    }
   }
 
   // =======================================================================

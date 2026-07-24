@@ -14,7 +14,7 @@ import {
   getConversationBackendSessionId,
   normalizeConversationSessionSettings,
 } from '../../../core/types';
-import type { CodexReasoningEffort, CodexSandboxMode, CodexWebSearchMode } from '../../../core/types/settings';
+import type { CodexApprovalPolicy, CodexReasoningEffort, CodexSandboxMode, CodexWebSearchMode } from '../../../core/types/settings';
 import { t } from '../../../i18n';
 import {
   ConversationSessionSettingsModal,
@@ -40,6 +40,7 @@ export interface ResolvedConversationSessionSettings {
   codexAdditionalDirectories?: string[];
   codexNetworkAccessEnabled?: boolean;
   codexWebSearchMode?: CodexWebSearchMode;
+  codexApprovalPolicy?: CodexApprovalPolicy;
 }
 
 export interface ConversationSessionSettingsCoordinatorHost {
@@ -60,7 +61,7 @@ export interface ConversationSessionSettingsCoordinatorHost {
   supportsQuestions?(): boolean;
   canOpenExperimentalActions?(): boolean;
   openExperimentalActions?(): void;
-  getCodexGlobalDefaults?(): { sandboxMode: CodexSandboxMode; modelReasoningEffort: CodexReasoningEffort; model: string; additionalDirectories: string[]; networkAccessEnabled: boolean; webSearchMode: CodexWebSearchMode };
+  getCodexGlobalDefaults?(): { sandboxMode: CodexSandboxMode; modelReasoningEffort: CodexReasoningEffort; model: string; additionalDirectories: string[]; networkAccessEnabled: boolean; webSearchMode: CodexWebSearchMode; approvalPolicy?: CodexApprovalPolicy };
   applyCodexRuntimeOverrides?(overrides: { sandboxMode: CodexSandboxMode; modelReasoningEffort: CodexReasoningEffort; model?: string; additionalDirectories?: string[]; networkAccessEnabled?: boolean; webSearchMode?: CodexWebSearchMode }): void;
   agentServiceRegistry?: AgentServiceRegistry;
   /** Open a backend session as a new conversation in the chat view. */
@@ -107,6 +108,7 @@ export class ConversationSessionSettingsCoordinator {
         codexAdditionalDirectories: codexDefaults.additionalDirectories,
         codexNetworkAccessEnabled: codexDefaults.networkAccessEnabled,
         codexWebSearchMode: codexDefaults.webSearchMode,
+        codexApprovalPolicy: this.resolveCodexGlobalApprovalPolicy(codexDefaults),
         codexAvailableModels,
         codexThreadGoal,
       } : {}),
@@ -266,6 +268,10 @@ export class ConversationSessionSettingsCoordinator {
           overrides?.codexWebSearchMode === null || overrides?.codexWebSearchMode === undefined
             ? codexDefaults.webSearchMode
             : overrides.codexWebSearchMode;
+        result.codexApprovalPolicy =
+          overrides?.codexApprovalPolicy === null || overrides?.codexApprovalPolicy === undefined
+            ? this.resolveCodexGlobalApprovalPolicy(codexDefaults)
+            : overrides.codexApprovalPolicy;
       }
     }
 
@@ -300,6 +306,7 @@ export class ConversationSessionSettingsCoordinator {
         networkAccessEnabled: effective.codexNetworkAccessEnabled,
         webSearchMode: effective.codexWebSearchMode,
       });
+      this.applyCodexApprovalPolicy(effective.codexApprovalPolicy ?? 'inherit');
       // Drop the cached SDK Thread so the next turn re-resumes the backend
       // thread with the freshly-updated options. The SDK freezes per-thread
       // options at Thread creation; without invalidation the live thread
@@ -336,6 +343,22 @@ export class ConversationSessionSettingsCoordinator {
     if (typeof adapter?.invalidateLiveThread === 'function') {
       adapter.invalidateLiveThread(sessionId);
     }
+  }
+
+  /** Apply approval through this existing coordinator/registry owner, not the guarded view shell. */
+  private applyCodexApprovalPolicy(policy: CodexApprovalPolicy): void {
+    const adapter = this.host.agentServiceRegistry?.get('codex') as {
+      updateApprovalPolicy?(value: CodexApprovalPolicy): void;
+    } | null;
+    adapter?.updateApprovalPolicy?.(policy);
+  }
+
+  private resolveCodexGlobalApprovalPolicy(
+    defaults: { approvalPolicy?: CodexApprovalPolicy },
+  ): CodexApprovalPolicy {
+    return defaults.approvalPolicy
+      ?? this.resolveOpenCodianPlugin()?.settings?.backendSettings?.codex?.approvalPolicy
+      ?? 'inherit';
   }
 
   async saveConversationOverrides(
@@ -447,6 +470,7 @@ export class ConversationSessionSettingsCoordinator {
   }
 
   private resolveOpenCodianPlugin(): {
+    settings?: { backendSettings?: { codex?: { approvalPolicy?: CodexApprovalPolicy } } };
     opencodeConfigManager?: {
       getShareConfig?(): Promise<OpencodeShareMode | undefined>;
     };
@@ -461,6 +485,7 @@ export class ConversationSessionSettingsCoordinator {
       };
     }).plugins?.plugins?.opencodian as
       | {
+        settings?: { backendSettings?: { codex?: { approvalPolicy?: CodexApprovalPolicy } } };
         opencodeConfigManager?: {
           getShareConfig?(): Promise<OpencodeShareMode | undefined>;
         };

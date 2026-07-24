@@ -25,6 +25,8 @@ import type {
   AppServerAccountRateLimitsResult,
   AppServerAccountUsage,
   AppServerAccountUsageResult,
+  AppServerApprovalPolicyEffective,
+  AppServerEffectivePermissionProfile,
   AppServerForkResult,
   AppServerListSkillsOptions,
   AppServerMcpResourceContent,
@@ -39,8 +41,10 @@ import type {
   AppServerRateLimits,
   AppServerReviewResult,
   AppServerReviewTarget,
+  AppServerSandboxPolicy,
   AppServerSkill,
   AppServerThread,
+  AppServerThreadEffectiveSettings,
   AppServerThreadGoal,
   AppServerThreadNotification,
   AppServerThreadResumeOptions,
@@ -50,6 +54,7 @@ import type {
   McpOauthLoginResult,
 } from './CodexAppServerClientTypes';
 import { CodexAppServerTransport } from './CodexAppServerTransport';
+import type { ConfigurationEvidence } from './ProjectResourceSecureWrite';
 
 // Re-export all wire types so existing imports from this module stay valid.
 export * from './CodexAppServerClientTypes';
@@ -70,6 +75,208 @@ interface AppServerSkillGroupEnvelope {
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function readOptionalString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.length > 0 ? value : undefined;
+}
+
+function readOptionalStringArray(value: unknown): readonly string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const filtered = value.filter((v): v is string => typeof v === 'string' && v.length > 0);
+  return filtered.length > 0 ? filtered : undefined;
+}
+
+/**
+ * Read the effective approval policy. Per the Codex 0.144.1 bindings this may
+ * be a known scalar ('untrusted' | 'on-request' | 'never'), another string
+ * (forward-compat), or a granular object. Captured verbatim; never fabricated.
+ */
+function readApprovalPolicyEffective(value: unknown): AppServerApprovalPolicyEffective | undefined {
+  if (typeof value === 'string' && value.length > 0) return value;
+  if (isPlainObject(value)) return value as Readonly<Record<string, unknown>>;
+  return undefined;
+}
+
+/**
+ * Read the effective sandbox policy. The binding is a discriminated object
+ * keyed by `type` (dangerFullAccess | readOnly | workspaceWrite, or an unknown
+ * variant). A bare string is NOT a valid binding shape and is dropped.
+ */
+function readSandboxPolicy(value: unknown): AppServerSandboxPolicy | undefined {
+  if (!isPlainObject(value) || typeof value.type !== 'string' || value.type.length === 0) {
+    return undefined;
+  }
+  return value as AppServerSandboxPolicy;
+}
+
+/** Read the effective permission profile { id, extends? }. */
+function readEffectivePermissionProfile(value: unknown): AppServerEffectivePermissionProfile | undefined {
+  if (!isPlainObject(value) || typeof value.id !== 'string' || value.id.length === 0) {
+    return undefined;
+  }
+  const ext = value.extends;
+  return {
+    id: value.id,
+    ...(typeof ext === 'string' ? { extends: ext } : ext === null ? { extends: null } : {}),
+  };
+}
+
+/**
+ * Defensively extract the effective-settings fields from a `thread/start` or
+ * `thread/resume` response object. The response carries `thread` plus sibling
+ * fields (model, modelProvider, cwd, runtimeWorkspaceRoots, instructionSources,
+ * approvalPolicy, approvalsReviewer, sandbox, activePermissionProfile,
+ * reasoningEffort). Older app-server versions omit some or all of them; every
+ * field stays optional and absence means "runtime readback unavailable" (NOT
+ * a verified echo of the request). Shapes match the Codex 0.144.1 bindings.
+ */
+function extractThreadEffectiveSettings(result: unknown): AppServerThreadEffectiveSettings | undefined {
+  if (!isPlainObject(result)) return undefined;
+  const effective: AppServerThreadEffectiveSettings = {
+    ...(readOptionalString(result.model) ? { model: readOptionalString(result.model) } : {}),
+    ...(readOptionalString(result.modelProvider) ? { modelProvider: readOptionalString(result.modelProvider) } : {}),
+    ...(readOptionalString(result.cwd) ? { cwd: readOptionalString(result.cwd) } : {}),
+    ...(readOptionalStringArray(result.runtimeWorkspaceRoots) ? { runtimeWorkspaceRoots: readOptionalStringArray(result.runtimeWorkspaceRoots) } : {}),
+    ...(readOptionalStringArray(result.instructionSources) ? { instructionSources: readOptionalStringArray(result.instructionSources) } : {}),
+    ...(readApprovalPolicyEffective(result.approvalPolicy) ? { approvalPolicy: readApprovalPolicyEffective(result.approvalPolicy) } : {}),
+    ...(readOptionalString(result.approvalsReviewer) ? { approvalsReviewer: readOptionalString(result.approvalsReviewer) } : {}),
+    ...(readSandboxPolicy(result.sandbox) ? { sandbox: readSandboxPolicy(result.sandbox) } : {}),
+    ...(readEffectivePermissionProfile(result.activePermissionProfile) ? { activePermissionProfile: readEffectivePermissionProfile(result.activePermissionProfile) } : {}),
+    ...(readOptionalString(result.reasoningEffort) ? { reasoningEffort: readOptionalString(result.reasoningEffort) } : {}),
+  };
+  return Object.keys(effective).length > 0 ? effective : undefined;
+}
+
+/**
+ * Per-field runtime evidence for a thread's effective settings, reusing the
+ * shared three-axis ConfigurationEvidence (persistence/application/runtime ×
+ * verified|pending|unavailable|failed|not-applicable).
+ *
+ * For this session-level readback surface `persistence` is honestly
+ * `not-applicable` (this evidence proves runtime confirmation, not a stored
+ * source). `application`/`runtime` track the request lifecycle:
+ *   - pending: a thread start/resume is in flight for this session
+ *   - verified: the server returned this field in its response
+ *   - unavailable: the app-server is not in use, or a successful response
+ *     omitted the field (older server) — detail distinguishes the two
+ *   - failed: the thread start/resume request failed
+ *
+ * Request-side turn options are NEVER reported as verified here.
+ */
+export interface AppServerThreadEffectiveEvidence {
+  readonly model: ConfigurationEvidence;
+  readonly modelProvider: ConfigurationEvidence;
+  readonly cwd: ConfigurationEvidence;
+  readonly sandbox: ConfigurationEvidence;
+  readonly approvalPolicy: ConfigurationEvidence;
+  readonly activePermissionProfile: ConfigurationEvidence;
+  readonly reasoningEffort: ConfigurationEvidence;
+}
+
+export type EffectiveReadbackStatus = 'pending' | 'verified' | 'unavailable' | 'failed';
+
+const EFFECTIVE_FIELD_KEYS = [
+  'model',
+  'modelProvider',
+  'cwd',
+  'sandbox',
+  'approvalPolicy',
+  'activePermissionProfile',
+  'reasoningEffort',
+] as const;
+
+/**
+ * Build uniform evidence for every field at one lifecycle status, RESPECTING
+ * wiring: a field the plugin never wires (modelProvider, activePermissionProfile,
+ * approval under `inherit`) is application `not-applicable` in every state —
+ * never pending/failed/unavailable. `runtime` still tracks the lifecycle.
+ */
+export function buildUniformEffectiveEvidence(
+  status: 'pending' | 'failed' | 'unavailable',
+  wired: EffectiveFieldWiring,
+  detail?: string,
+): AppServerThreadEffectiveEvidence {
+  const entries = EFFECTIVE_FIELD_KEYS.map((key) => {
+    const w = wired[key as keyof EffectiveFieldWiring];
+    const application: ConfigurationEvidence['application'] = w ? status : 'not-applicable';
+    const ev: ConfigurationEvidence = { persistence: 'not-applicable', application, runtime: status, ...(detail ? { detail } : {}) };
+    return [key, ev] as const;
+  });
+  return Object.fromEntries(entries) as unknown as AppServerThreadEffectiveEvidence;
+}
+
+/** Per-field application-axis status (computed from phase + wiring). */
+export type FieldApplicationStatus = ConfigurationEvidence['application'];
+export interface EffectiveFieldApplication {
+  readonly model: FieldApplicationStatus;
+  readonly modelProvider: FieldApplicationStatus;
+  readonly cwd: FieldApplicationStatus;
+  readonly sandbox: FieldApplicationStatus;
+  readonly approvalPolicy: FieldApplicationStatus;
+  readonly activePermissionProfile: FieldApplicationStatus;
+  readonly reasoningEffort: FieldApplicationStatus;
+}
+
+/**
+ * Build per-field evidence from an explicit per-field application map + a runtime
+ * lifecycle status (+ captured response for verified/unavailable runtime). The
+ * honest core: application decided by phase+wiring (caller), runtime by response.
+ */
+export function buildEffectiveEvidenceWithApplication(
+  application: EffectiveFieldApplication,
+  runtimeStatus: 'verified' | 'pending' | 'failed' | 'unavailable',
+  effective: AppServerThreadEffectiveSettings | null,
+): AppServerThreadEffectiveEvidence {
+  const entries = EFFECTIVE_FIELD_KEYS.map((key) => {
+    const val = effective ? (effective as Record<string, unknown>)[key] : undefined;
+    const present = val !== undefined && val !== null;
+    const runtime: ConfigurationEvidence['runtime'] =
+      runtimeStatus === 'verified' ? (present ? 'verified' : 'unavailable') : runtimeStatus;
+    const ev: ConfigurationEvidence = { persistence: 'not-applicable', application: application[key as keyof EffectiveFieldApplication], runtime };
+    return [key, ev] as const;
+  });
+  return Object.fromEntries(entries) as unknown as AppServerThreadEffectiveEvidence;
+}
+
+/** Thread-phase application: thread-sent fields verified (if wired); effort pending (turn not done); never-wired NA. */
+export function threadPhaseApplication(wired: EffectiveFieldWiring): EffectiveFieldApplication {
+  const w = (b: boolean, threadField: boolean): FieldApplicationStatus =>
+    !b ? 'not-applicable' : threadField ? 'verified' : 'pending';
+  return {
+    model: w(wired.model, true),
+    modelProvider: 'not-applicable',
+    cwd: w(wired.cwd, true),
+    sandbox: w(wired.sandbox, true),
+    approvalPolicy: w(wired.approvalPolicy, true),
+    activePermissionProfile: 'not-applicable',
+    reasoningEffort: w(wired.reasoningEffort, false), // effort is sent at turn/start, not thread
+  };
+}
+
+/** Turn-success application: thread fields + effort all verified (if wired); never-wired NA. */
+export function turnSuccessApplication(wired: EffectiveFieldWiring): EffectiveFieldApplication {
+  const w = (b: boolean): FieldApplicationStatus => (b ? 'verified' : 'not-applicable');
+  return {
+    model: w(wired.model),
+    modelProvider: 'not-applicable',
+    cwd: w(wired.cwd),
+    sandbox: w(wired.sandbox),
+    approvalPolicy: w(wired.approvalPolicy),
+    activePermissionProfile: 'not-applicable',
+    reasoningEffort: w(wired.reasoningEffort),
+  };
+}
+
+/** Per-field "did the plugin wire this into the app-server request/turn?" map. */
+export interface EffectiveFieldWiring {
+  readonly model: boolean;
+  readonly modelProvider: boolean;
+  readonly cwd: boolean;
+  readonly sandbox: boolean;
+  readonly approvalPolicy: boolean;
+  readonly activePermissionProfile: boolean;
+  readonly reasoningEffort: boolean;
 }
 
 function isGroupEnvelope(entry: unknown): entry is AppServerSkillGroupEnvelope {
@@ -149,6 +356,13 @@ export class CodexAppServerClient extends CodexAppServerTransport {
   // App-server API wrappers
   // ---------------------------------------------------------------------------
 
+  /**
+   * Effective settings defensively captured from the most recent
+   * `thread/start` / `thread/resume` response for each thread id. Absent
+   * entries mean no verified runtime readback is available for that thread.
+   */
+  private readonly threadEffectiveSettings = new Map<string, AppServerThreadEffectiveSettings | null>();
+
   async listThreads(options: { limit?: number; archived?: boolean | null } = {}): Promise<AppServerThread[]> {
     await this.start();
     const { limit = 50, archived } = options;
@@ -180,7 +394,11 @@ export class CodexAppServerClient extends CodexAppServerTransport {
         options as unknown as Record<string, unknown>,
         30000,
       )) as { thread?: AppServerThread } | undefined;
-      return result?.thread ?? null;
+      const thread = result?.thread ?? null;
+      if (thread?.id) {
+        this.captureThreadEffectiveSettings(thread.id, result);
+      }
+      return thread;
     } catch (err) {
       logger.warn('Failed to start thread via app-server', { error: err instanceof Error ? err.message : String(err) });
       return null;
@@ -192,7 +410,11 @@ export class CodexAppServerClient extends CodexAppServerTransport {
     await this.start();
     try {
       const result = (await this.request('thread/resume', { threadId, ...options }, 30000)) as { thread: AppServerThread } | undefined;
-      return result?.thread ?? null;
+      const thread = result?.thread ?? null;
+      if (thread?.id) {
+        this.captureThreadEffectiveSettings(thread.id, result);
+      }
+      return thread;
     } catch (err) {
       logger.warn('Failed to resume thread via app-server', {
         threadId,
@@ -200,6 +422,41 @@ export class CodexAppServerClient extends CodexAppServerTransport {
       });
       return null;
     }
+  }
+
+  /**
+   * Defensively capture the effective-settings fields from a thread start/resume
+   * response. ALWAYS replaces the thread's entry with the parsed result of THIS
+   * response (null when the server echoed no effective fields), so a later
+   * no-field response cannot leave a stale `verified` snapshot from an earlier
+   * response.
+   */
+  private captureThreadEffectiveSettings(threadId: string, result: unknown): void {
+    this.threadEffectiveSettings.set(threadId, extractThreadEffectiveSettings(result) ?? null);
+  }
+
+  /**
+   * Read the most recently captured effective settings for a thread, or null
+   * when the most recent response echoed no effective fields (older server) or
+   * no readback exists. Request-side turn options are never reported here —
+   * only server-confirmed fields.
+   */
+  getThreadEffectiveSettings(threadId: string): AppServerThreadEffectiveSettings | null {
+    return this.threadEffectiveSettings.get(threadId) ?? null;
+  }
+
+  /**
+   * Evict the cached effective settings for a thread (used by adapter
+   * deleteSession to prevent stale readback for a deleted session).
+   */
+  clearThreadEffectiveSettings(threadId: string): void {
+    this.threadEffectiveSettings.delete(threadId);
+  }
+
+  /** Stop the transport and clear all cached effective settings. */
+  override async stop(): Promise<void> {
+    await super.stop();
+    this.threadEffectiveSettings.clear();
   }
 
   /** Start a turn. Progress arrives exclusively through async notifications. */
@@ -369,9 +626,10 @@ export class CodexAppServerClient extends CodexAppServerTransport {
    * `AppServerSkill[]` (name/description/path/enabled/scope) or an empty array
    * when the route is unreachable on the current Codex version.
    *
-   * This is read-only: the plugin never writes global Codex skills. The
-   * returned entries only describe runtime-discovered skills for the chat
-   * menu and resource settings.
+   * This API is read-only: it only describes runtime-discovered skills and
+   * does not mutate resources. The current P0 surface exposes no global Codex
+   * skill mutation API; a future P1 global CRUD owner would need the shared
+   * secure-file contract with allowlisted-root validation.
    */
    async listSkills(options?: AppServerListSkillsOptions): Promise<AppServerSkill[]> {
     await this.start();

@@ -21,6 +21,7 @@ import type { Codex, Thread, ThreadEvent, ThreadOptions, UserInput } from '@open
 
 import { createLogger } from '../../../shared';
 import type { AgentBackendKind, ContextUsageSnapshot, ImageAttachment, StreamChunk } from '../../types/chat';
+import type { CodexApprovalPolicy } from '../../types/settings';
 import { AgentCapability, type BackendCapabilities } from '../AgentCapability';
 import type {
   AgentChatCapability,
@@ -46,11 +47,18 @@ import {
   type AppServerReviewTarget,
   type AppServerSkill,
   type AppServerThread,
+  type AppServerThreadEffectiveEvidence,
+  type AppServerThreadEffectiveSettings,
   type AppServerThreadGoal,
   type AppServerThreadStartOptions,
   type AppServerTurnStartOptions,
+  buildEffectiveEvidenceWithApplication,
+  buildUniformEffectiveEvidence,
   CodexAppServerClient,
+  type EffectiveFieldWiring,
   type McpOauthLoginResult,
+  threadPhaseApplication,
+  turnSuccessApplication,
 } from './CodexAppServerClient';
 import {
   type AppServerStreamState,
@@ -74,6 +82,24 @@ export type CodexFactory = () => Promise<Codex>;
  */
 export type CodexAppServerClientFactory = () => CodexAppServerClient | null;
 
+/** Immutable snapshot of the option values that form one app-server attempt. */
+export interface AttemptOptions {
+  readonly model?: string;
+  readonly workingDirectory?: string;
+  readonly sandboxMode?: 'read-only' | 'workspace-write' | 'danger-full-access';
+  readonly additionalDirectories?: readonly string[];
+  readonly networkAccessEnabled?: boolean;
+  readonly webSearchMode?: 'disabled' | 'cached' | 'live';
+  readonly approvalPolicy?: CodexApprovalPolicy;
+  readonly modelReasoningEffort?: 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
+}
+
+interface AppServerAttempt {
+  readonly sessionId: string;
+  readonly epoch: number;
+  readonly options: Readonly<AttemptOptions>;
+}
+
 export interface CodexAdapterOptions {
   /** OpenAI API key. Falls back to CODEX_API_KEY / OPENAI_API_KEY env vars. */
   apiKey?: string;
@@ -89,6 +115,13 @@ export interface CodexAdapterOptions {
   networkAccessEnabled?: boolean;
   /** Web search mode passed as ThreadOptions.webSearchMode → SDK --config CLI arg. */
   webSearchMode?: 'disabled' | 'cached' | 'live';
+  /**
+   * Approval policy. 'inherit' (default) omits the override so the backend
+   * uses its own policy; 'untrusted'/'on-request' require an available
+   * app-server AND an approval bridge (fail closed otherwise); 'never' may
+   * use the existing SDK fallback.
+   */
+  approvalPolicy?: CodexApprovalPolicy;
   /** Working directory for thread operations. */
   workingDirectory?: string;
   /**
@@ -266,6 +299,27 @@ export class CodexAdapter
   private activeControllers = new Map<string, AbortController>();
   private activeAppServerTurns = new Map<string, { threadId: string; turnId: string | null }>();
   private appServerContextSnapshots = new Map<string, ContextUsageSnapshot>();
+  /**
+   * Per-session three-axis runtime evidence for thread effective settings,
+   * keyed by sessionId (NOT threadId) so the lifecycle can be set to `pending`
+   * before a start (when no thread id exists yet) and so concurrent sessions
+   * never bleed state. Not a global singleton — instance state on this adapter.
+   */
+  private sessionEffectiveEvidence = new Map<string, AppServerThreadEffectiveEvidence>();
+  /** Latest server-confirmed effective settings per session (for the readback consumer's value display). */
+  private sessionEffectiveSettings = new Map<string, AppServerThreadEffectiveSettings | null>();
+  /**
+   * Per-session IMMUTABLE attempt options snapshot captured before any await.
+   * Prevents mid-flight option mutations from fabricating false evidence or
+   * sending inconsistent thread/turn options. The snapshot freezes the actual
+   * VALUES (model, sandbox, approval, effort, etc.) that form the request.
+   */
+  private sessionAttemptOptions = new Map<string, Readonly<AttemptOptions>>();
+  /** Per-session attempt epoch; stop/deleteSession invalidates the current epoch so in-flight attempts abort. */
+  private sessionEpochs = new Map<string, number>();
+  /** Monotonic across stop/start so an old attempt can never ABA-match a new one. */
+  private nextAttemptEpoch = 0;
+  private lastEvidenceSessionId: string | null = null;
   private statusHandlers = new Set<StatusChangeHandler>();
   private capabilityHandlers = new Set<CapabilityChangeHandler>();
   /**
@@ -397,6 +451,11 @@ export class CodexAdapter
     this.activeControllers.clear();
     this.activeAppServerTurns.clear();
     this.appServerContextSnapshots.clear();
+    this.sessionEffectiveEvidence.clear();
+    this.sessionEffectiveSettings.clear();
+    this.sessionAttemptOptions.clear();
+    this.sessionEpochs.clear();
+    this.lastEvidenceSessionId = null;
     this.codex = null;
     if (this.appServerClient) {
       try {
@@ -1038,6 +1097,21 @@ export class CodexAdapter
     };
   }
 
+  /**
+   * Update the approval policy used for subsequent thread creation/resume.
+   *
+   * 'inherit' omits the approvalPolicy override; 'untrusted'/'on-request'
+   * require the app-server + approval bridge at turn time (fail closed
+   * otherwise); 'never' may use the SDK fallback. Does not affect an
+   * already-cached thread — only the next thread/turn boundary.
+   */
+  updateApprovalPolicy(policy: CodexApprovalPolicy): void {
+    this.options = {
+      ...this.options,
+      approvalPolicy: policy,
+    };
+  }
+
   // -------------------------------------------------------------------------
   // Server-request approval bridge
   // -------------------------------------------------------------------------
@@ -1220,12 +1294,38 @@ export class CodexAdapter
       return;
     }
 
+    // Approval-policy gating. Explicit untrusted/on-request require an
+    // available app-server AND a connected approval-collection bridge; if
+    // either is missing the turn fails closed with an actionable error
+    // instead of silently falling back to a less restrictive path. 'never'
+    // may use the existing fallback; 'inherit' omits the override entirely.
+    const policy = this.options.approvalPolicy ?? 'inherit';
+    if (policy === 'untrusted' || policy === 'on-request') {
+      if (!this.canUseAppServerChat() || typeof this.approvalHost.collectApproval !== 'function') {
+        yield {
+          type: 'error',
+          content: `Codex approval policy "${policy}" requires the Codex app-server and an approval bridge, which are unavailable. Start the Codex backend or switch the approval policy to "inherit" or "never".`,
+        };
+        return;
+      }
+    }
+
     if (this.canUseAppServerChat()) {
       yield* this.sendMessageViaAppServer(request);
       return;
     }
 
     yield* this.sendMessageViaSdk(request);
+  }
+
+  /**
+   * Resolve the wire approval policy for app-server thread/turn options.
+   * Returns undefined for 'inherit' (omit the field) so the backend uses its
+   * own default policy.
+   */
+  private resolveWireApprovalPolicy(): 'untrusted' | 'on-request' | 'never' | undefined {
+    const policy = this.options.approvalPolicy ?? 'inherit';
+    return policy === 'inherit' ? undefined : policy;
   }
 
   private async *sendMessageViaSdk(request: AgentChatSendRequest): AsyncGenerator<StreamChunk> {
@@ -1298,6 +1398,7 @@ export class CodexAdapter
    * silently falls through to SDK chat on a turn error: the same thread owns
    * messages, approvals, cancellation, and authoritative context snapshots.
    */
+  // eslint-disable-next-line complexity -- dense async-generator handling streaming + evidence lifecycle + error recovery in one cohesive method.
   private async *sendMessageViaAppServer(request: AgentChatSendRequest): AsyncGenerator<StreamChunk> {
     const client = this.appServerClient;
     if (!client) {
@@ -1311,8 +1412,13 @@ export class CodexAdapter
       : undefined;
     let tempDir: string | undefined;
     let subscription: { dispose(): void } | null = null;
+    let ownedThreadId: string | null = null;
+    let ownedTurnId: string | null = null;
+    const attempt = this.beginAppServerAttempt(request.sessionId);
+    const sessionId = attempt.sessionId;
     const controller = new AbortController();
-    this.activeControllers.set(request.sessionId, controller);
+    this.activeControllers.get(sessionId)?.abort();
+    this.activeControllers.set(sessionId, controller);
 
     const pending: StreamChunk[] = [];
     const streamedAgentMessageItemIds = new Set<string>();
@@ -1325,26 +1431,65 @@ export class CodexAdapter
     };
     let wake: (() => void) | null = null;
     let completed = false;
+    const pendingTurnCompletions: Array<{ id?: string; error?: unknown }> = [];
     const enqueue = (chunk: StreamChunk): void => {
       pending.push(chunk);
       const resolve = wake;
       wake = null;
       resolve?.();
     };
-
-    try {
-      const thread = await this.resolveOrStartAppServerThread(request.sessionId);
-      if (!thread) {
-        yield { type: 'error', content: `Failed to resolve Codex session: ${request.sessionId}` };
+    const completeCurrentTurn = (completedTurn: { id?: string; error?: unknown }): void => {
+      const active = this.activeAppServerTurns.get(sessionId);
+      if (!active?.turnId || completedTurn.id !== active.turnId) {
         return;
       }
-      this.aliasSession(request.sessionId, thread.id);
+      const error = readAppServerTurnError(completedTurn.error);
+      this.applyTurnCompletionEvidence(sessionId, error, (msg: string) => enqueue({ type: 'error', content: msg }));
+      completed = true;
+      const resolve = wake;
+      wake = null;
+      resolve?.();
+    };
+    controller.signal.addEventListener('abort', () => {
+      const resolve = wake;
+      wake = null;
+      resolve?.();
+    }, { once: true });
+
+    try {
+      const thread = await this.resolveOrStartAppServerThread(attempt);
+      if (!thread) {
+        if (this.isCurrentAppServerAttempt(attempt)) {
+          yield { type: 'error', content: `Failed to resolve Codex session: ${request.sessionId}` };
+        }
+        return;
+      }
+      if (!this.isCurrentAppServerAttempt(attempt)) return;
+      this.aliasSession(sessionId, thread.id);
+      ownedThreadId = thread.id;
 
       subscription = client.subscribeToThreadNotifications(thread.id, (event) => {
+        if (!this.isCurrentAppServerAttempt(attempt)) return;
+        const params = event.params as { turn?: { id?: string; error?: unknown } } | null;
+        const completedTurn = params?.turn;
+        if (event.method === 'turn/completed') {
+          const active = this.activeAppServerTurns.get(sessionId);
+          if (!active?.turnId) {
+            // The app-server can deliver notifications before turn/start
+            // returns. Retain completions until the current turn ID is known,
+            // then accept only that exact turn; a prior turn on this thread
+            // must not finish or fail the new stream.
+            pendingTurnCompletions.push(completedTurn ?? {});
+            return;
+          }
+          if (completedTurn?.id !== active.turnId) {
+            return;
+          }
+        }
         const mapping = mapAppServerNotification({
           event,
-          modelId: this.options.model ?? null,
-          sessionId: request.sessionId,
+          modelId: attempt.options.model ?? null,
+          sessionId,
           streamState,
           threadId: thread.id,
         });
@@ -1354,21 +1499,8 @@ export class CodexAdapter
         for (const chunk of mapping.chunks) {
           enqueue(chunk);
         }
-        const params = event.params as { turn?: { id?: string; error?: unknown } } | null;
-        const completedTurn = params?.turn;
-        const active = this.activeAppServerTurns.get(request.sessionId);
-        if (
-          event.method === 'turn/completed'
-          && (!active?.turnId || completedTurn?.id === active.turnId)
-        ) {
-          const error = readAppServerTurnError(completedTurn?.error);
-          if (error) {
-            enqueue({ type: 'error', content: error });
-          }
-          completed = true;
-          const resolve = wake;
-          wake = null;
-          resolve?.();
+        if (event.method === 'turn/completed') {
+          completeCurrentTurn(completedTurn ?? {});
         }
       });
 
@@ -1377,46 +1509,70 @@ export class CodexAdapter
       const turnOptions: AppServerTurnStartOptions = {
         threadId: thread.id,
         input: input.payload,
-        ...this.buildAppServerTurnOptions(outputSchema),
+        ...this.buildAppServerTurnOptions(attempt.options, outputSchema),
       };
       const turn = await client.startTurn(turnOptions);
+      if (!this.isCurrentAppServerAttempt(attempt)) {
+        if (turn?.id) {
+          await client.interruptTurn(thread.id, turn.id);
+        }
+        return;
+      }
       if (!turn?.id) {
+        this.sessionEffectiveEvidence.set(sessionId, buildUniformEffectiveEvidence('failed', this.attemptWiringForSession(sessionId), 'turn did not start'));
+        this.sessionEffectiveSettings.set(sessionId, null);
         yield { type: 'error', content: 'Codex app-server did not start a turn' };
         return;
       }
-      this.activeAppServerTurns.set(request.sessionId, { threadId: thread.id, turnId: turn.id });
+      this.activeAppServerTurns.set(sessionId, { threadId: thread.id, turnId: turn.id });
+      ownedTurnId = turn.id;
+      for (const pendingTurnCompletion of pendingTurnCompletions) {
+        completeCurrentTurn(pendingTurnCompletion);
+      }
       if (controller.signal.aborted) {
         await client.interruptTurn(thread.id, turn.id);
       }
 
       yield { type: 'message_start' };
+      if (!this.isCurrentAppServerAttempt(attempt) || controller.signal.aborted) return;
       yield {
         type: 'message_metadata',
         messageId: `${thread.id}::${crypto.randomUUID()}`,
         timestamp: Date.now(),
         sessionId: thread.id,
-        ...(this.options.model ? { modelId: this.options.model } : {}),
+        ...(attempt.options.model ? { modelId: attempt.options.model } : {}),
       };
       while (!completed && !controller.signal.aborted) {
         if (pending.length === 0) {
           await new Promise<void>((resolve) => { wake = resolve; });
         }
         while (pending.length > 0) {
+          if (!this.isCurrentAppServerAttempt(attempt) || controller.signal.aborted) return;
           yield pending.shift()!;
         }
       }
       while (pending.length > 0) {
+        if (!this.isCurrentAppServerAttempt(attempt) || controller.signal.aborted) return;
         yield pending.shift()!;
       }
-      if (!controller.signal.aborted) {
+      if (this.isCurrentAppServerAttempt(attempt) && !controller.signal.aborted) {
         yield { type: 'message_stop' };
       }
     } catch (err) {
-      yield { type: 'error', content: err instanceof Error ? err.message : String(err) };
+      if (this.isCurrentAppServerAttempt(attempt)) {
+        this.sessionEffectiveEvidence.set(sessionId, buildUniformEffectiveEvidence('failed', this.attemptWiringForSession(sessionId), err instanceof Error ? err.message : 'turn/stream failed'));
+        this.sessionEffectiveSettings.set(sessionId, null);
+        yield { type: 'error', content: err instanceof Error ? err.message : String(err) };
+      }
     } finally {
       subscription?.dispose();
-      this.activeControllers.delete(request.sessionId);
-      this.activeAppServerTurns.delete(request.sessionId);
+      if (this.activeControllers.get(sessionId) === controller) {
+        this.activeControllers.delete(sessionId);
+      }
+      const activeTurn = this.activeAppServerTurns.get(sessionId);
+      if (activeTurn?.threadId === ownedThreadId && activeTurn.turnId === ownedTurnId) {
+        this.activeAppServerTurns.delete(sessionId);
+      }
       if (tempDir) {
         this.safeRemoveTempDir(tempDir);
       }
@@ -1432,21 +1588,46 @@ export class CodexAdapter
     );
   }
 
-  private async resolveOrStartAppServerThread(sessionId: string): Promise<AppServerThread | null> {
+  private async resolveOrStartAppServerThread(attempt: AppServerAttempt): Promise<AppServerThread | null> {
     const client = this.appServerClient;
     if (!client) {
       return null;
     }
+    const { sessionId } = attempt;
     const entry = this.resolveSession(sessionId);
     const knownThreadId = entry?.threadId
       ?? (!this.isProvisionalId(sessionId) ? sessionId : null);
-    const options = this.buildAppServerThreadOptions();
-    const thread = knownThreadId
-      ? await client.resumeThread(knownThreadId, options)
-      : await client.startThread(options);
+    const options = this.buildAppServerThreadOptions(attempt.options);
+    let thread: AppServerThread | null;
+    try {
+      thread = knownThreadId
+        ? await client.resumeThread(knownThreadId, options)
+        : await client.startThread(options);
+    } catch (err) {
+      // A thrown rejection (e.g. transport failure before the client's inner
+      // catch) must flip pending → failed; it must never stay pending.
+      if (this.isCurrentAppServerAttempt(attempt)) {
+        this.sessionEffectiveEvidence.set(sessionId, buildUniformEffectiveEvidence('failed', this.attemptWiringForSession(sessionId), err instanceof Error ? err.message : 'thread start/resume threw'));
+        this.sessionEffectiveSettings.set(sessionId, null);
+      }
+      throw err;
+    }
+    // Check epoch: if stop/deleteSession invalidated this attempt, abort silently.
+    if (!this.isCurrentAppServerAttempt(attempt)) return null;
     if (!thread?.id) {
+      // Request failed (start/resume returned null after an internal error).
+      this.sessionEffectiveEvidence.set(sessionId, buildUniformEffectiveEvidence('failed', this.attemptWiringForSession(sessionId), 'thread start/resume request failed'));
       return null;
     }
+    // Success: rebuild per-field evidence from THIS response only, with
+    // independent application (request wiring) and runtime (response echo)
+    // axes. A field the server did not echo becomes runtime `unavailable`; a
+    // field the plugin did not wire (e.g. approval under `inherit`) is
+    // application `not-applicable`. Stale state from a prior response is never
+    // inherited.
+    const captured = client.getThreadEffectiveSettings(thread.id);
+    this.sessionEffectiveSettings.set(sessionId, captured);
+    this.sessionEffectiveEvidence.set(sessionId, buildEffectiveEvidenceWithApplication(threadPhaseApplication(this.attemptWiringForSession(sessionId)), 'verified', captured));
     const provisionalId = entry?.provisionalId ?? sessionId;
     const existing = this.sessions.get(provisionalId);
     if (existing) {
@@ -1458,28 +1639,29 @@ export class CodexAdapter
     return thread;
   }
 
-  private buildAppServerThreadOptions(): AppServerThreadStartOptions {
+  private buildAppServerThreadOptions(opts: AttemptOptions): AppServerThreadStartOptions {
     const config: Record<string, unknown> = {};
-    if (this.options.webSearchMode) {
-      config.web_search = this.options.webSearchMode;
+    if (opts.webSearchMode) {
+      config.web_search = opts.webSearchMode;
     }
+    const wireApprovalPolicy = opts.approvalPolicy !== undefined && opts.approvalPolicy !== 'inherit' ? opts.approvalPolicy : undefined;
     return {
-      ...(this.options.model ? { model: this.options.model } : {}),
-      ...(this.options.workingDirectory ? { cwd: this.options.workingDirectory } : {}),
-      ...(this.options.sandboxMode ? { sandbox: this.options.sandboxMode } : {}),
-      approvalPolicy: 'on-request',
+      ...(opts.model ? { model: opts.model } : {}),
+      ...(opts.workingDirectory ? { cwd: opts.workingDirectory } : {}),
+      ...(opts.sandboxMode ? { sandbox: opts.sandboxMode } : {}),
+      ...(wireApprovalPolicy ? { approvalPolicy: wireApprovalPolicy } : {}),
       ...(Object.keys(config).length > 0 ? { config } : {}),
     };
   }
 
-  private buildAppServerTurnOptions(outputSchema: unknown): Omit<AppServerTurnStartOptions, 'threadId' | 'input'> {
-    const writableRoots = [this.options.workingDirectory, ...(this.options.additionalDirectories ?? [])]
-      .filter((path): path is string => typeof path === 'string' && path.trim().length > 0)
-      .filter((path, index, paths) => paths.indexOf(path) === index);
-    const networkAccess = this.options.networkAccessEnabled === true;
-    const sandboxPolicy = this.options.sandboxMode === 'danger-full-access'
+  private buildAppServerTurnOptions(opts: AttemptOptions, outputSchema: unknown): Omit<AppServerTurnStartOptions, 'threadId' | 'input'> {
+    const writableRoots = [opts.workingDirectory, ...(opts.additionalDirectories ?? [])]
+      .filter((p): p is string => typeof p === 'string' && p.trim().length > 0)
+      .filter((p, index, paths) => paths.indexOf(p) === index);
+    const networkAccess = opts.networkAccessEnabled === true;
+    const sandboxPolicy = opts.sandboxMode === 'danger-full-access'
       ? { type: 'dangerFullAccess' as const }
-      : this.options.sandboxMode === 'read-only'
+      : opts.sandboxMode === 'read-only'
         ? { type: 'readOnly' as const, networkAccess }
         : {
           type: 'workspaceWrite' as const,
@@ -1488,12 +1670,13 @@ export class CodexAdapter
           excludeTmpdirEnvVar: false,
           excludeSlashTmp: false,
         };
+    const wireApprovalPolicy = opts.approvalPolicy !== undefined && opts.approvalPolicy !== 'inherit' ? opts.approvalPolicy : undefined;
     return {
-      ...(this.options.workingDirectory ? { cwd: this.options.workingDirectory } : {}),
-      approvalPolicy: 'on-request',
+      ...(opts.workingDirectory ? { cwd: opts.workingDirectory } : {}),
+      ...(wireApprovalPolicy ? { approvalPolicy: wireApprovalPolicy } : {}),
       sandboxPolicy,
-      ...(this.options.model ? { model: this.options.model } : {}),
-      ...(this.options.modelReasoningEffort ? { effort: this.options.modelReasoningEffort } : {}),
+      ...(opts.model ? { model: opts.model } : {}),
+      ...(opts.modelReasoningEffort ? { effort: opts.modelReasoningEffort } : {}),
       ...(outputSchema !== undefined ? { outputSchema } : {}),
     };
   }
@@ -1574,14 +1757,15 @@ export class CodexAdapter
   }
 
   cancelStream(sessionId: string): void {
-    const activeTurn = this.activeAppServerTurns.get(sessionId);
+    const logicalKey = this.logicalSessionKey(sessionId);
+    const activeTurn = this.activeAppServerTurns.get(logicalKey);
     if (activeTurn?.turnId && this.appServerClient) {
       void this.appServerClient.interruptTurn(activeTurn.threadId, activeTurn.turnId);
     }
-    const controller = this.activeControllers.get(sessionId);
+    const controller = this.activeControllers.get(logicalKey);
     if (controller) {
       controller.abort();
-      this.activeControllers.delete(sessionId);
+      this.activeControllers.delete(logicalKey);
     }
   }
 
@@ -1590,6 +1774,146 @@ export class CodexAdapter
     const entry = this.resolveSession(sessionId);
     const threadId = entry?.threadId ?? (!this.isProvisionalId(sessionId) ? sessionId : null);
     return threadId ? this.appServerContextSnapshots.get(threadId) ?? null : null;
+  }
+
+  /**
+   * Return the server-confirmed effective settings for a session's thread, or
+   * null when no verified runtime readback is available (app-server
+   * unavailable, or an older server that did not echo effective fields).
+   * Request-side turn options are never reported here — only fields the
+   * server actually confirmed in its `thread/start` / `thread/resume` response.
+   */
+  getThreadEffectiveSettings(sessionId: string): AppServerThreadEffectiveSettings | null {
+    if (!this.appServerClient) {
+      return null;
+    }
+    const entry = this.resolveSession(sessionId);
+    const threadId = entry?.threadId ?? (!this.isProvisionalId(sessionId) ? sessionId : null);
+    if (!threadId) {
+      return null;
+    }
+    return this.appServerClient.getThreadEffectiveSettings(threadId);
+  }
+
+  /**
+   * Return honest per-field runtime evidence for a session's thread, tracking
+   * the request lifecycle (pending → verified/unavailable/failed). Reuses the
+   * shared three-axis ConfigurationEvidence; for this readback surface
+   * persistence is `not-applicable`. Never claims a request echo is runtime
+   * proof. Sessions are isolated (per-sessionId map, no global singleton).
+   */
+  getThreadEffectiveEvidence(sessionId: string): AppServerThreadEffectiveEvidence {
+    const logicalKey = this.logicalSessionKey(sessionId);
+    return this.sessionEffectiveEvidence.get(logicalKey)
+      ?? buildUniformEffectiveEvidence('unavailable', this.attemptWiringForSession(logicalKey), 'no app-server readback attempted for this session');
+  }
+
+  /**
+   * Return the evidence + server-confirmed values for the most recently
+   * started/resumed Codex session, or null when no session has attempted a
+   * readback. Used by the Capability Lab production consumer.
+   */
+  getLatestThreadEffectiveEvidence(): { sessionId: string; evidence: AppServerThreadEffectiveEvidence; settings: AppServerThreadEffectiveSettings | null } | null {
+    if (!this.lastEvidenceSessionId) {
+      return null;
+    }
+    const sessionId = this.lastEvidenceSessionId;
+    return {
+      sessionId,
+      evidence: this.getThreadEffectiveEvidence(sessionId),
+      settings: this.sessionEffectiveSettings.get(sessionId) ?? null,
+    };
+  }
+
+  /**
+   * Compute which effective fields the plugin actually wires into the app-server
+   * request/turn. Used for the `application` evidence axis — a field the plugin
+   * does not send (e.g. approval under `inherit`, or server-only fields like
+   * modelProvider) is `not-applicable`, never inferred from a runtime echo.
+   */
+  /**
+   * Capture an immutable snapshot of the current option values that form one
+   * app-server attempt. Called BEFORE any await so mid-flight mutations to
+   * this.options do not leak into the attempt's thread/turn options or evidence.
+   */
+  private captureAttemptOptions(): AttemptOptions {
+    return {
+      ...(this.options.model !== undefined ? { model: this.options.model } : {}),
+      ...(this.options.workingDirectory !== undefined ? { workingDirectory: this.options.workingDirectory } : {}),
+      ...(this.options.sandboxMode !== undefined ? { sandboxMode: this.options.sandboxMode } : {}),
+      ...(this.options.additionalDirectories ? { additionalDirectories: [...this.options.additionalDirectories] } : {}),
+      ...(this.options.networkAccessEnabled !== undefined ? { networkAccessEnabled: this.options.networkAccessEnabled } : {}),
+      ...(this.options.webSearchMode !== undefined ? { webSearchMode: this.options.webSearchMode } : {}),
+      ...(this.options.approvalPolicy !== undefined ? { approvalPolicy: this.options.approvalPolicy } : {}),
+      ...(this.options.modelReasoningEffort !== undefined ? { modelReasoningEffort: this.options.modelReasoningEffort } : {}),
+    };
+  }
+
+  /** Resolve every provisional/thread alias to the one logical state-map key. */
+  private logicalSessionKey(sessionId: string): string {
+    return this.resolveSession(sessionId)?.provisionalId ?? sessionId;
+  }
+
+  /** Begin one immutable app-server attempt before its first await. */
+  private beginAppServerAttempt(sessionId: string): AppServerAttempt {
+    const logicalSessionId = this.logicalSessionKey(sessionId);
+    const options = this.captureAttemptOptions();
+    const epoch = ++this.nextAttemptEpoch;
+    this.sessionEpochs.set(logicalSessionId, epoch);
+    this.sessionAttemptOptions.set(logicalSessionId, options);
+    this.sessionEffectiveEvidence.set(
+      logicalSessionId,
+      buildUniformEffectiveEvidence('pending', this.attemptWiringForSession(logicalSessionId), 'thread start/resume in flight'),
+    );
+    this.sessionEffectiveSettings.set(logicalSessionId, null);
+    this.lastEvidenceSessionId = logicalSessionId;
+    return { sessionId: logicalSessionId, epoch, options };
+  }
+
+  private isCurrentAppServerAttempt(attempt: AppServerAttempt): boolean {
+    return this.sessionEpochs.get(attempt.sessionId) === attempt.epoch;
+  }
+
+  private invalidateAppServerAttempt(sessionId: string): void {
+    this.sessionEpochs.delete(this.logicalSessionKey(sessionId));
+  }
+
+  /**
+   * Compute wiring from the per-session attempt snapshot. If no snapshot exists
+   * (no attempt has been made), returns all-false (honest: can't prove what
+   * was sent). Never re-reads mutable this.options for an in-flight attempt.
+   */
+  private attemptWiringForSession(sessionId: string): EffectiveFieldWiring {
+    const snap = this.sessionAttemptOptions.get(sessionId);
+    if (!snap) {
+      // No snapshot: cannot prove what was wired. For fields the plugin COULD
+      // wire (model/cwd/sandbox/approval/effort), report the lifecycle status
+      // honestly (unavailable — "can't tell"). Server-only fields that the
+      // plugin NEVER wires stay not-applicable.
+      return { model: true, modelProvider: false, cwd: true, sandbox: true, approvalPolicy: true, activePermissionProfile: false, reasoningEffort: true };
+    }
+    // Snapshot exists: use the frozen values from attempt start (immutable).
+    return {
+      model: !!snap.model,
+      modelProvider: false,
+      cwd: !!snap.workingDirectory,
+      sandbox: true,
+      approvalPolicy: snap.approvalPolicy !== undefined && snap.approvalPolicy !== 'inherit',
+      activePermissionProfile: false,
+      reasoningEffort: !!snap.modelReasoningEffort,
+    };
+  }
+
+  private applyTurnCompletionEvidence(sessionId: string, error: string | null, enqueue: (msg: string) => void): void {
+    const wiring = this.attemptWiringForSession(sessionId);
+    if (error) {
+      enqueue(error);
+      this.sessionEffectiveEvidence.set(sessionId, buildUniformEffectiveEvidence('failed', wiring, error));
+      this.sessionEffectiveSettings.set(sessionId, null);
+    } else {
+      const captured = this.sessionEffectiveSettings.get(sessionId) ?? null;
+      this.sessionEffectiveEvidence.set(sessionId, buildEffectiveEvidenceWithApplication(turnSuccessApplication(wiring), 'verified', captured));
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -1607,11 +1931,45 @@ export class CodexAdapter
   }
 
   async deleteSession(sessionId: string): Promise<void> {
-    const entry = this.sessions.get(sessionId);
+    const entry = this.resolveSession(sessionId);
+    // The logical session key is the provisionalId; resolveSession finds the
+    // entry whether sessionId is a provisional id or a real thread id/alias.
+    const logicalKey = entry?.provisionalId ?? sessionId;
+    const threadId = entry?.threadId ?? (!this.isProvisionalId(sessionId) ? sessionId : null);
+    this.invalidateAppServerAttempt(logicalKey);
+    const controller = this.activeControllers.get(logicalKey);
+    controller?.abort();
+    this.activeControllers.delete(logicalKey);
+    const activeTurn = this.activeAppServerTurns.get(logicalKey);
+    if (activeTurn?.turnId && this.appServerClient) {
+      try {
+        await this.appServerClient.interruptTurn(activeTurn.threadId, activeTurn.turnId);
+      } catch {
+        // Best-effort cancellation; the attempt fence still blocks late state.
+      }
+    }
+    this.activeAppServerTurns.delete(logicalKey);
     if (entry?.threadId) {
       this.threadAlias.delete(entry.threadId);
     }
-    this.sessions.delete(sessionId);
+    this.sessions.delete(logicalKey);
+    this.sessionEffectiveEvidence.delete(logicalKey);
+    this.sessionEffectiveSettings.delete(logicalKey);
+    this.sessionAttemptOptions.delete(logicalKey);
+    // Also clean by the passed key in case it differs from the logical key.
+    if (sessionId !== logicalKey) {
+      this.sessions.delete(sessionId);
+      this.sessionEffectiveEvidence.delete(sessionId);
+      this.sessionEffectiveSettings.delete(sessionId);
+    }
+    // Evict client readback cache + context snapshot by thread id (full chain).
+    if (threadId) {
+      this.appServerClient?.clearThreadEffectiveSettings?.(threadId);
+      this.appServerContextSnapshots.delete(threadId);
+    }
+    if (this.lastEvidenceSessionId === logicalKey || this.lastEvidenceSessionId === sessionId) {
+      this.lastEvidenceSessionId = null;
+    }
   }
 
   async updateSessionTitle(

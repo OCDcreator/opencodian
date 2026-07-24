@@ -9717,3 +9717,91 @@ describe('SettingsCapabilityLabSection', () => {
     });
   });
 });
+
+describe('SettingsCapabilityLabSection Codex effective-readback consumer', () => {
+  beforeEach(() => {
+    setLocale('en');
+    document.body.innerHTML = '';
+  });
+  afterEach(() => jest.restoreAllMocks());
+
+  // Independent application/runtime axes (honest three-axis evidence).
+  function evidence(application: string, runtime: string, detail?: string) {
+    return { persistence: 'not-applicable' as const, application: application as never, runtime: runtime as never, ...(detail ? { detail } : {}) };
+  }
+
+  it('visually renders three labeled axes + actual server values (not hidden-only)', () => {
+    const codexAdapter = {
+      kind: 'codex',
+      getLatestThreadEffectiveEvidence: () => ({
+        sessionId: 'codex-session-xyz',
+        evidence: {
+          // approval: wired (verified application) AND server-confirmed (verified runtime)
+          approvalPolicy: evidence('verified', 'verified', 'wired + confirmed'),
+          // sandbox: wired, confirmed, value is an object → rendered as its type
+          sandbox: evidence('verified', 'verified'),
+          cwd: evidence('verified', 'verified'),
+          // model: NOT wired by plugin (not-applicable) but server reported a value
+          model: evidence('not-applicable', 'verified'),
+          modelProvider: evidence('not-applicable', 'unavailable'),
+          reasoningEffort: evidence('verified', 'unavailable'),
+          activePermissionProfile: evidence('not-applicable', 'verified'),
+        },
+        settings: {
+          approvalPolicy: 'never',
+          sandbox: { type: 'workspaceWrite', networkAccess: true },
+          cwd: '/vault',
+          model: 'gpt-5',
+          reasoningEffort: undefined,
+          activePermissionProfile: { id: 'default', extends: 'base' },
+        },
+      }),
+    };
+    const containerEl = document.createElement('div');
+    document.body.appendChild(containerEl);
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(null, 'codex', undefined, codexAdapter),
+      createSectionHeading: createHeadingStub(),
+    });
+    section.attachTabbed(containerEl, 'capability-lab');
+    activateCapabilityBackend(containerEl, 'codex');
+
+    const readback = containerEl.querySelector('[data-capability-lab-section="codex-effective-readback"]');
+    expect(readback).toBeTruthy();
+    // Three VISIBLE labeled axis badges per row (axis label + status text in textContent).
+    const approvalRow = readback?.querySelector('[data-effective-field="approvalPolicy"]');
+    const approvalAxes = approvalRow?.querySelectorAll('[data-effective-axis]');
+    expect(approvalAxes?.length).toBe(3);
+    const axisLabels = Array.from(approvalAxes ?? []).map((b) => b.textContent ?? '');
+    expect(axisLabels.some((s) => s.includes('Application') && s.includes('Verified'))).toBe(true);
+    expect(axisLabels.some((s) => s.includes('Runtime') && s.includes('Verified'))).toBe(true);
+    expect(axisLabels.some((s) => s.includes('Persistence') && s.includes('N/A'))).toBe(true);
+    // model: application not-applicable but runtime verified — visually distinct.
+    const modelAxes = readback?.querySelectorAll('[data-effective-field="model"] [data-effective-axis]');
+    const modelAxisText = Array.from(modelAxes ?? []).map((b) => b.textContent ?? '');
+    expect(modelAxisText.some((s) => s.includes('Application') && s.includes('N/A'))).toBe(true);
+    expect(modelAxisText.some((s) => s.includes('Runtime') && s.includes('Verified'))).toBe(true);
+    // Actual server values are surfaced as visible text.
+    expect(approvalRow?.textContent).toContain('never');
+    expect(readback?.querySelector('[data-effective-field="sandbox"]')?.textContent).toContain('workspaceWrite');
+    expect(readback?.querySelector('[data-effective-field="model"]')?.textContent).toContain('gpt-5');
+    expect(readback?.querySelector('[data-effective-field="activePermissionProfile"]')?.textContent).toContain('default (base)');
+    // Absent server value shows the em-dash placeholder.
+    expect(readback?.querySelector('[data-effective-field="reasoningEffort"]')?.textContent).toContain('—');
+    expect(readback?.textContent).toContain('codex-session-xyz');
+  });
+
+  it('renders a no-session notice when no Codex readback exists yet', () => {
+    const codexAdapter = { kind: 'codex', getLatestThreadEffectiveEvidence: () => null };
+    const containerEl = document.createElement('div');
+    document.body.appendChild(containerEl);
+    const section = new SettingsCapabilityLabSection({
+      plugin: createMockPlugin(null, 'codex', undefined, codexAdapter),
+      createSectionHeading: createHeadingStub(),
+    });
+    section.attachTabbed(containerEl, 'capability-lab');
+    activateCapabilityBackend(containerEl, 'codex');
+    const readback = containerEl.querySelector('[data-capability-lab-section="codex-effective-readback"]');
+    expect(readback?.querySelector('[data-effective-readback="no-session"]')).toBeTruthy();
+  });
+});

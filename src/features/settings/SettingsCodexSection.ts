@@ -14,7 +14,7 @@
 import { DropdownComponent, Setting } from 'obsidian';
 
 import type { CodexModelSummary } from '../../core/agents/backend/CodexAdapter';
-import type { CodexReasoningEffort, CodexWebSearchMode } from '../../core/types/settings';
+import type { CodexApprovalPolicy, CodexReasoningEffort, CodexWebSearchMode } from '../../core/types/settings';
 import {
   getDefaultClaudeCodeBackendSettings,
   getDefaultCodexBackendSettings,
@@ -127,6 +127,11 @@ export class SettingsCodexSection {
       return;
     }
 
+    if (resolvedTabId === 'permissions') {
+      this.renderPermissionsGroup(bodyEl);
+      return;
+    }
+
     if (resolvedTabId === 'account') {
       this.renderAccountAndStatusGroup(bodyEl);
       return;
@@ -180,11 +185,57 @@ export class SettingsCodexSection {
 
     this.renderApiKeySetting(controlsEl);
     this.renderModelSetting(controlsEl);
-    this.renderSandboxSetting(controlsEl);
     this.renderReasoningSetting(controlsEl);
-    this.renderAdditionalDirectoriesSetting(controlsEl);
-    this.renderNetworkAccessSetting(controlsEl);
     this.renderWebSearchSetting(controlsEl);
+  }
+
+  /**
+   * Permissions tab: approval policy, sandbox, network access, and additional
+   * directories. Model, reasoning, API key, and web search stay in Connection.
+   */
+  private renderPermissionsGroup(bodyEl: HTMLElement): void {
+    const groupEl = bodyEl.createDiv({
+      cls: 'opencodian-settings-codex-group opencodian-settings-codex-group--permissions',
+      attr: { 'data-codex-group': 'permissions' },
+    });
+
+    groupEl.createEl('h4', {
+      cls: 'opencodian-settings-codex-group-title',
+      text: t('settings.codex.groups.permissions'),
+    });
+    groupEl.createDiv({
+      cls: 'opencodian-settings-codex-group-desc',
+      text: t('settings.codex.groups.permissionsDesc'),
+    });
+
+    const controlsEl = groupEl.createDiv({
+      cls: 'opencodian-settings-codex-group-controls opencodian-settings-codex-group-stack',
+      attr: { 'data-codex-group-controls': 'permissions' },
+    });
+
+    this.renderApprovalPolicySetting(controlsEl);
+    this.renderSandboxSetting(controlsEl);
+    this.renderNetworkAccessSetting(controlsEl);
+    this.renderAdditionalDirectoriesSetting(controlsEl);
+  }
+
+  private renderApprovalPolicySetting(bodyEl: HTMLElement): void {
+    new Setting(bodyEl)
+      .setName(t('settings.codex.approvalPolicy.name'))
+      .setDesc(t('settings.codex.approvalPolicy.desc'))
+      .addDropdown((dropdown) =>
+        dropdown
+          .addOption('inherit', t('settings.codex.approvalPolicy.inherit'))
+          .addOption('untrusted', t('settings.codex.approvalPolicy.untrusted'))
+          .addOption('on-request', t('settings.codex.approvalPolicy.onRequest'))
+          .addOption('never', t('settings.codex.approvalPolicy.never'))
+          .setValue(this.plugin.settings.backendSettings.codex.approvalPolicy)
+          .onChange(async (value) => {
+            this.plugin.settings.backendSettings.codex.approvalPolicy = value as CodexApprovalPolicy;
+            await this.plugin.saveSettings();
+            this.applyCodexRuntimeUpdates();
+          }),
+      );
   }
 
   private renderApiKeySetting(bodyEl: HTMLElement): void {
@@ -467,6 +518,11 @@ export class SettingsCodexSection {
     if ('updateWebSearchMode' in adapter) {
       (adapter as { updateWebSearchMode(m: CodexWebSearchMode): void })
         .updateWebSearchMode(codex.webSearchMode);
+    }
+
+    if ('updateApprovalPolicy' in adapter) {
+      (adapter as { updateApprovalPolicy(p: CodexApprovalPolicy): void })
+        .updateApprovalPolicy(codex.approvalPolicy);
     }
 
     if ('updateModel' in adapter) {

@@ -6,6 +6,8 @@
 
 > **新增（skills）**: `listSkills({ cwd, forceReload? })` 调用 app-server `skills/list`，返回扁平 `AppServerSkill[]`（name/description/path/enabled/scope）。结果经导出的纯函数 `normalizeSkillsListResult` 归一：接受扁平数组、`{data}` 包装、单个/多个 `{cwd, skills, errors}` group envelope（真实服务器形态），丢弃无 `name` 的畸形项，**绝不伪造** skills。`subscribeToSkillsChanged(handler)` 包装 `skills/changed` 通知订阅，返回 unsubscribe 函数。
 
+> **新增（运行时证据，2026-07-24）**: `startThread` / `resumeThread` 在返回 thread 的同时，**防御式捕获**响应中服务端确认的有效设置（`AppServerThreadEffectiveSettings`），按 threadId 缓存。形状对齐 Codex 0.144.1 bindings：`sandbox` 为判别对象 `AppServerSandboxPolicy`（dangerFullAccess/readOnly/workspaceWrite）、`activePermissionProfile` 为 `{id, extends?}`、`approvalPolicy` 为标量或粒度对象；裸字符串 sandbox/profile 被丢弃（非合法 binding）。`getThreadEffectiveSettings(threadId)` 读取最近一次捕获结果，无回显时返回 null。**三轴证据**由生产路径 `buildEffectiveEvidenceWithApplication(application, runtimeStatus, effective)` 独立计算 application/runtime（`application` 由 `threadPhaseApplication` / `turnSuccessApplication` 按实际 wiring 生成）：只有实际写入请求的字段才可得 application=verified，只有本次响应含字段才可得 runtime=verified；`buildUniformEffectiveEvidence('pending'|'failed'|'unavailable', wired)` 供生命周期（请求前 pending、请求失败 failed、app-server 不可用 unavailable）。请求侧 turn 选项**绝不**当作 runtime verified。`startThread`/`resumeThread` 返回类型保持 `AppServerThread | null` 不变（向后兼容）。
+
 ## 概述
 
 `CodexAppServerClient` 是 Codex 本地 app-server 的类型化客户端。2026-07-22 起，实验 API 协商成功时它也是 Codex 的主 chat send/stream 路径；协商失败时 `CodexAdapter` 才保持 SDK 聊天回退且不挂载会话 Context Ring。

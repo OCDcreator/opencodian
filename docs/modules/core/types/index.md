@@ -3,6 +3,7 @@
 > **源码**: `src/core/types/index.ts`
 > **状态**: [REVIEW]
 > **Updated**: 2026-07-23 — added Claude project provider preset types and normalization exports; provider credentials are projected only to project-local Claude settings.
+> **Updated**: 2026-07-24 — re-exports `CodexApprovalPolicy`.
 
 ## 概述
 
