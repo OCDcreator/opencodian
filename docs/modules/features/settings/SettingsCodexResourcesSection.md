@@ -5,7 +5,7 @@
 
 ## 概述
 
-`SettingsCodexResourcesSection.ts` 是 Codex 资源管理设置面板的渲染 owner。它在 Codex 设置的 `resources` 二级 tab 下展示项目（可编辑）与全局（只读）的 Codex skills（`.agents/skills/<name>/SKILL.md`）和 agents（`.codex/agents/<name>.toml`），并提供创建/编辑/删除项目资源的入口。
+`SettingsCodexResourcesSection.ts` 是 Codex 资源管理设置面板的渲染 owner。它在 Codex 设置的 `resources` 二级 tab 下展示项目（可编辑）与全局资源的 Codex skills（`.agents/skills/<name>/SKILL.md`）和 agents（`.codex/agents/<name>.toml`），并提供创建/编辑/删除项目资源的入口。当前 P0 UI 对全局资源只读；P1 只有在共享 `allowlisted-root` 安全契约下才会开放全局 CRUD。
 
 本模块是纯渲染薄层，所有写入逻辑与校验都委托给经过测试的 `CodexProjectResourceDiscovery` CRUD 函数；本模块不包含任何写逻辑。
 
@@ -35,5 +35,5 @@
 ## 注意事项
 
 - 本模块不直接读写文件系统；所有 I/O 经 `CodexProjectResourceDiscovery`，保证校验、原子写与路径穿越保护集中。
-- 全局资源（`~/.agents`、`~/.codex`）绝无写入/删除通道。
+- 当前 P0 UI 对全局资源（`~/.agents`、`~/.codex`）不提供写入/删除通道；全局可写化属于 P1，必须经过共享 `allowlisted-root` 安全契约。
 - 保存后仅刷新本面板；聊天菜单的 runtime skill 真相由 `CodexAppServerClient.listSkills()` + `skills/changed` 失效驱动，不由此面板直接控制。

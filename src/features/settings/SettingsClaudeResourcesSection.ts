@@ -3,10 +3,12 @@
  *
  * Surfaces Claude commands (.claude/commands/<name>.md), skills
  * (.claude/skills/<name>/SKILL.md), and agents (.claude/agents/<name>.md) for
- * both project (editable) and global (read-only) scopes. Project resources
- * support create / edit / delete through validated, atomic writes; global
- * resources (~/.claude) are strictly read-only — OpenCodian never writes to
- * global Claude directories.
+ * both project (editable) and global (read-only in this P0 surface) scopes.
+ * Project resources support create / edit / delete through validated, atomic
+ * writes; this owner currently exposes global Claude resources through
+ * discovery/readback only and has no global mutation API. A future P1 global
+ * CRUD path must use the shared secure-file contract with allowlisted-root
+ * validation.
  *
  * The rendering is a thin layer over the tested discovery/CRUD functions; no
  * write logic lives here. After a successful project mutation the host may
@@ -72,7 +74,8 @@ export interface ClaudeResourceScopeStatus {
  * the user-source-enabled logic is independently testable without DOM.
  *
  * - Project resources are always "Project" (never the global/disabled status).
- * - Global resources are read-only; when the `user` setting source is enabled
+ * - Global resources are presented as read-only by this P0 surface; when the
+ *   `user` setting source is enabled
  *   they show "Global · enabled", otherwise "Global · discovered, not enabled".
  *
  * Does NOT change the source toggle's runtime semantics.
@@ -373,7 +376,8 @@ export class SettingsClaudeResourcesSection {
    * Open a viewer/editor for a specific resource. Loads content by the item's
    * EXACT path (not by name lookup), so a global readonly item always shows its
    * own global content even when a project resource shares the same name.
-   * Write/save is only offered for project (non-readonly) items.
+   * Write/save is only offered for project (non-readonly) items on this P0
+   * surface; global mutation is not exposed by this owner.
    */
   private openEditor(
     item: ClaudeProjectCommandInfo | ClaudeProjectSkillInfo | ClaudeProjectAgentInfo,

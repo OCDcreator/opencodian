@@ -2,10 +2,10 @@
  * SettingsCodexResourcesSection — Codex resource management panel.
  *
  * Surfaces Codex skills (.agents/skills/&lt;name&gt;/SKILL.md) and agents
- * (.codex/agents/&lt;name&gt;.toml) for both project (editable) and global
- * (read-only) scopes. Project resources support create / edit / delete through
- * validated, atomic writes; global resources (~/.agents, ~/.codex) are strictly
- * read-only — OpenCodian never writes to global Codex directories.
+ * (.codex/agents/&lt;name&gt;.toml) for both project (editable) and global scopes.
+ * Project resources support create / edit / delete through validated, atomic
+ * writes. In P0 the UI keeps global resources read-only; P1 may expose global
+ * CRUD only through the shared allowlisted-root security contract.
  *
  * The rendering is a thin layer over the tested discovery/CRUD functions in
  * `CodexProjectResourceDiscovery`; no write logic lives here.
@@ -263,9 +263,10 @@ export class SettingsCodexResourcesSection {
 
   /**
    * Open a viewer/editor for a specific resource. Loads content by the item's
-   * EXACT path (not by name lookup), so a global readonly item always shows its
-   * own global content even when a project resource shares the same name.
-   * Write/save is only offered for project (non-readonly) items.
+   * EXACT path (not by name lookup), so a global-scoped item (currently
+   * read-only in P0) always shows its own global content even when a project
+   * resource shares the same name. Write/save is only offered for project
+   * (non-readonly) items.
    */
   private openEditor(
     item: CodexSkillInfo | CodexAgentInfo,

@@ -7,9 +7,9 @@
 
 ### 2026-07-23 标签拆分
 
-构造参数 `kinds` 允许 host 只渲染指定资源种类：Claude `skills-commands` 传 `['skill', 'command']`，`agents` 传 `['agent']`。项目可写、全局只读、来源 badge 和 mutation 后的 catalog 失效语义不变；原 Claude `resources` tab 不再存在。拆分后的 tab 名与各资源类型组标题已提供层级，故不再渲染重复的「Claude 资源」section heading。
+构造参数 `kinds` 允许 host 只渲染指定资源种类：Claude `skills-commands` 传 `['skill', 'command']`，`agents` 传 `['agent']`。项目可写、全局在当前 P0 UI 只读、来源 badge 和 mutation 后的 catalog 失效语义不变；原 Claude `resources` tab 不再存在。拆分后的 tab 名与各资源类型组标题已提供层级，故不再渲染重复的「Claude 资源」section heading。
 
-`SettingsClaudeResourcesSection.ts` 是 Claude 资源管理设置面板的渲染 owner。它在 Claude Code 设置的 `skills-commands` 或 `agents` 二级 tab 下展示项目（可编辑）与全局（只读）的 Claude commands（`.claude/commands/<name>.md`）、skills（`.claude/skills/<name>/SKILL.md`）和 agents（`.claude/agents/<name>.md`），并提供创建/编辑/删除项目资源的入口。
+`SettingsClaudeResourcesSection.ts` 是 Claude 资源管理设置面板的渲染 owner。它在 Claude Code 设置的 `skills-commands` 或 `agents` 二级 tab 下展示项目（可编辑）与全局（当前 P0 UI 只读）的 Claude commands（`.claude/commands/<name>.md`）、skills（`.claude/skills/<name>/SKILL.md`）和 agents（`.claude/agents/<name>.md`），并提供创建/编辑/删除项目资源的入口。当前 owner 只有 discovery/readback 路径，没有全局 mutation API；P1 若开放全局 CRUD，必须经共享安全文件契约与 allowlisted-root 校验。
 
 本模块是纯渲染薄层，所有写入逻辑与校验都委托给经过测试的 Claude discovery CRUD 函数；本模块不包含任何写逻辑。
 
@@ -29,7 +29,7 @@
 
 - `render()` 同时发现项目 + 全局 commands/skills/agents，按类型分组渲染。每组是扁平语义组：组头行（h4 标题 + 右侧 compact primary「新建」按钮）+ muted 计数行（`groupSummary`）+ ScrollArea 有界列表。Skills & Commands 保持 viewport max-height `min(38vh, 360px)`；独立 Agents tab 在首帧和异步 discovery 完成后各测量一次 viewport 顶部，将最终剩余设置窗口高度写入 `--opencodian-settings-scrollarea-available-height`，由其 viewport 填充且继续在内部滚动。
 - 读取 `plugin.settings.backendSettings.claudeCode.settingSources` 判定 `user` 来源是否启用（不改 source 开关运行时语义）。
-- 全局资源始终只读列出；状态徽章区分：`user` 启用→「全局 · 已启用」(`is-global`)，未启用→「全局 · 已发现，未启用」(`is-global-disabled`)。`user` 未启用时额外显示来源提示（整框 1px warning 边框 + tonal 底的 quiet Alert，不再使用左侧色条）。
+- 当前 P0 UI 仅以只读方式列出全局资源；状态徽章区分：`user` 启用→「全局 · 已启用」(`is-global`)，未启用→「全局 · 已发现，未启用」(`is-global-disabled`)。`user` 未启用时额外显示来源提示（整框 1px warning 边框 + tonal 底的 quiet Alert，不再使用左侧色条）。本 owner 没有全局 mutation API；P1 全局 CRUD 只能经共享安全文件契约与 allowlisted-root 校验开放。
 - 项目资源始终为「项目」(`is-project`)，绝不误标 global/disabled。
 - 状态文案由纯函数 `resolveClaudeResourceScopeStatus(item, userSourceEnabled)` 解析（独立可测）。
 - 每个资源渲染为结构化 row-card（非 `Setting` 行）：行 1 = 名称 + tonal scope badge + 右侧操作；行 2 = 描述；行 3 = 等宽 11px 路径 metadata。
@@ -43,4 +43,4 @@
 
 - source toggle（`renderSettingSources`）经 `saveSettings()` 已即时失效 catalog（`OpenCodianSettingsRuntimeCoordinator.saveSettings` L99-100 调 `invalidateSlashCommandMenuCatalogs`），无需额外接线。
 - 本模块不直接读写文件系统；所有 I/O 经 Claude discovery CRUD，保证校验、原子写与 symlink-aware 路径穿越保护集中。
-- 全局资源（`~/.claude`）绝无写入/删除通道。
+- 当前 P0 owner 不提供全局资源（`~/.claude`）写入/删除通道；P1 若开放，必须经共享安全文件契约与 allowlisted-root 校验。

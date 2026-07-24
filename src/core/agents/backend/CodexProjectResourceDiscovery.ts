@@ -4,14 +4,16 @@
  * Pure filesystem scanner for Codex resources the plugin is allowed to surface:
  *   - Project skills:  <vault>/.agents/skills/<name>/SKILL.md   (editable)
  *   - Project agents:  <vault>/.codex/agents/<name>.toml         (editable)
- *   - Global skills:   ~/.agents/skills/<name>/SKILL.md          (read-only)
- *   - Global agents:   ~/.codex/agents/<name>.toml               (read-only)
+ *   - Global skills:   ~/.agents/skills/<name>/SKILL.md          (read-only in this P0 path)
+ *   - Global agents:   ~/.codex/agents/<name>.toml               (read-only in this P0 path)
  *
- * Global resources are strictly read-only: OpenCodian must never write to
- * ~/.claude, ~/.agents, or ~/.codex (product constraint). Only project roots
- * under the vault are writable, and every write is validated (required fields,
- * name safety, duplicate detection, path-traversal protection) and performed
- * atomically (temp file + rename) so a half-written file is never left behind.
+ * Global resources are read-only in this P0 discovery path: this owner has no
+ * global mutation API. Any future P1 global CRUD path must use the shared
+ * secure-file contract with explicit allowlisted-root validation. Only
+ * project roots under the vault are writable here, and every write is
+ * validated (required fields, name safety, duplicate detection,
+ * path-traversal protection) and performed atomically (temp file + rename) so
+ * a half-written file is never left behind.
  *
  * Codex legacy ~/.codex/prompts are intentionally NOT discovered or shown.
  */
