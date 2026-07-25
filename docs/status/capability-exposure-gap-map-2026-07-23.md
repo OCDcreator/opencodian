@@ -87,7 +87,7 @@
 
 | # | 能力域 | 缺什么 | 状态 |
 |---|--------|--------|------|
-| G1 | Skill/Resource 的 **global scope** | P1-A 已将 Claude Command/Skill/Agent（`~/.claude`）与 Codex Skill/Agent（`~/.agents`、`~/.codex`）接入显式 project/global scope、安全 CRUD、历史与调用方选定的 restore；P1-B 已将 OpenCode XDG 与 `~/.opencode` project/global source inventory、read/write/delete/history/restore 接入。所有写入、读取与历史操作均受精确 `allowlisted-root`/symlink confinement、revision 冲突与归档关联契约约束，并由目标 Jest 契约覆盖。三轴保持诚实：`persistence` 仅在契约成功路径为 `verified`；`application` 依 request wiring 为 `pending`/`not-applicable`；`runtime` 仍为 `unavailable`，尚无生产/Test Vault Obsidian 验收 | 🟢 `DONE`（代码 + 自动化测试；production/runtime 待验收） |
+| G1 | Skill/Resource 的 **global scope** | P1-A 已将 Claude Command/Skill/Agent（`~/.claude`）与 Codex Skill/Agent（`~/.agents`、`~/.codex`）接入显式 project/global scope、安全 CRUD、历史与调用方选定的 restore；P1-B 已将 OpenCode XDG 与 `~/.opencode` project/global source inventory、read/write/delete/history/restore 接入。所有写入、读取与历史操作均受精确 `allowlisted-root`/symlink confinement、revision 冲突与归档关联契约约束，并由目标 Jest 契约覆盖。release acceptance（production/Test Vault/真实 Obsidian UI 与安全操作）已完成；三轴仍保持诚实：`persistence` 仅在契约成功路径为 `verified`；`application` 依 request wiring 为 `pending`/`not-applicable`；无真实 backend readback 时 `runtime` 保持 `unavailable` | 🟢 `DONE`（代码、自动化测试与 release acceptance；runtime readback 按证据保持 unavailable） |
 | G2 | **Codex Approval Policy** | 已作顶层设置 + session 覆盖暴露（`CodexApprovalPolicy = inherit\|untrusted\|on-request\|never`，`SettingsCodexSection` Permissions tab + `ConversationSessionSettingsModal`）。`inherit` 省略覆盖；`untrusted`/`on-request` 需 app-server+桥接并 fail-closed；`never` 可 SDK 回退。null session 覆盖继承真实全局值：`ConversationSessionSettingsCoordinator` 根据会话设置 registry 调用 adapter，adapter 再把全局默认与会话覆盖合并到下一线程边界。全局默认来源优先为 `getCodexGlobalDefaults().approvalPolicy`，否则读取持久化的 `plugin.settings.backendSettings.codex.approvalPolicy`，最终归一化回 `inherit` | 🟢 `DONE` |
 | G3 | **Claude Code Sandbox 子策略** | filesystem/network/ripgrep 子策略控件已存在（`SettingsClaudeCodeSection` 的 sandbox 子策略） | 🟢 `DONE` |
 | G4 | Codex Web Search Mode | 配置证据边界已闭合（settings → adapter 选项 → app-server `web_search` config；session 覆盖已接线）。cached/live 行为差异属运行时验证，归 Capability Lab/QA，非配置缺口 | 🟢 `DONE`（配置闭环）；行为验证：Capability Lab/QA |
@@ -108,7 +108,7 @@
 | G12 | Codex MCP server 模式 (codex/codex-reply) | `codex mcp-server` | `WONTFIX`（判为冗余替代路径） |
 | G13 | Claude Code File Checkpoint/Rewind | `Options.rewindFiles` | `BLOCKED`（上游 SDK bug #236） |
 | G14 | **统一的能力差异说明** | **拒绝（WONTFIX/REJECTED）**：settings tab 本身就是导航；按「Capability Navigation」（见 CONTEXT.md）由 Capability Lab 承担「切到 X 后端会少哪些能力」，不在每个 tab 重复 | ⚪ `WONTFIX/REJECTED` |
-| G15 | **OpenCode Global Config** | OpenCode 全局配置（`~/.config/opencode`、`~/.opencode` 等全局源）在插件内不可编辑 | 🔴 `TODO`（依赖 G1 全局可写化 + allowlist 契约） |
+| G15 | **OpenCode Global Config** | P1-B 已实现 OpenCode Project/Global config source inventory（含 XDG 与 `~/.opencode` 候选）、安全 read/write/delete/history/restore；managed 系统层保持只读。写入与历史操作受 allowlisted-root、symlink confinement、revision 冲突与归档关联契约约束。三轴保持诚实：`persistence` 仅在契约成功路径为 `verified`；`application` 依 request wiring 为 `pending`/`not-applicable`；无真实 backend readback 时 `runtime` 为 `unavailable` | 🟢 `DONE`（P1-B 代码、测试与 release acceptance；runtime readback 按证据保持 unavailable） |
 | G16 | **Codex Profiles** | Codex `~/.codex/config.toml` profiles（多 profile 切换/编辑）未在插件暴露 | 🔴 `TODO`（依赖 A 子系统的 TOML 校验/编辑基础） |
 
 ---
@@ -123,7 +123,7 @@
 
 ### P1 — 性价比最高的 CRUD gap 补全
 
-- [x] **G1：global scope 可编辑化（代码/自动化层已收口）**。P1-A 为 Claude/Codex 资源提供显式 project/global scope、安全 CRUD、历史与选定 restore；P1-B 为 OpenCode XDG 与 `~/.opencode` 配置源提供同等的 source inventory 与安全生命周期。allowlist、精确根目录 confinement、revision 冲突和归档关联均有契约测试。`persistence` 只在成功契约路径标 `verified`；`application` 保持 `pending`/`not-applicable`；`runtime` 保持 `unavailable`，production/Test Vault/真实 Obsidian 验收仍待完成。
+- [x] **G1：global scope 可编辑化（代码、自动化与 release acceptance 已收口）**。P1-A 为 Claude/Codex 资源提供显式 project/global scope、安全 CRUD、历史与选定 restore；P1-B 为 OpenCode XDG 与 `~/.opencode` 配置源提供同等的 source inventory 与安全生命周期。allowlist、精确根目录 confinement、revision 冲突和归档关联均有契约测试。production/Test Vault/真实 Obsidian release acceptance 已完成；`persistence` 只在成功契约路径标 `verified`；`application` 保持 `pending`/`not-applicable`；没有真实 backend readback 的场景中 `runtime` 保持 `unavailable`。
 - [x] **G2：Codex Approval Policy 暴露**。已作顶层设置 + session 覆盖暴露（`SettingsCodexSection` Permissions tab + `ConversationSessionSettingsModal`），`inherit`/`untrusted`/`on-request`/`never`，fail-closed 语义已实现。
 
 ### P2 — 把「假装有」的做实
@@ -144,6 +144,7 @@
 
 | 日期 | 改动 | 行号/标识 |
 |------|------|----------|
+| 2026-07-25 (P1 final acceptance) | P1-A/P1-B 完成 release acceptance：G1 global resources 与 G15 OpenCode Project/Global Config 的 inventory、安全 CRUD、history/restore 已通过自动化门禁、Test Vault 部署及真实 Obsidian 安全操作验收。三轴继续按证据记录：`persistence` 在成功契约路径为 `verified`，`application` 为 `pending`/`not-applicable`，无真实 backend readback 时 `runtime` 为 `unavailable` | G1 / G15 / §3 P1 |
 | 2026-07-24 (P1 close, code/automation only) | G1 收口为 DONE：P1-A 完成 Claude/Codex global resource 的显式 scope、安全 CRUD、revision/history/selected restore 与 Settings 编辑器；P1-B 完成 OpenCode XDG 与 `~/.opencode` source inventory、read/write/delete/history/restore。allowlist + 精确根目录/symlink confinement + 冲突/归档关联由契约测试覆盖。三轴不夸大：成功契约路径的 `persistence` 可为 `verified`，`application` 保持 `pending`/`not-applicable`，`runtime` 为 `unavailable`；生产/Test Vault/真实 Obsidian 验收未关闭 | G1 / §2 / §3 P1 |
 | 2026-07-24 | 证据驱动修正：G3/G4/G5/G11/G2 标 DONE（闭环/语义已闭合）；G7 标 NON-CONFIG；G14 拒绝（settings tab 即导航，差异说明归 Capability Lab）；G10 拆为 G10a(已 DONE 项目层)/G10b/G10c；新增 G15(OpenCode Global Config)、G16(Codex Profiles)；维护规则扩展为允许证据修正/拆分/新增。配套：`CONTEXT.md`、`docs/adr/0001-complete-configuration-means-closed-loop-control.md`、A 子系统 allowlist+SHA256+归档契约、B 子系统 Codex Approval Policy、C 子系统运行时证据捕获 | §2/§3/维护规则 |
 | 2026-07-24 (round 2) | 修复审查问题：G2 session 审批区分「Use global setting」与显式 inherit；最终运行时应用由 `ConversationSessionSettingsCoordinator` 经 registry 直接调用 adapter，真实全局值优先取 host、缺失时取 plugin settings，不增长 guarded `OpenCodianView`。FileRevision 契约强制 `FileRevision\|null` 并比较 canonicalPath+mtime+size+sha256（restore 也要求 expectedRevision + 校验归档内容）；归档抽出独立 `ConfigurationArchiveService`（confined 段校验 + 清单关联/文件名校验 + 原子清单写 + 类型化 `clearDeleted`）；ThreadStart/Resume 解析对齐 Codex 0.144.1 bindings（SandboxPolicy 对象 / `{id,extends}` profile / 粒度 approval）+ 诚实 evidence 映射 | §2 G2 / A·C 子系统 |
