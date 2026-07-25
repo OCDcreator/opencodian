@@ -27,6 +27,9 @@
 - **归档布局**（默认根 `~/.opencodian/archive`，可注入）：`<backend>/<scope>/<kind>/<sha256(canonicalPath)[:16]>/` 下 `manifest.json` + `versions/<utc>-<rand>-overwrite.<ext>` + `deleted/<utc>-<rand>-delete.<ext>`。
 - **保留策略**：overwrite 仅保留最新 `OVERWRITE_RETENTION_LIMIT`（=10）个；**deleted 永不自动清理**，只能由 `clearDeletedArchives` 手动清除。
 - **Restore**：`safeRestoreFile` 取最近一条 deleted 记录写回；写回前**先归档当前 target**（作为 overwrite）。
+- **P1 History / selected restore（additive）**：`listConfigurationArchiveHistory` 只读列出一个显式 allowlist target 的 validated history；`catalogConfigurationArchiveHistory` 以 backend + optional scope/kind 扫描 archive manifest，并对每个 canonical target 重新执行 allowlist（包括当前已删除、常规 filesystem discovery 不可见的 target）。catalog 任一 archive/association/allowlist 完整性失败即整批 `archive-failed`，不返回 partial targets。macOS `/var -> /private/var` 等 root 映射先把 manifest canonical target 映射回 allowlist lexical root；若窄根已删除，catalog 从最近存在的 canonical ancestor 重建**只读映射**而不物化 root，仍不另起纯字符串越根判断。
+- **Opaque identity only**：history entry 的 `identity` 是 archive owner 签发的 branded opaque string；UI/调用方既不获得也不能传入任意 archive path。`safeRestoreArchivedEntry` 仅接收该 identity、`expectedRevision`、allowlist 与可选 archive root；它从 identity 解析 target association 后重验 allowlist，再由 archive owner 重验 backend/scope/kind/canonical target/format、manifest entry、filename/timestamp/mtime/size/sha256、confinement、listing-time + read-time `dev/ino` 与 bytes。caller-selected overwrite 或 delete 都可恢复；合法 selection 已从 manifest 移除时返回 `not-found`。
+- **Selected restore mutation 语义不分叉**：source bytes 先通过 format validation；`expectedRevision: null` 明确要求 target absent，revision 则要求四字段完整匹配；present target 在 replace 前先 archive 为 overwrite；最终仍复用 `commitContentAtExpectedState` 的 create-if-absent / identity-claim 安全提交与 conflict result。没有 force overwrite；冲突时外部 target bytes 与 caller draft/selection 均不被改写，caller 可刷新 revision 后再次显式提交。
 - **内容校验 / JSONC patch**：`validateConfigurationContent(format, content)`（strict JSON 拒注释/尾逗号/非对象根；JSONC 允许注释与尾逗号；TOML 全量 smol-toml 解析；markdown 恒通过）；`applyJsoncPathEdits` 用 jsonc-parser 结构化修改，**保留注释、键序、未知字段、缩进与 EOL**。
 - **依赖**：`jsonc-parser`、`smol-toml`（运行时依赖，随 main.js 打包）。
 
@@ -51,10 +54,15 @@
 | `ConfigurationEvidence` / `isConfigurationEvidenceComplete` | persistence/application/runtime 三轴 + 完备判定 |
 | `ConfigurationAllowlist` / `AllowlistMatch` | 显式 allowlist + 匹配结果 |
 | `assertWithinAllowlistedRoot(allowlist, targetPath)` | 多 root 安全断言（async，realpath parent-walk） |
+| `readAllowlistedFileSnapshot()` | 显式 allowlist 的 descriptor-bound `content + FileRevision` snapshot；可选 expected revision，缺失仅在未预期文件时返回 `absent`，并拒绝 symlink/inode/读中替换而不泄露内容。 |
 | `computeFileRevision(targetPath)` | 当前 FileRevision（不存在返回 null） |
 | `validateConfigurationContent(format, content)` | strict JSON / JSONC / TOML 校验 |
 | `applyJsoncPathEdits(content, edits)` | JSONC 路径编辑，保留格式 |
 | `safeWriteFile` / `safeDeleteFile` / `safeRestoreFile` | 带归档+冲突检测的安全 mutation |
+| `listConfigurationArchiveHistory(options)` | 一个 allowlisted target 的 fail-closed validated history |
+| `catalogConfigurationArchiveHistory(options)` | backend + optional scope/kind 的 fail-closed catalog；可发现已删除 target，并逐 target 重验 allowlist |
+| `safeRestoreArchivedEntry(options)` | 仅凭 opaque entry identity 恢复 caller-selected overwrite/delete；强制 expectedRevision 且复用安全 commit |
+| `ArchiveHistoryEntryIdentity` / `ArchiveHistoryEntrySummary` / `ArchiveHistoryTarget` | P1 history/selection 公共数据类型（无 archive path） |
 | `clearDeletedArchives(options)` | 手动清除 deleted 归档（best-effort） |
 | `OVERWRITE_RETENTION_LIMIT` / `resolveDefaultArchiveRoot` | 保留上限 / 默认归档根 |
 
@@ -65,5 +73,7 @@
 - 纯 `path.resolve` 词法检查**不能**防御父目录符号链接逃逸；本实现用 `realpath` + `lstat` parent-walk 才安全。
 - 全局根的可写性由 allowlist 显式授权控制；默认行为（未列入 allowlist）仍是拒绝。
 - `safe*` 系列返回 `SafeFileMutationResult`，调用方必须按 `status` 分支；没有 force-overwrite。
+- history listing 是只读操作；只有 `safeRestoreArchivedEntry` 能把 selected entry 写回 target。调用方不得自行解码 identity 生成 archive 路径，也不得把 canonical target 当作 archive path。
+- `catalogConfigurationArchiveHistory` 返回的 canonical target 已做 archive association + allowlist 双重验证；一个非法 archived target 会使整个 catalog fail closed，而不是悄悄跳过后返回不完整 UI。
 - create/update/delete/restore 的并发回归测试必须覆盖「预期 revision 检查后发生外部修改」；不得只测试调用前已修改的静态冲突。
 - 提交边界回归必须从公开 `safe*` API 进入，并在 facade syscall 前注入外部写入；断言最终外部 bytes、`conflict` / 可定位的 `write-failed`，以及普通/单 winner 路径没有 `.opencodian-commit-*` 或 temp 残留。

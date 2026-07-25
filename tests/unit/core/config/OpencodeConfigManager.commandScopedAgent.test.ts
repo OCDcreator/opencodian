@@ -14,7 +14,9 @@ let manager: OpencodeConfigManager;
 beforeEach(() => {
   fs.rmSync(testVaultPath, { recursive: true, force: true });
   fs.mkdirSync(testVaultPath, { recursive: true });
-  manager = new OpencodeConfigManager(testVaultPath);
+  manager = new OpencodeConfigManager(testVaultPath, {
+    archiveRootPath: path.join(testVaultPath, '.opencodian-test-archive'),
+  });
 });
 
 afterEach(() => {

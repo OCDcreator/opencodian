@@ -5,8 +5,7 @@
  * User-level Claude files and shell environment are inspection-only inputs.
  */
 
-import { existsSync } from 'fs';
-import { readFile } from 'fs/promises';
+import { lstat, mkdir, readFile } from 'fs/promises';
 import { homedir } from 'os';
 import * as path from 'path';
 
@@ -16,9 +15,14 @@ import {
   type ClaudeProviderPreset,
 } from '../../types/settings';
 import {
+  assertWithinAllowlistedRoot,
   assertWithinRoot,
-  atomicWriteFile,
+  type ConfigurationEvidence,
+  type FileRevision,
   ProjectResourceError,
+  readAllowlistedFileSnapshot,
+  type SafeFileMutationResult,
+  safeWriteFile,
 } from './ProjectResourceSecureWrite';
 
 const CLAUDE_SETTINGS_DIR = '.claude';
@@ -50,18 +54,37 @@ export interface ClaudeProviderPresetValidation {
 
 export interface ApplyClaudeProviderPresetResult {
   lastAppliedManagedEnvKeys: string[];
+  revision: FileRevision;
+  evidence: ConfigurationEvidence;
+  /** Retained for source compatibility; malformed JSON now fails closed. */
   backupPath?: string;
 }
 
 export interface MigrateClaudeProviderModelsResult {
   migrated: boolean;
+  revision?: FileRevision;
+  evidence?: ConfigurationEvidence;
+  /** Retained for source compatibility; malformed JSON now fails closed. */
   backupPath?: string;
+}
+
+export interface ClaudeProviderMutationOptions {
+  /** Explicit caller revision. Omit only for legacy immediate read-modify-write callers. */
+  expectedRevision?: FileRevision | null;
+  readonly archiveRootPath?: string;
 }
 
 interface WritableSettings {
   filePath: string;
   content: Record<string, unknown>;
-  backupPath?: string;
+  revision: FileRevision | null;
+}
+
+export class ClaudeProviderConfigMutationError extends Error {
+  constructor(public readonly result: SafeFileMutationResult) {
+    super(`Claude provider configuration persistence failed (${result.status})`);
+    this.name = 'ClaudeProviderConfigMutationError';
+  }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -95,22 +118,6 @@ function cloneJsonRecord(value: Record<string, unknown>): Record<string, unknown
   return { ...value };
 }
 
-async function findBackupPath(filePath: string): Promise<string> {
-  const firstCandidate = `${filePath}.bak`;
-  if (!existsSync(firstCandidate)) {
-    return firstCandidate;
-  }
-
-  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-  let ordinal = 0;
-  let candidate = `${firstCandidate}.${stamp}`;
-  while (existsSync(candidate)) {
-    ordinal += 1;
-    candidate = `${firstCandidate}.${stamp}-${ordinal}`;
-  }
-  return candidate;
-}
-
 async function loadWritableSettings(vaultPath: string): Promise<WritableSettings> {
   const normalizedVaultPath = vaultPath.trim();
   if (!normalizedVaultPath) {
@@ -118,35 +125,91 @@ async function loadWritableSettings(vaultPath: string): Promise<WritableSettings
   }
 
   const filePath = localSettingsPath(normalizedVaultPath);
-  await assertWithinRoot(normalizedVaultPath, filePath);
-
-  let text: string;
+  const claudeRoot = path.join(normalizedVaultPath, CLAUDE_SETTINGS_DIR);
+  await assertWithinRoot(normalizedVaultPath, claudeRoot);
   try {
-    text = await readFile(filePath, 'utf-8');
+    await lstat(claudeRoot);
   } catch (error) {
     if (isMissingFileError(error)) {
-      return { filePath, content: {} };
+      return { filePath, content: {}, revision: null };
     }
     throw error;
   }
+  await assertWithinAllowlistedRoot([{ scope: 'local', rootPath: claudeRoot }], filePath);
+  const snapshot = await readAllowlistedFileSnapshot({
+    targetPath: filePath,
+    allowlist: [{ scope: 'local', rootPath: claudeRoot }],
+  });
+  if (snapshot.status === 'absent') return { filePath, content: {}, revision: null };
+  if (snapshot.status !== 'success') {
+    const detail = snapshot.status === 'read-failed' ? snapshot.cause : snapshot.status;
+    throw new Error(`Claude settings.local.json changed while reading: ${detail}`);
+  }
 
   try {
-    const parsed: unknown = JSON.parse(text);
+    const parsed: unknown = JSON.parse(snapshot.content);
     if (!isRecord(parsed)) {
-      throw new Error('Settings JSON must contain an object');
+      throw new Error('root must be an object');
     }
-    return { filePath, content: cloneJsonRecord(parsed) };
-  } catch {
-    const backupPath = await findBackupPath(filePath);
-    await assertWithinRoot(normalizedVaultPath, backupPath);
-    await atomicWriteFile(backupPath, text);
-    return { filePath, content: {}, backupPath };
+    return { filePath, content: cloneJsonRecord(parsed), revision: snapshot.revision };
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    throw new Error(`Claude settings.local.json must be valid strict JSON: ${detail}`);
   }
 }
 
-async function writeLocalSettings(vaultPath: string, filePath: string, content: Record<string, unknown>): Promise<void> {
-  await assertWithinRoot(vaultPath.trim(), filePath);
-  await atomicWriteFile(filePath, `${JSON.stringify(content, null, 2)}\n`);
+function successfulMutationEvidence(): ConfigurationEvidence {
+  return {
+    persistence: 'verified',
+    application: 'pending',
+    runtime: 'unavailable',
+    detail: 'Claude settings.local.json and its revision were verified. The next Claude process must reload it; no runtime readback was captured.',
+  };
+}
+
+function resolveExpectedRevision(
+  options: ClaudeProviderMutationOptions,
+  observedRevision: FileRevision | null,
+): FileRevision | null {
+  return Object.prototype.hasOwnProperty.call(options, 'expectedRevision')
+    ? options.expectedRevision ?? null
+    : observedRevision;
+}
+
+async function writeLocalSettings(
+  options: {
+    vaultPath: string;
+    filePath: string;
+    content: Record<string, unknown>;
+    expectedRevision: FileRevision | null;
+    archiveRootPath?: string;
+  },
+): Promise<Extract<SafeFileMutationResult, { status: 'success' }>> {
+  const normalizedVaultPath = options.vaultPath.trim();
+  const claudeRoot = path.join(normalizedVaultPath, CLAUDE_SETTINGS_DIR);
+  // The narrow `.claude` root can be planted as an escaping symlink after the
+  // initial vault proof. Re-check immediately after materialization and before
+  // the shared allowlist mutation resolves its root.
+  await assertWithinRoot(normalizedVaultPath, claudeRoot);
+  await mkdir(claudeRoot, { recursive: true });
+  await assertWithinRoot(normalizedVaultPath, claudeRoot);
+  const result = await safeWriteFile({
+    targetPath: options.filePath,
+    content: `${JSON.stringify(options.content, null, 2)}\n`,
+    expectedRevision: options.expectedRevision,
+    allowlist: [{ scope: 'local', rootPath: claudeRoot }],
+    archive: {
+      ...(options.archiveRootPath ? { archiveRootPath: options.archiveRootPath } : {}),
+      backend: 'claude',
+      kind: 'provider-settings',
+      format: 'json',
+    },
+    format: 'json',
+  });
+  if (result.status !== 'success') {
+    throw new ClaudeProviderConfigMutationError(result);
+  }
+  return result;
 }
 
 function removeManagedKeys(content: Record<string, unknown>, lastAppliedManagedEnvKeys: readonly string[]): Record<string, unknown> {
@@ -195,6 +258,7 @@ export async function applyClaudeProviderPreset(
   vaultPath: string,
   preset: ClaudeProviderPreset,
   lastAppliedManagedEnvKeys: readonly string[],
+  options: ClaudeProviderMutationOptions = {},
 ): Promise<ApplyClaudeProviderPresetResult> {
   const validation = validateClaudeProviderPreset(preset);
   if (Object.values(validation).some(Boolean)) {
@@ -234,10 +298,17 @@ export async function applyClaudeProviderPreset(
     }
   }
 
-  await writeLocalSettings(vaultPath, writable.filePath, next);
+  const mutation = await writeLocalSettings({
+    vaultPath,
+    filePath: writable.filePath,
+    content: next,
+    expectedRevision: resolveExpectedRevision(options, writable.revision),
+    ...(options.archiveRootPath ? { archiveRootPath: options.archiveRootPath } : {}),
+  });
   return {
     lastAppliedManagedEnvKeys: isOfficialPreset(preset) ? [] : Object.keys(normalizeExtraEnv(preset.extraEnv)),
-    backupPath: writable.backupPath,
+    revision: mutation.revision,
+    evidence: successfulMutationEvidence(),
   };
 }
 
@@ -246,6 +317,7 @@ export async function migrateClaudeProviderModels(
   vaultPath: string,
   model: string,
   fallbackModel: string,
+  options: ClaudeProviderMutationOptions = {},
 ): Promise<MigrateClaudeProviderModelsResult> {
   const writable = await loadWritableSettings(vaultPath);
   const next = cloneJsonRecord(writable.content);
@@ -260,10 +332,21 @@ export async function migrateClaudeProviderModels(
     next.fallbackModel = [normalizedFallback];
     migrated = true;
   }
-  if (migrated || writable.backupPath) {
-    await writeLocalSettings(vaultPath, writable.filePath, next);
+  if (migrated) {
+    const mutation = await writeLocalSettings({
+      vaultPath,
+      filePath: writable.filePath,
+      content: next,
+      expectedRevision: resolveExpectedRevision(options, writable.revision),
+      ...(options.archiveRootPath ? { archiveRootPath: options.archiveRootPath } : {}),
+    });
+    return {
+      migrated,
+      revision: mutation.revision,
+      evidence: successfulMutationEvidence(),
+    };
   }
-  return { migrated, backupPath: writable.backupPath };
+  return { migrated };
 }
 
 async function readConfigLayer(id: ClaudeProviderConfigLayer['id'], filePath: string): Promise<ClaudeProviderConfigLayer> {

@@ -16,10 +16,24 @@ import * as path from 'path';
 import {
   assertWithinRoot,
   atomicWriteFile,
+  type FileRevision,
   isSafeResourceName,
   type ProjectResourceWriteError,
   toWriteErrorCode,
 } from './ProjectResourceSecureWrite';
+import {
+  createNamedScopedConfigurationResourceFacade,
+  type CreateNamedScopedConfigurationResourceOptions,
+  type DeleteNamedScopedConfigurationResourceOptions,
+  type NamedScopedConfigurationResourceContext,
+  type ReadNamedScopedConfigurationResourceOptions,
+  type RestoreNamedScopedConfigurationResourceOptions,
+  type ScopedConfigurationResourceContext,
+  type ScopedConfigurationResourceMutationResult,
+  type ScopedConfigurationResourceReadResult,
+  type ScopedConfigurationResourceScope,
+  type UpdateNamedScopedConfigurationResourceOptions,
+} from './ScopedConfigurationResourceService';
 
 /** Metadata for a single discovered Claude skill (a SKILL.md file in .claude/skills/<name>/). */
 export interface ClaudeProjectSkillInfo {
@@ -43,6 +57,41 @@ export type ClaudeSkillWriteResult =
 
 const SKILL_MD_FILENAME = 'SKILL.md';
 const CLAUDE_SKILLS_DIR = path.join('.claude', 'skills');
+
+export type ClaudeSkillResourceScope = ScopedConfigurationResourceScope;
+
+export type ClaudeSkillResourceContext = ScopedConfigurationResourceContext;
+
+export interface ClaudeSkillResourceInfo extends ClaudeProjectSkillInfo {
+  readonly readonly: false;
+  readonly revision: FileRevision;
+}
+
+interface SecureDiscoveredClaudeSkill extends ClaudeProjectSkillInfo {
+  readonly revision: FileRevision;
+}
+
+export type CreateClaudeSkillResourceOptions = CreateNamedScopedConfigurationResourceOptions;
+export type ReadClaudeSkillResourceOptions = ReadNamedScopedConfigurationResourceOptions;
+export type UpdateClaudeSkillResourceOptions = UpdateNamedScopedConfigurationResourceOptions;
+export type DeleteClaudeSkillResourceOptions = DeleteNamedScopedConfigurationResourceOptions;
+export type ClaudeSkillResourceHistoryOptions = NamedScopedConfigurationResourceContext;
+export type CatalogClaudeSkillResourceHistoryOptions = ScopedConfigurationResourceContext;
+export type RestoreClaudeSkillResourceHistoryEntryOptions = RestoreNamedScopedConfigurationResourceOptions;
+
+export type ClaudeSkillResourceMutationResult = ScopedConfigurationResourceMutationResult;
+export type ClaudeSkillResourceReadResult = ScopedConfigurationResourceReadResult;
+
+const CLAUDE_SKILL_RESOURCE = createNamedScopedConfigurationResourceFacade({
+  backend: 'claude',
+  kind: 'skill',
+  format: 'markdown',
+  relativeRootPath: CLAUDE_SKILLS_DIR,
+  targetRelativePath: (name) => path.join(name, SKILL_MD_FILENAME),
+  isSafeName: isSafeResourceName,
+  defaultContent: defaultClaudeSkillContent,
+  validateContent: validateClaudeSkillContent,
+});
 
 const CODE_FENCE_MARKER = String.fromCharCode(96, 96, 96);
 
@@ -108,32 +157,47 @@ function extractDescription(content: string): string {
 export async function discoverClaudeProjectSkills(
   vaultPath: string | null | undefined,
 ): Promise<ClaudeProjectSkillInfo[]> {
-  return scanSkills(vaultPath, CLAUDE_SKILLS_DIR, 'project');
+  const skills = await scanSkills(vaultPath, CLAUDE_SKILLS_DIR, 'project');
+  return skills.map(toLegacySkillInfo);
 }
 
 /** Discover global (~/.claude/skills) skills — read-only. */
 export async function discoverClaudeGlobalSkills(
   homePath: string | null | undefined,
 ): Promise<ClaudeProjectSkillInfo[]> {
-  return scanSkills(homePath, CLAUDE_SKILLS_DIR, 'global');
+  const skills = await scanSkills(homePath, CLAUDE_SKILLS_DIR, 'global');
+  return skills.map(toLegacySkillInfo);
+}
+
+function toLegacySkillInfo(skill: SecureDiscoveredClaudeSkill): ClaudeProjectSkillInfo {
+  return {
+    name: skill.name,
+    description: skill.description,
+    skillMdPath: skill.skillMdPath,
+    relativePath: skill.relativePath,
+    readonly: skill.readonly,
+    scope: skill.scope,
+  };
 }
 
 async function scanSkills(
   scanRoot: string | null | undefined,
   skillsDir: string,
   scope: 'project' | 'global',
-): Promise<ClaudeProjectSkillInfo[]> {
+): Promise<SecureDiscoveredClaudeSkill[]> {
   if (!scanRoot || !scanRoot.trim()) {
     return [];
   }
   const absoluteSkillsDir = path.join(scanRoot, skillsDir);
   let entries: Dirent[];
   try {
+    await assertWithinRoot(scanRoot, absoluteSkillsDir);
     entries = await readdir(absoluteSkillsDir, { withFileTypes: true }) as unknown as Dirent[];
   } catch {
     return [];
   }
-  const results: ClaudeProjectSkillInfo[] = [];
+  const context = { basePath: scanRoot, scope };
+  const results: SecureDiscoveredClaudeSkill[] = [];
   for (const entry of entries) {
     if (!entry.isDirectory()) {
       continue;
@@ -143,19 +207,22 @@ async function scanSkills(
       continue;
     }
     const skillMdPath = path.join(absoluteSkillsDir, skillName, SKILL_MD_FILENAME);
-    let content: string;
-    try {
-      content = await readFile(skillMdPath, 'utf-8');
-    } catch {
-      continue;
-    }
+    const revision = await CLAUDE_SKILL_RESOURCE.readRevision(context, skillName);
+    if (revision === null) continue;
+    const readResult = await CLAUDE_SKILL_RESOURCE.read({
+      ...context,
+      name: skillName,
+      expectedRevision: revision,
+    });
+    if (readResult.status !== 'success') continue;
     results.push({
       name: skillName,
-      description: extractDescription(content),
+      description: extractDescription(readResult.content),
       skillMdPath,
       relativePath: path.join(skillsDir, skillName),
       readonly: scope === 'global',
       scope,
+      revision: readResult.revision,
     });
   }
   return results.sort((a, b) => a.name.localeCompare(b.name));
@@ -284,3 +351,19 @@ export async function deleteClaudeProjectSkill(
     return { ok: false, reason: toWriteErrorCode(err) };
   }
 }
+
+export async function discoverClaudeSkillResources(
+  context: ClaudeSkillResourceContext,
+): Promise<ClaudeSkillResourceInfo[]> {
+  if (!context.basePath?.trim()) return [];
+  const discovered = await scanSkills(context.basePath, CLAUDE_SKILLS_DIR, context.scope);
+  return discovered.map((skill) => ({ ...skill, readonly: false as const }));
+}
+
+export const createClaudeSkillResource = CLAUDE_SKILL_RESOURCE.create;
+export const readClaudeSkillResourceContent = CLAUDE_SKILL_RESOURCE.read;
+export const updateClaudeSkillResource = CLAUDE_SKILL_RESOURCE.update;
+export const deleteClaudeSkillResource = CLAUDE_SKILL_RESOURCE.delete;
+export const listClaudeSkillResourceHistory = CLAUDE_SKILL_RESOURCE.listHistory;
+export const catalogClaudeSkillResourceHistory = CLAUDE_SKILL_RESOURCE.catalogHistory;
+export const restoreClaudeSkillResourceHistoryEntry = CLAUDE_SKILL_RESOURCE.restore;

@@ -35,7 +35,9 @@ function cleanupTestVault(targetPath: string | undefined): void {
 
 beforeEach(() => {
   testVaultPath = createTempVaultPath();
-  manager = new OpencodeConfigManager(testVaultPath);
+  manager = new OpencodeConfigManager(testVaultPath, {
+    archiveRootPath: path.join(testVaultPath, '.opencodian-test-archive'),
+  });
 });
 
 afterEach(() => {
@@ -720,7 +722,38 @@ describe('OpencodeConfigManager paths', () => {
 
     it('should return correct config file path', () => {
       const configPath = manager.getConfigPath();
-      expect(configPath).toBe(path.join(testVaultPath, '.opencode', 'opencode.json'));
+      expect(configPath).toBe(path.join(testVaultPath, '.opencode', 'opencode.jsonc'));
+    });
+
+    it('creates and structurally writes the JSONC default without creating a legacy sibling', async () => {
+      await manager.updatePermission({ bash: 'deny' });
+
+      expect(fs.existsSync(path.join(testVaultPath, '.opencode', 'opencode.jsonc'))).toBe(true);
+      expect(fs.existsSync(path.join(testVaultPath, '.opencode', 'opencode.json'))).toBe(false);
+    });
+
+    it('preserves a sole legacy JSON source without silently creating its JSONC sibling', async () => {
+      const legacyPath = path.join(testVaultPath, '.opencode', 'opencode.json');
+      fs.mkdirSync(path.dirname(legacyPath), { recursive: true });
+      fs.writeFileSync(legacyPath, '{\n  "legacy": true\n}\n', 'utf-8');
+
+      await manager.updatePermission({ bash: 'deny' });
+
+      expect(fs.readFileSync(legacyPath, 'utf-8')).toContain('"legacy": true');
+      expect(fs.existsSync(path.join(testVaultPath, '.opencode', 'opencode.jsonc'))).toBe(false);
+    });
+
+    it('fails closed rather than choosing between coexisting project JSON and JSONC sources', async () => {
+      const configDir = path.join(testVaultPath, '.opencode');
+      fs.mkdirSync(configDir, { recursive: true });
+      const legacyPath = path.join(configDir, 'opencode.json');
+      const jsoncPath = path.join(configDir, 'opencode.jsonc');
+      fs.writeFileSync(legacyPath, '{\n  "legacy": true\n}\n', 'utf-8');
+      fs.writeFileSync(jsoncPath, '{\n  // keep\n  "jsonc": true\n}\n', 'utf-8');
+
+      await expect(manager.updatePermission({ bash: 'deny' })).rejects.toThrow(/ambiguous/i);
+      expect(fs.readFileSync(legacyPath, 'utf-8')).toContain('"legacy": true');
+      expect(fs.readFileSync(jsoncPath, 'utf-8')).toContain('"jsonc": true');
     });
 
     it('should return correct plugin directory path', () => {

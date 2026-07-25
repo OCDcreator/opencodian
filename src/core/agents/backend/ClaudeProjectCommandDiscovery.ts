@@ -15,10 +15,24 @@ import * as path from 'path';
 import {
   assertWithinRoot,
   atomicWriteFile,
+  type FileRevision,
   isSafeResourceName,
   type ProjectResourceWriteError,
   toWriteErrorCode,
 } from './ProjectResourceSecureWrite';
+import {
+  createNamedScopedConfigurationResourceFacade,
+  type CreateNamedScopedConfigurationResourceOptions,
+  type DeleteNamedScopedConfigurationResourceOptions,
+  type NamedScopedConfigurationResourceContext,
+  type ReadNamedScopedConfigurationResourceOptions,
+  type RestoreNamedScopedConfigurationResourceOptions,
+  type ScopedConfigurationResourceContext,
+  type ScopedConfigurationResourceMutationResult,
+  type ScopedConfigurationResourceReadResult,
+  type ScopedConfigurationResourceScope,
+  type UpdateNamedScopedConfigurationResourceOptions,
+} from './ScopedConfigurationResourceService';
 
 /** Metadata for a single discovered Claude command (a .md file in .claude/commands/). */
 export interface ClaudeProjectCommandInfo {
@@ -41,6 +55,41 @@ export type ClaudeCommandWriteResult =
   | { ok: false; reason: ProjectResourceWriteError; path?: string };
 
 const CLAUDE_COMMANDS_DIR = path.join('.claude', 'commands');
+
+export type ClaudeCommandResourceScope = ScopedConfigurationResourceScope;
+
+export type ClaudeCommandResourceContext = ScopedConfigurationResourceContext;
+
+export interface ClaudeCommandResourceInfo extends ClaudeProjectCommandInfo {
+  readonly readonly: false;
+  readonly revision: FileRevision;
+}
+
+interface SecureDiscoveredClaudeCommand extends ClaudeProjectCommandInfo {
+  readonly revision: FileRevision;
+}
+
+export type CreateClaudeCommandResourceOptions = CreateNamedScopedConfigurationResourceOptions;
+export type ReadClaudeCommandResourceOptions = ReadNamedScopedConfigurationResourceOptions;
+export type UpdateClaudeCommandResourceOptions = UpdateNamedScopedConfigurationResourceOptions;
+export type DeleteClaudeCommandResourceOptions = DeleteNamedScopedConfigurationResourceOptions;
+export type ClaudeCommandResourceHistoryOptions = NamedScopedConfigurationResourceContext;
+export type CatalogClaudeCommandResourceHistoryOptions = ScopedConfigurationResourceContext;
+export type RestoreClaudeCommandResourceHistoryEntryOptions = RestoreNamedScopedConfigurationResourceOptions;
+
+export type ClaudeCommandResourceMutationResult = ScopedConfigurationResourceMutationResult;
+export type ClaudeCommandResourceReadResult = ScopedConfigurationResourceReadResult;
+
+const CLAUDE_COMMAND_RESOURCE = createNamedScopedConfigurationResourceFacade({
+  backend: 'claude',
+  kind: 'command',
+  format: 'markdown',
+  relativeRootPath: CLAUDE_COMMANDS_DIR,
+  targetRelativePath: (name) => `${name}.md`,
+  isSafeName: isSafeResourceName,
+  defaultContent: defaultClaudeCommandContent,
+  validateContent: validateClaudeCommandContent,
+});
 
 const CODE_FENCE_MARKER = String.fromCharCode(96, 96, 96);
 
@@ -106,32 +155,47 @@ function extractDescription(content: string): string {
 export async function discoverClaudeProjectCommands(
   vaultPath: string | null | undefined,
 ): Promise<ClaudeProjectCommandInfo[]> {
-  return scanCommands(vaultPath, CLAUDE_COMMANDS_DIR, 'project');
+  const commands = await scanCommands(vaultPath, CLAUDE_COMMANDS_DIR, 'project');
+  return commands.map(toLegacyCommandInfo);
 }
 
 /** Discover global (~/.claude/commands) commands — read-only. */
 export async function discoverClaudeGlobalCommands(
   homePath: string | null | undefined,
 ): Promise<ClaudeProjectCommandInfo[]> {
-  return scanCommands(homePath, CLAUDE_COMMANDS_DIR, 'global');
+  const commands = await scanCommands(homePath, CLAUDE_COMMANDS_DIR, 'global');
+  return commands.map(toLegacyCommandInfo);
+}
+
+function toLegacyCommandInfo(command: SecureDiscoveredClaudeCommand): ClaudeProjectCommandInfo {
+  return {
+    name: command.name,
+    description: command.description,
+    filePath: command.filePath,
+    relativePath: command.relativePath,
+    readonly: command.readonly,
+    scope: command.scope,
+  };
 }
 
 async function scanCommands(
   scanRoot: string | null | undefined,
   commandsDir: string,
   scope: 'project' | 'global',
-): Promise<ClaudeProjectCommandInfo[]> {
+): Promise<SecureDiscoveredClaudeCommand[]> {
   if (!scanRoot || !scanRoot.trim()) {
     return [];
   }
   const absoluteDir = path.join(scanRoot, commandsDir);
   let entries: string[];
   try {
+    await assertWithinRoot(scanRoot, absoluteDir);
     entries = await readdir(absoluteDir);
   } catch {
     return [];
   }
-  const results: ClaudeProjectCommandInfo[] = [];
+  const context = { basePath: scanRoot, scope };
+  const results: SecureDiscoveredClaudeCommand[] = [];
   for (const entryName of entries) {
     if (!entryName.endsWith('.md')) {
       continue;
@@ -141,19 +205,22 @@ async function scanCommands(
       continue;
     }
     const filePath = path.join(absoluteDir, entryName);
-    let content: string;
-    try {
-      content = await readFile(filePath, 'utf-8');
-    } catch {
-      continue;
-    }
+    const revision = await CLAUDE_COMMAND_RESOURCE.readRevision(context, commandName);
+    if (revision === null) continue;
+    const readResult = await CLAUDE_COMMAND_RESOURCE.read({
+      ...context,
+      name: commandName,
+      expectedRevision: revision,
+    });
+    if (readResult.status !== 'success') continue;
     results.push({
       name: commandName,
-      description: extractDescription(content),
+      description: extractDescription(readResult.content),
       filePath,
       relativePath: path.join(commandsDir, entryName),
       readonly: scope === 'global',
       scope,
+      revision: readResult.revision,
     });
   }
   return results.sort((a, b) => a.name.localeCompare(b.name));
@@ -276,3 +343,24 @@ export async function deleteClaudeProjectCommand(
     return { ok: false, reason: toWriteErrorCode(err) };
   }
 }
+
+/**
+ * Discover editable Claude commands for one explicitly selected configuration
+ * scope. Unlike the legacy project/global scanners, this P1 seam includes the
+ * optimistic revision required by update/delete/restore operations.
+ */
+export async function discoverClaudeCommandResources(
+  context: ClaudeCommandResourceContext,
+): Promise<ClaudeCommandResourceInfo[]> {
+  if (!context.basePath?.trim()) return [];
+  const discovered = await scanCommands(context.basePath, CLAUDE_COMMANDS_DIR, context.scope);
+  return discovered.map((command) => ({ ...command, readonly: false as const }));
+}
+
+export const createClaudeCommandResource = CLAUDE_COMMAND_RESOURCE.create;
+export const readClaudeCommandResourceContent = CLAUDE_COMMAND_RESOURCE.read;
+export const updateClaudeCommandResource = CLAUDE_COMMAND_RESOURCE.update;
+export const deleteClaudeCommandResource = CLAUDE_COMMAND_RESOURCE.delete;
+export const listClaudeCommandResourceHistory = CLAUDE_COMMAND_RESOURCE.listHistory;
+export const catalogClaudeCommandResourceHistory = CLAUDE_COMMAND_RESOURCE.catalogHistory;
+export const restoreClaudeCommandResourceHistoryEntry = CLAUDE_COMMAND_RESOURCE.restore;

@@ -5,6 +5,7 @@ import * as path from 'path';
 import {
   createClaudeProjectSkill,
   discoverClaudeProjectSkills,
+  discoverClaudeSkillResources,
 } from '../../../../../src/core/agents/backend/ClaudeProjectSkillDiscovery';
 
 describe('ClaudeProjectSkillDiscovery', () => {
@@ -123,6 +124,38 @@ describe('ClaudeProjectSkillDiscovery', () => {
 
     expect(skill.description).toBe(`${'a'.repeat(197)}...`);
     expect(skill.description).toHaveLength(200);
+  });
+
+  it('rejects a symlinked SKILL.md without exposing root-external content', async () => {
+    const outsideRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'opencodian-claude-skill-outside-'));
+    try {
+      const outsideFile = path.join(outsideRoot, 'SKILL.md');
+      await fs.writeFile(outsideFile, '# ROOT-EXTERNAL SKILL BYTES\n', 'utf-8');
+      const skillDir = path.join(tempRoot, '.claude', 'skills', 'escaped');
+      await fs.mkdir(skillDir, { recursive: true });
+      await fs.symlink(outsideFile, path.join(skillDir, 'SKILL.md'));
+
+      await expect(discoverClaudeProjectSkills(tempRoot)).resolves.toEqual([]);
+      await expect(discoverClaudeSkillResources({ scope: 'project', basePath: tempRoot })).resolves.toEqual([]);
+    } finally {
+      await fs.rm(outsideRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects a fixed skills-root symlink without exposing root-external content', async () => {
+    const outsideRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'opencodian-claude-skill-root-outside-'));
+    try {
+      const outsideSkillDir = path.join(outsideRoot, 'escaped');
+      await fs.mkdir(outsideSkillDir, { recursive: true });
+      await fs.writeFile(path.join(outsideSkillDir, 'SKILL.md'), '# ROOT-EXTERNAL SKILL ROOT BYTES\n', 'utf-8');
+      await fs.mkdir(path.join(tempRoot, '.claude'), { recursive: true });
+      await fs.symlink(outsideRoot, path.join(tempRoot, '.claude', 'skills'));
+
+      await expect(discoverClaudeProjectSkills(tempRoot)).resolves.toEqual([]);
+      await expect(discoverClaudeSkillResources({ scope: 'project', basePath: tempRoot })).resolves.toEqual([]);
+    } finally {
+      await fs.rm(outsideRoot, { recursive: true, force: true });
+    }
   });
 
   it('creates .claude/skills/<name>/SKILL.md with valid frontmatter default content', async () => {

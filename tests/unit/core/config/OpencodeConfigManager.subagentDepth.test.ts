@@ -29,7 +29,9 @@ function cleanupTestVault(targetPath: string | undefined): void {
 
 beforeEach(() => {
   testVaultPath = createTempVaultPath();
-  manager = new OpencodeConfigManager(testVaultPath);
+  manager = new OpencodeConfigManager(testVaultPath, {
+    archiveRootPath: path.join(testVaultPath, '.opencodian-test-archive'),
+  });
 });
 
 afterEach(() => {

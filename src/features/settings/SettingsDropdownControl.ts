@@ -1,4 +1,5 @@
-import { type DropdownComponent, setIcon, type Setting } from 'obsidian';
+/* eslint-disable max-lines -- The dropdown owner keeps portal, keyboard, mutation, and accessibility synchronization together. */
+import { type DropdownComponent, type Keymap, Scope, setIcon, type Setting } from 'obsidian';
 
 /** Gap between trigger and menu in pixels. */
 const MENU_GAP = 5;
@@ -130,7 +131,7 @@ export interface SettingsDropdownsEnhancerHandle {
   refresh: () => void;
 }
 
-export function enhanceSettingsDropdowns(containerEl: HTMLElement): SettingsDropdownsEnhancerHandle {
+export function enhanceSettingsDropdowns(containerEl: HTMLElement, keymap?: Keymap): SettingsDropdownsEnhancerHandle {
   const handles = new Set<SettingsDropdownControlHandle>();
   const mutationAddsSelect = (records: MutationRecord[]) => records.some((record) => (
     Array.from(record.addedNodes).some((node) => (
@@ -141,7 +142,7 @@ export function enhanceSettingsDropdowns(containerEl: HTMLElement): SettingsDrop
 
   const refresh = () => {
     for (const selectEl of Array.from(containerEl.querySelectorAll<HTMLSelectElement>('select'))) {
-      handles.add(enhanceSettingsSelect(selectEl));
+      handles.add(enhanceSettingsSelect(selectEl, keymap));
     }
   };
 
@@ -179,8 +180,11 @@ export function addSettingsDropdown(
   });
 }
 
-export function enhanceSettingsDropdownComponent(dropdown: DropdownComponent): SettingsDropdownControlHandle {
-  const handle = enhanceSettingsSelect(dropdown.selectEl);
+export function enhanceSettingsDropdownComponent(
+  dropdown: DropdownComponent,
+  keymap?: Keymap,
+): SettingsDropdownControlHandle {
+  const handle = enhanceSettingsSelect(dropdown.selectEl, keymap);
   const originalAddOption = dropdown.addOption.bind(dropdown);
   const originalSetValue = dropdown.setValue.bind(dropdown);
 
@@ -307,6 +311,7 @@ function handleDropdownKeydown(event: KeyboardEvent, ctx: DropdownKeydownContext
       advanceHighlight({ options: ctx.options, current: ctx.highlightedIndex, delta: 1, setIndex: ctx.setHighlightedIndex, renderOptions: ctx.renderOptions });
     }
     event.preventDefault();
+    event.stopPropagation();
     return;
   }
   if (event.key === 'ArrowUp') {
@@ -316,6 +321,7 @@ function handleDropdownKeydown(event: KeyboardEvent, ctx: DropdownKeydownContext
       advanceHighlight({ options: ctx.options, current: ctx.highlightedIndex, delta: -1, setIndex: ctx.setHighlightedIndex, renderOptions: ctx.renderOptions });
     }
     event.preventDefault();
+    event.stopPropagation();
     return;
   }
   if (event.key === 'Enter' || event.key === ' ') {
@@ -325,11 +331,13 @@ function handleDropdownKeydown(event: KeyboardEvent, ctx: DropdownKeydownContext
       ctx.onOpen();
     }
     event.preventDefault();
+    event.stopPropagation();
     return;
   }
   if (event.key === 'Escape' && ctx.isOpen) {
     ctx.onClose();
     event.preventDefault();
+    event.stopPropagation();
   }
 }
 
@@ -353,7 +361,11 @@ function advanceHighlight(ctx: HighlightAdvanceContext): void {
   ctx.renderOptions();
 }
 
-export function enhanceSettingsSelect(selectEl: HTMLSelectElement): SettingsDropdownControlHandle {
+// eslint-disable-next-line max-lines-per-function -- The enhancer owns one cohesive trigger/listbox lifecycle, including portal and accessibility synchronization.
+export function enhanceSettingsSelect(
+  selectEl: HTMLSelectElement,
+  keymap?: Keymap,
+): SettingsDropdownControlHandle {
   const existingHandle = enhancedSelects.get(selectEl);
   if (existingHandle) {
     existingHandle.refresh();
@@ -393,6 +405,8 @@ export function enhanceSettingsSelect(selectEl: HTMLSelectElement): SettingsDrop
   let highlightedIndex = -1;
   let isOpen = false;
   let portalCleanup: (() => void) | null = null;
+  const dropdownScope = keymap ? new Scope() : null;
+  let isScopePushed = false;
 
   const getSelectedIndex = () => options.findIndex((option) => option.value === selectEl.value);
   const getFirstEnabledIndex = () => options.findIndex((option) => !option.disabled);
@@ -402,9 +416,28 @@ export function enhanceSettingsSelect(selectEl: HTMLSelectElement): SettingsDrop
     rootEl.toggleClass('is-disabled', selectEl.disabled);
   };
 
+  const syncAccessibleName = () => {
+    const labelledBy = selectEl.getAttribute('aria-labelledby');
+    if (labelledBy?.trim()) {
+      // Keep the reference-based name when both attributes exist; it preserves
+      // the visible field label instead of replacing it with fallback text.
+      triggerEl.setAttribute('aria-labelledby', labelledBy);
+      triggerEl.removeAttribute('aria-label');
+      return;
+    }
+    const ariaLabel = selectEl.getAttribute('aria-label');
+    if (ariaLabel !== null) {
+      triggerEl.setAttribute('aria-label', ariaLabel);
+    } else {
+      triggerEl.removeAttribute('aria-label');
+    }
+    triggerEl.removeAttribute('aria-labelledby');
+  };
+
   const renderTrigger = () => {
     const selectedOption = options[getSelectedIndex()];
     labelEl.setText(selectedOption?.label ?? selectEl.value);
+    syncAccessibleName();
     syncDisabledState();
   };
 
@@ -440,7 +473,14 @@ export function enhanceSettingsSelect(selectEl: HTMLSelectElement): SettingsDrop
     return false;
   };
 
+  const popDropdownScope = () => {
+    if (!keymap || !dropdownScope || !isScopePushed) return;
+    keymap.popScope(dropdownScope);
+    isScopePushed = false;
+  };
+
   const close = () => {
+    popDropdownScope();
     if (!isOpen && menuEl.parentElement === rootEl) return;
     isOpen = false;
     rootEl.removeClass('is-open');
@@ -454,6 +494,12 @@ export function enhanceSettingsSelect(selectEl: HTMLSelectElement): SettingsDrop
     portalCleanup = null;
     rootEl.appendChild(menuEl);
   };
+
+  dropdownScope?.register([], 'Escape', (event) => {
+    if (!isOpen || event.target !== triggerEl) return;
+    close();
+    return false;
+  });
 
   const renderOptions = () => {
     renderMenuOptions(menuEl, {
@@ -475,6 +521,10 @@ export function enhanceSettingsSelect(selectEl: HTMLSelectElement): SettingsDrop
       highlightedIndex = getFirstEnabledIndex();
     }
     isOpen = true;
+    if (keymap && dropdownScope && !isScopePushed) {
+      keymap.pushScope(dropdownScope);
+      isScopePushed = true;
+    }
     rootEl.addClass('is-open');
     menuEl.removeClass('is-hidden');
     triggerEl.setAttribute('aria-expanded', 'true');
@@ -544,14 +594,12 @@ export function enhanceSettingsSelect(selectEl: HTMLSelectElement): SettingsDrop
   triggerEl.addEventListener('keydown', handleTriggerKeydown);
   selectEl.addEventListener('change', refresh);
   document.addEventListener('pointerdown', handleDocumentPointerDown);
-  mutationObserver.observe(selectEl, { attributes: true, attributeFilter: ['disabled', 'label', 'value'], childList: true, subtree: true });
+  mutationObserver.observe(selectEl, { attributes: true, attributeFilter: ['aria-label', 'aria-labelledby', 'disabled', 'label', 'value'], childList: true, subtree: true });
 
   const handle: SettingsDropdownControlHandle = {
     close,
     destroy: () => {
-      isOpen = false;
-      portalCleanup?.();
-      portalCleanup = null;
+      close();
       if (menuEl.parentElement === document.body) menuEl.remove();
       document.removeEventListener('pointerdown', handleDocumentPointerDown);
       selectEl.removeEventListener('change', refresh);

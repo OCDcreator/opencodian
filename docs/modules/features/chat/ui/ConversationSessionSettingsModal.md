@@ -72,6 +72,7 @@ class ConversationSessionSettingsModal extends Modal {
 - 顶部 hero 区显示当前会话标题、继承说明与“会话覆盖”语义 badge，避免用户把它误认为全局设置
 - modal 主体包含聊天字体大小的单一显示设置
 - `showCodexControls` 开启时，在 Display 分组下方渲染 Codex 分组，包含模型覆盖（下拉，含“Inherit”、可用模型和“Custom...”自定义输入）、沙盒模式（read-only / workspace-write / danger-full-access）、推理强度（minimal / low / medium / high / xhigh）、审批策略（Use global setting / inherit / untrusted / on-request / never）等下拉；分组内含 boundary hint 说明"这些设置在下一个线程生效，不影响当前对话"
+- 会话级模型、沙盒、推理、网络、网页搜索和目录控件会生成稳定的 `id`，并通过对应 `<label for>`、`aria-labelledby` 与 `aria-label` 关联；Codex code-review target 下拉也提供明确的可访问名称，避免仅依赖视觉标题。
 - Codex 审批策略下拉：空值表示「Use global setting」（null 覆盖，继承真实全局值）；显式「inherit」强制后端默认（不覆盖）。二者语义不同，UI 与 `buildOverrides` 明确区分
 - Codex 下拉选择“Inherit”时回写 `null`（与字体大小行为一致），全字段为 null 时 `buildOverrides()` 返回 `undefined`
 - 分享分组显示当前 session 的分享状态。`shareUrl === null` 时展示 Not shared 并隐藏取消分享；存在 URL 时展示 Shared、公开链接和取消分享动作；`shareMode === "disabled"` 且当前未分享时展示 Sharing disabled、禁用分享按钮，并显示跳转主设置页的 plain-language 提示；`undefined` 保留兼容的未知状态

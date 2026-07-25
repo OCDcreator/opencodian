@@ -29,7 +29,26 @@
 - mode 写回后会立即刷新 config status，并继续沿用“未开启自动重启时只提示手动重启”的旧行为
 - auto restart 仍只在 local server 且健康检查通过时执行；remote 模式继续提示不可管理，不会擅自改动 remote-manage 语义
 - config editor tooltip、restart 按钮文本和 restart notice 现已全部走 locale keys，不再硬编码英文
-- `Restart service` 按钮继续保留“运行中则 stop → wait → start，未运行则直接 start”的旧流程
+- `Restart service` 按钮继续保留“运行中则 stop → wait → start，未运行则直接 start”的旧流程；文案只声明 application attempt/boundary，不能声称具体配置已经 runtime verified
+
+### P1-B OpenCode configuration sources
+
+- `renderConfigFileSetting()` opens `OpencodeConfigModal` without an implicit
+  path; the modal requires explicit Project/Global/managed source selection.
+- A minimal `configManagerFactory` option is available for tests to inject a
+  temp `archiveRootPath`; production defaults to `new OpencodeConfigManager()`.
+- The modal displays backend source labels, exact paths, revisions, parse/read
+  failures, and persistence/application/runtime evidence. Managed sources are
+  preview-only, and malformed JSONC is loaded as raw bytes for repair.
+- Save/delete/restore use captured revisions (including canonical archived
+  target to lexical source mapping) and keep conflict drafts open.
+  Archive failure is never presented as an empty history. Service restart stays
+  a separate application boundary and never claims runtime readback.
+- The config-file setting row's primary CTA (`.setCta()`) is the "Edit
+  configuration source" button; the apply-and-restart action stays a plain
+  secondary button so the more common review/edit task owns the emphasis.
+  Inside the modal, Close is always rendered while Save/Delete/History only
+  appear for a ready, editable source.
 
 ### Blocklist 与导出路径
 

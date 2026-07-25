@@ -93,13 +93,13 @@ export interface PluginEnvironmentSnapshot {
 `inspect(serviceMode, isolationMode, disabledPluginSpecs)` 会并发读取多组数据：
 
 1. 全局配置文件 `<home>/.config/opencode/opencode.json`（保留为 `globalConfigPath` / `globalConfigSpecs`）
-2. 项目配置文件 `<vault>/.opencode/opencode.json`（保留为 `projectConfigPath` / `projectConfigSpecs`）
+2. 项目配置 source：fresh `<vault>/.opencode/opencode.jsonc`；sole legacy `<vault>/.opencode/opencode.json` 兼容（保留为 `projectConfigPath` / `projectConfigSpecs`）。两者并存时只盘点，不产生 effective project source。
 3. 全局 `plugin/`、`plugins/` 目录扫描结果
 4. 项目 `plugin/`、`plugins/` 目录扫描结果
 5. **所有已知配置来源的清查**（`configSources`），共 7 个：
    - 全局配置目录：`config.json`、`opencode.json`、`opencode.jsonc`
    - Vault 根目录：`opencode.json`、`opencode.jsonc`
-   - Vault `.opencode/`：`opencode.json`（可编辑）、`opencode.jsonc`（只读）
+   - Vault `.opencode/`：`opencode.json`、`opencode.jsonc`（均可盘点；fresh default 为 JSONC）
 
 之后它会把配置式插件和目录式插件分别标准化，再组合成 `PluginEnvironmentSnapshot`。`disabledPluginSpecs` 代表插件侧保存的项目插件禁用清单，`inspect()` 会用它给项目级 config / directory entries 标记 `disabled`，并派生禁用条目集合。快照里同时保留：
 
@@ -122,12 +122,12 @@ export interface PluginEnvironmentSnapshot {
 | 全局 `opencode.jsonc` | `<home>/.config/opencode/opencode.jsonc` | ❌ 只读 |
 | Vault 根 `opencode.json` | `<vault>/opencode.json` | ❌ 只读 |
 | Vault 根 `opencode.jsonc` | `<vault>/opencode.jsonc` | ❌ 只读 |
-| **Vault `.opencode/opencode.json`** | `<vault>/.opencode/opencode.json` | ✅ 可编辑 |
-| Vault `.opencode/opencode.jsonc` | `<vault>/.opencode/opencode.jsonc` | ❌ 只读 |
+| Vault `.opencode/opencode.json` | `<vault>/.opencode/opencode.json` | ✅ sole legacy compatibility |
+| **Vault `.opencode/opencode.jsonc`** | `<vault>/.opencode/opencode.jsonc` | ✅ fresh default |
 
-**只有 `.opencode/opencode.json` 是 OpenCodian 的 canonical 可编辑来源**。所有 `updateProjectConfigPlugins`、`installConfigPlugin`、`uninstallConfigPlugin` 等写入操作都通过 `OpencodeConfigManager` 写回该文件。
+Fresh projects use `.opencode/opencode.jsonc`; a sole legacy `.json` remains compatible. When both exist, inspection exposes both but has no effective project source, and mutation delegates to `OpencodeConfigManager`'s typed ambiguity failure rather than selecting a sibling.
 
-`globalConfigSpecs` 与 `projectConfigSpecs` 仍分别只代表上述 canonical 全局/项目文件的 `plugin` 数组，**不是**所有来源的 hand-rolled merge。真正的 OpenCode effective config 由后端通过 `sdk.config.get()` 在运行时给出，未来会在事件接入层单独展示。
+`globalConfigSpecs` 与 `projectConfigSpecs` 仍分别只代表上述唯一 effective 全局/项目 source 的 `plugin` 数组，**不是**所有来源的 hand-rolled merge。项目 JSON/JSONC 双候选时 `projectConfigSpecs` 为空，避免伪造 canonical 选择。真正的 OpenCode effective config 由后端通过 `sdk.config.get()` 在运行时给出，未来会在事件接入层单独展示。
 
 ### 目录插件扫描规则
 
@@ -152,13 +152,13 @@ export interface PluginEnvironmentSnapshot {
 
 | 方法 | 行为 |
 |------|------|
-| `updateProjectConfigPlugins(plugins)` | 通过 `OpencodeConfigManager` 更新项目配置 canonical 文件的 `plugin` 字段 |
+| `updateProjectConfigPlugins(plugins)` | 通过 `OpencodeConfigManager` 更新 fresh JSONC 或 sole legacy JSON 的 `plugin` 字段；双候选时抛 typed ambiguity，不写入任一文件 |
 | `ensureProjectPluginDirectory()` | 创建 `<vault>/.opencode/plugins` |
 | `ensureProjectOmoConfig()` | 创建 `<vault>/.opencode/oh-my-opencode.jsonc`，若不存在则写入占位模板 |
 | `applyConfigPluginAvailabilityChange(specifier, disabled)` | 写回插件侧禁用清单中某个项目 config plugin 的可用状态，不直接改写 `plugin` 数组 |
 | `toggleDirectoryPlugin(fileName, disabled)` | 写回插件侧禁用清单中某个项目目录 plugin 文件的可用状态 |
-| `installConfigPlugin(spec)` | 向项目 `.opencode/opencode.json` 的 `plugin` 数组追加配置式插件 |
-| `uninstallConfigPlugin(specifier)` | 从项目 config plugin 列表移除匹配 specifier，并清理对应禁用状态 |
+| `installConfigPlugin(spec)` | 向 fresh `.opencode/opencode.jsonc` 或 sole legacy `.json` 的 `plugin` 数组追加配置式插件；双候选 fail closed |
+| `uninstallConfigPlugin(specifier)` | 从唯一 effective 项目 config plugin 列表移除匹配 specifier 并清理禁用状态；双候选 fail closed |
 | `deleteDirectoryPlugin(fileName)` | 删除项目 `.opencode/plugins` 下的目录式插件文件，并清理对应禁用状态 |
 
 ### 配置式插件解析
@@ -215,8 +215,11 @@ global config.json / opencode.json / opencode.jsonc
 vault root opencode.json / opencode.jsonc
   -> configSources (read-only provenance)
 
-vault .opencode/opencode.json (canonical editable)
+vault .opencode/opencode.jsonc (fresh) OR sole opencode.json (legacy)
   -> projectConfigSpecs / projectConfigPlugins
+
+both project JSON + JSONC
+  -> configSources only; no effective selection or mutation
 
 global opencode.json (canonical for global legacy fields)
   -> globalConfigSpecs / globalConfigPlugins
@@ -248,6 +251,6 @@ disabledPluginSpecs
 - 目录扫描仅记录文件，不记录目录，也不会读取插件文件内容。
 - `PluginEntry.disabled` 表达 OpenCodian 插件侧禁用状态，不代表 OpenCode 全局配置或 runtime catalog 已移除该插件。
 - `PluginEntry.provenance` 仅在条目来自配置式来源时存在，用于把 entry 归因到具体配置文件；目录式或禁用记忆条目不带 provenance。
-- 任何单个配置文件解析失败都会记录在该来源的 `PluginConfigSourceSnapshot.error` 中，不会导致整个 `inspect()` 失败；对应的 canonical 全局/项目 legacy 数组会变为空，但其他来源和目录扫描正常返回。
+- 任何单个配置文件解析失败都会记录在该来源的 `PluginConfigSourceSnapshot.error` 中，不会导致整个 `inspect()` 失败；对应唯一 effective 全局/项目 source 的数组会变为空，但其他来源和目录扫描正常返回。
 - `globalInfluenceDetected` 在全局任意配置来源声明了插件，或任意全局 `plugin/` / `plugins/` 目录包含活动（非禁用）插件文件时为 `true`；仅含 `.disabled` 文件不会使其为 `true`。
 - `configSources` 是 Round 1 新增的 additive 字段，用于声明式来源 provenance 清查；Round 2/3 由 `OpenCodeService` / `OpenCodeEventSubscriptionCoordinator` 独立捕获 `plugin.added` runtime evidence 与 `sdk.config.get()` effective config evidence，`PluginManagementService` 不合并这两者。

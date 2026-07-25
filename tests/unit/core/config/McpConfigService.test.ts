@@ -32,12 +32,14 @@ function cleanupTestVault(targetPath: string | undefined): void {
 async function writeRawConfig(text: string): Promise<void> {
   const configDir = path.join(testVaultPath, '.opencode');
   await fs.promises.mkdir(configDir, { recursive: true });
-  await fs.promises.writeFile(path.join(configDir, 'opencode.json'), text, 'utf-8');
+  await fs.promises.writeFile(manager.getConfigPath(), text, 'utf-8');
 }
 
 beforeEach(() => {
   testVaultPath = createTempVaultPath();
-  manager = new OpencodeConfigManager(testVaultPath);
+  manager = new OpencodeConfigManager(testVaultPath, {
+    archiveRootPath: path.join(testVaultPath, '.opencodian-test-archive'),
+  });
   service = new McpConfigService(manager);
 });
 

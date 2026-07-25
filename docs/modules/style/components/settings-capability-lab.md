@@ -41,6 +41,9 @@
 - `.opencodian-capability-lab-probe-status-item`, `.opencodian-capability-lab-probe-status-label`, `.opencodian-capability-lab-probe-status-value`: 状态网格内的单项容器、标签和值。
 - `.opencodian-capability-lab-select`, `.opencodian-capability-lab-input`: 共享的 select/input 基线样式，min-height 34px。
 - `.opencodian-capability-lab-button`, `.opencodian-capability-lab-button-warning`: 操作按钮基线（min-height 34px, font-weight 650）及 warning 变体。
+- `.opencodian-capability-lab-effective-*`: Codex 有效设置回读区（P0 权限证据）。容器用 border-top 分隔（非卡片），含 h4、desc/empty、session mono 行；每个字段一行（flex-wrap），field-name 在前，三轴 chip（Persistence/Application/Runtime）按 verified→success、pending→info、failed→error、unavailable/not-applicable→muted dashed 着色，axis-label 为 muted 文本，value/detail 使用 11px monospace 且占满整行以容纳长路径与长值。chip 复用 `--opencodian-status-*` token，不引入新色系。
+- 文件尾部 `@media (prefers-reduced-motion: reduce)` 覆盖 `[data-capability-backend-tab]` 的 150ms transition，尊重系统减弱动态设置。
+- 既有 `--text-faint` 用途（tab-state、probe-status-label、preview-meta）已提升为 `--text-muted`，保证 11–12px 文本在浅色主题下达到 AA 对比度。
 
 ## 设计约束
 

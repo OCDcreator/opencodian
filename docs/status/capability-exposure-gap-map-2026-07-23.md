@@ -87,7 +87,7 @@
 
 | # | 能力域 | 缺什么 | 状态 |
 |---|--------|--------|------|
-| G1 | Skill/Resource 的 **global scope** | 当前 P0 UI 对 `~/.claude`、`~/.agents`、`~/.codex` 全局资源只读；P1 通过共享 `allowlisted-root` 契约开放安全 CRUD | 🔴 `TODO` |
+| G1 | Skill/Resource 的 **global scope** | P1-A 已将 Claude Command/Skill/Agent（`~/.claude`）与 Codex Skill/Agent（`~/.agents`、`~/.codex`）接入显式 project/global scope、安全 CRUD、历史与调用方选定的 restore；P1-B 已将 OpenCode XDG 与 `~/.opencode` project/global source inventory、read/write/delete/history/restore 接入。所有写入、读取与历史操作均受精确 `allowlisted-root`/symlink confinement、revision 冲突与归档关联契约约束，并由目标 Jest 契约覆盖。三轴保持诚实：`persistence` 仅在契约成功路径为 `verified`；`application` 依 request wiring 为 `pending`/`not-applicable`；`runtime` 仍为 `unavailable`，尚无生产/Test Vault Obsidian 验收 | 🟢 `DONE`（代码 + 自动化测试；production/runtime 待验收） |
 | G2 | **Codex Approval Policy** | 已作顶层设置 + session 覆盖暴露（`CodexApprovalPolicy = inherit\|untrusted\|on-request\|never`，`SettingsCodexSection` Permissions tab + `ConversationSessionSettingsModal`）。`inherit` 省略覆盖；`untrusted`/`on-request` 需 app-server+桥接并 fail-closed；`never` 可 SDK 回退。null session 覆盖继承真实全局值：`ConversationSessionSettingsCoordinator` 根据会话设置 registry 调用 adapter，adapter 再把全局默认与会话覆盖合并到下一线程边界。全局默认来源优先为 `getCodexGlobalDefaults().approvalPolicy`，否则读取持久化的 `plugin.settings.backendSettings.codex.approvalPolicy`，最终归一化回 `inherit` | 🟢 `DONE` |
 | G3 | **Claude Code Sandbox 子策略** | filesystem/network/ripgrep 子策略控件已存在（`SettingsClaudeCodeSection` 的 sandbox 子策略） | 🟢 `DONE` |
 | G4 | Codex Web Search Mode | 配置证据边界已闭合（settings → adapter 选项 → app-server `web_search` config；session 覆盖已接线）。cached/live 行为差异属运行时验证，归 Capability Lab/QA，非配置缺口 | 🟢 `DONE`（配置闭环）；行为验证：Capability Lab/QA |
@@ -123,7 +123,7 @@
 
 ### P1 — 性价比最高的 CRUD gap 补全
 
-- [ ] **G1：global scope 可编辑化**。把 `~/.claude`、`~/.agents`、`~/.codex`、`~/.opencode` 从只读升级为可编辑（带 project/global scope 切换）。A 子系统的 allowlist 契约已就位，等待 P1 UI。
+- [x] **G1：global scope 可编辑化（代码/自动化层已收口）**。P1-A 为 Claude/Codex 资源提供显式 project/global scope、安全 CRUD、历史与选定 restore；P1-B 为 OpenCode XDG 与 `~/.opencode` 配置源提供同等的 source inventory 与安全生命周期。allowlist、精确根目录 confinement、revision 冲突和归档关联均有契约测试。`persistence` 只在成功契约路径标 `verified`；`application` 保持 `pending`/`not-applicable`；`runtime` 保持 `unavailable`，production/Test Vault/真实 Obsidian 验收仍待完成。
 - [x] **G2：Codex Approval Policy 暴露**。已作顶层设置 + session 覆盖暴露（`SettingsCodexSection` Permissions tab + `ConversationSessionSettingsModal`），`inherit`/`untrusted`/`on-request`/`never`，fail-closed 语义已实现。
 
 ### P2 — 把「假装有」的做实
@@ -144,6 +144,7 @@
 
 | 日期 | 改动 | 行号/标识 |
 |------|------|----------|
+| 2026-07-24 (P1 close, code/automation only) | G1 收口为 DONE：P1-A 完成 Claude/Codex global resource 的显式 scope、安全 CRUD、revision/history/selected restore 与 Settings 编辑器；P1-B 完成 OpenCode XDG 与 `~/.opencode` source inventory、read/write/delete/history/restore。allowlist + 精确根目录/symlink confinement + 冲突/归档关联由契约测试覆盖。三轴不夸大：成功契约路径的 `persistence` 可为 `verified`，`application` 保持 `pending`/`not-applicable`，`runtime` 为 `unavailable`；生产/Test Vault/真实 Obsidian 验收未关闭 | G1 / §2 / §3 P1 |
 | 2026-07-24 | 证据驱动修正：G3/G4/G5/G11/G2 标 DONE（闭环/语义已闭合）；G7 标 NON-CONFIG；G14 拒绝（settings tab 即导航，差异说明归 Capability Lab）；G10 拆为 G10a(已 DONE 项目层)/G10b/G10c；新增 G15(OpenCode Global Config)、G16(Codex Profiles)；维护规则扩展为允许证据修正/拆分/新增。配套：`CONTEXT.md`、`docs/adr/0001-complete-configuration-means-closed-loop-control.md`、A 子系统 allowlist+SHA256+归档契约、B 子系统 Codex Approval Policy、C 子系统运行时证据捕获 | §2/§3/维护规则 |
 | 2026-07-24 (round 2) | 修复审查问题：G2 session 审批区分「Use global setting」与显式 inherit；最终运行时应用由 `ConversationSessionSettingsCoordinator` 经 registry 直接调用 adapter，真实全局值优先取 host、缺失时取 plugin settings，不增长 guarded `OpenCodianView`。FileRevision 契约强制 `FileRevision\|null` 并比较 canonicalPath+mtime+size+sha256（restore 也要求 expectedRevision + 校验归档内容）；归档抽出独立 `ConfigurationArchiveService`（confined 段校验 + 清单关联/文件名校验 + 原子清单写 + 类型化 `clearDeleted`）；ThreadStart/Resume 解析对齐 Codex 0.144.1 bindings（SandboxPolicy 对象 / `{id,extends}` profile / 粒度 approval）+ 诚实 evidence 映射 | §2 G2 / A·C 子系统 |
 | 2026-07-24 (round 2, archive hardening) | `ConfigurationArchiveService` 安全加固：archive-root anchored realpath/symlink 逐级 parent-walk（所有读/写/删/manifest 操作经 `confinedPath`）；manifest 三态（absent/valid/present-but-invalid→fail-closed，不当首档、不覆盖）；retention 事务顺序改为「写新文件→原子提交 manifest→成功后才 best-effort 清旧；失败清孤立新文件」；`clearDeleted` 改为 manifest-first 诚实结果（cleared=实际物理删除、orphanedFiles、manifestWriteFailed）；format 纳入 manifest association + entry 扩展校验 + 跨格式拒绝 + 缺 format fail-closed；FileRevision 注释与四字段比较一致 | A 子系统 |

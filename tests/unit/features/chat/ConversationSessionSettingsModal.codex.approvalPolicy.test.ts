@@ -1,7 +1,7 @@
 import {
   ConversationSessionSettingsModal,
 } from '../../../../src/features/chat/ui/ConversationSessionSettingsModal';
-import { setLocale } from '../../../../src/i18n';
+import { setLocale, t } from '../../../../src/i18n';
 
 describe('ConversationSessionSettingsModal Codex approvalPolicy', () => {
   beforeEach(() => {
@@ -34,6 +34,29 @@ describe('ConversationSessionSettingsModal Codex approvalPolicy', () => {
     return select;
   }
 
+  function getAccessibleName(select: HTMLSelectElement): string {
+    const labelledBy = select.getAttribute('aria-labelledby');
+    if (labelledBy) {
+      return labelledBy
+        .split(/\s+/)
+        .map((id) => modalLabel(select, id))
+        .filter((value): value is string => value !== null)
+        .join(' ')
+        .trim();
+    }
+    const ariaLabel = select.getAttribute('aria-label');
+    if (ariaLabel) return ariaLabel;
+    const id = select.id;
+    if (!id) return '';
+    return select.ownerDocument.querySelector<HTMLLabelElement>(`label[for="${CSS.escape(id)}"]`)?.textContent?.trim() ?? '';
+  }
+
+  function modalLabel(select: HTMLSelectElement, id: string): string | null {
+    let root: HTMLElement | null = select.parentElement;
+    while (root?.parentElement) root = root.parentElement;
+    return root?.querySelector<HTMLElement>(`[id="${id}"]`)?.textContent?.trim() ?? null;
+  }
+
   it('renders a blank "Use global setting" option DISTINCT from the explicit "inherit" option', () => {
     const modal = openModal();
     const select = getSelect(modal);
@@ -55,6 +78,25 @@ describe('ConversationSessionSettingsModal Codex approvalPolicy', () => {
   it('initializes to an explicit override when one exists', () => {
     expect(getSelect(openModal({ codexApprovalPolicy: 'untrusted' })).value).toBe('untrusted');
     expect(getSelect(openModal({ codexApprovalPolicy: 'inherit' })).value).toBe('inherit');
+  });
+
+  it('gives the real Approval Policy, Sandbox Mode, and related session selects an accessible name', () => {
+    const modal = openModal();
+    const approval = getSelect(modal);
+    expect(modal.contentEl.querySelector('#codex-approval-policy-label')?.textContent).toContain('Approval');
+    expect(approval.getAttribute('aria-labelledby')).toBe('codex-approval-policy-label');
+    expect(getAccessibleName(approval)).toBe(t('chat.sessionSettings.modal.codexApprovalPolicy'));
+
+    for (const setting of [
+      'codex-sandbox-mode',
+      'codex-reasoning-effort',
+      'codex-network-access-enabled',
+      'codex-web-search-mode',
+    ]) {
+      const select = modal.contentEl.querySelector<HTMLSelectElement>(`[data-setting="${setting}"]`);
+      if (!select) throw new Error(`Expected ${setting} select to render`);
+      expect(getAccessibleName(select)).not.toBe('');
+    }
   });
 
   it('saves null (use global) when the blank option is selected', async () => {

@@ -20,9 +20,9 @@
 |------|------|
 | `SettingsDropdownControlHandle` | 单个 select 的增强句柄，提供 `refresh()`、`close()`、`destroy()` |
 | `SettingsDropdownsEnhancerHandle` | 容器级增强句柄，负责扫描容器中的 select 并统一销毁 |
-| `enhanceSettingsSelect()` | 接管一个现有 `HTMLSelectElement` |
-| `enhanceSettingsDropdowns()` | 扫描容器内全部 select，并在新增 select 时补增强 |
-| `enhanceSettingsDropdownComponent()` | 接管 Obsidian `DropdownComponent` 并 patch `addOption()` / `setValue()` 后刷新视觉层 |
+| `enhanceSettingsSelect()` | 接管一个现有 `HTMLSelectElement`；可选接收 Obsidian `Keymap` 以管理打开态 Scope |
+| `enhanceSettingsDropdowns()` | 扫描容器内全部 select，并在新增 select 时补增强；可选透传 `Keymap` |
+| `enhanceSettingsDropdownComponent()` | 接管 Obsidian `DropdownComponent` 并 patch `addOption()` / `setValue()` 后刷新视觉层，可选透传 `Keymap` |
 | `addSettingsDropdown()` | 面向新代码的薄 helper，保留 `Setting` 链式写法 |
 
 ## 核心逻辑
@@ -31,11 +31,15 @@
 
 增强后原 select 会添加 `.opencodian-settings-native-select` 并移出可交互视觉层，但仍保留 value、options、disabled 状态和 `change` 事件。自绘选项点击或键盘确认后，会先写回 `selectEl.value`，再派发 bubbling `change`，因此旧设置保存逻辑无需重写。
 
+由于原生 select 会被设为 `aria-hidden="true"`、`tabindex=-1`，焦点实际落在自绘 trigger 上。增强器会把 select 的 `aria-labelledby` 或 `aria-label` 同步到 trigger；两者同时存在时优先保留 `aria-labelledby`，并在属性变化后通过现有 `MutationObserver` 刷新，确保屏幕阅读器不会只读出当前选项值。
+
 ### 自绘 listbox（Portal 模式）
 
 控件渲染一个持久 trigger 和一个 `role="listbox"` 菜单。**打开时，菜单通过 Portal 挂载到 `document.body`**，避免被祖先容器（如 `.opencodian-settings-block` 的 `overflow: hidden`）裁剪。关闭时菜单回到 `rootEl` 内。
 
 菜单项来自当前 `select.options`，保留 disabled option 语义，当前值显示 check icon。支持点击外部关闭、Esc、ArrowUp / ArrowDown、Enter / Space，并在选择后把焦点还给 trigger。
+
+Trigger 已消费的 ArrowUp / ArrowDown、Enter / Space 会同时 `preventDefault()` 和 `stopPropagation()`，避免宿主 Settings 把这些 dropdown 操作误判成全局键盘动作。主设置页增强器接收 Obsidian `Keymap`，每个 dropdown 仅在菜单打开时 push 自己的 `Scope`，关闭或销毁时 pop；Scope 只对 `isOpen` 且事件目标为 trigger 的 Escape 处理并返回 `false`，从而优先于宿主 Settings scope 关闭动作。Tab 与关闭状态的 Escape 不会被 dropdown scope 吞掉，也不会泄漏重复 scope。
 
 #### 定位逻辑
 

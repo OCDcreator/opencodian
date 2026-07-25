@@ -86,7 +86,7 @@
 }
 
 .opencodian-settings [data-capability-backend-tab-state] {
-  color: var(--text-faint);
+  color: var(--text-muted);
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0;
@@ -612,7 +612,7 @@
 }
 
 .opencodian-settings .opencodian-capability-lab-probe-status-label {
-  color: var(--text-faint);
+  color: var(--text-muted);
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.03em;
@@ -675,7 +675,7 @@
 }
 
 .opencodian-settings .opencodian-capability-lab-preview-meta {
-  color: var(--text-faint);
+  color: var(--text-muted);
   font-family: var(--font-monospace);
   font-size: 11px;
   line-height: 1.4;
@@ -741,6 +741,135 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--opencodian-settings-space-sm);
+}
+
+/* Codex effective-settings readback (three-axis evidence, production surface).
+   Flat list rows — the axis badges carry the state, rows stay quiet. */
+.opencodian-settings .opencodian-capability-lab-effective-readback {
+  display: flex;
+  flex-direction: column;
+  gap: var(--opencodian-settings-space-sm);
+  min-width: 0;
+  padding-top: var(--opencodian-settings-space-md);
+  border-top: 1px solid var(--opencodian-settings-inline-border);
+}
+
+.opencodian-settings .opencodian-capability-lab-effective-readback > h4 {
+  margin: 0;
+  color: var(--text-normal);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.opencodian-settings .opencodian-capability-lab-effective-readback-desc,
+.opencodian-settings .opencodian-capability-lab-effective-readback-empty {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.opencodian-settings .opencodian-capability-lab-effective-readback-session {
+  color: var(--text-muted);
+  font-family: var(--font-monospace);
+  font-size: 11px;
+  line-height: 1.45;
+  word-break: break-all;
+}
+
+.opencodian-settings .opencodian-capability-lab-effective-readback-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  min-width: 0;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--opencodian-settings-inline-border);
+}
+
+.opencodian-settings .opencodian-capability-lab-effective-readback-row:last-child {
+  border-bottom: 0;
+}
+
+.opencodian-settings .opencodian-capability-lab-effective-field-name {
+  flex: 0 0 auto;
+  color: var(--text-normal);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.opencodian-settings .opencodian-capability-lab-effective-axis {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 3px;
+  align-items: center;
+  max-width: 100%;
+  padding: 1px 8px;
+  border: 1px solid var(--opencodian-settings-inline-border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--background-primary) 70%, transparent);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.opencodian-settings .opencodian-capability-lab-effective-axis-label {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.opencodian-settings .opencodian-capability-lab-effective-status--verified {
+  border-color: var(--opencodian-status-success-border);
+  background: var(--opencodian-status-success-subtle);
+  color: var(--opencodian-status-success);
+}
+
+.opencodian-settings .opencodian-capability-lab-effective-status--pending {
+  border-color: var(--opencodian-status-info-border);
+  background: var(--opencodian-status-info-subtle);
+  color: var(--opencodian-status-info);
+}
+
+.opencodian-settings .opencodian-capability-lab-effective-status--failed {
+  border-color: var(--opencodian-status-error-border);
+  background: var(--opencodian-status-error-subtle);
+  color: var(--opencodian-status-error);
+}
+
+.opencodian-settings .opencodian-capability-lab-effective-status--unavailable,
+.opencodian-settings .opencodian-capability-lab-effective-status--not-applicable {
+  border-color: var(--text-muted);
+  border-style: dashed;
+  color: var(--text-muted);
+}
+
+.opencodian-settings .opencodian-capability-lab-effective-value {
+  flex: 1 1 100%;
+  min-width: 0;
+  color: var(--text-muted);
+  font-family: var(--font-monospace);
+  font-size: 11px;
+  line-height: 1.45;
+  word-break: break-all;
+}
+
+.opencodian-settings .opencodian-capability-lab-effective-readback-detail {
+  flex: 1 1 100%;
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .opencodian-settings [data-capability-backend-tab] {
+    transition: none;
+  }
 }
 
 @media (max-width: 720px) {

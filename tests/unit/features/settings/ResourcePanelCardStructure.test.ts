@@ -2,10 +2,11 @@
  * Resource panel card-structure regression.
  *
  * Verifies the unified hierarchy for BOTH Claude and Codex resource tabs:
- * each resource type (commands / skills / agents) renders as an independent
- * `opencodian-resource-group-card`, with no single outer section card wrapping
+ * each resource type (commands / skills / agents) renders inside a layout-only
+ * `opencodian-resource-group-card` container — the row cards carry the visuals
+ * so groups never read as nested cards, and no single outer section card wraps
  * them. The render() surface itself never created an outer card; this locks
- * the per-type independent-card contract.
+ * the per-type layout-container contract.
  */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -128,9 +129,13 @@ describe('resource panel card structure (unified Claude + Codex)', () => {
       'utf8',
     );
 
-    expect(css).toMatch(
-      /\[data-claude-code-section='skills-commands'\]\s*>\s*\.opencodian-resource-group-card,[\s\S]*?\[data-claude-code-section='agents'\]\s*>\s*\.opencodian-resource-group-card\s*\{[\s\S]*?padding-inline:\s*14px;/u,
-    );
+    // The per-type group container is layout-only (no painted card chrome),
+    // so the row cards never render as cards nested inside another card.
+    const groupCardRule = css.match(/\.opencodian-resource-group-card\s*\{[\s\S]*?\}/u)?.[0] ?? '';
+    expect(groupCardRule).toContain('min-width: 0;');
+    expect(groupCardRule).not.toContain('background');
+    expect(groupCardRule).not.toContain('border');
+    expect(groupCardRule).not.toContain('padding');
     expect(css).toMatch(
       /\[data-claude-code-section='skills-commands'\]\s+\.opencodian-claude-resource-row,[\s\S]*?\[data-claude-code-section='agents'\]\s+\.opencodian-claude-resource-row\s*\{[\s\S]*?padding-inline:\s*14px;/u,
     );

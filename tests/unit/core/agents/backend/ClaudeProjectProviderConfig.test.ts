@@ -10,6 +10,12 @@ import {
   resolveClaudeProviderGlobalEffectiveValue,
   validateClaudeProviderPreset,
 } from '../../../../../src/core/agents/backend/ClaudeProjectProviderConfig';
+import {
+  listConfigurationArchiveHistory,
+  ProjectResourceError,
+  readAllowlistedFileSnapshot,
+} from '../../../../../src/core/agents/backend/ProjectResourceSecureWrite';
+import * as projectResourceSecureWrite from '../../../../../src/core/agents/backend/ProjectResourceSecureWrite';
 import type { ClaudeProviderPreset } from '../../../../../src/core/types/settings';
 
 describe('ClaudeProjectProviderConfig', () => {
@@ -28,6 +34,7 @@ describe('ClaudeProjectProviderConfig', () => {
   });
 
   const localSettingsPath = (): string => path.join(tempRoot, '.claude', 'settings.local.json');
+  const archiveRootPath = (): string => path.join(tempRoot, 'archive');
 
   beforeEach(async () => {
     tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'opencodian-claude-provider-'));
@@ -52,8 +59,26 @@ describe('ClaudeProjectProviderConfig', () => {
       env: { MY_FLAG: '1', OLD_USER_VALUE: 'keep' },
     }));
 
-    const applied = await applyClaudeProviderPreset(tempRoot, preset(), []);
+    const applied = await applyClaudeProviderPreset(tempRoot, preset(), [], { archiveRootPath: archiveRootPath() });
     expect(applied.lastAppliedManagedEnvKeys).toEqual(['FOO']);
+    expect(applied.evidence).toMatchObject({
+      persistence: 'verified',
+      application: 'pending',
+      runtime: 'unavailable',
+    });
+    const history = await listConfigurationArchiveHistory({
+      targetPath: localSettingsPath(),
+      allowlist: [{ scope: 'local', rootPath: path.dirname(localSettingsPath()) }],
+      archive: {
+        archiveRootPath: archiveRootPath(),
+        backend: 'claude',
+        kind: 'provider-settings',
+        format: 'json',
+      },
+    });
+    expect(history.status).toBe('success');
+    if (history.status !== 'success') return;
+    expect(history.targets[0]?.entries.some((entry) => entry.archiveKind === 'overwrite')).toBe(true);
     expect(await readLocalSettings()).toEqual({
       permissions: { allow: ['Read'] },
       model: 'claude-sonnet-4-5',
@@ -72,6 +97,7 @@ describe('ClaudeProjectProviderConfig', () => {
       tempRoot,
       preset({ id: 'official', name: 'Anthropic Official', baseUrl: '', authToken: '', model: '', fallbackModel: '', haikuModel: '', extraEnv: {} }),
       applied.lastAppliedManagedEnvKeys,
+      { expectedRevision: applied.revision, archiveRootPath: archiveRootPath() },
     );
     expect(await readLocalSettings()).toEqual({
       permissions: { allow: ['Read'] },
@@ -79,33 +105,189 @@ describe('ClaudeProjectProviderConfig', () => {
     });
   });
 
-  it('backs up malformed JSON before applying a preset', async () => {
+  it('fails closed on malformed strict JSON without creating a backup or overwriting bytes', async () => {
     await writeLocalSettings('{ malformed');
 
-    const result = await applyClaudeProviderPreset(tempRoot, preset({ extraEnv: {} }), []);
-    expect(result.backupPath).toBe(`${localSettingsPath()}.bak`);
-    await expect(fs.readFile(`${localSettingsPath()}.bak`, 'utf-8')).resolves.toBe('{ malformed');
-    expect(await readLocalSettings()).toMatchObject({
-      model: 'claude-sonnet-4-5',
-      env: expect.objectContaining({ ANTHROPIC_AUTH_TOKEN: 'token-123456789' }),
-    });
+    await expect(applyClaudeProviderPreset(
+      tempRoot,
+      preset({ extraEnv: {} }),
+      [],
+      { archiveRootPath: archiveRootPath() },
+    )).rejects.toThrow('strict JSON');
+    await expect(fs.readFile(localSettingsPath(), 'utf-8')).resolves.toBe('{ malformed');
+    await expect(fs.access(`${localSettingsPath()}.bak`)).rejects.toMatchObject({ code: 'ENOENT' });
   });
 
-  it('uses a timestamped backup name without overwriting an existing backup', async () => {
+  it('rejects a settings.local.json symlink outside the narrow .claude root before preset persistence', async () => {
+    const outsidePath = path.join(tempRoot, 'outside-settings.json');
+    const outsideContent = '{\n  "outsideSecret": "must-not-be-read"\n}\n';
+    await fs.writeFile(outsidePath, outsideContent, 'utf8');
+    await fs.mkdir(path.dirname(localSettingsPath()), { recursive: true });
+    await fs.symlink(outsidePath, localSettingsPath());
+
+    await expect(applyClaudeProviderPreset(
+      tempRoot,
+      preset({ extraEnv: {} }),
+      [],
+      { archiveRootPath: archiveRootPath() },
+    )).rejects.toEqual(expect.objectContaining({
+      name: ProjectResourceError.name,
+      code: expect.stringMatching(/outside-allowlist|path-traversal/),
+    }));
+    await expect(fs.readFile(outsidePath, 'utf8')).resolves.toBe(outsideContent);
+  });
+
+  it('fails closed during legacy migration when the existing local settings are malformed', async () => {
     await writeLocalSettings('{ malformed');
-    await fs.writeFile(`${localSettingsPath()}.bak`, 'older backup', 'utf-8');
 
-    const result = await applyClaudeProviderPreset(tempRoot, preset({ extraEnv: {} }), []);
+    await expect(migrateClaudeProviderModels(
+      tempRoot,
+      'legacy-model',
+      'legacy-fallback',
+      { archiveRootPath: archiveRootPath() },
+    )).rejects.toThrow('strict JSON');
+    await expect(fs.readFile(localSettingsPath(), 'utf-8')).resolves.toBe('{ malformed');
+  });
 
-    expect(result.backupPath).toMatch(new RegExp(`^${localSettingsPath().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\.bak\\.`));
-    await expect(fs.readFile(`${localSettingsPath()}.bak`, 'utf-8')).resolves.toBe('older backup');
-    await expect(fs.readFile(result.backupPath!, 'utf-8')).resolves.toBe('{ malformed');
+  it('surfaces an expected-revision conflict without replacing an external edit', async () => {
+    await writeLocalSettings(JSON.stringify({ permissions: { allow: ['Read'] } }));
+    const applied = await applyClaudeProviderPreset(
+      tempRoot,
+      preset({ extraEnv: {} }),
+      [],
+      { archiveRootPath: archiveRootPath() },
+    );
+    const external = '{\n  "external": true\n}\n';
+    await writeLocalSettings(external);
+
+    await expect(applyClaudeProviderPreset(
+      tempRoot,
+      preset({ model: 'new-model', extraEnv: {} }),
+      [],
+      { expectedRevision: applied.revision, archiveRootPath: archiveRootPath() },
+    )).rejects.toEqual(expect.objectContaining({
+      name: 'ClaudeProviderConfigMutationError',
+      result: expect.objectContaining({ status: 'conflict' }),
+    }));
+    await expect(fs.readFile(localSettingsPath(), 'utf-8')).resolves.toBe(external);
+  });
+
+});
+
+describe('ClaudeProjectProviderConfig mutation safety and validation', () => {
+  let tempRoot: string;
+
+  const preset = (overrides: Partial<ClaudeProviderPreset> = {}): ClaudeProviderPreset => ({
+    id: 'gateway',
+    name: 'Gateway',
+    baseUrl: 'https://gateway.example.com',
+    authToken: 'token-123456789',
+    model: 'claude-sonnet-4-5',
+    fallbackModel: 'claude-haiku-4-5',
+    haikuModel: 'claude-haiku-4-5',
+    extraEnv: { FOO: '1' },
+    ...overrides,
+  });
+
+  const localSettingsPath = (): string => path.join(tempRoot, '.claude', 'settings.local.json');
+  const archiveRootPath = (): string => path.join(tempRoot, 'archive');
+
+  beforeEach(async () => {
+    tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'opencodian-claude-provider-'));
+  });
+
+  afterEach(async () => {
+    await fs.rm(tempRoot, { recursive: true, force: true });
+  });
+
+  async function writeLocalSettings(content: string): Promise<void> {
+    await fs.mkdir(path.dirname(localSettingsPath()), { recursive: true });
+    await fs.writeFile(localSettingsPath(), content, 'utf-8');
+  }
+
+  async function readLocalSettings(): Promise<Record<string, unknown>> {
+    return JSON.parse(await fs.readFile(localSettingsPath(), 'utf-8')) as Record<string, unknown>;
+  }
+
+  it('rejects an escaping Claude parent symlink planted after the initial preset-write guard', async () => {
+    const claudeRoot = path.dirname(localSettingsPath());
+    const outsideRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'opencodian-claude-outside-'));
+    let planted = false;
+    let claudeRootGuardCalls = 0;
+    const secureWriteModule = '../../../../../src/core/agents/backend/ProjectResourceSecureWrite';
+    const providerConfigModule = '../../../../../src/core/agents/backend/ClaudeProjectProviderConfig';
+
+    // Reload only this public mutation seam with a guard wrapper. The wrapper
+    // plants the symlink after writeLocalSettings' first proof (call 2: call 1
+    // belongs to the initial read), making the actual mkdir/recheck sequence
+    // deterministic without replacing the filesystem mutation itself.
+    jest.resetModules();
+    jest.doMock(secureWriteModule, () => {
+      const actual = jest.requireActual(secureWriteModule) as typeof import('../../../../../src/core/agents/backend/ProjectResourceSecureWrite');
+      return {
+        ...actual,
+        assertWithinRoot: async (basePath: string, targetPath: string): Promise<void> => {
+          await actual.assertWithinRoot(basePath, targetPath);
+          if (targetPath === claudeRoot) {
+            claudeRootGuardCalls += 1;
+            if (claudeRootGuardCalls === 2) {
+              planted = true;
+              await fs.symlink(outsideRoot, claudeRoot);
+            }
+          }
+        },
+      };
+    });
+
+    try {
+      const { applyClaudeProviderPreset: applyWithRace } = await import(providerConfigModule) as typeof import('../../../../../src/core/agents/backend/ClaudeProjectProviderConfig');
+      await expect(applyWithRace(
+        tempRoot,
+        preset({ extraEnv: {} }),
+        [],
+        { archiveRootPath: archiveRootPath() },
+      )).rejects.toEqual(expect.objectContaining({ name: ProjectResourceError.name }));
+      expect(planted).toBe(true);
+      expect(claudeRootGuardCalls).toBe(2);
+      await expect(fs.access(path.join(outsideRoot, 'settings.local.json'))).rejects.toMatchObject({ code: 'ENOENT' });
+    } finally {
+      jest.dontMock(secureWriteModule);
+      jest.resetModules();
+      await fs.rm(outsideRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('fails closed without merging bytes when the shared descriptor snapshot detects a read race', async () => {
+    const external = '{\n  "external": true\n}\n';
+    await writeLocalSettings(external);
+    const actualSnapshot = readAllowlistedFileSnapshot;
+    const snapshotSpy = jest.spyOn(projectResourceSecureWrite, 'readAllowlistedFileSnapshot')
+      .mockImplementation(async (options) => (
+        options.targetPath === localSettingsPath()
+          ? { status: 'conflict', expected: null, current: null }
+          : actualSnapshot(options)
+      ));
+
+    await expect(applyClaudeProviderPreset(
+      tempRoot,
+      preset({ extraEnv: {} }),
+      [],
+      { archiveRootPath: archiveRootPath() },
+    )).rejects.toThrow(/changed while reading|snapshot|conflict/i);
+    expect(snapshotSpy).toHaveBeenCalledWith(expect.objectContaining({ targetPath: localSettingsPath() }));
+    await expect(fs.readFile(localSettingsPath(), 'utf-8')).resolves.toBe(external);
+    snapshotSpy.mockRestore();
   });
 
   it('preserves an existing file model during one-time legacy migration', async () => {
     await writeLocalSettings(JSON.stringify({ model: 'user-model', permissions: { allow: ['Read'] } }));
 
-    const result = await migrateClaudeProviderModels(tempRoot, 'legacy-model', 'legacy-fallback');
+    const result = await migrateClaudeProviderModels(
+      tempRoot,
+      'legacy-model',
+      'legacy-fallback',
+      { archiveRootPath: archiveRootPath() },
+    );
     expect(result.migrated).toBe(true);
     expect(await readLocalSettings()).toEqual({
       model: 'user-model',
@@ -115,7 +297,7 @@ describe('ClaudeProjectProviderConfig', () => {
   });
 
   it('does not write a local file for an empty legacy migration', async () => {
-    const result = await migrateClaudeProviderModels(tempRoot, '', '');
+    const result = await migrateClaudeProviderModels(tempRoot, '', '', { archiveRootPath: archiveRootPath() });
 
     expect(result.migrated).toBe(false);
     await expect(fs.access(localSettingsPath())).rejects.toMatchObject({ code: 'ENOENT' });

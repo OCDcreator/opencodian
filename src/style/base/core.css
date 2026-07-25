@@ -121,15 +121,6 @@
   --opencodian-text-strong: color-mix(in srgb, var(--text-normal) 90%, var(--text-muted));
   --opencodian-accent-subtle: color-mix(in srgb, var(--interactive-accent) 10%, transparent);
   --opencodian-accent-border: color-mix(in srgb, var(--interactive-accent) 32%, transparent);
-  --opencodian-status-warning: var(--text-warning, var(--color-orange, var(--interactive-accent)));
-  --opencodian-status-warning-subtle: color-mix(in srgb, var(--opencodian-status-warning) 10%, transparent);
-  --opencodian-status-warning-border: color-mix(in srgb, var(--opencodian-status-warning) 28%, transparent);
-  --opencodian-status-success: var(--text-success, var(--background-modifier-success));
-  --opencodian-status-success-subtle: color-mix(in srgb, var(--opencodian-status-success) 10%, transparent);
-  --opencodian-status-success-border: color-mix(in srgb, var(--opencodian-status-success) 24%, transparent);
-  --opencodian-status-error: var(--text-error, var(--background-modifier-error));
-  --opencodian-status-error-subtle: color-mix(in srgb, var(--opencodian-status-error) 10%, transparent);
-  --opencodian-status-error-border: color-mix(in srgb, var(--opencodian-status-error) 24%, transparent);
   --opencodian-glass-base: color-mix(in srgb, var(--background-primary) 60%, transparent);
   --opencodian-glass-base-strong: color-mix(in srgb, var(--background-secondary) 52%, transparent);
   --opencodian-glass-base-soft: color-mix(in srgb, var(--background-primary) 34%, transparent);
@@ -168,6 +159,38 @@
   --opencodian-composer-danger-bg-hover: color-mix(in srgb, var(--background-modifier-error) 82%, var(--background-primary));
   --opencodian-composer-danger-shadow: color-mix(in srgb, var(--background-modifier-error) 16%, transparent);
   --opencodian-composer-danger-shadow-strong: color-mix(in srgb, var(--background-modifier-error) 22%, transparent);
+}
+
+/* Status tokens must live on body: Obsidian defines --text-success/--text-error/--text-warning/--color-* only on body,
+   so :root declarations referencing them resolve to guaranteed-invalid and never reach descendants. */
+body {
+  --opencodian-status-warning: var(--text-warning, var(--color-orange, var(--interactive-accent)));
+  --opencodian-status-warning-subtle: color-mix(in srgb, var(--opencodian-status-warning) 10%, transparent);
+  --opencodian-status-warning-border: color-mix(in srgb, var(--opencodian-status-warning) 28%, transparent);
+  --opencodian-status-success: var(--text-success, var(--background-modifier-success));
+  --opencodian-status-success-subtle: color-mix(in srgb, var(--opencodian-status-success) 10%, transparent);
+  --opencodian-status-success-border: color-mix(in srgb, var(--opencodian-status-success) 24%, transparent);
+  --opencodian-status-error: var(--text-error, var(--background-modifier-error));
+  --opencodian-status-error-subtle: color-mix(in srgb, var(--opencodian-status-error) 10%, transparent);
+  --opencodian-status-error-border: color-mix(in srgb, var(--opencodian-status-error) 24%, transparent);
+  --opencodian-status-info: var(--color-blue, var(--interactive-accent));
+  --opencodian-status-info-subtle: color-mix(in srgb, var(--opencodian-status-info) 10%, transparent);
+  --opencodian-status-info-border: color-mix(in srgb, var(--opencodian-status-info) 28%, transparent);
+}
+
+/* AA tuning: raw status hues fail 4.5:1 as small chip text in one or both themes, so the
+   text-level tokens are mixed toward --text-normal per theme (dark: lighten error/info;
+   light: darken all four). -subtle/-border derive from these base tokens automatically. */
+.theme-dark {
+  --opencodian-status-error: color-mix(in srgb, var(--text-error, var(--background-modifier-error)) 70%, var(--text-normal));
+  --opencodian-status-info: color-mix(in srgb, var(--color-blue, var(--interactive-accent)) 55%, var(--text-normal));
+}
+
+.theme-light {
+  --opencodian-status-warning: color-mix(in srgb, var(--text-warning, var(--color-orange, var(--interactive-accent))) 60%, var(--text-normal));
+  --opencodian-status-success: color-mix(in srgb, var(--text-success, var(--background-modifier-success)) 60%, var(--text-normal));
+  --opencodian-status-error: color-mix(in srgb, var(--text-error, var(--background-modifier-error)) 65%, var(--text-normal));
+  --opencodian-status-info: color-mix(in srgb, var(--color-blue, var(--interactive-accent)) 70%, var(--text-normal));
 }
 
 body[data-opencodian-provider-icon-mode="system"] {

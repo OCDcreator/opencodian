@@ -109,7 +109,12 @@ export class PluginManagementService {
     ]);
 
     const globalSource = configSources.find((source) => source.path === globalConfigPath);
-    const projectSource = configSources.find((source) => source.path === projectConfigPath);
+    const projectConfigDir = this.configManager.getConfigDir();
+    const projectSources = configSources.filter((source) => source.exists && (
+      source.path === path.join(projectConfigDir, 'opencode.json')
+      || source.path === path.join(projectConfigDir, 'opencode.jsonc')
+    ));
+    const projectSource = projectSources.length === 1 ? projectSources[0] : undefined;
 
     const globalConfigPlugins = globalSource?.plugins ?? [];
     const projectConfigPlugins = projectSource?.plugins ?? [];
@@ -124,7 +129,7 @@ export class PluginManagementService {
       isolationMode,
       vaultConfigDir: this.configManager.getConfigDir(),
       globalConfigPath,
-      projectConfigPath,
+      projectConfigPath: projectSource?.path ?? projectConfigPath,
       globalConfigSpecs: globalSource?.specs ?? [],
       projectConfigSpecs: projectSource?.specs ?? [],
       globalConfigPlugins,
@@ -165,9 +170,7 @@ export class PluginManagementService {
     return path.join(this.configManager.getConfigDir(), 'oh-my-opencode.jsonc');
   }
 
-  getProjectOmoConfigRelativePath(): string {
-    return '.opencode/oh-my-opencode.jsonc';
-  }
+  getProjectOmoConfigRelativePath(): string { return '.opencode/oh-my-opencode.jsonc'; }
 
   formatPluginSpec(spec: OpencodePluginSpec): string {
     return typeof spec === 'string' ? spec : JSON.stringify(spec);
@@ -307,9 +310,7 @@ export class PluginManagementService {
   // Private helpers
   // ---------------------------------------------------------------------------
 
-  private getGlobalConfigPath(): string {
-    return path.join(this.globalConfigDir, 'opencode.json');
-  }
+  private getGlobalConfigPath(): string { return path.join(this.globalConfigDir, 'opencode.json'); }
 
   private getGlobalConfigCandidatePaths(): string[] {
     return [
@@ -325,7 +326,7 @@ export class PluginManagementService {
       { path: path.join(this.vaultPath, 'opencode.json'), editable: false },
       { path: path.join(this.vaultPath, 'opencode.jsonc'), editable: false },
       { path: path.join(configDir, 'opencode.json'), editable: true },
-      { path: path.join(configDir, 'opencode.jsonc'), editable: false },
+      { path: path.join(configDir, 'opencode.jsonc'), editable: true },
     ];
   }
 

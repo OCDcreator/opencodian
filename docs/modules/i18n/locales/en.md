@@ -1,6 +1,13 @@
 # English Locale
 
 > **源码**: `src/i18n/locales/en.ts`
+> **Updated**: 2026-07-25 P0/P1 settings UI review fixes — removed the duplicated lifecycle tail sentence from the four Codex permission row descriptions (the full sentence now lives only in `settings.codex.groups.permissionsDesc`); stripped emoji from `configEditor.help.*` titles; added `configEditor.metadata.value.{yes,no,none}`, `configEditor.metadata.status.*`, `configEditor.scope.{project,global,managed}` and `configEditor.evidenceDetail.*` for localized evidence metadata; rewrote `settings.codex.resources.deleted` / `settings.claudeCode.resources.deleted` to state "deleted and archived, restorable from history" and added matching `deleteConfirm` / `restoreConfirm` copy.
+> **Updated**: 2026-07-24 P1 resource history states — added explicit archive-manifest failure copy for Claude and Codex resource history so unavailable history is not presented as an empty list.
+> **Updated**: 2026-07-24 P1 secure resource reads — added typed read-failure copy for Claude and Codex scoped editor load failures.
+> **Updated**: 2026-07-24 P1 resource mutations — added explicit invalid-content copy for Claude and Codex facade validation failures.
+> **Updated**: 2026-07-24 P1 resource scope labels — removed stale read-only wording from the legacy Global translation keys now superseded by explicit scope badges.
+> **Updated**: 2026-07-24 P1 resource descriptions — aligned Codex/Claude resource descriptions and no-vault copy with global scoped CRUD.
+> **Updated**: 2026-07-24 OpenCode P1-B configuration sources — added explicit source-selection, raw JSONC editor, revision conflict, archive/history, evidence-axis, managed-readonly, and honest service-boundary copy.
 > **Updated**: 2026-07-23 resource-tab simplification — removed the unused `settings.claudeCode.resources.title`; the split tab and resource-group labels now carry the visible hierarchy.
 > **Updated**: 2026-07-23 Claude project providers — added `settings.claudeCode.providers.*` copy for the local-source gate, preset editor, masked configuration view, validation and source-precedence guidance; added new Claude tab labels for Providers, MCP, Skills & Commands, and Agents.
 > **Updated**: Codex/Claude resource management + Codex skill menu — added `chat.codex.agentMentionUnavailable.*`, `settings.codex.resources.*`, `settings.codex.tab.resources`, and `settings.claudeCode.resources.*` / `settings.claudeCode.tab.resources` key groups.

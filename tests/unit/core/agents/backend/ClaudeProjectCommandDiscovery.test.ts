@@ -4,6 +4,7 @@ import * as path from 'path';
 
 import {
   createClaudeProjectCommand,
+  discoverClaudeCommandResources,
   discoverClaudeProjectCommands,
 } from '../../../../../src/core/agents/backend/ClaudeProjectCommandDiscovery';
 
@@ -80,6 +81,36 @@ describe('ClaudeProjectCommandDiscovery', () => {
     const commands = await discoverClaudeProjectCommands(tempRoot);
 
     expect(commands.map((command) => command.name)).toEqual(['alpha', 'middle', 'zeta']);
+  });
+
+  it('rejects a command leaf symlink without exposing root-external content', async () => {
+    const outsideRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'opencodian-claude-command-outside-'));
+    try {
+      const outsideFile = path.join(outsideRoot, 'escaped.md');
+      await fs.writeFile(outsideFile, '# ROOT-EXTERNAL COMMAND BYTES\n', 'utf-8');
+      const commandsDir = path.join(tempRoot, '.claude', 'commands');
+      await fs.mkdir(commandsDir, { recursive: true });
+      await fs.symlink(outsideFile, path.join(commandsDir, 'escaped.md'));
+
+      await expect(discoverClaudeProjectCommands(tempRoot)).resolves.toEqual([]);
+      await expect(discoverClaudeCommandResources({ scope: 'project', basePath: tempRoot })).resolves.toEqual([]);
+    } finally {
+      await fs.rm(outsideRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects a fixed commands-root symlink without exposing root-external content', async () => {
+    const outsideRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'opencodian-claude-command-root-outside-'));
+    try {
+      await fs.writeFile(path.join(outsideRoot, 'escaped.md'), '# ROOT-EXTERNAL COMMAND ROOT BYTES\n', 'utf-8');
+      await fs.mkdir(path.join(tempRoot, '.claude'), { recursive: true });
+      await fs.symlink(outsideRoot, path.join(tempRoot, '.claude', 'commands'));
+
+      await expect(discoverClaudeProjectCommands(tempRoot)).resolves.toEqual([]);
+      await expect(discoverClaudeCommandResources({ scope: 'project', basePath: tempRoot })).resolves.toEqual([]);
+    } finally {
+      await fs.rm(outsideRoot, { recursive: true, force: true });
+    }
   });
 
   it('creates .claude/commands/<name>.md with default content and returns absolute path', async () => {

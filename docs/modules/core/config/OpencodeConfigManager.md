@@ -5,18 +5,20 @@
 
 ## 概述
 
-`OpencodeConfigManager` 是项目级 OpenCode 配置文件的文件系统包装器。它面向当前 vault 的绝对路径工作，统一管理：
+`OpencodeConfigManager` 是 OpenCode 配置的兼容 facade。它继续维护既有项目 API 与路径，同时通过 `OpencodeConfigSourceService` 暴露 P1-B 的 scope-aware source contract：
 
-- 配置目录：`<vault>/.opencode`
-- 配置文件：`<vault>/.opencode/opencode.json`
+- 既有配置目录：`<vault>/.opencode`
+- 默认配置文件：`<vault>/.opencode/opencode.jsonc`
+- 既有 sole legacy source：`<vault>/.opencode/opencode.json` 仍由 structured helper 兼容读写；两者同时存在时 helper 抛 `OpencodeConfigAmbiguousSourceError`，不选择或重写任一 sibling。
+- 新建 Global 默认：`$XDG_CONFIG_HOME/opencode/opencode.jsonc`；无 XDG 时 `~/.config/opencode/opencode.jsonc`
 - 插件目录：`<vault>/.opencode/plugins`
 
-这个类不依赖 Obsidian 的 vault adapter，而是直接使用 Node `fs` 和 `path`，因此它的职责偏向桌面端文件管理与权限配置持久化。
+manager 不依赖 Obsidian vault adapter。所有旧结构化 helper 仍先 `read()`、局部变换、再 `write()`，但 `write()` 不再 `JSON.stringify` 整份 JSONC：它计算 leaf-level path edits，并由 source service 进入 P0 的 allowlist、expected revision、archive-before-mutation 与安全 commit 契约。
 
 ## 导入关系
 
 ```text
-上游: fs, path, obsidian Notice, src/shared/logger.ts, src/core/config/modelConfig.ts, src/core/types/permission.ts, src/core/types/opencodeConfig.ts
+上游: jsonc-parser, path, obsidian Notice, src/shared/logger.ts, ProjectResourceSecureWrite types, OpencodeConfigSourceService, src/core/config/modelConfig.ts, src/core/types/permission.ts, src/core/types/opencodeConfig.ts
 下游: src/main.ts, src/features/settings/OpenCodianSettings.ts, src/features/settings/OpencodeConfigModal.ts, src/core/config/ModelConfigService.ts, src/core/config/PluginManagementService.ts
 ```
 
@@ -24,6 +26,7 @@
 
 ```typescript
 class OpencodeConfigManager {
+  constructor(vaultPath: string, sourceOptions?: OpencodeConfigSourceServiceOptions);
   static getPermissionTemplate(mode: PermissionMode): PermissionConfig | PermissionAction;
   static summarizePermissionConfig(permission: PermissionConfig | PermissionAction | undefined): PermissionConfigSummary;
   static ensureInitialized(vaultPath: string, permissionMode: PermissionMode): Promise<void>;
@@ -64,8 +67,22 @@ class OpencodeConfigManager {
   getConfigDir(): string;
   getPluginDir(): string;
   getConfigPath(): string;
+  getDefaultProjectConfigPath(): string;
+  getDefaultGlobalConfigPath(): string;
+  inventoryConfigurationSources(): Promise<OpencodeConfigSourceCandidate[]>;
+  readConfigurationSource(targetPath: string): Promise<OpencodeConfigSourceReadResult>;
+  writeConfigurationSource(options: WriteOpencodeConfigSourceOptions): Promise<OpencodeConfigSourceMutationOutcome>;
+  applyConfigurationPathEdits(options: ApplyOpencodeConfigPathEditsOptions): Promise<OpencodeConfigSourceMutationOutcome>;
+  deleteConfigurationSource(options: DeleteOpencodeConfigSourceOptions): Promise<OpencodeConfigSourceMutationOutcome>;
+  listConfigurationHistory(targetPath: string): Promise<OpencodeConfigSourceHistoryResult>;
+  catalogConfigurationHistory(scope?: 'project' | 'global'): Promise<ArchiveHistoryCatalogOutcome>;
+  restoreConfigurationHistory(options: RestoreOpencodeConfigSourceOptions): Promise<OpencodeConfigSourceMutationOutcome>;
   remove(): Promise<void>;
   notifyRestartRequired(): Promise<void>;
+}
+
+class OpencodeConfigMutationError extends Error {
+  readonly outcome: OpencodeConfigSourceMutationOutcome;
 }
 
 getCommandScopedAgentId(commandId: string): string
@@ -75,13 +92,13 @@ getCommandScopedAgentId(commandId: string): string
 
 ### 配置文件存在性与默认值
 
-`exists()` 用 `fs.promises.access()` 检查 `opencode.json` 是否存在。
+`exists()` 通过 source service 解析 sole project candidate；新项目落到 JSONC，sole legacy JSON 保持兼容，双候选不静默选择。
 
 `read()` 的行为是：
 
 1. 文件不存在时返回默认配置
-2. 文件存在时读取文本
-3. 用 `parseOpencodeConfigText()` 解析带注释的 JSON
+2. 文件存在时读取精确文本与 revision
+3. 用 `jsonc-parser` 解析 JSONC（允许注释和尾逗号）
 4. 读取失败或解析失败时记录日志并返回默认配置
 
 默认配置只包含两项：
@@ -89,15 +106,28 @@ getCommandScopedAgentId(commandId: string): string
 - `$schema: 'https://opencode.ai/config.json'`
 - `permission: { '*': 'ask' }`
 
-### 写入与 schema 注入
+### JSONC path patch、schema 与安全写入
 
-`write()` 总会：
+`write()` 保持 void-returning legacy 签名，但内部流程已改为：
 
-1. 确保 `.opencode` 目录存在
-2. 以 `JSON.stringify(..., null, 2)` 写入格式化 JSON
-3. 在最终输出对象最前面强制写入 `$schema: OPENCODE_SCHEMA_URL`
+1. 读取唯一 project target 的 descriptor-bound 精确 bytes 与完整 revision；新项目为 JSONC，sole legacy JSON 兼容；malformed JSONC fail closed，双候选抛 typed ambiguity。
+2. 把调用方 config 与固定 `$schema = https://opencode.ai/config.json` 比较为 leaf-level edits；对象递归到 leaf，数组作为一个值替换，删除字段用 JSONC path delete。
+3. 由 `OpencodeConfigSourceService.applyPathEdits()` 保留未触及的注释、未知字段、键序、缩进和换行。
+4. 通过 `safeWriteFile()` 执行 allowlist、expected revision、archive-before-mutation 与原子提交。
 
-这意味着即使调用方传入了别的 `$schema`，最终写入也会被当前模块覆盖为 `https://opencode.ai/config.json`。
+外部修改、invalid content、archive failure 等不会被压平为通用字符串；legacy helper 抛出携带完整 outcome 的 `OpencodeConfigMutationError`。调用方输入仍保留在内存，且 source API 的 raw mutation outcome 会携带 draft。
+
+### P1-B source facade
+
+manager 新增的 source facade 只转发 `OpencodeConfigSourceService` 的显式 target API：
+
+- inventory 同时报告 Project、Global 和 managed candidates 的 scope/source/path/exists/editable/revision/evidence。
+- Project / Global 多候选并存时不会自动选取；write/path edit/delete/read/history 都必须传 target path。
+- managed system candidate 可展示与读取，但 mutation/history write 返回 `read-only`。
+- create 用 `expectedRevision: null`；update/delete/restore 使用读取时 revision；conflict 不提供 force-overwrite。
+- history 与 restore 留在调用它的所属设置区块，不引入独立 Archive 页面。
+
+完整候选、allowlist 和 evidence 契约见 `docs/modules/core/config/OpencodeConfigSourceService.md`。
 
 ### 权限配置快捷模式
 
@@ -186,7 +216,7 @@ manager 内提供了更细粒度的项目配置 helper，供当前 session setti
 | `getPermissionTemplate(mode)` | 返回 OpenCodian 的标准权限模板 |
 | `summarizePermissionConfig(permission)` | 识别精确模板或提取自定义权限特征 |
 | `read()` | 读取并解析项目级 OpenCode 配置，失败时回退默认值 |
-| `write(config)` | 写入项目级配置并强制附带 `$schema` |
+| `write(config)` | 对唯一 project target 计算 JSONC leaf patches，强制 canonical `$schema`，并进入 shared safe mutation；失败抛类型化 error |
 | `updatePermission(permission)` | 直接替换 `permission` 字段 |
 | `getPluginConfig()` | 返回 `plugin` 数组副本 |
 | `updatePluginConfig(plugins)` | 更新或删除 `plugin` 字段 |
@@ -199,6 +229,12 @@ manager 内提供了更细粒度的项目配置 helper，供当前 session setti
 | `getAgentConfig()` / `upsertAgentConfig()` / `removeAgentConfig()` | 兼容 deprecated `mode` 导入的 agent helper |
 | `getCommandConfig()` / `upsertCommandConfig()` / `removeCommandConfig()` | 命令 map 的细粒度 helper，必要时维护 command-owned hidden agent |
 | `getCommandScopedAgentId()` | 返回命令级隐藏 agent 的稳定 ID |
+| `inventoryConfigurationSources()` | 返回 Project / Global / managed 候选的来源、真实路径、revision 与 evidence |
+| `readConfigurationSource(targetPath)` / `writeConfigurationSource(options)` | 对用户明确选择的 candidate 读取/保存 raw JSONC；conflict outcome 保留 draft |
+| `applyConfigurationPathEdits(options)` | 对明确 target 执行 comment/order/format-preserving JSONC path edits |
+| `deleteConfigurationSource(options)` | expected-revision + archive-before-delete |
+| `listConfigurationHistory(targetPath)` / `catalogConfigurationHistory(scope)` | 所属设置区块使用的 target/scoped history |
+| `restoreConfigurationHistory(options)` | 恢复 caller-selected opaque history identity；仍要求 expected revision |
 | `setYoloMode()` | 整体改为 `'allow'` |
 | `setNormalMode()` | 写入“全部询问”权限对象 |
 | `setPlanMode()` | 写入“禁止写入”的计划模式权限对象 |
@@ -214,7 +250,8 @@ manager 内提供了更细粒度的项目配置 helper，供当前 session setti
 - `src/features/settings/SettingsToolSection.ts` 通过 `setToolPermission()` / `clearToolPermission()` 管理 `permission["*"]` 默认值与单工具覆盖。
 - `src/core/config/ModelConfigService.ts` 通过它读写模型相关字段所在的完整配置文件。
 - `src/core/config/PluginManagementService.ts` 通过它读写项目级 `plugin` 配置，并复用它暴露的 `.opencode` 路径。
-- `src/features/settings/OpencodeConfigModal.ts` 直接接受这个管理器实例，用于编辑项目配置。
+- `src/features/settings/OpencodeConfigModal.ts` 直接接受这个管理器实例；P1-B UI 应使用 source inventory/read/mutation/history facade，而不是自行拼接全局路径。
+- `src/core/config/OpencodeConfigSourceService.ts` 是 P1-B scope/source 与 safe mutation owner；manager 保留 legacy helper compatibility 并把所有结构化写入路由给它。
 
 ## 注意事项
 
@@ -234,7 +271,7 @@ manager 内提供了更细粒度的项目配置 helper，供当前 session setti
 
 ### 不可移除的关键行为
 
-1. **`write()` 的 `$schema` 强制注入**：每次写入都会把 `$schema` 设为 `https://opencode.ai/config.json`；即使调用方传入别的值也会被覆盖。这是为了保证 OpenCode CLI 和编辑器扩展总能正确识别配置 schema。
+1. **`write()` 的 `$schema` 强制注入**：每次结构化写入都会把 `$schema` 设为 `https://opencode.ai/config.json`；即使调用方传入别的值也会被覆盖。该变更必须作为 JSONC path edit 完成，不能回退为整份 `JSON.stringify`。
 2. **Formatter 的 exact subtree write**：`updateFormatterConfig()` 不做 deep merge，而是直接替换整个 `formatter` 子树。这让 UI 可以安全删除 formatter entry；如果改为 merge，旧 entry 会残留在磁盘上。
 3. **Agent helper 的 deprecated `mode` 兼容**：读取时会合并 deprecated `mode` 和 native `agent`；删除时同步清理两个位置的条目。不能只清理 `agent` 而留下 `mode`，否则 helper 读取时"复活"旧配置。
 4. **`read()` 的静默回退默认值**：文件不存在或解析失败时返回默认配置（`$schema` + `permission: '*': 'ask'`），不抛异常。下游依赖这个行为——不能改为抛异常，否则启动流程会中断。
@@ -242,9 +279,10 @@ manager 内提供了更细粒度的项目配置 helper，供当前 session setti
 
 ### 其他注意事项
 
-- 仓库源码的实际文件名是 `.opencode/opencode.json`，不是 `config.json`。
-- `write()` 失败时会抛出新的通用错误 `Failed to write OpenCode configuration`，原始错误只写日志。
-- `remove()` 只删除配置文件，不会删除 `.opencode` 目录或其子目录。
+- legacy helper 的实际目标由唯一现存 project source 决定；fresh target 是 `.opencode/opencode.jsonc`，sole `.json` 不自动迁移；两者并存必须由显式 source surface 决策。
+- `write()` 失败时抛 `OpencodeConfigMutationError`，其 `outcome` 保留 conflict/current revision、archive/validation 状态与 evidence；不得再压平为通用错误。
+- `remove()` 只通过 safe delete 删除已解析的唯一 project source，不会删除 `.opencode` 目录或其子目录；它保持历史上“记录错误、不向上抛”的行为。
+- source mutation 成功只证明 `persistence=verified`；`application=pending`、`runtime=unavailable`，不得显示为 OpenCode runtime 已验证。
 
 ## 2026-04-23 Compaction config alignment
 

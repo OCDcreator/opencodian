@@ -493,6 +493,97 @@
   font-weight: 500;
 }
 
+/* OpenCode config source editor (P1): explicit source selection, metadata,
+   status line, and archive history. Quiet rows; mono for exact values. */
+.opencodian-config-source-select {
+  width: 100%;
+}
+
+.opencodian-config-source-metadata {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.opencodian-config-source-metadata-row {
+  overflow-wrap: anywhere;
+}
+
+.opencodian-config-source-metadata-row[data-config-path],
+.opencodian-config-source-metadata-row[data-config-revision],
+.opencodian-config-source-metadata-row[data-config-parse-error],
+.opencodian-config-source-metadata-row[data-config-evidence] {
+  font-family: var(--font-monospace);
+  font-size: 11px;
+  word-break: break-all;
+}
+
+.opencodian-config-source-status {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.opencodian-config-history {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.opencodian-config-history:empty {
+  display: none;
+}
+
+.opencodian-config-history > h4 {
+  margin: 0;
+  color: var(--text-normal);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.opencodian-config-history-target {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+}
+
+.opencodian-config-history-target-path {
+  font-family: var(--font-monospace);
+  font-size: 11px;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.opencodian-config-history-entry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--text-muted);
+  font-family: var(--font-monospace);
+  font-size: 11px;
+}
+
+.opencodian-config-history-empty {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.opencodian-config-history-error {
+  padding: 8px 10px;
+  border: 1px solid var(--text-warning, #e8a33d);
+  border-radius: 6px;
+  color: var(--text-warning, #b87700);
+  font-size: var(--font-ui-smaller);
+}
+
 .opencodian-config-help {
   margin-top: 20px;
   padding: 20px;

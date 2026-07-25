@@ -223,8 +223,9 @@ export class SettingsCodexSection {
     new Setting(bodyEl)
       .setName(t('settings.codex.approvalPolicy.name'))
       .setDesc(t('settings.codex.approvalPolicy.desc'))
-      .addDropdown((dropdown) =>
-        dropdown
+      .addDropdown((dropdown) => {
+        dropdown.selectEl?.setAttribute('aria-label', t('settings.codex.approvalPolicy.name'));
+        return dropdown
           .addOption('inherit', t('settings.codex.approvalPolicy.inherit'))
           .addOption('untrusted', t('settings.codex.approvalPolicy.untrusted'))
           .addOption('on-request', t('settings.codex.approvalPolicy.onRequest'))
@@ -234,8 +235,8 @@ export class SettingsCodexSection {
             this.plugin.settings.backendSettings.codex.approvalPolicy = value as CodexApprovalPolicy;
             await this.plugin.saveSettings();
             this.applyCodexRuntimeUpdates();
-          }),
-      );
+          });
+      });
   }
 
   private renderApiKeySetting(bodyEl: HTMLElement): void {
@@ -318,8 +319,9 @@ export class SettingsCodexSection {
     new Setting(bodyEl)
       .setName(t('settings.codex.sandbox.name'))
       .setDesc(t('settings.codex.sandbox.desc'))
-      .addDropdown((dropdown) =>
-        dropdown
+      .addDropdown((dropdown) => {
+        dropdown.selectEl?.setAttribute('aria-label', t('settings.codex.sandbox.name'));
+        return dropdown
           .addOption('read-only', t('settings.codex.sandbox.readOnly'))
           .addOption('workspace-write', t('settings.codex.sandbox.workspaceWrite'))
           .addOption('danger-full-access', t('settings.codex.sandbox.dangerFullAccess'))
@@ -328,8 +330,8 @@ export class SettingsCodexSection {
             this.plugin.settings.backendSettings.codex.sandboxMode = value as 'read-only' | 'workspace-write' | 'danger-full-access';
             await this.plugin.saveSettings();
             this.applyCodexRuntimeUpdates();
-          }),
-      );
+          });
+      });
   }
 
   private renderReasoningSetting(bodyEl: HTMLElement): void {

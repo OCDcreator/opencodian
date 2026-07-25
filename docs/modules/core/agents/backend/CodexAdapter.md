@@ -6,6 +6,8 @@
 
 > **新增（skills runtime truth）**: `getRuntimeSkills()` 通过 app-server `skills/list`（scoped to `workingDirectory`）返回 Codex 当前 vault 的 runtime skills，作为聊天 `/skills` 与 `$` 菜单的唯一 runtime 真相；app-server 不可用时返回 null。`forceNextRuntimeSkillsReload()` 设置一次性标志，使**下一次** `getRuntimeSkills()` 传 `forceReload: true` 绕过 app-server 缓存（用于插件自身的项目 skill 写入后，app-server 不一定发 `skills/changed`），随即清除标志；正常菜单打开保持缓存。`onSkillsChanged(handler)` 暴露 `skills/changed` 失效信号 Disposable；`start()` 时订阅、`stop()` 时取消订阅。聊天菜单缓存订阅此信号以立即失效，而非仅靠 120s TTL。
 
+> **P1 grouped settings readback（2026-07-24）**: `getRuntimeSkillGroups()` 是 additive 设置页 seam，调用 `CodexAppServerClient.listSkillGroups({ cwd: workingDirectory })`，返回 cwd/source/errors 完整分组；app-server 不可用或调用抛错时返回 null。它不替换 `getRuntimeSkills()`，不参与聊天目录排序、去重或菜单结构。
+
 ## 概述
 
 `CodexAdapter.ts` 是 OpenAI Codex SDK 接入的 AgentService 适配器。它实现 `AgentChatCapability` 和 `AgentSessionCapability`，把 Codex SDK 的 `Codex` / `Thread` API 包装为统一的 agent 后端接口。
@@ -27,6 +29,7 @@
 - `updateAdditionalDirectories()` 允许运行时更新额外目录，影响后续 thread 创建/恢复
 - `updateNetworkAccessEnabled()` 允许运行时更新网络访问开关，影响后续 thread 创建/恢复
 - `updateWebSearchMode()` 允许运行时更新网页搜索模式（disabled/cached/live），影响后续 thread 创建/恢复
+- `getRuntimeSkillGroups()` 为 Codex 设置区提供 cwd 分组、skill 来源和服务端 errors；聊天仍只消费 `getRuntimeSkills()` 的既有扁平目录
 - `CodexAppServerClient` 也负责 persisted session discovery；`listSessions()` 合并 in-memory 与 app-server threads，现在会同时请求 `thread/list archived=false` 与 `thread/list archived=true` 并合并，使 `BackendSessionBrowserModal` 能同时展示活跃与归档 threads；`getSessionMessages()` 通过 app-server 读取 thread turns 并归一化为 `{ role, content }` 形状供 `AgentBackendRouting` 消费；`getSession()` 优先 in-memory，回退 app-server；`stop()` 清理 app-server client。
 - 实现 `AgentForkCapability`：`forkSession()` / `archiveSession()` / `unarchiveSession()` 通过 app-server `thread/fork`、`thread/archive`、`thread/unarchive` 操作 persisted threads
 - **Server-request approval bridge** (Round 5): `setApprovalHost(host)` 注入 UI 回调；当 app-server client 可用且 host 提供 `collectApproval` 时，在 `start()` 后注册 `execCommandApproval` / `applyPatchApproval` 处理器。处理器把服务端 params 归一化为 `CodexApprovalRequest`（`kind`、`summary`、`command?`、`cwd?`、`changeCount?`、`raw`），交给 host 回调收集 `CodexApprovalDecision`（`approved` / `approved_for_session` / `denied` / `abort`），返回 `{ decision }` 由已落地的 bridge 基础设施回写为 JSON-RPC result。host 缺失/抛错/返回 null 时安全降级为 `denied`。`stop()` 注销处理器。导出类型：`CodexApprovalKind`、`CodexApprovalRequest`、`CodexApprovalDecision`、`CodexApprovalBridgeHost`

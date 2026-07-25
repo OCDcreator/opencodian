@@ -22,14 +22,29 @@ import type { Dirent } from 'fs';
 import { existsSync } from 'fs';
 import { readdir, readFile, rm, unlink } from 'fs/promises';
 import * as path from 'path';
+import { parse as parseToml } from 'smol-toml';
 
 import {
   assertWithinRoot,
   atomicWriteFile,
+  type FileRevision,
   isSafeResourceName,
   type ProjectResourceWriteError,
   toWriteErrorCode,
 } from './ProjectResourceSecureWrite';
+import {
+  createNamedScopedConfigurationResourceFacade,
+  type CreateNamedScopedConfigurationResourceOptions,
+  type DeleteNamedScopedConfigurationResourceOptions,
+  type NamedScopedConfigurationResourceContext,
+  type ReadNamedScopedConfigurationResourceOptions,
+  type RestoreNamedScopedConfigurationResourceOptions,
+  type ScopedConfigurationResourceContext,
+  type ScopedConfigurationResourceMutationResult,
+  type ScopedConfigurationResourceReadResult,
+  type ScopedConfigurationResourceScope,
+  type UpdateNamedScopedConfigurationResourceOptions,
+} from './ScopedConfigurationResourceService';
 
 /** A discovered Codex skill (a SKILL.md file under .agents/skills/<name>/). */
 export interface CodexSkillInfo {
@@ -61,6 +76,64 @@ const SKILL_MD_FILENAME = 'SKILL.md';
 const CODEX_AGENTS_SKILLS_DIR = path.join('.agents', 'skills');
 const CODEX_AGENTS_DIR = path.join('.codex', 'agents');
 const CODE_FENCE_MARKER = String.fromCharCode(96, 96, 96);
+
+export type CodexResourceScope = ScopedConfigurationResourceScope;
+
+export type CodexResourceContext = ScopedConfigurationResourceContext;
+
+export interface CodexSkillResourceInfo extends CodexSkillInfo {
+  readonly readonly: false;
+  readonly revision: FileRevision;
+}
+
+export type CreateCodexSkillResourceOptions = CreateNamedScopedConfigurationResourceOptions;
+export type ReadCodexSkillResourceOptions = ReadNamedScopedConfigurationResourceOptions;
+export type UpdateCodexSkillResourceOptions = UpdateNamedScopedConfigurationResourceOptions;
+export type DeleteCodexSkillResourceOptions = DeleteNamedScopedConfigurationResourceOptions;
+export type CodexSkillResourceHistoryOptions = NamedScopedConfigurationResourceContext;
+export type CatalogCodexSkillResourceHistoryOptions = ScopedConfigurationResourceContext;
+export type RestoreCodexSkillResourceHistoryEntryOptions = RestoreNamedScopedConfigurationResourceOptions;
+
+export type CodexSkillResourceMutationResult = ScopedConfigurationResourceMutationResult;
+export type CodexSkillResourceReadResult = ScopedConfigurationResourceReadResult;
+
+export interface CodexAgentResourceInfo extends CodexAgentInfo {
+  readonly readonly: false;
+  readonly revision: FileRevision;
+}
+
+export type CreateCodexAgentResourceOptions = CreateNamedScopedConfigurationResourceOptions;
+export type ReadCodexAgentResourceOptions = ReadNamedScopedConfigurationResourceOptions;
+export type UpdateCodexAgentResourceOptions = UpdateNamedScopedConfigurationResourceOptions;
+export type DeleteCodexAgentResourceOptions = DeleteNamedScopedConfigurationResourceOptions;
+export type CodexAgentResourceHistoryOptions = NamedScopedConfigurationResourceContext;
+export type CatalogCodexAgentResourceHistoryOptions = ScopedConfigurationResourceContext;
+export type RestoreCodexAgentResourceHistoryEntryOptions = RestoreNamedScopedConfigurationResourceOptions;
+
+export type CodexAgentResourceMutationResult = ScopedConfigurationResourceMutationResult;
+export type CodexAgentResourceReadResult = ScopedConfigurationResourceReadResult;
+
+const CODEX_SKILL_RESOURCE = createNamedScopedConfigurationResourceFacade({
+  backend: 'codex',
+  kind: 'skill',
+  format: 'markdown',
+  relativeRootPath: CODEX_AGENTS_SKILLS_DIR,
+  targetRelativePath: (name) => path.join(name, SKILL_MD_FILENAME),
+  isSafeName: isSafeResourceName,
+  defaultContent: defaultCodexSkillContent,
+  validateContent: validateCodexSkillContent,
+});
+
+const CODEX_AGENT_RESOURCE = createNamedScopedConfigurationResourceFacade({
+  backend: 'codex',
+  kind: 'agent',
+  format: 'toml',
+  relativeRootPath: CODEX_AGENTS_DIR,
+  targetRelativePath: (name) => `${name}.toml`,
+  isSafeName: isSafeResourceName,
+  defaultContent: defaultCodexAgentContent,
+  validateContent: validateCodexAgentContent,
+});
 
 /** Result of a write operation with an actionable error reason. */
 export type CodexResourceWriteResult =
@@ -129,6 +202,7 @@ async function scanSkillDir(
   const absoluteSkillsDir = path.join(scanRoot, skillsDir);
   let entries: Dirent[];
   try {
+    await assertWithinRoot(scanRoot, absoluteSkillsDir);
     entries = await readdir(absoluteSkillsDir, { withFileTypes: true }) as unknown as Dirent[];
   } catch {
     return [];
@@ -144,15 +218,11 @@ async function scanSkillDir(
       continue;
     }
     const skillMdPath = path.join(absoluteSkillsDir, name, SKILL_MD_FILENAME);
-    let content: string;
-    try {
-      content = await readFile(skillMdPath, 'utf-8');
-    } catch {
-      continue;
-    }
     results.push({
       name,
-      description: extractDescription(content),
+      // Content and revision are populated only by the descriptor-bound P1
+      // read below; never raw-read a discovered path before narrow-root proof.
+      description: '',
       skillMdPath,
       relativePath: path.join(skillsDir, name),
       readonly: scope === 'global',
@@ -166,14 +236,16 @@ export async function discoverCodexProjectSkills(vaultPath: string | null | unde
   if (!vaultPath || !vaultPath.trim()) {
     return [];
   }
-  return scanSkillDir(vaultPath, CODEX_AGENTS_SKILLS_DIR, 'project');
+  const resources = await discoverCodexSkillResources({ scope: 'project', basePath: vaultPath });
+  return resources.map(({ revision: _revision, ...skill }) => skill);
 }
 
 export async function discoverCodexGlobalSkills(homePath: string | null | undefined): Promise<CodexSkillInfo[]> {
   if (!homePath || !homePath.trim()) {
     return [];
   }
-  return scanSkillDir(homePath, CODEX_AGENTS_SKILLS_DIR, 'global');
+  const resources = await discoverCodexSkillResources({ scope: 'global', basePath: homePath });
+  return resources.map(({ revision: _revision, ...skill }) => ({ ...skill, readonly: true }));
 }
 
 export async function readCodexSkillContent(skillMdPath: string): Promise<string | null> {
@@ -285,6 +357,30 @@ export async function deleteCodexProjectSkill(
   }
 }
 
+export async function discoverCodexSkillResources(
+  context: CodexResourceContext,
+): Promise<CodexSkillResourceInfo[]> {
+  if (!context.basePath?.trim()) return [];
+  const discovered = await scanSkillDir(context.basePath, CODEX_AGENTS_SKILLS_DIR, context.scope);
+  const resources = await Promise.all(discovered.map(async (skill) => {
+    const revision = await CODEX_SKILL_RESOURCE.readRevision(context, skill.name);
+    if (revision === null) return null;
+    const readResult = await CODEX_SKILL_RESOURCE.read({ ...context, name: skill.name, expectedRevision: revision });
+    return readResult.status === 'success'
+      ? { ...skill, description: extractDescription(readResult.content), readonly: false as const, revision: readResult.revision }
+      : null;
+  }));
+  return resources.filter((resource): resource is CodexSkillResourceInfo => resource !== null);
+}
+
+export const createCodexSkillResource = CODEX_SKILL_RESOURCE.create;
+export const readCodexSkillResourceContent = CODEX_SKILL_RESOURCE.read;
+export const updateCodexSkillResource = CODEX_SKILL_RESOURCE.update;
+export const deleteCodexSkillResource = CODEX_SKILL_RESOURCE.delete;
+export const listCodexSkillResourceHistory = CODEX_SKILL_RESOURCE.listHistory;
+export const catalogCodexSkillResourceHistory = CODEX_SKILL_RESOURCE.catalogHistory;
+export const restoreCodexSkillResourceHistoryEntry = CODEX_SKILL_RESOURCE.restore;
+
 // ---------------------------------------------------------------------------
 // Agent (TOML) discovery + CRUD
 // ---------------------------------------------------------------------------
@@ -297,6 +393,7 @@ async function scanAgentDir(
   const absoluteAgentsDir = path.join(scanRoot, agentsDir);
   let entries: Dirent[];
   try {
+    await assertWithinRoot(scanRoot, absoluteAgentsDir);
     entries = await readdir(absoluteAgentsDir, { withFileTypes: true }) as unknown as Dirent[];
   } catch {
     return [];
@@ -312,15 +409,11 @@ async function scanAgentDir(
       continue;
     }
     const agentTomlPath = path.join(absoluteAgentsDir, entry.name);
-    let content: string;
-    try {
-      content = await readFile(agentTomlPath, 'utf-8');
-    } catch {
-      continue;
-    }
     results.push({
       name: baseName,
-      description: extractCodexAgentDescription(content),
+      // The P1 descriptor-bound read supplies metadata content after the
+      // fixed root and leaf identity are both proven stable.
+      description: '',
       agentTomlPath,
       relativePath: path.join(agentsDir, entry.name),
       readonly: scope === 'global',
@@ -344,14 +437,16 @@ export async function discoverCodexProjectAgents(vaultPath: string | null | unde
   if (!vaultPath || !vaultPath.trim()) {
     return [];
   }
-  return scanAgentDir(vaultPath, CODEX_AGENTS_DIR, 'project');
+  const resources = await discoverCodexAgentResources({ scope: 'project', basePath: vaultPath });
+  return resources.map(({ revision: _revision, ...agent }) => agent);
 }
 
 export async function discoverCodexGlobalAgents(homePath: string | null | undefined): Promise<CodexAgentInfo[]> {
   if (!homePath || !homePath.trim()) {
     return [];
   }
-  return scanAgentDir(homePath, CODEX_AGENTS_DIR, 'global');
+  const resources = await discoverCodexAgentResources({ scope: 'global', basePath: homePath });
+  return resources.map(({ revision: _revision, ...agent }) => ({ ...agent, readonly: true }));
 }
 
 export async function readCodexAgentContent(agentTomlPath: string): Promise<string | null> {
@@ -366,15 +461,22 @@ export function defaultCodexAgentContent(name: string): string {
   return `# Codex project agent. Edit the fields below.\n# This takes effect for future spawned sessions only; the current app-server\n# cannot select or dispatch a chosen agent.\nname = "${name}"\ndescription = "Describe what this Codex agent does."\n`;
 }
 
-/**
- * Validate a Codex agent TOML body without a full parser: require a non-empty
- * `name` and `description` key. Returns an error message or null when valid.
- */
+/** Strictly parse the complete TOML document and require root string fields. */
 export function validateCodexAgentContent(content: string): string | null {
-  if (!/^name\s*=\s*"\S.*"/m.test(content) && !/^name\s*=\s*'''[\s\S]*'''/m.test(content)) {
+  let parsed: unknown;
+  try {
+    parsed = parseToml(content);
+  } catch (err) {
+    return `Agent TOML is invalid: ${err instanceof Error ? err.message : String(err)}`;
+  }
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    return 'Agent TOML root must be a table.';
+  }
+  const fields = parsed as Record<string, unknown>;
+  if (typeof fields.name !== 'string' || !fields.name.trim()) {
     return 'Agent TOML is missing a non-empty "name" field.';
   }
-  if (!/^description\s*=\s*"\S.*"/m.test(content) && !/^description\s*=\s*'''[\s\S]*'''/m.test(content)) {
+  if (typeof fields.description !== 'string' || !fields.description.trim()) {
     return 'Agent TOML is missing a non-empty "description" field.';
   }
   return null;
@@ -459,3 +561,27 @@ export async function deleteCodexProjectAgent(
     return { ok: false, reason: toWriteErrorCode(err) };
   }
 }
+
+export async function discoverCodexAgentResources(
+  context: CodexResourceContext,
+): Promise<CodexAgentResourceInfo[]> {
+  if (!context.basePath?.trim()) return [];
+  const discovered = await scanAgentDir(context.basePath, CODEX_AGENTS_DIR, context.scope);
+  const resources = await Promise.all(discovered.map(async (agent) => {
+    const revision = await CODEX_AGENT_RESOURCE.readRevision(context, agent.name);
+    if (revision === null) return null;
+    const readResult = await CODEX_AGENT_RESOURCE.read({ ...context, name: agent.name, expectedRevision: revision });
+    return readResult.status === 'success'
+      ? { ...agent, description: extractCodexAgentDescription(readResult.content), readonly: false as const, revision: readResult.revision }
+      : null;
+  }));
+  return resources.filter((resource): resource is CodexAgentResourceInfo => resource !== null);
+}
+
+export const createCodexAgentResource = CODEX_AGENT_RESOURCE.create;
+export const readCodexAgentResourceContent = CODEX_AGENT_RESOURCE.read;
+export const updateCodexAgentResource = CODEX_AGENT_RESOURCE.update;
+export const deleteCodexAgentResource = CODEX_AGENT_RESOURCE.delete;
+export const listCodexAgentResourceHistory = CODEX_AGENT_RESOURCE.listHistory;
+export const catalogCodexAgentResourceHistory = CODEX_AGENT_RESOURCE.catalogHistory;
+export const restoreCodexAgentResourceHistoryEntry = CODEX_AGENT_RESOURCE.restore;

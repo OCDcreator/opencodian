@@ -22,8 +22,8 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { homedir } from 'node:os';
 
-import { existsSync } from 'fs';
-import { lstat, mkdir, readFile, realpath, rmdir, stat, unlink, writeFile } from 'fs/promises';
+import { constants, existsSync, type Stats } from 'fs';
+import { lstat, mkdir, open, readFile, realpath, rmdir, stat, unlink, writeFile } from 'fs/promises';
 import {
   applyEdits as applyJsoncEdits,
   type FormattingOptions,
@@ -41,20 +41,33 @@ import {
   renameFileAtCommit,
   unlinkFileAtCommit,
 } from './ConfigurationFileCommitOperations';
-import { confinedComponentWalk } from './PathConfinement';
+import { confinedComponentWalk, isENOENTError } from './PathConfinement';
 
 // Re-export the archive owner and its public surface so callers can import the
 // complete contract from the secure-write module.
 export {
   type ArchiveContext,
   type ArchiveEntry,
+  type ArchiveHistoryCatalogOutcome,
+  type ArchiveHistoryEntryAssociation,
+  type ArchiveHistoryEntryIdentity,
+  type ArchiveHistoryEntryKind,
+  type ArchiveHistoryEntrySummary,
+  type ArchiveHistoryTarget,
   type ArchiveManifest,
   type ClearDeletedResult,
   ConfigurationArchiveService,
   OVERWRITE_RETENTION_LIMIT,
+  type ReadArchiveHistoryEntryOutcome,
   type ReadDeletedOutcome,
 } from './ConfigurationArchiveService';
-import { type ArchiveContext, type ClearDeletedResult, ConfigurationArchiveService } from './ConfigurationArchiveService';
+import {
+  type ArchiveContext,
+  type ArchiveHistoryCatalogOutcome,
+  type ArchiveHistoryEntryIdentity,
+  type ClearDeletedResult,
+  ConfigurationArchiveService,
+} from './ConfigurationArchiveService';
 
 export type ProjectResourceWriteError =
   | 'empty-vault'
@@ -470,6 +483,184 @@ export async function computeFileRevision(targetPath: string): Promise<FileRevis
     size: st.size,
     sha256: sha256Hex(content),
   };
+}
+
+/** A descriptor-bound read option for an explicitly allowlisted configuration file. */
+export interface ReadAllowlistedFileSnapshotOptions {
+  readonly targetPath: string;
+  readonly allowlist: ConfigurationAllowlist;
+  /** When supplied, any replacement or revision mismatch returns conflict. */
+  readonly expectedRevision?: FileRevision;
+}
+
+/**
+ * A content + revision pair captured from one stable descriptor identity.
+ * `absent` is only possible when no expected revision was supplied; callers
+ * that expected a file receive `conflict` instead, preserving their draft.
+ */
+export type AllowlistedFileSnapshotResult =
+  | { readonly status: 'success'; readonly content: string; readonly revision: FileRevision }
+  | { readonly status: 'absent' }
+  | { readonly status: 'conflict'; readonly expected: FileRevision | null; readonly current: FileRevision | null }
+  | { readonly status: 'invalid-path' }
+  | { readonly status: 'read-failed'; readonly cause: string };
+
+const READ_ONLY_NOFOLLOW_FLAGS = constants.O_RDONLY
+  | (typeof constants.O_NOFOLLOW === 'number' ? constants.O_NOFOLLOW : 0);
+
+function snapshotErrorCode(error: unknown): string | undefined {
+  return error !== null && typeof error === 'object'
+    ? (error as { code?: string }).code
+    : undefined;
+}
+
+function snapshotDescriptorIdentityMatches(a: Stats, b: Stats): boolean {
+  const inodeIdentityAvailable = a.dev !== 0 || b.dev !== 0 || a.ino !== 0 || b.ino !== 0;
+  if (inodeIdentityAvailable) return a.dev === b.dev && a.ino === b.ino;
+  return a.birthtimeMs === b.birthtimeMs && a.mode === b.mode;
+}
+
+function snapshotDescriptorStateMatches(a: Stats, b: Stats): boolean {
+  return snapshotDescriptorIdentityMatches(a, b)
+    && a.mtimeMs === b.mtimeMs
+    && a.size === b.size;
+}
+
+function snapshotConflict(
+  expectedRevision: FileRevision | undefined,
+  current: FileRevision | null,
+): AllowlistedFileSnapshotResult {
+  return { status: 'conflict', expected: expectedRevision ?? null, current };
+}
+
+function snapshotMissing(expectedRevision: FileRevision | undefined): AllowlistedFileSnapshotResult {
+  return expectedRevision === undefined
+    ? { status: 'absent' }
+    : snapshotConflict(expectedRevision, null);
+}
+
+/**
+ * Read a regular file through a descriptor-bound, no-follow snapshot. The
+ * returned content and revision originate from the same file identity; an
+ * allowlist/canonical-path/descriptor change never leaks content.
+ */
+// eslint-disable-next-line complexity -- each branch maps a distinct filesystem race to a content-free typed outcome.
+export async function readAllowlistedFileSnapshot(
+  options: ReadAllowlistedFileSnapshotOptions,
+): Promise<AllowlistedFileSnapshotResult> {
+  let initialCanonicalTarget: string;
+  try {
+    const match = await assertWithinAllowlistedRoot(options.allowlist, options.targetPath);
+    initialCanonicalTarget = match.canonicalTarget;
+  } catch {
+    return { status: 'invalid-path' };
+  }
+
+  let lexicalState: Stats;
+  try {
+    lexicalState = await lstat(options.targetPath);
+  } catch (error) {
+    if (snapshotErrorCode(error) === 'ENOENT') return snapshotMissing(options.expectedRevision);
+    return { status: 'read-failed', cause: error instanceof Error ? error.message : String(error) };
+  }
+  if (lexicalState.isSymbolicLink()) return { status: 'invalid-path' };
+  if (!lexicalState.isFile()) return { status: 'read-failed', cause: 'resource target is not a regular file' };
+
+  let handle;
+  try {
+    handle = await open(options.targetPath, READ_ONLY_NOFOLLOW_FLAGS);
+  } catch (error) {
+    const code = snapshotErrorCode(error);
+    if (code === 'ELOOP') return { status: 'invalid-path' };
+    if (code === 'ENOENT') return snapshotMissing(options.expectedRevision);
+    return { status: 'read-failed', cause: error instanceof Error ? error.message : String(error) };
+  }
+
+  try {
+    const beforeReadState = await handle.stat();
+    if (!beforeReadState.isFile()) return { status: 'read-failed', cause: 'resource target is not a regular file' };
+    if (!snapshotDescriptorIdentityMatches(lexicalState, beforeReadState)) {
+      return snapshotConflict(options.expectedRevision, null);
+    }
+
+    let beforeReadCanonicalTarget: string;
+    try {
+      const match = await assertWithinAllowlistedRoot(options.allowlist, options.targetPath);
+      beforeReadCanonicalTarget = match.canonicalTarget;
+    } catch {
+      return { status: 'invalid-path' };
+    }
+    if (beforeReadCanonicalTarget !== initialCanonicalTarget) return snapshotConflict(options.expectedRevision, null);
+    const beforeReadLexicalState = await lstat(options.targetPath);
+    if (beforeReadLexicalState.isSymbolicLink()) return { status: 'invalid-path' };
+    if (!snapshotDescriptorIdentityMatches(beforeReadLexicalState, beforeReadState)) {
+      return snapshotConflict(options.expectedRevision, null);
+    }
+    if (
+      options.expectedRevision !== undefined
+      && (
+        options.expectedRevision.canonicalPath !== beforeReadCanonicalTarget
+        || options.expectedRevision.mtimeMs !== beforeReadState.mtimeMs
+        || options.expectedRevision.size !== beforeReadState.size
+      )
+    ) {
+      return snapshotConflict(options.expectedRevision, null);
+    }
+
+    const content = await handle.readFile({ encoding: 'utf8' });
+    const afterReadState = await handle.stat();
+    if (!snapshotDescriptorStateMatches(beforeReadState, afterReadState)) {
+      return snapshotConflict(options.expectedRevision, null);
+    }
+    const revision: FileRevision = {
+      canonicalPath: beforeReadCanonicalTarget,
+      mtimeMs: afterReadState.mtimeMs,
+      size: afterReadState.size,
+      sha256: sha256Hex(content),
+    };
+    if (options.expectedRevision !== undefined && !revisionsMatch(options.expectedRevision, revision)) {
+      return snapshotConflict(options.expectedRevision, revision);
+    }
+
+    let afterReadCanonicalTarget: string;
+    try {
+      const match = await assertWithinAllowlistedRoot(options.allowlist, options.targetPath);
+      afterReadCanonicalTarget = match.canonicalTarget;
+    } catch {
+      return { status: 'invalid-path' };
+    }
+    if (afterReadCanonicalTarget !== beforeReadCanonicalTarget) return snapshotConflict(options.expectedRevision, null);
+    const afterReadLexicalState = await lstat(options.targetPath);
+    if (afterReadLexicalState.isSymbolicLink()) return { status: 'invalid-path' };
+    if (!snapshotDescriptorStateMatches(afterReadLexicalState, afterReadState)) {
+      return snapshotConflict(options.expectedRevision, null);
+    }
+
+    let verificationHandle;
+    try {
+      verificationHandle = await open(options.targetPath, READ_ONLY_NOFOLLOW_FLAGS);
+      const verificationState = await verificationHandle.stat();
+      if (!snapshotDescriptorStateMatches(verificationState, afterReadState)) {
+        return snapshotConflict(options.expectedRevision, null);
+      }
+    } catch (error) {
+      const code = snapshotErrorCode(error);
+      if (code === 'ELOOP') return { status: 'invalid-path' };
+      if (code === 'ENOENT') return snapshotMissing(options.expectedRevision);
+      return { status: 'read-failed', cause: error instanceof Error ? error.message : String(error) };
+    } finally {
+      await verificationHandle?.close().catch(() => undefined);
+    }
+
+    return { status: 'success', content, revision };
+  } catch (error) {
+    const code = snapshotErrorCode(error);
+    if (code === 'ELOOP') return { status: 'invalid-path' };
+    if (code === 'ENOENT') return snapshotMissing(options.expectedRevision);
+    return { status: 'read-failed', cause: error instanceof Error ? error.message : String(error) };
+  } finally {
+    await handle.close().catch(() => undefined);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1135,6 +1326,140 @@ async function safeDeleteFileUnlocked(options: SafeDeleteFileOptions): Promise<S
   return { status: 'success', revision: current, previousRevision: current };
 }
 
+/**
+ * Re-enter the canonical target stored in a manifest through its allowlist's
+ * lexical root. This preserves the `/var` -> `/private/var` root mapping that
+ * ordinary caller paths get from assertWithinAllowlistedRoot.
+ */
+async function matchArchivedCanonicalTargetWithinAllowlist(
+  allowlist: ConfigurationAllowlist,
+  canonicalTarget: string,
+  expectedScope: ConfigurationScope,
+  allowMissingRoot = false,
+): Promise<AllowlistMatch | null> {
+  for (const entry of allowlist) {
+    if (entry.scope !== expectedScope) continue;
+    const lexicalRoot = path.resolve(entry.rootPath);
+    let canonicalRoot: string;
+    let rootMissing = false;
+    try {
+      canonicalRoot = await realpath(lexicalRoot);
+    } catch (error) {
+      if (!allowMissingRoot || !isENOENTError(error)) continue;
+      const missingCanonicalRoot = await resolveMissingLexicalRootCanonicalPath(lexicalRoot);
+      if (missingCanonicalRoot === null) continue;
+      canonicalRoot = missingCanonicalRoot;
+      rootMissing = true;
+    }
+    const relativeTarget = path.relative(canonicalRoot, canonicalTarget);
+    if (relativeTarget.startsWith('..') || path.isAbsolute(relativeTarget)) continue;
+    const lexicalTarget = path.join(lexicalRoot, relativeTarget);
+    if (rootMissing) {
+      // The root is absent, so assertWithinAllowlistedRoot cannot realpath it.
+      // `canonicalRoot` was derived only by walking up to an existing real
+      // ancestor, and the relative target was checked against that root above.
+      return { scope: entry.scope, canonicalRoot, canonicalTarget };
+    }
+    try {
+      const match = await assertWithinAllowlistedRoot([entry], lexicalTarget);
+      if (match.canonicalTarget === canonicalTarget && match.scope === expectedScope) return match;
+    } catch {
+      // Try the next explicitly allowlisted root.
+    }
+  }
+  return null;
+}
+
+/**
+ * Map a missing lexical allowlist root through its nearest existing canonical
+ * ancestor. This preserves `/var` -> `/private/var`-style mappings without
+ * creating the missing root, and is intentionally used only by archive
+ * catalog readback for already-recorded canonical targets.
+ */
+async function resolveMissingLexicalRootCanonicalPath(lexicalRoot: string): Promise<string | null> {
+  const suffix: string[] = [];
+  let candidate = lexicalRoot;
+  while (path.dirname(candidate) !== candidate) {
+    try {
+      return path.join(await realpath(candidate), ...suffix);
+    } catch (error) {
+      if (!isENOENTError(error)) return null;
+      const parent = path.dirname(candidate);
+      suffix.unshift(path.basename(candidate));
+      candidate = parent;
+    }
+  }
+  try {
+    return path.join(await realpath(candidate), ...suffix);
+  } catch {
+    return null;
+  }
+}
+
+export type ConfigurationArchiveHistoryResult = ArchiveHistoryCatalogOutcome | { readonly status: 'invalid-path' };
+
+export interface ListConfigurationArchiveHistoryOptions {
+  readonly targetPath: string;
+  readonly allowlist: ConfigurationAllowlist;
+  readonly archive: ConfigurationArchiveOptions;
+}
+
+/** List validated history for one caller-allowlisted configuration target. */
+export async function listConfigurationArchiveHistory(
+  options: ListConfigurationArchiveHistoryOptions,
+): Promise<ConfigurationArchiveHistoryResult> {
+  let match: AllowlistMatch;
+  try {
+    match = await assertWithinAllowlistedRoot(options.allowlist, options.targetPath);
+  } catch {
+    return { status: 'invalid-path' };
+  }
+  const service = new ConfigurationArchiveService(options.archive.archiveRootPath ?? resolveDefaultArchiveRoot());
+  return service.listHistory({
+    backend: options.archive.backend,
+    kind: options.archive.kind,
+    format: options.archive.format,
+    match,
+  });
+}
+
+export interface CatalogConfigurationArchiveHistoryOptions {
+  readonly archiveRootPath?: string;
+  readonly backend: string;
+  readonly scope?: ConfigurationScope;
+  readonly kind?: string;
+  readonly allowlist: ConfigurationAllowlist;
+}
+
+/**
+ * Catalog validated archived targets, including targets currently absent from
+ * filesystem discovery. Every manifest target is revalidated against the
+ * caller's allowlist; one failure suppresses the complete catalog.
+ */
+export async function catalogConfigurationArchiveHistory(
+  options: CatalogConfigurationArchiveHistoryOptions,
+): Promise<ArchiveHistoryCatalogOutcome> {
+  const service = new ConfigurationArchiveService(options.archiveRootPath ?? resolveDefaultArchiveRoot());
+  const catalog = await service.catalogHistory({
+    backend: options.backend,
+    ...(options.scope ? { scope: options.scope } : {}),
+    ...(options.kind ? { kind: options.kind } : {}),
+  });
+  if (catalog.status === 'archive-failed') return catalog;
+  for (const target of catalog.targets) {
+    const match = await matchArchivedCanonicalTargetWithinAllowlist(
+      options.allowlist,
+      target.canonicalTarget,
+      target.scope,
+      true,
+    );
+    if (match === null) {
+      return { status: 'archive-failed', cause: 'archived target is outside the configuration allowlist' };
+    }
+  }
+  return catalog;
+}
+
 export interface SafeRestoreFileOptions {
   readonly targetPath: string;
   /** Expected state of the TARGET (not the archive). `null` = expected absent. */
@@ -1227,6 +1552,107 @@ async function safeRestoreFileUnlocked(options: SafeRestoreFileOptions): Promise
   if (revision === null) {
     return { status: 'write-failed', cause: 'file missing after restore' };
   }
+  return { status: 'success', revision, ...(current ? { previousRevision: current } : {}) };
+}
+
+export interface SafeRestoreArchivedEntryOptions {
+  /** Opaque identity returned by a validated history listing. */
+  readonly entryIdentity: ArchiveHistoryEntryIdentity;
+  /** Expected state of the TARGET represented by the identity. */
+  readonly expectedRevision: FileRevision | null;
+  readonly allowlist: ConfigurationAllowlist;
+  readonly archiveRootPath?: string;
+}
+
+/** Restore one caller-selected overwrite or delete archive entry. */
+export async function safeRestoreArchivedEntry(
+  options: SafeRestoreArchivedEntryOptions,
+): Promise<SafeFileMutationResult> {
+  const service = new ConfigurationArchiveService(options.archiveRootPath ?? resolveDefaultArchiveRoot());
+  const association = service.getHistoryEntryAssociation(options.entryIdentity);
+  if (association === null) {
+    return { status: 'archive-failed', cause: 'invalid archive history identity' };
+  }
+  const match = await matchArchivedCanonicalTargetWithinAllowlist(
+    options.allowlist,
+    association.canonicalTarget,
+    association.scope,
+  );
+  if (match === null) {
+    return { status: 'invalid-path' };
+  }
+  const ctx: ArchiveContext = {
+    backend: association.backend,
+    kind: association.kind,
+    format: association.format,
+    match,
+  };
+  return withConfigurationMutationLock(match.canonicalTarget, () => (
+    safeRestoreArchivedEntryUnlocked(options, service, ctx)
+  ));
+}
+
+// eslint-disable-next-line complexity -- Selected restore keeps identity/content validation, optimistic conflict checks, archive-before-replace, and the shared commit fence adjacent.
+async function safeRestoreArchivedEntryUnlocked(
+  options: SafeRestoreArchivedEntryOptions,
+  service: ConfigurationArchiveService,
+  ctx: ArchiveContext,
+): Promise<SafeFileMutationResult> {
+  const selected = await service.readHistoryEntryContent(ctx, options.entryIdentity);
+  if (selected.status === 'not-found') return { status: 'not-found' };
+  if (selected.status === 'archive-failed') {
+    return { status: 'archive-failed', cause: selected.cause };
+  }
+  if (ctx.format !== 'markdown') {
+    const validation = validateConfigurationContent(ctx.format, selected.content);
+    if (!validation.ok) {
+      return { status: 'invalid-content', diagnostics: validation.diagnostics };
+    }
+  }
+
+  const current = await computeFileRevision(ctx.match.canonicalTarget);
+  if (options.expectedRevision === null) {
+    if (current !== null) return { status: 'conflict', expected: null, current };
+  } else {
+    if (current === null) {
+      return { status: 'conflict', expected: options.expectedRevision, current: null };
+    }
+    if (!revisionsMatch(current, options.expectedRevision)) {
+      return { status: 'conflict', expected: options.expectedRevision, current };
+    }
+    const archiveOptions: ConfigurationArchiveOptions = {
+      ...(options.archiveRootPath ? { archiveRootPath: options.archiveRootPath } : {}),
+      backend: ctx.backend,
+      kind: ctx.kind,
+      format: ctx.format,
+    };
+    const archiveCause = await archiveCurrentOverwrite(archiveOptions, ctx.match, current);
+    if (archiveCause !== 'ok') {
+      const conflict = await detectArchiveRaceConflict(ctx.match, options.expectedRevision);
+      if (conflict) return conflict;
+      return { status: 'archive-failed', cause: archiveCause };
+    }
+  }
+
+  if (options.expectedRevision !== null) {
+    const restoreRecheck = await computeFileRevision(ctx.match.canonicalTarget);
+    if (restoreRecheck === null || !revisionsMatch(restoreRecheck, options.expectedRevision)) {
+      return { status: 'conflict', expected: options.expectedRevision, current: restoreRecheck };
+    }
+  }
+  try {
+    const commitFailure = await commitContentAtExpectedState(
+      ctx.match.canonicalTarget,
+      selected.content,
+      options.expectedRevision,
+    );
+    if (commitFailure !== null) return commitFailure;
+  } catch (err) {
+    return { status: 'write-failed', cause: err instanceof Error ? err.message : String(err) };
+  }
+
+  const revision = await computeFileRevision(ctx.match.canonicalTarget);
+  if (revision === null) return { status: 'write-failed', cause: 'file missing after restore' };
   return { status: 'success', revision, ...(current ? { previousRevision: current } : {}) };
 }
 

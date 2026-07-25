@@ -329,12 +329,16 @@ export class ConversationSessionSettingsModal extends Modal {
       name: options.name,
       description: options.description,
       defaultValue: options.defaultValue,
+      controlId: options.setting,
     });
 
     const selectEl = controlEl.createEl('select', {
       cls: 'opencodian-session-settings-dropdown',
       attr: {
+        id: options.setting,
         'data-setting': options.setting,
+        'aria-labelledby': `${options.setting}-label`,
+        'aria-label': options.name,
       },
     });
 
@@ -372,14 +376,18 @@ export class ConversationSessionSettingsModal extends Modal {
       name: options.name,
       description: options.description,
       defaultValue: options.defaultValue,
+      controlId: options.setting,
     });
 
     const inputEl = controlEl.createEl('input', {
       cls: 'opencodian-session-settings-text-input',
       attr: {
         type: 'text',
+        id: options.setting,
         placeholder: options.placeholder,
         'data-setting': options.setting,
+        'aria-labelledby': `${options.setting}-label`,
+        'aria-label': options.name,
       },
     });
     inputEl.value = typeof options.initialValue === 'string'
@@ -401,6 +409,7 @@ export class ConversationSessionSettingsModal extends Modal {
       name: options.name,
       description: options.description,
       defaultValue: options.defaultValue,
+      controlId: options.setting,
     });
 
     const textareaEl = controlEl.createEl('textarea', {
@@ -435,7 +444,10 @@ export class ConversationSessionSettingsModal extends Modal {
     const selectEl = controlEl.createEl('select', {
       cls: 'opencodian-session-settings-dropdown',
       attr: {
+        id: options.setting,
         'data-setting': options.setting,
+        'aria-labelledby': `${options.setting}-label`,
+        'aria-label': options.name,
       },
     });
 
@@ -744,7 +756,11 @@ export class ConversationSessionSettingsModal extends Modal {
 
     const targetSelect = controlsEl.createEl('select', {
       cls: 'opencodian-session-settings-codex-review-target dropdown',
-      attr: { 'data-codex-review-target': 'true' },
+      attr: {
+        id: 'codex-review-target',
+        'data-codex-review-target': 'true',
+        'aria-label': t('chat.sessionSettings.modal.codexReview'),
+      },
     });
     targetSelect.add(new Option(t('chat.sessionSettings.modal.codexReviewTargetUncommitted'), 'uncommittedChanges'));
     targetSelect.add(new Option(t('chat.sessionSettings.modal.codexReviewTargetBaseBranch'), 'baseBranch'));
@@ -1034,7 +1050,7 @@ export class ConversationSessionSettingsModal extends Modal {
 
   private createFieldShell(
     containerEl: HTMLElement,
-    options: { name: string; description: string; defaultValue: string },
+    options: { name: string; description: string; defaultValue: string; controlId?: string },
   ): HTMLElement {
     const fieldEl = containerEl.createDiv({
       cls: 'opencodian-session-settings-field',
@@ -1045,6 +1061,7 @@ export class ConversationSessionSettingsModal extends Modal {
     infoEl.createEl('label', {
       cls: 'opencodian-session-settings-field-label',
       text: options.name,
+      ...(options.controlId ? { attr: { for: options.controlId, id: `${options.controlId}-label` } } : {}),
     });
     infoEl.createDiv({
       cls: 'opencodian-session-settings-field-description',

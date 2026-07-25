@@ -46,6 +46,7 @@ import {
   type AppServerReviewResult,
   type AppServerReviewTarget,
   type AppServerSkill,
+  type AppServerSkillGroup,
   type AppServerThread,
   type AppServerThreadEffectiveEvidence,
   type AppServerThreadEffectiveSettings,
@@ -625,6 +626,24 @@ export class CodexAdapter
       });
     } catch (err) {
       logger.warn('App-server skills/list failed', { error: err instanceof Error ? err.message : String(err) });
+      return null;
+    }
+  }
+
+  /**
+   * Read the same runtime skill catalog without flattening cwd groups or
+   * discarding server discovery errors. Intended for settings readback only;
+   * chat callers continue to use `getRuntimeSkills()`.
+   */
+  async getRuntimeSkillGroups(): Promise<AppServerSkillGroup[] | null> {
+    const client = this.appServerClient;
+    if (!client) return null;
+    try {
+      return await client.listSkillGroups({ cwd: this.options.workingDirectory });
+    } catch (err) {
+      logger.warn('Grouped app-server skills/list failed', {
+        error: err instanceof Error ? err.message : String(err),
+      });
       return null;
     }
   }

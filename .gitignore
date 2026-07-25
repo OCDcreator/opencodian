@@ -75,7 +75,7 @@ docs/*
 # Automation runtime
 automation/runtime/
 .codex/
-.gitnexus/
+.codegraph/
 
 # Local debug artifacts
 .obsidian-debug/

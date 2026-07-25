@@ -3,7 +3,7 @@
 > **源码**: `src/core/agents/backend/CodexAppServerClientTypes.ts`
 > **状态**: [RUNTIME_ADJUNCT]
 
-> **新增类型**: `AppServerSkill`（name/description?/path?/enabled?/scope?）与 `AppServerListSkillsOptions`（cwd?/forceReload?），描述 app-server `skills/list` 只读结果。插件永不写入全局 Codex skills。
+> **P1 grouped skills readback（2026-07-24）**: `AppServerSkill` 除既有 name/description/path/enabled/scope 外，防御式保留 `source`、`shortDescription`、`interface`、`dependencies`；`AppServerSkillGroup` 以 `{ cwd: string | null, skills, errors }` 保留每个 cwd 分组，`AppServerSkillError` 保留服务端的 path/message。`AppServerListSkillsOptions` 仍为 cwd?/forceReload?。
 
 > **新增类型（2026-07-24）**: `AppServerThreadEffectiveSettings` —— `thread/start`/`thread/resume` 响应中**服务端确认**的有效设置，形状对齐 Codex 0.144.1 生成的 bindings：`sandbox` 为判别对象 `AppServerSandboxPolicy`（`dangerFullAccess` / `readOnly` / `workspaceWrite` / 未知 type），`activePermissionProfile` 为 `AppServerEffectivePermissionProfile`（`{ id, extends? }`），`approvalPolicy` 为 `AppServerApprovalPolicyEffective`（已知标量或粒度对象），外加 model/modelProvider/cwd/runtimeWorkspaceRoots/instructionSources/approvalsReviewer/reasoningEffort。这是 runtime 证据轴的载体：缺失字段意为 `unavailable`（旧版 app-server 不回显），**非**请求侧值的伪回读。插件 UI 策略仍限 `inherit|untrusted|on-request|never`，与运行时证据的更宽形状分离。
 
@@ -17,6 +17,7 @@
 - 定义实验主聊天的 `AppServerThreadStartOptions`、`AppServerThreadResumeOptions`、`AppServerTurnStartOptions` 与 `AppServerThreadNotification`
 - 定义 `AppServerThreadTokenUsageUpdatedNotification`：`total` 是累计权威 token，`last` 是当前回合 token，`modelContextWindow` 是 Context Ring 分母
 - 定义 `AppServerItem` union（verified against real Codex app-server output）
+- 定义 `skills/list` 的扁平 skill metadata 以及供设置页使用的 cwd/error 分组 readback 类型
 - 定义 `AppServerServerRequestHandler`（服务端发起 JSON-RPC 请求的 handler 签名，供 `CodexAppServerTransport` 使用）
 
 ## 维护约束

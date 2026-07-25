@@ -40,7 +40,7 @@ General 里的设置界面模式、界面语言、在编辑区打开设置，以
 - 通过 `SettingsStyleBackgroundSection` 协调 style owner 下的聊天背景图子区块 lifecycle
 - 对多个 modal 与辅助服务的编排
 
-最近还把一组稳定的 panel chrome 逻辑（标题品牌、通用 block 壳层、inline-code 格式化、help button、语言选择器）抽到 companion 模块 `SettingsPanelChrome.ts`，让主设置页 owner 更聚焦于 section 装配与跨 owner bridge。设置页原生下拉的视觉接管由 `SettingsDropdownControl.ts` 扫描当前 settings container 完成，主 owner 只负责 display / hide 生命周期里的挂载与销毁。
+最近还把一组稳定的 panel chrome 逻辑（标题品牌、通用 block 壳层、inline-code 格式化、help button、语言选择器）抽到 companion 模块 `SettingsPanelChrome.ts`，让主设置页 owner 更聚焦于 section 装配与跨 owner bridge。设置页原生下拉的视觉接管由 `SettingsDropdownControl.ts` 扫描当前 settings container 完成，主 owner 只负责 display / hide 生命周期里的挂载与销毁；主设置页 display 会把 `this.app.keymap` 透传给增强器，使打开态 dropdown Scope 优先处理 trigger Escape，关闭或销毁时恢复宿主 scope。
 
 ## 主要分区
 

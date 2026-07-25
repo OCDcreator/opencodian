@@ -257,7 +257,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     } else {
       this.renderClassicDisplay(containerEl);
     }
-    this.dropdownsEnhancer = enhanceSettingsDropdowns(containerEl);
+    this.dropdownsEnhancer = enhanceSettingsDropdowns(containerEl, this.app.keymap);
   }
 
   private disposeSections(): void {

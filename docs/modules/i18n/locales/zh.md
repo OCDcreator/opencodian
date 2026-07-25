@@ -1,6 +1,13 @@
 # Chinese Locale
 
 > **源码**: `src/i18n/locales/zh.ts`
+> **Updated**: 2026-07-25 P0/P1 设置 UI 审查修复 — Codex 权限四条行描述去除重复尾句（完整生命周期说明只保留在 `settings.codex.groups.permissionsDesc`）；`configEditor.help.*` 标题去除 emoji；新增 `configEditor.metadata.value.{yes,no,none}`、`configEditor.metadata.status.*`、`configEditor.scope.{project,global,managed}` 与 `configEditor.evidenceDetail.*` 本地化证据文案；`settings.codex.resources.deleted` / `settings.claudeCode.resources.deleted` 改为明确"已删除并归档，可从历史恢复"，并新增对应 `deleteConfirm` / `restoreConfirm` 确认文案。
+> **Updated**: 2026-07-24 P1 资源历史状态 — 新增 Claude/Codex 资源归档清单失败文案，避免将不可用历史伪装为空列表。
+> **Updated**: 2026-07-24 P1 安全资源读取 — 新增 Claude/Codex 作用域编辑器读取失败的 typed 文案。
+> **Updated**: 2026-07-24 P1 资源写入 — 新增 Claude/Codex facade 校验失败的 invalid-content 明确文案。
+> **Updated**: 2026-07-24 P1 资源作用域标签 — 清理旧 Global 翻译键中的只读措辞，改由显式作用域 badge 表达状态。
+> **Updated**: 2026-07-24 P1 资源描述 — 将 Codex/Claude 资源描述与无仓库文案对齐到全局作用域 CRUD。
+> **Updated**: 2026-07-24 OpenCode P1-B 配置来源 — 新增显式来源选择、原始 JSONC 编辑器、版本冲突、归档/历史、三轴证据、托管只读和诚实服务边界文案。
 > **最近更新**: 2026-07-23 资源标签精简 — 删除未使用的 `settings.claudeCode.resources.title`；拆分后的 tab 与资源类型组标题承担可见层级。
 > **最近更新**: 2026-07-23 Claude 项目级 Providers — 新增 `settings.claudeCode.providers.*`，覆盖 local-source 门禁、预设编辑器、脱敏配置视图、行内校验与来源优先级提示；并补齐 Providers、MCP、Skills & Commands、Agents 子标签文案。
 > **最近更新**: Codex/Claude 资源管理 + Codex 技能菜单 — 新增 `chat.codex.agentMentionUnavailable.*`、`settings.codex.resources.*`、`settings.codex.tab.resources`，以及 `settings.claudeCode.resources.*` / `settings.claudeCode.tab.resources` 键组。

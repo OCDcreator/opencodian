@@ -15,10 +15,24 @@ import * as path from 'path';
 import {
   assertWithinRoot,
   atomicWriteFile,
+  type FileRevision,
   isSafeResourceName,
   type ProjectResourceWriteError,
   toWriteErrorCode,
 } from './ProjectResourceSecureWrite';
+import {
+  createNamedScopedConfigurationResourceFacade,
+  type CreateNamedScopedConfigurationResourceOptions,
+  type DeleteNamedScopedConfigurationResourceOptions,
+  type NamedScopedConfigurationResourceContext,
+  type ReadNamedScopedConfigurationResourceOptions,
+  type RestoreNamedScopedConfigurationResourceOptions,
+  type ScopedConfigurationResourceContext,
+  type ScopedConfigurationResourceMutationResult,
+  type ScopedConfigurationResourceReadResult,
+  type ScopedConfigurationResourceScope,
+  type UpdateNamedScopedConfigurationResourceOptions,
+} from './ScopedConfigurationResourceService';
 
 /** Metadata for a single discovered Claude agent (a .md file in .claude/agents/). */
 export interface ClaudeProjectAgentInfo {
@@ -41,6 +55,41 @@ export type ClaudeAgentWriteResult =
   | { ok: false; reason: ProjectResourceWriteError; path?: string };
 
 const CLAUDE_AGENTS_DIR = path.join('.claude', 'agents');
+
+export type ClaudeAgentResourceScope = ScopedConfigurationResourceScope;
+
+export type ClaudeAgentResourceContext = ScopedConfigurationResourceContext;
+
+export interface ClaudeAgentResourceInfo extends ClaudeProjectAgentInfo {
+  readonly readonly: false;
+  readonly revision: FileRevision;
+}
+
+interface SecureDiscoveredClaudeAgent extends ClaudeProjectAgentInfo {
+  readonly revision: FileRevision;
+}
+
+export type CreateClaudeAgentResourceOptions = CreateNamedScopedConfigurationResourceOptions;
+export type ReadClaudeAgentResourceOptions = ReadNamedScopedConfigurationResourceOptions;
+export type UpdateClaudeAgentResourceOptions = UpdateNamedScopedConfigurationResourceOptions;
+export type DeleteClaudeAgentResourceOptions = DeleteNamedScopedConfigurationResourceOptions;
+export type ClaudeAgentResourceHistoryOptions = NamedScopedConfigurationResourceContext;
+export type CatalogClaudeAgentResourceHistoryOptions = ScopedConfigurationResourceContext;
+export type RestoreClaudeAgentResourceHistoryEntryOptions = RestoreNamedScopedConfigurationResourceOptions;
+
+export type ClaudeAgentResourceMutationResult = ScopedConfigurationResourceMutationResult;
+export type ClaudeAgentResourceReadResult = ScopedConfigurationResourceReadResult;
+
+const CLAUDE_AGENT_RESOURCE = createNamedScopedConfigurationResourceFacade({
+  backend: 'claude',
+  kind: 'agent',
+  format: 'markdown',
+  relativeRootPath: CLAUDE_AGENTS_DIR,
+  targetRelativePath: (name) => `${name}.md`,
+  isSafeName: isSafeAgentName,
+  defaultContent: defaultClaudeAgentContent,
+  validateContent: validateClaudeAgentContent,
+});
 
 const CODE_FENCE_MARKER = String.fromCharCode(96, 96, 96);
 
@@ -106,32 +155,47 @@ function extractDescription(content: string): string {
 export async function discoverClaudeProjectAgents(
   vaultPath: string | null | undefined,
 ): Promise<ClaudeProjectAgentInfo[]> {
-  return scanAgents(vaultPath, CLAUDE_AGENTS_DIR, 'project');
+  const agents = await scanAgents(vaultPath, CLAUDE_AGENTS_DIR, 'project');
+  return agents.map(toLegacyAgentInfo);
 }
 
 /** Discover global (~/.claude/agents) agents — read-only. */
 export async function discoverClaudeGlobalAgents(
   homePath: string | null | undefined,
 ): Promise<ClaudeProjectAgentInfo[]> {
-  return scanAgents(homePath, CLAUDE_AGENTS_DIR, 'global');
+  const agents = await scanAgents(homePath, CLAUDE_AGENTS_DIR, 'global');
+  return agents.map(toLegacyAgentInfo);
+}
+
+function toLegacyAgentInfo(agent: SecureDiscoveredClaudeAgent): ClaudeProjectAgentInfo {
+  return {
+    name: agent.name,
+    description: agent.description,
+    filePath: agent.filePath,
+    relativePath: agent.relativePath,
+    readonly: agent.readonly,
+    scope: agent.scope,
+  };
 }
 
 async function scanAgents(
   scanRoot: string | null | undefined,
   agentsDir: string,
   scope: 'project' | 'global',
-): Promise<ClaudeProjectAgentInfo[]> {
+): Promise<SecureDiscoveredClaudeAgent[]> {
   if (!scanRoot || !scanRoot.trim()) {
     return [];
   }
   const absoluteDir = path.join(scanRoot, agentsDir);
   let entries: string[];
   try {
+    await assertWithinRoot(scanRoot, absoluteDir);
     entries = await readdir(absoluteDir);
   } catch {
     return [];
   }
-  const results: ClaudeProjectAgentInfo[] = [];
+  const context = { basePath: scanRoot, scope };
+  const results: SecureDiscoveredClaudeAgent[] = [];
   for (const entryName of entries) {
     if (!entryName.endsWith('.md')) {
       continue;
@@ -141,19 +205,22 @@ async function scanAgents(
       continue;
     }
     const filePath = path.join(absoluteDir, entryName);
-    let content: string;
-    try {
-      content = await readFile(filePath, 'utf-8');
-    } catch {
-      continue;
-    }
+    const revision = await CLAUDE_AGENT_RESOURCE.readRevision(context, agentName);
+    if (revision === null) continue;
+    const readResult = await CLAUDE_AGENT_RESOURCE.read({
+      ...context,
+      name: agentName,
+      expectedRevision: revision,
+    });
+    if (readResult.status !== 'success') continue;
     results.push({
       name: agentName,
-      description: extractDescription(content),
+      description: extractDescription(readResult.content),
       filePath,
       relativePath: path.join(agentsDir, entryName),
       readonly: scope === 'global',
       scope,
+      revision: readResult.revision,
     });
   }
   return results.sort((a, b) => a.name.localeCompare(b.name));
@@ -283,3 +350,19 @@ export async function deleteClaudeProjectAgent(
     return { ok: false, reason: toWriteErrorCode(err) };
   }
 }
+
+export async function discoverClaudeAgentResources(
+  context: ClaudeAgentResourceContext,
+): Promise<ClaudeAgentResourceInfo[]> {
+  if (!context.basePath?.trim()) return [];
+  const discovered = await scanAgents(context.basePath, CLAUDE_AGENTS_DIR, context.scope);
+  return discovered.map((agent) => ({ ...agent, readonly: false as const }));
+}
+
+export const createClaudeAgentResource = CLAUDE_AGENT_RESOURCE.create;
+export const readClaudeAgentResourceContent = CLAUDE_AGENT_RESOURCE.read;
+export const updateClaudeAgentResource = CLAUDE_AGENT_RESOURCE.update;
+export const deleteClaudeAgentResource = CLAUDE_AGENT_RESOURCE.delete;
+export const listClaudeAgentResourceHistory = CLAUDE_AGENT_RESOURCE.listHistory;
+export const catalogClaudeAgentResourceHistory = CLAUDE_AGENT_RESOURCE.catalogHistory;
+export const restoreClaudeAgentResourceHistoryEntry = CLAUDE_AGENT_RESOURCE.restore;

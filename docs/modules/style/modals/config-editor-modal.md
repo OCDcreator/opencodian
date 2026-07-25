@@ -9,7 +9,7 @@
 
 ## 关键类名 / CSS 变量
 
-- 配置编辑：`.opencodian-config-editor*`、`.opencodian-config-help*`、`.opencodian-config-buttons`。
+- 配置编辑：`.opencodian-config-editor*`、`.opencodian-config-help*`、`.opencodian-config-buttons`、`.opencodian-config-source-select`（来源下拉，全宽）、`.opencodian-config-source-metadata`（scope/path/exists/editable/revision/parse-error/evidence 的 12px muted 元数据列；mono 行用 `data-config-path|revision|parse-error|evidence` 标记，11px monospace + break-all）、`.opencodian-config-source-status`（`role="status"` 的 muted 状态行）与 `.opencodian-config-history*`（`:empty` 隐藏的历史区、h4、target 卡片、`-target-path` mono 路径、entry 11px mono、empty muted、error warning 边框）。
 - 压缩帮助弹窗：`.opencodian-conversation-compaction-help-modal`、`.opencodian-conversation-compaction-help`、`.opencodian-compaction-help-*`（宽桌面卡片式 help modal，避免沿用默认窄容器和内部滚动）。
 - 项目配置帮助弹窗：`.opencodian-project-config-help-modal`、`.opencodian-project-config-help`、`.opencodian-project-config-help-*`（用于 share / permission.bash 这类项目级 OpenCode 配置解释，主体是短列表 + 官方链接区）。
 - 会话设置分享动作：`.opencodian-session-settings-sharing-status`、`.opencodian-session-settings-sharing-url`、`.opencodian-session-settings-sharing-hint`、`.opencodian-session-settings-sharing-actions` 与 `.opencodian-session-settings-sharing-button`，用于当前会话的分享状态、公开链接、禁用提示、share/unshare 操作按钮。

@@ -362,10 +362,32 @@ export interface McpOauthLoginResult {
 export interface AppServerSkill {
   name: string;
   description?: string;
+  /** Optional compact label exposed by newer app-server builds. */
+  shortDescription?: string;
   path?: string;
   enabled?: boolean;
   /** Best-effort scope label from the server (e.g. "project", "global", "user"). */
   scope?: string;
+  /** Best-effort origin label retained for settings readback when supplied by the server. */
+  source?: string;
+  /** Forward-compatible display metadata from the generated SkillMetadata binding. */
+  interface?: Readonly<Record<string, unknown>>;
+  /** Forward-compatible tool dependency metadata from the generated SkillMetadata binding. */
+  dependencies?: Readonly<Record<string, unknown>>;
+}
+
+/** A server-reported skill discovery error scoped to one cwd group. */
+export interface AppServerSkillError {
+  path?: string;
+  message: string;
+}
+
+/** Stable grouped readback from one Codex app-server `skills/list` entry. */
+export interface AppServerSkillGroup {
+  /** Resolved directory for this group, or null when a legacy/malformed reply omitted it. */
+  cwd: string | null;
+  skills: AppServerSkill[];
+  errors: AppServerSkillError[];
 }
 
 /** Params accepted by `CodexAppServerClient.listSkills()`. */

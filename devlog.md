@@ -11,6 +11,20 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-07-24 P1 — Global resource/config scope closure (code and automation)
+
+**Objective.** Close G1 at the implementation and automated-contract layer: make supported global resource/config sources explicitly targetable and safely editable while keeping persistence, application, and runtime evidence separate.
+
+**P1-A — Claude/Codex resources.** Claude Command/Skill/Agent resources under `~/.claude` and Codex Skill/Agent resources under `~/.agents`/`~/.codex` now expose explicit Project/Global scope, secure create/update/delete, revision-checked conflict handling, archive history, and caller-selected restore. Settings editors show the scoped target/path/revision and retain drafts/modal state on conflicts or archive failures. Codex Agent editing remains strict TOML source-only; Codex Skill/Agent runtime readback stays diagnostic.
+
+**P1-B — OpenCode configuration sources.** Project and global OpenCode sources now include the XDG default and legacy `~/.opencode/opencode.json[c]` candidates, with explicit source targeting, JSONC-preserving edits, safe delete/history/restore, and legacy manager integration. Managed sources remain read-only. Exact-root allowlist and parent/leaf symlink confinement prevent escaped bytes or revisions; revision checks, archive association, and malformed-content paths fail closed.
+
+**Security contract.** The shared resource/archive contracts cover descriptor-bound reads, canonical revision checks, external-edit conflicts without overwriting caller/external bytes, atomic archive/manifest association, exact backend/scope/kind/format targeting, and symlink escape rejection. Successful mutation tests prove persistence only; application is `pending` or `not-applicable` according to request wiring, and runtime is `unavailable` until production/Test Vault Obsidian acceptance.
+
+**Verification.** Targeted P1-A resource/backend Jest contracts and P1-B OpenCode source contracts pass, with owned Settings/manager regression suites passing; scoped ESLint is 0 errors/0 warnings, `npm run typecheck` passes, and `npm run check:module-docs` reports 530/530 mapped modules. Artifacts: `.omo/evidence/p1a-resource-backend/40-handoff-evidence.md`, `.omo/evidence/p1a-resource-ui-user-source/index.md`, `.omo/evidence/p1a-resource-ui-secure-read/index.md`, and `.omo/evidence/p1b_config_backend/final-evidence-index.md`.
+
+**Remaining acceptance.** G1 is `DONE` for code and automated tests only. Production bundle deployment, Test Vault reload, and real Obsidian runtime proof remain open to the root acceptance lane; G6/G9 and all P2/P3 items are unchanged.
+
 ## 2026-06-17 Composer — Hide @agent Dropdown for Claude (Decouple from @mention)
 
 **Objective.** The composer's `@agent` selector dropdown was wrongly shown for the Claude Code backend even though Claude doesn't support choosing a "primary" agent before send (its subagents are spawned on demand via the Task tool, surfaced through the inline `@` mention). Worse, the dropdown's `primaryAgent` selection was silently dropped by `ClaudeCodeAdapter.resolveSendOptionOverrides` (which only extracts `model`/`effort`) — so the button was purely decorative for Claude. The fix: hide the dropdown for Claude while keeping the `@` inline mention working.

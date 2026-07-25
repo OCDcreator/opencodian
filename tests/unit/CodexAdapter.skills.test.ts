@@ -151,6 +151,57 @@ describe('CodexAdapter — getRuntimeSkills()', () => {
   });
 });
 
+describe('CodexAdapter — getRuntimeSkillGroups()', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('returns grouped readback scoped to the vault cwd', async () => {
+    const listSkillGroups = jest.fn().mockResolvedValue([{
+      cwd: '/vault',
+      skills: [{ name: 'code-review', source: 'repo' }],
+      errors: [{ path: '/vault/broken', message: 'invalid' }],
+    }]);
+    const adapter = buildAdapterWithClient({
+      start: jest.fn().mockResolvedValue(undefined),
+      stop: jest.fn(),
+      listSkillGroups,
+      subscribeToSkillsChanged: jest.fn().mockReturnValue(() => undefined),
+    });
+
+    await adapter.start();
+    await expect(adapter.getRuntimeSkillGroups()).resolves.toEqual([{
+      cwd: '/vault',
+      skills: [{ name: 'code-review', source: 'repo' }],
+      errors: [{ path: '/vault/broken', message: 'invalid' }],
+    }]);
+    expect(listSkillGroups).toHaveBeenCalledWith({ cwd: '/vault' });
+  });
+
+  it('returns null when there is no app-server client', async () => {
+    const adapter = new CodexAdapter({
+      codexPathOverride: '/mock/codex',
+      createCodex: async () => ({}) as Awaited<ReturnType<CodexFactory>>,
+      createAppServerClient: () => null,
+    });
+    await adapter.start();
+
+    await expect(adapter.getRuntimeSkillGroups()).resolves.toBeNull();
+  });
+
+  it('returns null when grouped skills/list readback throws', async () => {
+    const adapter = buildAdapterWithClient({
+      start: jest.fn().mockResolvedValue(undefined),
+      stop: jest.fn(),
+      listSkillGroups: jest.fn().mockRejectedValue(new Error('boom')),
+      subscribeToSkillsChanged: jest.fn().mockReturnValue(() => undefined),
+    });
+    await adapter.start();
+
+    await expect(adapter.getRuntimeSkillGroups()).resolves.toBeNull();
+  });
+});
+
 describe('CodexAdapter — skills/changed invalidation bridge', () => {
   beforeEach(() => {
     jest.clearAllMocks();

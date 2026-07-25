@@ -122,15 +122,6 @@
   --opencodian-text-strong: color-mix(in srgb, var(--text-normal) 90%, var(--text-muted));
   --opencodian-accent-subtle: color-mix(in srgb, var(--interactive-accent) 10%, transparent);
   --opencodian-accent-border: color-mix(in srgb, var(--interactive-accent) 32%, transparent);
-  --opencodian-status-warning: var(--text-warning, var(--color-orange, var(--interactive-accent)));
-  --opencodian-status-warning-subtle: color-mix(in srgb, var(--opencodian-status-warning) 10%, transparent);
-  --opencodian-status-warning-border: color-mix(in srgb, var(--opencodian-status-warning) 28%, transparent);
-  --opencodian-status-success: var(--text-success, var(--background-modifier-success));
-  --opencodian-status-success-subtle: color-mix(in srgb, var(--opencodian-status-success) 10%, transparent);
-  --opencodian-status-success-border: color-mix(in srgb, var(--opencodian-status-success) 24%, transparent);
-  --opencodian-status-error: var(--text-error, var(--background-modifier-error));
-  --opencodian-status-error-subtle: color-mix(in srgb, var(--opencodian-status-error) 10%, transparent);
-  --opencodian-status-error-border: color-mix(in srgb, var(--opencodian-status-error) 24%, transparent);
   --opencodian-glass-base: color-mix(in srgb, var(--background-primary) 60%, transparent);
   --opencodian-glass-base-strong: color-mix(in srgb, var(--background-secondary) 52%, transparent);
   --opencodian-glass-base-soft: color-mix(in srgb, var(--background-primary) 34%, transparent);
@@ -169,6 +160,38 @@
   --opencodian-composer-danger-bg-hover: color-mix(in srgb, var(--background-modifier-error) 82%, var(--background-primary));
   --opencodian-composer-danger-shadow: color-mix(in srgb, var(--background-modifier-error) 16%, transparent);
   --opencodian-composer-danger-shadow-strong: color-mix(in srgb, var(--background-modifier-error) 22%, transparent);
+}
+
+/* Status tokens must live on body: Obsidian defines --text-success/--text-error/--text-warning/--color-* only on body,
+   so :root declarations referencing them resolve to guaranteed-invalid and never reach descendants. */
+body {
+  --opencodian-status-warning: var(--text-warning, var(--color-orange, var(--interactive-accent)));
+  --opencodian-status-warning-subtle: color-mix(in srgb, var(--opencodian-status-warning) 10%, transparent);
+  --opencodian-status-warning-border: color-mix(in srgb, var(--opencodian-status-warning) 28%, transparent);
+  --opencodian-status-success: var(--text-success, var(--background-modifier-success));
+  --opencodian-status-success-subtle: color-mix(in srgb, var(--opencodian-status-success) 10%, transparent);
+  --opencodian-status-success-border: color-mix(in srgb, var(--opencodian-status-success) 24%, transparent);
+  --opencodian-status-error: var(--text-error, var(--background-modifier-error));
+  --opencodian-status-error-subtle: color-mix(in srgb, var(--opencodian-status-error) 10%, transparent);
+  --opencodian-status-error-border: color-mix(in srgb, var(--opencodian-status-error) 24%, transparent);
+  --opencodian-status-info: var(--color-blue, var(--interactive-accent));
+  --opencodian-status-info-subtle: color-mix(in srgb, var(--opencodian-status-info) 10%, transparent);
+  --opencodian-status-info-border: color-mix(in srgb, var(--opencodian-status-info) 28%, transparent);
+}
+
+/* AA tuning: raw status hues fail 4.5:1 as small chip text in one or both themes, so the
+   text-level tokens are mixed toward --text-normal per theme (dark: lighten error/info;
+   light: darken all four). -subtle/-border derive from these base tokens automatically. */
+.theme-dark {
+  --opencodian-status-error: color-mix(in srgb, var(--text-error, var(--background-modifier-error)) 70%, var(--text-normal));
+  --opencodian-status-info: color-mix(in srgb, var(--color-blue, var(--interactive-accent)) 55%, var(--text-normal));
+}
+
+.theme-light {
+  --opencodian-status-warning: color-mix(in srgb, var(--text-warning, var(--color-orange, var(--interactive-accent))) 60%, var(--text-normal));
+  --opencodian-status-success: color-mix(in srgb, var(--text-success, var(--background-modifier-success)) 60%, var(--text-normal));
+  --opencodian-status-error: color-mix(in srgb, var(--text-error, var(--background-modifier-error)) 65%, var(--text-normal));
+  --opencodian-status-info: color-mix(in srgb, var(--color-blue, var(--interactive-accent)) 70%, var(--text-normal));
 }
 
 body[data-opencodian-provider-icon-mode="system"] {
@@ -11610,7 +11633,7 @@ img.opencodian-model-provider-header-icon {
 }
 
 .opencodian-settings [data-capability-backend-tab-state] {
-  color: var(--text-faint);
+  color: var(--text-muted);
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0;
@@ -12136,7 +12159,7 @@ img.opencodian-model-provider-header-icon {
 }
 
 .opencodian-settings .opencodian-capability-lab-probe-status-label {
-  color: var(--text-faint);
+  color: var(--text-muted);
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.03em;
@@ -12199,7 +12222,7 @@ img.opencodian-model-provider-header-icon {
 }
 
 .opencodian-settings .opencodian-capability-lab-preview-meta {
-  color: var(--text-faint);
+  color: var(--text-muted);
   font-family: var(--font-monospace);
   font-size: 11px;
   line-height: 1.4;
@@ -12265,6 +12288,135 @@ img.opencodian-model-provider-header-icon {
   display: flex;
   flex-wrap: wrap;
   gap: var(--opencodian-settings-space-sm);
+}
+
+/* Codex effective-settings readback (three-axis evidence, production surface).
+   Flat list rows — the axis badges carry the state, rows stay quiet. */
+.opencodian-settings .opencodian-capability-lab-effective-readback {
+  display: flex;
+  flex-direction: column;
+  gap: var(--opencodian-settings-space-sm);
+  min-width: 0;
+  padding-top: var(--opencodian-settings-space-md);
+  border-top: 1px solid var(--opencodian-settings-inline-border);
+}
+
+.opencodian-settings .opencodian-capability-lab-effective-readback > h4 {
+  margin: 0;
+  color: var(--text-normal);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.opencodian-settings .opencodian-capability-lab-effective-readback-desc,
+.opencodian-settings .opencodian-capability-lab-effective-readback-empty {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.opencodian-settings .opencodian-capability-lab-effective-readback-session {
+  color: var(--text-muted);
+  font-family: var(--font-monospace);
+  font-size: 11px;
+  line-height: 1.45;
+  word-break: break-all;
+}
+
+.opencodian-settings .opencodian-capability-lab-effective-readback-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  min-width: 0;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--opencodian-settings-inline-border);
+}
+
+.opencodian-settings .opencodian-capability-lab-effective-readback-row:last-child {
+  border-bottom: 0;
+}
+
+.opencodian-settings .opencodian-capability-lab-effective-field-name {
+  flex: 0 0 auto;
+  color: var(--text-normal);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.opencodian-settings .opencodian-capability-lab-effective-axis {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 3px;
+  align-items: center;
+  max-width: 100%;
+  padding: 1px 8px;
+  border: 1px solid var(--opencodian-settings-inline-border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--background-primary) 70%, transparent);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.opencodian-settings .opencodian-capability-lab-effective-axis-label {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.opencodian-settings .opencodian-capability-lab-effective-status--verified {
+  border-color: var(--opencodian-status-success-border);
+  background: var(--opencodian-status-success-subtle);
+  color: var(--opencodian-status-success);
+}
+
+.opencodian-settings .opencodian-capability-lab-effective-status--pending {
+  border-color: var(--opencodian-status-info-border);
+  background: var(--opencodian-status-info-subtle);
+  color: var(--opencodian-status-info);
+}
+
+.opencodian-settings .opencodian-capability-lab-effective-status--failed {
+  border-color: var(--opencodian-status-error-border);
+  background: var(--opencodian-status-error-subtle);
+  color: var(--opencodian-status-error);
+}
+
+.opencodian-settings .opencodian-capability-lab-effective-status--unavailable,
+.opencodian-settings .opencodian-capability-lab-effective-status--not-applicable {
+  border-color: var(--text-muted);
+  border-style: dashed;
+  color: var(--text-muted);
+}
+
+.opencodian-settings .opencodian-capability-lab-effective-value {
+  flex: 1 1 100%;
+  min-width: 0;
+  color: var(--text-muted);
+  font-family: var(--font-monospace);
+  font-size: 11px;
+  line-height: 1.45;
+  word-break: break-all;
+}
+
+.opencodian-settings .opencodian-capability-lab-effective-readback-detail {
+  flex: 1 1 100%;
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .opencodian-settings [data-capability-backend-tab] {
+    transition: none;
+  }
 }
 
 @media (max-width: 720px) {
@@ -13264,22 +13416,16 @@ img.opencodian-model-provider-header-icon {
 
 
 /* components/settings-codex-resources.css */
-/* Codex resource management panel (project editable / global read-only).
+/* Codex resource management panel (project / global scopes, both editable).
    Structured row-card lists inside a bounded ScrollArea, quiet group
    headers with the create action on the right, tonal scope badges.
    Shares the Settings Extension Surface vocabulary (skills/tools rows). */
 
-/* Codex resource management panel (project editable / global read-only).
-   No outer section card: each resource type (skills / agents) is an
-   independent card (opencodian-resource-group-card), sharing the unified
-   resource-card vocabulary with the Claude resources panel. */
-
-/* Independent per-type resource card (shared across Claude + Codex). */
+/* Per-type resource group (shared across Claude + Codex): layout-only
+   container. The row cards carry the visuals so the panel does not read
+   as nested cards. */
 .opencodian-resource-group-card {
-  background: var(--background-secondary, var(--background-modifier-form-background, transparent));
-  border: 1px solid var(--background-modifier-border, var(--background-modifier-box-border));
-  border-radius: var(--opencodian-settings-form-row-radius, 10px);
-  padding: var(--opencodian-settings-space-md, 12px);
+  min-width: 0;
 }
 
 .opencodian-codex-resource-group {
@@ -13299,6 +13445,13 @@ img.opencodian-model-provider-header-icon {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+}
+
+.opencodian-codex-resource-group-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
 }
 
 .opencodian-settings .opencodian-codex-resource-group-title {
@@ -13359,6 +13512,7 @@ img.opencodian-model-provider-header-icon {
 .opencodian-codex-resource-row-header {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
   min-width: 0;
 }
@@ -13380,7 +13534,9 @@ img.opencodian-model-provider-header-icon {
 }
 
 .opencodian-codex-resource-edit,
-.opencodian-codex-resource-view {
+.opencodian-codex-resource-view,
+.opencodian-codex-resource-preview,
+.opencodian-codex-resource-history {
   appearance: none;
   border: 1px solid transparent;
   border-radius: 6px;
@@ -13396,7 +13552,9 @@ img.opencodian-model-provider-header-icon {
 }
 
 .opencodian-codex-resource-edit:hover,
-.opencodian-codex-resource-view:hover {
+.opencodian-codex-resource-view:hover,
+.opencodian-codex-resource-preview:hover,
+.opencodian-codex-resource-history:hover {
   background: var(--background-modifier-hover);
   color: var(--text-normal);
 }
@@ -13423,12 +13581,15 @@ img.opencodian-model-provider-header-icon {
 }
 
 .opencodian-codex-resource-delete svg {
+  flex: 0 0 14px;
   width: 14px;
   height: 14px;
 }
 
 .opencodian-codex-resource-edit:focus-visible,
 .opencodian-codex-resource-view:focus-visible,
+.opencodian-codex-resource-preview:focus-visible,
+.opencodian-codex-resource-history:focus-visible,
 .opencodian-codex-resource-delete:focus-visible {
   outline: 2px solid var(--interactive-accent);
   outline-offset: 2px;
@@ -13438,6 +13599,8 @@ img.opencodian-model-provider-header-icon {
   .opencodian-codex-resource-create,
   .opencodian-codex-resource-edit,
   .opencodian-codex-resource-view,
+  .opencodian-codex-resource-preview,
+  .opencodian-codex-resource-history,
   .opencodian-codex-resource-delete {
     transition: none;
   }
@@ -13455,8 +13618,20 @@ img.opencodian-model-provider-header-icon {
   margin: 0;
   font-family: var(--font-monospace);
   font-size: 11px;
-  color: var(--text-faint);
+  color: var(--text-muted);
   word-break: break-all;
+}
+
+.opencodian-codex-resource-revision,
+.opencodian-resource-editor-metadata {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin: 0;
+  font-family: var(--font-monospace);
+  font-size: 11px;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
 }
 
 /* Tonal scope badges (low-chroma; state lives in the badge, not the row). */
@@ -13473,7 +13648,8 @@ img.opencodian-model-provider-header-icon {
 
 .opencodian-codex-resource-scope.is-project {
   background: color-mix(in srgb, var(--interactive-accent) 12%, transparent);
-  color: color-mix(in srgb, var(--interactive-accent) 82%, var(--text-normal));
+  /* text-normal keeps the 12px badge AA-readable on the accent tint in every theme */
+  color: var(--text-normal);
 }
 
 .opencodian-codex-resource-scope.is-global {
@@ -13520,24 +13696,143 @@ img.opencodian-model-provider-header-icon {
   border-top: 1px solid var(--background-modifier-border);
 }
 
+.opencodian-codex-resource-preview-pane {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 320px;
+  padding: 10px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  background: var(--background-primary);
+  color: var(--text-normal);
+  overflow-wrap: anywhere;
+}
+
+.opencodian-resource-conflict {
+  margin-top: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--text-warning, #e8a33d);
+  border-radius: 6px;
+  color: var(--text-warning, #b87700);
+  font-size: var(--font-ui-smaller);
+}
+
+.opencodian-resource-read-error {
+  margin-top: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--text-warning, #e8a33d);
+  border-radius: 6px;
+  color: var(--text-warning, #b87700);
+  font-size: var(--font-ui-smaller);
+}
+
+.opencodian-resource-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.opencodian-resource-history-error {
+  padding: 8px 10px;
+  border: 1px solid var(--text-warning, #e8a33d);
+  border-radius: 6px;
+  color: var(--text-warning, #b87700);
+  font-size: var(--font-ui-smaller);
+}
+
+.opencodian-resource-history-target {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+}
+
+.opencodian-resource-history-target-path {
+  font-family: var(--font-monospace);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.opencodian-resource-history-entry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: var(--font-ui-smaller);
+}
+
+.opencodian-resource-history-restore {
+  flex-shrink: 0;
+}
+
+/* Grouped Codex app-server skills/list readback (settings only). */
+.opencodian-codex-runtime-skill-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: var(--opencodian-settings-space-lg, 12px);
+  padding: 10px 12px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  background: var(--background-secondary);
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.opencodian-codex-runtime-skill-groups-title {
+  margin: 0;
+  padding: 0;
+  font-size: var(--font-ui-small);
+  font-weight: 600;
+}
+
+.opencodian-codex-runtime-skill-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.opencodian-codex-runtime-skill-group-cwd,
+.opencodian-codex-runtime-skill-name,
+.opencodian-codex-runtime-skill-source,
+.opencodian-codex-runtime-skill-error {
+  font-family: var(--font-monospace);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.opencodian-codex-runtime-skill-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 5px 0;
+}
+
+.opencodian-codex-runtime-skill-source {
+  color: var(--text-muted);
+}
+
+.opencodian-codex-runtime-skill-error {
+  color: var(--text-error, #e11d48);
+}
+
 
 /* components/settings-claude-resources.css */
-/* Claude resource management panel (project editable / global read-only).
+/* Claude resource management panel (project / global scopes; global rows
+   surface a read-only notice when the user source is disabled).
    Structured row-card lists inside a bounded ScrollArea, quiet group
    headers with the create action on the right, tonal scope badges.
    Shares the Settings Extension Surface vocabulary (skills/tools rows). */
 
-/* Claude resource management panel (project editable / global read-only).
-   No outer section card: each resource type (commands / skills / agents) is
-   an independent card (opencodian-resource-group-card), sharing the unified
-   resource-card vocabulary with the Codex resources panel. */
-
-/* Independent per-type resource card (shared across Claude + Codex). */
+/* Per-type resource group (shared across Claude + Codex): layout-only
+   container. The row cards carry the visuals so the panel does not read
+   as nested cards. */
 .opencodian-resource-group-card {
-  background: var(--background-secondary, var(--background-modifier-form-background, transparent));
-  border: 1px solid var(--background-modifier-border, var(--background-modifier-box-border));
-  border-radius: var(--opencodian-settings-form-row-radius, 10px);
-  padding: var(--opencodian-settings-space-md, 12px);
+  min-width: 0;
 }
 
 .opencodian-claude-resource-group {
@@ -13551,18 +13846,19 @@ img.opencodian-model-provider-header-icon {
   margin-top: var(--opencodian-settings-space-lg, 12px);
 }
 
-/* Claude resource tabs use the same 14px inline card inset as other Claude settings. */
-.opencodian-settings [data-claude-code-section='skills-commands'] > .opencodian-resource-group-card,
-.opencodian-settings [data-claude-code-section='agents'] > .opencodian-resource-group-card {
-  padding-inline: 14px;
-}
-
 /* Group header: title stays left; its primary create action stays right. */
 .opencodian-claude-resource-group-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+}
+
+.opencodian-claude-resource-group-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
 }
 
 .opencodian-settings .opencodian-claude-resource-group-title {
@@ -13627,6 +13923,7 @@ img.opencodian-model-provider-header-icon {
   background: var(--opencodian-settings-form-row-bg, var(--background-secondary));
 }
 
+/* Row content keeps the 14px inline inset used by other Claude settings rows. */
 .opencodian-settings [data-claude-code-section='skills-commands'] .opencodian-claude-resource-row,
 .opencodian-settings [data-claude-code-section='agents'] .opencodian-claude-resource-row {
   padding-inline: 14px;
@@ -13635,6 +13932,7 @@ img.opencodian-model-provider-header-icon {
 .opencodian-claude-resource-row-header {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
   min-width: 0;
 }
@@ -13656,7 +13954,9 @@ img.opencodian-model-provider-header-icon {
 }
 
 .opencodian-claude-resource-edit,
-.opencodian-claude-resource-view {
+.opencodian-claude-resource-view,
+.opencodian-claude-resource-preview,
+.opencodian-claude-resource-history {
   appearance: none;
   border: 1px solid transparent;
   border-radius: 6px;
@@ -13672,7 +13972,9 @@ img.opencodian-model-provider-header-icon {
 }
 
 .opencodian-claude-resource-edit:hover,
-.opencodian-claude-resource-view:hover {
+.opencodian-claude-resource-view:hover,
+.opencodian-claude-resource-preview:hover,
+.opencodian-claude-resource-history:hover {
   background: var(--background-modifier-hover);
   color: var(--text-normal);
 }
@@ -13706,6 +14008,8 @@ img.opencodian-model-provider-header-icon {
 
 .opencodian-claude-resource-edit:focus-visible,
 .opencodian-claude-resource-view:focus-visible,
+.opencodian-claude-resource-preview:focus-visible,
+.opencodian-claude-resource-history:focus-visible,
 .opencodian-claude-resource-delete:focus-visible {
   outline: 2px solid var(--interactive-accent);
   outline-offset: 2px;
@@ -13715,6 +14019,8 @@ img.opencodian-model-provider-header-icon {
   .opencodian-claude-resource-create,
   .opencodian-claude-resource-edit,
   .opencodian-claude-resource-view,
+  .opencodian-claude-resource-preview,
+  .opencodian-claude-resource-history,
   .opencodian-claude-resource-delete {
     transition: none;
   }
@@ -13732,8 +14038,20 @@ img.opencodian-model-provider-header-icon {
   margin: 0;
   font-family: var(--font-monospace);
   font-size: 11px;
-  color: var(--text-faint);
+  color: var(--text-muted);
   word-break: break-all;
+}
+
+.opencodian-claude-resource-revision,
+.opencodian-resource-editor-metadata {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin: 0;
+  font-family: var(--font-monospace);
+  font-size: 11px;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
 }
 
 /* Tonal scope badges (low-chroma; state lives in the badge, not the row). */
@@ -13750,7 +14068,8 @@ img.opencodian-model-provider-header-icon {
 
 .opencodian-claude-resource-scope.is-project {
   background: color-mix(in srgb, var(--interactive-accent) 12%, transparent);
-  color: color-mix(in srgb, var(--interactive-accent) 82%, var(--text-normal));
+  /* text-normal keeps the 12px badge AA-readable on the accent tint in every theme */
+  color: var(--text-normal);
 }
 
 .opencodian-claude-resource-scope.is-global {
@@ -13778,10 +14097,81 @@ img.opencodian-model-provider-header-icon {
   border-top: 1px solid var(--background-modifier-border);
 }
 
+.opencodian-claude-resource-preview-pane {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 320px;
+  padding: 10px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  background: var(--background-primary);
+  color: var(--text-normal);
+  overflow-wrap: anywhere;
+}
+
+.opencodian-resource-conflict {
+  margin-top: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--text-warning, #e8a33d);
+  border-radius: 6px;
+  color: var(--text-warning, #b87700);
+  font-size: var(--font-ui-smaller);
+}
+
+.opencodian-resource-read-error {
+  margin-top: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--text-warning, #e8a33d);
+  border-radius: 6px;
+  color: var(--text-warning, #b87700);
+  font-size: var(--font-ui-smaller);
+}
+
+.opencodian-resource-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.opencodian-resource-history-error {
+  padding: 8px 10px;
+  border: 1px solid var(--text-warning, #e8a33d);
+  border-radius: 6px;
+  color: var(--text-warning, #b87700);
+  font-size: var(--font-ui-smaller);
+}
+
+.opencodian-resource-history-target {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+}
+
+.opencodian-resource-history-target-path {
+  font-family: var(--font-monospace);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.opencodian-resource-history-entry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: var(--font-ui-smaller);
+}
+
+.opencodian-resource-history-restore {
+  flex-shrink: 0;
+}
+
 /* Global-but-disabled scope (user setting source off): warning tonal. */
 .opencodian-claude-resource-scope.is-global-disabled {
   background: color-mix(in srgb, var(--text-warning, #e8a33d) 14%, transparent);
-  color: var(--text-warning, #b87700);
+  color: var(--text-normal);
 }
 
 /* User-source notice: quiet full-border alert, no side-stripe. */
@@ -18021,6 +18411,97 @@ img.opencodian-model-provider-header-icon {
   padding: 0 16px;
   font-size: 13px;
   font-weight: 500;
+}
+
+/* OpenCode config source editor (P1): explicit source selection, metadata,
+   status line, and archive history. Quiet rows; mono for exact values. */
+.opencodian-config-source-select {
+  width: 100%;
+}
+
+.opencodian-config-source-metadata {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.opencodian-config-source-metadata-row {
+  overflow-wrap: anywhere;
+}
+
+.opencodian-config-source-metadata-row[data-config-path],
+.opencodian-config-source-metadata-row[data-config-revision],
+.opencodian-config-source-metadata-row[data-config-parse-error],
+.opencodian-config-source-metadata-row[data-config-evidence] {
+  font-family: var(--font-monospace);
+  font-size: 11px;
+  word-break: break-all;
+}
+
+.opencodian-config-source-status {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.opencodian-config-history {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.opencodian-config-history:empty {
+  display: none;
+}
+
+.opencodian-config-history > h4 {
+  margin: 0;
+  color: var(--text-normal);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.opencodian-config-history-target {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+}
+
+.opencodian-config-history-target-path {
+  font-family: var(--font-monospace);
+  font-size: 11px;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.opencodian-config-history-entry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--text-muted);
+  font-family: var(--font-monospace);
+  font-size: 11px;
+}
+
+.opencodian-config-history-empty {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.opencodian-config-history-error {
+  padding: 8px 10px;
+  border: 1px solid var(--text-warning, #e8a33d);
+  border-radius: 6px;
+  color: var(--text-warning, #b87700);
+  font-size: var(--font-ui-smaller);
 }
 
 .opencodian-config-help {

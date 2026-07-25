@@ -10,6 +10,9 @@ describe('PluginManagementService', () => {
   const testRoot = path.join(__dirname, 'plugin-management-fixtures');
   const testHome = path.join(testRoot, 'home');
   const testVault = path.join(testRoot, 'vault');
+  const createConfigManager = (): OpencodeConfigManager => new OpencodeConfigManager(testVault, {
+    archiveRootPath: path.join(testRoot, 'archive'),
+  });
 
   beforeEach(() => {
     fs.rmSync(testRoot, { recursive: true, force: true });
@@ -36,7 +39,7 @@ describe('PluginManagementService', () => {
     );
     fs.writeFileSync(path.join(globalConfigDir, 'plugins', 'global-local.ts'), 'export default {};', 'utf-8');
 
-    const configManager = new OpencodeConfigManager(testVault);
+    const configManager = createConfigManager();
     await configManager.updatePluginConfig([
       'opencode-project-plugin',
       ['./plugins/project-custom.ts', { enabled: true }],
@@ -71,7 +74,7 @@ describe('PluginManagementService', () => {
     fs.writeFileSync(path.join(globalConfigDir, 'plugin', 'singular-global.ts'), 'export default {};', 'utf-8');
     fs.writeFileSync(path.join(globalConfigDir, 'plugins', 'plural-global.js'), 'export default {};', 'utf-8');
 
-    const configManager = new OpencodeConfigManager(testVault);
+    const configManager = createConfigManager();
     fs.mkdirSync(path.join(configManager.getConfigDir(), 'plugin'), { recursive: true });
     fs.mkdirSync(configManager.getPluginDir(), { recursive: true });
     fs.writeFileSync(
@@ -170,7 +173,7 @@ describe('PluginManagementService', () => {
       'utf-8',
     );
 
-    const configManager = new OpencodeConfigManager(testVault);
+    const configManager = createConfigManager();
     await configManager.updatePluginConfig(['vault-opencode-json']);
 
     const service = new PluginManagementService(testVault, { globalConfigDir });
@@ -211,27 +214,26 @@ describe('PluginManagementService', () => {
     expect(vaultRootJsonc.editable).toBe(false);
     expect(vaultRootJsonc.specs).toEqual(['vault-root-jsonc']);
 
-    // Canonical editable source
-    const vaultOpencodeJson = byPath.get(configManager.getConfigPath())!;
-    expect(vaultOpencodeJson.scope).toBe('project');
-    expect(vaultOpencodeJson.exists).toBe(true);
-    expect(vaultOpencodeJson.editable).toBe(true);
-    expect(vaultOpencodeJson.specs).toEqual(['vault-opencode-json']);
-
-    // Read-only sibling JSONC in .opencode/
-    const vaultOpencodeJsonc = byPath.get(`${configManager.getConfigPath()}c`)!;
+    // Fresh JSONC is the canonical editable source; its legacy JSON sibling is
+    // independently inventoried rather than implicitly selected.
+    const vaultOpencodeJsonc = byPath.get(configManager.getConfigPath())!;
     expect(vaultOpencodeJsonc.scope).toBe('project');
     expect(vaultOpencodeJsonc.exists).toBe(true);
-    expect(vaultOpencodeJsonc.editable).toBe(false);
-    expect(vaultOpencodeJsonc.specs).toEqual(['vault-opencode-jsonc']);
+    expect(vaultOpencodeJsonc.editable).toBe(true);
+    expect(vaultOpencodeJsonc.specs).toEqual(['vault-opencode-json']);
+
+    const vaultOpencodeJson = byPath.get(path.join(configManager.getConfigDir(), 'opencode.json'))!;
+    expect(vaultOpencodeJson.scope).toBe('project');
+    expect(vaultOpencodeJson.exists).toBe(false);
+    expect(vaultOpencodeJson.editable).toBe(true);
+    expect(vaultOpencodeJson.specs).toEqual([]);
 
     // Each config-derived plugin entry is attributable to its source path
-    expect(vaultOpencodeJson.plugins[0].provenance.sourcePath).toBe(configManager.getConfigPath());
-    expect(vaultOpencodeJsonc.plugins[0].provenance.sourcePath).toBe(`${configManager.getConfigPath()}c`);
+    expect(vaultOpencodeJsonc.plugins[0].provenance.sourcePath).toBe(configManager.getConfigPath());
     expect(globalConfigJson.plugins[0].provenance.sourcePath).toBe(path.join(globalConfigDir, 'config.json'));
   });
 
-  it('does not merge root or JSONC sources into canonical projectConfigSpecs', async () => {
+  it('uses the sole project JSONC source for projectConfigSpecs without merging root sources', async () => {
     const globalConfigDir = path.join(testHome, '.config', 'opencode');
     fs.mkdirSync(globalConfigDir, { recursive: true });
     fs.writeFileSync(
@@ -262,7 +264,7 @@ describe('PluginManagementService', () => {
       'utf-8',
     );
 
-    const configManager = new OpencodeConfigManager(testVault);
+    const configManager = createConfigManager();
     await configManager.updatePluginConfig(['canonical-project-plugin']);
 
     const service = new PluginManagementService(testVault, { globalConfigDir });
@@ -276,7 +278,27 @@ describe('PluginManagementService', () => {
     const byPath = new Map(snapshot.configSources.map((s) => [s.path, s]));
     expect(byPath.get(path.join(testVault, 'opencode.json'))!.specs).toEqual(['vault-root-json']);
     expect(byPath.get(path.join(testVault, 'opencode.jsonc'))!.specs).toEqual(['vault-root-jsonc']);
-    expect(byPath.get(`${configManager.getConfigPath()}c`)!.specs).toEqual(['vault-opencode-jsonc']);
+    expect(byPath.get(configManager.getConfigPath())!.specs).toEqual(['canonical-project-plugin']);
+  });
+
+  it('shows coexisting project JSON and JSONC sources without choosing an effective plugin target', async () => {
+    const configDir = path.join(testVault, '.opencode');
+    fs.mkdirSync(configDir, { recursive: true });
+    const legacyPath = path.join(configDir, 'opencode.json');
+    const jsoncPath = path.join(configDir, 'opencode.jsonc');
+    fs.writeFileSync(legacyPath, JSON.stringify({ plugin: ['legacy-plugin'] }), 'utf-8');
+    fs.writeFileSync(jsoncPath, JSON.stringify({ plugin: ['jsonc-plugin'] }), 'utf-8');
+
+    const service = new PluginManagementService(testVault);
+    const snapshot = await service.inspect('local', 'default');
+
+    expect(snapshot.projectConfigSpecs).toEqual([]);
+    expect(snapshot.projectConfigPlugins).toEqual([]);
+    expect(snapshot.configSources?.find((source) => source.path === legacyPath)).toMatchObject({ editable: true, specs: ['legacy-plugin'] });
+    expect(snapshot.configSources?.find((source) => source.path === jsoncPath)).toMatchObject({ editable: true, specs: ['jsonc-plugin'] });
+    await expect(service.updateProjectConfigPlugins(['must-not-write'])).rejects.toThrow(/ambiguous/i);
+    expect(fs.readFileSync(legacyPath, 'utf-8')).toContain('legacy-plugin');
+    expect(fs.readFileSync(jsoncPath, 'utf-8')).toContain('jsonc-plugin');
   });
 
   it('reports a malformed source without hiding valid siblings or crashing inspect', async () => {
@@ -289,7 +311,7 @@ describe('PluginManagementService', () => {
       'utf-8',
     );
 
-    const configManager = new OpencodeConfigManager(testVault);
+    const configManager = createConfigManager();
     await configManager.updatePluginConfig(['valid-project-plugin']);
 
     const service = new PluginManagementService(testVault, { globalConfigDir });
@@ -321,7 +343,7 @@ describe('PluginManagementService', () => {
       'utf-8',
     );
 
-    const configManager = new OpencodeConfigManager(testVault);
+    const configManager = createConfigManager();
     await configManager.updatePluginConfig(['valid-project-plugin']);
 
     const service = new PluginManagementService(testVault, { globalConfigDir });
@@ -356,15 +378,16 @@ describe('PluginManagementService', () => {
       'utf-8',
     );
 
-    const configManager = new OpencodeConfigManager(testVault);
+    const configManager = createConfigManager();
     await configManager.updatePluginConfig(['canonical-project-plugin']);
     // Corrupt the canonical file after writing it
     fs.writeFileSync(configManager.getConfigPath(), '{ invalid json', 'utf-8');
 
-    // Also write a read-only JSONC sibling to prove it is still inventoried
+    // Also write the legacy JSON sibling to prove coexistence stays inventoried
+    // without choosing either project source as effective.
     fs.writeFileSync(
-      `${configManager.getConfigPath()}c`,
-      JSON.stringify({ plugin: ['vault-opencode-jsonc'] }),
+      path.join(configManager.getConfigDir(), 'opencode.json'),
+      JSON.stringify({ plugin: ['vault-opencode-json'] }),
       'utf-8',
     );
 
@@ -381,10 +404,10 @@ describe('PluginManagementService', () => {
     expect(snapshot.projectConfigSpecs).toEqual([]);
     expect(snapshot.projectConfigPlugins).toEqual([]);
 
-    const siblingJsonc = snapshot.configSources.find(
-      (s) => s.path === `${configManager.getConfigPath()}c`,
+    const siblingJson = snapshot.configSources.find(
+      (s) => s.path === path.join(configManager.getConfigDir(), 'opencode.json'),
     )!;
-    expect(siblingJsonc.specs).toEqual(['vault-opencode-jsonc']);
+    expect(siblingJson.specs).toEqual(['vault-opencode-json']);
     expect(snapshot.globalConfigSpecs).toEqual(['valid-global-plugin']);
     expect(snapshot.globalInfluenceDetected).toBe(true);
   });

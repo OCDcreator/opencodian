@@ -1,9 +1,13 @@
 /* eslint-disable max-lines */
-import * as fs from 'fs';
+import { parse as parseJsonc } from 'jsonc-parser';
 import { Notice } from 'obsidian';
 import * as path from 'path';
 
 import { createLogger } from '../../shared';
+import type {
+  ArchiveHistoryCatalogOutcome,
+  JsoncPathEdit,
+} from '../agents/backend/ProjectResourceSecureWrite';
 import type {
   OpencodeAgentConfig, OpencodeAgentConfigRecord, OpencodeCommandConfig,
   OpencodeCommandConfigRecord, OpencodeCompactionConfig, OpencodeConfig,
@@ -17,7 +21,19 @@ import {
   writeFormatterConfigValue,
   writeLspConfigValue,
 } from './formatterConfig';
-import { isRecord, OPENCODE_SCHEMA_URL, parseOpencodeConfigText } from './modelConfig';
+import { isRecord, OPENCODE_SCHEMA_URL } from './modelConfig';
+import {
+  type ApplyOpencodeConfigPathEditsOptions,
+  type DeleteOpencodeConfigSourceOptions,
+  type OpencodeConfigSourceCandidate,
+  type OpencodeConfigSourceHistoryResult,
+  type OpencodeConfigSourceMutationOutcome,
+  type OpencodeConfigSourceReadResult,
+  OpencodeConfigSourceService,
+  type OpencodeConfigSourceServiceOptions,
+  type RestoreOpencodeConfigSourceOptions,
+  type WriteOpencodeConfigSourceOptions,
+} from './OpencodeConfigSourceService';
 
 const logger = createLogger('OpencodeConfigManager');
 
@@ -58,69 +74,123 @@ const PERMISSION_MODE_TEMPLATES: Record<PermissionMode, PermissionAction | Permi
 
 const SHARE_MODES: ReadonlySet<string> = new Set(['manual', 'auto', 'disabled']);
 
+/** Typed failure for legacy void-returning writers; additive source APIs return outcomes directly. */
+export class OpencodeConfigMutationError extends Error {
+  constructor(public readonly outcome: OpencodeConfigSourceMutationOutcome) {
+    super(`OpenCode configuration persistence failed (${outcome.result.status})`);
+    this.name = 'OpencodeConfigMutationError';
+  }
+}
+
+/** Legacy structured helpers must not pick a sibling when both project sources exist. */
+export class OpencodeConfigAmbiguousSourceError extends Error {
+  constructor(public readonly candidates: readonly string[]) {
+    super(`Ambiguous OpenCode project configuration sources: ${candidates.join(', ')}`);
+    this.name = 'OpencodeConfigAmbiguousSourceError';
+  }
+}
+
+function jsonValuesEqual(left: unknown, right: unknown): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+/** Build leaf-level JSONC edits so untouched comments/order/unknown keys survive. */
+function collectJsoncPathEdits(
+  current: Record<string, unknown>,
+  next: Record<string, unknown>,
+  prefix: readonly (string | number)[] = [],
+): JsoncPathEdit[] {
+  const edits: JsoncPathEdit[] = [];
+  const keys = new Set([...Object.keys(current), ...Object.keys(next)]);
+  for (const key of keys) {
+    const pathParts = [...prefix, key];
+    const hasNext = Object.prototype.hasOwnProperty.call(next, key) && next[key] !== undefined;
+    const hasCurrent = Object.prototype.hasOwnProperty.call(current, key);
+    if (!hasNext) {
+      if (hasCurrent) edits.push({ path: pathParts, value: undefined });
+      continue;
+    }
+    const currentValue = current[key];
+    const nextValue = next[key];
+    if (isRecord(currentValue) && isRecord(nextValue)) {
+      edits.push(...collectJsoncPathEdits(currentValue, nextValue, pathParts));
+      continue;
+    }
+    if (!hasCurrent || !jsonValuesEqual(currentValue, nextValue)) {
+      edits.push({ path: pathParts, value: nextValue });
+    }
+  }
+  return edits;
+}
+
 export class OpencodeConfigManager {
   private vaultPath: string;
   private configDir: string;
   private configPath: string;
+  private readonly sourceService: OpencodeConfigSourceService;
 
-  constructor(vaultPath: string) {
+  constructor(vaultPath: string, sourceOptions: OpencodeConfigSourceServiceOptions = {}) {
     this.vaultPath = vaultPath;
     this.configDir = path.join(vaultPath, '.opencode');
-    this.configPath = path.join(this.configDir, 'opencode.json');
+    this.configPath = path.join(this.configDir, 'opencode.jsonc');
+    this.sourceService = new OpencodeConfigSourceService(vaultPath, sourceOptions);
   }
 
   async exists(): Promise<boolean> {
-    try {
-      await fs.promises.access(this.configPath);
-      return true;
-    } catch {
-      return false;
-    }
+    const source = await this.sourceService.read(await this.resolveStructuredConfigTarget());
+    return source.status === 'success' && source.source.exists;
   }
 
   async read(): Promise<OpencodeConfig> {
-    if (!(await this.exists())) {
+    const source = await this.sourceService.read(await this.resolveStructuredConfigTarget());
+    if (source.status === 'success' && !source.source.exists) return this.getDefaultConfig();
+    if (source.status !== 'success' || source.source.parseError) {
+      logger.error('Failed to read config:', source.status === 'success' ? source.source.parseError : source.status);
       return this.getDefaultConfig();
     }
-
-    try {
-      const content = await fs.promises.readFile(this.configPath, 'utf-8');
-      return parseOpencodeConfigText(content);
-    } catch (error) {
-      logger.error('Failed to read config:', error);
-      return this.getDefaultConfig();
-    }
+    const parsed: unknown = parseJsonc(source.content, undefined, { allowTrailingComma: true });
+    return isRecord(parsed) ? parsed as OpencodeConfig : this.getDefaultConfig();
   }
 
   async write(config: OpencodeConfig): Promise<void> {
-    let tempPath: string | null = null;
-    try {
-      // Ensure directory exists
-      if (!fs.existsSync(this.configDir)) {
-        await fs.promises.mkdir(this.configDir, { recursive: true });
-      }
-
-      const content = JSON.stringify({
-        $schema: OPENCODE_SCHEMA_URL,
-        ...config,
-      }, null, 2);
-
-      tempPath = path.join(
-        this.configDir,
-        `opencode.${process.pid}.${Date.now()}.${Math.random().toString(16).slice(2)}.tmp`,
-      );
-      await fs.promises.writeFile(tempPath, content, 'utf-8');
-      await fs.promises.rename(tempPath, this.configPath);
-    } catch (error) {
-      if (tempPath) {
-        try {
-          await fs.promises.unlink(tempPath);
-        } catch {
-          // Ignore temp cleanup failures.
-        }
-      }
-      logger.error('Failed to write config:', error);
-      throw new Error('Failed to write OpenCode configuration');
+    const targetPath = await this.resolveStructuredConfigTarget();
+    const source = await this.sourceService.read(targetPath);
+    if (source.status !== 'success') {
+      throw new OpencodeConfigMutationError({
+        targetPath,
+        result: { status: 'invalid-target' },
+        evidence: {
+          persistence: 'failed',
+          application: 'not-applicable',
+          runtime: 'not-applicable',
+        },
+      });
+    }
+    if (source.source.parseError) {
+      const outcome = await this.sourceService.applyPathEdits({
+        targetPath,
+        expectedRevision: source.source.revision,
+        edits: [],
+      });
+      throw new OpencodeConfigMutationError(outcome);
+    }
+    const current: Record<string, unknown> = source.source.exists
+      ? parseJsonc(source.content, undefined, { allowTrailingComma: true }) as Record<string, unknown>
+      : { $schema: OPENCODE_SCHEMA_URL };
+    const next: Record<string, unknown> = {
+      ...config,
+      $schema: OPENCODE_SCHEMA_URL,
+    };
+    const edits = collectJsoncPathEdits(current, next);
+    if (source.source.exists && edits.length === 0) return;
+    const outcome = await this.sourceService.applyPathEdits({
+      targetPath,
+      expectedRevision: source.source.revision,
+      edits,
+    });
+    if (outcome.result.status !== 'success') {
+      logger.error('Failed to write config:', outcome.result.status);
+      throw new OpencodeConfigMutationError(outcome);
     }
   }
 
@@ -615,10 +685,66 @@ export class OpencodeConfigManager {
 
   getConfigPath(): string { return this.configPath; }
 
+  /** P1-B default for a newly selected Project source; legacy helpers keep opencode.json. */
+  getDefaultProjectConfigPath(): string { return this.sourceService.getDefaultProjectConfigPath(); }
+
+  /** XDG-aware P1-B default for a newly selected Global source. */
+  getDefaultGlobalConfigPath(): string { return this.sourceService.getDefaultGlobalConfigPath(); }
+
+  async inventoryConfigurationSources(): Promise<OpencodeConfigSourceCandidate[]> {
+    return this.sourceService.inventory();
+  }
+
+  async readConfigurationSource(targetPath: string): Promise<OpencodeConfigSourceReadResult> {
+    return this.sourceService.read(targetPath);
+  }
+
+  async writeConfigurationSource(
+    options: WriteOpencodeConfigSourceOptions,
+  ): Promise<OpencodeConfigSourceMutationOutcome> {
+    return this.sourceService.write(options);
+  }
+
+  async applyConfigurationPathEdits(
+    options: ApplyOpencodeConfigPathEditsOptions,
+  ): Promise<OpencodeConfigSourceMutationOutcome> {
+    return this.sourceService.applyPathEdits(options);
+  }
+
+  async deleteConfigurationSource(
+    options: DeleteOpencodeConfigSourceOptions,
+  ): Promise<OpencodeConfigSourceMutationOutcome> {
+    return this.sourceService.delete(options);
+  }
+
+  async listConfigurationHistory(targetPath: string): Promise<OpencodeConfigSourceHistoryResult> {
+    return this.sourceService.listHistory(targetPath);
+  }
+
+  async catalogConfigurationHistory(
+    scope?: 'project' | 'global',
+  ): Promise<ArchiveHistoryCatalogOutcome> {
+    return this.sourceService.catalogHistory(scope);
+  }
+
+  async restoreConfigurationHistory(
+    options: RestoreOpencodeConfigSourceOptions,
+  ): Promise<OpencodeConfigSourceMutationOutcome> {
+    return this.sourceService.restore(options);
+  }
+
   async remove(): Promise<void> {
     try {
-      if (await this.exists()) {
-        await fs.promises.unlink(this.configPath);
+      const targetPath = await this.resolveStructuredConfigTarget();
+      const source = await this.sourceService.read(targetPath);
+      if (source.status === 'success' && source.source.revision) {
+        const outcome = await this.sourceService.delete({
+          targetPath,
+          expectedRevision: source.source.revision,
+        });
+        if (outcome.result.status !== 'success') {
+          logger.error('Failed to remove config:', outcome.result.status);
+        }
       }
     } catch (error) {
       logger.error('Failed to remove config:', error);
@@ -654,6 +780,24 @@ export class OpencodeConfigManager {
     } catch (error) {
       logger.error('Failed to sync OpenCode config:', error);
     }
+  }
+
+  /**
+   * P1-B's fresh project default is JSONC. A pre-existing sole legacy JSON
+   * source remains a supported structured target, but coexistence is an
+   * explicit user decision surface and legacy helpers must fail closed.
+   */
+  private async resolveStructuredConfigTarget(): Promise<string> {
+    const candidates = await this.sourceService.inventory();
+    const projectCandidates = candidates.filter((candidate) => (
+      candidate.scope === 'project'
+      && (candidate.source === 'project-default' || candidate.source === 'project-legacy')
+    ));
+    const existing = projectCandidates.filter((candidate) => candidate.exists);
+    if (existing.length > 1) {
+      throw new OpencodeConfigAmbiguousSourceError(existing.map((candidate) => candidate.path));
+    }
+    return existing[0]?.path ?? this.configPath;
   }
 
   private getDefaultConfig(): OpencodeConfig {

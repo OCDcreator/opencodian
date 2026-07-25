@@ -1,4 +1,4 @@
-/* eslint-disable max-lines -- Covers the full Codex settings surface across connection/permissions/resume-inspect/account tabs; splitting would fragment the per-tab routing and control-persistence coverage. */
+/* eslint-disable max-lines, max-lines-per-function -- Covers the full Codex settings surface across connection/permissions/resume-inspect/account tabs; splitting would fragment the per-tab routing and control-persistence coverage. */
 import { Setting } from 'obsidian';
 
 import {
@@ -81,6 +81,7 @@ function mockSettingPrototype(): void {
     callback: (control: { addOption: jest.Mock; setValue: jest.Mock; onChange: jest.Mock }) => unknown,
   ) {
     const control = {
+      selectEl: document.createElement('select'),
       addOption: jest.fn().mockReturnThis(),
       setValue: jest.fn().mockReturnThis(),
       onChange: jest.fn().mockReturnThis(),
@@ -207,6 +208,47 @@ describe('SettingsCodexSection stable surface', () => {
     section.attachTabbed(containerEl, 'permissions');
 
     expect(settingNames).toContain(t('settings.codex.sandbox.name'));
+  });
+
+  it('assigns accessible names to the real Approval Policy and Sandbox Mode selects', () => {
+    const plugin = createPlugin();
+    const section = new SettingsCodexSection({
+      plugin: plugin as never,
+      createSectionHeading,
+    });
+    const containerEl = document.createElement('div');
+    section.attachTabbed(containerEl, 'permissions');
+
+    const dropdownCalls = (Setting.prototype.addDropdown as jest.Mock).mock.calls as Array<[(control: {
+      addOption: jest.Mock;
+      setValue: jest.Mock;
+      onChange: jest.Mock;
+      selectEl: HTMLSelectElement;
+    }) => unknown]>;
+    const selectFor = (optionValue: string): HTMLSelectElement => {
+      const match = dropdownCalls.find(([callback]) => {
+        const control = {
+          selectEl: document.createElement('select'),
+          addOption: jest.fn().mockReturnThis(),
+          setValue: jest.fn().mockReturnThis(),
+          onChange: jest.fn().mockReturnThis(),
+        };
+        callback(control);
+        return control.addOption.mock.calls.some(([value]) => value === optionValue);
+      });
+      if (!match) throw new Error(`Dropdown ${optionValue} was not registered`);
+      const control = {
+        selectEl: document.createElement('select'),
+        addOption: jest.fn().mockReturnThis(),
+        setValue: jest.fn().mockReturnThis(),
+        onChange: jest.fn().mockReturnThis(),
+      };
+      match[0](control);
+      return control.selectEl;
+    };
+
+    expect(selectFor('inherit').getAttribute('aria-label')).toBe(t('settings.codex.approvalPolicy.name'));
+    expect(selectFor('danger-full-access').getAttribute('aria-label')).toBe(t('settings.codex.sandbox.name'));
   });
 
   it('renders modelReasoningEffort control', () => {

@@ -77,6 +77,47 @@ describe('CodexAppServerClient — listSkills()', () => {
   });
 });
 
+describe('CodexAppServerClient — listSkillGroups()', () => {
+  it('returns grouped cwd/source/errors readback without flattening', async () => {
+    const client = createClientWithMocks({
+      request: jest.fn().mockResolvedValue({
+        data: [{
+          cwd: '/vault',
+          skills: [{ name: 'code-review', source: 'repo' }],
+          errors: [{ path: '/vault/.agents/skills/broken/SKILL.md', message: 'invalid frontmatter' }],
+        }],
+      }),
+    } as any);
+
+    const groups = await client.listSkillGroups({ cwd: '/vault' });
+
+    expect((client as any).request).toHaveBeenCalledWith('skills/list', { cwd: '/vault' });
+    expect(groups).toEqual([{
+      cwd: '/vault',
+      skills: [{ name: 'code-review', source: 'repo' }],
+      errors: [{ path: '/vault/.agents/skills/broken/SKILL.md', message: 'invalid frontmatter' }],
+    }]);
+  });
+
+  it('uses the requested cwd as the explicit fallback for a legacy flat response', async () => {
+    const client = createClientWithMocks({
+      request: jest.fn().mockResolvedValue([{ name: 'legacy' }]),
+    } as any);
+
+    await expect(client.listSkillGroups({ cwd: '/vault' })).resolves.toEqual([
+      { cwd: '/vault', skills: [{ name: 'legacy' }], errors: [] },
+    ]);
+  });
+
+  it('returns null when the route rejects so settings can distinguish unavailable from empty', async () => {
+    const client = createClientWithMocks({
+      request: jest.fn().mockRejectedValue(new Error('method not found')),
+    } as any);
+
+    await expect(client.listSkillGroups()).resolves.toBeNull();
+  });
+});
+
 describe('CodexAppServerClient — subscribeToSkillsChanged()', () => {
   it('registers a skills/changed handler and returns an unsubscribe function', () => {
     const client = createClientWithMocks();

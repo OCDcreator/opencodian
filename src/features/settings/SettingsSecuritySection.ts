@@ -30,6 +30,8 @@ interface SettingsSecuritySectionOptions {
   app: App;
   plugin: OpenCodianPlugin;
   createSectionHeading: (containerEl: HTMLElement, title: string, tooltip?: string) => HTMLHeadingElement;
+  /** Injectable only for tests; production keeps the default manager construction. */
+  configManagerFactory?: (vaultPath: string) => OpencodeConfigManager;
 }
 
 interface ConfigStatusView {
@@ -41,11 +43,13 @@ export class SettingsSecuritySection {
   private readonly app: App;
   private readonly plugin: OpenCodianPlugin;
   private readonly createSectionHeading: (containerEl: HTMLElement, title: string, tooltip?: string) => HTMLHeadingElement;
+  private readonly configManagerFactory: (vaultPath: string) => OpencodeConfigManager;
 
   constructor(options: SettingsSecuritySectionOptions) {
     this.app = options.app;
     this.plugin = options.plugin;
     this.createSectionHeading = options.createSectionHeading;
+    this.configManagerFactory = options.configManagerFactory ?? ((vaultPath) => new OpencodeConfigManager(vaultPath));
   }
 
   dispose(): void {}
@@ -64,7 +68,7 @@ export class SettingsSecuritySection {
       return headingEl;
     }
 
-    const configManager = new OpencodeConfigManager(vaultPath);
+    const configManager = this.configManagerFactory(vaultPath);
     const configStatusSetting = this.renderConfigStatusSetting(containerEl);
 
     this.renderPermissionModeSetting(containerEl, () =>
@@ -107,7 +111,7 @@ export class SettingsSecuritySection {
         this.renderUnavailableConfigStatus(containerEl);
         return;
       }
-      const configManager = new OpencodeConfigManager(vaultPath);
+      const configManager = this.configManagerFactory(vaultPath);
       const configStatusSetting = this.renderConfigStatusSetting(containerEl);
       this.renderPermissionModeSetting(containerEl, () =>
         this.updateConfigStatus(configStatusSetting, configManager)
@@ -120,7 +124,7 @@ export class SettingsSecuritySection {
         this.renderUnavailableConfigStatus(containerEl);
         return;
       }
-      const configManager = new OpencodeConfigManager(vaultPath);
+      const configManager = this.configManagerFactory(vaultPath);
       const configStatusSetting = this.renderConfigStatusSetting(containerEl);
       this.renderPermissionModeSetting(containerEl, () =>
         this.updateConfigStatus(configStatusSetting, configManager)
@@ -128,7 +132,7 @@ export class SettingsSecuritySection {
       void this.updateConfigStatus(configStatusSetting, configManager).catch(() => {});
       this.renderAutoRestartSetting(containerEl);
     } else if (secondaryTabId === 'safety') {
-      const configManager = vaultPath ? new OpencodeConfigManager(vaultPath) : null;
+      const configManager = vaultPath ? this.configManagerFactory(vaultPath) : null;
       this.renderBlocklistSettings(containerEl, configManager);
     }
   }
@@ -295,22 +299,24 @@ export class SettingsSecuritySection {
   ): void {
     new Setting(containerEl)
       .setName(t('settings.security.configFile.name'))
-      .setDesc(`${t('settings.security.configFile.desc')}${configManager.getConfigPath()}`)
+      .setDesc(t('settings.security.configFile.desc'))
       .addButton((btn) => {
         btn
           .setButtonText(t('settings.security.configFile.editBtn'))
           .setTooltip(t('settings.security.configFile.editTooltip'))
+          .setCta()
           .onClick(() => {
             if (!this.ensureOpenCodeActive()) {
               return;
             }
-            new OpencodeConfigModal(this.app, configManager).open();
+            new OpencodeConfigModal(this.app, configManager, {
+              isMutationAllowed: () => this.isOpenCodeActive(),
+            }).open();
           });
       })
       .addButton((btn) => {
         btn
           .setButtonText(t('settings.security.configFile.applyBtn'))
-          .setCta()
           .onClick(async () => {
             await this.applyConfigRestart(btn);
           });

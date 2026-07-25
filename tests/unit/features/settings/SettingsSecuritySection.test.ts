@@ -95,6 +95,8 @@ const settingRecords: SettingRecord[] = [];
 const tempDirs: string[] = [];
 const currentPlatformKey = getCurrentPlatformKey();
 const currentPlatformLabel = currentPlatformKey === 'windows' ? 'Windows' : 'Unix';
+const SETTING_RECORD_WAIT_TIMEOUT_MS = 5_000;
+const SETTING_RECORD_POLL_INTERVAL_MS = 10;
 
 function ensureSettingRecord(instance: Setting): SettingRecord {
   const existing = settingRecordMap.get(instance);
@@ -273,6 +275,13 @@ function createPlugin(options?: {
     tempDirs.push(basePath);
   }
 
+  const archiveRootPath = basePath
+    ? path.join(basePath, '.test-opencodian-archive')
+    : fs.mkdtempSync(path.join(os.tmpdir(), 'security-section-archive-'));
+  if (!basePath) {
+    tempDirs.push(archiveRootPath);
+  }
+
   const settings = cloneSettings();
   Object.assign(settings, options?.settings);
   if (options?.settings?.server) {
@@ -302,7 +311,9 @@ function createPlugin(options?: {
     },
   } as App;
 
-  const configManager = basePath ? new OpencodeConfigManager(basePath) : null;
+  const configManager = basePath
+    ? new OpencodeConfigManager(basePath, { archiveRootPath })
+    : null;
   let lastSavedPermissionMode = settings.permissionMode;
   const plugin: SecuritySectionPlugin = {
     app,
@@ -316,6 +327,7 @@ function createPlugin(options?: {
       refreshSdkCapabilities: jest.fn().mockResolvedValue({ entries: [], generatedAt: 0 }),
     },
   } as unknown as SecuritySectionPlugin;
+  (plugin as SecuritySectionPlugin & { __testArchiveRootPath?: string }).__testArchiveRootPath = archiveRootPath;
 
   plugin.saveSettings = jest.fn().mockImplementation(async () => {
     if (!configManager) {
@@ -332,7 +344,20 @@ function createPlugin(options?: {
     lastSavedPermissionMode = plugin.settings.permissionMode;
   });
 
-  return { app, basePath, configManager, plugin };
+  return { app, basePath, archiveRootPath, configManager, plugin };
+}
+
+function createSecuritySection(options: {
+  app: App;
+  plugin: SecuritySectionPlugin;
+  createSectionHeading: (containerEl: HTMLElement, title: string) => HTMLHeadingElement;
+}): SettingsSecuritySection {
+  const archiveRootPath = (options.plugin as SecuritySectionPlugin & { __testArchiveRootPath?: string }).__testArchiveRootPath;
+  if (!archiveRootPath) throw new Error('test archive root missing');
+  return new SettingsSecuritySection({
+    ...options,
+    configManagerFactory: (vaultPath) => new OpencodeConfigManager(vaultPath, { archiveRootPath }),
+  });
 }
 
 async function flushAsync(): Promise<void> {
@@ -344,15 +369,16 @@ async function waitForSettingRecord(
   name: string,
   predicate: (record: SettingRecord) => boolean,
 ): Promise<SettingRecord> {
-  for (let attempt = 0; attempt < 20; attempt += 1) {
+  const deadline = Date.now() + SETTING_RECORD_WAIT_TIMEOUT_MS;
+  while (Date.now() < deadline) {
     const record = settingRecords.find((entry) => entry.name === name);
     if (record && predicate(record)) {
       return record;
     }
-    await flushAsync();
+    await new Promise<void>((resolve) => setTimeout(resolve, SETTING_RECORD_POLL_INTERVAL_MS));
   }
 
-  throw new Error(`Timed out waiting for setting record: ${name}`);
+  throw new Error(`Timed out waiting ${SETTING_RECORD_WAIT_TIMEOUT_MS}ms for setting record: ${name}`);
 }
 
 function createSectionHeading(containerEl: HTMLElement, title: string): HTMLHeadingElement {
@@ -438,7 +464,7 @@ describe('SettingsSecuritySection', () => {
   });
   it('renders config status, permission controls, and blocklist text areas', async () => {
     const { app, plugin } = createPlugin();
-    const section = new SettingsSecuritySection({
+    const section = createSecuritySection({
       app,
       plugin: plugin as unknown as OpenCodianPlugin,
       createSectionHeading,
@@ -461,6 +487,9 @@ describe('SettingsSecuritySection', () => {
     }
     expect(textAreaRecords.map((record) => record.name)).toEqual(expectedTextAreaNames);
     expect(buttonRecords.filter((record) => record.name === t('settings.security.configFile.name'))).toHaveLength(2);
+    const configFileRecords = settingRecords.filter((record) => record.name === t('settings.security.configFile.name'));
+    expect(configFileRecords[0]?.desc).toBe(t('settings.security.configFile.desc'));
+    expect(configFileRecords[0]?.desc).not.toContain('.opencode/opencode.json');
     const configStatusRecord = await waitForSettingRecord(
       t('settings.security.configStatus.name'),
       (record) => record.desc === t('settings.security.configStatus.notCreated'),
@@ -476,7 +505,7 @@ describe('SettingsSecuritySection', () => {
         server: { ...DEFAULT_SETTINGS.server, mode: 'remote' },
       },
     });
-    const section = new SettingsSecuritySection({
+    const section = createSecuritySection({
       app,
       plugin: plugin as unknown as OpenCodianPlugin,
       createSectionHeading,
@@ -509,7 +538,7 @@ describe('SettingsSecuritySection', () => {
         external_directory: { '*': 'ask', '/shared/libs/*': 'allow' },
       },
     });
-    const section = new SettingsSecuritySection({
+    const section = createSecuritySection({
       app,
       plugin: plugin as unknown as OpenCodianPlugin,
       createSectionHeading,
@@ -529,7 +558,7 @@ describe('SettingsSecuritySection', () => {
   it('restarts the local service from the config action button', async () => {
     jest.useFakeTimers();
     const { app, plugin } = createPlugin();
-    const section = new SettingsSecuritySection({
+    const section = createSecuritySection({
       app,
       plugin: plugin as unknown as OpenCodianPlugin,
       createSectionHeading,
@@ -554,9 +583,30 @@ describe('SettingsSecuritySection', () => {
     expect(applyButtonRecord?.control.setButtonText).toHaveBeenLastCalledWith(t('settings.security.configFile.applyBtn'));
   });
 
+  it('injects a temp archive root into both the section manager and the test helper manager', async () => {
+    const { app, archiveRootPath, configManager, plugin, basePath } = createPlugin();
+    await configManager?.write({ permission: { '*': 'ask', bash: 'ask' } });
+    const section = createSecuritySection({
+      app,
+      plugin: plugin as unknown as OpenCodianPlugin,
+      createSectionHeading,
+    });
+    const containerEl = document.createElement('div');
+    section.attach(containerEl);
+    const blockedCommandsRecord = textAreaRecords.find(
+      (record) => record.name === t('settings.security.blockedCommands.name', { platform: currentPlatformLabel }),
+    );
+    await blockedCommandsRecord?.onChange?.('rm -rf');
+
+    expect(basePath).toBeTruthy();
+    expect(fs.existsSync(archiveRootPath)).toBe(true);
+    const archiveFiles = fs.readdirSync(archiveRootPath, { recursive: true });
+    expect(archiveFiles.length).toBeGreaterThan(0);
+  });
+
   it('parses export paths and blocked commands before saving', async () => {
     const { app, plugin } = createPlugin();
-    const section = new SettingsSecuritySection({
+    const section = createSecuritySection({
       app,
       plugin: plugin as unknown as OpenCodianPlugin,
       createSectionHeading,
@@ -592,7 +642,7 @@ describe('SettingsSecuritySection', () => {
         edit: 'ask',
       },
     });
-    const section = new SettingsSecuritySection({
+    const section = createSecuritySection({
       app,
       plugin: plugin as unknown as OpenCodianPlugin,
       createSectionHeading,
@@ -623,7 +673,7 @@ describe('SettingsSecuritySection', () => {
         autoRestartOnPermissionChange: true,
       },
     });
-    const section = new SettingsSecuritySection({
+    const section = createSecuritySection({
       app,
       plugin: plugin as unknown as OpenCodianPlugin,
       createSectionHeading,
@@ -644,7 +694,7 @@ describe('SettingsSecuritySection', () => {
   it('opens the bash permission help modal from the blocked commands help button', () => {
     const openSpy = jest.spyOn(OpenCodeProjectConfigHelpModal.prototype, 'open').mockImplementation(() => {});
     const { app, plugin } = createPlugin();
-    const section = new SettingsSecuritySection({
+    const section = createSecuritySection({
       app,
       plugin: plugin as unknown as OpenCodianPlugin,
       createSectionHeading,
@@ -684,7 +734,7 @@ describe('SettingsSecuritySection', () => {
         },
       },
     });
-    const section = new SettingsSecuritySection({
+    const section = createSecuritySection({
       app,
       plugin: plugin as unknown as OpenCodianPlugin,
       createSectionHeading,
@@ -722,7 +772,7 @@ describe('SettingsSecuritySection', () => {
         autoRestartOnPermissionChange: true,
       } as Partial<SecuritySectionPlugin['settings']>,
     });
-    const section = new SettingsSecuritySection({
+    const section = createSecuritySection({
       app,
       plugin: plugin as unknown as OpenCodianPlugin,
       createSectionHeading,
@@ -757,7 +807,7 @@ describe('SettingsSecuritySection', () => {
       } as Partial<SecuritySectionPlugin['settings']>,
     });
     const syncSpy = jest.spyOn(OpencodeConfigManager.prototype, 'syncManagedBashDenyPatterns');
-    const section = new SettingsSecuritySection({
+    const section = createSecuritySection({
       app,
       plugin: plugin as unknown as OpenCodianPlugin,
       createSectionHeading,

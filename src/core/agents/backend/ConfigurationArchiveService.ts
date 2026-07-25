@@ -29,8 +29,8 @@
  */
 /* eslint-disable max-lines -- Cohesive high-risk archive owner (confined layout, manifest integrity, retention, atomic I/O, honest clear). Splitting would scatter the security boundary. */
 import { createHash, randomBytes } from 'node:crypto';
-import { type Dirent } from 'node:fs';
-import { link, lstat, mkdir, readdir, readFile, realpath, rename, rm, stat, writeFile } from 'node:fs/promises';
+import { constants, type Dirent, type Stats } from 'node:fs';
+import { link, lstat, mkdir, open, readdir, readFile, realpath, rename, rm, stat, writeFile } from 'node:fs/promises';
 import * as path from 'node:path';
 
 import { confinedComponentWalk, isENOENTError, resolveAnchorRealpath } from './PathConfinement';
@@ -71,6 +71,48 @@ export interface ArchiveContext {
   readonly format: ConfigurationFormat;
   readonly match: AllowlistMatch;
 }
+
+declare const archiveHistoryEntryIdentityBrand: unique symbol;
+
+/** Opaque selection token issued only by a validated history listing. */
+export type ArchiveHistoryEntryIdentity = string & {
+  readonly [archiveHistoryEntryIdentityBrand]: true;
+};
+
+export type ArchiveHistoryEntryKind = 'overwrite' | 'delete';
+
+export interface ArchiveHistoryEntrySummary {
+  readonly identity: ArchiveHistoryEntryIdentity;
+  readonly archiveKind: ArchiveHistoryEntryKind;
+  readonly timestamp: number;
+  readonly size: number;
+}
+
+export interface ArchiveHistoryTarget {
+  readonly canonicalTarget: string;
+  readonly backend: string;
+  readonly scope: ConfigurationScope;
+  readonly kind: string;
+  readonly format: ConfigurationFormat;
+  readonly entries: readonly ArchiveHistoryEntrySummary[];
+}
+
+export type ArchiveHistoryCatalogOutcome =
+  | { readonly status: 'success'; readonly targets: readonly ArchiveHistoryTarget[] }
+  | { readonly status: 'archive-failed'; readonly cause: string };
+
+export interface ArchiveHistoryEntryAssociation {
+  readonly canonicalTarget: string;
+  readonly backend: string;
+  readonly scope: ConfigurationScope;
+  readonly kind: string;
+  readonly format: ConfigurationFormat;
+}
+
+export type ReadArchiveHistoryEntryOutcome =
+  | { readonly status: 'not-found' }
+  | { readonly status: 'found'; readonly content: string }
+  | { readonly status: 'archive-failed'; readonly cause: string };
 
 /**
  * Typed outcome of reading the latest deleted archive content. Distinguishes
@@ -118,6 +160,33 @@ interface ArchiveEntryIdentity {
 interface ArchiveEntryPreflight {
   readonly failures: string[];
   readonly identities: ArchiveEntryIdentity[];
+}
+
+interface ArchiveHistoryFileState {
+  readonly dev: number;
+  readonly ino: number;
+  readonly mode: number;
+  readonly size: number;
+  readonly mtimeMs: number;
+  readonly ctimeMs: number;
+  readonly birthtimeMs: number;
+}
+
+interface ArchiveHistoryEntryFence {
+  readonly entry: ArchiveEntry;
+  readonly lexicalPath: string;
+  readonly fileState: ArchiveHistoryFileState;
+}
+
+type ArchiveHistoryDescriptorReadOutcome =
+  | { readonly status: 'valid'; readonly identity: ArchiveHistoryEntryFence; readonly content: string }
+  | { readonly status: 'invalid'; readonly reason: string };
+
+interface ArchiveHistoryIdentityPayload extends ArchiveHistoryEntryAssociation {
+  readonly version: 1;
+  readonly archiveKind: ArchiveHistoryEntryKind;
+  readonly entry: ArchiveEntry;
+  readonly fileState: ArchiveHistoryFileState;
 }
 
 class ArchiveIntegrityError extends Error {}
@@ -200,6 +269,138 @@ function validateEntries(
     safe.push({ timestamp, fileName, sha256, mtimeMs, size });
   }
   return safe;
+}
+
+function archiveEntriesMatch(a: ArchiveEntry, b: ArchiveEntry): boolean {
+  return a.timestamp === b.timestamp
+    && a.fileName === b.fileName
+    && a.sha256 === b.sha256
+    && a.mtimeMs === b.mtimeMs
+    && a.size === b.size;
+}
+
+function archiveHistoryFileState(stats: Stats): ArchiveHistoryFileState {
+  return {
+    dev: stats.dev,
+    ino: stats.ino,
+    mode: stats.mode,
+    size: stats.size,
+    mtimeMs: stats.mtimeMs,
+    ctimeMs: stats.ctimeMs,
+    birthtimeMs: stats.birthtimeMs,
+  };
+}
+
+function archiveHistoryDescriptorIdentityMatches(
+  a: ArchiveHistoryFileState,
+  b: ArchiveHistoryFileState,
+): boolean {
+  const inodeIdentityAvailable = a.dev !== 0 || b.dev !== 0 || a.ino !== 0 || b.ino !== 0;
+  if (inodeIdentityAvailable) return a.dev === b.dev && a.ino === b.ino;
+  return a.birthtimeMs === b.birthtimeMs
+    && a.ctimeMs === b.ctimeMs
+    && a.mode === b.mode;
+}
+
+function archiveHistoryDescriptorStateMatches(
+  a: ArchiveHistoryFileState,
+  b: ArchiveHistoryFileState,
+): boolean {
+  return archiveHistoryDescriptorIdentityMatches(a, b)
+    && a.mode === b.mode
+    && a.size === b.size
+    && a.mtimeMs === b.mtimeMs
+    && a.ctimeMs === b.ctimeMs
+    && a.birthtimeMs === b.birthtimeMs;
+}
+
+function decodeArchiveHistoryFileState(value: unknown): ArchiveHistoryFileState | null {
+  if (!isPlainObject(value)) return null;
+  const integerFields = [value.dev, value.ino, value.mode];
+  if (integerFields.some((field) => !Number.isSafeInteger(field) || (field as number) < 0)) return null;
+  const numericFields = [value.size, value.mtimeMs, value.ctimeMs, value.birthtimeMs];
+  if (numericFields.some((field) => typeof field !== 'number' || !Number.isFinite(field) || field < 0)) return null;
+  return {
+    dev: value.dev as number,
+    ino: value.ino as number,
+    mode: value.mode as number,
+    size: value.size as number,
+    mtimeMs: value.mtimeMs as number,
+    ctimeMs: value.ctimeMs as number,
+    birthtimeMs: value.birthtimeMs as number,
+  };
+}
+
+function archiveHistoryErrorCode(error: unknown): string | undefined {
+  return error !== null && typeof error === 'object'
+    ? (error as { code?: string }).code
+    : undefined;
+}
+
+function isUnsupportedNoFollowError(error: unknown): boolean {
+  const code = archiveHistoryErrorCode(error);
+  return code === 'EINVAL' || code === 'ENOSYS' || code === 'ENOTSUP' || code === 'EOPNOTSUPP';
+}
+
+function encodeArchiveHistoryEntryIdentity(
+  manifest: ArchiveManifest,
+  archiveKind: ArchiveHistoryEntryKind,
+  identity: ArchiveHistoryEntryFence,
+): ArchiveHistoryEntryIdentity {
+  const payload: ArchiveHistoryIdentityPayload = {
+    version: 1,
+    canonicalTarget: manifest.canonicalPath,
+    backend: manifest.backend,
+    scope: manifest.scope as ConfigurationScope,
+    kind: manifest.kind,
+    format: manifest.format,
+    archiveKind,
+    entry: identity.entry,
+    fileState: identity.fileState,
+  };
+  return Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url') as ArchiveHistoryEntryIdentity;
+}
+
+// eslint-disable-next-line complexity -- Opaque identity parsing rejects every malformed association, entry metadata, filename, and listing-time file-identity branch at one fail-closed boundary.
+function decodeArchiveHistoryEntryIdentity(identity: ArchiveHistoryEntryIdentity): ArchiveHistoryIdentityPayload | null {
+  if (typeof identity !== 'string' || identity.length === 0 || identity.length > 8192 || !/^[A-Za-z0-9_-]+$/.test(identity)) {
+    return null;
+  }
+  let parsed: unknown;
+  try {
+    const decoded = Buffer.from(identity, 'base64url');
+    if (decoded.toString('base64url') !== identity) return null;
+    parsed = JSON.parse(decoded.toString('utf8'));
+  } catch {
+    return null;
+  }
+  if (!isPlainObject(parsed) || parsed.version !== 1) return null;
+  if (typeof parsed.backend !== 'string' || !isSafeArchiveSegment(parsed.backend)) return null;
+  if (typeof parsed.kind !== 'string' || !isSafeArchiveSegment(parsed.kind)) return null;
+  if (typeof parsed.scope !== 'string' || !(VALID_SCOPES as readonly string[]).includes(parsed.scope)) return null;
+  if (!isConfigurationFormat(parsed.format)) return null;
+  if (typeof parsed.canonicalTarget !== 'string' || !path.isAbsolute(parsed.canonicalTarget) || parsed.canonicalTarget.includes('\0')) return null;
+  if (parsed.archiveKind !== 'overwrite' && parsed.archiveKind !== 'delete') return null;
+  const fileState = decodeArchiveHistoryFileState(parsed.fileState);
+  if (fileState === null) return null;
+  const ext = archiveFileExtension(parsed.format);
+  const entries = validateEntries(
+    [parsed.entry],
+    parsed.archiveKind,
+    ext,
+  );
+  if (entries === null || entries.length !== 1) return null;
+  return {
+    version: 1,
+    canonicalTarget: parsed.canonicalTarget,
+    backend: parsed.backend,
+    scope: parsed.scope as ConfigurationScope,
+    kind: parsed.kind,
+    format: parsed.format,
+    archiveKind: parsed.archiveKind,
+    entry: entries[0],
+    fileState,
+  };
 }
 
 export class ConfigurationArchiveService {
@@ -465,6 +666,323 @@ export class ConfigurationArchiveService {
         // best-effort
       }
       throw err;
+    }
+  }
+
+  /** List validated history for one already-allowlisted configuration target. */
+  async listHistory(ctx: ArchiveContext): Promise<ArchiveHistoryCatalogOutcome> {
+    let dir: string;
+    try {
+      dir = this.resolveArchiveDir(ctx);
+    } catch (err) {
+      return { status: 'archive-failed', cause: err instanceof Error ? err.message : 'invalid archive context' };
+    }
+    let outcome: ManifestOutcome;
+    try {
+      outcome = await this.readManifestOutcome(dir, ctx);
+    } catch (err) {
+      return { status: 'archive-failed', cause: err instanceof Error ? err.message : 'manifest path escaped confinement' };
+    }
+    if (outcome.status === 'absent') return { status: 'success', targets: [] };
+    if (outcome.status === 'invalid') {
+      return { status: 'archive-failed', cause: `manifest invalid: ${outcome.reason}` };
+    }
+    const target = await this.buildHistoryTarget(dir, outcome.manifest);
+    return target.status === 'success'
+      ? { status: 'success', targets: [target.target] }
+      : target;
+  }
+
+  /**
+   * Catalog every validated archived target under a backend and optional
+   * scope/kind. The caller must still apply its configuration allowlist before
+   * exposing the result. Any discovered integrity failure suppresses all
+   * partial results.
+   */
+  async catalogHistory(options: {
+    readonly backend: string;
+    readonly scope?: ConfigurationScope;
+    readonly kind?: string;
+  }): Promise<ArchiveHistoryCatalogOutcome> {
+    if (!isSafeArchiveSegment(options.backend)) {
+      return { status: 'archive-failed', cause: `unsafe backend segment: ${options.backend}` };
+    }
+    if (options.scope !== undefined && !VALID_SCOPES.includes(options.scope)) {
+      return { status: 'archive-failed', cause: `unsafe archive scope: ${options.scope}` };
+    }
+    if (options.kind !== undefined && !isSafeArchiveSegment(options.kind)) {
+      return { status: 'archive-failed', cause: `unsafe archive kind segment: ${options.kind}` };
+    }
+
+    const backendRoot = path.join(this.archiveRootPath, options.backend);
+    const failures: string[] = [];
+    const targets: ArchiveHistoryTarget[] = [];
+    const scopeScan = await this.confinedScanDir(backendRoot);
+    failures.push(...scopeScan.failures);
+    for (const scopeDir of scopeScan.dirs) {
+      const scope = path.basename(scopeDir);
+      if (!(VALID_SCOPES as readonly string[]).includes(scope)) {
+        failures.push(`${scope}: unknown archive scope`);
+        continue;
+      }
+      if (options.scope && options.scope !== scope) continue;
+      const kindScan = await this.confinedScanDir(scopeDir);
+      failures.push(...kindScan.failures);
+      for (const kindDir of kindScan.dirs) {
+        const kind = path.basename(kindDir);
+        if (options.kind && options.kind !== kind) continue;
+        const hashScan = await this.confinedScanDir(kindDir);
+        failures.push(...hashScan.failures);
+        for (const hashDir of hashScan.dirs) {
+          const validated = await this.readManifestForClear(hashDir, options.backend, scope, kind);
+          if (validated.kind === 'absent') {
+            failures.push(`${path.basename(hashDir)}: manifest absent`);
+            continue;
+          }
+          if (validated.kind === 'integrity') {
+            failures.push(validated.reason);
+            continue;
+          }
+          const manifest: ArchiveManifest = {
+            canonicalPath: validated.canonicalPath,
+            backend: options.backend,
+            scope,
+            kind,
+            format: validated.format,
+            versions: validated.versions,
+            deleted: validated.deleted,
+          };
+          const target = await this.buildHistoryTarget(hashDir, manifest);
+          if (target.status === 'archive-failed') failures.push(target.cause);
+          else targets.push(target.target);
+        }
+      }
+    }
+    if (failures.length > 0) {
+      return { status: 'archive-failed', cause: failures.join('; ') };
+    }
+    targets.sort((a, b) => a.canonicalTarget.localeCompare(b.canonicalTarget));
+    return { status: 'success', targets };
+  }
+
+  /** Decode only the target association carried by an opaque history token. */
+  getHistoryEntryAssociation(identity: ArchiveHistoryEntryIdentity): ArchiveHistoryEntryAssociation | null {
+    const payload = decodeArchiveHistoryEntryIdentity(identity);
+    if (payload === null) return null;
+    return {
+      canonicalTarget: payload.canonicalTarget,
+      backend: payload.backend,
+      scope: payload.scope,
+      kind: payload.kind,
+      format: payload.format,
+    };
+  }
+
+  /** Revalidate and read one caller-selected history entry without accepting an archive path. */
+  // eslint-disable-next-line complexity -- Selected archive reads keep token/context/manifest/entry/confinement/identity/content checks adjacent so no invalid branch can fall through to bytes.
+  async readHistoryEntryContent(
+    ctx: ArchiveContext,
+    identity: ArchiveHistoryEntryIdentity,
+  ): Promise<ReadArchiveHistoryEntryOutcome> {
+    const payload = decodeArchiveHistoryEntryIdentity(identity);
+    if (payload === null) return { status: 'archive-failed', cause: 'invalid archive history identity' };
+    if (
+      payload.backend !== ctx.backend
+      || payload.scope !== ctx.match.scope
+      || payload.kind !== ctx.kind
+      || payload.format !== ctx.format
+      || payload.canonicalTarget !== ctx.match.canonicalTarget
+    ) {
+      return { status: 'archive-failed', cause: 'archive history identity association mismatch' };
+    }
+
+    let dir: string;
+    try {
+      dir = this.resolveArchiveDir(ctx);
+    } catch (err) {
+      return { status: 'archive-failed', cause: err instanceof Error ? err.message : 'invalid archive context' };
+    }
+    let outcome: ManifestOutcome;
+    try {
+      outcome = await this.readManifestOutcome(dir, ctx);
+    } catch (err) {
+      return { status: 'archive-failed', cause: err instanceof Error ? err.message : 'manifest path escaped confinement' };
+    }
+    if (outcome.status === 'absent') return { status: 'not-found' };
+    if (outcome.status === 'invalid') {
+      return { status: 'archive-failed', cause: `manifest invalid: ${outcome.reason}` };
+    }
+    const candidates = payload.archiveKind === 'overwrite'
+      ? outcome.manifest.versions
+      : outcome.manifest.deleted;
+    const selected = candidates.find((entry) => archiveEntriesMatch(entry, payload.entry));
+    if (selected === undefined) return { status: 'not-found' };
+
+    const subdir = payload.archiveKind === 'overwrite' ? 'versions' : 'deleted';
+    const ext = archiveFileExtension(ctx.format);
+    const directoryFailures = await this.preflightDirectory(dir, subdir);
+    if (directoryFailures.length > 0) {
+      return { status: 'archive-failed', cause: directoryFailures.join('; ') };
+    }
+    const read = await this.readHistoryEntryDescriptorBound(
+      dir,
+      subdir,
+      selected,
+      ext,
+      payload.fileState,
+    );
+    if (read.status === 'invalid') {
+      return { status: 'archive-failed', cause: read.reason };
+    }
+    return { status: 'found', content: read.content };
+  }
+
+  private async buildHistoryTarget(
+    dir: string,
+    manifest: ArchiveManifest,
+  ): Promise<
+    | { readonly status: 'success'; readonly target: ArchiveHistoryTarget }
+    | { readonly status: 'archive-failed'; readonly cause: string }
+  > {
+    const ext = archiveFileExtension(manifest.format);
+    const versionDirectoryFailures = await this.preflightDirectory(dir, 'versions');
+    const deletedDirectoryFailures = await this.preflightDirectory(dir, 'deleted');
+    const failures = [
+      ...versionDirectoryFailures,
+      ...deletedDirectoryFailures,
+    ];
+    const versions: ArchiveHistoryEntryFence[] = [];
+    for (const entry of manifest.versions) {
+      const read = await this.readHistoryEntryDescriptorBound(dir, 'versions', entry, ext);
+      if (read.status === 'invalid') failures.push(read.reason);
+      else versions.push(read.identity);
+    }
+    const deleted: ArchiveHistoryEntryFence[] = [];
+    for (const entry of manifest.deleted) {
+      const read = await this.readHistoryEntryDescriptorBound(dir, 'deleted', entry, ext);
+      if (read.status === 'invalid') failures.push(read.reason);
+      else deleted.push(read.identity);
+    }
+    if (failures.length > 0) return { status: 'archive-failed', cause: failures.join('; ') };
+
+    const entries: ArchiveHistoryEntrySummary[] = [
+      ...versions.map((identity) => ({
+        identity: encodeArchiveHistoryEntryIdentity(manifest, 'overwrite', identity),
+        archiveKind: 'overwrite' as const,
+        timestamp: identity.entry.timestamp,
+        size: identity.entry.size,
+      })),
+      ...deleted.map((identity) => ({
+        identity: encodeArchiveHistoryEntryIdentity(manifest, 'delete', identity),
+        archiveKind: 'delete' as const,
+        timestamp: identity.entry.timestamp,
+        size: identity.entry.size,
+      })),
+    ].sort((a, b) => b.timestamp - a.timestamp);
+    return {
+      status: 'success',
+      target: {
+        canonicalTarget: manifest.canonicalPath,
+        backend: manifest.backend,
+        scope: manifest.scope as ConfigurationScope,
+        kind: manifest.kind,
+        format: manifest.format,
+        entries,
+      },
+    };
+  }
+
+  /** Descriptor-bound history read shared by listing and selected restore. */
+  // eslint-disable-next-line complexity, max-params -- One fail-closed boundary owns filename/confinement, nofollow open, lexical-vs-handle identity, stable descriptor state, and content integrity.
+  private async readHistoryEntryDescriptorBound(
+    dir: string,
+    subdir: 'versions' | 'deleted',
+    entry: ArchiveEntry,
+    ext: string,
+    expectedFileState?: ArchiveHistoryFileState,
+  ): Promise<ArchiveHistoryDescriptorReadOutcome> {
+    const expectedKind = subdir === 'versions' ? 'overwrite' : 'delete';
+    if (!isSafeArchiveFileName(entry.fileName, expectedKind, ext)) {
+      return { status: 'invalid', reason: `${entry.fileName}: unsafe archive filename` };
+    }
+    const lexicalDirectory = path.join(dir, subdir);
+    const lexicalEntryPath = path.join(lexicalDirectory, entry.fileName);
+    if (path.dirname(lexicalEntryPath) !== lexicalDirectory) {
+      return { status: 'invalid', reason: `${entry.fileName}: archive entry path escaped its directory` };
+    }
+
+    let handle: Awaited<ReturnType<typeof open>> | undefined;
+    try {
+      await this.confinedPath(lexicalEntryPath);
+      const initialLexicalStats = await lstat(lexicalEntryPath);
+      if (initialLexicalStats.isSymbolicLink() || !initialLexicalStats.isFile()) {
+        return { status: 'invalid', reason: `${entry.fileName}: archive entry is not a regular lexical file` };
+      }
+
+      const noFollowFlag = typeof constants.O_NOFOLLOW === 'number' ? constants.O_NOFOLLOW : 0;
+      try {
+        handle = await open(lexicalEntryPath, constants.O_RDONLY | noFollowFlag);
+      } catch (error) {
+        if (noFollowFlag === 0 || !isUnsupportedNoFollowError(error)) throw error;
+        handle = await open(lexicalEntryPath, constants.O_RDONLY);
+      }
+
+      const beforeReadStats = await handle.stat();
+      if (!beforeReadStats.isFile()) {
+        return { status: 'invalid', reason: `${entry.fileName}: opened archive entry is not a regular file` };
+      }
+      await this.confinedPath(lexicalEntryPath);
+      const beforeReadLexicalStats = await lstat(lexicalEntryPath);
+      if (beforeReadLexicalStats.isSymbolicLink() || !beforeReadLexicalStats.isFile()) {
+        return { status: 'invalid', reason: `${entry.fileName}: archive entry changed type before descriptor read` };
+      }
+      const initialState = archiveHistoryFileState(initialLexicalStats);
+      const beforeReadState = archiveHistoryFileState(beforeReadStats);
+      const beforeReadLexicalState = archiveHistoryFileState(beforeReadLexicalStats);
+      if (
+        !archiveHistoryDescriptorStateMatches(initialState, beforeReadState)
+        || !archiveHistoryDescriptorStateMatches(beforeReadLexicalState, beforeReadState)
+      ) {
+        return { status: 'invalid', reason: `${entry.fileName}: archive entry identity changed before descriptor read` };
+      }
+      if (
+        expectedFileState !== undefined
+        && !archiveHistoryDescriptorStateMatches(expectedFileState, beforeReadState)
+      ) {
+        return { status: 'invalid', reason: `${entry.fileName}: archive entry identity changed since listing` };
+      }
+
+      const contentBuffer = await handle.readFile();
+      const afterReadStats = await handle.stat();
+      const afterReadState = archiveHistoryFileState(afterReadStats);
+      if (!afterReadStats.isFile() || !archiveHistoryDescriptorStateMatches(beforeReadState, afterReadState)) {
+        return { status: 'invalid', reason: `${entry.fileName}: archive entry descriptor changed during read` };
+      }
+      const contentSha = createHash('sha256').update(contentBuffer).digest('hex');
+      if (contentBuffer.byteLength !== entry.size || contentSha !== entry.sha256) {
+        return { status: 'invalid', reason: `${entry.fileName}: content integrity mismatch (size/sha256)` };
+      }
+
+      await this.confinedPath(lexicalEntryPath);
+      const afterReadLexicalStats = await lstat(lexicalEntryPath);
+      if (afterReadLexicalStats.isSymbolicLink() || !afterReadLexicalStats.isFile()) {
+        return { status: 'invalid', reason: `${entry.fileName}: archive entry changed type during descriptor read` };
+      }
+      if (!archiveHistoryDescriptorStateMatches(archiveHistoryFileState(afterReadLexicalStats), afterReadState)) {
+        return { status: 'invalid', reason: `${entry.fileName}: archive entry identity changed during descriptor read` };
+      }
+      return {
+        status: 'valid',
+        identity: { entry, lexicalPath: lexicalEntryPath, fileState: afterReadState },
+        content: contentBuffer.toString('utf8'),
+      };
+    } catch (error) {
+      return {
+        status: 'invalid',
+        reason: `${entry.fileName}: descriptor read error ${archiveHistoryErrorCode(error) ?? 'unknown'}`,
+      };
+    } finally {
+      await handle?.close().catch(() => undefined);
     }
   }
 

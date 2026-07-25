@@ -4,6 +4,7 @@ import * as path from 'path';
 
 import {
   createClaudeProjectAgent,
+  discoverClaudeAgentResources,
   discoverClaudeProjectAgents,
 } from '../../../../../src/core/agents/backend/ClaudeProjectAgentDiscovery';
 
@@ -67,6 +68,36 @@ describe('ClaudeProjectAgentDiscovery', () => {
     const agents = await discoverClaudeProjectAgents(tempRoot);
 
     expect(agents.map((agent) => agent.name)).toEqual(['visible']);
+  });
+
+  it('rejects an agent leaf symlink without exposing root-external content', async () => {
+    const outsideRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'opencodian-claude-agent-outside-'));
+    try {
+      const outsideFile = path.join(outsideRoot, 'escaped.md');
+      await fs.writeFile(outsideFile, '# ROOT-EXTERNAL AGENT BYTES\n', 'utf-8');
+      const agentsDir = path.join(tempRoot, '.claude', 'agents');
+      await fs.mkdir(agentsDir, { recursive: true });
+      await fs.symlink(outsideFile, path.join(agentsDir, 'escaped.md'));
+
+      await expect(discoverClaudeProjectAgents(tempRoot)).resolves.toEqual([]);
+      await expect(discoverClaudeAgentResources({ scope: 'project', basePath: tempRoot })).resolves.toEqual([]);
+    } finally {
+      await fs.rm(outsideRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects a fixed agents-root symlink without exposing root-external content', async () => {
+    const outsideRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'opencodian-claude-agent-root-outside-'));
+    try {
+      await fs.writeFile(path.join(outsideRoot, 'escaped.md'), '# ROOT-EXTERNAL AGENT ROOT BYTES\n', 'utf-8');
+      await fs.mkdir(path.join(tempRoot, '.claude'), { recursive: true });
+      await fs.symlink(outsideRoot, path.join(tempRoot, '.claude', 'agents'));
+
+      await expect(discoverClaudeProjectAgents(tempRoot)).resolves.toEqual([]);
+      await expect(discoverClaudeAgentResources({ scope: 'project', basePath: tempRoot })).resolves.toEqual([]);
+    } finally {
+      await fs.rm(outsideRoot, { recursive: true, force: true });
+    }
   });
 
   it('creates .claude/agents/<name>.md with safe default frontmatter (no model placeholder)', async () => {

@@ -68,6 +68,7 @@ The Account tab also exposes the shared cost-estimate entry as its own sub-group
 - Registered as primary tab `codex` with `backendRequired: 'codex'` in `settingsLayoutRegistry`; secondary tabs are `connection` (default), `permissions`, `resume-inspect`, `account`, and `resources` (5 tabs)
 - Follows the same `attach()` / `attachTabbed()` pattern as `SettingsClaudeCodeSection`
 - Owns the wired settings controls grouped by Source Grouping (see `CONTEXT.md`): **Connection** tab owns `apiKey`, `model`, `modelReasoningEffort`, `webSearchMode`; **Permissions** tab owns `approvalPolicy`, `sandboxMode`, `additionalDirectories`, `networkAccessEnabled` (8 writable fields total). Both tabs apply live adapter updates via `applyCodexRuntimeUpdates()`
+- Dropdown controls for approval policy and sandbox mode expose their setting names as explicit `aria-label` values in addition to the visible descriptions, preserving an accessible name when the Obsidian `Setting` wrapper is rendered or tested independently.
 - Renders a lightweight connection-source summary instead of a disabled "Authentication" setting
 - Delegates the remaining live runtime readbacks to `SettingsCodexReadbackControls` inside the **Resume & inspect** tab
 - Mounts the four account/capability product cards via `SettingsCodexAccountSurface` inside the **Account** tab, passing the inferred `authSource` derived from the plugin `apiKey` field; the section disposes the account surface during settings re-render so its Codex connection subscription cannot outlive the visible tab

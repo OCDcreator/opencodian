@@ -1,7 +1,46 @@
+/* eslint-disable max-lines -- Dropdown portal, keyboard, accessibility, and style contracts share one focused fixture. */
 import * as fs from 'fs';
+import { Scope } from 'obsidian';
 import * as path from 'path';
 
 import { enhanceSettingsSelect } from '../../../../src/features/settings/SettingsDropdownControl';
+
+type ScopeBinding = { key: string | null; func: (event: KeyboardEvent) => false | void };
+
+interface FakeKeymapHarness {
+  activeScopes: Scope[];
+  dispose: () => void;
+  keymap: {
+    popScope: jest.Mock<void, [Scope]>;
+    pushScope: jest.Mock<void, [Scope]>;
+  };
+}
+
+function createFakeKeymap(): FakeKeymapHarness {
+  const activeScopes: Scope[] = [];
+  const handleKeydown = (event: KeyboardEvent) => {
+    const activeScope = activeScopes[activeScopes.length - 1] as (Scope & { registeredHandlers?: ScopeBinding[] }) | undefined;
+    const binding = activeScope?.registeredHandlers?.find(({ key }) => key === event.key);
+    if (binding?.func(event) === false) {
+      event.preventDefault();
+    }
+  };
+  document.addEventListener('keydown', handleKeydown, true);
+  const keymap = {
+    pushScope: jest.fn((scope: Scope) => {
+      activeScopes.push(scope);
+    }),
+    popScope: jest.fn((scope: Scope) => {
+      const index = activeScopes.lastIndexOf(scope);
+      if (index >= 0) activeScopes.splice(index, 1);
+    }),
+  };
+  return {
+    activeScopes,
+    keymap,
+    dispose: () => document.removeEventListener('keydown', handleKeydown, true),
+  };
+}
 
 function readStyleFile(relativePath: string): string {
   return fs.readFileSync(path.join(process.cwd(), relativePath), 'utf8');
@@ -35,6 +74,11 @@ function createSelect(): HTMLSelectElement {
   return selectEl;
 }
 
+const enhanceSettingsSelectWithKeymap = (
+  selectEl: HTMLSelectElement,
+  keymap: FakeKeymapHarness['keymap'],
+) => enhanceSettingsSelect(selectEl, keymap);
+
 describe('SettingsDropdownControl', () => {
   afterEach(() => {
     document.body.replaceChildren();
@@ -59,6 +103,36 @@ describe('SettingsDropdownControl', () => {
     expect(menuEl?.classList.contains('is-hidden')).toBe(false);
     expect(menuEl?.querySelectorAll('[role="option"]')).toHaveLength(3);
     expect(menuEl?.querySelector('[aria-selected="true"]')?.textContent).toContain('Preset');
+  });
+
+  it('transfers the native select accessible name to the focusable trigger, preferring labelledby', () => {
+    const selectEl = createSelect();
+    const labelEl = document.createElement('span');
+    labelEl.id = 'settings-field-label';
+    labelEl.textContent = 'Theme';
+    document.body.appendChild(labelEl);
+    selectEl.setAttribute('aria-labelledby', labelEl.id);
+    selectEl.setAttribute('aria-label', 'Fallback theme');
+
+    enhanceSettingsSelect(selectEl);
+
+    const triggerEl = document.body.querySelector<HTMLButtonElement>('.opencodian-settings-dropdown-trigger');
+    expect(triggerEl?.getAttribute('aria-labelledby')).toBe(labelEl.id);
+    expect(triggerEl?.hasAttribute('aria-label')).toBe(false);
+  });
+
+  it('inherits an aria-label and refreshes the trigger when the select name changes', async () => {
+    const selectEl = createSelect();
+    selectEl.setAttribute('aria-label', 'Initial theme');
+    const handle = enhanceSettingsSelect(selectEl);
+    const triggerEl = document.body.querySelector<HTMLButtonElement>('.opencodian-settings-dropdown-trigger');
+    expect(triggerEl?.getAttribute('aria-label')).toBe('Initial theme');
+
+    selectEl.setAttribute('aria-label', 'Updated theme');
+    await Promise.resolve();
+    expect(triggerEl?.getAttribute('aria-label')).toBe('Updated theme');
+
+    handle.destroy();
   });
 
   it('syncs selection back to the original select and dispatches change', () => {
@@ -95,6 +169,141 @@ describe('SettingsDropdownControl', () => {
 
     expect(selectEl.value).toBe('liquid-glass');
     expect(onChange).toHaveBeenCalledTimes(1);
+  });
+
+  it('consumes handled keyboard events at the trigger and closes on Escape without bubbling', () => {
+    const selectEl = createSelect();
+    enhanceSettingsSelect(selectEl);
+    const triggerEl = document.body.querySelector<HTMLButtonElement>('.opencodian-settings-dropdown-trigger');
+    const menuEl = document.body.querySelector<HTMLElement>('.opencodian-settings-dropdown-menu');
+    if (!triggerEl || !menuEl) throw new Error('dropdown trigger/menu missing');
+    const hostKeydown = jest.fn();
+    document.addEventListener('keydown', hostKeydown);
+
+    const dispatchHandled = (key: string): KeyboardEvent => {
+      const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
+      triggerEl.dispatchEvent(event);
+      expect(event.defaultPrevented).toBe(true);
+      expect(hostKeydown).not.toHaveBeenCalled();
+      return event;
+    };
+    try {
+      dispatchHandled('ArrowDown');
+      expect(menuEl.classList.contains('is-hidden')).toBe(false);
+      dispatchHandled('ArrowUp');
+      expect(menuEl.classList.contains('is-hidden')).toBe(false);
+      dispatchHandled('Escape');
+      expect(menuEl.classList.contains('is-hidden')).toBe(true);
+      expect(triggerEl.getAttribute('aria-expanded')).toBe('false');
+
+      dispatchHandled('Enter');
+      expect(menuEl.classList.contains('is-hidden')).toBe(false);
+      dispatchHandled(' ');
+      expect(menuEl.classList.contains('is-hidden')).toBe(true);
+    } finally {
+      document.removeEventListener('keydown', hostKeydown);
+    }
+  });
+
+  it('allows unrelated keyboard events to bubble to the host', () => {
+    const selectEl = createSelect();
+    enhanceSettingsSelect(selectEl);
+    const triggerEl = document.body.querySelector<HTMLButtonElement>('.opencodian-settings-dropdown-trigger');
+    if (!triggerEl) throw new Error('dropdown trigger missing');
+    const hostKeydown = jest.fn();
+    document.addEventListener('keydown', hostKeydown);
+    try {
+      const event = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
+      triggerEl.dispatchEvent(event);
+      expect(event.defaultPrevented).toBe(false);
+      expect(hostKeydown).toHaveBeenCalledTimes(1);
+    } finally {
+      document.removeEventListener('keydown', hostKeydown);
+    }
+  });
+
+  it('pushes a native scope only while open and lets closed Escape pass through', () => {
+    const keymapHarness = createFakeKeymap();
+    const selectEl = createSelect();
+    const handle = enhanceSettingsSelectWithKeymap(selectEl, keymapHarness.keymap);
+    const triggerEl = document.body.querySelector<HTMLButtonElement>('.opencodian-settings-dropdown-trigger');
+    const menuEl = document.body.querySelector<HTMLElement>('.opencodian-settings-dropdown-menu');
+    if (!triggerEl || !menuEl) throw new Error('dropdown DOM missing');
+    try {
+      expect(keymapHarness.keymap.pushScope).not.toHaveBeenCalled();
+      triggerEl.click();
+      expect(keymapHarness.keymap.pushScope).toHaveBeenCalledTimes(1);
+      expect(keymapHarness.activeScopes).toHaveLength(1);
+
+      const openTab = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
+      triggerEl.dispatchEvent(openTab);
+      expect(openTab.defaultPrevented).toBe(false);
+      expect(menuEl.classList.contains('is-hidden')).toBe(false);
+
+      const openEscape = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+      triggerEl.dispatchEvent(openEscape);
+
+      expect(openEscape.defaultPrevented).toBe(true);
+      expect(menuEl.classList.contains('is-hidden')).toBe(true);
+      expect(keymapHarness.keymap.popScope).toHaveBeenCalledTimes(1);
+      expect(keymapHarness.activeScopes).toHaveLength(0);
+
+      const closedEscape = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+      triggerEl.dispatchEvent(closedEscape);
+      expect(closedEscape.defaultPrevented).toBe(false);
+      expect(keymapHarness.keymap.pushScope).toHaveBeenCalledTimes(1);
+      expect(keymapHarness.keymap.popScope).toHaveBeenCalledTimes(1);
+    } finally {
+      handle.destroy();
+      keymapHarness.dispose();
+    }
+  });
+
+  it('does not consume Escape from a non-trigger target while open', () => {
+    const keymapHarness = createFakeKeymap();
+    const selectEl = createSelect();
+    const handle = enhanceSettingsSelectWithKeymap(selectEl, keymapHarness.keymap);
+    const triggerEl = document.body.querySelector<HTMLButtonElement>('.opencodian-settings-dropdown-trigger');
+    const menuEl = document.body.querySelector<HTMLElement>('.opencodian-settings-dropdown-menu');
+    if (!triggerEl || !menuEl) throw new Error('dropdown DOM missing');
+    try {
+      triggerEl.click();
+      const optionEl = menuEl.querySelector<HTMLElement>('[role="option"]');
+      if (!optionEl) throw new Error('dropdown option missing');
+      const event = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+      optionEl.dispatchEvent(event);
+
+      expect(event.defaultPrevented).toBe(false);
+      expect(menuEl.classList.contains('is-hidden')).toBe(false);
+      expect(keymapHarness.keymap.popScope).not.toHaveBeenCalled();
+    } finally {
+      handle.destroy();
+      keymapHarness.dispose();
+    }
+  });
+
+  it('does not leak scope pushes across repeated open, close, or destroy calls', () => {
+    const keymapHarness = createFakeKeymap();
+    const selectEl = createSelect();
+    const handle = enhanceSettingsSelectWithKeymap(selectEl, keymapHarness.keymap);
+    const triggerEl = document.body.querySelector<HTMLButtonElement>('.opencodian-settings-dropdown-trigger');
+    if (!triggerEl) throw new Error('dropdown trigger missing');
+    try {
+      triggerEl.click();
+      triggerEl.click();
+      triggerEl.click();
+      handle.close();
+      handle.close();
+      triggerEl.click();
+      handle.destroy();
+      handle.destroy();
+
+      expect(keymapHarness.keymap.pushScope).toHaveBeenCalledTimes(3);
+      expect(keymapHarness.keymap.popScope).toHaveBeenCalledTimes(3);
+      expect(keymapHarness.activeScopes).toHaveLength(0);
+    } finally {
+      keymapHarness.dispose();
+    }
   });
 });
 

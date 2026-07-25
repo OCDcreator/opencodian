@@ -43,6 +43,8 @@ import type {
   AppServerReviewTarget,
   AppServerSandboxPolicy,
   AppServerSkill,
+  AppServerSkillError,
+  AppServerSkillGroup,
   AppServerThread,
   AppServerThreadEffectiveSettings,
   AppServerThreadGoal,
@@ -303,6 +305,105 @@ function pickSkillFields(entry: AppServerSkill): AppServerSkill {
     out.scope = entry.scope;
   }
   return out;
+}
+
+/** Preserve grouped settings metadata without expanding the legacy flat API. */
+function pickGroupedSkillFields(entry: AppServerSkill): AppServerSkill {
+  const out = pickSkillFields(entry);
+  if (entry.shortDescription !== undefined) {
+    out.shortDescription = entry.shortDescription;
+  }
+  if (entry.source !== undefined) {
+    out.source = entry.source;
+  }
+  if (entry.interface !== undefined) {
+    out.interface = entry.interface;
+  }
+  if (entry.dependencies !== undefined) {
+    out.dependencies = entry.dependencies;
+  }
+  return out;
+}
+
+function isGroupedSkillCandidate(entry: unknown): entry is Record<string, unknown> {
+  if (!isPlainObject(entry)) return false;
+  return readOptionalString(entry.cwd) !== undefined
+    || Array.isArray(entry.skills)
+    || Array.isArray(entry.errors);
+}
+
+function normalizeSkillCandidates(value: unknown): AppServerSkill[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter(isAppServerSkill)
+    .map(pickGroupedSkillFields);
+}
+
+function normalizeSkillError(entry: unknown): AppServerSkillError | null {
+  if (typeof entry === 'string' && entry.length > 0) {
+    return { message: entry };
+  }
+  if (!isPlainObject(entry)) return null;
+  const message = readOptionalString(entry.message);
+  if (!message) return null;
+  const path = readOptionalString(entry.path);
+  return path ? { path, message } : { message };
+}
+
+function normalizeSkillErrors(value: unknown): AppServerSkillError[] {
+  if (!Array.isArray(value)) return [];
+  const errors: AppServerSkillError[] = [];
+  for (const entry of value) {
+    const error = normalizeSkillError(entry);
+    if (error) errors.push(error);
+  }
+  return errors;
+}
+
+/**
+ * Normalize `skills/list` without discarding its cwd grouping or discovery
+ * errors. Legacy flat replies are represented as one group, using only an
+ * explicitly supplied fallback cwd; an absent cwd remains null.
+ */
+export function normalizeSkillsListGroupedResult(
+  result: unknown,
+  defaultCwd?: string,
+): AppServerSkillGroup[] {
+  let candidates: unknown[] | undefined;
+  if (Array.isArray(result)) {
+    candidates = result;
+  } else if (isPlainObject(result)) {
+    if (Array.isArray(result.data)) {
+      candidates = result.data;
+    } else if (isGroupedSkillCandidate(result)) {
+      candidates = [result];
+    }
+  }
+  if (!candidates) return [];
+
+  const fallbackCwd = readOptionalString(defaultCwd) ?? null;
+  const groups: AppServerSkillGroup[] = [];
+  let looseSkills: AppServerSkill[] = [];
+  const flushLooseSkills = (): void => {
+    if (looseSkills.length === 0) return;
+    groups.push({ cwd: fallbackCwd, skills: looseSkills, errors: [] });
+    looseSkills = [];
+  };
+
+  for (const entry of candidates) {
+    if (isGroupedSkillCandidate(entry)) {
+      flushLooseSkills();
+      groups.push({
+        cwd: readOptionalString(entry.cwd) ?? fallbackCwd,
+        skills: normalizeSkillCandidates(entry.skills),
+        errors: normalizeSkillErrors(entry.errors),
+      });
+    } else if (isAppServerSkill(entry)) {
+      looseSkills.push(pickGroupedSkillFields(entry));
+    }
+  }
+  flushLooseSkills();
+  return groups;
 }
 
 /**
@@ -646,6 +747,31 @@ export class CodexAppServerClient extends CodexAppServerTransport {
     } catch (err) {
       logger.warn('Failed to list skills from app-server', { error: err instanceof Error ? err.message : String(err) });
       return [];
+    }
+  }
+
+  /**
+   * List skills while preserving each server-provided cwd group and its
+   * discovery errors. This is an additive settings readback API; `listSkills`
+   * remains the flat chat/catalog compatibility path.
+   */
+  async listSkillGroups(options?: AppServerListSkillsOptions): Promise<AppServerSkillGroup[] | null> {
+    await this.start();
+    try {
+      const params: Record<string, unknown> = {};
+      if (options?.cwd) {
+        params.cwd = options.cwd;
+      }
+      if (options?.forceReload) {
+        params.forceReload = true;
+      }
+      const result = await this.request('skills/list', params);
+      return normalizeSkillsListGroupedResult(result, options?.cwd);
+    } catch (err) {
+      logger.warn('Failed to list grouped skills from app-server', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return null;
     }
   }
 
