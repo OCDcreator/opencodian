@@ -378,3 +378,167 @@
     width: 100%;
   }
 }
+
+/* Claude configuration workbench (context-sources tab). Flat, native, theme-driven. */
+.opencodian-claude-configuration {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-4-2, 8px);
+  min-inline-size: 0;
+}
+
+.opencodian-claude-configuration-source-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--size-4-2, 8px);
+  align-items: center;
+  color: var(--text-normal);
+  font-size: var(--font-ui-smaller);
+}
+
+.opencodian-claude-configuration-readonly {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+}
+
+.opencodian-claude-configuration-target-path {
+  font-family: var(--font-monospace);
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  word-break: break-all;
+}
+
+.opencodian-claude-configuration-evidence {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+}
+
+.opencodian-claude-configuration-source-meta {
+  font-size: var(--font-ui-smaller);
+}
+
+.opencodian-claude-configuration-editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-4-2, 8px);
+  min-inline-size: 0;
+}
+
+.opencodian-claude-configuration-draft {
+  width: 100%;
+  min-height: 18em;
+  font-family: var(--font-monospace);
+  font-size: var(--font-smaller);
+  resize: vertical;
+}
+
+/* Compare is a read-only, inline evidence view. It preserves JSON whitespace
+   while wrapping otherwise unbreakable lines inside narrow Obsidian panes;
+   overflow remains locally scrollable rather than widening the Settings UI. */
+.opencodian-claude-configuration-compare-output {
+  box-sizing: border-box;
+  max-inline-size: 100%;
+  margin: 0;
+  overflow: auto;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  font-family: var(--font-monospace);
+  font-size: var(--font-ui-smaller);
+  line-height: 1.5;
+}
+
+.opencodian-claude-configuration-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--size-4-2, 8px);
+  align-items: center;
+}
+
+.opencodian-claude-configuration-status[data-claude-config-status-level='ok'] { color: var(--text-success, var(--text-normal)); }
+.opencodian-claude-configuration-status[data-claude-config-status-level='error'] { color: var(--text-error); }
+.opencodian-claude-configuration-status[data-claude-config-status-level='warn'] { color: var(--text-warning, var(--text-muted)); }
+
+.opencodian-claude-configuration-diagnostic {
+  color: var(--text-error);
+  font-family: var(--font-monospace);
+  font-size: var(--font-ui-smaller);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.opencodian-claude-configuration-error {
+  color: var(--text-error);
+  font-size: var(--font-ui-smaller);
+}
+
+.opencodian-claude-configuration-form,
+.opencodian-claude-configuration-hooks,
+.opencodian-claude-configuration-history {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-4-1, 4px);
+}
+
+.opencodian-claude-configuration-field-row,
+.opencodian-claude-configuration-hook-group,
+.opencodian-claude-configuration-hook-handler,
+.opencodian-claude-configuration-history-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--size-4-1, 4px);
+  padding: var(--size-4-1, 4px) 0;
+}
+
+.opencodian-claude-configuration-field-label {
+  flex: 1 1 14rem;
+  color: var(--text-normal);
+}
+
+.opencodian-claude-configuration-field,
+.opencodian-claude-configuration-hook-group input,
+.opencodian-claude-configuration-hook-handler input,
+.opencodian-claude-configuration-hook-handler select {
+  min-width: min(100%, 14rem);
+  flex: 1 1 14rem;
+}
+
+.opencodian-claude-configuration-source-path,
+.opencodian-claude-configuration-source-revision,
+.opencodian-claude-configuration-hooks-evidence,
+.opencodian-claude-configuration-history-meta {
+  font-family: var(--font-monospace);
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.opencodian-claude-configuration-hook-event,
+.opencodian-claude-configuration-history {
+  border-block-start: 1px solid var(--background-modifier-border);
+  padding-block-start: var(--size-4-2, 8px);
+}
+
+.opencodian-claude-configuration-hook-handler,
+.opencodian-claude-configuration-history-row {
+  background: var(--background-secondary-alt, var(--background-secondary));
+}
+
+.opencodian-claude-configuration button:focus-visible,
+.opencodian-claude-configuration select:focus-visible,
+.opencodian-claude-configuration input:focus-visible,
+.opencodian-claude-configuration textarea:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 2px;
+}
+
+@media (max-width: 520px) {
+  .opencodian-claude-configuration-field-label,
+  .opencodian-claude-configuration-field,
+  .opencodian-claude-configuration-hook-group input,
+  .opencodian-claude-configuration-hook-handler input,
+  .opencodian-claude-configuration-hook-handler select {
+    flex-basis: 100%;
+    min-width: 0;
+  }
+}

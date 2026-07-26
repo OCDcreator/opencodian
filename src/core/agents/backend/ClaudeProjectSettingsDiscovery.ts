@@ -6,7 +6,7 @@
  * settings surfaces without depending on the SDK or runtime queries.
  */
 
-import { mkdir, readFile, writeFile } from 'fs/promises';
+import { readFile } from 'fs/promises';
 import * as path from 'path';
 
 /** Parsed hook command from a Claude settings file. */
@@ -194,30 +194,6 @@ export async function discoverClaudeProjectSettings(
     return Promise.all(CLAUDE_SETTINGS_FILE_NAMES.map((fileName) => readSettingsFile(vaultPath, fileName)));
   } catch {
     return CLAUDE_SETTINGS_FILE_NAMES.map((fileName) => emptySettingsInfo(vaultPath, fileName));
-  }
-}
-
-/**
- * Create a Claude project settings file with empty valid JSON content.
- * Returns the absolute path of the created file, or null on failure/existing file.
- */
-export async function createClaudeProjectSettingsFile(
-  vaultPath: string | null | undefined,
-  fileName: ClaudeProjectSettingsFileName,
-): Promise<string | null> {
-  if (!vaultPath || !vaultPath.trim()) {
-    return null;
-  }
-
-  const settingsDir = path.join(vaultPath, CLAUDE_SETTINGS_DIR);
-  const filePath = path.join(settingsDir, fileName);
-
-  try {
-    await mkdir(settingsDir, { recursive: true });
-    await writeFile(filePath, '{}', { encoding: 'utf-8', flag: 'wx' });
-    return filePath;
-  } catch {
-    return null;
   }
 }
 

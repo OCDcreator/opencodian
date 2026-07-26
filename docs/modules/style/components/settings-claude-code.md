@@ -146,6 +146,15 @@ Claude Code 设置面板的专用样式，负责 tab body、语义 group、readb
 - 使用 warning tint
 - 表示选项已连接但行为尚未验证
 
+## Configuration workbench
+
+`context-sources` 的 `SettingsClaudeConfigurationSection` 使用 `opencodian-claude-configuration*` class 与 `data-claude-config-*` / `data-claude-hooks-*` hooks。它是 flat native-DOM surface，不复用 Claude Code card chrome：source/scope rows、strict JSON textarea、action/status/diagnostic rows、common-field form、history rows 和 hooks event/group/handler rows 使用 shared Obsidian spacing and theme variables。
+
+- `.opencodian-claude-configuration`、`-source-row`、`-editor`、`-actions` 控制窄面板中的 flex wrapping；target paths、revisions、schema evidence 使用 monospace muted metadata。
+- `.opencodian-claude-configuration-draft` 保留可垂直调整的 strict-JSON textarea；`.opencodian-claude-configuration-compare-output` 使用局部滚动和 `pre-wrap`，不会撑宽 Settings pane。
+- `.opencodian-claude-configuration-status[data-claude-config-status-level]` 区分 ok/error/warn；`.opencodian-claude-configuration-diagnostic` 与 error rows 使用 error tint。managed/read-only 标识保持 muted，不伪装成可写控件。
+- field/group/handler/history rows 与 hooks evidence 使用轻量分隔和 `gap`，不增加卡片层级；未知 event/handler raw JSON 仍可读。
+
 ## 维护约束
 
 - 新增 Claude Code 设置相关样式时优先放入此文件

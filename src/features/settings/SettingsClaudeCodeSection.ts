@@ -27,7 +27,6 @@ import {
 } from '../../core/agents/backend/ClaudeCodeProcessResolver';
 import type { ClaudeProjectAgentInfo } from '../../core/agents/backend/ClaudeProjectAgentDiscovery';
 import type { ClaudeProjectCommandInfo } from '../../core/agents/backend/ClaudeProjectCommandDiscovery';
-import type { ClaudeProjectSettingsInfo } from '../../core/agents/backend/ClaudeProjectSettingsDiscovery';
 import type { ClaudeProjectSkillInfo } from '../../core/agents/backend/ClaudeProjectSkillDiscovery';
 import {
   type ClaudeCodeEffort,
@@ -42,6 +41,7 @@ import type OpenCodianPlugin from '../../main';
 import { getVaultBasePath } from '../../shared';
 import { BackendSessionBrowserModal } from '../chat/ui/BackendSessionBrowserModal';
 import { ClaudeCodeHelpContent, ClaudeCodeHelpModal } from './ClaudeCodeHelpModal';
+import { SettingsClaudeConfigurationSection } from './SettingsClaudeConfigurationSection';
 import { SettingsClaudeProvidersSection } from './SettingsClaudeProvidersSection';
 import { SettingsClaudeResourcesSection } from './SettingsClaudeResourcesSection';
 import { SettingsTooltipController } from './SettingsTooltipController';
@@ -159,6 +159,7 @@ type ClaudeCodeGroupId =
   | 'sandbox-advanced'
   | 'source-activation'
   | 'project-source-files'
+  | 'claude-configuration'
   | 'additional-context'
   | 'mcp-runtime'
   | 'tool-policy'
@@ -239,6 +240,10 @@ const CLAUDE_CODE_GROUP_COPY: Record<ClaudeCodeGroupId, { titleKey: TranslationK
     titleKey: 'settings.claudeCode.groups.projectSourceFiles.title',
     descKey: 'settings.claudeCode.groups.projectSourceFiles.desc',
   },
+  'claude-configuration': {
+    titleKey: 'settings.claudeCode.groups.claudeConfiguration.title',
+    descKey: 'settings.claudeCode.groups.claudeConfiguration.desc',
+  },
   'additional-context': {
     titleKey: 'settings.claudeCode.groups.additionalContext.title',
     descKey: 'settings.claudeCode.groups.additionalContext.desc',
@@ -288,6 +293,7 @@ export class SettingsClaudeCodeSection {
   private readonly resolveProcess: (options: ClaudeCodeProcessResolverOptions) => ClaudeCodeProcessResolution;
   private readonly resourcesSections = new Map<string, SettingsClaudeResourcesSection>();
   private providersSection: SettingsClaudeProvidersSection | null = null;
+  private configurationSection: SettingsClaudeConfigurationSection | null = null;
 
   constructor(options: SettingsClaudeCodeSectionOptions) {
     this.plugin = options.plugin;
@@ -641,7 +647,6 @@ export class SettingsClaudeCodeSection {
     this.renderClaudeProjectSkillsControls(projectFilesEl);
     this.renderClaudeProjectCommandsControls(projectFilesEl);
     this.renderClaudeProjectAgentsControls(projectFilesEl);
-    this.renderClaudeProjectSettingsControls(projectFilesEl);
 
     const inspectionEl = this.createClaudeCodeGroup(containerEl, { id: 'runtime-inspection' });
     this.renderClaudeRuntimeCommandsControls(inspectionEl);
@@ -1312,176 +1317,6 @@ export class SettingsClaudeCodeSection {
     await this.openFileInEditor(filePath);
     // Re-scan to show the new agent
     await this.renderClaudeProjectAgentsReadback(outputEl);
-  }
-
-  // ─── Claude Project Settings (Hooks & Plugins) ────────────────
-
-  private renderClaudeProjectSettingsControls(containerEl: HTMLElement): void {
-    let outputEl: HTMLElement | null = null;
-    const getOutputEl = (): HTMLElement => {
-      outputEl ??= containerEl.createDiv({
-        cls: 'opencodian-settings-inline-notice opencodian-claude-code-project-settings',
-        attr: {
-          'data-claude-code-project-settings': 'true',
-        },
-      });
-      return outputEl;
-    };
-
-    const setting = new Setting(containerEl)
-      .setName(t('settings.claudeCode.projectSettings.name'))
-      .setDesc(t('settings.claudeCode.projectSettings.desc'))
-      .addButton((button) => {
-        button
-          .setButtonText(t('settings.claudeCode.projectSettings.scanButton'))
-          .onClick(async () => {
-            await this.renderClaudeProjectSettingsReadback(getOutputEl());
-          });
-      })
-      .addButton((button) => {
-        button
-          .setButtonText(t('settings.claudeCode.projectSettings.createLocalButton'))
-          .onClick(async () => {
-            await this.handleCreateClaudeProjectSettingsFile(getOutputEl(), 'settings.local.json');
-          });
-      })
-      .addButton((button) => {
-        button
-          .setButtonText(t('settings.claudeCode.projectSettings.createSharedButton'))
-          .onClick(async () => {
-            await this.handleCreateClaudeProjectSettingsFile(getOutputEl(), 'settings.json');
-          });
-      });
-    this.attachSettingHelp(setting, {
-      boundaryAttr: 'data-claude-code-project-settings-boundary',
-      boundaryText: t('settings.claudeCode.projectSettings.boundaryNotice'),
-      helpTitle: t('settings.claudeCode.projectSettings.name'),
-    });
-  }
-
-  private async renderClaudeProjectSettingsReadback(outputEl: HTMLElement): Promise<void> {
-    outputEl.empty();
-    outputEl.setText(t('settings.claudeCode.projectSettings.loading'));
-
-    const vaultPath = this.getVaultBasePath();
-    if (!vaultPath) {
-      outputEl.setText(t('settings.claudeCode.projectSettings.empty'));
-      return;
-    }
-
-    let settingsFiles: ClaudeProjectSettingsInfo[];
-    try {
-      const { discoverClaudeProjectSettings } = await import('../../core/agents/backend/ClaudeProjectSettingsDiscovery');
-      settingsFiles = await discoverClaudeProjectSettings(vaultPath);
-    } catch {
-      outputEl.setText(t('settings.claudeCode.projectSettings.failed'));
-      return;
-    }
-
-    outputEl.empty();
-
-    for (const sf of settingsFiles) {
-      const fileEl = outputEl.createDiv({
-        cls: 'opencodian-claude-code-project-settings-file-entry',
-        attr: {
-          'data-settings-file': sf.relativePath,
-          'data-settings-exists': String(sf.exists),
-        },
-      });
-
-      const headerLabel = sf.exists
-        ? t('settings.claudeCode.projectSettings.fileEntry', { path: sf.relativePath })
-        : t('settings.claudeCode.projectSettings.fileNotFound', { path: sf.relativePath });
-      fileEl.createEl('p', { text: headerLabel });
-
-      if (sf.parseError) {
-        fileEl.createEl('p', {
-          cls: 'opencodian-settings-inline-notice',
-          text: t('settings.claudeCode.projectSettings.parseError', { error: sf.parseError }),
-        });
-        continue;
-      }
-
-      if (!sf.exists) {
-        continue;
-      }
-
-      if (sf.hookCount > 0) {
-        const hookEvents = Object.keys(sf.hooks);
-        const hookSummary = hookEvents
-          .map((event) => {
-            const groups = sf.hooks[event];
-            const cmdCount = groups.reduce((sum, g) => sum + g.hooks.length, 0);
-            return `${event} (${cmdCount})`;
-          })
-          .join(', ');
-        fileEl.createEl('p', {
-          text: t('settings.claudeCode.projectSettings.hooksSummary', {
-            count: sf.hookCount,
-            events: hookSummary,
-          }),
-        });
-      } else {
-        fileEl.createEl('p', {
-          cls: 'opencodian-settings-inline-notice',
-          text: t('settings.claudeCode.projectSettings.noHooks'),
-        });
-      }
-
-      if (sf.enabledPlugins.length > 0) {
-        fileEl.createEl('p', {
-          text: t('settings.claudeCode.projectSettings.pluginsSummary', {
-            count: sf.enabledPlugins.length,
-            names: sf.enabledPlugins.join(', '),
-          }),
-        });
-      } else {
-        fileEl.createEl('p', {
-          cls: 'opencodian-settings-inline-notice',
-          text: t('settings.claudeCode.projectSettings.noPlugins'),
-        });
-      }
-
-      if (sf.extraKnownMarketplaces.length > 0) {
-        fileEl.createEl('p', {
-          text: t('settings.claudeCode.projectSettings.marketplacesSummary', {
-            count: sf.extraKnownMarketplaces.length,
-            urls: sf.extraKnownMarketplaces.join(', '),
-          }),
-        });
-      } else {
-        fileEl.createEl('p', {
-          cls: 'opencodian-settings-inline-notice',
-          text: t('settings.claudeCode.projectSettings.noMarketplaces'),
-        });
-      }
-
-      const openBtn = fileEl.createEl('button', {
-        cls: 'opencodian-claude-code-action-button',
-        text: t('settings.claudeCode.projectSettings.openButton'),
-      });
-      openBtn.addEventListener('click', () => {
-        void this.openFileInEditor(sf.filePath);
-      });
-    }
-  }
-
-  private async handleCreateClaudeProjectSettingsFile(
-    outputEl: HTMLElement,
-    fileName: 'settings.json' | 'settings.local.json',
-  ): Promise<void> {
-    const vaultPath = this.plugin.app ? this.getVaultBasePath() : null;
-    if (!vaultPath) return;
-
-    const { createClaudeProjectSettingsFile } = await import('../../core/agents/backend/ClaudeProjectSettingsDiscovery');
-    const filePath = await createClaudeProjectSettingsFile(vaultPath, fileName);
-    if (!filePath) {
-      new Notice(t('settings.claudeCode.projectSettings.createFailed'));
-      return;
-    }
-
-    await this.openFileInEditor(filePath);
-    await this.renderClaudeProjectSettingsReadback(outputEl);
   }
 
   // ─── Shared helpers ────────────────────────────────────────────────
@@ -2366,8 +2201,23 @@ export class SettingsClaudeCodeSection {
     const projectFilesEl = this.createClaudeCodeGroup(containerEl, { id: 'project-source-files' });
     this.renderProjectSourceStatus(projectFilesEl);
 
+    const configurationEl = this.createClaudeCodeGroup(containerEl, { id: 'claude-configuration' });
+    this.renderConfigurationWorkbench(configurationEl);
+
     const additionalContextEl = this.createClaudeCodeGroup(containerEl, { id: 'additional-context' });
     this.renderAdditionalDirectories(additionalContextEl);
+  }
+
+  private renderConfigurationWorkbench(containerEl: HTMLElement): void {
+    if (!this.configurationSection) {
+      this.configurationSection = new SettingsClaudeConfigurationSection({
+        plugin: this.plugin,
+        onAfterMutation: () => {
+          this.plugin.invalidateSlashCommandCatalog?.();
+        },
+      });
+    }
+    this.configurationSection.render(containerEl);
   }
 
   private renderRuntimeBoundaryNotice(containerEl: HTMLElement): void {

@@ -170,7 +170,6 @@ export {
   type ClaudeHookGroup,
   type ClaudeHooksConfig,
   type ClaudeProjectSettingsInfo,
-  createClaudeProjectSettingsFile,
   discoverClaudeProjectSettings,
   openClaudeProjectSettingsFile,
 } from './ClaudeProjectSettingsDiscovery';

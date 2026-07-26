@@ -1,7 +1,7 @@
 # backend/index
 
 > **源码**: `src/core/agents/backend/index.ts`
-> **最近更新**: 2026-07-23 — 新增 `ClaudeProjectProviderConfig`：唯一可写边界为 `<vault>/.claude/settings.local.json`，用户层与 shell 配置只读展示。
+> **最近更新**: 2026-07-26 — `ClaudeProjectSettingsDiscovery` 保持只读 discover/open；创建与完整 settings mutation 已移交 `ClaudeSettingsSourceService`，barrel 不再导出旧的 `createClaudeProjectSettingsFile`。
 
 > **新增导出**: `CodexProjectResourceDiscovery`（Codex 项目/全局 skills+agents discovery 与安全 CRUD）、`ClaudeCodeProcessMissingReason`、`AppServerSkill`/`AppServerListSkillsOptions`（经 CodexAppServerClient re-export）。
 
@@ -15,7 +15,7 @@
 - 重新导出 `AgentService.ts` 中的核心接口、状态类型、共享 disposable 类型、chat/session 请求类型和可选 capability interface
 - 导出 `OpenCodeAdapter` 作为当前 OpenCode backend 的 adapter 实现
 - 导出 backend routing helper，供入口、聊天视图和发送管线按 conversation owner / active backend 做 capability narrowing
-- 导出 Claude Code adapter、runtime catalog readback 类型、project skill/command/agent/settings discovery helper、model catalog projection、SDK loader、options builder、MCP config adapter、MCP elicitation bridge、process resolver、stream normalizer 与 permission bridge；`claude-code` 已可在设置中显式启用，默认仍保持 OpenCode
+- 导出 Claude Code adapter、runtime catalog readback 类型、project skill/command/agent/settings discovery helper（settings helper 仅 discover/open）、model catalog projection、SDK loader、options builder、MCP config adapter、MCP elicitation bridge、process resolver、stream normalizer 与 permission bridge；`claude-code` 已可在设置中显式启用，默认仍保持 OpenCode
 - 导出 `AgentServiceRegistry` 作为 adapter 注册与 active backend 解析 owner
 - 导出 Codex adapter 骨架与 stream normalizer；`codex` 已加入 `IMPLEMENTED_AGENT_BACKENDS`，在 UI 暴露为用户可选后端
 - 保持 type-only 导出与 value 导出分层，避免 barrel 额外引入运行时副作用
@@ -31,6 +31,7 @@
 - `ClaudeProjectSkillInfo` / `discoverClaudeProjectSkills`: Claude 项目 `.claude/skills/<name>/SKILL.md` 的只读文件系统 discovery 类型与扫描函数；用于 settings/chat discovery，不代表 SDK runtime 已加载或允许执行该 skill。
 - `ClaudeProjectCommandInfo` / `discoverClaudeProjectCommands`: Claude 项目 `.claude/commands/<name>.md` 的只读文件系统 discovery 类型与扫描函数；用于 settings discovery。
 - `ClaudeProjectAgentInfo` / `discoverClaudeProjectAgents`: Claude 项目 `.claude/agents/<name>.md` 的只读文件系统 discovery 类型与扫描函数；用于 settings discovery 和 `@agent` mention 候选来源。
+- `ClaudeProjectSettingsInfo` / `discoverClaudeProjectSettings` / `openClaudeProjectSettingsFile`: 项目 `.claude/settings.json` 与 `.claude/settings.local.json` 的只读 strict-JSON 摘要和编辑器路径 helper；不创建文件、不执行 hooks。完整 Project/Local/Global/managed inventory、CAS、archive/restore 由未从 barrel 暴露的 `ClaudeSettingsSourceService` owner 负责。
 - `readClaudeProviderConfigSnapshot` / `maskClaudeProviderConfigSnapshot` / `resolveClaudeProviderGlobalEffectiveValue`: 读取并掩码 user/project/local 三个 Claude settings 层及受限 shell 环境；只提供只读对照，不会写入 `~/.claude/**`。
 - `applyClaudeProviderPreset` / `migrateClaudeProviderModels` / `validateClaudeProviderPreset`: 项目 provider preset 的受管键投影、单次旧 model migration 与行内校验。写入仅经安全原子写入落到 vault 的 local settings 文件，并保留未知键。
 - `PromptSuggestionsReadbackProbeResult`: Claude Code `promptSuggestions` 选项 readback probe 结果类型；诊断专用，不验证实际 SDK emission。

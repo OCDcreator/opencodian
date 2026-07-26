@@ -3,7 +3,6 @@ import * as os from 'os';
 import * as path from 'path';
 
 import {
-  createClaudeProjectSettingsFile,
   discoverClaudeProjectSettings,
   openClaudeProjectSettingsFile,
 } from '../../../../../src/core/agents/backend/ClaudeProjectSettingsDiscovery';
@@ -233,23 +232,6 @@ describe('ClaudeProjectSettingsDiscovery', () => {
     expect(localSettings.extraKnownMarketplaces).toEqual([]);
     expect(localSettings.hookCount).toBe(0);
     expect(localSettings.parseError).toEqual(expect.any(String));
-  });
-
-  it('creates settings.json with default empty content', async () => {
-    const filePath = await createClaudeProjectSettingsFile(tempRoot, 'settings.json');
-
-    expect(filePath).toBe(path.join(tempRoot, '.claude', 'settings.json'));
-    await expect(fs.readFile(filePath ?? '', 'utf-8')).resolves.toBe('{}');
-  });
-
-  it('returns null when creating and file already exists', async () => {
-    await writeSettings('settings.json', '{}');
-
-    await expect(createClaudeProjectSettingsFile(tempRoot, 'settings.json')).resolves.toBeNull();
-  });
-
-  it('returns null when creating with null vaultPath', async () => {
-    await expect(createClaudeProjectSettingsFile(null, 'settings.json')).resolves.toBeNull();
   });
 
   it('openClaudeProjectSettingsFile returns correct path without checking existence', async () => {

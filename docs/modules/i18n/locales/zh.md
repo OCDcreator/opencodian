@@ -486,6 +486,10 @@ Claude Code 不再使用过载的 `settings.claudeCode.tab.mcpAdvanced` 标签�
 - `settings.claudeCode.enableContext1mBeta.boundaryNotice`: 硬化完整 SDK 路径追踪（setting → CLI `--betas` 标志）；模型侧 beta 接受明确标记为未验证
 - 2026-06-06 JS Runtime 审计硬化（Outcome B）：`settings.claudeCode.jsRuntime.boundaryNotice` 收紧为明确的“仅回读”模式，说明插件只能证明 `options.executable` 接线，不能观察 CLI 子进程实际选用了哪个运行时；同时新增 16 个 `settings.capabilityLab.proofs.jsRuntime.*` 中文 locale keys，覆盖按钮、运行中、标题、边界、生命周期、status yes/no、option-wired / setting-value / sdk-option / sdk-value / value-match 状态行，以及 readback / fail / threw 提示，替换掉 Capability Lab 里的硬编码英文。
 
+## 2026-07-26 Claude 配置 workbench 文案键
+
+新增 `settings.claudeCode.groups.claudeConfiguration.*` 与 `settings.claudeCode.configuration.*`，覆盖 context-sources 配置 workbench 的 Project/Local/Global 显式作用域（Project 为安全默认）、strict JSON 草稿/编辑器诊断、常用字段标签、Hooks schema 依据、分组/处理器动作、CAS 冲突/重新加载、归档历史、删除/恢复确认以及独立的 persistence/application/runtime 证据轴。文案明确 managed 来源只读；没有真实 probe 时不把保存写入描述成 runtime 已应用。
+
 ## SDK capability disclosure locale keys
 
 新增 `capabilities.status.*`（available/unsupportedByServer/disabledByUser/unsupportedBySdk/unknown）、`capabilities.recheck`、`settings.<section>.capabilityStatus` 以及 `capabilities.label.*` 显示名称键，用于 Settings 能力披露行。

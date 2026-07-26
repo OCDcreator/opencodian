@@ -9,6 +9,7 @@ import {
   getDefaultClaudeCodeBackendSettings,
 } from '../../../../src/core/types';
 import { SettingsClaudeCodeSection } from '../../../../src/features/settings/SettingsClaudeCodeSection';
+import { SettingsClaudeConfigurationSection } from '../../../../src/features/settings/SettingsClaudeConfigurationSection';
 import { setLocale, t } from '../../../../src/i18n';
 import type OpenCodianPlugin from '../../../../src/main';
 
@@ -700,9 +701,10 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       expectGroupOrder(containerEl, [
         'source-activation',
         'project-source-files',
+        'claude-configuration',
         'additional-context',
       ]);
-      expect(containerEl.querySelectorAll('[data-claude-code-group]')).toHaveLength(3);
+      expect(containerEl.querySelectorAll('[data-claude-code-group]')).toHaveLength(4);
     });
 
     it('renders Context & Sources tab with setting source toggles and directories textarea', () => {
@@ -794,6 +796,35 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
   });
 
   describe('runtime tab', () => {
+    it('keeps project settings configuration out of Runtime when Context & Sources owns the workbench', () => {
+      const plugin = createPlugin();
+      const runtimeContainerEl = document.createElement('div');
+      const runtimeSection = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      runtimeSection.attachTabbed(runtimeContainerEl, 'runtime');
+
+      expect(runtimeContainerEl.querySelector('[data-claude-code-project-settings="true"]')).toBeNull();
+      expect(buttonRecords.some((record) => record.label === t('settings.claudeCode.projectSettings.scanButton'))).toBe(false);
+      expect(buttonRecords.some((record) => record.label === t('settings.claudeCode.projectSettings.createLocalButton'))).toBe(false);
+      expect(buttonRecords.some((record) => record.label === t('settings.claudeCode.projectSettings.createSharedButton'))).toBe(false);
+
+      const contextContainerEl = document.createElement('div');
+      (plugin as unknown as { app: { vault: { adapter: { basePath: string } } } }).app.vault.adapter.basePath = '/tmp/opencodian-test-vault';
+      jest.spyOn(SettingsClaudeConfigurationSection.prototype, 'render').mockImplementation((bodyEl) => {
+        bodyEl.setAttribute('data-test-configuration-workbench', 'true');
+      });
+      const contextSection = new SettingsClaudeCodeSection({
+        plugin: plugin as OpenCodianPlugin,
+        createSectionHeading,
+      });
+      contextSection.attachTabbed(contextContainerEl, 'context-sources');
+
+      expect(contextContainerEl.querySelector('[data-claude-code-group="claude-configuration"]')).toBeTruthy();
+      expect(contextContainerEl.querySelector('[data-test-configuration-workbench="true"]')).toBeTruthy();
+    });
+
     it('renders semantic groups in the approved order', () => {
       const plugin = createPlugin();
       const containerEl = document.createElement('div');
