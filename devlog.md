@@ -11,6 +11,14 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-07-27 G9 — Provider 配置 backend-native truth final acceptance
+
+**产品契约。** G9 按各后端原生边界收口为 DONE，不追求三方 CRUD 对称。Claude 只写 vault-local `.claude/settings.local.json`，经 CAS/archive/conflict 安全链路；写入后 `persistence=verified`、`application=pending`（下一次 Claude 进程/请求边界前）、`runtime=unavailable`。Codex native Provider 是 external-managed/read-only，不伪造 native save；legacy plugin credential 只做 masked、transactional 处理。OpenCode 要显式选择 project/global exact source，managed source 只读，写入走 CAS/archive；`pending`/restart/partial persistence 三轴诚实，effective/runtime readonly 永不作为写目标。
+
+**路线终态。** P3 采用 `DONE` / `READBACK` / `NON-CONFIG` / `WONTFIX` / `BLOCKED`（含 `CURRENT CONTRACT CHANGED`）收口：G9 DONE，G10b READBACK，G10c NON-CONFIG；G13 仍因上游 SDK bug #236 为 BLOCKED，仅在 bug 修复且真实 rewind probe 可用时 reopening；G16 仍为 BLOCKED / CURRENT CONTRACT CHANGED，仅在官方 app-server/thread profile selection 或可验证 persistent active-profile contract 出现时 reopening。阻断项未实现。
+
+**验证、QA 与部署。** Standards/Spec/UX P0/P1 none；fresh `npm run verify` **661 suites / 6,240 tests**；lint **0 errors / 0 warnings**；typecheck/build PASS；Graphify **12,394 nodes / 35,796 edges / 299 communities**；CodeGraph complete、pending 0。production build 与 Test Vault BUILD_ID `main.202607270437` 对齐；dist/Test Vault SHA-256 对齐：`main.js` `bc58930e6ca52a8a44af6aa03ac54df2a5946f55fb86d94913a67ce82e2088cc`、`manifest.json` `ba6540a1fe1d5e2b0abad80db5b005df4e667120e5136396cd58b1592002e02e`、`styles.css` `d15ba49e87236bcb48e3e45b0f2fd55ba5e2b0a93c3cec5aa4275be6bfbf79f5`。Definitive live QA: exact 346x900 en/light Claude Provider scan enumerated 30 entries with zero horizontal/vertical/clipped/nested scrollbar violations; the block expands and the parent host owns scrolling；zh/dark token-safe；runtime restored to zh/dark/Codex/1920x954 chat；final errors/residue empty；Retry injection remains AUTOMATED-ONLY；未 push。Evidence: `.omo/evidence/g9-live-obsidian-qa.md`；build artifacts: `.omo/evidence/g9-final4-build-artifacts.txt`。
+
 ## 2026-07-26 P3 — Codex protocol reconciliation (hooks readback, compaction runtime, profiles contract)
 
 **Scope.** Reconcile the P3 documentation contract with the actual installed `codex-cli 0.144.1`, while retaining the repository-pinned `@openai/codex-sdk`/bundled Codex `0.139.0` as a separate integration surface. P3 is limited to G10b Hooks readback, G10c foreground-thread compaction, and G16 profile protocol reconciliation; no profile editor/switcher was implemented.

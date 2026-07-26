@@ -18,7 +18,8 @@
 - 模型开关管理：`.opencodian-model-toggle-*`。
 - 模型 provider directory 诊断：`.opencodian-model-provider-directory-summary`（显示 `provider.list()` connected / listed / listed outside catalog 辅助计数，不承担可选模型目录布局）与 `.opencodian-model-status-badge.is-diagnostic`（provider 行的中性目录诊断 badge）。
 - 模型 V2 影子比较：`.opencodian-model-catalog-comparison` 与 `is-match` / `is-drift` / `is-unavailable` 变体；三态均使用中性主题变量，不把 V2 不支持或暂时读取失败显示成错误红色。
-- 模型工作区：`.opencodian-model-workspace-*`（平铺表单、预设选择器、provider 切换条、工具条、JSON 预览、状态徽章）。
+- 模型工作区：`.opencodian-model-workspace-*`（平铺表单、预设选择器、provider 切换条、工具条、JSON 预览、状态徽章）；`.opencodian-model-config-source-selector`（显式 source selector、全宽 select、加载/读取失败说明）与 `.opencodian-model-config-readonly-summary`（effective / connected 只读诊断摘要）。
+- 模型 source conflict：`.opencodian-model-config-source-conflict`（assertive alert 内的 Reload / Inspect / Retry 操作组；长 path / 文案可换行，346px 下按钮改为全宽单列）。
 - 设置区块：`.opencodian-settings-block*`。
 - 代理 / 命令设置目录：`.opencodian-agent-editor-*`、`.opencodian-settings-catalog-scroll`、`.opencodian-agent-catalog-scroll`、`.opencodian-command-catalog-scroll`（项目代理编辑器分组卡片、默认折叠的高级区，以及代理 / 命令目录最大高度 + 内部滚动）。
 - 命令目录卡片：`.opencodian-cmd-catalog-*`（搜索栏、筛选标签、按需显示的批量操作栏、两列卡片网格、方形批量选择 checkbox、复用 Obsidian `checkbox-container` 的可见性 switch、来源/状态芯片、可折叠描述、滚动容器）。
@@ -60,7 +61,16 @@
 - `model availability` 里的 `.opencodian-model-availability-controls` 现在只负责布局，不再自带分组大卡片壳；如果后续想恢复这层视觉容器，先确认不会重新出现“外层模型 block 里再包一层 controls 大卡片”的双层嵌套感。
 - `opencodian-settings-catalog-scroll` 只负责目录块的内部滚动高度，不应把整个 settings 容器再次改成双滚动。
 - `opencodian-mcp-server-card-main` 默认是三列对齐，但窄屏会退化成单列；如果修改卡片 grid，记得同时检查状态 badge、transport badge 和按钮在移动宽度下不会重新挤压换行得太难看。
+- source selector / conflict 只能作为模型工作区内的平铺辅助区，不能再包一层 card。selector、metadata 和 conflict 文案必须有 `min-width: 0` 与可折行规则；346px 宽度下 conflict action 纵向排列并让每个按钮满宽，防止 path 或 Retry 操作造成横向溢出。
 - 修改后执行 `npm run build:css`（或完整 `npm run build`）。
+
+## 2026-07-27 G9 OpenCode source-bound model configuration
+
+模型工作区新增显式来源选择、只读 runtime 摘要和 CAS conflict action，但保持原有单列设置层级：
+
+- `.opencodian-model-config-source-selector` 使用纵向紧凑 stack；原生 `select` 固定为容器宽度并应用 `box-sizing: border-box`。
+- `.opencodian-model-config-source-conflict`、标题和说明统一允许长文本折行；内部 `.opencodian-config-buttons` 可换行，窄宽 media query 下退化为全宽单列按钮。
+- source path、revision、evidence 和 hidden-secret guidance 属于文本/状态信息，不应通过新卡片、渐变或装饰性阴影提升视觉权重。
 
 ## 2026-05-09 Session settings summary rows
 

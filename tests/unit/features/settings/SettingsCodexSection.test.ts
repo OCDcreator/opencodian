@@ -20,7 +20,7 @@ type TestPlugin = {
 };
 
 const settingNames: string[] = [];
-const buttonRecords: Array<{ name: string; label?: string; onClick?: () => void }> = [];
+const buttonRecords: Array<{ name: string; label?: string; onClick?: () => void | Promise<void> }> = [];
 function createPlugin(): TestPlugin {
   return {
     settings: {
@@ -116,7 +116,7 @@ function mockSettingPrototype(): void {
     this: Setting,
     callback: (control: { setButtonText: jest.Mock; setDisabled: jest.Mock; onClick: jest.Mock }) => unknown,
   ) {
-    const record: { name: string; label?: string; onClick?: () => void } = {
+    const record: { name: string; label?: string; onClick?: () => void | Promise<void> } = {
       name: (this as Setting & { __settingName?: string }).__settingName ?? '',
     };
     const control = {
@@ -439,6 +439,147 @@ describe('SettingsCodexSection stable surface', () => {
     expect(summaryEl).toBeTruthy();
     expect(summaryEl?.textContent).toContain(t('settings.codex.connection.name'));
     expect(summaryEl?.textContent).toContain(t('settings.codex.connection.sourceApiKey'));
+  });
+
+  it('does not expose a legacy Codex credential value or native provider controls', () => {
+    const secret = 'legacy-codex-secret-do-not-render';
+    const plugin = createPlugin();
+    plugin.settings.backendSettings.codex.apiKey = secret;
+    const section = new SettingsCodexSection({
+      plugin: plugin as never,
+      createSectionHeading,
+    });
+    const containerEl = document.createElement('div');
+    section.attach(containerEl);
+
+    const credentialEl = containerEl.querySelector('[data-codex-legacy-credential]');
+    expect(credentialEl).toBeTruthy();
+    expect(credentialEl?.getAttribute('data-credential-state')).toBe('configured');
+    expect(credentialEl?.textContent).toContain(t('settings.codex.apiKey.statusConfigured'));
+    expect(credentialEl?.querySelectorAll('input')).toHaveLength(0);
+    expect(credentialEl?.innerHTML).not.toContain(secret);
+    expect(containerEl.innerHTML).not.toContain(secret);
+    expect(containerEl.querySelector('input[type="password"]')).toBeNull();
+    expect(buttonRecords.map((record) => record.label ?? '').some((label) => /save|edit|delete/i.test(label))).toBe(false);
+  });
+
+  it('guides empty legacy credential state toward Codex login or environment auth without a secret input', () => {
+    const plugin = createPlugin();
+    plugin.settings.backendSettings.codex.apiKey = '';
+    const section = new SettingsCodexSection({
+      plugin: plugin as never,
+      createSectionHeading,
+    });
+    const containerEl = document.createElement('div');
+    section.attach(containerEl);
+
+    const credentialEl = containerEl.querySelector('[data-codex-legacy-credential]');
+    expect(credentialEl).toBeTruthy();
+    expect(credentialEl?.getAttribute('data-credential-state')).toBe('empty');
+    expect(credentialEl?.textContent).toContain(t('settings.codex.apiKey.statusMissing'));
+    expect(credentialEl?.querySelectorAll('input')).toHaveLength(0);
+    expect(credentialEl?.querySelectorAll('button')).toHaveLength(0);
+  });
+
+  it('requires confirmation before clearing a legacy credential and refreshes the masked status', async () => {
+    const secret = 'legacy-codex-secret-clear-test';
+    const plugin = createPlugin();
+    plugin.settings.backendSettings.codex.apiKey = secret;
+    const section = new SettingsCodexSection({
+      plugin: plugin as never,
+      createSectionHeading,
+    });
+    const containerEl = document.createElement('div');
+    section.attach(containerEl);
+
+    const clearRecord = buttonRecords.find((record) => record.label === t('settings.codex.apiKey.clearButton'));
+    expect(clearRecord?.onClick).toBeDefined();
+    const confirmSpy = jest.spyOn(window, 'confirm').mockReturnValue(false);
+    await clearRecord!.onClick!();
+    expect(plugin.settings.backendSettings.codex.apiKey).toBe(secret);
+    expect(plugin.saveSettings).not.toHaveBeenCalled();
+
+    confirmSpy.mockReturnValue(true);
+    await clearRecord!.onClick!();
+    expect(plugin.settings.backendSettings.codex.apiKey).toBe('');
+    expect(plugin.saveSettings).toHaveBeenCalledTimes(1);
+    const credentialEl = containerEl.querySelector('[data-codex-legacy-credential]');
+    expect(credentialEl?.getAttribute('data-credential-state')).toBe('empty');
+    expect(containerEl.innerHTML).not.toContain(secret);
+    confirmSpy.mockRestore();
+  });
+
+  it('rolls back a rejected credential clear without changing auth summary or invoking runtime updates', async () => {
+    const secret = 'legacy-codex-secret-persistence-failure';
+    const adapter = {
+      updateModel: jest.fn(),
+    };
+    const plugin = createPlugin();
+    plugin.settings.backendSettings.codex.apiKey = secret;
+    plugin.agentServiceRegistry.get.mockReturnValue(adapter);
+    plugin.saveSettings.mockRejectedValueOnce(new Error('persistence failure must stay hidden'));
+    const section = new SettingsCodexSection({
+      plugin: plugin as never,
+      createSectionHeading,
+    });
+    const containerEl = document.createElement('div');
+    section.attach(containerEl);
+
+    const clearRecord = buttonRecords.find((record) => record.label === t('settings.codex.apiKey.clearButton'));
+    const confirmSpy = jest.spyOn(window, 'confirm').mockReturnValue(true);
+    await clearRecord!.onClick!();
+
+    expect(plugin.settings.backendSettings.codex.apiKey).toBe(secret);
+    expect(containerEl.querySelector('[data-codex-connection-summary]')?.textContent)
+      .toContain(t('settings.codex.connection.sourceApiKey'));
+    expect(containerEl.querySelector('[data-codex-legacy-credential]')?.textContent)
+      .toContain(t('settings.codex.apiKey.clearFailed'));
+    expect(containerEl.innerHTML).not.toContain(secret);
+    expect(adapter.updateModel).not.toHaveBeenCalled();
+    confirmSpy.mockRestore();
+  });
+
+  it('updates the Codex runtime only after a credential clear persists successfully', async () => {
+    const adapter = {
+      updateModel: jest.fn(),
+    };
+    const plugin = createPlugin();
+    plugin.agentServiceRegistry.get.mockReturnValue(adapter);
+    const section = new SettingsCodexSection({
+      plugin: plugin as never,
+      createSectionHeading,
+    });
+    const containerEl = document.createElement('div');
+    section.attach(containerEl);
+
+    const clearRecord = buttonRecords.find((record) => record.label === t('settings.codex.apiKey.clearButton'));
+    const confirmSpy = jest.spyOn(window, 'confirm').mockReturnValue(true);
+    await clearRecord!.onClick!();
+
+    expect(plugin.settings.backendSettings.codex.apiKey).toBe('');
+    expect(plugin.saveSettings).toHaveBeenCalledTimes(1);
+    expect(adapter.updateModel).toHaveBeenCalledWith(plugin.settings.backendSettings.codex.model);
+    expect(containerEl.querySelector('[data-codex-connection-summary]')?.textContent)
+      .toContain(t('settings.codex.connection.sourceEnvOrChatgpt'));
+    confirmSpy.mockRestore();
+  });
+
+  it.each(['en', 'zh'] as const)('keeps the legacy credential status keyboard-safe and localised (%s)', (locale) => {
+    setLocale(locale);
+    const plugin = createPlugin();
+    plugin.settings.backendSettings.codex.apiKey = '';
+    const section = new SettingsCodexSection({
+      plugin: plugin as never,
+      createSectionHeading,
+    });
+    const containerEl = document.createElement('div');
+    section.attach(containerEl);
+
+    const credentialEl = containerEl.querySelector('[data-codex-legacy-credential]');
+    expect(credentialEl?.getAttribute('role')).toBe('status');
+    expect(credentialEl?.getAttribute('aria-live')).toBe('polite');
+    expect(credentialEl?.getAttribute('aria-label')).toBe(t('settings.codex.apiKey.name'));
+    expect(credentialEl?.textContent).toContain(t('settings.codex.apiKey.statusMissing'));
   });
 });
 

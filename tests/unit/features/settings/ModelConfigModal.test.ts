@@ -26,6 +26,13 @@ function createEmptyCatalogBundle(): ModelCatalogBundle {
 
 function createPlugin(overrides: Record<string, unknown> = {}) {
   return {
+    app: {
+      vault: {
+        adapter: {
+          basePath: '/vault',
+        },
+      },
+    },
     modelConfigService: {
       readLocalModelConfig: jest.fn().mockResolvedValue({}),
       getCatalogs: jest.fn().mockResolvedValue(createEmptyCatalogBundle()),
@@ -318,10 +325,11 @@ describe('ModelConfigModal save plan', () => {
     expect(plugin.settings.disabledModelRefs).toEqual(['openai/gpt-4o']);
     expect(onSaved).toHaveBeenCalledTimes(1);
     expect(noticeSpy).toHaveBeenCalledWith(t('settings.model.visualEditor.saveSuccess'));
-    expect(closeSpy).toHaveBeenCalledTimes(1);
+    expect(closeSpy).not.toHaveBeenCalled();
+    expect(modal.contentEl.querySelector('[data-model-config-save-pending-restart]')).not.toBeNull();
   });
 
-  it('persists add-provider saves through the shared save plan', async () => {
+  it('keeps add-provider persistence visible until application and runtime can be verified', async () => {
     const writeLocalModelConfig = jest.fn().mockResolvedValue(undefined);
     const plugin = createPlugin({
       modelConfigService: {
@@ -385,7 +393,9 @@ describe('ModelConfigModal save plan', () => {
     expect(plugin.settings.disabledModelRefs).toEqual(['openai/legacy']);
     expect(onSaved).toHaveBeenCalledTimes(1);
     expect(noticeSpy).toHaveBeenCalledWith(t('settings.model.visualEditor.saveSuccess'));
-    expect(closeSpy).toHaveBeenCalledTimes(1);
+    expect(closeSpy).not.toHaveBeenCalled();
+    expect(modal.contentEl.querySelector('[data-model-config-save-pending-restart]')).not.toBeNull();
+    expect(modal.contentEl.textContent).toContain(t('settings.model.config.savePendingRestart'));
   });
 
   it('reports validation failures through the shared save error handler', async () => {

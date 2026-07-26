@@ -4,11 +4,23 @@ import {
   buildConfigPreview,
   fetchProviderModels,
   hydrateWorkspaceState,
+  isSafeProviderExtraOptionForVisualEditor,
   normalizeFetchedModelsFromResponse,
 } from '../../../../src/features/settings/modelConfigWorkspace';
 
 beforeEach(() => {
   (requestUrl as jest.Mock).mockReset();
+});
+
+it('only permits the exact reviewed setCacheKey boolean forms in the visual provider editor', () => {
+  expect(isSafeProviderExtraOptionForVisualEditor('setCacheKey', true)).toBe(true);
+  expect(isSafeProviderExtraOptionForVisualEditor('setCacheKey', false)).toBe(true);
+  expect(isSafeProviderExtraOptionForVisualEditor('setCacheKey', 'true')).toBe(true);
+  expect(isSafeProviderExtraOptionForVisualEditor('setCacheKey', 'false')).toBe(true);
+
+  expect(isSafeProviderExtraOptionForVisualEditor('setCacheKey', ' true ')).toBe(false);
+  expect(isSafeProviderExtraOptionForVisualEditor('setcachekey', true)).toBe(false);
+  expect(isSafeProviderExtraOptionForVisualEditor('headers', { Cookie: 'session=secret' })).toBe(false);
 });
 
 it('hydrates provider/model extra fields and disabled state', () => {

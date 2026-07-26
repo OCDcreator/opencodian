@@ -2,7 +2,6 @@ import { setIcon } from 'obsidian';
 
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
-import { ModelConfigJsonModal } from './ModelConfigJsonModal';
 import {
   createModelConfigKeyValueState,
   type ModelConfigModalFlow,
@@ -14,6 +13,7 @@ import type {
 } from './ModelConfigModelListEditor';
 import { ModelConfigModelListEditor } from './ModelConfigModelListEditor';
 import {
+  isSafeProviderExtraOptionForVisualEditor,
   PROVIDER_INTERFACE_FORMAT_OPTIONS,
   type ProviderFormState,
   type ProviderInterfaceFormatId,
@@ -69,6 +69,7 @@ interface ModelConfigProviderEditorOptions {
   deleteSelectedProvider: () => void;
   syncProviderRawFromJsonDraft: (provider: ProviderFormState) => void;
   formatAddProviderJson: () => void;
+  openAdvancedEditor: () => void;
 }
 
 export class ModelConfigProviderEditor {
@@ -336,10 +337,17 @@ export class ModelConfigProviderEditor {
     description: string,
   ): void {
     const extraOptionsSectionEl = containerEl.createDiv({ cls: 'opencodian-model-workspace-section is-flow-section' });
+    const hiddenExtraOptionUids = new Set(provider.extraOptions
+      .filter((entry) => this.isConfiguredUnsafeExtraOption(entry.key, entry.value))
+      .map((entry) => entry.uid));
     this.renderKeyValueEditor(extraOptionsSectionEl, {
       title: t('settings.model.visualEditor.extraOptionsTitle'),
       description,
-      values: provider.extraOptions,
+      // The generic key/value renderer is also used by model fields. Keep this
+      // provider-only boundary here so configured unknown values never enter DOM.
+      values: provider.extraOptions.map((entry) => (
+        hiddenExtraOptionUids.has(entry.uid) ? { ...entry, value: '' } : entry
+      )),
       onAdd: () => {
         provider.extraOptions.push(createModelConfigKeyValueState());
         this.options.updatePreview();
@@ -369,6 +377,41 @@ export class ModelConfigProviderEditor {
       stackedLabels: true,
       iconRemoveButton: true,
     });
+    if (hiddenExtraOptionUids.size === 0) {
+      return;
+    }
+
+    const rows = Array.from(extraOptionsSectionEl.querySelectorAll<HTMLElement>(
+      '.opencodian-model-workspace-keyvalue-row',
+    ));
+    for (const [index, rowEl] of rows.entries()) {
+      if (!hiddenExtraOptionUids.has(provider.extraOptions[index]?.uid ?? '')) {
+        continue;
+      }
+      rowEl.setAttribute('data-model-config-hidden-secret-row', 'true');
+      for (const control of rowEl.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLButtonElement>(
+        'input, textarea, button',
+      )) {
+        control.disabled = true;
+      }
+      const valueInput = rowEl.querySelector<HTMLTextAreaElement>('.opencodian-model-workspace-keyvalue-textarea');
+      if (valueInput) {
+        valueInput.value = '';
+        valueInput.placeholder = t('settings.model.config.configuredHidden');
+        valueInput.setAttribute('aria-label', t('settings.model.config.configuredHidden'));
+        valueInput.setAttribute('data-model-config-hidden-secret', 'true');
+      }
+    }
+    extraOptionsSectionEl.createDiv({
+      cls: 'opencodian-model-workspace-field-description',
+      attr: { 'data-model-config-hidden-secret-guidance': 'true' },
+      text: t('settings.model.config.hiddenSecretGuidance'),
+    });
+  }
+
+  private isConfiguredUnsafeExtraOption(key: string, value: string): boolean {
+    return (key.trim().length > 0 || value.trim().length > 0)
+      && !isSafeProviderExtraOptionForVisualEditor(key, value);
   }
 
   private renderProviderDefaultsSection(containerEl: HTMLElement): void {
@@ -410,15 +453,14 @@ export class ModelConfigProviderEditor {
     const previewToolbarEl = previewSectionEl.createDiv({ cls: 'opencodian-model-workspace-preview-toolbar' });
     const jsonButton = previewToolbarEl.createEl('button', { text: t('settings.model.config.jsonButton') });
     jsonButton.type = 'button';
-    jsonButton.addEventListener('click', () => {
-      new ModelConfigJsonModal(this.options.plugin.app, this.options.plugin).open();
-    });
+    jsonButton.addEventListener('click', () => this.options.openAdvancedEditor());
 
     const restartLabel = previewToolbarEl.createEl('label', {
       cls: 'opencodian-model-config-checkbox opencodian-model-workspace-restart-toggle',
     });
     const restartToggleEl = restartLabel.createEl('input', { attr: { type: 'checkbox' } });
-    restartToggleEl.checked = this.options.plugin.settings.server.mode === 'local';
+    // Restart is an explicit, optional apply action; persistence alone does not imply runtime application.
+    restartToggleEl.checked = false;
     restartLabel.createSpan({ text: t('settings.model.config.restart') });
     this.options.setRestartToggleEl(restartToggleEl);
 
@@ -484,8 +526,10 @@ export class ModelConfigProviderEditor {
     fieldEl.createEl('label', { text: label });
     const inputEl = fieldEl.createEl('input', { attr: { type: secret ? 'password' : 'text' } });
     this.bindEditableControl(inputEl);
-    inputEl.value = value;
-    inputEl.placeholder = placeholder;
+    // Existing credentials stay in form state for an unchanged save, but are never copied into DOM.
+    const hiddenStoredSecret = secret && value.length > 0;
+    inputEl.value = hiddenStoredSecret ? '' : value;
+    inputEl.placeholder = hiddenStoredSecret ? t('settings.model.config.configuredHidden') : placeholder;
     inputEl.addEventListener('input', () => {
       onChange(inputEl.value);
       this.options.updatePreview();

@@ -59,8 +59,36 @@
 
 .opencodian-claude-provider-info,
 .opencodian-claude-provider-global-summary,
-.opencodian-claude-provider-config-path {
+.opencodian-claude-provider-config-path,
+.opencodian-claude-provider-local-status {
   color: var(--text-muted);
+}
+
+.opencodian-claude-provider-local-status,
+.opencodian-claude-provider-conflict,
+.opencodian-claude-provider-partial-persistence {
+  margin: 10px 0;
+  padding: 10px 12px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s, 4px);
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+
+.opencodian-claude-provider-conflict {
+  color: var(--text-normal);
+  border-color: color-mix(in srgb, var(--text-error) 45%, var(--background-modifier-border));
+  background: color-mix(in srgb, var(--background-primary) 90%, var(--text-error) 10%);
+}
+
+.opencodian-claude-provider-partial-persistence {
+  color: var(--text-normal);
+  border-color: color-mix(in srgb, var(--color-orange) 55%, var(--background-modifier-border));
+  background: color-mix(in srgb, var(--background-primary) 92%, var(--color-orange) 8%);
+}
+
+.opencodian-claude-provider-partial-persistence p {
+  margin: 6px 0 0;
 }
 
 .opencodian-claude-provider-global-summary {
@@ -93,5 +121,106 @@
   .opencodian-claude-provider-card-heading {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  /* The providers tab can be narrower than the viewport when the Settings
+     modal keeps its navigation rail visible. Reset the native setting-item
+     minimums and make every provider surface shrink with that actual block. */
+  .opencodian-settings [data-claude-code-section='providers'],
+  .opencodian-settings [data-claude-code-section='providers'] > .opencodian-settings-block-body {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .opencodian-settings [data-claude-code-section='providers'] > .opencodian-settings-block-body > * {
+    box-sizing: border-box;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .opencodian-settings [data-claude-code-section='providers'].opencodian-settings-block.opencodian-settings-section {
+    flex: 0 0 auto;
+    height: auto;
+    max-height: none;
+    overflow-x: clip;
+    overflow-y: visible;
+  }
+
+  .opencodian-settings [data-claude-code-section='providers'] .opencodian-settings-section-heading {
+    box-sizing: border-box;
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    white-space: normal;
+  }
+
+  .opencodian-settings [data-claude-code-section='providers'] .setting-item {
+    box-sizing: border-box;
+    grid-template-columns: minmax(0, 1fr);
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .opencodian-settings [data-claude-code-section='providers'] .setting-item-info,
+  .opencodian-settings [data-claude-code-section='providers'] .setting-item-control {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .opencodian-settings [data-claude-code-section='providers'] .setting-item-name,
+  .opencodian-settings [data-claude-code-section='providers'] .setting-item-description {
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+
+  .opencodian-settings [data-claude-code-section='providers'] .setting-item-control {
+    justify-content: flex-start;
+  }
+
+  .opencodian-settings [data-claude-code-section='providers'] .setting-item-control button,
+  .opencodian-settings [data-claude-code-section='providers'] .opencodian-claude-provider-card-actions button {
+    box-sizing: border-box;
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .opencodian-settings [data-claude-code-section='providers'] .opencodian-claude-provider-list,
+  .opencodian-settings [data-claude-code-section='providers'] .opencodian-claude-provider-list > .opencodian-claude-provider-card {
+    box-sizing: border-box;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .opencodian-settings [data-claude-code-section='providers'] .opencodian-claude-provider-card-heading > * {
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    white-space: normal;
+  }
+
+  .opencodian-settings [data-claude-code-section='providers'] .opencodian-claude-provider-global-summary > *,
+  .opencodian-settings [data-claude-code-section='providers'] .opencodian-claude-provider-card code {
+    box-sizing: border-box;
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    white-space: normal;
+  }
+}
+
+@media (max-width: 480px) {
+  .opencodian-claude-provider-partial-persistence {
+    padding: 8px 10px;
+  }
+
+  .opencodian-claude-provider-partial-persistence button {
+    max-width: 100%;
+    white-space: normal;
   }
 }

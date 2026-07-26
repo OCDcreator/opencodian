@@ -3,6 +3,8 @@
 > **源码**: `src/style/components/settings-codex-account.css`
 > **状态**: [REVIEW]
 
+> **更新**: 2026-07-26 G9 — added compact external-managed Provider status and masked legacy-credential status styling.
+
 ## 概述
 
 Codex 账号与能力产品面的专用样式。把四个官方 app-server 表面（account/read、account/usage/read、account/rateLimits/read、modelProvider/capabilities/read）渲染为真实的设置卡片（徽章、统计磁贴、能力 chip、诚实的 auth-required 状态），而不是 JSON dump。
@@ -39,6 +41,14 @@ Codex 设置面板的三大分组容器（连接与运行默认项 / 恢复与�
 ### `.opencodian-settings-codex-connection-summary`
 
 连接来源摘要条：flex 行，标签 + 当前来源值。作为卡片基座的一员，它与下方第一个分组的间距由 `margin-bottom: var(--oc-codex-group-header-gap)` 固定为 `16px`。
+
+### `.opencodian-codex-provider-configuration-status`
+
+Account 标签顶部的紧凑 Provider 配置状态条。它用 `data-provider-config-state="external-managed"` 和 `role="status"` 明确表示 Codex 原生 Provider 配置由 Codex 登录、环境变量或原生配置管理；状态条只展示 auth source 与下方 capabilities live readback，不渲染 Provider 操作控件。`grid` 在窄宽度下折叠为单列（`max-width: 480px`），来源值允许 `overflow-wrap: anywhere`，避免设置面板水平溢出。
+
+### `.opencodian-settings-codex-legacy-credential-status`
+
+Connection 标签中的旧版插件凭据状态容器。它只显示“已配置（值已隐藏）”或 Codex login/environment 指引，永远不放置 `input`；已配置时唯一操作是带确认的清除按钮，保留普通 `Setting` 行的键盘语义。状态文案使用 `.opencodian-settings-codex-legacy-credential-status-copy`，不得把凭据值插入 text、attribute 或日志。
 
 ### `.opencodian-codex-account-card`
 

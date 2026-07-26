@@ -60,13 +60,22 @@ type StatusAwareAdapter = {
   onStatusChange?: (handler: (status: AgentConnectionStatus) => void) => Disposable;
 };
 
+type CodexAccountCardKind = 'identity' | 'usage' | 'rate-limits' | 'capabilities';
+
 export class SettingsCodexAccountSurface {
   private readonly plugin: OpenCodianPlugin;
   private identityOutputEl: HTMLElement | null = null;
   private usageOutputEl: HTMLElement | null = null;
   private rateLimitsOutputEl: HTMLElement | null = null;
   private capabilitiesOutputEl: HTMLElement | null = null;
+  private providerConfigurationStatusEl: HTMLElement | null = null;
   private statusSubscription: Disposable | null = null;
+  private readonly refreshEpochs: Record<CodexAccountCardKind, number> = {
+    identity: 0,
+    usage: 0,
+    'rate-limits': 0,
+    capabilities: 0,
+  };
 
   constructor(options: SettingsCodexAccountSurfaceOptions) {
     this.plugin = options.plugin;
@@ -78,46 +87,122 @@ export class SettingsCodexAccountSurface {
    */
   attach(containerEl: HTMLElement, authSource: CodexAuthSource): void {
     this.dispose();
+    this.authSource = authSource;
+    this.providerConfigurationStatusEl = this.createProviderConfigurationStatus(containerEl);
+    this.renderProviderConfigurationStatus();
     this.identityOutputEl = this.createCard(
       containerEl,
       'identity',
       t('settings.codex.accountSurface.identity.name'),
-      () => this.refreshIdentity(),
+      () => {
+        const epoch = this.beginRefresh('identity');
+        void this.refreshIdentity(epoch);
+      },
     );
     this.usageOutputEl = this.createCard(
       containerEl,
       'usage',
       t('settings.codex.accountSurface.usage.name'),
-      () => this.refreshUsage(),
+      () => {
+        const epoch = this.beginRefresh('usage');
+        void this.refreshUsage(epoch);
+      },
     );
     this.rateLimitsOutputEl = this.createCard(
       containerEl,
       'rate-limits',
       t('settings.codex.accountSurface.rateLimits.name'),
-      () => this.refreshRateLimits(),
+      () => {
+        const epoch = this.beginRefresh('rate-limits');
+        void this.refreshRateLimits(epoch);
+      },
     );
     this.capabilitiesOutputEl = this.createCard(
       containerEl,
       'capabilities',
       t('settings.codex.accountSurface.capabilities.name'),
-      () => this.refreshCapabilities(),
+      () => {
+        const epoch = this.beginRefresh('capabilities');
+        void this.refreshCapabilities(epoch);
+      },
     );
 
-    this.authSource = authSource;
     this.subscribeToCodexConnection();
     void this.refreshAll();
   }
 
   dispose(): void {
+    this.invalidateAllRefreshes();
     this.statusSubscription?.dispose();
     this.statusSubscription = null;
     this.identityOutputEl = null;
     this.usageOutputEl = null;
     this.rateLimitsOutputEl = null;
     this.capabilitiesOutputEl = null;
+    this.providerConfigurationStatusEl = null;
   }
 
   private authSource: CodexAuthSource = 'env-or-chatgpt';
+
+  /** Update the read-only auth-source summary after a legacy credential clear. */
+  updateAuthSource(authSource: CodexAuthSource): void {
+    this.authSource = authSource;
+    this.renderProviderConfigurationStatus();
+  }
+
+  private createProviderConfigurationStatus(containerEl: HTMLElement): HTMLElement {
+    const statusEl = containerEl.createDiv({
+      cls: 'opencodian-codex-provider-configuration-status',
+      attr: {
+        'data-codex-provider-configuration-status': 'true',
+        'data-provider-config-state': 'external-managed',
+        role: 'status',
+        'aria-live': 'polite',
+      },
+    });
+    return statusEl;
+  }
+
+  private renderProviderConfigurationStatus(): void {
+    const statusEl = this.providerConfigurationStatusEl;
+    if (!statusEl) {
+      return;
+    }
+    statusEl.empty();
+    statusEl.setAttribute('data-provider-config-state', 'external-managed');
+    statusEl.createDiv({
+      cls: 'opencodian-codex-provider-configuration-status-header',
+    }).createEl('h4', {
+      cls: 'opencodian-codex-provider-configuration-status-title',
+      text: t('settings.codex.accountSurface.providerConfiguration.name'),
+    });
+    statusEl.createSpan({
+      cls: 'opencodian-codex-provider-configuration-status-state',
+      text: t('settings.codex.accountSurface.providerConfiguration.externalManaged'),
+    });
+    statusEl.createDiv({
+      cls: 'opencodian-codex-provider-configuration-status-description',
+      text: t('settings.codex.accountSurface.providerConfiguration.description'),
+    });
+    const sourceEl = statusEl.createDiv({
+      cls: 'opencodian-codex-provider-configuration-status-source',
+      attr: { 'data-codex-auth-source': this.authSource },
+    });
+    sourceEl.createSpan({
+      cls: 'opencodian-codex-provider-configuration-status-source-label',
+      text: t('settings.codex.accountSurface.providerConfiguration.authSourceLabel'),
+    });
+    sourceEl.createSpan({
+      cls: 'opencodian-codex-provider-configuration-status-source-value',
+      text: this.authSource === 'plugin-api-key'
+        ? t('settings.codex.accountSurface.providerConfiguration.authSourceLegacy')
+        : t('settings.codex.accountSurface.providerConfiguration.authSourceEnv'),
+    });
+    statusEl.createDiv({
+      cls: 'opencodian-codex-provider-configuration-status-capabilities',
+      text: t('settings.codex.accountSurface.providerConfiguration.capabilitiesReadback'),
+    });
+  }
 
   // ─── Card scaffolding ───────────────────────────────────────────
 
@@ -175,10 +260,33 @@ export class SettingsCodexAccountSurface {
   }
 
   private async refreshAll(): Promise<void> {
-    void this.refreshIdentity();
-    void this.refreshCapabilities();
-    void this.refreshUsage();
-    void this.refreshRateLimits();
+    const epochs = {
+      identity: this.beginRefresh('identity'),
+      usage: this.beginRefresh('usage'),
+      'rate-limits': this.beginRefresh('rate-limits'),
+      capabilities: this.beginRefresh('capabilities'),
+    };
+    await Promise.all([
+      this.refreshIdentity(epochs.identity),
+      this.refreshCapabilities(epochs.capabilities),
+      this.refreshUsage(epochs.usage),
+      this.refreshRateLimits(epochs['rate-limits']),
+    ]);
+  }
+
+  private beginRefresh(kind: CodexAccountCardKind): number {
+    this.refreshEpochs[kind] += 1;
+    return this.refreshEpochs[kind];
+  }
+
+  private invalidateAllRefreshes(): void {
+    for (const kind of Object.keys(this.refreshEpochs) as CodexAccountCardKind[]) {
+      this.refreshEpochs[kind] += 1;
+    }
+  }
+
+  private isCurrentRefresh(kind: CodexAccountCardKind, epoch: number, el: HTMLElement | null): el is HTMLElement {
+    return epoch === this.refreshEpochs[kind] && el !== null;
   }
 
   private subscribeToCodexConnection(): void {
@@ -195,9 +303,9 @@ export class SettingsCodexAccountSurface {
 
   // ─── Identity card ──────────────────────────────────────────────
 
-  private async refreshIdentity(): Promise<void> {
+  private async refreshIdentity(epoch: number): Promise<void> {
     const el = this.identityOutputEl;
-    if (!el) return;
+    if (!this.isCurrentRefresh('identity', epoch, el)) return;
     this.renderLoading(el);
     const adapter = this.plugin.agentServiceRegistry?.get('codex') as AccountInfoAdapter | null;
     if (typeof adapter?.getAccountInfo !== 'function') {
@@ -208,9 +316,11 @@ export class SettingsCodexAccountSurface {
     try {
       raw = await adapter.getAccountInfo();
     } catch {
+      if (!this.isCurrentRefresh('identity', epoch, el)) return;
       this.renderIdentityUnavailable(el, 'failed');
       return;
     }
+    if (!this.isCurrentRefresh('identity', epoch, el)) return;
     if (raw === null) {
       this.renderIdentityUnavailable(el, 'none');
       return;
@@ -348,9 +458,9 @@ export class SettingsCodexAccountSurface {
 
   // ─── Usage card ─────────────────────────────────────────────────
 
-  private async refreshUsage(): Promise<void> {
+  private async refreshUsage(epoch: number): Promise<void> {
     const el = this.usageOutputEl;
-    if (!el) return;
+    if (!this.isCurrentRefresh('usage', epoch, el)) return;
     this.renderLoading(el);
     const adapter = this.plugin.agentServiceRegistry?.get('codex') as UsageAdapter | null;
     if (typeof adapter?.getAccountUsage !== 'function') {
@@ -361,9 +471,11 @@ export class SettingsCodexAccountSurface {
     try {
       result = await adapter.getAccountUsage();
     } catch {
+      if (!this.isCurrentRefresh('usage', epoch, el)) return;
       this.renderUsageUnavailable(el, 'failed');
       return;
     }
+    if (!this.isCurrentRefresh('usage', epoch, el)) return;
     if (result.usage === null) {
       this.renderUsageAuthOrUnavailable(el, result.errorReason);
       return;
@@ -463,9 +575,9 @@ export class SettingsCodexAccountSurface {
 
   // ─── Rate limits card ───────────────────────────────────────────
 
-  private async refreshRateLimits(): Promise<void> {
+  private async refreshRateLimits(epoch: number): Promise<void> {
     const el = this.rateLimitsOutputEl;
-    if (!el) return;
+    if (!this.isCurrentRefresh('rate-limits', epoch, el)) return;
     this.renderLoading(el);
     const adapter = this.plugin.agentServiceRegistry?.get('codex') as RateLimitsAdapter | null;
     if (typeof adapter?.getAccountRateLimits !== 'function') {
@@ -476,9 +588,11 @@ export class SettingsCodexAccountSurface {
     try {
       result = await adapter.getAccountRateLimits();
     } catch {
+      if (!this.isCurrentRefresh('rate-limits', epoch, el)) return;
       this.renderRateLimitsUnavailable(el, 'failed');
       return;
     }
+    if (!this.isCurrentRefresh('rate-limits', epoch, el)) return;
     if (result.rateLimits === null) {
       this.renderRateLimitsAuthOrUnavailable(el, result.errorReason);
       return;
@@ -568,9 +682,9 @@ export class SettingsCodexAccountSurface {
 
   // ─── Capabilities card ──────────────────────────────────────────
 
-  private async refreshCapabilities(): Promise<void> {
+  private async refreshCapabilities(epoch: number): Promise<void> {
     const el = this.capabilitiesOutputEl;
-    if (!el) return;
+    if (!this.isCurrentRefresh('capabilities', epoch, el)) return;
     this.renderLoading(el);
     const adapter = this.plugin.agentServiceRegistry?.get('codex') as CapabilitiesAdapter | null;
     if (typeof adapter?.getModelProviderCapabilities !== 'function') {
@@ -581,9 +695,11 @@ export class SettingsCodexAccountSurface {
     try {
       capabilities = await adapter.getModelProviderCapabilities();
     } catch {
+      if (!this.isCurrentRefresh('capabilities', epoch, el)) return;
       this.renderCapabilitiesUnavailable(el, 'failed');
       return;
     }
+    if (!this.isCurrentRefresh('capabilities', epoch, el)) return;
     if (capabilities === null) {
       this.renderCapabilitiesUnavailable(el, 'none');
       return;
@@ -637,7 +753,7 @@ export class SettingsCodexAccountSurface {
   private renderCapabilitiesUnavailable(el: HTMLElement, reason: 'no-adapter' | 'failed' | 'none'): void {
     el.empty();
     el.setAttribute('data-proof-state', 'readback');
-    el.setAttribute('data-capabilities-state', 'unavailable');
+    el.setAttribute('data-capabilities-state', reason === 'failed' ? 'failed' : 'unavailable');
     el.createEl('p', {
       cls: 'opencodian-codex-account-card-muted',
       text: reason === 'failed'

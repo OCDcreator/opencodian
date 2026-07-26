@@ -13757,6 +13757,101 @@ img.opencodian-model-provider-header-icon {
   font-weight: 500;
 }
 
+/* Native Codex Provider configuration is intentionally an external-managed
+   read-only diagnostic. Keep this compact strip separate from the account
+   cards so it does not imply a local save/edit surface. */
+.opencodian-codex-provider-configuration-status {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 12px;
+  align-items: start;
+  margin-bottom: var(--oc-codex-group-header-gap);
+  padding: 10px 12px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  background: var(--background-secondary);
+  min-width: 0;
+}
+
+.opencodian-codex-provider-configuration-status-header {
+  min-width: 0;
+}
+
+.opencodian-codex-provider-configuration-status-title {
+  margin: 0;
+  font-size: var(--font-ui-small);
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+.opencodian-codex-provider-configuration-status-state {
+  justify-self: end;
+  color: var(--text-muted);
+  font-size: var(--font-smallest);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.opencodian-codex-provider-configuration-status-description,
+.opencodian-codex-provider-configuration-status-source,
+.opencodian-codex-provider-configuration-status-capabilities {
+  grid-column: 1 / -1;
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: var(--font-smallest);
+  line-height: 1.4;
+}
+
+.opencodian-codex-provider-configuration-status-source {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+}
+
+.opencodian-codex-provider-configuration-status-source-label {
+  flex-shrink: 0;
+}
+
+.opencodian-codex-provider-configuration-status-source-value {
+  min-width: 0;
+  color: var(--text-normal);
+  overflow-wrap: anywhere;
+}
+
+.opencodian-settings-codex-legacy-credential-status {
+  min-width: 0;
+}
+
+.opencodian-settings-codex-legacy-credential-status-copy {
+  margin-bottom: 8px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+  line-height: 1.4;
+}
+
+.opencodian-settings-codex-legacy-credential-status-error {
+  margin: 0 0 8px;
+  color: var(--text-error);
+  font-size: var(--font-ui-small);
+  line-height: 1.4;
+}
+
+.opencodian-settings-codex-legacy-credential-status .setting-item-control button:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 2px;
+}
+
+@media (max-width: 480px) {
+  .opencodian-codex-provider-configuration-status {
+    grid-template-columns: 1fr;
+  }
+
+  .opencodian-codex-provider-configuration-status-state {
+    justify-self: start;
+    white-space: normal;
+  }
+}
+
 /* Readback outputs and info notices rendered inside Codex groups.
    They share the card base above and use the card body gap for
    internal blocks. */
@@ -14627,8 +14722,36 @@ img.opencodian-model-provider-header-icon {
 
 .opencodian-claude-provider-info,
 .opencodian-claude-provider-global-summary,
-.opencodian-claude-provider-config-path {
+.opencodian-claude-provider-config-path,
+.opencodian-claude-provider-local-status {
   color: var(--text-muted);
+}
+
+.opencodian-claude-provider-local-status,
+.opencodian-claude-provider-conflict,
+.opencodian-claude-provider-partial-persistence {
+  margin: 10px 0;
+  padding: 10px 12px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s, 4px);
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+
+.opencodian-claude-provider-conflict {
+  color: var(--text-normal);
+  border-color: color-mix(in srgb, var(--text-error) 45%, var(--background-modifier-border));
+  background: color-mix(in srgb, var(--background-primary) 90%, var(--text-error) 10%);
+}
+
+.opencodian-claude-provider-partial-persistence {
+  color: var(--text-normal);
+  border-color: color-mix(in srgb, var(--color-orange) 55%, var(--background-modifier-border));
+  background: color-mix(in srgb, var(--background-primary) 92%, var(--color-orange) 8%);
+}
+
+.opencodian-claude-provider-partial-persistence p {
+  margin: 6px 0 0;
 }
 
 .opencodian-claude-provider-global-summary {
@@ -14661,6 +14784,107 @@ img.opencodian-model-provider-header-icon {
   .opencodian-claude-provider-card-heading {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  /* The providers tab can be narrower than the viewport when the Settings
+     modal keeps its navigation rail visible. Reset the native setting-item
+     minimums and make every provider surface shrink with that actual block. */
+  .opencodian-settings [data-claude-code-section='providers'],
+  .opencodian-settings [data-claude-code-section='providers'] > .opencodian-settings-block-body {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .opencodian-settings [data-claude-code-section='providers'] > .opencodian-settings-block-body > * {
+    box-sizing: border-box;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .opencodian-settings [data-claude-code-section='providers'].opencodian-settings-block.opencodian-settings-section {
+    flex: 0 0 auto;
+    height: auto;
+    max-height: none;
+    overflow-x: clip;
+    overflow-y: visible;
+  }
+
+  .opencodian-settings [data-claude-code-section='providers'] .opencodian-settings-section-heading {
+    box-sizing: border-box;
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    white-space: normal;
+  }
+
+  .opencodian-settings [data-claude-code-section='providers'] .setting-item {
+    box-sizing: border-box;
+    grid-template-columns: minmax(0, 1fr);
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .opencodian-settings [data-claude-code-section='providers'] .setting-item-info,
+  .opencodian-settings [data-claude-code-section='providers'] .setting-item-control {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .opencodian-settings [data-claude-code-section='providers'] .setting-item-name,
+  .opencodian-settings [data-claude-code-section='providers'] .setting-item-description {
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+
+  .opencodian-settings [data-claude-code-section='providers'] .setting-item-control {
+    justify-content: flex-start;
+  }
+
+  .opencodian-settings [data-claude-code-section='providers'] .setting-item-control button,
+  .opencodian-settings [data-claude-code-section='providers'] .opencodian-claude-provider-card-actions button {
+    box-sizing: border-box;
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .opencodian-settings [data-claude-code-section='providers'] .opencodian-claude-provider-list,
+  .opencodian-settings [data-claude-code-section='providers'] .opencodian-claude-provider-list > .opencodian-claude-provider-card {
+    box-sizing: border-box;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .opencodian-settings [data-claude-code-section='providers'] .opencodian-claude-provider-card-heading > * {
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    white-space: normal;
+  }
+
+  .opencodian-settings [data-claude-code-section='providers'] .opencodian-claude-provider-global-summary > *,
+  .opencodian-settings [data-claude-code-section='providers'] .opencodian-claude-provider-card code {
+    box-sizing: border-box;
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    white-space: normal;
+  }
+}
+
+@media (max-width: 480px) {
+  .opencodian-claude-provider-partial-persistence {
+    padding: 8px 10px;
+  }
+
+  .opencodian-claude-provider-partial-persistence button {
+    max-width: 100%;
+    white-space: normal;
   }
 }
 
@@ -23926,62 +24150,6 @@ img.opencodian-model-provider-header-icon {
   display: block;
 }
 
-@media (max-width: 480px) {
-  .opencodian-plugin-source-filter {
-    display: flex;
-    width: 100%;
-  }
-
-  .opencodian-plugin-source-filter-button {
-    flex: 1 1 0;
-    min-width: 0;
-    text-align: center;
-  }
-
-  /* Collapse the two-column metadata grid into a single column at narrow
-   * widths so long labels and long values do not overflow horizontally.
-   * The label becomes a leading muted line above its value. */
-  .opencodian-plugin-source-meta-row {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 2px;
-  }
-
-  .opencodian-plugin-source-meta-label {
-    text-transform: none;
-    letter-spacing: 0;
-  }
-
-  /* Path stacks label over status badge instead of side-by-side.
-   * This covers both the current source-panel DOM (.opencodian-plugin-source-path
-   * with flex-direction: row by default) and the legacy .opencodian-plugin-source-path-row
-   * grid layout used by renderPluginEntryGroup/renderManagedEntryGroup fallbacks. */
-  .opencodian-plugin-source-path {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 2px;
-  }
-
-  .opencodian-plugin-source-path-status {
-    align-self: flex-start;
-  }
-
-  .opencodian-plugin-source-path-row {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  /* Header: title and badges wrap onto separate lines on narrow widths. */
-  .opencodian-plugin-source-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: var(--opencodian-settings-space-xs);
-  }
-
-  .opencodian-plugin-source-badges {
-    width: 100%;
-    flex-wrap: wrap;
-  }
-}
-
 /* Managed plugin entry row with toggle and delete */
 .opencodian-plugin-source-item.is-plugin-disabled {
   opacity: 0.55;
@@ -25820,6 +25988,7 @@ img.opencodian-model-provider-header-icon {
 .opencodian-model-workspace-modal .modal-content {
   max-height: calc(100vh - 32px);
   padding: 0;
+  overflow-x: hidden;
   overflow-y: auto;
 }
 
@@ -25847,6 +26016,64 @@ img.opencodian-model-provider-header-icon {
 
 .opencodian-model-workspace-path {
   margin: -4px 0 0;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.opencodian-model-config-source-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.opencodian-model-config-source-selector select {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.opencodian-model-config-source-selector .setting-item-description {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.opencodian-model-config-source-conflict {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.opencodian-model-config-source-conflict h3,
+.opencodian-model-config-source-conflict p {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.opencodian-model-config-source-conflict .opencodian-config-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.opencodian-model-config-source-conflict .opencodian-config-buttons button {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .opencodian-model-workspace-toolbar.is-cc-switch {
@@ -26391,6 +26618,41 @@ img.opencodian-model-provider-header-icon {
 .opencodian-model-workspace-editor-panel.is-add-provider-flow .opencodian-model-workspace-keyvalue-input {
   min-height: 42px;
   height: 42px;
+}
+
+@media (max-width: 480px) {
+  .opencodian-model-workspace-modal {
+    width: min(980px, calc(100vw - 16px)) !important;
+  }
+
+  .opencodian-model-workspace-shell {
+    min-width: 0;
+    padding: 16px;
+  }
+
+  .opencodian-model-config-source-conflict .opencodian-config-buttons {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .opencodian-model-config-source-conflict .opencodian-config-buttons button {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .opencodian-model-workspace-footer {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  .opencodian-model-workspace-footer button {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
 }
 
 @media (max-width: 900px) {
@@ -27086,6 +27348,64 @@ img.opencodian-model-provider-header-icon {
   margin: 0;
   font-size: 0.8em;
   color: var(--text-muted);
+}
+
+/* Source-panel narrow-width overrides stay after later modal media blocks so
+ * the complete source-panel responsive contract remains easy to audit. */
+@media (max-width: 480px) {
+  .opencodian-plugin-source-filter {
+    display: flex;
+    width: 100%;
+  }
+
+  .opencodian-plugin-source-filter-button {
+    flex: 1 1 0;
+    min-width: 0;
+    text-align: center;
+  }
+
+  /* Collapse the two-column metadata grid into a single column at narrow
+   * widths so long labels and long values do not overflow horizontally.
+   * The label becomes a leading muted line above its value. */
+  .opencodian-plugin-source-meta-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+
+  .opencodian-plugin-source-meta-label {
+    text-transform: none;
+    letter-spacing: 0;
+  }
+
+  /* Path stacks label over status badge instead of side-by-side.
+   * This covers both the current source-panel DOM (.opencodian-plugin-source-path
+   * with flex-direction: row by default) and the legacy .opencodian-plugin-source-path-row
+   * grid layout used by renderPluginEntryGroup/renderManagedEntryGroup fallbacks. */
+  .opencodian-plugin-source-path {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+  }
+
+  .opencodian-plugin-source-path-status {
+    align-self: flex-start;
+  }
+
+  .opencodian-plugin-source-path-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* Header: title and badges wrap onto separate lines on narrow widths. */
+  .opencodian-plugin-source-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--opencodian-settings-space-xs);
+  }
+
+  .opencodian-plugin-source-badges {
+    width: 100%;
+    flex-wrap: wrap;
+  }
 }
 
 

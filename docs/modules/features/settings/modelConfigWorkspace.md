@@ -23,6 +23,7 @@
 | `ModelFormState` / `ProviderFormState` | 可视化编辑器的模型 / provider 表单状态 |
 | `HydratedWorkspaceState` | 从 config hydrate 后的完整 workspace |
 | `FetchedProviderModelCandidate` | 远程抓取模型列表后的候选模型结构 |
+| `isSafeProviderExtraOptionForVisualEditor()` | 判断 provider extra option 是否可进入可视化编辑器的严格 allowlist |
 
 ## 核心逻辑
 
@@ -43,6 +44,10 @@
 ### 保存前转换辅助
 
 模块提供 `serializeUnknownValue()`、`parseLooseValue()`、`parseModelVariantValue()` 和 `assertModelExtraFieldKeyAllowed()`，用于把 UI 文本框中的松散值转换为保存计划可消费的类型，同时阻止保留字段被当作 extra field 写入。
+
+### Provider extra option 可视化安全边界
+
+`isSafeProviderExtraOptionForVisualEditor()` 是 fail-closed allowlist：仅精确键名 `setCacheKey` 且值为 boolean、`"true"` 或 `"false"` 时返回 `true`。它不负责掩码或序列化；`ModelConfigProviderEditor` 用它决定哪些既有 `extraOptions` 可以进入 DOM，`ModelConfigModal` 用同一规则决定 preview 中哪些 provider `options` 可以显示。未知、对象和敏感值必须保留在 canonical form/source payload 中，改由高级 JSONC 或原生环境配置修改。
 
 ### 远程模型列表
 
@@ -75,3 +80,4 @@
 - 新增 provider interface format 时，要同步 `PROVIDER_INTERFACE_FORMAT_OPTIONS`、locale key、保存计划和 UI 说明。
 - `uid` 只用于表单行稳定渲染，不应写回 OpenCode config。
 - `parseLooseValue()` 会影响 extra options 与 variants 保存语义，修改时需同时跑 model config 相关测试。
+- 不要把 allowlist 放宽为 secret-key blacklist；provider options 的未知值默认不可安全展示，只有明确审计过的稳定标量才可加入。

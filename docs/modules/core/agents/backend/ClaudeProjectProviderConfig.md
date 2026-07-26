@@ -14,8 +14,8 @@ P1-B 起，preset 与 legacy model migration 的写入统一进入 `ProjectResou
 | 导出 | 说明 |
 |---|---|
 | `applyClaudeProviderPreset()` | 安全 merge-write 受管 model/fallbackModel/env 键；未知字段保持不变；成功返回新 revision 与三轴 evidence。 |
-| `migrateClaudeProviderModels()` | 一次性把旧 plugin model/fallback 字段迁至 local 文件，且不覆盖文件中已有值；真实写入时返回 revision/evidence。 |
-| `readClaudeProviderConfigSnapshot()` | 读取 user / project / local 三层和受限 shell env，用于只读配置视图。 |
+| `migrateClaudeProviderModels()` | 一次性把旧 plugin model/fallback 字段迁至 local 文件，且不覆盖文件中已有值；可用调用方 capture 的 `expectedRevision` 做 CAS，真实写入时返回 revision/evidence。 |
+| `readClaudeProviderConfigSnapshot()` | 读取 user / project / local 三层和受限 shell env，用于只读配置视图；local layer 通过 allowlisted no-follow descriptor snapshot 同时取得 content 与 revision，供下一次写入 CAS。 |
 | `maskClaudeProviderConfigSnapshot()` | 递归掩码 token、secret 等敏感值。 |
 | `resolveClaudeProviderGlobalEffectiveValue()` | 以 project shared → user → shell 的已知文件优先级计算非 local 的只读对照值。 |
 | `validateClaudeProviderPreset()` | 检查 `/v1` Base URL、`Bearer` token、同名 fallback 和受管 extra-env 冲突。 |
@@ -32,6 +32,8 @@ P1-B 起，preset 与 legacy model migration 的写入统一进入 `ProjectResou
 - 同一 `.claude` narrow allowlist 传给 `readAllowlistedFileSnapshot()` 与 `safeWriteFile()`；严格 JSON 的 content 和 revision 来自同一个 no-follow descriptor snapshot。读期间文件替换/identity 变化 fail closed，不会把旧 content 绑定给新 revision。
 - update 先归档为 `backend=claude / kind=provider-settings / format=json`；归档失败中止写入。create 使用 `expectedRevision: null`，update 使用完整 `{ canonicalPath, mtimeMs, size, sha256 }` revision。
 - 为兼容现有即时 read-modify-write 调用方，省略 options 时内部使用刚读取的 revision；新的设置 UI 必须显式回传它展示内容时取得的 revision，以便保留草稿并正确呈现外部修改冲突。
+- migration 与 preset apply 共用同一 archive-before-CAS owner；冲突先返回，不清理 plugin 旧模型字段，也不覆盖外部 bytes。
+- snapshot/readback 只展示 `maskClaudeProviderConfigSnapshot()` 的结果；revision 是文件元数据而不是 secret，配置值和 token 不会进入可见的状态、比较或错误文本。
 
 ## 三轴证据
 

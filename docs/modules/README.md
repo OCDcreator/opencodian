@@ -255,6 +255,7 @@ docs/modules/
 │       ├── ServerSettingHelpModal.md
 │       ├── SettingsCommandsSection.md
 │       ├── SettingsCodexAccountSurface.md
+│       ├── SettingsCodexLegacyCredentialControl.md
 │       ├── SettingsCodexReadbackControls.md
 │       ├── SettingsCodexSection.md
 │       ├── SettingsModelCatalogCoordinator.md

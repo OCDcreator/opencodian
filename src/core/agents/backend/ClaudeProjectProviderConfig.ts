@@ -38,6 +38,8 @@ export interface ClaudeProviderConfigLayer {
   exists: boolean;
   content: Record<string, unknown>;
   parseError?: string;
+  /** Present only for the local file; used as the UI's compare-and-swap token. */
+  revision?: FileRevision | null;
 }
 
 export interface ClaudeProviderConfigSnapshot {
@@ -349,9 +351,61 @@ export async function migrateClaudeProviderModels(
   return { migrated };
 }
 
-async function readConfigLayer(id: ClaudeProviderConfigLayer['id'], filePath: string): Promise<ClaudeProviderConfigLayer> {
+async function readConfigLayer(
+  id: ClaudeProviderConfigLayer['id'],
+  filePath: string,
+  vaultPath?: string,
+): Promise<ClaudeProviderConfigLayer> {
   if (!filePath) {
     return { id, filePath, exists: false, content: {} };
+  }
+  if (id === 'local' && vaultPath) {
+    const localRoot = path.dirname(filePath);
+    try {
+      await assertWithinRoot(vaultPath, localRoot);
+      const snapshot = await readAllowlistedFileSnapshot({
+        targetPath: filePath,
+        allowlist: [{ scope: 'local', rootPath: localRoot }],
+      });
+      if (snapshot.status === 'absent') {
+        return { id, filePath, exists: false, content: {}, revision: null };
+      }
+      if (snapshot.status !== 'success') {
+        return {
+          id,
+          filePath,
+          exists: false,
+          content: {},
+          revision: null,
+          parseError: `Local settings could not be read safely (${snapshot.status})`,
+        };
+      }
+      try {
+        const parsed: unknown = JSON.parse(snapshot.content);
+        if (!isRecord(parsed)) {
+          return { id, filePath, exists: true, content: {}, revision: snapshot.revision, parseError: 'Settings JSON must contain an object' };
+        }
+        return { id, filePath, exists: true, content: cloneJsonRecord(parsed), revision: snapshot.revision };
+      } catch (error) {
+        return {
+          id,
+          filePath,
+          exists: true,
+          content: {},
+          revision: snapshot.revision,
+          parseError: error instanceof Error ? error.message : String(error),
+        };
+      }
+    } catch (error) {
+      return {
+        id,
+        filePath,
+        exists: false,
+        content: {},
+        revision: null,
+        parseError: error instanceof Error ? error.message : String(error),
+      };
+    }
   }
   try {
     const text = await readFile(filePath, 'utf-8');
@@ -395,7 +449,7 @@ export async function readClaudeProviderConfigSnapshot(vaultPath: string): Promi
   const layers = await Promise.all([
     readConfigLayer('user', userSettingsPath),
     readConfigLayer('project', projectSettingsPath),
-    readConfigLayer('local', localFilePath),
+    readConfigLayer('local', localFilePath, trimmedVaultPath),
   ]);
   const shellEnv: Record<string, string> = {};
   for (const [key, value] of Object.entries(process.env)) {

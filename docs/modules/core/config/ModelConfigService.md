@@ -45,6 +45,10 @@ export interface ModelCatalogBundle {
 
 ### 读取和写回本地模型子集
 
+G9 source-bound 编辑新增 `inventoryConfigurationSources()`、`readModelConfigurationSource(targetPath)` 与 `applyModelConfigurationSource(targetPath, subset, expectedRevision)`：它们只复用 P1 的 source inventory/read/CAS JSONC path-edit API，并且只编辑五个模型键；不会把 merged `effective` 当成可写文件。
+
+`readModelConfigurationSource()` 保留选中来源的精确原始内容给高级 JSONC 编辑器，同时为 visual form 提供模型字段子集。空白、仅空白字符或 JSONC 无法解析的来源会降级为空子集 `{}`，而不是让表单 JSON parse 崩溃；来源自身的 parse 状态仍由 P1 readback 保留。该降级不等于“修复”或“覆盖”原文件，后续写入仍必须经过选中 path + revision 的 CAS mutation。
+
 `readLocalModelConfig()` 只摘取模型相关字段：
 
 - `model`
@@ -153,6 +157,9 @@ provider 开关继承规则依然保留在 `effectiveProviderConfig` 里，按�
 | `getConfigPath()` | 返回当前 vault 的 `.opencode` 配置路径 |
 | `readLocalModelConfig()` | 读取模型相关配置子集 |
 | `writeLocalModelConfig(subset)` | 局部更新模型配置子集 |
+| `inventoryConfigurationSources()` | 返回 P1 定义的 project/global/managed 来源 inventory；只用于显式选择，不把 effective/readback 视作写入目标 |
+| `readModelConfigurationSource(targetPath)` | 读取指定来源的原始内容、revision 与模型子集；空白或不可解析 JSONC 返回空子集而保留原始 readback |
+| `applyModelConfigurationSource(targetPath, subset, expectedRevision)` | 对指定来源执行 revision-aware 的五键 JSONC 局部 mutation，并返回三轴证据 |
 | `getLocalCatalog()` | 从本地配置构建 catalog |
 | `getServerCatalog()` | 从 OpenCode 服务端构建 catalog |
 | `getCatalogs(mode, disabledModelRefs?)` | 返回 `local/server/baseEffective/effective` 四套视图 |

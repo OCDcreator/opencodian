@@ -37,6 +37,10 @@ export interface SelectedProviderEditorState {
 
 ### Workspace Provider 编辑
 
+已有 provider 的 API key 会保留在 modal 的内部 form state，但 password input 以空值和 `configured (hidden)` 占位渲染；不会把已有完整 credential 写入 DOM、预览或提示。用户显式输入仍按原有回调替换内部值。workspace preview 的脱敏由 modal callback 统一完成：正常 JSON 递归掩码 secret-key 字段；不可解析 preview 则只显示 hidden sentinel，不能把原始文本泄露进 DOM，也不能把 sentinel 回写 canonical save draft。
+
+provider `extraOptions` 另有 fail-closed 专用保护边界：只有精确 `setCacheKey` 且值为 boolean / `"true"` / `"false"` 的行可进入可视化编辑器；所有其他已配置行都会向共享 key/value renderer 传递 value 为空的副本。原 canonical value 仍留在 form state，因此未编辑的保存不会写入 mask sentinel；对应行的输入、删除和其他控件会锁定，并显示“请在高级 JSONC/native env 中更新”的本地化说明。不要把这条 provider-only 规则搬进共享 `renderKeyValueEditor()`，因为模型列表也使用该 renderer，且不属于本模块的秘密字段边界。
+
 `renderWorkspaceEditor()` 负责已有 provider 的单列编辑流：
 
 - provider 工具条：显示名称 / 状态 / 模型数、项目内启用开关、provider runtime 测试、图标管理与删除入口

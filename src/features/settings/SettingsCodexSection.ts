@@ -23,6 +23,7 @@ import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { renderCostEstimateSettingsRow } from './CostEstimateSettingsRow';
 import { SettingsCodexAccountSurface } from './SettingsCodexAccountSurface';
+import { SettingsCodexLegacyCredentialControl } from './SettingsCodexLegacyCredentialControl';
 import { SettingsCodexReadbackControls } from './SettingsCodexReadbackControls';
 import { SettingsCodexResourcesSection } from './SettingsCodexResourcesSection';
 
@@ -36,13 +37,25 @@ export class SettingsCodexSection {
   private readonly createSectionHeading: SettingsCodexSectionOptions['createSectionHeading'];
   private readonly readbackControls: SettingsCodexReadbackControls;
   private readonly accountSurface: SettingsCodexAccountSurface;
+  private readonly legacyCredentialControl: SettingsCodexLegacyCredentialControl;
   private readonly resourcesSurface: SettingsCodexResourcesSection;
+  private connectionSummaryValueEl: HTMLElement | null = null;
 
   constructor(options: SettingsCodexSectionOptions) {
     this.plugin = options.plugin;
     this.createSectionHeading = options.createSectionHeading;
     this.readbackControls = new SettingsCodexReadbackControls({ plugin: this.plugin });
     this.accountSurface = new SettingsCodexAccountSurface({ plugin: this.plugin });
+    this.legacyCredentialControl = new SettingsCodexLegacyCredentialControl({
+      plugin: this.plugin,
+      onAfterClear: () => {
+        if (this.connectionSummaryValueEl) {
+          this.connectionSummaryValueEl.textContent = t('settings.codex.connection.sourceEnvOrChatgpt');
+        }
+        this.accountSurface.updateAuthSource('env-or-chatgpt');
+        this.applyCodexRuntimeUpdates();
+      },
+    });
     this.resourcesSurface = new SettingsCodexResourcesSection({
       plugin: this.plugin,
       createSectionHeading: options.createSectionHeading,
@@ -65,6 +78,8 @@ export class SettingsCodexSection {
 
   dispose(): void {
     this.accountSurface.dispose();
+    this.legacyCredentialControl.dispose();
+    this.connectionSummaryValueEl = null;
   }
 
   attach(containerEl: HTMLElement): HTMLHeadingElement {
@@ -146,7 +161,11 @@ export class SettingsCodexSection {
     const codex = this.plugin.settings.backendSettings.codex;
     const summaryEl = bodyEl.createDiv({
       cls: 'opencodian-settings-codex-connection-summary',
-      attr: { 'data-codex-connection-summary': 'true' },
+      attr: {
+        'data-codex-connection-summary': 'true',
+        role: 'status',
+        'aria-live': 'polite',
+      },
     });
 
     const authSource = codex.apiKey
@@ -157,9 +176,10 @@ export class SettingsCodexSection {
       cls: 'opencodian-settings-codex-connection-summary-label',
       text: t('settings.codex.connection.name'),
     });
-    summaryEl.createSpan({
+    this.connectionSummaryValueEl = summaryEl.createSpan({
       cls: 'opencodian-settings-codex-connection-summary-value',
       text: authSource,
+      attr: { 'data-codex-auth-source-summary': 'true' },
     });
   }
 
@@ -183,7 +203,7 @@ export class SettingsCodexSection {
       attr: { 'data-codex-group-controls': 'runtime-defaults' },
     });
 
-    this.renderApiKeySetting(controlsEl);
+    this.legacyCredentialControl.render(controlsEl);
     this.renderModelSetting(controlsEl);
     this.renderReasoningSetting(controlsEl);
     this.renderWebSearchSetting(controlsEl);
@@ -236,28 +256,6 @@ export class SettingsCodexSection {
             await this.plugin.saveSettings();
             this.applyCodexRuntimeUpdates();
           });
-      });
-  }
-
-  private renderApiKeySetting(bodyEl: HTMLElement): void {
-    new Setting(bodyEl)
-      .setName(t('settings.codex.apiKey.name'))
-      .setDesc(t('settings.codex.apiKey.desc'))
-      .addText((text) =>
-        text
-          .setPlaceholder(t('settings.codex.apiKey.placeholder'))
-          .setValue(this.plugin.settings.backendSettings.codex.apiKey)
-          .onChange(async (value) => {
-            this.plugin.settings.backendSettings.codex.apiKey = value;
-            await this.plugin.saveSettings();
-          }),
-      )
-      .then((setting) => {
-        const inputEl = setting.controlEl.querySelector('input');
-        if (inputEl) {
-          inputEl.type = 'password';
-          inputEl.autocomplete = 'off';
-        }
       });
   }
 

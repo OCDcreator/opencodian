@@ -1,6 +1,12 @@
 # Chinese Locale
 
 > **源码**: `src/i18n/locales/zh.ts`
+> **Updated**: 2026-07-27 G9 OpenCode 重启恢复 — 新增停止状态未知与已停止后启动失败两种人工恢复文案；两者均保留已验证持久化，并保持应用/运行时证据待处理。
+> **Updated**: 2026-07-27 G9 OpenCode 保存恢复 — 新增非冲突来源写入失败、部分持久化与待重启文案，避免把 CAS 成功误报为插件配置已完整应用。
+> **Updated**: 2026-07-26 G9 OpenCode 来源绑定模型配置 — 新增来源元数据/三轴证据、托管只读/CAS 冲突、运行时目录不可用、待重启及凭据预览脱敏文案。
+> **Updated**: 2026-07-26 G9 Codex 凭据安全 — 新增外部管理 Provider 状态、旧版凭据脱敏指引与确认后清除文案。
+> **Updated**: 2026-07-26 G9 Claude Providers — 新增按 revision CAS 绑定的显式迁移、generation-fenced 本机快照失败状态、完整中文三轴状态与脱敏冲突 reload/查看/retry 文案。
+> **Updated**: 2026-07-27 G9 Claude 部分持久化 — 新增来源已保存/插件设置待持久化恢复文案、仅元数据重试标签与本地化证据状态。
 > **Updated**: 2026-07-26 G10b Codex Hooks 读回 — 新增五态状态、结构化 Hook 字段、诊断信息、加载 live region 以及只读弹窗的中英文文案。
 > **Updated**: 2026-07-26 G10c Codex 前台压缩 — 新增 action row、精确线程确认、已受理/已验证/超时/过期状态、四类可用性原因与可访问 live region 文案。
 > **Updated**: 2026-07-25 P0/P1 设置 UI 审查修复 — Codex 权限四条行描述去除重复尾句（完整生命周期说明只保留在 `settings.codex.groups.permissionsDesc`）；`configEditor.help.*` 标题去除 emoji；新增 `configEditor.metadata.value.{yes,no,none}`、`configEditor.metadata.status.*`、`configEditor.scope.{project,global,managed}` 与 `configEditor.evidenceDetail.*` 本地化证据文案；`settings.codex.resources.deleted` / `settings.claudeCode.resources.deleted` 改为明确"已删除并归档，可从历史恢复"，并新增对应 `deleteConfirm` / `restoreConfirm` 确认文案。

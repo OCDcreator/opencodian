@@ -4,6 +4,7 @@ import { Modal, Notice, Setting } from 'obsidian';
 
 import {
   applyClaudeProviderPreset,
+  type ClaudeProviderConfigSnapshot,
   maskClaudeProviderConfigSnapshot,
   maskClaudeProviderValue,
   migrateClaudeProviderModels,
@@ -11,13 +12,11 @@ import {
   resolveClaudeProviderGlobalEffectiveValue,
   validateClaudeProviderPreset,
 } from '../../core/agents/backend';
-import {
-  CLAUDE_OFFICIAL_PROVIDER_PRESET,
-  type ClaudeProviderPreset,
-} from '../../core/types';
+import { CLAUDE_OFFICIAL_PROVIDER_PRESET, type ClaudeProviderPreset } from '../../core/types';
 import { t, type TranslationKey } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { getVaultBasePath } from '../../shared';
+import { SettingsClaudeProviderMetadataPersistenceCoordinator } from './SettingsClaudeProviderMetadataPersistenceCoordinator';
 
 export interface SettingsClaudeProvidersSectionOptions {
   plugin: OpenCodianPlugin;
@@ -32,6 +31,15 @@ function clonePreset(preset: ClaudeProviderPreset): ClaudeProviderPreset {
 function isOfficialPreset(preset: ClaudeProviderPreset): boolean {
   return preset.id === CLAUDE_OFFICIAL_PROVIDER_PRESET.id;
 }
+
+type ClaudeProviderConflict = { kind: 'preset'; preset: ClaudeProviderPreset } | { kind: 'migration' };
+type ClaudeProviderRenderContext = {
+  bodyEl: HTMLElement;
+  generation: number;
+  snapshotPromise: Promise<ClaudeProviderConfigSnapshot>;
+  vaultPath: string;
+  migrationButton?: HTMLButtonElement | null;
+};
 
 function parseExtraEnv(value: string): Record<string, string> {
   const result: Record<string, string> = {};
@@ -53,10 +61,7 @@ function makePresetId(): string {
 }
 
 class ClaudeProviderConfigModal extends Modal {
-  constructor(
-    app: OpenCodianPlugin['app'],
-    private readonly snapshot: Awaited<ReturnType<typeof readClaudeProviderConfigSnapshot>>,
-  ) {
+  constructor(app: OpenCodianPlugin['app'], private readonly snapshot: Awaited<ReturnType<typeof readClaudeProviderConfigSnapshot>>) {
     super(app);
   }
 
@@ -74,10 +79,8 @@ class ClaudeProviderConfigModal extends Modal {
         cls: 'opencodian-claude-provider-config-path',
         text: layer.filePath || t('settings.claudeCode.providers.noVault'),
       });
-      if (layer.parseError) {
-        section.createEl('p', { cls: 'opencodian-claude-provider-warning', text: layer.parseError });
-      }
-      section.createEl('pre', { text: layer.exists ? JSON.stringify(layer.content, null, 2) : '{}' });
+      if (layer.parseError) section.createEl('p', { cls: 'opencodian-claude-provider-warning', text: t('settings.claudeCode.providers.configModal.unavailable') });
+      section.createEl('pre', { text: layer.parseError ? '{}' : layer.exists ? JSON.stringify(layer.content, null, 2) : '{}' });
     }
     const shellSection = contentEl.createDiv({ cls: 'opencodian-claude-provider-config-layer' });
     shellSection.createEl('h3', { text: t('settings.claudeCode.providers.layer.shell') });
@@ -92,22 +95,9 @@ class ClaudeProviderConfigModal extends Modal {
 class ClaudeProviderPresetModal extends Modal {
   private readonly draft: ClaudeProviderPreset;
 
-  constructor(
-    app: OpenCodianPlugin['app'],
-    preset: ClaudeProviderPreset | null,
-    private readonly onSave: (preset: ClaudeProviderPreset) => Promise<void>,
-  ) {
+  constructor(app: OpenCodianPlugin['app'], preset: ClaudeProviderPreset | null, private readonly onSave: (preset: ClaudeProviderPreset) => Promise<void>) {
     super(app);
-    this.draft = preset ? clonePreset(preset) : {
-      id: makePresetId(),
-      name: '',
-      baseUrl: '',
-      authToken: '',
-      model: '',
-      fallbackModel: '',
-      haikuModel: '',
-      extraEnv: {},
-    };
+    this.draft = preset ? clonePreset(preset) : { id: makePresetId(), name: '', baseUrl: '', authToken: '', model: '', fallbackModel: '', haikuModel: '', extraEnv: {} };
   }
 
   onOpen(): void {
@@ -171,10 +161,22 @@ class ClaudeProviderPresetModal extends Modal {
 
 export class SettingsClaudeProvidersSection {
   private migrationInFlight = false;
+  private renderGeneration = 0;
+  private localRevision: Awaited<ReturnType<typeof readClaudeProviderConfigSnapshot>>['layers'][number]['revision'] = null;
+  private conflict: ClaudeProviderConflict | null = null;
+  private readonly metadataPersistence: SettingsClaudeProviderMetadataPersistenceCoordinator;
 
-  constructor(private readonly options: SettingsClaudeProvidersSectionOptions) {}
+  constructor(private readonly options: SettingsClaudeProvidersSectionOptions) {
+    this.metadataPersistence = new SettingsClaudeProviderMetadataPersistenceCoordinator({
+      plugin: options.plugin, getSettings: () => this.getSettings(),
+      requestRender: (bodyEl) => { bodyEl.empty(); this.render(bodyEl); },
+      onAfterMutation: options.onAfterMutation,
+    });
+  }
 
   render(bodyEl: HTMLElement): void {
+    const generation = ++this.renderGeneration;
+    this.metadataPersistence.setRenderGeneration(generation, bodyEl);
     const settings = this.getSettings();
     const vaultPath = getVaultBasePath(this.options.plugin.app);
     this.options.createSectionHeading(
@@ -192,12 +194,17 @@ export class SettingsClaudeProvidersSection {
       return;
     }
 
-    this.migrateLegacyModels(vaultPath, bodyEl);
     this.renderGuidance(bodyEl);
+    this.metadataPersistence.render(bodyEl, generation);
+    const snapshotPromise = readClaudeProviderConfigSnapshot(vaultPath);
+    const context: ClaudeProviderRenderContext = { bodyEl, generation, snapshotPromise, vaultPath };
+    context.migrationButton = this.renderMigrationAction(context);
+    this.renderLocalStatus(context);
+    this.renderConflictResolution(context);
     this.renderGlobalConfigurationAction(bodyEl, vaultPath);
     const listEl = bodyEl.createDiv({ cls: 'opencodian-claude-provider-list' });
     for (const preset of settings.providers.presets) {
-      this.renderPresetCard(listEl, preset, vaultPath, bodyEl);
+      this.renderPresetCard(listEl, preset, context);
     }
     new Setting(bodyEl)
       .setName(t('settings.claudeCode.providers.add.name'))
@@ -246,6 +253,107 @@ export class SettingsClaudeProvidersSection {
     }
   }
 
+  private renderMigrationAction(context: ClaudeProviderRenderContext): HTMLButtonElement | null {
+    const { bodyEl, generation, snapshotPromise, vaultPath } = context;
+    const settings = this.getSettings();
+    if (settings.providers.modelMigrationDone) {
+      return null;
+    }
+    const setting = new Setting(bodyEl)
+      .setName(t('settings.claudeCode.providers.migrationAction.name'))
+      .setDesc(t('settings.claudeCode.providers.migrationAction.desc'));
+    const migrationButton = setting.controlEl.createEl('button', {
+      text: t('settings.claudeCode.providers.migrationAction.button'),
+    });
+    migrationButton.disabled = true;
+    migrationButton.addEventListener('click', () => this.migrateLegacyModels(vaultPath, bodyEl));
+    void snapshotPromise.then((snapshot) => {
+      if (generation !== this.renderGeneration || !migrationButton) return;
+      const local = snapshot.layers.find((layer) => layer.id === 'local');
+      migrationButton.disabled = this.metadataPersistence.hasPendingPersistence() || !local || Boolean(local.parseError);
+    }).catch(() => {
+      if (generation === this.renderGeneration && migrationButton) {
+        migrationButton.disabled = true;
+      }
+    });
+    return migrationButton;
+  }
+
+  private renderLocalStatus(context: ClaudeProviderRenderContext): void {
+    const { bodyEl, generation, snapshotPromise, vaultPath } = context;
+    const migrationButton = context.migrationButton ?? null;
+    const statusEl = bodyEl.createDiv({ cls: 'opencodian-claude-provider-local-status', attr: { 'data-claude-provider-local-status': 'true' }, text: t('settings.claudeCode.providers.localStatus.loading') });
+    void snapshotPromise.then((snapshot) => {
+      if (generation !== this.renderGeneration) return;
+      const local = snapshot.layers.find((layer) => layer.id === 'local');
+      this.localRevision = local?.revision ?? null;
+      if (!local || local.parseError) {
+        this.renderLocalFailure(statusEl, local ? 'parse' : 'read', migrationButton);
+        return;
+      }
+      const revision = local?.revision?.sha256.slice(0, 8) ?? t('settings.claudeCode.providers.localStatus.newFile');
+      statusEl.dataset.claudeProviderLocalStatusState = 'ready';
+      statusEl.setText(t('settings.claudeCode.providers.localStatus.ready', {
+        path: local?.filePath || vaultPath,
+        revision,
+      }));
+      if (migrationButton) migrationButton.disabled = false;
+    }).catch(() => {
+      if (generation === this.renderGeneration) {
+        this.localRevision = null;
+        this.renderLocalFailure(statusEl, 'read', migrationButton);
+        statusEl.dataset.claudeProviderLocalStatusState = 'unavailable';
+      }
+    });
+  }
+
+  private renderLocalFailure(statusEl: HTMLElement, reason: 'parse' | 'read', migrationButton: HTMLButtonElement | null): void {
+    statusEl.dataset.claudeProviderLocalStatusState = 'failed';
+    statusEl.setText(t('settings.claudeCode.providers.localStatus.failed', { reason: t(`settings.claudeCode.providers.localStatus.reason.${reason}` as TranslationKey) }));
+    if (migrationButton) migrationButton.disabled = true;
+  }
+
+  private renderConflictResolution(context: ClaudeProviderRenderContext): void {
+    const { bodyEl, vaultPath } = context;
+    const conflict = this.conflict;
+    if (!conflict) return;
+    const conflictEl = bodyEl.createDiv({ cls: 'opencodian-claude-provider-conflict', attr: { 'data-claude-provider-conflict': 'true', role: 'alert' } });
+    conflictEl.createEl('strong', { text: t('settings.claudeCode.providers.conflict.title') });
+    conflictEl.createEl('p', {
+      text: t(conflict.kind === 'migration'
+        ? 'settings.claudeCode.providers.conflict.migrationDesc'
+        : 'settings.claudeCode.providers.conflict.desc'),
+    });
+    const actions = conflictEl.createDiv({ cls: 'opencodian-claude-provider-card-actions' });
+    actions.createEl('button', { text: t('settings.claudeCode.providers.conflict.reload') }).addEventListener('click', () => {
+      this.conflict = null;
+      bodyEl.empty();
+      this.render(bodyEl);
+    });
+    actions.createEl('button', { text: t('settings.claudeCode.providers.conflict.inspect') }).addEventListener('click', () => {
+      void readClaudeProviderConfigSnapshot(vaultPath).then((snapshot) => {
+        new ClaudeProviderConfigModal(this.options.plugin.app, snapshot).open();
+      }).catch(() => new Notice(t('settings.claudeCode.providers.globalUnavailable')));
+    });
+    actions.createEl('button', { cls: 'mod-cta', text: t('settings.claudeCode.providers.conflict.retry') }).addEventListener('click', () => {
+      void readClaudeProviderConfigSnapshot(vaultPath).then((snapshot) => {
+        const local = snapshot.layers.find((layer) => layer.id === 'local');
+        this.localRevision = local?.revision ?? null;
+        if (!local || local.parseError) {
+          new Notice(t('settings.claudeCode.providers.localStatus.failed', {
+            reason: t(`settings.claudeCode.providers.localStatus.reason.${local ? 'parse' : 'read'}` as TranslationKey),
+          }));
+          return;
+        }
+        if (conflict.kind === 'migration') {
+          this.migrateLegacyModels(vaultPath, bodyEl);
+        } else {
+          this.activatePreset(conflict.preset, vaultPath, bodyEl);
+        }
+      }).catch(() => new Notice(t('settings.claudeCode.providers.localStatus.unavailable')));
+    });
+  }
+
   private renderGlobalConfigurationAction(bodyEl: HTMLElement, vaultPath: string): void {
     new Setting(bodyEl)
       .setName(t('settings.claudeCode.providers.configModal.name'))
@@ -262,9 +370,9 @@ export class SettingsClaudeProvidersSection {
   private renderPresetCard(
     containerEl: HTMLElement,
     preset: ClaudeProviderPreset,
-    vaultPath: string,
-    bodyEl: HTMLElement,
+    context: ClaudeProviderRenderContext,
   ): void {
+    const { bodyEl, vaultPath } = context;
     const cardEl = containerEl.createDiv({
       cls: 'opencodian-claude-provider-card',
       attr: { 'data-claude-provider-preset': preset.id },
@@ -281,27 +389,26 @@ export class SettingsClaudeProvidersSection {
     if (validation.fallbackMatchesModel) cardEl.createEl('p', { cls: 'opencodian-claude-provider-warning', text: t('settings.claudeCode.providers.validation.sameFallback') });
     const actions = cardEl.createDiv({ cls: 'opencodian-claude-provider-card-actions' });
     const activateButton = actions.createEl('button', { text: t('settings.claudeCode.providers.activate') });
-    activateButton.disabled = preset.id === this.getSettings().providers.activePresetId;
+    activateButton.disabled = this.metadataPersistence.hasPendingPersistence() || preset.id === this.getSettings().providers.activePresetId;
     activateButton.addEventListener('click', () => this.activatePreset(preset, vaultPath, bodyEl));
     if (!isOfficialPreset(preset)) {
       const editButton = actions.createEl('button', { text: t('settings.claudeCode.providers.edit') });
+      editButton.disabled = this.metadataPersistence.hasPendingPersistence();
       editButton.addEventListener('click', () => this.openPresetEditor(preset, containerEl.parentElement ?? containerEl));
       const deleteButton = actions.createEl('button', { cls: 'mod-warning', text: t('settings.claudeCode.providers.delete') });
-      deleteButton.disabled = preset.id === this.getSettings().providers.activePresetId;
+      deleteButton.disabled = this.metadataPersistence.hasPendingPersistence() || preset.id === this.getSettings().providers.activePresetId;
       deleteButton.addEventListener('click', () => this.deletePreset(preset, containerEl.parentElement ?? containerEl));
     }
     if (preset.id === this.getSettings().providers.activePresetId) {
-      this.renderGlobalEffectiveSummary(cardEl, vaultPath);
+      this.renderGlobalEffectiveSummary(cardEl, context);
     }
   }
 
-  private renderGlobalEffectiveSummary(cardEl: HTMLElement, vaultPath: string): void {
-    const summaryEl = cardEl.createDiv({
-      cls: 'opencodian-claude-provider-global-summary',
-      attr: { 'data-claude-provider-global-values': 'true' },
-      text: t('settings.claudeCode.providers.globalLoading'),
-    });
-    void readClaudeProviderConfigSnapshot(vaultPath).then((snapshot) => {
+  private renderGlobalEffectiveSummary(cardEl: HTMLElement, context: ClaudeProviderRenderContext): void {
+    const { generation, snapshotPromise } = context;
+    const summaryEl = cardEl.createDiv({ cls: 'opencodian-claude-provider-global-summary', attr: { 'data-claude-provider-global-values': 'true' }, text: t('settings.claudeCode.providers.globalLoading') });
+    void snapshotPromise.then((snapshot) => {
+      if (generation !== this.renderGeneration) return;
       summaryEl.empty();
       for (const [key, label] of [
         ['model', t('settings.claudeCode.providers.field.model.name')],
@@ -316,7 +423,11 @@ export class SettingsClaudeProvidersSection {
           : JSON.stringify(maskClaudeProviderValue(key, value));
         summaryEl.createEl('small', { text: `${label}: ${display}` });
       }
-    }).catch(() => summaryEl.setText(t('settings.claudeCode.providers.globalUnavailable')));
+    }).catch(() => {
+      if (generation === this.renderGeneration) {
+        summaryEl.setText(t('settings.claudeCode.providers.globalUnavailable'));
+      }
+    });
   }
 
   private openPresetEditor(preset: ClaudeProviderPreset | null, bodyEl: HTMLElement): void {
@@ -348,15 +459,20 @@ export class SettingsClaudeProvidersSection {
   }
 
   private activatePreset(preset: ClaudeProviderPreset, vaultPath: string, bodyEl: HTMLElement): void {
+    if (this.metadataPersistence.hasPendingPersistence()) return;
     const settings = this.getSettings();
-    void applyClaudeProviderPreset(vaultPath, preset, settings.providers.lastAppliedManagedEnvKeys)
+    void applyClaudeProviderPreset(vaultPath, preset, settings.providers.lastAppliedManagedEnvKeys, {
+      expectedRevision: this.localRevision,
+    })
       .then(async (result) => {
+        this.conflict = null;
+        this.localRevision = result.revision;
         settings.providers = {
           ...settings.providers,
           activePresetId: preset.id,
           lastAppliedManagedEnvKeys: result.lastAppliedManagedEnvKeys,
         };
-        await this.options.plugin.saveSettings();
+        if (!await this.metadataPersistence.persistPresetMetadata(result, settings, bodyEl)) return;
         this.options.onAfterMutation?.();
         bodyEl.empty();
         this.render(bodyEl);
@@ -364,26 +480,52 @@ export class SettingsClaudeProvidersSection {
           ? t('settings.claudeCode.providers.appliedWithBackup')
           : t('settings.claudeCode.providers.applied'));
       })
-      .catch(() => new Notice(t('settings.claudeCode.providers.applyFailed')));
+      .catch((error: unknown) => {
+        if (this.isRevisionConflict(error)) {
+          this.conflict = { kind: 'preset', preset: clonePreset(preset) };
+          bodyEl.empty();
+          this.render(bodyEl);
+          return;
+        }
+        new Notice(t('settings.claudeCode.providers.applyFailed'));
+      });
+  }
+
+  private isRevisionConflict(error: unknown): boolean {
+    return typeof error === 'object' && error !== null && 'result' in error && (error as { result?: { status?: string } }).result?.status === 'conflict';
   }
 
   private migrateLegacyModels(vaultPath: string, bodyEl: HTMLElement): void {
     const settings = this.getSettings();
-    if (settings.providers.modelMigrationDone || this.migrationInFlight) {
+    if (settings.providers.modelMigrationDone || this.migrationInFlight || this.metadataPersistence.hasPendingPersistence()) {
       return;
     }
     this.migrationInFlight = true;
-    void migrateClaudeProviderModels(vaultPath, settings.model, settings.fallbackModel)
-      .then(async () => {
+    void migrateClaudeProviderModels(vaultPath, settings.model, settings.fallbackModel, {
+      expectedRevision: this.localRevision,
+    })
+      .then(async (result) => {
+        this.conflict = null;
+        if (result.revision) {
+          this.localRevision = result.revision;
+        }
         settings.model = '';
         settings.fallbackModel = '';
         settings.providers = { ...settings.providers, modelMigrationDone: true };
-        await this.options.plugin.saveSettings();
+        if (!await this.metadataPersistence.persistMigrationMetadata(result, settings, bodyEl)) return;
         new Notice(t('settings.claudeCode.providers.migrationDone'));
         bodyEl.empty();
         this.render(bodyEl);
       })
-      .catch(() => new Notice(t('settings.claudeCode.providers.migrationFailed')))
+      .catch((error: unknown) => {
+        if (this.isRevisionConflict(error)) {
+          this.conflict = { kind: 'migration' };
+          bodyEl.empty();
+          this.render(bodyEl);
+          return;
+        }
+        new Notice(t('settings.claudeCode.providers.migrationFailed'));
+      })
       .finally(() => {
         this.migrationInFlight = false;
       });

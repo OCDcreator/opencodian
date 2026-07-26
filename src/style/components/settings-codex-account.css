@@ -521,6 +521,101 @@
   font-weight: 500;
 }
 
+/* Native Codex Provider configuration is intentionally an external-managed
+   read-only diagnostic. Keep this compact strip separate from the account
+   cards so it does not imply a local save/edit surface. */
+.opencodian-codex-provider-configuration-status {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 12px;
+  align-items: start;
+  margin-bottom: var(--oc-codex-group-header-gap);
+  padding: 10px 12px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  background: var(--background-secondary);
+  min-width: 0;
+}
+
+.opencodian-codex-provider-configuration-status-header {
+  min-width: 0;
+}
+
+.opencodian-codex-provider-configuration-status-title {
+  margin: 0;
+  font-size: var(--font-ui-small);
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+.opencodian-codex-provider-configuration-status-state {
+  justify-self: end;
+  color: var(--text-muted);
+  font-size: var(--font-smallest);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.opencodian-codex-provider-configuration-status-description,
+.opencodian-codex-provider-configuration-status-source,
+.opencodian-codex-provider-configuration-status-capabilities {
+  grid-column: 1 / -1;
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: var(--font-smallest);
+  line-height: 1.4;
+}
+
+.opencodian-codex-provider-configuration-status-source {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+}
+
+.opencodian-codex-provider-configuration-status-source-label {
+  flex-shrink: 0;
+}
+
+.opencodian-codex-provider-configuration-status-source-value {
+  min-width: 0;
+  color: var(--text-normal);
+  overflow-wrap: anywhere;
+}
+
+.opencodian-settings-codex-legacy-credential-status {
+  min-width: 0;
+}
+
+.opencodian-settings-codex-legacy-credential-status-copy {
+  margin-bottom: 8px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+  line-height: 1.4;
+}
+
+.opencodian-settings-codex-legacy-credential-status-error {
+  margin: 0 0 8px;
+  color: var(--text-error);
+  font-size: var(--font-ui-small);
+  line-height: 1.4;
+}
+
+.opencodian-settings-codex-legacy-credential-status .setting-item-control button:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 2px;
+}
+
+@media (max-width: 480px) {
+  .opencodian-codex-provider-configuration-status {
+    grid-template-columns: 1fr;
+  }
+
+  .opencodian-codex-provider-configuration-status-state {
+    justify-self: start;
+    white-space: normal;
+  }
+}
+
 /* Readback outputs and info notices rendered inside Codex groups.
    They share the card base above and use the card body gap for
    internal blocks. */

@@ -27,10 +27,23 @@ import {
   resolveProviderAvailabilityProbePlan,
 } from './modelConfig';
 import type { OpencodeConfigManager } from './OpencodeConfigManager';
+import type {
+  OpencodeConfigSourceCandidate,
+  OpencodeConfigSourceMutationOutcome,
+  OpencodeConfigSourceReadResult,
+} from './OpencodeConfigSourceService';
 
 const logger = createLogger('ModelConfigService');
 
 export type { ProviderDirectorySnapshot };
+
+/** A source-bound model configuration snapshot. The effective catalog is intentionally not editable. */
+export interface ModelConfigSourceSnapshot {
+  readonly source: OpencodeConfigSourceCandidate;
+  readonly content: string;
+  readonly subset: OpencodeModelConfigSubset;
+}
+
 
 export interface ModelCatalogBundle {
   local: ModelCatalog;
@@ -100,6 +113,59 @@ export class ModelConfigService {
     const next = applyModelConfig(current, subset);
     await this.configManager.write(next);
   }
+
+  /** P1 source inventory is the sole authority for selectable configuration files. */
+  async inventoryConfigurationSources(): Promise<readonly OpencodeConfigSourceCandidate[]> {
+    return this.configManager.inventoryConfigurationSources();
+  }
+
+  /** Reads exactly the selected source; it never resolves or edits merged effective config. */
+  async readModelConfigurationSource(targetPath: string): Promise<ModelConfigSourceSnapshot | OpencodeConfigSourceReadResult> {
+    const result = await this.configManager.readConfigurationSource(targetPath);
+    if (result.status !== 'success') return result;
+    let subset: OpencodeModelConfigSubset = {};
+    if (result.content.trim()) {
+      try {
+        subset = extractModelConfig(parseOpencodeConfigText(result.content));
+      } catch (error) {
+        // P1 deliberately returns exact raw bytes for repairable malformed JSONC.
+        // The visual model editor can safely show an empty owned subset while the
+        // source metadata directs the user to the raw advanced editor.
+        logger.warn('Selected OpenCode model source could not be parsed as JSONC; using an empty model subset', {
+          targetPath,
+          error,
+        });
+      }
+    }
+    return {
+      source: result.source,
+      content: result.content,
+      subset,
+    };
+  }
+
+  /**
+   * Applies only the five model-owned top-level keys through the P1 JSONC/CAS writer.
+   * Undefined values deliberately remove their key while preserving comments and unknown fields.
+   */
+  async applyModelConfigurationSource(
+    targetPath: string,
+    subset: OpencodeModelConfigSubset,
+    expectedRevision: OpencodeConfigSourceCandidate['revision'],
+  ): Promise<OpencodeConfigSourceMutationOutcome> {
+    return this.configManager.applyConfigurationPathEdits({
+      targetPath,
+      expectedRevision,
+      edits: [
+        { path: ['model'], value: subset.model },
+        { path: ['small_model'], value: subset.small_model },
+        { path: ['provider'], value: subset.provider },
+        { path: ['enabled_providers'], value: subset.enabled_providers },
+        { path: ['disabled_providers'], value: subset.disabled_providers },
+      ],
+    });
+  }
+
 
   async getLocalCatalog(): Promise<ModelCatalog> {
     return buildCatalogFromConfig(await this.readLocalModelConfig(), 'local');

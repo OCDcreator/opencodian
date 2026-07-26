@@ -201,6 +201,21 @@ export function extractProviderExtraOptions(options: unknown): KeyValueFieldStat
     }));
 }
 
+/**
+ * Only a deliberately small set of provider extra options is safe to expose
+ * in the visual editor. All other configured values must stay in the
+ * canonical form state and be edited through the advanced JSONC surface.
+ */
+export function isSafeProviderExtraOptionForVisualEditor(key: string, value: unknown): boolean {
+  if (key !== 'setCacheKey') {
+    return false;
+  }
+  if (typeof value === 'boolean') {
+    return true;
+  }
+  return value === 'true' || value === 'false';
+}
+
 export function extractModelOptions(model: OpencodeProviderModelConfig): KeyValueFieldState[] {
   if (typeof model.options !== 'object' || model.options === null || Array.isArray(model.options)) {
     return [];

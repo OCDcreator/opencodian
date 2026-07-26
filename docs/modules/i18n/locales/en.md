@@ -1,6 +1,12 @@
 # English Locale
 
 > **源码**: `src/i18n/locales/en.ts`
+> **Updated**: 2026-07-27 G9 OpenCode restart recovery — added separate stop-unknown and post-stop start-failed recovery copy; both retain verified persistence while keeping application/runtime evidence pending.
+> **Updated**: 2026-07-27 G9 OpenCode save recovery — added non-conflict source-write failure, partial-persistence, and pending-restart copy so CAS success is not presented as a fully applied plugin save.
+> **Updated**: 2026-07-26 G9 OpenCode source-bound model configuration — added source metadata/evidence, managed-readonly/CAS conflict, runtime-catalog-unavailable, pending-restart, and hidden-credential preview copy.
+> **Updated**: 2026-07-26 G9 Codex credential hardening — added external-managed Provider status, masked legacy credential guidance, and confirmation-gated clear copy.
+> **Updated**: 2026-07-26 G9 Claude providers — added explicit CAS-bound migration, generation-fenced local snapshot failure copy, localized three-axis status, and masked conflict reload/inspect/retry copy.
+> **Updated**: 2026-07-27 G9 Claude partial persistence — added source-saved/plugin-settings-pending recovery copy, metadata-only retry labels, and localized evidence statuses.
 > **Updated**: 2026-07-26 G10b Codex hooks readback — added localized five-state status, structured hook-field labels, diagnostics, loading live-region, and read-only modal copy.
 > **Updated**: 2026-07-26 G10c foreground Codex compaction — added action-row labels, exact-thread confirmation, accepted/verified/timeout/stale status, four availability reasons, and accessible live-region copy.
 > **Updated**: 2026-07-25 P0/P1 settings UI review fixes — removed the duplicated lifecycle tail sentence from the four Codex permission row descriptions (the full sentence now lives only in `settings.codex.groups.permissionsDesc`); stripped emoji from `configEditor.help.*` titles; added `configEditor.metadata.value.{yes,no,none}`, `configEditor.metadata.status.*`, `configEditor.scope.{project,global,managed}` and `configEditor.evidenceDetail.*` for localized evidence metadata; rewrote `settings.codex.resources.deleted` / `settings.claudeCode.resources.deleted` to state "deleted and archived, restorable from history" and added matching `deleteConfirm` / `restoreConfirm` copy.

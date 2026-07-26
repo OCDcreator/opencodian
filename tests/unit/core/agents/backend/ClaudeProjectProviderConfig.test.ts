@@ -7,6 +7,7 @@ import {
   maskClaudeProviderConfigSnapshot,
   maskClaudeProviderValue,
   migrateClaudeProviderModels,
+  readClaudeProviderConfigSnapshot,
   resolveClaudeProviderGlobalEffectiveValue,
   validateClaudeProviderPreset,
 } from '../../../../../src/core/agents/backend/ClaudeProjectProviderConfig';
@@ -205,10 +206,6 @@ describe('ClaudeProjectProviderConfig mutation safety and validation', () => {
     await fs.writeFile(localSettingsPath(), content, 'utf-8');
   }
 
-  async function readLocalSettings(): Promise<Record<string, unknown>> {
-    return JSON.parse(await fs.readFile(localSettingsPath(), 'utf-8')) as Record<string, unknown>;
-  }
-
   it('rejects an escaping Claude parent symlink planted after the initial preset-write guard', async () => {
     const claudeRoot = path.dirname(localSettingsPath());
     const outsideRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'opencodian-claude-outside-'));
@@ -278,6 +275,42 @@ describe('ClaudeProjectProviderConfig mutation safety and validation', () => {
     await expect(fs.readFile(localSettingsPath(), 'utf-8')).resolves.toBe(external);
     snapshotSpy.mockRestore();
   });
+});
+
+describe('ClaudeProjectProviderConfig migration, validation, and snapshots', () => {
+  let tempRoot: string;
+
+  const preset = (overrides: Partial<ClaudeProviderPreset> = {}): ClaudeProviderPreset => ({
+    id: 'gateway',
+    name: 'Gateway',
+    baseUrl: 'https://gateway.example.com',
+    authToken: 'token-123456789',
+    model: 'claude-sonnet-4-5',
+    fallbackModel: 'claude-haiku-4-5',
+    haikuModel: 'claude-haiku-4-5',
+    extraEnv: { FOO: '1' },
+    ...overrides,
+  });
+
+  const localSettingsPath = (): string => path.join(tempRoot, '.claude', 'settings.local.json');
+  const archiveRootPath = (): string => path.join(tempRoot, 'archive');
+
+  beforeEach(async () => {
+    tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'opencodian-claude-provider-'));
+  });
+
+  afterEach(async () => {
+    await fs.rm(tempRoot, { recursive: true, force: true });
+  });
+
+  async function writeLocalSettings(content: string): Promise<void> {
+    await fs.mkdir(path.dirname(localSettingsPath()), { recursive: true });
+    await fs.writeFile(localSettingsPath(), content, 'utf-8');
+  }
+
+  async function readLocalSettings(): Promise<Record<string, unknown>> {
+    return JSON.parse(await fs.readFile(localSettingsPath(), 'utf-8')) as Record<string, unknown>;
+  }
 
   it('preserves an existing file model during one-time legacy migration', async () => {
     await writeLocalSettings(JSON.stringify({ model: 'user-model', permissions: { allow: ['Read'] } }));
@@ -337,6 +370,78 @@ describe('ClaudeProjectProviderConfig mutation safety and validation', () => {
     expect(maskClaudeProviderConfigSnapshot(snapshot).layers[0]?.content).toEqual({
       model: 'user-model',
       env: { ANTHROPIC_AUTH_TOKEN: 'user…123' },
+    });
+  });
+
+  it('returns the exact local revision in the masked read-only snapshot without exposing its token', async () => {
+    await writeLocalSettings(JSON.stringify({ env: { ANTHROPIC_AUTH_TOKEN: 'token-123456789' }, unknownTopLevel: { preserved: true } }));
+
+    const snapshot = await readClaudeProviderConfigSnapshot(tempRoot);
+    const local = snapshot.layers.find((layer) => layer.id === 'local');
+
+    expect(local?.filePath).toBe(localSettingsPath());
+    expect(local?.revision).toEqual(expect.objectContaining({ canonicalPath: expect.any(String), sha256: expect.any(String) }));
+    expect(JSON.stringify(maskClaudeProviderConfigSnapshot(snapshot))).not.toContain('token-123456789');
+  });
+
+  it('uses the allowlisted descriptor snapshot as the single source for local content and revision', async () => {
+    await writeLocalSettings(JSON.stringify({ fromDisk: 'must-not-win' }));
+    const stableRevision = {
+      canonicalPath: localSettingsPath(), mtimeMs: 123, size: 42, sha256: 'stable-snapshot-revision',
+    };
+    const actualSnapshot = readAllowlistedFileSnapshot;
+    const snapshotSpy = jest.spyOn(projectResourceSecureWrite, 'readAllowlistedFileSnapshot')
+      .mockImplementation(async (options) => (
+        options.targetPath === localSettingsPath()
+          ? { status: 'success', content: JSON.stringify({ fromSnapshot: true }), revision: stableRevision }
+          : actualSnapshot(options)
+      ));
+
+    try {
+      const snapshot = await readClaudeProviderConfigSnapshot(tempRoot);
+      const local = snapshot.layers.find((layer) => layer.id === 'local');
+      expect(snapshotSpy).toHaveBeenCalledWith(expect.objectContaining({
+        targetPath: localSettingsPath(),
+        allowlist: [{ scope: 'local', rootPath: path.dirname(localSettingsPath()) }],
+      }));
+      expect(local?.content).toEqual({ fromSnapshot: true });
+      expect(local?.revision).toEqual(stableRevision);
+    } finally {
+      snapshotSpy.mockRestore();
+    }
+  });
+
+  it('binds legacy migration to the captured revision and requires a fresh revision after conflict', async () => {
+    await writeLocalSettings(JSON.stringify({ permissions: { allow: ['Read'] } }));
+    const captured = (await readClaudeProviderConfigSnapshot(tempRoot)).layers.find((layer) => layer.id === 'local')?.revision;
+    expect(captured).not.toBeNull();
+    const external = '{\n  "external": true\n}\n';
+    await writeLocalSettings(external);
+
+    await expect(migrateClaudeProviderModels(
+      tempRoot,
+      'legacy-model',
+      'legacy-fallback',
+      { expectedRevision: captured, archiveRootPath: archiveRootPath() },
+    )).rejects.toEqual(expect.objectContaining({
+      name: 'ClaudeProviderConfigMutationError',
+      result: expect.objectContaining({ status: 'conflict' }),
+    }));
+    await expect(fs.readFile(localSettingsPath(), 'utf-8')).resolves.toBe(external);
+
+    const freshRevision = (await readClaudeProviderConfigSnapshot(tempRoot)).layers.find((layer) => layer.id === 'local')?.revision;
+    const retried = await migrateClaudeProviderModels(
+      tempRoot,
+      'legacy-model',
+      'legacy-fallback',
+      { expectedRevision: freshRevision, archiveRootPath: archiveRootPath() },
+    );
+    expect(retried.migrated).toBe(true);
+    expect(retried.revision).toEqual(expect.objectContaining({ sha256: expect.any(String) }));
+    expect(await readLocalSettings()).toEqual({
+      external: true,
+      model: 'legacy-model',
+      fallbackModel: ['legacy-fallback'],
     });
   });
 });
