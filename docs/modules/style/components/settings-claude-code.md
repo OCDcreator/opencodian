@@ -154,6 +154,7 @@ Claude Code 设置面板的专用样式，负责 tab body、语义 group、readb
 - `.opencodian-claude-configuration-draft` 保留可垂直调整的 strict-JSON textarea；`.opencodian-claude-configuration-compare-output` 使用局部滚动和 `pre-wrap`，不会撑宽 Settings pane。
 - `.opencodian-claude-configuration-status[data-claude-config-status-level]` 区分 ok/error/warn；`.opencodian-claude-configuration-diagnostic` 与 error rows 使用 error tint。managed/read-only 标识保持 muted，不伪装成可写控件。
 - field/group/handler/history rows 与 hooks evidence 使用轻量分隔和 `gap`，不增加卡片层级；未知 event/handler raw JSON 仍可读。
+- P2 UX 增量：`-summary` current-editing 摘要条常驻首屏（scope/path/presence/writable/dirty/三轴摘要），`-chip` 为 compact 中性标识；`-global-warning` 用 warning tint 且仅 Global 选中时可见；`-switch-confirm` 内联呈现未保存草稿的 Save/Discard/Cancel 决策，并保留原生 button 的可见 `:focus-visible` 环；`-disclosure-toggle` + hidden region 承载 sources/Advanced JSON/History/Hooks 渐进披露，折叠不销毁 draft；source 行内 `<details class="-source-tech">` 收 canonical path/revision/priority 等技术 token；`-live-region` 为 sr-only 的 role=status/alert carrier，阻断 diagnostic 与 inventory/history error 仍在可见 surface；`[aria-invalid="true"]` 控件有 error tint 轮廓。Hooks 重渲染后的程序化焦点只落到仍存在的语义 button/input/select/textarea；workbench 的可见焦点环统一使用 `:focus-visible`，不对无语义 `div` 使用 `tabindex`、`:focus` outline 或被移除的 outline。长路径改为分段 DOM：分隔符处自然换行、长单段 ellipsis，同时完整值保留在 `title`/`aria-label`/Copy，不能退回只依赖 `overflow-wrap:anywhere`。
 
 ## 维护约束
 

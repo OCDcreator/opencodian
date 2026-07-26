@@ -19,7 +19,8 @@ import type {
 } from '../../core/agents/backend/ClaudeSettingsSourceService';
 import type { ArchiveHistoryEntryIdentity } from '../../core/agents/backend/ConfigurationArchiveService';
 import type { FileRevision } from '../../core/agents/backend/ProjectResourceSecureWrite';
-import { t } from '../../i18n';
+import { getLocale, t, type TranslationKey } from '../../i18n';
+import { appendText, formatClaudeSettingsEvidenceHuman } from './ClaudeSettingsContextSourcesPresenter';
 
 export type ClaudeConfigurationScope = 'project' | 'local' | 'global';
 export type ClaudeSettingsStatusLevel = '' | 'error' | 'warn' | 'ok';
@@ -52,9 +53,13 @@ export interface ClaudeSettingsMutationHost {
   isMutationContextCurrent(context: ClaudeSettingsMutationContext, requireRevision: boolean): boolean;
   getDraft(): string;
   setExpectedRevision(revision: FileRevision | null): void;
+  /** Marks one submitted snapshot as the saved baseline for dirty tracking. */
+  markDraftSaved(submittedDraft: string): void;
   setStatus(message: string, level: ClaudeSettingsStatusLevel): void;
   refreshInventory(): Promise<void>;
   refreshSaveControl(): void;
+  /** Returns focus to a stable workbench control after a destructive mutation. */
+  focusEditorAnchor(): void;
   onAfterMutation?(): void;
 }
 
@@ -62,6 +67,11 @@ export interface ClaudeSettingsSaveControls {
   saveButton: HTMLButtonElement;
   reloadButton: HTMLButtonElement;
   compareButton: HTMLButtonElement;
+}
+
+/** Exact canonical draft snapshot accepted by the successful write request. */
+export interface ClaudeSettingsSaveOutcome {
+  readonly submittedDraft: string;
 }
 
 export interface ClaudeSettingsDeleteControls {
@@ -77,6 +87,12 @@ interface RestoreConfirmation {
   row: HTMLElement;
   entryIdentity: ArchiveHistoryEntryIdentity;
   context: ClaudeSettingsMutationContext;
+  trigger: HTMLButtonElement;
+}
+
+/** Localized scope label for confirmation copy (e.g. "Project" / "项目"). */
+function claudeSettingsScopeLabel(scope: ClaudeConfigurationScope): string {
+  return t(`settings.claudeCode.configuration.scopeLabel.${scope}` as TranslationKey);
 }
 
 /** True only when revision identities represent the same exact file snapshot. */
@@ -88,9 +104,39 @@ export function sameClaudeSettingsRevision(left: FileRevision | null, right: Fil
     && left.sha256 === right.sha256);
 }
 
-/** Formats evidence without ever inferring or promoting a verification axis. */
-export function formatClaudeSettingsEvidence(evidence: { persistence: string; application: string; runtime: string }): string {
-  return `persistence=${evidence.persistence}; application=${evidence.application}; runtime=${evidence.runtime}`;
+const HISTORY_KIND_KEYS: Readonly<Record<string, TranslationKey>> = {
+  overwrite: 'settings.claudeCode.configuration.history.kind.overwrite',
+  delete: 'settings.claudeCode.configuration.history.kind.delete',
+};
+
+function claudeSettingsLocaleTag(): string {
+  return getLocale() === 'zh' ? 'zh-CN' : 'en-US';
+}
+
+function formatClaudeSettingsHistoryKind(kind: string): string {
+  const key = HISTORY_KIND_KEYS[kind];
+  return key
+    ? t(key)
+    : t('settings.claudeCode.configuration.history.kind.unknown', { kind });
+}
+
+function formatClaudeSettingsHistoryTime(timestamp: number): string {
+  return new Intl.DateTimeFormat(claudeSettingsLocaleTag(), { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(timestamp));
+}
+
+function formatClaudeSettingsHistorySize(bytes: number): string {
+  const safeBytes = Math.max(0, bytes);
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  let unitIndex = 0;
+  let value = safeBytes;
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex++;
+  }
+  const formatted = new Intl.NumberFormat(claudeSettingsLocaleTag(), {
+    maximumFractionDigits: value < 10 && unitIndex > 0 ? 1 : 0,
+  }).format(value);
+  return t('settings.claudeCode.configuration.history.size', { value: formatted, unit: units[unitIndex] });
 }
 
 export class ClaudeSettingsMutationController {
@@ -98,6 +144,8 @@ export class ClaudeSettingsMutationController {
   private deleteInFlight = false;
   private restoreInFlight = false;
   private compareInFlight = false;
+  /** Invalidates a history response whenever its disclosure is closed or reopened. */
+  private historyRequestToken = 0;
 
   constructor(private readonly host: ClaudeSettingsMutationHost) {}
 
@@ -105,43 +153,75 @@ export class ClaudeSettingsMutationController {
     return this.saveInFlight;
   }
 
-  /** Save the exact draft snapshot under the current selection/revision CAS. */
-  async save(controls: ClaudeSettingsSaveControls): Promise<void> {
-    if (this.saveInFlight) return;
+  /** Removes visible delete/restore confirmations, compare output, and history rows under the editor. */
+  clearConfirmations(editor: HTMLElement | null | undefined): void {
+    if (!editor) return;
+    editor.querySelector('[data-claude-config-delete-confirm]')?.remove();
+    editor.querySelectorAll('[data-claude-config-restore-confirm]').forEach((node) => node.remove());
+    editor.querySelector('[data-claude-config-compare-output]')?.remove();
+    const history = editor.querySelector('[data-claude-config-history]') as HTMLElement | null;
+    if (history) {
+      this.historyRequestToken++;
+      history.hidden = true;
+      history.setAttribute('aria-busy', 'false');
+      this.clearChildren(history);
+      const toggle = editor.querySelector('[data-claude-config-history-toggle]') as HTMLButtonElement | null;
+      toggle?.setAttribute('aria-expanded', 'false');
+    }
+  }
+
+  /**
+   * Save the exact draft snapshot under the current selection/revision CAS.
+   * Returns the exact submitted snapshot only after a verified success, so
+   * gated flows (e.g. Save & Switch) can compare it with the live draft.
+   */
+  async save(controls: ClaudeSettingsSaveControls): Promise<ClaudeSettingsSaveOutcome | null> {
+    if (this.saveInFlight) return null;
     const context = this.host.captureMutationContext();
     const vaultPath = this.host.getVaultPath();
-    if (!vaultPath || context.sourceReadOnly) return;
-    const draft = this.host.getDraft();
+    if (!vaultPath || context.sourceReadOnly) return null;
+    // Capture before the first await. This is the sole snapshot that this save
+    // may mark as persisted even if the user continues editing while it runs.
+    const submittedDraft = this.host.getDraft();
     const service = this.host.resolveService(vaultPath);
     this.saveInFlight = true;
     this.host.refreshSaveControl();
     try {
       const result = await service.write({
         targetPath: context.targetPath,
-        content: draft,
+        content: submittedDraft,
         expectedRevision: context.expectedRevision,
       });
-      if (!this.host.isMutationContextCurrent(context, false)) return;
+      if (!this.host.isMutationContextCurrent(context, false)) return null;
       if (result.result.status === 'success') {
         this.host.setExpectedRevision((result.result as { revision?: FileRevision }).revision ?? context.expectedRevision);
+        this.host.markDraftSaved(submittedDraft);
         controls.reloadButton.hidden = true;
         controls.compareButton.hidden = true;
         this.host.onAfterMutation?.();
         await this.host.refreshInventory();
         if (this.host.isMutationContextCurrent(context, false)) {
-          this.host.setStatus(`${t('settings.claudeCode.configuration.saved')} ${formatClaudeSettingsEvidence(result.evidence)}`, 'ok');
+          const newerDraftExists = this.host.getDraft() !== submittedDraft;
+          const suffix = newerDraftExists
+            ? t('settings.claudeCode.configuration.savedNewerDraft')
+            : formatClaudeSettingsEvidenceHuman(result.evidence);
+          this.host.setStatus(`${t('settings.claudeCode.configuration.saved')} ${suffix}`, newerDraftExists ? 'warn' : 'ok');
         }
-      } else if (result.result.status === 'conflict') {
+        return { submittedDraft };
+      }
+      if (result.result.status === 'conflict') {
         controls.reloadButton.hidden = false;
         controls.compareButton.hidden = false;
         this.host.setStatus(t('settings.claudeCode.configuration.conflict'), 'error');
       } else {
         this.host.setStatus(t('settings.claudeCode.configuration.saveFailed'), 'error');
       }
+      return null;
     } catch {
       if (this.host.isMutationContextCurrent(context, false)) {
         this.host.setStatus(t('settings.claudeCode.configuration.saveFailed'), 'error');
       }
+      return null;
     } finally {
       this.saveInFlight = false;
       this.host.refreshSaveControl();
@@ -187,10 +267,20 @@ export class ClaudeSettingsMutationController {
     }
     const confirm = document.createElement('div');
     confirm.setAttribute('data-claude-config-delete-confirm', 'true');
-    this.appendText(confirm, 'opencodian-claude-configuration-confirm-text', t('settings.claudeCode.configuration.deleteConfirm'));
+    appendText(
+      confirm,
+      'opencodian-claude-configuration-confirm-text',
+      t('settings.claudeCode.configuration.deleteConfirm', {
+        scope: claudeSettingsScopeLabel(context.scope),
+        path: context.targetPath,
+      }),
+    );
     const accept = this.createButton(t('settings.claudeCode.configuration.confirm'), 'data-claude-config-delete-accept');
     const cancel = this.createButton(t('settings.claudeCode.configuration.cancel'), 'data-claude-config-delete-cancel');
-    cancel.addEventListener('click', () => confirm.remove());
+    cancel.addEventListener('click', () => {
+      confirm.remove();
+      controls.trigger.focus();
+    });
     accept.addEventListener('click', () => {
       void this.deleteConfirmed({ context, confirm, accept, trigger: controls.trigger });
     });
@@ -199,37 +289,51 @@ export class ClaudeSettingsMutationController {
   }
 
   /** Read history without materializing a missing root, then render exact-target entries. */
-  async toggleHistory(container: HTMLElement): Promise<void> {
+  async toggleHistory(container: HTMLElement, onVisibilityChange?: (expanded: boolean) => void): Promise<void> {
     if (!container.hidden) {
+      this.historyRequestToken++;
       container.hidden = true;
+      container.setAttribute('aria-busy', 'false');
       this.clearChildren(container);
+      onVisibilityChange?.(false);
       return;
     }
+    const requestToken = ++this.historyRequestToken;
     const context = this.host.captureMutationContext();
     const vaultPath = this.host.getVaultPath();
     if (!vaultPath) return;
     container.hidden = false;
+    container.setAttribute('aria-busy', 'true');
+    onVisibilityChange?.(true);
     this.clearChildren(container);
-    this.appendText(container, 'opencodian-claude-configuration-history-loading', t('settings.claudeCode.configuration.historyLoading'));
+    appendText(container, 'opencodian-claude-configuration-history-loading', t('settings.claudeCode.configuration.historyLoading'));
     const service = this.host.resolveService(vaultPath);
     try {
       const result = await service.listHistory(context.targetPath);
-      if (!this.isVisibleCurrentHistory(container, context)) return;
+      if (!this.isVisibleCurrentHistory(container, context, requestToken)) return;
+      container.setAttribute('aria-busy', 'false');
       this.clearChildren(container);
       if (result.status !== 'success') {
-        this.appendText(container, 'opencodian-claude-configuration-history-error', t('settings.claudeCode.configuration.historyFailed'));
+        const error = appendText(container, 'opencodian-claude-configuration-history-error', t('settings.claudeCode.configuration.historyFailed'));
+        error.setAttribute('role', 'alert');
+        error.setAttribute('aria-live', 'assertive');
+        this.host.setStatus(t('settings.claudeCode.configuration.historyFailed'), 'error');
         return;
       }
       const target = result.targets.length === 1 ? result.targets[0] : undefined;
       if (!target || target.entries.length === 0) {
-        this.appendText(container, 'opencodian-claude-configuration-history-empty', t('settings.claudeCode.configuration.historyEmpty'));
+        appendText(container, 'opencodian-claude-configuration-history-empty', t('settings.claudeCode.configuration.historyEmpty'));
         return;
       }
       for (const entry of target.entries) this.renderHistoryEntry(container, entry, context);
     } catch {
-      if (this.isVisibleCurrentHistory(container, context)) {
+      if (this.isVisibleCurrentHistory(container, context, requestToken)) {
+        container.setAttribute('aria-busy', 'false');
         this.clearChildren(container);
-        this.appendText(container, 'opencodian-claude-configuration-history-error', t('settings.claudeCode.configuration.historyFailed'));
+        const error = appendText(container, 'opencodian-claude-configuration-history-error', t('settings.claudeCode.configuration.historyFailed'));
+        error.setAttribute('role', 'alert');
+        error.setAttribute('aria-live', 'assertive');
+        this.host.setStatus(t('settings.claudeCode.configuration.historyFailed'), 'error');
       }
     }
   }
@@ -262,7 +366,8 @@ export class ClaudeSettingsMutationController {
         this.host.onAfterMutation?.();
         await this.host.refreshInventory();
         if (this.host.isMutationContextCurrent(context, false)) {
-          this.host.setStatus(`${t('settings.claudeCode.configuration.deleted')} ${formatClaudeSettingsEvidence(result.evidence)}`, 'ok');
+          this.host.setStatus(`${t('settings.claudeCode.configuration.deleted')} ${formatClaudeSettingsEvidenceHuman(result.evidence)}`, 'ok');
+          this.host.focusEditorAnchor();
         }
       } else if (result.result.status === 'conflict') {
         this.host.setStatus(t('settings.claudeCode.configuration.conflict'), 'error');
@@ -290,10 +395,14 @@ export class ClaudeSettingsMutationController {
     const row = document.createElement('div');
     row.className = 'opencodian-claude-configuration-history-row';
     row.setAttribute('data-claude-config-history-entry', String(entry.timestamp));
-    this.appendText(row, 'opencodian-claude-configuration-history-meta', `${entry.archiveKind} · ${new Date(entry.timestamp).toLocaleString()} · ${entry.size}`);
+    appendText(
+      row,
+      'opencodian-claude-configuration-history-meta',
+      `${formatClaudeSettingsHistoryKind(entry.archiveKind)} · ${formatClaudeSettingsHistoryTime(entry.timestamp)} · ${formatClaudeSettingsHistorySize(entry.size)}`,
+    );
     const restore = this.createButton(t('settings.claudeCode.configuration.restore'), 'data-claude-config-history-restore');
     restore.disabled = context.sourceReadOnly;
-    restore.addEventListener('click', () => this.requestRestore({ row, entryIdentity: entry.identity, context }));
+    restore.addEventListener('click', () => this.requestRestore({ row, entryIdentity: entry.identity, context, trigger: restore }));
     row.appendChild(restore);
     container.appendChild(row);
   }
@@ -302,10 +411,20 @@ export class ClaudeSettingsMutationController {
     if (confirmation.row.querySelector('[data-claude-config-restore-confirm]')) return;
     const root = document.createElement('div');
     root.setAttribute('data-claude-config-restore-confirm', 'true');
-    this.appendText(root, 'opencodian-claude-configuration-confirm-text', t('settings.claudeCode.configuration.restoreConfirm'));
+    appendText(
+      root,
+      'opencodian-claude-configuration-confirm-text',
+      t('settings.claudeCode.configuration.restoreConfirm', {
+        scope: claudeSettingsScopeLabel(confirmation.context.scope),
+        path: confirmation.context.targetPath,
+      }),
+    );
     const accept = this.createButton(t('settings.claudeCode.configuration.confirm'), 'data-claude-config-restore-accept');
     const cancel = this.createButton(t('settings.claudeCode.configuration.cancel'), 'data-claude-config-restore-cancel');
-    cancel.addEventListener('click', () => root.remove());
+    cancel.addEventListener('click', () => {
+      root.remove();
+      confirmation.trigger.focus();
+    });
     accept.addEventListener('click', () => void this.restoreConfirmed({ ...confirmation, confirm: root, accept }));
     root.append(accept, cancel);
     confirmation.row.appendChild(root);
@@ -334,7 +453,8 @@ export class ClaudeSettingsMutationController {
         this.host.onAfterMutation?.();
         await this.host.refreshInventory();
         if (this.host.isMutationContextCurrent(context, false)) {
-          this.host.setStatus(`${t('settings.claudeCode.configuration.restored')} ${formatClaudeSettingsEvidence(result.evidence)}`, 'ok');
+          this.host.setStatus(`${t('settings.claudeCode.configuration.restored')} ${formatClaudeSettingsEvidenceHuman(result.evidence)}`, 'ok');
+          this.host.focusEditorAnchor();
         }
       } else if (result.result.status === 'conflict') {
         this.host.setStatus(t('settings.claudeCode.configuration.conflict'), 'error');
@@ -351,8 +471,14 @@ export class ClaudeSettingsMutationController {
     }
   }
 
-  private isVisibleCurrentHistory(container: HTMLElement, context: ClaudeSettingsMutationContext): boolean {
-    return !container.hidden && this.host.isMutationContextCurrent(context, true);
+  private isVisibleCurrentHistory(
+    container: HTMLElement,
+    context: ClaudeSettingsMutationContext,
+    requestToken: number,
+  ): boolean {
+    return requestToken === this.historyRequestToken
+      && !container.hidden
+      && this.host.isMutationContextCurrent(context, true);
   }
 
   private createButton(text: string, dataName: string): HTMLButtonElement {
@@ -363,14 +489,6 @@ export class ClaudeSettingsMutationController {
     button.setAttribute('aria-label', text);
     button.setAttribute(dataName, 'true');
     return button;
-  }
-
-  private appendText(parent: HTMLElement, className: string, text: string): HTMLElement {
-    const node = document.createElement('span');
-    node.className = className;
-    node.textContent = text;
-    parent.appendChild(node);
-    return node;
   }
 
   private clearChildren(element: HTMLElement): void {

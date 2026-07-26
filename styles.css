@@ -12887,11 +12887,24 @@ img.opencodian-model-provider-header-icon {
   font-size: var(--font-ui-smaller);
 }
 
-.opencodian-claude-configuration-target-path {
+.opencodian-claude-configuration-target-path,
+.opencodian-claude-configuration-summary-path,
+.opencodian-claude-configuration-source-path {
+  display: flex;
+  flex-wrap: wrap;
+  min-inline-size: 0;
+  max-inline-size: 100%;
   font-family: var(--font-monospace);
   font-size: var(--font-ui-smaller);
   color: var(--text-muted);
-  word-break: break-all;
+}
+
+.opencodian-claude-configuration-path-segment {
+  min-inline-size: 0;
+  max-inline-size: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .opencodian-claude-configuration-evidence {
@@ -12957,6 +12970,11 @@ img.opencodian-model-provider-header-icon {
   font-size: var(--font-ui-smaller);
 }
 
+.opencodian-claude-configuration-history-error {
+  color: var(--text-error);
+  font-size: var(--font-ui-smaller);
+}
+
 .opencodian-claude-configuration-form,
 .opencodian-claude-configuration-hooks,
 .opencodian-claude-configuration-history {
@@ -12999,6 +13017,10 @@ img.opencodian-model-provider-header-icon {
   overflow-wrap: anywhere;
 }
 
+.opencodian-claude-configuration-source-path {
+  overflow-wrap: normal;
+}
+
 .opencodian-claude-configuration-hook-event,
 .opencodian-claude-configuration-history {
   border-block-start: 1px solid var(--background-modifier-border);
@@ -13016,6 +13038,187 @@ img.opencodian-model-provider-header-icon {
 .opencodian-claude-configuration textarea:focus-visible {
   outline: 2px solid var(--interactive-accent);
   outline-offset: 2px;
+}
+
+/* Current editing summary: compact context bar answering scope, target,
+   presence, writable, dirty state, and the three independent evidence axes. */
+.opencodian-claude-configuration-summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-4-1, 4px);
+  padding: var(--size-4-2, 8px) var(--size-4-3, 12px);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s, 6px);
+  background: var(--background-secondary-alt, var(--background-secondary));
+  min-inline-size: 0;
+}
+
+.opencodian-claude-configuration-summary-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--size-4-1, 4px) var(--size-4-2, 8px);
+  align-items: center;
+  min-inline-size: 0;
+}
+
+.opencodian-claude-configuration-summary-path {
+  flex: 1 1 12rem;
+  color: var(--text-normal);
+}
+
+.opencodian-claude-configuration-summary-evidence {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+}
+
+.opencodian-claude-configuration-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--background-modifier-border);
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.opencodian-claude-configuration-summary-dirty.is-dirty {
+  color: var(--text-warning, var(--color-yellow));
+  border-color: color-mix(in srgb, var(--text-warning, var(--color-yellow)) 40%, var(--background-modifier-border));
+}
+
+.opencodian-claude-configuration-copy-path {
+  padding: 0 4px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.opencodian-claude-configuration-copy-path:hover {
+  color: var(--text-normal);
+}
+
+/* Persistent Global-scope warning: visible only while Global is selected. */
+.opencodian-claude-configuration-global-warning {
+  padding: var(--size-4-2, 8px) var(--size-4-3, 12px);
+  border: 1px solid color-mix(in srgb, var(--text-warning, var(--color-yellow)) 30%, var(--background-modifier-border));
+  border-radius: var(--radius-s, 6px);
+  background: color-mix(in srgb, var(--text-warning, var(--color-yellow)) 6%, var(--background-primary));
+  color: var(--text-normal);
+  font-size: var(--font-ui-smaller);
+  overflow-wrap: anywhere;
+}
+
+/* Unsaved-draft switch decision: inline, quiet, with the target in context. */
+.opencodian-claude-configuration-switch-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--size-4-2, 8px);
+  align-items: center;
+  padding: var(--size-4-2, 8px) var(--size-4-3, 12px);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s, 6px);
+  background: var(--background-secondary-alt, var(--background-secondary));
+}
+
+.opencodian-claude-configuration-confirm-text {
+  flex: 1 1 100%;
+  color: var(--text-normal);
+  font-size: var(--font-ui-smaller);
+  overflow-wrap: anywhere;
+}
+
+/* Disclosure toggles: full-width quiet buttons, never another card layer. */
+.opencodian-claude-configuration-disclosure-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--size-4-2, 8px);
+  inline-size: 100%;
+  padding: var(--size-4-1, 4px) 2px;
+  background: transparent;
+  border: none;
+  color: var(--text-normal);
+  font-size: var(--font-ui-medium);
+  font-weight: 600;
+  text-align: start;
+  cursor: pointer;
+}
+
+.opencodian-claude-configuration-disclosure-toggle::before {
+  content: '▸';
+  color: var(--text-faint);
+  font-size: var(--font-ui-smaller);
+}
+
+.opencodian-claude-configuration-disclosure-toggle[aria-expanded='true']::before {
+  content: '▾';
+}
+
+.opencodian-claude-configuration-disclosure-toggle:hover {
+  color: var(--text-accent, var(--interactive-accent));
+}
+
+/* Source inventory rows: human layer first, technical details behind a
+   per-row disclosure so first-screen weight stays low. */
+.opencodian-claude-configuration-source-row {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--size-4-1, 4px);
+  padding: var(--size-4-1, 4px) 0;
+}
+
+.opencodian-claude-configuration-source-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--size-4-1, 4px) var(--size-4-2, 8px);
+  align-items: center;
+  color: var(--text-normal);
+  font-size: var(--font-ui-smaller);
+}
+
+.opencodian-claude-configuration-evidence-human {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+}
+
+.opencodian-claude-configuration-source-tech {
+  font-size: var(--font-ui-smaller);
+}
+
+.opencodian-claude-configuration-source-tech > summary {
+  color: var(--text-faint);
+  cursor: pointer;
+}
+
+.opencodian-claude-configuration-source-tech > summary:hover {
+  color: var(--text-muted);
+}
+
+.opencodian-claude-configuration-source-tech > span {
+  display: block;
+}
+
+/* Screen-reader-only live-region carriers: visually hidden, still announced. */
+.opencodian-claude-configuration-live-region {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.opencodian-claude-configuration-hooks-event-filter {
+  min-width: min(100%, 10rem);
+  flex: 1 1 10rem;
+}
+
+.opencodian-claude-configuration [aria-invalid='true'] {
+  border-color: var(--text-error) !important;
 }
 
 @media (max-width: 520px) {

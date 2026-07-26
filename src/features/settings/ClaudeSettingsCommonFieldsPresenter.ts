@@ -18,6 +18,8 @@ export interface ClaudeSettingsCommonFieldsHost {
   isReadOnly(): boolean;
   applyDraftEdit(edit: JsoncPathEdit): boolean;
   setInlineDiagnostic(message: string): void;
+  /** Stable id of the shared diagnostic element for aria-describedby wiring. */
+  diagnosticId(): string;
 }
 
 /** Renders and synchronizes the nine documented Claude settings fields. */
@@ -52,6 +54,9 @@ export class ClaudeSettingsCommonFieldsPresenter {
       const control = this.controls.get(meta.id);
       if (!control) continue;
       this.writeControlValue(control, this.serialize(meta, this.readPath(parsed, meta.path)));
+      // A repaired raw draft is authoritative. Never leave a field pointing
+      // at a diagnostic that no longer describes its current value.
+      this.clearControlInvalid(control);
     }
   }
 
@@ -100,6 +105,7 @@ export class ClaudeSettingsCommonFieldsPresenter {
   private applyControlChange(meta: ClaudeCommonFieldMeta, control: HTMLElement): void {
     const value = this.parse(meta, this.readControlValue(control));
     if (value === undefined) {
+      this.markControlInvalid(control);
       this.host.setInlineDiagnostic(t('settings.claudeCode.configuration.invalidField'));
       return;
     }
@@ -111,10 +117,23 @@ export class ClaudeSettingsCommonFieldsPresenter {
     }
     const edit = buildClaudeSettingsCommonFieldEdit(parsed, meta.id, value);
     if (!edit.ok) {
+      this.markControlInvalid(control);
       this.host.setInlineDiagnostic(t('settings.claudeCode.configuration.invalidField'));
       return;
     }
+    this.clearControlInvalid(control);
     this.host.applyDraftEdit(edit.edit);
+  }
+
+  private markControlInvalid(control: HTMLElement): void {
+    control.setAttribute('aria-invalid', 'true');
+    const diagnosticId = this.host.diagnosticId();
+    if (diagnosticId) control.setAttribute('aria-describedby', diagnosticId);
+  }
+
+  private clearControlInvalid(control: HTMLElement): void {
+    control.removeAttribute('aria-invalid');
+    control.removeAttribute('aria-describedby');
   }
 
   private parse(meta: ClaudeCommonFieldMeta, raw: string): unknown {

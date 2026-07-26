@@ -10,7 +10,7 @@
 ## 核心行为
 
 - `render(root)` 按 `CLAUDE_SETTINGS_COMMON_FIELDS` 创建稳定的 `data-claude-config-field` 控件；`refresh()` 从同一 raw draft 反映值并在 read-only source 时禁用控件。
-- 字符串、数字、布尔、string-array 和 string-record 使用对应控件/JSON 输入；空值表示 inherit/remove。任何 parse、kind、enum 或最小值失败都只报告 inline diagnostic，不改 draft。
+- 字符串、数字、布尔、string-array 和 string-record 使用对应控件/JSON 输入；空值表示 inherit/remove。任何 parse、kind、enum 或最小值失败都只报告 inline diagnostic，不改 draft，并给对应控件置 `aria-invalid` 和指向 diagnostic 的 `aria-describedby`；下一次成功应用时清除。
 - change 通过 `buildClaudeSettingsCommonFieldEdit()` 产生一个局部 `JsoncPathEdit`，交由宿主应用；未知 sibling fields 和格式保留由宿主的 JSONC path-edit applier 负责。
 
 ## Durable owner 与边界

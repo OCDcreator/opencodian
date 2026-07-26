@@ -490,6 +490,10 @@ Claude Code 不再使用过载的 `settings.claudeCode.tab.mcpAdvanced` 标签�
 
 新增 `settings.claudeCode.groups.claudeConfiguration.*` 与 `settings.claudeCode.configuration.*`，覆盖 context-sources 配置 workbench 的 Project/Local/Global 显式作用域（Project 为安全默认）、strict JSON 草稿/编辑器诊断、常用字段标签、Hooks schema 依据、分组/处理器动作、CAS 冲突/重新加载、归档历史、删除/恢复确认以及独立的 persistence/application/runtime 证据轴。文案明确 managed 来源只读；没有真实 probe 时不把保存写入描述成 runtime 已应用。
 
+## 2026-07-26 配置 workbench P2 UX 文案键
+
+为 P2 UX 阶段扩展 `settings.claudeCode.configuration.*`：人类可读的 scope/presence/writable 标签与逐轴状态词汇（verified/pending/unavailable/failed/not-applicable，跨轴绝不合并晋级）、当前编辑摘要条文案、“已检查 N 个来源” disclosure 切换、current 来源标识、技术详情 disclosure 标签、Global 选中时的持续警告（含完整目标路径）、未保存草稿切换决策（保存/放弃/取消）文案、明确草稿仍被保留的本地化 JSON 无效前缀、复制路径反馈，以及按 event/group/handler 区分的唯一 hooks 动作名称与容器标签。保存/删除/恢复主状态使用人类可读的三轴 formatter；History 的 archive kind、日期时间与缩放后的文件大小也按当前 locale 格式化；`persistence=...` 等原始 token 只留在技术详情。`reload` 现在明示会放弃未保存草稿；`deleteConfirm`/`restoreConfirm` 增加 `{scope}` 与 `{path}` 参数，使确认文案明确 scope、目标路径和动作。
+
 ## SDK capability disclosure locale keys
 
 新增 `capabilities.status.*`（available/unsupportedByServer/disabledByUser/unsupportedBySdk/unknown）、`capabilities.recheck`、`settings.<section>.capabilityStatus` 以及 `capabilities.label.*` 显示名称键，用于 Settings 能力披露行。

@@ -92,7 +92,7 @@
 | G3 | **Claude Code Sandbox 子策略** | filesystem/network/ripgrep 子策略控件已存在（`SettingsClaudeCodeSection` 的 sandbox 子策略） | 🟢 `DONE` |
 | G4 | Codex Web Search Mode | 配置证据边界已闭合（settings → adapter 选项 → app-server `web_search` config；session 覆盖已接线）。cached/live 行为差异属运行时验证，归 Capability Lab/QA，非配置缺口 | 🟢 `DONE`（配置闭环）；行为验证：Capability Lab/QA |
 | G5 | Claude Code 允许工具白名单 | 语义修正：`allowedTools` 是**预审批**（pre-approval）放行，非强制白名单；真正的内置白名单是 `restrictedBuiltinTools`。已用正确语义暴露二者，配置缺口已闭合 | 🟢 `DONE`（语义修正后） |
-| G6 | Claude Code Hooks | 仅文件 hook 扫描/创建/打开，无编程式 hook 编辑器 | 🟡 `TODO` |
+| G6 | Claude Code Hooks | P2 已在 Settings → Claude Code → Context & Sources → Configuration workbench 完成编程式 Hooks editor：单一 canonical strict-JSON draft 与 common/Advanced JSON 双向一致，schema 驱动 event/group/handler 编辑、未知字段保留、可访问的阻断诊断与语义焦点恢复；保存期 snapshot/fencing、CAS 与 archive-before-mutation 均沿用既有安全契约。RED→GREEN focused 7 suites / 84 tests，最终 `npm run verify` 648 suites / 6120 tests；macOS Test Vault BUILD_ID `main.202607261550`、三件部署文件 SHA-256 对齐，真实 Obsidian QA 与清理均通过（证据：`/Users/dht/.codex/visualizations/2026/07/26/019f9d22-6468-7ab1-a571-ee231409cb85/p2-qa-main.202607261550/`） | 🟢 `DONE`（P2 实现、自动化、部署与真实 QA） |
 | G7 | Claude Code inspect 只读块 | runtimeCatalog/accountInfo/contextUsage 是**只读诊断**，不是配置项。按定义属 Capability Navigation/Capability Lab，非配置缺口 | ⚪ `NON-CONFIG / N/A` |
 | G8 | OpenCode v2 deferred 方法 | session/credential/integration/pty/projectCopy 全 deferred-by-safety | 🟡 `WONTFIX`（有意 gate）|
 | G9 | 三方 Provider 配置对称性 | Claude 有 providers preset，Codex/OpenCode 暴露方式完全不同 | 🟡 `TODO` |
@@ -130,13 +130,14 @@
 
 - [x] **G4：Codex Web Search Mode**。配置闭环已闭合（cached/live 行为差异归 Capability Lab/QA）。
 - [x] **G5：Claude Code 白名单语义修正**。`allowedTools`（预审批）与 `restrictedBuiltinTools`（真正内置白名单）已按正确语义暴露。
+- [x] **G6：Claude Code Hooks 编程式编辑器**。P2 的 canonical draft、Hooks schema editor、保存期防竞态、可访问性/本地化与窄宽路径体验已收口；focused 7 suites / 84 tests、`npm run verify` 648 suites / 6120 tests 和 macOS Test Vault 真实 QA 均通过（详见 §2 G6 与 2026-07-26 变更记录）。
 
 ### P3 — 深度补全（可延后）
 
-- [x] **G3：Claude Code Sandbox 子策略**（filesystem/network/ripgrep 控件已存在）。
-- [ ] **G6：Claude Code Hooks 编程式编辑器**
+- [ ] **G9：三方 Provider 配置对称性**
 - [ ] **G10b：Codex Hooks 接入**；**G10c：Codex Compaction**（runtime 操作 backlog）
-- [x] **G11：structured output**（outputSchema + 流式映射已通）。
+- [ ] **G13：Claude Code File Checkpoint/Rewind**（受上游 SDK bug #236 阻塞）
+- [ ] **G16：Codex Profiles**（依赖 A 子系统的 TOML 校验/编辑基础）
 
 ---
 
@@ -144,6 +145,7 @@
 
 | 日期 | 改动 | 行号/标识 |
 |------|------|----------|
+| 2026-07-26 (P2 final acceptance) | G6 Claude Hooks 由 TODO 收口为 DONE：Configuration workbench 的 Hooks 编程式 editor 完成 canonical draft/save snapshot fencing、可见诊断与 ARIA 修复、语义键盘焦点、History 同步 ARIA、三轴本地化与路径分段。RED→GREEN focused 7 suites / 84 tests；`npm run verify` 648 suites / 6120 tests；macOS Test Vault BUILD_ID `main.202607261550` 部署后，`main.js`=`9c3cc67566e4a91734e888b1ae414d3b932a79f6b41d065679e98ef126b67462`、`manifest.json`=`ba6540a1fe1d5e2b0abad80db5b005df4e667120e5136396cd58b1592002e02e`、`styles.css`=`1a7a1629c03819c219bd67aa18f0a3ad5f21c2f065c8c2d7b377d84813f8d26a` 与 dist 全部一致；真实 Obsidian QA 及清理通过，125 个非空 artifact 的 matrix 位于 `/Users/dht/.codex/visualizations/2026/07/26/019f9d22-6468-7ab1-a571-ee231409cb85/p2-qa-main.202607261550/019f9d22-6468-7ab1-a571-ee231409cb85-manual-qa.md` | G6 / §3 P3 / P2 QA |
 | 2026-07-25 (P1 final acceptance) | P1-A/P1-B 完成 release acceptance：G1 global resources 与 G15 OpenCode Project/Global Config 的 inventory、安全 CRUD、history/restore 已通过自动化门禁、Test Vault 部署及真实 Obsidian 安全操作验收。三轴继续按证据记录：`persistence` 在成功契约路径为 `verified`，`application` 为 `pending`/`not-applicable`，无真实 backend readback 时 `runtime` 为 `unavailable` | G1 / G15 / §3 P1 |
 | 2026-07-24 (P1 close, code/automation only) | G1 收口为 DONE：P1-A 完成 Claude/Codex global resource 的显式 scope、安全 CRUD、revision/history/selected restore 与 Settings 编辑器；P1-B 完成 OpenCode XDG 与 `~/.opencode` source inventory、read/write/delete/history/restore。allowlist + 精确根目录/symlink confinement + 冲突/归档关联由契约测试覆盖。三轴不夸大：成功契约路径的 `persistence` 可为 `verified`，`application` 保持 `pending`/`not-applicable`，`runtime` 为 `unavailable`；生产/Test Vault/真实 Obsidian 验收未关闭 | G1 / §2 / §3 P1 |
 | 2026-07-24 | 证据驱动修正：G3/G4/G5/G11/G2 标 DONE（闭环/语义已闭合）；G7 标 NON-CONFIG；G14 拒绝（settings tab 即导航，差异说明归 Capability Lab）；G10 拆为 G10a(已 DONE 项目层)/G10b/G10c；新增 G15(OpenCode Global Config)、G16(Codex Profiles)；维护规则扩展为允许证据修正/拆分/新增。配套：`CONTEXT.md`、`docs/adr/0001-complete-configuration-means-closed-loop-control.md`、A 子系统 allowlist+SHA256+归档契约、B 子系统 Codex Approval Policy、C 子系统运行时证据捕获 | §2/§3/维护规则 |

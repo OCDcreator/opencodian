@@ -482,6 +482,10 @@ Claude Code no longer uses the overloaded `settings.claudeCode.tab.mcpAdvanced` 
 
 Added `settings.claudeCode.groups.claudeConfiguration.*` and `settings.claudeCode.configuration.*` for the context-sources configuration workbench: explicit Project/Local/Global scope labels (Project is the safe default), strict-JSON draft/editor diagnostics, common-field labels, hooks schema evidence, group/handler actions, CAS conflict/reload, archive history, delete/restore confirmations, and independent persistence/application/runtime evidence. Copy keeps managed sources read-only and does not imply runtime application without a real probe.
 
+## 2026-07-26 Configuration workbench P2 UX locale keys
+
+Extended `settings.claudeCode.configuration.*` for the P2 UX pass: human-readable scope/presence/writable labels and per-axis state vocabulary (verified/pending/unavailable/failed/not-applicable, never merged across axes), current-editing summary bar copy, "inspected N sources" disclosure toggle, current-source marker, technical-details disclosure label, persistent Global warning with full target path, unsaved-draft switch decision (save/discard/cancel) copy, localized invalid-JSON prefix that states the draft is preserved, copy-path feedback, and unique per event/group/handler hooks action names with container labels. Save/Delete/Restore primary statuses use the human three-axis formatter; History formats its archive kind, date/time, and scaled file size through the active locale; raw `persistence=...` tokens remain technical-detail-only. `reload` now states that it discards the unsaved draft; `deleteConfirm`/`restoreConfirm` take `{scope}` and `{path}` parameters so the confirmation names the scope, target path, and action.
+
 ## SDK capability disclosure locale keys
 
 新增 `capabilities.status.*`（available/unsupportedByServer/disabledByUser/unsupportedBySdk/unknown）、`capabilities.recheck`、`settings.<section>.capabilityStatus` 以及 `capabilities.label.*` 显示名称键，用于 Settings 能力披露行。

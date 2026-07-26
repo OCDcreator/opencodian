@@ -1,10 +1,18 @@
-import { SettingsClaudeConfigurationSection } from '../../../../src/features/settings/SettingsClaudeConfigurationSection';
+import { type ClaudeSettingsServiceBoundary, SettingsClaudeConfigurationSection } from '../../../../src/features/settings/SettingsClaudeConfigurationSection';
 import { candidate, fakePlugin, flushMicrotasks, projectRevision, readOk, stubService } from './SettingsClaudeConfigurationSection.testSupport';
 
-describe('SettingsClaudeConfigurationSection compare and mutation controller', () => {
-  beforeEach(() => { document.body.innerHTML = ''; });
-  afterEach(() => { document.body.innerHTML = ''; });
+const clearDocument = (): void => { document.body.innerHTML = ''; };
 
+beforeEach(clearDocument);
+afterEach(clearDocument);
+
+const deferred = <T,>() => {
+  let resolve: (value: T) => void = () => {};
+  const promise = new Promise<T>((next) => { resolve = next; });
+  return { promise, resolve };
+};
+
+describe('SettingsClaudeConfigurationSection compare and mutation controller · compare and history', () => {
   it('shows a localized non-mutating draft/disk compare without replacing the draft', async () => {
     const body = document.createElement('div');
     document.body.appendChild(body);
@@ -123,6 +131,82 @@ describe('SettingsClaudeConfigurationSection compare and mutation controller', (
     await flushMicrotasks();
     expect(restore.mock.calls[0][0]).toEqual({ entryIdentity: identity, expectedRevision: null });
   });
+});
+
+describe('SettingsClaudeConfigurationSection compare and mutation controller · request fencing', () => {
+
+  it('keeps the latest reopened History request busy and does not render a closed request response', async () => {
+    const first = deferred<Awaited<ReturnType<ClaudeSettingsServiceBoundary['listHistory']>>>();
+    const second = deferred<Awaited<ReturnType<ClaudeSettingsServiceBoundary['listHistory']>>>();
+    const listHistory = jest.fn()
+      .mockImplementationOnce(() => first.promise)
+      .mockImplementationOnce(() => second.promise);
+    const body = document.createElement('div');
+    document.body.appendChild(body);
+    new SettingsClaudeConfigurationSection({
+      plugin: fakePlugin('/vault') as never,
+      sourceService: stubService({ read: async () => readOk('{"model":"x"}'), listHistory: listHistory as never }),
+    }).render(body);
+    await flushMicrotasks();
+    const toggle = body.querySelector('[data-claude-config-history-toggle]') as HTMLButtonElement;
+    const history = body.querySelector('[data-claude-config-history]') as HTMLElement;
+
+    toggle.click();
+    toggle.click();
+    toggle.click();
+    expect(listHistory).toHaveBeenCalledTimes(2);
+    expect(history.hidden).toBe(false);
+    expect(history.getAttribute('aria-busy')).toBe('true');
+
+    first.resolve({
+      status: 'success',
+      targets: [{
+        canonicalTarget: '/vault/.claude/settings.json', backend: 'claude', scope: 'project', kind: 'settings', format: 'json',
+        entries: [{ identity: 'stale-history-entry' as never, archiveKind: 'overwrite', timestamp: 1, size: 2 }],
+      }],
+    });
+    await flushMicrotasks();
+
+    expect(history.getAttribute('aria-busy')).toBe('true');
+    expect(history.querySelector('[data-claude-config-history-entry]')).toBeNull();
+
+    second.resolve({
+      status: 'success',
+      targets: [{
+        canonicalTarget: '/vault/.claude/settings.json', backend: 'claude', scope: 'project', kind: 'settings', format: 'json',
+        entries: [{ identity: 'current-history-entry' as never, archiveKind: 'overwrite', timestamp: 2, size: 4 }],
+      }],
+    });
+    await flushMicrotasks();
+
+    expect(history.getAttribute('aria-busy')).toBe('false');
+    expect(history.querySelector('[data-claude-config-history-entry]')?.getAttribute('data-claude-config-history-entry')).toBe('2');
+  });
+
+  it('keeps a failed source-inventory alert outside a default-hidden disclosure', async () => {
+    const body = document.createElement('div');
+    document.body.appendChild(body);
+    new SettingsClaudeConfigurationSection({
+      plugin: fakePlugin('/vault') as never,
+      sourceService: stubService({
+        read: async () => readOk('{"model":"x"}'),
+        inventory: async () => { throw new Error('inventory unavailable'); },
+      }),
+    }).render(body);
+    await flushMicrotasks();
+
+    const error = body.querySelector('[data-claude-config-error]') as HTMLElement;
+    const sources = body.querySelector('[data-claude-config-sources]') as HTMLElement;
+    const toggle = body.querySelector('[data-claude-config-sources-toggle]') as HTMLButtonElement;
+    expect(error.getAttribute('role')).toBe('alert');
+    expect(error.getAttribute('aria-live')).toBe('assertive');
+    expect(error.closest('[hidden]')).toBeNull();
+    expect(sources.hidden).toBe(false);
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+  });
+});
+
+describe('SettingsClaudeConfigurationSection compare and mutation controller · rerender and revisions', () => {
 
   it('re-enables the current save control after a fenced save completes after rerender', async () => {
     const body = document.createElement('div');
