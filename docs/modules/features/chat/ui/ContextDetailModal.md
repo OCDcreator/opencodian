@@ -5,7 +5,7 @@
 
 ## 概述
 
-Obsidian Modal，展示当前会话的上下文使用详情。包括会话元信息（标题、provider、model）、消息统计（总数/用户/助手）、Token 明细（input/output/reasoning/cache/cost）、上下文分段条形图（breakdown）、异步加载的原始消息区，以及时间戳。统计数据来源于 `ContextUsageService` 的 `summarize()`、`getDisplayTokenBreakdown()`、`getContextBreakdown()` 三个方法；原始消息由调用方通过懒加载回调提供。
+Obsidian Modal，展示当前会话的上下文使用详情。包括会话元信息（标题、provider、model）、消息统计（总数/用户/助手）、Token 明细（input/output/reasoning/cache/cost）、上下文分段条形图（breakdown）、异步加载的原始消息区、时间戳，以及 Codex 专用的底部 foreground compaction action。统计数据来源于 `ContextUsageService` 的 `summarize()`、`getDisplayTokenBreakdown()`、`getContextBreakdown()` 三个方法；原始消息由调用方通过懒加载回调提供。
 
 当后端没有报告 cache-write 或 cost 时，modal 将它们显示为 `-`。成本来源行会区分 OpenCode 已上报、models.dev 本地估算、本地单价覆盖、部分估算和基础档近似；有第三方计费身份时还显示 Base URL。Claude/Codex 的本地数值不是订阅账单。Codex 的 total/context window 均来自 app-server 的 thread token-usage 通知，不混入账号日/周用量。
 
@@ -22,8 +22,9 @@ constructor(
   app: App,
   conversation: Conversation | null,
   contextState: TabContextState | null,
-  systemPrompt?: string | null,
-  rawMessageLoader?: () => Promise<ContextRawMessageItem[]>,
+    systemPrompt?: string | null,
+    rawMessageLoader?: () => Promise<ContextRawMessageItem[]>,
+    compactionCoordinator?: ContextDetailModalCompactionCoordinator,
 )
 ```
 
@@ -37,6 +38,8 @@ constructor(
   payload: string;
 }
 ```
+
+`ContextDetailModalCompactionCoordinator` 由 `ActiveTabContextUsageCoordinator` 提供 `getForegroundCompactionControl()` 与 `compactForegroundThread()`。Modal 不持有 backend/client 或 usage state；`ContextCompactionActionController` 负责 action row 的呈现、确认、in-flight 防重复、ARIA status，以及 accepted/verified/timeout/failure/stale 文案。
 
 ## 核心逻辑
 
@@ -67,6 +70,16 @@ constructor(
 ### 估算标记
 
 若 `contextState.preciseTokens` 为 false，显示"估算值"提示。
+
+### Codex foreground compaction
+
+- 只有 coordinator 认定当前 conversation backend 为 `codex` 时渲染底部 action row；非 Codex 完全隐藏。
+- action row 顶部使用既有 separator，target thread 以可选择、可换行的 monospace 文本显示，避免窄 modal 横溢。
+- `available` 才启用 native button； app-server unavailable、invalid thread、active turn/busy 分别显示禁用原因。
+- click 使用一次短确认（文案包含精确 thread id）；确认后立即进入 requesting 并防重复，ACK 回调只显示“已受理，等待权威验证”。
+- 只有 coordinator 返回 `verified` 且 `runtimeVerified`、`acknowledged`、`completed`、`tokenUsageObserved` 全部成立才显示 success；stale/timeout/failure 不写入 token，也不宣称 success。
+- status 节点统一 `role=status` + `aria-live=polite` + `aria-atomic=true`，请求中或 busy 设置 `aria-busy`；按钮使用显式 accessible name，保留 Obsidian 原生键盘/focus 行为。
+- action controller 会把显示时的 tab/session/thread identity 传回 coordinator；若用户在确认前切换 tab，返回 stale 且不发送任何 backend RPC。
 
 ## 关键方法
 

@@ -76,6 +76,15 @@ function createHost(
     getActiveTabId: jest.fn().mockReturnValue('tab-1'),
     openContextUsageDetailsModal: jest.fn(),
     persistContextUsageSnapshot: jest.fn().mockResolvedValue(undefined),
+    getForegroundCompactionAvailability: jest.fn().mockReturnValue({ status: 'unavailable' }),
+    compactForegroundThread: jest.fn().mockResolvedValue({
+      status: 'unavailable',
+      acknowledged: false,
+      runtimeVerified: false,
+      started: false,
+      completed: false,
+      tokenUsageObserved: false,
+    }),
     ...overrides,
   };
 }

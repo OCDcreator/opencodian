@@ -3,6 +3,7 @@
 > **源码**: `src/features/chat/OpenCodianView.ts`
 > **状态**: [REVIEW]
 > **最近更新**: Backend session browser with preview transcript seeding + settings info entry + sandbox badge host wiring + Codex session webSearchMode override host wiring
+> **最近更新**: G10c foreground Codex compaction host wiring — the view exposes adapter availability/compact methods through the existing `ActiveTabContextUsageCoordinatorHost` seam and passes the coordinator into `ContextDetailModal`; no compaction state is owned in the view.
 
 > **新增（Codex 资源/技能）**: cache host 提供 `loadCodexRuntimeSkills`、`getBackendKey` 返回 `'codex'`；`syncCodexSkillsChangedSubscription()` 订阅 Codex adapter `onSkillsChanged` → 立即失效 slash 菜单缓存；`notifyCodexAgentMentionUnavailable()` 在 Codex `@` 时显示无原生派发提示并提供设置入口。
 
@@ -548,6 +549,7 @@ session todo 这条子链路现在的边界是：
 - `QuestionTodoActivationRefreshCoordinator`：activation/open 侧的 question dock render、session todo dock writeback 与 supplemental refresh 编排
 - `QuestionTodoBackgroundTaskActivationHostAdapter` 内联的 background-task activation port：activation/open 侧的 background-task indicator reset、conversation-derived runtime rebuild 与 render trigger 编排
 - `ActiveTabContextUsageCoordinator`：activation/open 与相邻 sync 路径的 active-tab context usage identity / snapshot writeback 编排，以及 per-tab stream lifecycle、indicator 刷新和详情弹窗打开；context usage detail modal 的 rawMessageLoader 现通过 `loadBackendSessionMessages()` 路由到 backend-aware session history service。`OpenCodianView.createActiveTabContextUsageCoordinatorHost().getSessionContextUsageSnapshot()` 已后端感知：当当前会话 backend 为 `claude-code` 时，路由到 `ClaudeCodeAdapter.getSessionContextUsageSnapshot()`（调用 `query.getContextUsage()` 并转换为 core-owned `ContextUsageSnapshot`）；当 backend 为 `opencode` 时，仍走 `OpenCodeService.getSessionContextUsageSnapshot()` 原有路径；Codex 等未接入精确 context snapshot 的 backend 会在 coordinator 层跳过 server refresh，避免误触 OpenCode session API。`OpenCodianView` 只消费 `src/core/types` 导出的 DTO，不从 `ContextUsageService` 反向导入类型，保持 chat view 与 backend owner 的依赖方向清晰
+- G10c foreground compaction 继续复用上述 host seam：`getForegroundCompactionAvailability()` 与 `compactForegroundThread()` 只路由到 Codex adapter；`ContextDetailModal` 通过 coordinator 获取当前 thread/availability 与 action，不在 view 内增加 requesting、accepted、verified 或 stale 状态。
 - `QuestionRuntimeViewHostFactory`：question runtime 相邻的 dock/API/attention late-bound host 派生，以及完整的 runtime bundle 装配（`createQuestionRuntimeBundle`）；`OpenCodianView` 不再直接调用 `createQuestionRuntimeViewHost`、`createQuestionPostResolutionRuntimeHostAdapter` 或 `createQuestionRuntimeServices`
 - `QuestionTodoBackgroundTaskRefreshHostAdapter`：`QuestionTodoStatusRefreshCoordinator`、`PostSyncQuestionTodoRefreshFacade`、`VisibleConversationPostSyncCoordinator` 与 `BackgroundConversationPostSyncHandoffCoordinator` 共用的 refresh-side host factory 与 service bundle 装配
 - `QuestionTodoBackgroundTaskRuntimeServiceBundle`：question/todo/background-task 共享的 host assembly 与 service instantiation 顺序；`OpenCodianView` 不再内联组装 `assembleQuestionTodoBackgroundTaskRuntimeHost()`，改为构造 `QuestionTodoBackgroundTaskRuntimeSeam` 直接传给本模块的 `createQuestionTodoBackgroundTaskRuntimeServiceBundleFromSeam()` 工厂

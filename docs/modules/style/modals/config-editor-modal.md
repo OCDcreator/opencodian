@@ -24,7 +24,7 @@
 - 命令目录卡片：`.opencodian-cmd-catalog-*`（搜索栏、筛选标签、按需显示的批量操作栏、两列卡片网格、方形批量选择 checkbox、复用 Obsidian `checkbox-container` 的可见性 switch、来源/状态芯片、可折叠描述、滚动容器）。
 - MCP 设置：`.opencodian-mcp-*`（management toolbar + metric cards、server cards、runtime switch label、status/detail modal、editor modal grouped form）。
 - Codex MCP 服务器详情：`.opencodian-codex-mcp-detail-modal`、`.opencodian-codex-mcp-server-section*`、`.opencodian-codex-mcp-resource-*`、`.opencodian-codex-mcp-tool-*`（顶部摘要 + server sections，工具/资源使用轻量 row/list，无嵌套卡片）。
-- Codex 诊断 readback 弹窗：`.opencodian-codex-readback-modal`、`.opencodian-codex-readback-*`（intro、notes、status bar、content、row、code block）。
+- Codex 诊断 readback 弹窗：`.opencodian-codex-readback-modal`、`.opencodian-codex-readback-*`（intro、notes、status bar、content、row、code block）；Hooks 读回额外使用 `.opencodian-codex-hooks-group`、`.opencodian-codex-hooks-entry`、`.opencodian-codex-hooks-field` 与 diagnostic/cwd hooks，所有 exact path/command/hash 字段使用可收缩布局与 `overflow-wrap:anywhere`，不引入嵌套卡片。
 - provider 卡片 / 预设卡片：`.opencodian-settings-provider-*`、`.opencodian-preset-*`。
 - 模型选择弹层：`.opencodian-model-picker-*`（列表、搜索、筛选、选项、provider 分组标题与图标、source badge、空状态、响应式折行）。
 - 线程目标 readback + set/clear：`.opencodian-session-settings-codex-goal-*`（shell 容器、readback 卡片、objective 文本、status/token/time 预算 meta、空状态提示、set 输入行 + 按钮、clear 按钮）。
@@ -53,6 +53,7 @@
 - 插件管理区现在包含安装区与每个条目的 toggle / uninstall / delete 控制，样式仍应复用既有 plugin/catalog density contract。
 - 含较多响应式规则（`@media`），改网格列数、工具条折行或 footer 粘底时需同时检查窄屏可读性。
 - `ContextDetailModal` 通过 `.opencodian-context-detail-modal` 直接覆盖 Obsidian 默认 modal 宽度；若切回 `:has(...)` 或改 class 名，需确认 raw message JSON 在宽窗口下不会再次被默认壳层截断。
+- `ContextDetailModal` 底部 Codex action row 使用 `.opencodian-context-compaction-action-row`、`.opencodian-context-compaction-thread`、`.opencodian-context-compaction-status` 与 `.opencodian-context-compaction-button`；row 顶部有 separator，thread 使用 monospace + `overflow-wrap:anywhere`，720px 以下切单列并让 button 满宽，346px 窄宽不横溢。
 - `ConversationCompactionHelpModal` 也通过专用 class 直接放宽 modal 宽度，并把内容做成 2×2 信息卡；如果改回 `.opencodian-config-help` 默认壳层，容易重新出现内容过窄和内部滚动问题。
 - `ConversationSessionSettingsModal` 的 sticky footer 只负责把取消 / 保存按钮固定在底部，不应重新添加独立 top border、渐变遮罩或不透明背景带；按钮区应承接弹窗自身背景，保持会话设置弹窗底部统一。
 - 代理设置相关样式现在混合了静态卡片和 `details/summary` 折叠区；如果修改 `.opencodian-agent-editor-group-summary` 的交互样式，需同时确认默认折叠的“高级配置”仍能看出可展开状态。
@@ -359,6 +360,10 @@ Codex readback 弹窗改用共享 inspection-panel 布局：
 - `.opencodian-codex-readback-state-message`：loading / unavailable / failed / empty 状态文案。
 - `.opencodian-codex-readback-row` / `-row-name` / `-row-meta`：列表行，复用 `.opencodian-inspection-row` 节奏。
 - `.opencodian-codex-readback-code`：JSON / 代码证据块，复用 `.opencodian-inspection-code`。
+
+## 2026-07-26 Codex hooks narrow readback
+
+Hooks `hooks/list` 结构化读回沿用 `.opencodian-codex-readback-modal`，并为 cwd 组、hook entry、字段值和诊断信息提供平铺布局类。组、entry、字段与 modal content 均设置 `min-width: 0` / `max-width: 100%`，字段使用 monospace、`overflow-wrap: anywhere`、`word-break: break-word`，modal content 隐藏横向溢出；因此 346px 窄弹窗中的长 source path、command 与 64 位 hash 会折行而不会撑宽容器。颜色只使用 Obsidian theme tokens。
 
 ## 2026-06-16 MCP detail modal inspection panel
 

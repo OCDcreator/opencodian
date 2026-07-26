@@ -32,6 +32,56 @@ interface ActiveTabContextUsageConversation {
   lastContextUsage?: ContextUsageSnapshot;
 }
 
+export type ForegroundCompactionAvailabilityStatus =
+  | 'available'
+  | 'unavailable'
+  | 'invalid-thread'
+  | 'busy';
+
+export interface ForegroundCompactionAvailability {
+  status: ForegroundCompactionAvailabilityStatus;
+  threadId?: string;
+}
+
+export type ForegroundCompactionActionStatus =
+  | 'verified'
+  | 'unavailable'
+  | 'invalid-thread'
+  | 'busy'
+  | 'failed'
+  | 'malformed'
+  | 'timed-out';
+
+export interface ForegroundCompactionActionResult {
+  status: ForegroundCompactionActionStatus | 'stale';
+  acknowledged: boolean;
+  runtimeVerified: boolean;
+  started: boolean;
+  completed: boolean;
+  tokenUsageObserved: boolean;
+  threadId?: string;
+  errorReason?: string;
+}
+
+export interface ForegroundCompactionActionOptions {
+  timeoutMs?: number;
+  acknowledgementTimeoutMs?: number;
+  /** Modal-owned target identity; prevents dispatching a newly active tab's thread. */
+  expectedSessionId?: string;
+  expectedThreadId?: string;
+  expectedTabId?: TabId | null;
+  onAccepted?: () => void;
+}
+
+export interface ForegroundCompactionControl {
+  visible: boolean;
+  tabId: TabId | null;
+  sessionId: string | null;
+  threadId: string | null;
+  title: string | null;
+  availability: ForegroundCompactionAvailability | null;
+}
+
 export interface ActiveTabContextUsageCoordinatorHost {
   hasActiveTab(): boolean;
   getCurrentConversation(): ActiveTabContextUsageConversation | null;
@@ -50,6 +100,13 @@ export interface ActiveTabContextUsageCoordinatorHost {
   persistContextUsageSnapshot(tabId: TabId | null, snapshot: ContextUsageSnapshot): Promise<void>;
   /** Adds local cost provenance after a backend emits an authoritative token snapshot. */
   enrichContextUsageSnapshot?(snapshot: ContextUsageSnapshot): ContextUsageSnapshot;
+  getForegroundCompactionAvailability(
+    sessionId: string,
+  ): ForegroundCompactionAvailability;
+  compactForegroundThread(
+    sessionId: string,
+    options?: ForegroundCompactionActionOptions,
+  ): Promise<ForegroundCompactionActionResult>;
 }
 
 export class ActiveTabContextUsageCoordinator {
@@ -275,9 +332,134 @@ export class ActiveTabContextUsageCoordinator {
     this.host.openContextUsageDetailsModal(contextState);
   }
 
+  getForegroundCompactionControl(): ForegroundCompactionControl {
+    const conversation = this.host.getCurrentConversation();
+    if (!this.host.hasActiveTab() || !conversation || (conversation.backend ?? 'opencode') !== 'codex') {
+      return {
+        visible: false,
+        tabId: this.host.getActiveTabId(),
+        sessionId: null,
+        threadId: null,
+        title: null,
+        availability: null,
+      };
+    }
+
+    const sessionId = getConversationBackendSessionId(conversation) ?? null;
+    const availability = sessionId
+      ? this.host.getForegroundCompactionAvailability(sessionId)
+      : { status: 'invalid-thread' as const };
+    return {
+      visible: true,
+      tabId: this.host.getActiveTabId(),
+      sessionId,
+      threadId: availability.threadId ?? null,
+      title: conversation.title || null,
+      availability,
+    };
+  }
+
+  async compactForegroundThread(
+    options: ForegroundCompactionActionOptions = {},
+  ): Promise<ForegroundCompactionActionResult> {
+    const expectedIdentity = this.captureForegroundCompactionIdentity();
+    const control = this.getForegroundCompactionControl();
+    if (
+      (options.expectedSessionId !== undefined && options.expectedSessionId !== control.sessionId)
+      || (options.expectedThreadId !== undefined && options.expectedThreadId !== control.threadId)
+      || (options.expectedTabId !== undefined && options.expectedTabId !== control.tabId)
+      || !this.isCurrentForegroundCompactionIdentity(expectedIdentity)
+    ) {
+      return {
+        status: 'stale',
+        acknowledged: false,
+        runtimeVerified: false,
+        started: false,
+        completed: false,
+        tokenUsageObserved: false,
+        ...(options.expectedThreadId ? { threadId: options.expectedThreadId } : {}),
+      };
+    }
+    if (!control.visible || !control.sessionId) {
+      return this.createForegroundCompactionActionResult('invalid-thread');
+    }
+    if (control.availability && control.availability.status !== 'available') {
+      return this.createForegroundCompactionActionResult(control.availability.status, {
+        threadId: control.threadId ?? undefined,
+      });
+    }
+
+    const result = await this.host.compactForegroundThread(control.sessionId, {
+      timeoutMs: options.timeoutMs,
+      acknowledgementTimeoutMs: options.acknowledgementTimeoutMs,
+      onAccepted: () => {
+        if (this.isCurrentForegroundCompactionIdentity(expectedIdentity)) {
+          options.onAccepted?.();
+        }
+      },
+    });
+    if (!this.isCurrentForegroundCompactionIdentity(expectedIdentity)) {
+      return { ...result, status: 'stale' };
+    }
+
+    if (result.status === 'verified' && result.runtimeVerified) {
+      await this.refreshFromServer();
+      if (!this.isCurrentForegroundCompactionIdentity(expectedIdentity)) {
+        return { ...result, status: 'stale' };
+      }
+    }
+    return result;
+  }
+
   refreshContextUsageIndicator(): void {
     const state = this.host.getActiveTabContextUsage() ?? null;
     this.host.renderContextUsageIndicator(state);
+  }
+
+  private captureForegroundCompactionIdentity(): {
+    tabId: TabId | null;
+    conversationId: string | null;
+    sessionId: string | null;
+    backend: string;
+  } {
+    const conversation = this.host.getCurrentConversation();
+    return {
+      tabId: this.host.getActiveTabId(),
+      conversationId: conversation?.id ?? null,
+      sessionId: conversation ? getConversationBackendSessionId(conversation) ?? null : null,
+      backend: conversation?.backend ?? 'opencode',
+    };
+  }
+
+  private isCurrentForegroundCompactionIdentity(expected: {
+    tabId: TabId | null;
+    conversationId: string | null;
+    sessionId: string | null;
+    backend: string;
+  }): boolean {
+    if (!this.host.hasActiveTab() || this.host.getActiveTabId() !== expected.tabId) {
+      return false;
+    }
+    const conversation = this.host.getCurrentConversation();
+    return conversation?.id === expected.conversationId
+      && (conversation.backend ?? 'opencode') === expected.backend
+      && (conversation ? getConversationBackendSessionId(conversation) ?? null : null) === expected.sessionId;
+  }
+
+  private createForegroundCompactionActionResult(
+    status: ForegroundCompactionActionStatus,
+    details: Partial<Omit<ForegroundCompactionActionResult, 'status' | 'runtimeVerified'>> = {},
+  ): ForegroundCompactionActionResult {
+    return {
+      status,
+      acknowledged: details.acknowledged ?? false,
+      runtimeVerified: false,
+      started: details.started ?? false,
+      completed: details.completed ?? false,
+      tokenUsageObserved: details.tokenUsageObserved ?? false,
+      ...(details.threadId ? { threadId: details.threadId } : {}),
+      ...(details.errorReason ? { errorReason: details.errorReason } : {}),
+    };
   }
 
   private scheduleSnapshotPersistence(tabId: TabId | null, snapshot: ContextUsageSnapshot): void {

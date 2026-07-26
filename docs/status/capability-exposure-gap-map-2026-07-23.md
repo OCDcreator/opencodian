@@ -35,7 +35,7 @@
 | Tools 白/黑名单 | ✅/◐ | ✖ | ✅ |
 | MCP Servers | ✅ | ✅ | ✅ |
 | MCP OAuth / resource / tool-call | ◐ | ✅ | ✖ |
-| Hooks | ✅（文件 hook）| —（app-server 有，未接入）| ✖ |
+| Hooks | ✅（文件 hook）| ◐（`hooks/list` 只读 readback；无 hooks 写 route；P3 Test Vault QA 已通过）| ✖ |
 | Skills | ✅ | ◐（项目层 CRUD + runtime 只读已接入，见 G10a；全局可写化见 G1）| ◐（v2.skill diagnostic）|
 | Slash Commands | ✅ | ✖ | ✅ |
 | Agents / Subagents | ◐（diagnostic）| ✖ | ✅ |
@@ -54,7 +54,7 @@
 | Plugins | ✅（marketplace）| ✖ | ✅ |
 | Formatter | ✖ | ✖ | ✅ |
 | LSP | ✖ | ✖ | ✅ |
-| Compaction | ✖ | —（未接入）| ✅ |
+| Compaction | ✖ | ◐（非配置 runtime action；真实成功与 P3 Test Vault QA 已通过）| ✅ |
 | Share | ✖ | ✖ | ✅ |
 | PTY / Terminal | ✖ | ✖ | ◐（deferred，有意 gate）|
 | File Checkpoint / Rewind | ◐（SDK bug #236）| ✖ | ✖ |
@@ -102,14 +102,14 @@
 | # | 能力域 | 哪个后端有 | 状态 |
 |---|--------|-----------|------|
 | G10a | Codex Skills | Codex app-server 有 `skills/list`、`skills/changed`（runtime 只读 + 项目 CRUD 已接线于 `SettingsCodexResourcesSection`） | 🟢 `DONE`（项目层）；全局可写化见 G1/新 gap |
-| G10b | Codex Hooks | Codex app-server 有 `hooks/list`，插件未接入 | 🟡 `TODO`（若要 Codex 真正对称） |
-| G10c | Codex Compaction | Codex app-server 有 `thread/compact/start` | 🟡 `TODO`（runtime 操作 backlog，非配置缺口） |
+| G10b | Codex Hooks | 已接入 `hooks/list`：`{cwds?: string[]}` → `{data:[{cwd,hooks,warnings,errors}]}`；是带 source/path/enabled 的只读 readback，0.144.1 无 hooks 写 route，不能标 CRUD DONE。P3 QA 已在 Test Vault 观察到真实非空 Hooks，并通过 full state matrix、zh/en dark/light 和 314px modal（346px viewport equivalent） | 🟡 `READBACK`（部分暴露；QA 通过） |
+| G10c | Codex Compaction | 已接入 `thread/compact/start({threadId})`；空 `{}` 仅 ACK。runtime verified 必须有 accepted ACK、post-dispatch 的同一非空 item ID `item/started` → matching `item/completed`（`contextCompaction`），以及新鲜 `thread/tokenUsage/updated`；completion-only、replayed 或 mismatched ID 均不验证。它是非配置 runtime action；P3 QA 已验证真实成功及 confirmation/pending/duplicate/reject/no-thread/session-switch stale fencing/timeout-warning。Test Vault 仅 1 tab，真实 stale 为 active-tab conversation/session switch；tab-ID switching 仅自动化覆盖 | 🟢 `RUNTIME VERIFIED / NON-CONFIG` |
 | G11 | Codex Structured Output | SDK `TurnOptions.outputSchema` 已接线，app-server 流式映射 (`outputSchema` → turn 选项 → `item/agentMessage`) 已通 | 🟢 `DONE` |
 | G12 | Codex MCP server 模式 (codex/codex-reply) | `codex mcp-server` | `WONTFIX`（判为冗余替代路径） |
 | G13 | Claude Code File Checkpoint/Rewind | `Options.rewindFiles` | `BLOCKED`（上游 SDK bug #236） |
 | G14 | **统一的能力差异说明** | **拒绝（WONTFIX/REJECTED）**：settings tab 本身就是导航；按「Capability Navigation」（见 CONTEXT.md）由 Capability Lab 承担「切到 X 后端会少哪些能力」，不在每个 tab 重复 | ⚪ `WONTFIX/REJECTED` |
 | G15 | **OpenCode Global Config** | P1-B 已实现 OpenCode Project/Global config source inventory（含 XDG 与 `~/.opencode` 候选）、安全 read/write/delete/history/restore；managed 系统层保持只读。写入与历史操作受 allowlisted-root、symlink confinement、revision 冲突与归档关联契约约束。三轴保持诚实：`persistence` 仅在契约成功路径为 `verified`；`application` 依 request wiring 为 `pending`/`not-applicable`；无真实 backend readback 时 `runtime` 为 `unavailable` | 🟢 `DONE`（P1-B 代码、测试与 release acceptance；runtime readback 按证据保持 unavailable） |
-| G16 | **Codex Profiles** | Codex `~/.codex/config.toml` profiles（多 profile 切换/编辑）未在插件暴露 | 🔴 `TODO`（依赖 A 子系统的 TOML 校验/编辑基础） |
+| G16 | **Codex Profiles** | 当前 0.144.1 合约已变化：legacy `profile = "name"` 被拒绝；官方选择是 `$CODEX_HOME/<name>.config.toml` + CLI `--profile`。app-server/thread route 无 profile 选择参数，也无可验证 persistent active-profile 字段；不得实现 `~/.codex/config.toml` profiles editor/switcher，且这不是 `permissionProfile/list` | 🔴 `BLOCKED / CURRENT CONTRACT CHANGED` |
 
 ---
 
@@ -135,9 +135,10 @@
 ### P3 — 深度补全（可延后）
 
 - [ ] **G9：三方 Provider 配置对称性**
-- [ ] **G10b：Codex Hooks 接入**；**G10c：Codex Compaction**（runtime 操作 backlog）
+- [x] **G10b：Codex Hooks readback**（仅 `hooks/list`，无 hooks 写 route；真实非空 readback、全状态矩阵、zh/en dark/light、窄宽 QA 已通过）
+- [x] **G10c：Codex Compaction runtime action**（真实成功按 ACK + 同 item lifecycle + fresh tokenUsage 判定；confirmation/pending/duplicate/reject/no-thread/session-switch stale fencing/timeout-warning QA 已通过；非配置 runtime action）
 - [ ] **G13：Claude Code File Checkpoint/Rewind**（受上游 SDK bug #236 阻塞）
-- [ ] **G16：Codex Profiles**（依赖 A 子系统的 TOML 校验/编辑基础）
+- [ ] **G16：Codex Profiles**（`BLOCKED / CURRENT CONTRACT CHANGED`；不实现 config.toml active-profile editor/switcher）
 
 ---
 
@@ -145,6 +146,7 @@
 
 | 日期 | 改动 | 行号/标识 |
 |------|------|----------|
+| 2026-07-26 (P3 final acceptance) | 当前 CLI 为 `codex-cli 0.144.1`，repo pinned SDK/bundled Codex 为 0.139.0。G10b 是 `hooks/list` readonly readback（无 hooks 写 route），真实非空 UI、full state matrix、zh/en dark/light 与 314px modal QA 通过；G10c 是 `thread/compact/start` 非配置 runtime action，只有 accepted ACK、post-dispatch 同一非空 ID 的 `contextCompaction` started→completed 和新鲜 tokenUsage 才验证成功；Luna 增加 same-modal generation fence 且自动化通过，final-build QA 重跑精确真实 Codex reply、真实 compaction success/confirmation/duplicate、session-switch stale fencing 与 timeout/narrow paths（Test Vault 仅 1 tab，真实 stale 为 active-tab switch；tab-ID switching 为自动化覆盖）。G16 仍为 `BLOCKED / CURRENT CONTRACT CHANGED`，不写 config；最终 `~/.codex/config.toml` 保持存在、`-rw-------`、5767 bytes、mtime `2026-07-26T18:27:10+0800`、SHA-256 `53a1b793a30d76ae7eea50b166285234e4875a9eac1fb14ef3b1398d4e2c192b`。focused 8 suites / 91 tests，verify 654 suites / 6,184 tests，production build/Test Vault BUILD_ID `main.202607262132` 与 `main.js` `19aa3a7ecb78b5583f72e225a6eb1da68623076a4b6099d6affcc762f622236a`、`manifest.json` `ba6540a1fe1d5e2b0abad80db5b005df4e667120e5136396cd58b1592002e02e`、`styles.css` `55bc2cee450cafc9739a073672813e6ad152d2e17026739935e10422eb23c339` 已核对；QA 清理完成。证据：`/Users/dht/.codex/visualizations/2026/07/26/019f9df6-ec92-7f80-8ed9-c282c6900bde/p3-qa-main.202607262020/019f9df6-ec92-7f80-8ed9-c282c6900bde-manual-qa.md`。未 push | G10b / G10c / G16 / §3 P3 |
 | 2026-07-26 (P2 final acceptance) | G6 Claude Hooks 由 TODO 收口为 DONE：Configuration workbench 的 Hooks 编程式 editor 完成 canonical draft/save snapshot fencing、可见诊断与 ARIA 修复、语义键盘焦点、History 同步 ARIA、三轴本地化与路径分段。RED→GREEN focused 7 suites / 84 tests；`npm run verify` 648 suites / 6120 tests；macOS Test Vault BUILD_ID `main.202607261550` 部署后，`main.js`=`9c3cc67566e4a91734e888b1ae414d3b932a79f6b41d065679e98ef126b67462`、`manifest.json`=`ba6540a1fe1d5e2b0abad80db5b005df4e667120e5136396cd58b1592002e02e`、`styles.css`=`1a7a1629c03819c219bd67aa18f0a3ad5f21c2f065c8c2d7b377d84813f8d26a` 与 dist 全部一致；真实 Obsidian QA 及清理通过，125 个非空 artifact 的 matrix 位于 `/Users/dht/.codex/visualizations/2026/07/26/019f9d22-6468-7ab1-a571-ee231409cb85/p2-qa-main.202607261550/019f9d22-6468-7ab1-a571-ee231409cb85-manual-qa.md` | G6 / §3 P3 / P2 QA |
 | 2026-07-25 (P1 final acceptance) | P1-A/P1-B 完成 release acceptance：G1 global resources 与 G15 OpenCode Project/Global Config 的 inventory、安全 CRUD、history/restore 已通过自动化门禁、Test Vault 部署及真实 Obsidian 安全操作验收。三轴继续按证据记录：`persistence` 在成功契约路径为 `verified`，`application` 为 `pending`/`not-applicable`，无真实 backend readback 时 `runtime` 为 `unavailable` | G1 / G15 / §3 P1 |
 | 2026-07-24 (P1 close, code/automation only) | G1 收口为 DONE：P1-A 完成 Claude/Codex global resource 的显式 scope、安全 CRUD、revision/history/selected restore 与 Settings 编辑器；P1-B 完成 OpenCode XDG 与 `~/.opencode` source inventory、read/write/delete/history/restore。allowlist + 精确根目录/symlink confinement + 冲突/归档关联由契约测试覆盖。三轴不夸大：成功契约路径的 `persistence` 可为 `verified`，`application` 保持 `pending`/`not-applicable`，`runtime` 为 `unavailable`；生产/Test Vault/真实 Obsidian 验收未关闭 | G1 / §2 / §3 P1 |

@@ -453,6 +453,55 @@
   font-size: 0.9em;
 }
 
+/* Codex hooks readback: keep exact paths, commands, and hashes readable in
+   narrow modals without introducing nested card surfaces. */
+.opencodian-codex-readback-modal .modal-content {
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.opencodian-codex-hooks-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.opencodian-codex-hooks-group-cwd,
+.opencodian-codex-hooks-diagnostic {
+  margin: 0;
+  min-width: 0;
+  max-width: 100%;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.opencodian-codex-hooks-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.opencodian-codex-hooks-field {
+  margin: 0;
+  min-width: 0;
+  max-width: 100%;
+  color: var(--text-normal);
+  font-family: var(--font-monospace);
+  font-size: 0.82em;
+  line-height: 1.45;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
 
 
 
@@ -1614,6 +1663,87 @@
   color: var(--text-muted);
 }
 
+.opencodian-context-compaction-action-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  margin-top: 20px;
+  padding-top: 14px;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.opencodian-context-compaction-copy {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.opencodian-context-compaction-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+.opencodian-context-compaction-target {
+  min-width: 0;
+  margin-top: 4px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.opencodian-context-compaction-thread {
+  color: var(--text-normal);
+  font-family: var(--font-monospace);
+  user-select: text;
+  overflow-wrap: anywhere;
+}
+
+.opencodian-context-compaction-controls {
+  display: flex;
+  flex: 0 1 260px;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+}
+
+.opencodian-context-compaction-button {
+  max-width: 100%;
+  min-width: 0;
+  min-height: 30px;
+  box-sizing: border-box;
+  white-space: normal;
+}
+
+.opencodian-context-compaction-status {
+  max-width: 100%;
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.opencodian-context-compaction-status.is-error {
+  color: var(--text-error);
+}
+
+.opencodian-context-compaction-status.is-pending-verification {
+  color: var(--text-warning);
+}
+
+.opencodian-context-compaction-status.is-success {
+  color: var(--text-success);
+}
+
 .opencodian-context-raw-messages {
   margin-top: 18px;
 }
@@ -1700,6 +1830,19 @@
   .opencodian-context-modal-grid,
   .opencodian-context-breakdown-legend {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .opencodian-context-compaction-action-row {
+    flex-direction: column;
+  }
+
+  .opencodian-context-compaction-controls {
+    width: 100%;
+    flex-basis: auto;
+  }
+
+  .opencodian-context-compaction-button {
+    width: 100%;
   }
 }
 

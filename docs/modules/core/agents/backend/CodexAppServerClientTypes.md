@@ -16,8 +16,10 @@
 - 定义 app-server JSON-RPC 路由的请求/响应 wire 类型（thread、model、permission、account、MCP、review、thread-goal 等）
 - 定义实验主聊天的 `AppServerThreadStartOptions`、`AppServerThreadResumeOptions`、`AppServerTurnStartOptions` 与 `AppServerThreadNotification`
 - 定义 `AppServerThreadTokenUsageUpdatedNotification`：`total` 是累计权威 token，`last` 是当前回合 token，`modelContextWindow` 是 Context Ring 分母
+- 定义 `thread/compact/start` 的 ACK-only outcome：0.144.1 的精确 `{}` 仅为 `accepted`，`unavailable`、`invalid-thread`、`failed`、`malformed`、`timed-out` 保持可区分；该 wire 结果绝不表示运行时压缩完成
 - 定义 `AppServerItem` union（verified against real Codex app-server output）
 - 定义 `skills/list` 的扁平 skill metadata 以及供设置页使用的 cwd/error 分组 readback 类型
+- 定义 `hooks/list` 的 cwd 分组、HookMetadata（`key`/`eventName`/`handlerType` 为必需身份字段，其余字段可选）、错误和 `available|empty|unavailable|failed|malformed` 只读 readback outcome 类型
 - 定义 `AppServerServerRequestHandler`（服务端发起 JSON-RPC 请求的 handler 签名，供 `CodexAppServerTransport` 使用）
 
 ## 维护约束

@@ -28,6 +28,11 @@ import type {
   AppServerApprovalPolicyEffective,
   AppServerEffectivePermissionProfile,
   AppServerForkResult,
+  AppServerHookError,
+  AppServerHookGroup,
+  AppServerHookMetadata,
+  AppServerHooksReadbackResult,
+  AppServerListHooksOptions,
   AppServerListSkillsOptions,
   AppServerMcpResourceContent,
   AppServerMcpResourceReadResult,
@@ -46,6 +51,8 @@ import type {
   AppServerSkillError,
   AppServerSkillGroup,
   AppServerThread,
+  AppServerThreadCompactionAckResult,
+  AppServerThreadCompactionStartOptions,
   AppServerThreadEffectiveSettings,
   AppServerThreadGoal,
   AppServerThreadNotification,
@@ -452,6 +459,109 @@ export function normalizeSkillsListResult(result: unknown): AppServerSkill[] {
   return flattened;
 }
 
+function errorToReason(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+/** Route absence/transport loss means the adjunct capability is unavailable. */
+function isHooksRouteUnavailable(error: unknown): boolean {
+  const reason = errorToReason(error).toLowerCase();
+  return reason.includes('method not found')
+    || reason.includes('unknown method')
+    || reason.includes('not supported')
+    || reason.includes('websocket not open')
+    || reason.includes('app-server start')
+    || reason.includes('app-server exited')
+    || reason.includes('websocket connection')
+    || reason.includes('app-server client stopped');
+}
+
+function readHookNullableString(value: unknown): string | null | undefined {
+  if (value === null) return null;
+  return typeof value === 'string' ? value : undefined;
+}
+
+function readHookNumber(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === 'string' && value.length > 0;
+}
+
+function setHookMetadataField(metadata: AppServerHookMetadata, key: keyof AppServerHookMetadata, value: unknown): void {
+  if (value !== undefined) {
+    Object.assign(metadata, { [key]: value });
+  }
+}
+
+/** Normalize one metadata object while intentionally dropping unknown fields. */
+function normalizeHookMetadata(value: unknown): AppServerHookMetadata | null {
+  if (!isPlainObject(value)) return null;
+  const requiredFields = ['key', 'eventName', 'handlerType'] as const;
+  if (!requiredFields.every((field) => isNonEmptyString(value[field]))) {
+    return null;
+  }
+  const metadata: AppServerHookMetadata = {
+    key: value.key as string,
+    eventName: value.eventName as string,
+    handlerType: value.handlerType as string,
+  };
+  setHookMetadataField(metadata, 'matcher', readHookNullableString(value.matcher));
+  setHookMetadataField(metadata, 'command', readHookNullableString(value.command));
+  setHookMetadataField(metadata, 'timeoutSec', readHookNumber(value.timeoutSec));
+  setHookMetadataField(metadata, 'statusMessage', readHookNullableString(value.statusMessage));
+  setHookMetadataField(metadata, 'sourcePath', typeof value.sourcePath === 'string' ? value.sourcePath : undefined);
+  setHookMetadataField(metadata, 'source', typeof value.source === 'string' ? value.source : undefined);
+  setHookMetadataField(metadata, 'pluginId', readHookNullableString(value.pluginId));
+  setHookMetadataField(metadata, 'displayOrder', readHookNumber(value.displayOrder));
+  setHookMetadataField(metadata, 'enabled', typeof value.enabled === 'boolean' ? value.enabled : undefined);
+  setHookMetadataField(metadata, 'isManaged', typeof value.isManaged === 'boolean' ? value.isManaged : undefined);
+  setHookMetadataField(metadata, 'currentHash', typeof value.currentHash === 'string' ? value.currentHash : undefined);
+  setHookMetadataField(metadata, 'trustStatus', typeof value.trustStatus === 'string' ? value.trustStatus : undefined);
+  return metadata;
+}
+
+function normalizeHookError(value: unknown): AppServerHookError | null {
+  if (!isPlainObject(value) || typeof value.path !== 'string' || typeof value.message !== 'string') {
+    return null;
+  }
+  return { path: value.path, message: value.message };
+}
+
+/** Normalize the exact `{ data: HooksListEntry[] }` response shape. */
+function normalizeHooksListResult(result: unknown): AppServerHookGroup[] | null {
+  if (!isPlainObject(result) || !Array.isArray(result.data)) return null;
+  const groups: AppServerHookGroup[] = [];
+  for (const value of result.data) {
+    if (!isPlainObject(value) || typeof value.cwd !== 'string' || !Array.isArray(value.hooks)
+      || !Array.isArray(value.warnings) || !Array.isArray(value.errors)) {
+      return null;
+    }
+    const hooks: AppServerHookMetadata[] = [];
+    for (const hook of value.hooks) {
+      const normalized = normalizeHookMetadata(hook);
+      if (!normalized) return null;
+      hooks.push(normalized);
+    }
+    const warnings = value.warnings.filter((warning): warning is string => typeof warning === 'string');
+    if (warnings.length !== value.warnings.length) return null;
+    const errors: AppServerHookError[] = [];
+    for (const error of value.errors) {
+      const normalized = normalizeHookError(error);
+      if (!normalized) return null;
+      errors.push(normalized);
+    }
+    groups.push({ cwd: value.cwd, hooks, warnings, errors });
+  }
+  return groups;
+}
+
+function hooksReadbackFromGroups(groups: AppServerHookGroup[]): AppServerHooksReadbackResult {
+  const empty = groups.every((group) => group.hooks.length === 0 && group.warnings.length === 0 && group.errors.length === 0);
+  return { status: empty ? 'empty' : 'available', groups };
+}
+
 export class CodexAppServerClient extends CodexAppServerTransport {
   // ---------------------------------------------------------------------------
   // App-server API wrappers
@@ -576,6 +686,59 @@ export class CodexAppServerClient extends CodexAppServerTransport {
         error: err instanceof Error ? err.message : String(err),
       });
       return null;
+    }
+  }
+
+  /**
+   * Request foreground context compaction for one persisted app-server thread.
+   *
+   * An empty object is the exact 0.144.1 ACK shape and means only that the
+   * server accepted the request.  Runtime completion remains asynchronous and
+   * is intentionally observed by `CodexAdapter` from thread notifications.
+   */
+  async startThreadCompaction(
+    threadId: string,
+    options: AppServerThreadCompactionStartOptions = {},
+  ): Promise<AppServerThreadCompactionAckResult> {
+    if (!threadId.trim()) {
+      return { status: 'invalid-thread', acknowledged: false, errorReason: 'threadId is required' };
+    }
+    try {
+      await this.start();
+    } catch (err) {
+      return { status: 'unavailable', acknowledged: false, errorReason: errorToReason(err) };
+    }
+    try {
+      const result = await this.request(
+        'thread/compact/start',
+        { threadId },
+        options.acknowledgementTimeoutMs ?? 30_000,
+      );
+      if (!isPlainObject(result) || Array.isArray(result) || Object.keys(result).length !== 0) {
+        return {
+          status: 'malformed',
+          acknowledged: false,
+          errorReason: 'thread/compact/start ACK did not match the empty object binding',
+        };
+      }
+      return { status: 'accepted', acknowledged: true };
+    } catch (err) {
+      const reason = errorToReason(err);
+      const normalized = reason.toLowerCase();
+      if (normalized.includes('timeout')) {
+        return { status: 'timed-out', acknowledged: false, errorReason: reason };
+      }
+      if (normalized.includes('thread not found') || normalized.includes('missing field')) {
+        return { status: 'invalid-thread', acknowledged: false, errorReason: reason };
+      }
+      if (normalized.includes('method not found')
+        || normalized.includes('unknown method')
+        || normalized.includes('not supported')
+        || normalized.includes('websocket not open')
+        || normalized.includes('app-server client stopped')) {
+        return { status: 'unavailable', acknowledged: false, errorReason: reason };
+      }
+      return { status: 'failed', acknowledged: false, errorReason: reason };
     }
   }
 
@@ -772,6 +935,47 @@ export class CodexAppServerClient extends CodexAppServerTransport {
         error: err instanceof Error ? err.message : String(err),
       });
       return null;
+    }
+  }
+
+  /**
+   * Read Codex hook metadata via the read-only `hooks/list` route.
+   *
+   * `available` and `empty` are successful responses; `unavailable` means the
+   * route or transport is absent; `failed` means the route rejected/timed out;
+   * `malformed` means a successful reply did not match the generated binding.
+   * No write/update/delete route is implied by this readback API.
+   */
+  async listHooks(options?: AppServerListHooksOptions): Promise<AppServerHooksReadbackResult> {
+    try {
+      await this.start();
+    } catch (err) {
+      const reason = errorToReason(err);
+      return {
+        status: 'unavailable',
+        groups: [],
+        ...(reason ? { errorReason: reason } : {}),
+      };
+    }
+
+    try {
+      const params: Record<string, unknown> = {};
+      if (options?.cwds !== undefined) {
+        params.cwds = options.cwds;
+      }
+      const result = await this.request('hooks/list', params);
+      const groups = normalizeHooksListResult(result);
+      if (!groups) {
+        return { status: 'malformed', groups: [], errorReason: 'hooks/list response did not match the generated binding' };
+      }
+      return hooksReadbackFromGroups(groups);
+    } catch (err) {
+      const reason = errorToReason(err);
+      return {
+        status: isHooksRouteUnavailable(err) ? 'unavailable' : 'failed',
+        groups: [],
+        ...(reason ? { errorReason: reason } : {}),
+      };
     }
   }
 

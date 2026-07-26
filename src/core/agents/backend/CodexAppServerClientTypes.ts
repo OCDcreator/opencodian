@@ -51,6 +51,32 @@ export interface AppServerThreadTokenUsageUpdatedNotification {
   tokenUsage: AppServerThreadTokenUsage;
 }
 
+/**
+ * Acknowledgement-only outcome for `thread/compact/start`.
+ *
+ * The real 0.144.1 app-server replies with `{}` when it has accepted the
+ * request.  That reply is deliberately not a completion signal: callers must
+ * wait for the matching `contextCompaction` item and a new token-usage event.
+ */
+export type AppServerThreadCompactionAckStatus =
+  | 'accepted'
+  | 'unavailable'
+  | 'invalid-thread'
+  | 'failed'
+  | 'malformed'
+  | 'timed-out';
+
+export interface AppServerThreadCompactionAckResult {
+  status: AppServerThreadCompactionAckStatus;
+  acknowledged: boolean;
+  errorReason?: string;
+}
+
+export interface AppServerThreadCompactionStartOptions {
+  /** Bounded RPC ACK wait. Runtime completion is owned by the adapter. */
+  acknowledgementTimeoutMs?: number;
+}
+
 export interface AppServerThreadStartOptions {
   model?: string;
   cwd?: string;
@@ -388,6 +414,71 @@ export interface AppServerSkillGroup {
   cwd: string | null;
   skills: AppServerSkill[];
   errors: AppServerSkillError[];
+}
+
+/** A server-reported hook discovery error scoped to one cwd group. */
+export interface AppServerHookError {
+  path: string;
+  message: string;
+}
+
+/**
+ * Hook metadata returned by Codex app-server `hooks/list`.
+ *
+ * Codex 0.144.1 requires the identity fields `key`, `eventName`, and
+ * `handlerType`; the remaining fields are optional for defensive compatibility
+ * with older/newer servers. Unknown wire properties are deliberately dropped
+ * by the client normalizer instead of being exposed as raw JSON.
+ */
+export interface AppServerHookMetadata {
+  key: string;
+  eventName: string;
+  handlerType: string;
+  matcher?: string | null;
+  command?: string | null;
+  timeoutSec?: number;
+  statusMessage?: string | null;
+  sourcePath?: string;
+  source?: string;
+  pluginId?: string | null;
+  displayOrder?: number;
+  enabled?: boolean;
+  isManaged?: boolean;
+  currentHash?: string;
+  trustStatus?: string;
+}
+
+/** Stable cwd-group readback from one Codex app-server `hooks/list` entry. */
+export interface AppServerHookGroup {
+  cwd: string;
+  hooks: AppServerHookMetadata[];
+  warnings: string[];
+  errors: AppServerHookError[];
+}
+
+/** Params accepted by Codex app-server `hooks/list`. */
+export interface AppServerListHooksOptions {
+  /** Empty or omitted defaults to the app-server session cwd. */
+  cwds?: string[];
+}
+
+/** Honest outcome states for the read-only hooks/list route. */
+export type AppServerHooksReadbackStatus =
+  | 'available'
+  | 'empty'
+  | 'unavailable'
+  | 'failed'
+  | 'malformed';
+
+/**
+ * Additive hooks/list readback result. `groups` is always present (and empty
+ * for non-success outcomes), allowing consumers to branch on status without
+ * conflating unavailable/failed with a successful empty catalog.
+ */
+export interface AppServerHooksReadbackResult {
+  status: AppServerHooksReadbackStatus;
+  groups: AppServerHookGroup[];
+  errorReason?: string;
 }
 
 /** Params accepted by `CodexAppServerClient.listSkills()`. */

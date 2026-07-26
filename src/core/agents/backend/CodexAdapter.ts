@@ -37,6 +37,8 @@ import type {
 import {
   type AppServerAccountRateLimitsResult,
   type AppServerAccountUsageResult,
+  type AppServerHooksReadbackResult,
+  type AppServerListHooksOptions,
   type AppServerMcpResourceReadResult,
   type AppServerMcpServerStatus,
   type AppServerMcpToolCallResult,
@@ -48,6 +50,7 @@ import {
   type AppServerSkill,
   type AppServerSkillGroup,
   type AppServerThread,
+  type AppServerThreadCompactionAckResult,
   type AppServerThreadEffectiveEvidence,
   type AppServerThreadEffectiveSettings,
   type AppServerThreadGoal,
@@ -213,6 +216,58 @@ interface CodexSessionEntry {
   thread: Thread | null;
 }
 
+/** Final two-axis outcome for a foreground `thread/compact/start` request. */
+export interface CodexForegroundCompactionResult {
+  status: 'verified' | 'unavailable' | 'invalid-thread' | 'busy' | 'failed' | 'malformed' | 'timed-out';
+  /** True only after the server returned its empty `{}` ACK. */
+  acknowledged: boolean;
+  /** True only after matching compaction completion plus fresh token usage. */
+  runtimeVerified: boolean;
+  /** Whether a matching `item/started` was observed before completion. */
+  started: boolean;
+  /** Whether a matching `item/completed` was observed. */
+  completed: boolean;
+  /** Whether an authoritative post-request context snapshot was observed. */
+  tokenUsageObserved: boolean;
+  threadId?: string;
+  errorReason?: string;
+}
+
+export interface CodexForegroundCompactionOptions {
+  /** Bounded end-to-end wait for runtime evidence after the RPC request starts. */
+  timeoutMs?: number;
+  acknowledgementTimeoutMs?: number;
+  /** Called exactly once after an empty ACK; it is never a success callback. */
+  onAccepted?: () => void;
+}
+
+/** Side-effect-free preflight for foreground compaction controls. */
+export interface CodexForegroundCompactionAvailability {
+  status: 'available' | 'unavailable' | 'invalid-thread' | 'busy';
+  threadId?: string;
+}
+
+interface ForegroundCompactionGate extends CodexForegroundCompactionAvailability {
+  logicalSessionId?: string;
+  client?: CodexAppServerClient;
+}
+
+interface PendingForegroundCompaction {
+  readonly sessionId: string;
+  readonly threadId: string;
+  readonly epoch: number;
+  acknowledged: boolean;
+  /** False until immediately before the compact RPC is sent; pre-dispatch events are stale. */
+  requestDispatched: boolean;
+  started: boolean;
+  completed: boolean;
+  tokenUsageObserved: boolean;
+  itemId: string | null;
+  timer: ReturnType<typeof setTimeout> | null;
+  subscription: Disposable | null;
+  resolve: (result: CodexForegroundCompactionResult) => void;
+}
+
 /** Narrow record guard for defensive approval-param normalization. */
 function isRecordLike(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -300,6 +355,11 @@ export class CodexAdapter
   private activeControllers = new Map<string, AbortController>();
   private activeAppServerTurns = new Map<string, { threadId: string; turnId: string | null }>();
   private appServerContextSnapshots = new Map<string, ContextUsageSnapshot>();
+  /** Independent from per-turn stream subscriptions; one foreground compaction per logical session. */
+  private pendingForegroundCompactions = new Map<string, PendingForegroundCompaction>();
+  /** Separate from turn-attempt epochs so compaction never invalidates a live stream. */
+  private foregroundCompactionEpochs = new Map<string, number>();
+  private nextForegroundCompactionEpoch = 0;
   /**
    * Per-session three-axis runtime evidence for thread effective settings,
    * keyed by sessionId (NOT threadId) so the lifecycle can be set to `pending`
@@ -451,6 +511,7 @@ export class CodexAdapter
     }
     this.activeControllers.clear();
     this.activeAppServerTurns.clear();
+    this.clearPendingForegroundCompactions('unavailable', 'Codex adapter stopped');
     this.appServerContextSnapshots.clear();
     this.sessionEffectiveEvidence.clear();
     this.sessionEffectiveSettings.clear();
@@ -645,6 +706,28 @@ export class CodexAdapter
         error: err instanceof Error ? err.message : String(err),
       });
       return null;
+    }
+  }
+
+  /**
+   * Read Codex app-server hook metadata without exposing write semantics.
+   *
+   * The outcome deliberately keeps `empty`, `unavailable`, `failed`, and
+   * `malformed` distinct so settings/readback consumers never mistake a
+   * missing route or rejected request for a successful empty catalog.
+   */
+  async getHooksReadback(options?: AppServerListHooksOptions): Promise<AppServerHooksReadbackResult> {
+    const client = this.appServerClient;
+    if (!client) {
+      return { status: 'unavailable', groups: [] };
+    }
+    try {
+      const cwds = options?.cwds ?? (this.options.workingDirectory ? [this.options.workingDirectory] : undefined);
+      return await client.listHooks(cwds === undefined ? undefined : { cwds });
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      logger.warn('Failed to read Codex hooks from app-server', { error: reason });
+      return { status: 'failed', groups: [], errorReason: reason };
     }
   }
 
@@ -1796,6 +1879,228 @@ export class CodexAdapter
   }
 
   /**
+   * Read the same local gates enforced by `compactForegroundThread` without
+   * creating a subscription, starting an RPC, or changing any runtime state.
+   */
+  getForegroundCompactionAvailability(sessionId: string): CodexForegroundCompactionAvailability {
+    const gate = this.resolveForegroundCompactionGate(sessionId);
+    return {
+      status: gate.status,
+      ...(gate.threadId ? { threadId: gate.threadId } : {}),
+    };
+  }
+
+  /**
+   * Request foreground context compaction on an app-server-owned current
+   * thread. The empty RPC ACK is deliberately exposed only through
+   * `onAccepted`; this promise resolves `verified` only after both independent
+   * runtime notifications have arrived, in either order.
+   */
+  async compactForegroundThread(
+    sessionId: string,
+    options: CodexForegroundCompactionOptions = {},
+  ): Promise<CodexForegroundCompactionResult> {
+    const gate = this.resolveForegroundCompactionGate(sessionId);
+    if (gate.status === 'unavailable') {
+      return this.foregroundCompactionResult('unavailable', { errorReason: 'Codex app-server is unavailable' });
+    }
+    if (gate.status === 'invalid-thread') {
+      return this.foregroundCompactionResult('invalid-thread', { errorReason: 'No app-server-owned thread is available for this session' });
+    }
+    if (gate.status === 'busy') {
+      return this.foregroundCompactionResult('busy', { threadId: gate.threadId, errorReason: 'A foreground app-server turn or compaction is still active' });
+    }
+    const { client, logicalSessionId, threadId } = gate;
+    // The `available` gate populates these fields atomically from the current
+    // adapter mapping. Keep this defensive fallback so a future gate change
+    // cannot turn a UI preflight race into an arbitrary RPC target.
+    if (!client || !logicalSessionId || !threadId) {
+      return this.foregroundCompactionResult('invalid-thread', { errorReason: 'Foreground compaction session changed before dispatch' });
+    }
+
+    const epoch = ++this.nextForegroundCompactionEpoch;
+    this.foregroundCompactionEpochs.set(logicalSessionId, epoch);
+    return new Promise<CodexForegroundCompactionResult>((resolve) => {
+      const pending: PendingForegroundCompaction = {
+        sessionId: logicalSessionId,
+        threadId,
+        epoch,
+        acknowledged: false,
+        requestDispatched: false,
+        started: false,
+        completed: false,
+        tokenUsageObserved: false,
+        itemId: null,
+        timer: null,
+        subscription: null,
+        resolve,
+      };
+      this.pendingForegroundCompactions.set(logicalSessionId, pending);
+      pending.subscription = client.subscribeToThreadNotifications(threadId, (event) => {
+        this.observeForegroundCompactionNotification(pending, event);
+      });
+      pending.timer = setTimeout(() => {
+        this.finishForegroundCompaction(pending, 'timed-out', 'Timed out waiting for Codex compaction runtime evidence');
+      }, options.timeoutMs ?? 120_000);
+
+      // This assignment is intentionally immediately before the RPC call:
+      // pre-request notifications and the cached snapshot cannot be reused.
+      pending.requestDispatched = true;
+      void client.startThreadCompaction(threadId, {
+        ...(options.acknowledgementTimeoutMs === undefined
+          ? {}
+          : { acknowledgementTimeoutMs: options.acknowledgementTimeoutMs }),
+      }).then((ack) => {
+        if (!this.isCurrentForegroundCompaction(pending)) return;
+        if (!ack.acknowledged || ack.status !== 'accepted') {
+          this.finishForegroundCompaction(pending, this.compactionAckFailureStatus(ack), ack.errorReason);
+          return;
+        }
+        pending.acknowledged = true;
+        try {
+          options.onAccepted?.();
+        } catch (err) {
+          logger.warn('Codex compaction accepted callback failed', { error: err instanceof Error ? err.message : String(err) });
+        }
+        this.maybeVerifyForegroundCompaction(pending);
+      }, (err) => {
+        if (this.isCurrentForegroundCompaction(pending)) {
+          this.finishForegroundCompaction(pending, 'failed', err instanceof Error ? err.message : String(err));
+        }
+      });
+    });
+  }
+
+  /** Shared, synchronous, no-RPC gate for availability readback and dispatch. */
+  private resolveForegroundCompactionGate(sessionId: string): ForegroundCompactionGate {
+    const client = this.appServerClient;
+    if (!client) return { status: 'unavailable' };
+    const logicalSessionId = this.logicalSessionKey(sessionId);
+    const entry = this.resolveSession(logicalSessionId);
+    const threadId = entry?.threadId;
+    // A provisional, arbitrary, or SDK-only session must never become an RPC
+    // target merely because it looks like a thread ID.
+    if (!entry || !threadId || this.threadAlias.get(threadId) !== logicalSessionId) {
+      return { status: 'invalid-thread' };
+    }
+    if (this.activeAppServerTurns.has(logicalSessionId) || this.pendingForegroundCompactions.has(logicalSessionId)) {
+      return { status: 'busy', threadId };
+    }
+    return { status: 'available', threadId, logicalSessionId, client };
+  }
+
+  private observeForegroundCompactionNotification(pending: PendingForegroundCompaction, event: import('./CodexAppServerClient').AppServerThreadNotification): void {
+    if (!pending.requestDispatched || !this.isCurrentForegroundCompaction(pending)) return;
+    const params = isRecordLike(event.params) ? event.params : null;
+    if (!params) return;
+    if (event.method === 'thread/tokenUsage/updated') {
+      const mapping = mapAppServerNotification({
+        event,
+        modelId: this.options.model ?? null,
+        sessionId: pending.sessionId,
+        threadId: pending.threadId,
+        streamState: { streamedAgentMessageItemIds: new Set(), streamedReasoningItemIds: new Set(), startedTodoItemIds: new Set(), outputSchema: undefined },
+      });
+      if (mapping.contextUsageSnapshot) {
+        this.appServerContextSnapshots.set(pending.threadId, mapping.contextUsageSnapshot);
+        pending.tokenUsageObserved = true;
+        this.maybeVerifyForegroundCompaction(pending);
+      }
+      return;
+    }
+    if (event.method === 'item/started' || event.method === 'item/completed') {
+      this.observeForegroundCompactionItem(pending, event.method, params);
+    }
+  }
+
+  private observeForegroundCompactionItem(
+    pending: PendingForegroundCompaction,
+    method: 'item/started' | 'item/completed',
+    params: Record<string, unknown>,
+  ): void {
+    const item = isRecordLike(params.item) ? params.item : null;
+    const itemId = item && typeof item.id === 'string' && item.id.trim() ? item.id : null;
+    if (!item || item.type !== 'contextCompaction' || !itemId) return;
+    if (method === 'item/started') {
+      if (pending.itemId && pending.itemId !== itemId) return;
+      pending.itemId = itemId;
+      pending.started = true;
+      return;
+    }
+    // The compact-start ACK has no operation identifier. A completion is
+    // therefore evidence only after this request observed a nonempty matching
+    // contextCompaction start; completion-only/replayed events cannot bind to
+    // the request and must remain unverified.
+    if (!pending.started || pending.itemId !== itemId) return;
+    pending.completed = true;
+    this.maybeVerifyForegroundCompaction(pending);
+  }
+
+  private maybeVerifyForegroundCompaction(pending: PendingForegroundCompaction): void {
+    if (pending.acknowledged && pending.started && pending.itemId && pending.completed && pending.tokenUsageObserved) {
+      this.finishForegroundCompaction(pending, 'verified');
+    }
+  }
+
+  private isCurrentForegroundCompaction(pending: PendingForegroundCompaction): boolean {
+    return this.pendingForegroundCompactions.get(pending.sessionId) === pending
+      && this.foregroundCompactionEpochs.get(pending.sessionId) === pending.epoch
+      && this.resolveSession(pending.sessionId)?.threadId === pending.threadId;
+  }
+
+  private compactionAckFailureStatus(ack: AppServerThreadCompactionAckResult): Exclude<CodexForegroundCompactionResult['status'], 'verified' | 'busy'> {
+    return ack.status === 'accepted' ? 'failed' : ack.status;
+  }
+
+  private foregroundCompactionResult(
+    status: CodexForegroundCompactionResult['status'],
+    details: Partial<Omit<CodexForegroundCompactionResult, 'status' | 'runtimeVerified'>> = {},
+  ): CodexForegroundCompactionResult {
+    return {
+      status,
+      acknowledged: details.acknowledged ?? false,
+      runtimeVerified: status === 'verified',
+      started: details.started ?? false,
+      completed: details.completed ?? false,
+      tokenUsageObserved: details.tokenUsageObserved ?? false,
+      ...(details.threadId ? { threadId: details.threadId } : {}),
+      ...(details.errorReason ? { errorReason: details.errorReason } : {}),
+    };
+  }
+
+  private finishForegroundCompaction(
+    pending: PendingForegroundCompaction,
+    status: CodexForegroundCompactionResult['status'],
+    errorReason?: string,
+  ): void {
+    if (this.pendingForegroundCompactions.get(pending.sessionId) !== pending) return;
+    if (pending.timer) clearTimeout(pending.timer);
+    pending.subscription?.dispose();
+    this.pendingForegroundCompactions.delete(pending.sessionId);
+    this.foregroundCompactionEpochs.delete(pending.sessionId);
+    pending.resolve(this.foregroundCompactionResult(status, {
+      acknowledged: pending.acknowledged,
+      started: pending.started,
+      completed: pending.completed,
+      tokenUsageObserved: pending.tokenUsageObserved,
+      threadId: pending.threadId,
+      ...(errorReason ? { errorReason } : {}),
+    }));
+  }
+
+  private clearPendingForegroundCompactions(
+    status: Exclude<CodexForegroundCompactionResult['status'], 'verified' | 'busy'>,
+    errorReason: string,
+    sessionId?: string,
+  ): void {
+    for (const pending of [...this.pendingForegroundCompactions.values()]) {
+      if (sessionId === undefined || pending.sessionId === sessionId) {
+        this.finishForegroundCompaction(pending, status, errorReason);
+      }
+    }
+  }
+
+  /**
    * Return the server-confirmed effective settings for a session's thread, or
    * null when no verified runtime readback is available (app-server
    * unavailable, or an older server that did not echo effective fields).
@@ -1956,6 +2261,7 @@ export class CodexAdapter
     const logicalKey = entry?.provisionalId ?? sessionId;
     const threadId = entry?.threadId ?? (!this.isProvisionalId(sessionId) ? sessionId : null);
     this.invalidateAppServerAttempt(logicalKey);
+    this.clearPendingForegroundCompactions('invalid-thread', 'Codex session was deleted', logicalKey);
     const controller = this.activeControllers.get(logicalKey);
     controller?.abort();
     this.activeControllers.delete(logicalKey);

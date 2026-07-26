@@ -12,6 +12,7 @@
 - 在同一条 snapshot refresh 里把 `Session.time.compacting` 投影到 active-tab context state，复用已有 context usage refresh seam 暴露 compaction live state
 - 在无活动 tab 时统一清空 context ring，而不是让 bridge 或 view 分散判断
 - 为 `TabViewActivationBridge` 与 `TabConversationActivationBridge` 提供共享的 activation/open-side context usage 边界
+- 为当前 Codex conversation 提供 foreground compaction 的 availability 读回、精确 session dispatch、tab/conversation/session stale fencing，以及 verified 后的唯一 authoritative refresh
 
 它不负责 stream chunk 的 usage 累积、stream begin/complete 标记，或 context ring 详情弹窗；这些职责仍分别留给 `ContextUsageService`、`OpenCodianView` 的 per-tab stream writeback 和 `ContextDetailModal`。它只承接 activation/open 与相邻 sync 路径上的 active-tab identity/snapshot writeback。
 
@@ -37,6 +38,8 @@ export interface ActiveTabContextUsageCoordinatorHost {
   setTabContextUsage(tabId: TabId | null, contextUsage: TabContextState): void;
   getActiveTabId(): TabId | null;
   openContextUsageDetailsModal(contextState: TabContextState | null): void;
+  getForegroundCompactionAvailability(sessionId: string): ForegroundCompactionAvailability;
+  compactForegroundThread(sessionId: string, options?: ForegroundCompactionActionOptions): Promise<ForegroundCompactionActionResult>;
 }
 
 export class ActiveTabContextUsageCoordinator {
@@ -47,6 +50,8 @@ export class ActiveTabContextUsageCoordinator {
   applyUsageChunkToTab(tabId: TabId | null, chunk: Extract<StreamChunk, { type: 'usage' }>): void;
   openContextUsageDetails(): void;
   refreshContextUsageIndicator(): void;
+  getForegroundCompactionControl(): ForegroundCompactionControl;
+  compactForegroundThread(options?: ForegroundCompactionActionOptions): Promise<ForegroundCompactionActionResult>;
 }
 ```
 
@@ -71,4 +76,7 @@ export class ActiveTabContextUsageCoordinator {
 - `TabViewActivationBridge` 只保留 pane、layout、selector、send-button 与 loaded post-render 编排，不再直接持有 context usage identity/snapshot host
 - `TabViewActivationBridge` 的 loaded-conversation hydration tail 现在只同步 identity，精确 snapshot 改为后台刷新；coordinator 继续负责 stale guard 和回写安全性
 - `TabConversationActivationBridge` 只保留 current-tab open shell/outcome 编排，不再直接持有 context usage identity/snapshot host
+- foreground compaction action 由 coordinator 读取当前 conversation/backend/session/tab identity；非 Codex 不暴露控制，`available` 之外的 `unavailable`、`invalid-thread`、`busy` 在调用前直接返回并由 UI 解释
+- `ForegroundCompactionControl` 还携带 `tabId`；modal 把显示时的 tab/session/thread 作为 expected identity 传回 action。若点击前切换 tab，即使新 tab 也有可用 Codex thread，也会在任何 host RPC 前返回 `stale`。
+- `compactForegroundThread()` 只在 identity 仍匹配时转发 `onAccepted`；后端结果若在 tab/session/conversation 切换后返回，会变成 `stale`，不会触发 success 或 usage refresh。只有 `verified + runtimeVerified` 才调用现有 `refreshFromServer()`，不合成 token 状态
 - 这条边界推进的是 master plan 的 P2 `question / todo / background task` 相邻 activation/open ownership 收敛，同时为后续 P3 context/composer 链路留出更清晰的 context usage seam

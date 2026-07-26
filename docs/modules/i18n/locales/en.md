@@ -1,6 +1,8 @@
 # English Locale
 
 > **源码**: `src/i18n/locales/en.ts`
+> **Updated**: 2026-07-26 G10b Codex hooks readback — added localized five-state status, structured hook-field labels, diagnostics, loading live-region, and read-only modal copy.
+> **Updated**: 2026-07-26 G10c foreground Codex compaction — added action-row labels, exact-thread confirmation, accepted/verified/timeout/stale status, four availability reasons, and accessible live-region copy.
 > **Updated**: 2026-07-25 P0/P1 settings UI review fixes — removed the duplicated lifecycle tail sentence from the four Codex permission row descriptions (the full sentence now lives only in `settings.codex.groups.permissionsDesc`); stripped emoji from `configEditor.help.*` titles; added `configEditor.metadata.value.{yes,no,none}`, `configEditor.metadata.status.*`, `configEditor.scope.{project,global,managed}` and `configEditor.evidenceDetail.*` for localized evidence metadata; rewrote `settings.codex.resources.deleted` / `settings.claudeCode.resources.deleted` to state "deleted and archived, restorable from history" and added matching `deleteConfirm` / `restoreConfirm` copy.
 > **Updated**: 2026-07-24 P1 resource history states — added explicit archive-manifest failure copy for Claude and Codex resource history so unavailable history is not presented as an empty list.
 > **Updated**: 2026-07-24 P1 secure resource reads — added typed read-failure copy for Claude and Codex scoped editor load failures.

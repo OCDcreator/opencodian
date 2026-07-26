@@ -10,14 +10,172 @@
  * to product-grade cards and now live in `SettingsCodexAccountSurface`.
  */
 
-import { Notice, Setting } from 'obsidian';
+import { Modal, Notice, Setting } from 'obsidian';
 
+import type {
+  AppServerHookGroup,
+  AppServerHookMetadata,
+  AppServerHooksReadbackResult,
+} from '../../core/agents/backend/CodexAppServerClientTypes';
 import type { AgentBackendKind } from '../../core/types/chat';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { BackendSessionBrowserModal } from '../chat/ui/BackendSessionBrowserModal';
 import { CodexMcpServerDetailModal, createCodexMcpServerDetailHost } from './CodexMcpServerDetailModal';
 import { CodexReadbackModal } from './CodexReadbackModal';
+
+type CodexHooksReadbackAdapter = {
+  getHooksReadback?: () => Promise<AppServerHooksReadbackResult>;
+};
+
+export interface SettingsCodexHooksReadbackModalOptions {
+  app: OpenCodianPlugin['app'];
+  adapter: CodexHooksReadbackAdapter | null;
+}
+
+const hookStatuses = ['available', 'empty', 'unavailable', 'failed', 'malformed'] as const;
+type HookReadbackStatus = typeof hookStatuses[number];
+
+function isHookReadbackStatus(value: unknown): value is HookReadbackStatus {
+  return typeof value === 'string' && hookStatuses.includes(value as HookReadbackStatus);
+}
+
+function hookValue(value: unknown): string {
+  if (value === undefined || value === null || value === '') return t('settings.codex.hooks.unknown');
+  if (typeof value === 'boolean') {
+    return value ? t('settings.codex.hooks.booleanEnabled') : t('settings.codex.hooks.booleanDisabled');
+  }
+  return String(value);
+}
+
+/** Structured, read-only hooks/list inspection. No write actions or raw JSON are exposed. */
+export class SettingsCodexHooksReadbackModal extends Modal {
+  private readonly options: SettingsCodexHooksReadbackModalOptions;
+  private statusEl: HTMLElement | null = null;
+  private contentAreaEl: HTMLElement | null = null;
+
+  constructor(options: SettingsCodexHooksReadbackModalOptions) {
+    super(options.app);
+    this.options = options;
+  }
+
+  onOpen(): void {
+    this.titleEl.setText(t('settings.codex.hooks.modalTitle'));
+    this.titleEl.id = 'opencodian-codex-hooks-readback-title';
+    this.modalEl.addClass('opencodian-codex-readback-modal');
+    this.modalEl.setAttribute('role', 'dialog');
+    this.modalEl.setAttribute('aria-labelledby', this.titleEl.id);
+    this.contentEl.empty();
+    const shellEl = this.contentEl.createDiv({ cls: 'opencodian-modal-shell opencodian-inspection-panel' });
+    shellEl.createEl('p', {
+      cls: 'opencodian-codex-readback-intro opencodian-inspection-summary-intro',
+      text: t('settings.codex.hooks.intro'),
+    });
+    this.statusEl = shellEl.createEl('span', {
+      cls: 'opencodian-codex-readback-status-value opencodian-inspection-badge',
+      text: t('settings.codex.hooks.statusLoading'),
+      attr: {
+        'data-hooks-readback-status': 'loading',
+        role: 'status',
+        'aria-live': 'polite',
+        'aria-busy': 'true',
+      },
+    });
+    shellEl.createEl('p', {
+      cls: 'opencodian-codex-readback-note opencodian-codex-readback-note--readonly',
+      text: t('settings.codex.hooks.readonlyNote'),
+    });
+    this.contentAreaEl = shellEl.createDiv({ cls: 'opencodian-codex-readback-content opencodian-inspection-content' });
+    void this.load();
+  }
+
+  private async load(): Promise<void> {
+    if (typeof this.options.adapter?.getHooksReadback !== 'function') {
+      this.renderState('unavailable');
+      return;
+    }
+    try {
+      const result = await this.options.adapter.getHooksReadback();
+      this.renderResult(result);
+    } catch {
+      this.renderState('failed');
+    }
+  }
+
+  private renderResult(result: AppServerHooksReadbackResult | null | undefined): void {
+    if (!result || !isHookReadbackStatus(result.status) || !Array.isArray(result.groups)) {
+      this.renderState('malformed');
+      return;
+    }
+    this.renderState(result.status, result.groups);
+  }
+
+  private renderState(status: HookReadbackStatus, groups: AppServerHookGroup[] = []): void {
+    if (!this.statusEl || !this.contentAreaEl) return;
+    this.statusEl.setAttribute('data-hooks-readback-status', status);
+    this.statusEl.setAttribute('aria-busy', 'false');
+    this.statusEl.setText(t(`settings.codex.hooks.status${status[0].toUpperCase()}${status.slice(1)}` as 'settings.codex.hooks.statusAvailable'));
+    this.contentAreaEl.empty();
+    if (status === 'available') {
+      groups.forEach((group) => this.renderGroup(group));
+      return;
+    }
+    this.contentAreaEl.createEl('p', {
+      cls: 'opencodian-codex-readback-state-message opencodian-inspection-state',
+      text: t(`settings.codex.hooks.message${status[0].toUpperCase()}${status.slice(1)}` as 'settings.codex.hooks.messageAvailable'),
+    });
+  }
+
+  private renderGroup(group: AppServerHookGroup): void {
+    const groupEl = this.contentAreaEl!.createDiv({ cls: 'opencodian-codex-hooks-group', attr: { 'data-codex-hooks-group': 'true' } });
+    const cwdEl = groupEl.createEl('p', {
+      cls: 'opencodian-codex-hooks-group-cwd',
+      text: `${t('settings.codex.hooks.cwd')}: ${group.cwd}`,
+      attr: { 'data-hooks-group-cwd': group.cwd, title: group.cwd },
+    });
+    cwdEl.setAttribute('aria-label', `${t('settings.codex.hooks.cwd')}: ${group.cwd}`);
+    group.warnings.forEach((warning) => groupEl.createEl('p', {
+      cls: 'opencodian-codex-hooks-diagnostic opencodian-codex-hooks-warning',
+      text: `${t('settings.codex.hooks.warning')}: ${warning}`,
+      attr: { 'data-hooks-warning': 'true' },
+    }));
+    group.errors.forEach((error) => groupEl.createEl('p', {
+      cls: 'opencodian-codex-hooks-diagnostic opencodian-codex-hooks-error',
+      text: `${t('settings.codex.hooks.error')}: ${error.path} — ${error.message}`,
+      attr: { 'data-hooks-error': 'true' },
+    }));
+    group.hooks.forEach((hook) => this.renderHook(groupEl, hook));
+  }
+
+  private renderHook(groupEl: HTMLElement, hook: AppServerHookMetadata): void {
+    const rowEl = groupEl.createDiv({ cls: 'opencodian-codex-hooks-entry', attr: { 'data-codex-hook-entry': 'true' } });
+    const fields: Array<[keyof AppServerHookMetadata, string, unknown]> = [
+      ['key', t('settings.codex.hooks.fieldKey'), hook.key],
+      ['eventName', t('settings.codex.hooks.fieldEvent'), hook.eventName],
+      ['handlerType', t('settings.codex.hooks.fieldHandler'), hook.handlerType],
+      ['matcher', t('settings.codex.hooks.fieldMatcher'), hook.matcher],
+      ['command', t('settings.codex.hooks.fieldCommand'), hook.command],
+      ['timeoutSec', t('settings.codex.hooks.fieldTimeout'), hook.timeoutSec],
+      ['statusMessage', t('settings.codex.hooks.fieldStatus'), hook.statusMessage],
+      ['sourcePath', t('settings.codex.hooks.fieldSourcePath'), hook.sourcePath],
+      ['source', t('settings.codex.hooks.fieldSource'), hook.source],
+      ['pluginId', t('settings.codex.hooks.fieldPlugin'), hook.pluginId],
+      ['displayOrder', t('settings.codex.hooks.fieldDisplayOrder'), hook.displayOrder],
+      ['enabled', t('settings.codex.hooks.fieldEnabled'), hook.enabled],
+      ['isManaged', t('settings.codex.hooks.fieldManaged'), hook.isManaged],
+      ['currentHash', t('settings.codex.hooks.fieldHash'), hook.currentHash],
+      ['trustStatus', t('settings.codex.hooks.fieldTrust'), hook.trustStatus],
+    ];
+    fields.forEach(([field, label, value]) => {
+      const text = hookValue(value);
+      rowEl.createEl('p', {
+        cls: 'opencodian-codex-hooks-field',
+        text: `${label}: ${text}`,
+        attr: { 'data-hook-field': field, title: text },
+      });
+    });
+  }
+}
 
 export interface SettingsCodexReadbackControlsOptions {
   plugin: OpenCodianPlugin;
@@ -296,6 +454,33 @@ export class SettingsCodexReadbackControls {
             this.openLoadedThreadsReadbackModal();
           });
       });
+  }
+
+  renderHooksReadbackControls(containerEl: HTMLElement): void {
+    const cardEl = containerEl.createDiv({
+      cls: 'opencodian-settings-inline-notice opencodian-settings-codex-readback',
+      attr: { 'data-codex-hooks-readback': 'true' },
+    });
+    cardEl.createEl('p', {
+      cls: 'opencodian-codex-hooks-readback-title',
+      text: t('settings.codex.hooks.name'),
+    });
+    cardEl.createEl('p', {
+      cls: 'opencodian-codex-hooks-readback-desc',
+      text: t('settings.codex.hooks.desc'),
+    });
+    const label = t('settings.codex.hooks.inspectButton');
+    const buttonEl = cardEl.createEl('button', {
+      cls: 'opencodian-codex-hooks-readback-button',
+      text: label,
+      attr: { type: 'button', 'aria-label': label, title: label, 'data-codex-hooks-readback-button': 'true' },
+    });
+    buttonEl.addEventListener('click', () => this.openHooksReadbackModal());
+  }
+
+  private openHooksReadbackModal(): void {
+    const adapter = this.plugin.agentServiceRegistry?.get('codex') as CodexHooksReadbackAdapter | null;
+    new SettingsCodexHooksReadbackModal({ app: this.plugin.app, adapter }).open();
   }
 
   private openLoadedThreadsReadbackModal(): void {

@@ -431,6 +431,7 @@ export class SettingsCodexSection {
     this.readbackControls.renderPermissionProfilesReadbackControls(controlsEl);
     this.readbackControls.renderMcpServerStatusReadbackControls(controlsEl);
     this.readbackControls.renderLoadedThreadsReadbackControls(controlsEl);
+    this.readbackControls.renderHooksReadbackControls(controlsEl);
   }
 
   private renderAccountAndStatusGroup(bodyEl: HTMLElement): void {

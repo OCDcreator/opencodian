@@ -23,12 +23,14 @@
 - `readThread(threadId, includeTurns)`: 调用 `thread/read` 获取单个 thread 的元数据和 turns
 - `startThread(options)` / `resumeThread(threadId, options)`: 通过实验 API 新建或恢复主聊天 thread；当前模型、cwd、sandbox、审批和 web-search config 在此边界生效
 - `startTurn(options)` / `interruptTurn(threadId, turnId)`: 启动/取消 app-server 回合；输出经异步通知到达，不能以 SDK 错误作为静默切换信号
+- `startThreadCompaction(threadId, options?)`: 发送精确 `{ threadId }` 到 `thread/compact/start`。真实 0.144.1 的空 `{}` ACK 只表示请求 accepted，不能显示为完成；非空 ACK 是 `malformed`，route/transport、invalid-thread 与 timeout 也保持可区分。运行时完成由 adapter 独立监听 `contextCompaction` + token usage
 - `subscribeToThreadNotifications(threadId, handler)`: 订阅并按 thread ID 隔离 `thread/tokenUsage/updated`、turn、item、warning/error 通知，支持并发 Codex 会话
 - `listPermissionProfiles(options)`: 调用 `permissionProfile/list` 获取可用权限配置文件列表（Checkpoint 15C）；支持可选 `cwd`、`limit`、`cursor` 参数；返回 `AppServerPermissionProfile[]`（含 `id` 和可选 `description`）
 - `getAccountRateLimits()`: 调用 `account/rateLimits/read` 获取账号速率限制信息（Checkpoint 15D / 15R）；返回 `AppServerAccountRateLimitsResult { rateLimits, errorReason? }`。环境相关（与 `account/usage/read` 相同）：ChatGPT 鉴权账号返回真实 `AppServerRateLimits`（含 `rateLimits` 和可选 `rateLimitsByLimitId`），API-key 鉴权返回 `chatgpt authentication required to read rate limits` 错误；`errorReason` 透传给 UI 以显示精确原因（含 `codex login` 提示），而不是笼统的 "unavailable"
 - `getAccountRead()`: 调用 `account/read` 获取账号/认证信息（Round 3）；返回 app-server 响应（含 `account.type`、`account.email`、`account.planType`、`requiresOpenaiAuth` 等），错误或不可用时返回 `null`
 - `listModels(options?)`: 调用 `model/list` 获取可用模型列表（Checkpoint 15B / Round 2）；返回 `AppServerModel[]`（含 `id`、`model`、`displayName`、可选 `description`、`defaultReasoningEffort`、`inputModalities`、`serviceTiers`、`upgradeInfo`）
 - `listSkillGroups(options?)`: 设置页专用的 additive readback，保留 skills/list 的 cwd 分组和 server errors；不得替换聊天目录使用的扁平 `listSkills()`
+- `listHooks(options?)`: 只读调用 `hooks/list`，发送 `{ cwds?: string[] }`，保留每个 cwd 的 hooks/warnings/errors 与已证实的 HookMetadata 字段（`key`/`eventName`/`handlerType` 为必需身份字段）；返回 `available|empty|unavailable|failed|malformed` outcome，绝不提供 hooks 写入或删除能力
 - `listMcpServerStatus()`: 调用 `mcpServerStatus/list` 获取 MCP 服务器运行时状态（Checkpoint 15N）；返回 `AppServerMcpServerStatus[]`（含 `name`、可选 `serverInfo`、`tools`、`resources`、`resourceTemplates`、`authStatus`）；请求超时 30 秒以覆盖慢速 MCP 探测
 - `reloadMcpServers()`: 调用 `config/mcpServer/reload` 请求 app-server 重新读取 MCP 配置；返回是否成功
 - `mcpServerToolCall(threadId, server, tool, toolArguments)`: **16A 新增**。调用 `mcpServer/tool/call` 直接执行 MCP 工具调用。先 `thread/resume`（幂等）加载 thread，然后发送 `{ threadId, server, tool, arguments }`。返回 `AppServerMcpToolCallResult { content: [{ type, text }], isError, errorReason? }`。用于 inline retry 功能：当聊天中的 MCP 工具块失败时，用户可以重新执行完全相同的 server/tool/arguments 来验证修复
@@ -43,6 +45,7 @@
 ## 维护约束
 
 - 主聊天仅在 `initialize.capabilities.experimentalApi=true` 成功协商后使用该客户端；协商失败才回退 `@openai/codex-sdk`，并且回退模式不得展示估算为精确的 Codex 上下文百分比。
+- foreground compaction 没有 SDK fallback：只有 app-server-owned 的真实 thread 才能调用；`thread/compact/start` 的 ACK 不是 token 降低或 context 已压缩的证据
 - App-server 生命周期由 `CodexAdapter` 管理：`start()` 时初始化，`stop()` 时清理。
 - App-server 启动是 best-effort：如果子进程 spawn 失败或 WebSocket 连接超时，`CodexAdapter` 会捕获异常并降级为仅使用 in-memory sessions。
 - 协议生成的类型 (`AppServerThread`, `AppServerTurn`, `AppServerItem`) 基于本地 `codex app-server generate-ts` 输出，但在此文件中做了最小化内联以避免额外的生成步骤依赖。

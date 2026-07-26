@@ -137,6 +137,9 @@ import {
 import {
   ActiveTabContextUsageCoordinator,
   type ActiveTabContextUsageCoordinatorHost,
+  type ForegroundCompactionActionOptions,
+  type ForegroundCompactionActionResult,
+  type ForegroundCompactionAvailability,
 } from './services/ActiveTabContextUsageCoordinator';
 import {
   type BackgroundTaskCompletionInfo,
@@ -2717,6 +2720,52 @@ export class OpenCodianView extends ItemView {
         }
         return this.plugin.openCodeService.getSessionContextUsageSnapshot(sessionId);
       },
+      getForegroundCompactionAvailability: (sessionId): ForegroundCompactionAvailability => {
+        const conversation = this.currentConversation;
+        if ((conversation?.backend ?? 'opencode') !== 'codex') {
+          return { status: 'unavailable' };
+        }
+        const adapter = this.plugin.agentServiceRegistry?.get('codex') as {
+          getForegroundCompactionAvailability?(sessionId: string): ForegroundCompactionAvailability;
+        } | undefined;
+        if (typeof adapter?.getForegroundCompactionAvailability !== 'function') {
+          return { status: 'unavailable' };
+        }
+        return adapter.getForegroundCompactionAvailability(sessionId);
+      },
+      compactForegroundThread: (
+        sessionId,
+        options,
+      ): Promise<ForegroundCompactionActionResult> => {
+        const conversation = this.currentConversation;
+        if ((conversation?.backend ?? 'opencode') !== 'codex') {
+          return Promise.resolve({
+            status: 'unavailable',
+            acknowledged: false,
+            runtimeVerified: false,
+            started: false,
+            completed: false,
+            tokenUsageObserved: false,
+          });
+        }
+        const adapter = this.plugin.agentServiceRegistry?.get('codex') as {
+          compactForegroundThread?(
+            sessionId: string,
+            options?: ForegroundCompactionActionOptions,
+          ): Promise<ForegroundCompactionActionResult>;
+        } | undefined;
+        if (typeof adapter?.compactForegroundThread !== 'function') {
+          return Promise.resolve({
+            status: 'unavailable',
+            acknowledged: false,
+            runtimeVerified: false,
+            started: false,
+            completed: false,
+            tokenUsageObserved: false,
+          });
+        }
+        return adapter.compactForegroundThread(sessionId, options);
+      },
       hasTab: (tabId) => Boolean(this.tabManager?.getTab(tabId)),
       getTabContextUsage: (tabId) => this.tabManager?.getTabContextUsage(tabId) ?? null,
       setTabContextUsage: (tabId, contextUsage) => {
@@ -2737,6 +2786,7 @@ export class OpenCodianView extends ItemView {
               sessionId,
             );
           },
+          compactionCoordinator: this.activeTabContextUsageCoordinator,
         }).open();
       },
       persistContextUsageSnapshot: async (tabId, snapshot) => {

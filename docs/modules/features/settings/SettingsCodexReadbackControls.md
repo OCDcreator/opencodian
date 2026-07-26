@@ -15,6 +15,8 @@ Diagnostic readback rendering helper for the Codex backend settings panel. Owns 
 |--------|------|-------|
 | `SettingsCodexReadbackControls` | Class | Renders the readback buttons and the session browser launcher |
 | `SettingsCodexReadbackControlsOptions` | Interface | Constructor options |
+| `SettingsCodexHooksReadbackModal` | Class | Structured hooks/list readback modal with five-state status handling |
+| `SettingsCodexHooksReadbackModalOptions` | Interface | Modal app and read-only adapter options |
 
 ## Rendered Surfaces
 
@@ -25,6 +27,7 @@ Diagnostic readback rendering helper for the Codex backend settings panel. Owns 
 | Permission profile readback | `CodexAdapter.getPermissionProfiles()` → app-server `permissionProfile/list` | `CodexReadbackModal` | Diagnostic-only; the profiles alias existing `sandboxMode` values |
 | MCP server status readback | `CodexAdapter.getMcpServerStatus()` → app-server `mcpServerStatus/list`; `CodexAdapter.reloadMcpServers()` → `config/mcpServer/reload` | `CodexMcpServerDetailModal` | Diagnostic-only; structured inspection, reload, OAuth, and resource viewer |
 | Loaded threads readback | `CodexAdapter.listLoadedThreads()` → app-server `thread/loaded/list` | `CodexReadbackModal` | Diagnostic-only internal state indicator |
+| Hooks readback | `CodexAdapter.getHooksReadback()` → app-server `hooks/list` | `SettingsCodexHooksReadbackModal` | Structured cwd groups, hook metadata, warnings, and errors; read-only with no scope/edit/delete/enable controls |
 
 ## Behavior
 
@@ -35,6 +38,8 @@ The modal carries:
 - a compact summary meta strip (status badge, read-only note, refresh note),
 - loading / unavailable / failed / empty / success states, and
 - on success, a structured inspection list.
+
+The hooks readback is a dedicated structured modal in the same Resume & Inspect area. It keeps the backend's five honest outcomes (`available`, `empty`, `unavailable`, `failed`, and `malformed`) distinct, ignores `errorReason` in the main UI, and renders each group cwd plus hook fields such as event, handler, source, source path, enabled state, matcher, command, timeout, trust, and hash. Warning and error diagnostics are rendered as labelled text. Paths retain selectable text and a `title` attribute so long values remain verifiable even when a host theme truncates them. The modal intentionally renders no raw JSON or mutation controls.
 
 Model-catalog rows show the display name, slug, description, and side badges for visibility, reasoning level, and API support. Permission-profile rows show the profile id, description, and a "profile" badge. Loaded-thread rows show the thread id with a toggle to reveal the raw JSON record.
 

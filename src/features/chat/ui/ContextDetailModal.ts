@@ -3,6 +3,10 @@ import { App, Modal } from 'obsidian';
 import type { ContextBreakdownSegment, Conversation, TabContextState } from '../../../core/types';
 import { getLocale, t } from '../../../i18n';
 import { ContextUsageService } from '../services/ContextUsageService';
+import {
+  ContextCompactionActionController,
+  type ContextDetailModalCompactionCoordinator,
+} from './ContextCompactionActionController';
 
 export interface ContextRawMessageItem {
   id: string;
@@ -10,6 +14,8 @@ export interface ContextRawMessageItem {
   createdAt: number | null;
   payload: string;
 }
+
+export type { ContextDetailModalCompactionCoordinator } from './ContextCompactionActionController';
 
 export class ContextDetailModal extends Modal {
   private isClosed = false;
@@ -23,6 +29,7 @@ export class ContextDetailModal extends Modal {
       contextState: TabContextState | null;
       systemPrompt?: string | null;
       rawMessageLoader?: () => Promise<ContextRawMessageItem[]>;
+      compactionCoordinator?: ContextDetailModalCompactionCoordinator;
     },
   ) {
     super(app);
@@ -30,15 +37,20 @@ export class ContextDetailModal extends Modal {
     this.contextState = options.contextState;
     this.systemPrompt = options.systemPrompt;
     this.rawMessageLoader = options.rawMessageLoader;
+    this.compactionController = options.compactionCoordinator
+      ? new ContextCompactionActionController(options.compactionCoordinator, () => this.isClosed)
+      : undefined;
   }
 
   private readonly conversation: Conversation | null;
   private readonly contextState: TabContextState | null;
   private readonly systemPrompt?: string | null;
   private readonly rawMessageLoader?: () => Promise<ContextRawMessageItem[]>;
+  private readonly compactionController?: ContextCompactionActionController;
 
   onOpen(): void {
     this.isClosed = false;
+    this.compactionController?.dispose();
     this.modalEl.addClass(ContextDetailModal.MODAL_CLASS);
     this.contentEl.addClass(ContextDetailModal.CONTENT_CLASS);
     const { contentEl } = this;
@@ -60,6 +72,7 @@ export class ContextDetailModal extends Modal {
         cls: 'opencodian-context-modal-empty',
         text: t('context.usage.noData'),
       });
+      this.compactionController?.render(contentEl);
       return;
     }
 
@@ -168,6 +181,7 @@ export class ContextDetailModal extends Modal {
       cls: 'opencodian-context-modal-note',
       text: t('context.breakdown.note'),
     });
+    this.compactionController?.render(contentEl);
   }
 
   onClose(): void {
@@ -175,6 +189,7 @@ export class ContextDetailModal extends Modal {
     this.contentEl.empty();
     this.contentEl.removeClass(ContextDetailModal.CONTENT_CLASS);
     this.modalEl.removeClass(ContextDetailModal.MODAL_CLASS);
+    this.compactionController?.dispose();
   }
 
   private renderRow(containerEl: HTMLElement, label: string, value: string): void {

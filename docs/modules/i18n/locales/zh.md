@@ -1,6 +1,8 @@
 # Chinese Locale
 
 > **源码**: `src/i18n/locales/zh.ts`
+> **Updated**: 2026-07-26 G10b Codex Hooks 读回 — 新增五态状态、结构化 Hook 字段、诊断信息、加载 live region 以及只读弹窗的中英文文案。
+> **Updated**: 2026-07-26 G10c Codex 前台压缩 — 新增 action row、精确线程确认、已受理/已验证/超时/过期状态、四类可用性原因与可访问 live region 文案。
 > **Updated**: 2026-07-25 P0/P1 设置 UI 审查修复 — Codex 权限四条行描述去除重复尾句（完整生命周期说明只保留在 `settings.codex.groups.permissionsDesc`）；`configEditor.help.*` 标题去除 emoji；新增 `configEditor.metadata.value.{yes,no,none}`、`configEditor.metadata.status.*`、`configEditor.scope.{project,global,managed}` 与 `configEditor.evidenceDetail.*` 本地化证据文案；`settings.codex.resources.deleted` / `settings.claudeCode.resources.deleted` 改为明确"已删除并归档，可从历史恢复"，并新增对应 `deleteConfirm` / `restoreConfirm` 确认文案。
 > **Updated**: 2026-07-24 P1 资源历史状态 — 新增 Claude/Codex 资源归档清单失败文案，避免将不可用历史伪装为空列表。
 > **Updated**: 2026-07-24 P1 安全资源读取 — 新增 Claude/Codex 作用域编辑器读取失败的 typed 文案。
