@@ -15,9 +15,9 @@
 
 **目标。** 为 GitHub 与自托管 Gitea 增加同构的 `Plugin Package` workflow：`main` push、`v*` tag 与手动触发均执行 `npm ci`、`npm run verify`、`npm run package:plugin`，并上传以 commit SHA 命名的 Obsidian 插件 artifact。
 
-**实现。** 共享 `scripts/package-plugin-artifact.mjs` 以 fail-closed 方式读取 production `dist/`，拒绝缺失文件、symlink/non-regular source、越界目录和错误 manifest，清理旧输出后只生成 `main.js`、`manifest.json`、`styles.css`，同时输出逐文件 SHA-256。GitHub 与 Gitea workflow 均使用 Node 24 runtime 的 `actions/checkout@v7`、`actions/setup-node@v7` 与 `actions/upload-artifact@v7`；Gitea 1.26.4 的 ArtifactService v4 实现及 version 7 集成测试提供协议依据。新增单元测试覆盖严格三文件、缺失源失败和双 workflow Node 24 契约。
+**实现。** 共享 `scripts/package-plugin-artifact.mjs` 以 fail-closed 方式读取 production `dist/`，拒绝缺失文件、symlink/non-regular source、越界目录和错误 manifest，清理旧输出后只生成 `main.js`、`manifest.json`、`styles.css`，同时输出逐文件 SHA-256。两端 workflow 均使用 Node 24 runtime 的 `actions/checkout@v7` 与 `actions/setup-node@v7`；GitHub 使用 `actions/upload-artifact@v7`，Gitea 使用完整 URL `https://gitea.com/actions/gitea-upload-artifact@v7`。Gitea 1.26.4 的 ArtifactService v4 实现及 version 7 集成测试提供协议依据。新增单元测试覆盖严格三文件、缺失源失败和双 workflow Node 24 契约。
 
-**Runner。** Gitea instance runner `macmini-opencodian` 使用 `gitea/act_runner:0.2.11` 与 `ubuntu-latest:docker://node:24-bookworm` 标签运行，长期容器不保存一次性 registration token。真实远端 run、artifact 下载及两端 SHA-256 对齐结果在双远端推送后验收。
+**Runner。** Gitea instance runner `macmini-opencodian` 使用 `gitea/act_runner:0.2.13` 与 `ubuntu-latest:docker://node:24-bookworm` 标签运行，长期容器不保存一次性 registration token。真实远端 run、artifact 下载及两端 SHA-256 对齐结果在双远端推送后验收。
 
 **Node 20 / CI 文件系统兼容性。** 首轮 GitHub/Gitea run 都在仓库既有 `scripts/run-jest.js` 处暴露同一根因：Node 20.20.2 禁止把 `--localstorage-file` 放入 `NODE_OPTIONS`。启动器现按 `process.allowedNodeEnvironmentFlags` 条件注入，新 Node 保留隔离的 webstorage 文件，Node 20 不再接收非法 flag；回归测试覆盖两条 capability 路径。第二轮进一步暴露 archive identity 安全测试的跨文件系统夹具假设：unlink 后重建可能复用同一 inode；夹具改为先创建 replacement 再 rename，确保实际发生 dev/ino identity swap，生产安全逻辑不变。
 
@@ -25,7 +25,7 @@
 
 **确定性双端产物。** Gitea job container 以 root 运行时，`chmod` 不能可靠制造 `EACCES`；相关 archive 测试改用既有 I/O seam 注入确定性失败，覆盖同一安全语义。两端 workflow 还将经校验的 `OPENCODIAN_BUILD_ID` 固定为 `ci-<commit SHA>`，消除 runner 构建分钟/时区导致的 `main.js` 漂移；本地未设置该变量时继续使用 `{branch}.{timestamp}`。
 
-**Node 24 升级。** GitHub CI/Plugin Package 与 Gitea Plugin Package 的项目运行时统一为 Node.js 24；两端 Actions 自身均升级到 Node 24 runtime 的 v7，消除 GitHub 对 Node 20 action runtime 的弃用 annotation。Gitea runner job image 同步升级为 `node:24-bookworm`，执行器从 `act_runner 0.2.11` 升到首个允许 `runs.using: node24` 的 `0.2.13`。Gitea 1.26.4 服务端虽支持 ArtifactService v4/version 7，但上游 action 会先按第三方 `GITHUB_SERVER_URL` 抛出 GHES guard；上传步骤将该变量局部覆盖为 action 放行的 `.localhost` hostname，实际 runtime URL/token 仍由 Gitea runner 注入。全套并行测试还暴露 Claude Agents 高度测试对异步双帧队列数量的脆弱假设；测试现排空所有已调度帧后断言最终高度，不再把调度时序误判为布局失败。
+**Node 24 升级。** GitHub CI/Plugin Package 与 Gitea Plugin Package 的项目运行时统一为 Node.js 24；两端 Actions 自身均升级到 Node 24 runtime 的 v7，消除 GitHub 对 Node 20 action runtime 的弃用 annotation。Gitea runner job image 同步升级为 `node:24-bookworm`，执行器从 `act_runner 0.2.11` 升到首个允许 `runs.using: node24` 的 `0.2.13`。Gitea run 20 证明上游 action 会先按第三方 `GITHUB_SERVER_URL` 抛出 GHES guard，且 step 级 `.localhost` 覆盖不会替代 runner 的标准环境；最终改用 Gitea 公共 `actions` 组织提供的 `gitea-upload-artifact@v7`，由其直接使用 runner 注入的 runtime URL/token 对接 1.26.4 ArtifactService。全套并行测试还暴露 Claude Agents 高度测试对异步双帧队列数量的脆弱假设；测试现排空所有已调度帧后断言最终高度，不再把调度时序误判为布局失败。
 
 ## 2026-07-27 G9 — Provider 配置 backend-native truth final acceptance
 
