@@ -45,6 +45,7 @@ export class ConversationSyncedUpdateApplyDelegate {
 - incremental helper 继续只比较 `getMessagesForRender()` 后的 rendered sequence，非尾部 signature 变化或消息数量回退时返回 `null`
 - `hasInterruptedLocalAssistantTail()` 判定消息列表中是否存在本地发起、带有可见内容的 assistant 消息（无 `sourceMessageId`、非 `notice` 样式），供 sync-load 和 reload 路径判断是否需要保留 interrupted tail
 - synced append path 会先尝试 patch trailing assistant，再渲染新增消息并刷新 background-task indicator
+- synced assistant append 会优先查找同 `data-canonical-message-id` 的一次性 pending local shell；命中时复用该节点，更新 message/source identity、正文、footer 与 streaming state，再清除标记，而不是再创建第二个 assistant shell。未命中时维持既有 persisted / pseudo-stream 分支
 - plain text assistant append 继续走 pseudo-stream reveal；notice、assistant `summary`、question resolution 与 structured blocks 仍直接使用 persisted assistant shell，避免 compaction report 被伪流式展开
 - user message rerender 继续复用 host 提供的 frame/body/footer callbacks，其中 body 渲染通过 `host.userMessageContentRenderer` 端口调用 `UserMessageContentRenderer`，不在 runtime 内创建新的 view dependency
 

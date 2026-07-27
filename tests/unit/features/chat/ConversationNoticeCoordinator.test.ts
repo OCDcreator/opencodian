@@ -281,10 +281,12 @@ describe('ConversationNoticeCoordinator error and action helpers', () => {
   beforeEach(resetConversationNoticeMocks);
 
   describe('getFriendlyStreamErrorMessage', () => {
-    it('returns server-no-response for empty input', () => {
+    it('returns backend-specific no-response guidance for empty input', () => {
       const coordinator = new ConversationNoticeCoordinator(createHost());
-      expect(coordinator.getFriendlyStreamErrorMessage('')).toBe(t('chat.error.serverNoResponse'));
-      expect(coordinator.getFriendlyStreamErrorMessage('   ')).toBe(t('chat.error.serverNoResponse'));
+      expect(coordinator.getFriendlyStreamErrorMessage('', 'opencode')).toBe(t('chat.error.serverNoResponse'));
+      expect(coordinator.getFriendlyStreamErrorMessage('   ', 'opencode')).toBe(t('chat.error.serverNoResponse'));
+      expect(coordinator.getFriendlyStreamErrorMessage('', 'claude-code'))
+        .toBe(t('chat.error.claudeNoResponse'));
     });
 
     it('returns server-connection for network error patterns', () => {

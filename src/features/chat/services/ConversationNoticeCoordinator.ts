@@ -1,4 +1,9 @@
-import type { ChatMessage, Conversation, SessionDiffEntry } from '../../../core/types';
+import type {
+  ChatMessage,
+  Conversation,
+  SessionDiffEntry,
+} from '../../../core/types';
+import type { AgentBackendKind } from '../../../core/types/chat';
 import { t } from '../../../i18n';
 import { buildStreamErrorNotice } from '../runtime/AssistantNoticeRenderer';
 import type { TabId } from '../tabs';
@@ -17,6 +22,27 @@ function readActiveBackendDisplayNameFromPlugin(): string {
   } catch {
     return 'opencode';
   }
+}
+
+function readActiveBackendKindFromPlugin(): AgentBackendKind {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const activeBackend = (globalThis as any).app?.plugins?.plugins?.opencodian
+      ?.settings?.activeBackend;
+    if (
+      activeBackend === 'opencode'
+      || activeBackend === 'claude-code'
+      || activeBackend === 'codex'
+      || activeBackend === 'copilot'
+      || activeBackend === 'pi'
+    ) {
+      return activeBackend;
+    }
+  } catch {
+    // Use the legacy OpenCode default when the view is unavailable in tests or teardown.
+  }
+
+  return 'opencode';
 }
 
 const NETWORK_ERROR_PATTERNS = [
@@ -179,11 +205,17 @@ export class ConversationNoticeCoordinator {
     return [t('chat.diffNotice.description'), '', ...lines].join('\n');
   }
 
-  getFriendlyStreamErrorMessage(rawMessage: string): string {
+  getFriendlyStreamErrorMessage(
+    rawMessage: string,
+    backend: AgentBackendKind = readActiveBackendKindFromPlugin(),
+  ): string {
     const message = rawMessage.trim();
     const lowerMessage = message.toLowerCase();
 
     if (!message) {
+      if (backend === 'claude-code') {
+        return t('chat.error.claudeNoResponse');
+      }
       return t('chat.error.serverNoResponse');
     }
 

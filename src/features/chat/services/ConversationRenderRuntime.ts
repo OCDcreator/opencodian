@@ -159,12 +159,67 @@ class ConversationAssistantMessageRenderDelegate {
   }
 
   async renderSyncedMessage(message: ChatMessage): Promise<void> {
+    if (await this.takeOverPendingCanonicalAssistantShell(message)) {
+      return;
+    }
+
     if (!this.shouldPseudoStreamSyncedAssistantMessage(message)) {
       await this.renderPersistedMessage(message);
       return;
     }
 
     await this.renderSyncedAssistantMessageWithReveal(message);
+  }
+
+  private async takeOverPendingCanonicalAssistantShell(message: ChatMessage): Promise<boolean> {
+    const messageEl = this.findPendingCanonicalAssistantShell(message.id);
+    if (!messageEl) {
+      return false;
+    }
+
+    const contentEl = this.ensureAssistantContentElement(messageEl);
+    this.syncAssistantMessageIdentity(messageEl, message);
+    contentEl.replaceChildren();
+    await this.host.assistantTailRender.renderMessageBody(contentEl, message);
+    this.host.assistantTailRender.finalizePersistedFooter(messageEl, message);
+    delete messageEl.dataset.canonicalMessageId;
+    delete messageEl.dataset.canonicalSyncPending;
+    return true;
+  }
+
+  private findPendingCanonicalAssistantShell(messageId: string): HTMLElement | null {
+    const messagesEl = this.host.getMessagesContainer();
+    if (!messagesEl) {
+      return null;
+    }
+
+    return Array.from(messagesEl.querySelectorAll<HTMLElement>(
+      '.opencodian-message--assistant[data-canonical-sync-pending="true"]',
+    )).find((messageEl) => messageEl.dataset.canonicalMessageId === messageId) ?? null;
+  }
+
+  private ensureAssistantContentElement(messageEl: HTMLElement): HTMLElement {
+    const existingContentEl = Array.from(messageEl.children).find((child) =>
+      child instanceof HTMLElement && child.classList.contains('opencodian-message-content'),
+    );
+    if (existingContentEl instanceof HTMLElement) {
+      return existingContentEl;
+    }
+
+    const contentEl = document.createElement('div');
+    contentEl.className = 'opencodian-message-content';
+    messageEl.prepend(contentEl);
+    return contentEl;
+  }
+
+  private syncAssistantMessageIdentity(messageEl: HTMLElement, message: ChatMessage): void {
+    messageEl.dataset.messageId = message.id;
+    if (message.sourceMessageId) {
+      messageEl.dataset.sourceMessageId = message.sourceMessageId;
+    } else {
+      delete messageEl.dataset.sourceMessageId;
+    }
+    messageEl.classList.remove('is-streaming');
   }
 
   private shouldPseudoStreamSyncedAssistantMessage(message: ChatMessage): boolean {

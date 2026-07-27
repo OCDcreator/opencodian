@@ -72,6 +72,45 @@ describe('ClaudeCodeStreamNormalizer', () => {
     )).toEqual([]);
   });
 
+  it('uses a successful terminal result as the only text fallback when no assistant text arrived', () => {
+    const normalizer = createClaudeCodeStreamNormalizer();
+
+    expect(normalizer.transformSDKMessage({
+      type: 'result',
+      subtype: 'success',
+      result: 'Terminal-only response',
+    })).toEqual([{ type: 'text', content: 'Terminal-only response' }]);
+  });
+
+  it('does not replay a successful terminal result after assistant text has already streamed', () => {
+    const normalizer = createClaudeCodeStreamNormalizer();
+
+    expect(normalizer.transformSDKMessage(
+      assistantMessage('msg-result-dedup', [{ type: 'text', text: 'Already visible' }]),
+    )).toEqual([{ type: 'text', content: 'Already visible' }]);
+
+    expect(normalizer.transformSDKMessage({
+      type: 'result',
+      subtype: 'success',
+      result: 'Already visible',
+    })).toEqual([]);
+  });
+
+  it('resets terminal-result fallback state after each result for persistent queries', () => {
+    const normalizer = createClaudeCodeStreamNormalizer();
+
+    expect(normalizer.transformSDKMessage({
+      type: 'result',
+      subtype: 'success',
+      result: 'First turn result',
+    })).toEqual([{ type: 'text', content: 'First turn result' }]);
+    expect(normalizer.transformSDKMessage({
+      type: 'result',
+      subtype: 'success',
+      result: 'Second turn result',
+    })).toEqual([{ type: 'text', content: 'Second turn result' }]);
+  });
+
   it('normalizes text and thinking deltas', () => {
     const normalizer = createClaudeCodeStreamNormalizer();
 

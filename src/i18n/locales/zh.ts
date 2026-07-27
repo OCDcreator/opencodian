@@ -2383,6 +2383,7 @@ export const zhTranslations = {
   'chat.error.serverOffline': 'OpenCode 服务未运行。\n请到“设置 → 服务器”启动服务后再试一次。',
   'chat.error.serverStarting': 'OpenCode 服务仍在启动中。\n请稍等几秒后再试一次。',
   'chat.error.serverNoResponse': 'OpenCode 没有返回任何内容。\n服务可能尚未启动完成，或模型 / 提供商还未配置好。',
+  'chat.error.claudeNoResponse': 'Claude Code 未返回可显示内容。\n请检查 Claude Code 会话状态后重试。',
   'chat.error.serverConnection': '无法连接到 OpenCode 服务。\n请确认服务已启动，并检查当前配置的主机、端口、URL、认证信息和 opencode 全局安装。',
   'chat.error.serverBinaryMissing': '未找到 OpenCode 可执行文件（`opencode`）。\n请先安装 OpenCode，或在“设置 → 服务器”里填写可执行文件路径，然后重启服务。',
   'chat.error.serverPortInUse': '端口已被其他进程占用。\n请检查是否已有其他服务占用了当前 OpenCode 端口。',

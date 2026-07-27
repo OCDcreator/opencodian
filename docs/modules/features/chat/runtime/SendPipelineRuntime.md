@@ -99,6 +99,7 @@ chunk router 现在由 `runtime/StreamChunkRouter.ts` 承接，并继续下钻�
 - `file_edited`：累计到 tab runtime 的 `pendingEditedFiles`
 - `permission_request` / `question_request`：暂停 idle timeout，等待现有交互流完成后再恢复计时
 - 其余可渲染 chunk：统一交给 `StreamController`
+- error 与空流 fallback 会连同当前 conversation backend 传给 friendly-error host contract；runtime 只转发这条上下文，不在 composition root 硬编码任何 backend 文案
 
 其中：
 

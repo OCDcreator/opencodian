@@ -18,6 +18,7 @@
 - 将 assistant-level SDK 错误（例如 `authentication_failed`）优先映射成 `error` chunk，避免把认证失败提示当普通 assistant 文本渲染
 - 将 result-level `errors[]` 汇总为 error chunk 内容，保留 SDK 认证/运行时错误关键词
 - 记录 message/content block 已输出长度，避免 partial assistant message 和 final assistant message 重复输出文本或 thinking
+- 当一轮成功 `result` 未伴随任何可见 assistant text 时，将非空 `result.result` 作为唯一 text fallback；若 assistant text 已输出则不回放 result，并在每个 result 后重置这轮 fallback 状态，兼容持久 `query()` 的下一轮
 - 记录已输出 tool use/result id，避免 final message 重放同一工具事件
 - 为 Claude tool chunk 写入 `toolMetadata.source = 'claude-code'`，并保留 session/tool id 供后续 UI 与 permission bridge 使用
 - 复用通用 tool identity 规则识别 Claude built-in、MCP、question、plan、task 等工具 kind

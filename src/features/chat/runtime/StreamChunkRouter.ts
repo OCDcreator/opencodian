@@ -2,6 +2,7 @@ import {
   getConversationBackendSessionId,
   type StreamChunk as CoreStreamChunk,
 } from '../../../core/types';
+import type { AgentBackendKind } from '../../../core/types/chat';
 import { createLogger } from '../../../shared';
 import { PendingIndicatorController } from './PendingIndicatorController';
 import { hasVisibleStreamingContent } from './sendPipelineContent';
@@ -242,7 +243,10 @@ export class StreamChunkRouter {
 
     this.trace.noteRenderedChunk(streamingChunk);
     if (streamingChunk.type === 'error') {
-      this.latestErrorMessage = this.options.host.getFriendlyStreamErrorMessage(streamingChunk.content);
+      this.latestErrorMessage = this.options.host.getFriendlyStreamErrorMessage(
+        streamingChunk.content,
+        this.getBackend(),
+      );
       streamingChunk.content = this.latestErrorMessage;
     } else {
       this.receivedMeaningfulChunk = true;
@@ -270,7 +274,7 @@ export class StreamChunkRouter {
       return;
     }
 
-    this.latestErrorMessage = this.options.host.getFriendlyStreamErrorMessage('');
+    this.latestErrorMessage = this.options.host.getFriendlyStreamErrorMessage('', this.getBackend());
     this.trace.logStage('injecting-fallback-error-before-done');
     await this.options.streamController.handleChunk({
       type: 'error',
@@ -297,6 +301,7 @@ export class StreamChunkRouter {
     logger.error('Streaming error:', error);
     this.latestErrorMessage = this.options.host.getFriendlyStreamErrorMessage(
       error instanceof Error ? error.message : 'Unknown error',
+      this.getBackend(),
     );
     this.trace.logStage('stream-loop-error', {
       errorMessage: error instanceof Error ? error.message : String(error),
@@ -337,6 +342,10 @@ export class StreamChunkRouter {
     this.trace.logStage('pending-indicator-cleared', {
       reason: 'first-content',
     });
+  }
+
+  private getBackend(): AgentBackendKind {
+    return this.options.preparedSend.conversation.backend ?? 'opencode';
   }
 
   private scheduleStreamTimeout(): void {

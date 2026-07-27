@@ -35,6 +35,10 @@ export async function persistLocalStreamOutcome(options: {
       runtime,
     );
     if (!shouldPersistAssistantMessage) {
+      markCanonicalAssistantTakeoverPending(
+        outcome.finalizedStreamingMessageEl,
+        outcome.finalizedAssistantMessageId,
+      );
       await persistBackendSessionIdentityIfNeeded({
         host,
         preparedSend,
@@ -204,6 +208,18 @@ function shouldPersistLocalAssistantMessage(
     outcome.shouldPersistInterruptedState
       || runtime.pendingQuestionResolution,
   );
+}
+
+function markCanonicalAssistantTakeoverPending(
+  messageEl: HTMLElement | null,
+  assistantMessageId: string | undefined,
+): void {
+  if (!messageEl || !assistantMessageId) {
+    return;
+  }
+
+  messageEl.dataset.canonicalMessageId = assistantMessageId;
+  messageEl.dataset.canonicalSyncPending = 'true';
 }
 
 function appendNoticeMessage(options: {

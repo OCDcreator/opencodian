@@ -6,6 +6,7 @@ import {
   createConversationRenderHost,
 } from '../../../../src/features/chat/services/ConversationRenderService';
 import {
+  createHost,
   createMessage,
   getIncrementalRenderedMessageUpdate,
 } from './ConversationRenderService.testSupport';
@@ -52,6 +53,54 @@ describe('getIncrementalRenderedMessageUpdate', () => {
     });
 
     expect(result).toBeNull();
+  });
+});
+
+describe('ConversationRenderService canonical assistant takeover', () => {
+  it('reuses the completed local shell when canonical sync appends the same assistant message', async () => {
+    const host = createHost();
+    const service = new ConversationRenderService(host);
+    const userMessage = createMessage({ id: 'user-1', role: 'user', content: 'Hello' });
+    const canonicalAssistant = createMessage({
+      id: 'assistant-server-1',
+      role: 'assistant',
+      content: 'Canonical assistant response',
+      sourceMessageId: 'assistant-server-1',
+    });
+    const localShell = document.createElement('div');
+    localShell.className = 'opencodian-message opencodian-message--assistant is-streaming';
+    localShell.dataset.canonicalMessageId = canonicalAssistant.id;
+    localShell.dataset.canonicalSyncPending = 'true';
+    const localContent = document.createElement('div');
+    localContent.className = 'opencodian-message-content';
+    localContent.textContent = 'Locally streamed response';
+    localShell.appendChild(localContent);
+    host.messagesEl.appendChild(localShell);
+
+    const conversation = host.getCurrentConversation();
+    conversation.messages = [userMessage, canonicalAssistant];
+
+    await service.applySyncedConversationUpdate([userMessage], conversation.messages);
+
+    const assistantShells = host.messagesEl.querySelectorAll(
+      '.opencodian-message--assistant',
+    );
+    expect(assistantShells).toHaveLength(1);
+    expect(assistantShells[0]).toBe(localShell);
+    expect(localShell.dataset.messageId).toBe(canonicalAssistant.id);
+    expect(localShell.dataset.sourceMessageId).toBe(canonicalAssistant.sourceMessageId);
+    expect(localShell.dataset.canonicalMessageId).toBeUndefined();
+    expect(localShell.dataset.canonicalSyncPending).toBeUndefined();
+    expect(localShell.classList.contains('is-streaming')).toBe(false);
+    expect(localContent.textContent).toBe(canonicalAssistant.content);
+    expect(host.assistantTailRender.finalizePersistedFooter).toHaveBeenCalledWith(
+      localShell,
+      canonicalAssistant,
+    );
+    expect(host.assistantShellRender.renderPersistedMessage).not.toHaveBeenCalled();
+
+    await service.applySyncedConversationUpdate(conversation.messages, conversation.messages);
+    expect(host.messagesEl.querySelectorAll('.opencodian-message--assistant')).toHaveLength(1);
   });
 });
 

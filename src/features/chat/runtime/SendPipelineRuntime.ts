@@ -105,7 +105,7 @@ export interface SendPipelineHostDependencies {
   showPermissionDialog: SendPipelineHost['showPermissionDialog'];
   showQuestionDialog: SendPipelineHost['showQuestionDialog'];
   convertToStreamingChunk: SendPipelineHost['convertToStreamingChunk'];
-  getFriendlyStreamErrorMessage(rawMessage: string): string;
+  getFriendlyStreamErrorMessage: SendPipelineHost['getFriendlyStreamErrorMessage'];
   createSendPipelineShellPort(): import('./SendPipelineTypes').SendPipelineShellPort;
   createConversationWriteTicket: SendPipelineHost['createConversationWriteTicket'];
   commitConversationWrite: SendPipelineHost['commitConversationWrite'];
@@ -147,7 +147,8 @@ export function createSendPipelineRuntimeHost(deps: SendPipelineHostDependencies
     showPermissionDialog: (request, tabId) => deps.showPermissionDialog(request, tabId),
     showQuestionDialog: (request, tabId) => deps.showQuestionDialog(request, tabId),
     convertToStreamingChunk: (chunk) => deps.convertToStreamingChunk(chunk),
-    getFriendlyStreamErrorMessage: (rawMessage) => deps.getFriendlyStreamErrorMessage(rawMessage),
+    getFriendlyStreamErrorMessage: (rawMessage, backend) =>
+      deps.getFriendlyStreamErrorMessage(rawMessage, backend),
   };
   const shellPort: SendPipelineShellPort = deps.createSendPipelineShellPort();
   const persistencePort: SendPipelinePersistencePort = {

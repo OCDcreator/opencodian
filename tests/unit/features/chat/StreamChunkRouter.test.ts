@@ -142,6 +142,53 @@ describe('StreamChunkRouter structured output capture', () => {
   });
 });
 
+describe('StreamChunkRouter empty-stream backend routing', () => {
+  it('passes the Claude Code backend to the empty-stream error formatter', async () => {
+    const host = createHost();
+    host.getFriendlyStreamErrorMessage.mockImplementation((message, backend) =>
+      message || `No displayable content from ${backend}`,
+    );
+    const runtime: SendPipelineTabRuntime = {
+      isStreaming: true,
+      streamingMessageEl: null,
+      streamingContentEl: null,
+      pendingEditedFiles: new Set(),
+      pendingQuestionResolution: null,
+      isConversationSyncInFlight: false,
+    };
+    const streamController: SendPipelineStreamController = {
+      startStream: jest.fn(),
+      handleChunk: jest.fn().mockResolvedValue(undefined),
+      cancelStream: jest.fn(),
+      getContentBlocks: jest.fn(() => []),
+    };
+    const preparedSend = createPreparedSend();
+    preparedSend.conversation.backend = 'claude-code';
+
+    async function* stream() {
+      yield { type: 'message_start' } as const;
+      yield { type: 'message_stop' } as const;
+    }
+
+    const router = new StreamChunkRouter({
+      host,
+      preparedSend,
+      runtime,
+      stream: stream(),
+      streamController,
+      contentEl: document.body.createDiv(),
+    });
+
+    await router.consume();
+
+    expect(host.getFriendlyStreamErrorMessage).toHaveBeenCalledWith('', 'claude-code');
+    expect(streamController.handleChunk).toHaveBeenCalledWith({
+      type: 'error',
+      content: 'No displayable content from claude-code',
+    });
+  });
+});
+
 describe('StreamChunkRouter stream validation', () => {
   it('handles non-async-iterable stream by returning error result', async () => {
     const host = createHost();

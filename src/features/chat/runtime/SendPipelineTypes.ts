@@ -10,6 +10,7 @@ import type {
   QuestionResolution,
   StreamChunk as CoreStreamChunk,
 } from '../../../core/types';
+import type { AgentBackendKind } from '../../../core/types/chat';
 import type {
   ContentBlock as StreamingContentBlock,
   StreamChunk as StreamingChunk,
@@ -117,7 +118,7 @@ export interface SendPipelineTransportPort {
   ): Promise<void>;
   showQuestionDialog(request: QuestionRequest, tabId: TabId | null): Promise<void>;
   convertToStreamingChunk(chunk: CoreStreamChunk): StreamingChunk | null;
-  getFriendlyStreamErrorMessage(rawMessage: string): string;
+  getFriendlyStreamErrorMessage(rawMessage: string, backend: AgentBackendKind): string;
 }
 
 export interface SendPipelineShellPort {

@@ -18,6 +18,7 @@ interface ClaudeCodeStreamNormalizerState {
   thinkingLengths: Map<string, number>;
   emittedToolUses: Set<string>;
   emittedToolResults: Set<string>;
+  hasVisibleAssistantTextInCurrentTurn: boolean;
 }
 
 interface AppendToolUseChunkContext {
@@ -495,6 +496,7 @@ export class ClaudeCodeStreamNormalizer {
       thinkingLengths: new Map(),
       emittedToolUses: new Set(),
       emittedToolResults: new Set(),
+      hasVisibleAssistantTextInCurrentTurn: false,
     };
   }
 
@@ -504,6 +506,7 @@ export class ClaudeCodeStreamNormalizer {
     this.state.thinkingLengths.clear();
     this.state.emittedToolUses.clear();
     this.state.emittedToolResults.clear();
+    this.state.hasVisibleAssistantTextInCurrentTurn = false;
   }
 
   transformSDKMessage(message: unknown): StreamChunk[] {
@@ -633,6 +636,7 @@ export class ClaudeCodeStreamNormalizer {
     }
 
     chunks.push({ type: 'text', content });
+    this.state.hasVisibleAssistantTextInCurrentTurn = true;
   }
 
   private appendAssistantContentChunks(
@@ -657,6 +661,7 @@ export class ClaudeCodeStreamNormalizer {
         const content = this.takeSuffix(this.state.textLengths, key, text);
         if (content) {
           chunks.push({ type: 'text', content });
+          this.state.hasVisibleAssistantTextInCurrentTurn = true;
         }
         return;
       }
@@ -796,7 +801,14 @@ export class ClaudeCodeStreamNormalizer {
         type: 'error',
         content: normalizeErrorContent(record),
       });
+    } else if (!this.state.hasVisibleAssistantTextInCurrentTurn) {
+      const resultText = readString(record.result);
+      if (resultText?.trim()) {
+        chunks.push({ type: 'text', content: resultText });
+      }
     }
+
+    this.state.hasVisibleAssistantTextInCurrentTurn = false;
   }
 
   private appendPromptSuggestionChunk(

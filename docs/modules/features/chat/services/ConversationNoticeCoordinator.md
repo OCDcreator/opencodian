@@ -35,7 +35,7 @@ export interface ConversationNoticeCoordinatorHost {
 }
 
 export class ConversationNoticeCoordinator {
-  getFriendlyStreamErrorMessage(rawMessage: string): string;
+  getFriendlyStreamErrorMessage(rawMessage: string, backend?: AgentBackendKind): string;
   createStreamErrorNotice(message: string): ChatMessage;
   shouldRenderEmptyConversationNotice(): boolean;
   createEmptyConversationNotice(): ChatMessage;
@@ -59,7 +59,8 @@ export class ConversationNoticeCoordinator {
 ### stream error notice
 
 - `createStreamErrorNotice()` 复用 `AssistantNoticeRenderer.buildStreamErrorNotice()`，统一补上当前模型 id
-- `getFriendlyStreamErrorMessage()` 把原始流错误字符串映射为用户友好文案：网络错误 → server connection，opencode not found → binary missing，空消息 → no response，其余 → send failed + 原文
+- `getFriendlyStreamErrorMessage()` 把原始流错误字符串映射为用户友好文案：网络错误 → server connection，opencode not found → binary missing，空消息 → backend-aware no response，其余 → send failed + 原文
+- 空消息在 OpenCode 保留既有 server-no-response 指引；Claude Code 改为“未返回可显示内容”，避免用户被错误引导到 OpenCode 服务设置
 - Claude Code backend 的 SDK/stream 错误保留 Claude Code 标签，不再被映射成 OpenCode server connection failure，避免用户在 Claude 后端失败时被引导去排查 OpenCode 本地服务。
 
 ### turn diff notice

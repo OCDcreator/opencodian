@@ -2383,6 +2383,7 @@ export const enTranslations = {
   'chat.error.serverOffline': 'OpenCode server is not running.\nStart it in Settings → Server and try again.',
   'chat.error.serverStarting': 'OpenCode server is still starting.\nPlease wait a few seconds and try again.',
   'chat.error.serverNoResponse': 'OpenCode returned no response.\nThe server may still be starting, or the model/provider may not be configured yet.',
+  'chat.error.claudeNoResponse': 'Claude Code returned no displayable content.\nCheck the Claude Code session and try again.',
   'chat.error.serverConnection': 'Could not connect to the OpenCode server.\nCheck that it is running and verify the configured host, port, URL, authentication, and global opencode install.',
   'chat.error.serverBinaryMissing': 'OpenCode executable (`opencode`) was not found.\nInstall OpenCode, or set its executable path in Settings -> Server, then restart the service.',
   'chat.error.serverPortInUse': 'The port is already in use.\nCheck whether another process is already using the configured OpenCode port.',

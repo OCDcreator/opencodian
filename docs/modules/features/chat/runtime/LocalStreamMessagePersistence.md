@@ -25,6 +25,7 @@ persistLocalStreamOutcome(options): Promise<void>
   - 记录本地持久化阶段的 debug 日志
 - 只要本地实际追加了 message / notice，就更新 `updatedAt`、`lastResponseAt` 并执行第一次本地保存
 - 正常 completed assistant 在 canonical sync pending 时只做 cache-deferred 日志，不把 stale body 当作本地 truth 落盘
+- canonical sync pending 时，会把已完成本地 shell 标记为 `data-canonical-message-id` / `data-canonical-sync-pending`；该标记只用于随后同 id 的 authoritative assistant 接管 DOM，不写入 conversation cache
 - 若 stream metadata 捕获到新的 backend session id，即使 assistant body 延后给 canonical sync，也会单独通过 serialized write 更新 conversation `backendSessionId`
 - Codex provisional → real thread upgrade：当新的 `backendSessionId` 从 `codex-local-*` 升级为真实 thread id 时，`persistLocalStreamOutcome()` / `persistBackendSessionIdentityIfNeeded()` 会过滤掉 conversation 中 `noticeMeta.kind === 'codex-provisional-warning'` 的过期 warning message，避免用户已建立真实线程后仍看到 provisional warning
 - 若 stream 捕获到 `resolvedUserMessageIdentity`，`persistLocalStreamOutcome()` / `persistBackendSessionIdentityIfNeeded()` 会在 optimistic user message 尚无 `sourceMessageId` 时写入该 UUID，给 Claude conversation 提供 fork/rewind 所需的源消息 identity

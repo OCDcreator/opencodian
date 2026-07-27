@@ -73,7 +73,7 @@ export class StreamChunkRouter {
 ### 可渲染 chunk
 
 - text / thinking / tool / error 等可转换 chunk 继续交给 `StreamController`
-- error chunk 会先经过 view host 的 friendly error formatter
+- error chunk 与无 meaningful content 的 fallback 都会带当前 conversation backend 经过 view host 的 friendly error formatter；这让 Claude Code 空流不再误用 OpenCode 的服务诊断文案
 - 首个可见内容到达时，会清理 pending indicator 并记录 `pending-indicator-cleared`
 - 如果 stream 结束时没有任何 meaningful chunk，也没有真实 error，会注入 fallback error
 

@@ -144,6 +144,9 @@ describe('createSendPipelineRuntimeHost', () => {
     host.completeTabContextUsageStream('tab-1');
     expect(deps.completeTabContextUsageStream).toHaveBeenCalledWith('tab-1');
 
+    host.getFriendlyStreamErrorMessage('', 'claude-code');
+    expect(deps.getFriendlyStreamErrorMessage).toHaveBeenCalledWith('', 'claude-code');
+
     expect(deps.createSendPipelineShellPort).toHaveBeenCalled();
     expect(host.createAssistantMessageElement).toBe(shellPort.createAssistantMessageElement);
     expect(host.revealStreamingAssistantMessageElement).toBe(shellPort.revealStreamingAssistantMessageElement);

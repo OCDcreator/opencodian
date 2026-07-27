@@ -1,6 +1,7 @@
 # English Locale
 
 > **源码**: `src/i18n/locales/en.ts`
+> **Updated**: 2026-07-28 stream fallback copy — added `chat.error.claudeNoResponse` so Claude Code empty streams no longer use OpenCode server guidance.
 > **Updated**: 2026-07-27 Version-management status panel — added `settings.pluginUpdate.currentVersionLabel`, `errorLabel`, and short badge copy `badge.{idle,checking,error,empty,update,current}`; removed the combined `currentVersion` and `status.error` sentence keys.
 > **Updated**: 2026-07-27 G9 OpenCode restart recovery — added separate stop-unknown and post-stop start-failed recovery copy; both retain verified persistence while keeping application/runtime evidence pending.
 > **Updated**: 2026-07-27 G9 OpenCode save recovery — added non-conflict source-write failure, partial-persistence, and pending-restart copy so CAS success is not presented as a fully applied plugin save.

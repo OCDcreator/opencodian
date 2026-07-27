@@ -132,6 +132,30 @@ describe('persistLocalStreamOutcome canonical cache boundary', () => {
     });
   });
 
+  it('marks the completed local shell for one-time canonical assistant takeover', async () => {
+    const conversation = createConversation([
+      {
+        id: 'user-1',
+        role: 'user',
+        content: 'Hello',
+        timestamp: 1,
+      },
+    ]);
+    const host = createHost();
+    const localShell = document.createElement('div');
+
+    await persistLocalStreamOutcome({
+      host,
+      preparedSend: createPreparedSend(conversation),
+      runtime: createRuntime({ streamingMessageEl: localShell }),
+      outcome: createOutcome({ finalizedStreamingMessageEl: localShell }),
+      logAssistantFinalizationStage: jest.fn(),
+    });
+
+    expect(localShell.dataset.canonicalMessageId).toBe('assistant-1');
+    expect(localShell.dataset.canonicalSyncPending).toBe('true');
+  });
+
   it('persists captured backend session identity even when assistant cache writes are deferred', async () => {
     const conversation = createConversation([
       {
