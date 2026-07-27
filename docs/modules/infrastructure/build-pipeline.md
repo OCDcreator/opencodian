@@ -61,7 +61,7 @@ GitHub Actions 与 Gitea Actions 各自使用一份薄 `Plugin Package` workflow
 
 GitHub 使用 `actions/upload-artifact@v4`，Gitea 使用与其 artifact service 兼容的 `actions/upload-artifact@v3`。平台差异只存在于上传 action 版本，打包内容由共享仓库脚本在上传前 fail-closed 校验。
 
-Gitea runner 使用 `ubuntu-latest:docker://node:20-bookworm` 标签，因此 workflow 不依赖 Windows host shell。runner 注册 token 只用于一次性初始化本机 runner state，不进入仓库、workflow 或长期容器环境。
+Gitea runner 使用 `ubuntu-latest:docker://node:20-bookworm` 标签，因此 workflow 不依赖 Windows host shell。macmini runner 的 job container 是原生 ARM64；Gitea workflow 安装 Debian ARM64 `chromium` 并通过 `PUPPETEER_EXECUTABLE_PATH` 供 rendered tests 使用，避免执行 Puppeteer 的 x86_64 bundled browser。runner 注册 token 只用于一次性初始化本机 runner state，不进入仓库、workflow 或长期容器环境。
 
 ### BUILD_ID 生成 (`scripts/build-utils.mjs`)
 

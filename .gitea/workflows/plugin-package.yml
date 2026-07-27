@@ -13,6 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       PLUGIN_ARTIFACT_NAME: opencodian-plugin-${{ github.sha }}
+      PUPPETEER_EXECUTABLE_PATH: /usr/bin/chromium
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -24,6 +25,11 @@ jobs:
         with:
           node-version: 20
           cache: npm
+
+      - name: Install native Chromium for rendered tests
+        run: |
+          apt-get update
+          apt-get install --yes --no-install-recommends chromium
 
       - name: Install dependencies
         run: npm ci
