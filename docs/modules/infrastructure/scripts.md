@@ -45,7 +45,7 @@ esbuild 平台不匹配时输出友好错误提示，引导运行 `npm run docto
 三个导出函数：
 - `getGitBranch()` — `git rev-parse --abbrev-ref HEAD`
 - `sanitizeBranchName(branch)` — `/` → `-`，移除非字母数字字符
-- `generateBuildId()` — `{sanitizedBranch}.{YYYYMMDDHHmm}`
+- `generateBuildId()` — 优先使用经字符集/长度校验的 `OPENCODIAN_BUILD_ID`；未设置时生成 `{sanitizedBranch}.{YYYYMMDDHHmm}`
 
 ### package-plugin-artifact.mjs — 插件三件套 artifact
 

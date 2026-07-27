@@ -23,6 +23,8 @@
 
 **ARM64 rendered tests。** `act_runner 0.2.11` daemon 不支持 job `ContainerArchitecture`，且 container options 不接受 `--platform`；因此保留 macmini 原生 ARM64 job，Gitea workflow 安装 Debian ARM64 Chromium，并以 `PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium` 运行真实 Puppeteer 渲染测试，不跳过 UI 验证。
 
+**确定性双端产物。** Gitea job container 以 root 运行时，`chmod` 不能可靠制造 `EACCES`；相关 archive 测试改用既有 I/O seam 注入确定性失败，覆盖同一安全语义。两端 workflow 还将经校验的 `OPENCODIAN_BUILD_ID` 固定为 `ci-<commit SHA>`，消除 runner 构建分钟/时区导致的 `main.js` 漂移；本地未设置该变量时继续使用 `{branch}.{timestamp}`。
+
 ## 2026-07-27 G9 — Provider 配置 backend-native truth final acceptance
 
 **产品契约。** G9 按各后端原生边界收口为 DONE，不追求三方 CRUD 对称。Claude 只写 vault-local `.claude/settings.local.json`，经 CAS/archive/conflict 安全链路；写入后 `persistence=verified`、`application=pending`（下一次 Claude 进程/请求边界前）、`runtime=unavailable`。Codex native Provider 是 external-managed/read-only，不伪造 native save；legacy plugin credential 只做 masked、transactional 处理。OpenCode 要显式选择 project/global exact source，managed source 只读，写入走 CAS/archive；`pending`/restart/partial persistence 三轴诚实，effective/runtime readonly 永不作为写目标。

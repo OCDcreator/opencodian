@@ -59,7 +59,7 @@ GitHub Actions 与 Gitea Actions 各自使用一份薄 `Plugin Package` workflow
 4. `npm run package:plugin`；
 5. 上传只含 `main.js`、`manifest.json`、`styles.css` 的 `opencodian-plugin-<commit SHA>` artifact。
 
-GitHub 使用 `actions/upload-artifact@v4`，Gitea 使用与其 artifact service 兼容的 `actions/upload-artifact@v3`。平台差异只存在于上传 action 版本，打包内容由共享仓库脚本在上传前 fail-closed 校验。
+GitHub 使用 `actions/upload-artifact@v4`，Gitea 使用与其 artifact service 兼容的 `actions/upload-artifact@v3`。平台差异只存在于上传 action 版本，打包内容由共享仓库脚本在上传前 fail-closed 校验。两端 workflow 都把 `OPENCODIAN_BUILD_ID` 固定为 `ci-<commit SHA>`，避免各 runner 的构建时间和时区进入 `main.js`，从而使同一 commit 的三件套可逐文件复现。
 
 Gitea runner 使用 `ubuntu-latest:docker://node:20-bookworm` 标签，因此 workflow 不依赖 Windows host shell。macmini runner 的 job container 是原生 ARM64；Gitea workflow 安装 Debian ARM64 `chromium` 并通过 `PUPPETEER_EXECUTABLE_PATH` 供 rendered tests 使用，避免执行 Puppeteer 的 x86_64 bundled browser。runner 注册 token 只用于一次性初始化本机 runner state，不进入仓库、workflow 或长期容器环境。
 
@@ -67,6 +67,11 @@ Gitea runner 使用 `ubuntu-latest:docker://node:20-bookworm` 标签，因此 wo
 
 ```javascript
 function generateBuildId() {
+  const override = process.env.OPENCODIAN_BUILD_ID;
+  if (override !== undefined) {
+    if (!/^[a-zA-Z0-9._-]{1,128}$/.test(override)) throw new Error('invalid BUILD_ID');
+    return override; // CI: ci-<commit SHA>
+  }
   const branch = sanitizeBranchName(getGitBranch());  // git branch → sanitize
   const timestamp = getLocalTimeStamp();               // YYYYMMDDHHmm
   return `${branch}.${timestamp}`;
@@ -76,6 +81,7 @@ function generateBuildId() {
 
 `getGitBranch()` 执行 `git rev-parse --abbrev-ref HEAD`，失败返回 `'unknown'`。
 `sanitizeBranchName()` 将 `/` 替换为 `-`，移除非字母数字字符。
+`OPENCODIAN_BUILD_ID` 仅接受 1–128 个字母、数字、点、下划线或连字符；未设置时仍使用本地 `{branch}.{timestamp}`，因此普通开发构建行为不变。
 
 ### 主构建 (`esbuild.config.mjs` / `scripts/build.mjs`)
 
