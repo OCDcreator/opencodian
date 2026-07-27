@@ -11,6 +11,14 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-07-27 CI — GitHub/Gitea 双远端插件三件套
+
+**目标。** 为 GitHub 与自托管 Gitea 增加同构的 `Plugin Package` workflow：`main` push、`v*` tag 与手动触发均执行 `npm ci`、`npm run verify`、`npm run package:plugin`，并上传以 commit SHA 命名的 Obsidian 插件 artifact。
+
+**实现。** 共享 `scripts/package-plugin-artifact.mjs` 以 fail-closed 方式读取 production `dist/`，拒绝缺失文件、symlink/non-regular source、越界目录和错误 manifest，清理旧输出后只生成 `main.js`、`manifest.json`、`styles.css`，同时输出逐文件 SHA-256。GitHub workflow 使用 `actions/upload-artifact@v4`；Gitea workflow 使用兼容其 artifact service 的 v3，除此之外命令保持一致。新增单元测试覆盖严格三文件、缺失源失败和双 workflow 契约。
+
+**Runner。** Gitea instance runner `macmini-opencodian` 使用 `gitea/act_runner:0.2.11` 与 `ubuntu-latest:docker://node:20-bookworm` 标签运行，长期容器不保存一次性 registration token。真实远端 run、artifact 下载及两端 SHA-256 对齐结果在双远端推送后验收。
+
 ## 2026-07-27 G9 — Provider 配置 backend-native truth final acceptance
 
 **产品契约。** G9 按各后端原生边界收口为 DONE，不追求三方 CRUD 对称。Claude 只写 vault-local `.claude/settings.local.json`，经 CAS/archive/conflict 安全链路；写入后 `persistence=verified`、`application=pending`（下一次 Claude 进程/请求边界前）、`runtime=unavailable`。Codex native Provider 是 external-managed/read-only，不伪造 native save；legacy plugin credential 只做 masked、transactional 处理。OpenCode 要显式选择 project/global exact source，managed source 只读，写入走 CAS/archive；`pending`/restart/partial persistence 三轴诚实，effective/runtime readonly 永不作为写目标。

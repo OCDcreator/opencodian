@@ -1,6 +1,6 @@
 # 构建管线
 
-> **源码**: `esbuild.config.mjs`, `scripts/build.mjs`, `scripts/build-css.mjs`, `scripts/build-utils.mjs`
+> **源码**: `esbuild.config.mjs`, `scripts/build.mjs`, `scripts/build-css.mjs`, `scripts/build-utils.mjs`, `scripts/package-plugin-artifact.mjs`
 > **状态**: [REVIEW]
 
 ## 概述
@@ -49,6 +49,20 @@
 
 最后一步的意义是：确保提交中的 `src/style/**` 改动已经同步刷新到根目录 `styles.css`，避免 CI 通过但仓库产物滞后。
 
+### 双远端插件打包 (`.github/workflows/plugin-package.yml`, `.gitea/workflows/plugin-package.yml`)
+
+GitHub Actions 与 Gitea Actions 各自使用一份薄 `Plugin Package` workflow，在 `main` push、`v*` tag 和手动触发时执行同一组命令：
+
+1. checkout 完整历史并安装 Node.js 20；
+2. `npm ci`；
+3. `npm run verify`；
+4. `npm run package:plugin`；
+5. 上传只含 `main.js`、`manifest.json`、`styles.css` 的 `opencodian-plugin-<commit SHA>` artifact。
+
+GitHub 使用 `actions/upload-artifact@v4`，Gitea 使用与其 artifact service 兼容的 `actions/upload-artifact@v3`。平台差异只存在于上传 action 版本，打包内容由共享仓库脚本在上传前 fail-closed 校验。
+
+Gitea runner 使用 `ubuntu-latest:docker://node:20-bookworm` 标签，因此 workflow 不依赖 Windows host shell。runner 注册 token 只用于一次性初始化本机 runner state，不进入仓库、workflow 或长期容器环境。
+
 ### BUILD_ID 生成 (`scripts/build-utils.mjs`)
 
 ```javascript
@@ -96,6 +110,16 @@ Claude Code backend 不再要求复制 `dist/node_modules/@anthropic-ai/claude-a
 
 读取 `src/style/index.css` 的 `@import` 顺序，将引用到的 CSS 片段合并到根目录 `styles.css`，每个片段添加注释标记。
 
+### 插件三件套 (`scripts/package-plugin-artifact.mjs`)
+
+`npm run package:plugin` 从生产 `dist/` 读取三份必需的 regular files，校验 `manifest.json` 的 OpenCodian id/version，清理旧输出后写入 `artifacts/opencodian/`。输出目录必须严格只包含：
+
+- `main.js`
+- `manifest.json`
+- `styles.css`
+
+脚本拒绝缺失文件、symlink/non-regular source、父目录 symlink traversal、相互重叠的 source/output，以及越出仓库根目录的输入输出路径，并在 stdout 返回版本、文件列表和逐文件 SHA-256，供本地及 Actions 留证。
+
 ## 关键方法
 
 | 脚本 | npm 命令 | 说明 |
@@ -142,6 +166,7 @@ npm run build
 | `dev` | `node esbuild.config.mjs` | 开发模式 |
 | `build` | `node scripts/build.mjs production` | 生产构建（自动包含 CSS 合并） |
 | `build:css` | `node scripts/build-css.mjs` | CSS 构建 |
+| `package:plugin` | `node scripts/package-plugin-artifact.mjs` | 校验并生成可上传的 Obsidian 插件三件套 |
 
 ## 注意事项
 

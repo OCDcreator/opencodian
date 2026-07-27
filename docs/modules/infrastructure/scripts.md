@@ -5,7 +5,7 @@
 
 ## 概述
 
-项目辅助脚本集合，涵盖生产构建、CSS 合并、BUILD_ID 生成、旧 Claude Agent SDK runtime artifact 清理、esbuild 平台检查、版本发布、graphify 刷新/新鲜度检查、devlog 排序验证、模块文档硬约束，以及新的 guarded thick-owner ownership gate。脚本主要为 ESM (.mjs) 格式，通过 npm scripts 调用。纯逻辑函数的单元测试位于 `tests/unit/infrastructure/module-doc-guard-lib.test.mjs`、`tests/unit/infrastructure/owner-guard-lib.test.mjs` 和 `tests/unit/infrastructure/claude-sdk-dist.test.mjs`。
+项目辅助脚本集合，涵盖生产构建、插件三件套打包、CSS 合并、BUILD_ID 生成、旧 Claude Agent SDK runtime artifact 清理、esbuild 平台检查、版本发布、graphify 刷新/新鲜度检查、devlog 排序验证、模块文档硬约束，以及新的 guarded thick-owner ownership gate。脚本主要为 ESM (.mjs) 格式，通过 npm scripts 调用。相关单元测试位于 `tests/unit/infrastructure/`，包括 module-doc guard、owner guard、Claude SDK dist 和 plugin artifact 契约。
 
 ## 导入关系
 上游: `esbuild`, `child_process`, `fs`, `path`, `process`
@@ -46,6 +46,12 @@ esbuild 平台不匹配时输出友好错误提示，引导运行 `npm run docto
 - `getGitBranch()` — `git rev-parse --abbrev-ref HEAD`
 - `sanitizeBranchName(branch)` — `/` → `-`，移除非字母数字字符
 - `generateBuildId()` — `{sanitizedBranch}.{YYYYMMDDHHmm}`
+
+### package-plugin-artifact.mjs — 插件三件套 artifact
+
+Actions 与本地共用的 fail-closed 打包器。它只接受仓库根目录内、彼此不重叠且不经过 symlink 父目录的 `distDir` / `outputDir`，要求 `dist/main.js`、`dist/manifest.json`、`dist/styles.css` 都是可读 regular files，并校验 manifest 的 `id=opencodian` 与非空 version。每次运行先清理旧输出，再生成严格只有三份文件的 `artifacts/opencodian/`，同时返回逐文件 SHA-256。
+
+该脚本不把 `dist/assets/` 或平台相关 `dist/node_modules/` 混入 Obsidian 社区插件三件套；完整 Test Vault runtime 部署仍遵循仓库已有的宿主相关部署规则。
 
 ### doctor-esbuild.mjs — 平台检查
 
@@ -151,6 +157,7 @@ Node.js 脚本形式的 Jest 启动包装器。它会为 Jest 子进程设置 re
 | `build.mjs` | `npm run build` | 生产构建 |
 | `build-css.mjs` | `npm run build:css` | CSS 合并 |
 | `build-utils.mjs` | — | 共享工具（被其他脚本 import） |
+| `package-plugin-artifact.mjs` | `npm run package:plugin` | 生成并校验 Actions 上传的插件三件套 |
 | `doctor-esbuild.mjs` | `npm run doctor:esbuild` / `doctor:esbuild:fix` | esbuild 平台检查/修复 |
 | `release.mjs` | `npm run release:patch/minor/major` | 版本发布 |
 | `update-graphify-src.mjs` | `npm run graphify:update:src` | 刷新 `src` 范围 graphify artifacts |
