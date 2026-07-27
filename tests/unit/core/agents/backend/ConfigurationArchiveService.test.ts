@@ -223,11 +223,15 @@ describe('ConfigurationArchiveService — retention transaction order', () => {
     const filesBefore = fs.readdirSync(versionsDir).length;
     expect(manifestBefore.versions.length).toBe(OVERWRITE_RETENTION_LIMIT);
 
-    // Inject manifest-write failure: make hashDir read-only (versions/ stays writable).
-    fs.chmodSync(hashDir, 0o555);
+    // Inject the manifest failure deterministically. chmod is not a reliable
+    // failure seam when the test process runs as root (for example in act_runner).
+    const internals = service as unknown as {
+      writeManifestAtomic(dir: string, manifest: unknown): Promise<void>;
+    };
+    jest.spyOn(internals, 'writeManifestAtomic')
+      .mockRejectedValueOnce(Object.assign(new Error('permission denied'), { code: 'EACCES' }));
     write(target, '{"v":99}');
     await expect(service.archiveOverwrite(ctx, revisionOf(target))).rejects.toThrow();
-    fs.chmodSync(hashDir, 0o755);
 
     // Old manifest is unchanged and still references exactly the old files.
     const manifestAfter = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
@@ -730,15 +734,10 @@ describe('ConfigurationArchiveService — preflight directory symlink + EACCES (
     const hashDir = findHashDir(archiveRoot) as string;
     const manifestPath = path.join(hashDir, 'manifest.json');
     const manifestBefore = fs.readFileSync(manifestPath, 'utf8');
-    // Chmod the scope dir to 000 → readdir inside fails with EACCES.
-    const scopeDir = path.dirname(path.dirname(hashDir));
-    let result;
-    try {
-      fs.chmodSync(scopeDir, 0o000);
-      result = await service.clearDeleted({ backend: 'test' });
-    } finally {
-      fs.chmodSync(scopeDir, 0o755);
-    }
+    // Inject EACCES through the scan seam so this also works when CI runs as root.
+    jest.spyOn(service as unknown as { readDirEntries: () => Promise<unknown[]> }, 'readDirEntries')
+      .mockRejectedValueOnce(Object.assign(new Error('permission denied'), { code: 'EACCES' }));
+    const result = await service.clearDeleted({ backend: 'test' });
     expect(result.ok).toBe(false);
     const failed = result as { integrityFailures: readonly unknown[]; manifestWriteFailed: boolean };
     expect(failed.integrityFailures.length > 0 || failed.manifestWriteFailed).toBe(true);
