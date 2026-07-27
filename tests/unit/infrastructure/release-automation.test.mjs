@@ -6,6 +6,7 @@ const path = require('node:path');
 
 const detectPath = path.join(process.cwd(), 'scripts', 'detect-release-version.mjs');
 const publishPath = path.join(process.cwd(), 'scripts', 'publish-gitea-release.mjs');
+const syncVersionPath = path.join(process.cwd(), 'scripts', 'sync-version.js');
 
 function callDetect(options) {
   const code = `
@@ -26,11 +27,12 @@ function callDetect(options) {
   return JSON.parse(result.stdout);
 }
 
-function versionFiles(version) {
+function versionFiles(version, minAppVersion = '1.4.5') {
   return {
-    manifestText: JSON.stringify({ id: 'opencodian', version }),
+    manifestText: JSON.stringify({ id: 'opencodian', version, minAppVersion }),
     packageText: JSON.stringify({ name: 'opencodian', version }),
     lockText: JSON.stringify({ version, packages: { '': { version } } }),
+    versionsText: JSON.stringify({ [version]: minAppVersion }),
   };
 }
 
@@ -128,6 +130,45 @@ describe('release version detection', () => {
       previousManifestText: JSON.stringify({ version: '1.0.0' }),
     });
     expect(invalidPrerelease.error).toMatch(/leading zeroes/);
+  });
+
+  it('fails closed when the compatibility directory is missing or stale', () => {
+    const missing = callDetect({
+      ...versionFiles('1.1.0'),
+      versionsText: '{}',
+      previousManifestText: JSON.stringify({ version: '1.0.0' }),
+    });
+    expect(missing.error).toMatch(/versions\.json must map 1\.1\.0/);
+
+    const stale = callDetect({
+      ...versionFiles('1.1.0'),
+      versionsText: JSON.stringify({ '1.1.0': '1.5.0' }),
+      previousManifestText: JSON.stringify({ version: '1.0.0' }),
+    });
+    expect(stale.error).toMatch(/manifest\.json minAppVersion 1\.4\.5/);
+  });
+});
+
+describe('version lifecycle synchronization', () => {
+  it('writes the manifest version and compatibility index entry together', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'opencodian-sync-version-'));
+    try {
+      fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({ version: '1.2.0' }));
+      fs.writeFileSync(path.join(root, 'manifest.json'), JSON.stringify({ version: '1.1.0', minAppVersion: '1.4.5' }));
+      fs.writeFileSync(path.join(root, 'versions.json'), JSON.stringify({ '1.0.1': '1.4.5' }));
+
+      const result = spawnSync(process.execPath, [syncVersionPath], { cwd: root, encoding: 'utf8' });
+
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('Version and versions.json synced: 1.2.0');
+      expect(JSON.parse(fs.readFileSync(path.join(root, 'manifest.json'), 'utf8'))).toMatchObject({ version: '1.2.0' });
+      expect(JSON.parse(fs.readFileSync(path.join(root, 'versions.json'), 'utf8'))).toEqual({
+        '1.0.1': '1.4.5',
+        '1.2.0': '1.4.5',
+      });
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
   });
 });
 

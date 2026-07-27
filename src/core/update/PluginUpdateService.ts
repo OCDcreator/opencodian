@@ -14,9 +14,10 @@ const PLUGIN_ID = 'opencodian';
 const REQUIRED_ASSET_NAMES = ['main.js', 'manifest.json', 'styles.css'] as const;
 const BACKUP_DIRECTORY_NAME = '.opencodian-update-backups';
 const BACKUP_METADATA_FILE = 'backup.json';
-const PAGE_SIZE = 100;
-const MAX_RELEASE_PAGES = 500;
 const MAX_BACKUPS = 3;
+const RELEASE_REPOSITORY = 'OCDcreator/opencodian';
+const RELEASE_BRANCH = 'main';
+const VERSION_INDEX_FILE = 'versions.json';
 
 type RequiredAssetName = typeof REQUIRED_ASSET_NAMES[number];
 
@@ -133,19 +134,6 @@ function readString(value: unknown): string | null {
   return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
 }
 
-function readBoolean(value: unknown): boolean {
-  return value === true;
-}
-
-function isHttpUrl(value: string): boolean {
-  try {
-    const parsed = new URL(value);
-    return parsed.protocol === 'https:' && !parsed.username && !parsed.password;
-  } catch {
-    return false;
-  }
-}
-
 function cloneArrayBuffer(value: ArrayBuffer): ArrayBuffer {
   return value.slice(0);
 }
@@ -227,60 +215,73 @@ function normalizePersistedState(value: PluginUpdatePersistedState | undefined):
   };
 }
 
-function releaseEndpoint(source: PluginUpdateSource, page: number): string {
+function versionIndexEndpoint(source: PluginUpdateSource): string {
   if (source === 'github') {
-    return `https://api.github.com/repos/OCDcreator/opencodian/releases?per_page=${PAGE_SIZE}&page=${page}`;
+    return `https://raw.githubusercontent.com/${RELEASE_REPOSITORY}/${RELEASE_BRANCH}/${VERSION_INDEX_FILE}`;
   }
-  return `https://gitea.ltreen.tech/api/v1/repos/OCDcreator/opencodian/releases?limit=${PAGE_SIZE}&page=${page}`;
+  return `https://gitea.ltreen.tech/${RELEASE_REPOSITORY}/raw/branch/${RELEASE_BRANCH}/${VERSION_INDEX_FILE}`;
 }
 
-function sourceHeaders(source: PluginUpdateSource): Record<string, string> {
-  return source === 'github'
-    ? { Accept: 'application/vnd.github+json', 'User-Agent': 'OpenCodian-plugin-update-check' }
-    : { Accept: 'application/json' };
+function releaseAssetEndpoint(source: PluginUpdateSource, version: string, assetName: RequiredAssetName): string {
+  const tagName = `v${version}`;
+  const baseUrl = source === 'github'
+    ? `https://github.com/${RELEASE_REPOSITORY}`
+    : `https://gitea.ltreen.tech/${RELEASE_REPOSITORY}`;
+  return `${baseUrl}/releases/download/${tagName}/${assetName}`;
 }
 
-function asReleaseAssets(value: unknown): Map<RequiredAssetName, ReleaseAsset> {
+function releasePageUrl(source: PluginUpdateSource, version: string): string {
+  const tagName = `v${version}`;
+  const baseUrl = source === 'github'
+    ? `https://github.com/${RELEASE_REPOSITORY}`
+    : `https://gitea.ltreen.tech/${RELEASE_REPOSITORY}`;
+  return `${baseUrl}/releases/tag/${tagName}`;
+}
+
+function releaseAssets(source: PluginUpdateSource, version: string): Map<RequiredAssetName, ReleaseAsset> {
   const assets = new Map<RequiredAssetName, ReleaseAsset>();
-  if (!Array.isArray(value)) return assets;
-  for (const entry of value) {
-    if (!isRecord(entry)) continue;
-    const name = readString(entry.name);
-    const url = readString(entry.browser_download_url) ?? readString(entry.download_url);
-    if (!name || !url || !REQUIRED_ASSET_NAMES.includes(name as RequiredAssetName)) continue;
-    if (!isHttpUrl(url)) continue;
-    const assetName = name as RequiredAssetName;
-    if (assets.has(assetName)) {
-      throw new PackageValidationError(`Release has duplicate ${assetName} assets.`);
-    }
-    assets.set(assetName, { name: assetName, url });
+  for (const assetName of REQUIRED_ASSET_NAMES) {
+    assets.set(assetName, {
+      name: assetName,
+      url: releaseAssetEndpoint(source, version, assetName),
+    });
   }
   return assets;
 }
 
-function releaseFromPayload(
+function versionIndexCandidates(
   source: PluginUpdateSource,
   payload: unknown,
-): ReleaseCandidate | null {
-  if (!isRecord(payload)) return null;
-  if (readBoolean(payload.draft) || readBoolean(payload.prerelease)) return null;
-  const tagName = readString(payload.tag_name);
-  if (!tagName || !tagName.startsWith('v')) return null;
-  const version = tagName.slice(1);
-  if (!parseVersion(version)) return null;
-  const assets = asReleaseAssets(payload.assets ?? payload.attachments);
-  return {
-    source,
-    version,
-    tagName,
-    publishedAt: readString(payload.published_at),
-    releaseUrl: readString(payload.html_url),
-    assets,
-    minAppVersion: null,
-    compatible: false,
-    installable: false,
-    unavailableReason: null,
-  };
+  isApiVersionSupported: (version: string) => boolean,
+): ReleaseCandidate[] {
+  if (!isRecord(payload)) {
+    throw new PackageValidationError(`${source} ${VERSION_INDEX_FILE} must contain an object.`);
+  }
+
+  const candidates: ReleaseCandidate[] = [];
+  for (const [version, minimumVersion] of Object.entries(payload)) {
+    if (!parseVersion(version)) {
+      throw new PackageValidationError(`${source} ${VERSION_INDEX_FILE} contains an invalid stable version: ${version}.`);
+    }
+    const minAppVersion = readString(minimumVersion);
+    if (!minAppVersion || !parseVersion(minAppVersion)) {
+      throw new PackageValidationError(`${source} ${VERSION_INDEX_FILE} has an invalid minimum version for ${version}.`);
+    }
+    const compatible = isApiVersionSupported(minAppVersion);
+    candidates.push({
+      source,
+      version,
+      tagName: `v${version}`,
+      publishedAt: null,
+      releaseUrl: releasePageUrl(source, version),
+      assets: releaseAssets(source, version),
+      minAppVersion,
+      compatible,
+      installable: compatible,
+      unavailableReason: compatible ? null : `Requires Obsidian ${minAppVersion} or later.`,
+    });
+  }
+  return candidates.sort((left, right) => comparePluginVersions(right.version, left.version));
 }
 
 function toPublicRelease(candidate: ReleaseCandidate): PluginUpdateRelease {
@@ -396,8 +397,7 @@ export class PluginUpdateService {
 
   private async checkForUpdatesInternal(): Promise<PluginUpdateSnapshot> {
     try {
-      const listed = await this.listReleaseCandidatesWithFallback();
-      const releases = await Promise.all(listed.map((candidate) => this.inspectReleaseCandidate(candidate)));
+      const releases = await this.listReleaseCandidatesWithFallback();
       this.candidates = new Map(releases.map((candidate) => [candidate.version, candidate]));
       await this.refreshBackups();
       const publicReleases = releases.map(toPublicRelease);
@@ -433,84 +433,37 @@ export class PluginUpdateService {
 
   private async listReleaseCandidatesWithFallback(): Promise<ReleaseCandidate[]> {
     try {
-      return await this.listReleaseCandidates('github');
+      return await this.listVersionIndexCandidates('github');
     } catch (error) {
       if (!(error instanceof SourceUnavailableError)) throw error;
-      return this.listReleaseCandidates('gitea');
+      return this.listVersionIndexCandidates('gitea');
     }
   }
 
-  private async listReleaseCandidates(source: PluginUpdateSource): Promise<ReleaseCandidate[]> {
-    const candidates: ReleaseCandidate[] = [];
-    for (let page = 1; page <= MAX_RELEASE_PAGES; page += 1) {
-      const response = await this.requestReleasePage(source, page);
-      if (!Array.isArray(response)) {
-        throw new PackageValidationError(`${source} returned an invalid release list.`);
-      }
-      for (const item of response) {
-        const candidate = releaseFromPayload(source, item);
-        if (candidate) candidates.push(candidate);
-      }
-      if (response.length < PAGE_SIZE) break;
-      if (page === MAX_RELEASE_PAGES) {
-        throw new PackageValidationError('Release history exceeds the safe pagination limit.');
-      }
-    }
-
-    const versions = new Set<string>();
-    for (const candidate of candidates) {
-      if (versions.has(candidate.version)) {
-        throw new PackageValidationError(`Release history contains duplicate version ${candidate.version}.`);
-      }
-      versions.add(candidate.version);
-    }
-    return candidates.sort((left, right) => comparePluginVersions(right.version, left.version));
+  private async listVersionIndexCandidates(source: PluginUpdateSource): Promise<ReleaseCandidate[]> {
+    const versionIndex = await this.requestVersionIndex(source);
+    return versionIndexCandidates(source, versionIndex, this.isApiVersionSupported);
   }
 
-  private async requestReleasePage(source: PluginUpdateSource, page: number): Promise<unknown> {
+  private async requestVersionIndex(source: PluginUpdateSource): Promise<unknown> {
     let response: RequestUrlResponse;
     try {
       response = await this.request({
-        url: releaseEndpoint(source, page),
+        url: versionIndexEndpoint(source),
         method: 'GET',
-        headers: sourceHeaders(source),
+        headers: { Accept: 'application/json', 'User-Agent': 'OpenCodian-plugin-update-check' },
         throw: false,
       });
     } catch (error) {
-      throw new SourceUnavailableError(`${source} release service is unavailable: ${formatError(error)}`);
+      throw new SourceUnavailableError(`${source} ${VERSION_INDEX_FILE} is unavailable: ${formatError(error)}`);
     }
-    const rateLimitRemaining = response.headers['x-ratelimit-remaining'] ?? response.headers['X-RateLimit-Remaining'];
-    if (response.status === 429 || response.status >= 500 || (response.status === 403 && rateLimitRemaining === '0')) {
-      throw new SourceUnavailableError(`${source} release service returned ${response.status}.`);
+    if (response.status === 429 || response.status >= 500) {
+      throw new SourceUnavailableError(`${source} ${VERSION_INDEX_FILE} returned ${response.status}.`);
     }
     if (response.status < 200 || response.status >= 300) {
-      throw new PackageValidationError(`${source} release service returned ${response.status}.`);
+      throw new PackageValidationError(`${source} ${VERSION_INDEX_FILE} returned ${response.status}.`);
     }
     return response.json;
-  }
-
-  private async inspectReleaseCandidate(candidate: ReleaseCandidate): Promise<ReleaseCandidate> {
-    const manifestAsset = candidate.assets.get('manifest.json');
-    if (!manifestAsset || REQUIRED_ASSET_NAMES.some((asset) => !candidate.assets.has(asset))) {
-      return { ...candidate, unavailableReason: 'Release is missing one or more required plugin assets.' };
-    }
-    try {
-      const manifestResponse = await this.request({ url: manifestAsset.url, method: 'GET', throw: false });
-      if (manifestResponse.status < 200 || manifestResponse.status >= 300) {
-        throw new PackageValidationError(`manifest.json download returned ${manifestResponse.status}.`);
-      }
-      const parsed = parseManifest(manifestResponse.arrayBuffer, candidate.version);
-      const compatible = this.isApiVersionSupported(parsed.minAppVersion);
-      return {
-        ...candidate,
-        minAppVersion: parsed.minAppVersion,
-        compatible,
-        installable: compatible,
-        unavailableReason: compatible ? null : `Requires Obsidian ${parsed.minAppVersion} or later.`,
-      };
-    } catch (error) {
-      return { ...candidate, unavailableReason: formatError(error) };
-    }
   }
 
   private async downloadReleasePackage(candidate: ReleaseCandidate): Promise<PluginPackage> {
@@ -528,6 +481,9 @@ export class PluginUpdateService {
       files[assetName] = cloneArrayBuffer(response.arrayBuffer);
     }
     const parsed = parseManifest(files['manifest.json'], candidate.version);
+    if (parsed.minAppVersion !== candidate.minAppVersion) {
+      throw new PackageValidationError(`manifest.json minimum version does not match ${VERSION_INDEX_FILE} for ${candidate.version}.`);
+    }
     if (!this.isApiVersionSupported(parsed.minAppVersion)) {
       throw new PackageValidationError(`Release ${candidate.version} requires Obsidian ${parsed.minAppVersion} or later.`);
     }

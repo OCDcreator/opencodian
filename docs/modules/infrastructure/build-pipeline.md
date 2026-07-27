@@ -65,9 +65,9 @@ Gitea runner 使用 `ubuntu-latest:docker://node:24-bookworm` 标签，因此 wo
 
 ### 双远端自动 Release
 
-两个 `Plugin Package` workflow 都在 `main` push 后调用 `scripts/detect-release-version.mjs`，将事件的 `before` commit 与当前 `manifest.json` 比较。只有版本发生严格 SemVer 递增，且 `manifest.json`、`package.json`、`package-lock.json` 顶层版本与 root package 版本完全一致时，才输出 `changed=true` 和 `v<version>` tag；普通代码 push、tag push、手动 dispatch、版本未变、降级或版本文件漂移都不会误发 Release。
+两个 `Plugin Package` workflow 都在 `main` push 后调用 `scripts/detect-release-version.mjs`，将事件的 `before` commit 与当前 `manifest.json` 比较。只有版本发生严格 SemVer 递增，`manifest.json`、`package.json`、`package-lock.json` 顶层版本与 root package 版本完全一致，且 `versions.json` 将当前版本精确映射到当前 `minAppVersion` 时，才输出 `changed=true` 和 `v<version>` tag；普通代码 push、tag push、手动 dispatch、版本未变、降级或版本文件漂移都不会误发 Release。
 
-GitHub 通过 Node 24 runtime 的 `softprops/action-gh-release@v3` 创建或更新 Release、生成 release notes，并附加严格三件套；发布前先解析已有 lightweight/annotated tag，若最终 commit 不是当前 workflow SHA 就失败。Gitea workflow 使用内置 `${{ secrets.GITEA_TOKEN }}` 与 `contents: write`，由 Node 24 `scripts/publish-gitea-release.mjs` 调用实例 Release API；脚本验证既有 tag 指向，重复运行只接受 SHA-256 完全一致的既有资产，缺失资产可补传，冲突资产不会被静默覆盖。两端都不需要个人访问令牌，Release 资产固定为 `main.js`、`manifest.json`、`styles.css`。
+GitHub 通过 Node 24 runtime 的 `softprops/action-gh-release@v3` 创建或更新 Release、生成 release notes，并附加严格三件套；发布前先解析已有 lightweight/annotated tag，若最终 commit 不是当前 workflow SHA 就失败。Gitea workflow 使用内置 `${{ secrets.GITEA_TOKEN }}` 与 `contents: write`，由 Node 24 `scripts/publish-gitea-release.mjs` 调用实例 Release API；脚本验证既有 tag 指向，重复运行只接受 SHA-256 完全一致的既有资产，缺失资产可补传，冲突资产不会被静默覆盖。两端都不需要个人访问令牌，Release 资产固定为 `main.js`、`manifest.json`、`styles.css`。每次版本 bump 还会同步根目录标准 `versions.json`；自更新器从 Raw GitHub 或 Gitea 的这份静态兼容目录发现完整版本历史，不查询 Releases API。
 
 ### BUILD_ID 生成 (`scripts/build-utils.mjs`)
 

@@ -67,7 +67,7 @@ Actions 与本地共用的 fail-closed 打包器。它只接受仓库根目录�
 - `minor`: 0.1.0 → 0.2.0
 - `major`: 0.1.0 → 1.0.0
 
-同时更新 `package.json`, `package-lock.json` 和 `manifest.json`。
+同时更新 `package.json`, `package-lock.json`、`manifest.json` 和标准 Obsidian 兼容版本目录 `versions.json`。
 
 ### detect-release-version.mjs — Release 版本门禁
 
@@ -152,7 +152,7 @@ Node.js 脚本形式的 Jest 启动包装器。`run-jest-options.js` 只在当�
 
 ### sync-version.js — 版本同步
 
-确保 `manifest.json` 的 `version` 字段与 `package.json` 保持一致。
+确保 `manifest.json` 的 `version` 字段与 `package.json` 保持一致，并将该版本的 `minAppVersion` 写入标准 `versions.json`。发布检测会反向要求当前条目与 `manifest.json` 精确一致，防止漏提交或写错兼容版本。这份静态目录供 OpenCodian 自更新器一次读取完整稳定版本历史，无需调用 GitHub Releases API。
 
 ### sync-lobehub-icons.mjs — LobeHub 图标清单同步
 
@@ -199,7 +199,7 @@ npm run release:patch
   → scripts/release.mjs patch
     → 更新 package.json version
     → npm install --package-lock-only
-    → 更新 manifest.json version
+    → 更新 manifest.json version 与 versions.json 兼容目录
 
 main push
   → scripts/detect-release-version.mjs
@@ -285,7 +285,7 @@ npm run list:module-docs -- --range origin/main...HEAD
 - `check:owner-guard` 已接入 `npm run verify`，也会由 repo-local `.githooks/pre-push` 作为早期门禁执行；CI 是最终不可绕过的硬门禁
 - `check:graphify` 已接入 `npm run verify`；如果修改了 `src/`，通常需要先运行 `npm run graphify:update:src`
 - `check-module-docs` 已接入 `npm run verify`，源码模块新增、修改、删除时不能跳过对应文档
-- `sync-version.js` 应在 release 后自动运行
+- `sync-version.js` 应在 release 后自动运行，并提交 `versions.json`
 
 ## 待补充
 - [ ] 脚本间的依赖关系图

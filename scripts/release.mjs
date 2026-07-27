@@ -16,4 +16,4 @@ console.log(`Bumping version (${bumpType})...`);
 // The existing "version" lifecycle hook will sync manifest.json
 execSync(`npm version ${bumpType} --no-git-tag-version`, { stdio: 'inherit' });
 
-console.log('Release complete. Files updated: package.json, package-lock.json, manifest.json');
+console.log('Release complete. Files updated: package.json, package-lock.json, manifest.json, versions.json');

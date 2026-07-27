@@ -2,7 +2,7 @@
 
 > **源码**: `src/core/update/PluginUpdateService.ts`
 > **状态**: [REVIEW]
-> **Updated**: 2026-07-27 — added stable-release discovery, transactional self-update, and local rollback backups.
+> **Updated**: 2026-07-27 — added static compatibility-index discovery, transactional self-update, and local rollback backups.
 
 ## 概述
 
@@ -12,11 +12,11 @@ The service is deliberately internal: it has no configurable release URL and nev
 
 ## 来源与版本目录
 
-- GitHub Releases is the primary source. Gitea is queried only when GitHub is unavailable because of a request failure, HTTP 429, rate-limit 403, or 5xx response.
-- A reachable source that returns malformed metadata, an ordinary 4xx response, an invalid manifest, or invalid assets fails closed; the service does not merge or silently switch source lists.
-- Every page is read (`per_page`/`limit` 100, capped at 500 pages), drafts and prereleases are omitted, and valid stable SemVer tags are sorted descending.
-- Each listed release must have exactly `main.js`, `manifest.json`, and `styles.css`. Its manifest must match the `vX.Y.Z` tag, identify `opencodian`, and contain stable `version` and `minAppVersion` values.
-- Incompatible releases remain visible with `installable: false`; the service calls `requireApiVersion()` through an injectable seam for that decision.
+- GitHub Raw is the primary source: it reads the standard root `versions.json` once from the release branch. Gitea reads the same file only when GitHub Raw has a request failure, HTTP 429, or 5xx response.
+- `versions.json` is a stable-SemVer-to-`minAppVersion` object. A reachable malformed index, an ordinary 4xx, or an invalid entry fails closed; the service does not merge or silently switch source lists.
+- The selected source's stable entries are sorted descending. The fixed `vX.Y.Z` Release URL convention supplies the three asset URLs without querying the GitHub or Gitea Releases APIs.
+- Every installation stages `main.js`, `manifest.json`, and `styles.css` before write. The downloaded manifest must match `opencodian`, the selected version, and the selected `versions.json` minimum version.
+- Incompatible versions remain visible with `installable: false`; the service calls `requireApiVersion()` through an injectable seam for that decision.
 
 ## Public state and operations
 
@@ -34,5 +34,4 @@ If a write or post-write verification fails, the original three-file package is 
 
 ## Testing seams
 
-`request`, `isApiVersionSupported`, `now`, and `persistState` are injectable. Unit tests use these seams with an in-memory `DataAdapter` to prove pagination, source fallback boundaries, validation rejection, compatibility gating, complete staging, rollback recovery, retention, and concurrent-operation rejection.
-
+`request`, `isApiVersionSupported`, `now`, and `persistState` are injectable. Unit tests use these seams with an in-memory `DataAdapter` to prove one-request static-index discovery, source fallback boundaries, index/manifest validation rejection, compatibility gating, complete staging, rollback recovery, retention, and concurrent-operation rejection.

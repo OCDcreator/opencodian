@@ -16,6 +16,20 @@ function parseJson(text, label) {
   }
 }
 
+function validateVersionIndex(versionsText, version, minAppVersion) {
+  const versions = parseJson(versionsText, 'versions.json');
+  if (!versions || typeof versions !== 'object' || Array.isArray(versions)) {
+    throw new Error('versions.json must contain an object');
+  }
+  if (typeof minAppVersion !== 'string' || minAppVersion.trim().length === 0) {
+    throw new Error('manifest.json minAppVersion must be a non-empty string');
+  }
+  parseSemver(minAppVersion, 'manifest.json minAppVersion');
+  if (versions[version] !== minAppVersion) {
+    throw new Error(`versions.json must map ${version} to manifest.json minAppVersion ${minAppVersion}`);
+  }
+}
+
 export function parseSemver(version, label = 'version') {
   if (typeof version !== 'string') {
     throw new Error(`${label} must be a string`);
@@ -67,12 +81,13 @@ export function compareSemver(leftVersion, rightVersion) {
   return 0;
 }
 
-export function detectReleaseChange({ manifestText, packageText, lockText, previousManifestText }) {
+export function detectReleaseChange({ manifestText, packageText, lockText, versionsText, previousManifestText }) {
   const manifest = parseJson(manifestText, 'manifest.json');
   const packageJson = parseJson(packageText, 'package.json');
   const lock = parseJson(lockText, 'package-lock.json');
   const version = manifest.version;
   const parsedVersion = parseSemver(version, 'manifest.json version');
+  validateVersionIndex(versionsText, version, manifest.minAppVersion);
 
   const versionSources = [
     ['package.json', packageJson.version],
@@ -139,6 +154,7 @@ export function detectReleaseFromRepository({
     manifestText: fs.readFileSync(path.join(rootDir, 'manifest.json'), 'utf8'),
     packageText: fs.readFileSync(path.join(rootDir, 'package.json'), 'utf8'),
     lockText: fs.readFileSync(path.join(rootDir, 'package-lock.json'), 'utf8'),
+    versionsText: fs.readFileSync(path.join(rootDir, 'versions.json'), 'utf8'),
     previousManifestText: readPreviousManifest(rootDir, beforeSha),
   });
   appendOutputs(outputPath, result);

@@ -31,7 +31,7 @@
     "test:watch": "node scripts/run-jest.js --watch",
     "test:coverage": "node scripts/run-jest.js --coverage",
     "hooks:install": "node scripts/install-hooks.mjs",
-    "version": "node scripts/sync-version.js && git add manifest.json",
+    "version": "node scripts/sync-version.js && git add manifest.json versions.json",
     "impeccable": "impeccable",
     "impeccable:detect": "impeccable detect",
     "impeccable:skills": "impeccable skills"

@@ -8,6 +8,8 @@ Object.assign(globalThis, { TextEncoder: NodeTextEncoder, TextDecoder: NodeTextD
 const encoder = new NodeTextEncoder();
 const decoder = new NodeTextDecoder();
 const PLUGIN_DIR = '.obsidian/plugins/opencodian';
+const GITHUB_INDEX_URL = 'https://raw.githubusercontent.com/OCDcreator/opencodian/main/versions.json';
+const GITEA_INDEX_URL = 'https://gitea.ltreen.tech/OCDcreator/opencodian/raw/branch/main/versions.json';
 
 function binary(value: string): ArrayBuffer {
   return encoder.encode(value).buffer;
@@ -105,19 +107,23 @@ class MemoryAdapter {
   }
 }
 
-function release(version: string, source = 'github') {
-  const base = `https://downloads.example/${source}/${version}`;
+function releaseAssetUrl(version: string, assetName: string, source = 'github'): string {
+  const baseUrl = source === 'github'
+    ? 'https://github.com/OCDcreator/opencodian'
+    : 'https://gitea.ltreen.tech/OCDcreator/opencodian';
+  return `${baseUrl}/releases/download/v${version}/${assetName}`;
+}
+
+function releasePackage(
+  version: string,
+  options: { source?: string; minAppVersion?: string; main?: RequestUrlResponse; styles?: RequestUrlResponse } = {},
+): Record<string, RequestUrlResponse> {
+  const source = options.source ?? 'github';
+  const minimum = options.minAppVersion ?? '1.4.5';
   return {
-    tag_name: `v${version}`,
-    draft: false,
-    prerelease: false,
-    published_at: '2026-07-27T00:00:00Z',
-    html_url: `https://example.test/${source}/${version}`,
-    assets: [
-      { name: 'main.js', browser_download_url: `${base}/main.js` },
-      { name: 'manifest.json', browser_download_url: `${base}/manifest.json` },
-      { name: 'styles.css', browser_download_url: `${base}/styles.css` },
-    ],
+    [releaseAssetUrl(version, 'manifest.json', source)]: response(200, manifest(version, minimum), binary(manifest(version, minimum))),
+    [releaseAssetUrl(version, 'main.js', source)]: options.main ?? response(200, 'main-new', binary('main-new')),
+    [releaseAssetUrl(version, 'styles.css', source)]: options.styles ?? response(200, 'styles-new', binary('styles-new')),
   };
 }
 
@@ -150,10 +156,10 @@ function createService(options: {
   return { service, adapter, persist };
 }
 
-function githubRequest(releases: unknown[], extra: Record<string, RequestUrlResponse> = {}) {
+function githubRequest(index: Record<string, string>, extra: Record<string, RequestUrlResponse> = {}) {
   return jest.fn(async (input: RequestUrlParam | string) => {
     const url = typeof input === 'string' ? input : input.url;
-    if (url.includes('api.github.com')) return response(200, releases);
+    if (url === GITHUB_INDEX_URL) return response(200, index);
     const matched = extra[url];
     if (matched) return matched;
     throw new Error(`Unexpected URL ${url}`);
@@ -161,20 +167,18 @@ function githubRequest(releases: unknown[], extra: Record<string, RequestUrlResp
 }
 
 describe('PluginUpdateService', () => {
-  it('lists only stable releases from GitHub, validates manifests, and persists check metadata', async () => {
-    const stable = release('1.2.0');
-    const prerelease = { ...release('1.3.0'), prerelease: true };
-    const request = githubRequest([stable, prerelease], {
-      'https://downloads.example/github/1.2.0/manifest.json': response(200, manifest('1.2.0'), binary(manifest('1.2.0'))),
-    });
+  it('lists and sorts stable versions from one static GitHub index request', async () => {
+    const request = githubRequest({ '1.1.0': '1.4.5', '1.2.0': '1.5.0' });
     const { service, persist } = createService({ request });
 
     const snapshot = await service.checkForUpdates();
 
     expect(snapshot.status).toBe('ready');
     expect(snapshot.source).toBe('github');
-    expect(snapshot.releases.map((entry) => entry.version)).toEqual(['1.2.0']);
-    expect(snapshot.latestRelease).toMatchObject({ version: '1.2.0', compatible: true, installable: true });
+    expect(snapshot.releases.map((entry) => entry.version)).toEqual(['1.2.0', '1.1.0']);
+    expect(snapshot.latestRelease).toMatchObject({ version: '1.2.0', minAppVersion: '1.5.0', compatible: true, installable: true });
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(request).toHaveBeenCalledWith(expect.objectContaining({ url: GITHUB_INDEX_URL }));
     expect(persist).toHaveBeenCalledWith(expect.objectContaining({
       lastCheckAt: 1000,
       latestStableVersion: '1.2.0',
@@ -182,17 +186,14 @@ describe('PluginUpdateService', () => {
     }));
   });
 
-  it('uses Gitea only when the GitHub release service is unavailable', async () => {
-    const gitea = release('1.1.0', 'gitea');
+  it('uses Gitea only when the GitHub version index is unavailable', async () => {
     const request = jest.fn(async (input: RequestUrlParam | string) => {
       const url = typeof input === 'string' ? input : input.url;
-      if (url.includes('api.github.com')) throw new Error('offline');
-      if (url.includes('gitea.ltreen.tech/api')) return response(200, [gitea]);
-      if (url.endsWith('/manifest.json')) return response(200, manifest('1.1.0'), binary(manifest('1.1.0')));
+      if (url === GITHUB_INDEX_URL) throw new Error('offline');
+      if (url === GITEA_INDEX_URL) return response(200, { '1.1.0': '1.4.5' });
       throw new Error(`Unexpected URL ${url}`);
     });
-    let clock = 1000;
-    const { service } = createService({ request, now: () => clock++ });
+    const { service } = createService({ request });
 
     const snapshot = await service.checkForUpdates();
 
@@ -201,34 +202,11 @@ describe('PluginUpdateService', () => {
     expect(snapshot.latestRelease?.version).toBe('1.1.0');
   });
 
-  it('paginates the complete stable release history before sorting it', async () => {
-    const firstPage = Array.from({ length: 100 }, (_, index) => ({
-      ...release(`0.0.${index}`),
-      prerelease: true,
-    }));
-    const latest = release('2.0.0');
+  it('treats a static-index 429 response as unavailable and falls back to Gitea', async () => {
     const request = jest.fn(async (input: RequestUrlParam | string) => {
       const url = typeof input === 'string' ? input : input.url;
-      if (url.includes('api.github.com') && url.endsWith('page=1')) return response(200, firstPage);
-      if (url.includes('api.github.com') && url.endsWith('page=2')) return response(200, [latest]);
-      if (url.endsWith('/manifest.json')) return response(200, manifest('2.0.0'), binary(manifest('2.0.0')));
-      throw new Error(`Unexpected URL ${url}`);
-    });
-    const { service } = createService({ request });
-
-    const snapshot = await service.checkForUpdates();
-
-    expect(snapshot.releases.map((entry) => entry.version)).toEqual(['2.0.0']);
-    expect(request).toHaveBeenCalledWith(expect.objectContaining({ url: expect.stringContaining('page=2') }));
-  });
-
-  it('treats a GitHub rate-limit response as unavailable and falls back to Gitea', async () => {
-    const gitea = release('1.1.0', 'gitea');
-    const request = jest.fn(async (input: RequestUrlParam | string) => {
-      const url = typeof input === 'string' ? input : input.url;
-      if (url.includes('api.github.com')) return { ...response(403), headers: { 'x-ratelimit-remaining': '0' } };
-      if (url.includes('gitea.ltreen.tech/api')) return response(200, [gitea]);
-      if (url.endsWith('/manifest.json')) return response(200, manifest('1.1.0'), binary(manifest('1.1.0')));
+      if (url === GITHUB_INDEX_URL) return response(429);
+      if (url === GITEA_INDEX_URL) return response(200, { '1.1.0': '1.4.5' });
       throw new Error(`Unexpected URL ${url}`);
     });
     const { service } = createService({ request });
@@ -236,10 +214,24 @@ describe('PluginUpdateService', () => {
     await expect(service.checkForUpdates()).resolves.toMatchObject({ source: 'gitea', status: 'ready' });
   });
 
-  it('does not fall back to Gitea when GitHub responds with an integrity failure', async () => {
+  it('does not fall back to Gitea when the reachable GitHub index returns an ordinary 404', async () => {
     const request = jest.fn(async (input: RequestUrlParam | string) => {
       const url = typeof input === 'string' ? input : input.url;
-      if (url.includes('api.github.com')) return response(403, { message: 'forbidden' });
+      if (url === GITHUB_INDEX_URL) return response(404);
+      throw new Error(`Gitea must not be requested: ${url}`);
+    });
+    const { service } = createService({ request });
+
+    const snapshot = await service.checkForUpdates();
+
+    expect(snapshot).toMatchObject({ status: 'error', error: 'github versions.json returned 404.' });
+    expect(request.mock.calls.some(([input]) => (typeof input === 'string' ? input : input.url) === GITEA_INDEX_URL)).toBe(false);
+  });
+
+  it('does not fall back to Gitea when GitHub returns an invalid static index', async () => {
+    const request = jest.fn(async (input: RequestUrlParam | string) => {
+      const url = typeof input === 'string' ? input : input.url;
+      if (url === GITHUB_INDEX_URL) return response(200, { '1.1.0': 'not-a-version' });
       throw new Error(`Gitea must not be requested: ${url}`);
     });
     const { service } = createService({ request });
@@ -247,15 +239,12 @@ describe('PluginUpdateService', () => {
     const snapshot = await service.checkForUpdates();
 
     expect(snapshot.status).toBe('error');
-    expect(snapshot.error).toContain('github release service returned 403');
-    expect(request.mock.calls.some(([input]) => (typeof input === 'string' ? input : input.url).includes('gitea'))).toBe(false);
+    expect(snapshot.error).toContain('versions.json has an invalid minimum version');
+    expect(request.mock.calls.some(([input]) => (typeof input === 'string' ? input : input.url) === GITEA_INDEX_URL)).toBe(false);
   });
 
-  it('shows incompatible versions but refuses to install them', async () => {
-    const stable = release('1.1.0');
-    const request = githubRequest([stable], {
-      'https://downloads.example/github/1.1.0/manifest.json': response(200, manifest('1.1.0', '9.0.0'), binary(manifest('1.1.0', '9.0.0'))),
-    });
+  it('shows incompatible versions from the standard index but refuses to install them', async () => {
+    const request = githubRequest({ '1.1.0': '9.0.0' });
     const { service } = createService({ request, supported: () => false });
 
     const snapshot = await service.checkForUpdates();
@@ -264,36 +253,10 @@ describe('PluginUpdateService', () => {
     await expect(service.installLatestStable()).rejects.toThrow('Requires Obsidian 9.0.0');
   });
 
-  it('shows malformed or incomplete releases as unavailable without switching sources', async () => {
-    const malformed = release('1.2.0');
-    malformed.assets = malformed.assets.filter((asset) => asset.name !== 'styles.css');
-    const invalidMinimum = release('1.1.0');
-    const request = githubRequest([malformed, invalidMinimum], {
-      'https://downloads.example/github/1.1.0/manifest.json': response(
-        200,
-        manifest('1.1.0', 'not-a-version'),
-        binary(manifest('1.1.0', 'not-a-version')),
-      ),
-    });
-    const { service } = createService({ request });
-
-    const snapshot = await service.checkForUpdates();
-
-    expect(snapshot.source).toBe('github');
-    expect(snapshot.releases).toEqual(expect.arrayContaining([
-      expect.objectContaining({ version: '1.2.0', installable: false }),
-      expect.objectContaining({ version: '1.1.0', installable: false }),
-    ]));
-    await expect(service.installRelease('1.2.0')).rejects.toThrow('missing one or more required plugin assets');
-  });
-
-  it('stages every release asset before taking a backup or touching the installed package', async () => {
-    const stable = release('1.1.0');
-    const request = githubRequest([stable], {
-      'https://downloads.example/github/1.1.0/manifest.json': response(200, manifest('1.1.0'), binary(manifest('1.1.0'))),
-      'https://downloads.example/github/1.1.0/main.js': response(200, 'main-new', binary('main-new')),
-      'https://downloads.example/github/1.1.0/styles.css': response(503),
-    });
+  it('stages every fixed release asset before taking a backup or touching the installed package', async () => {
+    const request = githubRequest({ '1.1.0': '1.4.5' }, releasePackage('1.1.0', {
+      styles: response(503),
+    }));
     const { service, adapter } = createService({ request });
     await service.checkForUpdates();
 
@@ -305,12 +268,46 @@ describe('PluginUpdateService', () => {
     expect(service.getSnapshot().backups).toEqual([]);
   });
 
+  it('rejects a downloaded manifest whose minimum version conflicts with the version index', async () => {
+    const request = githubRequest({ '1.1.0': '1.4.5' }, releasePackage('1.1.0', { minAppVersion: '9.0.0' }));
+    const { service, adapter } = createService({ request });
+    await service.checkForUpdates();
+
+    await expect(service.installLatestStable()).rejects.toThrow('minimum version does not match versions.json');
+    expect(text(adapter.files.get(`${PLUGIN_DIR}/main.js`)!)).toBe('main-old');
+    expect(service.getSnapshot().backups).toEqual([]);
+  });
+
+  it('keeps Gitea as the sole asset source after an unavailable GitHub index falls back', async () => {
+    const request = jest.fn(async (input: RequestUrlParam | string) => {
+      const url = typeof input === 'string' ? input : input.url;
+      if (url === GITHUB_INDEX_URL) throw new Error('offline');
+      if (url === GITEA_INDEX_URL) return response(200, { '1.1.0': '1.4.5' });
+      const packageResponse = releasePackage('1.1.0', { source: 'gitea' })[url];
+      if (packageResponse) return packageResponse;
+      throw new Error(`Unexpected URL ${url}`);
+    });
+    const { service, adapter } = createService({ request });
+    await service.checkForUpdates();
+
+    await expect(service.installLatestStable()).resolves.toMatchObject({ installedVersion: '1.1.0', source: 'gitea' });
+
+    expect(text(adapter.files.get(`${PLUGIN_DIR}/main.js`)!)).toBe('main-new');
+    expect(request.mock.calls.every(([input]) => {
+      const url = typeof input === 'string' ? input : input.url;
+      return !url.includes('github.com/OCDcreator/opencodian/releases/download/');
+    })).toBe(true);
+    expect(request.mock.calls.some(([input]) => {
+      const url = typeof input === 'string' ? input : input.url;
+      return url === releaseAssetUrl('1.1.0', 'main.js', 'gitea');
+    })).toBe(true);
+  });
+
   it('serializes concurrent version changes', async () => {
-    const stable = release('1.1.0');
     let resolveMainDownload: ((value: RequestUrlResponse) => void) | undefined;
     const request = jest.fn(async (input: RequestUrlParam | string) => {
       const url = typeof input === 'string' ? input : input.url;
-      if (url.includes('api.github.com')) return response(200, [stable]);
+      if (url === GITHUB_INDEX_URL) return response(200, { '1.1.0': '1.4.5' });
       if (url.endsWith('/manifest.json')) return response(200, manifest('1.1.0'), binary(manifest('1.1.0')));
       if (url.endsWith('/main.js')) {
         return new Promise<RequestUrlResponse>((resolve) => { resolveMainDownload = resolve; });
@@ -330,12 +327,7 @@ describe('PluginUpdateService', () => {
   });
 
   it('backs up the current package before install, retains a restorable local backup, and restores it', async () => {
-    const stable = release('1.1.0');
-    const request = githubRequest([stable], {
-      'https://downloads.example/github/1.1.0/manifest.json': response(200, manifest('1.1.0'), binary(manifest('1.1.0'))),
-      'https://downloads.example/github/1.1.0/main.js': response(200, 'main-new', binary('main-new')),
-      'https://downloads.example/github/1.1.0/styles.css': response(200, 'styles-new', binary('styles-new')),
-    });
+    const request = githubRequest({ '1.1.0': '1.4.5' }, releasePackage('1.1.0'));
     const { service, adapter } = createService({ request });
     await service.checkForUpdates();
 
@@ -349,12 +341,7 @@ describe('PluginUpdateService', () => {
   });
 
   it('keeps only the three newest complete local backups', async () => {
-    const stable = release('1.1.0');
-    const request = githubRequest([stable], {
-      'https://downloads.example/github/1.1.0/manifest.json': response(200, manifest('1.1.0'), binary(manifest('1.1.0'))),
-      'https://downloads.example/github/1.1.0/main.js': response(200, 'main-new', binary('main-new')),
-      'https://downloads.example/github/1.1.0/styles.css': response(200, 'styles-new', binary('styles-new')),
-    });
+    const request = githubRequest({ '1.1.0': '1.4.5' }, releasePackage('1.1.0'));
     let clock = 1000;
     const { service } = createService({ request, now: () => clock++ });
     await service.checkForUpdates();
@@ -368,12 +355,7 @@ describe('PluginUpdateService', () => {
   });
 
   it('restores the original package when a target write fails', async () => {
-    const stable = release('1.1.0');
-    const request = githubRequest([stable], {
-      'https://downloads.example/github/1.1.0/manifest.json': response(200, manifest('1.1.0'), binary(manifest('1.1.0'))),
-      'https://downloads.example/github/1.1.0/main.js': response(200, 'main-new', binary('main-new')),
-      'https://downloads.example/github/1.1.0/styles.css': response(200, 'styles-new', binary('styles-new')),
-    });
+    const request = githubRequest({ '1.1.0': '1.4.5' }, releasePackage('1.1.0'));
     const { service, adapter } = createService({ request });
     await service.checkForUpdates();
     adapter.failWritePath = `${PLUGIN_DIR}/manifest.json`;
