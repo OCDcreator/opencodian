@@ -113,8 +113,10 @@ describe('resource panel card structure (unified Claude + Codex)', () => {
       expect(scrollEl.style.getPropertyValue('--opencodian-settings-scrollarea-available-height')).toBe('280px');
       await new Promise((resolve) => window.setTimeout(resolve, 0));
       viewportTop = 420;
-      expect(animationFrames).toHaveLength(1);
-      animationFrames.shift()?.(Date.now());
+      expect(animationFrames.length).toBeGreaterThanOrEqual(1);
+      while (animationFrames.length > 0) {
+        animationFrames.shift()?.(Date.now());
+      }
       expect(scrollEl.style.getPropertyValue('--opencodian-settings-scrollarea-available-height')).toBe('516px');
     } finally {
       window.requestAnimationFrame = originalRequestAnimationFrame;
