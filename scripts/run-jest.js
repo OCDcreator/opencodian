@@ -3,6 +3,7 @@ const { execSync } = require('child_process');
 const { mkdirSync } = require('fs');
 const { join } = require('path');
 const process = require('process');
+const { resolveJestNodeOptions } = require('./run-jest-options');
 
 const args = process.argv.slice(2).join(' ');
 const storageDir = join(process.cwd(), '.tmp');
@@ -16,10 +17,10 @@ try {
     cwd: process.cwd(),
     env: {
       ...process.env,
-      NODE_OPTIONS: [
-        process.env.NODE_OPTIONS,
-        `--localstorage-file=${storageFile}`,
-      ].filter(Boolean).join(' '),
+      NODE_OPTIONS: resolveJestNodeOptions({
+        existingNodeOptions: process.env.NODE_OPTIONS,
+        storageFile,
+      }),
     },
   });
 } catch (error) {

@@ -19,6 +19,8 @@
 
 **Runner。** Gitea instance runner `macmini-opencodian` 使用 `gitea/act_runner:0.2.11` 与 `ubuntu-latest:docker://node:20-bookworm` 标签运行，长期容器不保存一次性 registration token。真实远端 run、artifact 下载及两端 SHA-256 对齐结果在双远端推送后验收。
 
+**Node 20 兼容性。** 首轮 GitHub/Gitea run 都在仓库既有 `scripts/run-jest.js` 处暴露同一根因：Node 20.20.2 禁止把 `--localstorage-file` 放入 `NODE_OPTIONS`。启动器现按 `process.allowedNodeEnvironmentFlags` 条件注入，新 Node 保留隔离的 webstorage 文件，Node 20 不再接收非法 flag；回归测试覆盖两条 capability 路径。
+
 ## 2026-07-27 G9 — Provider 配置 backend-native truth final acceptance
 
 **产品契约。** G9 按各后端原生边界收口为 DONE，不追求三方 CRUD 对称。Claude 只写 vault-local `.claude/settings.local.json`，经 CAS/archive/conflict 安全链路；写入后 `persistence=verified`、`application=pending`（下一次 Claude 进程/请求边界前）、`runtime=unavailable`。Codex native Provider 是 external-managed/read-only，不伪造 native save；legacy plugin credential 只做 masked、transactional 处理。OpenCode 要显式选择 project/global exact source，managed source 只读，写入走 CAS/archive；`pending`/restart/partial persistence 三轴诚实，effective/runtime readonly 永不作为写目标。

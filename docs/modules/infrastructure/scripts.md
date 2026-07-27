@@ -140,7 +140,7 @@ repo-local owner guard 入口脚本。它读取 git diff 范围，构建 guarded
 
 ### run-jest.js — Jest 启动器
 
-Node.js 脚本形式的 Jest 启动包装器。它会为 Jest 子进程设置 repo-local `.tmp/jest-node-localstorage.json` 作为 Node webstorage 文件，避免 Node 环境 teardown 读取 `global.localStorage` 时输出 `--localstorage-file` warning。
+Node.js 脚本形式的 Jest 启动包装器。`run-jest-options.js` 只在当前运行时的 `process.allowedNodeEnvironmentFlags` 支持 `--localstorage-file` 时，为 Jest 子进程设置 repo-local `.tmp/jest-node-localstorage.json`，避免新 Node 环境 teardown 的 webstorage warning；Node 20 等不支持该 flag 的运行时会保留调用方已有 `NODE_OPTIONS` 而不注入非法参数。
 
 ### sync-version.js — 版本同步
 
@@ -170,6 +170,7 @@ Node.js 脚本形式的 Jest 启动包装器。它会为 Jest 子进程设置 re
 | `check-owner-guard.mjs` | `npm run check:owner-guard` | 阻断 guarded thick-owner 功能回灌与净新增 ownership |
 | `install-hooks.mjs` | `npm run hooks:install` | 安装 repo-local `.githooks` |
 | `run-jest.js` | `npm run test` | Jest 启动 |
+| `run-jest-options.js` | — | 按 Node runtime capability 安全解析 Jest 子进程的 `NODE_OPTIONS` |
 | `sync-version.js` | — | 版本同步 |
 | `sync-lobehub-icons.mjs` | `npm run sync:lobehub-icons` | 从 `@lobehub/icons` 生成 provider icon manifest |
 
