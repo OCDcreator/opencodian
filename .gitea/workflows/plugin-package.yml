@@ -43,6 +43,11 @@ jobs:
 
       - name: Upload plugin artifact
         uses: actions/upload-artifact@v7
+        env:
+          # Upstream v7 rejects non-GitHub hostnames before consulting Gitea's
+          # compatible ArtifactService v4 runtime URLs. Scope the guard bypass
+          # to this step; upload traffic still uses ACTIONS_RESULTS_URL.
+          GITHUB_SERVER_URL: https://gitea.localhost
         with:
           name: ${{ env.PLUGIN_ARTIFACT_NAME }}
           path: artifacts/opencodian/

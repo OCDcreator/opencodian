@@ -143,6 +143,7 @@ describe('plugin artifact packaging', () => {
     expect(githubWorkflow).not.toContain('actions/upload-artifact@v3');
     expect(giteaWorkflow).toContain('actions/upload-artifact@v7');
     expect(giteaWorkflow).not.toContain('actions/upload-artifact@v3');
+    expect(giteaWorkflow).toContain('GITHUB_SERVER_URL: https://gitea.localhost');
     expect(giteaWorkflow).toContain('PUPPETEER_EXECUTABLE_PATH: /usr/bin/chromium');
     expect(giteaWorkflow).toContain('apt-get install --yes --no-install-recommends chromium');
   });

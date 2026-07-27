@@ -25,7 +25,7 @@
 
 **确定性双端产物。** Gitea job container 以 root 运行时，`chmod` 不能可靠制造 `EACCES`；相关 archive 测试改用既有 I/O seam 注入确定性失败，覆盖同一安全语义。两端 workflow 还将经校验的 `OPENCODIAN_BUILD_ID` 固定为 `ci-<commit SHA>`，消除 runner 构建分钟/时区导致的 `main.js` 漂移；本地未设置该变量时继续使用 `{branch}.{timestamp}`。
 
-**Node 24 升级。** GitHub CI/Plugin Package 与 Gitea Plugin Package 的项目运行时统一为 Node.js 24；两端 Actions 自身均升级到 Node 24 runtime 的 v7，消除 GitHub 对 Node 20 action runtime 的弃用 annotation。Gitea runner job image 同步升级为 `node:24-bookworm`。
+**Node 24 升级。** GitHub CI/Plugin Package 与 Gitea Plugin Package 的项目运行时统一为 Node.js 24；两端 Actions 自身均升级到 Node 24 runtime 的 v7，消除 GitHub 对 Node 20 action runtime 的弃用 annotation。Gitea runner job image 同步升级为 `node:24-bookworm`，执行器从 `act_runner 0.2.11` 升到首个允许 `runs.using: node24` 的 `0.2.13`。Gitea 1.26.4 服务端虽支持 ArtifactService v4/version 7，但上游 action 会先按第三方 `GITHUB_SERVER_URL` 抛出 GHES guard；上传步骤将该变量局部覆盖为 action 放行的 `.localhost` hostname，实际 runtime URL/token 仍由 Gitea runner 注入。全套并行测试还暴露 Claude Agents 高度测试对异步双帧队列数量的脆弱假设；测试现排空所有已调度帧后断言最终高度，不再把调度时序误判为布局失败。
 
 ## 2026-07-27 G9 — Provider 配置 backend-native truth final acceptance
 
