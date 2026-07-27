@@ -838,14 +838,16 @@ describe('ConfigurationArchiveService — round 8: readdir seam + in-root symlin
     const deletedDir = path.join(hashDir, 'deleted');
     const deletedFile = fs.readdirSync(deletedDir)[0];
     const deletedPath = path.join(deletedDir, deletedFile);
+    const replacementPath = path.join(deletedDir, `${deletedFile}.replacement`);
     const internals = service as unknown as {
       writeManifestAtomic(dir: string, manifest: unknown): Promise<void>;
     };
     const writeManifestAtomic = internals.writeManifestAtomic.bind(service);
     jest.spyOn(internals, 'writeManifestAtomic').mockImplementationOnce(async (dir, manifest) => {
       await writeManifestAtomic(dir, manifest);
+      write(replacementPath, '{"a":1}');
       fs.rmSync(deletedPath, { force: true });
-      write(deletedPath, '{"a":1}');
+      fs.renameSync(replacementPath, deletedPath);
     });
 
     const result = await service.clearDeleted({ backend: 'test' });

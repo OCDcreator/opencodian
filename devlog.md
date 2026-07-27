@@ -19,7 +19,7 @@
 
 **Runner。** Gitea instance runner `macmini-opencodian` 使用 `gitea/act_runner:0.2.11` 与 `ubuntu-latest:docker://node:20-bookworm` 标签运行，长期容器不保存一次性 registration token。真实远端 run、artifact 下载及两端 SHA-256 对齐结果在双远端推送后验收。
 
-**Node 20 兼容性。** 首轮 GitHub/Gitea run 都在仓库既有 `scripts/run-jest.js` 处暴露同一根因：Node 20.20.2 禁止把 `--localstorage-file` 放入 `NODE_OPTIONS`。启动器现按 `process.allowedNodeEnvironmentFlags` 条件注入，新 Node 保留隔离的 webstorage 文件，Node 20 不再接收非法 flag；回归测试覆盖两条 capability 路径。
+**Node 20 / CI 文件系统兼容性。** 首轮 GitHub/Gitea run 都在仓库既有 `scripts/run-jest.js` 处暴露同一根因：Node 20.20.2 禁止把 `--localstorage-file` 放入 `NODE_OPTIONS`。启动器现按 `process.allowedNodeEnvironmentFlags` 条件注入，新 Node 保留隔离的 webstorage 文件，Node 20 不再接收非法 flag；回归测试覆盖两条 capability 路径。第二轮进一步暴露 archive identity 安全测试的跨文件系统夹具假设：unlink 后重建可能复用同一 inode；夹具改为先创建 replacement 再 rename，确保实际发生 dev/ino identity swap，生产安全逻辑不变。
 
 ## 2026-07-27 G9 — Provider 配置 backend-native truth final acceptance
 
