@@ -58,6 +58,8 @@ function slashItem(id: string, description: string, overrides: Partial<SlashComm
 
 const createdCoordinators: ComposerInputShellCoordinator[] = [];
 
+type DockVisibility = 'visible' | 'hidden';
+
 function createFixture(options: {
   shouldMountAgentSelector?: boolean;
   shouldHandleAgentMentions?: boolean;
@@ -68,6 +70,8 @@ function createFixture(options: {
   withEmptyStateNotice?: boolean;
   hasImageInputCapability?: boolean;
   renderHostControls?: boolean;
+  todoDock?: DockVisibility;
+  questionDock?: DockVisibility;
 } = {}) {
   let isStreaming = false;
   let isForegroundBusy = false;
@@ -106,8 +110,20 @@ function createFixture(options: {
   surfaceRoot.appendChild(suggestionMountRoot);
 
   const host: jest.Mocked<ComposerInputShellCoordinatorHost> = {
-    attachSessionTodo: jest.fn(),
-    attachQuestionDock: jest.fn(),
+    attachSessionTodo: jest.fn((container) => {
+      if (!options.todoDock) {
+        return;
+      }
+      const slot = container.createDiv({ cls: 'opencodian-session-todo-slot' });
+      slot.createDiv({ cls: `opencodian-session-todo-dock${options.todoDock === 'hidden' ? ' is-hidden' : ''}` });
+    }),
+    attachQuestionDock: jest.fn((container) => {
+      if (!options.questionDock) {
+        return;
+      }
+      const slot = container.createDiv({ cls: 'opencodian-question-dock-slot' });
+      slot.createDiv({ cls: `opencodian-question-dock${options.questionDock === 'hidden' ? ' is-hidden' : ''}` });
+    }),
     setContextRowElement: jest.fn(),
     setTooltipLabel: jest.fn((element, label, position) => {
       element.setAttribute('data-tooltip', label);
@@ -313,6 +329,31 @@ describe('ComposerInputShellCoordinator', () => {
     expect(fixture.host.addChosenFileContextToActiveTab).toHaveBeenCalledTimes(1);
     expect(fixture.textarea.value).toBe('');
   });
+
+  it.each([
+    ['both visible', 'visible', 'visible'],
+    ['only Todo visible', 'visible', 'hidden'],
+    ['only question visible', 'hidden', 'visible'],
+    ['both hidden', 'hidden', 'hidden'],
+  ] as const)(
+    'orders input-position regions as Todo, question dock, tabs, and composer when %s',
+    (_state, todoDock, questionDock) => {
+      const fixture = createFixture({ todoDock, questionDock });
+
+      const inputRegions = Array.from(fixture.container.children)
+        .filter((element) => element.matches(
+          '.opencodian-session-todo-slot, .opencodian-question-dock-slot, .opencodian-tab-bar-slot--input, .opencodian-composer-shell',
+        ))
+        .map((element) => {
+          if (element.classList.contains('opencodian-session-todo-slot')) return 'todo';
+          if (element.classList.contains('opencodian-question-dock-slot')) return 'question';
+          if (element.classList.contains('opencodian-tab-bar-slot--input')) return 'tabs';
+          return 'composer';
+        });
+
+      expect(inputRegions).toEqual(['todo', 'question', 'tabs', 'composer']);
+    },
+  );
 
   it('focuses the composer textarea through its public focus seam', () => {
     const fixture = createFixture();

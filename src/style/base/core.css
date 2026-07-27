@@ -842,7 +842,7 @@ body[data-opencodian-provider-icon-mode="color"] {
 }
 
 .opencodian-tab-bar-slot--input {
-  margin-bottom: 10px;
+  margin-bottom: 0;
 }
 
 .opencodian-tab-bar-external-host {

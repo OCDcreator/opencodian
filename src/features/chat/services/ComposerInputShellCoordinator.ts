@@ -245,11 +245,11 @@ export class ComposerInputShellCoordinator {
     this.destroy();
     this.inputContainerEl = container;
 
+    this.host.attachSessionTodo(container);
+    this.host.attachQuestionDock(container);
     this.inputTabBarSlotEl = container.createDiv({
       cls: 'opencodian-tab-bar-slot opencodian-tab-bar-slot--input',
     });
-    this.host.attachSessionTodo(container);
-    this.host.attachQuestionDock(container);
 
     // Prompt suggestion chip is mounted under the latest assistant turn body,
     // so it stays semantically tied to the assistant follow-up it suggests.

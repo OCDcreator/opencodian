@@ -1058,6 +1058,15 @@
   pointer-events: auto;
 }
 
+/*
+ * Session tabs can be mounted into the external tab host (z-index: 220).
+ * Elevate the whole input-area stacking context only while a composer
+ * popover is open, so the menu is not covered by a tab that floats above it.
+ */
+.opencodian-input-area:has(.opencodian-agent-trigger.is-open, .opencodian-permission-trigger.is-open, .opencodian-model-trigger.is-open, .opencodian-runtime-overflow.is-open) {
+  z-index: 230;
+}
+
 /* Keep liquid-glass backdrop stable instead of letting hover leak through to messages beneath it. */
 .opencodian-input-area:has(.opencodian-composer-shell--liquid-glass) {
   pointer-events: auto;
@@ -1781,6 +1790,20 @@
 .opencodian-question-dock-slot {
   display: flex;
   flex-direction: column;
+}
+
+/* Hidden docks must leave the input area's flex flow instead of preserving empty gaps. */
+.opencodian-input-area > .opencodian-session-todo-slot:has(> .opencodian-session-todo-dock.is-hidden) {
+  display: none;
+}
+
+.opencodian-input-area > .opencodian-question-dock-slot:has(> .opencodian-question-dock.is-hidden) {
+  display: none;
+}
+
+/* An inactive input tab slot has no visible session navigation to separate from the composer. */
+.opencodian-input-area > .opencodian-tab-bar-slot--input:empty {
+  display: none;
 }
 
 .opencodian-question-dock {
