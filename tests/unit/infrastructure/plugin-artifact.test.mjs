@@ -5,6 +5,7 @@ const path = require('node:path');
 
 const modulePath = path.join(process.cwd(), 'scripts', 'package-plugin-artifact.mjs');
 const buildUtilsPath = path.join(process.cwd(), 'scripts', 'build-utils.mjs');
+const githubCiWorkflowPath = path.join(process.cwd(), '.github', 'workflows', 'ci.yml');
 const githubWorkflowPath = path.join(process.cwd(), '.github', 'workflows', 'plugin-package.yml');
 const giteaWorkflowPath = path.join(process.cwd(), '.gitea', 'workflows', 'plugin-package.yml');
 
@@ -119,6 +120,7 @@ describe('plugin artifact packaging', () => {
   });
 
   it('keeps GitHub and Gitea workflows aligned while using compatible artifact actions', () => {
+    const githubCiWorkflow = fs.readFileSync(githubCiWorkflowPath, 'utf8');
     const githubWorkflow = fs.readFileSync(githubWorkflowPath, 'utf8');
     const giteaWorkflow = fs.readFileSync(giteaWorkflowPath, 'utf8');
 
@@ -129,12 +131,18 @@ describe('plugin artifact packaging', () => {
       expect(workflow).toContain('artifacts/opencodian/');
       expect(workflow).toContain('opencodian-plugin-${{ github.sha }}');
       expect(workflow).toContain('OPENCODIAN_BUILD_ID: ci-${{ github.sha }}');
+      expect(workflow).toContain('actions/checkout@v7');
+      expect(workflow).toContain('actions/setup-node@v7');
+      expect(workflow).toContain('node-version: 24');
     }
 
-    expect(githubWorkflow).toContain('actions/upload-artifact@v4');
+    expect(githubCiWorkflow.match(/actions\/checkout@v7/g)).toHaveLength(2);
+    expect(githubCiWorkflow.match(/actions\/setup-node@v7/g)).toHaveLength(2);
+    expect(githubCiWorkflow.match(/node-version: 24/g)).toHaveLength(2);
+    expect(githubWorkflow).toContain('actions/upload-artifact@v7');
     expect(githubWorkflow).not.toContain('actions/upload-artifact@v3');
-    expect(giteaWorkflow).toContain('actions/upload-artifact@v3');
-    expect(giteaWorkflow).not.toContain('actions/upload-artifact@v4');
+    expect(giteaWorkflow).toContain('actions/upload-artifact@v7');
+    expect(giteaWorkflow).not.toContain('actions/upload-artifact@v3');
     expect(giteaWorkflow).toContain('PUPPETEER_EXECUTABLE_PATH: /usr/bin/chromium');
     expect(giteaWorkflow).toContain('apt-get install --yes --no-install-recommends chromium');
   });
