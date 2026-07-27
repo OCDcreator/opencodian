@@ -69,6 +69,14 @@ Actions 与本地共用的 fail-closed 打包器。它只接受仓库根目录�
 
 同时更新 `package.json`, `package-lock.json` 和 `manifest.json`。
 
+### detect-release-version.mjs — Release 版本门禁
+
+读取当前 `manifest.json`、`package.json`、`package-lock.json` 与 push 事件 `before` commit 中的 `manifest.json`。三个当前版本源和 lockfile root package 必须完全一致；版本必须是有效 SemVer，发生变化时还必须严格递增。脚本通过 `GITHUB_OUTPUT` 输出 `changed`、`version`、`previous_version`、`tag` 与 `prerelease`，供 GitHub/Gitea workflow 共享；零 `before` SHA 或无历史版本不会自动创建初始 Release。
+
+### publish-gitea-release.mjs — Gitea Release 发布
+
+使用 workflow 内置 `GITEA_TOKEN` 调用 Gitea 1.26 Release API，在当前 commit 创建 `v<version>` tag/release，并上传 `artifacts/opencodian/` 中严格三件套。服务地址生产环境强制 HTTPS；token 不写入仓库或日志。若 Release 已存在，脚本先验证 tag 最终 commit，再下载既有资产核对 size 与 SHA-256：一致则幂等跳过，缺失则补传，不一致则 fail-closed，绝不静默改写错误发布。
+
 ### check-devlog-order.mjs — Devlog 排序验证
 
 检查 `devlog.md` 中 `## YYYY-MM-DD ...` 标题是否按降序排列。新条目必须插入到第一个日期标题之前，不能追加到文件末尾。
@@ -160,6 +168,8 @@ Node.js 脚本形式的 Jest 启动包装器。`run-jest-options.js` 只在当�
 | `package-plugin-artifact.mjs` | `npm run package:plugin` | 生成并校验 Actions 上传的插件三件套 |
 | `doctor-esbuild.mjs` | `npm run doctor:esbuild` / `doctor:esbuild:fix` | esbuild 平台检查/修复 |
 | `release.mjs` | `npm run release:patch/minor/major` | 版本发布 |
+| `detect-release-version.mjs` | Actions 直接调用 | 校验版本同步、递增并输出 Release 决策 |
+| `publish-gitea-release.mjs` | Gitea Actions 直接调用 | 以 Node 24 和内置 job token 幂等创建 Release/三件套资产 |
 | `update-graphify-src.mjs` | `npm run graphify:update:src` | 刷新 `src` 范围 graphify artifacts |
 | `check-graphify-freshness.mjs` | `npm run check:graphify` | 检查 graphify artifacts 是否跟上 `src` |
 | `check-devlog-order.mjs` | `npm run check:devlog-order` | Devlog 排序验证 |
@@ -190,6 +200,13 @@ npm run release:patch
     → 更新 package.json version
     → npm install --package-lock-only
     → 更新 manifest.json version
+
+main push
+  → scripts/detect-release-version.mjs
+    → 比较 event.before 与当前 manifest version
+    → 校验 package/lock/manifest 版本同步与 SemVer 严格递增
+    → changed=true 时 GitHub action / Gitea API 创建 v<version> Release
+    → 上传 main.js、manifest.json、styles.css
 
 npm run doctor:esbuild:fix
   → scripts/doctor-esbuild.mjs --fix

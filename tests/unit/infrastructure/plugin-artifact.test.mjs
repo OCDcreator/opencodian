@@ -129,12 +129,15 @@ describe('plugin artifact packaging', () => {
       expect(workflow).toContain('npm run verify');
       expect(workflow).toContain('npm run package:plugin');
       expect(workflow).toContain('artifacts/opencodian/');
-      expect(workflow).toContain('opencodian-plugin-${{ github.sha }}');
-      expect(workflow).toContain('OPENCODIAN_BUILD_ID: ci-${{ github.sha }}');
       expect(workflow).toContain('actions/checkout@v7');
       expect(workflow).toContain('actions/setup-node@v7');
       expect(workflow).toContain('node-version: 24');
     }
+
+    expect(githubWorkflow).toContain('opencodian-plugin-${{ github.sha }}');
+    expect(githubWorkflow).toContain('OPENCODIAN_BUILD_ID: ci-${{ github.sha }}');
+    expect(giteaWorkflow).toContain('opencodian-plugin-${{ gitea.sha }}');
+    expect(giteaWorkflow).toContain('OPENCODIAN_BUILD_ID: ci-${{ gitea.sha }}');
 
     expect(githubCiWorkflow.match(/actions\/checkout@v7/g)).toHaveLength(2);
     expect(githubCiWorkflow.match(/actions\/setup-node@v7/g)).toHaveLength(2);

@@ -8,12 +8,15 @@ on:
       - 'v*'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   package-plugin:
     runs-on: ubuntu-latest
     env:
-      PLUGIN_ARTIFACT_NAME: opencodian-plugin-${{ github.sha }}
-      OPENCODIAN_BUILD_ID: ci-${{ github.sha }}
+      PLUGIN_ARTIFACT_NAME: opencodian-plugin-${{ gitea.sha }}
+      OPENCODIAN_BUILD_ID: ci-${{ gitea.sha }}
       PUPPETEER_EXECUTABLE_PATH: /usr/bin/chromium
     steps:
       - name: Checkout
@@ -26,6 +29,13 @@ jobs:
         with:
           node-version: 24
           cache: npm
+
+      - name: Detect version release
+        id: release
+        if: gitea.event_name == 'push' && gitea.ref == 'refs/heads/main'
+        env:
+          RELEASE_BEFORE_SHA: ${{ gitea.event.before }}
+        run: node scripts/detect-release-version.mjs
 
       - name: Install native Chromium for rendered tests
         run: |
@@ -48,3 +58,15 @@ jobs:
           path: artifacts/opencodian/
           if-no-files-found: error
           retention-days: 30
+
+      - name: Publish Gitea release
+        if: steps.release.outputs.changed == 'true'
+        env:
+          GITEA_RELEASE_SERVER_URL: ${{ gitea.server_url }}
+          GITEA_RELEASE_REPOSITORY: ${{ gitea.repository }}
+          GITEA_RELEASE_TOKEN: ${{ secrets.GITEA_TOKEN }}
+          GITEA_RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          GITEA_RELEASE_VERSION: ${{ steps.release.outputs.version }}
+          GITEA_RELEASE_TARGET_SHA: ${{ gitea.sha }}
+          GITEA_RELEASE_PRERELEASE: ${{ steps.release.outputs.prerelease }}
+        run: node scripts/publish-gitea-release.mjs

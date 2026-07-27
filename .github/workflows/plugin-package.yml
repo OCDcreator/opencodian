@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   package-plugin:
@@ -29,6 +29,13 @@ jobs:
           node-version: 24
           cache: npm
 
+      - name: Detect version release
+        id: release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          RELEASE_BEFORE_SHA: ${{ github.event.before }}
+        run: node scripts/detect-release-version.mjs
+
       - name: Install dependencies
         run: npm ci
 
@@ -45,3 +52,36 @@ jobs:
           path: artifacts/opencodian/
           if-no-files-found: error
           retention-days: 30
+
+      - name: Guard GitHub release tag
+        if: steps.release.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          if ref_json="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${RELEASE_TAG}" 2>/dev/null)"; then
+            ref_type="$(printf '%s' "$ref_json" | jq -r '.object.type')"
+            ref_sha="$(printf '%s' "$ref_json" | jq -r '.object.sha')"
+            if [ "$ref_type" = "tag" ]; then
+              tag_json="$(gh api "repos/${GITHUB_REPOSITORY}/git/tags/${ref_sha}")"
+              ref_type="$(printf '%s' "$tag_json" | jq -r '.object.type')"
+              ref_sha="$(printf '%s' "$tag_json" | jq -r '.object.sha')"
+            fi
+            test "$ref_type" = "commit"
+            test "$ref_sha" = "$GITHUB_SHA"
+          fi
+
+      - name: Publish GitHub release
+        if: steps.release.outputs.changed == 'true'
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ steps.release.outputs.tag }}
+          name: OpenCodian ${{ steps.release.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          generate_release_notes: true
+          prerelease: ${{ steps.release.outputs.prerelease }}
+          fail_on_unmatched_files: true
+          files: |
+            artifacts/opencodian/main.js
+            artifacts/opencodian/manifest.json
+            artifacts/opencodian/styles.css

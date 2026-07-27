@@ -63,6 +63,12 @@ GitHub 使用 Node 24 runtime 的 `actions/upload-artifact@v7`；Gitea 使用完
 
 Gitea runner 使用 `ubuntu-latest:docker://node:24-bookworm` 标签，因此 workflow 不依赖 Windows host shell，并与 workflow 的 Node.js 24 项目运行时一致。macmini runner 的 job container 是原生 ARM64；Gitea workflow 安装 Debian ARM64 `chromium` 并通过 `PUPPETEER_EXECUTABLE_PATH` 供 rendered tests 使用，避免执行 Puppeteer 的 x86_64 bundled browser。runner 注册 token 只用于一次性初始化本机 runner state，不进入仓库、workflow 或长期容器环境。
 
+### 双远端自动 Release
+
+两个 `Plugin Package` workflow 都在 `main` push 后调用 `scripts/detect-release-version.mjs`，将事件的 `before` commit 与当前 `manifest.json` 比较。只有版本发生严格 SemVer 递增，且 `manifest.json`、`package.json`、`package-lock.json` 顶层版本与 root package 版本完全一致时，才输出 `changed=true` 和 `v<version>` tag；普通代码 push、tag push、手动 dispatch、版本未变、降级或版本文件漂移都不会误发 Release。
+
+GitHub 通过 Node 24 runtime 的 `softprops/action-gh-release@v3` 创建或更新 Release、生成 release notes，并附加严格三件套；发布前先解析已有 lightweight/annotated tag，若最终 commit 不是当前 workflow SHA 就失败。Gitea workflow 使用内置 `${{ secrets.GITEA_TOKEN }}` 与 `contents: write`，由 Node 24 `scripts/publish-gitea-release.mjs` 调用实例 Release API；脚本验证既有 tag 指向，重复运行只接受 SHA-256 完全一致的既有资产，缺失资产可补传，冲突资产不会被静默覆盖。两端都不需要个人访问令牌，Release 资产固定为 `main.js`、`manifest.json`、`styles.css`。
+
 ### BUILD_ID 生成 (`scripts/build-utils.mjs`)
 
 ```javascript

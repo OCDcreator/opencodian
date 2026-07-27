@@ -27,6 +27,8 @@
 
 **Node 24 升级。** GitHub CI/Plugin Package 与 Gitea Plugin Package 的项目运行时统一为 Node.js 24；两端 Actions 自身均升级到 Node 24 runtime 的 v7，消除 GitHub 对 Node 20 action runtime 的弃用 annotation。Gitea runner job image 同步升级为 `node:24-bookworm`，执行器从 `act_runner 0.2.11` 升到首个允许 `runs.using: node24` 的 `0.2.13`。Gitea run 20 证明上游 action 会先按第三方 `GITHUB_SERVER_URL` 抛出 GHES guard，且 step 级 `.localhost` 覆盖不会替代 runner 的标准环境；最终改用 Gitea 公共 `actions` 组织提供的 `gitea-upload-artifact@v7`，由其直接使用 runner 注入的 runtime URL/token 对接 1.26.4 ArtifactService。全套并行测试还暴露 Claude Agents 高度测试对异步双帧队列数量的脆弱假设；测试现排空所有已调度帧后断言最终高度，不再把调度时序误判为布局失败。
 
+**版本驱动 Release。** 两端 Plugin Package workflow 在 `main` push 时比较事件 `before` commit 与当前 `manifest.json`；只有 `package.json`、`package-lock.json`、manifest 版本同步且 SemVer 严格递增时才创建 `v<version>` Release。GitHub 使用 Node 24 的 `softprops/action-gh-release@v3` 与自动 release notes；Gitea 使用仓库内 Node 24 API 发布器和内置 `GITEA_TOKEN`，不引入仍声明 Node 16 的旧 release action 或个人 token。两端 Release 都附加严格三件套；已有 tag 必须指向当前 commit，Gitea 重跑还会逐资产核对 SHA-256，冲突时 fail-closed。
+
 ## 2026-07-27 G9 — Provider 配置 backend-native truth final acceptance
 
 **产品契约。** G9 按各后端原生边界收口为 DONE，不追求三方 CRUD 对称。Claude 只写 vault-local `.claude/settings.local.json`，经 CAS/archive/conflict 安全链路；写入后 `persistence=verified`、`application=pending`（下一次 Claude 进程/请求边界前）、`runtime=unavailable`。Codex native Provider 是 external-managed/read-only，不伪造 native save；legacy plugin credential 只做 masked、transactional 处理。OpenCode 要显式选择 project/global exact source，managed source 只读，写入走 CAS/archive；`pending`/restart/partial persistence 三轴诚实，effective/runtime readonly 永不作为写目标。
