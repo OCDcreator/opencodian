@@ -26,7 +26,7 @@
 
 `owner-guard` job：
 
-1. `actions/checkout@v4` with `fetch-depth: 0`
+1. `actions/checkout@v7` with `fetch-depth: 0`
 2. `npm ci`
 3. `npm run check:owner-guard`
 
@@ -34,7 +34,7 @@
 
 `verify` job：
 
-1. `actions/checkout@v4` with `fetch-depth: 0`
+1. `actions/checkout@v7` with `fetch-depth: 0`
 2. `npm ci`
 3. `npm run check:module-docs`
 4. `npm run check:graphify`
@@ -53,15 +53,15 @@
 
 GitHub Actions 与 Gitea Actions 各自使用一份薄 `Plugin Package` workflow，在 `main` push、`v*` tag 和手动触发时执行同一组命令：
 
-1. checkout 完整历史并安装 Node.js 20；
+1. 通过 `actions/checkout@v7` checkout 完整历史，并由 `actions/setup-node@v7` 安装 Node.js 24；
 2. `npm ci`；
 3. `npm run verify`；
 4. `npm run package:plugin`；
 5. 上传只含 `main.js`、`manifest.json`、`styles.css` 的 `opencodian-plugin-<commit SHA>` artifact。
 
-GitHub 使用 `actions/upload-artifact@v4`，Gitea 使用与其 artifact service 兼容的 `actions/upload-artifact@v3`。平台差异只存在于上传 action 版本，打包内容由共享仓库脚本在上传前 fail-closed 校验。两端 workflow 都把 `OPENCODIAN_BUILD_ID` 固定为 `ci-<commit SHA>`，避免各 runner 的构建时间和时区进入 `main.js`，从而使同一 commit 的三件套可逐文件复现。
+GitHub 与 Gitea 均使用 Node 24 runtime 的 `actions/upload-artifact@v7`。Gitea 1.26.4 原生实现 ArtifactService v4 协议，且其集成测试覆盖 version 7 的分块上传、Finalize 与 SHA-256；因此无需再固定 legacy v3。打包内容由共享仓库脚本在上传前 fail-closed 校验。两端 workflow 都把 `OPENCODIAN_BUILD_ID` 固定为 `ci-<commit SHA>`，避免各 runner 的构建时间和时区进入 `main.js`，从而使同一 commit 的三件套可逐文件复现。
 
-Gitea runner 使用 `ubuntu-latest:docker://node:20-bookworm` 标签，因此 workflow 不依赖 Windows host shell。macmini runner 的 job container 是原生 ARM64；Gitea workflow 安装 Debian ARM64 `chromium` 并通过 `PUPPETEER_EXECUTABLE_PATH` 供 rendered tests 使用，避免执行 Puppeteer 的 x86_64 bundled browser。runner 注册 token 只用于一次性初始化本机 runner state，不进入仓库、workflow 或长期容器环境。
+Gitea runner 使用 `ubuntu-latest:docker://node:24-bookworm` 标签，因此 workflow 不依赖 Windows host shell，并与 workflow 的 Node.js 24 项目运行时一致。macmini runner 的 job container 是原生 ARM64；Gitea workflow 安装 Debian ARM64 `chromium` 并通过 `PUPPETEER_EXECUTABLE_PATH` 供 rendered tests 使用，避免执行 Puppeteer 的 x86_64 bundled browser。runner 注册 token 只用于一次性初始化本机 runner state，不进入仓库、workflow 或长期容器环境。
 
 ### BUILD_ID 生成 (`scripts/build-utils.mjs`)
 
