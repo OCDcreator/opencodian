@@ -1,0 +1,46 @@
+name: Plugin Package
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package-plugin:
+    runs-on: ubuntu-latest
+    env:
+      PLUGIN_ARTIFACT_NAME: opencodian-plugin-${{ github.sha }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify repository
+        run: npm run verify
+
+      - name: Prepare plugin three-file artifact
+        run: npm run package:plugin
+
+      - name: Upload plugin artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.PLUGIN_ARTIFACT_NAME }}
+          path: artifacts/opencodian/
+          if-no-files-found: error
+          retention-days: 30

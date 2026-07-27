@@ -6,6 +6,7 @@
   "scripts": {
     "postinstall": "node scripts/patch-unrs-resolver.mjs",
     "build:css": "node scripts/build-css.mjs",
+    "package:plugin": "node scripts/package-plugin-artifact.mjs",
     "dev": "npm run build:css && node esbuild.config.mjs",
     "build": "node scripts/build.mjs production",
     "sync:lobehub-icons": "node scripts/sync-lobehub-icons.mjs",

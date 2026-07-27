@@ -3,6 +3,7 @@ node_modules/
 
 # Build output
 dist/
+artifacts/
 main.js
 src/**/*.js
 *.js.map
