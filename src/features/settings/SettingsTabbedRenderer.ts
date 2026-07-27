@@ -83,6 +83,7 @@ export interface TabRendererDependencies {
   renderLayoutModeSetting: (containerEl: HTMLElement) => void;
   renderLanguageSetting: (containerEl: HTMLElement) => void;
   renderSettingsInEditorAreaSetting: (containerEl: HTMLElement) => void;
+  renderPluginUpdateSection: (containerEl: HTMLElement) => void;
 }
 
 export class SettingsTabbedRenderer {
@@ -358,6 +359,7 @@ export class SettingsTabbedRenderer {
     this.deps.renderLayoutModeSetting(blockBodyEl);
     this.deps.renderLanguageSetting(blockBodyEl);
     this.deps.renderSettingsInEditorAreaSetting(blockBodyEl);
+    this.deps.renderPluginUpdateSection(blockBodyEl);
   }
 
   private renderServerContent(containerEl: HTMLElement, secondaryTabId: string): void {

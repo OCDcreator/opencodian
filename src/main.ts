@@ -33,6 +33,7 @@ import { OpenCodianStartupCoordinator } from './core/runtime/OpenCodianStartupCo
 import { PluginRuntimeCoordinator } from './core/runtime/PluginRuntimeCoordinator';
 import { StorageService } from './core/storage';
 import { ConversationFullMessageCache } from './core/storage/ConversationFullMessageCache';
+import { PluginUpdateService } from './core/update/PluginUpdateService';
 import type {
   ChatAppearanceSettings,
   ChatMessage,
@@ -100,6 +101,7 @@ export default class OpenCodianPlugin extends Plugin {
   opencodeConfigManager: OpencodeConfigManager | null = null;
   modelConfigService: ModelConfigService | null = null;
   modelPricingService: ModelPricingService | null = null;
+  pluginUpdateService: PluginUpdateService;
   settingsTab?: InstanceType<typeof OpenCodianSettingTab>;
 
   private conversations: Conversation[] = [];
@@ -111,6 +113,8 @@ export default class OpenCodianPlugin extends Plugin {
   private runtimeCoordinator = new PluginRuntimeCoordinator({
     getSettings: () => this.settings ?? null,
     getOpenCodeService: () => this.openCodeService ?? null,
+    getPluginUpdateService: () => this.pluginUpdateService ?? null,
+    getPluginVersion: () => this.manifest.version,
     getOpenCodianLeaves: () => this.app.workspace.getLeavesOfType(VIEW_TYPE_OPENCODIAN),
     hasEnabledBackend: (backendId: AgentBackendKind) =>
       this.settings?.enabledBackends?.includes(backendId) ?? false,
@@ -161,6 +165,7 @@ export default class OpenCodianPlugin extends Plugin {
       onRegisterWorkspaceIntegration: () => this.registerWorkspaceIntegration(),
       onScheduleDeferredRuntimeWarmup: () => this.runtimeCoordinator.scheduleDeferredRuntimeWarmup(),
     });
+    void this.runtimeCoordinator.checkPluginUpdateOnStartup();
   }
 
   private warnSettingsPersistenceBlocked(message: string): void {
@@ -177,6 +182,20 @@ export default class OpenCodianPlugin extends Plugin {
     this.storage = new StorageService(this);
     await coordinator.measureStartupStep('storage.initialize', () => this.storage.initialize());
     await coordinator.measureStartupStep('loadSettings', () => this.loadSettings());
+    this.pluginUpdateService = new PluginUpdateService({
+      app: this.app,
+      manifest: this.manifest,
+      initialState: this.settings.pluginUpdateState,
+      persistState: async (state) => {
+        this.settings.pluginUpdateState = state;
+        await this.saveSettings({
+          syncService: false,
+          reloadModels: false,
+          syncConfig: false,
+          applyUi: false,
+        });
+      },
+    });
     await coordinator.measureStartupStep('loadModelPricingCatalog', async () => {
       this.modelPricingService = new ModelPricingService({
         storage: this.storage,

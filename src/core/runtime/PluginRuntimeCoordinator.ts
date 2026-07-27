@@ -1,12 +1,14 @@
-import type { WorkspaceLeaf } from 'obsidian';
+import { Notice, type WorkspaceLeaf } from 'obsidian';
 
 import { OpenCodianView } from '../../features/chat/OpenCodianView';
 import { UserMessageFooterRenderer } from '../../features/chat/runtime/UserMessageFooterRenderer';
+import { t } from '../../i18n';
 import { createLogger, formatDurationMs, getPerformanceTimestampMs } from '../../shared';
 import { OpenCodeService } from '../opencode';
 import type { OpenCodianSettings } from '../types';
 import { isLocalServerMode } from '../types';
 import type { AgentBackendKind } from '../types/chat';
+import { comparePluginVersions, type PluginUpdateService } from '../update/PluginUpdateService';
 
 const logger = createLogger('PluginRuntimeCoordinator');
 
@@ -24,6 +26,8 @@ export interface SlashCommandCatalogInvalidationOptions {
 export interface PluginRuntimeCoordinatorHost {
   getSettings(): OpenCodianSettings | null;
   getOpenCodeService(): OpenCodeService | null;
+  getPluginUpdateService(): PluginUpdateService | null;
+  getPluginVersion(): string;
   getOpenCodianLeaves(): WorkspaceLeaf[];
   hasEnabledBackend?(backendId: AgentBackendKind): boolean;
   applyProviderIconColorMode(): void;
@@ -69,6 +73,32 @@ export class PluginRuntimeCoordinator {
   invalidateSlashCommandMenuCatalogs(options: SlashCommandCatalogInvalidationOptions = {}): void {
     for (const view of this.getOpenCodianViews()) {
       view.invalidateSlashCommandMenuCatalog(options);
+    }
+  }
+
+  async checkPluginUpdateOnStartup(): Promise<void> {
+    const service = this.host.getPluginUpdateService();
+    const settings = this.host.getSettings();
+    if (!service || !settings) {
+      return;
+    }
+
+    try {
+      const snapshot = await service.checkForUpdates();
+      const latest = snapshot.latestRelease;
+      if (!latest?.installable || snapshot.status !== 'ready') {
+        return;
+      }
+      if (comparePluginVersions(latest.version, this.host.getPluginVersion()) <= 0) {
+        return;
+      }
+      if (settings.pluginUpdateState.lastNotifiedVersion === latest.version) {
+        return;
+      }
+      new Notice(t('settings.pluginUpdate.startupNotice', { version: latest.version }));
+      await service.markVersionNotified(latest.version);
+    } catch (error) {
+      logger.warn('Plugin update startup check failed', error);
     }
   }
 

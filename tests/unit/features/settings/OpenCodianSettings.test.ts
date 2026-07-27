@@ -673,6 +673,19 @@ function createSettingsTab(layoutMode: 'classic' | 'tabbed' = 'classic') {
       requireSdkCapability: jest.fn().mockReturnValue({ kind: 'available' }),
       refreshSdkCapabilities: jest.fn().mockResolvedValue({ entries: [], generatedAt: 0 }),
     },
+    pluginUpdateService: {
+      getSnapshot: jest.fn().mockReturnValue({
+        status: 'ready',
+        source: 'github',
+        currentVersion: '1.0.1',
+        latestRelease: null,
+        releases: [],
+        backups: [],
+        error: null,
+        isApplying: false,
+      }),
+      checkForUpdates: jest.fn().mockResolvedValue(undefined),
+    },
   };
   const tab = new OpenCodianSettingTab(app as never, plugin as never);
   document.body.appendChild(tab.containerEl);
@@ -830,7 +843,7 @@ describe('OpenCodianSettingTab layout shell', () => {
       Array.from(generalBlock!.querySelectorAll<HTMLElement>('.opencodian-settings-subsection-heading')).map(
         (element) => element.textContent?.trim(),
       ),
-    ).toEqual([]);
+    ).toEqual(['Plugin version management']);
     expect(generalBlock?.classList.contains('opencodian-settings-section')).toBe(true);
     expect(generalBlock?.dataset.settingsSurface).toBe('section');
     expect(generalBlock?.querySelector('.opencodian-settings-section-body')).not.toBeNull();
@@ -861,6 +874,7 @@ describe('OpenCodianSettingTab layout shell', () => {
       renderLayoutModeSetting: jest.fn(appendSettingRow),
       renderLanguageSetting: jest.fn(appendSettingRow),
       renderSettingsInEditorAreaSetting: jest.fn(appendSettingRow),
+      renderPluginUpdateSection: jest.fn(appendSettingRow),
     });
 
     tab.display();

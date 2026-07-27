@@ -293,3 +293,7 @@ graph TD
 - `onunload()` 当前没有显式调用 `clearSettingsUiStateSaveTimer()`；卸载时只清除了 chat appearance timer 与 model refresh 帧请求。
 
 - `loadSettings()` 现在在归一化后调用 `migrateOpenCodeCapabilitySettingsEnvelope()`，对 `opencodeCapabilities` envelope 执行 versioned migration；不可映射字段会先通过 `StorageService.snapshotRawCapabilitySettings()` 备份原始值，再展示 startup notice（不暴露原始备份内容或 secret）。
+
+## 2026-07-27 Plugin update startup check
+
+After settings load, `OpenCodianPlugin` constructs `PluginUpdateService` with the plugin manifest, persisted update metadata, and a narrow persistence callback. Once normal startup registration completes, it delegates one non-blocking stable-release check to `PluginRuntimeCoordinator`. That runtime owner enforces the once-per-version notice marker; startup never installs, rolls back, or reloads the plugin automatically.

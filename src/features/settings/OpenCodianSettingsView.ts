@@ -38,6 +38,7 @@ import {
   setSettingNameWithFormatting,
 } from './SettingsPanelChrome';
 import { SettingsPluginSection } from './SettingsPluginSection';
+import { SettingsPluginUpdateSection } from './SettingsPluginUpdateSection';
 import { SettingsSectionCoordinator } from './SettingsSectionCoordinator';
 import { SettingsSecuritySection } from './SettingsSecuritySection';
 import { SettingsServerSection } from './SettingsServerSection';
@@ -263,6 +264,7 @@ export class OpenCodianSettingsView extends ItemView {
       renderLayoutModeSetting: (el) => { this.renderLayoutModeSetting(el); },
       renderLanguageSetting: (el) => { this.renderLanguageSetting(el); },
       renderSettingsInEditorAreaSetting: (el) => { this.renderSettingsInEditorAreaSetting(el); },
+      renderPluginUpdateSection: (el) => { this.renderPluginUpdateSection(el); },
     };
   }
 
@@ -302,6 +304,9 @@ export class OpenCodianSettingsView extends ItemView {
           })
       );
   }
+  private renderPluginUpdateSection(containerEl: HTMLElement): void {
+    new SettingsPluginUpdateSection({ plugin: this.plugin, requestDisplayRefresh: () => { this.renderSettings(); } }).render(containerEl);
+  }
 
   // ─── Classic section rendering ─────────────────────────────────────
 
@@ -324,6 +329,7 @@ export class OpenCodianSettingsView extends ItemView {
     this.renderLayoutModeSetting(blockBodyEl);
     this.renderLanguageSetting(blockBodyEl);
     this.renderSettingsInEditorAreaSetting(blockBodyEl);
+    this.renderPluginUpdateSection(blockBodyEl);
   }
 
   private addServerSettings(containerEl: HTMLElement): void {

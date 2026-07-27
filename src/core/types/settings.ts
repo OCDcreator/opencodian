@@ -15,6 +15,7 @@ import {
   normalizeDebugRefreshIntervalMs,
 } from '../../shared/debugModules';
 import type { OpenCodeCapabilitySettings } from '../opencode/OpenCodeCapabilitySettingsMigration';
+import type { PluginUpdatePersistedState } from '../update/PluginUpdateService';
 import type { AgentBackendKind } from './chat';
 import type { ModelPricingOverride } from './pricing';
 
@@ -2735,6 +2736,9 @@ export interface OpenCodianSettings {
   settingsTabbedPrimaryTab: string;
   settingsTabbedSecondaryTabByPrimary: Record<string, string>;
 
+  /** Persisted plugin-update notification and catalogue metadata. */
+  pluginUpdateState: PluginUpdatePersistedState;
+
   // Language
   locale: string;
 
@@ -2910,6 +2914,12 @@ export const DEFAULT_SETTINGS: OpenCodianSettings = {
   settingsLayoutMode: 'tabbed',
   settingsTabbedPrimaryTab: 'server',
   settingsTabbedSecondaryTabByPrimary: {},
+  pluginUpdateState: {
+    lastCheckAt: null,
+    lastNotifiedVersion: null,
+    latestStableVersion: null,
+    lastSource: null,
+  },
 
   locale: 'en',
 

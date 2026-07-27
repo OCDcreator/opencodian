@@ -5,7 +5,7 @@
 
 ## 概述
 
-`PluginRuntimeCoordinator` 是插件入口旁的 runtime orchestration owner。它把原本集中在 `main.ts` 里的跨视图刷新、模型目录刷新调度、slash command catalog invalidation，以及 deferred local runtime warmup 收束到一个 durable coordinator 中。
+`PluginRuntimeCoordinator` 是插件入口旁的 runtime orchestration owner。它把原本集中在 `main.ts` 里的跨视图刷新、模型目录刷新调度、slash command catalog invalidation、deferred local runtime warmup，以及启动期插件更新检查收束到一个 durable coordinator 中。
 
 `OpenCodianPlugin` 仍然负责 Obsidian lifecycle、settings/storage/service 构造和诊断导出；本模块只持有启动后 runtime 调度所需的 timer / animation-frame / promise 状态，并通过 host seam 回调入口拥有的服务能力。
 
@@ -30,6 +30,7 @@
 - `RuntimeRefreshOptions`: 控制跨视图刷新是否 reload models、是否 apply UI。
 - `SlashCommandCatalogInvalidationOptions`: 透传给 `OpenCodianView.invalidateSlashCommandMenuCatalog()` 的 preload 选项。
 - `RuntimeWarmupSource`: 区分 startup deferred warmup 和 session-bootstrap 强制 warmup。
+- `PluginRuntimeCoordinatorHost.getPluginUpdateService()` / `getPluginVersion()`：把入口已构造的更新服务与当前插件版本以窄 seam 提供给启动检查，不让入口重新持有更新决策。
 - `modelRefreshFrameId`: 模型目录刷新 requestAnimationFrame 句柄。
 - `deferredRuntimeWarmupTimerId`: onload 后延迟 warmup 的 setTimeout 句柄。
 - `deferredRuntimeWarmupPromise`: 正在执行的 runtime warmup promise，用于 session bootstrap 复用或等待。
@@ -60,6 +61,12 @@
 - 如果 timer 或 warmup promise 已存在，不重复排队。
 - `ensureRuntimeWarmupReadyForSessionBootstrap()` 用于创建 session 前的安全栅栏：如果 deferred timer 还没跑，先取消 timer 并以 `session-bootstrap` source 立即 warmup；如果 warmup 已在运行则等待同一个 promise。
 - `runDeferredRuntimeWarmup()` 保持原启动语义：记录开始日志，调用 host 启动本地服务，再写 server status snapshot，最后记录耗时。
+
+### Plugin update startup check
+
+- `checkPluginUpdateOnStartup()` 在正常启动注册完成后由入口 fire-and-forget 调用，不会阻塞插件加载。
+- 服务检查出新的兼容稳定版时，coordinator 比较当前版本与 `settings.pluginUpdateState.lastNotifiedVersion`；每个版本最多显示一次 notice，然后让 service 持久化通知标记。
+- 检查、比较或通知标记写入异常只写 runtime warning；它们不影响插件启动，也不会安装、回滚或热重载插件。
 
 ## 数据流
 

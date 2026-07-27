@@ -109,3 +109,7 @@ AgentServiceRegistry.onActiveChange()
 - 该 view 只在 leaf 生命周期内保存自己的滚动位置，避免即时重绘跳回顶部，同时不持久化到标准设置页滚动恢复状态。
 - classic quick-nav 在编辑区内必须锁定 `contentEl` 作为滚动容器；不要让 fallback 误选外层 workspace leaf，否则平铺模式跳转会把整个视图滚出可视区域。
 - editor-area 专用样式应定位 `.workspace-leaf-content[data-type="opencodian-settings-view"] > .view-content.opencodian-settings`，不要把 `.opencodian-settings` 直接挂到 leaf 外壳上，否则 Obsidian `Setting` 行会落在异常层级。
+
+## 2026-07-27 General version management
+
+The editor-area settings view passes the same `renderPluginUpdateSection` seam to `SettingsTabbedRenderer` and mounts `SettingsPluginUpdateSection` in its classic General block. This keeps version history, local backup restoration, confirmation, and operation refresh behavior equivalent to the standard settings tab.

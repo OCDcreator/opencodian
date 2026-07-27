@@ -34,6 +34,7 @@ import {
   setSettingNameWithFormatting,
 } from './SettingsPanelChrome';
 import { SettingsPluginSection } from './SettingsPluginSection';
+import { SettingsPluginUpdateSection } from './SettingsPluginUpdateSection';
 import { SettingsSectionCoordinator } from './SettingsSectionCoordinator';
 import { SettingsSecuritySection } from './SettingsSecuritySection';
 import { SettingsServerSection } from './SettingsServerSection';
@@ -119,6 +120,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
         renderLayoutModeSetting: (el) => { this.renderLayoutModeSetting(el); },
         renderLanguageSetting: (el) => { this.renderLanguageSetting(el); },
         renderSettingsInEditorAreaSetting: (el) => { this.renderSettingsInEditorAreaSetting(el); },
+        renderPluginUpdateSection: (el) => { this.renderPluginUpdateSection(el); },
       });
     }
     return this.tabbedRenderer;
@@ -158,6 +160,13 @@ export class OpenCodianSettingTab extends PluginSettingTab {
             await this.plugin.saveSettings();
           })
       );
+  }
+
+  private renderPluginUpdateSection(containerEl: HTMLElement): void {
+    new SettingsPluginUpdateSection({
+      plugin: this.plugin,
+      requestDisplayRefresh: () => { this.display(); },
+    }).render(containerEl);
   }
 
   // ─── Navigation ────────────────────────────────────────────────────
@@ -398,6 +407,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     this.renderLayoutModeSetting(blockBodyEl);
     this.renderLanguageSetting(blockBodyEl);
     this.renderSettingsInEditorAreaSetting(blockBodyEl);
+    this.renderPluginUpdateSection(blockBodyEl);
   }
 
   private addServerSettings(containerEl: HTMLElement): HTMLHeadingElement {

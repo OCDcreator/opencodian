@@ -1,7 +1,7 @@
 {
   "id": "opencodian",
   "name": "OpenCodian",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "minAppVersion": "1.4.5",
   "description": "Embeds OpenCode as an AI collaborator in your vault. Supports multiple LLM providers including Claude, GPT, and local models.",
   "author": "OpenCodian Team",

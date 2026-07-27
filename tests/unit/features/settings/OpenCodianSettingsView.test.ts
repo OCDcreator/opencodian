@@ -28,6 +28,19 @@ function createSettingsView(layoutMode: 'classic' | 'tabbed' = 'classic') {
     },
     saveSettings: jest.fn().mockResolvedValue(undefined),
     scheduleSettingsUiStateSave: jest.fn(),
+    pluginUpdateService: {
+      getSnapshot: jest.fn().mockReturnValue({
+        status: 'ready',
+        source: 'github',
+        currentVersion: '1.0.1',
+        latestRelease: null,
+        releases: [],
+        backups: [],
+        error: null,
+        isApplying: false,
+      }),
+      checkForUpdates: jest.fn().mockResolvedValue(undefined),
+    },
   };
   const view = new OpenCodianSettingsView({} as never, plugin as never);
   view.containerEl.dataset.type = 'opencodian-settings-view';

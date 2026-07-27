@@ -15011,6 +15011,294 @@ img.opencodian-model-provider-header-icon {
 }
 
 
+/* components/settings-plugin-update.css */
+/* Version-management subsection: heading + description above a single flat
+   status panel (current version block, state badge, status detail, actions),
+   followed by the release-history and local-backup lists. The panel follows
+   the Codex settings-card language: hairline border on background-secondary,
+   pill badges with status dots, and a tinted notice for check failures. */
+
+.opencodian-plugin-update-section {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.opencodian-plugin-update-description,
+.opencodian-plugin-update-list-description,
+.opencodian-plugin-update-version-meta,
+.opencodian-plugin-update-empty {
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+}
+
+/* Status panel */
+
+.opencodian-plugin-update-panel {
+  display: grid;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 10px;
+  background: var(--background-secondary);
+}
+
+.opencodian-plugin-update-panel-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  min-width: 0;
+}
+
+.opencodian-plugin-update-version-block {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.opencodian-plugin-update-version-label {
+  color: var(--text-muted);
+  font-size: var(--font-smallest);
+  line-height: 1.4;
+}
+
+.opencodian-plugin-update-version-value {
+  color: var(--text-normal);
+  font-family: var(--font-monospace);
+  font-size: var(--font-ui-medium);
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+/* Status badge: quiet pill whose dot carries the state color. */
+
+.opencodian-plugin-update-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  padding: 3px 10px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 999px;
+  background: var(--background-primary);
+  color: var(--text-muted);
+  font-size: var(--font-smallest);
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.opencodian-plugin-update-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-faint);
+}
+
+.opencodian-plugin-update-status-badge[data-plugin-update-badge='checking'] .opencodian-plugin-update-status-dot {
+  background: var(--interactive-accent);
+  animation: opencodian-plugin-update-pulse 1.2s ease-in-out infinite;
+}
+
+.opencodian-plugin-update-status-badge[data-plugin-update-badge='update'] {
+  border-color: rgba(var(--color-blue-rgb, 2, 132, 199), 0.45);
+  background: rgba(var(--color-blue-rgb, 2, 132, 199), 0.12);
+  color: var(--color-blue, #0284c7);
+}
+
+.opencodian-plugin-update-status-badge[data-plugin-update-badge='update'] .opencodian-plugin-update-status-dot {
+  background: var(--color-blue, #0284c7);
+}
+
+.opencodian-plugin-update-status-badge[data-plugin-update-badge='current'] {
+  border-color: rgba(var(--color-green-rgb, 76, 175, 80), 0.4);
+  background: rgba(var(--color-green-rgb, 76, 175, 80), 0.12);
+  color: var(--color-green, #4caf50);
+}
+
+.opencodian-plugin-update-status-badge[data-plugin-update-badge='current'] .opencodian-plugin-update-status-dot {
+  background: var(--color-green, #4caf50);
+}
+
+.opencodian-plugin-update-status-badge[data-plugin-update-badge='error'] {
+  border-color: rgba(var(--color-red-rgb, 224, 49, 49), 0.4);
+  background: rgba(var(--color-red-rgb, 224, 49, 49), 0.1);
+  color: var(--text-error);
+}
+
+.opencodian-plugin-update-status-badge[data-plugin-update-badge='error'] .opencodian-plugin-update-status-dot {
+  background: var(--text-error);
+}
+
+@keyframes opencodian-plugin-update-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .opencodian-plugin-update-status-badge[data-plugin-update-badge='checking'] .opencodian-plugin-update-status-dot {
+    animation: none;
+  }
+}
+
+/* Status detail: one muted line for idle/checking/ready; a tinted notice with
+   a mono raw-error readout for failures. */
+
+.opencodian-plugin-update-status-detail {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+  line-height: 1.45;
+}
+
+.opencodian-plugin-update-status-detail.is-error {
+  display: grid;
+  gap: 3px;
+  padding: 8px 10px;
+  border: 1px solid rgba(var(--color-red-rgb, 224, 49, 49), 0.35);
+  border-radius: 6px;
+  background: rgba(var(--color-red-rgb, 224, 49, 49), 0.08);
+}
+
+.opencodian-plugin-update-error-label {
+  color: var(--text-error);
+  font-size: var(--font-ui-small);
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.opencodian-plugin-update-error-raw {
+  color: var(--text-muted);
+  font-family: var(--font-monospace);
+  font-size: var(--font-smallest);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+/* Actions sit inside the panel behind a hairline separator. */
+
+.opencodian-plugin-update-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.opencodian-plugin-update-button {
+  white-space: nowrap;
+}
+
+.opencodian-plugin-update-button:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 2px;
+}
+
+.opencodian-plugin-update-downgrade-note {
+  flex-basis: 100%;
+  color: var(--text-warning);
+  font-size: var(--font-ui-small);
+  line-height: 1.4;
+}
+
+/* Release history / local backups */
+
+.opencodian-plugin-update-list-group {
+  display: grid;
+  gap: 6px;
+}
+
+.opencodian-plugin-update-list-group h5 {
+  margin: 8px 0 0;
+  color: var(--text-normal);
+  font-size: var(--font-ui-small);
+  font-weight: 600;
+}
+
+.opencodian-plugin-update-list {
+  display: grid;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-s);
+  overflow: hidden;
+}
+
+.opencodian-plugin-update-version-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 44px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--background-modifier-border);
+  transition: background-color 150ms ease-out;
+}
+
+.opencodian-plugin-update-version-row:hover {
+  background: var(--background-modifier-hover);
+}
+
+.opencodian-plugin-update-version-row:last-child {
+  border-bottom: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .opencodian-plugin-update-version-row {
+    transition: none;
+  }
+}
+
+.opencodian-plugin-update-version-identity {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.opencodian-plugin-update-version {
+  color: var(--text-normal);
+  font-family: var(--font-monospace);
+  font-size: var(--font-ui-small);
+}
+
+.opencodian-plugin-update-current-badge {
+  width: fit-content;
+  padding: 1px 8px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 999px;
+  background: var(--background-primary);
+  color: var(--text-muted);
+  font-size: var(--font-smallest);
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.opencodian-plugin-update-version-error {
+  color: var(--text-error);
+  font-size: var(--font-ui-smaller);
+}
+
+@media (max-width: 480px) {
+  .opencodian-plugin-update-version-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .opencodian-plugin-update-version-row .opencodian-plugin-update-button {
+    width: 100%;
+  }
+}
+
+
 /* features/chat-user.css */
 /* ============================================================
    User Message - Push-Up Sticky Header

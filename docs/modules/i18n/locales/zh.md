@@ -1,6 +1,7 @@
 # Chinese Locale
 
 > **源码**: `src/i18n/locales/zh.ts`
+> **Updated**: 2026-07-27 版本管理状态面板 — 新增 `settings.pluginUpdate.currentVersionLabel`、`errorLabel` 与 `badge.{idle,checking,error,empty,update,current}` 短状态徽章文案；移除合并式 `currentVersion` 与 `status.error` 长句键。
 > **Updated**: 2026-07-27 G9 OpenCode 重启恢复 — 新增停止状态未知与已停止后启动失败两种人工恢复文案；两者均保留已验证持久化，并保持应用/运行时证据待处理。
 > **Updated**: 2026-07-27 G9 OpenCode 保存恢复 — 新增非冲突来源写入失败、部分持久化与待重启文案，避免把 CAS 成功误报为插件配置已完整应用。
 > **Updated**: 2026-07-26 G9 OpenCode 来源绑定模型配置 — 新增来源元数据/三轴证据、托管只读/CAS 冲突、运行时目录不可用、待重启及凭据预览脱敏文案。
@@ -513,3 +514,7 @@ Claude Code 不再使用过载的 `settings.claudeCode.tab.mcpAdvanced` 标签�
 ## SDK 1.17.18 experimental-action locale keys
 
 新增 `settings.server.experimental.*`、`settings.conversation.experimental.*` 与 `chat.experimentalActions.*`。这些键覆盖默认关闭的 gate、最终确认、PTY cleanup、project-copy preview、control-plane 目标位置和后台会话 inline status；文案不把 SDK presence 误写成可执行保证。
+
+## 2026-07-27 插件版本管理文案键
+
+新增 `settings.pluginUpdate.*`，覆盖通用基础页共用版本管理区的检查/状态、最新稳定版/历史版本/本地备份动作、不兼容原因、降级与还原确认、手动重载完成/失败提示及每个版本一次的启动提醒。文案明确区分“插件包已替换”和“运行中的插件已重载”。

@@ -1,6 +1,7 @@
 # English Locale
 
 > **源码**: `src/i18n/locales/en.ts`
+> **Updated**: 2026-07-27 Version-management status panel — added `settings.pluginUpdate.currentVersionLabel`, `errorLabel`, and short badge copy `badge.{idle,checking,error,empty,update,current}`; removed the combined `currentVersion` and `status.error` sentence keys.
 > **Updated**: 2026-07-27 G9 OpenCode restart recovery — added separate stop-unknown and post-stop start-failed recovery copy; both retain verified persistence while keeping application/runtime evidence pending.
 > **Updated**: 2026-07-27 G9 OpenCode save recovery — added non-conflict source-write failure, partial-persistence, and pending-restart copy so CAS success is not presented as a fully applied plugin save.
 > **Updated**: 2026-07-26 G9 OpenCode source-bound model configuration — added source metadata/evidence, managed-readonly/CAS conflict, runtime-catalog-unavailable, pending-restart, and hidden-credential preview copy.
@@ -505,3 +506,7 @@ Extended `settings.claudeCode.configuration.*` for the P2 UX pass: human-readabl
 ## SDK 1.17.18 experimental-action locale keys
 
 新增 `settings.server.experimental.*`、`settings.conversation.experimental.*` 与 `chat.experimentalActions.*`。这些键覆盖 default-off gate、最终确认、PTY cleanup、project-copy preview、control-plane destination 和后台会话 inline status；文案不把 SDK presence 写成可执行保证。
+
+## 2026-07-27 Plugin update locale keys
+
+Added `settings.pluginUpdate.*` for the shared General version-management section: check and status text, latest/release-history/local-backup actions, compatibility reasons, downgrade and restore confirmations, manual-reload completion/failure notices, and the once-per-version startup notification. Copy distinguishes a successful package replacement from a live plugin reload.

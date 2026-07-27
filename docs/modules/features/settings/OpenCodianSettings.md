@@ -276,3 +276,7 @@ provider 开关写回仍遵循 `ModelConfigService` 返回的 `effectiveProvider
 - provider 图标颜色模式虽然存在于模型工具区，但它影响聊天区、设置页、模型工作区与图标管理 modal 的所有 provider 图标显示，因此保存后要同步触发全局 UI 应用。
 - Debug 分区里的“内联序列化调试参数”只影响 `logger.debug(...)` 的 console 输出形式，不改变 `info/warn/error` 的独立对象参数行为。
 - 如果设置页 `服务器目录` 的 provider 数量明显少于 `opencode models`，先排查 `ServerManager` 是否接管了旧的本地 `4096` 进程；不要先改这里的展示过滤逻辑。
+
+## 2026-07-27 General version management
+
+The classic General block now creates `SettingsPluginUpdateSection` after its layout, locale, and editor-area controls. `OpenCodianSettingTab` only supplies the redraw seam; release discovery, backup actions, and confirmation behavior remain in the dedicated owner so classic and tabbed layouts cannot drift.

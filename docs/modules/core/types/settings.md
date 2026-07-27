@@ -421,3 +421,7 @@ New normalize functions added:
 - `ClaudeCodeBackendSettings` 新增 `promptSuggestions: boolean` 字段（默认 false）。JSDoc 标注为 readback：SDK options wiring + pump callback 已证明，端到端建议传递未独立验证。normalization 使用 `candidate.promptSuggestions === true` 严格布尔检查。
 
 - `OpenCodianSettings` 新增可选 `opencodeCapabilities?: OpenCodeCapabilitySettings` 字段（来自 `OpenCodeCapabilitySettingsMigration`），承载 SDK capability preferences 与 experimental gates。`DEFAULT_SETTINGS` 默认为 `undefined`，由 normalizer 处理默认值。不存储 live server availability、secrets 或原始 server payload。
+
+## 2026-07-27 Plugin update persistence
+
+`OpenCodianSettings.pluginUpdateState` 保存更新器的轻量元数据：`lastCheckAt`、`lastNotifiedVersion`、`latestStableVersion` 和 `lastSource`。默认值全部为空，不保存远端资产、Release 清单或本地备份内容。`PluginUpdateService` 在构造时对旧/损坏字段做防御性归一化，并仅在检查或通知标记更新时通过正常 settings persistence 写回。

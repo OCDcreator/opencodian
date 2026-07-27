@@ -52,6 +52,9 @@ function createRendererState(options?: {
   const renderSettingsInEditorAreaSetting = jest.fn((containerEl: HTMLElement) => {
     containerEl.createDiv({ cls: 'settings-editor-area-marker', text: 'settings-editor-area-setting' });
   });
+  const renderPluginUpdateSection = jest.fn((containerEl: HTMLElement) => {
+    containerEl.createDiv({ cls: 'plugin-update-marker', text: 'plugin-update-section' });
+  });
   const renderUserContent = jest.fn((containerEl: HTMLElement, secondaryTabId: string) => {
     containerEl.createDiv({ cls: 'user-marker', text: secondaryTabId });
   });
@@ -97,6 +100,7 @@ function createRendererState(options?: {
     renderLayoutModeSetting,
     renderLanguageSetting,
     renderSettingsInEditorAreaSetting,
+    renderPluginUpdateSection,
   });
 
   return {
@@ -106,6 +110,7 @@ function createRendererState(options?: {
     renderLayoutModeSetting,
     renderLanguageSetting,
     renderSettingsInEditorAreaSetting,
+    renderPluginUpdateSection,
     renderUserContent,
     setActive,
   };
