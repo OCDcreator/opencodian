@@ -41,6 +41,13 @@ export function getLocalTimeStamp() {
  * @returns {string} BUILD_ID
  */
 export function generateBuildId() {
+  const override = process.env.OPENCODIAN_BUILD_ID;
+  if (override !== undefined) {
+    if (!/^[a-zA-Z0-9._-]{1,128}$/.test(override)) {
+      throw new Error('OPENCODIAN_BUILD_ID must contain 1-128 letters, digits, dots, underscores, or hyphens');
+    }
+    return override;
+  }
   const branch = sanitizeBranchName(getGitBranch());
   const timestamp = getLocalTimeStamp();
   return `${branch}.${timestamp}`;

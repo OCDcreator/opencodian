@@ -4,6 +4,7 @@ const os = require('node:os');
 const path = require('node:path');
 
 const modulePath = path.join(process.cwd(), 'scripts', 'package-plugin-artifact.mjs');
+const buildUtilsPath = path.join(process.cwd(), 'scripts', 'build-utils.mjs');
 const githubWorkflowPath = path.join(process.cwd(), '.github', 'workflows', 'plugin-package.yml');
 const giteaWorkflowPath = path.join(process.cwd(), '.gitea', 'workflows', 'plugin-package.yml');
 
@@ -22,6 +23,19 @@ function callPackagePluginArtifact(options) {
     throw new Error(result.stderr.trim() || `Packaging subprocess exited with status ${result.status}`);
   }
   return JSON.parse(result.stdout);
+}
+
+function callGenerateBuildId(override) {
+  const code = `
+    import { pathToFileURL } from 'node:url';
+    const mod = await import(pathToFileURL(${JSON.stringify(buildUtilsPath)}).href);
+    process.stdout.write(mod.generateBuildId());
+  `;
+  return spawnSync(process.execPath, ['--input-type=module', '--eval', code], {
+    cwd: process.cwd(),
+    encoding: 'utf8',
+    env: { ...process.env, OPENCODIAN_BUILD_ID: override },
+  });
 }
 
 function createFixture() {
@@ -114,6 +128,7 @@ describe('plugin artifact packaging', () => {
       expect(workflow).toContain('npm run package:plugin');
       expect(workflow).toContain('artifacts/opencodian/');
       expect(workflow).toContain('opencodian-plugin-${{ github.sha }}');
+      expect(workflow).toContain('OPENCODIAN_BUILD_ID: ci-${{ github.sha }}');
     }
 
     expect(githubWorkflow).toContain('actions/upload-artifact@v4');
@@ -122,5 +137,16 @@ describe('plugin artifact packaging', () => {
     expect(giteaWorkflow).not.toContain('actions/upload-artifact@v4');
     expect(giteaWorkflow).toContain('PUPPETEER_EXECUTABLE_PATH: /usr/bin/chromium');
     expect(giteaWorkflow).toContain('apt-get install --yes --no-install-recommends chromium');
+  });
+
+  it('uses a validated CI override to make BUILD_ID reproducible across remotes', () => {
+    const expected = 'ci-4191a60d61ca62c637e6f131e424724180f4ed1a';
+    const accepted = callGenerateBuildId(expected);
+    expect(accepted.status).toBe(0);
+    expect(accepted.stdout).toBe(expected);
+
+    const rejected = callGenerateBuildId('ci-build\nforged');
+    expect(rejected.status).not.toBe(0);
+    expect(rejected.stderr).toContain('OPENCODIAN_BUILD_ID');
   });
 });

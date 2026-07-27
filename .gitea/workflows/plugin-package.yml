@@ -13,6 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       PLUGIN_ARTIFACT_NAME: opencodian-plugin-${{ github.sha }}
+      OPENCODIAN_BUILD_ID: ci-${{ github.sha }}
       PUPPETEER_EXECUTABLE_PATH: /usr/bin/chromium
     steps:
       - name: Checkout

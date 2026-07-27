@@ -16,6 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       PLUGIN_ARTIFACT_NAME: opencodian-plugin-${{ github.sha }}
+      OPENCODIAN_BUILD_ID: ci-${{ github.sha }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
