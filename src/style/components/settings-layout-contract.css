@@ -194,6 +194,13 @@
   margin-top: 0;
 }
 
+.opencodian-settings .opencodian-codex-project-config-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--opencodian-settings-space-lg);
+  min-width: 0;
+}
+
 /* Project command advanced values stay in the editor flow as a disclosure, not a nested card. */
 .opencodian-settings .opencodian-command-editor-advanced {
   margin-top: var(--opencodian-settings-space-lg);
