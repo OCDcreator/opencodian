@@ -16,6 +16,10 @@ import {
 } from '../../../core/types';
 import type { CodexApprovalPolicy, CodexReasoningEffort, CodexSandboxMode, CodexWebSearchMode } from '../../../core/types/settings';
 import { t } from '../../../i18n';
+import {
+  enhanceSettingsSelect,
+  type SettingsDropdownControlHandle,
+} from '../../settings/SettingsDropdownControl';
 
 export interface ConversationSessionSettingsModalDefaults {
   chatFontSizePx: number;
@@ -94,6 +98,7 @@ export class ConversationSessionSettingsModal extends Modal {
   private codexGoalClearBtnEl: HTMLButtonElement | null = null;
   private codexGoalShellEl: HTMLElement | null = null;
   private codexReviewStatusEl: HTMLElement | null = null;
+  private readonly dropdownHandles = new Set<SettingsDropdownControlHandle>();
   private errorEl: HTMLElement | null = null;
   private saveButtonEl: HTMLButtonElement | null = null;
   private cancelButtonEl: HTMLButtonElement | null = null;
@@ -107,6 +112,7 @@ export class ConversationSessionSettingsModal extends Modal {
   }
 
   onOpen(): void {
+    this.destroyDropdowns();
     this.modalEl.addClass('opencodian-session-settings-modal');
     this.contentEl.empty();
     this.titleEl.setText(t('chat.sessionSettings.modal.title'));
@@ -179,6 +185,7 @@ export class ConversationSessionSettingsModal extends Modal {
   }
 
   onClose(): void {
+    this.destroyDropdowns();
     if (!this.didSave) {
       this.options.onCancelPreview?.();
     }
@@ -199,6 +206,18 @@ export class ConversationSessionSettingsModal extends Modal {
     this.saveButtonEl = null;
     this.cancelButtonEl = null;
     this.didSave = false;
+  }
+
+  private destroyDropdowns(): void {
+    for (const handle of this.dropdownHandles) {
+      handle.destroy();
+    }
+    this.dropdownHandles.clear();
+  }
+
+  private enhanceDropdown(selectEl: HTMLSelectElement): HTMLSelectElement {
+    this.dropdownHandles.add(enhanceSettingsSelect(selectEl));
+    return selectEl;
   }
 
   private createHero(containerEl: HTMLElement): void {
@@ -361,7 +380,7 @@ export class ConversationSessionSettingsModal extends Modal {
       selectEl.value = initialValue;
     }
 
-    return selectEl;
+    return this.enhanceDropdown(selectEl);
   }
 
   private createTextField(containerEl: HTMLElement, options: {
@@ -506,7 +525,7 @@ export class ConversationSessionSettingsModal extends Modal {
       }
     });
 
-    return selectEl;
+    return this.enhanceDropdown(selectEl);
   }
 
   private createCodexSection(bodyEl: HTMLElement): void {
@@ -766,6 +785,7 @@ export class ConversationSessionSettingsModal extends Modal {
     targetSelect.add(new Option(t('chat.sessionSettings.modal.codexReviewTargetBaseBranch'), 'baseBranch'));
     targetSelect.add(new Option(t('chat.sessionSettings.modal.codexReviewTargetCommit'), 'commit'));
     targetSelect.add(new Option(t('chat.sessionSettings.modal.codexReviewTargetCustom'), 'custom'));
+    this.enhanceDropdown(targetSelect);
 
     const paramInput = controlsEl.createEl('input', {
       cls: 'opencodian-session-settings-codex-review-param',

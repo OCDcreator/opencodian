@@ -25,6 +25,10 @@ import type {
 } from '../../core/config/OpencodeConfigSourceService';
 import { t } from '../../i18n';
 import { createLogger } from '../../shared';
+import {
+  enhanceSettingsSelect,
+  type SettingsDropdownControlHandle,
+} from './SettingsDropdownControl';
 import { TextareaSizeMemory } from './TextareaSizeMemory';
 
 const logger = createLogger('OpencodeConfigModal');
@@ -67,6 +71,7 @@ export class OpencodeConfigModal extends Modal {
   private editorEl: HTMLTextAreaElement | null = null;
   private editorSizeMemory: TextareaSizeMemory | null = null;
   private sourceSelectEl: HTMLSelectElement | null = null;
+  private sourceSelectDropdownHandle: SettingsDropdownControlHandle | null = null;
   private metadataEl: HTMLElement | null = null;
   private statusEl: HTMLElement | null = null;
   private actionsEl: HTMLElement | null = null;
@@ -84,6 +89,8 @@ export class OpencodeConfigModal extends Modal {
   }
 
   async onOpen(): Promise<void> {
+    this.sourceSelectDropdownHandle?.destroy();
+    this.sourceSelectDropdownHandle = null;
     this.contentEl.empty();
     this.selectedSource = null;
     this.selectedPath = null;
@@ -109,6 +116,7 @@ export class OpencodeConfigModal extends Modal {
       const selectedPath = this.sourceSelectEl?.value || null;
       void this.selectSource(selectedPath);
     });
+    this.sourceSelectDropdownHandle = enhanceSettingsSelect(this.sourceSelectEl);
     this.renderSelectorPlaceholder();
 
     this.metadataEl = sourceSection.createDiv({ cls: 'opencodian-config-source-metadata' });
@@ -145,7 +153,10 @@ export class OpencodeConfigModal extends Modal {
         ? this.options.targetPath
         : null;
       if (initialPath) {
-        if (this.sourceSelectEl) this.sourceSelectEl.value = initialPath;
+        if (this.sourceSelectEl) {
+          this.sourceSelectEl.value = initialPath;
+          this.sourceSelectDropdownHandle?.refresh();
+        }
         await this.selectSource(initialPath);
       }
     } catch (error) {
@@ -155,6 +166,8 @@ export class OpencodeConfigModal extends Modal {
   }
 
   onClose(): void {
+    this.sourceSelectDropdownHandle?.destroy();
+    this.sourceSelectDropdownHandle = null;
     this.editorSizeMemory?.destroy();
     this.editorSizeMemory = null;
     this.contentEl.empty();
@@ -168,6 +181,7 @@ export class OpencodeConfigModal extends Modal {
       attr: { value: '' },
     });
     this.sourceSelectEl.value = '';
+    this.sourceSelectDropdownHandle?.refresh();
   }
 
   private renderSelectorOptions(): void {
@@ -183,6 +197,7 @@ export class OpencodeConfigModal extends Modal {
       option.title = candidate.path;
       option.setAttribute('data-config-source-option', candidate.source);
     }
+    this.sourceSelectDropdownHandle?.refresh();
   }
 
   private async selectSource(targetPath: string | null): Promise<void> {

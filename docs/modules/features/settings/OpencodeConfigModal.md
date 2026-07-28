@@ -9,6 +9,13 @@ OpenCode Project/Global/managed configuration source modal. The modal consumes
 `OpencodeConfigManager`'s P1-B source APIs and keeps source choice explicit;
 it does not assume that the legacy project path is the target.
 
+The source selector reuses the shared `SettingsDropdownControl.enhanceSettingsSelect`
+primitive, so its native `<select>` remains the semantic value store while the
+visible trigger/listbox supplies the plugin's custom keyboard, focus, and portal
+behavior. The handle is refreshed after placeholder/source option rebuilds and
+after applying an initial `targetPath`, so the visible trigger label matches the
+selected source before the first readback. It is destroyed during modal teardown.
+
 ## Configuration source loop
 
 1. Inventory candidates and render backend-provided `scope`, `source`, exact
@@ -38,7 +45,9 @@ it does not assume that the legacy project path is the target.
 - `[data-config-source-select]` — explicit source selector (`aria-label` from
   the source section title); option labels are
   `<localized scope> · <source> · <basename>` with the full exact path on
-  `option.title` (the metadata block always shows the complete path).
+  `option.title` (the metadata block always shows the complete path). The
+  visible control is `.opencodian-settings-dropdown-trigger`; the backing
+  select is `aria-hidden` and kept synchronized for change handlers/tests.
 - `[data-config-editor]` — raw JSONC textarea (`aria-label` from the editor
   section title).
 - `[data-config-scope]`, `[data-config-source]`, `[data-config-path]`,

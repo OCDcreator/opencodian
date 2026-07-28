@@ -25,7 +25,13 @@ describe('ConversationSessionSettingsModal Codex controls', () => {
     modal.onOpen();
 
     expect(modal.contentEl.querySelector('[data-section="codex"]')).not.toBeNull();
-    expect(modal.contentEl.querySelector('[data-setting="codex-sandbox-mode"]')).not.toBeNull();
+    const sandboxSelect = modal.contentEl.querySelector<HTMLSelectElement>('[data-setting="codex-sandbox-mode"]');
+    expect(sandboxSelect).not.toBeNull();
+    expect(sandboxSelect?.getAttribute('aria-hidden')).toBe('true');
+    const selects = Array.from(modal.contentEl.querySelectorAll<HTMLSelectElement>('select'));
+    expect(selects).toHaveLength(6);
+    expect(selects.every((select) => select.getAttribute('aria-hidden') === 'true')).toBe(true);
+    expect(modal.contentEl.querySelectorAll('.opencodian-settings-dropdown-trigger')).toHaveLength(selects.length);
     expect(modal.contentEl.querySelector('[data-setting="codex-reasoning-effort"]')).not.toBeNull();
     expect(modal.contentEl.querySelector('[data-setting="codex-model-override"]')).not.toBeNull();
   });

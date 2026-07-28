@@ -134,6 +134,8 @@ describe('OpencodeConfigModal P1-B source contract', () => {
     const selector = modal.contentEl.querySelector<HTMLSelectElement>('[data-config-source-select]');
     expect(selector?.value).toBe('');
     expect(selector?.options).toHaveLength(6);
+    expect(selector?.getAttribute('aria-hidden')).toBe('true');
+    expect(modal.contentEl.querySelector('.opencodian-settings-dropdown-trigger')).not.toBeNull();
     expect(modal.contentEl.textContent).toContain('Select a configuration source');
 
     selectSource(modal, projectPath);
@@ -186,6 +188,20 @@ describe('OpencodeConfigModal P1-B source contract', () => {
     expect(editor.value).toBe('{"answer":2}\n');
     expect(modal.contentEl.textContent).toMatch(/changed|draft/i);
     expect(Notice).toHaveBeenCalled();
+  });
+
+  it('refreshes the custom trigger label when opened with an initial target path', async () => {
+    const targetPath = '/vault/.opencode/opencode.jsonc';
+    const manager = createManager([
+      candidate('project', 'project-default', targetPath),
+    ], { [targetPath]: '{"permission":"ask"}\n' });
+    const modal = new OpencodeConfigModal({} as App, manager as never, { targetPath });
+
+    await modal.onOpen();
+
+    expect(modal.contentEl.querySelector<HTMLSelectElement>('[data-config-source-select]')?.value).toBe(targetPath);
+    expect(modal.contentEl.querySelector('.opencodian-settings-dropdown-trigger')?.textContent).toContain('project-default');
+    expect(modal.contentEl.querySelector('.opencodian-settings-dropdown-trigger')?.textContent).toContain('opencode.jsonc');
   });
 
   it('keeps malformed JSONC bytes repairable and creates a missing default with null revision', async () => {

@@ -79,6 +79,7 @@ const enhanceSettingsSelectWithKeymap = (
   keymap: FakeKeymapHarness['keymap'],
 ) => enhanceSettingsSelect(selectEl, keymap);
 
+// eslint-disable-next-line max-lines-per-function -- Shared control tests keep keyboard, lifecycle, and accessibility contracts together.
 describe('SettingsDropdownControl', () => {
   afterEach(() => {
     document.body.replaceChildren();
@@ -103,6 +104,30 @@ describe('SettingsDropdownControl', () => {
     expect(menuEl?.classList.contains('is-hidden')).toBe(false);
     expect(menuEl?.querySelectorAll('[role="option"]')).toHaveLength(3);
     expect(menuEl?.querySelector('[aria-selected="true"]')?.textContent).toContain('Preset');
+  });
+
+  it('exposes combobox active-descendant semantics and closes before Tab leaves the field', () => {
+    const selectEl = createSelect();
+    enhanceSettingsSelect(selectEl);
+
+    const triggerEl = document.body.querySelector<HTMLButtonElement>('.opencodian-settings-dropdown-trigger');
+    const menuEl = document.body.querySelector<HTMLElement>('.opencodian-settings-dropdown-menu');
+    if (!triggerEl || !menuEl) throw new Error('dropdown DOM missing');
+
+    expect(triggerEl.getAttribute('role')).toBe('combobox');
+    triggerEl.click();
+
+    const activeId = triggerEl.getAttribute('aria-activedescendant');
+    expect(activeId).toBeTruthy();
+    expect(document.getElementById(activeId ?? '')?.getAttribute('role')).toBe('option');
+    const options = Array.from(menuEl.querySelectorAll<HTMLElement>('[role="option"]'));
+    expect(options.every((option) => option.id.length > 0 && option.tabIndex === -1)).toBe(true);
+
+    const tabEvent = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
+    triggerEl.dispatchEvent(tabEvent);
+    expect(tabEvent.defaultPrevented).toBe(false);
+    expect(menuEl.classList.contains('is-hidden')).toBe(true);
+    expect(triggerEl.hasAttribute('aria-activedescendant')).toBe(false);
   });
 
   it('transfers the native select accessible name to the focusable trigger, preferring labelledby', () => {
@@ -238,6 +263,9 @@ describe('SettingsDropdownControl', () => {
       const openTab = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
       triggerEl.dispatchEvent(openTab);
       expect(openTab.defaultPrevented).toBe(false);
+      expect(menuEl.classList.contains('is-hidden')).toBe(true);
+
+      triggerEl.click();
       expect(menuEl.classList.contains('is-hidden')).toBe(false);
 
       const openEscape = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
@@ -245,14 +273,14 @@ describe('SettingsDropdownControl', () => {
 
       expect(openEscape.defaultPrevented).toBe(true);
       expect(menuEl.classList.contains('is-hidden')).toBe(true);
-      expect(keymapHarness.keymap.popScope).toHaveBeenCalledTimes(1);
+      expect(keymapHarness.keymap.popScope).toHaveBeenCalledTimes(2);
       expect(keymapHarness.activeScopes).toHaveLength(0);
 
       const closedEscape = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
       triggerEl.dispatchEvent(closedEscape);
       expect(closedEscape.defaultPrevented).toBe(false);
-      expect(keymapHarness.keymap.pushScope).toHaveBeenCalledTimes(1);
-      expect(keymapHarness.keymap.popScope).toHaveBeenCalledTimes(1);
+      expect(keymapHarness.keymap.pushScope).toHaveBeenCalledTimes(2);
+      expect(keymapHarness.keymap.popScope).toHaveBeenCalledTimes(2);
     } finally {
       handle.destroy();
       keymapHarness.dispose();

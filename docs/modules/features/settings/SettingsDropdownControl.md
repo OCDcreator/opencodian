@@ -35,9 +35,9 @@
 
 ### 自绘 listbox（Portal 模式）
 
-控件渲染一个持久 trigger 和一个 `role="listbox"` 菜单。**打开时，菜单通过 Portal 挂载到 `document.body`**，避免被祖先容器（如 `.opencodian-settings-block` 的 `overflow: hidden`）裁剪。关闭时菜单回到 `rootEl` 内。
+控件渲染一个持久 trigger 和一个 `role="listbox"` 菜单。trigger 使用 `role="combobox"`、`aria-expanded`、`aria-controls` 和打开态 `aria-activedescendant` 指向当前高亮 option；option 按钮保持 `tabindex=-1`，因此焦点不会在 portal 前后产生额外 Tab 停靠点。**打开时，菜单通过 Portal 挂载到 `document.body`**，避免被祖先容器（如 `.opencodian-settings-block` 的 `overflow: hidden`）裁剪。关闭时菜单回到 `rootEl` 内。
 
-菜单项来自当前 `select.options`，保留 disabled option 语义，当前值显示 check icon。支持点击外部关闭、Esc、ArrowUp / ArrowDown、Enter / Space，并在选择后把焦点还给 trigger。
+菜单项来自当前 `select.options`，保留 disabled option 语义（`aria-disabled` + disabled button），当前值显示 check icon。支持点击外部关闭、Esc、ArrowUp / ArrowDown、Home / End、Enter / Space；打开态按 Tab 会先关闭菜单再让浏览器把焦点移出控件，并在选择后把焦点还给 trigger。
 
 Trigger 已消费的 ArrowUp / ArrowDown、Enter / Space 会同时 `preventDefault()` 和 `stopPropagation()`，避免宿主 Settings 把这些 dropdown 操作误判成全局键盘动作。主设置页增强器接收 Obsidian `Keymap`，每个 dropdown 仅在菜单打开时 push 自己的 `Scope`，关闭或销毁时 pop；Scope 只对 `isOpen` 且事件目标为 trigger 的 Escape 处理并返回 `false`，从而优先于宿主 Settings scope 关闭动作。Tab 与关闭状态的 Escape 不会被 dropdown scope 吞掉，也不会泄漏重复 scope。
 

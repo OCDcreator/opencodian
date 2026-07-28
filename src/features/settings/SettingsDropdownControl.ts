@@ -207,6 +207,7 @@ interface MenuRenderContext {
   options: SettingsDropdownOption[];
   highlightedIndex: number;
   selectedIndex: number;
+  optionIdPrefix: string;
   onSelect: (index: number) => void;
 }
 
@@ -224,15 +225,16 @@ function renderMenuOptions(menuEl: HTMLElement, ctx: MenuRenderContext): void {
       isCategoryHeader ? ' is-category-header' : '',
       index === ctx.highlightedIndex ? ' is-highlighted' : '',
     ].join('');
-    const optionEl = menuEl.createEl('button', {
-      cls,
-      attr: {
-        type: 'button',
-        role: isCategoryHeader ? 'presentation' : 'option',
-        'aria-selected': String(index === ctx.selectedIndex),
-        'data-value': option.value,
-      },
-    });
+    const optionEl = menuEl.createEl('button', { cls });
+    optionEl.id = `${ctx.optionIdPrefix}-${index}`;
+    optionEl.type = 'button';
+    optionEl.tabIndex = -1;
+    optionEl.setAttribute('role', isCategoryHeader ? 'presentation' : 'option');
+    optionEl.setAttribute('data-value', option.value);
+    if (!isCategoryHeader) {
+      optionEl.setAttribute('aria-selected', String(index === ctx.selectedIndex));
+      optionEl.setAttribute('aria-disabled', String(option.disabled));
+    }
     // Wrap label in a span so text-overflow: ellipsis works correctly
     optionEl.createSpan({ cls: 'opencodian-settings-dropdown-option-label', text: option.label });
     optionEl.disabled = option.disabled;
@@ -334,6 +336,30 @@ function handleDropdownKeydown(event: KeyboardEvent, ctx: DropdownKeydownContext
     event.stopPropagation();
     return;
   }
+  if (event.key === 'Home' || event.key === 'End') {
+    if (!ctx.isOpen) {
+      ctx.onOpen();
+    } else {
+      const enabledIndexes = ctx.options
+        .map((option, index) => ({ index, option }))
+        .filter(({ option }) => !option.disabled)
+        .map(({ index }) => index);
+      const nextIndex = event.key === 'Home'
+        ? enabledIndexes[0]
+        : enabledIndexes[enabledIndexes.length - 1];
+      if (nextIndex !== undefined) {
+        ctx.setHighlightedIndex(nextIndex);
+        ctx.renderOptions();
+      }
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    return;
+  }
+  if (event.key === 'Tab' && ctx.isOpen) {
+    ctx.onClose();
+    return;
+  }
   if (event.key === 'Escape' && ctx.isOpen) {
     ctx.onClose();
     event.preventDefault();
@@ -378,7 +404,9 @@ export function enhanceSettingsSelect(
     cls: 'opencodian-settings-dropdown-trigger',
     attr: {
       type: 'button',
+      role: 'combobox',
       'aria-haspopup': 'listbox',
+      'aria-autocomplete': 'none',
       'aria-expanded': 'false',
     },
   });
@@ -410,10 +438,19 @@ export function enhanceSettingsSelect(
 
   const getSelectedIndex = () => options.findIndex((option) => option.value === selectEl.value);
   const getFirstEnabledIndex = () => options.findIndex((option) => !option.disabled);
+  const getOptionId = (index: number) => `${menuId}-${index}`;
 
   const syncDisabledState = () => {
     triggerEl.disabled = selectEl.disabled;
     rootEl.toggleClass('is-disabled', selectEl.disabled);
+  };
+
+  const syncActiveDescendant = () => {
+    if (isOpen && highlightedIndex >= 0 && !options[highlightedIndex]?.disabled) {
+      triggerEl.setAttribute('aria-activedescendant', getOptionId(highlightedIndex));
+    } else {
+      triggerEl.removeAttribute('aria-activedescendant');
+    }
   };
 
   const syncAccessibleName = () => {
@@ -489,6 +526,7 @@ export function enhanceSettingsSelect(
     menuEl.removeClass('is-flipped');
     menuEl.removeClass('is-scrollable');
     triggerEl.setAttribute('aria-expanded', 'false');
+    triggerEl.removeAttribute('aria-activedescendant');
     resetPortalStyles();
     portalCleanup?.();
     portalCleanup = null;
@@ -506,8 +544,10 @@ export function enhanceSettingsSelect(
       options,
       highlightedIndex,
       selectedIndex: getSelectedIndex(),
+      optionIdPrefix: menuId,
       onSelect: selectOption,
     });
+    syncActiveDescendant();
   };
 
   const open = () => {
@@ -552,6 +592,12 @@ export function enhanceSettingsSelect(
       return;
     }
     if (isOpen) {
+      if (highlightedIndex < 0 || options[highlightedIndex]?.disabled) {
+        highlightedIndex = getSelectedIndex();
+        if (highlightedIndex < 0 || options[highlightedIndex]?.disabled) {
+          highlightedIndex = getFirstEnabledIndex();
+        }
+      }
       renderOptions();
       positionMenu();
     }
