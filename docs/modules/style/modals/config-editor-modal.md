@@ -72,6 +72,15 @@
 - `.opencodian-model-config-source-conflict`、标题和说明统一允许长文本折行；内部 `.opencodian-config-buttons` 可换行，窄宽 media query 下退化为全宽单列按钮。
 - source path、revision、evidence 和 hidden-secret guidance 属于文本/状态信息，不应通过新卡片、渐变或装饰性阴影提升视觉权重。
 
+## 2026-07-28 Codex session settings spacing alignment
+
+`ConversationSessionSettingsModal` 现在在 `.opencodian-session-settings-modal` 根上消费共享 modal 间距 token，避免这一个会话设置弹窗继续维护独立的 margin 体系：
+
+- modal 内容使用 `22px` 内边距，标题到可滚动正文为 `16px`，一级分组为 `20px`；普通字段的 label/control 列间距为 `16px`，字段行与分组内部为 `12px`。
+- `.opencodian-session-settings-codex-boundary-hint` 是带左右内边距和底部分隔线的辅助说明，不再贴着 Codex 分组边框，也不创建嵌套 card。
+- `.opencodian-session-settings-codex-goal-shell` 与 `.opencodian-session-settings-codex-review-shell` 是同一套平面 FieldGroup：它们以 `12px 16px` 内边距、`12px` 内部间距和顶部细分隔线接入 Codex section；内部 field 取消重复 padding。
+- 线程目标输入行动作和代码审查操作组统一使用 `8px` 间距；输入与按钮最低高度为 `34px`。目标输入行在窄屏切为单列，保持 CJK 文本和控件不横溢。
+
 ## 2026-05-09 Session settings summary rows
 
 `ConversationSessionSettingsModal` 的 Display 分组下方新增全局默认值摘要样式：
