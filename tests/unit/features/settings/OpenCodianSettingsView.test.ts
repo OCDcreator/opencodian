@@ -212,6 +212,32 @@ describe('OpenCodianSettingsView scroll restoration', () => {
   });
 });
 
+describe('OpenCodianSettingsView General version management', () => {
+  it('renders version management as a sibling of the merged General block', () => {
+    const { view } = createSettingsView('classic');
+    const appendMarker = (className: string) => (containerEl: HTMLElement) => {
+      containerEl.createDiv({ cls: className, text: className });
+    };
+    Object.assign(view as unknown as Record<string, unknown>, {
+      createSectionHeading: (containerEl: HTMLElement, title: string) => containerEl.createEl('h3', { text: title }),
+      renderLayoutModeSetting: appendMarker('layout-mode-setting'),
+      renderLanguageSetting: appendMarker('language-setting'),
+      renderSettingsInEditorAreaSetting: appendMarker('settings-editor-area-setting'),
+      renderPluginUpdateSection: appendMarker('opencodian-plugin-update-section'),
+    });
+
+    (view as unknown as { renderClassicGeneralSection: (containerEl: HTMLElement) => void })
+      .renderClassicGeneralSection(view.contentEl);
+
+    const generalBlock = view.contentEl.querySelector<HTMLElement>('.opencodian-settings-general-merged-block');
+    const updateSection = view.contentEl.querySelector<HTMLElement>('.opencodian-plugin-update-section');
+    expect(generalBlock).not.toBeNull();
+    expect(generalBlock?.querySelector('.opencodian-plugin-update-section')).toBeNull();
+    expect(updateSection?.parentElement).toBe(view.contentEl);
+    expect(updateSection?.previousElementSibling).toBe(generalBlock);
+  });
+});
+
 describe('OpenCodianSettingsView classic layout', () => {
   it('renders editor-area classic settings inside the ItemView content element', async () => {
     const { view } = createSettingsView('classic');

@@ -1,15 +1,17 @@
-/* Version-management subsection: heading + description above a single flat
-   status panel (current version block, state badge, status detail, actions),
-   followed by the release-history and local-backup lists. The panel follows
-   the Codex settings-card language: hairline border on background-secondary,
-   pill badges with status dots, and a tinted notice for check failures. */
-
 .opencodian-plugin-update-section {
   display: grid;
-  gap: 10px;
-  margin-top: 18px;
-  padding-top: 16px;
-  border-top: 1px solid var(--background-modifier-border);
+  gap: var(--opencodian-settings-space-lg);
+  margin-top: 0;
+  padding: var(--opencodian-settings-space-xl);
+  border: 1px solid var(--opencodian-settings-section-border);
+  border-radius: var(--opencodian-settings-form-row-radius);
+  background: var(--opencodian-settings-section-bg);
+}
+
+.opencodian-settings[data-settings-layout-mode='classic']
+  > .opencodian-settings-general-merged-block
+  + .opencodian-plugin-update-section {
+  margin-top: var(--opencodian-settings-space-lg);
 }
 
 .opencodian-plugin-update-description,
@@ -20,15 +22,9 @@
   font-size: var(--font-ui-small);
 }
 
-/* Status panel */
-
 .opencodian-plugin-update-panel {
   display: grid;
-  gap: 10px;
-  padding: 12px 14px;
-  border: 1px solid var(--background-modifier-border);
-  border-radius: 10px;
-  background: var(--background-secondary);
+  gap: var(--opencodian-settings-space-md);
 }
 
 .opencodian-plugin-update-panel-header {
@@ -36,13 +32,13 @@
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 8px 12px;
+  gap: var(--opencodian-settings-space-md) var(--opencodian-settings-space-lg);
   min-width: 0;
 }
 
 .opencodian-plugin-update-version-block {
   display: grid;
-  gap: 2px;
+  gap: var(--opencodian-settings-space-xs);
   min-width: 0;
 }
 
@@ -67,7 +63,7 @@
   align-items: center;
   gap: 6px;
   flex-shrink: 0;
-  padding: 3px 10px;
+  padding: var(--opencodian-settings-space-xs) var(--opencodian-settings-space-md);
   border: 1px solid var(--background-modifier-border);
   border-radius: 999px;
   background: var(--background-primary);
@@ -149,8 +145,8 @@
 
 .opencodian-plugin-update-status-detail.is-error {
   display: grid;
-  gap: 3px;
-  padding: 8px 10px;
+  gap: var(--opencodian-settings-space-xs);
+  padding: var(--opencodian-settings-space-md);
   border: 1px solid rgba(var(--color-red-rgb, 224, 49, 49), 0.35);
   border-radius: 6px;
   background: rgba(var(--color-red-rgb, 224, 49, 49), 0.08);
@@ -171,14 +167,12 @@
   overflow-wrap: anywhere;
 }
 
-/* Actions sit inside the panel behind a hairline separator. */
-
 .opencodian-plugin-update-actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
-  padding-top: 10px;
+  gap: var(--opencodian-settings-space-md);
+  padding-top: var(--opencodian-settings-space-lg);
   border-top: 1px solid var(--background-modifier-border);
 }
 
@@ -202,11 +196,11 @@
 
 .opencodian-plugin-update-list-group {
   display: grid;
-  gap: 6px;
+  gap: var(--opencodian-settings-space-sm);
 }
 
 .opencodian-plugin-update-list-group h5 {
-  margin: 8px 0 0;
+  margin: 0;
   color: var(--text-normal);
   font-size: var(--font-ui-small);
   font-weight: 600;
@@ -214,18 +208,16 @@
 
 .opencodian-plugin-update-list {
   display: grid;
-  border: 1px solid var(--background-modifier-border);
-  border-radius: var(--radius-s);
-  overflow: hidden;
+  background: transparent;
 }
 
 .opencodian-plugin-update-version-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--opencodian-settings-space-lg);
   min-height: 44px;
-  padding: 8px 10px;
+  padding: var(--opencodian-settings-space-md) var(--opencodian-settings-space-lg);
   border-bottom: 1px solid var(--background-modifier-border);
   transition: background-color 150ms ease-out;
 }
@@ -247,7 +239,7 @@
 .opencodian-plugin-update-version-identity {
   display: grid;
   min-width: 0;
-  gap: 3px;
+  gap: var(--opencodian-settings-space-xs);
 }
 
 .opencodian-plugin-update-version {
@@ -258,7 +250,7 @@
 
 .opencodian-plugin-update-current-badge {
   width: fit-content;
-  padding: 1px 8px;
+  padding: var(--opencodian-settings-space-xs) var(--opencodian-settings-space-md);
   border: 1px solid var(--background-modifier-border);
   border-radius: 999px;
   background: var(--background-primary);

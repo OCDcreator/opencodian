@@ -359,7 +359,7 @@ export class SettingsTabbedRenderer {
     this.deps.renderLayoutModeSetting(blockBodyEl);
     this.deps.renderLanguageSetting(blockBodyEl);
     this.deps.renderSettingsInEditorAreaSetting(blockBodyEl);
-    this.deps.renderPluginUpdateSection(blockBodyEl);
+    this.deps.renderPluginUpdateSection(containerEl);
   }
 
   private renderServerContent(containerEl: HTMLElement, secondaryTabId: string): void {

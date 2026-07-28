@@ -29,6 +29,7 @@
 - `General` 合并面板里的布局模式渲染回调
 - `General` 合并面板里的语言切换渲染回调
 - `General` 合并面板里的 editor-area settings 开关渲染回调，实际保存逻辑留在 settings shell
+- 独立版本管理卡片的渲染回调；它位于 General > Basic 合并基础卡片之后，而不是卡片内部
 
 ## 标签导航
 
@@ -39,7 +40,7 @@
 
 ## 内容路由
 
-`renderContent()` 根据 `primaryTabId` 分发到对应 section 的 tabbed 渲染。`server` 现在只保留 `connection` / `auth` / `status` 三个二级标签；`claude-code` 路由到 `SettingsClaudeCodeSection`，提供 Claude Code adapter 配置基础和 runtime diagnostics，但只有 Claude Code 是当前 active backend 时才显示。`debug` 的 `capability-lab` 二级标签路由到 `SettingsCapabilityLabSection`；该 section 内部再提供 Claude Code / OpenCode / Codex manual-activation backend tabs。Claude Code 拥有深诊断，OpenCode 只展示安全 capability snapshot/refresh/export，Codex 只展示自身矩阵；未访问 panel 惰性挂载。`MCP` 已提升为独立一级标签，并单独路由到 `SettingsMcpSection`。`skills` 标签路由到 `SettingsSkillSection`，负责技能目录与 `skill` 权限入口；`tools` 标签路由到 `SettingsToolSection`，根据 `secondaryTabId` 选择 `builtin` 或 `custom` 模式渲染；`acp` 标签路由到 `SettingsAcpSection`，负责 ACP agent 配置 CRUD。`formatter` 标签路由到 `SettingsFormatterSection`，该 section 自行处理 overview/config 两个二级面板的渲染。`user` 标签通过 `renderUserContent(containerEl, secondaryTabId)` 委托回 `SettingsUserSection`，renderer 不直接了解 profile/prompt/tags 的具体字段渲染。`general` 是一个特殊主类目：`basic` 二级标签直接在一张合并卡片里同时渲染 `settingsLayoutMode`、语言切换与 editor-area settings 开关；`backend` 二级标签委托给 `SettingsBackendSection` 管理 backend enablement；`MCP` 现在也不再显示单独的二级标签条，而是直接展示自己的内容面板。
+`renderContent()` 根据 `primaryTabId` 分发到对应 section 的 tabbed 渲染。`server` 现在只保留 `connection` / `auth` / `status` 三个二级标签；`claude-code` 路由到 `SettingsClaudeCodeSection`，提供 Claude Code adapter 配置基础和 runtime diagnostics，但只有 Claude Code 是当前 active backend 时才显示。`debug` 的 `capability-lab` 二级标签路由到 `SettingsCapabilityLabSection`；该 section 内部再提供 Claude Code / OpenCode / Codex manual-activation backend tabs。Claude Code 拥有深诊断，OpenCode 只展示安全 capability snapshot/refresh/export，Codex 只展示自身矩阵；未访问 panel 惰性挂载。`MCP` 已提升为独立一级标签，并单独路由到 `SettingsMcpSection`。`skills` 标签路由到 `SettingsSkillSection`，负责技能目录与 `skill` 权限入口；`tools` 标签路由到 `SettingsToolSection`，根据 `secondaryTabId` 选择 `builtin` 或 `custom` 模式渲染；`acp` 标签路由到 `SettingsAcpSection`，负责 ACP agent 配置 CRUD。`formatter` 标签路由到 `SettingsFormatterSection`，该 section 自行处理 overview/config 两个二级面板的渲染。`user` 标签通过 `renderUserContent(containerEl, secondaryTabId)` 委托回 `SettingsUserSection`，renderer 不直接了解 profile/prompt/tags 的具体字段渲染。`general` 是一个特殊主类目：`basic` 二级标签在一张合并基础卡片里渲染 `settingsLayoutMode`、语言切换与 editor-area settings 开关，并将 `SettingsPluginUpdateSection` 作为紧随其后的独立 sibling card；`backend` 二级标签委托给 `SettingsBackendSection` 管理 backend enablement；`MCP` 现在也不再显示单独的二级标签条，而是直接展示自己的内容面板。
 
 Tabbed plugin 内容创建 `SettingsPluginSection` 后，必须通过 `setPluginSection()` 把 owner 注册回标准 settings tab 或 editor-area settings view。这样下一次一级/二级标签重绘会先调用旧 owner 的 `dispose()`，释放唯一的 SDK plugin evidence observer；不能只替换 DOM，否则再次进入 Overview 会触发重复 observer 拒绝。Codex Account 内容同样会通过 `setCodexSection()` 注册 owner，确保每次重绘或关闭前取消账号卡片的 Codex `connected` 监听。
 
@@ -47,9 +48,9 @@ Tabbed plugin 内容创建 `SettingsPluginSection` 后，必须通过 `setPlugin
 
 同一个 registry 事件也会刷新已打开的 editor-area settings view：每个 leaf 在重绘前调用 `syncToActiveBackend()`，因此 Claude Code 的 `tools` 页面切到 Codex 时会进入 Codex 已保存的二级页（或 `connection` 默认页），不会因旧页不可见而退回 General。
 
-## 2026-07-27 General version-management seam
+## 2026-07-28 General version-management seam
 
-`TabRendererDependencies.renderPluginUpdateSection()` is called from the tabbed `general/basic` content after the layout, locale, and editor-area controls. The renderer keeps this as a shell seam: `SettingsPluginUpdateSection` owns remote release history, local backups, confirmations, and operation state, while standard and editor-area settings shells each provide their own full redraw callback.
+`TabRendererDependencies.renderPluginUpdateSection()` is called from the tabbed `general/basic` content after the merged base-settings card has been created. It appends the existing `SettingsPluginUpdateSection` root directly to the content shell, so the version-management card is a sibling of `.opencodian-settings-general-merged-block`, never its descendant or a nested `opencodian-settings-block`. The renderer keeps this as a shell seam: `SettingsPluginUpdateSection` owns remote release history, local backups, confirmations, and operation state, while standard and editor-area settings shells each provide their own full redraw callback.
 
 当 `secondaryTabId === 'capability-lab'` 时，`renderDebugContent` 直接创建 `SettingsCapabilityLabSection` 实例并调用 `attachTabbed()`，不经过 `SettingsDebugSection`。实验内容继续标记为 DIAGNOSTIC / EXPERIMENTAL / NOT STABLE；backend tab 选择会作为独立 UI preference 持久化，但不会改变 `activeBackend`、enabled backends 或实验 gate。
 

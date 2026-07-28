@@ -839,11 +839,11 @@ describe('OpenCodianSettingTab layout shell', () => {
     ).toEqual(['General']);
     const generalBlock = tab.containerEl.querySelector<HTMLElement>('.opencodian-settings-general-merged-block');
     expect(generalBlock).not.toBeNull();
-    expect(
-      Array.from(generalBlock!.querySelectorAll<HTMLElement>('.opencodian-settings-subsection-heading')).map(
-        (element) => element.textContent?.trim(),
-      ),
-    ).toEqual(['Plugin version management']);
+    expect(generalBlock?.querySelector('.opencodian-plugin-update-section')).toBeNull();
+    const updateSection = tab.containerEl.querySelector<HTMLElement>('.opencodian-plugin-update-section');
+    expect(updateSection).not.toBeNull();
+    expect(updateSection?.parentElement).toBe(tab.containerEl);
+    expect(updateSection?.previousElementSibling).toBe(generalBlock);
     expect(generalBlock?.classList.contains('opencodian-settings-section')).toBe(true);
     expect(generalBlock?.dataset.settingsSurface).toBe('section');
     expect(generalBlock?.querySelector('.opencodian-settings-section-body')).not.toBeNull();

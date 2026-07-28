@@ -176,6 +176,11 @@ describe('SettingsTabbedRenderer', () => {
     expect(generalBlockEl?.classList.contains('opencodian-settings-section')).toBe(true);
     expect(generalBlockEl?.dataset.settingsSurface).toBe('section');
     expect(generalBlockEl?.querySelector('.opencodian-settings-section-body')).not.toBeNull();
+    expect(generalBlockEl?.querySelector('.plugin-update-marker')).toBeNull();
+    const updateSectionEl = containerEl.querySelector<HTMLElement>('.plugin-update-marker');
+    expect(updateSectionEl).not.toBeNull();
+    expect(updateSectionEl?.parentElement).toBe(shellEl);
+    expect(updateSectionEl?.previousElementSibling).toBe(generalBlockEl);
   });
 
   it('shows MCP as a top-level tab before formatter and language servers', () => {

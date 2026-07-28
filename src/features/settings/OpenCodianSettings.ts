@@ -407,7 +407,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     this.renderLayoutModeSetting(blockBodyEl);
     this.renderLanguageSetting(blockBodyEl);
     this.renderSettingsInEditorAreaSetting(blockBodyEl);
-    this.renderPluginUpdateSection(blockBodyEl);
+    this.renderPluginUpdateSection(containerEl);
   }
 
   private addServerSettings(containerEl: HTMLElement): HTMLHeadingElement {

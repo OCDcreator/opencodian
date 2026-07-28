@@ -329,7 +329,7 @@ export class OpenCodianSettingsView extends ItemView {
     this.renderLayoutModeSetting(blockBodyEl);
     this.renderLanguageSetting(blockBodyEl);
     this.renderSettingsInEditorAreaSetting(blockBodyEl);
-    this.renderPluginUpdateSection(blockBodyEl);
+    this.renderPluginUpdateSection(containerEl);
   }
 
   private addServerSettings(containerEl: HTMLElement): void {
