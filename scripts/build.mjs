@@ -4,7 +4,6 @@ import process from "process";
 import builtins from "builtin-modules";
 import { buildCss } from "./build-css.mjs";
 import { pruneClaudeAgentSdkRuntimeArtifacts } from "./claude-sdk-dist.mjs";
-import { copyCodexRuntime } from "./codex-sdk-dist.mjs";
 import { generateBuildId } from './build-utils.mjs';
 
 const banner =
@@ -50,6 +49,12 @@ try {
       'import.meta.url': '__OPENCODIAN_IMPORT_META_URL__',
     },
     entryPoints: ['src/main.ts'],
+    // Keep Obsidian's renderer-oriented resolution for the plugin, but use
+    // `ws`'s Node entry for the local app-server transport. The package's
+    // normal browser condition deliberately throws at runtime.
+    alias: {
+      ws: path.resolve('node_modules/ws/index.js'),
+    },
     bundle: true,
     external: [
       'obsidian',
@@ -91,7 +96,6 @@ if (prod) {
 
   copyDirectoryIfExists('assets', 'dist/assets');
   pruneClaudeAgentSdkRuntimeArtifacts(process.cwd(), distDir);
-  copyCodexRuntime(process.cwd(), distDir);
   
   await context.dispose();
   console.log('Production build complete!');

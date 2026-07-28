@@ -180,6 +180,8 @@ export type CodexWebSearchMode = 'disabled' | 'cached' | 'live';
 export type CodexApprovalPolicy = 'inherit' | 'untrusted' | 'on-request' | 'never';
 
 export interface CodexBackendSettings {
+  /** Optional user-installed Codex CLI executable path. Empty uses PATH discovery. */
+  executablePath: string;
   /** OpenAI API key. Falls back to OPENAI_API_KEY env var / Codex CLI login. */
   apiKey: string;
   /** Model name passed as ThreadOptions.model → SDK --model CLI arg. Empty string = SDK default. */
@@ -492,6 +494,7 @@ export function getDefaultBackendSettings(): BackendSettings {
 
 export function getDefaultCodexBackendSettings(): CodexBackendSettings {
   return {
+    executablePath: '',
     apiKey: '',
     model: '',
     pricingProviderId: '',
@@ -860,13 +863,14 @@ function normalizeCodexBackendSettings(value: unknown): CodexBackendSettings {
   const VALID_WEB_SEARCH: readonly CodexWebSearchMode[] = ['disabled', 'cached', 'live'];
   const VALID_APPROVAL_POLICY: readonly CodexApprovalPolicy[] = ['inherit', 'untrusted', 'on-request', 'never'];
   const candidate = value && typeof value === 'object' && !Array.isArray(value)
-    ? value as { apiKey?: unknown; model?: unknown; pricingProviderId?: unknown; pricingEndpoint?: unknown; sandboxMode?: unknown; modelReasoningEffort?: unknown; additionalDirectories?: unknown; networkAccessEnabled?: unknown; webSearchMode?: unknown; approvalPolicy?: unknown }
+    ? value as { executablePath?: unknown; apiKey?: unknown; model?: unknown; pricingProviderId?: unknown; pricingEndpoint?: unknown; sandboxMode?: unknown; modelReasoningEffort?: unknown; additionalDirectories?: unknown; networkAccessEnabled?: unknown; webSearchMode?: unknown; approvalPolicy?: unknown }
     : {};
   const rawSandbox = typeof candidate.sandboxMode === 'string' ? candidate.sandboxMode : '';
   const rawEffort = typeof candidate.modelReasoningEffort === 'string' ? candidate.modelReasoningEffort : '';
   const rawWebSearch = typeof candidate.webSearchMode === 'string' ? candidate.webSearchMode : '';
   const rawApprovalPolicy = typeof candidate.approvalPolicy === 'string' ? candidate.approvalPolicy : '';
   return {
+    executablePath: typeof candidate.executablePath === 'string' ? candidate.executablePath.trim() : '',
     apiKey: typeof candidate.apiKey === 'string' ? candidate.apiKey : '',
     model: typeof candidate.model === 'string' ? candidate.model : '',
     pricingProviderId: typeof candidate.pricingProviderId === 'string'

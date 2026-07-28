@@ -3,6 +3,7 @@
 > **源码**: `src/core/types/settings.ts`
 > **状态**: [REVIEW]
 > **Updated**: 2026-07-24 — added `CodexApprovalPolicy` type (`'inherit'|'untrusted'|'on-request'|'never'`), `CodexBackendSettings.approvalPolicy` (default `'inherit'`), and normalization (missing/unknown → `'inherit'`, no migration to `on-request`).
+> **Updated**: 2026-07-28 — `CodexBackendSettings.executablePath` defaults to `''` and is trim-normalized; an empty string means automatic user-CLI discovery.
 
 ## 概述
 
@@ -168,7 +169,7 @@ OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings`、`DEFAULT_
 | `normalizeEffortLevel(value)` | 归一化努力级别，`'max'` → `'xhigh'`，默认 `'high'` |
 | `normalizeThinkingBudget(value)` | 归一化思考预算，支持字符串/数字输入 |
 | `normalizeBackendSettings(value)` | 归一化 backend 专属设置对象，包含 Claude Code 和 Codex 后端设置 |
-| `normalizeCodexBackendSettings(value)` | 归一化 Codex 后端设置（`apiKey` 字段） |
+| `normalizeCodexBackendSettings(value)` | 归一化 Codex 后端设置（含 trim 后的 `executablePath`、`apiKey` 与 runtime defaults） |
 | `normalizeClaudeCodeBackendSettings(value)` | 归一化 Claude Code executable、setting sources、permission/thinking/effort、additional directories、model、allowedTools/disallowedTools、maxTurns/maxBudgetUsd、env、file checkpoint、hook event、subagent transcript/progress 和 debug channel 开关字段 |
 | `normalizeClaudeCodeDebugChannelSettings(value)` | 归一化 Claude Code debug workbench channel record，未知 channel 丢弃，缺失 channel 回退默认值 |
 | `normalizeClaudeCodeStringArray(value)` | 归一化字符串数组，trim 后去重、过滤空字符串和非字符串条目；用于 allowed/disallowed tools 时避免把带空白的工具名传入 SDK |

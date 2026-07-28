@@ -51,6 +51,18 @@ describe('CodexAdapter — app-server start/stop lifecycle', () => {
     expect(MockedCodexAppServerClient).toHaveBeenCalledWith({ codexPathOverride: '/mock/codex' });
   });
 
+  it('enters error without constructing the SDK when wiring reports no user CLI', async () => {
+    const createCodex = jest.fn(async () => ({}) as any);
+    adapter = new CodexAdapter({
+      codexCliResolution: { mode: 'missing', reason: 'cli-not-on-path' },
+      createCodex,
+    });
+
+    await expect(adapter.start()).rejects.toThrow('Codex CLI was not found');
+    expect(createCodex).not.toHaveBeenCalled();
+    expect(adapter.status).toBe('error');
+  });
+
   it('initializes app-server client with the default Codex binary when no override is configured', async () => {
     adapter = new CodexAdapter({
       createCodex: async () => ({}) as any,
@@ -58,11 +70,10 @@ describe('CodexAdapter — app-server start/stop lifecycle', () => {
     await adapter.start();
     expect(MockedCodexAppServerClient).toHaveBeenCalledWith({
       codexPathOverride: undefined,
-      pluginDir: undefined,
     });
   });
 
-  it('continues even if app-server client fails to start', async () => {
+  it('continues with the SDK fallback when app-server protocol negotiation fails', async () => {
     MockedCodexAppServerClient.mockImplementation(() => ({
       start: jest.fn().mockRejectedValue(new Error('spawn failed')),
       stop: jest.fn(),
@@ -75,6 +86,25 @@ describe('CodexAdapter — app-server start/stop lifecycle', () => {
       createCodex: async () => ({}) as any,
     });
     await expect(adapter.start()).resolves.not.toThrow();
+    expect(adapter.status).toBe('connected');
+  });
+
+  it('enters error instead of reporting connected when the executable is missing', async () => {
+    const error = Object.assign(new Error('spawn /missing/codex ENOENT'), { code: 'ENOENT' });
+    MockedCodexAppServerClient.mockImplementation(() => ({
+      start: jest.fn().mockRejectedValue(error),
+      stop: jest.fn(),
+      listThreads: jest.fn(),
+      readThread: jest.fn(),
+    } as unknown as CodexAppServerClient));
+
+    adapter = new CodexAdapter({
+      codexPathOverride: '/missing/codex',
+      createCodex: async () => ({}) as any,
+    });
+
+    await expect(adapter.start()).rejects.toThrow('Codex executable could not be started');
+    expect(adapter.status).toBe('error');
   });
 
   it('stops app-server client when stopping adapter', async () => {

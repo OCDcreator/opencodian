@@ -77,6 +77,7 @@
 - `src/core/agents/backend/ClaudeCodeStreamNormalizer.ts`：Claude SDK message 到 `StreamChunk` 的转换 helper
 - `src/core/agents/backend/ClaudeCodePermissionBridge.ts`：Claude `canUseTool` / `AskUserQuestion` 到 OpenCodian permission/question host 的桥接 helper
 - `src/core/agents/backend/CodexAdapter.ts`：Codex SDK adapter 骨架（Chat + Session）
+- `src/core/agents/backend/CodexCliResolver.ts`：用户安装 Codex CLI 的显式路径 / GUI PATH / Windows npm shim 解析；不读取插件私有 runtime
 - `src/core/agents/backend/CodexDefaultApprovalHost.ts`：Codex 审批 bridge 的默认 host 实现；连接 adapter 的 `setApprovalHost` 到 view 的 question/inline-card UI
 - `src/core/agents/backend/CodexStreamNormalizer.ts`：Codex SDK ThreadEvent → StreamChunk 转换器
 - `src/core/agents/backend/CodexAppServerClientTypes.ts`：从 `CodexAppServerClient` 拆出的纯 wire 类型模块（thread/model/account/MCP/review 等），由 `CodexAppServerClient` 通过 `export *` 重新导出

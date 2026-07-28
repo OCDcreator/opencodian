@@ -16,7 +16,8 @@
  */
 
 import { spawn } from 'node:child_process';
-import * as path from 'node:path';
+
+import WebSocket from 'ws';
 
 import { createLogger } from '../../../shared';
 import type { AppServerServerRequestHandler } from './CodexAppServerClientTypes';
@@ -60,8 +61,6 @@ export class CodexAppServerTransport {
 
   /** Absolute path to the Codex CLI binary (optional). */
   protected codexPathOverride?: string;
-  /** Absolute path to the Obsidian plugin directory (for resolving `ws`). */
-  protected pluginDir?: string;
   /**
    * Working directory the owned app-server process is spawned with. When set
    * to the active vault path, project-scoped resources (e.g. `.agents/skills`)
@@ -70,9 +69,8 @@ export class CodexAppServerTransport {
    */
   protected workingDirectory?: string;
 
-  constructor(options?: { codexPathOverride?: string; pluginDir?: string; workingDirectory?: string }) {
+  constructor(options?: { codexPathOverride?: string; workingDirectory?: string }) {
     this.codexPathOverride = options?.codexPathOverride;
-    this.pluginDir = options?.pluginDir;
     this.workingDirectory = options?.workingDirectory;
   }
 
@@ -105,17 +103,9 @@ export class CodexAppServerTransport {
     this.wsUrl = wsUrl;
     logger.info('App-server WebSocket URL', { wsUrl });
 
-    // Connect via WebSocket using Node `ws`.
-    // Obsidian's renderer WebSocket is blocked for localhost, so we load the
-    // Node ws package from the plugin directory at runtime using `require`,
-    // which resolves through Node's module loader. Dynamic `import()` in the
-    // renderer would incorrectly go through the browser fetch path.
-    const wsPackagePath = this.pluginDir
-      ? path.join(this.pluginDir, 'node_modules', 'ws')
-      : 'ws';
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const WS = require(wsPackagePath) as new (url: string) => WebSocket;
-    const ws = new WS(wsUrl);
+    // Node `ws` is statically bundled into main.js. Obsidian's renderer
+    // WebSocket cannot connect to localhost app-server sockets.
+    const ws = new WebSocket(wsUrl);
     this.ws = ws;
 
     await new Promise<void>((resolve, reject) => {
@@ -310,7 +300,7 @@ export class CodexAppServerTransport {
 
   /** Send a JSON-RPC reply to a server-initiated request (result or error). */
   private sendServerRequestReply(id: number | string, result: unknown, error: { code: number; message: string } | undefined): void {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+    if (!this.ws || this.ws.readyState !== 1) {
       logger.warn('Cannot reply to server request; WebSocket not open', { id });
       return;
     }
@@ -322,7 +312,7 @@ export class CodexAppServerTransport {
 
   protected request(method: string, params?: Record<string, unknown>, timeoutMs?: number): Promise<unknown> {
     return new Promise((resolve, reject) => {
-      if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      if (!this.ws || this.ws.readyState !== 1) {
         reject(new Error('WebSocket not open'));
         return;
       }

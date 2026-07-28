@@ -1,4 +1,5 @@
 /* eslint-disable max-lines, max-lines-per-function -- Covers the full Codex settings surface across connection/permissions/resume-inspect/account tabs; splitting would fragment the per-tab routing and control-persistence coverage. */
+import * as obsidian from 'obsidian';
 import { Setting } from 'obsidian';
 
 import {
@@ -12,7 +13,11 @@ import type OpenCodianPlugin from '../../../../src/main';
 type TestPlugin = {
   settings: OpenCodianPlugin['settings'];
   saveSettings: jest.Mock;
-  app: { workspace: Record<string, unknown> };
+  app: {
+    workspace: Record<string, unknown>;
+    plugins?: { reloadPlugin?: jest.Mock };
+  };
+  manifest: { id: string };
   agentServiceRegistry: { get: jest.Mock };
   activateView: jest.Mock;
   createConversationFromBackendSession: jest.Mock;
@@ -37,7 +42,9 @@ function createPlugin(): TestPlugin {
     saveSettings: jest.fn().mockResolvedValue(undefined),
     app: {
       workspace: {},
+      plugins: { reloadPlugin: jest.fn().mockResolvedValue(undefined) },
     },
+    manifest: { id: 'opencodian' },
     agentServiceRegistry: {
       get: jest.fn((backend: string) => backend === 'codex' ? {} : null),
     },
@@ -185,7 +192,7 @@ describe('SettingsCodexSection stable surface', () => {
     jest.restoreAllMocks();
   });
 
-  it('renders only apiKey and model controls', () => {
+  it('renders the executable path alongside the existing connection controls', () => {
     const plugin = createPlugin();
     const section = new SettingsCodexSection({
       plugin: plugin as never,
@@ -195,7 +202,90 @@ describe('SettingsCodexSection stable surface', () => {
     section.attach(containerEl);
 
     expect(settingNames).toContain(t('settings.codex.apiKey.name'));
+    expect(settingNames).toContain(t('settings.codex.executablePath.name'));
     expect(settingNames).toContain(t('settings.codex.model.name'));
+  });
+
+  it('saves the executable path without live-applying it or reloading the plugin', async () => {
+    const plugin = createPlugin();
+    const section = new SettingsCodexSection({
+      plugin: plugin as never,
+      createSectionHeading,
+    });
+    section.attach(document.createElement('div'));
+
+    const textControl = (Setting.prototype.addText as jest.Mock).mock.calls
+      .find(([callback]) => {
+        const captured = {
+          setPlaceholder: jest.fn().mockReturnThis(),
+          setValue: jest.fn().mockReturnThis(),
+          onChange: jest.fn().mockReturnThis(),
+        };
+        callback(captured);
+        return captured.setPlaceholder.mock.calls.some(([value]) => value === t('settings.codex.executablePath.placeholder'));
+      });
+    expect(textControl).toBeTruthy();
+
+    const captured = {
+      setPlaceholder: jest.fn().mockReturnThis(),
+      setValue: jest.fn().mockReturnThis(),
+      onChange: jest.fn().mockReturnThis(),
+    };
+    (textControl as [jest.Mock])[0](captured);
+    const handler = captured.onChange.mock.calls[0][0] as (value: string) => Promise<void>;
+
+    await handler('  C:\\Tools\\codex.exe  ');
+
+    expect(plugin.settings.backendSettings.codex.executablePath).toBe('C:\\Tools\\codex.exe');
+    expect(plugin.saveSettings).toHaveBeenCalledTimes(1);
+    expect(plugin.app.plugins?.reloadPlugin).not.toHaveBeenCalled();
+  });
+
+  it('reloads OpenCodian on explicit user request', async () => {
+    const plugin = createPlugin();
+    const section = new SettingsCodexSection({
+      plugin: plugin as never,
+      createSectionHeading,
+    });
+    section.attach(document.createElement('div'));
+
+    const reload = buttonRecords.find((record) => record.name === t('settings.codex.reload.name'));
+    expect(reload?.label).toBe(t('settings.codex.reload.button'));
+    await reload?.onClick?.();
+
+    expect(plugin.app.plugins?.reloadPlugin).toHaveBeenCalledWith('opencodian');
+  });
+
+  it('shows a manual reload instruction when Obsidian cannot reload the plugin', async () => {
+    const noticeSpy = jest.spyOn(obsidian, 'Notice').mockImplementation(() => undefined as never);
+    const plugin = createPlugin();
+    plugin.app.plugins = undefined;
+    const section = new SettingsCodexSection({
+      plugin: plugin as never,
+      createSectionHeading,
+    });
+    section.attach(document.createElement('div'));
+
+    const reload = buttonRecords.find((record) => record.name === t('settings.codex.reload.name'));
+    await reload?.onClick?.();
+
+    expect(noticeSpy).toHaveBeenLastCalledWith(t('settings.codex.reload.manual'));
+  });
+
+  it('shows a manual recovery instruction when plugin reload rejects', async () => {
+    const noticeSpy = jest.spyOn(obsidian, 'Notice').mockImplementation(() => undefined as never);
+    const plugin = createPlugin();
+    plugin.app.plugins?.reloadPlugin?.mockRejectedValueOnce(new Error('reload failed'));
+    const section = new SettingsCodexSection({
+      plugin: plugin as never,
+      createSectionHeading,
+    });
+    section.attach(document.createElement('div'));
+
+    const reload = buttonRecords.find((record) => record.name === t('settings.codex.reload.name'));
+    await reload?.onClick?.();
+
+    expect(noticeSpy).toHaveBeenLastCalledWith(t('settings.codex.reload.failed'));
   });
 
   it('renders sandboxMode control', () => {
@@ -379,6 +469,8 @@ describe('SettingsCodexSection stable surface', () => {
     // Connection owns apiKey, model, reasoning and web search. Sandbox,
     // network, and additional directories moved to the Permissions tab.
     expect(settingNames).toEqual([
+      t('settings.codex.executablePath.name'),
+      t('settings.codex.reload.name'),
       t('settings.codex.apiKey.name'),
       t('settings.codex.model.name'),
       t('settings.codex.reasoning.name'),

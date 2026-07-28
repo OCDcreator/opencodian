@@ -1,6 +1,31 @@
 import { prepareLoadedSettingsBootstrapState } from '../../../../src/core/types/settingsLoadNormalization';
 
 describe('prepareLoadedSettingsBootstrapState backend normalization', () => {
+  it('normalizes the optional Codex executable path for migration-safe persistence', () => {
+    const state = prepareLoadedSettingsBootstrapState({
+      core: {
+        data: {
+          backendSettings: {
+            codex: { executablePath: '  ~/bin/codex  ' },
+          },
+        },
+        filePath: '.opencodian/settings.core.json',
+        source: 'primary',
+        shouldPersist: false,
+      },
+      ui: {
+        data: null,
+        filePath: '.opencodian/settings.ui.json',
+        source: 'missing',
+        shouldPersist: false,
+      },
+      writable: true,
+      shouldPersist: false,
+    });
+
+    expect(state.settings.backendSettings.codex.executablePath).toBe('~/bin/codex');
+  });
+
   it('keeps opencode enabled for a fresh install with no persisted settings', () => {
     const state = prepareLoadedSettingsBootstrapState({
       core: {

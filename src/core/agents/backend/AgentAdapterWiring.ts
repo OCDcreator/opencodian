@@ -8,12 +8,11 @@
  * See AGENTS.md: "move stable responsibilities to adjacent owners when touching them."
  */
 
-import * as path from 'path';
-
 import type { CodexBackendSettings } from '../../types/settings';
 import type { AgentService } from './AgentService';
 import type { AgentServiceRegistry } from './AgentServiceRegistry';
 import { CodexAdapter } from './CodexAdapter';
+import { resolveCodexCli } from './CodexCliResolver';
 
 export interface WireHiddenAdaptersOptions {
   registry: AgentServiceRegistry;
@@ -21,72 +20,14 @@ export interface WireHiddenAdaptersOptions {
   adapters: AgentService[];
   /** Vault base path, used as working directory for hidden adapters. */
   vaultPath: string | undefined;
-  /** Plugin directory (absolute path). Used to locate bundled runtime binaries. */
-  pluginDir: string;
+  /**
+   * Legacy bootstrap context retained so the entry-point call shape stays
+   * stable. It is intentionally ignored: Codex must never be discovered from
+   * plugin-private paths or bundled runtime binaries.
+   */
+  pluginDir?: string;
   /** Codex-specific settings from plugin configuration. */
   codexSettings?: CodexBackendSettings;
-}
-
-/**
- * Resolve the Codex CLI binary path from the plugin directory.
- *
- * The Codex SDK's built-in binary discovery (findCodexPath) uses
- * require.resolve() chained through createRequire(import.meta.url),
- * which fails in Obsidian's plugin loader because __filename resolves
- * to Electron internals rather than the plugin directory.
- *
- * This helper resolves the binary directly from the known plugin layout:
- *   <pluginDir>/node_modules/@openai/codex-darwin-arm64/vendor/<triple>/bin/codex
- */
-function resolveCodexBinaryPath(pluginDir: string): string | undefined {
-  const { platform, arch } = process;
-
-  let targetTriple: string | undefined;
-  if (platform === 'darwin' && arch === 'arm64') {
-    targetTriple = 'aarch64-apple-darwin';
-  } else if (platform === 'darwin' && arch === 'x64') {
-    targetTriple = 'x86_64-apple-darwin';
-  } else if (platform === 'linux' && arch === 'arm64') {
-    targetTriple = 'aarch64-unknown-linux-musl';
-  } else if (platform === 'linux' && arch === 'x64') {
-    targetTriple = 'x86_64-unknown-linux-musl';
-  } else if (platform === 'win32' && arch === 'x64') {
-    targetTriple = 'x86_64-pc-windows-msvc';
-  } else if (platform === 'win32' && arch === 'arm64') {
-    targetTriple = 'aarch64-pc-windows-msvc';
-  }
-
-  if (!targetTriple) {
-    return undefined;
-  }
-
-  // Map to platform package name
-  const platformPackages: Record<string, string> = {
-    'aarch64-apple-darwin': '@openai/codex-darwin-arm64',
-    'x86_64-apple-darwin': '@openai/codex-darwin-x64',
-    'aarch64-unknown-linux-musl': '@openai/codex-linux-arm64',
-    'x86_64-unknown-linux-musl': '@openai/codex-linux-x64',
-    'x86_64-pc-windows-msvc': '@openai/codex-win32-x64',
-    'aarch64-pc-windows-msvc': '@openai/codex-win32-arm64',
-  };
-
-  const platformPackage = platformPackages[targetTriple];
-  if (!platformPackage) {
-    return undefined;
-  }
-
-  const binaryName = platform === 'win32' ? 'codex.exe' : 'codex';
-  const binaryPath = path.join(
-    pluginDir,
-    'node_modules',
-    ...platformPackage.split('/'),
-    'vendor',
-    targetTriple,
-    'bin',
-    binaryName,
-  );
-
-  return binaryPath;
 }
 
 /**
@@ -99,17 +40,17 @@ function resolveCodexBinaryPath(pluginDir: string): string | undefined {
  * activate the desired user-facing backends.
  */
 export function wireHiddenAdapters(options: WireHiddenAdaptersOptions): void {
-  const { registry, adapters, vaultPath, pluginDir, codexSettings } = options;
+  const { registry, adapters, vaultPath, codexSettings } = options;
 
   for (const adapter of adapters) {
     registry.register(adapter);
   }
 
   if (vaultPath) {
-    const codexPathOverride = resolveCodexBinaryPath(pluginDir);
+    const codexCliResolution = resolveCodexCli({ executablePath: codexSettings?.executablePath ?? '' });
     registry.register(new CodexAdapter({
       workingDirectory: vaultPath,
-      pluginDir,
+      codexCliResolution,
       ...(codexSettings?.apiKey ? { apiKey: codexSettings.apiKey } : {}),
       ...(codexSettings?.model ? { model: codexSettings.model } : {}),
       ...(codexSettings?.sandboxMode ? { sandboxMode: codexSettings.sandboxMode } : {}),
@@ -126,7 +67,9 @@ export function wireHiddenAdapters(options: WireHiddenAdaptersOptions): void {
       ...(codexSettings?.approvalPolicy
         ? { approvalPolicy: codexSettings.approvalPolicy }
         : {}),
-      ...(codexPathOverride ? { codexPathOverride } : {}),
+      ...(codexCliResolution.mode === 'available'
+        ? { codexPathOverride: codexCliResolution.executablePath }
+        : {}),
     }));
   }
 }

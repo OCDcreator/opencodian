@@ -231,7 +231,6 @@ describe('Codex hidden wiring', () => {
         registry,
         adapters: [mockOC, mockCC],
         vaultPath: '/tmp/vault',
-        pluginDir: '/tmp/vault/.obsidian/plugins/opencodian',
       });
 
       expect(registry.get('opencode')).toBe(mockOC);
@@ -247,7 +246,6 @@ describe('Codex hidden wiring', () => {
         registry,
         adapters: [mockOC],
         vaultPath: undefined,
-        pluginDir: '',
       });
 
       expect(registry.get('opencode')).toBe(mockOC);
@@ -261,7 +259,6 @@ describe('Codex hidden wiring', () => {
         registry,
         adapters: [mockOC],
         vaultPath: '/tmp/vault',
-        pluginDir: '/tmp/vault/.obsidian/plugins/opencodian',
       });
 
       registry.setEnabledBackends(['opencode', 'claude-code']);
@@ -276,7 +273,6 @@ describe('Codex hidden wiring', () => {
         registry,
         adapters: [createMockAdapter('opencode')],
         vaultPath: '/tmp/vault',
-        pluginDir: '/tmp/vault/.obsidian/plugins/opencodian',
       });
 
       registry.setEnabledBackends(['opencode']);
@@ -302,7 +298,6 @@ describe('Codex wiring settings passthrough', () => {
         registry,
         adapters: [],
         vaultPath: '/tmp/vault',
-        pluginDir: '/tmp/vault/.obsidian/plugins/opencodian',
         codexSettings: {
           apiKey: '',
           model: '',
@@ -327,7 +322,6 @@ describe('Codex wiring settings passthrough', () => {
         registry,
         adapters: [],
         vaultPath: '/tmp/vault',
-        pluginDir: '/tmp/vault/.obsidian/plugins/opencodian',
         codexSettings: {
           apiKey: '',
           model: '',
@@ -354,7 +348,6 @@ describe('Codex wiring settings passthrough', () => {
         registry,
         adapters: [createMockAdapter('opencode')],
         vaultPath: '/tmp/vault',
-        pluginDir: '/tmp/vault/.obsidian/plugins/opencodian',
         codexSettings: { apiKey: 'sk-test', model: 'o4-mini', sandboxMode: 'workspace-write', modelReasoningEffort: 'medium', additionalDirectories: '', networkAccessEnabled: false, webSearchMode: 'cached' },
       });
 
@@ -369,7 +362,6 @@ describe('Codex wiring settings passthrough', () => {
         registry,
         adapters: [createMockAdapter('opencode')],
         vaultPath: '/tmp/vault',
-        pluginDir: '/tmp/vault/.obsidian/plugins/opencodian',
         codexSettings: { apiKey: '', model: '', sandboxMode: 'workspace-write', modelReasoningEffort: 'medium', additionalDirectories: '', networkAccessEnabled: false, webSearchMode: 'cached' },
       });
 

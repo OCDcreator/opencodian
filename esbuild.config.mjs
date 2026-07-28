@@ -1,4 +1,5 @@
 import esbuild from "esbuild";
+import path from "path";
 import process from "process";
 import builtins from "builtin-modules";
 import { generateBuildId } from './scripts/build-utils.mjs';
@@ -25,6 +26,11 @@ const context = await esbuild.context({
 		'import.meta.url': '__OPENCODIAN_IMPORT_META_URL__',
 	},
 	entryPoints: ['src/main.ts'],
+	// Match production: preserve renderer resolution globally, but use the
+	// Node `ws` entry required by the local app-server transport.
+	alias: {
+		ws: path.resolve('node_modules/ws/index.js'),
+	},
 	bundle: true,
 	external: [
 		'obsidian',

@@ -10,8 +10,9 @@
  * connection summary and the Account surface auth-source row, so the UI never
  * presents a disabled input as a status indicator.
  */
+/* eslint-disable max-lines -- Codex settings own connection, permissions, account, and inspection controls behind one tabbed section owner. */
 
-import { DropdownComponent, Setting } from 'obsidian';
+import { DropdownComponent, Notice, Setting } from 'obsidian';
 
 import type { CodexModelSummary } from '../../core/agents/backend/CodexAdapter';
 import type { CodexApprovalPolicy, CodexReasoningEffort, CodexWebSearchMode } from '../../core/types/settings';
@@ -154,6 +155,7 @@ export class SettingsCodexSection {
 
     // Default / 'connection'
     this.renderConnectionSummary(bodyEl);
+    this.renderCliLifecycleControls(bodyEl);
     this.renderRuntimeDefaultsGroup(bodyEl);
   }
 
@@ -181,6 +183,42 @@ export class SettingsCodexSection {
       text: authSource,
       attr: { 'data-codex-auth-source-summary': 'true' },
     });
+  }
+
+  private renderCliLifecycleControls(bodyEl: HTMLElement): void {
+    new Setting(bodyEl)
+      .setName(t('settings.codex.executablePath.name'))
+      .setDesc(t('settings.codex.executablePath.desc'))
+      .addText((text) => text
+        .setPlaceholder(t('settings.codex.executablePath.placeholder'))
+        .setValue(this.plugin.settings.backendSettings.codex.executablePath)
+        .onChange(async (value) => {
+          this.plugin.settings.backendSettings.codex.executablePath = value.trim();
+          await this.plugin.saveSettings();
+        }));
+
+    new Setting(bodyEl)
+      .setName(t('settings.codex.reload.name'))
+      .setDesc(t('settings.codex.reload.desc'))
+      .addButton((button) => button
+        .setButtonText(t('settings.codex.reload.button'))
+        .onClick(async () => this.reloadOpenCodian()));
+  }
+
+  private async reloadOpenCodian(): Promise<void> {
+    const plugins = (this.plugin.app as unknown as {
+      plugins?: { reloadPlugin?: (pluginId: string) => Promise<void> };
+    }).plugins;
+    if (typeof plugins?.reloadPlugin !== 'function') {
+      new Notice(t('settings.codex.reload.manual'));
+      return;
+    }
+
+    try {
+      await plugins.reloadPlugin(this.plugin.manifest.id);
+    } catch {
+      new Notice(t('settings.codex.reload.failed'));
+    }
   }
 
   private renderRuntimeDefaultsGroup(bodyEl: HTMLElement): void {

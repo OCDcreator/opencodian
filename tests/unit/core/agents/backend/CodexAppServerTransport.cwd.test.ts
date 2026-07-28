@@ -26,6 +26,7 @@ const mockWsInstance = {
   onclose: null as ((event?: unknown) => void) | null,
 };
 const MockWebSocket = jest.fn().mockImplementation(() => mockWsInstance);
+(MockWebSocket as unknown as { OPEN: number }).OPEN = 1;
 jest.mock('ws', () => MockWebSocket);
 
 import { CodexAppServerClient } from '../../../../../src/core/agents/backend/CodexAppServerClient';

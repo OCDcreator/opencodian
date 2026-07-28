@@ -69,9 +69,14 @@ import {
   mapAppServerNotification,
   readAppServerTurnError,
 } from './CodexAppServerStreamMapper';
+import { type CodexCliResolution,getCodexCliErrorMessage } from './CodexCliResolver';
 import { CodexStreamNormalizer } from './CodexStreamNormalizer';
 
 const logger = createLogger('CodexAdapter');
+
+function isExecutableMissingError(error: unknown): boolean {
+  return Boolean(error && typeof error === 'object' && (error as NodeJS.ErrnoException).code === 'ENOENT');
+}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -135,12 +140,8 @@ export interface CodexAdapterOptions {
    * Electron internals rather than the plugin directory).
    */
   codexPathOverride?: string;
-  /**
-   * Absolute path to the Obsidian plugin directory.
-   * Used at runtime to resolve the Node `ws` package for the app-server
-   * WebSocket client (Obsidian's renderer WebSocket is blocked for localhost).
-   */
-  pluginDir?: string;
+  /** Verified user-installed CLI resolution supplied during plugin startup. */
+  codexCliResolution?: CodexCliResolution;
   /** DI seam: override the Codex SDK instance factory. */
   createCodex?: CodexFactory;
   /** DI seam: provide or deliberately disable the local app-server client. */
@@ -448,6 +449,9 @@ export class CodexAdapter
     }
     this.setStatus('connecting');
     try {
+      if (this.options.codexCliResolution?.mode === 'missing') {
+        throw new Error(getCodexCliErrorMessage(this.options.codexCliResolution));
+      }
       if (this.options.createCodex) {
         this.codex = await this.options.createCodex();
       } else {
@@ -473,7 +477,6 @@ export class CodexAdapter
           ? this.options.createAppServerClient()
           : new CodexAppServerClient({
             codexPathOverride: this.options.codexPathOverride,
-            pluginDir: this.options.pluginDir,
             // Spawn the owned app-server inside the vault so project-scoped
             // skills/agents resolve. Injected factories manage their own cwd.
             ...(this.options.workingDirectory ? { workingDirectory: this.options.workingDirectory } : {}),
@@ -491,6 +494,12 @@ export class CodexAdapter
           this.setContextCapabilityAvailable(false);
         }
       } catch (err) {
+        if (isExecutableMissingError(err)) {
+          this.appServerClient?.stop();
+          this.appServerClient = null;
+          this.setContextCapabilityAvailable(false);
+          throw new Error(`Codex executable could not be started: ${err instanceof Error ? err.message : String(err)}. Verify the executable path in Codex settings, then reload OpenCodian.`);
+        }
         logger.warn('Codex app-server negotiation failed; preserving SDK chat without context usage', {
           error: err instanceof Error ? err.message : String(err),
         });
@@ -500,6 +509,18 @@ export class CodexAdapter
 
       this.setStatus('connected');
     } catch (err) {
+      this.codex = null;
+      if (this.appServerClient) {
+        try {
+          this.unregisterApprovalHandlers();
+          this.unsubscribeFromAppServerSkillsChanged();
+          this.appServerClient.stop();
+        } catch {
+          // Best-effort cleanup after a failed startup.
+        }
+        this.appServerClient = null;
+      }
+      this.setContextCapabilityAvailable(false);
       this.setStatus('error');
       throw err;
     }

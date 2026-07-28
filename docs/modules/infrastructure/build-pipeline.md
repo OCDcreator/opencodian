@@ -97,6 +97,7 @@ esbuild 配置：
 |------|-----|
 | entryPoints | `['src/main.ts']` |
 | format | `cjs` |
+| alias | `ws` 指向其 Node `index.js` 入口，避免浏览器 shim，同时保留其余依赖的 renderer 解析 |
 | target | `es2018` |
 | bundle | `true` |
 | treeShaking | `true` |
@@ -111,10 +112,9 @@ esbuild 配置：
 3. `fs.copyFileSync('styles.css', 'dist/styles.css')`
 4. `copyDirectoryIfExists('assets', 'dist/assets')`
 5. `pruneClaudeAgentSdkRuntimeArtifacts()` 移除旧的 `dist/node_modules/@anthropic-ai/claude-agent-sdk*` runtime artifact，防止历史 platform binary package 被误当成必需产物
-6. `copyCodexRuntime()` 复制 `@openai/codex`（package.json + bin/codex.js）和 `@openai/codex-<platform>-<arch>`（vendor/... 包含 CLI 二进制）到 `dist/node_modules/@openai/`
+6. 不复制 Codex CLI 或平台原生包；`ws` 是声明的直接依赖，esbuild 仅将它别名到 Node 入口并静态打进 `main.js`，不改变其余依赖的 renderer 解析
 
-部署到 Test Vault 时，以下运行时产物必须和 `dist/main.js` 一起复制：
-- `dist/node_modules/@openai/codex/` + `dist/node_modules/@openai/codex-<platform>-<arch>/` — Codex backend 运行时（191MB CLI 二进制）
+Codex backend 使用用户机器已安装的 CLI：显式 Codex executable path 优先，空值才自动查找 GUI PATH 或 Windows npm shim。发布与部署保持 `main.js`、`manifest.json`、`styles.css` 三件套。
 
 Claude Code backend 不再要求复制 `dist/node_modules/@anthropic-ai/claude-agent-sdk-<platform>/`。生产 runtime 保留 `@anthropic-ai/claude-agent-sdk` TypeScript SDK 主包作为 API facade（随 `main.js` 打包），但 Claude Code 后端进程必须来自用户本机安装的 external `claude` CLI：优先使用 `backendSettings.claudeCode.executablePath`，其次在增强 PATH 中查找 `claude` / `claude.exe` / npm wrapper。找不到 CLI 时设置页 runtime diagnostics 会提示安装 Claude Code CLI 或配置 executable path。
 
@@ -161,7 +161,7 @@ npm run build
     → context.rebuild()
     → 复制 manifest.json, styles.css, assets/ 到 dist/
     → 清理旧的 Claude Agent SDK runtime artifact
-    → 复制 Codex SDK runtime package 到 dist/node_modules/
+    → 不复制 Codex CLI 或原生 runtime；Node `ws` 已随 main.js 打包
 ```
 
 ## 与其他模块的交互
@@ -178,6 +178,7 @@ npm run build
 | `dev` | `node esbuild.config.mjs` | 开发模式 |
 | `build` | `node scripts/build.mjs production` | 生产构建（自动包含 CSS 合并） |
 | `build:css` | `node scripts/build-css.mjs` | CSS 构建 |
+| `deploy:windows:math` | `bash scripts/deploy-windows-math-vault.sh` | 一键构建并部署到 `C:\\Users\\lt\\Desktop\\Write\\math` 的 OpenCodian 插件目录 |
 | `package:plugin` | `node scripts/package-plugin-artifact.mjs` | 校验并生成可上传的 Obsidian 插件三件套 |
 
 ## 注意事项
@@ -187,6 +188,7 @@ npm run build
 - `external` 列表确保不打包 Obsidian 和 CodeMirror 运行时依赖；Claude Agent SDK 主包会随 `main.js` 打包，但平台 binary package 不再通过 `dist/node_modules` 随生产产物复制
 - BUILD_ID 在构建时硬编码，不会在运行时改变
 - `npm run build` 已内置 CSS 合并；若只想刷新根目录样式产物，可单独运行 `npm run build:css`
+- Windows `math` vault 的日常部署使用 `npm run deploy:windows:math`。脚本只覆盖 `main.js`、`manifest.json`、`styles.css`，会先构建，并在远端校验 `main.js` 的 SHA-256 和 BUILD_ID；可用 `OPENCODIAN_WINDOWS_SSH_TARGET`、`OPENCODIAN_WINDOWS_SSH_KEY`、`OPENCODIAN_WINDOWS_PLUGIN_DIR` 覆盖固定连接参数。
 - CI 会在构建后检查 `styles.css` 是否仍然干净，因此样式修改需要把生成产物一并提交
 
 ## 待补充

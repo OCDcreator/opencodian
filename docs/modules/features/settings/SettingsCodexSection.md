@@ -5,12 +5,13 @@
 
 > **更新**: 新增 `resources` 二级 tab，委托给 `SettingsCodexResourcesSection` 渲染 Codex 项目/全局 skills 与 agents 管理（当前 P0 UI 项目可编辑、全局只读；P1 通过共享 `allowlisted-root` 契约开放全局 CRUD）。
 > **更新**: 2026-07-26 G9 Codex credential hardening — native Provider configuration is external-managed/read-only; legacy plugin credentials are masked and confirmation-gated for clearing.
+> **更新**: 2026-07-28 — Connection tab adds a persisted user CLI executable path and explicit plugin-reload action. Saving never touches an active session; reload warns that it terminates active Codex turns.
 
 ## Purpose
 
 Codex backend settings panel. Uses five secondary tabs under the Codex primary tab to avoid piling unrelated settings into a single flat card stack, grouped by *what* a setting controls (Source Grouping, see `CONTEXT.md`):
 
-1. **Connection** — genuinely wired SDK options (`model`, `modelReasoningEffort`, `webSearchMode`) plus a lightweight connection-source summary and masked legacy-credential status. No Codex secret input is rendered.
+1. **Connection** — user-installed CLI executable path (empty = automatic discovery), explicit `Reload OpenCodian` action, genuinely wired SDK options (`model`, `modelReasoningEffort`, `webSearchMode`), a lightweight connection-source summary, and masked legacy-credential status. No Codex secret input is rendered.
 2. **Permissions** — approval/sandbox boundary: `approvalPolicy` (`CodexApprovalPolicy`), `sandboxMode`, `networkAccessEnabled`, `additionalDirectories`. `approvalPolicy` default `inherit` omits the override; `untrusted`/`on-request` fail closed in `CodexAdapter` without the app-server + bridge; `never` may use the SDK fallback.
 3. **Resume & inspect** — the backend session browser and live runtime readbacks (model catalog, permission profiles, MCP servers, loaded threads, and read-only hooks metadata).
 4. **Account** — live read-only account/capability cards rendered by `SettingsCodexAccountSurface`.

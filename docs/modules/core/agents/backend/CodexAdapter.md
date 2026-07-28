@@ -3,6 +3,7 @@
 > **源码**: `src/core/agents/backend/CodexAdapter.ts`
 > **状态**: [RUNTIME_PROVEN]
 > **Updated**: 2026-06-14 Checkpoint 15T — landed `invalidateLiveThread(sessionId)` live current-thread re-resume mechanism (drops cached SDK Thread so next turn re-resumes the same backendSessionId with updated CLI args, preserving conversation history)
+> **Updated**: 2026-07-28 — an explicit missing CLI resolution or app-server `ENOENT` leaves the adapter in `error`; only non-binary app-server negotiation errors retain the SDK fallback.
 
 > **新增（skills runtime truth）**: `getRuntimeSkills()` 通过 app-server `skills/list`（scoped to `workingDirectory`）返回 Codex 当前 vault 的 runtime skills，作为聊天 `/skills` 与 `$` 菜单的唯一 runtime 真相；app-server 不可用时返回 null。`forceNextRuntimeSkillsReload()` 设置一次性标志，使**下一次** `getRuntimeSkills()` 传 `forceReload: true` 绕过 app-server 缓存（用于插件自身的项目 skill 写入后，app-server 不一定发 `skills/changed`），随即清除标志；正常菜单打开保持缓存。`onSkillsChanged(handler)` 暴露 `skills/changed` 失效信号 Disposable；`start()` 时订阅、`stop()` 时取消订阅。聊天菜单缓存订阅此信号以立即失效，而非仅靠 120s TTL。
 
@@ -22,6 +23,7 @@
 - 实现 `AgentChatCapability`：通过 `thread.runStreamed()` 提供异步流式聊天，经由 `CodexStreamNormalizer` 转换事件
 - 实现 `AgentSessionCapability`：基于 provisional local ID + thread ID aliasing 的会话管理
 - 提供 DI seam（`CodexFactory` 与 `CodexAppServerClientFactory`）：测试时可分别注入 mock SDK、mock app-server，或显式返回 `null` 验证协商失败后的 SDK 回退，无需真实 API key、网络或本机 Codex 状态库
+- 接受 wiring 提供的 `CodexCliResolution`：missing 结果会在 SDK 构造前提供可操作错误；app-server spawn 的 `ENOENT` 也会清理部分状态并保持 `error`，不能显示为已连接
 - 仅声明有 smoke-test 证据的能力：Chat、Sessions、Thinking、FileOps、Shell
 - 使用 bundled `import('@openai/codex-sdk')` (esbuild 打包进 main.js)
 - `sendMessage` 在 `resolveOrCreateThread` 阶段捕获异常并降级为 error chunk
