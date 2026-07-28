@@ -1116,14 +1116,14 @@ describe('OpenCodianSettingTab title styling', () => {
     expect(headingEl).not.toBeNull();
     expect(headingEl?.querySelector('.opencodian-title')).not.toBeNull();
     expect(headingEl?.querySelector('.opencodian-logo')).not.toBeNull();
-    expect(
-      Array.from(headingEl?.querySelectorAll<HTMLImageElement>('.opencodian-settings-title-wordmark') ?? []).map(
-        (element) => element.getAttribute('src'),
-      ),
-    ).toEqual([
-      'app://opencodian//plugins/opencodian/assets/branding/opencodian-wordmark-light.svg',
-      'app://opencodian//plugins/opencodian/assets/branding/opencodian-wordmark-dark.svg',
+    const wordmarks = Array.from(
+      headingEl?.querySelectorAll<HTMLImageElement>('.opencodian-settings-title-wordmark') ?? [],
+    );
+    expect(wordmarks.map((element) => element.className)).toEqual([
+      'opencodian-title-text opencodian-settings-title-wordmark is-light',
+      'opencodian-title-text opencodian-settings-title-wordmark is-dark',
     ]);
+    expect(wordmarks.every((element) => element.src.startsWith('data:image/svg+xml'))).toBe(true);
     expect(headingEl?.querySelector('.opencodian-settings-panel-title-suffix')).toBeNull();
   });
 

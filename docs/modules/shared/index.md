@@ -106,7 +106,7 @@ export { getVaultBasePath } from './vault';
 ## 与其他模块的交互
 
 - 被聊天、设置和主入口广泛依赖
-- 各具体实现文档见 [debugModules.md](debugModules.md)、[diagnosticSecretSanitizer.md](diagnosticSecretSanitizer.md)、[logger.md](logger.md)、[obsidianContext.md](obsidianContext.md)、[toolIdentity.md](toolIdentity.md)、[toolExecution.md](toolExecution.md)、[vault.md](vault.md)
+- 各具体实现文档见 [brandingWordmark.md](brandingWordmark.md)、[debugModules.md](debugModules.md)、[diagnosticSecretSanitizer.md](diagnosticSecretSanitizer.md)、[logger.md](logger.md)、[obsidianContext.md](obsidianContext.md)、[toolIdentity.md](toolIdentity.md)、[toolExecution.md](toolExecution.md)、[vault.md](vault.md)
 
 ## 配置项
 

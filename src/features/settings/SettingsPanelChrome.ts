@@ -2,9 +2,7 @@ import { App, setIcon,Setting } from 'obsidian';
 
 import { setLocale, t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
-
-const SETTINGS_TITLE_WORDMARK_LIGHT_ASSET_PATH = 'assets/branding/opencodian-wordmark-light.svg';
-const SETTINGS_TITLE_WORDMARK_DARK_ASSET_PATH = 'assets/branding/opencodian-wordmark-dark.svg';
+import { getOpenCodianWordmarkDataUrl } from '../../shared/brandingWordmark';
 
 export interface SettingHelpButtonConfig {
   tooltip: string;
@@ -143,8 +141,8 @@ export function addSettingHelpButton(setting: Setting, helpButton: SettingHelpBu
 
 export function renderSettingsPanelTitle(
   containerEl: HTMLElement,
-  app: App,
-  plugin: OpenCodianPlugin,
+  _app: App,
+  _plugin: OpenCodianPlugin,
 ): void {
   const headingEl = containerEl.createEl('h2', { cls: 'opencodian-settings-panel-title' });
   const brandEl = headingEl.createSpan({ cls: 'opencodian-title' });
@@ -154,11 +152,11 @@ export function renderSettingsPanelTitle(
   const wordmarks = [
     {
       className: 'is-light',
-      src: resolvePluginAssetUrl(app, plugin, SETTINGS_TITLE_WORDMARK_LIGHT_ASSET_PATH),
+      src: getOpenCodianWordmarkDataUrl('light'),
     },
     {
       className: 'is-dark',
-      src: resolvePluginAssetUrl(app, plugin, SETTINGS_TITLE_WORDMARK_DARK_ASSET_PATH),
+      src: getOpenCodianWordmarkDataUrl('dark'),
     },
   ];
 
@@ -185,25 +183,6 @@ export function renderSettingsPanelTitle(
       text: t('plugin.name'),
     });
   }
-}
-
-function resolvePluginAssetUrl(
-  app: App,
-  plugin: OpenCodianPlugin,
-  relativePath: string,
-): string | null {
-  const pluginDir = plugin.manifest.dir?.trim();
-  if (!pluginDir) {
-    return null;
-  }
-
-  const adapter = app.vault?.adapter ?? plugin.app?.vault?.adapter;
-  if (!adapter || typeof adapter.getResourcePath !== 'function') {
-    return null;
-  }
-
-  const assetPath = `${pluginDir}/${relativePath}`.replace(/\\/g, '/');
-  return adapter.getResourcePath(assetPath);
 }
 
 function buildInlineCodeFragment(text: string): DocumentFragment {

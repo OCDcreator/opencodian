@@ -9,7 +9,7 @@
 
 当前模块负责：
 
-- 设置页顶部 brand title 渲染
+- 设置页顶部 brand title 渲染（wordmark 内联为 `data:image/svg+xml`，标准三文件安装无需 `assets/` 目录）
 - 通用 setting block 壳层
 - setting name / description 的 inline-code 格式化
 - help button 装配
@@ -46,4 +46,4 @@
 ## 注意事项
 
 - 这是展示壳层，不负责保存设置或跨 section 业务状态
-- 资源路径解析继续依赖 `manifest.dir` 与 vault adapter `getResourcePath()`
+- title wordmark 由 [`brandingWordmark.md`](../../shared/brandingWordmark.md) 提供内联 data URL；其他运行时资源仍须由各自 owner 按部署契约解析

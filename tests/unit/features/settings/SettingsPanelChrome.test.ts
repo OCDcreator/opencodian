@@ -1,4 +1,10 @@
-import { createSettingsBlock } from '../../../../src/features/settings/SettingsPanelChrome';
+import type { App } from 'obsidian';
+
+import {
+  createSettingsBlock,
+  renderSettingsPanelTitle,
+} from '../../../../src/features/settings/SettingsPanelChrome';
+import type OpenCodianPlugin from '../../../../src/main';
 
 describe('SettingsPanelChrome', () => {
   beforeEach(() => {
@@ -30,5 +36,27 @@ describe('SettingsPanelChrome', () => {
     expect(footerDescEl?.textContent).toBe('Manage providers grouped by provider.');
     expect(footerDescEl?.classList.contains('opencodian-settings-block-desc')).toBe(true);
     expect(detailsEl!.contains(footerDescEl)).toBe(false);
+  });
+
+  it('embeds both title wordmarks so a standard three-file plugin installation can render them', () => {
+    const containerEl = document.createElement('div');
+    const getResourcePath = jest.fn((path: string) => `app://vault/${path}`);
+    const app = {
+      vault: {
+        adapter: { getResourcePath },
+      },
+    } as unknown as App;
+    const plugin = {
+      manifest: { dir: '.obsidian/plugins/opencodian' },
+    } as unknown as OpenCodianPlugin;
+
+    renderSettingsPanelTitle(containerEl, app, plugin);
+
+    const wordmarks = Array.from(containerEl.querySelectorAll<HTMLImageElement>(
+      '.opencodian-settings-title-wordmark',
+    ));
+    expect(wordmarks).toHaveLength(2);
+    expect(wordmarks.every((wordmark) => wordmark.src.startsWith('data:image/svg+xml'))).toBe(true);
+    expect(getResourcePath).not.toHaveBeenCalled();
   });
 });

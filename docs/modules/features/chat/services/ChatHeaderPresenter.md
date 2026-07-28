@@ -5,7 +5,7 @@
 
 ## 概述
 
-`ChatHeaderPresenter` 承接聊天视图 header、server status shell 与 LSP status lifecycle 的 DOM / polling ownership，避免 `OpenCodianView` 继续直接维护 header button refs、status interval、LSP refresh coordinator 和品牌资源刷新。
+`ChatHeaderPresenter` 承接聊天视图 header、server status shell 与 LSP status lifecycle 的 DOM / polling ownership，避免 `OpenCodianView` 继续直接维护 header button refs、status interval、LSP refresh coordinator 和品牌资源刷新。标题 wordmark 由共享模块内联为 data URL，因此标准三文件安装不会请求未部署的 `assets/branding` 文件。
 
 它负责：
 
@@ -66,6 +66,7 @@ export class ChatHeaderPresenter {
 ## 关键行为
 
 - `build()` 组装完整 header DOM，并把 header tab bar slot 暴露给 `OpenCodianView` 的 tab layout 逻辑；header actions 现在拆成 `opencodian-header-status-group`、`opencodian-header-conversation-group`、`opencodian-header-config-group` 三段。server status 与 LSP status 留在 status group，`new-current-tab` / `new-tab` / `history` 留在 conversation group，`session-settings` / `settings` 留在 config group，让状态、会话操作和配置入口不再混成一串同权按钮
+- 标题 wordmark 通过 [`brandingWordmark.md`](../../../shared/brandingWordmark.md) 按 light/dark theme 选择内联 SVG data URL；css-change 仍会同步切换对应版本，但不再经 host 或 vault adapter 读取插件目录
 - LSP status indicator 展示 `lsp.status()` 的 server connection summary；`startLspStatusLoop()` 在 presenter 内创建并持有 `LspStatusRefreshCoordinator`，把状态更新转发给 UI 组件，并在 `destroy()` 中停止轮询
 - server status badge 现在是真正的 `button[type="button"]`，带 `data-status-chip="collapsed"` 与 `aria-expanded="false"`。默认只占 28px，用 active backend 的身份图标表达后端；所有 backend 都复用设置页后端导航的 `renderAgentSwitcherBackendIcon()` 和 LobeHub 彩色 light/dark 图标（包括 OpenCode、Claude Code、Codex、Copilot 与 Pi），避免聊天 header 与设置页出现不同的 provider 标识，并用 badge 级状态 ring/dot overlay 表达 checking/running/offline 等健康状态；状态文案保留在同一个按钮内但 `aria-hidden="true"`，由 CSS 在 hover / focus-visible 时在 badge 内部展开。Presenter 会读取当前字体下文本的 `scrollWidth`，加上图标、间距、边框和状态 ring 的 46px 容量预算后写入 `--opencodian-server-status-expanded-width`；无 layout 的测试环境才回退到字符宽度估算。短文案会精确收缩到所需宽度，长文案仍受响应式 220px / 48vw 上限约束，避免常驻或悬浮时无意义地挤占 header 顶部空间
 - header action 现在都是真正的 `button[type="button"]`，带稳定 `data-action`（`new-tab`、`new-current-tab`、`history`、`session-settings`、`settings`）和同步 locale 的 `data-tooltip`；可访问名称通过 `ConversationRenderService.setTooltipLabel()` 注入的隐藏 label + `aria-labelledby` 提供，避免在 Obsidian/Electron 里再冒出一层原生 hover tooltip。host 的显式 tooltip placement 支持 top/bottom/left/right，真实 UI 验收脚本可以直接按这些 locator 点击，不再依赖图标 SVG 或按钮顺序

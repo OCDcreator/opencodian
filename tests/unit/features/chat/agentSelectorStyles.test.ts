@@ -36,4 +36,13 @@ describe('agent selector toolbar styles', () => {
       expect(agentRule).toContain(declaration);
     }
   });
+
+  it('raises an open composer selector above externally mounted session tabs', () => {
+    const inputAreaRule = extractRule(
+      readStyleFile('src/style/features/chat-assistant.css'),
+      '.opencodian-input-area:has(.opencodian-agent-trigger.is-open, .opencodian-permission-trigger.is-open, .opencodian-model-trigger.is-open, .opencodian-runtime-overflow.is-open)',
+    );
+
+    expect(inputAreaRule).toContain('z-index: 230;');
+  });
 });

@@ -395,17 +395,13 @@ describe('ChatHeaderPresenter server status', () => {
     const wordmarkEl = fixture.headerEl.querySelector<HTMLImageElement>('.opencodian-title-text');
     const logoEl = fixture.headerEl.querySelector<HTMLElement>('.opencodian-logo');
 
-    expect(wordmarkEl?.getAttribute('src')).toBe(
-      'app://vault/assets/branding/opencodian-wordmark-light.svg',
-    );
+    expect(wordmarkEl?.getAttribute('src')).toMatch(/^data:image\/svg\+xml/);
     expect(logoEl?.innerHTML).toContain('clip0_light');
 
     document.body.classList.add('theme-dark');
     fixture.dispatchCssChange();
 
-    expect(wordmarkEl?.getAttribute('src')).toBe(
-      'app://vault/assets/branding/opencodian-wordmark-dark.svg',
-    );
+    expect(wordmarkEl?.getAttribute('src')).toMatch(/^data:image\/svg\+xml/);
     expect(logoEl?.innerHTML).toContain('clip0_dark');
     expect(fixture.host.scheduleChatSurfaceColorSync).toHaveBeenCalledTimes(1);
     expect(fixture.host.scheduleComposerLayoutSync).toHaveBeenCalledTimes(1);
