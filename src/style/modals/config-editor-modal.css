@@ -1075,6 +1075,26 @@
   border-top: 1px solid color-mix(in srgb, var(--background-modifier-border) 70%, transparent);
 }
 
+.opencodian-session-settings-section[data-section="codex"] {
+  display: flex;
+  flex-direction: column;
+  gap: var(--opencodian-modal-card-gap);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  overflow: visible;
+}
+
+.opencodian-session-settings-section[data-section="codex"] > .opencodian-session-settings-field {
+  border: 1px solid color-mix(in srgb, var(--background-modifier-border) 84%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--background-secondary) 78%, var(--background-primary));
+}
+
+.opencodian-session-settings-section[data-section="codex"] > .opencodian-session-settings-field + .opencodian-session-settings-field {
+  border-top: 0;
+}
+
 .opencodian-session-settings-field-info {
   min-width: 0;
 }
