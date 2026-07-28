@@ -12538,7 +12538,10 @@ img.opencodian-model-provider-header-icon {
 .opencodian-settings .opencodian-claude-code-group-title,
 .opencodian-settings .opencodian-settings-claude-code-group-title {
   margin: 0;
+  padding: 0;
   padding-inline-start: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
   color: var(--text-normal);
   font-size: 13px;
   font-weight: 700;
@@ -13284,8 +13287,12 @@ img.opencodian-model-provider-header-icon {
   margin-bottom: var(--oc-codex-card-title-body-gap);
 }
 
-.opencodian-codex-account-card-title {
+.opencodian-settings .opencodian-codex-account-card-title {
   margin: 0;
+  padding: 0;
+  padding-inline-start: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
   font-size: var(--font-ui-small);
   font-weight: 600;
   color: var(--text-normal);
@@ -13358,8 +13365,10 @@ img.opencodian-model-provider-header-icon {
   min-width: 0;
 }
 
-.opencodian-codex-account-identity-title {
+.opencodian-settings .opencodian-codex-account-identity-title {
   margin: 0;
+  padding: 0;
+  padding-inline-start: 0;
   font-size: var(--font-ui-small);
   font-weight: 600;
   color: var(--text-normal);
@@ -13491,12 +13500,17 @@ img.opencodian-model-provider-header-icon {
    label row under the chart, and hover feedback instead of 8px overflow
    labels absolutely positioned outside the bar. */
 .opencodian-codex-account-usage-buckets {
+  display: flex;
+  flex-direction: column;
+  gap: var(--oc-codex-card-title-body-gap);
   border-top: 1px solid var(--background-modifier-border);
   padding-top: var(--oc-codex-card-body-gap);
 }
 
-.opencodian-codex-account-usage-buckets-title {
-  margin: 0 0 6px;
+.opencodian-settings .opencodian-codex-account-usage-buckets-title {
+  margin: 0;
+  padding: 0;
+  padding-inline-start: 0;
   font-size: var(--font-smallest);
   color: var(--text-muted);
   font-weight: 600;
@@ -13532,7 +13546,7 @@ img.opencodian-model-provider-header-icon {
 .opencodian-codex-account-usage-labels {
   display: flex;
   gap: 3px;
-  margin-top: 4px;
+  margin-top: 0;
 }
 
 .opencodian-codex-account-usage-bar-label {
@@ -13548,17 +13562,25 @@ img.opencodian-model-provider-header-icon {
 
 /* Rate-limit tier groups */
 .opencodian-codex-account-rate-limit-groups {
+  display: flex;
+  flex-direction: column;
+  gap: var(--oc-codex-card-title-body-gap);
   margin-top: 0;
 }
 
 .opencodian-codex-account-rate-limit-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--oc-codex-card-title-body-gap);
   border-top: 1px solid var(--background-modifier-border);
   padding-top: 8px;
-  margin-top: 8px;
+  margin-top: 0;
 }
 
-.opencodian-codex-account-rate-limit-group-title {
-  margin: 0 0 2px;
+.opencodian-settings .opencodian-codex-account-rate-limit-group-title {
+  margin: 0;
+  padding: 0;
+  padding-inline-start: 0;
   font-size: var(--font-smallest);
   font-weight: 600;
   color: var(--text-muted);
@@ -13699,20 +13721,26 @@ img.opencodian-model-provider-header-icon {
    refresh-all action pinned to the right of the first line. */
 .opencodian-settings-codex-group-header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
 }
 
 .opencodian-settings-codex-group-header-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
   min-width: 0;
 }
 
 .opencodian-settings .opencodian-settings-codex-group-title {
-  margin: 0 0 4px;
+  margin: 0;
   /* Beat Obsidian's `.vertical-tab-content h4` horizontal padding so the
      title text starts at the same edge as the group description. */
   padding: 0;
+  padding-inline-start: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
   font-size: var(--font-ui-small);
   font-weight: 600;
   color: var(--text-normal);
@@ -13774,11 +13802,18 @@ img.opencodian-model-provider-header-icon {
 }
 
 .opencodian-codex-provider-configuration-status-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   min-width: 0;
 }
 
-.opencodian-codex-provider-configuration-status-title {
+.opencodian-settings .opencodian-codex-provider-configuration-status-title {
   margin: 0;
+  padding: 0;
+  padding-inline-start: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
   font-size: var(--font-ui-small);
   font-weight: 600;
   color: var(--text-normal);
@@ -13876,6 +13911,215 @@ img.opencodian-model-provider-header-icon {
   overflow-x: auto;
 }
 
+/* ── Global Codex configuration summary card ─────────────────── */
+
+.opencodian-codex-global-config-summary-card {
+  /* card base shared via .opencodian-codex-account-card */
+}
+
+.opencodian-codex-global-config-summary-readonly-note {
+  margin: 0 0 6px;
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+}
+
+.opencodian-codex-global-config-summary-state {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+}
+
+.opencodian-codex-global-config-summary-path {
+  margin: 0;
+  font-size: var(--font-smallest);
+  color: var(--text-muted);
+  word-break: break-all;
+}
+
+.opencodian-codex-global-config-summary-path-value {
+  font-family: var(--font-monospace);
+}
+
+.opencodian-codex-global-config-summary-last-read {
+  margin: 0;
+  font-size: var(--font-smallest);
+  color: var(--text-muted);
+}
+
+.opencodian-codex-global-config-summary-top-level {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.opencodian-codex-global-config-summary-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.opencodian-codex-global-config-summary-row-label {
+  flex-shrink: 0;
+  min-width: 120px;
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+}
+
+.opencodian-codex-global-config-summary-row-value {
+  min-width: 0;
+  word-break: break-all;
+  font-size: var(--font-ui-small);
+}
+
+/* Provider table — grid columns at desktop, stacked at narrow */
+.opencodian-codex-global-config-summary-providers {
+  display: flex;
+  flex-direction: column;
+  gap: var(--oc-codex-card-title-body-gap);
+  margin-top: 4px;
+}
+
+.opencodian-settings .opencodian-codex-global-config-summary-providers-title {
+  margin: 0;
+  padding: 0;
+  padding-inline-start: 0;
+  font-size: var(--font-ui-smaller);
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.opencodian-settings .opencodian-codex-project-config-advanced-title {
+  margin: 0;
+  padding: 0;
+  padding-inline-start: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.opencodian-settings .opencodian-codex-project-config-advanced {
+  display: flex;
+  flex-direction: column;
+  gap: var(--oc-codex-card-title-body-gap);
+}
+
+.opencodian-settings .opencodian-codex-project-config-advanced-desc {
+  margin: 0;
+}
+
+.opencodian-codex-global-config-summary-provider-row {
+  display: grid;
+  grid-template-columns: minmax(80px, 1fr) minmax(80px, 1fr) minmax(120px, 2fr) minmax(60px, 0.75fr) auto;
+  gap: 6px 10px;
+  align-items: baseline;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--background-modifier-border);
+  font-size: var(--font-smallest);
+}
+
+.opencodian-codex-global-config-summary-provider-row:last-child {
+  border-bottom: none;
+}
+
+.opencodian-codex-global-config-summary-provider-row[data-declared-default='true'] {
+  background: var(--background-modifier-hover);
+  border-radius: 4px;
+}
+
+.opencodian-codex-global-config-summary-provider-id {
+  font-family: var(--font-monospace);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.opencodian-codex-global-config-summary-provider-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.opencodian-codex-global-config-summary-provider-base-url {
+  font-family: var(--font-monospace);
+  overflow-wrap: anywhere;
+  word-break: break-all;
+  min-width: 0;
+}
+
+.opencodian-codex-global-config-summary-provider-wire-api {
+  font-family: var(--font-monospace);
+  color: var(--text-muted);
+}
+
+.opencodian-codex-global-config-summary-provider-default-badge {
+  flex-shrink: 0;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  font-size: var(--font-smallest);
+  white-space: nowrap;
+}
+
+/* Narrow layout: stack rows vertically */
+@media (max-width: 720px) {
+  .opencodian-codex-global-config-summary-provider-row {
+    grid-template-columns: 1fr;
+    gap: 1px;
+    padding: 6px 0;
+  }
+
+  .opencodian-codex-global-config-summary-provider-id,
+  .opencodian-codex-global-config-summary-provider-name {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+  }
+
+  .opencodian-codex-global-config-summary-row {
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .opencodian-codex-global-config-summary-row-label {
+    min-width: 0;
+  }
+}
+
+/* ── Project configuration diagnostics ──────────────────────── */
+
+.opencodian-codex-project-config-diagnostics {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+  padding: 8px;
+  border-radius: 4px;
+  background: var(--background-modifier-error);
+}
+
+.opencodian-codex-project-config-diagnostic {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.opencodian-codex-project-config-diagnostic-key {
+  font-family: var(--font-monospace);
+  font-weight: 600;
+  font-size: var(--font-smallest);
+}
+
+.opencodian-codex-project-config-diagnostic-reason {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+}
+
+.opencodian-codex-project-config-diagnostic--forbidden .opencodian-codex-project-config-diagnostic-key {
+  color: var(--text-error);
+}
+
 
 /* components/settings-codex-resources.css */
 /* Codex resource management panel (project / global scopes, both editable).
@@ -13919,6 +14163,9 @@ img.opencodian-model-provider-header-icon {
 .opencodian-settings .opencodian-codex-resource-group-title {
   margin: 0;
   padding: 0;
+  padding-inline-start: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
   font-size: var(--font-ui-small);
   font-weight: 600;
   color: var(--text-normal);
@@ -14250,6 +14497,14 @@ img.opencodian-model-provider-header-icon {
   font-weight: 600;
 }
 
+.opencodian-settings .opencodian-codex-runtime-skill-groups-title {
+  margin: 0;
+  padding: 0;
+  padding-inline-start: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .opencodian-codex-runtime-skill-group {
   display: flex;
   flex-direction: column;
@@ -14326,6 +14581,9 @@ img.opencodian-model-provider-header-icon {
 .opencodian-settings .opencodian-claude-resource-group-title {
   margin: 0;
   padding: 0;
+  padding-inline-start: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
   font-size: var(--font-ui-small);
   font-weight: 600;
   color: var(--text-normal);

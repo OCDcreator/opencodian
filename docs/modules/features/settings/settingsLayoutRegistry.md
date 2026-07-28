@@ -5,6 +5,7 @@
 
 > **更新**: Codex primary tab 新增 `resources` 二级 tab；Claude Code primary tab 新增 `resources` 二级 tab。
 > **更新（2026-07-24）**: Codex primary tab 新增 `permissions` 二级 tab（Approval Policy / Sandbox / Network Access / Additional Directories）。
+> **Updated**: 2026-07-28 — Codex primary tab adds project-config secondary tab.
 
 ## 概述
 

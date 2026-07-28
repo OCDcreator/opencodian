@@ -14,7 +14,7 @@ Codex 资源管理设置面板的样式，遵循 Settings Extension Surface 词�
 ## 注意事项
 
 - scope badge 一律低色度 tonal（project = accent 12% 底 + `var(--text-normal)` 前景保证任何主题下 AA 对比度，global = 中性 hover 底），不用实心 accent 填充。
-- 组头使用 `justify-content: space-between` 保持 h4 在左、primary 新建操作在右；`align-items: center` 使两者稳定垂直居中。标题规则必须由 `.opencodian-settings` 限定作用域，并以 `margin: 0; padding: 0` 覆盖宿主 h4 的默认间距。
+- 组头使用 `justify-content: space-between` 保持 h4 在左、primary 新建操作在右；`align-items: center` 使两者稳定垂直居中。`.opencodian-codex-resource-group-title` 与 `.opencodian-codex-runtime-skill-groups-title` 的标题规则必须由 `.opencodian-settings` 限定作用域，并以 `margin: 0; padding: 0; padding-inline-start: 0` 覆盖宿主 heading 的默认间距；标题自身保留 `min-width: 0` 与 `overflow-wrap: anywhere`，窄面板不会撑出横向溢出。
 - 行头 `flex-wrap: wrap`，窄侧栏下操作按钮可换行而不挤压名称与 badge；删除按钮的 trash SVG 固定 `flex: 0 0 14px`，防止宿主全局 SVG 规则把它压缩成 0px 宽的空白按钮。
 - 行卡复用 `--opencodian-settings-form-row-*` token；间距使用 `--opencodian-settings-space-*`，不写 ad-hoc em margin。
 - 路径文本走 Mono Evidence Rule（`--font-monospace` 11px `--text-muted`，AA 对比度），`word-break: break-all` 容纳长绝对路径。

@@ -6,6 +6,7 @@
 > **最近更新**: G10c foreground Codex compaction host wiring — the view exposes adapter availability/compact methods through the existing `ActiveTabContextUsageCoordinatorHost` seam and passes the coordinator into `ContextDetailModal`; no compaction state is owned in the view.
 
 > **新增（Codex 资源/技能）**: cache host 提供 `loadCodexRuntimeSkills`、`getBackendKey` 返回 `'codex'`；`syncCodexSkillsChangedSubscription()` 订阅 Codex adapter `onSkillsChanged` → 立即失效 slash 菜单缓存；`notifyCodexAgentMentionUnavailable()` 在 Codex `@` 时显示无原生派发提示并提供设置入口。
+> **Updated**: 2026-07-28 — loadModelCatalogData/getDefaultModelSelection/getBackendScopedActiveTabModelOverride gain Codex branches; setActiveTabModelOverride writes codexModelOverride + next-thread feedback; isModelAvailableOnServer skips server catalog for Codex.
 
 ## 概述
 

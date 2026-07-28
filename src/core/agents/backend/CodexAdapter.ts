@@ -323,6 +323,7 @@ const CODEX_CAPABILITIES: BackendCapabilities = Object.freeze(
     AgentCapability.Todos,     // todo_list items via tool_use → SessionTodoDock
     AgentCapability.Permissions, // sandbox mode selector (read-only/workspace-write/danger-full-access)
     AgentCapability.Images,    // local_image input via temp-file translation
+    AgentCapability.Models,    // getModelList() (app-server model/list + codex debug models fallback)
   ]),
 );
 

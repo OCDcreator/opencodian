@@ -4,6 +4,7 @@
 > **最近更新**: 2026-07-26 — `ClaudeProjectSettingsDiscovery` 保持只读 discover/open；创建与完整 settings mutation 已移交 `ClaudeSettingsSourceService`，barrel 不再导出旧的 `createClaudeProjectSettingsFile`。
 
 > **新增导出**: `CodexProjectResourceDiscovery`（Codex 项目/全局 skills+agents discovery 与安全 CRUD）、`ClaudeCodeProcessMissingReason`、`AppServerSkill`/`AppServerListSkillsOptions`（经 CodexAppServerClient re-export）。
+> **Updated**: 2026-07-28 — renamed ClaudeCodeModelSelectorProvider export to BackendModelSelectorProvider (backend-neutral).
 
 ## 概述
 

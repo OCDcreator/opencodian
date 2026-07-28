@@ -49,7 +49,9 @@ const CODEX_CAPABILITIES = new Set<AgentCapability>([
 // - abort via TurnOptions.signal (AbortSignal)
 ```
 
-**不支持（对照 OpenCode adapter）**: branching/fork (无 revert/unrevert/fork API), todos 的 plugin-managed 持久化（SDK 有 TodoListItem 但无写入 API），providers（仅 OpenAI），hooks，cost-tracking，compaction，sharing。
+**不支持（对照 OpenCode adapter）**: branching/fork (无 revert/unrevert/fork API — 注：fork 已在 app-server path 实现), todos 的 plugin-managed 持久化（SDK 有 TodoListItem 但无写入 API），providers（外部第三方 provider 可由 CLI 全局 `~/.codex/config.toml` 配置，但插件不暴露 provider 控制界面；受上游 #23417 阻塞，app-server thread/start 可能忽略 model_provider），hooks，cost-tracking，compaction，sharing。
+
+> **2026-07-28 models capability 落地**: Codex 现已声明 `AgentCapability.Models` 并在 composer 暴露模型选择器。单一数据源是 `CodexAdapter.getModelList()`（app-server `model/list` 优先，`codex debug models` 回退）。选择语义是**模型覆盖**（当前会话 `codexModelOverride`），不是 provider 切换；仅在下一个 thread 边界生效，明确显示该边界。Custom 模型名按鉴权方式差异化策略：API-key 允许、未知鉴权允许但标注"未验证"、ChatGPT 账号鉴权只允许列表候选。运行中 thread 期间模型选择禁用。provider 切换保持外部管理（姿态 B），受上游 #23417 阻塞。
 
 ## 3. 方法映射表
 

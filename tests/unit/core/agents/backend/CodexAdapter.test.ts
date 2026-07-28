@@ -102,7 +102,6 @@ describe('CodexAdapter', () => {
       const adapter = new CodexAdapter();
       const caps = adapter.capabilities;
       expect(caps.has(AgentCapability.Mcp)).toBe(false);
-      expect(caps.has(AgentCapability.Models)).toBe(false);
       expect(caps.has(AgentCapability.Branching)).toBe(false);
     });
 

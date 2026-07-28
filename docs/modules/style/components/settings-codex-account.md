@@ -4,6 +4,8 @@
 > **状态**: [REVIEW]
 
 > **更新**: 2026-07-26 G9 — added compact external-managed Provider status and masked legacy-credential status styling.
+> **Updated**: 2026-07-28 — adds responsive CSS for global config summary provider-row grid layout (desktop columns, <=720px stack) and project config diagnostics styling.
+> **Updated**: 2026-07-28 — Codex Settings / Account / Provider headings now explicitly flush host heading spacing and use parent flex/grid alignment; title-to-content rhythm is owned by container gaps.
 
 ## 概述
 
@@ -38,6 +40,8 @@ Codex 账号与能力产品面的专用样式。把四个官方 app-server 表�
 
 Codex 设置面板的三大分组容器（连接与运行默认项 / 恢复与检查 / 账号与 provider 状态）。分组标题使用 `h4`；`.opencodian-settings .opencodian-settings-codex-group-title` 以更高特异性设置 `padding: 0`，覆盖 Obsidian `.vertical-tab-content h4` 的水平 padding，使标题文本与 muted 描述左缘对齐。分组本身不再使用 `margin` 控制间距，而是依赖内部 stack 和相邻分组选择器（`+`）的 `margin-top: var(--oc-codex-card-gap)`。
 
+标题与描述由 `.opencodian-settings-codex-group-header-text` 的 column flex `gap: 4px` 分隔；标题自身保持 `margin: 0; padding: 0; padding-inline-start: 0`，右侧组级按钮由 header 的 `align-items: center` 垂直居中。
+
 ### `.opencodian-settings-codex-connection-summary`
 
 连接来源摘要条：flex 行，标签 + 当前来源值。作为卡片基座的一员，它与下方第一个分组的间距由 `margin-bottom: var(--oc-codex-group-header-gap)` 固定为 `16px`。
@@ -45,6 +49,8 @@ Codex 设置面板的三大分组容器（连接与运行默认项 / 恢复与�
 ### `.opencodian-codex-provider-configuration-status`
 
 Account 标签顶部的紧凑 Provider 配置状态条。它用 `data-provider-config-state="external-managed"` 和 `role="status"` 明确表示 Codex 原生 Provider 配置由 Codex 登录、环境变量或原生配置管理；状态条只展示 auth source 与下方 capabilities live readback，不渲染 Provider 操作控件。`grid` 在窄宽度下折叠为单列（`max-width: 480px`），来源值允许 `overflow-wrap: anywhere`，避免设置面板水平溢出。
+
+`.opencodian-codex-provider-configuration-status-header` 是标题行的 flex owner，使用 `align-items: center`；标题通过高特异性规则清除 Obsidian `h4` 的四侧 margin/padding，避免用单侧 margin 做视觉补偿。
 
 ### `.opencodian-settings-codex-legacy-credential-status`
 
@@ -57,6 +63,8 @@ Connection 标签中的旧版插件凭据状态容器。它只显示“已配置
 ### `.opencodian-codex-account-card-header` / `.opencodian-codex-account-card-title`
 
 卡片头部：标题 + 右侧 Refresh 按钮的 flex 布局。
+
+标题由 `.opencodian-settings .opencodian-codex-account-card-title` 负责 `margin: 0; padding: 0; padding-inline-start: 0`，并保留 `min-width: 0` / `overflow-wrap: anywhere`；header 的 `align-items: center` 负责标题与按钮的垂直居中，标题下方间距仍归 header 的 `margin-bottom: var(--oc-codex-card-title-body-gap)` 所有。
 
 ### `.opencodian-codex-account-card-refresh` / `.opencodian-codex-account-refresh-all`
 
@@ -99,9 +107,13 @@ Token 使用量的扁平统计行（flex wrap，间距分组）：每对是 valu
 
 最近每日用量的柱状图：flex 底对齐，柱高按最近窗口归一化，实色 `var(--interactive-accent)`（无渐变），hover 时提升到全不透明；每根柱子带 `title`（`日期 · tokens`）tooltip。日期标签在独立的 `.opencodian-codex-account-usage-labels` 行中与柱子一一对齐（9px `--text-faint`），不再使用 8px 绝对定位溢出标签。图表区通过 `border-top` 与统计行分隔。
 
+`.opencodian-codex-account-usage-buckets-title` 不再携带底部 margin；图表容器用 column `gap` 管理标题、柱体和日期标签的节奏。
+
 ### `.opencodian-codex-account-rate-limit-group`
 
 速率限制“按层级”分组：顶部边框分隔，层级标题大写。不再使用左侧色条缩进，避免装饰性 side-stripe。
+
+`.opencodian-codex-account-rate-limit-groups` 与每个 tier group 都是 column flex，间距由 `gap` 提供；tier 标题保持四侧零 margin/padding。Global provider summary 的 `h5` 标题与 Project advanced TOML 的 `h5` 标题同样由 Codex settings owner 清除宿主 heading inset；advanced 区域以 column `gap` 保持标题、说明和编辑器间距。
 
 ### `.opencodian-codex-account-capability-chip`
 

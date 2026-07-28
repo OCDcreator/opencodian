@@ -40,8 +40,9 @@ Claude Code 设置面板的专用样式，负责 tab body、语义 group、readb
 
 - 每个 Claude Code 设置组的稳定语义容器，对应 `data-claude-code-group`
 - **扁平**：无 border / background / radius / padding，仅 margin；组间用 `+` 选择器加 `--oc-claude-card-gap` 上间距
-- header 是 `flex-direction: row`，让 h4 标题与 help 按钮横排成单行
+- header 是 `flex-direction: row`，让 h4 标题与 help 按钮横排成单行，并用 `align-items: center` 垂直对齐
 - `h4` title 使用 `.opencodian-claude-code-group-title` / `.opencodian-settings-claude-code-group-title`
+- 两个 h4 alias 都由 `.opencodian-settings` 限定，显式使用 `margin: 0; padding: 0; padding-inline-start: 0`；`min-width: 0` 与 `overflow-wrap: anywhere` 保护窄设置栏中的长标题
 
 ### Row Layout
 

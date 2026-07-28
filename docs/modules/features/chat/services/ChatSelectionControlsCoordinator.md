@@ -2,6 +2,7 @@
 
 > **源码**: `src/features/chat/services/ChatSelectionControlsCoordinator.ts`
 > **状态**: [REVIEW]
+> **Updated**: 2026-07-28 — model selector trigger gains streaming-disable gate; Codex composer selection now targets the active OpenCodian view and persists through the existing session-settings coordinator.
 
 ## 概述
 
@@ -74,8 +75,8 @@ export class ChatSelectionControlsCoordinator {
 ## 与 `OpenCodianView` 的边界
 
 - `OpenCodianView` 现在只提供 model catalog data source、tab override writeback、model-source mode / server availability 查询、provider icon service 调用和 OpenCode permission-mode settings writeback。Claude Code permission-mode live switch 由本 coordinator 的 live plugin seam 处理；Codex sandbox-mode live switch 同理由本 coordinator 通过 `readCodexSandboxModeFromPlugin()` / `switchCodexSandboxModeInPlugin()` 处理。
-- model dropdown/search/list/selection display lifecycle 仍集中在 `ChatSelectionControlsCoordinator`；model catalog cache、selection resolution、switch-model notice 与 unavailable follow-up 已进一步收束到 `ModelSelectionRuntime`
-- 当前聊天模型选择写入 active-tab `modelOverride`，用于当前标签后续发送；不要把它描述为会话设置弹窗里的持久化 session setting。
+- model dropdown/search/list/selection display lifecycle 仍集中在 `ChatSelectionControlsCoordinator`；model catalog cache、selection resolution、switch-model notice 与 unavailable follow-up 已进一步收束到 `ModelSelectionRuntime`。Codex 选择会先验证 active `opencodian-view`，通过现有 `ConversationSessionSettingsCoordinator.saveConversationOverrides()` 写入 `codexModelOverride`；它关闭通用即时 notice，只有保存成功后才显示 next-thread / new-conversation 提示，失败时恢复会话与 tab override
+- OpenCode / Claude Code 的聊天模型选择仍写入 active-tab `modelOverride`，用于当前标签后续发送；Codex composer 选择是例外，会通过现有 session-settings coordinator 持久化 `codexModelOverride`，并仅在保存成功后显示 next-thread 反馈。
 - permission dropdown lifecycle 由 build-time `PermissionModeSelectorCoordinator` 承接，并仍通过 shared Escape handler 与 model dropdown 一起关闭
 - send pipeline options、`ModelCatalogStateService`、provider availability 语义与 icon fallback 顺序没有变化
 - 该模块刻意不接管 context usage、effort selector 或 input glass/theme；这些仍在相邻 owner 中维护

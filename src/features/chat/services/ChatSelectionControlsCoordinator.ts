@@ -1,6 +1,13 @@
-import { setIcon } from 'obsidian';
+import { Notice, setIcon } from 'obsidian';
 
+import {
+  CODEX_CUSTOM_MODEL_SENTINEL,
+  CODEX_PROVIDER_ID,
+  type CodexCatalogAdapter,
+  resolveCodexModelCatalogFromAdapter,
+} from '../../../core/agents/backend/BackendModelCatalog';
 import type { ResolvedModelSelection } from '../../../core/config/modelConfig';
+import { VIEW_TYPE_OPENCODIAN } from '../../../core/types/chat';
 import type { ClaudeCodePermissionMode } from '../../../core/types/settings';
 import type { CodexSandboxMode } from '../../../core/types/settings';
 import type { PermissionMode } from '../../../core/types/settings';
@@ -47,6 +54,12 @@ export interface ChatSelectionControlsCoordinatorHost extends ModelSelectionRunt
   /** OpenCode permission template mode (yolo/normal/plan). */
   getPermissionMode(): PermissionMode;
   switchPermissionMode(mode: PermissionMode): Promise<boolean>;
+  /**
+   * Whether the active tab is currently streaming. When true, the model
+   * selector trigger is disabled (model changes are next-thread boundaries
+   * and must not be presented as applying to an in-flight turn).
+   */
+  isActiveTabStreaming?(): boolean;
 }
 
 const MODEL_DROPDOWN_PREFERRED_WIDTH = 340;
@@ -60,9 +73,11 @@ const CLAUDE_CODE_PERMISSION_MODES: readonly ClaudeCodePermissionMode[] = [
 interface LiveOpenCodianPlugin {
   settings?: {
     activeBackend?: string;
+    defaultProvider?: string;
+    defaultModel?: string;
     backendSettings?: {
-      claudeCode?: { permissionMode?: ClaudeCodePermissionMode };
-      codex?: { sandboxMode?: CodexSandboxMode };
+      claudeCode?: { permissionMode?: ClaudeCodePermissionMode; model?: string };
+      codex?: { sandboxMode?: CodexSandboxMode; model?: string };
     };
   };
   saveSettings?: () => Promise<void>;
@@ -83,8 +98,135 @@ function readOpenCodianPlugin(): LiveOpenCodianPlugin | null {
   }
 }
 
-function readActiveBackendFromPlugin(): string {
+/**
+ * Get the ACTIVE OpenCodian chat view — NOT the first arbitrary leaf.
+ * Uses `app.workspace.activeLeaf` to ensure we operate on the view the user
+ * is currently interacting with. Returns null when the active leaf is not an
+ * OpenCodian chat view or has no conversation. This prevents wrong-conversation
+ * mutation in multi-leaf/window workspaces.
+ */
+interface ActiveCodexView {
+  getViewType?(): string;
+  currentConversation: {
+    backend?: string;
+    sessionSettings?: Record<string, unknown>;
+    updatedAt?: number;
+  };
+  conversationSessionSettingsCoordinator?: {
+    saveConversationOverrides(conv: unknown, overrides: unknown): Promise<unknown>;
+  };
+  createConversationInCurrentTab?(): Promise<void>;
+  createNewConversationInCurrentTab?(): Promise<void>;
+}
+
+export function getActiveCodexView(): ActiveCodexView | null {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const app = (globalThis as any).app;
+    const activeLeaf = app?.workspace?.activeLeaf;
+    const view = activeLeaf?.view;
+    if (typeof view?.getViewType !== 'function' || view.getViewType() !== VIEW_TYPE_OPENCODIAN) {
+      return null;
+    }
+    if (view.currentConversation) {
+      return view;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Read the active conversation's backend — NOT the global settings.activeBackend.
+ * Uses the ACTIVE leaf's conversation, not the first leaf. Falls back to global
+ * setting only when no active conversation is found.
+ */
+export function readActiveBackendFromPlugin(): string {
+  const view = getActiveCodexView();
+  if (view?.currentConversation) {
+    return view.currentConversation.backend ?? 'opencode';
+  }
   return readOpenCodianPlugin()?.settings?.activeBackend ?? 'opencode';
+}
+
+// ---------------------------------------------------------------------------
+// Codex model catalog — delegates to shared BackendModelCatalog resolver
+// to prevent policy drift (single owner for auth-aware Custom policy).
+// ---------------------------------------------------------------------------
+
+function getCodexAdapterFromPlugin(): CodexCatalogAdapter | undefined {
+  return readOpenCodianPlugin()?.agentServiceRegistry?.get?.('codex') as CodexCatalogAdapter | undefined;
+}
+
+/**
+ * Resolve Codex model providers via the shared resolver.
+ * Delegates to resolveCodexModelCatalogFromAdapter in BackendModelCatalog.
+ */
+async function resolveCodexModelProviders(): Promise<ModelSelectorProvider[] | null> {
+  const adapter = getCodexAdapterFromPlugin();
+  if (!adapter) return null;
+  const result = await resolveCodexModelCatalogFromAdapter(
+    adapter,
+    t('chat.modelSelector.codex.customApiKey'),
+    t('chat.modelSelector.codex.customUnverified'),
+  );
+  return result?.providers ?? null;
+}
+
+/**
+ * Wrap a ModelSelectionRuntimeHost with Codex-aware overrides.
+ * When Codex is the active backend, intercepts catalog loading, default
+ * selection, model availability, and model override to use Codex-specific
+ * logic. Falls through to the original host for non-Codex backends.
+ */
+function wrapHostForCodex(host: ModelSelectionRuntimeHost): ModelSelectionRuntimeHost {
+  return {
+    ...host,
+    async loadModelCatalogData() {
+      if (readActiveBackendFromPlugin() === 'codex') {
+        const providers = await resolveCodexModelProviders();
+        if (providers) return { catalogBundle: null, providers };
+        return { catalogBundle: null, providers: [] };
+      }
+      return host.loadModelCatalogData();
+    },
+    getDefaultModelSelection() {
+      if (readActiveBackendFromPlugin() === 'codex') {
+        const model = readOpenCodianPlugin()?.settings?.backendSettings?.codex?.model?.trim() ?? '';
+        return { provider: CODEX_PROVIDER_ID, model };
+      }
+      return host.getDefaultModelSelection();
+    },
+    async isModelAvailableOnServer(provider: string, model: string) {
+      if (readActiveBackendFromPlugin() === 'codex') {
+        return Boolean(provider && model);
+      }
+      return host.isModelAvailableOnServer(provider, model);
+    },
+    getActiveTabModelOverride() {
+      const override = host.getActiveTabModelOverride();
+      if (override && readActiveBackendFromPlugin() === 'codex') {
+        return override.provider === CODEX_PROVIDER_ID ? override : null;
+      }
+      return override;
+    },
+    setActiveTabModelOverride(selection) {
+      // Handle Codex Custom sentinel: prompt for model name.
+      if (readActiveBackendFromPlugin() === 'codex' && selection?.model === CODEX_CUSTOM_MODEL_SENTINEL) {
+        const custom = window.prompt(t('chat.modelSelector.codex.customPrompt'));
+        if (!custom?.trim()) return false;
+        selection = { provider: selection.provider, model: custom.trim() };
+      }
+      return host.setActiveTabModelOverride(selection);
+    },
+    syncActiveTabContextUsageIdentity() {
+      host.syncActiveTabContextUsageIdentity();
+    },
+    getModelSourceMode() {
+      return host.getModelSourceMode();
+    },
+  };
 }
 
 function normalizeClaudeCodePermissionMode(value: ClaudeCodePermissionMode | undefined): ClaudeCodePermissionMode {
@@ -194,7 +336,7 @@ export class ChatSelectionControlsCoordinator {
   constructor(
     private readonly host: ChatSelectionControlsCoordinatorHost,
   ) {
-    this.modelSelectionRuntime = new ModelSelectionRuntime(host);
+    this.modelSelectionRuntime = new ModelSelectionRuntime(wrapHostForCodex(host));
     // Permission selector is created per-build in buildBackendPermissionSelector()
     // because the mode system depends on the active backend.
     this.additionalDirectoriesBadge = new AdditionalDirectoriesConfigBadgeCoordinator();
@@ -299,6 +441,12 @@ export class ChatSelectionControlsCoordinator {
     this.modelSelectorTrigger.toggleClass('is-unavailable', displayState.isUnavailable);
     this.modelSelectorTrigger.toggleClass('is-unconfigured', displayState.isUnconfigured);
 
+    // Reflect streaming-disabled state on the trigger so model changes
+    // (next-thread boundaries) are never presented as applying mid-turn.
+    const streamingDisabled = this.isModelSelectorStreamingDisabled();
+    this.modelSelectorTrigger.toggleClass('is-streaming-disabled', streamingDisabled);
+    this.modelSelectorTrigger.toggleAttribute('aria-disabled', streamingDisabled);
+
     const textEl = this.modelSelectorTrigger.querySelector('.opencodian-model-trigger-text');
     if (textEl) {
       textEl.textContent = displayState.text;
@@ -306,10 +454,21 @@ export class ChatSelectionControlsCoordinator {
 
     this.modelSelectorTrigger.setAttribute(
       'title',
-      t('chat.modelSelector.currentTabOverrideTitle', { model: displayState.title }),
+      streamingDisabled
+        ? t('chat.modelSelector.streamingDisabledTitle')
+        : t('chat.modelSelector.currentTabOverrideTitle', { model: displayState.title }),
     );
     void this.updateModelSelectorIcon(current?.provider ?? null, displayState.iconLabel);
     this.host.updateEffortSelectorDisplay();
+  }
+
+  /**
+   * Whether model selection is disabled because the active tab is streaming.
+   * Model changes are next-thread boundaries; they must not be presented as
+   * applying to an in-flight turn.
+   */
+  private isModelSelectorStreamingDisabled(): boolean {
+    return Boolean(this.host.isActiveTabStreaming?.());
   }
 
   updatePermissionTriggerDisplay(): void {
@@ -657,6 +816,9 @@ export class ChatSelectionControlsCoordinator {
 
     this.modelSelectorTrigger.addEventListener('click', (event) => {
       event.stopPropagation();
+      if (this.isModelSelectorStreamingDisabled()) {
+        return;
+      }
       this.toggleModelDropdown();
     });
 
@@ -904,12 +1066,105 @@ export class ChatSelectionControlsCoordinator {
   }
 
   private selectModel(provider: string, model: string): boolean {
-    const didSwitch = this.modelSelectionRuntime.switchModel(provider, model);
+    // Codex sentinel already resolved by wrapped host; persist + show next-thread notice.
+    const isCodex = readActiveBackendFromPlugin() === 'codex';
+    const activeView = isCodex ? getActiveCodexView() : null;
+    if (isCodex && !activeView) {
+      new Notice(t('chat.modelSelector.codex.applyFailed'));
+      return false;
+    }
+
+    const previousOverride = this.host.getActiveTabModelOverride();
+    const didSwitch = this.modelSelectionRuntime.switchModel(provider, model, {
+      // The Codex save coordinator owns the async success/failure feedback.
+      notify: !isCodex,
+    });
     if (!didSwitch) {
       return false;
     }
     this.updateModelSelectorDisplay();
+    if (isCodex) {
+      // Only show the next-thread success notice after the active conversation
+      // save resolves. Failed saves roll back both the conversation snapshot
+      // and the ephemeral tab override so the UI cannot claim a false success.
+      void this.persistCodexModelOverride(model, activeView).then((saved) => {
+        if (saved) {
+          this.showCodexModelNextThreadNotice(activeView);
+        } else {
+          this.host.setActiveTabModelOverride(previousOverride);
+          this.updateModelSelectorDisplay();
+          new Notice(t('chat.modelSelector.codex.applyFailed'));
+        }
+      });
+    }
     return true;
+  }
+
+  /**
+   * Persist codexModelOverride on the ACTIVE conversation's sessionSettings.
+   * Uses getActiveCodexView() to target the correct conversation in multi-leaf
+   * workspaces. Returns true on success, false on failure/no active target.
+   * The caller must NOT show success feedback until this returns true.
+   */
+  private async persistCodexModelOverride(
+    model: string,
+    view: ActiveCodexView | null,
+  ): Promise<boolean> {
+    if (!view?.currentConversation) {
+      return false;
+    }
+    const coordinator = view.conversationSessionSettingsCoordinator;
+    if (!coordinator?.saveConversationOverrides) {
+      return false;
+    }
+    const conversation = view.currentConversation;
+    const previousSessionSettings = conversation.sessionSettings;
+    const previousUpdatedAt = conversation.updatedAt;
+    try {
+      const globalModel = readOpenCodianPlugin()?.settings?.backendSettings?.codex?.model?.trim() ?? '';
+      const codexModelOverride = model && model !== globalModel ? model : null;
+      await coordinator.saveConversationOverrides(conversation, {
+        ...(conversation.sessionSettings ?? {}),
+        codexModelOverride,
+      });
+      return true;
+    } catch {
+      // The existing coordinator mutates the conversation before awaiting its
+      // storage write. Restore the captured in-memory state when that write
+      // rejects so a failed selection cannot leak into the next turn.
+      conversation.sessionSettings = previousSessionSettings;
+      conversation.updatedAt = previousUpdatedAt;
+      return false;
+    }
+  }
+
+  /**
+   * Show next-thread notice with a New Conversation shortcut.
+   * Uses getActiveCodexView() to target the SAME active view for the shortcut.
+   */
+  private showCodexModelNextThreadNotice(view: ActiveCodexView | null): void {
+    const notice = new Notice('', 6000);
+    const el = notice.noticeEl;
+    el.addClass('opencodian-codex-model-next-thread-notice');
+    el.empty();
+    el.createEl('span', { text: t('chat.modelSelector.codex.savedNextThread') });
+    const action = el.createEl('button', {
+      cls: 'opencodian-codex-model-next-thread-action',
+      text: t('chat.modelSelector.codex.newConversationShortcut'),
+    });
+    action.addEventListener('click', () => {
+      notice.hide();
+      // Keep the shortcut bound to the view that was successfully persisted;
+      // do not create a conversation in whichever leaf happens to be active
+      // after the user switches panes while the notice is visible.
+      if (view && getActiveCodexView() === view) {
+        const createNewConversation =
+          view.createConversationInCurrentTab ?? view.createNewConversationInCurrentTab;
+        if (createNewConversation) {
+          void createNewConversation.call(view);
+        }
+      }
+    });
   }
 
   private getModelPopoverFrameTexts(): ComposerPopoverFrameTexts {

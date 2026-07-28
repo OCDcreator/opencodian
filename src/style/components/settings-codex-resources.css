@@ -39,6 +39,9 @@
 .opencodian-settings .opencodian-codex-resource-group-title {
   margin: 0;
   padding: 0;
+  padding-inline-start: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
   font-size: var(--font-ui-small);
   font-weight: 600;
   color: var(--text-normal);
@@ -368,6 +371,14 @@
   padding: 0;
   font-size: var(--font-ui-small);
   font-weight: 600;
+}
+
+.opencodian-settings .opencodian-codex-runtime-skill-groups-title {
+  margin: 0;
+  padding: 0;
+  padding-inline-start: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .opencodian-codex-runtime-skill-group {

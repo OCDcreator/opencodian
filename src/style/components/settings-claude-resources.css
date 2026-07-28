@@ -40,6 +40,9 @@
 .opencodian-settings .opencodian-claude-resource-group-title {
   margin: 0;
   padding: 0;
+  padding-inline-start: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
   font-size: var(--font-ui-small);
   font-weight: 600;
   color: var(--text-normal);

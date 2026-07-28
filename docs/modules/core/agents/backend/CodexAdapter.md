@@ -8,6 +8,7 @@
 > **新增（skills runtime truth）**: `getRuntimeSkills()` 通过 app-server `skills/list`（scoped to `workingDirectory`）返回 Codex 当前 vault 的 runtime skills，作为聊天 `/skills` 与 `$` 菜单的唯一 runtime 真相；app-server 不可用时返回 null。`forceNextRuntimeSkillsReload()` 设置一次性标志，使**下一次** `getRuntimeSkills()` 传 `forceReload: true` 绕过 app-server 缓存（用于插件自身的项目 skill 写入后，app-server 不一定发 `skills/changed`），随即清除标志；正常菜单打开保持缓存。`onSkillsChanged(handler)` 暴露 `skills/changed` 失效信号 Disposable；`start()` 时订阅、`stop()` 时取消订阅。聊天菜单缓存订阅此信号以立即失效，而非仅靠 120s TTL。
 
 > **P1 grouped settings readback（2026-07-24）**: `getRuntimeSkillGroups()` 是 additive 设置页 seam，调用 `CodexAppServerClient.listSkillGroups({ cwd: workingDirectory })`，返回 cwd/source/errors 完整分组；app-server 不可用或调用抛错时返回 null。它不替换 `getRuntimeSkills()`，不参与聊天目录排序、去重或菜单结构。
+> **Updated**: 2026-07-28 — CODEX_CAPABILITIES now declares AgentCapability.Models; the composer model selector is enabled for Codex.
 
 ## 概述
 

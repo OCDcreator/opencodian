@@ -2,6 +2,8 @@
 
 > **源码**: `src/features/chat/services/CodexChatSurfaceBinding.ts`
 > **状态**: [ACTIVE]
+> **Updated**: 2026-07-28 — adds `notifyModelSavedNextThread(onNewConversation)` and `notifyModelApplyFailed()` to own the Codex composer model-selection next-thread boundary notices, keeping the guarded OpenCodianView shell free of new notice/runtime ownership.
+> **Updated**: 2026-07-28 — now owns Codex model catalog resolution with auth-aware Custom policy (resolveCodexModelCatalog) via real adapter account readback, plus next-thread boundary notices.
 
 ## 概述
 

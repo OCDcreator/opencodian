@@ -24,7 +24,7 @@ export interface ModelSelectionRuntimeHost {
     providers: readonly ModelSelectorProvider[];
   }>;
   getActiveTabModelOverride(): ModelSelectorSelection | null;
-  setActiveTabModelOverride(selection: ModelSelectorSelection): boolean;
+  setActiveTabModelOverride(selection: ModelSelectorSelection | null): boolean;
   getDefaultModelSelection(): ModelSelectorSelection | null;
   syncActiveTabContextUsageIdentity(): void;
   getModelSourceMode(): ModelSourceMode;
@@ -34,6 +34,11 @@ export interface ModelSelectionRuntimeHost {
 export interface ModelUnavailableNoticeContent {
   title: string;
   message: string;
+}
+
+export interface ModelSelectionSwitchOptions {
+  /** Suppress the generic immediate-switch notice when the caller owns async persistence feedback. */
+  notify?: boolean;
 }
 
 interface ModelCatalogSnapshot {
@@ -215,7 +220,11 @@ export class ModelSelectionRuntime {
     };
   }
 
-  switchModel(provider: string, model: string): boolean {
+  switchModel(
+    provider: string,
+    model: string,
+    options: ModelSelectionSwitchOptions = {},
+  ): boolean {
     const didSetOverride = this.host.setActiveTabModelOverride({ provider, model });
     if (!didSetOverride) {
       return false;
@@ -225,7 +234,9 @@ export class ModelSelectionRuntime {
 
     const modelInfo = this.findAvailableModelInfo(provider, model);
     const modelName = modelInfo?.modelName || model;
-    new Notice(`Model switched to: ${modelName}`);
+    if (options.notify !== false) {
+      new Notice(`Model switched to: ${modelName}`);
+    }
     return true;
   }
 

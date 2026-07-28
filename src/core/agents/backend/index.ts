@@ -43,6 +43,15 @@ export type {
 } from './AgentService';
 export { AgentServiceRegistry } from './AgentServiceRegistry';
 export {
+  type BackendModelSelectorProvider,
+  buildClaudeCodeModelSelectorProviders,
+  CLAUDE_CODE_EFFORT_VARIANTS,
+  CLAUDE_CODE_PROVIDER_ID,
+  CLAUDE_CODE_PROVIDER_NAME,
+  type ClaudeCodeModelCatalogEntry,
+  CODEX_EFFORT_VARIANTS,
+} from './BackendModelCatalog';
+export {
   ClaudeCodeAdapter,
   type ClaudeCodeAdapterOptions,
   type ClaudeCodeRuntimeCatalog,
@@ -82,15 +91,6 @@ export {
   type ClaudeCodeMcpSseConfig,
   type ClaudeCodeMcpStdioConfig,
 } from './ClaudeCodeMcpConfigAdapter';
-export {
-  buildClaudeCodeModelSelectorProviders,
-  CLAUDE_CODE_EFFORT_VARIANTS,
-  CLAUDE_CODE_PROVIDER_ID,
-  CLAUDE_CODE_PROVIDER_NAME,
-  type ClaudeCodeModelCatalogEntry,
-  type ClaudeCodeModelSelectorProvider,
-  CODEX_EFFORT_VARIANTS,
-} from './ClaudeCodeModelCatalog';
 export {
   buildClaudeCodeOptions,
   type ClaudeCodeOptionsBuilderInput,

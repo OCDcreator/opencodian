@@ -25,6 +25,10 @@ import type {
   AppServerAccountUsageResult,
   AppServerModelProviderCapabilities,
 } from '../../core/agents/backend/CodexAppServerClient';
+import {
+  type GlobalCodexConfigSummary,
+  readGlobalCodexConfigSummary,
+} from '../../core/agents/backend/CodexGlobalConfigSummaryReader';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 
@@ -69,6 +73,8 @@ export class SettingsCodexAccountSurface {
   private rateLimitsOutputEl: HTMLElement | null = null;
   private capabilitiesOutputEl: HTMLElement | null = null;
   private providerConfigurationStatusEl: HTMLElement | null = null;
+  private globalConfigSummaryEl: HTMLElement | null = null;
+  private globalConfigSummaryGeneration = 0;
   private statusSubscription: Disposable | null = null;
   private readonly refreshEpochs: Record<CodexAccountCardKind, number> = {
     identity: 0,
@@ -90,6 +96,7 @@ export class SettingsCodexAccountSurface {
     this.authSource = authSource;
     this.providerConfigurationStatusEl = this.createProviderConfigurationStatus(containerEl);
     this.renderProviderConfigurationStatus();
+    this.globalConfigSummaryEl = this.createGlobalConfigSummaryCard(containerEl);
     this.identityOutputEl = this.createCard(
       containerEl,
       'identity',
@@ -129,10 +136,12 @@ export class SettingsCodexAccountSurface {
 
     this.subscribeToCodexConnection();
     void this.refreshAll();
+    void this.refreshGlobalConfigSummary();
   }
 
   dispose(): void {
     this.invalidateAllRefreshes();
+    this.globalConfigSummaryGeneration += 1;
     this.statusSubscription?.dispose();
     this.statusSubscription = null;
     this.identityOutputEl = null;
@@ -140,6 +149,7 @@ export class SettingsCodexAccountSurface {
     this.rateLimitsOutputEl = null;
     this.capabilitiesOutputEl = null;
     this.providerConfigurationStatusEl = null;
+    this.globalConfigSummaryEl = null;
   }
 
   private authSource: CodexAuthSource = 'env-or-chatgpt';
@@ -201,6 +211,180 @@ export class SettingsCodexAccountSurface {
     statusEl.createDiv({
       cls: 'opencodian-codex-provider-configuration-status-capabilities',
       text: t('settings.codex.accountSurface.providerConfiguration.capabilitiesReadback'),
+    });
+    // Provider posture B: #23417 upstream blocker explanation.
+    statusEl.createDiv({
+      cls: 'opencodian-codex-provider-configuration-status-upstream',
+    }).createEl('a', {
+      cls: 'opencodian-codex-provider-configuration-status-upstream-link',
+      attr: {
+        href: 'https://github.com/openai/codex/issues/23417',
+        target: '_blank',
+        rel: 'noopener noreferrer',
+      },
+      text: t('settings.codex.accountSurface.providerConfiguration.upstreamIssue'),
+    });
+  }
+
+  // ─── Global config summary card (read-only, no writes) ────────
+
+  private createGlobalConfigSummaryCard(containerEl: HTMLElement): HTMLElement {
+    const cardEl = containerEl.createDiv({
+      cls: 'opencodian-codex-account-card opencodian-codex-global-config-summary-card',
+      attr: {
+        'data-codex-account-card': 'global-config-summary',
+        'data-settings-surface': 'codex-account-card',
+      },
+    });
+
+    const headerEl = cardEl.createDiv({ cls: 'opencodian-codex-account-card-header' });
+    headerEl.createEl('h4', {
+      cls: 'opencodian-codex-account-card-title',
+      text: t('settings.codex.accountSurface.globalConfig.name'),
+    });
+
+    const refreshTooltip = t('settings.codex.accountSurface.refreshTooltip');
+    const refreshButtonEl = headerEl.createEl('button', {
+      cls: 'opencodian-codex-account-card-refresh',
+      text: t('settings.codex.accountSurface.refresh'),
+      attr: { type: 'button', title: refreshTooltip, 'aria-label': `${refreshTooltip}: ${t('settings.codex.accountSurface.globalConfig.name')}` },
+    });
+    refreshButtonEl.addEventListener('click', () => {
+      void this.refreshGlobalConfigSummary();
+    });
+
+    const bodyEl = cardEl.createDiv({
+      cls: 'opencodian-codex-account-card-body',
+      attr: {
+        'data-codex-global-config-summary': 'true',
+        'data-proof-state': 'readback',
+      },
+    });
+    bodyEl.createEl('p', {
+      cls: 'opencodian-codex-account-card-loading',
+      text: t('settings.codex.accountSurface.loading'),
+    });
+    return bodyEl;
+  }
+
+  /** Read the global config summary once. No polling or watching. */
+  private async refreshGlobalConfigSummary(): Promise<void> {
+    const el = this.globalConfigSummaryEl;
+    if (!el) {
+      return;
+    }
+    const generation = ++this.globalConfigSummaryGeneration;
+    let summary: GlobalCodexConfigSummary;
+    try {
+      summary = await readGlobalCodexConfigSummary();
+    } catch {
+      summary = {
+        fileState: 'read-failed',
+        filePath: '',
+        lastSuccessfulRead: null,
+        model: null,
+        modelProvider: null,
+        openaiBaseUrl: null,
+        providers: [],
+      };
+    }
+    if (generation !== this.globalConfigSummaryGeneration || this.globalConfigSummaryEl !== el) {
+      return;
+    }
+    this.renderGlobalConfigSummary(el, summary);
+  }
+
+  private renderGlobalConfigSummary(el: HTMLElement, summary: GlobalCodexConfigSummary): void {
+    el.empty();
+    el.setAttribute('data-global-config-state', summary.fileState);
+
+    el.createDiv({
+      cls: 'opencodian-codex-global-config-summary-readonly-note',
+      text: t('settings.codex.accountSurface.globalConfig.readonlyNote'),
+    });
+
+    if (summary.fileState !== 'readable') {
+      const stateText = summary.fileState === 'missing'
+        ? t('settings.codex.accountSurface.globalConfig.stateMissing')
+        : summary.fileState === 'parse-failed'
+          ? t('settings.codex.accountSurface.globalConfig.stateParseFailed')
+          : t('settings.codex.accountSurface.globalConfig.stateReadFailed');
+      el.createDiv({
+        cls: 'opencodian-codex-global-config-summary-state',
+        text: stateText,
+      });
+      return;
+    }
+
+    // File path (read-only display).
+    el.createDiv({
+      cls: 'opencodian-codex-global-config-summary-path',
+    }).createSpan({
+      cls: 'opencodian-codex-global-config-summary-path-value',
+      text: summary.filePath,
+    });
+
+    if (summary.lastSuccessfulRead) {
+      el.createDiv({
+        cls: 'opencodian-codex-global-config-summary-last-read',
+        text: t('settings.codex.accountSurface.globalConfig.lastRead', { time: summary.lastSuccessfulRead }),
+      });
+    }
+
+    // Top-level fields.
+    const topLevel = el.createDiv({ cls: 'opencodian-codex-global-config-summary-top-level' });
+    this.appendSummaryRow(topLevel, 'settings.codex.accountSurface.globalConfig.fieldModel', summary.model);
+    this.appendSummaryRow(topLevel, 'settings.codex.accountSurface.globalConfig.fieldModelProvider', summary.modelProvider);
+    this.appendSummaryRow(topLevel, 'settings.codex.accountSurface.globalConfig.fieldOpenaiBaseUrl', summary.openaiBaseUrl);
+
+    // Provider table.
+    if (summary.providers.length > 0) {
+      const tableEl = el.createDiv({ cls: 'opencodian-codex-global-config-summary-providers' });
+      tableEl.createEl('h5', {
+        cls: 'opencodian-codex-global-config-summary-providers-title',
+        text: t('settings.codex.accountSurface.globalConfig.providersTitle'),
+      });
+      for (const provider of summary.providers) {
+        const rowEl = tableEl.createDiv({
+          cls: 'opencodian-codex-global-config-summary-provider-row',
+          attr: provider.isDeclaredDefault ? { 'data-declared-default': 'true' } : undefined,
+        });
+        rowEl.createSpan({
+          cls: 'opencodian-codex-global-config-summary-provider-id',
+          text: provider.id,
+        });
+        rowEl.createSpan({
+          cls: 'opencodian-codex-global-config-summary-provider-name',
+          text: provider.name,
+        });
+        rowEl.createSpan({
+          cls: 'opencodian-codex-global-config-summary-provider-base-url',
+          text: provider.baseUrl ?? '—',
+        });
+        rowEl.createSpan({
+          cls: 'opencodian-codex-global-config-summary-provider-wire-api',
+          text: provider.wireApi ?? '—',
+        });
+        if (provider.isDeclaredDefault) {
+          rowEl.createSpan({
+            cls: 'opencodian-codex-global-config-summary-provider-default-badge',
+            text: t('settings.codex.accountSurface.globalConfig.declaredDefault'),
+          });
+        }
+      }
+    }
+  }
+
+  private appendSummaryRow(parent: HTMLElement, labelKey: string, value: string | null): void {
+    const row = parent.createDiv({ cls: 'opencodian-codex-global-config-summary-row' });
+    row.createSpan({
+      cls: 'opencodian-codex-global-config-summary-row-label',
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      text: t(labelKey as any),
+    });
+    row.createSpan({
+      cls: 'opencodian-codex-global-config-summary-row-value',
+      text: value ?? '—',
     });
   }
 

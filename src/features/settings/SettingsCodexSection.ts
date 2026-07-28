@@ -12,7 +12,10 @@
  */
 /* eslint-disable max-lines -- Codex settings own connection, permissions, account, and inspection controls behind one tabbed section owner. */
 
-import { DropdownComponent, Notice, Setting } from 'obsidian';
+import { realpathSync } from 'node:fs';
+import path from 'node:path';
+
+import { DropdownComponent, Modal, Notice, Setting } from 'obsidian';
 
 import type { CodexModelSummary } from '../../core/agents/backend/CodexAdapter';
 import type { CodexApprovalPolicy, CodexReasoningEffort, CodexWebSearchMode } from '../../core/types/settings';
@@ -22,9 +25,12 @@ import {
 } from '../../core/types/settings';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
+import type { CodexProjectConfigTomlDiagnostic } from './CodexProjectConfigFormModel';
+import { parseProjectConfigFormValues } from './CodexProjectConfigFormModel';
 import { renderCostEstimateSettingsRow } from './CostEstimateSettingsRow';
 import { SettingsCodexAccountSurface } from './SettingsCodexAccountSurface';
 import { SettingsCodexLegacyCredentialControl } from './SettingsCodexLegacyCredentialControl';
+import { SettingsCodexProjectConfigSection } from './SettingsCodexProjectConfigSection';
 import { SettingsCodexReadbackControls } from './SettingsCodexReadbackControls';
 import { SettingsCodexResourcesSection } from './SettingsCodexResourcesSection';
 
@@ -40,6 +46,7 @@ export class SettingsCodexSection {
   private readonly accountSurface: SettingsCodexAccountSurface;
   private readonly legacyCredentialControl: SettingsCodexLegacyCredentialControl;
   private readonly resourcesSurface: SettingsCodexResourcesSection;
+  private readonly projectConfigSection: SettingsCodexProjectConfigSection;
   private connectionSummaryValueEl: HTMLElement | null = null;
 
   constructor(options: SettingsCodexSectionOptions) {
@@ -75,6 +82,7 @@ export class SettingsCodexSection {
         adapter?.forceNextRuntimeSkillsReload?.();
       },
     });
+    this.projectConfigSection = new SettingsCodexProjectConfigSection({ plugin: this.plugin });
   }
 
   dispose(): void {
@@ -145,6 +153,11 @@ export class SettingsCodexSection {
 
     if (resolvedTabId === 'permissions') {
       this.renderPermissionsGroup(bodyEl);
+      return;
+    }
+
+    if (resolvedTabId === 'project-config') {
+      this.renderProjectConfigGroup(bodyEl);
       return;
     }
 
@@ -245,6 +258,400 @@ export class SettingsCodexSection {
     this.renderModelSetting(controlsEl);
     this.renderReasoningSetting(controlsEl);
     this.renderWebSearchSetting(controlsEl);
+  }
+
+  /**
+   * Project configuration tab: manages `<vault-root>/.codex/config.toml` with
+   * a common form + constrained advanced TOML editor. Reuses
+   * ProjectResourceSecureWrite for CAS, archive, and conflict detection.
+   */
+  private renderProjectConfigGroup(bodyEl: HTMLElement): void {
+    bodyEl.empty();
+    const groupEl = bodyEl.createDiv({
+      cls: 'opencodian-settings-codex-group opencodian-settings-codex-group--project-config',
+      attr: { 'data-codex-group': 'project-config' },
+    });
+
+    groupEl.createEl('h4', {
+      cls: 'opencodian-settings-codex-group-title',
+      text: t('settings.codex.projectConfig.title'),
+    });
+    groupEl.createDiv({
+      cls: 'opencodian-settings-codex-group-desc',
+      text: t('settings.codex.projectConfig.description'),
+    });
+
+    const stackEl = groupEl.createDiv({
+      cls: 'opencodian-settings-codex-group-controls opencodian-settings-codex-group-stack',
+    });
+
+    void this.renderProjectConfigForm(stackEl, bodyEl);
+  }
+
+  /** Clear and re-render the project config tab (Fix 8: no duplicate controls). */
+  private refreshProjectConfigTab(bodyEl: HTMLElement): void {
+    this.renderProjectConfigGroup(bodyEl);
+  }
+
+  /**
+   * Canonical path.relative containment check + explicit confirmation for
+   * vault-external additional_directories. Uses path.relative (NOT startsWith)
+   * to avoid /vault-evil matching /vault. Returns true if safe/confirmed.
+   */
+  private confirmExternalDirectories(dirs: readonly string[]): boolean {
+    if (dirs.length === 0) {
+      return true;
+    }
+    const vaultPath = (this.plugin.app.vault.adapter as { getBasePath?: () => string }).getBasePath?.();
+    if (!vaultPath) {
+      return true;
+    }
+    // Use canonical realpaths — NOT lexical path.resolve — so that a symlink
+    // inside the vault pointing to an external target is correctly detected.
+    let canonicalVault: string;
+    try {
+      canonicalVault = realpathSync(path.resolve(vaultPath));
+    } catch {
+      canonicalVault = path.resolve(vaultPath);
+    }
+    const externalDirs = dirs.filter((d) => {
+      const resolved = path.resolve(d);
+      // If the path exists, canonicalize via realpath to catch symlink escape.
+      let canonical: string;
+      try {
+        canonical = realpathSync(resolved);
+      } catch {
+        // Path doesn't exist yet or can't be canonicalized — fail conservatively
+        // by treating it as external (require confirmation).
+        return true;
+      }
+      const relative = path.relative(canonicalVault, canonical);
+      return relative.startsWith('..') || path.isAbsolute(relative);
+    });
+    if (externalDirs.length === 0) {
+      return true;
+    }
+    return window.confirm(t('settings.codex.projectConfig.externalDirConfirm', { count: String(externalDirs.length) }));
+  }
+
+  private async renderProjectConfigForm(containerEl: HTMLElement, bodyEl: HTMLElement): Promise<void> {
+    const statusEl = containerEl.createDiv({
+      cls: 'opencodian-codex-project-config-status',
+      text: t('settings.codex.projectConfig.loading'),
+    });
+
+    const readResult = await this.projectConfigSection.read();
+
+    statusEl.empty();
+    statusEl.setAttribute('data-project-config-state', readResult.status);
+
+    if (readResult.status === 'invalid-path') {
+      statusEl.setText(t('settings.codex.projectConfig.noVault'));
+      return;
+    }
+    if (readResult.status === 'conflict') {
+      statusEl.setText(t('settings.codex.projectConfig.conflictOnRead'));
+      return;
+    }
+    if (readResult.status === 'read-failed') {
+      statusEl.setText(t('settings.codex.projectConfig.readFailed'));
+      return;
+    }
+
+    const isExisting = readResult.status === 'success';
+    statusEl.setText(
+      isExisting
+        ? t('settings.codex.projectConfig.fileFound')
+        : t('settings.codex.projectConfig.fileMissing'),
+    );
+
+    // Common form fields.
+    const values = readResult.values;
+    let model = values.model ?? '';
+    let reasoningEffort = values.modelReasoningEffort ?? '';
+    let sandboxMode = values.sandboxMode ?? '';
+    let approvalPolicy = values.approvalPolicy ?? '';
+    let additionalDirs = (values.additionalDirectories ?? []).join('\n');
+    let networkAccess = values.networkAccess;
+    let webSearch = values.webSearch;
+    let advancedToml = readResult.content;
+
+    const formEl = containerEl.createDiv({ cls: 'opencodian-codex-project-config-form' });
+
+    new Setting(formEl)
+      .setName(t('settings.codex.projectConfig.fieldModel'))
+      .setDesc(t('settings.codex.projectConfig.fieldModelDesc'))
+      .addText((text) => {
+        text.setValue(model);
+        text.onChange((v) => { model = v; });
+      });
+
+    new Setting(formEl)
+      .setName(t('settings.codex.projectConfig.fieldReasoningEffort'))
+      .setDesc(t('settings.codex.projectConfig.fieldReasoningEffortDesc'))
+      .addDropdown((dropdown) => {
+        dropdown.addOption('', t('settings.codex.projectConfig.inherit'));
+        for (const effort of ['minimal', 'low', 'medium', 'high', 'xhigh']) {
+          dropdown.addOption(effort, effort);
+        }
+        dropdown.setValue(reasoningEffort);
+        dropdown.onChange((v) => { reasoningEffort = v; });
+      });
+
+    new Setting(formEl)
+      .setName(t('settings.codex.projectConfig.fieldSandboxMode'))
+      .setDesc(t('settings.codex.projectConfig.fieldSandboxModeDesc'))
+      .addDropdown((dropdown) => {
+        dropdown.addOption('', t('settings.codex.projectConfig.inherit'));
+        for (const mode of ['read-only', 'workspace-write', 'danger-full-access']) {
+          dropdown.addOption(mode, mode);
+        }
+        dropdown.setValue(sandboxMode);
+        dropdown.onChange((v) => { sandboxMode = v; });
+      });
+
+    new Setting(formEl)
+      .setName(t('settings.codex.projectConfig.fieldApprovalPolicy'))
+      .setDesc(t('settings.codex.projectConfig.fieldApprovalPolicyDesc'))
+      .addDropdown((dropdown) => {
+        dropdown.addOption('', t('settings.codex.projectConfig.inherit'));
+        for (const policy of ['never', 'on-request', 'on-failure', 'untrusted']) {
+          dropdown.addOption(policy, policy);
+        }
+        dropdown.setValue(approvalPolicy);
+        dropdown      .onChange((v) => { approvalPolicy = v; });
+      });
+
+    new Setting(formEl)
+      .setName(t('settings.codex.projectConfig.fieldNetworkAccess'))
+      .setDesc(t('settings.codex.projectConfig.fieldNetworkAccessDesc'))
+      .addDropdown((dropdown) => {
+        dropdown.addOption('', t('settings.codex.projectConfig.inherit'));
+        dropdown.addOption('true', t('settings.codex.projectConfig.enabled'));
+        dropdown.addOption('false', t('settings.codex.projectConfig.disabled'));
+        dropdown.setValue(networkAccess === null ? '' : String(networkAccess));
+        dropdown.onChange((v) => { networkAccess = v === '' ? null : v === 'true'; });
+      });
+
+    new Setting(formEl)
+      .setName(t('settings.codex.projectConfig.fieldWebSearch'))
+      .setDesc(t('settings.codex.projectConfig.fieldWebSearchDesc'))
+      .addDropdown((dropdown) => {
+        dropdown.addOption('', t('settings.codex.projectConfig.inherit'));
+        for (const mode of ['disabled', 'cached', 'live']) {
+          dropdown.addOption(mode, mode);
+        }
+        dropdown.setValue(webSearch ?? '');
+        dropdown.onChange((v) => { webSearch = v || null; });
+      });
+
+    new Setting(formEl)
+      .setName(t('settings.codex.projectConfig.fieldAdditionalDirectories'))
+      .setDesc(t('settings.codex.projectConfig.fieldAdditionalDirectoriesDesc'))
+      .addTextArea((text) => {
+        text.setValue(additionalDirs);
+        text.onChange((v) => { additionalDirs = v; });
+      });
+
+    // Advanced TOML editor.
+    const advancedEl = containerEl.createDiv({ cls: 'opencodian-codex-project-config-advanced' });
+    advancedEl.createEl('h5', {
+      cls: 'opencodian-codex-project-config-advanced-title',
+      text: t('settings.codex.projectConfig.advancedTitle'),
+    });
+    advancedEl.createDiv({
+      cls: 'opencodian-codex-project-config-advanced-desc',
+      text: t('settings.codex.projectConfig.advancedDesc'),
+    });
+    const tomlTextarea = advancedEl.createEl('textarea', {
+      cls: 'opencodian-codex-project-config-toml-editor',
+      attr: { spellcheck: 'false', rows: '12' },
+    });
+    tomlTextarea.value = advancedToml;
+    tomlTextarea.addEventListener('change', () => { advancedToml = tomlTextarea.value; });
+
+    // Save buttons.
+    const actionsEl = containerEl.createDiv({ cls: 'opencodian-codex-project-config-actions' });
+    const saveFormBtn = actionsEl.createEl('button', {
+      cls: 'mod-cta',
+      text: t('settings.codex.projectConfig.saveForm'),
+      attr: { type: 'button' },
+    });
+    saveFormBtn.addEventListener('click', async () => {
+      saveFormBtn.disabled = true;
+      saveFormBtn.setText(t('settings.codex.projectConfig.saving'));
+      try {
+        const dirs = additionalDirs
+          .split('\n')
+          .map((d) => d.trim())
+          .filter((d) => d.length > 0);
+        // External directory confirmation using canonical path.relative containment
+        // (NOT startsWith — /vault-evil must not match /vault).
+        if (!this.confirmExternalDirectories(dirs)) {
+          saveFormBtn.disabled = false;
+          saveFormBtn.setText(t('settings.codex.projectConfig.saveForm'));
+          return;
+        }
+        const result = await this.projectConfigSection.save(
+          {
+            model: model.trim() || null,
+            modelReasoningEffort: reasoningEffort || null,
+            sandboxMode: sandboxMode || null,
+            approvalPolicy: approvalPolicy || null,
+            networkAccess,
+            webSearch,
+            additionalDirectories: dirs.length > 0 ? dirs : null,
+          },
+          readResult.revision,
+          dirs.length > 0 ? dirs : null,
+        );
+        if (result.status === 'success') {
+          new Notice(t('settings.codex.projectConfig.saved'));
+          this.refreshProjectConfigTab(bodyEl);
+        } else {
+          new Notice(t(`settings.codex.projectConfig.error.${result.status}` as never) || result.status);
+        }
+      } finally {
+        saveFormBtn.disabled = false;
+        saveFormBtn.setText(t('settings.codex.projectConfig.saveForm'));
+      }
+    });
+
+    const saveAdvancedBtn = actionsEl.createEl('button', {
+      text: t('settings.codex.projectConfig.saveAdvanced'),
+      attr: { type: 'button' },
+    });
+    saveAdvancedBtn.addEventListener('click', async () => {
+      saveAdvancedBtn.disabled = true;
+      try {
+        // Parse and confirm external dirs from advanced TOML too.
+        const advancedValues = parseProjectConfigFormValues(advancedToml);
+        const advancedDirs = advancedValues.additionalDirectories ?? [];
+        if (!this.confirmExternalDirectories(advancedDirs)) {
+          return;
+        }
+        const result = await this.projectConfigSection.saveAdvancedToml(advancedToml, readResult.revision);
+        if (result.status === 'success') {
+          new Notice(t('settings.codex.projectConfig.saved'));
+          this.refreshProjectConfigTab(bodyEl);
+        } else {
+          new Notice(t(`settings.codex.projectConfig.error.${result.status}` as never) || result.status);
+          // Render focused diagnostics for invalid-content (Fix 5).
+          if (result.status === 'invalid-content' && result.diagnostics) {
+            this.renderProjectConfigDiagnostics(advancedEl, result.diagnostics);
+          }
+        }
+      } finally {
+        saveAdvancedBtn.disabled = false;
+      }
+    });
+
+    // History/restore button (Fix 6: protected archive history + restore).
+    const historyBtn = actionsEl.createEl('button', {
+      text: t('settings.codex.projectConfig.history'),
+      attr: { type: 'button' },
+    });
+    historyBtn.addEventListener('click', () => {
+      void this.openProjectConfigHistory(bodyEl, readResult.revision);
+    });
+  }
+
+  /**
+   * Render accessible, localized, focused diagnostics that identify rejected
+   * keys/locations (Fix 5). Clears previous diagnostics before rendering.
+   */
+  private renderProjectConfigDiagnostics(
+    container: HTMLElement,
+    diagnostics: readonly CodexProjectConfigTomlDiagnostic[],
+  ): void {
+    const existing = container.querySelector('.opencodian-codex-project-config-diagnostics');
+    if (existing) {
+      existing.remove();
+    }
+    if (diagnostics.length === 0) {
+      return;
+    }
+    const list = container.createDiv({
+      cls: 'opencodian-codex-project-config-diagnostics',
+      attr: { role: 'alert', 'aria-live': 'assertive' },
+    });
+    for (const diag of diagnostics) {
+      const item = list.createDiv({
+        cls: `opencodian-codex-project-config-diagnostic opencodian-codex-project-config-diagnostic--${diag.kind}`,
+      });
+      item.createSpan({
+        cls: 'opencodian-codex-project-config-diagnostic-key',
+        text: diag.key,
+      });
+      item.createSpan({
+        cls: 'opencodian-codex-project-config-diagnostic-reason',
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        text: t(diag.reasonKey as any, diag.params),
+      });
+    }
+  }
+
+  /**
+   * Open a protected history modal showing archived project config entries.
+   * Restore requires CAS (expectedRevision match) — stale revisions block
+   * restore. Fix 6.
+   */
+  private async openProjectConfigHistory(
+    bodyEl: HTMLElement,
+    expectedRevision: import('../../core/agents/backend/ProjectResourceSecureWrite').FileRevision | null,
+  ): Promise<void> {
+    const modal = new Modal(this.plugin.app);
+    modal.titleEl.setText(t('settings.codex.projectConfig.historyTitle'));
+    modal.contentEl.addClass('opencodian-codex-project-config-history-modal');
+    const bodyContent = modal.contentEl.createDiv({ cls: 'opencodian-codex-project-config-history-body' });
+    bodyContent.createEl('p', { text: t('settings.codex.projectConfig.historyLoading') });
+
+    modal.open();
+
+    const entries = await this.projectConfigSection.listHistory();
+    bodyContent.empty();
+
+    if (!entries || entries.length === 0) {
+      bodyContent.createEl('p', { text: t('settings.codex.projectConfig.historyEmpty') });
+      return;
+    }
+
+    for (const entry of entries) {
+      const row = bodyContent.createDiv({ cls: 'opencodian-codex-project-config-history-entry' });
+      row.createSpan({
+        cls: 'opencodian-codex-project-config-history-entry-kind',
+        text: entry.archiveKind,
+      });
+      row.createSpan({
+        cls: 'opencodian-codex-project-config-history-entry-date',
+        text: new Date(entry.timestamp).toLocaleString(),
+      });
+      const restoreBtn = row.createEl('button', {
+        text: t('settings.codex.projectConfig.restore'),
+        attr: { type: 'button' },
+      });
+      restoreBtn.addEventListener('click', async () => {
+        restoreBtn.disabled = true;
+        if (window.confirm(t('settings.codex.projectConfig.restoreConfirm')) === false) {
+          restoreBtn.disabled = false;
+          return;
+        }
+        const result = await this.projectConfigSection.restoreEntry(
+          entry.identity,
+          expectedRevision,
+        );
+        if (result.status === 'success') {
+          new Notice(t('settings.codex.projectConfig.restored'));
+          modal.close();
+          this.refreshProjectConfigTab(bodyEl);
+        } else if (result.status === 'conflict') {
+          new Notice(t('settings.codex.projectConfig.error.conflict'));
+        } else {
+          new Notice(t('settings.codex.projectConfig.error.write-failed'));
+        }
+        restoreBtn.disabled = false;
+      });
+    }
   }
 
   /**

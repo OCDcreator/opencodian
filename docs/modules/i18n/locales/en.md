@@ -51,6 +51,7 @@
 > **Previously**: 2026-06-15 Codex settings UI polish — added `settings.codex.groups.*` keys for the reorganized Codex settings panel groups, cleaned user-facing copy for model/sandbox/reasoning/additionalDirs/network/webSearch descriptions, and reframed provider/model/permission/rate-limit/usage readback copy from "diagnostic readback" to "live backend view".
 >
 > **Previously**: 2026-06-12 Checkpoint 15N — added `settings.codex.mcpServers.*` keys for the Codex MCP server status readback surface (inspect + reload) in the ordinary Codex settings panel.
+> **Updated**: 2026-07-28 — adds global config summary, Codex composer model selector (next-thread feedback, Custom policy, streaming-disable), and project configuration locale keys.
 
 ## 概述
 

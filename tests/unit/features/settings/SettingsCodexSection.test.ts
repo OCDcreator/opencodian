@@ -510,8 +510,10 @@ describe('SettingsCodexSection stable surface', () => {
     const containerEl = document.createElement('div');
     section.attachTabbed(containerEl, 'account');
 
-    // The account surface mounts four product cards.
-    expect(containerEl.querySelectorAll('[data-codex-account-card]')).toHaveLength(4);
+    // The account surface mounts four product cards plus a read-only global
+    // config summary card.
+    expect(containerEl.querySelectorAll('[data-codex-account-card]')).toHaveLength(5);
+    expect(containerEl.querySelector('[data-codex-account-card="global-config-summary"]')).toBeTruthy();
     expect(containerEl.querySelector('[data-codex-account-card="identity"]')).toBeTruthy();
     expect(containerEl.querySelector('[data-codex-account-card="usage"]')).toBeTruthy();
     expect(containerEl.querySelector('[data-codex-account-card="rate-limits"]')).toBeTruthy();

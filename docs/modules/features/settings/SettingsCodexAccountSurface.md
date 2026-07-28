@@ -1,3 +1,4 @@
+> **Updated**: 2026-07-28 — adds read-only Global Codex configuration summary card (reads ~/.codex/config.toml safely via CodexGlobalConfigSummaryReader) and provider posture B #23417 upstream link.
 # SettingsCodexAccountSurface
 
 **File:** `src/features/settings/SettingsCodexAccountSurface.ts`
