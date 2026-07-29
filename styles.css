@@ -15301,7 +15301,8 @@ img.opencodian-model-provider-header-icon {
   padding: 0;
   border: 1px solid var(--opencodian-settings-section-border);
   border-radius: var(--opencodian-settings-form-row-radius);
-  background: var(--opencodian-settings-section-bg);
+  background: var(--background-primary);
+  overflow: hidden;
 }
 
 .opencodian-settings[data-settings-layout-mode='classic']
@@ -15331,7 +15332,7 @@ img.opencodian-model-provider-header-icon {
   gap: var(--opencodian-settings-space-md);
   padding: var(--opencodian-settings-space-xl);
   border: 0;
-  background: transparent;
+  background: var(--background-primary);
   color: var(--text-normal);
   font: inherit;
   text-align: start;
@@ -15339,7 +15340,14 @@ img.opencodian-model-provider-header-icon {
 }
 
 .opencodian-plugin-update-heading-button:hover {
+  background: var(--opencodian-settings-form-row-hover-bg);
   color: var(--text-accent);
+}
+
+/* Obsidian's button:not(.clickable-icon) rule sets background-color with
+   greater specificity; keep the resting disclosure on the card's base. */
+.opencodian-plugin-update-section > .opencodian-settings-subsection-heading > .opencodian-plugin-update-heading-button {
+  background-color: var(--background-primary);
 }
 
 .opencodian-plugin-update-heading-button:focus-visible {

@@ -9,6 +9,36 @@ function readPluginUpdateCss(): string {
 }
 
 describe('SettingsPluginUpdateSection narrow disclosure CSS contract', () => {
+  it('uses the primary surface for the single outer disclosure without a secondary mix', () => {
+    const css = readPluginUpdateCss();
+    const sectionBlock = css.match(/\.opencodian-plugin-update-section\s*\{([^}]*)\}/s)?.[1] ?? '';
+
+    expect(sectionBlock).toMatch(/background:\s*var\(--background-primary\);/);
+    expect(sectionBlock).not.toMatch(/opencodian-settings-section-bg|color-mix\(/);
+    expect(css).not.toContain('--opencodian-settings-section-bg');
+  });
+
+  it('uses the existing form-row hover token and keeps content on the shared base', () => {
+    const css = readPluginUpdateCss();
+    const hoverBlock = css.match(/\.opencodian-plugin-update-heading-button:hover\s*\{([^}]*)\}/s)?.[1] ?? '';
+    const contentStart = css.indexOf('.opencodian-plugin-update-content {');
+    const contentEnd = css.indexOf('.opencodian-plugin-update-description', contentStart);
+    const contentCss = contentStart >= 0 && contentEnd >= 0 ? css.slice(contentStart, contentEnd) : '';
+
+    expect(hoverBlock).toContain('var(--opencodian-settings-form-row-hover-bg)');
+    expect(contentCss).not.toMatch(/background\s*:/);
+  });
+
+  it('pins the resting header to the same primary surface as the outer card', () => {
+    const css = readPluginUpdateCss();
+    const headerBlock = css.match(/\.opencodian-plugin-update-heading-button\s*\{([^}]*)\}/s)?.[1] ?? '';
+    const scopedHeaderBlock = css.match(/\.opencodian-plugin-update-section\s*>\s*\.opencodian-settings-subsection-heading\s*>\s*\.opencodian-plugin-update-heading-button\s*\{([^}]*)\}/s)?.[1] ?? '';
+
+    expect(headerBlock).toMatch(/background:\s*var\(--background-primary\);/);
+    expect(headerBlock).not.toMatch(/background:\s*transparent;/);
+    expect(scopedHeaderBlock).toMatch(/background-color:\s*var\(--background-primary\);/);
+  });
+
   it('overrides Obsidian compact button height so the header can grow for its metadata row', () => {
     const css = readPluginUpdateCss();
 
