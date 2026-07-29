@@ -240,11 +240,14 @@ export class SettingsCodexSection {
       attr: { 'data-codex-group': 'runtime-defaults' },
     });
 
-    groupEl.createEl('h4', {
+    const headerTextEl = groupEl.createDiv({
+      cls: 'opencodian-settings-codex-group-header-text',
+    });
+    headerTextEl.createEl('h4', {
       cls: 'opencodian-settings-codex-group-title',
       text: t('settings.codex.groups.runtimeDefaults'),
     });
-    groupEl.createDiv({
+    headerTextEl.createDiv({
       cls: 'opencodian-settings-codex-group-desc',
       text: t('settings.codex.groups.runtimeDefaultsDesc'),
     });
@@ -272,11 +275,14 @@ export class SettingsCodexSection {
       attr: { 'data-codex-group': 'project-config' },
     });
 
-    groupEl.createEl('h4', {
+    const headerTextEl = groupEl.createDiv({
+      cls: 'opencodian-settings-codex-group-header-text',
+    });
+    headerTextEl.createEl('h4', {
       cls: 'opencodian-settings-codex-group-title',
       text: t('settings.codex.projectConfig.title'),
     });
-    groupEl.createDiv({
+    headerTextEl.createDiv({
       cls: 'opencodian-settings-codex-group-desc',
       text: t('settings.codex.projectConfig.description'),
     });
@@ -664,11 +670,14 @@ export class SettingsCodexSection {
       attr: { 'data-codex-group': 'permissions' },
     });
 
-    groupEl.createEl('h4', {
+    const headerTextEl = groupEl.createDiv({
+      cls: 'opencodian-settings-codex-group-header-text',
+    });
+    headerTextEl.createEl('h4', {
       cls: 'opencodian-settings-codex-group-title',
       text: t('settings.codex.groups.permissions'),
     });
-    groupEl.createDiv({
+    headerTextEl.createDiv({
       cls: 'opencodian-settings-codex-group-desc',
       text: t('settings.codex.groups.permissionsDesc'),
     });
@@ -852,11 +861,14 @@ export class SettingsCodexSection {
       attr: { 'data-codex-group': 'resume-and-inspect' },
     });
 
-    groupEl.createEl('h4', {
+    const headerTextEl = groupEl.createDiv({
+      cls: 'opencodian-settings-codex-group-header-text',
+    });
+    headerTextEl.createEl('h4', {
       cls: 'opencodian-settings-codex-group-title',
       text: t('settings.codex.groups.resumeAndInspect'),
     });
-    groupEl.createDiv({
+    headerTextEl.createDiv({
       cls: 'opencodian-settings-codex-group-desc',
       text: t('settings.codex.groups.resumeAndInspectDesc'),
     });

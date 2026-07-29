@@ -8,16 +8,18 @@
 > **更新**: 新增 `resources` 二级 tab，委托给 `SettingsCodexResourcesSection` 渲染 Codex 项目/全局 skills 与 agents 管理（当前 P0 UI 项目可编辑、全局只读；P1 通过共享 `allowlisted-root` 契约开放全局 CRUD）。
 > **更新**: 2026-07-26 G9 Codex credential hardening — native Provider configuration is external-managed/read-only; legacy plugin credentials are masked and confirmation-gated for clearing.
 > **更新**: 2026-07-28 — Connection tab adds a persisted user CLI executable path and explicit plugin-reload action. Saving never touches an active session; reload warns that it terminates active Codex turns.
+> **更新**: 2026-07-29 — Main Codex page/group headings share the Account rhythm: `4px` title-to-description and `16px` description-to-controls; the cost estimate group uses `16px` title-to-controls. Classic top-level ribbons remain an intentional host exception.
 
 ## Purpose
 
-Codex backend settings panel. Uses five secondary tabs under the Codex primary tab to avoid piling unrelated settings into a single flat card stack, grouped by *what* a setting controls (Source Grouping, see `CONTEXT.md`):
+Codex backend settings panel. Uses six secondary tabs under the Codex primary tab to avoid piling unrelated settings into a single flat card stack, grouped by *what* a setting controls (Source Grouping, see `CONTEXT.md`):
 
 1. **Connection** — user-installed CLI executable path (empty = automatic discovery), explicit `Reload OpenCodian` action, genuinely wired SDK options (`model`, `modelReasoningEffort`, `webSearchMode`), a lightweight connection-source summary, and masked legacy-credential status. No Codex secret input is rendered.
 2. **Permissions** — approval/sandbox boundary: `approvalPolicy` (`CodexApprovalPolicy`), `sandboxMode`, `networkAccessEnabled`, `additionalDirectories`. `approvalPolicy` default `inherit` omits the override; `untrusted`/`on-request` fail closed in `CodexAdapter` without the app-server + bridge; `never` may use the SDK fallback.
 3. **Resume & inspect** — the backend session browser and live runtime readbacks (model catalog, permission profiles, MCP servers, loaded threads, and read-only hooks metadata).
 4. **Account** — live read-only account/capability cards rendered by `SettingsCodexAccountSurface`.
-5. **Resources** — delegated to `SettingsCodexResourcesSection` (project skills/agents; global resources are read-only in P0, with CRUD deferred to P1's allowlisted-root contract).
+5. **Project Config** — delegated save/read flow for `<vault>/.codex/config.toml`, including the constrained advanced TOML editor owned by `SettingsCodexProjectConfigSection`.
+6. **Resources** — delegated to `SettingsCodexResourcesSection` (project skills/agents; global resources are read-only in P0, with CRUD deferred to P1's allowlisted-root contract).
 
 The old disabled "Authentication" setting is replaced by the connection-source summary and an auth-source row inside the Account surface, so the UI never presents a disabled input as a status indicator.
 
@@ -72,7 +74,7 @@ The Account tab also exposes the shared cost-estimate entry as its own sub-group
 
 - Instantiated by `SettingsTabbedRenderer.renderCodexContent()`
 - Reads/writes `plugin.settings.backendSettings.codex`
-- Registered as primary tab `codex` with `backendRequired: 'codex'` in `settingsLayoutRegistry`; secondary tabs are `connection` (default), `permissions`, `resume-inspect`, `account`, and `resources` (5 tabs)
+- Registered as primary tab `codex` with `backendRequired: 'codex'` in `settingsLayoutRegistry`; secondary tabs are `connection` (default), `permissions`, `resume-inspect`, `account`, `project-config`, and `resources` (6 tabs)
 - Follows the same `attach()` / `attachTabbed()` pattern as `SettingsClaudeCodeSection`
 - Owns the wired settings controls grouped by Source Grouping (see `CONTEXT.md`): **Connection** tab owns `model`, `modelReasoningEffort`, `webSearchMode`, plus a masked/backward-compatible `apiKey` status; **Permissions** tab owns `approvalPolicy`, `sandboxMode`, `additionalDirectories`, `networkAccessEnabled`. Both tabs apply live adapter updates via `applyCodexRuntimeUpdates()`. `SettingsCodexLegacyCredentialControl` handles the legacy credential transaction: confirmation, temporary in-memory clear, awaited `saveSettings()`, rollback on rejection, localized failure, and the success-only callback that updates auth summary/account/runtime state.
 - Dropdown controls for approval policy and sandbox mode expose their setting names as explicit `aria-label` values in addition to the visible descriptions, preserving an accessible name when the Obsidian `Setting` wrapper is rendered or tested independently.
@@ -95,9 +97,9 @@ The Account tab also exposes the shared cost-estimate entry as its own sub-group
 
 ## Visual Rhythm
 
-All five Codex secondary tabs share a single spacing system documented in `DESIGN.md` under **Codex Settings Cards** and implemented in `src/style/components/settings-codex-account.css`.
+All six Codex secondary tabs share a single spacing system documented in `DESIGN.md` under **Codex Settings Cards** and implemented in `src/style/components/settings-codex-account.css`.
 
-- Each group renders its title + description, then a `.opencodian-settings-codex-group-controls.opencodian-settings-codex-group-stack` container. The Account group wraps title + description + the group-level "Refresh all" action in a `.opencodian-settings-codex-group-header` flex row.
+- Each page/group heading uses zero host `margin`/`padding`. Groups with descriptions render title + description inside `.opencodian-settings-codex-group-header-text` (`4px` gap), then a `.opencodian-settings-codex-group-controls.opencodian-settings-codex-group-stack` container (`16px` top gap). The Account group additionally wraps title + description + the group-level "Refresh all" action in a `.opencodian-settings-codex-group-header` flex row. The cost estimate group has no description and therefore uses the same `16px` controls margin from title to controls.
 - The stack provides `12px` vertical gaps between cards or Setting rows.
 - The group's controls container is `16px` below the description.
 - Account cards, session-browser info notices, and the connection summary share the same card base (`14px 16px` padding, `10px` radius, `var(--background-secondary)` background, `1px` border). Readback outputs have moved into dedicated modals and are no longer inline cards in the settings panel.

@@ -13272,6 +13272,7 @@ img.opencodian-model-provider-header-icon {
    not leak into other settings surfaces. */
 .opencodian-settings-codex-block {
   --oc-codex-card-gap: 12px;
+  --oc-codex-group-title-desc-gap: 4px;
   --oc-codex-group-header-gap: 16px;
   --oc-codex-card-title-body-gap: 8px;
   --oc-codex-card-body-gap: 10px;
@@ -13753,7 +13754,7 @@ img.opencodian-model-provider-header-icon {
 .opencodian-settings-codex-group-header-text {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--oc-codex-group-title-desc-gap);
   min-width: 0;
 }
 

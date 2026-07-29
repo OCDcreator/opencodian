@@ -152,7 +152,7 @@ describe('Codex settings title alignment contract', () => {
       /\.opencodian-codex-account-rate-limit-groups\s*\{[^}]*display:\s*flex;[^}]*flex-direction:\s*column;[^}]*gap:/s,
     );
     expect(css).toMatch(
-      /\.opencodian-settings-codex-group-header-text\s*\{[^}]*display:\s*flex;[^}]*flex-direction:\s*column;[^}]*gap:\s*4px/s,
+      /\.opencodian-settings-codex-group-header-text\s*\{[^}]*display:\s*flex;[^}]*flex-direction:\s*column;[^}]*gap:\s*var\(--oc-codex-group-title-desc-gap\)/s,
     );
     expect(css).not.toMatch(
       /opencodian-codex-account-(usage-buckets|rate-limit-group)-title[^}]*margin:\s*0\s+0/s,

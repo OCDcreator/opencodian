@@ -5,7 +5,7 @@
 
 > **更新**: 2026-07-26 G9 — added compact external-managed Provider status and masked legacy-credential status styling.
 > **Updated**: 2026-07-28 — adds responsive CSS for global config summary provider-row grid layout (desktop columns, <=720px stack) and project config diagnostics styling.
-> **Updated**: 2026-07-28 — Codex Settings / Account / Provider headings now explicitly flush host heading spacing and use parent flex/grid alignment; title-to-content rhythm is owned by container gaps.
+> **Updated**: 2026-07-29 — Codex page/group headings now use one header-text rhythm: title-to-description `4px`, description-to-controls `16px`; cost estimate keeps the same `16px` title-to-controls distance.
 
 ## 概述
 
@@ -13,13 +13,14 @@ Codex 账号与能力产品面的专用样式。把四个官方 app-server 表�
 
 ## 样式规则
 
-### 固定间距体系（Codex 三个子标签页共用）
+### 固定间距体系（Codex 子标签页共用）
 
-所有 Codex 设置子标签页（Connection / Resume & Inspect / Account）共享同一组间距 token，定义在 `.opencodian-settings-codex-block` 上：
+所有 Codex 设置子标签页（Connection / Project Configuration / Permissions / Resume & Inspect / Account / Resources）共享同一组间距 token，定义在 `.opencodian-settings-codex-block` 上：
 
 | Token | 值 | 用途 |
 |-------|-----|------|
 | `--oc-codex-card-gap` | `12px` | 同一分组内卡片/setting 行之间的垂直间距 |
+| `--oc-codex-group-title-desc-gap` | `4px` | 分组标题与说明之间的垂直间距 |
 | `--oc-codex-group-header-gap` | `16px` | 分组标题/描述到第一个卡片/控件堆栈的距离 |
 | `--oc-codex-card-title-body-gap` | `8px` | 卡片标题/头部到卡片主体的距离 |
 | `--oc-codex-card-body-gap` | `10px` | 卡片主体内部各块之间的垂直间距 |
@@ -28,7 +29,7 @@ Codex 账号与能力产品面的专用样式。把四个官方 app-server 表�
 实现层通过以下 class 落地：
 
 - `.opencodian-settings-codex-group-stack`：`display: flex; flex-direction: column; gap: var(--oc-codex-card-gap)`，每个分组的控件/卡片容器都带这个 class。
-- `.opencodian-settings-codex-group-controls`：`margin-top: var(--oc-codex-group-header-gap)`，承载上述 stack。
+- `.opencodian-settings-codex-group-controls`：`margin-top: var(--oc-codex-group-header-gap)`（`16px`），承载上述 stack。
 - `.opencodian-codex-account-card-header`：`margin-bottom: var(--oc-codex-card-title-body-gap)`。
 - `.opencodian-codex-account-card-body` / `.opencodian-settings-codex-readback`：`gap: var(--oc-codex-card-body-gap)`。
 
@@ -38,9 +39,9 @@ Codex 账号与能力产品面的专用样式。把四个官方 app-server 表�
 
 ### `.opencodian-settings-codex-group`
 
-Codex 设置面板的三大分组容器（连接与运行默认项 / 恢复与检查 / 账号与 provider 状态）。分组标题使用 `h4`；`.opencodian-settings .opencodian-settings-codex-group-title` 以更高特异性设置 `padding: 0`，覆盖 Obsidian `.vertical-tab-content h4` 的水平 padding，使标题文本与 muted 描述左缘对齐。分组本身不再使用 `margin` 控制间距，而是依赖内部 stack 和相邻分组选择器（`+`）的 `margin-top: var(--oc-codex-card-gap)`。
+Codex 设置面板的页面级/分组级容器（连接与运行默认项 / 项目配置 / 权限 / 恢复与检查 / 账号与 provider 状态 / 费用估算）。分组标题使用 `h4`；`.opencodian-settings .opencodian-settings-codex-group-title` 以更高特异性设置 `margin: 0; padding: 0`，覆盖 Obsidian `.vertical-tab-content h4` 的宿主间距，使标题文本与 muted 描述左缘对齐。带说明的标题和说明必须位于 `.opencodian-settings-codex-group-header-text` 内，由 `4px` flex gap 分隔；`.opencodian-settings-codex-group-controls` 统一提供 `16px` 的说明到控件距离。无说明的 cost estimate 标题直接使用同一 controls margin，因此标题到控件也是 `16px`。分组之间的间距仍由相邻分组选择器（`+`）的 `margin-top: var(--oc-codex-card-gap)` 提供。
 
-标题与描述由 `.opencodian-settings-codex-group-header-text` 的 column flex `gap: 4px` 分隔；标题自身保持 `margin: 0; padding: 0; padding-inline-start: 0`，右侧组级按钮由 header 的 `align-items: center` 垂直居中。
+标题与描述由 `.opencodian-settings-codex-group-header-text` 的 column flex `gap: var(--oc-codex-group-title-desc-gap)`（`4px`）分隔；标题自身保持 `margin: 0; padding: 0; padding-inline-start: 0`，右侧组级按钮由 header 的 `align-items: center` 垂直居中。
 
 ### `.opencodian-settings-codex-connection-summary`
 
