@@ -98,8 +98,11 @@ export class MessageFinalizationService {
       }
 
       if (conversation.backend === undefined || conversation.backend === 'opencode') {
-        await this.host.refreshTabSessionTodos(tabId, getConversationBackendSessionId(conversation), { suppressErrors: true });
+        const sessionId = getConversationBackendSessionId(conversation);
+        await this.host.refreshTabSessionTodos(tabId, sessionId, { suppressErrors: true });
         logStage('session-todos-refreshed');
+        await this.host.refreshTabSessionStatus(tabId, sessionId, { suppressErrors: true });
+        logStage('session-status-refreshed');
       } else {
         logStage('session-todos-skipped', { backend: conversation.backend });
       }

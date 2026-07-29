@@ -5,7 +5,7 @@
 
 ## 概述
 
-`OpenCodeSessionControlOrchestrator` 是 `OpenCodeService` 内部的 session control / message-operation owner。它把 fork/revert/unrevert/diff、context-usage snapshot、session tree/share/summarize、message command/shell，以及 message/part 的更新删除操作收束到同一个较厚 orchestrator 里，让 `OpenCodeService` 退回为 transport seam 与对外 façade。
+`OpenCodeSessionControlOrchestrator` 是 `OpenCodeService` 内部的 session control / message-operation owner。它把 fork/revert/unrevert/diff、context-usage snapshot 的分流决策、session tree/share/summarize、message command/shell，以及 message/part 的更新删除操作收束到同一个较厚 orchestrator 里，让 `OpenCodeService` 退回为 transport seam 与对外 façade。
 
 ### 2026-07-22 context snapshot compatibility
 
@@ -19,6 +19,7 @@
 上游:
 - `../../shared`
 - `../types`
+- `./OpenCodeSessionContextUsageBuilder`
 - `./OpenCodeSessionLifecycleCoordinator`
 
 下游:
@@ -34,6 +35,7 @@
 - `OpenCodeSessionControlSdk`: orchestrator 依赖的最小 session SDK 面，覆盖 fork/revert/diff、session tree/share/summarize，以及 message command/shell。
 - `OpenCodeSessionControlPartSdk`: part update/delete 的最小 SDK 面。
 - `OpenCodeSessionControlOrchestratorHost`: host seam，提供 SDK CRUD 开关、legacy HTTP helper、session info/messages/model catalog 读取，以及 warning/error 日志。
+- `buildMessageLevelContextUsageSnapshot()` / `buildSessionLevelContextUsageSnapshot()`: 相邻 owner `OpenCodeSessionContextUsageBuilder` 暴露的 usage 计算入口，承接 message/session 两条 snapshot 组装路径。
 - `OpenCodeSessionControlOrchestrator`: 当前 owner，集中实现 session control / message-operation 公开方法。
 
 ## 核心逻辑
@@ -48,14 +50,14 @@ orchestrator 现在承接以下共享控制流：
 
 ### Context usage snapshot
 
-`getSessionContextUsageSnapshot()` 现在也归口到这个 orchestrator：
+`getSessionContextUsageSnapshot()` 现在也归口到这个 orchestrator，但计算细节已经挪到相邻 owner `OpenCodeSessionContextUsageBuilder`：
 
-- 并行读取 session info、filtered session messages 与当前 model catalog
-- 选取“最后一个带有效 token 的 assistant message”作为展示模型/上下文窗口/usage 的来源
-- 聚合 assistant cost，总结 input/output/reasoning/cache token 数
+- 先用 session info 判断当前是否存在可靠的 session-level totals，再决定是优先走 latest-assistant message path 还是直接走 message scan
+- 当 session-level totals 可用时，message-level 计算失败会在这里统一记 warning，并回退到 session totals
+- 只有 message/session 两条 snapshot 的选择、fallback 和日志还留在 orchestrator；provider/model 解析、assistant token/cost 组装、`compactingAt` 透传等细节交给 builder
 - 透传 session-level `time.compacting` 到 `compactingAt`，为后续 compaction live-state UI 保留事实来源
-- 当 `session.tokens` 和 `session.model` 均非空时，优先从 session info 直接读取 cost/tokens/model，跳过消息扫描路径；否则回退到原有的并行请求 + 消息扫描
-- session-level 快速路径在模型目录获取失败时回退到原始 provider/model ID（`contextWindow: 0`），不丢失已有的 tokens/cost 数据
+- 当 `session.tokens` 和 `session.model` 均非空时，仍会先扫描最后一个带 token 的 assistant message，把 session-level 累计 usage 误当成“当前上下文占用”；只有在最新 message token 缺失/无效时，才回退到 session totals
+- session-level 回退路径在模型目录获取失败时退回原始 provider/model ID（`contextWindow: 0`），不丢失已有的 tokens/cost 数据；message-level 路径则优先保留 session-level 累计 cost，避免把 context token 口径修正后连带丢掉总成本
 
 这样 `OpenCodeService` 不再直接持有 context-usage 计算细节，也避免相关逻辑继续散落在 session lifecycle 与 message API 之间。
 
@@ -91,12 +93,14 @@ graph TD
 ## 与其他模块的交互
 
 - `OpenCodeService` 继续作为对外总门面，负责创建 orchestrator 并提供 transport、session read 与 catalog host seam。
+- `OpenCodeSessionContextUsageBuilder` 持有 context usage snapshot 的 provider/model/token/cost 组装逻辑；orchestrator 只保留选择哪条 snapshot 路径与如何 fallback 的职责。
 - `OpenCodeSessionLifecycleCoordinator` 仍拥有 session create/list/messages/todos/statuses/current-session 指针；本模块通过 host seam 读取 lifecycle 结果，而不是把 ownership 抢回主服务。
 - `OpenCodeSdkFacade` 继续集中 request option 注入、response unwrap 与错误归一化；orchestrator 不直接创建 SDK client。
 
 ## 注意事项
 
 - 不要把 fork/revert/diff、session share/summarize、message command/shell、part update/delete 再拆成多个薄 gateway；这些 API 共享同一块 session control / message-operation 语义。
+- context usage snapshot 的“计算 owner”现在是 `OpenCodeSessionContextUsageBuilder`；如果只是改 token/cost/provider/model 组装细节，优先扩展 builder，而不是把实现重新塞回 orchestrator。
 - command template placeholder expansion 继续留在 `runSessionCommand()` 所在的 session control seam；不要把这层 ownership 重新塞回 `OpenCodeService` 或 settings editor。
 - 不要在这里混入 question/permission negotiation 或 broad query gateway；那是 roadmap 的后续 queue。
 - 只读 diff 仍允许 SDK→legacy fallback；session mutation 与 message/part SDK wrappers 保持既有 transport 语义，不在这里引入额外回退分支。

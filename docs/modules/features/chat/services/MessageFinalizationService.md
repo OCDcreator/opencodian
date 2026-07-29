@@ -31,7 +31,10 @@ export interface MessageFinalizationHostDependencies {
   conversationRenderService: { applySyncedConversationUpdate(...): Promise<void> };
   backgroundTaskHost: { renderBackgroundTaskIndicatorIfNeeded(tabId?: TabId | null): Promise<void> };
   conversationNoticeCoordinator: { appendTurnDiffNoticeIfNeeded(...): Promise<void> };
-  sessionTodoCoordinator: { refreshTabSessionTodos(...): Promise<SessionTodo[]> };
+  sessionTodoCoordinator: {
+    refreshTabSessionTodos(...): Promise<SessionTodo[]>;
+    refreshTabSessionStatus(...): Promise<SessionActivityStatus | null>;
+  };
   saveConversation(conversation: Conversation): Promise<void>;
   conversationTabRuntimeCoordinator: {
     updateConversationSyncRuntime(tabId, update: { inFlight?: boolean; fingerprint?: string | null }): void;
@@ -113,7 +116,7 @@ export class MessageFinalizationService {
 ### 收尾时序
 
 - 只有 should-sync 分支才执行最终 canonical/server sync、background indicator 刷新与 turn diff notice
-- 不论是否 should-sync，都会继续写最终 save、清空 pending edited files；session todos 只在 OpenCode-owned conversation 上刷新，非 OpenCode backend 先跳过 OpenCode-only todo refresh
+- 不论是否 should-sync，都会继续写最终 save、清空 pending edited files；OpenCode conversation 结束后会主动刷新 session todos 和 session status，把可能残留的 `busy` / `retry` 状态拉回 authoritative truth；非 OpenCode backend 继续跳过这些 OpenCode-only refresh
 - 如果用户在 finalization 期间切走 tab，则不做 foreground patch/rerender 与 active-tab context usage 刷新，而是改为给原 tab 打 attention
 - sync lock 会在 service 自己的 `finally` 中释放，避免 send finalization 途中遗漏解锁
 - tab session lifecycle 也会在同一个 `finally` 中收口到 `idle`，避免本地流或非 server-sync backend 结束后停在 `finalizing` 而阻塞下一次发送
@@ -177,6 +180,7 @@ export class MessageFinalizationService {
 - `renderBackgroundTaskIndicatorIfNeeded(tabId)` → `deps.backgroundTaskHost.renderBackgroundTaskIndicatorIfNeeded(tabId)`
 - `appendTurnDiffNoticeIfNeeded(...)` → `deps.conversationNoticeCoordinator.appendTurnDiffNoticeIfNeeded(...)`
 - `refreshTabSessionTodos(...)` → `deps.sessionTodoCoordinator.refreshTabSessionTodos(...)`
+- `refreshTabSessionStatus(...)` → `deps.sessionTodoCoordinator.refreshTabSessionStatus(...)`
 - `renderStreamError(options)` → `deps.assistantShellViewHostAdapter.renderStreamError(options)`
 - `summarizeChatMessageForDebug` → 直接使用从 `SendPipelineDebugSummaries` 导入的纯函数（不来自 deps）
 

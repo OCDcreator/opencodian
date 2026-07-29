@@ -1,6 +1,11 @@
 import { createLogger } from '../../shared';
 import { normalizeContextPath } from '../../shared/contextPath';
 import type { ContextUsageSnapshot, SessionDiffEntry } from '../types';
+import {
+  type AvailableModelDirectory,
+  buildMessageLevelContextUsageSnapshot,
+  buildSessionLevelContextUsageSnapshot,
+} from './OpenCodeSessionContextUsageBuilder';
 import type {
   Part,
   Session,
@@ -10,19 +15,6 @@ import type {
 const logger = createLogger('OpenCodeSessionControlOrchestrator');
 
 export type SessionContextUsageSnapshot = ContextUsageSnapshot;
-
-type AvailableModelDirectory = {
-  providers: Array<{
-    id: string;
-    name: string;
-    models: Array<{
-      id: string;
-      name: string;
-      contextWindow?: number;
-    }>;
-  }>;
-  defaults: Record<string, string>;
-};
 
 export interface SessionCommandTemplateContext {
   vaultPath?: string | null;
@@ -169,110 +161,30 @@ export class OpenCodeSessionControlOrchestrator {
       const hasSessionLevelUsage = session.tokens != null && session.model != null;
 
       if (hasSessionLevelUsage) {
-        return this.buildSessionLevelUsageSnapshot(session, sessionId);
+        try {
+          const latestMessageSnapshot = await buildMessageLevelContextUsageSnapshot(
+            session,
+            sessionId,
+            this.host,
+          );
+          if (latestMessageSnapshot.totalTokens > 0) {
+            return latestMessageSnapshot;
+          }
+        } catch (error) {
+          this.host.logServiceWarning(
+            'session.context-usage',
+            `Failed to derive latest-message context usage for ${sessionId}, falling back to session totals`,
+            error,
+          );
+        }
+        return buildSessionLevelContextUsageSnapshot(session, sessionId, this.host);
       }
 
-      return this.buildMessageLevelUsageSnapshot(session, sessionId);
+      return buildMessageLevelContextUsageSnapshot(session, sessionId, this.host);
     } catch (error) {
       this.host.logServiceError('session.context-usage', `Failed to get session context usage snapshot for ${sessionId}:`, error);
       return null;
     }
-  }
-
-  private async buildSessionLevelUsageSnapshot(
-    session: Session,
-    sessionId: string,
-  ): Promise<SessionContextUsageSnapshot> {
-    const rawPId = session.model?.providerID ?? null;
-    const rawMId = session.model?.id ?? null;
-    let providerName: string | null = rawPId;
-    let modelName: string | null = rawMId;
-    let contextWindow = 0;
-
-    try {
-      const providersResult = await this.host.getAvailableModels();
-      const provider = rawPId ? providersResult.providers.find((p) => p.id === rawPId) : undefined;
-      const model = provider && rawMId ? provider.models.find((m) => m.id === rawMId) : undefined;
-      providerName = provider?.name ?? rawPId;
-      modelName = model?.name ?? rawMId;
-      contextWindow = model?.contextWindow ?? 0;
-    } catch {
-      // Fall back to raw IDs when model catalog is unavailable
-    }
-
-    const inputTokens = session.tokens?.input ?? 0;
-    const outputTokens = session.tokens?.output ?? 0;
-    const reasoningTokens = session.tokens?.reasoning ?? 0;
-    const cacheReadTokens = session.tokens?.cache?.read ?? 0;
-    const cacheWriteTokens = session.tokens?.cache?.write ?? null;
-
-    return {
-      sessionId,
-      sessionTitle: session.title,
-      createdAt: session.time.created,
-      updatedAt: session.time.updated,
-      compactingAt: typeof session.time.compacting === 'number' ? session.time.compacting : null,
-      providerId: rawPId,
-      providerName,
-      modelId: rawMId,
-      modelName,
-      contextWindow,
-      totalTokens: inputTokens + outputTokens + reasoningTokens + cacheReadTokens + (cacheWriteTokens ?? 0),
-      inputTokens,
-      outputTokens,
-      reasoningTokens,
-      cacheReadTokens,
-      cacheWriteTokens,
-      totalCost: typeof session.cost === 'number' ? session.cost : null,
-    };
-  }
-
-  private async buildMessageLevelUsageSnapshot(
-    session: Session,
-    sessionId: string,
-  ): Promise<SessionContextUsageSnapshot> {
-    const [messages, providersResult] = await Promise.all([
-      this.host.getSessionMessages(sessionId),
-      this.host.getAvailableModels(),
-    ]);
-
-    const assistantMessages = messages.filter((message) => message.info.role === 'assistant');
-    const totalCost = assistantMessages.every((message) => typeof message.info.cost === 'number')
-      ? assistantMessages.reduce((sum, message) => sum + (message.info.cost ?? 0), 0)
-      : null;
-
-    const latestAssistantWithTokens = OpenCodeSessionControlOrchestrator.findLatestAssistantWithTokens(messages);
-    const rawPId = latestAssistantWithTokens?.info.providerID ?? null;
-    const rawMId = latestAssistantWithTokens?.info.modelID ?? null;
-    const provider = rawPId ? providersResult.providers.find((p) => p.id === rawPId) : undefined;
-    const model = provider && rawMId ? provider.models.find((m) => m.id === rawMId) : undefined;
-    const tokens = latestAssistantWithTokens?.info.tokens;
-
-    const inputTokens = tokens?.input ?? 0;
-    const outputTokens = tokens?.output ?? 0;
-    const reasoningTokens = tokens?.reasoning ?? 0;
-    const cacheReadTokens = tokens?.cache?.read ?? 0;
-    const cacheWriteTokens = tokens?.cache?.write ?? null;
-
-    return {
-      sessionId,
-      sessionTitle: session.title,
-      createdAt: session.time.created,
-      updatedAt: latestAssistantWithTokens?.info.time.created ?? session.time.updated,
-      compactingAt: typeof session.time.compacting === 'number' ? session.time.compacting : null,
-      providerId: rawPId,
-      providerName: provider?.name ?? rawPId,
-      modelId: rawMId,
-      modelName: model?.name ?? rawMId,
-      contextWindow: model?.contextWindow ?? 0,
-      totalTokens: inputTokens + outputTokens + reasoningTokens + cacheReadTokens + (cacheWriteTokens ?? 0),
-      inputTokens,
-      outputTokens,
-      reasoningTokens,
-      cacheReadTokens,
-      cacheWriteTokens,
-      totalCost,
-    };
   }
 
   async forkSession(sessionId: string, messageID?: string): Promise<{ id: string; title: string }> {
@@ -565,34 +477,5 @@ export class OpenCodeSessionControlOrchestrator {
       });
       return entries;
     }, []);
-  }
-
-  private static findLatestAssistantWithTokens(
-    messages: SessionMessage[],
-  ): SessionMessage | null {
-    for (let index = messages.length - 1; index >= 0; index -= 1) {
-      const message = messages[index];
-      if (message.info.role !== 'assistant') {
-        continue;
-      }
-
-      const tokens = message.info.tokens;
-      if (!tokens) {
-        continue;
-      }
-
-      const total = (tokens.input ?? 0)
-        + (tokens.output ?? 0)
-        + (tokens.reasoning ?? 0)
-        + (tokens.cache?.read ?? 0)
-        + (tokens.cache?.write ?? 0);
-      if (total <= 0) {
-        continue;
-      }
-
-      return message;
-    }
-
-    return null;
   }
 }

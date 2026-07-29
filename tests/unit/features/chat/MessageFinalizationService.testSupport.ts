@@ -63,6 +63,7 @@ export function createHost(
     renderBackgroundTaskIndicatorIfNeeded: jest.fn().mockResolvedValue(undefined),
     appendTurnDiffNoticeIfNeeded: jest.fn().mockResolvedValue(undefined),
     refreshTabSessionTodos: jest.fn().mockResolvedValue([]),
+    refreshTabSessionStatus: jest.fn().mockResolvedValue({ type: 'idle' }),
     saveConversation: jest.fn().mockResolvedValue(undefined),
     createConversationWriteTicket: jest.fn().mockImplementation((conversationId: string) => ({
       conversationId,

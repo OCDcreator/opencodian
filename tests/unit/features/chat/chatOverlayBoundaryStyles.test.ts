@@ -20,12 +20,18 @@ describe('Chat overlay boundary CSS contracts', () => {
 
   it('shrinks the modified-files panel and hover zone inside their containing block', () => {
     const css = readStyleFile('modified-files-sidebar.css');
+    const hostRule = css.match(/\.opencodian-modified-files-sidebar-host\s*\{([^}]+)\}/)?.[1] ?? '';
     const panelRule = css.match(/\.opencodian-modified-files-sidebar\s*\{([^}]+)\}/)?.[1] ?? '';
+    const hoverBaseRule = css.match(/\.opencodian-modified-files-hover-zone\s*\{([^}]+)\}/)?.[1] ?? '';
     const hoverRule = css.match(/\.opencodian-modified-files-hover-zone:hover\s*\{([^}]+)\}/)?.[1] ?? '';
 
+    expect(hostRule).toContain('--opencodian-modified-files-collapsed-height: 46px');
     expect(panelRule).toContain('right: 8px');
     expect(panelRule).toContain('width: min(280px, calc(100% - 16px))');
+    expect(hoverBaseRule).toContain('top: 76px');
+    expect(hoverBaseRule).toContain('height: var(--opencodian-modified-files-collapsed-height)');
     expect(hoverRule).toContain('width: min(300px, calc(100% - 8px))');
+    expect(hoverRule).toContain('height: var(--opencodian-modified-files-expanded-height)');
   });
 
   it('does not size chat dropdowns from the viewport width', () => {

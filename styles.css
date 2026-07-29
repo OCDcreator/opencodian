@@ -7473,6 +7473,8 @@ img.opencodian-model-provider-header-icon {
 /* ==================== Modified Files Sidebar ==================== */
 
 .opencodian-modified-files-sidebar-host {
+  --opencodian-modified-files-collapsed-height: 46px;
+  --opencodian-modified-files-expanded-height: min(420px, calc(100% - 160px));
   position: absolute;
   inset: 0;
   z-index: 220;
@@ -7482,7 +7484,7 @@ img.opencodian-model-provider-header-icon {
 .opencodian-modified-files-trigger-strip {
   position: absolute;
   right: 0;
-  top: 80px;
+  top: 4px;
   width: 6px;
   height: 38px;
   border-radius: 3px 0 0 3px;
@@ -7494,6 +7496,11 @@ img.opencodian-model-provider-header-icon {
 }
 
 .opencodian-modified-files-hover-zone:hover .opencodian-modified-files-trigger-strip {
+  width: 10px;
+  opacity: 0.7;
+}
+
+.opencodian-modified-files-hover-zone:focus-within .opencodian-modified-files-trigger-strip {
   width: 10px;
   opacity: 0.7;
 }
@@ -7525,10 +7532,10 @@ img.opencodian-model-provider-header-icon {
 .opencodian-modified-files-sidebar {
   position: absolute;
   right: 8px;
-  top: 80px;
+  top: 0;
   box-sizing: border-box;
   width: min(280px, calc(100% - 16px));
-  max-height: min(420px, calc(100% - 160px));
+  max-height: var(--opencodian-modified-files-expanded-height);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -7548,19 +7555,32 @@ img.opencodian-model-provider-header-icon {
 .opencodian-modified-files-hover-zone {
   position: absolute;
   right: 0;
-  top: 60px;
-  bottom: 60px;
+  top: 76px;
   width: 6px;
+  height: var(--opencodian-modified-files-collapsed-height);
   pointer-events: auto;
-  transition: width 0s 0.25s;
+  transition: width 0s 0.25s, height 0s 0.25s;
 }
 
 .opencodian-modified-files-hover-zone:hover {
   width: min(300px, calc(100% - 8px));
-  transition: width 0s;
+  height: var(--opencodian-modified-files-expanded-height);
+  transition: width 0s, height 0s;
+}
+
+.opencodian-modified-files-hover-zone:focus-within {
+  width: min(300px, calc(100% - 8px));
+  height: var(--opencodian-modified-files-expanded-height);
+  transition: width 0s, height 0s;
 }
 
 .opencodian-modified-files-hover-zone:hover .opencodian-modified-files-sidebar {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(0);
+}
+
+.opencodian-modified-files-hover-zone:focus-within .opencodian-modified-files-sidebar {
   opacity: 1;
   pointer-events: auto;
   transform: translateX(0);

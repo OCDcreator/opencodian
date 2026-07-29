@@ -44,6 +44,7 @@ describe('MessageFinalizationService foreground finalization', () => {
     expect(host.renderBackgroundTaskIndicatorIfNeeded).not.toHaveBeenCalled();
     expect(host.appendTurnDiffNoticeIfNeeded).not.toHaveBeenCalled();
     expect(host.refreshTabSessionTodos).toHaveBeenCalledWith('tab-1', 'session-1', { suppressErrors: true });
+    expect(host.refreshTabSessionStatus).toHaveBeenCalledWith('tab-1', 'session-1', { suppressErrors: true });
     expect(host.saveConversation).toHaveBeenCalledWith(conversation);
     expect(host.clearPendingEditedFiles).toHaveBeenCalledWith('tab-1');
     expect(host.setTabNeedsAttention).toHaveBeenCalledWith('tab-1', false);
@@ -81,6 +82,7 @@ describe('MessageFinalizationService foreground finalization', () => {
     expect(host.renderBackgroundTaskIndicatorIfNeeded).toHaveBeenCalledWith('tab-1');
     expect(host.appendTurnDiffNoticeIfNeeded).toHaveBeenCalledWith(conversation, ['notes.md'], 'tab-1');
     expect(host.refreshTabSessionTodos).toHaveBeenCalledWith('tab-1', 'session-1', { suppressErrors: true });
+    expect(host.refreshTabSessionStatus).toHaveBeenCalledWith('tab-1', 'session-1', { suppressErrors: true });
     const stableFingerprint = host.getConversationSyncFingerprint(conversation.messages);
     expect(host.setLastConversationSyncFingerprint).toHaveBeenNthCalledWith(1, 'tab-1', stableFingerprint);
     expect(host.setLastConversationSyncFingerprint).toHaveBeenNthCalledWith(
@@ -123,6 +125,28 @@ describe('MessageFinalizationService foreground finalization', () => {
     expect(host.applySyncedConversationUpdate).toHaveBeenCalledWith(previousMessages, nextMessages);
     expect(host.renderBackgroundTaskIndicatorIfNeeded).not.toHaveBeenCalled();
     expect(logStage).toHaveBeenCalledWith('post-sync-render-apply-complete');
+  });
+
+  it('refreshes OpenCode session status after finalization so stale busy state can clear', async () => {
+    const conversation = createConversation([
+      createMessage({ id: 'assistant-1', content: 'Stable', timestamp: 10 }),
+    ]);
+    const host = createHost(conversation);
+    const service = new MessageFinalizationService(host);
+
+    await service.finalizeAfterStream({
+      conversation,
+      tabId: 'tab-1',
+      shouldSyncFromServer: false,
+      editedFiles: [],
+      logStage: jest.fn(),
+    });
+
+    expect(host.refreshTabSessionTodos).toHaveBeenCalledWith('tab-1', 'session-1', { suppressErrors: true });
+    expect(host.refreshTabSessionStatus).toHaveBeenCalledWith('tab-1', 'session-1', { suppressErrors: true });
+    expect(host.refreshTabSessionStatus.mock.invocationCallOrder[0]).toBeGreaterThan(
+      host.refreshTabSessionTodos.mock.invocationCallOrder[0],
+    );
   });
 });
 

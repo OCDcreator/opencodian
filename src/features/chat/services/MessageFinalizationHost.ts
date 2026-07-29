@@ -1,3 +1,4 @@
+import type { SessionActivityStatus } from '../../../core/opencode';
 import type {
   ChatMessage,
   Conversation,
@@ -75,6 +76,11 @@ export interface MessageFinalizationHost {
     sessionId: string | undefined,
     options: { suppressErrors?: boolean },
   ): Promise<SessionTodo[]>;
+  refreshTabSessionStatus(
+    tabId: TabId | null,
+    sessionId: string | undefined,
+    options: { suppressErrors?: boolean },
+  ): Promise<SessionActivityStatus | null>;
   createConversationWriteTicket(conversationId: string): ConversationWriteTicket;
   commitConversationWrite(
     conversation: Conversation,
@@ -136,6 +142,11 @@ export interface MessageFinalizationHostDependencies {
       sessionId: string | undefined,
       options: { suppressErrors?: boolean },
     ): Promise<SessionTodo[]>;
+    refreshTabSessionStatus(
+      tabId: TabId | null,
+      sessionId: string | undefined,
+      options: { suppressErrors?: boolean },
+    ): Promise<SessionActivityStatus | null>;
   };
   createConversationWriteTicket: (conversationId: string) => ConversationWriteTicket;
   commitConversationWrite: (
@@ -194,6 +205,8 @@ export function createMessageFinalizationHost(
       deps.conversationNoticeCoordinator.appendTurnDiffNoticeIfNeeded(conversation, editedFiles, tabId),
     refreshTabSessionTodos: (tabId, sessionId, options) =>
       deps.sessionTodoCoordinator.refreshTabSessionTodos(tabId, sessionId, options),
+    refreshTabSessionStatus: (tabId, sessionId, options) =>
+      deps.sessionTodoCoordinator.refreshTabSessionStatus(tabId, sessionId, options),
     createConversationWriteTicket: (conversationId) =>
       deps.createConversationWriteTicket(conversationId),
     commitConversationWrite: (conversation, ticket, reason, write) =>

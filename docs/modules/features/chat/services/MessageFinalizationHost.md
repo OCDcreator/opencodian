@@ -12,6 +12,11 @@
 - `MessageFinalizationHost` / `MessageFinalizationHostDependencies`: the runtime contract between the service and `OpenCodianView`-owned coordinators.
 - `createMessageFinalizationHost()`: assembles the host object from view/runtime dependencies.
 
+## OpenCode Status Refresh
+
+- The host contract includes both `refreshTabSessionTodos(...)` and `refreshTabSessionStatus(...)` so OpenCode finalization can re-read the authoritative server snapshot after the local stream ends.
+- This extra status refresh is intentionally paired with todo refresh because the foreground-busy gate also treats stale `sessionStatus.type === 'busy' | 'retry'` as blocking even after `isStreaming` has already cleared.
+
 ## Claude User Message Backfill
 
 - The host contract now includes `backfillClaudeUserMessageIdentities(conversation)`.

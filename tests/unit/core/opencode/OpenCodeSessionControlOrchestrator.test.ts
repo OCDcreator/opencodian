@@ -161,7 +161,7 @@ it('builds context usage from session info, messages, and model catalog', async 
     expect(snapshot?.totalCost).toBeCloseTo(0.6, 6);
   });
 
-  it('uses session-level tokens and model when available, skipping message scan', async () => {
+  it('prefers latest assistant tokens over session cumulative totals when session model exists', async () => {
     const sessionSdk = createSessionSdk();
     const host = createHost(sessionSdk, createPartSdk(), {
       getSessionInfo: jest.fn().mockResolvedValue({
@@ -172,13 +172,43 @@ it('builds context usage from session info, messages, and model catalog', async 
         model: { id: 'gpt-5', providerID: 'openai' },
         time: { created: 1000, updated: 5000 },
       }),
-      getSessionMessages: jest.fn().mockResolvedValue([]),
+      getSessionMessages: jest.fn().mockResolvedValue([
+        {
+          info: {
+            id: 'assistant-1',
+            sessionID: 'session-fast',
+            role: 'assistant',
+            providerID: 'openai',
+            modelID: 'gpt-4.1',
+            cost: 0.12,
+            tokens: { input: 25, output: 10, reasoning: 1, cache: { read: 5, write: 0 } },
+            time: { created: 2000 },
+          },
+          parts: [],
+        },
+        {
+          info: {
+            id: 'assistant-2',
+            sessionID: 'session-fast',
+            role: 'assistant',
+            providerID: 'openai',
+            modelID: 'gpt-5',
+            cost: 0.3,
+            tokens: { input: 30, output: 12, reasoning: 2, cache: { read: 40, write: 1 } },
+            time: { created: 4500 },
+          },
+          parts: [],
+        },
+      ]),
       getAvailableModels: jest.fn().mockResolvedValue({
         providers: [
           {
             id: 'openai',
             name: 'OpenAI',
-            models: [{ id: 'gpt-5', name: 'GPT-5', contextWindow: 400000 }],
+            models: [
+              { id: 'gpt-4.1', name: 'GPT-4.1', contextWindow: 128000 },
+              { id: 'gpt-5', name: 'GPT-5', contextWindow: 400000 },
+            ],
           },
         ],
         defaults: {},
@@ -196,14 +226,68 @@ it('builds context usage from session info, messages, and model catalog', async 
       modelId: 'gpt-5',
       modelName: 'GPT-5',
       contextWindow: 400000,
+      inputTokens: 30,
+      outputTokens: 12,
+      reasoningTokens: 2,
+      cacheReadTokens: 40,
+      cacheWriteTokens: 1,
+      totalCost: 0.42,
+    });
+    expect(snapshot?.updatedAt).toBe(4500);
+    expect(host.getSessionMessages).toHaveBeenCalledTimes(1);
+  });
+
+  it('falls back to session-level totals when latest assistant tokens are unavailable', async () => {
+    const sessionSdk = createSessionSdk();
+    const host = createHost(sessionSdk, createPartSdk(), {
+      getSessionInfo: jest.fn().mockResolvedValue({
+        id: 'session-fallback',
+        title: 'Fallback fast path',
+        cost: 0.42,
+        tokens: { input: 100, output: 50, reasoning: 5, cache: { read: 10, write: 2 } },
+        model: { id: 'gpt-5', providerID: 'openai' },
+        time: { created: 1000, updated: 5000 },
+      }),
+      getSessionMessages: jest.fn().mockResolvedValue([
+        {
+          info: {
+            id: 'assistant-empty',
+            sessionID: 'session-fallback',
+            role: 'assistant',
+            providerID: 'openai',
+            modelID: 'gpt-5',
+            cost: 0.42,
+            tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+            time: { created: 4500 },
+          },
+          parts: [],
+        },
+      ]),
+      getAvailableModels: jest.fn().mockResolvedValue({
+        providers: [
+          {
+            id: 'openai',
+            name: 'OpenAI',
+            models: [{ id: 'gpt-5', name: 'GPT-5', contextWindow: 400000 }],
+          },
+        ],
+        defaults: {},
+      }),
+    });
+    const orchestrator = new OpenCodeSessionControlOrchestrator(host);
+
+    const snapshot = await orchestrator.getSessionContextUsageSnapshot('session-fallback');
+
+    expect(snapshot).toMatchObject({
+      sessionId: 'session-fallback',
       inputTokens: 100,
       outputTokens: 50,
       reasoningTokens: 5,
       cacheReadTokens: 10,
       cacheWriteTokens: 2,
       totalCost: 0.42,
+      updatedAt: 5000,
     });
-    expect(host.getSessionMessages).not.toHaveBeenCalled();
   });
 
   it('falls back to message scan when session has no tokens or model', async () => {
