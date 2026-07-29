@@ -1,4 +1,4 @@
-/* eslint-disable max-lines-per-function -- Context usage tests keep identity, snapshot, billing-ledger, and cost-provenance assertions together as one state contract. */
+/* eslint-disable max-lines, max-lines-per-function -- Context usage tests keep identity, snapshot, billing-ledger, cost-provenance, and OpenCode dual-metric assertions together as one state contract. */
 
 import {
   createEmptyTabContextState,
@@ -250,6 +250,143 @@ describe('ContextUsageService identity and totals', () => {
       cacheWriteTokens: null,
     });
     expect(deduplicated.billingUsage).toEqual(updated.billingUsage);
+  });
+
+  it('persists OpenCode current context separately from cumulative session totals', () => {
+    const state = ContextUsageService.applyUsageSnapshot(
+      createEmptyTabContextState(),
+      {
+        sessionId: 'opencode-session-1',
+        sessionTitle: 'OpenCode task',
+        createdAt: 100,
+        updatedAt: 200,
+        providerId: 'openai',
+        providerName: 'OpenAI',
+        modelId: 'gpt-5',
+        modelName: 'GPT-5',
+        contextWindow: 1000,
+        totalTokens: 167,
+        inputTokens: 100,
+        outputTokens: 50,
+        reasoningTokens: 5,
+        cacheReadTokens: 10,
+        cacheWriteTokens: 2,
+        totalCost: 0.42,
+        openCodeHasCumulativeTokens: true,
+        openCodeCurrentContext: {
+          providerId: 'openai',
+          providerName: 'OpenAI',
+          modelId: 'gpt-5',
+          modelName: 'GPT-5',
+          contextWindow: 1000,
+          totalTokens: 85,
+          inputTokens: 30,
+          outputTokens: 12,
+          reasoningTokens: 2,
+          cacheReadTokens: 40,
+          cacheWriteTokens: 1,
+        },
+      },
+    );
+
+    expect(state.preciseTokens?.total).toBe(167);
+    expect(state.openCodeCurrentContext?.totalTokens).toBe(85);
+    expect(ContextUsageService.summarize(state)).toMatchObject({
+      percentage: 9,
+      ringLabel: '9',
+      isUnavailable: false,
+    });
+    expect(ContextUsageService.summarize(state).tooltip).toContain('Total tokens: 167');
+
+    const persisted = ContextUsageService.createUsageSnapshot(state);
+    const restored = ContextUsageService.applyUsageSnapshot(createEmptyTabContextState(), persisted!);
+
+    expect(persisted).toMatchObject({
+      totalTokens: 167,
+      openCodeHasCumulativeTokens: true,
+      openCodeCurrentContext: { totalTokens: 85 },
+    });
+    expect(restored.preciseTokens?.total).toBe(167);
+    expect(restored.openCodeCurrentContext?.totalTokens).toBe(85);
+    expect(restored.percentage).toBe(9);
+  });
+
+  it('does not turn assistant context into session totals when OpenCode session tokens are absent', () => {
+    const state = ContextUsageService.applyUsageSnapshot(
+      createEmptyTabContextState(),
+      {
+        sessionId: 'opencode-session-no-totals',
+        sessionTitle: 'OpenCode task',
+        createdAt: 100,
+        updatedAt: 200,
+        providerId: 'openai',
+        providerName: 'OpenAI',
+        modelId: 'gpt-5',
+        modelName: 'GPT-5',
+        contextWindow: 1000,
+        totalTokens: 0,
+        inputTokens: 0,
+        outputTokens: 0,
+        reasoningTokens: 0,
+        cacheReadTokens: 0,
+        cacheWriteTokens: null,
+        totalCost: null,
+        openCodeHasCumulativeTokens: false,
+        openCodeCurrentContext: {
+          providerId: 'openai',
+          providerName: 'OpenAI',
+          modelId: 'gpt-5',
+          modelName: 'GPT-5',
+          contextWindow: 1000,
+          totalTokens: 85,
+          inputTokens: 30,
+          outputTokens: 12,
+          reasoningTokens: 2,
+          cacheReadTokens: 40,
+          cacheWriteTokens: 1,
+        },
+      },
+    );
+
+    expect(state.preciseTokens).toBeNull();
+    expect(ContextUsageService.summarize(state)).toMatchObject({
+      percentage: 9,
+      isUnavailable: false,
+    });
+    expect(ContextUsageService.summarize(state).tooltip).toContain('Total tokens: -');
+  });
+
+  it('keeps the OpenCode ring unavailable when only cumulative session data exists', () => {
+    const state = ContextUsageService.applyUsageSnapshot(
+      createEmptyTabContextState(),
+      {
+        sessionId: 'opencode-session-no-current',
+        sessionTitle: 'OpenCode task',
+        createdAt: 100,
+        updatedAt: 200,
+        providerId: 'openai',
+        providerName: 'OpenAI',
+        modelId: 'gpt-5',
+        modelName: 'GPT-5',
+        contextWindow: 1000,
+        totalTokens: 167,
+        inputTokens: 100,
+        outputTokens: 50,
+        reasoningTokens: 5,
+        cacheReadTokens: 10,
+        cacheWriteTokens: 2,
+        totalCost: 0.42,
+        openCodeHasCumulativeTokens: true,
+        openCodeCurrentContext: null,
+      },
+    );
+
+    expect(state.preciseTokens?.total).toBe(167);
+    expect(ContextUsageService.summarize(state)).toMatchObject({
+      ringLabel: '-',
+      isUnavailable: true,
+    });
+    expect(ContextUsageService.getContextBreakdown(state, [], '')).toEqual([]);
   });
 });
 

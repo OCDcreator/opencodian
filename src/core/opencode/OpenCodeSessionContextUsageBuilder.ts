@@ -1,4 +1,4 @@
-import type { ContextUsageSnapshot } from '../types';
+import type { ContextUsageSnapshot, OpenCodeCurrentContextUsage } from '../types';
 import type {
   Message,
   Session,
@@ -55,8 +55,10 @@ export async function buildSessionLevelContextUsageSnapshot(
     sessionId,
     updatedAt: session.time.updated,
     modelMetadata,
-    tokenBreakdown: buildTokenBreakdown(session.tokens),
+    cumulativeTokenBreakdown: buildTokenBreakdown(session.tokens),
     totalCost: typeof session.cost === 'number' ? session.cost : null,
+    openCodeCurrentContext: null,
+    openCodeHasCumulativeTokens: session.tokens != null,
   });
 }
 
@@ -81,8 +83,15 @@ export async function buildMessageLevelContextUsageSnapshot(
     sessionId,
     updatedAt: latestAssistantWithTokens?.info.time.created ?? session.time.updated,
     modelMetadata,
-    tokenBreakdown: buildTokenBreakdown(latestAssistantWithTokens?.info.tokens),
-    totalCost: resolveAssistantTotalCost(session, messages),
+    cumulativeTokenBreakdown: buildTokenBreakdown(session.tokens),
+    totalCost: typeof session.cost === 'number' ? session.cost : null,
+    openCodeCurrentContext: latestAssistantWithTokens
+      ? buildOpenCodeCurrentContextUsage(
+        modelMetadata,
+        buildTokenBreakdown(latestAssistantWithTokens.info.tokens),
+      )
+      : null,
+    openCodeHasCumulativeTokens: session.tokens != null,
   });
 }
 
@@ -91,16 +100,20 @@ function buildContextUsageSnapshot(options: {
   sessionId: string;
   updatedAt: number;
   modelMetadata: ModelMetadata;
-  tokenBreakdown: TokenBreakdown;
+  cumulativeTokenBreakdown: TokenBreakdown;
   totalCost: number | null;
+  openCodeCurrentContext: OpenCodeCurrentContextUsage | null;
+  openCodeHasCumulativeTokens: boolean;
 }): ContextUsageSnapshot {
   const {
     session,
     sessionId,
     updatedAt,
     modelMetadata,
-    tokenBreakdown,
+    cumulativeTokenBreakdown,
     totalCost,
+    openCodeCurrentContext,
+    openCodeHasCumulativeTokens,
   } = options;
 
   return {
@@ -116,13 +129,15 @@ function buildContextUsageSnapshot(options: {
     modelId: modelMetadata.modelId,
     modelName: modelMetadata.modelName,
     contextWindow: modelMetadata.contextWindow,
-    totalTokens: tokenBreakdown.totalTokens,
-    inputTokens: tokenBreakdown.inputTokens,
-    outputTokens: tokenBreakdown.outputTokens,
-    reasoningTokens: tokenBreakdown.reasoningTokens,
-    cacheReadTokens: tokenBreakdown.cacheReadTokens,
-    cacheWriteTokens: tokenBreakdown.cacheWriteTokens,
+    totalTokens: cumulativeTokenBreakdown.totalTokens,
+    inputTokens: cumulativeTokenBreakdown.inputTokens,
+    outputTokens: cumulativeTokenBreakdown.outputTokens,
+    reasoningTokens: cumulativeTokenBreakdown.reasoningTokens,
+    cacheReadTokens: cumulativeTokenBreakdown.cacheReadTokens,
+    cacheWriteTokens: cumulativeTokenBreakdown.cacheWriteTokens,
     totalCost,
+    openCodeCurrentContext,
+    openCodeHasCumulativeTokens,
   };
 }
 
@@ -149,20 +164,23 @@ function buildTokenBreakdown(
   };
 }
 
-function resolveAssistantTotalCost(
-  session: Session,
-  messages: SessionMessage[],
-): number | null {
-  if (typeof session.cost === 'number') {
-    return session.cost;
-  }
-
-  const assistantMessages = messages.filter((message) => message.info.role === 'assistant');
-  if (!assistantMessages.every((message) => typeof message.info.cost === 'number')) {
-    return null;
-  }
-
-  return assistantMessages.reduce((sum, message) => sum + (message.info.cost ?? 0), 0);
+function buildOpenCodeCurrentContextUsage(
+  modelMetadata: ModelMetadata,
+  tokenBreakdown: TokenBreakdown,
+): OpenCodeCurrentContextUsage {
+  return {
+    providerId: modelMetadata.providerId,
+    providerName: modelMetadata.providerName,
+    modelId: modelMetadata.modelId,
+    modelName: modelMetadata.modelName,
+    contextWindow: modelMetadata.contextWindow,
+    totalTokens: tokenBreakdown.totalTokens,
+    inputTokens: tokenBreakdown.inputTokens,
+    outputTokens: tokenBreakdown.outputTokens,
+    reasoningTokens: tokenBreakdown.reasoningTokens,
+    cacheReadTokens: tokenBreakdown.cacheReadTokens,
+    cacheWriteTokens: tokenBreakdown.cacheWriteTokens,
+  };
 }
 
 async function resolveSessionLevelModelMetadata(

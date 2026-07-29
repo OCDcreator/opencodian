@@ -92,4 +92,88 @@ describe('ContextRing', () => {
 
     ring.destroy();
   });
+
+  it('uses OpenCode assistant context for the ring while retaining session totals in its tooltip', () => {
+    const state = ContextUsageService.applyUsageSnapshot(
+      createEmptyTabContextState(),
+      {
+        sessionId: 'opencode-session-1',
+        sessionTitle: 'OpenCode task',
+        createdAt: 100,
+        updatedAt: 200,
+        providerId: 'openai',
+        providerName: 'OpenAI',
+        modelId: 'gpt-5',
+        modelName: 'GPT-5',
+        contextWindow: 1000,
+        totalTokens: 167,
+        inputTokens: 100,
+        outputTokens: 50,
+        reasoningTokens: 5,
+        cacheReadTokens: 10,
+        cacheWriteTokens: 2,
+        totalCost: 0.42,
+        openCodeHasCumulativeTokens: true,
+        openCodeCurrentContext: {
+          providerId: 'openai',
+          providerName: 'OpenAI',
+          modelId: 'gpt-5',
+          modelName: 'GPT-5',
+          contextWindow: 1000,
+          totalTokens: 85,
+          inputTokens: 30,
+          outputTokens: 12,
+          reasoningTokens: 2,
+          cacheReadTokens: 40,
+          cacheWriteTokens: 1,
+        },
+      },
+    );
+    const parentEl = document.createElement('div');
+    const ring = new ContextRing(parentEl, jest.fn());
+
+    ring.update(state);
+
+    const buttonEl = parentEl.querySelector<HTMLButtonElement>('.opencodian-context-ring');
+    expect(parentEl.querySelector('.opencodian-context-ring-label')?.textContent).toBe('9');
+    expect(buttonEl?.dataset.tooltip).toContain('Total tokens: 167');
+
+    ring.destroy();
+  });
+
+  it('retains the unavailable ring treatment when OpenCode has no current assistant context', () => {
+    const state = ContextUsageService.applyUsageSnapshot(
+      createEmptyTabContextState(),
+      {
+        sessionId: 'opencode-session-2',
+        sessionTitle: 'OpenCode task',
+        createdAt: 100,
+        updatedAt: 200,
+        providerId: 'openai',
+        providerName: 'OpenAI',
+        modelId: 'gpt-5',
+        modelName: 'GPT-5',
+        contextWindow: 1000,
+        totalTokens: 167,
+        inputTokens: 100,
+        outputTokens: 50,
+        reasoningTokens: 5,
+        cacheReadTokens: 10,
+        cacheWriteTokens: 2,
+        totalCost: 0.42,
+        openCodeHasCumulativeTokens: true,
+        openCodeCurrentContext: null,
+      },
+    );
+    const parentEl = document.createElement('div');
+    const ring = new ContextRing(parentEl, jest.fn());
+
+    ring.update(state);
+
+    const buttonEl = parentEl.querySelector<HTMLButtonElement>('.opencodian-context-ring');
+    expect(buttonEl?.classList.contains('is-unavailable')).toBe(true);
+    expect(parentEl.querySelector('.opencodian-context-ring-label')?.textContent).toBe('-');
+
+    ring.destroy();
+  });
 });

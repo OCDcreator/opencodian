@@ -290,7 +290,7 @@ beforeEach(() => {
       expect(mockRequestUrl).not.toHaveBeenCalled();
     });
 
-    it('uses the latest assistant message with tokens for context metrics', async () => {
+    it('keeps latest assistant context separate when session cumulative tokens are absent', async () => {
       mockRequestUrl
         .mockResolvedValueOnce({
           status: 200,
@@ -389,13 +389,23 @@ beforeEach(() => {
         modelId: 'gpt-5',
         modelName: 'GPT-5',
         contextWindow: 400000,
-        inputTokens: 40,
-        outputTokens: 20,
-        reasoningTokens: 10,
-        cacheReadTokens: 5,
-        cacheWriteTokens: 5,
+        totalTokens: 0,
+        inputTokens: 0,
+        outputTokens: 0,
+        reasoningTokens: 0,
+        cacheReadTokens: 0,
+        cacheWriteTokens: null,
+        openCodeHasCumulativeTokens: false,
+        openCodeCurrentContext: {
+          totalTokens: 80,
+          inputTokens: 40,
+          outputTokens: 20,
+          reasoningTokens: 10,
+          cacheReadTokens: 5,
+          cacheWriteTokens: 5,
+        },
         updatedAt: 4000,
       });
-      expect(snapshot?.totalCost).toBeCloseTo(0.6, 6);
+      expect(snapshot?.totalCost).toBeNull();
     });
   });

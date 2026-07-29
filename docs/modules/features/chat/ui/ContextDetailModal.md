@@ -7,7 +7,7 @@
 
 Obsidian Modal，展示当前会话的上下文使用详情。包括会话元信息（标题、provider、model）、消息统计（总数/用户/助手）、Token 明细（input/output/reasoning/cache/cost）、上下文分段条形图（breakdown）、异步加载的原始消息区、时间戳，以及 Codex 专用的底部 foreground compaction action。统计数据来源于 `ContextUsageService` 的 `summarize()`、`getDisplayTokenBreakdown()`、`getContextBreakdown()` 三个方法；原始消息由调用方通过懒加载回调提供。
 
-当后端没有报告 cache-write 或 cost 时，modal 将它们显示为 `-`。成本来源行会区分 OpenCode 已上报、models.dev 本地估算、本地单价覆盖、部分估算和基础档近似；有第三方计费身份时还显示 Base URL。Claude/Codex 的本地数值不是订阅账单。Codex 的 total/context window 均来自 app-server 的 thread token-usage 通知，不混入账号日/周用量。
+当后端没有报告 cache-write 或 cost 时，modal 将它们显示为 `-`。OpenCode 遵循 desktop 双口径：total/input/output/reasoning/cache/cost 来自 `session.tokens` / `session.cost`，而 Usage、context limit 与 breakdown 来自最后一条有效 assistant message；因此当前上下文缺失但累计数据仍存在时，modal 保持网格，Usage/Limit/Breakdown 显示不可用。Claude/Codex 的本地数值不是订阅账单。Codex 的 total/context window 均来自 app-server 的 thread token-usage 通知，不混入账号日/周用量。
 
 ## 导入关系
 上游: `obsidian`（Modal）、`Conversation`/`TabContextState`/`ContextBreakdownSegment`（core/types）、`i18n`、`ContextUsageService`
@@ -69,7 +69,7 @@ constructor(
 
 ### 估算标记
 
-若 `contextState.preciseTokens` 为 false，显示"估算值"提示。
+若 `contextState.preciseTokens` 为 false，显示"估算值"提示；OpenCode 明确缺失 `session.tokens` 时不把 message context 当作估算累计 totals，也不显示这条提示。
 
 ### Codex foreground compaction
 
@@ -85,7 +85,7 @@ constructor(
 
 | 方法 | 说明 |
 |------|------|
-| `onOpen()` | 清空内容、调用 summarize/breakdown、渲染网格/分段图，并启动原始消息异步加载 |
+| `onOpen()` | 清空内容、调用 summarize/breakdown、渲染网格/分段图，并启动原始消息异步加载；OpenCode 有累计但无当前 context 时不提前进入空态 |
 | `onClose()` | 清空 contentEl |
 | `renderRow(container, label, value)` | 创建 label/value 两行 div |
 | `renderBreakdown(container, segments)` | 渲染堆叠条形图 + 图例 |
@@ -116,7 +116,7 @@ Modal grid + breakdown bar + raw messages + notes
 
 ## 注意事项
 
-- 当 `contextState` 为 null 或 `summary.isUnavailable` 时，显示空状态提示
+- 当 `contextState` 为 null 或 `summary.isUnavailable` 且没有 OpenCode session totals/cost 时，显示空状态提示
 - 原始消息区是独立异步块；即使加载失败，也不影响上方 context usage 统计展示
 - `formatTimestamp` 有 fallback：先尝试 `dateStyle + timeStyle`，失败后使用 `year/month/day/hour/minute` 各组件
 - 该 modal 依赖 `src/style/modals/config-editor-modal.css` 里的宽 modal 壳层规则；如果后续重新命名类名，需要同步更新样式选择器

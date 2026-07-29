@@ -14,7 +14,7 @@
 - 生成 display token breakdown（precise 优先，estimated fallback）
 - 根据 system prompt、messages、parts 与 content blocks 估算输入侧 context breakdown
 - 在估算 token 超过真实 input tokens 时按比例缩放，并补齐 `other`
-- 精确状态优先使用 backend 的 `preciseTokens.total` 作为圆环分子；未知 cache-write/cost 显示 `-`，不会显示为 `0`
+- 普通 backend 的精确状态优先使用 `preciseTokens.total` 作为圆环分子；OpenCode 有独立当前上下文时则使用该 assistant message 的 total/window，未知 cache-write/cost 显示 `-`，不会显示为 `0`
 
 ## 公开接口
 
@@ -42,10 +42,10 @@ export class ContextUsageDisplayService {
 
 ## 关键行为
 
-- summary tone 阈值保持不变：`>= 85` 为 `danger`，`>= 60` 为 `warning`，其余为 `success`；无模型或 context window 时返回 muted/unavailable。
+- summary tone 阈值保持不变：`>= 85` 为 `danger`，`>= 60` 为 `warning`，其余为 `success`；无模型或 context window 时返回 muted/unavailable。OpenCode `openCodeCurrentContext = null` 也返回既有 `-` unavailable ring，即使 session cumulative totals 可用。
 - 当 `TabContextState.compactingAt` 存在时，summary 会切到 `isCompacting = true`、warning tone、`ringLabel = '…'`，并在 tooltip 首行加入 compaction 提示。
-- display token breakdown 有 `preciseTokens` 时直接使用 precise split；否则只展示 estimated input/output，reasoning/cache 记为 `0`。
-- context breakdown 的 token 估算仍是“字符数除以 4 向上取整”，仅用于 UI 级近似展示。
+- display token breakdown 有 `preciseTokens` 时直接使用累计 split；否则只展示 estimated input/output，reasoning/cache 记为 `0`。OpenCode 声明累计 tokens 缺失时，tooltip total 显示 `-`。
+- context breakdown 的 token 估算仍是“字符数除以 4 向上取整”，仅用于 UI 级近似展示；OpenCode 则以当前 assistant message 的 input tokens 作为该估算的总量，和累计明细分开。
 - message 字符统计继续兼容 `parts`、`contentBlocks` 与 fallback `content` 三种存储形态。
 - `formatCurrency()` 固定按 USD 格式化，并根据金额大小调整小数位数，保持小额费用可见。
 

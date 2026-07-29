@@ -3,7 +3,7 @@
 > **源码**: `src/core/types/index.ts`
 > **状态**: [REVIEW]
 > **Updated**: 2026-07-23 — added Claude project provider preset types and normalization exports; provider credentials are projected only to project-local Claude settings.
-> **Updated**: 2026-07-24 — re-exports `CodexApprovalPolicy`.
+> **Updated**: 2026-07-29 — re-exports OpenCode desktop-style current-context usage type.
 
 ## 概述
 
@@ -32,6 +32,7 @@ OpenCodian 全局类型的主聚合入口。它把聊天、模型、设置、权
 | `StreamChunk` | type | 流式事件联合类型（13 种事件） |
 | `TabContextState` | type | 标签页上下文状态 |
 | `ContextUsageSnapshot` | type | backend-neutral session context usage 快照 DTO，供 OpenCode/Claude Code snapshot owner 与 chat context ring 管线共享 |
+| `OpenCodeCurrentContextUsage` | type | OpenCode 专用的最新有效 assistant-message context token/model/window；与 session cumulative totals 分开 |
 | `ContextCostDetails` | type | 成本的来源、完整度、有效本地费率与 tier 提示 |
 | `ModelPricingRates` / `ModelPricingOverride` | type | USD/百万 Token 单价与用户覆盖 |
 | `ModelPricingCatalog` | type | 手动刷新的 models.dev 本地缓存 |

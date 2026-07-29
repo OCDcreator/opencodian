@@ -158,29 +158,16 @@ export class OpenCodeSessionControlOrchestrator {
 
     try {
       const session = await this.host.getSessionInfo(sessionId);
-      const hasSessionLevelUsage = session.tokens != null && session.model != null;
-
-      if (hasSessionLevelUsage) {
-        try {
-          const latestMessageSnapshot = await buildMessageLevelContextUsageSnapshot(
-            session,
-            sessionId,
-            this.host,
-          );
-          if (latestMessageSnapshot.totalTokens > 0) {
-            return latestMessageSnapshot;
-          }
-        } catch (error) {
-          this.host.logServiceWarning(
-            'session.context-usage',
-            `Failed to derive latest-message context usage for ${sessionId}, falling back to session totals`,
-            error,
-          );
-        }
+      try {
+        return await buildMessageLevelContextUsageSnapshot(session, sessionId, this.host);
+      } catch (error) {
+        this.host.logServiceWarning(
+          'session.context-usage',
+          `Failed to derive current context usage for ${sessionId}; preserving session totals only`,
+          error,
+        );
         return buildSessionLevelContextUsageSnapshot(session, sessionId, this.host);
       }
-
-      return buildMessageLevelContextUsageSnapshot(session, sessionId, this.host);
     } catch (error) {
       this.host.logServiceError('session.context-usage', `Failed to get session context usage snapshot for ${sessionId}:`, error);
       return null;

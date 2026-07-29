@@ -31,20 +31,11 @@ type ContextBreakdownTokenMap = Record<ContextBreakdownKey, number>;
 
 export class ContextUsageDisplayService {
   static summarize(state: TabContextState | null | undefined): ContextUsageSummary {
-    if (!state || !state.model || state.contextWindow <= 0) {
-      return {
-        totalTokens: 0,
-        percentage: 0,
-        tone: 'muted',
-        ringLabel: '-',
-        isCompacting: false,
-        isUnavailable: true,
-        contextWindow: 0,
-        tooltip: t('context.usage.unavailable'),
-      };
+    const display = this.getCurrentContextSnapshot(state);
+    if (!state || !display.modelId || display.contextWindow <= 0) {
+      return this.buildUnavailableSummary(state);
     }
 
-    const display = this.getDisplaySnapshot(state);
     const totalTokens = display.totalTokens;
     const percentage = display.percentage;
     const isCompacting = typeof state.compactingAt === 'number';
@@ -63,10 +54,10 @@ export class ContextUsageDisplayService {
       ringLabel: isCompacting ? '…' : String(percentage),
       isCompacting,
       isUnavailable: false,
-      contextWindow: state.contextWindow,
+      contextWindow: display.contextWindow,
       tooltip: [
         ...(isCompacting ? [t('context.usage.compacting')] : []),
-        `${t('context.usage.totalTokens')}: ${this.formatNumber(totalTokens)}`,
+        `${t('context.usage.totalTokens')}: ${this.formatCumulativeTotal(state)}`,
         `${t('context.usage.usage')}: ${percentage}%`,
         `${t('context.usage.cost')}: ${this.formatCurrency(state.totalCost)}`,
       ].join('\n'),
@@ -107,7 +98,7 @@ export class ContextUsageDisplayService {
     cacheWrite: number | null;
     total: number;
   } {
-    return this.getDisplaySnapshot(state).tokens;
+    return this.buildDisplayTokenBreakdown(state);
   }
 
   static getContextBreakdown(
@@ -115,7 +106,7 @@ export class ContextUsageDisplayService {
     messages: ChatMessage[],
     systemPrompt?: string | null,
   ): ContextBreakdownSegment[] {
-    const inputTokens = this.getDisplaySnapshot(state).tokens.input;
+    const inputTokens = this.getCurrentContextSnapshot(state).tokens.input;
     if (inputTokens <= 0) {
       return [];
     }
@@ -146,14 +137,73 @@ export class ContextUsageDisplayService {
     return Math.max(0, Math.min(100, Math.round((totalTokens / contextWindow) * 100)));
   }
 
-  private static getDisplaySnapshot(
+  private static buildUnavailableSummary(
     state: TabContextState | null | undefined,
-  ): { tokens: ContextDisplayTokenBreakdown; totalTokens: number; percentage: number } {
+  ): ContextUsageSummary {
+    const hasOpenCodeTotals = state?.openCodeCurrentContext === null
+      && state.openCodeHasCumulativeTokens === true;
+    return {
+      totalTokens: 0,
+      percentage: 0,
+      tone: 'muted',
+      ringLabel: '-',
+      isCompacting: false,
+      isUnavailable: true,
+      contextWindow: 0,
+      tooltip: hasOpenCodeTotals
+        ? [
+          `${t('context.usage.totalTokens')}: ${this.formatCumulativeTotal(state)}`,
+          `${t('context.usage.usage')}: -`,
+          `${t('context.usage.cost')}: ${this.formatCurrency(state.totalCost)}`,
+        ].join('\n')
+        : t('context.usage.unavailable'),
+    };
+  }
+
+  private static formatCumulativeTotal(state: TabContextState): string {
+    if (state.openCodeHasCumulativeTokens === false) {
+      return '-';
+    }
+
+    return this.formatNumber(this.buildDisplayTokenBreakdown(state).total);
+  }
+
+  private static getCurrentContextSnapshot(
+    state: TabContextState | null | undefined,
+  ): {
+    tokens: ContextDisplayTokenBreakdown;
+    totalTokens: number;
+    percentage: number;
+    contextWindow: number;
+    modelId: string | null;
+  } {
+    const currentContext = state?.openCodeCurrentContext;
+    if (currentContext !== undefined) {
+      const tokens = {
+        input: currentContext?.inputTokens ?? 0,
+        output: currentContext?.outputTokens ?? 0,
+        reasoning: currentContext?.reasoningTokens ?? 0,
+        cacheRead: currentContext?.cacheReadTokens ?? 0,
+        cacheWrite: currentContext?.cacheWriteTokens ?? null,
+        total: currentContext?.totalTokens ?? 0,
+      };
+      const contextWindow = currentContext?.contextWindow ?? 0;
+      return {
+        tokens,
+        totalTokens: tokens.total,
+        percentage: this.calculatePercentage(tokens.total, contextWindow),
+        contextWindow,
+        modelId: currentContext?.modelId ?? null,
+      };
+    }
+
     const tokens = this.buildDisplayTokenBreakdown(state);
     return {
       tokens,
       totalTokens: tokens.total,
       percentage: this.calculatePercentage(tokens.total, state?.contextWindow ?? 0),
+      contextWindow: state?.contextWindow ?? 0,
+      modelId: state?.model ?? null,
     };
   }
 

@@ -63,11 +63,13 @@ export class ContextDetailModal extends Modal {
     );
     const createdAt = this.contextState?.createdAt ?? this.conversation?.createdAt ?? null;
     const updatedAt = this.contextState?.updatedAt ?? this.conversation?.updatedAt ?? null;
+    const hasCumulativeTokens = this.hasCumulativeTokens();
+    const currentContext = this.contextState?.openCodeCurrentContext;
 
     contentEl.empty();
     contentEl.createEl('h2', { text: t('context.usage.title') });
 
-    if (summary.isUnavailable) {
+    if (summary.isUnavailable && !this.hasSessionDetails()) {
       contentEl.createDiv({
         cls: 'opencodian-context-modal-empty',
         text: t('context.usage.noData'),
@@ -76,101 +78,22 @@ export class ContextDetailModal extends Modal {
       return;
     }
 
-    const gridEl = contentEl.createDiv({ cls: 'opencodian-context-modal-grid' });
-    const messageCount = this.conversation?.messages.length ?? 0;
-    const userMessageCount = this.conversation?.messages.filter((message) => message.role === 'user').length ?? 0;
-    const assistantMessageCount = this.conversation?.messages.filter((message) => message.role === 'assistant').length ?? 0;
-    const sessionTitle = this.conversation?.title
-      || this.contextState?.sessionTitle
-      || t('chat.history.untitled');
-
-    this.renderRow(gridEl, t('context.usage.session'), sessionTitle);
-    this.renderRow(
-      gridEl,
-      t('context.usage.provider'),
-      this.contextState?.providerName ?? this.contextState?.provider ?? '-',
-    );
-    this.renderRow(
-      gridEl,
-      t('context.usage.model'),
-      this.contextState?.modelName ?? this.contextState?.model ?? '-',
-    );
-    if (this.contextState?.costDetails?.endpoint) {
-      this.renderRow(
-        gridEl,
-        t('context.usage.pricingEndpoint'),
-        this.contextState.costDetails.endpoint,
-      );
-    }
-    this.renderRow(gridEl, t('context.usage.messages'), ContextUsageService.formatNumber(messageCount));
-    this.renderRow(gridEl, t('context.usage.userMessages'), ContextUsageService.formatNumber(userMessageCount));
-    this.renderRow(gridEl, t('context.usage.assistantMessages'), ContextUsageService.formatNumber(assistantMessageCount));
-    this.renderRow(gridEl, t('context.usage.totalTokens'), ContextUsageService.formatNumber(tokens.total));
-    this.renderRow(gridEl, t('context.usage.usage'), `${summary.percentage}%`);
-    if (summary.isCompacting) {
-      this.renderRow(gridEl, t('context.usage.status'), t('context.usage.compacting'));
-    }
-    this.renderRow(gridEl, t('context.usage.contextLimit'), ContextUsageService.formatNumber(summary.contextWindow));
-    this.renderRow(
-      gridEl,
-      t('context.usage.inputTokens'),
-      ContextUsageService.formatNumber(tokens.input),
-    );
-    this.renderRow(
-      gridEl,
-      t('context.usage.outputTokens'),
-      ContextUsageService.formatNumber(tokens.output),
-    );
-    this.renderRow(
-      gridEl,
-      t('context.usage.reasoningTokens'),
-      ContextUsageService.formatNumber(tokens.reasoning),
-    );
-    this.renderRow(
-      gridEl,
-      t('context.usage.cacheTokens'),
-      `${ContextUsageService.formatNumber(tokens.cacheRead)} / ${this.formatOptionalTokenCount(tokens.cacheWrite)}`,
-    );
-    this.renderRow(
-      gridEl,
-      t('context.usage.cost'),
-      ContextUsageService.formatCurrency(this.contextState?.totalCost),
-    );
-    this.renderRow(
-      gridEl,
-      t('context.usage.costSource'),
-      this.formatCostDetails(),
-    );
-    this.renderRow(
-      gridEl,
-      t('context.usage.createdAt'),
-      this.formatTimestamp(createdAt),
-    );
-    this.renderRow(
-      gridEl,
-      t('context.usage.lastActivity'),
-      this.formatTimestamp(updatedAt),
-    );
+    this.renderUsageGrid(contentEl, {
+      summary,
+      tokens,
+      hasCumulativeTokens,
+      currentContext,
+      createdAt,
+      updatedAt,
+    });
 
     if (breakdown.length > 0) {
       this.renderBreakdown(contentEl, breakdown);
     }
 
-    const rawMessagesSectionEl = contentEl.createDiv({ cls: 'opencodian-context-raw-messages' });
-    rawMessagesSectionEl.createDiv({
-      cls: 'opencodian-context-raw-messages-title',
-      text: t('context.rawMessages.title'),
-    });
-    const rawMessagesBodyEl = rawMessagesSectionEl.createDiv({
-      cls: 'opencodian-context-raw-messages-body',
-    });
-    rawMessagesBodyEl.createDiv({
-      cls: 'opencodian-context-raw-messages-state is-loading',
-      text: t('context.rawMessages.loading'),
-    });
-    void this.loadRawMessages(rawMessagesBodyEl);
+    this.renderRawMessagesSection(contentEl);
 
-    if (!this.contextState?.preciseTokens) {
+    if (!this.contextState?.preciseTokens && hasCumulativeTokens) {
       contentEl.createDiv({
         cls: 'opencodian-context-modal-note',
         text: t('context.usage.estimated'),
@@ -192,6 +115,121 @@ export class ContextDetailModal extends Modal {
     this.compactionController?.dispose();
   }
 
+  private renderUsageGrid(
+    contentEl: HTMLElement,
+    options: {
+      summary: ReturnType<typeof ContextUsageService.summarize>;
+      tokens: ReturnType<typeof ContextUsageService.getDisplayTokenBreakdown>;
+      hasCumulativeTokens: boolean;
+      currentContext: TabContextState['openCodeCurrentContext'];
+      createdAt: number | null;
+      updatedAt: number | null;
+    },
+  ): void {
+    const gridEl = contentEl.createDiv({ cls: 'opencodian-context-modal-grid' });
+    const { currentContext, hasCumulativeTokens, summary, tokens } = options;
+    const messageCounts = this.getMessageCounts();
+    const identity = this.getContextIdentity(currentContext);
+    const usageValues = this.getUsageValues(summary, tokens, hasCumulativeTokens);
+
+    this.renderRow(gridEl, t('context.usage.session'), this.getSessionTitle());
+    this.renderRow(gridEl, t('context.usage.provider'), identity.provider);
+    this.renderRow(gridEl, t('context.usage.model'), identity.model);
+    if (this.contextState?.costDetails?.endpoint) {
+      this.renderRow(gridEl, t('context.usage.pricingEndpoint'), this.contextState.costDetails.endpoint);
+    }
+    this.renderRow(gridEl, t('context.usage.messages'), ContextUsageService.formatNumber(messageCounts.all));
+    this.renderRow(gridEl, t('context.usage.userMessages'), ContextUsageService.formatNumber(messageCounts.user));
+    this.renderRow(gridEl, t('context.usage.assistantMessages'), ContextUsageService.formatNumber(messageCounts.assistant));
+    this.renderRow(gridEl, t('context.usage.totalTokens'), usageValues.total);
+    this.renderRow(gridEl, t('context.usage.usage'), usageValues.usage);
+    if (summary.isCompacting) {
+      this.renderRow(gridEl, t('context.usage.status'), t('context.usage.compacting'));
+    }
+    this.renderRow(gridEl, t('context.usage.contextLimit'), usageValues.contextLimit);
+    this.renderRow(gridEl, t('context.usage.inputTokens'), usageValues.input);
+    this.renderRow(gridEl, t('context.usage.outputTokens'), usageValues.output);
+    this.renderRow(gridEl, t('context.usage.reasoningTokens'), usageValues.reasoning);
+    this.renderRow(gridEl, t('context.usage.cacheTokens'), usageValues.cache);
+    this.renderRow(gridEl, t('context.usage.cost'), ContextUsageService.formatCurrency(this.contextState?.totalCost));
+    this.renderRow(gridEl, t('context.usage.costSource'), this.formatCostDetails());
+    this.renderRow(gridEl, t('context.usage.createdAt'), this.formatTimestamp(options.createdAt));
+    this.renderRow(gridEl, t('context.usage.lastActivity'), this.formatTimestamp(options.updatedAt));
+  }
+
+  private renderRawMessagesSection(contentEl: HTMLElement): void {
+    const sectionEl = contentEl.createDiv({ cls: 'opencodian-context-raw-messages' });
+    sectionEl.createDiv({
+      cls: 'opencodian-context-raw-messages-title',
+      text: t('context.rawMessages.title'),
+    });
+    const bodyEl = sectionEl.createDiv({ cls: 'opencodian-context-raw-messages-body' });
+    bodyEl.createDiv({
+      cls: 'opencodian-context-raw-messages-state is-loading',
+      text: t('context.rawMessages.loading'),
+    });
+    void this.loadRawMessages(bodyEl);
+  }
+
+  private getSessionTitle(): string {
+    return this.conversation?.title
+      || this.contextState?.sessionTitle
+      || t('chat.history.untitled');
+  }
+
+  private getContextIdentity(
+    currentContext: TabContextState['openCodeCurrentContext'],
+  ): { provider: string; model: string } {
+    if (currentContext !== undefined) {
+      return {
+        provider: currentContext?.providerName ?? currentContext?.providerId ?? '-',
+        model: currentContext?.modelName ?? currentContext?.modelId ?? '-',
+      };
+    }
+
+    return {
+      provider: this.contextState?.providerName ?? this.contextState?.provider ?? '-',
+      model: this.contextState?.modelName ?? this.contextState?.model ?? '-',
+    };
+  }
+
+  private getMessageCounts(): { all: number; user: number; assistant: number } {
+    const messages = this.conversation?.messages ?? [];
+    return {
+      all: messages.length,
+      user: messages.filter((message) => message.role === 'user').length,
+      assistant: messages.filter((message) => message.role === 'assistant').length,
+    };
+  }
+
+  private getUsageValues(
+    summary: ReturnType<typeof ContextUsageService.summarize>,
+    tokens: ReturnType<typeof ContextUsageService.getDisplayTokenBreakdown>,
+    hasCumulativeTokens: boolean,
+  ): {
+    total: string;
+    usage: string;
+    contextLimit: string;
+    input: string;
+    output: string;
+    reasoning: string;
+    cache: string;
+  } {
+    const currentUsage = summary.isUnavailable ? '-' : `${summary.percentage}%`;
+    const contextLimit = summary.isUnavailable ? '-' : ContextUsageService.formatNumber(summary.contextWindow);
+    return {
+      total: this.formatCumulativeTokenCount(tokens.total, hasCumulativeTokens),
+      usage: currentUsage,
+      contextLimit,
+      input: this.formatCumulativeTokenCount(tokens.input, hasCumulativeTokens),
+      output: this.formatCumulativeTokenCount(tokens.output, hasCumulativeTokens),
+      reasoning: this.formatCumulativeTokenCount(tokens.reasoning, hasCumulativeTokens),
+      cache: hasCumulativeTokens
+        ? `${ContextUsageService.formatNumber(tokens.cacheRead)} / ${this.formatOptionalTokenCount(tokens.cacheWrite)}`
+        : '-',
+    };
+  }
+
   private renderRow(containerEl: HTMLElement, label: string, value: string): void {
     const rowEl = containerEl.createDiv({ cls: 'opencodian-context-modal-row' });
     rowEl.createDiv({ cls: 'opencodian-context-modal-label', text: label });
@@ -200,6 +238,30 @@ export class ContextDetailModal extends Modal {
 
   private formatOptionalTokenCount(value: number | null): string {
     return typeof value === 'number' ? ContextUsageService.formatNumber(value) : '-';
+  }
+
+  private formatCumulativeTokenCount(value: number, hasCumulativeTokens: boolean): string {
+    return hasCumulativeTokens ? ContextUsageService.formatNumber(value) : '-';
+  }
+
+  private hasCumulativeTokens(): boolean {
+    if (
+      this.contextState?.openCodeCurrentContext !== undefined
+      || this.contextState?.openCodeHasCumulativeTokens !== undefined
+    ) {
+      return this.contextState.openCodeHasCumulativeTokens === true;
+    }
+
+    return true;
+  }
+
+  private hasSessionDetails(): boolean {
+    const isOpenCodeDualMetric = this.contextState?.openCodeCurrentContext !== undefined
+      || this.contextState?.openCodeHasCumulativeTokens !== undefined;
+    return isOpenCodeDualMetric && (
+      this.hasCumulativeTokens()
+      || typeof this.contextState?.totalCost === 'number'
+    );
   }
 
   private formatCostDetails(): string {

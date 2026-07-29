@@ -310,6 +310,20 @@ export interface UsageInfo {
 }
 
 /** Backend session context usage snapshot */
+export interface OpenCodeCurrentContextUsage {
+  providerId: string | null;
+  providerName: string | null;
+  modelId: string | null;
+  modelName: string | null;
+  contextWindow: number;
+  totalTokens: number;
+  inputTokens: number;
+  outputTokens: number;
+  reasoningTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number | null;
+}
+
 export interface ContextUsageSnapshot {
   sessionId: string;
   sessionTitle: string;
@@ -339,6 +353,14 @@ export interface ContextUsageSnapshot {
   costDetails?: ContextCostDetails | null;
   /** Optional request-ledger used for cost only; it is distinct from context-window token totals. */
   billingUsage?: ContextBillingUsage | null;
+  /**
+   * OpenCode only: latest assistant-message context usage. `null` means the
+   * session has no valid assistant-message context; `undefined` preserves the
+   * single-metric contract used by other backends and persisted legacy data.
+   */
+  openCodeCurrentContext?: OpenCodeCurrentContextUsage | null;
+  /** OpenCode only: distinguishes missing `session.tokens` from a true zero total. */
+  openCodeHasCumulativeTokens?: boolean;
 }
 
 /** Cumulative billable request tokens, currently populated by Claude Code stream results. */
@@ -389,6 +411,10 @@ export interface TabContextState {
     cacheRead: number;
     cacheWrite: number | null;
   } | null;
+  /** See `ContextUsageSnapshot.openCodeCurrentContext`. */
+  openCodeCurrentContext?: OpenCodeCurrentContextUsage | null;
+  /** See `ContextUsageSnapshot.openCodeHasCumulativeTokens`. */
+  openCodeHasCumulativeTokens?: boolean;
   totalCost: number | null;
   costDetails: ContextCostDetails | null;
   billingUsage: ContextBillingUsage | null;

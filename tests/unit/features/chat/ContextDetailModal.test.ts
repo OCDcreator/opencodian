@@ -1,6 +1,9 @@
+/* eslint-disable max-lines-per-function -- Modal scenarios share one DOM/lifecycle fixture. */
+
 import type { App } from 'obsidian';
 
 import { type Conversation, createEmptyTabContextState } from '../../../../src/core/types';
+import { ContextUsageService } from '../../../../src/features/chat/services/ContextUsageService';
 import { ContextDetailModal } from '../../../../src/features/chat/ui/ContextDetailModal';
 import { setLocale } from '../../../../src/i18n';
 
@@ -63,6 +66,44 @@ describe('ContextDetailModal', () => {
 
     expect(modal.modalEl.classList.contains('opencodian-context-detail-modal')).toBe(false);
     expect(modal.contentEl.classList.contains('opencodian-context-detail-modal-content')).toBe(false);
+  });
+
+  it('keeps cumulative OpenCode session details visible when current context is unavailable', () => {
+    const contextState = ContextUsageService.applyUsageSnapshot(
+      createEmptyTabContextState(),
+      {
+        sessionId: 'session-1',
+        sessionTitle: 'Cumulative only',
+        createdAt: 1710000000000,
+        updatedAt: 1710000300000,
+        providerId: 'openai',
+        providerName: 'OpenAI',
+        modelId: 'gpt-5',
+        modelName: 'GPT-5',
+        contextWindow: 128000,
+        totalTokens: 167,
+        inputTokens: 100,
+        outputTokens: 50,
+        reasoningTokens: 5,
+        cacheReadTokens: 10,
+        cacheWriteTokens: 2,
+        totalCost: 0.42,
+        openCodeHasCumulativeTokens: true,
+        openCodeCurrentContext: null,
+      },
+    );
+    const { conversation } = createValidContext();
+    const modal = new ContextDetailModal({} as App, { conversation, contextState });
+
+    modal.onOpen();
+
+    expect(modal.contentEl.querySelector('.opencodian-context-modal-empty')).toBeNull();
+    const rowValues = Array.from(modal.contentEl.querySelectorAll('.opencodian-context-modal-value'))
+      .map((element) => element.textContent);
+    expect(rowValues).toContain('167');
+    expect(rowValues).toContain('-');
+
+    modal.onClose();
   });
 
   it('renders raw messages from generic backend loader', async () => {

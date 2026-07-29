@@ -66,6 +66,8 @@ export class ContextUsageService {
       next.streamInputTokens = 0;
       next.streamOutputTokens = 0;
       next.preciseTokens = null;
+      next.openCodeCurrentContext = undefined;
+      next.openCodeHasCumulativeTokens = undefined;
       next.totalCost = null;
       next.costDetails = null;
       next.billingUsage = null;
@@ -163,7 +165,7 @@ export class ContextUsageService {
     state: TabContextState | null | undefined,
     snapshot: ContextUsageSnapshot,
   ): TabContextState {
-    return this.applyPreciseUsage(
+    const next = this.applyPreciseUsage(
       this.syncStateIdentity(
         state,
         {
@@ -193,6 +195,8 @@ export class ContextUsageService {
         billingUsage: snapshot.billingUsage,
       },
     );
+    this.applyOpenCodeUsageSnapshot(next, snapshot);
+    return this.finalizeState(next);
   }
 
   static applyBillingUsage(
@@ -253,6 +257,12 @@ export class ContextUsageService {
       totalCost: isBackendReportedCost ? state.totalCost : null,
       costDetails: isBackendReportedCost ? state.costDetails : null,
       billingUsage: state.billingUsage,
+      ...(state.openCodeCurrentContext !== undefined
+        ? { openCodeCurrentContext: state.openCodeCurrentContext }
+        : {}),
+      ...(typeof state.openCodeHasCumulativeTokens === 'boolean'
+        ? { openCodeHasCumulativeTokens: state.openCodeHasCumulativeTokens }
+        : {}),
     };
   }
 
@@ -369,8 +379,37 @@ export class ContextUsageService {
       state.updatedAt = state.updatedAt ?? Date.now();
     }
 
-    state.percentage = this.calculatePercentage(this.getTotalTokens(state), state.contextWindow);
+    const currentContext = state.openCodeCurrentContext;
+    state.percentage = currentContext === undefined
+      ? this.calculatePercentage(this.getTotalTokens(state), state.contextWindow)
+      : currentContext
+        ? this.calculatePercentage(currentContext.totalTokens, currentContext.contextWindow)
+        : 0;
     return state;
+  }
+
+  private static applyOpenCodeUsageSnapshot(
+    state: TabContextState,
+    snapshot: ContextUsageSnapshot,
+  ): void {
+    if (
+      snapshot.openCodeCurrentContext === undefined
+      && snapshot.openCodeHasCumulativeTokens === undefined
+    ) {
+      state.openCodeCurrentContext = undefined;
+      state.openCodeHasCumulativeTokens = undefined;
+      return;
+    }
+
+    state.openCodeCurrentContext = snapshot.openCodeCurrentContext ?? null;
+    state.openCodeHasCumulativeTokens = snapshot.openCodeHasCumulativeTokens ?? false;
+    if (state.openCodeHasCumulativeTokens) {
+      return;
+    }
+
+    state.preciseTokens = null;
+    state.estimatedInputTokens = 0;
+    state.estimatedOutputTokens = 0;
   }
 
   private static buildPreciseTokens(usage: {

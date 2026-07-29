@@ -38,7 +38,7 @@ export interface ContextUsageSnapshot {
 }
 ```
 
-`totalTokens` 是后端明确提供时的权威累计数，优先于各分项合成；`null` 表示 backend 没有报告 cache-write 或 cost。身份同步一旦发现 session ID 变化，就清除旧 session 的 precise/estimated/cost 状态，随后才可能恢复新 conversation 持久化的快照。
+`totalTokens` 是后端明确提供时的权威累计数，优先于各分项合成；`null` 表示 backend 没有报告 cache-write 或 cost。OpenCode snapshot 还可携带 `openCodeCurrentContext`（最后一条有效 assistant message）及 `openCodeHasCumulativeTokens`：`preciseTokens` 继续只保存 session cumulative totals，当前上下文单独保存；缺失 `session.tokens` 时绝不把 assistant tokens 写成 precise totals。身份同步一旦发现 session ID 变化，就清除旧 session 的 precise/estimated/cost/OpenCode-current 状态，随后才可能恢复新 conversation 持久化的快照。
 
 `billingUsage` 是和 context-window 计数分离的可计费 request ledger，当前由 Claude Code 的 terminal result 填充；`costDetails` 保留 backend-reported、models.dev、user-override 或 unavailable 的来源、完整度与可选计费 endpoint。服务不自行决定单价，而是让 coordinator 的 pricing owner 传回 enriched snapshot。
 
@@ -81,7 +81,7 @@ export interface ContextUsageSnapshot {
 - `estimatedInputTokens = input + cacheRead + cacheWrite`
 - `estimatedOutputTokens = output + reasoning`
 
-如果有 `totalCost`，也会同步到 state。`applyUsageSnapshot()` 先同步 identity（含 `compactingAt`），再复用这条 precise usage 路径。`applyBillingUsage()` 对 request ID 去重并累加 Claude 的分类 token，`applyCostSnapshot()` 只写入由 pricing owner 计算完成的成本字段，避免把 context-window 的累计 input 误当账单 input。
+如果有 `totalCost`，也会同步到 state。`applyUsageSnapshot()` 先同步 identity（含 `compactingAt`），再复用这条 precise usage 路径；对于 `openCodeHasCumulativeTokens = false` 的 OpenCode snapshot 会立即清空 precise/estimated totals，同时保留独立的当前上下文和 session cost。`createUsageSnapshot()` 会把这两个 OpenCode 字段一并持久化。`applyBillingUsage()` 对 request ID 去重并累加 Claude 的分类 token，`applyCostSnapshot()` 只写入由 pricing owner 计算完成的成本字段，避免把 context-window 的累计 input 误当账单 input。
 
 ### compaction live state
 
@@ -101,5 +101,5 @@ export interface ContextUsageSnapshot {
 
 ## 注意事项
 
-- `percentage` 写回 state 时仍基于 precise total 或 estimated input/output 的总量，不受 display breakdown 估算影响。
+- 普通 backend 的 `percentage` 仍基于 precise total 或 estimated input/output；OpenCode 有 `openCodeCurrentContext` 时改用该 message 的 total/window，`null` 则写入 0 供 UI 保持不可用样式。
 - `ContextUsageService` 保持无状态纯函数式 API；不要在这里引入 tab/runtime 持有逻辑。

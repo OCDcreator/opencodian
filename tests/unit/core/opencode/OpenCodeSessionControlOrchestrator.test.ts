@@ -151,17 +151,27 @@ it('builds context usage from session info, messages, and model catalog', async 
       modelId: 'gpt-5',
       modelName: 'GPT-5',
       contextWindow: 400000,
-      inputTokens: 40,
-      outputTokens: 20,
-      reasoningTokens: 10,
-      cacheReadTokens: 5,
-      cacheWriteTokens: 5,
+      totalTokens: 0,
+      inputTokens: 0,
+      outputTokens: 0,
+      reasoningTokens: 0,
+      cacheReadTokens: 0,
+      cacheWriteTokens: null,
+      openCodeHasCumulativeTokens: false,
+      openCodeCurrentContext: {
+        inputTokens: 40,
+        outputTokens: 20,
+        reasoningTokens: 10,
+        cacheReadTokens: 5,
+        cacheWriteTokens: 5,
+        totalTokens: 80,
+      },
       updatedAt: 4000,
     });
-    expect(snapshot?.totalCost).toBeCloseTo(0.6, 6);
+    expect(snapshot?.totalCost).toBeNull();
   });
 
-  it('prefers latest assistant tokens over session cumulative totals when session model exists', async () => {
+  it('keeps session totals separate from latest assistant current-context usage', async () => {
     const sessionSdk = createSessionSdk();
     const host = createHost(sessionSdk, createPartSdk(), {
       getSessionInfo: jest.fn().mockResolvedValue({
@@ -226,18 +236,31 @@ it('builds context usage from session info, messages, and model catalog', async 
       modelId: 'gpt-5',
       modelName: 'GPT-5',
       contextWindow: 400000,
-      inputTokens: 30,
-      outputTokens: 12,
-      reasoningTokens: 2,
-      cacheReadTokens: 40,
-      cacheWriteTokens: 1,
+      totalTokens: 167,
+      inputTokens: 100,
+      outputTokens: 50,
+      reasoningTokens: 5,
+      cacheReadTokens: 10,
+      cacheWriteTokens: 2,
       totalCost: 0.42,
+      openCodeHasCumulativeTokens: true,
+      openCodeCurrentContext: {
+        providerId: 'openai',
+        modelId: 'gpt-5',
+        contextWindow: 400000,
+        totalTokens: 85,
+        inputTokens: 30,
+        outputTokens: 12,
+        reasoningTokens: 2,
+        cacheReadTokens: 40,
+        cacheWriteTokens: 1,
+      },
     });
     expect(snapshot?.updatedAt).toBe(4500);
     expect(host.getSessionMessages).toHaveBeenCalledTimes(1);
   });
 
-  it('falls back to session-level totals when latest assistant tokens are unavailable', async () => {
+  it('keeps current context unavailable when no assistant message has valid tokens', async () => {
     const sessionSdk = createSessionSdk();
     const host = createHost(sessionSdk, createPartSdk(), {
       getSessionInfo: jest.fn().mockResolvedValue({
@@ -287,10 +310,12 @@ it('builds context usage from session info, messages, and model catalog', async 
       cacheWriteTokens: 2,
       totalCost: 0.42,
       updatedAt: 5000,
+      openCodeHasCumulativeTokens: true,
+      openCodeCurrentContext: null,
     });
   });
 
-  it('falls back to message scan when session has no tokens or model', async () => {
+  it('does not substitute assistant tokens or costs when session totals are absent', async () => {
     const sessionSdk = createSessionSdk();
     const host = createHost(sessionSdk, createPartSdk(), {
       getSessionInfo: jest.fn().mockResolvedValue({
@@ -321,9 +346,79 @@ it('builds context usage from session info, messages, and model catalog', async 
     expect(snapshot).toMatchObject({
       sessionId: 'session-slow',
       modelId: 'gpt-5',
-      totalCost: 0.1,
+      totalTokens: 0,
+      totalCost: null,
+      openCodeHasCumulativeTokens: false,
+      openCodeCurrentContext: {
+        totalTokens: 15,
+        inputTokens: 10,
+        outputTokens: 5,
+      },
     });
     expect(host.getSessionMessages).toHaveBeenCalledTimes(1);
+  });
+
+  it('preserves cumulative session data when message context cannot be read', async () => {
+    const sessionSdk = createSessionSdk();
+    const host = createHost(sessionSdk, createPartSdk(), {
+      getSessionInfo: jest.fn().mockResolvedValue({
+        id: 'session-message-error',
+        title: 'Message error',
+        cost: 0.42,
+        tokens: { input: 100, output: 50, reasoning: 5, cache: { read: 10, write: 2 } },
+        model: { id: 'gpt-5', providerID: 'openai' },
+        time: { created: 1000, updated: 5000 },
+      }),
+      getSessionMessages: jest.fn().mockRejectedValue(new Error('message endpoint unavailable')),
+      getAvailableModels: jest.fn().mockResolvedValue({
+        providers: [{ id: 'openai', name: 'OpenAI', models: [{ id: 'gpt-5', name: 'GPT-5', contextWindow: 400000 }] }],
+        defaults: {},
+      }),
+    });
+    const orchestrator = new OpenCodeSessionControlOrchestrator(host);
+
+    const snapshot = await orchestrator.getSessionContextUsageSnapshot('session-message-error');
+
+    expect(snapshot).toMatchObject({
+      totalTokens: 167,
+      totalCost: 0.42,
+      openCodeHasCumulativeTokens: true,
+      openCodeCurrentContext: null,
+    });
+    expect(host.logServiceWarning).toHaveBeenCalledWith(
+      'session.context-usage',
+      expect.stringContaining('preserving session totals only'),
+      expect.any(Error),
+    );
+  });
+
+  it('preserves raw session totals when the model catalog cannot be read', async () => {
+    const sessionSdk = createSessionSdk();
+    const host = createHost(sessionSdk, createPartSdk(), {
+      getSessionInfo: jest.fn().mockResolvedValue({
+        id: 'session-catalog-error',
+        title: 'Catalog error',
+        cost: 0.42,
+        tokens: { input: 100, output: 50, reasoning: 5, cache: { read: 10, write: 2 } },
+        model: { id: 'gpt-5', providerID: 'openai' },
+        time: { created: 1000, updated: 5000 },
+      }),
+      getSessionMessages: jest.fn().mockResolvedValue([]),
+      getAvailableModels: jest.fn().mockRejectedValue(new Error('catalog unavailable')),
+    });
+    const orchestrator = new OpenCodeSessionControlOrchestrator(host);
+
+    const snapshot = await orchestrator.getSessionContextUsageSnapshot('session-catalog-error');
+
+    expect(snapshot).toMatchObject({
+      providerId: 'openai',
+      modelId: 'gpt-5',
+      contextWindow: 0,
+      totalTokens: 167,
+      totalCost: 0.42,
+      openCodeHasCumulativeTokens: true,
+      openCodeCurrentContext: null,
+    });
   });
 
   it('carries upstream compaction metadata through local session contracts', async () => {

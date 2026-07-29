@@ -52,12 +52,13 @@ orchestrator 现在承接以下共享控制流：
 
 `getSessionContextUsageSnapshot()` 现在也归口到这个 orchestrator，但计算细节已经挪到相邻 owner `OpenCodeSessionContextUsageBuilder`：
 
-- 先用 session info 判断当前是否存在可靠的 session-level totals，再决定是优先走 latest-assistant message path 还是直接走 message scan
-- 当 session-level totals 可用时，message-level 计算失败会在这里统一记 warning，并回退到 session totals
-- 只有 message/session 两条 snapshot 的选择、fallback 和日志还留在 orchestrator；provider/model 解析、assistant token/cost 组装、`compactingAt` 透传等细节交给 builder
+- 总是先扫描 latest-assistant message，成功时同时返回当前上下文与 session-level 累计详情
+- message 或 catalog 读取失败会在这里统一记 warning，并回退到仅含 session totals 的 snapshot；不会把 totals 重解释为当前上下文
+- 只有 message/session snapshot 的调用、fallback 和日志还留在 orchestrator；provider/model 解析、token/cost 组装、`compactingAt` 透传等细节交给 builder
 - 透传 session-level `time.compacting` 到 `compactingAt`，为后续 compaction live-state UI 保留事实来源
-- 当 `session.tokens` 和 `session.model` 均非空时，仍会先扫描最后一个带 token 的 assistant message，把 session-level 累计 usage 误当成“当前上下文占用”；只有在最新 message token 缺失/无效时，才回退到 session totals
-- session-level 回退路径在模型目录获取失败时退回原始 provider/model ID（`contextWindow: 0`），不丢失已有的 tokens/cost 数据；message-level 路径则优先保留 session-level 累计 cost，避免把 context token 口径修正后连带丢掉总成本
+- `openCodeCurrentContext` 只在最后一个有效 assistant message 存在时填充；无效/缺失时保持 `null`，让圆环显示既有的不可用状态
+- 顶层 token 分项与 `totalCost` 始终取 `session.tokens` / `session.cost`；缺失时保留 unavailable，而非回退 message token/cost
+- session-level 回退路径在模型目录获取失败时退回原始 provider/model ID（`contextWindow: 0`），不丢失已有的累计 tokens/cost 数据
 
 这样 `OpenCodeService` 不再直接持有 context-usage 计算细节，也避免相关逻辑继续散落在 session lifecycle 与 message API 之间。
 

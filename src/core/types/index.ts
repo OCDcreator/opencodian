@@ -24,6 +24,7 @@ export {
   type OmoReminderType,
   type OmoSystemReminderMeta,
   type OmoUserInjectionMeta,
+  type OpenCodeCurrentContextUsage,
   type PromptContextItem,
   type PromptContextKind,
   type PromptContextLineRange,
