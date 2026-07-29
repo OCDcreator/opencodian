@@ -603,6 +603,12 @@
   margin-top: 0;
 }
 
+.opencodian-settings .opencodian-opencode-trace-status {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--opencodian-settings-space-md);
+}
+
 .opencodian-settings .opencodian-debug-status-item {
   display: flex;
   flex-direction: column;
@@ -633,6 +639,31 @@
   max-width: 100%;
   overflow-wrap: anywhere;
   white-space: normal;
+}
+
+.opencodian-settings .opencodian-debug-trace-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--opencodian-settings-space-md);
+  padding: var(--opencodian-settings-space-md) 0;
+  border-bottom: 1px solid var(--opencodian-settings-inline-border);
+}
+
+.opencodian-settings .opencodian-debug-trace-copy {
+  min-width: 0;
+}
+
+.opencodian-settings .opencodian-debug-trace-id {
+  overflow: hidden;
+  font-family: var(--font-monospace);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.opencodian-settings .opencodian-debug-status-error {
+  grid-column: 1 / -1;
+  color: var(--text-error);
 }
 
 .opencodian-settings .opencodian-debug-privacy-note {

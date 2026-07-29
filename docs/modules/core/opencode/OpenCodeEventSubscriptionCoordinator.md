@@ -7,6 +7,8 @@
 
 `OpenCodeEventSubscriptionCoordinator` 是 `OpenCodeService` 内部的 open-code event runtime owner。它把 `event.subscribe()` / `global.event()` 相关的 listener registry、wanted state、双流订阅生命周期，以及 catalog-relevant payload routing 收束到同一个较厚 coordinator，避免这些状态机继续铺在 `OpenCodeService` 主门面里。
 
+订阅循环对异常结束和抛错都记录 reconnect attempt；连续第 3 次起发出 `anomaly.subscription_reconnect_repeated` warning，收到下一条事件后记录 recovery 并清零。由于 global source 没有可靠 session，生产 trace 将这类证据标为 runtime-window/unresolved。
+
 它不承接 tool/MCP catalog state 本身；registry tool ids、tool schema cache、MCP server status snapshot 与 catalog listener 现在都在 `OpenCodeCatalogStateStore`。本模块只负责在事件流里触发相应的 runtime 观察与 catalog store 广播。
 
 ## 导入关系

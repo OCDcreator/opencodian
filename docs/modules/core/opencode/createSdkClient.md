@@ -1,5 +1,7 @@
 # SDK v2 Client Factory
 
+> 2026-07-29: SDK client factory now accepts an optional OpenCode trace port and passes it only to the custom fetch implementation.
+
 > **源码**: `src/core/opencode/createSdkClient.ts`
 > **状态**: [REVIEW]
 

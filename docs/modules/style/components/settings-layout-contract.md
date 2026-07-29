@@ -1,5 +1,7 @@
 # Settings Layout Contract Styles
 
+> 2026-07-29: Added token-aligned OpenCode trace status and recent-trace layouts.
+
 > **源码**: `src/style/components/settings-layout-contract.css`
 > **状态**: [REVIEW]
 

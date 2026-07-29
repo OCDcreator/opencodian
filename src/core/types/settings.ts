@@ -14,6 +14,11 @@ import {
   normalizeDebugModuleSettings,
   normalizeDebugRefreshIntervalMs,
 } from '../../shared/debugModules';
+import {
+  OPEN_CODE_TRACE_CHANNEL_IDS,
+  type OpenCodeSessionTraceSettings,
+  type OpenCodeTraceChannelId,
+} from '../opencode/diagnostics';
 import type { OpenCodeCapabilitySettings } from '../opencode/OpenCodeCapabilitySettingsMigration';
 import type { PluginUpdatePersistedState } from '../update/PluginUpdateService';
 import type { AgentBackendKind } from './chat';
@@ -413,8 +418,22 @@ export interface ClaudeCodeBackendSettings {
 }
 
 export interface BackendSettings {
+  opencode: {
+    sessionTrace: OpenCodeSessionTraceSettings;
+  };
   claudeCode: ClaudeCodeBackendSettings;
   codex: CodexBackendSettings;
+}
+
+export function getDefaultOpenCodeSessionTraceSettings(): OpenCodeSessionTraceSettings {
+  return {
+    enabled: true,
+    consolePreset: 'standard',
+    consoleChannels: Object.fromEntries(
+      OPEN_CODE_TRACE_CHANNEL_IDS.map((channelId) => [channelId, true]),
+    ) as Record<OpenCodeTraceChannelId, boolean>,
+    storageDirectory: '',
+  };
 }
 
 export function normalizeEffortLevel(value: unknown): EffortLevel {
@@ -487,6 +506,9 @@ export function getDefaultClaudeCodeBackendSettings(): ClaudeCodeBackendSettings
 
 export function getDefaultBackendSettings(): BackendSettings {
   return {
+    opencode: {
+      sessionTrace: getDefaultOpenCodeSessionTraceSettings(),
+    },
     claudeCode: getDefaultClaudeCodeBackendSettings(),
     codex: getDefaultCodexBackendSettings(),
   };
@@ -849,11 +871,39 @@ export function normalizeClaudeCodeBackendSettings(value: unknown): ClaudeCodeBa
 
 export function normalizeBackendSettings(value: unknown): BackendSettings {
   const candidate = value && typeof value === 'object' && !Array.isArray(value)
-    ? value as { claudeCode?: unknown; codex?: unknown }
+    ? value as { opencode?: unknown; claudeCode?: unknown; codex?: unknown }
     : {};
   return {
+    opencode: normalizeOpenCodeBackendSettings(candidate.opencode),
     claudeCode: normalizeClaudeCodeBackendSettings(candidate.claudeCode),
     codex: normalizeCodexBackendSettings(candidate.codex),
+  };
+}
+
+function normalizeOpenCodeBackendSettings(value: unknown): BackendSettings['opencode'] {
+  const candidate = value && typeof value === 'object' && !Array.isArray(value)
+    ? value as { sessionTrace?: unknown }
+    : {};
+  const traceCandidate = candidate.sessionTrace && typeof candidate.sessionTrace === 'object'
+    && !Array.isArray(candidate.sessionTrace)
+    ? candidate.sessionTrace as Partial<OpenCodeSessionTraceSettings>
+    : {};
+  const defaults = getDefaultOpenCodeSessionTraceSettings();
+  const channels = Object.fromEntries(
+    OPEN_CODE_TRACE_CHANNEL_IDS.map((channelId) => [
+      channelId,
+      traceCandidate.consoleChannels?.[channelId] !== false,
+    ]),
+  ) as Record<OpenCodeTraceChannelId, boolean>;
+  return {
+    sessionTrace: {
+      enabled: traceCandidate.enabled !== false,
+      consolePreset: traceCandidate.consolePreset === 'full' ? 'full' : defaults.consolePreset,
+      consoleChannels: channels,
+      storageDirectory: typeof traceCandidate.storageDirectory === 'string'
+        ? traceCandidate.storageDirectory.trim()
+        : defaults.storageDirectory,
+    },
   };
 }
 

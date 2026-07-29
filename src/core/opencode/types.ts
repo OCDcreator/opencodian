@@ -10,6 +10,7 @@ import type {
   ServerAuthConfig,
   ServerMode,
 } from '../types/settings';
+import type { OpenCodeDiagnosticRunToken } from './diagnostics';
 import type { Message, Part, SessionMessage } from './OpenCodeSessionLifecycleCoordinator';
 import type { SdkFeatureFlags } from './sdkFeatureFlags';
 
@@ -77,6 +78,8 @@ export interface QueryOptions {
   allowedTools?: string[];
   externalContextPaths?: string[];
   variant?: string;
+  /** Plugin-internal trace context. Never serialized into an OpenCode request. */
+  diagnosticRunToken?: OpenCodeDiagnosticRunToken;
 }
 
 /** Server configuration */

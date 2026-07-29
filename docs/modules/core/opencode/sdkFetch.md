@@ -1,5 +1,7 @@
 # SDK Fetch Transport
 
+> 2026-07-29: requestUrl HTTP and native-fetch SSE paths record sanitized URL, method, status, duration, request ID and failures.
+
 > **源码**: `src/core/opencode/sdkFetch.ts`
 > **状态**: [REVIEW]
 

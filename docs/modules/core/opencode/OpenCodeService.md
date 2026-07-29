@@ -1,5 +1,9 @@
 # OpenCodeService
 
+> 2026-07-29: The service injects the independent trace port, binds session bootstrap, brackets each stream run, and observes raw plus normalized stream evidence.
+>
+> Deep runs read the authoritative session snapshot before SDK/legacy prompt dispatch and record it as plugin-normalized evidence, not SSE ingress; snapshot failures record a warning without blocking the prompt. Streaming and global-subscription reconnect observations are forwarded to the trace port.
+
 > **源码**: `src/core/opencode/OpenCodeService.ts`
 > **状态**: [REVIEW]
 
@@ -488,3 +492,7 @@ Compaction config is now project-scoped (`.opencode/opencode.json`). Ownership f
 ### SDK 1.17.18 experimental action boundary
 
 `runExperimentalAction()` 在每次调用前刷新生产 capability snapshot，再委托 `OpenCodeSdkExperimentalActionCoordinator`。Service 保持唯一 SDK 使用边界：它将已确认请求映射为 facade 的 PTY、project copy、control-plane 或 background endpoint，并将任何失败收敛为 coordinator 的脱敏结果。正常 session create 不走这个实验执行面。
+
+### OpenCode session trace wiring
+
+每次 `sendMessage()` 从内部 `diagnosticRunToken` 解析显式 trace context，并用 trace-scoped SDK façade 同时覆盖 prompt、SDK event subscribe、SDK fetch 与 legacy fallback。legacy `/event` GET、raw ingress、normalized outcome 分别记录 transport 与同一 `sourceEventId` 的两侧结果；诊断令牌和 context 不序列化到 OpenCode 请求正文。active trace 以 `runId` 管理，避免同 session 并发标签覆盖。

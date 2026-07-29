@@ -1,5 +1,7 @@
 # SettingsDebugSection
 
+> 2026-07-29: OpenCode diagnostics now includes status, settings, channels, recent traces, smart copy, full export, delete and confirmed clear.
+
 > **源码**: `src/features/settings/SettingsDebugSection.ts`
 > **状态**: [REVIEW]
 
@@ -102,3 +104,7 @@ Behavior remains unchanged:
 - global logging and module/channel toggles write the same settings keys
 - Claude Code copy actions still use the summary-only diagnostic report path
 - export actions still call `buildDiagnosticReport()` / `writeDiagnosticLogFile()` with the same sources
+
+## 2026-07-29 OpenCode diagnostics workbench
+
+OpenCode tab adds an OpenCode-only session trace workbench: enabled/preset/six channels, storage directory/status/occupancy, historical-anomaly filter, recent trace copy/export/delete and separately confirmed clear-all. The catalog keeps read historical anomalies visible, while chat badges and smart-report selection use highest unread severity. Smart copy prompts for optional actual/expected/reproduction context; custom directory changes explicitly require reload. These controls do not change Claude Code, Codex or ACP logging.

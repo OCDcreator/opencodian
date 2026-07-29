@@ -1,5 +1,6 @@
 import { createOpencodeClient } from '@opencode-ai/sdk/v2/client';
 
+import type { OpenCodeTraceContext, OpenCodeTracePort } from './diagnostics';
 import { createSdkFetch } from './sdkFetch';
 import type { SdkOpencodeClient, SdkOpencodeClientConfig } from './sdkTypes';
 
@@ -9,6 +10,8 @@ export interface CreateSdkClientOptions {
   directory?: string;
   experimentalWorkspaceId?: string;
   fetchImpl?: typeof fetch;
+  tracePort?: OpenCodeTracePort;
+  traceContext?: OpenCodeTraceContext;
 }
 
 /**
@@ -26,7 +29,10 @@ export function createSdkClient(options: CreateSdkClientOptions): SdkOpencodeCli
     baseUrl: options.baseUrl as `${string}://${string}`,
     directory: options.directory,
     experimental_workspaceID: options.experimentalWorkspaceId,
-    fetch: options.fetchImpl ?? createSdkFetch(),
+    fetch: options.fetchImpl ?? createSdkFetch({
+      tracePort: options.tracePort,
+      traceContext: options.traceContext,
+    }),
     headers: options.authHeaders,
     responseStyle: 'data',
     throwOnError: true,

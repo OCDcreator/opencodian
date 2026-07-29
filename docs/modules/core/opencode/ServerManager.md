@@ -1,5 +1,7 @@
 # ServerManager
 
+> 2026-07-29: The manager forwards the trace port to its sidecar owner; status diagnostics are emitted by lifecycle assembly without adding trace ownership to this guarded shell.
+
 > **源码**: `src/core/opencode/ServerManager.ts`
 > **状态**: [REVIEW]
 

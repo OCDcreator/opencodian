@@ -112,3 +112,4 @@ graph TD
 - 不要把 todo/status/message 三类 listener 再拆成独立薄 service；它们共享同一个 SDK sync stream 和 wanted/subscription 状态机。
 - 不要在这里混入 OpenCode catalog event、tool/MCP catalog、prompt builder 或 streaming runtime；这些属于后续 maintainability queue。
 - 修改 transient connectivity 行为时要同步考虑 `OpenCodeService.checkHealth()` 的日志抑制恢复语义。
+- host 的可选 `observeIngress(sessionId, event)` 在 canonical apply 前报告原始 sync 事件，使后台 task、child session、question/permission 和 message/part 同步进入 OpenCode structural trace；它不改变 listener 投递顺序或 sync 真值。

@@ -22,6 +22,7 @@ export interface ConversationTabLifecycleRecoveryHost {
   clearTabMessagesPanes(): void;
   resetTabManager(): void;
   removeTabMessagesPane(tabId: TabId): void;
+  cancelOpenCodeDiagnosticCapture?(tabId: TabId): void;
   showNotice(message: string): void;
 }
 
@@ -57,6 +58,7 @@ export class ConversationTabLifecycleRecoveryCoordinator {
       return;
     }
 
+    this.host.cancelOpenCodeDiagnosticCapture?.(tabId);
     this.host.removeTabMessagesPane(tabId);
 
     if (result.nextActiveTabId) {
@@ -95,6 +97,7 @@ export class ConversationTabLifecycleRecoveryCoordinator {
     const closeResult = tabManager.closeTabs(tabsToClose.map((tab) => tab.id));
 
     for (const closedTabId of closeResult.closedTabIds) {
+      this.host.cancelOpenCodeDiagnosticCapture?.(closedTabId);
       this.host.removeTabMessagesPane(closedTabId);
     }
 

@@ -1,5 +1,7 @@
 # Plugin Entry Point (main.ts)
 
+> 2026-07-29: Bootstrap constructs and injects `OpenCodeSessionTraceService`; unload flushes it independently.
+
 > **源码**: `src/main.ts`
 > **状态**: [REVIEW]
 

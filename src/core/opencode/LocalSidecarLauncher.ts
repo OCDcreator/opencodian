@@ -1,8 +1,11 @@
+/* eslint-disable max-lines -- Process launch, failure-tail, and pre-observation redaction share one lifecycle owner. */
+
 import { type ChildProcess, spawn } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 
 import { createLogger, getPerformanceTimestampMs } from '../../shared';
+import { type OpenCodeTracePort, OpenCodeTraceRedactor } from './diagnostics';
 import { LocalSidecarEndpointResolver } from './LocalSidecarEndpointResolver';
 import { LocalProcessProbe } from './LocalSidecarProcessInspector';
 import type { ManagedServerState, OpenCodeServerConfig } from './types';
@@ -59,7 +62,11 @@ export class LocalSidecarLauncher {
   private activeLaunch: LocalServerLaunch | null = null;
   private processProbe: LocalProcessProbe;
 
-  constructor(config: OpenCodeServerConfig, processProbe: LocalProcessProbe = new LocalProcessProbe()) {
+  constructor(
+    config: OpenCodeServerConfig,
+    processProbe: LocalProcessProbe = new LocalProcessProbe(),
+    private readonly tracePort?: OpenCodeTracePort,
+  ) {
     this.config = config;
     this.processProbe = processProbe;
   }
@@ -168,11 +175,28 @@ export class LocalSidecarLauncher {
       cleanup: () => undefined,
     };
 
-    const handleStdout = this.createLaunchOutputHandler(launch, (text) => logger.debug(text));
-    const handleStderr = this.createLaunchOutputHandler(launch, (text) => logger.error(text));
+    const handleStdout = this.createLaunchOutputHandler(launch, (text) => {
+      logger.debug(text);
+      this.tracePort?.recordServiceOutput?.({ stream: 'stdout', text, pid: proc.pid });
+    });
+    const handleStderr = this.createLaunchOutputHandler(launch, (text) => {
+      logger.error(text);
+      this.tracePort?.recordServiceOutput?.({ stream: 'stderr', text, pid: proc.pid });
+    });
 
     const handleError = (error: Error) => {
       launch.error = error;
+      this.tracePort?.recordRuntime?.({
+        channel: 'service-output',
+        source: 'server',
+        severity: 'error',
+        name: 'service.process_error',
+        payload: {
+          error,
+          errorTail: launch.outputTail.slice(-LOCAL_SERVER_LOG_TAIL_LIMIT),
+          association: 'runtime-window-only',
+        },
+      });
       options.onProcessError?.(error);
     };
 
@@ -180,6 +204,19 @@ export class LocalSidecarLauncher {
       launch.exited = true;
       launch.exitCode = code;
       launch.signal = signal;
+      this.tracePort?.recordRuntime?.({
+        channel: 'service-output',
+        source: 'server',
+        severity: code === 0 ? 'info' : 'error',
+        name: 'service.process_exit',
+        payload: {
+          code,
+          signal,
+          pid: proc.pid,
+          errorTail: code === 0 ? [] : launch.outputTail.slice(-LOCAL_SERVER_LOG_TAIL_LIMIT),
+          association: 'runtime-window-only',
+        },
+      });
       if (this.shouldPreserveLiveListenerAfterLauncherExit()) {
         this.detachLaunch(launch);
         return;
@@ -260,8 +297,13 @@ export class LocalSidecarLauncher {
     launch: LocalServerLaunch,
     logOutput: (message: string) => void,
   ): (data: unknown) => void {
+    const redactor = new OpenCodeTraceRedactor({
+      vaultPath: this.workingDirectory,
+      knownSecrets: [this.config.auth?.password ?? '', this.config.auth?.token ?? ''],
+    });
     return (data: unknown) => {
-      const text = String(data);
+      const redacted = redactor.redact(String(data), 'service-output').value;
+      const text = typeof redacted === 'string' ? redacted : JSON.stringify(redacted);
       this.pushLaunchOutput(launch, text);
       const trimmed = text.trim();
       if (trimmed) {
@@ -271,11 +313,9 @@ export class LocalSidecarLauncher {
   }
 
   private pushLaunchOutput(launch: LocalServerLaunch, chunk: string): void {
-    if (!chunk) {
-      return;
-    }
+    if (!chunk) return;
 
-    launch.outputTail.push(chunk);
+    launch.outputTail.push(...chunk.split(/\r?\n/).filter((line) => line.length > 0));
     while (launch.outputTail.length > LOCAL_SERVER_LOG_TAIL_LIMIT) {
       launch.outputTail.shift();
     }
@@ -504,7 +544,11 @@ export class LocalSidecarLauncher {
   }
 
   private formatLaunchOutputTail(launch: LocalServerLaunchSnapshot | null = this.getActiveLaunchSnapshot()): string {
-    const output = launch?.outputTail.join('').trim() ?? '';
+    const output = launch?.outputTail
+      .flatMap((chunk) => chunk.split(/\r?\n/))
+      .filter((line) => line.length > 0)
+      .join('\n')
+      .trim() ?? '';
     if (!output) {
       return '';
     }

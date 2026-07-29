@@ -1,5 +1,7 @@
 # Settings Types and Defaults
 
+> 2026-07-29: `BackendSettings.opencode.sessionTrace` normalizes default-on tracing, console preset, six channels and storage directory.
+
 > **源码**: `src/core/types/settings.ts`
 > **状态**: [REVIEW]
 > **Updated**: 2026-07-24 — added `CodexApprovalPolicy` type (`'inherit'|'untrusted'|'on-request'|'never'`), `CodexBackendSettings.approvalPolicy` (default `'inherit'`), and normalization (missing/unknown → `'inherit'`, no migration to `on-request`).

@@ -1,5 +1,7 @@
 # SettingsCapabilityLabSection
 
+> 2026-07-29: Backend fallback initialization uses complete defaults, including OpenCode trace settings.
+
 > **源码**: `src/features/settings/SettingsCapabilityLabSection.ts`
 > **最近更新**: 2026-07-16（持久化 backend tabs + Claude 诊断首载共享会话读取）
 > **Updated**: 2026-07-24 — Codex 面板新增 `renderCodexEffectiveReadback`：复用既有结果区展示最近一次 Codex 会话的**三轴运行时证据**（`ConfigurationEvidence` persistence/application/runtime × verified|pending|unavailable|failed|not-applicable），覆盖 approval/sandbox/cwd/model/provider/effort/permission-profile；`persistence` 诚实标 not-applicable，`application/runtime` 反映 pending→verified/unavailable/failed 生命周期。数据来自 `CodexAdapter.getLatestThreadEffectiveEvidence()`，无独立 Archive 页、无 P1–P3 UI；DOM 经 `data-effective-field/application/runtime/persistence` 可测试。

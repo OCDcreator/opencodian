@@ -2,6 +2,7 @@
  * OpenCode SDK wrapper module
  */
 
+export * from './diagnostics';
 export { LocalSidecarLauncher } from './LocalSidecarLauncher';
 export { LocalProcessProbe, LocalSidecarProcessInspector } from './LocalSidecarProcessInspector';
 export type {

@@ -4,7 +4,15 @@ import { Notice, Setting, type TextComponent } from 'obsidian';
 import * as os from 'os';
 import * as path from 'path';
 
-import { getCurrentPlatformDebugLogPath, getCurrentPlatformKey } from '../../core/types';
+import {
+  OPEN_CODE_TRACE_CHANNEL_IDS,
+  resolveDefaultOpenCodeTraceDirectory,
+} from '../../core/opencode/diagnostics';
+import {
+  getCurrentPlatformDebugLogPath,
+  getCurrentPlatformKey,
+  getDefaultOpenCodeSessionTraceSettings,
+} from '../../core/types';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import {
@@ -228,15 +236,228 @@ export class SettingsDebugSection {
     containerEl: HTMLElement,
     options: DebugRenderOptions = { includeIntro: true },
   ): void {
+    const workbenchEl = containerEl.createDiv({
+      cls: 'opencodian-debug-workbench',
+      attr: { 'data-debug-workbench': 'opencode' },
+    });
+    if (options.includeIntro) {
+      workbenchEl.createEl('h4', {
+        cls: 'opencodian-settings-subsection-heading',
+        text: t('settings.debug.modules.opencode.title'),
+      });
+      workbenchEl.createDiv({
+        cls: 'opencodian-settings-block-desc',
+        text: t('settings.debug.modules.opencode.desc'),
+      });
+    }
+    this.addOpenCodeTraceStatus(workbenchEl);
+    this.addOpenCodeTraceControls(workbenchEl);
     this.addDebugModuleSettings(
-      containerEl,
+      workbenchEl,
       {
         moduleKeys: DEBUG_MODULE_GROUPS.opencode,
         titleKey: 'settings.debug.modules.opencode.title',
         descriptionKey: 'settings.debug.modules.opencode.desc',
-        includeIntro: options.includeIntro,
+        includeIntro: false,
       },
     );
+    this.addOpenCodeTraceActions(workbenchEl);
+    this.addOpenCodeTraceCatalog(workbenchEl);
+  }
+
+  private addOpenCodeTraceStatus(containerEl: HTMLElement): void {
+    const status = this.plugin.openCodeTraceService?.store.getStatus();
+    const settings = this.getOpenCodeTraceSettings();
+    const stripEl = containerEl.createDiv({
+      cls: 'opencodian-opencode-trace-status',
+      attr: { 'data-opencode-trace-status': 'true' },
+    });
+    const items = [
+      [t('settings.debug.opencode.status.capture'), settings.enabled
+        ? t('settings.debug.opencode.status.enabled')
+        : t('settings.debug.opencode.status.disabled')],
+      [t('settings.debug.opencode.status.storage'), status?.mode ?? 'disk'],
+      [t('settings.debug.opencode.status.traces'), String(this.plugin.openCodeTraceService?.store.listSummaries(100).length ?? 0)],
+      [t('settings.debug.opencode.status.size'), `${Math.round((status?.approximateBytes ?? 0) / 1024)} KiB`],
+    ];
+    for (const [label, value] of items) {
+      const itemEl = stripEl.createDiv({ cls: 'opencodian-debug-status-item' });
+      itemEl.createDiv({ cls: 'opencodian-debug-status-label', text: label });
+      itemEl.createDiv({ cls: 'opencodian-debug-status-value', text: value });
+    }
+    if (status?.lastError) {
+      stripEl.createDiv({
+        cls: 'opencodian-debug-status-error',
+        text: t('settings.debug.opencode.status.error', { error: status.lastError }),
+      });
+    }
+  }
+
+  private addOpenCodeTraceControls(containerEl: HTMLElement): void {
+    const settings = this.getOpenCodeTraceSettings();
+    const controlsEl = containerEl.createDiv({ cls: 'opencodian-settings-block opencodian-debug-channel-panel' });
+    new Setting(controlsEl)
+      .setName(t('settings.debug.opencode.enabled.name'))
+      .setDesc(t('settings.debug.opencode.enabled.desc'))
+      .addToggle((toggle) => toggle
+        .setValue(settings.enabled)
+        .onChange(async (value) => {
+          settings.enabled = value;
+          await this.plugin.saveSettings();
+        }));
+    new Setting(controlsEl)
+      .setName(t('settings.debug.opencode.preset.name'))
+      .setDesc(t('settings.debug.opencode.preset.desc'))
+      .addDropdown((dropdown) => dropdown
+        .addOption('standard', t('settings.debug.opencode.preset.standard'))
+        .addOption('full', t('settings.debug.opencode.preset.full'))
+        .setValue(settings.consolePreset)
+        .onChange(async (value) => {
+          settings.consolePreset = value === 'full' ? 'full' : 'standard';
+          await this.plugin.saveSettings();
+        }));
+    new Setting(controlsEl)
+      .setName(t('settings.debug.opencode.storage.name'))
+      .setDesc(t('settings.debug.opencode.storage.desc'))
+      .setClass('opencodian-wide-text-setting')
+      .addText((text) => {
+        text
+          .setPlaceholder(resolveDefaultOpenCodeTraceDirectory())
+          .setValue(settings.storageDirectory)
+          .onChange(async (value) => {
+          settings.storageDirectory = value.trim();
+          await this.plugin.saveSettings();
+          });
+        text.inputEl.addEventListener('blur', () => {
+          new Notice(t('settings.debug.opencode.storage.restart'));
+        });
+      })
+      .addButton((button) => button
+        .setButtonText(t('settings.debug.opencode.storage.choose'))
+        .onClick(async () => {
+          const selected = await this.pickDirectory(settings.storageDirectory);
+          if (!selected) return;
+          settings.storageDirectory = selected;
+          await this.plugin.saveSettings();
+          new Notice(t('settings.debug.opencode.storage.restart'));
+        }));
+    const channelsEl = controlsEl.createDiv({ cls: 'opencodian-debug-channel-list' });
+    for (const channelId of OPEN_CODE_TRACE_CHANNEL_IDS) {
+      new Setting(channelsEl)
+        .setName(t(`settings.debug.opencode.channel.${channelId}.name` as never))
+        .setDesc(t(`settings.debug.opencode.channel.${channelId}.desc` as never))
+        .addToggle((toggle) => toggle
+          .setValue(settings.consoleChannels[channelId] !== false)
+          .onChange(async (value) => {
+            settings.consoleChannels = { ...settings.consoleChannels, [channelId]: value };
+            await this.plugin.saveSettings();
+          }));
+    }
+  }
+
+  private addOpenCodeTraceActions(containerEl: HTMLElement): void {
+    const actionsEl = containerEl.createDiv({ cls: 'opencodian-debug-log-actions' });
+    this.addActionButton(actionsEl, t('settings.debug.opencode.actions.copySmart'), async () => {
+      const actual = window.prompt(t('chat.opencodeDiagnostics.actualPrompt')) ?? undefined;
+      const expected = window.prompt(t('chat.opencodeDiagnostics.expectedPrompt')) ?? undefined;
+      const reproduction = window.prompt(t('chat.opencodeDiagnostics.reproductionPrompt')) ?? undefined;
+      const report = await this.plugin.openCodeTraceService.reportBuilder.buildSmartReport(undefined, {
+        actual,
+        expected,
+        reproduction,
+      });
+      await navigator.clipboard.writeText(report);
+      new Notice(t('settings.debug.opencode.actions.copySuccess'));
+    });
+    this.addActionButton(actionsEl, t('settings.debug.opencode.actions.flush'), async () => {
+      await this.plugin.openCodeTraceService.store.flush();
+      new Notice(t('settings.debug.opencode.actions.flushSuccess'));
+    }, false);
+    this.addActionButton(actionsEl, t('settings.debug.opencode.actions.export'), async () => {
+      const summary = this.plugin.openCodeTraceService.store.listSummaries(1)[0];
+      if (!summary) {
+        new Notice(t('settings.debug.opencode.recent.empty'));
+        return;
+      }
+      const targetDirectory = await this.pickDirectory('');
+      if (!targetDirectory) return;
+      const exportedDirectory = await this.plugin.openCodeTraceService.store.exportTraceBundle(
+        summary.traceId,
+        targetDirectory,
+      );
+      new Notice(t('settings.debug.opencode.actions.exportSuccess', { path: exportedDirectory }));
+    }, false);
+    this.addActionButton(actionsEl, t('settings.debug.opencode.actions.clear'), async () => {
+      if (!window.confirm(t('settings.debug.opencode.actions.clearConfirm'))) return;
+      await this.plugin.openCodeTraceService.store.clear();
+      const workbenchEl = containerEl.closest('[data-debug-workbench="opencode"]');
+      if (workbenchEl instanceof HTMLElement) {
+        workbenchEl.querySelector('[data-opencode-trace-catalog]')?.replaceChildren();
+      }
+      new Notice(t('settings.debug.opencode.actions.clearSuccess'));
+    }, false);
+  }
+
+  private addOpenCodeTraceCatalog(containerEl: HTMLElement): void {
+    const catalogEl = containerEl.createDiv({
+      cls: 'opencodian-settings-block opencodian-debug-log-panel',
+      attr: { 'data-opencode-trace-catalog': 'true' },
+    });
+    catalogEl.createEl('h4', {
+      cls: 'opencodian-settings-subsection-heading',
+      text: t('settings.debug.opencode.recent.title'),
+    });
+    const filterSetting = new Setting(catalogEl)
+      .setName(t('settings.debug.opencode.recent.anomaliesOnly'))
+      .setDesc(t('settings.debug.opencode.recent.anomaliesOnlyDesc'));
+    const rowsEl = catalogEl.createDiv({ cls: 'opencodian-debug-trace-rows' });
+    const summaries = this.plugin.openCodeTraceService?.store.listSummaries(20) ?? [];
+    const applyFilter = (anomaliesOnly: boolean) => {
+      for (const row of rowsEl.querySelectorAll<HTMLElement>('.opencodian-debug-trace-row')) {
+        row.toggleClass('is-hidden', anomaliesOnly && row.dataset.hasAnomaly !== 'true');
+      }
+    };
+    filterSetting.addToggle((toggle) => toggle
+      .setValue(false)
+      .onChange((value) => applyFilter(value)));
+    if (summaries.length === 0) {
+      rowsEl.createDiv({ cls: 'opencodian-settings-block-desc', text: t('settings.debug.opencode.recent.empty') });
+      return;
+    }
+    for (const summary of summaries) {
+      const rowEl = rowsEl.createDiv({
+        cls: 'opencodian-debug-trace-row',
+        attr: {
+          'data-has-anomaly': String(
+            summary.highestSeverity === 'warning'
+            || summary.highestSeverity === 'critical'
+            || summary.highestSeverity === 'error',
+          ),
+        },
+      });
+      const copyEl = rowEl.createDiv({ cls: 'opencodian-debug-trace-copy' });
+      copyEl.createDiv({ cls: 'opencodian-debug-trace-id', text: summary.sessionId ?? summary.traceId });
+      copyEl.createDiv({
+        cls: 'opencodian-settings-block-desc',
+        text: `${summary.lastUpdatedAt} · ${summary.eventCount} events · ${summary.highestSeverity}`,
+      });
+      const actionsEl = rowEl.createDiv({ cls: 'opencodian-debug-log-actions' });
+      this.addActionButton(actionsEl, t('settings.debug.opencode.recent.copy'), async () => {
+        const report = await this.plugin.openCodeTraceService.reportBuilder.buildSmartReport(summary.traceId);
+        await navigator.clipboard.writeText(report);
+      }, false);
+      this.addActionButton(actionsEl, t('settings.debug.opencode.recent.delete'), async () => {
+        await this.plugin.openCodeTraceService.store.deleteTrace(summary.traceId);
+        rowEl.remove();
+      }, false);
+    }
+  }
+
+  private getOpenCodeTraceSettings() {
+    this.plugin.settings.backendSettings.opencode ??= {
+      sessionTrace: getDefaultOpenCodeSessionTraceSettings(),
+    };
+    return this.plugin.settings.backendSettings.opencode.sessionTrace;
   }
 
   private addClaudeCodeDebugSettings(

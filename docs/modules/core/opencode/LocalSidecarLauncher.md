@@ -1,5 +1,7 @@
 # LocalSidecarLauncher
 
+> 2026-07-29: Managed stdout/stderr is independently redacted before logger output, the bounded in-memory tail, and the optional OpenCode trace port; process errors and exits then expose only that safe tail.
+
 > **源码**: `src/core/opencode/LocalSidecarLauncher.ts`
 > **状态**: [REVIEW]
 
@@ -73,6 +75,7 @@
 ## 与其他模块的交互
 
 - `ServerManager` 将 `checkHealth` 回调与进程事件回调注入本模块，保持生命周期控制权。
+- 可选 trace port 只观察 process/output 事实，不持有 `ServerStatus` 或 managed state 真值。
 - `ServerManager` 在 `launchRuntime` 成功后负责 managed pid 持久化与 listener pid 刷新。
 - `LocalProcessProbe` / `LocalSidecarEndpointResolver` 不直接依赖本模块。
 
@@ -81,3 +84,4 @@
 - 本模块不应持有 `ServerStatus` 或 managed state 真值。
 - 本模块不处理 adopt/restart/conflict domain 决策。
 - 若新增启动上下文逻辑，优先扩展本模块，避免重新回流到 `ServerManager`。
+- 普通输出只报告脱敏统计；process error 或非零退出最多附 80 行脱敏尾部。无法按 session 关联的 sidecar 行只标记 `runtime-window-only`，完整输出仅在关联 deep capture 时镜像。

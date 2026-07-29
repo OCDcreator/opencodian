@@ -32,8 +32,8 @@ import type {
 } from '../../core/opencode/OpenCodeSdkCapabilityDiscoveryCoordinator';
 import type { AgentBackendKind } from '../../core/types/chat';
 import {
+  getDefaultBackendSettings,
   getDefaultClaudeCodeBackendSettings,
-  getDefaultCodexBackendSettings,
 } from '../../core/types/settings';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
@@ -470,7 +470,7 @@ export class SettingsCapabilityLabSection {
   }
 
   private get claudeCodeSettings() {
-    this.plugin.settings.backendSettings ??= { claudeCode: getDefaultClaudeCodeBackendSettings(), codex: getDefaultCodexBackendSettings() };
+    this.plugin.settings.backendSettings ??= getDefaultBackendSettings();
     this.plugin.settings.backendSettings.claudeCode ??= getDefaultClaudeCodeBackendSettings();
     return this.plugin.settings.backendSettings.claudeCode;
   }

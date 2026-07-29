@@ -803,6 +803,21 @@ body[data-opencodian-provider-icon-mode="color"] {
   color: var(--text-normal);
 }
 
+.opencodian-header-btn[data-action="opencode-diagnostics"].is-hidden {
+  display: none;
+}
+
+.opencodian-header-btn[data-action="opencode-diagnostics"][data-trace-state="armed"],
+.opencodian-header-btn[data-action="opencode-diagnostics"][data-trace-state="capturing"] {
+  color: var(--interactive-accent);
+}
+
+.opencodian-header-btn[data-action="opencode-diagnostics"][data-trace-state="warning"],
+.opencodian-header-btn[data-action="opencode-diagnostics"][data-trace-state="critical"],
+.opencodian-header-btn[data-action="opencode-diagnostics"][data-trace-state="degraded"] {
+  color: var(--text-warning);
+}
+
 .opencodian-header-btn svg {
   width: 18px;
   height: 18px;

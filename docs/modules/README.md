@@ -67,6 +67,14 @@ docs/modules/
 │   │   └── modelConfig.md
 │   ├── opencode/
 │   │   ├── index.md
+│   │   ├── diagnostics/
+│   │   │   ├── index.md
+│   │   │   ├── types.md
+│   │   │   ├── OpenCodeSessionTraceService.md
+│   │   │   ├── OpenCodeTraceEventInspector.md
+│   │   │   ├── OpenCodeTraceRedactor.md
+│   │   │   ├── OpenCodeTraceReportBuilder.md
+│   │   │   └── OpenCodeTraceStore.md
 │   │   ├── LocalSidecarEndpointResolver.md
 │   │   ├── OpenCodeAppCatalogSidecar.md
 │   │   ├── OpenCodeCatalogStateStore.md

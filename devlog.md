@@ -11,6 +11,28 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-07-29 OpenCode 后端会话全流程诊断
+
+**范围。** 仅为 OpenCode 后端增加默认开启的安全结构轨迹，不改变 Claude Code、Codex、ACP 或其他后端。聊天当前标签可显式武装下一次运行的深度捕获，令牌从 tab-scoped send pipeline 传入 OpenCode `QueryOptions`，不会进入后端请求。
+
+**实现。** 新增独立 diagnostics domain，覆盖 runtime segment、bootstrap/session/run/child 关联，SDK façade、requestUrl/native SSE、legacy HTTP/SSE、流入口与归一化结果、问题/权限、工具/后台任务、ServerManager 和本地 sidecar 输出。显式 run context 和 `sourceEventId` 保证同 session 并发标签不串线；所有值写入控制台、队列、JSONL 或剪贴板前均结构化脱敏，诊断异常不得逃逸到会话路径。structural/deep/runtime 分层保存，支持轮转、崩溃尾行恢复、索引重建、跨 flush 容量上限、目录回退、内存降级、智能报告与全量导出二次脱敏。
+
+**产品入口。** OpenCode 聊天头提供捕获下一次运行、取消捕获和复制本会话诊断；设置 → 调试 → OpenCode 提供总开关、标准/完整预设、六通道、存储状态/目录、最近轨迹、智能复制、全量导出、单条删除和二次确认清空。异常未读状态与存储降级反映到聊天按钮。
+
+**验证。** 新增 hostile getter/proxy、URL/Cookie/env、脱敏失败隔离、深浅文件隔离、同 session 并发标签、跨运行段稳定 trace、报告 UTF-8/1 MiB 上限、JSONL 恢复/轮转/权限/目录回退、sidecar 80 行错误尾部、设置迁移和 SDK/legacy transport 回归；最终门禁结果以本次实施证据为准。真实 Obsidian、Windows、remote/external OpenCode、30 分钟 wall-clock 与关联后代稳定终止尚未实测；发现后代而无法证明稳定终止时 capture 明确标为 `incomplete`。本地诊断只提供 provider/host/凭据 HMAC 指纹等关联证据，不能证明供应商最终计费归属。
+
+**第三轮加固。** sidecar 输出在 console、内存尾部和 trace port 之前脱敏；deep info/debug 不再被全局 debug gate 抑制；child session 继承父 run/deep 上下文并按 ID 去重；历史与未读严重度分离；直接 dispose 仍写出队列压力通知；64/32/16 KiB 截断改为严格 UTF-8 字符边界。新增 canary、全局 debug off、父子 deep 因果、已读后新 warning、最高未读选择、连续过载后 dispose 和 CJK byte-boundary 回归。
+
+**第四轮加固。** memory mode 读取稳定合并降级前磁盘 structural/runtime 与降级后内存事件，deep 正文不从内存恢复；首次写入降级生成脱敏且 console 可见的 `trace.storage_degraded`，custom-directory fallback 的 `lastError` 同样驱动聊天 degraded。deep run 在 SDK/legacy prompt 前读取权威 session snapshot，失败仅记 warning/incomplete；child 配额改为 run/tree-scoped，结束后只保留 runless structural correlation。聊天 current-session 复制不再回退其他 trace；foreground SDK→legacy 与 global subscription 重连记录 attempt、第三次 warning、首事件 recovery/reset。
+
+**第五轮加固。** `trace.storage_degraded` 不再由 Store 复制模板并绕过 Redactor；生产 listener 在 Store 切入 memory mode 后复用 TraceService `emit()`，统一完成 known secret 与 `$HOME/$VAULT/$TMP/$DIAGNOSTICS` 路径归一、唯一单调序号、内存结构证据和 console 输出。standalone Store 只保留无原始错误正文、隔离 runtime id 的 fail-safe。deep pre-send `capture.session_snapshot` 改为 plugin-normalized evidence，不再误标成 SSE ingress；同一 trace/run/deep、prompt 前与失败不阻断语义保持不变。
+
+**第六轮加固。** 路径脱敏覆盖 macOS/Windows 前缀的原始斜杠、反斜杠和大小写混合 URI 编码形式，避免 URL query/path segment 在 console、structural JSONL 或智能报告中保留编码后的本地路径。实现只替换诊断副本中的已知前缀，不解码或重编码整条 URL，也不改变真实 HTTP 请求。
+
+**第七轮加固。** 修复智能报告的 actual/expected/reproduction 用户上下文绕过 OpenCode 路径归一的问题。报告在返回剪贴板调用方前逐行经过同一 `OpenCodeTraceRedactor`，统一清除已知秘密并替换 macOS/Windows 原始、斜杠变体及 URI 编码 vault 前缀；之后仍运行通用诊断文本 sanitizer 作为第二道防线。该修复只改变诊断报告副本，不改变真实 HTTP 请求。
+
+**第八轮加固。** 修复真实 deep run 已消费并终止后聊天头仍长期显示 armed 的 DOM 陈旧状态。token claim 后以 per-tab claimed 状态立即映射 capturing；send pipeline 在 claim 与 completed/error/cancel terminal 分别触发显式 tab 刷新，View 仅在目标仍是 active tab 时更新 header，因此并发或后台标签不会串线。
+
 ## 2026-07-27 CI — GitHub/Gitea 双远端插件三件套
 
 **目标。** 为 GitHub 与自托管 Gitea 增加同构的 `Plugin Package` workflow：`main` push、`v*` tag 与手动触发均执行 `npm ci`、`npm run verify`、`npm run package:plugin`，并上传以 commit SHA 命名的 Obsidian 插件 artifact。

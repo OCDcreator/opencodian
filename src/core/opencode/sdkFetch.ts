@@ -1,5 +1,7 @@
 import { requestUrl } from 'obsidian';
 
+import type { OpenCodeTraceContext, OpenCodeTracePort } from './diagnostics';
+
 const SSE_PATH_SUFFIXES = ['/event', '/global/event', '/global/sync-event'];
 const SCOPED_HEADER_TO_QUERY: Array<{ header: string; query: string }> = [
   { header: 'x-opencode-directory', query: 'directory' },
@@ -115,33 +117,78 @@ function responseBodyToText(response: { text?: string; json?: unknown }): { body
   };
 }
 
-export function createSdkFetch(options: { nativeFetch?: typeof fetch } = {}): typeof fetch {
+export function createSdkFetch(options: {
+  nativeFetch?: typeof fetch;
+  tracePort?: OpenCodeTracePort;
+  traceContext?: OpenCodeTraceContext;
+} = {}): typeof fetch {
   const nativeFetch = options.nativeFetch ?? globalThis.fetch.bind(globalThis);
 
   return async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const request = rewriteScopedRequest(new Request(input, init));
+    const startedAt = performance.now();
 
     if (isSseRequest(request)) {
-      return nativeFetch(request);
+      try {
+        const response = await nativeFetch(request);
+        options.tracePort?.recordTransport?.({
+          context: options.traceContext,
+          method: request.method,
+          url: request.url,
+          status: response.status,
+          durationMs: performance.now() - startedAt,
+          requestId: response.headers.get('x-request-id') ?? undefined,
+        });
+        return response;
+      } catch (error) {
+        options.tracePort?.recordTransport?.({
+          context: options.traceContext,
+          method: request.method,
+          url: request.url,
+          durationMs: performance.now() - startedAt,
+          error,
+        });
+        throw error;
+      }
     }
 
-    const body = await requestBodyToText(request);
-    const response = await requestUrl({
-      url: request.url,
-      method: request.method,
-      headers: headersToRecord(request.headers),
-      body,
-    });
+    try {
+      const body = await requestBodyToText(request);
+      const response = await requestUrl({
+        url: request.url,
+        method: request.method,
+        headers: headersToRecord(request.headers),
+        body,
+      });
 
-    const { body: responseBody, contentType } = responseBodyToText(response as { text?: string; json?: unknown });
-    const headers = responseHeadersToHeaders(
-      (response as { headers?: Record<string, string> }).headers,
-      contentType,
-    );
+      const { body: responseBody, contentType } = responseBodyToText(response as { text?: string; json?: unknown });
+      const headers = responseHeadersToHeaders(
+        (response as { headers?: Record<string, string> }).headers,
+        contentType,
+      );
+      const requestId = headers.get('x-request-id') ?? undefined;
+      options.tracePort?.recordTransport?.({
+        context: options.traceContext,
+        method: request.method,
+        url: request.url,
+        status: response.status,
+        durationMs: performance.now() - startedAt,
+        requestId,
+      });
 
-    return new Response(responseBody, {
-      status: response.status,
-      headers,
-    });
+      return new Response(responseBody, {
+        status: response.status,
+        headers,
+      });
+    } catch (error) {
+      options.tracePort?.recordTransport?.({
+        context: options.traceContext,
+        method: request.method,
+        url: request.url,
+        durationMs: performance.now() - startedAt,
+        error,
+      });
+      throw error;
+    }
   };
 }

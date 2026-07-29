@@ -15,6 +15,7 @@ import {
   formatDurationMs,
   getPerformanceTimestampMs,
 } from '../../shared';
+import type { OpenCodeTracePort } from './diagnostics';
 import {
   type ExistingServerProcessInfo,
   LocalSidecarEndpointResolver,
@@ -38,6 +39,7 @@ interface ServerManagerEvents {
 interface ServerManagerRuntimeOptions {
   initialManagedServerState?: ManagedServerState | null;
   onManagedServerStateChange?: (state: ManagedServerState | null) => void;
+  tracePort?: OpenCodeTracePort;
 }
 
 interface ManagedServerShutdownPlan {
@@ -72,7 +74,11 @@ export class ServerManager {
     this.managedServerState = runtimeOptions.initialManagedServerState ?? null;
     this.onManagedServerStateChange = runtimeOptions.onManagedServerStateChange;
     this.endpointResolver = new LocalSidecarEndpointResolver(this.config);
-    this.localSidecarLauncher = new LocalSidecarLauncher(this.config);
+    this.localSidecarLauncher = new LocalSidecarLauncher(
+      this.config,
+      undefined,
+      runtimeOptions.tracePort,
+    );
   }
 
   /** Set the working directory for the server (vault path) */

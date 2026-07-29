@@ -1,5 +1,7 @@
 # OpenCodeServiceLifecycleCoordinator
 
+> 2026-07-29: Lifecycle assembly records server status/error transitions and forwards the optional OpenCode trace port through `ServerManager` to `LocalSidecarLauncher`.
+
 > **源码**: `src/core/opencode/OpenCodeServiceLifecycleCoordinator.ts`
 > **状态**: [REVIEW]
 
@@ -46,6 +48,7 @@
 
 - `ServerManager.onStatusChange` 回流到 `handleServerStatusChange()`
 - `ServerManager.onError` 继续透传给 `OpenCodeService` 上游事件回调
+- status/error 先写入 OpenCode trace，再沿既有 lifecycle 回调传播；sidecar 输出与进程 exit/error 由 `LocalSidecarLauncher` 直接观察
 - server status / diagnostics / managed-state snapshot 由 coordinator 代理给服务层和 catalog debug metadata
 
 ### Initialize / start / stop
@@ -135,3 +138,4 @@ graph TD
 - `start()` 必须保持 server start 在前、subscription ensure 在后的顺序。
 - `stop()` / `dispose()` 必须先停止 subscriptions，再停止或释放 server manager，避免 lingering SDK event loops。
 - settings update 不得改变 managed server adoption/restart 规则、auth fallback、directory scope 或 sync/open-code event restart 条件。
+- server status 同时写入 runtime trace 的 mode、ownership 与 process-log availability；remote 和 local-external 只声明服务进程日志不可用，不尝试读取外部进程输出。

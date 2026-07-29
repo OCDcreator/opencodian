@@ -1,5 +1,7 @@
 # Core Styles
 
+> 2026-07-29: Added OpenCode diagnostic header-button visibility and state colors.
+
 > **源码**: `src/style/base/core.css`
 > **状态**: [FINAL]
 

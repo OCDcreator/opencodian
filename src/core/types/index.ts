@@ -108,6 +108,7 @@ export {
   getDefaultInputPanelGlassRefractionSettings,
   getDefaultInputPanelGlassRefractionSvgFilterSettings,
   getDefaultInputPanelLiquidGlassSettings,
+  getDefaultOpenCodeSessionTraceSettings,
   getDefaultPersistedTabState,
   getDefaultThemeSettings,
   getEnabledClaudeCodeDebugChannels,

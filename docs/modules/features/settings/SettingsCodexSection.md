@@ -1,4 +1,6 @@
 > **Updated**: 2026-07-28 — adds Project configuration secondary tab (project-config) delegated to SettingsCodexProjectConfigSection.
+
+> **Updated**: 2026-07-29 — backend fallback initialization preserves sibling OpenCode trace settings.
 > **Updated**: 2026-07-28 — canonical path.relative containment check for external dirs; advanced TOML external dir confirmation; focused diagnostics rendering; protected history/restore modal; bodyEl.empty() refresh on save.
 # SettingsCodexSection
 

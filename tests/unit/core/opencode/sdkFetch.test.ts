@@ -148,6 +148,38 @@ describe('createSdkFetch', () => {
     await expect(response.json()).resolves.toEqual({ healthy: true });
   });
 
+  it('records SDK HTTP outcomes without adding diagnostic data to the request', async () => {
+    mockRequestUrl.mockResolvedValue({
+      status: 200,
+      json: { healthy: true },
+      text: '{"healthy":true}',
+      headers: { 'x-request-id': 'req-1' },
+    });
+    const recordTransport = jest.fn();
+    const traceContext = {
+      traceId: 'trace-explicit',
+      runtimeSegmentId: 'runtime-explicit',
+      runId: 'run-explicit',
+      sessionId: 'ses_explicit',
+    };
+    const fetchImpl = createSdkFetch({
+      nativeFetch: jest.fn() as unknown as typeof fetch,
+      tracePort: { recordTransport } as never,
+      traceContext,
+    });
+
+    await fetchImpl('http://127.0.0.1:4096/global/health');
+
+    expect(recordTransport).toHaveBeenCalledWith(expect.objectContaining({
+      method: 'GET',
+      status: 200,
+      requestId: 'req-1',
+      context: traceContext,
+    }));
+    expect(mockRequestUrl.mock.calls[0][0]).not.toHaveProperty('tracePort');
+    expect(mockRequestUrl.mock.calls[0][0]).not.toHaveProperty('traceContext');
+  });
+
   it('returns an empty Response body for 204 requestUrl responses', async () => {
     mockRequestUrl.mockResolvedValue({
       status: 204,

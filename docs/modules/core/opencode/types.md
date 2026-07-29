@@ -1,5 +1,7 @@
 # OpenCode Service Types
 
+> 2026-07-29: `QueryOptions` includes a plugin-internal `diagnosticRunToken` that is never serialized to the backend.
+
 > **源码**: `src/core/opencode/types.ts`
 > **状态**: [REVIEW]
 

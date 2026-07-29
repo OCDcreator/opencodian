@@ -257,6 +257,7 @@ export function createHost(
     syncTabStreamLikeState: jest.fn(),
     transitionTabSessionLifecycle: jest.fn().mockReturnValue(true),
     refreshServerStatusBadge: jest.fn().mockResolvedValue(undefined),
+    refreshOpenCodeDiagnosticsState: jest.fn(),
     saveConversation: jest.fn().mockImplementation(async () => {
       callOrder.push('saveConversation');
     }),

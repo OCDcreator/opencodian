@@ -1,5 +1,7 @@
 # OpenCodeStreamingRuntimeCoordinator
 
+> 2026-07-29: SDK and legacy SSE loops expose optional ingress/outcome observers around the existing transformer.
+
 > **源码**: `src/core/opencode/OpenCodeStreamingRuntimeCoordinator.ts`
 > **状态**: [REVIEW]
 
@@ -56,6 +58,7 @@
 - `streamResponse()` 先根据 `useSdkStream` 选择 SDK 或 legacy transport，把 `OpenCodeService` 的入口分流收束到同一个 runtime seam。
 - `streamSdkResponse()` 先用传入的 `subscribe(signal)` 建立 SDK event stream，再执行 `startPrompt()`，避免 prompt 启动后立刻产生的 reasoning delta 在订阅前丢失。
 - 如果 SDK iterator 在第一条事件前抛错，coordinator 会通过 host 的 legacy SSE 请求参数立即切到 `/event`，保持既有 SDK-first / legacy fallback 策略。
+- 首事件前的 SDK subscribe/iterator 失败会记录 `stream.reconnect_attempt`；连续第 3 次起记录 warning，任一 SDK 或 legacy 事件恢复后写 `stream.reconnected` 并复位 session 计数。
 - 一旦已经收到首个 SDK event，后续异常不会再切回 legacy，而是直接产出 `error` chunk（含 `errorClass` 分类字段）。
 - `streamLegacyResponse()` 则直接执行 legacy prompt 启动后进入 `/event` 读取。
 - 每个 event outcome 都会先调用 host `applyStreamMutations()`，再 yield 对应 `StreamChunk`，避免 canonical graph 落后于本地 loose chunk；message/part merge 和 delta fallback 由 `OpenCodeSessionStateStore` 处理。
@@ -125,3 +128,4 @@ graph LR
 - `cancelStream()` 与 `detachStream()` 的差异是协议语义，不只是日志差异：前者会请求服务端 abort，后者不会。
 - `streamSdkResponse()` 的 fallback 只允许发生在首个 SDK event 之前；不要把“已经开始消费 SDK events 后的错误”也改成回退 legacy。
 - 当前根因边界不是“单纯 SDK 不可用”，而是 SDK/legacy 两条 transport 都可能先结束本地流，再晚一点才让 canonical assistant tail 完整可见；因此收尾逻辑必须以最终 session state 为准，而不是只相信流内 chunk。
+- 可选诊断 observer 接收显式 `traceContext` 与 `sourceEventId`；SDK/legacy 的 raw ingress 和 normalized outcome 必须复用同一 id，不能从全局 current session 推断。

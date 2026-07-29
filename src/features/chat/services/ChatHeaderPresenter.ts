@@ -107,6 +107,8 @@ export interface ChatHeaderPresenterHost {
   createConversationInCurrentTab(): Promise<void>;
   showConversationHistory(event: MouseEvent): void;
   openConversationSessionSettings(): void;
+  showOpenCodeDiagnostics?(event: MouseEvent): void;
+  getOpenCodeDiagnosticsState?(): 'disabled' | 'normal' | 'armed' | 'capturing' | 'warning' | 'critical' | 'degraded';
   openSettings(): void;
 }
 
@@ -124,6 +126,7 @@ export class ChatHeaderPresenter {
   private newConversationCurrentTabBtnEl: HTMLElement | null = null;
   private historyBtnEl: HTMLElement | null = null;
   private conversationSessionSettingsBtnEl: HTMLElement | null = null;
+  private diagnosticsBtnEl: HTMLElement | null = null;
   private settingsBtnEl: HTMLElement | null = null;
   private serverStatusIntervalId: number | null = null;
   private lspStatusRefreshCoordinator: LspStatusRefreshCoordinator | null = null;
@@ -201,6 +204,13 @@ export class ChatHeaderPresenter {
         this.host.openConversationSessionSettings();
       },
     });
+    this.diagnosticsBtnEl = this.buildActionButton(configGroupEl, {
+      actionId: 'opencode-diagnostics',
+      iconName: 'activity',
+      getTooltipLabel: () => t('chat.opencodeDiagnostics.open'),
+      onClick: (event) => this.host.showOpenCodeDiagnostics?.(event),
+    });
+    this.refreshBackendChrome();
     this.settingsBtnEl = this.buildActionButton(configGroupEl, {
       actionId: 'settings',
       iconName: 'settings',
@@ -240,6 +250,9 @@ export class ChatHeaderPresenter {
 
     if (this.settingsBtnEl) {
       this.applyActionLabel(this.settingsBtnEl, t('chat.settings.open'));
+    }
+    if (this.diagnosticsBtnEl) {
+      this.applyActionLabel(this.diagnosticsBtnEl, t('chat.opencodeDiagnostics.open'));
     }
 
     if (this.serverStatusTextEl) {
@@ -307,6 +320,7 @@ export class ChatHeaderPresenter {
     this.newConversationCurrentTabBtnEl = null;
     this.historyBtnEl = null;
     this.conversationSessionSettingsBtnEl = null;
+    this.diagnosticsBtnEl = null;
     this.settingsBtnEl = null;
     this.isRefreshingServerStatus = false;
     this.lastServerAvailability = null;
@@ -319,6 +333,7 @@ export class ChatHeaderPresenter {
     }
 
     if (!this.host.isOpenCodeBackend()) {
+      this.diagnosticsBtnEl?.addClass('is-hidden');
       this.lspStatusRefreshCoordinator?.stop();
       this.lspStatusRefreshCoordinator = null;
       this.openLspSettingsCallback = null;
@@ -326,6 +341,10 @@ export class ChatHeaderPresenter {
       this.lspStatusIndicator = null;
       statusGroupEl.querySelector('.opencodian-lsp-status')?.remove();
       return;
+    }
+    this.diagnosticsBtnEl?.removeClass('is-hidden');
+    if (this.diagnosticsBtnEl) {
+      this.diagnosticsBtnEl.dataset.traceState = this.host.getOpenCodeDiagnosticsState?.() ?? 'normal';
     }
 
     if (!this.lspStatusIndicator) {

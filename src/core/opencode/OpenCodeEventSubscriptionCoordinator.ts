@@ -7,6 +7,7 @@ import type { SdkEventEnvelope } from './types';
 const logger = createLogger('OpenCodeEventSubscriptionCoordinator');
 const EVENT_RETRY_DELAY_MS = 1_000;
 const EVENT_RESUBSCRIBE_DELAY_MS = 250;
+const EVENT_RECONNECT_WARNING_THRESHOLD = 3;
 const EVENT_SOURCES: Array<Exclude<SdkEventEnvelope['source'], 'sync'>> = ['event', 'global'];
 
 export type OpenCodeEventListener = (update: SdkEventEnvelope) => void;
@@ -117,6 +118,12 @@ export interface OpenCodeEventSubscriptionCoordinatorHost {
   emitCatalogUpdate(): void;
   refreshMcpServerStatus(): Promise<unknown>;
   logEventSubscriptionFailure(source: OpenCodeEventSource, error: unknown): void;
+  observeEventSubscriptionReconnect?(input: {
+    source: OpenCodeEventSource;
+    name: string;
+    severity: 'info' | 'warning';
+    payload: unknown;
+  }): void;
   delay(ms: number, signal?: AbortSignal): Promise<void>;
   /** Test/legacy fallback for plugin evidence transport. Production callers should use observer callbacks via `subscribeToOpenCodeEvents`. */
   getConnectionSignature?(): string;
@@ -366,6 +373,7 @@ export class OpenCodeEventSubscriptionCoordinator {
     source: OpenCodeEventSource,
     abortController: AbortController,
   ): Promise<void> {
+    let consecutiveReconnects = 0;
     while (!abortController.signal.aborted && this.wanted && this.hasListeners()) {
       try {
         const stream = await this.host.subscribeToEvents(source, abortController.signal);
@@ -374,6 +382,15 @@ export class OpenCodeEventSubscriptionCoordinator {
             return;
           }
 
+          if (consecutiveReconnects > 0) {
+            this.host.observeEventSubscriptionReconnect?.({
+              source,
+              name: 'subscription.reconnected',
+              severity: 'info',
+              payload: { attempts: consecutiveReconnects },
+            });
+            consecutiveReconnects = 0;
+          }
           this.handleSdkEventEnvelope({
             source,
             payload: value,
@@ -385,16 +402,38 @@ export class OpenCodeEventSubscriptionCoordinator {
           return;
         }
 
+        consecutiveReconnects += 1;
+        this.observeReconnectAttempt(source, consecutiveReconnects, {
+          reason: 'stream-ended',
+        });
         await this.host.delay(EVENT_RESUBSCRIBE_DELAY_MS, abortController.signal).catch(() => {});
       } catch (error) {
         if (abortController.signal.aborted || !this.wanted || !this.hasListeners()) {
           return;
         }
 
+        consecutiveReconnects += 1;
         this.host.logEventSubscriptionFailure(source, error);
+        this.observeReconnectAttempt(source, consecutiveReconnects, { error });
         await this.host.delay(EVENT_RETRY_DELAY_MS, abortController.signal).catch(() => {});
       }
     }
+  }
+
+  private observeReconnectAttempt(
+    source: OpenCodeEventSource,
+    attempt: number,
+    detail: unknown,
+  ): void {
+    const repeated = attempt >= EVENT_RECONNECT_WARNING_THRESHOLD;
+    this.host.observeEventSubscriptionReconnect?.({
+      source,
+      name: repeated
+        ? 'anomaly.subscription_reconnect_repeated'
+        : 'subscription.reconnect_attempt',
+      severity: repeated ? 'warning' : 'info',
+      payload: { attempt, detail },
+    });
   }
 
   private getEventPayload(payload: unknown): SdkEvent | null {

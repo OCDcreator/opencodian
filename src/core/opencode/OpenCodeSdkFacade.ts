@@ -2,7 +2,7 @@ import { createLogger } from '../../shared';
 import { createSdkClient, type CreateSdkClientOptions } from './createSdkClient';
 import { attachOpenCodeAppAgents } from './OpenCodeAppCatalogSidecar';
 import { extractSdkErrorCause } from './sdkErrorClassification';
-import type { SdkOpencodeClient } from './sdkTypes';
+import type { SdkEvent, SdkOpencodeClient } from './sdkTypes';
 
 export type { SdkErrorClass } from './sdkErrorClassification';
 
@@ -405,6 +405,11 @@ export class OpenCodeSdkFacade implements OpenCodeSdkFacadeClient {
     return `connection-${this.connectionGeneration}`;
   }
 
+  async subscribeSessionEvents(signal: AbortSignal): Promise<AsyncIterable<SdkEvent>> {
+    const result = await this.event.subscribe(undefined, { signal } as never);
+    return result.stream as AsyncIterable<SdkEvent>;
+  }
+
   private observeConnectionIdentity(): void {
     const identity = createConnectionIdentity(this.optionsProvider(), this.connectionSalt);
     if (!hasSameConnectionIdentity(this.connectionIdentity, identity)) {
@@ -435,14 +440,42 @@ export class OpenCodeSdkFacade implements OpenCodeSdkFacadeClient {
     functionPath: string[],
     args: unknown[],
   ): Promise<unknown> {
+    const startedAt = performance.now();
     this.observeConnectionIdentity();
     const parentObject = this.resolveValue(parentPath);
     const rawValue = this.resolveValue(functionPath);
     if (typeof rawValue !== 'function' || !parentObject || typeof parentObject !== 'object') {
-      throw new Error(`OpenCode SDK path ${functionPath.join('.')} is unavailable`);
+      const error = new Error(`OpenCode SDK path ${functionPath.join('.')} is unavailable`);
+      this.optionsProvider().tracePort?.recordSdkCall?.({
+        context: this.optionsProvider().traceContext,
+        path: functionPath.join('.'),
+        args,
+        durationMs: performance.now() - startedAt,
+        error,
+      });
+      throw error;
     }
 
-    return rawValue.apply(parentObject, args);
+    try {
+      const result = await rawValue.apply(parentObject, args);
+      this.optionsProvider().tracePort?.recordSdkCall?.({
+        context: this.optionsProvider().traceContext,
+        path: functionPath.join('.'),
+        args,
+        durationMs: performance.now() - startedAt,
+        result,
+      });
+      return result;
+    } catch (error) {
+      this.optionsProvider().tracePort?.recordSdkCall?.({
+        context: this.optionsProvider().traceContext,
+        path: functionPath.join('.'),
+        args,
+        durationMs: performance.now() - startedAt,
+        error,
+      });
+      throw error;
+    }
   }
 
   private attachAppSkillsSidecars(value: unknown): unknown {

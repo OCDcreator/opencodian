@@ -1,5 +1,7 @@
 # SettingsClaudeCodeSection
 
+> 2026-07-29: Backend fallback initialization preserves sibling OpenCode trace settings.
+
 > **源码**: `src/features/settings/SettingsClaudeCodeSection.ts`
 > **状态**: [REVIEW]
 > **Updated**: 2026-06-28 — Claude Code 设置第一阶段 UI 重塑：保持现有 DOM/data hooks、保存逻辑和 i18n 不变，将行级控件收敛为 shadcn/Rhea 风格的紧凑 control surface（桌面双列、窄屏单列），readback/runtime 输出改为轻量内层 row rhythm，并记录审计于 `docs/status/settings-claude-code-ui-audit-2026-06-28.md`。

@@ -57,3 +57,4 @@ export class ConversationTabLifecycleRecoveryCoordinator {
 - `OpenCodianView` 只保留 tab close / delete / delete-all confirmation 与 success notice wrapper，以及 host/port 装配
 - `ConversationTabLifecycleRecoveryCoordinator` 统一承接 close/delete/delete-all 后“该激活现有 tab、静默补建 fallback，还是重置 tabs 后走 noticed bootstrap”的 recovery 决策
 - 这次切口推进 master plan 的 P1 `tab / pane / conversation activation 与 sync orchestration` lane：把 tab lifecycle recovery ownership 从主 view 迁到 dedicated coordinator
+- close 或批量删除 tab 时通过可选 host callback 取消该 `tabId` 的一次性 OpenCode deep capture 武装状态；该清理不影响其他标签，也不改变非 OpenCode backend lifecycle。

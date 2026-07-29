@@ -122,6 +122,7 @@ export interface OpenCodeSyncEventRuntimeCoordinatorHost {
   logSyncEventStreamFailure(error: unknown): void;
   checkHealth(): Promise<boolean>;
   delay(ms: number, signal?: AbortSignal): Promise<void>;
+  observeIngress?(sessionId: string, event: unknown): void;
 }
 
 function resolveSessionId(event: RawSyncEvent): string {
@@ -399,6 +400,7 @@ export class OpenCodeSyncEventRuntimeCoordinator {
     if (!sessionId) {
       return;
     }
+    this.host.observeIngress?.(sessionId, event);
 
     if (value.type === 'todo.updated') {
       const todos = this.host.normalizeSessionTodos(value.properties?.todos);

@@ -1,5 +1,8 @@
+import { randomUUID } from 'crypto';
+
 import { createLogger } from '../../shared';
 import type { StreamChunk } from '../types';
+import type { OpenCodeTraceContext } from './diagnostics';
 import { OpenCodeLegacySseStreamReader } from './OpenCodeLegacySseStreamReader';
 import type { Message, Part } from './OpenCodeSessionLifecycleCoordinator';
 import type {
@@ -46,12 +49,39 @@ export interface OpenCodeStreamingRuntimeCoordinatorHost {
   getSessionMessages(sessionId: string): Promise<Array<{ info: Message; parts: Part[] }>>;
   logServiceWarning(key: string, message: string, error: unknown): void;
   streamEventTransformer: OpenCodeStreamingRuntimeEventTransformer;
+  observeIngress?(
+    sessionId: string,
+    source: 'sdk' | 'legacy',
+    event: unknown,
+    traceContext: OpenCodeTraceContext | undefined,
+    sourceEventId: string,
+  ): void;
+  observeOutcome?(
+    sessionId: string,
+    source: 'sdk' | 'legacy',
+    outcome: OpenCodeStreamEventOutcome,
+    traceContext: OpenCodeTraceContext | undefined,
+    sourceEventId: string,
+  ): void;
+  observeLegacyTransport?(
+    sessionId: string,
+    traceContext: OpenCodeTraceContext | undefined,
+    url: string,
+  ): void;
+  observeReconnect?(input: {
+    sessionId: string;
+    traceContext?: OpenCodeTraceContext;
+    name: string;
+    severity: 'info' | 'warning';
+    payload: unknown;
+  }): void;
 }
 
 export interface OpenCodeStreamingLegacyStreamRequest {
   sessionId: string;
   promptMessageId?: string;
   startPrompt?: () => Promise<void>;
+  traceContext?: OpenCodeTraceContext;
 }
 
 export interface OpenCodeStreamingSdkStreamRequest {
@@ -59,6 +89,7 @@ export interface OpenCodeStreamingSdkStreamRequest {
   promptMessageId?: string;
   startPrompt: () => Promise<void>;
   subscribe: (signal: AbortSignal) => Promise<AsyncIterable<SdkEvent>>;
+  traceContext?: OpenCodeTraceContext;
 }
 
 export interface OpenCodeStreamingRuntimeRequest {
@@ -67,18 +98,21 @@ export interface OpenCodeStreamingRuntimeRequest {
   useSdkStream: boolean;
   sdk: Omit<OpenCodeStreamingSdkStreamRequest, 'sessionId'>;
   legacy: Omit<OpenCodeStreamingLegacyStreamRequest, 'sessionId'>;
+  traceContext?: OpenCodeTraceContext;
 }
 
 type StreamingState = OpenCodeStreamEventState;
 
 export class OpenCodeStreamingRuntimeContext {
   readonly sessionId: string;
+  readonly traceContext?: OpenCodeTraceContext;
   private readonly abortController = new AbortController();
   private readonly partTypeMap = new Map<string, string>();
   private readonly partMessageIdMap = new Map<string, string>();
 
-  constructor(sessionId: string) {
+  constructor(sessionId: string, traceContext?: OpenCodeTraceContext) {
     this.sessionId = sessionId;
+    this.traceContext = traceContext;
   }
 
   get signal(): AbortSignal {
@@ -122,6 +156,7 @@ export class OpenCodeStreamingRuntimeCoordinator {
   private readonly activeStreams = new Map<string, OpenCodeStreamingRuntimeContext>();
   private readonly finalizationCoordinator: OpenCodeStreamingFinalizationCoordinator;
   private readonly legacyReader: OpenCodeLegacySseStreamReader;
+  private readonly reconnectFailuresBySession = new Map<string, number>();
 
   constructor(private readonly host: OpenCodeStreamingRuntimeCoordinatorHost) {
     this.finalizationCoordinator = new OpenCodeStreamingFinalizationCoordinator({
@@ -142,6 +177,7 @@ export class OpenCodeStreamingRuntimeCoordinator {
         sessionId: request.sessionId,
         promptMessageId: request.promptMessageId,
         ...request.sdk,
+        traceContext: request.traceContext,
       });
       return;
     }
@@ -150,17 +186,21 @@ export class OpenCodeStreamingRuntimeCoordinator {
       sessionId: request.sessionId,
       promptMessageId: request.promptMessageId,
       ...request.legacy,
+      traceContext: request.traceContext,
     });
   }
 
-  createActiveStreamContext(sessionId: string): OpenCodeStreamingRuntimeContext {
+  createActiveStreamContext(
+    sessionId: string,
+    traceContext?: OpenCodeTraceContext,
+  ): OpenCodeStreamingRuntimeContext {
     const existing = this.activeStreams.get(sessionId);
     if (existing) {
       logger.warn(`Replacing existing active stream context for session ${sessionId}`);
       existing.abort();
     }
 
-    const context = new OpenCodeStreamingRuntimeContext(sessionId);
+    const context = new OpenCodeStreamingRuntimeContext(sessionId, traceContext);
     this.activeStreams.set(sessionId, context);
     return context;
   }
@@ -194,7 +234,7 @@ export class OpenCodeStreamingRuntimeCoordinator {
     try {
       await request.startPrompt?.();
 
-      const streamContext = this.createActiveStreamContext(request.sessionId);
+      const streamContext = this.createActiveStreamContext(request.sessionId, request.traceContext);
       yield { type: 'message_start' };
       try {
         yield* this.consumeLegacyEventStream(
@@ -216,7 +256,7 @@ export class OpenCodeStreamingRuntimeCoordinator {
   async *streamSdkResponse(
     request: OpenCodeStreamingSdkStreamRequest,
   ): AsyncGenerator<StreamChunk> {
-    const streamContext = this.createActiveStreamContext(request.sessionId);
+    const streamContext = this.createActiveStreamContext(request.sessionId, request.traceContext);
     const state = this.createStreamingState();
     let yieldedMessageStart = false;
 
@@ -225,6 +265,7 @@ export class OpenCodeStreamingRuntimeCoordinator {
       try {
         stream = await request.subscribe(streamContext.signal);
       } catch (error) {
+        this.recordReconnectFailure(request.sessionId, request.traceContext, error);
         this.host.logServiceWarning(
           'session.event-stream',
           'SDK event stream failed before prompt start, falling back to legacy SSE',
@@ -252,6 +293,7 @@ export class OpenCodeStreamingRuntimeCoordinator {
           result = await iterator.next() as IteratorResult<SdkEvent>;
         } catch (error) {
           if (!yieldedMessageStart) {
+            this.recordReconnectFailure(request.sessionId, request.traceContext, error);
             this.host.logServiceWarning(
               'session.event-stream',
               'SDK event stream failed before first event, falling back to legacy SSE',
@@ -270,16 +312,32 @@ export class OpenCodeStreamingRuntimeCoordinator {
           break;
         }
 
+        this.recordReconnectRecovery(request.sessionId, request.traceContext, 'sdk');
         if (!yieldedMessageStart) {
           yield { type: 'message_start' };
           yieldedMessageStart = true;
         }
 
+        const sourceEventId = randomUUID();
+        this.host.observeIngress?.(
+          request.sessionId,
+          'sdk',
+          result.value,
+          request.traceContext,
+          sourceEventId,
+        );
         const outcome = this.host.streamEventTransformer.handleStreamingEvent(
           result.value as unknown as OpenCodeStreamEvent,
           request.sessionId,
           state,
           streamContext,
+        );
+        this.host.observeOutcome?.(
+          request.sessionId,
+          'sdk',
+          outcome,
+          request.traceContext,
+          sourceEventId,
         );
         if (outcome.mutations.length > 0) {
           this.host.applyStreamMutations(outcome.mutations);
@@ -362,6 +420,11 @@ export class OpenCodeStreamingRuntimeCoordinator {
     promptMessageId?: string,
   ): AsyncGenerator<StreamChunk> {
     const signal = streamContext.signal;
+    this.host.observeLegacyTransport?.(
+      sessionId,
+      streamContext.traceContext,
+      this.host.getLegacyEventStreamRequest().url,
+    );
     const eventStream = this.legacyReader.connectSSE(signal);
     const state = this.createStreamingState();
 
@@ -376,11 +439,27 @@ export class OpenCodeStreamingRuntimeCoordinator {
         continue;
       }
 
+      this.recordReconnectRecovery(sessionId, streamContext.traceContext, 'legacy');
+      const sourceEventId = randomUUID();
+      this.host.observeIngress?.(
+        sessionId,
+        'legacy',
+        eventData,
+        streamContext.traceContext,
+        sourceEventId,
+      );
       const outcome = this.host.streamEventTransformer.handleStreamingEvent(
         eventData,
         sessionId,
         state,
         streamContext,
+      );
+      this.host.observeOutcome?.(
+        sessionId,
+        'legacy',
+        outcome,
+        streamContext.traceContext,
+        sourceEventId,
       );
       if (outcome.mutations.length > 0) {
         this.host.applyStreamMutations(outcome.mutations);
@@ -405,6 +484,44 @@ export class OpenCodeStreamingRuntimeCoordinator {
       state,
       promptMessageId,
     );
+  }
+
+  private recordReconnectFailure(
+    sessionId: string,
+    traceContext: OpenCodeTraceContext | undefined,
+    error: unknown,
+  ): void {
+    const attempt = (this.reconnectFailuresBySession.get(sessionId) ?? 0) + 1;
+    this.reconnectFailuresBySession.set(sessionId, attempt);
+    this.host.observeReconnect?.({
+      sessionId,
+      traceContext,
+      name: attempt >= 3 ? 'anomaly.stream_reconnect_repeated' : 'stream.reconnect_attempt',
+      severity: attempt >= 3 ? 'warning' : 'info',
+      payload: {
+        attempt,
+        from: 'sdk',
+        to: 'legacy-sse',
+        error,
+      },
+    });
+  }
+
+  private recordReconnectRecovery(
+    sessionId: string,
+    traceContext: OpenCodeTraceContext | undefined,
+    transport: 'sdk' | 'legacy',
+  ): void {
+    const attempts = this.reconnectFailuresBySession.get(sessionId);
+    if (!attempts) return;
+    this.reconnectFailuresBySession.delete(sessionId);
+    this.host.observeReconnect?.({
+      sessionId,
+      traceContext,
+      name: 'stream.reconnected',
+      severity: 'info',
+      payload: { attempts, transport },
+    });
   }
 
   private async *finishStreamingResponse(

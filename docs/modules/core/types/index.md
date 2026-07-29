@@ -1,5 +1,7 @@
 # Core Types Barrel
 
+> 2026-07-29: The type barrel exports the OpenCode trace settings default factory.
+
 > **源码**: `src/core/types/index.ts`
 > **状态**: [REVIEW]
 > **Updated**: 2026-07-23 — added Claude project provider preset types and normalization exports; provider credentials are projected only to project-local Claude settings.

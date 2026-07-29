@@ -1,5 +1,7 @@
 # ChatHeaderPresenter
 
+> 2026-07-29: The configuration group includes an OpenCode-only diagnostics button with stable state attributes.
+
 > **源码**: `src/features/chat/services/ChatHeaderPresenter.ts`
 > **状态**: [REVIEW]
 

@@ -6,6 +6,7 @@
  * Now supports SSE streaming for real-time message updates.
  */
 
+import { randomUUID } from 'crypto';
 import { requestUrl } from 'obsidian';
 
 import {
@@ -27,6 +28,11 @@ import type {
 } from '../types';
 import type { OpenCodianSettings } from '../types/settings';
 import { getServerBaseUrl } from '../types/settings';
+import type {
+  OpenCodeBootstrapContext,
+  OpenCodeTraceContext,
+  OpenCodeTracePort,
+} from './diagnostics';
 import {
   OpenCodeCatalogQueryCoordinator,
   type OpenCodeV2CatalogSnapshot,
@@ -101,7 +107,6 @@ import {
 } from './OpenCodeSyncEventRuntimeCoordinator';
 import type { SdkFeatureFlags } from './sdkFeatureFlags';
 import { resolveSdkFeatureFlags } from './sdkFeatureFlags';
-import type { SdkEvent } from './sdkTypes';
 import type {
   ManagedServerState,
   McpServerSnapshot,
@@ -185,6 +190,7 @@ interface OpenCodeServiceRuntimeOptions {
   initialManagedServerState?: ManagedServerState | null;
   onManagedServerStateChange?: (state: ManagedServerState | null) => void;
   sdkFeatureFlags?: Partial<SdkFeatureFlags>;
+  tracePort?: OpenCodeTracePort;
 }
 
 interface ToolStateData {
@@ -322,7 +328,11 @@ export class OpenCodeService {
     private serviceLifecycle!: OpenCodeServiceLifecycleCoordinator;
   private readonly assistantCanonicalDiagnosticFingerprints = new Map<string, string>();
   private vaultPath?: string;
+  private readonly tracePort?: OpenCodeTracePort;
 
+  // Assembly wiring is intentionally colocated so every OpenCode runtime owner
+  // receives the same settings, lifecycle, and diagnostic context.
+  // eslint-disable-next-line max-lines-per-function
   constructor(
     settings: OpenCodianSettings,
     events: OpenCodeServiceEvents = {},
@@ -331,17 +341,14 @@ export class OpenCodeService {
     this.settings = cloneSettings(settings);
     this.events = events;
     this.baseUrl = getServerBaseUrl(settings.server);
+    this.tracePort = runtimeOptions.tracePort;
     this.sdkFeatureFlags = resolveSdkFeatureFlags(runtimeOptions.sdkFeatureFlags);
     this.diagnostics = new OpenCodeServiceDiagnostics();
     const logServiceWarning = (key: string, message: string, error: unknown) =>
       this.diagnostics.logServiceWarning(key, message, error);
     const logServiceError = (key: string, message: string, error: unknown) =>
       this.diagnostics.logServiceError(key, message, error);
-    this.sdk = new OpenCodeSdkFacade(() => ({
-      baseUrl: this.baseUrl,
-      authHeaders: this.getAuthHeaders(),
-      directory: this.getScopedDirectoryPath(),
-    }));
+    this.sdk = new OpenCodeSdkFacade(() => this.getSdkClientOptions());
     this.syncEventRuntime = new OpenCodeSyncEventRuntimeCoordinator({
       shouldUseSdkSync: () => this.shouldUseSdk('sdkSync'),
       subscribeToSyncEvents: async (signal) => {
@@ -356,6 +363,15 @@ export class OpenCodeService {
         logServiceWarning('global.sync-event', 'SDK sync event stream failed', error),
       checkHealth: () => this.checkHealth(),
       delay: (ms, signal) => this.delay(ms, signal),
+      observeIngress: (sessionId, event) => {
+        this.tracePort?.recordSessionIngress?.(
+          sessionId,
+          'stream.ingress.sync',
+          event,
+          undefined,
+          { sourceEventId: randomUUID() },
+        );
+      },
     });
     this.sessionLifecycle = new OpenCodeSessionLifecycleCoordinator({
       shouldUseSdkAbort: () => this.shouldUseSdk('sdkAbort'),
@@ -497,6 +513,43 @@ export class OpenCodeService {
       getSessionMessages: (sessionId) => this.getSessionMessages(sessionId),
       logServiceWarning,
       streamEventTransformer: this.streamEventTransformer,
+      // The callback signature mirrors the runtime event contract to keep the
+      // explicit session, source, context, and causal event id visible.
+      // eslint-disable-next-line max-params
+      observeIngress: (sessionId, source, event, traceContext, sourceEventId) =>
+        this.tracePort?.recordSessionIngress?.(
+          sessionId,
+          `stream.ingress.${source}`,
+          event,
+          traceContext,
+          { sourceEventId },
+        ),
+      // eslint-disable-next-line max-params
+      observeOutcome: (sessionId, source, outcome, traceContext, sourceEventId) =>
+        this.tracePort?.recordSessionNormalized?.(sessionId, `stream.outcome.${source}`, {
+          chunks: outcome.chunks,
+          mutations: outcome.mutations,
+          stop: outcome.stop,
+        }, traceContext, { sourceEventId }),
+      observeLegacyTransport: (_sessionId, traceContext, url) => {
+        this.tracePort?.recordTransport?.({
+          context: traceContext,
+          method: 'GET',
+          url,
+          durationMs: 0,
+        });
+      },
+      observeReconnect: (input) => {
+        this.tracePort?.recordReconnect?.({
+          context: input.traceContext,
+          name: input.name,
+          severity: input.severity,
+          payload: {
+            sessionId: input.sessionId,
+            detail: input.payload,
+          },
+        });
+      },
     });
     this.openCodeEventRuntime = new OpenCodeEventSubscriptionCoordinator({
       subscribeToEvents: async (source, signal) => {
@@ -516,6 +569,16 @@ export class OpenCodeService {
       refreshMcpServerStatus: () => this.refreshMcpServerStatus(),
       logEventSubscriptionFailure: (source, error) =>
         logServiceWarning(`${source}.subscribe`, `SDK ${source} subscription failed, retrying`, error),
+      observeEventSubscriptionReconnect: (input) => {
+        this.tracePort?.recordReconnect?.({
+          name: input.name,
+          severity: input.severity,
+          payload: {
+            source: input.source,
+            detail: input.payload,
+          },
+        });
+      },
       delay: (ms, signal) => this.delay(ms, signal),
     });
 
@@ -561,6 +624,7 @@ export class OpenCodeService {
       },
       initialManagedServerState: runtimeOptions.initialManagedServerState,
       onManagedServerStateChange: runtimeOptions.onManagedServerStateChange,
+      tracePort: runtimeOptions.tracePort,
     });
     return assembly.serviceLifecycle;
   }
@@ -638,14 +702,46 @@ export class OpenCodeService {
   }
 
   /** HTTP GET helper using Obsidian's requestUrl */
-  private async get<T>(path: string, options: { includeDirectory?: boolean } = {}): Promise<T> {
-    this.ensureBaseUrl();
+  private async requestLegacyTransport(
+    request: Exclude<Parameters<typeof requestUrl>[0], string>,
+    traceContext?: OpenCodeTraceContext,
+  ): Promise<Awaited<ReturnType<typeof requestUrl>>> {
+    const startedAt = performance.now();
+    try {
+      const response = await requestUrl(request);
+      this.tracePort?.recordTransport?.({
+        context: traceContext,
+        method: request.method ?? 'GET',
+        url: request.url,
+        status: response.status,
+        durationMs: performance.now() - startedAt,
+        requestId: response.headers?.['x-request-id'],
+      });
+      return response;
+    } catch (error) {
+      this.tracePort?.recordTransport?.({
+        context: traceContext,
+        method: request.method ?? 'GET',
+        url: request.url,
+        durationMs: performance.now() - startedAt,
+        error,
+      });
+      throw error;
+    }
+  }
 
-    const response = await requestUrl({
-      url: this.buildScopedUrl(path, options.includeDirectory ?? false),
+  /** HTTP GET helper using Obsidian's requestUrl */
+  private async get<T>(
+    path: string,
+    options: { includeDirectory?: boolean; traceContext?: OpenCodeTraceContext } = {},
+  ): Promise<T> {
+    this.ensureBaseUrl();
+    const url = this.buildScopedUrl(path, options.includeDirectory ?? false);
+    const response = await this.requestLegacyTransport({
+      url,
       method: 'GET',
       headers: this.getRequestHeaders(),
-    });
+    }, options.traceContext);
 
     // Check for error status codes
     if (response.status >= 400) {
@@ -666,15 +762,19 @@ export class OpenCodeService {
   }
 
   /** HTTP POST helper using Obsidian's requestUrl */
-  private async post<T>(path: string, body: unknown, options: { includeDirectory?: boolean } = {}): Promise<T> {
+  private async post<T>(
+    path: string,
+    body: unknown,
+    options: { includeDirectory?: boolean; traceContext?: OpenCodeTraceContext } = {},
+  ): Promise<T> {
     this.ensureBaseUrl();
-
-    const response = await requestUrl({
-      url: this.buildScopedUrl(path, options.includeDirectory ?? false),
+    const url = this.buildScopedUrl(path, options.includeDirectory ?? false);
+    const response = await this.requestLegacyTransport({
+      url,
       method: 'POST',
       headers: this.getRequestHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(body),
-    });
+    }, options.traceContext);
 
     // Check for error status codes
     if (response.status >= 400) {
@@ -700,15 +800,19 @@ export class OpenCodeService {
   }
 
   /** HTTP PATCH helper using Obsidian's requestUrl */
-  private async patch<T>(path: string, body: unknown, options: { includeDirectory?: boolean } = {}): Promise<T> {
+  private async patch<T>(
+    path: string,
+    body: unknown,
+    options: { includeDirectory?: boolean; traceContext?: OpenCodeTraceContext } = {},
+  ): Promise<T> {
     this.ensureBaseUrl();
-
-    const response = await requestUrl({
-      url: this.buildScopedUrl(path, options.includeDirectory ?? false),
+    const url = this.buildScopedUrl(path, options.includeDirectory ?? false);
+    const response = await this.requestLegacyTransport({
+      url,
       method: 'PATCH',
       headers: this.getRequestHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(body),
-    });
+    }, options.traceContext);
 
     if (response.status >= 400) {
       const errorText = response.text?.substring(0, 200) ?? 'Unknown error';
@@ -731,19 +835,33 @@ export class OpenCodeService {
   }
 
   /** HTTP DELETE helper using Obsidian's requestUrl */
-  private async delete(path: string, options: { includeDirectory?: boolean } = {}): Promise<void> {
+  private async delete(
+    path: string,
+    options: { includeDirectory?: boolean; traceContext?: OpenCodeTraceContext } = {},
+  ): Promise<void> {
     this.ensureBaseUrl();
-
-    await requestUrl({
-      url: this.buildScopedUrl(path, options.includeDirectory ?? false),
+    const url = this.buildScopedUrl(path, options.includeDirectory ?? false);
+    await this.requestLegacyTransport({
+      url,
       method: 'DELETE',
       headers: this.getRequestHeaders(),
-    });
+    }, options.traceContext);
   }
 
   /** Create a new session - returns Session object with id property */
   async createSession(title?: string, options: { setCurrent?: boolean } = {}): Promise<string> {
-    return this.sessionLifecycle.createSession(title, options);
+    const bootstrap: OpenCodeBootstrapContext | undefined = this.tracePort?.beginBootstrap({
+      title,
+      setCurrent: options.setCurrent !== false,
+    });
+    try {
+      const sessionId = await this.sessionLifecycle.createSession(title, options);
+      if (bootstrap) this.tracePort?.bindSession(bootstrap, sessionId);
+      return sessionId;
+    } catch (error) {
+      if (bootstrap) this.tracePort?.markAnomaly(bootstrap, 'session_create_failed', 'error', error);
+      throw error;
+    }
   }
 
   /** Set current session */
@@ -758,12 +876,16 @@ export class OpenCodeService {
 
   /** Cancel the current streaming response */
   cancelStream(sessionId?: string): void {
-    this.streamingRuntime.cancelStream(sessionId ?? this.sessionLifecycle.getSessionId());
+    const targetSessionId = sessionId ?? this.sessionLifecycle.getSessionId();
+    if (targetSessionId) this.tracePort?.finishActiveSessionRun?.(targetSessionId, 'cancelled');
+    this.streamingRuntime.cancelStream(targetSessionId);
   }
 
   /** Stop watching the current stream locally without aborting the server-side session */
   detachStream(sessionId?: string): void {
-    this.streamingRuntime.detachStream(sessionId ?? this.sessionLifecycle.getSessionId());
+    const targetSessionId = sessionId ?? this.sessionLifecycle.getSessionId();
+    if (targetSessionId) this.tracePort?.finishActiveSessionRun?.(targetSessionId, 'incomplete', { reason: 'detached' });
+    this.streamingRuntime.detachStream(targetSessionId);
   }
 
   /** List all sessions */
@@ -971,14 +1093,42 @@ export class OpenCodeService {
     }
 
     const payload = this.resolveStructuredPromptSendPayload(message, options);
-
-    yield* this.streamingRuntime.streamResponse({
+    const traceContext: OpenCodeTraceContext | undefined = this.tracePort?.beginRun({
+      sessionId,
+      model: options.model,
+      provider: options.provider,
+      messageId: payload.messageID,
+      prompt: message,
+      diagnosticRunToken: options.diagnosticRunToken,
+    });
+    const traceSdk = traceContext
+      ? this.getSdkFacade({ traceContext })
+      : this.sdk;
+    let terminalState: 'completed' | 'cancelled' | 'error' = 'completed';
+    try {
+      if (traceContext?.deepCapture) {
+        try {
+          const messages = await this.getSessionMessages(sessionId);
+          this.tracePort?.recordNormalized(traceContext, 'capture.session_snapshot', {
+            sessionId,
+            messages,
+          });
+        } catch (error) {
+          this.tracePort?.markAnomaly(
+            traceContext,
+            'capture.session_snapshot_failed',
+            'warning',
+            { error, incomplete: true },
+          );
+        }
+      }
+      for await (const chunk of this.streamingRuntime.streamResponse({
       sessionId,
       promptMessageId: payload.messageID,
       useSdkStream: this.shouldUseSdk('sdkStream'),
       sdk: {
         startPrompt: async () => {
-          await this.sdk.session.promptAsync(
+          await traceSdk.session.promptAsync(
             this.promptRequestBuilder.buildSdkPromptParameters(
               sessionId,
               payload.requestParts,
@@ -987,10 +1137,7 @@ export class OpenCodeService {
             ),
           );
         },
-        subscribe: async (signal) => {
-          const subscription = await this.sdk.event.subscribe(undefined, { signal } as never);
-          return subscription.stream as AsyncIterable<SdkEvent>;
-        },
+        subscribe: (signal) => traceSdk.subscribeSessionEvents(signal),
       },
       legacy: {
         startPrompt: async () => {
@@ -999,10 +1146,28 @@ export class OpenCodeService {
             options,
             payload.messageID,
           );
-          await this.post<void>(`/session/${sessionId}/prompt_async`, requestBody);
+          await this.post<void>(
+            `/session/${sessionId}/prompt_async`,
+            requestBody,
+            { traceContext },
+          );
         },
       },
-    });
+      traceContext,
+      })) {
+        if (traceContext) {
+          this.tracePort?.recordNormalized(traceContext, `stream.chunk.${chunk.type}`, chunk);
+        }
+        if (chunk.type === 'error') terminalState = 'error';
+        yield chunk;
+      }
+    } catch (error) {
+      terminalState = 'error';
+      if (traceContext) this.tracePort?.markAnomaly(traceContext, 'stream_failed', 'error', error);
+      throw error;
+    } finally {
+      if (traceContext) this.tracePort?.finishRun(traceContext, terminalState);
+    }
   }
 
   buildStructuredPromptSendPayload(
@@ -1054,13 +1219,22 @@ export class OpenCodeService {
     return this.sdkFeatureFlags[flag];
   }
 
-  private getSdkFacade(options: { includeDirectory?: boolean } = {}): OpenCodeSdkFacade {
-    const { includeDirectory = true } = options;
-    return new OpenCodeSdkFacade(() => ({
+  private getSdkFacade(options: {
+    includeDirectory?: boolean;
+    traceContext?: OpenCodeTraceContext;
+  } = {}): OpenCodeSdkFacade {
+    const { includeDirectory = true, traceContext } = options;
+    return new OpenCodeSdkFacade(() => this.getSdkClientOptions(includeDirectory, traceContext));
+  }
+
+  private getSdkClientOptions(includeDirectory = true, traceContext?: OpenCodeTraceContext) {
+    return {
       baseUrl: this.baseUrl,
       authHeaders: this.getAuthHeaders(),
       directory: includeDirectory ? this.getScopedDirectoryPath() : undefined,
-    }));
+      tracePort: this.tracePort,
+      traceContext,
+    };
   }
 
   private observeToolNamesInMessages(messages: Array<{ info: Message; parts: Part[] }>): void {

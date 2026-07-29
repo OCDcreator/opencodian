@@ -1,5 +1,7 @@
 # OpenCodeSdkFacade
 
+> 2026-07-29: SDK namespace calls record path, duration, outcome and inferred session correlation through the optional trace port.
+
 > **源码**: `src/core/opencode/OpenCodeSdkFacade.ts`
 > **状态**: [REVIEW]
 
@@ -24,6 +26,7 @@
 - `extractSdkErrorMessage()` / `describeSdkError()` 与 `normalizeSdkError()` 共用同一套 message/status 解析规则；`OpenCodeServiceDiagnostics` 也直接复用这套 helper，而不是在 service/local owner 里重复定义。
 - `OpenCodeAppCatalogSidecar.getAttachedOpenCodeAppAgents()` 只读取 façade 在 `app.skills()` 返回值上附带的不可枚举 sidecar；如果 `app.agents()` 失败，sidecar promise 会安全回退为空数组，不影响原始 skills 结果。
 - `OpenCodeServiceDiagnostics` 额外集中处理 transient connectivity suppression、assistant finalization debug payload 与 probe/assistant error 文本；它仍然使用 `OpenCodeService` logger 名称，避免改变现有日志来源标签。
+- `subscribeSessionEvents(signal)` 集中 session event stream 的 namespace 调用与 stream 解包，使 service 只装配 streaming runtime callback；trace-scoped façade 仍通过同一 options provider 注入 run context。
 - façade 本身不承担产品语义；像工具目录缓存、MCP 状态缓存、事件总线和 legacy fallback 仍由 `OpenCodeService` 负责。
 
 ## 与其他模块的交互

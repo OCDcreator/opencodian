@@ -1,5 +1,7 @@
 # OpenCodianView
 
+> 2026-07-30: The OpenCode diagnostics header refresh seam accepts an explicit changed tab and updates DOM only when it is still the active tab.
+
 > **源码**: `src/features/chat/OpenCodianView.ts`
 > **状态**: [REVIEW]
 > **最近更新**: Backend session browser with preview transcript seeding + settings info entry + sandbox badge host wiring + Codex session webSearchMode override host wiring
@@ -735,3 +737,7 @@ Chat 现在在渲染 session 相关操作前检查 `requireSdkCapability(id)`。
 ### Experimental OpenCode actions
 
 会话设置入口只在 OpenCode conversation 且至少一个实验 capability 同时满足用户 gate 与生产 availability 时显示。view 只装配 `OpenCodeExperimentalActionModal`，不直接使用 SDK。background 完成只在最新用户 turn 下追加 inline status；它不得写入 `isStreaming`、foreground `sessionStatus` 或现有 background-task 生命周期。
+
+### OpenCode diagnostics chrome
+
+诊断按钮只在当前 conversation backend 为 OpenCode 时显示，并从 tab-scoped trace state 映射 off/normal/armed/capturing/warning/critical/degraded；store 为 memory mode 或仍带 custom-directory fallback `lastError` 时均显示 degraded。捕获、取消和复制都使用当前 `tabId`；发送 runtime 在 claim 与 terminal 时回传显式 changed `tabId`，view 仅在它仍等于 active tab 时调用 `refreshBackendChrome()`，因此后台/并发标签不会误改当前 header。复制使用 current-session report，当前会话没有 trace 时输出空报告而非回退全局其他 trace。复制可附 actual/expected/reproduction，并在完成后刷新 unread badge。关闭标签通过 lifecycle coordinator 取消该标签尚未消费的 capture。

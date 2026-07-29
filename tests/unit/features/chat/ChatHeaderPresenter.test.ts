@@ -29,6 +29,7 @@ function createFixture() {
   let availability: ChatServerAvailability = 'checking';
   let localServerMode = true;
   let openCodeBackend = true;
+  let diagnosticsState: NonNullable<ReturnType<NonNullable<ChatHeaderPresenterHost['getOpenCodeDiagnosticsState']>>> = 'normal';
 
   const host: jest.Mocked<ChatHeaderPresenterHost> = {
     setTooltipLabel: jest.fn((element, label, position) => {
@@ -52,6 +53,7 @@ function createFixture() {
     isOpenCodeBackend: jest.fn(() => openCodeBackend),
     getActiveBackendDisplayName: jest.fn(() => openCodeBackend ? 'OpenCode' : 'Claude Code'),
     getActiveBackendKind: jest.fn(() => openCodeBackend ? 'opencode' : 'claude-code'),
+    getOpenCodeDiagnosticsState: jest.fn(() => diagnosticsState),
   };
 
   const headerEl = document.createElement('div');
@@ -71,6 +73,9 @@ function createFixture() {
     },
     setOpenCodeBackend: (nextOpenCodeBackend: boolean) => {
       openCodeBackend = nextOpenCodeBackend;
+    },
+    setDiagnosticsState: (nextState: typeof diagnosticsState) => {
+      diagnosticsState = nextState;
     },
     dispatchCssChange: () => {
       cssChangeListener?.();
@@ -103,7 +108,7 @@ describe('ChatHeaderPresenter header shell and actions', () => {
 
     expect(fixture.presenter.getTabBarSlotEl()).toBe(tabBarSlotEl);
     expect(fixture.host.registerCssChangeListener).toHaveBeenCalledTimes(1);
-    expect(actionButtons).toHaveLength(5);
+    expect(actionButtons).toHaveLength(6);
     expect(statusBadgeEl?.getAttribute('data-tooltip')).toBe(t('chat.serverStatus.openSettings'));
 
     statusBadgeEl?.click();
@@ -112,6 +117,7 @@ describe('ChatHeaderPresenter header shell and actions', () => {
     actionButtons[2]?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     actionButtons[3]?.click();
     actionButtons[4]?.click();
+    actionButtons[5]?.click();
 
     expect(fixture.host.openServerSettings).toHaveBeenCalledTimes(1);
     expect(fixture.host.createConversationInNewTab).toHaveBeenCalledTimes(1);
@@ -208,8 +214,24 @@ describe('ChatHeaderPresenter header shell and actions', () => {
     expect(
       Array.from(configGroup?.querySelectorAll<HTMLElement>('.opencodian-header-btn') ?? [])
         .map((button) => button.dataset.action),
-    ).toEqual(['session-settings', 'settings']);
+    ).toEqual(['session-settings', 'opencode-diagnostics', 'settings']);
   });
+
+  it.each(['armed', 'capturing', 'warning', 'critical'] as const)(
+    'reflects the current tab OpenCode diagnostics state: %s',
+    (state) => {
+      const fixture = createFixture();
+      fixture.setDiagnosticsState(state);
+
+      fixture.presenter.refreshBackendChrome();
+
+      const diagnosticsButton = fixture.headerEl.querySelector<HTMLElement>(
+        '.opencodian-header-btn[data-action="opencode-diagnostics"]',
+      );
+      expect(diagnosticsButton?.dataset.traceState).toBe(state);
+      expect(diagnosticsButton?.classList.contains('is-hidden')).toBe(false);
+    },
+  );
 
   it('renders the server status as a compact expandable status control', () => {
     const fixture = createFixture();
@@ -283,7 +305,7 @@ describe('ChatHeaderPresenter header shell and actions', () => {
     const actionButtons = fixture.headerEl.querySelectorAll<HTMLElement>('.opencodian-header-btn');
     const newTabButton = fixture.headerEl.querySelector<HTMLElement>('.opencodian-header-btn--new-tab');
 
-    expect(actionButtons).toHaveLength(5);
+    expect(actionButtons).toHaveLength(6);
     expect(newTabButton).toBe(actionButtons[1]);
   });
 

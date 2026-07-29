@@ -1,6 +1,7 @@
 import type {
   SessionActivityStatus,
 } from '../../../core/opencode';
+import type { OpenCodeDiagnosticRunToken } from '../../../core/opencode/diagnostics';
 import type {
   ChatMessage,
   Conversation,
@@ -79,6 +80,11 @@ export interface SendPipelineViewPort {
   syncTabStreamLikeState(tabId: TabId | null): void;
   transitionTabSessionLifecycle(tabId: TabId | null, phase: WritableTabSessionPhase, reason: string): boolean;
   refreshServerStatusBadge(): Promise<void>;
+  claimOpenCodeDiagnosticRunToken?(
+    tabId: TabId | null,
+    sessionId?: string,
+  ): OpenCodeDiagnosticRunToken | undefined;
+  refreshOpenCodeDiagnosticsState?(tabId: TabId | null): void;
 }
 
 export interface SendPipelineTransportPort {
@@ -94,6 +100,7 @@ export interface SendPipelineTransportPort {
       /** One-shot structured-output schema for Claude Code `/json` trigger. Not persisted. */
       outputFormat?: Record<string, unknown>;
       images?: ImageAttachment[];
+      diagnosticRunToken?: OpenCodeDiagnosticRunToken;
     },
   ): AsyncGenerator<CoreStreamChunk>;
   detachStream(sessionId: string | undefined): void;
@@ -174,7 +181,13 @@ export interface SendPipelineHost extends
   SendPipelineDebugPort {}
 
 export type SendPipelineExecutionHost =
-  Pick<SendPipelineViewPort, 'getTabRuntimeState' | 'getOrCreateTabStreamController'>
+  Pick<
+    SendPipelineViewPort,
+    | 'getTabRuntimeState'
+    | 'getOrCreateTabStreamController'
+    | 'claimOpenCodeDiagnosticRunToken'
+    | 'refreshOpenCodeDiagnosticsState'
+  >
   & Pick<SendPipelineTransportPort, 'sendStreamMessage'>
   & Pick<SendPipelineShellPort, 'createAssistantMessageElement'>;
 

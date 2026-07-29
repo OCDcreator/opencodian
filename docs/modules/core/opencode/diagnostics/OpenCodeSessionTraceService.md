@@ -1,0 +1,6 @@
+# OpenCodeSessionTraceService
+
+> **源码**: `src/core/opencode/diagnostics/OpenCodeSessionTraceService.ts`
+> **状态**: [REVIEW]
+
+OpenCode-only 诊断 owner。关联 bootstrap、session、runtime segment、run、child session 和当前标签的一次性深捕获，管理前后台停滞监控、问题权限暂停、服务输出、异常未读状态、控制台路由及写入降级。运行以 `runId` 而非 session-global 状态保存，同一 backend session 的并发标签仍保持隔离；token 从 armed 被目标标签 claim 后会先进入短暂的 per-tab claimed/capturing 状态，`beginRun` 接管同一 runId 后转入 active run，terminal 后回到 off 或由 trace 摘要呈现异常状态，避免 UI 在 generator 真正启动前出现 armed→off 闪断。child 配额按 run/tree 计算，运行终止后 child 降为只含父 trace/root 的 runless structural context，避免旧 run/deep/tab 泄漏到后续同步。store 首次降级后由本 owner 复用正常 `emit()`，因此错误经过结构化 Redactor、获得全局唯一单调序号并走稳定 console 前缀；同一 Redactor 也注入报告构建器，确保用户上下文和其他报告文本在返回剪贴板调用方前完成路径与已知秘密脱敏。foreground/global reconnect 证据分别保留显式关联或 runtime-window/unresolved。deep info/debug 使用强制控制台镜像，非 deep 仍遵守 debug/module/channel gate。settings、脱敏、store 或 console 抛错都不得逃逸到 OpenCode 会话路径。发现后代但无法证明稳定终止时，capture 明确以 `incomplete` 收口。

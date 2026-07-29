@@ -1,3 +1,5 @@
+/* eslint-disable max-lines -- Lifecycle coordination remains a single owner for transactional server and subscription state. */
+
 import { createLogger } from '../../shared';
 import type { OpencodeCompactionConfig } from '../types';
 import {
@@ -5,6 +7,7 @@ import {
   isLocalServerMode,
   type OpenCodianSettings,
 } from '../types/settings';
+import type { OpenCodeTracePort } from './diagnostics';
 import { ServerManager } from './ServerManager';
 import type {
   ManagedServerState,
@@ -85,6 +88,7 @@ export interface OpenCodeServiceLifecycleAssemblyHost {
   compaction: OpenCodeServiceLifecycleCompactionPort;
   initialManagedServerState?: ManagedServerState | null;
   onManagedServerStateChange?: (state: ManagedServerState | null) => void;
+  tracePort?: OpenCodeTracePort;
 }
 
 export interface OpenCodeServiceLifecycleCoordinatorHost {
@@ -167,17 +171,61 @@ export class OpenCodeServiceLifecycleCoordinator {
 
   static createAssembly(host: OpenCodeServiceLifecycleAssemblyHost): OpenCodeServiceLifecycleAssembly {
     const serviceLifecycleRef: { current: OpenCodeServiceLifecycleCoordinator | null } = { current: null };
+    const serverManagerRef: { current: ServerManager | null } = { current: null };
     const serverManager = new ServerManager(
       OpenCodeServiceLifecycleCoordinator.createServerConfig(host.getSettings()),
       {
-        onStatusChange: (status) => serviceLifecycleRef.current?.handleServerStatusChange(status),
-        onError: (error) => host.onError?.(error),
+        onStatusChange: (status) => {
+          const settings = host.getSettings();
+          const diagnostics = serverManagerRef.current?.getServerDiagnosticsSnapshot()
+            ?? { reason: undefined };
+          const processLogsUnavailable = settings.server.mode === 'remote'
+            || diagnostics.reason === 'local-external';
+          host.tracePort?.recordRuntime?.({
+            channel: 'lifecycle',
+            source: 'server',
+            severity: status === 'error' || status === 'conflict' ? 'error' : 'info',
+            name: 'service.status',
+            payload: {
+              status,
+              mode: settings.server.mode,
+              ownership: diagnostics.reason,
+              processLogs: processLogsUnavailable ? 'unavailable' : 'runtime-window-only',
+            },
+          });
+          if (status === 'running' && processLogsUnavailable) {
+            host.tracePort?.recordRuntime?.({
+              channel: 'service-output',
+              source: 'server',
+              severity: 'info',
+              name: 'service.process_logs_unavailable',
+              payload: {
+                mode: settings.server.mode,
+                ownership: diagnostics.reason,
+                reason: 'Plugin cannot read external or remote server process logs.',
+              },
+            });
+          }
+          serviceLifecycleRef.current?.handleServerStatusChange(status);
+        },
+        onError: (error) => {
+          host.tracePort?.recordRuntime?.({
+            channel: 'service-output',
+            source: 'server',
+            severity: 'error',
+            name: 'service.manager_error',
+            payload: error,
+          });
+          host.onError?.(error);
+        },
       },
       {
         initialManagedServerState: host.initialManagedServerState,
         onManagedServerStateChange: host.onManagedServerStateChange,
+        tracePort: host.tracePort,
       },
     );
+    serverManagerRef.current = serverManager;
     const serviceLifecycle = new OpenCodeServiceLifecycleCoordinator({
       getSettings: host.getSettings,
       setSettings: host.setSettings,

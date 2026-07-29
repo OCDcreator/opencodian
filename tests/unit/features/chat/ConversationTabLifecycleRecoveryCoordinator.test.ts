@@ -36,6 +36,7 @@ function createHost(
     clearTabMessagesPanes: jest.fn(),
     resetTabManager: jest.fn(),
     removeTabMessagesPane: jest.fn(),
+    cancelOpenCodeDiagnosticCapture: jest.fn(),
     showNotice: jest.fn(),
     ...overrides,
   };
@@ -88,6 +89,7 @@ describe('ConversationTabLifecycleRecoveryCoordinator', () => {
     await coordinator.closeTabAndRecover(secondTab!.id);
 
     expect(host.removeTabMessagesPane).toHaveBeenCalledWith(secondTab!.id);
+    expect(host.cancelOpenCodeDiagnosticCapture).toHaveBeenCalledWith(secondTab!.id);
     expect(port.activateTab).toHaveBeenCalledWith(firstTab!.id);
     expect(host.createConversation).not.toHaveBeenCalled();
     expect(port.createConversationInNewTab).not.toHaveBeenCalled();

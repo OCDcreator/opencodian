@@ -1,5 +1,7 @@
 # Core OpenCode Barrel
 
+> 2026-07-29: The barrel now exports the OpenCode-only session diagnostics domain.
+
 > **源码**: `src/core/opencode/index.ts`
 > **状态**: [REVIEW]
 
@@ -56,6 +58,7 @@ barrel 的作用是给上层提供稳定入口，而不是把整个目录平铺�
 
 - 运行时类：`OpenCodeService`、`ServerManager`、`LocalSidecarLauncher`、`LocalProcessProbe`、`LocalSidecarProcessInspector`
 - SDK 原子 façade：`OpenCodeSdkFacade`
+- OpenCode-only 诊断域：`OpenCodeSessionTraceService`、v1 trace schema、redactor、store 与 report builder
 - 调用方会直接引用的类型/常量：`SdkFeatureFlags`、`QueryOptions`、`ServerStatus` 与 canonical session graph 类型等
 
 ### rollout 常量透传

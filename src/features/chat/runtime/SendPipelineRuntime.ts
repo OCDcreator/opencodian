@@ -3,6 +3,7 @@ import type {
   PreparedMessageSend,
   PrepareMessageSendOptions,
 } from '../services/MessageSendPreparationService';
+import type { TabId } from '../tabs';
 import type {
   SendPipelineDebugContentBlock,
   SendPipelineDebugPort,
@@ -43,6 +44,13 @@ export type {
   StreamLocalFinalizerOptions,
   StreamLocalFinalizerResult,
 } from './SendPipelineTypes';
+
+export function shouldRefreshOpenCodeDiagnosticsHeader(
+  activeTabId: TabId | null,
+  changedTabId: TabId | null,
+): boolean {
+  return changedTabId !== null && activeTabId === changedTabId;
+}
 
 export interface SendPipelineSlashCommandPort {
   tryRunSlashCommand(content: string): Promise<boolean | string>;
@@ -95,6 +103,8 @@ export interface SendPipelineHostDependencies {
   syncTabStreamLikeState(tabId: import('../tabs').TabId | null): void;
   transitionTabSessionLifecycle: SendPipelineHost['transitionTabSessionLifecycle'];
   refreshServerStatusBadge(): Promise<void>;
+  claimOpenCodeDiagnosticRunToken?: SendPipelineHost['claimOpenCodeDiagnosticRunToken'];
+  refreshOpenCodeDiagnosticsState?: SendPipelineHost['refreshOpenCodeDiagnosticsState'];
   sendStreamMessage: SendPipelineHost['sendStreamMessage'];
   detachStream(sessionId: string | undefined): void;
   syncLatestUserMessageFromServer: SendPipelineHost['syncLatestUserMessageFromServer'];
@@ -133,6 +143,10 @@ export function createSendPipelineRuntimeHost(deps: SendPipelineHostDependencies
     transitionTabSessionLifecycle: (tabId, phase, reason) =>
       deps.transitionTabSessionLifecycle(tabId, phase, reason),
     refreshServerStatusBadge: () => deps.refreshServerStatusBadge(),
+    claimOpenCodeDiagnosticRunToken: (tabId, sessionId) =>
+      deps.claimOpenCodeDiagnosticRunToken?.(tabId, sessionId),
+    refreshOpenCodeDiagnosticsState: (tabId) =>
+      deps.refreshOpenCodeDiagnosticsState?.(tabId),
   };
   const transportPort: SendPipelineTransportPort = {
     sendStreamMessage: (conversation, content, options) => deps.sendStreamMessage(conversation, content, options),
@@ -211,34 +225,39 @@ export class SendPipelineRuntime {
       return;
     }
 
-    const execution = this.createStreamingExecution(preparedSend, content);
-    if (!execution) {
-      return;
+    const isOpenCode = (preparedSend.conversation.backend ?? 'opencode') === 'opencode';
+    try {
+      const execution = this.createStreamingExecution(preparedSend, content);
+      if (!execution) {
+        return;
+      }
+
+      const routedStream = await new StreamChunkRouter({
+        host: this.host,
+        preparedSend,
+        runtime: execution.runtime,
+        stream: execution.stream,
+        streamController: execution.streamController,
+        contentEl: execution.contentEl,
+      }).consume();
+      const localFinalization = await new StreamLocalFinalizer({
+        host: this.host,
+        preparedSend,
+        runtime: execution.runtime,
+        streamController: execution.streamController,
+        routedStream,
+      }).finalize();
+
+      await this.messageFinalizationService.finalizeAfterStream({
+        conversation: preparedSend.conversation,
+        tabId: preparedSend.tabId,
+        shouldSyncFromServer: localFinalization.shouldSyncFromServer,
+        editedFiles: [...execution.runtime.pendingEditedFiles],
+        logStage: localFinalization.logAssistantFinalizationStage,
+      });
+    } finally {
+      if (isOpenCode) this.host.refreshOpenCodeDiagnosticsState?.(preparedSend.tabId);
     }
-
-    const routedStream = await new StreamChunkRouter({
-      host: this.host,
-      preparedSend,
-      runtime: execution.runtime,
-      stream: execution.stream,
-      streamController: execution.streamController,
-      contentEl: execution.contentEl,
-    }).consume();
-    const localFinalization = await new StreamLocalFinalizer({
-      host: this.host,
-      preparedSend,
-      runtime: execution.runtime,
-      streamController: execution.streamController,
-      routedStream,
-    }).finalize();
-
-    await this.messageFinalizationService.finalizeAfterStream({
-      conversation: preparedSend.conversation,
-      tabId: preparedSend.tabId,
-      shouldSyncFromServer: localFinalization.shouldSyncFromServer,
-      editedFiles: [...execution.runtime.pendingEditedFiles],
-      logStage: localFinalization.logAssistantFinalizationStage,
-    });
     await this.sendQueuedFollowUp(preparedSend.tabId);
   }
 
@@ -267,6 +286,12 @@ export class SendPipelineRuntime {
 
     this.messageSendPreparationService.enterStreamingState(preparedSend.tabId);
     const backendSessionId = getConversationBackendSessionId(preparedSend.conversation);
+    const diagnosticRunToken = (preparedSend.conversation.backend ?? 'opencode') === 'opencode'
+      ? this.host.claimOpenCodeDiagnosticRunToken?.(preparedSend.tabId, backendSessionId)
+      : undefined;
+    if (diagnosticRunToken) {
+      this.host.refreshOpenCodeDiagnosticsState?.(preparedSend.tabId);
+    }
     const stream = this.host.sendStreamMessage(preparedSend.conversation, content, {
       sessionId: backendSessionId,
       ...preparedSend.modelOptions,
@@ -277,6 +302,7 @@ export class SendPipelineRuntime {
       messageID: preparedSend.messageID,
       requestParts: preparedSend.requestParts,
       images: preparedSend.images,
+      ...(diagnosticRunToken ? { diagnosticRunToken } : {}),
     });
     this.messageSendPreparationService.completePreparedStreamStart(preparedSend.tabId);
     const streamElements = this.host.createAssistantMessageElement(preparedSend.tabId, true);

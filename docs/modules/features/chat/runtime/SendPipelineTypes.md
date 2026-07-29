@@ -1,5 +1,7 @@
 # SendPipelineTypes
 
+> 2026-07-30: Runtime view ports include per-tab OpenCode diagnostic-token claim and header-refresh seams.
+
 > **源码**: `src/features/chat/runtime/SendPipelineTypes.ts`
 > **状态**: [REVIEW]
 
@@ -12,7 +14,7 @@
 - `SendPipelineTabRuntime`：发送链路真正需要读写的 tab 级 streaming 状态切片，并暴露可选 session status snapshot 供本地收尾读取 retry message
 - `SendPipelineStreamController` / `SendPipelineStreamElements`：stream shell 与流式渲染控制器边界
 - `SendPipelinePreparationPort` / `SendPipelineFinalizationPort`：对 `MessageSendPreparationService` 与 `MessageFinalizationService` 的窄接口。preparation port 还暴露 `consumeQueuedFollowUpSend()`，供 stream finalization 后按 tab 取回一条 queued send-intent 并重新走正常 send path
-- `SendPipelineViewPort` / `SendPipelineTransportPort` / `SendPipelineShellPort` / `SendPipelinePersistencePort` / `SendPipelineDebugPort`：把发送 host 面按职责拆开的窄 port；其中 transport port 现在显式接收完整 `Conversation`、backend-neutral `sessionId`、preparation 阶段生成的稳定 `messageID` / `requestParts`，并支持可选 top-level `agent`、一次性的 `outputFormat`（用于 Claude Code 和 Codex `/json` 结构化输出触发），以及可选的 `images`（`ImageAttachment[]`，用于 Codex `local_image` 输入）；persistence port 暴露 conversation write ticket + commit，而不是直接 save conversation；shell port 保留 streaming shell 创建、reveal、notice placeholder 渲染、timestamp 收尾，以及流式结构化输出 badge 注入（`renderStructuredOutputIfPresent`），并由 `AssistantShellRenderer.ts` 统一实现 shell adapter
+- `SendPipelineViewPort` / `SendPipelineTransportPort` / `SendPipelineShellPort` / `SendPipelinePersistencePort` / `SendPipelineDebugPort`：把发送 host 面按职责拆开的窄 port；view port 的可选 `claimOpenCodeDiagnosticRunToken(tabId, sessionId)` 与 `refreshOpenCodeDiagnosticsState(tabId)` 保持 capture 消费和 header 刷新显式绑定目标 tab；transport port 现在显式接收完整 `Conversation`、backend-neutral `sessionId`、preparation 阶段生成的稳定 `messageID` / `requestParts`，并支持可选 top-level `agent`、一次性的 `outputFormat`（用于 Claude Code 和 Codex `/json` 结构化输出触发），以及可选的 `images`（`ImageAttachment[]`，用于 Codex `local_image` 输入）；persistence port 暴露 conversation write ticket + commit，而不是直接 save conversation；shell port 保留 streaming shell 创建、reveal、notice placeholder 渲染、timestamp 收尾，以及流式结构化输出 badge 注入（`renderStructuredOutputIfPresent`），并由 `AssistantShellRenderer.ts` 统一实现 shell adapter
 - `SendPipelineTransportPort.applyContextUsageSnapshotToTab()`：将 `context_usage` 精确快照交给 tab coordinator；与旧的逐回合 `usage` 增量分开，避免把账号或估算数当作会话上下文
 - `SendPipelineTransportPort.getFriendlyStreamErrorMessage(rawMessage, backend)`：格式化真实 error 与空流 fallback 时显式接收当前 `AgentBackendKind`，由 router 传入 conversation backend，避免 backend 专属错误文案被 OpenCode 默认值覆盖
 - `SendPipelineHost`：由上述 port 组合出来的完整宿主契约，方便 view 侧一次性装配

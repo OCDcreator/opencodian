@@ -16,6 +16,7 @@ interface MockToggleControl {
 }
 
 interface MockTextControl {
+  inputEl: HTMLInputElement;
   setPlaceholder: jest.MockedFunction<(value: string) => MockTextControl>;
   setValue: jest.MockedFunction<(value: string) => MockTextControl>;
   onChange: jest.MockedFunction<(callback: (value: string) => void | Promise<void>) => MockTextControl>;
@@ -81,6 +82,7 @@ function createTextRecord(name: string): TextRecord {
   const record: TextRecord = {
     name,
     control: {
+      inputEl: document.createElement('input'),
       setPlaceholder: jest.fn(),
       setValue: jest.fn(),
       onChange: jest.fn(),
@@ -373,6 +375,40 @@ describe('SettingsDebugSection', () => {
     expect(containerEl.querySelector('[data-section-block="export"] h4')?.textContent).toBe(
       t('settings.debug.export.title'),
     );
+  });
+
+  it('keeps historically anomalous OpenCode traces marked after they are read', () => {
+    const plugin = createPlugin();
+    (plugin as unknown as {
+      openCodeTraceService: {
+        store: { getStatus: () => unknown; listSummaries: () => unknown[] };
+      };
+    }).openCodeTraceService = {
+      store: {
+        getStatus: () => ({
+          mode: 'disk',
+          rootDirectory: '/tmp/opencode-trace',
+          queuedEvents: 0,
+          approximateBytes: 100,
+          droppedEvents: 0,
+        }),
+        listSummaries: () => [{
+          traceId: 'trace-read-critical',
+          sessionId: 'ses-read-critical',
+          lastUpdatedAt: '2026-07-29T00:00:00.000Z',
+          eventCount: 4,
+          runCount: 1,
+          highestSeverity: 'critical',
+          highestUnreadSeverity: undefined,
+          unreadAnomalyCount: 0,
+          deepCaptureCount: 0,
+        }],
+      },
+    };
+
+    const { containerEl } = createTabbedSection('opencode', plugin);
+    expect(containerEl.querySelector('[data-has-anomaly="true"]')?.textContent)
+      .toContain('ses-read-critical');
   });
 
   it('renders every tabbed debug source inside the shared settings shell', () => {

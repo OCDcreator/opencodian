@@ -86,6 +86,7 @@ function createHost(
     emitCatalogUpdate: jest.fn(),
     refreshMcpServerStatus: jest.fn().mockResolvedValue({}),
     logEventSubscriptionFailure: jest.fn(),
+    observeEventSubscriptionReconnect: jest.fn(),
     delay: jest.fn().mockResolvedValue(undefined),
     getConnectionSignature: jest.fn(() => 'gen-1'),
     fetchPluginConfig: jest.fn().mockResolvedValue({ plugin: [] }),
@@ -254,6 +255,45 @@ describe('OpenCodeEventSubscriptionCoordinator', () => {
     expect(subscriptionAttempts.global).toBe(2);
     expect(host.delay).toHaveBeenCalledWith(1000, expect.any(AbortSignal));
 
+    dispose();
+  });
+
+  it('warns on repeated global reconnects and resets after the next event', async () => {
+    let globalAttempts = 0;
+    const host = createHost({
+      subscribeToEvents: jest.fn((source, signal) => {
+        if (source === 'global') {
+          globalAttempts += 1;
+          if (globalAttempts <= 3) {
+            return Promise.reject(new Error(`global failure ${globalAttempts}`));
+          }
+          return Promise.resolve(createSignalBoundStream(signal, [{
+            payload: {
+              type: 'message.updated',
+              properties: { info: { id: 'msg-recovered' } },
+            },
+          }]));
+        }
+        return Promise.resolve(createSignalBoundStream(signal));
+      }),
+    });
+    const coordinator = new OpenCodeEventSubscriptionCoordinator(host);
+    const dispose = coordinator.subscribeToOpenCodeEvents(jest.fn());
+
+    for (let index = 0; index < 6; index += 1) await flushAsync();
+
+    expect(host.observeEventSubscriptionReconnect).toHaveBeenCalledWith({
+      source: 'global',
+      name: 'anomaly.subscription_reconnect_repeated',
+      severity: 'warning',
+      payload: expect.objectContaining({ attempt: 3 }),
+    });
+    expect(host.observeEventSubscriptionReconnect).toHaveBeenCalledWith({
+      source: 'global',
+      name: 'subscription.reconnected',
+      severity: 'info',
+      payload: { attempts: 3 },
+    });
     dispose();
   });
 

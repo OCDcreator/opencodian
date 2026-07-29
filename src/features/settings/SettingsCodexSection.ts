@@ -20,7 +20,7 @@ import { DropdownComponent, Modal, Notice, Setting } from 'obsidian';
 import type { CodexModelSummary } from '../../core/agents/backend/CodexAdapter';
 import type { CodexApprovalPolicy, CodexReasoningEffort, CodexWebSearchMode } from '../../core/types/settings';
 import {
-  getDefaultClaudeCodeBackendSettings,
+  getDefaultBackendSettings,
   getDefaultCodexBackendSettings,
 } from '../../core/types/settings';
 import { t } from '../../i18n';
@@ -111,10 +111,7 @@ export class SettingsCodexSection {
     const resolvedTabId = secondaryTabId || 'connection';
 
     // Ensure codex settings object exists
-    this.plugin.settings.backendSettings ??= {
-      claudeCode: getDefaultClaudeCodeBackendSettings(),
-      codex: getDefaultCodexBackendSettings(),
-    };
+    this.plugin.settings.backendSettings ??= getDefaultBackendSettings();
     this.plugin.settings.backendSettings.codex ??= getDefaultCodexBackendSettings();
 
     // Resources renders as independent per-type cards (skills / agents) with no

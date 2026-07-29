@@ -1,5 +1,7 @@
 # SendPipelineRuntime
 
+> 2026-07-30: The pipeline refreshes the exact tab's OpenCode diagnostics chrome after token claim and again from a terminal `finally` path covering completion, error, and cancellation.
+
 > **源码**: `src/features/chat/runtime/SendPipelineRuntime.ts`
 > **状态**: [REVIEW]
 
@@ -85,6 +87,7 @@ export class SendPipelineRuntime {
 - transport 层接收完整 `PreparedMessageSend.conversation` 和 `sessionId`；`sessionId` 来自 `getConversationBackendSessionId()`，因此 OpenCode 旧会话继续使用 `openCodeSessionId`，非 OpenCode 后端可以只提供 `backendSessionId`
 - transport 层现在还会直接复用 `PreparedMessageSend.messageID` 与 `requestParts`，避免 send preparation 和真正 transport 再各自生成一批不同的 part id
 - 如果 preparation 阶段解析出了显式 main agent，transport 层还会把它透传给 `openCodeService.sendMessage()` 的 top-level `agent`
+- OpenCode deep-capture token 被目标 tab claim 后立即触发一次 tab-scoped diagnostics refresh，使 header 从 armed 进入 capturing；当前发送无论 completed、error 或 cancel 都在 terminal `finally` 再刷新一次，使 UI 读取 off 或最新 anomaly。刷新事件始终携带显式 `tabId`，不使用全局当前会话
 - 把 stream、controller、tab runtime 与 prepared send 交给 `StreamChunkRouter`
 - 当 `prepareMessageSend()` 因 busy tab 返回 `null` 时，queue 行为由 preparation service / tab runtime seam 处理；runtime 不创建队列，也不在 busy 时开第二条 stream
 

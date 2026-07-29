@@ -1,3 +1,4 @@
+/* eslint-disable max-lines-per-function -- Transport matrix intentionally shares one runtime fixture. */
 import { TextDecoder } from 'util';
 
 import type {
@@ -95,6 +96,7 @@ function createHost(
     }),
     getSessionMessages: jest.fn().mockResolvedValue([]),
     logServiceWarning: jest.fn(),
+    observeReconnect: jest.fn(),
     streamEventTransformer: createStreamEventTransformer(),
     ...overrides,
   } as jest.Mocked<OpenCodeStreamingRuntimeCoordinatorHost>;
@@ -255,10 +257,18 @@ describe('OpenCodeStreamingRuntimeCoordinator transport routing', () => {
     global.fetch = createSseFetchMock([
       '{"type":"session.idle","properties":{"sessionID":"sdk-session"}}',
     ]) as typeof global.fetch;
+    const traceContext = {
+      traceId: 'trace-reconnect',
+      runtimeSegmentId: 'runtime-reconnect',
+      runId: 'run-reconnect',
+      rootSessionId: 'sdk-session',
+      sessionId: 'sdk-session',
+    };
 
     const chunks: unknown[] = [];
     for await (const chunk of coordinator.streamSdkResponse({
       sessionId: 'sdk-session',
+      traceContext,
       startPrompt,
       subscribe,
     })) {
@@ -279,6 +289,113 @@ describe('OpenCodeStreamingRuntimeCoordinator transport routing', () => {
       expect.objectContaining({
         method: 'GET',
       }),
+    );
+    expect(host.observeReconnect).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      sessionId: 'sdk-session',
+      traceContext,
+      name: 'stream.reconnect_attempt',
+      severity: 'info',
+      payload: expect.objectContaining({ attempt: 1, from: 'sdk', to: 'legacy-sse' }),
+    }));
+    expect(host.observeReconnect).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      sessionId: 'sdk-session',
+      traceContext,
+      name: 'stream.reconnected',
+      payload: { attempts: 1, transport: 'legacy' },
+    }));
+  });
+
+  it('warns after repeated SDK fallback failures and resets after a successful event', async () => {
+    const host = createHost();
+    const coordinator = new OpenCodeStreamingRuntimeCoordinator(host);
+    const traceContext = {
+      traceId: 'trace-repeated',
+      runtimeSegmentId: 'runtime-repeated',
+      runId: 'run-repeated',
+      rootSessionId: 'sdk-repeated',
+      sessionId: 'sdk-repeated',
+    };
+    global.fetch = jest.fn().mockRejectedValue(new Error('legacy unavailable')) as typeof global.fetch;
+
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      for await (const _chunk of coordinator.streamSdkResponse({
+        sessionId: 'sdk-repeated',
+        traceContext,
+        startPrompt: jest.fn().mockResolvedValue(undefined),
+        subscribe: jest.fn().mockRejectedValue(new Error('sdk unavailable')),
+      })) {
+        void _chunk;
+      }
+    }
+
+    expect(host.observeReconnect).toHaveBeenCalledWith(expect.objectContaining({
+      name: 'anomaly.stream_reconnect_repeated',
+      severity: 'warning',
+      payload: expect.objectContaining({ attempt: 3 }),
+    }));
+
+    for await (const _chunk of coordinator.streamSdkResponse({
+      sessionId: 'sdk-repeated',
+      traceContext,
+      startPrompt: jest.fn().mockResolvedValue(undefined),
+      subscribe: jest.fn().mockResolvedValue((async function* () {
+        yield {
+          type: 'session.idle',
+          properties: { sessionID: 'sdk-repeated' },
+        } as never;
+      })()),
+    })) {
+      void _chunk;
+    }
+
+    expect(host.observeReconnect).toHaveBeenCalledWith(expect.objectContaining({
+      name: 'stream.reconnected',
+      severity: 'info',
+      payload: { attempts: 3, transport: 'sdk' },
+    }));
+  });
+
+  it('passes one explicit run context and source event id through raw and normalized observers', async () => {
+    const observeIngress = jest.fn();
+    const observeOutcome = jest.fn();
+    const host = createHost({ observeIngress, observeOutcome });
+    const coordinator = new OpenCodeStreamingRuntimeCoordinator(host);
+    const traceContext = {
+      traceId: 'trace-explicit',
+      runtimeSegmentId: 'runtime-explicit',
+      runId: 'run-explicit',
+      sessionId: 'sdk-session',
+    };
+    const subscribe = jest.fn().mockResolvedValue((async function* () {
+      yield {
+        type: 'session.idle',
+        properties: { sessionID: 'sdk-session' },
+      };
+    })());
+
+    for await (const _chunk of coordinator.streamSdkResponse({
+      sessionId: 'sdk-session',
+      traceContext,
+      startPrompt: jest.fn().mockResolvedValue(undefined),
+      subscribe,
+    })) {
+      void _chunk;
+    }
+
+    expect(observeIngress).toHaveBeenCalledWith(
+      'sdk-session',
+      'sdk',
+      expect.any(Object),
+      traceContext,
+      expect.any(String),
+    );
+    const sourceEventId = observeIngress.mock.calls[0]?.[4];
+    expect(observeOutcome).toHaveBeenCalledWith(
+      'sdk-session',
+      'sdk',
+      expect.any(Object),
+      traceContext,
+      sourceEventId,
     );
   });
 });
