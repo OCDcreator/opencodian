@@ -97,6 +97,22 @@ describe('SettingsPluginUpdateSection', () => {
     expect(incompatibleButton?.disabled).toBe(true);
   });
 
+  it('groups the title and description before the flat status panel', () => {
+    const { section } = createSection();
+    const containerEl = document.createElement('div');
+
+    section.render(containerEl);
+
+    const sectionEl = containerEl.querySelector<HTMLElement>('.opencodian-plugin-update-section');
+    const headingGroupEl = sectionEl?.querySelector<HTMLElement>(':scope > .opencodian-plugin-update-heading');
+    const headingEl = headingGroupEl?.querySelector<HTMLElement>(':scope > .opencodian-settings-subsection-heading');
+
+    expect(headingEl).not.toBeNull();
+    expect(sectionEl?.querySelectorAll(':scope > .opencodian-settings-subsection-heading')).toHaveLength(0);
+    expect(headingGroupEl?.querySelector(':scope > .opencodian-plugin-update-description')).not.toBeNull();
+    expect(headingGroupEl?.nextElementSibling?.classList.contains('opencodian-plugin-update-panel')).toBe(true);
+  });
+
   it('renders check failure and applying states without allowing duplicate actions', () => {
     const { section } = createSection(createSnapshot({
       status: 'error',

@@ -32,11 +32,12 @@ export class SettingsPluginUpdateSection {
         'data-plugin-update-applying': String(snapshot.isApplying),
       },
     });
-    sectionEl.createEl('h4', {
+    const headingEl = sectionEl.createDiv({ cls: 'opencodian-plugin-update-heading' });
+    headingEl.createEl('h4', {
       cls: 'opencodian-settings-subsection-heading',
       text: t('settings.pluginUpdate.title'),
     });
-    sectionEl.createDiv({
+    headingEl.createDiv({
       cls: 'opencodian-plugin-update-description',
       text: t('settings.pluginUpdate.desc'),
     });

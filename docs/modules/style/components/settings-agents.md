@@ -13,6 +13,7 @@
 
 - `.opencodian-agent-settings-shell`：布局 shell，只控制四个二级表面的垂直 rhythm，不增加背景、边框或 shadow。
 - `.opencodian-backend-agent-surface`：`General > Agent Management` 的 backend 管理 surface，包含默认 backend control row 和 enabled backend list。
+- `.opencodian-backend-agent-group` / `-title`：backend group 使用 shared `space-lg` stack；标题和内容同左边线，不保留视觉性 2px inset。
 - `.opencodian-backend-agent-list` / `.opencodian-backend-agent-row`：backend 管理卡片栈。`.opencodian-backend-agent-list` 是 flex column + `space-md` gap 的布局容器（不再是共享边框的 compact list 容器），每条 `.opencodian-backend-agent-row` 继承共享 `.setting-item` 的独立 card 视觉（自带 border / radius / background / padding），卡片之间靠容器 gap 留白，与面板其他设置区节奏一致。TS 会补 `role="listitem"`、`data-backend-agent-id`、`data-backend-agent-active` 和 `data-backend-agent-enabled`，状态通过 badge 表达。
 - `.opencodian-agent-settings-default-surface`：Default tab / classic default 区域的 control stack。
 - `.opencodian-agent-settings-control-row`：默认主代理和 expert mode 的 shadcn-style Form/Card row，桌面端 copy/control 两列，窄屏单列。2026-07-22 起两列轨道带容器相对下限（label `min(160px, 45%)`、control `min(var(--oc-agent-control-min-width), 50%)`），窄面板下 label 列不再塌缩为 0。

@@ -46,7 +46,7 @@
   align-items: center;
   gap: var(--opencodian-settings-space-sm);
   margin: 0;
-  padding: 0 2px;
+  padding: 0;
 }
 
 .opencodian-settings .opencodian-claude-code-group-title,

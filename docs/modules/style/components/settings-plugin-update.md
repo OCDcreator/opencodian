@@ -2,6 +2,7 @@
 
 > **源码**: `src/style/components/settings-plugin-update.css`
 > **状态**: [REVIEW]
+> **Updated**: 2026-07-29 — title/description use a dedicated 8px heading stack; the card controls all 16px group separation.
 > **Updated**: 2026-07-28 — version management is one independent card with flat internal status and version-list groups.
 
 ## 概述
@@ -10,7 +11,8 @@ This component stylesheet styles the shared version-management section in both s
 
 ## Contract
 
-- `.opencodian-plugin-update-section` is the one host-themed version-management card. It owns the border, radius, background, padding, and `12px` group rhythm for the title, status, release history, and local backups. In tabbed General > Basic, the content shell's `12px` sibling gap places it after the base-settings card; classic mode applies that same gap only to the adjacent General sibling pair.
+- `.opencodian-plugin-update-section` is the one host-themed version-management card. It owns the border, radius, background, padding, and `16px` group rhythm for the heading stack, status, release history, and local backups. In tabbed General > Basic, the content shell's `12px` sibling gap places it after the base-settings card; classic mode applies that same gap only to the adjacent General sibling pair.
+- `.opencodian-plugin-update-heading` is a layout-only title/description stack with an `8px` gap. It introduces no card surface and lets the shared Settings heading contract neutralize host `h4` margins and inline padding.
 - `.opencodian-plugin-update-panel` is a flat status group inside that card: version label + mono value, a pill state badge (`data-plugin-update-badge` variants: neutral `idle`/`empty`, pulsing accent dot `checking`, blue `update`, green `current`, red `error`), and actions behind a hairline separator.
 - Check failures render as a tinted error notice (`.opencodian-plugin-update-status-detail.is-error`) with a bold label and a mono raw-error readout; other states use one muted detail line.
 - Release and backup histories use flat compact rows with separators and hover feedback; the current-version badge is a neutral pill. They do not introduce a second card boundary inside the management card.

@@ -141,12 +141,12 @@
 .opencodian-settings .opencodian-backend-agent-group {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--opencodian-settings-space-lg);
 }
 
 .opencodian-settings .opencodian-backend-agent-group-title {
   margin: 0;
-  padding: 0 2px;
+  padding: 0;
 }
 
 .opencodian-settings .opencodian-backend-agent-list {

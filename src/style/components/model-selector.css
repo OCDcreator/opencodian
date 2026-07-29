@@ -1056,8 +1056,9 @@ img.opencodian-model-provider-header-icon {
 }
 
 .opencodian-settings h3 {
-  margin-top: 24px;
-  margin-bottom: 16px;
+  margin: 0;
+  padding: 0;
+  padding-inline-start: 0;
   color: var(--text-muted);
   font-size: 14px;
   text-transform: uppercase;

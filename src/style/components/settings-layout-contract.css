@@ -1183,9 +1183,25 @@
 }
 
 .opencodian-settings .opencodian-settings-section-heading {
+  margin: 0;
+  padding: 0;
+  padding-inline-start: 0;
   color: var(--text-normal);
   font-size: 14px;
   font-weight: 700;
+  line-height: 1.35;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.opencodian-settings .opencodian-settings-subsection-heading {
+  margin: 0;
+  padding: 0;
+  padding-inline-start: 0;
+  color: var(--text-normal);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.35;
   letter-spacing: 0;
   text-transform: none;
 }
@@ -1197,7 +1213,7 @@
   box-sizing: border-box;
   width: 100%;
   min-height: 36px;
-  margin: 28px 0 14px;
+  margin: var(--opencodian-settings-space-2xl) 0 var(--opencodian-settings-space-lg);
   padding: 8px 12px;
   border: 1px solid var(--opencodian-settings-section-border);
   border-radius: var(--opencodian-settings-radius-row);
@@ -1572,7 +1588,7 @@
   align-items: baseline;
   justify-content: space-between;
   gap: var(--opencodian-settings-space-md);
-  padding: 0 2px 2px;
+  padding: 0;
 }
 
 .opencodian-settings .opencodian-skill-source-header h3,
@@ -1977,14 +1993,14 @@
 .opencodian-settings .opencodian-tool-group-header {
   display: grid;
   gap: var(--opencodian-settings-space-xs);
-  padding: 0 2px;
+  padding: 0;
 }
 
 .opencodian-settings .opencodian-tool-files-header {
   grid-template-columns: minmax(0, 1fr) max-content;
   gap: var(--opencodian-settings-space-md) var(--opencodian-settings-space-lg);
   align-items: start;
-  padding: 0 2px 2px;
+  padding: 0;
 }
 
 .opencodian-settings .opencodian-tool-files-copy {
@@ -2569,7 +2585,7 @@
 
 .opencodian-settings .opencodian-skill-source-header,
 .opencodian-settings .opencodian-tool-group-header {
-  padding: 0 2px;
+  padding: 0;
 }
 
 .opencodian-settings .opencodian-skill-card,

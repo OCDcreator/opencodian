@@ -1,6 +1,6 @@
 .opencodian-plugin-update-section {
   display: grid;
-  gap: var(--opencodian-settings-space-lg);
+  gap: var(--opencodian-settings-space-xl);
   margin-top: 0;
   padding: var(--opencodian-settings-space-xl);
   border: 1px solid var(--opencodian-settings-section-border);
@@ -12,6 +12,11 @@
   > .opencodian-settings-general-merged-block
   + .opencodian-plugin-update-section {
   margin-top: var(--opencodian-settings-space-lg);
+}
+
+.opencodian-plugin-update-heading {
+  display: grid;
+  gap: var(--opencodian-settings-space-md);
 }
 
 .opencodian-plugin-update-description,

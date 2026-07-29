@@ -2,6 +2,7 @@
 
 > **源码**: `src/features/settings/SettingsPluginUpdateSection.ts`
 > **状态**: [REVIEW]
+> **Updated**: 2026-07-29 — title and description now share a semantic heading stack, keeping the version-management card's 8px/16px rhythm independent of Obsidian heading defaults.
 > **Updated**: 2026-07-28 — version management now renders as one independent card with flat status, release, and backup groups.
 > **Updated**: 2026-07-27 — added the shared General > Basic version-management section.
 
@@ -12,6 +13,7 @@
 ## UI contract
 
 - Shows the installed version as a label + mono value block next to a short state badge (`data-plugin-update-badge`: `idle` / `checking` / `error` / `empty` / `update` / `current`), plus a detail line for idle/checking/ready and a structured error notice (bold label + mono raw error) for failures.
+- Groups the `h4` title and description in `.opencodian-plugin-update-heading`; that stack owns their 8px relationship, while the outer card owns the 16px separation to the flat status group and history groups.
 - Keeps the manual check action and explicit latest-stable action in a flat status group, separated by a hairline inside the one version-management card.
 - Keeps the complete remote stable-release history and local three-file backups as flat groups using `data-plugin-update-list="releases"` and `data-plugin-update-list="backups"`, so their row separators never create nested cards.
 - Keeps incompatible entries visible but disables their action and renders the service-supplied reason.
