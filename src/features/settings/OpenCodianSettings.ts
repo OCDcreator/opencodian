@@ -71,6 +71,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
   private formatterSection: SettingsFormatterSection | null = null;
   private userSection: SettingsUserSection | null = null;
   private dropdownsEnhancer: SettingsDropdownsEnhancerHandle | null = null;
+  private pluginUpdateExpanded = false;
 
   constructor(app: App, plugin: OpenCodianPlugin) {
     super(app, plugin);
@@ -166,6 +167,8 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     new SettingsPluginUpdateSection({
       plugin: this.plugin,
       requestDisplayRefresh: () => { this.display(); },
+      isExpanded: this.pluginUpdateExpanded,
+      onExpandedChange: (isExpanded) => { this.pluginUpdateExpanded = isExpanded; },
     }).render(containerEl);
   }
 
@@ -611,6 +614,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
   // ─── Shared helpers ────────────────────────────────────────────────
 
   hide(): void {
+    this.pluginUpdateExpanded = false;
     this.sectionCoordinator.hide();
     this.dropdownsEnhancer?.destroy();
     this.dropdownsEnhancer = null;

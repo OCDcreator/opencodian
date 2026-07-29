@@ -1,4 +1,4 @@
-import { Notice } from 'obsidian';
+import { Notice, setIcon } from 'obsidian';
 
 import { comparePluginVersions, type PluginUpdateBackup, type PluginUpdateRelease, type PluginUpdateSnapshot } from '../../core/update/PluginUpdateService';
 import { t } from '../../i18n';
@@ -7,18 +7,26 @@ import type OpenCodianPlugin from '../../main';
 interface SettingsPluginUpdateSectionOptions {
   plugin: OpenCodianPlugin;
   requestDisplayRefresh: () => void;
+  isExpanded?: boolean;
+  onExpandedChange?: (isExpanded: boolean) => void;
 }
 
 type PluginUpdateBadgeVariant = 'idle' | 'checking' | 'error' | 'empty' | 'update' | 'current';
+
+let pluginUpdateSectionId = 0;
 
 /** Renders the self-update controls shared by classic and tabbed General settings. */
 export class SettingsPluginUpdateSection {
   private readonly plugin: OpenCodianPlugin;
   private readonly requestDisplayRefresh: () => void;
+  private readonly isExpanded: boolean;
+  private readonly onExpandedChange: (isExpanded: boolean) => void;
 
   constructor(options: SettingsPluginUpdateSectionOptions) {
     this.plugin = options.plugin;
     this.requestDisplayRefresh = options.requestDisplayRefresh;
+    this.isExpanded = options.isExpanded ?? false;
+    this.onExpandedChange = options.onExpandedChange ?? (() => {});
   }
 
   render(containerEl: HTMLElement): void {
@@ -32,20 +40,21 @@ export class SettingsPluginUpdateSection {
         'data-plugin-update-applying': String(snapshot.isApplying),
       },
     });
-    const headingEl = sectionEl.createDiv({ cls: 'opencodian-plugin-update-heading' });
-    headingEl.createEl('h4', {
-      cls: 'opencodian-settings-subsection-heading',
-      text: t('settings.pluginUpdate.title'),
+    let isExpanded = this.isExpanded;
+    const contentId = `opencodian-plugin-update-content-${++pluginUpdateSectionId}`;
+    const headingEl = sectionEl.createEl('h4', { cls: 'opencodian-settings-subsection-heading' });
+    const headerButton = headingEl.createEl('button', {
+      cls: 'opencodian-plugin-update-heading-button',
+      attr: {
+        type: 'button',
+        'aria-expanded': String(isExpanded),
+        'aria-controls': contentId,
+      },
     });
-    headingEl.createDiv({
-      cls: 'opencodian-plugin-update-description',
-      text: t('settings.pluginUpdate.desc'),
-    });
-
-    const panelEl = sectionEl.createDiv({ cls: 'opencodian-plugin-update-panel' });
-
-    const headerEl = panelEl.createDiv({ cls: 'opencodian-plugin-update-panel-header' });
-    const versionBlockEl = headerEl.createDiv({ cls: 'opencodian-plugin-update-version-block' });
+    const iconEl = headerButton.createSpan({ cls: 'opencodian-plugin-update-heading-icon', attr: { 'aria-hidden': 'true' } });
+    headerButton.createSpan({ cls: 'opencodian-plugin-update-heading-title', text: t('settings.pluginUpdate.title') });
+    const headerMetaEl = headerButton.createDiv({ cls: 'opencodian-plugin-update-heading-meta' });
+    const versionBlockEl = headerMetaEl.createDiv({ cls: 'opencodian-plugin-update-version-block' });
     versionBlockEl.createDiv({
       cls: 'opencodian-plugin-update-version-label',
       text: t('settings.pluginUpdate.currentVersionLabel'),
@@ -56,12 +65,41 @@ export class SettingsPluginUpdateSection {
     });
 
     const badge = this.badgeFor(snapshot);
-    const badgeEl = headerEl.createDiv({
+    const badgeEl = headerMetaEl.createSpan({
       cls: 'opencodian-plugin-update-status-badge',
       attr: { 'data-plugin-update-badge': badge.variant },
     });
     badgeEl.createSpan({ cls: 'opencodian-plugin-update-status-dot', attr: { 'aria-hidden': 'true' } });
     badgeEl.createSpan({ cls: 'opencodian-plugin-update-status-badge-text', text: badge.label });
+
+    const contentEl = sectionEl.createDiv({
+      cls: 'opencodian-plugin-update-content',
+      attr: { id: contentId },
+    });
+    const contentInnerEl = contentEl.createDiv({ cls: 'opencodian-plugin-update-content-inner' });
+    contentInnerEl.createDiv({
+      cls: 'opencodian-plugin-update-description',
+      text: t('settings.pluginUpdate.desc'),
+    });
+    const panelEl = contentInnerEl.createDiv({ cls: 'opencodian-plugin-update-panel' });
+
+    const applyExpandedState = (expanded: boolean): void => {
+      headerButton.setAttribute('aria-expanded', String(expanded));
+      headerButton.setAttribute(
+        'aria-label',
+        `${t('settings.pluginUpdate.title')}: ${t(expanded ? 'settings.pluginUpdate.collapse' : 'settings.pluginUpdate.expand')}`,
+      );
+      setIcon(iconEl, expanded ? 'chevron-down' : 'chevron-right');
+      contentEl.setAttribute('aria-hidden', String(!expanded));
+      contentEl.toggleAttribute('inert', !expanded);
+      (contentEl as HTMLElement & { inert?: boolean }).inert = !expanded;
+    };
+    applyExpandedState(isExpanded);
+    headerButton.addEventListener('click', () => {
+      isExpanded = !isExpanded;
+      applyExpandedState(isExpanded);
+      this.onExpandedChange(isExpanded);
+    });
 
     this.renderStatusDetail(panelEl, snapshot);
 
@@ -75,8 +113,8 @@ export class SettingsPluginUpdateSection {
     this.renderLatestAction(actionsEl, snapshot.latestRelease, snapshot.currentVersion, snapshot.isApplying);
 
     if (snapshot.status === 'ready') {
-      this.renderReleaseList(sectionEl, snapshot.releases, snapshot.currentVersion, snapshot.isApplying);
-      this.renderBackupList(sectionEl, snapshot.backups, snapshot.isApplying);
+      this.renderReleaseList(contentInnerEl, snapshot.releases, snapshot.currentVersion, snapshot.isApplying);
+      this.renderBackupList(contentInnerEl, snapshot.backups, snapshot.isApplying);
     }
 
     if (snapshot.status === 'idle') {

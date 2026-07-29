@@ -27,6 +27,8 @@ export const enTranslations = {
   'settings.general.title': 'General',
   'settings.pluginUpdate.title': 'Plugin version management',
   'settings.pluginUpdate.desc': 'Check stable OpenCodian releases, install the latest version, or restore a local package backup.',
+  'settings.pluginUpdate.expand': 'Expand',
+  'settings.pluginUpdate.collapse': 'Collapse',
   'settings.pluginUpdate.currentVersionLabel': 'Installed version',
   'settings.pluginUpdate.checkButton': 'Check for updates',
   'settings.pluginUpdate.installLatest': 'Install latest stable ({{version}})',

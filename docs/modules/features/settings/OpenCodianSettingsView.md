@@ -113,3 +113,5 @@ AgentServiceRegistry.onActiveChange()
 ## 2026-07-28 General version management
 
 The editor-area settings view passes the same `renderPluginUpdateSection` seam to `SettingsTabbedRenderer` and, in classic mode, mounts `SettingsPluginUpdateSection` directly after the General merged block rather than inside it. This keeps the version card a sibling of the base-settings card while preserving equivalent history, backup restoration, confirmation, and operation-refresh behavior with the standard settings tab.
+
+`OpenCodianSettingsView` owns a non-persisted `pluginUpdateExpanded` field and passes it through the section seam. Operation redraws retain the value; `onClose()` resets it to `false` so a newly opened editor-area view starts collapsed.

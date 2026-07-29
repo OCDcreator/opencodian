@@ -60,7 +60,10 @@ function createSnapshot(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function createSection(snapshot = createSnapshot()) {
+function createSection(
+  snapshot = createSnapshot(),
+  options: { isExpanded?: boolean; onExpandedChange?: (isExpanded: boolean) => void } = {},
+) {
   const service = {
     getSnapshot: jest.fn(() => snapshot),
     checkForUpdates: jest.fn().mockResolvedValue(snapshot),
@@ -71,6 +74,8 @@ function createSection(snapshot = createSnapshot()) {
   const section = new SettingsPluginUpdateSection({
     plugin: { pluginUpdateService: service } as never,
     requestDisplayRefresh: refresh,
+    isExpanded: options.isExpanded,
+    onExpandedChange: options.onExpandedChange,
   });
   return { section, service, refresh };
 }
@@ -97,20 +102,80 @@ describe('SettingsPluginUpdateSection', () => {
     expect(incompatibleButton?.disabled).toBe(true);
   });
 
-  it('groups the title and description before the flat status panel', () => {
+  it('renders a collapsed disclosure with the description inside its content wrapper', () => {
     const { section } = createSection();
     const containerEl = document.createElement('div');
 
     section.render(containerEl);
 
     const sectionEl = containerEl.querySelector<HTMLElement>('.opencodian-plugin-update-section');
-    const headingGroupEl = sectionEl?.querySelector<HTMLElement>(':scope > .opencodian-plugin-update-heading');
-    const headingEl = headingGroupEl?.querySelector<HTMLElement>(':scope > .opencodian-settings-subsection-heading');
+    const headingEl = sectionEl?.querySelector<HTMLElement>(':scope > .opencodian-settings-subsection-heading');
+    const headerButton = headingEl?.querySelector<HTMLButtonElement>(':scope > button');
+    const contentEl = sectionEl?.querySelector<HTMLElement>(':scope > .opencodian-plugin-update-content');
 
     expect(headingEl).not.toBeNull();
-    expect(sectionEl?.querySelectorAll(':scope > .opencodian-settings-subsection-heading')).toHaveLength(0);
-    expect(headingGroupEl?.querySelector(':scope > .opencodian-plugin-update-description')).not.toBeNull();
-    expect(headingGroupEl?.nextElementSibling?.classList.contains('opencodian-plugin-update-panel')).toBe(true);
+    expect(headerButton?.getAttribute('aria-expanded')).toBe('false');
+    expect(contentEl?.getAttribute('aria-hidden')).toBe('true');
+    expect(contentEl?.hasAttribute('inert')).toBe(true);
+    expect(contentEl?.querySelector('.opencodian-plugin-update-description')).not.toBeNull();
+  });
+
+  it('toggles from the full header button without rebuilding or losing focus', () => {
+    const onExpandedChange = jest.fn();
+    const { section } = createSection(createSnapshot(), { onExpandedChange });
+    const containerEl = document.createElement('div');
+    document.body.append(containerEl);
+    section.render(containerEl);
+
+    const headerButton = containerEl.querySelector<HTMLButtonElement>('.opencodian-plugin-update-heading-button');
+    const contentEl = containerEl.querySelector<HTMLElement>('.opencodian-plugin-update-content');
+    headerButton?.focus();
+    headerButton?.click();
+
+    expect(document.activeElement).toBe(headerButton);
+    expect(headerButton?.getAttribute('aria-expanded')).toBe('true');
+    expect(contentEl?.getAttribute('aria-hidden')).toBe('false');
+    expect(contentEl?.hasAttribute('inert')).toBe(false);
+    expect(onExpandedChange).toHaveBeenCalledWith(true);
+  });
+
+  it('keeps installed version and status badge in the header without duplicates', () => {
+    const { section } = createSection();
+    const containerEl = document.createElement('div');
+    section.render(containerEl);
+
+    const sectionEl = containerEl.querySelector<HTMLElement>('.opencodian-plugin-update-section');
+    const headingEl = sectionEl?.querySelector<HTMLElement>('.opencodian-settings-subsection-heading');
+    expect(headingEl?.querySelector('.opencodian-plugin-update-version-value')?.textContent).toBe('1.1.0');
+    expect(headingEl?.querySelector('[data-plugin-update-badge="update"]')).not.toBeNull();
+    expect(sectionEl?.querySelectorAll('.opencodian-plugin-update-version-value')).toHaveLength(1);
+    expect(sectionEl?.querySelectorAll('[data-plugin-update-badge]')).toHaveLength(1);
+  });
+
+  it('uses localized expand and collapse assistive text', () => {
+    const { section } = createSection();
+    const containerEl = document.createElement('div');
+    section.render(containerEl);
+    const headerButton = containerEl.querySelector<HTMLButtonElement>('.opencodian-plugin-update-heading-button');
+    expect(headerButton?.getAttribute('aria-label')).toContain('Expand');
+
+    setLocale('zh');
+    const zhContainerEl = document.createElement('div');
+    createSection(createSnapshot(), { isExpanded: true }).section.render(zhContainerEl);
+    expect(zhContainerEl.querySelector<HTMLButtonElement>('.opencodian-plugin-update-heading-button')?.getAttribute('aria-label')).toContain('收起');
+  });
+
+  it('retains the ephemeral expanded state when an operation re-renders the section', () => {
+    let isExpanded = false;
+    const first = createSection(createSnapshot(), { onExpandedChange: (value) => { isExpanded = value; } }).section;
+    const firstContainerEl = document.createElement('div');
+    first.render(firstContainerEl);
+    firstContainerEl.querySelector<HTMLButtonElement>('.opencodian-plugin-update-heading-button')?.click();
+
+    const second = createSection(createSnapshot(), { isExpanded, onExpandedChange: (value) => { isExpanded = value; } }).section;
+    const secondContainerEl = document.createElement('div');
+    second.render(secondContainerEl);
+    expect(secondContainerEl.querySelector<HTMLButtonElement>('.opencodian-plugin-update-heading-button')?.getAttribute('aria-expanded')).toBe('true');
   });
 
   it('renders check failure and applying states without allowing duplicate actions', () => {

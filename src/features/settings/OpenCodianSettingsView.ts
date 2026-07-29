@@ -77,6 +77,7 @@ export class OpenCodianSettingsView extends ItemView {
   private formatterSection: SettingsFormatterSection | null = null;
   private userSection: SettingsUserSection | null = null;
   private dropdownsEnhancer: SettingsDropdownsEnhancerHandle | null = null;
+  private pluginUpdateExpanded = false;
 
   constructor(leaf: import('obsidian').WorkspaceLeaf, plugin: OpenCodianPlugin) {
     super(leaf);
@@ -112,6 +113,7 @@ export class OpenCodianSettingsView extends ItemView {
   }
 
   async onClose(): Promise<void> {
+    this.pluginUpdateExpanded = false;
     this.disposeSections();
     this.dropdownsEnhancer?.destroy();
     this.dropdownsEnhancer = null;
@@ -305,7 +307,7 @@ export class OpenCodianSettingsView extends ItemView {
       );
   }
   private renderPluginUpdateSection(containerEl: HTMLElement): void {
-    new SettingsPluginUpdateSection({ plugin: this.plugin, requestDisplayRefresh: () => { this.renderSettings(); } }).render(containerEl);
+    new SettingsPluginUpdateSection({ plugin: this.plugin, requestDisplayRefresh: () => { this.renderSettings(); }, isExpanded: this.pluginUpdateExpanded, onExpandedChange: (isExpanded) => { this.pluginUpdateExpanded = isExpanded; } }).render(containerEl);
   }
 
   // ─── Classic section rendering ─────────────────────────────────────

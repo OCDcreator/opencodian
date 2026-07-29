@@ -15296,9 +15296,9 @@ img.opencodian-model-provider-header-icon {
 /* components/settings-plugin-update.css */
 .opencodian-plugin-update-section {
   display: grid;
-  gap: var(--opencodian-settings-space-xl);
+  gap: 0;
   margin-top: 0;
-  padding: var(--opencodian-settings-space-xl);
+  padding: 0;
   border: 1px solid var(--opencodian-settings-section-border);
   border-radius: var(--opencodian-settings-form-row-radius);
   background: var(--opencodian-settings-section-bg);
@@ -15313,6 +15313,87 @@ img.opencodian-model-provider-header-icon {
 .opencodian-plugin-update-heading {
   display: grid;
   gap: var(--opencodian-settings-space-md);
+}
+
+.opencodian-plugin-update-section > .opencodian-settings-subsection-heading {
+  margin: 0;
+}
+
+.opencodian-plugin-update-heading-button {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  width: 100%;
+  /* Obsidian's global button height is compact; this disclosure needs to grow
+     when the narrow layout puts version metadata on its second grid row. */
+  height: auto;
+  min-width: 0;
+  gap: var(--opencodian-settings-space-md);
+  padding: var(--opencodian-settings-space-xl);
+  border: 0;
+  background: transparent;
+  color: var(--text-normal);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.opencodian-plugin-update-heading-button:hover {
+  color: var(--text-accent);
+}
+
+.opencodian-plugin-update-heading-button:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 3px;
+  border-radius: var(--opencodian-settings-form-row-radius);
+}
+
+.opencodian-plugin-update-heading-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+}
+
+.opencodian-plugin-update-heading-title {
+  min-width: 0;
+}
+
+.opencodian-plugin-update-heading-meta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: var(--opencodian-settings-space-md) var(--opencodian-settings-space-lg);
+  min-width: 0;
+}
+
+.opencodian-plugin-update-content {
+  display: grid;
+  grid-template-rows: 1fr;
+  overflow: hidden;
+  opacity: 1;
+  transition: grid-template-rows 150ms ease-out, opacity 150ms ease-out;
+}
+
+.opencodian-plugin-update-content[aria-hidden='true'] {
+  grid-template-rows: 0fr;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.opencodian-plugin-update-content-inner {
+  display: grid;
+  min-height: 0;
+  gap: var(--opencodian-settings-space-xl);
+  overflow: hidden;
+  padding: var(--opencodian-settings-space-xl);
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.opencodian-plugin-update-content[aria-hidden='true'] .opencodian-plugin-update-content-inner {
+  padding-block: 0;
+  border-top-color: transparent;
 }
 
 .opencodian-plugin-update-description,
@@ -15362,7 +15443,7 @@ img.opencodian-model-provider-header-icon {
 .opencodian-plugin-update-status-badge {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--opencodian-settings-space-sm);
   flex-shrink: 0;
   padding: var(--opencodian-settings-space-xs) var(--opencodian-settings-space-md);
   border: 1px solid var(--background-modifier-border);
@@ -15429,8 +15510,10 @@ img.opencodian-model-provider-header-icon {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .opencodian-plugin-update-content,
   .opencodian-plugin-update-status-badge[data-plugin-update-badge='checking'] .opencodian-plugin-update-status-dot {
     animation: none;
+    transition: none;
   }
 }
 
@@ -15574,6 +15657,17 @@ img.opencodian-model-provider-header-icon {
 
   .opencodian-plugin-update-version-row .opencodian-plugin-update-button {
     width: 100%;
+  }
+}
+
+@media (max-width: 720px) {
+  .opencodian-plugin-update-heading-button {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .opencodian-plugin-update-heading-meta {
+    grid-column: 2;
+    justify-content: flex-start;
   }
 }
 

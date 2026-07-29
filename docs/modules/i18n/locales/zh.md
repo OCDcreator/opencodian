@@ -52,6 +52,7 @@
 >
 > **前次更新**: 2026-06-12 Checkpoint 15N — 新增 `settings.codex.mcpServers.*` 键，用于普通 Codex 设置面板中的 MCP 服务器状态回读表面（检查 + 刷新）。
 > **Updated**: 2026-07-28 — 新增全局配置摘要、Codex composer 模型选择器（next-thread 反馈、Custom 策略、流式禁用）与项目配置文案键。
+> **Updated**: 2026-07-29 — 新增插件版本管理折叠卡片的中英文展开/收起辅助标签文案。
 
 ## 概述
 

@@ -27,6 +27,8 @@ export const zhTranslations = {
   'settings.general.title': '通用',
   'settings.pluginUpdate.title': '插件版本管理',
   'settings.pluginUpdate.desc': '检查 OpenCodian 稳定版发布记录，安装最新版本，或还原本地插件包备份。',
+  'settings.pluginUpdate.expand': '展开',
+  'settings.pluginUpdate.collapse': '收起',
   'settings.pluginUpdate.currentVersionLabel': '当前安装版本',
   'settings.pluginUpdate.checkButton': '检查更新',
   'settings.pluginUpdate.installLatest': '安装最新稳定版（{{version}}）',

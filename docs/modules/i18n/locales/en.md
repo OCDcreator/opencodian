@@ -52,6 +52,7 @@
 >
 > **Previously**: 2026-06-12 Checkpoint 15N — added `settings.codex.mcpServers.*` keys for the Codex MCP server status readback surface (inspect + reload) in the ordinary Codex settings panel.
 > **Updated**: 2026-07-28 — adds global config summary, Codex composer model selector (next-thread feedback, Custom policy, streaming-disable), and project configuration locale keys.
+> **Updated**: 2026-07-29 — adds localized expand/collapse assistive labels for the collapsed plugin version-management disclosure.
 
 ## 概述
 
