@@ -111,7 +111,9 @@ export interface ChatHeaderPresenterHost {
   getOpenCodeDiagnosticsState?(): 'disabled' | 'normal' | 'armed' | 'capturing' | 'warning' | 'critical' | 'degraded';
   showCodexDiagnostics?(event: MouseEvent, tabId: string): void;
   getCodexDiagnosticsState?(tabId: string): 'disabled' | 'degraded' | 'armed' | 'capturing' | 'normal' | 'warning' | 'critical';
-  /** Active chat tab id for the codex diagnostics routing; null when tabs are unavailable. */
+  showClaudeDiagnostics?(event: MouseEvent, tabId: string): void;
+  getClaudeDiagnosticsState?(tabId: string): 'disabled' | 'degraded' | 'armed' | 'capturing' | 'normal' | 'warning' | 'critical';
+  /** Active chat tab id for backend diagnostics routing; null when tabs are unavailable. */
   getActiveDiagnosticsTabId?(): string | null;
   openSettings(): void;
 }
@@ -211,7 +213,7 @@ export class ChatHeaderPresenter {
     this.diagnosticsBtnEl = this.buildActionButton(configGroupEl, {
       actionId: 'opencode-diagnostics',
       iconName: 'activity',
-      getTooltipLabel: () => t('chat.opencodeDiagnostics.open'),
+      getTooltipLabel: () => this.getDiagnosticsTooltipLabel(),
       onClick: (event) => this.routeDiagnosticsClick(event),
     });
     this.refreshBackendChrome();
@@ -256,7 +258,7 @@ export class ChatHeaderPresenter {
       this.applyActionLabel(this.settingsBtnEl, t('chat.settings.open'));
     }
     if (this.diagnosticsBtnEl) {
-      this.applyActionLabel(this.diagnosticsBtnEl, t('chat.opencodeDiagnostics.open'));
+      this.applyActionLabel(this.diagnosticsBtnEl, this.getDiagnosticsTooltipLabel());
     }
 
     if (this.serverStatusTextEl) {
@@ -336,16 +338,23 @@ export class ChatHeaderPresenter {
       return;
     }
 
-    const isCodexDiagnostics = this.getActiveBackendKind() === 'codex'
+    const backendKind = this.getActiveBackendKind();
+    const isCodexDiagnostics = backendKind === 'codex'
       && Boolean(this.host.showCodexDiagnostics && this.host.getCodexDiagnosticsState);
-    if (this.host.isOpenCodeBackend() || isCodexDiagnostics) {
+    const isClaudeDiagnostics = backendKind === 'claude-code'
+      && Boolean(this.host.showClaudeDiagnostics && this.host.getClaudeDiagnosticsState);
+    if (this.host.isOpenCodeBackend() || isCodexDiagnostics || isClaudeDiagnostics) {
       this.diagnosticsBtnEl?.removeClass('is-hidden');
       if (this.diagnosticsBtnEl) {
         let state: string;
-        if (isCodexDiagnostics) {
+        if (isCodexDiagnostics || isClaudeDiagnostics) {
           const tabId = this.safeTrace(() => this.host.getActiveDiagnosticsTabId?.(), null);
           state = this.safeTrace(
-            () => (tabId ? this.host.getCodexDiagnosticsState?.(tabId) : undefined) ?? 'normal',
+            () => (tabId
+              ? (isCodexDiagnostics
+                ? this.host.getCodexDiagnosticsState?.(tabId)
+                : this.host.getClaudeDiagnosticsState?.(tabId))
+              : undefined) ?? 'normal',
             'normal',
           );
         } else {
@@ -376,14 +385,25 @@ export class ChatHeaderPresenter {
   }
 
   private routeDiagnosticsClick(event: MouseEvent): void {
-    if (this.getActiveBackendKind() === 'codex' && this.host.showCodexDiagnostics) {
+    const backendKind = this.getActiveBackendKind();
+    if ((backendKind === 'codex' && this.host.showCodexDiagnostics)
+      || (backendKind === 'claude-code' && this.host.showClaudeDiagnostics)) {
       const tabId = this.safeTrace(() => this.host.getActiveDiagnosticsTabId?.(), null);
       if (tabId) {
-        this.safeTrace(() => this.host.showCodexDiagnostics?.(event, tabId), undefined);
+        this.safeTrace(() => {
+          if (backendKind === 'codex') this.host.showCodexDiagnostics?.(event, tabId);
+          else this.host.showClaudeDiagnostics?.(event, tabId);
+        }, undefined);
       }
       return;
     }
     this.safeTrace(() => this.host.showOpenCodeDiagnostics?.(event), undefined);
+  }
+
+  private getDiagnosticsTooltipLabel(): string {
+    return this.getActiveBackendKind() === 'claude-code'
+      ? t('chat.claudeDiagnostics.open')
+      : t('chat.opencodeDiagnostics.open');
   }
 
   /**

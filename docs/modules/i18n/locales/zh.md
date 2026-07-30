@@ -2,6 +2,8 @@
 
 > 2026-07-30: 新增完整 Codex 诊断文案组：模块说明、捕获/存储/通道标签、深度捕获正文策略、智能/完整导出与刷新/清空动作、最近轨迹筛选，以及不可用/成功提示；文案明确 Codex 轨迹与 OpenCode、Claude Code 诊断相互区分。
 
+> 2026-07-30: 新增 Claude Code 会话轨迹文案组（`settings.debug.claude.*` 与 `chat.claudeDiagnostics.*`）：捕获/存储状态、关闭/标准/完整预设、五个独立 trace 通道、summary-only 隐私说明、智能复制/最新轨迹包导出/清空动作、最近轨迹筛选与行内操作，以及聊天层 arm/cancel/当前会话复制提示；这些 key 与既有 `claudeCode.debugChannels` 日志预览保持独立。
+
 > 2026-07-29: Added Chinese OpenCode session trace workbench, capture-menu and status strings.
 
 > **源码**: `src/i18n/locales/zh.ts`
@@ -174,7 +176,7 @@ Composer popover 新增 `chat.composerPopover.closeHint`，并与既有 navigate
 
 本轮还将 `chat.question.title` 调整为后端无关的“Agent 提问”，避免 Claude Code 的 AskUserQuestion / elicitation 复用统一 Question UI 时继续显示 OpenCode 专属标题。
 
-2026-05-21 Debug IA 更新新增 `settings.debug.tab.plugin` / `opencode` / `claudeCode` / `export`、`settings.debug.modules.*` 来源分组说明、`settings.debug.modules.claudeCode.*` 和 `settings.debug.export.*` 文案，用于把插件内部诊断、OpenCode 后端诊断、Claude Code SDK 摘要诊断和导出/控制台帮助分开展示。后续 Claude Code 调试工作台又补充 `settings.debug.claude.*`，覆盖状态条、summary-only 隐私说明、模块总开关、六个日志通道、最近日志预览、复制当前 Claude 日志和复制 Claude 专属诊断报告。
+2026-05-21 Debug IA 更新新增 `settings.debug.tab.plugin` / `opencode` / `claudeCode` / `export`、`settings.debug.modules.*` 来源分组说明、`settings.debug.modules.claudeCode.*` 和 `settings.debug.export.*` 文案，用于把插件内部诊断、OpenCode 后端诊断、Claude Code SDK 摘要诊断和导出/控制台帮助分开展示。后续 Claude Code 调试工作台又补充 `settings.debug.claude.*`，覆盖状态条、summary-only 隐私说明、模块总开关、六个日志通道、最近日志预览、复制当前 Claude 日志和复制 Claude 专属诊断报告；2026-07-30 再补充 session-trace 的捕获/预设、五个独立 trace 通道、目录/排队/字节/丢弃/错误状态、智能复制、最新轨迹包导出、全部清空、最近 20 条轨迹行内复制/删除，以及 `chat.claudeDiagnostics.*` 的聊天 arm/cancel/当前会话复制提示。
 
 ## 2026-07-22 图片附件文案
 

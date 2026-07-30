@@ -28,7 +28,10 @@ import {
   type ClaudeCodeSdkOptionsShape,
   type ClaudeCodeSpawnRequest,
 } from './ClaudeCodeOptionsBuilder';
-import { ClaudeCodePermissionBridge } from './ClaudeCodePermissionBridge';
+import {
+  type ClaudeCodeCanUseToolContext,
+  ClaudeCodePermissionBridge,
+} from './ClaudeCodePermissionBridge';
 import {
   type ClaudeCodeProcessResolution,
   type ClaudeCodeProcessResolverOptions,
@@ -51,6 +54,11 @@ import {
   type ClaudeProjectSkillInfo,
   discoverClaudeProjectSkills,
 } from './ClaudeProjectSkillDiscovery';
+import type {
+  ClaudeDiagnosticRunToken,
+  ClaudeTraceContext,
+  ClaudeTracePort,
+} from './diagnostics';
 import {
   clearPromptSuggestionSink,
   registerPromptSuggestionSink,
@@ -59,6 +67,7 @@ import {
 const runtimeLogger = createLogger('ClaudeCodeAdapter', { moduleKey: 'claudeCode', channel: 'runtime' });
 const sessionLogger = createLogger('ClaudeCodeAdapter', { moduleKey: 'claudeCode', channel: 'sessions' });
 const mcpLogger = createLogger('ClaudeCodeAdapter', { moduleKey: 'claudeCode', channel: 'mcp' });
+const traceLogger = createLogger('ClaudeTraceAdapter');
 
 function isClaudeAgentSdkBundledExecutablePath(candidate: string | undefined): boolean {
   if (!candidate) {
@@ -699,6 +708,8 @@ export interface ClaudeCodeAdapterOptions {
   sdk?: ClaudeCodeSdkFacade;
   sdkLoader?: ClaudeCodeSdkLoader;
   permissionBridge?: ClaudeCodePermissionBridge;
+  /** Optional diagnostics seam. Every hook is isolated through `trace()`. */
+  tracePort?: ClaudeTracePort;
   onElicitation?: (request: ElicitationRequest, options: { signal: AbortSignal }) => Promise<ElicitationResult>;
   mcpServers?: ClaudeCodeMcpServersMap;
   /** Dynamic MCP config loader — called at runtime when building SDK options. */
@@ -958,6 +969,16 @@ function extractModelUsageFromRaw(rawMessages: unknown[]): Record<string, unknow
     }
   }
   return undefined;
+}
+
+function isSdkResultError(message: unknown): boolean {
+  if (typeof message !== 'object' || message === null || Array.isArray(message)) return false;
+  const record = message as { type?: unknown; is_error?: unknown; isError?: unknown };
+  return record.type === 'result' && (record.is_error === true || record.isError === true);
+}
+
+function mergeTraceError(previous: boolean, next: boolean): boolean {
+  return previous || next;
 }
 
 function resolveComparableSessionIds(sessionInfo: ClaudeCodeSdkSessionInfo): string[] {
@@ -1363,6 +1384,9 @@ export class ClaudeCodeAdapter
   private lastDiagnosticSdkOptions: ClaudeCodeSdkOptionsShape | null = null;
   private readonly postResultCallbacks = new Set<(chunk: StreamChunk) => void>();
   private readonly options: ClaudeCodeAdapterOptions;
+  private readonly tracePort?: ClaudeTracePort;
+  /** Current turn context keyed by both plugin-local and SDK session identities. */
+  private readonly traceContextsBySession = new Map<string, ClaudeTraceContext>();
 
   constructor(options: ClaudeCodeAdapterOptions) {
     const bundledPathHint = isClaudeAgentSdkBundledExecutablePath(options.pathToClaudeCodeExecutable);
@@ -1379,6 +1403,7 @@ export class ClaudeCodeAdapter
       processEnv: processResolution?.env ?? options.processEnv,
       spawnShell: processResolution?.shell ?? options.spawnShell,
     };
+    this.tracePort = options.tracePort;
   }
 
   hasCapability(cap: AgentCapability): boolean {
@@ -1399,11 +1424,23 @@ export class ClaudeCodeAdapter
     };
   }
 
+  /** Diagnostics must never alter SDK, stream, permission, or elicitation behavior. */
+  private trace<T>(run: (port: ClaudeTracePort) => T): T | undefined {
+    if (!this.tracePort) return undefined;
+    try {
+      return run(this.tracePort);
+    } catch {
+      traceLogger.warn('trace hook failed; continuing without trace data');
+      return undefined;
+    }
+  }
+
   async start(): Promise<void> {
     runtimeLogger.debug('start', { vaultPath: this.options.vaultPath });
     await this.loadMcpConfig();
     registerPromptSuggestionSink(this);
     this.setStatus('connected');
+    this.trace((port) => port.recordLifecycle('runtime.started', { vaultPath: this.options.vaultPath }));
   }
 
   private assertExternalClaudeCliAvailable(): void {
@@ -1417,11 +1454,13 @@ export class ClaudeCodeAdapter
     runtimeLogger.debug('stop', { sessionCount: this.sessions.size });
     this.cancelledSessions.clear();
     for (const session of this.sessions.values()) {
+      this.finishTraceTurn(session, 'cancelled', { reason: 'adapter-stop' });
       this.closeRuntime(session);
     }
     clearPromptSuggestionSink();
     this.postResultCallbacks.clear();
     this.setStatus('disconnected');
+    this.trace((port) => port.recordLifecycle('runtime.stopped', { reason: 'stop' }));
   }
 
   dispose(): void {
@@ -1431,6 +1470,7 @@ export class ClaudeCodeAdapter
       this.invalidatedSessions.add(sessionId);
     }
     for (const session of this.sessions.values()) {
+      this.finishTraceTurn(session, 'cancelled', { reason: 'adapter-dispose' });
       this.closeRuntime(session);
     }
     this.sessions.clear();
@@ -1438,6 +1478,7 @@ export class ClaudeCodeAdapter
     this.postResultCallbacks.clear();
     clearPromptSuggestionSink();
     this.statusValue = 'disconnected';
+    this.trace((port) => port.recordLifecycle('runtime.stopped', { reason: 'dispose' }));
   }
 
   /**
@@ -1475,6 +1516,7 @@ export class ClaudeCodeAdapter
       titleLength: sessionTitle.length,
       autoTitle: this.options.settings.autoTitle,
     });
+    this.trace((port) => port.recordPersistence(undefined, 'create', { sessionId: id }));
     return id;
   }
 
@@ -1483,10 +1525,13 @@ export class ClaudeCodeAdapter
     this.cancelledSessions.add(sessionId);
     this.invalidatedSessions.add(sessionId);
     const session = this.sessions.get(sessionId);
+    this.trace((port) => port.recordPersistence(this.traceContextForSession(sessionId), 'delete', { sessionId }));
     if (session) {
+      this.finishTraceTurn(session, 'cancelled', { reason: 'session-delete' });
       this.closeRuntime(session);
     }
     this.sessions.delete(sessionId);
+    this.clearTraceContext(sessionId, session?.sdkSessionId);
   }
 
   async updateSessionTitle(sessionId: string, title: string): Promise<void> {
@@ -1497,6 +1542,11 @@ export class ClaudeCodeAdapter
       sdkSessionId: session.sdkSessionId,
       titleLength: title.length,
     });
+    this.trace((port) => port.recordPersistence(this.traceContextForSession(session), 'update', {
+      sessionId,
+      sdkSessionId: session.sdkSessionId,
+      titleLength: title.length,
+    }));
     if (session.sdkSessionId) {
       const sdk = await this.getSdk();
       await sdk.renameSession?.(session.sdkSessionId, title, { dir: this.options.vaultPath });
@@ -1872,11 +1922,26 @@ export class ClaudeCodeAdapter
       includeSubagents: options?.includeSubagents !== false,
       batchSize: options?.batchSize,
     });
-    await sdk.importSessionToStore(sdkSessionId, store, {
-      dir: this.options.vaultPath,
-      ...(options?.includeSubagents !== undefined ? { includeSubagents: options.includeSubagents } : {}),
-      ...(options?.batchSize !== undefined ? { batchSize: options.batchSize } : {}),
-    });
+    try {
+      await sdk.importSessionToStore(sdkSessionId, store, {
+        dir: this.options.vaultPath,
+        ...(options?.includeSubagents !== undefined ? { includeSubagents: options.includeSubagents } : {}),
+        ...(options?.batchSize !== undefined ? { batchSize: options.batchSize } : {}),
+      });
+      this.trace((port) => port.recordPersistence(this.traceContextForSession(state ?? sessionId), 'import', {
+        sessionId,
+        sdkSessionId,
+        result: 'completed',
+      }));
+    } catch (error) {
+      this.trace((port) => port.recordPersistence(this.traceContextForSession(state ?? sessionId), 'import', {
+        sessionId,
+        sdkSessionId,
+        result: 'error',
+        error: summarizeError(error),
+      }));
+      throw error;
+    }
   }
 
   async forkSession(sessionId: string, messageID?: string): Promise<{ id: string; title: string }> {
@@ -1905,6 +1970,19 @@ export class ClaudeCodeAdapter
       sdkSessionId: result.sessionId,
     };
     this.sessions.set(result.sessionId, forkedState);
+    const traceContext = this.trace((port) => port.bindSession({
+      sessionId: result.sessionId,
+      resumed: false,
+      via: 'sdk',
+      payload: { operation: 'fork', sourceSessionId, upToMessageId: messageID },
+    }));
+    if (traceContext) this.rememberTraceContext(forkedState, traceContext);
+    this.trace((port) => port.recordPersistence(traceContext, 'fork', {
+      sessionId,
+      sourceSessionId,
+      forkedSessionId: result.sessionId,
+      upToMessageId: messageID,
+    }));
     sessionLogger.debug('fork session complete', { sessionId, forkedSessionId: result.sessionId });
     return { id: result.sessionId, title: forkedState.title };
   }
@@ -1930,7 +2008,30 @@ export class ClaudeCodeAdapter
     if (!rewindFiles) {
       throw new Error('Claude Code rewindFiles is unavailable. Start a checkpoint-enabled runtime first.');
     }
-    return await rewindFiles(userMessageId, { ...options, dryRun: effectiveDryRun });
+    const traceContext = this.traceContextForSession(session);
+    this.trace((port) => port.recordPersistence(traceContext, 'rewind.request', {
+      sessionId,
+      userMessageId,
+      dryRun: effectiveDryRun,
+    }));
+    try {
+      const result = await rewindFiles(userMessageId, { ...options, dryRun: effectiveDryRun });
+      this.trace((port) => port.recordPersistence(traceContext, 'rewind.response', {
+        sessionId,
+        userMessageId,
+        dryRun: effectiveDryRun,
+        result,
+      }));
+      return result;
+    } catch (error) {
+      this.trace((port) => port.recordPersistence(traceContext, 'rewind.error', {
+        sessionId,
+        userMessageId,
+        dryRun: effectiveDryRun,
+        error: summarizeError(error),
+      }));
+      throw error;
+    }
   }
 
   private static extractUserMessageUuid(message: unknown): string | undefined {
@@ -4602,6 +4703,7 @@ export class ClaudeCodeAdapter
     const prompt = createUserPrompt(promptContent, request.images);
     session.messages.push(prompt);
     let runtime: ClaudeCodeSessionRuntime;
+    let traceContext: ClaudeTraceContext | undefined;
     try {
       runtime = await this.getOrStartRuntime(session, request.options);
       runtimeLogger.debug('sendMessage runtime-ready', summarizeSession(session));
@@ -4612,6 +4714,13 @@ export class ClaudeCodeAdapter
         phase: 'runtime-ready',
         error: summarizeError(error),
       });
+      traceContext = this.beginTraceTurn(session, request);
+      this.trace((port) => port.recordTurnEvent(traceContext, 'turn.send_failed', 'error', {
+        sessionId: request.sessionId,
+        phase: 'runtime-ready',
+        error: summarizeError(error),
+      }));
+      this.finishTraceContext(traceContext, 'error', { phase: 'runtime-ready' });
       const errorMessage = error instanceof Error ? error.message : String(error);
       yield {
         type: 'error',
@@ -4623,11 +4732,18 @@ export class ClaudeCodeAdapter
     }
 
     runtime.input.push(prompt);
+    traceContext = this.beginTraceTurn(session, request);
 
     let sawChunk = false;
+    let sawTraceError = false;
     try {
       for await (const item of runtime.output) {
         if (this.cancelledSessions.has(request.sessionId)) {
+          this.trace((port) => port.recordTurnEvent(traceContext, 'turn.cancelled', 'info', {
+            sessionId: request.sessionId,
+            phase: 'runtime-output',
+          }));
+          this.finishTraceContext(traceContext, 'cancelled', { phase: 'runtime-output' });
           return;
         }
         if (item.type === 'error') {
@@ -4636,6 +4752,12 @@ export class ClaudeCodeAdapter
             phase: 'runtime-output',
             error: summarizeError(item.error),
           });
+          this.trace((port) => port.recordTurnEvent(traceContext, 'turn.error_evidence', 'error', {
+            sessionId: request.sessionId,
+            phase: 'runtime-output',
+            error: summarizeError(item.error),
+          }));
+          this.finishTraceContext(traceContext, 'error', { phase: 'runtime-output' });
           yield {
             type: 'error',
             content: `Claude Code stream failed: ${item.error instanceof Error ? item.error.message : String(item.error)}`,
@@ -4644,8 +4766,13 @@ export class ClaudeCodeAdapter
         }
 
         const chunks = runtime.normalizer.transformSDKMessage(item.message);
+        sawTraceError = mergeTraceError(sawTraceError, isSdkResultError(item.message));
         this.captureSdkSessionId(session, item.message, chunks);
+        traceContext = this.traceContextForSession(session) ?? traceContext;
+        this.trace((port) => port.recordSdkMessage(traceContext, item.message));
         for (const chunk of chunks) {
+          sawTraceError = mergeTraceError(sawTraceError, chunk.type === 'error');
+          this.trace((port) => port.recordNormalizedChunk(traceContext, chunk.type, chunk));
           sawChunk = true;
           yield chunk;
         }
@@ -4654,6 +4781,14 @@ export class ClaudeCodeAdapter
             sessionId: request.sessionId,
             sawChunk,
             boundary: true,
+          });
+          this.recordTraceTerminal(traceContext, {
+            eventName: 'turn.result',
+            normalState: 'completed',
+            normalSeverity: 'info',
+            sessionId: request.sessionId,
+            sawChunk,
+            sawTraceError,
           });
           return;
         }
@@ -4664,6 +4799,12 @@ export class ClaudeCodeAdapter
         phase: 'stream',
         error: summarizeError(error),
       });
+      this.trace((port) => port.recordTurnEvent(traceContext, 'turn.send_failed', 'error', {
+        sessionId: request.sessionId,
+        phase: 'stream',
+        error: summarizeError(error),
+      }));
+      this.finishTraceContext(traceContext, 'error', { phase: 'stream' });
       yield {
         type: 'error',
         content: `Claude Code stream failed: ${error instanceof Error ? error.message : String(error)}`,
@@ -4675,12 +4816,26 @@ export class ClaudeCodeAdapter
       sawChunk,
       boundary: false,
     });
+    this.recordTraceTerminal(traceContext, {
+      eventName: 'turn.stream_ended',
+      normalState: 'incomplete',
+      normalSeverity: 'warning',
+      sessionId: request.sessionId,
+      sawChunk,
+      sawTraceError,
+    });
   }
 
   cancelStream(sessionId: string): void {
     runtimeLogger.debug('close runtime', { sessionId, reason: 'cancelStream' });
     this.cancelledSessions.add(sessionId);
     const session = this.sessions.get(sessionId);
+    const traceContext = this.traceContextForSession(session ?? sessionId);
+    this.trace((port) => port.recordTurnEvent(traceContext, 'turn.cancelled', 'info', {
+      sessionId,
+      phase: 'cancelStream',
+    }));
+    this.finishTraceContext(traceContext, 'cancelled', { phase: 'cancelStream' });
     void session?.runtime?.query?.interrupt?.();
     if (session) {
       this.closeRuntime(session);
@@ -4740,11 +4895,49 @@ export class ClaudeCodeAdapter
       abortController,
       spawnClaudeCodeProcess: this.spawnClaudeCodeProcess,
       canUseTool: this.options.permissionBridge
-        ? this.options.permissionBridge.canUseTool.bind(this.options.permissionBridge)
+        ? async (
+          toolName: string,
+          input: Record<string, unknown>,
+          context: ClaudeCodeCanUseToolContext = {},
+        ) => {
+          const traceContext = session ? this.traceContextForSession(session) : undefined;
+          this.trace((port) => port.recordPermission(traceContext, 'request', {
+            toolName,
+            input,
+            context,
+          }));
+          try {
+            const result = await this.options.permissionBridge!.canUseTool(toolName, input, context);
+            this.trace((port) => port.recordPermission(traceContext, 'decision', {
+              toolName,
+              result,
+            }));
+            return result;
+          } catch (error) {
+            this.trace((port) => port.recordPermission(traceContext, 'decision', {
+              toolName,
+              error: summarizeError(error),
+            }));
+            throw error;
+          }
+        }
         : undefined,
       onElicitation: this.options.onElicitation
-        ? async (request: ElicitationRequest, context: { signal: AbortSignal }) =>
-          await this.options.onElicitation!(request, context)
+        ? async (request: ElicitationRequest, context: { signal: AbortSignal }) => {
+          const traceContext = session ? this.traceContextForSession(session) : undefined;
+          this.trace((port) => port.recordElicitation(traceContext, 'request', { request }));
+          try {
+            const response = await this.options.onElicitation!(request, context);
+            this.trace((port) => port.recordElicitation(traceContext, 'response', { request, response }));
+            return response;
+          } catch (error) {
+            this.trace((port) => port.recordElicitation(traceContext, 'response', {
+              request,
+              error: summarizeError(error),
+            }));
+            throw error;
+          }
+        }
         : undefined,
       mcpServers: this.options.mcpServers ?? this.cachedMcpServers,
       hooks: this.options.hooks,
@@ -5110,8 +5303,96 @@ export class ClaudeCodeAdapter
       this.closeRuntime(session);
       throw new Error(`Claude Code resume validation failed: resumed query returned session "${sdkSessionId}" for requested session "${session.sdkSessionId}".`);
     }
+    const traceContext = this.trace((port) => port.bindSession({
+      sessionId: sdkSessionId,
+      provisionalId: session.id,
+      resumed: false,
+      via: 'sdk',
+      payload: { sessionId: session.id },
+    }));
+    if (traceContext) this.rememberTraceContext(session, traceContext);
     session.sdkSessionId = sdkSessionId;
     this.sessions.set(sdkSessionId, session);
+  }
+
+  /** Start at the input push boundary; new local IDs remain memory-only in the trace service. */
+  private beginTraceTurn(
+    session: ClaudeCodeSessionState,
+    request: AgentChatSendRequest,
+  ): ClaudeTraceContext | undefined {
+    const traceSessionId = session.sdkSessionId ?? session.id;
+    const traceContext = this.trace((port) => port.beginTurn({
+      sessionId: traceSessionId,
+      conversationId: request.sessionId,
+      tabId: request.diagnosticRunToken?.tabId,
+      model: typeof request.options?.model === 'string' ? request.options.model : undefined,
+      diagnosticRunToken: request.diagnosticRunToken as ClaudeDiagnosticRunToken | undefined,
+      provisional: !session.sdkSessionId,
+      payload: { sessionId: request.sessionId },
+    }));
+    if (traceContext) this.rememberTraceContext(session, traceContext);
+    return traceContext;
+  }
+
+  private traceContextForSession(sessionOrId: ClaudeCodeSessionState | string): ClaudeTraceContext | undefined {
+    const session = typeof sessionOrId === 'string' ? this.sessions.get(sessionOrId) : sessionOrId;
+    if (session) {
+      return this.traceContextsBySession.get(session.sdkSessionId ?? session.id)
+        ?? this.traceContextsBySession.get(session.id);
+    }
+    return typeof sessionOrId === 'string'
+      ? this.traceContextsBySession.get(sessionOrId)
+      : undefined;
+  }
+
+  private rememberTraceContext(session: ClaudeCodeSessionState, context: ClaudeTraceContext): void {
+    this.traceContextsBySession.set(session.id, context);
+    if (session.sdkSessionId) this.traceContextsBySession.set(session.sdkSessionId, context);
+    if (context.sessionId) this.traceContextsBySession.set(context.sessionId, context);
+  }
+
+  private clearTraceContext(sessionId: string, sdkSessionId?: string): void {
+    this.traceContextsBySession.delete(sessionId);
+    if (sdkSessionId) this.traceContextsBySession.delete(sdkSessionId);
+  }
+
+  private finishTraceTurn(
+    session: ClaudeCodeSessionState,
+    state: 'completed' | 'cancelled' | 'error' | 'incomplete',
+    payload?: unknown,
+  ): void {
+    this.finishTraceContext(this.traceContextForSession(session), state, payload);
+  }
+
+  private finishTraceContext(
+    context: ClaudeTraceContext | undefined,
+    state: 'completed' | 'cancelled' | 'error' | 'incomplete',
+    payload?: unknown,
+  ): void {
+    if (!context) return;
+    this.trace((port) => port.finishTurn(context, state, payload));
+  }
+
+  private recordTraceTerminal(
+    context: ClaudeTraceContext | undefined,
+    input: {
+      eventName: 'turn.result' | 'turn.stream_ended';
+      normalState: 'completed' | 'incomplete';
+      normalSeverity: 'info' | 'warning';
+      sessionId: string;
+      sawChunk: boolean;
+      sawTraceError: boolean;
+    },
+  ): void {
+    const state = input.sawTraceError ? 'error' : input.normalState;
+    const severity = input.sawTraceError ? 'error' : input.normalSeverity;
+    const payload = {
+      sessionId: input.sessionId,
+      sawChunk: input.sawChunk,
+      ...(input.sawTraceError ? { error: true } : {}),
+    };
+    this.trace((port) => port.recordTurnEvent(context, input.eventName, severity, payload));
+    this.finishTraceContext(context, state, payload);
   }
 
   private async validateUserResumeSession(
@@ -5165,6 +5446,11 @@ export class ClaudeCodeAdapter
           effort: session.runtime.effort,
           hasModelOverride: Boolean(overrides.model),
         });
+        this.trace((port) => port.recordLifecycle('runtime.reused', {
+          sessionId: session.id,
+          sdkSessionId: session.sdkSessionId,
+          effort: session.runtime!.effort,
+        }));
         return session.runtime;
       }
     }
@@ -5188,6 +5474,11 @@ export class ClaudeCodeAdapter
       sdkSessionId: session.sdkSessionId,
       effort: runtime.effort,
     });
+    this.trace((port) => port.recordLifecycle('runtime.created', {
+      sessionId: session.id,
+      sdkSessionId: session.sdkSessionId,
+      effort: runtime.effort,
+    }));
     runtimeLogger.debug('SDK query creation', {
       sessionId: session.id,
       sdkSessionId: session.sdkSessionId,
@@ -5198,6 +5489,10 @@ export class ClaudeCodeAdapter
       prompt: runtime.input,
       options: this.buildSdkOptions(abortController, session, sendOptions),
     });
+    this.trace((port) => port.recordLifecycle('runtime.sdk_query_created', {
+      sessionId: session.id,
+      sdkSessionId: session.sdkSessionId,
+    }));
     session.runtime = runtime;
     void this.pumpRuntimeOutput(session, runtime);
     return runtime;
@@ -5582,6 +5877,10 @@ export class ClaudeCodeAdapter
         phase: 'runtime-pump',
         error: summarizeError(error),
       });
+      this.trace((port) => port.recordTurnEvent(this.traceContextForSession(session), 'turn.runtime_output_error', 'error', {
+        sessionId: session.id,
+        error: summarizeError(error),
+      }));
       runtime.output.push({ type: 'error', error });
     } finally {
       runtime.closed = true;
@@ -5595,6 +5894,11 @@ export class ClaudeCodeAdapter
         sdkSessionId: session.sdkSessionId,
         reason: 'pump-finally',
       });
+      this.trace((port) => port.recordLifecycle('runtime.stopped', {
+        sessionId: session.id,
+        sdkSessionId: session.sdkSessionId,
+        reason: 'pump-finally',
+      }));
     }
   }
 
@@ -5608,6 +5912,11 @@ export class ClaudeCodeAdapter
       sdkSessionId: session.sdkSessionId,
       reason: 'closeRuntime',
     });
+    this.trace((port) => port.recordLifecycle('runtime.stopped', {
+      sessionId: session.id,
+      sdkSessionId: session.sdkSessionId,
+      reason: 'closeRuntime',
+    }));
     runtime.closed = true;
     runtime.abortController.abort();
     runtime.input.close();
@@ -5718,6 +6027,21 @@ export class ClaudeCodeAdapter
       restored: true,
       sdkSessionId: restoredSession.sdkSessionId,
     });
+    if (restoredSession.sdkSessionId) {
+      const traceContext = this.trace((port) => port.bindSession({
+        sessionId: restoredSession.sdkSessionId!,
+        resumed: true,
+        via: 'sdk',
+        payload: { sessionId, operation: 'restore' },
+      }));
+      if (traceContext) this.rememberTraceContext(restoredSession, traceContext);
+      this.trace((port) => port.recordPersistence(traceContext, 'restore', {
+        sessionId,
+        sdkSessionId: restoredSession.sdkSessionId,
+      }));
+    } else {
+      this.trace((port) => port.recordPersistence(undefined, 'restore', { sessionId }));
+    }
     return restoredSession;
   }
 

@@ -152,6 +152,7 @@ describe('SETTINGS_PRIMARY_TABS', () => {
     expect(debugTab!.secondaryTabs.map((secondaryTab) => secondaryTab.id)).toEqual([
       'plugin',
       'opencode',
+      'codex',
       'claude-code',
       'export',
       'capability-lab',

@@ -2,6 +2,8 @@
 
 > 2026-07-30: Added the complete Codex diagnostics copy group: module description, capture/storage/channel labels, deep-capture content policy, smart/full export and flush/clear actions, recent-trace filters, and unavailable/success notices. The strings explicitly distinguish Codex traces from OpenCode and Claude Code diagnostics.
 
+> 2026-07-30: Added the Claude Code session-trace copy group in `settings.debug.claude.*` and `chat.claudeDiagnostics.*`: capture/storage status, off/standard/full presets, five independent trace channels, hardened summary-only privacy text, smart copy/latest bundle export/clear actions, recent-trace filtering and row actions, and chat arm/cancel/current-session prompts. These keys describe the persistent trace surface separately from the existing `claudeCode.debugChannels` logger preview.
+
 > 2026-07-29: Added OpenCode session trace workbench, capture-menu and status strings.
 
 > **源码**: `src/i18n/locales/en.ts`
@@ -202,7 +204,7 @@ Composer popover 新增 `chat.composerPopover.closeHint`，并与既有 navigate
 
 本轮还将 `chat.question.title` 调整为 backend-neutral 的 “Question from agent”，避免 Claude Code 的 AskUserQuestion / elicitation 复用统一 Question UI 时继续显示 OpenCode 专属标题。
 
-2026-05-21 Debug IA 更新新增 `settings.debug.tab.plugin` / `opencode` / `claudeCode` / `export`、`settings.debug.modules.*` 来源分组说明、`settings.debug.modules.claudeCode.*` 和 `settings.debug.export.*` 文案，用于把插件内部诊断、OpenCode 后端诊断、Claude Code SDK 摘要诊断和导出/控制台帮助分开展示。后续 Claude Code 调试工作台又补充 `settings.debug.claude.*`，覆盖状态条、summary-only 隐私说明、模块总开关、六个日志通道、最近日志预览、复制当前 Claude 日志和复制 Claude 专属诊断报告。
+2026-05-21 Debug IA 更新新增 `settings.debug.tab.plugin` / `opencode` / `claudeCode` / `export`、`settings.debug.modules.*` 来源分组说明、`settings.debug.modules.claudeCode.*` 和 `settings.debug.export.*` 文案，用于把插件内部诊断、OpenCode 后端诊断、Claude Code SDK 摘要诊断和导出/控制台帮助分开展示。后续 Claude Code 调试工作台又补充 `settings.debug.claude.*`，覆盖状态条、summary-only 隐私说明、模块总开关、六个日志通道、最近日志预览、复制当前 Claude 日志和复制 Claude 专属诊断报告；2026-07-30 再补充 session-trace 的 capture/preset、五个独立 trace channel、目录/队列/字节/丢弃/错误状态、智能复制、最新 bundle 导出、清空全部、最近 20 条轨迹行内复制/删除，以及 `chat.claudeDiagnostics.*` 的 chat arm/cancel/current-session copy prompts。
 
 ## 2026-07-22 Image attachment copy
 

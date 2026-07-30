@@ -212,6 +212,7 @@ export const SETTINGS_PRIMARY_TABS: SettingsPrimaryTabDefinition[] = [
     secondaryTabs: [
       { id: 'plugin', labelKey: 'settings.debug.tab.plugin' },
       { id: 'opencode', labelKey: 'settings.debug.tab.opencode' },
+      { id: 'codex', labelKey: 'settings.debug.tab.codex' },
       { id: 'claude-code', labelKey: 'settings.debug.tab.claudeCode' },
       { id: 'export', labelKey: 'settings.debug.tab.export' },
       { id: 'capability-lab', labelKey: 'settings.debug.tab.capabilityLab' },

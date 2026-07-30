@@ -2,6 +2,7 @@
 
 > 2026-07-29: Bootstrap constructs and injects `OpenCodeSessionTraceService`; unload flushes it independently.
 > 2026-07-30: Bootstrap additionally constructs `CodexSessionTraceService` (default-on, reads `backendSettings.codex.sessionTrace`), exposes it as `this.codexTraceService`, injects the service itself as `codexTracePort` into `wireHiddenAdapters()` so the Codex adapter/transport can emit session/turn/wire trace events, and flushes it independently in `onunload`. Codex trace flush failures only emit a generic warning so rejected errors cannot leak secrets or local paths; the OpenCode-side behavior is unchanged.
+> 2026-07-30: Bootstrap constructs `ClaudeSessionTraceService`, exposes it as `this.claudeTraceService`, and injects it as `tracePort` when constructing `ClaudeCodeAdapter`. Its dynamic `knownSecrets` getter recursively collects only non-empty api-key/token/secret-like values from current `backendSettings.claudeCode`; unload disposes it with a generic warning only, so a rejected trace flush cannot expose credential/path detail or affect plugin shutdown.
 
 > **源码**: `src/main.ts`
 > **状态**: [REVIEW]
@@ -58,6 +59,7 @@ Codex 审批 host context 的入口级 wiring 保留在 `main.ts`：插件持有
 - `settings`: 当前归一化后的 `OpenCodianSettings`。
 - `storage`: vault 侧持久化入口。
 - `openCodeService`: OpenCode 运行时门面。
+- `openCodeTraceService` / `codexTraceService` / `claudeTraceService`: 三个 backend 的独立会话 trace runtime；Claude service 从当前 Claude backend settings 动态读取开关与 credential-like known secrets。
 - `opencodeConfigManager` / `modelConfigService`: 只有拿到 vault 路径后才创建。
 - `modelPricingService`: 读取手动刷新的 models.dev 本地缓存，并为没有 backend 实际成本的 token snapshot 添加 API 等价估算；启动只读缓存，不自动联网。
 - `conversations`: 只在内存里缓存会话元数据；正文按需从 `StorageService.loadFullConversation()` 读取。
@@ -86,7 +88,8 @@ Codex 审批 host context 的入口级 wiring 保留在 `main.ts`：插件持有
 10. 构造 `OpenCodeService`，注入 server status / error / models loaded 回调，以及 `initialManagedServerState`、`SDK_FEATURE_FLAG_ROLLOUT_DEFAULTS` 和 managed server state 持久化回调。
 11. 如果能解析到 vault 路径，就创建 `OpencodeConfigManager` / `ModelConfigService`，并把 vault 路径传给 `openCodeService`。
 12. 在注册视图之前执行 `loadConversations()`，只预热会话元数据；`StorageService` 会优先读取轻量 `session-metas/` sidecar，缺失时再回退完整 session JSON，并把这次 fallback 统计送进 startup diagnosis。
-12a. 构建 `AgentServiceRegistry`：`main.ts` 构造各 adapter 实例（OpenCode、Claude Code），然后调用 `wireHiddenAdapters()`（来自 `AgentAdapterWiring.ts`）统一注册所有 user-facing adapter（当前包含 Codex）。Claude Code 的 external CLI 解析由 `ClaudeCodeAdapter`/`ClaudeCodeProcessResolver` 在 backend owner 内完成；Codex 由 `CodexCliResolver` 按显式 path → GUI PATH / Windows npm shim 解析用户安装的 native CLI。入口层保留兼容旧 bootstrap 形状的 `pluginDir` hint，但 wiring 层刻意忽略它，绝不把 bundled platform binary package 视为必需 runtime。最后由 `setEnabledBackends()` 激活用户可见后端。
+12a. 在 adapter 注册前构造 OpenCode、Codex 与 Claude 三个 trace service。Claude service 使用 `backendSettings.claudeCode.sessionTrace`、vault path、build identity 和动态 credential-like `knownSecrets` getter；这些 secret 仅进入 hardened redactor，不写入报告、bundle 或 generic unload warning。
+12b. 构建 `AgentServiceRegistry`：`main.ts` 构造各 adapter 实例（OpenCode、Claude Code），把 Claude trace service 作为 `tracePort` 注入 `ClaudeCodeAdapter`，然后调用 `wireHiddenAdapters()`（来自 `AgentAdapterWiring.ts`）统一注册所有 user-facing adapter（当前包含 Codex）。Claude Code 的 external CLI 解析由 `ClaudeCodeAdapter`/`ClaudeCodeProcessResolver` 在 backend owner 内完成；Codex 由 `CodexCliResolver` 按显式 path → GUI PATH / Windows npm shim 解析用户安装的 native CLI。入口层保留兼容旧 bootstrap 形状的 `pluginDir` hint，但 wiring 层刻意忽略它，绝不把 bundled platform binary package 视为必需 runtime。最后由 `setEnabledBackends()` 激活用户可见后端。
 13. 注册 `OpenCodianView`、自定义品牌 icon（供 ribbon / tab header 复用）、命令与设置页。
 14. 启动结束时输出一行汇总日志；这条汇总同样走 `always`。若检测到失败或明显慢启动，还会额外输出一条 automatic diagnosis。
 15. 最近一次 trace 会暴露给诊断报告；若 debug 已开启，或本次启动被判定为慢启动/失败，还会自动把 `startup-perf-latest.log` 写到 vault 的 `.opencodian/debug/`。诊断报告也会输出 Claude Code backend 设置摘要、debug module 状态和 debug channel 配置，但不会把 Claude Code 能力包装成 full runtime proof。
@@ -198,7 +201,7 @@ OpenCode server status 回调也不再只刷新设置页状态：当本地/远�
 | 方法 | 说明 |
 |------|------|
 | `onload()` | 完成服务装配、设置迁移、视图/命令注册与会话预加载 |
-| `onunload()` | 停止 `OpenCodeService`，清除 chat appearance timer 与模型刷新帧请求 |
+| `onunload()` | 停止 `OpenCodeService`，独立 best-effort dispose 三个 session trace service，清除 chat appearance timer 与模型刷新帧请求 |
 | `loadSettings()` | 读取并迁移历史设置，生成当前版本的归一化配置 |
 | `saveSettings()` | 同步服务层、写回存储、刷新所有视图、同步 `.opencode` 权限配置 |
 | `invalidateSlashCommandCatalog({preload?})` | 失效 slash 命令/runtime 菜单 catalog（Claude/Codex 项目资源保存后调用，使下次 `/` 刷新；runtime supportedCommands()/supportedAgents() 仍为最终真相） |

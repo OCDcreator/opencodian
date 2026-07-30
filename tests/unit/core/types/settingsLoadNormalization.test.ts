@@ -199,6 +199,18 @@ describe('prepareLoadedSettingsBootstrapState backend normalization', () => {
         mcp: true,
         experimental: false,
       },
+      sessionTrace: {
+        enabled: true,
+        consolePreset: 'standard',
+        consoleChannels: {
+          lifecycle: true,
+          'stream-sync': true,
+          'tool-interaction': true,
+          'persistence-recovery': true,
+          'service-output': true,
+        },
+        storageDirectory: '',
+      },
       sandbox: {
         enabled: false,
         failIfUnavailable: false,

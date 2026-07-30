@@ -109,8 +109,10 @@ export interface SendPipelineHostDependencies {
   refreshServerStatusBadge(): Promise<void>;
   claimOpenCodeDiagnosticRunToken?: SendPipelineHost['claimOpenCodeDiagnosticRunToken'];
   claimCodexDiagnosticRunToken?: SendPipelineHost['claimCodexDiagnosticRunToken'];
+  claimClaudeDiagnosticRunToken?: SendPipelineHost['claimClaudeDiagnosticRunToken'];
   refreshOpenCodeDiagnosticsState?: SendPipelineHost['refreshOpenCodeDiagnosticsState'];
   refreshCodexDiagnosticsState?: SendPipelineHost['refreshCodexDiagnosticsState'];
+  refreshClaudeDiagnosticsState?: SendPipelineHost['refreshClaudeDiagnosticsState'];
   sendStreamMessage: SendPipelineHost['sendStreamMessage'];
   detachStream(sessionId: string | undefined): void;
   syncLatestUserMessageFromServer: SendPipelineHost['syncLatestUserMessageFromServer'];
@@ -153,10 +155,14 @@ export function createSendPipelineRuntimeHost(deps: SendPipelineHostDependencies
       deps.claimOpenCodeDiagnosticRunToken?.(tabId, sessionId),
     claimCodexDiagnosticRunToken: (tabId, threadId) =>
       deps.claimCodexDiagnosticRunToken?.(tabId, threadId),
+    claimClaudeDiagnosticRunToken: (tabId, sessionId) =>
+      deps.claimClaudeDiagnosticRunToken?.(tabId, sessionId),
     refreshOpenCodeDiagnosticsState: (tabId) =>
       deps.refreshOpenCodeDiagnosticsState?.(tabId),
     refreshCodexDiagnosticsState: (tabId) =>
       deps.refreshCodexDiagnosticsState?.(tabId),
+    refreshClaudeDiagnosticsState: (tabId) =>
+      deps.refreshClaudeDiagnosticsState?.(tabId),
   };
   const transportPort: SendPipelineTransportPort = {
     sendStreamMessage: (conversation, content, options) => deps.sendStreamMessage(conversation, content, options),
@@ -272,6 +278,8 @@ export class SendPipelineRuntime {
         // Codex capture is turn-scoped; refresh codex chrome once the stream
         // finalizes so the badge reflects the (now cleared) claim.
         this.safeTrace(() => this.host.refreshCodexDiagnosticsState?.(preparedSend.tabId), undefined);
+      } else if ((preparedSend.conversation.backend ?? 'opencode') === 'claude-code') {
+        this.safeTrace(() => this.host.refreshClaudeDiagnosticsState?.(preparedSend.tabId), undefined);
       }
     }
     await this.sendQueuedFollowUp(preparedSend.tabId);
@@ -300,6 +308,12 @@ export class SendPipelineRuntime {
     if (backend === 'codex') {
       return this.safeTrace(
         () => this.host.claimCodexDiagnosticRunToken?.(preparedSend.tabId, backendSessionId),
+        undefined,
+      );
+    }
+    if (backend === 'claude-code') {
+      return this.safeTrace(
+        () => this.host.claimClaudeDiagnosticRunToken?.(preparedSend.tabId, backendSessionId),
         undefined,
       );
     }
@@ -352,6 +366,8 @@ export class SendPipelineRuntime {
       this.safeTrace(() => {
         if (backend === 'codex') {
           this.host.refreshCodexDiagnosticsState?.(preparedSend.tabId);
+        } else if (backend === 'claude-code') {
+          this.host.refreshClaudeDiagnosticsState?.(preparedSend.tabId);
         } else {
           this.host.refreshOpenCodeDiagnosticsState?.(preparedSend.tabId);
         }

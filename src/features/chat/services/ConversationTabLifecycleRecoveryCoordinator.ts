@@ -27,6 +27,7 @@ export interface ConversationTabLifecycleRecoveryHost {
   removeTabMessagesPane(tabId: TabId): void;
   cancelOpenCodeDiagnosticCapture?(tabId: TabId): void;
   cancelCodexDiagnosticCapture?(tabId: TabId): void;
+  cancelClaudeDiagnosticCapture?(tabId: TabId): void;
   showNotice(message: string): void;
 }
 
@@ -77,6 +78,7 @@ export class ConversationTabLifecycleRecoveryCoordinator {
 
     this.safeTraceCancel(() => this.host.cancelOpenCodeDiagnosticCapture?.(tabId));
     this.safeTraceCancel(() => this.host.cancelCodexDiagnosticCapture?.(tabId));
+    this.safeTraceCancel(() => this.host.cancelClaudeDiagnosticCapture?.(tabId));
     this.host.removeTabMessagesPane(tabId);
 
     if (result.nextActiveTabId) {
@@ -117,6 +119,7 @@ export class ConversationTabLifecycleRecoveryCoordinator {
     for (const closedTabId of closeResult.closedTabIds) {
       this.safeTraceCancel(() => this.host.cancelOpenCodeDiagnosticCapture?.(closedTabId));
       this.safeTraceCancel(() => this.host.cancelCodexDiagnosticCapture?.(closedTabId));
+      this.safeTraceCancel(() => this.host.cancelClaudeDiagnosticCapture?.(closedTabId));
       this.host.removeTabMessagesPane(closedTabId);
     }
 
@@ -151,6 +154,7 @@ export class ConversationTabLifecycleRecoveryCoordinator {
     for (const tabId of tabIds) {
       this.safeTraceCancel(() => this.host.cancelOpenCodeDiagnosticCapture?.(tabId));
       this.safeTraceCancel(() => this.host.cancelCodexDiagnosticCapture?.(tabId));
+      this.safeTraceCancel(() => this.host.cancelClaudeDiagnosticCapture?.(tabId));
     }
     this.host.clearTabMessagesPanes();
     this.host.resetTabManager();

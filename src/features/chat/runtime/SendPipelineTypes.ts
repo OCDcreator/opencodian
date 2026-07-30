@@ -101,6 +101,10 @@ export interface SendPipelineViewPort {
     tabId: TabId | null,
     threadId?: string,
   ): DiagnosticRunToken | undefined;
+  claimClaudeDiagnosticRunToken?(
+    tabId: TabId | null,
+    sessionId?: string,
+  ): DiagnosticRunToken | undefined;
   refreshOpenCodeDiagnosticsState?(tabId: TabId | null): void;
   /**
    * Refreshes the Codex diagnostics chrome for the given tab. Codex capture
@@ -108,6 +112,8 @@ export interface SendPipelineViewPort {
    * so the correct backend state is reflected after a token is claimed.
    */
   refreshCodexDiagnosticsState?(tabId: TabId | null): void;
+  /** Refreshes Claude Code diagnostics chrome after capture state changes. */
+  refreshClaudeDiagnosticsState?(tabId: TabId | null): void;
 }
 
 export interface SendPipelineTransportPort {
@@ -210,8 +216,10 @@ export type SendPipelineExecutionHost =
     | 'getOrCreateTabStreamController'
     | 'claimOpenCodeDiagnosticRunToken'
     | 'claimCodexDiagnosticRunToken'
+    | 'claimClaudeDiagnosticRunToken'
     | 'refreshOpenCodeDiagnosticsState'
     | 'refreshCodexDiagnosticsState'
+    | 'refreshClaudeDiagnosticsState'
   >
   & Pick<SendPipelineTransportPort, 'sendStreamMessage'>
   & Pick<SendPipelineShellPort, 'createAssistantMessageElement'>;

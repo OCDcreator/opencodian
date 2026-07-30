@@ -42,7 +42,7 @@
 
 Capability Lab 的 `capabilityLabSelectedBackend` 在最终 settings merge 时通过 `normalizeCapabilityLabSelectedBackend()` 清洗。任意非空 descriptor id 会被 trim 后保留，使未来 backend 不需要修改启动归一化白名单；当前不存在的 id 由 tabs controller 对照 descriptor 集忽略，再按 `activeBackend` → descriptor 第一项解析初始选择。该字段不会参与 active backend 或 enabled backend 归一化。
 
-最终 settings merge 会用 `IMPLEMENTED_AGENT_BACKENDS` 过滤 `enabledBackends`，并在 `activeBackend` 不在 enabled 列表中时回退到第一个 enabled backend。当前实现只保留 `opencode`，避免旧快照或手写设置启用尚未接入的 backend。`backendSettings.claudeCode` 仍会归一化并持久保留，作为隐藏 foundation，不能因此把 Claude 暴露成已实现 backend。
+最终 settings merge 会用 `IMPLEMENTED_AGENT_BACKENDS` 过滤 `enabledBackends`，并在 `activeBackend` 不在 enabled 列表中时回退到第一个 enabled backend。当前实现只保留 `opencode`，避免旧快照或手写设置启用尚未接入的 backend。`backendSettings.claudeCode` 仍会归一化并持久保留，作为隐藏 foundation，不能因此把 Claude 暴露成已实现 backend；该最终 merge 边界也会重新调用 `normalizeBackendSettings()`，确保旧 snapshot 缺失的 `claudeCode.sessionTrace` 补齐默认值、五个 channel map、合法 console preset 与 trim 后的 storage directory。
 
 ### server / theme / input-panel 迁移
 
@@ -53,7 +53,7 @@ Capability Lab 的 `capabilityLabSelectedBackend` 在最终 settings merge 时�
 ## 与其他模块的交互
 
 - 依赖 `settings.ts` 的 `normalize*` / `getDefault*` 工具函数，但不把这些纯函数重新包装成新的 facade。
-- Claude Code backend settings 在启动期通过 `normalizeBackendSettings()` 清洗：`settingSources` 默认 `['project']`，显式空数组保留为空，invalid permission/thinking/effort/additionalDirectories 回退安全默认。
+- Claude Code backend settings 在启动期通过 `normalizeBackendSettings()` 清洗：`settingSources` 默认 `['project']`，显式空数组保留为空，invalid permission/thinking/effort/additionalDirectories 回退安全默认；`sessionTrace` 使用 `CLAUDE_TRACE_CHANNEL_IDS` 重建完整 map，`enabled !== false` 保持默认开启，只有 `off|standard|full` 是有效 console preset，storage directory 会 trim。
 - 会话标签启用状态通过 `normalizeTabsEnabled()` 在启动快照构建阶段清洗一次，只有持久化值明确为 `false` 才禁用；最终 settings merge 直接使用该归一化结果或默认值，避免重复清洗和历史设置误关标签入口。
 - 依赖 `core/theme` 的 preset 解析与 appearance override 计算，确保 theme startup 顺序与原逻辑一致。
 - 依赖 `core/agents/backend` 的 `IMPLEMENTED_AGENT_BACKENDS` 清洗 backend 设置，使新安装和旧设置都只落到已实现 backend。

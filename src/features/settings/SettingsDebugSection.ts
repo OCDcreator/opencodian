@@ -5,6 +5,7 @@ import * as os from 'os';
 import * as path from 'path';
 
 import {
+  CLAUDE_TRACE_CHANNEL_IDS,
   CODEX_TRACE_CHANNEL_IDS,
 } from '../../core/agents/backend/diagnostics';
 import {
@@ -205,19 +206,11 @@ export class SettingsDebugSection {
   }
 
   private createDebugTabShell(containerEl: HTMLElement, config: DebugTabShellConfig): HTMLElement {
-    const isCodexShell = config.id === 'codex';
     const shellEl = containerEl.createDiv({
       cls: `opencodian-debug-tab-shell opencodian-debug-tab-shell-${config.id}`,
       attr: {
-        ...(isCodexShell
-          ? {
-            'data-codex-section-block': config.id,
-            'data-codex-debug-tab-shell': 'true',
-          }
-          : {
-            'data-section-block': config.id,
-            'data-debug-tab-shell': 'true',
-          }),
+        'data-section-block': config.id,
+        'data-debug-tab-shell': 'true',
       },
     });
     const headerEl = shellEl.createDiv({ cls: 'opencodian-debug-tab-header' });
@@ -728,6 +721,10 @@ export class SettingsDebugSection {
       },
     );
     this.addClaudeCodeChannelSettings(workbenchEl);
+    this.addClaudeTraceStatus(workbenchEl);
+    this.addClaudeTraceControls(workbenchEl);
+    this.addClaudeTraceActions(workbenchEl);
+    this.addClaudeTraceCatalog(workbenchEl);
     this.addClaudeCodeLogPreview(workbenchEl);
   }
 
@@ -838,6 +835,204 @@ export class SettingsDebugSection {
             })
         );
     }
+  }
+
+  private addClaudeTraceStatus(containerEl: HTMLElement): void {
+    const status = this.plugin.claudeTraceService?.getStorageStatus();
+    const settings = this.getClaudeTraceSettings();
+    const stripEl = containerEl.createDiv({
+      cls: 'opencodian-debug-status-strip',
+      attr: { 'data-claude-trace-status': 'true' },
+    });
+    const items = [
+      [t('settings.debug.claude.status.capture'), settings.enabled
+        ? t('settings.debug.codex.status.enabled')
+        : t('settings.debug.codex.status.disabled')],
+      [t('settings.debug.claude.status.mode'), status?.mode ?? 'disk'],
+      [t('settings.debug.claude.status.directory'), status?.rootDirectory || settings.storageDirectory || resolveDefaultTraceDirectory('claude')],
+      [t('settings.debug.claude.status.queued'), String(status?.queuedEvents ?? 0)],
+      [t('settings.debug.claude.status.size'), `${Math.round((status?.approximateBytes ?? 0) / 1024)} KiB`],
+      [t('settings.debug.claude.status.dropped'), String(status?.droppedEvents ?? 0)],
+    ];
+    for (const [label, value] of items) {
+      const itemEl = stripEl.createDiv({ cls: 'opencodian-debug-status-item' });
+      itemEl.createDiv({ cls: 'opencodian-debug-status-label', text: label });
+      itemEl.createDiv({ cls: 'opencodian-debug-status-value', text: value });
+    }
+    if (status?.lastError) {
+      stripEl.createDiv({
+        cls: 'opencodian-debug-status-error',
+        text: t('settings.debug.claude.status.error', { error: status.lastError }),
+      });
+    }
+  }
+
+  private addClaudeTraceControls(containerEl: HTMLElement): void {
+    const settings = this.getClaudeTraceSettings();
+    const controlsEl = containerEl.createDiv({ cls: 'opencodian-settings-block opencodian-debug-channel-panel' });
+    new Setting(controlsEl)
+      .setName(t('settings.debug.claude.enabled.name'))
+      .setDesc(t('settings.debug.claude.enabled.desc'))
+      .addToggle((toggle) => toggle
+        .setValue(settings.enabled)
+        .onChange(async (value) => {
+          settings.enabled = value;
+          await this.plugin.saveSettings();
+        }));
+    new Setting(controlsEl)
+      .setName(t('settings.debug.claude.preset.name'))
+      .setDesc(t('settings.debug.claude.preset.desc'))
+      .addDropdown((dropdown) => dropdown
+        .addOption('off', t('settings.debug.claude.preset.off'))
+        .addOption('standard', t('settings.debug.claude.preset.standard'))
+        .addOption('full', t('settings.debug.claude.preset.full'))
+        .setValue(settings.consolePreset)
+        .onChange(async (value) => {
+          settings.consolePreset = value === 'full' || value === 'standard' ? value : 'off';
+          await this.plugin.saveSettings();
+        }));
+    new Setting(controlsEl)
+      .setName(t('settings.debug.claude.storage.name'))
+      .setDesc(t('settings.debug.claude.storage.desc'))
+      .setClass('opencodian-wide-text-setting')
+      .addText((text) => {
+        text
+          .setPlaceholder(resolveDefaultTraceDirectory('claude'))
+          .setValue(settings.storageDirectory)
+          .onChange(async (value) => {
+            settings.storageDirectory = value.trim();
+            await this.plugin.saveSettings();
+          });
+        text.inputEl.addEventListener('blur', () => {
+          new Notice(t('settings.debug.claude.storage.restart'));
+        });
+      })
+      .addButton((button) => button
+        .setButtonText(t('settings.debug.claude.storage.choose'))
+        .onClick(async () => {
+          const selected = await this.pickDirectory(settings.storageDirectory);
+          if (!selected) return;
+          settings.storageDirectory = selected;
+          await this.plugin.saveSettings();
+          new Notice(t('settings.debug.claude.storage.restart'));
+        }));
+    const channelsEl = controlsEl.createDiv({ cls: 'opencodian-debug-channel-list' });
+    for (const channelId of CLAUDE_TRACE_CHANNEL_IDS) {
+      new Setting(channelsEl)
+        .setName(t(`settings.debug.claude.channel.${channelId}.name` as never))
+        .setDesc(t(`settings.debug.claude.channel.${channelId}.desc` as never))
+        .addToggle((toggle) => toggle
+          .setValue(settings.consoleChannels[channelId] !== false)
+          .onChange(async (value) => {
+            settings.consoleChannels = { ...settings.consoleChannels, [channelId]: value };
+            await this.plugin.saveSettings();
+          }));
+    }
+  }
+
+  private addClaudeTraceActions(containerEl: HTMLElement): void {
+    const actionsEl = containerEl.createDiv({ cls: 'opencodian-debug-log-actions' });
+    this.addActionButton(actionsEl, t('settings.debug.claude.actions.copyReport'), async () => {
+      const report = await this.plugin.claudeTraceService?.buildSmartReport();
+      if (!report) return;
+      await navigator.clipboard.writeText(report);
+      new Notice(t('settings.debug.claude.actions.copySuccess'));
+    });
+    this.addActionButton(actionsEl, t('settings.debug.claude.actions.export'), async () => {
+      const summary = this.plugin.claudeTraceService?.listRecentTraces(1)[0];
+      if (!summary) {
+        new Notice(t('settings.debug.claude.recent.empty'));
+        return;
+      }
+      const targetDirectory = getCurrentPlatformDebugLogPath(this.plugin.settings.debugLogPaths).trim();
+      if (!targetDirectory || !fs.existsSync(targetDirectory)) {
+        new Notice(t('settings.debug.claude.actions.exportDirectoryUnavailable'));
+        return;
+      }
+      const exportedDirectory = await this.plugin.claudeTraceService?.exportTrace(summary.traceId, targetDirectory);
+      if (exportedDirectory) {
+        new Notice(t('settings.debug.claude.actions.exportSuccess', { path: exportedDirectory }));
+      }
+    }, false);
+    this.addActionButton(actionsEl, t('settings.debug.claude.actions.clear'), async () => {
+      if (!window.confirm(t('settings.debug.claude.actions.clearConfirm'))) return;
+      await this.plugin.claudeTraceService?.clearAll();
+      const workbenchEl = containerEl.closest('[data-debug-workbench="claude-code"]');
+      if (workbenchEl instanceof HTMLElement) {
+        this.refreshClaudeTraceCatalog(workbenchEl);
+      }
+      new Notice(t('settings.debug.claude.actions.clearSuccess'));
+    }, false);
+  }
+
+  private addClaudeTraceCatalog(containerEl: HTMLElement): void {
+    const catalogEl = containerEl.createDiv({
+      cls: 'opencodian-settings-block opencodian-debug-log-panel',
+      attr: { 'data-claude-trace-catalog': 'true' },
+    });
+    this.renderClaudeTraceCatalog(catalogEl);
+  }
+
+  private refreshClaudeTraceCatalog(containerEl: HTMLElement): void {
+    const catalogEl = containerEl.querySelector('[data-claude-trace-catalog="true"]');
+    if (catalogEl instanceof HTMLElement) this.renderClaudeTraceCatalog(catalogEl);
+  }
+
+  private renderClaudeTraceCatalog(catalogEl: HTMLElement): void {
+    catalogEl.replaceChildren();
+    catalogEl.createEl('h4', {
+      cls: 'opencodian-settings-subsection-heading',
+      text: t('settings.debug.claude.recent.title'),
+    });
+    const filterSetting = new Setting(catalogEl)
+      .setName(t('settings.debug.claude.recent.anomaliesOnly'))
+      .setDesc(t('settings.debug.claude.recent.anomaliesOnlyDesc'));
+    const rowsEl = catalogEl.createDiv({ cls: 'opencodian-debug-trace-rows' });
+    const summaries = this.plugin.claudeTraceService?.listRecentTraces(20) ?? [];
+    const applyFilter = (anomaliesOnly: boolean) => {
+      for (const row of rowsEl.querySelectorAll<HTMLElement>('.opencodian-debug-trace-row')) {
+        row.toggleClass('is-hidden', anomaliesOnly && row.dataset.hasAnomaly !== 'true');
+      }
+    };
+    filterSetting.addToggle((toggle) => toggle
+      .setValue(false)
+      .onChange((value) => applyFilter(value)));
+    if (summaries.length === 0) {
+      rowsEl.createDiv({ cls: 'opencodian-settings-block-desc', text: t('settings.debug.claude.recent.empty') });
+      return;
+    }
+    for (const summary of summaries) {
+      const rowEl = rowsEl.createDiv({
+        cls: 'opencodian-debug-trace-row',
+        attr: {
+          'data-has-anomaly': String(
+            summary.highestSeverity === 'warning'
+            || summary.highestSeverity === 'critical'
+            || summary.highestSeverity === 'error',
+          ),
+        },
+      });
+      const copyEl = rowEl.createDiv({ cls: 'opencodian-debug-trace-copy' });
+      copyEl.createDiv({ cls: 'opencodian-debug-trace-id', text: summary.sessionId ?? summary.traceId });
+      copyEl.createDiv({
+        cls: 'opencodian-settings-block-desc',
+        text: `${summary.lastUpdatedAt} · ${summary.eventCount} events · ${summary.highestSeverity}`,
+      });
+      const rowActionsEl = rowEl.createDiv({ cls: 'opencodian-debug-log-actions' });
+      this.addActionButton(rowActionsEl, t('settings.debug.claude.recent.copy'), async () => {
+        const report = await this.plugin.claudeTraceService?.buildSmartReport(summary.traceId);
+        if (report) await navigator.clipboard.writeText(report);
+      }, false);
+      this.addActionButton(rowActionsEl, t('settings.debug.claude.recent.delete'), async () => {
+        await this.plugin.claudeTraceService?.store.deleteTrace(summary.traceId);
+        rowEl.remove();
+      }, false);
+    }
+  }
+
+  private getClaudeTraceSettings() {
+    this.plugin.settings.backendSettings.claudeCode.sessionTrace ??= getDefaultBackendSettings().claudeCode.sessionTrace;
+    return this.plugin.settings.backendSettings.claudeCode.sessionTrace;
   }
 
   private addClaudeCodeLogPreview(containerEl: HTMLElement): void {
@@ -1322,10 +1517,9 @@ export class SettingsDebugSection {
   }
 
   private showActiveBlock(containerEl: HTMLElement, activeTabId: string): void {
-    containerEl.querySelectorAll('[data-section-block], [data-codex-section-block]').forEach((el) => {
+    containerEl.querySelectorAll('[data-section-block]').forEach((el) => {
       const blockEl = el as HTMLElement;
-      const blockId = blockEl.dataset.sectionBlock ?? blockEl.dataset.codexSectionBlock;
-      blockEl.style.display = blockId === activeTabId ? '' : 'none';
+      blockEl.style.display = blockEl.dataset.sectionBlock === activeTabId ? '' : 'none';
     });
   }
 

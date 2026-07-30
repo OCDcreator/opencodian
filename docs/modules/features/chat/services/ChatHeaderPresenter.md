@@ -2,6 +2,7 @@
 
 > 2026-07-29: The configuration group includes an OpenCode-only diagnostics button with stable state attributes.
 > 2026-07-30: The diagnostics button is now backend-routed. Host gains optional `showCodexDiagnostics(event, tabId)`, `getCodexDiagnosticsState(tabId)` and `getActiveDiagnosticsTabId()`. `refreshBackendChrome()` shows the button for OpenCode or Codex (when a Codex host is wired) and writes `data-trace-state` from the matching state getter; `routeDiagnosticsClick` dispatches to the Codex path for the active codex backend and falls back to OpenCode otherwise. Non-trace backends keep the button hidden.
+> 2026-07-30: Claude Code is now a third backend-routed diagnostics surface. The host may provide `showClaudeDiagnostics(event, tabId)` and `getClaudeDiagnosticsState(tabId)`; when the active backend is `claude-code`, the presenter writes the Claude state to the shared badge and dispatches clicks to `ClaudeDiagnosticsHostAdapter`. Missing or throwing trace callbacks keep the button conservative and do not affect the rest of header chrome.
 > Diagnostic callback fallbacks log only a generic status, never raw exception text, while preserving header refresh and click handling.
 
 > **源码**: `src/features/chat/services/ChatHeaderPresenter.ts`
@@ -44,6 +45,11 @@ export interface ChatHeaderPresenterHost {
   getActiveBackendKind?(): AgentBackendKind;
   refreshContextUsageIndicator(): void;
   onServerAvailabilityRefreshed?(): void;
+  showCodexDiagnostics?(event: MouseEvent, tabId: string): void;
+  getCodexDiagnosticsState?(tabId: string): 'disabled' | 'degraded' | 'armed' | 'capturing' | 'normal' | 'warning' | 'critical';
+  showClaudeDiagnostics?(event: MouseEvent, tabId: string): void;
+  getClaudeDiagnosticsState?(tabId: string): 'disabled' | 'degraded' | 'armed' | 'capturing' | 'normal' | 'warning' | 'critical';
+  getActiveDiagnosticsTabId?(): string | null;
   openServerSettings(): void;
   openLspSettings?(): void;
   createConversationInNewTab(): Promise<void>;
@@ -70,6 +76,7 @@ export class ChatHeaderPresenter {
 ## 关键行为
 
 - `build()` 组装完整 header DOM，并把 header tab bar slot 暴露给 `OpenCodianView` 的 tab layout 逻辑；header actions 现在拆成 `opencodian-header-status-group`、`opencodian-header-conversation-group`、`opencodian-header-config-group` 三段。server status 与 LSP status 留在 status group，`new-current-tab` / `new-tab` / `history` 留在 conversation group，`session-settings` / `settings` 留在 config group，让状态、会话操作和配置入口不再混成一串同权按钮
+- `build()` 组装完整 header DOM，并把 header tab bar slot 暴露给 `OpenCodianView` 的 tab layout 逻辑；header actions 现在拆成 `opencodian-header-status-group`、`opencodian-header-conversation-group`、`opencodian-header-config-group` 三段。server status 与 LSP status 留在 status group，`new-current-tab` / `new-tab` / `history` 留在 conversation group，`session-settings` / `settings` 留在 config group，让状态、会话操作和配置入口不再混成一串同权按钮。diagnostics 按钮仍是共享 header DOM，但其状态与菜单按 active backend 走 OpenCode、Codex 或 Claude host seam
 - 标题 wordmark 通过 [`brandingWordmark.md`](../../../shared/brandingWordmark.md) 按 light/dark theme 选择内联 SVG data URL；css-change 仍会同步切换对应版本，但不再经 host 或 vault adapter 读取插件目录
 - LSP status indicator 展示 `lsp.status()` 的 server connection summary；`startLspStatusLoop()` 在 presenter 内创建并持有 `LspStatusRefreshCoordinator`，把状态更新转发给 UI 组件，并在 `destroy()` 中停止轮询
 - server status badge 现在是真正的 `button[type="button"]`，带 `data-status-chip="collapsed"` 与 `aria-expanded="false"`。默认只占 28px，用 active backend 的身份图标表达后端；所有 backend 都复用设置页后端导航的 `renderAgentSwitcherBackendIcon()` 和 LobeHub 彩色 light/dark 图标（包括 OpenCode、Claude Code、Codex、Copilot 与 Pi），避免聊天 header 与设置页出现不同的 provider 标识，并用 badge 级状态 ring/dot overlay 表达 checking/running/offline 等健康状态；状态文案保留在同一个按钮内但 `aria-hidden="true"`，由 CSS 在 hover / focus-visible 时在 badge 内部展开。Presenter 会读取当前字体下文本的 `scrollWidth`，加上图标、间距、边框和状态 ring 的 46px 容量预算后写入 `--opencodian-server-status-expanded-width`；无 layout 的测试环境才回退到字符宽度估算。短文案会精确收缩到所需宽度，长文案仍受响应式 220px / 48vw 上限约束，避免常驻或悬浮时无意义地挤占 header 顶部空间
@@ -80,6 +87,7 @@ export class ChatHeaderPresenter {
 - `refreshServerStatusBadge()` 更新 `is-running` / `is-disabled` / `is-offline` 等状态 class，设置 `data-active-backend` 为当前 canonical backend kind（优先使用 host 的 `getActiveBackendKind`，未实现时从全局插件设置读取 active backend），同步 `.opencodian-server-status-icon` 的 `data-backend-icon`；图标统一通过设置页共用的 renderer 输出对应 backend 的 LobeHub light/dark 图标，而非保留 OpenCode brandmark 或 Codex provider SVG 特例，并根据 local/remote mode 选择 status 文案；如果 async availability 返回时 header 已销毁，会重新检查 DOM refs 并跳过写入，避免设置页/视图切换期间的空节点错误
 - `build()` / `startLspStatusLoop()` / `refreshBackendChrome()` 现在会先检查 `isOpenCodeBackend()`；当当前 active backend 不是一个真正启用中的 OpenCode surface 时，不再挂载或轮询 LSP 状态，避免 disabled-backend 场景继续打无意义运行时请求。后端切换时 view 会调用 `refreshBackendChrome()`，让 OpenCode-only LSP chrome 随 active backend 重新挂载或移除。
 - 非 OpenCode backend 的可用状态会先由 active adapter 的 `status` 映射；`connected` 才显示为 backend connected，`connecting` 显示为 starting，`disconnected` / `error` 显示为 offline。`offline` 现在也会带出 backend 名称（例如 `Claude Code offline`），这样 Claude Code 断开时不会再被标题栏伪装成无主的 generic offline。状态徽标 tooltip 也继续使用 backend settings copy，点击仍通过 host seam 进入对应 backend 的 runtime settings，而不是固定打开 OpenCode server section。`data-active-backend` 同步设置为当前 canonical backend kind，为 CSS 和 UI 验收脚本提供稳定 hook。
+- diagnostics backend routing 与 server availability 独立：Claude Code 即使处于 `offline` 也不会误显示 OpenCode diagnostics。只有 active backend 为 `claude-code` 且 Claude host callbacks 已接线时才显示按钮；`getActiveDiagnosticsTabId()` 提供显式 tab identity，`getClaudeDiagnosticsState(tabId)` 的 `armed/capturing/warning/critical/degraded` 结果写入共享 `data-trace-state`，点击再由 `showClaudeDiagnostics(event, tabId)` 打开 Claude 菜单。
 - `applyLocaleTexts()` 刷新所有 header tooltip，并按最后一次 availability 立即重算 status label
 - `destroy()` 停止 polling 并释放 presenter 内部 DOM refs
 

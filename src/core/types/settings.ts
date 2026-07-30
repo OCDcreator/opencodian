@@ -15,6 +15,9 @@ import {
   normalizeDebugRefreshIntervalMs,
 } from '../../shared/debugModules';
 import {
+  CLAUDE_TRACE_CHANNEL_IDS,
+  type ClaudeSessionTraceSettings,
+  type ClaudeTraceChannelId,
   CODEX_TRACE_CHANNEL_IDS,
   type CodexSessionTraceSettings,
   type CodexTraceChannelId,
@@ -276,6 +279,8 @@ export interface ClaudeCodeBackendSettings {
   promptSuggestions: boolean;
   /** Product workbench debug channels for future Claude Code logging routes. */
   debugChannels: ClaudeCodeDebugChannelSettings;
+  /** Claude Code session trace (diagnostics) settings. */
+  sessionTrace: ClaudeSessionTraceSettings;
   /**
    * Sandbox behavior controls for Claude Code subprocess isolation.
    * Readback: SDK options wiring proven; OS-level process isolation not independently verified.
@@ -484,6 +489,7 @@ export function getDefaultClaudeCodeBackendSettings(): ClaudeCodeBackendSettings
     agentProgressSummaries: false,
     promptSuggestions: false,
     debugChannels: getDefaultClaudeCodeDebugChannelSettings(),
+    sessionTrace: getDefaultClaudeSessionTraceSettings(),
     sandbox: {
       enabled: false,
       failIfUnavailable: false,
@@ -508,6 +514,17 @@ export function getDefaultClaudeCodeBackendSettings(): ClaudeCodeBackendSettings
     systemPrompt: '',
     outputStyle: '',
     autoTitle: true,
+  };
+}
+
+export function getDefaultClaudeSessionTraceSettings(): ClaudeSessionTraceSettings {
+  return {
+    enabled: true,
+    consolePreset: 'standard',
+    consoleChannels: Object.fromEntries(
+      CLAUDE_TRACE_CHANNEL_IDS.map((channelId) => [channelId, true]),
+    ) as Record<ClaudeTraceChannelId, boolean>,
+    storageDirectory: '',
   };
 }
 
@@ -865,6 +882,7 @@ export function normalizeClaudeCodeBackendSettings(value: unknown): ClaudeCodeBa
     agentProgressSummaries: candidate.agentProgressSummaries === true,
     promptSuggestions: candidate.promptSuggestions === true,
     debugChannels: normalizeClaudeCodeDebugChannelSettings(candidate.debugChannels),
+    sessionTrace: normalizeClaudeSessionTraceSettings(candidate.sessionTrace),
     sandbox: normalizeClaudeCodeSandboxSettings(candidate.sandbox),
     planModeInstructions: typeof candidate.planModeInstructions === 'string'
       ? candidate.planModeInstructions.trim()
@@ -946,6 +964,29 @@ function normalizeCodexSessionTraceSettings(value: unknown): CodexSessionTraceSe
       ? traceCandidate.storageDirectory.trim()
       : traceDefaults.storageDirectory,
     captureContent: traceCandidate.captureContent !== false,
+  };
+}
+
+function normalizeClaudeSessionTraceSettings(value: unknown): ClaudeSessionTraceSettings {
+  const traceCandidate = value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Partial<ClaudeSessionTraceSettings>
+    : {};
+  const traceDefaults = getDefaultClaudeSessionTraceSettings();
+  const traceChannels = Object.fromEntries(
+    CLAUDE_TRACE_CHANNEL_IDS.map((channelId) => [
+      channelId,
+      traceCandidate.consoleChannels?.[channelId] !== false,
+    ]),
+  ) as Record<ClaudeTraceChannelId, boolean>;
+  return {
+    enabled: traceCandidate.enabled !== false,
+    consolePreset: traceCandidate.consolePreset === 'off' || traceCandidate.consolePreset === 'full'
+      ? traceCandidate.consolePreset
+      : traceDefaults.consolePreset,
+    consoleChannels: traceChannels,
+    storageDirectory: typeof traceCandidate.storageDirectory === 'string'
+      ? traceCandidate.storageDirectory.trim()
+      : traceDefaults.storageDirectory,
   };
 }
 

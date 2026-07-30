@@ -360,6 +360,7 @@ describe('SettingsDebugSection', () => {
     expect(blockDisplays).toEqual([
       ['plugin', 'none'],
       ['opencode', ''],
+      ['codex', 'none'],
       ['claude-code', 'none'],
       ['export', 'none'],
     ]);
@@ -418,6 +419,7 @@ describe('SettingsDebugSection', () => {
     expect(shellEls.map((el) => (el as HTMLElement).dataset.sectionBlock)).toEqual([
       'plugin',
       'opencode',
+      'codex',
       'claude-code',
       'export',
     ]);
@@ -444,6 +446,11 @@ describe('SettingsDebugSection', () => {
         id: 'opencode',
         title: t('settings.debug.modules.opencode.title'),
         description: t('settings.debug.modules.opencode.desc'),
+      },
+      {
+        id: 'codex',
+        title: t('settings.debug.modules.codex.title'),
+        description: t('settings.debug.modules.codex.desc'),
       },
       {
         id: 'claude-code',

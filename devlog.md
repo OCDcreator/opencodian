@@ -11,6 +11,34 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-07-30 Claude session-trace 收尾与 owner-guard 复核修复
+
+**范围。** Claude Code session-trace 与 Codex 调试导航修复进入收尾。本批未提交工作唯一硬门禁是 `npm run verify` 在 `check:owner-guard` 失败：`OpenCodianView.ts`（+19/-0）与 `main.ts`（+18/-1）相对任务起点 `921a9742` 都是 Class B（非 presentation、净增），触犯 `RULE_1_HOTSPOT_CLASS_B`。已提交的 Codex 批是同一模式，当时仅因直接进 `main`、`HEAD` 默认范围看不到 diff 才“过关”；本批要求用 `--range 921a9742` 显式复核真正通过。
+
+**根因与解决方案。** owner-guard 是纯文本启发式，构造代码不可能变成 `presentation-only`。在不明显扩大范围、不动稳定 OpenCode/Codex 基线（避免回归）的前提下，两个 guarded 文件都无法净减少（OpenCodianView 删 Codex 基线 15 行不够抵消 +19；main.ts 的 OpenCode/Codex/Claude 三个 trace service 构造都在基线，新增 secrets helper 本身也是自己加的）。因此走 `development-maintainability-rules.md` 明文设计的 `OWNER_GUARD_APPROVED` 单次精确豁免：先把 `collectClaudeCodeKnownSecrets` 下沉为 `ClaudeSessionTraceService.ts` 的导出辅助函数（owner-sink，`main.ts` 改为经 barrel 导入），`ClaudeDiagnosticsHostAdapter` 已是独立 owner，剩余 `OpenCodianView`/`main.ts` 改动仅为 AGENTS.md 明文允许的构造/装配/转发/生命周期接线，不含业务逻辑，不覆盖 `ClaudeCodeAdapter`。
+
+**实现。** 新增 `src/core/agents/backend/diagnostics/ClaudeSessionTraceService.ts::collectClaudeCodeKnownSecrets(value)`（cycle-safe 纯函数，按 key 名收集 api-key/token/secret 叶子）；删除 `main.ts` 内联同名函数并改为 `import { ..., collectClaudeCodeKnownSecrets, ... }`；同步 `docs/modules/core/agents/backend/diagnostics/ClaudeSessionTraceService.md` 的导出辅助函数段。
+
+**验证。** owner-guard 用 `OWNER_GUARD_APPROVED` 对 `--range 921a9742` 与默认 `HEAD` 都 PASS（`RULE_1_HOTSPOT_CLASS_B_APPROVED`，退出码 0）；专项测试 109 通过、全量 704 suites/6671 tests 通过、lint 0/0、tsc 0、build 成功（`BUILD_ID=main.202607302228`）；`check:module-docs`/`check:graphify`（已 `graphify:update:src` 刷新）/`check:devlog-order` 全绿；`npm run verify` 退出码 0。Test Vault 三产物 SHA-256 与 dist 一致、BUILD_ID 落地；Obsidian 真实 `.opencodian-settings-tabbed` 验收：Debug 有六个二级标签（插件/OpenCode/Codex/Claude Code/导出/能力实验室），点 Codex 时仅 codex block 可见、点 Claude Code 时仅 claude-code block 可见且 session-trace 控件与原 logger/channel 控件同时存在（13 trace 元素 + 2 channel-panel + 2 log-panel），无重复标题、无横向溢出；`dev:errors` 无异常，`dev:console` 仅见既有 OpenCodeTrace 镜像噪声与本地 server 未起时的 legacy HTTP fallback WARN。
+
+## 2026-07-30 Codex 调试页导航入口漏接修复
+
+**范围。** Codex 调试内容块已在 `SettingsDebugSection.attachTabbed` 内实现，但 UI 不可达——根因是导航注册表 `settingsLayoutRegistry.ts` 的 debug secondaryTabs 漏注册 `codex`、locale 缺 `settings.debug.tab.codex` 标签、且 `createDebugTabShell` 对 codex 用 `data-codex-section-block` / `data-codex-debug-tab-shell` 特判属性偏离统一 `data-section-block` 合约。严格按 `docs/design/codex-debug-nav-registration-fix-2026-07-30.md` 方案执行，不扩大范围（仅 debug 组，不动 `renderDebugContent` 分发与 capability-lab 渲染路径）。
+
+**实现。** S1 在 debug secondaryTabs 的 `opencode` 之后插入 `{ id: 'codex', labelKey: 'settings.debug.tab.codex' }`。S2 在 zh.ts / en.ts 的同组 key 相邻位置补 `'settings.debug.tab.codex': 'Codex'`。S3 删除 `createDebugTabShell` 的 `isCodexShell` 特判与 `showActiveBlock` 的 `[data-section-block], [data-codex-section-block]` 双属性 fallback，所有 shell 统一 `data-section-block` + `data-debug-tab-shell`，`showActiveBlock` 只查 `[data-section-block]`。
+
+**测试。** 更新 `settingsLayoutRegistry.test.ts` 的 debug tab 列表断言补 `codex`；把 `SettingsDebugSection.codex.test.ts` 的 `data-codex-section-block` 合约断言改为统一 `data-section-block`，保留直接 `attachTabbed('codex')` 的内容断言。新增 `SettingsDebugSection.navSeam.test.ts`：从 `getPrimaryTabDefinition('debug')` 读注册表 secondaryTabs，显式豁免 `capability-lab`（注释说明它由 `SettingsCapabilityLabSection` 经 `SettingsTabbedRenderer.ts:521` 分发渲染），对其余每个 tab 用真实 `SettingsDebugSection.attachTabbed` 渲染并断言可见性；另加孤儿守卫——渲染出的 `[data-section-block]` 集合必须严格等于注册表声明集合。负向验证：临时撤掉 S1 后接缝测试与 registry 断言双双变红（codex 成为孤儿块），恢复后转绿。
+
+**仓库义务。** 同步 `docs/modules/features/settings/SettingsDebugSection.md`（特判描述改为统一合约，五 tab 列表与 `attachTabbed` 路由清单补 codex）与 `settingsLayoutRegistry.md`（debug 二级标签清单补 codex）；`npm run check:module-docs` 通过；`npm run graphify:update:src` 已刷新。
+
+## 2026-07-30 Claude Code 后端会话日志调试（Session Trace）
+
+**范围。** 严格按已对齐的 Claude Code session-trace 方案，为 Claude 后端补齐持久化会话事件、异常回溯、stall watchdog、deep capture、聊天入口和设置区段；不引入 wire 级 trace，不改变既有 `claudeCode.debugChannels` console logger 行为，也不增加 `captureContent` 开关。
+
+**实现。** 阶段 A 复用 `src/shared/diagnostics/` 的 TraceStore/TraceRedactor/TraceReportBuilder，新增 Claude session trace service 与 per-session ring buffer，覆盖 SDK envelope、normalizer chunk、turn 生命周期、权限/elicitation、持久化事件、60s/180s watchdog、错误回溯和 30 分钟 deep capture。阶段 B 将 `ClaudeCodeAdapter` 通过 `this.trace(...)` 安全边界接入，并由 `main.ts` 注入 service；SDK sessionId 作为 trace 锚点，trace 故障不影响聊天路径。阶段 C 新增 `ClaudeDiagnosticsHostAdapter`，接入聊天徽章、捕获令牌、取消、报告复制与导出，`OpenCodianView` 仅保留装配。阶段 D 在既有 claude-code 设置 block 内增加 trace 状态、开关、preset、五通道、目录、报告/导出/清空和最近轨迹操作，同时保留原日志预览。阶段 E 补齐 service、ring/watchdog、adapter、settings、host adapter 与设置区段单元测试。
+
+**安全与收尾义务。** Trace 使用 `hardened` 脱敏，`knownSecrets` 从 `backendSettings.claudeCode` 动态收集 apiKey/token/secret 类字段，导出报告和 bundle 均须无明文凭据。新增/变更模块需同步 `docs/modules/**`，`src/` 变更后刷新并校验 Graphify，且持续遵守本日志倒序与 `npm run check:devlog-order` 门禁；最终仍需完成方案验收中的 `npm run verify` 与必要的 Test Vault 部署验证，本条不将其预先记为已通过。
+
 ## 2026-07-30 Codex 后端会话调试日志系统
 
 **范围。** 把 OpenCode 侧已有的 trace 基础设施下沉为后端无关的共享件，并为 Codex 后端独立构建一套默认开启的会话 trace 系统。OpenCode 既有行为零变更（六个回归测试原样保留），Codex 不复用 OpenCode 的 service/store，而是消费共享基座并叠加自己的线程/回合生命周期与线流量捕获。

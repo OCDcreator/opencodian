@@ -491,7 +491,10 @@ function normalizeLoadedPluginSettings(savedSettings: LoadedSettingsSnapshot | n
       capabilityLabSelectedBackend: normalizeCapabilityLabSelectedBackend(
         normalizedSettings?.capabilityLabSelectedBackend,
       ),
-      backendSettings: normalizedSettings?.backendSettings ?? DEFAULT_SETTINGS.backendSettings,
+      // Normalize again at the final merge boundary so newly added backend
+      // diagnostics fields (including Claude session trace settings) are
+      // materialized even when an older snapshot omitted them.
+      backendSettings: normalizeBackendSettings(normalizedSettings?.backendSettings),
       server: context.normalizedServer,
       enableTabs: normalizedSettings?.enableTabs ?? DEFAULT_SETTINGS.enableTabs,
       tabBarPosition: normalizeTabBarPosition(normalizedSettings?.tabBarPosition),

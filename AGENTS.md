@@ -38,6 +38,9 @@ Use `npm run doctor:esbuild` only after dependency changes or when build/dev rep
 ## Current Architecture
 
 - `src/main.ts`: plugin entry point. It initializes storage, settings normalization, locale, OpenCode services, commands, and view registration.
+- `src/core/agents/backend/diagnostics/ClaudeSessionTraceService.ts` + `ClaudeTraceRingBuffer.ts`: own Claude Code session traces on the shared diagnostics foundation; use hardened redaction with dynamically collected Claude credentials, keep trace channels independent from `claudeCode.debugChannels`, and contain trace failures away from the chat path. `main.ts` constructs and injects the service.
+- `src/features/chat/services/ClaudeDiagnosticsHostAdapter.ts`: owns Claude trace badge/menu state, capture-token and report/export callbacks; `OpenCodianView.ts` should only assemble and forward these callbacks.
+- `src/features/settings/SettingsDebugSection.ts`: keeps the Claude session-trace controls inside the existing `claude-code` debug block; preserve the existing console logger/channel controls alongside the independent trace settings.
 - `src/core/opencode/OpenCodeService.ts`: hybrid OpenCode facade. SDK v2 is the main path, but legacy HTTP/SSE fallback paths still exist and must not be removed casually.
 - `src/core/opencode/OpenCodeSdkFacade.ts`: thin SDK namespace wrapper. Keep request option injection, response unwrapping, and error normalization centralized here instead of reimplementing them ad hoc in callers.
 - `src/core/opencode/OpenCodeService.ts`: sync event subscriptions (message.updated, message.part.updated, session.diff) are managed by `OpenCodeSyncEventRuntimeCoordinator`; keep message-layer sync signals separate from foreground `session.status`.

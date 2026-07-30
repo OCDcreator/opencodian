@@ -183,6 +183,7 @@ import {
   ChildSessionGraphCoordinator,
   type ChildSessionGraphCoordinatorHost,
 } from './services/ChildSessionGraphCoordinator';
+import { ClaudeDiagnosticsHostAdapter } from './services/ClaudeDiagnosticsHostAdapter';
 import { CodexChatSurfaceBinding } from './services/CodexChatSurfaceBinding';
 import { CodexDiagnosticsHostAdapter } from './services/CodexDiagnosticsHostAdapter';
 import {
@@ -525,6 +526,7 @@ export class OpenCodianView extends ItemView {
   private backendCapabilityChangeDisposable: { dispose(): void } | null = null;
   private readonly codexChatSurfaceBinding: CodexChatSurfaceBinding;
   private readonly codexDiagnosticsAdapter: CodexDiagnosticsHostAdapter;
+  private readonly claudeDiagnosticsAdapter: ClaudeDiagnosticsHostAdapter;
   private escapeHandlers: Array<() => boolean> = [];
   private backendSurfaceSwitchPromise: Promise<void> | null = null;
 
@@ -781,6 +783,8 @@ export class OpenCodianView extends ItemView {
       getActiveDiagnosticsTabId: () => this.getActiveTabId(),
       getCodexDiagnosticsState: (tabId) => this.codexDiagnosticsAdapter.getDiagnosticsState(tabId),
       showCodexDiagnostics: (event, tabId) => this.codexDiagnosticsAdapter.showDiagnostics(event, tabId),
+      getClaudeDiagnosticsState: (tabId) => this.claudeDiagnosticsAdapter.getDiagnosticsState(tabId),
+      showClaudeDiagnostics: (event, tabId) => this.claudeDiagnosticsAdapter.showDiagnostics(event, tabId),
       openSettings: () => {
         this.openPluginSettingsPreservingScroll();
       },
@@ -1742,6 +1746,14 @@ export class OpenCodianView extends ItemView {
     this.codexDiagnosticsAdapter = new CodexDiagnosticsHostAdapter({
       getCodexTraceService: () => this.plugin.codexTraceService,
       getCodexSessionTraceSettings: () => this.plugin.settings.backendSettings.codex.sessionTrace,
+      getCurrentConversation: () => this.currentConversation,
+      refreshHeaderChrome: () => this.chatHeaderPresenter.refreshBackendChrome(),
+      createMenu: () => new Menu(),
+      showNotice: (message) => { new Notice(message); },
+    });
+    this.claudeDiagnosticsAdapter = new ClaudeDiagnosticsHostAdapter({
+      getClaudeTraceService: () => this.plugin.claudeTraceService,
+      getClaudeSessionTraceSettings: () => this.plugin.settings.backendSettings.claudeCode.sessionTrace,
       getCurrentConversation: () => this.currentConversation,
       refreshHeaderChrome: () => this.chatHeaderPresenter.refreshBackendChrome(),
       createMenu: () => new Menu(),
@@ -3255,6 +3267,7 @@ export class OpenCodianView extends ItemView {
         this.plugin.openCodeTraceService.cancelDeepCapture(tabId);
       },
       cancelCodexDiagnosticCapture: (tabId) => this.codexDiagnosticsAdapter.cancelDiagnosticCapture(tabId),
+      cancelClaudeDiagnosticCapture: (tabId) => this.claudeDiagnosticsAdapter.cancelDiagnosticCapture(tabId),
       showNotice: (message) => {
         new Notice(message);
       },
@@ -3289,11 +3302,17 @@ export class OpenCodianView extends ItemView {
       },
       claimCodexDiagnosticRunToken: (tabId, threadId) =>
         this.codexDiagnosticsAdapter.claimDiagnosticRunToken(tabId, threadId ?? undefined),
+      claimClaudeDiagnosticRunToken: (tabId, sessionId) =>
+        this.claudeDiagnosticsAdapter.claimDiagnosticRunToken(tabId, sessionId ?? undefined),
       refreshOpenCodeDiagnosticsState: (tabId) => {
         if (!shouldRefreshOpenCodeDiagnosticsHeader(this.getActiveTabId(), tabId)) return;
         this.chatHeaderPresenter.refreshBackendChrome();
       },
       refreshCodexDiagnosticsState: (tabId) => {
+        if (!shouldRefreshOpenCodeDiagnosticsHeader(this.getActiveTabId(), tabId)) return;
+        this.chatHeaderPresenter.refreshBackendChrome();
+      },
+      refreshClaudeDiagnosticsState: (tabId) => {
         if (!shouldRefreshOpenCodeDiagnosticsHeader(this.getActiveTabId(), tabId)) return;
         this.chatHeaderPresenter.refreshBackendChrome();
       },

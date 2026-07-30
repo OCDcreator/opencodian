@@ -7,6 +7,12 @@
 
 `ClaudeCodeAdapter.ts` 是 Claude Code Agent SDK backend adapter。它实现 `AgentService`、`AgentChatCapability`、`AgentSessionCapability` 和 `AgentForkCapability`，通过注入式或 lazy-loaded SDK facade 调用 `query()`，并复用 Claude options builder、stream normalizer 和 permission bridge。
 
+## Session trace（2026-07-30）
+
+adapter 可选注入 `ClaudeTracePort`，但所有 diagnostics 接线都必须经过私有 `this.trace(...)` 安全边界：trace port 缺失或任一 hook 抛错时只写独立 `ClaudeTraceAdapter` 警告，绝不进入既有 Claude runtime debug channel，也绝不影响 SDK、stream、permission 或 elicitation 行为。input push 时 `beginTraceTurn()` 用本地 session id 建 provisional turn/watchdog；首个 SDK `session_id` 到达后 `captureSdkSessionId()` 调用 `bindSession()`，迁移上下文并使 SDK id 成为 traceId，随后才记录 SDK message 与 normalized chunks。stream 终态把 SDK `is_error` 或 error chunk 视为 `error`，避免成功 result 边界误记 completed。
+
+接线覆盖 runtime start/stop、send 的 runtime-ready/stream error 与 cancellation、SDK message、normalized chunk、permission request/decision、MCP elicitation request/response，以及 create/delete/title/import/fork/rewind 等 session 持久化事件。adapter 不拥有存储、脱敏、ring、watchdog 或导出；这些均属于 `ClaudeSessionTraceService`。
+
 生产 runtime 通过 `ClaudeCodeSdkLoader` lazy-load 官方 SDK facade，避免插件启动时因为 SDK 包、external CLI 或本机认证状态阻塞 OpenCodian 启动。生产构建会把 SDK 主包打进 `main.js` 作为 API facade，但不再复制 `dist/node_modules/@anthropic-ai/claude-agent-sdk-<platform>/`。`claude-code` 已进入 `IMPLEMENTED_AGENT_BACKENDS`，但默认设置仍只启用 OpenCode；用户需要在 backend 设置中显式启用 Claude Code、安装 Claude Code CLI（或配置 executable path）并完成 Claude Code 认证。
 
 ## 图片附件路径（2026-07-22）

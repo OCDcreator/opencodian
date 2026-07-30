@@ -28,7 +28,7 @@ import { type CodexApprovalHostContext, createCodexApprovalBridgeHost } from './
 import { OpenCodeAdapter } from './core/agents/backend/OpenCodeAdapter';
 import { OpenCodeService, SDK_FEATURE_FLAG_ROLLOUT_DEFAULTS } from './core/opencode';
 import { OpenCodeSessionTraceService } from './core/opencode/diagnostics';
-import { CodexSessionTraceService } from './core/agents/backend/diagnostics';
+import { ClaudeSessionTraceService, collectClaudeCodeKnownSecrets, CodexSessionTraceService } from './core/agents/backend/diagnostics';
 import { migrateOpenCodeCapabilitySettings } from './core/opencode/OpenCodeCapabilitySettingsMigration';
 import { OpenCodianSettingsRuntimeCoordinator } from './core/runtime/OpenCodianSettingsRuntimeCoordinator';
 import { OpenCodianStartupCoordinator } from './core/runtime/OpenCodianStartupCoordinator';
@@ -88,6 +88,7 @@ const OPENCODIAN_APP_ICON_SVG = `
 
 type LoadedManagedServerState = Awaited<ReturnType<StorageService['loadManagedServerState']>>;
 type ConversationCachePinProvider = () => Iterable<string>;
+
 // BUILD_ID is injected at build time via esbuild define
 declare const BUILD_ID: string;
 
@@ -98,6 +99,7 @@ export default class OpenCodianPlugin extends Plugin {
   openCodeService: OpenCodeService;
   openCodeTraceService: OpenCodeSessionTraceService;
   codexTraceService!: CodexSessionTraceService;
+  claudeTraceService!: ClaudeSessionTraceService;
   agentServiceRegistry: AgentServiceRegistry;
   claudeCodePermissionBridge: ClaudeCodePermissionBridge | null = null;
   claudeCodePermissionHostContext: ClaudeCodePermissionBridgeHostContext = { getActiveTabId: () => null };
@@ -264,6 +266,17 @@ export default class OpenCodianPlugin extends Plugin {
           pluginIsolationMode: this.settings.pluginIsolationMode,
         }),
       });
+      this.claudeTraceService = new ClaudeSessionTraceService({
+        settings: () => this.settings.backendSettings.claudeCode.sessionTrace,
+        vaultPath: getVaultBasePath(this.app) ?? undefined,
+        buildIdentity: () => this.getDebugBuildIdentityText(),
+        knownSecrets: () => collectClaudeCodeKnownSecrets(this.settings.backendSettings.claudeCode),
+        runtimeMetadata: () => ({
+          serverMode: this.settings.server.mode,
+          modelSourceMode: this.settings.modelSourceMode,
+          pluginIsolationMode: this.settings.pluginIsolationMode,
+        }),
+      });
       this.openCodeService = new OpenCodeService(
         this.settings,
         {
@@ -301,6 +314,7 @@ export default class OpenCodianPlugin extends Plugin {
           pathToClaudeCodeExecutable: this.getBundledClaudeCodeExecutablePath(vaultPath),
           sdkLoader: loadClaudeCodeSdk,
           permissionBridge: this.claudeCodePermissionBridge,
+          tracePort: this.claudeTraceService,
           onElicitation: (request, options) => this.handleClaudeCodeElicitation(request, options),
           mcpConfigLoader: async () => {
             if (!this.opencodeConfigManager) {
@@ -572,6 +586,9 @@ export default class OpenCodianPlugin extends Plugin {
     });
     void this.codexTraceService?.dispose().catch(() => {
       logger.warn('Failed to flush Codex trace service during unload');
+    });
+    void this.claudeTraceService?.dispose().catch(() => {
+      logger.warn('Failed to flush Claude trace service during unload');
     });
     setAgentServiceRegistry(null);
     this.getSettingsRuntimeCoordinator().clearChatAppearanceSaveTimer();
