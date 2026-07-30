@@ -11,6 +11,24 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-07-30 Agent-Friendly Architecture 基建：owner manifest 与 inspector（Phase 0）
+
+**范围。** 执行 `docs/superpowers/plans/2026-07-30-agent-friendly-architecture-and-governance-refactor.md` 的 Phase 0（Task 1A、1B、2），建立机器可读的唯一架构 owner 事实源，不改动任何 runtime 源码。
+
+**产出。**
+- `architecture-owners.config.json`：strict-schema canonical owner manifest（schemaVersion 1，49 个 coarse owner，覆盖 542/542 个受管 `src` 路径，`legacy.unassigned.explicitPaths` = 0）。
+- `scripts/architecture-owner-lib.mjs` + `tests/unit/infrastructure/architecture-owner-lib.test.mjs`（24 个 fixture：unknown-key / zero-owner / ambiguous / delegation / canonical-state 唯一性 / exception 过期 等全部 fail-closed）。
+- `scripts/check-owner-manifest.mjs`（默认级：schema + exactly-one coverage + ambiguous + unassigned baseline 锁定；`--strict-paths` 级：overviewDoc 存在 + 入口/测试引用审计）。
+- `scripts/inspect-owner.mjs` + `tests/unit/infrastructure/inspect-owner.test.mjs`（13 个 golden test：chat/OpenCode/Codex/Claude/storage/settings/main 代表性路径解析、module-doc 组合、layer/dependency surface）。
+- `docs/architecture/owners/README.md`（owner model 叙述）+ 49 个 owner overview 页（从 manifest 生成）。
+- `package.json` 增 `check:owner-manifest`、`inspect:owner`；`AGENTS.md` 增 Owner Routing 一节，将长热点列表降级为 inspector + 简短 fallback map。
+
+**不变量。** owner manifest 不复制 module-doc 路径映射（仍由 `module-docs.config.json` 唯一拥有），不复制 Graphify 图事实；inspector 组合三者。reference-only dependency 别名 owner（`feature.chat-send` 等）声明零路径、零 canonical state，仅用于让 `allowedOwnerDependencies` 词汇表可读。
+
+**门禁。** `check:owner-manifest`（542/542 covered, 0 ambiguous, 0 unassigned）、`check:module-docs`（576/576）、`check:graphify`、`check:devlog-order`、lint（0/0）、typecheck、6708 tests、build 全绿。runtime 文件零改动，无需 Test Vault 部署。
+
+**后续。** Phase 0 待 Codex 独立审查 APPROVED 后进入 Phase 1（unified change scope + runtime/type/dynamic import-edge 分类门禁）。
+
 ## 2026-07-30 Claude session-trace 收尾与 owner-guard 复核修复
 
 **范围。** Claude Code session-trace 与 Codex 调试导航修复进入收尾。本批未提交工作唯一硬门禁是 `npm run verify` 在 `check:owner-guard` 失败：`OpenCodianView.ts`（+19/-0）与 `main.ts`（+18/-1）相对任务起点 `921a9742` 都是 Class B（非 presentation、净增），触犯 `RULE_1_HOTSPOT_CLASS_B`。已提交的 Codex 批是同一模式，当时仅因直接进 `main`、`HEAD` 默认范围看不到 diff 才“过关”；本批要求用 `--range 921a9742` 显式复核真正通过。
