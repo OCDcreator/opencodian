@@ -20,7 +20,7 @@ import { spawn } from 'node:child_process';
 import WebSocket from 'ws';
 
 import { createLogger } from '../../../shared';
-import type { AppServerServerRequestHandler } from './CodexAppServerClientTypes';
+import type { AppServerServerRequestHandler, CodexAppServerWireObserver } from './CodexAppServerClientTypes';
 
 const logger = createLogger('CodexAppServerClient');
 
@@ -51,7 +51,7 @@ export class CodexAppServerTransport {
   protected ws: WebSocket | null = null;
   protected process: ReturnType<typeof spawn> | null = null;
   protected nextId = 1;
-  protected pending = new Map<number, { resolve: (value: unknown) => void; reject: (reason: Error) => void }>();
+  protected pending = new Map<number, { resolve: (value: unknown) => void; reject: (reason: Error) => void; method: string; sentAt: number }>();
   protected notificationHandlers = new Map<string, Set<(params: unknown) => void>>();
   /** Server-initiated request handlers (method+id messages). One per method. */
   protected serverRequestHandlers = new Map<string, AppServerServerRequestHandler>();
@@ -69,9 +69,32 @@ export class CodexAppServerTransport {
    */
   protected workingDirectory?: string;
 
-  constructor(options?: { codexPathOverride?: string; workingDirectory?: string }) {
+  /**
+   * Optional wire-traffic observer. When set, the transport invokes its
+   * callbacks at the JSON-RPC / connection-lifecycle points listed in
+   * `CodexAppServerWireObserver`. Every call is guarded by `notifyObserver` so
+   * an observer exception never affects the RPC main path. `undefined` (the
+   * default for all existing callers) yields byte-for-byte identical behavior.
+   */
+  protected readonly wireObserver?: CodexAppServerWireObserver;
+
+  constructor(options?: { codexPathOverride?: string; workingDirectory?: string; wireObserver?: CodexAppServerWireObserver }) {
     this.codexPathOverride = options?.codexPathOverride;
     this.workingDirectory = options?.workingDirectory;
+    this.wireObserver = options?.wireObserver;
+  }
+
+  /**
+   * Invoke an observer callback, swallowing any exception so it can never
+   * escape into the JSON-RPC / connection-lifecycle main path. Belt-and-
+   * suspenders: callers also optional-chain `this.wireObserver?.onX?.(...)`.
+   */
+  private notifyObserver(notify: () => void): void {
+    try {
+      notify();
+    } catch (error) {
+      logger.warn('wire observer threw', { error: error instanceof Error ? error.message : String(error) });
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -89,6 +112,7 @@ export class CodexAppServerTransport {
   private async doStart(): Promise<void> {
     const codexPath = this.codexPathOverride ?? 'codex';
     logger.info('Starting Codex app-server', { codexPath, cwd: this.workingDirectory ?? '(inherited)' });
+    this.notifyObserver(() => this.wireObserver?.onConnection?.({ state: 'starting' }));
 
     this.process = spawn(codexPath, ['app-server', '--listen', 'ws://127.0.0.1:0'], {
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -102,6 +126,7 @@ export class CodexAppServerTransport {
     const wsUrl = await this.waitForWsUrl(this.process);
     this.wsUrl = wsUrl;
     logger.info('App-server WebSocket URL', { wsUrl });
+    this.notifyObserver(() => this.wireObserver?.onConnection?.({ state: 'ws-url', detail: wsUrl }));
 
     // Node `ws` is statically bundled into main.js. Obsidian's renderer
     // WebSocket cannot connect to localhost app-server sockets.
@@ -120,6 +145,8 @@ export class CodexAppServerTransport {
       };
     });
 
+    this.notifyObserver(() => this.wireObserver?.onConnection?.({ state: 'connected' }));
+
     ws.onmessage = (event) => {
       this.handleMessage(event.data as string);
     };
@@ -127,10 +154,12 @@ export class CodexAppServerTransport {
     ws.onclose = () => {
       logger.warn('App-server WebSocket closed');
       this.initialized = false;
+      this.notifyObserver(() => this.wireObserver?.onConnection?.({ state: 'closed' }));
     };
 
     ws.onerror = (err) => {
       logger.error('App-server WebSocket error', { error: String(err) });
+      this.notifyObserver(() => this.wireObserver?.onConnection?.({ state: 'error', detail: String(err) }));
     };
 
     // Initialize the JSON-RPC session
@@ -146,6 +175,7 @@ export class CodexAppServerTransport {
     ws.send(JSON.stringify({ jsonrpc: '2.0', method: 'initialized' }));
     this.initialized = true;
     logger.info('App-server initialized');
+    this.notifyObserver(() => this.wireObserver?.onConnection?.({ state: 'initialized' }));
   }
 
   private waitForWsUrl(proc: ReturnType<typeof spawn>): Promise<string> {
@@ -211,6 +241,7 @@ export class CodexAppServerTransport {
       pending.reject(new Error('App-server client stopped'));
     }
     this.pending.clear();
+    this.notifyObserver(() => this.wireObserver?.onConnection?.({ state: 'stopped' }));
   }
 
   // ---------------------------------------------------------------------------
@@ -235,28 +266,37 @@ export class CodexAppServerTransport {
     // before the plain-response branch, otherwise these get misrouted into the
     // pending-response lookup and silently dropped as "unexpected response id".
     if (hasId && hasMethod) {
+      this.notifyObserver(() => this.wireObserver?.onServerRequest?.({ id, method, params: msg.params }));
       this.handleServerRequest(id, method, msg.params);
       return;
     }
 
     // Ordinary response to a client request: `id`, no `method`.
     if (hasId) {
-      const pending = this.pending.get(id as number);
-      if (!pending) {
+      const entry = this.pending.get(id as number);
+      if (!entry) {
         logger.warn('Unexpected JSON-RPC response id', { id });
         return;
       }
       this.pending.delete(id as number);
+      const durationMs = Date.now() - entry.sentAt;
+      this.notifyObserver(() => this.wireObserver?.onResponse?.({
+        id: id as number,
+        ok: !msg.error,
+        durationMs,
+        ...(msg.error ? { error: `JSON-RPC error ${msg.error.code}: ${msg.error.message}` } : {}),
+      }));
       if (msg.error) {
-        pending.reject(new Error(`JSON-RPC error ${msg.error.code}: ${msg.error.message}`));
+        entry.reject(new Error(`JSON-RPC error ${msg.error.code}: ${msg.error.message}`));
       } else {
-        pending.resolve(msg.result);
+        entry.resolve(msg.result);
       }
       return;
     }
 
     // Notification: `method`, no `id`.
     if (hasMethod) {
+      this.notifyObserver(() => this.wireObserver?.onNotification?.({ method, params: msg.params }));
       const handlers = this.notificationHandlers.get(method);
       if (handlers) {
         for (const handler of handlers) {
@@ -308,6 +348,7 @@ export class CodexAppServerTransport {
       ? { jsonrpc: '2.0', id, result }
       : { jsonrpc: '2.0', id, error };
     this.ws.send(JSON.stringify(reply));
+    this.notifyObserver(() => this.wireObserver?.onServerReply?.({ id, ok: error === undefined }));
   }
 
   protected request(method: string, params?: Record<string, unknown>, timeoutMs?: number): Promise<unknown> {
@@ -338,6 +379,8 @@ export class CodexAppServerTransport {
           cleanupTimer();
           reject(reason);
         },
+        method,
+        sentAt: Date.now(),
       });
 
       if (timeoutMs !== undefined && timeoutMs > 0) {
@@ -347,6 +390,7 @@ export class CodexAppServerTransport {
         }, timeoutMs);
       }
 
+      this.notifyObserver(() => this.wireObserver?.onRequest?.({ id, method, params, timeoutMs }));
       this.ws.send(JSON.stringify(req));
     });
   }

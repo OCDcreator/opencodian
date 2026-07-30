@@ -508,3 +508,34 @@ export type AppServerItem =
  * with `{ decision: ReviewDecision }`.
  */
 export type AppServerServerRequestHandler = (params: unknown) => unknown | Promise<unknown>;
+
+/**
+ * Optional wire-traffic observer for the Codex app-server transport. When passed
+ * to `CodexAppServerTransport` (and thus `CodexAppServerClient`), every method is
+ * invoked at the corresponding JSON-RPC / connection-lifecycle point so a trace
+ * service (e.g. `CodexWireTraceBridge`) can observe traffic WITHOUT affecting the
+ * RPC main path. All methods are optional and guarded by the transport: an
+ * observer exception is caught and logged, never propagated into the RPC path.
+ *
+ * Each callback receives a snapshot of the message that just crossed the wire;
+ * `durationMs` on `onResponse` is measured transport-side from request-send to
+ * response-receive. When the observer is `undefined` (the default), transport
+ * behavior is byte-for-byte identical to the un-instrumented path.
+ */
+export interface CodexAppServerWireObserver {
+  /** Fired just before a client request is sent over the WebSocket. */
+  onRequest?(input: { id: number; method: string; params: unknown; timeoutMs?: number }): void;
+  /** Fired when the response to a client request arrives (success or error). */
+  onResponse?(input: { id: number; ok: boolean; durationMs: number; error?: string }): void;
+  /** Fired when a server notification (method, no id) arrives. */
+  onNotification?(input: { method: string; params: unknown }): void;
+  /** Fired when a server-initiated request (method + id) arrives. */
+  onServerRequest?(input: { id: number | string; method: string; params: unknown }): void;
+  /** Fired after the reply to a server-initiated request is sent. */
+  onServerReply?(input: { id: number | string; ok: boolean }): void;
+  /** Fired at connection-lifecycle transitions. `detail` is best-effort. */
+  onConnection?(input: {
+    state: 'starting' | 'ws-url' | 'connected' | 'initialized' | 'closed' | 'error' | 'stopped';
+    detail?: unknown;
+  }): void;
+}
