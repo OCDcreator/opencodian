@@ -39,6 +39,5 @@
       ],
       "exactMappings": {}
     }
-  ],
-  "src/features/chat/services/ChatVisualDemoCoordinator.ts": "docs/modules/features/chat/services/ChatVisualDemoCoordinator.md"
+  ]
 }

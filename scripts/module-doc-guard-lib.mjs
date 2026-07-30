@@ -54,6 +54,19 @@ export function loadConfig(root, configPath = 'module-docs.config.json') {
   }
 
   const parsed = JSON.parse(fs.readFileSync(resolved, 'utf8'));
+
+  // Strict top-level schema: reject unknown keys so stray top-level mappings
+  // (a historical drift where an exact mapping was accidentally placed at the
+  // root instead of inside a group's exactMappings) fail loudly instead of
+  // being silently ignored.
+  const ALLOWED_TOP_KEYS = new Set(['version', 'groups']);
+  const unknownTop = Object.keys(parsed).filter((k) => !ALLOWED_TOP_KEYS.has(k));
+  if (unknownTop.length) {
+    throw new Error(
+      `module-docs.config.json has unknown top-level key(s): ${unknownTop.join(', ')}. Exact mappings must live inside a group's "exactMappings".`,
+    );
+  }
+
   const groups = Array.isArray(parsed.groups) ? parsed.groups : [];
 
   if (groups.length === 0) {

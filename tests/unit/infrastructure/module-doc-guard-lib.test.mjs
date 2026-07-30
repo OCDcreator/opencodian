@@ -216,3 +216,55 @@ describe('aggregateDocsFromRequirements', () => {
     expect(callExport('aggregateDocsFromRequirements', requirements)).toEqual([]);
   });
 });
+
+describe('loadConfig strict top-level schema (Phase 2 Task 8)', () => {
+  const os = require('node:os');
+  const fs = require('node:fs');
+  const path = require('node:path');
+
+  function writeConfig(dir, json) {
+    fs.writeFileSync(path.join(dir, 'module-docs.config.json'), JSON.stringify(json));
+  }
+  function makeTmpDir() {
+    const d = fs.mkdtempSync(path.join(os.tmpdir(), 'moduledoc-strict-'));
+    fs.mkdirSync(path.join(d, 'src'), { recursive: true });
+    fs.mkdirSync(path.join(d, 'docs/modules'), { recursive: true });
+    return d;
+  }
+  function validConfig() {
+    return {
+      version: 1,
+      groups: [
+        { name: 'g', sourceRoot: 'src', docsRoot: 'docs/modules', include: ['**/*.ts'] },
+      ],
+    };
+  }
+  function loadIn(dir) {
+    const code = `
+      import { pathToFileURL } from 'node:url';
+      const mod = await import(pathToFileURL(${JSON.stringify(path.join(process.cwd(), 'scripts', 'module-doc-guard-lib.mjs'))}).href);
+      try { mod.loadConfig(${JSON.stringify(dir)}); process.stdout.write(JSON.stringify({ ok: true })); }
+      catch (e) { process.stdout.write(JSON.stringify({ ok: false, error: e.message })); }
+    `;
+    return JSON.parse(require('node:child_process').execFileSync(process.execNode || process.execPath, ['--input-type=module', '--eval', code], { encoding: 'utf8' }));
+  }
+
+  test('accepts a well-formed config with only version + groups', () => {
+    const dir = makeTmpDir();
+    writeConfig(dir, validConfig());
+    const r = loadIn(dir);
+    expect(r.ok).toBe(true);
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  test('rejects a stray top-level mapping', () => {
+    const dir = makeTmpDir();
+    const cfg = validConfig();
+    cfg['src/orphan.ts'] = 'docs/modules/orphan.md'; // stray top-level mapping
+    writeConfig(dir, cfg);
+    const r = loadIn(dir);
+    expect(r.ok).toBe(false);
+    expect(r.error).toContain('unknown top-level key');
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+});

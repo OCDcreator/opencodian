@@ -102,6 +102,7 @@ function main() {
     ['architecture cycles', 'node scripts/check-architecture-cycles.mjs'],
     ['architecture approvals', 'node scripts/check-architecture-approvals.mjs'],
     ['module docs', 'npm run check:module-docs'],
+    ['module doc owner impact', 'npm run check:module-doc-owner-impact'],
     ['graphify freshness', 'npm run check:graphify'],
     ['devlog order', 'npm run check:devlog-order'],
     ['lint', 'npm run lint'],
