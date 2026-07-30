@@ -97,6 +97,10 @@ function main() {
   const steps = [
     ['change scope', 'node scripts/check-change-scope.mjs'],
     ['owner manifest', 'node scripts/check-owner-manifest.mjs'],
+    ['owner boundaries', 'node scripts/check-owner-boundaries.mjs'],
+    ['dependency direction', 'node scripts/check-dependency-direction.mjs'],
+    ['architecture cycles', 'node scripts/check-architecture-cycles.mjs'],
+    ['architecture approvals', 'node scripts/check-architecture-approvals.mjs'],
     ['module docs', 'npm run check:module-docs'],
     ['graphify freshness', 'npm run check:graphify'],
     ['devlog order', 'npm run check:devlog-order'],

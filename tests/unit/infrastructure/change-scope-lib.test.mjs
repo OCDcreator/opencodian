@@ -205,3 +205,23 @@ describe('resolveBaseRef fail-closed', () => {
     }
   });
 });
+
+describe('candidateDigest excludes approval request metadata (Codex Phase 1 review fix)', () => {
+  test('approval request files do not affect the digest', () => {
+    const modulePath = path.join(process.cwd(), 'scripts', 'change-scope-lib.mjs');
+    const code = `
+      import { pathToFileURL } from 'node:url';
+      const mod = await import(pathToFileURL(${JSON.stringify(modulePath)}).href);
+      const records = [
+        { path: 'src/main.ts', status: 'M', mode: '100644', contentSha256: 'aaa' },
+        { path: 'docs/architecture/approvals/req.json', status: 'A', mode: '100644', contentSha256: 'bbb' },
+      ];
+      const withApproval = mod.candidateDigest(records);
+      const withoutApproval = mod.candidateDigest([records[0]]);
+      process.stdout.write(JSON.stringify({ withApproval, withoutApproval, equal: withApproval === withoutApproval }));
+    `;
+    const out = execFileSync(process.execPath, ['--input-type=module', '--eval', code], { encoding: 'utf8' });
+    const parsed = JSON.parse(out.trim());
+    expect(parsed.equal).toBe(true);
+  });
+});

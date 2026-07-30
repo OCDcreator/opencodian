@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-07-30T17:13:11.509Z",
-  "headShaAtGeneration": "ccc39f161f09135acf5d201827ad1172c72b11f6",
+  "generatedAt": "2026-07-30T17:31:51.371Z",
+  "headShaAtGeneration": "e2d696620504fe5d8d7ace4b91eeb530ed85eb73",
   "edges": [
     {
       "id": "src/core/acp/AcpClientManager.ts|src/core/acp/types.ts|type-only|./types",
@@ -3035,6 +3035,13 @@
       "specifier": "../types/pricing"
     },
     {
+      "id": "src/core/storage/StorageService.ts|src/main.ts|type-only|../../main",
+      "from": "src/core/storage/StorageService.ts",
+      "to": "src/main.ts",
+      "kind": "type-only",
+      "specifier": "../../main"
+    },
+    {
       "id": "src/core/storage/StorageService.ts|src/shared/index.ts|runtime-static|../../shared",
       "from": "src/core/storage/StorageService.ts",
       "to": "src/shared/index.ts",
@@ -3999,6 +4006,13 @@
       "to": "src/i18n/index.ts",
       "kind": "runtime-static",
       "specifier": "../../i18n"
+    },
+    {
+      "id": "src/features/chat/OpenCodianView.ts|src/main.ts|type-only|../../main",
+      "from": "src/features/chat/OpenCodianView.ts",
+      "to": "src/main.ts",
+      "kind": "type-only",
+      "specifier": "../../main"
     },
     {
       "id": "src/features/chat/OpenCodianView.ts|src/shared/index.ts|runtime-static|../../shared",
@@ -9713,6 +9727,13 @@
       "specifier": "../../../core/types"
     },
     {
+      "id": "src/features/chat/services/TitleGenerationService.ts|src/main.ts|type-only|../../../main",
+      "from": "src/features/chat/services/TitleGenerationService.ts",
+      "to": "src/main.ts",
+      "kind": "type-only",
+      "specifier": "../../../main"
+    },
+    {
       "id": "src/features/chat/services/trailingAssistantPatchDebug.ts|src/features/chat/services/trailingAssistantPatchTypes.ts|type-only|./trailingAssistantPatchTypes",
       "from": "src/features/chat/services/trailingAssistantPatchDebug.ts",
       "to": "src/features/chat/services/trailingAssistantPatchTypes.ts",
@@ -10399,6 +10420,13 @@
       "specifier": "../../i18n"
     },
     {
+      "id": "src/features/settings/capabilityDisclosureRow.ts|src/main.ts|type-only|../../main",
+      "from": "src/features/settings/capabilityDisclosureRow.ts",
+      "to": "src/main.ts",
+      "kind": "type-only",
+      "specifier": "../../main"
+    },
+    {
       "id": "src/features/settings/ClaudeCodeHelpModal.ts|src/i18n/index.ts|runtime-static|../../i18n",
       "from": "src/features/settings/ClaudeCodeHelpModal.ts",
       "to": "src/i18n/index.ts",
@@ -10623,6 +10651,13 @@
       "specifier": "../../i18n"
     },
     {
+      "id": "src/features/settings/CostEstimateSettingsRow.ts|src/main.ts|type-only|../../main",
+      "from": "src/features/settings/CostEstimateSettingsRow.ts",
+      "to": "src/main.ts",
+      "kind": "type-only",
+      "specifier": "../../main"
+    },
+    {
       "id": "src/features/settings/index.ts|src/features/settings/OpenCodianSettings.ts|re-export|./OpenCodianSettings",
       "from": "src/features/settings/index.ts",
       "to": "src/features/settings/OpenCodianSettings.ts",
@@ -10728,6 +10763,13 @@
       "specifier": "../../i18n"
     },
     {
+      "id": "src/features/settings/ModelConfigJsonModal.ts|src/main.ts|type-only|../../main",
+      "from": "src/features/settings/ModelConfigJsonModal.ts",
+      "to": "src/main.ts",
+      "kind": "type-only",
+      "specifier": "../../main"
+    },
+    {
       "id": "src/features/settings/ModelConfigJsonModal.ts|src/shared/index.ts|runtime-static|../../shared",
       "from": "src/features/settings/ModelConfigJsonModal.ts",
       "to": "src/shared/index.ts",
@@ -10817,6 +10859,13 @@
       "to": "src/i18n/index.ts",
       "kind": "runtime-static",
       "specifier": "../../i18n"
+    },
+    {
+      "id": "src/features/settings/ModelConfigModal.ts|src/main.ts|type-only|../../main",
+      "from": "src/features/settings/ModelConfigModal.ts",
+      "to": "src/main.ts",
+      "kind": "type-only",
+      "specifier": "../../main"
     },
     {
       "id": "src/features/settings/ModelConfigModal.ts|src/shared/index.ts|runtime-static|../../shared",
@@ -10929,6 +10978,13 @@
       "to": "src/i18n/index.ts",
       "kind": "runtime-static",
       "specifier": "../../i18n"
+    },
+    {
+      "id": "src/features/settings/ModelConfigProviderEditor.ts|src/main.ts|type-only|../../main",
+      "from": "src/features/settings/ModelConfigProviderEditor.ts",
+      "to": "src/main.ts",
+      "kind": "type-only",
+      "specifier": "../../main"
     },
     {
       "id": "src/features/settings/modelConfigSavePlan.ts|src/core/config/modelConfig.ts|runtime-static|../../core/config/modelConfig",
@@ -11069,6 +11125,13 @@
       "to": "src/i18n/index.ts",
       "kind": "runtime-static",
       "specifier": "../../i18n"
+    },
+    {
+      "id": "src/features/settings/ModelPricingModal.ts|src/main.ts|type-only|../../main",
+      "from": "src/features/settings/ModelPricingModal.ts",
+      "to": "src/main.ts",
+      "kind": "type-only",
+      "specifier": "../../main"
     },
     {
       "id": "src/features/settings/ModifiedFilesSidebarHelpModal.ts|src/i18n/index.ts|runtime-static|../../i18n",
@@ -11309,6 +11372,13 @@
       "specifier": "../../i18n"
     },
     {
+      "id": "src/features/settings/OpenCodianSettings.ts|src/main.ts|type-only|../../main",
+      "from": "src/features/settings/OpenCodianSettings.ts",
+      "to": "src/main.ts",
+      "kind": "type-only",
+      "specifier": "../../main"
+    },
+    {
       "id": "src/features/settings/OpenCodianSettingsView.ts|src/core/types/chat.ts|type-only|../../core/types/chat",
       "from": "src/features/settings/OpenCodianSettingsView.ts",
       "to": "src/core/types/chat.ts",
@@ -11484,6 +11554,13 @@
       "specifier": "../../i18n"
     },
     {
+      "id": "src/features/settings/OpenCodianSettingsView.ts|src/main.ts|type-only|../../main",
+      "from": "src/features/settings/OpenCodianSettingsView.ts",
+      "to": "src/main.ts",
+      "kind": "type-only",
+      "specifier": "../../main"
+    },
+    {
       "id": "src/features/settings/projectAgentEditorConfig.ts|src/core/config/modelConfig.ts|runtime-static|../../core/config/modelConfig",
       "from": "src/features/settings/projectAgentEditorConfig.ts",
       "to": "src/core/config/modelConfig.ts",
@@ -11533,6 +11610,13 @@
       "specifier": "../../i18n"
     },
     {
+      "id": "src/features/settings/ProviderBuiltinIconPickerModal.ts|src/main.ts|type-only|../../main",
+      "from": "src/features/settings/ProviderBuiltinIconPickerModal.ts",
+      "to": "src/main.ts",
+      "kind": "type-only",
+      "specifier": "../../main"
+    },
+    {
       "id": "src/features/settings/ProviderBuiltinIconPickerModal.ts|src/utils/icons/index.ts|runtime-static|../../utils/icons",
       "from": "src/features/settings/ProviderBuiltinIconPickerModal.ts",
       "to": "src/utils/icons/index.ts",
@@ -11573,6 +11657,13 @@
       "to": "src/i18n/index.ts",
       "kind": "runtime-static",
       "specifier": "../../i18n"
+    },
+    {
+      "id": "src/features/settings/ProviderIconCacheModal.ts|src/main.ts|type-only|../../main",
+      "from": "src/features/settings/ProviderIconCacheModal.ts",
+      "to": "src/main.ts",
+      "kind": "type-only",
+      "specifier": "../../main"
     },
     {
       "id": "src/features/settings/ProviderIconCacheModal.ts|src/utils/icons/ProviderIconService.ts|runtime-static|../../utils/icons/ProviderIconService",
@@ -11652,6 +11743,13 @@
       "specifier": "../../i18n"
     },
     {
+      "id": "src/features/settings/SettingsAcpSection.ts|src/main.ts|type-only|../../main",
+      "from": "src/features/settings/SettingsAcpSection.ts",
+      "to": "src/main.ts",
+      "kind": "type-only",
+      "specifier": "../../main"
+    },
+    {
       "id": "src/features/settings/SettingsAgentsSection.ts|src/core/agents/index.ts|runtime-static|../../core/agents",
       "from": "src/features/settings/SettingsAgentsSection.ts",
       "to": "src/core/agents/index.ts",
@@ -11694,6 +11792,13 @@
       "specifier": "../../i18n"
     },
     {
+      "id": "src/features/settings/SettingsAgentsSection.ts|src/main.ts|type-only|../../main",
+      "from": "src/features/settings/SettingsAgentsSection.ts",
+      "to": "src/main.ts",
+      "kind": "type-only",
+      "specifier": "../../main"
+    },
+    {
       "id": "src/features/settings/SettingsAgentsSection.ts|src/shared/index.ts|runtime-static|../../shared",
       "from": "src/features/settings/SettingsAgentsSection.ts",
       "to": "src/shared/index.ts",
@@ -11720,6 +11825,13 @@
       "to": "src/i18n/index.ts",
       "kind": "runtime-static",
       "specifier": "../../i18n"
+    },
+    {
+      "id": "src/features/settings/SettingsBackendSection.ts|src/main.ts|type-only|../../main",
+      "from": "src/features/settings/SettingsBackendSection.ts",
+      "to": "src/main.ts",
+      "kind": "type-only",
+      "specifier": "../../main"
     },
     {
       "id": "src/features/settings/SettingsCapabilityLabSection.ts|src/core/agents/AgentCapability.ts|runtime-static|../../core/agents/AgentCapability",
@@ -11818,6 +11930,13 @@
       "to": "src/i18n/index.ts",
       "kind": "runtime-static",
       "specifier": "../../i18n"
+    },
+    {
+      "id": "src/features/settings/SettingsCapabilityLabSection.ts|src/main.ts|type-only|../../main",
+      "from": "src/features/settings/SettingsCapabilityLabSection.ts",
+      "to": "src/main.ts",
+      "kind": "type-only",
+      "specifier": "../../main"
     },
     {
       "id": "src/features/settings/SettingsCapabilityLabSection.ts|src/shared/index.ts|runtime-static|../../shared",
@@ -11953,6 +12072,13 @@
       "specifier": "../../i18n"
     },
     {
+      "id": "src/features/settings/SettingsClaudeCodeSection.ts|src/main.ts|type-only|../../main",
+      "from": "src/features/settings/SettingsClaudeCodeSection.ts",
+      "to": "src/main.ts",
+      "kind": "type-only",
+      "specifier": "../../main"
+    },
+    {
       "id": "src/features/settings/SettingsClaudeCodeSection.ts|src/shared/index.ts|runtime-static|../../shared",
       "from": "src/features/settings/SettingsClaudeCodeSection.ts",
       "to": "src/shared/index.ts",
@@ -12023,6 +12149,13 @@
       "specifier": "../../i18n"
     },
     {
+      "id": "src/features/settings/SettingsClaudeConfigurationSection.ts|src/main.ts|type-only|../../main",
+      "from": "src/features/settings/SettingsClaudeConfigurationSection.ts",
+      "to": "src/main.ts",
+      "kind": "type-only",
+      "specifier": "../../main"
+    },
+    {
       "id": "src/features/settings/SettingsClaudeConfigurationSection.ts|src/shared/index.ts|runtime-static|../../shared",
       "from": "src/features/settings/SettingsClaudeConfigurationSection.ts",
       "to": "src/shared/index.ts",
@@ -12051,6 +12184,13 @@
       "specifier": "../../i18n"
     },
     {
+      "id": "src/features/settings/SettingsClaudeProviderMetadataPersistenceCoordinator.ts|src/main.ts|type-only|../../main",
+      "from": "src/features/settings/SettingsClaudeProviderMetadataPersistenceCoordinator.ts",
+      "to": "src/main.ts",
+      "kind": "type-only",
+      "specifier": "../../main"
+    },
+    {
       "id": "src/features/settings/SettingsClaudeProvidersSection.ts|src/core/agents/backend/index.ts|runtime-static|../../core/agents/backend",
       "from": "src/features/settings/SettingsClaudeProvidersSection.ts",
       "to": "src/core/agents/backend/index.ts",
@@ -12077,6 +12217,13 @@
       "to": "src/i18n/index.ts",
       "kind": "runtime-static",
       "specifier": "../../i18n"
+    },
+    {
+      "id": "src/features/settings/SettingsClaudeProvidersSection.ts|src/main.ts|type-only|../../main",
+      "from": "src/features/settings/SettingsClaudeProvidersSection.ts",
+      "to": "src/main.ts",
+      "kind": "type-only",
+      "specifier": "../../main"
     },
     {
       "id": "src/features/settings/SettingsClaudeProvidersSection.ts|src/shared/index.ts|runtime-static|../../shared",
@@ -12128,6 +12275,13 @@
       "specifier": "../../i18n"
     },
     {
+      "id": "src/features/settings/SettingsClaudeResourcesSection.ts|src/main.ts|type-only|../../main",
+      "from": "src/features/settings/SettingsClaudeResourcesSection.ts",
+      "to": "src/main.ts",
+      "kind": "type-only",
+      "specifier": "../../main"
+    },
+    {
       "id": "src/features/settings/SettingsClaudeResourcesSection.ts|src/shared/index.ts|runtime-static|../../shared",
       "from": "src/features/settings/SettingsClaudeResourcesSection.ts",
       "to": "src/shared/index.ts",
@@ -12163,11 +12317,25 @@
       "specifier": "../../i18n"
     },
     {
+      "id": "src/features/settings/SettingsCodexAccountSurface.ts|src/main.ts|type-only|../../main",
+      "from": "src/features/settings/SettingsCodexAccountSurface.ts",
+      "to": "src/main.ts",
+      "kind": "type-only",
+      "specifier": "../../main"
+    },
+    {
       "id": "src/features/settings/SettingsCodexLegacyCredentialControl.ts|src/i18n/index.ts|runtime-static|../../i18n",
       "from": "src/features/settings/SettingsCodexLegacyCredentialControl.ts",
       "to": "src/i18n/index.ts",
       "kind": "runtime-static",
       "specifier": "../../i18n"
+    },
+    {
+      "id": "src/features/settings/SettingsCodexLegacyCredentialControl.ts|src/main.ts|type-only|../../main",
+      "from": "src/features/settings/SettingsCodexLegacyCredentialControl.ts",
+      "to": "src/main.ts",
+      "kind": "type-only",
+      "specifier": "../../main"
     },
     {
       "id": "src/features/settings/SettingsCodexProjectConfigSection.ts|src/core/agents/backend/ProjectResourceSecureWrite.ts|runtime-static|../../core/agents/backend/ProjectResourceSecureWrite",
@@ -12182,6 +12350,13 @@
       "to": "src/features/settings/CodexProjectConfigFormModel.ts",
       "kind": "runtime-static",
       "specifier": "./CodexProjectConfigFormModel"
+    },
+    {
+      "id": "src/features/settings/SettingsCodexProjectConfigSection.ts|src/main.ts|type-only|../../main",
+      "from": "src/features/settings/SettingsCodexProjectConfigSection.ts",
+      "to": "src/main.ts",
+      "kind": "type-only",
+      "specifier": "../../main"
     },
     {
       "id": "src/features/settings/SettingsCodexReadbackControls.ts|src/core/agents/backend/CodexAppServerClientTypes.ts|type-only|../../core/agents/backend/CodexAppServerClientTypes",
@@ -12226,6 +12401,13 @@
       "specifier": "../../i18n"
     },
     {
+      "id": "src/features/settings/SettingsCodexReadbackControls.ts|src/main.ts|type-only|../../main",
+      "from": "src/features/settings/SettingsCodexReadbackControls.ts",
+      "to": "src/main.ts",
+      "kind": "type-only",
+      "specifier": "../../main"
+    },
+    {
       "id": "src/features/settings/SettingsCodexResourcesSection.ts|src/core/agents/backend/CodexAppServerClientTypes.ts|type-only|../../core/agents/backend/CodexAppServerClientTypes",
       "from": "src/features/settings/SettingsCodexResourcesSection.ts",
       "to": "src/core/agents/backend/CodexAppServerClientTypes.ts",
@@ -12266,6 +12448,13 @@
       "to": "src/i18n/index.ts",
       "kind": "runtime-static",
       "specifier": "../../i18n"
+    },
+    {
+      "id": "src/features/settings/SettingsCodexResourcesSection.ts|src/main.ts|type-only|../../main",
+      "from": "src/features/settings/SettingsCodexResourcesSection.ts",
+      "to": "src/main.ts",
+      "kind": "type-only",
+      "specifier": "../../main"
     },
     {
       "id": "src/features/settings/SettingsCodexResourcesSection.ts|src/shared/index.ts|runtime-static|../../shared",
@@ -12359,6 +12548,13 @@
       "specifier": "../../i18n"
     },
     {
+      "id": "src/features/settings/SettingsCodexSection.ts|src/main.ts|type-only|../../main",
+      "from": "src/features/settings/SettingsCodexSection.ts",
+      "to": "src/main.ts",
+      "kind": "type-only",
+      "specifier": "../../main"
+    },
+    {
       "id": "src/features/settings/SettingsCommandsSection.ts|src/core/config/slashCommandCatalog.ts|runtime-static|../../core/config/slashCommandCatalog",
       "from": "src/features/settings/SettingsCommandsSection.ts",
       "to": "src/core/config/slashCommandCatalog.ts",
@@ -12406,6 +12602,13 @@
       "to": "src/i18n/index.ts",
       "kind": "runtime-static",
       "specifier": "../../i18n"
+    },
+    {
+      "id": "src/features/settings/SettingsCommandsSection.ts|src/main.ts|type-only|../../main",
+      "from": "src/features/settings/SettingsCommandsSection.ts",
+      "to": "src/main.ts",
+      "kind": "type-only",
+      "specifier": "../../main"
     },
     {
       "id": "src/features/settings/SettingsCommandsSection.ts|src/shared/index.ts|runtime-static|../../shared",
@@ -12513,6 +12716,13 @@
       "specifier": "../../i18n"
     },
     {
+      "id": "src/features/settings/SettingsConversationSection.ts|src/main.ts|type-only|../../main",
+      "from": "src/features/settings/SettingsConversationSection.ts",
+      "to": "src/main.ts",
+      "kind": "type-only",
+      "specifier": "../../main"
+    },
+    {
       "id": "src/features/settings/SettingsConversationSection.ts|src/shared/index.ts|runtime-static|../../shared",
       "from": "src/features/settings/SettingsConversationSection.ts",
       "to": "src/shared/index.ts",
@@ -12546,6 +12756,13 @@
       "to": "src/i18n/index.ts",
       "kind": "runtime-static",
       "specifier": "../../i18n"
+    },
+    {
+      "id": "src/features/settings/SettingsDebugSection.ts|src/main.ts|type-only|../../main",
+      "from": "src/features/settings/SettingsDebugSection.ts",
+      "to": "src/main.ts",
+      "kind": "type-only",
+      "specifier": "../../main"
     },
     {
       "id": "src/features/settings/SettingsDebugSection.ts|src/shared/debugModules.ts|runtime-static|../../shared/debugModules",
@@ -12609,6 +12826,13 @@
       "to": "src/i18n/index.ts",
       "kind": "runtime-static",
       "specifier": "../../i18n"
+    },
+    {
+      "id": "src/features/settings/SettingsFormatterSection.ts|src/main.ts|type-only|../../main",
+      "from": "src/features/settings/SettingsFormatterSection.ts",
+      "to": "src/main.ts",
+      "kind": "type-only",
+      "specifier": "../../main"
     },
     {
       "id": "src/features/settings/settingsLayoutRegistry.ts|src/core/types/chat.ts|type-only|../../core/types/chat",
@@ -12693,6 +12917,13 @@
       "to": "src/i18n/index.ts",
       "kind": "runtime-static",
       "specifier": "../../i18n"
+    },
+    {
+      "id": "src/features/settings/SettingsMcpSection.ts|src/main.ts|type-only|../../main",
+      "from": "src/features/settings/SettingsMcpSection.ts",
+      "to": "src/main.ts",
+      "kind": "type-only",
+      "specifier": "../../main"
     },
     {
       "id": "src/features/settings/SettingsMcpSection.ts|src/shared/index.ts|runtime-static|../../shared",
@@ -12793,6 +13024,13 @@
       "specifier": "../../i18n"
     },
     {
+      "id": "src/features/settings/SettingsModelCatalogCoordinator.ts|src/main.ts|type-only|../../main",
+      "from": "src/features/settings/SettingsModelCatalogCoordinator.ts",
+      "to": "src/main.ts",
+      "kind": "type-only",
+      "specifier": "../../main"
+    },
+    {
       "id": "src/features/settings/SettingsModelCatalogCoordinator.ts|src/shared/index.ts|runtime-static|../../shared",
       "from": "src/features/settings/SettingsModelCatalogCoordinator.ts",
       "to": "src/shared/index.ts",
@@ -12877,6 +13115,13 @@
       "specifier": "../../i18n"
     },
     {
+      "id": "src/features/settings/SettingsModelIconCacheManager.ts|src/main.ts|type-only|../../main",
+      "from": "src/features/settings/SettingsModelIconCacheManager.ts",
+      "to": "src/main.ts",
+      "kind": "type-only",
+      "specifier": "../../main"
+    },
+    {
       "id": "src/features/settings/SettingsModelIconCacheManager.ts|src/shared/index.ts|runtime-static|../../shared",
       "from": "src/features/settings/SettingsModelIconCacheManager.ts",
       "to": "src/shared/index.ts",
@@ -12947,11 +13192,25 @@
       "specifier": "../../i18n"
     },
     {
+      "id": "src/features/settings/SettingsModelSection.ts|src/main.ts|type-only|../../main",
+      "from": "src/features/settings/SettingsModelSection.ts",
+      "to": "src/main.ts",
+      "kind": "type-only",
+      "specifier": "../../main"
+    },
+    {
       "id": "src/features/settings/SettingsPanelChrome.ts|src/i18n/index.ts|runtime-static|../../i18n",
       "from": "src/features/settings/SettingsPanelChrome.ts",
       "to": "src/i18n/index.ts",
       "kind": "runtime-static",
       "specifier": "../../i18n"
+    },
+    {
+      "id": "src/features/settings/SettingsPanelChrome.ts|src/main.ts|type-only|../../main",
+      "from": "src/features/settings/SettingsPanelChrome.ts",
+      "to": "src/main.ts",
+      "kind": "type-only",
+      "specifier": "../../main"
     },
     {
       "id": "src/features/settings/SettingsPanelChrome.ts|src/shared/brandingWordmark.ts|runtime-static|../../shared/brandingWordmark",
@@ -13087,6 +13346,13 @@
       "specifier": "../../i18n"
     },
     {
+      "id": "src/features/settings/SettingsPluginSection.ts|src/main.ts|type-only|../../main",
+      "from": "src/features/settings/SettingsPluginSection.ts",
+      "to": "src/main.ts",
+      "kind": "type-only",
+      "specifier": "../../main"
+    },
+    {
       "id": "src/features/settings/SettingsPluginSection.ts|src/shared/index.ts|runtime-static|../../shared",
       "from": "src/features/settings/SettingsPluginSection.ts",
       "to": "src/shared/index.ts",
@@ -13106,6 +13372,13 @@
       "to": "src/i18n/index.ts",
       "kind": "runtime-static",
       "specifier": "../../i18n"
+    },
+    {
+      "id": "src/features/settings/SettingsPluginUpdateSection.ts|src/main.ts|type-only|../../main",
+      "from": "src/features/settings/SettingsPluginUpdateSection.ts",
+      "to": "src/main.ts",
+      "kind": "type-only",
+      "specifier": "../../main"
     },
     {
       "id": "src/features/settings/SettingsProjectAgentEditor.ts|src/core/agents/index.ts|type-only|../../core/agents",
@@ -13141,6 +13414,13 @@
       "to": "src/i18n/index.ts",
       "kind": "runtime-static",
       "specifier": "../../i18n"
+    },
+    {
+      "id": "src/features/settings/SettingsProjectAgentEditor.ts|src/main.ts|type-only|../../main",
+      "from": "src/features/settings/SettingsProjectAgentEditor.ts",
+      "to": "src/main.ts",
+      "kind": "type-only",
+      "specifier": "../../main"
     },
     {
       "id": "src/features/settings/SettingsProjectAgentEditor.ts|src/shared/index.ts|runtime-static|../../shared",
@@ -13183,6 +13463,13 @@
       "to": "src/i18n/index.ts",
       "kind": "runtime-static",
       "specifier": "../../i18n"
+    },
+    {
+      "id": "src/features/settings/SettingsProjectCommandEditor.ts|src/main.ts|type-only|../../main",
+      "from": "src/features/settings/SettingsProjectCommandEditor.ts",
+      "to": "src/main.ts",
+      "kind": "type-only",
+      "specifier": "../../main"
     },
     {
       "id": "src/features/settings/SettingsProjectCommandEditor.ts|src/shared/index.ts|runtime-static|../../shared",
@@ -13269,6 +13556,13 @@
       "specifier": "../../i18n"
     },
     {
+      "id": "src/features/settings/SettingsSecuritySection.ts|src/main.ts|type-only|../../main",
+      "from": "src/features/settings/SettingsSecuritySection.ts",
+      "to": "src/main.ts",
+      "kind": "type-only",
+      "specifier": "../../main"
+    },
+    {
       "id": "src/features/settings/SettingsSecuritySection.ts|src/shared/index.ts|runtime-static|../../shared",
       "from": "src/features/settings/SettingsSecuritySection.ts",
       "to": "src/shared/index.ts",
@@ -13311,6 +13605,13 @@
       "specifier": "../../i18n"
     },
     {
+      "id": "src/features/settings/SettingsServerSection.ts|src/main.ts|type-only|../../main",
+      "from": "src/features/settings/SettingsServerSection.ts",
+      "to": "src/main.ts",
+      "kind": "type-only",
+      "specifier": "../../main"
+    },
+    {
       "id": "src/features/settings/SettingsSkillSection.ts|src/core/types/index.ts|type-only|../../core/types",
       "from": "src/features/settings/SettingsSkillSection.ts",
       "to": "src/core/types/index.ts",
@@ -13344,6 +13645,13 @@
       "to": "src/i18n/index.ts",
       "kind": "runtime-static",
       "specifier": "../../i18n"
+    },
+    {
+      "id": "src/features/settings/SettingsSkillSection.ts|src/main.ts|type-only|../../main",
+      "from": "src/features/settings/SettingsSkillSection.ts",
+      "to": "src/main.ts",
+      "kind": "type-only",
+      "specifier": "../../main"
     },
     {
       "id": "src/features/settings/SettingsSkillSection.ts|src/shared/contextPath.ts|runtime-static|../../shared/contextPath",
@@ -13395,6 +13703,13 @@
       "specifier": "../../i18n"
     },
     {
+      "id": "src/features/settings/SettingsStyleBackgroundSection.ts|src/main.ts|type-only|../../main",
+      "from": "src/features/settings/SettingsStyleBackgroundSection.ts",
+      "to": "src/main.ts",
+      "kind": "type-only",
+      "specifier": "../../main"
+    },
+    {
       "id": "src/features/settings/SettingsStyleBackgroundSection.ts|src/shared/index.ts|runtime-static|../../shared",
       "from": "src/features/settings/SettingsStyleBackgroundSection.ts",
       "to": "src/shared/index.ts",
@@ -13421,6 +13736,13 @@
       "to": "src/i18n/index.ts",
       "kind": "runtime-static",
       "specifier": "../../i18n"
+    },
+    {
+      "id": "src/features/settings/settingsStyleControls.ts|src/main.ts|type-only|../../main",
+      "from": "src/features/settings/settingsStyleControls.ts",
+      "to": "src/main.ts",
+      "kind": "type-only",
+      "specifier": "../../main"
     },
     {
       "id": "src/features/settings/SettingsStyleInputPanelSection.ts|src/core/types/index.ts|runtime-static|../../core/types",
@@ -13458,6 +13780,13 @@
       "specifier": "../../i18n"
     },
     {
+      "id": "src/features/settings/SettingsStyleInputPanelSection.ts|src/main.ts|type-only|../../main",
+      "from": "src/features/settings/SettingsStyleInputPanelSection.ts",
+      "to": "src/main.ts",
+      "kind": "type-only",
+      "specifier": "../../main"
+    },
+    {
       "id": "src/features/settings/SettingsStyleInputPanelSection.ts|src/utils/glass/index.ts|runtime-static|../../utils/glass",
       "from": "src/features/settings/SettingsStyleInputPanelSection.ts",
       "to": "src/utils/glass/index.ts",
@@ -13493,6 +13822,13 @@
       "specifier": "../../i18n"
     },
     {
+      "id": "src/features/settings/SettingsStyleLiquidGlassInputControls.ts|src/main.ts|type-only|../../main",
+      "from": "src/features/settings/SettingsStyleLiquidGlassInputControls.ts",
+      "to": "src/main.ts",
+      "kind": "type-only",
+      "specifier": "../../main"
+    },
+    {
       "id": "src/features/settings/SettingsStyleLiquidGlassInputControls.ts|src/utils/glass/index.ts|runtime-static|../../utils/glass",
       "from": "src/features/settings/SettingsStyleLiquidGlassInputControls.ts",
       "to": "src/utils/glass/index.ts",
@@ -13519,6 +13855,13 @@
       "to": "src/i18n/index.ts",
       "kind": "runtime-static",
       "specifier": "../../i18n"
+    },
+    {
+      "id": "src/features/settings/SettingsStylePresetSection.ts|src/main.ts|type-only|../../main",
+      "from": "src/features/settings/SettingsStylePresetSection.ts",
+      "to": "src/main.ts",
+      "kind": "type-only",
+      "specifier": "../../main"
     },
     {
       "id": "src/features/settings/SettingsStylePresetSection.ts|src/shared/index.ts|runtime-static|../../shared",
@@ -13575,6 +13918,13 @@
       "to": "src/i18n/index.ts",
       "kind": "runtime-static",
       "specifier": "../../i18n"
+    },
+    {
+      "id": "src/features/settings/SettingsStyleSection.ts|src/main.ts|type-only|../../main",
+      "from": "src/features/settings/SettingsStyleSection.ts",
+      "to": "src/main.ts",
+      "kind": "type-only",
+      "specifier": "../../main"
     },
     {
       "id": "src/features/settings/SettingsStyleSection.ts|src/shared/index.ts|runtime-static|../../shared",
@@ -13766,6 +14116,13 @@
       "specifier": "../../i18n"
     },
     {
+      "id": "src/features/settings/SettingsTabbedRenderer.ts|src/main.ts|type-only|../../main",
+      "from": "src/features/settings/SettingsTabbedRenderer.ts",
+      "to": "src/main.ts",
+      "kind": "type-only",
+      "specifier": "../../main"
+    },
+    {
       "id": "src/features/settings/SettingsToolDetailModal.ts|src/features/settings/settingsBackendGuards.ts|runtime-static|./settingsBackendGuards",
       "from": "src/features/settings/SettingsToolDetailModal.ts",
       "to": "src/features/settings/settingsBackendGuards.ts",
@@ -13780,11 +14137,25 @@
       "specifier": "../../i18n"
     },
     {
+      "id": "src/features/settings/SettingsToolDetailModal.ts|src/main.ts|type-only|../../main",
+      "from": "src/features/settings/SettingsToolDetailModal.ts",
+      "to": "src/main.ts",
+      "kind": "type-only",
+      "specifier": "../../main"
+    },
+    {
       "id": "src/features/settings/SettingsToolFileService.ts|src/features/settings/SettingsToolDetailModal.ts|type-only|./SettingsToolDetailModal",
       "from": "src/features/settings/SettingsToolFileService.ts",
       "to": "src/features/settings/SettingsToolDetailModal.ts",
       "kind": "type-only",
       "specifier": "./SettingsToolDetailModal"
+    },
+    {
+      "id": "src/features/settings/SettingsToolFileService.ts|src/main.ts|type-only|../../main",
+      "from": "src/features/settings/SettingsToolFileService.ts",
+      "to": "src/main.ts",
+      "kind": "type-only",
+      "specifier": "../../main"
     },
     {
       "id": "src/features/settings/SettingsToolSection.ts|src/features/settings/settingsBackendGuards.ts|runtime-static|./settingsBackendGuards",
@@ -13815,6 +14186,13 @@
       "specifier": "../../i18n"
     },
     {
+      "id": "src/features/settings/SettingsToolSection.ts|src/main.ts|type-only|../../main",
+      "from": "src/features/settings/SettingsToolSection.ts",
+      "to": "src/main.ts",
+      "kind": "type-only",
+      "specifier": "../../main"
+    },
+    {
       "id": "src/features/settings/SettingsToolSection.ts|src/shared/toolIdentity.ts|runtime-static|../../shared/toolIdentity",
       "from": "src/features/settings/SettingsToolSection.ts",
       "to": "src/shared/toolIdentity.ts",
@@ -13843,6 +14221,13 @@
       "specifier": "../../i18n"
     },
     {
+      "id": "src/features/settings/SettingsUiSection.ts|src/main.ts|type-only|../../main",
+      "from": "src/features/settings/SettingsUiSection.ts",
+      "to": "src/main.ts",
+      "kind": "type-only",
+      "specifier": "../../main"
+    },
+    {
       "id": "src/features/settings/SettingsUserSection.ts|src/features/settings/TextareaSizeMemory.ts|runtime-static|./TextareaSizeMemory",
       "from": "src/features/settings/SettingsUserSection.ts",
       "to": "src/features/settings/TextareaSizeMemory.ts",
@@ -13855,6 +14240,13 @@
       "to": "src/i18n/index.ts",
       "kind": "runtime-static",
       "specifier": "../../i18n"
+    },
+    {
+      "id": "src/features/settings/SettingsUserSection.ts|src/main.ts|type-only|../../main",
+      "from": "src/features/settings/SettingsUserSection.ts",
+      "to": "src/main.ts",
+      "kind": "type-only",
+      "specifier": "../../main"
     },
     {
       "id": "src/features/settings/SettingsViewRegistrar.ts|src/core/types/chat.ts|type-only|../../core/types/chat",
@@ -13883,6 +14275,13 @@
       "to": "src/i18n/index.ts",
       "kind": "runtime-static",
       "specifier": "../../i18n"
+    },
+    {
+      "id": "src/features/settings/SettingsViewRegistrar.ts|src/main.ts|type-only|../../main",
+      "from": "src/features/settings/SettingsViewRegistrar.ts",
+      "to": "src/main.ts",
+      "kind": "type-only",
+      "specifier": "../../main"
     },
     {
       "id": "src/features/settings/SlashCommandCatalogRenderer.ts|src/core/config/slashCommandCatalog.ts|type-only|../../core/config/slashCommandCatalog",
@@ -13946,6 +14345,251 @@
       "to": "src/i18n/locales/zh.ts",
       "kind": "re-export",
       "specifier": "./zh"
+    },
+    {
+      "id": "src/main.ts|src/core/agents/AgentCapability.ts|runtime-static|./core/agents/AgentCapability",
+      "from": "src/main.ts",
+      "to": "src/core/agents/AgentCapability.ts",
+      "kind": "runtime-static",
+      "specifier": "./core/agents/AgentCapability"
+    },
+    {
+      "id": "src/main.ts|src/core/agents/backend/AgentAdapterWiring.ts|runtime-static|./core/agents/backend/AgentAdapterWiring",
+      "from": "src/main.ts",
+      "to": "src/core/agents/backend/AgentAdapterWiring.ts",
+      "kind": "runtime-static",
+      "specifier": "./core/agents/backend/AgentAdapterWiring"
+    },
+    {
+      "id": "src/main.ts|src/core/agents/backend/AgentBackendRouting.ts|runtime-static|./core/agents/backend/AgentBackendRouting",
+      "from": "src/main.ts",
+      "to": "src/core/agents/backend/AgentBackendRouting.ts",
+      "kind": "runtime-static",
+      "specifier": "./core/agents/backend/AgentBackendRouting"
+    },
+    {
+      "id": "src/main.ts|src/core/agents/backend/AgentServiceRegistry.ts|runtime-static|./core/agents/backend/AgentServiceRegistry",
+      "from": "src/main.ts",
+      "to": "src/core/agents/backend/AgentServiceRegistry.ts",
+      "kind": "runtime-static",
+      "specifier": "./core/agents/backend/AgentServiceRegistry"
+    },
+    {
+      "id": "src/main.ts|src/core/agents/backend/ClaudeCodeAdapter.ts|runtime-static|./core/agents/backend/ClaudeCodeAdapter",
+      "from": "src/main.ts",
+      "to": "src/core/agents/backend/ClaudeCodeAdapter.ts",
+      "kind": "runtime-static",
+      "specifier": "./core/agents/backend/ClaudeCodeAdapter"
+    },
+    {
+      "id": "src/main.ts|src/core/agents/backend/ClaudeCodeDefaultPermissionHost.ts|runtime-static|./core/agents/backend/ClaudeCodeDefaultPermissionHost",
+      "from": "src/main.ts",
+      "to": "src/core/agents/backend/ClaudeCodeDefaultPermissionHost.ts",
+      "kind": "runtime-static",
+      "specifier": "./core/agents/backend/ClaudeCodeDefaultPermissionHost"
+    },
+    {
+      "id": "src/main.ts|src/core/agents/backend/ClaudeCodeElicitationBridge.ts|runtime-static|./core/agents/backend/ClaudeCodeElicitationBridge",
+      "from": "src/main.ts",
+      "to": "src/core/agents/backend/ClaudeCodeElicitationBridge.ts",
+      "kind": "runtime-static",
+      "specifier": "./core/agents/backend/ClaudeCodeElicitationBridge"
+    },
+    {
+      "id": "src/main.ts|src/core/agents/backend/ClaudeCodeMcpConfigAdapter.ts|runtime-static|./core/agents/backend/ClaudeCodeMcpConfigAdapter",
+      "from": "src/main.ts",
+      "to": "src/core/agents/backend/ClaudeCodeMcpConfigAdapter.ts",
+      "kind": "runtime-static",
+      "specifier": "./core/agents/backend/ClaudeCodeMcpConfigAdapter"
+    },
+    {
+      "id": "src/main.ts|src/core/agents/backend/ClaudeCodePermissionBridge.ts|runtime-static|./core/agents/backend/ClaudeCodePermissionBridge",
+      "from": "src/main.ts",
+      "to": "src/core/agents/backend/ClaudeCodePermissionBridge.ts",
+      "kind": "runtime-static",
+      "specifier": "./core/agents/backend/ClaudeCodePermissionBridge"
+    },
+    {
+      "id": "src/main.ts|src/core/agents/backend/ClaudeCodeSdkLoader.ts|runtime-static|./core/agents/backend/ClaudeCodeSdkLoader",
+      "from": "src/main.ts",
+      "to": "src/core/agents/backend/ClaudeCodeSdkLoader.ts",
+      "kind": "runtime-static",
+      "specifier": "./core/agents/backend/ClaudeCodeSdkLoader"
+    },
+    {
+      "id": "src/main.ts|src/core/agents/backend/CodexAdapter.ts|runtime-static|./core/agents/backend/CodexAdapter",
+      "from": "src/main.ts",
+      "to": "src/core/agents/backend/CodexAdapter.ts",
+      "kind": "runtime-static",
+      "specifier": "./core/agents/backend/CodexAdapter"
+    },
+    {
+      "id": "src/main.ts|src/core/agents/backend/CodexDefaultApprovalHost.ts|runtime-static|./core/agents/backend/CodexDefaultApprovalHost",
+      "from": "src/main.ts",
+      "to": "src/core/agents/backend/CodexDefaultApprovalHost.ts",
+      "kind": "runtime-static",
+      "specifier": "./core/agents/backend/CodexDefaultApprovalHost"
+    },
+    {
+      "id": "src/main.ts|src/core/agents/backend/diagnostics/index.ts|runtime-static|./core/agents/backend/diagnostics",
+      "from": "src/main.ts",
+      "to": "src/core/agents/backend/diagnostics/index.ts",
+      "kind": "runtime-static",
+      "specifier": "./core/agents/backend/diagnostics"
+    },
+    {
+      "id": "src/main.ts|src/core/agents/backend/OpenCodeAdapter.ts|runtime-static|./core/agents/backend/OpenCodeAdapter",
+      "from": "src/main.ts",
+      "to": "src/core/agents/backend/OpenCodeAdapter.ts",
+      "kind": "runtime-static",
+      "specifier": "./core/agents/backend/OpenCodeAdapter"
+    },
+    {
+      "id": "src/main.ts|src/core/config/index.ts|runtime-static|./core/config",
+      "from": "src/main.ts",
+      "to": "src/core/config/index.ts",
+      "kind": "runtime-static",
+      "specifier": "./core/config"
+    },
+    {
+      "id": "src/main.ts|src/core/config/McpConfigService.ts|runtime-dynamic|./core/config/McpConfigService",
+      "from": "src/main.ts",
+      "to": "src/core/config/McpConfigService.ts",
+      "kind": "runtime-dynamic",
+      "specifier": "./core/config/McpConfigService"
+    },
+    {
+      "id": "src/main.ts|src/core/opencode/diagnostics/index.ts|runtime-static|./core/opencode/diagnostics",
+      "from": "src/main.ts",
+      "to": "src/core/opencode/diagnostics/index.ts",
+      "kind": "runtime-static",
+      "specifier": "./core/opencode/diagnostics"
+    },
+    {
+      "id": "src/main.ts|src/core/opencode/index.ts|runtime-static|./core/opencode",
+      "from": "src/main.ts",
+      "to": "src/core/opencode/index.ts",
+      "kind": "runtime-static",
+      "specifier": "./core/opencode"
+    },
+    {
+      "id": "src/main.ts|src/core/opencode/OpenCodeCapabilitySettingsMigration.ts|runtime-static|./core/opencode/OpenCodeCapabilitySettingsMigration",
+      "from": "src/main.ts",
+      "to": "src/core/opencode/OpenCodeCapabilitySettingsMigration.ts",
+      "kind": "runtime-static",
+      "specifier": "./core/opencode/OpenCodeCapabilitySettingsMigration"
+    },
+    {
+      "id": "src/main.ts|src/core/runtime/OpenCodianSettingsRuntimeCoordinator.ts|runtime-static|./core/runtime/OpenCodianSettingsRuntimeCoordinator",
+      "from": "src/main.ts",
+      "to": "src/core/runtime/OpenCodianSettingsRuntimeCoordinator.ts",
+      "kind": "runtime-static",
+      "specifier": "./core/runtime/OpenCodianSettingsRuntimeCoordinator"
+    },
+    {
+      "id": "src/main.ts|src/core/runtime/OpenCodianStartupCoordinator.ts|runtime-static|./core/runtime/OpenCodianStartupCoordinator",
+      "from": "src/main.ts",
+      "to": "src/core/runtime/OpenCodianStartupCoordinator.ts",
+      "kind": "runtime-static",
+      "specifier": "./core/runtime/OpenCodianStartupCoordinator"
+    },
+    {
+      "id": "src/main.ts|src/core/runtime/PluginRuntimeCoordinator.ts|runtime-static|./core/runtime/PluginRuntimeCoordinator",
+      "from": "src/main.ts",
+      "to": "src/core/runtime/PluginRuntimeCoordinator.ts",
+      "kind": "runtime-static",
+      "specifier": "./core/runtime/PluginRuntimeCoordinator"
+    },
+    {
+      "id": "src/main.ts|src/core/storage/ConversationFullMessageCache.ts|runtime-static|./core/storage/ConversationFullMessageCache",
+      "from": "src/main.ts",
+      "to": "src/core/storage/ConversationFullMessageCache.ts",
+      "kind": "runtime-static",
+      "specifier": "./core/storage/ConversationFullMessageCache"
+    },
+    {
+      "id": "src/main.ts|src/core/storage/index.ts|runtime-static|./core/storage",
+      "from": "src/main.ts",
+      "to": "src/core/storage/index.ts",
+      "kind": "runtime-static",
+      "specifier": "./core/storage"
+    },
+    {
+      "id": "src/main.ts|src/core/types/chat.ts|type-only|./core/types/chat",
+      "from": "src/main.ts",
+      "to": "src/core/types/chat.ts",
+      "kind": "type-only",
+      "specifier": "./core/types/chat"
+    },
+    {
+      "id": "src/main.ts|src/core/types/index.ts|runtime-static|./core/types",
+      "from": "src/main.ts",
+      "to": "src/core/types/index.ts",
+      "kind": "runtime-static",
+      "specifier": "./core/types"
+    },
+    {
+      "id": "src/main.ts|src/core/types/index.ts|type-only|./core/types",
+      "from": "src/main.ts",
+      "to": "src/core/types/index.ts",
+      "kind": "type-only",
+      "specifier": "./core/types"
+    },
+    {
+      "id": "src/main.ts|src/core/types/settingsLoadNormalization.ts|runtime-static|./core/types/settingsLoadNormalization",
+      "from": "src/main.ts",
+      "to": "src/core/types/settingsLoadNormalization.ts",
+      "kind": "runtime-static",
+      "specifier": "./core/types/settingsLoadNormalization"
+    },
+    {
+      "id": "src/main.ts|src/core/update/PluginUpdateService.ts|runtime-static|./core/update/PluginUpdateService",
+      "from": "src/main.ts",
+      "to": "src/core/update/PluginUpdateService.ts",
+      "kind": "runtime-static",
+      "specifier": "./core/update/PluginUpdateService"
+    },
+    {
+      "id": "src/main.ts|src/features/chat/OpenCodianView.ts|runtime-static|./features/chat/OpenCodianView",
+      "from": "src/main.ts",
+      "to": "src/features/chat/OpenCodianView.ts",
+      "kind": "runtime-static",
+      "specifier": "./features/chat/OpenCodianView"
+    },
+    {
+      "id": "src/main.ts|src/features/settings/OpenCodianSettings.ts|runtime-static|./features/settings/OpenCodianSettings",
+      "from": "src/main.ts",
+      "to": "src/features/settings/OpenCodianSettings.ts",
+      "kind": "runtime-static",
+      "specifier": "./features/settings/OpenCodianSettings"
+    },
+    {
+      "id": "src/main.ts|src/features/settings/SettingsViewRegistrar.ts|runtime-static|./features/settings/SettingsViewRegistrar",
+      "from": "src/main.ts",
+      "to": "src/features/settings/SettingsViewRegistrar.ts",
+      "kind": "runtime-static",
+      "specifier": "./features/settings/SettingsViewRegistrar"
+    },
+    {
+      "id": "src/main.ts|src/i18n/index.ts|runtime-static|./i18n",
+      "from": "src/main.ts",
+      "to": "src/i18n/index.ts",
+      "kind": "runtime-static",
+      "specifier": "./i18n"
+    },
+    {
+      "id": "src/main.ts|src/shared/index.ts|runtime-static|./shared",
+      "from": "src/main.ts",
+      "to": "src/shared/index.ts",
+      "kind": "runtime-static",
+      "specifier": "./shared"
+    },
+    {
+      "id": "src/main.ts|src/utils/glass/index.ts|runtime-static|./utils/glass",
+      "from": "src/main.ts",
+      "to": "src/utils/glass/index.ts",
+      "kind": "runtime-static",
+      "specifier": "./utils/glass"
     },
     {
       "id": "src/shared/diagnostics/index.ts|src/shared/diagnostics/TraceRedactor.ts|re-export|./TraceRedactor",
@@ -14716,6 +15360,83 @@
       "members": [
         "src/core/agents/backend/diagnostics/CodexSessionTraceService.ts",
         "src/core/agents/backend/diagnostics/CodexWireTraceBridge.ts"
+      ]
+    },
+    {
+      "id": "src/core/config/ModelPricingService.ts;;src/core/config/index.ts;;src/core/runtime/OpenCodianSettingsRuntimeCoordinator.ts;;src/core/runtime/PluginRuntimeCoordinator.ts;;src/core/storage/StorageService.ts;;src/core/storage/index.ts;;src/core/types/settingsLoadNormalization.ts;;src/features/chat/OpenCodianView.ts;;src/features/chat/services/ChatHeaderPresenter.ts;;src/features/chat/services/ChatSelectionControlsCoordinator.ts;;src/features/chat/services/ModelSelectionRuntime.ts;;src/features/chat/services/TitleGenerationService.ts;;src/features/settings/AgentSwitcherFloatingIcons.ts;;src/features/settings/CostEstimateSettingsRow.ts;;src/features/settings/ModelConfigJsonModal.ts;;src/features/settings/ModelConfigModal.ts;;src/features/settings/ModelConfigProviderEditor.ts;;src/features/settings/ModelPricingModal.ts;;src/features/settings/OpenCodianSettings.ts;;src/features/settings/OpenCodianSettingsView.ts;;src/features/settings/OpencodeConfigModal.ts;;src/features/settings/ProviderBuiltinIconPickerModal.ts;;src/features/settings/ProviderIconCacheModal.ts;;src/features/settings/SettingsAcpSection.ts;;src/features/settings/SettingsAgentsSection.ts;;src/features/settings/SettingsBackendSection.ts;;src/features/settings/SettingsCapabilityLabSection.ts;;src/features/settings/SettingsClaudeCodeSection.ts;;src/features/settings/SettingsClaudeConfigurationSection.ts;;src/features/settings/SettingsClaudeProviderMetadataPersistenceCoordinator.ts;;src/features/settings/SettingsClaudeProvidersSection.ts;;src/features/settings/SettingsClaudeResourcesSection.ts;;src/features/settings/SettingsCodexAccountSurface.ts;;src/features/settings/SettingsCodexLegacyCredentialControl.ts;;src/features/settings/SettingsCodexProjectConfigSection.ts;;src/features/settings/SettingsCodexReadbackControls.ts;;src/features/settings/SettingsCodexResourcesSection.ts;;src/features/settings/SettingsCodexSection.ts;;src/features/settings/SettingsCommandsSection.ts;;src/features/settings/SettingsConversationSection.ts;;src/features/settings/SettingsDebugSection.ts;;src/features/settings/SettingsFormatterSection.ts;;src/features/settings/SettingsMcpSection.ts;;src/features/settings/SettingsModelCatalogAvailability.ts;;src/features/settings/SettingsModelCatalogCoordinator.ts;;src/features/settings/SettingsModelCatalogPresenter.ts;;src/features/settings/SettingsModelIconCacheManager.ts;;src/features/settings/SettingsModelSection.ts;;src/features/settings/SettingsPanelChrome.ts;;src/features/settings/SettingsPluginSection.ts;;src/features/settings/SettingsPluginUpdateSection.ts;;src/features/settings/SettingsProjectAgentEditor.ts;;src/features/settings/SettingsProjectCommandEditor.ts;;src/features/settings/SettingsSecuritySection.ts;;src/features/settings/SettingsServerSection.ts;;src/features/settings/SettingsSkillSection.ts;;src/features/settings/SettingsStyleBackgroundSection.ts;;src/features/settings/SettingsStyleInputPanelSection.ts;;src/features/settings/SettingsStyleLiquidGlassInputControls.ts;;src/features/settings/SettingsStylePresetSection.ts;;src/features/settings/SettingsStyleSection.ts;;src/features/settings/SettingsTabbedHeader.ts;;src/features/settings/SettingsTabbedRenderer.ts;;src/features/settings/SettingsToolDetailModal.ts;;src/features/settings/SettingsToolFileService.ts;;src/features/settings/SettingsToolSection.ts;;src/features/settings/SettingsUiSection.ts;;src/features/settings/SettingsUserSection.ts;;src/features/settings/SettingsViewRegistrar.ts;;src/features/settings/capabilityDisclosureRow.ts;;src/features/settings/settingsStyleControls.ts;;src/main.ts",
+      "members": [
+        "src/core/config/ModelPricingService.ts",
+        "src/core/config/index.ts",
+        "src/core/runtime/OpenCodianSettingsRuntimeCoordinator.ts",
+        "src/core/runtime/PluginRuntimeCoordinator.ts",
+        "src/core/storage/StorageService.ts",
+        "src/core/storage/index.ts",
+        "src/core/types/settingsLoadNormalization.ts",
+        "src/features/chat/OpenCodianView.ts",
+        "src/features/chat/services/ChatHeaderPresenter.ts",
+        "src/features/chat/services/ChatSelectionControlsCoordinator.ts",
+        "src/features/chat/services/ModelSelectionRuntime.ts",
+        "src/features/chat/services/TitleGenerationService.ts",
+        "src/features/settings/AgentSwitcherFloatingIcons.ts",
+        "src/features/settings/CostEstimateSettingsRow.ts",
+        "src/features/settings/ModelConfigJsonModal.ts",
+        "src/features/settings/ModelConfigModal.ts",
+        "src/features/settings/ModelConfigProviderEditor.ts",
+        "src/features/settings/ModelPricingModal.ts",
+        "src/features/settings/OpenCodianSettings.ts",
+        "src/features/settings/OpenCodianSettingsView.ts",
+        "src/features/settings/OpencodeConfigModal.ts",
+        "src/features/settings/ProviderBuiltinIconPickerModal.ts",
+        "src/features/settings/ProviderIconCacheModal.ts",
+        "src/features/settings/SettingsAcpSection.ts",
+        "src/features/settings/SettingsAgentsSection.ts",
+        "src/features/settings/SettingsBackendSection.ts",
+        "src/features/settings/SettingsCapabilityLabSection.ts",
+        "src/features/settings/SettingsClaudeCodeSection.ts",
+        "src/features/settings/SettingsClaudeConfigurationSection.ts",
+        "src/features/settings/SettingsClaudeProviderMetadataPersistenceCoordinator.ts",
+        "src/features/settings/SettingsClaudeProvidersSection.ts",
+        "src/features/settings/SettingsClaudeResourcesSection.ts",
+        "src/features/settings/SettingsCodexAccountSurface.ts",
+        "src/features/settings/SettingsCodexLegacyCredentialControl.ts",
+        "src/features/settings/SettingsCodexProjectConfigSection.ts",
+        "src/features/settings/SettingsCodexReadbackControls.ts",
+        "src/features/settings/SettingsCodexResourcesSection.ts",
+        "src/features/settings/SettingsCodexSection.ts",
+        "src/features/settings/SettingsCommandsSection.ts",
+        "src/features/settings/SettingsConversationSection.ts",
+        "src/features/settings/SettingsDebugSection.ts",
+        "src/features/settings/SettingsFormatterSection.ts",
+        "src/features/settings/SettingsMcpSection.ts",
+        "src/features/settings/SettingsModelCatalogAvailability.ts",
+        "src/features/settings/SettingsModelCatalogCoordinator.ts",
+        "src/features/settings/SettingsModelCatalogPresenter.ts",
+        "src/features/settings/SettingsModelIconCacheManager.ts",
+        "src/features/settings/SettingsModelSection.ts",
+        "src/features/settings/SettingsPanelChrome.ts",
+        "src/features/settings/SettingsPluginSection.ts",
+        "src/features/settings/SettingsPluginUpdateSection.ts",
+        "src/features/settings/SettingsProjectAgentEditor.ts",
+        "src/features/settings/SettingsProjectCommandEditor.ts",
+        "src/features/settings/SettingsSecuritySection.ts",
+        "src/features/settings/SettingsServerSection.ts",
+        "src/features/settings/SettingsSkillSection.ts",
+        "src/features/settings/SettingsStyleBackgroundSection.ts",
+        "src/features/settings/SettingsStyleInputPanelSection.ts",
+        "src/features/settings/SettingsStyleLiquidGlassInputControls.ts",
+        "src/features/settings/SettingsStylePresetSection.ts",
+        "src/features/settings/SettingsStyleSection.ts",
+        "src/features/settings/SettingsTabbedHeader.ts",
+        "src/features/settings/SettingsTabbedRenderer.ts",
+        "src/features/settings/SettingsToolDetailModal.ts",
+        "src/features/settings/SettingsToolFileService.ts",
+        "src/features/settings/SettingsToolSection.ts",
+        "src/features/settings/SettingsUiSection.ts",
+        "src/features/settings/SettingsUserSection.ts",
+        "src/features/settings/SettingsViewRegistrar.ts",
+        "src/features/settings/capabilityDisclosureRow.ts",
+        "src/features/settings/settingsStyleControls.ts",
+        "src/main.ts"
       ]
     },
     {

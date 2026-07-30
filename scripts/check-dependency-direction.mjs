@@ -11,7 +11,6 @@
 //
 // Exit 0 = PASS (no new direction violations), 1 = FAIL.
 
-import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
@@ -19,10 +18,8 @@ import process from 'node:process';
 import {
   buildImportGraph,
   diffAgainstBaseline,
-  edgeId,
-  normalizeRepoPath,
 } from './typescript-import-graph.mjs';
-import { repoRoot } from './change-scope-lib.mjs';
+import { listManagedSourceFiles, repoRoot } from './change-scope-lib.mjs';
 import { classifyPath, loadOwnerConfig } from './architecture-owner-lib.mjs';
 
 const LAYER_ORDER = { shared: 0, core: 1, feature: 2, app: 3 };
@@ -32,17 +29,6 @@ function ownerLayer(config, repoPath) {
   if (!c.assigned) return null;
   const owner = (config.owners ?? []).find((o) => o.id === c.assigned);
   return owner?.layer ?? null;
-}
-
-function listSourceFiles(root) {
-  const out = execFileSync('git', ['ls-files', 'src/**/*.ts', 'src/**/*.tsx'], {
-    cwd: root,
-    encoding: 'utf8',
-  }).trim();
-  return out
-    .split(/\r?\n/)
-    .map(normalizeRepoPath)
-    .filter((p) => p && !p.endsWith('.d.ts'));
 }
 
 function isReverseEdgeByLayer(config, fromPath, toPath) {
@@ -66,7 +52,7 @@ async function main() {
   }
   const baseline = JSON.parse(fs.readFileSync(baselinePath, 'utf8'));
 
-  const files = listSourceFiles(root);
+  const files = listManagedSourceFiles(root);
   process.stdout.write(`Scanning ${files.length} source files...\n`);
   const { edges, unresolved } = await buildImportGraph(files, {
     aliasPrefix: 'src',

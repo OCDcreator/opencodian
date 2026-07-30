@@ -37,7 +37,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint \"{src,tests}/**/*.ts\"",
     "lint:fix": "npm run lint -- --fix",
-    "verify": "npm run check:owner-guard && npm run check:module-docs && npm run check:graphify && npm run check:devlog-order && npm run lint && npm run typecheck && npm test && npm run build",
+    "verify": "npm run check:owner-manifest && npm run check:owner-boundaries && npm run check:dependency-direction && npm run check:architecture-cycles && npm run check:module-docs && npm run check:graphify && npm run check:devlog-order && npm run lint && npm run typecheck && npm test && npm run build",
     "test": "node scripts/run-jest.js",
     "test:watch": "node scripts/run-jest.js --watch",
     "test:coverage": "node scripts/run-jest.js --coverage",

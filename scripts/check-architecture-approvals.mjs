@@ -93,10 +93,9 @@ function main() {
     cwd: root,
     encoding: 'utf8',
   }).trim();
-  // Lightweight committed-digest for approval binding: hash sorted
-  // (path, finalStatus). A full content digest is in change-scope-lib; here we
-  // recompute via the same helper for consistency.
-  const { computeChangeScope } = require('./change-scope-lib.mjs');
+  // Recompute the committed candidate digest for approval binding via the
+  // change-scope helper already imported at the top of this file. (Do NOT use
+  // require() — this is an ESM module.)
   const scope = computeChangeScope(root, { baseRef: baseResolution.ref });
   const committedDigest = scope.digests.committed;
   const changedPaths = new Set(scope.paths);

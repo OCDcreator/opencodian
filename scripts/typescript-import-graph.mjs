@@ -94,9 +94,28 @@ export function getSpecifier(tsModule, node) {
 }
 
 /**
+ * Determine whether a specifier is syntactically internal (relative or alias),
+ * independent of whether it resolves. An internal specifier that does NOT
+ * resolve must fail closed, not be treated as external.
+ */
+export function isInternalSpecifier(specifier, { aliasTarget = '@' } = {}) {
+  return (
+    typeof specifier === 'string'
+    && (specifier === aliasTarget
+      || specifier.startsWith(`${aliasTarget}/`)
+      || specifier.startsWith('./')
+      || specifier.startsWith('../'))
+  );
+}
+
+/**
  * Resolve a module specifier to a repo-relative file path, honoring the @/*
- * path alias and barrel index files. Returns null when unresolved (external or
- * dynamic specifier that cannot be statically resolved).
+ * path alias and barrel index files. Returns null when unresolved.
+ *
+ * Callers MUST distinguish "unresolved internal" (fail closed — a potential
+ * hidden internal cycle) from "external" (npm package, not an edge). Use
+ * isInternalSpecifier() to tell them apart: a null result for an internal
+ * specifier is an unresolved internal import, not an external one.
  *
  * @param {string} specifier
  * @param {string} fromFile - repo-relative path of the importing file
@@ -133,8 +152,65 @@ export function resolveSpecifier(specifier, fromFile, opts = {}) {
 }
 
 /**
+ * Classify an edge's resolution: resolved internal, unresolved internal
+ * (fail-closed — a potential hidden internal cycle), external (npm package), or
+ * vendored (resolves outside src/ to a known vendored path like
+ * reference-projects/ — allowed, not an internal cycle, not fail-closed). An
+ * internal specifier that does not resolve AND does not land in a vendored root
+ * is fail-closed.
+ */
+function classifyEdgeResolution(specifier, fromPath, kind, { knownFiles, aliasPrefix, aliasTarget }) {
+  if (!specifier) {
+    // Variable/unknown specifier — cannot resolve statically. Fail closed.
+    return { from: fromPath, to: null, kind, specifier: null, external: false, unresolved: true };
+  }
+  const resolved = resolveSpecifier(specifier, fromPath, { knownFiles, aliasPrefix, aliasTarget });
+  if (resolved) {
+    return { from: fromPath, to: resolved, kind, specifier, external: false };
+  }
+  // Unresolved internal specifier: check whether it points into a vendored
+  // root outside src/ (e.g. reference-projects/). Such edges are allowed and
+  // are not internal cycles; they are recorded as vendored, not unresolved.
+  if (isInternalSpecifier(specifier, { aliasTarget })) {
+    const target = resolveSpecifierRaw(specifier, fromPath, { aliasPrefix, aliasTarget });
+    if (target && isVendoredPath(target)) {
+      return { from: fromPath, to: null, kind, specifier, external: false, vendored: true, vendoredTarget: target };
+    }
+    // Genuinely unresolved internal — fail closed.
+    return { from: fromPath, to: null, kind, specifier, external: false, unresolved: true };
+  }
+  return { from: fromPath, to: null, kind, specifier, external: true };
+}
+
+// Paths outside src/ that are treated as vendored/allowed references, not
+// internal cycles. reference-projects/ is the repo's vendored-bundle home and
+// is read-only per AGENTS.
+const VENDORED_PREFIXES = ['reference-projects/'];
+
+function isVendoredPath(repoPath) {
+  return VENDORED_PREFIXES.some((p) => repoPath.startsWith(p));
+}
+
+/**
+ * Resolve a specifier to its raw repo-relative candidate WITHOUT requiring it to
+ * be a known managed file. Used to detect vendored targets outside src/.
+ */
+function resolveSpecifierRaw(specifier, fromFile, { aliasPrefix = 'src', aliasTarget = '@' } = {}) {
+  let candidate;
+  if (specifier === aliasTarget || specifier.startsWith(`${aliasTarget}/`)) {
+    candidate = specifier.replace(aliasTarget, aliasPrefix);
+  } else if (specifier.startsWith('./') || specifier.startsWith('../')) {
+    const fromDir = fromFile.includes('/') ? fromFile.slice(0, fromFile.lastIndexOf('/')) : '';
+    candidate = normalizeRepoPath(path.posix.join(fromDir, specifier));
+  } else {
+    return null;
+  }
+  return candidate;
+}
+
+/**
  * Parse a single source file and emit edges: { from, to, kind, specifier }.
- * 'from' is repo-relative; 'to' is repo-relative or null (external).
+ * 'from' is repo-relative; 'to' is repo-relative or null (external/unresolved).
  * Pure (no disk IO) given the source text and resolved rootDir.
  *
  * @param {object} args - { filePath, sourceText, tsModule, knownFiles, aliasPrefix, aliasTarget }
@@ -153,10 +229,8 @@ export function extractEdges({ filePath, sourceText, tsModule, knownFiles, alias
     ) {
       const specifier = getSpecifier(tsLocal, node);
       const kind = classifyImportKind(tsLocal, node);
-      const resolved = specifier
-        ? resolveSpecifier(specifier, fromPath, { knownFiles, aliasPrefix, aliasTarget })
-        : null;
-      edges.push({ from: fromPath, to: resolved, kind, specifier, external: resolved === null });
+      const edge = classifyEdgeResolution(specifier, fromPath, kind, { knownFiles, aliasPrefix, aliasTarget });
+      edges.push(edge);
       return;
     }
     // dynamic import('...')
@@ -165,14 +239,12 @@ export function extractEdges({ filePath, sourceText, tsModule, knownFiles, alias
       && node.expression.kind === tsLocal.SyntaxKind.ImportKeyword
     ) {
       const specifier = getSpecifier(tsLocal, node);
-      const kind = 'runtime-dynamic';
-      const resolved = specifier
-        ? resolveSpecifier(specifier, fromPath, { knownFiles, aliasPrefix, aliasTarget })
-        : null;
-      edges.push({ from: fromPath, to: resolved, kind, specifier, external: resolved === null });
+      const edge = classifyEdgeResolution(specifier, fromPath, 'runtime-dynamic', { knownFiles, aliasPrefix, aliasTarget });
+      edges.push(edge);
       return;
     }
-    // require('...') — only string-literal requires; variable requires fail closed.
+    // require('...') — string-literal requires classify via the same resolver
+    // (unresolved internal fails closed); variable requires fail closed.
     if (
       tsLocal.isCallExpression(node)
       && tsLocal.isIdentifier(node.expression)
@@ -181,12 +253,11 @@ export function extractEdges({ filePath, sourceText, tsModule, knownFiles, alias
     ) {
       if (tsLocal.isStringLiteral(node.arguments[0])) {
         const specifier = node.arguments[0].text;
-        const resolved = resolveSpecifier(specifier, fromPath, { knownFiles, aliasPrefix, aliasTarget });
-        edges.push({ from: fromPath, to: resolved, kind: 'require', specifier, external: resolved === null });
+        const edge = classifyEdgeResolution(specifier, fromPath, 'require', { knownFiles, aliasPrefix, aliasTarget });
+        edges.push(edge);
       } else {
-        // Variable specifier require — cannot resolve statically. Record as
-        // unresolved require so the caller can require exact registration.
-        edges.push({ from: fromPath, to: null, kind: 'require', specifier: null, external: true, unresolved: true });
+        // Variable specifier require — cannot resolve statically. Fail closed.
+        edges.push({ from: fromPath, to: null, kind: 'require', specifier: null, external: false, unresolved: true });
       }
       return;
     }

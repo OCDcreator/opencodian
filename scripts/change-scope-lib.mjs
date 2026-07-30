@@ -33,6 +33,28 @@ export function repoRoot(cwd = process.cwd()) {
   }).trim();
 }
 
+/**
+ * List all tracked TypeScript source files under src/, at ANY depth (including
+ * root-level src/main.ts). The pathspec 'src/' is used (then filtered by
+ * extension) because a recursive glob with the double-star sequence misses
+ * root-level files — the star-star segment requires at least one directory
+ * level. Declaration files (.d.ts) are excluded to match module-docs and
+ * owner-manifest managed scope.
+ */
+export function listManagedSourceFiles(root) {
+  const out = execFileSync('git', ['ls-files', 'src/'], {
+    cwd: root,
+    encoding: 'utf8',
+  }).trim();
+  if (!out) return [];
+  return out
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((p) => p && (p.endsWith('.ts') || p.endsWith('.tsx')) && !p.endsWith('.d.ts'))
+    .map(normalizeRepoPath)
+    .sort();
+}
+
 function git(args, { cwd, encoding = 'utf8' } = {}) {
   return execFileSync('git', args, { cwd, encoding });
 }
@@ -267,9 +289,20 @@ export function unionCandidates(root, { mergeBaseSha, headSha } = {}) {
  * Compute the normalized candidate digest: hash of sorted
  * (path, finalStatus, mode, contentSha256) records. The same logical final tree
  * in committed/staged/unstaged/untracked forms MUST yield the same digest.
+ *
+ * Approval request metadata (docs/architecture/approvals/**) is EXCLUDED from
+ * the digest so an approval request does not create a self-referential binding
+ * (the request would otherwise bind to a digest that includes itself). This
+ * also means adding/removing an approval request file never changes the scope
+ * digest of the actual code change.
  */
-export function candidateDigest(records) {
-  const normalized = records
+export const APPROVAL_REQUEST_EXCLUDE_PREFIX = 'docs/architecture/approvals/';
+
+export function candidateDigest(records, { excludePrefixes = [APPROVAL_REQUEST_EXCLUDE_PREFIX] } = {}) {
+  const filtered = excludePrefixes?.length
+    ? records.filter((r) => !excludePrefixes.some((p) => r.path.startsWith(p)))
+    : records;
+  const normalized = filtered
     .map((r) => `${r.path}\0${r.status}\0${r.mode}\0${r.contentSha256}`)
     .sort();
   return sha256String(normalized.join('\n'));

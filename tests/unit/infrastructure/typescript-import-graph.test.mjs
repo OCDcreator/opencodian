@@ -77,7 +77,10 @@ describe('classifyImportKind — edge classification', () => {
     );
     expect(edges[0].kind).toBe('require');
     expect(edges[0].unresolved).toBe(true);
-    expect(edges[0].external).toBe(true);
+    // A variable require cannot be statically resolved; it is NOT external (it
+    // could resolve internally at runtime), so it fails closed rather than being
+    // silently treated as an external edge.
+    expect(edges[0].external).toBe(false);
   });
 
   test('re-export export ... from', async () => {
@@ -237,5 +240,49 @@ describe('re-export edges are runtime-carrying (Codex Phase 1 review fix)', () =
   test('isRuntimeEdge returns true for re-export', async () => {
     const result = await runAsync(`process.stdout.write(JSON.stringify(mod.isRuntimeEdge({ kind: 're-export' })));`);
     expect(result).toBe(true);
+  });
+});
+
+describe('fail-closed unresolved internal imports (Codex Phase 1 review fix)', () => {
+  test('an unresolved relative internal specifier is unresolved (not external)', async () => {
+    const edges = await extractEdges(
+      `import { X } from './missing';\n`,
+      'src/a.ts',
+      new Set(['src/a.ts']),
+    );
+    expect(edges[0].external).toBe(false);
+    expect(edges[0].unresolved).toBe(true);
+    expect(edges[0].to).toBeNull();
+  });
+
+  test('an unresolved alias internal specifier is unresolved (not external)', async () => {
+    const edges = await extractEdges(
+      `import { X } from '@/missing';\n`,
+      'src/a.ts',
+      new Set(['src/a.ts']),
+    );
+    expect(edges[0].unresolved).toBe(true);
+    expect(edges[0].external).toBe(false);
+  });
+
+  test('a vendored reference-projects target is allowed (vendored, not unresolved)', async () => {
+    const edges = await extractEdges(
+      `export { Foo } from '../../reference-projects/three.js/build/three.module.js';\n`,
+      'src/vendor/three.ts',
+      new Set(['src/vendor/three.ts']),
+    );
+    expect(edges[0].unresolved).toBeUndefined();
+    expect(edges[0].vendored).toBe(true);
+    expect(edges[0].external).toBe(false);
+  });
+
+  test('a true npm external package is external (not unresolved)', async () => {
+    const edges = await extractEdges(
+      `import { x } from 'obsidian';\n`,
+      'src/a.ts',
+      new Set(['src/a.ts']),
+    );
+    expect(edges[0].external).toBe(true);
+    expect(edges[0].unresolved).toBeUndefined();
   });
 });

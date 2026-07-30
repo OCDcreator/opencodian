@@ -13,22 +13,11 @@ import path from 'node:path';
 import process from 'node:process';
 
 import { buildImportGraph, generateBaseline, normalizeRepoPath } from './typescript-import-graph.mjs';
-import { repoRoot } from './change-scope-lib.mjs';
-
-function listSourceFiles(root) {
-  const out = execFileSync('git', ['ls-files', 'src/**/*.ts', 'src/**/*.tsx'], {
-    cwd: root,
-    encoding: 'utf8',
-  }).trim();
-  return out
-    .split(/\r?\n/)
-    .map(normalizeRepoPath)
-    .filter((p) => p && !p.endsWith('.d.ts'));
-}
+import { listManagedSourceFiles, repoRoot } from './change-scope-lib.mjs';
 
 async function main() {
   const root = repoRoot();
-  const files = listSourceFiles(root);
+  const files = listManagedSourceFiles(root);
   process.stdout.write(`Scanning ${files.length} source files for import edges...\n`);
 
   // buildImportGraph uses the filePath param as the 'from'. Pass repo-relative

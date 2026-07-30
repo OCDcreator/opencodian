@@ -13,7 +13,6 @@
 //
 // Exit 0 = PASS (no new runtime SCC, no new type-coupling member), 1 = FAIL.
 
-import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
@@ -22,21 +21,9 @@ import {
   buildImportGraph,
   classifySccs,
   diffAgainstBaseline,
-  normalizeRepoPath,
   sccId,
 } from './typescript-import-graph.mjs';
-import { repoRoot } from './change-scope-lib.mjs';
-
-function listSourceFiles(root) {
-  const out = execFileSync('git', ['ls-files', 'src/**/*.ts', 'src/**/*.tsx'], {
-    cwd: root,
-    encoding: 'utf8',
-  }).trim();
-  return out
-    .split(/\r?\n/)
-    .map(normalizeRepoPath)
-    .filter((p) => p && !p.endsWith('.d.ts'));
-}
+import { listManagedSourceFiles, repoRoot } from './change-scope-lib.mjs';
 
 async function main() {
   const root = repoRoot();
@@ -48,7 +35,7 @@ async function main() {
   }
   const baseline = JSON.parse(fs.readFileSync(baselinePath, 'utf8'));
 
-  const files = listSourceFiles(root);
+  const files = listManagedSourceFiles(root);
   process.stdout.write(`Scanning ${files.length} source files...\n`);
   const { edges } = await buildImportGraph(files, {
     aliasPrefix: 'src',
