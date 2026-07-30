@@ -1,0 +1,1158 @@
+{
+  "schemaVersion": 1,
+  "sourceScopes": [
+    "src/**/*.ts",
+    "src/**/*.tsx"
+  ],
+  "layers": [
+    { "id": "shared", "mayImportLayers": ["shared"] },
+    { "id": "core", "mayImportLayers": ["shared", "core"] },
+    { "id": "feature", "mayImportLayers": ["shared", "core", "feature"] },
+    { "id": "app", "mayImportLayers": ["shared", "core", "feature", "app"] }
+  ],
+  "owners": [
+    {
+      "id": "app.composition",
+      "layer": "app",
+      "include": ["src/main.ts"],
+      "delegatesTo": [],
+      "responsibilities": [
+        "plugin entry point, composition and Obsidian registration",
+        "startup storage load, settings normalization, locale, command registration",
+        "view registration and lifecycle wiring"
+      ],
+      "canonicalState": ["OpenCodianPlugin instance"],
+      "entrypoints": ["src/main.ts"],
+      "allowedOwnerDependencies": ["core.runtime", "core.opencode", "core.agents", "core.storage", "core.config", "feature.chat-shell", "feature.settings-shell"],
+      "forbiddenDependencies": [],
+      "adjacentOwners": ["core.runtime", "core.opencode"],
+      "tests": ["tests/unit/entry-point/**"],
+      "overviewDoc": "docs/architecture/owners/app-composition.md",
+      "requiredGates": ["typecheck", "module-docs", "build"],
+      "risk": "high"
+    },
+    {
+      "id": "shared.foundation",
+      "layer": "shared",
+      "include": [
+        "src/shared/index.ts",
+        "src/shared/brandingWordmark.ts",
+        "src/shared/contextPath.ts",
+        "src/shared/debugModules.ts",
+        "src/shared/diagnosticSecretSanitizer.ts",
+        "src/shared/logger.ts",
+        "src/shared/obsidianContext.ts",
+        "src/shared/toolExecution.ts",
+        "src/shared/toolIdentity.ts",
+        "src/shared/TooltipLayerController.ts",
+        "src/shared/vault.ts"
+      ],
+      "delegatesTo": [],
+      "responsibilities": [
+        "shared cross-cutting primitives: logging, context paths, vault access, tool identity",
+        "diagnostic secret sanitizer primitive"
+      ],
+      "canonicalState": ["shared logger instance"],
+      "entrypoints": ["src/shared/index.ts"],
+      "allowedOwnerDependencies": [],
+      "forbiddenDependencies": ["core", "feature", "app"],
+      "adjacentOwners": ["shared.diagnostics", "shared.modals"],
+      "tests": ["tests/unit/shared/**"],
+      "overviewDoc": "docs/architecture/owners/shared-foundation.md",
+      "requiredGates": ["typecheck", "module-docs"],
+      "risk": "low"
+    },
+    {
+      "id": "shared.diagnostics",
+      "layer": "shared",
+      "include": [
+        "src/shared/diagnostics/index.ts",
+        "src/shared/diagnostics/TraceRedactor.ts",
+        "src/shared/diagnostics/TraceReportBuilder.ts",
+        "src/shared/diagnostics/TraceStore.ts",
+        "src/shared/diagnostics/types.ts"
+      ],
+      "delegatesTo": [],
+      "responsibilities": [
+        "shared diagnostics foundation: redaction, trace store, report builder",
+        "backend-agnostic trace primitives reused by OpenCode/Codex/Claude trace services"
+      ],
+      "canonicalState": ["shared trace redactor", "shared trace store contract"],
+      "entrypoints": ["src/shared/diagnostics/index.ts"],
+      "allowedOwnerDependencies": ["shared.foundation"],
+      "forbiddenDependencies": ["core", "feature", "app"],
+      "adjacentOwners": ["shared.foundation", "core.opencode-diagnostics", "core.backend-diagnostics"],
+      "tests": ["tests/unit/shared/diagnostics/**"],
+      "overviewDoc": "docs/architecture/owners/shared-diagnostics.md",
+      "requiredGates": ["typecheck", "module-docs", "diagnostics-safety"],
+      "risk": "high"
+    },
+    {
+      "id": "shared.modals",
+      "layer": "shared",
+      "include": [
+        "src/shared/modals/index.ts",
+        "src/shared/modals/ForkTargetModal.ts"
+      ],
+      "delegatesTo": [],
+      "responsibilities": [
+        "cross-feature modal primitives reused by chat and settings"
+      ],
+      "canonicalState": [],
+      "entrypoints": ["src/shared/modals/index.ts"],
+      "allowedOwnerDependencies": ["shared.foundation"],
+      "forbiddenDependencies": ["core", "feature", "app"],
+      "adjacentOwners": ["shared.foundation"],
+      "tests": ["tests/unit/shared/modals/**"],
+      "overviewDoc": "docs/architecture/owners/shared-modals.md",
+      "requiredGates": ["typecheck", "module-docs"],
+      "risk": "low"
+    },
+    {
+      "id": "shared.types",
+      "layer": "shared",
+      "include": ["src/types/jsx-shim.ts"],
+      "delegatesTo": [],
+      "responsibilities": [
+        "ambient type shims shared across the whole source tree"
+      ],
+      "canonicalState": [],
+      "entrypoints": ["src/types/jsx-shim.ts"],
+      "allowedOwnerDependencies": [],
+      "forbiddenDependencies": ["core", "feature", "app"],
+      "adjacentOwners": ["shared.foundation"],
+      "tests": [],
+      "overviewDoc": "docs/architecture/owners/shared-types.md",
+      "requiredGates": ["typecheck"],
+      "risk": "low"
+    },
+    {
+      "id": "shared.i18n",
+      "layer": "shared",
+      "include": ["src/i18n/**"],
+      "delegatesTo": [],
+      "responsibilities": [
+        "locale catalog and i18n message table",
+        "translation key surface consumed by chat and settings"
+      ],
+      "canonicalState": ["i18n message catalog"],
+      "entrypoints": ["src/i18n/index.ts"],
+      "allowedOwnerDependencies": ["shared.foundation"],
+      "forbiddenDependencies": ["core", "feature", "app"],
+      "adjacentOwners": ["shared.foundation"],
+      "tests": ["tests/unit/i18n/**"],
+      "overviewDoc": "docs/architecture/owners/shared-i18n.md",
+      "requiredGates": ["typecheck", "module-docs"],
+      "risk": "low"
+    },
+    {
+      "id": "shared.utils-glass",
+      "layer": "shared",
+      "include": ["src/utils/glass/**"],
+      "delegatesTo": [],
+      "responsibilities": [
+        "liquid glass adapter registry and builtin visual adapters"
+      ],
+      "canonicalState": ["glass adapter registry"],
+      "entrypoints": ["src/utils/glass/index.ts"],
+      "allowedOwnerDependencies": ["shared.foundation"],
+      "forbiddenDependencies": ["core", "feature", "app"],
+      "adjacentOwners": ["shared.foundation", "feature.chat-appearance"],
+      "tests": ["tests/unit/utils/glass/**"],
+      "overviewDoc": "docs/architecture/owners/shared-utils-glass.md",
+      "requiredGates": ["typecheck", "module-docs"],
+      "risk": "medium"
+    },
+    {
+      "id": "shared.utils-icons",
+      "layer": "shared",
+      "include": ["src/utils/icons/**"],
+      "delegatesTo": [],
+      "responsibilities": [
+        "provider icon resolution spanning LobeHub, builtin and custom sources",
+        "icon asset cache lifecycle"
+      ],
+      "canonicalState": ["provider icon registry", "provider icon asset cache"],
+      "entrypoints": ["src/utils/icons/index.ts", "src/utils/icons/ProviderIconService.ts"],
+      "allowedOwnerDependencies": ["shared.foundation"],
+      "forbiddenDependencies": ["core", "feature", "app"],
+      "adjacentOwners": ["shared.foundation", "feature.settings-model-catalog"],
+      "tests": ["tests/unit/utils/icons/**"],
+      "overviewDoc": "docs/architecture/owners/shared-utils-icons.md",
+      "requiredGates": ["typecheck", "module-docs"],
+      "risk": "medium"
+    },
+    {
+      "id": "shared.utils-markdown",
+      "layer": "shared",
+      "include": ["src/utils/markdown/**"],
+      "delegatesTo": [],
+      "responsibilities": [
+        "markdown rendering service, file-link and image-embed processing"
+      ],
+      "canonicalState": [],
+      "entrypoints": ["src/utils/markdown/index.ts", "src/utils/markdown/MarkdownRenderer.ts"],
+      "allowedOwnerDependencies": ["shared.foundation"],
+      "forbiddenDependencies": ["core", "feature", "app"],
+      "adjacentOwners": ["shared.foundation", "feature.chat-rendering"],
+      "tests": ["tests/unit/utils/markdown/**"],
+      "overviewDoc": "docs/architecture/owners/shared-utils-markdown.md",
+      "requiredGates": ["typecheck", "module-docs"],
+      "risk": "medium"
+    },
+    {
+      "id": "shared.utils-streaming",
+      "layer": "shared",
+      "include": ["src/utils/streaming/**"],
+      "delegatesTo": [],
+      "responsibilities": [
+        "tool kind/icon/summary rules and streaming render primitives",
+        "MCP tool summary classification"
+      ],
+      "canonicalState": ["tool kind/summary classification rules"],
+      "entrypoints": ["src/utils/streaming/index.ts"],
+      "allowedOwnerDependencies": ["shared.foundation", "shared.utils-markdown"],
+      "forbiddenDependencies": ["core", "feature", "app"],
+      "adjacentOwners": ["shared.foundation", "feature.chat-rendering"],
+      "tests": ["tests/unit/utils/streaming/**"],
+      "overviewDoc": "docs/architecture/owners/shared-utils-streaming.md",
+      "requiredGates": ["typecheck", "module-docs"],
+      "risk": "medium"
+    },
+    {
+      "id": "shared.utils-misc",
+      "layer": "shared",
+      "include": [
+        "src/utils/index.ts",
+        "src/utils/editorSelectionHighlight.ts"
+      ],
+      "delegatesTo": [],
+      "responsibilities": [
+        "miscellaneous shared utilities not yet promoted to a dedicated owner"
+      ],
+      "canonicalState": [],
+      "entrypoints": ["src/utils/index.ts"],
+      "allowedOwnerDependencies": ["shared.foundation"],
+      "forbiddenDependencies": ["core", "feature", "app"],
+      "adjacentOwners": ["shared.foundation"],
+      "tests": [],
+      "overviewDoc": "docs/architecture/owners/shared-utils-misc.md",
+      "requiredGates": ["typecheck", "module-docs"],
+      "risk": "low"
+    },
+    {
+      "id": "shared.vendor",
+      "layer": "shared",
+      "include": ["src/vendor/**"],
+      "delegatesTo": [],
+      "responsibilities": [
+        "vendored high-risk dependency wrappers; no product feature imports"
+      ],
+      "canonicalState": [],
+      "entrypoints": ["src/vendor/three.ts"],
+      "allowedOwnerDependencies": ["shared.foundation"],
+      "forbiddenDependencies": ["core", "feature", "app"],
+      "adjacentOwners": ["shared.utils-glass"],
+      "tests": [],
+      "overviewDoc": "docs/architecture/owners/shared-vendor.md",
+      "requiredGates": ["typecheck", "module-docs"],
+      "risk": "medium"
+    },
+    {
+      "id": "core.opencode",
+      "layer": "core",
+      "include": ["src/core/opencode/**"],
+      "delegatesTo": ["core.opencode-diagnostics"],
+      "responsibilities": [
+        "OpenCode hybrid facade (SDK v2 primary, legacy HTTP/SSE fallback)",
+        "canonical session/message/part state in OpenCodeSessionStateStore",
+        "streaming, sync events, lifecycle, catalog, capability and server management"
+      ],
+      "canonicalState": [
+        "OpenCode canonical session/message/part state",
+        "OpenCode streaming/lifecycle coordinators",
+        "OpenCode server lifecycle"
+      ],
+      "entrypoints": [
+        "src/core/opencode/index.ts",
+        "src/core/opencode/OpenCodeService.ts",
+        "src/core/opencode/OpenCodeSessionStateStore.ts",
+        "src/core/opencode/ServerManager.ts"
+      ],
+      "allowedOwnerDependencies": ["shared.foundation", "shared.diagnostics", "core.types"],
+      "forbiddenDependencies": ["feature", "app"],
+      "adjacentOwners": ["app.composition", "feature.chat-shell", "core.opencode-diagnostics"],
+      "tests": ["tests/unit/core/opencode/**"],
+      "overviewDoc": "docs/architecture/owners/core-opencode.md",
+      "requiredGates": ["typecheck", "module-docs", "build"],
+      "risk": "high"
+    },
+    {
+      "id": "core.opencode-diagnostics",
+      "layer": "core",
+      "include": ["src/core/opencode/diagnostics/**"],
+      "delegatesTo": [],
+      "responsibilities": [
+        "OpenCode backend trace service, store, report builder and redactor",
+        "trace channel lifecycle for OpenCode diagnostics"
+      ],
+      "canonicalState": ["OpenCode trace service/store"],
+      "entrypoints": ["src/core/opencode/diagnostics/index.ts"],
+      "allowedOwnerDependencies": ["shared.foundation", "shared.diagnostics"],
+      "forbiddenDependencies": ["feature", "app"],
+      "adjacentOwners": ["shared.diagnostics", "core.backend-diagnostics", "feature.chat-diagnostics"],
+      "tests": ["tests/unit/core/opencode/diagnostics/**"],
+      "overviewDoc": "docs/architecture/owners/core-opencode-diagnostics.md",
+      "requiredGates": ["typecheck", "module-docs", "diagnostics-safety"],
+      "risk": "high"
+    },
+    {
+      "id": "core.agents",
+      "layer": "core",
+      "include": ["src/core/agents/**"],
+      "delegatesTo": ["core.backend", "core.backend-diagnostics"],
+      "responsibilities": [
+        "agent capability, catalog and invocation service",
+        "child session graph and system agent guards"
+      ],
+      "canonicalState": ["agent service registry", "agent capability catalog"],
+      "entrypoints": ["src/core/agents/index.ts", "src/core/agents/AgentInvocationService.ts"],
+      "allowedOwnerDependencies": ["shared.foundation", "core.types"],
+      "forbiddenDependencies": ["feature", "app"],
+      "adjacentOwners": ["core.backend", "feature.chat-send", "feature.chat-shell"],
+      "tests": ["tests/unit/core/agents/**"],
+      "overviewDoc": "docs/architecture/owners/core-agents.md",
+      "requiredGates": ["typecheck", "module-docs"],
+      "risk": "medium"
+    },
+    {
+      "id": "core.backend",
+      "layer": "core",
+      "include": ["src/core/agents/backend/**"],
+      "delegatesTo": ["core.backend-diagnostics"],
+      "responsibilities": [
+        "agent backend adapters and transports for OpenCode, Codex and Claude",
+        "Claude settings source, project resource secure write, configuration archive",
+        "backend model catalog and routing"
+      ],
+      "canonicalState": [
+        "agent service registry instances",
+        "Claude/Codex/OpenCode adapter state",
+        "backend model catalog"
+      ],
+      "entrypoints": [
+        "src/core/agents/backend/index.ts",
+        "src/core/agents/backend/ClaudeCodeAdapter.ts",
+        "src/core/agents/backend/CodexAdapter.ts",
+        "src/core/agents/backend/OpenCodeAdapter.ts"
+      ],
+      "allowedOwnerDependencies": ["shared.foundation", "shared.diagnostics", "core.types"],
+      "forbiddenDependencies": ["feature", "app"],
+      "adjacentOwners": ["core.agents", "core.backend-diagnostics", "feature.chat-send"],
+      "tests": ["tests/unit/core/agents/backend/**"],
+      "overviewDoc": "docs/architecture/owners/core-backend.md",
+      "requiredGates": ["typecheck", "module-docs"],
+      "risk": "high"
+    },
+    {
+      "id": "core.backend-diagnostics",
+      "layer": "core",
+      "include": ["src/core/agents/backend/diagnostics/**"],
+      "delegatesTo": [],
+      "responsibilities": [
+        "Codex and Claude backend trace services and ring buffers",
+        "hardened redaction with dynamically collected backend credentials",
+        "trace channels independent from chat paths"
+      ],
+      "canonicalState": ["Codex trace service/store", "Claude trace service/store"],
+      "entrypoints": ["src/core/agents/backend/diagnostics/index.ts"],
+      "allowedOwnerDependencies": ["shared.foundation", "shared.diagnostics"],
+      "forbiddenDependencies": ["feature", "app"],
+      "adjacentOwners": ["shared.diagnostics", "core.opencode-diagnostics", "feature.chat-diagnostics"],
+      "tests": ["tests/unit/core/agents/backend/diagnostics/**"],
+      "overviewDoc": "docs/architecture/owners/core-backend-diagnostics.md",
+      "requiredGates": ["typecheck", "module-docs", "diagnostics-safety"],
+      "risk": "high"
+    },
+    {
+      "id": "core.config",
+      "layer": "core",
+      "include": ["src/core/config/**"],
+      "delegatesTo": [],
+      "responsibilities": [
+        "merge local config and server catalogs (ModelConfigService, OpencodeConfigManager)",
+        "model catalog state, selection, pricing, formatter and MCP config",
+        "slash command catalog and plugin management service"
+      ],
+      "canonicalState": [
+        "model catalog assembly (baseEffective vs effective)",
+        "opencode config manager state",
+        "slash command catalog"
+      ],
+      "entrypoints": [
+        "src/core/config/index.ts",
+        "src/core/config/ModelConfigService.ts",
+        "src/core/config/OpencodeConfigManager.ts"
+      ],
+      "allowedOwnerDependencies": ["shared.foundation", "core.types"],
+      "forbiddenDependencies": ["feature", "app"],
+      "adjacentOwners": ["feature.settings-model-catalog", "feature.chat-shell"],
+      "tests": ["tests/unit/core/config/**"],
+      "overviewDoc": "docs/architecture/owners/core-config.md",
+      "requiredGates": ["typecheck", "module-docs"],
+      "risk": "medium"
+    },
+    {
+      "id": "core.storage",
+      "layer": "core",
+      "include": ["src/core/storage/**"],
+      "delegatesTo": [],
+      "responsibilities": [
+        "local-first persistence for conversations, theme backgrounds and provider-icon assets",
+        "conversation metadata and full-message cache"
+      ],
+      "canonicalState": ["conversation store", "theme background storage"],
+      "entrypoints": ["src/core/storage/index.ts", "src/core/storage/StorageService.ts"],
+      "allowedOwnerDependencies": ["shared.foundation", "core.types"],
+      "forbiddenDependencies": ["feature", "app"],
+      "adjacentOwners": ["app.composition", "feature.chat-shell"],
+      "tests": ["tests/unit/core/storage/**"],
+      "overviewDoc": "docs/architecture/owners/core-storage.md",
+      "requiredGates": ["typecheck", "module-docs"],
+      "risk": "medium"
+    },
+    {
+      "id": "core.runtime",
+      "layer": "core",
+      "include": ["src/core/runtime/**"],
+      "delegatesTo": [],
+      "responsibilities": [
+        "plugin runtime coordinator and startup coordination",
+        "settings runtime coordinator (theme/appearance composition)"
+      ],
+      "canonicalState": ["plugin runtime coordinator state"],
+      "entrypoints": [
+        "src/core/runtime/PluginRuntimeCoordinator.ts",
+        "src/core/runtime/OpenCodianStartupCoordinator.ts"
+      ],
+      "allowedOwnerDependencies": ["shared.foundation", "core.types", "core.storage"],
+      "forbiddenDependencies": ["feature", "app"],
+      "adjacentOwners": ["app.composition", "feature.chat-shell"],
+      "tests": ["tests/unit/core/runtime/**"],
+      "overviewDoc": "docs/architecture/owners/core-runtime.md",
+      "requiredGates": ["typecheck", "module-docs"],
+      "risk": "high"
+    },
+    {
+      "id": "core.security",
+      "layer": "core",
+      "include": ["src/core/security/**"],
+      "delegatesTo": [],
+      "responsibilities": [
+        "blocklist/security checks shared across the runtime"
+      ],
+      "canonicalState": [],
+      "entrypoints": ["src/core/security/index.ts"],
+      "allowedOwnerDependencies": ["shared.foundation"],
+      "forbiddenDependencies": ["feature", "app"],
+      "adjacentOwners": ["shared.diagnostics", "feature.chat-send"],
+      "tests": ["tests/unit/core/security/**"],
+      "overviewDoc": "docs/architecture/owners/core-security.md",
+      "requiredGates": ["typecheck", "module-docs"],
+      "risk": "medium"
+    },
+    {
+      "id": "core.prompts",
+      "layer": "core",
+      "include": ["src/core/prompts/**"],
+      "delegatesTo": [],
+      "responsibilities": [
+        "core prompt templates including title generation"
+      ],
+      "canonicalState": [],
+      "entrypoints": ["src/core/prompts/titleGeneration.ts"],
+      "allowedOwnerDependencies": ["shared.foundation"],
+      "forbiddenDependencies": ["feature", "app"],
+      "adjacentOwners": ["feature.chat-title"],
+      "tests": [],
+      "overviewDoc": "docs/architecture/owners/core-prompts.md",
+      "requiredGates": ["typecheck", "module-docs"],
+      "risk": "low"
+    },
+    {
+      "id": "core.tools",
+      "layer": "core",
+      "include": ["src/core/tools/**"],
+      "delegatesTo": [],
+      "responsibilities": [
+        "core tool name registry"
+      ],
+      "canonicalState": ["tool name registry"],
+      "entrypoints": ["src/core/tools/index.ts"],
+      "allowedOwnerDependencies": ["shared.foundation"],
+      "forbiddenDependencies": ["feature", "app"],
+      "adjacentOwners": ["shared.utils-streaming"],
+      "tests": [],
+      "overviewDoc": "docs/architecture/owners/core-tools.md",
+      "requiredGates": ["typecheck", "module-docs"],
+      "risk": "low"
+    },
+    {
+      "id": "core.types",
+      "layer": "core",
+      "include": ["src/core/types/**"],
+      "delegatesTo": [],
+      "responsibilities": [
+        "core domain type definitions (chat, models, config, settings, permission, pricing, tools)"
+      ],
+      "canonicalState": [],
+      "entrypoints": ["src/core/types/index.ts"],
+      "allowedOwnerDependencies": ["shared.foundation"],
+      "forbiddenDependencies": ["feature", "app"],
+      "adjacentOwners": ["core.config", "core.opencode", "feature.settings-shell"],
+      "tests": [],
+      "overviewDoc": "docs/architecture/owners/core-types.md",
+      "requiredGates": ["typecheck", "module-docs"],
+      "risk": "low"
+    },
+    {
+      "id": "core.theme",
+      "layer": "core",
+      "include": ["src/core/theme/**"],
+      "delegatesTo": [],
+      "responsibilities": [
+        "core theme preset definitions and composition"
+      ],
+      "canonicalState": ["builtin theme presets"],
+      "entrypoints": ["src/core/theme/index.ts"],
+      "allowedOwnerDependencies": ["shared.foundation"],
+      "forbiddenDependencies": ["feature", "app"],
+      "adjacentOwners": ["feature.settings-style", "feature.chat-appearance"],
+      "tests": [],
+      "overviewDoc": "docs/architecture/owners/core-theme.md",
+      "requiredGates": ["typecheck", "module-docs"],
+      "risk": "medium"
+    },
+    {
+      "id": "core.update",
+      "layer": "core",
+      "include": ["src/core/update/**"],
+      "delegatesTo": [],
+      "responsibilities": [
+        "plugin update discovery and version comparison"
+      ],
+      "canonicalState": ["plugin update persisted state"],
+      "entrypoints": ["src/core/update/PluginUpdateService.ts"],
+      "allowedOwnerDependencies": ["shared.foundation"],
+      "forbiddenDependencies": ["feature", "app"],
+      "adjacentOwners": ["feature.settings-plugin", "app.composition"],
+      "tests": ["tests/unit/core/update/**"],
+      "overviewDoc": "docs/architecture/owners/core-update.md",
+      "requiredGates": ["typecheck", "module-docs"],
+      "risk": "medium"
+    },
+    {
+      "id": "core.acp",
+      "layer": "core",
+      "include": ["src/core/acp/**"],
+      "delegatesTo": [],
+      "responsibilities": [
+        "ACP (Agent Client Protocol) client manager and transport owner"
+      ],
+      "canonicalState": ["ACP client manager"],
+      "entrypoints": ["src/core/acp/AcpClientManager.ts"],
+      "allowedOwnerDependencies": ["shared.foundation", "core.types"],
+      "forbiddenDependencies": ["feature", "app"],
+      "adjacentOwners": ["core.agents", "feature.chat-send"],
+      "tests": [],
+      "overviewDoc": "docs/architecture/owners/core-acp.md",
+      "requiredGates": ["typecheck", "module-docs"],
+      "risk": "medium"
+    },
+    {
+      "id": "feature.chat-shell",
+      "layer": "feature",
+      "include": ["src/features/chat/**"],
+      "delegatesTo": [
+        "feature.chat-rendering",
+        "feature.chat-runtime",
+        "feature.chat-services",
+        "feature.chat-tabs",
+        "feature.chat-ui",
+        "feature.chat-demos",
+        "feature.chat-diagnostics",
+        "feature.chat-misc"
+      ],
+      "responsibilities": [
+        "main chat view runtime (OpenCodianView): ItemView lifecycle, DOM mount, tab/stream forwarding",
+        "concurrent tab/session streaming orchestration",
+        "conversation reload hydration/auth-sync"
+      ],
+      "canonicalState": [
+        "OpenCodianView tab/stream/conversation runtime state",
+        "chat view scroll-restore state"
+      ],
+      "entrypoints": ["src/features/chat/OpenCodianView.ts"],
+      "allowedOwnerDependencies": ["shared.foundation", "shared.diagnostics", "core.opencode", "core.agents", "core.config", "core.storage", "core.runtime", "feature.chat-runtime", "feature.chat-services", "feature.chat-rendering", "feature.chat-ui", "feature.chat-tabs", "feature.chat-diagnostics"],
+      "forbiddenDependencies": ["app"],
+      "adjacentOwners": ["app.composition", "feature.chat-runtime", "feature.chat-services", "feature.settings-debug"],
+      "tests": ["tests/unit/features/chat/OpenCodianView*.test.ts"],
+      "overviewDoc": "docs/architecture/owners/feature-chat-shell.md",
+      "requiredGates": ["typecheck", "module-docs", "build"],
+      "risk": "high"
+    },
+    {
+      "id": "feature.chat-rendering",
+      "layer": "feature",
+      "include": [
+        "src/features/chat/autoScrollState.ts",
+        "src/features/chat/chatAppearance.ts",
+        "src/features/chat/composerContext.ts",
+        "src/features/chat/forkMessages.ts",
+        "src/features/chat/renderGroups.ts",
+        "src/features/chat/rendering/**",
+        "src/features/chat/userMessageActions.ts",
+        "src/features/chat/userMessageDisplay.ts"
+      ],
+      "delegatesTo": [],
+      "responsibilities": [
+        "message render grouping, appearance, auto-scroll, collapsible sections",
+        "user message actions/display and composer context state"
+      ],
+      "canonicalState": ["chat composer context state", "chat appearance settings snapshot"],
+      "entrypoints": ["src/features/chat/composerContext.ts", "src/features/chat/renderGroups.ts"],
+      "allowedOwnerDependencies": ["shared.foundation", "core.types"],
+      "forbiddenDependencies": ["app"],
+      "adjacentOwners": ["feature.chat-shell", "feature.chat-runtime"],
+      "tests": ["tests/unit/features/chat/rendering/**"],
+      "overviewDoc": "docs/architecture/owners/feature-chat-rendering.md",
+      "requiredGates": ["typecheck", "module-docs"],
+      "risk": "medium"
+    },
+    {
+      "id": "feature.chat-runtime",
+      "layer": "feature",
+      "include": ["src/features/chat/runtime/**"],
+      "delegatesTo": [],
+      "responsibilities": [
+        "chat runtime coordinators: send pipeline, streaming, background tasks, sync load, tab activation",
+        "assistant/user message renderers, permission and question inline cards"
+      ],
+      "canonicalState": [
+        "send pipeline runtime state",
+        "background task stream/indicator state",
+        "conversation sync load/hydration state"
+      ],
+      "entrypoints": [
+        "src/features/chat/runtime/SendPipelineRuntime.ts",
+        "src/features/chat/runtime/BackgroundTaskIndicatorCoordinator.ts"
+      ],
+      "allowedOwnerDependencies": ["shared.foundation", "shared.utils-streaming", "core.types"],
+      "forbiddenDependencies": ["app"],
+      "adjacentOwners": ["feature.chat-shell", "feature.chat-services"],
+      "tests": ["tests/unit/features/chat/runtime/**"],
+      "overviewDoc": "docs/architecture/owners/feature-chat-runtime.md",
+      "requiredGates": ["typecheck", "module-docs"],
+      "risk": "high"
+    },
+    {
+      "id": "feature.chat-services",
+      "layer": "feature",
+      "include": ["src/features/chat/services/**"],
+      "delegatesTo": ["feature.chat-diagnostics", "feature.chat-misc"],
+      "responsibilities": [
+        "chat services: context usage, scroll, conversation sync, background tasks, slash commands, title generation, model selection, session todo",
+        "conversation history, write serialization, post-sync coordination"
+      ],
+      "canonicalState": [
+        "conversation sync orchestration state",
+        "slash command menu catalog cache",
+        "context usage service state",
+        "title generation service"
+      ],
+      "entrypoints": [
+        "src/features/chat/services/ScrollManager.ts",
+        "src/features/chat/services/ContextUsageService.ts",
+        "src/features/chat/services/SlashCommandMenuCatalogCache.ts",
+        "src/features/chat/services/TitleGenerationService.ts"
+      ],
+      "allowedOwnerDependencies": ["shared.foundation", "shared.diagnostics", "core.types", "core.prompts"],
+      "forbiddenDependencies": ["app"],
+      "adjacentOwners": ["feature.chat-shell", "feature.chat-runtime", "feature.chat-diagnostics"],
+      "tests": ["tests/unit/features/chat/services/**"],
+      "overviewDoc": "docs/architecture/owners/feature-chat-services.md",
+      "requiredGates": ["typecheck", "module-docs"],
+      "risk": "high"
+    },
+    {
+      "id": "feature.chat-diagnostics",
+      "layer": "feature",
+      "include": [
+        "src/features/chat/services/ClaudeDiagnosticsHostAdapter.ts",
+        "src/features/chat/services/CodexDiagnosticsHostAdapter.ts"
+      ],
+      "delegatesTo": [],
+      "responsibilities": [
+        "chat-side Claude and Codex trace badge/menu state, capture-token and report/export callbacks",
+        "trace failure containment away from chat path"
+      ],
+      "canonicalState": ["chat diagnostics host adapter state"],
+      "entrypoints": [
+        "src/features/chat/services/ClaudeDiagnosticsHostAdapter.ts",
+        "src/features/chat/services/CodexDiagnosticsHostAdapter.ts"
+      ],
+      "allowedOwnerDependencies": ["shared.foundation", "shared.diagnostics", "core.backend-diagnostics", "core.opencode-diagnostics"],
+      "forbiddenDependencies": ["app"],
+      "adjacentOwners": ["feature.chat-shell", "core.backend-diagnostics", "feature.settings-debug"],
+      "tests": ["tests/unit/features/chat/services/**DiagnosticsHostAdapter*"],
+      "overviewDoc": "docs/architecture/owners/feature-chat-diagnostics.md",
+      "requiredGates": ["typecheck", "module-docs", "diagnostics-safety"],
+      "risk": "high"
+    },
+    {
+      "id": "feature.chat-tabs",
+      "layer": "feature",
+      "include": ["src/features/chat/tabs/**"],
+      "delegatesTo": [],
+      "responsibilities": [
+        "chat tab lifecycle: Tab, TabBar, TabManager and tab types"
+      ],
+      "canonicalState": ["chat tab manager state"],
+      "entrypoints": ["src/features/chat/tabs/index.ts", "src/features/chat/tabs/TabManager.ts"],
+      "allowedOwnerDependencies": ["shared.foundation", "core.types"],
+      "forbiddenDependencies": ["app"],
+      "adjacentOwners": ["feature.chat-shell"],
+      "tests": ["tests/unit/features/chat/tabs/**"],
+      "overviewDoc": "docs/architecture/owners/feature-chat-tabs.md",
+      "requiredGates": ["typecheck", "module-docs"],
+      "risk": "medium"
+    },
+    {
+      "id": "feature.chat-ui",
+      "layer": "feature",
+      "include": ["src/features/chat/ui/**"],
+      "delegatesTo": [],
+      "responsibilities": [
+        "chat UI components: modals, docks, overlays, model selector, navigation sidebar, lsp indicator"
+      ],
+      "canonicalState": [],
+      "entrypoints": ["src/features/chat/ui/modelSelector/ModelSelectorRenderer.ts"],
+      "allowedOwnerDependencies": ["shared.foundation", "shared.utils-streaming", "core.types"],
+      "forbiddenDependencies": ["app"],
+      "adjacentOwners": ["feature.chat-shell", "feature.chat-rendering"],
+      "tests": ["tests/unit/features/chat/ui/**"],
+      "overviewDoc": "docs/architecture/owners/feature-chat-ui.md",
+      "requiredGates": ["typecheck", "module-docs"],
+      "risk": "medium"
+    },
+    {
+      "id": "feature.chat-demos",
+      "layer": "feature",
+      "include": [
+        "src/features/chat/glassOctahedronDemo.ts",
+        "src/features/chat/glassOctahedronDemoRefraction.ts",
+        "src/features/chat/glassOctahedronDemoThree.ts",
+        "src/features/chat/liquidDiamondDemo.ts",
+        "src/features/chat/liquidDiamondDemoWebgl.ts"
+      ],
+      "delegatesTo": [],
+      "responsibilities": [
+        "experimental visual demos (glass octahedron, liquid diamond)",
+        "kept opt-in, never exposed in stable UI paths"
+      ],
+      "canonicalState": [],
+      "entrypoints": ["src/features/chat/liquidDiamondDemo.ts", "src/features/chat/glassOctahedronDemo.ts"],
+      "allowedOwnerDependencies": ["shared.foundation", "shared.vendor", "shared.utils-glass"],
+      "forbiddenDependencies": ["app"],
+      "adjacentOwners": ["feature.chat-shell"],
+      "tests": [],
+      "overviewDoc": "docs/architecture/owners/feature-chat-demos.md",
+      "requiredGates": ["typecheck", "module-docs"],
+      "risk": "low"
+    },
+    {
+      "id": "feature.chat-misc",
+      "layer": "feature",
+      "include": ["src/features/chat/services/ChatVisualDemoCoordinator.ts"],
+      "delegatesTo": [],
+      "responsibilities": [
+        "chat visual demo coordinator wiring"
+      ],
+      "canonicalState": [],
+      "entrypoints": ["src/features/chat/services/ChatVisualDemoCoordinator.ts"],
+      "allowedOwnerDependencies": ["shared.foundation", "feature.chat-demos"],
+      "forbiddenDependencies": ["app"],
+      "adjacentOwners": ["feature.chat-shell", "feature.chat-demos"],
+      "tests": [],
+      "overviewDoc": "docs/architecture/owners/feature-chat-misc.md",
+      "requiredGates": ["typecheck", "module-docs"],
+      "risk": "low"
+    },
+    {
+      "id": "feature.chat-send",
+      "layer": "feature",
+      "delegatesTo": [],
+      "responsibilities": [
+        "logical send-pipeline dependency alias: actual files and canonical state live in feature.chat-runtime; referenced only by allowedOwnerDependencies to keep the dependency surface readable"
+      ],
+      "canonicalState": [],
+      "entrypoints": [],
+      "allowedOwnerDependencies": ["shared.foundation", "core.agents", "core.backend"],
+      "forbiddenDependencies": ["app"],
+      "adjacentOwners": ["feature.chat-shell", "feature.chat-runtime", "core.agents"],
+      "tests": [],
+      "overviewDoc": "docs/architecture/owners/feature-chat-send.md",
+      "requiredGates": ["typecheck"],
+      "risk": "high"
+    },
+    {
+      "id": "feature.chat-title",
+      "layer": "feature",
+      "delegatesTo": [],
+      "responsibilities": [
+        "logical title-generation dependency alias: actual files and canonical state live in feature.chat-services; referenced only by allowedOwnerDependencies"
+      ],
+      "canonicalState": [],
+      "entrypoints": [],
+      "allowedOwnerDependencies": ["shared.foundation", "core.prompts"],
+      "forbiddenDependencies": ["app"],
+      "adjacentOwners": ["feature.chat-services", "core.prompts"],
+      "tests": [],
+      "overviewDoc": "docs/architecture/owners/feature-chat-title.md",
+      "requiredGates": ["typecheck"],
+      "risk": "low"
+    },
+    {
+      "id": "feature.chat-appearance",
+      "layer": "feature",
+      "delegatesTo": [],
+      "responsibilities": [
+        "logical chat-appearance dependency alias: actual files and canonical state live in feature.chat-rendering; referenced only by allowedOwnerDependencies"
+      ],
+      "canonicalState": [],
+      "entrypoints": [],
+      "allowedOwnerDependencies": ["shared.foundation", "shared.utils-glass", "core.theme"],
+      "forbiddenDependencies": ["app"],
+      "adjacentOwners": ["feature.chat-rendering", "feature.settings-style"],
+      "tests": [],
+      "overviewDoc": "docs/architecture/owners/feature-chat-appearance.md",
+      "requiredGates": ["typecheck"],
+      "risk": "low"
+    },
+    {
+      "id": "feature.settings-shell",
+      "layer": "feature",
+      "include": ["src/features/settings/**"],
+      "delegatesTo": [
+        "feature.settings-debug",
+        "feature.settings-model-catalog",
+        "feature.settings-claude",
+        "feature.settings-codex",
+        "feature.settings-opencode",
+        "feature.settings-style",
+        "feature.settings-mcp",
+        "feature.settings-agents",
+        "feature.settings-plugin"
+      ],
+      "responsibilities": [
+        "settings tab shell, router, coordinator and shared controls",
+        "settings normalization and view registration"
+      ],
+      "canonicalState": ["OpenCodianSettings normalized state", "settings section coordinator state"],
+      "entrypoints": [
+        "src/features/settings/OpenCodianSettings.ts",
+        "src/features/settings/OpenCodianSettingsView.ts"
+      ],
+      "allowedOwnerDependencies": ["shared.foundation", "core.types", "core.config"],
+      "forbiddenDependencies": ["app"],
+      "adjacentOwners": ["app.composition", "feature.settings-debug", "feature.settings-model-catalog"],
+      "tests": ["tests/unit/features/settings/**"],
+      "overviewDoc": "docs/architecture/owners/feature-settings-shell.md",
+      "requiredGates": ["typecheck", "module-docs", "build"],
+      "risk": "high"
+    },
+    {
+      "id": "feature.settings-debug",
+      "layer": "feature",
+      "include": ["src/features/settings/SettingsDebugSection.ts"],
+      "delegatesTo": [],
+      "responsibilities": [
+        "debug settings section: five debug source tabs, three backend trace workbenches, plugin export actions",
+        "Claude session-trace controls inside claude-code debug block"
+      ],
+      "canonicalState": ["debug section tab shell/router state"],
+      "entrypoints": ["src/features/settings/SettingsDebugSection.ts"],
+      "allowedOwnerDependencies": ["shared.foundation", "shared.diagnostics", "core.opencode-diagnostics", "core.backend-diagnostics", "core.types"],
+      "forbiddenDependencies": ["app"],
+      "adjacentOwners": ["feature.settings-shell", "feature.chat-diagnostics"],
+      "tests": ["tests/unit/features/settings/SettingsDebugSection*"],
+      "overviewDoc": "docs/architecture/owners/feature-settings-debug.md",
+      "requiredGates": ["typecheck", "module-docs", "diagnostics-safety"],
+      "risk": "high"
+    },
+    {
+      "id": "feature.settings-model-catalog",
+      "layer": "feature",
+      "include": [
+        "src/features/settings/SettingsModelCatalogAvailability.ts",
+        "src/features/settings/SettingsModelCatalogCoordinator.ts",
+        "src/features/settings/SettingsModelCatalogPresenter.ts",
+        "src/features/settings/SettingsModelIconCacheManager.ts",
+        "src/features/settings/SettingsModelSection.ts",
+        "src/features/settings/ModelConfigModal.ts",
+        "src/features/settings/modelConfigModalState.ts",
+        "src/features/settings/ModelConfigModelListEditor.ts",
+        "src/features/settings/ModelConfigProviderEditor.ts",
+        "src/features/settings/modelConfigSavePlan.ts",
+        "src/features/settings/modelConfigStructuredOptions.ts",
+        "src/features/settings/ModelConfigStructuredOptionsEditor.ts",
+        "src/features/settings/modelConfigWorkspace.ts",
+        "src/features/settings/modelPicker.ts",
+        "src/features/settings/ModelPickerModal.ts",
+        "src/features/settings/ModelPricingModal.ts",
+        "src/features/settings/ModelConfigJsonModal.ts"
+      ],
+      "delegatesTo": [],
+      "responsibilities": [
+        "model catalog presenter, coordinator, modal and editors",
+        "model picker, pricing modal and icon cache management"
+      ],
+      "canonicalState": ["model config modal state", "model picker state"],
+      "entrypoints": [
+        "src/features/settings/SettingsModelCatalogPresenter.ts",
+        "src/features/settings/ModelConfigModal.ts"
+      ],
+      "allowedOwnerDependencies": ["shared.foundation", "shared.utils-icons", "core.config", "core.types"],
+      "forbiddenDependencies": ["app"],
+      "adjacentOwners": ["feature.settings-shell", "core.config"],
+      "tests": ["tests/unit/features/settings/**Model*"],
+      "overviewDoc": "docs/architecture/owners/feature-settings-model-catalog.md",
+      "requiredGates": ["typecheck", "module-docs"],
+      "risk": "medium"
+    },
+    {
+      "id": "feature.settings-claude",
+      "layer": "feature",
+      "include": [
+        "src/features/settings/SettingsClaudeCodeSection.ts",
+        "src/features/settings/SettingsClaudeConfigurationSection.ts",
+        "src/features/settings/SettingsClaudeProviderMetadataPersistenceCoordinator.ts",
+        "src/features/settings/SettingsClaudeProvidersSection.ts",
+        "src/features/settings/SettingsClaudeResourcesSection.ts",
+        "src/features/settings/ClaudeCodeHelpModal.ts",
+        "src/features/settings/ClaudeSettingsCommonFieldsPresenter.ts",
+        "src/features/settings/ClaudeSettingsContextSourcesPresenter.ts",
+        "src/features/settings/ClaudeSettingsHookFieldControls.ts",
+        "src/features/settings/ClaudeSettingsHooksBuilder.ts",
+        "src/features/settings/ClaudeSettingsMutationController.ts"
+      ],
+      "delegatesTo": [],
+      "responsibilities": [
+        "Claude settings sections, configuration, provider metadata, resources",
+        "Claude settings hooks builder and mutation controller"
+      ],
+      "canonicalState": [],
+      "entrypoints": ["src/features/settings/SettingsClaudeCodeSection.ts"],
+      "allowedOwnerDependencies": ["shared.foundation", "core.types"],
+      "forbiddenDependencies": ["app"],
+      "adjacentOwners": ["feature.settings-shell"],
+      "tests": ["tests/unit/features/settings/**Claude*"],
+      "overviewDoc": "docs/architecture/owners/feature-settings-claude.md",
+      "requiredGates": ["typecheck", "module-docs"],
+      "risk": "medium"
+    },
+    {
+      "id": "feature.settings-codex",
+      "layer": "feature",
+      "include": [
+        "src/features/settings/SettingsCodexSection.ts",
+        "src/features/settings/SettingsCodexProjectConfigSection.ts",
+        "src/features/settings/SettingsCodexAccountSurface.ts",
+        "src/features/settings/SettingsCodexLegacyCredentialControl.ts",
+        "src/features/settings/SettingsCodexReadbackControls.ts",
+        "src/features/settings/SettingsCodexResourcesSection.ts",
+        "src/features/settings/CodexMcpServerDetailModal.ts",
+        "src/features/settings/CodexMcpServerDetailRenderers.ts",
+        "src/features/settings/CodexProjectConfigFormModel.ts",
+        "src/features/settings/CodexReadbackModal.ts"
+      ],
+      "delegatesTo": [],
+      "responsibilities": [
+        "Codex settings sections, project config, account surface, credentials, readback controls, resources",
+        "Codex MCP server detail modal"
+      ],
+      "canonicalState": [],
+      "entrypoints": ["src/features/settings/SettingsCodexSection.ts"],
+      "allowedOwnerDependencies": ["shared.foundation", "core.types"],
+      "forbiddenDependencies": ["app"],
+      "adjacentOwners": ["feature.settings-shell"],
+      "tests": ["tests/unit/features/settings/**Codex*"],
+      "overviewDoc": "docs/architecture/owners/feature-settings-codex.md",
+      "requiredGates": ["typecheck", "module-docs"],
+      "risk": "medium"
+    },
+    {
+      "id": "feature.settings-opencode",
+      "layer": "feature",
+      "include": [
+        "src/features/settings/SettingsBackendSection.ts",
+        "src/features/settings/OpencodeConfigModal.ts",
+        "src/features/settings/OpenCodeProjectConfigHelpModal.ts",
+        "src/features/settings/projectAgentEditorConfig.ts",
+        "src/features/settings/ProjectConfigFileWatcher.ts",
+        "src/features/settings/SettingsProjectAgentEditor.ts",
+        "src/features/settings/SettingsProjectCommandEditor.ts",
+        "src/features/settings/SettingsServerSection.ts",
+        "src/features/settings/ServerSettingHelpModal.ts",
+        "src/features/settings/SettingsCommandsSection.ts",
+        "src/features/settings/CostEstimateSettingsRow.ts"
+      ],
+      "delegatesTo": [],
+      "responsibilities": [
+        "OpenCode backend/server sections, opencode config modal, project config help/file watcher",
+        "project agent/command editors, commands section, cost estimate row"
+      ],
+      "canonicalState": [],
+      "entrypoints": ["src/features/settings/OpencodeConfigModal.ts", "src/features/settings/SettingsServerSection.ts"],
+      "allowedOwnerDependencies": ["shared.foundation", "core.opencode", "core.config", "core.types"],
+      "forbiddenDependencies": ["app"],
+      "adjacentOwners": ["feature.settings-shell", "core.opencode"],
+      "tests": ["tests/unit/features/settings/**Opencode*", "tests/unit/features/settings/**Server*"],
+      "overviewDoc": "docs/architecture/owners/feature-settings-opencode.md",
+      "requiredGates": ["typecheck", "module-docs"],
+      "risk": "medium"
+    },
+    {
+      "id": "feature.settings-style",
+      "layer": "feature",
+      "include": [
+        "src/features/settings/SettingsStyleSection.ts",
+        "src/features/settings/settingsStyleControls.ts",
+        "src/features/settings/SettingsStyleInputPanelSection.ts",
+        "src/features/settings/SettingsStyleLiquidGlassInputControls.ts",
+        "src/features/settings/SettingsStylePresetSection.ts",
+        "src/features/settings/SettingsStyleBackgroundSection.ts",
+        "src/features/settings/InputFontRegistry.ts",
+        "src/features/settings/LiquidGlassSettingHelpModal.ts"
+      ],
+      "delegatesTo": [],
+      "responsibilities": [
+        "settings style sections, controls, presets, background, input panel and liquid glass controls",
+        "input font registry"
+      ],
+      "canonicalState": [],
+      "entrypoints": ["src/features/settings/SettingsStyleSection.ts"],
+      "allowedOwnerDependencies": ["shared.foundation", "shared.utils-glass", "core.theme", "core.types"],
+      "forbiddenDependencies": ["app"],
+      "adjacentOwners": ["feature.settings-shell", "core.theme", "feature.chat-appearance"],
+      "tests": ["tests/unit/features/settings/**Style*"],
+      "overviewDoc": "docs/architecture/owners/feature-settings-style.md",
+      "requiredGates": ["typecheck", "module-docs"],
+      "risk": "medium"
+    },
+    {
+      "id": "feature.settings-mcp",
+      "layer": "feature",
+      "include": [
+        "src/features/settings/SettingsMcpSection.ts",
+        "src/features/settings/SettingsMcpAddForm.ts",
+        "src/features/settings/McpServerEditorModal.ts",
+        "src/features/settings/McpServerStatusModal.ts"
+      ],
+      "delegatesTo": [],
+      "responsibilities": [
+        "MCP server settings section, add form, editor and status modals"
+      ],
+      "canonicalState": [],
+      "entrypoints": ["src/features/settings/SettingsMcpSection.ts"],
+      "allowedOwnerDependencies": ["shared.foundation", "core.config", "core.types"],
+      "forbiddenDependencies": ["app"],
+      "adjacentOwners": ["feature.settings-shell"],
+      "tests": ["tests/unit/features/settings/**Mcp*"],
+      "overviewDoc": "docs/architecture/owners/feature-settings-mcp.md",
+      "requiredGates": ["typecheck", "module-docs"],
+      "risk": "medium"
+    },
+    {
+      "id": "feature.settings-agents",
+      "layer": "feature",
+      "include": [
+        "src/features/settings/SettingsAgentsSection.ts",
+        "src/features/settings/AgentSwitcherChips.ts",
+        "src/features/settings/AgentSwitcherFloatingIcons.ts",
+        "src/features/settings/SettingsSkillSection.ts",
+        "src/features/settings/SlashCommandCatalogRenderer.ts",
+        "src/features/settings/SettingsToolSection.ts",
+        "src/features/settings/SettingsToolDetailModal.ts",
+        "src/features/settings/SettingsToolFileService.ts",
+        "src/features/settings/capabilityDisclosureRow.ts",
+        "src/features/settings/capabilityLabBackendTabs.ts",
+        "src/features/settings/capabilityLabBackendWorkspace.ts",
+        "src/features/settings/SettingsCapabilityLabSection.ts"
+      ],
+      "delegatesTo": [],
+      "responsibilities": [
+        "agents, skill, tool and capability-lab settings sections",
+        "agent switcher chips and floating icons, slash command catalog renderer"
+      ],
+      "canonicalState": [],
+      "entrypoints": [
+        "src/features/settings/SettingsAgentsSection.ts",
+        "src/features/settings/SettingsCapabilityLabSection.ts"
+      ],
+      "allowedOwnerDependencies": ["shared.foundation", "core.agents", "core.config", "core.types"],
+      "forbiddenDependencies": ["app"],
+      "adjacentOwners": ["feature.settings-shell", "core.agents"],
+      "tests": ["tests/unit/features/settings/**Agent*", "tests/unit/features/settings/**Capability*"],
+      "overviewDoc": "docs/architecture/owners/feature-settings-agents.md",
+      "requiredGates": ["typecheck", "module-docs"],
+      "risk": "medium"
+    },
+    {
+      "id": "feature.settings-plugin",
+      "layer": "feature",
+      "include": [
+        "src/features/settings/SettingsPluginSection.ts",
+        "src/features/settings/SettingsPluginEvidenceCoordinator.ts",
+        "src/features/settings/SettingsPluginEvidencePresenter.ts",
+        "src/features/settings/SettingsPluginUpdateSection.ts",
+        "src/features/settings/SettingsConversationSection.ts",
+        "src/features/settings/ConversationCompactionHelpModal.ts",
+        "src/features/settings/SettingsSecuritySection.ts",
+        "src/features/settings/SettingsFormatterSection.ts",
+        "src/features/settings/SettingsAcpSection.ts",
+        "src/features/settings/SettingsUiSection.ts",
+        "src/features/settings/SettingsUserSection.ts",
+        "src/features/settings/settingsBackendGuards.ts",
+        "src/features/settings/providerPresets.ts",
+        "src/features/settings/ModifiedFilesSidebarHelpModal.ts",
+        "src/features/settings/ProviderBuiltinIconPickerModal.ts",
+        "src/features/settings/ProviderIconCacheModal.ts"
+      ],
+      "delegatesTo": [],
+      "responsibilities": [
+        "plugin, update, conversation, security, formatter, acp, ui and user settings sections",
+        "plugin evidence coordinator/presenter, provider icon cache/picker modals, provider presets"
+      ],
+      "canonicalState": [],
+      "entrypoints": [
+        "src/features/settings/SettingsPluginSection.ts",
+        "src/features/settings/SettingsPluginUpdateSection.ts"
+      ],
+      "allowedOwnerDependencies": ["shared.foundation", "shared.utils-icons", "core.update", "core.types"],
+      "forbiddenDependencies": ["app"],
+      "adjacentOwners": ["feature.settings-shell", "core.update"],
+      "tests": ["tests/unit/features/settings/**Plugin*", "tests/unit/features/settings/**Provider*"],
+      "overviewDoc": "docs/architecture/owners/feature-settings-plugin.md",
+      "requiredGates": ["typecheck", "module-docs"],
+      "risk": "medium"
+    }
+  ],
+  "legacy": {
+    "unassigned": {
+      "explicitPaths": [],
+      "mustReachZeroBeforePhase": 1
+    }
+  },
+  "dependencyExceptions": []
+}

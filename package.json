@@ -18,6 +18,8 @@
     "doctor:esbuild:fix": "node scripts/doctor-esbuild.mjs --fix",
     "graphify:update:src": "node scripts/update-graphify-src.mjs",
     "check:owner-guard": "node scripts/check-owner-guard.mjs",
+    "check:owner-manifest": "node scripts/check-owner-manifest.mjs",
+    "inspect:owner": "node scripts/inspect-owner.mjs",
     "check:graphify": "node scripts/check-graphify-freshness.mjs",
     "check:devlog-order": "node scripts/check-devlog-order.mjs",
     "check:module-docs:coverage": "node scripts/check-module-doc-coverage.mjs",
