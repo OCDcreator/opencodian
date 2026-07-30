@@ -84,6 +84,7 @@
 - `src/core/agents/backend/CodexAppServerClientTypes.ts`：从 `CodexAppServerClient` 拆出的纯 wire 类型模块（thread/model/account/MCP/review 等），由 `CodexAppServerClient` 通过 `export *` 重新导出
 - `src/core/agents/backend/CodexAppServerTransport.ts`：从 `CodexAppServerClient` 拆出的基类，负责 app-server 进程生命周期与 JSON-RPC 2.0 plumbing；`CodexAppServerClient extends CodexAppServerTransport`
 - `src/core/agents/backend/CodexAppServerClientNormalization.ts`：从 `CodexAppServerClient` 拆出的 transcript 归一化纯函数模块（`normalizeThreadList` / `normalizeTurnsToPreviewMessages`）
+- `src/core/agents/backend/diagnostics/`：Codex 会话 trace 子目录（见 `diagnostics/index.md`）——`types` 类型契约、`CodexSessionTraceService` trace runtime、`CodexTraceRingBuffer` 追溯式线记录缓冲、`CodexWireTraceBridge` 线流量桥；不经本 barrel 导出
 - `src/core/types/chat.ts`：提供 `AgentBackendKind` 类型约束
 
 ## 维护约束
