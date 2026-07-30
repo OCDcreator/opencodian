@@ -344,38 +344,46 @@ export class CodexSessionTraceService implements CodexTracePort {
     payload?: unknown,
     options?: { metrics?: Record<string, number>; forceDeep?: boolean; runId?: string },
   ): void {
-    if (!this.options.settings().enabled) return;
-    const redacted = payload === undefined ? undefined : this.redactor.redact(payload, channel === 'service-output' ? 'service-output' : 'ordinary');
-    const deep = Boolean(options?.forceDeep ?? context.deepCapture);
-    const event: CodexTraceEventV1 = {
-      schemaVersion: CODEX_TRACE_SCHEMA_VERSION,
-      timestamp: new Date().toISOString(),
-      monotonicSequence: ++this.sequence,
-      traceId: context.traceId,
-      runtimeSegmentId: context.runtimeSegmentId,
-      runId: options?.runId ?? context.runId,
-      sessionId: context.threadId,
-      turnId: context.turnId,
-      channel,
-      source,
-      severity,
-      name,
-      metrics: { ...(redacted ? this.redactionMetrics(redacted.stats) : {}), ...options?.metrics },
-      payload: redacted?.value,
-      payloadRef: { kind: deep ? 'deep' : 'inline', runId: options?.runId ?? context.runId },
-    };
-    this.store.append(event, deep);
-    this.mirrorToConsole(event);
+    try {
+      if (!this.options.settings().enabled) return;
+      const redacted = payload === undefined ? undefined : this.redactor.redact(payload, channel === 'service-output' ? 'service-output' : 'ordinary');
+      const deep = Boolean(options?.forceDeep ?? context.deepCapture);
+      const event: CodexTraceEventV1 = {
+        schemaVersion: CODEX_TRACE_SCHEMA_VERSION,
+        timestamp: new Date().toISOString(),
+        monotonicSequence: ++this.sequence,
+        traceId: context.traceId,
+        runtimeSegmentId: context.runtimeSegmentId,
+        runId: options?.runId ?? context.runId,
+        sessionId: context.threadId,
+        turnId: context.turnId,
+        channel,
+        source,
+        severity,
+        name,
+        metrics: { ...(redacted ? this.redactionMetrics(redacted.stats) : {}), ...options?.metrics },
+        payload: redacted?.value,
+        payloadRef: { kind: deep ? 'deep' : 'inline', runId: options?.runId ?? context.runId },
+      };
+      this.store.append(event, deep);
+      this.mirrorToConsole(event);
+    } catch {
+      // Diagnostics must never affect the Codex chat request or stream path.
+    }
   }
 
   private mirrorToConsole(event: CodexTraceEventV1): void {
-    const settings = this.options.settings();
-    const always = event.severity === 'warning' || event.severity === 'critical' || event.severity === 'error';
-    if (!always && settings.consolePreset !== 'full') return;
-    if (!always && !settings.consoleChannels[event.channel]) return;
-    const line = `[codex-trace] ${event.severity} ${event.channel}/${event.name}`;
-    if (always) logger.warn(line, event.payload ?? '');
-    else logger.debug(line, event.payload ?? '');
+    try {
+      const settings = this.options.settings();
+      const always = event.severity === 'warning' || event.severity === 'critical' || event.severity === 'error';
+      if (!always && settings.consolePreset !== 'full') return;
+      if (!always && !settings.consoleChannels[event.channel]) return;
+      const line = `[codex-trace] ${event.severity} ${event.channel}/${event.name}`;
+      if (always) logger.warn(line, event.payload ?? '');
+      else logger.debug(line, event.payload ?? '');
+    } catch {
+      // Console failure is diagnostics-only.
+    }
   }
 }
 
