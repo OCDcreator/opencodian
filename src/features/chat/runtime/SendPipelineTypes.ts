@@ -26,6 +26,19 @@ import type {
 import type { WritableTabSessionPhase } from '../services/TabSessionPhase';
 import type { TabId } from '../tabs';
 
+/**
+ * Structural shape shared by every backend diagnostic deep-capture token
+ * (`OpenCodeDiagnosticRunToken`, `CodexDiagnosticRunToken`). Inlined here so
+ * the send pipeline contract stays backend-agnostic while the transport port
+ * can carry either kind into {@link AgentChatSendRequest.diagnosticRunToken}.
+ */
+export interface DiagnosticRunToken {
+  runId: string;
+  tabId: string;
+  armedAt: number;
+  expiresAt: number;
+}
+
 export interface SendPipelineTabRuntime {
   isStreaming: boolean;
   streamingMessageEl: HTMLElement | null;
@@ -84,6 +97,10 @@ export interface SendPipelineViewPort {
     tabId: TabId | null,
     sessionId?: string,
   ): OpenCodeDiagnosticRunToken | undefined;
+  claimCodexDiagnosticRunToken?(
+    tabId: TabId | null,
+    threadId?: string,
+  ): DiagnosticRunToken | undefined;
   refreshOpenCodeDiagnosticsState?(tabId: TabId | null): void;
 }
 
@@ -100,7 +117,7 @@ export interface SendPipelineTransportPort {
       /** One-shot structured-output schema for Claude Code `/json` trigger. Not persisted. */
       outputFormat?: Record<string, unknown>;
       images?: ImageAttachment[];
-      diagnosticRunToken?: OpenCodeDiagnosticRunToken;
+      diagnosticRunToken?: DiagnosticRunToken;
     },
   ): AsyncGenerator<CoreStreamChunk>;
   detachStream(sessionId: string | undefined): void;
@@ -186,6 +203,7 @@ export type SendPipelineExecutionHost =
     | 'getTabRuntimeState'
     | 'getOrCreateTabStreamController'
     | 'claimOpenCodeDiagnosticRunToken'
+    | 'claimCodexDiagnosticRunToken'
     | 'refreshOpenCodeDiagnosticsState'
   >
   & Pick<SendPipelineTransportPort, 'sendStreamMessage'>

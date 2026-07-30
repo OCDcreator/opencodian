@@ -2167,6 +2167,7 @@ export const zhTranslations = {
   'settings.debug.codex.captureContent.desc': '关闭后，深度捕获与回溯落盘只保存 payload 形状摘要，不保存消息正文。',
   'settings.debug.codex.actions.copyReport': '复制智能报告',
   'settings.debug.codex.actions.copySuccess': 'Codex 诊断报告已复制。',
+  'settings.debug.codex.exportUnavailable': '此会话不可用 Codex 会话诊断。',
   'settings.debug.codex.actions.flush': '刷新待写轨迹',
   'settings.debug.codex.actions.flushSuccess': 'Codex 待写轨迹已刷新。',
   'settings.debug.codex.actions.export': '导出最近完整轨迹',

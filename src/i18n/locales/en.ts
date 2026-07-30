@@ -2167,6 +2167,7 @@ export const enTranslations = {
   'settings.debug.codex.captureContent.desc': 'When off, deep capture and retroactive dumps store payload shapes instead of full message content.',
   'settings.debug.codex.actions.copyReport': 'Copy smart report',
   'settings.debug.codex.actions.copySuccess': 'Codex diagnostic report copied.',
+  'settings.debug.codex.exportUnavailable': 'Codex session diagnostics are unavailable for this conversation.',
   'settings.debug.codex.actions.flush': 'Flush pending traces',
   'settings.debug.codex.actions.flushSuccess': 'Pending Codex traces flushed.',
   'settings.debug.codex.actions.export': 'Export latest full trace',

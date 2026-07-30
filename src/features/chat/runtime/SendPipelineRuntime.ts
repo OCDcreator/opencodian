@@ -5,6 +5,7 @@ import type {
 } from '../services/MessageSendPreparationService';
 import type { TabId } from '../tabs';
 import type {
+  DiagnosticRunToken,
   SendPipelineDebugContentBlock,
   SendPipelineDebugPort,
   SendPipelineExecutionHost,
@@ -104,6 +105,7 @@ export interface SendPipelineHostDependencies {
   transitionTabSessionLifecycle: SendPipelineHost['transitionTabSessionLifecycle'];
   refreshServerStatusBadge(): Promise<void>;
   claimOpenCodeDiagnosticRunToken?: SendPipelineHost['claimOpenCodeDiagnosticRunToken'];
+  claimCodexDiagnosticRunToken?: SendPipelineHost['claimCodexDiagnosticRunToken'];
   refreshOpenCodeDiagnosticsState?: SendPipelineHost['refreshOpenCodeDiagnosticsState'];
   sendStreamMessage: SendPipelineHost['sendStreamMessage'];
   detachStream(sessionId: string | undefined): void;
@@ -145,6 +147,8 @@ export function createSendPipelineRuntimeHost(deps: SendPipelineHostDependencies
     refreshServerStatusBadge: () => deps.refreshServerStatusBadge(),
     claimOpenCodeDiagnosticRunToken: (tabId, sessionId) =>
       deps.claimOpenCodeDiagnosticRunToken?.(tabId, sessionId),
+    claimCodexDiagnosticRunToken: (tabId, threadId) =>
+      deps.claimCodexDiagnosticRunToken?.(tabId, threadId),
     refreshOpenCodeDiagnosticsState: (tabId) =>
       deps.refreshOpenCodeDiagnosticsState?.(tabId),
   };
@@ -270,6 +274,26 @@ export class SendPipelineRuntime {
     await this.sendMessage({ ...queuedSend, targetTabId: tabId });
   }
 
+  /**
+   * Claims a backend-specific diagnostic deep-capture token for the outgoing
+   * send. OpenCode conversations keep their existing behavior unchanged;
+   * Codex conversations claim through the codex trace service. Other backends
+   * (e.g. claude-code) and any backend without a trace host return undefined.
+   */
+  private claimDiagnosticRunToken(
+    preparedSend: PreparedMessageSend,
+    backendSessionId: string | undefined,
+  ): DiagnosticRunToken | undefined {
+    const backend = preparedSend.conversation.backend ?? 'opencode';
+    if (backend === 'codex') {
+      return this.host.claimCodexDiagnosticRunToken?.(preparedSend.tabId, backendSessionId);
+    }
+    if (backend === 'opencode') {
+      return this.host.claimOpenCodeDiagnosticRunToken?.(preparedSend.tabId, backendSessionId);
+    }
+    return undefined;
+  }
+
   private createStreamingExecution(
     preparedSend: PreparedMessageSend,
     content: string,
@@ -286,9 +310,7 @@ export class SendPipelineRuntime {
 
     this.messageSendPreparationService.enterStreamingState(preparedSend.tabId);
     const backendSessionId = getConversationBackendSessionId(preparedSend.conversation);
-    const diagnosticRunToken = (preparedSend.conversation.backend ?? 'opencode') === 'opencode'
-      ? this.host.claimOpenCodeDiagnosticRunToken?.(preparedSend.tabId, backendSessionId)
-      : undefined;
+    const diagnosticRunToken = this.claimDiagnosticRunToken(preparedSend, backendSessionId);
     if (diagnosticRunToken) {
       this.host.refreshOpenCodeDiagnosticsState?.(preparedSend.tabId);
     }

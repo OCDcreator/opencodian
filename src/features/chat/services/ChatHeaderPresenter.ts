@@ -109,6 +109,10 @@ export interface ChatHeaderPresenterHost {
   openConversationSessionSettings(): void;
   showOpenCodeDiagnostics?(event: MouseEvent): void;
   getOpenCodeDiagnosticsState?(): 'disabled' | 'normal' | 'armed' | 'capturing' | 'warning' | 'critical' | 'degraded';
+  showCodexDiagnostics?(event: MouseEvent, tabId: string): void;
+  getCodexDiagnosticsState?(tabId: string): 'disabled' | 'degraded' | 'armed' | 'capturing' | 'normal' | 'warning' | 'critical';
+  /** Active chat tab id for the codex diagnostics routing; null when tabs are unavailable. */
+  getActiveDiagnosticsTabId?(): string | null;
   openSettings(): void;
 }
 
@@ -208,7 +212,7 @@ export class ChatHeaderPresenter {
       actionId: 'opencode-diagnostics',
       iconName: 'activity',
       getTooltipLabel: () => t('chat.opencodeDiagnostics.open'),
-      onClick: (event) => this.host.showOpenCodeDiagnostics?.(event),
+      onClick: (event) => this.routeDiagnosticsClick(event),
     });
     this.refreshBackendChrome();
     this.settingsBtnEl = this.buildActionButton(configGroupEl, {
@@ -332,8 +336,25 @@ export class ChatHeaderPresenter {
       return;
     }
 
-    if (!this.host.isOpenCodeBackend()) {
+    const isCodexDiagnostics = this.getActiveBackendKind() === 'codex'
+      && Boolean(this.host.showCodexDiagnostics && this.host.getCodexDiagnosticsState);
+    if (this.host.isOpenCodeBackend() || isCodexDiagnostics) {
+      this.diagnosticsBtnEl?.removeClass('is-hidden');
+      if (this.diagnosticsBtnEl) {
+        let state: string;
+        if (isCodexDiagnostics) {
+          const tabId = this.host.getActiveDiagnosticsTabId?.();
+          state = (tabId && this.host.getCodexDiagnosticsState?.(tabId)) ?? 'normal';
+        } else {
+          state = this.host.getOpenCodeDiagnosticsState?.() ?? 'normal';
+        }
+        this.diagnosticsBtnEl.dataset.traceState = state;
+      }
+    } else {
       this.diagnosticsBtnEl?.addClass('is-hidden');
+    }
+
+    if (!this.host.isOpenCodeBackend()) {
       this.lspStatusRefreshCoordinator?.stop();
       this.lspStatusRefreshCoordinator = null;
       this.openLspSettingsCallback = null;
@@ -342,11 +363,6 @@ export class ChatHeaderPresenter {
       statusGroupEl.querySelector('.opencodian-lsp-status')?.remove();
       return;
     }
-    this.diagnosticsBtnEl?.removeClass('is-hidden');
-    if (this.diagnosticsBtnEl) {
-      this.diagnosticsBtnEl.dataset.traceState = this.host.getOpenCodeDiagnosticsState?.() ?? 'normal';
-    }
-
     if (!this.lspStatusIndicator) {
       this.lspStatusIndicator = new LspStatusIndicator(statusGroupEl, {
         onClick: () => (this.openLspSettingsCallback ?? this.host.openLspSettings)?.(),
@@ -354,6 +370,15 @@ export class ChatHeaderPresenter {
       });
       this.lspStatusIndicator.load();
     }
+  }
+
+  private routeDiagnosticsClick(event: MouseEvent): void {
+    if (this.getActiveBackendKind() === 'codex' && this.host.showCodexDiagnostics) {
+      const tabId = this.host.getActiveDiagnosticsTabId?.();
+      if (tabId) this.host.showCodexDiagnostics?.(event, tabId);
+      return;
+    }
+    this.host.showOpenCodeDiagnostics?.(event);
   }
 
   private buildStatusBadge(actionsEl: HTMLElement): void {
