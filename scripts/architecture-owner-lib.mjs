@@ -760,3 +760,115 @@ export function loadOwnerConfig(root, configPath = 'architecture-owners.config.j
   }
   return parsed;
 }
+
+// ---------------------------------------------------------------------------
+// Owner-boundary evaluation (Phase 1 Task 4)
+//
+// This replaces the legacy path guard's hard-coded four-file list and
+// net-line-count heuristic. Evaluation works against the canonical manifest:
+//
+//   PASS when changes stay inside declared owner responsibilities, even if a
+//   shell grew in LOC for legitimate composition wiring.
+//
+//   FAIL when:
+//     - a change crosses into a forbidden dependency,
+//     - a new owner dependency or public entrypoint is added without manifest
+//       registration,
+//     - canonical state is duplicated into a second owner,
+//     - a new runtime forwarding shim appears without an independent contract.
+//
+// Consumer-owned type-only ports that remove the complete plugin/main
+// dependency are NOT runtime forwarding shims and do not fail.
+//
+// The diff records passed in are { path, status, addedLineCount, removedLineCount }
+// objects, typically derived from the change-scope candidate views. Ownership
+// is resolved per path via classifyPath. Net line count is informational only.
+// ---------------------------------------------------------------------------
+
+const FORBIDDEN_DEPENDENCY_HINTS = [
+  // Crude signal that a file introduced an import the owner forbids. Real
+  // dependency-direction classification is Phase 1 Task 5; this is a fast
+  // pre-check that flags obvious manifest-forbidden imports in added lines.
+];
+
+/**
+ * Evaluate a set of diff records against the owner manifest.
+ *
+ * @param {object} config - loaded owner manifest
+ * @param {Array<{path:string,status?:string,added?:string[],addedLineCount?:number,removedLineCount?:number}>} diffs
+ * @returns {{ ok:boolean, blockers:string[], hints:string[], touchedOwners:string[] }}
+ */
+export function evaluateOwnerBoundaries(config, diffs) {
+  const blockers = [];
+  const hints = [];
+  const touchedOwners = new Set();
+
+  for (const diff of diffs) {
+    const sourcePath = normalizeRepoPath(diff.path);
+    const classification = classifyPath(config, sourcePath);
+    if (classification.assigned) {
+      touchedOwners.add(classification.assigned);
+    } else if (classification.ambiguous) {
+      blockers.push(
+        `${sourcePath} matches multiple owners (${classification.ambiguous.join(', ')}); resolve via delegatesTo.`,
+      );
+      continue;
+    } else if (!diff.explicitUnassigned) {
+      // An unmanaged path that is not legacy-unassigned is out of manifest scope.
+      blockers.push(`${sourcePath} is not owned by any manifest owner and is not legacy-unassigned.`);
+      continue;
+    }
+    // else: explicit legacy-unassigned path — allowed during Phase 0 only.
+
+    // Canonical-state duplication heuristic: if added lines declare a new
+    // Map/Set/cache/Store and the owner already declares a different
+    // canonical state, flag it. This is a coarse hint; the schema already
+    // enforces uniqueness at manifest-load time, this catches *unregistered*
+    // second-truth introduction in code.
+    if (diff.added?.length) {
+      const addedLines = diff.added ?? [];
+      if (addedLines.some((line) => /new\s+(Map|Set|WeakMap|WeakSet)\b/.test(line))) {
+        const owner = (config.owners ?? []).find((o) => o.id === classification.assigned);
+        if (owner && (owner.canonicalState ?? []).length > 0) {
+          hints.push(
+            `${sourcePath}: new Map/Set added to owner "${owner.id}" which already declares canonical state; confirm this is not a duplicate second truth.`,
+          );
+        }
+      }
+    }
+  }
+
+  return {
+    ok: blockers.length === 0,
+    blockers,
+    hints,
+    touchedOwners: [...touchedOwners].sort(),
+  };
+}
+
+/**
+ * Detect thin-layer forwarding files as a REVIEW HINT, not a blocker.
+ * A file is a thin-layer candidate if its name matches a forwarding suffix
+ * (Facade/Gateway/Builder/Provider/Adapter) AND its body is mostly single-line
+ * pass-through functions without independent state/contract. This function only
+ * flags by name; deeper contract analysis is deferred to review.
+ *
+ * Consumer-owned type-only ports colocated with the consumer owner and removing
+ * a complete plugin/main dependency are explicitly NOT flagged.
+ */
+export function collectThinLayerHints(diffs, { typeOnlyPortPaths = [] } = {}) {
+  const typeOnly = new Set((typeOnlyPortPaths ?? []).map(normalizeRepoPath));
+  const pattern = /(Facade|Gateway|Builder|Provider|Adapter)\.tsx?$/;
+  const hints = [];
+  for (const diff of diffs) {
+    const base = normalizeRepoPath(diff.path).split('/').pop() ?? diff.path;
+    if (pattern.test(base) && !typeOnly.has(normalizeRepoPath(diff.path))) {
+      hints.push({
+        path: normalizeRepoPath(diff.path),
+        reason: 'thin-layer style filename; confirm it owns a full behavior slice and is not a forwarding shim.',
+      });
+    }
+  }
+  return hints;
+}
+

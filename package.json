@@ -18,6 +18,7 @@
     "doctor:esbuild:fix": "node scripts/doctor-esbuild.mjs --fix",
     "graphify:update:src": "node scripts/update-graphify-src.mjs",
     "check:owner-guard": "node scripts/check-owner-guard.mjs",
+    "check:owner-boundaries": "node scripts/check-owner-boundaries.mjs",
     "check:owner-manifest": "node scripts/check-owner-manifest.mjs",
     "check:change-scope": "node scripts/check-change-scope.mjs",
     "inspect:owner": "node scripts/inspect-owner.mjs",
