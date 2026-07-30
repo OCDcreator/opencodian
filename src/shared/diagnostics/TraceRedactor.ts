@@ -299,6 +299,12 @@ export function resolveDefaultTraceDirectory(backend: string): string {
   } catch {
     userData = undefined;
   }
-  const base = userData ?? path.join(os.homedir(), '.config', 'obsidian');
+  const base = userData ?? defaultUserDataDirectory();
   return path.join(base, 'OpenCodian', 'diagnostics', backend);
+}
+
+function defaultUserDataDirectory(): string {
+  if (process.platform === 'darwin') return path.join(os.homedir(), 'Library', 'Application Support', 'obsidian');
+  if (process.platform === 'win32') return path.join(process.env.APPDATA ?? os.homedir(), 'obsidian');
+  return path.join(process.env.XDG_CONFIG_HOME ?? path.join(os.homedir(), '.config'), 'obsidian');
 }

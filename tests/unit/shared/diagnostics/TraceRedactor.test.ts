@@ -22,4 +22,17 @@ describe('resolveDefaultTraceDirectory', () => {
     expect(resolveDefaultTraceDirectory('codex')).toMatch(/OpenCodian[/\\]diagnostics[/\\]codex$/);
     expect(resolveDefaultTraceDirectory('opencode')).toMatch(/OpenCodian[/\\]diagnostics[/\\]opencode$/);
   });
+
+  it('falls back to the platform-specific obsidian directory when @electron/remote is unavailable', () => {
+    // Jest runs in plain Node, so the @electron/remote require cannot resolve
+    // and the platform fallback branch is exercised directly.
+    const resolved = resolveDefaultTraceDirectory('codex');
+    const expectedBase: Record<string, RegExp> = {
+      darwin: /Library[/\\]Application Support[/\\]obsidian[/\\]/,
+      win32: /AppData[/\\]Roaming[/\\]obsidian[/\\]/,
+    };
+    const pattern = expectedBase[process.platform] ?? /\.config[/\\]obsidian[/\\]/;
+    expect(resolved).toMatch(pattern);
+    expect(resolved).toMatch(/OpenCodian[/\\]diagnostics[/\\]codex$/);
+  });
 });
