@@ -54,8 +54,53 @@ None. No Test Vault deployment required (infrastructure/docs-only phase).
 ---
 
 ## Phase 1 — Trustworthy diff and architecture gates (Task 3–6)
+
 - **PHASE_BASE:** `14bcdda1b51310abb3d6d8d87f90d5259732d5ae`
-- **Status:** unblocked; Phase 0 APPROVED. Ready to start.
+- **PHASE_HEAD:** `e5b93f10270eada9e37566f6a36d223cd46929ba`
+- **Range:** `14bcdda1..e5b93f10` (5 commits, runtime source untouched)
+
+### Commits
+| SHA | Type | Subject |
+|---|---|---|
+| `d3c8f8ea` | feat(gates) | add unified change scope (Task 3) |
+| `4a90511e` | feat(gates) | add owner-boundary evaluation, deprecate path guard (Task 4) |
+| `b6bdc0e3` | feat(gates) | add dependency-direction and cycle baseline (Task 5) |
+| `645c936a` | feat(gates) | add structured diff-bound approvals (Task 6) |
+| `e5b93f10` | docs(devlog) | record Phase 1 architecture gates |
+
+### Acceptance status
+- [x] Task 3: non-empty `origin/main...HEAD` can never become Class A "no changes" because worktree is clean. committed/staged/unstaged/untracked equivalence proven.
+- [x] Task 4: no hard-coded four-file list; no pass/fail based solely on line count; composition-line-growth passes, duplicated-state hints, thin-layer is a hint not blocker.
+- [x] Task 5: baseline runtime/type debt precisely classified (0 runtime SCC, 4 type-only, 11 mixed); new reverse edges and runtime cycles are non-waivable; type-only SCC never reported as runtime cycle.
+- [x] Task 6: repo-writable JSON alone never PASS; external authority is the trust root; never-approvable rules rejected.
+
+### Gate evidence (run on clean tree at PHASE_HEAD)
+- `verify:architecture` → owner-manifest / owner-boundaries / dependency-direction / architecture-cycles all PASS.
+- `check:dependency-direction` → 0 new reverse-layer edges, 0 unresolved.
+- `check:architecture-cycles` → 0 runtime SCC, 4 type-only, 11 mixed; 0 new runtime SCC, 0 new type-coupling members.
+- `check:architecture-approvals` → PASS (no pending requests).
+- Infrastructure Jest → 17 suites / 150 tests.
+- Full `npm test` → 711 suites / 6756 tests.
+- `check:module-docs` (576/576), `check:graphify`, `check:devlog-order` (501), lint 0/0, typecheck, build all green.
+
+### Runtime files changed
+None. No Test Vault deployment required.
+
+### Architecture baseline snapshot (Phase 1 entry)
+- Runtime SCCs: 0 (frozen).
+- Type-only SCCs: 4 (debt).
+- Mixed SCCs: 11 (debt).
+- Internal edges: 2095.
+- These confirm the plan's finding that Graphify's 14 mixed SCCs are type/mixed coupling, not runtime cycles.
+
+### Codex independent review
+- Status: **PENDING** — awaiting independent Codex read-only review of `14bcdda1..e5b93f10`.
+
+---
+
+## Phase 2 — Graphify, module docs, CI, and documentation truth (Task 7–9)
+- **PHASE_BASE:** _pending Phase 1 APPROVED_
+- **Status:** blocked on Phase 1 Codex APPROVED.
 
 ## Phase 2–6
 - **Status:** blocked on preceding phase APPROVED.
