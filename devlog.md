@@ -11,6 +11,19 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-07-31 Agent-Friendly Architecture 门禁：Graphify digest / module-doc owner-aware / CI 统一（Phase 2）
+
+**范围。** 执行实施计划 Phase 2（Task 7、8、9），不改动任何 runtime 源码。
+
+**产出。**
+- Task 7 Graphify 内容寻址：`graph-input-digest.mjs` 计算覆盖 src 文件 + tsconfig/package/lock/.gitignore/.graphifyignore/wrapper/graphify 版本的确定性 byte digest；`update-graphify-src.mjs` 写入 `graphify-out/input-manifest.json` 并 patch 报告 freshness block；`check-graphify-freshness.mjs` 用 digest 相等取代 timestamp/mtime，逐字节敏感（注释改动也需刷新）。证明旧 `921a9742` metadata mismatch 不再可能通过。
+- Task 8 module-doc owner-aware：`module-docs.config.json` 移除顶层游离 mapping；`loadConfig` strict schema 拒绝未知顶层键；`check-module-doc-diff.mjs` 优先消费 `VERIFY_SCOPE_ARTIFACT`（committed candidate）而非 `--range HEAD`，多 commit PR 无法把未文档化的 source 改动藏在早期 commit；新增 `check-module-doc-owner-impact.mjs`（owner 边界/source 改动缺 owner-overview 或 mapped-doc 更新则失败，组合 manifest 与 module-doc config 不复制）。
+- Task 9 CI 统一 + 旧 owner-guard 退役：CI 拆 architecture/verify 两 job，统一用 `VERIFY_BASE_REF`（GitHub event base，不退化为 HEAD）；pre-push 跑 `verify:architecture`；删除 `check-owner-guard.mjs`、`owner-guard-lib.mjs`、其测试与 `check:owner-guard` 脚本；`GUARD_TARGETS`/`OWNER_GUARD_APPROVED`/`--approved` 自由文本 waiver 全部退役，budget waiver 改为结构化 diff-bound approval（外部 protected-CI authority）；`development-maintainability-rules.md` 与 `AGENTS.md` 同步更新。run-verify 与默认 verify 接入 module-doc-owner-impact。
+
+**门禁。** 157 infra suites / 6738 全量 tests 全绿；`verify:architecture` 4 PASS；`check:module-docs`、`check:graphify`（内容 digest）、`check:devlog-order`、lint 0/0、typecheck、build 全绿。runtime 源码零改动，无需 Test Vault 部署。
+
+**后续。** Phase 2 待 Codex 独立审查 APPROVED 后进入 Phase 3（diagnostics 纵向切片）。
+
 ## 2026-07-31 Agent-Friendly Architecture 门禁：change scope / 边界 / 依赖方向 / 结构化 approval（Phase 1）
 
 **范围。** 执行实施计划 Phase 1（Task 3、4、5、6），建立可信的 diff 与架构门禁，不改动任何 runtime 源码。
