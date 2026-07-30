@@ -22,6 +22,7 @@
     "check:owner-manifest": "node scripts/check-owner-manifest.mjs",
     "check:dependency-direction": "node scripts/check-dependency-direction.mjs",
     "check:architecture-cycles": "node scripts/check-architecture-cycles.mjs",
+    "check:architecture-approvals": "node scripts/check-architecture-approvals.mjs",
     "update:architecture-baseline": "node scripts/update-architecture-baseline.mjs",
     "verify:architecture": "node scripts/verify-architecture.mjs",
     "check:change-scope": "node scripts/check-change-scope.mjs",
