@@ -8,10 +8,15 @@ permissions:
   contents: read
 
 jobs:
-  owner-guard:
+  # Architecture gates use the same unified scope in local verify, pre-push,
+  # PR and push. The base ref is resolved from the GitHub event (PR base ref or
+  # push before/after), never degrading to HEAD. Phase 2 Task 9 removed the old
+  # OWNER_GUARD_DIFF_RANGE / OWNER_GUARD_APPROVED env and the deprecated path
+  # guard; CI now runs the architecture gates directly.
+  architecture:
     runs-on: ubuntu-latest
     env:
-      OWNER_GUARD_DIFF_RANGE: ${{ github.event_name == 'pull_request' && format('origin/{0}...HEAD', github.base_ref) || 'HEAD' }}
+      VERIFY_BASE_REF: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || 'origin/main' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -27,13 +32,16 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Check owner guard
-        run: npm run check:owner-guard
+      - name: Architecture gates (manifest / boundaries / dependency-direction / cycles / approvals)
+        run: npm run verify:architecture
+
+      - name: Module doc owner impact
+        run: npm run check:module-doc-owner-impact
 
   verify:
     runs-on: ubuntu-latest
     env:
-      OWNER_GUARD_DIFF_RANGE: ${{ github.event_name == 'pull_request' && format('origin/{0}...HEAD', github.base_ref) || 'HEAD' }}
+      VERIFY_BASE_REF: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || 'origin/main' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -49,10 +57,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Module doc coverage and diff
+      - name: Module doc coverage and diff (scope-correct)
         run: npm run check:module-docs
 
-      - name: Graphify freshness
+      - name: Graphify freshness (content-addressed)
         run: npm run check:graphify
 
       - name: Devlog order

@@ -1,7 +1,13 @@
 #!/bin/sh
+# pre-push hook (Phase 2 Task 9).
+#
+# Runs the same architecture gates and scope as local verify and CI. The base
+# ref resolves to origin/main (the merge gate also runs in protected CI). The
+# old OWNER_GUARD_DIFF_RANGE / OWNER_GUARD_APPROVED env is retired.
+
 set -eu
 
 repo_root=$(git rev-parse --show-toplevel)
 cd "$repo_root"
 
-OWNER_GUARD_DIFF_RANGE=origin/main...HEAD npm run check:owner-guard
+VERIFY_BASE_REF=origin/main npm run verify:architecture

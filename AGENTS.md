@@ -140,7 +140,7 @@ Rules:
 - If graphify-out/wiki/index.md exists, navigate it instead of reading raw files
 - The graphify Python tool must be available on `PATH` or invocable via `py -m graphify ...` on Windows
 - This repo's committed graph is `src`-scoped, not whole-repo scoped; refresh it with `npm run graphify:update:src`, not `graphify update .`
-- `npm run verify` includes `npm run check:graphify`, so stale committed `src` history or local `src` edits without a later graph refresh should fail fast
+- `npm run verify` includes `npm run check:graphify` (content-addressed digest, Phase 2 Task 7), so stale committed `src` history, local `src` edits, or config/tool-envelope changes without a later graph refresh should fail fast
 - The repo-local graphify wrapper updates `src`, syncs committed artifacts back to root `graphify-out/`, and removes transient `src/graphify-out/` so git does not fill with generated noise
 - If the local package and installed agent skill drift, check `py -m graphify --help` and refresh the Codex install with `py -m graphify install --platform codex`
 
