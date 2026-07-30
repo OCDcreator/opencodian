@@ -11,6 +11,18 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-07-30 Codex 后端会话调试日志系统
+
+**范围。** 把 OpenCode 侧已有的 trace 基础设施下沉为后端无关的共享件，并为 Codex 后端独立构建一套默认开启的会话 trace 系统。OpenCode 既有行为零变更（六个回归测试原样保留），Codex 不复用 OpenCode 的 service/store，而是消费共享基座并叠加自己的线程/回合生命周期与线流量捕获。
+
+**实现（共享下沉）。** Task 1-3 把 `TraceRedactor`（递归脱敏器 + `resolveDefaultTraceDirectory`）、`TraceStore`（异步批量 JSONL store，含 retention/降级/索引重建/导出二次脱敏）和 `TraceReportBuilder`（≤1 MiB 智能报告生成器）从 `core/opencode/diagnostics` 下沉到 `src/shared/diagnostics/`，分别泛化为 `TraceStore<TEvent>` / `TraceReportBuilder<TEvent>`（事件类型参数化、构造追加 `bundlePrefix` 与 `{ title, extractMetadata }` 注入）。OpenCode 侧保留薄兼容子类（固定 `bundlePrefix: 'opencode-trace'`、注入报告标题与元信息提取器），调用方与测试不受影响。
+
+**实现（Codex 独立 trace）。** Task 4 定义 Codex trace 类型与设置 schema（五通道 `lifecycle`/`transport`/`stream-sync`/`tool-interaction`/`service-output`、`captureContent`、默认 enabled）。Task 5 落地 `CodexSessionTraceService`（实现 `CodexTracePort`）：traceId = `trace-` + sha256(threadId)[:32]，经 `store.bindSession` 持久化以支持跨实例 `thread.bound`/`thread.resumed`；armed 深度捕获 TTL 30min，仅当活动 turn 持有已 claim 令牌且 `captureContent=true` 时才把完整线 payload 写入 deep run，否则保留 envelope 或形状摘要。`CodexTraceRingBuffer` 按 thread 分 lane 暂存原始线记录（5MiB/thread、20MiB 全局两级驱逐），供 response 错误、turn 异常终结或看门狗触发时以 `wire.retroactive` 回放。看门狗 60s warning 触发一次 buffer 回放 + `turn.stalled`，180s critical 以 `incomplete` 终结 turn。`CodexWireTraceBridge` 把 app-server JSON-RPC 流量翻译为 `CodexWireRecord`。Task 6 固定看门狗与 retroactive flush 行为；Task 7 在 `CodexAppServerTransport` 落地 `CodexAppServerWireObserver` 契约（权威定义在 `CodexAppServerClientTypes.ts`），每次调用经 `notifyObserver` 包裹，observer 抛错绝不影响 RPC 主路径；Task 8 在 `CodexAdapter` 的 `aliasSession`/`beginTurn`/`finishTurn`（含 cancel/error/incomplete）插桩，transport 构造时透传 `tracePort.wireBridge`；Task 9 在 `main.ts` 启动期构造 service 并经 `wireHiddenAdapters({ codexTracePort })` 注入。所有 trace 钩子经 try/catch 守卫，trace 异常不得逃逸到聊天路径。存储落 `<userData>/OpenCodian/diagnostics/codex/`。
+
+**产品入口。** Task 10 在设置 → 调试增加 Codex 区块：状态（捕获开关、存储模式、轨迹数、体积、最近错误）、总开关、standard/full 预设、五通道、自定义存储目录、智能复制、全量导出、最近轨迹列表（逐条智能复制/删除）与二次确认清空，附中英 locale。Task 11 在聊天头增加 Codex 诊断入口：`ChatHeaderPresenter` 的诊断按钮按 backend 路由（codex 时显示并写 `data-trace-state`），菜单提供捕获下一次运行 / 取消捕获 / 复制本会话诊断；send pipeline 的 token claim 按 backend 分派（codex → `claimCodexDiagnosticRunToken`，opencode → 既有 hook），transport token 类型放宽为后端无关的 `DiagnosticRunToken`。
+
+**验证。** 各任务分别补单元测试（共享件泛化、Codex service/ring buffer/watchdog/retroactive flush、wire observer、adapter 生命周期、设置区块、聊天侧捕获/导出），OpenCode 侧六个回归测试原样通过。最终 `npm run verify` 全绿（owner-guard / module-docs / graphify / devlog-order / lint / typecheck / test / build）。
+
 ## 2026-07-29 OpenCode 后端会话全流程诊断
 
 **范围。** 仅为 OpenCode 后端增加默认开启的安全结构轨迹，不改变 Claude Code、Codex、ACP 或其他后端。聊天当前标签可显式武装下一次运行的深度捕获，令牌从 tab-scoped send pipeline 传入 OpenCode `QueryOptions`，不会进入后端请求。

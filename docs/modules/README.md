@@ -56,7 +56,8 @@ docs/modules/
 │   │       ├── AgentService.md
 │   │       ├── ClaudeCodeModelCatalog.md
 │   │       ├── OpenCodeAdapter.md
-│   │       └── AgentServiceRegistry.md
+│   │       ├── AgentServiceRegistry.md
+│   │       └── diagnostics/          ← Codex 会话 trace（service / ring buffer / wire bridge / types）
 │   ├── config/
 │   │   ├── index.md
 │   │   ├── commandScopedAgent.md
@@ -298,6 +299,12 @@ docs/modules/
 │   ├── toolIdentity.md
 │   ├── toolExecution.md
 │   ├── vault.md
+│   ├── diagnostics/                  ← 后端无关 trace 基础设施（types / TraceRedactor / TraceStore / TraceReportBuilder）
+│   │   ├── index.md
+│   │   ├── types.md
+│   │   ├── TraceRedactor.md
+│   │   ├── TraceStore.md
+│   │   └── TraceReportBuilder.md
 │   └── modals/
 │       ├── index.md
 │       └── ForkTargetModal.md

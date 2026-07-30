@@ -5,6 +5,7 @@
 > **Updated**: 2026-06-09 Checkpoint 4 — Codex now public, accepts `codexSettings`
 > **Updated**: 2026-07-24 — Codex adapter construction now forwards `approvalPolicy` from `CodexBackendSettings` (default `inherit`)
 > **Updated**: 2026-07-28 — Codex now resolves only a user-installed CLI via `CodexCliResolver`; plugin-private runtime binaries are no longer considered.
+> **Updated（2026-07-30）**: 新增可选入参 `codexTracePort?: CodexTracePort`（来自 `diagnostics/types.ts`）。设置后透传给 `CodexAdapter` 的 `tracePort`，使会话/回合生命周期与 app-server 线流量经 try/catch 守卫流入 `CodexSessionTraceService`；缺省时（既有调用方）adapter 不插桩任何 trace，行为不变。
 
 ## 概述
 

@@ -5,6 +5,7 @@
 
 > **更新**: 构造函数新增可选 `workingDirectory`；`doStart` 的 `spawn` 在提供时以此作为 `cwd` 启动 owned app-server 进程，使项目级资源(`.agents/skills`、`.codex/agents`)相对 vault 解析。未提供时继承插件进程 cwd（向后兼容）。
 > **更新**: Node `ws` 现在作为声明的直接依赖静态打进 `main.js`；transport 不再从插件目录动态 require `node_modules/ws`。
+> **更新（2026-07-30）**: 构造函数新增可选 `wireObserver?: CodexAppServerWireObserver`（类型定义在 `CodexAppServerClientTypes.ts`）。设置后，transport 在 JSON-RPC 与连接生命周期的关键点（`onRequest` / `onResponse` / `onNotification` / `onServerRequest` / `onServerReply` / `onConnection`）调用对应回调，供 Codex 会话 trace 的 `CodexWireTraceBridge` 把线流量翻译为 `CodexWireRecord` 注入 trace service。每次调用都经 `notifyObserver` 包裹，observer 抛错绝不影响 RPC 主路径；`undefined`（所有既有调用方的默认值）行为逐字节不变。Codex adapter 在构造 transport 时通过 `tracePort.wireBridge` 注入 observer。
 
 ## 概述
 

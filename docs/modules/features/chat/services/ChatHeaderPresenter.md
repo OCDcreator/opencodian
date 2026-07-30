@@ -1,6 +1,7 @@
 # ChatHeaderPresenter
 
 > 2026-07-29: The configuration group includes an OpenCode-only diagnostics button with stable state attributes.
+> 2026-07-30: The diagnostics button is now backend-routed. Host gains optional `showCodexDiagnostics(event, tabId)`, `getCodexDiagnosticsState(tabId)` and `getActiveDiagnosticsTabId()`. `refreshBackendChrome()` shows the button for OpenCode or Codex (when a Codex host is wired) and writes `data-trace-state` from the matching state getter; `routeDiagnosticsClick` dispatches to the Codex path for the active codex backend and falls back to OpenCode otherwise. Non-trace backends keep the button hidden.
 
 > **源码**: `src/features/chat/services/ChatHeaderPresenter.ts`
 > **状态**: [REVIEW]
