@@ -1,0 +1,37 @@
+# Owner: feature.chat-diagnostics
+
+> Auto-generated scaffold from `architecture-owners.config.json`. The manifest is the canonical truth source; this page narrates the model and records hard-to-automate rationale. Update it when the owner boundary or its non-obvious invariants change.
+
+- **Layer:** `feature` (may import layers: shared, core, feature)
+- **Risk:** high
+- **Include:** `src/features/chat/services/ClaudeDiagnosticsHostAdapter.ts`, `src/features/chat/services/CodexDiagnosticsHostAdapter.ts`
+
+## Responsibilities
+- chat-side Claude and Codex trace badge/menu state, capture-token and report/export callbacks
+- trace failure containment away from chat path
+
+## Canonical state (truth home)
+- chat diagnostics host adapter state
+
+> Cross-owner access is read-only snapshot/command/event. Do not replicate this state as a second writable truth source.
+
+## Entrypoints
+- `src/features/chat/services/ClaudeDiagnosticsHostAdapter.ts`
+- `src/features/chat/services/CodexDiagnosticsHostAdapter.ts`
+
+## Dependency surface
+- **Allowed owner dependencies:** `shared.foundation`, `shared.diagnostics`, `core.backend-diagnostics`, `core.opencode-diagnostics`
+- **Forbidden dependencies:** `app`
+- **Adjacent owners** (prefer editing these when out of scope): `feature.chat-shell`, `core.backend-diagnostics`, `feature.settings-debug`
+
+## Focused tests
+- `tests/unit/features/chat/services/**DiagnosticsHostAdapter*`
+
+## Required gates
+Run before merge: `npm run typecheck`, `npm run module-docs`, `npm run diagnostics-safety`.
+
+## Hard invariants
+- Do not cross `forbiddenDependencies`.
+- Do not replicate canonical state in another owner.
+- Changes here must update the matching `docs/modules/**` page (via `module-docs.config.json`).
+- Run `npm run inspect:owner -- <this owner or a path>` for an always-fresh summary.

@@ -19,9 +19,29 @@ npm run lint
 npm run check:module-docs
 npm run check:graphify
 npm run check:devlog-order
+npm run check:owner-manifest
+npm run inspect:owner -- <path|symbol>
 ```
 
 Use `npm run doctor:esbuild` only after dependency changes or when build/dev reports an esbuild platform mismatch.
+
+## Owner Routing (start here)
+
+Before editing any module, resolve its architecture owner:
+
+```bash
+npm run inspect:owner -- src/core/opencode/OpenCodeService.ts   # by path
+npm run inspect:owner -- OpenCodianView                          # by symbol/entrypoint
+npm run inspect:owner -- core.opencode --json                    # machine-readable
+```
+
+The inspector returns the owner, its responsibilities, canonical state, entrypoints, allowed/forbidden/adjacent dependencies, focused tests, owner overview doc, mapped module doc, risk and required gates. The canonical owner facts live solely in `architecture-owners.config.json` (see `docs/architecture/owners/README.md` for the model). Fallback map when the inspector is unavailable:
+
+- `src/main.ts` -> `app.composition`
+- `src/core/**` (opencode, agents, config, storage, runtime, etc.) -> the matching `core.*` owner
+- `src/features/chat/**` -> `feature.chat-*` owners (shell, runtime, services, rendering, tabs, ui, diagnostics)
+- `src/features/settings/**` -> `feature.settings-*` owners (shell, debug, model-catalog, claude, codex, etc.)
+- `src/shared/**`, `src/utils/**`, `src/i18n/**`, `src/types/**`, `src/vendor/**` -> `shared.*` owners
 
 ## Maintainability Guardrails
 
