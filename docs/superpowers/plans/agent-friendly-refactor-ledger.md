@@ -56,8 +56,8 @@ None. No Test Vault deployment required (infrastructure/docs-only phase).
 ## Phase 1 — Trustworthy diff and architecture gates (Task 3–6)
 
 - **PHASE_BASE:** `14bcdda1b51310abb3d6d8d87f90d5259732d5ae`
-- **PHASE_HEAD:** `e5b93f10270eada9e37566f6a36d223cd46929ba`
-- **Range:** `14bcdda1..e5b93f10` (5 commits, runtime source untouched)
+- **PHASE_HEAD:** `07b86e6c348381e3acaf5a840cf52467acd3323d`
+- **Range:** `14bcdda1..07b86e6c` (7 commits, runtime source untouched)
 
 ### Commits
 | SHA | Type | Subject |
@@ -67,6 +67,10 @@ None. No Test Vault deployment required (infrastructure/docs-only phase).
 | `b6bdc0e3` | feat(gates) | add dependency-direction and cycle baseline (Task 5) |
 | `645c936a` | feat(gates) | add structured diff-bound approvals (Task 6) |
 | `e5b93f10` | docs(devlog) | record Phase 1 architecture gates |
+| `ccc39f16` | docs(superpowers) | record Phase 1 completion in ledger |
+| `e2d69662` | fix(gates) | re-export in runtime edges + EOF blank lines (review round 1) |
+| `0aae0469` | fix(gates) | Codex round-2 review (ESM require, digest exclusion, fail-closed, main.ts glob, verify wiring) |
+| `07b86e6c` | fix(gates) | import computeChangeScope + wire approvals into verify (review round 3) |
 
 ### Acceptance status
 - [x] Task 3: non-empty `origin/main...HEAD` can never become Class A "no changes" because worktree is clean. committed/staged/unstaged/untracked equivalence proven.
@@ -89,18 +93,25 @@ None. No Test Vault deployment required.
 ### Architecture baseline snapshot (Phase 1 entry)
 - Runtime SCCs: 0 (frozen).
 - Type-only SCCs: 4 (debt).
-- Mixed SCCs: 11 (debt).
-- Internal edges: 2095.
+- Mixed SCCs: 12 (debt).
+- Internal edges: 2187 (542 managed files; the round-2 fix corrected a glob that had missed src/main.ts, 541→542).
 - These confirm the plan's finding that Graphify's 14 mixed SCCs are type/mixed coupling, not runtime cycles.
 
-### Codex independent review
-- Status: **PENDING** — awaiting independent Codex read-only review of `14bcdda1..e5b93f10`.
+### Codex independent review — APPROVED
+- **Reviewer:** Codex CLI (gpt-5.6-sol), writable sandbox (workspace-write) so Jest could actually run.
+- **Verdict:** **APPROVED** (Critical 0, Important 0, Minor 0).
+- **Review-fix rounds:** Three rounds of Codex review found and fixed 6 real issues (read-only sandbox had hidden Jest failures):
+  1. Round 1 (re-export): `RUNTIME_EDGE_KINDS` omitted `re-export` → value re-export cycles misclassified as mixed; + 2 EOF blank-line `git diff --check` failures.
+  2. Round 2 (writable sandbox): `check-architecture-approvals.mjs` used `require()` in an ESM file (crash); `candidateDigest` did not exclude approval-request metadata (self-referential binding); unresolved internal imports mislabeled `external` (would hide cycles); `git ls-files 'src/**/*.ts'` glob missed `src/main.ts` (541 vs 542 files, made all `../../main` imports spurious-unresolved); default `verify` still ran the deprecated owner-guard.
+  3. Round 3: `computeChangeScope` called without import (ReferenceError on pending request); default `verify` did not include `check:architecture-approvals`.
+- **Independently verified by Codex:** all 9 gates incl. Jest (9 suites / 122 tests in the Phase 1 focused set), spot-checks A (fail-closed internal / vendored / external classification), B (digest excludes approvals), C (no require() / computeChangeScope imported).
+- **Environment caveat:** browser/network-sensitive suites (capability-lab render, release-automation, model-popover) cannot run inside the Codex sandbox (EPERM on browser/port bind); verified green locally (6759 tests). These are pre-existing environment-sensitive tests, not Phase 1 work.
 
 ---
 
 ## Phase 2 — Graphify, module docs, CI, and documentation truth (Task 7–9)
-- **PHASE_BASE:** _pending Phase 1 APPROVED_
-- **Status:** blocked on Phase 1 Codex APPROVED.
+- **PHASE_BASE:** `07b86e6c348381e3acaf5a840cf52467acd3323d`
+- **Status:** unblocked; Phase 1 APPROVED.
 
 ## Phase 2–6
 - **Status:** blocked on preceding phase APPROVED.
