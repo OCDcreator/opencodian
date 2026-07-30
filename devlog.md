@@ -11,6 +11,20 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-07-31 Agent-Friendly Architecture 门禁：change scope / 边界 / 依赖方向 / 结构化 approval（Phase 1）
+
+**范围。** 执行实施计划 Phase 1（Task 3、4、5、6），建立可信的 diff 与架构门禁，不改动任何 runtime 源码。
+
+**产出。**
+- Task 3 unified change scope：`change-scope-lib.mjs` + `check-change-scope.mjs` + `run-verify.mjs`。从 merge-base 计算 base/head/merge-base SHA 与 committed/index/workspace 三个独立 candidate view；normalized digest 对 (path, finalStatus, mode, contentSha256) 排序哈希，rename 归一为 delete+add。同一逻辑 final tree 在 committed/staged/unstaged/untracked 形态下得到相同 digest。`resolveBaseRef` 不得退化为 HEAD/本地分支，无法解析时 fail closed。
+- Task 4 owner-boundaries：`evaluateOwnerBoundaries` + `check-owner-boundaries.mjs` 替换硬编码四文件 path guard 与净行数启发式。声明职责内的行增长可过；ambiguous/unowned 路径阻断；重复 canonical state 与 thin-layer 仅作 hint。`check-owner-guard.mjs` 降级为 deprecated alias（30 天后由 Task 9 删除）。
+- Task 5 dependency-direction + cycle baseline：`typescript-import-graph.mjs` 用 TS compiler 分类 runtime-static/runtime-dynamic/require/type-only/re-export 边，Tarjan SCC 在 runtime 边与 type-only/mixed 边上分别运行。生成 frozen content-addressed `architecture-baseline.generated.json`（0 runtime SCC、4 type-only SCC、11 mixed SCC、2095 内部边，HEAD 4a90511e）——证实 Graphify 的 14 条混合 SCC 是 type/mixed 耦合而非 runtime cycle。`check-dependency-direction.mjs`（新反向层 edge / unresolved internal import 阻断）、`check-architecture-cycles.mjs`（新 runtime SCC 不可豁免阻断；type-only/mixed SCC 只作 debt，新成员阻断）。`verify:architecture` 组合 Task 1/3/4/5。
+- Task 6 structured approval：`architecture-approval-lib.mjs` + `check-architecture-approvals.mjs`。仓内 JSON 只是 request + diff binding，非信任根；外部 authority（protected CI required reviewer/CODEOWNERS）才是信任根。本地恒返回 REVIEW_REQUIRED。硬不变量（DEPENDENCY_DIRECTION/NEW_ARCHITECTURE_CYCLE/DUPLICATE_CANONICAL_STATE/diagnostics redaction/chat isolation/test/module-doc/Graphify freshness）永不可 approval。
+
+**门禁。** 17 infra suites / 150 tests 全绿（新增 change-scope-lib 7、verify-runner 3、owner-boundaries 7、typescript-import-graph 18、architecture-approval-lib 13）；`verify:architecture`（manifest/boundaries/dependency-direction/cycles）全 PASS；`check:module-docs`（576/576）、`check:graphify`、`check:devlog-order`、lint 0/0、typecheck、build 全绿。runtime 源码零改动，无需 Test Vault 部署。
+
+**后续。** Phase 1 待 Codex 独立审查 APPROVED 后进入 Phase 2（Graphify digest 内容寻址、module-doc owner-aware、CI 统一、删除旧 owner-guard/approval env）。
+
 ## 2026-07-30 Agent-Friendly Architecture 基建：owner manifest 与 inspector（Phase 0）
 
 **范围。** 执行 `docs/superpowers/plans/2026-07-30-agent-friendly-architecture-and-governance-refactor.md` 的 Phase 0（Task 1A、1B、2），建立机器可读的唯一架构 owner 事实源，不改动任何 runtime 源码。
