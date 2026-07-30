@@ -221,3 +221,21 @@ describe('generateBaseline + diffAgainstBaseline', () => {
     expect(diff.newReverseEdges.length).toBe(1);
   });
 });
+
+describe('re-export edges are runtime-carrying (Codex Phase 1 review fix)', () => {
+  test('a pure value re-export cycle IS a runtime SCC', async () => {
+    const edges = [
+      { from: 'src/a.ts', to: 'src/b.ts', kind: 're-export', specifier: './b', external: false },
+      { from: 'src/b.ts', to: 'src/a.ts', kind: 're-export', specifier: './a', external: false },
+    ];
+    const result = await runAsync(`process.stdout.write(JSON.stringify(mod.classifySccs(${JSON.stringify(edges)})));`);
+    expect(result.runtimeSccs.length).toBe(1);
+    expect(result.typeOnlySccs.length).toBe(0);
+    expect(result.mixedSccs.length).toBe(0);
+  });
+
+  test('isRuntimeEdge returns true for re-export', async () => {
+    const result = await runAsync(`process.stdout.write(JSON.stringify(mod.isRuntimeEdge({ kind: 're-export' })));`);
+    expect(result).toBe(true);
+  });
+});

@@ -871,4 +871,3 @@ export function collectThinLayerHints(diffs, { typeOnlyPortPaths = [] } = {}) {
   }
   return hints;
 }
-

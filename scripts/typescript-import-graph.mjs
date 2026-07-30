@@ -344,13 +344,14 @@ export function detectSccs(adjacency) {
   return sccs;
 }
 
-const RUNTIME_EDGE_KINDS = new Set(['runtime-static', 'runtime-dynamic', 'require']);
+// Runtime-carrying edge kinds. A value re-export (`export { foo } from './x'`)
+// propagates the runtime value, so a pure value-re-export cycle IS a runtime
+// cycle. `export type { Foo } from './x'` is classified as 'type-only' at
+// extraction time and is therefore correctly excluded here.
+const RUNTIME_EDGE_KINDS = new Set(['runtime-static', 'runtime-dynamic', 'require', 're-export']);
 
 /**
- * Classify edges into runtime vs type-only. 're-export' is treated as carrying
- * the same runtime/type character as the re-exported symbol, but conservatively
- * counts as runtime-static unless it is explicitly type-only (handled at edge
- * extraction via kind='type-only' for `export type`).
+ * Classify edges into runtime vs type-only.
  */
 export function isRuntimeEdge(edge) {
   return RUNTIME_EDGE_KINDS.has(edge.kind);
@@ -471,4 +472,3 @@ export function diffAgainstBaseline(currentEdges, baseline, { isReverseEdge = ()
 
   return { newRuntimeSccs, newTypeCouplingMembers, newReverseEdges };
 }
-
