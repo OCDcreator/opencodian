@@ -40,6 +40,11 @@ jobs:
         run: npm ci
 
       - name: Verify repository
+        env:
+          # Same unified scope resolution as the main CI: use the push event
+          # 'before' SHA for pushes (new-branch zero-SHA falls back to main),
+          # never HEAD, so a main push cannot collapse to an empty diff range.
+          VERIFY_BASE_REF: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || (github.event.before && github.event.before != '0000000000000000000000000000000000000000' && github.event.before) || 'origin/main' }}
         run: npm run verify
 
       - name: Prepare plugin three-file artifact

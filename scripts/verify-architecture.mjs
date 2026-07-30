@@ -1,9 +1,10 @@
-// verify:architecture — combines Phase 1 Tasks 1, 3, 4, 5 into one command.
+// verify:architecture — the unified architecture gate surface.
 //
 // Runs: owner-manifest, owner-boundaries, dependency-direction, architecture-
-// cycles, using the same change scope. Intended as the unified architecture
-// gate surface (Phase 1 Task 5 step "Add verify:architecture combining Tasks 1,
-// 3, 4 and 5").
+// cycles, architecture-approvals, using the same change scope. This combines
+// Phase 1 Tasks 1/3/4/5/6 so local verify, pre-push, PR, push and the package
+// workflow all exercise the same architecture gates (including the structured
+// approval validation that protected CI needs).
 //
 // Usage: npm run verify:architecture -- [--base <ref>]
 
@@ -15,6 +16,7 @@ const steps = [
   ['owner boundaries', 'node scripts/check-owner-boundaries.mjs'],
   ['dependency direction', 'node scripts/check-dependency-direction.mjs'],
   ['architecture cycles', 'node scripts/check-architecture-cycles.mjs'],
+  ['architecture approvals', 'node scripts/check-architecture-approvals.mjs'],
 ];
 
 function main() {
