@@ -9,14 +9,14 @@ permissions:
 
 jobs:
   # Architecture gates use the same unified scope in local verify, pre-push,
-  # PR and push. The base ref is resolved from the GitHub event (PR base ref or
-  # push before/after), never degrading to HEAD. Phase 2 Task 9 removed the old
-  # OWNER_GUARD_DIFF_RANGE / OWNER_GUARD_APPROVED env and the deprecated path
-  # guard; CI now runs the architecture gates directly.
+  # PR and push. The base ref is resolved from the GitHub event: for a PR it is
+  # the PR base ref; for a push it is the event 'before' SHA (the previous tip),
+  # falling back to the default branch ref for a new-branch push. It never
+  # degrades to HEAD, so a main push cannot collapse to an empty diff range.
   architecture:
     runs-on: ubuntu-latest
     env:
-      VERIFY_BASE_REF: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || 'origin/main' }}
+      VERIFY_BASE_REF: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || (github.event.before && github.event.before != '0000000000000000000000000000000000000000' && github.event.before) || 'origin/main' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -41,7 +41,7 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     env:
-      VERIFY_BASE_REF: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || 'origin/main' }}
+      VERIFY_BASE_REF: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || (github.event.before && github.event.before != '0000000000000000000000000000000000000000' && github.event.before) || 'origin/main' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7

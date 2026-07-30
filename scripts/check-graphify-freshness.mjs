@@ -28,16 +28,28 @@ function fail(message) {
 }
 
 function resolveGraphifyVersion() {
-  try {
-    const probe = spawnSync('python3', ['-c', 'import graphify; print(getattr(graphify, "__version__", "unknown"))'], {
-      cwd: repoRoot,
-      encoding: 'utf8',
-    });
-    if (probe.status === 0 && probe.stdout.trim()) {
-      return probe.stdout.trim();
+  // Use the same interpreter resolution as the wrapper (repo venv first).
+  const localVenvPython = join(repoRoot, '.graphify-venv', 'bin', 'python3');
+  const interpreters = [localVenvPython, 'python3', 'python'];
+  const argSets = [
+    ['-m', 'graphify', '--version'],
+    ['-c', 'import graphify; print(getattr(graphify, "__version__", ""))'],
+    ['-c', 'import importlib.metadata as m; print(m.version("graphifyy"))'],
+  ];
+  for (const py of interpreters) {
+    for (const args of argSets) {
+      try {
+        const probe = spawnSync(py, args, { cwd: repoRoot, encoding: 'utf8' });
+        if (probe.status === 0) {
+          const version = probe.stdout.trim();
+          if (version && version !== 'unknown') {
+            return version;
+          }
+        }
+      } catch {
+        // try next
+      }
     }
-  } catch {
-    // fall through
   }
   return 'unknown';
 }

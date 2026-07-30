@@ -168,3 +168,16 @@ describe('checkFreshness', () => {
     fs.rmSync(dir1, { recursive: true, force: true });
   });
 });
+
+describe('untracked files in graph-input envelope (Codex Phase 2 review fix)', () => {
+  test('an untracked src file is included in the envelope', () => {
+    const dir = makeFakeRepo({ 'src/a.ts': 'a', 'package.json': '{}' });
+    // add an untracked file
+    fs.writeFileSync(path.join(dir, 'src/new-untracked.ts'), 'untracked');
+    const records = collectInRepo(dir);
+    const keys = records.map((r) => r.key);
+    expect(keys).toContain('src/a.ts');
+    expect(keys).toContain('src/new-untracked.ts');
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+});

@@ -90,6 +90,20 @@ function main() {
     }
   }
 
+  // Owner-boundary change via manifest only (no src change): if
+  // architecture-owners.config.json itself changed, every owner overviewDoc
+  // must be touched (a boundary change affects the owner model narrative).
+  // This closes the gap where a manifest-only boundary edit would PASS with an
+  // empty changed-src set.
+  const manifestChanged = changedSet.has('architecture-owners.config.json');
+  if (manifestChanged) {
+    for (const owner of ownerConfig.owners ?? []) {
+      if (owner.overviewDoc) {
+        requiredOverviewDocs.add(normalizeRepoPath(owner.overviewDoc));
+      }
+    }
+  }
+
   // An owner boundary change is signaled when the manifest itself changed OR a
   // path moved owners. For Phase 2 we treat any changed source path under an
   // owner as requiring its overview + mapped doc to be touched (diff-

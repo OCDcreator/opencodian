@@ -48,17 +48,32 @@ function assertScopedOutputExists(path) {
 }
 
 function resolveGraphifyVersion() {
-  // Best-effort: read the installed graphify package version if discoverable.
-  try {
-    const probe = spawnSync('python3', ['-c', 'import graphify; print(getattr(graphify, "__version__", "unknown"))'], {
-      cwd: repoRoot,
-      encoding: 'utf8',
-    });
-    if (probe.status === 0 && probe.stdout.trim()) {
-      return probe.stdout.trim();
+  // Resolve the installed Graphify tool version using the SAME python
+  // interpreter the wrapper uses to run graphify (repo venv, then python3/
+  // python). The version is exposed via the CLI (`<py> -m graphify --version`)
+  // and the package metadata. Falling back to 'unknown' would let a tool
+  // upgrade silently pass the content-addressed freshness gate.
+  const localVenvPython = join(repoRoot, '.graphify-venv', 'bin', 'python3');
+  const interpreters = [localVenvPython, 'python3', 'python'];
+  const argSets = [
+    ['-m', 'graphify', '--version'],
+    ['-c', 'import graphify; print(getattr(graphify, "__version__", ""))'],
+    ['-c', 'import importlib.metadata as m; print(m.version("graphifyy"))'],
+  ];
+  for (const py of interpreters) {
+    for (const args of argSets) {
+      try {
+        const probe = spawnSync(py, args, { cwd: repoRoot, encoding: 'utf8' });
+        if (probe.status === 0) {
+          const version = probe.stdout.trim();
+          if (version && version !== 'unknown') {
+            return version;
+          }
+        }
+      } catch {
+        // try next
+      }
     }
-  } catch {
-    // fall through
   }
   return 'unknown';
 }

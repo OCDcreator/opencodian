@@ -101,12 +101,21 @@ export function collectGraphInputRecords(root, opts = {}) {
 }
 
 function listSrcFiles(root) {
-  const out = execFileSync('git', ['ls-files', 'src/'], {
+  // The graph-input envelope must cover the EXACT current source tree that
+  // Graphify consumes, including untracked files (a new untracked src file
+  // changes the graph even before it is committed). Combine tracked + untracked
+  // (non-ignored) files under src/, excluding the transient src/graphify-out.
+  const tracked = execFileSync('git', ['ls-files', 'src/'], {
     cwd: root,
     encoding: 'utf8',
   }).trim();
-  if (!out) return [];
-  return out.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).map(normalizeRepoPath);
+  const others = execFileSync('git', ['ls-files', '--others', '--exclude-standard', 'src/'], {
+    cwd: root,
+    encoding: 'utf8',
+  }).trim();
+  const all = `${tracked}\n${others}`;
+  if (!all.trim()) return [];
+  return [...new Set(all.split(/\r?\n/).map((line) => line.trim()).filter(Boolean))].map(normalizeRepoPath);
 }
 
 function listTsconfigs(root) {
