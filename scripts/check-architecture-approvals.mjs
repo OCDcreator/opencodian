@@ -23,8 +23,7 @@ import path from 'node:path';
 import process from 'node:process';
 
 import { evaluateApproval, validateApprovalRequest } from './architecture-approval-lib.mjs';
-import { repoRoot, resolveBaseRef, computeScopeShas } from './change-scope-lib.mjs';
-import { candidateDigest } from './change-scope-lib.mjs';
+import { repoRoot, resolveBaseRef, computeScopeShas, computeChangeScope } from './change-scope-lib.mjs';
 
 function parseArgs(argv = process.argv.slice(2)) {
   const args = { base: null };
