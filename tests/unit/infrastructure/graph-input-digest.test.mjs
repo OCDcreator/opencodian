@@ -181,3 +181,31 @@ describe('untracked files in graph-input envelope (Codex Phase 2 review fix)', (
     fs.rmSync(dir, { recursive: true, force: true });
   });
 });
+
+describe('tsconfig extends chain resolution (Codex Phase 2 round-2 review fix)', () => {
+  test('a change to an extended base config affects the digest', () => {
+    // tsconfig.json extends ./config/base.json; modifying base.json must change
+    // the digest.
+    const dir1 = makeFakeRepo({
+      'src/a.ts': 'a',
+      'package.json': '{}',
+      'tsconfig.json': '{ "extends": "./config/base.json", "compilerOptions": {} }',
+      'config/base.json': '{ "compilerOptions": { "strict": true } }',
+    });
+    const dir2 = makeFakeRepo({
+      'src/a.ts': 'a',
+      'package.json': '{}',
+      'tsconfig.json': '{ "extends": "./config/base.json", "compilerOptions": {} }',
+      'config/base.json': '{ "compilerOptions": { "strict": false } }',
+    });
+    const r1 = collectInRepo(dir1);
+    const r2 = collectInRepo(dir2);
+    const keys1 = r1.map((r) => `${r.kind}:${r.key}`);
+    expect(keys1).toContain('tsconfig:config/base.json');
+    const d1 = callExport('computeGraphInputDigest', r1);
+    const d2 = callExport('computeGraphInputDigest', r2);
+    expect(d1).not.toBe(d2);
+    fs.rmSync(dir1, { recursive: true, force: true });
+    fs.rmSync(dir2, { recursive: true, force: true });
+  });
+});

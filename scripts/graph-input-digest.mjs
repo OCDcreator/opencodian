@@ -85,9 +85,12 @@ export function collectGraphInputRecords(root, opts = {}) {
   addFile('.gitignore', 'ignore');
   addFile('.graphifyignore', 'ignore');
 
-  // 5. wrapper scripts
+  // 5. wrapper scripts + the digest library that defines how the envelope is
+  //    hashed (a change to the digest computation must itself invalidate the
+  //    stored digest).
   addFile('scripts/update-graphify-src.mjs', 'wrapper');
   addFile('scripts/run-graphify-update.py', 'wrapper');
+  addFile('scripts/graph-input-digest.mjs', 'wrapper');
 
   // 6. Graphify tool version (resolved lazily by caller via opts.graphifyVersion)
   if (opts.graphifyVersion) {
@@ -119,13 +122,116 @@ function listSrcFiles(root) {
 }
 
 function listTsconfigs(root) {
-  // Root-level tsconfig*.json + any nested ones that affect compilation.
+  // Enumerate all tsconfig*.json files, then RESOLVE their `extends` chains so
+  // a change to an extended base config (e.g. config/base.json) is part of the
+  // input envelope. A bare name match misses extends targets that do not match
+  // *tsconfig*.json (the plan requires the parsed extends chain).
   const out = execFileSync('git', ['ls-files', '*tsconfig*.json', '**/*tsconfig*.json'], {
     cwd: root,
     encoding: 'utf8',
   }).trim();
-  if (!out) return [];
-  return out.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).map(normalizeRepoPath);
+  const others = execFileSync('git', ['ls-files', '--others', '--exclude-standard', '*tsconfig*.json', '**/*tsconfig*.json'], {
+    cwd: root,
+    encoding: 'utf8',
+  }).trim();
+  const direct = `${out}\n${others}`.split(/\r?\n/).map((l) => l.trim()).filter(Boolean).map(normalizeRepoPath);
+  const seen = new Set(direct);
+  const result = [...direct];
+  // Resolve extends targets for each tsconfig, breadth-first.
+  for (const tc of direct) {
+    for (const target of resolveExtendsTargets(root, tc)) {
+      if (!seen.has(target)) {
+        seen.add(target);
+        result.push(target);
+      }
+    }
+  }
+  return result;
+}
+
+/**
+ * Parse a tsconfig file's `extends` field (string or array, TS 5.0+) and
+ * resolve each target to a repo-relative path if it points at a local file.
+ * Node_modules / package extends are not local files and are intentionally not
+ * followed (their version is captured by package.json/lock in the envelope).
+ */
+function resolveExtendsTargets(root, tsconfigRepoPath) {
+  const targets = [];
+  let parsed;
+  try {
+    const text = fs.readFileSync(path.join(root, tsconfigRepoPath), 'utf8');
+    parsed = JSON.parse(stripJsonComments(text));
+  } catch {
+    return targets;
+  }
+  const extendsField = parsed?.extends;
+  if (!extendsField) return targets;
+  const list = Array.isArray(extendsField) ? extendsField : [extendsField];
+  const tsconfigDir = tsconfigRepoPath.includes('/')
+    ? tsconfigRepoPath.slice(0, tsconfigRepoPath.lastIndexOf('/'))
+    : '';
+  for (const spec of list) {
+    if (typeof spec !== 'string') continue;
+    // Resolve relative to the tsconfig's directory; try as-is + .json + /tsconfig.json.
+    const candidates = [];
+    if (spec.startsWith('./') || spec.startsWith('../')) {
+      const base = normalizeRepoPath(path.posix.join(tsconfigDir, spec));
+      candidates.push(base, `${base}.json`, `${base}/tsconfig.json`);
+    }
+    for (const cand of candidates) {
+      if (fs.existsSync(path.join(root, cand))) {
+        targets.push(normalizeRepoPath(cand));
+        // Recurse one level into the extended config's own extends.
+        for (const deeper of resolveExtendsTargets(root, normalizeRepoPath(cand))) {
+          if (!targets.includes(deeper)) targets.push(deeper);
+        }
+        break;
+      }
+    }
+  }
+  return targets;
+}
+
+// Minimal JSONC strip: remove // and /* */ comments so tsconfig files with
+// comments still parse. (tsconfig allows JSONC.)
+function stripJsonComments(text) {
+  let out = '';
+  let i = 0;
+  let inString = false;
+  while (i < text.length) {
+    const ch = text[i];
+    const next = text[i + 1];
+    if (inString) {
+      out += ch;
+      if (ch === '\\' && next) {
+        out += next;
+        i += 2;
+        continue;
+      }
+      if (ch === '"') inString = false;
+      i += 1;
+      continue;
+    }
+    if (ch === '"') {
+      inString = true;
+      out += ch;
+      i += 1;
+      continue;
+    }
+    if (ch === '/' && next === '/') {
+      while (i < text.length && text[i] !== '\n') i += 1;
+      continue;
+    }
+    if (ch === '/' && next === '*') {
+      i += 2;
+      while (i < text.length && !(text[i] === '*' && text[i + 1] === '/')) i += 1;
+      i += 2;
+      continue;
+    }
+    out += ch;
+    i += 1;
+  }
+  return out;
 }
 
 /**

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "digest": "18d648439c254cc1203e464f0df3d7d8d6c95913ccbd3ea6e4bee699b87a3d78",
-  "recordCount": 589,
+  "digest": "fc13e21689f7cbf9a3a572c3dca96b90a21710afc0920d06e81b902d23429bfb",
+  "recordCount": 590,
   "records": [
     {
       "kind": "ignore",
@@ -2940,6 +2940,11 @@
     },
     {
       "kind": "wrapper",
+      "key": "scripts/graph-input-digest.mjs",
+      "sha256": "b2a0aa9c15b19cfbd4c9b5c03e462ca7048bf2431eb6f58073e5310975114d9b"
+    },
+    {
+      "kind": "wrapper",
       "key": "scripts/run-graphify-update.py",
       "sha256": "c047df3c6375e534fee00196b07baa497ec4668f0606e4186ef354cd20dfd8d4"
     },
@@ -2949,7 +2954,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-07-30T18:09:55.323Z",
-  "headShaAtGeneration": "f650eabd201b0c5e258d4586cf1331f693b0bfcf",
+  "generatedAt": "2026-07-30T18:20:17.189Z",
+  "headShaAtGeneration": "e4976ec8c187187f64091e78ff410a750c6d9a1a",
   "graphifyVersion": "graphify 0.9.22"
 }
