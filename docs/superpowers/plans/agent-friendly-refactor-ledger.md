@@ -110,8 +110,40 @@ None. No Test Vault deployment required.
 ---
 
 ## Phase 2 — Graphify, module docs, CI, and documentation truth (Task 7–9)
+
 - **PHASE_BASE:** `07b86e6c348381e3acaf5a840cf52467acd3323d`
-- **Status:** unblocked; Phase 1 APPROVED.
+- **PHASE_HEAD:** `d5a6a2e9d21bb9df6ffd999b660feb68e5f5cf5a`
+- **Range:** `07b86e6c..d5a6a2e9` (4 commits, runtime source untouched)
+
+### Commits
+| SHA | Type | Subject |
+|---|---|---|
+| `4e0c6e00` | feat(graphify) | content-addressed graph-input digest (Task 7) |
+| `88526478` | feat(gates) | module-doc owner-aware + scope-correct (Task 8) |
+| `687d6ed6` | feat(governance) | unify CI/pre-push/verify + retire old owner-guard (Task 9) |
+| `d5a6a2e9` | docs(devlog) | record Phase 2 |
+
+### Acceptance status
+- [x] Task 7: `check:graphify` passes iff artifacts identify the exact current source/config/tool envelope; comment-only changes conservatively require refresh; the stale `921a9742` metadata mismatch can no longer pass.
+- [x] Task 8: multi-commit PR cannot hide an undocumented source change in an earlier commit; module-doc config strict; owner-boundary change requires owner-overview + mapped-doc update.
+- [x] Task 9: local/hook/CI produce identical decision on the same normalized candidate tree; old GUARD_TARGETS / OWNER_GUARD_APPROVED / deprecated command removed; no workflow/hook still sets HEAD as empty diff range.
+
+### Gate evidence (run on clean tree at PHASE_HEAD)
+- `verify:architecture` → 4 PASS.
+- `check:graphify` → content digest match ( regenerated after envelope changes).
+- `check:module-docs` → OK; `check:module-doc-owner-impact` → PASS.
+- Infrastructure Jest → 17 suites / 157 tests (owner-guard-lib suite retired).
+- Full `npm test` → 6738 tests.
+- lint 0/0, typecheck, build all green.
+
+### Codex independent review
+- Status: **PENDING** — awaiting independent Codex review of `07b86e6c..d5a6a2e9`.
+
+---
+
+## Phase 3 — Diagnostics vertical slice (Task 10–13)
+- **PHASE_BASE:** _pending Phase 2 APPROVED_
+- **Status:** blocked on Phase 2 Codex APPROVED. This is the first runtime-change phase.
 
 ## Phase 2–6
 - **Status:** blocked on preceding phase APPROVED.
