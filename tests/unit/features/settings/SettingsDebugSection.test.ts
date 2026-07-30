@@ -360,6 +360,7 @@ describe('SettingsDebugSection', () => {
     expect(blockDisplays).toEqual([
       ['plugin', 'none'],
       ['opencode', ''],
+      ['codex', 'none'],
       ['claude-code', 'none'],
       ['export', 'none'],
     ]);
@@ -368,6 +369,9 @@ describe('SettingsDebugSection', () => {
     );
     expect(containerEl.querySelector('[data-section-block="opencode"] h4')?.textContent).toBe(
       t('settings.debug.modules.opencode.title'),
+    );
+    expect(containerEl.querySelector('[data-section-block="codex"] h4')?.textContent).toBe(
+      t('settings.debug.modules.codex.title'),
     );
     expect(containerEl.querySelector('[data-section-block="claude-code"] h4')?.textContent).toBe(
       t('settings.debug.modules.claudeCode.title'),
@@ -418,6 +422,7 @@ describe('SettingsDebugSection', () => {
     expect(shellEls.map((el) => (el as HTMLElement).dataset.sectionBlock)).toEqual([
       'plugin',
       'opencode',
+      'codex',
       'claude-code',
       'export',
     ]);
