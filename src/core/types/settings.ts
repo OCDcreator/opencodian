@@ -15,6 +15,11 @@ import {
   normalizeDebugRefreshIntervalMs,
 } from '../../shared/debugModules';
 import {
+  CODEX_TRACE_CHANNEL_IDS,
+  type CodexSessionTraceSettings,
+  type CodexTraceChannelId,
+} from '../agents/backend/diagnostics/types';
+import {
   OPEN_CODE_TRACE_CHANNEL_IDS,
   type OpenCodeSessionTraceSettings,
   type OpenCodeTraceChannelId,
@@ -214,6 +219,8 @@ export interface CodexBackendSettings {
    * on-request.
    */
   approvalPolicy: CodexApprovalPolicy;
+  /** Codex session trace (diagnostics) settings. */
+  sessionTrace: CodexSessionTraceSettings;
 }
 
 export interface ClaudeCodeBackendSettings {
@@ -514,6 +521,18 @@ export function getDefaultBackendSettings(): BackendSettings {
   };
 }
 
+export function getDefaultCodexSessionTraceSettings(): CodexSessionTraceSettings {
+  return {
+    enabled: true,
+    consolePreset: 'standard',
+    consoleChannels: Object.fromEntries(
+      CODEX_TRACE_CHANNEL_IDS.map((channelId) => [channelId, true]),
+    ) as Record<CodexTraceChannelId, boolean>,
+    storageDirectory: '',
+    captureContent: true,
+  };
+}
+
 export function getDefaultCodexBackendSettings(): CodexBackendSettings {
   return {
     executablePath: '',
@@ -527,6 +546,7 @@ export function getDefaultCodexBackendSettings(): CodexBackendSettings {
     networkAccessEnabled: false,
     webSearchMode: 'cached',
     approvalPolicy: 'inherit',
+    sessionTrace: getDefaultCodexSessionTraceSettings(),
   };
 }
 
@@ -907,13 +927,35 @@ function normalizeOpenCodeBackendSettings(value: unknown): BackendSettings['open
   };
 }
 
+function normalizeCodexSessionTraceSettings(value: unknown): CodexSessionTraceSettings {
+  const traceCandidate = value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Partial<CodexSessionTraceSettings>
+    : {};
+  const traceDefaults = getDefaultCodexSessionTraceSettings();
+  const traceChannels = Object.fromEntries(
+    CODEX_TRACE_CHANNEL_IDS.map((channelId) => [
+      channelId,
+      traceCandidate.consoleChannels?.[channelId] !== false,
+    ]),
+  ) as Record<CodexTraceChannelId, boolean>;
+  return {
+    enabled: traceCandidate.enabled !== false,
+    consolePreset: traceCandidate.consolePreset === 'full' ? 'full' : traceDefaults.consolePreset,
+    consoleChannels: traceChannels,
+    storageDirectory: typeof traceCandidate.storageDirectory === 'string'
+      ? traceCandidate.storageDirectory.trim()
+      : traceDefaults.storageDirectory,
+    captureContent: traceCandidate.captureContent !== false,
+  };
+}
+
 function normalizeCodexBackendSettings(value: unknown): CodexBackendSettings {
   const VALID_SANDBOX_MODES: readonly CodexSandboxMode[] = ['read-only', 'workspace-write', 'danger-full-access'];
   const VALID_EFFORTS: readonly CodexReasoningEffort[] = ['minimal', 'low', 'medium', 'high', 'xhigh'];
   const VALID_WEB_SEARCH: readonly CodexWebSearchMode[] = ['disabled', 'cached', 'live'];
   const VALID_APPROVAL_POLICY: readonly CodexApprovalPolicy[] = ['inherit', 'untrusted', 'on-request', 'never'];
   const candidate = value && typeof value === 'object' && !Array.isArray(value)
-    ? value as { executablePath?: unknown; apiKey?: unknown; model?: unknown; pricingProviderId?: unknown; pricingEndpoint?: unknown; sandboxMode?: unknown; modelReasoningEffort?: unknown; additionalDirectories?: unknown; networkAccessEnabled?: unknown; webSearchMode?: unknown; approvalPolicy?: unknown }
+    ? value as { executablePath?: unknown; apiKey?: unknown; model?: unknown; pricingProviderId?: unknown; pricingEndpoint?: unknown; sandboxMode?: unknown; modelReasoningEffort?: unknown; additionalDirectories?: unknown; networkAccessEnabled?: unknown; webSearchMode?: unknown; approvalPolicy?: unknown; sessionTrace?: unknown }
     : {};
   const rawSandbox = typeof candidate.sandboxMode === 'string' ? candidate.sandboxMode : '';
   const rawEffort = typeof candidate.modelReasoningEffort === 'string' ? candidate.modelReasoningEffort : '';
@@ -944,6 +986,7 @@ function normalizeCodexBackendSettings(value: unknown): CodexBackendSettings {
     approvalPolicy: VALID_APPROVAL_POLICY.includes(rawApprovalPolicy as CodexApprovalPolicy)
       ? (rawApprovalPolicy as CodexApprovalPolicy)
       : 'inherit',
+    sessionTrace: normalizeCodexSessionTraceSettings(candidate.sessionTrace),
   };
 }
 

@@ -1,6 +1,7 @@
 # Settings Types and Defaults
 
 > 2026-07-29: `BackendSettings.opencode.sessionTrace` normalizes default-on tracing, console preset, six channels and storage directory.
+> 2026-07-30: `CodexBackendSettings.sessionTrace` adds the Codex trace schema (five channels from `CODEX_TRACE_CHANNEL_IDS` plus `captureContent`), with `getDefaultCodexSessionTraceSettings()` and field-by-field normalization mirroring the opencode block.
 
 > **源码**: `src/core/types/settings.ts`
 > **状态**: [REVIEW]
