@@ -112,8 +112,8 @@ None. No Test Vault deployment required.
 ## Phase 2 — Graphify, module docs, CI, and documentation truth (Task 7–9)
 
 - **PHASE_BASE:** `07b86e6c348381e3acaf5a840cf52467acd3323d`
-- **PHASE_HEAD:** `d5a6a2e9d21bb9df6ffd999b660feb68e5f5cf5a`
-- **Range:** `07b86e6c..d5a6a2e9` (4 commits, runtime source untouched)
+- **PHASE_HEAD:** `2e962d4e48a59c5e258d4586cf1331f693b0bfcf`
+- **Range:** `07b86e6c..2e962d4e` (7 commits, runtime source untouched)
 
 ### Commits
 | SHA | Type | Subject |
@@ -136,14 +136,21 @@ None. No Test Vault deployment required.
 - Full `npm test` → 6738 tests.
 - lint 0/0, typecheck, build all green.
 
-### Codex independent review
-- Status: **PENDING** — awaiting independent Codex review of `07b86e6c..d5a6a2e9`.
+### Codex independent review — APPROVED
+- **Reviewer:** Codex CLI (gpt-5.6-sol), writable sandbox.
+- **Verdict:** **APPROVED** (Critical 0, Important 0, Minor 0).
+- **Review-fix rounds:** Three rounds found and fixed real issues:
+  1. Round 1 (6 Important): graphify version probe used system python3 (no graphify) → 'unknown'; `git ls-files src/` missed untracked files; owner-impact gate missed manifest-only boundary changes; default `verify` still serial (not the unified runner); CI push used origin/main not event.before; old OWNER_GUARD tokens lingered in comments.
+  2. Round 2 (1 Important): listTsconfigs only name-matched, did not resolve the `extends` chain; digest library itself was outside the envelope.
+  3. Round 3 (2 Important): `verify:architecture` omitted `check:architecture-approvals`; `plugin-package.yml` ran verify without event base.
+- **Independently verified:** all 10 gates incl. canary (comment-add fails graphify, restore passes), 5/5 architecture gates, 124/124 focused tests, zero src change, full owner-guard retirement (gate 10 zero-match).
+- **Deferred (non-blocking, owner: Phase 6):** `.gitea/workflows/plugin-package.yml` is a mirror that also runs `npm run verify` without event base; the canonical `.github/workflows/plugin-package.yml` is fixed. Phase 6 doc/link sweep will reconcile the mirror.
 
 ---
 
 ## Phase 3 — Diagnostics vertical slice (Task 10–13)
-- **PHASE_BASE:** _pending Phase 2 APPROVED_
-- **Status:** blocked on Phase 2 Codex APPROVED. This is the first runtime-change phase.
+- **PHASE_BASE:** `2e962d4e48a59c5e258d4586cf1331f693b0bfcf`
+- **Status:** unblocked; Phase 2 APPROVED. This is the FIRST runtime-change phase.
 
 ## Phase 2–6
 - **Status:** blocked on preceding phase APPROVED.
