@@ -73,7 +73,7 @@ describe('CodexAppServerTransport wire observer', () => {
   beforeEach(resetAppServerMocks);
 
   /** Drive start() to completion with a wire observer attached. */
-  async function startClient(observer: CodexAppServerWireObserver): Promise<CodexAppServerClient> {
+  async function startClient(observer?: CodexAppServerWireObserver): Promise<CodexAppServerClient> {
     const proc = createMockProcess();
     mockSpawn.mockReturnValue(proc);
     emitWsUrl(proc);
@@ -145,5 +145,102 @@ describe('CodexAppServerTransport wire observer', () => {
     expect(seen).toContain('n:warning');
     expect(seen).toContain('s:execCommandApproval');
     expect(seen).toContain('reply:true');
+  });
+
+  it('keeps legacy stderr logging when no service-output observer is configured', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation();
+    try {
+      await startClient();
+      warn.mockClear();
+      const proc = mockSpawn.mock.results.at(-1)?.value as ReturnType<typeof SpawnFn>;
+      (proc as unknown as { stderr: EventEmitter }).stderr.emit('data', Buffer.from('Error: raw-stderr-secret'));
+      expect(warn.mock.calls.some((call) => JSON.stringify(call).includes('raw-stderr-secret'))).toBe(true);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('keeps legacy stderr logging when a service-output observer dynamically declines capture', async () => {
+    const observer: CodexAppServerWireObserver = { onServiceOutput: () => false };
+    const warn = jest.spyOn(console, 'warn').mockImplementation();
+    try {
+      await startClient(observer);
+      warn.mockClear();
+      const proc = mockSpawn.mock.results.at(-1)?.value as ReturnType<typeof SpawnFn>;
+      (proc as unknown as { stderr: EventEmitter }).stderr.emit('data', Buffer.from('Error: disabled-trace-stderr'));
+      expect(warn.mock.calls.some((call) => JSON.stringify(call).includes('disabled-trace-stderr'))).toBe(true);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('uses only generic logging when a service-output observer throws', async () => {
+    const observer: CodexAppServerWireObserver = {
+      onServiceOutput: () => { throw new Error('observer-secret'); },
+    };
+    const warn = jest.spyOn(console, 'warn').mockImplementation();
+    try {
+      await startClient(observer);
+      warn.mockClear();
+      const proc = mockSpawn.mock.results.at(-1)?.value as ReturnType<typeof SpawnFn>;
+      (proc as unknown as { stderr: EventEmitter }).stderr.emit('data', Buffer.from('Error: raw-stderr-secret'));
+      const output = JSON.stringify(warn.mock.calls);
+      expect(output).toContain('App-server stderr received');
+      expect(output).not.toContain('raw-stderr-secret');
+      expect(output).not.toContain('observer-secret');
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('keeps startup on the main path when service-output observer getter throws', async () => {
+    const getterSecret = 'wire-observer-getter-secret';
+    const observer = {} as CodexAppServerWireObserver;
+    Object.defineProperty(observer, 'onServiceOutput', {
+      configurable: true,
+      get: () => {
+        throw new Error(getterSecret);
+      },
+    });
+    const warn = jest.spyOn(console, 'warn').mockImplementation();
+    try {
+      await expect(startClient(observer)).resolves.toBeDefined();
+      const proc = mockSpawn.mock.results.at(-1)?.value as ReturnType<typeof SpawnFn>;
+      (proc as unknown as { stderr: EventEmitter }).stderr.emit('data', Buffer.from('Error: getter-raw-stderr-secret'));
+      const output = JSON.stringify(warn.mock.calls);
+      expect(output).toContain('App-server stderr received');
+      expect(output).not.toContain(getterSecret);
+      expect(output).not.toContain('getter-raw-stderr-secret');
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('does not expose observer exception secrets in console output', async () => {
+    const observer: CodexAppServerWireObserver = {
+      onNotification: () => { throw new Error('sk-observer-canary /vault/private'); },
+    };
+    const warn = jest.spyOn(console, 'warn').mockImplementation();
+    try {
+      await startClient(observer);
+      warn.mockClear();
+      mockWsInstance.onmessage?.({ data: JSON.stringify({ jsonrpc: '2.0', method: 'warning', params: {} }) });
+      const output = JSON.stringify(warn.mock.calls);
+      expect(output).toContain('wire observer threw');
+      expect(output).not.toContain('sk-observer-canary');
+      expect(output).not.toContain('/vault/private');
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('reports a timed-out request as an observer failure response', async () => {
+    const responses: Array<{ id: number; ok: boolean; error?: string }> = [];
+    const client = await startClient({ onResponse: (response) => responses.push(response) });
+    const request = (client as unknown as {
+      request(method: string, params?: Record<string, unknown>, timeoutMs?: number): Promise<unknown>;
+    }).request('slow/request', {}, 1);
+    await expect(request).rejects.toThrow('JSON-RPC request timeout for slow/request');
+    expect(responses).toContainEqual(expect.objectContaining({ ok: false, error: 'JSON-RPC request timeout for slow/request' }));
   });
 });

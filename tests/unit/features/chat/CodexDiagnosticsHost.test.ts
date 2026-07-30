@@ -7,6 +7,7 @@ jest.mock('../../../../src/core/opencode', () => ({
 import type { Conversation } from '../../../../src/core/types';
 import { DEFAULT_SETTINGS } from '../../../../src/core/types';
 import { OpenCodianView } from '../../../../src/features/chat/OpenCodianView';
+import type { SendPipelineHostDependencies } from '../../../../src/features/chat/runtime/SendPipelineRuntime';
 import { ChatHeaderPresenter, type ChatHeaderPresenterHost } from '../../../../src/features/chat/services/ChatHeaderPresenter';
 import {
   createAsyncStream,
@@ -102,6 +103,12 @@ function getChatHeaderHost(view: OpenCodianView): ChatHeaderPresenterHost {
   return (view as unknown as { createChatHeaderPresenterHost(): ChatHeaderPresenterHost }).createChatHeaderPresenterHost();
 }
 
+function getSendPipelineHostDependencies(view: OpenCodianView): SendPipelineHostDependencies {
+  return (view as unknown as {
+    createSendPipelineHostDependencies(): SendPipelineHostDependencies;
+  }).createSendPipelineHostDependencies();
+}
+
 function setActiveConversation(view: OpenCodianView, conversation: Conversation | null): void {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (view as unknown as { currentConversation: Conversation | null }).currentConversation = conversation;
@@ -179,6 +186,81 @@ describe('codex diagnostics host wiring', () => {
     );
   });
 
+  it('routes a Codex diagnostic token to the backend request top level and options', () => {
+    const service = createFakeCodexTraceService();
+    const view = createView(service);
+    const token = { runId: 'run-codex', tabId: 'tab-1', armedAt: 1, expiresAt: 2 };
+    const backend = {
+      hasCapability: jest.fn(() => true),
+      sendMessage: jest.fn(),
+    };
+    (view as unknown as {
+      plugin: { agentServiceRegistry: { get(kind: string): unknown } };
+    }).plugin.agentServiceRegistry = { get: jest.fn(() => backend) };
+    const conversation: Conversation = {
+      id: 'conversation-1',
+      title: 'Codex',
+      createdAt: 1,
+      updatedAt: 1,
+      backend: 'codex',
+      backendSessionId: 'thread-codex',
+      messages: [],
+    } as Conversation;
+
+    getSendPipelineHostDependencies(view).sendStreamMessage(conversation, 'Hello', {
+      sessionId: 'thread-codex',
+      contextItems: [],
+      messageID: 'message-1',
+      requestParts: [],
+      diagnosticRunToken: token,
+    });
+
+    expect(backend.sendMessage).toHaveBeenCalledWith(expect.objectContaining({
+      diagnosticRunToken: token,
+      options: expect.objectContaining({ diagnosticRunToken: token }),
+    }));
+  });
+
+  it('continues the chat send when a Codex diagnostic claim or refresh throws', async () => {
+    const preparedSend = createPreparedSend({
+      conversation: {
+        id: 'conversation-1',
+        title: 'Codex',
+        createdAt: 1,
+        updatedAt: 1,
+        backend: 'codex',
+        backendSessionId: 'thread-codex',
+        messages: [],
+      } as Conversation,
+    });
+    const runtimeState = createTabRuntime();
+    const streamController = createStreamController();
+    const preparationPort = createPreparationPort(preparedSend);
+    const finalizationPort = createFinalizationPort();
+    const sendStreamMessage = jest.fn().mockImplementation(() => createAsyncStream([
+      { type: 'message_start' },
+      { type: 'message_stop' },
+    ]));
+    const host = createHost(runtimeState, streamController, [], {
+      claimCodexDiagnosticRunToken: jest.fn(() => { throw new Error('sk-canary /vault/secret'); }),
+      refreshCodexDiagnosticsState: jest.fn(() => { throw new Error('sk-canary /vault/secret'); }),
+      sendStreamMessage,
+    });
+    const runtime = new SendPipelineRuntime(host, preparationPort, finalizationPort);
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    await expect(runtime.sendMessage('Hello')).resolves.toBeUndefined();
+
+    expect(sendStreamMessage).toHaveBeenCalledWith(
+      preparedSend.conversation,
+      'Hello',
+      expect.not.objectContaining({ diagnosticRunToken: expect.anything() }),
+    );
+    const logged = warn.mock.calls.flat().map((item) => typeof item === 'string' ? item : JSON.stringify(item)).join(' ');
+    expect(logged).not.toContain('sk-canary');
+    expect(logged).not.toContain('/vault/');
+  });
+
   it('resolves the current conversation trace id via backendSessionId for export', async () => {
     const service = createFakeCodexTraceService({
       store: {
@@ -210,12 +292,13 @@ describe('codex diagnostics host wiring', () => {
     });
     window.prompt = jest.fn().mockReturnValue('');
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const exportFn = (view as unknown as {
-      exportCodexConversationDiagnostics: (conversation: Conversation) => Promise<void>;
-    }).exportCodexConversationDiagnostics;
+    const adapter = (view as unknown as {
+      codexDiagnosticsAdapter: {
+        exportConversationDiagnostics(conversation: Conversation): Promise<void>;
+      };
+    }).codexDiagnosticsAdapter;
 
-    await exportFn.call(view, conversation);
+    await adapter.exportConversationDiagnostics(conversation);
 
     expect(service.flushRingBuffer).toHaveBeenCalledWith('thread-1', 'manual-export');
     expect(service.store.resolveTraceId).toHaveBeenCalledWith('thread-1');

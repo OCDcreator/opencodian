@@ -291,9 +291,16 @@ describe('SettingsDebugSection codex block', () => {
 
   it('keeps codex tab visible and other tabs hidden when codex is active', () => {
     const { containerEl } = renderTabbed('codex');
-    const blockDisplays = Array.from(containerEl.querySelectorAll('[data-section-block]')).map(
-      (blockEl) => [(blockEl as HTMLElement).dataset.sectionBlock, (blockEl as HTMLElement).style.display],
+    const blockDisplays = Array.from(containerEl.querySelectorAll('[data-section-block], [data-codex-section-block]')).map(
+      (blockEl) => [
+        (blockEl as HTMLElement).dataset.sectionBlock ?? (blockEl as HTMLElement).dataset.codexSectionBlock,
+        (blockEl as HTMLElement).style.display,
+      ],
     );
+
+    expect(containerEl.querySelector('[data-codex-section-block="codex"]')?.classList.contains(
+      'opencodian-debug-tab-shell-codex',
+    )).toBe(true);
 
     expect(blockDisplays).toEqual([
       ['plugin', 'none'],

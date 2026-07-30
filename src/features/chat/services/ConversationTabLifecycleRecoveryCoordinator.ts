@@ -1,6 +1,9 @@
 import type { Conversation } from '../../../core/types';
 import { t } from '../../../i18n';
+import { createLogger } from '../../../shared';
 import type { CloseTabResult, CloseTabsResult, TabData, TabId } from '../tabs';
+
+const logger = createLogger('ConversationTabLifecycleRecoveryCoordinator');
 
 interface ConversationTabLifecycleRecoveryTabManager {
   areTabsEnabled?(): boolean;
@@ -38,6 +41,19 @@ export class ConversationTabLifecycleRecoveryCoordinator {
     private readonly port: ConversationTabLifecycleRecoveryPort,
   ) {}
 
+  /**
+   * Runs a diagnostic-capture cancel inside a safe boundary so a throwing
+   * trace service cannot interrupt tab recovery / deletion. The cancel is
+   * best-effort; a throw is logged and swallowed.
+   */
+  private safeTraceCancel(run: () => void): void {
+    try {
+      run();
+    } catch {
+      logger.warn('trace cancel hook threw; continuing tab recovery without trace data');
+    }
+  }
+
   async closeTabAndRecover(tabId: TabId): Promise<void> {
     const tabManager = this.host.getTabManager();
     if (!tabManager) {
@@ -59,8 +75,8 @@ export class ConversationTabLifecycleRecoveryCoordinator {
       return;
     }
 
-    this.host.cancelOpenCodeDiagnosticCapture?.(tabId);
-    this.host.cancelCodexDiagnosticCapture?.(tabId);
+    this.safeTraceCancel(() => this.host.cancelOpenCodeDiagnosticCapture?.(tabId));
+    this.safeTraceCancel(() => this.host.cancelCodexDiagnosticCapture?.(tabId));
     this.host.removeTabMessagesPane(tabId);
 
     if (result.nextActiveTabId) {
@@ -99,8 +115,8 @@ export class ConversationTabLifecycleRecoveryCoordinator {
     const closeResult = tabManager.closeTabs(tabsToClose.map((tab) => tab.id));
 
     for (const closedTabId of closeResult.closedTabIds) {
-      this.host.cancelOpenCodeDiagnosticCapture?.(closedTabId);
-      this.host.cancelCodexDiagnosticCapture?.(closedTabId);
+      this.safeTraceCancel(() => this.host.cancelOpenCodeDiagnosticCapture?.(closedTabId));
+      this.safeTraceCancel(() => this.host.cancelCodexDiagnosticCapture?.(closedTabId));
       this.host.removeTabMessagesPane(closedTabId);
     }
 
@@ -128,6 +144,14 @@ export class ConversationTabLifecycleRecoveryCoordinator {
       await this.host.deleteConversation(conversationId);
     }
 
+    // Reset drops every tab in one step, so it has no close-result loop in
+    // which to cancel capture claims. Snapshot ids first and cancel each
+    // best-effort before the manager is cleared.
+    const tabIds = this.host.getTabManager()?.getAllTabs().map((tab) => tab.id) ?? [];
+    for (const tabId of tabIds) {
+      this.safeTraceCancel(() => this.host.cancelOpenCodeDiagnosticCapture?.(tabId));
+      this.safeTraceCancel(() => this.host.cancelCodexDiagnosticCapture?.(tabId));
+    }
     this.host.clearTabMessagesPanes();
     this.host.resetTabManager();
     const tabManager = this.host.getTabManager();

@@ -2,6 +2,7 @@
 
 > 2026-07-30: The pipeline refreshes the exact tab's OpenCode diagnostics chrome after token claim and again from a terminal `finally` path covering completion, error, and cancellation.
 > 2026-07-30: Diagnostic token claiming is now backend-dispatched. New `claimDiagnosticRunToken(preparedSend, backendSessionId)` routes codex conversations to the optional `claimCodexDiagnosticRunToken` host hook and opencode conversations to the existing OpenCode hook; other backends (and any backend without a wired trace host) return undefined. The transport token type widened to the backend-agnostic `DiagnosticRunToken` (inlined in `SendPipelineTypes.ts`) which is structurally aligned with both `OpenCodeDiagnosticRunToken` and `CodexDiagnosticRunToken`.
+> Trace-hook fallback warnings contain no exception payload, so a failed diagnostics callback cannot expose secrets or vault paths while the send continues.
 
 > **源码**: `src/features/chat/runtime/SendPipelineRuntime.ts`
 > **状态**: [REVIEW]

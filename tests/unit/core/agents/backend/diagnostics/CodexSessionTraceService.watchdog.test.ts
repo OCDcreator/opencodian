@@ -68,4 +68,18 @@ describe('CodexSessionTraceService watchdog', () => {
     const finish = events.find((event) => event.name === 'turn.finished');
     expect((finish?.payload as { state?: string } | undefined)?.state).toBe('error');
   });
+
+  it('does not arm a watchdog for a turn started while diagnostics are disabled', async () => {
+    await service.dispose();
+    let enabled = false;
+    service = new CodexSessionTraceService({ settings: () => ({ ...traceSettings(dir), enabled }) });
+    service.beginTurn({ threadId: 'thread-disabled-watchdog', turnId: 'turn-disabled-watchdog' });
+    enabled = true;
+    service.bindThread({ threadId: 'thread-disabled-watchdog', resumed: false, via: 'app-server' });
+    jest.advanceTimersByTime(180_000);
+    await service.store.flush();
+    const traceId = service.store.resolveTraceId('thread-disabled-watchdog') as string;
+    const events = await service.store.readTrace(traceId);
+    expect(events.some((event) => event.name === 'turn.stalled')).toBe(false);
+  });
 });

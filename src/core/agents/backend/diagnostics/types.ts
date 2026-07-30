@@ -58,6 +58,7 @@ export interface CodexTracePort {
   recordLifecycle(name: string, payload?: unknown): void;
   recordWireEvent(record: CodexWireRecord): void;
   recordServiceOutput(stream: 'stdout' | 'stderr', text: string): void;
+  flushRingBuffer(threadId: string | undefined, reason: string): void;
   finishTurn(context: CodexTraceContext, state: TraceTerminalState, payload?: unknown): void;
   markAnomaly(context: CodexTraceContext | undefined, name: string, severity: 'warning' | 'critical' | 'error', payload?: unknown): void;
   armDeepCapture(tabId: string, threadId?: string): CodexDiagnosticRunToken;

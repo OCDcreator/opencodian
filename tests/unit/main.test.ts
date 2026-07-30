@@ -125,6 +125,35 @@ describe('OpenCodianPlugin.getConversationById', () => {
 
 });
 
+describe('OpenCodianPlugin unload diagnostics', () => {
+  it('does not expose Codex trace disposal error contents in console warnings', async () => {
+    const secret = 'codex-unload-secret-canary';
+    const vaultPath = '/Volumes/SDD2T/obsidian-vault-write/testvault';
+    const plugin = new OpenCodianPlugin() as unknown as {
+      onunload(): void;
+      runtimeCoordinator: { dispose: jest.Mock };
+      codexTraceService?: { dispose(): Promise<void> };
+      getSettingsRuntimeCoordinator: jest.Mock<{ clearChatAppearanceSaveTimer: jest.Mock }, []>;
+    };
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    plugin.runtimeCoordinator = { dispose: jest.fn() };
+    plugin.codexTraceService = {
+      dispose: () => Promise.reject(new Error(`${secret} at ${vaultPath}/trace.jsonl`)),
+    };
+    plugin.getSettingsRuntimeCoordinator = jest.fn(() => ({ clearChatAppearanceSaveTimer: jest.fn() }));
+    try {
+      plugin.onunload();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      const output = JSON.stringify(warn.mock.calls);
+      expect(output).toContain('Failed to flush Codex trace service during unload');
+      expect(output).not.toContain(secret);
+      expect(output).not.toContain(vaultPath);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+});
+
 describe('OpenCodianPlugin conversation full-message cache', () => {
   it('trims unpinned full-message conversations after loading over the cache limit', async () => {
     const plugin = new OpenCodianPlugin() as OpenCodianPlugin & {

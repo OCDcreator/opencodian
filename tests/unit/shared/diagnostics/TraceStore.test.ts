@@ -51,4 +51,27 @@ describe('TraceStore (shared)', () => {
     fs.rmSync(target, { recursive: true, force: true });
     await store.dispose();
   });
+
+  it('does not queue or initialize storage while disabled until explicitly enabled', async () => {
+    const disabledDirectory = path.join(dir, 'disabled');
+    const store = new TraceStore(undefined, disabledDirectory, { disabled: true });
+    store.append(event({ traceId: 'trace-disabled' }));
+    await store.flush();
+    expect(fs.existsSync(disabledDirectory)).toBe(false);
+    expect(await store.readTrace('trace-disabled')).toEqual([]);
+
+    store.enable();
+    store.append(event({ traceId: 'trace-enabled' }));
+    await store.flush();
+    expect(await store.readTrace('trace-enabled')).toHaveLength(1);
+    await store.dispose();
+  });
+
+  it('clears memory only without creating a directory while disabled', async () => {
+    const disabledDirectory = path.join(dir, 'disabled-clear');
+    const store = new TraceStore(undefined, disabledDirectory, { disabled: true });
+    await store.clear();
+    expect(fs.existsSync(disabledDirectory)).toBe(false);
+    await store.dispose();
+  });
 });

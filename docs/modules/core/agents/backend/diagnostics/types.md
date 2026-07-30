@@ -5,7 +5,7 @@
 
 ## 概述
 
-Codex 后端会话 trace 的类型定义层。`CodexTraceEventV1` 在共享 `TraceEventBase` 之上把 `schemaVersion` 固定为 `CODEX_TRACE_SCHEMA_VERSION`（1）、把 channel/source 收窄为 Codex 字面量联合（`lifecycle` / `transport` / `stream-sync` / `tool-interaction` / `service-output` 五个 channel，`plugin` / `app-server` / `cli` / `storage` 四类 source），并追加 `turnId` / `itemId` 锚点。`CodexTraceContext` 是跨 trace/run/thread/turn 的上下文句柄；`CodexDiagnosticRunToken` 描述深度捕获令牌；`CodexSessionTraceSettings` 是设置 schema（enabled、consolePreset、consoleChannels、storageDirectory、captureContent），由 `core/types/settings.ts` 提供默认值与归一化；`CodexWireRecord` 描述 app-server 线协议记录；`CodexTracePort` 是后续 trace runtime 实现的完整采集端口接口（bindThread/beginTurn/各类 record/finishTurn/异常标记/深度捕获 arm-cancel-claim）。
+Codex 后端会话 trace 的类型定义层。`CodexTraceEventV1` 在共享 `TraceEventBase` 之上把 `schemaVersion` 固定为 `CODEX_TRACE_SCHEMA_VERSION`（1）、把 channel/source 收窄为 Codex 字面量联合（`lifecycle` / `transport` / `stream-sync` / `tool-interaction` / `service-output` 五个 channel，`plugin` / `app-server` / `cli` / `storage` 四类 source），并追加 `turnId` / `itemId` 锚点。`CodexTraceContext` 是跨 trace/run/thread/turn 的上下文句柄；`CodexDiagnosticRunToken` 描述深度捕获令牌；`CodexSessionTraceSettings` 是设置 schema（enabled、consolePreset、consoleChannels、storageDirectory、captureContent），由 `core/types/settings.ts` 提供默认值与归一化；`CodexWireRecord` 描述 app-server 线协议记录；`CodexTracePort` 是后续 trace runtime 实现的完整采集端口接口（bindThread/beginTurn/各类 record/flushRingBuffer/finishTurn/异常标记/深度捕获 arm-cancel-claim）。
 
 ## 导入关系
 

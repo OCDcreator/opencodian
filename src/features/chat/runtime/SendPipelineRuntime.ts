@@ -1,4 +1,5 @@
 import { getConversationBackendSessionId } from '../../../core/types';
+import { createLogger } from '../../../shared';
 import type {
   PreparedMessageSend,
   PrepareMessageSendOptions,
@@ -22,6 +23,8 @@ import type {
 } from './SendPipelineTypes';
 import { StreamChunkRouter } from './StreamChunkRouter';
 import { StreamLocalFinalizer } from './StreamLocalFinalizer';
+
+const logger = createLogger('SendPipelineRuntime');
 
 export type {
   LocalStreamOutcome,
@@ -107,6 +110,7 @@ export interface SendPipelineHostDependencies {
   claimOpenCodeDiagnosticRunToken?: SendPipelineHost['claimOpenCodeDiagnosticRunToken'];
   claimCodexDiagnosticRunToken?: SendPipelineHost['claimCodexDiagnosticRunToken'];
   refreshOpenCodeDiagnosticsState?: SendPipelineHost['refreshOpenCodeDiagnosticsState'];
+  refreshCodexDiagnosticsState?: SendPipelineHost['refreshCodexDiagnosticsState'];
   sendStreamMessage: SendPipelineHost['sendStreamMessage'];
   detachStream(sessionId: string | undefined): void;
   syncLatestUserMessageFromServer: SendPipelineHost['syncLatestUserMessageFromServer'];
@@ -151,6 +155,8 @@ export function createSendPipelineRuntimeHost(deps: SendPipelineHostDependencies
       deps.claimCodexDiagnosticRunToken?.(tabId, threadId),
     refreshOpenCodeDiagnosticsState: (tabId) =>
       deps.refreshOpenCodeDiagnosticsState?.(tabId),
+    refreshCodexDiagnosticsState: (tabId) =>
+      deps.refreshCodexDiagnosticsState?.(tabId),
   };
   const transportPort: SendPipelineTransportPort = {
     sendStreamMessage: (conversation, content, options) => deps.sendStreamMessage(conversation, content, options),
@@ -260,7 +266,13 @@ export class SendPipelineRuntime {
         logStage: localFinalization.logAssistantFinalizationStage,
       });
     } finally {
-      if (isOpenCode) this.host.refreshOpenCodeDiagnosticsState?.(preparedSend.tabId);
+      if (isOpenCode) {
+        this.safeTrace(() => this.host.refreshOpenCodeDiagnosticsState?.(preparedSend.tabId), undefined);
+      } else if ((preparedSend.conversation.backend ?? 'opencode') === 'codex') {
+        // Codex capture is turn-scoped; refresh codex chrome once the stream
+        // finalizes so the badge reflects the (now cleared) claim.
+        this.safeTrace(() => this.host.refreshCodexDiagnosticsState?.(preparedSend.tabId), undefined);
+      }
     }
     await this.sendQueuedFollowUp(preparedSend.tabId);
   }
@@ -286,12 +298,33 @@ export class SendPipelineRuntime {
   ): DiagnosticRunToken | undefined {
     const backend = preparedSend.conversation.backend ?? 'opencode';
     if (backend === 'codex') {
-      return this.host.claimCodexDiagnosticRunToken?.(preparedSend.tabId, backendSessionId);
+      return this.safeTrace(
+        () => this.host.claimCodexDiagnosticRunToken?.(preparedSend.tabId, backendSessionId),
+        undefined,
+      );
     }
     if (backend === 'opencode') {
-      return this.host.claimOpenCodeDiagnosticRunToken?.(preparedSend.tabId, backendSessionId);
+      return this.safeTrace(
+        () => this.host.claimOpenCodeDiagnosticRunToken?.(preparedSend.tabId, backendSessionId),
+        undefined,
+      );
     }
     return undefined;
+  }
+
+  /**
+   * Runs a trace-hook read/call inside a safe boundary so a throwing trace
+   * service can never interrupt the chat send path or header render. Returns
+   * the fallback on throw (and logs once) so observable behavior is unchanged
+   * when the trace service is healthy.
+   */
+  private safeTrace<T>(run: () => T, fallback: T): T {
+    try {
+      return run();
+    } catch {
+      logger.warn('trace hook threw; falling back without trace data');
+      return fallback;
+    }
   }
 
   private createStreamingExecution(
@@ -312,7 +345,17 @@ export class SendPipelineRuntime {
     const backendSessionId = getConversationBackendSessionId(preparedSend.conversation);
     const diagnosticRunToken = this.claimDiagnosticRunToken(preparedSend, backendSessionId);
     if (diagnosticRunToken) {
-      this.host.refreshOpenCodeDiagnosticsState?.(preparedSend.tabId);
+      // Route the chrome refresh to the correct backend so a codex token
+      // refreshes codex state (not OpenCode state). Guarded so a throw in the
+      // header refresh cannot strand the send in a streaming state.
+      const backend = preparedSend.conversation.backend ?? 'opencode';
+      this.safeTrace(() => {
+        if (backend === 'codex') {
+          this.host.refreshCodexDiagnosticsState?.(preparedSend.tabId);
+        } else {
+          this.host.refreshOpenCodeDiagnosticsState?.(preparedSend.tabId);
+        }
+      }, undefined);
     }
     const stream = this.host.sendStreamMessage(preparedSend.conversation, content, {
       sessionId: backendSessionId,

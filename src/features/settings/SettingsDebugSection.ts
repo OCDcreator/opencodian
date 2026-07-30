@@ -205,11 +205,19 @@ export class SettingsDebugSection {
   }
 
   private createDebugTabShell(containerEl: HTMLElement, config: DebugTabShellConfig): HTMLElement {
+    const isCodexShell = config.id === 'codex';
     const shellEl = containerEl.createDiv({
       cls: `opencodian-debug-tab-shell opencodian-debug-tab-shell-${config.id}`,
       attr: {
-        'data-section-block': config.id,
-        'data-debug-tab-shell': 'true',
+        ...(isCodexShell
+          ? {
+            'data-codex-section-block': config.id,
+            'data-codex-debug-tab-shell': 'true',
+          }
+          : {
+            'data-section-block': config.id,
+            'data-debug-tab-shell': 'true',
+          }),
       },
     });
     const headerEl = shellEl.createDiv({ cls: 'opencodian-debug-tab-header' });
@@ -1314,9 +1322,10 @@ export class SettingsDebugSection {
   }
 
   private showActiveBlock(containerEl: HTMLElement, activeTabId: string): void {
-    containerEl.querySelectorAll('[data-section-block]').forEach((el) => {
+    containerEl.querySelectorAll('[data-section-block], [data-codex-section-block]').forEach((el) => {
       const blockEl = el as HTMLElement;
-      blockEl.style.display = blockEl.dataset.sectionBlock === activeTabId ? '' : 'none';
+      const blockId = blockEl.dataset.sectionBlock ?? blockEl.dataset.codexSectionBlock;
+      blockEl.style.display = blockId === activeTabId ? '' : 'none';
     });
   }
 

@@ -1,5 +1,7 @@
 # English Locale
 
+> 2026-07-30: Added the complete Codex diagnostics copy group: module description, capture/storage/channel labels, deep-capture content policy, smart/full export and flush/clear actions, recent-trace filters, and unavailable/success notices. The strings explicitly distinguish Codex traces from OpenCode and Claude Code diagnostics.
+
 > 2026-07-29: Added OpenCode session trace workbench, capture-menu and status strings.
 
 > **源码**: `src/i18n/locales/en.ts`

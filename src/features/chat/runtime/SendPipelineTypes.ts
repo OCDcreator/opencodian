@@ -102,6 +102,12 @@ export interface SendPipelineViewPort {
     threadId?: string,
   ): DiagnosticRunToken | undefined;
   refreshOpenCodeDiagnosticsState?(tabId: TabId | null): void;
+  /**
+   * Refreshes the Codex diagnostics chrome for the given tab. Codex capture
+   * claims must route here (not to {@link refreshOpenCodeDiagnosticsState})
+   * so the correct backend state is reflected after a token is claimed.
+   */
+  refreshCodexDiagnosticsState?(tabId: TabId | null): void;
 }
 
 export interface SendPipelineTransportPort {
@@ -205,6 +211,7 @@ export type SendPipelineExecutionHost =
     | 'claimOpenCodeDiagnosticRunToken'
     | 'claimCodexDiagnosticRunToken'
     | 'refreshOpenCodeDiagnosticsState'
+    | 'refreshCodexDiagnosticsState'
   >
   & Pick<SendPipelineTransportPort, 'sendStreamMessage'>
   & Pick<SendPipelineShellPort, 'createAssistantMessageElement'>;

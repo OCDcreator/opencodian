@@ -1,7 +1,7 @@
 # OpenCodianView
 
 > 2026-07-30: The OpenCode diagnostics header refresh seam accepts an explicit changed tab and updates DOM only when it is still the active tab.
-> 2026-07-30: Added Codex chat-side diagnostics entry points. The view implements the `ChatHeaderPresenter` host callbacks for Codex (`getCodexDiagnosticsState` / `showCodexDiagnostics` / `getActiveDiagnosticsTabId`) backed by `this.plugin.codexTraceService`: state derives capture armed/capturing + store degraded + current-session highest unread severity; the menu offers capture-next / cancel-capture / copy-session-diagnostics (`exportCodexConversationDiagnostics` flushes the ring buffer, builds a current-session smart report, copies to clipboard). Also exposes `claimCodexDiagnosticRunToken` / `cancelCodexDiagnosticCapture` to the send pipeline. All access is null-safe (service optional). OpenCode diagnostics behavior unchanged.
+> 2026-07-30: Codex chat-side diagnostics live in `CodexDiagnosticsHostAdapter`; `OpenCodianView` supplies only live-state/menu/notice host callbacks and delegates header state/menu, capture claim/cancel, and export there. The send-pipeline host preserves every diagnostic token in `options` for OpenCode compatibility and also forwards it at the backend-neutral request top level, which is the contract consumed by `CodexAdapter`. OpenCode diagnostics behavior is unchanged.
 
 > **源码**: `src/features/chat/OpenCodianView.ts`
 > **状态**: [REVIEW]

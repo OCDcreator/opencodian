@@ -259,4 +259,5 @@ describe('ConversationTabLifecycleRecoveryCoordinator', () => {
     expect(port.activateTab).toHaveBeenCalledWith(fallbackTab!.id);
     expect(port.createConversationInNewTab).not.toHaveBeenCalled();
   });
+
 });

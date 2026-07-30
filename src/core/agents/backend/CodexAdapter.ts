@@ -500,6 +500,11 @@ export class CodexAdapter
       // only local protocol that publishes authoritative context usage. The
       // SDK remains a compatibility fallback solely when negotiation fails.
       try {
+        // `wireBridge` belongs to the optional diagnostics port. Read it
+        // through the trace boundary as well: a defective getter must not
+        // prevent app-server startup or silently force ordinary chat onto the
+        // SDK fallback.
+        const wireBridge = this.trace((port) => port.wireBridge);
         const appServerClient = this.options.createAppServerClient
           ? this.options.createAppServerClient()
           : new CodexAppServerClient({
@@ -508,7 +513,7 @@ export class CodexAdapter
             // skills/agents resolve. Injected factories manage their own cwd.
             ...(this.options.workingDirectory ? { workingDirectory: this.options.workingDirectory } : {}),
             // Feed raw wire traffic into the trace port (no-op when absent).
-            ...(this.tracePort?.wireBridge ? { wireObserver: this.tracePort.wireBridge } : {}),
+            ...(wireBridge ? { wireObserver: wireBridge } : {}),
           });
         if (appServerClient) {
           this.appServerClient = appServerClient;
@@ -2367,6 +2372,15 @@ export class CodexAdapter
     controller?.abort();
     this.activeControllers.delete(logicalKey);
     const activeTurn = this.activeAppServerTurns.get(logicalKey);
+    if (activeTurn?.turnId) {
+      const activeContext = this.lastTurnContextBySession.get(logicalKey);
+      if (activeContext) {
+        // Clear before the awaited interrupt so a concurrent/re-entrant delete
+        // cannot finish the same trace turn twice.
+        this.lastTurnContextBySession.delete(logicalKey);
+        this.trace((port) => port.finishTurn(activeContext, 'incomplete', { reason: 'session_deleted' }));
+      }
+    }
     if (activeTurn?.turnId && this.appServerClient) {
       try {
         await this.appServerClient.interruptTurn(activeTurn.threadId, activeTurn.turnId);
@@ -2641,8 +2655,8 @@ export class CodexAdapter
     if (!this.tracePort) return undefined;
     try {
       return run(this.tracePort);
-    } catch (error) {
-      logger.warn('codex trace hook failed', { error: error instanceof Error ? error.message : String(error) });
+    } catch {
+      logger.warn('codex trace hook failed; continuing without trace data');
       return undefined;
     }
   }

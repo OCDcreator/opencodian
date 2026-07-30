@@ -343,10 +343,13 @@ export class ChatHeaderPresenter {
       if (this.diagnosticsBtnEl) {
         let state: string;
         if (isCodexDiagnostics) {
-          const tabId = this.host.getActiveDiagnosticsTabId?.();
-          state = (tabId && this.host.getCodexDiagnosticsState?.(tabId)) ?? 'normal';
+          const tabId = this.safeTrace(() => this.host.getActiveDiagnosticsTabId?.(), null);
+          state = this.safeTrace(
+            () => (tabId ? this.host.getCodexDiagnosticsState?.(tabId) : undefined) ?? 'normal',
+            'normal',
+          );
         } else {
-          state = this.host.getOpenCodeDiagnosticsState?.() ?? 'normal';
+          state = this.safeTrace(() => this.host.getOpenCodeDiagnosticsState?.() ?? 'normal', 'normal');
         }
         this.diagnosticsBtnEl.dataset.traceState = state;
       }
@@ -374,11 +377,28 @@ export class ChatHeaderPresenter {
 
   private routeDiagnosticsClick(event: MouseEvent): void {
     if (this.getActiveBackendKind() === 'codex' && this.host.showCodexDiagnostics) {
-      const tabId = this.host.getActiveDiagnosticsTabId?.();
-      if (tabId) this.host.showCodexDiagnostics?.(event, tabId);
+      const tabId = this.safeTrace(() => this.host.getActiveDiagnosticsTabId?.(), null);
+      if (tabId) {
+        this.safeTrace(() => this.host.showCodexDiagnostics?.(event, tabId), undefined);
+      }
       return;
     }
-    this.host.showOpenCodeDiagnostics?.(event);
+    this.safeTrace(() => this.host.showOpenCodeDiagnostics?.(event), undefined);
+  }
+
+  /**
+   * Runs a trace-hook read/call inside a safe boundary so a throwing trace
+   * service (getCaptureState/getStatus/resolveTraceId/listSummaries) cannot
+   * propagate into the header render or diagnostics click. Returns the
+   * fallback on throw; behavior is unchanged when the trace service is healthy.
+   */
+  private safeTrace<T>(run: () => T, fallback: T): T {
+    try {
+      return run();
+    } catch {
+      logger.warn('trace hook threw; falling back without trace data');
+      return fallback;
+    }
   }
 
   private buildStatusBadge(actionsEl: HTMLElement): void {

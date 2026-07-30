@@ -538,4 +538,12 @@ export interface CodexAppServerWireObserver {
     state: 'starting' | 'ws-url' | 'connected' | 'initialized' | 'closed' | 'error' | 'stopped';
     detail?: unknown;
   }): void;
+  /**
+   * Fired for each stdout/stderr chunk the spawned app-server process emits.
+   * Used by the trace bridge to record (and redact) service output before it
+   * is logged. Return `true` when the chunk was safely handled, or `false` to
+   * request the legacy stderr behavior (for example while trace is disabled).
+   * The transport catches exceptions and never propagates them into spawning.
+   */
+  onServiceOutput?(input: { stream: 'stdout' | 'stderr'; text: string }): boolean;
 }

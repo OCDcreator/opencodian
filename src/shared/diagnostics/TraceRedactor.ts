@@ -14,7 +14,13 @@ export interface TraceRedactorOptions {
   vaultPath?: string;
   diagnosticsPath?: string;
   temporaryPath?: string;
-  knownSecrets?: readonly string[];
+  /** A provider may supply a getter so changed credentials are never retained as a stale snapshot. */
+  knownSecrets?: readonly string[] | (() => readonly string[]);
+  /**
+   * Compatibility keeps the original OpenCode payload shape; hardened also
+   * redacts property keys, Error names, and stringified primitive values.
+   */
+  redactionMode?: 'compatibility' | 'hardened';
   maxStringBytes?: number;
   maxStackBytes?: number;
   maxServiceOutputBytes?: number;
@@ -55,6 +61,7 @@ export class TraceRedactor {
       maxServiceOutputBytes: options.maxServiceOutputBytes ?? 16 * 1024,
       maxArrayLength: options.maxArrayLength ?? 100,
       maxDepth: options.maxDepth ?? 8,
+      redactionMode: options.redactionMode ?? 'compatibility',
     };
   }
 
@@ -113,11 +120,15 @@ export class TraceRedactor {
       return { omitted: 'binary', bytes: buffer.byteLength, sha256: sha256(buffer) };
     }
     if (typeof value !== 'object') {
-      return String(value);
+      return this.options.redactionMode === 'hardened'
+        ? this.redactString(String(value), stats, kind)
+        : String(value);
     }
     if (value instanceof Error) {
       return {
-        name: value.name,
+        name: this.options.redactionMode === 'hardened'
+          ? this.redactString(String(value.name), stats, 'ordinary')
+          : value.name,
         message: this.redactString(value.message, stats, 'ordinary'),
         stack: value.stack
           ? this.redactString(value.stack, stats, 'stack')
@@ -142,14 +153,17 @@ export class TraceRedactor {
     }
     const output: Record<string, unknown> = {};
     for (const entryKey of this.safeEnumerableKeys(value)) {
+      const outputKey = this.options.redactionMode === 'hardened'
+        ? this.uniqueOutputKey(output, this.redactObjectKey(entryKey, stats))
+        : entryKey;
       let entryValue: unknown;
       try {
         entryValue = (value as Record<string, unknown>)[entryKey];
       } catch {
-        output[entryKey] = '[UNREADABLE]';
+        output[outputKey] = '[UNREADABLE]';
         continue;
       }
-      output[entryKey] = this.redactValue(entryValue, stats, seen, depth + 1, entryKey, kind);
+      output[outputKey] = this.redactValue(entryValue, stats, seen, depth + 1, entryKey, kind);
     }
     return output;
   }
@@ -157,10 +171,29 @@ export class TraceRedactor {
   private redactEnvironmentObject(value: object, stats: TraceRedactionStats): Record<string, string> {
     const output: Record<string, string> = {};
     for (const key of this.safeEnumerableKeys(value)) {
-      output[key] = '[REDACTED]';
+      const outputKey = this.options.redactionMode === 'hardened'
+        ? this.uniqueOutputKey(output, this.redactObjectKey(key, stats))
+        : key;
+      output[outputKey] = '[REDACTED]';
       stats.secretsRemoved += 1;
     }
     return output;
+  }
+
+  private redactObjectKey(key: string, stats: TraceRedactionStats): string {
+    const redacted = this.redactString(key, stats, 'ordinary');
+    return typeof redacted === 'string' ? redacted : '[REDACTED_KEY]';
+  }
+
+  private uniqueOutputKey(output: Record<string, unknown>, key: string): string {
+    if (!Object.prototype.hasOwnProperty.call(output, key)) return key;
+    let suffix = 1;
+    let candidate = `${key}#${suffix}`;
+    while (Object.prototype.hasOwnProperty.call(output, candidate)) {
+      suffix += 1;
+      candidate = `${key}#${suffix}`;
+    }
+    return candidate;
   }
 
   private safeEnumerableKeys(value: object): string[] {
@@ -201,7 +234,10 @@ export class TraceRedactor {
         stats.secretsRemoved += 1;
         return `${match.slice(0, match.indexOf(':') + 1)} [REDACTED]`;
       });
-    for (const secret of this.options.knownSecrets ?? []) {
+    const knownSecrets = typeof this.options.knownSecrets === 'function'
+      ? this.options.knownSecrets()
+      : this.options.knownSecrets ?? [];
+    for (const secret of knownSecrets) {
       if (secret.length >= 4 && value.includes(secret)) {
         stats.secretsRemoved += 1;
         value = value.split(secret).join('[REDACTED]');

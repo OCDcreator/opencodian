@@ -62,18 +62,29 @@ export class CodexSessionTraceService implements CodexTracePort {
   private readonly claimedByTab = new Map<string, CodexDiagnosticRunToken>();
   private readonly threadContextById = new Map<string, CodexTraceContext>();
   private readonly activeTurnsByThread = new Map<string, ActiveTurnState>();
+  /** Turn identities that have emitted their terminal event. */
+  private readonly finishedTurnKeys = new Set<string>();
 
   constructor(private readonly options: CodexSessionTraceServiceOptions) {
     const storageDirectory = options.settings().storageDirectory.trim();
     this.store = new TraceStore<CodexTraceEventV1>(
       storageDirectory || undefined,
       resolveDefaultTraceDirectory('codex'),
-      { bundlePrefix: 'codex-trace' },
+      // Codex has no `run.started` event — its run analog is `turn.started`.
+      // Inject the name so the store's runCount/deepCaptureCount counters
+      // reflect Codex turns instead of staying permanently zero.
+      {
+        bundlePrefix: 'codex-trace',
+        runStartEventName: 'turn.started',
+        disabled: !options.settings().enabled,
+        sanitizeExport: (content) => this.redactExportContent(content),
+      },
     );
     this.redactor = new TraceRedactor({
       vaultPath: options.vaultPath,
       diagnosticsPath: this.store.rootDirectory,
-      knownSecrets: options.knownSecrets?.(),
+      knownSecrets: options.knownSecrets,
+      redactionMode: 'hardened',
     });
     this.reportBuilder = new TraceReportBuilder<CodexTraceEventV1>(
       this.store,
@@ -106,6 +117,7 @@ export class CodexSessionTraceService implements CodexTracePort {
       conversationId: input.conversationId,
       tabId: input.tabId,
     };
+    if (!this.isEnabled()) return context;
     this.store.bindSession(input.threadId, context.traceId);
     this.threadContextById.set(input.threadId, context);
     this.emit(context, 'lifecycle', 'plugin', 'info', input.resumed || previousTraceId ? 'thread.resumed' : 'thread.bound', {
@@ -118,22 +130,43 @@ export class CodexSessionTraceService implements CodexTracePort {
 
   beginTurn(input: { threadId: string; turnId?: string; conversationId?: string; tabId?: string; model?: string; diagnosticRunToken?: CodexDiagnosticRunToken; payload?: unknown }): CodexTraceContext {
     const bound = this.threadContextById.get(input.threadId) ?? this.bindThread({ threadId: input.threadId, resumed: true, via: 'app-server' });
+    if (!this.isEnabled()) {
+      return {
+        ...bound,
+        conversationId: input.conversationId ?? bound.conversationId,
+        tabId: input.tabId ?? bound.tabId,
+        turnId: input.turnId,
+      };
+    }
     const token = input.diagnosticRunToken;
-    const deepCapture = Boolean(token && token.expiresAt > Date.now());
+    const deepCapture = this.isActiveDeepCaptureToken(token);
     const context: CodexTraceContext = {
       ...bound,
       conversationId: input.conversationId ?? bound.conversationId,
-      tabId: input.tabId ?? bound.tabId,
+      tabId: input.tabId ?? bound.tabId ?? token?.tabId,
       turnId: input.turnId,
       runId: deepCapture ? token?.runId : undefined,
       deepCapture,
     };
+    this.finishedTurnKeys.delete(this.turnKey(context));
     this.emit(context, 'lifecycle', 'plugin', 'info', 'turn.started', { model: input.model, deepCapture, ...(input.payload as Record<string, unknown> | undefined) });
     this.armTurnWatchdog(context);
+    // I5: the `turn/start` RPC is sent BEFORE beginTurn is called (the turnId
+    // is only known once startTurn returns), so that request/response lands
+    // only in the ring buffer. When a claimed deep-capture token is active,
+    // retroactively flush the ring buffer into this deep run so the most
+    // important prompt enters the capture instead of being lost.
+    if (deepCapture) {
+      this.flushRingBufferIntoRun(input.threadId, token!.runId, 'turn-start-deep', context);
+    }
     return context;
   }
 
   recordTurnNotification(context: CodexTraceContext, method: string, payload?: unknown): void {
+    if (!this.isEnabled()) {
+      this.clearTurnForContext(context);
+      return;
+    }
     this.resetTurnWatchdog(context.threadId);
     const turn = this.activeTurnsByThread.get(context.threadId ?? '');
     this.emit(context, 'stream-sync', 'app-server', 'debug', 'turn.notification', this.summarize(payload), { metrics: { bytes: byteLength(payload) } });
@@ -156,11 +189,18 @@ export class CodexSessionTraceService implements CodexTracePort {
   }
 
   recordServiceOutput(stream: 'stdout' | 'stderr', text: string): void {
-    const redacted = this.redactor.redact(text, 'service-output');
-    this.emit(this.runtimeContext(), 'service-output', 'cli', stream === 'stderr' ? 'warning' : 'debug', 'service.output', redacted.value, { metrics: this.redactionMetrics(redacted.stats) });
+    this.emit(this.runtimeContext(), 'service-output', 'cli', stream === 'stderr' ? 'warning' : 'debug', 'service.output', text);
+  }
+
+  shouldCaptureServiceOutput(): boolean {
+    return this.isEnabled();
   }
 
   recordWireEvent(record: CodexWireRecord): void {
+    if (!this.isEnabled()) {
+      this.clearActiveTurn(record.threadId);
+      return;
+    }
     this.ringBuffer.record(record.threadId, { recordedAt: Date.now(), record });
     if (record.kind === 'notification') this.resetTurnWatchdog(record.threadId);
     if (record.kind === 'connection' && (record.method === 'closed' || record.method === 'error')) {
@@ -168,10 +208,10 @@ export class CodexSessionTraceService implements CodexTracePort {
     }
     if (record.kind === 'response' && record.ok === false) {
       this.markAnomaly(this.contextForWire(record), 'wire.response_error', 'error', { requestId: record.requestId, error: record.payload });
-      this.flushRingBuffer(record.threadId, 'response-error');
+      if (record.threadId) this.flushRingBuffer(record.threadId, 'response-error');
     }
     const context = this.contextForWire(record);
-    const deep = Boolean(context.deepCapture);
+    const deep = this.isActiveDeepCaptureContext(context);
     const name = `wire.${record.kind}`;
     const envelope: Record<string, unknown> = {
       direction: record.direction,
@@ -188,13 +228,25 @@ export class CodexSessionTraceService implements CodexTracePort {
   }
 
   finishTurn(context: CodexTraceContext, state: TraceTerminalState, payload?: unknown): void {
-    const turn = this.activeTurnsByThread.get(context.threadId ?? '');
-    if (turn) {
-      turn.finished = true;
-      this.clearTurnWatchdog(turn);
-      this.activeTurnsByThread.delete(context.threadId ?? '');
+    if (!this.isEnabled()) {
+      this.clearTurnForContext(context);
+      return;
     }
-    this.emit(context, 'lifecycle', 'plugin', state === 'completed' ? 'info' : state === 'cancelled' ? 'info' : 'warning', 'turn.finished', { state, ...(payload as Record<string, unknown> | undefined) });
+    const threadId = context.threadId ?? '';
+    const deepCapture = this.isActiveDeepCaptureContext(context);
+    const turn = this.activeTurnsByThread.get(threadId);
+    if (turn && this.sameTurn(turn.context, context)) this.clearTurnForContext(context);
+    // I1 idempotency: once a turn has emitted `turn.finished`, subsequent
+    // calls (e.g. the adapter's explicit finishTurn after the auto-finish on
+    // `turn/completed`) still clear timers/claims and remove state, but MUST
+    // NOT emit a second `turn.finished` event — that would double-count runs /
+    // deep captures in the report and catalog.
+    const turnKey = this.turnKey(context);
+    if (this.finishedTurnKeys.has(turnKey)) {
+      return;
+    }
+    this.finishedTurnKeys.add(turnKey);
+    this.emit(context, 'lifecycle', 'plugin', state === 'completed' ? 'info' : state === 'cancelled' ? 'info' : 'warning', 'turn.finished', { state, ...(payload as Record<string, unknown> | undefined) }, { forceDeep: deepCapture });
     if (state === 'error' || state === 'incomplete') {
       this.flushRingBuffer(context.threadId, `turn-${state}`);
     }
@@ -205,6 +257,10 @@ export class CodexSessionTraceService implements CodexTracePort {
   }
 
   armDeepCapture(tabId: string, threadId?: string): CodexDiagnosticRunToken {
+    if (!this.isEnabled()) {
+      const armedAt = Date.now();
+      return { runId: randomUUID(), tabId, armedAt, expiresAt: armedAt };
+    }
     const token: CodexDiagnosticRunToken = { runId: randomUUID(), tabId, armedAt: Date.now(), expiresAt: Date.now() + ARM_TTL_MS };
     this.armedByTab.set(tabId, { token, threadId });
     this.emit(this.runtimeContext(), 'lifecycle', 'plugin', 'info', 'capture.armed', { tabId, threadId, expiresAt: new Date(token.expiresAt).toISOString() });
@@ -212,12 +268,17 @@ export class CodexSessionTraceService implements CodexTracePort {
   }
 
   cancelDeepCapture(tabId: string): boolean {
-    const existed = this.armedByTab.delete(tabId) || this.claimedByTab.delete(tabId);
+    const existed = this.clearCaptureForTab(tabId);
+    if (!this.isEnabled()) return existed;
     if (existed) this.emit(this.runtimeContext(), 'lifecycle', 'plugin', 'info', 'capture.cancelled', { tabId });
     return existed;
   }
 
   claimDeepCapture(tabId: string, threadId?: string): CodexDiagnosticRunToken | undefined {
+    if (!this.isEnabled()) {
+      this.clearCaptureForTab(tabId);
+      return undefined;
+    }
     const armed = this.armedByTab.get(tabId);
     if (!armed || armed.token.expiresAt <= Date.now()) return undefined;
     if (armed.threadId && threadId && armed.threadId !== threadId) return undefined;
@@ -228,20 +289,41 @@ export class CodexSessionTraceService implements CodexTracePort {
   }
 
   getCaptureState(tabId: string): 'off' | 'armed' | 'capturing' {
-    if (this.claimedByTab.has(tabId)) return 'capturing';
+    if (!this.isEnabled()) {
+      this.clearCaptureForTab(tabId);
+      return 'off';
+    }
+    const claimed = this.claimedByTab.get(tabId);
+    if (claimed) {
+      // I4: a claimed token must still honor its TTL; an expired claim is
+      // reaped here and reported as 'off' so the chrome does not show a
+      // stale 'capturing' state.
+      if (claimed.expiresAt > Date.now()) return 'capturing';
+      this.claimedByTab.delete(tabId);
+    }
     const armed = this.armedByTab.get(tabId);
     return armed && armed.token.expiresAt > Date.now() ? 'armed' : 'off';
   }
 
   flushRingBuffer(threadId: string | undefined, reason: string): void {
+    if (!this.isEnabled()) return;
+    this.flushRingBufferIntoRun(threadId, `retro-${randomUUID()}`, reason);
+  }
+
+  /**
+   * Drains the ring buffer for a thread and emits each entry as a deep
+   * `wire.retroactive` event bound to `runId`. Used both for ad-hoc flushes
+   * (manual export / error flush → synthetic retro run) and, when a claimed
+   * deep-capture token is active, to fold the already-seen `turn/start`
+   * request/response into the live deep run.
+   */
+  private flushRingBufferIntoRun(threadId: string | undefined, runId: string, reason: string, context = this.contextForThreadId(threadId)): void {
     const entries = this.ringBuffer.drain(threadId);
     if (entries.length === 0) return;
-    const retroRunId = `retro-${randomUUID()}`;
     const captureContent = this.options.settings().captureContent;
-    const context = this.contextForThreadId(threadId);
     for (const entry of entries) {
       const payload = captureContent ? entry.record.payload : this.summarize(entry.record.payload);
-      this.emit({ ...context, runId: retroRunId }, 'transport', 'app-server', 'info', 'wire.retroactive', { reason, recordedAt: new Date(entry.recordedAt).toISOString(), envelope: { direction: entry.record.direction, kind: entry.record.kind, method: entry.record.method, requestId: entry.record.requestId, bytes: entry.record.bytes }, payload }, { forceDeep: true, runId: retroRunId });
+      this.emit({ ...context, runId }, 'transport', 'app-server', 'info', 'wire.retroactive', { reason, recordedAt: new Date(entry.recordedAt).toISOString(), envelope: { direction: entry.record.direction, kind: entry.record.kind, method: entry.record.method, requestId: entry.record.requestId, bytes: entry.record.bytes }, payload }, { forceDeep: true, runId });
     }
   }
 
@@ -302,9 +384,45 @@ export class CodexSessionTraceService implements CodexTracePort {
     clearTimeout(turn.criticalTimer);
   }
 
+  private clearActiveTurn(threadId: string | undefined): void {
+    if (!threadId) return;
+    const turn = this.activeTurnsByThread.get(threadId);
+    if (turn) this.clearTurnForContext(turn.context);
+  }
+
+  private clearTurnForContext(context: CodexTraceContext): void {
+    const threadId = context.threadId ?? '';
+    const turn = this.activeTurnsByThread.get(threadId);
+    if (turn && this.sameTurn(turn.context, context)) {
+      turn.finished = true;
+      this.clearTurnWatchdog(turn);
+      this.activeTurnsByThread.delete(threadId);
+    }
+    if (context.tabId) {
+      const claimed = this.claimedByTab.get(context.tabId);
+      if (!claimed || !context.runId || claimed.runId === context.runId) this.claimedByTab.delete(context.tabId);
+    }
+  }
+
+  private sameTurn(left: CodexTraceContext, right: CodexTraceContext): boolean {
+    if (left === right) return true;
+    if (left.threadId !== right.threadId) return false;
+    if (left.turnId || right.turnId) return Boolean(left.turnId && right.turnId && left.turnId === right.turnId);
+    if (left.runId || right.runId) return Boolean(left.runId && right.runId && left.runId === right.runId);
+    return false;
+  }
+
+  private turnKey(context: CodexTraceContext): string {
+    return `${context.threadId ?? ''}:${context.turnId ?? context.runId ?? 'unidentified'}`;
+  }
+
   private onTurnSilent(threadId: string, level: 'warning' | 'critical'): void {
     const turn = this.activeTurnsByThread.get(threadId);
     if (!turn || turn.finished) return;
+    if (!this.isEnabled()) {
+      this.clearTurnForContext(turn.context);
+      return;
+    }
     const silentMs = level === 'warning' ? TURN_WARNING_MS : TURN_CRITICAL_MS;
     this.markAnomaly(turn.context, 'turn.stalled', level, { threadId, silentMs });
     if (level === 'warning' && !turn.flushedAtWarning) {
@@ -345,9 +463,10 @@ export class CodexSessionTraceService implements CodexTracePort {
     options?: { metrics?: Record<string, number>; forceDeep?: boolean; runId?: string },
   ): void {
     try {
-      if (!this.options.settings().enabled) return;
+      if (!this.isEnabled()) return;
+      this.store.enable();
       const redacted = payload === undefined ? undefined : this.redactor.redact(payload, channel === 'service-output' ? 'service-output' : 'ordinary');
-      const deep = Boolean(options?.forceDeep ?? context.deepCapture);
+      const deep = options?.forceDeep ?? this.isActiveDeepCaptureContext(context);
       const event: CodexTraceEventV1 = {
         schemaVersion: CODEX_TRACE_SCHEMA_VERSION,
         timestamp: new Date().toISOString(),
@@ -385,12 +504,49 @@ export class CodexSessionTraceService implements CodexTracePort {
       // Console failure is diagnostics-only.
     }
   }
+
+  private isEnabled(): boolean {
+    return this.options.settings().enabled;
+  }
+
+  private clearCaptureForTab(tabId: string): boolean {
+    const armed = this.armedByTab.delete(tabId);
+    const claimed = this.claimedByTab.delete(tabId);
+    return armed || claimed;
+  }
+
+  private isActiveDeepCaptureToken(token: CodexDiagnosticRunToken | undefined): boolean {
+    if (!token || token.expiresAt <= Date.now()) return false;
+    const claimed = this.claimedByTab.get(token.tabId);
+    return claimed?.runId === token.runId;
+  }
+
+  private isActiveDeepCaptureContext(context: CodexTraceContext): boolean {
+    if (!context.deepCapture || !context.tabId || !context.runId) return false;
+    const claimed = this.claimedByTab.get(context.tabId);
+    if (claimed?.runId === context.runId && claimed.expiresAt > Date.now()) return true;
+    if (claimed?.runId === context.runId) this.claimedByTab.delete(context.tabId);
+    context.deepCapture = false;
+    return false;
+  }
+
+  private redactExportContent(content: string): string {
+    return content.split('\n').map((line) => {
+      if (!line) return line;
+      try {
+        return JSON.stringify(this.redactor.redact(JSON.parse(line)).value);
+      } catch {
+        const redacted = this.redactor.redact(line).value;
+        return typeof redacted === 'string' ? redacted : JSON.stringify(redacted);
+      }
+    }).join('\n');
+  }
 }
 
 function byteLength(value: unknown): number {
   if (value === undefined) return 0;
   try {
-    return JSON.stringify(value)?.length ?? 0;
+    return Buffer.byteLength(JSON.stringify(value) ?? '', 'utf8');
   } catch {
     return 0;
   }

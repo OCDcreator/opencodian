@@ -76,6 +76,28 @@ describe('CodexAdapter trace instrumentation', () => {
     expect(tracePort.finishTurn).toHaveBeenCalledWith(expect.anything(), 'error', expect.objectContaining({ error: 'boom' }));
   });
 
+  it('finishes an active turn once as incomplete when deleteSession interrupts it despite a trace-hook fault', async () => {
+    const tracePort = createFakeTracePort();
+    tracePort.finishTurn.mockImplementation(() => {
+      throw new Error('trace finish unavailable');
+    });
+    const adapter = new CodexAdapter({ tracePort, approvalPolicy: 'never', createCodex: jest.fn().mockResolvedValue({}) });
+    await adapter.start();
+    const sessionId = await adapter.createSession();
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const consume = (async () => { for await (const chunk of adapter.sendMessage({ sessionId, content: 'hi' })) { void chunk; } })();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    await expect(adapter.deleteSession(sessionId)).resolves.toBeUndefined();
+    await expect(consume).resolves.toBeUndefined();
+
+    expect(mockClient.interruptTurn).toHaveBeenCalledWith('thread-1', 'turn-1');
+    expect(tracePort.finishTurn).toHaveBeenCalledTimes(1);
+    expect(tracePort.finishTurn).toHaveBeenCalledWith(expect.anything(), 'incomplete', { reason: 'session_deleted' });
+    await expect(adapter.getSession(sessionId)).resolves.toBeNull();
+    warn.mockRestore();
+  });
+
   it('works without a tracePort (no-op path unchanged)', async () => {
     const adapter = new CodexAdapter({ approvalPolicy: 'never', createCodex: jest.fn().mockResolvedValue({}) });
     await adapter.start();
@@ -84,5 +106,39 @@ describe('CodexAdapter trace instrumentation', () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
     notificationHandler?.({ method: 'turn/completed', params: { threadId: 'thread-1', turn: { id: 'turn-1', items: [] } } });
     await expect(consume).resolves.toBeUndefined();
+  });
+
+  it('keeps the app-server transport when a wire bridge getter throws', async () => {
+    const tracePort = createFakeTracePort();
+    Object.defineProperty(tracePort, 'wireBridge', {
+      configurable: true,
+      get: () => {
+        throw new Error('wire bridge unavailable');
+      },
+    });
+    const adapter = new CodexAdapter({ tracePort, approvalPolicy: 'never', createCodex: jest.fn().mockResolvedValue({}) });
+
+    await expect(adapter.start()).resolves.toBeUndefined();
+
+    expect(mockClient.start).toHaveBeenCalled();
+  });
+
+  it('continues an app-server send when beginTurn tracing throws', async () => {
+    const tracePort = createFakeTracePort();
+    tracePort.beginTurn.mockImplementation(() => {
+      throw new Error('sk-canary /vault/secret');
+    });
+    const adapter = new CodexAdapter({ tracePort, approvalPolicy: 'never', createCodex: jest.fn().mockResolvedValue({}) });
+    await adapter.start();
+    const sessionId = await adapter.createSession();
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const consume = (async () => { for await (const chunk of adapter.sendMessage({ sessionId, content: 'hi' })) { void chunk; } })();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    notificationHandler?.({ method: 'turn/completed', params: { threadId: 'thread-1', turn: { id: 'turn-1', items: [] } } });
+
+    await expect(consume).resolves.toBeUndefined();
+    const logged = warn.mock.calls.flat().map((item) => typeof item === 'string' ? item : JSON.stringify(item)).join(' ');
+    expect(logged).not.toContain('sk-canary');
+    expect(logged).not.toContain('/vault/');
   });
 });

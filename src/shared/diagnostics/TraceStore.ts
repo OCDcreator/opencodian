@@ -33,6 +33,15 @@ interface QueuedRecord<TEvent extends TraceEventBase> {
   bytes: number;
 }
 
+export interface TraceStoreOptions {
+  bundlePrefix?: string;
+  runStartEventName?: string;
+  /** Avoid all filesystem initialization until the owning diagnostics service is enabled. */
+  disabled?: boolean;
+  /** Final content scrub applied to every exported JSONL file. */
+  sanitizeExport?: (content: string) => string;
+}
+
 interface PersistedTraceIndex {
   sessions: Record<string, string>;
   summaries: Record<string, TraceSummary>;
@@ -42,6 +51,16 @@ export class TraceStore<TEvent extends TraceEventBase = TraceEventBase> {
   rootDirectory: string;
   private readonly requestedDirectory: string;
   private readonly bundlePrefix: string;
+  private readonly sanitizeExport: (content: string) => string;
+  private storageEnabled: boolean;
+  /**
+   * Event name that marks the start of a "run" for summary counters
+   * (`runCount` / `deepCaptureCount`). Defaults to `'run.started'` (the
+   * OpenCode lifecycle event). Backends whose run analog uses a different
+   * event name (e.g. Codex, which emits `turn.started`) inject it here so the
+   * summary counters do not stay permanently zero.
+   */
+  private readonly runStartEventName: string;
   private queue: QueuedRecord<TEvent>[] = [];
   private queueBytes = 0;
   private timer: ReturnType<typeof setTimeout> | null = null;
@@ -64,15 +83,26 @@ export class TraceStore<TEvent extends TraceEventBase = TraceEventBase> {
   constructor(
     customDirectory?: string,
     private readonly fallbackDirectory = DEFAULT_SHARED_TRACE_DIRECTORY,
-    options?: { bundlePrefix?: string },
+    options?: TraceStoreOptions,
   ) {
     this.bundlePrefix = options?.bundlePrefix ?? 'trace';
+    this.runStartEventName = options?.runStartEventName ?? 'run.started';
+    this.sanitizeExport = options?.sanitizeExport ?? ((content) => content);
+    this.storageEnabled = !options?.disabled;
     this.requestedDirectory = customDirectory?.trim() || this.fallbackDirectory;
     this.rootDirectory = this.requestedDirectory;
+    this.initialized = this.storageEnabled ? this.initialize() : Promise.resolve();
+  }
+
+  /** Starts persistence on the first enabled diagnostic event after an initially-disabled boot. */
+  enable(): void {
+    if (this.storageEnabled) return;
+    this.storageEnabled = true;
     this.initialized = this.initialize();
   }
 
   append(event: TEvent, deep = false): void {
+    if (!this.storageEnabled) return;
     let structuralEvent: TEvent;
     let json: string;
     let deepJson: string | undefined;
@@ -199,6 +229,7 @@ export class TraceStore<TEvent extends TraceEventBase = TraceEventBase> {
   }
 
   bindSession(sessionId: string, traceId: string): void {
+    if (!this.storageEnabled) return;
     this.index.sessions[sessionId] = traceId;
   }
 
@@ -293,6 +324,12 @@ export class TraceStore<TEvent extends TraceEventBase = TraceEventBase> {
   }
 
   async clear(): Promise<void> {
+    if (!this.storageEnabled) {
+      this.index = { sessions: {}, summaries: {} };
+      this.memoryEvents = [];
+      this.approximateBytes = 0;
+      return;
+    }
     await this.flush();
     this.index = { sessions: {}, summaries: {} };
     this.memoryEvents = [];
@@ -347,7 +384,7 @@ export class TraceStore<TEvent extends TraceEventBase = TraceEventBase> {
 
   private async exportSanitizedFile(source: string, target: string): Promise<void> {
     const content = await fs.readFile(source, 'utf8');
-    await fs.writeFile(target, sanitizeDiagnosticReport(content), {
+    await fs.writeFile(target, sanitizeDiagnosticReport(this.sanitizeExport(content)), {
       encoding: 'utf8',
       mode: 0o600,
     });
@@ -466,7 +503,7 @@ export class TraceStore<TEvent extends TraceEventBase = TraceEventBase> {
             ? previous.lastUpdatedAt
             : event.timestamp,
           eventCount: (previous?.eventCount ?? 0) + 1,
-          runCount: (previous?.runCount ?? 0) + (event.name === 'run.started' ? 1 : 0),
+          runCount: (previous?.runCount ?? 0) + (event.name === this.runStartEventName ? 1 : 0),
           highestSeverity: !previous
             || severityOrder.indexOf(event.severity) > severityOrder.indexOf(previous.highestSeverity)
             ? event.severity
@@ -476,7 +513,7 @@ export class TraceStore<TEvent extends TraceEventBase = TraceEventBase> {
             : previous?.highestUnreadSeverity,
           unreadAnomalyCount: (previous?.unreadAnomalyCount ?? 0) + (isAnomaly ? 1 : 0),
           deepCaptureCount: (previous?.deepCaptureCount ?? 0)
-            + (event.payloadRef?.kind === 'deep' && event.name === 'run.started' ? 1 : 0),
+            + (event.payloadRef?.kind === 'deep' && event.name === this.runStartEventName ? 1 : 0),
         };
       }
     }
@@ -560,7 +597,7 @@ export class TraceStore<TEvent extends TraceEventBase = TraceEventBase> {
       sessionId: event.sessionId ?? previous?.sessionId,
       lastUpdatedAt: event.timestamp,
       eventCount: (previous?.eventCount ?? 0) + 1,
-      runCount: (previous?.runCount ?? 0) + (event.name === 'run.started' ? 1 : 0),
+      runCount: (previous?.runCount ?? 0) + (event.name === this.runStartEventName ? 1 : 0),
       highestSeverity: !previous || severityOrder.indexOf(event.severity) > severityOrder.indexOf(previous.highestSeverity)
         ? event.severity
         : previous.highestSeverity,
@@ -568,7 +605,7 @@ export class TraceStore<TEvent extends TraceEventBase = TraceEventBase> {
         ? this.higherSeverity(event.severity, previous?.highestUnreadSeverity)
         : previous?.highestUnreadSeverity,
       unreadAnomalyCount: (previous?.unreadAnomalyCount ?? 0) + (isAnomaly ? 1 : 0),
-      deepCaptureCount: (previous?.deepCaptureCount ?? 0) + (deep && event.name === 'run.started' ? 1 : 0),
+      deepCaptureCount: (previous?.deepCaptureCount ?? 0) + (deep && event.name === this.runStartEventName ? 1 : 0),
     };
   }
 

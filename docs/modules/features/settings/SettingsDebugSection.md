@@ -2,6 +2,7 @@
 
 > 2026-07-29: OpenCode diagnostics now includes status, settings, channels, recent traces, smart copy, full export, delete and confirmed clear.
 > 2026-07-30: Added a Codex diagnostics tab block mirroring the OpenCode block — status (capture enabled/disabled, storage mode, trace count, size, last error), enabled toggle, standard/full preset, five channel checkboxes (`CODEX_TRACE_CHANNEL_IDS`), custom storage directory, smart copy, full export, recent traces list with per-trace smart copy / delete, and double-confirm clear. Reads `backendSettings.codex.sessionTrace` and `this.plugin.codexTraceService` (may be undefined; all controls null-safe).
+> 2026-07-30: The Codex shell uses dedicated `data-codex-section-block` / `data-codex-debug-tab-shell` compatibility markers so legacy `[data-section-block]` and `[data-debug-tab-shell="true"]` consumers retain their four-source contract. `showActiveBlock()` selects both marker families, preserving normal Codex tab switching while the shared shell class, header, body and visual layout remain unchanged.
 
 > **源码**: `src/features/settings/SettingsDebugSection.ts`
 > **状态**: [REVIEW]

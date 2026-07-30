@@ -1,7 +1,7 @@
 # Plugin Entry Point (main.ts)
 
 > 2026-07-29: Bootstrap constructs and injects `OpenCodeSessionTraceService`; unload flushes it independently.
-> 2026-07-30: Bootstrap additionally constructs `CodexSessionTraceService` (default-on, reads `backendSettings.codex.sessionTrace`), exposes it as `this.codexTraceService`, injects the service itself as `codexTracePort` into `wireHiddenAdapters()` so the Codex adapter/transport can emit session/turn/wire trace events, and flushes it independently in `onunload`. The OpenCode-side behavior is unchanged.
+> 2026-07-30: Bootstrap additionally constructs `CodexSessionTraceService` (default-on, reads `backendSettings.codex.sessionTrace`), exposes it as `this.codexTraceService`, injects the service itself as `codexTracePort` into `wireHiddenAdapters()` so the Codex adapter/transport can emit session/turn/wire trace events, and flushes it independently in `onunload`. Codex trace flush failures only emit a generic warning so rejected errors cannot leak secrets or local paths; the OpenCode-side behavior is unchanged.
 
 > **源码**: `src/main.ts`
 > **状态**: [REVIEW]

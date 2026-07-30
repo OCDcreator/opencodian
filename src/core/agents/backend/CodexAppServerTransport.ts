@@ -92,8 +92,19 @@ export class CodexAppServerTransport {
   private notifyObserver(notify: () => void): void {
     try {
       notify();
-    } catch (error) {
-      logger.warn('wire observer threw', { error: error instanceof Error ? error.message : String(error) });
+    } catch {
+      // Observer errors may include wire data, local paths, or credentials.
+      logger.warn('wire observer threw');
+    }
+  }
+
+  private notifyServiceOutput(input: { stream: 'stdout' | 'stderr'; text: string }): 'handled' | 'declined' | 'failed' {
+    try {
+      return this.wireObserver?.onServiceOutput?.(input) ? 'handled' : 'declined';
+    } catch {
+      // Service output may contain credentials, so observer failures never log the raw exception or chunk.
+      logger.warn('wire service-output observer threw');
+      return 'failed';
     }
   }
 
@@ -198,13 +209,32 @@ export class CodexAppServerTransport {
       // so we must scan both streams to find the WebSocket address.
       proc.stdout?.on('data', onData);
       proc.stderr?.on('data', onData);
-      proc.stderr?.on('data', (chunk: Buffer) => {
-        const text = chunk.toString();
-        // Only log actual errors, not routine warnings
-        if (text.includes('Error:')) {
-          logger.warn('App-server stderr', { text: text.trim() });
-        }
-      });
+      let hasServiceOutputObserver = false;
+      try {
+        hasServiceOutputObserver = typeof this.wireObserver?.onServiceOutput === 'function';
+      } catch {
+        // Accessing an observer property is untrusted code too.
+        logger.warn('wire service-output observer threw');
+        hasServiceOutputObserver = true;
+      }
+      if (hasServiceOutputObserver) {
+        proc.stderr?.on('data', (chunk: Buffer) => {
+          const text = chunk.toString();
+          const outcome = this.notifyServiceOutput({ stream: 'stderr', text });
+          if (!text.includes('Error:')) return;
+          if (outcome === 'declined') logger.warn('App-server stderr', { text: text.trim() });
+          else logger.warn('App-server stderr received (see trace store for redacted text)');
+        });
+        proc.stdout?.on('data', (chunk: Buffer) => {
+          this.notifyServiceOutput({ stream: 'stdout', text: chunk.toString() });
+        });
+      } else {
+        // Preserve legacy no-observer behavior for existing callers.
+        proc.stderr?.on('data', (chunk: Buffer) => {
+          const text = chunk.toString();
+          if (text.includes('Error:')) logger.warn('App-server stderr', { text: text.trim() });
+        });
+      }
 
       proc.on('error', (err) => {
         clearTimeout(timeout);
@@ -385,8 +415,17 @@ export class CodexAppServerTransport {
 
       if (timeoutMs !== undefined && timeoutMs > 0) {
         timer = setTimeout(() => {
-      this.pending.delete(id as number);
-          reject(new Error(`JSON-RPC request timeout for ${method}`));
+          const entry = this.pending.get(id);
+          if (!entry) return;
+          this.pending.delete(id);
+          const error = `JSON-RPC request timeout for ${method}`;
+          this.notifyObserver(() => this.wireObserver?.onResponse?.({
+            id,
+            ok: false,
+            durationMs: Date.now() - entry.sentAt,
+            error,
+          }));
+          entry.reject(new Error(error));
         }, timeoutMs);
       }
 

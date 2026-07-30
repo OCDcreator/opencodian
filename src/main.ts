@@ -255,8 +255,8 @@ export default class OpenCodianPlugin extends Plugin {
         vaultPath: getVaultBasePath(this.app) ?? undefined,
         buildIdentity: () => this.getDebugBuildIdentityText(),
         knownSecrets: () => [
-          this.settings.server.auth.password,
-          this.settings.server.auth.token,
+          this.settings.server.auth.password, this.settings.server.auth.token,
+          this.settings.backendSettings.codex.apiKey,
         ].filter(Boolean),
         runtimeMetadata: () => ({
           serverMode: this.settings.server.mode,
@@ -570,8 +570,8 @@ export default class OpenCodianPlugin extends Plugin {
     void this.openCodeTraceService?.dispose().catch((error) => {
       logger.warn('Failed to flush OpenCode trace service during unload:', error);
     });
-    void this.codexTraceService?.dispose().catch((error) => {
-      logger.warn('Failed to flush Codex trace service during unload:', error);
+    void this.codexTraceService?.dispose().catch(() => {
+      logger.warn('Failed to flush Codex trace service during unload');
     });
     setAgentServiceRegistry(null);
     this.getSettingsRuntimeCoordinator().clearChatAppearanceSaveTimer();

@@ -2,6 +2,8 @@
 
 > 2026-07-30: Runtime view ports include per-tab OpenCode diagnostic-token claim and header-refresh seams.
 
+> 2026-07-30: The backend-neutral `DiagnosticRunToken` shape now carries Codex deep-capture claims alongside OpenCode. `SendPipelineViewPort` exposes optional `claimCodexDiagnosticRunToken()` and `refreshCodexDiagnosticsState()`, and execution-host picks include both backend seams.
+
 > **源码**: `src/features/chat/runtime/SendPipelineTypes.ts`
 > **状态**: [REVIEW]
 

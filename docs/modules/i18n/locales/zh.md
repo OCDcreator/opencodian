@@ -1,5 +1,7 @@
 # Chinese Locale
 
+> 2026-07-30: 新增完整 Codex 诊断文案组：模块说明、捕获/存储/通道标签、深度捕获正文策略、智能/完整导出与刷新/清空动作、最近轨迹筛选，以及不可用/成功提示；文案明确 Codex 轨迹与 OpenCode、Claude Code 诊断相互区分。
+
 > 2026-07-29: Added Chinese OpenCode session trace workbench, capture-menu and status strings.
 
 > **源码**: `src/i18n/locales/zh.ts`
