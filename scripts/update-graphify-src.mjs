@@ -1,6 +1,9 @@
 import { spawnSync } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, rmSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { execFileSync } from 'node:child_process';
+
+import { buildInputManifest } from './graph-input-digest.mjs';
 
 const repoRoot = process.cwd();
 const sourceRoot = join(repoRoot, 'src');
@@ -44,6 +47,38 @@ function assertScopedOutputExists(path) {
   }
 }
 
+function resolveGraphifyVersion() {
+  // Best-effort: read the installed graphify package version if discoverable.
+  try {
+    const probe = spawnSync('python3', ['-c', 'import graphify; print(getattr(graphify, "__version__", "unknown"))'], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+    });
+    if (probe.status === 0 && probe.stdout.trim()) {
+      return probe.stdout.trim();
+    }
+  } catch {
+    // fall through
+  }
+  return 'unknown';
+}
+
+function writeInputManifest() {
+  // Phase 2 Task 7: write a deterministic graph-input manifest so the freshness
+  // gate can compare content digests instead of commit timestamps/mtimes.
+  let headSha = null;
+  try {
+    headSha = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repoRoot, encoding: 'utf8' }).trim();
+  } catch {
+    // ignore
+  }
+  const manifest = buildInputManifest(repoRoot, {
+    graphifyVersion: resolveGraphifyVersion(),
+    headSha,
+  });
+  writeFileSync(join(committedOutputDir, 'input-manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
+}
+
 function syncCommittedArtifacts() {
   mkdirSync(committedOutputDir, { recursive: true });
 
@@ -55,6 +90,42 @@ function syncCommittedArtifacts() {
       force: true,
     });
   }
+
+  // Write the input manifest AFTER copying artifacts but BEFORE patching the
+  // report freshness block (the block reads the manifest digest).
+  writeInputManifest();
+
+  // Patch the report freshness block to record the content digest (informational
+  // HEAD SHA + Source digest), replacing the stale "Built from commit" signal.
+  patchReportFreshnessBlock();
+}
+
+function patchReportFreshnessBlock() {
+  const reportPath = join(committedOutputDir, 'GRAPH_REPORT.md');
+  if (!existsSync(reportPath)) return;
+  const manifestPath = join(committedOutputDir, 'input-manifest.json');
+  if (!existsSync(manifestPath)) return;
+  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+  let text = readFileSync(reportPath, 'utf8');
+  const headSha = manifest.headShaAtGeneration ?? 'unknown';
+  const digest = manifest.digest;
+  const block = [
+    '## Graph Freshness',
+    `- Source digest: \`${digest}\``,
+    `- Generated at: ${manifest.generatedAt}`,
+    `- HEAD at generation: \`${headSha}\` (informational only; the content digest is the correctness signal)`,
+    `- Run \`npm run graphify:update:src\` after \`src/\`, tsconfig, package/lock, ignore rules, wrapper or Graphify version changes.`,
+    '',
+  ].join('\n');
+  // Replace an existing freshness block, or insert after the first heading.
+  const freshnessMatch = text.match(/## Graph Freshness[\s\S]*?(?=\n## |\n$|$)/);
+  if (freshnessMatch) {
+    text = text.replace(freshnessMatch[0], block.trimEnd());
+  } else {
+    const firstHeadingEnd = text.indexOf('\n', text.indexOf('#'));
+    text = firstHeadingEnd >= 0 ? `${text.slice(0, firstHeadingEnd + 1)}\n${block}${text.slice(firstHeadingEnd + 1)}` : `${text}\n${block}`;
+  }
+  writeFileSync(reportPath, text);
 }
 
 function removeScopedOutput() {
@@ -96,6 +167,8 @@ if (update.status !== 0) {
   process.stderr.write('graphify exited non-zero after writing required report/json artifacts; continuing without HTML viz.\n');
 }
 
+// syncCommittedArtifacts copies artifacts, writes the manifest, then patches
+// the report (in that order, since the patch reads the manifest).
 syncCommittedArtifacts();
 removeScopedOutput();
 
