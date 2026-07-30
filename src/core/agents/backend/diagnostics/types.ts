@@ -1,4 +1,5 @@
 import type { TraceEventBase, TraceTerminalState } from '../../../../shared/diagnostics';
+import type { CodexAppServerWireObserver } from '../CodexAppServerClientTypes';
 
 export const CODEX_TRACE_SCHEMA_VERSION = 1 as const;
 export const CODEX_TRACE_CHANNEL_IDS = ['lifecycle', 'transport', 'stream-sync', 'tool-interaction', 'service-output'] as const;
@@ -41,6 +42,14 @@ export interface CodexWireRecord {
   payload?: unknown;
 }
 export interface CodexTracePort {
+  /**
+   * Duck-typed wire observer fed into `CodexAppServerTransport`. When a
+   * `CodexSessionTraceService` is the port, this is its public
+   * `wireBridge: CodexWireTraceBridge`, which structurally satisfies
+   * `CodexAppServerWireObserver` (all six methods). Optional and
+   * optional-chained by the adapter so a port without one is a no-op.
+   */
+  readonly wireBridge?: CodexAppServerWireObserver;
   bindThread(input: { threadId: string; provisionalId?: string; conversationId?: string; tabId?: string; resumed: boolean; via: 'app-server' | 'sdk'; payload?: unknown }): CodexTraceContext;
   beginTurn(input: { threadId: string; turnId?: string; conversationId?: string; tabId?: string; model?: string; diagnosticRunToken?: CodexDiagnosticRunToken; payload?: unknown }): CodexTraceContext;
   recordTurnNotification(context: CodexTraceContext, method: string, payload?: unknown): void;

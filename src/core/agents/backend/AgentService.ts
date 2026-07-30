@@ -107,6 +107,14 @@ export interface AgentChatSendRequest {
   readonly content: string;
   readonly images?: ImageAttachment[];
   readonly options?: Record<string, unknown>;
+  /**
+   * Optional diagnostic deep-capture token armed by the UI. Structurally
+   * aligned with `CodexDiagnosticRunToken` but inlined here so the core
+   * AgentService contract does not gain a reverse dependency on the
+   * diagnostics package. Consumed only by backends that opt in (e.g. the
+   * Codex adapter's trace port); absent for normal sends.
+   */
+  readonly diagnosticRunToken?: { runId: string; tabId: string; armedAt: number; expiresAt: number };
 }
 
 /** Chat: send a message and cancel active streams. */

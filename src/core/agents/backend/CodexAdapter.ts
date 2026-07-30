@@ -71,6 +71,7 @@ import {
 } from './CodexAppServerStreamMapper';
 import { type CodexCliResolution,getCodexCliErrorMessage } from './CodexCliResolver';
 import { CodexStreamNormalizer } from './CodexStreamNormalizer';
+import type { CodexTraceContext, CodexTracePort } from './diagnostics/types';
 
 const logger = createLogger('CodexAdapter');
 
@@ -146,6 +147,14 @@ export interface CodexAdapterOptions {
   createCodex?: CodexFactory;
   /** DI seam: provide or deliberately disable the local app-server client. */
   createAppServerClient?: CodexAppServerClientFactory;
+  /**
+   * Optional trace port for lifecycle/wire instrumentation. When present the
+   * adapter records thread-binding, turn begin/finish, notifications,
+   * approvals, and status changes through it (each guarded by `trace()` so a
+   * trace hook can never break the chat path). When absent, behavior is
+   * byte-for-byte identical to the un-instrumented adapter.
+   */
+  tracePort?: CodexTracePort;
 }
 
 export interface CodexModelSummary {
@@ -274,6 +283,13 @@ function isRecordLike(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+/** Best-effort threadId extraction from a server-request approval payload. */
+function readThreadIdFromParams(params: unknown): string | undefined {
+  if (!isRecordLike(params)) return undefined;
+  const candidate = params.threadId;
+  return typeof candidate === 'string' ? candidate : undefined;
+}
+
 /** Read a command string from an approval param that may be a string, array, or object. */
 function readCommandString(command: unknown): string {
   if (typeof command === 'string') {
@@ -356,6 +372,13 @@ export class CodexAdapter
   private threadAlias = new Map<string, string>(); // threadId → provisionalId
   private activeControllers = new Map<string, AbortController>();
   private activeAppServerTurns = new Map<string, { threadId: string; turnId: string | null }>();
+  /**
+   * Most recent trace turn context per session (provisionalId-keyed), captured
+   * at `beginTurn` so `cancelStream`/`deleteSession` can finish the turn on the
+   * trace port without the adapter holding the service's internal thread map.
+   * Cleared alongside `activeAppServerTurns`.
+   */
+  private lastTurnContextBySession = new Map<string, CodexTraceContext>();
   private appServerContextSnapshots = new Map<string, ContextUsageSnapshot>();
   /** Independent from per-turn stream subscriptions; one foreground compaction per logical session. */
   private pendingForegroundCompactions = new Map<string, PendingForegroundCompaction>();
@@ -427,9 +450,12 @@ export class CodexAdapter
    * toolbar effort selector without re-creating the adapter.
    */
   private options: CodexAdapterOptions;
+  /** Optional trace port; every instrumentation point optional-chains through `trace()`. */
+  private readonly tracePort?: CodexTracePort;
 
   constructor(options: CodexAdapterOptions = {}) {
     this.options = { ...options };
+    this.tracePort = options.tracePort;
   }
 
   // -------------------------------------------------------------------------
@@ -481,6 +507,8 @@ export class CodexAdapter
             // Spawn the owned app-server inside the vault so project-scoped
             // skills/agents resolve. Injected factories manage their own cwd.
             ...(this.options.workingDirectory ? { workingDirectory: this.options.workingDirectory } : {}),
+            // Feed raw wire traffic into the trace port (no-op when absent).
+            ...(this.tracePort?.wireBridge ? { wireObserver: this.tracePort.wireBridge } : {}),
           });
         if (appServerClient) {
           this.appServerClient = appServerClient;
@@ -1298,10 +1326,13 @@ export class CodexAdapter
    */
   private async handleApproval(kind: CodexApprovalKind, params: unknown): Promise<{ decision: string }> {
     const collect = this.approvalHost.collectApproval;
+    const threadId = readThreadIdFromParams(params);
     if (!collect) {
+      this.trace((port) => port.recordToolInteraction(undefined, 'approval.decision', { kind, decision: 'denied', reason: 'no_host', threadId }));
       return { decision: 'denied' };
     }
     const request = this.normalizeApprovalRequest(kind, params);
+    this.trace((port) => port.recordToolInteraction(undefined, 'approval.request', { kind, threadId, summary: request.summary }));
     let decision: CodexApprovalDecision | null;
     try {
       decision = await collect(request);
@@ -1310,11 +1341,14 @@ export class CodexAdapter
         kind,
         error: err instanceof Error ? err.message : String(err),
       });
+      this.trace((port) => port.recordToolInteraction(undefined, 'approval.decision', { kind, decision: 'denied', reason: 'host_threw', threadId }));
       return { decision: 'denied' };
     }
     if (!decision) {
+      this.trace((port) => port.recordToolInteraction(undefined, 'approval.decision', { kind, decision: 'denied', reason: 'host_cancelled', threadId }));
       return { decision: 'denied' };
     }
+    this.trace((port) => port.recordToolInteraction(undefined, 'approval.decision', { kind, decision: decision.decision, threadId }));
     return { decision: decision.decision };
   }
 
@@ -1496,7 +1530,7 @@ export class CodexAdapter
 
       for await (const event of streamed.events as AsyncIterable<ThreadEvent>) {
         if (event.type === 'thread.started') {
-          this.aliasSession(request.sessionId, event.thread_id);
+          this.aliasSession(request.sessionId, event.thread_id, { resumed: false, via: 'sdk' });
         }
 
         const chunks = normalizer.transformEvent(event);
@@ -1522,7 +1556,7 @@ export class CodexAdapter
    * silently falls through to SDK chat on a turn error: the same thread owns
    * messages, approvals, cancellation, and authoritative context snapshots.
    */
-  // eslint-disable-next-line complexity -- dense async-generator handling streaming + evidence lifecycle + error recovery in one cohesive method.
+  // eslint-disable-next-line complexity, max-lines-per-function -- dense async-generator handling streaming + evidence lifecycle + error recovery + trace instrumentation in one cohesive method.
   private async *sendMessageViaAppServer(request: AgentChatSendRequest): AsyncGenerator<StreamChunk> {
     const client = this.appServerClient;
     if (!client) {
@@ -1538,6 +1572,8 @@ export class CodexAdapter
     let subscription: { dispose(): void } | null = null;
     let ownedThreadId: string | null = null;
     let ownedTurnId: string | null = null;
+    /** Trace turn context captured at `beginTurn`; shared with the subscription callback and completion/catch paths. */
+    let turnContext: CodexTraceContext | undefined;
     const attempt = this.beginAppServerAttempt(request.sessionId);
     const sessionId = attempt.sessionId;
     const controller = new AbortController();
@@ -1569,6 +1605,13 @@ export class CodexAdapter
       }
       const error = readAppServerTurnError(completedTurn.error);
       this.applyTurnCompletionEvidence(sessionId, error, (msg: string) => enqueue({ type: 'error', content: msg }));
+      const ctx = turnContext;
+      if (ctx) {
+        this.trace((port) => port.finishTurn(ctx, error ? 'error' : 'completed', error ? { error } : undefined));
+      }
+      if (error) {
+        this.trace((port) => port.markAnomaly(ctx, 'turn.error_evidence', 'error', { error }));
+      }
       completed = true;
       const resolve = wake;
       wake = null;
@@ -1581,7 +1624,7 @@ export class CodexAdapter
     }, { once: true });
 
     try {
-      const thread = await this.resolveOrStartAppServerThread(attempt);
+      const { thread, resumed: usedResume } = await this.resolveOrStartAppServerThread(attempt);
       if (!thread) {
         if (this.isCurrentAppServerAttempt(attempt)) {
           yield { type: 'error', content: `Failed to resolve Codex session: ${request.sessionId}` };
@@ -1589,7 +1632,7 @@ export class CodexAdapter
         return;
       }
       if (!this.isCurrentAppServerAttempt(attempt)) return;
-      this.aliasSession(sessionId, thread.id);
+      this.aliasSession(sessionId, thread.id, { resumed: usedResume, via: 'app-server' });
       ownedThreadId = thread.id;
 
       subscription = client.subscribeToThreadNotifications(thread.id, (event) => {
@@ -1610,6 +1653,13 @@ export class CodexAdapter
             return;
           }
         }
+        // Record every notification on the trace port before mapping. The turn
+        // context is set right after startTurn returns; notifications that
+        // arrive earlier (rare) are skipped to avoid fabricating a context.
+        if (turnContext) {
+          const ctx = turnContext;
+          this.trace((port) => port.recordTurnNotification(ctx, event.method, event.params));
+        }
         const mapping = mapAppServerNotification({
           event,
           modelId: attempt.options.model ?? null,
@@ -1622,6 +1672,9 @@ export class CodexAdapter
         }
         for (const chunk of mapping.chunks) {
           enqueue(chunk);
+        }
+        if (mapping.chunks.length === 0 && !mapping.contextUsageSnapshot) {
+          this.trace((port) => port.recordStreamSync(turnContext, 'notification.no_chunks', 'debug', { method: event.method }));
         }
         if (event.method === 'turn/completed') {
           completeCurrentTurn(completedTurn ?? {});
@@ -1650,6 +1703,15 @@ export class CodexAdapter
       }
       this.activeAppServerTurns.set(sessionId, { threadId: thread.id, turnId: turn.id });
       ownedTurnId = turn.id;
+      turnContext = this.trace((port) => port.beginTurn({
+        threadId: thread.id,
+        turnId: turn.id,
+        model: attempt.options.model ?? undefined,
+        ...(request.diagnosticRunToken ? { diagnosticRunToken: request.diagnosticRunToken } : {}),
+      }));
+      if (turnContext) {
+        this.lastTurnContextBySession.set(sessionId, turnContext);
+      }
       for (const pendingTurnCompletion of pendingTurnCompletions) {
         completeCurrentTurn(pendingTurnCompletion);
       }
@@ -1684,8 +1746,14 @@ export class CodexAdapter
       }
     } catch (err) {
       if (this.isCurrentAppServerAttempt(attempt)) {
-        this.sessionEffectiveEvidence.set(sessionId, buildUniformEffectiveEvidence('failed', this.attemptWiringForSession(sessionId), err instanceof Error ? err.message : 'turn/stream failed'));
+        const message = err instanceof Error ? err.message : 'turn/stream failed';
+        const ctx = turnContext;
+        this.sessionEffectiveEvidence.set(sessionId, buildUniformEffectiveEvidence('failed', this.attemptWiringForSession(sessionId), message));
         this.sessionEffectiveSettings.set(sessionId, null);
+        if (ctx) {
+          this.trace((port) => port.finishTurn(ctx, 'error', { error: message }));
+        }
+        this.trace((port) => port.markAnomaly(ctx, 'turn.send_failed', 'error', { error: message }));
         yield { type: 'error', content: err instanceof Error ? err.message : String(err) };
       }
     } finally {
@@ -1696,6 +1764,11 @@ export class CodexAdapter
       const activeTurn = this.activeAppServerTurns.get(sessionId);
       if (activeTurn?.threadId === ownedThreadId && activeTurn.turnId === ownedTurnId) {
         this.activeAppServerTurns.delete(sessionId);
+      }
+      // Stale turn-context guard: only clear what THIS stream set, so a later
+      // attempt on the same session keeps its own context.
+      if (turnContext && this.lastTurnContextBySession.get(sessionId) === turnContext) {
+        this.lastTurnContextBySession.delete(sessionId);
       }
       if (tempDir) {
         this.safeRemoveTempDir(tempDir);
@@ -1712,15 +1785,16 @@ export class CodexAdapter
     );
   }
 
-  private async resolveOrStartAppServerThread(attempt: AppServerAttempt): Promise<AppServerThread | null> {
+  private async resolveOrStartAppServerThread(attempt: AppServerAttempt): Promise<{ thread: AppServerThread | null; resumed: boolean }> {
     const client = this.appServerClient;
     if (!client) {
-      return null;
+      return { thread: null, resumed: false };
     }
     const { sessionId } = attempt;
     const entry = this.resolveSession(sessionId);
     const knownThreadId = entry?.threadId
       ?? (!this.isProvisionalId(sessionId) ? sessionId : null);
+    const resumed = Boolean(knownThreadId);
     const options = this.buildAppServerThreadOptions(attempt.options);
     let thread: AppServerThread | null;
     try {
@@ -1737,11 +1811,11 @@ export class CodexAdapter
       throw err;
     }
     // Check epoch: if stop/deleteSession invalidated this attempt, abort silently.
-    if (!this.isCurrentAppServerAttempt(attempt)) return null;
+    if (!this.isCurrentAppServerAttempt(attempt)) return { thread: null, resumed };
     if (!thread?.id) {
       // Request failed (start/resume returned null after an internal error).
       this.sessionEffectiveEvidence.set(sessionId, buildUniformEffectiveEvidence('failed', this.attemptWiringForSession(sessionId), 'thread start/resume request failed'));
-      return null;
+      return { thread: null, resumed };
     }
     // Success: rebuild per-field evidence from THIS response only, with
     // independent application (request wiring) and runtime (response echo)
@@ -1760,7 +1834,7 @@ export class CodexAdapter
     } else {
       this.sessions.set(provisionalId, { provisionalId, threadId: thread.id, thread: null });
     }
-    return thread;
+    return { thread, resumed };
   }
 
   private buildAppServerThreadOptions(opts: AttemptOptions): AppServerThreadStartOptions {
@@ -1884,6 +1958,10 @@ export class CodexAdapter
     const logicalKey = this.logicalSessionKey(sessionId);
     const activeTurn = this.activeAppServerTurns.get(logicalKey);
     if (activeTurn?.turnId && this.appServerClient) {
+      const activeContext = this.lastTurnContextBySession.get(logicalKey);
+      if (activeContext) {
+        this.trace((port) => port.finishTurn(activeContext, 'cancelled', { reason: 'user_cancel' }));
+      }
       void this.appServerClient.interruptTurn(activeTurn.threadId, activeTurn.turnId);
     }
     const controller = this.activeControllers.get(logicalKey);
@@ -2273,6 +2351,7 @@ export class CodexAdapter
       threadId: null,
       thread: null,
     });
+    this.trace((port) => port.recordLifecycle('session.created', { provisionalId }));
     return provisionalId;
   }
 
@@ -2296,6 +2375,7 @@ export class CodexAdapter
       }
     }
     this.activeAppServerTurns.delete(logicalKey);
+    this.lastTurnContextBySession.delete(logicalKey);
     if (entry?.threadId) {
       this.threadAlias.delete(entry.threadId);
     }
@@ -2308,6 +2388,7 @@ export class CodexAdapter
       this.sessions.delete(sessionId);
       this.sessionEffectiveEvidence.delete(sessionId);
       this.sessionEffectiveSettings.delete(sessionId);
+      this.lastTurnContextBySession.delete(sessionId);
     }
     // Evict client readback cache + context snapshot by thread id (full chain).
     if (threadId) {
@@ -2550,12 +2631,34 @@ export class CodexAdapter
     return null;
   }
 
-  private aliasSession(provisionalId: string, threadId: string): void {
+  /**
+   * Defensive wrapper for every trace-port call. Returns `undefined` (and logs
+   * a warning) when the port is absent or a hook throws, so a trace failure can
+   * NEVER break the chat/stream/approval path. Callers that consume a returned
+   * context must tolerate `undefined`.
+   */
+  private trace<T>(run: (port: CodexTracePort) => T): T | undefined {
+    if (!this.tracePort) return undefined;
+    try {
+      return run(this.tracePort);
+    } catch (error) {
+      logger.warn('codex trace hook failed', { error: error instanceof Error ? error.message : String(error) });
+      return undefined;
+    }
+  }
+
+  private aliasSession(provisionalId: string, threadId: string, meta?: { resumed?: boolean; via?: 'app-server' | 'sdk' }): void {
     const entry = this.sessions.get(provisionalId);
     if (entry) {
       entry.threadId = threadId;
     }
     this.threadAlias.set(threadId, provisionalId);
+    this.trace((port) => port.bindThread({
+      threadId,
+      provisionalId,
+      resumed: meta?.resumed ?? false,
+      via: meta?.via ?? 'app-server',
+    }));
   }
 
   private setStatus(status: AgentConnectionStatus): void {
@@ -2563,6 +2666,7 @@ export class CodexAdapter
       return;
     }
     this._status = status;
+    this.trace((port) => port.recordLifecycle('adapter.status', { status }));
     for (const handler of this.statusHandlers) {
       try {
         handler(status);
