@@ -1,3 +1,5 @@
+import type { TraceEventBase, TraceSeverity, TraceStoreStatus, TraceSummary, TraceTerminalState } from '../../../shared/diagnostics/types';
+
 export const OPEN_CODE_TRACE_SCHEMA_VERSION = 1 as const;
 
 export const OPEN_CODE_TRACE_CHANNEL_IDS = [
@@ -10,35 +12,18 @@ export const OPEN_CODE_TRACE_CHANNEL_IDS = [
 ] as const;
 
 export type OpenCodeTraceChannelId = typeof OPEN_CODE_TRACE_CHANNEL_IDS[number];
-export type OpenCodeTraceSeverity = 'debug' | 'info' | 'warning' | 'critical' | 'error';
+export type OpenCodeTraceSeverity = TraceSeverity;
 export type OpenCodeTraceSource = 'plugin' | 'sdk' | 'http' | 'sse' | 'server' | 'storage';
-export type OpenCodeTraceTerminalState = 'completed' | 'cancelled' | 'error' | 'incomplete';
+export type OpenCodeTraceTerminalState = TraceTerminalState;
 
-export interface OpenCodeTraceEventV1 {
+export interface OpenCodeTraceEventV1 extends TraceEventBase {
   schemaVersion: typeof OPEN_CODE_TRACE_SCHEMA_VERSION;
-  timestamp: string;
-  monotonicSequence: number;
-  traceId: string;
-  runtimeSegmentId: string;
-  runId?: string;
-  rootSessionId?: string;
-  parentSessionId?: string;
-  sessionId?: string;
+  channel: OpenCodeTraceChannelId;
+  source: OpenCodeTraceSource;
   messageId?: string;
   partId?: string;
   callId?: string;
   requestId?: string;
-  sourceEventId?: string;
-  channel: OpenCodeTraceChannelId;
-  source: OpenCodeTraceSource;
-  severity: OpenCodeTraceSeverity;
-  name: string;
-  metrics?: Record<string, number>;
-  payload?: unknown;
-  payloadRef?: {
-    kind: 'inline' | 'deep';
-    runId?: string;
-  };
 }
 
 export interface OpenCodeDiagnosticRunToken {
@@ -164,23 +149,6 @@ export interface OpenCodeTracePort {
   finishActiveSessionRun?(sessionId: string, state: OpenCodeTraceTerminalState, payload?: unknown): void;
 }
 
-export interface OpenCodeTraceSummary {
-  traceId: string;
-  sessionId?: string;
-  lastUpdatedAt: string;
-  eventCount: number;
-  runCount: number;
-  highestSeverity: OpenCodeTraceSeverity;
-  highestUnreadSeverity?: OpenCodeTraceSeverity;
-  unreadAnomalyCount: number;
-  deepCaptureCount: number;
-}
+export type OpenCodeTraceSummary = TraceSummary;
 
-export interface OpenCodeTraceStoreStatus {
-  mode: 'disk' | 'memory';
-  rootDirectory: string;
-  queuedEvents: number;
-  approximateBytes: number;
-  lastError?: string;
-  droppedEvents: number;
-}
+export type OpenCodeTraceStoreStatus = TraceStoreStatus;
