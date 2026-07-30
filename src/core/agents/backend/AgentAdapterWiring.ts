@@ -13,6 +13,7 @@ import type { AgentService } from './AgentService';
 import type { AgentServiceRegistry } from './AgentServiceRegistry';
 import { CodexAdapter } from './CodexAdapter';
 import { resolveCodexCli } from './CodexCliResolver';
+import type { CodexTracePort } from './diagnostics/types';
 
 export interface WireHiddenAdaptersOptions {
   registry: AgentServiceRegistry;
@@ -28,6 +29,12 @@ export interface WireHiddenAdaptersOptions {
   pluginDir?: string;
   /** Codex-specific settings from plugin configuration. */
   codexSettings?: CodexBackendSettings;
+  /**
+   * Codex session-trace port. Injected into the CodexAdapter so wire-level
+   * events flow into the CodexSessionTraceService. Optional for backwards
+   * compatibility with callers that pre-date tracing.
+   */
+  codexTracePort?: CodexTracePort;
 }
 
 /**
@@ -70,6 +77,7 @@ export function wireHiddenAdapters(options: WireHiddenAdaptersOptions): void {
       ...(codexCliResolution.mode === 'available'
         ? { codexPathOverride: codexCliResolution.executablePath }
         : {}),
+      tracePort: options.codexTracePort,
     }));
   }
 }

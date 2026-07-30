@@ -28,6 +28,7 @@ import { type CodexApprovalHostContext, createCodexApprovalBridgeHost } from './
 import { OpenCodeAdapter } from './core/agents/backend/OpenCodeAdapter';
 import { OpenCodeService, SDK_FEATURE_FLAG_ROLLOUT_DEFAULTS } from './core/opencode';
 import { OpenCodeSessionTraceService } from './core/opencode/diagnostics';
+import { CodexSessionTraceService } from './core/agents/backend/diagnostics';
 import { migrateOpenCodeCapabilitySettings } from './core/opencode/OpenCodeCapabilitySettingsMigration';
 import { OpenCodianSettingsRuntimeCoordinator } from './core/runtime/OpenCodianSettingsRuntimeCoordinator';
 import { OpenCodianStartupCoordinator } from './core/runtime/OpenCodianStartupCoordinator';
@@ -96,6 +97,7 @@ export default class OpenCodianPlugin extends Plugin {
   storage: StorageService;
   openCodeService: OpenCodeService;
   openCodeTraceService: OpenCodeSessionTraceService;
+  codexTraceService!: CodexSessionTraceService;
   agentServiceRegistry: AgentServiceRegistry;
   claudeCodePermissionBridge: ClaudeCodePermissionBridge | null = null;
   claudeCodePermissionHostContext: ClaudeCodePermissionBridgeHostContext = { getActiveTabId: () => null };
@@ -245,6 +247,23 @@ export default class OpenCodianPlugin extends Plugin {
           pluginIsolationMode: this.settings.pluginIsolationMode,
         }),
       });
+      // Construct the Codex trace service before wiring adapters so it can be
+      // injected into the CodexAdapter via wireHiddenAdapters below. Mirrors
+      // the OpenCode trace service construction above.
+      this.codexTraceService = new CodexSessionTraceService({
+        settings: () => this.settings.backendSettings.codex.sessionTrace,
+        vaultPath: getVaultBasePath(this.app) ?? undefined,
+        buildIdentity: () => this.getDebugBuildIdentityText(),
+        knownSecrets: () => [
+          this.settings.server.auth.password,
+          this.settings.server.auth.token,
+        ].filter(Boolean),
+        runtimeMetadata: () => ({
+          serverMode: this.settings.server.mode,
+          modelSourceMode: this.settings.modelSourceMode,
+          pluginIsolationMode: this.settings.pluginIsolationMode,
+        }),
+      });
       this.openCodeService = new OpenCodeService(
         this.settings,
         {
@@ -306,6 +325,7 @@ export default class OpenCodianPlugin extends Plugin {
           ? path.join(vaultPath, this.manifest.dir?.trim() || path.join('.obsidian', 'plugins', this.manifest.id?.trim() || 'opencodian'))
           : '',
         codexSettings: this.settings.backendSettings.codex,
+        codexTracePort: this.codexTraceService,
       });
       this.agentServiceRegistry.setEnabledBackends(this.settings.enabledBackends);
       if (this.settings.activeBackend) {
@@ -549,6 +569,9 @@ export default class OpenCodianPlugin extends Plugin {
     this.agentServiceRegistry?.dispose();
     void this.openCodeTraceService?.dispose().catch((error) => {
       logger.warn('Failed to flush OpenCode trace service during unload:', error);
+    });
+    void this.codexTraceService?.dispose().catch((error) => {
+      logger.warn('Failed to flush Codex trace service during unload:', error);
     });
     setAgentServiceRegistry(null);
     this.getSettingsRuntimeCoordinator().clearChatAppearanceSaveTimer();

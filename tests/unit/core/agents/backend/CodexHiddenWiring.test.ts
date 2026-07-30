@@ -18,6 +18,7 @@ import { wireHiddenAdapters } from '../../../../../src/core/agents/backend/Agent
 import type { Disposable } from '../../../../../src/core/agents/backend/AgentService';
 import { AgentServiceRegistry } from '../../../../../src/core/agents/backend/AgentServiceRegistry';
 import { CodexAdapter } from '../../../../../src/core/agents/backend/CodexAdapter';
+import type { CodexTracePort } from '../../../../../src/core/agents/backend/diagnostics/types';
 import type { AgentBackendKind } from '../../../../../src/core/types/chat';
 
 // ---------------------------------------------------------------------------
@@ -282,6 +283,40 @@ describe('Codex hidden wiring', () => {
 
       expect(all.find((a) => a.kind === 'codex')).toBeDefined();
       expect(enabled.find((a) => a.kind === 'codex')).toBeUndefined();
+    });
+
+    it('passes the codex trace port into the CodexAdapter options', () => {
+      const tracePort = { wireBridge: undefined } as unknown as CodexTracePort;
+
+      wireHiddenAdapters({
+        registry,
+        adapters: [createMockAdapter('opencode')],
+        vaultPath: '/tmp/vault',
+        codexTracePort: tracePort,
+      });
+
+      const codexAdapter = registry.get('codex') as CodexAdapter;
+      expect(codexAdapter).toBeInstanceOf(CodexAdapter);
+
+      // The adapter stores tracePort as a private field; read it via a cast to
+      // prove the option is threaded through (behavior is covered by
+      // CodexAdapter.trace.test.ts).
+      const injected = (codexAdapter as unknown as { tracePort?: unknown }).tracePort;
+      expect(injected).toBe(tracePort);
+    });
+
+    it('constructs without codexTracePort (backwards compatible)', () => {
+      wireHiddenAdapters({
+        registry,
+        adapters: [createMockAdapter('opencode')],
+        vaultPath: '/tmp/vault',
+      });
+
+      const codexAdapter = registry.get('codex') as CodexAdapter;
+      expect(codexAdapter).toBeInstanceOf(CodexAdapter);
+      expect(
+        (codexAdapter as unknown as { tracePort?: unknown }).tracePort
+      ).toBeUndefined();
     });
   });
 });
