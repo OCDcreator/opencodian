@@ -1682,18 +1682,21 @@
       "id": "feature.settings-debug",
       "layer": "feature",
       "include": [
-        "src/features/settings/SettingsDebugSection.ts"
+        "src/features/settings/SettingsDebugSection.ts",
+        "src/features/settings/debug/**"
       ],
       "delegatesTo": [],
       "responsibilities": [
-        "debug settings section: five debug source tabs, three backend trace workbenches, plugin export actions",
-        "Claude session-trace controls inside claude-code debug block"
+        "shared debug section shell/router, plugin export actions, and platform/path/action/module helpers",
+        "complete OpenCode trace debug panel: settings, status, actions, catalog, and narrow diagnostics-port wiring",
+        "Codex and Claude debug workbenches remain in SettingsDebugSection pending their later panel slices"
       ],
       "canonicalState": [
         "debug section tab shell/router state"
       ],
       "entrypoints": [
-        "src/features/settings/SettingsDebugSection.ts"
+        "src/features/settings/SettingsDebugSection.ts",
+        "src/features/settings/debug/OpenCodeDebugPanel.ts"
       ],
       "allowedOwnerDependencies": [
         "shared.foundation",
@@ -1710,7 +1713,8 @@
         "feature.chat-diagnostics"
       ],
       "tests": [
-        "tests/unit/features/settings/SettingsDebugSection*"
+        "tests/unit/features/settings/SettingsDebugSection*",
+        "tests/unit/features/settings/OpenCodeDebugPanel*"
       ],
       "overviewDoc": "docs/architecture/owners/feature-settings-debug.md",
       "requiredGates": [

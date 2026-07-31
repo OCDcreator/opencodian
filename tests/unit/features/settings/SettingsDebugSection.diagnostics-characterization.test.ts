@@ -362,7 +362,7 @@ describe('Phase 3 Task 10 — SettingsDebugSection diagnostics characterization'
   //
   // The plan (Task 10 step 5 + Task 13) requires: "separately prove whether
   // legacy non-tabbed attach is reachable and record its current Codex
-  // omission." attach() calls addPluginDebugSettings, addOpenCodeDebugSettings,
+  // omission." attach() calls addPluginDebugSettings, openCodeDebugPanel.render,
   // addClaudeCodeDebugSettings, addExportDebugSettings — it does NOT call
   // addCodexDebugSettings. This is the documented inconsistency. Task 13 must
   // NOT silently fix or permanently entrench it inside a pure-refactor commit;
@@ -385,9 +385,9 @@ describe('Phase 3 Task 10 — SettingsDebugSection diagnostics characterization'
       const attachStart = source.indexOf('  attach(containerEl: HTMLElement): HTMLHeadingElement {');
       expect(attachStart).toBeGreaterThan(-1);
       const attachBody = source.slice(attachStart, attachStart + 500);
-      // attach() invokes these four add* methods...
+      // attach() invokes the plugin, OpenCode panel, Claude, and export render paths...
       expect(attachBody).toContain('this.addPluginDebugSettings(');
-      expect(attachBody).toContain('this.addOpenCodeDebugSettings(');
+      expect(attachBody).toContain('this.openCodeDebugPanel.render(');
       expect(attachBody).toContain('this.addClaudeCodeDebugSettings(');
       expect(attachBody).toContain('this.addExportDebugSettings(');
       // ...but does NOT invoke addCodexDebugSettings.
@@ -449,10 +449,9 @@ describe('Phase 3 Task 10 — SettingsDebugSection diagnostics characterization'
       expect(body).toContain('this.addClaudeTraceCatalog(');
     });
 
-    it('the three backend blocks each own a status + actions lifecycle and call their sub-methods (source contract)', () => {
-      // Each backend block has its own addXxxDebugSettings that CALLS its
-      // status/actions/catalog sub-methods. Pin the CALLS (not just method
-      // existence) so removing a sub-method call is caught.
+    it('the three backend blocks each own a status + actions lifecycle (source contract)', () => {
+      // OpenCode moved into its dedicated panel; Codex and Claude remain
+      // section methods until their later extraction slices.
       // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
       const fs = require('fs') as typeof import('fs');
       // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
@@ -461,7 +460,17 @@ describe('Phase 3 Task 10 — SettingsDebugSection diagnostics characterization'
         path.resolve(__dirname, '../../../../src/features/settings/SettingsDebugSection.ts'),
         'utf8',
       );
-      // Extract each addXxxDebugSettings body and assert the sub-method calls.
+      const openCodeSource = fs.readFileSync(
+        path.resolve(__dirname, '../../../../src/features/settings/debug/OpenCodeDebugPanel.ts'),
+        'utf8',
+      );
+      expect(openCodeSource).toContain('this.addTraceStatus(');
+      expect(openCodeSource).toContain('this.addTraceActions(');
+      expect(openCodeSource).toContain('this.addTraceCatalog(');
+      expect(source).not.toContain('openCodeTraceService');
+      expect(source).toContain('getDiagnostics: options.getOpenCodeDiagnostics');
+
+      // Extract each remaining section-owned backend method and assert its sub-method calls.
       function methodBody(methodName: string): string {
         const start = source.indexOf(`private ${methodName}(`);
         expect(start).toBeGreaterThan(-1);
@@ -469,10 +478,6 @@ describe('Phase 3 Task 10 — SettingsDebugSection diagnostics characterization'
         const nextRel = source.slice(start + 1).search(/\n[/ ]{2}private\s\w/);
         return nextRel > 0 ? source.slice(start, start + 1 + nextRel) : source.slice(start, start + 4000);
       }
-      const ocBody = methodBody('addOpenCodeDebugSettings');
-      expect(ocBody).toContain('this.addOpenCodeTraceStatus');
-      expect(ocBody).toContain('this.addOpenCodeTraceActions');
-      expect(ocBody).toContain('this.addOpenCodeTraceCatalog');
       const codexBody = methodBody('addCodexDebugSettings');
       expect(codexBody).toContain('this.addCodexTraceStatus');
       expect(codexBody).toContain('this.addCodexTraceActions');
@@ -481,8 +486,8 @@ describe('Phase 3 Task 10 — SettingsDebugSection diagnostics characterization'
       expect(claudeBody).toContain('this.addClaudeTraceStatus');
       expect(claudeBody).toContain('this.addClaudeTraceActions');
       expect(claudeBody).toContain('this.addClaudeTraceCatalog');
-      // Each reads a trace-store status (asymmetry: OpenCode/Codex .store.getStatus, Claude getStorageStatus).
-      expect(source).toMatch(/openCodeTraceService\?\.store\.getStatus/);
+      // Each reads a trace-store status (OpenCode through its operation port; Codex .store.getStatus, Claude getStorageStatus).
+      expect(openCodeSource).toMatch(/diagnostics\?\.getStatus/);
       expect(source).toMatch(/codexTraceService\?\.store\.getStatus/);
       expect(source).toMatch(/claudeTraceService\?\.getStorageStatus/);
     });
@@ -506,10 +511,9 @@ describe('Phase 3 Task 10 — SettingsDebugSection diagnostics characterization'
       expect(loggingBody).toMatch(/enableDebugLogging/);
     });
 
-    it('DEBUG_MODULE_GROUPS maps the four non-export blocks to their debug-module keys (source contract)', () => {
-      // The module GROUPS (not the flat registry) map each block to its module
-      // keys. Task 13 splits the three backend blocks into panels; the grouping
-      // must remain coherent. Pin the exact structure from source.
+    it('debug-module groups retain their section and OpenCode-panel ownership keys (source contract)', () => {
+      // The module GROUPS (not the flat registry) map each owner to its module
+      // keys. The OpenCode panel owns its group after this extraction slice.
       // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
       const fs = require('fs') as typeof import('fs');
       // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
@@ -521,14 +525,17 @@ describe('Phase 3 Task 10 — SettingsDebugSection diagnostics characterization'
       const groupsStart = source.indexOf('const DEBUG_MODULE_GROUPS:');
       expect(groupsStart).toBeGreaterThan(-1);
       const groupsBody = source.slice(groupsStart, groupsStart + 600);
-      // Exactly four block keys (plugin, opencode, codex, claude-code).
+      // Section-owned groups contain plugin, codex, and claude-code.
       expect(groupsBody).toMatch(/plugin:\s*\[/);
-      expect(groupsBody).toMatch(/opencode:\s*\[/);
       expect(groupsBody).toMatch(/codex:\s*\[\]\s*as\s*DebugModuleKey\[\]/);
       expect(groupsBody).toMatch(/'claude-code':\s*\[/);
-      // Pin the EXACT array contents so adding/removing a module key is caught.
-      // opencode is exactly ['server', 'models', 'streaming'].
-      expect(groupsBody).toContain("opencode: ['server', 'models', 'streaming'],");
+      expect(groupsBody).not.toMatch(/opencode:\s*\[/);
+      const openCodeSource = fs.readFileSync(
+        path.resolve(__dirname, '../../../../src/features/settings/debug/OpenCodeDebugPanel.ts'),
+        'utf8',
+      );
+      // OpenCode owns its exact module-key grouping after extraction.
+      expect(openCodeSource).toContain("['server', 'models', 'streaming']");
       // claude-code is exactly ['claudeCode'].
       expect(groupsBody).toContain("'claude-code': ['claudeCode'],");
       // codex is exactly empty.

@@ -16,7 +16,7 @@
 ## 导入关系
 
 ```text
-上游: obsidian, i18n, main, Settings*Section, SettingsSectionCoordinator, SettingsTabbedRenderer, SettingsPanelChrome, SettingsDropdownControl
+上游: obsidian, i18n, main, Settings*Section, settings/debug/OpenCodeDebugPanel, settings/debug/types, SettingsSectionCoordinator, SettingsTabbedRenderer, SettingsPanelChrome, SettingsDropdownControl
 下游: SettingsViewRegistrar
 ```
 
@@ -41,6 +41,7 @@ export class OpenCodianSettingsView extends ItemView
 - classic 模式按 General、Claude Code、Server、Model、Conversation、Agents、Commands、MCP、Formatter、Plugin、Security、UI、Style、Debug、User、Skills、Tools、ACP 顺序挂载 section
 - tabbed 模式通过 `SettingsTabbedRenderer` 路由一级 / 二级标签内容
 - General 面板额外承载设置布局模式、语言，以及“在编辑区打开设置”的开关
+- editor-area 的 OpenCode debug composition path 与标准 settings tab 一样，在创建 `SettingsDebugSection` 时注入 `createOpenCodeTraceDiagnosticsPort()`；view 不直接把 trace service/store/report 传入 panel
 
 ### 跨 section 状态桥接
 
@@ -96,6 +97,7 @@ AgentServiceRegistry.onActiveChange()
 - 各 `Settings*Section`: 继续拥有具体设置项与业务生命周期，避免该 view 复制 settings tab 的业务逻辑
 - `SettingsUserSection`: 除了继续承接 user/profile/prompt/tags 渲染外，editor-area view 也负责在重绘和 `onClose()` 时调用其 `dispose()`，统一释放 textarea size-memory observer
 - `SettingsClaudeCodeSection`: 提供 Claude Code Phase 1 配置基础与 runtime diagnostics；editor-area view 只负责装配，backend enablement 由 General / Backend 的 `SettingsBackendSection` 管理
+- `settings/debug/OpenCodeDebugPanel` / `types`: 提供 OpenCode workbench owner 与窄 settings/diagnostics port；Codex/Claude debug workbench 仍由 `SettingsDebugSection` 保留
 
 ## 配置项
 

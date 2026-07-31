@@ -1,5 +1,6 @@
 # SettingsDebugSection
 
+> 2026-07-31: The OpenCode debug workbench moved to the complete owner `debug/OpenCodeDebugPanel.ts`. This section now retains the shared source-tab shell/router, plugin export, shared platform/path/action/module helpers, and the Codex/Claude workbenches. It passes a narrow OpenCode settings/diagnostics port and has no direct OpenCode trace-service, store, or report access. The legacy non-tabbed attach Codex omission remains unchanged.
 > 2026-07-29: OpenCode diagnostics now includes status, settings, channels, recent traces, smart copy, full export, delete and confirmed clear.
 > 2026-07-30: Added a Codex diagnostics tab block mirroring the OpenCode block — status (capture enabled/disabled, storage mode, trace count, size, last error), enabled toggle, standard/full preset, five channel checkboxes (`CODEX_TRACE_CHANNEL_IDS`), custom storage directory, smart copy, full export, recent traces list with per-trace smart copy / delete, and double-confirm clear. Reads `backendSettings.codex.sessionTrace` and `this.plugin.codexTraceService` (may be undefined; all controls null-safe).
 > 2026-07-30: Added the Claude Code session-trace subsection inside the existing `claude-code` workbench. It is separate from `backendSettings.claudeCode.debugChannels`: the trace block renders mode/directory/queue/bytes/dropped/error status, enabled + off/standard/full preset, five trace-channel toggles (`CLAUDE_TRACE_CHANNEL_IDS`), storage-directory input, smart copy, latest-bundle export, clear-all confirmation, and a recent-20 trace catalog with inline copy/delete.
@@ -10,10 +11,10 @@
 
 ## 概述
 
-`SettingsDebugSection` 是设置页 debug 分区的厚 owner。当前它负责完整调试生命周期 UI：
+`SettingsDebugSection` 是设置页 debug 分区的共享 shell owner。它负责来源分区的 shell/router、插件导出、共享平台路径/按钮/模块 helper，以及尚未拆出的 Codex 与 Claude workbench；OpenCode 的完整 workbench 由相邻的 `debug/OpenCodeDebugPanel` owner 渲染。
 
 - `Plugin` 来源分组：debug 总开关，以及 app/settings/chat/contextUsage/tasks/storage/providerIcons/visuals 等插件内部模块开关
-- `OpenCode` 来源分组：server/models/streaming 等 OpenCode 后端诊断开关
+- `OpenCode` 来源分组：由 `OpenCodeDebugPanel` 负责 server/models/streaming 等 OpenCode 后端诊断开关、trace 状态、控制项、动作和 catalog
 - `Claude Code` 来源分组：Claude Code SDK 诊断工作台，用于查看状态摘要、隐私边界、模块总开关、runtime/session/stream/permission/MCP/experimental 通道开关和最近 Claude Code 摘要日志；同一 block 内还承载独立的 session-trace 状态、捕获 preset、trace channel、持久化目录、智能复制/导出/清空和最近轨迹目录
 - `Export` 分组：高频刷新、参数格式、日志路径、诊断动作和控制台帮助
 - 高频日志刷新间隔
@@ -24,11 +25,17 @@
 - 复制版本 / `BUILD_ID`
 - 控制台打开帮助
 
+### OpenCode panel boundary
+
+`SettingsDebugSection` 在 classic `attach()` 和 tabbed `attachTabbed()` 两条路径中调用 `OpenCodeDebugPanel`。section 只注入共享的目录选择、action button、debug-module 渲染和保存回调；`OpenCodeDebugPanel` 通过 `OpenCodeDebugPanelOptions` 接收 settings port 与 `OpenCodeTraceDiagnosticsPort`，因此 section 不直接访问 OpenCode trace service、store 或 report builder。
+
+本 slice 只完成 OpenCode panel。Codex 与 Claude trace/debug workbench 仍在本模块中，后续 panel slice 才能迁移；不要把它们写成已经存在的 `CodexDebugPanel` 或 `ClaudeCodeDebugPanel`。三条 settings composition 路径各自在边界创建 OpenCode diagnostics port。legacy non-tabbed attach 的 Codex omission 也不在本 slice 修复。
+
 ## 核心逻辑
 
 ### 模块开关
 
-section 通过 `DEBUG_MODULE_REGISTRY` 动态生成模块 toggles，并在本 owner 内按来源过滤到 `plugin`、`opencode`、`claude-code` 三个分组，而不是手写散落的开关列表。这样新增 debug module 时：
+section 通过 `DEBUG_MODULE_REGISTRY` 动态生成模块 toggles，并在共享 shell 中按来源过滤到 `plugin`、`claude-code` 等仍由本 owner 持有的分组；OpenCode 的 `server` / `models` / `streaming` key 集合由 `OpenCodeDebugPanel` 声明并通过 callback 复用本 section 的模块渲染 helper，而不是复制 helper。这样新增 debug module 时：
 
 1. 先改注册表
 2. 在 `SettingsDebugSection` 里把 module key 放进正确来源分组
@@ -76,7 +83,8 @@ section 直接编辑 `settings.debugRefreshIntervalMs`。logger 侧会用该值�
 
 ## 与其他模块的交互
 
-- `src/main.ts`: 提供 `saveSettings()`、`logServerStatusSnapshot()`、`buildDiagnosticReport()`、`writeDiagnosticLogFile()` 和 build identity 文本
+- `src/main.ts`: 为本 section 的 Codex/Claude/export 逻辑提供 `saveSettings()`、`logServerStatusSnapshot()`、`buildDiagnosticReport()`、`writeDiagnosticLogFile()` 和 build identity 文本；OpenCode diagnostics 由 composition path 转成窄 port 后注入
+- `src/features/settings/debug/OpenCodeDebugPanel.ts` / `types.ts`: OpenCode 完整 panel 与窄 port/adapter contract
 - `src/shared/debugModules.ts`: 提供模块注册表和刷新间隔归一化
 - `src/shared/diagnosticSecretSanitizer.ts`: 提供 `sanitizeDiagnosticReport()` 用于导出前密钥净化
 - `src/core/agents/backend/diagnostics/ClaudeSessionTraceService.ts`: 提供 Claude trace storage status、smart report、bundle export、recent summary 与 clear-all 操作；service 内部使用 hardened redaction 和 ring/deep capture 生命周期
@@ -87,7 +95,7 @@ section 直接编辑 `settings.debugRefreshIntervalMs`。logger 侧会用该值�
 
 - 这里的模块开关只控制 `info` / `debug`；`always` / `warn` / `error` 不应被隐藏。
 - 导出路径的选择、确认后持久化语义保持不变。
-- 如果后续继续扩展 debug 面板，优先继续在这个 owner 收口，不要把逻辑重新散回 `OpenCodianSettings.ts`。
+- 如果后续扩展 debug 面板，shared shell/helper 继续在本 owner 收口；backend-specific panel 行为应进入对应的 `settings/debug/` owner，不要重新散回 `OpenCodianSettings.ts`。
 
 ## 2026-05-21 Debug source IA
 

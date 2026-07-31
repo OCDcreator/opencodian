@@ -10,6 +10,7 @@ import { App, PluginSettingTab, Setting } from 'obsidian';
 import type { AgentBackendKind } from '../../core/types/chat';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
+import { createOpenCodeTraceDiagnosticsPort } from './debug/types';
 import { SettingsAcpSection } from './SettingsAcpSection';
 import { SettingsAgentsSection } from './SettingsAgentsSection';
 import { SettingsClaudeCodeSection } from './SettingsClaudeCodeSection';
@@ -567,6 +568,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
   private addDebugSettings(containerEl: HTMLElement): HTMLHeadingElement {
     this.debugSection ??= new SettingsDebugSection({
       plugin: this.plugin,
+      getOpenCodeDiagnostics: () => createOpenCodeTraceDiagnosticsPort(this.plugin.openCodeTraceService),
       createSectionHeading: (hostEl, title, tooltip) => this.createSectionHeading(hostEl, title, tooltip),
     });
     return this.debugSection.attach(containerEl);

@@ -7,13 +7,13 @@
  * Reuses all existing section classes from OpenCodianSettingTab —
  * no rendering logic is duplicated.
  */
-
 import type { App } from 'obsidian';
 import { ItemView, Setting } from 'obsidian';
 
 import type { AgentBackendKind } from '../../core/types/chat';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
+import { createOpenCodeTraceDiagnosticsPort } from './debug/types';
 import { SettingsAcpSection } from './SettingsAcpSection';
 import { SettingsAgentsSection } from './SettingsAgentsSection';
 import { SettingsClaudeCodeSection } from './SettingsClaudeCodeSection';
@@ -489,6 +489,7 @@ export class OpenCodianSettingsView extends ItemView {
   private addDebugSettings(containerEl: HTMLElement): void {
     this.debugSection ??= new SettingsDebugSection({
       plugin: this.plugin,
+      getOpenCodeDiagnostics: () => createOpenCodeTraceDiagnosticsPort(this.plugin.openCodeTraceService),
       createSectionHeading: (hostEl, title, tooltip) => this.createSectionHeading(hostEl, title, tooltip),
     });
     this.debugSection.attach(containerEl);
@@ -560,11 +561,7 @@ export class OpenCodianSettingsView extends ItemView {
     this.refreshModelCatalogStatusCallback = undefined;
   }
 
-  private createSectionHeading(
-    containerEl: HTMLElement,
-    title: string,
-    tooltip = title,
-  ): HTMLHeadingElement {
+  private createSectionHeading(containerEl: HTMLElement, title: string, tooltip = title): HTMLHeadingElement {
     return this.sectionCoordinator.createSectionHeading(containerEl, {
       title,
       tooltip,

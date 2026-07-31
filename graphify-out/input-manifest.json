@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "digest": "12d48dbbce8b51cb405c717712ce71647cf7a254e5ae10b09bb666bcdc24bf13",
-  "recordCount": 594,
+  "digest": "2b00a963004508130fba82a72a994058659ca9c832f01a65358b073895904b32",
+  "recordCount": 596,
   "records": [
     {
       "kind": "ignore",
@@ -2035,6 +2035,16 @@
     },
     {
       "kind": "src",
+      "key": "src/features/settings/debug/OpenCodeDebugPanel.ts",
+      "sha256": "b374efa4666083e93084219d8634675ee439fdcb332ac57d6d8b6f735a1945e3"
+    },
+    {
+      "kind": "src",
+      "key": "src/features/settings/debug/types.ts",
+      "sha256": "4168bd563328a36fc16c29a89e157ae8e5a444f6e3b3ef609bd1bfad1143ce85"
+    },
+    {
+      "kind": "src",
       "key": "src/features/settings/index.ts",
       "sha256": "d5d9fd87c02b2df16946c030b6040aa6b3b651527e46711ce47e0dc82fc5cce2"
     },
@@ -2136,12 +2146,12 @@
     {
       "kind": "src",
       "key": "src/features/settings/OpenCodianSettings.ts",
-      "sha256": "443b27798c15a3dfa13b93247cbedd7791c8cf1953ae8ff6a42b444a56ccd933"
+      "sha256": "6d1b9efff9c4ae06a346a4ef7f5402f25852ba694e8791876fed8be87e146966"
     },
     {
       "kind": "src",
       "key": "src/features/settings/OpenCodianSettingsView.ts",
-      "sha256": "ddedaa36d37dbe1a99ea4c618ab563278b781144bdcf62831cb50405b06ee2c0"
+      "sha256": "b96dd2fcc6795ff4dafe2017ce8328d9652c91c526903b5aabcf62fb4488ce30"
     },
     {
       "kind": "src",
@@ -2271,7 +2281,7 @@
     {
       "kind": "src",
       "key": "src/features/settings/SettingsDebugSection.ts",
-      "sha256": "f7be4b203a129fdf355456bc171e7f5a0465dd423b116a9d0758d6808295beee"
+      "sha256": "8e88da43eb7dbea1ce5676e16ca96b9f3048d0b8ed42e7b70beb112025ca54a1"
     },
     {
       "kind": "src",
@@ -2421,7 +2431,7 @@
     {
       "kind": "src",
       "key": "src/features/settings/SettingsTabbedRenderer.ts",
-      "sha256": "3f405520104dda2b35e0058c0845a5eb174e3354c399653ea0c0a801001af6d4"
+      "sha256": "d4690e2da0ad29963263f4d14c85e9a3b94dd7f52c3783e76291d83049313377"
     },
     {
       "kind": "src",
@@ -2974,7 +2984,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-07-31T07:36:56.400Z",
-  "headShaAtGeneration": "b73754d6c2cf24df50f35cd6ff072501979657b4",
+  "generatedAt": "2026-07-31T09:19:47.941Z",
+  "headShaAtGeneration": "91fc3b7f27d2541bb48d0671e2f0aebed96b1295",
   "graphifyVersion": "graphify 0.9.22"
 }

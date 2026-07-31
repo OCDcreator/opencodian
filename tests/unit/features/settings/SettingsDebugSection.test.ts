@@ -4,6 +4,7 @@ import * as obsidian from 'obsidian';
 import { Setting } from 'obsidian';
 
 import { DEFAULT_SETTINGS, getCurrentPlatformKey } from '../../../../src/core/types';
+import { createOpenCodeTraceDiagnosticsPort } from '../../../../src/features/settings/debug/types';
 import { SettingsDebugSection } from '../../../../src/features/settings/SettingsDebugSection';
 import { setLocale, t } from '../../../../src/i18n';
 import type OpenCodianPlugin from '../../../../src/main';
@@ -156,9 +157,17 @@ function createSectionHeading(containerEl: HTMLElement, title: string): HTMLHead
   return headingEl;
 }
 
+function getOpenCodeDiagnostics(plugin: DebugSectionPlugin) {
+  const { openCodeTraceService } = plugin as unknown as {
+    openCodeTraceService?: Parameters<typeof createOpenCodeTraceDiagnosticsPort>[0];
+  };
+  return createOpenCodeTraceDiagnosticsPort(openCodeTraceService);
+}
+
 function createSection(plugin = createPlugin()) {
   const section = new SettingsDebugSection({
     plugin: plugin as unknown as OpenCodianPlugin,
+    getOpenCodeDiagnostics: () => getOpenCodeDiagnostics(plugin),
     createSectionHeading,
   });
   const containerEl = document.createElement('div');
@@ -175,6 +184,7 @@ function createSection(plugin = createPlugin()) {
 function createTabbedSection(secondaryTabId: string, plugin = createPlugin()) {
   const section = new SettingsDebugSection({
     plugin: plugin as unknown as OpenCodianPlugin,
+    getOpenCodeDiagnostics: () => getOpenCodeDiagnostics(plugin),
     createSectionHeading,
   });
   const containerEl = document.createElement('div');
