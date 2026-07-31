@@ -588,11 +588,13 @@ describe('OpenCodianPlugin backend bootstrap', () => {
   let bootstrapVaultPath: string | null = null;
   afterEach(async () => {
     const coord = (bootstrappedPlugin as unknown as { diagnosticsCoordinator?: { dispose(): Promise<void> } | null })?.diagnosticsCoordinator;
+    // Coordinator dispose awaits 3 backend store flushes; allow 20s under
+    // sandbox I/O contention (default 5s timed out in CI-style sandboxes).
     if (coord) await coord.dispose().catch(() => undefined);
     bootstrappedPlugin = null;
     if (bootstrapVaultPath) fs.rmSync(bootstrapVaultPath, { recursive: true, force: true });
     bootstrapVaultPath = null;
-  });
+  }, 20000);
 
   it('registers Claude Code and restores it as the active backend from settings', async () => {
     const vaultPath = fs.mkdtempSync(path.join(os.tmpdir(), 'opencodian-claude-bootstrap-'));
