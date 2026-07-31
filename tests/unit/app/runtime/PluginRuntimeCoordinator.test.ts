@@ -1,6 +1,6 @@
 import * as obsidian from 'obsidian';
 
-import { PluginRuntimeCoordinator } from '../../../../src/core/runtime/PluginRuntimeCoordinator';
+import { PluginRuntimeCoordinator } from '../../../../src/app/runtime/PluginRuntimeCoordinator';
 import type { OpenCodianSettings } from '../../../../src/core/types';
 import { DEFAULT_SETTINGS } from '../../../../src/core/types';
 

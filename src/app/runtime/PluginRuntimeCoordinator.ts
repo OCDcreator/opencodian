@@ -1,14 +1,14 @@
 import { Notice, type WorkspaceLeaf } from 'obsidian';
 
+import { OpenCodeService } from '../../core/opencode';
+import type { OpenCodianSettings } from '../../core/types';
+import { isLocalServerMode } from '../../core/types';
+import type { AgentBackendKind } from '../../core/types/chat';
+import { comparePluginVersions, type PluginUpdateService } from '../../core/update/PluginUpdateService';
 import { OpenCodianView } from '../../features/chat/OpenCodianView';
 import { UserMessageFooterRenderer } from '../../features/chat/runtime/UserMessageFooterRenderer';
 import { t } from '../../i18n';
 import { createLogger, formatDurationMs, getPerformanceTimestampMs } from '../../shared';
-import { OpenCodeService } from '../opencode';
-import type { OpenCodianSettings } from '../types';
-import { isLocalServerMode } from '../types';
-import type { AgentBackendKind } from '../types/chat';
-import { comparePluginVersions, type PluginUpdateService } from '../update/PluginUpdateService';
 
 const logger = createLogger('PluginRuntimeCoordinator');
 

@@ -33,7 +33,7 @@ import { DiagnosticsRuntimeCoordinator } from './app/diagnostics';
 import { migrateOpenCodeCapabilitySettings } from './core/opencode/OpenCodeCapabilitySettingsMigration';
 import { OpenCodianSettingsRuntimeCoordinator } from './core/runtime/OpenCodianSettingsRuntimeCoordinator';
 import { OpenCodianStartupCoordinator } from './core/runtime/OpenCodianStartupCoordinator';
-import { PluginRuntimeCoordinator } from './core/runtime/PluginRuntimeCoordinator';
+import { PluginRuntimeCoordinator } from './app/runtime/PluginRuntimeCoordinator';
 import { StorageService } from './core/storage';
 import { ConversationFullMessageCache } from './core/storage/ConversationFullMessageCache';
 import { PluginUpdateService } from './core/update/PluginUpdateService';

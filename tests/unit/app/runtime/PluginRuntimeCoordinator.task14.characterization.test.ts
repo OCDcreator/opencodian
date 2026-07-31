@@ -1,4 +1,4 @@
-import { PluginRuntimeCoordinator } from '../../../../src/core/runtime/PluginRuntimeCoordinator';
+import { PluginRuntimeCoordinator } from '../../../../src/app/runtime/PluginRuntimeCoordinator';
 import { DEFAULT_SETTINGS } from '../../../../src/core/types';
 import { OpenCodianView } from '../../../../src/features/chat/OpenCodianView';
 
