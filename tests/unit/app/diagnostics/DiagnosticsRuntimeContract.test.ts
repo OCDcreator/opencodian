@@ -83,8 +83,15 @@ describe('Phase 3 Task 10 — DiagnosticsRuntimeContract (characterization)', ()
 
   describe('construction options shape', () => {
     let dir: string;
+    const created: Array<{ dispose: () => Promise<void> }> = [];
     beforeEach(() => { dir = tempDir('ctor'); });
-    afterEach(() => { fs.rmSync(dir, { recursive: true, force: true }); });
+    afterEach(async () => {
+      // Dispose all created services to prevent background timers leaking into
+      // later tests (the verify gate runs all suites in one worker pool).
+      await Promise.all(created.map((s) => s.dispose().catch(() => undefined)));
+      created.length = 0;
+      fs.rmSync(dir, { recursive: true, force: true });
+    });
 
     it('accepts the documented { settings, vaultPath, buildIdentity, knownSecrets, runtimeMetadata } option set for all three services', async () => {
       const oc = new OpenCodeSessionTraceService({
@@ -108,6 +115,7 @@ describe('Phase 3 Task 10 — DiagnosticsRuntimeContract (characterization)', ()
         knownSecrets: () => ['s1'],
         runtimeMetadata: () => ({ serverMode: 'local', customMeta: 'claude' }),
       });
+      created.push(oc, codex, claude);
       expect(oc.runtimeSegmentId).toMatch(/^[\da-f-]+$/);
       expect(codex.runtimeSegmentId).toMatch(/^[\da-f-]+$/);
       expect(claude.runtimeSegmentId).toMatch(/^[\da-f-]+$/);
@@ -121,12 +129,15 @@ describe('Phase 3 Task 10 — DiagnosticsRuntimeContract (characterization)', ()
       expect(codexRt.find((e) => e.name === 'runtime.started')?.payload).toMatchObject({ customMeta: 'codex' });
       const claudeRt = await claude.store.readRuntimeSegment(claude.runtimeSegmentId);
       expect(claudeRt.find((e) => e.name === 'runtime.started')?.payload).toMatchObject({ customMeta: 'claude' });
-    });
+      // Three readRuntimeSegment calls (each flushes + reads disk) can exceed the
+      // default 5s timeout under full-suite I/O contention; allow 15s.
+    }, 15000);
 
     it('uses a hardcoded build-identity fallback when buildIdentity is omitted', () => {
       const oc = new OpenCodeSessionTraceService({ settings: () => openCodeTraceSettings(dir) });
       const codex = new CodexSessionTraceService({ settings: () => codexTraceSettings(dir) });
       const claude = new ClaudeSessionTraceService({ settings: () => claudeTraceSettings(dir) });
+      created.push(oc, codex, claude);
       // No throw; the fallback string is 'Build: unknown' for all three.
       expect(oc.reportBuilder).toBeDefined();
       expect(codex.reportBuilder).toBeDefined();
@@ -378,7 +389,9 @@ describe('Phase 3 Task 10 — DiagnosticsRuntimeContract (characterization)', ()
       expect(ocRt.some((e) => e.name === 'runtime.stopped')).toBe(true);
       expect(codexRt.some((e) => e.name === 'runtime.stopped')).toBe(true);
       expect(claudeRt.some((e) => e.name === 'runtime.stopped')).toBe(true);
-    });
+      // Six readRuntimeSegment/readTrace calls can exceed the default 5s timeout
+      // under full-suite I/O contention; allow 15s.
+    }, 15000);
 
     it('dispose is idempotent (safe to call twice, as main.ts uses void ... .catch())', async () => {
       const service = new OpenCodeSessionTraceService({ settings: () => openCodeTraceSettings(dir) });
