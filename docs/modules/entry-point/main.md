@@ -202,7 +202,7 @@ OpenCode server status 回调也不再只刷新设置页状态：当本地/远�
 | 方法 | 说明 |
 |------|------|
 | `onload()` | 完成服务装配、设置迁移、视图/命令注册与会话预加载 |
-| `onunload()` | 停止 `OpenCodeService`，独立 best-effort dispose 三个 session trace service，清除 chat appearance timer 与模型刷新帧请求 |
+| `onunload()` | 停止 `OpenCodeService`，委托 `DiagnosticsRuntimeCoordinator.dispose()` 统一 best-effort flush 三个 session trace service（顺序 OpenCode→Codex→Claude，每个 void+catch），清除 chat appearance timer 与模型刷新帧请求 |
 | `loadSettings()` | 读取并迁移历史设置，生成当前版本的归一化配置 |
 | `saveSettings()` | 同步服务层、写回存储、刷新所有视图、同步 `.opencode` 权限配置 |
 | `invalidateSlashCommandCatalog({preload?})` | 失效 slash 命令/runtime 菜单 catalog（Claude/Codex 项目资源保存后调用，使下次 `/` 刷新；runtime supportedCommands()/supportedAgents() 仍为最终真相） |

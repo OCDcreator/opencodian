@@ -56,7 +56,13 @@ describe('Phase 3 Task 11 — DiagnosticsRuntimeCoordinator (behavior)', () => {
   const created: Array<{ dispose: () => Promise<void> }> = [];
   const dirs: string[] = [];
   afterEach(async () => {
+    // coordinator.dispose() is fire-and-forget (void+catch, matching main.ts
+    // onunload). Await the background disposals BEFORE deleting their dirs,
+    // otherwise rmSync races with in-flight store writes (ENOTEMPTY/storage_degraded).
     await Promise.all(created.map((c) => c.dispose().catch(() => undefined)));
+    // Flush fire-and-forget disposal microtasks/macrotasks + pending timers.
+    jest.runAllTimers();
+    await new Promise((resolve) => setTimeout(resolve, 50));
     created.length = 0;
     for (const d of dirs) fs.rmSync(d, { recursive: true, force: true });
     dirs.length = 0;
