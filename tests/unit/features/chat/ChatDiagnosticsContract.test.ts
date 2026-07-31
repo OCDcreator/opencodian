@@ -2,8 +2,8 @@
 /**
  * Phase 3 Task 10 — ChatDiagnosticsContract characterization.
  *
- * Captures the CURRENT chat-side diagnostics behavior that Task 12
- * (ChatDiagnosticsCoordinator) must preserve:
+ * Captures the chat-side diagnostics routing behavior after Task 12
+ * (`ChatDiagnosticsCoordinator`) extraction:
  *
  *   1. Codex/Claude host adapters are the fail-closed boundary: every trace
  *      read/call runs inside safeTrace() and returns a safe fallback on throw,
@@ -14,9 +14,8 @@
  *   4. delete-conversation performs NO trace interaction (the plan's explicit
  *      invariant — Task 12 must not invent a seam that does not exist).
  *
- * The units under test are the host adapters (already extracted) plus the
- * delete-conversation path through StorageService. This suite does NOT move
- * production code.
+ * The units under test are the host adapters, the OpenCode coordinator routing,
+ * and the delete-conversation path through StorageService.
  */
 import type { Menu } from 'obsidian';
 
@@ -324,63 +323,21 @@ describe('Phase 3 Task 10 — ChatDiagnosticsContract (characterization)', () =>
     });
   });
 
-  describe('header/menu route behavior — OpenCode inline diagnostics (source contract)', () => {
+  describe('header/menu route behavior — OpenCode coordinator routing (source contract)', () => {
     function readHeaderDiagnosticsBlock(): string {
       return readBoundedOpenCodianViewBlock(
-        'getOpenCodeDiagnosticsState: () => {',
+        'getOpenCodeDiagnosticsState: () => this.chatDiagnosticsCoordinator.getOpenCodeDiagnosticsState(),',
         'getActiveDiagnosticsTabId: () => this.getActiveTabId(),',
       );
     }
 
-    it('pins the enabled, storage, capture, and unread-severity state path', () => {
+    it('routes the OpenCode header state and menu operations through the coordinator', () => {
       const block = readHeaderDiagnosticsBlock();
-
-      // This is deliberately the current inline OpenCode state path, not the
-      // similar Codex/Claude adapter implementation. Every early-return and
-      // severity mapping is pinned so Task 12 cannot silently drop a state.
       expectSourceOrder(block, [
-        'const settings = this.plugin.settings.backendSettings.opencode.sessionTrace;',
-        "if (!settings.enabled) return 'disabled';",
-        'const storeStatus = this.plugin.openCodeTraceService.store.getStatus();',
-        "if (storeStatus.mode === 'memory' || storeStatus.lastError) return 'degraded';",
-        'const tabId = this.getActiveTabId();',
-        "if (!tabId) return 'normal';",
-        'const captureState = this.plugin.openCodeTraceService.getCaptureState(tabId);',
-        "if (captureState !== 'off') return captureState;",
-        'const sessionId = this.getSessionIdForTab(tabId);',
-        'this.plugin.openCodeTraceService.store.resolveTraceId(sessionId)',
-        'this.plugin.openCodeTraceService.store.listSummaries(100).find((item) => item.traceId === traceId)',
-        "if (!summary?.unreadAnomalyCount) return 'normal';",
+        'getOpenCodeDiagnosticsState: () => this.chatDiagnosticsCoordinator.getOpenCodeDiagnosticsState(),',
+        'showOpenCodeDiagnostics: (event) => this.chatDiagnosticsCoordinator.showOpenCodeDiagnostics(event),',
       ]);
-      expect(block).toContain("summary.highestUnreadSeverity === 'critical' || summary.highestUnreadSeverity === 'error'");
-      expect(block).toContain("? 'critical'");
-      expect(block).toContain(": 'warning';");
-    });
-
-    it('pins arm, cancel, and copy labels/notices with their observable call order', () => {
-      const block = readHeaderDiagnosticsBlock();
-
-      // OpenCode remains inline before Task 12; do not collapse its current
-      // menu behavior into the Codex/Claude adapter contracts above.
-      expectSourceOrder(block, [
-        "if (captureState === 'armed') {",
-        ".setTitle(t('chat.opencodeDiagnostics.cancelCapture'))",
-        'this.plugin.openCodeTraceService.cancelDeepCapture(tabId);',
-        'this.chatHeaderPresenter.refreshBackendChrome();',
-        ".setTitle(t('chat.opencodeDiagnostics.captureNext'))",
-        'this.plugin.openCodeTraceService.armDeepCapture(tabId, sessionId);',
-        'this.chatHeaderPresenter.refreshBackendChrome();',
-        "new Notice(t('chat.opencodeDiagnostics.captureArmed'));",
-        ".setTitle(t('chat.opencodeDiagnostics.copySession'))",
-        'this.plugin.openCodeTraceService.store.resolveTraceId(sessionId)',
-        'const userContext = await this.promptDiagnosticsUserContext();',
-        'this.plugin.openCodeTraceService.reportBuilder.buildSmartReport(',
-        "{ selection: 'current-session' }",
-        'await navigator.clipboard.writeText(report);',
-        'this.chatHeaderPresenter.refreshBackendChrome();',
-        "new Notice(t('chat.opencodeDiagnostics.copySuccess'));",
-        'menu.showAtMouseEvent(event);',
-      ]);
+      expect(block).not.toContain('this.plugin.openCodeTraceService');
     });
   });
 
@@ -468,8 +425,8 @@ describe('Phase 3 Task 10 — ChatDiagnosticsContract (characterization)', () =>
   // ---------------------------------------------------------------------------
   // Step 3 (cont.): tab-cleanup capture-cancel seam.
   //
-  // OpenCodianView (lines 3266-3270) wires tab cleanup to cancel capture per
-  // backend: OpenCode → openCodeTraceService.cancelDeepCapture(tabId); Codex →
+  // OpenCodianView wires tab cleanup to cancel capture per backend: OpenCode →
+  // ChatDiagnosticsCoordinator.cancelOpenCodeDiagnosticCapture(tabId); Codex →
   // codexDiagnosticsAdapter.cancelDiagnosticCapture(tabId); Claude →
   // claudeDiagnosticsAdapter.cancelDiagnosticCapture(tabId). Task 12 must keep
   // these three cancel seams distinct (no merged cross-backend cancel).
@@ -477,30 +434,31 @@ describe('Phase 3 Task 10 — ChatDiagnosticsContract (characterization)', () =>
 
   describe('tab-cleanup capture-cancel seam (three distinct backends)', () => {
     it('OpenCodianView wires three separate cancel seams (source contract)', () => {
+      expect.hasAssertions();
       const block = readBoundedOpenCodianViewBlock(
         'private createConversationTabLifecycleRecoveryHost(): ConversationTabLifecycleRecoveryHost {',
         'private createSendPipelineHostDependencies(): SendPipelineHostDependencies {',
       );
       // The tab-cleanup host dependencies wire three distinct cancel callbacks.
       expectSourceOrder(block, [
-        'cancelOpenCodeDiagnosticCapture: (tabId) => {',
-        'this.plugin.openCodeTraceService.cancelDeepCapture(tabId);',
+        'cancelOpenCodeDiagnosticCapture: (tabId) =>',
+        'this.chatDiagnosticsCoordinator.cancelOpenCodeDiagnosticCapture(tabId),',
         'cancelCodexDiagnosticCapture: (tabId) => this.codexDiagnosticsAdapter.cancelDiagnosticCapture(tabId),',
         'cancelClaudeDiagnosticCapture: (tabId) => this.claudeDiagnosticsAdapter.cancelDiagnosticCapture(tabId),',
       ]);
     });
 
     it('OpenCodianView wires three distinct claim seams for the send path (source contract)', () => {
+      expect.hasAssertions();
       const block = readBoundedOpenCodianViewBlock(
-        'claimOpenCodeDiagnosticRunToken: (tabId, sessionId) => {',
+        'private createSendPipelineHostDependencies(): SendPipelineHostDependencies {',
         'sendStreamMessage: (conversation, content, options) => {',
       );
       // Each claim callback must actually invoke its backend-specific claim,
       // not become a generic no-op during coordinator extraction.
       expectSourceOrder(block, [
-        'claimOpenCodeDiagnosticRunToken: (tabId, sessionId) => {',
-        'if (!tabId) return undefined;',
-        'this.plugin.openCodeTraceService.claimDeepCapture(tabId, sessionId);',
+        'claimOpenCodeDiagnosticRunToken: (tabId, sessionId) =>',
+        'this.chatDiagnosticsCoordinator.claimOpenCodeDiagnosticRunToken(tabId, sessionId),',
         'claimCodexDiagnosticRunToken: (tabId, threadId) =>',
         'this.codexDiagnosticsAdapter.claimDiagnosticRunToken(tabId, threadId ?? undefined),',
         'claimClaudeDiagnosticRunToken: (tabId, sessionId) =>',

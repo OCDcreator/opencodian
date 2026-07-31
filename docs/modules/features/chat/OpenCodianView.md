@@ -3,6 +3,7 @@
 > 2026-07-30: The OpenCode diagnostics header refresh seam accepts an explicit changed tab and updates DOM only when it is still the active tab.
 > 2026-07-30: Codex chat-side diagnostics live in `CodexDiagnosticsHostAdapter`; `OpenCodianView` supplies only live-state/menu/notice host callbacks and delegates header state/menu, capture claim/cancel, and export there. The send-pipeline host preserves every diagnostic token in `options` for OpenCode compatibility and also forwards it at the backend-neutral request top level, which is the contract consumed by `CodexAdapter`. OpenCode diagnostics behavior is unchanged.
 > 2026-07-30: Claude Code chat diagnostics are assembled through `ClaudeDiagnosticsHostAdapter`. The view only injects live trace-service/settings/conversation callbacks, delegates badge/menu, deep-capture claim/cancel and current-session report export, and forwards Claude token/refresh/cancel hooks through existing chat ports; trace failures stay outside the chat path.
+> 2026-07-31: OpenCode chat diagnostics are assembled through `ChatDiagnosticsCoordinator`. The view injects only narrow live ports for settings, trace service, active tab/session, header refresh, menu, prompt, clipboard, and notice; the Header, SendPipeline, and tab-recovery seams delegate their OpenCode state/menu, token claim, and cancellation operations to that coordinator. Codex and Claude adapter composition is unchanged.
 
 > **源码**: `src/features/chat/OpenCodianView.ts`
 > **状态**: [REVIEW]
@@ -107,6 +108,7 @@ background task completion notice 的 queued-state 则已经完全移出 `TabRun
 
 - `currentConversation` / `currentConversationRevertState`
 - `services/ChatHeaderPresenter.ts` 的 host seam：server availability、settings/history/new-tab callbacks、status refresh 和 header tab-slot 写回
+- `services/ChatDiagnosticsCoordinator.ts` 的 OpenCode-only host seam：session-trace settings/service、活动 tab/session、header refresh、Menu、prompt、clipboard 与 Notice；view 不再内联读取 OpenCode trace store/report builder
 - `services/ClaudeDiagnosticsHostAdapter.ts` 的 host seam：Claude Code trace service/settings/conversation 读取、header refresh、Menu/Notice 工厂；view 只装配该 adapter，并把 badge/menu、token claim/cancel 与 current-session smart-report 回调透传给 header、send pipeline 和 tab recovery
 - `services/LspStatusRefreshCoordinator.ts` 的 host seam：调用 `OpenCodeService.getLspStatus()`，把 language server connection summary 推送给 header indicator
 - `services/ConversationSessionSettingsCoordinator.ts` 的 host seam：current conversation、global session defaults、active-tab context usage refresh，以及 per-conversation session settings notice/save；view 现在还把 `agentServiceRegistry` 交给 coordinator，用于把当前会话的 share-URL 读取路由到 `readBackendSessionShareUrl()` → backend `getSession(sessionId)` 这条窄 seam。coordinator 按 conversation backend/capability gate 让 Claude Code 会话只显示通用字体/渲染摘要，不暴露 OpenCode-only 的标题生成、问答、压缩或分享 UI；share/unshare 写操作仍由相邻 owner 通过插件实例解析，避免继续增长 view shell

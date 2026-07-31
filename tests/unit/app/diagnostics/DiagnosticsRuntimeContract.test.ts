@@ -884,8 +884,9 @@ describe('Phase 3 Task 10 — DiagnosticsRuntimeContract (characterization)', ()
   //
   // The plan (item 6) requires capturing each backend's current export/flush
   // sequence WITHOUT inventing a uniform baseline. The asymmetry:
-  //   - OpenCode chat export (OpenCodianView inline): resolveTraceId →
-  //     buildSmartReport → clipboard.writeText (NO pre-flush).
+  //   - OpenCode chat export (ChatDiagnosticsCoordinator): resolveTraceId →
+  //     promptDiagnosticsUserContext → buildSmartReport → host clipboard
+  //     (NO pre-flush).
   //   - Codex/Claude adapter export: flushRingBuffer → store.flush() →
   //     buildSmartReport → clipboard.writeText.
   // Plus the plugin-level export (writeDiagnosticLogFile / buildDiagnosticReport)
@@ -928,20 +929,22 @@ describe('Phase 3 Task 10 — DiagnosticsRuntimeContract (characterization)', ()
       expect(buildIdx).toBeLessThan(clipboardIdx);
     });
 
-    it('OpenCode chat export (OpenCodianView inline) does NOT pre-flush — it resolves traceId then builds the report directly', () => {
+    it('OpenCode chat export (ChatDiagnosticsCoordinator) does NOT pre-flush — it resolves traceId, prompts for context, then builds the report directly', () => {
       const src = fs.readFileSync(
-        path.resolve(__dirname, '../../../../src/features/chat/OpenCodianView.ts'),
+        path.resolve(__dirname, '../../../../src/features/chat/services/ChatDiagnosticsCoordinator.ts'),
         'utf8',
       );
-      // Find the copySession menu onClick handler that builds the OpenCode report.
+      // Find the coordinator-owned copySession menu onClick handler.
       const copyIdx = src.indexOf("setTitle(t('chat.opencodeDiagnostics.copySession'))");
       expect(copyIdx).toBeGreaterThan(-1);
       const body = src.slice(copyIdx, copyIdx + 800);
       const resolveIdx = body.indexOf('resolveTraceId(');
+      const promptIdx = body.indexOf('promptDiagnosticsUserContext(');
       const buildIdx = body.indexOf('buildSmartReport(');
-      const clipboardIdx = body.indexOf('navigator.clipboard.writeText');
+      const clipboardIdx = body.indexOf('this.host.writeTextToClipboard(report)');
       expect(resolveIdx).toBeGreaterThan(-1);
-      expect(resolveIdx).toBeLessThan(buildIdx);
+      expect(resolveIdx).toBeLessThan(promptIdx);
+      expect(promptIdx).toBeLessThan(buildIdx);
       expect(buildIdx).toBeLessThan(clipboardIdx);
       // OpenCode export does NOT call flushRingBuffer or store.flush before building.
       const preBuildSlice = body.slice(0, buildIdx);

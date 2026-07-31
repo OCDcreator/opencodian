@@ -163,6 +163,7 @@ import {
   type BackgroundTaskViewHost,
   createBackgroundTaskViewHost,
 } from './services/BackgroundTaskTimelineService';
+import { ChatDiagnosticsCoordinator } from './services/ChatDiagnosticsCoordinator';
 import {
   ChatHeaderPresenter,
   type ChatHeaderPresenterHost,
@@ -525,6 +526,7 @@ export class OpenCodianView extends ItemView {
   private backendActiveChangeDisposable: { dispose(): void } | null = null;
   private backendCapabilityChangeDisposable: { dispose(): void } | null = null;
   private readonly codexChatSurfaceBinding: CodexChatSurfaceBinding;
+  private readonly chatDiagnosticsCoordinator: ChatDiagnosticsCoordinator;
   private readonly codexDiagnosticsAdapter: CodexDiagnosticsHostAdapter;
   private readonly claudeDiagnosticsAdapter: ClaudeDiagnosticsHostAdapter;
   private escapeHandlers: Array<() => boolean> = [];
@@ -716,70 +718,8 @@ export class OpenCodianView extends ItemView {
       openConversationSessionSettings: () => {
         this.conversationSessionSettingsCoordinator.openCurrentConversationSettings();
       },
-      getOpenCodeDiagnosticsState: () => {
-        const settings = this.plugin.settings.backendSettings.opencode.sessionTrace;
-        if (!settings.enabled) return 'disabled';
-        const storeStatus = this.plugin.openCodeTraceService.store.getStatus();
-        if (storeStatus.mode === 'memory' || storeStatus.lastError) return 'degraded';
-        const tabId = this.getActiveTabId();
-        if (!tabId) return 'normal';
-        const captureState = this.plugin.openCodeTraceService.getCaptureState(tabId);
-        if (captureState !== 'off') return captureState;
-        const sessionId = this.getSessionIdForTab(tabId);
-        const traceId = sessionId
-          ? this.plugin.openCodeTraceService.store.resolveTraceId(sessionId)
-          : undefined;
-        const summary = traceId
-          ? this.plugin.openCodeTraceService.store.listSummaries(100).find((item) => item.traceId === traceId)
-          : undefined;
-        if (!summary?.unreadAnomalyCount) return 'normal';
-        return summary.highestUnreadSeverity === 'critical' || summary.highestUnreadSeverity === 'error'
-          ? 'critical'
-          : 'warning';
-      },
-      showOpenCodeDiagnostics: (event) => {
-        const tabId = this.getActiveTabId();
-        if (!tabId) return;
-        const sessionId = this.getSessionIdForTab(tabId) ?? undefined;
-        const menu = new Menu();
-        const captureState = this.plugin.openCodeTraceService.getCaptureState(tabId);
-        if (captureState === 'armed') {
-          menu.addItem((item) => item
-            .setTitle(t('chat.opencodeDiagnostics.cancelCapture'))
-            .setIcon('circle-stop')
-            .onClick(() => {
-              this.plugin.openCodeTraceService.cancelDeepCapture(tabId);
-              this.chatHeaderPresenter.refreshBackendChrome();
-            }));
-        } else {
-          menu.addItem((item) => item
-            .setTitle(t('chat.opencodeDiagnostics.captureNext'))
-            .setIcon('radio')
-            .onClick(() => {
-              this.plugin.openCodeTraceService.armDeepCapture(tabId, sessionId);
-              this.chatHeaderPresenter.refreshBackendChrome();
-              new Notice(t('chat.opencodeDiagnostics.captureArmed'));
-            }));
-        }
-        menu.addItem((item) => item
-          .setTitle(t('chat.opencodeDiagnostics.copySession'))
-          .setIcon('copy')
-          .onClick(async () => {
-            const traceId = sessionId
-              ? this.plugin.openCodeTraceService.store.resolveTraceId(sessionId)
-              : undefined;
-            const userContext = await this.promptDiagnosticsUserContext();
-            const report = await this.plugin.openCodeTraceService.reportBuilder.buildSmartReport(
-              traceId,
-              userContext,
-              { selection: 'current-session' },
-            );
-            await navigator.clipboard.writeText(report);
-            this.chatHeaderPresenter.refreshBackendChrome();
-            new Notice(t('chat.opencodeDiagnostics.copySuccess'));
-          }));
-        menu.showAtMouseEvent(event);
-      },
+      getOpenCodeDiagnosticsState: () => this.chatDiagnosticsCoordinator.getOpenCodeDiagnosticsState(),
+      showOpenCodeDiagnostics: (event) => this.chatDiagnosticsCoordinator.showOpenCodeDiagnostics(event),
       getActiveDiagnosticsTabId: () => this.getActiveTabId(),
       getCodexDiagnosticsState: (tabId) => this.codexDiagnosticsAdapter.getDiagnosticsState(tabId),
       showCodexDiagnostics: (event, tabId) => this.codexDiagnosticsAdapter.showDiagnostics(event, tabId),
@@ -1742,6 +1682,17 @@ export class OpenCodianView extends ItemView {
       invalidateSlashCommandMenuCache: () => this.slashCommandMenuCatalogCache.invalidate(),
       openPluginSettings: () => this.openPluginSettingsPreservingScroll(),
       isCodexActive: () => this.isCodexConversationActive(),
+    });
+    this.chatDiagnosticsCoordinator = new ChatDiagnosticsCoordinator({
+      getOpenCodeSessionTraceSettings: () => this.plugin.settings.backendSettings.opencode.sessionTrace,
+      getOpenCodeTraceService: () => this.plugin.openCodeTraceService,
+      getActiveTabId: () => this.getActiveTabId(),
+      getSessionIdForTab: (tabId) => this.getSessionIdForTab(tabId),
+      refreshHeaderChrome: () => this.chatHeaderPresenter.refreshBackendChrome(),
+      createMenu: () => new Menu(),
+      promptDiagnosticsUserContext: () => this.promptDiagnosticsUserContext(),
+      writeTextToClipboard: (text) => navigator.clipboard.writeText(text),
+      showNotice: (message) => { new Notice(message); },
     });
     this.codexDiagnosticsAdapter = new CodexDiagnosticsHostAdapter({
       getCodexTraceService: () => this.plugin.codexTraceService,
@@ -3263,9 +3214,8 @@ export class OpenCodianView extends ItemView {
       removeTabMessagesPane: (tabId) => {
         this.removeTabMessagesPane(tabId);
       },
-      cancelOpenCodeDiagnosticCapture: (tabId) => {
-        this.plugin.openCodeTraceService.cancelDeepCapture(tabId);
-      },
+      cancelOpenCodeDiagnosticCapture: (tabId) =>
+        this.chatDiagnosticsCoordinator.cancelOpenCodeDiagnosticCapture(tabId),
       cancelCodexDiagnosticCapture: (tabId) => this.codexDiagnosticsAdapter.cancelDiagnosticCapture(tabId),
       cancelClaudeDiagnosticCapture: (tabId) => this.claudeDiagnosticsAdapter.cancelDiagnosticCapture(tabId),
       showNotice: (message) => {
@@ -3296,10 +3246,8 @@ export class OpenCodianView extends ItemView {
       transitionTabSessionLifecycle: (tabId, phase, reason) =>
         this.conversationTabRuntimeCoordinator.transitionTabSessionLifecycle(tabId, phase, reason),
       refreshServerStatusBadge: () => this.chatHeaderPresenter.refreshServerStatusBadge(),
-      claimOpenCodeDiagnosticRunToken: (tabId, sessionId) => {
-        if (!tabId) return undefined;
-        return this.plugin.openCodeTraceService.claimDeepCapture(tabId, sessionId);
-      },
+      claimOpenCodeDiagnosticRunToken: (tabId, sessionId) =>
+        this.chatDiagnosticsCoordinator.claimOpenCodeDiagnosticRunToken(tabId, sessionId),
       claimCodexDiagnosticRunToken: (tabId, threadId) =>
         this.codexDiagnosticsAdapter.claimDiagnosticRunToken(tabId, threadId ?? undefined),
       claimClaudeDiagnosticRunToken: (tabId, sessionId) =>
