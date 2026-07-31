@@ -258,4 +258,36 @@ None. No Test Vault deployment required.
 - **Test Vault evidence:** runtime code was deployed on macOS with BUILD_ID `main.202607311845`. Test Vault SHA-256: `main.js` `f0df3b4b420b50162e0e1c71467d64fbb9987858574a7d7f9cd60998d3f32440`; `manifest.json` `3a47461c4a27d35efbe7afde5be9c124e4a7599550d330626f81efb0f8c0be88`; `styles.css` `1e4aa7b41de2c2eadfb5ec7bbc7f6eac6256b795d4c7990b12848747b164e4a7`. The final three commits are docs/config only, so no redeployment was required; a later local `dist` BUILD_ID may differ and is not byte-equal evidence for the deployed runtime.
 
 ## Phase 4–6
-- **Status:** Phase 3 (Tasks 10–13) is **CLOSED / APPROVED** at `e0a008a3`; Phase 4 has not started and was not entered; Phase 5–6 remain not started. No push is claimed.
+- **Status:** Task 14 is **CLOSED / APPROVED** at `6773dfa1`; Task 15 has not started and Phase 4 is not yet closed. Phase 5–6 remain not started. No push is claimed.
+
+### Task 14 — Replace plugin-shaped seams with consumer-owned ports and move runtime orchestration — CLOSED / APPROVED
+- **Range:** `73a30557..6773dfa1` (6 commits).
+- **Commits:**
+  | SHA | Type | Subject |
+  |---|---|---|
+  | `c58458c6` | `test(architecture)` | `characterize Task 14 plugin seams` |
+  | `ae1088d9` | `refactor(storage)` | `replace plugin type with narrow port` |
+  | `9f3e7731` | `refactor(chat)` | `narrow title generation plugin port` |
+  | `2f1ae721` | `refactor(chat)` | `narrow view plugin port` |
+  | `e2ca9d75` | `refactor(runtime)` | `move plugin orchestration to app layer` |
+  | `6773dfa1` | `chore(architecture)` | `consolidate Task 14 shared snapshots` |
+
+- **Sol independent review — APPROVED (2 rounds).**
+  - Round 1: `/root/task14_review_r1` (gpt-5.6-sol) initially returned **CHANGES REQUESTED** on the old `d6e029db`: shared baseline/Graphify artifacts made the port commits reverse-merge-conflicting when selectively replayed.
+  - After historical reorganization and shared-snapshot consolidation, fresh round 2 `/root/task14_review_r2` (gpt-5.6-sol) reviewed `6773dfa1` and returned literal **APPROVED**; Standards findings 0, Spec findings 0. The round-1 recalibration is not the final gate.
+
+- **Acceptance status:**
+  - [x] Four behavior commits (`ae1088d9`, `9f3e7731`, `2f1ae721`, `e2ca9d75`) each independently `git revert --no-commit` from final HEAD with exit 0, zero unmerged paths, and exact scope; shared snapshots remain separated from behavior.
+  - [x] `src/core/**` → `main` runtime/type edges: 0; targeted Storage/View/Title → `main` direct edges: 0; View/Title plugin-class direct imports: 0.
+  - [x] Old `core/runtime` → `features/chat` runtime edges: 0; new `app.runtime` owns both `OpenCodianView` and `UserMessageFooterRenderer`; runtime SCC: 0; type/mixed debt remains 4/12; `dependencyExceptions=[]`.
+  - [x] Storage, title-generation, and chat ports are consumer-owned structural/type seams with no runtime forwarding, duplicated state, service locator, key/type lookup, or plugin-shaped mega-interface.
+
+- **Gate evidence (fresh final closure snapshot):**
+  - Focused matrix: 16/16 suites, 228/228 tests.
+  - Full `npm run verify`: 15/15 gates; 723/723 suites; 6915/6915 tests; lint 0 errors/0 warnings; typecheck, production build, and generated styles clean.
+  - Raw classified edges: 2574, unresolved 0; baseline generator parity: 2247/2247; owner manifest: 553/553; module docs: 587/587; Graphify digest: `c779838439a60328f69bb2282d972be3ecd384345ab3a70e69af0557f745065b`.
+  - Three negative mutation proofs all fail → restore → pass: model reload call removal, Storage → `main.ts` type import, and core runtime → `OpenCodianView` runtime import. Final SHA values and status were restored clean.
+
+- **CodeGraph evidence (depth 2):** `StorageService` constructor has 0 direct function/method callers, nodeCount 1; `TitleGenerationService` constructor has 0 direct function/method callers, nodeCount 1; `OpenCodianView` constructor has 0 direct function/method callers, nodeCount 1; `PluginRuntimeCoordinator` constructor has 0 direct function/method callers, nodeCount 1; `getOpenCodianViews` has 2 direct callers (`refreshOpenCodianViews`, `invalidateSlashCommandMenuCatalogs`), nodeCount 11.
+
+- **Test Vault deployment:** BUILD_ID `main.202607312330`; source and macOS Test Vault hashes match: `main.js` `117d02e452af5cb9ea6c80b9e1b734f9ab84001d25e9c4af6468f19632dc9239`, `manifest.json` `3a47461c4a27d35efbe7afde5be9c124e4a7599550d330626f81efb0f8c0be88`, `styles.css` `1e4aa7b41de2c2eadfb5ec7bbc7f6eac6256b795d4c7990b12848747b164e4a7`. No push is claimed.

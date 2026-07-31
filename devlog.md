@@ -11,6 +11,16 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-07-31 Agent-Friendly Architecture 试点：consumer-owned ports 与 app runtime 编排（Phase 4 Task 14）
+
+Task 14 在 `73a30557..6773dfa1` 完成六个提交：先以 characterization 固化 plugin seams，再将 Storage、TitleGeneration、Chat 改为 consumer-owned narrow ports，并把 `PluginRuntimeCoordinator` 从 `core/runtime` 移至 `app.runtime`；最终 `6773dfa1` 汇总共享 baseline/Graphify snapshots。`src/core/**`→`main` runtime/type、Storage/View/Title→`main` targeted direct edges、View/Title plugin-class imports及旧 `core/runtime`→`features/chat` runtime edges均为 0；runtime SCC 0，type/mixed debt 4/12，`dependencyExceptions=[]`，Task 15 尚未开始，Phase 4 尚未关闭。
+
+Sol 独立审查两轮：旧 `d6e029db` 上 `/root/task14_review_r1` 初审 **CHANGES REQUESTED**（历史 port commits 与共享 baseline/Graphify 产生 reverse-merge conflict）；历史重组后由 `/root/task14_review_r2` 以 gpt-5.6-sol 对 `6773dfa1` fresh review，最终 literal **APPROVED**（Standards/Spec findings 0）。四个 behavior commits 均从最终 HEAD 独立 `git revert --no-commit` 成功、unmerged 0 且范围精确；三类负向 mutation 均 fail→restore→pass，最终 SHA/status clean。
+
+门禁证据：focused 16/16 suites、228/228 tests；`npm run verify` 15/15、723/723 suites、6915/6915 tests，lint 0/0，typecheck/build/styles clean；raw classified edges 2574、unresolved 0，baseline parity 2247/2247，owner manifest 553/553，module docs 587/587，Graphify digest `c779838439a60328f69bb2282d972be3ecd384345ab3a70e69af0557f745065b`。CodeGraph depth 2 记录 constructors 与 `getOpenCodianViews` callers/nodeCount，见 Phase ledger。
+
+Test Vault 已部署并与源产物 SHA-256 一致，BUILD_ID `main.202607312330`：`main.js` `117d02e452af5cb9ea6c80b9e1b734f9ab84001d25e9c4af6468f19632dc9239`、`manifest.json` `3a47461c4a27d35efbe7afde5be9c124e4a7599550d330626f81efb0f8c0be88`、`styles.css` `1e4aa7b41de2c2eadfb5ec7bbc7f6eac6256b795d4c7990b12848747b164e4a7`。不声称 push。
+
 ## 2026-07-31 Agent-Friendly Architecture 试点：Settings 后端调试面板完整 owner 收口（Phase 3 Task 13）
 
 Task 13 在 `91fc3b7f..e0a008a3` 完成六个提交：`4201793c`（OpenCode）、`94cfdd75`（Codex）、`2c2bd00f`（Claude Code）分别提取完整调试面板，随后 `74a4f422` 补齐架构/模块文档索引，`cdebc97b` 修正三端口文档，`e0a008a3` 修正 debug module owner guidance。三个面板各自拥有 render/settings/status/actions/catalog lifecycle，只接收窄 typed settings/diagnostics ports 与 callbacks，不接收完整 plugin 或 mutable service map；`SettingsDebugSection` 保留 shared shell/router 与 platform/dialog/path/action/module helpers，且零直接 backend trace-service/store/report-builder 访问。Claude 的 console `debugChannels` 与 `sessionTrace.consoleChannels` 仍独立；legacy classic attach 的 Codex omission 保持不变，tabbed route 仍挂载 Codex，`src/i18n` 零 diff。
