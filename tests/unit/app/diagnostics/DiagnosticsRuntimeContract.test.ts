@@ -770,9 +770,12 @@ describe('Phase 3 Task 10 — DiagnosticsRuntimeContract (characterization)', ()
     });
 
     it('main.ts exposes delegating getters that return the coordinator typed ports (shims until Task 12/13)', () => {
-      expect(mainSrc).toMatch(/get openCodeTraceService\(\).*return this\.requireDiagnosticsCoordinator\(\)\.openCode/s);
-      expect(mainSrc).toMatch(/get codexTraceService\(\).*return this\.requireDiagnosticsCoordinator\(\)\.codex/s);
-      expect(mainSrc).toMatch(/get claudeTraceService\(\).*return this\.requireDiagnosticsCoordinator\(\)\.claude/s);
+      // The getters delegate to this.diagnosticsCoordinator?.<backend> and return
+      // undefined before bootstrap (matching the prior uninitialized-field runtime
+      // behavior). The declared type stays non-nullable so consumers keep typechecking.
+      expect(mainSrc).toMatch(/get openCodeTraceService\(\).*return this\.diagnosticsCoordinator\?\.openCode/s);
+      expect(mainSrc).toMatch(/get codexTraceService\(\).*return this\.diagnosticsCoordinator\?\.codex/s);
+      expect(mainSrc).toMatch(/get claudeTraceService\(\).*return this\.diagnosticsCoordinator\?\.claude/s);
     });
 
     it('main.ts onunload delegates dispose to the coordinator (not per-service inline disposal)', () => {
@@ -825,7 +828,7 @@ describe('Phase 3 Task 10 — DiagnosticsRuntimeContract (characterization)', ()
       expect(claudeCtor).toMatch(/inputs\.claudeKnownSecrets/);
     });
 
-    it('coordinator dispose() void-wraps each backend with .catch in pinned order opencode -> codex -> claude', () => {
+    it('coordinator dispose() void-wraps each backend with .catch in pinned order opencode -> codex -> claude, using the injected logger', () => {
       const disposeStart = coordSrc.indexOf('async dispose(): Promise<void> {');
       expect(disposeStart).toBeGreaterThan(-1);
       const body = coordSrc.slice(disposeStart, disposeStart + 800);
@@ -840,6 +843,19 @@ describe('Phase 3 Task 10 — DiagnosticsRuntimeContract (characterization)', ()
       expect(body).toMatch(/void this\.openCode\.dispose\(\)\.catch/);
       expect(body).toMatch(/void this\.codex\.dispose\(\)\.catch/);
       expect(body).toMatch(/void this\.claude\.dispose\(\)\.catch/);
+      // Warnings use the injected this.logger (preserves caller's scope), not a
+      // hardcoded module-level logger.
+      expect(body).toMatch(/this\.logger\.warn/);
+      expect(body).not.toMatch(/^const logger =/m);
+    });
+
+    it('coordinator accepts an injected logger and main.ts passes its OpenCodian logger (byte-compatible scope)', () => {
+      // The coordinator stores inputs.logger (defaulting to a coordinator-scoped logger).
+      expect(coordSrc).toMatch(/this\.logger\s*=\s*inputs\.logger\s*\?\?\s*createLogger/);
+      // main.ts injects its 'OpenCodian' logger so dispose warnings preserve the scope.
+      const mainBootstrap = mainSrc.indexOf('private async handleBootstrapOpenCodeRuntime(');
+      const mainBody = mainSrc.slice(mainBootstrap, mainSrc.indexOf('  activateView', mainBootstrap));
+      expect(mainBody).toMatch(/logger,/);
     });
 
     it('coordinator exposes typed backend ports (no generic mutable service map)', () => {

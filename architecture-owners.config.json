@@ -62,12 +62,14 @@
         "core.storage",
         "core.config",
         "feature.chat-shell",
-        "feature.settings-shell"
+        "feature.settings-shell",
+        "app.diagnostics-runtime"
       ],
       "forbiddenDependencies": [],
       "adjacentOwners": [
         "core.runtime",
-        "core.opencode"
+        "core.opencode",
+        "app.diagnostics-runtime"
       ],
       "tests": [
         "tests/unit/entry-point/**"

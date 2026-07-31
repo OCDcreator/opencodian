@@ -106,23 +106,26 @@ export default class OpenCodianPlugin extends Plugin {
    * 12/13 migrate the consumers and then these shims are removed.
    */
   private diagnosticsCoordinator: DiagnosticsRuntimeCoordinator | null = null;
+  /**
+   * Delegating getters returning the coordinator's typed backend ports. The
+   * declared types are non-nullable to match the prior stored fields (so
+   * consumers using `.` access keep typechecking), but the runtime value is
+   * undefined before bootstrap completes — exactly mirroring the prior
+   * uninitialized stored fields, where pre-bootstrap reads returned undefined.
+   * Consumers that may run before bootstrap use optional chaining
+   * (`this.plugin.openCodeTraceService?.store`). Shims removed in Task 12/13.
+   */
   /** @deprecated delegate to DiagnosticsRuntimeCoordinator; removed in Task 12/13. */
   get openCodeTraceService(): OpenCodeSessionTraceService {
-    return this.requireDiagnosticsCoordinator().openCode;
+    return this.diagnosticsCoordinator?.openCode as OpenCodeSessionTraceService;
   }
   /** @deprecated delegate to DiagnosticsRuntimeCoordinator; removed in Task 12/13. */
   get codexTraceService(): CodexSessionTraceService {
-    return this.requireDiagnosticsCoordinator().codex;
+    return this.diagnosticsCoordinator?.codex as CodexSessionTraceService;
   }
   /** @deprecated delegate to DiagnosticsRuntimeCoordinator; removed in Task 12/13. */
   get claudeTraceService(): ClaudeSessionTraceService {
-    return this.requireDiagnosticsCoordinator().claude;
-  }
-  private requireDiagnosticsCoordinator(): DiagnosticsRuntimeCoordinator {
-    if (!this.diagnosticsCoordinator) {
-      throw new Error('DiagnosticsRuntimeCoordinator not yet constructed; bootstrap has not completed.');
-    }
-    return this.diagnosticsCoordinator;
+    return this.diagnosticsCoordinator?.claude as ClaudeSessionTraceService;
   }
   agentServiceRegistry: AgentServiceRegistry;
   claudeCodePermissionBridge: ClaudeCodePermissionBridge | null = null;
@@ -293,6 +296,9 @@ export default class OpenCodianPlugin extends Plugin {
           modelSourceMode: this.settings.modelSourceMode,
           pluginIsolationMode: this.settings.pluginIsolationMode,
         }),
+        // Inject the main.ts 'OpenCodian' logger so dispose warnings preserve the
+        // prior `[OpenCodian]` console/export scope byte-for-byte.
+        logger,
       });
       this.openCodeService = new OpenCodeService(
         this.settings,

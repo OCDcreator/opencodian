@@ -56,4 +56,11 @@ export interface DiagnosticsRuntimeInputs {
   codexRuntimeMetadata: () => Record<string, unknown>;
   /** Claude runtime-metadata getter. */
   claudeRuntimeMetadata: () => Record<string, unknown>;
+  /**
+   * Logger used for per-backend dispose warnings. Injected so the caller
+   * (main.ts) controls the console/export logger scope — preserving the prior
+   * `[OpenCodian]` prefix byte-for-byte. Defaults to a DiagnosticsRuntimeCoordinator
+   * scoped logger when omitted.
+   */
+  logger?: import('../../shared/logger').Logger;
 }

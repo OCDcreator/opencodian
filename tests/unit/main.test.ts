@@ -126,11 +126,11 @@ describe('OpenCodianPlugin.getConversationById', () => {
 });
 
 describe('OpenCodianPlugin unload diagnostics', () => {
-  it('main.ts onunload delegates trace disposal to DiagnosticsRuntimeCoordinator (no inline per-service disposal)', async () => {
+  it('main.ts onunload delegates trace disposal to DiagnosticsRuntimeCoordinator (no inline per-service disposal)', () => {
     // After Phase 3 Task 11, main.ts no longer disposes trace services inline;
     // it calls this.diagnosticsCoordinator?.dispose(). The per-backend warning
     // behavior (fail-closed, no secret/path leak) is owned and tested by the
-    // DiagnosticsRuntimeCoordinator. Here we verify main.ts delegates.
+    // dedicated DiagnosticsRuntimeCoordinator.test.ts.
     const plugin = new OpenCodianPlugin() as unknown as {
       onunload(): void;
       runtimeCoordinator: { dispose: jest.Mock };
@@ -145,40 +145,20 @@ describe('OpenCodianPlugin unload diagnostics', () => {
     expect(coordinatorDispose).toHaveBeenCalled();
   });
 
-  it('DiagnosticsRuntimeCoordinator dispose does not expose Codex trace disposal error contents in console warnings', async () => {
-    // The per-backend fail-closed warning behavior moved to the coordinator.
-    const { DiagnosticsRuntimeCoordinator } = await import('../../src/app/diagnostics');
-    const secret = 'codex-unload-secret-canary';
-    const vaultPath = '/Volumes/SDD2T/obsidian-vault-write/testvault';
-    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
-    // Construct a coordinator whose codex service rejects with a secret-bearing error.
-    const inputs = {
-      openCodeSettings: () => ({ enabled: false, consolePreset: 'standard', consoleChannels: {}, storageDirectory: '' }),
-      codexSettings: () => ({ enabled: false, consolePreset: 'standard', consoleChannels: {}, storageDirectory: '', captureContent: false }),
-      claudeSettings: () => ({ enabled: false, consolePreset: 'off', consoleChannels: {}, storageDirectory: '' }),
-      vaultPath: undefined,
-      buildIdentity: () => 'test',
-      openCodeKnownSecrets: () => [],
-      codexKnownSecrets: () => [],
-      claudeKnownSecrets: () => [],
-      openCodeRuntimeMetadata: () => ({}),
-      codexRuntimeMetadata: () => ({}),
-      claudeRuntimeMetadata: () => ({}),
+  it('trace-service getters return undefined before bootstrap (preserves prior optional-chaining safety)', () => {
+    // The prior stored fields were uninitialized before bootstrap, so reads
+    // returned undefined and `this.plugin.openCodeTraceService?.store` was safe.
+    // The delegating getters must preserve this (return undefined, not throw).
+    const plugin = new OpenCodianPlugin() as unknown as {
+      openCodeTraceService?: unknown;
+      codexTraceService?: unknown;
+      claudeTraceService?: unknown;
+      diagnosticsCoordinator: null;
     };
-    const coordinator = new DiagnosticsRuntimeCoordinator(inputs);
-    // Override the codex dispose to reject with a secret-bearing error.
-    (coordinator.codex as unknown as { dispose: () => Promise<void> }).dispose = () =>
-      Promise.reject(new Error(`${secret} at ${vaultPath}/trace.jsonl`));
-    try {
-      await coordinator.dispose();
-      await new Promise((resolve) => setTimeout(resolve, 0));
-      const output = JSON.stringify(warn.mock.calls);
-      expect(output).toContain('Failed to flush Codex trace service during unload');
-      expect(output).not.toContain(secret);
-      expect(output).not.toContain(vaultPath);
-    } finally {
-      warn.mockRestore();
-    }
+    plugin.diagnosticsCoordinator = null;
+    expect(plugin.openCodeTraceService).toBeUndefined();
+    expect(plugin.codexTraceService).toBeUndefined();
+    expect(plugin.claudeTraceService).toBeUndefined();
   });
 });
 

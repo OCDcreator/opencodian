@@ -18,17 +18,20 @@
 import { ClaudeSessionTraceService } from '../../core/agents/backend/diagnostics/ClaudeSessionTraceService';
 import { CodexSessionTraceService } from '../../core/agents/backend/diagnostics/CodexSessionTraceService';
 import { OpenCodeSessionTraceService } from '../../core/opencode/diagnostics/OpenCodeSessionTraceService';
+import type { Logger } from '../../shared/logger';
 import { createLogger } from '../../shared/logger';
 import type { DiagnosticsBackendPorts, DiagnosticsRuntimeInputs } from './types';
-
-const logger = createLogger('DiagnosticsRuntimeCoordinator');
 
 export class DiagnosticsRuntimeCoordinator {
   readonly openCode: OpenCodeSessionTraceService;
   readonly codex: CodexSessionTraceService;
   readonly claude: ClaudeSessionTraceService;
+  private readonly logger: Logger;
 
   constructor(inputs: DiagnosticsRuntimeInputs) {
+    // Injected logger preserves the caller's console/export scope (main.ts uses
+    // 'OpenCodian'); defaults to a coordinator-scoped logger when omitted.
+    this.logger = inputs.logger ?? createLogger('DiagnosticsRuntimeCoordinator');
     // Construction order is pinned by the Task 10 characterization suite:
     // OpenCode first, then Codex, then Claude. Mirrors the prior inline order.
     this.openCode = new OpenCodeSessionTraceService({
@@ -66,15 +69,16 @@ export class DiagnosticsRuntimeCoordinator {
    */
   async dispose(): Promise<void> {
     // Per-backend warnings mirror the prior `onunload` inline disposal so
-    // operator-visible diagnostics stay byte-for-byte compatible.
+    // operator-visible diagnostics stay byte-for-byte compatible (the injected
+    // logger preserves the caller's scope prefix).
     void this.openCode.dispose().catch((error) => {
-      logger.warn('Failed to flush OpenCode trace service during unload:', error);
+      this.logger.warn('Failed to flush OpenCode trace service during unload:', error);
     });
     void this.codex.dispose().catch(() => {
-      logger.warn('Failed to flush Codex trace service during unload');
+      this.logger.warn('Failed to flush Codex trace service during unload');
     });
     void this.claude.dispose().catch(() => {
-      logger.warn('Failed to flush Claude trace service during unload');
+      this.logger.warn('Failed to flush Claude trace service during unload');
     });
   }
 }

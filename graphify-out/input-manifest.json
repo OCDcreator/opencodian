@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "dc08482604fd07680eb589743b12e6e0a2dd7b6a0b38e5eb751ff756d3eff5ff",
+  "digest": "93e8cf3d9ce32ccc9add26de528d1b7a9b47b41fdc01e498c6ea4687a0b63696",
   "recordCount": 593,
   "records": [
     {
@@ -26,7 +26,7 @@
     {
       "kind": "src",
       "key": "src/app/diagnostics/DiagnosticsRuntimeCoordinator.ts",
-      "sha256": "acd11d554e820969c80e63341388dd6ba7701eae99633f295231ed893969f7b9"
+      "sha256": "bcc74ae6d5f439ca2ef5c7ab7808a62090a52db3977e8626d8f7fb99cb6c3227"
     },
     {
       "kind": "src",
@@ -36,7 +36,7 @@
     {
       "kind": "src",
       "key": "src/app/diagnostics/types.ts",
-      "sha256": "c29eba4961dceb129a41b7ed63add3a234d2a1eb5b27aabdc4f370131549925a"
+      "sha256": "83987b7d9a23aaf37816a9bc75a1d9fa277f2cfbc29b0a7a345e9dc2ae5364fb"
     },
     {
       "kind": "src",
@@ -2486,7 +2486,7 @@
     {
       "kind": "src",
       "key": "src/main.ts",
-      "sha256": "71726c49b80168d0f8754dbc08b9f67fd5b68e1dc277791d4cf2ab92445757ff"
+      "sha256": "520437176f8451d1c798834f05832c1f551511de34901f1b354603c706f07c0e"
     },
     {
       "kind": "src",
@@ -2969,7 +2969,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-07-31T02:42:44.717Z",
-  "headShaAtGeneration": "0ce55280e316396a28412d3be34c19230ab65f85",
+  "generatedAt": "2026-07-31T03:10:25.747Z",
+  "headShaAtGeneration": "36bf55fc54c6a9aab1bb9493d92999641e16bd76",
   "graphifyVersion": "graphify 0.9.22"
 }
