@@ -955,7 +955,8 @@ describe('Phase 3 Task 10 — DiagnosticsRuntimeContract (characterization)', ()
       const reportStart = mainSrc.indexOf('async buildDiagnosticReport(');
       expect(reportStart).toBeGreaterThan(-1);
       const reportBody = mainSrc.slice(reportStart, reportStart + 4000);
-      // Pin the COMPLETE header line set so removing/adding a line is caught.
+      // Pin the COMPLETE header line set so removing/adding/reordering any line
+      // is caught. This is the full identity + environment header block.
       expect(reportBody).toContain("'# OpenCodian Diagnostic Report'");
       expect(reportBody).toContain("`Generated: ${new Date().toISOString()}`");
       expect(reportBody).toContain("`Source: ${source}`");
@@ -963,6 +964,8 @@ describe('Phase 3 Task 10 — DiagnosticsRuntimeContract (characterization)', ()
       expect(reportBody).toMatch(/Plugin ID: \$\{this\.manifest\.id\}/);
       expect(reportBody).toMatch(/Plugin version: \$\{this\.manifest\.version\}/);
       expect(reportBody).toMatch(/BUILD_ID: \$\{BUILD_ID\}/);
+      expect(reportBody).toMatch(/Platform: \$\{process\.platform\}/);
+      expect(reportBody).toMatch(/Vault path: \$\{vaultPath\}/);
       // The report array is joined with '\n' (LF line endings).
       expect(reportBody).toMatch(/\.join\('\\n'\)/);
 

@@ -533,12 +533,17 @@ describe('Phase 3 Task 10 — SettingsDebugSection diagnostics characterization'
       expect(groupsBody).toContain("'claude-code': ['claudeCode'],");
       // codex is exactly empty.
       expect(groupsBody).toContain('codex: [] as DebugModuleKey[],');
-      // plugin is exactly the 8-key list (pin the full array).
+      // plugin is exactly the 8-key list — pin the FULL ordered array so
+      // removing/adding/reordering any key is caught.
       expect(groupsBody).toContain("plugin: [");
       expect(groupsBody).toContain("'app',");
       expect(groupsBody).toContain("'settings',");
       expect(groupsBody).toContain("'chat',");
+      expect(groupsBody).toContain("'contextUsage',");
+      expect(groupsBody).toContain("'tasks',");
       expect(groupsBody).toContain("'storage',");
+      expect(groupsBody).toContain("'providerIcons',");
+      expect(groupsBody).toContain("'visuals',");
     });
   });
 });

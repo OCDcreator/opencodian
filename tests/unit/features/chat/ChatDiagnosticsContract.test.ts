@@ -355,8 +355,10 @@ describe('Phase 3 Task 10 — ChatDiagnosticsContract (characterization)', () =>
       // Body ends at the next method's JSDoc or the closing brace before a
       // method at column 2. Take a bounded slice.
       const body = source.slice(start, start + 600);
-      // The delete path must not reference any trace/diagnostic service.
-      expect(body).not.toMatch(/traceService|TraceService|tracePort|cancelDeepCapture|claimDeepCapture|armDeepCapture|flushRingBuffer|buildSmartReport|clearAll/);
+      // The delete path must not reference any trace/diagnostic service or the
+      // plugin-level diagnostic export surfaces (buildDiagnosticReport/
+      // writeDiagnosticLogFile/logServerStatusSnapshot/getServerDiagnostics).
+      expect(body).not.toMatch(/traceService|TraceService|tracePort|cancelDeepCapture|claimDeepCapture|armDeepCapture|flushRingBuffer|buildSmartReport|clearAll|buildDiagnosticReport|writeDiagnosticLogFile|logServerStatusSnapshot|getServerDiagnostics/);
       // It must reference only vault removal + metadata cache removal.
       expect(body).toMatch(/vault\.adapter\.remove/);
       expect(body).toMatch(/removeConversationMeta/);
@@ -374,7 +376,7 @@ describe('Phase 3 Task 10 — ChatDiagnosticsContract (characterization)', () =>
       const start = source.indexOf('async removeConversationMeta(');
       expect(start).toBeGreaterThan(-1);
       const body = source.slice(start, start + 400);
-      expect(body).not.toMatch(/traceService|TraceService|tracePort|cancelDeepCapture|claimDeepCapture|armDeepCapture/);
+      expect(body).not.toMatch(/traceService|TraceService|tracePort|cancelDeepCapture|claimDeepCapture|armDeepCapture|buildDiagnosticReport|writeDiagnosticLogFile/);
     });
 
     it('OpenCodianPlugin.deleteConversation (main.ts) source references no trace/diagnostic symbol', () => {
@@ -394,7 +396,7 @@ describe('Phase 3 Task 10 — ChatDiagnosticsContract (characterization)', () =>
       const nextMethodRel = source.slice(start + 1).search(/\n[/ ]{2}(private|public|protected|async)\b/);
       const end = nextMethodRel > 0 ? start + 1 + nextMethodRel : start + 800;
       const body = source.slice(start, end);
-      expect(body).not.toMatch(/traceService|TraceService|tracePort|cancelDeepCapture|claimDeepCapture|armDeepCapture|flushRingBuffer|buildSmartReport|clearAll/);
+      expect(body).not.toMatch(/traceService|TraceService|tracePort|cancelDeepCapture|claimDeepCapture|armDeepCapture|flushRingBuffer|buildSmartReport|clearAll|buildDiagnosticReport|writeDiagnosticLogFile|logServerStatusSnapshot|getServerDiagnostics/);
       // It delegates to storage.deleteConversation (no trace interaction).
       expect(body).toMatch(/this\.storage\.deleteConversation\(id\)/);
     });
