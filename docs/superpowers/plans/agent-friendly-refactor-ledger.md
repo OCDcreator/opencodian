@@ -152,5 +152,35 @@ None. No Test Vault deployment required.
 - **PHASE_BASE:** `2e962d4e48a5653f6decac51e2ef3dd78968c794`
 - **Status:** unblocked; Phase 2 APPROVED. This is the FIRST runtime-change phase.
 
-## Phase 2–6
+### Task 10 — Characterize the three-backend diagnostics contract — APPROVED
+- **Range:** `2e962d4e..05bdf53e` (7 commits, runtime source untouched — characterization only).
+- **Commits:**
+  | SHA | Type | Subject |
+  |---|---|---|
+  | `fb1aa03a` | test(diagnostics) | characterize three-backend diagnostics contract (Task 10) |
+  | `013fde93` | test(diagnostics) | strengthen characterization per Codex round-1 review |
+  | `56cdc253` | fix(test) | dispose created trace services + raise timeouts |
+  | `f8304f03` | fix(test) | resolve Codex round-2 review findings |
+  | `8e950166` | fix(test+docs) | resolve Codex round-3 review findings + correct Phase 2/3 SHA |
+  | `e26fa61e` | fix(test) | resolve Codex round-4 review findings |
+  | `3583ca5d` | fix(test) | resolve Codex round-5 review findings |
+  | `05bdf53e` | fix(test) | resolve Codex round-6 review findings |
+- **Codex independent review — APPROVED** (7 rounds; Critical 0, Important 0, Minor 0).
+  - Reviewer: Codex CLI (gpt-5.6-sol), writable sandbox (workspace-write) so Jest + negative mutations could run.
+  - Round 1–6 each returned CHANGES REQUESTED with real defects (tautological canaries, false-passing source contracts, storage races, unbounded method slices, incomplete option/header pinning). Round 7 APPROVED.
+  - Independently verified: all prescribed negative mutations fail (Codex removed lines/calls in isolated temp copies and confirmed the tests catch them); all 8 plugin module keys individually pinned; 75/75 tests pass; zero src/ changes in range.
+- **Acceptance status:**
+  - [x] construction options, dynamic knownSecrets, enabled/disabled, dispose/flush ordering pinned (incl. the OpenCode static-snapshot vs Claude/Codex dynamic-getter asymmetry).
+  - [x] main.ts construction/injection/dispose wiring points pinned (field declarations, construction order, tracePort injection, onunload void+catch order, all 5 option keys × 3 services with real values).
+  - [x] header/menu/send claim/cancel, tab-cleanup capture cancel, fail-closed behavior; delete-conversation performs NO trace interaction (StorageService + ConversationMetadataCache + OpenCodianPlugin.deleteConversation).
+  - [x] secret/path canaries for disk, console, report, exported bundle (incl. [REDACTED] presence proof).
+  - [x] five attachTabbed shells + six debug secondary tabs (registry) + legacy attach Codex omission + backend block sub-method calls + exact DEBUG_MODULE_GROUPS pinning.
+  - [x] plugin export source-structure contract (filename pattern, utf-8 encoding, build-then-write ordering, full report header, LF join); per-backend export/flush ordering asymmetry (Codex/Claude flush-before-build, OpenCode no pre-flush).
+- **Gate evidence (run on clean tree at 05bdf53e):** all 15 verify gates green; 75 characterization tests pass; lint 0/0.
+- **Runtime files changed:** none (characterization only). No Test Vault deployment required.
+
+### Task 11–13 — pending
+- **Status:** blocked on Task 10 APPROVED (now unblocked).
+
+## Phase 4–6
 - **Status:** blocked on preceding phase APPROVED.

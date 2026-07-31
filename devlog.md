@@ -11,6 +11,16 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-07-31 Agent-Friendly Architecture 试点：三后端 diagnostics 契约特征化（Phase 3 Task 10）
+
+Phase 3 是首个 runtime-change 阶段。Task 10 为硬前置——只写 characterization 测试，不移动任何 production 代码。新增三个特征化测试文件共 75 个测试：
+
+- `tests/unit/app/diagnostics/DiagnosticsRuntimeContract.test.ts`：固化三后端 trace service 的构造选项、`knownSecrets` 时序不对称（OpenCode 构造时静态快照 vs Claude/Codex 动态 getter）、enabled/disabled 门控差异（OpenCode arm/claim/cancel 不受 enabled 门控）、dispose 顺序、磁盘/控制台/报告/导出 bundle 的脱敏 canary、capture arm/claim/cancel 生命周期、main.ts 构造/注入/onunload 装配顺序、每后端 export/flush 顺序不对称、插件导出源结构契约。
+- `tests/unit/features/chat/ChatDiagnosticsContract.test.ts`：固化 Claude/Codex host adapter 的 fail-closed 边界（safeTrace 吞掉异常）、菜单动作执行（arm/cancel 到达 trace service）、delete-conversation 无 trace 交互不变量（StorageService + ConversationMetadataCache + OpenCodianPlugin.deleteConversation 三层源契约）、tab-cleanup 三后端独立 cancel/claim seam。
+- `tests/unit/features/settings/SettingsDebugSection.diagnostics-characterization.test.ts`：固化 attachTabbed 五个 block shell、settingsLayoutRegistry 六个 debug 子标签（含 capability-lab）、legacy attach 遗漏 Codex、每后端 block 的 status/actions/catalog 子方法调用、DEBUG_MODULE_GROUPS 精确数组。
+
+Codex 独立审查经过 7 轮返修才 APPROVED（Critical 0 / Important 0 / Minor 0）。每轮 Codex 用临时副本做真实负向 mutation（删除行/调用、替换值），证明了多轮 false-pass（同义反复 canary、未限界方法切片、存储竞态、选项/表头未全量 pin）。最终所有 mutation 均被测试捕获，75/75 通过，范围零 src/ 变更。
+
 ## 2026-07-31 Agent-Friendly Architecture 门禁：Graphify digest / module-doc owner-aware / CI 统一（Phase 2）
 
 **范围。** 执行实施计划 Phase 2（Task 7、8、9），不改动任何 runtime 源码。
