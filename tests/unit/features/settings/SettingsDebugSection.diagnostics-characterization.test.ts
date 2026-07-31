@@ -261,8 +261,9 @@ describe('Phase 3 Task 10 — SettingsDebugSection diagnostics characterization'
   // -------------------------------------------------------------------------
 
   describe('attachTabbed renders the five-block debug inventory', () => {
-    it('attachTabbed source invokes createDebugTabShell exactly five times with the canonical ids', () => {
-      // Source-level contract (authoritative — robust to mock attr gaps).
+    it('attachTabbed source invokes createDebugTabShell exactly five times (catches any added/removed shell)', () => {
+      // Count createDebugTabShell CALLS (not literal ids) so a sixth shell with
+      // any id — literal or variable — is caught.
       // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
       const fs = require('fs') as typeof import('fs');
       // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
@@ -275,7 +276,10 @@ describe('Phase 3 Task 10 — SettingsDebugSection diagnostics characterization'
       const tabbedEnd = source.indexOf('  private createDebugTabShell(');
       expect(tabbedStart).toBeGreaterThan(-1);
       const tabbedBody = source.slice(tabbedStart, tabbedEnd);
-      // Five shells with the canonical ids, in order.
+      // Exactly five createDebugTabShell( invocations in attachTabbed.
+      const shellCalls = tabbedBody.match(/this\.createDebugTabShell\(/g);
+      expect(shellCalls).toHaveLength(5);
+      // And the five canonical ids appear (in case of id typos).
       expect(tabbedBody.match(/id: 'plugin'/g)).toHaveLength(1);
       expect(tabbedBody.match(/id: 'opencode'/g)).toHaveLength(1);
       expect(tabbedBody.match(/id: 'codex'/g)).toHaveLength(1);
@@ -283,15 +287,13 @@ describe('Phase 3 Task 10 — SettingsDebugSection diagnostics characterization'
       expect(tabbedBody.match(/id: 'export'/g)).toHaveLength(1);
     });
 
-    it('attachTabbed renders without throwing and produces shell elements', () => {
+    it('attachTabbed renders without throwing', () => {
       const plugin = createPlugin();
       attachTraceServices(plugin);
       const section = new SettingsDebugSection({ plugin: plugin as unknown as OpenCodianPlugin, createSectionHeading });
       const containerEl = document.createElement('div');
       document.body.appendChild(containerEl);
       expect(() => section.attachTabbed(containerEl, 'plugin')).not.toThrow();
-      // At least one shell-class element is produced (mock may not apply attr).
-      expect(containerEl.querySelectorAll('.opencodian-debug-tab-shell').length).toBeGreaterThanOrEqual(0);
     });
 
     it('attachTabbed for the codex block does not throw (Codex is present, unlike legacy attach)', () => {

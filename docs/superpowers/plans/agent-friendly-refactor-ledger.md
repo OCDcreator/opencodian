@@ -112,7 +112,7 @@ None. No Test Vault deployment required.
 ## Phase 2 — Graphify, module docs, CI, and documentation truth (Task 7–9)
 
 - **PHASE_BASE:** `07b86e6c348381e3acaf5a840cf52467acd3323d`
-- **PHASE_HEAD:** `2e962d4e48a59c5e258d4586cf1331f693b0bfcf`
+- **PHASE_HEAD:** `2e962d4e48a5653f6decac51e2ef3dd78968c794`
 - **Range:** `07b86e6c..2e962d4e` (7 commits, runtime source untouched)
 
 ### Commits
@@ -149,7 +149,7 @@ None. No Test Vault deployment required.
 ---
 
 ## Phase 3 — Diagnostics vertical slice (Task 10–13)
-- **PHASE_BASE:** `2e962d4e48a59c5e258d4586cf1331f693b0bfcf`
+- **PHASE_BASE:** `2e962d4e48a5653f6decac51e2ef3dd78968c794`
 - **Status:** unblocked; Phase 2 APPROVED. This is the FIRST runtime-change phase.
 
 ## Phase 2–6

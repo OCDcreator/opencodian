@@ -368,13 +368,20 @@ describe('Phase 3 Task 10 — DiagnosticsRuntimeContract (characterization)', ()
     });
 
     it('disabled services still dispose without throwing', async () => {
-      // Each service gets its own dir (shared dir races on index.json.tmp).
-      const oc = new OpenCodeSessionTraceService({ settings: () => openCodeTraceSettings(tempDir('dis-oc'), { enabled: false }) });
-      const codex = new CodexSessionTraceService({ settings: () => codexTraceSettings(tempDir('dis-codex'), { enabled: false }) });
-      const claude = new ClaudeSessionTraceService({ settings: () => claudeTraceSettings(tempDir('dis-claude'), { enabled: false }) });
+      // Each service gets its own dir (shared dir races on index.json.tmp);
+      // capture the dirs so afterEach can clean them up.
+      const ocDir = tempDir('dis-oc');
+      const codexDir = tempDir('dis-codex');
+      const claudeDir = tempDir('dis-claude');
+      const oc = new OpenCodeSessionTraceService({ settings: () => openCodeTraceSettings(ocDir, { enabled: false }) });
+      const codex = new CodexSessionTraceService({ settings: () => codexTraceSettings(codexDir, { enabled: false }) });
+      const claude = new ClaudeSessionTraceService({ settings: () => claudeTraceSettings(claudeDir, { enabled: false }) });
       await expect(oc.dispose()).resolves.toBeUndefined();
       await expect(codex.dispose()).resolves.toBeUndefined();
       await expect(claude.dispose()).resolves.toBeUndefined();
+      fs.rmSync(ocDir, { recursive: true, force: true });
+      fs.rmSync(codexDir, { recursive: true, force: true });
+      fs.rmSync(claudeDir, { recursive: true, force: true });
     });
   });
 
@@ -726,6 +733,15 @@ describe('Phase 3 Task 10 — DiagnosticsRuntimeContract (characterization)', ()
     // `private async handleBootstrapOpenCodeRuntime(` uniquely identifies the
     // method body where the three services are constructed.
     const bootstrapMethodStart = mainSrc.indexOf('private async handleBootstrapOpenCodeRuntime(');
+    // Compute the method body boundary ONCE (next method at column 2) so all
+    // assertions in this block stay inside the method and do not bleed past it.
+    const bootstrapNextMethodRel = bootstrapMethodStart > -1
+      ? mainSrc.slice(bootstrapMethodStart + 1).search(/\n[/ ]{2}(private|public|protected|async)\b/)
+      : -1;
+    const bootstrapEnd = bootstrapNextMethodRel > 0
+      ? bootstrapMethodStart + 1 + bootstrapNextMethodRel
+      : (bootstrapMethodStart > -1 ? mainSrc.indexOf('  activateView', bootstrapMethodStart) : -1);
+    const bootstrapBody = bootstrapMethodStart > -1 ? mainSrc.slice(bootstrapMethodStart, bootstrapEnd) : '';
 
     it('declares the three trace-service fields; codex/claude use non-null assertions (bootstrap timing)', () => {
       // openCodeTraceService is declared WITHOUT `!` (assigned a definite type);
@@ -737,14 +753,13 @@ describe('Phase 3 Task 10 — DiagnosticsRuntimeContract (characterization)', ()
 
     it('constructs the three services inside handleBootstrapOpenCodeRuntime in order opencode -> codex -> claude', () => {
       expect(bootstrapMethodStart).toBeGreaterThan(-1);
-      // Assert on absolute offsets after the method declaration so the long body
-      // is covered and the callback reference at line 170 is excluded.
-      const ocIdx = mainSrc.indexOf('new OpenCodeSessionTraceService(', bootstrapMethodStart);
-      const codexIdx = mainSrc.indexOf('new CodexSessionTraceService(', bootstrapMethodStart);
-      const claudeIdx = mainSrc.indexOf('new ClaudeSessionTraceService(', bootstrapMethodStart);
-      expect(ocIdx).toBeGreaterThan(bootstrapMethodStart);
-      expect(codexIdx).toBeGreaterThan(bootstrapMethodStart);
-      expect(claudeIdx).toBeGreaterThan(bootstrapMethodStart);
+      // Assert within the bounded method body so offsets cannot bleed past it.
+      const ocIdx = bootstrapBody.indexOf('new OpenCodeSessionTraceService(');
+      const codexIdx = bootstrapBody.indexOf('new CodexSessionTraceService(');
+      const claudeIdx = bootstrapBody.indexOf('new ClaudeSessionTraceService(');
+      expect(ocIdx).toBeGreaterThan(-1);
+      expect(codexIdx).toBeGreaterThan(-1);
+      expect(claudeIdx).toBeGreaterThan(-1);
       // Construction order: opencode first, then codex, then claude.
       expect(ocIdx).toBeLessThan(codexIdx);
       expect(codexIdx).toBeLessThan(claudeIdx);
@@ -752,12 +767,7 @@ describe('Phase 3 Task 10 — DiagnosticsRuntimeContract (characterization)', ()
 
     it('injects openCode tracePort into OpenCodeService and claude tracePort into ClaudeCodeAdapter', () => {
       expect(bootstrapMethodStart).toBeGreaterThan(-1);
-      // Bound to the method body (next method after this one).
-      const nextMethodRel = mainSrc.slice(bootstrapMethodStart + 1).search(/\n[/ ]{2}(private|public|protected|async)\b/);
-      const bootstrapEnd = nextMethodRel > 0
-        ? bootstrapMethodStart + 1 + nextMethodRel
-        : mainSrc.indexOf('  activateView', bootstrapMethodStart);
-      const body = mainSrc.slice(bootstrapMethodStart, bootstrapEnd);
+      const body = bootstrapBody;
       // OpenCodeService receives tracePort: this.openCodeTraceService.
       expect(body).toMatch(/tracePort:\s*this\.openCodeTraceService/);
       // ClaudeCodeAdapter receives tracePort: this.claudeTraceService.
@@ -788,13 +798,14 @@ describe('Phase 3 Task 10 — DiagnosticsRuntimeContract (characterization)', ()
 
     it('constructs ALL THREE services with all five option keys (settings, vaultPath, buildIdentity, knownSecrets, runtimeMetadata)', () => {
       expect(bootstrapMethodStart).toBeGreaterThan(-1);
-      const ocCtorStart = mainSrc.indexOf('new OpenCodeSessionTraceService(', bootstrapMethodStart);
-      const codexCtorStart = mainSrc.indexOf('new CodexSessionTraceService(', bootstrapMethodStart);
-      const claudeCtorStart = mainSrc.indexOf('new ClaudeSessionTraceService(', bootstrapMethodStart);
-      // Slice each constructor to the next `new` or `this.` statement.
-      const ocCtor = mainSrc.slice(ocCtorStart, codexCtorStart);
-      const codexCtor = mainSrc.slice(codexCtorStart, claudeCtorStart);
-      const claudeCtor = mainSrc.slice(claudeCtorStart, claudeCtorStart + 600);
+      // Slice within the bounded method body so offsets cannot bleed past it.
+      const ocCtorStart = bootstrapBody.indexOf('new OpenCodeSessionTraceService(');
+      const codexCtorStart = bootstrapBody.indexOf('new CodexSessionTraceService(');
+      const claudeCtorStart = bootstrapBody.indexOf('new ClaudeSessionTraceService(');
+      // Slice each constructor to the next constructor start (or end of body).
+      const ocCtor = bootstrapBody.slice(ocCtorStart, codexCtorStart);
+      const codexCtor = bootstrapBody.slice(codexCtorStart, claudeCtorStart);
+      const claudeCtor = bootstrapBody.slice(claudeCtorStart);
       // All five option keys present in EACH constructor. knownSecrets is a
       // getter in all three, but the value differs: OpenCode/Codex use an array
       // literal `() => [...]`, Claude uses a collector `() => collectClaudeCodeKnownSecrets(...)`.
@@ -883,11 +894,16 @@ describe('Phase 3 Task 10 — DiagnosticsRuntimeContract (characterization)', ()
       expect(preBuildSlice).not.toMatch(/flushRingBuffer|\.store\.flush\(\)/);
     });
 
-    it('plugin-level export byte contract: filename pattern, utf-8 encoding, and report structure (source contract)', () => {
-      // The plan (item 6) requires plugin export filename, encoding, ordering,
-      // and content to remain byte-for-byte stable. Pin the source contract for
-      // writeDiagnosticLogFile + buildDiagnosticReport since main.ts cannot be
-      // instantiated in a unit test.
+    it('plugin-level export source-structure contract: filename pattern, utf-8 encoding, build-then-write ordering, and report header fields', () => {
+      // The plan (item 6) asks for byte-for-byte stability of plugin export
+      // filename, encoding, ordering, and content. main.ts cannot be instantiated
+      // in a unit test (it extends Obsidian Plugin with app/vault/manifest), so a
+      // true runtime byte test is not possible here. This source-structure
+      // contract pins the STRUCTURE that produces the bytes: the filename
+      // pattern, the utf-8 encoding argument, the build-then-write ordering, and
+      // the report header field set. A behavioral byte test belongs in an
+      // integration suite that can construct the plugin; Task 13's settings
+      // acceptance covers the export-block wiring.
       const mainSrc = fs.readFileSync(
         path.resolve(__dirname, '../../../../src/main.ts'),
         'utf8',
@@ -898,8 +914,8 @@ describe('Phase 3 Task 10 — DiagnosticsRuntimeContract (characterization)', ()
       expect(writeStart).toBeGreaterThan(-1);
       const writeBody = mainSrc.slice(writeStart, writeStart + 500);
       expect(writeBody).toMatch(/opencodian-debug-\$\{timestamp\}\.log/);
-      expect(writeBody).toMatch(/timestamp.*ISO.*replace\(\//);
-      // utf-8 encoding.
+      expect(writeBody).toMatch(/timestamp.*ISO.*replace\(/);
+      // utf-8 encoding (not utf8 without the dash, not binary).
       expect(writeBody).toMatch(/writeFile\(targetPath,\s*report,\s*'utf-8'\)/);
       // Ordering: build the report first, then write it.
       const buildCallIdx = writeBody.indexOf('buildDiagnosticReport(');
@@ -908,15 +924,18 @@ describe('Phase 3 Task 10 — DiagnosticsRuntimeContract (characterization)', ()
       expect(buildCallIdx).toBeLessThan(writeFileIdx);
 
       // buildDiagnosticReport: report starts with the canonical header and
-      // embeds BUILD_ID + manifest fields.
+      // embeds BUILD_ID + manifest fields. The raw array is joined with '\n'
+      // (LF) — pin the join so a CRLF switch is caught.
       const reportStart = mainSrc.indexOf('async buildDiagnosticReport(');
       expect(reportStart).toBeGreaterThan(-1);
-      const reportBody = mainSrc.slice(reportStart, reportStart + 1200);
+      const reportBody = mainSrc.slice(reportStart, reportStart + 4000);
       expect(reportBody).toContain("'# OpenCodian Diagnostic Report'");
       expect(reportBody).toMatch(/Plugin name: \$\{this\.manifest\.name\}/);
       expect(reportBody).toMatch(/Plugin ID: \$\{this\.manifest\.id\}/);
       expect(reportBody).toMatch(/Plugin version: \$\{this\.manifest\.version\}/);
       expect(reportBody).toMatch(/BUILD_ID: \$\{BUILD_ID\}/);
+      // The report array is joined with '\n' (LF line endings).
+      expect(reportBody).toMatch(/\.join\('\\n'\)/);
 
       // SettingsDebugSection wires both export surfaces into the export block.
       const debugSrc = fs.readFileSync(
@@ -952,7 +971,10 @@ describe('Phase 3 Task 10 — DiagnosticsRuntimeContract (characterization)', ()
       // recordSdkMessage persists only an envelope (the raw secret never enters
       // the trace), which would make this canary a tautology. Use recordTurnEvent
       // (raw-payload path) so the secret genuinely flows through the redactor
-      // into the persisted trace and then the export bundle.
+      // into the persisted trace and then the export bundle. Assert BOTH that the
+      // raw secret is absent AND that the [REDACTED] placeholder is present —
+      // this proves the secret reached the redactor (a mutation that silently
+      // drops the event would leave no [REDACTED] and fail).
       const secret = 'export-bundle-secret-claude-1234';
       const service = new ClaudeSessionTraceService({
         settings: () => claudeTraceSettings(dir),
@@ -962,14 +984,18 @@ describe('Phase 3 Task 10 — DiagnosticsRuntimeContract (characterization)', ()
       service.recordTurnEvent(ctx, 'export.canary', 'warning', { note: secret });
       service.finishTurn(ctx, 'completed');
       await service.store.flush();
-      // Confirm the secret actually reached the persisted trace (redacted).
+      // Confirm the secret reached the persisted trace AND was redacted (the
+      // [REDACTED] placeholder proves the redactor processed the note value).
       const traceBlob = readAllJsonFiles(dir).map((f) => f.content).join('\n');
       expect(traceBlob).not.toContain(secret);
+      expect(traceBlob).toContain('[REDACTED]');
+      expect(traceBlob).toContain('export.canary');
       const exportedPath = await service.exportTrace(ctx.traceId, exportDir);
       expect(exportedPath).toBeDefined();
-      // Read every file in the export directory and assert no raw secret.
+      // The export bundle must also contain the redacted placeholder, not the raw secret.
       const blob = readAllJsonFiles(exportDir).map((f) => f.content).join('\n');
       expect(blob).not.toContain(secret);
+      expect(blob).toContain('[REDACTED]');
     });
 
     it('OpenCode store.exportTraceBundle contains no raw secret', async () => {
