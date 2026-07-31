@@ -69,6 +69,31 @@ function createMenuStub(): Menu {
   } as unknown as Menu;
 }
 
+function readBoundedOpenCodianViewBlock(startMarker: string, endMarker: string): string {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
+  const fs = require('fs') as typeof import('fs');
+  // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
+  const path = require('path') as typeof import('path');
+  const source = fs.readFileSync(
+    path.resolve(__dirname, '../../../../src/features/chat/OpenCodianView.ts'),
+    'utf8',
+  );
+  const start = source.indexOf(startMarker);
+  expect(start).toBeGreaterThanOrEqual(0);
+  const end = source.indexOf(endMarker, start + startMarker.length);
+  expect(end).toBeGreaterThan(start);
+  return source.slice(start, end);
+}
+
+function expectSourceOrder(source: string, snippets: readonly string[]): void {
+  let cursor = 0;
+  for (const snippet of snippets) {
+    const next = source.indexOf(snippet, cursor);
+    expect(next).toBeGreaterThanOrEqual(0);
+    cursor = next + snippet.length;
+  }
+}
+
 describe('Phase 3 Task 10 — ChatDiagnosticsContract (characterization)', () => {
   // ---------------------------------------------------------------------------
   // Step 3: fail-closed behavior of the host adapters.
@@ -299,25 +324,63 @@ describe('Phase 3 Task 10 — ChatDiagnosticsContract (characterization)', () =>
     });
   });
 
-  describe('header/menu route behavior — OpenCode inline menu (source contract)', () => {
-    it('OpenCodianView showOpenCodeDiagnostics builds arm/cancel + copy-session menu items inline (not via an adapter)', () => {
-      // OpenCode's menu is inline in OpenCodianView (unlike Codex/Claude which
-      // delegate to adapters). Task 12 must preserve this distinction.
-      // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
-      const fs = require('fs') as typeof import('fs');
-      // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
-      const path = require('path') as typeof import('path');
-      const source = fs.readFileSync(
-        path.resolve(__dirname, '../../../../src/features/chat/OpenCodianView.ts'),
-        'utf8',
+  describe('header/menu route behavior — OpenCode inline diagnostics (source contract)', () => {
+    function readHeaderDiagnosticsBlock(): string {
+      return readBoundedOpenCodianViewBlock(
+        'getOpenCodeDiagnosticsState: () => {',
+        'getActiveDiagnosticsTabId: () => this.getActiveTabId(),',
       );
-      // The OpenCode diagnostics menu handler builds a Menu inline.
-      expect(source).toMatch(/showOpenCodeDiagnostics:\s*\(event\)/);
-      // It arms or cancels based on captureState, directly on openCodeTraceService.
-      expect(source).toMatch(/this\.plugin\.openCodeTraceService\.cancelDeepCapture\(tabId\)/);
-      expect(source).toMatch(/this\.plugin\.openCodeTraceService\.armDeepCapture\(tabId/);
-      // It builds a smart report + clipboard write for copy-session.
-      expect(source).toMatch(/this\.plugin\.openCodeTraceService\.reportBuilder\.buildSmartReport/);
+    }
+
+    it('pins the enabled, storage, capture, and unread-severity state path', () => {
+      const block = readHeaderDiagnosticsBlock();
+
+      // This is deliberately the current inline OpenCode state path, not the
+      // similar Codex/Claude adapter implementation. Every early-return and
+      // severity mapping is pinned so Task 12 cannot silently drop a state.
+      expectSourceOrder(block, [
+        'const settings = this.plugin.settings.backendSettings.opencode.sessionTrace;',
+        "if (!settings.enabled) return 'disabled';",
+        'const storeStatus = this.plugin.openCodeTraceService.store.getStatus();',
+        "if (storeStatus.mode === 'memory' || storeStatus.lastError) return 'degraded';",
+        'const tabId = this.getActiveTabId();',
+        "if (!tabId) return 'normal';",
+        'const captureState = this.plugin.openCodeTraceService.getCaptureState(tabId);',
+        "if (captureState !== 'off') return captureState;",
+        'const sessionId = this.getSessionIdForTab(tabId);',
+        'this.plugin.openCodeTraceService.store.resolveTraceId(sessionId)',
+        'this.plugin.openCodeTraceService.store.listSummaries(100).find((item) => item.traceId === traceId)',
+        "if (!summary?.unreadAnomalyCount) return 'normal';",
+      ]);
+      expect(block).toContain("summary.highestUnreadSeverity === 'critical' || summary.highestUnreadSeverity === 'error'");
+      expect(block).toContain("? 'critical'");
+      expect(block).toContain(": 'warning';");
+    });
+
+    it('pins arm, cancel, and copy labels/notices with their observable call order', () => {
+      const block = readHeaderDiagnosticsBlock();
+
+      // OpenCode remains inline before Task 12; do not collapse its current
+      // menu behavior into the Codex/Claude adapter contracts above.
+      expectSourceOrder(block, [
+        "if (captureState === 'armed') {",
+        ".setTitle(t('chat.opencodeDiagnostics.cancelCapture'))",
+        'this.plugin.openCodeTraceService.cancelDeepCapture(tabId);',
+        'this.chatHeaderPresenter.refreshBackendChrome();',
+        ".setTitle(t('chat.opencodeDiagnostics.captureNext'))",
+        'this.plugin.openCodeTraceService.armDeepCapture(tabId, sessionId);',
+        'this.chatHeaderPresenter.refreshBackendChrome();',
+        "new Notice(t('chat.opencodeDiagnostics.captureArmed'));",
+        ".setTitle(t('chat.opencodeDiagnostics.copySession'))",
+        'this.plugin.openCodeTraceService.store.resolveTraceId(sessionId)',
+        'const userContext = await this.promptDiagnosticsUserContext();',
+        'this.plugin.openCodeTraceService.reportBuilder.buildSmartReport(',
+        "{ selection: 'current-session' }",
+        'await navigator.clipboard.writeText(report);',
+        'this.chatHeaderPresenter.refreshBackendChrome();',
+        "new Notice(t('chat.opencodeDiagnostics.copySuccess'));",
+        'menu.showAtMouseEvent(event);',
+      ]);
     });
   });
 
@@ -414,41 +477,35 @@ describe('Phase 3 Task 10 — ChatDiagnosticsContract (characterization)', () =>
 
   describe('tab-cleanup capture-cancel seam (three distinct backends)', () => {
     it('OpenCodianView wires three separate cancel seams (source contract)', () => {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
-      const fs = require('fs') as typeof import('fs');
-      // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
-      const path = require('path') as typeof import('path');
-      const source = fs.readFileSync(
-        path.resolve(__dirname, '../../../../src/features/chat/OpenCodianView.ts'),
-        'utf8',
+      const block = readBoundedOpenCodianViewBlock(
+        'private createConversationTabLifecycleRecoveryHost(): ConversationTabLifecycleRecoveryHost {',
+        'private createSendPipelineHostDependencies(): SendPipelineHostDependencies {',
       );
       // The tab-cleanup host dependencies wire three distinct cancel callbacks.
-      expect(source).toContain('cancelOpenCodeDiagnosticCapture:');
-      expect(source).toContain('cancelCodexDiagnosticCapture:');
-      expect(source).toContain('cancelClaudeDiagnosticCapture:');
-      // OpenCode cancel calls the trace service directly.
-      expect(source).toMatch(/cancelOpenCodeDiagnosticCapture[\s\S]{0,80}openCodeTraceService\.cancelDeepCapture/);
-      // Codex/Claude cancel go through their adapters.
-      expect(source).toMatch(/cancelCodexDiagnosticCapture[\s\S]{0,80}codexDiagnosticsAdapter\.cancelDiagnosticCapture/);
-      expect(source).toMatch(/cancelClaudeDiagnosticCapture[\s\S]{0,80}claudeDiagnosticsAdapter\.cancelDiagnosticCapture/);
+      expectSourceOrder(block, [
+        'cancelOpenCodeDiagnosticCapture: (tabId) => {',
+        'this.plugin.openCodeTraceService.cancelDeepCapture(tabId);',
+        'cancelCodexDiagnosticCapture: (tabId) => this.codexDiagnosticsAdapter.cancelDiagnosticCapture(tabId),',
+        'cancelClaudeDiagnosticCapture: (tabId) => this.claudeDiagnosticsAdapter.cancelDiagnosticCapture(tabId),',
+      ]);
     });
 
     it('OpenCodianView wires three distinct claim seams for the send path (source contract)', () => {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
-      const fs = require('fs') as typeof import('fs');
-      // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
-      const path = require('path') as typeof import('path');
-      const source = fs.readFileSync(
-        path.resolve(__dirname, '../../../../src/features/chat/OpenCodianView.ts'),
-        'utf8',
+      const block = readBoundedOpenCodianViewBlock(
+        'claimOpenCodeDiagnosticRunToken: (tabId, sessionId) => {',
+        'sendStreamMessage: (conversation, content, options) => {',
       );
-      expect(source).toContain('claimOpenCodeDiagnosticRunToken:');
-      expect(source).toContain('claimCodexDiagnosticRunToken:');
-      expect(source).toContain('claimClaudeDiagnosticRunToken:');
-      // Each claim callback must actually invoke the claim, not be a no-op.
-      expect(source).toMatch(/claimOpenCodeDiagnosticRunToken[\s\S]{0,120}openCodeTraceService\.claimDeepCapture/);
-      expect(source).toMatch(/claimCodexDiagnosticRunToken[\s\S]{0,120}codexDiagnosticsAdapter\.claimDiagnosticRunToken/);
-      expect(source).toMatch(/claimClaudeDiagnosticRunToken[\s\S]{0,120}claudeDiagnosticsAdapter\.claimDiagnosticRunToken/);
+      // Each claim callback must actually invoke its backend-specific claim,
+      // not become a generic no-op during coordinator extraction.
+      expectSourceOrder(block, [
+        'claimOpenCodeDiagnosticRunToken: (tabId, sessionId) => {',
+        'if (!tabId) return undefined;',
+        'this.plugin.openCodeTraceService.claimDeepCapture(tabId, sessionId);',
+        'claimCodexDiagnosticRunToken: (tabId, threadId) =>',
+        'this.codexDiagnosticsAdapter.claimDiagnosticRunToken(tabId, threadId ?? undefined),',
+        'claimClaudeDiagnosticRunToken: (tabId, sessionId) =>',
+        'this.claudeDiagnosticsAdapter.claimDiagnosticRunToken(tabId, sessionId ?? undefined),',
+      ]);
     });
   });
 });
