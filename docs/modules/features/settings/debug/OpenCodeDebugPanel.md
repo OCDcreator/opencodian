@@ -74,5 +74,5 @@ OpenCodianSettings / OpenCodianSettingsView / SettingsTabbedRenderer
 
 - 这是完整 OpenCode panel owner，不是只转发一个调用的 shim。
 - 不把完整 plugin 或 trace service 作为新的 panel 依赖；service/store/report 访问只能留在 `types.ts` 的 composition adapter 内。
-- shared path/action/module helper 继续由 `SettingsDebugSection` 提供；Codex/Claude panel 不属于当前 slice。
+- shared path/action/module helper 继续由 `SettingsDebugSection` 提供；Codex 与 Claude panel 是同一 owner 下的相邻 backend workbench，不应被重新塞回 OpenCode panel。
 - 保持既有 OpenCode locale keys、DOM data markers、保存/导出/清空确认语义；legacy non-tabbed attach Codex omission 不在这里修复。

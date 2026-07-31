@@ -1690,7 +1690,7 @@
         "shared debug section shell/router, plugin export actions, and platform/path/action/module helpers",
         "complete OpenCode trace debug panel: settings, status, actions, catalog, and narrow diagnostics-port wiring",
         "complete Codex trace debug panel: settings, status, actions, catalog, capture-content control, and narrow diagnostics-port wiring; tabbed-only mounting in this intermediate slice",
-        "Claude Code debug workbench remains in SettingsDebugSection, including console debug channels and independent session-trace controls, pending its later panel slice"
+        "complete Claude Code debug panel: workbench DOM, console debug channels, independent session-trace settings/status/actions/catalog/filter, and narrow diagnostics-port wiring"
       ],
       "canonicalState": [
         "debug section tab shell/router state",
@@ -1700,7 +1700,8 @@
       "entrypoints": [
         "src/features/settings/SettingsDebugSection.ts",
         "src/features/settings/debug/OpenCodeDebugPanel.ts",
-        "src/features/settings/debug/CodexDebugPanel.ts"
+        "src/features/settings/debug/CodexDebugPanel.ts",
+        "src/features/settings/debug/ClaudeCodeDebugPanel.ts"
       ],
       "allowedOwnerDependencies": [
         "shared.foundation",
@@ -1719,7 +1720,8 @@
       "tests": [
         "tests/unit/features/settings/SettingsDebugSection*",
         "tests/unit/features/settings/OpenCodeDebugPanel*",
-        "tests/unit/features/settings/CodexDebugPanel*"
+        "tests/unit/features/settings/CodexDebugPanel*",
+        "tests/unit/features/settings/ClaudeCodeDebugPanel*"
       ],
       "overviewDoc": "docs/architecture/owners/feature-settings-debug.md",
       "requiredGates": [

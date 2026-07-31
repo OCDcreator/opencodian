@@ -51,7 +51,7 @@ catalog 初次渲染最多读取 20 条 summary，提供 anomaly-only filter。�
 
 ## 与其他模块的交互
 
-- `SettingsDebugSection`: 保留 debug source-tab shell/router、共享目录选择、action-button helper、插件 export 和 Claude workbench；只在 tabbed Codex 路由挂载本 panel。
+- `SettingsDebugSection`: 保留 shared shell/router、共享目录选择、action-button helper、plugin export；只在 tabbed Codex 路由挂载本 panel。Claude workbench 已由相邻的 `ClaudeCodeDebugPanel` 完整持有。
 - `settings/debug/types.ts`: 定义 `CodexDebugPanelOptions`、`CodexDebugSettingsPort` 和 `CodexTraceDiagnosticsPort`，并在 composition 边界提供 service adapter。
 - `OpenCodianSettings`、`OpenCodianSettingsView`、`SettingsTabbedRenderer`: 各自在创建 `SettingsDebugSection` 时注入 `createCodexTraceDiagnosticsPort(plugin.codexTraceService)`；这不改变 Codex trace service 的 app-owned ownership。
 - `core/agents/backend/diagnostics`: 通过 narrow port 提供 Codex trace status、summary、report、flush、bundle export、clear 和 delete 操作。
@@ -70,7 +70,7 @@ catalog 初次渲染最多读取 20 条 summary，提供 anomaly-only filter。�
 - 不把完整 plugin、`codexTraceService`、store 或 report builder 加回 panel options；新增能力先扩展窄 port 并保留 adapter 在 composition 边界。
 - `captureContent` 是当前 Codex trace settings contract 的一部分，不能在 panel 重构中遗漏或与 `consolePreset` 混为一谈。
 - tabbed-only 是当前 section 的挂载事实，不是对 legacy classic attach 的修复；不要把 Codex panel 加回 `attach()`，也不要声称 non-tabbed visibility omission 已解决。
-- shared platform/path/action helper 继续由 `SettingsDebugSection` 提供；Claude 的 console debug channels 与独立 session-trace controls 仍由该 section 持有，本文件不定义 Claude panel contract。
+- shared platform/path/action helper 继续由 `SettingsDebugSection` 提供；Claude 的 console debug channels 与独立 session-trace controls 由相邻的 `ClaudeCodeDebugPanel` 完整持有，本文件不定义 Claude panel contract。
 
 ## 测试
 

@@ -10,7 +10,7 @@ import type { AgentBackendKind } from '../../core/types/chat';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { renderAgentSwitcherFloatingIcons } from './AgentSwitcherFloatingIcons';
-import { createCodexTraceDiagnosticsPort, createOpenCodeTraceDiagnosticsPort } from './debug/types';
+import { createClaudeTraceDiagnosticsPort, createCodexTraceDiagnosticsPort, createOpenCodeTraceDiagnosticsPort } from './debug/types';
 import { SettingsAcpSection } from './SettingsAcpSection';
 import { SettingsAgentsSection } from './SettingsAgentsSection';
 import { SettingsBackendSection } from './SettingsBackendSection';
@@ -527,7 +527,7 @@ export class SettingsTabbedRenderer {
     const debugSection = new SettingsDebugSection({
       plugin: this.deps.plugin,
       getOpenCodeDiagnostics: () => createOpenCodeTraceDiagnosticsPort(this.deps.plugin.openCodeTraceService),
-      getCodexDiagnostics: () => createCodexTraceDiagnosticsPort(this.deps.plugin.codexTraceService),
+      getCodexDiagnostics: () => createCodexTraceDiagnosticsPort(this.deps.plugin.codexTraceService), getClaudeDiagnostics: () => createClaudeTraceDiagnosticsPort(this.deps.plugin.claudeTraceService),
       createSectionHeading: (hostEl, title, tooltip) => this.deps.createHeading(hostEl, title, tooltip),
     });
     debugSection.attachTabbed(containerEl, secondaryTabId);

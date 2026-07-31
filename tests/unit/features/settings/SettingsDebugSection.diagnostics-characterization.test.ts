@@ -363,7 +363,7 @@ describe('Phase 3 Task 10 — SettingsDebugSection diagnostics characterization'
   // The plan (Task 10 step 5 + Task 13) requires: "separately prove whether
   // legacy non-tabbed attach is reachable and record its current Codex
   // omission." attach() calls addPluginDebugSettings, openCodeDebugPanel.render,
-  // addClaudeCodeDebugSettings, addExportDebugSettings — it does NOT render
+  // claudeCodeDebugPanel.render, addExportDebugSettings — it does NOT render
   // the Codex panel. This is the documented inconsistency. Task 13 must
   // NOT silently fix or permanently entrench it inside a pure-refactor commit;
   // it must be handled as a separately-approved bugfix/cleanup.
@@ -388,7 +388,7 @@ describe('Phase 3 Task 10 — SettingsDebugSection diagnostics characterization'
       // attach() invokes the plugin, OpenCode panel, Claude, and export render paths...
       expect(attachBody).toContain('this.addPluginDebugSettings(');
       expect(attachBody).toContain('this.openCodeDebugPanel.render(');
-      expect(attachBody).toContain('this.addClaudeCodeDebugSettings(');
+      expect(attachBody).toContain('this.claudeCodeDebugPanel.render(');
       expect(attachBody).toContain('this.addExportDebugSettings(');
       // ...but does NOT render the Codex panel.
       expect(attachBody).not.toContain('this.codexDebugPanel.render(');
@@ -427,31 +427,26 @@ describe('Phase 3 Task 10 — SettingsDebugSection diagnostics characterization'
     it('the Claude block keeps console debug-channel controls alongside session-trace controls (source contract)', () => {
       // Plan invariant for Task 13: the Claude panel must preserve console
       // debug channels AND independent session-trace controls. Prove both
-      // control paths are wired in addClaudeCodeDebugSettings (delegated to
-      // addClaudeCodeChannelSettings + addClaudeTraceControls).
+      // control paths are wired in the complete Claude panel.
       // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
       const fs = require('fs') as typeof import('fs');
       // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
       const path = require('path') as typeof import('path');
-      const source = fs.readFileSync(
-        path.resolve(__dirname, '../../../../src/features/settings/SettingsDebugSection.ts'),
+      const panelSource = fs.readFileSync(
+        path.resolve(__dirname, '../../../../src/features/settings/debug/ClaudeCodeDebugPanel.ts'),
         'utf8',
       );
-      const start = source.indexOf('  private addClaudeCodeDebugSettings(');
-      expect(start).toBeGreaterThan(-1);
-      const body = source.slice(start, start + 4000);
       // Console debug-channel controls.
-      expect(body).toContain('this.addClaudeCodeChannelSettings(');
+      expect(panelSource).toContain('this.addCodeChannelSettings(');
       // Independent session-trace controls.
-      expect(body).toContain('this.addClaudeTraceControls(');
-      expect(body).toContain('this.addClaudeTraceStatus(');
-      expect(body).toContain('this.addClaudeTraceActions(');
-      expect(body).toContain('this.addClaudeTraceCatalog(');
+      expect(panelSource).toContain('this.addTraceControls(');
+      expect(panelSource).toContain('this.addTraceStatus(');
+      expect(panelSource).toContain('this.addTraceActions(');
+      expect(panelSource).toContain('this.addTraceCatalog(');
     });
 
     it('the three backend blocks each own a status + actions lifecycle (source contract)', () => {
-      // OpenCode and Codex now have dedicated panels; Claude remains in the
-      // section until its later extraction slice.
+      // Every backend now has its own complete panel.
       // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
       const fs = require('fs') as typeof import('fs');
       // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
@@ -468,34 +463,29 @@ describe('Phase 3 Task 10 — SettingsDebugSection diagnostics characterization'
         path.resolve(__dirname, '../../../../src/features/settings/debug/CodexDebugPanel.ts'),
         'utf8',
       );
+      const claudeSource = fs.readFileSync(
+        path.resolve(__dirname, '../../../../src/features/settings/debug/ClaudeCodeDebugPanel.ts'),
+        'utf8',
+      );
       expect(openCodeSource).toContain('this.addTraceStatus(');
       expect(openCodeSource).toContain('this.addTraceActions(');
       expect(openCodeSource).toContain('this.addTraceCatalog(');
       expect(codexSource).toContain('this.addTraceStatus(');
       expect(codexSource).toContain('this.addTraceActions(');
       expect(codexSource).toContain('this.addTraceCatalog(');
+      expect(claudeSource).toContain('this.addTraceStatus(');
+      expect(claudeSource).toContain('this.addTraceActions(');
+      expect(claudeSource).toContain('this.addTraceCatalog(');
       expect(source).not.toContain('openCodeTraceService');
       expect(source).not.toContain('codexTraceService');
+      expect(source).not.toContain('claudeTraceService');
       expect(source).toContain('getDiagnostics: options.getOpenCodeDiagnostics');
       expect(source).toContain('getDiagnostics: options.getCodexDiagnostics');
-
-      // Claude remains section-owned and keeps its complete trace lifecycle.
-      function methodBody(methodName: string): string {
-        const start = source.indexOf(`private ${methodName}(`);
-        expect(start).toBeGreaterThan(-1);
-        // Bound to the next private method.
-        const nextRel = source.slice(start + 1).search(/\n[/ ]{2}private\s\w/);
-        return nextRel > 0 ? source.slice(start, start + 1 + nextRel) : source.slice(start, start + 4000);
-      }
-      const claudeBody = methodBody('addClaudeCodeDebugSettings');
-      expect(claudeBody).toContain('this.addClaudeTraceStatus');
-      expect(claudeBody).toContain('this.addClaudeTraceActions');
-      expect(claudeBody).toContain('this.addClaudeTraceCatalog');
-      // Each reads storage state through its narrow port; Claude remains on its
-      // direct backend-specific surface until its following extraction slice.
+      expect(source).toContain('getDiagnostics: options.getClaudeDiagnostics');
+      // Each reads storage state through its narrow port.
       expect(openCodeSource).toMatch(/diagnostics\?\.getStatus/);
       expect(codexSource).toMatch(/diagnostics\?\.getStatus/);
-      expect(source).toMatch(/claudeTraceService\?\.getStorageStatus/);
+      expect(claudeSource).toMatch(/getDiagnostics\(\)\?\.getStorageStatus/);
     });
 
     it('the plugin block registers the global enableDebugLogging toggle (source contract)', () => {
@@ -531,20 +521,24 @@ describe('Phase 3 Task 10 — SettingsDebugSection diagnostics characterization'
       const groupsStart = source.indexOf('const DEBUG_MODULE_GROUPS:');
       expect(groupsStart).toBeGreaterThan(-1);
       const groupsBody = source.slice(groupsStart, groupsStart + 600);
-      // Section-owned groups contain plugin and claude-code; Codex owns no
-      // debug-module group because its panel has trace-channel controls only.
+      // The section owns only the plugin group; each backend panel owns its
+      // own exact debug-module group where needed.
       expect(groupsBody).toMatch(/plugin:\s*\[/);
-      expect(groupsBody).toMatch(/'claude-code':\s*\[/);
+      expect(groupsBody).not.toMatch(/'claude-code':\s*\[/);
       expect(groupsBody).not.toMatch(/opencode:\s*\[/);
       expect(groupsBody).not.toMatch(/codex:\s*\[/);
       const openCodeSource = fs.readFileSync(
         path.resolve(__dirname, '../../../../src/features/settings/debug/OpenCodeDebugPanel.ts'),
         'utf8',
       );
+      const claudeSource = fs.readFileSync(
+        path.resolve(__dirname, '../../../../src/features/settings/debug/ClaudeCodeDebugPanel.ts'),
+        'utf8',
+      );
       // OpenCode owns its exact module-key grouping after extraction.
       expect(openCodeSource).toContain("['server', 'models', 'streaming']");
-      // claude-code is exactly ['claudeCode'].
-      expect(groupsBody).toContain("'claude-code': ['claudeCode'],");
+      // Claude owns its exact console debug-module group.
+      expect(claudeSource).toContain("moduleKeys: ['claudeCode']");
       // plugin is exactly the 8-key list — pin the FULL ordered array so
       // removing/adding/reordering any key is caught.
       expect(groupsBody).toContain("plugin: [");

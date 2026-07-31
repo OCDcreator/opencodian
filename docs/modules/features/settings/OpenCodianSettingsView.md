@@ -16,7 +16,7 @@
 ## 导入关系
 
 ```text
-上游: obsidian, i18n, main, Settings*Section, settings/debug/OpenCodeDebugPanel, settings/debug/CodexDebugPanel, settings/debug/types, SettingsSectionCoordinator, SettingsTabbedRenderer, SettingsPanelChrome, SettingsDropdownControl
+上游: obsidian, i18n, main, Settings*Section, settings/debug/OpenCodeDebugPanel, settings/debug/CodexDebugPanel, settings/debug/ClaudeCodeDebugPanel, settings/debug/types, SettingsSectionCoordinator, SettingsTabbedRenderer, SettingsPanelChrome, SettingsDropdownControl
 下游: SettingsViewRegistrar
 ```
 
@@ -41,7 +41,7 @@ export class OpenCodianSettingsView extends ItemView
 - classic 模式按 General、Claude Code、Server、Model、Conversation、Agents、Commands、MCP、Formatter、Plugin、Security、UI、Style、Debug、User、Skills、Tools、ACP 顺序挂载 section
 - tabbed 模式通过 `SettingsTabbedRenderer` 路由一级 / 二级标签内容
 - General 面板额外承载设置布局模式、语言，以及“在编辑区打开设置”的开关
-- editor-area 的 OpenCode 与 Codex debug composition path 与标准 settings tab 一样，在创建 `SettingsDebugSection` 时分别注入 `createOpenCodeTraceDiagnosticsPort()` 与 `createCodexTraceDiagnosticsPort()`；view 不直接把任一 trace service/store/report 传入 panel。Codex panel 只由 tabbed debug route 挂载，classic legacy attach omission 保持不变；Claude debug/trace workbench 仍由 `SettingsDebugSection` 持有
+- editor-area 的 OpenCode、Codex 与 Claude debug composition path 与标准 settings tab 一样，在创建 `SettingsDebugSection` 时分别注入三个 `create*TraceDiagnosticsPort()` 的结果；view 不直接把任一 trace service/store/report 传入 panel。Claude classic/tabbed 都继续渲染，Codex panel 只由 tabbed debug route 挂载，classic legacy attach omission 保持不变
 
 ### 跨 section 状态桥接
 
@@ -97,7 +97,7 @@ AgentServiceRegistry.onActiveChange()
 - 各 `Settings*Section`: 继续拥有具体设置项与业务生命周期，避免该 view 复制 settings tab 的业务逻辑
 - `SettingsUserSection`: 除了继续承接 user/profile/prompt/tags 渲染外，editor-area view 也负责在重绘和 `onClose()` 时调用其 `dispose()`，统一释放 textarea size-memory observer
 - `SettingsClaudeCodeSection`: 提供 Claude Code Phase 1 配置基础与 runtime diagnostics；editor-area view 只负责装配，backend enablement 由 General / Backend 的 `SettingsBackendSection` 管理
-- `settings/debug/OpenCodeDebugPanel`、`CodexDebugPanel` / `types`: 提供 OpenCode 与 Codex workbench owners 及窄 settings/diagnostics ports；Claude debug/trace workbench 仍由 `SettingsDebugSection` 保留
+- `settings/debug/OpenCodeDebugPanel`、`CodexDebugPanel`、`ClaudeCodeDebugPanel` / `types`: 提供三个 workbench owners 及窄 settings/diagnostics ports；view 只负责 composition 装配
 
 ## 配置项
 

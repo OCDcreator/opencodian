@@ -37,7 +37,7 @@ General 里的设置界面模式、界面语言、在编辑区打开设置，以
 - 通过 `SettingsSecuritySection` 协调 security section 的 config-status/permission/restart/blocklist lifecycle
 - 通过 `SettingsToolSection` 协调 Tools section 的 built-in permission、项目 `.opencode/tools` 自定义工具文件、全局 tools 只读目录和运行时 custom tool catalog 权限 lifecycle
 - 通过 `SettingsDebugSection` 协调 debug logging、log path picker、diagnostic action 与 console help lifecycle
-- `SettingsDebugSection` 内的 OpenCode 与 Codex workbench 分别由 `debug/OpenCodeDebugPanel` 和 `debug/CodexDebugPanel` 完整持有；本标准设置组合路径通过 `createOpenCodeTraceDiagnosticsPort()` 与 `createCodexTraceDiagnosticsPort()` 注入窄 diagnostics ports。Codex panel 只由 tabbed debug route 挂载，classic legacy attach omission 保持不变；Claude debug/trace workbench 仍由 `SettingsDebugSection` 持有
+- `SettingsDebugSection` 内的 OpenCode、Codex 与 Claude Code workbench 分别由 `debug/OpenCodeDebugPanel`、`debug/CodexDebugPanel` 和 `debug/ClaudeCodeDebugPanel` 完整持有；本标准设置组合路径通过三个 `create*TraceDiagnosticsPort()` adapter 注入窄 diagnostics ports。Claude classic/tabbed 都继续渲染，Codex panel 只由 tabbed debug route 挂载，classic legacy attach omission 保持不变
 - 通过 `SettingsStyleBackgroundSection` 协调 style owner 下的聊天背景图子区块 lifecycle
 - 对多个 modal 与辅助服务的编排
 
@@ -184,7 +184,7 @@ provider 开关写回仍遵循 `ModelConfigService` 返回的 `effectiveProvider
 - Commands section 的 runtime+project slash-command catalog、project command editor shell、`hiddenSlashCommands` 可见性与 `slashCommandSkillMode` 写回现在由 `SettingsCommandsSection` 持有
 - plugin section 的 snapshot refresh、project config editor、isolation mode、project directory 与 OMO config 管理现在由 `SettingsPluginSection` 持有
 - UI section 的 max tabs、tab position/layout、auto scroll、chat scroll mode 与 open-in-main-tab 写回现在由 `SettingsUiSection` 持有
-- debug section 的 shared shell、logging toggle、log path picker、plugin diagnostic export/action 与 console help block 现在由 `SettingsDebugSection` 持有；OpenCode 与 Codex trace settings/status/actions/catalog 分别由 `OpenCodeDebugPanel` 与 `CodexDebugPanel` 持有，Claude debug/trace workbench 仍留在 section 内
+- debug section 的 shared shell、logging toggle、log path picker、plugin diagnostic export/action 与 console help block 现在由 `SettingsDebugSection` 持有；OpenCode、Codex 与 Claude trace settings/status/actions/catalog 分别由三个 backend panel 持有，section 通过窄 callbacks 提供 shared helpers、visible logs 与 summary-only report
 - 模型加载后的 UI 刷新走 `requestAnimationFrame`
 - style section 的 preset/status、binding 同步与 reset/apply/save orchestration 现在由 `SettingsStyleSection` 持有；input subsection rerender 继续委托给 `SettingsStyleInputPanelSection`
 - 聊天背景图 subsection 继续由 `SettingsStyleBackgroundSection` 持有自己的 host、preview request guard 与 reset/upload lifecycle，`OpenCodianSettings` 只负责装配 `SettingsStyleSection`
@@ -233,7 +233,7 @@ provider 开关写回仍遵循 `ModelConfigService` 返回的 `effectiveProvider
 - `SettingsCommandsSection`: 管理 Commands section 的 runtime+project slash-command catalog、project command editor shell / placeholder reference、`hiddenSlashCommands` 用户可见性写回与 `slashCommandSkillMode`；project command 表单细节继续委托给 companion owner `SettingsProjectCommandEditor`，runtime placeholder expansion 与 slash execution 则分别留在 `OpenCodeSessionControlOrchestrator` / `SlashCommandExecutionService`
 - `SettingsPluginSection`: 管理 plugin section 的 environment snapshot、project config plugin editor、isolation mode、project plugin directory 与 OMO config open/create action；`OpenCodianSettings` 只保留 owner 装配与 formatting bridge
 - `SettingsUiSection`: 管理 UI section 的 max tabs、tab position/layout、auto scroll、chat scroll mode 与 open-in-main-tab 保存逻辑；`OpenCodianSettings` 只保留 owner 装配
-- `SettingsDebugSection`: 管理 shared debug shell、logging/export/help 与仍未拆出的 Codex/Claude workbench；OpenCode panel 通过窄 port 注入，`OpenCodianSettings` 只保留 owner 装配
+- `SettingsDebugSection`: 管理 shared debug shell、logging/export/help 与 section-level callbacks；三个 backend panel 通过窄 ports 注入，`OpenCodianSettings` 只保留 owner 装配
 - `SettingsSecuritySection`: 管理 security section 的 config status、permission mode 写回、restart action 与 blocklist/export-path 输入；`OpenCodianSettings` 只保留 owner 装配
 - `SettingsStyleSection`: 管理 style section 的 theme preset、binding sync、background/input 子 owner 装配与 custom CSS；`OpenCodianSettings` 只保留 owner 装配
 - `SettingsFormatterSection`: 管理 formatter section 的 runtime status 展示、project config 模式切换（default/disabled/custom）与 formatter 子树读写；`OpenCodianSettings` 只保留 owner 装配与 display refresh bridge

@@ -4,15 +4,8 @@ import { Notice, Setting, type TextComponent } from 'obsidian';
 import * as os from 'os';
 import * as path from 'path';
 
-import {
-  CLAUDE_TRACE_CHANNEL_IDS,
-  CODEX_TRACE_CHANNEL_IDS,
-} from '../../core/agents/backend/diagnostics';
-import {
-  getCurrentPlatformDebugLogPath,
-  getCurrentPlatformKey,
-  getDefaultBackendSettings,
-} from '../../core/types';
+import { CODEX_TRACE_CHANNEL_IDS } from '../../core/agents/backend/diagnostics';
+import { getCurrentPlatformDebugLogPath, getCurrentPlatformKey } from '../../core/types';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import {
@@ -30,10 +23,11 @@ import {
   type DebugModuleKey,
   normalizeDebugRefreshIntervalMs,
 } from '../../shared/debugModules';
-import { resolveDefaultTraceDirectory } from '../../shared/diagnostics';
+import { ClaudeCodeDebugPanel } from './debug/ClaudeCodeDebugPanel';
 import { CodexDebugPanel } from './debug/CodexDebugPanel';
 import { OPEN_CODE_DEBUG_MODULE_KEYS, OpenCodeDebugPanel } from './debug/OpenCodeDebugPanel';
 import type {
+  ClaudeTraceDiagnosticsPort,
   CodexTraceDiagnosticsPort,
   DebugModuleGroupConfig,
   OpenCodeTraceDiagnosticsPort,
@@ -43,10 +37,6 @@ const logger = createLogger('SettingsDebugSection');
 
 type DebugPlatformKey = 'unix' | 'windows';
 type DebugSectionBlockId = 'plugin' | 'opencode' | 'codex' | 'claude-code' | 'export';
-interface ClaudeCodeStatusItem {
-  label: string;
-  value: string;
-}
 
 interface DebugTabShellConfig {
   id: DebugSectionBlockId;
@@ -59,7 +49,7 @@ interface DebugRenderOptions {
   includeIntro: boolean;
 }
 
-const DEBUG_MODULE_GROUPS: Record<Exclude<DebugSectionBlockId, 'export' | 'opencode' | 'codex'>, readonly DebugModuleKey[]> = {
+const DEBUG_MODULE_GROUPS: Record<'plugin', readonly DebugModuleKey[]> = {
   plugin: [
     'app',
     'settings',
@@ -70,13 +60,13 @@ const DEBUG_MODULE_GROUPS: Record<Exclude<DebugSectionBlockId, 'export' | 'openc
     'providerIcons',
     'visuals',
   ],
-  'claude-code': ['claudeCode'],
 };
 
 interface SettingsDebugSectionOptions {
   plugin: OpenCodianPlugin;
   getOpenCodeDiagnostics?: () => OpenCodeTraceDiagnosticsPort | undefined;
   getCodexDiagnostics?: () => CodexTraceDiagnosticsPort | undefined;
+  getClaudeDiagnostics?: () => ClaudeTraceDiagnosticsPort | undefined;
   createSectionHeading: (
     containerEl: HTMLElement,
     title: string,
@@ -125,6 +115,7 @@ function getElectronDialog(): ElectronDialogModule | null {
 
 export class SettingsDebugSection {
   private readonly plugin: OpenCodianPlugin;
+  private readonly claudeCodeDebugPanel: ClaudeCodeDebugPanel;
   private readonly codexDebugPanel: CodexDebugPanel;
   private readonly openCodeDebugPanel: OpenCodeDebugPanel;
   private readonly createSectionHeading: (
@@ -153,6 +144,22 @@ export class SettingsDebugSection {
       addActionButton: (containerEl, label, onClick, cta) =>
         this.addActionButton(containerEl, label, onClick, cta),
     });
+    this.claudeCodeDebugPanel = new ClaudeCodeDebugPanel({
+      settings: this.plugin.settings,
+      getDiagnostics: options.getClaudeDiagnostics ?? (() => undefined),
+      saveSettings: () => this.plugin.saveSettings(),
+      pickDirectory: (defaultPath) => this.pickDirectory(defaultPath),
+      getValidatedExportDirectory: () => this.getValidatedClaudeTraceExportDirectory(),
+      addActionButton: (containerEl, label, onClick, cta) =>
+        this.addActionButton(containerEl, label, onClick, cta),
+      renderDebugModules: (containerEl, config) => this.addDebugModuleSettings(containerEl, config),
+      getVisibleLogEntryCount: () => this.getClaudeCodeLogEntries().length,
+      getVisibleLogText: () => this.getVisibleClaudeCodeLogText(),
+      buildDiagnosticReport: () => this.buildClaudeCodeDiagnosticReport(),
+      clearVisibleLogs: () => clearRecentLogs(),
+      reportVisibleLogCopyFailure: (error) => logger.error('Failed to copy Claude Code logs:', error),
+      reportDiagnosticCopyFailure: (error) => logger.error('Failed to copy Claude Code diagnostics:', error),
+    });
   }
 
   dispose(): void {}
@@ -167,7 +174,7 @@ export class SettingsDebugSection {
 
     this.addPluginDebugSettings(containerEl);
     this.openCodeDebugPanel.render(containerEl);
-    this.addClaudeCodeDebugSettings(containerEl);
+    this.claudeCodeDebugPanel.render(containerEl);
     this.addExportDebugSettings(containerEl, platformKey);
 
     return headingEl;
@@ -206,7 +213,7 @@ export class SettingsDebugSection {
       description: t('settings.debug.modules.claudeCode.groupDesc'),
       badges: ['Claude Code', String(CLAUDE_CODE_DEBUG_CHANNEL_IDS.length)],
     });
-    this.addClaudeCodeDebugSettings(claudeCodeBlockEl, { includeIntro: false });
+    this.claudeCodeDebugPanel.render(claudeCodeBlockEl, { includeIntro: false });
 
     const exportBlockEl = this.createDebugTabShell(containerEl, {
       id: 'export',
@@ -260,388 +267,6 @@ export class SettingsDebugSection {
         includeIntro: options.includeIntro,
       },
     );
-  }
-
-  private addClaudeCodeDebugSettings(
-    containerEl: HTMLElement,
-    options: DebugRenderOptions = { includeIntro: true },
-  ): void {
-    const workbenchEl = containerEl.createDiv({
-      cls: 'opencodian-debug-workbench',
-      attr: { 'data-debug-workbench': 'claude-code' },
-    });
-
-    const statusContainerEl = options.includeIntro
-      ? this.createClaudeCodeWorkbenchHeader(workbenchEl)
-      : workbenchEl;
-
-    this.addClaudeCodeStatusStrip(statusContainerEl);
-    this.addClaudeCodePrivacyNote(workbenchEl);
-    this.addDebugModuleSettings(
-      workbenchEl,
-      {
-        moduleKeys: DEBUG_MODULE_GROUPS['claude-code'],
-        titleKey: 'settings.debug.claude.module.title',
-        descriptionKey: 'settings.debug.claude.module.desc',
-        includeIntro: true,
-      },
-    );
-    this.addClaudeCodeChannelSettings(workbenchEl);
-    this.addClaudeTraceStatus(workbenchEl);
-    this.addClaudeTraceControls(workbenchEl);
-    this.addClaudeTraceActions(workbenchEl);
-    this.addClaudeTraceCatalog(workbenchEl);
-    this.addClaudeCodeLogPreview(workbenchEl);
-  }
-
-  private createClaudeCodeWorkbenchHeader(containerEl: HTMLElement): HTMLElement {
-    const headerEl = containerEl.createDiv({
-      cls: 'opencodian-debug-workbench-header opencodian-settings-block',
-    });
-    headerEl.createEl('h4', {
-      cls: 'opencodian-settings-subsection-heading',
-      text: t('settings.debug.modules.claudeCode.title'),
-    });
-    headerEl.createDiv({
-      cls: 'opencodian-settings-block-desc',
-      text: t('settings.debug.modules.claudeCode.groupDesc'),
-    });
-    return headerEl;
-  }
-
-  private addClaudeCodeStatusStrip(containerEl: HTMLElement): void {
-    const statusEl = containerEl.createDiv({
-      cls: 'opencodian-debug-status-strip',
-      attr: { 'data-claude-code-status-strip': 'true' },
-    });
-    this.renderClaudeCodeStatusStrip(statusEl);
-  }
-
-  private getClaudeCodeStatusItems(): ClaudeCodeStatusItem[] {
-    const settings = this.plugin.settings;
-    const claudeSettings = settings.backendSettings.claudeCode;
-    const claudeLogs = this.getClaudeCodeLogEntries();
-    const enabledChannelCount = CLAUDE_CODE_DEBUG_CHANNEL_IDS
-      .filter((channelId) => claudeSettings.debugChannels[channelId] !== false)
-      .length;
-    return [
-      {
-        label: t('settings.debug.claude.status.backend'),
-        value: settings.activeBackend === 'claude-code'
-          ? t('settings.debug.claude.status.backendActive')
-          : t('settings.debug.claude.status.backendInactive'),
-      },
-      {
-        label: t('settings.debug.claude.status.logging'),
-        value: settings.enableDebugLogging && settings.debugModuleSettings.claudeCode !== false
-          ? t('settings.debug.claude.status.loggingOn')
-          : t('settings.debug.claude.status.loggingOff'),
-      },
-      {
-        label: t('settings.debug.claude.status.channels'),
-        value: t('settings.debug.claude.status.channelsValue', {
-          enabled: String(enabledChannelCount),
-          total: String(CLAUDE_CODE_DEBUG_CHANNEL_IDS.length),
-        }),
-      },
-      {
-        label: t('settings.debug.claude.status.recent'),
-        value: t('settings.debug.claude.status.recentValue', { count: String(claudeLogs.length) }),
-      },
-    ];
-  }
-
-  private renderClaudeCodeStatusStrip(statusEl: HTMLElement): void {
-    statusEl.replaceChildren();
-    for (const item of this.getClaudeCodeStatusItems()) {
-      const itemEl = statusEl.createDiv({ cls: 'opencodian-debug-status-item' });
-      itemEl.createDiv({ cls: 'opencodian-debug-status-label', text: item.label });
-      itemEl.createDiv({ cls: 'opencodian-debug-status-value', text: item.value });
-    }
-  }
-
-  private addClaudeCodePrivacyNote(containerEl: HTMLElement): void {
-    const noteEl = containerEl.createDiv({ cls: 'opencodian-settings-block opencodian-debug-privacy-note' });
-    noteEl.createDiv({
-      cls: 'opencodian-debug-privacy-title',
-      text: t('settings.debug.claude.privacy.title'),
-    });
-    noteEl.createDiv({
-      cls: 'opencodian-debug-privacy-copy',
-      text: t('settings.debug.claude.privacy.desc'),
-    });
-  }
-
-  private addClaudeCodeChannelSettings(containerEl: HTMLElement): void {
-    const channelsEl = containerEl.createDiv({ cls: 'opencodian-settings-block opencodian-debug-channel-panel' });
-    channelsEl.createEl('h4', {
-      cls: 'opencodian-settings-subsection-heading',
-      text: t('settings.debug.claude.channels.title'),
-    });
-    channelsEl.createDiv({
-      cls: 'opencodian-settings-block-desc',
-      text: t('settings.debug.claude.channels.desc'),
-    });
-
-    const listEl = channelsEl.createDiv({ cls: 'opencodian-debug-channel-list' });
-    for (const channelId of CLAUDE_CODE_DEBUG_CHANNEL_IDS) {
-      new Setting(listEl)
-        .setName(t(`settings.debug.claude.channel.${channelId}.name` as never))
-        .setDesc(t(`settings.debug.claude.channel.${channelId}.desc` as never))
-        .addToggle((toggle) =>
-          toggle
-            .setValue(this.plugin.settings.backendSettings.claudeCode.debugChannels[channelId] !== false)
-            .onChange(async (value) => {
-              this.plugin.settings.backendSettings.claudeCode.debugChannels = {
-                ...this.plugin.settings.backendSettings.claudeCode.debugChannels,
-                [channelId]: value,
-              };
-              await this.plugin.saveSettings();
-              this.refreshClaudeCodeWorkbench(containerEl);
-            })
-        );
-    }
-  }
-
-  private addClaudeTraceStatus(containerEl: HTMLElement): void {
-    const status = this.plugin.claudeTraceService?.getStorageStatus();
-    const settings = this.getClaudeTraceSettings();
-    const stripEl = containerEl.createDiv({
-      cls: 'opencodian-debug-status-strip',
-      attr: { 'data-claude-trace-status': 'true' },
-    });
-    const items = [
-      [t('settings.debug.claude.status.capture'), settings.enabled
-        ? t('settings.debug.codex.status.enabled')
-        : t('settings.debug.codex.status.disabled')],
-      [t('settings.debug.claude.status.mode'), status?.mode ?? 'disk'],
-      [t('settings.debug.claude.status.directory'), status?.rootDirectory || settings.storageDirectory || resolveDefaultTraceDirectory('claude')],
-      [t('settings.debug.claude.status.queued'), String(status?.queuedEvents ?? 0)],
-      [t('settings.debug.claude.status.size'), `${Math.round((status?.approximateBytes ?? 0) / 1024)} KiB`],
-      [t('settings.debug.claude.status.dropped'), String(status?.droppedEvents ?? 0)],
-    ];
-    for (const [label, value] of items) {
-      const itemEl = stripEl.createDiv({ cls: 'opencodian-debug-status-item' });
-      itemEl.createDiv({ cls: 'opencodian-debug-status-label', text: label });
-      itemEl.createDiv({ cls: 'opencodian-debug-status-value', text: value });
-    }
-    if (status?.lastError) {
-      stripEl.createDiv({
-        cls: 'opencodian-debug-status-error',
-        text: t('settings.debug.claude.status.error', { error: status.lastError }),
-      });
-    }
-  }
-
-  private addClaudeTraceControls(containerEl: HTMLElement): void {
-    const settings = this.getClaudeTraceSettings();
-    const controlsEl = containerEl.createDiv({ cls: 'opencodian-settings-block opencodian-debug-channel-panel' });
-    new Setting(controlsEl)
-      .setName(t('settings.debug.claude.enabled.name'))
-      .setDesc(t('settings.debug.claude.enabled.desc'))
-      .addToggle((toggle) => toggle
-        .setValue(settings.enabled)
-        .onChange(async (value) => {
-          settings.enabled = value;
-          await this.plugin.saveSettings();
-        }));
-    new Setting(controlsEl)
-      .setName(t('settings.debug.claude.preset.name'))
-      .setDesc(t('settings.debug.claude.preset.desc'))
-      .addDropdown((dropdown) => dropdown
-        .addOption('off', t('settings.debug.claude.preset.off'))
-        .addOption('standard', t('settings.debug.claude.preset.standard'))
-        .addOption('full', t('settings.debug.claude.preset.full'))
-        .setValue(settings.consolePreset)
-        .onChange(async (value) => {
-          settings.consolePreset = value === 'full' || value === 'standard' ? value : 'off';
-          await this.plugin.saveSettings();
-        }));
-    new Setting(controlsEl)
-      .setName(t('settings.debug.claude.storage.name'))
-      .setDesc(t('settings.debug.claude.storage.desc'))
-      .setClass('opencodian-wide-text-setting')
-      .addText((text) => {
-        text
-          .setPlaceholder(resolveDefaultTraceDirectory('claude'))
-          .setValue(settings.storageDirectory)
-          .onChange(async (value) => {
-            settings.storageDirectory = value.trim();
-            await this.plugin.saveSettings();
-          });
-        text.inputEl.addEventListener('blur', () => {
-          new Notice(t('settings.debug.claude.storage.restart'));
-        });
-      })
-      .addButton((button) => button
-        .setButtonText(t('settings.debug.claude.storage.choose'))
-        .onClick(async () => {
-          const selected = await this.pickDirectory(settings.storageDirectory);
-          if (!selected) return;
-          settings.storageDirectory = selected;
-          await this.plugin.saveSettings();
-          new Notice(t('settings.debug.claude.storage.restart'));
-        }));
-    const channelsEl = controlsEl.createDiv({ cls: 'opencodian-debug-channel-list' });
-    for (const channelId of CLAUDE_TRACE_CHANNEL_IDS) {
-      new Setting(channelsEl)
-        .setName(t(`settings.debug.claude.channel.${channelId}.name` as never))
-        .setDesc(t(`settings.debug.claude.channel.${channelId}.desc` as never))
-        .addToggle((toggle) => toggle
-          .setValue(settings.consoleChannels[channelId] !== false)
-          .onChange(async (value) => {
-            settings.consoleChannels = { ...settings.consoleChannels, [channelId]: value };
-            await this.plugin.saveSettings();
-          }));
-    }
-  }
-
-  private addClaudeTraceActions(containerEl: HTMLElement): void {
-    const actionsEl = containerEl.createDiv({ cls: 'opencodian-debug-log-actions' });
-    this.addActionButton(actionsEl, t('settings.debug.claude.actions.copyReport'), async () => {
-      const report = await this.plugin.claudeTraceService?.buildSmartReport();
-      if (!report) return;
-      await navigator.clipboard.writeText(report);
-      new Notice(t('settings.debug.claude.actions.copySuccess'));
-    });
-    this.addActionButton(actionsEl, t('settings.debug.claude.actions.export'), async () => {
-      const summary = this.plugin.claudeTraceService?.listRecentTraces(1)[0];
-      if (!summary) {
-        new Notice(t('settings.debug.claude.recent.empty'));
-        return;
-      }
-      const targetDirectory = getCurrentPlatformDebugLogPath(this.plugin.settings.debugLogPaths).trim();
-      if (!targetDirectory || !fs.existsSync(targetDirectory)) {
-        new Notice(t('settings.debug.claude.actions.exportDirectoryUnavailable'));
-        return;
-      }
-      const exportedDirectory = await this.plugin.claudeTraceService?.exportTrace(summary.traceId, targetDirectory);
-      if (exportedDirectory) {
-        new Notice(t('settings.debug.claude.actions.exportSuccess', { path: exportedDirectory }));
-      }
-    }, false);
-    this.addActionButton(actionsEl, t('settings.debug.claude.actions.clear'), async () => {
-      if (!window.confirm(t('settings.debug.claude.actions.clearConfirm'))) return;
-      await this.plugin.claudeTraceService?.clearAll();
-      const workbenchEl = containerEl.closest('[data-debug-workbench="claude-code"]');
-      if (workbenchEl instanceof HTMLElement) {
-        this.refreshClaudeTraceCatalog(workbenchEl);
-      }
-      new Notice(t('settings.debug.claude.actions.clearSuccess'));
-    }, false);
-  }
-
-  private addClaudeTraceCatalog(containerEl: HTMLElement): void {
-    const catalogEl = containerEl.createDiv({
-      cls: 'opencodian-settings-block opencodian-debug-log-panel',
-      attr: { 'data-claude-trace-catalog': 'true' },
-    });
-    this.renderClaudeTraceCatalog(catalogEl);
-  }
-
-  private refreshClaudeTraceCatalog(containerEl: HTMLElement): void {
-    const catalogEl = containerEl.querySelector('[data-claude-trace-catalog="true"]');
-    if (catalogEl instanceof HTMLElement) this.renderClaudeTraceCatalog(catalogEl);
-  }
-
-  private renderClaudeTraceCatalog(catalogEl: HTMLElement): void {
-    catalogEl.replaceChildren();
-    catalogEl.createEl('h4', {
-      cls: 'opencodian-settings-subsection-heading',
-      text: t('settings.debug.claude.recent.title'),
-    });
-    const filterSetting = new Setting(catalogEl)
-      .setName(t('settings.debug.claude.recent.anomaliesOnly'))
-      .setDesc(t('settings.debug.claude.recent.anomaliesOnlyDesc'));
-    const rowsEl = catalogEl.createDiv({ cls: 'opencodian-debug-trace-rows' });
-    const summaries = this.plugin.claudeTraceService?.listRecentTraces(20) ?? [];
-    const applyFilter = (anomaliesOnly: boolean) => {
-      for (const row of rowsEl.querySelectorAll<HTMLElement>('.opencodian-debug-trace-row')) {
-        row.toggleClass('is-hidden', anomaliesOnly && row.dataset.hasAnomaly !== 'true');
-      }
-    };
-    filterSetting.addToggle((toggle) => toggle
-      .setValue(false)
-      .onChange((value) => applyFilter(value)));
-    if (summaries.length === 0) {
-      rowsEl.createDiv({ cls: 'opencodian-settings-block-desc', text: t('settings.debug.claude.recent.empty') });
-      return;
-    }
-    for (const summary of summaries) {
-      const rowEl = rowsEl.createDiv({
-        cls: 'opencodian-debug-trace-row',
-        attr: {
-          'data-has-anomaly': String(
-            summary.highestSeverity === 'warning'
-            || summary.highestSeverity === 'critical'
-            || summary.highestSeverity === 'error',
-          ),
-        },
-      });
-      const copyEl = rowEl.createDiv({ cls: 'opencodian-debug-trace-copy' });
-      copyEl.createDiv({ cls: 'opencodian-debug-trace-id', text: summary.sessionId ?? summary.traceId });
-      copyEl.createDiv({
-        cls: 'opencodian-settings-block-desc',
-        text: `${summary.lastUpdatedAt} · ${summary.eventCount} events · ${summary.highestSeverity}`,
-      });
-      const rowActionsEl = rowEl.createDiv({ cls: 'opencodian-debug-log-actions' });
-      this.addActionButton(rowActionsEl, t('settings.debug.claude.recent.copy'), async () => {
-        const report = await this.plugin.claudeTraceService?.buildSmartReport(summary.traceId);
-        if (report) await navigator.clipboard.writeText(report);
-      }, false);
-      this.addActionButton(rowActionsEl, t('settings.debug.claude.recent.delete'), async () => {
-        await this.plugin.claudeTraceService?.store.deleteTrace(summary.traceId);
-        rowEl.remove();
-      }, false);
-    }
-  }
-
-  private getClaudeTraceSettings() {
-    this.plugin.settings.backendSettings.claudeCode.sessionTrace ??= getDefaultBackendSettings().claudeCode.sessionTrace;
-    return this.plugin.settings.backendSettings.claudeCode.sessionTrace;
-  }
-
-  private addClaudeCodeLogPreview(containerEl: HTMLElement): void {
-    const logsEl = containerEl.createDiv({ cls: 'opencodian-settings-block opencodian-debug-log-panel' });
-    logsEl.createEl('h4', {
-      cls: 'opencodian-settings-subsection-heading',
-      text: t('settings.debug.claude.logs.title'),
-    });
-    logsEl.createDiv({
-      cls: 'opencodian-settings-block-desc',
-      text: t('settings.debug.claude.logs.desc'),
-    });
-
-    const actionsEl = logsEl.createDiv({ cls: 'opencodian-debug-log-actions' });
-    this.addActionButton(actionsEl, t('settings.debug.claude.logs.copyVisible'), async () => {
-      try {
-        await navigator.clipboard.writeText(this.getVisibleClaudeCodeLogText());
-        new Notice(t('settings.debug.claude.logs.copyVisibleSuccess'));
-      } catch (error) {
-        logger.error('Failed to copy Claude Code logs:', error);
-        new Notice(t('settings.debug.claude.logs.copyVisibleFailed'));
-      }
-    });
-    this.addActionButton(actionsEl, t('settings.debug.claude.logs.copyDiagnostics'), async () => {
-      try {
-        await navigator.clipboard.writeText(this.buildClaudeCodeDiagnosticReport());
-        new Notice(t('settings.debug.actions.copySuccess'));
-      } catch (error) {
-        logger.error('Failed to copy Claude Code diagnostics:', error);
-        new Notice(t('settings.debug.actions.copyFailed'));
-      }
-    });
-    this.addActionButton(actionsEl, t('settings.debug.actions.clearLogs'), () => {
-      clearRecentLogs();
-      this.refreshClaudeCodeWorkbench(containerEl);
-      new Notice(t('settings.debug.actions.clearLogsSuccess'));
-    }, false);
-
-    const previewEl = logsEl.createEl('pre', {
-      cls: 'opencodian-debug-log-preview',
-      attr: { 'data-claude-code-log-preview': 'true' },
-    });
-    previewEl.textContent = this.getVisibleClaudeCodeLogText();
   }
 
   private addActionButton(
@@ -828,20 +453,14 @@ export class SettingsDebugSection {
     return sanitizeDiagnosticReport(raw);
   }
 
-  private refreshClaudeCodeWorkbench(containerEl: HTMLElement): void {
-    const statusEl = containerEl.querySelector('[data-claude-code-status-strip="true"]');
-    if (statusEl instanceof HTMLElement) {
-      this.renderClaudeCodeStatusStrip(statusEl);
-    }
-    const previewEl = containerEl.querySelector('[data-claude-code-log-preview="true"]');
-    if (previewEl) {
-      previewEl.textContent = this.getVisibleClaudeCodeLogText();
-    }
-  }
-
   private isClaudeCodeDebugChannelId(value: unknown): value is ClaudeCodeDebugChannelId {
     return typeof value === 'string'
       && (CLAUDE_CODE_DEBUG_CHANNEL_IDS as readonly string[]).includes(value);
+  }
+
+  private getValidatedClaudeTraceExportDirectory(): string | null {
+    const targetDirectory = getCurrentPlatformDebugLogPath(this.plugin.settings.debugLogPaths).trim();
+    return targetDirectory && fs.existsSync(targetDirectory) ? targetDirectory : null;
   }
 
   private addLogPathSetting(

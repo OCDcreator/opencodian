@@ -1,4 +1,6 @@
 import type {
+  ClaudeSessionTraceService,
+  ClaudeSessionTraceSettings,
   CodexSessionTraceService,
   CodexSessionTraceSettings,
 } from '../../../core/agents/backend/diagnostics';
@@ -9,7 +11,7 @@ import type {
   OpenCodeTraceSummary,
 } from '../../../core/opencode/diagnostics';
 import type { t } from '../../../i18n';
-import type { DebugModuleKey } from '../../../shared/debugModules';
+import type { ClaudeCodeDebugChannelId, DebugModuleKey } from '../../../shared/debugModules';
 import type { TraceStoreStatus, TraceSummary } from '../../../shared/diagnostics';
 
 export interface DebugModuleGroupConfig {
@@ -118,4 +120,63 @@ export interface CodexDebugPanelOptions {
     onClick: () => void | Promise<void>,
     cta?: boolean,
   ) => HTMLButtonElement;
+}
+
+export interface ClaudeCodeDebugSettingsPort {
+  activeBackend?: string;
+  enableDebugLogging: boolean;
+  debugModuleSettings: {
+    claudeCode?: boolean;
+  };
+  backendSettings: {
+    claudeCode: {
+      debugChannels: Partial<Record<ClaudeCodeDebugChannelId, boolean>>;
+      sessionTrace?: ClaudeSessionTraceSettings;
+    };
+  };
+}
+
+export interface ClaudeTraceDiagnosticsPort {
+  getStorageStatus: () => TraceStoreStatus;
+  listRecentTraces: (limit?: number) => TraceSummary[];
+  buildSmartReport: (traceId?: string) => Promise<string>;
+  exportTrace: (traceId: string, targetDirectory: string) => Promise<string | undefined>;
+  clearAll: () => Promise<void>;
+  deleteTrace: (traceId: string) => Promise<void>;
+}
+
+/** Adapts the app-owned Claude trace service at a settings composition boundary. */
+export function createClaudeTraceDiagnosticsPort(
+  service: ClaudeSessionTraceService | undefined,
+): ClaudeTraceDiagnosticsPort | undefined {
+  if (!service) return undefined;
+  return {
+    getStorageStatus: () => service.getStorageStatus(),
+    listRecentTraces: (limit) => service.listRecentTraces(limit),
+    buildSmartReport: (traceId) => service.buildSmartReport(traceId),
+    exportTrace: (traceId, targetDirectory) => service.exportTrace(traceId, targetDirectory),
+    clearAll: () => service.clearAll(),
+    deleteTrace: (traceId) => service.store.deleteTrace(traceId),
+  };
+}
+
+export interface ClaudeCodeDebugPanelOptions {
+  settings: ClaudeCodeDebugSettingsPort;
+  getDiagnostics: () => ClaudeTraceDiagnosticsPort | undefined;
+  saveSettings: () => Promise<void>;
+  pickDirectory: (defaultPath?: string) => Promise<string | null>;
+  getValidatedExportDirectory: () => string | null;
+  addActionButton: (
+    containerEl: HTMLElement,
+    label: string,
+    onClick: () => void | Promise<void>,
+    cta?: boolean,
+  ) => HTMLButtonElement;
+  renderDebugModules: (containerEl: HTMLElement, config: DebugModuleGroupConfig) => void;
+  getVisibleLogEntryCount: () => number;
+  getVisibleLogText: () => string;
+  buildDiagnosticReport: () => string;
+  clearVisibleLogs: () => void;
+  reportVisibleLogCopyFailure: (error: unknown) => void;
+  reportDiagnosticCopyFailure: (error: unknown) => void;
 }

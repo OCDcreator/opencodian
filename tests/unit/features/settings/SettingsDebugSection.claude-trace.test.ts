@@ -4,6 +4,7 @@ import * as obsidian from 'obsidian';
 import { Setting } from 'obsidian';
 
 import { DEFAULT_SETTINGS } from '../../../../src/core/types';
+import { createClaudeTraceDiagnosticsPort } from '../../../../src/features/settings/debug/types';
 import { SettingsDebugSection } from '../../../../src/features/settings/SettingsDebugSection';
 import { setLocale, t } from '../../../../src/i18n';
 import type OpenCodianPlugin from '../../../../src/main';
@@ -188,7 +189,13 @@ function mockSettingPrototype(): void {
 }
 
 function renderTabbed(secondaryTabId: string, plugin = createPlugin()): { containerEl: HTMLElement; plugin: DebugSectionPlugin; section: SettingsDebugSection } {
-  const section = new SettingsDebugSection({ plugin: plugin as unknown as OpenCodianPlugin, createSectionHeading });
+  const section = new SettingsDebugSection({
+    plugin: plugin as unknown as OpenCodianPlugin,
+    getClaudeDiagnostics: () => createClaudeTraceDiagnosticsPort(
+      plugin.claudeTraceService as unknown as Parameters<typeof createClaudeTraceDiagnosticsPort>[0],
+    ),
+    createSectionHeading,
+  });
   const containerEl = document.createElement('div');
   document.body.appendChild(containerEl);
   section.attachTabbed(containerEl, secondaryTabId);

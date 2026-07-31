@@ -10,7 +10,7 @@
 - shared debug section shell/router, plugin export actions, and platform/path/action/module helpers
 - complete OpenCode trace debug panel: settings, status, actions, catalog, and narrow diagnostics-port wiring
 - complete Codex trace debug panel: settings, status, actions, catalog, `captureContent` control, and narrow diagnostics-port wiring; this intermediate slice mounts it only from the tabbed debug route
-- Claude Code debug workbench remains in `SettingsDebugSection`, including console debug channels and independent session-trace controls, pending its later panel slice
+- complete Claude Code debug panel: workbench DOM, console debug channels, independent session-trace settings/status/actions/catalog/filter, and narrow diagnostics-port wiring
 
 ## Canonical state (truth home)
 - debug section tab shell/router state
@@ -44,7 +44,7 @@ Run before merge: `npm run typecheck`, `npm run check:module-docs`, `npm run dia
 - `OpenCodeDebugPanel` is the complete OpenCode panel owner for its settings/status/actions/catalog surface; it receives narrow typed ports and callbacks rather than the full plugin or trace service.
 - `CodexDebugPanel` is the complete Codex trace panel owner for its settings/status/actions/catalog surface, including `captureContent`; it receives narrow typed ports and callbacks rather than the full plugin or trace service.
 - The Codex panel is currently mounted only by `SettingsDebugSection.attachTabbed()`. The legacy non-tabbed `attach()` path still omits Codex; this slice does not fix or delete that behavior.
-- Claude remains implemented inside `SettingsDebugSection` for this slice. That section retains Claude console debug-channel controls alongside the independent session-trace controls; no Claude panel module is claimed here yet.
-- The three settings composition paths create both OpenCode and Codex diagnostics ports at their boundaries. The adapters preserve app-owned service/store/report ownership and expose no mutable service map.
+- `ClaudeCodeDebugPanel` is the complete Claude workbench owner. It receives narrow settings/diagnostics ports and section callbacks rather than the full plugin, trace service, store, or report builder. `debugChannels` for console logs and `sessionTrace.consoleChannels` for trace capture remain independent.
+- The three settings composition paths create OpenCode, Codex, and Claude diagnostics ports at their boundaries. The adapters preserve app-owned service/store/report ownership and expose no mutable service map.
 - Changes here must update the matching `docs/modules/**` page (via `module-docs.config.json`).
 - Run `npm run inspect:owner -- <this owner or a path>` for an always-fresh summary.
