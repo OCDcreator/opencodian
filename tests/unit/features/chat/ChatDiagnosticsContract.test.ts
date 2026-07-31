@@ -263,8 +263,9 @@ describe('Phase 3 Task 10 — ChatDiagnosticsContract (characterization)', () =>
       const armItem = items.find((i) => i.onClick);
       expect(armItem).toBeDefined();
       armItem!.onClick();
-      // Arming is not directly on the stub (the adapter calls a method we didn't
-      // stub), but refreshHeaderChrome is invoked after arming.
+      // The arm action MUST reach the trace service's armDeepCapture (not just
+      // refresh the header chrome — that would be a no-op shim).
+      expect(service.armDeepCapture).toHaveBeenCalledWith('tab-1', undefined);
       expect(refreshHeaderChrome).toHaveBeenCalled();
     });
 

@@ -69,6 +69,14 @@ function tempDir(prefix: string): string {
 }
 
 describe('Phase 3 Task 10 — DiagnosticsRuntimeContract (characterization)', () => {
+  // Several tests construct trace services that hold background flush/watchdog
+  // timers. Clearing all timers after each test prevents those timers from
+  // leaking into later suites (which caused flakiness and "Cannot log after
+  // tests are done" under the full verify gate).
+  afterEach(() => {
+    jest.clearAllTimers();
+  });
+
   // ---------------------------------------------------------------------------
   // Step 1: Construction options + dynamic knownSecrets behavior.
   //
@@ -82,66 +90,85 @@ describe('Phase 3 Task 10 — DiagnosticsRuntimeContract (characterization)', ()
   // ---------------------------------------------------------------------------
 
   describe('construction options shape', () => {
-    let dir: string;
+    // Each service gets its OWN temp directory so their TraceStores do not race
+    // on the shared index.json.tmp path (which causes storage_degraded fallbacks
+    // toward real user diagnostics dirs).
+    const dirs: string[] = [];
     const created: Array<{ dispose: () => Promise<void> }> = [];
-    beforeEach(() => { dir = tempDir('ctor'); });
     afterEach(async () => {
       // Dispose all created services to prevent background timers leaking into
       // later tests (the verify gate runs all suites in one worker pool).
       await Promise.all(created.map((s) => s.dispose().catch(() => undefined)));
       created.length = 0;
-      fs.rmSync(dir, { recursive: true, force: true });
+      for (const d of dirs) fs.rmSync(d, { recursive: true, force: true });
+      dirs.length = 0;
     });
 
-    it('accepts the documented { settings, vaultPath, buildIdentity, knownSecrets, runtimeMetadata } option set for all three services', async () => {
+    it('accepts the documented { settings, vaultPath, buildIdentity, knownSecrets, runtimeMetadata } option set for all three services and wires buildIdentity into the report', async () => {
+      const ocDir = tempDir('ctor-oc'); dirs.push(ocDir);
+      const codexDir = tempDir('ctor-codex'); dirs.push(codexDir);
+      const claudeDir = tempDir('ctor-claude'); dirs.push(claudeDir);
       const oc = new OpenCodeSessionTraceService({
-        settings: () => openCodeTraceSettings(dir),
-        vaultPath: '/vault',
-        buildIdentity: () => 'Build: test-oc',
-        knownSecrets: () => ['s1'],
+        settings: () => openCodeTraceSettings(ocDir),
+        vaultPath: '/vault-oc',
+        buildIdentity: () => 'Build: test-oc-BUILD42',
+        knownSecrets: () => ['s1-oc'],
         runtimeMetadata: () => ({ serverMode: 'local', customMeta: 'oc' }),
       });
       const codex = new CodexSessionTraceService({
-        settings: () => codexTraceSettings(dir),
-        vaultPath: '/vault',
-        buildIdentity: () => 'Build: test-codex',
-        knownSecrets: () => ['s1'],
+        settings: () => codexTraceSettings(codexDir),
+        vaultPath: '/vault-codex',
+        buildIdentity: () => 'Build: test-codex-BUILD42',
+        knownSecrets: () => ['s1-codex'],
         runtimeMetadata: () => ({ serverMode: 'local', customMeta: 'codex' }),
       });
       const claude = new ClaudeSessionTraceService({
-        settings: () => claudeTraceSettings(dir),
-        vaultPath: '/vault',
-        buildIdentity: () => 'Build: test-claude',
-        knownSecrets: () => ['s1'],
+        settings: () => claudeTraceSettings(claudeDir),
+        vaultPath: '/vault-claude',
+        buildIdentity: () => 'Build: test-claude-BUILD42',
+        knownSecrets: () => ['s1-claude'],
         runtimeMetadata: () => ({ serverMode: 'local', customMeta: 'claude' }),
       });
       created.push(oc, codex, claude);
       expect(oc.runtimeSegmentId).toMatch(/^[\da-f-]+$/);
       expect(codex.runtimeSegmentId).toMatch(/^[\da-f-]+$/);
       expect(claude.runtimeSegmentId).toMatch(/^[\da-f-]+$/);
-      // runtimeMetadata is emitted into the runtime.started event; buildIdentity
-      // is consumed by the report builder. Pin both so a coordinator extraction
-      // cannot silently drop them.
+      // runtimeMetadata is emitted into the runtime.started event for all three.
       const ocRt = await oc.store.readRuntimeSegment(oc.runtimeSegmentId);
-      const ocStarted = ocRt.find((e) => e.name === 'runtime.started');
-      expect(ocStarted?.payload).toMatchObject({ serverMode: 'local', customMeta: 'oc' });
+      expect(ocRt.find((e) => e.name === 'runtime.started')?.payload).toMatchObject({ serverMode: 'local', customMeta: 'oc' });
       const codexRt = await codex.store.readRuntimeSegment(codex.runtimeSegmentId);
       expect(codexRt.find((e) => e.name === 'runtime.started')?.payload).toMatchObject({ customMeta: 'codex' });
       const claudeRt = await claude.store.readRuntimeSegment(claude.runtimeSegmentId);
       expect(claudeRt.find((e) => e.name === 'runtime.started')?.payload).toMatchObject({ customMeta: 'claude' });
-      // Three readRuntimeSegment calls (each flushes + reads disk) can exceed the
-      // default 5s timeout under full-suite I/O contention; allow 15s.
-    }, 15000);
+      // buildIdentity is consumed by each report builder — pin it so a coordinator
+      // extraction cannot silently drop the buildIdentity wiring. The report
+      // header embeds the build-identity string.
+      const ocReport = await oc.reportBuilder.buildSmartReport(undefined, undefined, undefined);
+      expect(ocReport).toContain('test-oc-BUILD42');
+      const codexReport = await codex.reportBuilder.buildSmartReport(undefined, undefined, undefined);
+      expect(codexReport).toContain('test-codex-BUILD42');
+      const claudeReport = await claude.reportBuilder.buildSmartReport(undefined, undefined, undefined);
+      expect(claudeReport).toContain('test-claude-BUILD42');
+      // Six readRuntimeSegment + three report builds can exceed the default 5s
+      // timeout under full-suite I/O contention; allow 20s.
+    }, 20000);
 
-    it('uses a hardcoded build-identity fallback when buildIdentity is omitted', () => {
-      const oc = new OpenCodeSessionTraceService({ settings: () => openCodeTraceSettings(dir) });
-      const codex = new CodexSessionTraceService({ settings: () => codexTraceSettings(dir) });
-      const claude = new ClaudeSessionTraceService({ settings: () => claudeTraceSettings(dir) });
+    it('uses a hardcoded build-identity fallback when buildIdentity is omitted', async () => {
+      const ocDir = tempDir('fb-oc'); dirs.push(ocDir);
+      const codexDir = tempDir('fb-codex'); dirs.push(codexDir);
+      const claudeDir = tempDir('fb-claude'); dirs.push(claudeDir);
+      const oc = new OpenCodeSessionTraceService({ settings: () => openCodeTraceSettings(ocDir) });
+      const codex = new CodexSessionTraceService({ settings: () => codexTraceSettings(codexDir) });
+      const claude = new ClaudeSessionTraceService({ settings: () => claudeTraceSettings(claudeDir) });
       created.push(oc, codex, claude);
-      // No throw; the fallback string is 'Build: unknown' for all three.
-      expect(oc.reportBuilder).toBeDefined();
-      expect(codex.reportBuilder).toBeDefined();
-      expect(claude.reportBuilder).toBeDefined();
+      // The fallback string is 'Build: unknown' for all three — pin it in the
+      // report so the fallback wiring cannot silently change.
+      const ocReport = await oc.reportBuilder.buildSmartReport(undefined, undefined, undefined);
+      expect(ocReport).toContain('Build: unknown');
+      const codexReport = await codex.reportBuilder.buildSmartReport(undefined, undefined, undefined);
+      expect(codexReport).toContain('Build: unknown');
+      const claudeReport = await claude.reportBuilder.buildSmartReport(undefined, undefined, undefined);
+      expect(claudeReport).toContain('Build: unknown');
     });
   });
 
@@ -341,9 +368,10 @@ describe('Phase 3 Task 10 — DiagnosticsRuntimeContract (characterization)', ()
     });
 
     it('disabled services still dispose without throwing', async () => {
-      const oc = new OpenCodeSessionTraceService({ settings: () => openCodeTraceSettings(dir, { enabled: false }) });
-      const codex = new CodexSessionTraceService({ settings: () => codexTraceSettings(dir, { enabled: false }) });
-      const claude = new ClaudeSessionTraceService({ settings: () => claudeTraceSettings(dir, { enabled: false }) });
+      // Each service gets its own dir (shared dir races on index.json.tmp).
+      const oc = new OpenCodeSessionTraceService({ settings: () => openCodeTraceSettings(tempDir('dis-oc'), { enabled: false }) });
+      const codex = new CodexSessionTraceService({ settings: () => codexTraceSettings(tempDir('dis-codex'), { enabled: false }) });
+      const claude = new ClaudeSessionTraceService({ settings: () => claudeTraceSettings(tempDir('dis-claude'), { enabled: false }) });
       await expect(oc.dispose()).resolves.toBeUndefined();
       await expect(codex.dispose()).resolves.toBeUndefined();
       await expect(claude.dispose()).resolves.toBeUndefined();
@@ -363,17 +391,25 @@ describe('Phase 3 Task 10 — DiagnosticsRuntimeContract (characterization)', ()
   // ---------------------------------------------------------------------------
 
   describe('dispose/flush ordering and idempotency', () => {
-    let dir: string;
-    beforeEach(() => { dir = tempDir('dispose'); });
-    afterEach(() => { fs.rmSync(dir, { recursive: true, force: true }); });
+    let ocDir: string;
+    let codexDir: string;
+    let claudeDir: string;
+    beforeEach(() => {
+      ocDir = tempDir('dispose-oc');
+      codexDir = tempDir('dispose-codex');
+      claudeDir = tempDir('dispose-claude');
+    });
+    afterEach(() => {
+      fs.rmSync(ocDir, { recursive: true, force: true });
+      fs.rmSync(codexDir, { recursive: true, force: true });
+      fs.rmSync(claudeDir, { recursive: true, force: true });
+    });
 
     it('dispose() emits runtime.stopped and flushes; runtime events live in a separate segment file (readRuntimeSegment, NOT readTrace)', async () => {
-      // TraceStore contract: readTrace() filters OUT runtime events (isRuntimeEvent);
-      // runtime.started/stopped are retrievable only via readRuntimeSegment(). This
-      // separation must survive the coordinator extraction.
-      const oc = new OpenCodeSessionTraceService({ settings: () => openCodeTraceSettings(dir) });
-      const codex = new CodexSessionTraceService({ settings: () => codexTraceSettings(dir) });
-      const claude = new ClaudeSessionTraceService({ settings: () => claudeTraceSettings(dir) });
+      // Each service gets its own dir to avoid the shared index.json.tmp race.
+      const oc = new OpenCodeSessionTraceService({ settings: () => openCodeTraceSettings(ocDir) });
+      const codex = new CodexSessionTraceService({ settings: () => codexTraceSettings(codexDir) });
+      const claude = new ClaudeSessionTraceService({ settings: () => claudeTraceSettings(claudeDir) });
       // readTrace must NOT surface runtime events even before dispose.
       const ocStructBefore = await oc.store.readTrace(oc.runtimeSegmentId);
       expect(ocStructBefore.some((e) => e.name === 'runtime.started')).toBe(false);
@@ -394,14 +430,18 @@ describe('Phase 3 Task 10 — DiagnosticsRuntimeContract (characterization)', ()
     }, 15000);
 
     it('dispose is idempotent (safe to call twice, as main.ts uses void ... .catch())', async () => {
-      const service = new OpenCodeSessionTraceService({ settings: () => openCodeTraceSettings(dir) });
+      const idempDir = tempDir('idemp');
+      const service = new OpenCodeSessionTraceService({ settings: () => openCodeTraceSettings(idempDir) });
       await service.dispose();
       await expect(service.dispose()).resolves.toBeUndefined();
+      fs.rmSync(idempDir, { recursive: true, force: true });
     });
 
     it('Codex dispose clears active turn watchdogs without throwing on an empty map', async () => {
-      const service = new CodexSessionTraceService({ settings: () => codexTraceSettings(dir) });
+      const codexWatchdogDir = tempDir('codex-watchdog');
+      const service = new CodexSessionTraceService({ settings: () => codexTraceSettings(codexWatchdogDir) });
       await expect(service.dispose()).resolves.toBeUndefined();
+      fs.rmSync(codexWatchdogDir, { recursive: true, force: true });
     });
   });
 
@@ -467,7 +507,7 @@ describe('Phase 3 Task 10 — DiagnosticsRuntimeContract (characterization)', ()
       expect(blob).not.toContain(vaultPath);
     });
 
-    it('Codex persisted files contain no raw secret (hardened mode)', async () => {
+    it('Codex persisted files contain no raw secret and normalize the vault path (hardened mode)', async () => {
       const secret = 'super-secret-codex-disk-1234';
       const service = new CodexSessionTraceService({
         settings: () => codexTraceSettings(dir),
@@ -475,11 +515,14 @@ describe('Phase 3 Task 10 — DiagnosticsRuntimeContract (characterization)', ()
         knownSecrets: () => [secret],
       });
       const ctx = service.bindThread({ threadId: 'thread-codex-disk', resumed: false, via: 'app-server' });
-      service.recordToolInteraction(ctx, 'tool.call', { apiKey: secret });
+      // recordToolInteraction emits the raw payload through the redactor.
+      service.recordToolInteraction(ctx, 'tool.call', { note: secret, filePath: `${vaultPath}/secret.txt` });
       await service.store.flush();
       const files = readAllJsonFiles(dir);
       const blob = files.map((f) => f.content).join('\n');
       expect(blob).not.toContain(secret);
+      expect(blob).toContain('$VAULT');
+      expect(blob).not.toContain(vaultPath);
     });
   });
 
@@ -679,6 +722,10 @@ describe('Phase 3 Task 10 — DiagnosticsRuntimeContract (characterization)', ()
       path.resolve(__dirname, '../../../../src/main.ts'),
       'utf8',
     );
+    // Anchor on the METHOD DECLARATION, not the callback reference at line 170.
+    // `private async handleBootstrapOpenCodeRuntime(` uniquely identifies the
+    // method body where the three services are constructed.
+    const bootstrapMethodStart = mainSrc.indexOf('private async handleBootstrapOpenCodeRuntime(');
 
     it('declares the three trace-service fields; codex/claude use non-null assertions (bootstrap timing)', () => {
       // openCodeTraceService is declared WITHOUT `!` (assigned a definite type);
@@ -689,25 +736,28 @@ describe('Phase 3 Task 10 — DiagnosticsRuntimeContract (characterization)', ()
     });
 
     it('constructs the three services inside handleBootstrapOpenCodeRuntime in order opencode -> codex -> claude', () => {
-      const bootstrapStart = mainSrc.indexOf('handleBootstrapOpenCodeRuntime');
-      expect(bootstrapStart).toBeGreaterThan(-1);
-      // Assert on absolute offsets within the full source so the long method
-      // body (which exceeds fragile brace-depth trackers) is covered.
-      const ocIdx = mainSrc.indexOf('new OpenCodeSessionTraceService(', bootstrapStart);
-      const codexIdx = mainSrc.indexOf('new CodexSessionTraceService(', bootstrapStart);
-      const claudeIdx = mainSrc.indexOf('new ClaudeSessionTraceService(', bootstrapStart);
-      expect(ocIdx).toBeGreaterThan(bootstrapStart);
-      expect(codexIdx).toBeGreaterThan(bootstrapStart);
-      expect(claudeIdx).toBeGreaterThan(bootstrapStart);
+      expect(bootstrapMethodStart).toBeGreaterThan(-1);
+      // Assert on absolute offsets after the method declaration so the long body
+      // is covered and the callback reference at line 170 is excluded.
+      const ocIdx = mainSrc.indexOf('new OpenCodeSessionTraceService(', bootstrapMethodStart);
+      const codexIdx = mainSrc.indexOf('new CodexSessionTraceService(', bootstrapMethodStart);
+      const claudeIdx = mainSrc.indexOf('new ClaudeSessionTraceService(', bootstrapMethodStart);
+      expect(ocIdx).toBeGreaterThan(bootstrapMethodStart);
+      expect(codexIdx).toBeGreaterThan(bootstrapMethodStart);
+      expect(claudeIdx).toBeGreaterThan(bootstrapMethodStart);
       // Construction order: opencode first, then codex, then claude.
       expect(ocIdx).toBeLessThan(codexIdx);
       expect(codexIdx).toBeLessThan(claudeIdx);
     });
 
     it('injects openCode tracePort into OpenCodeService and claude tracePort into ClaudeCodeAdapter', () => {
-      const bootstrapStart = mainSrc.indexOf('handleBootstrapOpenCodeRuntime');
-      const bootstrapEnd = mainSrc.indexOf('activateView', bootstrapStart);
-      const body = mainSrc.slice(bootstrapStart, bootstrapEnd);
+      expect(bootstrapMethodStart).toBeGreaterThan(-1);
+      // Bound to the method body (next method after this one).
+      const nextMethodRel = mainSrc.slice(bootstrapMethodStart + 1).search(/\n[/ ]{2}(private|public|protected|async)\b/);
+      const bootstrapEnd = nextMethodRel > 0
+        ? bootstrapMethodStart + 1 + nextMethodRel
+        : mainSrc.indexOf('  activateView', bootstrapMethodStart);
+      const body = mainSrc.slice(bootstrapMethodStart, bootstrapEnd);
       // OpenCodeService receives tracePort: this.openCodeTraceService.
       expect(body).toMatch(/tracePort:\s*this\.openCodeTraceService/);
       // ClaudeCodeAdapter receives tracePort: this.claudeTraceService.
@@ -716,33 +766,51 @@ describe('Phase 3 Task 10 — DiagnosticsRuntimeContract (characterization)', ()
       expect(body).toMatch(/codexTracePort:\s*this\.codexTraceService/);
     });
 
-    it('onunload disposes the three services in order opencode -> codex -> claude, each void-wrapped with catch', () => {
-      const onunloadStart = mainSrc.indexOf('onunload()');
+    it('onunload disposes the three services in order opencode -> codex -> claude, each void-wrapped with .catch', () => {
+      const onunloadStart = mainSrc.indexOf('  onunload()');
       expect(onunloadStart).toBeGreaterThan(-1);
-      const onunloadEnd = mainSrc.indexOf('activateView', onunloadStart);
+      const onunloadEnd = mainSrc.indexOf('  activateView', onunloadStart);
       const body = mainSrc.slice(onunloadStart, onunloadEnd);
-      const ocIdx = body.indexOf('this.openCodeTraceService?.dispose()');
-      const codexIdx = body.indexOf('this.codexTraceService?.dispose()');
-      const claudeIdx = body.indexOf('this.claudeTraceService?.dispose()');
+      const ocIdx = body.indexOf('void this.openCodeTraceService?.dispose()');
+      const codexIdx = body.indexOf('void this.codexTraceService?.dispose()');
+      const claudeIdx = body.indexOf('void this.claudeTraceService?.dispose()');
       expect(ocIdx).toBeGreaterThan(-1);
       expect(codexIdx).toBeGreaterThan(-1);
       expect(claudeIdx).toBeGreaterThan(-1);
       // Dispose order: opencode, codex, claude.
       expect(ocIdx).toBeLessThan(codexIdx);
       expect(codexIdx).toBeLessThan(claudeIdx);
+      // Each is void-wrapped with a .catch (fail-closed on unload).
+      expect(body).toMatch(/void this\.openCodeTraceService\?\.dispose\(\)\.catch/);
+      expect(body).toMatch(/void this\.codexTraceService\?\.dispose\(\)\.catch/);
+      expect(body).toMatch(/void this\.claudeTraceService\?\.dispose\(\)\.catch/);
     });
 
-    it('constructs each service with the documented option keys (settings, vaultPath, buildIdentity, knownSecrets, runtimeMetadata)', () => {
-      const bootstrapStart = mainSrc.indexOf('handleBootstrapOpenCodeRuntime');
-      const bootstrapEnd = mainSrc.indexOf('activateView', bootstrapStart);
-      const body = mainSrc.slice(bootstrapStart, bootstrapEnd);
-      // Each construction passes settings + knownSecrets + runtimeMetadata.
-      const ocCtor = body.slice(body.indexOf('new OpenCodeSessionTraceService('), body.indexOf('new CodexSessionTraceService('));
-      expect(ocCtor).toMatch(/settings:\s*\(\)/);
-      expect(ocCtor).toMatch(/knownSecrets:/);
-      expect(ocCtor).toMatch(/runtimeMetadata:/);
-      // OpenCode knownSecrets: () => [password, token].filter(Boolean) (the static-snapshot proof).
+    it('constructs ALL THREE services with all five option keys (settings, vaultPath, buildIdentity, knownSecrets, runtimeMetadata)', () => {
+      expect(bootstrapMethodStart).toBeGreaterThan(-1);
+      const ocCtorStart = mainSrc.indexOf('new OpenCodeSessionTraceService(', bootstrapMethodStart);
+      const codexCtorStart = mainSrc.indexOf('new CodexSessionTraceService(', bootstrapMethodStart);
+      const claudeCtorStart = mainSrc.indexOf('new ClaudeSessionTraceService(', bootstrapMethodStart);
+      // Slice each constructor to the next `new` or `this.` statement.
+      const ocCtor = mainSrc.slice(ocCtorStart, codexCtorStart);
+      const codexCtor = mainSrc.slice(codexCtorStart, claudeCtorStart);
+      const claudeCtor = mainSrc.slice(claudeCtorStart, claudeCtorStart + 600);
+      // All five option keys present in EACH constructor. knownSecrets is a
+      // getter in all three, but the value differs: OpenCode/Codex use an array
+      // literal `() => [...]`, Claude uses a collector `() => collectClaudeCodeKnownSecrets(...)`.
+      for (const ctor of [ocCtor, codexCtor, claudeCtor]) {
+        expect(ctor).toMatch(/settings:\s*\(\)/);
+        expect(ctor).toMatch(/vaultPath:/);
+        expect(ctor).toMatch(/buildIdentity:\s*\(\)/);
+        expect(ctor).toMatch(/knownSecrets:\s*\(\)\s*=>/);
+        expect(ctor).toMatch(/runtimeMetadata:\s*\(\)/);
+        // buildIdentity must call getDebugBuildIdentityText (not a hardcoded string).
+        expect(ctor).toMatch(/getDebugBuildIdentityText/);
+      }
+      // OpenCode/Codex use array-literal knownSecrets; Claude uses the collector.
       expect(ocCtor).toMatch(/knownSecrets:\s*\(\)\s*=>\s*\[/);
+      expect(codexCtor).toMatch(/knownSecrets:\s*\(\)\s*=>\s*\[/);
+      expect(claudeCtor).toMatch(/collectClaudeCodeKnownSecrets/);
     });
   });
 
@@ -815,19 +883,48 @@ describe('Phase 3 Task 10 — DiagnosticsRuntimeContract (characterization)', ()
       expect(preBuildSlice).not.toMatch(/flushRingBuffer|\.store\.flush\(\)/);
     });
 
-    it('plugin-level export surfaces (buildDiagnosticReport, writeDiagnosticLogFile) exist on the plugin and are wired into SettingsDebugSection', () => {
+    it('plugin-level export byte contract: filename pattern, utf-8 encoding, and report structure (source contract)', () => {
+      // The plan (item 6) requires plugin export filename, encoding, ordering,
+      // and content to remain byte-for-byte stable. Pin the source contract for
+      // writeDiagnosticLogFile + buildDiagnosticReport since main.ts cannot be
+      // instantiated in a unit test.
       const mainSrc = fs.readFileSync(
         path.resolve(__dirname, '../../../../src/main.ts'),
         'utf8',
       );
-      expect(mainSrc).toMatch(/buildDiagnosticReport/);
-      expect(mainSrc).toMatch(/writeDiagnosticLogFile/);
+      // writeDiagnosticLogFile: filename = opencodian-debug-${timestamp}.log where
+      // timestamp = ISO string with : and . replaced by -.
+      const writeStart = mainSrc.indexOf('async writeDiagnosticLogFile(');
+      expect(writeStart).toBeGreaterThan(-1);
+      const writeBody = mainSrc.slice(writeStart, writeStart + 500);
+      expect(writeBody).toMatch(/opencodian-debug-\$\{timestamp\}\.log/);
+      expect(writeBody).toMatch(/timestamp.*ISO.*replace\(\//);
+      // utf-8 encoding.
+      expect(writeBody).toMatch(/writeFile\(targetPath,\s*report,\s*'utf-8'\)/);
+      // Ordering: build the report first, then write it.
+      const buildCallIdx = writeBody.indexOf('buildDiagnosticReport(');
+      const writeFileIdx = writeBody.indexOf('writeFile(');
+      expect(buildCallIdx).toBeGreaterThan(-1);
+      expect(buildCallIdx).toBeLessThan(writeFileIdx);
+
+      // buildDiagnosticReport: report starts with the canonical header and
+      // embeds BUILD_ID + manifest fields.
+      const reportStart = mainSrc.indexOf('async buildDiagnosticReport(');
+      expect(reportStart).toBeGreaterThan(-1);
+      const reportBody = mainSrc.slice(reportStart, reportStart + 1200);
+      expect(reportBody).toContain("'# OpenCodian Diagnostic Report'");
+      expect(reportBody).toMatch(/Plugin name: \$\{this\.manifest\.name\}/);
+      expect(reportBody).toMatch(/Plugin ID: \$\{this\.manifest\.id\}/);
+      expect(reportBody).toMatch(/Plugin version: \$\{this\.manifest\.version\}/);
+      expect(reportBody).toMatch(/BUILD_ID: \$\{BUILD_ID\}/);
+
+      // SettingsDebugSection wires both export surfaces into the export block.
       const debugSrc = fs.readFileSync(
         path.resolve(__dirname, '../../../../src/features/settings/SettingsDebugSection.ts'),
         'utf8',
       );
-      // The export block invokes the plugin export surfaces.
-      expect(debugSrc).toMatch(/buildDiagnosticReport|writeDiagnosticLogFile/);
+      expect(debugSrc).toMatch(/buildDiagnosticReport/);
+      expect(debugSrc).toMatch(/writeDiagnosticLogFile/);
     });
   });
 
@@ -851,16 +948,23 @@ describe('Phase 3 Task 10 — DiagnosticsRuntimeContract (characterization)', ()
       fs.rmSync(exportDir, { recursive: true, force: true });
     });
 
-    it('Claude exportTrace bundle contains no raw secret', async () => {
+    it('Claude exportTrace bundle contains no raw secret (via recordTurnEvent raw-payload path)', async () => {
+      // recordSdkMessage persists only an envelope (the raw secret never enters
+      // the trace), which would make this canary a tautology. Use recordTurnEvent
+      // (raw-payload path) so the secret genuinely flows through the redactor
+      // into the persisted trace and then the export bundle.
       const secret = 'export-bundle-secret-claude-1234';
       const service = new ClaudeSessionTraceService({
         settings: () => claudeTraceSettings(dir),
         knownSecrets: () => [secret],
       });
       const ctx = service.bindSession({ sessionId: 'sess-export', resumed: false, via: 'sdk' });
-      service.recordSdkMessage(ctx, { note: secret });
+      service.recordTurnEvent(ctx, 'export.canary', 'warning', { note: secret });
       service.finishTurn(ctx, 'completed');
       await service.store.flush();
+      // Confirm the secret actually reached the persisted trace (redacted).
+      const traceBlob = readAllJsonFiles(dir).map((f) => f.content).join('\n');
+      expect(traceBlob).not.toContain(secret);
       const exportedPath = await service.exportTrace(ctx.traceId, exportDir);
       expect(exportedPath).toBeDefined();
       // Read every file in the export directory and assert no raw secret.
