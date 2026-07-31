@@ -605,7 +605,9 @@ export default class OpenCodianPlugin extends Plugin {
     // Dispose registry (which disposes adapters, which disposes OpenCodeService)
     this.agentServiceRegistry?.dispose();
     // DiagnosticsRuntimeCoordinator owns the unified flush/dispose of all three
-    // backend trace services (OpenCode → Codex → Claude, void+catch per service).
+    // backend trace services (OpenCode → Codex → Claude). coordinator.dispose()
+    // awaits each backend sequentially with .catch (fail-closed); onunload calls
+    // it with `void` (fire-and-forget, matching the prior unload timing).
     void this.diagnosticsCoordinator?.dispose();
     setAgentServiceRegistry(null);
     this.getSettingsRuntimeCoordinator().clearChatAppearanceSaveTimer();

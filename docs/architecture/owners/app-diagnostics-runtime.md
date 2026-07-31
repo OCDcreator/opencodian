@@ -33,7 +33,7 @@
 
 ## Invariants
 
-- 构造顺序固定 OpenCode → Codex → Claude；dispose 同序，每个 void+catch。
+- 构造顺序固定 OpenCode → Codex → Claude；dispose 同序，`dispose()` 顺序 await 每个后端的 `.dispose().catch(...)`（fail-closed，确定性 teardown），main.ts onunload 以 `void` 调用。
 - 暴露 typed backend ports（`openCode`/`codex`/`claude`），不暴露泛型可变 service map。
 - 不合并三后端事件 schema 或内部状态。
 - 每后端 option getter 保持原有构造时序不对称（OpenCode 静态 knownSecrets 快照 vs Claude/Codex 动态 getter）。

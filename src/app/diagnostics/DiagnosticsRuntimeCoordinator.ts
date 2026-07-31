@@ -6,7 +6,9 @@
  * `main.ts` (`handleBootstrapOpenCodeRuntime` + `onunload`):
  *   - Construction order: OpenCode → Codex → Claude.
  *   - Each service receives the same option getters/defaults as before.
- *   - Dispose order: OpenCode → Codex → Claude, each void-wrapped with `.catch`.
+ *   - Dispose order: OpenCode → Codex → Claude. dispose() awaits each backend's
+ *     `.dispose().catch(...)` sequentially (fail-closed warnings, deterministic
+ *     teardown); main.ts onunload calls it with `void` (fire-and-forget).
  *
  * The coordinator does NOT merge the three backends' event schemas or internal
  * state. It exposes typed backend ports (`ports.openCode`, `ports.codex`,

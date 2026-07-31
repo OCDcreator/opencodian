@@ -581,8 +581,22 @@ describe('OpenCodianPlugin.onload', () => {
 });
 
 describe('OpenCodianPlugin backend bootstrap', () => {
+  // Track the bootstrapped plugin + vault dir so afterEach can dispose the
+  // DiagnosticsRuntimeCoordinator (3 real trace services) and clean up, avoiding
+  // storage_degraded/ENOTEMPTY leaks (Phase 3 Task 11 made the coordinator real).
+  let bootstrappedPlugin: OpenCodianPlugin | null = null;
+  let bootstrapVaultPath: string | null = null;
+  afterEach(async () => {
+    const coord = (bootstrappedPlugin as unknown as { diagnosticsCoordinator?: { dispose(): Promise<void> } | null })?.diagnosticsCoordinator;
+    if (coord) await coord.dispose().catch(() => undefined);
+    bootstrappedPlugin = null;
+    if (bootstrapVaultPath) fs.rmSync(bootstrapVaultPath, { recursive: true, force: true });
+    bootstrapVaultPath = null;
+  });
+
   it('registers Claude Code and restores it as the active backend from settings', async () => {
     const vaultPath = fs.mkdtempSync(path.join(os.tmpdir(), 'opencodian-claude-bootstrap-'));
+    bootstrapVaultPath = vaultPath;
     const claudePath = path.join(vaultPath, 'bin', 'claude');
     fs.mkdirSync(path.dirname(claudePath), { recursive: true });
     fs.writeFileSync(claudePath, '#!/bin/sh\n');
@@ -625,6 +639,7 @@ describe('OpenCodianPlugin backend bootstrap', () => {
         handleBootstrapOpenCodeRuntime: (initialManagedServerState: null) => Promise<void>;
       }
     ).handleBootstrapOpenCodeRuntime(null);
+    bootstrappedPlugin = plugin;
 
     expect(plugin.agentServiceRegistry.get('opencode')).toBeDefined();
     const claudeAdapter = plugin.agentServiceRegistry.get('claude-code') as ClaudeCodeAdapter & {
