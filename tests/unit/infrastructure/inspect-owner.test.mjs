@@ -32,6 +32,14 @@ describe('inspect:owner — representative path resolution', () => {
     expect(json.owner.id).toBe('feature.chat-shell');
   });
 
+  test('resolves ChatDiagnosticsCoordinator to feature.chat-diagnostics through structured delegation', () => {
+    const { json, exitCode } = runInspectJson('src/features/chat/services/ChatDiagnosticsCoordinator.ts');
+    expect(exitCode).toBe(0);
+    expect(json.resolved).toBe(true);
+    expect(json.owner.id).toBe('feature.chat-diagnostics');
+    expect(json.owner.requiredGates).toContain('diagnostics-safety');
+  });
+
   test('resolves an OpenCode path to core.opencode', () => {
     const { json, exitCode } = runInspectJson('src/core/opencode/OpenCodeService.ts');
     expect(exitCode).toBe(0);

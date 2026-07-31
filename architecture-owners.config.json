@@ -1351,19 +1351,22 @@
       "layer": "feature",
       "include": [
         "src/features/chat/services/ClaudeDiagnosticsHostAdapter.ts",
-        "src/features/chat/services/CodexDiagnosticsHostAdapter.ts"
+        "src/features/chat/services/CodexDiagnosticsHostAdapter.ts",
+        "src/features/chat/services/ChatDiagnosticsCoordinator.ts"
       ],
       "delegatesTo": [],
       "responsibilities": [
-        "chat-side Claude and Codex trace badge/menu state, capture-token and report/export callbacks",
+        "chat-side OpenCode, Codex, and Claude diagnostics state, menu routes, capture-token operations, and report/export callbacks",
+        "ChatDiagnosticsCoordinator composition of the OpenCode port with Codex and Claude host adapters",
         "trace failure containment away from chat path"
       ],
       "canonicalState": [
-        "chat diagnostics host adapter state"
+        "chat diagnostics coordinator and host adapter state"
       ],
       "entrypoints": [
         "src/features/chat/services/ClaudeDiagnosticsHostAdapter.ts",
-        "src/features/chat/services/CodexDiagnosticsHostAdapter.ts"
+        "src/features/chat/services/CodexDiagnosticsHostAdapter.ts",
+        "src/features/chat/services/ChatDiagnosticsCoordinator.ts"
       ],
       "allowedOwnerDependencies": [
         "shared.foundation",
@@ -1380,7 +1383,10 @@
         "feature.settings-debug"
       ],
       "tests": [
-        "tests/unit/features/chat/services/**DiagnosticsHostAdapter*"
+        "tests/unit/features/chat/ChatDiagnosticsCoordinator.test.ts",
+        "tests/unit/features/chat/ChatDiagnosticsContract.test.ts",
+        "tests/unit/features/chat/*DiagnosticsHostAdapter.test.ts",
+        "tests/unit/features/chat/CodexDiagnosticsHost.test.ts"
       ],
       "overviewDoc": "docs/architecture/owners/feature-chat-diagnostics.md",
       "requiredGates": [

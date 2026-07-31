@@ -229,17 +229,49 @@ describe('Phase 3 Task 11 — DiagnosticsRuntimeCoordinator (behavior)', () => {
       expect(output).not.toContain(vaultPath);
     });
 
-    it('construction failure propagates the error (coordinator ctor try/catch disposes partial services)', async () => {
+    it('construction failure propagates and test awaits disposal of the partial OpenCode service', async () => {
       // If Codex construction throws, the coordinator ctor catch disposes the
       // already-constructed OpenCode service (tracked in a local constructed list)
-      // and re-throws. This test proves the throw propagates; the source contract
-      // (DiagnosticsRuntimeContract) pins the try/catch + constructed-list disposal.
+      // and re-throws. Intercept the actual disposal promise and keep it behind
+      // a test-controlled gate: this proves the test observes and awaits that
+      // promise without relying on a timing guess before afterEach removes dirs.
       const throwingCodexSettings = (): CodexSessionTraceSettings => { throw new Error('codex ctor boom'); };
-      expect(() => new DiagnosticsRuntimeCoordinator({
-        ...makeInputs(),
-        codexSettings: throwingCodexSettings,
-      })).toThrow('codex ctor boom');
-      await new Promise((resolve) => setTimeout(resolve, 20));
+      const originalDispose = OpenCodeSessionTraceService.prototype.dispose;
+      let partialDisposePromise: Promise<void> | undefined;
+      let releasePartialDispose!: () => void;
+      let partialDisposeSettled = false;
+      const partialDisposeGate = new Promise<void>((resolve) => {
+        releasePartialDispose = resolve;
+      });
+      const disposeSpy = jest.spyOn(OpenCodeSessionTraceService.prototype, 'dispose')
+        .mockImplementation(function disposePartialOpenCode(this: OpenCodeSessionTraceService) {
+          const disposal = partialDisposeGate
+            .then(() => originalDispose.call(this))
+            .then(() => { partialDisposeSettled = true; });
+          partialDisposePromise = disposal;
+          return disposal;
+        });
+
+      try {
+        expect(() => new DiagnosticsRuntimeCoordinator({
+          ...makeInputs(),
+          codexSettings: throwingCodexSettings,
+        })).toThrow('codex ctor boom');
+        // Mutation-sensitive: removing partial-service disposal fails here.
+        expect(disposeSpy).toHaveBeenCalledTimes(1);
+        const observedPartialDispose = partialDisposePromise;
+        if (!observedPartialDispose) {
+          throw new Error('Expected constructor cleanup to expose the partial OpenCode disposal promise');
+        }
+        // The controlled gate is not a delay: it proves cleanup is pending until
+        // this test explicitly observes and awaits its real disposal promise.
+        expect(partialDisposeSettled).toBe(false);
+        releasePartialDispose();
+        await expect(observedPartialDispose).resolves.toBeUndefined();
+        expect(partialDisposeSettled).toBe(true);
+      } finally {
+        disposeSpy.mockRestore();
+      }
     });
   });
 });

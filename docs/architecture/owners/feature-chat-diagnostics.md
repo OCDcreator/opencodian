@@ -4,20 +4,22 @@
 
 - **Layer:** `feature` (may import layers: shared, core, feature)
 - **Risk:** high
-- **Include:** `src/features/chat/services/ClaudeDiagnosticsHostAdapter.ts`, `src/features/chat/services/CodexDiagnosticsHostAdapter.ts`
+- **Include:** `src/features/chat/services/ClaudeDiagnosticsHostAdapter.ts`, `src/features/chat/services/CodexDiagnosticsHostAdapter.ts`, `src/features/chat/services/ChatDiagnosticsCoordinator.ts`
 
 ## Responsibilities
-- chat-side Claude and Codex trace badge/menu state, capture-token and report/export callbacks
+- chat-side OpenCode, Codex, and Claude diagnostics state, menu routes, capture-token operations, and report/export callbacks
+- `ChatDiagnosticsCoordinator` composition of the OpenCode port with Codex and Claude host adapters
 - trace failure containment away from chat path
 
 ## Canonical state (truth home)
-- chat diagnostics host adapter state
+- chat diagnostics coordinator and host adapter state
 
 > Cross-owner access is read-only snapshot/command/event. Do not replicate this state as a second writable truth source.
 
 ## Entrypoints
 - `src/features/chat/services/ClaudeDiagnosticsHostAdapter.ts`
 - `src/features/chat/services/CodexDiagnosticsHostAdapter.ts`
+- `src/features/chat/services/ChatDiagnosticsCoordinator.ts`
 
 ## Dependency surface
 - **Allowed owner dependencies:** `shared.foundation`, `shared.diagnostics`, `core.backend-diagnostics`, `core.opencode-diagnostics`
@@ -25,7 +27,10 @@
 - **Adjacent owners** (prefer editing these when out of scope): `feature.chat-shell`, `core.backend-diagnostics`, `feature.settings-debug`
 
 ## Focused tests
-- `tests/unit/features/chat/services/**DiagnosticsHostAdapter*`
+- `tests/unit/features/chat/ChatDiagnosticsCoordinator.test.ts`
+- `tests/unit/features/chat/ChatDiagnosticsContract.test.ts`
+- `tests/unit/features/chat/*DiagnosticsHostAdapter.test.ts`
+- `tests/unit/features/chat/CodexDiagnosticsHost.test.ts`
 
 ## Required gates
 Run before merge: `npm run typecheck`, `npm run module-docs`, `npm run diagnostics-safety`.
