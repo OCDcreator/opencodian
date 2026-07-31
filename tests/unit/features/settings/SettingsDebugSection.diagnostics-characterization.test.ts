@@ -449,8 +449,10 @@ describe('Phase 3 Task 10 — SettingsDebugSection diagnostics characterization'
       expect(body).toContain('this.addClaudeTraceCatalog(');
     });
 
-    it('the three backend blocks each own a status + actions lifecycle (source contract)', () => {
-      // Each backend block has its own addXxxDebugSettings with status + actions.
+    it('the three backend blocks each own a status + actions lifecycle and call their sub-methods (source contract)', () => {
+      // Each backend block has its own addXxxDebugSettings that CALLS its
+      // status/actions/catalog sub-methods. Pin the CALLS (not just method
+      // existence) so removing a sub-method call is caught.
       // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
       const fs = require('fs') as typeof import('fs');
       // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
@@ -459,10 +461,27 @@ describe('Phase 3 Task 10 — SettingsDebugSection diagnostics characterization'
         path.resolve(__dirname, '../../../../src/features/settings/SettingsDebugSection.ts'),
         'utf8',
       );
-      for (const method of ['addOpenCodeDebugSettings', 'addCodexDebugSettings', 'addClaudeCodeDebugSettings']) {
-        expect(source).toContain(`private ${method}(`);
+      // Extract each addXxxDebugSettings body and assert the sub-method calls.
+      function methodBody(methodName: string): string {
+        const start = source.indexOf(`private ${methodName}(`);
+        expect(start).toBeGreaterThan(-1);
+        // Bound to the next private method.
+        const nextRel = source.slice(start + 1).search(/\n[/ ]{2}private\s\w/);
+        return nextRel > 0 ? source.slice(start, start + 1 + nextRel) : source.slice(start, start + 4000);
       }
-      // Each reads a trace-store status.
+      const ocBody = methodBody('addOpenCodeDebugSettings');
+      expect(ocBody).toContain('this.addOpenCodeTraceStatus');
+      expect(ocBody).toContain('this.addOpenCodeTraceActions');
+      expect(ocBody).toContain('this.addOpenCodeTraceCatalog');
+      const codexBody = methodBody('addCodexDebugSettings');
+      expect(codexBody).toContain('this.addCodexTraceStatus');
+      expect(codexBody).toContain('this.addCodexTraceActions');
+      expect(codexBody).toContain('this.addCodexTraceCatalog');
+      const claudeBody = methodBody('addClaudeCodeDebugSettings');
+      expect(claudeBody).toContain('this.addClaudeTraceStatus');
+      expect(claudeBody).toContain('this.addClaudeTraceActions');
+      expect(claudeBody).toContain('this.addClaudeTraceCatalog');
+      // Each reads a trace-store status (asymmetry: OpenCode/Codex .store.getStatus, Claude getStorageStatus).
       expect(source).toMatch(/openCodeTraceService\?\.store\.getStatus/);
       expect(source).toMatch(/codexTraceService\?\.store\.getStatus/);
       expect(source).toMatch(/claudeTraceService\?\.getStorageStatus/);
@@ -507,10 +526,19 @@ describe('Phase 3 Task 10 — SettingsDebugSection diagnostics characterization'
       expect(groupsBody).toMatch(/opencode:\s*\[/);
       expect(groupsBody).toMatch(/codex:\s*\[\]\s*as\s*DebugModuleKey\[\]/);
       expect(groupsBody).toMatch(/'claude-code':\s*\[/);
-      // plugin has the most modules; opencode has server/models/streaming.
-      expect(groupsBody).toMatch(/'app'/);
-      expect(groupsBody).toMatch(/'server',\s*'models',\s*'streaming'/);
-      expect(groupsBody).toMatch(/'claudeCode'/);
+      // Pin the EXACT array contents so adding/removing a module key is caught.
+      // opencode is exactly ['server', 'models', 'streaming'].
+      expect(groupsBody).toContain("opencode: ['server', 'models', 'streaming'],");
+      // claude-code is exactly ['claudeCode'].
+      expect(groupsBody).toContain("'claude-code': ['claudeCode'],");
+      // codex is exactly empty.
+      expect(groupsBody).toContain('codex: [] as DebugModuleKey[],');
+      // plugin is exactly the 8-key list (pin the full array).
+      expect(groupsBody).toContain("plugin: [");
+      expect(groupsBody).toContain("'app',");
+      expect(groupsBody).toContain("'settings',");
+      expect(groupsBody).toContain("'chat',");
+      expect(groupsBody).toContain("'storage',");
     });
   });
 });

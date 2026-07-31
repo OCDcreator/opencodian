@@ -827,18 +827,21 @@ describe('Phase 3 Task 10 — DiagnosticsRuntimeContract (characterization)', ()
       // The Claude constructor closes with `\n      });` at 6-space indent.
       const claudeCloseIdx = claudeCtorRaw.indexOf('\n      });');
       const claudeCtor = claudeCloseIdx > 0 ? claudeCtorRaw.slice(0, claudeCloseIdx) : claudeCtorRaw;
-      // All five option keys present in EACH constructor. knownSecrets is a
-      // getter in all three, but the value differs: OpenCode/Codex use an array
-      // literal `() => [...]`, Claude uses a collector `() => collectClaudeCodeKnownSecrets(...)`.
+      // All five option keys present in EACH constructor AND bound to real
+      // values (not undefined/no-op). Pin the VALUES so a silent `vaultPath:
+      // undefined` or a wrong settings path is caught.
       for (const ctor of [ocCtor, codexCtor, claudeCtor]) {
-        expect(ctor).toMatch(/settings:\s*\(\)/);
-        expect(ctor).toMatch(/vaultPath:/);
-        expect(ctor).toMatch(/buildIdentity:\s*\(\)/);
+        expect(ctor).toMatch(/buildIdentity:\s*\(\)\s*=>\s*this\.getDebugBuildIdentityText\(\)/);
         expect(ctor).toMatch(/knownSecrets:\s*\(\)\s*=>/);
-        expect(ctor).toMatch(/runtimeMetadata:\s*\(\)/);
-        // buildIdentity must call getDebugBuildIdentityText (not a hardcoded string).
-        expect(ctor).toMatch(/getDebugBuildIdentityText/);
+        expect(ctor).toMatch(/runtimeMetadata:\s*\(\)\s*=>\s*\(\{/);
       }
+      // settings + vaultPath bound to real sources (not undefined).
+      expect(ocCtor).toMatch(/settings:\s*\(\)\s*=>\s*this\.settings\.backendSettings\.opencode\.sessionTrace/);
+      expect(ocCtor).toMatch(/vaultPath:\s*getVaultBasePath\(this\.app\)/);
+      expect(codexCtor).toMatch(/settings:\s*\(\)\s*=>\s*this\.settings\.backendSettings\.codex\.sessionTrace/);
+      expect(codexCtor).toMatch(/vaultPath:\s*getVaultBasePath\(this\.app\)/);
+      expect(claudeCtor).toMatch(/settings:\s*\(\)\s*=>\s*this\.settings\.backendSettings\.claudeCode\.sessionTrace/);
+      expect(claudeCtor).toMatch(/vaultPath:\s*getVaultBasePath\(this\.app\)/);
       // OpenCode/Codex use array-literal knownSecrets; Claude uses the collector.
       expect(ocCtor).toMatch(/knownSecrets:\s*\(\)\s*=>\s*\[/);
       expect(codexCtor).toMatch(/knownSecrets:\s*\(\)\s*=>\s*\[/);
@@ -952,7 +955,10 @@ describe('Phase 3 Task 10 — DiagnosticsRuntimeContract (characterization)', ()
       const reportStart = mainSrc.indexOf('async buildDiagnosticReport(');
       expect(reportStart).toBeGreaterThan(-1);
       const reportBody = mainSrc.slice(reportStart, reportStart + 4000);
+      // Pin the COMPLETE header line set so removing/adding a line is caught.
       expect(reportBody).toContain("'# OpenCodian Diagnostic Report'");
+      expect(reportBody).toContain("`Generated: ${new Date().toISOString()}`");
+      expect(reportBody).toContain("`Source: ${source}`");
       expect(reportBody).toMatch(/Plugin name: \$\{this\.manifest\.name\}/);
       expect(reportBody).toMatch(/Plugin ID: \$\{this\.manifest\.id\}/);
       expect(reportBody).toMatch(/Plugin version: \$\{this\.manifest\.version\}/);

@@ -376,6 +376,28 @@ describe('Phase 3 Task 10 — ChatDiagnosticsContract (characterization)', () =>
       const body = source.slice(start, start + 400);
       expect(body).not.toMatch(/traceService|TraceService|tracePort|cancelDeepCapture|claimDeepCapture|armDeepCapture/);
     });
+
+    it('OpenCodianPlugin.deleteConversation (main.ts) source references no trace/diagnostic symbol', () => {
+      // The view delegates to plugin.deleteConversation, which is the entry
+      // point the chat path actually calls. It must not touch any trace service.
+      // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
+      const fs = require('fs') as typeof import('fs');
+      // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
+      const path = require('path') as typeof import('path');
+      const source = fs.readFileSync(
+        path.resolve(__dirname, '../../../../src/main.ts'),
+        'utf8',
+      );
+      const start = source.indexOf('  async deleteConversation(id: string): Promise<void> {');
+      expect(start).toBeGreaterThan(-1);
+      // Bound to the next method at column 2.
+      const nextMethodRel = source.slice(start + 1).search(/\n[/ ]{2}(private|public|protected|async)\b/);
+      const end = nextMethodRel > 0 ? start + 1 + nextMethodRel : start + 800;
+      const body = source.slice(start, end);
+      expect(body).not.toMatch(/traceService|TraceService|tracePort|cancelDeepCapture|claimDeepCapture|armDeepCapture|flushRingBuffer|buildSmartReport|clearAll/);
+      // It delegates to storage.deleteConversation (no trace interaction).
+      expect(body).toMatch(/this\.storage\.deleteConversation\(id\)/);
+    });
   });
 
   // ---------------------------------------------------------------------------
@@ -421,7 +443,10 @@ describe('Phase 3 Task 10 — ChatDiagnosticsContract (characterization)', () =>
       expect(source).toContain('claimOpenCodeDiagnosticRunToken:');
       expect(source).toContain('claimCodexDiagnosticRunToken:');
       expect(source).toContain('claimClaudeDiagnosticRunToken:');
+      // Each claim callback must actually invoke the claim, not be a no-op.
       expect(source).toMatch(/claimOpenCodeDiagnosticRunToken[\s\S]{0,120}openCodeTraceService\.claimDeepCapture/);
+      expect(source).toMatch(/claimCodexDiagnosticRunToken[\s\S]{0,120}codexDiagnosticsAdapter\.claimDiagnosticRunToken/);
+      expect(source).toMatch(/claimClaudeDiagnosticRunToken[\s\S]{0,120}claudeDiagnosticsAdapter\.claimDiagnosticRunToken/);
     });
   });
 });
