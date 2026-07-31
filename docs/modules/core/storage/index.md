@@ -5,7 +5,7 @@
 
 ## 概述
 
-`src/core/storage/index.ts` 是存储层的最小公开入口，当前只导出 `StorageService`。所有会话、设置、运行时状态和主题背景资源的本地持久化能力，都通过这个类向上层暴露。
+`src/core/storage/index.ts` 是存储层的最小公开入口，当前只导出 `StorageService`。所有会话、设置、运行时状态和主题背景资源的本地持久化能力，都通过这个类向上层暴露。`StoragePluginPort` 是 `StorageService` 的内部构造契约，保留在存储目录内但不通过 barrel 扩大公开面。
 
 主题背景资源的二进制读写已经下沉到内部 `ThemeBackgroundStorage` owner，但它暂时不通过 barrel 公开。
 
@@ -21,6 +21,10 @@
 ```typescript
 export { StorageService } from './StorageService';
 ```
+
+## 内部构造契约
+
+`src/core/storage/StoragePluginPort.ts` 定义了由调用方拥有的窄 port：唯一成员是 `app: App`。`StorageService` 构造函数接收该 port，以消除对 `src/main.ts` 具体插件类的 type-only 依赖；它不拥有状态或生命周期，也不是 service locator/runtime forwarding 层。该契约不从 barrel 导出，避免把内部装配 seam 变成存储层的额外公开 API。
 
 ## 聚合规则
 

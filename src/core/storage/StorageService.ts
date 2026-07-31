@@ -8,7 +8,6 @@
 
 import { type App, normalizePath } from 'obsidian';
 
-import type { OpenCodianPlugin } from '../../main';
 import { createLogger, formatDurationMs, getPerformanceTimestampMs } from '../../shared';
 import type { ManagedServerState } from '../opencode/types';
 import {
@@ -26,6 +25,7 @@ import {
   ConversationMetadataCache,
   type MutableConversationListDiagnostics,
 } from './ConversationMetadataCache';
+import type { StoragePluginPort } from './StoragePluginPort';
 import { type StoredThemeBackgroundAsset, ThemeBackgroundStorage } from './ThemeBackgroundStorage';
 
 const STORAGE_DIR = '.opencodian';
@@ -173,7 +173,7 @@ export class StorageService {
   private themeBackgroundStorage: ThemeBackgroundStorage;
   private lastConversationListDiagnostics: ConversationListDiagnostics | null = null;
 
-  constructor(plugin: OpenCodianPlugin) {
+  constructor(plugin: StoragePluginPort) {
     this.app = plugin.app;
     this.vaultPath = (this.app.vault.adapter as unknown as { basePath: string }).basePath;
     this.conversationMetadataCache = new ConversationMetadataCache(this.app.vault.adapter);

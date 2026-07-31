@@ -20,10 +20,12 @@
 - `listConversations()` 输出本次会话元数据扫描耗时，并维护最近一次会话列表扫描诊断快照
 - 当历史会话还没有轻量 metadata sidecar 时，自动从完整 session JSON 回退读取并回填 sidecar，减少后续冷启动的读盘量
 
+构造函数接收 `StoragePluginPort` 这一由调用方拥有的窄 port，只读取其中的 `app`。这个 port 仅用于切断存储层对 `src/main.ts` 具体插件类的 type-only 依赖，不承载可变状态、生命周期或 service locator 职责。
+
 ## 导入关系
 
 ```text
-上游: obsidian App/normalizePath, src/main.ts, src/core/opencode/types.ts, src/core/storage/ThemeBackgroundStorage.ts, src/core/types/index.ts
+上游: obsidian App/normalizePath, src/core/storage/StoragePluginPort.ts, src/core/opencode/types.ts, src/core/storage/ThemeBackgroundStorage.ts, src/core/types/index.ts
 下游: src/main.ts, src/features/chat/OpenCodianView.ts
 ```
 
@@ -31,6 +33,7 @@
 
 ```typescript
 class StorageService {
+  constructor(plugin: StoragePluginPort);
   initialize(): Promise<void>;
   saveConversation(conversation: Conversation): Promise<void>;
   loadFullConversation(id: string): Promise<Conversation | null>;
