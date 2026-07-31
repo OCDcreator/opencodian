@@ -86,31 +86,41 @@ describe('Phase 3 Task 10 — DiagnosticsRuntimeContract (characterization)', ()
     beforeEach(() => { dir = tempDir('ctor'); });
     afterEach(() => { fs.rmSync(dir, { recursive: true, force: true }); });
 
-    it('accepts the documented { settings, vaultPath, buildIdentity, knownSecrets, runtimeMetadata } option set for all three services', () => {
+    it('accepts the documented { settings, vaultPath, buildIdentity, knownSecrets, runtimeMetadata } option set for all three services', async () => {
       const oc = new OpenCodeSessionTraceService({
         settings: () => openCodeTraceSettings(dir),
         vaultPath: '/vault',
-        buildIdentity: () => 'Build: test',
+        buildIdentity: () => 'Build: test-oc',
         knownSecrets: () => ['s1'],
-        runtimeMetadata: () => ({ serverMode: 'local' }),
+        runtimeMetadata: () => ({ serverMode: 'local', customMeta: 'oc' }),
       });
       const codex = new CodexSessionTraceService({
         settings: () => codexTraceSettings(dir),
         vaultPath: '/vault',
-        buildIdentity: () => 'Build: test',
+        buildIdentity: () => 'Build: test-codex',
         knownSecrets: () => ['s1'],
-        runtimeMetadata: () => ({ serverMode: 'local' }),
+        runtimeMetadata: () => ({ serverMode: 'local', customMeta: 'codex' }),
       });
       const claude = new ClaudeSessionTraceService({
         settings: () => claudeTraceSettings(dir),
         vaultPath: '/vault',
-        buildIdentity: () => 'Build: test',
+        buildIdentity: () => 'Build: test-claude',
         knownSecrets: () => ['s1'],
-        runtimeMetadata: () => ({ serverMode: 'local' }),
+        runtimeMetadata: () => ({ serverMode: 'local', customMeta: 'claude' }),
       });
       expect(oc.runtimeSegmentId).toMatch(/^[\da-f-]+$/);
       expect(codex.runtimeSegmentId).toMatch(/^[\da-f-]+$/);
       expect(claude.runtimeSegmentId).toMatch(/^[\da-f-]+$/);
+      // runtimeMetadata is emitted into the runtime.started event; buildIdentity
+      // is consumed by the report builder. Pin both so a coordinator extraction
+      // cannot silently drop them.
+      const ocRt = await oc.store.readRuntimeSegment(oc.runtimeSegmentId);
+      const ocStarted = ocRt.find((e) => e.name === 'runtime.started');
+      expect(ocStarted?.payload).toMatchObject({ serverMode: 'local', customMeta: 'oc' });
+      const codexRt = await codex.store.readRuntimeSegment(codex.runtimeSegmentId);
+      expect(codexRt.find((e) => e.name === 'runtime.started')?.payload).toMatchObject({ customMeta: 'codex' });
+      const claudeRt = await claude.store.readRuntimeSegment(claude.runtimeSegmentId);
+      expect(claudeRt.find((e) => e.name === 'runtime.started')?.payload).toMatchObject({ customMeta: 'claude' });
     });
 
     it('uses a hardcoded build-identity fallback when buildIdentity is omitted', () => {
@@ -425,7 +435,9 @@ describe('Phase 3 Task 10 — DiagnosticsRuntimeContract (characterization)', ()
       expect(blob).not.toContain(vaultPath);
     });
 
-    it('Claude persisted files contain no raw secret (hardened mode)', async () => {
+    it('Claude persisted files contain no raw secret and normalize the vault path (hardened mode, via recordTurnEvent raw-payload path)', async () => {
+      // recordSdkMessage summarizes; recordTurnEvent emits the raw payload through
+      // the redactor, so use it to exercise secret/path redaction on disk.
       const secret = 'super-secret-claude-disk-1234';
       const service = new ClaudeSessionTraceService({
         settings: () => claudeTraceSettings(dir),
@@ -433,11 +445,13 @@ describe('Phase 3 Task 10 — DiagnosticsRuntimeContract (characterization)', ()
         knownSecrets: () => [secret],
       });
       const ctx = service.bindSession({ sessionId: 'sess-claude-disk', resumed: false, via: 'sdk' });
-      service.recordSdkMessage(ctx, { apiKey: secret, nested: { token: secret } });
+      service.recordTurnEvent(ctx, 'disk.canary', 'warning', { note: secret, filePath: `${vaultPath}/secret.txt` });
       await service.store.flush();
       const files = readAllJsonFiles(dir);
       const blob = files.map((f) => f.content).join('\n');
       expect(blob).not.toContain(secret);
+      expect(blob).toContain('$VAULT');
+      expect(blob).not.toContain(vaultPath);
     });
 
     it('Codex persisted files contain no raw secret (hardened mode)', async () => {
@@ -630,6 +644,230 @@ describe('Phase 3 Task 10 — DiagnosticsRuntimeContract (characterization)', ()
     it('Codex recordServiceOutput does not throw when disabled', () => {
       const service = new CodexSessionTraceService({ settings: () => codexTraceSettings(dir, { enabled: false }) });
       expect(() => service.recordServiceOutput('stderr', 'should-not-throw')).not.toThrow();
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Step 2: main.ts construction/injection/dispose wiring points (source contract).
+  //
+  // main.ts is the composition shell that Task 11 will refactor. We pin the
+  // CURRENT wiring so any coordinator extraction that silently reorders
+  // construction, changes tracePort injection, or alters onunload disposal is
+  // detected. These are source-level contracts because main.ts cannot be
+  // instantiated in a unit test (it extends Obsidian Plugin with app/vault).
+  //
+  // The bootstrap timing issue the plan calls out: codexTraceService! and
+  // claudeTraceService! use non-null assertions because they are referenced
+  // before construction completes (assigned inside handleBootstrapOpenCodeRuntime).
+  // ---------------------------------------------------------------------------
+
+  describe('main.ts construction/injection/dispose wiring (source contract)', () => {
+    const mainSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../src/main.ts'),
+      'utf8',
+    );
+
+    it('declares the three trace-service fields; codex/claude use non-null assertions (bootstrap timing)', () => {
+      // openCodeTraceService is declared WITHOUT `!` (assigned a definite type);
+      // codex/claude use `!` because they are read before construction finishes.
+      expect(mainSrc).toMatch(/openCodeTraceService:\s*OpenCodeSessionTraceService/);
+      expect(mainSrc).toMatch(/codexTraceService!\s*:\s*CodexSessionTraceService/);
+      expect(mainSrc).toMatch(/claudeTraceService!\s*:\s*ClaudeSessionTraceService/);
+    });
+
+    it('constructs the three services inside handleBootstrapOpenCodeRuntime in order opencode -> codex -> claude', () => {
+      const bootstrapStart = mainSrc.indexOf('handleBootstrapOpenCodeRuntime');
+      expect(bootstrapStart).toBeGreaterThan(-1);
+      // Assert on absolute offsets within the full source so the long method
+      // body (which exceeds fragile brace-depth trackers) is covered.
+      const ocIdx = mainSrc.indexOf('new OpenCodeSessionTraceService(', bootstrapStart);
+      const codexIdx = mainSrc.indexOf('new CodexSessionTraceService(', bootstrapStart);
+      const claudeIdx = mainSrc.indexOf('new ClaudeSessionTraceService(', bootstrapStart);
+      expect(ocIdx).toBeGreaterThan(bootstrapStart);
+      expect(codexIdx).toBeGreaterThan(bootstrapStart);
+      expect(claudeIdx).toBeGreaterThan(bootstrapStart);
+      // Construction order: opencode first, then codex, then claude.
+      expect(ocIdx).toBeLessThan(codexIdx);
+      expect(codexIdx).toBeLessThan(claudeIdx);
+    });
+
+    it('injects openCode tracePort into OpenCodeService and claude tracePort into ClaudeCodeAdapter', () => {
+      const bootstrapStart = mainSrc.indexOf('handleBootstrapOpenCodeRuntime');
+      const bootstrapEnd = mainSrc.indexOf('activateView', bootstrapStart);
+      const body = mainSrc.slice(bootstrapStart, bootstrapEnd);
+      // OpenCodeService receives tracePort: this.openCodeTraceService.
+      expect(body).toMatch(/tracePort:\s*this\.openCodeTraceService/);
+      // ClaudeCodeAdapter receives tracePort: this.claudeTraceService.
+      expect(body).toMatch(/tracePort:\s*this\.claudeTraceService/);
+      // wireHiddenAdapters receives codexTracePort: this.codexTraceService.
+      expect(body).toMatch(/codexTracePort:\s*this\.codexTraceService/);
+    });
+
+    it('onunload disposes the three services in order opencode -> codex -> claude, each void-wrapped with catch', () => {
+      const onunloadStart = mainSrc.indexOf('onunload()');
+      expect(onunloadStart).toBeGreaterThan(-1);
+      const onunloadEnd = mainSrc.indexOf('activateView', onunloadStart);
+      const body = mainSrc.slice(onunloadStart, onunloadEnd);
+      const ocIdx = body.indexOf('this.openCodeTraceService?.dispose()');
+      const codexIdx = body.indexOf('this.codexTraceService?.dispose()');
+      const claudeIdx = body.indexOf('this.claudeTraceService?.dispose()');
+      expect(ocIdx).toBeGreaterThan(-1);
+      expect(codexIdx).toBeGreaterThan(-1);
+      expect(claudeIdx).toBeGreaterThan(-1);
+      // Dispose order: opencode, codex, claude.
+      expect(ocIdx).toBeLessThan(codexIdx);
+      expect(codexIdx).toBeLessThan(claudeIdx);
+    });
+
+    it('constructs each service with the documented option keys (settings, vaultPath, buildIdentity, knownSecrets, runtimeMetadata)', () => {
+      const bootstrapStart = mainSrc.indexOf('handleBootstrapOpenCodeRuntime');
+      const bootstrapEnd = mainSrc.indexOf('activateView', bootstrapStart);
+      const body = mainSrc.slice(bootstrapStart, bootstrapEnd);
+      // Each construction passes settings + knownSecrets + runtimeMetadata.
+      const ocCtor = body.slice(body.indexOf('new OpenCodeSessionTraceService('), body.indexOf('new CodexSessionTraceService('));
+      expect(ocCtor).toMatch(/settings:\s*\(\)/);
+      expect(ocCtor).toMatch(/knownSecrets:/);
+      expect(ocCtor).toMatch(/runtimeMetadata:/);
+      // OpenCode knownSecrets: () => [password, token].filter(Boolean) (the static-snapshot proof).
+      expect(ocCtor).toMatch(/knownSecrets:\s*\(\)\s*=>\s*\[/);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Step 6: each backend's export/flush ordering + plugin export bytes.
+  //
+  // The plan (item 6) requires capturing each backend's current export/flush
+  // sequence WITHOUT inventing a uniform baseline. The asymmetry:
+  //   - OpenCode chat export (OpenCodianView inline): resolveTraceId →
+  //     buildSmartReport → clipboard.writeText (NO pre-flush).
+  //   - Codex/Claude adapter export: flushRingBuffer → store.flush() →
+  //     buildSmartReport → clipboard.writeText.
+  // Plus the plugin-level export (writeDiagnosticLogFile / buildDiagnosticReport)
+  // surfaces in SettingsDebugSection. We pin the source ordering.
+  // ---------------------------------------------------------------------------
+
+  describe('per-backend export/flush ordering (source contract)', () => {
+    it('Codex adapter exportConversationDiagnostics flushes ring + store BEFORE building the report', () => {
+      const src = fs.readFileSync(
+        path.resolve(__dirname, '../../../../src/features/chat/services/CodexDiagnosticsHostAdapter.ts'),
+        'utf8',
+      );
+      const start = src.indexOf('async exportConversationDiagnostics(');
+      const body = src.slice(start, start + 1200);
+      const flushRingIdx = body.indexOf('flushRingBuffer(');
+      const storeFlushIdx = body.indexOf('await service.store.flush()');
+      const buildIdx = body.indexOf('buildSmartReport(');
+      const clipboardIdx = body.indexOf('navigator.clipboard.writeText');
+      // Order: flushRingBuffer -> store.flush -> buildSmartReport -> clipboard.
+      expect(flushRingIdx).toBeGreaterThan(-1);
+      expect(flushRingIdx).toBeLessThan(storeFlushIdx);
+      expect(storeFlushIdx).toBeLessThan(buildIdx);
+      expect(buildIdx).toBeLessThan(clipboardIdx);
+    });
+
+    it('Claude adapter exportConversationDiagnostics flushes ring + store BEFORE building the report (same order as Codex)', () => {
+      const src = fs.readFileSync(
+        path.resolve(__dirname, '../../../../src/features/chat/services/ClaudeDiagnosticsHostAdapter.ts'),
+        'utf8',
+      );
+      const start = src.indexOf('async exportConversationDiagnostics(');
+      const body = src.slice(start, start + 1200);
+      const flushRingIdx = body.indexOf('flushRingBuffer(');
+      const storeFlushIdx = body.indexOf('await service.store.flush()');
+      const buildIdx = body.indexOf('buildSmartReport(');
+      const clipboardIdx = body.indexOf('navigator.clipboard.writeText');
+      expect(flushRingIdx).toBeGreaterThan(-1);
+      expect(flushRingIdx).toBeLessThan(storeFlushIdx);
+      expect(storeFlushIdx).toBeLessThan(buildIdx);
+      expect(buildIdx).toBeLessThan(clipboardIdx);
+    });
+
+    it('OpenCode chat export (OpenCodianView inline) does NOT pre-flush — it resolves traceId then builds the report directly', () => {
+      const src = fs.readFileSync(
+        path.resolve(__dirname, '../../../../src/features/chat/OpenCodianView.ts'),
+        'utf8',
+      );
+      // Find the copySession menu onClick handler that builds the OpenCode report.
+      const copyIdx = src.indexOf("setTitle(t('chat.opencodeDiagnostics.copySession'))");
+      expect(copyIdx).toBeGreaterThan(-1);
+      const body = src.slice(copyIdx, copyIdx + 800);
+      const resolveIdx = body.indexOf('resolveTraceId(');
+      const buildIdx = body.indexOf('buildSmartReport(');
+      const clipboardIdx = body.indexOf('navigator.clipboard.writeText');
+      expect(resolveIdx).toBeGreaterThan(-1);
+      expect(resolveIdx).toBeLessThan(buildIdx);
+      expect(buildIdx).toBeLessThan(clipboardIdx);
+      // OpenCode export does NOT call flushRingBuffer or store.flush before building.
+      const preBuildSlice = body.slice(0, buildIdx);
+      expect(preBuildSlice).not.toMatch(/flushRingBuffer|\.store\.flush\(\)/);
+    });
+
+    it('plugin-level export surfaces (buildDiagnosticReport, writeDiagnosticLogFile) exist on the plugin and are wired into SettingsDebugSection', () => {
+      const mainSrc = fs.readFileSync(
+        path.resolve(__dirname, '../../../../src/main.ts'),
+        'utf8',
+      );
+      expect(mainSrc).toMatch(/buildDiagnosticReport/);
+      expect(mainSrc).toMatch(/writeDiagnosticLogFile/);
+      const debugSrc = fs.readFileSync(
+        path.resolve(__dirname, '../../../../src/features/settings/SettingsDebugSection.ts'),
+        'utf8',
+      );
+      // The export block invokes the plugin export surfaces.
+      expect(debugSrc).toMatch(/buildDiagnosticReport|writeDiagnosticLogFile/);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // Step 4 (cont.): exported-bundle redaction canary.
+  //
+  // exportTraceBundle writes a bundle directory; the bundle content must not
+  // contain a raw secret. Characterize Claude's exportTrace (the only service
+  // exposing it directly on the port) and the shared store export path.
+  // ---------------------------------------------------------------------------
+
+  describe('exported-bundle redaction canary', () => {
+    let dir: string;
+    let exportDir: string;
+    beforeEach(() => {
+      dir = tempDir('export');
+      exportDir = tempDir('export-out');
+    });
+    afterEach(() => {
+      fs.rmSync(dir, { recursive: true, force: true });
+      fs.rmSync(exportDir, { recursive: true, force: true });
+    });
+
+    it('Claude exportTrace bundle contains no raw secret', async () => {
+      const secret = 'export-bundle-secret-claude-1234';
+      const service = new ClaudeSessionTraceService({
+        settings: () => claudeTraceSettings(dir),
+        knownSecrets: () => [secret],
+      });
+      const ctx = service.bindSession({ sessionId: 'sess-export', resumed: false, via: 'sdk' });
+      service.recordSdkMessage(ctx, { note: secret });
+      service.finishTurn(ctx, 'completed');
+      await service.store.flush();
+      const exportedPath = await service.exportTrace(ctx.traceId, exportDir);
+      expect(exportedPath).toBeDefined();
+      // Read every file in the export directory and assert no raw secret.
+      const blob = readAllJsonFiles(exportDir).map((f) => f.content).join('\n');
+      expect(blob).not.toContain(secret);
+    });
+
+    it('OpenCode store.exportTraceBundle contains no raw secret', async () => {
+      const secret = 'export-bundle-secret-opencode-1234';
+      const service = new OpenCodeSessionTraceService({
+        settings: () => openCodeTraceSettings(dir),
+        knownSecrets: () => [secret],
+      });
+      const ctx = service.bindSession(service.beginBootstrap(), 'sess-export-oc');
+      service.markAnomaly(ctx, 'export.canary', 'warning', { note: secret });
+      await service.store.flush();
+      const exportedPath = await service.store.exportTraceBundle(ctx.traceId, exportDir);
+      expect(exportedPath).toBeDefined();
+      const blob = readAllJsonFiles(exportDir).map((f) => f.content).join('\n');
+      expect(blob).not.toContain(secret);
     });
   });
 });

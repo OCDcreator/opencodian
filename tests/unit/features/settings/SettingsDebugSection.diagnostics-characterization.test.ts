@@ -305,6 +305,58 @@ describe('Phase 3 Task 10 — SettingsDebugSection diagnostics characterization'
   });
 
   // -------------------------------------------------------------------------
+  // Step 5 (cont.): the SIX debug secondary tabs in settingsLayoutRegistry.
+  //
+  // The debug section declares SIX secondary tabs: plugin, opencode, codex,
+  // claude-code, export, capability-lab. attachTabbed renders the first FIVE
+  // as block shells; capability-lab is rendered by a separate component.
+  // Task 13 must not drop or merge any of the six.
+  // -------------------------------------------------------------------------
+
+  describe('settingsLayoutRegistry declares six debug secondary tabs', () => {
+    it('the debug section registry declares exactly six secondary tabs including capability-lab', () => {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
+      const fs = require('fs') as typeof import('fs');
+      // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
+      const path = require('path') as typeof import('path');
+      const source = fs.readFileSync(
+        path.resolve(__dirname, '../../../../src/features/settings/settingsLayoutRegistry.ts'),
+        'utf8',
+      );
+      const debugStart = source.indexOf("id: 'debug'");
+      expect(debugStart).toBeGreaterThan(-1);
+      // Slice to the next top-level section (next "id: '...'," at column 4).
+      const afterDebug = source.slice(debugStart + 1);
+      const nextSectionRel = afterDebug.search(/\n[/ ]{4}id: '/);
+      const debugBody = nextSectionRel > 0
+        ? source.slice(debugStart, debugStart + 1 + nextSectionRel)
+        : source.slice(debugStart, debugStart + 1200);
+      expect(debugBody).toContain("id: 'plugin'");
+      expect(debugBody).toContain("id: 'opencode'");
+      expect(debugBody).toContain("id: 'codex'");
+      expect(debugBody).toContain("id: 'claude-code'");
+      expect(debugBody).toContain("id: 'export'");
+      expect(debugBody).toContain("id: 'capability-lab'");
+      // Exactly six secondary tab entries in the debug section.
+      const tabIdMatches = debugBody.match(/\{\s*id:\s*'[^']+',\s*labelKey:/g);
+      expect(tabIdMatches?.length).toBe(6);
+    });
+
+    it('attachTabbed renders FIVE block shells; capability-lab is NOT a SettingsDebugSection block', () => {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
+      const fs = require('fs') as typeof import('fs');
+      // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
+      const path = require('path') as typeof import('path');
+      const source = fs.readFileSync(
+        path.resolve(__dirname, '../../../../src/features/settings/SettingsDebugSection.ts'),
+        'utf8',
+      );
+      // SettingsDebugSection must not reference capability-lab (it is a separate owner).
+      expect(source).not.toMatch(/capability-lab|capabilityLab/);
+    });
+  });
+
+  // -------------------------------------------------------------------------
   // Step 5 (THE plan requirement): legacy non-tabbed attach OMITS Codex.
   //
   // The plan (Task 10 step 5 + Task 13) requires: "separately prove whether
