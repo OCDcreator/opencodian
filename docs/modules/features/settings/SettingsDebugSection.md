@@ -38,9 +38,9 @@
 
 section 通过 `DEBUG_MODULE_REGISTRY` 动态生成模块 toggles，并在共享 shell 中按来源过滤到 `plugin` 等仍由本 owner 路由的分组；OpenCode 的 `server` / `models` / `streaming` 与 Claude 的 `claudeCode` key 集合由对应 panel 声明并通过 callback 复用本 section 的模块渲染 helper，而不是复制 helper。这样新增 debug module 时：
 
-1. 先改注册表
-2. 在 `SettingsDebugSection` 里把 module key 放进正确来源分组
-3. 对应测试也能发现映射遗漏
+1. 先更新 `DEBUG_MODULE_REGISTRY`。
+2. 再将 key 加到实际 owner：插件 key 放入 `SettingsDebugSection` 的 `DEBUG_MODULE_GROUPS.plugin`；OpenCode key 放入 `OpenCodeDebugPanel` 的 `OPEN_CODE_DEBUG_MODULE_KEYS`；Claude key 放入 `ClaudeCodeDebugPanel` panel-owned 的 `renderDebugModules` 配置。
+3. 更新对应 owner 的测试，确保可发现映射遗漏。
 
 `claudeCode` 目前只表示 Claude Code SDK 诊断开关，文案明确说它控制 query/session/stream/permission/MCP/experimental 摘要日志，不代表 full runtime proof 已完成。
 
