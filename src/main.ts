@@ -57,6 +57,7 @@ import {
 } from './core/types';
 import { prepareLoadedSettingsBootstrapState } from './core/types/settingsLoadNormalization';
 import { OpenCodianView } from './features/chat/OpenCodianView';
+import { createChatDiagnosticsCoordinatorFactory } from './features/chat/services/ChatDiagnosticsCoordinator';
 import { OpenCodianSettingTab } from './features/settings/OpenCodianSettings';
 import { broadcastModelsLoadedToSettingsViews, broadcastServerStatusToSettingsViews, registerSettingsView } from './features/settings/SettingsViewRegistrar';
 import { setLocale, t } from './i18n';
@@ -504,7 +505,11 @@ export default class OpenCodianPlugin extends Plugin {
   private registerWorkspaceIntegration(): void {
     this.registerView(
       VIEW_TYPE_OPENCODIAN,
-      (leaf) => new OpenCodianView(leaf, this)
+      (leaf) => new OpenCodianView(leaf, this, createChatDiagnosticsCoordinatorFactory({
+        getOpenCodeTraceService: () => this.diagnosticsCoordinator?.openCode,
+        getCodexTraceService: () => this.diagnosticsCoordinator?.codex,
+        getClaudeTraceService: () => this.diagnosticsCoordinator?.claude,
+      }))
     );
 
     registerSettingsView(this);

@@ -3,7 +3,8 @@
 > 2026-07-29: Bootstrap constructs and injects `OpenCodeSessionTraceService`; unload flushes it independently.
 > 2026-07-30: Bootstrap additionally constructs `CodexSessionTraceService` (default-on, reads `backendSettings.codex.sessionTrace`), exposes it as `this.codexTraceService`, injects the service itself as `codexTracePort` into `wireHiddenAdapters()` so the Codex adapter/transport can emit session/turn/wire trace events, and flushes it independently in `onunload`. Codex trace flush failures only emit a generic warning so rejected errors cannot leak secrets or local paths; the OpenCode-side behavior is unchanged.
 > 2026-07-30: Bootstrap constructs `ClaudeSessionTraceService`, exposes it as `this.claudeTraceService`, and injects it as `tracePort` when constructing `ClaudeCodeAdapter`. Its dynamic `knownSecrets` getter recursively collects only non-empty api-key/token/secret-like values from current `backendSettings.claudeCode`; unload disposes it with a generic warning only, so a rejected trace flush cannot expose credential/path detail or affect plugin shutdown.
-> 2026-07-31 (Phase 3 Task 11): The three backend trace services are no longer constructed inline in `handleBootstrapOpenCodeRuntime`. `main.ts` now constructs a single `DiagnosticsRuntimeCoordinator` (src/app/diagnostics) which owns construction (OpenCode → Codex → Claude, pinned order) with the same option getters, exposes typed backend ports, and owns the unified flush/dispose. `openCodeTraceService`/`codexTraceService`/`claudeTraceService` are now delegating getters returning the coordinator's typed ports (shims until Task 12/13 migrate consumers); `onunload` calls `this.diagnosticsCoordinator?.dispose()`. `main.ts` has zero direct `new *SessionTraceService`. tracePort/codexTracePort injection wiring is unchanged.
+> 2026-07-31 (Phase 3 Task 11): The three backend trace services are no longer constructed inline in `handleBootstrapOpenCodeRuntime`. `main.ts` now constructs a single `DiagnosticsRuntimeCoordinator` (src/app/diagnostics) which owns construction (OpenCode → Codex → Claude, pinned order) with the same option getters, exposes typed backend ports, and owns the unified flush/dispose. `main.ts` has zero direct `new *SessionTraceService`; the legacy per-backend getters still delegate to the coordinator for Settings and other compatibility consumers.
+> 2026-07-31 (Phase 3 Task 12 Claude slice): `registerWorkspaceIntegration()` injects `createChatDiagnosticsCoordinatorFactory()` into each `OpenCodianView`. Its explicit OpenCode/Codex/Claude getters are lazy: before diagnostics bootstrap they return no service and fail closed; after bootstrap they read the same `DiagnosticsRuntimeCoordinator` instance. The chat coordinator now owns the three backend-specific routes. This note records the wiring slice only and does not infer overall Phase 3/Task 12 closure or review status.
 
 > **源码**: `src/main.ts`
 > **状态**: [REVIEW]
@@ -60,7 +61,8 @@ Codex 审批 host context 的入口级 wiring 保留在 `main.ts`：插件持有
 - `settings`: 当前归一化后的 `OpenCodianSettings`。
 - `storage`: vault 侧持久化入口。
 - `openCodeService`: OpenCode 运行时门面。
-- `openCodeTraceService` / `codexTraceService` / `claudeTraceService`: 三个 backend 的独立会话 trace runtime；Claude service 从当前 Claude backend settings 动态读取开关与 credential-like known secrets。
+- `diagnosticsCoordinator`: 由 `DiagnosticsRuntimeCoordinator` 持有三个 backend 的会话 trace runtime、typed backend ports 和统一 flush/dispose 生命周期。
+- `openCodeTraceService` / `codexTraceService` / `claudeTraceService`: 保留到 Task 13 的 Settings/兼容 getters；运行时惰性委托到 `diagnosticsCoordinator`，bootstrap 前没有 service，bootstrap 后返回同一 coordinator 的 backend port。
 - `opencodeConfigManager` / `modelConfigService`: 只有拿到 vault 路径后才创建。
 - `modelPricingService`: 读取手动刷新的 models.dev 本地缓存，并为没有 backend 实际成本的 token snapshot 添加 API 等价估算；启动只读缓存，不自动联网。
 - `conversations`: 只在内存里缓存会话元数据；正文按需从 `StorageService.loadFullConversation()` 读取。
@@ -89,7 +91,7 @@ Codex 审批 host context 的入口级 wiring 保留在 `main.ts`：插件持有
 10. 构造 `OpenCodeService`，注入 server status / error / models loaded 回调，以及 `initialManagedServerState`、`SDK_FEATURE_FLAG_ROLLOUT_DEFAULTS` 和 managed server state 持久化回调。
 11. 如果能解析到 vault 路径，就创建 `OpencodeConfigManager` / `ModelConfigService`，并把 vault 路径传给 `openCodeService`。
 12. 在注册视图之前执行 `loadConversations()`，只预热会话元数据；`StorageService` 会优先读取轻量 `session-metas/` sidecar，缺失时再回退完整 session JSON，并把这次 fallback 统计送进 startup diagnosis。
-12a. 在 adapter 注册前构造 OpenCode、Codex 与 Claude 三个 trace service。Claude service 使用 `backendSettings.claudeCode.sessionTrace`、vault path、build identity 和动态 credential-like `knownSecrets` getter；这些 secret 仅进入 hardened redactor，不写入报告、bundle 或 generic unload warning。
+12a. 在 adapter 注册前由 `DiagnosticsRuntimeCoordinator` 按 OpenCode → Codex → Claude 的固定顺序构造三个 trace service，并暴露 typed backend ports；Claude service 使用 `backendSettings.claudeCode.sessionTrace`、vault path、build identity 和动态 credential-like `knownSecrets` getter。这些 secret 仅进入 hardened redactor，不写入报告、bundle 或 generic unload warning。
 12b. 构建 `AgentServiceRegistry`：`main.ts` 构造各 adapter 实例（OpenCode、Claude Code），把 Claude trace service 作为 `tracePort` 注入 `ClaudeCodeAdapter`，然后调用 `wireHiddenAdapters()`（来自 `AgentAdapterWiring.ts`）统一注册所有 user-facing adapter（当前包含 Codex）。Claude Code 的 external CLI 解析由 `ClaudeCodeAdapter`/`ClaudeCodeProcessResolver` 在 backend owner 内完成；Codex 由 `CodexCliResolver` 按显式 path → GUI PATH / Windows npm shim 解析用户安装的 native CLI。入口层保留兼容旧 bootstrap 形状的 `pluginDir` hint，但 wiring 层刻意忽略它，绝不把 bundled platform binary package 视为必需 runtime。最后由 `setEnabledBackends()` 激活用户可见后端。
 13. 注册 `OpenCodianView`、自定义品牌 icon（供 ribbon / tab header 复用）、命令与设置页。
 14. 启动结束时输出一行汇总日志；这条汇总同样走 `always`。若检测到失败或明显慢启动，还会额外输出一条 automatic diagnosis。
@@ -216,6 +218,7 @@ OpenCode server status 回调也不再只刷新设置页状态：当本地/远�
 | `writeDiagnosticLogFile()` | 将调试报告写成日志文件 |
 | `handlePrepareStartupState()` | 创建 StorageService、加载设置、应用启动副作用、加载 managed server state |
 | `handleBootstrapOpenCodeRuntime()` | 初始化 `.opencode` 配置、构造 OpenCodeService、配置 vault-scoped 服务、预加载会话 |
+| `registerWorkspaceIntegration()` | 注册 `OpenCodianView`、Settings view、ribbon、commands 和 settings tab；创建 View 时注入 `createChatDiagnosticsCoordinatorFactory()`，其 OpenCode/Codex/Claude getters 惰性读取同一 `DiagnosticsRuntimeCoordinator` |
 
 ## 数据流
 
@@ -248,7 +251,8 @@ graph TD
 - `ModelConfigService`: 在拿到 vault 路径后构建，供设置页和视图读取模型目录。
 - `OpenCodianStartupCoordinator`: 启动引导运行时 owner，负责编排 `onload` 阶段的启动序列和性能追踪；`main.ts` 通过回调注入具体行为，启动完成后保留 coordinator 引用读取诊断数据。
 - `PluginRuntimeCoordinator`: 入口旁的 runtime orchestration owner，负责 deferred warmup、session-bootstrap warmup readiness、model refresh frame、slash catalog invalidation 和 cross-view UI refresh fan-out。
-- `OpenCodianView`: 由入口注册，并在运行时回调插件实例获取会话、刷新 UI、附加上下文等能力。
+- `OpenCodianView`: 由入口注册；入口同时注入 `createChatDiagnosticsCoordinatorFactory()`，factory 闭包只保存三个显式、惰性的 diagnostics backend getters，view 只向 coordinator 提供 chat/UI callbacks。
+- `ChatDiagnosticsCoordinator`: chat surface 的统一 diagnostics boundary；持有 OpenCode logic、`CodexDiagnosticsHostAdapter` 和 `ClaudeDiagnosticsHostAdapter`，不作为通用 backend service locator。
 - `OpenCodianSettingTab`: 通过插件实例保存设置、刷新服务状态和模型目录。
 - `core/theme`: 负责主题预设与外观覆盖的归一化。
 - `i18n`: 由入口设置 locale，并通过 `PluginRuntimeCoordinator` 的跨视图刷新把文字变更传播出去。

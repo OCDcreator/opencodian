@@ -1,9 +1,18 @@
+import type { Menu } from 'obsidian';
+
+import type { ClaudeSessionTraceService } from '../../../core/agents/backend/diagnostics/ClaudeSessionTraceService';
 import type {
   OpenCodeSessionTraceService,
   OpenCodeSessionTraceSettings,
 } from '../../../core/opencode/diagnostics/OpenCodeSessionTraceService';
+import type { Conversation } from '../../../core/types';
 import { t } from '../../../i18n';
 import type { DiagnosticRunToken } from '../runtime/SendPipelineTypes';
+import {
+  ClaudeDiagnosticsHostAdapter,
+  type ClaudeDiagnosticsHostAdapterHost,
+  type ClaudeDiagnosticsState,
+} from './ClaudeDiagnosticsHostAdapter';
 import {
   CodexDiagnosticsHostAdapter,
   type CodexDiagnosticsHostAdapterHost,
@@ -58,7 +67,112 @@ export interface ChatDiagnosticsCoordinatorHost {
 }
 
 /**
- * Owns OpenCode and Codex diagnostics operations at the chat surface boundary.
+ * Chat-owned inputs used to assemble a diagnostics coordinator. This surface
+ * deliberately excludes every backend trace service: app composition supplies
+ * those through the opaque factory below.
+ */
+export interface ChatDiagnosticsCoordinatorViewHost {
+  getOpenCodeSessionTraceSettings(): Pick<OpenCodeSessionTraceSettings, 'enabled'>;
+  getCodexSessionTraceSettings(): { enabled: boolean };
+  getClaudeSessionTraceSettings(): { enabled: boolean };
+  getActiveTabId(): string | null;
+  getSessionIdForTab(tabId: string): string | null;
+  getCurrentConversation(): Conversation | null;
+  refreshHeaderChrome(): void;
+  createOpenCodeDiagnosticsMenu(): OpenCodeDiagnosticsMenu;
+  createBackendDiagnosticsMenu(): Menu;
+  promptDiagnosticsUserContext(): Promise<OpenCodeDiagnosticsUserContext>;
+  writeTextToClipboard(text: string): Promise<void>;
+  showNotice(message: string): void;
+}
+
+/**
+ * App-composition trace ports. The explicit backend getters prevent a generic
+ * backend lookup or merged diagnostics state from leaking into the chat view.
+ */
+export interface ChatDiagnosticsBackendPorts {
+  getOpenCodeTraceService(): OpenCodeTraceServicePort | undefined;
+  getCodexTraceService(): ReturnType<CodexDiagnosticsHostAdapterHost['getCodexTraceService']>;
+  getClaudeTraceService(): ClaudeSessionTraceService | undefined;
+}
+
+/** Opaque assembly seam injected by app composition into OpenCodianView. */
+export interface ChatDiagnosticsCoordinatorFactory {
+  create(host: ChatDiagnosticsCoordinatorViewHost): ChatDiagnosticsCoordinator;
+}
+
+const noTraceBackendPorts: ChatDiagnosticsBackendPorts = {
+  getOpenCodeTraceService: () => undefined,
+  getCodexTraceService: () => undefined,
+  getClaudeTraceService: () => undefined,
+};
+
+function createFailClosedCodexDiagnosticsHost(): CodexDiagnosticsHostAdapterHost {
+  return {
+    getCodexTraceService: () => undefined,
+    getCodexSessionTraceSettings: () => ({ enabled: false }),
+    getCurrentConversation: () => null,
+    refreshHeaderChrome: () => undefined,
+    createMenu: () => ({}) as Menu,
+    showNotice: () => undefined,
+  };
+}
+
+function createFailClosedClaudeDiagnosticsHost(): ClaudeDiagnosticsHostAdapterHost {
+  return {
+    getClaudeTraceService: () => undefined,
+    getClaudeSessionTraceSettings: () => ({ enabled: false }),
+    getCurrentConversation: () => null,
+    refreshHeaderChrome: () => undefined,
+    createMenu: () => ({}) as Menu,
+    showNotice: () => undefined,
+  };
+}
+
+/**
+ * Creates a backend-specific coordinator factory. The factory closes over the
+ * app-owned trace ports, while the view supplies only live chat/UI state.
+ */
+export function createChatDiagnosticsCoordinatorFactory(
+  ports: ChatDiagnosticsBackendPorts = noTraceBackendPorts,
+): ChatDiagnosticsCoordinatorFactory {
+  return {
+    create(viewHost: ChatDiagnosticsCoordinatorViewHost): ChatDiagnosticsCoordinator {
+      return new ChatDiagnosticsCoordinator({
+        getOpenCodeSessionTraceSettings: () => viewHost.getOpenCodeSessionTraceSettings(),
+        getOpenCodeTraceService: () => ports.getOpenCodeTraceService(),
+        getActiveTabId: () => viewHost.getActiveTabId(),
+        getSessionIdForTab: (tabId) => viewHost.getSessionIdForTab(tabId),
+        refreshHeaderChrome: () => viewHost.refreshHeaderChrome(),
+        createMenu: () => viewHost.createOpenCodeDiagnosticsMenu(),
+        promptDiagnosticsUserContext: () => viewHost.promptDiagnosticsUserContext(),
+        writeTextToClipboard: (text) => viewHost.writeTextToClipboard(text),
+        showNotice: (message) => viewHost.showNotice(message),
+      }, {
+        getCodexTraceService: () => ports.getCodexTraceService(),
+        getCodexSessionTraceSettings: () => viewHost.getCodexSessionTraceSettings(),
+        getCurrentConversation: () => viewHost.getCurrentConversation(),
+        refreshHeaderChrome: () => viewHost.refreshHeaderChrome(),
+        createMenu: () => viewHost.createBackendDiagnosticsMenu(),
+        showNotice: (message) => viewHost.showNotice(message),
+      }, {
+        getClaudeTraceService: () => ports.getClaudeTraceService(),
+        getClaudeSessionTraceSettings: () => viewHost.getClaudeSessionTraceSettings(),
+        getCurrentConversation: () => viewHost.getCurrentConversation(),
+        refreshHeaderChrome: () => viewHost.refreshHeaderChrome(),
+        createMenu: () => viewHost.createBackendDiagnosticsMenu(),
+        showNotice: (message) => viewHost.showNotice(message),
+      });
+    },
+  };
+}
+
+/** Default for direct view construction and tests before app composition. */
+export const failClosedChatDiagnosticsCoordinatorFactory =
+  createChatDiagnosticsCoordinatorFactory();
+
+/**
+ * Owns OpenCode, Codex, and Claude diagnostics operations at the chat surface boundary.
  *
  * The coordinator intentionally receives only narrow ports. Trace failures are
  * absorbed without logging so diagnostic data never escapes through an error
@@ -66,12 +180,15 @@ export interface ChatDiagnosticsCoordinatorHost {
  */
 export class ChatDiagnosticsCoordinator {
   private readonly codexDiagnosticsAdapter: CodexDiagnosticsHostAdapter;
+  private readonly claudeDiagnosticsAdapter: ClaudeDiagnosticsHostAdapter;
 
   constructor(
     private readonly host: ChatDiagnosticsCoordinatorHost,
-    codexDiagnosticsHost: CodexDiagnosticsHostAdapterHost,
+    codexDiagnosticsHost: CodexDiagnosticsHostAdapterHost = createFailClosedCodexDiagnosticsHost(),
+    claudeDiagnosticsHost: ClaudeDiagnosticsHostAdapterHost = createFailClosedClaudeDiagnosticsHost(),
   ) {
     this.codexDiagnosticsAdapter = new CodexDiagnosticsHostAdapter(codexDiagnosticsHost);
+    this.claudeDiagnosticsAdapter = new ClaudeDiagnosticsHostAdapter(claudeDiagnosticsHost);
   }
 
   getOpenCodeDiagnosticsState(): OpenCodeDiagnosticsState {
@@ -201,5 +318,24 @@ export class ChatDiagnosticsCoordinator {
 
   cancelCodexDiagnosticCapture(tabId: string): void {
     this.codexDiagnosticsAdapter.cancelDiagnosticCapture(tabId);
+  }
+
+  getClaudeDiagnosticsState(tabId: string | null): ClaudeDiagnosticsState {
+    return this.claudeDiagnosticsAdapter.getDiagnosticsState(tabId);
+  }
+
+  showClaudeDiagnostics(event: MouseEvent, tabId: string): void {
+    this.claudeDiagnosticsAdapter.showDiagnostics(event, tabId);
+  }
+
+  claimClaudeDiagnosticRunToken(
+    tabId: string | null,
+    sessionId?: string,
+  ): DiagnosticRunToken | undefined {
+    return this.claudeDiagnosticsAdapter.claimDiagnosticRunToken(tabId, sessionId);
+  }
+
+  cancelClaudeDiagnosticCapture(tabId: string): void {
+    this.claudeDiagnosticsAdapter.cancelDiagnosticCapture(tabId);
   }
 }

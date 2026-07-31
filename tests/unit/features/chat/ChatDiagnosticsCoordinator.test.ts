@@ -1,11 +1,14 @@
-/* eslint-disable max-lines -- Chat diagnostics characterization keeps OpenCode and Codex fail-closed routing in one coordinator contract. */
+/* eslint-disable max-lines -- Chat diagnostics characterization keeps backend fail-closed routing in one coordinator contract. */
 import {
   ChatDiagnosticsCoordinator,
   type ChatDiagnosticsCoordinatorHost,
+  type ChatDiagnosticsCoordinatorViewHost,
+  createChatDiagnosticsCoordinatorFactory,
   type OpenCodeDiagnosticsMenu,
   type OpenCodeDiagnosticsMenuItem,
   type OpenCodeTraceServicePort,
 } from '../../../../src/features/chat/services/ChatDiagnosticsCoordinator';
+import type { ClaudeDiagnosticsHostAdapterHost } from '../../../../src/features/chat/services/ClaudeDiagnosticsHostAdapter';
 import type { CodexDiagnosticsHostAdapterHost } from '../../../../src/features/chat/services/CodexDiagnosticsHostAdapter';
 import { t } from '../../../../src/i18n';
 
@@ -55,6 +58,25 @@ interface CodexTraceServiceStub {
   claimDeepCapture: jest.Mock;
 }
 
+interface ClaudeTraceServiceStub {
+  service: {
+    getCaptureState: jest.Mock;
+    armDeepCapture: jest.Mock;
+    cancelDeepCapture: jest.Mock;
+    claimDeepCapture: jest.Mock;
+    flushRingBuffer: jest.Mock;
+    getStorageStatus: jest.Mock;
+    resolveTraceId: jest.Mock;
+    listRecentTraces: jest.Mock;
+    store: { flush: jest.Mock };
+    buildSmartReport: jest.Mock;
+  };
+  getCaptureState: jest.Mock;
+  armDeepCapture: jest.Mock;
+  cancelDeepCapture: jest.Mock;
+  claimDeepCapture: jest.Mock;
+}
+
 interface HarnessOptions {
   enabled?: boolean;
   service?: OpenCodeTraceServicePort | null;
@@ -67,11 +89,14 @@ interface Harness {
   coordinator: ChatDiagnosticsCoordinator;
   service: TraceServiceStub;
   codexService: CodexTraceServiceStub;
+  claudeService: ClaudeTraceServiceStub;
   menu: CapturingMenu;
   codexMenu: CapturingMenu;
+  claudeMenu: CapturingMenu;
   events: string[];
   host: ChatDiagnosticsCoordinatorHost;
   codexHost: CodexDiagnosticsHostAdapterHost;
+  claudeHost: ClaudeDiagnosticsHostAdapterHost;
 }
 
 function createCapturingMenu(): CapturingMenu {
@@ -199,12 +224,58 @@ function createCodexTraceService(events: string[]): CodexTraceServiceStub {
   };
 }
 
+function createClaudeTraceService(events: string[]): ClaudeTraceServiceStub {
+  const getCaptureState = jest.fn().mockReturnValue('off');
+  const armDeepCapture = jest.fn().mockImplementation(() => {
+    events.push('claude-arm');
+    return {
+      runId: 'claude-run-1',
+      tabId: 'tab-1',
+      armedAt: Date.now(),
+      expiresAt: Date.now() + 1_000,
+    };
+  });
+  const cancelDeepCapture = jest.fn().mockImplementation(() => {
+    events.push('claude-cancel');
+    return true;
+  });
+  const claimDeepCapture = jest.fn().mockImplementation(() => {
+    events.push('claude-claim');
+    return {
+      runId: 'claude-run-1',
+      tabId: 'tab-1',
+      armedAt: 1,
+      expiresAt: 2,
+    };
+  });
+  return {
+    service: {
+      getCaptureState,
+      armDeepCapture,
+      cancelDeepCapture,
+      claimDeepCapture,
+      flushRingBuffer: jest.fn(),
+      getStorageStatus: jest.fn().mockReturnValue({ mode: 'disk', lastError: null }),
+      resolveTraceId: jest.fn().mockReturnValue(undefined),
+      listRecentTraces: jest.fn().mockReturnValue([]),
+      store: { flush: jest.fn().mockResolvedValue(undefined) },
+      buildSmartReport: jest.fn().mockResolvedValue('redacted report'),
+    },
+    getCaptureState,
+    armDeepCapture,
+    cancelDeepCapture,
+    claimDeepCapture,
+  };
+}
+
 function createHarness(options: HarnessOptions = {}): Harness {
   const events: string[] = [];
   const service = createTraceService(events);
   const codexService = createCodexTraceService(events);
+  const claudeService = createClaudeTraceService(events);
   const menu = createCapturingMenu();
   const codexMenu = createCapturingMenu();
+  const claudeMenu = createCapturingMenu();
   const host: ChatDiagnosticsCoordinatorHost = {
     getOpenCodeSessionTraceSettings: () => ({ enabled: options.enabled ?? true }),
     getOpenCodeTraceService: () => options.service === null ? undefined : options.service ?? service.port,
@@ -228,15 +299,26 @@ function createHarness(options: HarnessOptions = {}): Harness {
     createMenu: () => codexMenu.menu as never,
     showNotice: (message) => { events.push(`codex-notice:${message}`); },
   };
+  const claudeHost: ClaudeDiagnosticsHostAdapterHost = {
+    getClaudeTraceService: () => claudeService.service as never,
+    getClaudeSessionTraceSettings: () => ({ enabled: true }),
+    getCurrentConversation: () => null,
+    refreshHeaderChrome: () => { events.push('claude-refresh'); },
+    createMenu: () => claudeMenu.menu as never,
+    showNotice: (message) => { events.push(`claude-notice:${message}`); },
+  };
   return {
-    coordinator: new ChatDiagnosticsCoordinator(host, codexHost),
+    coordinator: new ChatDiagnosticsCoordinator(host, codexHost, claudeHost),
     service,
     codexService,
+    claudeService,
     menu,
     codexMenu,
+    claudeMenu,
     events,
     host,
     codexHost,
+    claudeHost,
   };
 }
 
@@ -339,7 +421,71 @@ describe('ChatDiagnosticsCoordinator state matrix', () => {
 });
 
 describe('ChatDiagnosticsCoordinator healthy operations', () => {
-  it('constructs and routes Codex diagnostics through backend-specific operations', async () => {
+  it('reads injected backend trace services lazily from the same factory-created coordinator', () => {
+    const events: string[] = [];
+    const openCodeMenu = createCapturingMenu();
+    const backendMenu = createCapturingMenu();
+    let openCodeTraceService: OpenCodeTraceServicePort | undefined = undefined;
+    let codexTraceService: ReturnType<CodexDiagnosticsHostAdapterHost['getCodexTraceService']> = undefined;
+    let claudeTraceService: ReturnType<ClaudeDiagnosticsHostAdapterHost['getClaudeTraceService']> = undefined;
+    const getOpenCodeTraceService = jest.fn(() => openCodeTraceService);
+    const getCodexTraceService = jest.fn(() => codexTraceService);
+    const getClaudeTraceService = jest.fn(() => claudeTraceService);
+    const factory = createChatDiagnosticsCoordinatorFactory({
+      getOpenCodeTraceService,
+      getCodexTraceService,
+      getClaudeTraceService,
+    });
+    const viewHost: ChatDiagnosticsCoordinatorViewHost = {
+      getOpenCodeSessionTraceSettings: () => ({ enabled: true }),
+      getCodexSessionTraceSettings: () => ({ enabled: true }),
+      getClaudeSessionTraceSettings: () => ({ enabled: true }),
+      getActiveTabId: () => 'tab-1',
+      getSessionIdForTab: () => 'session-1',
+      getCurrentConversation: () => null,
+      refreshHeaderChrome: () => { events.push('refresh'); },
+      createOpenCodeDiagnosticsMenu: () => openCodeMenu.menu,
+      createBackendDiagnosticsMenu: () => backendMenu.menu as never,
+      promptDiagnosticsUserContext: async () => ({}),
+      writeTextToClipboard: async () => undefined,
+      showNotice: () => undefined,
+    };
+    const coordinator = factory.create(viewHost);
+
+    expect(getOpenCodeTraceService).not.toHaveBeenCalled();
+    expect(getCodexTraceService).not.toHaveBeenCalled();
+    expect(getClaudeTraceService).not.toHaveBeenCalled();
+    expect(coordinator.getOpenCodeDiagnosticsState()).toBe('degraded');
+    expect(coordinator.getCodexDiagnosticsState('tab-1')).toBe('disabled');
+    expect(coordinator.getClaudeDiagnosticsState('tab-1')).toBe('disabled');
+    expect(coordinator.claimOpenCodeDiagnosticRunToken('tab-1', 'session-1')).toBeUndefined();
+    expect(coordinator.claimCodexDiagnosticRunToken('tab-1', 'thread-1')).toBeUndefined();
+    expect(coordinator.claimClaudeDiagnosticRunToken('tab-1', 'session-1')).toBeUndefined();
+    expect(openCodeMenu.items).toHaveLength(0);
+    expect(backendMenu.items).toHaveLength(0);
+
+    const openCodeService = createTraceService(events);
+    const codexService = createCodexTraceService(events);
+    const claudeService = createClaudeTraceService(events);
+    openCodeTraceService = openCodeService.port;
+    codexTraceService = codexService.service as never;
+    claudeTraceService = claudeService.service as never;
+
+    expect(coordinator.getOpenCodeDiagnosticsState()).toBe('normal');
+    expect(coordinator.getCodexDiagnosticsState('tab-1')).toBe('normal');
+    expect(coordinator.getClaudeDiagnosticsState('tab-1')).toBe('normal');
+    expect(coordinator.claimOpenCodeDiagnosticRunToken('tab-1', 'session-1'))
+      .toMatchObject({ runId: 'run-1', tabId: 'tab-1' });
+    expect(coordinator.claimCodexDiagnosticRunToken('tab-1', 'thread-1'))
+      .toMatchObject({ runId: 'codex-run-1', tabId: 'tab-1' });
+    expect(coordinator.claimClaudeDiagnosticRunToken('tab-1', 'session-1'))
+      .toMatchObject({ runId: 'claude-run-1', tabId: 'tab-1' });
+    expect(openCodeService.claimDeepCapture).toHaveBeenCalledWith('tab-1', 'session-1');
+    expect(codexService.claimDeepCapture).toHaveBeenCalledWith('tab-1', 'thread-1');
+    expect(claudeService.claimDeepCapture).toHaveBeenCalledWith('tab-1', 'session-1');
+  });
+
+  it('constructs and routes Codex and Claude diagnostics through backend-specific operations', async () => {
     const harness = createHarness();
 
     expect(harness.coordinator.getCodexDiagnosticsState('tab-1')).toBe('normal');
@@ -358,6 +504,23 @@ describe('ChatDiagnosticsCoordinator healthy operations', () => {
 
     harness.coordinator.cancelCodexDiagnosticCapture('tab-1');
     expect(harness.codexService.cancelDeepCapture).toHaveBeenCalledWith('tab-1');
+
+    expect(harness.coordinator.getClaudeDiagnosticsState('tab-1')).toBe('normal');
+    harness.coordinator.showClaudeDiagnostics({} as MouseEvent, 'tab-1');
+    expect(harness.claudeMenu.items.map((item) => item.title)).toEqual([
+      t('chat.claudeDiagnostics.captureNext'),
+      t('chat.claudeDiagnostics.copySession'),
+    ]);
+
+    await getMenuAction(harness.claudeMenu, t('chat.claudeDiagnostics.captureNext'))();
+    expect(harness.claudeService.armDeepCapture).toHaveBeenCalledWith('tab-1', undefined);
+
+    const claudeToken = harness.coordinator.claimClaudeDiagnosticRunToken('tab-1', 'session-1');
+    expect(claudeToken).toMatchObject({ runId: 'claude-run-1', tabId: 'tab-1' });
+    expect(harness.claudeService.claimDeepCapture).toHaveBeenCalledWith('tab-1', 'session-1');
+
+    harness.coordinator.cancelClaudeDiagnosticCapture('tab-1');
+    expect(harness.claudeService.cancelDeepCapture).toHaveBeenCalledWith('tab-1');
   });
 
   it('uses exact menu labels and preserves arm/cancel/copy action order', async () => {

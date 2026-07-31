@@ -8,6 +8,7 @@ import type { Conversation } from '../../../../src/core/types';
 import { DEFAULT_SETTINGS } from '../../../../src/core/types';
 import { OpenCodianView } from '../../../../src/features/chat/OpenCodianView';
 import type { SendPipelineHostDependencies } from '../../../../src/features/chat/runtime/SendPipelineRuntime';
+import { createChatDiagnosticsCoordinatorFactory } from '../../../../src/features/chat/services/ChatDiagnosticsCoordinator';
 import { ChatHeaderPresenter, type ChatHeaderPresenterHost } from '../../../../src/features/chat/services/ChatHeaderPresenter';
 import {
   createAsyncStream,
@@ -91,11 +92,13 @@ function createView(codexTraceService: FakeCodexTraceService): OpenCodianView {
         },
       },
     },
-    codexTraceService,
     openCodeService: {},
-    openCodeTraceService: {},
     storage: {},
-  } as never);
+  } as never, createChatDiagnosticsCoordinatorFactory({
+    getOpenCodeTraceService: () => undefined,
+    getCodexTraceService: () => codexTraceService as never,
+    getClaudeTraceService: () => undefined,
+  }));
 }
 
 function getChatHeaderHost(view: OpenCodianView): ChatHeaderPresenterHost {

@@ -163,7 +163,11 @@ import {
   type BackgroundTaskViewHost,
   createBackgroundTaskViewHost,
 } from './services/BackgroundTaskTimelineService';
-import { ChatDiagnosticsCoordinator } from './services/ChatDiagnosticsCoordinator';
+import {
+  ChatDiagnosticsCoordinator,
+  type ChatDiagnosticsCoordinatorFactory,
+  failClosedChatDiagnosticsCoordinatorFactory,
+} from './services/ChatDiagnosticsCoordinator';
 import {
   ChatHeaderPresenter,
   type ChatHeaderPresenterHost,
@@ -184,7 +188,6 @@ import {
   ChildSessionGraphCoordinator,
   type ChildSessionGraphCoordinatorHost,
 } from './services/ChildSessionGraphCoordinator';
-import { ClaudeDiagnosticsHostAdapter } from './services/ClaudeDiagnosticsHostAdapter';
 import { CodexChatSurfaceBinding } from './services/CodexChatSurfaceBinding';
 import {
   ComposerContextViewFacade,
@@ -526,7 +529,7 @@ export class OpenCodianView extends ItemView {
   private backendCapabilityChangeDisposable: { dispose(): void } | null = null;
   private readonly codexChatSurfaceBinding: CodexChatSurfaceBinding;
   private readonly chatDiagnosticsCoordinator: ChatDiagnosticsCoordinator;
-  private readonly claudeDiagnosticsAdapter: ClaudeDiagnosticsHostAdapter;
+  private readonly chatDiagnosticsCoordinatorFactory: ChatDiagnosticsCoordinatorFactory;
   private escapeHandlers: Array<() => boolean> = [];
   private backendSurfaceSwitchPromise: Promise<void> | null = null;
 
@@ -721,8 +724,8 @@ export class OpenCodianView extends ItemView {
       getActiveDiagnosticsTabId: () => this.getActiveTabId(),
       getCodexDiagnosticsState: (tabId) => this.chatDiagnosticsCoordinator.getCodexDiagnosticsState(tabId),
       showCodexDiagnostics: (event, tabId) => this.chatDiagnosticsCoordinator.showCodexDiagnostics(event, tabId),
-      getClaudeDiagnosticsState: (tabId) => this.claudeDiagnosticsAdapter.getDiagnosticsState(tabId),
-      showClaudeDiagnostics: (event, tabId) => this.claudeDiagnosticsAdapter.showDiagnostics(event, tabId),
+      getClaudeDiagnosticsState: (tabId) => this.chatDiagnosticsCoordinator.getClaudeDiagnosticsState(tabId),
+      showClaudeDiagnostics: (event, tabId) => this.chatDiagnosticsCoordinator.showClaudeDiagnostics(event, tabId),
       openSettings: () => {
         this.openPluginSettingsPreservingScroll();
       },
@@ -1612,9 +1615,15 @@ export class OpenCodianView extends ItemView {
     );
   }
 
-  constructor(leaf: WorkspaceLeaf, plugin: OpenCodianPlugin) {
+  constructor(
+    leaf: WorkspaceLeaf,
+    plugin: OpenCodianPlugin,
+    chatDiagnosticsCoordinatorFactory: ChatDiagnosticsCoordinatorFactory =
+      failClosedChatDiagnosticsCoordinatorFactory,
+  ) {
     super(leaf);
     this.plugin = plugin;
+    this.chatDiagnosticsCoordinatorFactory = chatDiagnosticsCoordinatorFactory;
     this.messageComponent = new Component();
     this.modifiedFilesSidebarCoordinator = new ModifiedFilesSidebarCoordinator();
     this.currentVariant = undefined;
@@ -1681,30 +1690,18 @@ export class OpenCodianView extends ItemView {
       openPluginSettings: () => this.openPluginSettingsPreservingScroll(),
       isCodexActive: () => this.isCodexConversationActive(),
     });
-    this.chatDiagnosticsCoordinator = new ChatDiagnosticsCoordinator({
+    this.chatDiagnosticsCoordinator = this.chatDiagnosticsCoordinatorFactory.create({
       getOpenCodeSessionTraceSettings: () => this.plugin.settings.backendSettings.opencode.sessionTrace,
-      getOpenCodeTraceService: () => this.plugin.openCodeTraceService,
+      getCodexSessionTraceSettings: () => this.plugin.settings.backendSettings.codex.sessionTrace,
+      getClaudeSessionTraceSettings: () => this.plugin.settings.backendSettings.claudeCode.sessionTrace,
       getActiveTabId: () => this.getActiveTabId(),
       getSessionIdForTab: (tabId) => this.getSessionIdForTab(tabId),
+      getCurrentConversation: () => this.currentConversation,
       refreshHeaderChrome: () => this.chatHeaderPresenter.refreshBackendChrome(),
-      createMenu: () => new Menu(),
+      createOpenCodeDiagnosticsMenu: () => new Menu(),
+      createBackendDiagnosticsMenu: () => new Menu(),
       promptDiagnosticsUserContext: () => this.promptDiagnosticsUserContext(),
       writeTextToClipboard: (text) => navigator.clipboard.writeText(text),
-      showNotice: (message) => { new Notice(message); },
-    }, {
-      getCodexTraceService: () => this.plugin.codexTraceService,
-      getCodexSessionTraceSettings: () => this.plugin.settings.backendSettings.codex.sessionTrace,
-      getCurrentConversation: () => this.currentConversation,
-      refreshHeaderChrome: () => this.chatHeaderPresenter.refreshBackendChrome(),
-      createMenu: () => new Menu(),
-      showNotice: (message) => { new Notice(message); },
-    });
-    this.claudeDiagnosticsAdapter = new ClaudeDiagnosticsHostAdapter({
-      getClaudeTraceService: () => this.plugin.claudeTraceService,
-      getClaudeSessionTraceSettings: () => this.plugin.settings.backendSettings.claudeCode.sessionTrace,
-      getCurrentConversation: () => this.currentConversation,
-      refreshHeaderChrome: () => this.chatHeaderPresenter.refreshBackendChrome(),
-      createMenu: () => new Menu(),
       showNotice: (message) => { new Notice(message); },
     });
     const surfaceRuntime = this.createSurfaceRuntimeWiring();
@@ -3214,7 +3211,7 @@ export class OpenCodianView extends ItemView {
       cancelOpenCodeDiagnosticCapture: (tabId) =>
         this.chatDiagnosticsCoordinator.cancelOpenCodeDiagnosticCapture(tabId),
       cancelCodexDiagnosticCapture: (tabId) => this.chatDiagnosticsCoordinator.cancelCodexDiagnosticCapture(tabId),
-      cancelClaudeDiagnosticCapture: (tabId) => this.claudeDiagnosticsAdapter.cancelDiagnosticCapture(tabId),
+      cancelClaudeDiagnosticCapture: (tabId) => this.chatDiagnosticsCoordinator.cancelClaudeDiagnosticCapture(tabId),
       showNotice: (message) => {
         new Notice(message);
       },
@@ -3248,7 +3245,7 @@ export class OpenCodianView extends ItemView {
       claimCodexDiagnosticRunToken: (tabId, threadId) =>
         this.chatDiagnosticsCoordinator.claimCodexDiagnosticRunToken(tabId, threadId ?? undefined),
       claimClaudeDiagnosticRunToken: (tabId, sessionId) =>
-        this.claudeDiagnosticsAdapter.claimDiagnosticRunToken(tabId, sessionId ?? undefined),
+        this.chatDiagnosticsCoordinator.claimClaudeDiagnosticRunToken(tabId, sessionId ?? undefined),
       refreshOpenCodeDiagnosticsState: (tabId) => {
         if (!shouldRefreshOpenCodeDiagnosticsHeader(this.getActiveTabId(), tabId)) return;
         this.chatHeaderPresenter.refreshBackendChrome();

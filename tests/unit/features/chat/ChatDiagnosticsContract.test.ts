@@ -342,37 +342,57 @@ describe('Phase 3 Task 10 — ChatDiagnosticsContract (characterization)', () =>
     function readHeaderDiagnosticsBlock(): string {
       return readBoundedOpenCodianViewBlock(
         'getOpenCodeDiagnosticsState: () => this.chatDiagnosticsCoordinator.getOpenCodeDiagnosticsState(),',
-        'getClaudeDiagnosticsState: (tabId) => this.claudeDiagnosticsAdapter.getDiagnosticsState(tabId),',
+        'openSettings: () => {',
       );
     }
 
-    it('routes the OpenCode and Codex header state and menu operations through the coordinator', () => {
+    it('routes all backend header state and menu operations through the coordinator', () => {
       const block = readHeaderDiagnosticsBlock();
       expectSourceOrder(block, [
         'getOpenCodeDiagnosticsState: () => this.chatDiagnosticsCoordinator.getOpenCodeDiagnosticsState(),',
         'showOpenCodeDiagnostics: (event) => this.chatDiagnosticsCoordinator.showOpenCodeDiagnostics(event),',
         'getCodexDiagnosticsState: (tabId) => this.chatDiagnosticsCoordinator.getCodexDiagnosticsState(tabId),',
         'showCodexDiagnostics: (event, tabId) => this.chatDiagnosticsCoordinator.showCodexDiagnostics(event, tabId),',
+        'getClaudeDiagnosticsState: (tabId) => this.chatDiagnosticsCoordinator.getClaudeDiagnosticsState(tabId),',
+        'showClaudeDiagnostics: (event, tabId) => this.chatDiagnosticsCoordinator.showClaudeDiagnostics(event, tabId),',
       ]);
       expect(block).not.toContain('this.plugin.openCodeTraceService');
       expect(block).not.toContain('this.codexDiagnosticsAdapter');
+      expect(block).not.toContain('this.claudeDiagnosticsAdapter');
     });
 
-    it('keeps Codex adapter composition in ChatDiagnosticsCoordinator, not OpenCodianView', () => {
+    it('keeps Codex and Claude adapter composition in ChatDiagnosticsCoordinator, not OpenCodianView', () => {
       const coordinatorSource = readChatDiagnosticsCoordinatorSource();
       expectSourceOrder(coordinatorSource, [
         'private readonly codexDiagnosticsAdapter: CodexDiagnosticsHostAdapter;',
-        'codexDiagnosticsHost: CodexDiagnosticsHostAdapterHost,',
+        'private readonly claudeDiagnosticsAdapter: ClaudeDiagnosticsHostAdapter;',
+        'codexDiagnosticsHost: CodexDiagnosticsHostAdapterHost =',
+        'claudeDiagnosticsHost: ClaudeDiagnosticsHostAdapterHost =',
         'this.codexDiagnosticsAdapter = new CodexDiagnosticsHostAdapter(codexDiagnosticsHost);',
+        'this.claudeDiagnosticsAdapter = new ClaudeDiagnosticsHostAdapter(claudeDiagnosticsHost);',
         'getCodexDiagnosticsState(tabId: string | null): CodexDiagnosticsState {',
         'showCodexDiagnostics(event: MouseEvent, tabId: string): void {',
         'claimCodexDiagnosticRunToken(',
         'cancelCodexDiagnosticCapture(tabId: string): void {',
+        'getClaudeDiagnosticsState(tabId: string | null): ClaudeDiagnosticsState {',
+        'showClaudeDiagnostics(event: MouseEvent, tabId: string): void {',
+        'claimClaudeDiagnosticRunToken(',
+        'cancelClaudeDiagnosticCapture(tabId: string): void {',
       ]);
 
       const viewSource = readOpenCodianViewSource();
       expect(viewSource).not.toContain('CodexDiagnosticsHostAdapter');
       expect(viewSource).not.toContain('codexDiagnosticsAdapter');
+      expect(viewSource).not.toContain('ClaudeDiagnosticsHostAdapter');
+      expect(viewSource).not.toContain('claudeDiagnosticsAdapter');
+    });
+
+    it('OpenCodianView has no direct backend trace service, store, or report-builder access', () => {
+      const viewSource = readOpenCodianViewSource();
+      expect(viewSource).toContain('ChatDiagnosticsCoordinatorFactory');
+      expect(viewSource).toContain('failClosedChatDiagnosticsCoordinatorFactory');
+      expect(viewSource).not.toMatch(/\b(?:openCodeTraceService|codexTraceService|claudeTraceService)\b/);
+      expect(viewSource).not.toMatch(/\b(?:TraceStore|reportBuilder|buildSmartReport)\b/);
     });
   });
 
@@ -461,9 +481,9 @@ describe('Phase 3 Task 10 — ChatDiagnosticsContract (characterization)', () =>
   // Step 3 (cont.): tab-cleanup capture-cancel seam.
   //
   // OpenCodianView wires tab cleanup to cancel capture per backend: OpenCode
-  // and Codex through ChatDiagnosticsCoordinator's backend-specific methods,
-  // Claude through its existing adapter. Task 12 must keep these three cancel
-  // seams distinct (no merged cross-backend cancel).
+  // Codex, and Claude through ChatDiagnosticsCoordinator's backend-specific
+  // methods. Task 12 must keep these three cancel seams distinct (no merged
+  // cross-backend cancel).
   // ---------------------------------------------------------------------------
 
   describe('tab-cleanup capture-cancel seam (three distinct backends)', () => {
@@ -478,7 +498,7 @@ describe('Phase 3 Task 10 — ChatDiagnosticsContract (characterization)', () =>
         'cancelOpenCodeDiagnosticCapture: (tabId) =>',
         'this.chatDiagnosticsCoordinator.cancelOpenCodeDiagnosticCapture(tabId),',
         'cancelCodexDiagnosticCapture: (tabId) => this.chatDiagnosticsCoordinator.cancelCodexDiagnosticCapture(tabId),',
-        'cancelClaudeDiagnosticCapture: (tabId) => this.claudeDiagnosticsAdapter.cancelDiagnosticCapture(tabId),',
+        'cancelClaudeDiagnosticCapture: (tabId) => this.chatDiagnosticsCoordinator.cancelClaudeDiagnosticCapture(tabId),',
       ]);
     });
 
@@ -496,7 +516,7 @@ describe('Phase 3 Task 10 — ChatDiagnosticsContract (characterization)', () =>
         'claimCodexDiagnosticRunToken: (tabId, threadId) =>',
         'this.chatDiagnosticsCoordinator.claimCodexDiagnosticRunToken(tabId, threadId ?? undefined),',
         'claimClaudeDiagnosticRunToken: (tabId, sessionId) =>',
-        'this.claudeDiagnosticsAdapter.claimDiagnosticRunToken(tabId, sessionId ?? undefined),',
+        'this.chatDiagnosticsCoordinator.claimClaudeDiagnosticRunToken(tabId, sessionId ?? undefined),',
       ]);
     });
   });

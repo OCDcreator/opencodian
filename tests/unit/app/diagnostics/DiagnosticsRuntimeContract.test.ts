@@ -778,6 +778,20 @@ describe('Phase 3 Task 10 — DiagnosticsRuntimeContract (characterization)', ()
       expect(mainSrc).toMatch(/get claudeTraceService\(\).*return this\.diagnosticsCoordinator\?\.claude/s);
     });
 
+    it('main.ts injects lazy private-coordinator trace ports into the chat factory without using compatibility getters', () => {
+      const workspaceStart = mainSrc.indexOf('  private registerWorkspaceIntegration(): void {');
+      expect(workspaceStart).toBeGreaterThan(-1);
+      const workspaceEnd = mainSrc.indexOf('  private registerPluginCommands()', workspaceStart);
+      const body = mainSrc.slice(workspaceStart, workspaceEnd);
+      expect(body).toContain('new OpenCodianView(leaf, this, createChatDiagnosticsCoordinatorFactory({');
+      expect(body).toContain('getOpenCodeTraceService: () => this.diagnosticsCoordinator?.openCode,');
+      expect(body).toContain('getCodexTraceService: () => this.diagnosticsCoordinator?.codex,');
+      expect(body).toContain('getClaudeTraceService: () => this.diagnosticsCoordinator?.claude,');
+      expect(body).not.toContain('this.openCodeTraceService');
+      expect(body).not.toContain('this.codexTraceService');
+      expect(body).not.toContain('this.claudeTraceService');
+    });
+
     it('main.ts onunload delegates dispose to the coordinator (not per-service inline disposal)', () => {
       const onunloadStart = mainSrc.indexOf('  onunload()');
       expect(onunloadStart).toBeGreaterThan(-1);
