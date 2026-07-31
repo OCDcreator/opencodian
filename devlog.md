@@ -11,6 +11,12 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-07-31 Agent-Friendly Architecture 试点：DiagnosticsRuntimeCoordinator 提取（Phase 3 Task 11）
+
+Task 11 是 Phase 3 首个 runtime-move。把 `main.ts` 内联构造的三个后端 trace service（OpenCode/Codex/Claude）移到新的 `src/app/diagnostics/DiagnosticsRuntimeCoordinator`。`main.ts` 不再有任何 `new *SessionTraceService`；只构造一个 coordinator，并通过 delegating getter（`openCodeTraceService`/`codexTraceService`/`claudeTraceService`，bootstrap 前返回 undefined 以保持此前 optional-chaining 安全）暴露给既有 consumer，这些 shim 待 Task 12/13 迁移 consumer 后移除。`onunload` 以 `void` 调用 `coordinator.dispose()`（fire-and-forget，保持此前 unload 时序）；dispose 内部顺序 await 每个后端 `.dispose().catch(...)`（opencode→codex→claude，fail-closed warn，logger 由 main.ts 注入以保持 `[OpenCodian]` scope）。coordinator 构造用 try/catch + constructed-list 保证部分构造失败时不泄漏。新增 `app.diagnostics-runtime` owner + 行为测试套件（捕获 swapped options、dispose 顺序、fail-closed secret-no-leak）。
+
+Codex 独立审查经 7 轮返修：前 6 轮发现真实缺陷（Critical：bootstrap getter throw 破坏 optional-chaining、logger scope 字节变化、构造失败 service 泄漏、fire-and-forget dispose teardown 竞态、文档陈旧）。第 7 轮：focused 命令 92/92 干净通过 3 次，所有负向 mutation 被捕获，静态审查无问题；唯一剩余 fail 是 Codex sandbox 对环境敏感 Puppeteer/socket 测试的 EPERM/SIGSEGV（pre-existing，非 Task 11，Codex 明确声明不指向该 commit）。本地 `npm run verify` 15/15 全绿（6855 tests）。Test Vault 部署 BUILD_ID main.202607311224。
+
 ## 2026-07-31 Agent-Friendly Architecture 试点：三后端 diagnostics 契约特征化（Phase 3 Task 10）
 
 Phase 3 是首个 runtime-change 阶段。Task 10 为硬前置——只写 characterization 测试，不移动任何 production 代码。新增三个特征化测试文件共 75 个测试：

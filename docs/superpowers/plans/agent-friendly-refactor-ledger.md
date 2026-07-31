@@ -179,8 +179,33 @@ None. No Test Vault deployment required.
 - **Gate evidence (run on clean tree at 05bdf53e):** all 15 verify gates green; 75 characterization tests pass; lint 0/0.
 - **Runtime files changed:** none (characterization only). No Test Vault deployment required.
 
-### Task 11–13 — pending
-- **Status:** blocked on Task 10 APPROVED (now unblocked).
+### Task 11 — Introduce DiagnosticsRuntimeCoordinator — APPROVED (with documented sandbox exception)
+- **Range:** `0ce55280..479f3c31` (7 commits, runtime source changed — FIRST runtime move of Phase 3).
+- **Commits:**
+  | SHA | Type | Subject |
+  |---|---|---|
+  | `36bf55fc` | refactor(diagnostics) | centralize runtime composition in DiagnosticsRuntimeCoordinator (Task 11) |
+  | `587932f6` | fix(diagnostics) | round-1: bootstrap-timing getter + injected logger scope |
+  | `903d5681` | fix(diagnostics) | round-2: construction-failure leak + complete redaction tests + dispose order |
+  | `173452d7` | fix(diagnostics) | round-3: dispose teardown flush + doc accuracy |
+  | `35533159` | fix(diagnostics) | round-4: awaitable dispose() for deterministic teardown |
+  | `93a870a8` | fix(diagnostics) | round-5: stale dispose docs + bootstrap test leak |
+  | `479f3c31` | fix(test) | round-6: raise bootstrap afterEach timeout for coordinator dispose |
+- **Codex independent review — APPROVED (7 rounds; sandbox exception documented).**
+  - Reviewer: Codex CLI (gpt-5.6-sol), writable sandbox.
+  - Rounds 1–6 each returned CHANGES REQUESTED with real defects (Critical: bootstrap-timing getter throw breaking optional chaining; logger scope byte change; construction-failure service leak; fire-and-forget dispose teardown race; stale docs). Round 7: the focused command (92/92) passes clean 3× in Codex's sandbox; all negative mutations caught; static review clean. The sole remaining "failure" is Codex's sandbox EPERM/SIGSEGV on environment-sensitive Puppeteer/socket tests (pre-existing, documented in Phase 0/1 ledger, not Task 11 work; Codex explicitly stated these "do not implicate commit 479f3c31").
+  - Independently verified by Codex: zero direct `new *SessionTraceService` in main.ts; coordinator construction order + all option getters correct; dispose awaits each backend sequentially (opencode→codex→claude) with per-backend .catch + injected logger; construction-failure try/catch disposes partial services; all negative mutations (option swap, order swap, await removal, empty knownSecrets, throwing getter, logger removal) fail their tests.
+- **Acceptance status:**
+  - [x] main.ts has zero direct `new *SessionTraceService`.
+  - [x] Runtime behavior + redaction byte-for-byte compatible at public boundaries (Task 10 characterization passes; coordinator behavior suite catches swapped options).
+  - [x] Coordinator exposes typed backend ports (no generic mutable service map).
+  - [x] Dispose ordering preserved (sequential await; main.ts onunload `void`).
+  - [x] Bootstrap-timing semantics preserved (getters return undefined pre-bootstrap, matching prior uninitialized fields).
+- **Gate evidence (run on clean tree at 479f3c31):** local `npm run verify` 15/15 green (6855 tests); Codex sandbox focused command 92/92 clean 3× (sandbox full-verify blocked by pre-existing Puppeteer/socket EPERM, not Task 11).
+- **Runtime files changed:** src/main.ts, src/app/diagnostics/** (deploy-relevant). Test Vault deployed (BUILD_ID main.202607311224).
+
+### Task 12–13 — pending
+- **Status:** blocked on Task 11 (now unblocked).
 
 ## Phase 4–6
 - **Status:** blocked on preceding phase APPROVED.
