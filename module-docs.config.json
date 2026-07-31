@@ -18,6 +18,7 @@
         "_WORKFLOW.md",
         "infrastructure/**/*.md",
         "style/README.md",
+        "features/settings/debug/index.md",
         "utils/streaming/mcp-summary-fields.md"
       ],
       "exactMappings": {

@@ -23,6 +23,7 @@
 - `src/features/settings/SettingsDebugSection.ts`
 - `src/features/settings/debug/OpenCodeDebugPanel.ts`
 - `src/features/settings/debug/CodexDebugPanel.ts`
+- `src/features/settings/debug/ClaudeCodeDebugPanel.ts`
 
 ## Dependency surface
 - **Allowed owner dependencies:** `shared.foundation`, `shared.diagnostics`, `core.opencode-diagnostics`, `core.backend-diagnostics`, `core.types`
@@ -33,6 +34,7 @@
 - `tests/unit/features/settings/SettingsDebugSection*`
 - `tests/unit/features/settings/OpenCodeDebugPanel*`
 - `tests/unit/features/settings/CodexDebugPanel*`
+- `tests/unit/features/settings/ClaudeCodeDebugPanel*`
 
 ## Required gates
 Run before merge: `npm run typecheck`, `npm run check:module-docs`, `npm run diagnostics-safety`.

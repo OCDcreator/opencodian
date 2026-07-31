@@ -242,6 +242,12 @@ docs/modules/
 │   │       └── SessionTodoDock.md
 │   └── settings/
 │       ├── index.md
+│       ├── debug/
+│       │   ├── index.md                 ← debug 子目录 aggregate index（非 src/index.ts 映射）
+│       │   ├── OpenCodeDebugPanel.md
+│       │   ├── CodexDebugPanel.md
+│       │   ├── ClaudeCodeDebugPanel.md
+│       │   └── types.md
 │       ├── CodexMcpServerDetailModal.md
 │       ├── CodexReadbackModal.md
 │       ├── LiquidGlassSettingHelpModal.md
