@@ -727,125 +727,128 @@ describe('Phase 3 Task 10 — DiagnosticsRuntimeContract (characterization)', ()
   });
 
   // ---------------------------------------------------------------------------
-  // Step 2: main.ts construction/injection/dispose wiring points (source contract).
+  // Step 2: DiagnosticsRuntimeCoordinator construction/injection/dispose wiring.
   //
-  // main.ts is the composition shell that Task 11 will refactor. We pin the
-  // CURRENT wiring so any coordinator extraction that silently reorders
-  // construction, changes tracePort injection, or alters onunload disposal is
-  // detected. These are source-level contracts because main.ts cannot be
-  // instantiated in a unit test (it extends Obsidian Plugin with app/vault).
+  // After Phase 3 Task 11, main.ts no longer constructs trace services directly.
+  // The DiagnosticsRuntimeCoordinator owns construction (OpenCode → Codex →
+  // Claude, pinned order) with the same option getters, exposes typed backend
+  // ports, and owns the unified dispose. main.ts:
+  //   - constructs ONE coordinator inside handleBootstrapOpenCodeRuntime;
+  //   - exposes delegating getters (openCodeTraceService/codexTraceService/
+  //     claudeTraceService) that return the coordinator's typed ports (shims
+  //     removed in Task 12/13 when consumers migrate);
+  //   - calls the coordinator's dispose() in onunload.
   //
-  // The bootstrap timing issue the plan calls out: codexTraceService! and
-  // claudeTraceService! use non-null assertions because they are referenced
-  // before construction completes (assigned inside handleBootstrapOpenCodeRuntime).
+  // We pin BOTH the coordinator's own construction/dispose contract AND main.ts's
+  // delegation, so any silent reordering, option drop, or re-introduction of a
+  // direct `new *SessionTraceService` in main.ts is detected.
   // ---------------------------------------------------------------------------
 
-  describe('main.ts construction/injection/dispose wiring (source contract)', () => {
+  describe('DiagnosticsRuntimeCoordinator + main.ts delegation wiring (source contract)', () => {
     const mainSrc = fs.readFileSync(
       path.resolve(__dirname, '../../../../src/main.ts'),
       'utf8',
     );
-    // Anchor on the METHOD DECLARATION, not the callback reference at line 170.
-    // `private async handleBootstrapOpenCodeRuntime(` uniquely identifies the
-    // method body where the three services are constructed.
-    const bootstrapMethodStart = mainSrc.indexOf('private async handleBootstrapOpenCodeRuntime(');
-    // Compute the method body boundary ONCE (next method at column 2) so all
-    // assertions in this block stay inside the method and do not bleed past it.
-    const bootstrapNextMethodRel = bootstrapMethodStart > -1
-      ? mainSrc.slice(bootstrapMethodStart + 1).search(/\n[/ ]{2}(private|public|protected|async)\b/)
-      : -1;
-    const bootstrapEnd = bootstrapNextMethodRel > 0
-      ? bootstrapMethodStart + 1 + bootstrapNextMethodRel
-      : (bootstrapMethodStart > -1 ? mainSrc.indexOf('  activateView', bootstrapMethodStart) : -1);
-    const bootstrapBody = bootstrapMethodStart > -1 ? mainSrc.slice(bootstrapMethodStart, bootstrapEnd) : '';
+    const coordSrc = fs.readFileSync(
+      path.resolve(__dirname, '../../../../src/app/diagnostics/DiagnosticsRuntimeCoordinator.ts'),
+      'utf8',
+    );
 
-    it('declares the three trace-service fields; codex/claude use non-null assertions (bootstrap timing)', () => {
-      // openCodeTraceService is declared WITHOUT `!` (assigned a definite type);
-      // codex/claude use `!` because they are read before construction finishes.
-      expect(mainSrc).toMatch(/openCodeTraceService:\s*OpenCodeSessionTraceService/);
-      expect(mainSrc).toMatch(/codexTraceService!\s*:\s*CodexSessionTraceService/);
-      expect(mainSrc).toMatch(/claudeTraceService!\s*:\s*ClaudeSessionTraceService/);
+    it('main.ts has ZERO direct `new *SessionTraceService` constructions (Task 11 hard requirement)', () => {
+      expect(mainSrc).not.toMatch(/new OpenCodeSessionTraceService\(/);
+      expect(mainSrc).not.toMatch(/new CodexSessionTraceService\(/);
+      expect(mainSrc).not.toMatch(/new ClaudeSessionTraceService\(/);
     });
 
-    it('constructs the three services inside handleBootstrapOpenCodeRuntime in order opencode -> codex -> claude', () => {
-      expect(bootstrapMethodStart).toBeGreaterThan(-1);
-      // Assert within the bounded method body so offsets cannot bleed past it.
-      const ocIdx = bootstrapBody.indexOf('new OpenCodeSessionTraceService(');
-      const codexIdx = bootstrapBody.indexOf('new CodexSessionTraceService(');
-      const claudeIdx = bootstrapBody.indexOf('new ClaudeSessionTraceService(');
-      expect(ocIdx).toBeGreaterThan(-1);
-      expect(codexIdx).toBeGreaterThan(-1);
-      expect(claudeIdx).toBeGreaterThan(-1);
-      // Construction order: opencode first, then codex, then claude.
-      expect(ocIdx).toBeLessThan(codexIdx);
-      expect(codexIdx).toBeLessThan(claudeIdx);
+    it('main.ts constructs a single DiagnosticsRuntimeCoordinator inside handleBootstrapOpenCodeRuntime', () => {
+      const bootstrapStart = mainSrc.indexOf('private async handleBootstrapOpenCodeRuntime(');
+      expect(bootstrapStart).toBeGreaterThan(-1);
+      const nextMethodRel = mainSrc.slice(bootstrapStart + 1).search(/\n[/ ]{2}(private|public|protected|async)\b/);
+      const bootstrapEnd = nextMethodRel > 0 ? bootstrapStart + 1 + nextMethodRel : mainSrc.indexOf('  activateView', bootstrapStart);
+      const body = mainSrc.slice(bootstrapStart, bootstrapEnd);
+      expect(body).toContain('this.diagnosticsCoordinator = new DiagnosticsRuntimeCoordinator({');
     });
 
-    it('injects openCode tracePort into OpenCodeService and claude tracePort into ClaudeCodeAdapter', () => {
-      expect(bootstrapMethodStart).toBeGreaterThan(-1);
-      const body = bootstrapBody;
-      // OpenCodeService receives tracePort: this.openCodeTraceService.
-      expect(body).toMatch(/tracePort:\s*this\.openCodeTraceService/);
-      // ClaudeCodeAdapter receives tracePort: this.claudeTraceService.
-      expect(body).toMatch(/tracePort:\s*this\.claudeTraceService/);
-      // wireHiddenAdapters receives codexTracePort: this.codexTraceService.
-      expect(body).toMatch(/codexTracePort:\s*this\.codexTraceService/);
+    it('main.ts exposes delegating getters that return the coordinator typed ports (shims until Task 12/13)', () => {
+      expect(mainSrc).toMatch(/get openCodeTraceService\(\).*return this\.requireDiagnosticsCoordinator\(\)\.openCode/s);
+      expect(mainSrc).toMatch(/get codexTraceService\(\).*return this\.requireDiagnosticsCoordinator\(\)\.codex/s);
+      expect(mainSrc).toMatch(/get claudeTraceService\(\).*return this\.requireDiagnosticsCoordinator\(\)\.claude/s);
     });
 
-    it('onunload disposes the three services in order opencode -> codex -> claude, each void-wrapped with .catch', () => {
+    it('main.ts onunload delegates dispose to the coordinator (not per-service inline disposal)', () => {
       const onunloadStart = mainSrc.indexOf('  onunload()');
       expect(onunloadStart).toBeGreaterThan(-1);
       const onunloadEnd = mainSrc.indexOf('  activateView', onunloadStart);
       const body = mainSrc.slice(onunloadStart, onunloadEnd);
-      const ocIdx = body.indexOf('void this.openCodeTraceService?.dispose()');
-      const codexIdx = body.indexOf('void this.codexTraceService?.dispose()');
-      const claudeIdx = body.indexOf('void this.claudeTraceService?.dispose()');
+      expect(body).toContain('void this.diagnosticsCoordinator?.dispose()');
+      // No per-service inline disposal remains in onunload.
+      expect(body).not.toMatch(/this\.openCodeTraceService\?\.dispose/);
+      expect(body).not.toMatch(/this\.codexTraceService\?\.dispose/);
+      expect(body).not.toMatch(/this\.claudeTraceService\?\.dispose/);
+    });
+
+    it('coordinator constructs the three services in pinned order opencode -> codex -> claude', () => {
+      const ocIdx = coordSrc.indexOf('this.openCode = new OpenCodeSessionTraceService(');
+      const codexIdx = coordSrc.indexOf('this.codex = new CodexSessionTraceService(');
+      const claudeIdx = coordSrc.indexOf('this.claude = new ClaudeSessionTraceService(');
       expect(ocIdx).toBeGreaterThan(-1);
       expect(codexIdx).toBeGreaterThan(-1);
       expect(claudeIdx).toBeGreaterThan(-1);
-      // Dispose order: opencode, codex, claude.
       expect(ocIdx).toBeLessThan(codexIdx);
       expect(codexIdx).toBeLessThan(claudeIdx);
-      // Each is void-wrapped with a .catch (fail-closed on unload).
-      expect(body).toMatch(/void this\.openCodeTraceService\?\.dispose\(\)\.catch/);
-      expect(body).toMatch(/void this\.codexTraceService\?\.dispose\(\)\.catch/);
-      expect(body).toMatch(/void this\.claudeTraceService\?\.dispose\(\)\.catch/);
     });
 
-    it('constructs ALL THREE services with all five option keys (settings, vaultPath, buildIdentity, knownSecrets, runtimeMetadata)', () => {
-      expect(bootstrapMethodStart).toBeGreaterThan(-1);
-      // Slice within the bounded method body so offsets cannot bleed past it.
-      const ocCtorStart = bootstrapBody.indexOf('new OpenCodeSessionTraceService(');
-      const codexCtorStart = bootstrapBody.indexOf('new CodexSessionTraceService(');
-      const claudeCtorStart = bootstrapBody.indexOf('new ClaudeSessionTraceService(');
-      // Slice each constructor to the next constructor start. For claude (the
-      // last), bound to its closing `});` so a later `vaultPath:` in the method
-      // body cannot satisfy the assertion.
-      const ocCtor = bootstrapBody.slice(ocCtorStart, codexCtorStart);
-      const codexCtor = bootstrapBody.slice(codexCtorStart, claudeCtorStart);
-      const claudeCtorRaw = bootstrapBody.slice(claudeCtorStart);
-      // The Claude constructor closes with `\n      });` at 6-space indent.
-      const claudeCloseIdx = claudeCtorRaw.indexOf('\n      });');
+    it('coordinator constructs ALL THREE services with all five option keys bound to real input getters', () => {
+      const ocCtorStart = coordSrc.indexOf('this.openCode = new OpenCodeSessionTraceService(');
+      const codexCtorStart = coordSrc.indexOf('this.codex = new CodexSessionTraceService(');
+      const claudeCtorStart = coordSrc.indexOf('this.claude = new ClaudeSessionTraceService(');
+      const ocCtor = coordSrc.slice(ocCtorStart, codexCtorStart);
+      const codexCtor = coordSrc.slice(codexCtorStart, claudeCtorStart);
+      const claudeCtorRaw = coordSrc.slice(claudeCtorStart);
+      const claudeCloseIdx = claudeCtorRaw.indexOf('\n    });');
       const claudeCtor = claudeCloseIdx > 0 ? claudeCtorRaw.slice(0, claudeCloseIdx) : claudeCtorRaw;
-      // All five option keys present in EACH constructor AND bound to real
-      // values (not undefined/no-op). Pin the VALUES so a silent `vaultPath:
-      // undefined` or a wrong settings path is caught.
+      // All five option keys present in EACH constructor, bound to input getters.
       for (const ctor of [ocCtor, codexCtor, claudeCtor]) {
-        expect(ctor).toMatch(/buildIdentity:\s*\(\)\s*=>\s*this\.getDebugBuildIdentityText\(\)/);
-        expect(ctor).toMatch(/knownSecrets:\s*\(\)\s*=>/);
-        expect(ctor).toMatch(/runtimeMetadata:\s*\(\)\s*=>\s*\(\{/);
+        expect(ctor).toMatch(/settings:\s*inputs\./);
+        expect(ctor).toMatch(/vaultPath:\s*inputs\.vaultPath/);
+        expect(ctor).toMatch(/buildIdentity:\s*inputs\.buildIdentity/);
+        expect(ctor).toMatch(/knownSecrets:\s*inputs\./);
+        expect(ctor).toMatch(/runtimeMetadata:\s*inputs\./);
       }
-      // settings + vaultPath bound to real sources (not undefined).
-      expect(ocCtor).toMatch(/settings:\s*\(\)\s*=>\s*this\.settings\.backendSettings\.opencode\.sessionTrace/);
-      expect(ocCtor).toMatch(/vaultPath:\s*getVaultBasePath\(this\.app\)/);
-      expect(codexCtor).toMatch(/settings:\s*\(\)\s*=>\s*this\.settings\.backendSettings\.codex\.sessionTrace/);
-      expect(codexCtor).toMatch(/vaultPath:\s*getVaultBasePath\(this\.app\)/);
-      expect(claudeCtor).toMatch(/settings:\s*\(\)\s*=>\s*this\.settings\.backendSettings\.claudeCode\.sessionTrace/);
-      expect(claudeCtor).toMatch(/vaultPath:\s*getVaultBasePath\(this\.app\)/);
-      // OpenCode/Codex use array-literal knownSecrets; Claude uses the collector.
-      expect(ocCtor).toMatch(/knownSecrets:\s*\(\)\s*=>\s*\[/);
-      expect(codexCtor).toMatch(/knownSecrets:\s*\(\)\s*=>\s*\[/);
-      expect(claudeCtor).toMatch(/collectClaudeCodeKnownSecrets/);
+      // Each backend binds its OWN settings/knownSecrets/runtimeMetadata input.
+      expect(ocCtor).toMatch(/inputs\.openCodeSettings/);
+      expect(ocCtor).toMatch(/inputs\.openCodeKnownSecrets/);
+      expect(ocCtor).toMatch(/inputs\.openCodeRuntimeMetadata/);
+      expect(codexCtor).toMatch(/inputs\.codexSettings/);
+      expect(codexCtor).toMatch(/inputs\.codexKnownSecrets/);
+      expect(claudeCtor).toMatch(/inputs\.claudeSettings/);
+      expect(claudeCtor).toMatch(/inputs\.claudeKnownSecrets/);
+    });
+
+    it('coordinator dispose() void-wraps each backend with .catch in pinned order opencode -> codex -> claude', () => {
+      const disposeStart = coordSrc.indexOf('async dispose(): Promise<void> {');
+      expect(disposeStart).toBeGreaterThan(-1);
+      const body = coordSrc.slice(disposeStart, disposeStart + 800);
+      const ocIdx = body.indexOf('this.openCode.dispose()');
+      const codexIdx = body.indexOf('this.codex.dispose()');
+      const claudeIdx = body.indexOf('this.claude.dispose()');
+      expect(ocIdx).toBeGreaterThan(-1);
+      expect(codexIdx).toBeGreaterThan(-1);
+      expect(claudeIdx).toBeGreaterThan(-1);
+      expect(ocIdx).toBeLessThan(codexIdx);
+      expect(codexIdx).toBeLessThan(claudeIdx);
+      expect(body).toMatch(/void this\.openCode\.dispose\(\)\.catch/);
+      expect(body).toMatch(/void this\.codex\.dispose\(\)\.catch/);
+      expect(body).toMatch(/void this\.claude\.dispose\(\)\.catch/);
+    });
+
+    it('coordinator exposes typed backend ports (no generic mutable service map)', () => {
+      expect(coordSrc).toMatch(/readonly openCode:\s*OpenCodeSessionTraceService/);
+      expect(coordSrc).toMatch(/readonly codex:\s*CodexSessionTraceService/);
+      expect(coordSrc).toMatch(/readonly claude:\s*ClaudeSessionTraceService/);
+      // ports getter returns the three typed properties, not a Map/index signature.
+      expect(coordSrc).not.toMatch(/Map<string/);
+      expect(coordSrc).toMatch(/get ports\(\).*openCode:\s*this\.openCode.*codex:\s*this\.codex.*claude:\s*this\.claude/s);
     });
   });
 

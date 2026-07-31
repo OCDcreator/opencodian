@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "digest": "fc13e21689f7cbf9a3a572c3dca96b90a21710afc0920d06e81b902d23429bfb",
-  "recordCount": 590,
+  "digest": "dc08482604fd07680eb589743b12e6e0a2dd7b6a0b38e5eb751ff756d3eff5ff",
+  "recordCount": 593,
   "records": [
     {
       "kind": "ignore",
@@ -22,6 +22,21 @@
       "kind": "package",
       "key": "package.json",
       "sha256": "a040db8188b23c8ce86f6245ff8303c5b7ad6130f388f13a13a026e81450cbca"
+    },
+    {
+      "kind": "src",
+      "key": "src/app/diagnostics/DiagnosticsRuntimeCoordinator.ts",
+      "sha256": "acd11d554e820969c80e63341388dd6ba7701eae99633f295231ed893969f7b9"
+    },
+    {
+      "kind": "src",
+      "key": "src/app/diagnostics/index.ts",
+      "sha256": "57ce86dd8ba1c4097666dbd6527fb8fae4234f22620cdd9cded447250e4acfdc"
+    },
+    {
+      "kind": "src",
+      "key": "src/app/diagnostics/types.ts",
+      "sha256": "c29eba4961dceb129a41b7ed63add3a234d2a1eb5b27aabdc4f370131549925a"
     },
     {
       "kind": "src",
@@ -2471,7 +2486,7 @@
     {
       "kind": "src",
       "key": "src/main.ts",
-      "sha256": "88900a28c8839ff6158de6faebf075e3b34beb5b48012be01838a7a38d7ba300"
+      "sha256": "71726c49b80168d0f8754dbc08b9f67fd5b68e1dc277791d4cf2ab92445757ff"
     },
     {
       "kind": "src",
@@ -2954,7 +2969,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-07-30T18:20:17.189Z",
-  "headShaAtGeneration": "e4976ec8c187187f64091e78ff410a750c6d9a1a",
+  "generatedAt": "2026-07-31T02:42:44.717Z",
+  "headShaAtGeneration": "0ce55280e316396a28412d3be34c19230ab65f85",
   "graphifyVersion": "graphify 0.9.22"
 }

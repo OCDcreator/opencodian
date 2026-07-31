@@ -126,23 +126,51 @@ describe('OpenCodianPlugin.getConversationById', () => {
 });
 
 describe('OpenCodianPlugin unload diagnostics', () => {
-  it('does not expose Codex trace disposal error contents in console warnings', async () => {
-    const secret = 'codex-unload-secret-canary';
-    const vaultPath = '/Volumes/SDD2T/obsidian-vault-write/testvault';
+  it('main.ts onunload delegates trace disposal to DiagnosticsRuntimeCoordinator (no inline per-service disposal)', async () => {
+    // After Phase 3 Task 11, main.ts no longer disposes trace services inline;
+    // it calls this.diagnosticsCoordinator?.dispose(). The per-backend warning
+    // behavior (fail-closed, no secret/path leak) is owned and tested by the
+    // DiagnosticsRuntimeCoordinator. Here we verify main.ts delegates.
     const plugin = new OpenCodianPlugin() as unknown as {
       onunload(): void;
       runtimeCoordinator: { dispose: jest.Mock };
-      codexTraceService?: { dispose(): Promise<void> };
+      diagnosticsCoordinator?: { dispose: jest.Mock };
       getSettingsRuntimeCoordinator: jest.Mock<{ clearChatAppearanceSaveTimer: jest.Mock }, []>;
     };
-    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const coordinatorDispose = jest.fn();
     plugin.runtimeCoordinator = { dispose: jest.fn() };
-    plugin.codexTraceService = {
-      dispose: () => Promise.reject(new Error(`${secret} at ${vaultPath}/trace.jsonl`)),
-    };
+    plugin.diagnosticsCoordinator = { dispose: coordinatorDispose };
     plugin.getSettingsRuntimeCoordinator = jest.fn(() => ({ clearChatAppearanceSaveTimer: jest.fn() }));
+    plugin.onunload();
+    expect(coordinatorDispose).toHaveBeenCalled();
+  });
+
+  it('DiagnosticsRuntimeCoordinator dispose does not expose Codex trace disposal error contents in console warnings', async () => {
+    // The per-backend fail-closed warning behavior moved to the coordinator.
+    const { DiagnosticsRuntimeCoordinator } = await import('../../src/app/diagnostics');
+    const secret = 'codex-unload-secret-canary';
+    const vaultPath = '/Volumes/SDD2T/obsidian-vault-write/testvault';
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    // Construct a coordinator whose codex service rejects with a secret-bearing error.
+    const inputs = {
+      openCodeSettings: () => ({ enabled: false, consolePreset: 'standard', consoleChannels: {}, storageDirectory: '' }),
+      codexSettings: () => ({ enabled: false, consolePreset: 'standard', consoleChannels: {}, storageDirectory: '', captureContent: false }),
+      claudeSettings: () => ({ enabled: false, consolePreset: 'off', consoleChannels: {}, storageDirectory: '' }),
+      vaultPath: undefined,
+      buildIdentity: () => 'test',
+      openCodeKnownSecrets: () => [],
+      codexKnownSecrets: () => [],
+      claudeKnownSecrets: () => [],
+      openCodeRuntimeMetadata: () => ({}),
+      codexRuntimeMetadata: () => ({}),
+      claudeRuntimeMetadata: () => ({}),
+    };
+    const coordinator = new DiagnosticsRuntimeCoordinator(inputs);
+    // Override the codex dispose to reject with a secret-bearing error.
+    (coordinator.codex as unknown as { dispose: () => Promise<void> }).dispose = () =>
+      Promise.reject(new Error(`${secret} at ${vaultPath}/trace.jsonl`));
     try {
-      plugin.onunload();
+      await coordinator.dispose();
       await new Promise((resolve) => setTimeout(resolve, 0));
       const output = JSON.stringify(warn.mock.calls);
       expect(output).toContain('Failed to flush Codex trace service during unload');

@@ -29,6 +29,7 @@ import { OpenCodeAdapter } from './core/agents/backend/OpenCodeAdapter';
 import { OpenCodeService, SDK_FEATURE_FLAG_ROLLOUT_DEFAULTS } from './core/opencode';
 import { OpenCodeSessionTraceService } from './core/opencode/diagnostics';
 import { ClaudeSessionTraceService, collectClaudeCodeKnownSecrets, CodexSessionTraceService } from './core/agents/backend/diagnostics';
+import { DiagnosticsRuntimeCoordinator } from './app/diagnostics';
 import { migrateOpenCodeCapabilitySettings } from './core/opencode/OpenCodeCapabilitySettingsMigration';
 import { OpenCodianSettingsRuntimeCoordinator } from './core/runtime/OpenCodianSettingsRuntimeCoordinator';
 import { OpenCodianStartupCoordinator } from './core/runtime/OpenCodianStartupCoordinator';
@@ -97,9 +98,32 @@ export default class OpenCodianPlugin extends Plugin {
   settings: OpenCodianSettings;
   storage: StorageService;
   openCodeService: OpenCodeService;
-  openCodeTraceService: OpenCodeSessionTraceService;
-  codexTraceService!: CodexSessionTraceService;
-  claudeTraceService!: ClaudeSessionTraceService;
+  /**
+   * Diagnostics runtime coordinator — owns construction + flush/dispose of the
+   * three backend trace services. Assigned during `handleBootstrapOpenCodeRuntime`.
+   * The per-backend getters below delegate to it so existing consumers
+   * (`this.plugin.openCodeTraceService` etc.) keep working byte-for-byte; Tasks
+   * 12/13 migrate the consumers and then these shims are removed.
+   */
+  private diagnosticsCoordinator: DiagnosticsRuntimeCoordinator | null = null;
+  /** @deprecated delegate to DiagnosticsRuntimeCoordinator; removed in Task 12/13. */
+  get openCodeTraceService(): OpenCodeSessionTraceService {
+    return this.requireDiagnosticsCoordinator().openCode;
+  }
+  /** @deprecated delegate to DiagnosticsRuntimeCoordinator; removed in Task 12/13. */
+  get codexTraceService(): CodexSessionTraceService {
+    return this.requireDiagnosticsCoordinator().codex;
+  }
+  /** @deprecated delegate to DiagnosticsRuntimeCoordinator; removed in Task 12/13. */
+  get claudeTraceService(): ClaudeSessionTraceService {
+    return this.requireDiagnosticsCoordinator().claude;
+  }
+  private requireDiagnosticsCoordinator(): DiagnosticsRuntimeCoordinator {
+    if (!this.diagnosticsCoordinator) {
+      throw new Error('DiagnosticsRuntimeCoordinator not yet constructed; bootstrap has not completed.');
+    }
+    return this.diagnosticsCoordinator;
+  }
   agentServiceRegistry: AgentServiceRegistry;
   claudeCodePermissionBridge: ClaudeCodePermissionBridge | null = null;
   claudeCodePermissionHostContext: ClaudeCodePermissionBridgeHostContext = { getActiveTabId: () => null };
@@ -234,44 +258,37 @@ export default class OpenCodianPlugin extends Plugin {
     });
 
     await this.startupCoordinator.measureStartupStep('constructOpenCodeService', () => {
-      this.openCodeTraceService = new OpenCodeSessionTraceService({
-        settings: () => this.settings.backendSettings.opencode.sessionTrace,
+      // The DiagnosticsRuntimeCoordinator owns construction of all three backend
+      // trace services (OpenCode → Codex → Claude, pinned order) plus their
+      // flush/dispose lifecycle. main.ts no longer constructs any trace service
+      // directly (Phase 3 Task 11). The per-backend getters above delegate to it.
+      this.diagnosticsCoordinator = new DiagnosticsRuntimeCoordinator({
+        openCodeSettings: () => this.settings.backendSettings.opencode.sessionTrace,
+        codexSettings: () => this.settings.backendSettings.codex.sessionTrace,
+        claudeSettings: () => this.settings.backendSettings.claudeCode.sessionTrace,
         vaultPath: getVaultBasePath(this.app) ?? undefined,
         buildIdentity: () => this.getDebugBuildIdentityText(),
-        knownSecrets: () => [
+        openCodeKnownSecrets: () => [
           this.settings.server.auth.password,
           this.settings.server.auth.token,
         ].filter(Boolean),
-        runtimeMetadata: () => ({
+        codexKnownSecrets: () => [
+          this.settings.server.auth.password, this.settings.server.auth.token,
+          this.settings.backendSettings.codex.apiKey,
+        ].filter(Boolean),
+        claudeKnownSecrets: () => collectClaudeCodeKnownSecrets(this.settings.backendSettings.claudeCode),
+        openCodeRuntimeMetadata: () => ({
           serverMode: this.settings.server.mode,
           baseUrl: getServerBaseUrl(this.settings.server),
           modelSourceMode: this.settings.modelSourceMode,
           pluginIsolationMode: this.settings.pluginIsolationMode,
         }),
-      });
-      // Construct the Codex trace service before wiring adapters so it can be
-      // injected into the CodexAdapter via wireHiddenAdapters below. Mirrors
-      // the OpenCode trace service construction above.
-      this.codexTraceService = new CodexSessionTraceService({
-        settings: () => this.settings.backendSettings.codex.sessionTrace,
-        vaultPath: getVaultBasePath(this.app) ?? undefined,
-        buildIdentity: () => this.getDebugBuildIdentityText(),
-        knownSecrets: () => [
-          this.settings.server.auth.password, this.settings.server.auth.token,
-          this.settings.backendSettings.codex.apiKey,
-        ].filter(Boolean),
-        runtimeMetadata: () => ({
+        codexRuntimeMetadata: () => ({
           serverMode: this.settings.server.mode,
           modelSourceMode: this.settings.modelSourceMode,
           pluginIsolationMode: this.settings.pluginIsolationMode,
         }),
-      });
-      this.claudeTraceService = new ClaudeSessionTraceService({
-        settings: () => this.settings.backendSettings.claudeCode.sessionTrace,
-        vaultPath: getVaultBasePath(this.app) ?? undefined,
-        buildIdentity: () => this.getDebugBuildIdentityText(),
-        knownSecrets: () => collectClaudeCodeKnownSecrets(this.settings.backendSettings.claudeCode),
-        runtimeMetadata: () => ({
+        claudeRuntimeMetadata: () => ({
           serverMode: this.settings.server.mode,
           modelSourceMode: this.settings.modelSourceMode,
           pluginIsolationMode: this.settings.pluginIsolationMode,
@@ -581,15 +598,9 @@ export default class OpenCodianPlugin extends Plugin {
     });
     // Dispose registry (which disposes adapters, which disposes OpenCodeService)
     this.agentServiceRegistry?.dispose();
-    void this.openCodeTraceService?.dispose().catch((error) => {
-      logger.warn('Failed to flush OpenCode trace service during unload:', error);
-    });
-    void this.codexTraceService?.dispose().catch(() => {
-      logger.warn('Failed to flush Codex trace service during unload');
-    });
-    void this.claudeTraceService?.dispose().catch(() => {
-      logger.warn('Failed to flush Claude trace service during unload');
-    });
+    // DiagnosticsRuntimeCoordinator owns the unified flush/dispose of all three
+    // backend trace services (OpenCode → Codex → Claude, void+catch per service).
+    void this.diagnosticsCoordinator?.dispose();
     setAgentServiceRegistry(null);
     this.getSettingsRuntimeCoordinator().clearChatAppearanceSaveTimer();
     delete document.body.dataset.opencodianProviderIconMode;
