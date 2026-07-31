@@ -34,27 +34,42 @@ export class DiagnosticsRuntimeCoordinator {
     this.logger = inputs.logger ?? createLogger('DiagnosticsRuntimeCoordinator');
     // Construction order is pinned by the Task 10 characterization suite:
     // OpenCode first, then Codex, then Claude. Mirrors the prior inline order.
-    this.openCode = new OpenCodeSessionTraceService({
-      settings: inputs.openCodeSettings,
-      vaultPath: inputs.vaultPath,
-      buildIdentity: inputs.buildIdentity,
-      knownSecrets: inputs.openCodeKnownSecrets,
-      runtimeMetadata: inputs.openCodeRuntimeMetadata,
-    });
-    this.codex = new CodexSessionTraceService({
-      settings: inputs.codexSettings,
-      vaultPath: inputs.vaultPath,
-      buildIdentity: inputs.buildIdentity,
-      knownSecrets: inputs.codexKnownSecrets,
-      runtimeMetadata: inputs.codexRuntimeMetadata,
-    });
-    this.claude = new ClaudeSessionTraceService({
-      settings: inputs.claudeSettings,
-      vaultPath: inputs.vaultPath,
-      buildIdentity: inputs.buildIdentity,
-      knownSecrets: inputs.claudeKnownSecrets,
-      runtimeMetadata: inputs.claudeRuntimeMetadata,
-    });
+    // If a later construction throws, dispose the already-constructed services so
+    // their timers/stores do not leak (the prior inline assignment published each
+    // service immediately; the coordinator must match that no-leak guarantee).
+    const constructed: Array<{ dispose(): Promise<void> }> = [];
+    try {
+      this.openCode = new OpenCodeSessionTraceService({
+        settings: inputs.openCodeSettings,
+        vaultPath: inputs.vaultPath,
+        buildIdentity: inputs.buildIdentity,
+        knownSecrets: inputs.openCodeKnownSecrets,
+        runtimeMetadata: inputs.openCodeRuntimeMetadata,
+      });
+      constructed.push(this.openCode);
+      this.codex = new CodexSessionTraceService({
+        settings: inputs.codexSettings,
+        vaultPath: inputs.vaultPath,
+        buildIdentity: inputs.buildIdentity,
+        knownSecrets: inputs.codexKnownSecrets,
+        runtimeMetadata: inputs.codexRuntimeMetadata,
+      });
+      constructed.push(this.codex);
+      this.claude = new ClaudeSessionTraceService({
+        settings: inputs.claudeSettings,
+        vaultPath: inputs.vaultPath,
+        buildIdentity: inputs.buildIdentity,
+        knownSecrets: inputs.claudeKnownSecrets,
+        runtimeMetadata: inputs.claudeRuntimeMetadata,
+      });
+      constructed.push(this.claude);
+    } catch (error) {
+      // Best-effort disposal of any partially-constructed services.
+      for (const service of constructed) {
+        void service.dispose().catch(() => { /* shutdown must not throw */ });
+      }
+      throw error;
+    }
   }
 
   /** Typed backend ports — one property per backend, no service-locator map. */

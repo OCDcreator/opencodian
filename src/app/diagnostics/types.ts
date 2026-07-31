@@ -29,9 +29,13 @@ export interface DiagnosticsBackendPorts {
 
 /**
  * The runtime inputs the coordinator needs to construct the three services.
- * These mirror the option getters `main.ts` previously inlined; they are read
- * lazily (as arrow getters) so credential rotations and settings changes take
- * effect at the point each service reads them.
+ * These mirror the option getters `main.ts` previously inlined. NOTE the
+ * knownSecrets timing asymmetry: OpenCodeSessionTraceService invokes
+ * `knownSecrets?.()` ONCE at construction and hands the array to its redactor
+ * (a construction-time snapshot), while Codex/Claude pass the getter itself to
+ * their redactor (re-evaluated on each redact). The getters below are all lazy
+ * arrows, but OpenCode's is only read once (at construction); settings,
+ * buildIdentity, and runtimeMetadata are likewise read lazily by each service.
  */
 export interface DiagnosticsRuntimeInputs {
   /** OpenCode session-trace settings getter. */

@@ -858,6 +858,16 @@ describe('Phase 3 Task 10 — DiagnosticsRuntimeContract (characterization)', ()
       expect(mainBody).toMatch(/logger,/);
     });
 
+    it('coordinator ctor wraps construction in try/catch that disposes partial services on failure (no leak)', () => {
+      // If a later construction throws, the already-constructed services must be
+      // disposed so timers/stores do not leak (matching the prior per-service
+      // immediate assignment).
+      expect(coordSrc).toMatch(/const constructed:/);
+      expect(coordSrc).toMatch(/constructed\.push\(this\.(openCode|codex|claude)\)/);
+      expect(coordSrc).toMatch(/}\s*catch\s*\(error\)\s*{[\s\S]*?for\s*\(const service of constructed\)/);
+      expect(coordSrc).toMatch(/throw error;/);
+    });
+
     it('coordinator exposes typed backend ports (no generic mutable service map)', () => {
       expect(coordSrc).toMatch(/readonly openCode:\s*OpenCodeSessionTraceService/);
       expect(coordSrc).toMatch(/readonly codex:\s*CodexSessionTraceService/);
