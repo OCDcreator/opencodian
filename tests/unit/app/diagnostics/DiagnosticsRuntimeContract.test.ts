@@ -77,6 +77,22 @@ describe('Phase 3 Task 10 — DiagnosticsRuntimeContract (characterization)', ()
     jest.clearAllTimers();
   });
 
+  // After the whole suite, sweep any leaked opencodian-task10-* temp dirs that
+  // individual afterEach hooks may have missed (e.g. if a test created a dir but
+  // threw before cleanup). This keeps /tmp clean across repeated runs.
+  afterAll(() => {
+    try {
+      const tmp = os.tmpdir();
+      for (const entry of fs.readdirSync(tmp, { withFileTypes: true })) {
+        if (entry.isDirectory() && entry.name.startsWith('opencodian-task10-')) {
+          fs.rmSync(path.join(tmp, entry.name), { recursive: true, force: true });
+        }
+      }
+    } catch {
+      // Best-effort cleanup; never fail the suite on sweep errors.
+    }
+  });
+
   // ---------------------------------------------------------------------------
   // Step 1: Construction options + dynamic knownSecrets behavior.
   //
@@ -802,10 +818,15 @@ describe('Phase 3 Task 10 — DiagnosticsRuntimeContract (characterization)', ()
       const ocCtorStart = bootstrapBody.indexOf('new OpenCodeSessionTraceService(');
       const codexCtorStart = bootstrapBody.indexOf('new CodexSessionTraceService(');
       const claudeCtorStart = bootstrapBody.indexOf('new ClaudeSessionTraceService(');
-      // Slice each constructor to the next constructor start (or end of body).
+      // Slice each constructor to the next constructor start. For claude (the
+      // last), bound to its closing `});` so a later `vaultPath:` in the method
+      // body cannot satisfy the assertion.
       const ocCtor = bootstrapBody.slice(ocCtorStart, codexCtorStart);
       const codexCtor = bootstrapBody.slice(codexCtorStart, claudeCtorStart);
-      const claudeCtor = bootstrapBody.slice(claudeCtorStart);
+      const claudeCtorRaw = bootstrapBody.slice(claudeCtorStart);
+      // The Claude constructor closes with `\n      });` at 6-space indent.
+      const claudeCloseIdx = claudeCtorRaw.indexOf('\n      });');
+      const claudeCtor = claudeCloseIdx > 0 ? claudeCtorRaw.slice(0, claudeCloseIdx) : claudeCtorRaw;
       // All five option keys present in EACH constructor. knownSecrets is a
       // getter in all three, but the value differs: OpenCode/Codex use an array
       // literal `() => [...]`, Claude uses a collector `() => collectClaudeCodeKnownSecrets(...)`.
@@ -914,7 +935,9 @@ describe('Phase 3 Task 10 — DiagnosticsRuntimeContract (characterization)', ()
       expect(writeStart).toBeGreaterThan(-1);
       const writeBody = mainSrc.slice(writeStart, writeStart + 500);
       expect(writeBody).toMatch(/opencodian-debug-\$\{timestamp\}\.log/);
-      expect(writeBody).toMatch(/timestamp.*ISO.*replace\(/);
+      // The timestamp normalization replaces `:` and `.` with `-` (ISO-safe).
+      // Pin the EXACT character class so a switch to e.g. `/Z/g` is caught.
+      expect(writeBody).toContain(".replace(/[:.]/g, '-')");
       // utf-8 encoding (not utf8 without the dash, not binary).
       expect(writeBody).toMatch(/writeFile\(targetPath,\s*report,\s*'utf-8'\)/);
       // Ordering: build the report first, then write it.

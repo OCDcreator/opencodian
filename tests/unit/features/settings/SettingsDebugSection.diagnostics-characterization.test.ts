@@ -23,7 +23,6 @@ import { SettingsDebugSection } from '../../../../src/features/settings/Settings
 import { setLocale } from '../../../../src/i18n';
 import type OpenCodianPlugin from '../../../../src/main';
 import { clearRecentLogs, setDebugLoggingEnabled } from '../../../../src/shared';
-import { DEBUG_MODULE_REGISTRY } from '../../../../src/shared/debugModules';
 
 interface MockToggleControl {
   setValue: jest.MockedFunction<(value: boolean) => MockToggleControl>;
@@ -488,17 +487,30 @@ describe('Phase 3 Task 10 — SettingsDebugSection diagnostics characterization'
       expect(loggingBody).toMatch(/enableDebugLogging/);
     });
 
-    it('DEBUG_MODULE_REGISTRY groups map to the four non-export blocks', () => {
-      // The module registry has groups for plugin/opencode/codex/claudeCode.
-      // Task 13 splits the three backend blocks into panels; the registry
-      // grouping must remain coherent with the panel ownership.
-      const keys = Object.keys(DEBUG_MODULE_REGISTRY);
-      expect(keys.length).toBeGreaterThan(0);
-      // Every group has modules (non-empty).
-      for (const key of keys) {
-        const group = (DEBUG_MODULE_REGISTRY as Record<string, unknown>)[key];
-        expect(group).toBeDefined();
-      }
+    it('DEBUG_MODULE_GROUPS maps the four non-export blocks to their debug-module keys (source contract)', () => {
+      // The module GROUPS (not the flat registry) map each block to its module
+      // keys. Task 13 splits the three backend blocks into panels; the grouping
+      // must remain coherent. Pin the exact structure from source.
+      // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
+      const fs = require('fs') as typeof import('fs');
+      // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
+      const path = require('path') as typeof import('path');
+      const source = fs.readFileSync(
+        path.resolve(__dirname, '../../../../src/features/settings/SettingsDebugSection.ts'),
+        'utf8',
+      );
+      const groupsStart = source.indexOf('const DEBUG_MODULE_GROUPS:');
+      expect(groupsStart).toBeGreaterThan(-1);
+      const groupsBody = source.slice(groupsStart, groupsStart + 600);
+      // Exactly four block keys (plugin, opencode, codex, claude-code).
+      expect(groupsBody).toMatch(/plugin:\s*\[/);
+      expect(groupsBody).toMatch(/opencode:\s*\[/);
+      expect(groupsBody).toMatch(/codex:\s*\[\]\s*as\s*DebugModuleKey\[\]/);
+      expect(groupsBody).toMatch(/'claude-code':\s*\[/);
+      // plugin has the most modules; opencode has server/models/streaming.
+      expect(groupsBody).toMatch(/'app'/);
+      expect(groupsBody).toMatch(/'server',\s*'models',\s*'streaming'/);
+      expect(groupsBody).toMatch(/'claudeCode'/);
     });
   });
 });
