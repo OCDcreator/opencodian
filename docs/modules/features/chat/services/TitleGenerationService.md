@@ -32,6 +32,8 @@ export interface TitleGenerationOptions {
 }
 ```
 
+构造函数接收 consumer-owned `TitleGenerationPort`。该端口只提供标题流程需要的 settings、backend registry、最小化的 OpenCode/model-config 能力、会话 ID 查询和默认标题生成器；它没有 runtime/state/lifecycle，也不是 service locator 或 forwarding adapter。详见 [`TitleGenerationPort`](./TitleGenerationPort.md)。
+
 内部状态仍然很简单：
 
 ```typescript
@@ -97,6 +99,7 @@ private readonly activeGenerations = new Map<string, AbortController>();
 ## 与其他模块的交互
 
 - `OpenCodianView`: 发起标题生成并接收结果回调
+- `TitleGenerationPort`: 由消费者组装并注入最小依赖面
 - `AgentBackendRouting.readBackendSessionTitle()`: backend-aware session 标题读取路由，通过 `getSession()` 获取 session 详情并提取标题
 - `OpenCodeService`: 仅 OpenCode conversation 在官方标题失败后创建临时 session、发送非流式请求、删除临时 session（AI 标题生成路径保持 OpenCode-only；Claude / 非 OpenCode 不借用 OpenCode 兜底）
 - `core/prompts/titleGeneration.ts`: 提供 locale-aware prompt 和 system prompt

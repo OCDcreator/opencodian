@@ -9,7 +9,7 @@ import {
 import type { ChatMessage } from '../../../core/types';
 import type { AgentBackendKind } from '../../../core/types/chat';
 import { getConversationBackendSessionId } from '../../../core/types/chat';
-import type OpenCodianPlugin from '../../../main';
+import type { TitleGenerationPort } from './TitleGenerationPort';
 
 const TITLE_MODEL_UNAVAILABLE_ERROR = 'Configured AI title model is unavailable';
 
@@ -49,7 +49,7 @@ const OPENCODE_DEFAULT_TITLE_PATTERN = /^(New session - |Child session - )\d{4}-
 export class TitleGenerationService {
   private readonly activeGenerations = new Map<string, AbortController>();
 
-  constructor(private readonly plugin: OpenCodianPlugin) {}
+  constructor(private readonly plugin: TitleGenerationPort) {}
 
   // eslint-disable-next-line max-params -- Existing view seam passes model and callback separately; options are only for official-title polling.
   async generateTitle(
