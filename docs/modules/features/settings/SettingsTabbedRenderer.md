@@ -30,7 +30,7 @@
 - `General` 合并面板里的语言切换渲染回调
 - `General` 合并面板里的 editor-area settings 开关渲染回调，实际保存逻辑留在 settings shell
 - 独立版本管理卡片的渲染回调；它位于 General > Basic 合并基础卡片之后，而不是卡片内部
-- Debug section 的 OpenCode、Codex 与 Claude diagnostics port factories；renderer 只在 composition 边界把三个 `create*TraceDiagnosticsPort()` 的结果注入 `SettingsDebugSection`
+- 注入的 `plugin` 依赖提供 OpenCode、Codex 与 Claude trace services；三个 `create*TraceDiagnosticsPort()` factories 由 renderer 直接导入，`renderDebugContent()` 在 composition 边界使用 `plugin` 创建三个 ports 并注入 `SettingsDebugSection`
 
 ## 标签导航
 

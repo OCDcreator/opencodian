@@ -210,7 +210,7 @@ provider 开关写回仍遵循 `ModelConfigService` 返回的 `effectiveProvider
 | `addPluginSettings()` | 创建并挂载 `SettingsPluginSection` owner，把 plugin management lifecycle 从主类中收口出去 |
 | `addUISettings()` | 创建并挂载 `SettingsUiSection` owner，把 UI section lifecycle 从主类中收口出去 |
 | `addStyleSettings()` | 创建并挂载 `SettingsStyleSection` owner，把完整 style section lifecycle 从主类中收口出去 |
-| `addDebugSettings()` | 创建并挂载 `SettingsDebugSection` owner，并在标准 settings 组合边界注入 OpenCode diagnostics port；主类只保留 section 装配 |
+| `addDebugSettings()` | 创建并挂载 `SettingsDebugSection` owner，并在标准 settings 组合边界注入 OpenCode、Codex 与 Claude 的三个窄 diagnostics ports/adapters；主类只保留 section 装配 |
 | `addFormatterSettings()` | 创建并挂载 `SettingsFormatterSection` owner，把 formatter runtime status / config / mode-switch lifecycle 从主类中收口出去 |
 | `addMcpSettings()` | 创建并挂载 `SettingsMcpSection` owner，把 MCP 服务器状态概览与刷新 lifecycle 从主类中收口出去 |
 | `addUserSettings()` | 创建并挂载 `SettingsUserSection` owner，把用户 profile/prompt/tags 的经典 section shell 从主类中收口出去 |
