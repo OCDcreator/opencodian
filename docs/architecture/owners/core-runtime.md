@@ -7,22 +7,23 @@
 - **Include:** `src/core/runtime/**`
 
 ## Responsibilities
-- plugin runtime coordinator and startup coordination
-- settings runtime coordinator (theme/appearance composition)
+- startup bootstrap coordination and performance tracing
+- settings runtime coordination (theme/appearance composition and persistence)
 
 ## Canonical state (truth home)
-- plugin runtime coordinator state
+- startup performance trace
+- settings runtime coordinator state
 
 > Cross-owner access is read-only snapshot/command/event. Do not replicate this state as a second writable truth source.
 
 ## Entrypoints
-- `src/core/runtime/PluginRuntimeCoordinator.ts`
 - `src/core/runtime/OpenCodianStartupCoordinator.ts`
+- `src/core/runtime/OpenCodianSettingsRuntimeCoordinator.ts`
 
 ## Dependency surface
-- **Allowed owner dependencies:** `shared.foundation`, `core.types`, `core.storage`
+- **Allowed owner dependencies:** `shared.foundation`, `core.types`, `core.config`, `core.opencode`, `core.storage`, `core.theme`
 - **Forbidden dependencies:** `feature`, `app`
-- **Adjacent owners** (prefer editing these when out of scope): `app.composition`, `feature.chat-shell`
+- **Adjacent owners** (prefer editing these when out of scope): `app.composition`, `app.runtime`, `feature.chat-shell`
 
 ## Focused tests
 - `tests/unit/core/runtime/**`

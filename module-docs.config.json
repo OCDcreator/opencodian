@@ -18,6 +18,8 @@
         "_WORKFLOW.md",
         "infrastructure/**/*.md",
         "style/README.md",
+        "app/runtime/index.md",
+        "core/runtime/index.md",
         "features/settings/debug/index.md",
         "utils/streaming/mcp-summary-fields.md"
       ],

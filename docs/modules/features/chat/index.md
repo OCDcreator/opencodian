@@ -12,6 +12,8 @@
 
 这个文件本身没有运行时状态，也不参与聊天流程、渲染流程或服务通信。
 
+`ChatPluginPort` 是 `OpenCodianView` 使用的内部 consumer-owned type seam，未由本 barrel 重新导出；其契约与边界见 [`ChatPluginPort.md`](./ChatPluginPort.md)。
+
 ## 导出面
 
 ```typescript

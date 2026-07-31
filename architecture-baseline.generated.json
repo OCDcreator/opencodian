@@ -1,8 +1,148 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-07-30T17:31:51.371Z",
-  "headShaAtGeneration": "e2d696620504fe5d8d7ace4b91eeb530ed85eb73",
+  "generatedAt": "2026-07-31T14:28:07.248Z",
+  "headShaAtGeneration": "27ada806ed93b97ddd80aa443f71e567e3af24b0",
   "edges": [
+    {
+      "id": "src/app/diagnostics/DiagnosticsRuntimeCoordinator.ts|src/app/diagnostics/types.ts|type-only|./types",
+      "from": "src/app/diagnostics/DiagnosticsRuntimeCoordinator.ts",
+      "to": "src/app/diagnostics/types.ts",
+      "kind": "type-only",
+      "specifier": "./types"
+    },
+    {
+      "id": "src/app/diagnostics/DiagnosticsRuntimeCoordinator.ts|src/core/agents/backend/diagnostics/ClaudeSessionTraceService.ts|runtime-static|../../core/agents/backend/diagnostics/ClaudeSessionTraceService",
+      "from": "src/app/diagnostics/DiagnosticsRuntimeCoordinator.ts",
+      "to": "src/core/agents/backend/diagnostics/ClaudeSessionTraceService.ts",
+      "kind": "runtime-static",
+      "specifier": "../../core/agents/backend/diagnostics/ClaudeSessionTraceService"
+    },
+    {
+      "id": "src/app/diagnostics/DiagnosticsRuntimeCoordinator.ts|src/core/agents/backend/diagnostics/CodexSessionTraceService.ts|runtime-static|../../core/agents/backend/diagnostics/CodexSessionTraceService",
+      "from": "src/app/diagnostics/DiagnosticsRuntimeCoordinator.ts",
+      "to": "src/core/agents/backend/diagnostics/CodexSessionTraceService.ts",
+      "kind": "runtime-static",
+      "specifier": "../../core/agents/backend/diagnostics/CodexSessionTraceService"
+    },
+    {
+      "id": "src/app/diagnostics/DiagnosticsRuntimeCoordinator.ts|src/core/opencode/diagnostics/OpenCodeSessionTraceService.ts|runtime-static|../../core/opencode/diagnostics/OpenCodeSessionTraceService",
+      "from": "src/app/diagnostics/DiagnosticsRuntimeCoordinator.ts",
+      "to": "src/core/opencode/diagnostics/OpenCodeSessionTraceService.ts",
+      "kind": "runtime-static",
+      "specifier": "../../core/opencode/diagnostics/OpenCodeSessionTraceService"
+    },
+    {
+      "id": "src/app/diagnostics/DiagnosticsRuntimeCoordinator.ts|src/shared/logger.ts|runtime-static|../../shared/logger",
+      "from": "src/app/diagnostics/DiagnosticsRuntimeCoordinator.ts",
+      "to": "src/shared/logger.ts",
+      "kind": "runtime-static",
+      "specifier": "../../shared/logger"
+    },
+    {
+      "id": "src/app/diagnostics/DiagnosticsRuntimeCoordinator.ts|src/shared/logger.ts|type-only|../../shared/logger",
+      "from": "src/app/diagnostics/DiagnosticsRuntimeCoordinator.ts",
+      "to": "src/shared/logger.ts",
+      "kind": "type-only",
+      "specifier": "../../shared/logger"
+    },
+    {
+      "id": "src/app/diagnostics/index.ts|src/app/diagnostics/DiagnosticsRuntimeCoordinator.ts|re-export|./DiagnosticsRuntimeCoordinator",
+      "from": "src/app/diagnostics/index.ts",
+      "to": "src/app/diagnostics/DiagnosticsRuntimeCoordinator.ts",
+      "kind": "re-export",
+      "specifier": "./DiagnosticsRuntimeCoordinator"
+    },
+    {
+      "id": "src/app/diagnostics/index.ts|src/app/diagnostics/types.ts|type-only|./types",
+      "from": "src/app/diagnostics/index.ts",
+      "to": "src/app/diagnostics/types.ts",
+      "kind": "type-only",
+      "specifier": "./types"
+    },
+    {
+      "id": "src/app/diagnostics/types.ts|src/core/agents/backend/diagnostics/ClaudeSessionTraceService.ts|type-only|../../core/agents/backend/diagnostics/ClaudeSessionTraceService",
+      "from": "src/app/diagnostics/types.ts",
+      "to": "src/core/agents/backend/diagnostics/ClaudeSessionTraceService.ts",
+      "kind": "type-only",
+      "specifier": "../../core/agents/backend/diagnostics/ClaudeSessionTraceService"
+    },
+    {
+      "id": "src/app/diagnostics/types.ts|src/core/agents/backend/diagnostics/CodexSessionTraceService.ts|type-only|../../core/agents/backend/diagnostics/CodexSessionTraceService",
+      "from": "src/app/diagnostics/types.ts",
+      "to": "src/core/agents/backend/diagnostics/CodexSessionTraceService.ts",
+      "kind": "type-only",
+      "specifier": "../../core/agents/backend/diagnostics/CodexSessionTraceService"
+    },
+    {
+      "id": "src/app/diagnostics/types.ts|src/core/opencode/diagnostics/OpenCodeSessionTraceService.ts|type-only|../../core/opencode/diagnostics/OpenCodeSessionTraceService",
+      "from": "src/app/diagnostics/types.ts",
+      "to": "src/core/opencode/diagnostics/OpenCodeSessionTraceService.ts",
+      "kind": "type-only",
+      "specifier": "../../core/opencode/diagnostics/OpenCodeSessionTraceService"
+    },
+    {
+      "id": "src/app/runtime/PluginRuntimeCoordinator.ts|src/core/opencode/index.ts|runtime-static|../../core/opencode",
+      "from": "src/app/runtime/PluginRuntimeCoordinator.ts",
+      "to": "src/core/opencode/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../core/opencode"
+    },
+    {
+      "id": "src/app/runtime/PluginRuntimeCoordinator.ts|src/core/types/chat.ts|type-only|../../core/types/chat",
+      "from": "src/app/runtime/PluginRuntimeCoordinator.ts",
+      "to": "src/core/types/chat.ts",
+      "kind": "type-only",
+      "specifier": "../../core/types/chat"
+    },
+    {
+      "id": "src/app/runtime/PluginRuntimeCoordinator.ts|src/core/types/index.ts|runtime-static|../../core/types",
+      "from": "src/app/runtime/PluginRuntimeCoordinator.ts",
+      "to": "src/core/types/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../core/types"
+    },
+    {
+      "id": "src/app/runtime/PluginRuntimeCoordinator.ts|src/core/types/index.ts|type-only|../../core/types",
+      "from": "src/app/runtime/PluginRuntimeCoordinator.ts",
+      "to": "src/core/types/index.ts",
+      "kind": "type-only",
+      "specifier": "../../core/types"
+    },
+    {
+      "id": "src/app/runtime/PluginRuntimeCoordinator.ts|src/core/update/PluginUpdateService.ts|runtime-static|../../core/update/PluginUpdateService",
+      "from": "src/app/runtime/PluginRuntimeCoordinator.ts",
+      "to": "src/core/update/PluginUpdateService.ts",
+      "kind": "runtime-static",
+      "specifier": "../../core/update/PluginUpdateService"
+    },
+    {
+      "id": "src/app/runtime/PluginRuntimeCoordinator.ts|src/features/chat/OpenCodianView.ts|runtime-static|../../features/chat/OpenCodianView",
+      "from": "src/app/runtime/PluginRuntimeCoordinator.ts",
+      "to": "src/features/chat/OpenCodianView.ts",
+      "kind": "runtime-static",
+      "specifier": "../../features/chat/OpenCodianView"
+    },
+    {
+      "id": "src/app/runtime/PluginRuntimeCoordinator.ts|src/features/chat/runtime/UserMessageFooterRenderer.ts|runtime-static|../../features/chat/runtime/UserMessageFooterRenderer",
+      "from": "src/app/runtime/PluginRuntimeCoordinator.ts",
+      "to": "src/features/chat/runtime/UserMessageFooterRenderer.ts",
+      "kind": "runtime-static",
+      "specifier": "../../features/chat/runtime/UserMessageFooterRenderer"
+    },
+    {
+      "id": "src/app/runtime/PluginRuntimeCoordinator.ts|src/i18n/index.ts|runtime-static|../../i18n",
+      "from": "src/app/runtime/PluginRuntimeCoordinator.ts",
+      "to": "src/i18n/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../i18n"
+    },
+    {
+      "id": "src/app/runtime/PluginRuntimeCoordinator.ts|src/shared/index.ts|runtime-static|../../shared",
+      "from": "src/app/runtime/PluginRuntimeCoordinator.ts",
+      "to": "src/shared/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../shared"
+    },
     {
       "id": "src/core/acp/AcpClientManager.ts|src/core/acp/types.ts|type-only|./types",
       "from": "src/core/acp/AcpClientManager.ts",
@@ -2895,69 +3035,6 @@
       "specifier": "../../shared"
     },
     {
-      "id": "src/core/runtime/PluginRuntimeCoordinator.ts|src/core/opencode/index.ts|runtime-static|../opencode",
-      "from": "src/core/runtime/PluginRuntimeCoordinator.ts",
-      "to": "src/core/opencode/index.ts",
-      "kind": "runtime-static",
-      "specifier": "../opencode"
-    },
-    {
-      "id": "src/core/runtime/PluginRuntimeCoordinator.ts|src/core/types/chat.ts|type-only|../types/chat",
-      "from": "src/core/runtime/PluginRuntimeCoordinator.ts",
-      "to": "src/core/types/chat.ts",
-      "kind": "type-only",
-      "specifier": "../types/chat"
-    },
-    {
-      "id": "src/core/runtime/PluginRuntimeCoordinator.ts|src/core/types/index.ts|runtime-static|../types",
-      "from": "src/core/runtime/PluginRuntimeCoordinator.ts",
-      "to": "src/core/types/index.ts",
-      "kind": "runtime-static",
-      "specifier": "../types"
-    },
-    {
-      "id": "src/core/runtime/PluginRuntimeCoordinator.ts|src/core/types/index.ts|type-only|../types",
-      "from": "src/core/runtime/PluginRuntimeCoordinator.ts",
-      "to": "src/core/types/index.ts",
-      "kind": "type-only",
-      "specifier": "../types"
-    },
-    {
-      "id": "src/core/runtime/PluginRuntimeCoordinator.ts|src/core/update/PluginUpdateService.ts|runtime-static|../update/PluginUpdateService",
-      "from": "src/core/runtime/PluginRuntimeCoordinator.ts",
-      "to": "src/core/update/PluginUpdateService.ts",
-      "kind": "runtime-static",
-      "specifier": "../update/PluginUpdateService"
-    },
-    {
-      "id": "src/core/runtime/PluginRuntimeCoordinator.ts|src/features/chat/OpenCodianView.ts|runtime-static|../../features/chat/OpenCodianView",
-      "from": "src/core/runtime/PluginRuntimeCoordinator.ts",
-      "to": "src/features/chat/OpenCodianView.ts",
-      "kind": "runtime-static",
-      "specifier": "../../features/chat/OpenCodianView"
-    },
-    {
-      "id": "src/core/runtime/PluginRuntimeCoordinator.ts|src/features/chat/runtime/UserMessageFooterRenderer.ts|runtime-static|../../features/chat/runtime/UserMessageFooterRenderer",
-      "from": "src/core/runtime/PluginRuntimeCoordinator.ts",
-      "to": "src/features/chat/runtime/UserMessageFooterRenderer.ts",
-      "kind": "runtime-static",
-      "specifier": "../../features/chat/runtime/UserMessageFooterRenderer"
-    },
-    {
-      "id": "src/core/runtime/PluginRuntimeCoordinator.ts|src/i18n/index.ts|runtime-static|../../i18n",
-      "from": "src/core/runtime/PluginRuntimeCoordinator.ts",
-      "to": "src/i18n/index.ts",
-      "kind": "runtime-static",
-      "specifier": "../../i18n"
-    },
-    {
-      "id": "src/core/runtime/PluginRuntimeCoordinator.ts|src/shared/index.ts|runtime-static|../../shared",
-      "from": "src/core/runtime/PluginRuntimeCoordinator.ts",
-      "to": "src/shared/index.ts",
-      "kind": "runtime-static",
-      "specifier": "../../shared"
-    },
-    {
       "id": "src/core/security/index.ts|src/core/security/BlocklistChecker.ts|re-export|./BlocklistChecker",
       "from": "src/core/security/index.ts",
       "to": "src/core/security/BlocklistChecker.ts",
@@ -3014,6 +3091,13 @@
       "specifier": "./ConversationMetadataCache"
     },
     {
+      "id": "src/core/storage/StorageService.ts|src/core/storage/StoragePluginPort.ts|type-only|./StoragePluginPort",
+      "from": "src/core/storage/StorageService.ts",
+      "to": "src/core/storage/StoragePluginPort.ts",
+      "kind": "type-only",
+      "specifier": "./StoragePluginPort"
+    },
+    {
       "id": "src/core/storage/StorageService.ts|src/core/storage/ThemeBackgroundStorage.ts|runtime-static|./ThemeBackgroundStorage",
       "from": "src/core/storage/StorageService.ts",
       "to": "src/core/storage/ThemeBackgroundStorage.ts",
@@ -3033,13 +3117,6 @@
       "to": "src/core/types/pricing.ts",
       "kind": "type-only",
       "specifier": "../types/pricing"
-    },
-    {
-      "id": "src/core/storage/StorageService.ts|src/main.ts|type-only|../../main",
-      "from": "src/core/storage/StorageService.ts",
-      "to": "src/main.ts",
-      "kind": "type-only",
-      "specifier": "../../main"
     },
     {
       "id": "src/core/storage/StorageService.ts|src/shared/index.ts|runtime-static|../../shared",
@@ -3245,6 +3322,76 @@
       "specifier": "../settings/InputFontRegistry"
     },
     {
+      "id": "src/features/chat/ChatPluginPort.ts|src/core/agents/backend/AgentServiceRegistry.ts|type-only|../../core/agents/backend/AgentServiceRegistry",
+      "from": "src/features/chat/ChatPluginPort.ts",
+      "to": "src/core/agents/backend/AgentServiceRegistry.ts",
+      "kind": "type-only",
+      "specifier": "../../core/agents/backend/AgentServiceRegistry"
+    },
+    {
+      "id": "src/features/chat/ChatPluginPort.ts|src/core/agents/backend/ClaudeCodeDefaultPermissionHost.ts|type-only|../../core/agents/backend/ClaudeCodeDefaultPermissionHost",
+      "from": "src/features/chat/ChatPluginPort.ts",
+      "to": "src/core/agents/backend/ClaudeCodeDefaultPermissionHost.ts",
+      "kind": "type-only",
+      "specifier": "../../core/agents/backend/ClaudeCodeDefaultPermissionHost"
+    },
+    {
+      "id": "src/features/chat/ChatPluginPort.ts|src/core/agents/backend/CodexDefaultApprovalHost.ts|type-only|../../core/agents/backend/CodexDefaultApprovalHost",
+      "from": "src/features/chat/ChatPluginPort.ts",
+      "to": "src/core/agents/backend/CodexDefaultApprovalHost.ts",
+      "kind": "type-only",
+      "specifier": "../../core/agents/backend/CodexDefaultApprovalHost"
+    },
+    {
+      "id": "src/features/chat/ChatPluginPort.ts|src/core/config/index.ts|type-only|../../core/config",
+      "from": "src/features/chat/ChatPluginPort.ts",
+      "to": "src/core/config/index.ts",
+      "kind": "type-only",
+      "specifier": "../../core/config"
+    },
+    {
+      "id": "src/features/chat/ChatPluginPort.ts|src/core/opencode/index.ts|type-only|../../core/opencode",
+      "from": "src/features/chat/ChatPluginPort.ts",
+      "to": "src/core/opencode/index.ts",
+      "kind": "type-only",
+      "specifier": "../../core/opencode"
+    },
+    {
+      "id": "src/features/chat/ChatPluginPort.ts|src/core/runtime/OpenCodianSettingsRuntimeCoordinator.ts|type-only|../../core/runtime/OpenCodianSettingsRuntimeCoordinator",
+      "from": "src/features/chat/ChatPluginPort.ts",
+      "to": "src/core/runtime/OpenCodianSettingsRuntimeCoordinator.ts",
+      "kind": "type-only",
+      "specifier": "../../core/runtime/OpenCodianSettingsRuntimeCoordinator"
+    },
+    {
+      "id": "src/features/chat/ChatPluginPort.ts|src/core/types/chat.ts|type-only|../../core/types/chat",
+      "from": "src/features/chat/ChatPluginPort.ts",
+      "to": "src/core/types/chat.ts",
+      "kind": "type-only",
+      "specifier": "../../core/types/chat"
+    },
+    {
+      "id": "src/features/chat/ChatPluginPort.ts|src/core/types/index.ts|type-only|../../core/types",
+      "from": "src/features/chat/ChatPluginPort.ts",
+      "to": "src/core/types/index.ts",
+      "kind": "type-only",
+      "specifier": "../../core/types"
+    },
+    {
+      "id": "src/features/chat/ChatPluginPort.ts|src/features/chat/services/ConversationTabRuntimeCoordinator.ts|type-only|./services/ConversationTabRuntimeCoordinator",
+      "from": "src/features/chat/ChatPluginPort.ts",
+      "to": "src/features/chat/services/ConversationTabRuntimeCoordinator.ts",
+      "kind": "type-only",
+      "specifier": "./services/ConversationTabRuntimeCoordinator"
+    },
+    {
+      "id": "src/features/chat/ChatPluginPort.ts|src/features/settings/OpenCodianSettings.ts|type-only|../settings/OpenCodianSettings",
+      "from": "src/features/chat/ChatPluginPort.ts",
+      "to": "src/features/settings/OpenCodianSettings.ts",
+      "kind": "type-only",
+      "specifier": "../settings/OpenCodianSettings"
+    },
+    {
       "id": "src/features/chat/composerContext.ts|src/core/types/index.ts|type-only|../../core/types",
       "from": "src/features/chat/composerContext.ts",
       "to": "src/core/types/index.ts",
@@ -3434,6 +3581,13 @@
       "specifier": "../../core/types/settings"
     },
     {
+      "id": "src/features/chat/OpenCodianView.ts|src/features/chat/ChatPluginPort.ts|type-only|./ChatPluginPort",
+      "from": "src/features/chat/OpenCodianView.ts",
+      "to": "src/features/chat/ChatPluginPort.ts",
+      "kind": "type-only",
+      "specifier": "./ChatPluginPort"
+    },
+    {
       "id": "src/features/chat/OpenCodianView.ts|src/features/chat/composerContext.ts|runtime-static|./composerContext",
       "from": "src/features/chat/OpenCodianView.ts",
       "to": "src/features/chat/composerContext.ts",
@@ -3588,6 +3742,13 @@
       "specifier": "./services/BackgroundTaskTimelineService"
     },
     {
+      "id": "src/features/chat/OpenCodianView.ts|src/features/chat/services/ChatDiagnosticsCoordinator.ts|runtime-static|./services/ChatDiagnosticsCoordinator",
+      "from": "src/features/chat/OpenCodianView.ts",
+      "to": "src/features/chat/services/ChatDiagnosticsCoordinator.ts",
+      "kind": "runtime-static",
+      "specifier": "./services/ChatDiagnosticsCoordinator"
+    },
+    {
       "id": "src/features/chat/OpenCodianView.ts|src/features/chat/services/ChatHeaderPresenter.ts|runtime-static|./services/ChatHeaderPresenter",
       "from": "src/features/chat/OpenCodianView.ts",
       "to": "src/features/chat/services/ChatHeaderPresenter.ts",
@@ -3623,25 +3784,11 @@
       "specifier": "./services/ChildSessionGraphCoordinator"
     },
     {
-      "id": "src/features/chat/OpenCodianView.ts|src/features/chat/services/ClaudeDiagnosticsHostAdapter.ts|runtime-static|./services/ClaudeDiagnosticsHostAdapter",
-      "from": "src/features/chat/OpenCodianView.ts",
-      "to": "src/features/chat/services/ClaudeDiagnosticsHostAdapter.ts",
-      "kind": "runtime-static",
-      "specifier": "./services/ClaudeDiagnosticsHostAdapter"
-    },
-    {
       "id": "src/features/chat/OpenCodianView.ts|src/features/chat/services/CodexChatSurfaceBinding.ts|runtime-static|./services/CodexChatSurfaceBinding",
       "from": "src/features/chat/OpenCodianView.ts",
       "to": "src/features/chat/services/CodexChatSurfaceBinding.ts",
       "kind": "runtime-static",
       "specifier": "./services/CodexChatSurfaceBinding"
-    },
-    {
-      "id": "src/features/chat/OpenCodianView.ts|src/features/chat/services/CodexDiagnosticsHostAdapter.ts|runtime-static|./services/CodexDiagnosticsHostAdapter",
-      "from": "src/features/chat/OpenCodianView.ts",
-      "to": "src/features/chat/services/CodexDiagnosticsHostAdapter.ts",
-      "kind": "runtime-static",
-      "specifier": "./services/CodexDiagnosticsHostAdapter"
     },
     {
       "id": "src/features/chat/OpenCodianView.ts|src/features/chat/services/ComposerContextViewFacade.ts|runtime-static|./services/ComposerContextViewFacade",
@@ -4006,13 +4153,6 @@
       "to": "src/i18n/index.ts",
       "kind": "runtime-static",
       "specifier": "../../i18n"
-    },
-    {
-      "id": "src/features/chat/OpenCodianView.ts|src/main.ts|type-only|../../main",
-      "from": "src/features/chat/OpenCodianView.ts",
-      "to": "src/main.ts",
-      "kind": "type-only",
-      "specifier": "../../main"
     },
     {
       "id": "src/features/chat/OpenCodianView.ts|src/shared/index.ts|runtime-static|../../shared",
@@ -5795,6 +5935,55 @@
     {
       "id": "src/features/chat/services/ChatAgentSelectionCoordinator.ts|src/i18n/index.ts|runtime-static|../../../i18n",
       "from": "src/features/chat/services/ChatAgentSelectionCoordinator.ts",
+      "to": "src/i18n/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../../i18n"
+    },
+    {
+      "id": "src/features/chat/services/ChatDiagnosticsCoordinator.ts|src/core/agents/backend/diagnostics/ClaudeSessionTraceService.ts|type-only|../../../core/agents/backend/diagnostics/ClaudeSessionTraceService",
+      "from": "src/features/chat/services/ChatDiagnosticsCoordinator.ts",
+      "to": "src/core/agents/backend/diagnostics/ClaudeSessionTraceService.ts",
+      "kind": "type-only",
+      "specifier": "../../../core/agents/backend/diagnostics/ClaudeSessionTraceService"
+    },
+    {
+      "id": "src/features/chat/services/ChatDiagnosticsCoordinator.ts|src/core/opencode/diagnostics/OpenCodeSessionTraceService.ts|type-only|../../../core/opencode/diagnostics/OpenCodeSessionTraceService",
+      "from": "src/features/chat/services/ChatDiagnosticsCoordinator.ts",
+      "to": "src/core/opencode/diagnostics/OpenCodeSessionTraceService.ts",
+      "kind": "type-only",
+      "specifier": "../../../core/opencode/diagnostics/OpenCodeSessionTraceService"
+    },
+    {
+      "id": "src/features/chat/services/ChatDiagnosticsCoordinator.ts|src/core/types/index.ts|type-only|../../../core/types",
+      "from": "src/features/chat/services/ChatDiagnosticsCoordinator.ts",
+      "to": "src/core/types/index.ts",
+      "kind": "type-only",
+      "specifier": "../../../core/types"
+    },
+    {
+      "id": "src/features/chat/services/ChatDiagnosticsCoordinator.ts|src/features/chat/runtime/SendPipelineTypes.ts|type-only|../runtime/SendPipelineTypes",
+      "from": "src/features/chat/services/ChatDiagnosticsCoordinator.ts",
+      "to": "src/features/chat/runtime/SendPipelineTypes.ts",
+      "kind": "type-only",
+      "specifier": "../runtime/SendPipelineTypes"
+    },
+    {
+      "id": "src/features/chat/services/ChatDiagnosticsCoordinator.ts|src/features/chat/services/ClaudeDiagnosticsHostAdapter.ts|runtime-static|./ClaudeDiagnosticsHostAdapter",
+      "from": "src/features/chat/services/ChatDiagnosticsCoordinator.ts",
+      "to": "src/features/chat/services/ClaudeDiagnosticsHostAdapter.ts",
+      "kind": "runtime-static",
+      "specifier": "./ClaudeDiagnosticsHostAdapter"
+    },
+    {
+      "id": "src/features/chat/services/ChatDiagnosticsCoordinator.ts|src/features/chat/services/CodexDiagnosticsHostAdapter.ts|runtime-static|./CodexDiagnosticsHostAdapter",
+      "from": "src/features/chat/services/ChatDiagnosticsCoordinator.ts",
+      "to": "src/features/chat/services/CodexDiagnosticsHostAdapter.ts",
+      "kind": "runtime-static",
+      "specifier": "./CodexDiagnosticsHostAdapter"
+    },
+    {
+      "id": "src/features/chat/services/ChatDiagnosticsCoordinator.ts|src/i18n/index.ts|runtime-static|../../../i18n",
+      "from": "src/features/chat/services/ChatDiagnosticsCoordinator.ts",
       "to": "src/i18n/index.ts",
       "kind": "runtime-static",
       "specifier": "../../../i18n"
@@ -9678,6 +9867,41 @@
       "specifier": "./TabSessionLifecycleState"
     },
     {
+      "id": "src/features/chat/services/TitleGenerationPort.ts|src/core/agents/backend/AgentServiceRegistry.ts|type-only|../../../core/agents/backend/AgentServiceRegistry",
+      "from": "src/features/chat/services/TitleGenerationPort.ts",
+      "to": "src/core/agents/backend/AgentServiceRegistry.ts",
+      "kind": "type-only",
+      "specifier": "../../../core/agents/backend/AgentServiceRegistry"
+    },
+    {
+      "id": "src/features/chat/services/TitleGenerationPort.ts|src/core/config/ModelConfigService.ts|type-only|../../../core/config/ModelConfigService",
+      "from": "src/features/chat/services/TitleGenerationPort.ts",
+      "to": "src/core/config/ModelConfigService.ts",
+      "kind": "type-only",
+      "specifier": "../../../core/config/ModelConfigService"
+    },
+    {
+      "id": "src/features/chat/services/TitleGenerationPort.ts|src/core/opencode/OpenCodeService.ts|type-only|../../../core/opencode/OpenCodeService",
+      "from": "src/features/chat/services/TitleGenerationPort.ts",
+      "to": "src/core/opencode/OpenCodeService.ts",
+      "kind": "type-only",
+      "specifier": "../../../core/opencode/OpenCodeService"
+    },
+    {
+      "id": "src/features/chat/services/TitleGenerationPort.ts|src/core/types/chat.ts|type-only|../../../core/types/chat",
+      "from": "src/features/chat/services/TitleGenerationPort.ts",
+      "to": "src/core/types/chat.ts",
+      "kind": "type-only",
+      "specifier": "../../../core/types/chat"
+    },
+    {
+      "id": "src/features/chat/services/TitleGenerationPort.ts|src/core/types/settings.ts|type-only|../../../core/types/settings",
+      "from": "src/features/chat/services/TitleGenerationPort.ts",
+      "to": "src/core/types/settings.ts",
+      "kind": "type-only",
+      "specifier": "../../../core/types/settings"
+    },
+    {
       "id": "src/features/chat/services/TitleGenerationService.ts|src/core/agents/backend/AgentBackendRouting.ts|runtime-static|../../../core/agents/backend/AgentBackendRouting",
       "from": "src/features/chat/services/TitleGenerationService.ts",
       "to": "src/core/agents/backend/AgentBackendRouting.ts",
@@ -9727,11 +9951,11 @@
       "specifier": "../../../core/types"
     },
     {
-      "id": "src/features/chat/services/TitleGenerationService.ts|src/main.ts|type-only|../../../main",
+      "id": "src/features/chat/services/TitleGenerationService.ts|src/features/chat/services/TitleGenerationPort.ts|type-only|./TitleGenerationPort",
       "from": "src/features/chat/services/TitleGenerationService.ts",
-      "to": "src/main.ts",
+      "to": "src/features/chat/services/TitleGenerationPort.ts",
       "kind": "type-only",
-      "specifier": "../../../main"
+      "specifier": "./TitleGenerationPort"
     },
     {
       "id": "src/features/chat/services/trailingAssistantPatchDebug.ts|src/features/chat/services/trailingAssistantPatchTypes.ts|type-only|./trailingAssistantPatchTypes",
@@ -10658,6 +10882,153 @@
       "specifier": "../../main"
     },
     {
+      "id": "src/features/settings/debug/ClaudeCodeDebugPanel.ts|src/core/agents/backend/diagnostics/index.ts|runtime-static|../../../core/agents/backend/diagnostics",
+      "from": "src/features/settings/debug/ClaudeCodeDebugPanel.ts",
+      "to": "src/core/agents/backend/diagnostics/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../../core/agents/backend/diagnostics"
+    },
+    {
+      "id": "src/features/settings/debug/ClaudeCodeDebugPanel.ts|src/core/types/index.ts|runtime-static|../../../core/types",
+      "from": "src/features/settings/debug/ClaudeCodeDebugPanel.ts",
+      "to": "src/core/types/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../../core/types"
+    },
+    {
+      "id": "src/features/settings/debug/ClaudeCodeDebugPanel.ts|src/features/settings/debug/types.ts|type-only|./types",
+      "from": "src/features/settings/debug/ClaudeCodeDebugPanel.ts",
+      "to": "src/features/settings/debug/types.ts",
+      "kind": "type-only",
+      "specifier": "./types"
+    },
+    {
+      "id": "src/features/settings/debug/ClaudeCodeDebugPanel.ts|src/i18n/index.ts|runtime-static|../../../i18n",
+      "from": "src/features/settings/debug/ClaudeCodeDebugPanel.ts",
+      "to": "src/i18n/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../../i18n"
+    },
+    {
+      "id": "src/features/settings/debug/ClaudeCodeDebugPanel.ts|src/shared/debugModules.ts|runtime-static|../../../shared/debugModules",
+      "from": "src/features/settings/debug/ClaudeCodeDebugPanel.ts",
+      "to": "src/shared/debugModules.ts",
+      "kind": "runtime-static",
+      "specifier": "../../../shared/debugModules"
+    },
+    {
+      "id": "src/features/settings/debug/ClaudeCodeDebugPanel.ts|src/shared/diagnostics/index.ts|runtime-static|../../../shared/diagnostics",
+      "from": "src/features/settings/debug/ClaudeCodeDebugPanel.ts",
+      "to": "src/shared/diagnostics/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../../shared/diagnostics"
+    },
+    {
+      "id": "src/features/settings/debug/CodexDebugPanel.ts|src/core/agents/backend/diagnostics/index.ts|runtime-static|../../../core/agents/backend/diagnostics",
+      "from": "src/features/settings/debug/CodexDebugPanel.ts",
+      "to": "src/core/agents/backend/diagnostics/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../../core/agents/backend/diagnostics"
+    },
+    {
+      "id": "src/features/settings/debug/CodexDebugPanel.ts|src/core/types/index.ts|runtime-static|../../../core/types",
+      "from": "src/features/settings/debug/CodexDebugPanel.ts",
+      "to": "src/core/types/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../../core/types"
+    },
+    {
+      "id": "src/features/settings/debug/CodexDebugPanel.ts|src/features/settings/debug/types.ts|type-only|./types",
+      "from": "src/features/settings/debug/CodexDebugPanel.ts",
+      "to": "src/features/settings/debug/types.ts",
+      "kind": "type-only",
+      "specifier": "./types"
+    },
+    {
+      "id": "src/features/settings/debug/CodexDebugPanel.ts|src/i18n/index.ts|runtime-static|../../../i18n",
+      "from": "src/features/settings/debug/CodexDebugPanel.ts",
+      "to": "src/i18n/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../../i18n"
+    },
+    {
+      "id": "src/features/settings/debug/CodexDebugPanel.ts|src/shared/diagnostics/index.ts|runtime-static|../../../shared/diagnostics",
+      "from": "src/features/settings/debug/CodexDebugPanel.ts",
+      "to": "src/shared/diagnostics/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../../shared/diagnostics"
+    },
+    {
+      "id": "src/features/settings/debug/OpenCodeDebugPanel.ts|src/core/opencode/diagnostics/index.ts|runtime-static|../../../core/opencode/diagnostics",
+      "from": "src/features/settings/debug/OpenCodeDebugPanel.ts",
+      "to": "src/core/opencode/diagnostics/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../../core/opencode/diagnostics"
+    },
+    {
+      "id": "src/features/settings/debug/OpenCodeDebugPanel.ts|src/core/types/index.ts|runtime-static|../../../core/types",
+      "from": "src/features/settings/debug/OpenCodeDebugPanel.ts",
+      "to": "src/core/types/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../../core/types"
+    },
+    {
+      "id": "src/features/settings/debug/OpenCodeDebugPanel.ts|src/features/settings/debug/types.ts|type-only|./types",
+      "from": "src/features/settings/debug/OpenCodeDebugPanel.ts",
+      "to": "src/features/settings/debug/types.ts",
+      "kind": "type-only",
+      "specifier": "./types"
+    },
+    {
+      "id": "src/features/settings/debug/OpenCodeDebugPanel.ts|src/i18n/index.ts|runtime-static|../../../i18n",
+      "from": "src/features/settings/debug/OpenCodeDebugPanel.ts",
+      "to": "src/i18n/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../../i18n"
+    },
+    {
+      "id": "src/features/settings/debug/OpenCodeDebugPanel.ts|src/shared/debugModules.ts|type-only|../../../shared/debugModules",
+      "from": "src/features/settings/debug/OpenCodeDebugPanel.ts",
+      "to": "src/shared/debugModules.ts",
+      "kind": "type-only",
+      "specifier": "../../../shared/debugModules"
+    },
+    {
+      "id": "src/features/settings/debug/types.ts|src/core/agents/backend/diagnostics/index.ts|type-only|../../../core/agents/backend/diagnostics",
+      "from": "src/features/settings/debug/types.ts",
+      "to": "src/core/agents/backend/diagnostics/index.ts",
+      "kind": "type-only",
+      "specifier": "../../../core/agents/backend/diagnostics"
+    },
+    {
+      "id": "src/features/settings/debug/types.ts|src/core/opencode/diagnostics/index.ts|type-only|../../../core/opencode/diagnostics",
+      "from": "src/features/settings/debug/types.ts",
+      "to": "src/core/opencode/diagnostics/index.ts",
+      "kind": "type-only",
+      "specifier": "../../../core/opencode/diagnostics"
+    },
+    {
+      "id": "src/features/settings/debug/types.ts|src/i18n/index.ts|type-only|../../../i18n",
+      "from": "src/features/settings/debug/types.ts",
+      "to": "src/i18n/index.ts",
+      "kind": "type-only",
+      "specifier": "../../../i18n"
+    },
+    {
+      "id": "src/features/settings/debug/types.ts|src/shared/debugModules.ts|type-only|../../../shared/debugModules",
+      "from": "src/features/settings/debug/types.ts",
+      "to": "src/shared/debugModules.ts",
+      "kind": "type-only",
+      "specifier": "../../../shared/debugModules"
+    },
+    {
+      "id": "src/features/settings/debug/types.ts|src/shared/diagnostics/index.ts|type-only|../../../shared/diagnostics",
+      "from": "src/features/settings/debug/types.ts",
+      "to": "src/shared/diagnostics/index.ts",
+      "kind": "type-only",
+      "specifier": "../../../shared/diagnostics"
+    },
+    {
       "id": "src/features/settings/index.ts|src/features/settings/OpenCodianSettings.ts|re-export|./OpenCodianSettings",
       "from": "src/features/settings/index.ts",
       "to": "src/features/settings/OpenCodianSettings.ts",
@@ -11204,6 +11575,13 @@
       "specifier": "../../core/types/chat"
     },
     {
+      "id": "src/features/settings/OpenCodianSettings.ts|src/features/settings/debug/types.ts|runtime-static|./debug/types",
+      "from": "src/features/settings/OpenCodianSettings.ts",
+      "to": "src/features/settings/debug/types.ts",
+      "kind": "runtime-static",
+      "specifier": "./debug/types"
+    },
+    {
       "id": "src/features/settings/OpenCodianSettings.ts|src/features/settings/SettingsAcpSection.ts|runtime-static|./SettingsAcpSection",
       "from": "src/features/settings/OpenCodianSettings.ts",
       "to": "src/features/settings/SettingsAcpSection.ts",
@@ -11384,6 +11762,13 @@
       "to": "src/core/types/chat.ts",
       "kind": "type-only",
       "specifier": "../../core/types/chat"
+    },
+    {
+      "id": "src/features/settings/OpenCodianSettingsView.ts|src/features/settings/debug/types.ts|runtime-static|./debug/types",
+      "from": "src/features/settings/OpenCodianSettingsView.ts",
+      "to": "src/features/settings/debug/types.ts",
+      "kind": "runtime-static",
+      "specifier": "./debug/types"
     },
     {
       "id": "src/features/settings/OpenCodianSettingsView.ts|src/features/settings/SettingsAcpSection.ts|runtime-static|./SettingsAcpSection",
@@ -12737,18 +13122,39 @@
       "specifier": "../../core/agents/backend/diagnostics"
     },
     {
-      "id": "src/features/settings/SettingsDebugSection.ts|src/core/opencode/diagnostics/index.ts|runtime-static|../../core/opencode/diagnostics",
-      "from": "src/features/settings/SettingsDebugSection.ts",
-      "to": "src/core/opencode/diagnostics/index.ts",
-      "kind": "runtime-static",
-      "specifier": "../../core/opencode/diagnostics"
-    },
-    {
       "id": "src/features/settings/SettingsDebugSection.ts|src/core/types/index.ts|runtime-static|../../core/types",
       "from": "src/features/settings/SettingsDebugSection.ts",
       "to": "src/core/types/index.ts",
       "kind": "runtime-static",
       "specifier": "../../core/types"
+    },
+    {
+      "id": "src/features/settings/SettingsDebugSection.ts|src/features/settings/debug/ClaudeCodeDebugPanel.ts|runtime-static|./debug/ClaudeCodeDebugPanel",
+      "from": "src/features/settings/SettingsDebugSection.ts",
+      "to": "src/features/settings/debug/ClaudeCodeDebugPanel.ts",
+      "kind": "runtime-static",
+      "specifier": "./debug/ClaudeCodeDebugPanel"
+    },
+    {
+      "id": "src/features/settings/SettingsDebugSection.ts|src/features/settings/debug/CodexDebugPanel.ts|runtime-static|./debug/CodexDebugPanel",
+      "from": "src/features/settings/SettingsDebugSection.ts",
+      "to": "src/features/settings/debug/CodexDebugPanel.ts",
+      "kind": "runtime-static",
+      "specifier": "./debug/CodexDebugPanel"
+    },
+    {
+      "id": "src/features/settings/SettingsDebugSection.ts|src/features/settings/debug/OpenCodeDebugPanel.ts|runtime-static|./debug/OpenCodeDebugPanel",
+      "from": "src/features/settings/SettingsDebugSection.ts",
+      "to": "src/features/settings/debug/OpenCodeDebugPanel.ts",
+      "kind": "runtime-static",
+      "specifier": "./debug/OpenCodeDebugPanel"
+    },
+    {
+      "id": "src/features/settings/SettingsDebugSection.ts|src/features/settings/debug/types.ts|type-only|./debug/types",
+      "from": "src/features/settings/SettingsDebugSection.ts",
+      "to": "src/features/settings/debug/types.ts",
+      "kind": "type-only",
+      "specifier": "./debug/types"
     },
     {
       "id": "src/features/settings/SettingsDebugSection.ts|src/i18n/index.ts|runtime-static|../../i18n",
@@ -12770,13 +13176,6 @@
       "to": "src/shared/debugModules.ts",
       "kind": "runtime-static",
       "specifier": "../../shared/debugModules"
-    },
-    {
-      "id": "src/features/settings/SettingsDebugSection.ts|src/shared/diagnostics/index.ts|runtime-static|../../shared/diagnostics",
-      "from": "src/features/settings/SettingsDebugSection.ts",
-      "to": "src/shared/diagnostics/index.ts",
-      "kind": "runtime-static",
-      "specifier": "../../shared/diagnostics"
     },
     {
       "id": "src/features/settings/SettingsDebugSection.ts|src/shared/index.ts|runtime-static|../../shared",
@@ -13962,6 +14361,13 @@
       "specifier": "./AgentSwitcherFloatingIcons"
     },
     {
+      "id": "src/features/settings/SettingsTabbedRenderer.ts|src/features/settings/debug/types.ts|runtime-static|./debug/types",
+      "from": "src/features/settings/SettingsTabbedRenderer.ts",
+      "to": "src/features/settings/debug/types.ts",
+      "kind": "runtime-static",
+      "specifier": "./debug/types"
+    },
+    {
       "id": "src/features/settings/SettingsTabbedRenderer.ts|src/features/settings/SettingsAcpSection.ts|runtime-static|./SettingsAcpSection",
       "from": "src/features/settings/SettingsTabbedRenderer.ts",
       "to": "src/features/settings/SettingsAcpSection.ts",
@@ -14347,6 +14753,20 @@
       "specifier": "./zh"
     },
     {
+      "id": "src/main.ts|src/app/diagnostics/index.ts|runtime-static|./app/diagnostics",
+      "from": "src/main.ts",
+      "to": "src/app/diagnostics/index.ts",
+      "kind": "runtime-static",
+      "specifier": "./app/diagnostics"
+    },
+    {
+      "id": "src/main.ts|src/app/runtime/PluginRuntimeCoordinator.ts|runtime-static|./app/runtime/PluginRuntimeCoordinator",
+      "from": "src/main.ts",
+      "to": "src/app/runtime/PluginRuntimeCoordinator.ts",
+      "kind": "runtime-static",
+      "specifier": "./app/runtime/PluginRuntimeCoordinator"
+    },
+    {
       "id": "src/main.ts|src/core/agents/AgentCapability.ts|runtime-static|./core/agents/AgentCapability",
       "from": "src/main.ts",
       "to": "src/core/agents/AgentCapability.ts",
@@ -14494,13 +14914,6 @@
       "specifier": "./core/runtime/OpenCodianStartupCoordinator"
     },
     {
-      "id": "src/main.ts|src/core/runtime/PluginRuntimeCoordinator.ts|runtime-static|./core/runtime/PluginRuntimeCoordinator",
-      "from": "src/main.ts",
-      "to": "src/core/runtime/PluginRuntimeCoordinator.ts",
-      "kind": "runtime-static",
-      "specifier": "./core/runtime/PluginRuntimeCoordinator"
-    },
-    {
       "id": "src/main.ts|src/core/storage/ConversationFullMessageCache.ts|runtime-static|./core/storage/ConversationFullMessageCache",
       "from": "src/main.ts",
       "to": "src/core/storage/ConversationFullMessageCache.ts",
@@ -14555,6 +14968,13 @@
       "to": "src/features/chat/OpenCodianView.ts",
       "kind": "runtime-static",
       "specifier": "./features/chat/OpenCodianView"
+    },
+    {
+      "id": "src/main.ts|src/features/chat/services/ChatDiagnosticsCoordinator.ts|runtime-static|./features/chat/services/ChatDiagnosticsCoordinator",
+      "from": "src/main.ts",
+      "to": "src/features/chat/services/ChatDiagnosticsCoordinator.ts",
+      "kind": "runtime-static",
+      "specifier": "./features/chat/services/ChatDiagnosticsCoordinator"
     },
     {
       "id": "src/main.ts|src/features/settings/OpenCodianSettings.ts|runtime-static|./features/settings/OpenCodianSettings",
@@ -15349,34 +15769,12 @@
   ],
   "mixedSccs": [
     {
-      "id": "src/core/agents/backend/ConfigurationArchiveService.ts;;src/core/agents/backend/ProjectResourceSecureWrite.ts",
+      "id": "src/app/runtime/PluginRuntimeCoordinator.ts;;src/features/chat/ChatPluginPort.ts;;src/features/chat/OpenCodianView.ts;;src/features/chat/services/ChatHeaderPresenter.ts;;src/features/settings/AgentSwitcherFloatingIcons.ts;;src/features/settings/CostEstimateSettingsRow.ts;;src/features/settings/ModelConfigJsonModal.ts;;src/features/settings/ModelConfigModal.ts;;src/features/settings/ModelConfigProviderEditor.ts;;src/features/settings/ModelPricingModal.ts;;src/features/settings/OpenCodianSettings.ts;;src/features/settings/OpenCodianSettingsView.ts;;src/features/settings/ProviderBuiltinIconPickerModal.ts;;src/features/settings/ProviderIconCacheModal.ts;;src/features/settings/SettingsAcpSection.ts;;src/features/settings/SettingsAgentsSection.ts;;src/features/settings/SettingsBackendSection.ts;;src/features/settings/SettingsCapabilityLabSection.ts;;src/features/settings/SettingsClaudeCodeSection.ts;;src/features/settings/SettingsClaudeConfigurationSection.ts;;src/features/settings/SettingsClaudeProviderMetadataPersistenceCoordinator.ts;;src/features/settings/SettingsClaudeProvidersSection.ts;;src/features/settings/SettingsClaudeResourcesSection.ts;;src/features/settings/SettingsCodexAccountSurface.ts;;src/features/settings/SettingsCodexLegacyCredentialControl.ts;;src/features/settings/SettingsCodexProjectConfigSection.ts;;src/features/settings/SettingsCodexReadbackControls.ts;;src/features/settings/SettingsCodexResourcesSection.ts;;src/features/settings/SettingsCodexSection.ts;;src/features/settings/SettingsCommandsSection.ts;;src/features/settings/SettingsConversationSection.ts;;src/features/settings/SettingsDebugSection.ts;;src/features/settings/SettingsFormatterSection.ts;;src/features/settings/SettingsMcpSection.ts;;src/features/settings/SettingsModelCatalogCoordinator.ts;;src/features/settings/SettingsModelIconCacheManager.ts;;src/features/settings/SettingsModelSection.ts;;src/features/settings/SettingsPanelChrome.ts;;src/features/settings/SettingsPluginSection.ts;;src/features/settings/SettingsPluginUpdateSection.ts;;src/features/settings/SettingsProjectAgentEditor.ts;;src/features/settings/SettingsProjectCommandEditor.ts;;src/features/settings/SettingsSecuritySection.ts;;src/features/settings/SettingsServerSection.ts;;src/features/settings/SettingsSkillSection.ts;;src/features/settings/SettingsStyleBackgroundSection.ts;;src/features/settings/SettingsStyleInputPanelSection.ts;;src/features/settings/SettingsStyleLiquidGlassInputControls.ts;;src/features/settings/SettingsStylePresetSection.ts;;src/features/settings/SettingsStyleSection.ts;;src/features/settings/SettingsTabbedHeader.ts;;src/features/settings/SettingsTabbedRenderer.ts;;src/features/settings/SettingsToolDetailModal.ts;;src/features/settings/SettingsToolFileService.ts;;src/features/settings/SettingsToolSection.ts;;src/features/settings/SettingsUiSection.ts;;src/features/settings/SettingsUserSection.ts;;src/features/settings/SettingsViewRegistrar.ts;;src/features/settings/capabilityDisclosureRow.ts;;src/features/settings/settingsStyleControls.ts;;src/main.ts",
       "members": [
-        "src/core/agents/backend/ConfigurationArchiveService.ts",
-        "src/core/agents/backend/ProjectResourceSecureWrite.ts"
-      ]
-    },
-    {
-      "id": "src/core/agents/backend/diagnostics/CodexSessionTraceService.ts;;src/core/agents/backend/diagnostics/CodexWireTraceBridge.ts",
-      "members": [
-        "src/core/agents/backend/diagnostics/CodexSessionTraceService.ts",
-        "src/core/agents/backend/diagnostics/CodexWireTraceBridge.ts"
-      ]
-    },
-    {
-      "id": "src/core/config/ModelPricingService.ts;;src/core/config/index.ts;;src/core/runtime/OpenCodianSettingsRuntimeCoordinator.ts;;src/core/runtime/PluginRuntimeCoordinator.ts;;src/core/storage/StorageService.ts;;src/core/storage/index.ts;;src/core/types/settingsLoadNormalization.ts;;src/features/chat/OpenCodianView.ts;;src/features/chat/services/ChatHeaderPresenter.ts;;src/features/chat/services/ChatSelectionControlsCoordinator.ts;;src/features/chat/services/ModelSelectionRuntime.ts;;src/features/chat/services/TitleGenerationService.ts;;src/features/settings/AgentSwitcherFloatingIcons.ts;;src/features/settings/CostEstimateSettingsRow.ts;;src/features/settings/ModelConfigJsonModal.ts;;src/features/settings/ModelConfigModal.ts;;src/features/settings/ModelConfigProviderEditor.ts;;src/features/settings/ModelPricingModal.ts;;src/features/settings/OpenCodianSettings.ts;;src/features/settings/OpenCodianSettingsView.ts;;src/features/settings/OpencodeConfigModal.ts;;src/features/settings/ProviderBuiltinIconPickerModal.ts;;src/features/settings/ProviderIconCacheModal.ts;;src/features/settings/SettingsAcpSection.ts;;src/features/settings/SettingsAgentsSection.ts;;src/features/settings/SettingsBackendSection.ts;;src/features/settings/SettingsCapabilityLabSection.ts;;src/features/settings/SettingsClaudeCodeSection.ts;;src/features/settings/SettingsClaudeConfigurationSection.ts;;src/features/settings/SettingsClaudeProviderMetadataPersistenceCoordinator.ts;;src/features/settings/SettingsClaudeProvidersSection.ts;;src/features/settings/SettingsClaudeResourcesSection.ts;;src/features/settings/SettingsCodexAccountSurface.ts;;src/features/settings/SettingsCodexLegacyCredentialControl.ts;;src/features/settings/SettingsCodexProjectConfigSection.ts;;src/features/settings/SettingsCodexReadbackControls.ts;;src/features/settings/SettingsCodexResourcesSection.ts;;src/features/settings/SettingsCodexSection.ts;;src/features/settings/SettingsCommandsSection.ts;;src/features/settings/SettingsConversationSection.ts;;src/features/settings/SettingsDebugSection.ts;;src/features/settings/SettingsFormatterSection.ts;;src/features/settings/SettingsMcpSection.ts;;src/features/settings/SettingsModelCatalogAvailability.ts;;src/features/settings/SettingsModelCatalogCoordinator.ts;;src/features/settings/SettingsModelCatalogPresenter.ts;;src/features/settings/SettingsModelIconCacheManager.ts;;src/features/settings/SettingsModelSection.ts;;src/features/settings/SettingsPanelChrome.ts;;src/features/settings/SettingsPluginSection.ts;;src/features/settings/SettingsPluginUpdateSection.ts;;src/features/settings/SettingsProjectAgentEditor.ts;;src/features/settings/SettingsProjectCommandEditor.ts;;src/features/settings/SettingsSecuritySection.ts;;src/features/settings/SettingsServerSection.ts;;src/features/settings/SettingsSkillSection.ts;;src/features/settings/SettingsStyleBackgroundSection.ts;;src/features/settings/SettingsStyleInputPanelSection.ts;;src/features/settings/SettingsStyleLiquidGlassInputControls.ts;;src/features/settings/SettingsStylePresetSection.ts;;src/features/settings/SettingsStyleSection.ts;;src/features/settings/SettingsTabbedHeader.ts;;src/features/settings/SettingsTabbedRenderer.ts;;src/features/settings/SettingsToolDetailModal.ts;;src/features/settings/SettingsToolFileService.ts;;src/features/settings/SettingsToolSection.ts;;src/features/settings/SettingsUiSection.ts;;src/features/settings/SettingsUserSection.ts;;src/features/settings/SettingsViewRegistrar.ts;;src/features/settings/capabilityDisclosureRow.ts;;src/features/settings/settingsStyleControls.ts;;src/main.ts",
-      "members": [
-        "src/core/config/ModelPricingService.ts",
-        "src/core/config/index.ts",
-        "src/core/runtime/OpenCodianSettingsRuntimeCoordinator.ts",
-        "src/core/runtime/PluginRuntimeCoordinator.ts",
-        "src/core/storage/StorageService.ts",
-        "src/core/storage/index.ts",
-        "src/core/types/settingsLoadNormalization.ts",
+        "src/app/runtime/PluginRuntimeCoordinator.ts",
+        "src/features/chat/ChatPluginPort.ts",
         "src/features/chat/OpenCodianView.ts",
         "src/features/chat/services/ChatHeaderPresenter.ts",
-        "src/features/chat/services/ChatSelectionControlsCoordinator.ts",
-        "src/features/chat/services/ModelSelectionRuntime.ts",
-        "src/features/chat/services/TitleGenerationService.ts",
         "src/features/settings/AgentSwitcherFloatingIcons.ts",
         "src/features/settings/CostEstimateSettingsRow.ts",
         "src/features/settings/ModelConfigJsonModal.ts",
@@ -15385,7 +15783,6 @@
         "src/features/settings/ModelPricingModal.ts",
         "src/features/settings/OpenCodianSettings.ts",
         "src/features/settings/OpenCodianSettingsView.ts",
-        "src/features/settings/OpencodeConfigModal.ts",
         "src/features/settings/ProviderBuiltinIconPickerModal.ts",
         "src/features/settings/ProviderIconCacheModal.ts",
         "src/features/settings/SettingsAcpSection.ts",
@@ -15408,9 +15805,7 @@
         "src/features/settings/SettingsDebugSection.ts",
         "src/features/settings/SettingsFormatterSection.ts",
         "src/features/settings/SettingsMcpSection.ts",
-        "src/features/settings/SettingsModelCatalogAvailability.ts",
         "src/features/settings/SettingsModelCatalogCoordinator.ts",
-        "src/features/settings/SettingsModelCatalogPresenter.ts",
         "src/features/settings/SettingsModelIconCacheManager.ts",
         "src/features/settings/SettingsModelSection.ts",
         "src/features/settings/SettingsPanelChrome.ts",
@@ -15437,6 +15832,20 @@
         "src/features/settings/capabilityDisclosureRow.ts",
         "src/features/settings/settingsStyleControls.ts",
         "src/main.ts"
+      ]
+    },
+    {
+      "id": "src/core/agents/backend/ConfigurationArchiveService.ts;;src/core/agents/backend/ProjectResourceSecureWrite.ts",
+      "members": [
+        "src/core/agents/backend/ConfigurationArchiveService.ts",
+        "src/core/agents/backend/ProjectResourceSecureWrite.ts"
+      ]
+    },
+    {
+      "id": "src/core/agents/backend/diagnostics/CodexSessionTraceService.ts;;src/core/agents/backend/diagnostics/CodexWireTraceBridge.ts",
+      "members": [
+        "src/core/agents/backend/diagnostics/CodexSessionTraceService.ts",
+        "src/core/agents/backend/diagnostics/CodexWireTraceBridge.ts"
       ]
     },
     {

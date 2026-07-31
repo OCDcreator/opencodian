@@ -63,18 +63,66 @@
         "core.config",
         "feature.chat-shell",
         "feature.settings-shell",
-        "app.diagnostics-runtime"
+        "app.diagnostics-runtime",
+        "app.runtime"
       ],
       "forbiddenDependencies": [],
       "adjacentOwners": [
         "core.runtime",
         "core.opencode",
-        "app.diagnostics-runtime"
+        "app.diagnostics-runtime",
+        "app.runtime"
       ],
       "tests": [
         "tests/unit/entry-point/**"
       ],
       "overviewDoc": "docs/architecture/owners/app-composition.md",
+      "requiredGates": [
+        "typecheck",
+        "module-docs",
+        "build"
+      ],
+      "risk": "high"
+    },
+    {
+      "id": "app.runtime",
+      "layer": "app",
+      "include": [
+        "src/app/runtime/**"
+      ],
+      "delegatesTo": [],
+      "responsibilities": [
+        "cross-view refresh and model refresh scheduling",
+        "slash catalog invalidation",
+        "deferred runtime warmup",
+        "plugin update startup check"
+      ],
+      "canonicalState": [
+        "PluginRuntimeCoordinator model refresh frame state",
+        "PluginRuntimeCoordinator deferred warmup timer and promise state"
+      ],
+      "entrypoints": [
+        "src/app/runtime/PluginRuntimeCoordinator.ts"
+      ],
+      "allowedOwnerDependencies": [
+        "shared.foundation",
+        "shared.i18n",
+        "core.opencode",
+        "core.types",
+        "core.update",
+        "feature.chat-shell",
+        "feature.chat-runtime"
+      ],
+      "forbiddenDependencies": [],
+      "adjacentOwners": [
+        "app.composition",
+        "core.runtime",
+        "feature.chat-shell"
+      ],
+      "tests": [
+        "tests/unit/app/runtime/**"
+      ],
+      "overviewDoc": "docs/architecture/owners/app-runtime.md",
       "requiredGates": [
         "typecheck",
         "module-docs",
@@ -868,20 +916,24 @@
       ],
       "delegatesTo": [],
       "responsibilities": [
-        "plugin runtime coordinator and startup coordination",
-        "settings runtime coordinator (theme/appearance composition)"
+        "startup bootstrap coordination and performance tracing",
+        "settings runtime coordination (theme/appearance composition and persistence)"
       ],
       "canonicalState": [
-        "plugin runtime coordinator state"
+        "startup performance trace",
+        "settings runtime coordinator state"
       ],
       "entrypoints": [
-        "src/core/runtime/PluginRuntimeCoordinator.ts",
-        "src/core/runtime/OpenCodianStartupCoordinator.ts"
+        "src/core/runtime/OpenCodianStartupCoordinator.ts",
+        "src/core/runtime/OpenCodianSettingsRuntimeCoordinator.ts"
       ],
       "allowedOwnerDependencies": [
         "shared.foundation",
         "core.types",
-        "core.storage"
+        "core.config",
+        "core.opencode",
+        "core.storage",
+        "core.theme"
       ],
       "forbiddenDependencies": [
         "feature",
@@ -889,6 +941,7 @@
       ],
       "adjacentOwners": [
         "app.composition",
+        "app.runtime",
         "feature.chat-shell"
       ],
       "tests": [

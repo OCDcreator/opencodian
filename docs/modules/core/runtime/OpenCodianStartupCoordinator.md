@@ -7,9 +7,9 @@
 
 `OpenCodianStartupCoordinator` 是 OpenCodian 的启动引导运行时 owner。它负责编排插件 `onload` 阶段的完整启动序列，并统一管理启动期性能追踪（startup perf tracing）。
 
-它不是薄包装，而是与 `PluginRuntimeCoordinator` 并列的相邻 durable owner：
+它不是薄包装，而是与 app 层 `PluginRuntimeCoordinator` 并列的相邻 durable owner：
 
-- `PluginRuntimeCoordinator` 负责启动后的 runtime 调度（deferred warmup、model refresh、cross-view refresh）
+- `app.runtime/PluginRuntimeCoordinator` 负责启动后的 runtime 调度（deferred warmup、model refresh、cross-view refresh）
 - `OpenCodianStartupCoordinator` 负责启动窗口内的引导序列和诊断
 
 `main.ts` 保留插件生命周期入口所有权（`onload`/`onunload`、命令注册、视图注册），但将启动期的具体编排委托给此 coordinator。
@@ -126,7 +126,7 @@ graph TD
 ## 与其他模块的交互
 
 - `main.ts`: 创建 coordinator 实例，在 `onload()` 中调用 `execute()`；通过 handler 回调执行具体的 storage/service/view 操作；通过 getter 读取 perf trace 数据用于诊断报告
-- `PluginRuntimeCoordinator`: `execute()` 最后通过回调触发 `scheduleDeferredRuntimeWarmup()`，将控制权移交到启动后 runtime owner
+- `app.runtime/PluginRuntimeCoordinator`: `execute()` 最后通过回调触发 `scheduleDeferredRuntimeWarmup()`，将控制权移交到启动后 runtime owner
 - `StorageService`: `onPrepareStartupState` 中创建和初始化
 - `OpenCodeService`: `onBootstrapOpenCodeRuntime` 中构造
 - `OpencodeConfigManager`: 在 bootstrap 阶段调用 `ensureInitialized`

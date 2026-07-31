@@ -250,7 +250,7 @@ graph TD
 - `OpencodeConfigManager`: 用于首次创建或后续同步 `.opencode` 权限配置。
 - `ModelConfigService`: 在拿到 vault 路径后构建，供设置页和视图读取模型目录。
 - `OpenCodianStartupCoordinator`: 启动引导运行时 owner，负责编排 `onload` 阶段的启动序列和性能追踪；`main.ts` 通过回调注入具体行为，启动完成后保留 coordinator 引用读取诊断数据。
-- `PluginRuntimeCoordinator`: 入口旁的 runtime orchestration owner，负责 deferred warmup、session-bootstrap warmup readiness、model refresh frame、slash catalog invalidation 和 cross-view UI refresh fan-out。
+- `PluginRuntimeCoordinator`: `app.runtime` owner（源码 `src/app/runtime/PluginRuntimeCoordinator.ts`），负责 deferred warmup、session-bootstrap warmup readiness、model refresh frame、slash catalog invalidation 和 cross-view UI refresh fan-out。
 - `OpenCodianView`: 由入口注册；入口同时注入 `createChatDiagnosticsCoordinatorFactory()`，factory 闭包只保存三个显式、惰性的 diagnostics backend getters，view 只向 coordinator 提供 chat/UI callbacks。
 - `ChatDiagnosticsCoordinator`: chat surface 的统一 diagnostics boundary；持有 OpenCode logic、`CodexDiagnosticsHostAdapter` 和 `ClaudeDiagnosticsHostAdapter`，不作为通用 backend service locator。
 - `OpenCodianSettingTab`: 通过插件实例保存设置、刷新服务状态和模型目录。

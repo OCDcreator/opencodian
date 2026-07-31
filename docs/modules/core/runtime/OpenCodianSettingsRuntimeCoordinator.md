@@ -91,7 +91,7 @@ export interface OpenCodianSettingsRuntimeCoordinatorHost {
 ## 与其他模块的交互
 
 - `main.ts`: 构造本模块并提供 host callbacks
-- `PluginRuntimeCoordinator`: 通过 host callback 进行跨视图刷新，并在恢复到本地 auto-start 运行时时调度 deferred warmup
+- `app.runtime/PluginRuntimeCoordinator`: 通过 host callback 进行跨视图刷新，并在恢复到本地 auto-start 运行时时调度 deferred warmup
 - `StorageService`: 通过 host callback 读写设置和主题背景资源
 - `OpenCodeService`: 通过 host callback 同步设置
 

@@ -48,6 +48,14 @@ docs/modules/
 ├── _WORKFLOW.md                       ← 并行填充与增量更新工作流
 ├── entry-point/
 │   └── main.md
+├── app/
+│   ├── diagnostics/
+│   │   ├── index.md
+│   │   ├── types.md
+│   │   └── DiagnosticsRuntimeCoordinator.md
+│   └── runtime/
+│       ├── index.md
+│       └── PluginRuntimeCoordinator.md
 ├── core/
 │   ├── agents/
 │   │   ├── AgentCapability.md
@@ -102,8 +110,9 @@ docs/modules/
 │   ├── prompts/
 │   │   └── titleGeneration.md
 │   ├── runtime/
+│   │   ├── index.md
 │   │   ├── OpenCodianSettingsRuntimeCoordinator.md
-│   │   └── PluginRuntimeCoordinator.md
+│   │   └── OpenCodianStartupCoordinator.md
 │   ├── security/
 │   │   ├── index.md
 │   │   └── BlocklistChecker.md
