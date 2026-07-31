@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "digest": "2b00a963004508130fba82a72a994058659ca9c832f01a65358b073895904b32",
-  "recordCount": 596,
+  "digest": "03535ea939f7e45482b06f4c0f8a1f7019cd46e9ae1b58ea238c010e322dd29f",
+  "recordCount": 597,
   "records": [
     {
       "kind": "ignore",
@@ -2035,13 +2035,18 @@
     },
     {
       "kind": "src",
+      "key": "src/features/settings/debug/CodexDebugPanel.ts",
+      "sha256": "d309227d3c35524559fe04a7f980979dce661a7ff4462ae083be520279f3842f"
+    },
+    {
+      "kind": "src",
       "key": "src/features/settings/debug/OpenCodeDebugPanel.ts",
       "sha256": "b374efa4666083e93084219d8634675ee439fdcb332ac57d6d8b6f735a1945e3"
     },
     {
       "kind": "src",
       "key": "src/features/settings/debug/types.ts",
-      "sha256": "4168bd563328a36fc16c29a89e157ae8e5a444f6e3b3ef609bd1bfad1143ce85"
+      "sha256": "e62f4876d6d3d174f337c53cc34b70b53c95358fc861c458d0b810fa111cd07c"
     },
     {
       "kind": "src",
@@ -2146,12 +2151,12 @@
     {
       "kind": "src",
       "key": "src/features/settings/OpenCodianSettings.ts",
-      "sha256": "6d1b9efff9c4ae06a346a4ef7f5402f25852ba694e8791876fed8be87e146966"
+      "sha256": "8e5d573acf90fe736aba272a9722eb2757a527b124b6edc6e918c50ec713250f"
     },
     {
       "kind": "src",
       "key": "src/features/settings/OpenCodianSettingsView.ts",
-      "sha256": "b96dd2fcc6795ff4dafe2017ce8328d9652c91c526903b5aabcf62fb4488ce30"
+      "sha256": "59908a535f84f2e53a6b7fa541739e98a786921c95f8ed3c29cdda41be32d23a"
     },
     {
       "kind": "src",
@@ -2281,7 +2286,7 @@
     {
       "kind": "src",
       "key": "src/features/settings/SettingsDebugSection.ts",
-      "sha256": "8e88da43eb7dbea1ce5676e16ca96b9f3048d0b8ed42e7b70beb112025ca54a1"
+      "sha256": "c13b6ed7b5c906080952d0f0b389a60d767a2ed8498b0bc221ccd3ca2f0bd0de"
     },
     {
       "kind": "src",
@@ -2431,7 +2436,7 @@
     {
       "kind": "src",
       "key": "src/features/settings/SettingsTabbedRenderer.ts",
-      "sha256": "d4690e2da0ad29963263f4d14c85e9a3b94dd7f52c3783e76291d83049313377"
+      "sha256": "c61f04be1afc1bc97a26f5fa070e43b3a66b3ee036571b5a0a2b0e194175dd73"
     },
     {
       "kind": "src",
@@ -2984,7 +2989,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-07-31T09:19:47.941Z",
-  "headShaAtGeneration": "91fc3b7f27d2541bb48d0671e2f0aebed96b1295",
+  "generatedAt": "2026-07-31T09:54:23.680Z",
+  "headShaAtGeneration": "4201793cd5c08f6f1ae46d244be6d6c54fef428f",
   "graphifyVersion": "graphify 0.9.22"
 }

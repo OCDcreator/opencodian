@@ -1,4 +1,8 @@
 import type {
+  CodexSessionTraceService,
+  CodexSessionTraceSettings,
+} from '../../../core/agents/backend/diagnostics';
+import type {
   OpenCodeSessionTraceService,
   OpenCodeSessionTraceSettings,
   OpenCodeTraceStoreStatus,
@@ -6,6 +10,7 @@ import type {
 } from '../../../core/opencode/diagnostics';
 import type { t } from '../../../i18n';
 import type { DebugModuleKey } from '../../../shared/debugModules';
+import type { TraceStoreStatus, TraceSummary } from '../../../shared/diagnostics';
 
 export interface DebugModuleGroupConfig {
   moduleKeys: readonly DebugModuleKey[];
@@ -63,4 +68,54 @@ export interface OpenCodeDebugPanelOptions {
     cta?: boolean,
   ) => HTMLButtonElement;
   renderDebugModules: (containerEl: HTMLElement, config: DebugModuleGroupConfig) => void;
+}
+
+export interface CodexDebugSettingsPort {
+  backendSettings: {
+    codex?: {
+      sessionTrace?: CodexSessionTraceSettings;
+    };
+  };
+}
+
+export interface CodexTraceDiagnosticsPort {
+  getStatus: () => TraceStoreStatus;
+  listSummaries: (limit?: number) => TraceSummary[];
+  buildSmartReport: (
+    traceId?: string,
+    userContext?: { actual?: string; expected?: string; reproduction?: string },
+  ) => Promise<string>;
+  flush: () => Promise<void>;
+  exportTraceBundle: (traceId: string, targetDirectory: string) => Promise<string>;
+  clear: () => Promise<void>;
+  deleteTrace: (traceId: string) => Promise<void>;
+}
+
+/** Adapts the app-owned Codex trace service at a settings composition boundary. */
+export function createCodexTraceDiagnosticsPort(
+  service: CodexSessionTraceService | undefined,
+): CodexTraceDiagnosticsPort | undefined {
+  if (!service) return undefined;
+  return {
+    getStatus: () => service.store.getStatus(),
+    listSummaries: (limit) => service.store.listSummaries(limit),
+    buildSmartReport: (traceId, userContext) => service.reportBuilder.buildSmartReport(traceId, userContext),
+    flush: () => service.store.flush(),
+    exportTraceBundle: (traceId, targetDirectory) => service.store.exportTraceBundle(traceId, targetDirectory),
+    clear: () => service.store.clear(),
+    deleteTrace: (traceId) => service.store.deleteTrace(traceId),
+  };
+}
+
+export interface CodexDebugPanelOptions {
+  settings: CodexDebugSettingsPort;
+  getDiagnostics: () => CodexTraceDiagnosticsPort | undefined;
+  saveSettings: () => Promise<void>;
+  pickDirectory: (defaultPath?: string) => Promise<string | null>;
+  addActionButton: (
+    containerEl: HTMLElement,
+    label: string,
+    onClick: () => void | Promise<void>,
+    cta?: boolean,
+  ) => HTMLButtonElement;
 }

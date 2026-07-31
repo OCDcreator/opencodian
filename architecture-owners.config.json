@@ -1689,14 +1689,18 @@
       "responsibilities": [
         "shared debug section shell/router, plugin export actions, and platform/path/action/module helpers",
         "complete OpenCode trace debug panel: settings, status, actions, catalog, and narrow diagnostics-port wiring",
-        "Codex and Claude debug workbenches remain in SettingsDebugSection pending their later panel slices"
+        "complete Codex trace debug panel: settings, status, actions, catalog, capture-content control, and narrow diagnostics-port wiring; tabbed-only mounting in this intermediate slice",
+        "Claude Code debug workbench remains in SettingsDebugSection, including console debug channels and independent session-trace controls, pending its later panel slice"
       ],
       "canonicalState": [
-        "debug section tab shell/router state"
+        "debug section tab shell/router state",
+        "backend trace settings persisted in OpenCodianPlugin.settings; panels keep no second settings copy",
+        "trace status and catalog state owned by app diagnostics services and exposed through narrow ports"
       ],
       "entrypoints": [
         "src/features/settings/SettingsDebugSection.ts",
-        "src/features/settings/debug/OpenCodeDebugPanel.ts"
+        "src/features/settings/debug/OpenCodeDebugPanel.ts",
+        "src/features/settings/debug/CodexDebugPanel.ts"
       ],
       "allowedOwnerDependencies": [
         "shared.foundation",
@@ -1714,7 +1718,8 @@
       ],
       "tests": [
         "tests/unit/features/settings/SettingsDebugSection*",
-        "tests/unit/features/settings/OpenCodeDebugPanel*"
+        "tests/unit/features/settings/OpenCodeDebugPanel*",
+        "tests/unit/features/settings/CodexDebugPanel*"
       ],
       "overviewDoc": "docs/architecture/owners/feature-settings-debug.md",
       "requiredGates": [

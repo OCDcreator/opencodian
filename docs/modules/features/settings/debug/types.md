@@ -5,13 +5,13 @@
 
 ## 概述
 
-该模块定义 OpenCode debug panel 的窄类型 contract，并在 settings composition 边界把 app-owned `OpenCodeSessionTraceService` 适配为 panel 可消费的 `OpenCodeTraceDiagnosticsPort`。它只描述边界和转接，不创建第二份 trace state。
+该模块定义 OpenCode 与 Codex debug panel 的窄类型 contract，并在 settings composition 边界把 app-owned trace services 分别适配为 panel 可消费的 diagnostics ports。它只描述边界和转接，不创建第二份 settings、trace status 或 catalog state；当前不定义 Claude port/adapter contract。
 
 ## 导入关系
 
 ```text
-上游: core/opencode/diagnostics, i18n, shared/debugModules
-下游: OpenCodeDebugPanel, OpenCodianSettings, OpenCodianSettingsView, SettingsTabbedRenderer, settings tests
+上游: core/opencode/diagnostics, core/agents/backend/diagnostics, i18n, shared/debugModules, shared/diagnostics
+下游: OpenCodeDebugPanel, CodexDebugPanel, OpenCodianSettings, OpenCodianSettingsView, SettingsTabbedRenderer, settings tests
 ```
 
 ## 核心类型 / 接口
@@ -22,16 +22,23 @@
 | `OpenCodeDebugSettingsPort` | 暴露 panel 所需的 OpenCode session-trace settings 形状 |
 | `OpenCodeTraceDiagnosticsPort` | 暴露 status、summary、smart report、flush、export、clear、delete 等最小诊断操作 |
 | `OpenCodeDebugPanelOptions` | 汇总 settings、diagnostics、保存、目录、按钮和 module-render callbacks |
+| `CodexDebugSettingsPort` | 暴露 panel 所需的 Codex session-trace settings 形状 |
+| `CodexTraceDiagnosticsPort` | 暴露 Codex status、summary、smart report、flush、export、clear、delete 等最小诊断操作 |
+| `CodexDebugPanelOptions` | 汇总 Codex settings、diagnostics、保存、目录和按钮 callbacks |
 
 ## 核心逻辑
 
-### Diagnostics adapter
+### OpenCode diagnostics adapter
 
 `createOpenCodeTraceDiagnosticsPort(service)` 在 service 存在时把 `store` 和 `reportBuilder` 的既有操作逐项映射到窄 port；service 未构造时返回 `undefined`。adapter 是唯一的 settings composition seam，不把完整 service 暴露给 `SettingsDebugSection` 或 `OpenCodeDebugPanel`。
 
+### Codex diagnostics adapter
+
+`createCodexTraceDiagnosticsPort(service)` 与 OpenCode adapter 对称地把 `CodexSessionTraceService.store` 和 `reportBuilder` 的既有操作逐项映射到 `CodexTraceDiagnosticsPort`；service 未构造时返回 `undefined`。Codex panel 使用该 port 读取 `TraceStoreStatus` / `TraceSummary`，执行 smart report、flush、bundle export、clear 和 delete；adapter 不复制 service 的 storage state，也不把完整 service 暴露给 `SettingsDebugSection` 或 `CodexDebugPanel`。
+
 ### Callback contract
 
-`OpenCodeDebugPanelOptions` 只携带 panel 所需的 settings、异步保存、目录选择、按钮创建和 debug-module 渲染能力。全量 plugin、section 私有 helper 和其他 backend diagnostics 不属于该 contract。
+`OpenCodeDebugPanelOptions` 只携带 OpenCode panel 所需的 settings、diagnostics、异步保存、目录选择、按钮创建和 debug-module 渲染能力。`CodexDebugPanelOptions` 只携带 Codex panel 所需的 settings、diagnostics、异步保存、目录选择和按钮创建能力；它不需要 OpenCode 的 debug-module renderer。全量 plugin、section 私有 helper 和其他 backend diagnostics 不属于这些 contracts。
 
 ## 关键导出
 
@@ -40,6 +47,9 @@
 | `createOpenCodeTraceDiagnosticsPort()` | 将可选 OpenCode trace service 转成可选窄 diagnostics port |
 | `OpenCodeTraceDiagnosticsPort` | panel 访问诊断状态和命令的最小接口 |
 | `OpenCodeDebugPanelOptions` | panel 的组合依赖接口 |
+| `createCodexTraceDiagnosticsPort()` | 将可选 Codex trace service 转成可选窄 diagnostics port |
+| `CodexTraceDiagnosticsPort` | Codex panel 访问诊断状态和命令的最小接口 |
+| `CodexDebugPanelOptions` | Codex panel 的组合依赖接口 |
 
 ## 数据流
 
@@ -49,15 +59,22 @@ plugin.openCodeTraceService?
   -> getOpenCodeDiagnostics callback
   -> OpenCodeDebugPanelOptions
   -> OpenCodeDebugPanel
+
+plugin.codexTraceService?
+  -> createCodexTraceDiagnosticsPort()
+  -> getCodexDiagnostics callback
+  -> CodexDebugPanelOptions
+  -> CodexDebugPanel
 ```
 
-三个 settings composition 路径（标准设置 tab、editor-area settings view、tabbed renderer）都在各自边界创建该 port；它们共享同一 adapter，但不改变 diagnostics service 的 canonical ownership。
+三个 settings composition 路径（标准设置 tab、editor-area settings view、tabbed renderer）都在各自边界分别创建 OpenCode 与 Codex port；它们共享对应 adapter，但不改变 diagnostics service 的 canonical ownership。Codex port 的注入不改变 Codex panel 只由 debug tabbed route 挂载的事实。
 
 ## 与其他模块的交互
 
-- `OpenCodeDebugPanel`: 消费所有 contract，不依赖完整 plugin。
-- `SettingsDebugSection`: 接收 `getOpenCodeDiagnostics`，并继续提供 section-level shared callbacks。
-- `OpenCodianSettings`、`OpenCodianSettingsView`、`SettingsTabbedRenderer`: 注入 adapter factory 的结果。
+- `OpenCodeDebugPanel`: 消费 OpenCode contract，不依赖完整 plugin。
+- `CodexDebugPanel`: 消费 Codex contract，不依赖完整 plugin；其 `captureContent` settings 由 `CodexDebugSettingsPort` 暴露。
+- `SettingsDebugSection`: 接收 `getOpenCodeDiagnostics` 与 `getCodexDiagnostics`，并继续提供 section-level shared callbacks；Claude controls 仍不经过本模块。
+- `OpenCodianSettings`、`OpenCodianSettingsView`、`SettingsTabbedRenderer`: 分别注入两个 adapter factory 的结果。
 - `core/opencode/diagnostics`: 保留 trace service、store、report builder 的真实 ownership。
 
 ## 配置项
@@ -66,6 +83,6 @@ plugin.openCodeTraceService?
 
 ## 注意事项
 
-- 不把 full plugin、store 或 report builder 加回 panel options；新增操作先评估是否属于窄 port。
-- 不在此模块复制 settings state 或 debug-module helper；helper 的实现仍属于 `SettingsDebugSection`。
-- 本 slice 不新增 locale key，也不声明 Codex/Claude panel contracts。
+- 不把 full plugin、store 或 report builder 加回任一 panel options；新增操作先评估是否属于对应窄 port。
+- 不在此模块复制 settings state 或 debug-module helper；OpenCode helper 的实现仍属于 `SettingsDebugSection`，Codex panel 使用 section 注入的 action/path callbacks。
+- 本 slice 不新增 locale key；本模块只声明 OpenCode 与 Codex contracts，不声明 Claude panel contract。

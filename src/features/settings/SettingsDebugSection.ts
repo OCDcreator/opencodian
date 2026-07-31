@@ -31,8 +31,13 @@ import {
   normalizeDebugRefreshIntervalMs,
 } from '../../shared/debugModules';
 import { resolveDefaultTraceDirectory } from '../../shared/diagnostics';
+import { CodexDebugPanel } from './debug/CodexDebugPanel';
 import { OPEN_CODE_DEBUG_MODULE_KEYS, OpenCodeDebugPanel } from './debug/OpenCodeDebugPanel';
-import type { DebugModuleGroupConfig, OpenCodeTraceDiagnosticsPort } from './debug/types';
+import type {
+  CodexTraceDiagnosticsPort,
+  DebugModuleGroupConfig,
+  OpenCodeTraceDiagnosticsPort,
+} from './debug/types';
 
 const logger = createLogger('SettingsDebugSection');
 
@@ -54,7 +59,7 @@ interface DebugRenderOptions {
   includeIntro: boolean;
 }
 
-const DEBUG_MODULE_GROUPS: Record<Exclude<DebugSectionBlockId, 'export' | 'opencode'>, readonly DebugModuleKey[]> = {
+const DEBUG_MODULE_GROUPS: Record<Exclude<DebugSectionBlockId, 'export' | 'opencode' | 'codex'>, readonly DebugModuleKey[]> = {
   plugin: [
     'app',
     'settings',
@@ -65,14 +70,13 @@ const DEBUG_MODULE_GROUPS: Record<Exclude<DebugSectionBlockId, 'export' | 'openc
     'providerIcons',
     'visuals',
   ],
-  // Codex trace workbench owns its own channel toggles and has no debug-log modules.
-  codex: [] as DebugModuleKey[],
   'claude-code': ['claudeCode'],
 };
 
 interface SettingsDebugSectionOptions {
   plugin: OpenCodianPlugin;
   getOpenCodeDiagnostics?: () => OpenCodeTraceDiagnosticsPort | undefined;
+  getCodexDiagnostics?: () => CodexTraceDiagnosticsPort | undefined;
   createSectionHeading: (
     containerEl: HTMLElement,
     title: string,
@@ -121,6 +125,7 @@ function getElectronDialog(): ElectronDialogModule | null {
 
 export class SettingsDebugSection {
   private readonly plugin: OpenCodianPlugin;
+  private readonly codexDebugPanel: CodexDebugPanel;
   private readonly openCodeDebugPanel: OpenCodeDebugPanel;
   private readonly createSectionHeading: (
     containerEl: HTMLElement,
@@ -139,6 +144,14 @@ export class SettingsDebugSection {
       addActionButton: (containerEl, label, onClick, cta) =>
         this.addActionButton(containerEl, label, onClick, cta),
       renderDebugModules: (containerEl, config) => this.addDebugModuleSettings(containerEl, config),
+    });
+    this.codexDebugPanel = new CodexDebugPanel({
+      settings: this.plugin.settings,
+      getDiagnostics: options.getCodexDiagnostics ?? (() => undefined),
+      saveSettings: () => this.plugin.saveSettings(),
+      pickDirectory: (defaultPath) => this.pickDirectory(defaultPath),
+      addActionButton: (containerEl, label, onClick, cta) =>
+        this.addActionButton(containerEl, label, onClick, cta),
     });
   }
 
@@ -185,7 +198,7 @@ export class SettingsDebugSection {
       description: t('settings.debug.modules.codex.desc'),
       badges: ['Codex', String(CODEX_TRACE_CHANNEL_IDS.length)],
     });
-    this.addCodexDebugSettings(codexBlockEl, { includeIntro: false });
+    this.codexDebugPanel.render(codexBlockEl, { includeIntro: false });
 
     const claudeCodeBlockEl = this.createDebugTabShell(containerEl, {
       id: 'claude-code',
@@ -247,226 +260,6 @@ export class SettingsDebugSection {
         includeIntro: options.includeIntro,
       },
     );
-  }
-
-  private addCodexDebugSettings(
-    containerEl: HTMLElement,
-    options: DebugRenderOptions = { includeIntro: true },
-  ): void {
-    const workbenchEl = containerEl.createDiv({
-      cls: 'opencodian-debug-workbench',
-      attr: { 'data-debug-workbench': 'codex' },
-    });
-    if (options.includeIntro) {
-      workbenchEl.createEl('h4', {
-        cls: 'opencodian-settings-subsection-heading',
-        text: t('settings.debug.modules.codex.title'),
-      });
-      workbenchEl.createDiv({
-        cls: 'opencodian-settings-block-desc',
-        text: t('settings.debug.modules.codex.desc'),
-      });
-    }
-    this.addCodexTraceStatus(workbenchEl);
-    this.addCodexTraceControls(workbenchEl);
-    this.addCodexTraceActions(workbenchEl);
-    this.addCodexTraceCatalog(workbenchEl);
-  }
-
-  private addCodexTraceStatus(containerEl: HTMLElement): void {
-    const status = this.plugin.codexTraceService?.store.getStatus();
-    const settings = this.getCodexTraceSettings();
-    const stripEl = containerEl.createDiv({
-      cls: 'opencodian-codex-trace-status',
-      attr: { 'data-codex-trace-status': 'true' },
-    });
-    const items = [
-      [t('settings.debug.codex.status.capture'), settings.enabled
-        ? t('settings.debug.codex.status.enabled')
-        : t('settings.debug.codex.status.disabled')],
-      [t('settings.debug.codex.status.storage'), status?.mode ?? 'disk'],
-      [t('settings.debug.codex.status.traces'), String(this.plugin.codexTraceService?.store.listSummaries(100).length ?? 0)],
-      [t('settings.debug.codex.status.size'), `${Math.round((status?.approximateBytes ?? 0) / 1024)} KiB`],
-    ];
-    for (const [label, value] of items) {
-      const itemEl = stripEl.createDiv({ cls: 'opencodian-debug-status-item' });
-      itemEl.createDiv({ cls: 'opencodian-debug-status-label', text: label });
-      itemEl.createDiv({ cls: 'opencodian-debug-status-value', text: value });
-    }
-    if (status?.lastError) {
-      stripEl.createDiv({
-        cls: 'opencodian-debug-status-error',
-        text: t('settings.debug.codex.status.error', { error: status.lastError }),
-      });
-    }
-  }
-
-  private addCodexTraceControls(containerEl: HTMLElement): void {
-    const settings = this.getCodexTraceSettings();
-    const controlsEl = containerEl.createDiv({ cls: 'opencodian-settings-block opencodian-debug-channel-panel' });
-    new Setting(controlsEl)
-      .setName(t('settings.debug.codex.enabled.name'))
-      .setDesc(t('settings.debug.codex.enabled.desc'))
-      .addToggle((toggle) => toggle
-        .setValue(settings.enabled)
-        .onChange(async (value) => {
-          settings.enabled = value;
-          await this.plugin.saveSettings();
-        }));
-    new Setting(controlsEl)
-      .setName(t('settings.debug.codex.preset.name'))
-      .setDesc(t('settings.debug.codex.preset.desc'))
-      .addDropdown((dropdown) => dropdown
-        .addOption('standard', t('settings.debug.codex.preset.standard'))
-        .addOption('full', t('settings.debug.codex.preset.full'))
-        .setValue(settings.consolePreset)
-        .onChange(async (value) => {
-          settings.consolePreset = value === 'full' ? 'full' : 'standard';
-          await this.plugin.saveSettings();
-        }));
-    new Setting(controlsEl)
-      .setName(t('settings.debug.codex.storage.name'))
-      .setDesc(t('settings.debug.codex.storage.desc'))
-      .setClass('opencodian-wide-text-setting')
-      .addText((text) => {
-        text
-          .setPlaceholder(resolveDefaultTraceDirectory('codex'))
-          .setValue(settings.storageDirectory)
-          .onChange(async (value) => {
-            settings.storageDirectory = value.trim();
-            await this.plugin.saveSettings();
-          });
-        text.inputEl.addEventListener('blur', () => {
-          new Notice(t('settings.debug.codex.storage.restart'));
-        });
-      })
-      .addButton((button) => button
-        .setButtonText(t('settings.debug.codex.storage.choose'))
-        .onClick(async () => {
-          const selected = await this.pickDirectory(settings.storageDirectory);
-          if (!selected) return;
-          settings.storageDirectory = selected;
-          await this.plugin.saveSettings();
-          new Notice(t('settings.debug.codex.storage.restart'));
-        }));
-    const channelsEl = controlsEl.createDiv({ cls: 'opencodian-debug-channel-list' });
-    for (const channelId of CODEX_TRACE_CHANNEL_IDS) {
-      new Setting(channelsEl)
-        .setName(t(`settings.debug.codex.channel.${channelId}.name` as never))
-        .setDesc(t(`settings.debug.codex.channel.${channelId}.desc` as never))
-        .addToggle((toggle) => toggle
-          .setValue(settings.consoleChannels[channelId] !== false)
-          .onChange(async (value) => {
-            settings.consoleChannels = { ...settings.consoleChannels, [channelId]: value };
-            await this.plugin.saveSettings();
-          }));
-    }
-    new Setting(controlsEl)
-      .setName(t('settings.debug.codex.captureContent.name'))
-      .setDesc(t('settings.debug.codex.captureContent.desc'))
-      .addToggle((toggle) => toggle
-        .setValue(settings.captureContent)
-        .onChange(async (value) => {
-          settings.captureContent = value;
-          await this.plugin.saveSettings();
-        }));
-  }
-
-  private addCodexTraceActions(containerEl: HTMLElement): void {
-    const actionsEl = containerEl.createDiv({ cls: 'opencodian-debug-log-actions' });
-    this.addActionButton(actionsEl, t('settings.debug.codex.actions.copyReport'), async () => {
-      const report = await this.plugin.codexTraceService.reportBuilder.buildSmartReport();
-      await navigator.clipboard.writeText(report);
-      new Notice(t('settings.debug.codex.actions.copySuccess'));
-    });
-    this.addActionButton(actionsEl, t('settings.debug.codex.actions.flush'), async () => {
-      await this.plugin.codexTraceService.store.flush();
-      new Notice(t('settings.debug.codex.actions.flushSuccess'));
-    }, false);
-    this.addActionButton(actionsEl, t('settings.debug.codex.actions.export'), async () => {
-      const summary = this.plugin.codexTraceService.store.listSummaries(1)[0];
-      if (!summary) {
-        new Notice(t('settings.debug.codex.recent.empty'));
-        return;
-      }
-      const targetDirectory = await this.pickDirectory('');
-      if (!targetDirectory) return;
-      const exportedDirectory = await this.plugin.codexTraceService.store.exportTraceBundle(
-        summary.traceId,
-        targetDirectory,
-      );
-      new Notice(t('settings.debug.codex.actions.exportSuccess', { path: exportedDirectory }));
-    }, false);
-    this.addActionButton(actionsEl, t('settings.debug.codex.actions.clear'), async () => {
-      if (!window.confirm(t('settings.debug.codex.actions.clearConfirm'))) return;
-      await this.plugin.codexTraceService.store.clear();
-      const workbenchEl = containerEl.closest('[data-debug-workbench="codex"]');
-      if (workbenchEl instanceof HTMLElement) {
-        workbenchEl.querySelector('[data-codex-trace-catalog]')?.replaceChildren();
-      }
-      new Notice(t('settings.debug.codex.actions.clearSuccess'));
-    }, false);
-  }
-
-  private addCodexTraceCatalog(containerEl: HTMLElement): void {
-    const catalogEl = containerEl.createDiv({
-      cls: 'opencodian-settings-block opencodian-debug-log-panel',
-      attr: { 'data-codex-trace-catalog': 'true' },
-    });
-    catalogEl.createEl('h4', {
-      cls: 'opencodian-settings-subsection-heading',
-      text: t('settings.debug.codex.recent.title'),
-    });
-    const filterSetting = new Setting(catalogEl)
-      .setName(t('settings.debug.codex.recent.anomaliesOnly'))
-      .setDesc(t('settings.debug.codex.recent.anomaliesOnlyDesc'));
-    const rowsEl = catalogEl.createDiv({ cls: 'opencodian-debug-trace-rows' });
-    const summaries = this.plugin.codexTraceService?.store.listSummaries(20) ?? [];
-    const applyFilter = (anomaliesOnly: boolean) => {
-      for (const row of rowsEl.querySelectorAll<HTMLElement>('.opencodian-debug-trace-row')) {
-        row.toggleClass('is-hidden', anomaliesOnly && row.dataset.hasAnomaly !== 'true');
-      }
-    };
-    filterSetting.addToggle((toggle) => toggle
-      .setValue(false)
-      .onChange((value) => applyFilter(value)));
-    if (summaries.length === 0) {
-      rowsEl.createDiv({ cls: 'opencodian-settings-block-desc', text: t('settings.debug.codex.recent.empty') });
-      return;
-    }
-    for (const summary of summaries) {
-      const rowEl = rowsEl.createDiv({
-        cls: 'opencodian-debug-trace-row',
-        attr: {
-          'data-has-anomaly': String(
-            summary.highestSeverity === 'warning'
-            || summary.highestSeverity === 'critical'
-            || summary.highestSeverity === 'error',
-          ),
-        },
-      });
-      const copyEl = rowEl.createDiv({ cls: 'opencodian-debug-trace-copy' });
-      copyEl.createDiv({ cls: 'opencodian-debug-trace-id', text: summary.sessionId ?? summary.traceId });
-      copyEl.createDiv({
-        cls: 'opencodian-settings-block-desc',
-        text: `${summary.lastUpdatedAt} · ${summary.eventCount} events · ${summary.highestSeverity}`,
-      });
-      const rowActionsEl = rowEl.createDiv({ cls: 'opencodian-debug-log-actions' });
-      this.addActionButton(rowActionsEl, t('settings.debug.codex.recent.copy'), async () => {
-        const report = await this.plugin.codexTraceService.reportBuilder.buildSmartReport(summary.traceId);
-        await navigator.clipboard.writeText(report);
-      }, false);
-      this.addActionButton(rowActionsEl, t('settings.debug.codex.recent.delete'), async () => {
-        await this.plugin.codexTraceService.store.deleteTrace(summary.traceId);
-        rowEl.remove();
-      }, false);
-    }
-  }
-
-  private getCodexTraceSettings() {
-    this.plugin.settings.backendSettings.codex ??= getDefaultBackendSettings().codex;
-    this.plugin.settings.backendSettings.codex.sessionTrace ??= getDefaultBackendSettings().codex.sessionTrace;
-    return this.plugin.settings.backendSettings.codex.sessionTrace;
   }
 
   private addClaudeCodeDebugSettings(

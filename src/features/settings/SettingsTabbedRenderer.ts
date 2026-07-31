@@ -4,14 +4,13 @@
  * Renders tabbed layout content panels and handles primary/secondary tab navigation.
  * Extracted from OpenCodianSettings to keep that file under the max-lines limit.
  */
-import type { App } from 'obsidian';
-import { setIcon, Setting } from 'obsidian';
+import { type App, setIcon, Setting } from 'obsidian';
 
 import type { AgentBackendKind } from '../../core/types/chat';
 import { t } from '../../i18n';
 import type OpenCodianPlugin from '../../main';
 import { renderAgentSwitcherFloatingIcons } from './AgentSwitcherFloatingIcons';
-import { createOpenCodeTraceDiagnosticsPort } from './debug/types';
+import { createCodexTraceDiagnosticsPort, createOpenCodeTraceDiagnosticsPort } from './debug/types';
 import { SettingsAcpSection } from './SettingsAcpSection';
 import { SettingsAgentsSection } from './SettingsAgentsSection';
 import { SettingsBackendSection } from './SettingsBackendSection';
@@ -528,6 +527,7 @@ export class SettingsTabbedRenderer {
     const debugSection = new SettingsDebugSection({
       plugin: this.deps.plugin,
       getOpenCodeDiagnostics: () => createOpenCodeTraceDiagnosticsPort(this.deps.plugin.openCodeTraceService),
+      getCodexDiagnostics: () => createCodexTraceDiagnosticsPort(this.deps.plugin.codexTraceService),
       createSectionHeading: (hostEl, title, tooltip) => this.deps.createHeading(hostEl, title, tooltip),
     });
     debugSection.attachTabbed(containerEl, secondaryTabId);

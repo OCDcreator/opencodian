@@ -4,6 +4,7 @@ import * as obsidian from 'obsidian';
 import { Setting } from 'obsidian';
 
 import { DEFAULT_SETTINGS } from '../../../../src/core/types';
+import { createCodexTraceDiagnosticsPort } from '../../../../src/features/settings/debug/types';
 import { SettingsDebugSection } from '../../../../src/features/settings/SettingsDebugSection';
 import { setLocale, t } from '../../../../src/i18n';
 import type OpenCodianPlugin from '../../../../src/main';
@@ -154,9 +155,17 @@ function attachCodexTraceService(plugin: DebugSectionPlugin, service: CodexTrace
   (plugin as unknown as { codexTraceService: CodexTraceServiceStub }).codexTraceService = service;
 }
 
+function getCodexDiagnostics(plugin: DebugSectionPlugin) {
+  const { codexTraceService } = plugin as unknown as {
+    codexTraceService?: Parameters<typeof createCodexTraceDiagnosticsPort>[0];
+  };
+  return createCodexTraceDiagnosticsPort(codexTraceService);
+}
+
 function renderTabbed(secondaryTabId: string, plugin = createPlugin()) {
   const section = new SettingsDebugSection({
     plugin: plugin as unknown as OpenCodianPlugin,
+    getCodexDiagnostics: () => getCodexDiagnostics(plugin),
     createSectionHeading,
   });
   const containerEl = document.createElement('div');

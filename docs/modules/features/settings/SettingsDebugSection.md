@@ -1,8 +1,8 @@
 # SettingsDebugSection
 
-> 2026-07-31: The OpenCode debug workbench moved to the complete owner `debug/OpenCodeDebugPanel.ts`. This section now retains the shared source-tab shell/router, plugin export, shared platform/path/action/module helpers, and the Codex/Claude workbenches. It passes a narrow OpenCode settings/diagnostics port and has no direct OpenCode trace-service, store, or report access. The legacy non-tabbed attach Codex omission remains unchanged.
+> 2026-07-31: The OpenCode and Codex debug workbenches now use complete owners, `debug/OpenCodeDebugPanel.ts` and `debug/CodexDebugPanel.ts`. This section retains the shared source-tab shell/router, plugin export, shared platform/path/action/module helpers, and the Claude workbench. It passes narrow OpenCode and Codex settings/diagnostics ports; it has no direct OpenCode or Codex trace-service, store, or report access. Codex is mounted only by `attachTabbed()`; the legacy non-tabbed attach Codex omission remains unchanged.
 > 2026-07-29: OpenCode diagnostics now includes status, settings, channels, recent traces, smart copy, full export, delete and confirmed clear.
-> 2026-07-30: Added a Codex diagnostics tab block mirroring the OpenCode block — status (capture enabled/disabled, storage mode, trace count, size, last error), enabled toggle, standard/full preset, five channel checkboxes (`CODEX_TRACE_CHANNEL_IDS`), custom storage directory, smart copy, full export, recent traces list with per-trace smart copy / delete, and double-confirm clear. Reads `backendSettings.codex.sessionTrace` and `this.plugin.codexTraceService` (may be undefined; all controls null-safe).
+> 2026-07-30: Added a Codex diagnostics tab block mirroring the OpenCode block — status (capture enabled/disabled, storage mode, trace count, size, last error), enabled toggle, standard/full preset, five channel checkboxes (`CODEX_TRACE_CHANNEL_IDS`), custom storage directory, smart copy, full export, recent traces list with per-trace smart copy / delete, and confirmed clear. Reads `backendSettings.codex.sessionTrace` and `this.plugin.codexTraceService` (may be undefined; status/catalog rendering is null-safe).
 > 2026-07-30: Added the Claude Code session-trace subsection inside the existing `claude-code` workbench. It is separate from `backendSettings.claudeCode.debugChannels`: the trace block renders mode/directory/queue/bytes/dropped/error status, enabled + off/standard/full preset, five trace-channel toggles (`CLAUDE_TRACE_CHANNEL_IDS`), storage-directory input, smart copy, latest-bundle export, clear-all confirmation, and a recent-20 trace catalog with inline copy/delete.
 > 2026-07-30: The Codex shell now uses the unified `data-section-block` / `data-debug-tab-shell` markers like every other debug shell. The earlier `data-codex-section-block` / `data-codex-debug-tab-shell` special-case has been removed, so `showActiveBlock()` selects only `[data-section-block]`. Codex tab switching, the shared shell class, header, body and visual layout are unchanged.
 
@@ -11,10 +11,11 @@
 
 ## 概述
 
-`SettingsDebugSection` 是设置页 debug 分区的共享 shell owner。它负责来源分区的 shell/router、插件导出、共享平台路径/按钮/模块 helper，以及尚未拆出的 Codex 与 Claude workbench；OpenCode 的完整 workbench 由相邻的 `debug/OpenCodeDebugPanel` owner 渲染。
+`SettingsDebugSection` 是设置页 debug 分区的共享 shell owner。它负责来源分区的 shell/router、插件导出、共享平台路径/按钮/模块 helper，以及仍由 section 持有的 Claude workbench；OpenCode 与 Codex 的完整 trace workbench 分别由 `debug/OpenCodeDebugPanel` 和 `debug/CodexDebugPanel` owner 渲染。
 
 - `Plugin` 来源分组：debug 总开关，以及 app/settings/chat/contextUsage/tasks/storage/providerIcons/visuals 等插件内部模块开关
 - `OpenCode` 来源分组：由 `OpenCodeDebugPanel` 负责 server/models/streaming 等 OpenCode 后端诊断开关、trace 状态、控制项、动作和 catalog
+- `Codex` 来源分组：由 `CodexDebugPanel` 负责 trace 状态、enabled/preset/channel/storage/`captureContent` 控件、动作和 catalog；当前只从 tabbed debug route 挂载
 - `Claude Code` 来源分组：Claude Code SDK 诊断工作台，用于查看状态摘要、隐私边界、模块总开关、runtime/session/stream/permission/MCP/experimental 通道开关和最近 Claude Code 摘要日志；同一 block 内还承载独立的 session-trace 状态、捕获 preset、trace channel、持久化目录、智能复制/导出/清空和最近轨迹目录
 - `Export` 分组：高频刷新、参数格式、日志路径、诊断动作和控制台帮助
 - 高频日志刷新间隔
@@ -27,9 +28,9 @@
 
 ### OpenCode panel boundary
 
-`SettingsDebugSection` 在 classic `attach()` 和 tabbed `attachTabbed()` 两条路径中调用 `OpenCodeDebugPanel`。section 只注入共享的目录选择、action button、debug-module 渲染和保存回调；`OpenCodeDebugPanel` 通过 `OpenCodeDebugPanelOptions` 接收 settings port 与 `OpenCodeTraceDiagnosticsPort`，因此 section 不直接访问 OpenCode trace service、store 或 report builder。
+`SettingsDebugSection` 在 classic `attach()` 和 tabbed `attachTabbed()` 两条路径中调用 `OpenCodeDebugPanel`；`CodexDebugPanel` 只在 `attachTabbed()` 的 Codex shell 中调用。section 注入共享的目录选择、action button、debug-module 渲染和保存回调，以及两个 backend 的窄 diagnostics ports；因此 section 不直接访问 OpenCode 或 Codex trace service、store 或 report builder。Claude 仍由 section 直接持有其 console debug channels 与独立 session-trace workbench。
 
-本 slice 只完成 OpenCode panel。Codex 与 Claude trace/debug workbench 仍在本模块中，后续 panel slice 才能迁移；不要把它们写成已经存在的 `CodexDebugPanel` 或 `ClaudeCodeDebugPanel`。三条 settings composition 路径各自在边界创建 OpenCode diagnostics port。legacy non-tabbed attach 的 Codex omission 也不在本 slice 修复。
+当前 slice 已完成 OpenCode 与 Codex panel 的抽取。三条 settings composition 路径各自在边界创建 OpenCode 与 Codex diagnostics ports；Claude 没有 panel/port 抽取，仍在本模块中保留 console debug channels 与独立 session-trace 控件。legacy non-tabbed attach 的 Codex omission 明确保持不变，不在本 slice 修复或删除。
 
 ## 核心逻辑
 
@@ -84,7 +85,7 @@ section 直接编辑 `settings.debugRefreshIntervalMs`。logger 侧会用该值�
 ## 与其他模块的交互
 
 - `src/main.ts`: 为本 section 的 Codex/Claude/export 逻辑提供 `saveSettings()`、`logServerStatusSnapshot()`、`buildDiagnosticReport()`、`writeDiagnosticLogFile()` 和 build identity 文本；OpenCode diagnostics 由 composition path 转成窄 port 后注入
-- `src/features/settings/debug/OpenCodeDebugPanel.ts` / `types.ts`: OpenCode 完整 panel 与窄 port/adapter contract
+- `src/features/settings/debug/OpenCodeDebugPanel.ts`、`CodexDebugPanel.ts` / `types.ts`: OpenCode 与 Codex 完整 panel，以及对应窄 port/adapter contracts
 - `src/shared/debugModules.ts`: 提供模块注册表和刷新间隔归一化
 - `src/shared/diagnosticSecretSanitizer.ts`: 提供 `sanitizeDiagnosticReport()` 用于导出前密钥净化
 - `src/core/agents/backend/diagnostics/ClaudeSessionTraceService.ts`: 提供 Claude trace storage status、smart report、bundle export、recent summary 与 clear-all 操作；service 内部使用 hardened redaction 和 ring/deep capture 生命周期
@@ -107,7 +108,7 @@ section 直接编辑 `settings.debugRefreshIntervalMs`。logger 侧会用该值�
 - `claude-code` — renders the Claude Code SDK diagnostics workbench with status, channel switches, log preview, and copy/clear actions
 - `export` — renders refresh interval, inline args, log path, diagnostic actions, and console help
 
-The classic `attach()` method remains single-page, but it follows the same source order.
+The classic `attach()` method remains single-page and keeps the legacy source order, but it intentionally omits the Codex panel; only the tabbed route mounts `CodexDebugPanel`.
 
 All five source tabs owned here render inside `.opencodian-debug-tab-shell`, a shared shadcn-inspired settings shell that provides a compact header, muted description, badge rail, and neutral body stack. Plugin/OpenCode module groups still use shared Setting rows, Codex/Claude Code keep their workbench controls and filtered log preview, and Export keeps refresh/path/action/help controls without changing persistence or copy/export behavior.
 

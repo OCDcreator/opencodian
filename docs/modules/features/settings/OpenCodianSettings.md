@@ -37,7 +37,7 @@ General 里的设置界面模式、界面语言、在编辑区打开设置，以
 - 通过 `SettingsSecuritySection` 协调 security section 的 config-status/permission/restart/blocklist lifecycle
 - 通过 `SettingsToolSection` 协调 Tools section 的 built-in permission、项目 `.opencode/tools` 自定义工具文件、全局 tools 只读目录和运行时 custom tool catalog 权限 lifecycle
 - 通过 `SettingsDebugSection` 协调 debug logging、log path picker、diagnostic action 与 console help lifecycle
-- `SettingsDebugSection` 内的 OpenCode workbench 由 `debug/OpenCodeDebugPanel` 完整持有；本标准设置组合路径通过 `createOpenCodeTraceDiagnosticsPort()` 注入窄 diagnostics port
+- `SettingsDebugSection` 内的 OpenCode 与 Codex workbench 分别由 `debug/OpenCodeDebugPanel` 和 `debug/CodexDebugPanel` 完整持有；本标准设置组合路径通过 `createOpenCodeTraceDiagnosticsPort()` 与 `createCodexTraceDiagnosticsPort()` 注入窄 diagnostics ports。Codex panel 只由 tabbed debug route 挂载，classic legacy attach omission 保持不变；Claude debug/trace workbench 仍由 `SettingsDebugSection` 持有
 - 通过 `SettingsStyleBackgroundSection` 协调 style owner 下的聊天背景图子区块 lifecycle
 - 对多个 modal 与辅助服务的编排
 
@@ -184,7 +184,7 @@ provider 开关写回仍遵循 `ModelConfigService` 返回的 `effectiveProvider
 - Commands section 的 runtime+project slash-command catalog、project command editor shell、`hiddenSlashCommands` 可见性与 `slashCommandSkillMode` 写回现在由 `SettingsCommandsSection` 持有
 - plugin section 的 snapshot refresh、project config editor、isolation mode、project directory 与 OMO config 管理现在由 `SettingsPluginSection` 持有
 - UI section 的 max tabs、tab position/layout、auto scroll、chat scroll mode 与 open-in-main-tab 写回现在由 `SettingsUiSection` 持有
-- debug section 的 shared shell、logging toggle、log path picker、plugin diagnostic export/action 与 console help block 现在由 `SettingsDebugSection` 持有；OpenCode trace settings/status/actions/catalog 由 `OpenCodeDebugPanel` 持有
+- debug section 的 shared shell、logging toggle、log path picker、plugin diagnostic export/action 与 console help block 现在由 `SettingsDebugSection` 持有；OpenCode 与 Codex trace settings/status/actions/catalog 分别由 `OpenCodeDebugPanel` 与 `CodexDebugPanel` 持有，Claude debug/trace workbench 仍留在 section 内
 - 模型加载后的 UI 刷新走 `requestAnimationFrame`
 - style section 的 preset/status、binding 同步与 reset/apply/save orchestration 现在由 `SettingsStyleSection` 持有；input subsection rerender 继续委托给 `SettingsStyleInputPanelSection`
 - 聊天背景图 subsection 继续由 `SettingsStyleBackgroundSection` 持有自己的 host、preview request guard 与 reset/upload lifecycle，`OpenCodianSettings` 只负责装配 `SettingsStyleSection`
