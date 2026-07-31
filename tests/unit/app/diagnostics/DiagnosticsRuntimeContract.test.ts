@@ -828,7 +828,7 @@ describe('Phase 3 Task 10 — DiagnosticsRuntimeContract (characterization)', ()
       expect(claudeCtor).toMatch(/inputs\.claudeKnownSecrets/);
     });
 
-    it('coordinator dispose() void-wraps each backend with .catch in pinned order opencode -> codex -> claude, using the injected logger', () => {
+    it('coordinator dispose() awaits each backend in pinned order opencode -> codex -> claude with per-backend .catch + injected logger (awaitable, deterministic)', () => {
       const disposeStart = coordSrc.indexOf('async dispose(): Promise<void> {');
       expect(disposeStart).toBeGreaterThan(-1);
       const body = coordSrc.slice(disposeStart, disposeStart + 800);
@@ -840,9 +840,10 @@ describe('Phase 3 Task 10 — DiagnosticsRuntimeContract (characterization)', ()
       expect(claudeIdx).toBeGreaterThan(-1);
       expect(ocIdx).toBeLessThan(codexIdx);
       expect(codexIdx).toBeLessThan(claudeIdx);
-      expect(body).toMatch(/void this\.openCode\.dispose\(\)\.catch/);
-      expect(body).toMatch(/void this\.codex\.dispose\(\)\.catch/);
-      expect(body).toMatch(/void this\.claude\.dispose\(\)\.catch/);
+      // Each backend is awaited with .catch (fail-closed, deterministic teardown).
+      expect(body).toMatch(/await this\.openCode\.dispose\(\)\.catch/);
+      expect(body).toMatch(/await this\.codex\.dispose\(\)\.catch/);
+      expect(body).toMatch(/await this\.claude\.dispose\(\)\.catch/);
       // Warnings use the injected this.logger (preserves caller's scope), not a
       // hardcoded module-level logger.
       expect(body).toMatch(/this\.logger\.warn/);

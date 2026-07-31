@@ -78,21 +78,22 @@ export class DiagnosticsRuntimeCoordinator {
   }
 
   /**
-   * Dispose all three services in the pinned order (OpenCode → Codex → Claude).
-   * Each disposal is void-wrapped with `.catch` so a throwing trace flush never
-   * blocks plugin unload — mirroring the prior `onunload` inline disposal.
+   * Dispose all three services in the pinned order (OpenCode → Codex → Claude),
+   * awaiting each backend's disposal so callers (tests) can deterministically
+   * wait for completion. A throwing trace flush is caught per-backend and logged
+   * via the injected logger, so a rejection never propagates and never blocks
+   * plugin unload — mirroring the prior `onunload` fail-closed inline disposal.
+   * main.ts calls this with `void` (fire-and-forget) to preserve the prior
+   * unload timing; tests `await` it for deterministic teardown.
    */
   async dispose(): Promise<void> {
-    // Per-backend warnings mirror the prior `onunload` inline disposal so
-    // operator-visible diagnostics stay byte-for-byte compatible (the injected
-    // logger preserves the caller's scope prefix).
-    void this.openCode.dispose().catch((error) => {
+    await this.openCode.dispose().catch((error) => {
       this.logger.warn('Failed to flush OpenCode trace service during unload:', error);
     });
-    void this.codex.dispose().catch(() => {
+    await this.codex.dispose().catch(() => {
       this.logger.warn('Failed to flush Codex trace service during unload');
     });
-    void this.claude.dispose().catch(() => {
+    await this.claude.dispose().catch(() => {
       this.logger.warn('Failed to flush Claude trace service during unload');
     });
   }

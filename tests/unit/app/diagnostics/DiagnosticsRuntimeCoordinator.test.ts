@@ -56,13 +56,10 @@ describe('Phase 3 Task 11 — DiagnosticsRuntimeCoordinator (behavior)', () => {
   const created: Array<{ dispose: () => Promise<void> }> = [];
   const dirs: string[] = [];
   afterEach(async () => {
-    // coordinator.dispose() is fire-and-forget (void+catch, matching main.ts
-    // onunload). Await the background disposals BEFORE deleting their dirs,
-    // otherwise rmSync races with in-flight store writes (ENOTEMPTY/storage_degraded).
+    // coordinator.dispose() now awaits each backend's disposal in pinned order,
+    // so awaiting it deterministically completes all store flushes BEFORE the
+    // dirs are deleted (no rmSync race, no storage_degraded/ENOTEMPTY).
     await Promise.all(created.map((c) => c.dispose().catch(() => undefined)));
-    // Flush fire-and-forget disposal microtasks/macrotasks + pending timers.
-    jest.runAllTimers();
-    await new Promise((resolve) => setTimeout(resolve, 50));
     created.length = 0;
     for (const d of dirs) fs.rmSync(d, { recursive: true, force: true });
     dirs.length = 0;
@@ -189,14 +186,14 @@ describe('Phase 3 Task 11 — DiagnosticsRuntimeCoordinator (behavior)', () => {
     it('dispose is idempotent and does not throw', async () => {
       const coord = new DiagnosticsRuntimeCoordinator(makeInputs());
       await coord.dispose();
-      // Flush fire-and-forget disposals before the second call.
-      await new Promise((resolve) => setTimeout(resolve, 20));
+      // dispose() awaits each backend; the second call completes deterministically.
       await expect(coord.dispose()).resolves.toBeUndefined();
-      await new Promise((resolve) => setTimeout(resolve, 20));
     });
 
-    it('dispose calls each backend dispose in pinned order opencode -> codex -> claude (runtime)', async () => {
+    it('dispose awaits each backend dispose in pinned order opencode -> codex -> claude (runtime)', async () => {
       // Runtime order test (not just source regex): spy on each backend dispose.
+      // Since dispose() now awaits each backend sequentially, the order array
+      // captures the actual completion order.
       const coord = new DiagnosticsRuntimeCoordinator(makeInputs());
       created.push(coord);
       const order: string[] = [];
@@ -208,10 +205,8 @@ describe('Phase 3 Task 11 — DiagnosticsRuntimeCoordinator (behavior)', () => {
       wrap(coord.codex as unknown as { dispose: () => Promise<void> }, 'codex');
       wrap(coord.claude as unknown as { dispose: () => Promise<void> }, 'claude');
       await coord.dispose();
-      // The dispose() body calls them synchronously in order (fire-and-forget),
-      // so the synchronous invocation order is pinned.
+      // Sequential await pins the completion order.
       expect(order).toEqual(['openCode', 'codex', 'claude']);
-      await new Promise((resolve) => setTimeout(resolve, 20));
     });
 
     it('dispose does not leak Codex trace disposal error secrets in warnings (injected logger)', async () => {
@@ -226,9 +221,8 @@ describe('Phase 3 Task 11 — DiagnosticsRuntimeCoordinator (behavior)', () => {
       // Override codex dispose to reject with a secret-bearing error.
       (coord.codex as unknown as { dispose: () => Promise<void> }).dispose = () =>
         Promise.reject(new Error(`${secret} at ${vaultPath}/trace.jsonl`));
+      // dispose() awaits the codex .catch, so the warning is emitted before resolve.
       await coord.dispose();
-      // Flush the fire-and-forget catch (microtask + macrotask).
-      await new Promise((resolve) => setTimeout(resolve, 50));
       const output = JSON.stringify(warn.mock.calls);
       expect(output).toContain('Failed to flush Codex trace service during unload');
       expect(output).not.toContain(secret);
