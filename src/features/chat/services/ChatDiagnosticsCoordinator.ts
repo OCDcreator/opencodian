@@ -4,6 +4,11 @@ import type {
 } from '../../../core/opencode/diagnostics/OpenCodeSessionTraceService';
 import { t } from '../../../i18n';
 import type { DiagnosticRunToken } from '../runtime/SendPipelineTypes';
+import {
+  CodexDiagnosticsHostAdapter,
+  type CodexDiagnosticsHostAdapterHost,
+  type CodexDiagnosticsState,
+} from './CodexDiagnosticsHostAdapter';
 
 export type OpenCodeDiagnosticsState =
   | 'disabled'
@@ -53,14 +58,21 @@ export interface ChatDiagnosticsCoordinatorHost {
 }
 
 /**
- * Owns OpenCode-only diagnostics operations at the chat surface boundary.
+ * Owns OpenCode and Codex diagnostics operations at the chat surface boundary.
  *
  * The coordinator intentionally receives only narrow ports. Trace failures are
  * absorbed without logging so diagnostic data never escapes through an error
  * message, and the normal chat path remains available.
  */
 export class ChatDiagnosticsCoordinator {
-  constructor(private readonly host: ChatDiagnosticsCoordinatorHost) {}
+  private readonly codexDiagnosticsAdapter: CodexDiagnosticsHostAdapter;
+
+  constructor(
+    private readonly host: ChatDiagnosticsCoordinatorHost,
+    codexDiagnosticsHost: CodexDiagnosticsHostAdapterHost,
+  ) {
+    this.codexDiagnosticsAdapter = new CodexDiagnosticsHostAdapter(codexDiagnosticsHost);
+  }
 
   getOpenCodeDiagnosticsState(): OpenCodeDiagnosticsState {
     try {
@@ -170,5 +182,24 @@ export class ChatDiagnosticsCoordinator {
     } catch {
       return;
     }
+  }
+
+  getCodexDiagnosticsState(tabId: string | null): CodexDiagnosticsState {
+    return this.codexDiagnosticsAdapter.getDiagnosticsState(tabId);
+  }
+
+  showCodexDiagnostics(event: MouseEvent, tabId: string): void {
+    this.codexDiagnosticsAdapter.showDiagnostics(event, tabId);
+  }
+
+  claimCodexDiagnosticRunToken(
+    tabId: string | null,
+    threadId?: string,
+  ): DiagnosticRunToken | undefined {
+    return this.codexDiagnosticsAdapter.claimDiagnosticRunToken(tabId, threadId);
+  }
+
+  cancelCodexDiagnosticCapture(tabId: string): void {
+    this.codexDiagnosticsAdapter.cancelDiagnosticCapture(tabId);
   }
 }

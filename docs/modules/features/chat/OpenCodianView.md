@@ -1,9 +1,8 @@
 # OpenCodianView
 
 > 2026-07-30: The OpenCode diagnostics header refresh seam accepts an explicit changed tab and updates DOM only when it is still the active tab.
-> 2026-07-30: Codex chat-side diagnostics live in `CodexDiagnosticsHostAdapter`; `OpenCodianView` supplies only live-state/menu/notice host callbacks and delegates header state/menu, capture claim/cancel, and export there. The send-pipeline host preserves every diagnostic token in `options` for OpenCode compatibility and also forwards it at the backend-neutral request top level, which is the contract consumed by `CodexAdapter`. OpenCode diagnostics behavior is unchanged.
 > 2026-07-30: Claude Code chat diagnostics are assembled through `ClaudeDiagnosticsHostAdapter`. The view only injects live trace-service/settings/conversation callbacks, delegates badge/menu, deep-capture claim/cancel and current-session report export, and forwards Claude token/refresh/cancel hooks through existing chat ports; trace failures stay outside the chat path.
-> 2026-07-31: OpenCode chat diagnostics are assembled through `ChatDiagnosticsCoordinator`. The view injects only narrow live ports for settings, trace service, active tab/session, header refresh, menu, prompt, clipboard, and notice; the Header, SendPipeline, and tab-recovery seams delegate their OpenCode state/menu, token claim, and cancellation operations to that coordinator. Codex and Claude adapter composition is unchanged.
+> 2026-07-31: `ChatDiagnosticsCoordinator` owns the OpenCode diagnostics operations and constructs/owns the existing `CodexDiagnosticsHostAdapter`. `OpenCodianView` injects narrow OpenCode/Codex ports into the coordinator and routes both backends' header state/menu, send-pipeline token claim, and tab-cleanup cancellation through backend-specific coordinator operations. Claude remains on `ClaudeDiagnosticsHostAdapter` for the next Task 12 slice; Task 12 is not complete.
 
 > **源码**: `src/features/chat/OpenCodianView.ts`
 > **状态**: [REVIEW]
@@ -108,7 +107,7 @@ background task completion notice 的 queued-state 则已经完全移出 `TabRun
 
 - `currentConversation` / `currentConversationRevertState`
 - `services/ChatHeaderPresenter.ts` 的 host seam：server availability、settings/history/new-tab callbacks、status refresh 和 header tab-slot 写回
-- `services/ChatDiagnosticsCoordinator.ts` 的 OpenCode-only host seam：session-trace settings/service、活动 tab/session、header refresh、Menu、prompt、clipboard 与 Notice；view 不再内联读取 OpenCode trace store/report builder
+- `services/ChatDiagnosticsCoordinator.ts` 的 OpenCode/Codex host seam：协调器接收 OpenCode 的 session-trace settings/service、活动 tab/session、header refresh、Menu、prompt、clipboard 与 Notice ports，并构造/持有现有 `CodexDiagnosticsHostAdapter` 及其 Codex trace service/settings/conversation/Menu/Notice ports；view 不再内联读取 OpenCode trace store/report builder，也不再直接持有 Codex diagnostics adapter
 - `services/ClaudeDiagnosticsHostAdapter.ts` 的 host seam：Claude Code trace service/settings/conversation 读取、header refresh、Menu/Notice 工厂；view 只装配该 adapter，并把 badge/menu、token claim/cancel 与 current-session smart-report 回调透传给 header、send pipeline 和 tab recovery
 - `services/LspStatusRefreshCoordinator.ts` 的 host seam：调用 `OpenCodeService.getLspStatus()`，把 language server connection summary 推送给 header indicator
 - `services/ConversationSessionSettingsCoordinator.ts` 的 host seam：current conversation、global session defaults、active-tab context usage refresh，以及 per-conversation session settings notice/save；view 现在还把 `agentServiceRegistry` 交给 coordinator，用于把当前会话的 share-URL 读取路由到 `readBackendSessionShareUrl()` → backend `getSession(sessionId)` 这条窄 seam。coordinator 按 conversation backend/capability gate 让 Claude Code 会话只显示通用字体/渲染摘要，不暴露 OpenCode-only 的标题生成、问答、压缩或分享 UI；share/unshare 写操作仍由相邻 owner 通过插件实例解析，避免继续增长 view shell
@@ -746,6 +745,10 @@ Chat 现在在渲染 session 相关操作前检查 `requireSdkCapability(id)`。
 ### OpenCode diagnostics chrome
 
 诊断按钮只在当前 conversation backend 为 OpenCode 时显示，并从 tab-scoped trace state 映射 off/normal/armed/capturing/warning/critical/degraded；store 为 memory mode 或仍带 custom-directory fallback `lastError` 时均显示 degraded。捕获、取消和复制都使用当前 `tabId`；发送 runtime 在 claim 与 terminal 时回传显式 changed `tabId`，view 仅在它仍等于 active tab 时调用 `refreshBackendChrome()`，因此后台/并发标签不会误改当前 header。复制使用 current-session report，当前会话没有 trace 时输出空报告而非回退全局其他 trace。复制可附 actual/expected/reproduction，并在完成后刷新 unread badge。关闭标签通过 lifecycle coordinator 取消该标签尚未消费的 capture。
+
+### Codex diagnostics chrome
+
+Codex chat diagnostics 由 `ChatDiagnosticsCoordinator` 构造并持有现有的 `CodexDiagnosticsHostAdapter`。Header 的 Codex 状态和菜单、`SendPipelineRuntime` 的按 tab/thread token claim，以及 tab cleanup cancellation 都通过协调器的 backend-specific operations 路由；Codex adapter 继续拥有自己的 trace state、capture 和 report/menu 语义。Claude 仍由独立的 `ClaudeDiagnosticsHostAdapter` 处理，属于 Task 12 的下一切片。
 
 ### Claude Code diagnostics chrome
 

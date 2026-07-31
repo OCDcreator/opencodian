@@ -293,10 +293,12 @@ describe('codex diagnostics host wiring', () => {
     window.prompt = jest.fn().mockReturnValue('');
 
     const adapter = (view as unknown as {
-      codexDiagnosticsAdapter: {
-        exportConversationDiagnostics(conversation: Conversation): Promise<void>;
+      chatDiagnosticsCoordinator: {
+        codexDiagnosticsAdapter: {
+          exportConversationDiagnostics(conversation: Conversation): Promise<void>;
+        };
       };
-    }).codexDiagnosticsAdapter;
+    }).chatDiagnosticsCoordinator.codexDiagnosticsAdapter;
 
     await adapter.exportConversationDiagnostics(conversation);
 

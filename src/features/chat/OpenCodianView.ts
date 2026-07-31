@@ -186,7 +186,6 @@ import {
 } from './services/ChildSessionGraphCoordinator';
 import { ClaudeDiagnosticsHostAdapter } from './services/ClaudeDiagnosticsHostAdapter';
 import { CodexChatSurfaceBinding } from './services/CodexChatSurfaceBinding';
-import { CodexDiagnosticsHostAdapter } from './services/CodexDiagnosticsHostAdapter';
 import {
   ComposerContextViewFacade,
   type ComposerContextViewHost,
@@ -527,7 +526,6 @@ export class OpenCodianView extends ItemView {
   private backendCapabilityChangeDisposable: { dispose(): void } | null = null;
   private readonly codexChatSurfaceBinding: CodexChatSurfaceBinding;
   private readonly chatDiagnosticsCoordinator: ChatDiagnosticsCoordinator;
-  private readonly codexDiagnosticsAdapter: CodexDiagnosticsHostAdapter;
   private readonly claudeDiagnosticsAdapter: ClaudeDiagnosticsHostAdapter;
   private escapeHandlers: Array<() => boolean> = [];
   private backendSurfaceSwitchPromise: Promise<void> | null = null;
@@ -721,8 +719,8 @@ export class OpenCodianView extends ItemView {
       getOpenCodeDiagnosticsState: () => this.chatDiagnosticsCoordinator.getOpenCodeDiagnosticsState(),
       showOpenCodeDiagnostics: (event) => this.chatDiagnosticsCoordinator.showOpenCodeDiagnostics(event),
       getActiveDiagnosticsTabId: () => this.getActiveTabId(),
-      getCodexDiagnosticsState: (tabId) => this.codexDiagnosticsAdapter.getDiagnosticsState(tabId),
-      showCodexDiagnostics: (event, tabId) => this.codexDiagnosticsAdapter.showDiagnostics(event, tabId),
+      getCodexDiagnosticsState: (tabId) => this.chatDiagnosticsCoordinator.getCodexDiagnosticsState(tabId),
+      showCodexDiagnostics: (event, tabId) => this.chatDiagnosticsCoordinator.showCodexDiagnostics(event, tabId),
       getClaudeDiagnosticsState: (tabId) => this.claudeDiagnosticsAdapter.getDiagnosticsState(tabId),
       showClaudeDiagnostics: (event, tabId) => this.claudeDiagnosticsAdapter.showDiagnostics(event, tabId),
       openSettings: () => {
@@ -1693,8 +1691,7 @@ export class OpenCodianView extends ItemView {
       promptDiagnosticsUserContext: () => this.promptDiagnosticsUserContext(),
       writeTextToClipboard: (text) => navigator.clipboard.writeText(text),
       showNotice: (message) => { new Notice(message); },
-    });
-    this.codexDiagnosticsAdapter = new CodexDiagnosticsHostAdapter({
+    }, {
       getCodexTraceService: () => this.plugin.codexTraceService,
       getCodexSessionTraceSettings: () => this.plugin.settings.backendSettings.codex.sessionTrace,
       getCurrentConversation: () => this.currentConversation,
@@ -3216,7 +3213,7 @@ export class OpenCodianView extends ItemView {
       },
       cancelOpenCodeDiagnosticCapture: (tabId) =>
         this.chatDiagnosticsCoordinator.cancelOpenCodeDiagnosticCapture(tabId),
-      cancelCodexDiagnosticCapture: (tabId) => this.codexDiagnosticsAdapter.cancelDiagnosticCapture(tabId),
+      cancelCodexDiagnosticCapture: (tabId) => this.chatDiagnosticsCoordinator.cancelCodexDiagnosticCapture(tabId),
       cancelClaudeDiagnosticCapture: (tabId) => this.claudeDiagnosticsAdapter.cancelDiagnosticCapture(tabId),
       showNotice: (message) => {
         new Notice(message);
@@ -3249,7 +3246,7 @@ export class OpenCodianView extends ItemView {
       claimOpenCodeDiagnosticRunToken: (tabId, sessionId) =>
         this.chatDiagnosticsCoordinator.claimOpenCodeDiagnosticRunToken(tabId, sessionId),
       claimCodexDiagnosticRunToken: (tabId, threadId) =>
-        this.codexDiagnosticsAdapter.claimDiagnosticRunToken(tabId, threadId ?? undefined),
+        this.chatDiagnosticsCoordinator.claimCodexDiagnosticRunToken(tabId, threadId ?? undefined),
       claimClaudeDiagnosticRunToken: (tabId, sessionId) =>
         this.claudeDiagnosticsAdapter.claimDiagnosticRunToken(tabId, sessionId ?? undefined),
       refreshOpenCodeDiagnosticsState: (tabId) => {

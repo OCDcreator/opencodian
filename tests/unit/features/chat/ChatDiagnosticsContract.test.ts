@@ -68,20 +68,35 @@ function createMenuStub(): Menu {
   } as unknown as Menu;
 }
 
-function readBoundedOpenCodianViewBlock(startMarker: string, endMarker: string): string {
+function readOpenCodianViewSource(): string {
   // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
   const fs = require('fs') as typeof import('fs');
   // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
   const path = require('path') as typeof import('path');
-  const source = fs.readFileSync(
+  return fs.readFileSync(
     path.resolve(__dirname, '../../../../src/features/chat/OpenCodianView.ts'),
     'utf8',
   );
+}
+
+function readBoundedOpenCodianViewBlock(startMarker: string, endMarker: string): string {
+  const source = readOpenCodianViewSource();
   const start = source.indexOf(startMarker);
   expect(start).toBeGreaterThanOrEqual(0);
   const end = source.indexOf(endMarker, start + startMarker.length);
   expect(end).toBeGreaterThan(start);
   return source.slice(start, end);
+}
+
+function readChatDiagnosticsCoordinatorSource(): string {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
+  const fs = require('fs') as typeof import('fs');
+  // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
+  const path = require('path') as typeof import('path');
+  return fs.readFileSync(
+    path.resolve(__dirname, '../../../../src/features/chat/services/ChatDiagnosticsCoordinator.ts'),
+    'utf8',
+  );
 }
 
 function expectSourceOrder(source: string, snippets: readonly string[]): void {
@@ -323,21 +338,41 @@ describe('Phase 3 Task 10 — ChatDiagnosticsContract (characterization)', () =>
     });
   });
 
-  describe('header/menu route behavior — OpenCode coordinator routing (source contract)', () => {
+  describe('header/menu route behavior — coordinator routing (source contract)', () => {
     function readHeaderDiagnosticsBlock(): string {
       return readBoundedOpenCodianViewBlock(
         'getOpenCodeDiagnosticsState: () => this.chatDiagnosticsCoordinator.getOpenCodeDiagnosticsState(),',
-        'getActiveDiagnosticsTabId: () => this.getActiveTabId(),',
+        'getClaudeDiagnosticsState: (tabId) => this.claudeDiagnosticsAdapter.getDiagnosticsState(tabId),',
       );
     }
 
-    it('routes the OpenCode header state and menu operations through the coordinator', () => {
+    it('routes the OpenCode and Codex header state and menu operations through the coordinator', () => {
       const block = readHeaderDiagnosticsBlock();
       expectSourceOrder(block, [
         'getOpenCodeDiagnosticsState: () => this.chatDiagnosticsCoordinator.getOpenCodeDiagnosticsState(),',
         'showOpenCodeDiagnostics: (event) => this.chatDiagnosticsCoordinator.showOpenCodeDiagnostics(event),',
+        'getCodexDiagnosticsState: (tabId) => this.chatDiagnosticsCoordinator.getCodexDiagnosticsState(tabId),',
+        'showCodexDiagnostics: (event, tabId) => this.chatDiagnosticsCoordinator.showCodexDiagnostics(event, tabId),',
       ]);
       expect(block).not.toContain('this.plugin.openCodeTraceService');
+      expect(block).not.toContain('this.codexDiagnosticsAdapter');
+    });
+
+    it('keeps Codex adapter composition in ChatDiagnosticsCoordinator, not OpenCodianView', () => {
+      const coordinatorSource = readChatDiagnosticsCoordinatorSource();
+      expectSourceOrder(coordinatorSource, [
+        'private readonly codexDiagnosticsAdapter: CodexDiagnosticsHostAdapter;',
+        'codexDiagnosticsHost: CodexDiagnosticsHostAdapterHost,',
+        'this.codexDiagnosticsAdapter = new CodexDiagnosticsHostAdapter(codexDiagnosticsHost);',
+        'getCodexDiagnosticsState(tabId: string | null): CodexDiagnosticsState {',
+        'showCodexDiagnostics(event: MouseEvent, tabId: string): void {',
+        'claimCodexDiagnosticRunToken(',
+        'cancelCodexDiagnosticCapture(tabId: string): void {',
+      ]);
+
+      const viewSource = readOpenCodianViewSource();
+      expect(viewSource).not.toContain('CodexDiagnosticsHostAdapter');
+      expect(viewSource).not.toContain('codexDiagnosticsAdapter');
     });
   });
 
@@ -425,11 +460,10 @@ describe('Phase 3 Task 10 — ChatDiagnosticsContract (characterization)', () =>
   // ---------------------------------------------------------------------------
   // Step 3 (cont.): tab-cleanup capture-cancel seam.
   //
-  // OpenCodianView wires tab cleanup to cancel capture per backend: OpenCode →
-  // ChatDiagnosticsCoordinator.cancelOpenCodeDiagnosticCapture(tabId); Codex →
-  // codexDiagnosticsAdapter.cancelDiagnosticCapture(tabId); Claude →
-  // claudeDiagnosticsAdapter.cancelDiagnosticCapture(tabId). Task 12 must keep
-  // these three cancel seams distinct (no merged cross-backend cancel).
+  // OpenCodianView wires tab cleanup to cancel capture per backend: OpenCode
+  // and Codex through ChatDiagnosticsCoordinator's backend-specific methods,
+  // Claude through its existing adapter. Task 12 must keep these three cancel
+  // seams distinct (no merged cross-backend cancel).
   // ---------------------------------------------------------------------------
 
   describe('tab-cleanup capture-cancel seam (three distinct backends)', () => {
@@ -443,7 +477,7 @@ describe('Phase 3 Task 10 — ChatDiagnosticsContract (characterization)', () =>
       expectSourceOrder(block, [
         'cancelOpenCodeDiagnosticCapture: (tabId) =>',
         'this.chatDiagnosticsCoordinator.cancelOpenCodeDiagnosticCapture(tabId),',
-        'cancelCodexDiagnosticCapture: (tabId) => this.codexDiagnosticsAdapter.cancelDiagnosticCapture(tabId),',
+        'cancelCodexDiagnosticCapture: (tabId) => this.chatDiagnosticsCoordinator.cancelCodexDiagnosticCapture(tabId),',
         'cancelClaudeDiagnosticCapture: (tabId) => this.claudeDiagnosticsAdapter.cancelDiagnosticCapture(tabId),',
       ]);
     });
@@ -460,7 +494,7 @@ describe('Phase 3 Task 10 — ChatDiagnosticsContract (characterization)', () =>
         'claimOpenCodeDiagnosticRunToken: (tabId, sessionId) =>',
         'this.chatDiagnosticsCoordinator.claimOpenCodeDiagnosticRunToken(tabId, sessionId),',
         'claimCodexDiagnosticRunToken: (tabId, threadId) =>',
-        'this.codexDiagnosticsAdapter.claimDiagnosticRunToken(tabId, threadId ?? undefined),',
+        'this.chatDiagnosticsCoordinator.claimCodexDiagnosticRunToken(tabId, threadId ?? undefined),',
         'claimClaudeDiagnosticRunToken: (tabId, sessionId) =>',
         'this.claudeDiagnosticsAdapter.claimDiagnosticRunToken(tabId, sessionId ?? undefined),',
       ]);
