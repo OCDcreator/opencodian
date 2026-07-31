@@ -52,7 +52,6 @@ import type { AgentBackendKind } from '../../core/types/chat';
 import type { PermissionMode } from '../../core/types/settings';
 import type { CodexReasoningEffort, CodexSandboxMode } from '../../core/types/settings';
 import { t } from '../../i18n';
-import type OpenCodianPlugin from '../../main';
 import {
   createLogger,
   formatDurationMs,
@@ -71,6 +70,7 @@ import {
   CodexMcpServerDetailModal,
   createCodexMcpServerDetailHost,
 } from '../settings/CodexMcpServerDetailModal';
+import type { ChatPluginPort } from './ChatPluginPort';
 import {
   type FocusContextPreview,
 } from './composerContext';
@@ -510,7 +510,7 @@ addIcon('opencodian-circle-plus', NEW_TAB_ICON);
 addIcon('opencodian-message-square-plus', CURRENT_TAB_NEW_CONVERSATION_ICON);
 
 export class OpenCodianView extends ItemView {
-  private plugin: OpenCodianPlugin;
+  private plugin: ChatPluginPort;
   private chatContainerEl: HTMLElement | null = null;
   private messagesShellEl: HTMLElement | null = null;
   private themeBackgroundImageEl: HTMLDivElement | null = null;
@@ -1617,7 +1617,7 @@ export class OpenCodianView extends ItemView {
 
   constructor(
     leaf: WorkspaceLeaf,
-    plugin: OpenCodianPlugin,
+    plugin: ChatPluginPort,
     chatDiagnosticsCoordinatorFactory: ChatDiagnosticsCoordinatorFactory =
       failClosedChatDiagnosticsCoordinatorFactory,
   ) {
