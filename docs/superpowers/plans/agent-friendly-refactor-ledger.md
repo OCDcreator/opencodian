@@ -204,8 +204,31 @@ None. No Test Vault deployment required.
 - **Gate evidence (run on clean tree at 479f3c31):** local `npm run verify` 15/15 green (6855 tests); Codex sandbox focused command 92/92 clean 3× (sandbox full-verify blocked by pre-existing Puppeteer/socket EPERM, not Task 11).
 - **Runtime files changed:** src/main.ts, src/app/diagnostics/** (deploy-relevant). Test Vault deployed (BUILD_ID main.202607311224).
 
-### Task 12–13 — pending
-- **Status:** blocked on Task 11 (now unblocked).
+### Task 12 — Introduce ChatDiagnosticsCoordinator — APPROVED
+- **Range:** `7b577e98..80421a8d` (5 commits, runtime source changed).
+- **Commits:**
+  | SHA | Type | Subject |
+  |---|---|---|
+  | `c1964e26` | test(diagnostics) | pin OpenCode chat behavior before Task 12 |
+  | `3616886d` | refactor(diagnostics) | centralize OpenCode chat diagnostics |
+  | `b73754d6` | refactor(diagnostics) | centralize Codex chat diagnostics |
+  | `55dc1804` | refactor(diagnostics) | centralize Claude chat diagnostics |
+  | `80421a8d` | fix(architecture) | address Task 12 review findings |
+- **Sol independent review — APPROVED (2 rounds).**
+  - Round 1 returned **CHANGES REQUESTED** with 2 Important findings: `ChatDiagnosticsCoordinator` was incorrectly owned by `feature.chat-shell` without `diagnostics-safety`; the constructor-cleanup test used an arbitrary 20 ms wait and could miss the actual partial OpenCode disposal promise.
+  - Repair commit `80421a8d` moved the coordinator to `feature.chat-diagnostics`, updated the owner manifest, owner overview, focused tests, and inspector regression, and replaced the fixed wait with deterministic interception/await of the real partial-disposal promise. Production fire-and-forget behavior stayed unchanged.
+  - Round 2 final reviewer: Codex CLI `gpt-5.6-sol`, session `019fb73c-9c33-7fd1-9761-bf52100ea350`; literal decision **APPROVED**. Findings: Blocker 0, Important 0; two non-blocking Minors (one-shot diagnostics factory stored as a field; a `CodexDiagnosticsHost` test reaches through private layers). Spec findings: none.
+- **Acceptance status:**
+  - [x] Diagnostics failures do not escape chat hooks.
+  - [x] `OpenCodianView` has zero direct backend trace service/store/report-builder access.
+  - [x] The coordinator exposes backend operations rather than a mutable service map; deletion remains zero trace interaction.
+  - [x] OpenCode → Codex → Claude landed as individually green slices.
+- **Gate evidence:** root `npm run verify` passed all 15 gates, 716/716 suites, 6893/6893 tests, production build, and generated styles. The root canonical 22-suite matrix passed three consecutive parallel runs without ENOENT or late Jest logging. The final Sol reviewer independently ran 22/22 suites (327/327 tests), focused 8/8 suites (167/167 tests), and historical snapshots of OpenCode 101, Codex 61, and Claude 111 tests. All four negative mutations (owner drift, missing partial cleanup, escaping fail-closed claim, deletion trace interaction) failed as required and were restored.
+- **CodeGraph evidence (depth 2, from Sol):** claim 3 direct callers / 10 nodes; deletion 3 / 7; constructor 0 / 1.
+- **Deployment:** runtime slices were deployed to the macOS Test Vault with `BUILD_ID main.202607311541`; dist/Test Vault hashes matched at deployment time. The repair commit changed no production source and required no new deployment. Later verification rebuilt the current `dist/main.js` as `main.202607311612`, so this ledger records the verified-at-deployment evidence and does not claim a current byte-match with the still-deployed `1541` file.
+
+### Task 13 — Split backend debug panels into complete owners — pending / unlocked
+- **Status:** pending and unlocked by Task 12 approval; no Task 13 work is recorded here.
 
 ## Phase 4–6
 - **Status:** blocked on preceding phase APPROVED.

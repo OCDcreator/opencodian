@@ -11,6 +11,14 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-07-31 Agent-Friendly Architecture 试点：ChatDiagnosticsCoordinator 提取（Phase 3 Task 12）
+
+Task 12 将聊天侧 OpenCode、Codex、Claude diagnostics 操作集中到 `ChatDiagnosticsCoordinator`：诊断异常不会逃逸 chat hooks，`OpenCodianView` 不再直接访问 backend trace service/store/report builder，coordinator 通过 typed backend operations 暴露能力而不是可变 service map；删除会话仍保持零 trace interaction。OpenCode → Codex → Claude 三个纵向切片分别保持绿色。
+
+Sol 独立审查共两轮。第 1 轮 **CHANGES REQUESTED**，发现 2 个 Important：coordinator owner 错置在缺少 `diagnostics-safety` 的 `feature.chat-shell`，以及构造失败清理测试使用任意 20 ms 等待。`80421a8d` 将 owner 改为 `feature.chat-diagnostics`，同步 manifest、owner overview、focused tests 与 inspector regression，并改为拦截/等待真实 partial OpenCode disposal promise；生产 fire-and-forget 行为不变。第 2 轮由 Codex CLI `gpt-5.6-sol`（session `019fb73c-9c33-7fd1-9761-bf52100ea350`）复核，literal decision **APPROVED**（Blocker 0 / Important 0；仅 2 个 non-blocking Minor，Spec findings none）。
+
+验证：root `npm run verify` 15/15 gates、716/716 suites、6893/6893 tests、production build 与 generated styles 全绿；canonical 22-suite matrix 连续 3 次并行通过，无 ENOENT 或 late Jest logging。Sol 独立复跑 22/22 suites（327/327 tests）及 focused 8/8 suites（167/167 tests）。runtime slices 已部署到 macOS Test Vault，部署时 `BUILD_ID main.202607311541`，dist/Test Vault hashes 当时匹配；修复提交未改 production source，因此无需重新部署。后续验证曾将当前 `dist/main.js` 重建为 `main.202607311612`，本条不据此声称当前产物仍与 Test Vault 的 `1541` 文件字节匹配。
+
 ## 2026-07-31 Agent-Friendly Architecture 试点：DiagnosticsRuntimeCoordinator 提取（Phase 3 Task 11）
 
 Task 11 是 Phase 3 首个 runtime-move。把 `main.ts` 内联构造的三个后端 trace service（OpenCode/Codex/Claude）移到新的 `src/app/diagnostics/DiagnosticsRuntimeCoordinator`。`main.ts` 不再有任何 `new *SessionTraceService`；只构造一个 coordinator，并通过 delegating getter（`openCodeTraceService`/`codexTraceService`/`claudeTraceService`，bootstrap 前返回 undefined 以保持此前 optional-chaining 安全）暴露给既有 consumer，这些 shim 待 Task 12/13 迁移 consumer 后移除。`onunload` 以 `void` 调用 `coordinator.dispose()`（fire-and-forget，保持此前 unload 时序）；dispose 内部顺序 await 每个后端 `.dispose().catch(...)`（opencode→codex→claude，fail-closed warn，logger 由 main.ts 注入以保持 `[OpenCodian]` scope）。coordinator 构造用 try/catch + constructed-list 保证部分构造失败时不泄漏。新增 `app.diagnostics-runtime` owner + 行为测试套件（捕获 swapped options、dispose 顺序、fail-closed secret-no-leak）。
