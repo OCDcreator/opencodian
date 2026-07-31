@@ -11,6 +11,16 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-07-31 Agent-Friendly Architecture 试点：Settings 后端调试面板完整 owner 收口（Phase 3 Task 13）
+
+Task 13 在 `91fc3b7f..e0a008a3` 完成六个提交：`4201793c`（OpenCode）、`94cfdd75`（Codex）、`2c2bd00f`（Claude Code）分别提取完整调试面板，随后 `74a4f422` 补齐架构/模块文档索引，`cdebc97b` 修正三端口文档，`e0a008a3` 修正 debug module owner guidance。三个面板各自拥有 render/settings/status/actions/catalog lifecycle，只接收窄 typed settings/diagnostics ports 与 callbacks，不接收完整 plugin 或 mutable service map；`SettingsDebugSection` 保留 shared shell/router 与 platform/dialog/path/action/module helpers，且零直接 backend trace-service/store/report-builder 访问。Claude 的 console `debugChannels` 与 `sessionTrace.consoleChannels` 仍独立；legacy classic attach 的 Codex omission 保持不变，tabbed route 仍挂载 Codex，`src/i18n` 零 diff。
+
+Sol 独立审查共四轮：前三轮分别在 HEAD `2c2bd00f`、`74a4f422`、`cdebc97b` 返回 **CHANGES REQUESTED**，依次修复缺失 aggregate module indexes/Claude owner-overview entrypoint 与 focused test、三-port composition/factory 文档错误、以及 `SettingsDebugSection.md` 将未来 debug keys 错归 section 的 hard docs-sync breach；最终 session `019fb80c-725d-7e10-9794-a8acd48cd73a` 对范围 `91fc3b7f..e0a008a3` 给出 literal **APPROVED**（Standards 0 / Spec 0）。
+
+最终证据：root `npm run verify` 为 15/15 gates、719/719 suites、6907/6907 tests，lint 0/0，typecheck/build/generated styles 全绿；Sol focused gates 为 owner manifest 550/550、module docs 584/584、module-doc owner impact PASS，Graphify digest `79e7fb99d938edad83b7f6d9f9164d63475c400ec6c5c0153ff8a5a8967b2267`；focused matrix 14/14 suites、187/187 tests。四个 CodeGraph-bounded mutation proof 均 fail → restore → pass：Claude catalog 3/5→5/5、channel crossover 1/5→5/5、LF→CRLF 1/48→48/48、constructor trace-service access 1/11→11/11；最终 affected scope empty、staged/unstaged clean、HEAD `e0a008a3` unchanged。plugin export contract 与 base/HEAD `src/main.ts`、Task 10 contract blobs byte-for-byte unchanged，canonical order/LF/UTF-8/filename/build-before-write 继续 pinned。
+
+Test Vault runtime 已在 macOS 部署，BUILD_ID `main.202607311845`；`main.js`/`manifest.json`/`styles.css` SHA-256 分别为 `f0df3b4b420b50162e0e1c71467d64fbb9987858574a7d7f9cd60998d3f32440`、`3a47461c4a27d35efbe7afde5be9c124e4a7599550d330626f81efb0f8c0be88`、`1e4aa7b41de2c2eadfb5ec7bbc7f6eac6256b795d4c7990b12848747b164e4a7`。最后三个提交仅 docs/config，故无需重新部署；后续本地 dist BUILD_ID 可能不同，不据此声称与已部署 runtime 字节相等。Phase 3 至此 CLOSED / APPROVED；Phase 4 尚未开始，本任务未进入 Phase 4，也不声称 push。
+
 ## 2026-07-31 Agent-Friendly Architecture 试点：ChatDiagnosticsCoordinator 提取（Phase 3 Task 12）
 
 Task 12 将聊天侧 OpenCode、Codex、Claude diagnostics 操作集中到 `ChatDiagnosticsCoordinator`：诊断异常不会逃逸 chat hooks，`OpenCodianView` 不再直接访问 backend trace service/store/report builder，coordinator 通过 typed backend operations 暴露能力而不是可变 service map；删除会话仍保持零 trace interaction。OpenCode → Codex → Claude 三个纵向切片分别保持绿色。

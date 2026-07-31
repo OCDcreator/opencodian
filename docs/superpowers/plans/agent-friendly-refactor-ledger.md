@@ -150,7 +150,7 @@ None. No Test Vault deployment required.
 
 ## Phase 3 — Diagnostics vertical slice (Task 10–13)
 - **PHASE_BASE:** `2e962d4e48a5653f6decac51e2ef3dd78968c794`
-- **Status:** unblocked; Phase 2 APPROVED. This is the FIRST runtime-change phase.
+- **Status:** Phase 3 Tasks 10–13 are **CLOSED / APPROVED** at `e0a008a3`; Phase 4 has not started and was not entered.
 
 ### Task 10 — Characterize the three-backend diagnostics contract — APPROVED
 - **Range:** `2e962d4e..05bdf53e` (7 commits, runtime source untouched — characterization only).
@@ -227,8 +227,35 @@ None. No Test Vault deployment required.
 - **CodeGraph evidence (depth 2, from Sol):** claim 3 direct callers / 10 nodes; deletion 3 / 7; constructor 0 / 1.
 - **Deployment:** runtime slices were deployed to the macOS Test Vault with `BUILD_ID main.202607311541`; dist/Test Vault hashes matched at deployment time. The repair commit changed no production source and required no new deployment. Later verification rebuilt the current `dist/main.js` as `main.202607311612`, so this ledger records the verified-at-deployment evidence and does not claim a current byte-match with the still-deployed `1541` file.
 
-### Task 13 — Split backend debug panels into complete owners — pending / unlocked
-- **Status:** pending and unlocked by Task 12 approval; no Task 13 work is recorded here.
+### Task 13 — Split backend debug panels into complete owners — APPROVED
+- **Range:** `91fc3b7f..e0a008a3` (6 commits).
+- **Commits:**
+  | SHA | Subject |
+  |---|---|
+  | `4201793c` | `refactor(settings): extract OpenCode debug panel` |
+  | `94cfdd75` | `refactor(settings): extract Codex debug panel` |
+  | `2c2bd00f` | `refactor(settings): extract Claude Code debug panel` |
+  | `74a4f422` | `docs(architecture): close Task 13 debug index gap` |
+  | `cdebc97b` | `docs(settings): correct Task 13 port documentation` |
+  | `e0a008a3` | `docs(settings): correct debug module ownership guidance` |
+- **Sol independent review — APPROVED (4 rounds).**
+  - Round 1: session `019fb7c9-69d4-7ec0-9abb-1f39bf238d1f`, HEAD `2c2bd00f`, **CHANGES REQUESTED**. Important findings: required aggregate module indexes were missing, and the owner overview omitted the Claude entrypoint/focused test. `74a4f422` added/synced the aggregate debug index, `docs/modules/README.md`, the owner overview, and the exact module-docs `docIgnore` closure.
+  - Round 2: session `019fb7e9-8fa4-76b0-ace7-76381329de15`, HEAD `74a4f422`, **CHANGES REQUESTED**. `OpenCodianSettings.md` and `SettingsTabbedRenderer.md` inaccurately described three-port composition/factory ownership. `cdebc97b` corrected the port documentation.
+  - Round 3: session `019fb7fa-2343-7293-9516-6159247108d4`, HEAD `cdebc97b`, **CHANGES REQUESTED**. Hard docs-sync breach: `SettingsDebugSection.md` still routed all future debug-module keys to the section instead of the actual owners. `e0a008a3` corrected the debug module ownership guidance.
+  - Round 4: session `019fb80c-725d-7e10-9794-a8acd48cd73a`, range `91fc3b7f..e0a008a3`, literal **APPROVED**; Standards 0 findings, Spec 0 findings.
+- **Acceptance status:**
+  - [x] OpenCode, Codex, and Claude panels are complete owners for render/settings/status/actions/catalog lifecycle, use narrow typed settings/diagnostics ports and callbacks, and receive neither the full plugin nor a mutable service map.
+  - [x] `SettingsDebugSection` retains the shared shell/router and platform/dialog/path/action/module helpers; it has zero direct backend trace-service/store/report-builder access.
+  - [x] Claude console `debugChannels` remain separate from `sessionTrace.consoleChannels`.
+  - [x] The legacy classic attach Codex omission is unchanged; the tabbed route still mounts Codex; `src/i18n` has zero Task 13 diff.
+  - [x] The plugin export contract is byte-for-byte unchanged: base/HEAD `src/main.ts` and Task 10 contract blobs match; canonical order, LF, UTF-8, filename, and build-before-write remain pinned.
+- **Gate evidence recorded after the final documentation repairs:**
+  - Root full `npm run verify`: 15/15 gates PASS; 719/719 suites; 6907/6907 tests; lint 0 errors/0 warnings; typecheck, production build, and generated styles clean.
+  - Final Sol focused gates: owner manifest 550/550; module docs 584/584; module-doc owner impact PASS; Graphify digest `79e7fb99d938edad83b7f6d9f9164d63475c400ec6c5c0153ff8a5a8967b2267`.
+  - Final focused matrix: 14/14 suites, 187/187 tests. Intermediate slices: OpenCode 12/12 suites, 177/177 tests; Codex 13/13, 182/182; Claude 14/14, 187/187.
+  - Four final Sol CodeGraph-bounded mutation proofs each followed fail → restore → pass with final SHA/Git blob/diff-clean restoration: Claude catalog removal (render direct method/function callers 0, impact depth 2, blast 2; 3/5 failed, restored 5/5); console/trace channel crossover (`addCodeChannelSettings` direct callers 1, depth 2, blast 3; 1/5 failed, restored 5/5); LF→CRLF (`buildDiagnosticReport` direct callers 3, depth 1, blast 5; 1/48 failed, restored 48/48); direct trace-service access in the `SettingsDebugSection` constructor (direct callers 0, depth 1, blast 1; 1/11 failed, restored 11/11).
+  - At the implementation closure snapshot, affected scope was empty, staged/unstaged diffs were clean, and HEAD remained `e0a008a3`.
+- **Test Vault evidence:** runtime code was deployed on macOS with BUILD_ID `main.202607311845`. Test Vault SHA-256: `main.js` `f0df3b4b420b50162e0e1c71467d64fbb9987858574a7d7f9cd60998d3f32440`; `manifest.json` `3a47461c4a27d35efbe7afde5be9c124e4a7599550d330626f81efb0f8c0be88`; `styles.css` `1e4aa7b41de2c2eadfb5ec7bbc7f6eac6256b795d4c7990b12848747b164e4a7`. The final three commits are docs/config only, so no redeployment was required; a later local `dist` BUILD_ID may differ and is not byte-equal evidence for the deployed runtime.
 
 ## Phase 4–6
-- **Status:** blocked on preceding phase APPROVED.
+- **Status:** Phase 3 (Tasks 10–13) is **CLOSED / APPROVED** at `e0a008a3`; Phase 4 has not started and was not entered; Phase 5–6 remain not started. No push is claimed.
