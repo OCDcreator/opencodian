@@ -362,7 +362,6 @@ export interface ChatRuntimeCompositionHost {
   getConversationForTab(tabId: TabId): Conversation | null;
   showPermissionDialog(request: unknown, tabId: TabId | null): void;
   convertToStreamingChunk(chunk: unknown): unknown;
-  getFriendlyStreamErrorMessage(rawMessage: unknown): string;
   syncLatestUserMessageFromServer(conversation: Conversation, optimisticMessageId: unknown, tabId: TabId | null): void;
 
   // --- host factories ---
@@ -402,7 +401,6 @@ export interface ChatRuntimeCompositionHost {
   createUserMessageFooterRendererHost(): unknown;
   createStreamingInlineCardRendererHost(): unknown;
   createQuestionRuntimeViewHostFactoryHost(): unknown;
-  createSendPipelineHostDependencies(): unknown;
   createTabConversationSyncFingerprintRuntimePort(): TabConversationSyncFingerprintRuntimePort;
 }
 

@@ -201,7 +201,7 @@ import {
   type ConversationHydrationRuntimeBridges,
   type ConversationHydrationRuntimeViewHost,
 } from './services/ConversationHydrationRuntimeViewHostFactory';
-import { ConversationIdentityRuntime } from './services/ConversationIdentityRuntime';
+import type { ConversationIdentityRuntime } from './services/ConversationIdentityRuntime';
 import {
   ConversationLoadRecoveryCoordinator,
 } from './services/ConversationLoadRecoveryCoordinator';
@@ -272,7 +272,7 @@ import {
   PersistentAssistantNoticeService,
   type PersistentAssistantNoticeServiceHost,
 } from './services/PersistentAssistantNoticeService';
-import { QuestionDockSlotCoordinator } from './services/QuestionDockSlotCoordinator';
+import type { QuestionDockSlotCoordinator } from './services/QuestionDockSlotCoordinator';
 import type { QuestionRuntimeServices } from './services/QuestionRuntimeHostAdapter';
 import {
   type QuestionRuntimeViewHostFactoryHost,
@@ -302,7 +302,7 @@ import {
 import {
   createInitialTabSessionLifecycleState,
 } from './services/TabSessionPhase';
-import { TitleGenerationService } from './services/TitleGenerationService';
+import type { TitleGenerationService } from './services/TitleGenerationService';
 import {
   createDebugLogCallbacks,
   logAssistantFinalizationDebug,
