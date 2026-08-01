@@ -11,6 +11,18 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-08-01 Agent-Friendly Architecture 试点：发布 steady-state contract（Phase 6 Task 20）
+
+Phase 6 Task 20 发布 agent-friendly 架构重构的 steady-state contract。本次为 docs-only（`docs/requirements/agent-maintainability.md` 更新 + devlog + ledger），**未改动** src/test/manifest/package.json/architecture-owners.config.json/graphify-out/automation。这是 Phase 0–6 计划的最后一个任务。
+
+- **`docs/requirements/agent-maintainability.md` 升级到 steady-state**：header 日期更新为 2026-08-01；新增"steady state, Phase 6"结论——pre-Phase-6 的 unattended autopilot 暂停于 R162、历史证据已归档（Task 19）、**唯一 active architecture roadmap**；durable source stack 增加 `architecture-owners.config.json` + `inspect:owner` 作为第 2 层；明确退役的 owner-guard 兼容层（`OWNER_GUARD_APPROVED` / `--approved` free-text waiver / 硬编码 path guard）已由 `check:owner-boundaries` + 结构化 diff-bound approval（protected CI）取代。Graph 证据刷新为 2026-08-01（555 files / ~13,393 nodes / ~38,893 edges / ~325 communities）。R1 阅读链增加 `inspect:owner` 步骤并注明归档不在默认链中。
+- **新增 R7（owner graph 是架构契约）**：列举 5 个 architecture gates（owner-manifest / owner-boundaries / dependency-direction / architecture-cycles / architecture-approvals）及其职责；要求改 function/class/method 前跑 CodeGraph callers + finite impact，改后跑 `codegraph affected`。
+- **新增 R8（deferred 架构 debt 带 owner + expiry）**：Phase 5 三个域（Claude adapter / OpenCodeService / settings）只 inventory 未 implement；每张 deferred card 保留 owner + 硬过期日 2026-09-01 + re-entry gate（fresh inventory + 独立 review + merge checkpoint，或显式 extension），过期/测试通过都不授权 implementation。
+- **compatibility-gates-gone 证明（Task 20 §847 acceptance）**：`scripts/`、`package.json`、`.github/` 中**零** `OWNER_GUARD_APPROVED` / `GUARD_TARGETS` / `--approved` / free-text waiver 引用（Phase 2 Task 9 已退役，本任务复核确认）。`src/` 仅余 3 处注释级 `owner-guard` 文字（解释性，非机制），归档文档中的历史引用属历史证据。
+- **acceptance criteria 扩展**：从 5 条扩到 7 条，新增 §6（compatibility gates 已退役，本任务复核）与 §7（deferred debt 带 owner/expiry）。
+- **未声称**：本次不声称 Phase 5 deferred 域已实现；不声称 LOC/file-count 指标达成；不触发 build/Test Vault deploy（纯 docs）。
+- **门禁**：`npm run verify:architecture` 5/5 PASS；`npm run check:module-docs` 588/588；`npm run check:graphify` 通过；`npm run check:devlog-order` 513 sections。
+
 ## 2026-08-01 Agent-Friendly Architecture 试点：settings plugin-type coupling inventory（Phase 5 Task 18）
 
 Phase 5 Task 18 的 dated discovery inventory 已完成：`docs/superpowers/plans/2026-08-01-settings-plugin-coupling-inventory.md` + 三份 per-domain child plan（`settings-debug-port-slice.md`、`settings-model-catalog-port-slice.md`、`settings-plugin-update-port-slice.md`）。本次为 discovery/inventory 提交，**未授权任何实现切片**，也未改动 production/source、test、manifest、config、generated-graph、barrel、ledger 或 approval。
