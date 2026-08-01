@@ -2923,6 +2923,68 @@ export class OpenCodianView extends ItemView {
     this.chatSurfaceAppearanceCoordinator.scheduleSurfaceColorSync();
   }
 
+  private getCurrentConversationForkService():
+    import('../../core/agents/backend/AgentService').AgentForkCapability | null {
+    const conversation = this.currentConversation;
+    const service = getConversationSessionBackendService(
+      this.plugin.agentServiceRegistry,
+      conversation,
+    );
+    if (!service?.hasCapability(AgentCapability.Fork)) {
+      return null;
+    }
+    return service as unknown as import('../../core/agents/backend/AgentService').AgentForkCapability;
+  }
+
+  private getCurrentConversationBranchService():
+    import('../../core/agents/backend/AgentService').AgentBranchCapability | null {
+    const conversation = this.currentConversation;
+    const service = getConversationSessionBackendService(
+      this.plugin.agentServiceRegistry,
+      conversation,
+    );
+    if (!service?.hasCapability(AgentCapability.Branching)) {
+      return null;
+    }
+    return service as unknown as import('../../core/agents/backend/AgentService').AgentBranchCapability;
+  }
+
+  private routeConversationRevertSession(sessionId: string, messageId: string): Promise<boolean> {
+    const backend = this.currentConversation?.backend ?? 'opencode';
+    const branchService = this.getCurrentConversationBranchService();
+    if (branchService) {
+      return branchService.revertSession(sessionId, messageId);
+    }
+    if (backend === 'opencode') {
+      return this.plugin.openCodeService.revertSession(sessionId, messageId);
+    }
+    throw new Error(`Rewind not available for backend "${backend}"`);
+  }
+
+  private routeConversationUnrevertSession(sessionId: string): Promise<boolean> {
+    const backend = this.currentConversation?.backend ?? 'opencode';
+    const branchService = this.getCurrentConversationBranchService();
+    if (branchService) {
+      return branchService.unrevertSession(sessionId);
+    }
+    if (backend === 'opencode') {
+      return this.plugin.openCodeService.unrevertSession(sessionId);
+    }
+    throw new Error(`Restore rewind not available for backend "${backend}"`);
+  }
+
+  private routeConversationForkSession(sessionId: string, messageId: string): Promise<{ id: string; title: string }> {
+    const backend = this.currentConversation?.backend ?? 'opencode';
+    const forkService = this.getCurrentConversationForkService();
+    if (forkService) {
+      return forkService.forkSession(sessionId, messageId);
+    }
+    if (backend === 'opencode') {
+      return this.plugin.openCodeService.forkSession(sessionId, messageId);
+    }
+    throw new Error(`Fork not available for backend "${backend}"`);
+  }
+
   /** Reset active turn references */
   private resetTurnState(tabId: TabId | null = this.getActiveTabId()): void {
     this.conversationTabRuntimeCoordinator.resetTurnState(tabId);

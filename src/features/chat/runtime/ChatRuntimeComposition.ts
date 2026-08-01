@@ -491,7 +491,10 @@ export class ChatRuntimeComposition {
       },
       () => {
         if (hasCapability(host.caps as never, AgentCapability.Questions)) {
-          (host.questionDockCoordinator as { render(): void } | null)?.render();
+          // Matches the pre-move direct call (this.questionDockCoordinator.render()).
+          // The view's questionDockCoordinator getter resolves live (post-compose), so the
+          // non-null assertion is equivalent to the original this.X read.
+          (host.questionDockCoordinator as { render(): void }).render();
         }
       },
     );
@@ -612,7 +615,7 @@ export class ChatRuntimeComposition {
           return Promise.resolve();
         },
         syncBackgroundTaskStateFromConversation: (conversation: Conversation) => {
-          host.backgroundTaskHost.syncBackgroundTaskStateFromConversation(conversation, host.getActiveTabId());
+          host.backgroundTaskHost.syncBackgroundTaskStateFromConversation(conversation);
         },
         shouldAutoScroll: (tabId: TabId | null) => host.shouldAutoScroll(tabId),
         scrollToBottom: (options?: unknown) => { host.scrollToBottom(options); },
