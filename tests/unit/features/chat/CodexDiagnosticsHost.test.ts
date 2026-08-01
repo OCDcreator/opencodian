@@ -7,6 +7,7 @@ jest.mock('../../../../src/core/opencode', () => ({
 import type { Conversation } from '../../../../src/core/types';
 import { DEFAULT_SETTINGS } from '../../../../src/core/types';
 import { OpenCodianView } from '../../../../src/features/chat/OpenCodianView';
+import { ChatRuntimeComposition } from '../../../../src/features/chat/runtime/ChatRuntimeComposition';
 import type { SendPipelineHostDependencies } from '../../../../src/features/chat/runtime/SendPipelineRuntime';
 import { createChatDiagnosticsCoordinatorFactory } from '../../../../src/features/chat/services/ChatDiagnosticsCoordinator';
 import { ChatHeaderPresenter, type ChatHeaderPresenterHost } from '../../../../src/features/chat/services/ChatHeaderPresenter';
@@ -107,9 +108,15 @@ function getChatHeaderHost(view: OpenCodianView): ChatHeaderPresenterHost {
 }
 
 function getSendPipelineHostDependencies(view: OpenCodianView): SendPipelineHostDependencies {
-  return (view as unknown as {
-    createSendPipelineHostDependencies(): SendPipelineHostDependencies;
-  }).createSendPipelineHostDependencies();
+  // Task 15: createSendPipelineHostDependencies moved to ChatRuntimeComposition.
+  // The owner constructs the full runtime via compose(); the send-pipeline host deps
+  // are built inside. We reach the relocated private builder through the composition owner.
+  const composition = new ChatRuntimeComposition(
+    view as unknown as import('../../../../src/features/chat/runtime/ChatRuntimeComposition').ChatRuntimeCompositionHost,
+  );
+  return (composition as unknown as {
+    buildSendPipelineHostDependencies(surface: { assistantShellViewHostAdapter: unknown }): SendPipelineHostDependencies;
+  }).buildSendPipelineHostDependencies({ assistantShellViewHostAdapter: (view as unknown as { assistantShellViewHostAdapter: unknown }).assistantShellViewHostAdapter });
 }
 
 function setActiveConversation(view: OpenCodianView, conversation: Conversation | null): void {

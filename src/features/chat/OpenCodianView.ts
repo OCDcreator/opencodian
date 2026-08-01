@@ -349,6 +349,7 @@ import type {
 } from './ui/modelSelector/types';
 import { NavigationSidebar } from './ui/NavigationSidebar';
 import { OpenCodeExperimentalActionModal } from './ui/OpenCodeExperimentalActionModal';
+import { ChatRuntimeComposition } from './runtime/ChatRuntimeComposition';
 
 
 const logger = createLogger('OpenCodianView');
@@ -384,82 +385,6 @@ interface ConversationRevertState {
 interface DeferredQuestionRequest {
   promise: Promise<void>;
   resolve: () => void;
-}
-
-type QuestionTodoBackgroundTaskRuntimeCoordinators = ReturnType<
-  typeof createQuestionTodoBackgroundTaskRuntimeServiceBundleFromSeam
->;
-
-interface OpenCodianViewSurfaceRuntimeWiring {
-  titleGenerationService: TitleGenerationService;
-  tabMessagesPaneCoordinator: TabMessagesPaneCoordinator<TabRuntimeState>;
-  chatHeaderPresenter: ChatHeaderPresenter;
-  conversationHistoryActionsCoordinator: ConversationHistoryActionsCoordinator;
-  chatSelectionControlsCoordinator: ChatSelectionControlsCoordinator;
-  composerInputShellCoordinator: ComposerInputShellCoordinator;
-  inputPanelAppearanceCoordinator: InputPanelAppearanceCoordinator;
-  chatSurfaceAppearanceCoordinator: ChatSurfaceAppearanceCoordinator;
-  conversationSessionSettingsCoordinator: ConversationSessionSettingsCoordinator;
-  composerContextViewFacade: ComposerContextViewFacade;
-  tabConversationSyncFingerprintRuntimePort: TabConversationSyncFingerprintRuntimePort;
-  persistentAssistantNoticeService: PersistentAssistantNoticeService;
-  conversationNoticeCoordinator: ConversationNoticeCoordinator;
-  sessionTodoCoordinator: SessionTodoCoordinator;
-  childSessionGraphCoordinator: ChildSessionGraphCoordinator;
-  questionDockSlotCoordinator: QuestionDockSlotCoordinator;
-  assistantShellViewHostAdapter: AssistantShellViewHostAdapter;
-}
-
-interface OpenCodianViewBackgroundTaskRuntimeWiring {
-  visibleConversationPostSyncCoordinator:
-    QuestionTodoBackgroundTaskRuntimeCoordinators['visibleConversationPostSyncCoordinator'];
-  backgroundConversationPostSyncHandoffCoordinator:
-    QuestionTodoBackgroundTaskRuntimeCoordinators['backgroundConversationPostSyncHandoffCoordinator'];
-  questionTodoActivationRefreshCoordinator:
-    QuestionTodoBackgroundTaskRuntimeCoordinators['questionTodoActivationRefreshCoordinator'];
-  backgroundTaskActivationIndicatorCoordinator:
-    QuestionTodoBackgroundTaskRuntimeCoordinators['backgroundTaskActivationIndicatorCoordinator'];
-  backgroundTaskStreamTriggerViewHost:
-    QuestionTodoBackgroundTaskRuntimeCoordinators['backgroundTaskStreamTriggerViewHost'];
-  activeTabContextUsageCoordinator: ActiveTabContextUsageCoordinator;
-  backgroundTaskNoticeStateService: BackgroundTaskNoticeStateService;
-  backgroundTaskTimelineService: BackgroundTaskTimelineService;
-  backgroundTaskLiveSignalCoordinator: BackgroundTaskLiveSignalCoordinator;
-}
-
-interface OpenCodianViewConversationRuntimeWiring {
-  conversationAuthoritativeSyncCoordinator: ConversationAuthoritativeSyncCoordinator;
-  conversationHydrationRenderBridge: ConversationHydrationRuntimeBridges['conversationHydrationRenderBridge'];
-  conversationTransitionBridge: ConversationHydrationRuntimeBridges['conversationTransitionBridge'];
-  tabConversationStateBridge: TabConversationStateBridge;
-  tabViewActivationBridge: TabViewActivationBridge;
-  conversationHydrationOutcomeBridge: ConversationHydrationRuntimeBridges['conversationHydrationOutcomeBridge'];
-  tabConversationActivationBridge: TabConversationActivationBridge;
-  tabRuntimeStateBridge: TabRuntimeStateBridge;
-  conversationSyncRuntimeCoordinator: ConversationSyncRuntimeCoordinator;
-  conversationSyncOrchestrationService: ConversationSyncOrchestrationService;
-  conversationSyncBridge: ConversationSyncBridge;
-  conversationSyncBridgePorts: ConversationSyncBridgePorts;
-  tabActivationConversationSyncRuntimePort: TabActivationConversationSyncRuntimePort;
-  conversationSessionSignalRuntime: ConversationSessionSignalRuntime;
-  backgroundTaskCompletionNoticeService: BackgroundTaskCompletionNoticeService;
-  backgroundTaskInlinePanelRenderer: BackgroundTaskInlinePanelRenderer;
-  backgroundTaskIndicatorCoordinator: BackgroundTaskIndicatorCoordinator;
-  backgroundTaskStreamTriggerCoordinator: BackgroundTaskStreamTriggerCoordinator;
-  conversationLoadRecoveryCoordinator: ConversationLoadRecoveryCoordinator;
-  conversationTabRuntimeCoordinator: ConversationTabRuntimeCoordinator<TabRuntimeState>;
-}
-
-interface OpenCodianViewInteractionRuntimeWiring {
-  messageSendPreparationService: MessageSendPreparationService;
-  messageFinalizationService: MessageFinalizationService;
-  assistantNoticeCardRenderer: AssistantNoticeCardRenderer;
-  userMessageContentRenderer: UserMessageContentRenderer;
-  userMessageFooterRenderer: UserMessageFooterRenderer;
-  streamingInlineCardRenderer: StreamingInlineCardRenderer;
-  permissionInlineCardRenderer: PermissionInlineCardRenderer;
-  questionRuntimeServices: QuestionRuntimeServices;
-  sendPipelineRuntime: SendPipelineRuntime;
 }
 
 interface TabRuntimeState extends ConversationTabRuntimeState {
@@ -628,6 +553,16 @@ export class OpenCodianView extends ItemView {
   /** Get current backend capabilities. Phase 0: always OpenCode full set. */
   private get caps() {
     return getActiveBackendCapabilities();
+  }
+
+  /**
+   * Narrow view port consumed by ChatRuntimeComposition for
+   * `assembleConversationTabRuntime` (Task 15, inventory §2.2c). The view satisfies
+   * TabRuntimeViewSource by shape; exposing it explicitly keeps the composition owner from
+   * receiving the full view (no god-object leak).
+   */
+  private get tabRuntimeViewSource(): import('./services/ConversationTabRuntimeCoordinator').TabRuntimeViewSource {
+    return this;
   }
 
   private isOpenCodeBackendActive(): boolean {
@@ -1704,186 +1639,70 @@ export class OpenCodianView extends ItemView {
       writeTextToClipboard: (text) => navigator.clipboard.writeText(text),
       showNotice: (message) => { new Notice(message); },
     });
-    const surfaceRuntime = this.createSurfaceRuntimeWiring();
-    this.titleGenerationService = surfaceRuntime.titleGenerationService;
-    this.tabMessagesPaneCoordinator = surfaceRuntime.tabMessagesPaneCoordinator;
-    this.chatHeaderPresenter = surfaceRuntime.chatHeaderPresenter;
-    this.conversationHistoryActionsCoordinator =
-      surfaceRuntime.conversationHistoryActionsCoordinator;
-    this.chatSelectionControlsCoordinator = surfaceRuntime.chatSelectionControlsCoordinator;
-    this.composerInputShellCoordinator = surfaceRuntime.composerInputShellCoordinator;
-    this.inputPanelAppearanceCoordinator = surfaceRuntime.inputPanelAppearanceCoordinator;
-    this.chatSurfaceAppearanceCoordinator = surfaceRuntime.chatSurfaceAppearanceCoordinator;
-    this.conversationSessionSettingsCoordinator =
-      surfaceRuntime.conversationSessionSettingsCoordinator;
-    this.composerContextViewFacade = surfaceRuntime.composerContextViewFacade;
-    this.tabConversationSyncFingerprintRuntimePort =
-      surfaceRuntime.tabConversationSyncFingerprintRuntimePort;
-    this.persistentAssistantNoticeService = surfaceRuntime.persistentAssistantNoticeService;
-    this.conversationNoticeCoordinator = surfaceRuntime.conversationNoticeCoordinator;
-    this.sessionTodoCoordinator = surfaceRuntime.sessionTodoCoordinator;
-    this.childSessionGraphCoordinator = surfaceRuntime.childSessionGraphCoordinator;
-    this.questionDockSlotCoordinator = surfaceRuntime.questionDockSlotCoordinator;
-    this.assistantShellViewHostAdapter = surfaceRuntime.assistantShellViewHostAdapter;
-
-    const backgroundTaskRuntime = this.createBackgroundTaskRuntimeWiring();
-    this.activeTabContextUsageCoordinator =
-      backgroundTaskRuntime.activeTabContextUsageCoordinator;
-    this.backgroundTaskNoticeStateService =
-      backgroundTaskRuntime.backgroundTaskNoticeStateService;
-    this.backgroundTaskTimelineService = backgroundTaskRuntime.backgroundTaskTimelineService;
-    this.backgroundTaskLiveSignalCoordinator =
-      backgroundTaskRuntime.backgroundTaskLiveSignalCoordinator;
-    this.conversationIdentityRuntime = new ConversationIdentityRuntime({
-      getCanonicalConversationFingerprint: (messages) => {
-        const fingerprintBuilder = (
-          this.plugin.openCodeService?.constructor as typeof OpenCodeService | undefined
-        )?.getCanonicalConversationFingerprint;
-        if (typeof fingerprintBuilder === 'function') {
-          return fingerprintBuilder(messages);
-        }
-        return undefined;
-      },
-      getActiveTabId: () => this.getActiveTabId(),
-      getTabContextUsage: (tabId) => this.tabManager?.getTabContextUsage(tabId) ?? null,
-    });
-
-    const userMessageContentRenderer = new UserMessageContentRenderer(
-      this.createUserMessageContentRendererHost(),
-    );
-    this.userMessageContentRenderer = userMessageContentRenderer;
-    const conversationRenderService = new ConversationRenderService(
-      createConversationRenderHost({
-        getCurrentConversation: () => this.currentConversation,
-        getMessagesContainer: () => this.messagesContainer,
-        getActiveTabId: () => this.getActiveTabId(),
-        getTabRuntimeState: (tabId) => this.getTabRuntimeState(tabId),
-        clearScheduledScrollToBottom: () => {
-          this.clearScheduledScrollToBottom();
-        },
-        beginConversationHydration: (tabId) => {
-          this.beginConversationHydration(tabId);
-        },
-        endConversationHydration: (tabId) => {
-          this.endConversationHydration(tabId);
-        },
-        shouldRenderEmptyConversationNotice: () =>
-          this.conversationNoticeCoordinator.shouldRenderEmptyConversationNotice(),
-        createEmptyConversationNotice: () =>
-          this.conversationNoticeCoordinator.createEmptyConversationNotice(),
-        createUserMessageFrame: (message) =>
-          this.createUserMessageRenderFrame(message),
-        userMessageContentRenderer,
-        addUserMessageFooter: (messageEl, message, content) => {
-          this.addUserMessageFooter(messageEl, message, content);
-        },
-        renderMarkdownInto: (container, markdown) =>
-          this.renderMarkdownInto(container, markdown),
-        renderBackgroundTaskIndicatorIfNeeded: (tabId) => {
-          if (hasCapability(this.caps, AgentCapability.Subagents)) {
-            return this.backgroundTaskHost.renderBackgroundTaskIndicatorIfNeeded(tabId);
-          }
-          return Promise.resolve();
-        },
-        syncBackgroundTaskStateFromConversation: (conversation) => {
-          this.backgroundTaskHost.syncBackgroundTaskStateFromConversation(conversation);
-        },
-        shouldAutoScroll: (tabId) => this.shouldAutoScroll(tabId),
-        scrollToBottom: (options) => {
-          this.scrollToBottom(options);
-        },
-        syncPaneScrollMetrics: (tabId, messagesEl) => {
-          this.syncPaneScrollMetrics(tabId, messagesEl);
-        },
-        scheduleComposerLayoutSync: () => {
-          this.scheduleComposerLayoutSync();
-        },
-        getMessagesForRender: (messages) =>
-          this.conversationIdentityRuntime.getMessagesForRender(messages),
-        getMessageVisualSignature: (message) =>
-          this.conversationIdentityRuntime.getMessageVisualSignature(message),
-        renderPersistedAssistantMessage: (options) =>
-          this.assistantShellViewHostAdapter.renderPersistedAssistantMessage(options),
-        createAssistantMessageElements: () =>
-          this.assistantShellViewHostAdapter.createAssistantMessageElement(),
-        finalizePseudoStreamFooter: (messageEl, message) => {
-          this.assistantShellViewHostAdapter.finalizePseudoStreamFooter(messageEl, message);
-        },
-        clearStreamingMessageState: () => {
-          this.streamingMessageEl = null;
-          this.streamingContentEl = null;
-        },
-        getAssistantBodySignature: (message) => this.assistantShellViewHostAdapter.getAssistantBodySignature(message),
-        renderAssistantMessageBody: (contentEl, message) =>
-          this.assistantShellViewHostAdapter.renderMessageBody(contentEl, message),
-        finalizePersistedFooter: (messageEl, message) => {
-          this.assistantShellViewHostAdapter.finalizePersistedFooter(messageEl, message);
-        },
-        resetTurnState: () => {
-          this.resetTurnState();
-        },
-      }),
-      {
-        getCanonicalSessionState: (sessionId) =>
-          this.plugin.openCodeService.getCanonicalSessionState(sessionId),
-        hydrateOpenCodeMessage: (info, parts) =>
-          this.plugin.openCodeService.hydrateOpenCodeMessage(info, parts),
-      },
-    );
-    this.conversationRenderService = conversationRenderService;
-
-    const conversationRuntime = this.createConversationRuntimeWiring(
-      backgroundTaskRuntime,
-      conversationRenderService,
-    );
-    this.conversationAuthoritativeSyncCoordinator =
-      conversationRuntime.conversationAuthoritativeSyncCoordinator;
-    this.conversationHydrationRenderBridge =
-      conversationRuntime.conversationHydrationRenderBridge;
-    this.conversationTransitionBridge = conversationRuntime.conversationTransitionBridge;
-    this.tabConversationStateBridge = conversationRuntime.tabConversationStateBridge;
-    this.tabViewActivationBridge = conversationRuntime.tabViewActivationBridge;
-    this.conversationHydrationOutcomeBridge =
-      conversationRuntime.conversationHydrationOutcomeBridge;
-    this.tabConversationActivationBridge =
-      conversationRuntime.tabConversationActivationBridge;
-    this.tabRuntimeStateBridge = conversationRuntime.tabRuntimeStateBridge;
-    this.conversationSyncRuntimeCoordinator =
-      conversationRuntime.conversationSyncRuntimeCoordinator;
-    this.conversationSyncOrchestrationService =
-      conversationRuntime.conversationSyncOrchestrationService;
-    this.conversationSyncBridge = conversationRuntime.conversationSyncBridge;
-    this.conversationSyncBridgePorts = conversationRuntime.conversationSyncBridgePorts;
-    this.tabActivationConversationSyncRuntimePort =
-      conversationRuntime.tabActivationConversationSyncRuntimePort;
-    this.conversationSessionSignalRuntime =
-      conversationRuntime.conversationSessionSignalRuntime;
-    this.backgroundTaskCompletionNoticeService =
-      conversationRuntime.backgroundTaskCompletionNoticeService;
-    this.backgroundTaskInlinePanelRenderer =
-      conversationRuntime.backgroundTaskInlinePanelRenderer;
-    this.backgroundTaskIndicatorCoordinator =
-      conversationRuntime.backgroundTaskIndicatorCoordinator;
-    this.backgroundTaskStreamTriggerCoordinator =
-      conversationRuntime.backgroundTaskStreamTriggerCoordinator;
-    this.conversationLoadRecoveryCoordinator =
-      conversationRuntime.conversationLoadRecoveryCoordinator;
-    this.conversationTabRuntimeCoordinator =
-      conversationRuntime.conversationTabRuntimeCoordinator;
-
-    const interactionRuntime = this.createInteractionRuntimeWiring(
-      conversationRuntime.conversationSyncBridgePorts,
-      conversationRenderService,
-    );
-    this.messageSendPreparationService = interactionRuntime.messageSendPreparationService;
-    this.messageFinalizationService = interactionRuntime.messageFinalizationService;
-    this.assistantNoticeCardRenderer = interactionRuntime.assistantNoticeCardRenderer;
-    this.userMessageContentRenderer = interactionRuntime.userMessageContentRenderer;
-    this.userMessageFooterRenderer = interactionRuntime.userMessageFooterRenderer;
-    this.streamingInlineCardRenderer = interactionRuntime.streamingInlineCardRenderer;
-    this.permissionInlineCardRenderer = interactionRuntime.permissionInlineCardRenderer;
-    this.questionRuntimeServices = interactionRuntime.questionRuntimeServices;
-    this.sendPipelineRuntime = interactionRuntime.sendPipelineRuntime;
+    // Task 15: runtime coordinator construction is owned by ChatRuntimeComposition.
+    // The view passes itself as the structural host (it satisfies
+    // ChatRuntimeCompositionHost by shape) and destructures the assembled runtime into its
+    // existing private fields. The four create*RuntimeWiring() methods + the inline
+    // identity/render constructions + createSendPipelineHostDependencies now live in
+    // ChatRuntimeComposition.
+    const runtime = new ChatRuntimeComposition(
+      this as unknown as import('./runtime/ChatRuntimeComposition').ChatRuntimeCompositionHost,
+    ).compose();
+    this.titleGenerationService = runtime.titleGenerationService;
+    this.tabMessagesPaneCoordinator = runtime.tabMessagesPaneCoordinator as never;
+    this.chatHeaderPresenter = runtime.chatHeaderPresenter;
+    this.conversationHistoryActionsCoordinator = runtime.conversationHistoryActionsCoordinator;
+    this.chatSelectionControlsCoordinator = runtime.chatSelectionControlsCoordinator;
+    this.composerInputShellCoordinator = runtime.composerInputShellCoordinator;
+    this.inputPanelAppearanceCoordinator = runtime.inputPanelAppearanceCoordinator;
+    this.chatSurfaceAppearanceCoordinator = runtime.chatSurfaceAppearanceCoordinator;
+    this.conversationSessionSettingsCoordinator = runtime.conversationSessionSettingsCoordinator;
+    this.composerContextViewFacade = runtime.composerContextViewFacade;
+    this.tabConversationSyncFingerprintRuntimePort = runtime.tabConversationSyncFingerprintRuntimePort;
+    this.persistentAssistantNoticeService = runtime.persistentAssistantNoticeService;
+    this.conversationNoticeCoordinator = runtime.conversationNoticeCoordinator;
+    this.sessionTodoCoordinator = runtime.sessionTodoCoordinator;
+    this.childSessionGraphCoordinator = runtime.childSessionGraphCoordinator;
+    this.questionDockSlotCoordinator = runtime.questionDockSlotCoordinator;
+    this.assistantShellViewHostAdapter = runtime.assistantShellViewHostAdapter;
+    this.activeTabContextUsageCoordinator = runtime.activeTabContextUsageCoordinator;
+    this.backgroundTaskNoticeStateService = runtime.backgroundTaskNoticeStateService;
+    this.backgroundTaskTimelineService = runtime.backgroundTaskTimelineService;
+    this.backgroundTaskLiveSignalCoordinator = runtime.backgroundTaskLiveSignalCoordinator;
+    this.conversationIdentityRuntime = runtime.conversationIdentityRuntime;
+    this.userMessageContentRenderer = runtime.userMessageContentRenderer;
+    this.conversationRenderService = runtime.conversationRenderService;
+    this.conversationAuthoritativeSyncCoordinator = runtime.conversationAuthoritativeSyncCoordinator;
+    this.conversationHydrationRenderBridge = runtime.conversationHydrationRenderBridge;
+    this.conversationTransitionBridge = runtime.conversationTransitionBridge;
+    this.tabConversationStateBridge = runtime.tabConversationStateBridge;
+    this.tabViewActivationBridge = runtime.tabViewActivationBridge;
+    this.conversationHydrationOutcomeBridge = runtime.conversationHydrationOutcomeBridge;
+    this.tabConversationActivationBridge = runtime.tabConversationActivationBridge;
+    this.tabRuntimeStateBridge = runtime.tabRuntimeStateBridge;
+    this.conversationSyncRuntimeCoordinator = runtime.conversationSyncRuntimeCoordinator;
+    this.conversationSyncOrchestrationService = runtime.conversationSyncOrchestrationService;
+    this.conversationSyncBridge = runtime.conversationSyncBridge;
+    this.conversationSyncBridgePorts = runtime.conversationSyncBridgePorts;
+    this.tabActivationConversationSyncRuntimePort = runtime.tabActivationConversationSyncRuntimePort;
+    this.conversationSessionSignalRuntime = runtime.conversationSessionSignalRuntime;
+    this.backgroundTaskCompletionNoticeService = runtime.backgroundTaskCompletionNoticeService;
+    this.backgroundTaskInlinePanelRenderer = runtime.backgroundTaskInlinePanelRenderer;
+    this.backgroundTaskIndicatorCoordinator = runtime.backgroundTaskIndicatorCoordinator;
+    this.backgroundTaskStreamTriggerCoordinator = runtime.backgroundTaskStreamTriggerCoordinator;
+    this.conversationLoadRecoveryCoordinator = runtime.conversationLoadRecoveryCoordinator;
+    this.conversationTabRuntimeCoordinator = runtime.conversationTabRuntimeCoordinator as never;
+    this.backgroundTaskHost = runtime.backgroundTaskHost;
+    this.conversationTabOpenCoordinator = runtime.conversationTabOpenCoordinator;
+    this.messageSendPreparationService = runtime.messageSendPreparationService;
+    this.messageFinalizationService = runtime.messageFinalizationService;
+    this.assistantNoticeCardRenderer = runtime.assistantNoticeCardRenderer;
+    this.userMessageContentRenderer = runtime.userMessageContentRenderer;
+    this.userMessageFooterRenderer = runtime.userMessageFooterRenderer;
+    this.streamingInlineCardRenderer = runtime.streamingInlineCardRenderer;
+    this.permissionInlineCardRenderer = runtime.permissionInlineCardRenderer;
+    this.questionRuntimeServices = runtime.questionRuntimeServices;
+    this.sendPipelineRuntime = runtime.sendPipelineRuntime;
     this.installClaudeCodePermissionHostContext();
     this.installCodexApprovalHostContext();
   }
@@ -1950,578 +1769,6 @@ export class OpenCodianView extends ItemView {
           this.questionRuntimeServices.inlineCardRenderer.clear(tabId);
         }
       },
-    };
-  }
-
-  private createSurfaceRuntimeWiring(): OpenCodianViewSurfaceRuntimeWiring {
-    // Read-only server-side fs/reference context surface. Only resolves support
-    // for the v2 fs/reference capability family; never throws, so the Chat
-    // context picker remains unaffected when the capability is absent.
-    const serverReferenceContextService = this.plugin.openCodeService
-      ? new ServerReferenceContextService({
-          requireCapability: (id) => {
-            try {
-              const availability = this.plugin.openCodeService.requireSdkCapability(id);
-              if (availability && 'supported' in availability && availability.supported === false) {
-                return { supported: false, reason: availability.reason };
-              }
-              return { supported: true };
-            } catch {
-              return { supported: false };
-            }
-          },
-        })
-      : undefined;
-    const composerContextViewFacade = ComposerContextViewFacade.create({
-      app: this.app,
-      getServerMode: () => this.plugin.settings.server.mode,
-      viewHost: this.createComposerContextViewHost(),
-      focusRuntimeViewHost: this.createFocusContextRuntimeViewHost(),
-      focusPreviewWritebackHost: this.createFocusContextPreviewWritebackHost(),
-      serverContext: serverReferenceContextService,
-    });
-    const titleGenerationService = new TitleGenerationService(this.plugin);
-    const questionDockSlotCoordinator = new QuestionDockSlotCoordinator(
-      {
-        shouldUseAboveInputQuestionDock: () => this.plugin.settings.questionCardPosition === 'above_input',
-      },
-      () => {
-        if (hasCapability(this.caps, AgentCapability.Questions)) {
-          this.questionDockCoordinator.render();
-        }
-      },
-    );
-    const conversationHistoryActionsCoordinator = new ConversationHistoryActionsCoordinator(
-      this.createConversationHistoryActionsHost(titleGenerationService),
-    );
-    const conversationSessionSettingsCoordinator = new ConversationSessionSettingsCoordinator(
-      this.createConversationSessionSettingsCoordinatorHost(),
-    );
-
-    return {
-      titleGenerationService,
-      tabMessagesPaneCoordinator: new TabMessagesPaneCoordinator(
-        this.createTabMessagesPaneCoordinatorHost(),
-        this.scrollScheduler,
-      ),
-      chatHeaderPresenter: new ChatHeaderPresenter(this.createChatHeaderPresenterHost()),
-      conversationHistoryActionsCoordinator,
-      chatSelectionControlsCoordinator: new ChatSelectionControlsCoordinator(
-        this.createChatSelectionControlsCoordinatorHost(),
-      ),
-      composerInputShellCoordinator: new ComposerInputShellCoordinator(
-        this.createComposerInputShellCoordinatorHost(),
-      ),
-      inputPanelAppearanceCoordinator: new InputPanelAppearanceCoordinator(
-        this.createInputPanelAppearanceCoordinatorHost(),
-      ),
-      chatSurfaceAppearanceCoordinator: new ChatSurfaceAppearanceCoordinator(
-        this.createChatSurfaceAppearanceCoordinatorHost(),
-      ),
-      conversationSessionSettingsCoordinator,
-      composerContextViewFacade,
-      tabConversationSyncFingerprintRuntimePort: this.createTabConversationSyncFingerprintRuntimePort(),
-      persistentAssistantNoticeService: new PersistentAssistantNoticeService(
-        this.createPersistentAssistantNoticeServiceHost(),
-      ),
-      conversationNoticeCoordinator: new ConversationNoticeCoordinator(
-        this.createConversationNoticeCoordinatorHost(),
-      ),
-      sessionTodoCoordinator: createSessionTodoCoordinator(this.createSessionTodoViewHost()),
-      childSessionGraphCoordinator: new ChildSessionGraphCoordinator(
-        this.createChildSessionGraphCoordinatorHost(),
-        (sessionId) => {
-          void this.conversationTabOpenCoordinator.openTaskToolSession(
-            sessionId,
-            null,
-            this.currentConversation?.backend,
-          );
-        },
-      ),
-      questionDockSlotCoordinator,
-      assistantShellViewHostAdapter: new AssistantShellViewHostAdapter(
-        this.createAssistantShellViewHostAdapterHost(),
-        (sessionId, toolCall) =>
-          this.conversationTabOpenCoordinator.openTaskToolSession(
-            sessionId,
-            toolCall,
-            this.currentConversation?.backend,
-          ),
-        {
-          onOpenMcpServerDetail: (serverName) => this.openCodexMcpServerDetailFromChat(serverName),
-          onAuthenticateMcpServer: (serverName) => { void this.authenticateMcpServerFromChat(serverName); },
-          onRetryMcpToolCall: (toolCall) => { void this.retryMcpToolCallFromChat(toolCall); },
-        },
-      ),
-    };
-  }
-
-  private createBackgroundTaskRuntimeWiring(): OpenCodianViewBackgroundTaskRuntimeWiring {
-    const questionTodoBackgroundTaskRuntime =
-      createQuestionTodoBackgroundTaskRuntimeServiceBundleFromSeam({
-        getActiveTabId: () => this.getActiveTabId(),
-        getCurrentConversation: () => this.currentConversation,
-        setCurrentConversationRevertState: (revertState) => {
-          this.currentConversationRevertState = revertState;
-        },
-        getConversationSyncRuntime: () => this.tabConversationSyncFingerprintRuntimePort,
-        getTabRuntimeState: (tabId) => this.getTabRuntimeState(tabId),
-        getSessionIdForTab: (tabId) => this.getSessionIdForTab(tabId),
-        renderSessionTodoDock: (tabId) => {
-          this.renderSessionTodoDock(tabId);
-        },
-        getQuestionDockCoordinator: () => this.questionDockCoordinator,
-        getSessionTodoCoordinator: () => this.sessionTodoCoordinator,
-        getQuestionDockSlotCoordinator: () => this.questionDockSlotCoordinator,
-        getBackgroundTaskHost: () => this.backgroundTaskHost,
-        getBackgroundTaskIndicatorCoordinator: () => this.backgroundTaskIndicatorCoordinator,
-        getBackgroundTaskLiveSignalCoordinator: () => this.backgroundTaskLiveSignalCoordinator,
-        getTabRuntimeStateBridge: () => this.tabRuntimeStateBridge,
-      });
-    const activeTabContextUsageCoordinator = new ActiveTabContextUsageCoordinator(
-      this.createActiveTabContextUsageCoordinatorHost(),
-    );
-    const backgroundTaskNoticeStateService = new BackgroundTaskNoticeStateService(
-      this.createBackgroundTaskNoticeStateServiceHost(),
-    );
-    const backgroundTaskTimelineService = new BackgroundTaskTimelineService(
-      this.createBackgroundTaskTimelineServiceHost(),
-    );
-    const backgroundTaskLiveSignalCoordinator = new BackgroundTaskLiveSignalCoordinator(
-      this.sessionTodoCoordinator,
-      backgroundTaskTimelineService,
-      backgroundTaskNoticeStateService,
-      this.createBackgroundTaskLiveSignalCoordinatorHostBuilderHost(),
-    );
-
-    return {
-      ...questionTodoBackgroundTaskRuntime,
-      activeTabContextUsageCoordinator,
-      backgroundTaskNoticeStateService,
-      backgroundTaskTimelineService,
-      backgroundTaskLiveSignalCoordinator,
-    };
-  }
-
-  private createConversationRuntimeWiring(
-    backgroundTaskRuntime: OpenCodianViewBackgroundTaskRuntimeWiring,
-    conversationRenderService: ConversationRenderService,
-  ): OpenCodianViewConversationRuntimeWiring {
-    const conversationAuthoritativeSyncCoordinator = new ConversationAuthoritativeSyncCoordinator(
-      this.createConversationAuthoritativeSyncHost(conversationRenderService),
-    );
-    this.conversationAuthoritativeSyncCoordinator = conversationAuthoritativeSyncCoordinator;
-    const tabActivationAssembly = createTabActivationRuntimeAssembly({
-      hostProviderHost: this.createTabActivationRuntimeHostProviderHost(),
-      focusPreviewRefresh: this.composerContextViewFacade,
-      questionTodoActivationRefresh:
-        backgroundTaskRuntime.questionTodoActivationRefreshCoordinator,
-      backgroundTaskActivationIndicator:
-        backgroundTaskRuntime.backgroundTaskActivationIndicatorCoordinator,
-      activeTabContextUsage: backgroundTaskRuntime.activeTabContextUsageCoordinator,
-    });
-    const { tabConversationStateBridge, tabViewActivationBridge } = tabActivationAssembly;
-    const {
-      conversationHydrationRenderBridge,
-      conversationTransitionBridge,
-      conversationHydrationOutcomeBridge,
-    } = assembleConversationHydrationRuntime({
-      host: this.createHydrationRuntimeHostDeps(conversationRenderService),
-      tabConversationStateBridge,
-      tabViewActivationBridge,
-    });
-    const tabConversationActivationBridge = tabActivationAssembly.tabConversationActivationBridge;
-    const tabRuntimeStateBridge = tabActivationAssembly.tabRuntimeStateBridge;
-    const conversationSyncRuntime = assembleConversationSyncRuntime({
-      viewHost: this.createConversationSyncLoadRuntimeViewHost(conversationRenderService),
-      visiblePostSyncCoordinator: backgroundTaskRuntime.visibleConversationPostSyncCoordinator,
-      backgroundPostSyncHandoffCoordinator:
-        backgroundTaskRuntime.backgroundConversationPostSyncHandoffCoordinator,
-    });
-    const tabActivationConversationSyncRuntimePort =
-      assembleTabActivationConversationSyncRuntimePort({
-        getConversationSyncFingerprint: (messages) =>
-          this.conversationIdentityRuntime.getConversationSyncFingerprint(messages),
-        setActiveTabConversationSyncFingerprint: (fingerprint) => {
-          this.conversationTabRuntimeCoordinator.updateConversationSyncRuntime(
-            this.getActiveTabId(),
-            { fingerprint },
-          );
-        },
-        startConversationSyncLoop: () => {
-          conversationSyncRuntime.bridgePorts.getLoopControl().startConversationSyncLoop();
-        },
-        stopConversationSyncLoop: () => {
-          conversationSyncRuntime.bridgePorts.getLoopControl().stopConversationSyncLoop();
-        },
-      });
-    const conversationSessionSignalRuntime = new ConversationSessionSignalRuntime(
-      this.createConversationSessionSignalRuntimeHost(),
-      backgroundTaskRuntime.backgroundTaskLiveSignalCoordinator,
-    );
-    const {
-      backgroundTaskCompletionNoticeService,
-      backgroundTaskInlinePanelRenderer,
-      backgroundTaskIndicatorCoordinator,
-      backgroundTaskStreamTriggerCoordinator,
-      backgroundTaskHost,
-    } = this.createBackgroundTaskInfrastructure(backgroundTaskRuntime, tabRuntimeStateBridge);
-    this.backgroundTaskHost = backgroundTaskHost;
-    const conversationLoadRuntimeBridge = new ConversationLoadRuntimeBridge(
-      conversationSyncRuntime.conversationLoadRuntimeBridgeHost,
-    );
-    const loadRecoveryAssembly = assembleConversationLoadRecovery({
-      viewStateHost: this.createConversationViewStateHost(),
-      tabConversationStateBridge,
-      tabConversationActivationBridge,
-      tabViewActivationBridge,
-      conversationHydrationOutcomeBridge,
-      conversationTransitionBridge,
-      conversationLoadRuntimeBridge,
-      tabOpenHost: this.createConversationTabOpenHost(),
-      lifecycleRecoveryHost: this.createConversationTabLifecycleRecoveryHost(),
-      loadRecoveryHostDeps: {
-        isActiveTabStreaming: () => this.isActiveTabStreaming(),
-        getCurrentConversation: () => this.currentConversation,
-        getTabManager: () => this.tabManager,
-        getMaxTabs: () => this.plugin.settings.maxTabs,
-        getPersistedTabState: () => this.plugin.settings.tabState,
-        setPersistedTabState: (state) => { this.plugin.settings.tabState = state; },
-        persistTabState: (options) => { this.persistTabState(options); },
-        loadConversations: () => this.plugin.loadConversations(),
-        getConversations: () => this.plugin.getConversations(),
-        getActiveBackend: () => this.plugin.settings.activeBackend,
-        createConversation: () => this.plugin.createConversation(),
-        app: this.app,
-        revertSession: (sessionId, messageId) => this.routeConversationRevertSession(sessionId, messageId),
-        unrevertSession: (sessionId) => this.routeConversationUnrevertSession(sessionId),
-        forkSession: (sessionId, messageId) => this.routeConversationForkSession(sessionId, messageId),
-        createConversationFromSession: (sessionId, initial) =>
-          this.plugin.createConversationFromSession(sessionId, initial),
-        deleteConversation: (conversationId) =>
-          this.plugin.deleteConversation(conversationId),
-        syncActiveTabConversation: (conversation) => {
-          this.tabConversationStateBridge.syncActiveTabConversation(conversation);
-        },
-        updateModelSelectorDisplay: () => { this.updateModelSelectorDisplay(); },
-        hasMatchingPersistentNotice: (title, content, tone, conversation) =>
-          this.persistentAssistantNoticeService.hasMatchingMessage(title, content, tone, conversation),
-        appendPersistentNotice: (options) =>
-          this.persistentAssistantNoticeService.appendMessage(options),
-      },
-    });
-    const {
-      conversationLoadRecoveryCoordinator,
-      conversationTabOpenCoordinator,
-      conversationTabLifecycleRecoveryCoordinator,
-    } = loadRecoveryAssembly;
-    this.conversationTabOpenCoordinator = conversationTabOpenCoordinator;
-    const conversationTabRuntimeCoordinator = assembleConversationTabRuntime({
-      tabBarState: this.createTabBarMutableState(),
-      settings: this.plugin.settings,
-      plugin: this.plugin,
-      view: this,
-      paneCoordinator: this.tabMessagesPaneCoordinator,
-      loadRecoveryCoordinator: conversationLoadRecoveryCoordinator,
-      lifecycleRecoveryCoordinator: conversationTabLifecycleRecoveryCoordinator,
-      runtimeStateBridge: tabRuntimeStateBridge,
-    });
-
-    return {
-      conversationAuthoritativeSyncCoordinator,
-      conversationHydrationRenderBridge,
-      conversationTransitionBridge,
-      tabConversationStateBridge,
-      tabViewActivationBridge,
-      conversationHydrationOutcomeBridge,
-      tabConversationActivationBridge,
-      tabRuntimeStateBridge,
-      conversationSyncRuntimeCoordinator: conversationSyncRuntime.runtimeCoordinator,
-      conversationSyncOrchestrationService: conversationSyncRuntime.orchestrationService,
-      conversationSyncBridge: conversationSyncRuntime.bridge,
-      conversationSyncBridgePorts: conversationSyncRuntime.bridgePorts,
-      tabActivationConversationSyncRuntimePort,
-      conversationSessionSignalRuntime,
-      backgroundTaskCompletionNoticeService,
-      backgroundTaskInlinePanelRenderer,
-      backgroundTaskIndicatorCoordinator,
-      backgroundTaskStreamTriggerCoordinator,
-      conversationLoadRecoveryCoordinator,
-      conversationTabRuntimeCoordinator,
-    };
-  }
-
-  private createBackgroundTaskInfrastructure(
-    backgroundTaskRuntime: OpenCodianViewBackgroundTaskRuntimeWiring,
-    tabRuntimeStateBridge: TabRuntimeStateBridge,
-  ): {
-    backgroundTaskCompletionNoticeService: BackgroundTaskCompletionNoticeService;
-    backgroundTaskInlinePanelRenderer: BackgroundTaskInlinePanelRenderer;
-    backgroundTaskIndicatorCoordinator: BackgroundTaskIndicatorCoordinator;
-    backgroundTaskStreamTriggerCoordinator: BackgroundTaskStreamTriggerCoordinator;
-    backgroundTaskHost: BackgroundTaskViewHost;
-  } {
-    const backgroundTaskCompletionNoticeService = new BackgroundTaskCompletionNoticeService(
-      this.createBackgroundTaskCompletionNoticeServiceHost(),
-    );
-    const backgroundTaskInlinePanelRenderer = new BackgroundTaskInlinePanelRenderer(
-      backgroundTaskRuntime.backgroundTaskTimelineService,
-      this.createBackgroundTaskInlinePanelRendererHost(),
-    );
-    const backgroundTaskIndicatorCoordinator = new BackgroundTaskIndicatorCoordinator({
-      inlinePanelRenderer: backgroundTaskInlinePanelRenderer,
-      timelineService: backgroundTaskRuntime.backgroundTaskTimelineService,
-      completionNoticeService: backgroundTaskCompletionNoticeService,
-      liveSignalCoordinator: backgroundTaskRuntime.backgroundTaskLiveSignalCoordinator,
-      tabRuntimeStateBridge,
-      host: this.createBackgroundTaskIndicatorCoordinatorHost(),
-    });
-    const backgroundTaskIndicatorRenderPort = {
-      renderIfNeeded: (tabId?: TabId | null) => {
-        if (hasCapability(this.caps, AgentCapability.Subagents)) {
-          return backgroundTaskIndicatorCoordinator.renderIfNeeded(tabId);
-        }
-        return Promise.resolve();
-      },
-    };
-    const backgroundTaskHost = createBackgroundTaskViewHost({
-      timelineService: backgroundTaskRuntime.backgroundTaskTimelineService,
-      indicatorRenderPort: backgroundTaskIndicatorRenderPort,
-    });
-    const backgroundTaskStreamTriggerCoordinator = new BackgroundTaskStreamTriggerCoordinator(
-      backgroundTaskIndicatorRenderPort,
-      backgroundTaskRuntime.backgroundTaskTimelineService,
-      backgroundTaskRuntime.backgroundTaskLiveSignalCoordinator,
-      backgroundTaskRuntime.backgroundTaskStreamTriggerViewHost,
-    );
-
-    return {
-      backgroundTaskCompletionNoticeService,
-      backgroundTaskInlinePanelRenderer,
-      backgroundTaskIndicatorCoordinator,
-      backgroundTaskStreamTriggerCoordinator,
-      backgroundTaskHost,
-    };
-  }
-
-  private getCurrentConversationForkService():
-    import('../../core/agents/backend/AgentService').AgentForkCapability | null {
-    const conversation = this.currentConversation;
-    const service = getConversationSessionBackendService(
-      this.plugin.agentServiceRegistry,
-      conversation,
-    );
-    if (!service?.hasCapability(AgentCapability.Fork)) {
-      return null;
-    }
-    return service as unknown as import('../../core/agents/backend/AgentService').AgentForkCapability;
-  }
-
-  private getCurrentConversationBranchService():
-    import('../../core/agents/backend/AgentService').AgentBranchCapability | null {
-    const conversation = this.currentConversation;
-    const service = getConversationSessionBackendService(
-      this.plugin.agentServiceRegistry,
-      conversation,
-    );
-    if (!service?.hasCapability(AgentCapability.Branching)) {
-      return null;
-    }
-    return service as unknown as import('../../core/agents/backend/AgentService').AgentBranchCapability;
-  }
-
-  private routeConversationRevertSession(sessionId: string, messageId: string): Promise<boolean> {
-    const backend = this.currentConversation?.backend ?? 'opencode';
-    const branchService = this.getCurrentConversationBranchService();
-    if (branchService) {
-      return branchService.revertSession(sessionId, messageId);
-    }
-    if (backend === 'opencode') {
-      return this.plugin.openCodeService.revertSession(sessionId, messageId);
-    }
-    throw new Error(`Rewind not available for backend "${backend}"`);
-  }
-
-  private routeConversationUnrevertSession(sessionId: string): Promise<boolean> {
-    const backend = this.currentConversation?.backend ?? 'opencode';
-    const branchService = this.getCurrentConversationBranchService();
-    if (branchService) {
-      return branchService.unrevertSession(sessionId);
-    }
-    if (backend === 'opencode') {
-      return this.plugin.openCodeService.unrevertSession(sessionId);
-    }
-    throw new Error(`Restore rewind not available for backend "${backend}"`);
-  }
-
-  private routeConversationForkSession(sessionId: string, messageId: string): Promise<{ id: string; title: string }> {
-    const backend = this.currentConversation?.backend ?? 'opencode';
-    const forkService = this.getCurrentConversationForkService();
-    if (forkService) {
-      return forkService.forkSession(sessionId, messageId);
-    }
-    if (backend === 'opencode') {
-      return this.plugin.openCodeService.forkSession(sessionId, messageId);
-    }
-    throw new Error(`Fork not available for backend "${backend}"`);
-  }
-
-  private createInteractionRuntimeWiring(
-    conversationSyncBridgePorts: ConversationSyncBridgePorts,
-    conversationRenderService: ConversationRenderService,
-  ): OpenCodianViewInteractionRuntimeWiring {
-    const messageFinalizationService = new MessageFinalizationService(
-      createMessageFinalizationHost({
-        getCurrentConversation: () => this.currentConversation,
-        getActiveTabId: () => this.getActiveTabId(),
-        syncConversationMessagesFromCanonicalState: (conversation, tabId, reason) =>
-          this.syncConversationMessagesFromCanonicalState(conversation, tabId, reason),
-        syncConversationMessagesFromServer: (conversation, tabId, reason) =>
-          this.syncConversationMessagesFromServer(conversation, tabId, reason),
-        conversationIdentityRuntime: this.conversationIdentityRuntime,
-        conversationRenderService,
-        backgroundTaskHost: this.backgroundTaskHost,
-        conversationNoticeCoordinator: this.conversationNoticeCoordinator,
-        sessionTodoCoordinator: this.sessionTodoCoordinator,
-        createConversationWriteTicket: (conversationId) =>
-          this.createConversationWriteTicket(conversationId),
-        commitConversationWrite: (conversation, ticket, reason, write) =>
-          this.commitConversationWrite(conversation, ticket, reason, write),
-        conversationTabRuntimeCoordinator: this.conversationTabRuntimeCoordinator,
-        setTabNeedsAttention: (tabId, needsAttention) =>
-          this.setTabNeedsAttention(tabId, needsAttention),
-        tabConversationStateBridge: this.tabConversationStateBridge,
-        activeTabContextUsageCoordinator: this.activeTabContextUsageCoordinator,
-        assistantShellViewHostAdapter: this.assistantShellViewHostAdapter,
-        formatCurrentSessionModelId: () =>
-          this.formatModelId(this.getCurrentSessionModel()),
-        scrollToBottom: (options) => this.scrollToBottom(options),
-      }),
-    );
-    const messageSendPreparationService = new MessageSendPreparationService(
-      createMessageSendPreparationHost({
-        getCurrentConversation: () => this.currentConversation,
-        createNewConversation: async () => {
-          await this.createNewConversation();
-          return this.currentConversation;
-        },
-        createConversationWriteTicket: (conversationId) =>
-          this.createConversationWriteTicket(conversationId),
-        commitConversationWrite: (conversation, ticket, reason, write) =>
-          this.commitConversationWrite(conversation, ticket, reason, write),
-        getActiveTabId: () => this.getActiveTabId(),
-        ensureTabRuntimeState: (tabId) => this.ensureTabRuntimeState(tabId),
-        isTabForegroundBusy: (tabId) => this.isTabForegroundBusy(tabId),
-        conversationTabRuntimeCoordinator: this.conversationTabRuntimeCoordinator,
-        getServerAvailability: () => this.getServerAvailability(),
-        chatHeaderPresenter: this.chatHeaderPresenter,
-        settingsTab: this.plugin.settingsTab ?? null,
-        getServerMode: () => this.plugin.settings.server.mode,
-        openPluginSettingsAtServerSection: () => this.openPluginSettingsAtServerSection(),
-        startServer: () => this.plugin.openCodeService.start(),
-        notifyForegroundBusy: () => {
-          new Notice(t('chat.tab.processingBlocked'));
-        },
-        assistantShellViewHostAdapter: this.assistantShellViewHostAdapter,
-        messageFinalizationService,
-        chatSelectionControlsCoordinator: this.chatSelectionControlsCoordinator,
-        reloadModelCatalog: () => this.reloadModelCatalog(),
-        getSendMessageOptions: () => this.getSendMessageOptions(),
-        appendModelUnavailableNoticeMessage: () => this.appendModelUnavailableNoticeMessage(),
-        openCodeService: this.plugin.openCodeService,
-        backgroundTaskHost: this.backgroundTaskHost,
-        conversationSyncBridgePorts,
-        conversationRenderService,
-        scrollToBottom: (options) => this.scrollToBottom(options),
-        applyFallbackConversationTitle: (conversationId, firstMessage) =>
-          this.applyFallbackConversationTitle(conversationId, firstMessage),
-        getTitleMode: () => this.plugin.settings.titleMode,
-        getClaudeAutoTitle: () => this.plugin.settings.backendSettings.claudeCode.autoTitle,
-        startAiConversationTitleGeneration: (conversationId, firstMessage, modelOptions) => {
-          void this.startAiConversationTitleGeneration(conversationId, firstMessage, modelOptions);
-        },
-        activeTabContextUsageCoordinator: this.activeTabContextUsageCoordinator,
-        syncTabStreamLikeState: (tabId) => this.syncTabStreamLikeState(tabId),
-      }),
-      this.composerContextViewFacade.sendContext,
-    );
-    const assistantNoticeCardRenderer = new AssistantNoticeCardRenderer(
-      this.createAssistantNoticeCardRendererHost(),
-    );
-    const userMessageFooterRenderer = new UserMessageFooterRenderer(
-      this.createUserMessageFooterRendererHost(),
-    );
-    const streamingInlineCardRenderer = new StreamingInlineCardRenderer(
-      this.createStreamingInlineCardRendererHost(),
-    );
-    const permissionInlineCardRenderer = new PermissionInlineCardRenderer(
-      streamingInlineCardRenderer,
-    );
-    const questionRuntimeViewHostFactoryHost = this.createQuestionRuntimeViewHostFactoryHost();
-    const questionRuntimeServices = createQuestionRuntimeBundle(
-      questionRuntimeViewHostFactoryHost,
-      {
-        conversationSync: conversationSyncBridgePorts.getVisibleSyncFollowUp(),
-        statusRefresh: this.sessionTodoCoordinator,
-        streamingInlineCardRenderer,
-      },
-    );
-    const slashCommandExecutionService = new SlashCommandExecutionService(
-      createSlashCommandExecutionHost({
-        getCurrentConversation: () => this.currentConversation,
-        createNewConversation: async () => {
-          await this.createNewConversation();
-        },
-        getActiveTabId: () => this.getActiveTabId(),
-        ensureTabRuntimeState: (tabId) => this.ensureTabRuntimeState(tabId),
-        isTabForegroundBusy: (tabId) => this.isTabForegroundBusy(tabId),
-        notifyForegroundBusy: () => {
-          new Notice(t('chat.tab.processingBlocked'));
-        },
-        getServerAvailability: () => this.getServerAvailability(),
-        chatHeaderPresenter: this.chatHeaderPresenter,
-        ensureServerReadyForChat: (availability) =>
-          messageSendPreparationService.ensureServerReadyForChat(availability),
-        opencodeConfigManager: this.plugin.opencodeConfigManager,
-        getSlashCommandSkillMode: () => this.plugin.settings.slashCommandSkillMode,
-        openCodeServiceSdk: this.plugin.openCodeService.sdk,
-        openCodeService: this.plugin.openCodeService,
-        runCompactSession: (sessionId) => executeCompactSession(
-          sessionId,
-          this.plugin.openCodeService,
-          () => this.getCurrentSessionModel(),
-          () => this.getCurrentSessionModelResolution(),
-        ),
-        getVaultPath: () => getVaultBasePath(this.app),
-        composerContextViewFacade: this.composerContextViewFacade,
-        getTabRuntimeState: (tabId) => this.getTabRuntimeState(tabId),
-        conversationSyncBridgePorts,
-        notifySlashCommandFailed: (commandId, error) => {
-          const message = error instanceof Error ? error.message : String(error);
-          new Notice(t('chat.slashCommand.executionFailed', {
-            command: commandId,
-            message,
-          }));
-        },
-      }),
-    );
-    const sendPipelineRuntime = new SendPipelineRuntime(
-      createSendPipelineRuntimeHost(this.createSendPipelineHostDependencies()),
-      messageSendPreparationService,
-      messageFinalizationService,
-      slashCommandExecutionService,
-    );
-
-    return {
-      messageSendPreparationService,
-      messageFinalizationService,
-      assistantNoticeCardRenderer,
-      userMessageContentRenderer: this.userMessageContentRenderer,
-      userMessageFooterRenderer,
-      streamingInlineCardRenderer,
-      permissionInlineCardRenderer,
-      questionRuntimeServices,
-      sendPipelineRuntime,
     };
   }
 
@@ -3215,110 +2462,6 @@ export class OpenCodianView extends ItemView {
       showNotice: (message) => {
         new Notice(message);
       },
-    };
-  }
-
-  private createSendPipelineHostDependencies(): SendPipelineHostDependencies {
-    return {
-      getTabRuntimeState: (tabId) => this.getTabRuntimeState(tabId),
-      getActiveTabId: () => this.getActiveTabId(),
-      shouldAutoScroll: (tabId) => this.shouldAutoScroll(tabId),
-      scheduleSettledScrollToBottomIfNeeded: (shouldScroll, tabId) => {
-        this.scheduleSettledScrollToBottomIfNeeded(shouldScroll, tabId);
-      },
-      getOrCreateTabStreamController: (tabId) => this.getOrCreateTabStreamController(tabId),
-      finalizeBackgroundTaskIndicatorAfterPrimaryStream: (tabId) =>
-        this.backgroundTaskStreamTriggerCoordinator.finalizeAfterPrimaryStream(tabId),
-      removeEmptyAssistantShells: () => {
-        if (this.messagesContainer) {
-          ConversationRenderService.removeEmptyAssistantShells(this.messagesContainer);
-        }
-      },
-      syncTabStreamLikeState: (tabId) => {
-        this.syncTabStreamLikeState(tabId);
-      },
-      transitionTabSessionLifecycle: (tabId, phase, reason) =>
-        this.conversationTabRuntimeCoordinator.transitionTabSessionLifecycle(tabId, phase, reason),
-      refreshServerStatusBadge: () => this.chatHeaderPresenter.refreshServerStatusBadge(),
-      claimOpenCodeDiagnosticRunToken: (tabId, sessionId) =>
-        this.chatDiagnosticsCoordinator.claimOpenCodeDiagnosticRunToken(tabId, sessionId),
-      claimCodexDiagnosticRunToken: (tabId, threadId) =>
-        this.chatDiagnosticsCoordinator.claimCodexDiagnosticRunToken(tabId, threadId ?? undefined),
-      claimClaudeDiagnosticRunToken: (tabId, sessionId) =>
-        this.chatDiagnosticsCoordinator.claimClaudeDiagnosticRunToken(tabId, sessionId ?? undefined),
-      refreshOpenCodeDiagnosticsState: (tabId) => {
-        if (!shouldRefreshOpenCodeDiagnosticsHeader(this.getActiveTabId(), tabId)) return;
-        this.chatHeaderPresenter.refreshBackendChrome();
-      },
-      refreshCodexDiagnosticsState: (tabId) => {
-        if (!shouldRefreshOpenCodeDiagnosticsHeader(this.getActiveTabId(), tabId)) return;
-        this.chatHeaderPresenter.refreshBackendChrome();
-      },
-      refreshClaudeDiagnosticsState: (tabId) => {
-        if (!shouldRefreshOpenCodeDiagnosticsHeader(this.getActiveTabId(), tabId)) return;
-        this.chatHeaderPresenter.refreshBackendChrome();
-      },
-      sendStreamMessage: (conversation, content, options) => {
-        const backend = getConversationChatBackendService(this.plugin.agentServiceRegistry, conversation);
-        if (!backend) {
-          throw new Error(`Backend ${conversation.backend ?? 'opencode'} does not support chat`);
-        }
-        return backend.sendMessage({
-          sessionId: options.sessionId ?? '',
-          content,
-          images: options.images,
-          options: { ...options },
-          ...(options.diagnosticRunToken ? { diagnosticRunToken: options.diagnosticRunToken } : {}),
-        });
-      },
-      detachStream: (sessionId) => {
-        if (sessionId) {
-          const conversation = this.currentConversation;
-          const backend = conversation
-            ? getConversationChatBackendService(this.plugin.agentServiceRegistry, conversation)
-            : undefined;
-          const conversationBackend = conversation?.backend ?? 'opencode';
-          if (backend && conversationBackend !== 'opencode') {
-            backend.cancelStream(sessionId);
-          } else {
-            this.plugin.openCodeService.detachStream(sessionId);
-          }
-        }
-      },
-      syncLatestUserMessageFromServer: (conversation, optimisticMessageId, tabId) =>
-        this.syncLatestUserMessageFromServer(conversation, optimisticMessageId, tabId),
-      beginTabContextUsageStream: (tabId) => {
-        const conversation = this.getConversationForTab(tabId);
-        if (conversation && (conversation.backend ?? 'opencode') !== 'opencode') {
-          return;
-        }
-        this.activeTabContextUsageCoordinator.beginTabContextUsageStream(tabId);
-      },
-      completeTabContextUsageStream: (tabId) => {
-        this.activeTabContextUsageCoordinator.completeTabContextUsageStream(tabId);
-      },
-      applyUsageChunkToTab: (tabId, chunk) => {
-        this.activeTabContextUsageCoordinator.applyUsageChunkToTab(tabId, chunk);
-      },
-      applyContextUsageSnapshotToTab: (tabId, snapshot) => {
-        this.activeTabContextUsageCoordinator.applyContextUsageSnapshotToTab(tabId, snapshot);
-      },
-      showPermissionDialog: (request, tabId) => this.showPermissionDialog(request, tabId),
-      showQuestionDialog: async (request, tabId) => {
-        await this.questionRuntimeServices.resolutionFlowCoordinator.showQuestionDialog(request, tabId);
-      },
-      convertToStreamingChunk: (chunk) => this.convertToStreamingChunk(chunk),
-      getFriendlyStreamErrorMessage: (rawMessage) => this.conversationNoticeCoordinator.getFriendlyStreamErrorMessage(rawMessage),
-      createSendPipelineShellPort: () => this.assistantShellViewHostAdapter.createSendPipelineShellPort(),
-      createConversationWriteTicket: (conversationId) =>
-        this.createConversationWriteTicket(conversationId),
-      commitConversationWrite: (conversation, ticket, reason, write) =>
-        this.commitConversationWrite(conversation, ticket, reason, write),
-      summarizeContentBlocksForDebug: (blocks) =>
-        summarizeContentBlocksForDebug(blocks as SendPipelineDebugContentBlock[] | undefined),
-      summarizeCoreStreamChunkForDebug: (chunk) => summarizeCoreStreamChunkForDebug(chunk),
-      summarizeChatMessageForDebug: (message) => summarizeChatMessageForDebug(message),
-      ...createDebugLogCallbacks(),
     };
   }
 

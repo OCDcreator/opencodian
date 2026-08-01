@@ -7,6 +7,7 @@ const justifiedMaxLinesFiles = [
   'src/core/opencode/ServerManager.ts',
   'src/core/types/settings.ts',
   'src/features/chat/OpenCodianView.ts',
+  'src/features/chat/runtime/ChatRuntimeComposition.ts',
   'src/features/chat/glassOctahedronDemo.ts',
   'src/features/chat/glassOctahedronDemoRefraction.ts',
   'src/features/chat/liquidDiamondDemo.ts',

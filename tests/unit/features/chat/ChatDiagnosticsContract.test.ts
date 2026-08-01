@@ -88,6 +88,26 @@ function readBoundedOpenCodianViewBlock(startMarker: string, endMarker: string):
   return source.slice(start, end);
 }
 
+function readChatRuntimeCompositionSource(): string {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
+  const fs = require('fs') as typeof import('fs');
+  // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
+  const path = require('path') as typeof import('path');
+  return fs.readFileSync(
+    path.resolve(__dirname, '../../../../src/features/chat/runtime/ChatRuntimeComposition.ts'),
+    'utf8',
+  );
+}
+
+function readBoundedChatRuntimeCompositionBlock(startMarker: string, endMarker: string): string {
+  const source = readChatRuntimeCompositionSource();
+  const start = source.indexOf(startMarker);
+  expect(start).toBeGreaterThanOrEqual(0);
+  const end = source.indexOf(endMarker, start + startMarker.length);
+  expect(end).toBeGreaterThan(start);
+  return source.slice(start, end);
+}
+
 function readChatDiagnosticsCoordinatorSource(): string {
   // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
   const fs = require('fs') as typeof import('fs');
@@ -489,9 +509,11 @@ describe('Phase 3 Task 10 — ChatDiagnosticsContract (characterization)', () =>
   describe('tab-cleanup capture-cancel seam (three distinct backends)', () => {
     it('OpenCodianView wires three separate cancel seams (source contract)', () => {
       expect.hasAssertions();
+      // Task 15: createSendPipelineHostDependencies moved to ChatRuntimeComposition; the
+      // cancel seams remain in the view's createConversationTabLifecycleRecoveryHost.
       const block = readBoundedOpenCodianViewBlock(
         'private createConversationTabLifecycleRecoveryHost(): ConversationTabLifecycleRecoveryHost {',
-        'private createSendPipelineHostDependencies(): SendPipelineHostDependencies {',
+        'private createAssistantNoticeCardRendererHost(): AssistantNoticeCardRendererHost {',
       );
       // The tab-cleanup host dependencies wire three distinct cancel callbacks.
       expectSourceOrder(block, [
@@ -504,19 +526,21 @@ describe('Phase 3 Task 10 — ChatDiagnosticsContract (characterization)', () =>
 
     it('OpenCodianView wires three distinct claim seams for the send path (source contract)', () => {
       expect.hasAssertions();
-      const block = readBoundedOpenCodianViewBlock(
-        'private createSendPipelineHostDependencies(): SendPipelineHostDependencies {',
-        'sendStreamMessage: (conversation, content, options) => {',
+      // Task 15: createSendPipelineHostDependencies moved to ChatRuntimeComposition as
+      // buildSendPipelineHostDependencies; the claim seams now live there.
+      const block = readBoundedChatRuntimeCompositionBlock(
+        'private buildSendPipelineHostDependencies(surface: SurfaceRuntimeWiring): SendPipelineHostDependencies {',
+        'sendStreamMessage: (conversation: Conversation, content: unknown, options: unknown) => {',
       );
       // Each claim callback must actually invoke its backend-specific claim,
       // not become a generic no-op during coordinator extraction.
       expectSourceOrder(block, [
-        'claimOpenCodeDiagnosticRunToken: (tabId, sessionId) =>',
-        'this.chatDiagnosticsCoordinator.claimOpenCodeDiagnosticRunToken(tabId, sessionId),',
-        'claimCodexDiagnosticRunToken: (tabId, threadId) =>',
-        'this.chatDiagnosticsCoordinator.claimCodexDiagnosticRunToken(tabId, threadId ?? undefined),',
-        'claimClaudeDiagnosticRunToken: (tabId, sessionId) =>',
-        'this.chatDiagnosticsCoordinator.claimClaudeDiagnosticRunToken(tabId, sessionId ?? undefined),',
+        'claimOpenCodeDiagnosticRunToken: (tabId: TabId | null, sessionId: string) =>',
+        'host.chatDiagnosticsCoordinator.claimOpenCodeDiagnosticRunToken(tabId, sessionId),',
+        'claimCodexDiagnosticRunToken: (tabId: TabId | null, threadId?: string) =>',
+        'host.chatDiagnosticsCoordinator.claimCodexDiagnosticRunToken(tabId, threadId ?? undefined),',
+        'claimClaudeDiagnosticRunToken: (tabId: TabId | null, sessionId?: string) =>',
+        'host.chatDiagnosticsCoordinator.claimClaudeDiagnosticRunToken(tabId, sessionId ?? undefined),',
       ]);
     });
   });
