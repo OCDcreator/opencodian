@@ -529,7 +529,7 @@ describe('Phase 3 Task 10 — ChatDiagnosticsContract (characterization)', () =>
       // Task 15: createSendPipelineHostDependencies moved to ChatRuntimeComposition as
       // buildSendPipelineHostDependencies; the claim seams now live there.
       const block = readBoundedChatRuntimeCompositionBlock(
-        'private buildSendPipelineHostDependencies(surface: SurfaceRuntimeWiring): SendPipelineHostDependencies {',
+        'private buildSendPipelineHostDependencies(',
         'sendStreamMessage: (conversation: Conversation, content: unknown, options: unknown) => {',
       );
       // Each claim callback must actually invoke its backend-specific claim,

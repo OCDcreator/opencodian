@@ -140,6 +140,7 @@ interface ConversationRuntimeResult extends ConversationRuntimeWiring {
 interface InteractionWiringInputs {
   conversation: ConversationRuntimeResult;
   surface: SurfaceRuntimeWiring;
+  background: BackgroundTaskRuntimeWiring;
   userMessageContentRenderer: UserMessageContentRenderer;
 }
 
@@ -356,7 +357,6 @@ export interface ChatRuntimeCompositionHost {
   getOrCreateTabStreamController(tabId: TabId): unknown;
   getConversationForTab(tabId: TabId): Conversation | null;
   showPermissionDialog(request: unknown, tabId: TabId | null): void;
-  showQuestionDialog(request: unknown, tabId: TabId | null): Promise<void>;
   convertToStreamingChunk(chunk: unknown): unknown;
   getFriendlyStreamErrorMessage(rawMessage: unknown): string;
   syncLatestUserMessageFromServer(conversation: Conversation, optimisticMessageId: unknown, tabId: TabId | null): void;
@@ -431,6 +431,7 @@ export class ChatRuntimeComposition {
       {
         conversation,
         surface,
+        background,
         userMessageContentRenderer,
       },
     );
@@ -662,7 +663,7 @@ export class ChatRuntimeComposition {
       getSessionIdForTab: (tabId: TabId | null) => host.getSessionIdForTab(tabId),
       renderSessionTodoDock: (tabId: TabId | null) => { host.renderSessionTodoDock(tabId); },
       getQuestionDockCoordinator: () => host.questionDockCoordinator as never,
-      getSessionTodoCoordinator: () => host.sessionTodoCoordinator,
+      getSessionTodoCoordinator: () => sessionTodoCoordinator,
       getQuestionDockSlotCoordinator: () => host.questionDockSlotCoordinator,
       getBackgroundTaskHost: () => host.backgroundTaskHost,
       getBackgroundTaskIndicatorCoordinator: () => host.backgroundTaskIndicatorCoordinator,
@@ -892,7 +893,7 @@ export class ChatRuntimeComposition {
     conversationRenderService: ConversationRenderService,
     inputs: InteractionWiringInputs,
   ): InteractionRuntimeWiring {
-    const { conversation, surface, userMessageContentRenderer } = inputs;
+    const { conversation, surface, background, userMessageContentRenderer } = inputs;
     const host = this.host;
     const messageFinalizationService = new MessageFinalizationService(
       createMessageFinalizationHost({
@@ -905,16 +906,16 @@ export class ChatRuntimeComposition {
         conversationIdentityRuntime: host.conversationIdentityRuntime,
         conversationRenderService,
         backgroundTaskHost: conversation.backgroundTaskHost,
-        conversationNoticeCoordinator: host.conversationNoticeCoordinator,
-        sessionTodoCoordinator: host.sessionTodoCoordinator,
+        conversationNoticeCoordinator: surface.conversationNoticeCoordinator,
+        sessionTodoCoordinator: surface.sessionTodoCoordinator,
         createConversationWriteTicket: (conversationId: string) => host.createConversationWriteTicket(conversationId),
         commitConversationWrite: (c: Conversation, ticket: unknown, reason: string, write: () => void | Promise<void>) =>
           host.commitConversationWrite(c, ticket, reason, write),
-        conversationTabRuntimeCoordinator: host.conversationTabRuntimeCoordinator,
+        conversationTabRuntimeCoordinator: conversation.conversationTabRuntimeCoordinator,
         setTabNeedsAttention: (tabId: TabId, needsAttention: boolean) => host.setTabNeedsAttention(tabId, needsAttention),
-        tabConversationStateBridge: host.tabConversationStateBridge,
-        activeTabContextUsageCoordinator: host.activeTabContextUsageCoordinator,
-        assistantShellViewHostAdapter: host.assistantShellViewHostAdapter,
+        tabConversationStateBridge: conversation.tabConversationStateBridge,
+        activeTabContextUsageCoordinator: background.activeTabContextUsageCoordinator,
+        assistantShellViewHostAdapter: surface.assistantShellViewHostAdapter,
         formatCurrentSessionModelId: () => host.formatModelId(host.getCurrentSessionModel()),
         scrollToBottom: (options?: unknown) => host.scrollToBottom(options),
       } as never),
@@ -932,17 +933,17 @@ export class ChatRuntimeComposition {
         getActiveTabId: () => host.getActiveTabId(),
         ensureTabRuntimeState: (tabId: TabId) => host.ensureTabRuntimeState(tabId),
         isTabForegroundBusy: (tabId: TabId | null) => host.isTabForegroundBusy(tabId),
-        conversationTabRuntimeCoordinator: host.conversationTabRuntimeCoordinator,
+        conversationTabRuntimeCoordinator: conversation.conversationTabRuntimeCoordinator,
         getServerAvailability: () => host.getServerAvailability(),
-        chatHeaderPresenter: host.chatHeaderPresenter,
+        chatHeaderPresenter: surface.chatHeaderPresenter,
         settingsTab: host.plugin.settingsTab ?? null,
         getServerMode: () => host.plugin.settings.server.mode as never,
         openPluginSettingsAtServerSection: () => host.openPluginSettingsAtServerSection(),
         startServer: () => host.plugin.openCodeService.start(),
         notifyForegroundBusy: () => { new Notice(t('chat.tab.processingBlocked')); },
-        assistantShellViewHostAdapter: host.assistantShellViewHostAdapter,
+        assistantShellViewHostAdapter: surface.assistantShellViewHostAdapter,
         messageFinalizationService,
-        chatSelectionControlsCoordinator: host.chatSelectionControlsCoordinator,
+        chatSelectionControlsCoordinator: surface.chatSelectionControlsCoordinator,
         reloadModelCatalog: () => host.reloadModelCatalog(),
         getSendMessageOptions: () => host.getSendMessageOptions(),
         appendModelUnavailableNoticeMessage: () => host.appendModelUnavailableNoticeMessage(),
@@ -958,7 +959,7 @@ export class ChatRuntimeComposition {
         startAiConversationTitleGeneration: (conversationId: string, firstMessage: unknown, modelOptions: unknown) => {
           void host.startAiConversationTitleGeneration(conversationId, firstMessage, modelOptions);
         },
-        activeTabContextUsageCoordinator: host.activeTabContextUsageCoordinator,
+        activeTabContextUsageCoordinator: background.activeTabContextUsageCoordinator,
         syncTabStreamLikeState: (tabId: TabId | null) => host.syncTabStreamLikeState(tabId),
       } as never),
       surface.composerContextViewFacade.sendContext,
@@ -978,7 +979,7 @@ export class ChatRuntimeComposition {
       questionRuntimeViewHostFactoryHost as never,
       {
         conversationSync: conversationSyncBridgePorts.getVisibleSyncFollowUp(),
-        statusRefresh: host.sessionTodoCoordinator,
+        statusRefresh: surface.sessionTodoCoordinator,
         streamingInlineCardRenderer,
       } as never,
     );
@@ -991,7 +992,7 @@ export class ChatRuntimeComposition {
         isTabForegroundBusy: (tabId: TabId | null) => host.isTabForegroundBusy(tabId),
         notifyForegroundBusy: () => { new Notice(t('chat.tab.processingBlocked')); },
         getServerAvailability: () => host.getServerAvailability(),
-        chatHeaderPresenter: host.chatHeaderPresenter,
+        chatHeaderPresenter: surface.chatHeaderPresenter,
         ensureServerReadyForChat: (availability: unknown) =>
           messageSendPreparationService.ensureServerReadyForChat(availability as never),
         opencodeConfigManager: host.plugin.opencodeConfigManager,
@@ -1015,7 +1016,7 @@ export class ChatRuntimeComposition {
       } as never),
     );
     const sendPipelineRuntime = new SendPipelineRuntime(
-      createSendPipelineRuntimeHost(this.buildSendPipelineHostDependencies(surface)),
+      createSendPipelineRuntimeHost(this.buildSendPipelineHostDependencies(surface, conversation, background, questionRuntimeServices)),
       messageSendPreparationService,
       messageFinalizationService,
       slashCommandExecutionService,
@@ -1041,7 +1042,12 @@ export class ChatRuntimeComposition {
    * is invoked during SendPipelineRuntime construction, before the view has destructured the
    * runtime. All other closures are lazy and resolve host.X live.
    */
-  private buildSendPipelineHostDependencies(surface: SurfaceRuntimeWiring): SendPipelineHostDependencies {
+  private buildSendPipelineHostDependencies(
+    surface: SurfaceRuntimeWiring,
+    conversation: ConversationRuntimeResult,
+    background: BackgroundTaskRuntimeWiring,
+    questionRuntimeServices: QuestionRuntimeServices,
+  ): SendPipelineHostDependencies {
     const host = this.host;
     return {
       getTabRuntimeState: (tabId: TabId) => host.getTabRuntimeState(tabId),
@@ -1052,7 +1058,7 @@ export class ChatRuntimeComposition {
       },
       getOrCreateTabStreamController: (tabId: TabId) => host.getOrCreateTabStreamController(tabId),
       finalizeBackgroundTaskIndicatorAfterPrimaryStream: (tabId: TabId | null) =>
-        host.backgroundTaskStreamTriggerCoordinator.finalizeAfterPrimaryStream(tabId),
+        conversation.backgroundTaskStreamTriggerCoordinator.finalizeAfterPrimaryStream(tabId),
       removeEmptyAssistantShells: () => {
         if (host.messagesContainer) {
           ConversationRenderService.removeEmptyAssistantShells(host.messagesContainer);
@@ -1060,8 +1066,8 @@ export class ChatRuntimeComposition {
       },
       syncTabStreamLikeState: (tabId: TabId | null) => { host.syncTabStreamLikeState(tabId); },
       transitionTabSessionLifecycle: (tabId: TabId | null, phase: unknown, reason: unknown) =>
-        host.conversationTabRuntimeCoordinator.transitionTabSessionLifecycle(tabId, phase as never, reason as never),
-      refreshServerStatusBadge: () => host.chatHeaderPresenter.refreshServerStatusBadge(),
+        conversation.conversationTabRuntimeCoordinator.transitionTabSessionLifecycle(tabId, phase as never, reason as never),
+      refreshServerStatusBadge: () => surface.chatHeaderPresenter.refreshServerStatusBadge(),
       claimOpenCodeDiagnosticRunToken: (tabId: TabId | null, sessionId: string) =>
         host.chatDiagnosticsCoordinator.claimOpenCodeDiagnosticRunToken(tabId, sessionId),
       claimCodexDiagnosticRunToken: (tabId: TabId | null, threadId?: string) =>
@@ -1070,15 +1076,15 @@ export class ChatRuntimeComposition {
         host.chatDiagnosticsCoordinator.claimClaudeDiagnosticRunToken(tabId, sessionId ?? undefined),
       refreshOpenCodeDiagnosticsState: (tabId: TabId | null) => {
         if (!shouldRefreshOpenCodeDiagnosticsHeader(host.getActiveTabId(), tabId)) return;
-        host.chatHeaderPresenter.refreshBackendChrome();
+        surface.chatHeaderPresenter.refreshBackendChrome();
       },
       refreshCodexDiagnosticsState: (tabId: TabId | null) => {
         if (!shouldRefreshOpenCodeDiagnosticsHeader(host.getActiveTabId(), tabId)) return;
-        host.chatHeaderPresenter.refreshBackendChrome();
+        surface.chatHeaderPresenter.refreshBackendChrome();
       },
       refreshClaudeDiagnosticsState: (tabId: TabId | null) => {
         if (!shouldRefreshOpenCodeDiagnosticsHeader(host.getActiveTabId(), tabId)) return;
-        host.chatHeaderPresenter.refreshBackendChrome();
+        surface.chatHeaderPresenter.refreshBackendChrome();
       },
       sendStreamMessage: (conversation: Conversation, content: unknown, options: unknown) => {
         const backend = getConversationChatBackendService(host.plugin.agentServiceRegistry as never, conversation);
@@ -1114,28 +1120,31 @@ export class ChatRuntimeComposition {
       syncLatestUserMessageFromServer: (conversation: Conversation, optimisticMessageId: unknown, tabId: TabId | null) =>
         host.syncLatestUserMessageFromServer(conversation, optimisticMessageId, tabId),
       beginTabContextUsageStream: (tabId: TabId | null) => {
-        const conversation = host.getConversationForTab(tabId as TabId);
-        if (conversation && (conversation.backend ?? 'opencode') !== 'opencode') {
+        const conversationForTab = host.getConversationForTab(tabId as TabId);
+        if (conversationForTab && (conversationForTab.backend ?? 'opencode') !== 'opencode') {
           return;
         }
-        host.activeTabContextUsageCoordinator.beginTabContextUsageStream(tabId as TabId);
+        background.activeTabContextUsageCoordinator.beginTabContextUsageStream(tabId as TabId);
       },
       completeTabContextUsageStream: (tabId: TabId | null) => {
-        host.activeTabContextUsageCoordinator.completeTabContextUsageStream(tabId as TabId);
+        background.activeTabContextUsageCoordinator.completeTabContextUsageStream(tabId as TabId);
       },
       applyUsageChunkToTab: (tabId: TabId | null, chunk: unknown) => {
-        host.activeTabContextUsageCoordinator.applyUsageChunkToTab(tabId as TabId, chunk as never);
+        background.activeTabContextUsageCoordinator.applyUsageChunkToTab(tabId as TabId, chunk as never);
       },
       applyContextUsageSnapshotToTab: (tabId: TabId | null, snapshot: unknown) => {
-        host.activeTabContextUsageCoordinator.applyContextUsageSnapshotToTab(tabId as TabId, snapshot as never);
+        background.activeTabContextUsageCoordinator.applyContextUsageSnapshotToTab(tabId as TabId, snapshot as never);
       },
       showPermissionDialog: (request: unknown, tabId: TabId | null) => host.showPermissionDialog(request, tabId),
       showQuestionDialog: async (request: unknown, tabId: TabId | null) => {
-        await host.showQuestionDialog(request, tabId);
+        // Inlined from the original createSendPipelineHostDependencies closure:
+        // the view has no showQuestionDialog method; it forwards through the
+        // question-runtime bundle's resolutionFlowCoordinator (built in this phase).
+        await questionRuntimeServices.resolutionFlowCoordinator.showQuestionDialog(request as never, tabId);
       },
       convertToStreamingChunk: (chunk: unknown) => host.convertToStreamingChunk(chunk),
       getFriendlyStreamErrorMessage: (rawMessage: unknown) =>
-        host.conversationNoticeCoordinator.getFriendlyStreamErrorMessage(rawMessage as never),
+        surface.conversationNoticeCoordinator.getFriendlyStreamErrorMessage(rawMessage as never),
       // Synchronously invoked during SendPipelineRuntime construction — read the surface-built
       // adapter (not host.X, which is unset until compose() returns).
       createSendPipelineShellPort: () => surface.assistantShellViewHostAdapter.createSendPipelineShellPort(),
