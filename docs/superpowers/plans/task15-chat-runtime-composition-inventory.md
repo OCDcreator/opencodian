@@ -32,21 +32,23 @@ This is a **composition seam already half-extracted** — the four methods are t
 
 Every concrete `new <Coordinator/Service/...>()` that is **runtime assembly** (not ItemView lifecycle, not DOM mount, not host factory) moves into `ChatRuntimeComposition`. Host-creation methods (`create*Host(...)`, which build the closures that reach back into the view) stay in the view and are passed in as a `ChatRuntimeCompositionHost`.
 
-### 2.1 Field-level constructors (move)
+### 2.1 Field-level constructors
 
-| Line | Field | Class | Notes |
+| Line | Field | Class | Decision |
 |---|---|---|---|
-| 1627 | `this.messageComponent` | `Component` (Obsidian) | **STAYS** — ItemView lifecycle component, Obsidian-owned. |
-| 1628 | `this.modifiedFilesSidebarCoordinator` | `ModifiedFilesSidebarCoordinator` | **MOVE** — stateless coordinator, no host deps. |
-| 1630 | `this.slashCommandMenuCatalogCache` | `SlashCommandMenuCatalogCache` | **STAYS** — constructed with view closures but is a catalog cache consumed widely; keep to minimize blast. (Revisit later.) |
-| 1685 | `this.codexChatSurfaceBinding` | `CodexChatSurfaceBinding` | **STAYS** — thin surface binding; leave to avoid churn. |
-| 1693 | `this.chatDiagnosticsCoordinator` | (factory) | **STAYS** — already a factory injection (Task 12), not a constructor. |
+| 1627 | `this.messageComponent` | `Component` (Obsidian) | **STAYS** — Obsidian ItemView lifecycle component; not runtime assembly. |
+| 1628 | `this.modifiedFilesSidebarCoordinator` | `ModifiedFilesSidebarCoordinator` | **STAYS-RETAINED** — runtime assembly, but stateless (no host deps) and torn down in `onClose` (3527). Kept in the view because moving a stateless singleton gains nothing and its `destroy()` is part of the §3 onClose order. Explicitly a non-goal of this slice. |
+| 1630 | `this.slashCommandMenuCatalogCache` | `SlashCommandMenuCatalogCache` | **STAYS-RETAINED** — runtime assembly, but it is a process-wide cache injected via the `ChatPluginPort` and consumed by *other* owners (sidebar, command palette) through `invalidate()`; relocating it would require a new shared owner and expands the slice beyond Task 15's "coordinator construction" scope. Retained with explicit justification; its `invalidate()` is not part of `onClose` (TTL-managed). |
+| 1685 | `this.codexChatSurfaceBinding` | `CodexChatSurfaceBinding` | **STAYS-RETAINED** — runtime assembly, but a leaf surface binding (5 closures, no nested coordinators) disposed at `onClose` (3534). Moving it adds a file without reducing view coupling; retained to keep this slice focused on the four large wiring methods. |
+| 1693 | `this.chatDiagnosticsCoordinator` | (factory `.create()`) | **STAYS** — already a Task-12 factory injection, not a constructor. |
+
+> **Retention justification (response to review):** `modifiedFilesSidebarCoordinator`, `slashCommandMenuCatalogCache`, and `codexChatSurfaceBinding` ARE runtime assemblies. They are retained *not* as ItemView lifecycle but because moving each would either (a) gain nothing (stateless singleton), (b) force a cross-owner shared-cache refactor out of scope, or (c) create a new thin file for a leaf object. This is an explicit, reviewed scope decision — not an oversight. Each retained object's teardown call site is listed in §3 so the disposal contract stays intact.
 
 ### 2.2 The four `create*RuntimeWiring()` methods (MOVE wholesale)
 
 These four methods + the four wiring interfaces (defined at `OpenCodianView.ts:393`+) move as a cohesive block. All ~35 coordinator constructions inside them move together:
 
-**Surface (13 coordinators):** `ServerReferenceContextService`, `ComposerContextViewFacade`, `TitleGenerationService`, `QuestionDockSlotCoordinator`, `ConversationHistoryActionsCoordinator`, `ConversationSessionSettingsCoordinator`, `TabMessagesPaneCoordinator`, `ChatHeaderPresenter`, `ChatSelectionControlsCoordinator`, `ComposerInputShellCoordinator`, `InputPanelAppearanceCoordinator`, `ChatSurfaceAppearanceCoordinator`, `PersistentAssistantNoticeService`, `ConversationNoticeCoordinator`, `ChildSessionGraphCoordinator`, `AssistantShellViewHostAdapter`.
+**Surface (16 constructions, lines 1961–2055):** `ServerReferenceContextService` (conditional 1961), `ComposerContextViewFacade.create` (1975, static factory), `TitleGenerationService` (1983), `QuestionDockSlotCoordinator` (1984), `ConversationHistoryActionsCoordinator` (1994), `ConversationSessionSettingsCoordinator` (1997), `TabMessagesPaneCoordinator` (2003), `ChatHeaderPresenter` (2007), `ChatSelectionControlsCoordinator` (2009), `ComposerInputShellCoordinator` (2012), `InputPanelAppearanceCoordinator` (2015), `ChatSurfaceAppearanceCoordinator` (2018), `PersistentAssistantNoticeService` (2024), `ConversationNoticeCoordinator` (2027), `createSessionTodoCoordinator` (2030, factory), `ChildSessionGraphCoordinator` (2031), `AssistantShellViewHostAdapter` (2042). *(Earlier draft miscounted as 13; corrected to 16 after review.)*
 
 **Background-task (4):** `ActiveTabContextUsageCoordinator`, `BackgroundTaskNoticeStateService`, `BackgroundTaskTimelineService`, `BackgroundTaskLiveSignalCoordinator`.
 
@@ -55,6 +57,37 @@ These four methods + the four wiring interfaces (defined at `OpenCodianView.ts:3
 **Interaction/send (8):** `MessageFinalizationService`, `MessageSendPreparationService`, `SlashCommandExecutionService`, `SendPipelineRuntime`, `AssistantNoticeCardRenderer`, `UserMessageFooterRenderer`, `StreamingInlineCardRenderer`, `PermissionInlineCardRenderer`, plus the question-runtime bundle.
 
 > The composition owner receives a `ChatRuntimeCompositionHost` (all the view's `create*Host()` closures + getters for `plugin`/`app`/`currentConversation`/`getActiveTabId`/etc.) and returns **one assembled `ChatRuntime`** object that the view destructures into its existing fields.
+
+### 2.2a Side-effect field assignments inside wiring methods (MUST surface in `ChatRuntime`)
+
+The wiring methods currently mutate view fields by **side effect** rather than returning them. These are NOT in the declared wiring return types today; the composition owner must expose them so the view never relies on undocumented mutation (review Critical #1):
+
+| Line | Field | Assigned inside | Currently in return type? |
+|---|---|---|---|
+| 2169 | `this.backgroundTaskHost` | `createBackgroundTaskInfrastructure()` (2254) | NO — destructured locally, then `this.backgroundTaskHost = backgroundTaskHost` |
+| 2218 | `this.conversationTabOpenCoordinator` | `createConversationRuntimeWiring()` via `assembleConversationLoadRecovery` (2173) | NO — destructured from `loadRecoveryAssembly`, then `this.conversationTabOpenCoordinator = conversationTabOpenCoordinator` |
+
+After the move, `createBackgroundTaskInfrastructure` and `assembleConversationLoadRecovery` results are consumed entirely inside the composition owner; both `backgroundTaskHost` and `conversationTabOpenCoordinator` become **fields of the returned `ChatRuntime` struct**, assigned by the view's destructure (same as every other field). No view mutation inside the owner; no undocumented forwarding.
+
+### 2.2b Imported runtime-assembly factories (MOVE call sites; imports relocate)
+
+The conversation/interaction wiring invokes imported `assemble*`/`create*` factories. Each call site moves into the owner (the host closures they need are passed in via `ChatRuntimeCompositionHost`). Full list (review Important #2):
+
+| Line | Factory (imported) | Phase |
+|---|---|---|
+| 2030 | `createSessionTodoCoordinator` | surface |
+| 2061 | `createQuestionTodoBackgroundTaskRuntimeServiceBundleFromSeam` | background |
+| 2114 | `createTabActivationRuntimeAssembly` | conversation |
+| 2128 | `assembleConversationHydrationRuntime` | conversation |
+| 2135 | `assembleConversationSyncRuntime` | conversation |
+| 2142 | `assembleTabActivationConversationSyncRuntimePort` | conversation |
+| 2173 | `assembleConversationLoadRecovery` | conversation |
+| 2219 | `assembleConversationTabRuntime` | conversation |
+| 2287 | `createBackgroundTaskViewHost` | conversation (infra) |
+| 2461 | `createQuestionRuntimeBundle` | interaction |
+| 2023 | `this.createTabConversationSyncFingerprintRuntimePort()` | surface (view method, **stays** — called via host) |
+
+The corresponding `import` statements for the 10 factories relocate from `OpenCodianView.ts` to `ChatRuntimeComposition.ts`.
 
 ### 2.3 Constructor inline constructions (MOVE the runtime ones)
 
@@ -95,7 +128,49 @@ ChatRuntimeComposition.compose(host: ChatRuntimeCompositionHost): ChatRuntime
 
 ---
 
-## 4. Risk assessment & rollback
+## 4. Disposal order contract (plan requires; review Critical #2)
+
+`onClose()` (`OpenCodianView.ts:3504–3556`) tears down the view in a **fixed 26-step order**. This order is a behavioral contract, not an implementation detail (it controls when sync loops stop vs. when renderers detach). **The move must not alter it.** The view keeps `onClose()` and keeps owning all the field teardown; the composition owner does NOT own disposal — it only constructs.
+
+Because the view still destructures every coordinator out of the returned `ChatRuntime` into its own private fields (exactly as today), `onClose()` calls `.destroy()`/`.cancel()`/`.dispose()`/`.stop()` on those view fields in the **same order**. The owner holds no teardown responsibility. The full ordered teardown (cite: `OpenCodianView.ts:3505–3555`):
+
+| # | Line | Call | Owner of target field |
+|---|---|---|---|
+| 1 | 3505 | `plugin.unregisterConversationCachePinProvider(...)` | plugin |
+| 2 | 3506 | `persistTabState({ flush: true })` | view |
+| 3 | 3507 | `clearSlashCommandMenuPreload()` | view |
+| 4 | 3508 | `chatHeaderPresenter.destroy()` | **surface (moved)** |
+| 5 | 3509 | `conversationHistoryActionsCoordinator.destroy()` | **surface (moved)** |
+| 6 | 3510 | `conversationSyncBridgePorts.getLoopControl().stopConversationSyncLoop()` | **conversation (moved)** |
+| 7 | 3511 | `composerContextViewFacade.dispose()` | **surface (moved)** |
+| 8 | 3512 | `chatSurfaceAppearanceCoordinator.destroy()` | **surface (moved)** |
+| 9 | 3513–3514 | `clearScheduledComposerLayoutSync()` / `clearScheduledScrollToBottom()` | view |
+| 10 | 3515–3516 | `childSessionGraphCoordinator.clearGraph()` / `.hide()` | **surface (moved)** |
+| 11 | 3517 | `titleGenerationService.cancelAll()` | **surface (moved)** |
+| 12 | 3518–3520 | `chatSelectionControlsCoordinator` / `inputPanelAppearanceCoordinator` / `composerInputShellCoordinator` `.destroy()` | **surface (moved)** |
+| 13 | 3521–3526 | `effortSelector` / `contextRing` `.destroy()` + null-out | view (DOM) |
+| 14 | 3527 | `modifiedFilesSidebarCoordinator.destroy()` | **retained (§2.1)** |
+| 15 | 3528 | `chatVisualDemoCoordinator.destroyAll()` | view (created at 3594, opt-in demo) |
+| 16 | 3529 | `permissionInlineCardRenderer.clearSessionApprovals()` | **interaction (moved)** |
+| 17 | 3530–3533 | `backendActiveChangeDisposable` / `backendCapabilityChangeDisposable` `.dispose()` + null-out | view (event disposables) |
+| 18 | 3534 | `codexChatSurfaceBinding.dispose()` | **retained (§2.1)** |
+| 19 | 3537 | `conversationTabRuntimeCoordinator.destroyTabSystem()` | **conversation (moved)** |
+| 20 | 3538–3542 | tab-bar slot / outer-bar host null-out + `.remove()` | view (DOM) |
+| 21 | 3543 | `questionDockSlotCoordinator.destroy()` | **surface (moved)** |
+| 22 | 3544 | `sessionTodoCoordinator.destroy()` | **surface (moved)** |
+| 23 | 3545 | `conversationSessionSignalRuntime.stop()` | **conversation (moved)** |
+| 24 | 3548–3551 | `eventRefs` `offref` loop + reset | view (Obsidian event refs) |
+| 25 | 3554 | `messageComponent.unload()` | view (Obsidian Component) |
+| 26 | 3555 | `markdownService = null` | view |
+
+**Invariants preserved by the move:**
+- Every "moved" field above is destructured from `ChatRuntime` into the same private view field, so `onClose` line numbers for the calls are unchanged in behavior.
+- The owner exposes no `dispose()` of its own (the view already owns all teardown). If a future coordinator needs owner-scoped teardown, that is a separate slice with its own design — out of scope here.
+- Retained objects (`modifiedFilesSidebarCoordinator` step 14, `codexChatSurfaceBinding` step 18) keep their exact teardown positions; retention does not disturb order.
+
+---
+
+## 5. Risk assessment & rollback
 
 - **Highest risk:** the constructor block (1685–1889) is one large method; relocating the four wiring methods changes the `this`-binding of ~40 closures. Mitigation: closures stay in the view's `create*Host()` methods (they already capture `this`); the composition owner only *calls* them.
 - **Tab state:** untouched. `createTabRuntimeState()` (1325) and tab canonical state stay in the view.
@@ -104,7 +179,7 @@ ChatRuntimeComposition.compose(host: ChatRuntimeCompositionHost): ChatRuntime
 
 ---
 
-## 5. Before/after measurement plan (evidence, not sole criterion)
+## 6. Before/after measurement plan (evidence, not sole criterion)
 
 - **Graph edges:** record `check:dependency-direction` edge count + `check:architecture-cycles` SCC count before and after. Expect: small edge shift from view→coordinator to composition→coordinator; **0 new runtime SCC** required.
 - **Line count:** informational only (plan: "line count is informational only").
@@ -113,7 +188,7 @@ ChatRuntimeComposition.compose(host: ChatRuntimeCompositionHost): ChatRuntime
 
 ---
 
-## 6. Review gate for this inventory
+## 7. Review gate for this inventory
 
 This inventory is the **BLOCK artifact**. It must be reviewed (codex/gpt-5.6 terra, independent, read-only) and receive literal APPROVED before `ChatRuntimeComposition.ts` is created. Review focus:
 1. Is every moved constructor listed (no silent drift)?
