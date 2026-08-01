@@ -74,7 +74,7 @@ import {
   type FocusContextPreview,
 } from './composerContext';
 import {
-  AssistantNoticeCardRenderer,
+  type AssistantNoticeCardRenderer,
   type AssistantNoticeCardRendererHost,
 } from './runtime/AssistantNoticeCardRenderer';
 import {
@@ -100,7 +100,7 @@ import {
   summarizeChatMessageForDebug,
 } from './runtime/SendPipelineDebugSummaries';
 import {
-  SendPipelineRuntime,
+  type SendPipelineRuntime,
 } from './runtime/SendPipelineRuntime';
 import {
   StreamingInlineCardRenderer,
@@ -159,7 +159,7 @@ import {
   failClosedChatDiagnosticsCoordinatorFactory,
 } from './services/ChatDiagnosticsCoordinator';
 import {
-  ChatHeaderPresenter,
+  type ChatHeaderPresenter,
   type ChatHeaderPresenterHost,
   type ChatServerAvailability,
 } from './services/ChatHeaderPresenter';
@@ -190,7 +190,7 @@ import {
   type ComposerInputShellCoordinatorHost,
 } from './services/ComposerInputShellCoordinator';
 import {
-  ConversationAuthoritativeSyncCoordinator,
+  type ConversationAuthoritativeSyncCoordinator,
   type ConversationAuthoritativeSyncHost,
 } from './services/ConversationAuthoritativeSyncCoordinator';
 import {
@@ -245,7 +245,7 @@ import {
   type ConversationTabOpenHost,
 } from './services/ConversationTabOpenCoordinator';
 import {
-  ConversationTabRuntimeCoordinator,
+  type ConversationTabRuntimeCoordinator,
   type ConversationTabRuntimeState,
   type TabBarMutableState,
 } from './services/ConversationTabRuntimeCoordinator';

@@ -29,6 +29,7 @@
 
 ## Focused tests
 - `tests/unit/features/chat/runtime/**`
+- `tests/unit/features/chat/ChatRuntimeComposition.test.ts`
 
 ## Required gates
 Run before merge: `npm run typecheck`, `npm run module-docs`.

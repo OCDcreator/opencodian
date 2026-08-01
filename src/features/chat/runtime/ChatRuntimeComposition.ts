@@ -274,31 +274,20 @@ export interface ChatRuntimeCompositionHost {
   readonly currentConversation: Conversation | null;
   readonly tabManager: { getTabContextUsage(tabId: TabId): unknown } | null;
   readonly messagesContainer: HTMLElement | null;
-  readonly streamingMessageEl: HTMLElement | null;
-  readonly streamingContentEl: HTMLElement | null;
   readonly questionDockCoordinator: unknown;
   readonly backgroundTaskHost: BackgroundTaskViewHost;
   readonly backgroundTaskIndicatorCoordinator: BackgroundTaskIndicatorCoordinator;
   readonly backgroundTaskLiveSignalCoordinator: BackgroundTaskLiveSignalCoordinator;
-  readonly backgroundTaskStreamTriggerCoordinator: BackgroundTaskStreamTriggerCoordinator;
   readonly tabRuntimeStateBridge: TabRuntimeStateBridge;
-  readonly chatHeaderPresenter: ChatHeaderPresenter;
-  readonly chatSelectionControlsCoordinator: ChatSelectionControlsCoordinator;
-  readonly composerContextViewFacade: ComposerContextViewFacade;
-  readonly conversationAuthoritativeSyncCoordinator: ConversationAuthoritativeSyncCoordinator;
   readonly conversationIdentityRuntime: ConversationIdentityRuntime;
   readonly conversationNoticeCoordinator: ConversationNoticeCoordinator;
   readonly conversationTabOpenCoordinator: ConversationTabOpenCoordinator;
   readonly conversationTabRuntimeCoordinator: ConversationTabRuntimeCoordinator;
   readonly persistentAssistantNoticeService: PersistentAssistantNoticeService;
   readonly questionDockSlotCoordinator: QuestionDockSlotCoordinator;
-  readonly sessionTodoCoordinator: SessionTodoCoordinator;
   readonly assistantShellViewHostAdapter: AssistantShellViewHostAdapter;
   readonly tabConversationStateBridge: TabConversationStateBridge;
   readonly tabConversationSyncFingerprintRuntimePort: TabConversationSyncFingerprintRuntimePort;
-  readonly tabMessagesPaneCoordinator: TabMessagesPaneCoordinator;
-  readonly activeTabContextUsageCoordinator: ActiveTabContextUsageCoordinator;
-  readonly userMessageContentRenderer: UserMessageContentRenderer;
   readonly tabRuntimeViewSource: TabRuntimeViewSource;
 
   // --- value methods ---
@@ -329,8 +318,6 @@ export interface ChatRuntimeCompositionHost {
   getSendMessageOptions(): unknown;
   getCurrentSessionModel(): unknown;
   getCurrentSessionModelResolution(): unknown;
-  getCurrentConversationForkService(): unknown;
-  getCurrentConversationBranchService(): unknown;
   formatModelId(model: unknown): string;
   reloadModelCatalog(): void;
   appendModelUnavailableNoticeMessage(): void;
