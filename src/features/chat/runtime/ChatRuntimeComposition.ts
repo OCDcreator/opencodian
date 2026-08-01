@@ -31,9 +31,14 @@ import { OpenCodeService } from '../../../core/opencode';
 import type { Conversation } from '../../../core/types';
 import { t } from '../../../i18n';
 import { getVaultBasePath } from '../../../shared';
+// Host-interface return types (tightened from `unknown` to remove as-never casts at call sites).
+import type { AssistantNoticeCardRendererHost } from '../runtime/AssistantNoticeCardRenderer';
 import { AssistantNoticeCardRenderer } from '../runtime/AssistantNoticeCardRenderer';
+import type { AssistantShellViewHostAdapterHost } from '../runtime/AssistantShellViewHostAdapter';
 import { AssistantShellViewHostAdapter } from '../runtime/AssistantShellViewHostAdapter';
+import type { BackgroundTaskIndicatorCoordinatorHost } from '../runtime/BackgroundTaskIndicatorCoordinator';
 import { BackgroundTaskIndicatorCoordinator } from '../runtime/BackgroundTaskIndicatorCoordinator';
+import type { BackgroundTaskInlinePanelRendererHost } from '../runtime/BackgroundTaskInlinePanelRenderer';
 import { BackgroundTaskInlinePanelRenderer } from '../runtime/BackgroundTaskInlinePanelRenderer';
 import { BackgroundTaskStreamTriggerCoordinator } from '../runtime/BackgroundTaskStreamTriggerCoordinator';
 import { ConversationLoadRuntimeBridge } from '../runtime/ConversationLoadRuntimeBridge';
@@ -46,26 +51,42 @@ import {
 import type { SendPipelineDebugContentBlock,SendPipelineHostDependencies } from '../runtime/SendPipelineRuntime';
 import { createSendPipelineRuntimeHost,SendPipelineRuntime } from '../runtime/SendPipelineRuntime';
 import { shouldRefreshOpenCodeDiagnosticsHeader } from '../runtime/SendPipelineRuntime';
+import type { StreamingInlineCardRendererHost } from '../runtime/StreamingInlineCardRenderer';
 import { StreamingInlineCardRenderer } from '../runtime/StreamingInlineCardRenderer';
 import { TabConversationActivationBridge } from '../runtime/TabConversationActivationBridge';
 import { TabConversationStateBridge } from '../runtime/TabConversationStateBridge';
 import { TabRuntimeStateBridge } from '../runtime/TabRuntimeStateBridge';
 import { TabViewActivationBridge } from '../runtime/TabViewActivationBridge';
+import type { UserMessageContentRendererHost } from '../runtime/UserMessageContentRenderer';
 import { UserMessageContentRenderer } from '../runtime/UserMessageContentRenderer';
+import type { UserMessageFooterRendererHost } from '../runtime/UserMessageFooterRenderer';
 import { UserMessageFooterRenderer } from '../runtime/UserMessageFooterRenderer';
+import type { ActiveTabContextUsageCoordinatorHost } from '../services/ActiveTabContextUsageCoordinator';
 import { ActiveTabContextUsageCoordinator } from '../services/ActiveTabContextUsageCoordinator';
+import type { BackgroundTaskCompletionNoticeServiceHost } from '../services/BackgroundTaskCompletionNoticeService';
 import { BackgroundTaskCompletionNoticeService } from '../services/BackgroundTaskCompletionNoticeService';
+import type { BackgroundTaskLiveSignalCoordinatorHostBuilderHost } from '../services/BackgroundTaskLiveSignalCoordinator';
 import { BackgroundTaskLiveSignalCoordinator } from '../services/BackgroundTaskLiveSignalCoordinator';
+import type { BackgroundTaskNoticeStateServiceHost } from '../services/BackgroundTaskNoticeStateService';
 import { BackgroundTaskNoticeStateService } from '../services/BackgroundTaskNoticeStateService';
 import type { BackgroundTaskViewHost } from '../services/BackgroundTaskTimelineService';
+import type { BackgroundTaskTimelineServiceHost } from '../services/BackgroundTaskTimelineService';
 import { BackgroundTaskTimelineService, createBackgroundTaskViewHost } from '../services/BackgroundTaskTimelineService';
+import type { ChatHeaderPresenterHost } from '../services/ChatHeaderPresenter';
 import { ChatHeaderPresenter } from '../services/ChatHeaderPresenter';
+import type { ChatSelectionControlsCoordinatorHost } from '../services/ChatSelectionControlsCoordinator';
 import { ChatSelectionControlsCoordinator } from '../services/ChatSelectionControlsCoordinator';
+import type { ChatSurfaceAppearanceCoordinatorHost } from '../services/ChatSurfaceAppearanceCoordinator';
 import { ChatSurfaceAppearanceCoordinator } from '../services/ChatSurfaceAppearanceCoordinator';
+import type { ChildSessionGraphCoordinatorHost } from '../services/ChildSessionGraphCoordinator';
 import { ChildSessionGraphCoordinator } from '../services/ChildSessionGraphCoordinator';
+import type { ComposerContextViewHost, FocusContextPreviewWritebackHost, FocusContextRuntimeViewHost } from '../services/ComposerContextViewFacade';
 import { ComposerContextViewFacade } from '../services/ComposerContextViewFacade';
+import type { ComposerInputShellCoordinatorHost } from '../services/ComposerInputShellCoordinator';
 import { ComposerInputShellCoordinator } from '../services/ComposerInputShellCoordinator';
+import type { ConversationAuthoritativeSyncHost } from '../services/ConversationAuthoritativeSyncCoordinator';
 import { ConversationAuthoritativeSyncCoordinator } from '../services/ConversationAuthoritativeSyncCoordinator';
+import type { ConversationHistoryActionsHost } from '../services/ConversationHistoryActionsCoordinator';
 import { ConversationHistoryActionsCoordinator } from '../services/ConversationHistoryActionsCoordinator';
 import type { ConversationHydrationRuntimeBridges, ConversationHydrationRuntimeViewHost } from '../services/ConversationHydrationRuntimeViewHostFactory';
 import {
@@ -76,9 +97,12 @@ import {
   assembleConversationLoadRecovery,
   ConversationLoadRecoveryCoordinator,
 } from '../services/ConversationLoadRecoveryCoordinator';
+import type { ConversationNoticeCoordinatorHost } from '../services/ConversationNoticeCoordinator';
 import { ConversationNoticeCoordinator } from '../services/ConversationNoticeCoordinator';
 import { ConversationRenderService, createConversationRenderHost } from '../services/ConversationRenderService';
+import type { ConversationSessionSettingsCoordinatorHost } from '../services/ConversationSessionSettingsCoordinator';
 import { ConversationSessionSettingsCoordinator } from '../services/ConversationSessionSettingsCoordinator';
+import type { ConversationSessionSignalRuntimeHost } from '../services/ConversationSessionSignalRuntime';
 import { ConversationSessionSignalRuntime } from '../services/ConversationSessionSignalRuntime';
 import type { ConversationSyncBridgePorts } from '../services/ConversationSyncBridge';
 import { ConversationSyncBridge } from '../services/ConversationSyncBridge';
@@ -86,18 +110,24 @@ import type { ConversationSyncRuntimeAssemblyViewHost } from '../services/Conver
 import { assembleConversationSyncRuntime } from '../services/ConversationSyncHostAdapter';
 import { ConversationSyncOrchestrationService } from '../services/ConversationSyncOrchestrationService';
 import { ConversationSyncRuntimeCoordinator } from '../services/ConversationSyncRuntimeCoordinator';
+import type { ConversationTabLifecycleRecoveryHost } from '../services/ConversationTabLifecycleRecoveryCoordinator';
+import type { ConversationTabOpenHost } from '../services/ConversationTabOpenCoordinator';
 import { ConversationTabOpenCoordinator } from '../services/ConversationTabOpenCoordinator';
 import type { TabRuntimeViewSource } from '../services/ConversationTabRuntimeCoordinator';
 import {
   assembleConversationTabRuntime,
   ConversationTabRuntimeCoordinator,
 } from '../services/ConversationTabRuntimeCoordinator';
+import type { ConversationViewStateHost } from '../services/ConversationViewStateService';
+import type { InputPanelAppearanceCoordinatorHost } from '../services/InputPanelAppearanceCoordinator';
 import { InputPanelAppearanceCoordinator } from '../services/InputPanelAppearanceCoordinator';
 import { createMessageFinalizationHost,MessageFinalizationService } from '../services/MessageFinalizationService';
 import { createMessageSendPreparationHost,MessageSendPreparationService } from '../services/MessageSendPreparationService';
+import type { PersistentAssistantNoticeServiceHost } from '../services/PersistentAssistantNoticeService';
 import { PersistentAssistantNoticeService } from '../services/PersistentAssistantNoticeService';
 import { QuestionDockSlotCoordinator } from '../services/QuestionDockSlotCoordinator';
 import type { QuestionRuntimeServices } from '../services/QuestionRuntimeHostAdapter';
+import type { QuestionRuntimeViewHostFactoryHost } from '../services/QuestionRuntimeViewHostFactory';
 import { createQuestionRuntimeBundle } from '../services/QuestionRuntimeViewHostFactory';
 import type { TabConversationSyncFingerprintRuntimePort } from '../services/QuestionTodoBackgroundTaskRuntimeServiceBundle';
 import {
@@ -106,14 +136,17 @@ import {
 import type { SettledScrollScheduler } from '../services/ScrollManager';
 import { ServerReferenceContextService } from '../services/ServerReferenceContextService';
 import type { SessionTodoCoordinator } from '../services/SessionTodoHostAdapter';
+import type { SessionTodoViewHost } from '../services/SessionTodoHostAdapter';
 import { createSessionTodoCoordinator } from '../services/SessionTodoHostAdapter';
 import { createSlashCommandExecutionHost, executeCompactSession } from '../services/SlashCommandExecutionHostFactory';
 import { SlashCommandExecutionService } from '../services/SlashCommandExecutionService';
+import type { TabActivationRuntimeHostProviderHost } from '../services/TabActivationRuntimeHostProvider';
 import type { TabActivationConversationSyncRuntimePort } from '../services/TabActivationRuntimeViewHostFactory';
 import {
   assembleTabActivationConversationSyncRuntimePort,
   createTabActivationRuntimeAssembly,
 } from '../services/TabActivationRuntimeViewHostFactory';
+import type { TabMessagesPaneCoordinatorHost } from '../services/TabMessagesPaneCoordinator';
 import { TabMessagesPaneCoordinator } from '../services/TabMessagesPaneCoordinator';
 import { TitleGenerationService } from '../services/TitleGenerationService';
 import { createDebugLogCallbacks } from '../services/trailingAssistantPatchDebug';
@@ -352,42 +385,42 @@ export interface ChatRuntimeCompositionHost {
   syncLatestUserMessageFromServer(conversation: Conversation, optimisticMessageId: unknown, tabId: TabId | null): void;
 
   // --- host factories ---
-  createChatHeaderPresenterHost(): unknown;
-  createChatSelectionControlsCoordinatorHost(): unknown;
-  createComposerInputShellCoordinatorHost(): unknown;
-  createInputPanelAppearanceCoordinatorHost(): unknown;
-  createChatSurfaceAppearanceCoordinatorHost(): unknown;
-  createConversationSessionSettingsCoordinatorHost(): unknown;
-  createConversationHistoryActionsHost(titleGenerationService: TitleGenerationService): unknown;
-  createPersistentAssistantNoticeServiceHost(): unknown;
-  createConversationNoticeCoordinatorHost(): unknown;
-  createChildSessionGraphCoordinatorHost(): unknown;
-  createAssistantShellViewHostAdapterHost(): unknown;
-  createComposerContextViewHost(): unknown;
-  createFocusContextRuntimeViewHost(): unknown;
-  createFocusContextPreviewWritebackHost(): unknown;
-  createSessionTodoViewHost(): unknown;
-  createTabMessagesPaneCoordinatorHost(): unknown;
-  createActiveTabContextUsageCoordinatorHost(): unknown;
-  createBackgroundTaskNoticeStateServiceHost(): unknown;
-  createBackgroundTaskTimelineServiceHost(): unknown;
-  createBackgroundTaskLiveSignalCoordinatorHostBuilderHost(): unknown;
-  createBackgroundTaskInlinePanelRendererHost(): unknown;
-  createBackgroundTaskIndicatorCoordinatorHost(): unknown;
-  createBackgroundTaskCompletionNoticeServiceHost(): unknown;
-  createTabActivationRuntimeHostProviderHost(): unknown;
+  createChatHeaderPresenterHost(): ChatHeaderPresenterHost;
+  createChatSelectionControlsCoordinatorHost(): ChatSelectionControlsCoordinatorHost;
+  createComposerInputShellCoordinatorHost(): ComposerInputShellCoordinatorHost;
+  createInputPanelAppearanceCoordinatorHost(): InputPanelAppearanceCoordinatorHost;
+  createChatSurfaceAppearanceCoordinatorHost(): ChatSurfaceAppearanceCoordinatorHost;
+  createConversationSessionSettingsCoordinatorHost(): ConversationSessionSettingsCoordinatorHost;
+  createConversationHistoryActionsHost(titleGenerationService: TitleGenerationService): ConversationHistoryActionsHost;
+  createPersistentAssistantNoticeServiceHost(): PersistentAssistantNoticeServiceHost;
+  createConversationNoticeCoordinatorHost(): ConversationNoticeCoordinatorHost;
+  createChildSessionGraphCoordinatorHost(): ChildSessionGraphCoordinatorHost;
+  createAssistantShellViewHostAdapterHost(): AssistantShellViewHostAdapterHost;
+  createComposerContextViewHost(): ComposerContextViewHost;
+  createFocusContextRuntimeViewHost(): FocusContextRuntimeViewHost;
+  createFocusContextPreviewWritebackHost(): FocusContextPreviewWritebackHost;
+  createSessionTodoViewHost(): SessionTodoViewHost;
+  createTabMessagesPaneCoordinatorHost(): TabMessagesPaneCoordinatorHost;
+  createActiveTabContextUsageCoordinatorHost(): ActiveTabContextUsageCoordinatorHost;
+  createBackgroundTaskNoticeStateServiceHost(): BackgroundTaskNoticeStateServiceHost;
+  createBackgroundTaskTimelineServiceHost(): BackgroundTaskTimelineServiceHost;
+  createBackgroundTaskLiveSignalCoordinatorHostBuilderHost(): BackgroundTaskLiveSignalCoordinatorHostBuilderHost;
+  createBackgroundTaskInlinePanelRendererHost(): BackgroundTaskInlinePanelRendererHost;
+  createBackgroundTaskIndicatorCoordinatorHost(): BackgroundTaskIndicatorCoordinatorHost;
+  createBackgroundTaskCompletionNoticeServiceHost(): BackgroundTaskCompletionNoticeServiceHost;
+  createTabActivationRuntimeHostProviderHost(): TabActivationRuntimeHostProviderHost;
   createConversationSyncLoadRuntimeViewHost(conversationRenderService: ConversationRenderService): ConversationSyncRuntimeAssemblyViewHost;
-  createConversationAuthoritativeSyncHost(conversationRenderService: ConversationRenderService): unknown;
+  createConversationAuthoritativeSyncHost(conversationRenderService: ConversationRenderService): ConversationAuthoritativeSyncHost;
   createHydrationRuntimeHostDeps(conversationRenderService: ConversationRenderService): ConversationHydrationRuntimeViewHost;
-  createConversationSessionSignalRuntimeHost(): unknown;
-  createConversationViewStateHost(): unknown;
-  createConversationTabOpenHost(): unknown;
-  createConversationTabLifecycleRecoveryHost(): unknown;
-  createAssistantNoticeCardRendererHost(): unknown;
-  createUserMessageContentRendererHost(): unknown;
-  createUserMessageFooterRendererHost(): unknown;
-  createStreamingInlineCardRendererHost(): unknown;
-  createQuestionRuntimeViewHostFactoryHost(): unknown;
+  createConversationSessionSignalRuntimeHost(): ConversationSessionSignalRuntimeHost;
+  createConversationViewStateHost(): ConversationViewStateHost;
+  createConversationTabOpenHost(): ConversationTabOpenHost;
+  createConversationTabLifecycleRecoveryHost(): ConversationTabLifecycleRecoveryHost;
+  createAssistantNoticeCardRendererHost(): AssistantNoticeCardRendererHost;
+  createUserMessageContentRendererHost(): UserMessageContentRendererHost;
+  createUserMessageFooterRendererHost(): UserMessageFooterRendererHost;
+  createStreamingInlineCardRendererHost(): StreamingInlineCardRendererHost;
+  createQuestionRuntimeViewHostFactoryHost(): QuestionRuntimeViewHostFactoryHost;
   createTabConversationSyncFingerprintRuntimePort(): TabConversationSyncFingerprintRuntimePort;
 }
 
@@ -464,9 +497,9 @@ export class ChatRuntimeComposition {
     const composerContextViewFacade = ComposerContextViewFacade.create({
       app: host.app as never,
       getServerMode: () => host.plugin.settings.server.mode as never,
-      viewHost: host.createComposerContextViewHost() as never,
-      focusRuntimeViewHost: host.createFocusContextRuntimeViewHost() as never,
-      focusPreviewWritebackHost: host.createFocusContextPreviewWritebackHost() as never,
+      viewHost: host.createComposerContextViewHost(),
+      focusRuntimeViewHost: host.createFocusContextRuntimeViewHost(),
+      focusPreviewWritebackHost: host.createFocusContextPreviewWritebackHost(),
       serverContext: serverReferenceContextService,
     });
     const titleGenerationService = new TitleGenerationService(host.plugin as never);
@@ -484,44 +517,44 @@ export class ChatRuntimeComposition {
       },
     );
     const conversationHistoryActionsCoordinator = new ConversationHistoryActionsCoordinator(
-      host.createConversationHistoryActionsHost(titleGenerationService) as never,
+      host.createConversationHistoryActionsHost(titleGenerationService),
     );
     const conversationSessionSettingsCoordinator = new ConversationSessionSettingsCoordinator(
-      host.createConversationSessionSettingsCoordinatorHost() as never,
+      host.createConversationSessionSettingsCoordinatorHost(),
     );
 
     return {
       titleGenerationService,
       tabMessagesPaneCoordinator: new TabMessagesPaneCoordinator(
-        host.createTabMessagesPaneCoordinatorHost() as never,
+        host.createTabMessagesPaneCoordinatorHost(),
         host.scrollScheduler,
       ),
-      chatHeaderPresenter: new ChatHeaderPresenter(host.createChatHeaderPresenterHost() as never),
+      chatHeaderPresenter: new ChatHeaderPresenter(host.createChatHeaderPresenterHost()),
       conversationHistoryActionsCoordinator,
       chatSelectionControlsCoordinator: new ChatSelectionControlsCoordinator(
-        host.createChatSelectionControlsCoordinatorHost() as never,
+        host.createChatSelectionControlsCoordinatorHost(),
       ),
       composerInputShellCoordinator: new ComposerInputShellCoordinator(
-        host.createComposerInputShellCoordinatorHost() as never,
+        host.createComposerInputShellCoordinatorHost(),
       ),
       inputPanelAppearanceCoordinator: new InputPanelAppearanceCoordinator(
-        host.createInputPanelAppearanceCoordinatorHost() as never,
+        host.createInputPanelAppearanceCoordinatorHost(),
       ),
       chatSurfaceAppearanceCoordinator: new ChatSurfaceAppearanceCoordinator(
-        host.createChatSurfaceAppearanceCoordinatorHost() as never,
+        host.createChatSurfaceAppearanceCoordinatorHost(),
       ),
       conversationSessionSettingsCoordinator,
       composerContextViewFacade,
       tabConversationSyncFingerprintRuntimePort: host.createTabConversationSyncFingerprintRuntimePort(),
       persistentAssistantNoticeService: new PersistentAssistantNoticeService(
-        host.createPersistentAssistantNoticeServiceHost() as never,
+        host.createPersistentAssistantNoticeServiceHost(),
       ),
       conversationNoticeCoordinator: new ConversationNoticeCoordinator(
-        host.createConversationNoticeCoordinatorHost() as never,
+        host.createConversationNoticeCoordinatorHost(),
       ),
-      sessionTodoCoordinator: createSessionTodoCoordinator(host.createSessionTodoViewHost() as never),
+      sessionTodoCoordinator: createSessionTodoCoordinator(host.createSessionTodoViewHost()),
       childSessionGraphCoordinator: new ChildSessionGraphCoordinator(
-        host.createChildSessionGraphCoordinatorHost() as never,
+        host.createChildSessionGraphCoordinatorHost(),
         (sessionId: string) => {
           void host.conversationTabOpenCoordinator.openTaskToolSession(
             sessionId,
@@ -532,7 +565,7 @@ export class ChatRuntimeComposition {
       ),
       questionDockSlotCoordinator,
       assistantShellViewHostAdapter: new AssistantShellViewHostAdapter(
-        host.createAssistantShellViewHostAdapterHost() as never,
+        host.createAssistantShellViewHostAdapterHost(),
         (sessionId: string, toolCall: unknown) =>
           host.conversationTabOpenCoordinator.openTaskToolSession(
             sessionId,
@@ -566,7 +599,7 @@ export class ChatRuntimeComposition {
   }
 
   private createUserMessageContentRenderer(): UserMessageContentRenderer {
-    return new UserMessageContentRenderer(this.host.createUserMessageContentRendererHost() as never);
+    return new UserMessageContentRenderer(this.host.createUserMessageContentRendererHost());
   }
 
   private createConversationRenderService(
@@ -662,19 +695,19 @@ export class ChatRuntimeComposition {
       getTabRuntimeStateBridge: () => host.tabRuntimeStateBridge,
     } as never);
     const activeTabContextUsageCoordinator = new ActiveTabContextUsageCoordinator(
-      host.createActiveTabContextUsageCoordinatorHost() as never,
+      host.createActiveTabContextUsageCoordinatorHost(),
     );
     const backgroundTaskNoticeStateService = new BackgroundTaskNoticeStateService(
-      host.createBackgroundTaskNoticeStateServiceHost() as never,
+      host.createBackgroundTaskNoticeStateServiceHost(),
     );
     const backgroundTaskTimelineService = new BackgroundTaskTimelineService(
-      host.createBackgroundTaskTimelineServiceHost() as never,
+      host.createBackgroundTaskTimelineServiceHost(),
     );
     const backgroundTaskLiveSignalCoordinator = new BackgroundTaskLiveSignalCoordinator(
       sessionTodoCoordinator,
       backgroundTaskTimelineService,
       backgroundTaskNoticeStateService,
-      host.createBackgroundTaskLiveSignalCoordinatorHostBuilderHost() as never,
+      host.createBackgroundTaskLiveSignalCoordinatorHostBuilderHost(),
     );
     return {
       ...bundle,
@@ -692,10 +725,10 @@ export class ChatRuntimeComposition {
     const host = this.host;
     const { conversationRenderService, conversationIdentityRuntime, composerContextViewFacade, tabMessagesPaneCoordinator } = inputs;
     const conversationAuthoritativeSyncCoordinator = new ConversationAuthoritativeSyncCoordinator(
-      host.createConversationAuthoritativeSyncHost(conversationRenderService) as never,
+      host.createConversationAuthoritativeSyncHost(conversationRenderService),
     );
     const tabActivationAssembly = createTabActivationRuntimeAssembly({
-      hostProviderHost: host.createTabActivationRuntimeHostProviderHost() as never,
+      hostProviderHost: host.createTabActivationRuntimeHostProviderHost(),
       focusPreviewRefresh: composerContextViewFacade,
       questionTodoActivationRefresh: background.questionTodoActivationRefreshCoordinator,
       backgroundTaskActivationIndicator: background.backgroundTaskActivationIndicatorCoordinator,
@@ -735,7 +768,7 @@ export class ChatRuntimeComposition {
       },
     } as never);
     const conversationSessionSignalRuntime = new ConversationSessionSignalRuntime(
-      host.createConversationSessionSignalRuntimeHost() as never,
+      host.createConversationSessionSignalRuntimeHost(),
       background.backgroundTaskLiveSignalCoordinator,
     );
     const infrastructure = this.createBackgroundTaskInfrastructure(background, tabRuntimeStateBridge);
@@ -744,15 +777,15 @@ export class ChatRuntimeComposition {
       conversationSyncRuntime.conversationLoadRuntimeBridgeHost,
     );
     const loadRecoveryAssembly = assembleConversationLoadRecovery({
-      viewStateHost: host.createConversationViewStateHost() as never,
+      viewStateHost: host.createConversationViewStateHost(),
       tabConversationStateBridge,
       tabConversationActivationBridge,
       tabViewActivationBridge,
       conversationHydrationOutcomeBridge,
       conversationTransitionBridge,
       conversationLoadRuntimeBridge,
-      tabOpenHost: host.createConversationTabOpenHost() as never,
-      lifecycleRecoveryHost: host.createConversationTabLifecycleRecoveryHost() as never,
+      tabOpenHost: host.createConversationTabOpenHost(),
+      lifecycleRecoveryHost: host.createConversationTabLifecycleRecoveryHost(),
       loadRecoveryHostDeps: {
         isActiveTabStreaming: () => host.isActiveTabStreaming(),
         getCurrentConversation: () => host.currentConversation,
@@ -790,7 +823,7 @@ export class ChatRuntimeComposition {
       conversationTabLifecycleRecoveryCoordinator,
     } = loadRecoveryAssembly;
     const conversationTabRuntimeCoordinator = assembleConversationTabRuntime({
-      tabBarState: host.createTabBarMutableState() as never,
+      tabBarState: host.createTabBarMutableState(),
       settings: host.plugin.settings as never,
       plugin: host.plugin as never,
       view: host.tabRuntimeViewSource,
@@ -838,11 +871,11 @@ export class ChatRuntimeComposition {
   } {
     const host = this.host;
     const backgroundTaskCompletionNoticeService = new BackgroundTaskCompletionNoticeService(
-      host.createBackgroundTaskCompletionNoticeServiceHost() as never,
+      host.createBackgroundTaskCompletionNoticeServiceHost(),
     );
     const backgroundTaskInlinePanelRenderer = new BackgroundTaskInlinePanelRenderer(
       background.backgroundTaskTimelineService,
-      host.createBackgroundTaskInlinePanelRendererHost() as never,
+      host.createBackgroundTaskInlinePanelRendererHost(),
     );
     const backgroundTaskIndicatorCoordinator = new BackgroundTaskIndicatorCoordinator({
       inlinePanelRenderer: backgroundTaskInlinePanelRenderer,
@@ -850,7 +883,7 @@ export class ChatRuntimeComposition {
       completionNoticeService: backgroundTaskCompletionNoticeService,
       liveSignalCoordinator: background.backgroundTaskLiveSignalCoordinator,
       tabRuntimeStateBridge,
-      host: host.createBackgroundTaskIndicatorCoordinatorHost() as never,
+      host: host.createBackgroundTaskIndicatorCoordinatorHost(),
     } as never);
     const backgroundTaskIndicatorRenderPort = {
       renderIfNeeded: (tabId?: TabId | null) => {
@@ -956,13 +989,13 @@ export class ChatRuntimeComposition {
       surface.composerContextViewFacade.sendContext,
     );
     const assistantNoticeCardRenderer = new AssistantNoticeCardRenderer(
-      host.createAssistantNoticeCardRendererHost() as never,
+      host.createAssistantNoticeCardRendererHost(),
     );
     const userMessageFooterRenderer = new UserMessageFooterRenderer(
-      host.createUserMessageFooterRendererHost() as never,
+      host.createUserMessageFooterRendererHost(),
     );
     const streamingInlineCardRenderer = new StreamingInlineCardRenderer(
-      host.createStreamingInlineCardRendererHost() as never,
+      host.createStreamingInlineCardRendererHost(),
     );
     const permissionInlineCardRenderer = new PermissionInlineCardRenderer(streamingInlineCardRenderer);
     const questionRuntimeViewHostFactoryHost = host.createQuestionRuntimeViewHostFactoryHost();

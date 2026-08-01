@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "cf5a42a315b6553ab362535e5066d6644f2b8ad5a36a267ad07092c9d3a60338",
+  "digest": "3d9b8ff302cd2fe5954937d0ae131d406c275c70e8a163e6a617aa64401f7170",
   "recordCount": 602,
   "records": [
     {
@@ -951,7 +951,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/runtime/ChatRuntimeComposition.ts",
-      "sha256": "113bd20cdc74037fee8f0ed62a2bc17a6fb3f53a5371a3355a90a5d4aa98e12f"
+      "sha256": "0c14b94cf3670feca506cc18848359ff6865cbc4aab03a3dd9a07829fe09f481"
     },
     {
       "kind": "src",
@@ -3014,7 +3014,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-08-01T05:18:16.879Z",
-  "headShaAtGeneration": "9e45cc1cbf6c462a414c3bf3acf6dcd9c61d6261",
+  "generatedAt": "2026-08-01T05:40:09.724Z",
+  "headShaAtGeneration": "de6926bf8bf6434c4dd19c875e115fe8738aea3d",
   "graphifyVersion": "graphify 0.9.22"
 }
