@@ -1,9 +1,9 @@
 import { WorkspaceLeaf } from 'obsidian';
 
-import { DEFAULT_SETTINGS } from '../../../../../src/core/types';
-import { OpenCodianView } from '../../../../../src/features/chat/OpenCodianView';
+import { DEFAULT_SETTINGS } from '../../../../src/core/types';
+import { OpenCodianView } from '../../../../src/features/chat/OpenCodianView';
 
-jest.mock('../../../../../src/core/opencode', () => ({
+jest.mock('../../../../src/core/opencode', () => ({
   OpenCodeService: class OpenCodeService {},
 }));
 
@@ -78,5 +78,22 @@ describe('ChatRuntimeComposition owner', () => {
     // nonexistent host.showQuestionDialog. The view has no such method.
     const view = constructView();
     expect((view as unknown as { showQuestionDialog?: unknown }).showQuestionDialog).toBeUndefined();
+  });
+
+  it('passes the narrow tabRuntimeViewSource (never the full view) to assembleConversationTabRuntime (source contract)', () => {
+    // Regression guard for codex/terra round-2 Critical #2: removing `view: host.tabRuntimeViewSource`
+    // from the owner source must fail this test. The owner must never pass the full view into
+    // the tab-runtime assembly (no god-object leak, inventory §2.2c).
+    // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
+    const fs = require('fs') as typeof import('fs');
+    // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
+    const path = require('path') as typeof import('path');
+    const source = fs.readFileSync(
+      path.resolve(__dirname, '../../../../src/features/chat/runtime/ChatRuntimeComposition.ts'),
+      'utf8',
+    );
+    // The assembleConversationTabRuntime call must wire the narrow port, not `view: this`.
+    expect(source).toContain('view: host.tabRuntimeViewSource,');
+    expect(source).not.toMatch(/view:\s*this\b/);
   });
 });

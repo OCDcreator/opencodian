@@ -141,6 +141,7 @@ interface InteractionWiringInputs {
   conversation: ConversationRuntimeResult;
   surface: SurfaceRuntimeWiring;
   background: BackgroundTaskRuntimeWiring;
+  conversationIdentityRuntime: ConversationIdentityRuntime;
   userMessageContentRenderer: UserMessageContentRenderer;
 }
 
@@ -432,6 +433,7 @@ export class ChatRuntimeComposition {
         conversation,
         surface,
         background,
+        conversationIdentityRuntime,
         userMessageContentRenderer,
       },
     );
@@ -893,7 +895,7 @@ export class ChatRuntimeComposition {
     conversationRenderService: ConversationRenderService,
     inputs: InteractionWiringInputs,
   ): InteractionRuntimeWiring {
-    const { conversation, surface, background, userMessageContentRenderer } = inputs;
+    const { conversation, surface, background, conversationIdentityRuntime, userMessageContentRenderer } = inputs;
     const host = this.host;
     const messageFinalizationService = new MessageFinalizationService(
       createMessageFinalizationHost({
@@ -903,7 +905,7 @@ export class ChatRuntimeComposition {
           host.syncConversationMessagesFromCanonicalState(c, tabId, reason),
         syncConversationMessagesFromServer: (c: Conversation, tabId: TabId | null, reason: unknown) =>
           host.syncConversationMessagesFromServer(c, tabId, reason),
-        conversationIdentityRuntime: host.conversationIdentityRuntime,
+        conversationIdentityRuntime,
         conversationRenderService,
         backgroundTaskHost: conversation.backgroundTaskHost,
         conversationNoticeCoordinator: surface.conversationNoticeCoordinator,
