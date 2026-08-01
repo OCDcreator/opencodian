@@ -13,6 +13,7 @@ export const zhTranslations = {
 
   // Settings sections
   'settings.title': 'OpenCodian 设置',
+  'settings.searchDesc': '配置 OpenCodian AI 协作助手：LLM 提供方、服务器连接、模型、智能体、工具、MCP、外观与诊断。',
   'settings.titleSuffix': '设置',
   'settings.server.title': '服务器',
   'settings.model.title': '模型',

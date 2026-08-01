@@ -2,6 +2,8 @@
 
 > 2026-07-30: Added the complete Codex diagnostics copy group: module description, capture/storage/channel labels, deep-capture content policy, smart/full export and flush/clear actions, recent-trace filters, and unavailable/success notices. The strings explicitly distinguish Codex traces from OpenCode and Claude Code diagnostics.
 
+> 2026-08-02 (Obsidian 1.13 compat): Added `settings.searchDesc` — the description used by the plugin's declarative `SettingDefinitionPage` so OpenCodian is discoverable in global Settings search by name and description on Obsidian 1.13+.
+
 > 2026-07-30: Added the Claude Code session-trace copy group in `settings.debug.claude.*` and `chat.claudeDiagnostics.*`: capture/storage status, off/standard/full presets, five independent trace channels, hardened summary-only privacy text, smart copy/latest bundle export/clear actions, recent-trace filtering and row actions, and chat arm/cancel/current-session prompts. These keys describe the persistent trace surface separately from the existing `claudeCode.debugChannels` logger preview.
 
 > 2026-07-29: Added OpenCode session trace workbench, capture-menu and status strings.

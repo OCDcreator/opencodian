@@ -193,7 +193,9 @@ provider 开关写回仍遵循 `ModelConfigService` 返回的 `effectiveProvider
 
 | 方法 | 说明 |
 |------|------|
-| `display()` | 重建完整设置面板，根据 `settingsLayoutMode` 分发到经典或标签布局 |
+| `display()` | 重建完整设置面板（`<1.13` 命令式入口，以及所有内部刷新如 requestDisplayRefresh / 语言 / 布局 / 后端切换），根据 `settingsLayoutMode` 分发到经典或标签布局；内部委托给 `displayInto(this.activeSettingsContainer ?? this.containerEl)`——即始终刷新**当前活跃容器**（声明式页为 `page.containerEl`，否则为 plugin tab `containerEl`），避免刷新到陈旧 tab 容器导致可见页面陈旧或出现第二个 surface |
+| `displayInto(containerEl)` | 把完整设置面板渲染进给定容器，记录为 `activeSettingsContainer`，并把 `sectionCoordinator` / `dropdownsEnhancer` 重定向到该容器。供 `display()` 与 1.13 声明式 `SettingPage` 复用 |
+| `getSettingDefinitions()` | **Obsidian 1.13+ 声明式 Settings 入口**：返回单个可搜索 `SettingDefinitionPage`（name + desc），其 `page()` 工厂产出 `OpenCodianSettingsPage`，打开时仍渲染现有经典/多级标签布局（不新增独立 capability-overview 页）。`<1.13` 宿主忽略它而调用 `display()`，故 `minAppVersion` 不变 |
 | `hide()` | 清理轮询、样式绑定，并让 `SettingsSectionCoordinator` 收尾滚动状态 |
 | `onModelsLoaded()` | 模型目录刷新后合并 UI 更新 |
 | `scrollToServerSection()` / `scrollToModelSection()` | 跳转到指定分区（经典模式滚动，标签模式切标签） |

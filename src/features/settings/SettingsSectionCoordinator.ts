@@ -43,7 +43,7 @@ interface BeginDisplayOptions {
 }
 
 export class SettingsSectionCoordinator {
-  private readonly containerEl: HTMLElement;
+  private containerEl: HTMLElement;
   private readonly getSavedScrollTop: () => number;
   private readonly setSavedScrollTop: (scrollTop: number) => void;
   private readonly scheduleScrollStateSave: () => void;
@@ -79,6 +79,30 @@ export class SettingsSectionCoordinator {
     this.setSavedScrollTop = options.setSavedScrollTop;
     this.scheduleScrollStateSave = options.scheduleScrollStateSave;
     this.getExplicitScrollContainer = options.getScrollContainer;
+  }
+
+  /**
+   * Re-target the coordinator onto a different content container.
+   *
+   * Needed for Obsidian 1.13's declarative Settings: when the plugin exposes
+   * `getSettingDefinitions()`, the host renders the page into a page-scoped
+   * container (not the plugin tab's own `containerEl`). Calling this before each
+   * render keeps scroll-restore, quick-nav, and section queries pointed at the
+   * container that actually holds the rendered settings. A no-op when the target
+   * is already the bound container.
+   *
+   * Tears down state bound to the previous container (scroll listeners, the
+   * panel-restore observer, height protection, quick-nav tooltip) so nothing
+   * leaks across container switches. The next `beginDisplay()` re-binds them
+   * against the new container.
+   */
+  reattachTo(containerEl: HTMLElement): void {
+    if (this.containerEl === containerEl) return;
+    this.teardownScrollPersistence();
+    this.clearSettingsPanelRestoreWork();
+    this.clearPanelHeightProtection();
+    this.hideQuickNavTooltip();
+    this.containerEl = containerEl;
   }
 
   scrollToSectionByTitle(sectionTitle: string): void {

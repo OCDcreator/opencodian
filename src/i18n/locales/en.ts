@@ -13,6 +13,7 @@ export const enTranslations = {
 
   // Settings sections
   'settings.title': 'OpenCodian Settings',
+  'settings.searchDesc': 'Configure the OpenCodian AI collaborator: LLM providers, server connection, models, agents, tools, MCP, appearance, and diagnostics.',
   'settings.titleSuffix': 'Settings',
   'settings.server.title': 'Server',
   'settings.model.title': 'Model',

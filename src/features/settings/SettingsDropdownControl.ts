@@ -165,31 +165,50 @@ export interface SettingsDropdownsEnhancerHandle {
 export function enhanceSettingsDropdowns(containerEl: HTMLElement, keymap?: Keymap): SettingsDropdownsEnhancerHandle {
   const handles = new Set<SettingsDropdownControlHandle>();
 
-  // A mutation "adds a select" only if at least one newly added node is, or
-  // contains, a real enhanceable select. This keeps Obsidian 1.13's transient
-  // `select.dropdown.is-measuring` width probes (which are also added as
-  // mutations) from triggering a wasted full re-scan that would re-render them
-  // as duplicate visible dropdowns.
-  const mutationAddsEnhanceableSelect = (records: MutationRecord[]) => records.some((record) => (
-    Array.from(record.addedNodes).some((node) => (
+  // A mutation is relevant if it adds a real enhanceable select OR mutates the
+  // `class` attribute of a select (a real select that the host later turns into a
+  // `.is-measuring` probe, or vice-versa). This keeps Obsidian 1.13's transient
+  // `select.dropdown.is-measuring` width probes from being rendered as duplicate
+  // dropdowns, while still catching the rare class-flip case.
+  const mutationRelevant = (records: MutationRecord[]) => records.some((record) => {
+    if (record.type === 'attributes' && record.attributeName === 'class') {
+      return record.target instanceof HTMLSelectElement;
+    }
+    return Array.from(record.addedNodes).some((node) => (
       isEnhanceableRealSelect(node)
       || (node instanceof HTMLElement && Array.from(node.querySelectorAll('select')).some(isEnhanceableRealSelect))
-    ))
-  ));
+    ));
+  });
 
   const refresh = () => {
-    // Scan for real selects only. `isEnhanceableRealSelect` rejects the 1.13
-    // `.is-measuring` probes and any select already enhanced, so this is safe to
-    // call repeatedly (initial render + every relevant mutation).
     const candidateSelects = Array.from(containerEl.querySelectorAll<HTMLSelectElement>('select'));
     for (const selectEl of candidateSelects) {
+      const wasEnhanced = enhancedSelects.has(selectEl);
+      // "still a real state source" is independent of the already-enhanced check:
+      // a select is still real iff it is connected and NOT a measuring probe.
+      const stillReal = selectEl.isConnected && !selectEl.classList.contains(HOST_MEASURING_SELECT_CLASS);
+      if (wasEnhanced && !stillReal) {
+        // The select was enhanced but is no longer a real state source (e.g. the
+        // host flipped its class to `.is-measuring`). Destroy its handle to remove
+        // the stale trigger so it cannot linger as a duplicate visible dropdown.
+        const handle = enhancedSelects.get(selectEl);
+        if (handle) {
+          handle.destroy();
+          handles.delete(handle);
+        }
+        continue;
+      }
+      // Skip non-real selects and selects already enhanced.
+      if (!stillReal || wasEnhanced) continue;
+      // isEnhanceableRealSelect also rejects detached + already-enhanced, but we
+      // have decomposed those above; the remaining gate is the type/instance check.
       if (!isEnhanceableRealSelect(selectEl)) continue;
       handles.add(enhanceSettingsSelect(selectEl, keymap));
     }
   };
 
   const mutationObserver = new MutationObserver((records) => {
-    if (mutationAddsEnhanceableSelect(records)) {
+    if (mutationRelevant(records)) {
       refresh();
     }
   });
@@ -197,6 +216,8 @@ export function enhanceSettingsDropdowns(containerEl: HTMLElement, keymap?: Keym
   mutationObserver.observe(containerEl, {
     childList: true,
     subtree: true,
+    attributes: true,
+    attributeFilter: ['class'],
   });
 
   return {

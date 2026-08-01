@@ -11,6 +11,50 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-08-02 Obsidian 1.13.4 兼容性升级 Phase B：新版 Settings API 迁移 + 宿主耦合验收
+
+Phase A 已通过只读 Codex review（`APPROVED`），进入 Phase B：将插件接入新版 declarative Settings API 使其被全局设置搜索发现，并对其余宿主耦合点完成静态与运行时审计。
+
+- **B.1 API 调研（不猜接口）**：从 `obsidianmd/obsidian-api` master 与 npm `obsidian@1.13.1` 取得权威 typings。确认 1.13 用 `SettingTab.getSettingDefinitions()`（`@since 1.13.0`）返回 `SettingDefinitionItem[]`（`page`/`group`/`list`/`control`/`render`）驱动渲染与搜索索引；`display()` 标记 deprecated，且当 definitions 非空时不被调用。`minAppVersion` 保持 `1.4.5`（declarative 类型仅编译期；运行时 `<1.13` 走 `display()`，`>=1.13` 走 definitions）。依赖 `obsidian` 由 `latest`（lockfile 解析到 `1.12.3`）升级并 pin 到 `^1.13.1`（package.json devDependency），升级后 typecheck 全绿，`doctor:esbuild` 通过。
+- **B.2 双支持迁移（Path B）**：`OpenCodianSettingTab` 新增 `getSettingDefinitions()` 返回单个可搜索 `SettingDefinitionPage`（name=`settings.title`，desc=`settings.searchDesc`，新增 en/zh locale key）；`page()` 工厂产出内部 `OpenCodianSettingsPage`（经懒工厂 `createOpenCodianSettingsPageCtor` 构建，**无模块级 `extends SettingPage`**，旧版安全），其 `display()` 委托给 `displayInto(page.containerEl)` 把现有经典/多级标签布局渲染进 page 自身容器。`display()` 委托 `displayInto(this.activeSettingsContainer ?? this.containerEl)`——始终刷新当前活跃容器（声明式页为 `page.containerEl`，否则 plugin tab `containerEl`），避免刷新到陈旧 tab 容器。`SettingsSectionCoordinator` 新增 `reattachTo(containerEl)` 在每次 render 前把 scroll-restore/quick-nav 重定向到实际承载容器并 teardown 旧容器状态。**不新增独立 capability-overview 页**。新增 3 个单测（page name/desc、page factory 渲染进 page.containerEl、`<1.13` 回退 display 渲染进 tab.containerEl）；obsidian mock 补 `SettingPage`。
+- **B.3/B.4 宿主耦合运行时验收（macOS Test Vault，build main.202608020001）**：
+  - **环境澄清（更正早期 1.12.7 误判）**：用户从 1.12.7 安装包**就地更新**到 **Obsidian 1.13.4**（窗口 `titleVersion=1.13.4`、`obsidian.asar` 含 `is-measuring` 探针字符串确认）。`Info.plist`/`getVersion()` 报 1.12.7 是**安装包**版本；**bundled Electron 仍为 39**（1.13.4 changelog 的 "Electron 43" 需重装安装包，未做）。故：Obsidian-1.13.4 行为在真实 1.13.4 app 上验证；**Electron-43 专属**行为仍标未验证。
+  - **1.13.4 运行时验收（真实 1.13.4 app，完整 live）**：①全局设置搜索键入 "OpenCodian" → 导航到 OpenCodian 声明式设置页，键盘 `ArrowDown+Enter` 落点正确且 **无重复渲染**（surfaces=1、triggers=2、probes=2，导航前后一致）；②主设置 declarative page 渲染 15 行、下拉单 trigger、`enhancedProbeCount=0`；③**MCP 编辑弹窗 live**——激活 OpenCode 服务器（adopt 4096，status=running，v1.17.15）+ 启用 opencode 后端使 MCP 区块渲染，经 `settingsTab.mcpSection.openAddModal()` 打开 `McpServerEditorModal`，实测 `selects=6 = 3 real + 3 .is-measuring probes → triggers=3`（每个真实下拉仅 1 trigger，1:1，`triggerEqualsRealSelect=true`、`noProbeEnhanced=true`）；④**CodeMirror live show/hide**——经 view 的 `retainedSelectionRuntimeCoordinator` 驱动真实 retained-selection 流程（开笔记→选区→prime→focus composer→blur），单序列捕获 `before=0 → shown=1（mark 出现，composerFocused=true）→ hidden=0（blur 后移除，composerFocused=false）`，`showWorked=true`、`hideWorked=true`，验证 `showSelectionHighlight`/`hideSelectionHighlight` 在升级后 CM6 上正常；⑤`@electron/remote.dialog.showOpenDialog` 是 function 并**多次真实弹出原生目录选择器**（"open" 半已验证）；⑥`obsidian dev:errors` 全程为空。
+  - **诚实未验证项**：`@electron/remote` 目录选择器的 **literal cancel 返回值**（`{canceled:true}`）——原生 macOS open-directory 对话框不响应脚本化取消（AppleScript Escape/Cmd+.、Quartz CGEvent、BrowserWindow close 均失败），需真实鼠标点击 Cancel；代码层 cancel 处理（`pickDirectory` 检查 `result.canceled||filePaths.length===0`→return null，部署 build 已确认）；Electron-43 专属对话框行为（bundled Electron 仍为 39，需重装 Electron-43 安装包）；Windows 跨平台（未执行）。
+  - 详证：`.obsidian-debug/phaseB/runtime-evidence.md`（gitignored 运行时产物）；清单更新：`docs/status/obsidian-1.13-host-coupling-inventory.md`。
+- **门禁**：`npm run verify` 15/15 全绿（lint / typecheck / full tests 6938 / production build / module-docs / owner-impact / graphify freshness / devlog order）。Phase B 只读 review 多轮迭代（首轮 REVISE 4 项、第二轮 REVISE 4 项均已在后续条目记录修复；最终 `APPROVED` 以 reviewer 字面结论为准，见本日志末尾的 Codex 审查结果记录）。
+
+---
+
+## 2026-08-02 Obsidian 1.13.4 兼容性升级 Phase B REVISE 第二轮修复：当前容器刷新 + 观察器属性监听 + fresh-load 证明
+
+第二轮外部只读 review 仍 `REVISE`（Standards 0 / Spec 3，最重为声明式页刷新到错误容器）。本条记录修复。
+
+- **Spec-high 当前容器刷新**：原 `display()` 总渲染 `this.containerEl`（plugin tab 容器），但声明式页面渲染在 `page.containerEl`；用户改一个设置触发 `requestDisplayRefresh → display()` 后会刷新错误容器，导致可见页面陈旧甚至出现第二个 surface。新增 `activeSettingsContainer` 字段，`displayInto()` 记录当前活跃容器，`display()` 改为 `displayInto(this.activeSettingsContainer ?? this.containerEl)`——所有内部刷新（语言/布局/后端/requestDisplayRefresh）都针对用户当前看到的容器。新增回归测试：声明式页面渲染后 `display()` 刷新命中 `page.containerEl` 而非 `tab.containerEl`。
+- **Spec-med MutationObserver 属性监听**：容器 observer 之前只监听 `childList`，class 翻转不会触发重扫；现增加 `attributes:true` + `attributeFilter:['class']`，并使 `mutationRelevant` 识别 select 的 class 变更。`refresh()` 现在会销毁“已增强但已变为 `.is-measuring` 探针”的 select（移除其 trigger），而非仅避免新增第二个。强化测试：真实 select 增强后被加 `.is-measuring`，**无需手动 `refresh()`** 即触发 observer，断言 trigger **被移除**（0 个）且该 select 失去 native-select 标记。
+- **Spec-med <1.13 fresh-load 证明**：原测试在模块加载后才置空 `SettingPage`，不能证明真实 1.12 fresh load。新增隔离测试 `OpenCodianSettings.declarativeFreshLoad.test.ts`：`jest.resetModules()` + 使 mock 的 `SettingPage` 从一开始就缺失，再 `require` 源模块——若有模块级 `extends SettingPage` 会抛 `Class extends value undefined`；断言重载模块仍构造成功且 `getSettingDefinitions()` 返回 `[]`。
+
+诚实未验证项保持不变：`@electron/remote` literal cancel（原生 macOS 对话框不响应脚本取消，需人工点击）、Electron-43 专属（需重装安装包）、Windows（无 obsidian CLI）。
+
+门禁：`npm run verify` 15/15 全绿（lint 0/0 / typecheck / full tests / module-docs / owner-impact / graphify / devlog-order / build）。下一步 rebuild → deploy → reload → 同 BUILD_ID 重做关键验收，再发起一轮全新只读 Codex review。
+
+---
+
+## 2026-08-02 Obsidian 1.13.4 兼容性升级 Phase B REVISE 修复：旧版加载安全 + 时序与生命周期覆盖
+
+外部只读 review 给出 `REVISE`（Standards 3 + Spec 5，最重为 P0 旧版启动崩溃）。本条记录在同阶段内的全部修复。
+
+- **P0 旧宿主加载崩溃**：原实现顶层 `class OpenCodianSettingsPage extends SettingPage` 会在 <1.13（无 `SettingPage` 运行时导出）于模块加载时抛 `Class extends value undefined`，破坏声明的 1.4.5 最低兼容。改为：`SettingPage` 改为 type-only import；新增 `getSettingPageCtor()` 在调用时 `require('obsidian').SettingPage`（运行时特性检测，无模块级 `extends`）；`getSettingDefinitions()` 在 `SettingPage` 缺失时返回 `[]`（宿主回退 `display()`）。页面类经 `createOpenCodianSettingsPageCtor()` 懒构建并缓存。新增 `<1.13` 回归测试（null 掉 `SettingPage` 断言返回 `[]` 且模块仍可加载）。
+- **Standards-med hide() 类型擦除**：`hide()` 去掉 `as unknown as { hide?:... }` 可选调用，改为直接 `this.tab.hide()`（tab 的 `hide()` 本就是 public）。
+- **Spec-med MutationObserver 时序**：新增两个时序测试——①真实 select 先被增强、随后插入 `.is-measuring` 探针（断言仍只 1 trigger、探针不被增强）；②真实 select 增强后获得 `.is-measuring` class（断言不产生第二个 trigger）。
+- **Standards-med reattachTo 生命周期**：`SettingsSectionCoordinator.reattachTo()` 现在在切容器前先 `teardownScrollPersistence()` + `clearSettingsPanelRestoreWork()` + `clearPanelHeightProtection()` + `hideQuickNavTooltip()`，避免旧容器的 scroll listener / panel-restore observer / 高度保护泄漏到新页面。新增 3 个生命周期测试（no-op、容器切换、清理状态）。
+- **Spec-high 原始状态恢复**：验收期间强制启用的 OpenCode 服务器现已停止——实测 `serverStatus: stopped`、`enabledBackends: []`、`activeBackend: undefined`、4196 端口无响应，与初始 `stopped` 一致。
+- **文档校正**：宿主耦合清单 typings 版本由 `1.12.3` 更正为 `1.13.1`（依赖已升级）；item 2 补充懒构建 + 运行时守卫说明。
+
+门禁：`npm run lint`（0/0）、typecheck、定向单测全过；下一步 rebuild → deploy → reload → 同 BUILD_ID 重做关键验收，再发起一轮全新只读 Codex review。
+
+---
+
 ## 2026-08-01 Obsidian 1.13.4 兼容性升级 Phase A：修复 settings dropdown 双渲染回归
 
 Obsidian 1.13.4（public, 2026-07-30）将 Settings 改为可搜索、键盘导航、默认新窗口，并为每个 `DropdownComponent` 插入隐藏的 `select.dropdown.is-measuring` 测宽探针。OpenCodian 的容器 select 扫描器把每个探针当作真实 select 自绘，导致每个设置行出现两个可见下拉（Test Vault 实测：3 真实 select + 3 探针，却产生 6 个 trigger）。本条目记录 Phase A：宿主耦合审计 + 下拉回归修复。

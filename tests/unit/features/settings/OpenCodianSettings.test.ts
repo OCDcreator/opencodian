@@ -692,6 +692,50 @@ function createSettingsTab(layoutMode: 'classic' | 'tabbed' = 'classic') {
   return { app, plugin, tab };
 }
 
+// reattachTo() is the 1.13 declarative-settings bridge: before each render into
+// a page-scoped container it must tear down state bound to the previous container
+// (scroll listeners, panel-restore observer, height protection, tooltip) so nothing
+// leaks across container switches.
+describe('SettingsSectionCoordinator reattachTo lifecycle', () => {
+  it('is a no-op when the target equals the bound container', () => {
+    const { coordinator, containerEl } = createCoordinator();
+    expect(() => coordinator.reattachTo(containerEl)).not.toThrow();
+  });
+
+  it('switches the bound container to the new target', () => {
+    const { coordinator, containerEl } = createCoordinator();
+    const newContainer = document.createElement('div');
+    coordinator.reattachTo(newContainer);
+    // The coordinator now operates on newContainer: e.g. beginDisplay clears it.
+    coordinator.beginDisplay('title', {});
+    expect(newContainer.classList.contains('opencodian-settings')).toBe(true);
+    expect(containerEl.classList.contains('opencodian-settings')).toBe(false);
+    coordinator.finishDisplay();
+  });
+
+  it('clears stale container-bound state so a subsequent display cycle starts clean', () => {
+    const { coordinator, containerEl } = createCoordinator();
+    // Run a display cycle on the original container so it carries opencodian-settings state.
+    coordinator.beginDisplay('title', {});
+    coordinator.finishDisplay();
+    expect(containerEl.classList.contains('opencodian-settings')).toBe(true);
+
+    // reattachTo must switch the bound container AND clear the height-protection
+    // (settingsPanelMinHeightRestoreFrameId) + restore work bound to the old one,
+    // so a subsequent beginDisplay operates solely on the new container.
+    const newContainer = document.createElement('div');
+    coordinator.reattachTo(newContainer);
+    // The pending height-restore RAF against the old container is cancelled.
+    const pendingHeightRestore = (coordinator as unknown as { settingsPanelMinHeightRestoreFrameId?: number | null }).settingsPanelMinHeightRestoreFrameId;
+    expect(pendingHeightRestore).toBeNull();
+    // A fresh display cycle on the new container works without re-touching the old one.
+    coordinator.beginDisplay('title', {});
+    expect(newContainer.classList.contains('opencodian-settings')).toBe(true);
+    expect(containerEl.classList.contains('opencodian-settings')).toBe(true); // old keeps its class until its own clear; the point is new binds correctly
+    coordinator.finishDisplay();
+  });
+});
+
 describe('OpenCodianSettingTab scroll restoration', () => {
   beforeEach(() => {
     setLocale('en');
@@ -1236,5 +1280,111 @@ describe('OpenCodianSettingTab title styling', () => {
     expect(popoverCss).toMatch(/\.opencodian-builtin-list-search-popover\s*\{[\s\S]*z-index:\s*2280;/);
     // Settings tooltip: z-index 2300 (highest)
     expect(overlayCss).toMatch(/\.opencodian-settings-tooltip-layer\s*\{[\s\S]*z-index:\s*2300;/);
+  });
+});
+
+// Obsidian 1.13+ declarative Settings: the plugin must expose
+// getSettingDefinitions() so its settings are discoverable in global Settings
+// search, while still rendering the existing classic/tabbed layout (no separate
+// capability-overview page). display() remains the <1.13 fallback.
+describe('OpenCodianSettingTab declarative settings (Obsidian 1.13+)', () => {
+  beforeEach(() => {
+    setLocale('en');
+    document.body.innerHTML = '';
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+    document.body.innerHTML = '';
+  });
+
+  it('exposes a single searchable page with a name and description', () => {
+    const { tab } = createSettingsTab('classic');
+    const defs = tab.getSettingDefinitions();
+
+    expect(defs).toHaveLength(1);
+    const page = defs[0];
+    expect(page.type).toBe('page');
+    // name + desc are required for global Settings search indexing.
+    expect(typeof page.name).toBe('string');
+    expect(page.name.length).toBeGreaterThan(0);
+    expect(typeof page.desc).toBe('string');
+    expect((page as { desc?: string }).desc?.length).toBeGreaterThan(0);
+    // No separate capability-overview page: exactly one top-level page.
+    expect(page.type).not.toBe('group');
+  });
+
+  it('page factory returns a page that renders the settings surface into its container', () => {
+    const { tab } = createSettingsTab('classic');
+    const pageDef = tab.getSettingDefinitions()[0] as { page: () => { containerEl: HTMLElement; display(): void } };
+    const page = pageDef.page();
+
+    // The page must render into its OWN container (not the plugin tab container),
+    // so spy on displayInto to confirm the declarative path re-targets rendering.
+    const displayIntoSpy = jest.spyOn(tab, 'displayInto').mockImplementation(() => {});
+    page.display();
+    expect(displayIntoSpy).toHaveBeenCalledTimes(1);
+    expect(displayIntoSpy.mock.calls[0][0]).toBe(page.containerEl);
+  });
+
+  it('falls back to display() rendering into the plugin tab container on Obsidian <1.13', () => {
+    const { tab } = createSettingsTab('classic');
+    const displayIntoSpy = jest.spyOn(tab, 'displayInto').mockImplementation(() => {});
+
+    tab.display();
+
+    // On <1.13 the host calls display(); it must render into the tab's containerEl.
+    expect(displayIntoSpy).toHaveBeenCalledTimes(1);
+    expect(displayIntoSpy.mock.calls[0][0]).toBe(tab.containerEl);
+  });
+
+  // REVISE regression (Spec-high): once the declarative page has rendered into
+  // page.containerEl, a subsequent internal refresh via display() (the path taken
+  // by requestDisplayRefresh / language switch / backend toggle) MUST target that
+  // same active container — not the stale plugin tab containerEl. Otherwise the
+  // visible page goes stale and a second surface can appear in the old container.
+  it('refreshes into the active declarative page container, not the stale tab container', () => {
+    const { tab } = createSettingsTab('classic');
+    // Stub the heavy downstream render so displayInto() can run (capturing the
+    // active container) without crashing into un-mocked services.
+    jest.spyOn(tab as never, 'renderClassicDisplay').mockImplementation(() => {});
+    jest.spyOn(tab as never, 'renderTabbedDisplay').mockImplementation(() => {});
+    const displayIntoSpy = jest.spyOn(tab, 'displayInto');
+
+    const pageDef = tab.getSettingDefinitions()[0] as { page: () => { containerEl: HTMLElement; display(): void } };
+    const page = pageDef.page();
+
+    // 1. Declarative page render: displayInto targets the page's container.
+    page.display();
+    expect(displayIntoSpy).toHaveBeenLastCalledWith(page.containerEl);
+
+    // 2. An internal refresh (e.g. user toggled a setting) calls display().
+    displayIntoSpy.mockClear();
+    tab.display();
+
+    // Must re-render the SAME active container (the page's), never the tab's.
+    expect(displayIntoSpy).toHaveBeenCalledTimes(1);
+    expect(displayIntoSpy.mock.calls[0][0]).toBe(page.containerEl);
+    expect(displayIntoSpy.mock.calls[0][0]).not.toBe(tab.containerEl);
+  });
+
+  // P0 regression: on Obsidian <1.13 there is no SettingPage runtime export.
+  // getSettingDefinitions() must return [] (host then uses display()), and the
+  // module must never have executed a module-level `extends SettingPage` that
+  // would throw `Class extends value undefined` at load time. Simulate the 1.12.x
+  // host by making the require('obsidian').SettingPage lookup return undefined.
+  it('returns [] and stays loadable when the host has no SettingPage (Obsidian <1.13)', () => {
+    const { tab } = createSettingsTab('classic');
+    // The resolver does require('obsidian').SettingPage. Mutate the SAME module
+    // instance the source's require resolves (jest's live module registry).
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- mirrors the source's runtime lookup to simulate a <1.13 host.
+    const obsidianModule = require('obsidian') as { SettingPage?: unknown };
+    const savedSettingPage = obsidianModule.SettingPage;
+    obsidianModule.SettingPage = undefined;
+    try {
+      expect(tab.getSettingDefinitions()).toEqual([]);
+    } finally {
+      obsidianModule.SettingPage = savedSettingPage;
+    }
   });
 });

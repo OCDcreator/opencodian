@@ -29,6 +29,7 @@
 | `scrollToSectionByTitle()` / quick-nav click handler | 统一走容器级滚动定位，扣除当前 sticky quick-nav 的实际可见高度，而不是单纯依赖 `scrollIntoView()` 与固定 `scroll-margin-top`；`scrollToSectionByTitle()` 会先匹配 `data-section-title`，再按 heading 文本匹配二级 block 标题 |
 | quick-nav tooltip overlay helpers | 在 hover/focus 时把 tooltip layer 挂到 `document.body`，根据按钮上下空间设置 `data-placement`，并随滚动/窗口变化重定位 |
 | `restoreScrollPosition()` | 执行带 settle/retry 的滚动恢复 |
+| `reattachTo(containerEl)` | 把 coordinator 重新绑定到另一个内容容器（目标相同则 no-op）。**Obsidian 1.13 声明式 Settings 需要**：当插件通过 `getSettingDefinitions()` 暴露页面时，宿主把页面渲染进 page-scoped 容器而非插件 tab 的 `containerEl`，因此每次 render 前需把 scroll-restore / quick-nav / section 查询重定向到实际承载渲染内容的容器。切容器前先 teardown 旧容器绑定状态：`teardownScrollPersistence()`（移除旧 scroll listener）、`clearSettingsPanelRestoreWork()`（断开 panel-restore observer + 清理 restore timers）、`clearPanelHeightProtection()`（取消 height-restore RAF）、`hideQuickNavTooltip()`，避免旧容器的 observer/listener/RAF 泄漏到新页面；下一次 `beginDisplay()` 会在新容器上重新建立这些绑定 |
 | `hide()` | 捕获当前 scrollTop 并清理 restore / persistence 监听器 |
 
 ## 与其他模块的交互

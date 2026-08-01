@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "9a374d5132d687a6ead45546a26920c3dc393e356a1439e211467835f81af4db",
+  "digest": "33178b55ae476478ebffbadae4c51de7bcab2e6325e0ca6c78925f01263a58af",
   "recordCount": 602,
   "records": [
     {
@@ -16,12 +16,12 @@
     {
       "kind": "package",
       "key": "package-lock.json",
-      "sha256": "d6089c6caa2ed5b631c3cf43387d18a9888c0df6fe01eea19bc89f6e2c74201d"
+      "sha256": "7776135d49b9c4ddb7d3907a7e6f2120f3deb19b0c784df1ea94b7fa6619456f"
     },
     {
       "kind": "package",
       "key": "package.json",
-      "sha256": "9a6f9bb4789d9f4ef3f10d7d93437e0b4204b9ef365eaea1f2d60f6c98d51085"
+      "sha256": "b9c59ce0f7b98e887674195e551755c9f6a8af6ec4a218cc1d607ddf24dc8f2b"
     },
     {
       "kind": "src",
@@ -2176,7 +2176,7 @@
     {
       "kind": "src",
       "key": "src/features/settings/OpenCodianSettings.ts",
-      "sha256": "44019bbb65ba9fb209f38fb85deee3981f88cb9fc2eb99b4376aa8f276bab908"
+      "sha256": "f49e5f16f48066f416a039ea05c12ff0b65f212ffa2ee2d00ece9eb62f7b3017"
     },
     {
       "kind": "src",
@@ -2316,7 +2316,7 @@
     {
       "kind": "src",
       "key": "src/features/settings/SettingsDropdownControl.ts",
-      "sha256": "67b4f0289377faa5602186a264f082a9c563837e98aa91ad9c02ff84cbc3501c"
+      "sha256": "59b4700a2022d9b6f49d3c725de89c7ab8726d694ca63bc026d30d64b8979c39"
     },
     {
       "kind": "src",
@@ -2406,7 +2406,7 @@
     {
       "kind": "src",
       "key": "src/features/settings/SettingsSectionCoordinator.ts",
-      "sha256": "b1805836430ee3cab51fe90178cacd99db1e3b225b505b7459d185cdec47a97a"
+      "sha256": "328ecf5494399a625d7cbdebaa1fbd028d734b672200c7689583d8dfddcc5618"
     },
     {
       "kind": "src",
@@ -2516,7 +2516,7 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/en.ts",
-      "sha256": "240b78c0cadf3f7acd8f02116592e405526fec08e094b09e21f45dc0dc68333e"
+      "sha256": "125c58e5830759b89c0b4856629c74148975e8141778486d8ca3bbbc980e8176"
     },
     {
       "kind": "src",
@@ -2526,7 +2526,7 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/zh.ts",
-      "sha256": "8958f26d3ef6ddbf172f3745938917e0add9962b7ab69cd2a466c0653378754e"
+      "sha256": "e437c0d9b214289b4aec6c0afdcc529fd822f7f75227f3e02dba6f536b4c2826"
     },
     {
       "kind": "src",
@@ -3014,7 +3014,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-08-01T15:37:56.142Z",
-  "headShaAtGeneration": "6799f13aa78414186e15bd6c72a8f36f51a5df5e",
+  "generatedAt": "2026-08-01T18:42:21.430Z",
+  "headShaAtGeneration": "d8291d893f4a59afc2b09f8e3bc8ad04b31c157b",
   "graphifyVersion": "graphify 0.9.31"
 }

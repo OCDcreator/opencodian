@@ -5,6 +5,7 @@
  * Supports two layout modes: classic flat and tabbed primary/secondary tabs.
  */
 
+import type { SettingDefinitionItem, SettingPage } from 'obsidian';
 import { App, PluginSettingTab, Setting } from 'obsidian';
 
 import type { AgentBackendKind } from '../../core/types/chat';
@@ -262,8 +263,37 @@ export class OpenCodianSettingTab extends PluginSettingTab {
 
   // ─── Main display ──────────────────────────────────────────────────
 
+  // The container the settings surface currently renders into. Equals the plugin
+  // tab's own `containerEl` on <1.13 (imperative display()) and the declarative
+  // page's `containerEl` on 1.13+. All internal refreshes (requestDisplayRefresh,
+  // language/layout/backend changes) MUST target this active container, otherwise
+  // they would re-render the stale tab container while the user is looking at the
+  // declarative page — leaving the visible page stale or producing a second surface.
+  private activeSettingsContainer: HTMLElement | null = null;
+
   display(): void {
-    const { containerEl } = this;
+    // Refresh into the currently active container. On <1.13 (or before any
+    // declarative page render) that is the plugin tab's own containerEl; on 1.13+
+    // it is the declarative page's container, captured by displayInto().
+    this.displayInto(this.activeSettingsContainer ?? this.containerEl);
+  }
+
+  /**
+   * Renders the full settings surface into the given container.
+   *
+   * `display()` (the <1.13 imperative fallback) renders into the plugin tab's
+   * own `containerEl`. On Obsidian 1.13+, when {@link getSettingDefinitions}
+   * returns a page, the host renders into a page-scoped container instead, so
+   * the declarative {@link OpenCodianSettingsPage} calls this with its own
+   * container and re-targets the section coordinator onto it.
+   *
+   * This also records the container as the active one so subsequent `display()`
+   * refreshes (settings changes, language switch, backend toggle) re-render the
+   * SAME container the user is looking at — never the stale tab container.
+   */
+  displayInto(containerEl: HTMLElement): void {
+    this.activeSettingsContainer = containerEl;
+    this.sectionCoordinator.reattachTo(containerEl);
     this.dropdownsEnhancer?.destroy();
     this.dropdownsEnhancer = null;
     this.disposeSections();
@@ -275,6 +305,33 @@ export class OpenCodianSettingTab extends PluginSettingTab {
       this.renderClassicDisplay(containerEl);
     }
     this.dropdownsEnhancer = enhanceSettingsDropdowns(containerEl, this.app.keymap);
+  }
+
+  /**
+   * Obsidian 1.13+ declarative Settings entry point.
+   *
+   * Returns a single navigable, searchable page whose `render` delegates to the
+   * existing classic/tabbed multi-level layout (no separate capability-overview
+   * page). The page's name/desc make the plugin discoverable in global Settings
+   * search; opening it renders the full settings surface into the page
+   * container.
+   *
+   * **Runtime safety:** `SettingPage` only exists on Obsidian 1.13+. On older
+   * hosts this returns `[]`, so the host falls back to {@link display} and the
+   * plugin keeps loading (no module-level `extends SettingPage` that would throw
+   * `Class extends value undefined` at load time). `minAppVersion` stays 1.4.5.
+   */
+  getSettingDefinitions(): SettingDefinitionItem[] {
+    const SettingPageCtor = getSettingPageCtor();
+    if (!SettingPageCtor) return [];
+    return [
+      {
+        type: 'page',
+        name: t('settings.title'),
+        desc: t('settings.searchDesc'),
+        page: () => new (createOpenCodianSettingsPageCtor(SettingPageCtor))(this),
+      },
+    ];
   }
 
   private disposeSections(): void {
@@ -664,4 +721,59 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     });
     return this.userSection;
   }
+}
+
+/**
+ * Resolve the host `SettingPage` constructor at call time (NOT at module load).
+ * `SettingPage` is `@since 1.13.0`; on older Obsidian it is absent, so this
+ * returns `undefined` and {@link OpenCodianSettingTab.getSettingDefinitions}
+ * falls back to `display()`. Keeping this lazy is what preserves load safety on
+ * <1.13 hosts — there is no module-level `extends SettingPage`.
+ */
+function getSettingPageCtor(): (new () => SettingPage) | undefined {
+  // `require` is available in the Obsidian/Electron renderer. The dynamic
+  // property read avoids any compile-time dependency on the 1.13 export existing.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- runtime feature detection for the 1.13-only SettingPage; keeps module load safe on <1.13.
+  const mod = (require('obsidian') as { SettingPage?: new () => SettingPage });
+  return mod?.SettingPage;
+}
+
+let cachedPageCtor: (new (tab: OpenCodianSettingTab) => SettingPage) | null = null;
+let cachedForBase: (new () => SettingPage) | undefined = undefined;
+
+/**
+ * Build (and cache) an `OpenCodianSettingsPage` subclass on top of the host's
+ * `SettingPage`. Built lazily per host so the plugin loads on any Obsidian
+ * version; the subclass delegates `display()` to the tab's existing layout and
+ * `hide()` to the tab's teardown — no state of its own.
+ */
+function createOpenCodianSettingsPageCtor(
+  SettingPageCtor: new () => SettingPage,
+): new (tab: OpenCodianSettingTab) => SettingPage {
+  if (cachedPageCtor && cachedForBase === SettingPageCtor) return cachedPageCtor;
+  // OpenCodianSettingsPageBase mirrors the previous class body; defined inside
+  // the factory so `extends SettingPageCtor` only evaluates when SettingPage
+  // actually exists (1.13+).
+  class OpenCodianSettingsPageBase extends SettingPageCtor {
+    constructor(private readonly tab: OpenCodianSettingTab) {
+      super();
+      this.title = t('settings.title');
+    }
+
+    display(): void {
+      // Render the full settings surface into this page's container. The tab
+      // re-targets its section coordinator and dropdown enhancer onto the same
+      // element so scroll-restore and custom dropdowns work on the page surface.
+      this.tab.displayInto(this.containerEl);
+    }
+
+    hide(): void {
+      // Delegate teardown to the tab's existing public hide() (disposes
+      // sections, destroys the dropdown enhancer, cancels pending frames).
+      this.tab.hide();
+    }
+  }
+  cachedPageCtor = OpenCodianSettingsPageBase;
+  cachedForBase = SettingPageCtor;
+  return OpenCodianSettingsPageBase;
 }

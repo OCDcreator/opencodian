@@ -69,7 +69,7 @@ Trigger 已消费的 ArrowUp / ArrowDown、Enter / Space 会同时 `preventDefau
 
 ### 动态刷新
 
-单个控件用 `MutationObserver` 监听 select 的 option / disabled 变化。容器级增强只在真实新增 select 节点时重新扫描，避免自绘 label 更新造成 observer 循环。
+单个控件用 `MutationObserver` 监听 select 的 option / disabled 变化。容器级增强在两种 mutation 时重新扫描：新增真实可增强 select 节点（`childList`），或某个 `<select>` 的 `class` 属性变化（`attributes` + `attributeFilter:['class']`）。后者覆盖宿主把已增强 select 翻转为 `.is-measuring` 探针的边界：`refresh()` 会销毁这类 select 的 handle，移除其 trigger，避免陈旧可见下拉残留。扫描本身只处理真实可增强 select（`isEnhanceableRealSelect()` 排除探针、已增强、未挂载节点），避免自绘 label 更新造成 observer 循环。
 
 #### Obsidian 1.13 `.is-measuring` 测宽探针
 

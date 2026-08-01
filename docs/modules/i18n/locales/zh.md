@@ -2,6 +2,8 @@
 
 > 2026-07-30: 新增完整 Codex 诊断文案组：模块说明、捕获/存储/通道标签、深度捕获正文策略、智能/完整导出与刷新/清空动作、最近轨迹筛选，以及不可用/成功提示；文案明确 Codex 轨迹与 OpenCode、Claude Code 诊断相互区分。
 
+> 2026-08-02（Obsidian 1.13 兼容）：新增 `settings.searchDesc`——供插件声明式 `SettingDefinitionPage` 使用，使 OpenCodian 在 Obsidian 1.13+ 全局设置搜索中可按名称与说明被发现。
+
 > 2026-07-30: 新增 Claude Code 会话轨迹文案组（`settings.debug.claude.*` 与 `chat.claudeDiagnostics.*`）：捕获/存储状态、关闭/标准/完整预设、五个独立 trace 通道、summary-only 隐私说明、智能复制/最新轨迹包导出/清空动作、最近轨迹筛选与行内操作，以及聊天层 arm/cancel/当前会话复制提示；这些 key 与既有 `claudeCode.debugChannels` 日志预览保持独立。
 
 > 2026-07-29: Added Chinese OpenCode session trace workbench, capture-menu and status strings.

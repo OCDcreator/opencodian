@@ -72,9 +72,24 @@ export class PluginSettingTab {
   app = {};
   plugin = {};
   containerEl = createMockElement('div');
-  
+
   display() {}
   hide() {}
+}
+
+// Minimal mock of Obsidian 1.13+'s declarative Settings page base class.
+// The real host owns rootEl/titlebarEl/containerEl and calls display()/hide();
+// tests that exercise OpenCodianSettingsPage only need a constructable base
+// with a usable containerEl to render into.
+export class SettingPage {
+  rootEl = createMockElement('div');
+  titlebarEl = createMockElement('div');
+  containerEl = createMockElement('div');
+  title = '';
+
+  constructor() {}
+  display(): void {}
+  hide(): void {}
 }
 
 export class Setting {

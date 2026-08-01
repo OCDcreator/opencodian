@@ -747,7 +747,28 @@ describe('SettingsDropdownControl positioning', () => {
 // These tests lock the fix: the predicate rejects probes, and the container
 // enhancer produces exactly one trigger per real select even when probes arrive
 // via MutationObserver.
+// eslint-disable-next-line max-lines-per-function -- the regression suite keeps probe, mutation, timing, MCP-style, and value-change cases in one cohesive fixture.
 describe('SettingsDropdownControl host measuring-probe regression (Obsidian 1.13)', () => {
+  // Shared fixtures for the probe-regression cases below. Reduces duplicated
+  // select/option construction across the probe scenarios.
+  function createRealDropdownSelect(values: string[], initial?: string): HTMLSelectElement {
+    const selectEl = document.createElement('select');
+    selectEl.className = 'dropdown';
+    for (const value of values) {
+      const optionEl = document.createElement('option');
+      optionEl.value = value;
+      optionEl.textContent = value.toUpperCase();
+      selectEl.appendChild(optionEl);
+    }
+    if (initial) selectEl.value = initial;
+    return selectEl;
+  }
+  function createMeasuringProbe(): HTMLSelectElement {
+    const probe = document.createElement('select');
+    probe.className = 'dropdown is-measuring';
+    return probe;
+  }
+
   afterEach(() => {
     document.body.replaceChildren();
   });
@@ -788,20 +809,11 @@ describe('SettingsDropdownControl host measuring-probe regression (Obsidian 1.13
     const containerEl = document.body.createDiv();
 
     // Real plugin dropdown select (the state source).
-    const realSelect = document.createElement('select');
-    realSelect.className = 'dropdown';
-    for (const value of ['a', 'b', 'c']) {
-      const optionEl = document.createElement('option');
-      optionEl.value = value;
-      optionEl.textContent = value.toUpperCase();
-      realSelect.appendChild(optionEl);
-    }
-    realSelect.value = 'a';
+    const realSelect = createRealDropdownSelect(['a', 'b', 'c'], 'a');
     containerEl.appendChild(realSelect);
 
     // Obsidian 1.13 width probe: same tag, `.dropdown.is-measuring`, no options.
-    const probe = document.createElement('select');
-    probe.className = 'dropdown is-measuring';
+    const probe = createMeasuringProbe();
     containerEl.appendChild(probe);
 
     const handle = enhanceSettingsDropdowns(containerEl);
@@ -821,13 +833,7 @@ describe('SettingsDropdownControl host measuring-probe regression (Obsidian 1.13
   it('does not enhance a measuring probe added after the initial scan via MutationObserver', async () => {
     const containerEl = document.body.createDiv();
 
-    const realSelect = document.createElement('select');
-    realSelect.className = 'dropdown';
-    const optionEl = document.createElement('option');
-    optionEl.value = 'keep';
-    optionEl.textContent = 'Keep';
-    realSelect.appendChild(optionEl);
-    realSelect.value = 'keep';
+    const realSelect = createRealDropdownSelect(['keep'], 'keep');
     containerEl.appendChild(realSelect);
 
     const handle = enhanceSettingsDropdowns(containerEl);
@@ -835,8 +841,7 @@ describe('SettingsDropdownControl host measuring-probe regression (Obsidian 1.13
       expect(containerEl.querySelectorAll('.opencodian-settings-dropdown-trigger')).toHaveLength(1);
 
       // Simulate Obsidian 1.13 adding its transient width probe mid-session.
-      const probe = document.createElement('select');
-      probe.className = 'dropdown is-measuring';
+      const probe = createMeasuringProbe();
       containerEl.appendChild(probe);
 
       // Allow the MutationObserver to fire.
@@ -855,12 +860,7 @@ describe('SettingsDropdownControl host measuring-probe regression (Obsidian 1.13
     try {
       expect(containerEl.querySelectorAll('.opencodian-settings-dropdown-trigger')).toHaveLength(0);
 
-      const realSelect = document.createElement('select');
-      realSelect.className = 'dropdown';
-      const optionEl = document.createElement('option');
-      optionEl.value = 'x';
-      optionEl.textContent = 'X';
-      realSelect.appendChild(optionEl);
+      const realSelect = createRealDropdownSelect(['x']);
       containerEl.appendChild(realSelect);
 
       await Promise.resolve();
@@ -871,22 +871,76 @@ describe('SettingsDropdownControl host measuring-probe regression (Obsidian 1.13
     }
   });
 
+  // Timing edge: host inserts the real <select> first (it gets enhanced), then
+  // inserts the `.is-measuring` probe afterward. The probe must never be
+  // enhanced and the already-enhanced real select must stay a single trigger —
+  // no double-render, no re-scan of the real select into a second handle.
+  it('does not enhance a measuring probe inserted after the real select is already enhanced', async () => {
+    const containerEl = document.body.createDiv();
+    const handle = enhanceSettingsDropdowns(containerEl);
+    try {
+      // 1. Real select arrives first and gets enhanced.
+      const realSelect = createRealDropdownSelect(['a']);
+      containerEl.appendChild(realSelect);
+      await Promise.resolve();
+      expect(containerEl.querySelectorAll('.opencodian-settings-dropdown-trigger')).toHaveLength(1);
+      expect(realSelect.classList.contains('opencodian-settings-native-select')).toBe(true);
+
+      // 2. Probe arrives afterward (the mutation the observer must react to).
+      const probe = createMeasuringProbe();
+      containerEl.appendChild(probe);
+      await Promise.resolve();
+
+      // Still exactly one trigger; the probe was not enhanced.
+      expect(containerEl.querySelectorAll('.opencodian-settings-dropdown-trigger')).toHaveLength(1);
+      expect(probe.classList.contains('opencodian-settings-native-select')).toBe(false);
+      expect(probe.getAttribute('aria-hidden')).not.toBe('true');
+      // The real select is unchanged (still the single enhanced state source).
+      expect(realSelect.classList.contains('opencodian-settings-native-select')).toBe(true);
+    } finally {
+      handle.destroy();
+    }
+  });
+
+  // Timing edge: a real select that later gains the `.is-measuring` class (host
+  // re-purposes a node) must not be treated as a fresh enhanceable select. The
+  // predicate re-evaluates class state on every scan, so a class flip to
+  // A real select that later gains the `.is-measuring` class (host re-purposes
+  // the node as a measuring probe) must have its trigger REMOVED — not merely
+  // avoid gaining a second one. The container MutationObserver watches class
+  // attribute changes, so this is caught WITHOUT a manual refresh().
+  it('removes the trigger when an enhanced select later becomes a measuring probe', async () => {
+    const containerEl = document.body.createDiv();
+    const realSelect = createRealDropdownSelect(['a']);
+    containerEl.appendChild(realSelect);
+
+    const handle = enhanceSettingsDropdowns(containerEl);
+    try {
+      const triggers = () => containerEl.querySelectorAll('.opencodian-settings-dropdown-trigger');
+      expect(triggers()).toHaveLength(1);
+      expect(realSelect.classList.contains('opencodian-settings-native-select')).toBe(true);
+
+      // Host flips the class to is-measuring after enhancement — NO manual refresh.
+      realSelect.classList.add('is-measuring');
+      // Allow the attribute-mutation observer (attributeFilter: ['class']) to fire.
+      await Promise.resolve();
+
+      // The stale trigger is removed (the select is no longer a real state source),
+      // and the select loses its enhanced-native-select treatment.
+      expect(triggers()).toHaveLength(0);
+      expect(realSelect.classList.contains('opencodian-settings-native-select')).toBe(false);
+    } finally {
+      handle.destroy();
+    }
+  });
+
   it('keeps the real select value changeable and reports it on the single trigger', () => {
     const containerEl = document.body.createDiv();
 
-    const realSelect = document.createElement('select');
-    realSelect.className = 'dropdown';
-    for (const value of ['one', 'two']) {
-      const optionEl = document.createElement('option');
-      optionEl.value = value;
-      optionEl.textContent = value.toUpperCase();
-      realSelect.appendChild(optionEl);
-    }
-    realSelect.value = 'one';
+    const realSelect = createRealDropdownSelect(['one', 'two'], 'one');
     containerEl.appendChild(realSelect);
 
-    const probe = document.createElement('select');
-    probe.className = 'dropdown is-measuring';
+    const probe = createMeasuringProbe();
     containerEl.appendChild(probe);
 
     const handle = enhanceSettingsDropdowns(containerEl);
@@ -914,28 +968,13 @@ describe('SettingsDropdownControl host measuring-probe regression (Obsidian 1.13
   it('renders one trigger per real select in an MCP-editor-style container with two dropdowns and two measuring probes', () => {
     const containerEl = document.body.createDiv();
 
-    const createRealDropdown = (values: string[], initial: string, cls = 'dropdown') => {
-      const selectEl = document.createElement('select');
-      selectEl.className = cls;
-      for (const value of values) {
-        const optionEl = document.createElement('option');
-        optionEl.value = value;
-        optionEl.textContent = value.toUpperCase();
-        selectEl.appendChild(optionEl);
-      }
-      selectEl.value = initial;
-      containerEl.appendChild(selectEl);
-      return selectEl;
-    };
-
-    const typeSelect = createRealDropdown(['local', 'remote'], 'local');
-    const authSelect = createRealDropdown(['none', 'oauth'], 'none');
+    const typeSelect = createRealDropdownSelect(['local', 'remote'], 'local');
+    const authSelect = createRealDropdownSelect(['none', 'oauth'], 'none');
+    containerEl.append(typeSelect, authSelect);
 
     // Two Obsidian 1.13 width probes (one per DropdownComponent).
-    const typeProbe = document.createElement('select');
-    typeProbe.className = 'dropdown is-measuring';
-    const authProbe = document.createElement('select');
-    authProbe.className = 'dropdown is-measuring';
+    const typeProbe = createMeasuringProbe();
+    const authProbe = createMeasuringProbe();
     containerEl.append(typeProbe, authProbe);
 
     const handle = enhanceSettingsDropdowns(containerEl);
