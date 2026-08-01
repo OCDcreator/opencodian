@@ -11,6 +11,18 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-08-01 Agent-Friendly Architecture 试点：OpenCodeService convergence inventory（Phase 5 Task 17）
+
+Phase 5 Task 17 的 dated child plan 已完成：`docs/superpowers/plans/2026-08-01-opencode-service-convergence.md`。本次为 discovery/inventory 提交，**未授权任何实现切片**，也未改动 production/source、test、manifest、barrel、generated-graph 或 approval 状态。
+
+- **Decision（核心结论）**：**no implementation slice is approved.** OpenCodeService 的所有剩余 seam（构造/生命周期/SDK facade/legacy transport、session/message/part/sync/stream lifecycle、prompt/question/permission/control、catalog/config/MCP/capability/action/diagnostics）都耦合到完整的 SDK-first/legacy lifecycle、活跃 listener/stream lifecycle，或唯一的 canonical `OpenCodeSessionStateStore`。在后续 inventory 同时 pin 住 transport parity 与 exclusive state truth 之前，抽取任一 seam 都会制造 duplicate cache/listener、暴露 mutable client/map，或新增 runtime forwarding shim——这些是 hard stops。
+- **Owner 契约**：`core.opencode` 仍是唯一 owner，manifest delta 为 **0**（before == after）。Task 15 的 `task15-chat-runtime-composition-scc-member` exception 不变。**每张 deferred card 的 owner 从 core.opencode → core.opencode（同 owner 收敛/defer，非 subowner 转移）**，保留至 Phase 5，硬过期日 **2026-09-01**；过期后须 fresh inventory + 独立 Sol read-only review + merge checkpoint，或显式批准的 deferred-owner/expiry extension，才能 source move。
+- **CodeGraph 证据**：21 行 query/callers/depth-2 impact 表全部 root-confirmed（file/line），直接 function/method callers（排除 file node）；multi-definition query / root divergence / cross-card radius / same-name collision 均作为 hard stop 处理。re-entry gate 要求：先重跑 query/callers/impact 并记录 root id/file/line + direct typed callers + nodes/edges，再跑/扩展 characterization matrix。
+- **现状证据**：当前测试矩阵 **21/21 suites、197/197 tests** 通过（10 个 service/lifecycle suites + 11 个 owner-unit suites）。
+- **公共边界保护**：`OpenCodeService.sdk` 是 public readonly `OpenCodeSdkFacade` 属性，**保持 public**。consumer 在 `OpenCodianView`/`MessageSendPreparationService`/`ChatRuntimeComposition`/`SettingsAgentsSection`/`SettingsCommandsSection`，barrel `src/core/opencode/index.ts` 继续导出 `OpenCodeService`。本计划只禁止泄漏 raw SDK client / mutable catalog state / service locator，不 privatize/remove/migrate `service.sdk`。
+- **指标**：incoming `main.ts` OpenCode-domain import metric 基线 **0 → 目标 0**；本任务不声称 main composition reduction。
+- **下一步**：Tasks 17 不关闭 Phase 5，不修改 ledger 的 Phase 5 closure，也不构成 implementation approval。Task 18（settings plugin-type coupling inventory）仍是 Phase 5 的剩余 discovery task。
+
 ## 2026-08-01 Agent-Friendly Architecture 试点：ClaudeCodeAdapter owner-slice inventory（Phase 5 Task 16，Task 16 关闭）
 
 Phase 5 Task 16 的 dated child plan 已完成独立审查并记录收口：计划提交 `6b98d4c9`（父提交 `3f464006`，范围 `3f464006..6b98d4c9`）仅包含 `docs/superpowers/plans/2026-08-01-claude-adapter-owner-slices.md`。没有 production/source、test、manifest 或 generated-artifact 改动，也没有实现任何候选 owner slice。
