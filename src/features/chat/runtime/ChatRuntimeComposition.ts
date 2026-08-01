@@ -348,6 +348,9 @@ export interface ChatRuntimeCompositionHost {
   retryMcpToolCallFromChat(toolCall: unknown): void;
   openPluginSettingsAtServerSection(): void;
   createTabBarMutableState(): unknown;
+  // --- typed host callbacks for view-private mutable state (no double-cast) ---
+  clearStreamingMessageState(): void;
+  setCurrentConversationRevertState(revertState: unknown): void;
   // --- accessors consumed by the relocated createSendPipelineHostDependencies ---
   readonly chatDiagnosticsCoordinator: {
     claimOpenCodeDiagnosticRunToken(tabId: TabId | null, sessionId: string): unknown;
@@ -405,8 +408,9 @@ export interface ChatRuntimeCompositionHost {
 
 /**
  * Composes the chat runtime. One instance per view; {@link compose} runs once at view
- * construction in the same phase order the pre-Task-15 constructor used (surface →
- * identity/render → background → conversation → interaction).
+ * construction in this phase order: surface → identity/render → background → conversation →
+ * interaction. (Pre-Task-15 the view built background before identity/render; the two phases
+ * are independent, so this reorder is behaviorally inert.)
  */
 export class ChatRuntimeComposition {
   constructor(private readonly host: ChatRuntimeCompositionHost) {}
@@ -627,10 +631,7 @@ export class ChatRuntimeComposition {
           host.assistantShellViewHostAdapter.finalizePseudoStreamFooter(messageEl, message as never);
         },
         clearStreamingMessageState: () => {
-          // streamingMessageEl/streamingContentEl are view-private mutable fields; the view owns
-          // their null-out. Exposed read-only here; the write is performed via a host callback.
-          (host as unknown as { streamingMessageEl: HTMLElement | null }).streamingMessageEl = null;
-          (host as unknown as { streamingContentEl: HTMLElement | null }).streamingContentEl = null;
+          host.clearStreamingMessageState();
         },
         getAssistantBodySignature: (message: unknown) =>
           host.assistantShellViewHostAdapter.getAssistantBodySignature(message as never),
@@ -658,7 +659,7 @@ export class ChatRuntimeComposition {
       getActiveTabId: () => host.getActiveTabId(),
       getCurrentConversation: () => host.currentConversation,
       setCurrentConversationRevertState: (revertState: unknown) => {
-        (host as unknown as { currentConversationRevertState: unknown }).currentConversationRevertState = revertState;
+        host.setCurrentConversationRevertState(revertState);
       },
       getConversationSyncRuntime: () => host.tabConversationSyncFingerprintRuntimePort,
       getTabRuntimeState: (tabId: TabId) => host.getTabRuntimeState(tabId),
@@ -1023,7 +1024,6 @@ export class ChatRuntimeComposition {
       messageFinalizationService,
       slashCommandExecutionService,
     );
-    void surface;
     return {
       messageSendPreparationService,
       messageFinalizationService,

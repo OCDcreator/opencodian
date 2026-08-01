@@ -28,7 +28,7 @@ Do NOT trust the implementer's claims. Open the real files and verify each again
    - In ChatRuntimeComposition: change `shouldUseAboveInputQuestionDock` to return a wrong constant → does a test fail?
    - Revert `createSendPipelineShellPort` to read `host.assistantShellViewHostAdapter` (unset during compose) → does construction throw/fail?
    - Remove the `tabRuntimeViewSource` host wiring → does the view fail to construct?
-   Run `npx jest tests/unit/features/chat/OpenCodianView.task15.characterization.test.ts tests/unit/features/chat/CodexDiagnosticsHost.test.ts tests/unit/features/chat/ChatDiagnosticsContract.test.ts` after each mutation; restore before next.
+   Run `npx jest tests/unit/features/chat/OpenCodianView.task15.characterization.test.ts tests/unit/features/chat/CodexDiagnosticsHost.test.ts tests/unit/features/chat/ChatDiagnosticsContract.test.ts tests/unit/features/chat/ChatRuntimeComposition.test.ts` after each mutation; restore before next.
 
 7. **dependencyException honesty.** Verify `architecture-owners.config.json`'s `task15-chat-runtime-composition-scc-member` exception is accurate (the SCC membership is inherited from coordinator value-imports, not a new runtime cycle) and that `check:dependency-direction` genuinely has 0 new reverse edges. The exception must not hide a real reverse edge or runtime cycle.
 

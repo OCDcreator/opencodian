@@ -534,6 +534,23 @@ export class OpenCodianView extends ItemView {
     return this;
   }
 
+  /**
+   * Host callback for ChatRuntimeComposition (Task 15): nulls the view-private streaming
+   * element fields. Typed callback replaces the owner's double-cast reach-through.
+   */
+  private clearStreamingMessageState(): void {
+    this.streamingMessageEl = null;
+    this.streamingContentEl = null;
+  }
+
+  /**
+   * Host callback for ChatRuntimeComposition (Task 15): writes the view-private
+   * conversation-revert-state field. Typed callback replaces the owner's double-cast.
+   */
+  private setCurrentConversationRevertState(revertState: unknown): void {
+    this.currentConversationRevertState = revertState as ConversationRevertState | null;
+  }
+
   private isOpenCodeBackendActive(): boolean {
     return this.plugin.settings.activeBackend === 'opencode'
       && this.plugin.settings.enabledBackends.includes('opencode');
