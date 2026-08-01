@@ -124,6 +124,25 @@ type QuestionTodoBackgroundTaskRuntimeCoordinators = ReturnType<
   typeof createQuestionTodoBackgroundTaskRuntimeServiceBundleFromSeam
 >;
 
+/** Inputs threaded from compose() into the conversation/interaction phase methods (≤4 params). */
+interface ConversationWiringInputs {
+  conversationRenderService: ConversationRenderService;
+  conversationIdentityRuntime: ConversationIdentityRuntime;
+  composerContextViewFacade: ComposerContextViewFacade;
+  tabMessagesPaneCoordinator: TabMessagesPaneCoordinator;
+}
+
+interface ConversationRuntimeResult extends ConversationRuntimeWiring {
+  backgroundTaskHost: BackgroundTaskViewHost;
+  conversationTabOpenCoordinator: ConversationTabOpenCoordinator;
+}
+
+interface InteractionWiringInputs {
+  conversation: ConversationRuntimeResult;
+  surface: SurfaceRuntimeWiring;
+  userMessageContentRenderer: UserMessageContentRenderer;
+}
+
 interface SurfaceRuntimeWiring {
   titleGenerationService: TitleGenerationService;
   tabMessagesPaneCoordinator: TabMessagesPaneCoordinator;
@@ -399,17 +418,21 @@ export class ChatRuntimeComposition {
     const background = this.createBackgroundTaskRuntimeWiring(surface.sessionTodoCoordinator);
     const conversation = this.createConversationRuntimeWiring(
       background,
-      conversationRenderService,
-      conversationIdentityRuntime,
-      surface.composerContextViewFacade,
-      surface.tabMessagesPaneCoordinator,
+      {
+        conversationRenderService,
+        conversationIdentityRuntime,
+        composerContextViewFacade: surface.composerContextViewFacade,
+        tabMessagesPaneCoordinator: surface.tabMessagesPaneCoordinator,
+      },
     );
     const interaction = this.createInteractionRuntimeWiring(
       conversation.conversationSyncBridgePorts,
       conversationRenderService,
-      conversation,
-      surface,
-      userMessageContentRenderer,
+      {
+        conversation,
+        surface,
+        userMessageContentRenderer,
+      },
     );
 
     return {
@@ -672,15 +695,10 @@ export class ChatRuntimeComposition {
 
   private createConversationRuntimeWiring(
     background: BackgroundTaskRuntimeWiring,
-    conversationRenderService: ConversationRenderService,
-    conversationIdentityRuntime: ConversationIdentityRuntime,
-    composerContextViewFacade: ComposerContextViewFacade,
-    tabMessagesPaneCoordinator: TabMessagesPaneCoordinator,
-  ): ConversationRuntimeWiring & {
-    backgroundTaskHost: BackgroundTaskViewHost;
-    conversationTabOpenCoordinator: ConversationTabOpenCoordinator;
-  } {
+    inputs: ConversationWiringInputs,
+  ): ConversationRuntimeResult {
     const host = this.host;
+    const { conversationRenderService, conversationIdentityRuntime, composerContextViewFacade, tabMessagesPaneCoordinator } = inputs;
     const conversationAuthoritativeSyncCoordinator = new ConversationAuthoritativeSyncCoordinator(
       host.createConversationAuthoritativeSyncHost(conversationRenderService) as never,
     );
@@ -872,13 +890,9 @@ export class ChatRuntimeComposition {
   private createInteractionRuntimeWiring(
     conversationSyncBridgePorts: ConversationSyncBridgePorts,
     conversationRenderService: ConversationRenderService,
-    conversation: ConversationRuntimeWiring & {
-      backgroundTaskHost: BackgroundTaskViewHost;
-      conversationTabOpenCoordinator: ConversationTabOpenCoordinator;
-    },
-    surface: SurfaceRuntimeWiring,
-    userMessageContentRenderer: UserMessageContentRenderer,
+    inputs: InteractionWiringInputs,
   ): InteractionRuntimeWiring {
+    const { conversation, surface, userMessageContentRenderer } = inputs;
     const host = this.host;
     const messageFinalizationService = new MessageFinalizationService(
       createMessageFinalizationHost({

@@ -34,7 +34,6 @@ import {
 } from '../../core/config/modelConfig';
 import type { SlashCommandMenuItem } from '../../core/config/slashCommandCatalog';
 import {
-  OpenCodeService,
   type SessionActivityStatus,
 } from '../../core/opencode';
 import {
@@ -93,23 +92,15 @@ import {
 import {
   BackgroundTaskStreamTriggerCoordinator,
 } from './runtime/BackgroundTaskStreamTriggerCoordinator';
-import {
-  ConversationLoadRuntimeBridge,
-} from './runtime/ConversationLoadRuntimeBridge';
+import { ChatRuntimeComposition } from './runtime/ChatRuntimeComposition';
 import {
   PermissionInlineCardRenderer,
 } from './runtime/PermissionInlineCardRenderer';
 import {
   summarizeChatMessageForDebug,
-  summarizeContentBlocksForDebug,
-  summarizeCoreStreamChunkForDebug,
 } from './runtime/SendPipelineDebugSummaries';
 import {
-  createSendPipelineRuntimeHost,
-  type SendPipelineDebugContentBlock,
-  type SendPipelineHostDependencies,
   SendPipelineRuntime,
-  shouldRefreshOpenCodeDiagnosticsHeader,
 } from './runtime/SendPipelineRuntime';
 import {
   StreamingInlineCardRenderer,
@@ -161,7 +152,6 @@ import {
   BackgroundTaskTimelineService,
   type BackgroundTaskTimelineServiceHost,
   type BackgroundTaskViewHost,
-  createBackgroundTaskViewHost,
 } from './services/BackgroundTaskTimelineService';
 import {
   ChatDiagnosticsCoordinator,
@@ -208,13 +198,11 @@ import {
   type ConversationHistoryActionsHost,
 } from './services/ConversationHistoryActionsCoordinator';
 import {
-  assembleConversationHydrationRuntime,
   type ConversationHydrationRuntimeBridges,
   type ConversationHydrationRuntimeViewHost,
 } from './services/ConversationHydrationRuntimeViewHostFactory';
 import { ConversationIdentityRuntime } from './services/ConversationIdentityRuntime';
 import {
-  assembleConversationLoadRecovery,
   ConversationLoadRecoveryCoordinator,
 } from './services/ConversationLoadRecoveryCoordinator';
 import {
@@ -227,7 +215,6 @@ import {
 import {
   ConversationRenderService,
   type ConversationUserMessageRenderFrame,
-  createConversationRenderHost,
 } from './services/ConversationRenderService';
 import {
   ConversationSessionSettingsCoordinator,
@@ -242,7 +229,6 @@ import {
   type ConversationSyncBridgePorts,
 } from './services/ConversationSyncBridge';
 import {
-  assembleConversationSyncRuntime,
   type ConversationSyncRuntimeAssemblyViewHost,
 } from './services/ConversationSyncHostAdapter';
 import {
@@ -259,7 +245,6 @@ import {
   type ConversationTabOpenHost,
 } from './services/ConversationTabOpenCoordinator';
 import {
-  assembleConversationTabRuntime,
   ConversationTabRuntimeCoordinator,
   type ConversationTabRuntimeState,
   type TabBarMutableState,
@@ -276,12 +261,10 @@ import {
   type InputPanelAppearanceCoordinatorHost,
 } from './services/InputPanelAppearanceCoordinator';
 import {
-  createMessageFinalizationHost,
   MessageFinalizationService,
 } from './services/MessageFinalizationService';
 import {
   type ComposerInputSubmission,
-  createMessageSendPreparationHost,
   MessageSendPreparationService,
 } from './services/MessageSendPreparationService';
 import { ModifiedFilesSidebarCoordinator } from './services/ModifiedFilesSidebarCoordinator';
@@ -292,36 +275,23 @@ import {
 import { QuestionDockSlotCoordinator } from './services/QuestionDockSlotCoordinator';
 import type { QuestionRuntimeServices } from './services/QuestionRuntimeHostAdapter';
 import {
-  createQuestionRuntimeBundle,
   type QuestionRuntimeViewHostFactoryHost,
 } from './services/QuestionRuntimeViewHostFactory';
 import {
-  createQuestionTodoBackgroundTaskRuntimeServiceBundleFromSeam,
   type TabConversationSyncFingerprintRuntimePort,
 } from './services/QuestionTodoBackgroundTaskRuntimeServiceBundle';
 import {
   SettledScrollScheduler,
 } from './services/ScrollManager';
-import { ServerReferenceContextService } from './services/ServerReferenceContextService';
 import {
-  createSessionTodoCoordinator,
   type SessionTodoCoordinator,
   type SessionTodoViewHost,
 } from './services/SessionTodoHostAdapter';
-import {
-  createSlashCommandExecutionHost,
-  executeCompactSession,
-} from './services/SlashCommandExecutionHostFactory';
-import {
-  SlashCommandExecutionService,
-} from './services/SlashCommandExecutionService';
 import { SlashCommandMenuCatalogCache } from './services/SlashCommandMenuCatalogCache';
 import {
   type TabActivationRuntimeHostProviderHost,
 } from './services/TabActivationRuntimeHostProvider';
 import {
-  assembleTabActivationConversationSyncRuntimePort,
-  createTabActivationRuntimeAssembly,
   type TabActivationConversationSyncRuntimePort,
 } from './services/TabActivationRuntimeViewHostFactory';
 import {
@@ -349,7 +319,6 @@ import type {
 } from './ui/modelSelector/types';
 import { NavigationSidebar } from './ui/NavigationSidebar';
 import { OpenCodeExperimentalActionModal } from './ui/OpenCodeExperimentalActionModal';
-import { ChatRuntimeComposition } from './runtime/ChatRuntimeComposition';
 
 
 const logger = createLogger('OpenCodianView');
