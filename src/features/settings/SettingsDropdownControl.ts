@@ -114,6 +114,37 @@ let nextDropdownId = 0;
 
 const enhancedSelects = new WeakMap<HTMLSelectElement, SettingsDropdownControlHandle>();
 
+/**
+ * CSS class Obsidian 1.13+ adds to the hidden `select` it inserts per
+ * `DropdownComponent` to measure the dropdown's natural width. These probes are
+ * not real state sources: they carry no options, never fire change events, and
+ * are removed once measuring is done. Enhancing them produced a second visible
+ * dropdown per settings row (the 1.13 regression), so both the initial scan and
+ * the MutationObserver increment must skip them.
+ */
+const HOST_MEASURING_SELECT_CLASS = 'is-measuring';
+
+/**
+ * Decides whether a `<select>` is a real, enhanceable state source — i.e. one
+ * OpenCodian should render a custom trigger for. Exposed for unit testing.
+ *
+ * Rejects:
+ * - Obsidian 1.13 width-measuring probes (`select.dropdown.is-measuring`);
+ * - selects already enhanced (idempotent — `enhanceSettingsSelect` also guards,
+ *   but skipping here avoids needless MutationObserver churn);
+ * - detached selects (no measurable trigger geometry).
+ */
+export function isEnhanceableRealSelect(selectEl: unknown): selectEl is HTMLSelectElement {
+  if (!(selectEl instanceof HTMLSelectElement)) return false;
+  if (!selectEl.isConnected) return false;
+  if (enhancedSelects.has(selectEl)) return false;
+  // `.dropdown` is the class Obsidian's DropdownComponent puts on its select;
+  // `.is-measuring` is the transient width probe added in 1.13. A real plugin
+  // dropdown select carries `.dropdown` (or no class) but never `.is-measuring`.
+  if (selectEl.classList.contains(HOST_MEASURING_SELECT_CLASS)) return false;
+  return true;
+}
+
 interface SettingsDropdownOption {
   disabled: boolean;
   label: string;
@@ -133,21 +164,32 @@ export interface SettingsDropdownsEnhancerHandle {
 
 export function enhanceSettingsDropdowns(containerEl: HTMLElement, keymap?: Keymap): SettingsDropdownsEnhancerHandle {
   const handles = new Set<SettingsDropdownControlHandle>();
-  const mutationAddsSelect = (records: MutationRecord[]) => records.some((record) => (
+
+  // A mutation "adds a select" only if at least one newly added node is, or
+  // contains, a real enhanceable select. This keeps Obsidian 1.13's transient
+  // `select.dropdown.is-measuring` width probes (which are also added as
+  // mutations) from triggering a wasted full re-scan that would re-render them
+  // as duplicate visible dropdowns.
+  const mutationAddsEnhanceableSelect = (records: MutationRecord[]) => records.some((record) => (
     Array.from(record.addedNodes).some((node) => (
-      node instanceof HTMLSelectElement
-      || (node instanceof HTMLElement && Boolean(node.querySelector('select')))
+      isEnhanceableRealSelect(node)
+      || (node instanceof HTMLElement && Array.from(node.querySelectorAll('select')).some(isEnhanceableRealSelect))
     ))
   ));
 
   const refresh = () => {
-    for (const selectEl of Array.from(containerEl.querySelectorAll<HTMLSelectElement>('select'))) {
+    // Scan for real selects only. `isEnhanceableRealSelect` rejects the 1.13
+    // `.is-measuring` probes and any select already enhanced, so this is safe to
+    // call repeatedly (initial render + every relevant mutation).
+    const candidateSelects = Array.from(containerEl.querySelectorAll<HTMLSelectElement>('select'));
+    for (const selectEl of candidateSelects) {
+      if (!isEnhanceableRealSelect(selectEl)) continue;
       handles.add(enhanceSettingsSelect(selectEl, keymap));
     }
   };
 
   const mutationObserver = new MutationObserver((records) => {
-    if (mutationAddsSelect(records)) {
+    if (mutationAddsEnhanceableSelect(records)) {
       refresh();
     }
   });

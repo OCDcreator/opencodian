@@ -21,7 +21,8 @@
 | `SettingsDropdownControlHandle` | 单个 select 的增强句柄，提供 `refresh()`、`close()`、`destroy()` |
 | `SettingsDropdownsEnhancerHandle` | 容器级增强句柄，负责扫描容器中的 select 并统一销毁 |
 | `enhanceSettingsSelect()` | 接管一个现有 `HTMLSelectElement`；可选接收 Obsidian `Keymap` 以管理打开态 Scope |
-| `enhanceSettingsDropdowns()` | 扫描容器内全部 select，并在新增 select 时补增强；可选透传 `Keymap` |
+| `enhanceSettingsDropdowns()` | 扫描容器内全部**真实** select，并在真实新增 select 时补增强；可选透传 `Keymap` |
+| `isEnhanceableRealSelect()` | 类型守卫谓词：判定一个 `<select>` 是否为可增强的真实状态源（已导出，便于单测）。拒绝 Obsidian 1.13 的 `.is-measuring` 测宽探针、已增强或未挂载的 select |
 | `enhanceSettingsDropdownComponent()` | 接管 Obsidian `DropdownComponent` 并 patch `addOption()` / `setValue()` 后刷新视觉层，可选透传 `Keymap` |
 | `addSettingsDropdown()` | 面向新代码的薄 helper，保留 `Setting` 链式写法 |
 
@@ -69,6 +70,10 @@ Trigger 已消费的 ArrowUp / ArrowDown、Enter / Space 会同时 `preventDefau
 ### 动态刷新
 
 单个控件用 `MutationObserver` 监听 select 的 option / disabled 变化。容器级增强只在真实新增 select 节点时重新扫描，避免自绘 label 更新造成 observer 循环。
+
+#### Obsidian 1.13 `.is-measuring` 测宽探针
+
+Obsidian 1.13 会为每个 `DropdownComponent` 在容器里插入一个隐藏的 `select.dropdown.is-measuring` 节点用于测量下拉自然宽度；该节点不是状态源（无 options、不触发 change、测完即移除）。容器扫描器和 MutationObserver 增量扫描都通过 `isEnhanceableRealSelect()` 过滤掉这类探针，否则每个设置行会出现两个可见下拉（1.13 回归）。判定不依赖时序，也不会用 `aria-hidden` 粗暴隐藏真实 select。回归测试见 `tests/unit/features/settings/SettingsDropdownControl.test.ts` 的 `host measuring-probe regression` 用例。
 
 ## 与其他模块的交互
 

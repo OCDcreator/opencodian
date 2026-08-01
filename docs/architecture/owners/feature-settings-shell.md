@@ -37,3 +37,7 @@ Run before merge: `npm run typecheck`, `npm run module-docs`, `npm run build`.
 - Do not replicate canonical state in another owner.
 - Changes here must update the matching `docs/modules/**` page (via `module-docs.config.json`).
 - Run `npm run inspect:owner -- <this owner or a path>` for an always-fresh summary.
+
+## Recent change notes
+
+- **Obsidian 1.13.4 compatibility (Phase A):** `SettingsDropdownControl.enhanceSettingsDropdowns` now filters Obsidian 1.13's transient `select.dropdown.is-measuring` width probes (one per `DropdownComponent`) via the exported `isEnhanceableRealSelect()` predicate, applied to both the initial container scan and the MutationObserver increment. Without this, every settings row rendered two visible dropdowns. The filter is explicit and timing-independent, and must not be replaced by blanket `aria-hidden` hiding of real selects. Regression coverage lives in `tests/unit/features/settings/SettingsDropdownControl.test.ts` (`host measuring-probe regression`). Full host-coupling audit: `docs/status/obsidian-1.13-host-coupling-inventory.md`.

@@ -11,6 +11,22 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-08-01 Obsidian 1.13.4 兼容性升级 Phase A：修复 settings dropdown 双渲染回归
+
+Obsidian 1.13.4（public, 2026-07-30）将 Settings 改为可搜索、键盘导航、默认新窗口，并为每个 `DropdownComponent` 插入隐藏的 `select.dropdown.is-measuring` 测宽探针。OpenCodian 的容器 select 扫描器把每个探针当作真实 select 自绘，导致每个设置行出现两个可见下拉（Test Vault 实测：3 真实 select + 3 探针，却产生 6 个 trigger）。本条目记录 Phase A：宿主耦合审计 + 下拉回归修复。
+
+- **审计先行**：阅读 `AGENTS.md`、`graphify-out/GRAPH_REPORT.md` 与受影响模块；对拟改函数跑 CodeGraph——`enhanceSettingsDropdowns` 有 6 个独立 method/function 调用者（`OpenCodianSettings.display`、`OpenCodianSettingsView.renderSettings`、`McpServerEditorModal.renderForm`、`ModelConfigModal.render`、`ModelPickerModal.onOpen`、`ProviderBuiltinIconPickerModal.onOpen`），`enhanceSettingsSelect` impact @depth2 = 27 节点/28 边。修复集中在 `SettingsDropdownControl` 即覆盖全部调用者。
+- **新建宿主耦合清单**：`docs/status/obsidian-1.13-host-coupling-inventory.md`，逐项标注已修复/当前兼容/需人工场景验证/不适用并附代码位置与证据（含 `.vertical-tab-*`、`app.setting` 未使用、`@electron/remote` 两处、`--callout-color` 未使用、CodeMirror 选区高亮等）。
+- **下拉回归修复**：`src/features/settings/SettingsDropdownControl.ts` 新增导出谓词 `isEnhanceableRealSelect()`，拒绝 Obsidian 1.13 的 `.is-measuring` 探针、已增强或未挂载的 select；初次扫描与 MutationObserver 增量扫描都走该谓词。判定显式、不依赖时序、不用 `aria-hidden` 粗暴隐藏真实 select。覆盖主设置页、编辑区设置视图、MCP 编辑弹窗（`McpServerEditorModal.ts:82,219` 两处 dropdown）。
+- **回归测试**：`tests/unit/features/settings/SettingsDropdownControl.test.ts` 新增 `host measuring-probe regression (Obsidian 1.13)` 用例——断言扫描期存在探针时每真实下拉仅 1 个 trigger、探针不被增强、MutationObserver 后仍只 1 个 trigger、扫描后新增真实 select 仍被增强、真实值仍可变更；另新增 MCP 编辑弹窗场景用例（2 真实下拉 + 2 探针共享容器，断言 2 trigger、探针不被增强、真实 select 被增强、探针保持宿主隐藏态）。
+- **门禁**：`npm run verify` 全绿（lint / typecheck / full tests / production build / module-docs / owner-impact / graphify freshness / devlog order）；同步更新 `docs/modules/features/settings/SettingsDropdownControl.md` 与 owner overview `docs/architecture/owners/feature-settings-shell.md`。
+- **Test Vault 运行时证据（macOS, 1.13.4, build main.202608012339）**：`obsidian plugin:reload id=opencodian` 后 `obsidian eval` 实测——主设置页与编辑区设置视图均为 `allSelects=4 = real(2)+probe(2)`、`triggers=2`、`enhancedNative=2`、`enhancedProbeCount=0`、`triggerEqualsReal=true`、`noProbeEnhanced=true`，探针保留宿主 `aria-hidden=true` 与 `offsetParent=null`（宿主隐藏态未受影响）；`obsidian dev:errors` 为空；console 仅有与本次改动无关的预存 trace 遥测与 OpenCode 服务器离线 `ERR_CONNECTION_REFUSED`。证据详录于 `.obsidian-debug/phaseA/runtime-evidence.md`（gitignored 运行时产物）。
+- **诚实披露**：MCP 编辑弹窗（`McpServerEditorModal`）走的是同一个 `enhanceSettingsDropdowns` 代码路径（`rg` + CodeGraph 已确认），但本次 Test Vault 因 OpenCode 服务器后端未激活、MCP 区块未渲染，**未对 live MCP 弹窗实跑**；以专属单元测试（MCP 风格 2 下拉 + 2 探针容器）补齐，live 弹窗验证留待后端激活环境。
+
+下一步：启动 Phase A 只读 Codex review；`APPROVED` 后进入 Phase B（新版 Settings API 迁移 + 其余兼容性验收）。
+
+---
+
 ## 2026-08-01 Agent-Friendly Architecture 试点：发布 steady-state contract（Phase 6 Task 20）
 
 Phase 6 Task 20 发布 agent-friendly 架构重构的 steady-state contract。本次为 docs-only（`docs/requirements/agent-maintainability.md` 更新 + devlog + ledger），**未改动** src/test/manifest/package.json/architecture-owners.config.json/graphify-out/automation。这是 Phase 0–6 计划的最后一个任务。

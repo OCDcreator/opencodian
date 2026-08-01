@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import { Scope } from 'obsidian';
 import * as path from 'path';
 
-import { enhanceSettingsSelect } from '../../../../src/features/settings/SettingsDropdownControl';
+import { enhanceSettingsDropdowns, enhanceSettingsSelect, isEnhanceableRealSelect } from '../../../../src/features/settings/SettingsDropdownControl';
 
 type ScopeBinding = { key: string | null; func: (event: KeyboardEvent) => false | void };
 
@@ -738,5 +738,218 @@ describe('SettingsDropdownControl positioning', () => {
 
     addSpy.mockRestore();
     handle.destroy();
+  });
+});
+
+// Obsidian 1.13 inserts a hidden `select.dropdown.is-measuring` width probe per
+// DropdownComponent. OpenCodian's container scanner previously treated each probe
+// as a real select and rendered a second visible dropdown per settings row.
+// These tests lock the fix: the predicate rejects probes, and the container
+// enhancer produces exactly one trigger per real select even when probes arrive
+// via MutationObserver.
+describe('SettingsDropdownControl host measuring-probe regression (Obsidian 1.13)', () => {
+  afterEach(() => {
+    document.body.replaceChildren();
+  });
+
+  describe('isEnhanceableRealSelect', () => {
+    it('accepts a connected, unenhanced, non-measuring select', () => {
+      const selectEl = document.createElement('select');
+      document.body.appendChild(selectEl);
+      expect(isEnhanceableRealSelect(selectEl)).toBe(true);
+    });
+
+    it('rejects the Obsidian `.dropdown.is-measuring` width probe', () => {
+      const probe = document.createElement('select');
+      probe.className = 'dropdown is-measuring';
+      document.body.appendChild(probe);
+      expect(isEnhanceableRealSelect(probe)).toBe(false);
+    });
+
+    it('rejects a detached select and non-select values', () => {
+      expect(isEnhanceableRealSelect(document.createElement('select'))).toBe(false);
+      expect(isEnhanceableRealSelect(null)).toBe(false);
+      expect(isEnhanceableRealSelect(document.createElement('div'))).toBe(false);
+    });
+
+    it('rejects a select that has already been enhanced', () => {
+      const selectEl = document.createElement('select');
+      document.body.appendChild(selectEl);
+      const handle = enhanceSettingsSelect(selectEl);
+      try {
+        expect(isEnhanceableRealSelect(selectEl)).toBe(false);
+      } finally {
+        handle.destroy();
+      }
+    });
+  });
+
+  it('renders exactly one trigger per real select when a measuring probe is present at scan time', () => {
+    const containerEl = document.body.createDiv();
+
+    // Real plugin dropdown select (the state source).
+    const realSelect = document.createElement('select');
+    realSelect.className = 'dropdown';
+    for (const value of ['a', 'b', 'c']) {
+      const optionEl = document.createElement('option');
+      optionEl.value = value;
+      optionEl.textContent = value.toUpperCase();
+      realSelect.appendChild(optionEl);
+    }
+    realSelect.value = 'a';
+    containerEl.appendChild(realSelect);
+
+    // Obsidian 1.13 width probe: same tag, `.dropdown.is-measuring`, no options.
+    const probe = document.createElement('select');
+    probe.className = 'dropdown is-measuring';
+    containerEl.appendChild(probe);
+
+    const handle = enhanceSettingsDropdowns(containerEl);
+    try {
+      const triggers = containerEl.querySelectorAll('.opencodian-settings-dropdown-trigger');
+      expect(triggers).toHaveLength(1);
+      // The probe must not gain the native-select marker class nor an aria-hidden flip.
+      expect(probe.classList.contains('opencodian-settings-native-select')).toBe(false);
+      expect(probe.getAttribute('aria-hidden')).not.toBe('true');
+      // The real select keeps its state-source treatment.
+      expect(realSelect.classList.contains('opencodian-settings-native-select')).toBe(true);
+    } finally {
+      handle.destroy();
+    }
+  });
+
+  it('does not enhance a measuring probe added after the initial scan via MutationObserver', async () => {
+    const containerEl = document.body.createDiv();
+
+    const realSelect = document.createElement('select');
+    realSelect.className = 'dropdown';
+    const optionEl = document.createElement('option');
+    optionEl.value = 'keep';
+    optionEl.textContent = 'Keep';
+    realSelect.appendChild(optionEl);
+    realSelect.value = 'keep';
+    containerEl.appendChild(realSelect);
+
+    const handle = enhanceSettingsDropdowns(containerEl);
+    try {
+      expect(containerEl.querySelectorAll('.opencodian-settings-dropdown-trigger')).toHaveLength(1);
+
+      // Simulate Obsidian 1.13 adding its transient width probe mid-session.
+      const probe = document.createElement('select');
+      probe.className = 'dropdown is-measuring';
+      containerEl.appendChild(probe);
+
+      // Allow the MutationObserver to fire.
+      await Promise.resolve();
+
+      expect(containerEl.querySelectorAll('.opencodian-settings-dropdown-trigger')).toHaveLength(1);
+      expect(probe.classList.contains('opencodian-settings-native-select')).toBe(false);
+    } finally {
+      handle.destroy();
+    }
+  });
+
+  it('still enhances a real select added after the initial scan via MutationObserver', async () => {
+    const containerEl = document.body.createDiv();
+    const handle = enhanceSettingsDropdowns(containerEl);
+    try {
+      expect(containerEl.querySelectorAll('.opencodian-settings-dropdown-trigger')).toHaveLength(0);
+
+      const realSelect = document.createElement('select');
+      realSelect.className = 'dropdown';
+      const optionEl = document.createElement('option');
+      optionEl.value = 'x';
+      optionEl.textContent = 'X';
+      realSelect.appendChild(optionEl);
+      containerEl.appendChild(realSelect);
+
+      await Promise.resolve();
+
+      expect(containerEl.querySelectorAll('.opencodian-settings-dropdown-trigger')).toHaveLength(1);
+    } finally {
+      handle.destroy();
+    }
+  });
+
+  it('keeps the real select value changeable and reports it on the single trigger', () => {
+    const containerEl = document.body.createDiv();
+
+    const realSelect = document.createElement('select');
+    realSelect.className = 'dropdown';
+    for (const value of ['one', 'two']) {
+      const optionEl = document.createElement('option');
+      optionEl.value = value;
+      optionEl.textContent = value.toUpperCase();
+      realSelect.appendChild(optionEl);
+    }
+    realSelect.value = 'one';
+    containerEl.appendChild(realSelect);
+
+    const probe = document.createElement('select');
+    probe.className = 'dropdown is-measuring';
+    containerEl.appendChild(probe);
+
+    const handle = enhanceSettingsDropdowns(containerEl);
+    try {
+      const triggerEl = containerEl.querySelector<HTMLButtonElement>('.opencodian-settings-dropdown-trigger');
+      expect(triggerEl?.textContent).toContain('ONE');
+
+      // Open the single menu and pick the other option.
+      triggerEl?.click();
+      const options = Array.from(document.body.querySelectorAll<HTMLButtonElement>('.opencodian-settings-dropdown-option'));
+      options.find((optionEl) => optionEl.dataset.value === 'two')?.click();
+
+      expect(realSelect.value).toBe('two');
+      expect(containerEl.querySelector('.opencodian-settings-dropdown-trigger')?.textContent).toContain('TWO');
+    } finally {
+      handle.destroy();
+    }
+  });
+
+  // Mirrors McpServerEditorModal (two Setting.addDropdown() rows at
+  // McpServerEditorModal.ts:82,219) inside one shared enhancer container. Obsidian
+  // 1.13 emits one .is-measuring probe per DropdownComponent, so this fixture
+  // exercises the exact 2-real + 2-probe ratio seen at runtime and asserts each
+  // real dropdown still gets exactly one trigger while probes are skipped.
+  it('renders one trigger per real select in an MCP-editor-style container with two dropdowns and two measuring probes', () => {
+    const containerEl = document.body.createDiv();
+
+    const createRealDropdown = (values: string[], initial: string, cls = 'dropdown') => {
+      const selectEl = document.createElement('select');
+      selectEl.className = cls;
+      for (const value of values) {
+        const optionEl = document.createElement('option');
+        optionEl.value = value;
+        optionEl.textContent = value.toUpperCase();
+        selectEl.appendChild(optionEl);
+      }
+      selectEl.value = initial;
+      containerEl.appendChild(selectEl);
+      return selectEl;
+    };
+
+    const typeSelect = createRealDropdown(['local', 'remote'], 'local');
+    const authSelect = createRealDropdown(['none', 'oauth'], 'none');
+
+    // Two Obsidian 1.13 width probes (one per DropdownComponent).
+    const typeProbe = document.createElement('select');
+    typeProbe.className = 'dropdown is-measuring';
+    const authProbe = document.createElement('select');
+    authProbe.className = 'dropdown is-measuring';
+    containerEl.append(typeProbe, authProbe);
+
+    const handle = enhanceSettingsDropdowns(containerEl);
+    try {
+      const triggers = containerEl.querySelectorAll('.opencodian-settings-dropdown-trigger');
+      expect(triggers).toHaveLength(2);
+      expect(typeProbe.classList.contains('opencodian-settings-native-select')).toBe(false);
+      expect(authProbe.classList.contains('opencodian-settings-native-select')).toBe(false);
+      expect(typeSelect.classList.contains('opencodian-settings-native-select')).toBe(true);
+      expect(authSelect.classList.contains('opencodian-settings-native-select')).toBe(true);
+      expect(typeProbe.getAttribute('aria-hidden')).not.toBe('true');
+      expect(authProbe.getAttribute('aria-hidden')).not.toBe('true');
+    } finally {
+      handle.destroy();
+    }
   });
 });
