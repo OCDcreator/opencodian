@@ -258,7 +258,7 @@ None. No Test Vault deployment required.
 - **Test Vault evidence:** runtime code was deployed on macOS with BUILD_ID `main.202607311845`. Test Vault SHA-256: `main.js` `f0df3b4b420b50162e0e1c71467d64fbb9987858574a7d7f9cd60998d3f32440`; `manifest.json` `3a47461c4a27d35efbe7afde5be9c124e4a7599550d330626f81efb0f8c0be88`; `styles.css` `1e4aa7b41de2c2eadfb5ec7bbc7f6eac6256b795d4c7990b12848747b164e4a7`. The final three commits are docs/config only, so no redeployment was required; a later local `dist` BUILD_ID may differ and is not byte-equal evidence for the deployed runtime.
 
 ## Phase 4–6
-- **Status:** Task 14 is **CLOSED / APPROVED** at `6773dfa1`; Task 15 has not started and Phase 4 is not yet closed. Phase 5–6 remain not started. No push is claimed.
+- **Status:** Task 14 **CLOSED / APPROVED** at `6773dfa1`; Task 15 **CLOSED / APPROVED** at `b0e7c450`; Phase 4 **CLOSED / APPROVED**. Phase 5–6 remain not started. No push is claimed.
 
 ### Task 14 — Replace plugin-shaped seams with consumer-owned ports and move runtime orchestration — CLOSED / APPROVED
 - **Range:** `73a30557..6773dfa1` (6 commits).
@@ -291,3 +291,34 @@ None. No Test Vault deployment required.
 - **CodeGraph evidence (depth 2):** `StorageService` constructor has 0 direct function/method callers, nodeCount 1; `TitleGenerationService` constructor has 0 direct function/method callers, nodeCount 1; `OpenCodianView` constructor has 0 direct function/method callers, nodeCount 1; `PluginRuntimeCoordinator` constructor has 0 direct function/method callers, nodeCount 1; `getOpenCodianViews` has 2 direct callers (`refreshOpenCodianViews`, `invalidateSlashCommandMenuCatalogs`), nodeCount 11.
 
 - **Test Vault deployment:** BUILD_ID `main.202607312330`; source and macOS Test Vault hashes match: `main.js` `117d02e452af5cb9ea6c80b9e1b734f9ab84001d25e9c4af6468f19632dc9239`, `manifest.json` `3a47461c4a27d35efbe7afde5be9c124e4a7599550d330626f81efb0f8c0be88`, `styles.css` `1e4aa7b41de2c2eadfb5ec7bbc7f6eac6256b795d4c7990b12848747b164e4a7`. No push is claimed.
+
+### Task 15 — Create a chat runtime composition owner — CLOSED / APPROVED
+- **Range:** `ccbd758a..b0e7c450` (inventory + characterization + code move + 8 codex review rounds).
+- **Inventory (MANDATORY BLOCK, plan step 2):** `docs/superpowers/plans/task15-chat-runtime-composition-inventory.md` — APPROVED by codex/terra (gpt-5.6-terra) over 4 independent read-only review rounds (2 Critical + 4 Important + 1 Minor → 5 Minor → APPROVED). The inventory lists every concrete coordinator constructor/import to move, the exact retained ItemView responsibilities, the 26-step onClose disposal-order contract, the `view: this` → `TabRuntimeViewSource` god-object guard (§2.2c), and the rollback story.
+
+- **Implementation:** new `src/features/chat/runtime/ChatRuntimeComposition.ts` composition owner. Relocated the four `create*RuntimeWiring()` methods + `createBackgroundTaskInfrastructure` + `createSendPipelineHostDependencies` + the constructor's inline identity/render constructions out of `OpenCodianView`. The view passes itself as the structural `ChatRuntimeCompositionHost` and destructures the assembled `ChatRuntime` into its existing private fields. Faithful `this.→host.` rewrite; cross-phase coordinators threaded as compose() locals; lazily-read view state resolves via `host.X`; synchronously-invoked closures (e.g. `createSendPipelineShellPort`) read surface-built locals. `view: this` → narrow `tabRuntimeViewSource` getter.
+
+- **Codex independent review — APPROVED (8 rounds; gpt-5.6-terra, workspace-write sandbox).**
+  - Rounds 1–7 returned CHANGES REQUESTED with real defects, each fixed:
+    1. Round 1 (3 Critical): eager `host.X` capture of compose-set coordinators in interaction/send-pipeline → routed through surface/conversation/background locals; `host.showQuestionDialog` forwarded to a nonexistent view method → inlined via questionRuntimeServices local; fabricated baselineEdgeId → corrected.
+    2. Round 2 (3 Critical): conversationIdentityRuntime eager capture → threaded as local; tabRuntimeViewSource mutation not caught → added source-contract test; baselineEdgeId truncated → set to full SCC id.
+    3. Round 3 (1 Critical): mutation-run review prompt omitted ChatRuntimeComposition.test.ts → added; the guards were verified to catch the mutations directly.
+    4. Round 4 (regression + 4 Important): **the round-1 sed delete (1956–2527) had accidentally removed 5 view-private methods** (`getCurrentConversationForkService`, `getCurrentConversationBranchService`, `routeConversationRevertSession`, `routeConversationUnrevertSession`, `routeConversationForkSession`) that sat between the wiring methods — restored verbatim. Also: owner deps added to `feature.chat-runtime`; SCC exception reason corrected; silent no-op render path restored to direct call.
+    5. Rounds 5–7: removed stale host members; converted type-only coordinator imports to `import type`; tightened all 35 host-factory return types from `unknown` to concrete host-interface types (removed ~31 as-never casts).
+  - Round 8: literal **APPROVED**, 0 findings. Independently verified: focused suite 40/40 passing; typecheck + lint clean; worktree clean; all three required negative mutations (shouldUseAboveInputQuestionDock, tabRuntimeViewSource, createSendPipelineShellPort) failed as expected and were restored; dependency-direction 0 new reverse edges; architecture-cycles 0 runtime SCCs.
+
+- **Acceptance status:**
+  - [x] `src/features/chat/runtime/ChatRuntimeComposition.ts` created; every concrete constructor/import named in the approved move inventory is absent from `OpenCodianView`'s runtime assembly and owned by the composition owner.
+  - [x] `OpenCodianView` no longer constructs the chat coordinators inline; it calls `new ChatRuntimeComposition(this as Host).compose()` and destructures.
+  - [x] The view does not retrieve services from composition by key/type (returns a struct; structural host). `assembleConversationTabRuntime` receives the narrow `TabRuntimeViewSource`, never the full view.
+  - [x] No new thin per-callback files; tab canonical state retained by the view; onClose 26-step disposal order unchanged (owner owns no disposal).
+  - [x] View lifecycle tests pass; `ChatRuntimeComposition.test.ts` (plan §768) present with mutation guards.
+
+- **Architecture baseline:** the composition owner inherits membership in the pre-existing OpenCodianView/settings/main.ts mixed SCC because it value-imports coordinators already in that SCC (structural debt inheritance, NOT a new runtime cycle or reverse edge). Recorded as `dependencyException` `task15-chat-runtime-composition-scc-member` (full SCC id, evidence, Phase 5+ retirement phase) and the baseline regenerated via the dedicated `update:architecture-baseline` command (the plan's designed path, §247-254). Baseline counts unchanged: 0 runtime SCC, 4 type-only, 12 mixed.
+
+- **Gate evidence (clean tree at b0e7c450):** full `npm run verify` 15/15 gates PASS; 725/725 suites, 6926/6926 tests; lint 0 errors/0 warnings; typecheck, production build, generated styles clean; 5/5 architecture gates PASS; owner manifest 554/554; module docs 588/588; graphify fresh.
+
+- **Test Vault deployment:** BUILD_ID `main.202608011240`; source and macOS Test Vault `main.js` BUILD_ID match. No push is claimed.
+
+### Phase 4 closure
+- **Phase 4 (Task 14 + Task 15): CLOSED / APPROVED** at `b0e7c450`. Phase 5 (Task 16–18: inventory + child plans, no production changes) and Phase 6 (Task 19–20: documentation retirement) remain not started.

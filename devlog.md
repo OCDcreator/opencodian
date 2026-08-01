@@ -11,6 +11,20 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-08-01 Agent-Friendly Architecture 试点：ChatRuntimeComposition composition owner（Phase 4 Task 15，Phase 4 关闭）
+
+Phase 4 Task 15 是迄今最大的单块重构：把 `OpenCodianView` 的四个 `create*RuntimeWiring()` 编排方法 + `createBackgroundTaskInfrastructure` + `createSendPipelineHostDependencies` + 构造器内联的 identity/render 装配全部迁出到新的 `src/features/chat/runtime/ChatRuntimeComposition.ts` composition owner。view 把自己作为结构化 `ChatRuntimeCompositionHost` 传入，解构返回的 `ChatRuntime` 到既有私有字段。
+
+- **强制 inventory 先行（plan step 2）**：`task15-chat-runtime-composition-inventory.md` 经 codex/terra 4 轮独立只读审查 APPROVED，逐条列出每个要迁移的 coordinator 构造、保留的 ItemView 职责、26 步 onClose 销毁顺序契约、`view: this` → `TabRuntimeViewSource` 窄化守卫。
+- **行为基线先行**：6 个特征化测试（3 结构 + 3 行为，含 `conversationNoticeCoordinator` → `currentConversationRevertState` 实时状态通路）在迁移前后保持 GREEN。
+- **核心难点**：owner 不能在 `compose()` 期间调用 view 的 `create*Host()` 方法去读 compose-set 字段（那些字段在 compose 返回后才被 view 解构赋值）。解法是把跨阶段 coordinator 作为 `compose()` 局部变量传递（surface→conversation→interaction），懒读取的 view 状态通过 `host.X` 实时解析；同步调用的闭包（如 `createSendPipelineShellPort`）读取 surface 构建的 local。
+- **codex/terra 独立审查 8 轮**：累计捕捉 6 个 Critical（含一个真实功能回归——round-1 的 sed 删除范围过大，误删了 5 个夹在 wiring 方法之间的 view 私有方法 `getCurrentConversationForkService`/`routeConversationRevertSession` 等，round-4 恢复）+ 多个 Important。Round 8 字面量 APPROVED，0 findings；三个负向变异（shouldUseAboveInputQuestionDock、tabRuntimeViewSource、createSendPipelineShellPort）均失败→恢复→通过。
+- **架构 baseline**：owner 因 value-import 本身就在既有 OpenCodianView mixed SCC（61 成员）里的 coordinator 而继承 SCC 成员身份——这是结构性债务继承，非 runtime cycle（dependency-direction 0 反向边，architecture-cycles 0 runtime SCC）。记录为 `dependencyException`（完整 SCC id + 证据 + Phase 5+ retirement phase），用专用 `update:architecture-baseline` 命令重生成（plan §247-254 设计路径）。baseline 计数不变：0 runtime SCC / 4 type-only / 12 mixed。
+- **类型收紧**：round-7 把全部 35 个 `create*Host()` factory 返回类型从 `unknown` 收紧为具体 host 接口类型，移除约 31 处 `as never` cast。
+- **门禁**：`npm run verify` 15/15 全绿（725/725 suites，6926/6926 tests）；Test Vault 部署 BUILD_ID `main.202608011240` 匹配。
+
+Phase 4（Task 14 + Task 15）CLOSED / APPROVED at `b0e7c450`。Phase 5（Task 16–18：inventory + child plans，零生产改动）与 Phase 6（Task 19–20：文档归档）未启动。
+
 ## 2026-07-31 Agent-Friendly Architecture 试点：consumer-owned ports 与 app runtime 编排（Phase 4 Task 14）
 
 Task 14 在 `73a30557..6773dfa1` 完成六个提交：先以 characterization 固化 plugin seams，再将 Storage、TitleGeneration、Chat 改为 consumer-owned narrow ports，并把 `PluginRuntimeCoordinator` 从 `core/runtime` 移至 `app.runtime`；最终 `6773dfa1` 汇总共享 baseline/Graphify snapshots。`src/core/**`→`main` runtime/type、Storage/View/Title→`main` targeted direct edges、View/Title plugin-class imports及旧 `core/runtime`→`features/chat` runtime edges均为 0；runtime SCC 0，type/mixed debt 4/12，`dependencyExceptions=[]`，Task 15 尚未开始，Phase 4 尚未关闭。
