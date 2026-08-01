@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Revise `docs/status/session-lifecycle-alignment-evaluation.md` into a current, source-grounded audit baseline that can safely feed later canonical session convergence work.
+**Goal:** Revise `docs/archive/maintainability/phases/session-lifecycle-alignment-evaluation.md` into a current, source-grounded audit baseline that can safely feed later canonical session convergence work.
 
 **Architecture:** This is a documentation-baseline slice. It corrects report claims, dates, evidence, and priority framing without changing TypeScript runtime behavior. Any later UI, layout, or style work must invoke `impeccable` first and preserve OpenCodian's Obsidian-native product UI vocabulary.
 
@@ -12,7 +12,7 @@
 
 ## File Structure
 
-- Modify: `docs/status/session-lifecycle-alignment-evaluation.md`
+- Modify: `docs/archive/maintainability/phases/session-lifecycle-alignment-evaluation.md`
   - Owns the public audit baseline for session lifecycle alignment.
   - Must remain an audit report, not an implementation plan.
 - Reference only: `docs/superpowers/specs/2026-05-10-session-lifecycle-report-baseline-design.md`
@@ -38,7 +38,7 @@
 
 - Do not modify runtime TypeScript, CSS, generated assets, `reference-projects/`, or test code in this slice.
 - Do not stage unrelated local changes or disturb the existing local commits ahead of `origin/main`.
-- Keep `docs/status/session-lifecycle-alignment-evaluation.md` as the only implementation target.
+- Keep `docs/archive/maintainability/phases/session-lifecycle-alignment-evaluation.md` as the only implementation target.
 - Do not claim Council review has happened unless the current workflow actually ran it.
 - If any task unexpectedly requires UI, layout, style, theme, visual component, or user-facing copy changes outside this report, stop and invoke `impeccable` before editing:
 
@@ -51,7 +51,7 @@ For this plan's report-only scope, `shape=not_required` and `image_gate=skipped:
 ## Task 1: Correct Report Header And Methodology Claims
 
 **Files:**
-- Modify: `docs/status/session-lifecycle-alignment-evaluation.md`
+- Modify: `docs/archive/maintainability/phases/session-lifecycle-alignment-evaluation.md`
 - Reference: `docs/superpowers/specs/2026-05-10-session-lifecycle-report-baseline-design.md`
 
 - [ ] **Step 1: Inspect the current report header**
@@ -59,14 +59,14 @@ For this plan's report-only scope, `shape=not_required` and `image_gate=skipped:
 Run:
 
 ```bash
-sed -n '1,40p' docs/status/session-lifecycle-alignment-evaluation.md
+sed -n '1,40p' docs/archive/maintainability/phases/session-lifecycle-alignment-evaluation.md
 ```
 
 Expected: The header shows the current report title, review date, reference baseline, and methodology claims.
 
 - [ ] **Step 2: Replace the stale header block**
 
-Edit the header block at the top of `docs/status/session-lifecycle-alignment-evaluation.md` so it reads exactly:
+Edit the header block at the top of `docs/archive/maintainability/phases/session-lifecycle-alignment-evaluation.md` so it reads exactly:
 
 ```markdown
 # OpenCodian 会话生命周期管理：对齐评估与优化增强报告
@@ -87,7 +87,7 @@ Edit the header block at the top of `docs/status/session-lifecycle-alignment-eva
 Run:
 
 ```bash
-rg -n "Council|多模型|共识" docs/status/session-lifecycle-alignment-evaluation.md
+rg -n "Council|多模型|共识" docs/archive/maintainability/phases/session-lifecycle-alignment-evaluation.md
 ```
 
 Expected: Matches show all remaining claims that imply a Council review already happened.
@@ -105,7 +105,7 @@ Replace any claim that says the report already completed multi-model Council rev
 Run:
 
 ```bash
-rg -n "源码级全量审计 \\+ 多模型|所有 Council 成员|一致同意|多数同意" docs/status/session-lifecycle-alignment-evaluation.md
+rg -n "源码级全量审计 \\+ 多模型|所有 Council 成员|一致同意|多数同意" docs/archive/maintainability/phases/session-lifecycle-alignment-evaluation.md
 ```
 
 Expected: No output.
@@ -113,7 +113,7 @@ Expected: No output.
 ## Task 2: Reframe The Core Technical Findings
 
 **Files:**
-- Modify: `docs/status/session-lifecycle-alignment-evaluation.md`
+- Modify: `docs/archive/maintainability/phases/session-lifecycle-alignment-evaluation.md`
 - Reference: `src/core/opencode/OpenCodeSessionStateStore.ts`
 - Reference: `src/features/chat/services/ConversationRenderService.ts`
 - Reference: `src/features/chat/services/ConversationAuthoritativeReloadCoordinator.ts`
@@ -153,7 +153,7 @@ Replace the current conclusion below the double-truth analysis with:
 Run:
 
 ```bash
-rg -n "渲染层始终|总是双重|没有单一的仲裁机制确保两者一致|双重真相是当前最大的架构风险点" docs/status/session-lifecycle-alignment-evaluation.md
+rg -n "渲染层始终|总是双重|没有单一的仲裁机制确保两者一致|双重真相是当前最大的架构风险点" docs/archive/maintainability/phases/session-lifecycle-alignment-evaluation.md
 ```
 
 Expected: No output.
@@ -161,16 +161,16 @@ Expected: No output.
 ## Task 3: Reorder The Roadmap Around Canonical Projection First
 
 **Files:**
-- Modify: `docs/status/session-lifecycle-alignment-evaluation.md`
-- Reference: `docs/status/opencode-session-alignment-current-audit-2026-04-21.md`
-- Reference: `docs/status/opencode-session-alignment-follow-up-plan-2026-04-21.md`
+- Modify: `docs/archive/maintainability/phases/session-lifecycle-alignment-evaluation.md`
+- Reference: `docs/archive/maintainability/phases/opencode-session-alignment-current-audit-2026-04-21.md`
+- Reference: `docs/archive/maintainability/phases/opencode-session-alignment-follow-up-plan-2026-04-21.md`
 
 - [ ] **Step 1: Inspect the existing Tier 1 section**
 
 Run:
 
 ```bash
-sed -n '/### 4.1 Tier 1/,/### 4.2 Tier 2/p' docs/status/session-lifecycle-alignment-evaluation.md
+sed -n '/### 4.1 Tier 1/,/### 4.2 Tier 2/p' docs/archive/maintainability/phases/session-lifecycle-alignment-evaluation.md
 ```
 
 Expected: The first recommendation is currently the conversation write-lock mechanism.
@@ -248,7 +248,7 @@ Tier 3（长期方向）
 Run:
 
 ```bash
-rg -n "先落地 #1 和 #2|串行变更机制\\s+← 数据完整性基石|建议 1：引入 `Conversation.messages` 串行变更机制" docs/status/session-lifecycle-alignment-evaluation.md
+rg -n "先落地 #1 和 #2|串行变更机制\\s+← 数据完整性基石|建议 1：引入 `Conversation.messages` 串行变更机制" docs/archive/maintainability/phases/session-lifecycle-alignment-evaluation.md
 ```
 
 Expected: No output.
@@ -256,7 +256,7 @@ Expected: No output.
 ## Task 4: Add Explicit UI Consistency Guard For Future Runtime Work
 
 **Files:**
-- Modify: `docs/status/session-lifecycle-alignment-evaluation.md`
+- Modify: `docs/archive/maintainability/phases/session-lifecycle-alignment-evaluation.md`
 - Reference: `PRODUCT.md`
 - Reference: `DESIGN.md`
 - Reference: `.codex/skills/impeccable/SKILL.md`
@@ -279,7 +279,7 @@ OpenCodian 是 product-register UI：优先 Obsidian-native、紧凑、状态清
 Run:
 
 ```bash
-rg -n "UI / layout / style guard|impeccable|Obsidian-native" docs/status/session-lifecycle-alignment-evaluation.md
+rg -n "UI / layout / style guard|impeccable|Obsidian-native" docs/archive/maintainability/phases/session-lifecycle-alignment-evaluation.md
 ```
 
 Expected: Output includes the new guard subsection and mentions `$impeccable`.
@@ -287,14 +287,14 @@ Expected: Output includes the new guard subsection and mentions `$impeccable`.
 ## Task 5: Self-Review, Commit, And Prepare External Review
 
 **Files:**
-- Modify: `docs/status/session-lifecycle-alignment-evaluation.md`
+- Modify: `docs/archive/maintainability/phases/session-lifecycle-alignment-evaluation.md`
 
 - [ ] **Step 1: Run report self-review searches**
 
 Run:
 
 ```bash
-rg -n "2025-05-10|源码级全量审计 \\+ 多模型|所有 Council 成员|一致同意|多数同意|T""BD|T""ODO|implement"" later|place""holder" docs/status/session-lifecycle-alignment-evaluation.md
+rg -n "2025-05-10|源码级全量审计 \\+ 多模型|所有 Council 成员|一致同意|多数同意|T""BD|T""ODO|implement"" later|place""holder" docs/archive/maintainability/phases/session-lifecycle-alignment-evaluation.md
 ```
 
 Expected: No output.
@@ -304,7 +304,7 @@ Expected: No output.
 Run:
 
 ```bash
-git diff --no-index -- /dev/null docs/status/session-lifecycle-alignment-evaluation.md || true
+git diff --no-index -- /dev/null docs/archive/maintainability/phases/session-lifecycle-alignment-evaluation.md || true
 ```
 
 Expected: Diff output shows the full report as an added file and its content matches this plan's report-baseline scope. The `|| true` is intentional because `git diff --no-index` exits with `1` when differences exist.
@@ -324,7 +324,7 @@ Expected: No output.
 Run:
 
 ```bash
-git add docs/status/session-lifecycle-alignment-evaluation.md
+git add docs/archive/maintainability/phases/session-lifecycle-alignment-evaluation.md
 ```
 
 Expected: Command succeeds with no output.
@@ -337,7 +337,7 @@ Run:
 git commit -m "docs: correct session lifecycle audit baseline"
 ```
 
-Expected: Commit succeeds and mentions only `docs/status/session-lifecycle-alignment-evaluation.md`.
+Expected: Commit succeeds and mentions only `docs/archive/maintainability/phases/session-lifecycle-alignment-evaluation.md`.
 
 - [ ] **Step 6: Prepare the opencode Council review prompt**
 
@@ -347,7 +347,7 @@ Use this exact prompt for the external review gate:
 请作为 Council 审查者审查当前 OpenCodian 工作区的会话生命周期报告基线修订。
 
 目标文件：
-- docs/status/session-lifecycle-alignment-evaluation.md
+- docs/archive/maintainability/phases/session-lifecycle-alignment-evaluation.md
 - docs/superpowers/specs/2026-05-10-session-lifecycle-report-baseline-design.md
 - docs/superpowers/plans/2026-05-10-session-lifecycle-report-baseline.md
 
@@ -372,7 +372,7 @@ Expected: The prompt is ready for `opencode run --dir "/Volumes/SDD2T/obsidian-v
 ## Task 6: Post-Review Acceptance
 
 **Files:**
-- Modify only if Council review fails: `docs/status/session-lifecycle-alignment-evaluation.md`
+- Modify only if Council review fails: `docs/archive/maintainability/phases/session-lifecycle-alignment-evaluation.md`
 
 - [ ] **Step 1: If Council verdict is pass, hand off to acceptance**
 
@@ -380,14 +380,14 @@ Expected: The validator checks the committed report, `git status --short --branc
 
 - [ ] **Step 2: If Council verdict is fail, apply only blocking report fixes**
 
-For each blocking issue, edit only `docs/status/session-lifecycle-alignment-evaluation.md`. Do not expand scope into runtime code.
+For each blocking issue, edit only `docs/archive/maintainability/phases/session-lifecycle-alignment-evaluation.md`. Do not expand scope into runtime code.
 
 - [ ] **Step 3: Re-run self-review after any blocking fixes**
 
 Run:
 
 ```bash
-rg -n "2025-05-10|源码级全量审计 \\+ 多模型|所有 Council 成员|一致同意|多数同意|T""BD|T""ODO|implement"" later|place""holder" docs/status/session-lifecycle-alignment-evaluation.md
+rg -n "2025-05-10|源码级全量审计 \\+ 多模型|所有 Council 成员|一致同意|多数同意|T""BD|T""ODO|implement"" later|place""holder" docs/archive/maintainability/phases/session-lifecycle-alignment-evaluation.md
 ```
 
 Expected: No output.
@@ -397,7 +397,7 @@ Expected: No output.
 Run:
 
 ```bash
-git add docs/status/session-lifecycle-alignment-evaluation.md
+git add docs/archive/maintainability/phases/session-lifecycle-alignment-evaluation.md
 git commit -m "docs: address session lifecycle audit review"
 ```
 
@@ -414,4 +414,4 @@ Expected: External review returns `verdict: pass`.
 - Spec coverage: Tasks cover report date/baseline, unsupported Council claims, source evidence, canonical-first nuance, roadmap priority, impeccable UI guard, self-review, commit, and external review.
 - Unfinished-marker scan: The plan should not leave vague or unbounded implementation steps.
 - Type consistency: This plan is docs-only and introduces no TypeScript types, methods, or properties.
-- Scope check: Runtime implementation is explicitly excluded. The only implementation target is `docs/status/session-lifecycle-alignment-evaluation.md`.
+- Scope check: Runtime implementation is explicitly excluded. The only implementation target is `docs/archive/maintainability/phases/session-lifecycle-alignment-evaluation.md`.

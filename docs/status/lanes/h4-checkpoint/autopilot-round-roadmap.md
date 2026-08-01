@@ -6,7 +6,7 @@
 
 - **Goal**: Re-measure the hotspot files, verify that earlier rounds produced real ownership shrinkage, and remove only residual thin seams that block a clean checkpoint.
 - **Key files**:
-  - `docs/status/autopilot-master-plan.md`
+  - `docs/archive/maintainability/autopilot/autopilot-master-plan.md`
   - recent lane phase docs
   - any small residual seam files created by earlier rounds
   - matching module docs if boundaries change
@@ -19,8 +19,8 @@
 
 - **Goal**: Leave the branch in a resumable, evidence-backed checkpoint state with no fabricated backlog and no stale `[NEXT]` item left behind.
 - **Key files**:
-  - `docs/status/autopilot-master-plan.md`
-  - `docs/status/autopilot-lane-map.md`
+  - `docs/archive/maintainability/autopilot/autopilot-master-plan.md`
+  - `docs/archive/maintainability/autopilot/autopilot-lane-map.md`
   - latest phase docs
 - **Acceptance**:
   - The queue can safely stop with explicit residual hotspots, validation evidence, and future manual-entry guidance.

@@ -26,7 +26,7 @@
   - Extend the CSS contract so it preserves both tabbed flat blocks and classic section panels.
 - Modify: `docs/modules/style/modals/config-editor-modal.md`
   - Document the classic-mode repair.
-- Create after validation: `docs/status/settings-classic-catalog-hierarchy-repair-visual-qa-2026-05-12.md`
+- Create after validation: `docs/archive/maintainability/phases/settings-classic-catalog-hierarchy-repair-visual-qa-2026-05-12.md`
   - Record verification and autodebug evidence.
 - Generated: `styles.css`
 

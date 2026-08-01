@@ -12,7 +12,7 @@
 
 ## Scope Check
 
-This plan implements the Council Tier 2 items from `docs/status/session-lifecycle-council-review-2026-05-10.md`:
+This plan implements the Council Tier 2 items from `docs/archive/maintainability/phases/session-lifecycle-council-review-2026-05-10.md`:
 
 - Obsidian-adapted LRU full-message cache: metadata index plus pinned full conversations plus bounded unpinned full-message retention.
 - Canonical session map eviction API: explicit local deletion for `OpenCodeSessionStateStore.sessions` and associated diff entries.
@@ -47,7 +47,7 @@ This plan does not remove all runtime reads from `Conversation.messages`; that i
   - Create `docs/modules/core/storage/ConversationFullMessageCache.md`
   - Update `docs/modules/core/storage/StorageService.md`
   - Update `docs/modules/features/chat/OpenCodianView.md`
-  - Append a Tier 2 plan link to `docs/status/session-lifecycle-council-review-2026-05-10.md`
+  - Append a Tier 2 plan link to `docs/archive/maintainability/phases/session-lifecycle-council-review-2026-05-10.md`
 - Generated:
   - `graphify-out/**`
 
@@ -1022,7 +1022,7 @@ git commit -m "refactor: pin open tab conversations in message cache"
 **Files:**
 - Modify: `docs/modules/core/storage/StorageService.md`
 - Modify: `docs/modules/features/chat/OpenCodianView.md`
-- Modify: `docs/status/session-lifecycle-council-review-2026-05-10.md`
+- Modify: `docs/archive/maintainability/phases/session-lifecycle-council-review-2026-05-10.md`
 - Generated: `graphify-out/**`
 
 - [ ] **Step 1: Update `StorageService` module docs**
@@ -1049,7 +1049,7 @@ In `docs/modules/features/chat/OpenCodianView.md`, add this paragraph near the t
 
 - [ ] **Step 3: Link the Council review to this Tier 2 plan**
 
-In `docs/status/session-lifecycle-council-review-2026-05-10.md`, update the existing Tier 1 implementation-plan section so it includes both plans:
+In `docs/archive/maintainability/phases/session-lifecycle-council-review-2026-05-10.md`, update the existing Tier 1 implementation-plan section so it includes both plans:
 
 ```markdown
 本审查的 Tier 1 收敛已落到实施计划：`docs/superpowers/plans/2026-05-10-session-lifecycle-tier1-convergence.md`。
@@ -1117,7 +1117,7 @@ Expected: `rg` prints one or more matches for the same non-empty `BUILD_ID`.
 - [ ] **Step 8: Commit Task 5**
 
 ```bash
-git add docs/modules/core/storage/StorageService.md docs/modules/features/chat/OpenCodianView.md docs/status/session-lifecycle-council-review-2026-05-10.md graphify-out
+git add docs/modules/core/storage/StorageService.md docs/modules/features/chat/OpenCodianView.md docs/archive/maintainability/phases/session-lifecycle-council-review-2026-05-10.md graphify-out
 git commit -m "docs: record session lifecycle cache eviction"
 ```
 

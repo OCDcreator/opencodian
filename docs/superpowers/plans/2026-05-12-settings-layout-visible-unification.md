@@ -44,7 +44,7 @@ Out of scope:
 - Modify `tests/unit/features/settings/SettingsTabbedRenderer.test.ts`: keep the no-tab-panel tests and add navigation/content-shell marker assertions if missing.
 - Modify `tests/unit/features/settings/OpenCodianSettingsView.test.ts`: confirm editor-area settings mirrors the visible contract.
 - Modify `docs/modules/style/components/settings-layout-contract.md`: document the visible hierarchy slice and forbidden nested-card treatment.
-- Modify `docs/status/settings-layout-foundation-visual-qa-2026-05-12.md` or create a new status note after Obsidian QA: record build id, screenshots, DOM findings, and remaining object-card work.
+- Modify `docs/archive/maintainability/phases/settings-layout-foundation-visual-qa-2026-05-12.md` or create a new status note after Obsidian QA: record build id, screenshots, DOM findings, and remaining object-card work.
 
 ## Design Contract For This Slice
 
@@ -435,7 +435,7 @@ Expected: pass, including the no-side-stripe check.
 
 **Files:**
 - Modify: `docs/modules/style/components/settings-layout-contract.md`
-- Create: `docs/status/settings-layout-visible-unification-visual-qa-2026-05-12.md`
+- Create: `docs/archive/maintainability/phases/settings-layout-visible-unification-visual-qa-2026-05-12.md`
 - Generated: `styles.css`
 - Generated if source changed: `graphify-out/**`
 
@@ -504,7 +504,7 @@ Expected: lint `0 errors / 0 warnings`, typecheck passes, tests pass, production
 - Deploy: `/Volumes/SDD2T/obsidian-vault-write/testvault/.obsidian/plugins/opencodian/manifest.json`
 - Deploy: `/Volumes/SDD2T/obsidian-vault-write/testvault/.obsidian/plugins/opencodian/styles.css`
 - Runtime artifacts: `.obsidian-debug/settings-layout-visible-unification/`
-- Status doc: `docs/status/settings-layout-visible-unification-visual-qa-2026-05-12.md`
+- Status doc: `docs/archive/maintainability/phases/settings-layout-visible-unification-visual-qa-2026-05-12.md`
 
 - [ ] **Step 1: Build production bundle**
 
@@ -624,7 +624,7 @@ Expected: no OpenCodian settings errors.
 
 - [ ] **Step 9: Write the visual QA status note**
 
-Create `docs/status/settings-layout-visible-unification-visual-qa-2026-05-12.md`:
+Create `docs/archive/maintainability/phases/settings-layout-visible-unification-visual-qa-2026-05-12.md`:
 
 ```markdown
 # Settings Layout Visible Unification Visual QA - 2026-05-12
@@ -713,7 +713,7 @@ Expected: no diff, unless a prior committed foundation change already touched do
 Run:
 
 ```bash
-git add src/style/components/settings-layout-contract.css src/style/components/model-selector.css styles.css tests/unit/features/settings/OpenCodianSettings.test.ts tests/unit/features/settings/SettingsTabbedRenderer.test.ts tests/unit/features/settings/OpenCodianSettingsView.test.ts docs/modules/style/components/settings-layout-contract.md docs/status/settings-layout-visible-unification-visual-qa-2026-05-12.md graphify-out
+git add src/style/components/settings-layout-contract.css src/style/components/model-selector.css styles.css tests/unit/features/settings/OpenCodianSettings.test.ts tests/unit/features/settings/SettingsTabbedRenderer.test.ts tests/unit/features/settings/OpenCodianSettingsView.test.ts docs/modules/style/components/settings-layout-contract.md docs/archive/maintainability/phases/settings-layout-visible-unification-visual-qa-2026-05-12.md graphify-out
 git commit -m "style: visibly unify settings layout hierarchy"
 ```
 

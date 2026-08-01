@@ -12,7 +12,7 @@
 
 ## File Structure
 
-- Modify: `docs/status/askquestion-mechanism-alignment-evaluation-2026-05-11.md`
+- Modify: `docs/archive/maintainability/phases/askquestion-mechanism-alignment-evaluation-2026-05-11.md`
   - Responsibility: source-backed status report and calibrated roadmap for AskQuestion alignment.
 - Modify: `src/features/chat/services/QuestionDockCoordinator.ts`
   - Responsibility: above-input question dock pending request lifecycle, waiter queue, draft/selection state, and pending writeback.
@@ -26,14 +26,14 @@
 ## Task 1: Calibrate AskQuestion Status Report
 
 **Files:**
-- Modify: `docs/status/askquestion-mechanism-alignment-evaluation-2026-05-11.md`
+- Modify: `docs/archive/maintainability/phases/askquestion-mechanism-alignment-evaluation-2026-05-11.md`
 
 - [ ] **Step 1: Inspect current factual anchors**
 
 Run:
 
 ```bash
-rg -n "QuestionDockSlotCoordinator|QuestionDockCoordinator|clearPendingQuestionState|POST /question/ask|awaitAnswers|question\\.ask|question\\.list|question\\.reply|question\\.reject" docs/status/askquestion-mechanism-alignment-evaluation-2026-05-11.md src/features/chat/services/QuestionDockCoordinator.ts /Volumes/SDD2T/obsidian-vault-write/open-source-project/AI-tools-agents/opencode/packages/opencode/src/server/routes/instance/httpapi/groups/question.ts /Volumes/SDD2T/obsidian-vault-write/open-source-project/AI-tools-agents/opencode/packages/sdk/js/src/v2/gen/sdk.gen.ts
+rg -n "QuestionDockSlotCoordinator|QuestionDockCoordinator|clearPendingQuestionState|POST /question/ask|awaitAnswers|question\\.ask|question\\.list|question\\.reply|question\\.reject" docs/archive/maintainability/phases/askquestion-mechanism-alignment-evaluation-2026-05-11.md src/features/chat/services/QuestionDockCoordinator.ts /Volumes/SDD2T/obsidian-vault-write/open-source-project/AI-tools-agents/opencode/packages/opencode/src/server/routes/instance/httpapi/groups/question.ts /Volumes/SDD2T/obsidian-vault-write/open-source-project/AI-tools-agents/opencode/packages/sdk/js/src/v2/gen/sdk.gen.ts
 ```
 
 Expected:
@@ -44,7 +44,7 @@ Expected:
 
 - [ ] **Step 2: Patch the owner and upstream-reference claims**
 
-In `docs/status/askquestion-mechanism-alignment-evaluation-2026-05-11.md`, make these exact content changes:
+In `docs/archive/maintainability/phases/askquestion-mechanism-alignment-evaluation-2026-05-11.md`, make these exact content changes:
 
 ```markdown
 **已确认 Bug：**
@@ -75,7 +75,7 @@ Where the roadmap lists P0/P1/P2, ensure this pass is described as:
 Run:
 
 ```bash
-rg -n "QuestionDockSlotCoordinator\\.clearPendingQuestionState|QuestionDockSlotCoordinator.*waiter|QuestionDockSlotCoordinator.*questionRequestWaiters|POST /question/ask.*P0|awaitAnswers.*P0|question.ask.*本轮" docs/status/askquestion-mechanism-alignment-evaluation-2026-05-11.md
+rg -n "QuestionDockSlotCoordinator\\.clearPendingQuestionState|QuestionDockSlotCoordinator.*waiter|QuestionDockSlotCoordinator.*questionRequestWaiters|POST /question/ask.*P0|awaitAnswers.*P0|question.ask.*本轮" docs/archive/maintainability/phases/askquestion-mechanism-alignment-evaluation-2026-05-11.md
 ```
 
 Expected: no output.
@@ -85,7 +85,7 @@ Expected: no output.
 Run:
 
 ```bash
-git diff -- docs/status/askquestion-mechanism-alignment-evaluation-2026-05-11.md
+git diff -- docs/archive/maintainability/phases/askquestion-mechanism-alignment-evaluation-2026-05-11.md
 ```
 
 Expected:
@@ -298,7 +298,7 @@ If full verify fails because of unrelated existing changes, keep the focused evi
 
 **Files:**
 - Stage only files changed by this implementation slice:
-  - `docs/status/askquestion-mechanism-alignment-evaluation-2026-05-11.md`
+  - `docs/archive/maintainability/phases/askquestion-mechanism-alignment-evaluation-2026-05-11.md`
   - `src/features/chat/services/QuestionDockCoordinator.ts`
   - `tests/unit/features/chat/QuestionDockCoordinator.test.ts`
   - `docs/modules/features/chat/services/QuestionDockCoordinator.md`
@@ -310,7 +310,7 @@ If full verify fails because of unrelated existing changes, keep the focused evi
 Run:
 
 ```bash
-git diff -- docs/status/askquestion-mechanism-alignment-evaluation-2026-05-11.md src/features/chat/services/QuestionDockCoordinator.ts tests/unit/features/chat/QuestionDockCoordinator.test.ts docs/modules/features/chat/services/QuestionDockCoordinator.md graphify-out/GRAPH_REPORT.md graphify-out/graph.json
+git diff -- docs/archive/maintainability/phases/askquestion-mechanism-alignment-evaluation-2026-05-11.md src/features/chat/services/QuestionDockCoordinator.ts tests/unit/features/chat/QuestionDockCoordinator.test.ts docs/modules/features/chat/services/QuestionDockCoordinator.md graphify-out/GRAPH_REPORT.md graphify-out/graph.json
 ```
 
 Expected:
@@ -325,7 +325,7 @@ Expected:
 Run:
 
 ```bash
-git add docs/status/askquestion-mechanism-alignment-evaluation-2026-05-11.md src/features/chat/services/QuestionDockCoordinator.ts tests/unit/features/chat/QuestionDockCoordinator.test.ts docs/modules/features/chat/services/QuestionDockCoordinator.md graphify-out/GRAPH_REPORT.md graphify-out/graph.json
+git add docs/archive/maintainability/phases/askquestion-mechanism-alignment-evaluation-2026-05-11.md src/features/chat/services/QuestionDockCoordinator.ts tests/unit/features/chat/QuestionDockCoordinator.test.ts docs/modules/features/chat/services/QuestionDockCoordinator.md graphify-out/GRAPH_REPORT.md graphify-out/graph.json
 ```
 
 Expected:

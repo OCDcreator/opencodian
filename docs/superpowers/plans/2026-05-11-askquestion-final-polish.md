@@ -51,7 +51,7 @@ Expected: if the behavior is already present, the test may pass immediately. In 
 ### Task 3: Council Report And Module Docs
 
 **Files:**
-- Modify: `docs/status/askquestion-mechanism-alignment-evaluation-2026-05-11.md`
+- Modify: `docs/archive/maintainability/phases/askquestion-mechanism-alignment-evaluation-2026-05-11.md`
 - Modify: `docs/modules/features/chat/ui/QuestionDock.md`
 - Modify: `docs/modules/features/chat/runtime/QuestionInlineCardRenderer.md`
 
@@ -82,6 +82,6 @@ npm run verify
 - [ ] **Step 3: Commit**
 
 ```bash
-git add docs/superpowers/specs/2026-05-11-askquestion-final-polish-design.md docs/superpowers/plans/2026-05-11-askquestion-final-polish.md tests/unit/features/chat/QuestionDock.test.ts tests/unit/features/chat/QuestionInlineCardRenderer.test.ts docs/status/askquestion-mechanism-alignment-evaluation-2026-05-11.md docs/modules/features/chat/ui/QuestionDock.md docs/modules/features/chat/runtime/QuestionInlineCardRenderer.md
+git add docs/superpowers/specs/2026-05-11-askquestion-final-polish-design.md docs/superpowers/plans/2026-05-11-askquestion-final-polish.md tests/unit/features/chat/QuestionDock.test.ts tests/unit/features/chat/QuestionInlineCardRenderer.test.ts docs/archive/maintainability/phases/askquestion-mechanism-alignment-evaluation-2026-05-11.md docs/modules/features/chat/ui/QuestionDock.md docs/modules/features/chat/runtime/QuestionInlineCardRenderer.md
 git commit -m "test: document askquestion final polish"
 ```

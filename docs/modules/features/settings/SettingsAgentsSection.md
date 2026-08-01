@@ -109,7 +109,7 @@ owner 会并行读取：
 
 ### Agent management visual hierarchy
 
-Agents section follows the design audit in `docs/status/settings-agents-ui-audit-2026-06-28.md`:
+Agents section follows the design audit in `docs/archive/maintainability/phases/settings-agents-ui-audit-2026-06-28.md`:
 
 - default agent 与 expert mode 是 default surface 内的同级 Card/Form rows；
 - catalog 是 bounded ScrollArea list，agent mode/source/status/visibility 通过 badge strip 承载；

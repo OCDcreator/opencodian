@@ -274,7 +274,7 @@ Expected: all transformer tests pass.
 
 **Files:**
 - Modify: `docs/modules/core/opencode/OpenCodeStreamEventTransformer.md`
-- Modify: `docs/status/askquestion-mechanism-alignment-evaluation-2026-05-11.md`
+- Modify: `docs/archive/maintainability/phases/askquestion-mechanism-alignment-evaluation-2026-05-11.md`
 
 - [ ] **Step 1: Update module docs**
 
@@ -295,7 +295,7 @@ Change the report from a stale gap list to final state:
 Run:
 
 ```bash
-rg -n "键盘导航完全缺失|鼠标操作|缺少 tool-part|后续 tool-part fallback|P1-2|waiter 超时|6\\.7/10|8\\.5/10" docs/status/askquestion-mechanism-alignment-evaluation-2026-05-11.md
+rg -n "键盘导航完全缺失|鼠标操作|缺少 tool-part|后续 tool-part fallback|P1-2|waiter 超时|6\\.7/10|8\\.5/10" docs/archive/maintainability/phases/askquestion-mechanism-alignment-evaluation-2026-05-11.md
 ```
 
 Expected: no stale old-gap claims remain except quoted historical context if explicitly labeled as historical.
@@ -348,7 +348,7 @@ git add \
   src/core/opencode/OpenCodeStreamEventTransformer.ts \
   tests/unit/core/opencode/OpenCodeStreamEventTransformer.streamPartHandlingSuite.ts \
   docs/modules/core/opencode/OpenCodeStreamEventTransformer.md \
-  docs/status/askquestion-mechanism-alignment-evaluation-2026-05-11.md
+  docs/archive/maintainability/phases/askquestion-mechanism-alignment-evaluation-2026-05-11.md
 ```
 
 If graphify root artifacts contain unrelated local dirty work, stage refreshed graph blobs through a clean temporary worktree or `git update-index --cacheinfo` rather than staging the current worktree files blindly.

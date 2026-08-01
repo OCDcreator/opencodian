@@ -2,13 +2,13 @@
 
 ## Context
 
-`docs/status/session-lifecycle-alignment-evaluation.md` is an untracked status report that evaluates OpenCodian's session lifecycle against OpenCode Desktop. The report is useful, but it currently needs to become a trustworthy audit baseline before it drives implementation planning or external review.
+`docs/archive/maintainability/phases/session-lifecycle-alignment-evaluation.md` is an untracked status report that evaluates OpenCodian's session lifecycle against OpenCode Desktop. The report is useful, but it currently needs to become a trustworthy audit baseline before it drives implementation planning or external review.
 
 The current repository state also has local `main` ahead of `origin/main` by five commits. This design intentionally scopes the next work to the report baseline only and avoids touching unrelated commits or runtime code.
 
 ## Goal
 
-Revise `docs/status/session-lifecycle-alignment-evaluation.md` into a factual, source-grounded, externally reviewable audit report that can safely feed the later implementation plan.
+Revise `docs/archive/maintainability/phases/session-lifecycle-alignment-evaluation.md` into a factual, source-grounded, externally reviewable audit report that can safely feed the later implementation plan.
 
 ## Non-Goals
 

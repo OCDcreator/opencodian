@@ -2,7 +2,7 @@
 
 ## Context
 
-`docs/status/askquestion-mechanism-alignment-evaluation-2026-05-11.md` is a Council-style evaluation of OpenCodian's AskQuestion behavior against OpenCode desktop/app behavior. The report is useful, but the current source check found several places where it mixes older upstream PR claims with the current local OpenCode reference and misidentifies at least one OpenCodian owner.
+`docs/archive/maintainability/phases/askquestion-mechanism-alignment-evaluation-2026-05-11.md` is a Council-style evaluation of OpenCodian's AskQuestion behavior against OpenCode desktop/app behavior. The report is useful, but the current source check found several places where it mixes older upstream PR claims with the current local OpenCode reference and misidentifies at least one OpenCodian owner.
 
 The current OpenCodian source still has a confirmed correctness bug: `QuestionDockCoordinator.clearPendingQuestionState()` clears `questionRequestWaiters` without resolving them. A caller waiting in `waitForDockResolutionIfEnabled()` can remain suspended when pending question state is cleared.
 
@@ -40,7 +40,7 @@ Repair the report and immediately implement waiter cleanup, keyboard navigation,
 
 ### Report calibration
 
-Update `docs/status/askquestion-mechanism-alignment-evaluation-2026-05-11.md` so it becomes a source-backed implementation guide:
+Update `docs/archive/maintainability/phases/askquestion-mechanism-alignment-evaluation-2026-05-11.md` so it becomes a source-backed implementation guide:
 
 - Correct the waiter bug location from `QuestionDockSlotCoordinator` to `QuestionDockCoordinator`.
 - Mark `POST /question/ask` and `awaitAnswers` as not applicable to the current local OpenCode reference unless upstream reintroduces those routes.

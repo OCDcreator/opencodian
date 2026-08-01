@@ -212,7 +212,7 @@ No new locale keys are required because the chip displays the raw server name an
 
 **Files:**
 - Modify: `docs/status/codex-sdk-current-state-2026-06-09.md`
-- Modify: `docs/status/checkpoint-15m-codex-sdk-0.139.0-upgrade.md`
+- Modify: `docs/archive/maintainability/phases/checkpoint-15m-codex-sdk-0.139.0-upgrade.md`
 - Modify: `devlog.md`
 - Modify: `docs/modules/utils/streaming/ToolCallRenderer.md` (if exists)
 

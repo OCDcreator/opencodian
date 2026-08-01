@@ -17,8 +17,8 @@
 
 - `AGENTS.md`
 - `docs/superpowers/plans/2026-04-21-opencode-session-message-alignment.md`
-- `docs/status/autopilot-master-plan.md`
-- `docs/status/autopilot-lane-map.md`
+- `docs/archive/maintainability/autopilot/autopilot-master-plan.md`
+- `docs/archive/maintainability/autopilot/autopilot-lane-map.md`
 - `docs/status/lanes/m3-checkpoint/autopilot-round-roadmap.md`
 
 ## Validation Baseline

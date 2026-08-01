@@ -14,7 +14,7 @@
 
 - OpenCodian target: `/Volumes/SDD2T/obsidian-vault-write/custom-project/opencodian`
 - OpenCode reference: `/Volumes/SDD2T/obsidian-vault-write/open-source-project/AI-tools-agents/opencode`
-- Evaluation report: `docs/status/task-subagent-lifecycle-alignment-evaluation-2026-05-11.md`
+- Evaluation report: `docs/archive/maintainability/phases/task-subagent-lifecycle-alignment-evaluation-2026-05-11.md`
 - Reference files:
   - `packages/ui/src/components/message-part.tsx`
   - `packages/opencode/src/tool/task.ts`
@@ -541,7 +541,7 @@ Expected: only stream-trigger files are staged.
 - Modify: `docs/modules/features/chat/services/BackgroundTaskTimelineService.md`
 - Modify: `docs/modules/features/chat/runtime/BackgroundTaskStreamTriggerCoordinator.md`
 - Modify: `graphify-out/**`
-- Read: `docs/status/task-subagent-lifecycle-alignment-evaluation-2026-05-11.md`
+- Read: `docs/archive/maintainability/phases/task-subagent-lifecycle-alignment-evaluation-2026-05-11.md`
 
 - [ ] **Step 1: Update module docs**
 

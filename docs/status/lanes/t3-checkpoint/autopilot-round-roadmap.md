@@ -6,8 +6,8 @@
 
 - **Goal**: Leave the branch in a resumable, evidence-backed checkpoint state after the two planned `ServerManager` seams land.
 - **Key files**:
-  - `docs/status/autopilot-master-plan.md`
-  - `docs/status/autopilot-lane-map.md`
+  - `docs/archive/maintainability/autopilot/autopilot-master-plan.md`
+  - `docs/archive/maintainability/autopilot/autopilot-lane-map.md`
   - latest lane phase docs
 - **Acceptance**:
   - Fresh hotspot evidence for `ServerManager.ts` is recorded.

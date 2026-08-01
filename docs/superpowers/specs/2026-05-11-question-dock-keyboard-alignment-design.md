@@ -2,7 +2,7 @@
 
 ## Context
 
-`docs/status/askquestion-mechanism-alignment-evaluation-2026-05-11.md` identifies keyboard navigation as the largest remaining AskQuestion alignment gap. The previous slice calibrated the report and fixed `QuestionDockCoordinator.clearPendingQuestionState()` waiter cleanup. This round should continue alignment in a small, independently verifiable UX slice.
+`docs/archive/maintainability/phases/askquestion-mechanism-alignment-evaluation-2026-05-11.md` identifies keyboard navigation as the largest remaining AskQuestion alignment gap. The previous slice calibrated the report and fixed `QuestionDockCoordinator.clearPendingQuestionState()` waiter cleanup. This round should continue alignment in a small, independently verifiable UX slice.
 
 `src/features/chat/ui/QuestionDock.ts` owns the above-input question dock DOM. It currently supports mouse interaction through native radio/checkbox changes, custom input typing, tab clicks, submit/next, reject, and close. It does not install dock-level keyboard handling for option navigation, answer selection, submit/next, or reject/close shortcuts.
 

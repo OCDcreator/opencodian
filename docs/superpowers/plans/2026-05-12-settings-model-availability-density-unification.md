@@ -30,7 +30,7 @@
   - Document the Slice 2 contract and guardrails.
 - Modify: `styles.css`
   - Regenerate with `npm run build:css` or `npm run build`.
-- Create: `docs/status/settings-model-availability-density-visual-qa-2026-05-12.md`
+- Create: `docs/archive/maintainability/phases/settings-model-availability-density-visual-qa-2026-05-12.md`
   - Record verification, deploy BUILD_ID, DOM/CSS checks, screenshots, and errors.
 
 ## Task 1: Add CSS Contract Tests First
@@ -288,7 +288,7 @@ Do not commit these screenshots unless explicitly requested.
 
 - [ ] **Step 5: Write visual QA report**
 
-Create `docs/status/settings-model-availability-density-visual-qa-2026-05-12.md` with branch, build ID, deployment path, exact commands, DOM/CSS findings, screenshot paths, error capture, and remaining setting-density debt.
+Create `docs/archive/maintainability/phases/settings-model-availability-density-visual-qa-2026-05-12.md` with branch, build ID, deployment path, exact commands, DOM/CSS findings, screenshot paths, error capture, and remaining setting-density debt.
 
 ## Task 5: Final Diff And Commit
 
@@ -308,7 +308,7 @@ Expected: changes are scoped to model availability CSS/tests/docs/generated CSS 
 Run:
 
 ```bash
-git add src/style/modals/config-editor-modal.css styles.css tests/unit/features/settings/SettingsModelCatalogPresenter.test.ts docs/modules/style/modals/config-editor-modal.md docs/status/settings-model-availability-density-visual-qa-2026-05-12.md docs/superpowers/plans/2026-05-12-settings-model-availability-density-unification.md
+git add src/style/modals/config-editor-modal.css styles.css tests/unit/features/settings/SettingsModelCatalogPresenter.test.ts docs/modules/style/modals/config-editor-modal.md docs/archive/maintainability/phases/settings-model-availability-density-visual-qa-2026-05-12.md docs/superpowers/plans/2026-05-12-settings-model-availability-density-unification.md
 git commit -m "style: unify model availability settings density"
 ```
 

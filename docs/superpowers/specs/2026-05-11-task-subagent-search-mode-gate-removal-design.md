@@ -2,7 +2,7 @@
 
 ## Context
 
-`docs/status/task-subagent-lifecycle-alignment-evaluation-2026-05-11.md` now records the Council finding that OpenCodian's streaming path mostly follows native OpenCode task metadata, while persisted timeline, indicator arming, and live-signal cleanup still treat OMO `search-mode` as the structural background-task gate. That leaves a split behavior: ordinary native OpenCode `task` tool calls can render during active streaming, but reload and live-signal reconstruction are still incomplete when the user anchor has no OMO `search-mode` tag.
+`docs/archive/maintainability/phases/task-subagent-lifecycle-alignment-evaluation-2026-05-11.md` now records the Council finding that OpenCodian's streaming path mostly follows native OpenCode task metadata, while persisted timeline, indicator arming, and live-signal cleanup still treat OMO `search-mode` as the structural background-task gate. That leaves a split behavior: ordinary native OpenCode `task` tool calls can render during active streaming, but reload and live-signal reconstruction are still incomplete when the user anchor has no OMO `search-mode` tag.
 
 The previous committed slice already moved task identity toward `toolMetadata.sessionId` and native `toolStatus`. This design intentionally targets only the remaining P1-P3 search-mode gates from the Council report. It does not merge services or remove OMO compatibility.
 

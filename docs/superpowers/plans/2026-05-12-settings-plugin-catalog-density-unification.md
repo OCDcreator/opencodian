@@ -31,7 +31,7 @@
   - Retune `.opencodian-plugin-block*`, `.opencodian-settings-catalog-scroll`, `.opencodian-agent-editor-*`, `.opencodian-plugin-summary-*`, and `.opencodian-plugin-source-*` to shared settings tokens.
 - Modify: `docs/modules/style/modals/config-editor-modal.md`
   - Document the Agents/Commands/Plugin catalog density guardrail.
-- Create after validation: `docs/status/settings-plugin-catalog-density-visual-qa-2026-05-12.md`
+- Create after validation: `docs/archive/maintainability/phases/settings-plugin-catalog-density-visual-qa-2026-05-12.md`
   - Record build/deploy/autodebug evidence and screenshot paths.
 - Generated/possibly modified: `styles.css`, `graphify-out/*`
   - Refresh with repo scripts if build/graphify reports changes.
@@ -415,7 +415,7 @@ Expected: PASS. Commit generated graph files only if the script changes them.
 ## Task 4: Full Verification, Deployment, And Autodebug
 
 **Files:**
-- Create: `docs/status/settings-plugin-catalog-density-visual-qa-2026-05-12.md`
+- Create: `docs/archive/maintainability/phases/settings-plugin-catalog-density-visual-qa-2026-05-12.md`
 
 - [ ] **Step 1: Run full verify**
 
@@ -462,7 +462,7 @@ Use the Obsidian CLI/autodebug eval-file flow to:
 
 - [ ] **Step 5: Write QA report**
 
-Create `docs/status/settings-plugin-catalog-density-visual-qa-2026-05-12.md` with:
+Create `docs/archive/maintainability/phases/settings-plugin-catalog-density-visual-qa-2026-05-12.md` with:
 
 - branch/worktree/build id;
 - files changed;
@@ -482,7 +482,7 @@ Run:
 ```bash
 git diff --stat
 git diff --check
-git diff -- tests/unit/features/settings/SettingsPluginSection.test.ts src/style/modals/config-editor-modal.css docs/modules/style/modals/config-editor-modal.md docs/status/settings-plugin-catalog-density-visual-qa-2026-05-12.md | sed -n '1,260p'
+git diff -- tests/unit/features/settings/SettingsPluginSection.test.ts src/style/modals/config-editor-modal.css docs/modules/style/modals/config-editor-modal.md docs/archive/maintainability/phases/settings-plugin-catalog-density-visual-qa-2026-05-12.md | sed -n '1,260p'
 ```
 
 Expected: no whitespace errors; diff limited to the planned slice.
@@ -492,7 +492,7 @@ Expected: no whitespace errors; diff limited to the planned slice.
 Run:
 
 ```bash
-git add tests/unit/features/settings/SettingsPluginSection.test.ts src/style/modals/config-editor-modal.css styles.css docs/modules/style/modals/config-editor-modal.md docs/status/settings-plugin-catalog-density-visual-qa-2026-05-12.md docs/superpowers/plans/2026-05-12-settings-plugin-catalog-density-unification.md
+git add tests/unit/features/settings/SettingsPluginSection.test.ts src/style/modals/config-editor-modal.css styles.css docs/modules/style/modals/config-editor-modal.md docs/archive/maintainability/phases/settings-plugin-catalog-density-visual-qa-2026-05-12.md docs/superpowers/plans/2026-05-12-settings-plugin-catalog-density-unification.md
 git commit -m "style: unify plugin catalog settings density"
 ```
 

@@ -2,7 +2,7 @@
 
 ## Context
 
-`docs/status/task-subagent-lifecycle-alignment-evaluation-2026-05-11.md` records the third Council review after commit `8f2e84eb`. Lifecycle correctness is no longer the blocker: native OpenCode `task` blocks now use `toolStatus`, `toolMetadata.sessionId`, and ordinary user-message anchors without functional `search-mode` gates.
+`docs/archive/maintainability/phases/task-subagent-lifecycle-alignment-evaluation-2026-05-11.md` records the third Council review after commit `8f2e84eb`. Lifecycle correctness is no longer the blocker: native OpenCode `task` blocks now use `toolStatus`, `toolMetadata.sessionId`, and ordinary user-message anchors without functional `search-mode` gates.
 
 The remaining gap is architectural weight. OpenCodian keeps useful behavior that OpenCode Desktop does not have, including inline background-task panels, stale-task warnings, per-tab isolation, and persisted completion notices. The optimization should keep those behaviors while removing small delegation-only services, narrowing OMO compatibility, and reducing the background sync service surface.
 

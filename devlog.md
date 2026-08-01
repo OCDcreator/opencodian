@@ -11,6 +11,19 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-08-01 Agent-Friendly Architecture 试点：归档历史可维护性 phase/autopilot 文档（Phase 6 Task 19）
+
+Phase 6 Task 19 把 pre-Phase-6 的历史可维护性文档移出默认 agent 阅读链，移入 `docs/archive/maintainability/`。本次为 docs-only 归档，**未改动**任何 src/test/manifest/package.json/architecture-owners.config.json/graphify-out/automation。验收目标："there is one active architecture roadmap; agents are not instructed to read hundreds of phase documents."
+
+- **移动内容（`git mv`，历史完整保留）**：
+  - `docs/archive/maintainability/phases/`：501 份编号 `maintainability-phase-N.md`、model-config-maintainability phase、checkpoint 执行包/审查、`*-audit-*`/`*-evaluation-*`/`*-alignment-*` 一次性证据、settings density visual-QA、session-lifecycle council/Tier5 inventory 等，共约 590 份。
+  - `docs/archive/maintainability/autopilot/`：13 份 autopilot 控制/master/lane/round 文档（`maintainability-master-plan`/`-round-roadmap`/`-lane-map`/`-completed-batches`、`autopilot-master-plan`/`-lane-map`、各 lane 的 master-plan/lane-map、`model-config-maintainability-*`）。
+- **新建 `docs/archive/maintainability/index.md`**：说明归档原因、被 active roadmap（`docs/superpowers/plans/2026-07-30-…refactor.md` + `docs/architecture/README.md`）取代、git 历史保留（`git log --follow`）、按类目索引、明确不在默认阅读链。
+- **死链修复**：全仓库扫描对已移动路径的引用（排除 `docs/archive/`、`automation/`），逐一更新为新归档路径——涉及 `devlog.md` 历史条目、`docs/status/lanes/**`、`docs/superpowers/plans/2026-05-*` 历史计划、`docs/modules/features/settings/*`、`docs/status/codex-sdk-current-state-*` 等。**零 unresolved 死链**（唯一保留引用是父计划 §46 的 dated evidence baseline 快照，属历史证据而非阅读链指令）。
+- **阅读链更新**：`docs/README.md` 删除"也放 maintainability-phase-N"等历史 phase 阅读建议，改为指向归档索引；并更正"`docs/superpowers/` 已删除"的陈旧声明（该目录存在、存放 active plan + specs）。`AGENTS.md` 经核查不引用任何已移动路径，无需改动。
+- **范围判断（保留）**：`docs/status/lanes/`（73 份 autopilot lane phase）**保留原位 + 仅做死链修复**——它们被 `automation/*autopilot-config.json`（paused 但仍存在的 runtime 配置）与 openspec changes 引用，移动会破坏 automation config，超出 docs-only 归档范围。
+- **门禁**：`npm run verify:architecture` 5/5 PASS；`npm run check:module-docs` 588/588；`npm run check:graphify` 通过；`npm run check:devlog-order` 510 sections；`docs/status/` 文件数从 641 降到 38（保留 live 的 sdk-v2-rollout/manual-checklist、development-maintainability-rules、current-state/capability 文档等）。本次不涉及 build/Test Vault deploy（纯 docs）。
+
 ## 2026-08-01 Agent-Friendly Architecture 试点：OpenCodeService convergence inventory（Phase 5 Task 17）
 
 Phase 5 Task 17 的 dated child plan 已完成：`docs/superpowers/plans/2026-08-01-opencode-service-convergence.md`。本次为 discovery/inventory 提交，**未授权任何实现切片**，也未改动 production/source、test、manifest、barrel、generated-graph 或 approval 状态。
@@ -779,7 +792,7 @@ Narrow lane: re-challenge `webSearchMode` three-state runtime distinction (`disa
 |------|--------|
 | `src/i18n/locales/en.ts` | Modified: `settings.codex.webSearch.desc` + `chat.sessionSettings.modal.codexWebSearchModeDesc` |
 | `src/i18n/locales/zh.ts` | Modified: same two keys |
-| `docs/status/checkpoint-15v-codex-websearchmode-cached-live-rechallenge.md` | Created |
+| `docs/archive/maintainability/phases/checkpoint-15v-codex-websearchmode-cached-live-rechallenge.md` | Created |
 | `docs/status/codex-sdk-current-state-2026-06-09.md` | Updated: header + §1.2 `settings-only` webSearchMode entries |
 | `devlog.md` | Updated: this entry |
 
@@ -2189,7 +2202,7 @@ Smallest honest richer-chat MCP rendering step after Checkpoint 15N: surface the
 - `tests/unit/utils/streaming/ToolCallRenderer.test.ts` — added tests for MCP server chip header, non-MCP suppression, and expanded `Server:` detail.
 - `docs/modules/utils/streaming/ToolCallRenderer.md` — documented MCP server chip behavior.
 - `docs/status/codex-sdk-current-state-2026-06-09.md` — updated `已 pass` and `未接入` MCP wording.
-- `docs/status/checkpoint-15m-codex-sdk-0.139.0-upgrade.md` — updated MCP transcript/未接入 wording.
+- `docs/archive/maintainability/phases/checkpoint-15m-codex-sdk-0.139.0-upgrade.md` — updated MCP transcript/未接入 wording.
 - `devlog.md` — inserted this entry and cleaned stale 1917/1910 references in Round 2 entry.
 - `docs/superpowers/plans/2026-06-12-codex-mcp-server-chat-chip.md` — implementation plan for this batch.
 
@@ -2224,7 +2237,7 @@ Productize the smallest honest Codex MCP settings surface: settings-side MCP ser
 - **Adapter passthrough** — `CodexAdapter` exposes `getMcpServerStatus()` and `reloadMcpServers()`, returning `null`/`false` gracefully when the app-server client is unavailable or the request fails.
 - **Chat MCP rendering re-audit** — The existing visible `mcp_tool_call` transcript seam remains `已 pass`; it renders a generic MCP tool block via `ToolCallRenderer`. Richer chat MCP schema rendering (per-server badges, tool description/schema expansion, auth-status chips inside the transcript) is classified `未接入`.
 - **Truth bucket update** — Codex MCP settings surface moves from `未接入` to `readback`. Richer chat MCP schema rendering stays `未接入`. Codex-as-MCP-server integration stays `未接入`.
-- **Stale evidence references fixed** — Replaced stale Round 2/15M `BUILD_ID 1917/1910` artifact paths in `docs/status/codex-sdk-current-state-2026-06-09.md` and `docs/status/checkpoint-15m-codex-sdk-0.139.0-upgrade.md` with the drift-fix build (`feature-codex-sdk-capability.202606122043`) artifacts.
+- **Stale evidence references fixed** — Replaced stale Round 2/15M `BUILD_ID 1917/1910` artifact paths in `docs/status/codex-sdk-current-state-2026-06-09.md` and `docs/archive/maintainability/phases/checkpoint-15m-codex-sdk-0.139.0-upgrade.md` with the drift-fix build (`feature-codex-sdk-capability.202606122043`) artifacts.
 
 ### Files Changed
 
@@ -2241,7 +2254,7 @@ Productize the smallest honest Codex MCP settings surface: settings-side MCP ser
 - `docs/modules/features/settings/SettingsCodexSection.md` — documented MCP readback row and status.
 - `docs/modules/i18n/locales/en.md` / `zh.md` — recorded new locale keys.
 - `docs/status/codex-sdk-current-state-2026-06-09.md` — updated honest buckets and stale evidence references.
-- `docs/status/checkpoint-15m-codex-sdk-0.139.0-upgrade.md` — fixed stale Round 2 artifact paths.
+- `docs/archive/maintainability/phases/checkpoint-15m-codex-sdk-0.139.0-upgrade.md` — fixed stale Round 2 artifact paths.
 - `devlog.md` (this entry).
 
 ### Verification
@@ -2356,7 +2369,7 @@ Execute the smallest productizable batch after the 0.139.0 audit: replace the fr
 - `src/i18n/locales/en.ts`, `src/i18n/locales/zh.ts` — model selector lifecycle copy and session override descriptions.
 - `tests/unit/core/agents/backend/CodexAppServerClient.modelList.test.ts` (created), `tests/unit/CodexAdapter.app-server.test.ts`, `tests/unit/features/settings/SettingsCodexSection.modelSelector.test.ts` (created), `tests/unit/features/chat/ConversationSessionSettingsModal.codex.model.test.ts`, `tests/unit/features/chat/ConversationSessionSettingsCoordinator.codex.test.ts`.
 - `docs/status/codex-sdk-current-state-2026-06-09.md` (updated)
-- `docs/status/checkpoint-15m-codex-sdk-0.139.0-upgrade.md` (updated)
+- `docs/archive/maintainability/phases/checkpoint-15m-codex-sdk-0.139.0-upgrade.md` (updated)
 - `devlog.md` (this entry)
 
 ### Truth Bucket Updates
@@ -2405,7 +2418,7 @@ Upgrade `@openai/codex-sdk` from `0.137.0` to `0.139.0`, sync lockfile and bundl
 
 - `package.json`
 - `package-lock.json`
-- `docs/status/checkpoint-15m-codex-sdk-0.139.0-upgrade.md` (created)
+- `docs/archive/maintainability/phases/checkpoint-15m-codex-sdk-0.139.0-upgrade.md` (created)
 - `docs/status/codex-sdk-current-state-2026-06-09.md` (updated)
 - `devlog.md` (this entry)
 
@@ -2442,7 +2455,7 @@ This proves the runtime `disabled` vs `enabled` (`cached`/`live`) boundary. Howe
 
 ### Files Changed
 
-- `docs/status/checkpoint-15k-codex-websearchmode-bundled-runtime-audit.md` (created)
+- `docs/archive/maintainability/phases/checkpoint-15k-codex-websearchmode-bundled-runtime-audit.md` (created)
 - `docs/status/codex-sdk-current-state-2026-06-09.md` (updated)
 - `devlog.md` (this entry)
 
@@ -2690,7 +2703,7 @@ Two small runtime fixes were required to make the app-server client work inside 
 - `scripts/codex-sdk-dist.mjs`
 - `docs/modules/core/agents/backend/CodexAppServerClient.md`
 - `docs/status/codex-sdk-current-state-2026-06-09.md`
-- `docs/status/checkpoint-14i-codex-persisted-session-row-runtime-proof.md`
+- `docs/archive/maintainability/phases/checkpoint-14i-codex-persisted-session-row-runtime-proof.md`
 - `scripts/check-codex-threads.mjs` (local diagnostic helper)
 
 ---
@@ -2735,7 +2748,7 @@ Wire `CodexAppServerClient` into `CodexAdapter` as an adjunct client (best-effor
 - `tests/unit/CodexAdapter.app-server.test.ts` (created)
 - `docs/modules/core/agents/backend/CodexAdapter.md`
 - `docs/status/codex-sdk-current-state-2026-06-09.md`
-- `docs/status/checkpoint-14h-codex-app-server-session-discovery.md` (created)
+- `docs/archive/maintainability/phases/checkpoint-14h-codex-app-server-session-discovery.md` (created)
 
 ---
 
@@ -2773,7 +2786,7 @@ Add the smallest honest bridge: plugin exposes `createConversationFromBackendSes
 - `docs/modules/features/chat/runtime/LocalStreamMessagePersistence.md`
 - `docs/modules/features/chat/services/ConversationLoadRecoveryCoordinator.md`
 - `docs/status/codex-sdk-current-state-2026-06-09.md`
-- `docs/status/checkpoint-13e-codex-settings-resume.md` (created)
+- `docs/archive/maintainability/phases/checkpoint-13e-codex-settings-resume.md` (created)
 
 ---
 
@@ -2802,7 +2815,7 @@ No stable ordinary surface is justified because:
 4. `networkAccessEnabled` already provides broader network access control
 
 ### Files Changed
-- `docs/status/checkpoint-13d-codex-websearchmode-truth.md` (created)
+- `docs/archive/maintainability/phases/checkpoint-13d-codex-websearchmode-truth.md` (created)
 - `docs/status/codex-sdk-current-state-2026-06-09.md` (updated audit scope and rationale)
 - `devlog.md` (this entry)
 
@@ -2869,7 +2882,7 @@ Productize the smallest truthful subset of already-wired Codex runtime settings 
 - Left `webSearchMode` out of the ordinary settings UI because `cached` vs `live` differentiation is not yet runtime-proven
 - Added +5 adapter tests and +4 settings-section tests (RED→GREEN)
 - Updated module docs for `CodexAdapter` and `SettingsCodexSection`
-- Added `docs/status/checkpoint-10a-codex-runtime-settings-truth-split.md`
+- Added `docs/archive/maintainability/phases/checkpoint-10a-codex-runtime-settings-truth-split.md`
 - Updated `docs/status/codex-sdk-current-state-2026-06-09.md` truth buckets
 
 ### Verify
@@ -13236,7 +13249,7 @@ Added the top-level Formatter settings page with two secondary views (overview, 
 - `docs/modules/features/chat/runtime/*.md`
 - `docs/modules/features/chat/OpenCodianView.md`
 - `docs/modules/README.md`
-- `docs/status/maintainability-phase-7.md`
+- `docs/archive/maintainability/phases/maintainability-phase-7.md`
 - `docs/README.md`
   - 补齐发送 runtime 子目录文档
   - 新增第七阶段总结与第八阶段实施说明文档
@@ -13274,7 +13287,7 @@ Added the top-level Formatter settings page with two secondary views (overview, 
 - `tests/unit/features/chat/modelSelectorDisplay.test.ts`
   - 新增 model selector 单测，覆盖 loading / empty state、provider 分组渲染、sticky-header cleanup 重绑、键盘高亮、选中当前高亮项、滚动当前模型到可见区域，以及 trigger display state 推导
 
-- `docs/status/maintainability-phase-3.md`
+- `docs/archive/maintainability/phases/maintainability-phase-3.md`
 - `docs/modules/features/chat/OpenCodianView.md`
 - `docs/modules/features/chat/ui/modelSelector/*.md`
 - `docs/modules/README.md`
@@ -13315,7 +13328,7 @@ Added the top-level Formatter settings page with two secondary views (overview, 
 
 - `docs/modules/features/chat/OpenCodianView.md`
 - `docs/modules/features/chat/services/ConversationViewStateService.md`
-- `docs/status/maintainability-phase-2.md`
+- `docs/archive/maintainability/phases/maintainability-phase-2.md`
   - 更新 `OpenCodianView` 模块文档，说明 tab / conversation 装载编排已迁出
   - 新增 `ConversationViewStateService` 模块文档
   - 新增第二阶段总结与第三阶段实施说明，并在文末附上可直接复制的新会话提示词
@@ -13360,7 +13373,7 @@ Added the top-level Formatter settings page with two secondary views (overview, 
   - 补充 blocklist、滚动恢复、sticky header、persisted tab restore 和 `ModelConfigModal` 的关键单测
   - 补齐测试环境里的 Obsidian DOM 扩展 shim：`hasClass` / `appendText`
 
-- `docs/status/maintainability-phase-1.md`
+- `docs/archive/maintainability/phases/maintainability-phase-1.md`
 - `docs/README.md`
 - `AGENTS.md`
 - `docs/modules/**`

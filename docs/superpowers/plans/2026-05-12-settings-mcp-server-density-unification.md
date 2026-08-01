@@ -29,7 +29,7 @@
   - Keep existing responsive behavior, badge semantics, and action layout.
 - Modify: `docs/modules/style/modals/config-editor-modal.md`
   - Document the Slice 3 guardrail so future edits do not reintroduce local MCP card families.
-- Create: `docs/status/settings-mcp-server-density-visual-qa-2026-05-12.md`
+- Create: `docs/archive/maintainability/phases/settings-mcp-server-density-visual-qa-2026-05-12.md`
   - Record build/deploy/autodebug evidence and screenshot paths after validation.
 - Generated/possibly modified: `styles.css`, `graphify-out/*`
   - Refresh with repo scripts only if build/graphify reports changes.
@@ -296,7 +296,7 @@ Expected: Test Vault `main.js` contains the same newest build id as `dist/main.j
 
 **Files:**
 - Create runtime-only artifacts under `.obsidian-debug/settings-mcp-server-density/`
-- Create: `docs/status/settings-mcp-server-density-visual-qa-2026-05-12.md`
+- Create: `docs/archive/maintainability/phases/settings-mcp-server-density-visual-qa-2026-05-12.md`
 
 - [ ] **Step 1: Attach debug surface and reload plugin**
 
@@ -375,7 +375,7 @@ Expected: no captured errors.
 
 - [ ] **Step 6: Write QA report**
 
-`docs/status/settings-mcp-server-density-visual-qa-2026-05-12.md` must include:
+`docs/archive/maintainability/phases/settings-mcp-server-density-visual-qa-2026-05-12.md` must include:
 
 - branch and worktree path;
 - deployed build id;
@@ -397,7 +397,7 @@ Run:
 
 ```bash
 git diff --cached --stat
-git diff --cached -- tests/unit/features/settings/SettingsMcpSection.test.ts src/style/modals/config-editor-modal.css docs/modules/style/modals/config-editor-modal.md docs/status/settings-mcp-server-density-visual-qa-2026-05-12.md
+git diff --cached -- tests/unit/features/settings/SettingsMcpSection.test.ts src/style/modals/config-editor-modal.css docs/modules/style/modals/config-editor-modal.md docs/archive/maintainability/phases/settings-mcp-server-density-visual-qa-2026-05-12.md
 ```
 
 - [ ] **Step 2: Commit**

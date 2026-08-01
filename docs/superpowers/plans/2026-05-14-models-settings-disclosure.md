@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Make the Models settings page fully disclose the OpenCode model/provider capabilities identified in `docs/status/models-settings-audit-2026-05-14.md`.
+**Goal:** Make the Models settings page fully disclose the OpenCode model/provider capabilities identified in `docs/archive/maintainability/phases/models-settings-audit-2026-05-14.md`.
 
 **Architecture:** Keep section ownership intact. `SettingsModelSection` adds the Common-tab entry point, `SettingsModelCatalogCoordinator` owns local `.opencode` writes for `small_model`, and the model workspace editor gets a focused structured-options helper while retaining raw key/value escape hatches.
 
@@ -42,7 +42,7 @@
 - Create: `docs/modules/features/settings/modelConfigStructuredOptions.md`
 - Modify: `docs/modules/features/settings/SettingsModelSection.md`
 - Modify: `docs/modules/features/settings/ModelConfigModal.md`
-- Modify: `docs/status/models-settings-audit-2026-05-14.md`
+- Modify: `docs/archive/maintainability/phases/models-settings-audit-2026-05-14.md`
 
 - [x] Update module docs and the audit report final status.
 - [x] Run focused tests, module-doc guard, build.

@@ -113,4 +113,4 @@ The checkpoint lane now has fresh hotspot evidence and one less residual thin se
 
 ## Next Recommended Slice
 
-Execute only `h4-checkpoint` Task 2: write the final checkpoint summary and stop the queue cleanly. Start from `docs/status/autopilot-master-plan.md`, `docs/status/autopilot-lane-map.md`, and the H1-H4 phase docs; avoid new code changes unless a final checkpoint cleanup strictly requires them.
+Execute only `h4-checkpoint` Task 2: write the final checkpoint summary and stop the queue cleanly. Start from `docs/archive/maintainability/autopilot/autopilot-master-plan.md`, `docs/archive/maintainability/autopilot/autopilot-lane-map.md`, and the H1-H4 phase docs; avoid new code changes unless a final checkpoint cleanup strictly requires them.

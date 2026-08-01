@@ -60,7 +60,7 @@ Those items need a separate storage/cache plan after this one lands because thei
   - `docs/modules/features/chat/services/TabSessionPhase.md`
   - Create `docs/modules/features/chat/services/TabSessionLifecycleState.md`
   - Create `docs/modules/features/chat/services/ConversationWriteSerializationService.md`
-  - Refresh `docs/status/session-lifecycle-council-review-2026-05-10.md` with an implementation-plan link only if this plan is committed in the same branch.
+  - Refresh `docs/archive/maintainability/phases/session-lifecycle-council-review-2026-05-10.md` with an implementation-plan link only if this plan is committed in the same branch.
 
 ## Task 1: Add The Pure Writable Lifecycle State Machine
 
@@ -1262,7 +1262,7 @@ git commit -m "refactor: serialize conversation message writes"
 - Create: `docs/modules/features/chat/services/ConversationWriteSerializationService.md`
 - Modify: `docs/modules/features/chat/services/TabSessionPhase.md`
 - Modify: `docs/modules/features/chat/services/ConversationSyncRuntimeCoordinator.md`
-- Modify: `docs/status/session-lifecycle-council-review-2026-05-10.md`
+- Modify: `docs/archive/maintainability/phases/session-lifecycle-council-review-2026-05-10.md`
 - Generated: `graphify-out/**`
 
 - [ ] **Step 1: Create module doc for `TabSessionLifecycleState`**
@@ -1392,7 +1392,7 @@ Update `docs/modules/features/chat/services/ConversationSyncRuntimeCoordinator.m
 
 - [ ] **Step 4: Link the council review to this plan**
 
-Append to `docs/status/session-lifecycle-council-review-2026-05-10.md` before the final status note:
+Append to `docs/archive/maintainability/phases/session-lifecycle-council-review-2026-05-10.md` before the final status note:
 
 ```markdown
 ## 10. 实施计划
@@ -1443,7 +1443,7 @@ Expected: PASS with lint reporting `0 errors / 0 warnings`.
 - [ ] **Step 8: Commit Task 5**
 
 ```bash
-git add docs/modules/features/chat/services/TabSessionLifecycleState.md docs/modules/features/chat/services/ConversationWriteSerializationService.md docs/modules/features/chat/services/TabSessionPhase.md docs/modules/features/chat/services/ConversationSyncRuntimeCoordinator.md docs/status/session-lifecycle-council-review-2026-05-10.md graphify-out
+git add docs/modules/features/chat/services/TabSessionLifecycleState.md docs/modules/features/chat/services/ConversationWriteSerializationService.md docs/modules/features/chat/services/TabSessionPhase.md docs/modules/features/chat/services/ConversationSyncRuntimeCoordinator.md docs/archive/maintainability/phases/session-lifecycle-council-review-2026-05-10.md graphify-out
 git commit -m "docs: record session lifecycle tier1 convergence"
 ```
 

@@ -22,7 +22,7 @@
 
 ## File Structure
 
-- Create: `docs/status/settings-layout-regression-audit-2026-05-12.md`
+- Create: `docs/archive/maintainability/phases/settings-layout-regression-audit-2026-05-12.md`
   - Documents the audit matrix, findings, and final hierarchy rules.
 - Modify: `docs/modules/style/components/settings-layout-contract.md`
   - Adds a reusable hierarchy taxonomy: nav, section, classic child panel, object, row, inline.
@@ -81,7 +81,7 @@ Expected: FAIL because `Mode-Aware Hierarchy Taxonomy` does not exist yet.
 
 **Files:**
 - Modify: `docs/modules/style/components/settings-layout-contract.md`
-- Create: `docs/status/settings-layout-regression-audit-2026-05-12.md`
+- Create: `docs/archive/maintainability/phases/settings-layout-regression-audit-2026-05-12.md`
 
 - [x] **Step 1: Add taxonomy to module docs**
 
@@ -102,7 +102,7 @@ Rule: never apply one hierarchy rule globally across both layout modes without c
 
 - [x] **Step 2: Create audit status doc**
 
-Create `docs/status/settings-layout-regression-audit-2026-05-12.md` with:
+Create `docs/archive/maintainability/phases/settings-layout-regression-audit-2026-05-12.md` with:
 
 - scope and non-goals;
 - audit matrix for layout foundation, model availability, MCP, formatter, agents, commands, plugins;
@@ -181,7 +181,7 @@ Save screenshots under:
 
 - [x] **Step 4: Update audit status doc**
 
-Add the result JSON summaries, screenshot paths, and console/error status to `docs/status/settings-layout-regression-audit-2026-05-12.md`.
+Add the result JSON summaries, screenshot paths, and console/error status to `docs/archive/maintainability/phases/settings-layout-regression-audit-2026-05-12.md`.
 
 ## Task 5: Commit
 
@@ -192,7 +192,7 @@ Run:
 ```bash
 git diff --stat
 git diff --check
-git diff -- docs/modules/style/components/settings-layout-contract.md docs/status/settings-layout-regression-audit-2026-05-12.md tests/unit/features/settings/OpenCodianSettings.test.ts | sed -n '1,260p'
+git diff -- docs/modules/style/components/settings-layout-contract.md docs/archive/maintainability/phases/settings-layout-regression-audit-2026-05-12.md tests/unit/features/settings/OpenCodianSettings.test.ts | sed -n '1,260p'
 ```
 
 - [x] **Step 2: Commit**
@@ -200,7 +200,7 @@ git diff -- docs/modules/style/components/settings-layout-contract.md docs/statu
 Run:
 
 ```bash
-git add docs/modules/style/components/settings-layout-contract.md docs/status/settings-layout-regression-audit-2026-05-12.md docs/superpowers/plans/2026-05-12-settings-layout-regression-audit.md tests/unit/features/settings/OpenCodianSettings.test.ts
+git add docs/modules/style/components/settings-layout-contract.md docs/archive/maintainability/phases/settings-layout-regression-audit-2026-05-12.md docs/superpowers/plans/2026-05-12-settings-layout-regression-audit.md tests/unit/features/settings/OpenCodianSettings.test.ts
 git commit -m "docs: codify settings layout hierarchy rules"
 ```
 

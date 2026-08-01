@@ -362,7 +362,7 @@ Expected: PASS.
 
 **Files:**
 - Modify: matching `docs/modules/features/chat/**` files for every changed/deleted `src` module.
-- Modify: `docs/status/task-subagent-lifecycle-alignment-evaluation-2026-05-11.md`
+- Modify: `docs/archive/maintainability/phases/task-subagent-lifecycle-alignment-evaluation-2026-05-11.md`
 - Modify: `graphify-out/GRAPH_REPORT.md`
 - Modify: `graphify-out/graph.json`
 

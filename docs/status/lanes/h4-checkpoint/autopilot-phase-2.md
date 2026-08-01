@@ -40,7 +40,7 @@ Explicit non-goals:
 
 ## Hotspot Baseline
 
-Evidence from `docs/status/autopilot-master-plan.md` before the hotspot queue began:
+Evidence from `docs/archive/maintainability/autopilot/autopilot-master-plan.md` before the hotspot queue began:
 
 - `src/features/chat/OpenCodianView.ts`: about `5418` lines, `91` imports, and `306` touches in the prior 120 days.
 - `src/core/opencode/OpenCodeService.ts`: about `1867` lines, `25` imports, and `103` touches in the prior 120 days.

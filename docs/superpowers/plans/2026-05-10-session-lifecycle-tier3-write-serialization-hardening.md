@@ -12,7 +12,7 @@
 
 ## Scope Check
 
-This Tier 3 plan covers only the two remaining medium-priority Council residuals from `docs/status/session-lifecycle-council-review-2026-05-10.md`:
+This Tier 3 plan covers only the two remaining medium-priority Council residuals from `docs/archive/maintainability/phases/session-lifecycle-council-review-2026-05-10.md`:
 
 - write serialization head-of-line blocking: slow or stuck `saveConversation()` can keep later same-conversation compatibility/cache writes waiting.
 - cross-view write competition: each Obsidian pane currently creates its own `ConversationWriteSerializationService`, so two `OpenCodianView` instances can independently save the same conversation.

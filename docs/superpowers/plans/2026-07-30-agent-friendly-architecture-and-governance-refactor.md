@@ -4,7 +4,7 @@
 >
 > **Implementation style:** execute phase by phase. Every code-bearing task starts with characterization or failing gate tests, preserves current behavior, and ends with focused checks plus `npm run verify`.
 >
-> **Supersedes for architecture work:** the active planning role of `docs/status/maintainability-master-plan.md`, `docs/status/maintainability-lane-map.md`, `docs/status/maintainability-round-roadmap.md`, and the generic thick-owner autopilot plans. Their historical evidence remains useful, but they must not run in parallel as another architecture roadmap after Phase 6.
+> **Supersedes for architecture work:** the active planning role of `docs/archive/maintainability/autopilot/maintainability-master-plan.md`, `docs/archive/maintainability/autopilot/maintainability-lane-map.md`, `docs/archive/maintainability/autopilot/maintainability-round-roadmap.md`, and the generic thick-owner autopilot plans. Their historical evidence remains useful, but they must not run in parallel as another architecture roadmap after Phase 6.
 
 ## Goal
 

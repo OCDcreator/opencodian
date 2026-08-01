@@ -2,7 +2,7 @@
 
 ## Context
 
-`docs/status/askquestion-mechanism-alignment-evaluation-2026-05-11.md` originally identified four AskQuestion alignment gaps: stale report calibration, dock waiter cleanup, keyboard UX, and protocol fallback. The first three implementation slices have now landed:
+`docs/archive/maintainability/phases/askquestion-mechanism-alignment-evaluation-2026-05-11.md` originally identified four AskQuestion alignment gaps: stale report calibration, dock waiter cleanup, keyboard UX, and protocol fallback. The first three implementation slices have now landed:
 
 - report calibration and waiter cleanup
 - above-input `QuestionDock` keyboard controls
@@ -87,6 +87,6 @@ Run:
 Update:
 
 - `docs/modules/core/opencode/OpenCodeStreamEventTransformer.md`
-- `docs/status/askquestion-mechanism-alignment-evaluation-2026-05-11.md`
+- `docs/archive/maintainability/phases/askquestion-mechanism-alignment-evaluation-2026-05-11.md`
 
 The status report should become a final alignment record, not another stale gap list. It should state that keyboard UX and waiter cleanup are implemented, protocol fallback is implemented conservatively, and no further required AskQuestion alignment item remains for the current local OpenCode contract.

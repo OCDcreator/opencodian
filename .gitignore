@@ -61,6 +61,8 @@ docs/*
 !docs/adr/**
 !docs/architecture/
 !docs/architecture/**
+!docs/archive/
+!docs/archive/**
 !docs/modules/
 !docs/modules/**
 !docs/reference/
