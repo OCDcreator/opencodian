@@ -258,7 +258,7 @@ None. No Test Vault deployment required.
 - **Test Vault evidence:** runtime code was deployed on macOS with BUILD_ID `main.202607311845`. Test Vault SHA-256: `main.js` `f0df3b4b420b50162e0e1c71467d64fbb9987858574a7d7f9cd60998d3f32440`; `manifest.json` `3a47461c4a27d35efbe7afde5be9c124e4a7599550d330626f81efb0f8c0be88`; `styles.css` `1e4aa7b41de2c2eadfb5ec7bbc7f6eac6256b795d4c7990b12848747b164e4a7`. The final three commits are docs/config only, so no redeployment was required; a later local `dist` BUILD_ID may differ and is not byte-equal evidence for the deployed runtime.
 
 ## Phase 4–6
-- **Status:** Task 14 **CLOSED / APPROVED** at `6773dfa1`; Task 15 **CLOSED / APPROVED** at `b0e7c450`; Phase 4 **CLOSED / APPROVED**. Phase 5–6 remain not started. No push is claimed.
+- **Status:** Task 14 **CLOSED / APPROVED** at `6773dfa1`; Task 15 **CLOSED / APPROVED** at `b0e7c450`; Phase 4 **CLOSED / APPROVED**. Task 16 is **CLOSED / APPROVED** at `6b98d4c9`; Phase 5 Tasks 17–18 and Phase 6 remain not started. No push is claimed.
 
 ### Task 14 — Replace plugin-shaped seams with consumer-owned ports and move runtime orchestration — CLOSED / APPROVED
 - **Range:** `73a30557..6773dfa1` (6 commits).
@@ -321,4 +321,15 @@ None. No Test Vault deployment required.
 - **Test Vault deployment:** BUILD_ID `main.202608011240`; source and macOS Test Vault `main.js` BUILD_ID match. No push is claimed.
 
 ### Phase 4 closure
-- **Phase 4 (Task 14 + Task 15): CLOSED / APPROVED** at `b0e7c450`. Phase 5 (Task 16–18: inventory + child plans, no production changes) and Phase 6 (Task 19–20: documentation retirement) remain not started.
+- **Phase 4 (Task 14 + Task 15): CLOSED / APPROVED** at `b0e7c450`. Phase 5 Task 16 is now closed below; Tasks 17–18 (remaining inventory/child plans) and Phase 6 (Task 19–20: documentation retirement) remain not started.
+
+## Phase 5 — Claude adapter ownership inventory and deferred child plan (Task 16–18)
+
+### Task 16 — Inventory `ClaudeCodeAdapter` and record deferred owner slices — CLOSED / APPROVED
+- **Range:** `3f464006..6b98d4c9` (1 docs-only commit; no source, production, test, manifest, or generated-artifact changes).
+- **Plan artifact commit:** `6b98d4c9b097dbaa8bc2a9022c599d3865d8568c` (parent `3f46400636429fea6de83a94a394dc47b7966c50`), subject `docs(architecture): record Claude adapter owner plan`.
+- **Sol independent review — APPROVED (7 rounds).** Rounds 1–6 returned **CHANGES REQUESTED**; fresh round 7 returned the literal **APPROVED** result. This records the completed review result only; it does not authorize implementation.
+- **Scope/result:** all proposed session/runtime, SDK-option, and trace moves remain **deferred**. The inventory is explicitly nonexhaustive; unresolved query/SDK/CodeGraph root and caller ambiguity is a hard stop, and no candidate is called implemented. `core.backend` remains the sole owner and the plan's manifest delta is zero.
+- **Unchanged contracts:** the Task 15 `task15-chat-runtime-composition-scc-member` exception remains untouched; incoming Claude-backend `main.ts` type-import metric remains **0 → 0**; no `main.ts` composition reduction is claimed.
+- **Gate evidence:** Sol independently rechecked **43/43** material finite-depth CodeGraph rows at depth 2 and its focused matrix passed **3 suites / 197 tests**. It confirmed no `src/` or test diff, owner/module-doc/Graphify checks, and unique valid future manifests. The expected untracked-plan `git diff --no-index --check` exit 1 produced no whitespace diagnostics. Root `npm run verify` passed **15/15 gates**, **725/725 suites**, **6926/6926 tests**; `npm run check:module-docs` passed **588/588**, `npm run check:graphify` passed, and `npm run check:devlog-order` passed **508 sections**.
+- **Acceptance status:** [x] dated child plan committed; [x] no production/test implementation or manifest mutation; [x] deferred cards retain explicit re-entry conditions and hard stops; [x] governance evidence recorded. Tasks 17–18 remain pending and must not be inferred from this closure.

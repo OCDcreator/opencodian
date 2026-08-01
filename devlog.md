@@ -11,6 +11,15 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-08-01 Agent-Friendly Architecture 试点：ClaudeCodeAdapter owner-slice inventory（Phase 5 Task 16，Task 16 关闭）
+
+Phase 5 Task 16 的 dated child plan 已完成独立审查并记录收口：计划提交 `6b98d4c9`（父提交 `3f464006`，范围 `3f464006..6b98d4c9`）仅包含 `docs/superpowers/plans/2026-08-01-claude-adapter-owner-slices.md`。没有 production/source、test、manifest 或 generated-artifact 改动，也没有实现任何候选 owner slice。
+
+- **Sol 独立审查**：共 7 轮；第 1–6 轮为 **CHANGES REQUESTED**，fresh 第 7 轮返回字面量 **APPROVED**。本条只记录已完成的审查结果，不把候选称为已实现。
+- **范围与硬停**：所有 session/runtime、SDK-option、trace 候选继续 deferred。inventory 明确是 nonexhaustive；query/SDK/CodeGraph 的 root/caller 歧义是硬停，`core.backend` 仍是唯一 owner，当前 manifest delta 为 0。Task 15 的 `task15-chat-runtime-composition-scc-member` exception 保持不变。
+- **指标**：Claude backend incoming `main.ts` type-import 保持 **0 → 0**；未声称 main composition reduction。Sol 复核了 **43/43** 个 material depth-2 CodeGraph rows，focused matrix **3 suites / 197 tests** 通过，并确认无 `src/`/test diff、owner/module-doc/Graphify checks 与唯一有效的 future manifests。untracked plan 的 `git diff --no-index --check` 预期退出 1，但无 whitespace diagnostics。
+- **门禁**：root `npm run verify` 为 **15/15 gates、725/725 suites、6926/6926 tests**；`npm run check:module-docs` 为 **588/588**，`npm run check:graphify` 通过，`npm run check:devlog-order` 为 **508 sections**。Phase 5 后续 Tasks 17–18 仍未启动。
+
 ## 2026-08-01 Agent-Friendly Architecture 试点：ChatRuntimeComposition composition owner（Phase 4 Task 15，Phase 4 关闭）
 
 Phase 4 Task 15 是迄今最大的单块重构：把 `OpenCodianView` 的四个 `create*RuntimeWiring()` 编排方法 + `createBackgroundTaskInfrastructure` + `createSendPipelineHostDependencies` + 构造器内联的 identity/render 装配全部迁出到新的 `src/features/chat/runtime/ChatRuntimeComposition.ts` composition owner。view 把自己作为结构化 `ChatRuntimeCompositionHost` 传入，解构返回的 `ChatRuntime` 到既有私有字段。
