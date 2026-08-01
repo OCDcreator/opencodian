@@ -20,6 +20,7 @@
 ## Entrypoints
 - `src/features/chat/runtime/SendPipelineRuntime.ts`
 - `src/features/chat/runtime/BackgroundTaskIndicatorCoordinator.ts`
+- `src/features/chat/runtime/ChatRuntimeComposition.ts` — composition owner that assembles the full chat runtime (surface/identity/render/background/conversation/interaction phases) into a single `ChatRuntime` struct the view destructures. Owns no disposal; receives the view only as the structural `ChatRuntimeCompositionHost`. See Task 15.
 
 ## Dependency surface
 - **Allowed owner dependencies:** `shared.foundation`, `shared.utils-streaming`, `core.types`
