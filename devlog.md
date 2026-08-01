@@ -11,6 +11,17 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-08-01 Agent-Friendly Architecture 试点：settings plugin-type coupling inventory（Phase 5 Task 18）
+
+Phase 5 Task 18 的 dated discovery inventory 已完成：`docs/superpowers/plans/2026-08-01-settings-plugin-coupling-inventory.md` + 三份 per-domain child plan（`settings-debug-port-slice.md`、`settings-model-catalog-port-slice.md`、`settings-plugin-update-port-slice.md`）。本次为 discovery/inventory 提交，**未授权任何实现切片**，也未改动 production/source、test、manifest、config、generated-graph、barrel、ledger 或 approval。
+
+- **Decision（核心结论）**：三个 settings 域——**debug**（1 file，6 member accesses）、**model-catalog**（7 files，cohesive）、**plugin-update**（1 file，仅 `pluginUpdateService` 6 次）——足够 independently releasable，各自得到一份完整 child plan（含 owner current→target、CodeGraph 证据、narrow `Settings<Domain>Port` sketch、characterization matrix、falsifiable acceptance、exact future C/B/G transaction+rollback、empty manifest delta）。其余 8 个域（claude/codex/opencode/style/agents/mcp/shell/plugin-bucket）**deferred**，owner 保持各自的 `feature.settings-*`，硬过期日 **2026-09-01**，原因逐域记录（最大 root、cross-owner 构造、appearance mega-port 风险、composition seam 必须最后迁移等）。
+- **Owner 契约（zero manifest delta）**：manifest 已把 `src/features/settings/**` 拆成 shell + 9 个 delegated sub-owner，全部 `layer: feature`、全部 forbid `app`。每个 port 是 consumer-owned type-only seam，定义在 consumer owner 目录内、由 shell 适配；**不** privatize/remove/migrate `OpenCodianPlugin.settings`/`.openCodeService`/`.sdk` 等 public surface。禁止 settings mega-port、one-interface-per-callback、runtime forwarding module、`unknown` cast、global lookup。
+- **CodeGraph 证据**：9 个 `Settings*Section` root 全部 single-definition（class + 同文件 option/runtime interface）。一个 collision hard stop：unqualified `OpenCodianSettings` 返回 3 个定义（interface in `settings.ts`、class `OpenCodianSettingsView`、interface `OpenCodianSettingsRuntimeCoordinatorHost`）——shell 域 card 改用 qualified `OpenCodianSettingsView` class root，不把 unqualified name 当 section root。
+- **Cross-owner 发现**：`ModelConfigModal.openAdvancedEditor` 直接 `new OpencodeConfigModal(this.app, new OpencodeConfigManager(vaultPath), …)`，**不**经过 `this.plugin.opencodeConfigManager`——model-catalog port 可保持 narrow；该 cross-owner 构造是 deferred opencode 域的关注点。
+- **指标（Phase 5 acceptance）**：settings→main type-only `OpenCodianPlugin` import 基线 **54 files / 186 references**（re-verified）。三份 child plan 合并后累计目标 54 → 45；其余 9 个 deferred 域各自保留 owner/expiry。
+- **门禁**：`npm run verify:architecture` 5/5 PASS（owner manifest/boundaries/dependency direction/cycles/approvals）；`npm run check:module-docs` 588/588；`npm run check:graphify` 通过；`npm run check:devlog-order` 512 sections。本 inventory 不关闭 Phase 5，也不构成 implementation approval；每个 child plan 仍 "deferred until its own review/merge checkpoint"。
+
 ## 2026-08-01 Agent-Friendly Architecture 试点：归档历史可维护性 phase/autopilot 文档（Phase 6 Task 19）
 
 Phase 6 Task 19 把 pre-Phase-6 的历史可维护性文档移出默认 agent 阅读链，移入 `docs/archive/maintainability/`。本次为 docs-only 归档，**未改动**任何 src/test/manifest/package.json/architecture-owners.config.json/graphify-out/automation。验收目标："there is one active architecture roadmap; agents are not instructed to read hundreds of phase documents."
