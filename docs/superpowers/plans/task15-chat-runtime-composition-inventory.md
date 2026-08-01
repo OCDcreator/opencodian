@@ -18,9 +18,9 @@
 |---|---|---|---|
 | `createSurfaceRuntimeWiring()` | 1956–2057 | surface | `OpenCodianViewSurfaceRuntimeWiring` |
 | `createBackgroundTaskRuntimeWiring()` | 2059–2105 | background-task | `OpenCodianViewBackgroundTaskRuntimeWiring` |
-| `createConversationRuntimeWiring()` | 2106–2253 | conversation | `OpenCodianViewConversationRuntimeWiring` |
-| `createInteractionRuntimeWiring()` | 2369–2527 | interaction/send | `OpenCodianViewInteractionRuntimeWiring` |
-| `createBackgroundTaskInfrastructure()` | 2254–2306 | bg-task infra (called inside conversation wiring) | (inline destructure) |
+| `createConversationRuntimeWiring()` | 2106–2252 | conversation | `OpenCodianViewConversationRuntimeWiring` |
+| `createInteractionRuntimeWiring()` | 2369–2526 | interaction/send | `OpenCodianViewInteractionRuntimeWiring` |
+| `createBackgroundTaskInfrastructure()` | 2254–2305 | bg-task infra (called inside conversation wiring) | (inline destructure) |
 
 Constructor orchestration block (1685–1889) calls these four, plus constructs a few coordinators inline (`ConversationIdentityRuntime`, `UserMessageContentRenderer`, `ConversationRenderService`) and the `chatDiagnosticsCoordinatorFactory.create(...)`, then destructures everything into view fields and calls `installClaudeCodePermissionHostContext()` / `installCodexApprovalHostContext()`.
 
@@ -36,12 +36,12 @@ Every concrete `new <Coordinator/Service/...>()` that is **runtime assembly** (n
 
 | Line | Field | Class | Decision |
 |---|---|---|---|
-| 566 | `this.scrollScheduler` | `SettledScrollScheduler` | **STAYS** — stateless scroll utility used across the view; retained, exposed to composition via host getter. |
+| 566 | `this.scrollScheduler` | `SettledScrollScheduler` | **STAYS** — scroll scheduler owning mutable `frameId` scheduling/cancellation state (`ScrollManager.ts:101-121`); used across the view. Retained because its lifecycle spans the whole view (constructed once as a field, shared by surface + render paths); exposed to composition read-only via host getter. Not a coordinator; not moved. |
 | 567 | `this.conversationWriteSerializationService` | `ConversationWriteSerializationService` | **STAYS-RETAINED** — runtime assembly with mutable write-ticket state, consumed by view-private methods `createConversationWriteTicket` (866) and `commitConversationWrite` (876). These are view-owned write-serialization seams, not coordinator construction; moving them would pull write-serialization logic into composition for no coupling reduction. Retained; not part of `onClose` (no teardown). |
 | 1627 | `this.messageComponent` | `Component` (Obsidian) | **STAYS** — Obsidian ItemView lifecycle component; not runtime assembly. |
 | 1628 | `this.modifiedFilesSidebarCoordinator` | `ModifiedFilesSidebarCoordinator` | **STAYS-RETAINED** — runtime assembly that owns mutable sidebar state and a DOM sidebar (constructed lazily). Retained because its lifecycle is bound to the view's sidebar DOM mount, not to the chat runtime; its `destroy()` runs at `onClose` (3527). Moving it would split DOM-bound ownership. |
 | 1630 | `this.slashCommandMenuCatalogCache` | `SlashCommandMenuCatalogCache` | **STAYS-RETAINED** — runtime assembly constructed privately in the view (not injected via `ChatPluginPort`), but a process-wide catalog cache consumed by multiple owners through `invalidate()`; relocating it would require a new shared owner and expands the slice beyond Task 15's "coordinator construction" scope. Retained with explicit justification; TTL-managed, not part of `onClose`. |
-| 1685 | `this.codexChatSurfaceBinding` | `CodexChatSurfaceBinding` | **STAYS-RETAINED** — runtime assembly, but a leaf surface binding (5 closures, no nested coordinators) disposed at `onClose` (3534). Moving it adds a file without reducing view coupling; retained to keep this slice focused on the four large wiring methods. |
+| 1685 | `this.codexChatSurfaceBinding` | `CodexChatSurfaceBinding` | **STAYS-RETAINED** — runtime assembly, but a leaf surface binding (4 host callbacks: `getCodexAdapter`/`invalidateSlashCommandMenuCache`/`openPluginSettings`/`isCodexActive`, no nested coordinators) disposed at `onClose` (3534). Moving it adds a file without reducing view coupling; retained to keep this slice focused on the four large wiring methods. |
 | 1693 | `this.chatDiagnosticsCoordinator` | (factory `.create()`) | **STAYS** — already a Task-12 factory injection, not a constructor. |
 
 > **Retention justification (response to review):** `conversationWriteSerializationService`, `modifiedFilesSidebarCoordinator`, `slashCommandMenuCatalogCache`, and `codexChatSurfaceBinding` ARE runtime assemblies. They are retained because moving each would either (a) pull view-private write-serialization seams into composition, (b) split DOM-bound sidebar ownership, (c) force a cross-owner shared-cache refactor out of scope, or (d) create a new thin file for a leaf object. This is an explicit, reviewed scope decision — not an oversight. Each retained object's teardown call site (if any) is listed in §4 so the disposal contract stays intact.
