@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-07-31T14:28:07.248Z",
-  "headShaAtGeneration": "27ada806ed93b97ddd80aa443f71e567e3af24b0",
+  "generatedAt": "2026-08-01T03:17:00.276Z",
+  "headShaAtGeneration": "43096ac1914370b97f77ad788a57329bc4e0b6a1",
   "edges": [
     {
       "id": "src/app/diagnostics/DiagnosticsRuntimeCoordinator.ts|src/app/diagnostics/types.ts|type-only|./types",
@@ -3630,11 +3630,11 @@
       "specifier": "./runtime/BackgroundTaskStreamTriggerCoordinator"
     },
     {
-      "id": "src/features/chat/OpenCodianView.ts|src/features/chat/runtime/ConversationLoadRuntimeBridge.ts|runtime-static|./runtime/ConversationLoadRuntimeBridge",
+      "id": "src/features/chat/OpenCodianView.ts|src/features/chat/runtime/ChatRuntimeComposition.ts|runtime-static|./runtime/ChatRuntimeComposition",
       "from": "src/features/chat/OpenCodianView.ts",
-      "to": "src/features/chat/runtime/ConversationLoadRuntimeBridge.ts",
+      "to": "src/features/chat/runtime/ChatRuntimeComposition.ts",
       "kind": "runtime-static",
-      "specifier": "./runtime/ConversationLoadRuntimeBridge"
+      "specifier": "./runtime/ChatRuntimeComposition"
     },
     {
       "id": "src/features/chat/OpenCodianView.ts|src/features/chat/runtime/PermissionInlineCardRenderer.ts|runtime-static|./runtime/PermissionInlineCardRenderer",
@@ -4008,32 +4008,11 @@
       "specifier": "./services/ScrollManager"
     },
     {
-      "id": "src/features/chat/OpenCodianView.ts|src/features/chat/services/ServerReferenceContextService.ts|runtime-static|./services/ServerReferenceContextService",
-      "from": "src/features/chat/OpenCodianView.ts",
-      "to": "src/features/chat/services/ServerReferenceContextService.ts",
-      "kind": "runtime-static",
-      "specifier": "./services/ServerReferenceContextService"
-    },
-    {
       "id": "src/features/chat/OpenCodianView.ts|src/features/chat/services/SessionTodoHostAdapter.ts|runtime-static|./services/SessionTodoHostAdapter",
       "from": "src/features/chat/OpenCodianView.ts",
       "to": "src/features/chat/services/SessionTodoHostAdapter.ts",
       "kind": "runtime-static",
       "specifier": "./services/SessionTodoHostAdapter"
-    },
-    {
-      "id": "src/features/chat/OpenCodianView.ts|src/features/chat/services/SlashCommandExecutionHostFactory.ts|runtime-static|./services/SlashCommandExecutionHostFactory",
-      "from": "src/features/chat/OpenCodianView.ts",
-      "to": "src/features/chat/services/SlashCommandExecutionHostFactory.ts",
-      "kind": "runtime-static",
-      "specifier": "./services/SlashCommandExecutionHostFactory"
-    },
-    {
-      "id": "src/features/chat/OpenCodianView.ts|src/features/chat/services/SlashCommandExecutionService.ts|runtime-static|./services/SlashCommandExecutionService",
-      "from": "src/features/chat/OpenCodianView.ts",
-      "to": "src/features/chat/services/SlashCommandExecutionService.ts",
-      "kind": "runtime-static",
-      "specifier": "./services/SlashCommandExecutionService"
     },
     {
       "id": "src/features/chat/OpenCodianView.ts|src/features/chat/services/SlashCommandMenuCatalogCache.ts|runtime-static|./services/SlashCommandMenuCatalogCache",
@@ -4643,6 +4622,538 @@
       "to": "src/features/chat/services/MessageSendPreparationService.ts",
       "kind": "type-only",
       "specifier": "../services/MessageSendPreparationService"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/core/agents/backend/AgentBackendRouting.ts|runtime-static|../../../core/agents/backend/AgentBackendRouting",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/core/agents/backend/AgentBackendRouting.ts",
+      "kind": "runtime-static",
+      "specifier": "../../../core/agents/backend/AgentBackendRouting"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/core/agents/index.ts|runtime-static|../../../core/agents",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/core/agents/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../../core/agents"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/core/opencode/index.ts|runtime-static|../../../core/opencode",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/core/opencode/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../../core/opencode"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/core/types/index.ts|type-only|../../../core/types",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/core/types/index.ts",
+      "kind": "type-only",
+      "specifier": "../../../core/types"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/runtime/AssistantNoticeCardRenderer.ts|runtime-static|../runtime/AssistantNoticeCardRenderer",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/runtime/AssistantNoticeCardRenderer.ts",
+      "kind": "runtime-static",
+      "specifier": "../runtime/AssistantNoticeCardRenderer"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/runtime/AssistantShellViewHostAdapter.ts|runtime-static|../runtime/AssistantShellViewHostAdapter",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/runtime/AssistantShellViewHostAdapter.ts",
+      "kind": "runtime-static",
+      "specifier": "../runtime/AssistantShellViewHostAdapter"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/runtime/BackgroundTaskIndicatorCoordinator.ts|runtime-static|../runtime/BackgroundTaskIndicatorCoordinator",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/runtime/BackgroundTaskIndicatorCoordinator.ts",
+      "kind": "runtime-static",
+      "specifier": "../runtime/BackgroundTaskIndicatorCoordinator"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/runtime/BackgroundTaskInlinePanelRenderer.ts|runtime-static|../runtime/BackgroundTaskInlinePanelRenderer",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/runtime/BackgroundTaskInlinePanelRenderer.ts",
+      "kind": "runtime-static",
+      "specifier": "../runtime/BackgroundTaskInlinePanelRenderer"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/runtime/BackgroundTaskStreamTriggerCoordinator.ts|runtime-static|../runtime/BackgroundTaskStreamTriggerCoordinator",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/runtime/BackgroundTaskStreamTriggerCoordinator.ts",
+      "kind": "runtime-static",
+      "specifier": "../runtime/BackgroundTaskStreamTriggerCoordinator"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/runtime/ConversationLoadRuntimeBridge.ts|runtime-static|../runtime/ConversationLoadRuntimeBridge",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/runtime/ConversationLoadRuntimeBridge.ts",
+      "kind": "runtime-static",
+      "specifier": "../runtime/ConversationLoadRuntimeBridge"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/runtime/PermissionInlineCardRenderer.ts|runtime-static|../runtime/PermissionInlineCardRenderer",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/runtime/PermissionInlineCardRenderer.ts",
+      "kind": "runtime-static",
+      "specifier": "../runtime/PermissionInlineCardRenderer"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/runtime/SendPipelineDebugSummaries.ts|runtime-static|../runtime/SendPipelineDebugSummaries",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/runtime/SendPipelineDebugSummaries.ts",
+      "kind": "runtime-static",
+      "specifier": "../runtime/SendPipelineDebugSummaries"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/runtime/SendPipelineRuntime.ts|runtime-static|../runtime/SendPipelineRuntime",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/runtime/SendPipelineRuntime.ts",
+      "kind": "runtime-static",
+      "specifier": "../runtime/SendPipelineRuntime"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/runtime/SendPipelineRuntime.ts|runtime-static|../runtime/SendPipelineRuntime",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/runtime/SendPipelineRuntime.ts",
+      "kind": "runtime-static",
+      "specifier": "../runtime/SendPipelineRuntime"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/runtime/SendPipelineRuntime.ts|type-only|../runtime/SendPipelineRuntime",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/runtime/SendPipelineRuntime.ts",
+      "kind": "type-only",
+      "specifier": "../runtime/SendPipelineRuntime"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/runtime/StreamingInlineCardRenderer.ts|runtime-static|../runtime/StreamingInlineCardRenderer",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/runtime/StreamingInlineCardRenderer.ts",
+      "kind": "runtime-static",
+      "specifier": "../runtime/StreamingInlineCardRenderer"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/runtime/TabConversationActivationBridge.ts|runtime-static|../runtime/TabConversationActivationBridge",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/runtime/TabConversationActivationBridge.ts",
+      "kind": "runtime-static",
+      "specifier": "../runtime/TabConversationActivationBridge"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/runtime/TabConversationStateBridge.ts|runtime-static|../runtime/TabConversationStateBridge",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/runtime/TabConversationStateBridge.ts",
+      "kind": "runtime-static",
+      "specifier": "../runtime/TabConversationStateBridge"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/runtime/TabRuntimeStateBridge.ts|runtime-static|../runtime/TabRuntimeStateBridge",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/runtime/TabRuntimeStateBridge.ts",
+      "kind": "runtime-static",
+      "specifier": "../runtime/TabRuntimeStateBridge"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/runtime/TabViewActivationBridge.ts|runtime-static|../runtime/TabViewActivationBridge",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/runtime/TabViewActivationBridge.ts",
+      "kind": "runtime-static",
+      "specifier": "../runtime/TabViewActivationBridge"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/runtime/UserMessageContentRenderer.ts|runtime-static|../runtime/UserMessageContentRenderer",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/runtime/UserMessageContentRenderer.ts",
+      "kind": "runtime-static",
+      "specifier": "../runtime/UserMessageContentRenderer"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/runtime/UserMessageFooterRenderer.ts|runtime-static|../runtime/UserMessageFooterRenderer",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/runtime/UserMessageFooterRenderer.ts",
+      "kind": "runtime-static",
+      "specifier": "../runtime/UserMessageFooterRenderer"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/ActiveTabContextUsageCoordinator.ts|runtime-static|../services/ActiveTabContextUsageCoordinator",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/ActiveTabContextUsageCoordinator.ts",
+      "kind": "runtime-static",
+      "specifier": "../services/ActiveTabContextUsageCoordinator"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/BackgroundTaskCompletionNoticeService.ts|runtime-static|../services/BackgroundTaskCompletionNoticeService",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/BackgroundTaskCompletionNoticeService.ts",
+      "kind": "runtime-static",
+      "specifier": "../services/BackgroundTaskCompletionNoticeService"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/BackgroundTaskLiveSignalCoordinator.ts|runtime-static|../services/BackgroundTaskLiveSignalCoordinator",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/BackgroundTaskLiveSignalCoordinator.ts",
+      "kind": "runtime-static",
+      "specifier": "../services/BackgroundTaskLiveSignalCoordinator"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/BackgroundTaskNoticeStateService.ts|runtime-static|../services/BackgroundTaskNoticeStateService",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/BackgroundTaskNoticeStateService.ts",
+      "kind": "runtime-static",
+      "specifier": "../services/BackgroundTaskNoticeStateService"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/BackgroundTaskTimelineService.ts|runtime-static|../services/BackgroundTaskTimelineService",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/BackgroundTaskTimelineService.ts",
+      "kind": "runtime-static",
+      "specifier": "../services/BackgroundTaskTimelineService"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/BackgroundTaskTimelineService.ts|type-only|../services/BackgroundTaskTimelineService",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/BackgroundTaskTimelineService.ts",
+      "kind": "type-only",
+      "specifier": "../services/BackgroundTaskTimelineService"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/ChatHeaderPresenter.ts|runtime-static|../services/ChatHeaderPresenter",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/ChatHeaderPresenter.ts",
+      "kind": "runtime-static",
+      "specifier": "../services/ChatHeaderPresenter"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/ChatSelectionControlsCoordinator.ts|runtime-static|../services/ChatSelectionControlsCoordinator",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/ChatSelectionControlsCoordinator.ts",
+      "kind": "runtime-static",
+      "specifier": "../services/ChatSelectionControlsCoordinator"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/ChatSurfaceAppearanceCoordinator.ts|runtime-static|../services/ChatSurfaceAppearanceCoordinator",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/ChatSurfaceAppearanceCoordinator.ts",
+      "kind": "runtime-static",
+      "specifier": "../services/ChatSurfaceAppearanceCoordinator"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/ChildSessionGraphCoordinator.ts|runtime-static|../services/ChildSessionGraphCoordinator",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/ChildSessionGraphCoordinator.ts",
+      "kind": "runtime-static",
+      "specifier": "../services/ChildSessionGraphCoordinator"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/ComposerContextViewFacade.ts|runtime-static|../services/ComposerContextViewFacade",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/ComposerContextViewFacade.ts",
+      "kind": "runtime-static",
+      "specifier": "../services/ComposerContextViewFacade"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/ComposerInputShellCoordinator.ts|runtime-static|../services/ComposerInputShellCoordinator",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/ComposerInputShellCoordinator.ts",
+      "kind": "runtime-static",
+      "specifier": "../services/ComposerInputShellCoordinator"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/ConversationAuthoritativeSyncCoordinator.ts|runtime-static|../services/ConversationAuthoritativeSyncCoordinator",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/ConversationAuthoritativeSyncCoordinator.ts",
+      "kind": "runtime-static",
+      "specifier": "../services/ConversationAuthoritativeSyncCoordinator"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/ConversationHistoryActionsCoordinator.ts|runtime-static|../services/ConversationHistoryActionsCoordinator",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/ConversationHistoryActionsCoordinator.ts",
+      "kind": "runtime-static",
+      "specifier": "../services/ConversationHistoryActionsCoordinator"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/ConversationHydrationRuntimeViewHostFactory.ts|runtime-static|../services/ConversationHydrationRuntimeViewHostFactory",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/ConversationHydrationRuntimeViewHostFactory.ts",
+      "kind": "runtime-static",
+      "specifier": "../services/ConversationHydrationRuntimeViewHostFactory"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/ConversationHydrationRuntimeViewHostFactory.ts|type-only|../services/ConversationHydrationRuntimeViewHostFactory",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/ConversationHydrationRuntimeViewHostFactory.ts",
+      "kind": "type-only",
+      "specifier": "../services/ConversationHydrationRuntimeViewHostFactory"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/ConversationIdentityRuntime.ts|runtime-static|../services/ConversationIdentityRuntime",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/ConversationIdentityRuntime.ts",
+      "kind": "runtime-static",
+      "specifier": "../services/ConversationIdentityRuntime"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/ConversationLoadRecoveryCoordinator.ts|runtime-static|../services/ConversationLoadRecoveryCoordinator",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/ConversationLoadRecoveryCoordinator.ts",
+      "kind": "runtime-static",
+      "specifier": "../services/ConversationLoadRecoveryCoordinator"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/ConversationNoticeCoordinator.ts|runtime-static|../services/ConversationNoticeCoordinator",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/ConversationNoticeCoordinator.ts",
+      "kind": "runtime-static",
+      "specifier": "../services/ConversationNoticeCoordinator"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/ConversationRenderService.ts|runtime-static|../services/ConversationRenderService",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/ConversationRenderService.ts",
+      "kind": "runtime-static",
+      "specifier": "../services/ConversationRenderService"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/ConversationSessionSettingsCoordinator.ts|runtime-static|../services/ConversationSessionSettingsCoordinator",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/ConversationSessionSettingsCoordinator.ts",
+      "kind": "runtime-static",
+      "specifier": "../services/ConversationSessionSettingsCoordinator"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/ConversationSessionSignalRuntime.ts|runtime-static|../services/ConversationSessionSignalRuntime",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/ConversationSessionSignalRuntime.ts",
+      "kind": "runtime-static",
+      "specifier": "../services/ConversationSessionSignalRuntime"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/ConversationSyncBridge.ts|runtime-static|../services/ConversationSyncBridge",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/ConversationSyncBridge.ts",
+      "kind": "runtime-static",
+      "specifier": "../services/ConversationSyncBridge"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/ConversationSyncBridge.ts|type-only|../services/ConversationSyncBridge",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/ConversationSyncBridge.ts",
+      "kind": "type-only",
+      "specifier": "../services/ConversationSyncBridge"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/ConversationSyncHostAdapter.ts|runtime-static|../services/ConversationSyncHostAdapter",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/ConversationSyncHostAdapter.ts",
+      "kind": "runtime-static",
+      "specifier": "../services/ConversationSyncHostAdapter"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/ConversationSyncHostAdapter.ts|type-only|../services/ConversationSyncHostAdapter",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/ConversationSyncHostAdapter.ts",
+      "kind": "type-only",
+      "specifier": "../services/ConversationSyncHostAdapter"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/ConversationSyncOrchestrationService.ts|runtime-static|../services/ConversationSyncOrchestrationService",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/ConversationSyncOrchestrationService.ts",
+      "kind": "runtime-static",
+      "specifier": "../services/ConversationSyncOrchestrationService"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/ConversationSyncRuntimeCoordinator.ts|runtime-static|../services/ConversationSyncRuntimeCoordinator",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/ConversationSyncRuntimeCoordinator.ts",
+      "kind": "runtime-static",
+      "specifier": "../services/ConversationSyncRuntimeCoordinator"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/ConversationTabOpenCoordinator.ts|runtime-static|../services/ConversationTabOpenCoordinator",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/ConversationTabOpenCoordinator.ts",
+      "kind": "runtime-static",
+      "specifier": "../services/ConversationTabOpenCoordinator"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/ConversationTabRuntimeCoordinator.ts|runtime-static|../services/ConversationTabRuntimeCoordinator",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/ConversationTabRuntimeCoordinator.ts",
+      "kind": "runtime-static",
+      "specifier": "../services/ConversationTabRuntimeCoordinator"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/ConversationTabRuntimeCoordinator.ts|type-only|../services/ConversationTabRuntimeCoordinator",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/ConversationTabRuntimeCoordinator.ts",
+      "kind": "type-only",
+      "specifier": "../services/ConversationTabRuntimeCoordinator"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/InputPanelAppearanceCoordinator.ts|runtime-static|../services/InputPanelAppearanceCoordinator",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/InputPanelAppearanceCoordinator.ts",
+      "kind": "runtime-static",
+      "specifier": "../services/InputPanelAppearanceCoordinator"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/MessageFinalizationService.ts|runtime-static|../services/MessageFinalizationService",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/MessageFinalizationService.ts",
+      "kind": "runtime-static",
+      "specifier": "../services/MessageFinalizationService"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/MessageSendPreparationService.ts|runtime-static|../services/MessageSendPreparationService",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/MessageSendPreparationService.ts",
+      "kind": "runtime-static",
+      "specifier": "../services/MessageSendPreparationService"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/PersistentAssistantNoticeService.ts|runtime-static|../services/PersistentAssistantNoticeService",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/PersistentAssistantNoticeService.ts",
+      "kind": "runtime-static",
+      "specifier": "../services/PersistentAssistantNoticeService"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/QuestionDockSlotCoordinator.ts|runtime-static|../services/QuestionDockSlotCoordinator",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/QuestionDockSlotCoordinator.ts",
+      "kind": "runtime-static",
+      "specifier": "../services/QuestionDockSlotCoordinator"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/QuestionRuntimeHostAdapter.ts|type-only|../services/QuestionRuntimeHostAdapter",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/QuestionRuntimeHostAdapter.ts",
+      "kind": "type-only",
+      "specifier": "../services/QuestionRuntimeHostAdapter"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/QuestionRuntimeViewHostFactory.ts|runtime-static|../services/QuestionRuntimeViewHostFactory",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/QuestionRuntimeViewHostFactory.ts",
+      "kind": "runtime-static",
+      "specifier": "../services/QuestionRuntimeViewHostFactory"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/QuestionTodoBackgroundTaskRuntimeServiceBundle.ts|runtime-static|../services/QuestionTodoBackgroundTaskRuntimeServiceBundle",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/QuestionTodoBackgroundTaskRuntimeServiceBundle.ts",
+      "kind": "runtime-static",
+      "specifier": "../services/QuestionTodoBackgroundTaskRuntimeServiceBundle"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/QuestionTodoBackgroundTaskRuntimeServiceBundle.ts|type-only|../services/QuestionTodoBackgroundTaskRuntimeServiceBundle",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/QuestionTodoBackgroundTaskRuntimeServiceBundle.ts",
+      "kind": "type-only",
+      "specifier": "../services/QuestionTodoBackgroundTaskRuntimeServiceBundle"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/ScrollManager.ts|type-only|../services/ScrollManager",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/ScrollManager.ts",
+      "kind": "type-only",
+      "specifier": "../services/ScrollManager"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/ServerReferenceContextService.ts|runtime-static|../services/ServerReferenceContextService",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/ServerReferenceContextService.ts",
+      "kind": "runtime-static",
+      "specifier": "../services/ServerReferenceContextService"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/SessionTodoHostAdapter.ts|runtime-static|../services/SessionTodoHostAdapter",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/SessionTodoHostAdapter.ts",
+      "kind": "runtime-static",
+      "specifier": "../services/SessionTodoHostAdapter"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/SessionTodoHostAdapter.ts|type-only|../services/SessionTodoHostAdapter",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/SessionTodoHostAdapter.ts",
+      "kind": "type-only",
+      "specifier": "../services/SessionTodoHostAdapter"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/SlashCommandExecutionHostFactory.ts|runtime-static|../services/SlashCommandExecutionHostFactory",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/SlashCommandExecutionHostFactory.ts",
+      "kind": "runtime-static",
+      "specifier": "../services/SlashCommandExecutionHostFactory"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/SlashCommandExecutionService.ts|runtime-static|../services/SlashCommandExecutionService",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/SlashCommandExecutionService.ts",
+      "kind": "runtime-static",
+      "specifier": "../services/SlashCommandExecutionService"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/TabActivationRuntimeViewHostFactory.ts|runtime-static|../services/TabActivationRuntimeViewHostFactory",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/TabActivationRuntimeViewHostFactory.ts",
+      "kind": "runtime-static",
+      "specifier": "../services/TabActivationRuntimeViewHostFactory"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/TabActivationRuntimeViewHostFactory.ts|type-only|../services/TabActivationRuntimeViewHostFactory",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/TabActivationRuntimeViewHostFactory.ts",
+      "kind": "type-only",
+      "specifier": "../services/TabActivationRuntimeViewHostFactory"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/TabMessagesPaneCoordinator.ts|runtime-static|../services/TabMessagesPaneCoordinator",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/TabMessagesPaneCoordinator.ts",
+      "kind": "runtime-static",
+      "specifier": "../services/TabMessagesPaneCoordinator"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/TitleGenerationService.ts|runtime-static|../services/TitleGenerationService",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/TitleGenerationService.ts",
+      "kind": "runtime-static",
+      "specifier": "../services/TitleGenerationService"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/trailingAssistantPatchDebug.ts|runtime-static|../services/trailingAssistantPatchDebug",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/trailingAssistantPatchDebug.ts",
+      "kind": "runtime-static",
+      "specifier": "../services/trailingAssistantPatchDebug"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/tabs/types.ts|type-only|../tabs/types",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/tabs/types.ts",
+      "kind": "type-only",
+      "specifier": "../tabs/types"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/i18n/index.ts|runtime-static|../../../i18n",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/i18n/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../../i18n"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/shared/index.ts|runtime-static|../../../shared",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/shared/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../../shared"
     },
     {
       "id": "src/features/chat/runtime/ConversationHydrationOutcomeBridge.ts|src/core/types/index.ts|runtime-static|../../../core/types",
@@ -15769,11 +16280,12 @@
   ],
   "mixedSccs": [
     {
-      "id": "src/app/runtime/PluginRuntimeCoordinator.ts;;src/features/chat/ChatPluginPort.ts;;src/features/chat/OpenCodianView.ts;;src/features/chat/services/ChatHeaderPresenter.ts;;src/features/settings/AgentSwitcherFloatingIcons.ts;;src/features/settings/CostEstimateSettingsRow.ts;;src/features/settings/ModelConfigJsonModal.ts;;src/features/settings/ModelConfigModal.ts;;src/features/settings/ModelConfigProviderEditor.ts;;src/features/settings/ModelPricingModal.ts;;src/features/settings/OpenCodianSettings.ts;;src/features/settings/OpenCodianSettingsView.ts;;src/features/settings/ProviderBuiltinIconPickerModal.ts;;src/features/settings/ProviderIconCacheModal.ts;;src/features/settings/SettingsAcpSection.ts;;src/features/settings/SettingsAgentsSection.ts;;src/features/settings/SettingsBackendSection.ts;;src/features/settings/SettingsCapabilityLabSection.ts;;src/features/settings/SettingsClaudeCodeSection.ts;;src/features/settings/SettingsClaudeConfigurationSection.ts;;src/features/settings/SettingsClaudeProviderMetadataPersistenceCoordinator.ts;;src/features/settings/SettingsClaudeProvidersSection.ts;;src/features/settings/SettingsClaudeResourcesSection.ts;;src/features/settings/SettingsCodexAccountSurface.ts;;src/features/settings/SettingsCodexLegacyCredentialControl.ts;;src/features/settings/SettingsCodexProjectConfigSection.ts;;src/features/settings/SettingsCodexReadbackControls.ts;;src/features/settings/SettingsCodexResourcesSection.ts;;src/features/settings/SettingsCodexSection.ts;;src/features/settings/SettingsCommandsSection.ts;;src/features/settings/SettingsConversationSection.ts;;src/features/settings/SettingsDebugSection.ts;;src/features/settings/SettingsFormatterSection.ts;;src/features/settings/SettingsMcpSection.ts;;src/features/settings/SettingsModelCatalogCoordinator.ts;;src/features/settings/SettingsModelIconCacheManager.ts;;src/features/settings/SettingsModelSection.ts;;src/features/settings/SettingsPanelChrome.ts;;src/features/settings/SettingsPluginSection.ts;;src/features/settings/SettingsPluginUpdateSection.ts;;src/features/settings/SettingsProjectAgentEditor.ts;;src/features/settings/SettingsProjectCommandEditor.ts;;src/features/settings/SettingsSecuritySection.ts;;src/features/settings/SettingsServerSection.ts;;src/features/settings/SettingsSkillSection.ts;;src/features/settings/SettingsStyleBackgroundSection.ts;;src/features/settings/SettingsStyleInputPanelSection.ts;;src/features/settings/SettingsStyleLiquidGlassInputControls.ts;;src/features/settings/SettingsStylePresetSection.ts;;src/features/settings/SettingsStyleSection.ts;;src/features/settings/SettingsTabbedHeader.ts;;src/features/settings/SettingsTabbedRenderer.ts;;src/features/settings/SettingsToolDetailModal.ts;;src/features/settings/SettingsToolFileService.ts;;src/features/settings/SettingsToolSection.ts;;src/features/settings/SettingsUiSection.ts;;src/features/settings/SettingsUserSection.ts;;src/features/settings/SettingsViewRegistrar.ts;;src/features/settings/capabilityDisclosureRow.ts;;src/features/settings/settingsStyleControls.ts;;src/main.ts",
+      "id": "src/app/runtime/PluginRuntimeCoordinator.ts;;src/features/chat/ChatPluginPort.ts;;src/features/chat/OpenCodianView.ts;;src/features/chat/runtime/ChatRuntimeComposition.ts;;src/features/chat/services/ChatHeaderPresenter.ts;;src/features/settings/AgentSwitcherFloatingIcons.ts;;src/features/settings/CostEstimateSettingsRow.ts;;src/features/settings/ModelConfigJsonModal.ts;;src/features/settings/ModelConfigModal.ts;;src/features/settings/ModelConfigProviderEditor.ts;;src/features/settings/ModelPricingModal.ts;;src/features/settings/OpenCodianSettings.ts;;src/features/settings/OpenCodianSettingsView.ts;;src/features/settings/ProviderBuiltinIconPickerModal.ts;;src/features/settings/ProviderIconCacheModal.ts;;src/features/settings/SettingsAcpSection.ts;;src/features/settings/SettingsAgentsSection.ts;;src/features/settings/SettingsBackendSection.ts;;src/features/settings/SettingsCapabilityLabSection.ts;;src/features/settings/SettingsClaudeCodeSection.ts;;src/features/settings/SettingsClaudeConfigurationSection.ts;;src/features/settings/SettingsClaudeProviderMetadataPersistenceCoordinator.ts;;src/features/settings/SettingsClaudeProvidersSection.ts;;src/features/settings/SettingsClaudeResourcesSection.ts;;src/features/settings/SettingsCodexAccountSurface.ts;;src/features/settings/SettingsCodexLegacyCredentialControl.ts;;src/features/settings/SettingsCodexProjectConfigSection.ts;;src/features/settings/SettingsCodexReadbackControls.ts;;src/features/settings/SettingsCodexResourcesSection.ts;;src/features/settings/SettingsCodexSection.ts;;src/features/settings/SettingsCommandsSection.ts;;src/features/settings/SettingsConversationSection.ts;;src/features/settings/SettingsDebugSection.ts;;src/features/settings/SettingsFormatterSection.ts;;src/features/settings/SettingsMcpSection.ts;;src/features/settings/SettingsModelCatalogCoordinator.ts;;src/features/settings/SettingsModelIconCacheManager.ts;;src/features/settings/SettingsModelSection.ts;;src/features/settings/SettingsPanelChrome.ts;;src/features/settings/SettingsPluginSection.ts;;src/features/settings/SettingsPluginUpdateSection.ts;;src/features/settings/SettingsProjectAgentEditor.ts;;src/features/settings/SettingsProjectCommandEditor.ts;;src/features/settings/SettingsSecuritySection.ts;;src/features/settings/SettingsServerSection.ts;;src/features/settings/SettingsSkillSection.ts;;src/features/settings/SettingsStyleBackgroundSection.ts;;src/features/settings/SettingsStyleInputPanelSection.ts;;src/features/settings/SettingsStyleLiquidGlassInputControls.ts;;src/features/settings/SettingsStylePresetSection.ts;;src/features/settings/SettingsStyleSection.ts;;src/features/settings/SettingsTabbedHeader.ts;;src/features/settings/SettingsTabbedRenderer.ts;;src/features/settings/SettingsToolDetailModal.ts;;src/features/settings/SettingsToolFileService.ts;;src/features/settings/SettingsToolSection.ts;;src/features/settings/SettingsUiSection.ts;;src/features/settings/SettingsUserSection.ts;;src/features/settings/SettingsViewRegistrar.ts;;src/features/settings/capabilityDisclosureRow.ts;;src/features/settings/settingsStyleControls.ts;;src/main.ts",
       "members": [
         "src/app/runtime/PluginRuntimeCoordinator.ts",
         "src/features/chat/ChatPluginPort.ts",
         "src/features/chat/OpenCodianView.ts",
+        "src/features/chat/runtime/ChatRuntimeComposition.ts",
         "src/features/chat/services/ChatHeaderPresenter.ts",
         "src/features/settings/AgentSwitcherFloatingIcons.ts",
         "src/features/settings/CostEstimateSettingsRow.ts",

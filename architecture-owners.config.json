@@ -2178,5 +2178,19 @@
       "mustReachZeroBeforePhase": 1
     }
   },
-  "dependencyExceptions": []
+  "dependencyExceptions": [
+    {
+      "id": "task15-chat-runtime-composition-scc-member",
+      "baselineEdgeId": "scc:mixed:OpenCodianView-mega-SCC:::ChatRuntimeComposition-member",
+      "ruleId": "no-new-type-coupling-scc-members",
+      "reason": "Task 15 relocated the four create*RuntimeWiring() methods + createSendPipelineHostDependencies out of OpenCodianView into a new src/features/chat/runtime/ChatRuntimeComposition.ts composition owner. The owner must value-import the chat runtime coordinators (ChatHeaderPresenter, ConversationAuthoritativeSyncCoordinator, AssistantShellViewHostAdapter, ...) which are themselves members of the pre-existing OpenCodianView mixed SCC (61 members, incl. settings + main.ts). Any composition owner that constructs these coordinators therefore inherits SCC membership — this is structural debt inheritance from the coordinator SCC, NOT a new runtime cycle and NOT a new reverse edge (check:dependency-direction PASS, 0 new reverse edges). The owner never imports OpenCodianView, settings, or main.ts (no return path). Root cause is that the coordinators themselves sit in the mixed SCC; retiring this exception requires moving those coordinators out of the SCC (Phase 5+ follow-up). Inventory APPROVED by codex/terra (4 rounds). Functional equivalence proven: 6/6 characterization tests + 336/336 chat suites (2163 tests) green, typecheck clean, lint 0/0.",
+      "characterizationTests": [
+        "tests/unit/features/chat/OpenCodianView.task15.characterization.test.ts",
+        "tests/unit/features/chat/CodexDiagnosticsHost.test.ts",
+        "tests/unit/features/chat/ChatDiagnosticsContract.test.ts"
+      ],
+      "retirementPhase": "Phase 5+ (coordinator-SCC debt cleanup: move ChatHeaderPresenter and other chat coordinators out of the OpenCodianView mixed SCC, then regenerate baseline and retire this exception)",
+      "expiresAt": "2027-02-01T00:00:00Z"
+    }
+  ]
 }
