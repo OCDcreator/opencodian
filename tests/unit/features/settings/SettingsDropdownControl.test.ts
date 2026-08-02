@@ -352,6 +352,41 @@ describe('SettingsDropdownControl portal behavior', () => {
     expect(menuEl?.parentElement).toBe(document.body);
   });
 
+  it('portals a dropdown in a foreign settings document inside that document', () => {
+    const settingsFrameEl = document.createElement('iframe');
+    document.body.appendChild(settingsFrameEl);
+    const settingsDocument = settingsFrameEl.contentDocument;
+    if (!settingsDocument?.body) throw new Error('foreign settings document missing');
+
+    const selectEl = settingsDocument.createElement('select');
+    const optionEl = settingsDocument.createElement('option');
+    optionEl.value = 'multi-level-tags';
+    optionEl.textContent = '多级标签分类';
+    selectEl.appendChild(optionEl);
+    settingsDocument.body.appendChild(selectEl);
+
+    expect(isEnhanceableRealSelect(selectEl)).toBe(true);
+    const handle = enhanceSettingsSelect(selectEl);
+    try {
+      const triggerEl = settingsDocument.body.querySelector<HTMLButtonElement>('.opencodian-settings-dropdown-trigger');
+      if (!triggerEl) throw new Error('foreign dropdown trigger missing');
+
+      triggerEl.click();
+
+      const menuEl = settingsDocument.body.querySelector<HTMLElement>('.opencodian-settings-dropdown-menu');
+      expect(menuEl?.classList.contains('is-portal')).toBe(true);
+      expect(menuEl?.parentElement).toBe(settingsDocument.body);
+      expect(document.body.querySelector('.opencodian-settings-dropdown-menu.is-portal')).toBeNull();
+
+      handle.close();
+      const rootEl = settingsDocument.body.querySelector('.opencodian-settings-dropdown');
+      expect(menuEl?.parentElement).toBe(rootEl);
+    } finally {
+      handle.destroy();
+      settingsFrameEl.remove();
+    }
+  });
+
   it('returns menu to rootEl on close', () => {
     const selectEl = createSelect();
     enhanceSettingsSelect(selectEl);
@@ -778,6 +813,30 @@ describe('SettingsDropdownControl host measuring-probe regression (Obsidian 1.13
       const selectEl = document.createElement('select');
       document.body.appendChild(selectEl);
       expect(isEnhanceableRealSelect(selectEl)).toBe(true);
+    });
+
+    it('accepts a main-window select prototype owned by a detached Settings document', () => {
+      const selectEl = document.createElement('select');
+      document.body.appendChild(selectEl);
+      const DetachedSettingsSelectElement = class DetachedSettingsSelectElement {};
+      const detachedSettingsDocument = {
+        defaultView: { HTMLSelectElement: DetachedSettingsSelectElement },
+      } as unknown as Document;
+      Object.defineProperty(selectEl, 'ownerDocument', {
+        configurable: true,
+        value: detachedSettingsDocument,
+      });
+
+      try {
+        // Obsidian 1.13's detached Settings window reports this exact split:
+        // the element keeps the main renderer prototype while ownerDocument
+        // belongs to the Settings window.
+        expect(selectEl instanceof HTMLSelectElement).toBe(true);
+        expect(selectEl instanceof DetachedSettingsSelectElement).toBe(false);
+        expect(isEnhanceableRealSelect(selectEl)).toBe(true);
+      } finally {
+        delete (selectEl as HTMLSelectElement & { ownerDocument?: Document }).ownerDocument;
+      }
     });
 
     it('rejects the Obsidian `.dropdown.is-measuring` width probe', () => {

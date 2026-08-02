@@ -36,7 +36,11 @@
 
 ### 自绘 listbox（Portal 模式）
 
-控件渲染一个持久 trigger 和一个 `role="listbox"` 菜单。trigger 使用 `role="combobox"`、`aria-expanded`、`aria-controls` 和打开态 `aria-activedescendant` 指向当前高亮 option；option 按钮保持 `tabindex=-1`，因此焦点不会在 portal 前后产生额外 Tab 停靠点。**打开时，菜单通过 Portal 挂载到 `document.body`**，避免被祖先容器（如 `.opencodian-settings-block` 的 `overflow: hidden`）裁剪。关闭时菜单回到 `rootEl` 内。
+控件渲染一个持久 trigger 和一个 `role="listbox"` 菜单。trigger 使用 `role="combobox"`、`aria-expanded`、`aria-controls` 和打开态 `aria-activedescendant` 指向当前高亮 option；option 按钮保持 `tabindex=-1`，因此焦点不会在 portal 前后产生额外 Tab 停靠点。**打开时，菜单通过 Portal 挂载到原始 select 的 `ownerDocument.body`**，避免被祖先容器（如 `.opencodian-settings-block` 的 `overflow: hidden`）裁剪。关闭时菜单回到 `rootEl` 内。
+
+这个 owner-document 约束同时覆盖菜单、root/选项节点、`pointerdown`/capture-phase scroll 监听器、`resize`、RAF、viewport 定位、`MutationObserver` 与 change event。Obsidian 1.13 的原生 Settings 是独立 Electron 窗口；不得在本控件中使用词法全局 `document` / `window`，否则菜单会被 portal 到主窗口而在设置窗口不可见。
+
+Obsidian 的跨窗口节点还有一个非直观的原型行为：select 的 `ownerDocument` 可以属于独立 Settings 窗口，但 `instanceof HTMLSelectElement` 仍只匹配主 renderer。`isEnhanceableRealSelect()` 因而必须接受主 renderer 或 owner-window 任一 `HTMLSelectElement` 构造器；只接受后者会把所有真实 select 误判为不可增强，导致 UI 回退为宿主原生下拉框。
 
 菜单项来自当前 `select.options`，保留 disabled option 语义（`aria-disabled` + disabled button），当前值显示 check icon。支持点击外部关闭、Esc、ArrowUp / ArrowDown、Home / End、Enter / Space；打开态按 Tab 会先关闭菜单再让浏览器把焦点移出控件，并在选择后把焦点还给 trigger。
 
@@ -55,7 +59,7 @@ Trigger 已消费的 ArrowUp / ArrowDown、Enter / Space 会同时 `preventDefau
 - 短菜单默认不启用纵向滚动槽；只有实际内容高度超过定位阶段算出的 `maxHeight` 时才添加 `.is-scrollable` 并启用内部滚动
 - 极端小视窗下空间低于 `MIN_MENU_HEIGHT` 时自动关闭
 
-滚动和 resize 时通过 capture-phase `document scroll` + `window resize` 监听器（RAF 节流）重新定位；trigger 滚出视窗时自动关闭。
+滚动和 resize 时通过 owner document 的 capture-phase `scroll` + owner window 的 `resize` 监听器（RAF 节流）重新定位；trigger 滚出该窗口的视窗时自动关闭。
 
 #### 关键常量
 
@@ -85,7 +89,7 @@ Obsidian 1.13 会为每个 `DropdownComponent` 在容器里插入一个隐藏的
 ## 注意事项
 
 - 聊天区 model / agent / permission selector 已经是专门的自绘控件，不通过本模块接管。
-- 菜单打开时 Portal 到 `document.body`（`.is-portal` class），关闭时回到 `rootEl`。不要移除 Portal 逻辑，否则会复现卡片底部裁剪问题。
+- 菜单打开时 Portal 到 backing select 的 `ownerDocument.body`（`.is-portal` class），关闭时回到 `rootEl`。不要移除 Portal 逻辑，否则会复现卡片底部裁剪问题；也不要退回到词法全局 `document.body`，否则 Obsidian 1.13 的独立 Settings 窗口会看不到菜单。
 - `close()` 是幂等的：重复调用安全。
 - `destroy()` 会先清理 portal listeners 再移除 DOM，即使菜单处于打开状态也能安全清理。
 - 如果未来新增设置 modal 并直接创建 `<select>`，需要在 modal render 后调用 `enhanceSettingsDropdowns(contentEl)` 或直接使用 `enhanceSettingsSelect()`。

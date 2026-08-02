@@ -135,13 +135,24 @@ const HOST_MEASURING_SELECT_CLASS = 'is-measuring';
  * - detached selects (no measurable trigger geometry).
  */
 export function isEnhanceableRealSelect(selectEl: unknown): selectEl is HTMLSelectElement {
-  if (!(selectEl instanceof HTMLSelectElement)) return false;
-  if (!selectEl.isConnected) return false;
-  if (enhancedSelects.has(selectEl)) return false;
+  if (!selectEl || typeof selectEl !== 'object') return false;
+  const candidateElement = selectEl as Element;
+  const ownerWindowSelectElement = candidateElement.ownerDocument?.defaultView?.HTMLSelectElement;
+  // Obsidian 1.13's detached Settings window keeps select nodes on the main
+  // renderer's prototype chain even though their ownerDocument belongs to the
+  // Settings window. Accept either realm: requiring only the owner-window
+  // constructor silently skips every real Settings dropdown and exposes the
+  // host-native select instead of OpenCodian's custom control.
+  const isSelectElement = candidateElement instanceof HTMLSelectElement
+    || (ownerWindowSelectElement ? candidateElement instanceof ownerWindowSelectElement : candidateElement.tagName === 'SELECT');
+  if (!isSelectElement) return false;
+  const candidate = candidateElement as HTMLSelectElement;
+  if (!candidate.isConnected) return false;
+  if (enhancedSelects.has(candidate)) return false;
   // `.dropdown` is the class Obsidian's DropdownComponent puts on its select;
   // `.is-measuring` is the transient width probe added in 1.13. A real plugin
   // dropdown select carries `.dropdown` (or no class) but never `.is-measuring`.
-  if (selectEl.classList.contains(HOST_MEASURING_SELECT_CLASS)) return false;
+  if (candidate.classList.contains(HOST_MEASURING_SELECT_CLASS)) return false;
   return true;
 }
 
@@ -288,7 +299,8 @@ function renderMenuOptions(menuEl: HTMLElement, ctx: MenuRenderContext): void {
       isCategoryHeader ? ' is-category-header' : '',
       index === ctx.highlightedIndex ? ' is-highlighted' : '',
     ].join('');
-    const optionEl = menuEl.createEl('button', { cls });
+    const optionEl = menuEl.ownerDocument.createElement('button');
+    optionEl.className = cls;
     optionEl.id = `${ctx.optionIdPrefix}-${index}`;
     optionEl.type = 'button';
     optionEl.tabIndex = -1;
@@ -299,14 +311,20 @@ function renderMenuOptions(menuEl: HTMLElement, ctx: MenuRenderContext): void {
       optionEl.setAttribute('aria-disabled', String(option.disabled));
     }
     // Wrap label in a span so text-overflow: ellipsis works correctly
-    optionEl.createSpan({ cls: 'opencodian-settings-dropdown-option-label', text: option.label });
+    const labelEl = menuEl.ownerDocument.createElement('span');
+    labelEl.className = 'opencodian-settings-dropdown-option-label';
+    labelEl.textContent = option.label;
+    optionEl.appendChild(labelEl);
     optionEl.disabled = option.disabled;
     if (!isCategoryHeader) {
-      const checkEl = optionEl.createSpan({ cls: 'opencodian-settings-dropdown-option-check' });
+      const checkEl = menuEl.ownerDocument.createElement('span');
+      checkEl.className = 'opencodian-settings-dropdown-option-check';
+      optionEl.appendChild(checkEl);
       if (index === ctx.selectedIndex) {
         setIcon(checkEl, 'check');
       }
     }
+    menuEl.appendChild(optionEl);
     optionEl.addEventListener('click', () => {
       ctx.onSelect(index);
     });
@@ -323,11 +341,13 @@ function attachPortalListeners(
   closeFn: () => void,
   positionMenuFn: () => void,
 ): () => void {
+  const ownerDocument = triggerEl.ownerDocument;
+  const ownerWindow = ownerDocument.defaultView ?? window;
   let rafId = 0;
 
   const schedulePosition = () => {
     if (rafId) return;
-    rafId = requestAnimationFrame(() => {
+    rafId = ownerWindow.requestAnimationFrame(() => {
       rafId = 0;
       if (!isOpenRef()) return;
       if (!triggerEl.isConnected) {
@@ -335,7 +355,7 @@ function attachPortalListeners(
         return;
       }
       const triggerRect = triggerEl.getBoundingClientRect();
-      if (triggerRect.bottom < 0 || triggerRect.top > window.innerHeight) {
+      if (triggerRect.bottom < 0 || triggerRect.top > ownerWindow.innerHeight) {
         closeFn();
         return;
       }
@@ -343,13 +363,13 @@ function attachPortalListeners(
     });
   };
 
-  document.addEventListener('scroll', schedulePosition, { capture: true, passive: true });
-  window.addEventListener('resize', schedulePosition, { passive: true });
+  ownerDocument.addEventListener('scroll', schedulePosition, { capture: true, passive: true });
+  ownerWindow.addEventListener('resize', schedulePosition, { passive: true });
 
   return () => {
-    cancelAnimationFrame(rafId);
-    document.removeEventListener('scroll', schedulePosition, { capture: true });
-    window.removeEventListener('resize', schedulePosition);
+    ownerWindow.cancelAnimationFrame(rafId);
+    ownerDocument.removeEventListener('scroll', schedulePosition, { capture: true });
+    ownerWindow.removeEventListener('resize', schedulePosition);
   };
 }
 
@@ -461,30 +481,32 @@ export function enhanceSettingsSelect(
     return existingHandle;
   }
 
-  const rootEl = document.createElement('div');
+  const ownerDocument = selectEl.ownerDocument;
+  const ownerWindow = ownerDocument.defaultView ?? window;
+  const rootEl = ownerDocument.createElement('div');
   rootEl.className = 'opencodian-settings-dropdown';
-  const triggerEl = rootEl.createEl('button', {
-    cls: 'opencodian-settings-dropdown-trigger',
-    attr: {
-      type: 'button',
-      role: 'combobox',
-      'aria-haspopup': 'listbox',
-      'aria-autocomplete': 'none',
-      'aria-expanded': 'false',
-    },
-  });
-  const labelEl = triggerEl.createSpan({ cls: 'opencodian-settings-dropdown-label' });
-  const chevronEl = triggerEl.createSpan({ cls: 'opencodian-settings-dropdown-chevron' });
+  const triggerEl = ownerDocument.createElement('button');
+  triggerEl.className = 'opencodian-settings-dropdown-trigger';
+  triggerEl.type = 'button';
+  triggerEl.setAttribute('role', 'combobox');
+  triggerEl.setAttribute('aria-haspopup', 'listbox');
+  triggerEl.setAttribute('aria-autocomplete', 'none');
+  triggerEl.setAttribute('aria-expanded', 'false');
+  rootEl.appendChild(triggerEl);
+  const labelEl = ownerDocument.createElement('span');
+  labelEl.className = 'opencodian-settings-dropdown-label';
+  triggerEl.appendChild(labelEl);
+  const chevronEl = ownerDocument.createElement('span');
+  chevronEl.className = 'opencodian-settings-dropdown-chevron';
+  triggerEl.appendChild(chevronEl);
   setIcon(chevronEl, 'chevron-down');
 
   const menuId = `opencodian-settings-dropdown-menu-${nextDropdownId++}`;
-  const menuEl = rootEl.createDiv({
-    cls: 'opencodian-settings-dropdown-menu is-hidden',
-    attr: {
-      id: menuId,
-      role: 'listbox',
-    },
-  });
+  const menuEl = ownerDocument.createElement('div');
+  menuEl.className = 'opencodian-settings-dropdown-menu is-hidden';
+  menuEl.id = menuId;
+  menuEl.setAttribute('role', 'listbox');
+  rootEl.appendChild(menuEl);
   triggerEl.setAttribute('aria-controls', menuId);
 
   selectEl.classList.add('opencodian-settings-native-select');
@@ -505,7 +527,7 @@ export function enhanceSettingsSelect(
 
   const syncDisabledState = () => {
     triggerEl.disabled = selectEl.disabled;
-    rootEl.toggleClass('is-disabled', selectEl.disabled);
+    rootEl.classList.toggle('is-disabled', selectEl.disabled);
   };
 
   const syncActiveDescendant = () => {
@@ -536,7 +558,7 @@ export function enhanceSettingsSelect(
 
   const renderTrigger = () => {
     const selectedOption = options[getSelectedIndex()];
-    labelEl.setText(selectedOption?.label ?? selectEl.value);
+    labelEl.textContent = selectedOption?.label ?? selectEl.value;
     syncAccessibleName();
     syncDisabledState();
   };
@@ -550,13 +572,13 @@ export function enhanceSettingsSelect(
   };
 
   const positionMenu = (): boolean => {
-    menuEl.removeClass('is-scrollable');
+    menuEl.classList.remove('is-scrollable');
     const pos = computePortalPosition({
       desiredMenuWidth: estimateMenuWidth(options),
       menuScrollHeight: menuEl.scrollHeight,
       triggerRect: triggerEl.getBoundingClientRect(),
-      viewportHeight: window.innerHeight,
-      viewportWidth: window.innerWidth,
+      viewportHeight: ownerWindow.innerHeight,
+      viewportWidth: ownerWindow.innerWidth,
     });
     menuEl.style.width = pos.width;
     if (pos.insufficientSpace) {
@@ -567,9 +589,9 @@ export function enhanceSettingsSelect(
     menuEl.style.bottom = pos.bottom;
     menuEl.style.left = pos.left;
     menuEl.style.maxHeight = pos.maxHeight;
-    menuEl.toggleClass('is-flipped', pos.placement === 'above');
+    menuEl.classList.toggle('is-flipped', pos.placement === 'above');
     const maxHeight = parseFloat(pos.maxHeight);
-    menuEl.toggleClass('is-scrollable', Number.isFinite(maxHeight) && menuEl.scrollHeight > maxHeight);
+    menuEl.classList.toggle('is-scrollable', Number.isFinite(maxHeight) && menuEl.scrollHeight > maxHeight);
     return false;
   };
 
@@ -583,11 +605,11 @@ export function enhanceSettingsSelect(
     popDropdownScope();
     if (!isOpen && menuEl.parentElement === rootEl) return;
     isOpen = false;
-    rootEl.removeClass('is-open');
-    menuEl.addClass('is-hidden');
-    menuEl.removeClass('is-portal');
-    menuEl.removeClass('is-flipped');
-    menuEl.removeClass('is-scrollable');
+    rootEl.classList.remove('is-open');
+    menuEl.classList.add('is-hidden');
+    menuEl.classList.remove('is-portal');
+    menuEl.classList.remove('is-flipped');
+    menuEl.classList.remove('is-scrollable');
     triggerEl.setAttribute('aria-expanded', 'false');
     triggerEl.removeAttribute('aria-activedescendant');
     resetPortalStyles();
@@ -628,12 +650,12 @@ export function enhanceSettingsSelect(
       keymap.pushScope(dropdownScope);
       isScopePushed = true;
     }
-    rootEl.addClass('is-open');
-    menuEl.removeClass('is-hidden');
+    rootEl.classList.add('is-open');
+    menuEl.classList.remove('is-hidden');
     triggerEl.setAttribute('aria-expanded', 'true');
     renderOptions();
-    document.body.appendChild(menuEl);
-    menuEl.addClass('is-portal');
+    ownerDocument.body.appendChild(menuEl);
+    menuEl.classList.add('is-portal');
     const didClose = positionMenu();
     if (didClose || !isOpen) return;
     portalCleanup = attachPortalListeners(
@@ -675,7 +697,7 @@ export function enhanceSettingsSelect(
     refresh();
     close();
     triggerEl.focus();
-    if (changed) selectEl.dispatchEvent(new Event('change', { bubbles: true }));
+    if (changed) selectEl.dispatchEvent(new ownerWindow.Event('change', { bubbles: true }));
   };
 
   const handleTriggerKeydown = (event: KeyboardEvent) => {
@@ -692,25 +714,25 @@ export function enhanceSettingsSelect(
   };
 
   const handleDocumentPointerDown = (event: PointerEvent | MouseEvent) => {
-    const target = event.target;
-    if (!(target instanceof Node) || rootEl.contains(target) || selectEl.contains(target) || menuEl.contains(target)) return;
+    const target = event.target as Node | null;
+    if (!target || typeof target.nodeType !== 'number' || rootEl.contains(target) || selectEl.contains(target) || menuEl.contains(target)) return;
     close();
   };
 
-  const mutationObserver = new MutationObserver(refresh);
+  const mutationObserver = new ownerWindow.MutationObserver(refresh);
 
   triggerEl.addEventListener('click', () => { if (isOpen) { close(); } else { open(); } });
   triggerEl.addEventListener('keydown', handleTriggerKeydown);
   selectEl.addEventListener('change', refresh);
-  document.addEventListener('pointerdown', handleDocumentPointerDown);
+  ownerDocument.addEventListener('pointerdown', handleDocumentPointerDown);
   mutationObserver.observe(selectEl, { attributes: true, attributeFilter: ['aria-label', 'aria-labelledby', 'disabled', 'label', 'value'], childList: true, subtree: true });
 
   const handle: SettingsDropdownControlHandle = {
     close,
     destroy: () => {
       close();
-      if (menuEl.parentElement === document.body) menuEl.remove();
-      document.removeEventListener('pointerdown', handleDocumentPointerDown);
+      if (menuEl.parentElement === ownerDocument.body) menuEl.remove();
+      ownerDocument.removeEventListener('pointerdown', handleDocumentPointerDown);
       selectEl.removeEventListener('change', refresh);
       mutationObserver.disconnect();
       rootEl.remove();

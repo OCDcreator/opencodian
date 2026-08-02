@@ -65,6 +65,38 @@ Authoritative references:
   realSelects` with `enhancedProbeCount === 0` and `noProbeEnhanced === true`
   (probes carry host `aria-hidden=true`, untouched); `obsidian dev:errors` empty.
 
+### 1.1 Detached native Settings dropdown portal — **已修复（Obsidian 1.13.4 运行时已验证）**
+
+- Symptom (Obsidian 1.13.4 native Settings window): clicking a custom dropdown
+  flips its trigger chevron to the open state, but no option list is visible in
+  the same window.
+- Root cause: `SettingsDropdownControl` created its visual root, portal, global
+  event listeners, viewport sizing, RAF, and change event from lexical
+  `document` / `window`. In Obsidian 1.13's detached native Settings window,
+  those globals still resolve to the main vault renderer, so the menu was
+  appended to the main-window `body`, not merely hidden behind a higher z-index.
+- Fix: resolve `selectEl.ownerDocument` and its `defaultView` once per enhanced
+  select; create the custom DOM in that document, portal to its body, and scope
+  positioning/listener/cleanup/event work to that window. The outside-click
+  guard is realm-safe. Crucially, `isEnhanceableRealSelect()` accepts either the
+  main-renderer or owner-window `HTMLSelectElement` realm: detached Settings
+  select nodes retain the former prototype while reporting the latter document.
+- Regression coverage: `tests/unit/features/settings/SettingsDropdownControl.test.ts`
+  creates a dropdown in an iframe-backed foreign document, asserts its open
+  menu is never attached to the main document, and verifies close returns it to
+  the foreign root. The focused suite passes locally.
+- The earlier menu-visibility check was insufficient: it proved a list could
+  open in the window but did not assert that the custom root replaced the native
+  select. It was therefore able to pass while the UI had regressed to the host
+  control.
+- **Runtime acceptance (2026-08-02, `main.202608021136`):** after opening the
+  real OpenCodian page in the detached `设置 - testvault - Obsidian 1.13.4`
+  window, `customRoots=2`, `realSelects=2`, `enhancedSelects=2`, and
+  `measuringProbes=2`. Opening the first control produced one portal listbox
+  with two options; its `ownerDocument.title` was that Settings window and its
+  parent was that window's `body`. The visual capture showed OpenCodian's custom
+  trigger and option styling, not the host-native select/menu.
+
 ## 2. New Settings API / global search — **已修复 (Phase B, 1.13.4 已验证)**
 
 - Obsidian 1.13 deprecates `PluginSettingTab.display()` and renders declaratively
@@ -174,9 +206,11 @@ Authoritative references:
   The host IS Obsidian 1.13.4 (this is not a version gap); the untested scenario is
   specifically scroll-restore/quick-nav behavior inside the new detached settings
   Electron window, because `obsidian eval` runs in the main vault window and cannot
-  reach the settings window's DOM after it detaches. Declarative-page render,
-  dropdown single-trigger, and no-double-render WERE verified in the settings window
-  via the settings-doc (`ownerDocument`) path while reachable.
+  reach the settings window's DOM after it detaches. Declarative-page render and
+  dropdown single-trigger/no-double-render were verified there, but that did **not**
+  verify the custom menu portal: the prior portal code still used the main renderer's
+  global document and therefore rendered the open menu in the wrong window. Item 1.1
+  records the corrective owner-document scope and its pending runtime recheck.
 
 ## 9. Windows cross-platform — **未验证**
 
