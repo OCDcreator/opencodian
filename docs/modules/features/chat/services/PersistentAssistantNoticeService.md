@@ -9,7 +9,7 @@
 
 - 用统一的 `displayStyle: 'notice'` 结构构造持久化 assistant notice message
 - 按 `title + content + tone` 扫描 conversation 历史，供 session todo / background task stale / completion notice 做 persisted dedupe
-- 在当前可见会话里先渲染 notice，再写入 conversation、更新 sync fingerprint，并触发 hydration/scroll 后续动作
+- 通过共享 conversation write serialization state 先写入并保存 notice、更新 sync fingerprint，再在当前可见会话里渲染并触发 hydration/scroll 后续动作
 - 在隐藏 tab 会话里只做持久化与 fingerprint 写回，再标记 tab attention
 
 它不决定 notice 何时出现，也不生成 session todo / background task 的 fingerprint 与文案；这些规则仍分别由 `SessionTodoStateService` 与 `BackgroundTaskNoticeStateService` 持有。
@@ -42,8 +42,8 @@ export class PersistentAssistantNoticeService {
 
 ### visible / hidden append 路由
 
-- `appendMessage()` 对当前可见会话会先调用 host render，再把 notice 真正 push 进 conversation 并保存，保持现有 UI 出现顺序
-- 保存后统一通过 `TabConversationSyncFingerprintRuntimePort` 写回 conversation sync fingerprint；可见会话走 hydration pending-layout / settled-scroll follow-up，隐藏 tab 走 attention 标记
+- `appendMessage()` 通过 `ConversationWriteSerializationService` 与 authoritative sync / send finalization 共用 conversation 级写入队列；notice 会先进入 conversation、完成保存并写回 sync fingerprint，之后才允许可见会话 render，避免 UI 已出现但 canonical rerender 仍读不到本地记录
+- 可见 notice render 也保持在同一 serialized write 内，防止排在其后的 authoritative sync 在 notice 尚未落到 DOM 时抢先应用；提交成功后可见会话走 hydration pending-layout / settled-scroll follow-up，隐藏 tab 走 attention 标记
 - `noticeActions` 与 `noticeMeta` 会原样透传，供 model-unavailable notice 与 background-task completion notice 继续复用
 
 ## 与 `OpenCodianView` 的边界

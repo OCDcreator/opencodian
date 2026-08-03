@@ -128,7 +128,12 @@ export class ConversationAuthoritativeReloadCoordinator {
       );
       const syncMerge = this.getConversationServerSyncMerge(syncContext, snapshot);
 
-      const writeApplied = await this.applyConversationServerSyncMessages(conversation, ticket, syncMerge, 'authoritative-server-sync');
+      const writeApplied = await this.applyConversationServerSyncMessages(conversation, {
+        tabId,
+        ticket,
+        syncMerge,
+        reason: 'authoritative-server-sync',
+      });
       if (!writeApplied) {
         return this.buildSkippedConversationServerSyncResult(conversation);
       }
@@ -203,7 +208,12 @@ export class ConversationAuthoritativeReloadCoordinator {
       snapshot.convertedServerMessages,
     );
     const syncMerge = this.getConversationServerSyncMerge(syncContext, snapshot);
-    const writeApplied = await this.applyConversationServerSyncMessages(conversation, ticket, syncMerge, 'authoritative-canonical-sync');
+    const writeApplied = await this.applyConversationServerSyncMessages(conversation, {
+      tabId,
+      ticket,
+      syncMerge,
+      reason: 'authoritative-canonical-sync',
+    });
     if (!writeApplied) {
       return this.buildSkippedConversationServerSyncResult(conversation);
     }
@@ -533,11 +543,45 @@ export class ConversationAuthoritativeReloadCoordinator {
 
   private async applyConversationServerSyncMessages(
     conversation: Conversation,
-    ticket: ReturnType<ConversationAuthoritativeReloadHost['createConversationWriteTicket']>,
-    syncMerge: ConversationServerSyncMergeResult,
-    reason: string,
+    options: {
+      tabId: TabId | null;
+      ticket: ReturnType<ConversationAuthoritativeReloadHost['createConversationWriteTicket']>;
+      syncMerge: ConversationServerSyncMergeResult;
+      reason: string;
+    },
   ): Promise<boolean> {
+    const { tabId, ticket, syncMerge, reason } = options;
     return this.host.commitConversationWrite(conversation, ticket, reason, () => {
+      const previousCacheFingerprint = this.host.getConversationSyncFingerprint(conversation.messages);
+      const previousFingerprint = this.host.getTabRuntimeState(tabId)?.lastConversationSyncFingerprint
+        ?? previousCacheFingerprint;
+      const turnDiffSourceMessageIds = new Set(
+        syncMerge.merged.flatMap((message) => {
+          const sourceMessageId = getTurnDiffNoticeMeta(message)?.sourceMessageId;
+          return sourceMessageId ? [sourceMessageId] : [];
+        }),
+      );
+      const lateTurnDiffNotices = conversation.messages.filter((message) => {
+        const sourceMessageId = getTurnDiffNoticeMeta(message)?.sourceMessageId;
+        if (!sourceMessageId || turnDiffSourceMessageIds.has(sourceMessageId)) {
+          return false;
+        }
+        turnDiffSourceMessageIds.add(sourceMessageId);
+        return true;
+      });
+
+      if (lateTurnDiffNotices.length > 0) {
+        syncMerge.merged = [...syncMerge.merged, ...lateTurnDiffNotices]
+          .sort((left, right) => left.timestamp - right.timestamp);
+        syncMerge.preservedClientOnlyMessages = [
+          ...syncMerge.preservedClientOnlyMessages,
+          ...lateTurnDiffNotices,
+        ];
+      }
+
+      syncMerge.fingerprint = this.host.getConversationSyncFingerprint(syncMerge.merged);
+      syncMerge.changed = syncMerge.fingerprint !== previousFingerprint;
+      syncMerge.cacheWritebackChanged = syncMerge.fingerprint !== previousCacheFingerprint;
       conversation.messages = syncMerge.merged;
       if (syncMerge.cacheWritebackChanged) {
         conversation.updatedAt = Date.now();

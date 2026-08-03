@@ -37,7 +37,7 @@
 Run before merge: `npm run typecheck`, `npm run module-docs`.
 
 ## Recent change notes
-- **Authoritative-sync preservation:** valid turn-change records are locally persisted, deduplicated by their anchored user-message ID, and retained across authoritative reload; malformed or generic local notices do not receive that preservation rule.
+- **Authoritative-sync preservation:** persistent assistant notices share the conversation write queue with authoritative sync. Valid turn-change records are persisted before visible rendering, deduplicated by their anchored user-message ID, and narrowly rebased if they arrive after merge calculation but before serialized commit; malformed or generic local notices do not receive that preservation rule.
 
 ## Hard invariants
 - Do not cross `forbiddenDependencies`.

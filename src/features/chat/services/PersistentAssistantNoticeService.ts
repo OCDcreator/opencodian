@@ -1,5 +1,6 @@
 import type { ChatMessage, Conversation } from '../../../core/types';
 import type { TabId } from '../tabs';
+import { ConversationWriteSerializationService } from './ConversationWriteSerializationService';
 import type { TabConversationSyncFingerprintRuntimePort } from './QuestionTodoBackgroundTaskRuntimeServiceBundle';
 
 export interface PersistentAssistantNoticeMessageOptions {
@@ -24,7 +25,10 @@ export interface PersistentAssistantNoticeServiceHost {
 }
 
 export class PersistentAssistantNoticeService {
-  constructor(private readonly host: PersistentAssistantNoticeServiceHost) {}
+  constructor(
+    private readonly host: PersistentAssistantNoticeServiceHost,
+    private readonly writeSerialization = new ConversationWriteSerializationService(),
+  ) {}
 
   hasMatchingMessage(
     title: string,
@@ -62,21 +66,39 @@ export class PersistentAssistantNoticeService {
 
     const targetTabId = options.tabId ?? this.host.getActiveTabId();
     const conversationSyncRuntime = this.host.getConversationSyncRuntime();
-    const fingerprint = conversationSyncRuntime.getConversationSyncFingerprint([
-      ...targetConversation.messages,
-      noticeMessage,
-    ]);
-    const targetConversationIsVisible =
-      this.host.getCurrentConversation()?.id === targetConversation.id;
+    const ticket = this.writeSerialization.createTicket(targetConversation.id);
+    let targetConversationIsVisible = false;
+    let renderError: unknown;
+    const commitResult = await this.writeSerialization.commit({
+      conversation: targetConversation,
+      ticket,
+      reason: 'persistent-assistant-notice',
+      write: async () => {
+        targetConversation.messages.push(noticeMessage);
+        targetConversation.updatedAt = timestamp;
+        await this.host.saveConversation(targetConversation);
+        conversationSyncRuntime.setTabConversationSyncFingerprint(
+          targetTabId,
+          conversationSyncRuntime.getConversationSyncFingerprint(targetConversation.messages),
+        );
 
-    if (targetConversationIsVisible) {
-      await this.host.renderAssistantMessage(noticeMessage);
+        targetConversationIsVisible =
+          this.host.getCurrentConversation()?.id === targetConversation.id;
+        if (targetConversationIsVisible) {
+          try {
+            await this.host.renderAssistantMessage(noticeMessage);
+          } catch (error) {
+            renderError = error;
+          }
+        }
+      },
+    });
+    if (!commitResult.applied) {
+      return;
     }
-
-    targetConversation.messages.push(noticeMessage);
-    targetConversation.updatedAt = timestamp;
-    await this.host.saveConversation(targetConversation);
-    conversationSyncRuntime.setTabConversationSyncFingerprint(targetTabId, fingerprint);
+    if (renderError) {
+      throw renderError;
+    }
 
     if (targetConversationIsVisible) {
       this.host.handleVisibleNoticeMessageAppended();

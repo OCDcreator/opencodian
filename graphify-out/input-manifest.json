@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "dfb7b47c645015a6e30e56ce19163976b91d839ee38e17a6c7c73cff1f80e1f4",
+  "digest": "bc22f352ea9236af21c12590ef7edeefdff90c828a3f68d064c70e19359563ae",
   "recordCount": 602,
   "records": [
     {
@@ -1331,7 +1331,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/services/ConversationAuthoritativeReloadCoordinator.ts",
-      "sha256": "1fd99f6a8715f43eddf7edd9146ce5b899f47eb39552db323da185fa61e65075"
+      "sha256": "6507322502135b8ce7886a0fce7317dbccad25363b48d590aba0d2847108d211"
     },
     {
       "kind": "src",
@@ -1551,7 +1551,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/services/PersistentAssistantNoticeService.ts",
-      "sha256": "97970bb247e90c0b844c6d0ba2cbd0f18e4624c5f129af4387f0b48771dd0349"
+      "sha256": "ca934d2d30337a2bd6a5e2afc9167fe1d00077b7af6848a4c496d563eee6b6d9"
     },
     {
       "kind": "src",
@@ -3014,7 +3014,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-08-03T03:23:19.326Z",
-  "headShaAtGeneration": "04ec31a14b340a72f9c3079508b5b89b9d964af4",
+  "generatedAt": "2026-08-03T05:40:40.454Z",
+  "headShaAtGeneration": "a01d953c6d81c35ca9560a1e942bc6e04872cdf0",
   "graphifyVersion": "graphify 0.9.31"
 }

@@ -1,3 +1,4 @@
+import { ConversationWriteSerializationService } from '../../../../src/features/chat/services/ConversationWriteSerializationService';
 import {
   PersistentAssistantNoticeService,
   type PersistentAssistantNoticeServiceHost,
@@ -6,35 +7,35 @@ import type {
   TabConversationSyncFingerprintRuntimePort,
 } from '../../../../src/features/chat/services/QuestionTodoBackgroundTaskRuntimeServiceBundle';
 
+function createHost(options?: {
+  currentConversation?: Record<string, unknown> | null;
+}): PersistentAssistantNoticeServiceHost & {
+  getConversationSyncRuntime: jest.Mock<TabConversationSyncFingerprintRuntimePort, []>;
+  renderAssistantMessage: jest.Mock;
+  saveConversation: jest.Mock;
+  handleVisibleNoticeMessageAppended: jest.Mock;
+  setTabNeedsAttention: jest.Mock;
+} {
+  const conversationSyncRuntime: jest.Mocked<TabConversationSyncFingerprintRuntimePort> = {
+    getConversationSyncFingerprint: jest.fn((messages: Array<Record<string, unknown>>) => {
+      const lastMessage = messages[messages.length - 1];
+      return `fingerprint:${messages.length}:${String(lastMessage?.id ?? 'missing')}`;
+    }),
+    setTabConversationSyncFingerprint: jest.fn(),
+  };
+
+  return {
+    getCurrentConversation: jest.fn().mockReturnValue(options?.currentConversation ?? null),
+    getActiveTabId: jest.fn().mockReturnValue('tab-1'),
+    getConversationSyncRuntime: jest.fn(() => conversationSyncRuntime),
+    renderAssistantMessage: jest.fn().mockResolvedValue(undefined),
+    saveConversation: jest.fn().mockResolvedValue(undefined),
+    handleVisibleNoticeMessageAppended: jest.fn(),
+    setTabNeedsAttention: jest.fn(),
+  };
+}
+
 describe('PersistentAssistantNoticeService', () => {
-  function createHost(options?: {
-    currentConversation?: Record<string, unknown> | null;
-  }): PersistentAssistantNoticeServiceHost & {
-    getConversationSyncRuntime: jest.Mock<TabConversationSyncFingerprintRuntimePort, []>;
-    renderAssistantMessage: jest.Mock;
-    saveConversation: jest.Mock;
-    handleVisibleNoticeMessageAppended: jest.Mock;
-    setTabNeedsAttention: jest.Mock;
-  } {
-    const conversationSyncRuntime: jest.Mocked<TabConversationSyncFingerprintRuntimePort> = {
-      getConversationSyncFingerprint: jest.fn((messages: Array<Record<string, unknown>>) => {
-        const lastMessage = messages[messages.length - 1];
-        return `fingerprint:${messages.length}:${String(lastMessage?.id ?? 'missing')}`;
-      }),
-      setTabConversationSyncFingerprint: jest.fn(),
-    };
-
-    return {
-      getCurrentConversation: jest.fn().mockReturnValue(options?.currentConversation ?? null),
-      getActiveTabId: jest.fn().mockReturnValue('tab-1'),
-      getConversationSyncRuntime: jest.fn(() => conversationSyncRuntime),
-      renderAssistantMessage: jest.fn().mockResolvedValue(undefined),
-      saveConversation: jest.fn().mockResolvedValue(undefined),
-      handleVisibleNoticeMessageAppended: jest.fn(),
-      setTabNeedsAttention: jest.fn(),
-    };
-  }
-
   it('matches an existing persisted notice in a conversation', () => {
     const conversation = {
       id: 'conversation-1',
@@ -109,6 +110,84 @@ describe('PersistentAssistantNoticeService', () => {
       );
     expect(host.handleVisibleNoticeMessageAppended).toHaveBeenCalledTimes(1);
     expect(host.setTabNeedsAttention).not.toHaveBeenCalled();
+  });
+
+  it('persists conversation state before rendering a visible turn diff notice', async () => {
+    const conversation = {
+      id: 'conversation-turn-diff',
+      messages: [],
+      updatedAt: 0,
+    } as never;
+    const events: string[] = [];
+    const host = createHost({ currentConversation: conversation });
+    host.saveConversation.mockImplementation(async () => {
+      events.push('save');
+    });
+    host.renderAssistantMessage.mockImplementation(async () => {
+      events.push('render');
+    });
+    const service = new PersistentAssistantNoticeService(host);
+
+    await service.appendMessage({
+      title: 'Files changed',
+      content: 'notes.md',
+      tone: 'info',
+      timestamp: 234,
+      noticeMeta: {
+        kind: 'turn-diff',
+        sourceMessageId: 'user-1',
+        entries: [{ file: 'notes.md', additions: 1, deletions: 0 }],
+      },
+    });
+
+    expect(events).toEqual(['save', 'render']);
+    expect(conversation.messages).toHaveLength(1);
+  });
+  it('queues notice persistence behind earlier conversation writes', async () => {
+    const conversation = {
+      id: 'conversation-serialized',
+      messages: [],
+      updatedAt: 0,
+    } as never;
+    const host = createHost({ currentConversation: conversation });
+    const writeSerialization = new ConversationWriteSerializationService();
+    let releaseBlocker: () => void = () => undefined;
+    const blockerGate = new Promise<void>((resolve) => {
+      releaseBlocker = resolve;
+    });
+    const blockerTicket = writeSerialization.createTicket(conversation.id);
+    const blockerCommit = writeSerialization.commit({
+      conversation,
+      ticket: blockerTicket,
+      reason: 'earlier-conversation-write',
+      write: async () => blockerGate,
+    });
+    const service = new PersistentAssistantNoticeService(host);
+
+    const appendPromise = service.appendMessage({
+      title: 'Files changed',
+      content: 'notes.md',
+      tone: 'info',
+      timestamp: 345,
+      noticeMeta: {
+        kind: 'turn-diff',
+        sourceMessageId: 'user-1',
+        entries: [{ file: 'notes.md', additions: 1, deletions: 0 }],
+      },
+    });
+    await Promise.resolve();
+
+    expect(conversation.messages).toHaveLength(0);
+    expect(host.saveConversation).not.toHaveBeenCalled();
+    expect(host.renderAssistantMessage).not.toHaveBeenCalled();
+
+    releaseBlocker();
+    await blockerCommit;
+    await appendPromise;
+
+    expect(conversation.messages).toHaveLength(1);
+    expect(host.saveConversation).toHaveBeenCalledTimes(1);
+    expect(host.renderAssistantMessage).toHaveBeenCalledTimes(1);
   });
 
   it('persists hidden-tab notices without rendering and marks attention', async () => {

@@ -125,6 +125,56 @@ function buildCanonicalRenderMessages(
     .messages;
 }
 
+function createTurnDiffRaceMessages(sessionId: string): CanonicalSessionMessage[] {
+  return [
+    {
+      info: {
+        id: 'user-race',
+        role: 'user',
+        sessionID: sessionId,
+        time: { created: 10 },
+      },
+      parts: [{
+        id: 'part-user-race',
+        sessionID: sessionId,
+        messageID: 'user-race',
+        type: 'text',
+        text: 'Edit notes',
+      }],
+    },
+    {
+      info: {
+        id: 'assistant-race',
+        role: 'assistant',
+        sessionID: sessionId,
+        time: { created: 20 },
+      },
+      parts: [{
+        id: 'part-assistant-race',
+        sessionID: sessionId,
+        messageID: 'assistant-race',
+        type: 'text',
+        text: 'Done',
+      }],
+    },
+  ];
+}
+
+function createTurnDiffRaceNotice(): ChatMessage {
+  return {
+    id: 'turn-diff-race-notice',
+    role: 'assistant',
+    content: 'changed notes.md',
+    timestamp: 30,
+    displayStyle: 'notice',
+    noticeMeta: {
+      kind: 'turn-diff',
+      sourceMessageId: 'user-race',
+      entries: [{ file: 'notes.md', additions: 2, deletions: 1 }],
+    },
+  };
+}
+
 describe('ConversationAuthoritativeSyncCoordinator server snapshot projection', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -293,6 +343,37 @@ describe('ConversationAuthoritativeSyncCoordinator server snapshot projection', 
       'assistant-1',
       'turn-diff-notice',
     ]);
+  });
+
+  it('preserves a turn diff notice appended after server merge but before serialized commit', async () => {
+    const conversation = createConversation('turn-diff-server-race');
+    const serverMessages = createTurnDiffRaceMessages(conversation.openCodeSessionId);
+    const turnDiffNotice = createTurnDiffRaceNotice();
+    const host = createHost({
+      getSessionMessages: jest.fn().mockResolvedValue(serverMessages),
+      hydrateOpenCodeMessage: jest.fn((info, parts) =>
+        OpenCodeService.openCodeMessageToChatMessage(info as never, parts as never)),
+      commitConversationWrite: jest.fn().mockImplementation(async (
+        _conversation: Conversation,
+        _ticket,
+        _reason,
+        write,
+      ) => {
+        conversation.messages.push(turnDiffNotice);
+        await write();
+        return true;
+      }),
+    });
+    const coordinator = new ConversationAuthoritativeSyncCoordinator(host);
+
+    const result = await coordinator.syncConversationMessagesFromServer(
+      conversation,
+      'tab-1',
+      'visible-background-sync',
+    );
+
+    expect(result.messages.filter((message) => message.id === turnDiffNotice.id)).toHaveLength(1);
+    expect(conversation.messages.filter((message) => message.id === turnDiffNotice.id)).toHaveLength(1);
   });
 });
 
@@ -465,6 +546,37 @@ describe('ConversationAuthoritativeSyncCoordinator canonical projection', () => 
     expect(conversation.messages).toEqual(expectedMessages);
     expect(host.saveConversation).toHaveBeenCalledTimes(1);
     expect(host.saveConversation).toHaveBeenCalledWith(conversation);
+  });
+
+  it('preserves a turn diff notice appended after canonical merge but before serialized commit', async () => {
+    const conversation = createConversation('turn-diff-canonical-race');
+    const canonicalMessages = createTurnDiffRaceMessages(conversation.openCodeSessionId);
+    const turnDiffNotice = createTurnDiffRaceNotice();
+    const host = createHost({
+      getCanonicalSessionMessages: jest.fn().mockReturnValue(canonicalMessages),
+      hydrateOpenCodeMessage: jest.fn((info, parts) =>
+        OpenCodeService.openCodeMessageToChatMessage(info as never, parts as never)),
+      commitConversationWrite: jest.fn().mockImplementation(async (
+        _conversation: Conversation,
+        _ticket,
+        _reason,
+        write,
+      ) => {
+        conversation.messages.push(turnDiffNotice);
+        await write();
+        return true;
+      }),
+    });
+    const coordinator = new ConversationAuthoritativeSyncCoordinator(host);
+
+    const result = await coordinator.syncConversationMessagesFromCanonicalState(
+      conversation,
+      'tab-1',
+      'sync-event:message.updated',
+    );
+
+    expect(result?.messages.filter((message) => message.id === turnDiffNotice.id)).toHaveLength(1);
+    expect(conversation.messages.filter((message) => message.id === turnDiffNotice.id)).toHaveLength(1);
   });
 
 });

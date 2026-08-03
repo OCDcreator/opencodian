@@ -31,10 +31,10 @@ export class ConversationAuthoritativeReloadCoordinator {
 - **OpenCode-only sync gate**: `syncConversationMessagesFromServer()` 在 `conversation.backend !== 'opencode'` 时直接返回无变化结果。server snapshot / revert 查询仍是 OpenCode-only sync 能力；缺失 backend session id 时返回空 snapshot，不伪造跨 backend history sync。
 - `syncConversationMessagesFromServer()` 现在也会先把 raw `[{ info, parts[] }]` snapshot 投影到同一份 canonical render input，再进入 authoritative merge，避免 render path 与 reload path 各自维护一套 message hydrate 顺序。
 - merge 之后仍然按 timestamp 排序，并继续复用 per-tab `lastConversationSyncFingerprint` 判断本轮是否真的发生 foreground render authoritative 变化；同时单独比较当前 `Conversation.messages` cache fingerprint，确保 canonical projection 已经是最新输入时仍会写回 stale compatibility cache。
-- merge 只保留带有效 `TurnDiffNoticeMeta` 的本地 turn diff card，并按 `noticeMeta.sourceMessageId` 去重后按时间线并入 authoritative/canonical 结果；锚点不使用 `ChatMessage.sourceMessageId`，避免覆盖 canonical user identity。generic client-only notice 仍遵循原有受限规则。
+- merge 只保留带有效 `TurnDiffNoticeMeta` 的本地 turn diff card，并按 `noticeMeta.sourceMessageId` 去重后按时间线并入 authoritative/canonical 结果；serialized write 真正执行时还会从最新 `conversation.messages` 再 rebase 一次仅限 typed Turn Change Record 的 late arrivals，避免排队期间新增的记录被早先计算的 authoritative snapshot 覆盖。锚点不使用 `ChatMessage.sourceMessageId`，generic client-only notice 也不会被这条 rebase 扩大保留范围。
 - 只有在 authoritative snapshot 为空时，才继续保留本地 interrupted assistant 作为恢复兜底；如果本轮发送在服务端接受 user message 之前就失败并生成了无 `sourceMessageId` 的本地 error notice，也会保留这一整组本地失败 turn，避免后续 background sync 把用户气泡和错误卡片清空；额外地，若本地只剩 timeout warning notice、而 authoritative snapshot 仍停在“最新 user 已落盘但 assistant 还没回来”的状态，也会继续保留这张 notice，直到 server 真的补回 assistant 为止。
 - preserved interrupted assistants 的日志 fingerprint 仍写回 tab runtime，避免 background/signal sync 重复刷同一条 preservation 日志。
-- compatibility/cache writeback 通过 host 注入的 conversation write ticket + commit 执行；ticket 过期时跳过本轮 apply，避免 finalization / latest-user hydration / background sync 的异步写入互相覆盖。
+- compatibility/cache writeback 通过 host 注入的 conversation write ticket + commit 执行；在 write callback 内完成 late Turn Change Record rebase 后，重新计算 render/cache fingerprint 与 `changed`，再提交实际 merged timeline。ticket 过期时跳过本轮 apply，避免 finalization / latest-user hydration / background sync 的异步写入互相覆盖。
 - compatibility/cache writeback 变化发生时会更新 `conversation.updatedAt` 并保存；`changed` 仍只表达 foreground render fingerprint 是否变化，避免 finalization / post-sync 把 cache dirty 当成 render drift。
 - 失败兜底仍返回当前 conversation messages 与 active conversation revert-state，不改变现有 auth-sync 完成门槛。
 
