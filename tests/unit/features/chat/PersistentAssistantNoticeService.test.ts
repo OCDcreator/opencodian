@@ -143,6 +143,40 @@ describe('PersistentAssistantNoticeService', () => {
     expect(events).toEqual(['save', 'render']);
     expect(conversation.messages).toHaveLength(1);
   });
+
+  it('persists a visible notice to the live conversation when the caller holds a detached copy', async () => {
+    const liveConversation = {
+      id: 'conversation-detached-copy',
+      messages: [],
+      updatedAt: 0,
+    } as never;
+    const detachedConversation = {
+      id: 'conversation-detached-copy',
+      messages: [],
+      updatedAt: 0,
+    } as never;
+    const host = createHost({ currentConversation: liveConversation });
+    const service = new PersistentAssistantNoticeService(host);
+
+    await service.appendMessage({
+      title: 'Files changed',
+      content: 'notes.md',
+      tone: 'info',
+      conversation: detachedConversation,
+      timestamp: 300,
+      noticeMeta: {
+        kind: 'turn-diff',
+        sourceMessageId: 'user-1',
+        entries: [{ file: 'notes.md', additions: 1, deletions: 0 }],
+      },
+    });
+
+    expect(host.saveConversation).toHaveBeenCalledWith(liveConversation);
+    expect(liveConversation.messages).toHaveLength(1);
+    expect(detachedConversation.messages).toHaveLength(0);
+    expect(host.renderAssistantMessage).toHaveBeenCalledTimes(1);
+  });
+
   it('queues notice persistence behind earlier conversation writes', async () => {
     const conversation = {
       id: 'conversation-serialized',

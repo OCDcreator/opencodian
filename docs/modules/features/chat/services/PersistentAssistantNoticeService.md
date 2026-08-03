@@ -43,6 +43,7 @@ export class PersistentAssistantNoticeService {
 ### visible / hidden append 路由
 
 - `appendMessage()` 通过 `ConversationWriteSerializationService` 与 authoritative sync / send finalization 共用 conversation 级写入队列；notice 会先进入 conversation、完成保存并写回 sync fingerprint，之后才允许可见会话 render，避免 UI 已出现但 canonical rerender 仍读不到本地记录
+- 调用方若仍持有同一 conversation id 的 detached 旧对象，而当前可见会话已经换成新的 live 对象，`appendMessage()` 会把 notice 写入并保存 live 对象；不会只把卡片画进 DOM、却把持久化记录留在随后会被 authoritative sync 淘汰的旧引用里
 - 可见 notice render 也保持在同一 serialized write 内，防止排在其后的 authoritative sync 在 notice 尚未落到 DOM 时抢先应用；提交成功后可见会话走 hydration pending-layout / settled-scroll follow-up，隐藏 tab 走 attention 标记
 - `noticeActions` 与 `noticeMeta` 会原样透传，供 model-unavailable notice 与 background-task completion notice 继续复用
 

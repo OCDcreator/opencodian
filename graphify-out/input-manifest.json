@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "20c8675bd42af77412a5e155d9dbcc43be6e74b36d8766b365849da12533d092",
+  "digest": "a220e7cd30e7d65bd5e7e6a8d2e5a09ffa6367dc20b28466dc8901600dbe719d",
   "recordCount": 602,
   "records": [
     {
@@ -1551,7 +1551,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/services/PersistentAssistantNoticeService.ts",
-      "sha256": "ca934d2d30337a2bd6a5e2afc9167fe1d00077b7af6848a4c496d563eee6b6d9"
+      "sha256": "5e9e60b2333c0658ecdb283835c77e212f8a04268eb949b3dcd4b5b1f2d421a7"
     },
     {
       "kind": "src",
@@ -3014,7 +3014,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-08-03T06:55:55.545Z",
-  "headShaAtGeneration": "16a6cbd328f667a8539b3e6514b1717cf30bd6cf",
+  "generatedAt": "2026-08-03T08:40:16.460Z",
+  "headShaAtGeneration": "f33b74e36d5be069443157ca4eb424c0cfa90847",
   "graphifyVersion": "graphify 0.9.31"
 }

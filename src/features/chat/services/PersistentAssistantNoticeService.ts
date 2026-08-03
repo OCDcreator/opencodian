@@ -59,10 +59,14 @@ export class PersistentAssistantNoticeService {
       noticeMeta: options.noticeMeta,
     };
 
-    const targetConversation = options.conversation ?? this.host.getCurrentConversation();
-    if (!targetConversation) {
+    const currentConversation = this.host.getCurrentConversation();
+    const requestedConversation = options.conversation ?? currentConversation;
+    if (!requestedConversation) {
       return;
     }
+    const targetConversation = currentConversation?.id === requestedConversation.id
+      ? currentConversation
+      : requestedConversation;
 
     const targetTabId = options.tabId ?? this.host.getActiveTabId();
     const conversationSyncRuntime = this.host.getConversationSyncRuntime();
