@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "f4ddfe25380a421c1167f12f0dc584bc1c1b89cf5725387393da3fbdc4af23f0",
+  "digest": "2c13c8da9dc03f72db6e2cec0b9478e594c5213d6b062c48cb848af383ac29ae",
   "recordCount": 602,
   "records": [
     {
@@ -861,7 +861,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/OpenCodianView.ts",
-      "sha256": "f25a3fb1ea5911aefb932a2aae7b738e1684488a72dc760575865ce5e94ad7a1"
+      "sha256": "af53b2ea666a2f61cdcb38f1b2de44ecc069359636c2d062dc0c8e8318bb01f5"
     },
     {
       "kind": "src",
@@ -1371,7 +1371,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/services/ConversationNoticeCoordinator.ts",
-      "sha256": "e9fcb68491d590c00ccbe9e819c79902e45702ce3114a8268ab3a84a80c4605e"
+      "sha256": "e680d4beef0f4f4a3c01fbc5682dd8d2f2eef449f1917272751c23f141179870"
     },
     {
       "kind": "src",
@@ -1541,7 +1541,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/services/ModifiedFilesSidebarCoordinator.ts",
-      "sha256": "a2ef83a52e657540888d226f0238609c39900b9ea61b22c1d62dde96979f6827"
+      "sha256": "9f2b043c67fd3a27817d2cabedcc81fbda286ce0846c0d70cc82894a8b64f015"
     },
     {
       "kind": "src",
@@ -3014,7 +3014,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-08-03T08:54:23.287Z",
-  "headShaAtGeneration": "935ce79be4ca4c2092effc15c7ac7a48ce6d15f4",
+  "generatedAt": "2026-08-03T11:04:27.846Z",
+  "headShaAtGeneration": "66548eeab46fa94a1fa9c15ba54acdc6e7f36f3e",
   "graphifyVersion": "graphify 0.9.31"
 }
