@@ -6,7 +6,7 @@ import type {
   ChatMessage,
   Conversation,
 } from '../../../core/types';
-import { getConversationBackendSessionId } from '../../../core/types';
+import { getConversationBackendSessionId, getTurnDiffNoticeMeta } from '../../../core/types';
 import { createLogger } from '../../../shared';
 import type { TabId } from '../tabs';
 import {
@@ -388,7 +388,22 @@ export class ConversationAuthoritativeReloadCoordinator {
       return existingMessages;
     }
 
+    const preservedTurnDiffKeys = new Set<string>();
     return existingMessages.filter((message) => {
+      const turnDiffMeta = getTurnDiffNoticeMeta(message);
+      if (turnDiffMeta) {
+        const key = turnDiffMeta.sourceMessageId;
+        if (
+          preservedTurnDiffKeys.has(key)
+          || syncedMessages.some((candidate) =>
+            getTurnDiffNoticeMeta(candidate)?.sourceMessageId === key)
+        ) {
+          return false;
+        }
+        preservedTurnDiffKeys.add(key);
+        return true;
+      }
+
       if (shouldPreserveInterruptedNoticeOnSync(existingMessages, syncedMessages, message)) {
         return true;
       }

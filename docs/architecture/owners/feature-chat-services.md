@@ -36,6 +36,9 @@
 ## Required gates
 Run before merge: `npm run typecheck`, `npm run module-docs`.
 
+## Recent change notes
+- **Authoritative-sync preservation:** valid turn-change records are locally persisted, deduplicated by their anchored user-message ID, and retained across authoritative reload; malformed or generic local notices do not receive that preservation rule.
+
 ## Hard invariants
 - Do not cross `forbiddenDependencies`.
 - Do not replicate canonical state in another owner.

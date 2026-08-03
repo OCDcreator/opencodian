@@ -222,10 +222,18 @@ describe('ConversationNoticeCoordinator diff notices', () => {
         messages: [{ role: 'user', sourceMessageId: 'msg-1' }],
       } as never, ['notes.md']);
 
-      expect(mockAppendPersistentNotice).toHaveBeenCalledWith(expect.objectContaining({
+    expect(mockAppendPersistentNotice).toHaveBeenCalledWith(expect.objectContaining({
         title: t('chat.diffNotice.title'),
         content: expect.stringContaining('[[notes.md]] modified (+1 / -0)'),
+        noticeMeta: expect.objectContaining({
+          kind: 'turn-diff',
+          sourceMessageId: 'msg-1',
+          entries: [{ file: 'notes.md', additions: 1, deletions: 0, status: 'modified' }],
+        }),
       }));
+      const noticeMeta = mockAppendPersistentNotice.mock.calls[0][0].noticeMeta;
+      expect(Object.isFrozen(noticeMeta)).toBe(true);
+      expect(Object.isFrozen(noticeMeta.entries)).toBe(true);
       expect(mockRenderBackgroundTaskIndicatorIfNeeded).toHaveBeenCalledWith('tab-active');
     });
 
@@ -273,6 +281,33 @@ describe('ConversationNoticeCoordinator diff notices', () => {
       } as never, ['notes.md'], 'tab-old');
 
       expect(mockRenderBackgroundTaskIndicatorIfNeeded).not.toHaveBeenCalled();
+    });
+
+    it('does not append a second turn diff notice for the same user anchor', async () => {
+      const coordinator = new ConversationNoticeCoordinator(createHost());
+      const conversation = {
+        openCodeSessionId: 'session',
+        messages: [
+          {
+            id: 'notice-1',
+            role: 'assistant',
+            content: 'diff',
+            timestamp: 2,
+            displayStyle: 'notice',
+            noticeMeta: {
+              kind: 'turn-diff',
+              sourceMessageId: 'msg-1',
+              entries: [{ file: 'notes.md', additions: 1, deletions: 0 }],
+            },
+          },
+          { role: 'user', sourceMessageId: 'msg-1' },
+        ],
+      };
+
+      await coordinator.appendTurnDiffNoticeIfNeeded(conversation as never, ['notes.md']);
+
+      expect(mockGetSessionDiff).not.toHaveBeenCalled();
+      expect(mockAppendPersistentNotice).not.toHaveBeenCalled();
     });
   });
 });

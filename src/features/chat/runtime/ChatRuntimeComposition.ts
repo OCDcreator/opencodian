@@ -28,7 +28,8 @@ import { Notice } from 'obsidian';
 import { AgentCapability, hasCapability } from '../../../core/agents';
 import { getConversationChatBackendService } from '../../../core/agents/backend/AgentBackendRouting';
 import { OpenCodeService } from '../../../core/opencode';
-import type { Conversation } from '../../../core/types';
+import type { ChatMessage, Conversation } from '../../../core/types';
+import { getTurnDiffNoticeMeta } from '../../../core/types';
 import { t } from '../../../i18n';
 import { getVaultBasePath } from '../../../shared';
 // Host-interface return types (tightened from `unknown` to remove as-never casts at call sites).
@@ -284,6 +285,7 @@ export interface ChatRuntimeCompositionHost {
       readonly server: { readonly mode: unknown };
       readonly slashCommandSkillMode: unknown;
       readonly questionCardPosition: string;
+      readonly showTurnChangeRecords: boolean;
       readonly backendSettings: { readonly claudeCode: { readonly autoTitle: boolean } };
     };
     readonly settingsTab: unknown;
@@ -595,6 +597,7 @@ export class ChatRuntimeComposition {
       },
       getActiveTabId: () => host.getActiveTabId(),
       getTabContextUsage: (tabId: TabId) => (host.tabManager?.getTabContextUsage(tabId) ?? null) as never,
+      showTurnChangeRecords: () => host.plugin.settings.showTurnChangeRecords,
     });
   }
 
@@ -668,6 +671,13 @@ export class ChatRuntimeComposition {
           host.plugin.openCodeService.getCanonicalSessionState(sessionId),
         hydrateOpenCodeMessage: (info: unknown, parts: unknown) =>
           host.plugin.openCodeService.hydrateOpenCodeMessage(info, parts) as never,
+        getLocalTurnDiffNotices: (conversationId: string): ChatMessage[] => {
+          const conversation = host.currentConversation;
+          if (!conversation || conversation.id !== conversationId) {
+            return [];
+          }
+          return conversation.messages.filter((message) => getTurnDiffNoticeMeta(message) !== null);
+        },
       },
     );
   }

@@ -66,6 +66,19 @@ context sources, tools, etc.) rather than by which file/backend they happen to
 originate from. Source grouping reduces the "where do I configure this?"
 scatter across tabs.
 
+### Chat Change Tracking
+
+**Turn Change Record**:
+An immutable, locally owned history record of the files changed by one
+completed agent turn. It is evidence of that turn, not a mutable description
+of the current working tree.
+_Avoid_: diff toast, temporary change card
+
+**Session Change Sidebar**:
+A mutable, current-session overview of files OpenCode changed, distinct from
+repository-wide Git status and from Turn Change Records.
+_Avoid_: Git changes sidebar, global change list
+
 ### Capability Lab
 
 The diagnostic/navigation surface (`SettingsCapabilityLabSection`) that shows

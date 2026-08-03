@@ -1,3 +1,5 @@
+/* eslint-disable max-lines -- Canonical projection regression scenarios stay grouped by sync owner. */
+
 import type {
   ChatMessage,
   Conversation,
@@ -215,6 +217,82 @@ describe('ConversationAuthoritativeSyncCoordinator server snapshot projection', 
     });
     expect(result.messages[0]?.contextAttachments).toBeUndefined();
     expect(result.messages[0]?.structured).toBeUndefined();
+  });
+
+  it('preserves one anchored local turn diff notice across authoritative sync', async () => {
+    const serverMessages: CanonicalSessionMessage[] = [
+      {
+        info: {
+          id: 'user-1',
+          role: 'user',
+          sessionID: 'session-turn-diff',
+          time: { created: 10 },
+        },
+        parts: [{
+          id: 'part-user-1',
+          sessionID: 'session-turn-diff',
+          messageID: 'user-1',
+          type: 'text',
+          text: 'edit notes',
+        }],
+      },
+      {
+        info: {
+          id: 'assistant-1',
+          role: 'assistant',
+          sessionID: 'session-turn-diff',
+          time: { created: 20 },
+        },
+        parts: [{
+          id: 'part-assistant-1',
+          sessionID: 'session-turn-diff',
+          messageID: 'assistant-1',
+          type: 'text',
+          text: 'done',
+        }],
+      },
+    ];
+    const turnDiffNotice: ChatMessage = {
+      id: 'turn-diff-notice',
+      role: 'assistant',
+      content: 'changed notes.md',
+      timestamp: 30,
+      displayStyle: 'notice',
+      noticeMeta: {
+        kind: 'turn-diff',
+        sourceMessageId: 'user-1',
+        entries: [{ file: 'notes.md', additions: 2, deletions: 1 }],
+      },
+    };
+    const conversation = createConversation('turn-diff-sync', {
+      messages: [
+        turnDiffNotice,
+        {
+          id: 'generic-local-notice',
+          role: 'assistant',
+          content: 'local-only generic notice',
+          timestamp: 31,
+          displayStyle: 'notice',
+          noticeTone: 'info',
+        },
+      ],
+    });
+    const host = createHost({
+      getSessionMessages: jest.fn().mockResolvedValue(serverMessages),
+      hydrateOpenCodeMessage: jest.fn((info, parts) =>
+        OpenCodeService.openCodeMessageToChatMessage(info as never, parts as never)),
+    });
+    const coordinator = new ConversationAuthoritativeSyncCoordinator(host);
+
+    const result = await coordinator.syncConversationMessagesFromServer(conversation, 'tab-1');
+
+    expect(result.messages.filter((message) => message.id === 'turn-diff-notice')).toHaveLength(1);
+    expect(result.messages.some((message) => message.id === 'generic-local-notice')).toBe(false);
+    expect(result.messages.map((message) => message.id)).toEqual([
+      'user-1',
+      'assistant-1',
+      'turn-diff-notice',
+    ]);
   });
 });
 

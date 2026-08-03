@@ -2,6 +2,11 @@ import type {
   ChatMessage,
   Conversation,
   SessionDiffEntry,
+  TurnDiffNoticeEntry,
+  TurnDiffNoticeMeta,
+} from '../../../core/types';
+import {
+  getTurnDiffNoticeMeta,
 } from '../../../core/types';
 import type { AgentBackendKind } from '../../../core/types/chat';
 import { t } from '../../../i18n';
@@ -157,6 +162,11 @@ export class ConversationNoticeCoordinator {
       return;
     }
 
+    if (conversation.messages.some((message) =>
+      getTurnDiffNoticeMeta(message)?.sourceMessageId === latestUserMessage.sourceMessageId)) {
+      return;
+    }
+
     const diffEntries = await this.host.getSessionDiff(
       conversation.openCodeSessionId,
       latestUserMessage.sourceMessageId,
@@ -178,10 +188,23 @@ export class ConversationNoticeCoordinator {
       return;
     }
 
+    const noticeEntries = Object.freeze(entries.map<TurnDiffNoticeEntry>((entry) => Object.freeze({
+      file: entry.file,
+      additions: entry.additions,
+      deletions: entry.deletions,
+      ...(entry.status ? { status: entry.status } : {}),
+    })));
+    const noticeMeta: TurnDiffNoticeMeta = Object.freeze({
+      kind: 'turn-diff',
+      sourceMessageId: latestUserMessage.sourceMessageId,
+      entries: noticeEntries,
+    });
+
     await this.host.appendPersistentNotice({
       title: t('chat.diffNotice.title'),
       content: this.formatDiffNoticeMarkdown(entries),
       tone: 'info',
+      noticeMeta,
       conversation,
       tabId,
     });

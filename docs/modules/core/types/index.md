@@ -47,6 +47,8 @@ OpenCodian 全局类型的主聚合入口。它把聊天、模型、设置、权
 | `QuestionResolution` | type | 问题解决状态 |
 | `SessionTodo` | type | 会话待办项 |
 | `SessionDiffEntry` | type | 会话差异条目 |
+| `TurnDiffNoticeEntry` / `TurnDiffNoticeMeta` | type | 本地不可变 turn diff notice 记录及其文件统计 |
+| `getTurnDiffNoticeMeta` | function | 将 notice 元数据收窄为 turn diff 记录 |
 | `OmoMessageMeta` | type | OMO 消息元数据 |
 | `VIEW_TYPE_OPENCODIAN` | const | 视图类型常量 `'opencodian-view'` |
 

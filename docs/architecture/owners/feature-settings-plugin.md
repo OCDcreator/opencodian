@@ -26,6 +26,9 @@
 ## Required gates
 Run before merge: `npm run typecheck`, `npm run module-docs`.
 
+## Recent change notes
+- **Conversation display preference:** `showTurnChangeRecords` defaults to enabled and controls only render visibility. Switching it off neither clears nor stops recording historical turn-change records.
+
 ## Hard invariants
 - Do not cross `forbiddenDependencies`.
 - Do not replicate canonical state in another owner.

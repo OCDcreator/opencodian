@@ -34,6 +34,9 @@
 ## Required gates
 Run before merge: `npm run typecheck`, `npm run module-docs`.
 
+## Recent change notes
+- **Canonical render seam:** runtime composition supplies valid local turn-change records to canonical OpenCode rendering and reads the display preference through `ConversationIdentityRuntime`; this preserves the record without broadening ordinary local-notice retention.
+
 ## Hard invariants
 - Do not cross `forbiddenDependencies`.
 - Do not replicate canonical state in another owner.

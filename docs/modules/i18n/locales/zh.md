@@ -1,5 +1,10 @@
 # Chinese Locale
 
+> 2026-08-03：更新修改文件侧栏文案，改为持久可点击入口、已就绪空状态/未就绪状态、点击/Escape 收起与仅当前 OpenCode 会话语义，不再描述悬浮或自动隐藏。
+> 2026-08-03：新增 `modifiedFiles.readyShort` / `modifiedFiles.unavailableShort` 短状态标签，适配窄侧栏单行摘要，完整空状态说明保留在面板正文。
+
+> 2026-08-02：新增 `settings.conversation.showTurnChangeRecords` 名称与说明（“显示本轮文件变更卡片”），明确关闭只隐藏、记录仍持续收集并保留，重新开启后恢复。
+
 > 2026-07-30: 新增完整 Codex 诊断文案组：模块说明、捕获/存储/通道标签、深度捕获正文策略、智能/完整导出与刷新/清空动作、最近轨迹筛选，以及不可用/成功提示；文案明确 Codex 轨迹与 OpenCode、Claude Code 诊断相互区分。
 
 > 2026-08-02（Obsidian 1.13 兼容）：新增 `settings.searchDesc`——供插件声明式 `SettingDefinitionPage` 使用，使 OpenCodian 在 Obsidian 1.13+ 全局设置搜索中可按名称与说明被发现。

@@ -66,6 +66,8 @@ export class ConversationNoticeCoordinator {
 ### turn diff notice
 
 - `appendTurnDiffNoticeIfNeeded()` 先查当前 session 的 live diff，再回退 cached diff，最后回退 edited file 列表
+- 生成的 notice 使用窄类型、冻结的 `TurnDiffNoticeMeta`：`sourceMessageId` 只存在于 `noticeMeta`，文件 entries 是只读本地快照，不写入 `ChatMessage.sourceMessageId`，因此不会污染 canonical user/assistant message identity
+- 同一用户 source anchor 已有 turn diff notice 时直接去重；generic client-only notice 不会因为此规则而扩大保留范围
 - **OpenCode-only diff gate**: `backend !== 'opencode'` 时直接返回。`getSessionDiff` 与 `getCachedSessionDiffEntries` 是 OpenCode-specific API，暂无 backend-neutral 等价物。Claude 等 backend 的 diff surface 未稳定完成前不伪造 diff notice。
 - `formatDiffNoticeMarkdown()` 输出 vault 链接、diff stats 与 status
 - 只有 active tab 才会补发 background task indicator

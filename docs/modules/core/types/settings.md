@@ -320,6 +320,7 @@ OpenCodian 的中央设置模式定义，包含 `OpenCodianSettings`、`DEFAULT_
 | `tabBarPosition` | `TabBarPosition` | `'below-header'` | 标签栏位置 |
 | `belowHeaderTabBarLayout` | `BelowHeaderTabBarLayout` | `'grid'` | 下方标签布局 |
 | `enableAutoScroll` | `boolean` | `true` | 启用自动滚动 |
+| `showTurnChangeRecords` | `boolean` | `true` | 是否在会话中显示历史回合文件变更记录；关闭只影响渲染，不删除数据 |
 | `chatFontSizePx` | `number` | `13` | 聊天正文的默认字体大小 |
 | `chatScrollMode` | `ChatScrollMode` | `'sticky-mask'` | 滚动模式 |
 | `inputPanelTheme` | `InputPanelThemeId` | `'preset'` | 输入面板主题 |

@@ -5,7 +5,7 @@
 
 ## 概述
 
-`SettingsConversationSection` 是 settings/conversation 分区的厚 owner。它从 `OpenCodianSettings.ts` 接管 conversation section 的完整 lifecycle：标题生成模式与备用标题模型 picker、项目级 compaction 配置编辑、聊天字体大小、问题卡片显示/位置、已回答卡片显示，以及 user markup 渲染开关。
+`SettingsConversationSection` 是 settings/conversation 分区的厚 owner。它从 `OpenCodianSettings.ts` 接管 conversation section 的完整 lifecycle：标题生成模式与备用标题模型 picker、项目级 compaction 配置编辑、聊天字体大小、回合变更记录显示开关、问题卡片显示/位置、已回答卡片显示，以及 user markup 渲染开关。
 
 它必须按当前 active backend 过滤能力：聊天字体大小与 user markup 渲染是通用显示设置，Claude Code 和 OpenCode 都可以显示；项目级 compaction、会话分享与问答卡片当前都依赖 OpenCode 机制，只有 active backend 为 `opencode` 时才装配、加载模型目录或监听 `.opencode/opencode.json`。
 
@@ -49,7 +49,7 @@
 - 在“会话标题”块装配 title mode dropdown 与 AI title model picker
 - 在“上下文压缩（项目级）”块装配 compaction controls
 - 在“会话分享（项目级）”块装配 OpenCode `share` mode dropdown
-- 在“阅读与显示”块装配 global session default chat font size
+- 在“阅读与显示”块装配 global session default chat font size 与回合变更记录显示开关；后者保存后刷新 conversation rendering，关闭只隐藏有效 turn-diff notice
 - 在“提问交互”块装配 question display mode、question card position、answered-card toggle
 - 在“消息渲染”块装配 user markup 渲染 toggle
 - 注册首次与后续模型目录变化时复用的 title-model refresh callback

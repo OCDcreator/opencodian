@@ -1,3 +1,5 @@
+/* eslint-disable max-lines -- Render orchestration remains the canonical owner for these seams. */
+
 import type {
   OpenCodeCanonicalMessageInfo,
   OpenCodeCanonicalPart,
@@ -7,6 +9,7 @@ import {
   type ChatMessage,
   type Conversation,
   getConversationBackendSessionId,
+  getTurnDiffNoticeMeta,
 } from '../../../core/types';
 import { TooltipLayerController } from '../../../shared/TooltipLayerController';
 import { summarizeChatMessageForDebug } from '../runtime/SendPipelineDebugSummaries';
@@ -65,6 +68,8 @@ export interface ConversationCanonicalRenderSource {
     info: OpenCodeCanonicalMessageInfo,
     parts: OpenCodeCanonicalPart[],
   ): ChatMessage;
+  /** Local persisted notices are not part of canonical OpenCode session state. */
+  getLocalTurnDiffNotices?(conversationId: string): ChatMessage[];
 }
 
 /** Flat dependency object passed from OpenCodianView to assemble a ConversationRenderHost. */
@@ -396,7 +401,35 @@ export class ConversationRenderService {
 
     const sessionId = getConversationBackendSessionId(conversation);
     const canonicalMessages = sessionId ? this.buildCanonicalRenderMessages(sessionId) : [];
-    return canonicalMessages.length > 0 ? canonicalMessages : (fallbackMessages ?? conversation.messages);
+    if (canonicalMessages.length === 0) {
+      return fallbackMessages ?? conversation.messages;
+    }
+
+    return this.mergeCanonicalWithLocalTurnDiffNotices(conversation.id, canonicalMessages);
+  }
+
+  private mergeCanonicalWithLocalTurnDiffNotices(
+    conversationId: string,
+    canonicalMessages: ChatMessage[],
+  ): ChatMessage[] {
+    const localNotices = this.canonicalRenderSource?.getLocalTurnDiffNotices?.(conversationId) ?? [];
+    if (localNotices.length === 0) {
+      return canonicalMessages;
+    }
+
+    const seenSourceMessageIds = new Set<string>();
+    const preservedNotices = localNotices.filter((message) => {
+      const sourceMessageId = getTurnDiffNoticeMeta(message)?.sourceMessageId;
+      if (!sourceMessageId || seenSourceMessageIds.has(sourceMessageId)) {
+        return false;
+      }
+      seenSourceMessageIds.add(sourceMessageId);
+      return !canonicalMessages.some((candidate) =>
+        getTurnDiffNoticeMeta(candidate)?.sourceMessageId === sourceMessageId);
+    });
+
+    return [...canonicalMessages, ...preservedNotices]
+      .sort((left, right) => left.timestamp - right.timestamp);
   }
 
   private buildCanonicalRenderMessages(sessionId: string): ChatMessage[] {

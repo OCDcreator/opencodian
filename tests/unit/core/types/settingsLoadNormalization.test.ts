@@ -46,6 +46,31 @@ describe('prepareLoadedSettingsBootstrapState backend normalization', () => {
 
     expect(state.settings.enabledBackends).toEqual(['opencode']);
     expect(state.settings.activeBackend).toBe('opencode');
+    expect(state.settings.showTurnChangeRecords).toBe(true);
+  });
+
+  it('defaults missing or invalid turn-change display settings to enabled', () => {
+    const buildState = (showTurnChangeRecords: unknown) => prepareLoadedSettingsBootstrapState({
+      core: {
+        data: { showTurnChangeRecords },
+        filePath: '.opencodian/settings.core.json',
+        source: 'primary',
+        shouldPersist: false,
+      },
+      ui: {
+        data: null,
+        filePath: '.opencodian/settings.ui.json',
+        source: 'missing',
+        shouldPersist: false,
+      },
+      writable: true,
+      shouldPersist: false,
+    });
+
+    expect(buildState(undefined).settings.showTurnChangeRecords).toBe(true);
+    expect(buildState(null).settings.showTurnChangeRecords).toBe(true);
+    expect(buildState('false').settings.showTurnChangeRecords).toBe(true);
+    expect(buildState(false).settings.showTurnChangeRecords).toBe(false);
   });
 
   it('preserves a valid Capability Lab backend selection from the UI settings envelope', () => {

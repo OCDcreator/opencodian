@@ -388,6 +388,7 @@ export class SettingsConversationSection {
 
   private renderDisplayBlock(containerEl: HTMLElement): void {
     this.addChatFontSizeSetting(containerEl);
+    this.addTurnChangeRecordsSetting(containerEl);
   }
 
   private renderDisplayTabBlock(containerEl: HTMLElement): void {
@@ -1280,6 +1281,21 @@ export class SettingsConversationSection {
             this.plugin.settings.chatFontSizePx = nextValue;
             text.setValue(String(nextValue));
             await this.saveGlobalSessionDefaults();
+          });
+      });
+  }
+
+  private addTurnChangeRecordsSetting(containerEl: HTMLElement): void {
+    new Setting(containerEl)
+      .setName(t('settings.conversation.showTurnChangeRecords.name'))
+      .setDesc(t('settings.conversation.showTurnChangeRecords.desc'))
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.plugin.settings.showTurnChangeRecords)
+          .onChange(async (value) => {
+            this.plugin.settings.showTurnChangeRecords = value;
+            await this.plugin.saveSettings();
+            this.plugin.refreshConversationRendering();
           });
       });
   }

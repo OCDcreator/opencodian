@@ -32,6 +32,9 @@
 ## Required gates
 Run before merge: `npm run typecheck`, `npm run module-docs`, `npm run build`.
 
+## Recent change notes
+- **Turn change record visibility:** the chat plugin port exposes the global `showTurnChangeRecords` display preference to the runtime without making the shell a second store for persisted notices.
+
 ## Hard invariants
 - Do not cross `forbiddenDependencies`.
 - Do not replicate canonical state in another owner.

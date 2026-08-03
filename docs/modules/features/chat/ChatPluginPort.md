@@ -13,7 +13,7 @@
 | 域 | 契约 |
 | --- | --- |
 | Obsidian / manifest | `app.vault`、manifest `dir/id` |
-| Settings | `OpenCodianSettings` 中聊天、backend、tab、theme、locale 等实际读取字段 |
+| Settings | `OpenCodianSettings` 中聊天、backend、tab、theme、locale 及回合变更记录显示开关等实际读取字段 |
 | OpenCode / config / model | `OpenCodeService`、`OpencodeConfigManager`、`ModelConfigService`、`ModelPricingService` 的窄方法集 |
 | UI contexts | Claude Code permission 与 Codex approval 的 active-tab/card renderer 回调 |
 | Settings tab | 可选的 scroll/refresh/navigation 回调 |

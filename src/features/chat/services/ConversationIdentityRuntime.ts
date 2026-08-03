@@ -2,7 +2,7 @@ import type {
   ChatMessage,
   Conversation,
 } from '../../../core/types';
-import { getConversationBackendSessionId } from '../../../core/types';
+import { getConversationBackendSessionId, getTurnDiffNoticeMeta } from '../../../core/types';
 import {
   buildMessageRenderGroups,
   injectLiveCompactionDivider,
@@ -18,6 +18,8 @@ export interface ConversationIdentityRuntimeHost {
   getActiveTabId(): TabId | null;
   /** Returns context usage state for a tab (used for compaction divider injection). */
   getTabContextUsage(tabId: TabId): { compactingAt?: number | null } | null;
+  /** Returns whether persisted turn-change records should be included in render output. */
+  showTurnChangeRecords(): boolean;
 }
 
 export class ConversationIdentityRuntime {
@@ -136,21 +138,32 @@ export class ConversationIdentityRuntime {
     }
 
     if (message.displayStyle === 'notice') {
+      if (this.isTurnChangeRecordHidden(message)) {
+        return false;
+      }
       return true;
     }
 
     if (message.role !== 'assistant') {
-      return Boolean(
-        message.content?.trim()
-        || (message.contentBlocks?.length ?? 0) > 0
-        || (message.contextAttachments?.length ?? 0) > 0
-        || (message.images?.length ?? 0) > 0
-        || message.questionResolution
-        || message.omo
-        || message.compactionDivider,
-      );
+      return this.hasRenderableNonAssistantContent(message);
     }
 
+    return this.hasRenderableAssistantContent(message);
+  }
+
+  private hasRenderableNonAssistantContent(message: ChatMessage): boolean {
+    return Boolean(
+      message.content?.trim()
+      || (message.contentBlocks?.length ?? 0) > 0
+      || (message.contextAttachments?.length ?? 0) > 0
+      || (message.images?.length ?? 0) > 0
+      || message.questionResolution
+      || message.omo
+      || message.compactionDivider,
+    );
+  }
+
+  private hasRenderableAssistantContent(message: ChatMessage): boolean {
     return Boolean(
       message.content?.trim()
       || (message.contentBlocks?.length ?? 0) > 0
@@ -159,6 +172,10 @@ export class ConversationIdentityRuntime {
       || message.omo
       || message.structured,
     );
+  }
+
+  private isTurnChangeRecordHidden(message: ChatMessage): boolean {
+    return getTurnDiffNoticeMeta(message) !== null && !this.host.showTurnChangeRecords();
   }
 
   private isBackgroundTaskCompletionReminder(message: ChatMessage): boolean {

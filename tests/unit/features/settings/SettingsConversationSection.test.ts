@@ -376,6 +376,21 @@ describe('SettingsConversationSection', () => {
     expect((plugin.openCodeService as { refreshSdkCapabilities: jest.Mock }).refreshSdkCapabilities).toHaveBeenCalledTimes(1);
   });
 
+  it('persists the global turn-change record display gate and refreshes conversation rendering', async () => {
+    const plugin = createPlugin({ showTurnChangeRecords: true });
+    createSection(plugin);
+
+    const toggle = findToggle(t('settings.conversation.showTurnChangeRecords.name'));
+    expect(toggle).toBeDefined();
+    expect(toggle?.control.setValue).toHaveBeenCalledWith(true);
+
+    await toggle?.onChange?.(false);
+
+    expect(plugin.settings.showTurnChangeRecords).toBe(false);
+    expect(plugin.saveSettings).toHaveBeenCalledTimes(1);
+    expect(plugin.refreshConversationRendering).toHaveBeenCalledTimes(1);
+  });
+
   it('dispose clears any registered title-model refresh callback', () => {
     let refreshTitleModelsCallback: (() => void) | undefined = () => {};
     const section = new SettingsConversationSection({

@@ -1,3 +1,5 @@
+/* eslint-disable max-lines -- Chat contracts remain co-located to preserve the persisted schema owner. */
+
 /**
  * Chat-related type definitions
  */
@@ -212,12 +214,53 @@ export interface ChatNoticeAction {
 }
 
 export interface ChatNoticeMeta {
-  kind: 'background-task-completion' | 'codex-provisional-warning';
+  kind: 'background-task-completion' | 'codex-provisional-warning' | 'turn-diff';
   conversationId?: string;
   anchorKey?: string;
   sourceReminderIds?: string[];
   allComplete?: boolean;
   taskIds?: string[];
+  sourceMessageId?: string;
+  entries?: readonly TurnDiffNoticeEntry[];
+}
+
+/** Immutable, local-only record attached to a persisted turn diff notice. */
+export interface TurnDiffNoticeEntry {
+  readonly file: string;
+  readonly additions: number;
+  readonly deletions: number;
+  readonly status?: SessionDiffEntry['status'];
+}
+
+export interface TurnDiffNoticeMeta extends ChatNoticeMeta {
+  readonly kind: 'turn-diff';
+  readonly sourceMessageId: string;
+  readonly entries: readonly TurnDiffNoticeEntry[];
+}
+
+export function getTurnDiffNoticeMeta(message: ChatMessage): TurnDiffNoticeMeta | null {
+  const meta = message.noticeMeta;
+  if (
+    message.displayStyle !== 'notice'
+    || meta?.kind !== 'turn-diff'
+    || typeof meta.sourceMessageId !== 'string'
+    || meta.sourceMessageId.trim().length === 0
+    || !Array.isArray(meta.entries)
+    || meta.entries.length === 0
+    || !meta.entries.every((entry) => (
+      Boolean(entry)
+      && typeof entry.file === 'string'
+      && entry.file.trim().length > 0
+      && typeof entry.additions === 'number'
+      && Number.isFinite(entry.additions)
+      && typeof entry.deletions === 'number'
+      && Number.isFinite(entry.deletions)
+    ))
+  ) {
+    return null;
+  }
+
+  return meta as TurnDiffNoticeMeta;
 }
 
 export type OmoReminderType =

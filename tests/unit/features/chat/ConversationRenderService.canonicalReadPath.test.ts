@@ -134,6 +134,54 @@ describe('ConversationRenderService canonical read-path migration', () => {
       expect(renderedIds).toEqual(['fb-user']);
     });
 
+    it('merges persisted local turn diff notices into canonical timeline once', async () => {
+      const conversation = createConversation([
+        createMessage({
+          id: 'turn-diff-notice',
+          role: 'assistant',
+          content: 'changed notes.md',
+          timestamp: 3,
+          displayStyle: 'notice',
+          noticeMeta: {
+            kind: 'turn-diff',
+            sourceMessageId: 'canonical-user',
+            entries: [{ file: 'notes.md', additions: 2, deletions: 1 }],
+          },
+        }),
+      ]);
+      const canonicalState: OpenCodeCanonicalSessionState = {
+        sessionID: 'session-1',
+        messages: [
+          createCanonicalMessage({ id: 'canonical-user', role: 'user', time: { created: 1 } }),
+          createCanonicalMessage({ id: 'canonical-assistant', role: 'assistant', time: { created: 4 } }),
+        ],
+        partsByMessageID: {
+          'canonical-user': [
+            createCanonicalPart({ id: 'p1', messageID: 'canonical-user', type: 'text', text: 'new' }),
+          ],
+          'canonical-assistant': [
+            createCanonicalPart({ id: 'p2', messageID: 'canonical-assistant', type: 'text', text: 'reply' }),
+          ],
+        },
+      };
+      const host = createHost({
+        getCurrentConversation: jest.fn().mockReturnValue(conversation),
+      });
+      const service = new ConversationRenderService(host, {
+        getCanonicalSessionState: jest.fn().mockReturnValue(canonicalState),
+        hydrateOpenCodeMessage: jest.fn(hydrateCanonicalMessage),
+        getLocalTurnDiffNotices: jest.fn().mockReturnValue(conversation.messages),
+      });
+
+      await service.rerenderConversationMessages(conversation);
+
+      const renderedIds = [...host.messagesEl.children].map(
+        (el) => (el as HTMLElement).dataset.messageId,
+      );
+      expect(renderedIds).toEqual(['canonical-user', 'turn-diff-notice', 'canonical-assistant']);
+      expect(renderedIds.filter((id) => id === 'turn-diff-notice')).toHaveLength(1);
+    });
+
     it('skips canonical session state lookup for non-OpenCode conversations', async () => {
       const fallbackMessages = [
         createMessage({ id: 'claude-user', role: 'user', content: 'claude fallback' }),

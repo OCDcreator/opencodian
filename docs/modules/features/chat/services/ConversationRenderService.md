@@ -99,6 +99,7 @@ export interface ConversationCanonicalRenderSource {
     info: OpenCodeCanonicalMessageInfo,
     parts: OpenCodeCanonicalPart[],
   ): ChatMessage;
+  getLocalTurnDiffNotices?(conversationId: string): ChatMessage[];
 }
 
 export class ConversationRenderService {
@@ -159,8 +160,8 @@ export class ConversationRenderService {
 
 - 只在当前活动 conversation 仍匹配、且消息容器存在时执行
 - 如果当前 session 已有 canonical state，会直接调用 `ConversationTurnViewModelBuilder.buildCanonicalRenderInput()` 生成稳定的 canonical render `ChatMessage[]`
-- canonical state 一旦可用，就直接成为 full rerender 与 synced update 的唯一 render 输入；`conversation.messages` 只在 canonical 缺失时才作为临时 fallback
-- **Tier 5 canonical read-path migration**: `resolveConversationRenderMessages` 现在使用 lazy fallback（`fallbackMessages?: ChatMessage[]` + `?? conversation.messages`），当 canonical state 可用时完全不读取 `conversation.messages`；`rerenderConversationMessages` 的诊断日志也使用已解析的 canonical 消息而非原始 `conversation.messages`
+- canonical state 一旦可用，就作为 assistant/user truth；通过 `ConversationCanonicalRenderSource.getLocalTurnDiffNotices()` 只追加冻结、按 `noticeMeta.sourceMessageId` 去重的本地 turn diff cards，其他 generic client-only notice 不会被放宽保留
+- canonical read path 仍保持 lazy fallback；local turn diff callback 独立读取持久化 notice，避免把本地 card 当成 canonical message 或写入顶层 source identity
 - 进入 hydration 前先抓取 scroll snapshot，并复用 `ScrollManager` 恢复 bottom / distance / anchor 语义
 - 重渲后继续刷新 background-task indicator、pane metrics 和 composer layout
 

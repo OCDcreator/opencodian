@@ -1,5 +1,10 @@
 # English Locale
 
+> 2026-08-03: Updated modified-files sidebar copy to describe a persistent clickable entry, ready-empty/unavailable states, click/Escape dismissal, and OpenCode-session-only semantics instead of hover/auto-hide behavior.
+> 2026-08-03: Added short `modifiedFiles.readyShort` / `modifiedFiles.unavailableShort` labels so narrow sidebar headers stay single-line while full empty-state explanations remain in the panel body.
+
+> 2026-08-02: Added `settings.conversation.showTurnChangeRecords` name/description for the global turn-change record display gate; copy explains that disabling only hides retained records and re-enabling restores them.
+
 > 2026-07-30: Added the complete Codex diagnostics copy group: module description, capture/storage/channel labels, deep-capture content policy, smart/full export and flush/clear actions, recent-trace filters, and unavailable/success notices. The strings explicitly distinguish Codex traces from OpenCode and Claude Code diagnostics.
 
 > 2026-08-02 (Obsidian 1.13 compat): Added `settings.searchDesc` — the description used by the plugin's declarative `SettingDefinitionPage` so OpenCodian is discoverable in global Settings search by name and description on Obsidian 1.13+.

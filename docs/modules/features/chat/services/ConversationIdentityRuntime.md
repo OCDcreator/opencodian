@@ -11,7 +11,7 @@
 - 单条消息的 visual signature 计算
 - conversation render list 的过滤、assistant merge、live compaction divider 注入与 compaction summary tagging
 
-它只依赖一个很小的 host seam：canonical fingerprint builder、活动 tab id 与 tab context usage。这样 `OpenCodianView` 继续负责 wiring，而 fingerprint / render-shaping 规则本身可以被 sync/render 协调器稳定复用。
+它只依赖一个很小的 host seam：canonical fingerprint builder、活动 tab id、tab context usage 与回合变更记录显示开关。这样 `OpenCodianView` 继续负责 wiring，而 fingerprint / render-shaping 规则本身可以被 sync/render 协调器稳定复用。
 
 ## 公开接口
 
@@ -20,6 +20,7 @@ export interface ConversationIdentityRuntimeHost {
   getCanonicalConversationFingerprint(messages: ChatMessage[]): string | undefined;
   getActiveTabId(): TabId | null;
   getTabContextUsage(tabId: TabId): { compactingAt?: number | null } | null;
+  showTurnChangeRecords(): boolean;
 }
 
 export class ConversationIdentityRuntime {
@@ -37,7 +38,7 @@ export class ConversationIdentityRuntime {
 ## 关键行为
 
 - `getConversationSyncFingerprint()` 先调用 host 注入的 canonical fingerprint builder；只有 builder 不可用时才退回原来的 JSON 字段映射，避免 view / service 自己重建 OpenCodeService 的判定逻辑
-- `shouldRenderConversationMessage()` 继续隐藏 background-task completion reminder，但保留 notice、question resolution、OMO、compaction divider 等非纯文本消息；**assistant 角色的 `structured` 字段也被视为可渲染依据**，避免 structured-only assistant message 在 render filtering 阶段被过滤掉
+- `shouldRenderConversationMessage()` 继续隐藏 background-task completion reminder，但保留 notice、question resolution、OMO、compaction divider 等非纯文本消息；有效 `turn-diff` notice 额外受 host 的 `showTurnChangeRecords()` gate 控制，关闭时只过滤渲染结果，不改写会话数据；**assistant 角色的 `structured` 字段也被视为可渲染依据**，避免 structured-only assistant message 在 render filtering 阶段被过滤掉
 - `getMessageVisualSignature()` 计算单条消息的 visual signature，用于 hydration / authoritative merge 后判断尾部 assistant 是否需要重渲；**签名包含 `structured` 字段和 `sourceMessageId` 字段**，确保仅 structured 变化或 `sourceMessageId` 回填时也能触发尾部/用户消息重渲
 - `getMessagesForRender()` 继续串联 `renderGroups.ts` 里的 `buildMessageRenderGroups()` → `mergeAssistantMessagesForRender()` → `injectLiveCompactionDivider()` → `tagCompactionSummaries()`，把 render-list shaping 留在单一 owner 内
 - **Backend-aware session identity**: sync fingerprint payload 中的 `sessionId` 现在通过 `getConversationBackendSessionId()` 解析，不再直接读取 `conversation.openCodeSessionId`。

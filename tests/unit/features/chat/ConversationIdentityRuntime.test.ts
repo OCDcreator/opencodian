@@ -17,6 +17,7 @@ function createHost(overrides: Partial<MockedHost> = {}): MockedHost {
     getCanonicalConversationFingerprint: jest.fn(),
     getActiveTabId: jest.fn(),
     getTabContextUsage: jest.fn(),
+    showTurnChangeRecords: jest.fn().mockReturnValue(true),
     ...overrides,
   };
 }

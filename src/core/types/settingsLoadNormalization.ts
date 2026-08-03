@@ -497,6 +497,8 @@ function normalizeLoadedPluginSettings(savedSettings: LoadedSettingsSnapshot | n
       backendSettings: normalizeBackendSettings(normalizedSettings?.backendSettings),
       server: context.normalizedServer,
       enableTabs: normalizedSettings?.enableTabs ?? DEFAULT_SETTINGS.enableTabs,
+      showTurnChangeRecords: typeof normalizedSettings?.showTurnChangeRecords === 'boolean'
+        ? normalizedSettings.showTurnChangeRecords : DEFAULT_SETTINGS.showTurnChangeRecords,
       tabBarPosition: normalizeTabBarPosition(normalizedSettings?.tabBarPosition),
       belowHeaderTabBarLayout: normalizeBelowHeaderTabBarLayout(normalizedSettings?.belowHeaderTabBarLayout),
       inputPanelTheme: normalizeInputPanelThemeId(normalizedSettings?.inputPanelTheme),

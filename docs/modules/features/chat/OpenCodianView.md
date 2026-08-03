@@ -91,7 +91,7 @@ interface TabRuntimeState {
 }
 ```
 
-这些状态现在通过 `services/ConversationTabRuntimeCoordinator.ts` 统一进入 tab runtime owner；该 coordinator 组合 `TabMessagesPaneCoordinator`、first-open restore、close/recovery 与 stream-like writeback 端口，负责 tab manager / tab bar / persisted-state / active pane 等生命周期。`OpenCodianView` 仍定义 `TabRuntimeState` 的 shape，并把 runtime factory / navigation sidebar writeback / scroll policy 作为 host seam 提供给 pane coordinator；modified-files UI lifecycle 已委托给 `ModifiedFilesSidebarCoordinator`。每个 tab 都有自己的：
+这些状态现在通过 `services/ConversationTabRuntimeCoordinator.ts` 统一进入 tab runtime owner；该 coordinator 组合 `TabMessagesPaneCoordinator`、first-open restore、close/recovery 与 stream-like writeback 端口，负责 tab manager / tab bar / persisted-state / active pane 等生命周期。`OpenCodianView` 仍定义 `TabRuntimeState` 的 shape，并把 runtime factory / navigation sidebar writeback / scroll policy 作为 host seam 提供给 pane coordinator；modified-files UI lifecycle 已委托给 `ModifiedFilesSidebarCoordinator`。启用设置后，右缘入口始终可见；`refreshModifiedFilesSidebar()` 只用 `AgentCapability.Context` 决定是否能读取当前 OpenCode session diff，并向入口传递 ready/empty/unavailable 三态，不再用 capability 隐藏入口。每个 tab 都有自己的：
 
 - streaming 控制器
 - DOM pane

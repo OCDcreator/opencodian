@@ -1,7 +1,10 @@
 import { App } from 'obsidian';
 
 import type { SessionDiffEntry } from '../../../core/types';
-import { ModifiedFilesSidebar } from '../ui/ModifiedFilesSidebar';
+import {
+  ModifiedFilesSidebar,
+  type ModifiedFilesSidebarAvailability,
+} from '../ui/ModifiedFilesSidebar';
 
 export class ModifiedFilesSidebarCoordinator {
   private sidebar: ModifiedFilesSidebar | null = null;
@@ -14,9 +17,13 @@ export class ModifiedFilesSidebarCoordinator {
     this.sidebar = new ModifiedFilesSidebar(app, boundaryEl);
   }
 
-  refresh(sessionId: string | null, getEntries: (id: string) => SessionDiffEntry[]): void {
-    const entries = sessionId ? getEntries(sessionId) : [];
-    this.sidebar?.updateEntries(entries);
+  refresh(
+    sessionId: string | null,
+    getEntries: (id: string) => SessionDiffEntry[],
+    availability: ModifiedFilesSidebarAvailability = 'ready',
+  ): void {
+    const entries = availability === 'ready' && sessionId ? getEntries(sessionId) : [];
+    this.sidebar?.updateEntries(entries, availability);
   }
 
   setVisible(enabled: boolean): void {

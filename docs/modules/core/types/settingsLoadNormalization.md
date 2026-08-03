@@ -35,7 +35,7 @@
 唯一公开入口，完成：
 
 1. 合并分层持久化快照；
-2. 归一化 server/theme/chat appearance/input-panel/question/debug/backend/tabbed-layout 等启动设置；
+2. 归一化 server/theme/chat appearance/input-panel/question/debug/backend/tabbed-layout 及回合变更记录显示开关等启动设置；缺失或非布尔值的 `showTurnChangeRecords` 回退为 `true`；
 3. 计算 legacy local port 与 glass defaults migration 是否命中；
 4. 生成最终 `OpenCodianSettings`；
 5. 决定本次启动是否需要把归一化结果立即写回磁盘。

@@ -48,6 +48,7 @@ type ChatPluginSettings = Pick<
   | 'settingsPanelScrollTop'
   | 'showAnsweredQuestionCards'
   | 'showModifiedFilesSidebar'
+  | 'showTurnChangeRecords'
   | 'slashCommandSkillMode'
   | 'systemPrompt'
   | 'tabBarPosition'

@@ -91,6 +91,7 @@
 | 类型 | 说明 |
 |------|------|
 | `SessionDiffEntry` | 会话差异条目（`file`, `patch?`, `before?`, `after?`, `additions`, `deletions`, `status?`） |
+| `TurnDiffNoticeEntry` / `TurnDiffNoticeMeta` | 本地不可变的单轮 diff notice 记录；以 `noticeMeta.sourceMessageId` 锚定用户 turn，并保存只读文件统计，不占用 `ChatMessage.sourceMessageId` |
 | `SessionTodo` | 会话待办项（`id?`, `content`, `status`, `priority?`） |
 
 ### 通知动作
@@ -137,6 +138,7 @@
 - `before?` / `after?`: legacy diff 形状兼容字段
 - `status`: `'added' \| 'deleted' \| 'modified'`
 - `additions`/`deletions`: 行数统计
+- `TurnDiffNoticeMeta` 只用于 OpenCode turn diff 持久化；`getTurnDiffNoticeMeta()` 是窄类型守卫。它与 background-task completion notice 保持独立，不改变 generic client-only notice 的保留规则。
 
 ### 会话待办
 `SessionTodo` 记录会话级任务列表：
@@ -196,3 +198,4 @@ Ownership facts:
 1. Compaction config is project-scoped and stored in `.opencode/opencode.json`.
 2. Conversation session settings no longer own compaction; `ConversationSessionSettings` now only carries display-only `chatFontSizePx`.
 3. Manual `session.summarize()` remains a per-session action available through `OpenCodeService` session control, not a conversation settings field.
+> 2026-08-02: `getTurnDiffNoticeMeta()` now requires a non-blank source message ID, at least one non-empty file entry, and finite numeric additions/deletions before a notice is treated as a valid turn-diff record.

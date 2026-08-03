@@ -23,6 +23,9 @@
 ## Required gates
 Run before merge: `npm run typecheck`, `npm run module-docs`.
 
+## Recent change notes
+- **Modified-files sidebar:** the sidebar is an explicit, keyboard-accessible current-OpenCode-session `session.diff` viewer. It does not query or imply Git working-tree state.
+
 ## Hard invariants
 - Do not cross `forbiddenDependencies`.
 - Do not replicate canonical state in another owner.

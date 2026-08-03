@@ -2807,12 +2807,12 @@ export class OpenCodianView extends ItemView {
       ? (conversation.openCodeSessionId ?? null)
       : null;
     this.modifiedFilesSidebarCoordinator.setVisible(
-      this.plugin.settings.showModifiedFilesSidebar
-      && hasCapability(this.caps, AgentCapability.Context),
+      this.plugin.settings.showModifiedFilesSidebar,
     );
     this.modifiedFilesSidebarCoordinator.refresh(
       sessionId,
       (id) => this.plugin.openCodeService.getCachedSessionDiffEntries(id),
+      sessionId && hasCapability(this.caps, AgentCapability.Context) ? 'ready' : 'unavailable',
     );
   }
 

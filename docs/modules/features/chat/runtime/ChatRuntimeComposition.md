@@ -22,6 +22,8 @@
 - 早期阶段构建、晚期阶段消费的 coordinator 通过 `compose()` 局部变量传递（如 `conversationRenderService`、`composerContextViewFacade`、`tabMessagesPaneCoordinator`、`userMessageContentRenderer`、`sessionTodoCoordinator`）。
 - 懒读取的 view 状态（compose 完成后才被 view 解构赋值的字段）通过 `host.X` 读取，使其在闭包被调用时 live 解析。
 - `buildSendPipelineHostDependencies` 中被同步调用的 `createSendPipelineShellPort` 读取 surface 构建的 `assistantShellViewHostAdapter`（非 `host.X`），因为它在 `SendPipelineRuntime` 构造期间就被调用，早于 view 解构。
+- identity/render 装配向 `ConversationRenderService` 注入独立的本地 turn-diff notice 读取 seam；该 card 只在 canonical full render 时按 `noticeMeta.sourceMessageId` 合并，不改变 canonical message truth。
+- identity runtime wiring 通过窄 host seam 读取 `plugin.settings.showTurnChangeRecords`；该开关只门控有效 `turn-diff` notice 的渲染，历史消息仍保留并可在重新开启后恢复。
 
 ## 依赖方向
 

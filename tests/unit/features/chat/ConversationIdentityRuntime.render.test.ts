@@ -17,6 +17,7 @@ function createHost(overrides: Partial<MockedHost> = {}): MockedHost {
     getCanonicalConversationFingerprint: jest.fn(),
     getActiveTabId: jest.fn(),
     getTabContextUsage: jest.fn(),
+    showTurnChangeRecords: jest.fn().mockReturnValue(true),
     ...overrides,
   };
 }
@@ -123,6 +124,57 @@ describe('ConversationIdentityRuntime.getMessagesForRender', () => {
 });
 
 describe('ConversationIdentityRuntime.shouldRenderConversationMessage', () => {
+  const turnDiffNotice: ChatMessage = {
+    id: 'turn-diff-1',
+    role: 'assistant',
+    content: '',
+    timestamp: 100,
+    displayStyle: 'notice',
+    noticeMeta: {
+      kind: 'turn-diff',
+      sourceMessageId: 'source-1',
+      entries: [{ file: 'src/example.ts', additions: 2, deletions: 1 }],
+    },
+  };
+
+  it('hides valid turn-diff notices only when the global display gate is off', () => {
+    const host = createHost({ showTurnChangeRecords: jest.fn().mockReturnValue(false) });
+    const runtime = new ConversationIdentityRuntime(host);
+
+    expect(runtime.shouldRenderConversationMessage(turnDiffNotice)).toBe(false);
+    expect(runtime.getMessagesForRender([turnDiffNotice])).toEqual([]);
+  });
+
+  it('restores historical turn-diff notices when the display gate is enabled again', () => {
+    const host = createHost({ showTurnChangeRecords: jest.fn().mockReturnValue(false) });
+    const runtime = new ConversationIdentityRuntime(host);
+
+    expect(runtime.getMessagesForRender([turnDiffNotice])).toEqual([]);
+    host.showTurnChangeRecords.mockReturnValue(true);
+    expect(runtime.getMessagesForRender([turnDiffNotice])).toEqual([turnDiffNotice]);
+  });
+
+  it('keeps ordinary and background-task-completion notices visible when turn records are hidden', () => {
+    const host = createHost({ showTurnChangeRecords: jest.fn().mockReturnValue(false) });
+    const runtime = new ConversationIdentityRuntime(host);
+    const ordinaryNotice: ChatMessage = {
+      id: 'ordinary-notice',
+      role: 'assistant',
+      content: '',
+      timestamp: 110,
+      displayStyle: 'notice',
+      noticeMeta: { kind: 'background-task-completion' },
+    };
+    const malformedTurnDiffNotice: ChatMessage = {
+      ...turnDiffNotice,
+      id: 'malformed-turn-diff',
+      noticeMeta: { kind: 'turn-diff', sourceMessageId: 'source-2', entries: [] },
+    };
+
+    expect(runtime.shouldRenderConversationMessage(ordinaryNotice)).toBe(true);
+    expect(runtime.shouldRenderConversationMessage(malformedTurnDiffNotice)).toBe(true);
+  });
+
   it('returns false for background-task-completed reminders', () => {
     const host = createHost();
     const runtime = new ConversationIdentityRuntime(host);

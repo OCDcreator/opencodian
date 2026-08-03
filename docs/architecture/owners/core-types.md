@@ -20,6 +20,9 @@
 ## Required gates
 Run before merge: `npm run typecheck`, `npm run module-docs`.
 
+## Recent change notes
+- **Turn change record contract:** a valid `noticeMeta.kind === 'turn-diff'` record owns its immutable snapshot and its user-message anchor inside `noticeMeta`; the top-level `ChatMessage.sourceMessageId` remains reserved for canonical message identity.
+
 ## Hard invariants
 - Do not cross `forbiddenDependencies`.
 - Do not replicate canonical state in another owner.
