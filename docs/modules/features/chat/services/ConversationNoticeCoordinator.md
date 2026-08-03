@@ -27,6 +27,7 @@ export interface ConversationNoticeCoordinatorHost {
   getSessionDiff(sessionId: string, sourceMessageId: string): Promise<SessionDiffEntry[]>;
   getCachedSessionDiffEntries(sessionId: string): SessionDiffEntry[];
   appendPersistentNotice(options: PersistentAssistantNoticeMessageOptions): Promise<void>;
+  refreshSessionChangeSidebar(): void;
   renderBackgroundTaskIndicatorIfNeeded(tabId: TabId | null): Promise<void>;
   handleRestoreRewindRequest(): Promise<void>;
   openPluginSettingsPreservingScroll(): void;
@@ -68,6 +69,7 @@ export class ConversationNoticeCoordinator {
 - `appendTurnDiffNoticeIfNeeded()` 先查当前 session 的 live diff，再回退 cached diff，最后回退 edited file 列表
 - 生成的 notice 使用窄类型、冻结的 `TurnDiffNoticeMeta`：`sourceMessageId` 只存在于 `noticeMeta`，文件 entries 是只读本地快照，不写入 `ChatMessage.sourceMessageId`，因此不会污染 canonical user/assistant message identity
 - 同一用户 source anchor 已有 turn diff notice 时直接去重；generic client-only notice 不会因为此规则而扩大保留范围
+- `appendPersistentNotice()` 成功完成后才调用中性的 `refreshSessionChangeSidebar()` host seam，使刚持久化的 Turn Change Record 立即更新 Session Change Sidebar；所有 early return 与持久化失败路径都不刷新
 - **OpenCode-only diff gate**: `backend !== 'opencode'` 时直接返回。`getSessionDiff` 与 `getCachedSessionDiffEntries` 是 OpenCode-specific API，暂无 backend-neutral 等价物。Claude 等 backend 的 diff surface 未稳定完成前不伪造 diff notice。
 - `formatDiffNoticeMarkdown()` 输出 vault 链接、diff stats 与 status
 - 只有 active tab 才会补发 background task indicator
@@ -94,7 +96,7 @@ export class ConversationNoticeCoordinator {
 - 依赖 `PersistentAssistantNoticeService` 完成 notice 持久化
 - 依赖 `OpenCodeService` 提供 session diff 与 cached diff
 - 依赖 `ChatSelectionControlsCoordinator` 提供模型 id 格式化
-- 依赖 `OpenCodianView` host seam 执行 rewind、settings 和 background task indicator 后续动作
+- 依赖 `OpenCodianView` host seam 执行 rewind、settings、Session Change Sidebar refresh 和 background task indicator 后续动作
 
 ## 注意事项
 

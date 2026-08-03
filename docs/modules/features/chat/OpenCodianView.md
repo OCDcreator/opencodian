@@ -53,7 +53,7 @@
 | `applyLocaleTexts()` | 委托 header presenter、selection controls coordinator 与 composer input coordinator 刷新 header/status、selector、placeholder、dock 和 tab 文案 |
 | `refreshQuestionUi()` | 重绘 question dock，并在需要时重绘当前对话 |
 | `invalidateSlashCommandMenuCatalog()` | 立刻清空 slash command menu catalog 缓存，并可选触发一次后台 warm preload |
-| `createConversationInCurrentTab()` | 公开给插件命令层使用，委托 `ConversationLoadRecoveryCoordinator.createConversationInCurrentTab()`，确保全局 `new-conversation` 命令会真正替换当前视图的 active conversation |
+| `createConversationInCurrentTab()` | 公开给插件命令层使用；await `ConversationLoadRecoveryCoordinator.createConversationInCurrentTab()` 后比较调用前后的 conversation id + backend session id，只有身份变化才刷新 Session Change Sidebar。max-tabs/no-op 等正常返回但未切换会话的路径不会重复刷新 |
 | `loadConversationForExternalHost(conversationId)` | 最小公开 seam，供外部 host（如 settings-side backend session browser）加载已恢复的会话，委托内部 `loadConversation()` |
 | `toggleLiquidDiamondDemo()` | 切换 CPU 版 floating diamond demo |
 | `toggleLiquidDiamondWebGlDemo()` | 切换 WebGL2 版 floating diamond demo |
@@ -91,7 +91,7 @@ interface TabRuntimeState {
 }
 ```
 
-这些状态现在通过 `services/ConversationTabRuntimeCoordinator.ts` 统一进入 tab runtime owner；该 coordinator 组合 `TabMessagesPaneCoordinator`、first-open restore、close/recovery 与 stream-like writeback 端口，负责 tab manager / tab bar / persisted-state / active pane 等生命周期。`OpenCodianView` 仍定义 `TabRuntimeState` 的 shape，并把 runtime factory / navigation sidebar writeback / scroll policy 作为 host seam 提供给 pane coordinator；modified-files UI lifecycle 已委托给 `ModifiedFilesSidebarCoordinator`。启用设置后，右缘入口始终可见；`refreshModifiedFilesSidebar()` 只用 `AgentCapability.Context` 决定是否能读取当前 OpenCode session diff，并向入口传递 ready/empty/unavailable 三态，不再用 capability 隐藏入口。每个 tab 都有自己的：
+这些状态现在通过 `services/ConversationTabRuntimeCoordinator.ts` 统一进入 tab runtime owner；该 coordinator 组合 `TabMessagesPaneCoordinator`、first-open restore、close/recovery 与 stream-like writeback 端口，负责 tab manager / tab bar / persisted-state / active pane 等生命周期。`OpenCodianView` 仍定义 `TabRuntimeState` 的 shape，并把 runtime factory / navigation sidebar writeback / scroll policy 作为 host seam 提供给 pane coordinator；modified-files UI lifecycle 已委托给 `ModifiedFilesSidebarCoordinator`。启用设置后，右缘入口始终可见；`refreshModifiedFilesSidebar()` 只用 `AgentCapability.Context` 决定是否能读取当前 OpenCode session diff，并向入口传递 ready/empty/unavailable 三态，不再用 capability 隐藏入口。它同时传递当前 conversation 的持久化 messages：canonical cached `session.diff` 为空时，coordinator 从不可变 `turn-diff` Turn Change Records 构建 reload-safe 的 Session Change Sidebar fallback；canonical 非空时仍优先。active backend capability hydration、插件重载后的 first-tab restore、new-tab/current-tab conversation 身份实际变化、以及 turn-diff notice 成功持久化都会刷新 sidebar，避免初始 unavailable 或旧会话 diff 状态滞留；conversation wrapper 使用 id + backend session id gate，max-tabs/no-op 等身份未变路径不会刷新。非 active backend capability 事件和 notice early-return/持久化失败路径同样不会刷新。每个 tab 都有自己的：
 
 - streaming 控制器
 - DOM pane
@@ -155,7 +155,7 @@ background task completion notice 的 queued-state 则已经完全移出 `TabRun
 5. `wireEventHandlers()`，其中 composer/context 相关的 workspace / vault / DOM 事件注册与 retained-selection polling 启动都会转交给 `ComposerContextEventBridge`
 6. `wireBackendSurfaceSwitch()` 注册 active-backend change 监听，确保设置页或 agent switcher 切换 backend 后，聊天表面同步切到该 backend 自己的 conversation
 7. 通过 `ConversationSessionSignalRuntime` 统一订阅 session sync event 与 todo/status live signal 更新；只有当前 active backend 确实是启用中的 OpenCode 时才启动，避免 Claude Code-only / 非 OpenCode active 场景继续建立 OpenCode-only signal 订阅并制造离线噪音
-8. `initializeFirstTab()`：只恢复当前 active backend 的持久化 tabs、加载该 backend 的首个对话；如果最终需要新建 conversation，才会经由插件层 `createConversation()` 接管 deferred runtime warmup，避免把已有会话的视图首开也一并阻塞
+8. `initializeFirstTab()`：只恢复当前 active backend 的持久化 tabs、加载该 backend 的首个对话，并在恢复完成后刷新 Session Change Sidebar；如果最终需要新建 conversation，才会经由插件层 `createConversation()` 接管 deferred runtime warmup，避免把已有会话的视图首开也一并阻塞
 
 结束时会输出一条 `[view-open]` 汇总日志，包含各阶段耗时拆分。
 

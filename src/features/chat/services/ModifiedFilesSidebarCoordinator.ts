@@ -1,6 +1,10 @@
 import { App } from 'obsidian';
 
-import type { SessionDiffEntry } from '../../../core/types';
+import {
+  type ChatMessage,
+  getTurnDiffNoticeMeta,
+  type SessionDiffEntry,
+} from '../../../core/types';
 import {
   ModifiedFilesSidebar,
   type ModifiedFilesSidebarAvailability,
@@ -21,9 +25,29 @@ export class ModifiedFilesSidebarCoordinator {
     sessionId: string | null,
     getEntries: (id: string) => SessionDiffEntry[],
     availability: ModifiedFilesSidebarAvailability = 'ready',
+    persistedMessages: readonly ChatMessage[] = [],
   ): void {
-    const entries = availability === 'ready' && sessionId ? getEntries(sessionId) : [];
+    const canReadSessionChanges = availability === 'ready' && sessionId !== null;
+    const canonicalEntries = canReadSessionChanges ? getEntries(sessionId) : [];
+    const entries = canonicalEntries.length > 0
+      ? canonicalEntries
+      : canReadSessionChanges
+        ? this.getPersistedTurnDiffEntries(persistedMessages)
+        : [];
     this.sidebar?.updateEntries(entries, availability);
+  }
+
+  private getPersistedTurnDiffEntries(
+    messages: readonly ChatMessage[],
+  ): SessionDiffEntry[] {
+    const latestEntryByFile = new Map<string, SessionDiffEntry>();
+    for (const message of messages) {
+      const noticeMeta = getTurnDiffNoticeMeta(message);
+      for (const entry of noticeMeta?.entries ?? []) {
+        latestEntryByFile.set(entry.file, { ...entry });
+      }
+    }
+    return [...latestEntryByFile.values()];
   }
 
   setVisible(enabled: boolean): void {

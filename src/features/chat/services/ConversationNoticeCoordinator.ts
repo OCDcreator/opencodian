@@ -72,6 +72,7 @@ export interface ConversationNoticeCoordinatorHost {
   appendPersistentNotice(
     options: PersistentAssistantNoticeMessageOptions,
   ): Promise<void>;
+  refreshSessionChangeSidebar(): void;
   renderBackgroundTaskIndicatorIfNeeded(tabId: TabId | null): Promise<void>;
   handleRestoreRewindRequest(): Promise<void>;
   openPluginSettingsPreservingScroll(): void;
@@ -208,6 +209,7 @@ export class ConversationNoticeCoordinator {
       conversation,
       tabId,
     });
+    this.host.refreshSessionChangeSidebar();
 
     if (tabId === this.host.getActiveTabId()) {
       await this.host.renderBackgroundTaskIndicatorIfNeeded(tabId);

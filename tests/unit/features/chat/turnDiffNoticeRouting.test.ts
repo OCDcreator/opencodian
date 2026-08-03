@@ -6,6 +6,7 @@ describe('OpenCodianView turn diff notice routing', () => {
   const mockGetSessionDiff = jest.fn();
   const mockGetCachedSessionDiffEntries = jest.fn();
   const mockAppendPersistentNotice = jest.fn();
+  const mockRefreshSessionChangeSidebar = jest.fn();
   const mockRenderBackgroundTaskIndicatorIfNeeded = jest.fn();
 
   function createCoordinator() {
@@ -17,6 +18,7 @@ describe('OpenCodianView turn diff notice routing', () => {
       getSessionDiff: mockGetSessionDiff,
       getCachedSessionDiffEntries: mockGetCachedSessionDiffEntries,
       appendPersistentNotice: mockAppendPersistentNotice,
+      refreshSessionChangeSidebar: mockRefreshSessionChangeSidebar,
       renderBackgroundTaskIndicatorIfNeeded: mockRenderBackgroundTaskIndicatorIfNeeded,
       handleRestoreRewindRequest: jest.fn(),
       openPluginSettingsPreservingScroll: jest.fn(),
@@ -66,6 +68,7 @@ describe('OpenCodianView turn diff notice routing', () => {
       conversation: sendingConversation,
       tabId: 'tab-old',
     }));
+    expect(mockRefreshSessionChangeSidebar).toHaveBeenCalledTimes(1);
   });
 
   it('uses cached session.diff entries when the final diff fetch is empty', async () => {

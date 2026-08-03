@@ -1,6 +1,6 @@
-import type { App } from 'obsidian';
+import { type App, Component } from 'obsidian';
 
-import type { SessionDiffEntry } from '../../../../src/core/types/chat';
+import type { ChatMessage, SessionDiffEntry } from '../../../../src/core/types/chat';
 import { ModifiedFilesSidebarCoordinator } from '../../../../src/features/chat/services/ModifiedFilesSidebarCoordinator';
 import { ModifiedFilesSidebar } from '../../../../src/features/chat/ui/ModifiedFilesSidebar';
 import { t } from '../../../../src/i18n';
@@ -14,8 +14,14 @@ type ObsidianLikeElement = HTMLElement & {
   createSpan: (options?: { cls?: string; text?: string; attr?: Record<string, string> }) => HTMLSpanElement;
 };
 
+const originalComponentLoad = Component.prototype.load;
+
 function installObsidianElementHelpers(): void {
   const prototype = HTMLElement.prototype as ObsidianLikeElement;
+
+  Component.prototype.load = function load() {
+    (this as Component & { onload?: () => void }).onload?.();
+  };
 
   if (!prototype.createDiv) {
     prototype.createDiv = function createDiv(options = {}) {
@@ -61,9 +67,14 @@ function appendChildElement<K extends keyof HTMLElementTagNameMap>(
   return element;
 }
 
+// eslint-disable-next-line max-lines-per-function -- sidebar and fallback scenarios share one realistic Obsidian component lifecycle harness.
 describe('ModifiedFilesSidebar', () => {
   beforeAll(() => {
     installObsidianElementHelpers();
+  });
+
+  afterAll(() => {
+    Component.prototype.load = originalComponentLoad;
   });
 
   beforeEach(() => {
@@ -118,9 +129,135 @@ describe('ModifiedFilesSidebar', () => {
     coordinator.mountSidebar(parentEl, {
       workspace: { openLinkText: jest.fn() },
     } as unknown as App);
-    coordinator.refresh('session-1', getEntries, 'unavailable');
+    coordinator.refresh('session-1', getEntries, 'unavailable', [{
+      id: 'persisted-turn-diff',
+      role: 'assistant',
+      content: '',
+      timestamp: 1,
+      displayStyle: 'notice',
+      noticeMeta: {
+        kind: 'turn-diff',
+        sourceMessageId: 'user-1',
+        entries: [{ file: 'must-not-leak.md', additions: 1, deletions: 0 }],
+      },
+    }]);
 
     expect(getEntries).not.toHaveBeenCalled();
+    expect(document.querySelector<HTMLButtonElement>('.opencodian-modified-files-trigger-strip')?.dataset.state)
+      .toBe('unavailable');
+    expect(document.body.textContent).not.toContain('must-not-leak.md');
+  });
+
+  it('does not expose persisted Turn Change Records without an OpenCode session', () => {
+    const parentEl = document.createElement('div') as ObsidianLikeElement;
+    document.body.appendChild(parentEl);
+    const coordinator = new ModifiedFilesSidebarCoordinator();
+    const getEntries = jest.fn().mockReturnValue([]);
+
+    coordinator.mountSidebar(parentEl, {
+      workspace: { openLinkText: jest.fn() },
+    } as unknown as App);
+    coordinator.refresh(null, getEntries, 'ready', [{
+      id: 'stale-turn-diff',
+      role: 'assistant',
+      content: '',
+      timestamp: 1,
+      displayStyle: 'notice',
+      noticeMeta: {
+        kind: 'turn-diff',
+        sourceMessageId: 'user-1',
+        entries: [{ file: 'stale.md', additions: 1, deletions: 0 }],
+      },
+    }]);
+
+    expect(getEntries).not.toHaveBeenCalled();
+    expect(document.querySelector<HTMLButtonElement>('.opencodian-modified-files-trigger-strip')?.dataset.state)
+      .toBe('ready');
+    expect(document.body.textContent).not.toContain('stale.md');
+  });
+
+  it('falls back to unique persisted Turn Change Records when the canonical session diff is empty', () => {
+    const parentEl = document.createElement('div') as ObsidianLikeElement;
+    document.body.appendChild(parentEl);
+    const coordinator = new ModifiedFilesSidebarCoordinator();
+    const persistedMessages: ChatMessage[] = [
+      {
+        id: 'turn-diff-1',
+        role: 'assistant',
+        content: '',
+        timestamp: 1,
+        displayStyle: 'notice',
+        noticeMeta: {
+          kind: 'turn-diff',
+          sourceMessageId: 'user-1',
+          entries: [
+            { file: 'notes/repeated.md', additions: 1, deletions: 0, status: 'modified' },
+            { file: 'notes/unique.md', additions: 2, deletions: 1, status: 'added' },
+          ],
+        },
+      },
+      {
+        id: 'turn-diff-2',
+        role: 'assistant',
+        content: '',
+        timestamp: 2,
+        displayStyle: 'notice',
+        noticeMeta: {
+          kind: 'turn-diff',
+          sourceMessageId: 'user-2',
+          entries: [
+            { file: 'notes/repeated.md', additions: 7, deletions: 2, status: 'modified' },
+          ],
+        },
+      },
+    ];
+
+    coordinator.mountSidebar(parentEl, {
+      workspace: { openLinkText: jest.fn() },
+    } as unknown as App);
+    coordinator.refresh('session-1', () => [], 'ready', persistedMessages);
+
+    const trigger = document.querySelector<HTMLButtonElement>('.opencodian-modified-files-trigger-strip');
+    const paths = Array.from(
+      document.querySelectorAll<HTMLElement>('.opencodian-modified-files-sidebar-path'),
+      (element) => element.textContent,
+    );
+    expect(trigger?.dataset.state).toBe('changed');
+    expect(paths).toEqual(['notes/repeated.md', 'notes/unique.md']);
+    expect(paths.filter((path) => path === 'notes/repeated.md')).toHaveLength(1);
+    expect(document.querySelector('.opencodian-modified-files-sidebar-summary')?.textContent)
+      .toBe('2 · +9 -3');
+  });
+
+  it('keeps a non-empty canonical session diff ahead of persisted Turn Change Records', () => {
+    const parentEl = document.createElement('div') as ObsidianLikeElement;
+    document.body.appendChild(parentEl);
+    const coordinator = new ModifiedFilesSidebarCoordinator();
+    coordinator.mountSidebar(parentEl, {
+      workspace: { openLinkText: jest.fn() },
+    } as unknown as App);
+
+    coordinator.refresh(
+      'session-1',
+      () => [{ file: 'canonical.md', additions: 3, deletions: 1, status: 'modified' }],
+      'ready',
+      [{
+        id: 'persisted-turn-diff',
+        role: 'assistant',
+        content: '',
+        timestamp: 1,
+        displayStyle: 'notice',
+        noticeMeta: {
+          kind: 'turn-diff',
+          sourceMessageId: 'user-1',
+          entries: [{ file: 'fallback.md', additions: 8, deletions: 2 }],
+        },
+      }],
+    );
+
+    expect(document.querySelector('.opencodian-modified-files-sidebar-path')?.textContent)
+      .toBe('canonical.md');
+    expect(document.body.textContent).not.toContain('fallback.md');
   });
 
   it('shows a compact session summary and toggles explicitly from the trigger', () => {

@@ -9,6 +9,7 @@ const mockGetActiveTabId = jest.fn();
 const mockGetSessionDiff = jest.fn();
 const mockGetCachedSessionDiffEntries = jest.fn();
 const mockAppendPersistentNotice = jest.fn();
+const mockRefreshSessionChangeSidebar = jest.fn();
 const mockRenderBackgroundTaskIndicatorIfNeeded = jest.fn();
 const mockHandleRestoreRewindRequest = jest.fn();
 const mockOpenPluginSettingsPreservingScroll = jest.fn();
@@ -45,6 +46,7 @@ function createHost(): ConversationNoticeCoordinatorHost {
     getSessionDiff: mockGetSessionDiff,
     getCachedSessionDiffEntries: mockGetCachedSessionDiffEntries,
     appendPersistentNotice: mockAppendPersistentNotice,
+    refreshSessionChangeSidebar: mockRefreshSessionChangeSidebar,
     renderBackgroundTaskIndicatorIfNeeded: mockRenderBackgroundTaskIndicatorIfNeeded,
     handleRestoreRewindRequest: mockHandleRestoreRewindRequest,
     openPluginSettingsPreservingScroll: mockOpenPluginSettingsPreservingScroll,
@@ -187,10 +189,26 @@ describe('ConversationNoticeCoordinator diff notices', () => {
   });
 
   describe('appendTurnDiffNoticeIfNeeded', () => {
+    it('refreshes the Session Change Sidebar after the turn diff notice is persisted', async () => {
+      mockGetSessionDiff.mockResolvedValue([
+        { file: 'notes.md', additions: 1, deletions: 0, status: 'modified' },
+      ]);
+      const coordinator = new ConversationNoticeCoordinator(createHost());
+
+      await coordinator.appendTurnDiffNoticeIfNeeded({
+        openCodeSessionId: 'session',
+        messages: [{ role: 'user', sourceMessageId: 'msg-1' }],
+      } as never, ['notes.md']);
+
+      expect(mockAppendPersistentNotice).toHaveBeenCalledTimes(1);
+      expect(mockRefreshSessionChangeSidebar).toHaveBeenCalledTimes(1);
+    });
+
     it('skips when the session id is missing', async () => {
       const coordinator = new ConversationNoticeCoordinator(createHost());
       await coordinator.appendTurnDiffNoticeIfNeeded({ messages: [], updatedAt: 0 } as never, ['a.md']);
       expect(mockGetSessionDiff).not.toHaveBeenCalled();
+      expect(mockRefreshSessionChangeSidebar).not.toHaveBeenCalled();
     });
 
     it('skips when there are no edited files', async () => {
@@ -200,6 +218,7 @@ describe('ConversationNoticeCoordinator diff notices', () => {
         messages: [{ role: 'user', sourceMessageId: 'msg-1' }],
       } as never, []);
       expect(mockGetSessionDiff).not.toHaveBeenCalled();
+      expect(mockRefreshSessionChangeSidebar).not.toHaveBeenCalled();
     });
 
     it('skips when there is no user source message', async () => {
@@ -209,6 +228,7 @@ describe('ConversationNoticeCoordinator diff notices', () => {
         messages: [{ role: 'assistant' }],
       } as never, ['a.md']);
       expect(mockGetSessionDiff).not.toHaveBeenCalled();
+      expect(mockRefreshSessionChangeSidebar).not.toHaveBeenCalled();
     });
 
     it('uses diff entries and renders the active tab indicator', async () => {
@@ -283,6 +303,21 @@ describe('ConversationNoticeCoordinator diff notices', () => {
       expect(mockRenderBackgroundTaskIndicatorIfNeeded).not.toHaveBeenCalled();
     });
 
+    it('does not refresh when notice persistence fails', async () => {
+      mockGetSessionDiff.mockResolvedValue([
+        { file: 'notes.md', additions: 1, deletions: 0 },
+      ]);
+      mockAppendPersistentNotice.mockRejectedValue(new Error('persist failed'));
+      const coordinator = new ConversationNoticeCoordinator(createHost());
+
+      await expect(coordinator.appendTurnDiffNoticeIfNeeded({
+        openCodeSessionId: 'session',
+        messages: [{ role: 'user', sourceMessageId: 'msg-1' }],
+      } as never, ['notes.md'])).rejects.toThrow('persist failed');
+
+      expect(mockRefreshSessionChangeSidebar).not.toHaveBeenCalled();
+    });
+
     it('does not append a second turn diff notice for the same user anchor', async () => {
       const coordinator = new ConversationNoticeCoordinator(createHost());
       const conversation = {
@@ -308,6 +343,7 @@ describe('ConversationNoticeCoordinator diff notices', () => {
 
       expect(mockGetSessionDiff).not.toHaveBeenCalled();
       expect(mockAppendPersistentNotice).not.toHaveBeenCalled();
+      expect(mockRefreshSessionChangeSidebar).not.toHaveBeenCalled();
     });
   });
 });

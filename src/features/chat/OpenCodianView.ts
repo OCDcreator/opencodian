@@ -1823,6 +1823,7 @@ export class OpenCodianView extends ItemView {
         this.plugin.openCodeService.getCachedSessionDiffEntries(sessionId),
       appendPersistentNotice: (options) =>
         this.persistentAssistantNoticeService.appendMessage(options),
+      refreshSessionChangeSidebar: () => this.refreshModifiedFilesSidebar(),
       renderBackgroundTaskIndicatorIfNeeded: (tabId) => {
         if (hasCapability(this.caps, AgentCapability.Subagents)) {
           return this.backgroundTaskHost.renderBackgroundTaskIndicatorIfNeeded(tabId);
@@ -2813,6 +2814,7 @@ export class OpenCodianView extends ItemView {
       sessionId,
       (id) => this.plugin.openCodeService.getCachedSessionDiffEntries(id),
       sessionId && hasCapability(this.caps, AgentCapability.Context) ? 'ready' : 'unavailable',
+      conversation?.messages ?? [],
     );
   }
 
@@ -2830,6 +2832,7 @@ export class OpenCodianView extends ItemView {
 
   private async initializeFirstTab(): Promise<void> {
     await this.conversationTabRuntimeCoordinator.initializeFirstTab();
+    this.refreshModifiedFilesSidebar();
   }
 
   private renderTabBar(): void {
@@ -3215,12 +3218,38 @@ export class OpenCodianView extends ItemView {
 
   /** Create a new conversation */
   private async createNewConversation() {
+    const previousConversationId = this.currentConversation?.id;
+    const previousSessionId = this.currentConversation
+      ? getConversationBackendSessionId(this.currentConversation)
+      : undefined;
     await this.conversationLoadRecoveryCoordinator.createConversationInNewTab();
+    const currentSessionId = this.currentConversation
+      ? getConversationBackendSessionId(this.currentConversation)
+      : undefined;
+    if (
+      this.currentConversation?.id !== previousConversationId
+      || currentSessionId !== previousSessionId
+    ) {
+      this.refreshModifiedFilesSidebar();
+    }
   }
 
   /** Create a new conversation in the current tab */
   async createConversationInCurrentTab(): Promise<void> {
+    const previousConversationId = this.currentConversation?.id;
+    const previousSessionId = this.currentConversation
+      ? getConversationBackendSessionId(this.currentConversation)
+      : undefined;
     await this.conversationLoadRecoveryCoordinator.createConversationInCurrentTab();
+    const currentSessionId = this.currentConversation
+      ? getConversationBackendSessionId(this.currentConversation)
+      : undefined;
+    if (
+      this.currentConversation?.id !== previousConversationId
+      || currentSessionId !== previousSessionId
+    ) {
+      this.refreshModifiedFilesSidebar();
+    }
   }
 
   /**
@@ -3271,6 +3300,7 @@ export class OpenCodianView extends ItemView {
       this.refreshComposerToolbarForActiveBackend();
       this.activeTabContextUsageCoordinator.syncIdentity();
       this.codexChatSurfaceBinding.syncSkillsChangedSubscription();
+      this.refreshModifiedFilesSidebar();
     }) ?? null;
   }
 

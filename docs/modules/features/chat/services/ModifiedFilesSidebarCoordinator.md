@@ -12,7 +12,7 @@
 ```ts
 export class ModifiedFilesSidebarCoordinator {
   mountSidebar(parentEl: HTMLElement, app: App): void;
-  refresh(sessionId: string | null, getEntries: (id: string) => SessionDiffEntry[], availability?: 'ready' | 'unavailable'): void;
+  refresh(sessionId: string | null, getEntries: (id: string) => SessionDiffEntry[], availability?: 'ready' | 'unavailable', persistedMessages?: readonly ChatMessage[]): void;
   destroy(): void;
 }
 ```
@@ -20,11 +20,13 @@ export class ModifiedFilesSidebarCoordinator {
 ## 关键行为
 
 - `mountSidebar()` replaces any existing `ModifiedFilesSidebar` before mounting into the nearest Chat `.opencodian-container`, so its percentage sizing and right inset resolve against the sidebar boundary rather than the wider workspace leaf.
-- `refresh()` reads entries through the injected session lookup when a session is available, then updates the sidebar list, badge count, and ready/unavailable state. Capability gating affects whether entries can be read, not whether the configured entry is discoverable.
+- `refresh()` reads the canonical cached `session.diff` through the injected session lookup when a session is available. A non-empty canonical cache always wins.
+- When the canonical cache is empty and availability is `ready`, `refresh()` rebuilds the current Session Change Sidebar from persisted `turn-diff` Turn Change Records. It keeps the latest entry for each file while preserving stable first-seen file order, so repeated turns do not inflate the file count.
+- Capability gating affects whether canonical or persisted entries can be read, not whether the configured entry is discoverable. `unavailable` never exposes persisted OpenCode fallback data.
 - `destroy()` clears the sidebar and all DOM references for view close or navigation sidebar rebuild.
 
 ## 边界
 
 - The coordinator does not decide the active conversation; callers pass the active session id.
-- The coordinator does not own canonical diff storage; `OpenCodeService.getCachedSessionDiffEntries()` remains the source of truth.
+- The coordinator does not own canonical diff storage; `OpenCodeService.getCachedSessionDiffEntries()` remains the primary source of truth, while persisted Turn Change Records are reload-safe fallback evidence only.
 - `ModifiedFilesSidebar` still owns item rendering and file-open behavior.
