@@ -599,6 +599,7 @@ describe('OpenCodianPlugin backend bootstrap', () => {
   it('registers Claude Code and restores it as the active backend from settings', async () => {
     const vaultPath = fs.mkdtempSync(path.join(os.tmpdir(), 'opencodian-claude-bootstrap-'));
     bootstrapVaultPath = vaultPath;
+    const traceStorageRoot = path.join(vaultPath, 'diagnostics');
     const claudePath = path.join(vaultPath, 'bin', 'claude');
     fs.mkdirSync(path.dirname(claudePath), { recursive: true });
     fs.writeFileSync(claudePath, '#!/bin/sh\n');
@@ -623,9 +624,27 @@ describe('OpenCodianPlugin backend bootstrap', () => {
       activeBackend: 'claude-code',
       backendSettings: {
         ...DEFAULT_SETTINGS.backendSettings,
+        opencode: {
+          ...DEFAULT_SETTINGS.backendSettings.opencode,
+          sessionTrace: {
+            ...DEFAULT_SETTINGS.backendSettings.opencode.sessionTrace,
+            storageDirectory: path.join(traceStorageRoot, 'opencode'),
+          },
+        },
         claudeCode: {
           ...DEFAULT_SETTINGS.backendSettings.claudeCode,
           executablePath: claudePath,
+          sessionTrace: {
+            ...DEFAULT_SETTINGS.backendSettings.claudeCode.sessionTrace,
+            storageDirectory: path.join(traceStorageRoot, 'claude'),
+          },
+        },
+        codex: {
+          ...DEFAULT_SETTINGS.backendSettings.codex,
+          sessionTrace: {
+            ...DEFAULT_SETTINGS.backendSettings.codex.sessionTrace,
+            storageDirectory: path.join(traceStorageRoot, 'codex'),
+          },
         },
       },
     };
