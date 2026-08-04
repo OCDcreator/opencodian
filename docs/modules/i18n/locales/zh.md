@@ -535,3 +535,7 @@ Claude Code 不再使用过载的 `settings.claudeCode.tab.mcpAdvanced` 标签�
 ## 2026-07-27 插件版本管理文案键
 
 新增 `settings.pluginUpdate.*`，覆盖通用基础页共用版本管理区的检查/状态、最新稳定版/历史版本/本地备份动作、不兼容原因、降级与还原确认、手动重载完成/失败提示及每个版本一次的启动提醒。文案明确区分“插件包已替换”和“运行中的插件已重载”。
+
+## 2026-08-04 Turn Change Record 紧凑卡片文案键
+
+新增 `chat.diffNotice.fileCount`（`{count}`，标题数量徽标的可访问名称）、`chat.diffNotice.expandRemaining`（`{count}`，展开其余文件 toggle 文案）、`chat.diffNotice.collapse`、`chat.diffNotice.statusAdded` 与 `chat.diffNotice.statusDeleted`，供 turn-diff 专用卡片分支使用。`chat.diffNotice.description` 保留用于 persisted Markdown/导出兼容，但结构化卡片分支不再渲染它。

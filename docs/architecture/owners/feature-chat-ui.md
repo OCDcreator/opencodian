@@ -25,6 +25,7 @@ Run before merge: `npm run typecheck`, `npm run module-docs`.
 
 ## Recent change notes
 - **Modified-files sidebar:** the sidebar is an explicit, keyboard-accessible current-OpenCode-session `session.diff` viewer. It does not query or imply Git working-tree state.
+- **Shared vault path delegation:** `ModifiedFilesSidebar.formatPath()` now delegates to the shared `toVaultRelativePath()` pure function (directory-boundary stripping, traversal rejection, fail-closed `null` for unprovable absolute paths) while keeping its own adapter `getBasePath()` acquisition. Unresolved entries show only a non-interactive basename and never expose/open the raw absolute path.
 
 ## Hard invariants
 - Do not cross `forbiddenDependencies`.

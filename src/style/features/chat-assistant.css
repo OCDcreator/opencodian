@@ -404,6 +404,177 @@
   transform: translateY(-1px);
 }
 
+/* Turn Change Record compact layout: single-line file rows, scoped to the
+   dedicated .is-turn-diff card so generic notice icons/flex stay untouched. */
+.opencodian-chat-notice-card.is-turn-diff .opencodian-chat-notice-body {
+  width: 100%;
+}
+
+.opencodian-turn-diff-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.opencodian-turn-diff-count {
+  min-width: 20px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--background-modifier-hover);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.opencodian-turn-diff-list {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.opencodian-chat-notice-card.is-turn-diff button.opencodian-turn-diff-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 30px;
+  padding: 4px 8px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-normal);
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.4;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.opencodian-chat-notice-card.is-turn-diff button.opencodian-turn-diff-row[hidden] {
+  display: none;
+}
+
+.opencodian-chat-notice-card.is-turn-diff button.opencodian-turn-diff-row:hover:not(:disabled) {
+  background: var(--background-modifier-hover);
+  box-shadow: none;
+}
+
+.opencodian-chat-notice-card.is-turn-diff button.opencodian-turn-diff-row:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: -2px;
+}
+
+.opencodian-chat-notice-card.is-turn-diff button.opencodian-turn-diff-row:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.opencodian-turn-diff-path {
+  display: flex;
+  align-items: baseline;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.opencodian-turn-diff-parent {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-faint);
+}
+
+.opencodian-turn-diff-filename {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-normal);
+  font-weight: 600;
+}
+
+.opencodian-turn-diff-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.opencodian-turn-diff-status {
+  padding: 1px 6px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.opencodian-turn-diff-status.status-added {
+  color: var(--opencodian-status-success);
+  background: var(--opencodian-status-success-subtle);
+}
+
+.opencodian-turn-diff-status.status-deleted {
+  color: var(--opencodian-status-error);
+  background: var(--opencodian-status-error-subtle);
+}
+
+/* Reserved visual mapping only; SessionDiffEntry.status has no renamed value yet. */
+.opencodian-turn-diff-status.status-renamed {
+  color: var(--opencodian-status-warning);
+  background: var(--opencodian-status-warning-subtle);
+}
+
+.opencodian-turn-diff-stat {
+  padding: 1px 6px;
+  border-radius: 6px;
+  font-family: var(--font-monospace);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.5;
+}
+
+.opencodian-turn-diff-stat.is-additions {
+  color: var(--opencodian-status-success);
+  background: var(--opencodian-status-success-subtle);
+}
+
+.opencodian-turn-diff-stat.is-deletions {
+  color: var(--opencodian-status-error);
+  background: var(--opencodian-status-error-subtle);
+}
+
+.opencodian-turn-diff-toggle {
+  margin-top: 8px;
+  padding: 4px 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.opencodian-turn-diff-toggle:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+.opencodian-turn-diff-toggle:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 1px;
+}
+
 /* Copy button */
 .opencodian-copy-btn-inline {
   border: 1px solid var(--opencodian-glass-border);

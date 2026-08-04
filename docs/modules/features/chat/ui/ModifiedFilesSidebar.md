@@ -21,7 +21,7 @@
 - CSS 由 `is-expanded` 状态负责右侧滑入/淡出；hover/focus 不再是展开的唯一机制，并提供 `prefers-reduced-motion` 和 `:focus-visible` 规则。
 - `render()` 在 ready 空状态显示 `modifiedFiles.empty`，在不可用状态显示 `modifiedFiles.unavailable`；头部摘要使用短的 `modifiedFiles.readyShort` / `modifiedFiles.unavailableShort`，并通过省略号适配窄 pane，完整说明只留在正文；有内容时渲染默认展开、原生 `<details>` 可折叠的逐文件条目，摘要显示可点击路径，内容显示 `+N`/`-N` 统计和状态 badge；列表项使用随 DOM 替换一起释放的元素级 click listener，避免重复 render 积累 Component 级事件注册。
 - 每个组件实例生成生命周期内稳定且唯一的 panel id，并由触发器的 `aria-controls` 关联，避免多 chat leaf 的 DOM id 冲突。
-- `formatPath()` 会在桌面 adapter 可用时去掉 vault base path，便于 `workspace.openLinkText()` 以 vault 相对路径打开文件。
+- `formatPath()` 委托共享纯函数 `toVaultRelativePath()`（`src/shared/vault.ts`）剥离 vault base path；base path 仍由桌面 adapter 的 `getBasePath()` 获取。无法证明位于 vault 内的路径只显示 `getFilePathBasename()` 提取的 basename，并标记为 unresolved，不写入绝对 tooltip，也不调用 `workspace.openLinkText()`。
 
 ## 与其他模块的交互
 

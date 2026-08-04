@@ -59,4 +59,4 @@ export {
   isBuiltinToolName,
   MCP_TOOL_ICON_ID,
 } from './toolIdentity';
-export { getVaultBasePath } from './vault';
+export { getFilePathBasename, getVaultBasePath, toVaultRelativePath } from './vault';

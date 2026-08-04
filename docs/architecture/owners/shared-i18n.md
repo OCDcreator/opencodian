@@ -39,4 +39,6 @@ Run before merge: `npm run typecheck`, `npm run module-docs`.
 
 - **Turn-change record preference:** added English and Chinese labels explaining that the Conversation setting hides or restores historical file-change cards without stopping their collection or retention.
 
+- **Turn-diff compact card copy:** added `chat.diffNotice.fileCount` / `expandRemaining` / `collapse` / `statusAdded` / `statusDeleted` (en + zh) for the structured turn-diff card; `chat.diffNotice.description` stays for persisted Markdown compatibility but is no longer rendered by the dedicated branch.
+
 - **Obsidian 1.13.4 compatibility (Phase B):** added `settings.searchDesc` (en + zh) — the description consumed by `OpenCodianSettingTab.getSettingDefinitions()`'s declarative `SettingDefinitionPage`, so the plugin is discoverable by name and description in global Settings search on Obsidian 1.13+. Module-doc changelog entries added to `docs/modules/i18n/locales/{en,zh}.md`.

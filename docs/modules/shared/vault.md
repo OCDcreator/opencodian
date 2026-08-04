@@ -5,11 +5,11 @@
 
 ## 概述
 
-提供 Vault 相关的工具函数。当前仅包含 `getVaultBasePath()`，通过类型断言访问 Obsidian `VaultAdapter` 的 `basePath` 属性，获取 vault 的文件系统绝对路径。现在它还会容忍 `app.vault` 或 `adapter` 缺失的测试 / mock 场景，直接回退 `null`，避免启动日志和诊断路径在单元测试里提前抛错。
+提供 Vault 相关的工具函数。`getVaultBasePath()` 通过类型断言访问 Obsidian `VaultAdapter` 的 `basePath` 属性，获取 vault 的文件系统绝对路径；它还会容忍 `app.vault` 或 `adapter` 缺失的测试 / mock 场景，直接回退 `null`，避免启动日志和诊断路径在单元测试里提前抛错。`toVaultRelativePath()` 是纯函数形式的跨平台 vault-relative 路径规范化，供 session-diff 展示与打开文件链路共用；`getFilePathBasename()` 为 unresolved 路径提供不泄露父目录的最后一段显示值。
 
 ## 导入关系
 上游: `obsidian` (App)
-下游: `OpenCodianView`, `ServerManager`, `OpenCodeService` 等需要 vault 路径的模块
+下游: `OpenCodianView`, `ServerManager`, `OpenCodeService`、`ModifiedFilesSidebar` 等需要 vault 路径的模块
 
 ## 核心类型 / 接口
 
@@ -27,11 +27,23 @@ function getVaultBasePath(app: App): string | null {
 
 通过双重类型断言（`as unknown as`）访问 `FileSystemAdapter` 的内部 `basePath` 属性。此属性在桌面端存在，移动端不存在。
 
+### toVaultRelativePath(filePath, vaultBasePath)
+
+纯函数，不触碰 Obsidian API：
+
+- 输入与 base 先统一 `\` → `/`。
+- 任意输入只要包含 `..` 路径段就返回 `null`，防止 vault 前缀之后的父目录穿越。
+- 输入本已是相对路径：原样返回（仅统一分隔符），不需要 base。
+- 输入为绝对路径（POSIX `/...` 或 Windows `X:/...`）：仅当它在目录边界上真实位于 `vaultBasePath` 之下时剥离 base 前缀；base 末尾多余的 `/` 先归一化，`/vault` 不会错误剥离 `/vault-two/...`；Windows drive path 比较不区分大小写。
+- 无法证明位于 vault 内的绝对路径（含 base 缺失、等于 base 本身）：返回 `null`，调用方必须 fail closed，不得把主机绝对路径写进链接、DOM 或 tooltip。
+
 ## 关键方法
 
 | 方法 | 说明 |
 |------|------|
 | `getVaultBasePath(app)` | 获取 vault 文件系统绝对路径 |
+| `getFilePathBasename(filePath)` | 只返回最后一个路径段，用于 unresolved 的安全显示 |
+| `toVaultRelativePath(filePath, vaultBasePath)` | 归一化为 vault 相对路径；无法证明在 vault 内时返回 `null` |
 
 ## 数据流
 
@@ -39,13 +51,17 @@ function getVaultBasePath(app: App): string | null {
 调用方 → getVaultBasePath(app)
   → app.vault.adapter.basePath
   → "/Users/user/my-vault" 或 null
+
+调用方 → toVaultRelativePath(filePath, basePath)
+  → "notes/today.md"（vault 相对）或 null（fail closed）
 ```
 
 ## 与其他模块的交互
 
 - **ServerManager**: 获取 vault 路径用于设置 OpenCode server 的工作目录
 - **OpenCodeService**: 在构建 API URL 时可能使用 vault 路径
-- **OpenCodianView**: 在需要文件系统路径的场景调用
+- **OpenCodianView**: 在需要文件系统路径的场景调用；`AssistantNoticeCardRendererHost.resolveVaultRelativePath()` 由它用 `toVaultRelativePath()` + `getVaultBasePath()` 接线
+- **ModifiedFilesSidebar**: `formatPath()` 委托给 `toVaultRelativePath()`，base path 获取行为保持不变
 
 ## 配置项
 
@@ -57,4 +73,4 @@ function getVaultBasePath(app: App): string | null {
 - `app.vault` / `adapter` 缺失时会返回 `null`；调用方不能假定这里一定有值
 - 移动端 Obsidian 不支持文件系统路径，返回 `null`
 - 仅适用于桌面端 Obsidian（与 AGENTS.md 中 "Desktop only" 要求一致）
-
+- `toVaultRelativePath()` 只负责“完整相对路径”语义；紧凑展示（中间省略等）是渲染层的 presentation 责任，不要塞进这里

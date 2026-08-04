@@ -9,6 +9,7 @@ import { App, Component, setIcon } from 'obsidian';
 
 import type { SessionDiffEntry } from '../../../core/types/chat';
 import { t } from '../../../i18n';
+import { getFilePathBasename, toVaultRelativePath } from '../../../shared';
 import { ConversationRenderService } from '../services/ConversationRenderService';
 
 export type ModifiedFilesSidebarAvailability = 'ready' | 'unavailable';
@@ -189,16 +190,22 @@ export class ModifiedFilesSidebar extends Component {
       const summaryEl = itemEl.createEl('summary', {
         cls: 'opencodian-modified-files-sidebar-item-summary',
       });
+      const relativePath = this.formatPath(entry.file);
+      const displayPath = relativePath ?? getFilePathBasename(entry.file);
       const pathEl = summaryEl.createSpan({
         cls: 'opencodian-modified-files-sidebar-path',
-        text: this.formatPath(entry.file),
+        text: displayPath,
       });
-      pathEl.title = entry.file;
-      pathEl.addEventListener('click', (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        void this.app.workspace.openLinkText(this.formatPath(entry.file), '', false);
-      });
+      pathEl.title = displayPath;
+      if (relativePath) {
+        pathEl.addEventListener('click', (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          void this.app.workspace.openLinkText(relativePath, '', false);
+        });
+      } else {
+        pathEl.classList.add('is-unresolved');
+      }
 
       const metaEl = itemEl.createDiv({ cls: 'opencodian-modified-files-sidebar-meta' });
       const statsEl = metaEl.createSpan({ cls: 'opencodian-modified-files-sidebar-stats' });
@@ -223,15 +230,8 @@ export class ModifiedFilesSidebar extends Component {
     }
   }
 
-  private formatPath(filePath: string): string {
-    const basePath = this.getVaultBasePath();
-    if (!basePath) return filePath;
-    const normFile = filePath.replace(/\\/g, '/');
-    const normBase = basePath.replace(/\\/g, '/');
-    if (normFile.startsWith(`${normBase}/`)) {
-      return normFile.slice(normBase.length + 1);
-    }
-    return filePath;
+  private formatPath(filePath: string): string | null {
+    return toVaultRelativePath(filePath, this.getVaultBasePath());
   }
 
   private getVaultBasePath(): string | null {

@@ -56,7 +56,7 @@ export type { ToolExecutionStateLike, ToolExecutionStatus } from './toolExecutio
 export { isToolExecutionError, resolveToolExecutionStatus, resolveToolResultText } from './toolExecution';
 export type { ToolIdentity, ToolIdentityKind, ToolIdentityOptions } from './toolIdentity';
 export { getNormalizedToolName, getToolIdentity, isBuiltinToolName } from './toolIdentity';
-export { getVaultBasePath } from './vault';
+export { getFilePathBasename, getVaultBasePath, toVaultRelativePath } from './vault';
 ```
 
 ## 核心逻辑
@@ -97,6 +97,8 @@ export { getVaultBasePath } from './vault';
 | `getNormalizedToolName()` | 获取工具规范名 |
 | `isBuiltinToolName()` | 判断是否属于内置/特殊内建工具 |
 | `getVaultBasePath()` | 解析当前 vault 根路径 |
+| `getFilePathBasename()` | 安全提取最后一个路径段，不暴露父目录 |
+| `toVaultRelativePath()` | 纯函数归一化 vault 相对路径；无法证明在 vault 内时返回 `null` |
 | `sanitizeDiagnosticReport()` | 诊断报告导出前的密钥/令牌/密码净化 |
 
 ## 数据流

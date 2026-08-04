@@ -29,6 +29,9 @@
 ## Required gates
 Run before merge: `npm run typecheck`, `npm run module-docs`.
 
+## Recent change notes
+- **Vault-relative path pure functions:** `src/shared/vault.ts` gained `toVaultRelativePath()` — cross-platform separator normalization with traversal rejection and directory-boundary stripping that fails closed (`null`) for paths it cannot prove safe — plus `getFilePathBasename()` for unresolved display without parent-directory leakage. `getVaultBasePath()` is unchanged, and the barrel `src/shared/index.ts` re-exports all three.
+
 ## Hard invariants
 - Do not cross `forbiddenDependencies`.
 - Do not replicate canonical state in another owner.

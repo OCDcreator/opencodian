@@ -12,6 +12,7 @@
 - 助手消息：`.opencodian-message--assistant`、`.opencodian-message-time-row`、`.opencodian-message-model-id`。
 - 用户消息高亮：`.opencodian-message-highlight-agent`（`@agent`）、`.opencodian-message-highlight-command`（普通 `/command`）与 `.opencodian-message-highlight-skill`（direct `/skill`、`/skills skill`）。
 - 通知卡：`.opencodian-chat-notice-card*`、`.opencodian-chat-notice-action-btn`。
+- Turn Change Record 紧凑卡片：`.opencodian-chat-notice-card.is-turn-diff` 命名空间下的 `.opencodian-turn-diff-*`——header 数量徽标、单行 `nowrap` 文件行（`min-height: 30px`、4px gap、`hidden` 属性显隐覆盖 flex）、可收缩弱化父目录 + 优先可见的文件名、`+N`/`−N` 统计徽标（`--opencodian-status-success(-subtle)` / `--opencodian-status-error(-subtle)` 弱背景、`font-variant-numeric: tabular-nums`）、`added`/`deleted` 状态标签（`.status-renamed` 仅预留视觉映射，无数据）、DOM-local 展开/收起 toggle；row selector 使用足够 specificity 显式清除 Obsidian button 的常态背景/阴影，hover 仅轻背景，`:focus-visible` 用 accent outline，无内部滚动、无第二层卡片边框、无阴影。
 - 交互按钮：`.opencodian-copy-btn-inline`、`.opencodian-user-action-btn*`。
 - Fork target modal：`.opencodian-fork-target-list`、`.opencodian-fork-target-option` 和 `.opencodian-fork-target-note`，后者用于禁用会话标签时解释 why “fork to new tab” 不显示。
 - 问题与 TODO：`.opencodian-question-dock*`、`.opencodian-question-dock-collapse-toggle`、`.opencodian-question-dock.is-collapsed`、`.opencodian-session-todo-*`。

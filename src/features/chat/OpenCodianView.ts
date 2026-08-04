@@ -57,6 +57,7 @@ import {
   getPerformanceTimestampMs,
   getVaultBasePath,
   isInternalStructuredOutputTool,
+  toVaultRelativePath,
 } from '../../shared';
 import { ProviderIconService } from '../../utils/icons/ProviderIconService';
 import { MarkdownRenderService } from '../../utils/markdown';
@@ -2457,6 +2458,10 @@ export class OpenCodianView extends ItemView {
       renderMarkdownInto: (container, markdown) => this.renderMarkdownInto(container, markdown),
       handleNoticeAction: (actionType) => this.conversationNoticeCoordinator.routeNoticeAction(actionType),
       handleCollapsibleToggle: () => this.scheduleActiveSettledScrollToBottomIfNeeded(),
+      resolveVaultRelativePath: (filePath) => toVaultRelativePath(filePath, getVaultBasePath(this.app)),
+      openVaultFile: (relativePath) => {
+        void this.app.workspace.openLinkText(relativePath, '', false);
+      },
     };
   }
 

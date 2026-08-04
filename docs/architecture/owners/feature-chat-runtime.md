@@ -36,6 +36,7 @@ Run before merge: `npm run typecheck`, `npm run module-docs`.
 
 ## Recent change notes
 - **Canonical render seam:** runtime composition supplies valid local turn-change records to canonical OpenCode rendering and reads the display preference through `ConversationIdentityRuntime`; this preserves the record without broadening ordinary local-notice retention.
+- **Turn-diff compact card:** `AssistantNoticeCardRenderer` now routes valid `turn-diff` notices (via `getTurnDiffNoticeMeta`) into a dedicated structured DOM branch — no notice icon, one native button row per file, vault-relative middle-elided paths, `+N`/`−N` badges, and a DOM-local 5-row expand/collapse toggle. Generic warning/error/info/OMO notices keep the existing icon + Markdown branch; `message.content` Markdown remains persistence-only for these cards.
 
 ## Hard invariants
 - Do not cross `forbiddenDependencies`.

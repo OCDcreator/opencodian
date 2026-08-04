@@ -374,6 +374,61 @@ describe('ModifiedFilesSidebar', () => {
     removeListenerSpy.mockRestore();
   });
 
+  it('resolves vault-internal absolute entries through the shared vault-relative path helper', () => {
+    const openLinkText = jest.fn();
+    const parentEl = document.createElement('div') as ObsidianLikeElement;
+    document.body.appendChild(parentEl);
+    const vaultBase = '/Volumes/SDD2T/obsidian-vault-write/testvault';
+    const sidebar = new ModifiedFilesSidebar({
+      vault: { adapter: { getBasePath: () => vaultBase } },
+      workspace: { openLinkText },
+    } as unknown as App, parentEl);
+    sidebar.onload();
+    sidebar.updateEntries([
+      { file: `${vaultBase}/notes/today.md`, additions: 1, deletions: 2, status: 'modified' },
+      { file: `${vaultBase}/custom/deep/nested/导数模型.md`, additions: 3, deletions: 0, status: 'added' },
+    ]);
+
+    const paths = Array.from(
+      document.querySelectorAll<HTMLElement>('.opencodian-modified-files-sidebar-path'),
+      (element) => element.textContent,
+    );
+    expect(paths).toEqual(['notes/today.md', 'custom/deep/nested/导数模型.md']);
+
+    document.querySelector<HTMLElement>('.opencodian-modified-files-sidebar-path')?.click();
+    expect(openLinkText).toHaveBeenCalledWith('notes/today.md', '', false);
+    expect(document.querySelector<HTMLElement>('.opencodian-modified-files-sidebar-path')?.title)
+      .toBe('notes/today.md');
+  });
+
+  it('fails closed to non-interactive basenames for unprovable absolute paths', () => {
+    const openLinkText = jest.fn();
+    const parentEl = document.createElement('div') as ObsidianLikeElement;
+    document.body.appendChild(parentEl);
+    const sidebar = new ModifiedFilesSidebar({
+      vault: { adapter: { getBasePath: () => '/vault' } },
+      workspace: { openLinkText },
+    } as unknown as App, parentEl);
+    sidebar.onload();
+    sidebar.updateEntries([
+      { file: '/vault-two/notes/today.md', additions: 1, deletions: 0 },
+      { file: '/etc/passwd', additions: 0, deletions: 1 },
+    ]);
+
+    const paths = Array.from(
+      document.querySelectorAll<HTMLElement>('.opencodian-modified-files-sidebar-path'),
+      (element) => element.textContent,
+    );
+    expect(paths).toEqual(['today.md', 'passwd']);
+    const pathEls = Array.from(
+      document.querySelectorAll<HTMLElement>('.opencodian-modified-files-sidebar-path'),
+    );
+    expect(pathEls.every((element) => element.classList.contains('is-unresolved'))).toBe(true);
+    expect(pathEls.map((element) => element.title)).toEqual(['today.md', 'passwd']);
+    pathEls.forEach((element) => element.click());
+    expect(openLinkText).not.toHaveBeenCalled();
+  });
+
   it('assigns unique panel ids to separate sidebar instances', () => {
     const firstParent = document.createElement('div') as ObsidianLikeElement;
     const secondParent = document.createElement('div') as ObsidianLikeElement;
