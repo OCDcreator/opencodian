@@ -74,6 +74,7 @@ import type { ChatPluginPort } from './ChatPluginPort';
 import {
   type FocusContextPreview,
 } from './composerContext';
+import { disposeCollapsiblesWithin } from './rendering/collapsible';
 import {
   type AssistantNoticeCardRenderer,
   type AssistantNoticeCardRendererHost,
@@ -1283,6 +1284,7 @@ export class OpenCodianView extends ItemView {
       backgroundTaskStaleNoticeFingerprint: null,
       backgroundTaskSuppressedFingerprint: null,
       isHydratingConversation: false,
+      hydrationDepth: 0,
       pendingLayoutMutations: 0,
       suppressNextLayoutAutoScroll: false,
       pendingSignalConversationSyncReasons: new Set(),
@@ -1509,6 +1511,10 @@ export class OpenCodianView extends ItemView {
   private endConversationHydration(tabId: TabId | null = this.getActiveTabId()): void {
     const hadPendingLayoutMutations =
       this.conversationTabRuntimeCoordinator.endConversationHydration(tabId);
+    const runtime = this.getTabRuntimeState(tabId);
+    if (!runtime?.isHydratingConversation) {
+      this.getTabPaneState(tabId)?.messagesEl.classList.remove('is-rehydrating');
+    }
     if (hadPendingLayoutMutations) {
       this.scheduleSettledScrollToBottomIfNeeded(this.shouldAutoScroll(tabId), tabId);
     }
@@ -1825,9 +1831,9 @@ export class OpenCodianView extends ItemView {
       appendPersistentNotice: (options) =>
         this.persistentAssistantNoticeService.appendMessage(options),
       refreshSessionChangeSidebar: () => this.refreshModifiedFilesSidebar(),
-      renderBackgroundTaskIndicatorIfNeeded: (tabId) => {
+      renderBackgroundTaskIndicatorIfNeeded: (tabId, options) => {
         if (hasCapability(this.caps, AgentCapability.Subagents)) {
-          return this.backgroundTaskHost.renderBackgroundTaskIndicatorIfNeeded(tabId);
+          return this.backgroundTaskHost.renderBackgroundTaskIndicatorIfNeeded(tabId, options);
         }
         return Promise.resolve();
       },
@@ -1860,11 +1866,16 @@ export class OpenCodianView extends ItemView {
         title: string;
         content: string;
         tone: ChatMessage['noticeTone'];
+        isCurrent?: () => boolean;
       }) => this.persistentAssistantNoticeService.appendMessage(options),
       getSessionTodos: (sessionId) => this.plugin.openCodeService.getSessionTodos(sessionId),
       getSessionStatuses: () => this.plugin.openCodeService.getSessionStatuses(),
-      reconcileBackgroundTaskLiveSignals: (tabId) => {
-        this.backgroundTaskLiveSignalCoordinator.reconcileStateFromLiveSignals(tabId);
+      reconcileBackgroundTaskLiveSignals: (tabId, options) => {
+        if (options?.isCurrent) {
+          this.backgroundTaskLiveSignalCoordinator.reconcileStateFromLiveSignals(tabId, options);
+        } else {
+          this.backgroundTaskLiveSignalCoordinator.reconcileStateFromLiveSignals(tabId);
+        }
       },
     };
   }
@@ -1885,6 +1896,7 @@ export class OpenCodianView extends ItemView {
         title: string;
         content: string;
         tone: ChatMessage['noticeTone'];
+        isCurrent?: () => boolean;
       }) => this.persistentAssistantNoticeService.appendMessage(options),
     };
   }
@@ -1945,6 +1957,7 @@ export class OpenCodianView extends ItemView {
         this.updateModelSelectorDisplay();
       },
       clearMessagesContainer: () => {
+        disposeCollapsiblesWithin(this.messagesContainer);
         this.messagesContainer?.empty();
         this.childSessionGraphCoordinator.clearContainer();
       },
@@ -2169,6 +2182,7 @@ export class OpenCodianView extends ItemView {
       getActiveTabId: () => this.getActiveTabId(),
       getAllTabs: () => this.tabManager?.getAllTabs() ?? [],
       getTab: (tabId) => this.tabManager?.getTab(tabId) ?? null,
+      getTabPaneState: (tabId) => this.getTabPaneState(tabId),
       getTabRuntimeState: (tabId: TabId | null) => this.getTabRuntimeState(tabId),
       getConversationSyncFingerprint: (messages) =>
         this.conversationIdentityRuntime.getConversationSyncFingerprint(messages),
@@ -2182,9 +2196,9 @@ export class OpenCodianView extends ItemView {
       },
       applySyncedConversationUpdate: (previousMessages, nextMessages) =>
         conversationRenderService.applySyncedConversationUpdate(previousMessages, nextMessages),
-      renderBackgroundTaskIndicatorIfNeeded: (tabId) => {
+      renderBackgroundTaskIndicatorIfNeeded: (tabId, options) => {
         if (hasCapability(this.caps, AgentCapability.Subagents)) {
-          return this.backgroundTaskHost.renderBackgroundTaskIndicatorIfNeeded(tabId);
+          return this.backgroundTaskHost.renderBackgroundTaskIndicatorIfNeeded(tabId, options);
         }
         return Promise.resolve();
       },
@@ -2251,9 +2265,9 @@ export class OpenCodianView extends ItemView {
       },
       rerenderSingleUserMessage: (previousMessageId, message) =>
         conversationRenderService.rerenderSingleUserMessage(previousMessageId, message),
-      renderBackgroundTaskIndicatorIfNeeded: (tabId) => {
+      renderBackgroundTaskIndicatorIfNeeded: (tabId, options) => {
         if (hasCapability(this.caps, AgentCapability.Subagents)) {
-          return this.backgroundTaskHost.renderBackgroundTaskIndicatorIfNeeded(tabId);
+          return this.backgroundTaskHost.renderBackgroundTaskIndicatorIfNeeded(tabId, options);
         }
         return Promise.resolve();
       },
@@ -2293,7 +2307,7 @@ export class OpenCodianView extends ItemView {
       reapplyConversationSessionVisualState: (conversation) => {
         this.conversationSessionSettingsCoordinator.applyConversationVisualState(conversation);
       },
-      renderMessages: (messages) => conversationRenderService.renderMessages(messages),
+      renderMessages: (messages, options) => conversationRenderService.renderMessages(messages, options),
       getCurrentConversation: () => this.currentConversation,
       cancelTitleGeneration: (conversationId) => {
         this.titleGenerationService.cancelConversation(conversationId);
@@ -2305,7 +2319,10 @@ export class OpenCodianView extends ItemView {
       },
       clearScheduledScrollToBottom: () => { this.clearScheduledScrollToBottom(); },
       beginConversationHydration: (tabId) => { this.beginConversationHydration(tabId); },
-      clearMessagesContainer: () => { this.messagesContainer?.empty(); },
+      clearMessagesContainer: () => {
+        disposeCollapsiblesWithin(this.messagesContainer);
+        this.messagesContainer?.empty();
+      },
       resetTurnState: () => { this.resetTurnState(); },
       endConversationHydration: (tabId) => { this.endConversationHydration(tabId); },
     };

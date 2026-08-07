@@ -1,3 +1,4 @@
+/* eslint-disable max-lines-per-function -- live-signal fixture covers the full reconciliation matrix. */
 import type { SessionActivityStatus } from '../../../../src/core/opencode';
 import {
   BackgroundTaskLiveSignalCoordinator,
@@ -193,6 +194,34 @@ describe('BackgroundTaskLiveSignalCoordinator', () => {
     expect(runtime.backgroundTaskWaitingForFollowUp).toBe(false);
     expect(noticeStateService.handleStoppedPendingLaunches).toHaveBeenCalledWith('tab-1', [launch]);
     expect(resetBackgroundTaskIndicator).toHaveBeenCalledWith('tab-1');
+  });
+
+  it('passes a stale activation lease to live-signal notice reconciliation', () => {
+    const launch = createLaunch();
+    const {
+      service,
+      sessionTodoStateService,
+      noticeStateService,
+    } = createService({
+      runtime: {
+        backgroundTaskLaunches: new Map([[launch.launchId, launch]]),
+      },
+      status: { type: 'idle' },
+      pendingLaunches: [launch],
+    });
+    const isCurrent = jest.fn().mockReturnValue(true);
+
+    service.reconcileStateFromLiveSignals('tab-1', { isCurrent });
+
+    expect(sessionTodoStateService.reconcileStaleSessionTodoState).toHaveBeenCalledWith(
+      'tab-1',
+      { isCurrent },
+    );
+    expect(noticeStateService.handleStoppedPendingLaunches).toHaveBeenCalledWith(
+      'tab-1',
+      [launch],
+      { isCurrent },
+    );
   });
 
   it('clears empty task placeholders after the grace period regardless of mode', () => {

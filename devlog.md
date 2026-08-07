@@ -11,6 +11,21 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-08-06 会话渲染链路修复：并发正确性 + 滚动恢复 + keyed reconcile + 帧预算
+
+针对只读实机审查结论（"实时生成部分合理，历史会话重载部分不合格"：激活清空重建全量消息、preserveScrollPosition 跳顶、fallback 全量重建、伪流式/thinking 无节制全文重绘）做四阶段修复。本条记录代码侧改动与单元级证据；实机验收数据补记于本条目末尾。
+
+- **阶段一 阻止错误 DOM**：`questionCardPosition`/`showAnsweredQuestionCards` 两个设置合并为单次 `refreshQuestionUi()`（SettingsConversationSection），消除同 tick 双 fire-and-forget 全量 rerender；会话 rerender 建立串行化队列 + 代际保护（ConversationRenderService），重入不再交错追加；可见会话同步在 hydration 期间不直接改 DOM，延后合并、hydration 完成后重试（上限 40×150ms）并重新校验 tab/conversation 身份（ConversationSyncRuntimeCoordinator）；`loadConversation` 建立 per-tab generation/abort——请求开始固定目标 tab/conversation，关键 await 后、激活前、逐条渲染前、滚动恢复前、hydration tail 前均校验 generation，旧加载不采用后来变化的 activeTabId（ConversationViewStateService/ConversationTabRuntimeCoordinator）；点击已激活且内容未变化 tab 直接短路，不再重复全量 hydration。新增回归测试：同 tick 双 rerender 无重复 message id、hydration 与周期同步交错、A→B/A→B→A 快速切换最终 DOM 归属、旧 generation 不执行 restore/tail/伪流式写入。
+- **阶段二 滚动恢复**：`ConversationHydrationRenderBridge` 在任何 clear 前捕获完整 scroll anchor 快照（真实 message-id anchor、offset、旧 scrollHeight/scrollTop、distanceFromBottom），与 sync fallback 捕获时机对齐，杜绝"新 scrollHeight + 旧 scrollTop"伪距离；`resolveEffectiveScrollRestoreSnapshot` 以 scrollTop>0 判定用户接管，用户滚动意图优先于 hydration 开始时的 `shouldStickToBottom`；`beginConversationHydration` 武装 `armProgrammaticScrollGuard` 防 clear-clamp 滚动事件污染 autoScrollEnabled；`restoreElementScrollAfterRender` 新增 `lateContentReapplyWindowMs`（1500ms 内 late load 事件重放 anchor，用户接管即 dispose）。移除掩盖问题的过度 mock，改用真实 DOM/真实 snapshot 函数的集成测试。
+- **阶段三 keyed reconcile**：新增 `ConversationKeyedReconcileDelegate`（feature.chat-services），按稳定 message identity 调和插入/删除/更新/重排：未变化消息保留 DOM node identity；user 更新走就地 `rerenderSingleUserMessage`，assistant 更新 `replaceWith`；正确处理连续 assistant 合并的复合 id 与合并/拆分；prune 空 turn；保留 thinking/工具/用户消息折叠状态；仅 drift/streaming shell/空态/重复 id 等无法调和时返回 false 走全量 fallback。接入 `ConversationSyncedUpdateApplyDelegate`：incremental 为 null 时先 reconcile 再 fallback。OpenCodianView 未新增 runtime 职责。
+- **阶段四 受证据约束的性能修复**：新增 `MarkdownRenderScheduler`（shared.utils-streaming，`STREAMING_MARKDOWN_RENDER_MIN_INTERVAL_MS=96`，leading+trailing 合并、flush/cancel），thinking（ThinkingBlockRenderer per-state scheduler + `flushContent` + finalize 兜底 flush + cleanup cancel）与伪流式（renderSyncedAssistantMessageWithReveal 的 chunk 循环改为 schedule/结束 flush、abort 时 cancel、保留容器检查）统一纳入帧预算，StreamController 私有常量改为共享导入；`setupCollapsible` 返回幂等 dispose 句柄（disconnect ResizeObserver + 移除监听）并新增 `disposeCollapsiblesWithin`，清空/就地替换消息子树前执行（潜在 retention 风险，未做 heap snapshot 前不宣称已证明泄漏）；消息入场动画补 `prefers-reduced-motion`（chat-user.css，覆盖 user/assistant）；确认图片嵌入仅在用户显式 `|宽x高` 语法时设置尺寸、无投机占位（补 characterization 测试），延迟 load 后 anchor 由阶段二 late reapply 覆盖。折叠懒渲染评估后放弃（展开时才全文渲染会把最大单次渲染成本挪到交互时刻且错误处理移到点击路径，帧预算已足够）；`content-visibility` 仅作实验项，实机验证前不提交。
+- **测试**：新增 8 个测试文件 + 多个既有套件用例，全部红→绿；全量单测 720 suites / 6910 tests 通过；tsc 干净；触碰文件 eslint 干净。
+- **诚实边界**：静态竞争窗口（双 rerender 交错、hydration/sync 交错、generation 过期写入）均以单元回归锁定，不宣称"已实机复现"；不宣称图片是重载 scrollHeight 增长主因。
+
+门禁：`npm run check:module-docs`（coverage 590/590 + diff）、`npm run check:owner-manifest`、typecheck、lint 均通过；graphify 刷新与 `npm run verify`、build、Test Vault 部署及实机验收见本条目后续补记。
+
+---
+
 ## 2026-08-02 Obsidian 1.13.4 兼容性升级 Phase B：新版 Settings API 迁移 + 宿主耦合验收
 
 Phase A 已通过只读 Codex review（`APPROVED`），进入 Phase B：将插件接入新版 declarative Settings API 使其被全局设置搜索发现，并对其余宿主耦合点完成静态与运行时审计。

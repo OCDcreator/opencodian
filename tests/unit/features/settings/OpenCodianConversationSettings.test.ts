@@ -330,7 +330,9 @@ describe('OpenCodian conversation settings', () => {
 
     expect(plugin.settings.questionCardPosition).toBe('above_input');
     expect(plugin.saveSettings).toHaveBeenCalledTimes(1);
-    expect(plugin.refreshConversationRendering).toHaveBeenCalledTimes(1);
+    // refreshQuestionUi already re-renders the conversation messages; a second
+    // refreshConversationRendering call would double the full rerender.
+    expect(plugin.refreshConversationRendering).not.toHaveBeenCalled();
     expect(plugin.refreshQuestionUi).toHaveBeenCalledTimes(1);
   });
 
@@ -344,7 +346,9 @@ describe('OpenCodian conversation settings', () => {
 
     expect(plugin.settings.showAnsweredQuestionCards).toBe(false);
     expect(plugin.saveSettings).toHaveBeenCalledTimes(1);
-    expect(plugin.refreshConversationRendering).toHaveBeenCalledTimes(1);
+    // refreshQuestionUi already re-renders the conversation messages; a second
+    // refreshConversationRendering call would double the full rerender.
+    expect(plugin.refreshConversationRendering).not.toHaveBeenCalled();
     expect(plugin.refreshQuestionUi).toHaveBeenCalledTimes(1);
   });
 

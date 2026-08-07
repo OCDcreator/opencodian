@@ -11,6 +11,10 @@ export interface ConversationSyncBackgroundPostSyncRouterRuntime {
 }
 
 export interface ConversationSyncBackgroundPostSyncRouterHost {
+  captureBackgroundPostSyncIdentity?(context: {
+    tabId: TabId;
+    conversationId: string;
+  }): { isCurrent(): boolean };
   getTabRuntimeState(
     tabId: TabId | null,
   ): ConversationSyncBackgroundPostSyncRouterRuntime | null;
@@ -40,23 +44,40 @@ export class ConversationSyncBackgroundPostSyncRouter {
   async routeSignalSyncComplete(
     options: SignalConversationPostSyncRouteOptions,
   ): Promise<void> {
-    const runtime = this.host.getTabRuntimeState(options.syncContext.tabId);
-    if (runtime) {
-      runtime.lastConversationSyncFingerprint = options.syncResult.fingerprint;
-    }
+    const identityLease = this.host.captureBackgroundPostSyncIdentity?.({
+      tabId: options.syncContext.tabId,
+      conversationId: options.syncContext.conversation.id,
+    }) ?? { isCurrent: () => true };
 
     await this.postSyncCoordinator.handleSignalSyncComplete({
       ...options.syncContext,
       syncResult: options.syncResult,
+      isCurrent: identityLease.isCurrent,
     });
+    if (!identityLease.isCurrent()) {
+      return;
+    }
+
+    const runtime = this.host.getTabRuntimeState(options.syncContext.tabId);
+    if (runtime) {
+      runtime.lastConversationSyncFingerprint = options.syncResult.fingerprint;
+    }
   }
 
   async routeBackgroundTabSyncComplete(
     options: BackgroundTabConversationPostSyncRouteOptions,
   ): Promise<void> {
+    const identityLease = this.host.captureBackgroundPostSyncIdentity?.({
+      tabId: options.syncContext.tabId,
+      conversationId: options.syncContext.conversation.id,
+    }) ?? { isCurrent: () => true };
     await this.postSyncCoordinator.handleBackgroundTabSyncComplete({
       ...options.syncContext,
       syncResult: options.syncResult,
+      isCurrent: identityLease.isCurrent,
     });
+    if (!identityLease.isCurrent()) {
+      return;
+    }
   }
 }

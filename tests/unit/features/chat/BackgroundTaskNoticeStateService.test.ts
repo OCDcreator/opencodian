@@ -108,4 +108,26 @@ describe('BackgroundTaskNoticeStateService', () => {
     expect(runtime.backgroundTaskStaleNoticeFingerprint).toBeNull();
     expect(appendPersistentAssistantNoticeMessage).not.toHaveBeenCalled();
   });
+
+  it('does not append a stopped notice after the activation lease expires', async () => {
+    const { service, appendPersistentAssistantNoticeMessage } = createService();
+    let current = true;
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    appendPersistentAssistantNoticeMessage.mockImplementationOnce(async () => gate);
+
+    const pendingNotice = service.handleStoppedPendingLaunches(
+      'tab-1',
+      pending,
+      { isCurrent: () => current },
+    );
+    current = false;
+    release();
+    await pendingNotice;
+
+    expect(appendPersistentAssistantNoticeMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ isCurrent: expect.any(Function) }),
+    );
+    expect(appendPersistentAssistantNoticeMessage.mock.calls[0]?.[0].isCurrent?.()).toBe(false);
+  });
 });

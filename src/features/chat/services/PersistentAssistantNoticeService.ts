@@ -12,6 +12,7 @@ export interface PersistentAssistantNoticeMessageOptions {
   tabId?: TabId | null;
   timestamp?: number;
   noticeMeta?: ChatMessage['noticeMeta'];
+  isCurrent?: () => boolean;
 }
 
 export interface PersistentAssistantNoticeServiceHost {
@@ -46,6 +47,10 @@ export class PersistentAssistantNoticeService {
   }
 
   async appendMessage(options: PersistentAssistantNoticeMessageOptions): Promise<void> {
+    const isCurrent = options.isCurrent ?? (() => true);
+    if (!isCurrent()) {
+      return;
+    }
     const timestamp = options.timestamp ?? Date.now();
     const noticeMessage: ChatMessage = {
       id: `assistant-notice-${timestamp}`,
@@ -78,9 +83,41 @@ export class PersistentAssistantNoticeService {
       ticket,
       reason: 'persistent-assistant-notice',
       write: async () => {
+        if (!isCurrent()) {
+          return;
+        }
+        const previousUpdatedAt = targetConversation.updatedAt;
         targetConversation.messages.push(noticeMessage);
         targetConversation.updatedAt = timestamp;
-        await this.host.saveConversation(targetConversation);
+        const rollback = (): void => {
+          const noticeIndex = targetConversation.messages.indexOf(noticeMessage);
+          if (noticeIndex >= 0) {
+            targetConversation.messages.splice(noticeIndex, 1);
+          }
+          if (targetConversation.updatedAt === timestamp) {
+            targetConversation.updatedAt = previousUpdatedAt;
+          }
+        };
+        try {
+          await this.host.saveConversation(targetConversation);
+        } catch (error) {
+          rollback();
+          throw error;
+        }
+        if (!isCurrent()) {
+          // The save may have crossed a tab/conversation switch. Remove the
+          // message from the in-memory model and issue a compensating save so
+          // a stale notice is not left behind when the storage write already
+          // completed before the lease check.
+          rollback();
+          try {
+            await this.host.saveConversation(targetConversation);
+          } catch {
+            // Best effort: the caller lease is already stale, so do not render
+            // or surface a notice even if rollback persistence is unavailable.
+          }
+          return;
+        }
         conversationSyncRuntime.setTabConversationSyncFingerprint(
           targetTabId,
           conversationSyncRuntime.getConversationSyncFingerprint(targetConversation.messages),
@@ -102,6 +139,10 @@ export class PersistentAssistantNoticeService {
     }
     if (renderError) {
       throw renderError;
+    }
+
+    if (!isCurrent()) {
+      return;
     }
 
     if (targetConversationIsVisible) {

@@ -48,6 +48,7 @@ export class ConversationAuthoritativeSyncCoordinator {
 - **Backend-aware session identity**: 使用 `getConversationBackendSessionId()` 解析会话标识，不再直接读取 `conversation.openCodeSessionId`。
 - **OpenCode-only sync gate**: `syncLatestUserMessageFromServer()` 与 `syncConversationMessagesFromServer()` 在 `conversation.backend !== 'opencode'` 时直接返回无变化结果。Authoritative server sync 目前仍是 OpenCode-specific 能力（message shape、hydration path、canonical state 都假设 OpenCode 语义）。Claude 等非 OpenCode backend 的 sync 暂不启用，避免把 Claude session ID 误传入 OpenCode-only 路径。
 - host 依赖与外部调用方式保持不变，因此 `ConversationSyncBridge`、send pipeline 与 view wrapper 不需要感知这次内部 owner 收口。
+- background-task indicator host seam 支持可选 `isCurrent` lease；authoritative sync 触发的异步 indicator/writeback 必须在旧 tab 或旧 pane 失效后停止提交。
 
 ## 与 `OpenCodianView` 的边界
 

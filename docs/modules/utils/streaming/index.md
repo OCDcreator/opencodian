@@ -5,21 +5,30 @@
 
 ## 概述
 
-流式渲染子系统的聚合入口，向上层统一暴露 `StreamController`、`ThinkingBlockRenderer`、`ToolCallRenderer`、`mcpSummaryConfig` 常量与流式状态相关类型。聊天主视图通常通过这个入口获得流事件处理能力。
+流式渲染子系统的聚合入口，向上层统一暴露 `StreamController`、`ThinkingBlockRenderer`、`ToolCallRenderer`、`MarkdownRenderScheduler` 帧预算工具、`mcpSummaryConfig` 常量与流式状态相关类型。聊天主视图通常通过这个入口获得流事件处理能力。
 
 ## 导入关系
 
 ```text
-上游: ./mcpSummaryConfig, ./StreamController, ./ThinkingBlockRenderer, ./ToolCallRenderer, ./types
+上游: ./MarkdownRenderScheduler, ./mcpSummaryConfig, ./StreamController, ./ThinkingBlockRenderer, ./ToolCallRenderer, ./streamingCollapsible, ./types
 下游: OpenCodianView、测试与其他需要消费流式事件的模块
 ```
 
 ## 核心类型 / 接口
 
 ```typescript
+export {
+  MarkdownRenderScheduler,
+  STREAMING_MARKDOWN_RENDER_MIN_INTERVAL_MS,
+} from './MarkdownRenderScheduler';
 export { StreamController } from './StreamController';
 export { ThinkingBlockRenderer } from './ThinkingBlockRenderer';
 export { ToolCallRenderer } from './ToolCallRenderer';
+export {
+  disposeStreamingCollapsible,
+  disposeStreamingCollapsiblesWithin,
+  registerStreamingCollapsible,
+} from './streamingCollapsible';
 export type {
   McpSummaryCategoryDefinition,
   McpSummaryCategoryId,
@@ -57,6 +66,8 @@ export { createStreamState } from './types';
 | `StreamController` | 流事件状态控制器 |
 | `ThinkingBlockRenderer` | thinking 内容块渲染器 |
 | `ToolCallRenderer` | 工具调用内容块渲染器 |
+| `disposeStreamingCollapsible*` / `registerStreamingCollapsible` | 流式 thinking/tool 卡片的生命周期 disposer |
+| `MarkdownRenderScheduler` / `STREAMING_MARKDOWN_RENDER_MIN_INTERVAL_MS` | 流式 markdown 重渲染的共享帧预算调度器与间隔常量 |
 | `MCP_SUMMARY_CATEGORY_DEFINITIONS` 等常量 | MCP tool summary 分类与字段优先级配置 |
 | `createStreamState()` | 创建流式状态初值 |
 
@@ -66,7 +77,7 @@ export { createStreamState } from './types';
 
 ## 与其他模块的交互
 
-- 与 [StreamController.md](C:/Users/lt/Desktop/Write/custom-project/opencodian/docs/modules/utils/streaming/StreamController.md)、[ThinkingBlockRenderer.md](C:/Users/lt/Desktop/Write/custom-project/opencodian/docs/modules/utils/streaming/ThinkingBlockRenderer.md)、[ToolCallRenderer.md](C:/Users/lt/Desktop/Write/custom-project/opencodian/docs/modules/utils/streaming/ToolCallRenderer.md)、[mcpSummaryConfig.md](C:/Users/lt/Desktop/Write/custom-project/opencodian/docs/modules/utils/streaming/mcpSummaryConfig.md)、[mcp-summary-fields.md](C:/Users/lt/Desktop/Write/custom-project/opencodian/docs/modules/utils/streaming/mcp-summary-fields.md)、[types.md](C:/Users/lt/Desktop/Write/custom-project/opencodian/docs/modules/utils/streaming/types.md) 组成同一子系统
+- 与 [StreamController.md](C:/Users/lt/Desktop/Write/custom-project/opencodian/docs/modules/utils/streaming/StreamController.md)、[ThinkingBlockRenderer.md](C:/Users/lt/Desktop/Write/custom-project/opencodian/docs/modules/utils/streaming/ThinkingBlockRenderer.md)、[ToolCallRenderer.md](C:/Users/lt/Desktop/Write/custom-project/opencodian/docs/modules/utils/streaming/ToolCallRenderer.md)、[MarkdownRenderScheduler.md](C:/Users/lt/Desktop/Write/custom-project/opencodian/docs/modules/utils/streaming/MarkdownRenderScheduler.md)、[mcpSummaryConfig.md](C:/Users/lt/Desktop/Write/custom-project/opencodian/docs/modules/utils/streaming/mcpSummaryConfig.md)、[mcp-summary-fields.md](C:/Users/lt/Desktop/Write/custom-project/opencodian/docs/modules/utils/streaming/mcp-summary-fields.md)、[types.md](C:/Users/lt/Desktop/Write/custom-project/opencodian/docs/modules/utils/streaming/types.md) 组成同一子系统
 
 ## 配置项
 

@@ -1861,6 +1861,12 @@ body[data-opencodian-provider-icon-mode="color"] {
   animation: none !important;
 }
 
+/* Keep hydrated history from replaying entrance motion when the temporary
+ * rehydration class is removed; live appended messages remain unmarked. */
+.opencodian-messages .opencodian-message[data-opencodian-hydration-settled="true"] {
+  animation: none !important;
+}
+
 .opencodian-messages--sticky-basic,
 .opencodian-messages--sticky-mask {
   gap: 8px;

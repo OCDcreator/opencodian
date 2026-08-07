@@ -1,8 +1,11 @@
+/* eslint-disable max-lines, max-lines-per-function -- Incremental render-flow scenarios share one fixture to preserve lifecycle coverage. */
+
 import type {
   OpenCodeCanonicalMessageInfo,
   OpenCodeCanonicalPart,
   OpenCodeCanonicalSessionState,
 } from '../../../../src/core/opencode';
+import { setupCollapsible } from '../../../../src/features/chat/rendering/collapsible';
 import { OpenCodeService } from '../../core/opencode/OpenCodeService.testSupport';
 import {
   captureElementScrollRestoreSnapshot,
@@ -61,6 +64,54 @@ describe('ConversationRenderService incremental render flows', () => {
     jest.clearAllMocks();
   });
 
+  it('keeps user and following assistant messages in one staged turn during hydration', async () => {
+    const host = createHost();
+    host.createUserMessageFrame.mockImplementation((message) => {
+      const turnEl = document.createElement('div');
+      turnEl.className = 'opencodian-turn';
+      const bodyEl = document.createElement('div');
+      bodyEl.className = 'opencodian-turn-body';
+      const messageEl = document.createElement('div');
+      messageEl.className = 'opencodian-message opencodian-message--user';
+      messageEl.dataset.messageId = message.id;
+      const contentEl = document.createElement('div');
+      contentEl.className = 'opencodian-message-content';
+      messageEl.appendChild(contentEl);
+      bodyEl.appendChild(messageEl);
+      turnEl.appendChild(bodyEl);
+      host.messagesEl.appendChild(turnEl);
+      host.renderRuntime.currentTurnBodyEl = bodyEl;
+      return { messageEl, contentEl };
+    });
+    host.assistantShellRender.renderPersistedMessage.mockImplementation(async (message) => {
+      let bodyEl = host.renderRuntime.stagedTurnBodyEl;
+      if (!bodyEl && host.renderRuntime.currentTurnBodyEl?.isConnected) {
+        bodyEl = host.renderRuntime.currentTurnBodyEl;
+      }
+      if (!bodyEl) {
+        throw new Error('assistant render lost staged turn body');
+      }
+      const messageEl = document.createElement('div');
+      messageEl.className = 'opencodian-message opencodian-message--assistant';
+      messageEl.dataset.messageId = message.id;
+      bodyEl.appendChild(messageEl);
+      return messageEl;
+    });
+    const stagingContainer = document.createElement('div');
+    const service = new ConversationRenderService(host);
+
+    await service.renderMessages([
+      createMessage({ id: 'user-1', role: 'user', content: 'Question' }),
+      createMessage({ id: 'assistant-1', role: 'assistant', content: 'Answer' }),
+    ], { stagingContainer });
+
+    const turns = stagingContainer.querySelectorAll('.opencodian-turn');
+    expect(turns).toHaveLength(1);
+    expect(turns[0].querySelectorAll('.opencodian-message')).toHaveLength(2);
+    expect(turns[0].querySelector('[data-message-id="user-1"]')).not.toBeNull();
+    expect(turns[0].querySelector('[data-message-id="assistant-1"]')).not.toBeNull();
+  });
+
   it('renders the empty conversation notice when a rewind leaves no messages', async () => {
     const host = createHost({
       shouldRenderEmptyConversationNotice: jest.fn().mockReturnValue(true),
@@ -114,6 +165,83 @@ describe('ConversationRenderService incremental render flows', () => {
     );
   });
 
+  it('does not commit deferred user content after the message element is replaced', async () => {
+    const host = createHost();
+    const messageEl = document.createElement('div');
+    messageEl.className = 'opencodian-message opencodian-message--user';
+    messageEl.dataset.messageId = 'user-1';
+    host.messagesEl.appendChild(messageEl);
+    let release!: () => void;
+    const pending = new Promise<void>((resolve) => { release = resolve; });
+    host.userMessageContentRenderer.renderUserMessageContent.mockImplementationOnce(
+      async (contentEl: HTMLElement) => {
+        await pending;
+        contentEl.textContent = 'stale';
+        return 'stale';
+      },
+    );
+    const service = new ConversationRenderService(host);
+    const applying = service.rerenderSingleUserMessage('user-1', createMessage({ id: 'user-2', role: 'user', content: 'new' }));
+    await Promise.resolve();
+    const conversationB = createConversation([]);
+    conversationB.id = 'conversation-b';
+    host.getCurrentConversation.mockReturnValue(conversationB);
+    const newer = document.createElement('div');
+    newer.className = 'opencodian-message opencodian-message--user';
+    newer.dataset.messageId = 'user-1';
+    newer.textContent = 'new-owner';
+    messageEl.replaceWith(newer);
+    release();
+    await applying;
+    expect(newer.textContent).toBe('new-owner');
+  });
+
+  it('disposes collapsible observers before replacing user message content', async () => {
+    const disconnect = jest.fn();
+    const originalResizeObserver = globalThis.ResizeObserver;
+    (globalThis as Record<string, unknown>).ResizeObserver = jest.fn().mockImplementation(() => ({
+      observe: jest.fn(),
+      unobserve: jest.fn(),
+      disconnect,
+    }));
+    try {
+      const host = createHost();
+      const messageEl = document.createElement('div');
+      messageEl.className = 'opencodian-message opencodian-message--user';
+      messageEl.dataset.messageId = 'user-1';
+      const contentEl = document.createElement('div');
+      contentEl.className = 'opencodian-message-content';
+      // Simulate the collapsible the real user content renderer registered.
+      const wrapperEl = document.createElement('div');
+      const textEl = document.createElement('div');
+      const toggleEl = document.createElement('button');
+      wrapperEl.append(textEl, toggleEl);
+      contentEl.appendChild(wrapperEl);
+      messageEl.appendChild(contentEl);
+      host.messagesEl.appendChild(messageEl);
+      setupCollapsible({
+        wrapperEl,
+        headerEl: toggleEl,
+        contentEl: textEl,
+        state: { isExpanded: false, isCollapsible: false },
+      });
+
+      const service = new ConversationRenderService(host);
+      await service.rerenderSingleUserMessage(
+        'user-1',
+        createMessage({ id: 'user-2', role: 'user', content: 'Updated user text' }),
+      );
+
+      expect(disconnect).toHaveBeenCalledTimes(1);
+    } finally {
+      if (originalResizeObserver === undefined) {
+        delete (globalThis as Record<string, unknown>).ResizeObserver;
+      } else {
+        globalThis.ResizeObserver = originalResizeObserver;
+      }
+    }
+  });
+
   it('appends rendered messages without forcing a full rerender', async () => {
     const previousMessages = [
       createMessage({ id: 'user-1', role: 'user', content: 'Hi' }),
@@ -161,6 +289,40 @@ describe('ConversationRenderService incremental render flows', () => {
       appendedMessage,
     );
     expect(host.assistantShellRender.renderPersistedMessage).not.toHaveBeenCalled();
+  });
+
+  it('caps pseudo-stream markdown renders within a frame budget', async () => {
+    jest.useFakeTimers();
+    try {
+      const previousMessages = [
+        createMessage({ id: 'user-1', role: 'user', content: 'Hi' }),
+      ];
+      // 40 pseudo-stream chunks of 12 characters each.
+      const longContent = 'x'.repeat(480);
+      const appendedMessage = createMessage({ id: 'assistant-2', content: longContent });
+      const nextMessages = [...previousMessages, appendedMessage];
+      const conversation = createConversation(nextMessages);
+      const host = createHost({
+        getCurrentConversation: jest.fn().mockReturnValue(conversation),
+      });
+      const service = new ConversationRenderService(host);
+
+      const applyPromise = service.applySyncedConversationUpdate(previousMessages, nextMessages);
+      await jest.advanceTimersByTimeAsync(2_000);
+      await applyPromise;
+
+      const renderCalls = (host.renderMarkdownInto as jest.Mock).mock.calls;
+      // Without a render budget this would render once per chunk (40 times).
+      expect(renderCalls.length).toBeGreaterThan(1);
+      expect(renderCalls.length).toBeLessThanOrEqual(16);
+      expect(renderCalls[renderCalls.length - 1][1]).toBe(longContent);
+      expect(host.assistantShellRender.finalizePseudoStreamFooter).toHaveBeenCalledWith(
+        expect.any(HTMLElement),
+        appendedMessage,
+      );
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('renders tool-first assistant sync updates from canonical state without leaving a blank block', async () => {

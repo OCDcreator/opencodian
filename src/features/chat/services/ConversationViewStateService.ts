@@ -20,6 +20,7 @@ export interface LoadConversationOptions {
 
 interface ConversationViewStateTabManager {
   getTab(tabId: TabId): TabData | null;
+  getActiveTab(): TabData | null;
 }
 
 export interface ConversationViewStateHost {
@@ -57,6 +58,14 @@ export class ConversationViewStateService {
   private readonly conversationHydrationOutcomeBridge: ConversationHydrationOutcomePort;
   private readonly conversationTransitionBridge: ConversationTransitionPort;
   private readonly conversationLoadRuntimeBridge: ConversationLoadRuntimePort;
+  /**
+   * Per-tab load generation. Every new `loadConversation` for a tab bumps the
+   * tab's generation; a stale load checks its captured generation (and that
+   * its target tab is still the active tab) after every await so it can never
+   * activate, render, restore scroll, or run the hydration tail for a
+   * conversation the user has already navigated away from.
+   */
+  private readonly loadGenerationByTab = new Map<TabId, number>();
 
   constructor({
     host,
@@ -89,10 +98,16 @@ export class ConversationViewStateService {
 
     if (tab.conversationId) {
       if (tab.isStreaming) {
+        const streamingConversationId = tab.conversationId;
         const conversation = await this.conversationLoadRuntimeBridge.resolveConversation(
-          tab.conversationId,
+          streamingConversationId,
         );
-        if (!conversation) {
+        if (
+          !conversation
+          || tabManager.getActiveTab()?.id !== tabId
+          || tabManager.getTab(tabId)?.conversationId !== streamingConversationId
+        ) {
+          // The user switched away while the streaming conversation resolved.
           return;
         }
 
@@ -116,6 +131,12 @@ export class ConversationViewStateService {
     id: string,
     options: LoadConversationOptions = {},
   ): Promise<void> {
+    const tabManager = this.host.getTabManager();
+    const requestTabId = tabManager?.getActiveTab()?.id ?? null;
+    const generation = this.bumpLoadGeneration(requestTabId);
+    const isCurrent = (expectedConversationId?: string) =>
+      this.isConversationLoadCurrent(requestTabId, generation, expectedConversationId);
+
     const startedAt = getPerformanceTimestampMs();
     const stepSummaries: string[] = [];
     const measureStep = async <T>(step: string, operation: () => Promise<T> | T): Promise<T> => {
@@ -135,11 +156,14 @@ export class ConversationViewStateService {
       'prepareLoadedConversationTransition',
       () => this.conversationTransitionBridge.prepareLoadedConversationTransition(id),
     );
+    if (!isCurrent()) {
+      return;
+    }
 
     const conversation = await measureStep('resolveConversation', () => this.conversationLoadRuntimeBridge.resolveConversation(id, {
       reloadIfMissing: true,
     }));
-    if (!conversation) {
+    if (!conversation || !isCurrent()) {
       return;
     }
 
@@ -150,6 +174,11 @@ export class ConversationViewStateService {
       ),
     );
     const { activeTabId } = transitionContext;
+    if (!isCurrent() || (requestTabId !== null && activeTabId !== requestTabId)) {
+      // The capture raced a tab switch; never activate into a tab we did not
+      // pin at request time.
+      return;
+    }
 
     await measureStep('applyLoadedConversationActivation', () => {
       this.tabConversationActivationBridge.applyLoadedConversationActivation(
@@ -161,6 +190,11 @@ export class ConversationViewStateService {
       this.conversationTransitionBridge.beginLoadedConversationTransition(transitionContext);
     });
 
+    if (!this.isConversationLoadCurrent(requestTabId, generation, id)) {
+      this.conversationTransitionBridge.abortLoadedConversationTransition(transitionContext);
+      return;
+    }
+
     try {
       const messages = await measureStep(
         'loadConversationMessages',
@@ -170,17 +204,29 @@ export class ConversationViewStateService {
           this.buildConversationLoadRuntimeOptions(options),
         ),
       );
+      if (!isCurrent(id)) {
+        this.conversationTransitionBridge.abortLoadedConversationTransition(transitionContext);
+        return;
+      }
       await measureStep(
         'applyLoadedConversationOutcome',
         () => this.conversationHydrationOutcomeBridge.applyLoadedConversationOutcome(
           activeTabId,
           conversation,
           messages,
+          { shouldContinueRender: isCurrent },
         ),
       );
+      if (!isCurrent(id)) {
+        this.conversationTransitionBridge.abortLoadedConversationTransition(transitionContext);
+        return;
+      }
       await measureStep('restoreLoadedConversationTransition', () => {
         this.conversationTransitionBridge.restoreLoadedConversationTransition(transitionContext);
       });
+      if (!isCurrent(id)) {
+        return;
+      }
       await measureStep(
         'applyLoadedConversationHydrationTail',
         () => this.tabViewActivationBridge.applyLoadedConversationHydrationTail(),
@@ -191,6 +237,44 @@ export class ConversationViewStateService {
     } finally {
       this.conversationTransitionBridge.endLoadedConversationTransition(transitionContext);
     }
+  }
+
+  private bumpLoadGeneration(tabId: TabId | null): number {
+    if (!tabId) {
+      return 0;
+    }
+
+    const nextGeneration = (this.loadGenerationByTab.get(tabId) ?? 0) + 1;
+    this.loadGenerationByTab.set(tabId, nextGeneration);
+    return nextGeneration;
+  }
+
+  private isConversationLoadCurrent(
+    tabId: TabId | null,
+    generation: number,
+    expectedConversationId?: string,
+  ): boolean {
+    if (!tabId) {
+      return true;
+    }
+
+    const tabManager = this.host.getTabManager();
+    if (!tabManager) {
+      return true;
+    }
+
+    if ((this.loadGenerationByTab.get(tabId) ?? 0) !== generation) {
+      return false;
+    }
+
+    // A load pinned its target tab at request time; once the active tab moves
+    // on, this load must never activate/render/restore into the new tab.
+    if ((tabManager.getActiveTab()?.id ?? null) !== tabId) {
+      return false;
+    }
+
+    return expectedConversationId === undefined
+      || tabManager.getTab(tabId)?.conversationId === expectedConversationId;
   }
 
   private buildConversationLoadRuntimeOptions(

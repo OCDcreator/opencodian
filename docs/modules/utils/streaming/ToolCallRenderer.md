@@ -8,7 +8,7 @@
 渲染 AI 工具调用卡片。显示工具名称、摘要信息、状态图标、MCP 服务器名 chip（当 `kind: 'mcp'` 且 `toolMetadata.server` 存在时）和可展开的执行结果。`ToolCallRenderer` 现在把 MCP 摘要分类/字段回退委托给 `mcpSummaryConfig.getMcpToolSummary()`，MCP 服务器 chip 和展开 `Server:` 行委托给 `McpToolCallRenderer`，task/subagent 展开卡片委托给 `TaskToolCallRenderer`；自身只保留 DOM 渲染与 builtin/custom 工具摘要装配；工具名称/图标识别继续统一委托给 `shared/toolIdentity`，兼容 OpenCode 与 Claudian 的不同命名体系。对 OpenCode 原生 `task`，它会切换到专用 subagent 卡片：显示 agent / description / status / child session，并避免默认展开原始 `<task_result>`。
 
 ## 导入关系
-上游: `obsidian` (setIcon), `../../shared` (tool identity), `./mcpSummaryConfig` (MCP summary resolver), `./McpToolCallRenderer` (MCP server chip/detail), `./TaskToolCallRenderer` (task/subagent expanded card), `./types` (ToolCallInfo, ToolCallStatus, ToolRendererOptions)
+上游: `obsidian` (setIcon), `../../shared` (tool identity), `./mcpSummaryConfig` (MCP summary resolver), `./McpToolCallRenderer` (MCP server chip/detail), `./TaskToolCallRenderer` (task/subagent expanded card), `./streamingCollapsible` (collapsible disposer), `./types` (ToolCallInfo, ToolCallStatus, ToolRendererOptions)
 下游: `StreamController` (持有并调用)
 
 ## 核心类型 / 接口
@@ -151,6 +151,7 @@
 | 方法 | 说明 |
 |------|------|
 | `render(parentEl, toolCall)` | 创建工具调用卡片 DOM |
+| `cleanup(toolEl)` | 释放卡片 header listeners（DOM 清理前调用） |
 | `updateResult(toolEl, toolCall)` | 更新结果内容和状态图标 |
 | `updateHeader(toolEl, toolCall)` | 更新名称、摘要和 MCP server chip（增量 input） |
 | `updateStatus(toolEl, status)` | 仅更新状态图标 |
@@ -169,7 +170,7 @@ StreamController.handleToolResultChunk(chunk)
     → 清空 content → renderExpandedContent / renderTaskExpandedContent / renderMcpExpandedContent
     → updateStatus (completed/error)
 
-用户点击 header → toggle 展开/折叠 content → `onCollapsibleToggle?()`
+用户点击 header → toggle 展开/折叠 content → `onCollapsibleToggle?()`；卡片清理时由 streaming collapsible disposer 移除 header listeners
 ```
 
 ## 与其他模块的交互

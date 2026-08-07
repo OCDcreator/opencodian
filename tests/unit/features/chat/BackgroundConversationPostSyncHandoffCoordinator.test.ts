@@ -194,4 +194,34 @@ describe('BackgroundConversationPostSyncHandoffCoordinator', () => {
 
     expect(host.setTabNeedsAttention).not.toHaveBeenCalled();
   });
+
+  it('does not write attention for a stale background result after the target tab switches during refresh', async () => {
+    const conversation = createConversation();
+    const state = { tabId: 'tab-bg', conversationId: conversation.id };
+    let resolveRefresh: (() => void) | undefined;
+    const refreshDeferred = new Promise<void>((resolve) => {
+      resolveRefresh = resolve;
+    });
+    const backgroundRefreshExecutor = createBackgroundRefreshExecutor();
+    backgroundRefreshExecutor.refreshBackgroundTabConversation.mockReturnValue(refreshDeferred);
+    const host = createHandoffHost();
+    const coordinator = new BackgroundConversationPostSyncHandoffCoordinator(
+      backgroundRefreshExecutor,
+      host,
+    );
+    const handoffPromise = coordinator.handleBackgroundTabSyncComplete({
+      tabId: 'tab-bg',
+      conversation,
+      previousFingerprint: 'old',
+      syncResult: { changed: true, fingerprint: 'new' },
+      isCurrent: () => state.tabId === 'tab-bg' && state.conversationId === conversation.id,
+    });
+
+    state.tabId = 'tab-other';
+    state.conversationId = 'conversation-b';
+    resolveRefresh?.();
+    await handoffPromise;
+
+    expect(host.setTabNeedsAttention).not.toHaveBeenCalled();
+  });
 });

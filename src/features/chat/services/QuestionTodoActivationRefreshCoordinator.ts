@@ -26,10 +26,15 @@ export class QuestionTodoActivationRefreshCoordinator {
   applyConversationActivation(
     tabId: TabId | null,
     sessionId: string | null | undefined,
+    options: { isCurrent?: () => boolean } = {},
   ): void {
     this.host.renderSessionTodoDock(tabId);
     this.host.renderQuestionDock();
-    void this.questionTodoStatusRefresh.refreshAfterActivation(tabId, sessionId);
+    if (options.isCurrent) {
+      void this.questionTodoStatusRefresh.refreshAfterActivation(tabId, sessionId, options);
+    } else {
+      void this.questionTodoStatusRefresh.refreshAfterActivation(tabId, sessionId);
+    }
   }
 
   applyEmptyActivation(tabId: TabId): void {

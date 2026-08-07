@@ -9,6 +9,7 @@
 It is responsible for:
 
 - preserving the existing `queueNotices()` and `flushQueuedNotices()` API used by `BackgroundTaskIndicatorCoordinator`
+- `flushQueuedNotices()` 透传 post-sync `isCurrent` lease，避免异步 notice 写回跨 conversation。
 - exposing completion event/info/runtime types from the consolidated notice owner
 - adapting the completion-only host shape to the broader notice service host
 

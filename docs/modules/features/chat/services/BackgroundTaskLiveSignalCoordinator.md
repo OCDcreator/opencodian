@@ -36,7 +36,10 @@ export class BackgroundTaskLiveSignalCoordinator {
   armAuthoritativeSyncGate(...): void;
   clearAuthoritativeSyncGate(...): void;
   markAuthoritativeSync(...): void;
-  reconcileStateFromLiveSignals(...): void;
+  reconcileStateFromLiveSignals(
+    tabId: TabId | null,
+    options?: { isCurrent?: () => boolean },
+  ): void;
 }
 ```
 
@@ -56,6 +59,7 @@ export class BackgroundTaskLiveSignalCoordinator {
 ### live-signal reconciliation
 
 - `reconcileStateFromLiveSignals()` 会先直接复用 `SessionTodoStateService` 的 stale todo 协调，再通过 `BackgroundTaskTimelineService` 查询 pending launch，并在需要时调用 `BackgroundTaskNoticeStateService` 追加 stopped notice
+- `reconcileStateFromLiveSignals()` 在加载/activation 提供 `isCurrent` 租约时会把它传给 stale todo 与 stopped notice 路径；租约失效后不会再向新会话追加旧会话通知。无租约调用保留原有参数形状
 - 当 session 仍 busy/retry，或仍有未完成 todo 且尚未 idle 时，coordinator 只更新 `backgroundTaskWaitingForFollowUp` 并刷新 tab stream-like UI
 - 只有在 authoritative-sync gate 已落下、grace period 已结束、且 pending launch 仍未完成时，才会触发 stopped notice 请求并清空 indicator
 

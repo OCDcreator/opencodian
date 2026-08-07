@@ -32,6 +32,7 @@ export interface QuestionTodoStatusRefreshCoordinatorHost {
 - `refreshAfterPostSync()` 保持 post-sync 语义：先等待 pending-question refresh，再运行 `afterPendingQuestionRefresh` hook，让 background-task rebuild / follow-up facade 仍能稳定发生在 todo/status gate 之前。**后端守护**：非 OpenCode 后端跳过 `refreshPendingQuestionsForTab()`
 - todo/status post-sync refresh 只有在 tab runtime 存在，且存在 incomplete todos、background-task launch、waiting-for-follow-up，或调用方强制刷新时才会执行
 - visible-conversation post-sync 可把 pending-question session 与当前 todo/status session 分开传入，保留“当前 conversation 已切换时仍刷新当前 session live state”的旧行为
+- post-sync 可携带 `isCurrent` lease；pending-question、status、todo 每个异步阶段在网络返回后重新校验，lease 失效即停止后续副作用。
 
 ## 与 `OpenCodianView` 的边界
 

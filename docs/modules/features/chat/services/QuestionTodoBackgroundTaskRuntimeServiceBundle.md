@@ -89,6 +89,7 @@ export function assembleQuestionTodoBackgroundTaskRuntimeHost(
 
 - `OpenCodianView` 不再内联组装 `assembleQuestionTodoBackgroundTaskRuntimeHost()`，改为构造 `QuestionTodoBackgroundTaskRuntimeSeam` 并传给本模块的 `createQuestionTodoBackgroundTaskRuntimeServiceBundleFromSeam()` 工厂
 - seam 中 `getBackgroundTaskHost()` 返回 `this.backgroundTaskHost`，由工厂在每次调用时 late-resolve，保证 host 在 `createConversationRuntimeWiring()` 中赋值后才真正被消费
+- shared host 的 background-task indicator 方法支持可选 `isCurrent` lease，并在 late-bound wrapper、activation host 与 post-sync handoff 之间保持条件透传。
 - 主调用链从 `OpenCodianView -> RuntimeServiceBundle -> RuntimeHostProvider -> RuntimeViewHostFactory -> adapter/services` 缩短为 `OpenCodianView -> RuntimeServiceBundle -> adapter/services`
 - refresh、visible state、background handoff、activation 与 stream-trigger host assembly 的业务边界仍分别留在原有 adapter / coordinator 模块
 - 这次切片继续推进 master plan 的 P2 `question / todo / background task` lane：把 post-sync/activation 之外残余的 background-task stream-trigger host assembly 也从主集成点继续下沉一层

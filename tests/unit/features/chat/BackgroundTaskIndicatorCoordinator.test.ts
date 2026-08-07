@@ -159,4 +159,23 @@ describe('BackgroundTaskIndicatorCoordinator', () => {
     expect(completionNoticeService.queueNotices).not.toHaveBeenCalled();
     expect(completionNoticeService.flushQueuedNotices).not.toHaveBeenCalled();
   });
+
+  it('abandons indicator work when the captured pane lease expires during inline rendering', async () => {
+    let current = true;
+    const {
+      coordinator,
+      inlinePanelRenderer,
+      completionNoticeService,
+      tabRuntimeStateBridge,
+    } = createCoordinator();
+    inlinePanelRenderer.render.mockImplementationOnce(async () => {
+      current = false;
+    });
+
+    await coordinator.renderIfNeeded('tab-1', { isCurrent: () => current });
+
+    expect(completionNoticeService.queueNotices).not.toHaveBeenCalled();
+    expect(completionNoticeService.flushQueuedNotices).not.toHaveBeenCalled();
+    expect(tabRuntimeStateBridge.syncStreamLikeState).not.toHaveBeenCalled();
+  });
 });

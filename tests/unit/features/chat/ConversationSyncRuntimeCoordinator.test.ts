@@ -1,3 +1,5 @@
+/* eslint-disable max-lines-per-function -- The coordinator fixture exercises the complete runtime seam. */
+
 import type {
   ChatMessage,
   Conversation,
@@ -36,6 +38,7 @@ describe('ConversationSyncRuntimeCoordinator', () => {
     activeTabId?: string | null;
     runtime?: Partial<ConversationSyncRuntime> | null;
     fingerprint?: string;
+    tabConversationId?: string | null;
     coordinatorOptions?: ConversationSyncRuntimeCoordinatorOptions;
   }) {
     const runtime: ConversationSyncRuntime | null = options?.runtime === null
@@ -43,6 +46,7 @@ describe('ConversationSyncRuntimeCoordinator', () => {
       : {
         isStreaming: false,
         isConversationSyncInFlight: false,
+        isHydratingConversation: false,
         lastConversationSyncFingerprint: null,
         tabSessionLifecycle: createInitialTabSessionLifecycleState(),
         ...options?.runtime,
@@ -65,6 +69,11 @@ describe('ConversationSyncRuntimeCoordinator', () => {
       {
         getActiveTabId: jest.fn().mockReturnValue(options?.activeTabId ?? 'tab-1'),
         getTabRuntimeState: jest.fn().mockImplementation(() => runtime),
+        getTab: jest.fn().mockImplementation(() => (
+          options && 'tabConversationId' in options && options.tabConversationId === null
+            ? null
+            : { conversationId: options?.tabConversationId ?? 'conversation-1' }
+        )),
         getConversationSyncFingerprint,
         transitionTabSessionLifecycle: transitionLifecycle,
       },
@@ -236,5 +245,113 @@ describe('ConversationSyncRuntimeCoordinator', () => {
     } finally {
       jest.useRealTimers();
     }
+  });
+
+  describe('hydration deferral', () => {
+    function createHydrationCoordinatorOptions() {
+      return {
+        now: () => Date.now(),
+        setTimeout: (callback: () => void, delay: number) => setTimeout(callback, delay),
+        clearTimeout: (handle: ReturnType<typeof setTimeout>) => clearTimeout(handle),
+      };
+    }
+
+    it('defers visible sync while hydration is in flight and retries after hydration ends', async () => {
+      jest.useFakeTimers();
+      try {
+        const { service, runtime } = createService({
+          runtime: { isHydratingConversation: true },
+          coordinatorOptions: createHydrationCoordinatorOptions(),
+        });
+        const callback = jest.fn().mockResolvedValue(undefined);
+
+        const ran = await service.runVisibleConversationSync(createConversation(), callback);
+
+        expect(ran).toBe(false);
+        expect(callback).not.toHaveBeenCalled();
+
+        await jest.advanceTimersByTimeAsync(500);
+        expect(callback).not.toHaveBeenCalled();
+
+        runtime!.isHydratingConversation = false;
+        await jest.advanceTimersByTimeAsync(500);
+
+        expect(callback).toHaveBeenCalledTimes(1);
+        expect(callback).toHaveBeenCalledWith(expect.objectContaining({
+          tabId: 'tab-1',
+          conversation: expect.objectContaining({ id: 'conversation-1' }),
+        }));
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('merges concurrent sync requests during hydration and retains the latest callback', async () => {
+      jest.useFakeTimers();
+      try {
+        const { service, runtime } = createService({
+          runtime: { isHydratingConversation: true },
+          coordinatorOptions: createHydrationCoordinatorOptions(),
+        });
+        const firstCallback = jest.fn().mockResolvedValue(undefined);
+        const secondCallback = jest.fn().mockResolvedValue(undefined);
+
+        await service.runVisibleConversationSync(createConversation(), firstCallback);
+        await service.runVisibleConversationSync(createConversation(), secondCallback);
+
+        runtime!.isHydratingConversation = false;
+        await jest.advanceTimersByTimeAsync(1000);
+
+        expect(firstCallback).not.toHaveBeenCalled();
+        expect(secondCallback).toHaveBeenCalledTimes(1);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('drops the deferred sync when the tab conversation changed during hydration', async () => {
+      jest.useFakeTimers();
+      try {
+        const { service, runtime } = createService({
+          runtime: { isHydratingConversation: true },
+          tabConversationId: 'conversation-other',
+          coordinatorOptions: createHydrationCoordinatorOptions(),
+        });
+        const callback = jest.fn().mockResolvedValue(undefined);
+
+        await service.runVisibleConversationSync(createConversation(), callback);
+
+        runtime!.isHydratingConversation = false;
+        await jest.advanceTimersByTimeAsync(1000);
+
+        expect(callback).not.toHaveBeenCalled();
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('defers tab sync while hydration is in flight and stops retrying after the attempt cap', async () => {
+      jest.useFakeTimers();
+      try {
+        const { service } = createService({
+          runtime: { isHydratingConversation: true },
+          coordinatorOptions: createHydrationCoordinatorOptions(),
+        });
+        const callback = jest.fn().mockResolvedValue(undefined);
+
+        const ran = await service.runTabConversationSync(
+          { tabId: 'tab-1', conversation: createConversation() },
+          callback,
+        );
+
+        expect(ran).toBe(false);
+        // Hydration never settles: retries must stop after the bounded attempt cap
+        // instead of looping forever.
+        await jest.advanceTimersByTimeAsync(60_000);
+        expect(callback).not.toHaveBeenCalled();
+      } finally {
+        jest.useRealTimers();
+      }
+    });
   });
 });

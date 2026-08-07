@@ -28,6 +28,7 @@ Run before merge: `npm run typecheck`, `npm run module-docs`.
 
 ## Recent change notes
 - **Conversation display preference:** `showTurnChangeRecords` defaults to enabled and controls only render visibility. Switching it off neither clears nor stops recording historical turn-change records.
+- **Question UI refresh dedup:** the `questionCardPosition` and `showAnsweredQuestionCards` controls now share a single `refreshQuestionUi()` call; toggling both no longer fires two overlapping full conversation rerenders.
 
 ## Hard invariants
 - Do not cross `forbiddenDependencies`.

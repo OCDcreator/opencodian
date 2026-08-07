@@ -629,9 +629,12 @@ export class ChatRuntimeComposition {
         },
         renderMarkdownInto: (container: HTMLElement, markdown: string) =>
           host.renderMarkdownInto(container, markdown),
-        renderBackgroundTaskIndicatorIfNeeded: (tabId: TabId | null) => {
+        renderBackgroundTaskIndicatorIfNeeded: (
+          tabId: TabId | null,
+          options?: { isCurrent?: () => boolean },
+        ) => {
           if (hasCapability(host.caps as never, AgentCapability.Subagents)) {
-            return host.backgroundTaskHost.renderBackgroundTaskIndicatorIfNeeded(tabId);
+            return host.backgroundTaskHost.renderBackgroundTaskIndicatorIfNeeded(tabId, options);
           }
           return Promise.resolve();
         },
@@ -896,9 +899,9 @@ export class ChatRuntimeComposition {
       host: host.createBackgroundTaskIndicatorCoordinatorHost(),
     } as never);
     const backgroundTaskIndicatorRenderPort = {
-      renderIfNeeded: (tabId?: TabId | null) => {
+      renderIfNeeded: (tabId?: TabId | null, options?: { isCurrent?: () => boolean }) => {
         if (hasCapability(host.caps as never, AgentCapability.Subagents)) {
-          return backgroundTaskIndicatorCoordinator.renderIfNeeded(tabId);
+          return backgroundTaskIndicatorCoordinator.renderIfNeeded(tabId, options);
         }
         return Promise.resolve();
       },

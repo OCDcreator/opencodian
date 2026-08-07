@@ -17,6 +17,7 @@
 
 ```typescript
 export interface ConversationSyncBackgroundPostSyncRouterHost {
+  captureBackgroundPostSyncIdentity?(context): { isCurrent(): boolean };
   getTabRuntimeState(tabId: TabId | null): {
     lastConversationSyncFingerprint: string | null;
   } | null;
@@ -40,6 +41,7 @@ export class ConversationSyncBackgroundPostSyncRouter {
 
 - 不触碰 runtime fingerprint
 - 只负责把 polling sync context 与 `syncResult` 合并成 post-sync coordinator 可消费的参数
+- signal/background 路径捕获目标 tab + conversation identity lease，并把 `isCurrent` 传给 handoff；await 后目标 tab 已切换时旧 handoff 不再写回。
 
 ## 与相邻模块的边界
 

@@ -15,16 +15,17 @@ export interface QuestionTodoStatusRefreshCoordinatorHost {
   refreshPendingQuestionsForTab(
     tabId: TabId | null,
     sessionId: string | null | undefined,
+    options?: { isCurrent?: () => boolean },
   ): Promise<QuestionRequest[]>;
   refreshTabSessionStatus(
     tabId: TabId | null,
     sessionId: string | null | undefined,
-    options: { suppressErrors?: boolean },
+    options: { suppressErrors?: boolean; isCurrent?: () => boolean },
   ): Promise<SessionActivityStatus | null>;
   refreshTabSessionTodos(
     tabId: TabId | null,
     sessionId: string | null | undefined,
-    options: { suppressErrors?: boolean },
+    options: { suppressErrors?: boolean; isCurrent?: () => boolean },
   ): Promise<SessionTodo[]>;
 }
 
@@ -34,6 +35,8 @@ export interface PostSyncQuestionTodoStatusRefreshOptions {
   todoStatusSessionId: string | null | undefined;
   forceTodoStatusRefresh?: boolean;
   afterPendingQuestionRefresh?: (() => void | Promise<void>) | null;
+  /** Captured post-sync lease; subsequent refresh stages must stop once stale. */
+  isCurrent?: () => boolean;
 }
 
 export class QuestionTodoStatusRefreshCoordinator {
@@ -42,31 +45,59 @@ export class QuestionTodoStatusRefreshCoordinator {
   async refreshAfterActivation(
     tabId: TabId | null,
     sessionId: string | null | undefined,
+    options: { isCurrent?: () => boolean } = {},
   ): Promise<void> {
+    const isCurrent = options.isCurrent ?? (() => true);
+    if (!isCurrent()) {
+      return;
+    }
     const backend = this.host.getCurrentConversationBackend();
     // Pending-questions REST polling is OpenCode-only.
     // For non-OpenCode backends, questions arrive through SDK callbacks,
     // not REST polling. Skip the REST call to avoid leaking.
     const pendingQuestionsPromise = backend === 'opencode'
-      ? this.host.refreshPendingQuestionsForTab(tabId, sessionId)
+      ? options.isCurrent
+        ? this.host.refreshPendingQuestionsForTab(tabId, sessionId, options)
+        : this.host.refreshPendingQuestionsForTab(tabId, sessionId)
       : Promise.resolve([] as QuestionRequest[]);
 
-    await Promise.allSettled([
-      this.host.refreshTabSessionStatus(tabId, sessionId, { suppressErrors: true }),
-      pendingQuestionsPromise,
-      this.host.refreshTabSessionTodos(tabId, sessionId, { suppressErrors: true }),
-    ]);
+    const statusPromise = options.isCurrent
+      ? this.host.refreshTabSessionStatus(tabId, sessionId, { suppressErrors: true, isCurrent })
+      : this.host.refreshTabSessionStatus(tabId, sessionId, { suppressErrors: true });
+    const todoPromise = options.isCurrent
+      ? this.host.refreshTabSessionTodos(tabId, sessionId, { suppressErrors: true, isCurrent })
+      : this.host.refreshTabSessionTodos(tabId, sessionId, { suppressErrors: true });
+    await Promise.allSettled([statusPromise, pendingQuestionsPromise, todoPromise]);
   }
 
   async refreshAfterPostSync(
     options: PostSyncQuestionTodoStatusRefreshOptions,
   ): Promise<void> {
+    const isCurrent = options.isCurrent ?? (() => true);
+    if (!isCurrent()) {
+      return;
+    }
     const backend = this.host.getCurrentConversationBackend();
     // Pending-questions REST polling is OpenCode-only (see refreshAfterActivation).
     if (backend === 'opencode') {
-      await this.host.refreshPendingQuestionsForTab(options.tabId, options.questionSessionId);
+      if (options.isCurrent) {
+        await this.host.refreshPendingQuestionsForTab(
+          options.tabId,
+          options.questionSessionId,
+          { isCurrent },
+        );
+      } else {
+        await this.host.refreshPendingQuestionsForTab(options.tabId, options.questionSessionId);
+      }
+    }
+    if (!isCurrent()) {
+      return;
     }
     await options.afterPendingQuestionRefresh?.();
+
+    if (!isCurrent()) {
+      return;
+    }
 
     if (!this.shouldRefreshTodoStatus(options.tabId, options.forceTodoStatusRefresh ?? false)) {
       return;
@@ -75,12 +106,15 @@ export class QuestionTodoStatusRefreshCoordinator {
     await this.host.refreshTabSessionStatus(
       options.tabId,
       options.todoStatusSessionId,
-      { suppressErrors: true },
+      options.isCurrent ? { suppressErrors: true, isCurrent } : { suppressErrors: true },
     );
+    if (!isCurrent()) {
+      return;
+    }
     await this.host.refreshTabSessionTodos(
       options.tabId,
       options.todoStatusSessionId,
-      { suppressErrors: true },
+      options.isCurrent ? { suppressErrors: true, isCurrent } : { suppressErrors: true },
     );
   }
 

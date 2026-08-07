@@ -226,6 +226,65 @@ describe('PersistentAssistantNoticeService', () => {
   });
 });
 
+describe('PersistentAssistantNoticeService identity lease', () => {
+  it('drops a queued notice when its lease expires before serialization commit', async () => {
+    const conversation = { id: 'conversation-lease', messages: [], updatedAt: 0 } as never;
+    const host = createHost({ currentConversation: conversation });
+    const writeSerialization = new ConversationWriteSerializationService();
+    let releaseBlocker: () => void = () => undefined;
+    const blockerGate = new Promise<void>((resolve) => { releaseBlocker = resolve; });
+    const blockerCommit = writeSerialization.commit({
+      conversation,
+      ticket: writeSerialization.createTicket(conversation.id),
+      reason: 'earlier-conversation-write',
+      write: async () => blockerGate,
+    });
+    const service = new PersistentAssistantNoticeService(host, writeSerialization);
+    let current = true;
+    const appendPromise = service.appendMessage({
+      title: 'Files changed', content: 'notes.md', timestamp: 346, isCurrent: () => current,
+    });
+    current = false;
+    releaseBlocker();
+    await blockerCommit;
+    await appendPromise;
+    expect(conversation.messages).toHaveLength(0);
+    expect(host.saveConversation).not.toHaveBeenCalled();
+    expect(host.renderAssistantMessage).not.toHaveBeenCalled();
+  });
+
+  it('compensates a notice save when its lease expires during persistence', async () => {
+    const conversation = { id: 'conversation-save-lease', messages: [], updatedAt: 0 } as never;
+    const host = createHost({ currentConversation: conversation });
+    let current = true;
+    let releaseSave!: () => void;
+    const saveGate = new Promise<void>((resolve) => { releaseSave = resolve; });
+    host.saveConversation.mockImplementationOnce(async () => {
+      current = false;
+      await saveGate;
+    });
+    const service = new PersistentAssistantNoticeService(host);
+
+    const appendPromise = service.appendMessage({
+      title: 'Stale notice',
+      content: 'Should be rolled back',
+      timestamp: 347,
+      isCurrent: () => current,
+    });
+    while (host.saveConversation.mock.calls.length < 1) {
+      await Promise.resolve();
+    }
+    expect(conversation.messages).toHaveLength(1);
+    releaseSave();
+    await appendPromise;
+
+    expect(conversation.messages).toHaveLength(0);
+    expect(conversation.updatedAt).toBe(0);
+    expect(host.saveConversation).toHaveBeenCalledTimes(2);
+    expect(host.renderAssistantMessage).not.toHaveBeenCalled();
+  });
+});
+
 describe('PersistentAssistantNoticeService detached conversation handling', () => {
   it('persists a visible notice to the live conversation when the caller holds a detached copy', async () => {
     const liveConversation = {

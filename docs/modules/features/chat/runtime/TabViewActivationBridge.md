@@ -23,7 +23,11 @@ export class TabViewActivationBridge {
   applyActivationPreflight(tabId: TabId): void;
   applyStreamingActivationOutcome(tabId: TabId, sessionId: string | null): void;
   applyEmptyActivationOutcome(tabId: TabId): void;
-  applyLoadedConversationPostRenderOutcome(tabId: TabId | null, sessionId: string | null): Promise<void>;
+  applyLoadedConversationPostRenderOutcome(
+    tabId: TabId | null,
+    sessionId: string | null,
+    options?: { isCurrent?: () => boolean },
+  ): Promise<void>;
   applyLoadedConversationHydrationTail(): void;
 }
 ```
@@ -34,6 +38,8 @@ export class TabViewActivationBridge {
 - `applyStreamingActivationOutcome()` 保持 streaming fast-path 的后续刷新顺序：model selector → context usage identity → activation-side question/todo refresh（仅当调用方传入 OpenCode session id）→ send button，其中 context usage identity 已委托给 `ActiveTabContextUsageCoordinator`
 - `applyEmptyActivationOutcome()` 保持 empty-tab 清空后的后续刷新顺序：activation-side empty question/todo refresh → model selector → context usage identity → send button，其中 context usage identity 已委托给 `ActiveTabContextUsageCoordinator`
 - `applyLoadedConversationPostRenderOutcome()` 接管 loaded conversation 在消息重渲后、scroll restore 之前的 activation/render outcome：先经由 adapter-owned background-task activation port awaited 刷新 background-task indicator，再在调用方传入 OpenCode session id 时复用同一条 activation-side question/todo refresh；非 OpenCode backend 会传 `null` 跳过 OpenCode-only dock 刷新
+- loaded activation 可携带 tab/conversation/session/generation `isCurrent` lease，并透传至 question/todo refresh；切换到 Claude 或新 conversation 后旧 OpenCode 请求不会写入新 tab runtime。
+- loaded-conversation post-render outcome 可接收 `isCurrent` lease，并在 background-task indicator await 前后检查；A→B 切换后不会继续执行旧会话的 activation dock writeback。
 - `applyLoadedConversationHydrationTail()` 接管 loaded conversation 在 scroll restore 之后的 hydration 尾段 UI 顺序：composer layout sync → model selector → context usage identity，然后把 context usage snapshot fetch 改成后台刷新；这样首开/首个恢复 tab 不会再被慢服务端 snapshot 串行阻塞
 - `ConversationViewStateService.activateTab()` 现在只决定激活后走 streaming / hydration / empty-tab 哪条分支，不再直接持有这些 pane-level UI writeback
 - `ConversationHydrationOutcomeBridge` 现在负责在消息装载后触发本 bridge 的 loaded-conversation post-render outcome；`ConversationViewStateService.loadConversation()` 继续保留 hydrate 主链路和 scroll restore，但不再直接持有这段 post-render outcome

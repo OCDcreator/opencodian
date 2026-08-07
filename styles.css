@@ -1862,6 +1862,12 @@ body[data-opencodian-provider-icon-mode="color"] {
   animation: none !important;
 }
 
+/* Keep hydrated history from replaying entrance motion when the temporary
+ * rehydration class is removed; live appended messages remain unmarked. */
+.opencodian-messages .opencodian-message[data-opencodian-hydration-settled="true"] {
+  animation: none !important;
+}
+
 .opencodian-messages--sticky-basic,
 .opencodian-messages--sticky-mask {
   gap: 8px;
@@ -2092,6 +2098,10 @@ body[data-opencodian-provider-icon-mode="color"] {
   max-width: 100%;
   border-radius: 4px;
   display: block;
+}
+
+.markdown-embedded-image.has-intrinsic-placeholder img {
+  aspect-ratio: auto 16 / 9;
 }
 
 /* File links */
@@ -15983,6 +15993,13 @@ img.opencodian-model-provider-header-icon {
 .opencodian-message--user:nth-child(4) { animation-delay: 150ms; }
 .opencodian-message--user:nth-child(5) { animation-delay: 200ms; }
 
+/* Reduced motion: messages appear without the slide-in entrance */
+@media (prefers-reduced-motion: reduce) {
+  .opencodian-message--user {
+    animation: none;
+  }
+}
+
 /* Text selection in user messages */
 .opencodian-message--user ::selection {
   background: color-mix(in srgb, var(--interactive-accent) 24%, transparent);
@@ -16110,6 +16127,18 @@ img.opencodian-model-provider-header-icon {
 
 .opencodian-message--assistant.is-streaming .opencodian-message-content {
   transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .opencodian-message--assistant,
+  .opencodian-message--assistant .opencodian-message-content {
+    animation: none;
+    transition: none;
+  }
+
+  .opencodian-message--assistant:hover .opencodian-message-content {
+    transform: none;
+  }
 }
 
 .opencodian-container--theme-background .opencodian-message--assistant .opencodian-message-content {

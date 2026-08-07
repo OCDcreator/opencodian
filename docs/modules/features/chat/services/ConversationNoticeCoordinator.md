@@ -102,3 +102,4 @@ export class ConversationNoticeCoordinator {
 
 - `open_model_settings` 的滚动恢复逻辑仍由 view host 负责
 - model-unavailable notice 仍归 `ChatSelectionControlsCoordinator`，不要迁移进这个 coordinator
+- `renderBackgroundTaskIndicatorIfNeeded()` 的 host seam 允许透传 `isCurrent` lease；notice 侧若在会话切换窗口调用该入口，不得丢掉 lease。

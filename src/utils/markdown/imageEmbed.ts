@@ -14,6 +14,7 @@ const IMAGE_EXTENSIONS = new Set([
 ]);
 
 const IMAGE_EMBED_PATTERN = /!\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g;
+const DEFAULT_IMAGE_ASPECT_RATIO = 'auto 16 / 9';
 
 function isImagePath(path: string): boolean {
   const ext = path.split('.').pop()?.toLowerCase();
@@ -52,10 +53,10 @@ function resolveImageFile(
 }
 
 function buildStyleAttribute(altText: string | undefined): string {
-  if (!altText) return '';
+  if (!altText) return ` style="aspect-ratio: ${DEFAULT_IMAGE_ASPECT_RATIO};"`;
 
   const dimMatch = altText.match(/^(\d+)(?:x(\d+))?$/);
-  if (!dimMatch) return '';
+  if (!dimMatch) return ` style="aspect-ratio: ${DEFAULT_IMAGE_ASPECT_RATIO};"`;
 
   const width = dimMatch[1];
   const height = dimMatch[2];
@@ -75,8 +76,10 @@ function createImageHtml(
   const src = app.vault.getResourcePath(file);
   const alt = escapeHtml(altText || file.basename);
   const style = buildStyleAttribute(altText);
+  const hasExplicitDimensions = /^(\d+)(?:x\d+)?$/.test(altText ?? '');
+  const placeholderClass = hasExplicitDimensions ? '' : ' has-intrinsic-placeholder';
 
-  return `<span class="${wrapperClass}"><img src="${escapeHtml(src)}" alt="${alt}" loading="lazy"${style}></span>`;
+  return `<span class="${wrapperClass}${placeholderClass}"><img src="${escapeHtml(src)}" alt="${alt}" loading="lazy"${style}></span>`;
 }
 
 function createFallbackHtml(wikilink: string, fallbackClass: string): string {

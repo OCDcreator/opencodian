@@ -5,6 +5,7 @@ describe('StreamController', () => {
     const containerEl = document.createElement('div');
     const contentEl = document.createElement('div');
     containerEl.appendChild(contentEl);
+    document.body.appendChild(containerEl);
 
     const markdownService = {
       render: jest.fn().mockResolvedValue(undefined),
@@ -49,6 +50,7 @@ describe('StreamController', () => {
     const containerEl = document.createElement('div');
     const contentEl = document.createElement('div');
     containerEl.appendChild(contentEl);
+    document.body.appendChild(containerEl);
 
     const markdownService = {
       render: jest.fn().mockImplementation(async (el: HTMLElement, content: string) => {
@@ -81,6 +83,7 @@ describe('StreamController', () => {
     const containerEl = document.createElement('div');
     const contentEl = document.createElement('div');
     containerEl.appendChild(contentEl);
+    document.body.appendChild(containerEl);
 
     jest.useFakeTimers();
 
@@ -134,6 +137,7 @@ describe('StreamController', () => {
     const containerEl = document.createElement('div');
     const contentEl = document.createElement('div');
     containerEl.appendChild(contentEl);
+    document.body.appendChild(containerEl);
 
     const markdownService = {
       render: jest.fn().mockResolvedValue(undefined),
@@ -177,6 +181,7 @@ describe('StreamController', () => {
     const contentEl = document.createElement('div');
     const onCollapsibleToggle = jest.fn();
     containerEl.appendChild(contentEl);
+    document.body.appendChild(containerEl);
 
     const markdownService = {
       render: jest.fn().mockImplementation(async (el: HTMLElement, content: string) => {
@@ -201,5 +206,121 @@ describe('StreamController', () => {
     contentEl.querySelector<HTMLElement>('.streaming-thinking-header')?.click();
 
     expect(onCollapsibleToggle).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('StreamController deferred text rendering', () => {
+  it('does not finalize onto a detached target after cancellation', async () => {
+    const containerEl = document.createElement('div');
+    const contentEl = document.createElement('div');
+    const scrollToBottom = jest.fn();
+    containerEl.appendChild(contentEl);
+    document.body.appendChild(containerEl);
+
+    let resolveRender!: () => void;
+    const pendingRender = new Promise<void>((resolve) => {
+      resolveRender = resolve;
+    });
+    const markdownService = {
+      render: jest.fn((el: HTMLElement, content: string) => {
+        pendingRender.then(() => {
+          el.textContent = content;
+        });
+        return pendingRender;
+      }),
+    };
+    const controller = new StreamController({
+      containerEl,
+      markdownService: markdownService as never,
+      scrollToBottom,
+    });
+
+    controller.startStream(contentEl);
+    await controller.handleChunk({ type: 'text', content: 'cancelled reply' });
+
+    const textEl = contentEl.querySelector<HTMLElement>('.streaming-text-block');
+    expect(textEl).not.toBeNull();
+    expect(textEl?.isConnected).toBe(true);
+    Object.defineProperty(textEl, 'offsetHeight', {
+      configurable: true,
+      value: 24,
+    });
+
+    controller.cancelStream();
+    textEl?.remove();
+    expect(textEl?.isConnected).toBe(false);
+    resolveRender();
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(textEl?.textContent).toBe('');
+    expect(textEl?.style.minHeight).toBe('24px');
+    expect(scrollToBottom).not.toHaveBeenCalled();
+    expect((controller as unknown as { lastRenderedTextContent: string }).lastRenderedTextContent).toBe('');
+    expect((controller as unknown as { lastTextRenderAt: number }).lastTextRenderAt).toBe(0);
+  });
+
+  it('drops deferred renders from a cancelled stream after restart', async () => {
+    const containerEl = document.createElement('div');
+    const contentEl = document.createElement('div');
+    const nextContentEl = document.createElement('div');
+    const scrollToBottom = jest.fn();
+    containerEl.append(contentEl, nextContentEl);
+    document.body.appendChild(containerEl);
+
+    jest.useFakeTimers();
+
+    let resolveRender!: () => void;
+    const pendingRender = new Promise<void>((resolve) => {
+      resolveRender = resolve;
+    });
+    const markdownService = {
+      render: jest.fn((el: HTMLElement, content: string) => {
+        pendingRender.then(() => {
+          el.textContent = content;
+        });
+        return pendingRender;
+      }),
+    };
+
+    try {
+      const controller = new StreamController({
+        containerEl,
+        markdownService: markdownService as never,
+        scrollToBottom,
+      });
+
+      controller.startStream(contentEl);
+      await controller.handleChunk({ type: 'text', content: 'old reply' });
+
+      const oldTextEl = contentEl.querySelector<HTMLElement>('.streaming-text-block');
+      expect(oldTextEl).not.toBeNull();
+      Object.defineProperty(oldTextEl, 'offsetHeight', {
+        configurable: true,
+        value: 24,
+      });
+
+      jest.runOnlyPendingTimers();
+      await Promise.resolve();
+      expect(markdownService.render).toHaveBeenCalledTimes(1);
+      expect(oldTextEl?.style.minHeight).toBe('24px');
+
+      controller.cancelStream();
+      controller.startStream(nextContentEl);
+
+      resolveRender();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(oldTextEl?.textContent).toBe('');
+      expect(oldTextEl?.style.minHeight).toBe('24px');
+      expect(scrollToBottom).not.toHaveBeenCalled();
+      expect((controller as unknown as { lastRenderedTextContent: string }).lastRenderedTextContent).toBe('');
+      expect((controller as unknown as { lastTextRenderAt: number }).lastTextRenderAt).toBe(0);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });

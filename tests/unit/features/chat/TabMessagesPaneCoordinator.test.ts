@@ -24,6 +24,7 @@ function createRuntimeState(): TestRuntimeState {
     isNearBottom: true,
     programmaticScrollGuardUntil: 0,
     isHydratingConversation: false,
+    hydrationDepth: 0,
     pendingLayoutMutations: 0,
     isStreaming: false,
     streamController: {
@@ -181,6 +182,74 @@ describe('TabMessagesPaneCoordinator', () => {
     expect(pane.runtime.pendingLayoutMutations).toBe(1);
     expect(fixture.host.updateNavigationSidebarVisibility).toHaveBeenCalled();
     expect(fixture.scheduler.scheduleCalls.length).toBe(0);
+  });
+
+  it('hands a user input gesture through the programmatic guard before its scroll event', () => {
+    const fixture = createFixture();
+    const pane = fixture.coordinator.ensurePane('tab-1');
+    if (!pane) {
+      throw new Error('Expected a tab pane');
+    }
+
+    pane.runtime.isHydratingConversation = true;
+    pane.runtime.programmaticScrollGuardUntil = Date.now() + 10_000;
+    setElementMetrics(pane.messagesEl, {
+      scrollTop: 10,
+      scrollHeight: 300,
+      clientHeight: 100,
+    });
+
+    pane.messagesEl.dispatchEvent(new Event('wheel'));
+    expect(pane.runtime.programmaticScrollGuardUntil).toBe(0);
+    expect(pane.runtime.userScrollIntentDuringHydration).toBeUndefined();
+
+    pane.messagesEl.dispatchEvent(new Event('scroll'));
+    expect(pane.runtime.userScrollIntentDuringHydration).toBe(true);
+    expect(pane.runtime.autoScrollEnabled).toBe(false);
+  });
+
+  it('only clears the guard for scroll-intent keys and waits for an actual scroll', () => {
+    const fixture = createFixture();
+    const pane = fixture.coordinator.ensurePane('tab-1');
+    if (!pane) {
+      throw new Error('Expected a tab pane');
+    }
+
+    pane.runtime.isHydratingConversation = true;
+    pane.runtime.programmaticScrollGuardUntil = Date.now() + 10_000;
+
+    pane.messagesEl.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+    expect(pane.runtime.programmaticScrollGuardUntil).toBeGreaterThan(Date.now());
+
+    pane.messagesEl.dispatchEvent(new KeyboardEvent('keydown', { key: 'PageDown' }));
+    expect(pane.runtime.programmaticScrollGuardUntil).toBe(0);
+    expect(pane.runtime.userScrollIntentDuringHydration).toBeUndefined();
+  });
+
+  it('reattaches a disconnected pane without replacing its active runtime', () => {
+    const fixture = createFixture();
+    const firstPane = fixture.coordinator.ensurePane('tab-1');
+    if (!firstPane) {
+      throw new Error('Expected a tab pane');
+    }
+    fixture.coordinator.setActivePane('tab-1');
+
+    firstPane.messagesEl.remove();
+    const reattachedPane = fixture.coordinator.ensurePane('tab-1');
+    if (!reattachedPane) {
+      throw new Error('Expected a reattached tab pane');
+    }
+
+    expect(reattachedPane).toBe(firstPane);
+    expect(firstPane.messagesEl.parentElement).toBe(fixture.messagesShellEl);
+    expect(firstPane.messagesEl.isConnected).toBe(true);
+    expect(fixture.getMessagesContainer()).toBe(firstPane.messagesEl);
+    expect(firstPane.runtime.streamController?.cancelStream).not.toHaveBeenCalled();
+    expect(fixture.host.clearScheduledSignalConversationSync).not.toHaveBeenCalled();
+
+    firstPane.runtime.programmaticScrollGuardUntil = Date.now() + 10_000;
+    firstPane.messagesEl.dispatchEvent(new Event('wheel'));
+    expect(firstPane.runtime.programmaticScrollGuardUntil).toBe(0);
   });
 
   it('suppresses the next active layout auto-scroll when a user-controlled toggle marks it', async () => {

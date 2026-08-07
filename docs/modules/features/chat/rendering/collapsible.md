@@ -7,6 +7,8 @@
 
 `setupCollapsible()` 是一个一次性装配函数，用来给现有 DOM 节点加上“超高内容可折叠”的行为。它既被普通长文本复用，也被 OMO 原始提示块复用。现在它还支持在展开/收起后通知上层，由视图层决定是否执行“布局稳定后滚到底”的补偿。
 
+模块同时提供 `disposeCollapsiblesWithin(rootEl)`：在清空或替换已渲染消息子树之前调用，释放子树内所有 collapsible 的 ResizeObserver 与事件监听，避免 detached 内容节点被未断开的 observer 继续持有（潜在 retention 风险）。
+
 ## 核心类型
 
 ```typescript
@@ -33,7 +35,7 @@ setupCollapsible({
   state,
   options?,
   onToggle?,
-}): void
+}): () => void
 ```
 
 初始化时会：
@@ -42,6 +44,11 @@ setupCollapsible({
 - 设置 `aria-expanded`、`aria-hidden`、`hidden`、`tabIndex`
 - 写入 `--opencodian-collapsible-max-height`
 - 用 `contentEl.scrollHeight > collapsedHeight + minOverflow` 判定是否真的需要折叠
+- 把幂等的 dispose 句柄按 `wrapperEl` 注册进模块内 WeakMap，并作为返回值交给调用方
+
+dispose 句柄会 disconnect `ResizeObserver`、移除 header 的 click/keydown 监听并从 WeakMap 注销；重复调用不会重复执行。
+
+`disposeCollapsiblesWithin(rootEl)` 遍历 `rootEl` 下所有 `.opencodian-collapsible` wrapper，并同时释放 streaming thinking/tool 卡片的自有 listeners；`rootEl` 为 null 时直接返回。
 
 默认值：
 
@@ -79,8 +86,9 @@ setupCollapsible({
 
 - 无上游依赖
 - 下游消费者：`OpenCodianView.renderUserMessageContent()`、`OpenCodianView.renderOmoUserInjection()`、`AssistantNoticeCardRenderer.renderOmoRawSystemReminder()`
+- `disposeCollapsiblesWithin()` 消费者：`OpenCodianView` 的两处 `clearMessagesContainer` seam（`.empty()` 前）、`ConversationRenderRuntime` 的 assistant/user 就地重渲（`replaceChildren()` 前）
 
 ## 注意事项
 
-- 这个函数不返回 disposer；观察器生命周期完全依赖 DOM 节点后续一起被释放。
+- `setupCollapsible()` 现在返回幂等的 dispose 句柄；调用方若不持有它，也可以在移除子树前统一走 `disposeCollapsiblesWithin()`。
 - `headerEl` 类型写成 `HTMLElement`，但实现会给它写 `type="button"` 和键盘交互属性，所以调用方实际传入的是按钮元素。

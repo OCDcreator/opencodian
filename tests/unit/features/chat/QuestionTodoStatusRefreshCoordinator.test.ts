@@ -1,3 +1,4 @@
+/* eslint-disable max-lines-per-function -- activation and post-sync lease cases share one fixture matrix. */
 import type { SessionActivityStatus } from '../../../../src/core/opencode';
 import type { QuestionRequest, SessionTodo } from '../../../../src/core/types';
 import {
@@ -85,6 +86,34 @@ describe('QuestionTodoStatusRefreshCoordinator', () => {
     expect(callOrder).toEqual(['pending-question', 'status', 'todo']);
   });
 
+  it('does not write activation refresh results after its tab/session lease expires', async () => {
+    const host = createHost();
+    let resolvePending: ((value: QuestionRequest[]) => void) | undefined;
+    host.refreshPendingQuestionsForTab.mockReturnValue(new Promise((resolve) => {
+      resolvePending = resolve;
+    }));
+    let current = true;
+    const coordinator = new QuestionTodoStatusRefreshCoordinator(host);
+    const refreshPromise = coordinator.refreshAfterActivation('tab-1', 'session-a', {
+      isCurrent: () => current,
+    });
+
+    current = false;
+    resolvePending?.([]);
+    await refreshPromise;
+
+    expect(host.refreshPendingQuestionsForTab).toHaveBeenCalledWith(
+      'tab-1',
+      'session-a',
+      { isCurrent: expect.any(Function) },
+    );
+    expect(host.refreshTabSessionStatus).toHaveBeenCalledWith(
+      'tab-1',
+      'session-a',
+      { suppressErrors: true, isCurrent: expect.any(Function) },
+    );
+  });
+
   it('runs post-sync pending questions before background reconciliation and todo/status refresh', async () => {
     const callOrder: string[] = [];
     const host = createHost({
@@ -116,6 +145,36 @@ describe('QuestionTodoStatusRefreshCoordinator', () => {
       { suppressErrors: true },
     );
     expect(callOrder).toEqual(['pending-question', 'reconcile', 'status', 'todo']);
+  });
+
+  it('stops all later post-sync stages when the lease expires after pending questions', async () => {
+    const host = createHost({
+      runtime: createRuntime({ sessionTodos: [createTodo('pending')] }),
+      hasIncompleteTodos: true,
+    });
+    let resolvePending: ((value: QuestionRequest[]) => void) | undefined;
+    host.refreshPendingQuestionsForTab.mockReturnValue(new Promise((resolve) => {
+      resolvePending = resolve;
+    }));
+    let current = true;
+    const afterPendingQuestionRefresh = jest.fn();
+    const coordinator = new QuestionTodoStatusRefreshCoordinator(host);
+    const refreshPromise = coordinator.refreshAfterPostSync({
+      tabId: 'tab-1',
+      questionSessionId: 'question-session',
+      todoStatusSessionId: 'todo-session',
+      afterPendingQuestionRefresh,
+      isCurrent: () => current,
+      forceTodoStatusRefresh: true,
+    });
+
+    current = false;
+    resolvePending?.([]);
+    await refreshPromise;
+
+    expect(afterPendingQuestionRefresh).not.toHaveBeenCalled();
+    expect(host.refreshTabSessionStatus).not.toHaveBeenCalled();
+    expect(host.refreshTabSessionTodos).not.toHaveBeenCalled();
   });
 
   it('skips post-sync todo/status refresh when runtime has no incomplete work', async () => {

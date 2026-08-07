@@ -60,6 +60,7 @@ interface SessionTodoNoticeMessageOptions {
   title: string;
   content: string;
   tone: ChatMessage['noticeTone'];
+  isCurrent?: () => boolean;
 }
 
 export interface SessionTodoCoordinatorHost {
@@ -77,7 +78,10 @@ export interface SessionTodoCoordinatorHost {
   appendPersistentAssistantNoticeMessage(options: SessionTodoNoticeMessageOptions): Promise<void>;
   getSessionTodos(sessionId: string): Promise<SessionTodo[]>;
   getSessionStatuses(): Promise<Record<string, SessionActivityStatus>>;
-  reconcileBackgroundTaskLiveSignals(tabId: TabId | null): void;
+  reconcileBackgroundTaskLiveSignals(
+    tabId: TabId | null,
+    options?: { isCurrent?: () => boolean },
+  ): void;
 }
 
 export class SessionTodoCoordinator {
@@ -157,15 +161,25 @@ export class SessionTodoCoordinator {
     return this.stateService.hasIncompleteTabSessionTodos(tabId);
   }
 
-  reconcileStaleSessionTodoState(tabId: TabId | null = this.host.getActiveTabId()): void {
-    this.stateService.reconcileStaleSessionTodoState(tabId);
+  reconcileStaleSessionTodoState(
+    tabId: TabId | null = this.host.getActiveTabId(),
+    options: { isCurrent?: () => boolean } = {},
+  ): void {
+    if (options.isCurrent) {
+      this.stateService.reconcileStaleSessionTodoState(tabId, options);
+    } else {
+      this.stateService.reconcileStaleSessionTodoState(tabId);
+    }
   }
 
   async refreshTabSessionTodos(
     tabId: TabId | null,
     sessionId: string | null | undefined,
-    options: { suppressErrors?: boolean } = {},
+    options: { suppressErrors?: boolean; isCurrent?: () => boolean } = {},
   ): Promise<SessionTodo[]> {
+    if (options.isCurrent && !options.isCurrent()) {
+      return [];
+    }
     const runtime = this.host.getTabRuntimeState(tabId);
     if (!runtime || !sessionId) {
       this.render(tabId);
@@ -188,17 +202,24 @@ export class SessionTodoCoordinator {
 
     try {
       const todos = await this.host.getSessionTodos(sessionId);
+      if (options.isCurrent && !options.isCurrent()) {
+        return this.getTabSessionTodos(tabId);
+      }
       const latestRuntime = this.host.getTabRuntimeState(tabId);
       if (!latestRuntime || latestRuntime.todoRequestId !== requestId) {
         return this.getTabSessionTodos(tabId);
       }
 
-      this.writeSessionTodos(tabId, sessionId, todos);
-      this.host.reconcileBackgroundTaskLiveSignals(tabId);
+      this.writeSessionTodos(tabId, sessionId, todos, options);
+      if (options.isCurrent) {
+        this.host.reconcileBackgroundTaskLiveSignals(tabId, options);
+      } else {
+        this.host.reconcileBackgroundTaskLiveSignals(tabId);
+      }
       return todos;
     } catch (error) {
       logger.debug('Failed to refresh session todos', error);
-      if (!options.suppressErrors) {
+      if (!options.suppressErrors && (!options.isCurrent || options.isCurrent())) {
         new Notice(t('chat.todo.loadFailed'));
       }
       return this.getTabSessionTodos(tabId);
@@ -208,8 +229,11 @@ export class SessionTodoCoordinator {
   async refreshTabSessionStatus(
     tabId: TabId | null,
     sessionId: string | null | undefined,
-    options: { suppressErrors?: boolean } = {},
+    options: { suppressErrors?: boolean; isCurrent?: () => boolean } = {},
   ): Promise<SessionActivityStatus | null> {
+    if (options.isCurrent && !options.isCurrent()) {
+      return null;
+    }
     const runtime = this.host.getTabRuntimeState(tabId);
     if (!runtime || !sessionId) {
       this.writeSessionStatus(tabId, sessionId ?? null, null);
@@ -230,18 +254,25 @@ export class SessionTodoCoordinator {
 
     try {
       const statuses = await this.host.getSessionStatuses();
+      if (options.isCurrent && !options.isCurrent()) {
+        return this.getTabSessionStatus(tabId, sessionId);
+      }
       const latestRuntime = this.host.getTabRuntimeState(tabId);
       if (!latestRuntime || latestRuntime.statusRequestId !== requestId) {
         return this.getTabSessionStatus(tabId, sessionId);
       }
 
       const status = statuses[sessionId] ?? { type: 'idle' as const };
-      this.writeSessionStatus(tabId, sessionId, status);
-      this.host.reconcileBackgroundTaskLiveSignals(tabId);
+      this.writeSessionStatus(tabId, sessionId, status, options);
+      if (options.isCurrent) {
+        this.host.reconcileBackgroundTaskLiveSignals(tabId, options);
+      } else {
+        this.host.reconcileBackgroundTaskLiveSignals(tabId);
+      }
       return status;
     } catch (error) {
       logger.debug('Failed to refresh session status', error);
-      if (!options.suppressErrors) {
+      if (!options.suppressErrors && (!options.isCurrent || options.isCurrent())) {
         new Notice(t('chat.todo.loadFailed'));
       }
       return this.getTabSessionStatus(tabId, sessionId);
@@ -544,15 +575,17 @@ export class SessionTodoCoordinator {
     tabId: TabId | null,
     sessionId: string | null,
     todos: SessionTodo[],
+    options: { isCurrent?: () => boolean } = {},
   ): void {
-    this.stateService.setTabSessionTodos(tabId, todos, sessionId);
+    this.stateService.setTabSessionTodos(tabId, todos, sessionId, options);
   }
 
   private writeSessionStatus(
     tabId: TabId | null,
     sessionId: string | null,
     status: SessionActivityStatus | null,
+    options: { isCurrent?: () => boolean } = {},
   ): void {
-    this.stateService.setTabSessionStatus(tabId, status, sessionId);
+    this.stateService.setTabSessionStatus(tabId, status, sessionId, options);
   }
 }

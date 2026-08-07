@@ -164,8 +164,9 @@ export function assembleQuestionTodoBackgroundTaskRuntimeHost(
     resetBackgroundTaskIndicator: (tabId) => getBackgroundTaskHost().resetBackgroundTaskIndicator(tabId),
     syncBackgroundTaskStateFromConversation: (conversation, tabId) =>
       getBackgroundTaskHost().syncBackgroundTaskStateFromConversation(conversation, tabId),
-    renderBackgroundTaskIndicatorIfNeeded: (tabId) =>
-      getBackgroundTaskHost().renderBackgroundTaskIndicatorIfNeeded(tabId),
+    renderBackgroundTaskIndicatorIfNeeded: (tabId, options) => options
+      ? getBackgroundTaskHost().renderBackgroundTaskIndicatorIfNeeded(tabId, options)
+      : getBackgroundTaskHost().renderBackgroundTaskIndicatorIfNeeded(tabId),
   };
 }
 
@@ -190,8 +191,9 @@ export function createQuestionTodoBackgroundTaskRuntimeViewHosts(
     syncBackgroundTaskStateFromConversation: (conversation, tabId) => {
       host.syncBackgroundTaskStateFromConversation(conversation, tabId ?? null);
     },
-    renderBackgroundTaskIndicatorIfNeeded: (tabId) =>
-      host.renderBackgroundTaskIndicatorIfNeeded(tabId),
+    renderBackgroundTaskIndicatorIfNeeded: (tabId, options) => options
+      ? host.renderBackgroundTaskIndicatorIfNeeded(tabId, options)
+      : host.renderBackgroundTaskIndicatorIfNeeded(tabId),
   };
   const backgroundTaskStreamTriggerViewHost: BackgroundTaskStreamTriggerCoordinatorHost = {
     getActiveTabId: () => host.getActiveTabId(),

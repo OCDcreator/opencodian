@@ -10,17 +10,20 @@ export interface PostSyncQuestionTodoRefreshPlanBuilderHost {
 export interface VisibleConversationRefreshPlanOptions {
   tabId: TabId;
   questionSessionId: string | null | undefined;
+  isCurrent?: () => boolean;
 }
 
 export interface SignalSyncedBackgroundConversationRefreshPlanOptions {
   tabId: TabId;
   conversation: Conversation;
   tabHasBackgroundTask: boolean;
+  isCurrent?: () => boolean;
 }
 
 export interface BackgroundTabConversationRefreshPlanOptions {
   tabId: TabId;
   conversation: Conversation;
+  isCurrent?: () => boolean;
 }
 
 export class PostSyncQuestionTodoRefreshPlanBuilder {
@@ -33,6 +36,7 @@ export class PostSyncQuestionTodoRefreshPlanBuilder {
       tabId: options.tabId,
       questionSessionId: options.questionSessionId,
       todoStatusSessionId: this.host.getCurrentConversationSessionId(),
+      isCurrent: options.isCurrent,
     };
   }
 

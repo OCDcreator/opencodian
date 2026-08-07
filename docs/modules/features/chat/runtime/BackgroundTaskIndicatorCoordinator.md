@@ -29,6 +29,7 @@ export class BackgroundTaskIndicatorCoordinator {
 
 - `renderIfNeeded()` 先确认目标 tab runtime 仍存在，再直接调用 `BackgroundTaskLiveSignalCoordinator.reconcileStateFromLiveSignals()`、`BackgroundTaskInlinePanelRenderer.render()`，然后复用统一的 completion/writeback helper
 - `flushCompletionNoticesAndSyncStreamLikeState()` 把 completion notice queue/flush 与 `TabRuntimeStateBridge.syncStreamLikeState()` 折叠成一条 dedicated post-sync / render writeback 能力
+- 支持 post-sync `isCurrent` lease，在 notice flush await 前后校验，失效时跳过 notice 与 stream-like 状态写回。
 - `queueAndFlushCompletionNotices()` 复用 `BackgroundTaskTimelineService.collectSegments()` 收集 completion events，再把 queue/flush 顺序集中交给 `BackgroundTaskNoticeStateService`
 - 当 conversation 不可用时，completion notice refresh 会 no-op；inline panel render 仍可在 `renderIfNeeded()` 中收到 `null` conversation 并清理 stale panel
 - streaming tool-call start/end 与 primary-stream finalize 触发不再由本 coordinator 负责，而是交给 `BackgroundTaskStreamTriggerCoordinator`，本模块只保留 render/notice/sync 顺序

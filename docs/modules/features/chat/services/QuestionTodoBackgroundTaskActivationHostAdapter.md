@@ -45,6 +45,7 @@ export function createQuestionTodoBackgroundTaskActivationServices(...): Questio
 - `BackgroundTaskActivationIndicatorPort.syncOpenConversationState()` 直接委托 `syncBackgroundTaskStateFromConversation(conversation, tabId)`
 - `BackgroundTaskActivationIndicatorPort.renderOpenConversationIndicator()` fire-and-forget 调用 `renderBackgroundTaskIndicatorIfNeeded(tabId)`，`renderLoadedConversationIndicator()` 则 await 同一 render 入口
 - `createQuestionTodoBackgroundTaskActivationServices()` 顺序实例化 `QuestionTodoActivationRefreshCoordinator`，并把 adapter-owned background-task activation indicator port 放入共享 activation bundle；同时接收 `QuestionTodoStatusRefreshCoordinator.refreshAfterActivation()` 作为 activation refresh port
+- indicator render adapter 对可选 `isCurrent` lease 做条件透传；无 lease 的旧调用保持原参数形状，带 lease 的 activation/post-sync 调用不能被降级成 tabId-only 调用。
 
 ## 与 `OpenCodianView` 的边界
 

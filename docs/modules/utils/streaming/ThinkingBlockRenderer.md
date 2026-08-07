@@ -8,7 +8,7 @@
 渲染 AI 扩展思考（extended thinking）块。创建可折叠的思考区域，支持实时内容追加、计时器显示和持续时间格式化。提供两种模式：流式创建（实时追加）和存储恢复（从持久化数据重建）。
 
 ## 导入关系
-上游: `../markdown` (MarkdownRenderService), `./types` (ThinkingBlockState, ThinkingRendererOptions)
+上游: `../markdown` (MarkdownRenderService), `./MarkdownRenderScheduler` (MarkdownRenderScheduler), `./streamingCollapsible` (collapsible disposer), `./types` (ThinkingBlockState, ThinkingRendererOptions)
 下游: `StreamController` (持有并调用)
 
 ## 核心类型 / 接口
@@ -52,7 +52,7 @@
 
 ### 内容追加
 
-`appendContent(state, content)` → 累积文本 → `markdownService.render()` 重新渲染
+`appendContent(state, content)` → 累积文本 → 按 state 经 WeakMap 取得对应 `MarkdownRenderScheduler` 并 `schedule()`，把每 chunk 的全文重渲合并进共享流式帧预算；`flushContent(state)` 立即 drain 合并调度并渲染最新内容
 
 ### 最终化
 
@@ -61,6 +61,7 @@
 2. 使用 `resolvedDurationSeconds`（如果已设置）或计算经过时间
 3. 格式化标签（"Thought for 5s" 或 "Thought (<1s)"）
 4. 如果 `collapsedByDefault` 且当前展开 → 折叠
+5. 末尾 fire-and-forget 触发一次 scheduler `flush()`（内部 catch），保证流结束落在帧预算间隔之间时最终内容仍会上屏；`finalize` 本身对调用方保持同步。flush 使用 generation + staging node，清理或 detached 后的旧异步完成不会写回旧 DOM
 
 ### 持续时间格式化
 
@@ -78,9 +79,10 @@
 | 方法 | 说明 |
 |------|------|
 | `create(parentEl)` | 创建流式思考块，返回 `ThinkingBlockState` |
-| `appendContent(state, content)` | 追加思考内容 |
+| `appendContent(state, content)` | 追加思考内容，经 per-state `MarkdownRenderScheduler.schedule()` 合并渲染 |
+| `flushContent(state)` | 立即 drain 合并调度并渲染最新思考内容 |
 | `finalize(state)` | 最终化，返回持续时间秒数 |
-| `cleanup(state)` | 清理计时器 |
+| `cleanup(state)` | 取消 pending 渲染调度并清理计时器 |
 | `updateDuration(state, durationSeconds)` | 设置服务端提供的持续时间 |
 | `updateStoredDuration(wrapperEl, durationSeconds)` | 更新已持久化块的标签 |
 | `renderStored(parentEl, content, durationSeconds?)` | 从持久化数据重建，返回 wrapper `HTMLElement` |
@@ -90,9 +92,9 @@
 ```
 流式模式:
   create(parentEl) → ThinkingBlockState
-  appendContent(state, chunk1) → markdown render
-  appendContent(state, chunk2) → markdown render
-  finalize(state) → durationSeconds → label 更新
+  appendContent(state, chunk1) → scheduler.schedule()（帧预算合并渲染）
+  appendContent(state, chunk2) → scheduler.schedule()
+  finalize(state) → durationSeconds → label 更新 → fire-and-forget flush 最终内容
 
 持久化恢复:
   renderStored(parentEl, savedContent, savedDuration)
@@ -103,6 +105,7 @@
 
 - **StreamController**: 持有 `ThinkingBlockRenderer` 实例，调用所有核心方法
 - **MarkdownRenderService**: 通过构造函数注入，用于渲染思考内容的 markdown
+- **MarkdownRenderScheduler**: 按 `ThinkingBlockState` 经 WeakMap 持有，把 per-chunk 全文重渲合并进共享帧预算
 
 ## 配置项
 
@@ -116,8 +119,9 @@
 ## 注意事项
 
 - 计时器通过 `setInterval` 实现，在 `finalize()` 或 `cleanup()` 时必须清除
-- `appendContent()` 每次调用都完整重新渲染 markdown
+- `appendContent()` 不再每个 chunk 都完整重渲 markdown，而是经 per-state `MarkdownRenderScheduler.schedule()` 合并进帧预算；scheduler 渲染时读取最新累积内容
+- `cleanup(state)` 会同时取消该 state 的 pending 渲染调度并释放 collapsible listeners
+- 已连接后又被 hydration/rerender 替换的思考块不会继续向 detached content node 写入 markdown
 - 折叠/展开通过 `display: none/block` 切换，不使用 CSS animation
 - 每次切换后会触发 `onCollapsibleToggle`（如果提供），通常由上层安排一次 settled scroll，避免 assistant 内容展开后底部不可达
 - 键盘支持：Enter 和 Space 键切换展开/折叠
-

@@ -140,7 +140,11 @@ export class QuestionDockCoordinator {
   async refreshPendingQuestionsForTab(
     tabId: TabId | null,
     sessionId: string | null | undefined = this.host.getSessionIdForTab(tabId),
+    options: { isCurrent?: () => boolean } = {},
   ): Promise<QuestionRequest[]> {
+    if (options.isCurrent && !options.isCurrent()) {
+      return [];
+    }
     const runtime = this.host.getTabRuntimeState(tabId);
     if (!runtime || !sessionId) {
       this.clearPendingQuestionsForTab(tabId);
@@ -149,6 +153,9 @@ export class QuestionDockCoordinator {
 
     try {
       const pendingRequests = await this.host.getPendingQuestions();
+      if (options.isCurrent && !options.isCurrent()) {
+        return runtime.pendingQuestionRequests;
+      }
       const sessionRequests = pendingRequests.filter(
         (request) => request.sessionId === sessionId,
       );

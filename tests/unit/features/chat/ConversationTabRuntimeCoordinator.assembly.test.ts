@@ -130,12 +130,14 @@ describe('assembleConversationTabRuntime', () => {
     const coordinator = assembleConversationTabRuntime(deps);
     const tabManager = new TabManager('New chat', { getMaxTabs: () => 4 });
     deps.tabBarState.tabManager = tabManager;
-    tabManager.createTab({ id: 'conv-1', title: 'Tab 1' });
-    const secondTab = tabManager.createTab({ id: 'conv-2', title: 'Tab 2' });
+    const firstTab = tabManager.createTab({ id: 'conv-1', title: 'Tab 1' });
+    tabManager.createTab({ id: 'conv-2', title: 'Tab 2' });
 
-    await coordinator.handleTabSwitch(secondTab.id);
+    // The second tab is already active after createTab; switching to the
+    // inactive first tab exercises the activation route.
+    await coordinator.handleTabSwitch(firstTab.id);
 
-    expect(deps.loadRecoveryCoordinator.activateTab).toHaveBeenCalledWith(secondTab.id);
+    expect(deps.loadRecoveryCoordinator.activateTab).toHaveBeenCalledWith(firstTab.id);
   });
 
   it('wires handleTabClose to lifecycleRecoveryCoordinator.closeTabAndRecover', async () => {

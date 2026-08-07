@@ -34,6 +34,7 @@ export class PostSyncQuestionTodoRefreshPlanBuilder {
 - background-tab refresh 同样使用 `getConversationBackendSessionId()` 解析的 session，但始终把 `forceTodoStatusRefresh` 设为 `true`
 - **Backend gate**: 当 `conversation.backend` 不是 `'opencode'` 时，background plan 方法返回 `null`，表示跳过 question/todo 刷新。question/todo 是 OpenCode server 独有的 API，不是跨后端通用 contract
 - builder 返回的 plan 不包含 `afterPendingQuestionRefresh` hook；runtime rebuild 与 completion writeback 顺序仍留在 `PostSyncQuestionTodoRefreshFacade`
+- the resulting refresh plan may carry a captured `isCurrent` lease; every awaited refresh stage must re-check it before invoking the next side effect
 
 ## 与 `OpenCodianView` 的边界
 

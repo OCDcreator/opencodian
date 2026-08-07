@@ -1,3 +1,4 @@
+import { disposeCollapsiblesWithin } from '../rendering/collapsible';
 import {
   ConversationHydrationOutcomeBridge,
   type ConversationHydrationOutcomeBridgeHost,
@@ -77,6 +78,10 @@ export function createConversationHydrationRuntimeViewHosts(
         host.syncPaneScrollMetrics(tabId, messagesEl);
       },
       requestAnimationFrame: (callback) => host.requestAnimationFrame(callback),
+      commitHydrationStaging: (messagesEl, stagingEl) => {
+        disposeCollapsiblesWithin(messagesEl);
+        messagesEl.replaceChildren(...Array.from(stagingEl.childNodes));
+      },
     },
     conversationHydrationOutcomeBridgeHost: {
       syncBackgroundTaskStateFromConversation: (conversation) => {
@@ -85,7 +90,7 @@ export function createConversationHydrationRuntimeViewHosts(
       reapplyConversationSessionVisualState: (conversation) => {
         host.reapplyConversationSessionVisualState(conversation);
       },
-      renderMessages: (messages) => host.renderMessages(messages),
+      renderMessages: (messages, options) => host.renderMessages(messages, options),
     },
     conversationTransitionBridgeHost: {
       getCurrentConversation: () => host.getCurrentConversation(),
@@ -133,6 +138,7 @@ export function createConversationHydrationRuntimeBridges(
     viewHosts.conversationHydrationOutcomeBridgeHost,
     tabConversationStateBridge,
     tabViewActivationBridge,
+    conversationHydrationRenderBridge,
   );
 
   return {

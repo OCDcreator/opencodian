@@ -15,7 +15,7 @@
 export interface ConversationHydrationOutcomeBridgeHost {
   syncBackgroundTaskStateFromConversation(conversation: Conversation): void;
   reapplyConversationSessionVisualState(conversation: Conversation): void;
-  renderMessages(messages: ChatMessage[]): Promise<void>;
+  renderMessages(messages: ChatMessage[], options?: ConversationRenderMessagesOptions): Promise<void>;
 }
 
 export interface ConversationHydrationOutcomePort {
@@ -23,13 +23,14 @@ export interface ConversationHydrationOutcomePort {
     tabId: TabId | null,
     conversation: Conversation,
     messages: ChatMessage[],
+    options?: ConversationRenderMessagesOptions,
   ): Promise<void>;
 }
 ```
 
 ## 关键行为
 
-- `applyLoadedConversationOutcome()` 保持原有 loaded-conversation outcome 顺序：先 `syncBackgroundTaskStateFromConversation()`，再把 per-conversation session visual state 重新应用到当前 conversation root，随后 `renderMessages()`，然后只在当前 conversation 属于 OpenCode 时把 session identity 传给 `TabViewActivationBridge.applyLoadedConversationPostRenderOutcome()`，最后 `commitConversationSyncBaseline()`
+- `applyLoadedConversationOutcome()` 保持原有 loaded-conversation outcome 顺序：先 `syncBackgroundTaskStateFromConversation()`，再把 per-conversation session visual state 重新应用到当前 conversation root，随后 `renderMessages()`（现在透传 `ConversationRenderMessagesOptions`；`ConversationViewStateService` 用 `shouldContinueRender` 把 per-tab load generation 校验接到逐条渲染循环里，过期装载不会再往自己已不再拥有的 pane 追加消息），然后只在当前 conversation 属于 OpenCode 时把 session identity 传给 `TabViewActivationBridge.applyLoadedConversationPostRenderOutcome()`，最后 `commitConversationSyncBaseline()`
 - Claude Code 等非 OpenCode backend 的 loaded conversation 会继续渲染消息和 background-task indicator，但 post-render question/todo activation refresh 会收到 `null` session id，避免把 `claude-code-*` session 误交给 OpenCode-only `session.todo()` 路径
 - background-task runtime rebuild 继续基于当前 conversation 语义，不把 timeline 推导逻辑重新塞回装载服务
 - post-render indicator / dock / status-question-todo lazy refresh 继续复用 `TabViewActivationBridge` 与 `QuestionTodoStatusRefreshCoordinator`

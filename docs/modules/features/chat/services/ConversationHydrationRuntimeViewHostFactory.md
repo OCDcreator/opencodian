@@ -37,5 +37,6 @@ export function assembleConversationHydrationRuntime(
 
 - `OpenCodianView` 通过 `assembleConversationHydrationRuntime` 一次性完成 hydration runtime 装配，不再直接调用 `createConversationHydrationRuntimeBridges`，也不再持有独立的 `createConversationHydrationRuntimeViewHost` 方法
 - `ConversationHydrationRuntimeViewHostFactory` 拥有完整的 hydration bridge assembly 生命周期：从扁平 seam 到 host 重组，再到 bridge 实例化，全部收束在 factory 模块内
-- `ConversationHydrationRenderBridge`、`ConversationHydrationOutcomeBridge` 与 `ConversationTransitionBridge` 的行为边界保持不变；hydration outcome seam 现在额外承接 conversation session visual-state reapply
+- `ConversationHydrationRenderBridge`、`ConversationHydrationOutcomeBridge` 与 `ConversationTransitionBridge` 的行为边界保持不变；hydration outcome seam 现在额外承接 conversation session visual-state reapply，并把 `renderMessages` 的 `ConversationRenderMessagesOptions`（如 `shouldContinueRender`）从 view seam 透传到 outcome bridge
+- activation hydration 的 render host 还提供 `commitHydrationStaging()`：提交 detached messages root 前先调用 `disposeCollapsiblesWithin()` 释放 live pane 的 collapsible/streaming 资源，再原子替换 children，避免旧 DOM 监听器泄漏或与新历史并存
 - 这条边界推进 master plan 的 P1 activation / sync / runtime bridge ownership：让 loaded-conversation hydration/transition 的 host assembly 与 bridge construction 不再散落在 view 里

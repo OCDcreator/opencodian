@@ -116,6 +116,10 @@
   display: block;
 }
 
+.markdown-embedded-image.has-intrinsic-placeholder img {
+  aspect-ratio: auto 16 / 9;
+}
+
 /* File links */
 .markdown-file-link {
   color: var(--link-color);

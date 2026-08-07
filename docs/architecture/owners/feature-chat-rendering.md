@@ -31,6 +31,9 @@
 ## Required gates
 Run before merge: `npm run typecheck`, `npm run module-docs`.
 
+## Recent change notes
+- **Collapsible disposal:** `setupCollapsible` returns an idempotent dispose handle that disconnects its ResizeObserver and removes toggle listeners; wrappers register in a module-level WeakMap so `disposeCollapsiblesWithin(rootEl)` can release every collapsible before a message subtree is cleared or replaced (undisposed observers are a potential retention risk).
+
 ## Hard invariants
 - Do not cross `forbiddenDependencies`.
 - Do not replicate canonical state in another owner.

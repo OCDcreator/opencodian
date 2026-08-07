@@ -110,7 +110,6 @@ describe('ConversationTransitionBridge', () => {
       'clearScheduledScrollToBottom',
       'beginConversationHydration',
       'beginHydrationShell',
-      'clearMessagesContainer',
       'resetTurnState',
       'restoreHydrationShell',
       'endConversationHydration',

@@ -5,6 +5,10 @@ import {
   getMcpToolSummary,
 } from './mcpSummaryConfig';
 import { getMcpServerName, renderMcpExpandedContent, renderMcpServerChip, renderOrUpdateMcpAuthButton, renderOrUpdateMcpRetryButton } from './McpToolCallRenderer';
+import {
+  disposeStreamingCollapsible,
+  registerStreamingCollapsible,
+} from './streamingCollapsible';
 import { renderTaskExpandedContent } from './TaskToolCallRenderer';
 import type { ToolCallInfo, ToolCallStatus, ToolRendererOptions } from './types';
 
@@ -504,11 +508,16 @@ export class ToolCallRenderer {
     };
 
     header.addEventListener('click', toggle);
-    header.addEventListener('keydown', (e) => {
+    const onKeydown = (e: KeyboardEvent): void => {
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
         toggle();
       }
+    };
+    header.addEventListener('keydown', onKeydown);
+    registerStreamingCollapsible(toolEl, () => {
+      header.removeEventListener('click', toggle);
+      header.removeEventListener('keydown', onKeydown);
     });
   }
 
@@ -520,6 +529,11 @@ export class ToolCallRenderer {
     if (statusEl) {
       this.setStatus(statusEl, status);
     }
+  }
+
+  /** Release this card's header listeners before its DOM subtree is cleared. */
+  cleanup(toolEl: HTMLElement | null): void {
+    disposeStreamingCollapsible(toolEl);
   }
 
   updateResult(

@@ -14,6 +14,7 @@
 - `:root`、`.theme-dark`、`.theme-light`：定义 `--opencodian-*` 与 `--lobehub-icon-filter*` 等主题变量；其中 `body[data-opencodian-provider-icon-mode]` 会在 `跟随系统 / 单色 / 彩色` 三种 provider 图标模式之间切换。
 - `.opencodian-container`：聊天主容器，声明消息/输入区的尺寸变量（如 `--opencodian-messages-pad-*`、`--opencodian-composer-stack-height`）。
 - `.opencodian-messages`、`.opencodian-turn*`：消息列表、分轮结构与 sticky header 行为。
+- `.opencodian-messages.is-rehydrating`：水合期间暂停入场动画；已完成 hydration 的消息节点带 `data-opencodian-hydration-settled="true"`，在临时 class 移除后仍不重复播放历史入场动画。
 - `.opencodian-tab-bar*`、`.opencodian-tab-bar-parent-breadcrumb*`、`.opencodian-tab-bar-parent-close*`、`.opencodian-tab-overflow-menu*`：多会话标签栏、子会话返回父 tab 面包屑、隐藏子会话关闭按钮与溢出菜单样式。
 - `.opencodian-container--tabs-disabled`：禁用会话标签时隐藏普通 tab bar slot 与 header 的 new-tab 专用按钮；当 slot 带有 `is-parent-only` 时仍显示返回父会话面包屑。它只影响可见控件，不改变内部 active tab / `tabState` 数据。
 - `.opencodian-tab-bar-slot--input`：输入位置的会话标签不再额外添加底部 margin；它与 Composer 的间距完全复用 `.opencodian-input-area` 的 8px flex gap，避免在 Todo／问题卡不存在时留下额外空白。

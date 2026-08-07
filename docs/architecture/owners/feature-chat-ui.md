@@ -26,9 +26,11 @@ Run before merge: `npm run typecheck`, `npm run module-docs`.
 ## Recent change notes
 - **Modified-files sidebar:** the sidebar is an explicit, keyboard-accessible current-OpenCode-session `session.diff` viewer. It does not query or imply Git working-tree state.
 - **Shared vault path delegation:** `ModifiedFilesSidebar.formatPath()` now delegates to the shared `toVaultRelativePath()` pure function (directory-boundary stripping, traversal rejection, fail-closed `null` for unprovable absolute paths) while keeping its own adapter `getBasePath()` acquisition. Unresolved entries show only a non-interactive basename and never expose/open the raw absolute path.
+- **Single tooltip ownership:** an `EffortSelector` custom tooltip trigger must not sit beneath an ancestor `aria-label` or `title` that Obsidian can also adopt as a native hover tooltip. Keep the visible value and custom `data-tooltip` on the concrete control, and preserve its accessible name through `aria-labelledby` plus a visually hidden carrier.
 
 ## Hard invariants
 - Do not cross `forbiddenDependencies`.
 - Do not replicate canonical state in another owner.
+- Do not combine a custom tooltip trigger with a native-tooltip-owning `aria-label` or `title` on that trigger or its component-owned ancestor.
 - Changes here must update the matching `docs/modules/**` page (via `module-docs.config.json`).
 - Run `npm run inspect:owner -- <this owner or a path>` for an always-fresh summary.

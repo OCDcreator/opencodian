@@ -26,7 +26,7 @@
 - `.opencodian-runtime-overflow` / `.opencodian-runtime-overflow-trigger` / `.opencodian-runtime-overflow-panel` 收纳 sandbox、additional directories 和 Codex runtime defaults 等低优先级只读状态。`.opencodian-effort-slot` 位于右侧，overflow trigger 保持最后一个视觉 affordance。
 - 输入文本层（`.opencodian-input`、highlight backdrop 与 placeholder）使用 `--opencodian-composer-font-family`，默认落到 bundled `OpenCodian Newsreader` + serif fallback；`.opencodian-input-area` 保持 `font-family: inherit`，toolbar 控件仍使用 Obsidian/system UI 字体。
 - Structured Output 可折叠渲染：`.opencodian-structured-output-details`、`.opencodian-structured-output-summary`、`.opencodian-structured-output-body`、`.opencodian-structured-output-pre`、`.opencodian-structured-output-code`，用于在 assistant message 底部展示从 `backend_event` 捕获的结构化输出 JSON。
-- 动画：`opencodian-spin`、`opencodian-todo-pulse`、若干玻璃态 hover 过渡。
+- 动画：`opencodian-spin`、`opencodian-todo-pulse`、若干玻璃态 hover 过渡；assistant 消息与已标记为 hydration-settled 的历史节点在 reduced-motion / 水合完成后不会重复播放入场动画。
 
 ## 图片附件样式（2026-07-22）
 

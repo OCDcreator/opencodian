@@ -1,10 +1,30 @@
+/* eslint-disable max-lines -- Render delegates and the synced-update transaction share one pane-ownership boundary; splitting them would reintroduce cross-pass state indirection. */
+
 import {
   type ChatMessage,
   type Conversation,
 } from '../../../core/types';
+import { MarkdownRenderScheduler } from '../../../utils/streaming/MarkdownRenderScheduler';
+import { disposeCollapsiblesWithin } from '../rendering/collapsible';
 import type { UserMessageContentRenderer } from '../runtime/UserMessageContentRenderer';
 import type { TabId } from '../tabs';
-import { type ScrollRuntimeState } from './ScrollManager';
+import type { ConversationKeyedReconcileDelegate } from './ConversationKeyedReconcileDelegate';
+import {
+  getPaneRenderSurfaceGeneration,
+  type ScrollRuntimeState,
+} from './ScrollManager';
+
+const renderSurfaceGenerations = new WeakMap<object, number>();
+
+export function getConversationRenderSurfaceGeneration(host: ConversationRenderHost): number {
+  return renderSurfaceGenerations.get(host) ?? 0;
+}
+
+export function beginConversationRenderSurfacePass(host: ConversationRenderHost): number {
+  const generation = getConversationRenderSurfaceGeneration(host) + 1;
+  renderSurfaceGenerations.set(host, generation);
+  return generation;
+}
 
 export interface IncrementalRenderedMessageUpdate {
   appendedRenderedMessages: ChatMessage[];
@@ -67,8 +87,31 @@ export function hasInterruptedLocalAssistantTail(messages: ChatMessage[]): boole
   );
 }
 
+/** Keep hydrated history from replaying its entrance animation when the
+ * temporary rehydration class is removed; live appended messages stay
+ * unmarked and retain the normal entrance motion. */
+export function markHydrationSettledMessages(messagesEl: HTMLElement): void {
+  for (const messageEl of messagesEl.querySelectorAll<HTMLElement>('.opencodian-message')) {
+    messageEl.dataset.opencodianHydrationSettled = 'true';
+  }
+}
+
+export interface ConversationRenderMessagesOptions {
+  /**
+   * Checked before each message render during a multi-message pass. When it
+   * returns false (e.g. the owning conversation load was superseded), the
+   * remaining messages are skipped so a stale pass never appends into a pane
+   * it no longer owns.
+   */
+  shouldContinueRender?(): boolean;
+  /** Detached root supplied by the activation hydration transaction. */
+  stagingContainer?: HTMLElement | null;
+}
+
 export interface ConversationRenderRuntimeState {
   currentTurnBodyEl: HTMLElement | null;
+  /** Detached body used by keyed reconcile while async assistant markup renders. */
+  stagedTurnBodyEl?: HTMLElement | null;
 }
 
 export interface ConversationAssistantTailRenderPort {
@@ -116,7 +159,10 @@ export interface ConversationRenderHost {
   userMessageContentRenderer: UserMessageContentRenderer;
   addUserMessageFooter(messageEl: HTMLElement, message: ChatMessage, content?: string): void;
   renderMarkdownInto(container: HTMLElement, markdown: string): Promise<void>;
-  renderBackgroundTaskIndicatorIfNeeded(tabId?: TabId | null): Promise<void>;
+  renderBackgroundTaskIndicatorIfNeeded(
+    tabId?: TabId | null,
+    options?: { isCurrent?: () => boolean },
+  ): Promise<void>;
   syncBackgroundTaskStateFromConversation(conversation: Conversation): void;
 
   shouldAutoScroll(tabId?: TabId | null): boolean;
@@ -179,6 +225,7 @@ class ConversationAssistantMessageRenderDelegate {
 
     const contentEl = this.ensureAssistantContentElement(messageEl);
     this.syncAssistantMessageIdentity(messageEl, message);
+    disposeCollapsiblesWithin(contentEl);
     contentEl.replaceChildren();
     await this.host.assistantTailRender.renderMessageBody(contentEl, message);
     this.host.assistantTailRender.finalizePersistedFooter(messageEl, message);
@@ -248,23 +295,49 @@ class ConversationAssistantMessageRenderDelegate {
 
     messageEl.style.visibility = 'hidden';
 
+    // Coalesce the per-chunk markdown re-renders into the shared streaming
+    // frame budget; the scheduler always renders the latest accumulated text.
     let rendered = '';
-    for (const chunk of chunks) {
-      rendered += chunk;
+    const renderScheduler = new MarkdownRenderScheduler(async () => {
+      if (!this.isElementInCurrentMessagesContainer(messageEl)) {
+        // A concurrent hydration/rerender replaced the messages container:
+        // skip writing into the detached shell.
+        return;
+      }
       await this.host.renderMarkdownInto(textEl, rendered);
       if (messageEl.style.visibility === 'hidden') {
         messageEl.style.visibility = '';
       }
+    });
+
+    for (const chunk of chunks) {
+      if (!this.isElementInCurrentMessagesContainer(messageEl)) {
+        // A concurrent hydration/rerender replaced the messages container:
+        // stop writing into the detached shell and skip footer finalization.
+        renderScheduler.cancel();
+        return;
+      }
+      rendered += chunk;
+      renderScheduler.schedule();
       if (delayMs > 0) {
         await this.sleep(delayMs);
       }
     }
 
+    await renderScheduler.flush();
+    if (!this.isElementInCurrentMessagesContainer(messageEl)) {
+      return;
+    }
     if (messageEl.style.visibility === 'hidden') {
       messageEl.style.visibility = '';
     }
     this.host.assistantShellRender.finalizePseudoStreamFooter(messageEl, message);
     this.host.assistantShellRender.clearStreamingMessageState();
+  }
+
+  private isElementInCurrentMessagesContainer(messageEl: HTMLElement): boolean {
+    const messagesEl = this.host.getMessagesContainer();
+    return Boolean(messagesEl && messagesEl.contains(messageEl));
   }
 
   private splitPseudoStreamChunks(text: string): string[] {
@@ -321,11 +394,39 @@ class ConversationUserMessageRenderDelegate {
     if (!messageEl) {
       return;
     }
-
+    const messagesEl = this.host.getMessagesContainer();
+    const ownerConversationId = this.host.getCurrentConversation()?.id ?? null;
+    const ownerTabId = this.host.getActiveTabId();
+    const ownerSurfaceGeneration = getConversationRenderSurfaceGeneration(this.host);
+    const ownerPaneGeneration = getPaneRenderSurfaceGeneration(messagesEl);
+    const stagedMessageEl = messageEl.cloneNode(false) as HTMLElement;
+    const stagedContentEl = this.appendMessageContentElement(stagedMessageEl);
+    let copyContent: string | undefined;
+    if (message.compactionDivider) {
+      stagedMessageEl.addClass('opencodian-message--compaction-divider');
+      this.host.userMessageContentRenderer.renderCompactionDivider(
+        stagedMessageEl,
+        message.compactionDivider,
+      );
+    } else {
+      copyContent = await this.host.userMessageContentRenderer.renderUserMessageContent(
+        stagedContentEl,
+        message,
+      );
+    }
+    const stillOwner = this.host.getMessagesContainer() === messagesEl
+      && this.host.getCurrentConversation()?.id === ownerConversationId
+      && this.host.getActiveTabId() === ownerTabId
+      && getConversationRenderSurfaceGeneration(this.host) === ownerSurfaceGeneration
+      && getPaneRenderSurfaceGeneration(messagesEl) === ownerPaneGeneration
+      && this.findExistingMessageElement(previousMessageId) === messageEl;
+    if (!stillOwner) {
+      return;
+    }
     this.syncExistingMessageIdentity(messageEl, message);
-    messageEl.replaceChildren();
-    const contentEl = this.appendMessageContentElement(messageEl);
-    await this.renderMessageIntoFrame({ messageEl, contentEl }, message);
+    disposeCollapsiblesWithin(messageEl);
+    messageEl.replaceChildren(...Array.from(stagedMessageEl.childNodes));
+    this.host.addUserMessageFooter(messageEl, message, copyContent);
   }
 
   private findExistingMessageElement(previousMessageId: string): HTMLElement | null {
@@ -369,10 +470,16 @@ class ConversationUserMessageRenderDelegate {
 export class ConversationMessageRenderDelegate {
   private readonly assistantMessageRenderer: ConversationAssistantMessageRenderDelegate;
   private readonly userMessageRenderer: ConversationUserMessageRenderDelegate;
+  private stagingContainer: HTMLElement | null = null;
 
   constructor(private readonly host: ConversationRenderHost) {
     this.assistantMessageRenderer = new ConversationAssistantMessageRenderDelegate(host);
     this.userMessageRenderer = new ConversationUserMessageRenderDelegate(host);
+  }
+
+  /** Stage a full hydration pass away from the live pane. */
+  setStagingContainer(container: HTMLElement | null): void {
+    this.stagingContainer = container;
   }
 
   async renderMessage(message: ChatMessage): Promise<HTMLElement | void | undefined> {
@@ -383,14 +490,85 @@ export class ConversationMessageRenderDelegate {
     return this.userMessageRenderer.renderMessage(message);
   }
 
-  async renderMessages(messages: ChatMessage[]): Promise<void> {
+  async renderMessages(
+    messages: ChatMessage[],
+    options: ConversationRenderMessagesOptions = {},
+  ): Promise<void> {
+    const renderRuntime = this.host.getRenderRuntimeForTab(this.host.getActiveTabId());
+    if (options.stagingContainer && renderRuntime) {
+      // The live pane remains mounted during activation hydration. Keep the
+      // current turn body addressable after each shell is moved to staging so
+      // subsequent assistant messages stay in the same turn instead of
+      // creating a detached assistant-only turn.
+      renderRuntime.stagedTurnBodyEl = null;
+    }
     if (messages.length === 0) {
-      await this.renderEmptyConversationNoticeIfNeeded();
+      if (!this.shouldContinueRender(options)) {
+        return;
+      }
+      const rendered = await this.renderEmptyConversationNoticeIfNeeded();
+      if (!this.shouldContinueRender(options)) {
+        this.disposeStaleRenderedElement(rendered);
+      }
       return;
     }
 
     for (const message of this.host.getMessagesForRender(messages)) {
-      await this.renderMessage(message);
+      if (!this.shouldContinueRender(options)) {
+        return;
+      }
+      const liveContainer = this.host.getMessagesContainer();
+      const liveChildren = liveContainer ? new Set(Array.from(liveContainer.children)) : null;
+      const renderPromise = this.renderMessage(message);
+      // Renderers create their turn shell synchronously, before awaiting
+      // markdown. Move that shell immediately so deferred body work cannot
+      // expose a partial history in the live pane.
+      this.moveNewChildrenToStaging(liveContainer, liveChildren);
+      const rendered = await renderPromise;
+      this.syncStagedTurnBody(renderRuntime, options.stagingContainer);
+      if (!this.shouldContinueRender(options)) {
+        this.disposeStaleRenderedElement(rendered);
+        return;
+      }
+    }
+  }
+
+  private syncStagedTurnBody(
+    renderRuntime: ConversationRenderRuntimeState | null,
+    stagingContainer: HTMLElement | null | undefined,
+  ): void {
+    if (!renderRuntime || !stagingContainer) {
+      return;
+    }
+    const bodies = stagingContainer.querySelectorAll<HTMLElement>('.opencodian-turn-body');
+    renderRuntime.stagedTurnBodyEl = bodies.item(bodies.length - 1) ?? null;
+  }
+
+  private shouldContinueRender(options: ConversationRenderMessagesOptions): boolean {
+    return !options.shouldContinueRender || options.shouldContinueRender();
+  }
+
+  private moveNewChildrenToStaging(
+    liveContainer: HTMLElement | null,
+    liveChildren: Set<Element> | null,
+  ): void {
+    if (!this.stagingContainer || !liveContainer || !liveChildren) {
+      return;
+    }
+
+    for (const child of Array.from(liveContainer.children)) {
+      if (!liveChildren.has(child)) {
+        this.stagingContainer.appendChild(child);
+      }
+    }
+  }
+
+  private disposeStaleRenderedElement(rendered: HTMLElement | void | undefined): void {
+    // A superseding owner may have reused the same message id in the live
+    // pane. Only dispose nodes that this pass explicitly staged.
+    if (rendered instanceof HTMLElement && this.stagingContainer?.contains(rendered)) {
+      disposeCollapsiblesWithin(rendered);
+      rendered.remove();
     }
   }
 
@@ -401,16 +579,29 @@ export class ConversationMessageRenderDelegate {
     await this.userMessageRenderer.rerenderMessage(previousMessageId, message);
   }
 
-  async renderSyncedMessages(messages: ChatMessage[]): Promise<void> {
+  async renderSyncedMessages(
+    messages: ChatMessage[],
+    shouldContinueRender?: () => boolean,
+  ): Promise<void> {
     for (const message of messages) {
+      if (shouldContinueRender && !shouldContinueRender()) {
+        return;
+      }
       await this.renderSyncedMessage(message);
+      if (shouldContinueRender && !shouldContinueRender()) {
+        // Do not query/remove by message id after ownership is lost: a newer
+        // pane generation may already have rendered a legitimate node with
+        // the same id. The owning pass will clean the stale subtree itself.
+        return;
+      }
     }
   }
 
-  private async renderEmptyConversationNoticeIfNeeded(): Promise<void> {
+  private async renderEmptyConversationNoticeIfNeeded(): Promise<HTMLElement | void | undefined> {
     if (this.host.shouldRenderEmptyConversationNotice()) {
-      await this.renderMessage(this.host.createEmptyConversationNoticeMessage());
+      return this.renderMessage(this.host.createEmptyConversationNoticeMessage());
     }
+    return undefined;
   }
 
   private async renderSyncedMessage(message: ChatMessage): Promise<void> {
@@ -428,6 +619,7 @@ export class ConversationSyncedUpdateApplyDelegate {
     private readonly host: ConversationRenderHost,
     private readonly messageRenderer: ConversationMessageRenderDelegate,
     private readonly patchPort: ConversationSyncedUpdatePatchPort,
+    private readonly keyedReconcile: ConversationKeyedReconcileDelegate,
   ) {}
 
   async apply(
@@ -446,7 +638,10 @@ export class ConversationSyncedUpdateApplyDelegate {
       getMessageVisualSignature: (message) => this.host.getMessageVisualSignature(message),
     });
     if (!incrementalUpdate) {
-      await this.patchPort.rerenderConversationMessages(currentConversation);
+      const reconciled = await this.keyedReconcile.tryApply(previousMessages, nextMessages);
+      if (!reconciled) {
+        await this.patchPort.rerenderConversationMessages(currentConversation);
+      }
       return;
     }
 
@@ -464,6 +659,20 @@ export class ConversationSyncedUpdateApplyDelegate {
     nextMessages,
     previousMessages,
   }: ConversationSyncedUpdateApplyContext): Promise<void> {
+    const messagesEl = this.host.getMessagesContainer();
+    const tabId = this.host.getActiveTabId();
+    const surfaceGeneration = getConversationRenderSurfaceGeneration(this.host);
+    const paneSurfaceGeneration = getPaneRenderSurfaceGeneration(messagesEl);
+    const ownsRender = (): boolean =>
+      this.host.getCurrentConversation()?.id === currentConversation.id
+      && this.host.getActiveTabId() === tabId
+      && this.host.getMessagesContainer() === messagesEl
+      && !this.host.getScrollRuntimeForTab(tabId)?.isHydratingConversation
+      && getConversationRenderSurfaceGeneration(this.host) === surfaceGeneration
+      && getPaneRenderSurfaceGeneration(messagesEl) === paneSurfaceGeneration;
+    if (!ownsRender()) {
+      return;
+    }
     const shouldStickToBottom = this.host.shouldAutoScroll();
     this.host.syncBackgroundTaskStateFromConversation(currentConversation);
 
@@ -472,13 +681,27 @@ export class ConversationSyncedUpdateApplyDelegate {
       previousMessages,
       nextMessages,
     );
+    if (!ownsRender()) {
+      return;
+    }
     if (!patchedTail) {
       await this.patchPort.rerenderConversationMessages(currentConversation);
       return;
     }
 
-    await this.messageRenderer.renderSyncedMessages(incrementalUpdate.appendedRenderedMessages);
-    await this.host.renderBackgroundTaskIndicatorIfNeeded();
+    await this.messageRenderer.renderSyncedMessages(
+      incrementalUpdate.appendedRenderedMessages,
+      ownsRender,
+    );
+    if (!ownsRender()) {
+      return;
+    }
+    await this.host.renderBackgroundTaskIndicatorIfNeeded(tabId, {
+      isCurrent: ownsRender,
+    });
+    if (!ownsRender()) {
+      return;
+    }
 
     if (shouldStickToBottom) {
       this.host.scrollToBottom();

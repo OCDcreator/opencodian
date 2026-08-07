@@ -13,6 +13,7 @@ interface BackgroundTaskNoticeMessageOptions {
   tabId?: TabId | null;
   timestamp?: number;
   noticeMeta?: ChatMessage['noticeMeta'];
+  isCurrent?: () => boolean;
 }
 
 export interface BackgroundTaskNoticeLaunchInfo {
@@ -121,8 +122,9 @@ export class BackgroundTaskNoticeStateService {
   async handleStoppedPendingLaunches(
     tabId: TabId | null,
     pending: readonly BackgroundTaskNoticeLaunchInfo[],
+    options: { isCurrent?: () => boolean } = {},
   ): Promise<void> {
-    if (pending.length === 0) {
+    if (pending.length === 0 || (options.isCurrent && !options.isCurrent())) {
       return;
     }
 
@@ -132,7 +134,7 @@ export class BackgroundTaskNoticeStateService {
       runtime.backgroundTaskSuppressedFingerprint = fingerprint;
     }
 
-    await this.appendStoppedNoticeIfPossible(tabId, fingerprint);
+    await this.appendStoppedNoticeIfPossible(tabId, fingerprint, options);
   }
 
   queueNotices(
@@ -180,6 +182,7 @@ export class BackgroundTaskNoticeStateService {
   async flushQueuedNotices(
     tabId: TabId | null,
     conversation: Conversation | null,
+    options: { isCurrent?: () => boolean } = {},
   ): Promise<void> {
     const runtime = this.host.getTabRuntimeState(tabId);
     if (!runtime || !conversation || runtime.isStreaming) {
@@ -190,6 +193,9 @@ export class BackgroundTaskNoticeStateService {
     const persisted = this.getPersistedBackgroundTaskCompletionNoticeFingerprints(conversation);
 
     for (const [anchorKey, queued] of [...queuedNotices.entries()]) {
+      if (options.isCurrent && !options.isCurrent()) {
+        return;
+      }
       const taskIds = [...queued.tasks.keys()].sort();
       const fingerprint = this.getBackgroundTaskCompletionNoticeFingerprint({
         anchorKey,
@@ -218,7 +224,11 @@ export class BackgroundTaskNoticeStateService {
           allComplete: queued.allComplete,
           taskIds,
         },
+        isCurrent: options.isCurrent,
       });
+      if (options.isCurrent && !options.isCurrent()) {
+        return;
+      }
       logger.debug('Background task completion notice persisted', {
         tabId,
         anchorKey,
@@ -233,7 +243,11 @@ export class BackgroundTaskNoticeStateService {
   private async appendStoppedNoticeIfPossible(
     tabId: TabId | null,
     fingerprint: string,
+    options: { isCurrent?: () => boolean } = {},
   ): Promise<void> {
+    if (options.isCurrent && !options.isCurrent()) {
+      return;
+    }
     const runtime = this.host.getTabRuntimeState(tabId);
     const conversation = this.host.getCurrentConversation();
     if (!runtime || !tabId || tabId !== this.host.getActiveTabId() || !conversation) {
@@ -259,11 +273,18 @@ export class BackgroundTaskNoticeStateService {
     runtime.backgroundTaskStaleNoticeFingerprint = fingerprint;
     runtime.backgroundTaskSuppressedFingerprint = fingerprint;
     try {
+      if (options.isCurrent && !options.isCurrent()) {
+        return;
+      }
       await this.host.appendPersistentAssistantNoticeMessage({
         title: t('chat.backgroundTask.staleTitle'),
         content: fingerprint,
         tone: 'warning',
+        isCurrent: options.isCurrent,
       });
+      if (options.isCurrent && !options.isCurrent()) {
+        return;
+      }
     } catch (error) {
       if (runtime.backgroundTaskStaleNoticeFingerprint === fingerprint) {
         runtime.backgroundTaskStaleNoticeFingerprint = null;

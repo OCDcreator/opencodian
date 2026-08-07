@@ -180,4 +180,35 @@ describe('BackgroundConversationPostSyncRefreshExecutor', () => {
     );
     expect(callOrder).toEqual(['writeback']);
   });
+
+  it('stops rebuild and notice writeback when the lease expires after the first refresh await', async () => {
+    const conversation = createConversation();
+    const planBuilder = createPlanBuilder();
+    let resolveRefresh: (() => void) | undefined;
+    const refreshDeferred = new Promise<void>((resolve) => {
+      resolveRefresh = resolve;
+    });
+    const refreshCoordinator: jest.Mocked<QuestionTodoStatusRefreshPort> = {
+      refreshAfterPostSync: jest.fn(() => refreshDeferred),
+    };
+    const writebackPort = createWritebackPort();
+    let current = true;
+    const executor = new BackgroundConversationPostSyncRefreshExecutor(
+      planBuilder,
+      refreshCoordinator,
+      writebackPort,
+    );
+    const refreshPromise = executor.refreshBackgroundTabConversation({
+      tabId: 'tab-bg',
+      conversation,
+      isCurrent: () => current,
+    });
+
+    current = false;
+    resolveRefresh?.();
+    await refreshPromise;
+
+    expect(writebackPort.syncBackgroundTaskStateFromConversation).not.toHaveBeenCalled();
+    expect(writebackPort.flushBackgroundTaskPostSyncWriteback).not.toHaveBeenCalled();
+  });
 });

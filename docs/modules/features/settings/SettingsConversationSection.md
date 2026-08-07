@@ -50,7 +50,7 @@
 - 在“上下文压缩（项目级）”块装配 compaction controls
 - 在“会话分享（项目级）”块装配 OpenCode `share` mode dropdown
 - 在“阅读与显示”块装配 global session default chat font size 与回合变更记录显示开关；后者保存后刷新 conversation rendering，关闭只隐藏有效 turn-diff notice
-- 在“提问交互”块装配 question display mode、question card position、answered-card toggle
+- 在“提问交互”块装配 question display mode、question card position、answered-card toggle；其中 question card position 与 answered-card toggle 的变更只调用一次 `refreshQuestionUi()`（其内部已重渲 conversation messages），不再额外叠加 `refreshConversationRendering()`，避免第二次并发 full rerender 与消息 append 交错
 - 在“消息渲染”块装配 user markup 渲染 toggle
 - 注册首次与后续模型目录变化时复用的 title-model refresh callback
 

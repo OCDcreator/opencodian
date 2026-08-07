@@ -93,7 +93,7 @@ export function createHost(
   } = {},
 ): MockedConversationRenderHost & {
   messagesEl: HTMLElement;
-  renderRuntime: { currentTurnBodyEl: HTMLElement | null };
+  renderRuntime: { currentTurnBodyEl: HTMLElement | null; stagedTurnBodyEl?: HTMLElement | null };
   scrollRuntime: { autoScrollEnabled: boolean; programmaticScrollGuardUntil: number };
 } {
   const messagesEl = document.createElement('div');
@@ -117,6 +117,7 @@ export function createHost(
   };
   const renderRuntime = {
     currentTurnBodyEl: null,
+    stagedTurnBodyEl: null,
   };
   const conversation = createConversation([]);
   const assistantTailRender: MockedConversationAssistantTailRenderPort = {

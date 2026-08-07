@@ -11,7 +11,7 @@ OpenCode 模式下，variants 来自当前 provider model catalog 的 `models[mo
 
 ## 职责
 
-- 渲染 compact 当前值和 dropdown options；`Effort` / `思考强度` 只通过 group `aria-label`、当前值 custom tooltip 与菜单项 tooltip 暴露，不在 toolbar 内占可见宽度
+- 渲染 compact 当前值和 dropdown options；`Effort` / `思考强度` 通过当前 control 的 `aria-labelledby` visually-hidden carrier、当前值 custom tooltip 与菜单项 tooltip 暴露，不在 toolbar 内占可见宽度，也不让父 group 成为 Obsidian 原生 tooltip owner
 - 点击当前值时打开/关闭菜单，点击外部或按 Escape 关闭菜单
 - 以 reverse order 展示 variants，让较高 effort 靠上
 - 在当前模型不存在或 variants 为空时隐藏自身，避免留下空 toolbar 控件
@@ -24,7 +24,8 @@ OpenCode 模式下，variants 来自当前 provider model catalog 的 `models[mo
 
 - 该组件只管理 DOM 与选择事件，不保存设置，也不直接读取 backend capability。
 - OpenCode / Claude Code / Codex 的 variant 来源与保存策略由 `OpenCodianView` host seam 决定。
-- Codex effort 写回路径：`onVariantChange` → `plugin.settings.backendSettings.codex.modelReasoningEffort` + `CodexAdapter.updateModelReasoningEffort()`。仅影响后续 thread 创建，不改变正在运行的 thread。该边界通过 `getBoundaryHint()` 回调进入当前值 `data-tooltip` 与 group `aria-label`（例如 `Effort: Medium. Controls how much reasoning budget... Applies to next turn`），避免在输入框有限空间里显示 `思考强度` 长标签，也避免原生 `title` 和全局 custom tooltip 重复。
+- Codex effort 写回路径：`onVariantChange` → `plugin.settings.backendSettings.codex.modelReasoningEffort` + `CodexAdapter.updateModelReasoningEffort()`。仅影响后续 thread 创建，不改变正在运行的 thread。该边界通过 `getBoundaryHint()` 回调进入当前值 `data-tooltip`，并由同一 control 的 `aria-labelledby` 指向 visually-hidden carrier（例如 `Effort: Medium. Controls how much reasoning budget... Applies to next turn`）。父 group、当前 trigger 和菜单 trigger 都不得持有 `aria-label` 或 `title`，避免 Obsidian 原生 tooltip 与全局 custom tooltip 重复。
 - 新增 backend effort 语义时，优先扩展 callbacks，而不是在组件中硬编码 backend kind。
 - `.opencodian-effort-label` 与 `.opencodian-effort-boundary-hint` 不再渲染；`.opencodian-effort-current` 是主 tooltip trigger，`.opencodian-effort-gear` 每一项也有独立 tooltip，鼠标在弹出菜单内移动时 tooltip 文案会随 hover 项更新，而不是停留在父级说明。
+- tooltip 回归测试必须从真实 `EffortSelector` DOM seam 检查每个 `.opencodian-tooltip-trigger[data-tooltip]` 的祖先链，确保不存在 Obsidian 会接管的 `[aria-label]` / `[title]` owner，并验证当前 control 的 hidden accessible carrier 与 `aria-labelledby` 保持同步。
 - 每次 variants 更新并重建 options DOM 时必须重建浮层控制器；destroy 时断开 observer，避免继续持有旧菜单节点。

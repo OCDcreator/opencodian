@@ -178,6 +178,50 @@ describe('SessionTodoStateService stale suppression', () => {
 });
 
 describe('SessionTodoStateService stale notices', () => {
+  it('passes the activation lease through status writeback before scheduling a stale notice', async () => {
+    const runtime = createStaleIncompleteRuntime();
+    runtime.sessionStatus = { type: 'idle' };
+    const conversation = createConversation();
+    const { service, appendPersistentAssistantNoticeMessage } = createFixture({
+      runtime,
+      conversation,
+    });
+    let current = true;
+
+    service.setTabSessionStatus(
+      'tab-1',
+      { type: 'idle' },
+      'session-1',
+      { isCurrent: () => current },
+    );
+    current = false;
+    await flushPendingNoticeTasks();
+
+    expect(appendPersistentAssistantNoticeMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ isCurrent: expect.any(Function) }),
+    );
+    expect(appendPersistentAssistantNoticeMessage.mock.calls[0]?.[0].isCurrent?.()).toBe(false);
+  });
+
+  it('does not append a stale notice after the activation lease switches conversations', async () => {
+    const runtime = createStaleIncompleteRuntime();
+    const conversation = createConversation();
+    const { service, appendPersistentAssistantNoticeMessage } = createFixture({
+      runtime,
+      conversation,
+    });
+    let current = true;
+
+    service.reconcileStaleSessionTodoState('tab-1', { isCurrent: () => current });
+    current = false;
+    await flushPendingNoticeTasks();
+
+    expect(appendPersistentAssistantNoticeMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ isCurrent: expect.any(Function) }),
+    );
+    expect(appendPersistentAssistantNoticeMessage.mock.calls[0]?.[0].isCurrent?.()).toBe(false);
+  });
+
   it('appends a stale notice after suppressing a stale snapshot', async () => {
     const runtime = createStaleIncompleteRuntime();
     const conversation = createConversation();

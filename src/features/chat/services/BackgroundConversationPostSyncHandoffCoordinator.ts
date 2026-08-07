@@ -23,6 +23,8 @@ interface BackgroundTaskPostSyncBaseOptions {
   conversation: Conversation;
   previousFingerprint: string;
   syncResult: BackgroundTaskPostSyncResult;
+  /** Captured target-tab/conversation lease; stale async refreshes must not write back. */
+  isCurrent?: () => boolean;
 }
 
 export interface SignalBackgroundTaskPostSyncOptions extends BackgroundTaskPostSyncBaseOptions {
@@ -49,7 +51,11 @@ export class BackgroundConversationPostSyncHandoffCoordinator {
       tabId: options.tabId,
       conversation: options.conversation,
       tabHasBackgroundTask: options.tabHasBackgroundTask,
+      isCurrent: options.isCurrent,
     });
+    if (options.isCurrent && !options.isCurrent()) {
+      return;
+    }
     if (!this.didConversationChange(options.syncResult, options.previousFingerprint)) {
       return;
     }
@@ -63,7 +69,11 @@ export class BackgroundConversationPostSyncHandoffCoordinator {
     await this.backgroundConversationPostSyncRefresh.refreshBackgroundTabConversation({
       tabId: options.tabId,
       conversation: options.conversation,
+      isCurrent: options.isCurrent,
     });
+    if (options.isCurrent && !options.isCurrent()) {
+      return;
+    }
     if (!this.didConversationChange(options.syncResult, options.previousFingerprint)) {
       return;
     }

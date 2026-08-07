@@ -475,7 +475,10 @@ export class BackgroundTaskTimelineService {
 export interface BackgroundTaskViewHost {
   resetBackgroundTaskIndicator(tabId?: TabId | null): void;
   syncBackgroundTaskStateFromConversation(conversation: Conversation, tabId?: TabId | null): void;
-  renderBackgroundTaskIndicatorIfNeeded(tabId?: TabId | null): Promise<void>;
+  renderBackgroundTaskIndicatorIfNeeded(
+    tabId?: TabId | null,
+    options?: { isCurrent?: () => boolean },
+  ): Promise<void>;
   armBackgroundTaskIndicatorForUserMessage(message: ChatMessage, tabId: TabId | null): void;
   logOmoBackgroundTaskDiagnostics(
     conversation: Conversation,
@@ -487,7 +490,7 @@ export interface BackgroundTaskViewHost {
 export interface BackgroundTaskViewHostDependencies {
   timelineService: BackgroundTaskTimelineService;
   indicatorRenderPort: {
-    renderIfNeeded(tabId?: TabId | null): Promise<void>;
+    renderIfNeeded(tabId?: TabId | null, options?: { isCurrent?: () => boolean }): Promise<void>;
   };
 }
 
@@ -501,8 +504,9 @@ export function createBackgroundTaskViewHost(
     syncBackgroundTaskStateFromConversation: (conversation, tabId) => {
       dependencies.timelineService.syncStateFromConversation(conversation, tabId);
     },
-    renderBackgroundTaskIndicatorIfNeeded: (tabId) =>
-      dependencies.indicatorRenderPort.renderIfNeeded(tabId),
+    renderBackgroundTaskIndicatorIfNeeded: (tabId, options) => options
+      ? dependencies.indicatorRenderPort.renderIfNeeded(tabId, options)
+      : dependencies.indicatorRenderPort.renderIfNeeded(tabId),
     armBackgroundTaskIndicatorForUserMessage: (message, tabId) => {
       dependencies.timelineService.armIndicatorForUserMessage(message, tabId);
     },

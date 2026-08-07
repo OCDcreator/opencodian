@@ -13,13 +13,14 @@
 - conversation 全量重渲
 - synced message 的 append-only 增量渲染
 - 尾部 assistant render patch
-- 无法安全增量时回退 full rerender
+- 无法安全增量时先按稳定 message identity 做 keyed reconcile，再回退 full rerender
 - canonical session graph 到 turn view-model 的 render input seam
 
 它不持有聊天视图的 DOM 根状态，也不直接依赖插件实例；所有真实渲染、scroll runtime、background-task UI 和调试日志都通过 `ConversationRenderHost` 回调回到 `OpenCodianView`。其中 persisted assistant shell / pseudo-stream footer / streaming-shell state 收尾由嵌套的 `ConversationAssistantShellRenderPort` 提供，assistant tail 相关的正文签名、正文重渲与 persisted footer 收尾则进一步收束在 `ConversationAssistantTailRenderPort`。canonical session graph 的读取与 OpenCode message hydration 则通过可选的 `ConversationCanonicalRenderSource` 注入，避免 render host 继续扩大。
 
 基础 render contract、消息/伪流式 assistant 渲染 delegate 与 synced append apply delegate 已拆到 `ConversationRenderRuntime`；尾部 assistant patch 的 tab/container、rendered sequence、signature 与 DOM target preflight 已拆到 `ConversationTrailingAssistantPatchPlanner`。canonical turn 组装与 canonical render input 投影都由 `ConversationTurnViewModelBuilder` 承接，`ConversationRenderService` 本身因此只保留 full rerender、synced update 输入选择与 trailing-assistant patch execution/logging 这些高层控制流。full rerender 的 canonical source lookup 现在通过 `getConversationBackendSessionId()` 解析 session id；缺失 backend session 时回退 persisted `Conversation.messages`。`resolveConversationRenderMessages()` 对非 OpenCode 后端有显式 `backend !== 'opencode'` 提前返回，完全跳过 canonical state 路径（`getCanonicalSessionState` / `hydrateOpenCodeMessage` 是 OpenCode 专有概念），而不依赖隐式 null 安全。
 - rerender 的 debug log（`rerender-conversation-messages-start` / `rerender-conversation-messages-complete`）中的 `sessionId` 字段同样通过 `getConversationBackendSessionId()` 解析。
+- full hydration 先在 detached staging root 渲染；deferred markdown 期间 live pane 保持原 DOM，不会出现清空或逐条长出。只有 conversation/tab/container/generation ownership 仍有效时才一次性替换 children；失效 pass 丢弃 staging tree，不执行 clear/commit。scroll snapshot、background indicator、turn reset 与 hydration lifecycle 仍沿用原 contract。
 
 ## 公开接口
 
@@ -104,7 +105,10 @@ export interface ConversationCanonicalRenderSource {
 
 export class ConversationRenderService {
   renderMessage(message: ChatMessage): Promise<HTMLElement | void | undefined>;
-  renderMessages(messages: ChatMessage[]): Promise<void>;
+  renderMessages(
+    messages: ChatMessage[],
+    options?: ConversationRenderMessagesOptions,
+  ): Promise<void>;
   rerenderSingleUserMessage(
     previousMessageId: string,
     message: ChatMessage,
@@ -158,11 +162,12 @@ export class ConversationRenderService {
 
 ### 全量重渲
 
+- full rerender 现在经 `rerenderQueue` + `rerenderGeneration` 串行化：并发调用方（设置开关、sync fallback）不会交错 `clear + append` 过程；排队期间被更新请求 supersede 的旧请求直接跳过，同 tick 的重复请求合并为一次重建；链路用 `catch` 保持不断，单次失败不阻塞后续请求
 - 只在当前活动 conversation 仍匹配、且消息容器存在时执行
 - 如果当前 session 已有 canonical state，会直接调用 `ConversationTurnViewModelBuilder.buildCanonicalRenderInput()` 生成稳定的 canonical render `ChatMessage[]`
 - canonical state 一旦可用，就作为 assistant/user truth；通过 `ConversationCanonicalRenderSource.getLocalTurnDiffNotices()` 只追加冻结、按 `noticeMeta.sourceMessageId` 去重的本地 turn diff cards，其他 generic client-only notice 不会被放宽保留
 - canonical read path 仍保持 lazy fallback；local turn diff callback 独立读取持久化 notice，避免把本地 card 当成 canonical message 或写入顶层 source identity
-- 进入 hydration 前先抓取 scroll snapshot，并复用 `ScrollManager` 恢复 bottom / distance / anchor 语义
+- 进入 hydration 前先抓取 scroll snapshot，并复用 `ScrollManager` 恢复 bottom / distance / anchor 语义；恢复前经 `resolveEffectiveScrollRestoreSnapshot()` 以 live `autoScrollEnabled` 修正快照（重渲期间的用户滚动意图优先于捕获时的 stick-to-bottom），并带 `lateContentReapplyWindowMs`（1500ms）：anchor 模式下监听容器内 load 事件重放 anchor 位置，用户滚动接管即提前 dispose
 - 重渲后继续刷新 background-task indicator、pane metrics 和 composer layout
 
 ### 增量同步
@@ -172,6 +177,7 @@ export class ConversationRenderService {
 - append-only 时只渲染新增消息，不重跑整段历史
 - 纯文本 assistant append 继续直接在 service 内走 pseudo-stream reveal，而不是回到 view 再分支
 - synced update 的“增量判断 → optional tail patch → append render → indicator/scroll follow-up”现在由 `ConversationRenderRuntime` 的 apply delegate 串起来，service 公开入口只保留高层委托与 full-rerender fallback
+- incremental 判定为 `null` 时，apply delegate 先尝试 `ConversationKeyedReconcileDelegate.tryApply()`：未变化的消息保留 DOM node identity 与折叠状态，只有新增/变化/移除/重排触及 DOM；reconcile 返回 `false` 才执行 full rerender
 
 ### 尾部 assistant patch
 

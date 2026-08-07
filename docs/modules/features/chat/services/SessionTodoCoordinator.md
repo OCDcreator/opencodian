@@ -53,6 +53,8 @@ export class SessionTodoCoordinator {
 
 ## 关键行为
 
+- status/todo refresh 可携带 post-sync `isCurrent` lease；网络返回后 lease 失效时跳过 runtime、notice、reconcile 与 dock 写回。
+
 - `refreshTabSessionTodos()` / `refreshTabSessionStatus()` 继续拥有 request-id stale guard，并在 refresh 成功后触发 foreground background-task reconcile。这两个方法现在有显式 backend gate：如果 `conversation.backend` 不是 `'opencode'`，`refreshTabSessionTodos()` 会跳过 OpenCode-only 的 `getSessionTodos()` 调用，`refreshTabSessionStatus()` 会跳过 OpenCode-only 的 `getSessionStatuses()` 调用，并提前返回空结果
 - Claude Code session todo 仍纯粹来自 stream tool call：`BackgroundTaskStreamTriggerCoordinator` / view pipeline 把工具输入交给 `applyStreamingTodoSnapshotFromTool()`，再写入同一套 per-tab todo state；不会为 Claude Code 调用 OpenCode server session todo API。该入口现在分流两条路径：OpenCode `TodoWrite` 继续使用 snapshot model，Claude Code `TaskCreate` / `TaskUpdate` 等 Task* 工具使用 incremental CRUD model
 - Claude Code 的 Task* path 由 `claudeTaskSessionStates` 维护**按 backend sessionId 隔离**的增量 task 状态（不是 coordinator 全局单一 Map）。每个 session 拥有独立的 `tasks: Map<string, SessionTodo>`。`TaskCreate` 只在 tool result `status === 'completed'` 时落地，优先从 `Task #N created successfully: subject` 解析 task id / subject，并创建 `{ id: taskId, content: subject, status: 'pending' }`；`TaskUpdate` 更新已存在 todo 的 `in_progress` / `completed` 状态，也可同步 subject。result-string parsing 较脆弱，解析失败时回落到从 tool call ID 派生的 synthetic ID（`tc_` 前缀），保证永不与真实数字 task ID 冲突

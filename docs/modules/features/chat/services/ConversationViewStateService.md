@@ -57,6 +57,8 @@ export class ConversationViewStateService {
 
 ### conversation hydration
 
+- `loadConversation()` 现在按 tab 固定目标并维护 per-tab load generation：请求开始时 pin 住当时的 active tab 并 bump 该 tab 的 generation；在关键 await 之后、activation 之前、逐条渲染之前（经 `shouldContinueRender`）、scroll restore 之前与 hydration tail 之前都校验 generation 与 active tab 身份，过期装载立即返回（已进入 hydration shell 的分支走 `abortLoadedConversationTransition()` 释放 rehydrating class），绝不采用后来变化的 activeTabId，也不会往新 tab activate/render/restore
+- streaming conversation 的 resolve 之后同样先确认 active tab 未切走再进入 streaming activation
 - 切换前先通过 `ConversationTransitionBridge` 处理旧 conversation 的标题生成与背景任务指示器清理
 - loaded conversation 的 resolve / reload retry 与是否触发 `load-conversation` server sync，现在先委托给 `ConversationLoadRuntimeBridge`
 - 装载时仍保留 hydration lifecycle 的 `finally` 保护，但 begin/end shell 已通过 `ConversationTransitionBridge` 收束

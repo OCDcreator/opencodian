@@ -12,16 +12,22 @@ import {
   getTurnDiffNoticeMeta,
 } from '../../../core/types';
 import { TooltipLayerController } from '../../../shared/TooltipLayerController';
+import { disposeCollapsiblesWithin } from '../rendering/collapsible';
 import { summarizeChatMessageForDebug } from '../runtime/SendPipelineDebugSummaries';
 import type { UserMessageContentRenderer } from '../runtime/UserMessageContentRenderer';
 import type { TabId } from '../tabs';
+import { ConversationKeyedReconcileDelegate } from './ConversationKeyedReconcileDelegate';
 import {
+  beginConversationRenderSurfacePass,
   type ConversationAssistantShellRenderPort,
   type ConversationAssistantTailRenderPort,
   ConversationMessageRenderDelegate,
   type ConversationRenderHost,
+  type ConversationRenderMessagesOptions,
   type ConversationRenderRuntimeState,
   ConversationSyncedUpdateApplyDelegate,
+  getConversationRenderSurfaceGeneration,
+  markHydrationSettledMessages,
 } from './ConversationRenderRuntime';
 import {
   type TrailingAssistantPatchPlanningContext,
@@ -29,8 +35,12 @@ import {
 } from './ConversationTrailingAssistantPatchPlanner';
 import { ConversationTurnViewModelBuilder } from './ConversationTurnViewModelBuilder';
 import {
+  bumpPaneRenderSurfaceGeneration,
   captureElementScrollRestoreSnapshot,
+  getPaneRenderSurfaceGeneration,
   isElementNearBottom,
+  LATE_CONTENT_SCROLL_REAPPLY_WINDOW_MS,
+  resolveEffectiveScrollRestoreSnapshot,
   restoreElementScrollAfterRender,
   type ScrollRuntimeState,
 } from './ScrollManager';
@@ -55,6 +65,7 @@ export type {
   ConversationAssistantShellRenderPort,
   ConversationAssistantTailRenderPort,
   ConversationRenderHost,
+  ConversationRenderMessagesOptions,
   ConversationRenderRuntimeState,
   ConversationUserMessageRenderFrame,
   IncrementalRenderedMessageUpdate,
@@ -87,7 +98,10 @@ export interface ConversationRenderHostDependencies {
   userMessageContentRenderer: UserMessageContentRenderer;
   addUserMessageFooter(messageEl: HTMLElement, message: ChatMessage, content?: string): void;
   renderMarkdownInto(container: HTMLElement, markdown: string): Promise<void>;
-  renderBackgroundTaskIndicatorIfNeeded(tabId?: TabId | null): Promise<void>;
+  renderBackgroundTaskIndicatorIfNeeded(
+    tabId?: TabId | null,
+    options?: { isCurrent?: () => boolean },
+  ): Promise<void>;
   syncBackgroundTaskStateFromConversation(conversation: Conversation): void;
   shouldAutoScroll(tabId?: TabId | null): boolean;
   scrollToBottom(options?: { tabId?: TabId | null }): void;
@@ -168,7 +182,10 @@ export function createConversationRenderHost(
     },
     renderMarkdownInto: (container, markdown) =>
       deps.renderMarkdownInto(container, markdown),
-    renderBackgroundTaskIndicatorIfNeeded: (tabId) => deps.renderBackgroundTaskIndicatorIfNeeded(tabId),
+    renderBackgroundTaskIndicatorIfNeeded: (tabId, options) =>
+      options
+        ? deps.renderBackgroundTaskIndicatorIfNeeded(tabId, options)
+        : deps.renderBackgroundTaskIndicatorIfNeeded(tabId),
     syncBackgroundTaskStateFromConversation: (conversation) => {
       deps.syncBackgroundTaskStateFromConversation(conversation);
     },
@@ -199,6 +216,14 @@ export class ConversationRenderService {
   private readonly syncedUpdateApplier: ConversationSyncedUpdateApplyDelegate;
   private readonly trailingAssistantPatchPlanner: TrailingAssistantPatchPlanningDelegate;
   private readonly turnViewModelBuilder = new ConversationTurnViewModelBuilder();
+  /**
+   * Full rerenders are serialized so concurrent callers (settings toggles,
+   * sync fallbacks) can never interleave `clear + append` passes. A newer
+   * request supersedes a still-queued older one, which collapses same-tick
+   * duplicate requests into a single rebuild.
+   */
+  private rerenderQueue: Promise<void> = Promise.resolve();
+  private rerenderGeneration = 0;
 
   constructor(
     private readonly host: ConversationRenderHost,
@@ -215,6 +240,7 @@ export class ConversationRenderService {
         rerenderConversationMessages: (conversation) =>
           this.rerenderConversationMessages(conversation),
       },
+      new ConversationKeyedReconcileDelegate(host, this.messageRenderer),
     );
   }
 
@@ -222,8 +248,33 @@ export class ConversationRenderService {
     return this.messageRenderer.renderMessage(message);
   }
 
-  async renderMessages(messages: ChatMessage[]): Promise<void> {
-    await this.messageRenderer.renderMessages(messages);
+  async renderMessages(
+    messages: ChatMessage[],
+    options: ConversationRenderMessagesOptions = {},
+  ): Promise<void> {
+    const surfaceGeneration = beginConversationRenderSurfacePass(this.host);
+    const messagesEl = this.host.getMessagesContainer();
+    const paneSurfaceGeneration = bumpPaneRenderSurfaceGeneration(messagesEl);
+    if (Object.prototype.hasOwnProperty.call(options, 'stagingContainer')) {
+      this.messageRenderer.setStagingContainer(options.stagingContainer ?? null);
+    }
+    try {
+      await this.messageRenderer.renderMessages(messages, {
+        ...options,
+        shouldContinueRender: () =>
+          (!options.shouldContinueRender || options.shouldContinueRender())
+          && getConversationRenderSurfaceGeneration(this.host) === surfaceGeneration
+          && getPaneRenderSurfaceGeneration(messagesEl) === paneSurfaceGeneration,
+      });
+    } finally {
+      if (Object.prototype.hasOwnProperty.call(options, 'stagingContainer')) {
+        this.messageRenderer.setStagingContainer(null);
+        const runtime = this.host.getRenderRuntimeForTab(this.host.getActiveTabId());
+        if (runtime?.stagedTurnBodyEl && options.stagingContainer?.contains(runtime.stagedTurnBodyEl)) {
+          runtime.stagedTurnBodyEl = null;
+        }
+      }
+    }
   }
 
   async rerenderSingleUserMessage(
@@ -234,6 +285,20 @@ export class ConversationRenderService {
   }
 
   async rerenderConversationMessages(conversation: Conversation): Promise<void> {
+    const generation = ++this.rerenderGeneration;
+    const queued = this.rerenderQueue.then(async () => {
+      if (generation !== this.rerenderGeneration) {
+        // A newer rerender request superseded this one while it was queued.
+        return;
+      }
+      await this.performRerenderConversationMessages(conversation);
+    });
+    // Keep the chain alive for later requests even when this pass rejects.
+    this.rerenderQueue = queued.catch(() => {});
+    return queued;
+  }
+
+  private async performRerenderConversationMessages(conversation: Conversation): Promise<void> {
     const currentConversation = this.host.getCurrentConversation();
     const messagesEl = this.host.getMessagesContainer();
     if (!currentConversation || currentConversation.id !== conversation.id || !messagesEl) {
@@ -252,6 +317,10 @@ export class ConversationRenderService {
     });
 
     const activeTabId = this.host.getActiveTabId();
+    const renderGeneration = this.rerenderGeneration;
+    const surfaceGeneration = getConversationRenderSurfaceGeneration(this.host) + 1;
+    // renderMessages() owns the pane-generation bump for this pass.
+    const paneSurfaceGeneration = getPaneRenderSurfaceGeneration(messagesEl);
     const runtime = this.host.getScrollRuntimeForTab(activeTabId);
     const shouldStickToBottom = runtime?.autoScrollEnabled ?? isElementNearBottom(messagesEl);
     const previousScrollTop = messagesEl.scrollTop;
@@ -264,14 +333,59 @@ export class ConversationRenderService {
 
     this.host.clearScheduledScrollToBottom();
     messagesEl.classList.add('is-rehydrating');
-    this.host.clearMessagesContainer();
     this.host.resetTurnState();
+    const stagedMessagesEl = document.createElement('div');
+    this.messageRenderer.setStagingContainer(stagedMessagesEl);
 
     try {
-      await this.renderMessages(resolvedMessages);
-      await this.host.renderBackgroundTaskIndicatorIfNeeded();
-      restoreElementScrollAfterRender(messagesEl, scrollSnapshot, {
-        runtime: this.host.getScrollRuntimeForTab(activeTabId),
+      await this.renderMessages(resolvedMessages, {
+        shouldContinueRender: () => this.isRenderOwner(
+          conversation.id,
+          activeTabId,
+          messagesEl,
+          renderGeneration,
+        )
+          && getConversationRenderSurfaceGeneration(this.host) === surfaceGeneration
+          && getPaneRenderSurfaceGeneration(messagesEl) >= paneSurfaceGeneration,
+      });
+      this.messageRenderer.setStagingContainer(null);
+      if (!this.isRenderOwner(conversation.id, activeTabId, messagesEl, renderGeneration)
+        || getConversationRenderSurfaceGeneration(this.host) !== surfaceGeneration
+        || getPaneRenderSurfaceGeneration(messagesEl) <= paneSurfaceGeneration) {
+        return;
+      }
+      disposeCollapsiblesWithin(messagesEl);
+      this.host.clearMessagesContainer();
+      messagesEl.append(...Array.from(stagedMessagesEl.childNodes));
+      await this.host.renderBackgroundTaskIndicatorIfNeeded(activeTabId, {
+        isCurrent: () => this.isRenderOwner(conversation.id, activeTabId, messagesEl, renderGeneration)
+          && getConversationRenderSurfaceGeneration(this.host) === surfaceGeneration
+          && getPaneRenderSurfaceGeneration(messagesEl) > paneSurfaceGeneration,
+      });
+      if (!this.isRenderOwner(conversation.id, activeTabId, messagesEl, renderGeneration)
+        || getConversationRenderSurfaceGeneration(this.host) !== surfaceGeneration
+        || getPaneRenderSurfaceGeneration(messagesEl) <= paneSurfaceGeneration) {
+        return;
+      }
+      const restoreRuntime = this.host.getScrollRuntimeForTab(activeTabId);
+      const effectiveSnapshot = resolveEffectiveScrollRestoreSnapshot(messagesEl, scrollSnapshot, {
+        preserveScrollPosition: true,
+        // The live auto-scroll state reflects any user scrolling that happened
+        // while the rerender was in flight; it wins over the capture-time one.
+        stickToBottom: restoreRuntime?.autoScrollEnabled ?? shouldStickToBottom,
+        userScrollIntent: restoreRuntime?.userScrollIntentDuringHydration,
+      });
+      restoreElementScrollAfterRender(messagesEl, effectiveSnapshot, {
+        runtime: restoreRuntime,
+        lateContentReapplyWindowMs: LATE_CONTENT_SCROLL_REAPPLY_WINDOW_MS,
+        isRestoreCurrent: () => this.isRenderOwner(
+          conversation.id,
+          activeTabId,
+          messagesEl,
+          renderGeneration,
+        )
+          && getConversationRenderSurfaceGeneration(this.host) === surfaceGeneration
+          && getPaneRenderSurfaceGeneration(messagesEl) > paneSurfaceGeneration,
         onRestoreBottom: () => {
           this.host.scrollToBottom({ tabId: activeTabId });
         },
@@ -280,11 +394,21 @@ export class ConversationRenderService {
         },
       });
       this.host.scheduleComposerLayoutSync();
+      markHydrationSettledMessages(messagesEl);
 
       this.host.requestAnimationFrame(() => {
-        messagesEl.classList.remove('is-rehydrating');
+        if (
+          this.rerenderGeneration === renderGeneration
+          && this.isRenderOwner(conversation.id, activeTabId, messagesEl)
+          && getConversationRenderSurfaceGeneration(this.host) === surfaceGeneration
+          && getPaneRenderSurfaceGeneration(messagesEl) > paneSurfaceGeneration
+          && (this.host.getScrollRuntimeForTab(activeTabId)?.hydrationDepth ?? 0) <= 0
+        ) {
+          messagesEl.classList.remove('is-rehydrating');
+        }
       });
     } finally {
+      this.messageRenderer.setStagingContainer(null);
       this.host.endConversationHydration(activeTabId);
     }
 
@@ -294,6 +418,18 @@ export class ConversationRenderService {
       shouldStickToBottom,
       previousScrollTop,
     });
+  }
+
+  private isRenderOwner(
+    conversationId: string,
+    tabId: TabId | null,
+    messagesEl: HTMLElement,
+    generation = this.rerenderGeneration,
+  ): boolean {
+    return this.rerenderGeneration === generation
+      && this.host.getMessagesContainer() === messagesEl
+      && this.host.getActiveTabId() === tabId
+      && this.host.getCurrentConversation()?.id === conversationId;
   }
 
   async applySyncedConversationUpdate(
@@ -340,10 +476,24 @@ export class ConversationRenderService {
     }
     const successPlan = this.buildTrailingAssistantPatchSuccessPlan(preflight.planningContext);
 
+    const surfaceGeneration = getConversationRenderSurfaceGeneration(this.host);
+    const messagesEl = this.host.getMessagesContainer();
+    const paneSurfaceGeneration = getPaneRenderSurfaceGeneration(messagesEl);
+    const canContinue = (): boolean =>
+      getConversationRenderSurfaceGeneration(this.host) === surfaceGeneration
+      && getPaneRenderSurfaceGeneration(messagesEl) === paneSurfaceGeneration
+      && this.host.getMessagesContainer() === messagesEl
+      && this.host.getActiveTabId() === tabId;
+    let patchApplied = false;
     await withTrailingAssistantTurnBodyScope(successPlan.turnBodyScopePlan, async () => {
-      await this.executeTrailingAssistantPatch(successPlan.executionPlan);
-      applyTrailingAssistantPatchTailState(successPlan.tailStatePlan, tabId, this.host);
+      patchApplied = await this.executeTrailingAssistantPatch(successPlan.executionPlan, canContinue);
+      if (patchApplied && canContinue()) {
+        applyTrailingAssistantPatchTailState(successPlan.tailStatePlan, tabId, this.host);
+      }
     });
+    if (!patchApplied || !canContinue()) {
+      return false;
+    }
 
     const completionDebugLoggingContext =
       buildTrailingAssistantPatchCompletionDebugLoggingContext(
@@ -371,13 +521,17 @@ export class ConversationRenderService {
 
   private async executeTrailingAssistantPatch(
     executionPlan: TrailingAssistantPatchExecutionPlan,
-  ): Promise<void> {
+    canContinue: () => boolean,
+  ): Promise<boolean> {
+    if (!canContinue()) {
+      return false;
+    }
     if (executionPlan.kind === 'finalize-footer') {
       this.host.assistantTailRender.finalizePersistedFooter(
         executionPlan.messageEl,
         executionPlan.nextTailMessage,
       );
-      return;
+      return canContinue();
     }
 
     executionPlan.contentEl.replaceChildren();
@@ -385,6 +539,7 @@ export class ConversationRenderService {
       executionPlan.contentEl,
       executionPlan.nextTailMessage,
     );
+    return canContinue();
   }
 
   private resolveConversationRenderMessages(

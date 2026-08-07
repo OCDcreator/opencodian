@@ -27,9 +27,10 @@
 
 与旧文档不同，现在文本不是每来一段就立刻完整重渲。控制器维护了：
 
-- `STREAMING_MARKDOWN_RENDER_MIN_INTERVAL_MS = 96`
+- `STREAMING_MARKDOWN_RENDER_MIN_INTERVAL_MS = 96`（从 `MarkdownRenderScheduler` 导入的共享常量，不再私有定义）
 - `textRenderRequested`
 - `textRenderInFlight`
+- `textRenderGeneration`（每次取消或重启时递增，用于丢弃已经脱离当前流的旧 Promise 完成结果）
 - `lastTextRenderAt`
 - `lastRenderedTextContent`
 
@@ -38,7 +39,7 @@
 - 降低 streaming markdown 反复重排导致的抖动
 - 避免在收尾阶段重复渲染完全相同的文本
 
-`renderMarkdownText()` 还会临时设置 `min-height`，用来减少重绘时的布局跳动。
+`renderMarkdownText()` 会先渲染到脱离文档树的 staging element，再在 generation 仍然有效时提交到目标节点；这样取消或重启后的旧 Promise 不会写回旧 DOM，也不会覆盖新的 `last*` 状态或触发滚动。它还会临时设置 `min-height`，用来减少重绘时的布局跳动；过期 generation 不会清理新一代渲染设置的 shell 高度。
 
 ### chunk 路由
 
@@ -105,6 +106,7 @@ tool call 不再只是“收到结果时 append 一次”那么简单。控制�
 
 - `OpenCodianView`: 创建并持有控制器，把服务层 chunk 映射到这里
 - `MarkdownRenderService`: 渲染 streaming text 和历史 text block
+- `MarkdownRenderScheduler`: 提供共享渲染间隔常量；thinking chunk 的全文重渲经 `ThinkingBlockRenderer` 内部 per-state scheduler 帧预算调度
 - `ThinkingBlockRenderer`: 管理 thinking block 的创建、展开和 duration 更新
 - `ToolCallRenderer`: 管理 tool call 卡片 UI
 - `shared.isInternalStructuredOutputTool()`: 过滤内部结构化输出工具

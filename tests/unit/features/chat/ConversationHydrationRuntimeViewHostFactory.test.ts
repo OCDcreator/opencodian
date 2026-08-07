@@ -1,3 +1,4 @@
+import * as collapsible from '../../../../src/features/chat/rendering/collapsible';
 import { ConversationHydrationOutcomeBridge } from '../../../../src/features/chat/runtime/ConversationHydrationOutcomeBridge';
 import { ConversationHydrationRenderBridge } from '../../../../src/features/chat/runtime/ConversationHydrationRenderBridge';
 import { ConversationTransitionBridge } from '../../../../src/features/chat/runtime/ConversationTransitionBridge';
@@ -75,6 +76,25 @@ describe('ConversationHydrationRuntimeViewHostFactory', () => {
     jest.clearAllMocks();
   });
 
+  it('disposes live collapsibles before activation staging commit', () => {
+    const fixture = createFixture();
+    const { conversationHydrationRenderBridgeHost } =
+      createConversationHydrationRuntimeViewHosts(fixture.host);
+    const messagesEl = document.createElement('div');
+    const old = document.createElement('div');
+    old.className = 'opencodian-collapsible';
+    messagesEl.appendChild(old);
+    const stagingEl = document.createElement('div');
+    stagingEl.appendChild(document.createElement('span'));
+    const disposeSpy = jest.spyOn(collapsible, 'disposeCollapsiblesWithin');
+
+    conversationHydrationRenderBridgeHost.commitHydrationStaging(messagesEl, stagingEl);
+
+    expect(disposeSpy).toHaveBeenCalledWith(messagesEl);
+    expect(messagesEl.querySelector('.opencodian-collapsible')).toBeNull();
+    expect(messagesEl.children).toHaveLength(1);
+  });
+
   it('derives hydration and transition hosts from the flattened view seam', async () => {
     const fixture = createFixture();
     const {
@@ -137,7 +157,7 @@ describe('ConversationHydrationRuntimeViewHostFactory', () => {
     expect(fixture.host.endConversationHydration).toHaveBeenCalledWith('tab-active');
     expect(fixture.host.syncBackgroundTaskStateFromConversation)
       .toHaveBeenCalledWith(conversation);
-    expect(fixture.host.renderMessages).toHaveBeenCalledWith(messages);
+    expect(fixture.host.renderMessages).toHaveBeenCalledWith(messages, undefined);
   });
 
   it('keeps the flattened seam late-bound to the latest hydration collaborators', async () => {
@@ -177,7 +197,7 @@ describe('ConversationHydrationRuntimeViewHostFactory', () => {
     expect(fixture.host.requestAnimationFrame).toHaveBeenCalledTimes(1);
     expect(fixture.host.getCurrentConversation).toHaveBeenCalledTimes(1);
     expect(fixture.host.clearMessagesContainer).toHaveBeenCalledTimes(1);
-    expect(fixture.host.renderMessages).toHaveBeenCalledWith([]);
+    expect(fixture.host.renderMessages).toHaveBeenCalledWith([], undefined);
   });
 
   it('packages hydration bridge construction from the same flattened view seam', () => {

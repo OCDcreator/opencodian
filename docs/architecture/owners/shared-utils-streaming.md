@@ -29,6 +29,9 @@
 ## Required gates
 Run before merge: `npm run typecheck`, `npm run module-docs`.
 
+## Recent change notes
+- **Streaming markdown frame budget:** `MarkdownRenderScheduler` coalesces cumulative markdown re-renders into a shared minimum interval (`STREAMING_MARKDOWN_RENDER_MIN_INTERVAL_MS = 96`): leading-edge render, at most one trailing render per interval, `flush()` at stream boundaries, `cancel()` on teardown. `StreamController`, `ThinkingBlockRenderer` (per-state schedulers via WeakMap) and the chat pseudo-stream reveal render through it instead of re-rendering full markdown per chunk.
+
 ## Hard invariants
 - Do not cross `forbiddenDependencies`.
 - Do not replicate canonical state in another owner.

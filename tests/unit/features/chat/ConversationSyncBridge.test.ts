@@ -1,3 +1,5 @@
+/* eslint-disable max-lines -- Bridge scenarios intentionally stay co-located with their shared host fixture. */
+
 import type {
   ChatMessage,
   Conversation,
@@ -68,7 +70,9 @@ function createHost(options?: {
   };
 }
 
-function createRuntimeCoordinator(): Mocked<ConversationSyncBridgeRuntimeCoordinator> {
+function createRuntimeCoordinator(options?: {
+  isVisibleConversationCurrent?: boolean;
+}): Mocked<ConversationSyncBridgeRuntimeCoordinator> {
   return {
     runVisibleConversationSync: jest.fn(async (conversation, callback) => {
       if (!conversation) {
@@ -81,6 +85,9 @@ function createRuntimeCoordinator(): Mocked<ConversationSyncBridgeRuntimeCoordin
       });
       return true;
     }),
+    isVisibleConversationCurrent: jest.fn().mockReturnValue(
+      options?.isVisibleConversationCurrent ?? true,
+    ),
   };
 }
 
@@ -233,6 +240,35 @@ describe('ConversationSyncBridge', () => {
         fingerprint: 'visible-fallback',
       }),
     });
+  });
+
+  it('drops a visible sync result when the active tab changed during the awaited sync', async () => {
+    const conversation = createConversation('visible-stale');
+    const host = createHost({
+      currentConversation: conversation,
+      syncResult: createSyncResult(conversation),
+    });
+    const runtimeCoordinator = createRuntimeCoordinator({
+      isVisibleConversationCurrent: false,
+    });
+    const orchestration = createOrchestration();
+    const visiblePostSyncRouter = createVisiblePostSyncRouter();
+    const backgroundPostSyncRouter = createBackgroundPostSyncRouter();
+    const bridge = new ConversationSyncBridge({
+      host,
+      runtimeCoordinator,
+      orchestrationService: orchestration,
+      visiblePostSyncRouter,
+      backgroundPostSyncRouter,
+    });
+
+    await bridge.syncVisibleConversationInBackground();
+
+    expect(runtimeCoordinator.isVisibleConversationCurrent).toHaveBeenCalledWith({
+      tabId: 'tab-active',
+      conversation,
+    });
+    expect(visiblePostSyncRouter.routeVisibleSyncComplete).not.toHaveBeenCalled();
   });
 
   it('ignores session.diff as message sync input', async () => {

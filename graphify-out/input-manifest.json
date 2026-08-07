@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "digest": "ab83e49e40e36dc07ab0b1cf494c416769a6a612fc1b93f6dc150745b535c427",
-  "recordCount": 602,
+  "digest": "52578b376c7e75b2e9f180e9928620da5ce2e359d9d97a15a8528f4a7a28e1b1",
+  "recordCount": 605,
   "records": [
     {
       "kind": "ignore",
@@ -861,7 +861,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/OpenCodianView.ts",
-      "sha256": "aa7b0043d24ec46d6f29220734a2e0bcf836d538088c7a2dc1aa05510fe6114d"
+      "sha256": "a365b203aee9de572212a2822cfe34eebb46551334a860c247678f81c9aec692"
     },
     {
       "kind": "src",
@@ -871,7 +871,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/rendering/collapsible.ts",
-      "sha256": "80e1ffdb0cd5d5ce7dc419d794e259c41ce43336b11997708231466647f47f0d"
+      "sha256": "5f4ba794b797f4bcaf77e46c1f743392dbfe090bcc23f9717743a6b07f72eab9"
     },
     {
       "kind": "src",
@@ -931,12 +931,12 @@
     {
       "kind": "src",
       "key": "src/features/chat/runtime/BackgroundTaskIndicatorCoordinator.ts",
-      "sha256": "8e02726882f0c24b1fb89daa7ac211e502f7d99e1722b706a3a4f157b7ef1920"
+      "sha256": "65240925349eaecdd4a61f8f3e0ca6fdde068d0b8490be0264e7d431aed89feb"
     },
     {
       "kind": "src",
       "key": "src/features/chat/runtime/BackgroundTaskInlinePanelRenderer.ts",
-      "sha256": "a2987d03c9874625ea377470f688eb79f56ecf8a68a41238f2c22ee255146ac0"
+      "sha256": "555a9af2c56f072886508e308ac841a90dd796c234073c2d6dd76e6b1babe65c"
     },
     {
       "kind": "src",
@@ -951,17 +951,17 @@
     {
       "kind": "src",
       "key": "src/features/chat/runtime/ChatRuntimeComposition.ts",
-      "sha256": "4f877ab569405f9cbd7a7807ee3248170e8b520bcb9ab372865bb0544805fb8c"
+      "sha256": "24b65a99325c9a7ab16a2b7c382e6a93b269c934ab8707ec7cae5d656822ad1d"
     },
     {
       "kind": "src",
       "key": "src/features/chat/runtime/ConversationHydrationOutcomeBridge.ts",
-      "sha256": "7f63259bfc2f54d06d15122a73237e1fd3880c5bfe6d5ab4b50bff5273d381b8"
+      "sha256": "ef9541ef55ae9f6cc962672edb4bf01e1ef9f63505111de7529799ebe650a1a5"
     },
     {
       "kind": "src",
       "key": "src/features/chat/runtime/ConversationHydrationRenderBridge.ts",
-      "sha256": "b8e3d7aaa4b0a3b338643dfb31616e7883577c2b674bd27c2b8642fd910da4f4"
+      "sha256": "9b69b3e2ee6cd886f03a020137f46c1bc7333ff05d8cd8251bce467d8a64326b"
     },
     {
       "kind": "src",
@@ -976,7 +976,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/runtime/ConversationTransitionBridge.ts",
-      "sha256": "49a30590de84a853f0b6d65deb66127dbb9eef0be5fb65b6abd50c25924d938a"
+      "sha256": "14a0c07a12eefcd671a5027b5a112cf111e1f8375e6798f73755558c2b41d0d5"
     },
     {
       "kind": "src",
@@ -1086,7 +1086,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/runtime/TabViewActivationBridge.ts",
-      "sha256": "a28f9f247efb87ac98cd03f63bfb3a298db5d29f5fad3d57123a70fe64b2bd14"
+      "sha256": "15bb860eb86f0b8b48f8b34dc27180738962c5f1cfbe9dcd49d106f5ffbc3d84"
     },
     {
       "kind": "src",
@@ -1121,32 +1121,32 @@
     {
       "kind": "src",
       "key": "src/features/chat/services/BackgroundConversationPostSyncHandoffCoordinator.ts",
-      "sha256": "5163e47df9a3226cff216b04e8493cab94665666c55b5593fdc530aca9b2975f"
+      "sha256": "4cea3cb5a4d3010df92de5108bbf0e696c99a1e8b907dff0a902925333a5ee41"
     },
     {
       "kind": "src",
       "key": "src/features/chat/services/BackgroundConversationPostSyncHandoffHostAdapter.ts",
-      "sha256": "43914002995b32ffafe97bdd5763af3f1c8485cb214d678f1d2fb65fd617b62f"
+      "sha256": "aaf1f9d54510ee62d589cb063572f8cdbeac30445fb6ef26892034042cb877f4"
     },
     {
       "kind": "src",
       "key": "src/features/chat/services/BackgroundConversationPostSyncRefreshExecutor.ts",
-      "sha256": "ee7ea314d7ef560f370a68ea2312f89eba8d09007e4788b648c07787456e60c6"
+      "sha256": "e35132618b0c9743c854537021fb13f176d86538f40c649d97a032690944da00"
     },
     {
       "kind": "src",
       "key": "src/features/chat/services/BackgroundTaskCompletionNoticeService.ts",
-      "sha256": "242cd073212466b80266d666147557fe3b8c5784e198161a79811eb4c9084b37"
+      "sha256": "3eb5bde1620824871e5462ae89b05a8187c90fbdeca159bdbb9b76d454864c06"
     },
     {
       "kind": "src",
       "key": "src/features/chat/services/BackgroundTaskLiveSignalCoordinator.ts",
-      "sha256": "9d44e423c5ecab058b19590d17072acb97dc4682a9a44d2c047725702121406f"
+      "sha256": "8c6d2a1a26e31d8522bc90c3b936b4889a587aa82d33874e1bcc0aeeac9e8440"
     },
     {
       "kind": "src",
       "key": "src/features/chat/services/BackgroundTaskNoticeStateService.ts",
-      "sha256": "52ce0f12b9e44aab9bbb5aa7486e4deb43e9bfb9e504b9739e910e0b5d5a09aa"
+      "sha256": "672b98ee270b0acce15731bcf946e7089a19b1b1738fde9528d0a19396a2afc3"
     },
     {
       "kind": "src",
@@ -1161,7 +1161,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/services/BackgroundTaskTimelineService.ts",
-      "sha256": "65306add1a9838bddeadc6c6c9d3a9005e152026ae771b532d391d7ed84dd583"
+      "sha256": "d53e636e5be9f90915d19a81bfb1445ca02de63975aa172ba181a18b33b8175e"
     },
     {
       "kind": "src",
@@ -1341,7 +1341,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/services/ConversationAuthoritativeSyncCoordinator.ts",
-      "sha256": "8bca40448c6b1379281f88a0014eb0c508a982b03fb47ec82dc6f4b73354741b"
+      "sha256": "7941736074d9463571e53b8ba3bc94b641f338a0a60f1aa600e150744622fbb7"
     },
     {
       "kind": "src",
@@ -1356,12 +1356,17 @@
     {
       "kind": "src",
       "key": "src/features/chat/services/ConversationHydrationRuntimeViewHostFactory.ts",
-      "sha256": "12f74b4de195eef1c2c4c138b6cc165c242202b927a8383db6ebe72bced9cbbb"
+      "sha256": "f353c16af4a5834c844441b14ecb6146465c871e06920ce8eec76eebaaab578d"
     },
     {
       "kind": "src",
       "key": "src/features/chat/services/ConversationIdentityRuntime.ts",
       "sha256": "e5a5c5b63dbdb9638c4a37a3a247fcdf8091dd48148d95c188e6d6cd25743448"
+    },
+    {
+      "kind": "src",
+      "key": "src/features/chat/services/ConversationKeyedReconcileDelegate.ts",
+      "sha256": "20bce8c4e0c59329b79a5acb2fdbf19caf05dfe2664b25e3ead4acb4d05d9e19"
     },
     {
       "kind": "src",
@@ -1371,17 +1376,17 @@
     {
       "kind": "src",
       "key": "src/features/chat/services/ConversationNoticeCoordinator.ts",
-      "sha256": "e680d4beef0f4f4a3c01fbc5682dd8d2f2eef449f1917272751c23f141179870"
+      "sha256": "584344fad987efd8793e01bd2bffd766e2cabe4b33d3cd3a12e4fb9a1fbc64a5"
     },
     {
       "kind": "src",
       "key": "src/features/chat/services/ConversationRenderRuntime.ts",
-      "sha256": "eb3e1fcbbe208a1050d2ced93916a38f47963c933d2d240e3151e84b48c47935"
+      "sha256": "2304657cf97d8851eaccc99c9b3ffdc0507f409fb1fe71dfcfb1186f88d5a8ed"
     },
     {
       "kind": "src",
       "key": "src/features/chat/services/ConversationRenderService.ts",
-      "sha256": "f0d770a3924531a604ae5e1d777de5bd8290fb8c6d0fe70280aefae618d66b4d"
+      "sha256": "9a4ab7e8adb6aa03f8882ae3d93763f14bd38021121f8f6297ebd228c907f9f5"
     },
     {
       "kind": "src",
@@ -1401,17 +1406,17 @@
     {
       "kind": "src",
       "key": "src/features/chat/services/ConversationSyncBackgroundPostSyncRouter.ts",
-      "sha256": "1edfeb1980559d0dc1b1d318ef149247b06f99ac693c002c0b959880e14b3bd4"
+      "sha256": "f062a7e20421144d514dbe482780a69af001020eff2b902ed37ca3c42aa5f8e1"
     },
     {
       "kind": "src",
       "key": "src/features/chat/services/ConversationSyncBridge.ts",
-      "sha256": "9bcd38a36b5d658e3289bc28c95511421ba0a0d3f48aa7f7067b766128a295a6"
+      "sha256": "82aa25b98572d6c2e0e3bdc719230496162e2fac446fdc3d8c9abfb804662134"
     },
     {
       "kind": "src",
       "key": "src/features/chat/services/ConversationSyncHostAdapter.ts",
-      "sha256": "ffdc15054fe97ba1a50e3f0f990dc935a5c6a30fe0d7d50ee3c4602fcc0753f9"
+      "sha256": "123a7e13fceeb7f15460a5e5a90d456820f2fccf29385456a79e6ac21c8ff476"
     },
     {
       "kind": "src",
@@ -1426,12 +1431,12 @@
     {
       "kind": "src",
       "key": "src/features/chat/services/ConversationSyncRuntimeCoordinator.ts",
-      "sha256": "bd61c1be75082a598acce7ccb9587bf5e97cbd7f8be7f108453d5386d06e0349"
+      "sha256": "b0e402696246467031deea2a96b1d6584685067acd344d847b1c1a1b9fdd56e7"
     },
     {
       "kind": "src",
       "key": "src/features/chat/services/ConversationSyncVisiblePostSyncRouter.ts",
-      "sha256": "fe19387024e59839c8b7764d0247c9b03c917d30dc7ce10b1e573a9a861a4eac"
+      "sha256": "9c0abec0ab33ce4dde25d302b0fa3b0fc3d09444910d4d11f5e1ec89705ece04"
     },
     {
       "kind": "src",
@@ -1446,7 +1451,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/services/ConversationTabRuntimeCoordinator.ts",
-      "sha256": "cbe9c04ed71c428effaa4a1e318f5f998723ba008eabd6e3779409e617c365bf"
+      "sha256": "3c05ac2e6618c7ebe863c3371d21203d828e1716e5a45d8740de1a416d1acdeb"
     },
     {
       "kind": "src",
@@ -1461,7 +1466,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/services/ConversationViewStateService.ts",
-      "sha256": "5cd3276a9efc1ebf8d95a2a7c7ecd69d56fded19ecf7c2633d33c70944142c4a"
+      "sha256": "af869b3ea939ce463ec1b433f00544e8ff9df64d3c19d8fad57b7fcf98715d82"
     },
     {
       "kind": "src",
@@ -1551,7 +1556,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/services/PersistentAssistantNoticeService.ts",
-      "sha256": "5e9e60b2333c0658ecdb283835c77e212f8a04268eb949b3dcd4b5b1f2d421a7"
+      "sha256": "20484cfd848a9b234e9c70e44893c056e19239ccecdfb3a94de1bdad92844f1f"
     },
     {
       "kind": "src",
@@ -1561,12 +1566,12 @@
     {
       "kind": "src",
       "key": "src/features/chat/services/PostSyncQuestionTodoRefreshHostAdapter.ts",
-      "sha256": "b17de29295ed6aba5fe7896c98c634331778d009a390cbf5953a94e90090cd1a"
+      "sha256": "1ef83b7f7f356bc7077a9c9ef3c885740f158eb5a67445fdba6240f19484062c"
     },
     {
       "kind": "src",
       "key": "src/features/chat/services/PostSyncQuestionTodoRefreshPlanBuilder.ts",
-      "sha256": "9446ea2c66a773c641cd00fd591582c22271fb87afa4f44662b52138a3caef59"
+      "sha256": "feaf0a8ff1b5c93c28c3cb9f6724c3ee33105373836a727cb07a06dc67c3424a"
     },
     {
       "kind": "src",
@@ -1576,7 +1581,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/services/QuestionDockCoordinator.ts",
-      "sha256": "7b4911983f1fa1219696642eddd5bd270ceb4c62f35364467fc2c7848961ad47"
+      "sha256": "f49f6c8399db2a93e6c4108e681e4e5addcb9cfdbb4f9157ebc584f0c379ebf5"
     },
     {
       "kind": "src",
@@ -1641,27 +1646,27 @@
     {
       "kind": "src",
       "key": "src/features/chat/services/QuestionTodoActivationRefreshCoordinator.ts",
-      "sha256": "92b9cb06a2781fba79a1199f205acc6a8875da6d2c7c9b15fe3d5bb7c0abc4ea"
+      "sha256": "6ead7ec2197f4bb03d32bdc5895c3dd4ccd581be59a14ff0fcb2bde9d0c8682c"
     },
     {
       "kind": "src",
       "key": "src/features/chat/services/QuestionTodoBackgroundTaskActivationHostAdapter.ts",
-      "sha256": "fd253ee30bea75b116499cb92e372a8549535169c35a6ceee7cdb3e01b11360d"
+      "sha256": "34f1dc17b21e02a50d8c03bfb4bdae36e5089cbaec448e365d94c4484b649b4f"
     },
     {
       "kind": "src",
       "key": "src/features/chat/services/QuestionTodoBackgroundTaskRefreshHostAdapter.ts",
-      "sha256": "2d9d3254906b985b5f420567e8eada158366b074e4580b7b9e4d528f66507475"
+      "sha256": "0ef96806e1f1fa190f8f3f7e29c8ac8e218cda4062d690cb6172171eba578e29"
     },
     {
       "kind": "src",
       "key": "src/features/chat/services/QuestionTodoBackgroundTaskRuntimeServiceBundle.ts",
-      "sha256": "32004251f39aa08b1c581d8e0ed3ae1a5b4546e464f877f4d1881649ad5a21cc"
+      "sha256": "011fb81d8018365d919abe80d14379dca2e2348afc2ce4d3249824c6cf67d3bf"
     },
     {
       "kind": "src",
       "key": "src/features/chat/services/QuestionTodoStatusRefreshCoordinator.ts",
-      "sha256": "7f721a07e916744b0a5525567f2da39c50ec2a098c78b8478b1a25639ad0e08a"
+      "sha256": "217dadff041fadf47f74b2a97cb482bf8d466bc2e83b3b6be30edf2ae3800df5"
     },
     {
       "kind": "src",
@@ -1681,7 +1686,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/services/ScrollManager.ts",
-      "sha256": "0f5d13469d4c9bacb609446964f4b2ef0b951142e60765a9be707c88ee62c5a7"
+      "sha256": "59eecaf264df233eefe1c4726e38d877b61d19423fbc65a0a5d0a2c609c98d2c"
     },
     {
       "kind": "src",
@@ -1691,7 +1696,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/services/SessionTodoCoordinator.ts",
-      "sha256": "a7bf39cd93398a64bdd9e00f5ba47203100fd8fc0c44a0c5ffbfa8f82ce9db78"
+      "sha256": "35b90b03d132717217aee65706df92d392f15d5bc23e96791768c3663f599828"
     },
     {
       "kind": "src",
@@ -1706,7 +1711,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/services/SessionTodoStateService.ts",
-      "sha256": "4f708d578c4383033d70d3c2828f9c098cf4d28cd1a05067556bd07d009d13b8"
+      "sha256": "534a50890d3fb396657a3d2ae10eb908e6322a4cf52145e5966faef7f0fcb037"
     },
     {
       "kind": "src",
@@ -1756,7 +1761,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/services/TabMessagesPaneCoordinator.ts",
-      "sha256": "0b4ee7dab72f7ebe3eb45d2dcbc4f5f7a11864205a0da124e1a4fe3853cc5cd4"
+      "sha256": "db83517d9ecc082ad1b009a1a19b4b651f8d210d2eda3607b822226bcd80d0b8"
     },
     {
       "kind": "src",
@@ -1801,7 +1806,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/services/VisibleConversationPostSyncCoordinator.ts",
-      "sha256": "c93b6540ab3cc6bef9b493ca5d5b82dc699c0f613fdb1dd7877fd6efa67d3313"
+      "sha256": "a4f866ebb94e7db0acf623873329e55e782bd8b45f46ba852ab447cffb1a5269"
     },
     {
       "kind": "src",
@@ -1891,7 +1896,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/ui/EffortSelector.ts",
-      "sha256": "83f33850dc6fc964acfc5d22fccafd0d419cd2b42d852d806cba8e66d8329418"
+      "sha256": "cf3ffb3577dd8433ed96ef07a7a17c058ca3b99b07499aa33feb142197b18bfc"
     },
     {
       "kind": "src",
@@ -2306,7 +2311,7 @@
     {
       "kind": "src",
       "key": "src/features/settings/SettingsConversationSection.ts",
-      "sha256": "849709b1233f2c2895aba0e05fda32fd504c8f395e5ad825fcaaea74b928dabe"
+      "sha256": "50b935f0339027a446e870c312e1db52c60e3035e53242b7de4930e8073c396f"
     },
     {
       "kind": "src",
@@ -2626,7 +2631,7 @@
     {
       "kind": "src",
       "key": "src/style/base/core.css",
-      "sha256": "e8d4c0e29a947702bfad006f92f5a064f0a8c3cbb3ab0f1a6d26ac51ddbc5e7e"
+      "sha256": "0ef61a1b7f2f253e73ce026fe90ebd46f25e5a68bc9b7ee17a2311203b4af4d4"
     },
     {
       "kind": "src",
@@ -2761,12 +2766,12 @@
     {
       "kind": "src",
       "key": "src/style/features/chat-assistant.css",
-      "sha256": "6f9791055702e4911a00e3c8de4f44c836af52c1b3b4a9c22775a598b0ded3ba"
+      "sha256": "861af5f3cac8f39feee09e5a5bb800830d760b385c2b902a925d3d72354f65d2"
     },
     {
       "kind": "src",
       "key": "src/style/features/chat-user.css",
-      "sha256": "a795c98cf1c3f9ed6b077a1d80c22c17808bcd768e3febd80b8d195064ff49e3"
+      "sha256": "6a05206dd66a9bfddad24b6acb45de471794b1c79abee7783b089cf7dae8e6bd"
     },
     {
       "kind": "src",
@@ -2796,7 +2801,7 @@
     {
       "kind": "src",
       "key": "src/style/utils/markdown.css",
-      "sha256": "77b18ad5bb8dc45b959952de82d545b1aacdc904d9451983158488ea01a57592"
+      "sha256": "69fa95c1240efc89283a3475739fed3ec407a5e3c59d1b7fce2f12b5fc75775b"
     },
     {
       "kind": "src",
@@ -2906,7 +2911,7 @@
     {
       "kind": "src",
       "key": "src/utils/markdown/imageEmbed.ts",
-      "sha256": "2991b060b24c64e52e629fac666e4d5e3c34d9dc0c1139139818fe3cbfe6a7f2"
+      "sha256": "c7643f40d7bcd39b130017543c9e21176605492a80fecfae23effdcc9aef39d8"
     },
     {
       "kind": "src",
@@ -2931,7 +2936,12 @@
     {
       "kind": "src",
       "key": "src/utils/streaming/index.ts",
-      "sha256": "427fe30aec0b41ea47a22fb90b6a2a4faa2b5bb1379ec780493fcc4a6da6b470"
+      "sha256": "77e3fe42367ab3c83459f1ec47b9e9cc29c1e0f8701a1143f04ac22dbca25b58"
+    },
+    {
+      "kind": "src",
+      "key": "src/utils/streaming/MarkdownRenderScheduler.ts",
+      "sha256": "307f1378bc6b81809831c1dc835ee22eb1661e417882e4c672cbf3eb23e977fb"
     },
     {
       "kind": "src",
@@ -2956,7 +2966,12 @@
     {
       "kind": "src",
       "key": "src/utils/streaming/StreamController.ts",
-      "sha256": "57eaf96462d71eb285ad066612a07448e035d1f2454d6991459a1899fa4921a1"
+      "sha256": "62a056475bac885e388c5578c35e43bdd14fbcd1b25cb65c15979d6107c690fc"
+    },
+    {
+      "kind": "src",
+      "key": "src/utils/streaming/streamingCollapsible.ts",
+      "sha256": "bc913026596e6cfa3555cdeaf368017f62e249a7b75a9275e2a0498b474bc41a"
     },
     {
       "kind": "src",
@@ -2966,12 +2981,12 @@
     {
       "kind": "src",
       "key": "src/utils/streaming/ThinkingBlockRenderer.ts",
-      "sha256": "9aa0a807c93780aa384b6a27ffba6890498df31ce8ee325d8f5e02401e93535e"
+      "sha256": "893b4033f5f1e9d26f3c8e236c5f720e7014c5bf9dadb8cc6bfd8d9da0b05171"
     },
     {
       "kind": "src",
       "key": "src/utils/streaming/ToolCallRenderer.ts",
-      "sha256": "6a41abf19a0280d65e69993ab3fe8f229d3c1f7305b969c1f45dd2dfbb40f2fe"
+      "sha256": "9f11b3ad1988ff16819a63614fd9295b86d33a855d250f4fe1610fa1117abe56"
     },
     {
       "kind": "src",
@@ -3014,7 +3029,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-08-04T11:40:38.585Z",
-  "headShaAtGeneration": "d8280bb6206477b5800421194bb910a7c04a9076",
+  "generatedAt": "2026-08-07T14:50:40.403Z",
+  "headShaAtGeneration": "5ef8f8b960d78e260983fcaafd0a2edf07a015cb",
   "graphifyVersion": "graphify 0.9.31"
 }

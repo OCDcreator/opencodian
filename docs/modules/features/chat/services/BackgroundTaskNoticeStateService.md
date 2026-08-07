@@ -55,6 +55,7 @@ export class BackgroundTaskNoticeStateService {
 - `queueNotices()` 以 `anchorKey` 为粒度合并 completion reminder，把多个 source reminder 和 task 列表折叠进同一个 queued notice
 - queued state 继续挂在 service 内部的 runtime-keyed `WeakMap` 上，不重新放回 `OpenCodianView` 或 `TabRuntimeState`
 - `flushQueuedNotices()` 只在 tab 不再 streaming 时落盘，保持 primary stream 期间不插入额外 notice 的既有顺序
+- flush 可携带 `isCurrent` lease，在每个 notice await 前后校验，避免旧 conversation 的 notice 落入新 tab。
 - completion persisted dedupe 同时检查 source reminder id 与 `anchorKey + allComplete + sorted taskIds` fingerprint，避免 reload / repeated queue pass 重复写 notice
 
 ## 与 `OpenCodianView` 的边界

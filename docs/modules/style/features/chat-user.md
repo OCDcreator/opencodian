@@ -17,7 +17,7 @@
 - `.opencodian-compaction-divider-line`：分割线内部的水平线元素。
 - `.opencodian-compaction-divider-badge`：显示 compaction 状态（completed / overflow / auto）的徽章元素。
 - `.opencodian-compaction-divider--live`：进行中 compaction 的修饰类。
-- 动画：`@keyframes messageSlideIn`，并通过 `nth-child` 做轻度错峰。
+- 动画：`@keyframes messageSlideIn`，并通过 `nth-child` 做轻度错峰；`@media (prefers-reduced-motion: reduce)` 下 `.opencodian-message--user` 与 `.opencodian-message--assistant` 关闭 slide-in 入场动画，消息直接出现。
 
 ## 关联 TS 组件
 

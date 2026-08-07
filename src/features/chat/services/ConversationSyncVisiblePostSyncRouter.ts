@@ -13,11 +13,17 @@ export interface ConversationSyncVisiblePostSyncResult
 }
 
 export interface ConversationSyncVisiblePostSyncRouterHost {
+  captureVisiblePostSyncIdentity?(context: VisibleConversationSyncContext): {
+    isCurrent(): boolean;
+  };
   applySyncedConversationUpdate(
     previousMessages: ChatMessage[],
     nextMessages: ChatMessage[],
   ): Promise<void>;
-  renderBackgroundTaskIndicatorIfNeeded(tabId?: TabId | null): Promise<void>;
+  renderBackgroundTaskIndicatorIfNeeded(
+    tabId?: TabId | null,
+    options?: { isCurrent?: () => boolean },
+  ): Promise<void>;
 }
 
 type VisibleConversationPostSyncPort = Pick<
@@ -41,12 +47,17 @@ export class ConversationSyncVisiblePostSyncRouter {
     options: VisibleConversationPostSyncRouteOptions,
   ): Promise<void> {
     const conversation = options.syncContext.conversation;
+    const identityLease = this.host.captureVisiblePostSyncIdentity?.(options.syncContext)
+      ?? { isCurrent: () => true };
 
     // Backend gate: question/todo refresh is an OpenCode-only feature.
     // Non-OpenCode conversations skip the post-sync question/todo refresh and
     // apply the synced update directly.
     const backend = conversation.backend ?? 'opencode';
     if (backend !== 'opencode') {
+      if (!identityLease.isCurrent()) {
+        return;
+      }
       await this.host.applySyncedConversationUpdate(
         options.previousMessages,
         conversation.messages,
@@ -59,7 +70,12 @@ export class ConversationSyncVisiblePostSyncRouter {
       expectedConversationId: conversation.id,
       questionSessionId: getConversationBackendSessionId(conversation),
       syncResult: options.syncResult,
+      isCurrent: identityLease.isCurrent,
     });
+
+    if (!identityLease.isCurrent()) {
+      return;
+    }
 
     if (postSyncOutcome.shouldApplySyncedConversationUpdate) {
       await this.host.applySyncedConversationUpdate(
@@ -70,7 +86,9 @@ export class ConversationSyncVisiblePostSyncRouter {
     }
 
     if (postSyncOutcome.shouldRenderBackgroundTaskIndicator) {
-      await this.host.renderBackgroundTaskIndicatorIfNeeded(options.syncContext.tabId);
+      await this.host.renderBackgroundTaskIndicatorIfNeeded(options.syncContext.tabId, {
+        isCurrent: identityLease.isCurrent,
+      });
     }
   }
 }

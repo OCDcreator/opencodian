@@ -18,6 +18,11 @@ type BackgroundTaskLiveSignalNoticePort = Pick<
   'handleStoppedPendingLaunches'
 >;
 
+export interface BackgroundTaskLiveSignalReconcileOptions {
+  /** Captured activation/load lease; stale notices must not write after a tab switch. */
+  isCurrent?: () => boolean;
+}
+
 export interface BackgroundTaskLiveSignalLaunchInfo {
   launchId: string;
   taskId: string | null;
@@ -148,13 +153,23 @@ export class BackgroundTaskLiveSignalCoordinator {
     });
   }
 
-  reconcileStateFromLiveSignals(tabId: TabId | null): void {
+  reconcileStateFromLiveSignals(
+    tabId: TabId | null,
+    options: BackgroundTaskLiveSignalReconcileOptions = {},
+  ): void {
+    if (options.isCurrent && !options.isCurrent()) {
+      return;
+    }
     const runtime = this.host.getTabRuntimeState(tabId);
     if (!runtime || runtime.isStreaming || !runtime.backgroundTaskStartedAt) {
       return;
     }
 
-    this.sessionTodoStateService.reconcileStaleSessionTodoState(tabId);
+    if (options.isCurrent) {
+      this.sessionTodoStateService.reconcileStaleSessionTodoState(tabId, options);
+    } else {
+      this.sessionTodoStateService.reconcileStaleSessionTodoState(tabId);
+    }
 
     if (runtime.isHydratingConversation || runtime.backgroundTaskAwaitingAuthoritativeSync) {
       this.host.syncTabStreamLikeState(tabId);
@@ -187,7 +202,11 @@ export class BackgroundTaskLiveSignalCoordinator {
 
     const stalePending = this.timelineService.getPendingLaunches(tabId);
     if (stalePending.length > 0) {
-      void this.noticeStateService.handleStoppedPendingLaunches(tabId, stalePending);
+      if (options.isCurrent) {
+        void this.noticeStateService.handleStoppedPendingLaunches(tabId, stalePending, options);
+      } else {
+        void this.noticeStateService.handleStoppedPendingLaunches(tabId, stalePending);
+      }
     }
     logger.debug('Clearing stale background task indicator after session became idle without incomplete todos', {
       tabId,

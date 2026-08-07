@@ -31,6 +31,15 @@ function mockRect(element: HTMLElement, left: number, right: number): void {
   });
 }
 
+function findObsidianNativeTooltipOwner(trigger: Element): HTMLElement | null {
+  return trigger.closest<HTMLElement>('[aria-label], [title]');
+}
+
+function getAccessibleCarrier(current: Element | null): HTMLElement | null {
+  const labelId = current?.getAttribute('aria-labelledby');
+  return labelId ? current.querySelector<HTMLElement>(`#${labelId}`) : null;
+}
+
 describe('EffortSelector boundary hint', () => {
   it('keeps the effort label and boundary hint in the custom tooltip instead of visible toolbar text', () => {
     const { container } = mount(makeCallbacks({
@@ -39,17 +48,19 @@ describe('EffortSelector boundary hint', () => {
 
     const group = container.querySelector('.opencodian-effort-group');
     const current = container.querySelector('.opencodian-effort-current');
+    const currentValue = current?.querySelector('.opencodian-effort-current-value');
+    const accessibleCarrier = getAccessibleCarrier(current);
+    const expected = 'Effort: Medium. Controls how much reasoning budget the model spends before answering. Higher effort can be slower or costlier, but can help complex tasks. Applies to next turn';
     expect(container.querySelector('.opencodian-effort-label')).toBeNull();
     expect(container.querySelector('.opencodian-effort-boundary-hint')).toBeNull();
-    expect(current?.textContent).toBe('Medium');
-    expect(group?.getAttribute('aria-label')).toBe(
-      'Effort: Medium. Controls how much reasoning budget the model spends before answering. Higher effort can be slower or costlier, but can help complex tasks. Applies to next turn',
-    );
+    expect(currentValue?.textContent).toBe('Medium');
+    expect(group?.getAttribute('aria-label')).toBeNull();
     expect(group?.getAttribute('data-tooltip')).toBeNull();
-    expect(current?.getAttribute('data-tooltip')).toBe(
-      'Effort: Medium. Controls how much reasoning budget the model spends before answering. Higher effort can be slower or costlier, but can help complex tasks. Applies to next turn',
-    );
+    expect(current?.getAttribute('data-tooltip')).toBe(expected);
     expect(current?.getAttribute('data-tooltip-position')).toBe('top');
+    expect(current?.getAttribute('aria-label')).toBeNull();
+    expect(current?.getAttribute('aria-labelledby')).toBe(accessibleCarrier?.id);
+    expect(accessibleCarrier?.textContent).toBe(expected);
     expect(group?.getAttribute('title')).toBeNull();
     expect(current?.getAttribute('title')).toBeNull();
   });
@@ -77,10 +88,14 @@ describe('EffortSelector boundary hint', () => {
 
     const group = container.querySelector('.opencodian-effort-group');
     const current = container.querySelector('.opencodian-effort-current');
+    const accessibleCarrier = getAccessibleCarrier(current);
     const expected = 'Effort: Medium. Controls how much reasoning budget the model spends before answering. Higher effort can be slower or costlier, but can help complex tasks. Applies to next turn';
-    expect(group?.getAttribute('aria-label')).toBe(expected);
+    expect(group?.getAttribute('aria-label')).toBeNull();
     expect(group?.getAttribute('data-tooltip')).toBeNull();
     expect(current?.getAttribute('data-tooltip')).toBe(expected);
+    expect(current?.getAttribute('aria-label')).toBeNull();
+    expect(current?.getAttribute('aria-labelledby')).toBe(accessibleCarrier?.id);
+    expect(accessibleCarrier?.textContent).toBe(expected);
     expect(group?.getAttribute('title')).toBeNull();
     expect(current?.getAttribute('title')).toBeNull();
   });
@@ -90,10 +105,14 @@ describe('EffortSelector boundary hint', () => {
 
     const group = container.querySelector('.opencodian-effort-group');
     const current = container.querySelector('.opencodian-effort-current');
+    const accessibleCarrier = getAccessibleCarrier(current);
     const expected = 'Effort: Medium. Controls how much reasoning budget the model spends before answering. Higher effort can be slower or costlier, but can help complex tasks.';
-    expect(group?.getAttribute('aria-label')).toBe(expected);
+    expect(group?.getAttribute('aria-label')).toBeNull();
     expect(group?.getAttribute('data-tooltip')).toBeNull();
     expect(current?.getAttribute('data-tooltip')).toBe(expected);
+    expect(current?.getAttribute('aria-label')).toBeNull();
+    expect(current?.getAttribute('aria-labelledby')).toBe(accessibleCarrier?.id);
+    expect(accessibleCarrier?.textContent).toBe(expected);
     expect(group?.getAttribute('title')).toBeNull();
     expect(current?.getAttribute('title')).toBeNull();
   });
@@ -114,6 +133,9 @@ describe('EffortSelector boundary hint', () => {
     expect(container.querySelector('.opencodian-effort-current')?.getAttribute('data-tooltip')).toBe(
       'Effort: Medium. Controls how much reasoning budget the model spends before answering. Higher effort can be slower or costlier, but can help complex tasks. Next message only',
     );
+    expect(getAccessibleCarrier(container.querySelector('.opencodian-effort-current'))?.textContent).toBe(
+      'Effort: Medium. Controls how much reasoning budget the model spends before answering. Higher effort can be slower or costlier, but can help complex tasks. Next message only',
+    );
   });
 
   it('shows the full Medium effort label in the compact composer control', () => {
@@ -121,7 +143,7 @@ describe('EffortSelector boundary hint', () => {
       getVariant: () => 'medium',
     }));
 
-    expect(container.querySelector('.opencodian-effort-current')?.textContent).toBe('Medium');
+    expect(container.querySelector('.opencodian-effort-current-value')?.textContent).toBe('Medium');
   });
 
   it('gives each dropdown option its own tooltip so hover changes the shared tooltip content', () => {
@@ -137,6 +159,21 @@ describe('EffortSelector boundary hint', () => {
     ]);
     expect(gears.every(gear => gear.classList.contains('opencodian-tooltip-trigger'))).toBe(true);
     expect(gears.every(gear => gear.getAttribute('data-tooltip-position') === 'left')).toBe(true);
+  });
+
+  it('keeps every custom tooltip trigger outside Obsidian native tooltip ownership', () => {
+    const { container } = mount(makeCallbacks({
+      getBoundaryHint: () => 'Applies to next turn',
+    }));
+
+    const triggers = Array.from(
+      container.querySelectorAll<HTMLElement>('.opencodian-tooltip-trigger[data-tooltip]'),
+    );
+
+    expect(triggers).not.toHaveLength(0);
+    expect(triggers.map(findObsidianNativeTooltipOwner)).toEqual(
+      triggers.map(() => null),
+    );
   });
 
   it('clamps the effort menu from its right edge when opened with the keyboard', () => {

@@ -33,6 +33,7 @@ export function createBackgroundConversationPostSyncHandoffServices(...):
 
 - `createBackgroundConversationPostSyncHandoffViewHostAdapter()` 只暴露 background handoff 自己需要的四个 writeback seam：background task state rebuild、completion notice flush、authoritative-sync mark 与 tab attention writeback
 - late-bound getters 让 runtime factory 仍能在构造期提前建立 handoff bundle，同时安全引用稍后初始化的 `BackgroundTaskIndicatorCoordinator`、`BackgroundTaskLiveSignalCoordinator` 与 `TabRuntimeStateBridge`
+- post-sync refresh/writeback ports accept the captured identity lease and must stop before stale attention, notice, or stream-state writes
 
 ### handoff coordinator wiring
 

@@ -25,16 +25,17 @@ export interface PostSyncQuestionTodoRefreshViewHost {
   refreshPendingQuestionsForTab(
     tabId: TabId | null,
     sessionId: string | null | undefined,
+    options?: { isCurrent?: () => boolean },
   ): Promise<QuestionRequest[]>;
   refreshTabSessionStatus(
     tabId: TabId | null,
     sessionId: string | null | undefined,
-    options: { suppressErrors?: boolean },
+    options: { suppressErrors?: boolean; isCurrent?: () => boolean },
   ): Promise<SessionActivityStatus | null>;
   refreshTabSessionTodos(
     tabId: TabId | null,
     sessionId: string | null | undefined,
-    options: { suppressErrors?: boolean },
+    options: { suppressErrors?: boolean; isCurrent?: () => boolean },
   ): Promise<SessionTodo[]>;
 }
 
@@ -61,16 +62,19 @@ export function createPostSyncQuestionTodoRefreshHosts(
       refreshPendingQuestionsForTab: (
         tabId: TabId | null,
         sessionId: string | null | undefined,
-      ) => viewHost.refreshPendingQuestionsForTab(tabId, sessionId),
+        options?: { isCurrent?: () => boolean },
+      ) => options
+        ? viewHost.refreshPendingQuestionsForTab(tabId, sessionId, options)
+        : viewHost.refreshPendingQuestionsForTab(tabId, sessionId),
       refreshTabSessionStatus: (
         tabId: TabId | null,
         sessionId: string | null | undefined,
-        options: { suppressErrors?: boolean },
+        options: { suppressErrors?: boolean; isCurrent?: () => boolean },
       ) => viewHost.refreshTabSessionStatus(tabId, sessionId, options),
       refreshTabSessionTodos: (
         tabId: TabId | null,
         sessionId: string | null | undefined,
-        options: { suppressErrors?: boolean },
+        options: { suppressErrors?: boolean; isCurrent?: () => boolean },
       ) => viewHost.refreshTabSessionTodos(tabId, sessionId, options),
     },
     postSyncQuestionTodoRefreshPlanBuilderHost: {

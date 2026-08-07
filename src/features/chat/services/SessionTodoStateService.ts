@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- session todo state and stale-notice ownership share one runtime boundary. */
 import type { SessionActivityStatus } from '../../../core/opencode';
 import { type ChatMessage, type Conversation, getConversationBackendSessionId, type SessionTodo } from '../../../core/types';
 import { t } from '../../../i18n';
@@ -87,7 +88,11 @@ export class SessionTodoStateService {
     tabId: TabId | null,
     todos: SessionTodo[],
     sessionId: string | null = this.host.getSessionIdForTab(tabId),
+    options: { isCurrent?: () => boolean } = {},
   ): void {
+    if (options.isCurrent && !options.isCurrent()) {
+      return;
+    }
     const runtime = this.host.getTabRuntimeState(tabId);
     if (!runtime) {
       return;
@@ -101,7 +106,7 @@ export class SessionTodoStateService {
       this.host.renderSessionTodoDock(tabId);
     }
 
-    this.reconcileStaleSessionTodoState(tabId);
+    this.reconcileStaleSessionTodoState(tabId, options);
   }
 
   getTabSessionStatus(
@@ -124,7 +129,11 @@ export class SessionTodoStateService {
     tabId: TabId | null,
     status: SessionActivityStatus | null,
     sessionId: string | null = this.host.getSessionIdForTab(tabId),
+    options: { isCurrent?: () => boolean } = {},
   ): void {
+    if (options.isCurrent && !options.isCurrent()) {
+      return;
+    }
     const runtime = this.host.getTabRuntimeState(tabId);
     if (!runtime) {
       return;
@@ -151,7 +160,7 @@ export class SessionTodoStateService {
       }
     }
 
-    this.reconcileStaleSessionTodoState(tabId);
+    this.reconcileStaleSessionTodoState(tabId, options);
   }
 
   extractSessionTodosFromToolInput(input: Record<string, unknown>): SessionTodo[] {
@@ -193,10 +202,16 @@ export class SessionTodoStateService {
     return candidate.visibleTodos;
   }
 
-  reconcileStaleSessionTodoState(tabId: TabId | null = this.host.getActiveTabId()): void {
+  reconcileStaleSessionTodoState(
+    tabId: TabId | null = this.host.getActiveTabId(),
+    options: { isCurrent?: () => boolean } = {},
+  ): void {
+    if (options.isCurrent && !options.isCurrent()) {
+      return;
+    }
     const staleTodos = this.suppressStaleSessionTodosIfNeeded(tabId);
     if (staleTodos && staleTodos.length > 0) {
-      void this.appendStaleSessionTodoNotice(tabId, staleTodos);
+      void this.appendStaleSessionTodoNotice(tabId, staleTodos, options);
     }
   }
 
@@ -485,7 +500,11 @@ export class SessionTodoStateService {
   private async appendStaleSessionTodoNotice(
     tabId: TabId | null,
     todos: SessionTodo[],
+    options: { isCurrent?: () => boolean } = {},
   ): Promise<void> {
+    if (options.isCurrent && !options.isCurrent()) {
+      return;
+    }
     const target = this.getStaleSessionTodoNoticeTarget(
       tabId,
       this.host.getSessionIdForTab(tabId),
@@ -508,11 +527,13 @@ export class SessionTodoStateService {
 
     target.runtime.sessionTodoStaleNoticeFingerprint = target.content;
     try {
-      await this.host.appendPersistentAssistantNoticeMessage({
+      const noticeOptions = {
         title: target.title,
         content: target.content,
-        tone: 'warning',
-      });
+        tone: 'warning' as const,
+        ...(options.isCurrent ? { isCurrent: options.isCurrent } : {}),
+      };
+      await this.host.appendPersistentAssistantNoticeMessage(noticeOptions);
     } catch (error) {
       if (target.runtime.sessionTodoStaleNoticeFingerprint === target.content) {
         target.runtime.sessionTodoStaleNoticeFingerprint = null;

@@ -104,6 +104,8 @@ export interface ConversationSyncBridgeRuntimeCoordinator {
     conversation: Conversation | null,
     callback: (context: VisibleConversationSyncContext) => Promise<void>,
   ): Promise<boolean>;
+  isVisibleConversationCurrent?(context: VisibleConversationSyncContext): boolean;
+  isTabConversationCurrent?(context: VisibleConversationSyncContext): boolean;
 }
 
 export interface ConversationSyncBridgeOrchestration {
@@ -243,6 +245,10 @@ export class ConversationSyncBridge {
           return;
         }
 
+        if (!this.isVisibleConversationCurrent(syncContext)) {
+          return;
+        }
+
         await this.visiblePostSyncRouter.routeVisibleSyncComplete({
           syncContext,
           previousMessages,
@@ -272,6 +278,10 @@ export class ConversationSyncBridge {
           return;
         }
 
+        if (!this.isTabConversationCurrent(syncContext)) {
+          return;
+        }
+
         await this.backgroundPostSyncRouter.routeBackgroundTabSyncComplete({
           syncContext,
           syncResult,
@@ -291,6 +301,10 @@ export class ConversationSyncBridge {
     );
 
     if (!syncResult) {
+      return;
+    }
+
+    if (!this.isTabConversationCurrent(syncContext)) {
       return;
     }
 
@@ -331,6 +345,10 @@ export class ConversationSyncBridge {
           return;
         }
 
+        if (!this.isVisibleConversationCurrent(syncContext)) {
+          return;
+        }
+
         await this.visiblePostSyncRouter.routeVisibleSyncComplete({
           syncContext,
           previousMessages,
@@ -361,6 +379,10 @@ export class ConversationSyncBridge {
         );
 
         if (!syncResult) {
+          return;
+        }
+
+        if (!this.isVisibleConversationCurrent(syncContext)) {
           return;
         }
 
@@ -395,6 +417,10 @@ export class ConversationSyncBridge {
       return;
     }
 
+    if (!this.isTabConversationCurrent(syncContext)) {
+      return;
+    }
+
     await this.backgroundPostSyncRouter.routeSignalSyncComplete({
       syncContext,
       syncResult,
@@ -417,5 +443,14 @@ export class ConversationSyncBridge {
       reason,
       options,
     );
+  }
+
+  private isVisibleConversationCurrent(context: VisibleConversationSyncContext): boolean {
+    return this.runtimeCoordinator.isVisibleConversationCurrent?.(context)
+      ?? this.host.getCurrentConversation()?.id === context.conversation.id;
+  }
+
+  private isTabConversationCurrent(context: VisibleConversationSyncContext): boolean {
+    return this.runtimeCoordinator.isTabConversationCurrent?.(context) ?? true;
   }
 }

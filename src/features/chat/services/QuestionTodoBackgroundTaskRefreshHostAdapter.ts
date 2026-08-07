@@ -66,14 +66,17 @@ export function createQuestionTodoBackgroundTaskRefreshViewHostAdapter(
     refreshPendingQuestionsForTab: (
       tabId: TabId | null,
       sessionId: string | null | undefined,
+      options?: { isCurrent?: () => boolean },
     ) =>
-      dependencies
-        .getQuestionDockCoordinator()
-        .refreshPendingQuestionsForTab(tabId, sessionId),
+      options
+        ? dependencies.getQuestionDockCoordinator()
+          .refreshPendingQuestionsForTab(tabId, sessionId, options)
+        : dependencies.getQuestionDockCoordinator()
+          .refreshPendingQuestionsForTab(tabId, sessionId),
     refreshTabSessionStatus: (
       tabId: TabId | null,
       sessionId: string | null | undefined,
-      options: { suppressErrors?: boolean },
+      options: { suppressErrors?: boolean; isCurrent?: () => boolean },
     ) =>
       dependencies
         .getSessionTodoCoordinator()
@@ -81,7 +84,7 @@ export function createQuestionTodoBackgroundTaskRefreshViewHostAdapter(
     refreshTabSessionTodos: (
       tabId: TabId | null,
       sessionId: string | null | undefined,
-      options: { suppressErrors?: boolean },
+      options: { suppressErrors?: boolean; isCurrent?: () => boolean },
     ) =>
       dependencies
         .getSessionTodoCoordinator()

@@ -94,3 +94,4 @@ export function createBackgroundTaskViewHost(
 - `BackgroundTaskInlinePanelRenderer`：负责真实 DOM 创建、位置挂载、Markdown 渲染与 mount 复用。
 - `BackgroundTaskIndicatorCoordinator`：负责 indicator render 场景和 post-sync 场景共用的 completion notice queue/flush 顺序。
 - `BackgroundTaskLiveSignalCoordinator` 负责 live-signal stale follow-up；`BackgroundTaskNoticeStateService` 负责 stopped/stale notice state 与 completion notice queue state。
+- `BackgroundTaskViewHost.renderBackgroundTaskIndicatorIfNeeded()` 可接收 `isCurrent` lease；工厂与 indicator render port 必须原样透传，不能在组合层只转发 tabId 而丢失代际校验。

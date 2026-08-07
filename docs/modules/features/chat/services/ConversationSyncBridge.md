@@ -57,6 +57,7 @@ export class ConversationSyncBridge {
 - `scheduleConversationSyncFromSignal()` 仍保留给真正需要 debounce 的 signal reload 场景；`session.diff` 不再经过这条路径
 - signal/background-tab sync 完成后，bridge 会把 context 与 `syncResult` 委托给 `ConversationSyncBackgroundPostSyncRouter`
 - hidden-tab `lastConversationSyncFingerprint` writeback 与 post-sync option shaping 不再留在 bridge 内部
+- 每个 awaited canonical/server sync 完成后都会重新校验 ownership：visible 路径要求 active tab 仍持有同一 conversation，background/signal 路径只要求目标 tab 仍持有该 conversation，避免把旧 tab 的结果路由到新会话
 
 ## 与相邻模块的边界
 

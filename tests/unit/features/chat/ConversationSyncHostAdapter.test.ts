@@ -94,6 +94,10 @@ function createViewHost(options?: {
       'tab-hidden': createRuntime({ lastConversationSyncFingerprint: 'hidden-fingerprint' }),
     }),
   );
+  const paneByTab = new Map<string, { messagesEl: HTMLElement }>([
+    ['tab-active', { messagesEl: document.createElement('div') }],
+    ['tab-hidden', { messagesEl: document.createElement('div') }],
+  ]);
 
   return {
     getCurrentConversation: jest.fn().mockReturnValue(currentConversation),
@@ -101,6 +105,9 @@ function createViewHost(options?: {
     getAllTabs: jest.fn().mockReturnValue(tabs),
     getTab: jest.fn().mockImplementation((tabId: string) =>
       tabs.find((tab) => tab.id === tabId) ?? null,
+    ),
+    getTabPaneState: jest.fn().mockImplementation((tabId: string | null) =>
+      tabId ? (paneByTab.get(tabId) ?? null) : null,
     ),
     getTabRuntimeState: jest.fn().mockImplementation((tabId: string | null) =>
       tabId ? (runtimes.get(tabId) ?? null) : null,
@@ -234,6 +241,27 @@ describe('ConversationSyncHostAdapter', () => {
       currentConversation.messages,
     );
     expect(viewHost.renderBackgroundTaskIndicatorIfNeeded).toHaveBeenCalledWith('tab-active');
+  });
+
+  it('captures production post-sync leases across tab, conversation, and pane identity', () => {
+    const viewHost = createViewHost();
+    const hosts = createConversationSyncHosts(viewHost);
+    const visibleLease = hosts.visiblePostSyncRouterHost.captureVisiblePostSyncIdentity?.({
+      tabId: 'tab-active',
+      conversation: createConversation('conversation-active'),
+    });
+
+    expect(visibleLease?.isCurrent()).toBe(true);
+    viewHost.getActiveTabId.mockReturnValue('tab-hidden');
+    expect(visibleLease?.isCurrent()).toBe(false);
+
+    const backgroundLease = hosts.backgroundPostSyncRouterHost.captureBackgroundPostSyncIdentity?.({
+      tabId: 'tab-hidden',
+      conversationId: 'conversation-hidden',
+    });
+    expect(backgroundLease?.isCurrent()).toBe(true);
+    viewHost.getTab.mockImplementation(() => createTab({ conversationId: 'conversation-other' }));
+    expect(backgroundLease?.isCurrent()).toBe(false);
   });
 });
 

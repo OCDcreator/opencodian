@@ -1312,7 +1312,9 @@ export class SettingsConversationSection {
           .onChange(async (value) => {
             this.plugin.settings.questionCardPosition = value as QuestionCardPosition;
             await this.plugin.saveSettings();
-            this.plugin.refreshConversationRendering();
+            // refreshQuestionUi() already re-renders the conversation messages;
+            // calling refreshConversationRendering() too would fire a second
+            // concurrent full rerender and interleave message appends.
             this.plugin.refreshQuestionUi();
           });
       });
@@ -1328,7 +1330,9 @@ export class SettingsConversationSection {
           .onChange(async (value) => {
             this.plugin.settings.showAnsweredQuestionCards = value;
             await this.plugin.saveSettings();
-            this.plugin.refreshConversationRendering();
+            // refreshQuestionUi() already re-renders the conversation messages;
+            // calling refreshConversationRendering() too would fire a second
+            // concurrent full rerender and interleave message appends.
             this.plugin.refreshQuestionUi();
           });
       });

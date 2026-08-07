@@ -20,7 +20,10 @@ export interface QuestionTodoBackgroundTaskActivationViewHostAdapterHost {
   renderSessionTodoDock(tabId: TabId | null): void;
   resetBackgroundTaskIndicator(): void;
   syncBackgroundTaskStateFromConversation(conversation: Conversation, tabId: TabId | null): void;
-  renderBackgroundTaskIndicatorIfNeeded(tabId: TabId | null): Promise<void>;
+  renderBackgroundTaskIndicatorIfNeeded(
+    tabId: TabId | null,
+    options?: { isCurrent?: () => boolean },
+  ): Promise<void>;
 }
 
 export interface QuestionTodoBackgroundTaskActivationViewHostAdapterDependencies {
@@ -36,14 +39,20 @@ export interface QuestionTodoBackgroundTaskActivationViewHost {
   renderSessionTodoDock(tabId: TabId | null): void;
   resetBackgroundTaskIndicator(): void;
   syncBackgroundTaskStateFromConversation(conversation: Conversation, tabId: TabId | null): void;
-  renderBackgroundTaskIndicatorIfNeeded(tabId: TabId | null): Promise<void>;
+  renderBackgroundTaskIndicatorIfNeeded(
+    tabId: TabId | null,
+    options?: { isCurrent?: () => boolean },
+  ): Promise<void>;
 }
 
 export interface BackgroundTaskActivationIndicatorPort {
   prepareOpenConversation(conversation: Conversation): void;
   syncOpenConversationState(conversation: Conversation, tabId: TabId | null): void;
   renderOpenConversationIndicator(tabId: TabId | null): void;
-  renderLoadedConversationIndicator(tabId: TabId | null): Promise<void>;
+  renderLoadedConversationIndicator(
+    tabId: TabId | null,
+    options?: { isCurrent?: () => boolean },
+  ): Promise<void>;
 }
 
 export function createQuestionTodoBackgroundTaskActivationViewHostAdapter(
@@ -66,8 +75,12 @@ export function createQuestionTodoBackgroundTaskActivationViewHostAdapter(
     syncBackgroundTaskStateFromConversation: (conversation: Conversation, tabId: TabId | null) => {
       dependencies.viewHost.syncBackgroundTaskStateFromConversation(conversation, tabId);
     },
-    renderBackgroundTaskIndicatorIfNeeded: (tabId: TabId | null) =>
-      dependencies.viewHost.renderBackgroundTaskIndicatorIfNeeded(tabId),
+    renderBackgroundTaskIndicatorIfNeeded: (
+      tabId: TabId | null,
+      options?: { isCurrent?: () => boolean },
+    ) => options
+      ? dependencies.viewHost.renderBackgroundTaskIndicatorIfNeeded(tabId, options)
+      : dependencies.viewHost.renderBackgroundTaskIndicatorIfNeeded(tabId),
   };
 }
 
@@ -111,8 +124,12 @@ export function createQuestionTodoBackgroundTaskActivationHosts(
       renderOpenConversationIndicator: (tabId: TabId | null) => {
         void viewHost.renderBackgroundTaskIndicatorIfNeeded(tabId);
       },
-      renderLoadedConversationIndicator: (tabId: TabId | null) =>
-        viewHost.renderBackgroundTaskIndicatorIfNeeded(tabId),
+      renderLoadedConversationIndicator: (
+        tabId: TabId | null,
+        options?: { isCurrent?: () => boolean },
+      ) => options
+        ? viewHost.renderBackgroundTaskIndicatorIfNeeded(tabId, options)
+        : viewHost.renderBackgroundTaskIndicatorIfNeeded(tabId),
     },
   };
 }

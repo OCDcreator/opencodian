@@ -16,6 +16,7 @@ import { AnchoredOverlayLayoutController } from './AnchoredOverlayLayoutControll
 
 const EFFORT_DROPDOWN_MINIMUM_WIDTH = 60;
 const EFFORT_DROPDOWN_SAFE_INSET = 8;
+let accessibleLabelId = 0;
 
 export interface EffortSelectorCallbacks {
   /** Available variant names for the current model */
@@ -92,7 +93,7 @@ export class EffortSelector {
 
     // Current value display
     const currentEl = this.gearsEl.createDiv({ cls: 'opencodian-effort-current' });
-    currentEl.setText(currentLabel);
+    currentEl.createSpan({ cls: 'opencodian-effort-current-value', text: currentLabel });
     currentEl.setAttribute('role', 'button');
     currentEl.setAttribute('tabindex', '0');
     currentEl.setAttribute('aria-haspopup', 'menu');
@@ -241,10 +242,17 @@ export class EffortSelector {
       return;
     }
 
+    this.groupEl.removeAttribute('aria-label');
+    this.groupEl.removeAttribute('data-tooltip');
+    this.groupEl.removeAttribute('title');
+    const currentEl = this.gearsEl?.querySelector<HTMLElement>('.opencodian-effort-current');
+
     if (!currentLabel) {
-      this.groupEl.removeAttribute('aria-label');
-      this.groupEl.removeAttribute('data-tooltip');
-      this.groupEl.removeAttribute('title');
+      currentEl?.removeAttribute('aria-label');
+      currentEl?.removeAttribute('aria-labelledby');
+      currentEl?.removeAttribute('data-tooltip');
+      currentEl?.removeAttribute('title');
+      currentEl?.querySelector('[data-effort-accessible-label="true"]')?.remove();
       return;
     }
 
@@ -254,12 +262,20 @@ export class EffortSelector {
     const accessibleLabel = hint
       ? `${label}: ${currentLabel}. ${description} ${hint}`
       : `${label}: ${currentLabel}. ${description}`;
-    this.groupEl.setAttribute('aria-label', accessibleLabel);
-    this.groupEl.removeAttribute('data-tooltip');
-    this.groupEl.removeAttribute('title');
-    const currentEl = this.gearsEl?.querySelector<HTMLElement>('.opencodian-effort-current');
-    currentEl?.setAttribute('data-tooltip', accessibleLabel);
-    currentEl?.removeAttribute('title');
+    if (!currentEl) {
+      return;
+    }
+
+    const labelEl = currentEl.createSpan({
+      cls: 'opencodian-visually-hidden',
+      text: accessibleLabel,
+    });
+    labelEl.id = `opencodian-effort-label-${++accessibleLabelId}`;
+    labelEl.setAttribute('data-effort-accessible-label', 'true');
+    currentEl.setAttribute('aria-labelledby', labelEl.id);
+    currentEl.setAttribute('data-tooltip', accessibleLabel);
+    currentEl.removeAttribute('aria-label');
+    currentEl.removeAttribute('title');
   }
 
   private buildOptionTooltip(label: string): string {

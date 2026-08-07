@@ -27,5 +27,6 @@ Run before merge: `npm run typecheck`, `npm run module-docs`.
 ## Hard invariants
 - Do not cross `forbiddenDependencies`.
 - Do not replicate canonical state in another owner.
+- Image embeds without explicit dimensions must reserve a fallback aspect-ratio box until intrinsic dimensions are available; explicit width/height syntax remains authoritative.
 - Changes here must update the matching `docs/modules/**` page (via `module-docs.config.json`).
 - Run `npm run inspect:owner -- <this owner or a path>` for an always-fresh summary.

@@ -1,3 +1,5 @@
+/* eslint-disable max-lines, max-lines-per-function -- Tab lifecycle scenarios share one fixture and transition matrix. */
+
 import type { SessionActivityStatus } from '../../../../src/core/opencode';
 import type { PersistedTabState, TabContextState } from '../../../../src/core/types';
 import {
@@ -202,6 +204,27 @@ describe('ConversationTabRuntimeCoordinator', () => {
     expect(fixture.ports.setTabNeedsAttention).toHaveBeenCalledWith(secondTab!.id, true);
   });
 
+  it('skips re-activation when switching to the already-active tab', async () => {
+    const fixture = createFixture();
+    fixture.coordinator.initializeTabSystem();
+    const firstTab = fixture.getTabManager()?.createTab({ id: 'conv-1', title: 'Conversation 1' });
+    const secondTab = fixture.getTabManager()?.createTab({ id: 'conv-2', title: 'Conversation 2' });
+    fixture.ports.activateTab.mockClear();
+
+    // createTab() activates the new tab: secondTab is already active here.
+    await fixture.coordinator.handleTabSwitch(secondTab!.id);
+    expect(fixture.ports.activateTab).not.toHaveBeenCalled();
+
+    await fixture.coordinator.handleTabSwitch(firstTab!.id);
+    expect(fixture.ports.activateTab).toHaveBeenCalledTimes(1);
+    expect(fixture.ports.activateTab).toHaveBeenCalledWith(firstTab!.id);
+
+    // Switching back to the now-active first tab is a no-op again.
+    fixture.ports.activateTab.mockClear();
+    await fixture.coordinator.handleTabSwitch(firstTab!.id);
+    expect(fixture.ports.activateTab).not.toHaveBeenCalled();
+  });
+
   it('keeps foreground busy gating tied to runtime streaming and session status', () => {
     const fixture = createFixture({
       sessionStatus: {
@@ -360,6 +383,23 @@ describe('ConversationTabRuntimeCoordinator', () => {
     expect(runtime.pendingLayoutMutations).toBe(0);
   });
 
+  it('arms the programmatic scroll guard when hydration begins', () => {
+    const fixture = createFixture();
+    const runtime = createRuntimeState();
+    fixture.pane.runtimeByTab.set('tab-1', runtime);
+    const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(5_000);
+
+    try {
+      // The rebuild's own clear clamps scrollTop and fires a scroll event; the
+      // guard keeps that programmatic event from flipping autoScrollEnabled.
+      expect(fixture.coordinator.beginConversationHydration('tab-1')).toBe(true);
+
+      expect(runtime.programmaticScrollGuardUntil).toBe(5_120);
+    } finally {
+      nowSpy.mockRestore();
+    }
+  });
+
 });
 
 describe('createConversationTabRuntimeCoordinatorHost factory', () => {
@@ -509,11 +549,13 @@ describe('createConversationTabRuntimeCoordinator top-level factory', () => {
     const coordinator = createConversationTabRuntimeCoordinator(fixture.deps);
     const tabManager = new TabManager('New chat', { getMaxTabs: () => 4 });
     fixture.deps.tabBarState.tabManager = tabManager;
-    tabManager.createTab({ id: 'conv-1', title: 'Tab 1' });
+    const firstTab = tabManager.createTab({ id: 'conv-1', title: 'Tab 1' });
     const secondTab = tabManager.createTab({ id: 'conv-2', title: 'Tab 2' });
 
-    await coordinator.handleTabSwitch(secondTab.id);
-    expect(fixture.loadRecoveryCoordinator.activateTab).toHaveBeenCalledWith(secondTab.id);
+    // secondTab is already active after createTab; switch to the inactive tab
+    // to exercise the activation route (same-tab clicks are a no-op).
+    await coordinator.handleTabSwitch(firstTab!.id);
+    expect(fixture.loadRecoveryCoordinator.activateTab).toHaveBeenCalledWith(firstTab!.id);
 
     await coordinator.handleTabClose(secondTab.id);
     expect(fixture.lifecycleRecoveryCoordinator.closeTabAndRecover).toHaveBeenCalledWith(secondTab.id);

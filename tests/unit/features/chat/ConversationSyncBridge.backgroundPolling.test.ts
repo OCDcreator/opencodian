@@ -63,9 +63,14 @@ function createHost(options?: {
   };
 }
 
-function createRuntimeCoordinator(): Mocked<ConversationSyncBridgeRuntimeCoordinator> {
+function createRuntimeCoordinator(options?: {
+  isTabConversationCurrent?: boolean;
+}): Mocked<ConversationSyncBridgeRuntimeCoordinator> {
   return {
     runVisibleConversationSync: jest.fn(),
+    isTabConversationCurrent: jest.fn().mockReturnValue(
+      options?.isTabConversationCurrent ?? true,
+    ),
   };
 }
 
@@ -156,6 +161,42 @@ describe('ConversationSyncBridge background polling', () => {
         fingerprint: 'background-new',
       }),
     });
+    expect(runtimeCoordinator.isTabConversationCurrent).toHaveBeenCalledWith(expect.objectContaining({
+      tabId: 'tab-bg',
+      conversation: backgroundConversation,
+    }));
+  });
+
+  it('drops a background-tab result when that tab changed conversation during sync', async () => {
+    const backgroundConversation = createConversation('background-stale');
+    const host = createHost({
+      currentConversation: createConversation('active'),
+      syncResult: createSyncResult(backgroundConversation),
+    });
+    const runtimeCoordinator = createRuntimeCoordinator({ isTabConversationCurrent: false });
+    const orchestration = createOrchestration();
+    const visiblePostSyncRouter = createVisiblePostSyncRouter();
+    const backgroundPostSyncRouter = createBackgroundPostSyncRouter();
+    const bridge = new ConversationSyncBridge({
+      host,
+      runtimeCoordinator,
+      orchestrationService: orchestration,
+      visiblePostSyncRouter,
+      backgroundPostSyncRouter,
+    });
+    let backgroundCallback: ((context: TabConversationSyncContext) => Promise<void>) | null = null;
+    orchestration.syncBackgroundTaskTabs.mockImplementation(async (callback) => {
+      backgroundCallback = callback;
+    });
+
+    await bridge.syncBackgroundTaskTabsInBackground();
+    await backgroundCallback?.({
+      tabId: 'tab-bg',
+      conversation: backgroundConversation,
+      previousFingerprint: 'old',
+    });
+
+    expect(backgroundPostSyncRouter.routeBackgroundTabSyncComplete).not.toHaveBeenCalled();
   });
 
   it('falls back to server sync for background-tab polling when canonical state is missing', async () => {

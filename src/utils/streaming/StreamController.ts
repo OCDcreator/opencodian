@@ -1,6 +1,7 @@
 import type { SdkErrorClass } from '../../core/opencode/sdkErrorClassification';
 import { createLogger, getToolIdentity, isInternalStructuredOutputTool } from '../../shared';
 import type { MarkdownRenderService } from '../markdown';
+import { STREAMING_MARKDOWN_RENDER_MIN_INTERVAL_MS } from './MarkdownRenderScheduler';
 import { ThinkingBlockRenderer } from './ThinkingBlockRenderer';
 import { ToolCallRenderer } from './ToolCallRenderer';
 import type {
@@ -19,7 +20,6 @@ import type {
 import { createStreamState } from './types';
 
 const logger = createLogger('StreamController');
-const STREAMING_MARKDOWN_RENDER_MIN_INTERVAL_MS = 96;
 
 const ERROR_CLASS_ICONS: Record<SdkErrorClass, string> = {
   not_found: '🔍',
@@ -43,6 +43,7 @@ export class StreamController {
   private textRenderTimerId: number | null = null;
   private textRenderInFlight: Promise<void> | null = null;
   private textRenderRequested = false;
+  private textRenderGeneration = 0;
   private lastTextRenderAt = 0;
   private lastRenderedTextContent = '';
 
@@ -429,14 +430,24 @@ export class StreamController {
     this.textRenderRequested = false;
     const targetEl = this.state.currentTextEl;
     const content = this.state.currentTextContent;
-    this.textRenderInFlight = this.renderMarkdownText(targetEl, content)
+    const generation = this.textRenderGeneration;
+    const renderPromise = this.renderMarkdownText(
+      targetEl,
+      content,
+      generation,
+      () => this.ownsTextRenderTarget(targetEl, generation),
+    );
+    const trackedPromise = renderPromise
       .finally(() => {
-        this.textRenderInFlight = null;
+        if (this.textRenderInFlight === trackedPromise) {
+          this.textRenderInFlight = null;
+        }
       });
+    this.textRenderInFlight = trackedPromise;
 
-    await this.textRenderInFlight;
+    await trackedPromise;
 
-    if (this.textRenderRequested) {
+    if (generation === this.textRenderGeneration && this.textRenderRequested) {
       this.scheduleTextRender();
     }
   }
@@ -463,6 +474,8 @@ export class StreamController {
   }
 
   private clearPendingTextRender(): void {
+    this.textRenderGeneration += 1;
+
     if (this.textRenderTimerId !== null) {
       window.clearTimeout(this.textRenderTimerId);
       this.textRenderTimerId = null;
@@ -472,20 +485,37 @@ export class StreamController {
     this.textRenderInFlight = null;
   }
 
-  private renderMarkdownText(targetEl: HTMLElement, content: string): Promise<void> {
+  private renderMarkdownText(
+    targetEl: HTMLElement,
+    content: string,
+    generation = this.textRenderGeneration,
+    isOwned: () => boolean = () => this.ownsTextRenderTarget(targetEl, generation),
+  ): Promise<void> {
     const previousHeight = targetEl.offsetHeight;
     if (previousHeight > 0) {
       targetEl.style.minHeight = `${previousHeight}px`;
     }
 
-    return this.markdownService.render(targetEl, content)
+    // Render into a detached staging element. If the stream is cancelled or
+    // restarted while MarkdownRenderService is still awaiting Obsidian, a
+    // stale completion can only mutate this detached tree, never the old DOM.
+    const stagingEl = document.createElement('div');
+
+    return this.markdownService.render(stagingEl, content)
       .then(() => {
+        if (!isOwned()) {
+          return;
+        }
+
+        targetEl.replaceChildren(...Array.from(stagingEl.childNodes));
         this.lastTextRenderAt = Date.now();
         this.lastRenderedTextContent = content;
         this.scrollToBottom?.();
       })
       .finally(() => {
-        targetEl.style.removeProperty('min-height');
+        if (isOwned()) {
+          targetEl.style.removeProperty('min-height');
+        }
       })
       .then(() => undefined);
   }
@@ -501,7 +531,24 @@ export class StreamController {
       return Promise.resolve();
     }
 
-    return this.renderMarkdownText(targetEl, content);
+    const generation = this.textRenderGeneration;
+    if (!this.ownsTextRenderTarget(targetEl, generation)) {
+      return Promise.resolve();
+    }
+
+    return this.renderMarkdownText(
+      targetEl,
+      content,
+      generation,
+      () => this.ownsTextRenderTarget(targetEl, generation),
+    );
+  }
+
+  private ownsTextRenderTarget(targetEl: HTMLElement, generation: number): boolean {
+    return generation === this.textRenderGeneration
+      && this.state.isStreaming
+      && this.state.currentTextEl === targetEl
+      && targetEl.isConnected;
   }
 
   private finalizeThinkingBlock(): void {

@@ -9,6 +9,7 @@
 `ConversationSyncRuntimeCoordinator` 把 `OpenCodianView` 里对话同步入口共用的 runtime guard、`isConversationSyncInFlight` 兼容 flag 生命周期、`TabSessionLifecycleState` sync transition，以及 per-tab sync fingerprint baseline 判定独立出来，专门负责：
 
 - 为 visible active-conversation sync 统一检查 active tab、session 可用性，以及 tab runtime 是否仍可发起同步
+- hydration 期间到达的 visible/tab sync 不直接触碰消息 DOM：按有界节奏（150ms × 最多 40 次）延后重试直到 hydration 落定，同 tab 并发请求合并为单个 pending retry，重入 sync lock 前重新校验 tab 是否仍可见、tab 内 conversation 身份是否未变；超过上限则 warn 并丢弃，避免卡死的 hydration 无限自旋
 - 为 signal sync / background-tab sync 统一检查目标 tab runtime，并产出 `previousFingerprint`
 - 用同一处 lock/unlock 包裹同步回调，避免这些入口各自手写 `isConversationSyncInFlight = true/false`
 - 在进入/退出 sync lock 时推进 `TabSessionLifecycleState`：进入 `syncing`，退出回到 `idle`
@@ -21,8 +22,13 @@
 export interface ConversationSyncRuntimeCoordinatorHost {
   getActiveTabId(): TabId | null;
   getTabRuntimeState(tabId: TabId | null): ConversationSyncRuntime | null;
+  getTab(tabId: TabId | null): ConversationSyncTabIdentity | null;
   getConversationSyncFingerprint(messages: ChatMessage[]): string;
   transitionTabSessionLifecycle(tabId: TabId | null, phase: WritableTabSessionPhase, reason: string): boolean;
+}
+
+export interface ConversationSyncTabIdentity {
+  conversationId: string | null;
 }
 
 export interface ConversationSyncTimeoutDiagnostic {
@@ -57,6 +63,7 @@ export class ConversationSyncRuntimeCoordinator {
 
 - `runVisibleConversationSync()` 只接受当前 active tab 对应的 conversation
 - 当 active tab 缺失、runtime 正在 streaming / 已有 sync 在飞，或 conversation 没有任何 backend session id 时，会直接跳过
+- runtime 正处于 conversation hydration（`isHydratingConversation`）时不进入 sync lock：改由 hydration-deferral 路径按 tab 合并并发请求（`hydrationDeferredSyncTabIds` 保证同 tab 只有一个 pending retry），150ms 后重试；重试前校验 tab 仍是 active（visible deferral 的 tab 不可见即作废）与 `host.getTab(tabId)?.conversationId` 未变（tab 已切走即作废）；仍在 hydrating 且未达 40 次上限则递归重排，超过上限则 warn 并丢弃，避免卡死的 hydration 无限自旋
 - 真正的 sync 回调结束后，无论成功还是抛错，coordinator 都会负责清理 in-flight flag
 - sync lock enter 会调用 `transitionTabSessionLifecycle(tabId, 'syncing', 'conversation-sync-lock')`
 - sync lock release 会调用 `transitionTabSessionLifecycle(tabId, 'idle', 'conversation-sync-lock-release')`

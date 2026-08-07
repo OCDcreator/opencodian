@@ -30,11 +30,13 @@ export class BackgroundConversationPostSyncHandoffCoordinator {
 - `handleSignalSyncComplete()` 先写入 background-task authoritative-sync ready 标记，reason 统一加上 `sync-event:` 前缀
 - 接着调用 `BackgroundConversationPostSyncRefreshExecutor.refreshSignalSyncedBackgroundConversation()`，让 pending question / todo status refresh、background task rebuild 与 completion follow-up 保持既有顺序
 - 最后按 `changed || fingerprint !== previousFingerprint` 判定是否写入 tab attention；signal sync 对 active tab 写入 `false`，对非 active tab 写入 `true`
+- refresh await 返回后校验传入的目标 tab + conversation identity lease；lease 失效时跳过 attention 写回。
 
 ### background-tab handoff
 
 - `handleBackgroundTabSyncComplete()` 面向已有后台 tab 的 sync 结果，委托 `BackgroundConversationPostSyncRefreshExecutor.refreshBackgroundTabConversation()`
 - refresh 完成后再按同一 fingerprint/change 判定写入 attention；background-tab sync 一旦变化固定写入 `true`，保持 attention writeback 仍晚于 refresh/build/flush
+- 同样在 refresh await 后校验 lease，避免 A 的异步结果把 attention 写到切换后的 B tab。
 
 ## 与 post-sync router 的边界
 

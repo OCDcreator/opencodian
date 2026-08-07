@@ -35,6 +35,7 @@ import {
   ConversationSyncVisiblePostSyncRouter,
   type ConversationSyncVisiblePostSyncRouterHost,
 } from './ConversationSyncVisiblePostSyncRouter';
+import { getPaneRenderSurfaceGeneration } from './ScrollManager';
 import type { WritableTabSessionPhase } from './TabSessionPhase';
 import type { VisibleConversationPostSyncCoordinator } from './VisibleConversationPostSyncCoordinator';
 
@@ -43,6 +44,7 @@ export interface ConversationSyncViewHost {
   getActiveTabId(): TabId | null;
   getAllTabs(): readonly TabData[];
   getTab(tabId: TabId): TabData | null;
+  getTabPaneState?(tabId: TabId | null): { messagesEl: HTMLElement } | null;
   getTabRuntimeState(tabId: TabId | null): ConversationSyncSignalRuntime | null;
   getConversationById(id: string): Promise<Conversation | null>;
   getConversationSyncFingerprint(messages: ChatMessage[]): string;
@@ -63,7 +65,10 @@ export interface ConversationSyncViewHost {
     previousMessages: ChatMessage[],
     nextMessages: ChatMessage[],
   ): Promise<void>;
-  renderBackgroundTaskIndicatorIfNeeded(tabId?: TabId | null): Promise<void>;
+  renderBackgroundTaskIndicatorIfNeeded(
+    tabId?: TabId | null,
+    options?: { isCurrent?: () => boolean },
+  ): Promise<void>;
 }
 
 interface ConversationSyncLifecycleHost extends ConversationSyncViewHost {
@@ -96,6 +101,10 @@ export function createConversationSyncHosts(
     runtimeCoordinatorHost: {
       getActiveTabId: () => viewHost.getActiveTabId(),
       getTabRuntimeState: (tabId: TabId | null) => viewHost.getTabRuntimeState(tabId),
+      getTab: (tabId: TabId | null) => {
+        const tab = tabId ? viewHost.getTab(tabId) : null;
+        return tab ? { conversationId: tab.conversationId ?? null } : null;
+      },
       getConversationSyncFingerprint: (messages: ChatMessage[]) =>
         viewHost.getConversationSyncFingerprint(messages),
       transitionTabSessionLifecycle: (tabId, phase, reason) =>
@@ -126,14 +135,32 @@ export function createConversationSyncHosts(
       ) => viewHost.syncConversationMessagesFromCanonicalState(conversation, tabId, reason, options),
     },
     visiblePostSyncRouterHost: {
+      captureVisiblePostSyncIdentity: (context) => {
+        const capturedTabId = viewHost.getActiveTabId();
+        const capturedConversationId = context.conversation.id;
+        const capturedPane = viewHost.getTabPaneState?.(context.tabId)?.messagesEl ?? null;
+        const capturedPaneGeneration = getPaneRenderSurfaceGeneration(capturedPane);
+        return {
+          isCurrent: () => viewHost.getActiveTabId() === capturedTabId
+            && viewHost.getTab(context.tabId)?.conversationId === capturedConversationId
+            && (!viewHost.getTabPaneState
+              || (viewHost.getTabPaneState(context.tabId)?.messagesEl === capturedPane
+                && getPaneRenderSurfaceGeneration(capturedPane) === capturedPaneGeneration)),
+        };
+      },
       applySyncedConversationUpdate: (
         previousMessages: ChatMessage[],
         nextMessages: ChatMessage[],
       ) => viewHost.applySyncedConversationUpdate(previousMessages, nextMessages),
-      renderBackgroundTaskIndicatorIfNeeded: (tabId?: TabId | null) =>
-        viewHost.renderBackgroundTaskIndicatorIfNeeded(tabId),
+      renderBackgroundTaskIndicatorIfNeeded: (tabId?: TabId | null, options?: { isCurrent?: () => boolean }) =>
+        options
+          ? viewHost.renderBackgroundTaskIndicatorIfNeeded(tabId, options)
+          : viewHost.renderBackgroundTaskIndicatorIfNeeded(tabId),
     },
     backgroundPostSyncRouterHost: {
+      captureBackgroundPostSyncIdentity: ({ tabId, conversationId }) => ({
+        isCurrent: () => viewHost.getTab(tabId)?.conversationId === conversationId,
+      }),
       getTabRuntimeState: (tabId: TabId | null) => viewHost.getTabRuntimeState(tabId),
     },
   };

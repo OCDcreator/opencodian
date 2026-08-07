@@ -47,5 +47,6 @@ export function createQuestionTodoBackgroundTaskRefreshServices(...): QuestionTo
 
 - `OpenCodianView` 现在只提供 `QuestionTodoBackgroundTaskRuntimeServiceBundleHost` 的扁平 runtime seam，不再直接组装完整 `QuestionTodoBackgroundTaskRefreshViewHost`
 - activation/post-sync 共用的 conversation/runtime writeback host 现在先由 `QuestionTodoBackgroundTaskRuntimeServiceBundle` 组装，再分别交给本模块与 `BackgroundConversationPostSyncHandoffHostAdapter` 继续扩成 refresh-side host
+- refresh-side host methods preserve the captured post-sync lease through pending-question, status, todo, notice, and background writeback awaits
 - `QuestionTodoStatusRefreshCoordinator`、`PostSyncQuestionTodoRefreshHostAdapter`、`VisibleConversationPostSyncStateHostAdapter`、`BackgroundConversationPostSyncHandoffHostAdapter` 与 `VisibleConversationPostSyncCoordinator` 的业务边界保持分离
 - 这次切片推进的是 master plan 的 P2 `question / todo / background task` lane：继续削弱 `OpenCodianView` 对 question/todo/background-task post-sync wiring 与 signal/background-tab source routing 的直接 ownership

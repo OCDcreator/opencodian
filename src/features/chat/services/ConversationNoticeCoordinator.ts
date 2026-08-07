@@ -73,7 +73,10 @@ export interface ConversationNoticeCoordinatorHost {
     options: PersistentAssistantNoticeMessageOptions,
   ): Promise<void>;
   refreshSessionChangeSidebar(): void;
-  renderBackgroundTaskIndicatorIfNeeded(tabId: TabId | null): Promise<void>;
+  renderBackgroundTaskIndicatorIfNeeded(
+    tabId: TabId | null,
+    options?: { isCurrent?: () => boolean },
+  ): Promise<void>;
   handleRestoreRewindRequest(): Promise<void>;
   openPluginSettingsPreservingScroll(): void;
   hasAnyEnabledBackend(): boolean;

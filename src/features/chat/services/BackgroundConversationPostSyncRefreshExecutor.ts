@@ -28,6 +28,7 @@ export interface BackgroundTaskPostSyncRefreshPort {
   flushBackgroundTaskPostSyncWriteback(
     tabId: TabId | null,
     conversation: Conversation | null,
+    options?: { isCurrent?: () => boolean },
   ): Promise<void>;
 }
 
@@ -50,6 +51,7 @@ export class BackgroundConversationPostSyncRefreshExecutor {
       options.tabId,
       options.conversation,
       this.refreshPlanBuilder.createSignalSyncedBackgroundConversationPlan(options),
+      options.isCurrent,
     );
   }
 
@@ -60,6 +62,7 @@ export class BackgroundConversationPostSyncRefreshExecutor {
       options.tabId,
       options.conversation,
       this.refreshPlanBuilder.createBackgroundTabConversationPlan(options),
+      options.isCurrent,
     );
   }
 
@@ -67,13 +70,18 @@ export class BackgroundConversationPostSyncRefreshExecutor {
     tabId: TabId,
     conversation: Conversation,
     refreshPlan: PostSyncQuestionTodoStatusRefreshOptions | null,
+    isCurrent?: () => boolean,
   ): Promise<void> {
     // Backend gate: when the plan builder returns null (non-OpenCode conversation),
     // skip question/todo refresh but still flush background-task writeback.
     if (refreshPlan) {
       await this.questionTodoStatusRefreshCoordinator.refreshAfterPostSync({
         ...refreshPlan,
+        isCurrent,
         afterPendingQuestionRefresh: () => {
+          if (isCurrent && !isCurrent()) {
+            return;
+          }
           this.backgroundTaskPostSyncRefresh.syncBackgroundTaskStateFromConversation(
             conversation,
             tabId,
@@ -82,9 +90,20 @@ export class BackgroundConversationPostSyncRefreshExecutor {
       });
     }
 
-    await this.backgroundTaskPostSyncRefresh.flushBackgroundTaskPostSyncWriteback(
-      tabId,
-      conversation,
-    );
+    if (isCurrent && !isCurrent()) {
+      return;
+    }
+    if (isCurrent) {
+      await this.backgroundTaskPostSyncRefresh.flushBackgroundTaskPostSyncWriteback(
+        tabId,
+        conversation,
+        { isCurrent },
+      );
+    } else {
+      await this.backgroundTaskPostSyncRefresh.flushBackgroundTaskPostSyncWriteback(
+        tabId,
+        conversation,
+      );
+    }
   }
 }

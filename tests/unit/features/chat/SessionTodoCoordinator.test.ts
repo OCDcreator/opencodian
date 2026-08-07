@@ -182,6 +182,16 @@ describe('SessionTodoCoordinator', () => {
     expect(host.reconcileBackgroundTaskLiveSignals).toHaveBeenCalledWith('tab-1');
   });
 
+  it('forwards a refresh lease into background-task reconciliation', async () => {
+    const { coordinator, host } = createFixture();
+    host.getSessionTodos.mockResolvedValue([createTodo('todo-1')]);
+    const options = { isCurrent: jest.fn().mockReturnValue(true) };
+
+    await coordinator.refreshTabSessionTodos('tab-1', 'session-1', options);
+
+    expect(host.reconcileBackgroundTaskLiveSignals).toHaveBeenCalledWith('tab-1', options);
+  });
+
   it('returns the current todo snapshot when a refresh result becomes stale', async () => {
     const currentTodos = [createTodo('current')];
     const runtime = createRuntime({
@@ -212,6 +222,16 @@ describe('SessionTodoCoordinator', () => {
     expect(host.getSessionStatuses).toHaveBeenCalled();
     expect(runtime?.sessionStatus).toEqual(status);
     expect(host.reconcileBackgroundTaskLiveSignals).toHaveBeenCalledWith('tab-1');
+  });
+
+  it('forwards a status refresh lease into background-task reconciliation', async () => {
+    const { coordinator, host } = createFixture();
+    host.getSessionStatuses.mockResolvedValue({ 'session-1': { type: 'busy' } });
+    const options = { suppressErrors: true, isCurrent: jest.fn().mockReturnValue(true) };
+
+    await coordinator.refreshTabSessionStatus('tab-1', 'session-1', options);
+
+    expect(host.reconcileBackgroundTaskLiveSignals).toHaveBeenCalledWith('tab-1', options);
   });
 
   it('returns the current session status when a refresh result becomes stale', async () => {

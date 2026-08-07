@@ -34,13 +34,14 @@
 `buildStyleAttribute()` 解析 alt 文本中的尺寸语法：
 - `![[image.png|300]]` → `width: 300px`
 - `![[image.png|300x200]]` → `width: 300px; height: 200px`
+- 未声明尺寸时增加 `has-intrinsic-placeholder` 类和 `aspect-ratio: auto 16 / 9` 占位，避免懒加载图片晚到时推高消息布局；图片加载后自动采用其 intrinsic ratio，显式尺寸始终优先且不附加占位类。
 
 ### 替换流程
 
 `replaceImageEmbedsWithHtml()` 使用正则 `!\[\[([^\]|]+)(?:\|([^\]]+))?\]\]` 全局匹配：
 1. 跳过非图片文件
 2. 解析图片文件
-3. 文件存在 → `<span class="wrapper"><img src="..." alt="..." loading="lazy"></span>`
+3. 文件存在 → `<span class="wrapper"><img src="..." alt="..." loading="lazy"></span>`（无显式尺寸时附加稳定占位类与 aspect-ratio 样式）
 4. 文件不存在 → `<span class="fallback">![[image.png]]</span>`
 
 ## 关键方法
@@ -83,5 +84,3 @@ MarkdownRenderService.render()
 - HTML 属性值通过 `escapeHtml()` 转义防止 XSS
 - `<img>` 标签设置 `loading="lazy"` 延迟加载
 - 非 Obsidian vault 内的图片路径无法解析
-
-

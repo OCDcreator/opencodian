@@ -99,7 +99,10 @@ export interface ConversationAuthoritativeSyncHost {
     tabId: TabId | null,
   ): void;
   rerenderSingleUserMessage(previousMessageId: string, message: ChatMessage): Promise<void>;
-  renderBackgroundTaskIndicatorIfNeeded(tabId?: TabId | null): Promise<void>;
+  renderBackgroundTaskIndicatorIfNeeded(
+    tabId?: TabId | null,
+    options?: { isCurrent?: () => boolean },
+  ): Promise<void>;
   summarizeChatMessageForDebug(
     message: ChatMessage | null | undefined,
   ): Record<string, unknown> | null;

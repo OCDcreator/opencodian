@@ -51,7 +51,7 @@
 | `reapplyCurrentConversationSessionSettings()` | 复用 `ConversationSessionSettingsCoordinator`，把当前会话（或全局默认）的 effective chat font-size 写回，并触发 compaction backend apply / deferred fallback |
 | `applyChatScrollMode()` | 把当前滚动模式应用到消息容器；无论 pane coordinator 是否处理滚动模式，都会同步表面颜色 |
 | `applyLocaleTexts()` | 委托 header presenter、selection controls coordinator 与 composer input coordinator 刷新 header/status、selector、placeholder、dock 和 tab 文案 |
-| `refreshQuestionUi()` | 重绘 question dock，并在需要时重绘当前对话 |
+| `refreshQuestionUi()` | 重绘 question dock，并在需要时重绘当前对话；question card 位置 / 已回答卡片开关变更也只走这一条入口（其内部已重渲 conversation messages），不再叠加第二次并发 full rerender |
 | `invalidateSlashCommandMenuCatalog()` | 立刻清空 slash command menu catalog 缓存，并可选触发一次后台 warm preload |
 | `createConversationInCurrentTab()` | 公开给插件命令层使用；await `ConversationLoadRecoveryCoordinator.createConversationInCurrentTab()` 后比较调用前后的 conversation id + backend session id，只有身份变化才刷新 Session Change Sidebar。max-tabs/no-op 等正常返回但未切换会话的路径不会重复刷新 |
 | `loadConversationForExternalHost(conversationId)` | 最小公开 seam，供外部 host（如 settings-side backend session browser）加载已恢复的会话，委托内部 `loadConversation()` |
@@ -283,6 +283,7 @@ Phase 0/1 的 backend-empty / backend-offline 收尾还在这个 seam 上新增�
 - 在必要时调用 `syncConversationMessagesFromServer()`
 - 在 load 完成与 authoritative sync 完成后额外调用 `ChildSessionGraphCoordinator.refreshGraph()`，让 child-session tree 跟随当前可见对话的 persisted/live child-session 数据刷新
 - 装载阶段进入 hydration：先重建历史 turn / inline background task，再等待后续 authoritative message sync 决定是否允许 stale 降级
+- `loadConversation()` 现在按 tab pin 住请求时的 active tab 并维护 per-tab generation：关键 await 后、activation 前、逐条渲染与 scroll restore 前都校验 generation / active tab，被 supersede 的旧装载不再 activate、render 或 restore 进新 tab；点击已激活 tab 也会在 tab runtime 入口短路，不重跑完整 hydration
 - 重新渲染消息、背景任务指示器、todo dock、question dock
 - 通过 `ConversationSyncHostAdapter` 组装 `ConversationSyncRuntimeCoordinator` / `ConversationSyncOrchestrationService` / `ConversationSyncBridge`，并通过 `ConversationSessionSignalRuntime` 接入 session sync event + todo/status live signal 的订阅、session→tab 匹配与 cleanup 生命周期
 - 更新模型显示和 context usage
@@ -315,7 +316,7 @@ signal sync 与后台轮询里的 loop lifecycle、signal debounce、tab / conve
 - 在 pane 切换时调用 `coordinator.clearContainer()` 和 `coordinator.render(currentGraph)`
 - 在 close / empty-tab 路径上调用 `coordinator.hide()` 和 `coordinator.clearGraph()`
 
-真正把 visible/signal/background 三条 sync 回调装配到一起的层现在是 `ConversationSyncBridge`：它会把 orchestration 的 dispatch 回调统一接到 server sync、fingerprint commit 和 post-sync coordinator，再把真正依赖当前 DOM/render host 的 `applySyncedConversationUpdate()` 留在 view；`renderBackgroundTaskIndicatorIfNeeded()` 已直接委托 `BackgroundTaskIndicatorCoordinator.renderIfNeeded()`。hidden-tab 与 active-tab 同步入口仍通过 `ConversationSyncRuntimeCoordinator` 统一处理 tab runtime guard、`isConversationSyncInFlight` 生命周期，以及 per-tab fingerprint baseline 判定。
+真正把 visible/signal/background 三条 sync 回调装配到一起的层现在是 `ConversationSyncBridge`：它会把 orchestration 的 dispatch 回调统一接到 server sync、fingerprint commit 和 post-sync coordinator，再把真正依赖当前 DOM/render host 的 `applySyncedConversationUpdate()` 留在 view；`renderBackgroundTaskIndicatorIfNeeded()` 已直接委托 `BackgroundTaskIndicatorCoordinator.renderIfNeeded()`。hidden-tab 与 active-tab 同步入口仍通过 `ConversationSyncRuntimeCoordinator` 统一处理 tab runtime guard、`isConversationSyncInFlight` 生命周期，以及 per-tab fingerprint baseline 判定。hydration 期间到达的 visible/tab sync 不再直接触碰消息 DOM，也不会被丢弃：coordinator 按 tab 合并延后（150ms × 最多 40 次），hydration 落定后重试，并在重入 sync lock 前重新校验 tab/conversation 身份。
 
 `session.diff` 现在不再触发 message authoritative sync/reload：sync-event 自带的 diff entries 由 `OpenCodeSessionStateStore.setSessionDiffEntries()` 统一缓存，view 通过 `OpenCodeService.getCachedSessionDiffEntries()` 读取作为 turn-diff notice 的输入备用；真正的 message truth correction 仍只来自 canonical message/part graph 与必要时的 gap-recovery server sync。
 
@@ -343,7 +344,7 @@ streaming tab 激活时那条 active-conversation/session 写回 + baseline + se
 
 首次打开聊天视图时那段 `loadConversations()`、persisted tab restore、restore 失败后的 tab state reset/flush，以及“复用首个已有 conversation / 不存在时创建新 conversation”的 fallback；header 上“新建会话”与“在当前 tab 新建会话”两条入口里的 max-tabs / streaming-block / notice 分支；以及 delete conversation / delete-all 后的 recovery/reset 路径，现在都先由 `services/ConversationLoadRecoveryCoordinator.ts` 统一收口。它直接拥有 bootstrap / restore 决策，并继续复用 `ConversationTabOpenCoordinator.ts`、`ConversationTabLifecycleRecoveryCoordinator.ts` 与 `ConversationViewStateService.ts`，因此 view 不再直接持有多条平行的 create/load/recovery 主链路。load-recovery host 组装已通过 `createConversationLoadRecoveryHost(deps)` 工厂函数集中到 coordinator 文件；工厂吸收了 `showNotice`、`confirmRewind`、`chooseForkTarget`、`resetPersistedTabState` 四项组装逻辑，view 只传入 `app` 和 `setPersistedTabState` 等低层级依赖，不再传入 Notice/confirm/fork-modal 回调。close-last-tab 的静默 fallback tab、delete/delete-all 复用 noticed new-tab 路径、persisted restore 失败后的 state reset/flush 与现有 activate/hydration 语义都保持不变。
 
-loaded-conversation 切换里旧标题生成取消、background-task indicator reset、scheduled scroll cleanup、消息区清空、turn state reset，以及 hydration lifecycle shell，也不再由 `ConversationViewStateService` 直接通过散落 host 回调持有；这些壳层步骤现在先由 `runtime/ConversationTransitionBridge.ts` 统一桥接。随后消息容器的 `is-rehydrating` class、scroll snapshot、restore-bottom / restore-anchor / restore-distance 调度，以及 pane scroll metrics 回写，再由 `runtime/ConversationHydrationRenderBridge.ts` 承接，view 只保留 title/background indicator/message container/runtime 的真实实现。
+loaded-conversation 切换里旧标题生成取消、background-task indicator reset、scheduled scroll cleanup、消息区清空、turn state reset，以及 hydration lifecycle shell，也不再由 `ConversationViewStateService` 直接通过散落 host 回调持有；这些壳层步骤现在先由 `runtime/ConversationTransitionBridge.ts` 统一桥接。随后消息容器的 `is-rehydrating` class、scroll snapshot、restore-bottom / restore-anchor / restore-distance 调度，以及 pane scroll metrics 回写，再由 `runtime/ConversationHydrationRenderBridge.ts` 承接，view 只保留 title/background indicator/message container/runtime 的真实实现。view 提供的两处 `clearMessagesContainer` seam（render host 与 hydration host）现在在 `.empty()` 前先调用 `disposeCollapsiblesWithin()`，释放旧消息子树内 collapsible 的 ResizeObserver 与事件监听，避免 detached 节点被继续持有。
 
 loaded-conversation activate 前的 conversation lookup、reload retry、interrupted-tail 驱动的 server-sync 判定，以及 `load-conversation` sync 返回的 revert-state 写回，也不再由 `ConversationViewStateService` 直接通过散落的 host 回调组合；这些数据解析入口现在先由 `runtime/ConversationLoadRuntimeBridge.ts` 统一桥接，view 只保留真实的 conversation 查询、sync 与 revert-state 落点实现。
 
@@ -368,8 +369,8 @@ question dock 与 pending-question refresh 的主要 runtime/UI ownership 现在
 
 消息区的 render orchestration 现在由 `ConversationRenderService` 统一决定：
 
-- `rerenderConversationMessages()`：整段历史重渲、scroll snapshot/restore、hydration begin/end
-- `applySyncedConversationUpdate()`：先判定是否可增量，再决定 append / tail patch / full rerender
+- `rerenderConversationMessages()`：整段历史重渲、scroll snapshot/restore、hydration begin/end；full rerender 经串行化队列 + 代际保护执行，并发/同 tick 重复请求合并为一次重建，不会交错 `clear + append`
+- `applySyncedConversationUpdate()`：先判定是否可增量，再决定 append / tail patch；incremental 失败时先经 `ConversationKeyedReconcileDelegate` 按稳定 message identity 做 keyed reconcile（保留未变化消息的 DOM 与折叠状态），再回退 full rerender
 - `patchTrailingAssistantRender()`：只在前缀 rendered message 完全稳定时 patch 最后一条 assistant
 - `getIncrementalRenderedMessageUpdate()`：作为纯 helper 判断当前 sync 是否还能走 append-only 路径
 - `createConversationRenderHost(deps)` 工厂函数（定义在 `ConversationRenderService.ts`）接收 `ConversationRenderHostDependencies` 扁平依赖，在工厂内部装配完整的 `ConversationRenderHost` 回调对象（包括 shell/tail render port 和 debug callbacks）；view 只提供原始 service 引用和简单 lambda，不再拥有 `createConversationRenderHost` / `createConversationAssistantShellRenderPort` / `createConversationAssistantTailRenderPort` 私有方法

@@ -17,6 +17,7 @@ interface BackgroundTaskCompletionNoticeMessageOptions {
   tabId?: TabId | null;
   timestamp?: number;
   noticeMeta?: ChatMessage['noticeMeta'];
+  isCurrent?: () => boolean;
 }
 
 export type {
@@ -60,7 +61,8 @@ export class BackgroundTaskCompletionNoticeService {
   async flushQueuedNotices(
     tabId: TabId | null,
     conversation: Conversation | null,
+    options: { isCurrent?: () => boolean } = {},
   ): Promise<void> {
-    await this.noticeService.flushQueuedNotices(tabId, conversation);
+    await this.noticeService.flushQueuedNotices(tabId, conversation, options);
   }
 }

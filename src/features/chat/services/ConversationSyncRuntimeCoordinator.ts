@@ -13,16 +13,31 @@ import type {
 const logger = createLogger('ConversationSyncRuntimeCoordinator');
 type ConversationSyncTimerHandle = ReturnType<typeof setTimeout>;
 
+/**
+ * While a conversation hydration is rendering, visible/tab syncs must not
+ * touch the messages DOM. Instead of dropping them, the sync is retried on a
+ * bounded cadence until hydration settles; each retry re-validates that the
+ * tab still hosts the same conversation before re-entering the lock.
+ */
+const HYDRATION_SYNC_DEFER_MS = 150;
+const HYDRATION_SYNC_DEFER_MAX_ATTEMPTS = 40;
+
 export interface ConversationSyncRuntime {
   isStreaming: boolean;
   isConversationSyncInFlight: boolean;
+  isHydratingConversation: boolean;
   lastConversationSyncFingerprint: string | null;
   tabSessionLifecycle: TabSessionLifecycleState;
+}
+
+export interface ConversationSyncTabIdentity {
+  conversationId: string | null;
 }
 
 export interface ConversationSyncRuntimeCoordinatorHost {
   getActiveTabId(): TabId | null;
   getTabRuntimeState(tabId: TabId | null): ConversationSyncRuntime | null;
+  getTab(tabId: TabId | null): ConversationSyncTabIdentity | null;
   getConversationSyncFingerprint(messages: ChatMessage[]): string;
   transitionTabSessionLifecycle(tabId: TabId | null, phase: WritableTabSessionPhase, reason: string): boolean;
 }
@@ -58,6 +73,15 @@ export interface TabConversationSyncContext extends VisibleConversationSyncConte
   previousFingerprint: string;
 }
 
+interface HydrationDeferredSyncRequest {
+  conversation: Conversation;
+  callback: (context: VisibleConversationSyncContext & {
+    runtime: ConversationSyncRuntime;
+  }) => Promise<void>;
+  attempt: number;
+  requireActiveTab: boolean;
+}
+
 export class ConversationSyncRuntimeCoordinator {
   private readonly syncTimeoutMs: number;
   private readonly onSyncTimeout: (diagnostic: ConversationSyncTimeoutDiagnostic) => void;
@@ -67,6 +91,11 @@ export class ConversationSyncRuntimeCoordinator {
     delayMs: number,
   ) => ConversationSyncTimerHandle;
   private readonly clearTimer: (handle: ConversationSyncTimerHandle) => void;
+  /** Latest hydration-deferred sync request per tab; one retry timer per tab. */
+  private readonly hydrationDeferredSyncByTabId = new Map<
+    TabId,
+    HydrationDeferredSyncRequest
+  >();
 
   constructor(
     private readonly host: ConversationSyncRuntimeCoordinatorHost,
@@ -97,6 +126,16 @@ export class ConversationSyncRuntimeCoordinator {
         });
       },
     );
+  }
+
+  /** Re-check ownership after an awaited network/canonical sync operation. */
+  isVisibleConversationCurrent(context: VisibleConversationSyncContext): boolean {
+    return this.host.getActiveTabId() === context.tabId
+      && this.host.getTab(context.tabId)?.conversationId === context.conversation.id;
+  }
+
+  isTabConversationCurrent(context: VisibleConversationSyncContext): boolean {
+    return this.host.getTab(context.tabId)?.conversationId === context.conversation.id;
   }
 
   async runTabConversationSync(
@@ -136,6 +175,18 @@ export class ConversationSyncRuntimeCoordinator {
       return false;
     }
 
+    if (runtime.isHydratingConversation) {
+      return this.deferConversationSyncUntilHydrationSettles(
+        tabId,
+        {
+          conversation,
+          callback,
+          attempt: 1,
+          requireActiveTab: tabId === this.host.getActiveTabId(),
+        },
+      );
+    }
+
     runtime.isConversationSyncInFlight = true;
     this.host.transitionTabSessionLifecycle(tabId, 'syncing', 'conversation-sync-lock');
     const syncStartedAt = this.now();
@@ -154,6 +205,76 @@ export class ConversationSyncRuntimeCoordinator {
       runtime.isConversationSyncInFlight = false;
       this.host.transitionTabSessionLifecycle(tabId, 'idle', 'conversation-sync-lock-release');
     }
+  }
+
+  /**
+   * Hydration owns the messages DOM, so syncs arriving mid-hydration are
+   * deferred instead of dropped. Concurrent requests for the same tab merge
+   * into a single pending retry; the retry re-validates tab/conversation
+   * identity before re-entering the sync lock, and gives up after a bounded
+   * number of attempts so a stuck hydration cannot spin forever.
+   */
+  private deferConversationSyncUntilHydrationSettles(
+    tabId: TabId,
+    request: HydrationDeferredSyncRequest,
+  ): boolean {
+    if (this.hydrationDeferredSyncByTabId.has(tabId)) {
+      // A later canonical/server request carries newer intent (notably a
+      // compaction reload), so retain it while sharing the existing timer.
+      this.hydrationDeferredSyncByTabId.set(tabId, request);
+      return false;
+    }
+
+    this.hydrationDeferredSyncByTabId.set(tabId, request);
+    this.setTimer(() => {
+      const pendingRequest = this.hydrationDeferredSyncByTabId.get(tabId);
+      this.hydrationDeferredSyncByTabId.delete(tabId);
+      if (pendingRequest) {
+        void this.retryHydrationDeferredSync(tabId, pendingRequest);
+      }
+    }, HYDRATION_SYNC_DEFER_MS);
+    return false;
+  }
+
+  private async retryHydrationDeferredSync(
+    tabId: TabId,
+    request: HydrationDeferredSyncRequest,
+  ): Promise<void> {
+    const { conversation, callback, attempt, requireActiveTab } = request;
+    if (requireActiveTab && this.host.getActiveTabId() !== tabId) {
+      // A visible-sync deferral whose tab is no longer visible is obsolete.
+      return;
+    }
+
+    if (this.host.getTab(tabId)?.conversationId !== conversation.id) {
+      // The tab moved on to another conversation while hydrating; the new
+      // conversation's own sync loop covers it, so this retry is obsolete.
+      return;
+    }
+
+    const runtime = this.host.getTabRuntimeState(tabId);
+    if (runtime?.isHydratingConversation) {
+      if (attempt >= HYDRATION_SYNC_DEFER_MAX_ATTEMPTS) {
+        logger.warn('Dropping conversation sync after repeated hydration deferrals', {
+          tabId,
+          conversationId: conversation.id,
+          attempts: attempt,
+        });
+        return;
+      }
+      this.deferConversationSyncUntilHydrationSettles(
+        tabId,
+        {
+          conversation,
+          callback,
+          attempt: attempt + 1,
+          requireActiveTab,
+        },
+      );
+      return;
+    }
+
+    await this.withConversationSyncLock(tabId, conversation, callback);
   }
 
   private reportSyncTimeout(

@@ -18,6 +18,7 @@ import {
   TabManager,
 } from '../tabs';
 import type { PrepareMessageSendOptions } from './MessageSendPreparationService';
+import { armProgrammaticScrollGuard } from './ScrollManager';
 import {
   type TabMessagesPaneCoordinator,
   type TabMessagesPaneRuntimeState,
@@ -342,8 +343,17 @@ export class ConversationTabRuntimeCoordinator<
     if (!runtime) {
       return false;
     }
+    const wasHydrating = runtime.hydrationDepth > 0 || runtime.isHydratingConversation;
+    runtime.hydrationDepth = Math.max(0, runtime.hydrationDepth || 0) + 1;
     runtime.isHydratingConversation = true;
-    runtime.pendingLayoutMutations = 0;
+    if (!wasHydrating) {
+      runtime.pendingLayoutMutations = 0;
+      runtime.userScrollIntentDuringHydration = false;
+    }
+    // Clearing the messages container clamps scrollTop and fires a scroll
+    // event. Mark it as programmatic so the pane scroll handler does not
+    // mistake the rebuild for the user scrolling to the bottom.
+    armProgrammaticScrollGuard(runtime);
     return true;
   }
   recordHydrationLayoutMutation(tabId: TabId | null = this.getActiveTabId()): boolean {
@@ -357,6 +367,16 @@ export class ConversationTabRuntimeCoordinator<
   endConversationHydration(tabId: TabId | null = this.getActiveTabId()): boolean {
     const runtime = this.getRuntimeState(tabId);
     if (!runtime) {
+      return false;
+    }
+    if (runtime.hydrationDepth <= 0) {
+      runtime.isHydratingConversation = false;
+      runtime.pendingLayoutMutations = 0;
+      return false;
+    }
+    runtime.hydrationDepth -= 1;
+    if (runtime.hydrationDepth > 0) {
+      // A nested hydration pass ended; the outermost pass still owns the flag.
       return false;
     }
     runtime.isHydratingConversation = false;
@@ -464,6 +484,7 @@ export class ConversationTabRuntimeCoordinator<
   ensureTurnBody(tabId: TabId | null = this.getActiveTabId()): HTMLElement | null {
     const paneState = this.getPaneState(tabId);
     if (!paneState) return null;
+    if (paneState.runtime.stagedTurnBodyEl) return paneState.runtime.stagedTurnBodyEl;
     if (paneState.runtime.currentTurnBodyEl?.isConnected) return paneState.runtime.currentTurnBodyEl;
     const turnEl = paneState.messagesEl.createDiv({ cls: 'opencodian-turn opencodian-turn--assistant-only' });
     const bodyEl = turnEl.createDiv({ cls: 'opencodian-turn-body' });
@@ -516,7 +537,18 @@ export class ConversationTabRuntimeCoordinator<
   }
 
   async handleTabSwitch(tabId: TabId): Promise<void> {
-    if (this.host.getTabManager()?.switchToTab(tabId)) {
+    const tabManager = this.host.getTabManager();
+    if (!tabManager) {
+      return;
+    }
+
+    // Clicking the already-active tab must not re-run a full hydration: the
+    // pane for this tab is already rendered and in sync via the sync loop.
+    if (tabManager.getActiveTab()?.id === tabId) {
+      return;
+    }
+
+    if (tabManager.switchToTab(tabId)) {
       await this.ports.activateTab(tabId);
     }
   }

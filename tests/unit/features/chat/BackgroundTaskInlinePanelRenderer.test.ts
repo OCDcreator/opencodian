@@ -141,4 +141,97 @@ describe('BackgroundTaskInlinePanelRenderer', () => {
     expect(runtime.backgroundTaskIndicatorEl).toBeNull();
     expect(runtime.backgroundTaskInlineEls.size).toBe(0);
   });
+
+  it('removes a panel created before body markdown when the lease expires during await', async () => {
+    const {
+      anchorOneBody,
+      renderer,
+      renderMarkdownInto,
+      runtime,
+    } = createHarness();
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    let current = true;
+    renderMarkdownInto.mockImplementationOnce(async (container: HTMLElement, markdown: string) => {
+      container.setText(`markdown:${markdown}`);
+      current = false;
+      await gate;
+    });
+
+    const renderPromise = renderer.render(null, 'tab-1', { isCurrent: () => current });
+    while (renderMarkdownInto.mock.calls.length < 1) {
+      await Promise.resolve();
+    }
+    const panel = runtime.backgroundTaskInlineEls.get('anchor-1');
+    expect(panel?.parentElement).toBe(anchorOneBody);
+    expect(panel?.querySelector('.opencodian-chat-notice-text')).not.toBeNull();
+
+    release();
+    await renderPromise;
+
+    expect(runtime.backgroundTaskInlineEls.has('anchor-1')).toBe(false);
+    expect(panel?.isConnected).toBe(false);
+  });
+
+  it('removes a half-rendered panel when the lease expires during tasks markdown', async () => {
+    const {
+      renderer,
+      renderMarkdownInto,
+      runtime,
+    } = createHarness();
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    let callCount = 0;
+    let current = true;
+    renderMarkdownInto.mockImplementation(async (container: HTMLElement, markdown: string) => {
+      callCount += 1;
+      container.setText(`markdown:${markdown}`);
+      if (callCount === 3) {
+        current = false;
+        await gate;
+      }
+    });
+
+    const renderPromise = renderer.render(null, 'tab-1', { isCurrent: () => current });
+    while (callCount < 3) {
+      await Promise.resolve();
+    }
+    const panel = runtime.backgroundTaskInlineEls.get('anchor-2');
+    expect(panel).toBeDefined();
+    expect(panel?.isConnected).toBe(true);
+
+    release();
+    await renderPromise;
+
+    expect(runtime.backgroundTaskInlineEls.has('anchor-2')).toBe(false);
+    expect(panel?.isConnected).toBe(false);
+  });
+
+  it('does not let an older overlapping render discard the newer panel', async () => {
+    const { renderer, renderMarkdownInto, runtime } = createHarness();
+    let releaseFirst!: () => void;
+    const firstGate = new Promise<void>((resolve) => { releaseFirst = resolve; });
+    let callCount = 0;
+    renderMarkdownInto.mockImplementation(async (container: HTMLElement, markdown: string) => {
+      callCount += 1;
+      container.setText(`markdown:${markdown}`);
+      if (callCount === 1) {
+        await firstGate;
+      }
+    });
+
+    const first = renderer.render(null, 'tab-1', { isCurrent: () => true });
+    while (callCount < 1) {
+      await Promise.resolve();
+    }
+    const second = renderer.render(null, 'tab-1', { isCurrent: () => true });
+    releaseFirst();
+    await Promise.all([first, second]);
+
+    const panel = runtime.backgroundTaskInlineEls.get('anchor-1');
+    expect(panel?.isConnected).toBe(true);
+    expect(panel?.querySelector('.opencodian-chat-notice-text')?.textContent).toBe(
+      'markdown:Preparing body',
+    );
+  });
 });

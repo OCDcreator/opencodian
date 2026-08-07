@@ -33,6 +33,7 @@ export class VisibleConversationPostSyncCoordinator {
 - `handleVisibleConversationSyncComplete()` 先刷新 pending question / todo / status，再提交 visible current-conversation state
 - visible refresh 的 session-id 配对继续由 `PostSyncQuestionTodoRefreshFacade` 与 `PostSyncQuestionTodoRefreshPlanBuilder` 组合承接
 - state commit、fingerprint 更新与 apply/indicator outcome 判定继续由 `VisibleConversationPostSyncStateCoordinator` 持有，本 coordinator 只维护调用顺序
+- visible post-sync 将 captured lease 传入 question/todo refresh，并在 refresh await 后再次校验后才允许 state commit。
 
 ## 与 `OpenCodianView` 的边界
 

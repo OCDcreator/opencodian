@@ -19,6 +19,11 @@ export interface BackgroundTaskInlinePanelRuntimeState {
   backgroundTaskActiveAnchorKey: string | null;
 }
 
+export interface BackgroundTaskInlinePanelRenderOptions {
+  /** Captured pane/conversation lease for async markdown work. */
+  isCurrent?: () => boolean;
+}
+
 export interface BackgroundTaskInlinePanelRendererHost {
   getActiveTabId(): TabId | null;
   getTabRuntimeState(tabId: TabId | null): BackgroundTaskInlinePanelRuntimeState | null;
@@ -26,6 +31,9 @@ export interface BackgroundTaskInlinePanelRendererHost {
 }
 
 export class BackgroundTaskInlinePanelRenderer {
+  private readonly renderGenerationByRuntime = new WeakMap<object, number>();
+  private readonly panelGenerationByElement = new WeakMap<HTMLElement, number>();
+
   constructor(
     private readonly timelineService: BackgroundTaskInlineTimelinePort,
     private readonly host: BackgroundTaskInlinePanelRendererHost,
@@ -37,6 +45,10 @@ export class BackgroundTaskInlinePanelRenderer {
       return;
     }
 
+    this.renderGenerationByRuntime.set(
+      runtime,
+      (this.renderGenerationByRuntime.get(runtime) ?? 0) + 1,
+    );
     runtime.backgroundTaskIndicatorEl?.remove();
     runtime.backgroundTaskIndicatorEl = null;
     for (const element of runtime.backgroundTaskInlineEls.values()) {
@@ -45,19 +57,49 @@ export class BackgroundTaskInlinePanelRenderer {
     runtime.backgroundTaskInlineEls.clear();
   }
 
+  private discardPanel(
+    anchorKey: string,
+    runtime: BackgroundTaskInlinePanelRuntimeState,
+    panelEl: HTMLElement,
+    renderGeneration: number,
+  ): void {
+    if (this.panelGenerationByElement.get(panelEl) !== renderGeneration) {
+      return;
+    }
+    if (runtime.backgroundTaskInlineEls.get(anchorKey) === panelEl) {
+      runtime.backgroundTaskInlineEls.delete(anchorKey);
+    }
+    if (runtime.backgroundTaskIndicatorEl === panelEl) {
+      runtime.backgroundTaskIndicatorEl = null;
+    }
+    panelEl.remove();
+  }
+
   async render(
     conversation: Conversation | null = null,
     tabId: TabId | null = this.host.getActiveTabId(),
+    options: BackgroundTaskInlinePanelRenderOptions = {},
   ): Promise<void> {
+    if (options.isCurrent && !options.isCurrent()) {
+      return;
+    }
     const runtime = this.host.getTabRuntimeState(tabId);
     if (!runtime) {
       return;
     }
+    const renderGeneration = (this.renderGenerationByRuntime.get(runtime) ?? 0) + 1;
+    this.renderGenerationByRuntime.set(runtime, renderGeneration);
+    const isRenderCurrent = (): boolean =>
+      (!options.isCurrent || options.isCurrent())
+      && this.renderGenerationByRuntime.get(runtime) === renderGeneration;
 
     const segments = this.timelineService.collectInlineSegments(conversation, tabId);
     const activeKeys = new Set(segments.map((segment) => segment.anchorKey));
 
     for (const [anchorKey, element] of runtime.backgroundTaskInlineEls.entries()) {
+      if (!isRenderCurrent()) {
+        return;
+      }
       if (activeKeys.has(anchorKey)) {
         continue;
       }
@@ -70,14 +112,22 @@ export class BackgroundTaskInlinePanelRenderer {
     }
 
     for (const segment of segments) {
-      await this.renderSegment(segment, runtime);
+      await this.renderSegment(segment, runtime, renderGeneration, isRenderCurrent);
+      if (!isRenderCurrent()) {
+        return;
+      }
     }
   }
 
   private async renderSegment(
     segment: BackgroundTaskSegment,
     runtime: BackgroundTaskInlinePanelRuntimeState,
+    renderGeneration: number,
+    isRenderCurrent: () => boolean,
   ): Promise<void> {
+    if (!isRenderCurrent()) {
+      return;
+    }
     const parentEl = runtime.turnBodyByAnchorKey.get(segment.anchorKey);
     if (!parentEl?.isConnected) {
       return;
@@ -91,6 +141,7 @@ export class BackgroundTaskInlinePanelRenderer {
       panelEl.dataset.anchorKey = segment.anchorKey;
       runtime.backgroundTaskInlineEls.set(segment.anchorKey, panelEl);
     }
+    this.panelGenerationByElement.set(panelEl, renderGeneration);
 
     if (panelEl.parentElement !== parentEl || panelEl !== parentEl.lastElementChild) {
       parentEl.appendChild(panelEl);
@@ -112,6 +163,11 @@ export class BackgroundTaskInlinePanelRenderer {
     const textEl = bodyEl.createDiv({ cls: 'opencodian-chat-notice-text' });
     await this.host.renderMarkdownInto(textEl, copy.body);
 
+    if (!isRenderCurrent()) {
+      this.discardPanel(segment.anchorKey, runtime, panelEl, renderGeneration);
+      return;
+    }
+
     if (copy.detail) {
       bodyEl.createDiv({
         cls: 'opencodian-chat-notice-meta',
@@ -122,6 +178,10 @@ export class BackgroundTaskInlinePanelRenderer {
     if (copy.tasksMarkdown) {
       const tasksEl = bodyEl.createDiv({ cls: 'opencodian-chat-notice-task-list' });
       await this.host.renderMarkdownInto(tasksEl, copy.tasksMarkdown);
+      if (!isRenderCurrent()) {
+        this.discardPanel(segment.anchorKey, runtime, panelEl, renderGeneration);
+        return;
+      }
     }
 
     if (runtime.backgroundTaskActiveAnchorKey === segment.anchorKey) {

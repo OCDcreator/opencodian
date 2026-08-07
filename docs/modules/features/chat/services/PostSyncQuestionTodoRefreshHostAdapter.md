@@ -36,6 +36,7 @@ export function createPostSyncQuestionTodoRefreshServices(...): PostSyncQuestion
 - visible source 继续通过当前 live conversation session 生成 plan；signal/background-tab source 则复用同一组 coordinator/builder，再由 background refresh executor 持有 source-specific follow-up
 - `getCurrentConversationSessionId()` 现在使用 `getConversationBackendSessionId()` 解析 session identity，而非直接访问 `openCodeSessionId`
 - `getCurrentConversationBackend()` 现在通过 `resolveConversationBackendKind()` 提供 backend kind 信息，供 `QuestionTodoStatusRefreshCoordinator` 在 activation 和 post-sync 路径中守护 pending-questions REST 轮询
+- post-sync refresh callbacks carry an optional identity lease so pending-question, status, and todo writes are suppressed after a tab/conversation switch
 
 ## 与 `OpenCodianView` 的边界
 

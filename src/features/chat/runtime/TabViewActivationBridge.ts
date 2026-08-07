@@ -74,11 +74,19 @@ export class TabViewActivationBridge {
     this.questionTodoActivationRefreshCoordinator.applyActivationPreflight(tabId);
   }
 
-  applyStreamingActivationOutcome(tabId: TabId, sessionId: string | null): void {
+  applyStreamingActivationOutcome(
+    tabId: TabId,
+    sessionId: string | null,
+    options: { isCurrent?: () => boolean } = {},
+  ): void {
     this.host.updateModelSelectorDisplay();
     this.activeTabContextUsageCoordinator.syncIdentity();
     if (sessionId) {
-      this.questionTodoActivationRefreshCoordinator.applyConversationActivation(tabId, sessionId);
+      if (options.isCurrent) {
+        this.questionTodoActivationRefreshCoordinator.applyConversationActivation(tabId, sessionId, options);
+      } else {
+        this.questionTodoActivationRefreshCoordinator.applyConversationActivation(tabId, sessionId);
+      }
     }
     this.host.updateSendButtonState();
   }
@@ -93,10 +101,28 @@ export class TabViewActivationBridge {
   async applyLoadedConversationPostRenderOutcome(
     tabId: TabId | null,
     sessionId: string | null,
+    options: { isCurrent?: () => boolean } = {},
   ): Promise<void> {
-    await this.backgroundTaskActivationIndicatorCoordinator.renderLoadedConversationIndicator(tabId);
+    if (options.isCurrent && !options.isCurrent()) {
+      return;
+    }
+    if (options.isCurrent) {
+      await this.backgroundTaskActivationIndicatorCoordinator.renderLoadedConversationIndicator(
+        tabId,
+        options,
+      );
+    } else {
+      await this.backgroundTaskActivationIndicatorCoordinator.renderLoadedConversationIndicator(tabId);
+    }
+    if (options.isCurrent && !options.isCurrent()) {
+      return;
+    }
     if (sessionId) {
-      this.questionTodoActivationRefreshCoordinator.applyConversationActivation(tabId, sessionId);
+      if (options.isCurrent) {
+        this.questionTodoActivationRefreshCoordinator.applyConversationActivation(tabId, sessionId, options);
+      } else {
+        this.questionTodoActivationRefreshCoordinator.applyConversationActivation(tabId, sessionId);
+      }
     }
   }
 

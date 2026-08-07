@@ -25,3 +25,5 @@
 - copy 文案继续来自 `BackgroundTaskTimelineService.getInlineCopy()`；不要在 renderer 内重新拼装 background-task 文案
 - authoritative-sync gate、stopped/stale notice、completion notice queue/flush，仍分别由 `BackgroundTaskLiveSignalCoordinator`、`BackgroundTaskNoticeStateService` 与 `BackgroundTaskIndicatorCoordinator` 负责
 - `OpenCodianView` 仍保留 background-task service bundle 的 host wiring；`renderBackgroundTaskIndicatorIfNeeded()` 的 render/queue/flush 顺序现在由 `BackgroundTaskIndicatorCoordinator` 承接
+- `render()` 可接收 `isCurrent` lease；Markdown、晚到的 detail/tasks 渲染及每个 segment 的 DOM 提交前后都必须通过该 lease。若 panel 已在 await 前创建而 lease 失效，会同步从 runtime map 和 DOM 移除，旧会话切换后不留下空/半成品壳
+- 每个 runtime 维护单调递增的 render generation；重叠 render 只允许最新 generation 复用/提交 panel，旧 generation 在 await 返回后不会误删新 render 正在使用的同一 anchor panel

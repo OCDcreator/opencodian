@@ -12,7 +12,7 @@
 - `:is(.opencodian-message-text, .streaming-text-block).markdown-rendered`：Markdown 根作用域。
 - `.markdown-code-wrapper`、`.markdown-code-lang-label`：代码块容器与语言标签。
 - `.markdown-file-link`：文件链接样式（与 Obsidian 内链交互配合）。
-- `.markdown-embedded-image`：图片嵌入区。
+- `.markdown-embedded-image`：图片嵌入区；`.has-intrinsic-placeholder` 在无显式尺寸的懒加载图片上提供 16:9 稳定占位，避免 late layout shift。
 - `.markdown-render-error`：渲染失败提示。
 
 ## 关联 TS 组件

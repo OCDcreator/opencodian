@@ -24,13 +24,23 @@ export function getIncrementalRenderedMessageUpdate(
 
 export function hasInterruptedLocalAssistantTail(messages: ChatMessage[]): boolean;
 
+export interface ConversationRenderMessagesOptions {
+  /**
+   * 多条渲染过程中每渲染一条前检查；返回 false（例如所属 conversation
+   * load 已被 supersede）时跳过剩余消息，过期 pass 不会往自己不再
+   * 拥有的 pane 追加内容。
+   */
+  shouldContinueRender?(): boolean;
+}
+
 export interface ConversationRenderHost;
 export interface ConversationAssistantShellRenderPort;
 export interface ConversationAssistantTailRenderPort;
 
 export class ConversationMessageRenderDelegate {
+  setStagingContainer(container: HTMLElement | null): void;
   renderMessage(message: ChatMessage): Promise<HTMLElement | void | undefined>;
-  renderMessages(messages: ChatMessage[]): Promise<void>;
+  renderMessages(messages: ChatMessage[], options?: ConversationRenderMessagesOptions): Promise<void>;
   rerenderSingleUserMessage(previousMessageId: string, message: ChatMessage): Promise<void>;
   renderSyncedMessages(messages: ChatMessage[]): Promise<void>;
 }
@@ -44,9 +54,14 @@ export class ConversationSyncedUpdateApplyDelegate {
 
 - incremental helper 继续只比较 `getMessagesForRender()` 后的 rendered sequence，非尾部 signature 变化或消息数量回退时返回 `null`
 - `hasInterruptedLocalAssistantTail()` 判定消息列表中是否存在本地发起、带有可见内容的 assistant 消息（无 `sourceMessageId`、非 `notice` 样式），供 sync-load 和 reload 路径判断是否需要保留 interrupted tail
+- incremental 判定为 `null` 时，synced apply delegate 先调用 `ConversationKeyedReconcileDelegate.tryApply()` 按稳定 message identity 做 keyed reconcile；返回 `false` 才回退 `rerenderConversationMessages()` 全量重建
 - synced append path 会先尝试 patch trailing assistant，再渲染新增消息并刷新 background-task indicator
 - synced assistant append 会优先查找同 `data-canonical-message-id` 的一次性 pending local shell；命中时复用该节点，更新 message/source identity、正文、footer 与 streaming state，再清除标记，而不是再创建第二个 assistant shell。未命中时维持既有 persisted / pseudo-stream 分支
 - plain text assistant append 继续走 pseudo-stream reveal；notice、assistant `summary`、question resolution 与 structured blocks 仍直接使用 persisted assistant shell，避免 compaction report 被伪流式展开
+- pseudo-stream reveal 的 per-chunk markdown 重渲现在经 `MarkdownRenderScheduler` 合并进共享帧预算：chunk 循环只做 `schedule()`、结束时 `flush()` 保证最终内容上屏；循环前后与 render 回调内都检查 message 元素是否仍在当前 messages container，并发 hydration/rerender 换掉容器时 `cancel()` 调度并中止 reveal
+- assistant body 与 user message 两处就地重渲在 `replaceChildren()` 前都会先调用 `disposeCollapsiblesWithin()`，释放旧子树内 collapsible 的 observer/listener
+- `ConversationRenderRuntimeState.stagedTurnBodyEl` 是 keyed reconcile 的可选 detached staging body；`ConversationTabRuntimeCoordinator.ensureTurnBody()` 优先返回它，使异步 assistant shell/content 渲染期间不触碰 live pane
+- `ConversationMessageRenderDelegate.setStagingContainer()` 为 full hydration 提供 detached staging root。每条消息创建 turn shell 后立即从 live container 移入 staging，避免异步 markdown 在 live pane 暴露部分历史；service 在 owner 检查通过后原子提交 staging children。
 - user message rerender 继续复用 host 提供的 frame/body/footer callbacks，其中 body 渲染通过 `host.userMessageContentRenderer` 端口调用 `UserMessageContentRenderer`，不在 runtime 内创建新的 view dependency
 
 ## Compaction Divider 渲染
@@ -57,6 +72,7 @@ export class ConversationSyncedUpdateApplyDelegate {
 
 ## 与 `ConversationRenderService` 的边界
 
-- `ConversationRenderService` 保留 full rerender、scroll restore、trailing assistant patch success/failure logging 与 public API
+- `ConversationRenderService` 保留 full rerender（含串行化队列与代际保护）、scroll restore、trailing assistant patch success/failure logging 与 public API
 - `ConversationRenderRuntime` 只承接基础消息 render delegate 和 synced append apply delegate
+- `ConversationKeyedReconcileDelegate` 独立承接 incremental 失败时的 keyed reconcile，apply delegate 只持有其引用并按返回值决定是否回退全量重建
 - `ConversationTrailingAssistantPatchPlanner` 独立承接 tail patch preflight，避免 runtime 再持有 DOM target 解析责任

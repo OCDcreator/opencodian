@@ -16,10 +16,20 @@ interface CancellableStreamController {
 }
 
 export interface TabMessagesPaneRuntimeState {
+  /** Detached body used while keyed reconcile awaits assistant rendering. */
+  stagedTurnBodyEl?: HTMLElement | null;
   autoScrollEnabled: boolean;
   isNearBottom: boolean;
   programmaticScrollGuardUntil: number;
   isHydratingConversation: boolean;
+  /**
+   * Nested hydration passes (e.g. a settings rerender running inside a
+   * conversation load) share the per-tab flag; only the outermost end may
+   * clear it, otherwise a sync deferral window opens mid-hydration.
+   */
+  hydrationDepth: number;
+  /** Set when a real scroll event occurs while hydration is in flight. */
+  userScrollIntentDuringHydration?: boolean;
   pendingLayoutMutations: number;
   suppressNextLayoutAutoScroll?: boolean;
   isStreaming: boolean;
@@ -33,6 +43,7 @@ export interface TabMessagesPaneState<
   messagesEl: HTMLElement;
   runtime: Runtime;
   scrollHandler: () => void;
+  userInputHandler?: (event: Event) => void;
   mutationObserver: MutationObserver | null;
   resizeObserver: ResizeObserver | null;
 }
@@ -110,6 +121,14 @@ export class TabMessagesPaneCoordinator<
     if (!messagesShellEl) {
       return null;
     }
+    if (existing) {
+      // A shell rebuild can temporarily detach a cached pane without ending
+      // the tab runtime. Reattach the same node so active host references,
+      // stream state, observers, listeners, and DOM-only UI state stay valid.
+      messagesShellEl.appendChild(existing.messagesEl);
+      this.host.applyChatScrollModeToMessagesEl(existing.messagesEl);
+      return existing;
+    }
 
     const messagesEl = messagesShellEl.createDiv({
       cls: 'opencodian-messages opencodian-messages-pane',
@@ -121,6 +140,24 @@ export class TabMessagesPaneCoordinator<
       this.handleScroll(tabId);
     };
     messagesEl.addEventListener('scroll', scrollHandler, { passive: true });
+
+    const userInputHandler = (event: Event) => {
+      if (!this.isScrollIntentInput(event)) {
+        return;
+      }
+      const runtime = this.getRuntimeState(tabId);
+      if (!runtime) {
+        return;
+      }
+      // A real gesture/key input takes precedence over the short guard used
+      // to absorb clear/restore-induced scroll events. Clear it before the
+      // browser emits the resulting scroll event; only that scroll event may
+      // claim hydration user intent.
+      runtime.programmaticScrollGuardUntil = 0;
+    };
+    messagesEl.addEventListener('wheel', userInputHandler, { passive: true });
+    messagesEl.addEventListener('touchstart', userInputHandler, { passive: true });
+    messagesEl.addEventListener('keydown', userInputHandler);
 
     const resizeObserver = typeof ResizeObserver !== 'undefined'
       ? new ResizeObserver(() => {
@@ -149,6 +186,7 @@ export class TabMessagesPaneCoordinator<
       messagesEl,
       runtime: this.host.createRuntimeState(),
       scrollHandler,
+      userInputHandler,
       mutationObserver,
       resizeObserver,
     };
@@ -272,6 +310,10 @@ export class TabMessagesPaneCoordinator<
       return;
     }
 
+    if (paneState.runtime.isHydratingConversation) {
+      paneState.runtime.userScrollIntentDuringHydration = true;
+    }
+
     const nextState = applyUserScrollIntent(paneState.runtime, nearBottom);
     paneState.runtime.autoScrollEnabled = nextState.autoScrollEnabled;
     paneState.runtime.isNearBottom = nextState.isNearBottom;
@@ -318,6 +360,11 @@ export class TabMessagesPaneCoordinator<
     paneState.runtime.streamController?.cancelStream();
     this.host.clearScheduledSignalConversationSync(paneState.tabId);
     paneState.messagesEl.removeEventListener('scroll', paneState.scrollHandler);
+    if (paneState.userInputHandler) {
+      paneState.messagesEl.removeEventListener('wheel', paneState.userInputHandler);
+      paneState.messagesEl.removeEventListener('touchstart', paneState.userInputHandler);
+      paneState.messagesEl.removeEventListener('keydown', paneState.userInputHandler);
+    }
     paneState.mutationObserver?.disconnect();
     paneState.resizeObserver?.disconnect();
     paneState.messagesEl.remove();
@@ -327,5 +374,14 @@ export class TabMessagesPaneCoordinator<
     this.host.setMessagesContainer(null);
     this.host.resetTurnState();
     this.host.destroyNavigationSidebar();
+  }
+
+  private isScrollIntentInput(event: Event): boolean {
+    if (event.type !== 'keydown') {
+      return true;
+    }
+
+    return event instanceof KeyboardEvent
+      && ['ArrowDown', 'ArrowUp', 'End', 'Home', 'PageDown', 'PageUp', ' ', 'Spacebar'].includes(event.key);
   }
 }

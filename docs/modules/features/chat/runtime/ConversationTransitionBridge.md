@@ -34,6 +34,7 @@ export interface ConversationTransitionPort {
   captureLoadedConversationTransition(preserveScrollPosition: boolean): LoadedConversationTransitionContext;
   beginLoadedConversationTransition(context: LoadedConversationTransitionContext): void;
   restoreLoadedConversationTransition(context: LoadedConversationTransitionContext): void;
+  abortLoadedConversationTransition(context: LoadedConversationTransitionContext): void;
   endLoadedConversationTransition(context: LoadedConversationTransitionContext): void;
 }
 ```
@@ -44,6 +45,7 @@ export interface ConversationTransitionPort {
 - `captureLoadedConversationTransition()` 把 active-tab 与 hydration scroll/class shell context 统一打包，避免装载服务继续同时持有两段 bridge 状态
 - `beginLoadedConversationTransition()` 保持原有 preflight 顺序：先清掉 scheduled scroll-to-bottom，再进入 hydration lifecycle、挂上 rehydrating shell、清空消息容器并重置 turn state
 - `restoreLoadedConversationTransition()` 与 `endLoadedConversationTransition()` 只转发 hydration render restore 和 lifecycle 收尾，让 `ConversationViewStateService` 更接近“决定走哪条装载分支”的 orchestration 层
+- `abortLoadedConversationTransition()` 转发 hydration render bridge 的 abort shell：被更新的装载请求 supersede 的旧装载完全跳过 scroll restore，但仍释放 rehydrating class
 
 ## 与 `OpenCodianView` 的边界
 

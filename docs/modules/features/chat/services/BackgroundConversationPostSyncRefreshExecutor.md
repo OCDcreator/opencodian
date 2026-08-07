@@ -34,6 +34,7 @@ export class BackgroundConversationPostSyncRefreshExecutor {
 - `refreshBackgroundTabConversation()` 固定 background-tab sync 走 forced todo/status refresh plan，避免后台 tab 状态停留在旧快照
 - 两个入口都会落到同一条 background execution seam：pending-question refresh → rebuild runtime state → conditional todo/status refresh → post-sync writeback
 - rebuild hook 仍挂在 `QuestionTodoStatusRefreshCoordinator.refreshAfterPostSync()` 的 `afterPendingQuestionRefresh` 上，确保 background-task state 与 question refresh 保持旧顺序
+- refresh executor 贯穿同一 `isCurrent` lease；pending refresh 后不再 rebuild，或在 notice/stream writeback 前失效时，后续副作用全部跳过。
 
 ## Backend-aware routing
 

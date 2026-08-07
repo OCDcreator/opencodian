@@ -1,3 +1,7 @@
+export {
+  MarkdownRenderScheduler,
+  STREAMING_MARKDOWN_RENDER_MIN_INTERVAL_MS,
+} from './MarkdownRenderScheduler';
 export type {
   McpSummaryCategoryDefinition,
   McpSummaryCategoryId,
@@ -10,6 +14,11 @@ export {
   MCP_URL_LIKE_FIELDS,
 } from './mcpSummaryConfig';
 export { StreamController } from './StreamController';
+export {
+  disposeStreamingCollapsible,
+  disposeStreamingCollapsiblesWithin,
+  registerStreamingCollapsible,
+} from './streamingCollapsible';
 export { ThinkingBlockRenderer } from './ThinkingBlockRenderer';
 export { ToolCallRenderer } from './ToolCallRenderer';
 export type {

@@ -29,6 +29,7 @@ export interface ConversationTransitionPort {
   captureLoadedConversationTransition(preserveScrollPosition: boolean): LoadedConversationTransitionContext;
   beginLoadedConversationTransition(context: LoadedConversationTransitionContext): void;
   restoreLoadedConversationTransition(context: LoadedConversationTransitionContext): void;
+  abortLoadedConversationTransition(context: LoadedConversationTransitionContext): void;
   endLoadedConversationTransition(context: LoadedConversationTransitionContext): void;
 }
 
@@ -71,7 +72,6 @@ export class ConversationTransitionBridge implements ConversationTransitionPort 
     this.host.clearScheduledScrollToBottom();
     this.host.beginConversationHydration(context.activeTabId);
     this.hydrationRenderBridge.beginHydrationShell(context.hydrationRenderContext);
-    this.host.clearMessagesContainer();
     this.host.resetTurnState();
   }
 
@@ -79,7 +79,12 @@ export class ConversationTransitionBridge implements ConversationTransitionPort 
     this.hydrationRenderBridge.restoreHydrationShell(context.hydrationRenderContext);
   }
 
+  abortLoadedConversationTransition(context: LoadedConversationTransitionContext): void {
+    this.hydrationRenderBridge.abortHydrationShell(context.hydrationRenderContext);
+  }
+
   endLoadedConversationTransition(context: LoadedConversationTransitionContext): void {
     this.host.endConversationHydration(context.activeTabId);
+    this.hydrationRenderBridge.cleanupHydrationShell?.(context.hydrationRenderContext);
   }
 }

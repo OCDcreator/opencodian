@@ -24,7 +24,11 @@ export interface QuestionTodoActivationRefreshCoordinatorHost {
 
 export class QuestionTodoActivationRefreshCoordinator {
   applyActivationPreflight(tabId: TabId): void;
-  applyConversationActivation(tabId: TabId | null, sessionId: string | null | undefined): void;
+  applyConversationActivation(
+    tabId: TabId | null,
+    sessionId: string | null | undefined,
+    options?: { isCurrent?: () => boolean },
+  ): void;
   applyEmptyActivation(tabId: TabId): void;
 }
 ```
@@ -32,7 +36,7 @@ export class QuestionTodoActivationRefreshCoordinator {
 ## 关键行为
 
 - `applyActivationPreflight()` 保持原来的 preflight 顺序：question dock → todo dock tab writeback
-- `applyConversationActivation()` 保持原来的 activation/open 顺序：todo dock render → question dock render → supplemental refresh
+- `applyConversationActivation()` 保持原来的 activation/open 顺序：todo dock render → question dock render → supplemental refresh；加载 hydration 传入 `isCurrent` 时，租约会继续传到 pending-question、status、todo 请求，失效后不再写回复用的 tab runtime
 - `applyEmptyActivation()` 只刷新 empty-tab 需要的两个 dock，不触发 supplemental refresh
 
 ## 与 `OpenCodianView` 的边界

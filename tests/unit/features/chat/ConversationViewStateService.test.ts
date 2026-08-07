@@ -166,6 +166,7 @@ function createTransitionBridge(
     captureLoadedConversationTransition: jest.fn().mockReturnValue(context),
     beginLoadedConversationTransition: jest.fn(),
     restoreLoadedConversationTransition: jest.fn(),
+    abortLoadedConversationTransition: jest.fn(),
     endLoadedConversationTransition: jest.fn(),
     ...overrides,
   };
@@ -328,6 +329,7 @@ describe('ConversationViewStateService', () => {
       'tab-1',
       conversation,
       conversation.messages,
+      expect.objectContaining({ shouldContinueRender: expect.any(Function) }),
     );
     expect(transitionBridge.restoreLoadedConversationTransition).toHaveBeenCalledTimes(1);
     expect(hydrationTailSpy).toHaveBeenCalledTimes(1);

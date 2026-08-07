@@ -17,6 +17,7 @@
 
 ```typescript
 export interface ConversationSyncVisiblePostSyncRouterHost {
+  captureVisiblePostSyncIdentity?(context): { isCurrent(): boolean };
   applySyncedConversationUpdate(...): Promise<void>;
   renderBackgroundTaskIndicatorIfNeeded(...): Promise<void>;
 }
@@ -41,6 +42,7 @@ export class ConversationSyncVisiblePostSyncRouter {
 - 统一补齐 `expectedConversationId`、`questionSessionId` 与 `syncResult`
 - 如果 post-sync outcome 允许 DOM patch，则调用 `applySyncedConversationUpdate()`
 - 否则只在需要时调用 `renderBackgroundTaskIndicatorIfNeeded()`
+- coordinator `await` 返回后重新检查捕获的 identity lease；active tab、conversation 或 pane/render generation 发生变化时丢弃旧结果。
 
 ## 与相邻模块的边界
 

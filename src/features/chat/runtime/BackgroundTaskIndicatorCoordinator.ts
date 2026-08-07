@@ -3,7 +3,10 @@ import type { BackgroundTaskLiveSignalCoordinator } from '../services/Background
 import type { BackgroundTaskNoticeStateService } from '../services/BackgroundTaskNoticeStateService';
 import type { BackgroundTaskTimelineService } from '../services/BackgroundTaskTimelineService';
 import type { TabId } from '../tabs';
-import type { BackgroundTaskInlinePanelRenderer } from './BackgroundTaskInlinePanelRenderer';
+import type {
+  BackgroundTaskInlinePanelRenderer,
+  BackgroundTaskInlinePanelRenderOptions,
+} from './BackgroundTaskInlinePanelRenderer';
 import type { TabRuntimeStateBridge } from './TabRuntimeStateBridge';
 
 type BackgroundTaskIndicatorInlinePanelPort = Pick<BackgroundTaskInlinePanelRenderer, 'render'>;
@@ -23,6 +26,8 @@ export interface BackgroundTaskIndicatorCoordinatorHost {
   getCurrentConversation(): Conversation | null;
   hasTabRuntime(tabId: TabId | null): boolean;
 }
+
+export type BackgroundTaskIndicatorRenderOptions = BackgroundTaskInlinePanelRenderOptions;
 
 interface BackgroundTaskIndicatorCoordinatorDependencies {
   inlinePanelRenderer: BackgroundTaskIndicatorInlinePanelPort;
@@ -59,30 +64,59 @@ export class BackgroundTaskIndicatorCoordinator {
 
   async renderIfNeeded(
     tabId: TabId | null = this.host.getActiveTabId(),
+    options: BackgroundTaskIndicatorRenderOptions = {},
     conversation: Conversation | null = this.host.getCurrentConversation(),
   ): Promise<void> {
-    if (!this.host.hasTabRuntime(tabId)) {
+    if (!this.host.hasTabRuntime(tabId)
+      || (options.isCurrent && !options.isCurrent())) {
       return;
     }
 
-    this.liveSignalCoordinator.reconcileStateFromLiveSignals(tabId);
-    await this.inlinePanelRenderer.render(conversation, tabId);
-    await this.flushCompletionNoticesAndSyncStreamLikeState(tabId, conversation);
+    if (options.isCurrent) {
+      this.liveSignalCoordinator.reconcileStateFromLiveSignals(tabId, options);
+    } else {
+      this.liveSignalCoordinator.reconcileStateFromLiveSignals(tabId);
+    }
+    if (options.isCurrent) {
+      await this.inlinePanelRenderer.render(conversation, tabId, options);
+    } else {
+      await this.inlinePanelRenderer.render(conversation, tabId);
+    }
+    if (options.isCurrent && !options.isCurrent()) {
+      return;
+    }
+    if (options.isCurrent) {
+      await this.flushCompletionNoticesAndSyncStreamLikeState(tabId, conversation, options);
+    } else {
+      await this.flushCompletionNoticesAndSyncStreamLikeState(tabId, conversation);
+    }
   }
 
   async flushCompletionNoticesAndSyncStreamLikeState(
     tabId: TabId | null = this.host.getActiveTabId(),
     conversation: Conversation | null = this.host.getCurrentConversation(),
+    options: { isCurrent?: () => boolean } = {},
   ): Promise<void> {
-    await this.queueAndFlushCompletionNotices(tabId, conversation);
+    if (options.isCurrent && !options.isCurrent()) {
+      return;
+    }
+    if (options.isCurrent) {
+      await this.queueAndFlushCompletionNotices(tabId, conversation, options);
+    } else {
+      await this.queueAndFlushCompletionNotices(tabId, conversation);
+    }
+    if (options.isCurrent && !options.isCurrent()) {
+      return;
+    }
     this.tabRuntimeStateBridge.syncStreamLikeState(tabId);
   }
 
   async queueAndFlushCompletionNotices(
     tabId: TabId | null = this.host.getActiveTabId(),
     conversation: Conversation | null = this.host.getCurrentConversation(),
+    options: { isCurrent?: () => boolean } = {},
   ): Promise<void> {
-    if (!conversation) {
+    if (!conversation || (options.isCurrent && !options.isCurrent())) {
       return;
     }
 
@@ -91,6 +125,10 @@ export class BackgroundTaskIndicatorCoordinator {
       tabId,
       conversation,
     );
-    await this.completionNoticeService.flushQueuedNotices(tabId, conversation);
+    if (options.isCurrent) {
+      await this.completionNoticeService.flushQueuedNotices(tabId, conversation, options);
+    } else {
+      await this.completionNoticeService.flushQueuedNotices(tabId, conversation);
+    }
   }
 }

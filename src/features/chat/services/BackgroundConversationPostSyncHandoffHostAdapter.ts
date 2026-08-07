@@ -70,10 +70,14 @@ export function createBackgroundConversationPostSyncHandoffViewHostAdapter(
     flushBackgroundTaskPostSyncWriteback: (
       tabId: TabId | null,
       conversation: Conversation | null,
-    ) =>
-      dependencies
-        .getBackgroundTaskIndicatorCoordinator()
-        .flushCompletionNoticesAndSyncStreamLikeState(tabId, conversation),
+      options?: { isCurrent?: () => boolean },
+    ) => {
+      const coordinator = dependencies.getBackgroundTaskIndicatorCoordinator();
+      if (options) {
+        return coordinator.flushCompletionNoticesAndSyncStreamLikeState(tabId, conversation, options);
+      }
+      return coordinator.flushCompletionNoticesAndSyncStreamLikeState(tabId, conversation);
+    },
     markBackgroundTaskAuthoritativeSync: (tabId: TabId | null, reason: string) => {
       dependencies
         .getBackgroundTaskLiveSignalCoordinator()

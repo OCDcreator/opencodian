@@ -20,6 +20,7 @@ export interface VisibleConversationPostSyncOptions {
   expectedConversationId: string;
   questionSessionId: string | null | undefined;
   syncResult: VisibleConversationPostSyncResult;
+  isCurrent?: () => boolean;
 }
 
 export class VisibleConversationPostSyncCoordinator {
@@ -34,7 +35,15 @@ export class VisibleConversationPostSyncCoordinator {
     await this.postSyncQuestionTodoRefreshFacade.refreshVisibleConversation({
       tabId: options.tabId,
       questionSessionId: options.questionSessionId,
+      isCurrent: options.isCurrent,
     });
+
+    if (options.isCurrent && !options.isCurrent()) {
+      return {
+        shouldApplySyncedConversationUpdate: false,
+        shouldRenderBackgroundTaskIndicator: false,
+      };
+    }
 
     return this.visibleConversationPostSyncState.commitPostSyncState({
       tabId: options.tabId,

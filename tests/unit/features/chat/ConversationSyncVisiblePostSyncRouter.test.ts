@@ -106,6 +106,7 @@ describe('ConversationSyncVisiblePostSyncRouter', () => {
       tabId: 'tab-active',
       expectedConversationId: 'visible',
       questionSessionId: 'session-visible',
+      isCurrent: expect.any(Function),
       syncResult: {
         changed: true,
         messages: conversation.messages,
@@ -143,7 +144,10 @@ describe('ConversationSyncVisiblePostSyncRouter', () => {
     });
 
     expect(host.applySyncedConversationUpdate).not.toHaveBeenCalled();
-    expect(host.renderBackgroundTaskIndicatorIfNeeded).toHaveBeenCalledWith('tab-active');
+    expect(host.renderBackgroundTaskIndicatorIfNeeded).toHaveBeenCalledWith(
+      'tab-active',
+      { isCurrent: expect.any(Function) },
+    );
   });
 
   it('skips question/todo refresh for non-OpenCode conversations and applies sync directly', async () => {
@@ -178,6 +182,52 @@ describe('ConversationSyncVisiblePostSyncRouter', () => {
       [],
       conversation.messages,
     );
+    expect(host.renderBackgroundTaskIndicatorIfNeeded).not.toHaveBeenCalled();
+  });
+
+  it('does not write a stale visible result after the active pane switches during post-sync await', async () => {
+    const conversationA = createConversation('conversation-a');
+    const conversationB = createConversation('conversation-b');
+    const state = {
+      activeTabId: 'tab-a',
+      conversationId: conversationA.id,
+      paneGeneration: 1,
+    };
+    const host = createHost();
+    host.captureVisiblePostSyncIdentity = jest.fn(() => ({
+      isCurrent: () => state.activeTabId === 'tab-a'
+        && state.conversationId === conversationA.id
+        && state.paneGeneration === 1,
+    }));
+    let resolvePostSync: ((value: {
+      shouldApplySyncedConversationUpdate: boolean;
+      shouldRenderBackgroundTaskIndicator: boolean;
+    }) => void) | undefined;
+    const deferred = new Promise<{
+      shouldApplySyncedConversationUpdate: boolean;
+      shouldRenderBackgroundTaskIndicator: boolean;
+    }>((resolve) => {
+      resolvePostSync = resolve;
+    });
+    const coordinator = createCoordinator();
+    coordinator.handleVisibleConversationSyncComplete.mockReturnValue(deferred);
+    const router = new ConversationSyncVisiblePostSyncRouter(host, coordinator);
+    const routePromise = router.routeVisibleSyncComplete({
+      syncContext: { tabId: 'tab-a', conversation: conversationA },
+      previousMessages: [],
+      syncResult: createSyncResult(conversationA),
+    });
+
+    state.activeTabId = 'tab-b';
+    state.conversationId = conversationB.id;
+    state.paneGeneration = 2;
+    resolvePostSync?.({
+      shouldApplySyncedConversationUpdate: true,
+      shouldRenderBackgroundTaskIndicator: false,
+    });
+    await routePromise;
+
+    expect(host.applySyncedConversationUpdate).not.toHaveBeenCalled();
     expect(host.renderBackgroundTaskIndicatorIfNeeded).not.toHaveBeenCalled();
   });
 });

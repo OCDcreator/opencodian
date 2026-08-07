@@ -44,6 +44,8 @@ export class SessionTodoStateService {
 
 ## 关键行为
 
+- stale-session notice reconciliation 支持 activation/post-sync `isCurrent` lease；notice append 会在异步边界透传 lease，避免旧 tab 的 stale notice 保存到新 conversation。
+
 ### todo/status 状态桥接
 
 - `setTabSessionTodos()` 统一维护 normalized todo snapshot、fingerprint 与 suppression 恢复
