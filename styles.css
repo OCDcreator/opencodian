@@ -2008,22 +2008,39 @@ body[data-opencodian-provider-icon-mode="color"] {
   overflow-wrap: break-word;
 }
 
-/* Code block wrapper */
+:is(.opencodian-message-text, .streaming-text-block) {
+  --opencodian-markdown-inline-code-bg:
+    color-mix(in srgb, var(--background-modifier-hover) 56%, var(--background-secondary) 44%);
+  --opencodian-markdown-code-block-bg:
+    color-mix(in srgb, var(--code-background) 88%, var(--background-primary) 12%);
+  --opencodian-markdown-code-block-border:
+    color-mix(in srgb, var(--background-modifier-border) 64%, var(--text-muted) 36%);
+  --opencodian-markdown-code-language-bg:
+    color-mix(in srgb, var(--background-primary) 78%, var(--background-modifier-hover));
+}
+
+/* Code block panel: Tailwind Typography keeps fenced code in one distinct pre surface. */
 .markdown-code-wrapper {
   position: relative;
-  margin: 0.5em 0;
-  border-radius: 6px;
+  margin: 0.75em 0;
+  border: 1px solid var(--opencodian-markdown-code-block-border);
+  border-radius: 8px;
+  background: var(--opencodian-markdown-code-block-bg);
+  box-shadow: none;
   overflow: hidden;
 }
 
 .markdown-code-wrapper.has-language pre {
-  padding-top: 2em;
+  padding-top: 2.4em;
 }
 
 .markdown-code-wrapper pre {
   margin: 0;
-  padding: 1em;
-  background: var(--code-background);
+  padding: 0.9em 1em;
+  background: transparent;
+  color: inherit;
+  font-family: var(--font-monospace);
+  line-height: 1.6;
   overflow-x: auto;
 }
 
@@ -2036,11 +2053,12 @@ body[data-opencodian-provider-icon-mode="color"] {
   color: var(--text-muted);
   cursor: pointer;
   padding: 0.2em 0.5em;
-  border-radius: 3px;
-  background: var(--background-modifier-border);
+  border: 1px solid var(--opencodian-markdown-code-block-border);
+  border-radius: 4px;
+  background: var(--opencodian-markdown-code-language-bg);
   font-family: var(--font-monospace);
   user-select: none;
-  transition: all 0.2s ease;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
 .markdown-code-lang-label:hover {
@@ -2052,26 +2070,18 @@ body[data-opencodian-provider-icon-mode="color"] {
   display: none !important;
 }
 
-/* Inline code */
+/* Inline code: the compact shadcn-style token, deliberately unlike a code panel. */
 :is(.opencodian-message-text, .streaming-text-block) code {
+  position: relative;
   display: inline-block;
   font-family: var(--font-monospace);
   font-size: 0.9em;
-  background: color-mix(
-    in srgb,
-    var(--code-background, var(--background-secondary-alt, var(--background-secondary))) 88%,
-    var(--interactive-accent) 12%
-  );
-  padding: 0.18em 0.45em;
-  border-radius: 5px;
-  border: 1px solid color-mix(
-    in srgb,
-    var(--background-modifier-border-hover, var(--background-modifier-border)) 78%,
-    var(--interactive-accent) 22%
-  );
-  box-shadow:
-    0 1px 0 color-mix(in srgb, var(--background-modifier-border-hover) 22%, transparent),
-    inset 0 1px 0 color-mix(in srgb, var(--opencodian-glass-specular-soft, var(--text-muted)) 28%, transparent);
+  font-weight: 600;
+  background: var(--opencodian-markdown-inline-code-bg);
+  padding: 0.2em 0.3em;
+  border: 0;
+  border-radius: 4px;
+  box-shadow: none;
   color: var(--code-normal, var(--text-normal));
   white-space: break-spaces;
   overflow-wrap: anywhere;
@@ -2080,11 +2090,52 @@ body[data-opencodian-provider-icon-mode="color"] {
 }
 
 :is(.opencodian-message-text, .streaming-text-block) pre code {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
   padding: 0;
   background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  color: inherit;
+  font-size: inherit;
+  font-family: inherit;
+  font-weight: inherit;
+  line-height: inherit;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   word-break: break-word;
+}
+
+:is(.opencodian-message-text, .streaming-text-block) pre code::before,
+:is(.opencodian-message-text, .streaming-text-block) pre code::after {
+  content: none;
+}
+
+/* MathJax is mathematical typography, never a code chip or code panel. */
+:is(.opencodian-message-text, .streaming-text-block) :is(
+  .math.math-inline,
+  .math-inline,
+  .katex:not(.katex-display .katex),
+  mjx-container:not([display="true"])
+) {
+  color: var(--text-normal);
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+:is(.opencodian-message-text, .streaming-text-block) :is(.math.math-block, .math-block, .katex-display, mjx-container[display="true"]) {
+  margin: 0.85em 0;
+  padding: 0.2em 0;
+  color: var(--text-normal);
+  background: transparent !important;
+  border: none !important;
+  border-bottom: none !important;
+  box-shadow: none !important;
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 
 /* Images */
