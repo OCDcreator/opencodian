@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "02dce1c8e7f90871f9c38c6f3e863ff1715bcddcbcf576af1678fa249daf8bc6",
+  "digest": "e3a0a20485f18d8ac46f9748aa01e284135e6a51b973d7379f676ec917ea35d3",
   "recordCount": 605,
   "records": [
     {
@@ -1671,7 +1671,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/services/RetainedSelectionHighlightService.ts",
-      "sha256": "844dcd3c983fcb77aa9d8e3dca0dc655a3b2335bc778ead9040e32c8f62b7598"
+      "sha256": "c2db1f96340132a72a1c5198dfcfa879b36b914fa7c134e20f7b783f5043e304"
     },
     {
       "kind": "src",
@@ -3029,7 +3029,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-08-13T09:35:18.637Z",
-  "headShaAtGeneration": "95e9ecce4c9c37b0bf6470a1afde30f82c3385c9",
+  "generatedAt": "2026-08-13T09:58:04.620Z",
+  "headShaAtGeneration": "206be4b8b1043e1b7e3ada7ab52dd109342ee94b",
   "graphifyVersion": "graphify 0.9.31"
 }

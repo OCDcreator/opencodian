@@ -121,7 +121,7 @@ describe('RetainedSelectionHighlightService', () => {
     expect(service.shouldRetainPreviewDuringTransition()).toBe(false);
   });
 
-  it('shows and clears the retained CodeMirror highlight as composer focus changes', () => {
+  it('keeps the retained CodeMirror highlight after focus moves from the composer into the conversation', () => {
     const editor = createEditor({ fromOffset: 15, toOffset: 42 });
     const view = createMarkdownView('notes/focused.md', editor);
     const preview = createSelectionPreview('notes/focused.md');
@@ -138,6 +138,33 @@ describe('RetainedSelectionHighlightService', () => {
     setComposerFocused(false);
     setFocusPreview(preview);
     service.refreshHighlight();
+
+    expect(showSelectionHighlight).toHaveBeenLastCalledWith(editor.cm, 15, 42);
+    expect(hideSelectionHighlight).not.toHaveBeenCalled();
+  });
+
+  it('clears the retained CodeMirror highlight when the editor no longer reports a selection preview', () => {
+    const editor = createEditor({ fromOffset: 15, toOffset: 42 });
+    const view = createMarkdownView('notes/focused.md', editor);
+    const preview = createSelectionPreview('notes/focused.md');
+    const { service, setComposerFocused, setFocusPreview } = createHarness({
+      composerFocused: true,
+      focusPreview: preview,
+    });
+
+    service.syncFromPreview(preview, view, editor);
+
+    setComposerFocused(false);
+    setFocusPreview({
+      kind: 'current_note',
+      path: 'notes/focused.md',
+      label: 'notes/focused.md',
+    });
+    service.syncFromPreview({
+      kind: 'current_note',
+      path: 'notes/focused.md',
+      label: 'notes/focused.md',
+    }, view, editor);
 
     expect(hideSelectionHighlight).toHaveBeenCalledWith(editor.cm);
   });

@@ -46,7 +46,7 @@ class RetainedSelectionHighlightService {
 
 - 有 offsets 时优先调用 `editorSelectionHighlight` 渲染 CodeMirror 高亮
 - 没有 offsets 时退回 CSS Highlight API 的 DOM range 高亮
-- 焦点离开或 preview/path 不再匹配时，统一负责清理 CodeMirror 与 DOM highlight
+- 仅当 selection preview 失效或路径不再匹配时，统一负责清理 CodeMirror 与 DOM highlight；composer 焦点移到会话区域不会取消有效选区
 
 ## 与其他模块的交互
 

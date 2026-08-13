@@ -49,8 +49,7 @@ export class RetainedSelectionHighlightService {
     }
 
     const focusPreview = this.host.getFocusContextPreview();
-    const shouldShow = this.host.isComposerInteractionFocused()
-      && focusPreview?.kind === 'selection'
+    const shouldShow = focusPreview?.kind === 'selection'
       && focusPreview.path === retained.path;
 
     if (shouldShow) {
