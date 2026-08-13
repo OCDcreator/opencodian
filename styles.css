@@ -16501,6 +16501,11 @@ img.opencodian-model-provider-header-icon {
 
 /* Turn Change Record compact layout: single-line file rows, scoped to the
    dedicated .is-turn-diff card so generic notice icons/flex stay untouched. */
+.opencodian-chat-notice-card.is-turn-diff {
+  border: none;
+  box-shadow: none;
+}
+
 .opencodian-chat-notice-card.is-turn-diff .opencodian-chat-notice-body {
   width: 100%;
 }

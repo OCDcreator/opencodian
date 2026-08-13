@@ -66,6 +66,21 @@ describe('AssistantNoticeCardRenderer turn-diff style contract', () => {
     expect(focusRule).toMatch(/outline/);
   });
 
+  it('keeps the turn-diff card itself borderless and shadowless while preserving row focus styles', () => {
+    const cardRule = getRuleBlock(
+      stylesheet,
+      '.opencodian-chat-notice-card.is-turn-diff',
+    );
+    const rowFocusRule = getRuleBlock(
+      stylesheet,
+      '.opencodian-chat-notice-card.is-turn-diff button.opencodian-turn-diff-row:focus-visible',
+    );
+
+    expect(cardRule).toMatch(/border:\s*none/);
+    expect(cardRule).toMatch(/box-shadow:\s*none/);
+    expect(rowFocusRule).toMatch(/outline/);
+  });
+
   it('uses subtle semantic success/error backgrounds with tabular numbers on stat badges', () => {
     const additionsRule = getRuleBlock(stylesheet, '.opencodian-turn-diff-stat.is-additions');
     const deletionsRule = getRuleBlock(stylesheet, '.opencodian-turn-diff-stat.is-deletions');
