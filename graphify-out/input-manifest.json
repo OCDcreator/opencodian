@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "52578b376c7e75b2e9f180e9928620da5ce2e359d9d97a15a8528f4a7a28e1b1",
+  "digest": "fa7dfce0590f4922791784adbf2ca1e46a216ea500674ca13c71e36f02839341",
   "recordCount": 605,
   "records": [
     {
@@ -631,7 +631,7 @@
     {
       "kind": "src",
       "key": "src/core/opencode/OpenCodeStreamEventTransformer.ts",
-      "sha256": "c8ebcffa14ddfb3196617469197c264513be1d022471a7474b7b79d43e503d67"
+      "sha256": "5b60bb593ce8c115457f2ae0212cfb454858afb37943070678ce2e5f99cc4d82"
     },
     {
       "kind": "src",
@@ -3029,7 +3029,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-08-07T14:50:40.403Z",
-  "headShaAtGeneration": "5ef8f8b960d78e260983fcaafd0a2edf07a015cb",
+  "generatedAt": "2026-08-13T06:54:44.674Z",
+  "headShaAtGeneration": "478ecffee882b6abeede394d86c60f55e82c1f9e",
   "graphifyVersion": "graphify 0.9.31"
 }

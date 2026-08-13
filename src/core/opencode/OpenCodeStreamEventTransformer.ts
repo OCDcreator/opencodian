@@ -633,8 +633,10 @@ export class OpenCodeStreamEventTransformer {
     }
 
     const durationSeconds = resolveReasoningDurationSeconds(part);
+    const previousText = state.reasoningTextSnapshots.get(part.id) ?? '';
     const delta = this.resolveReasoningUpdatedDelta(part.id, part.text, state);
-    if (this.hasVisibleReasoningText(delta)) {
+    if (delta.length > 0
+      && (this.hasVisibleReasoningText(delta) || this.hasVisibleReasoningText(previousText))) {
       chunks.push({
         type: 'thinking',
         content: delta,
@@ -823,11 +825,19 @@ export class OpenCodeStreamEventTransformer {
     }
 
     if (this.isReasoningPartType(partType)) {
+      const previousText = partID
+        ? state.reasoningTextSnapshots.get(partID) ?? ''
+        : '';
       if (partID) {
-        const previousText = state.reasoningTextSnapshots.get(partID) ?? '';
         state.reasoningTextSnapshots.set(partID, `${previousText}${delta}`);
       }
-      if (this.hasVisibleReasoningText(delta)) {
+      // A newline or indentation delta is invisible by itself, but after a
+      // reasoning block has begun it is structural Markdown content. Dropping
+      // it joins adjacent sentences/list items (for example `changesThe`),
+      // then prevents the Markdown renderer from recognizing the next list
+      // marker. Keep leading whitespace suppressed so it cannot create an
+      // empty thinking block.
+      if (this.hasVisibleReasoningText(delta) || this.hasVisibleReasoningText(previousText)) {
         chunks.push({ type: 'thinking', content: delta, partId: partID });
       }
       return { chunks, mutations, stop: false };

@@ -1,4 +1,6 @@
 import './OpenCodeStreamEventTransformer.streamPartHandlingSuite';
+import './OpenCodeStreamEventTransformer.reasoningTextPartHandlingSuite';
+import './OpenCodeStreamEventTransformer.reasoningWhitespaceSuite';
 
 import {
   type OpenCodeStreamEventState,

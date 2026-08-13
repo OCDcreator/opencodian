@@ -99,4 +99,131 @@ describe('OpenCodeStreamEventTransformer reasoning whitespace handling', () => {
       { type: 'thinking', content: 'Reasoning started', partId: 'part-blank-thinking' },
     ]);
   });
+
+  it('preserves a whitespace-only delta after reasoning has become visible', () => {
+    const transformer = new OpenCodeStreamEventTransformer(createHost());
+    const state = createState();
+    const streamContext = createStreamContext();
+
+    transformer.handleStreamingEvent(
+      {
+        type: 'message.part.updated',
+        properties: {
+          sessionID: 'test-session',
+          part: {
+            id: 'part-list-thinking',
+            sessionID: 'test-session',
+            messageID: 'assistant-4',
+            type: 'reasoning',
+          },
+        },
+      },
+      'test-session',
+      state,
+      streamContext,
+    );
+
+    const firstLineOutcome = transformer.handleStreamingEvent(
+      {
+        type: 'message.part.delta',
+        properties: {
+          sessionID: 'test-session',
+          partID: 'part-list-thinking',
+          field: 'text',
+          delta: '1. First step',
+        },
+      },
+      'test-session',
+      state,
+      streamContext,
+    );
+    const newlineOutcome = transformer.handleStreamingEvent(
+      {
+        type: 'message.part.delta',
+        properties: {
+          sessionID: 'test-session',
+          partID: 'part-list-thinking',
+          field: 'text',
+          delta: '\n',
+        },
+      },
+      'test-session',
+      state,
+      streamContext,
+    );
+    const secondLineOutcome = transformer.handleStreamingEvent(
+      {
+        type: 'message.part.delta',
+        properties: {
+          sessionID: 'test-session',
+          partID: 'part-list-thinking',
+          field: 'text',
+          delta: '2. Second step',
+        },
+      },
+      'test-session',
+      state,
+      streamContext,
+    );
+
+    expect(firstLineOutcome.chunks).toEqual([
+      { type: 'thinking', content: '1. First step', partId: 'part-list-thinking' },
+    ]);
+    expect(newlineOutcome.chunks).toEqual([
+      { type: 'thinking', content: '\n', partId: 'part-list-thinking' },
+    ]);
+    expect(secondLineOutcome.chunks).toEqual([
+      { type: 'thinking', content: '2. Second step', partId: 'part-list-thinking' },
+    ]);
+  });
+
+  it('preserves a whitespace-only part update after reasoning has become visible', () => {
+    const transformer = new OpenCodeStreamEventTransformer(createHost());
+    const state = createState();
+    const streamContext = createStreamContext();
+
+    const firstOutcome = transformer.handleStreamingEvent(
+      {
+        type: 'message.part.updated',
+        properties: {
+          sessionID: 'test-session',
+          part: {
+            id: 'part-updated-list-thinking',
+            sessionID: 'test-session',
+            messageID: 'assistant-5',
+            type: 'reasoning',
+            text: '1. First step',
+          },
+        },
+      },
+      'test-session',
+      state,
+      streamContext,
+    );
+    const newlineOutcome = transformer.handleStreamingEvent(
+      {
+        type: 'message.part.updated',
+        properties: {
+          sessionID: 'test-session',
+          part: {
+            id: 'part-updated-list-thinking',
+            sessionID: 'test-session',
+            messageID: 'assistant-5',
+            type: 'reasoning',
+            text: '1. First step\n',
+          },
+        },
+      },
+      'test-session',
+      state,
+      streamContext,
+    );
+
+    expect(firstOutcome.chunks).toEqual([
+      { type: 'thinking', content: '1. First step', partId: 'part-updated-list-thinking' },
+    ]);
+    expect(newlineOutcome.chunks).toEqual([
+      { type: 'thinking', content: '\n', partId: 'part-updated-list-thinking' },
+    ]);
+  });
 });

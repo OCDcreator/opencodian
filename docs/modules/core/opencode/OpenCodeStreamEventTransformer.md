@@ -43,6 +43,7 @@
 ## 核心类型 / 状态
 
 - `OpenCodeStreamEventState`: 单条流里的文本累计、error snapshot、tool dedupe、reasoning text dedupe 状态与 text-delta debug 游标。
+- reasoning 的首个纯空白 delta 仍不创建可见 thinking 块；一旦该 part 已有可见文本，后续空格/换行会原样转发给前端，避免 Markdown 段落、缩进和编号列表在流式显示时被拼接破坏。
 - `OpenCodeStreamPartTypeState`: `OpenCodeStreamingRuntimeContext` 或测试用 map，记住 `partId -> partType` 与 `partId -> messageID`。
 - `OpenCodeStreamMutation`: 与 legacy chunks 并行的 canonical mutation 输出，覆盖 message upsert、part upsert、part delta 与 part completion signal。
 - `OpenCodeStreamEventOutcome`: `chunks + mutations + stop` 的统一返回结构；调用方必须先应用 mutations，再继续交付 legacy chunks。
