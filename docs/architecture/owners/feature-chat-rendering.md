@@ -33,6 +33,7 @@ Run before merge: `npm run typecheck`, `npm run module-docs`.
 
 ## Recent change notes
 - **Collapsible disposal:** `setupCollapsible` returns an idempotent dispose handle that disconnects its ResizeObserver and removes toggle listeners; wrappers register in a module-level WeakMap so `disposeCollapsiblesWithin(rootEl)` can release every collapsible before a message subtree is cleared or replaced (undisposed observers are a potential retention risk).
+- **Expansion-state boundary:** persisted block expansion state belongs to `AssistantShellViewHostAdapter` in `feature.chat-runtime`; this rendering owner continues to provide disposal primitives only and must not become a second state store.
 
 ## Hard invariants
 - Do not cross `forbiddenDependencies`.

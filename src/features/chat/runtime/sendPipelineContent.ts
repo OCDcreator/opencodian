@@ -15,6 +15,7 @@ export function mapStreamingContentBlocksToMessageContentBlocks(
     if (block.type === 'thinking') {
       return {
         type: 'thinking',
+        partId: block.partId,
         thinking: block.content,
         durationSeconds: block.durationSeconds,
       };

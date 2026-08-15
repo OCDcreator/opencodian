@@ -36,6 +36,9 @@
 ## Required gates
 Run before merge: `npm run typecheck`, `npm run module-docs`, `npm run build`.
 
+## Recent change notes
+- **Reasoning-part projection:** `OpenCodeMessageNormalizationMapper` copies the server reasoning part `id` into persisted thinking `ContentBlock.partId`. The mapper remains the canonical history-to-chat projection seam; UI owners consume the identity without deriving positional replacement keys.
+
 ## Hard invariants
 - Do not cross `forbiddenDependencies`.
 - Do not replicate canonical state in another owner.

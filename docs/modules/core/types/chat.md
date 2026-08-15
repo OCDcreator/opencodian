@@ -43,7 +43,7 @@
 |------|------|
 | `ChatMessage` | 聊天消息（`id`, `role`, `content`, `timestamp`, `modelId?`, `summary?`, `compactionDivider?`, `sourceMessageId?`, `streamState?`, `displayStyle?`, `noticeTitle?`, `noticeTone?`, `noticeActions?`, `images?`, `toolCalls?`, `contentBlocks?`, `contextAttachments?`, `questionResolution?`, `omo?`, `parts?`） |
 | `CompactionDividerMeta` | 结构化 compaction 分界元数据（`auto`, `overflow`, `tailStartId`） |
-| `ContentBlock` | 消息内容块（`type: 'text' \| 'thinking' \| 'tool_use' \| 'tool_result' \| 'subagent'`，工具块可带 `toolKind?`、`toolMetadata?`、`toolResultVisibility?`） |
+| `ContentBlock` | 消息内容块（`type: 'text' \| 'thinking' \| 'tool_use' \| 'tool_result' \| 'subagent'`，可选 `partId?` 保留 backend-stable block identity；工具块可带 `toolKind?`、`toolMetadata?`、`toolResultVisibility?`） |
 | `ToolCallInfo` | 工具调用信息（`id`, `name`, `kind?`, `input`, `toolMetadata?`, `status`, `result?`, `resultVisibility?`, `isExpanded?`） |
 | `ConversationSessionSettings` | 会话级覆盖设置（`chatFontSizePx?`，支持 `null` 表示显式继承；`codexSandboxMode?` / `codexModelReasoningEffort?` / `codexModelOverride?` / `codexAdditionalDirectories?` / `codexNetworkAccessEnabled?` / `codexWebSearchMode?` 为 Codex 后端会话的 per-conversation 覆盖）。Compaction 配置已移至项目级 `.opencode/opencode.json`；手动 `session.summarize()` 仍是会话级动作，而不是这里的字段。 |
 | `ConversationBackgroundTaskMetadata` | 会话级 background-task lifecycle 缓存（当前只包含可选 `activeAnchor`，用于 hydration/recovery 恢复 active anchor 生命周期，不承载消息正文、工具输出、结构化 payload 或 `contentBlocks` 真值） |
@@ -115,7 +115,7 @@
 ### 内容块类型
 `ContentBlock.type` 支持五种：
 - `text` — 文本内容
-- `thinking` — AI 推理过程（`durationSeconds?`）
+- `thinking` — AI 推理过程（`partId?`, `durationSeconds?`）；`partId` 来自 streaming / history backend part，用于跨 hydration 的 block identity
 - `tool_use` — 工具调用（`toolId`, `toolName`, `toolKind?`, `toolInput`, `toolMetadata?`, `toolResultVisibility?`；当前用于保留 OpenCode `task` child session id 并标记 raw task result 不可直接渲染）
 - `tool_result` — 工具结果（`toolStatus`, `toolResult`）
 - `subagent` — 子代理调用（`subagentId`, `subagentMode`）
@@ -185,6 +185,7 @@
 - `Conversation.backendAgentId` / legacy `acpAgentId` 用于记录 backend-owned agent identity；新代码应优先读写 `backendAgentId`
 - `normalizeConversationSessionSettings()` 会在会话读写时清理无效 override，并保留 `null` 形式的“显式继承”标记；Codex 字段（`codexSandboxMode` / `codexModelReasoningEffort`）会被校验为合法枚举值，无效值会被静默丢弃
 - `ContentBlock.durationSeconds` 仅用于 `thinking` 类型块
+- `ContentBlock.partId` 是可选的 backend part identity；thinking block 有该值时，持久化重渲使用它恢复独立的展开状态
 - `toolMetadata` 当前是 UI-safe 白名单字段，主要用于 `task` / subagent 卡片的 child session linkage，不等于原始 OpenCode metadata 全量透传
 - `toolResultVisibility: 'hidden'` 表示工具结果可保留给内部匹配/审计，但不应作为普通工具输出展示；当前主要用于 OpenCode 原生 `task`。
 - `SessionDiffEntry` 来自 `session.diff()` API，在文件编辑后自动获取

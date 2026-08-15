@@ -57,8 +57,8 @@ export class ConversationSyncedUpdateApplyDelegate {
 - incremental 判定为 `null` 时，synced apply delegate 先调用 `ConversationKeyedReconcileDelegate.tryApply()` 按稳定 message identity 做 keyed reconcile；返回 `false` 才回退 `rerenderConversationMessages()` 全量重建
 - synced append path 会先尝试 patch trailing assistant，再渲染新增消息并刷新 background-task indicator
 - synced assistant append 会优先查找同 `data-canonical-message-id` 的一次性 pending local shell；命中时复用该节点，更新 message/source identity、正文、footer 与 streaming state，再清除标记，而不是再创建第二个 assistant shell。未命中时维持既有 persisted / pseudo-stream 分支
-- plain text assistant append 继续走 pseudo-stream reveal；notice、assistant `summary`、question resolution 与 structured blocks 仍直接使用 persisted assistant shell，避免 compaction report 被伪流式展开
-- pseudo-stream reveal 的 per-chunk markdown 重渲现在经 `MarkdownRenderScheduler` 合并进共享帧预算：chunk 循环只做 `schedule()`、结束时 `flush()` 保证最终内容上屏；循环前后与 render 回调内都检查 message 元素是否仍在当前 messages container，并发 hydration/rerender 换掉容器时 `cancel()` 调度并中止 reveal
+- plain text assistant append 继续走 pseudo-stream reveal；创建的 streaming shell 会立即写入 `data-message-id`（及可选 `data-source-message-id`）后再逐块 reveal，使完成后的节点可被 keyed reconcile / DOM lookup 稳定识别；notice、assistant `summary`、question resolution 与 structured blocks 仍直接使用 persisted assistant shell，避免 compaction report 被伪流式展开
+- pseudo-stream reveal 的 per-chunk markdown 重渲现在经 `MarkdownRenderScheduler` 合并进共享帧预算：chunk 循环只做 `schedule()`、结束时 `flush()` 保证最终内容上屏；循环前后与 render 回调内都检查 message 元素是否仍在当前 messages container，并发 hydration/rerender 换掉容器时 `cancel()` 调度并中止 reveal。render 回调对 markdown 渲染采用 **detached staging**（渲染到临时 stagingEl，await 后复检容器仍 owned 才 `replaceChildren` 到 textEl），与 `StreamController.renderMarkdownText` 一致，避免 in-flight markdown 完成写入已 detach 的旧 textEl
 - assistant body 与 user message 两处就地重渲在 `replaceChildren()` 前都会先调用 `disposeCollapsiblesWithin()`，释放旧子树内 collapsible 的 observer/listener
 - `ConversationRenderRuntimeState.stagedTurnBodyEl` 是 keyed reconcile 的可选 detached staging body；`ConversationTabRuntimeCoordinator.ensureTurnBody()` 优先返回它，使异步 assistant shell/content 渲染期间不触碰 live pane
 - `ConversationMessageRenderDelegate.setStagingContainer()` 为 full hydration 提供 detached staging root。每条消息创建 turn shell 后立即从 live container 移入 staging，避免异步 markdown 在 live pane 暴露部分历史；service 在 owner 检查通过后原子提交 staging children。
@@ -68,6 +68,7 @@ export class ConversationSyncedUpdateApplyDelegate {
 
 - `ConversationUserMessageRenderDelegate.renderMessageIntoFrame()` 对 compaction divider 消息有专用 early-return 分支：命中时给容器添加 `opencodian-message--compaction-divider` CSS class，调用 `host.userMessageContentRenderer.renderCompactionDivider(el, divider)`，然后跳过 content 和 footer 渲染
 - `ConversationRenderHost` 接口通过 `userMessageContentRenderer: UserMessageContentRenderer` 字段暴露 body renderer，由 host 创建并注入具体的 `UserMessageContentRenderer` 实例
+- `ConversationRenderHost` 接口新增 `renderInputSettingsSignature(): string`：返回会影响 full-rerender DOM 输出但不在 `getMessageVisualSignature` 内的宿主显示设置签名（如 `renderUserMarkupAsCodeBlocks`）。由 `ConversationRenderService.computeRerenderFingerprint()` 折入 full-rerender 指纹，使设置切换不被 unchanged no-op 掩盖
 - incremental update check（`getIncrementalRenderedMessageUpdate()`）不对 compaction divider 消息做特殊处理，它们遵循普通 user message 的增量判定规则
 
 ## 与 `ConversationRenderService` 的边界

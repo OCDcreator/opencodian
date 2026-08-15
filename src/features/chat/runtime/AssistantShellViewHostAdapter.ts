@@ -81,6 +81,15 @@ export class AssistantShellViewHostAdapter {
   private readonly footerRenderer: AssistantFooterRenderer;
   private readonly errorRenderer: AssistantErrorRenderer;
   private readonly mcpCallbacks: AssistantShellViewHostAdapterMcpCallbacks;
+  /**
+   * Retains only the 256 most recently toggled persisted content-block keys
+   * for this view. Keys include the message id plus the content block's stable
+   * data identity, so a fresh hydration can reorder/recreate blocks without
+   * moving state by position. The cap bounds state without lifecycle APIs that
+   * callers can forget to invoke.
+   */
+  private readonly expansionStateByContentBlock = new Map<string, boolean>();
+  private static readonly maxRememberedExpansionStates = 256;
 
   constructor(
     private readonly host: AssistantShellViewHostAdapterHost,
@@ -249,7 +258,7 @@ export class AssistantShellViewHostAdapter {
         containerEl: content,
         questionResolutionRenderPlan,
         renderContentBlock: async (containerEl, block) => {
-          await this.renderContentBlock(containerEl, block);
+          await this.renderContentBlock(containerEl, block, message.id);
         },
       });
     } else {
@@ -279,6 +288,7 @@ export class AssistantShellViewHostAdapter {
       } : null,
       contentBlocks: (message.contentBlocks ?? []).map((block) => ({
         type: block.type,
+        partId: block.partId ?? null,
         text: block.text ?? null,
         thinking: block.thinking ?? null,
         durationSeconds: block.durationSeconds ?? null,
@@ -296,17 +306,29 @@ export class AssistantShellViewHostAdapter {
     });
   }
 
-  private async renderContentBlock(container: HTMLElement, block: ContentBlock): Promise<void> {
+  private async renderContentBlock(
+    container: HTMLElement,
+    block: ContentBlock,
+    messageId: string,
+  ): Promise<void> {
     const markdownService = this.host.getMarkdownService();
     if (!markdownService) return;
 
     switch (block.type) {
       case 'thinking':
         if (block.thinking) {
+          const expansionStateKey = this.getExpansionStateKey(messageId, block);
           const thinkingRenderer = new ThinkingBlockRenderer(markdownService, {
             collapsedByDefault: true,
             showTimer: false,
+            lazy: true,
             onCollapsibleToggle: () => this.host.suppressActiveLayoutAutoScrollOnce(),
+            getInitialExpanded: expansionStateKey
+              ? () => this.getRememberedExpansionState(expansionStateKey)
+              : undefined,
+            onExpandedChange: expansionStateKey
+              ? (_key, isExpanded) => this.rememberExpansionState(expansionStateKey, isExpanded)
+              : undefined,
           });
           thinkingRenderer.renderStored(container, block.thinking, block.durationSeconds);
         }
@@ -318,7 +340,9 @@ export class AssistantShellViewHostAdapter {
         }
 
         if (block.toolName && block.toolId) {
+          const expansionStateKey = this.getExpansionStateKey(messageId, block);
           const toolRenderer = new ToolCallRenderer({
+            lazy: true,
             onCollapsibleToggle: () => this.host.suppressActiveLayoutAutoScrollOnce(),
             onOpenToolSession: (sessionId, toolCall) => {
               void this.onOpenTaskToolSession(sessionId, toolCall);
@@ -326,6 +350,12 @@ export class AssistantShellViewHostAdapter {
             onOpenMcpServerDetail: (serverName) => this.mcpCallbacks.onOpenMcpServerDetail?.(serverName),
             onAuthenticateMcpServer: (serverName) => this.mcpCallbacks.onAuthenticateMcpServer?.(serverName),
             onRetryMcpToolCall: (toolCall) => this.mcpCallbacks.onRetryMcpToolCall?.(toolCall),
+            getInitialExpanded: expansionStateKey
+              ? () => this.getRememberedExpansionState(expansionStateKey)
+              : undefined,
+            onExpandedChange: expansionStateKey
+              ? (_key, isExpanded) => this.rememberExpansionState(expansionStateKey, isExpanded)
+              : undefined,
           });
           const toolCall: ToolCallInfo = {
             id: block.toolId,
@@ -351,6 +381,57 @@ export class AssistantShellViewHostAdapter {
           await markdownService.render(textEl, block.text);
         }
         break;
+    }
+  }
+
+  private getExpansionStateKey(messageId: string, block: ContentBlock): string | null {
+    if (block.type === 'tool_use' && block.toolId) {
+      return JSON.stringify([messageId, 'tool_use', block.toolId]);
+    }
+
+    if (block.type !== 'thinking') {
+      return null;
+    }
+
+    if (typeof block.partId === 'string' && block.partId.length > 0) {
+      return JSON.stringify([messageId, 'thinking-part', block.partId]);
+    }
+
+    // Persisted ContentBlock does not yet carry a thinking part id. Use the
+    // complete persisted payload rather than a position so fresh hydration
+    // and reordered blocks remain stable. Truly identical no-id blocks cannot
+    // be distinguished from their persisted data and therefore share state.
+    return JSON.stringify([
+      messageId,
+      'thinking-content',
+      block.thinking ?? '',
+      block.durationSeconds ?? null,
+    ]);
+  }
+
+  private getRememberedExpansionState(expansionStateKey: string): boolean {
+    const isExpanded = this.expansionStateByContentBlock.get(expansionStateKey);
+    if (isExpanded === undefined) {
+      return false;
+    }
+
+    // Reading counts as use for LRU eviction: a visible expanded block should
+    // not be discarded before older, no-longer-rendered blocks.
+    this.expansionStateByContentBlock.delete(expansionStateKey);
+    this.expansionStateByContentBlock.set(expansionStateKey, isExpanded);
+    return isExpanded;
+  }
+
+  private rememberExpansionState(expansionStateKey: string, isExpanded: boolean): void {
+    this.expansionStateByContentBlock.delete(expansionStateKey);
+    this.expansionStateByContentBlock.set(expansionStateKey, isExpanded);
+
+    while (this.expansionStateByContentBlock.size > AssistantShellViewHostAdapter.maxRememberedExpansionStates) {
+      const oldestKey = this.expansionStateByContentBlock.keys().next().value as string | undefined;
+      if (!oldestKey) {
+        return;
+      }
+      this.expansionStateByContentBlock.delete(oldestKey);
     }
   }
 

@@ -22,6 +22,7 @@ Run before merge: `npm run typecheck`, `npm run module-docs`.
 
 ## Recent change notes
 - **Turn change record contract:** a valid `noticeMeta.kind === 'turn-diff'` record owns its immutable snapshot and its user-message anchor inside `noticeMeta`; the top-level `ChatMessage.sourceMessageId` remains reserved for canonical message identity.
+- **Persisted content-block identity:** `ContentBlock.partId?` carries a stable backend part identity when one is available. It is optional to keep historical/local records compatible; render owners may use it to preserve block-local UI state across hydration, but it is not a second transcript source of truth.
 
 ## Hard invariants
 - Do not cross `forbiddenDependencies`.

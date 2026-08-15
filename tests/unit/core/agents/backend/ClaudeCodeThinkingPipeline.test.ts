@@ -42,7 +42,12 @@ describe('Thinking end-to-end pipeline', () => {
     const contentBlocks = mapStreamingContentBlocksToMessageContentBlocks(streamingBlocks);
 
     expect(contentBlocks).toEqual([
-      { type: 'thinking', thinking: 'Deep reasoning...', durationSeconds: 2.5 },
+      {
+        type: 'thinking',
+        partId: 'think-1',
+        thinking: 'Deep reasoning...',
+        durationSeconds: 2.5,
+      },
       { type: 'text', text: 'Final answer.' },
     ]);
   });

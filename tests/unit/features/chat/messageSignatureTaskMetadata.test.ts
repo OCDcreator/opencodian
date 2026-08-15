@@ -60,4 +60,21 @@ describe('Assistant body signature task metadata sensitivity', () => {
 
     expect(adapter.getAssistantBodySignature(previous)).not.toBe(adapter.getAssistantBodySignature(next));
   });
+
+  it('treats thinking part identity changes as body-signature changes', () => {
+    const adapter = createAdapter();
+    const previous: ChatMessage = {
+      id: 'assistant-thinking-1',
+      role: 'assistant',
+      content: '',
+      timestamp: 1,
+      contentBlocks: [{ type: 'thinking', partId: 'reasoning-1', thinking: 'same text' }],
+    };
+    const next: ChatMessage = {
+      ...previous,
+      contentBlocks: [{ type: 'thinking', partId: 'reasoning-2', thinking: 'same text' }],
+    };
+
+    expect(adapter.getAssistantBodySignature(previous)).not.toBe(adapter.getAssistantBodySignature(next));
+  });
 });

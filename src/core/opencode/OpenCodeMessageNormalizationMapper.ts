@@ -186,6 +186,7 @@ class OpenCodeToolContentAssembler {
       )
       .map((part) => ({
         type: 'thinking' as const,
+        partId: part.id,
         thinking: part.text,
         durationSeconds: resolveReasoningDurationSeconds(part),
       }));

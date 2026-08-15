@@ -200,6 +200,29 @@ describe('ConversationHydrationRenderBridge', () => {
     expect(pane.messagesEl.classList.contains('is-rehydrating')).toBe(false);
   });
 
+  it('marks hydrated messages with the hydration-settled dataset so history does not replay entrance animation', () => {
+    const pane = createPaneModel({ scrollHeight: 2000, clientHeight: 400, scrollTop: 0 });
+    buildConversation(pane);
+    const runtime = createRuntime({ autoScrollEnabled: true });
+    const { host, runFrames } = createHost(pane, runtime);
+    const bridge = new ConversationHydrationRenderBridge(host);
+
+    const context = bridge.captureHydrationContext(true);
+    bridge.beginHydrationShell(context);
+    pane.clearMessages();
+    buildConversation(pane);
+    bridge.restoreHydrationShell(context);
+    runFrames();
+
+    // Every hydrated message must carry the settled marker so the CSS
+    // entrance-animation suppression applies to reloaded history.
+    const messages = pane.messagesEl.querySelectorAll('.opencodian-message');
+    expect(messages.length).toBeGreaterThan(0);
+    for (const message of Array.from(messages)) {
+      expect((message as HTMLElement).dataset.opencodianHydrationSettled).toBe('true');
+    }
+  });
+
   it('does not let an older restore rAF remove a newer hydration shell class', () => {
     const pane = createPaneModel({ scrollHeight: 2000, clientHeight: 400, scrollTop: 1200 });
     buildConversation(pane);

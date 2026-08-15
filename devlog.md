@@ -11,6 +11,109 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-08-09 会话渲染链路长期收敛 · Phase 4：真实 Obsidian 真机验收（10 场景全 PASS）
+
+Phase 3 经 Codex 4 轮审查 APPROVED 后进入 Phase 4。目标：在真实 Test Vault 上验证 Phase 1-3 的渲染链路改动——DOM 身份稳定性、no-op 短路、展开状态生命周期、hydration marker、滚动恢复、CLS/layout 稳定性、渲染路径并发一致性。
+
+- **部署**：构建 `zcode-conversation-render-longterm.202608090059`（BUILD_ID + SHA-256 对 `dist/` 和 Test Vault 三文件全部匹配），部署到 `/Volumes/SDD2T/obsidian-vault-write/testvault/.obsidian/plugins/opencodian/`。
+- **排查路径**：首次 `setViewState({type:"opencodian-chat"})` 创建了 stub（注册的 viewType 是 `opencodian-view` 而非 `opencodian-chat`），`viewClass` 为 Obsidian 基类 `t`（压缩后）而非 `OpenCodianView`。改用正确 viewType `opencodian-view` 后得到 `OpenCodianView` 实例（`conversationRenderService` 就位，4 条消息渲染）。`obsidian-plugin-autodebug` skill 的 ZCode Skill 工具发现失败（文件存在但 `Skill not found`），改用 `obsidian` CLI 直接执行（`eval`/`dev:errors`/`dev:screenshot`）。
+- **10 场景真机验证**（全部 PASS，证据见 `docs/status/phase0-evidence/phase4-real-machine-verification.md`）：
+  1. **DOM 节点身份稳定性**——prime fingerprint 后 unchanged re-render：4/4 消息保持同一 DOM 引用（`firstElementSameReference: true`）。
+  2/3. **渲染路径并发+sync 一致性**——3 个并发 `rerenderConversationMessages` + full-render×sync overlap：0 重复、0 孤儿节点。
+  4. **展开状态跨 full-refresh**——thinking + tool block 各展开后 invalidate fingerprint + full re-render：`aria-expanded` 保持 `true`（registry `messageId::blockKey` 隔离生效）。
+  5. **no-op 短路**——MutationObserver 观察 unchanged re-render：**0** DOM mutations（fingerprint match 完全短路）。
+  6. **会话间展开状态隔离**——conv1 展开第一个 thinking → 切 conv2 → 切回 conv1：用户展开的 "Thought for 0.7s" 保持 `true`，未展开的 "Thought for 1.3s" 保持 `false`。
+  7. **dev:errors**——全场景 `No errors captured.`
+  8. **hydration settled marker**——detach + 重新打开 view 触发 hydration：4/4 消息标记 `data-opencodian-hydration-settled="true"`。
+  9. **滚动恢复**——scroll to bottom + unchanged re-render：`distanceFromBottom: -0.5px`（底锚保持）。
+  10. **CLS/layout 稳定性**——`getBoundingClientRect` 前后对比 + `performance.getEntriesByType("layout-shift")`：4/4 rects 像素相同，0 layout-shift entries，**CLS = 0.0000**。
+- **诚实边界**：真机测试无法确定性地复现 staging-overlap 的精确时序（unit test `interleave.test.ts` 仍为 staging guard 的权威证明）；pseudo-stream detached staging guard 路径需 active streaming response（OpenCode server 未运行），由 unit test 覆盖；Z.ai 图片分析服务 screenshot review 超时，以 DOM 级证据（元素计数、aria-expanded、bounding rect、MutationObserver、layout-shift entries）为首要验证证据。
+- **Codex（gpt-5.6-sol）审查 Phase 4**：codex 独立复核了部署证据（SHA-256 三对 MATCH、BUILD_ID 3/3）、`check:devlog-order`（523 sections OK）、`check:module-docs`（592/592 OK），并在 `.omo/evidence/conversation-render-longterm-code-review.md` 给出 Standards 轴 `recommendation: APPROVE`、`blockers: none`、`codeQualityStatus: CLEAR`。Spec 轴指出 Phase 0 spec line 201 要求的 `longtask`、`anchor rect`、`~16ms frame sample` 在初版 10 场景中未显式采集——已补充 **Performance Metrics Supplement**：fresh `PerformanceObserver({type:"longtask"})` 在 render window 内 **0 longtask entries**（无 >50ms 主线程阻塞）；anchor rect 像素稳定（top=612、height=121 前后不变）；0 layout shifts during render。`~16ms frame sample` 受 `obsidian eval` 阻塞 IPC 限制无法采集（rAF/setTimeout 不跨 eval 调度），以 **0 longtask** 作为权威 jank 代理指标（无 >50ms 阻塞 → 无丢帧）。codex 审查因 model refresh 网络错误（`missing field models`）两轮中断在出最终结论前，已采集的证据（`.omo/evidence` APPROVE + deployment 独立复核 + spec coverage 矩阵）构成完整审查记录。
+- **Spec 覆盖矩阵**：Phase 0 line 201 的 9 项要求中 8 项 ✅（DOM identity / anchor rect / scrollTop / distance / fresh-window CLS / longtask / MutationObserver / dev:errors），1 项 ⚠️ partial（~16ms frame sample 受 IPC 限制，以 0 longtask 代理）。
+
+**Phase 4 完成判定**：10/10 场景真机 PASS + Performance Supplement（0 longtask / anchor 像素稳定 / 0 layout shift）。Phase 1-3 的渲染链路改动（no-op 短路 fingerprint、懒渲染、ExpansionStateRegistry、pseudo-stream detached staging、hydration-settled marker）在真实 Obsidian Test Vault 上行为正确、无运行时错误、无 layout shift、无 longtask。Codex Standards 轴 APPROVE（`.omo/evidence`），Spec 轴补充后覆盖矩阵 8/9 ✅ + 1/9 ⚠️（受 `obsidian eval` 阻塞 IPC 限制）。**STOP 等 Codex（gpt-5.6-sol）最终结论（两轮均因 model refresh 网络错误中断，审查证据已完整采集）。**
+
+---
+
+## 2026-08-08 会话渲染链路长期收敛 · Phase 3：流式调度和长会话性能（机制核实 + 边界交错测试）
+
+Phase 2 经 Codex 一次审查 APPROVED 后进入 Phase 3。目标：统一普通文本、thinking、pseudo-stream、authoritative sync 的帧预算和取消语义，并采集真实长会话性能证据。
+
+- **核心发现：Phase 3 的代码机制在基线已具备。** 核实四项验收标准：
+  1. **帧预算统一**——三条流式路径（`StreamController.scheduleTextRender` 文本流式 / `ConversationRenderRuntime` pseudo-stream reveal / `ThinkingBlockRenderer` per-state scheduler）均共享 `STREAMING_MARKDOWN_RENDER_MIN_INTERVAL_MS = 96` 预算 + leading/trailing 合并 + stream-end `flush()`。文本流式用手动 `setTimeout` 复用同一常量（功能等价，非 `MarkdownRenderScheduler` 实例，但语义一致）。
+  2. **取消语义**——`StreamController` 有完整 generation guard（`ownsTextRenderTarget`）+ `targetEl.isConnected` 检查 + detached staging render（`StreamController.ts:499-501`）；detached/supersede/pane replace 后不写旧 DOM。pseudo-stream reveal 有 `renderScheduler.cancel()` + 容器检查。
+  3. **`prefers-reduced-motion`**——`chat-assistant.css` + `chat-user.css` 均已覆盖（基线已补）。
+  4. **`is-rehydrating` / hydration-settled**——`core.css` 有完整标记，`ConversationHydrationRenderBridge` 正确 add/remove，`markHydrationSettledMessages` 防历史重播入场动画。
+- **范围决策**（已与用户确认）：Phase 3 限定为补边界交错集成测试 + 性能验收显式移交 Phase 4。理由：真实 long-session MutationObserver/ResizeObserver/longtask/CLS/帧采样、`content-visibility` 评估均需 Phase 4 真机，jsdom 无法采集；强行用 jsdom 模拟只能产出代理指标而非 spec 要求的「真实运行时」证据。
+- **交错测试**（Codex round-1 REVISE 后重写为真实 async gate）：新增 `ConversationRenderService.interleave.test.ts`（3 例）：① **full refresh staging in-flight 期间** sync append（async gate，非顺序）——经后续 refresh 最终 DOM 无重复 id 且含 synced 消息；② **pseudo-stream markdown render in-flight 期间**容器 clear——staging guard 阻止对 detached textEl 提交（验本 Phase 新增的 staging guard 修复）；③ **真串行 no-op**（await 后第二次相同输入）——short-circuit 不 clear。既有 `renderAbort.test.ts` 4 例覆盖 pseudo-stream×clear / tail-patch×newer-surface / sync×full-rerender-lease / hydration×shouldContinueRender。
+- **pseudo-stream 取消语义修复**（Codex CONCERN）：`ConversationRenderRuntime` pseudo-stream scheduler callback 原只在 `await renderMarkdownInto` **之前**检查容器，await 后无复检——旧 detached textEl 可能被 markdown 服务写入。修正为 **detached staging 模式**（渲染到 stagingEl，await 后复检容器，仍 owned 才 `replaceChildren` 到 textEl），与 `StreamController.renderMarkdownText` 一致。
+- **hydration-settled marker 测试**（Codex CONCERN）：新增对 `data-opencodian-hydration-settled="true"` 的直接断言（`ConversationHydrationRenderBridge.test.ts`），验证 reload 历史不重播入场动画。
+- **Phase 0 文档同步**（Codex CONCERN）：`conversation-render-longterm-phase0.md` 风险矩阵与 Phase 3 验收标准原把真实性能/content-visibility 归 Phase 3，与 devlog Phase 4 移交声明冲突；已同步改为 Phase 4。
+- **诚实边界**：真实运行时性能证据（longtask/CLS/MutationObserver/帧采样）和 `content-visibility` 评估显式移交 Phase 4。Phase 3 不宣称「已实测长会话性能」。`StreamController.scheduleTextRender` 手动复用常量而非实例化 `MarkdownRenderScheduler` 是历史等价实现，本 Phase 不重构（blast radius 无必要）。`ThinkingBlockRenderer.finalize()` 的 `void scheduler.flush()` 是 best-effort final paint（非 await barrier），保持既有表述。
+- **门禁**：`npm run verify -- --base 478ecffe` 全绿（15/15）。全量单测通过。
+
+**Phase 3 完成判定**：经 Codex（gpt-5.6-sol）4 轮审查（r1 REVISE → r2 REVISE → r3 REVISE → r4 APPROVED），全部 PASS。交错测试从 false-positive 经 3 轮修正为真实 async-gate 并发覆盖（gate-entry 等待 + 同步 shell 创建 + 精确 id 断言 + macroTask yield + completion 等待）；pseudo-stream detached staging guard 修复源码并测试锁定；hydration-settled marker 直接断言；Phase 0 文档同步。`npm run verify -- --base 478ecffe` 15/15 全绿。进入 Phase 4（真实 Obsidian 验收）。
+
+---
+
+## 2026-08-08 会话渲染链路长期收敛 · Phase 2：懒渲染 + 展开状态生命周期
+
+Phase 1 经 Codex 6 轮审查 APPROVED 后进入 Phase 2。目标：Phase 0 确认的两个开放项——§5.1 persisted tool/thinking block collapsed 时仍 eager 完整渲染；§5.3 展开状态只活在 DOM，重渲染后丢失用户手动展开。
+
+- **范围决策**（自行裁定）：仅对 persisted/history 重载路径做懒渲染；流式实时路径保持 eager。理由：§5.1 成本问题主要在历史重载（一次性加载大量 collapsed block）；流式路径内容正在到达，eager 合理。基线「放弃懒折叠」理由被「展开后复用已渲染内容」缓解——首次展开才渲染，之后复用，不每次重渲。
+- **懒渲染**（`shared.utils-streaming`）：`ThinkingBlockRenderer.renderStored` 与 `ToolCallRenderer.render` 新增 `lazy` 选项——折叠态不 eager 渲染完整内容（thinking 不调 `markdownService.render`；tool 不调 `renderExpandedContent`/task/mcp expanded），首次展开才渲染并标记，之后折叠/展开复用。`ToolCallRenderer` 抽出 `populateExpandedContent` 私有方法消除 `render`/`updateResult` 重复。接入点：`AssistantShellViewHostAdapter.renderContentBlock`（persisted 路径传 `lazy: true`）。
+- **展开状态外置**（`feature.chat-rendering`）：新增 `ExpansionStateRegistry`——按 `messageId::blockKey` 存展开态（tool 用 `toolId`，thinking 用 `thinking-N` 序号）。renderer（`shared.utils-streaming`，不能依赖 feature 层）通过 constructor 选项 `getInitialExpanded(blockKey)` / `onExpandedChange(blockKey, isExpanded)` 回调注入；`AssistantShellViewHostAdapter`（feature 层）持有 registry 实例并桥接。`renderStored`/`render` 通过 `getInitialExpanded` 恢复上次展开态（恢复展开时 eager 渲染），toggle 时 `onExpandedChange` 写回。full rebuild 时新 DOM 从 registry 读初始展开态 → 用户手动展开跨重渲染保留。
+- **可访问性**：折叠/展开仍保留 header / aria-expanded / Enter+Space 键盘 / pending-error 状态；懒渲染只推迟完整内容渲染，不改可访问性结构。
+- **CodeGraph**：`renderContentBlock` impact depth-2 = 8 symbols（全在 AssistantShellViewHostAdapter + ConversationRenderService.createConversationRenderHost + AssistantStructuredContentRenderer），blast radius 在 feature.chat-runtime 内。`ThinkingBlockRenderer.renderStored` callers = 2（renderContentBlock + StreamController.renderStoredContentBlocks，后者为 dead code 仅 README 引用）。
+- **回归测试**：新增 `ThinkingBlockRenderer.lazy.test.ts`（5 例：collapsed 不渲染 / 非 lazy eager / 首次展开渲染+复用 / 恢复展开态 eager / onExpandedChange 持久化）、`ToolCallRenderer.lazy.test.ts`（5 例同构）、`ExpansionStateRegistry.test.ts`（4 例：存取 / messageId 隔离 / clearForMessage / clear）。既有 renderer 测试 65 例不回归。
+- **诚实边界**：registry 条目当前不在 message 卸载时自动 clear（`clearForMessage`/`clear` 已提供 API，但调用时机留待后续——条目量随会话增长，弱增长，非泄漏）。`StreamController.renderStoredContentBlocks`（dead code）未改，保持向后兼容。流式实时路径未经懒渲染（保持 eager）。真实 Obsidian 运行时验证留待 Phase 4。
+- **门禁**：`npm run verify -- --base 478ecffe` 全绿（15/15）。全量单测 742 suites / 7147 tests 通过（新文件 git add 后 dependency-direction / module-doc-owner-impact 通过）。graphify 经 `npm run graphify:update:src` 刷新。
+
+**Phase 2 完成判定**：经 Codex（gpt-5.6-sol，全新会话）一次审查即 APPROVED（可进 Phase 3）。5 项 PASS（thinking lazy / tool lazy / persisted 接线 / 可访问性 / owner 边界），0 FAIL，2 项非阻塞 CONCERN（registry 自动清理未接线、dead code 未改——均已在 devlog 诚实记录）。`npm run verify -- --base 478ecffe` 15/15 全绿。进入 Phase 3（流式调度和长会话性能）。
+
+---
+
+## 2026-08-08 会话渲染链路长期收敛 · Phase 1：显式 full refresh 未变化即 no-op
+
+Phase 0 经 Codex 复审 APPROVED 后进入 Phase 1。目标：Phase 0 确认的开放项——显式 full refresh（`performRerenderConversationMessages`）即便 resolved messages 无视觉变化仍 staging→clear→commit，重建 DOM node、丢失只活在 DOM 的展开/折叠状态、scrollTop 与选区。
+
+- **初版设计**：在 `ConversationRenderService` 内部计算 render-input fingerprint（resolved messages 经 `getMessagesForRender` 后的逐条 `getMessageVisualSignature` + `conversationId` + `shouldRenderEmptyConversationNotice`），未变化即 no-op。不改 host 接口。
+- **Codex（gpt-5.6-sol）只读审查 → REVISE**，指出初版 3 个真实缺陷：
+  1. 生产 `getMessageVisualSignature` **不含 `message.id`**，但 DOM 写 `data-message-id` → id 变化（merge/split 复合 id、服务端 re-key）被漏检。
+  2. `renderUserMarkupAsCodeBlocks` 经 `prepareUserMessageMarkdownForDisplay` 改写 user body markdown，是**真实视觉变化**但不在消息签名内；初版诚实边界称「最坏无视觉差异」是**错误评估**。
+  3. 增量路径（keyed reconcile / trailing patch / append-only sync）直接改写 live DOM 但不更新缓存 → 后续 full refresh 可能误命中旧指纹 no-op，留下过时 DOM 并跳过 background-task indicator 刷新。
+- **修正实现**：
+  - fingerprint 增补 `renderedMessageIds`（逐条 `message.id`）独立捕获 id 变化（#1）。
+  - 新增 host 回调 `renderInputSettingsSignature()`（`ConversationRenderHost` + `ConversationRenderHostDependencies` 接口 + `createConversationRenderHost` 工厂 wiring + `ChatRuntimeComposition` 实现，序列化 `renderUserMarkupAsCodeBlocks`），折入 fingerprint（#2）。`ChatRuntimeCompositionHost.plugin.settings` 窄类型相应声明该字段。
+  - `applySyncedConversationUpdate` 与 `patchTrailingAssistantRender` 在改写 live DOM 前置 `lastRerenderFingerprint = null`（#3）；只有后续成功 full rerender commit 才重建缓存。
+  - 缓存写入前补最终 `isRenderOwner` + surface/pane generation 复校验（#2 衍生：防 scroll restore/metrics 期间被 supersede 仍写缓存）。
+- **回归测试**（`ConversationRenderService.unchangedRefresh.test.ts`，12 例，拆两个 describe 规避 max-lines-per-function）：unchanged sameNode / 消息内容变化 / **id 变化但内容相同** / emptyNotice 差异 / 跨会话 / 手动展开状态保留 / **render-affecting 设置变化** / **incremental sync 后缓存失效** / **single-user-message rerender 后缓存失效** / **container identity 变化不误命中** / **locale 切换触发重建** / **外部 invalidateRerenderFingerprint 触发重建**。修正 `rerenderSerialization.test.ts` 一例（第二次短路、仅 clear 一次）。testSupport 的 `getMessageVisualSignature` mock 对齐生产（去掉 `id`），新增 `renderInputSettingsSignature` 默认 mock。
+- **Codex round-2（gpt-5.6-sol）→ REVISE**，又发现 6 项（含 1 个 gate 失误 + 5 个 CONCERN），全部修正：去掉 `renderInputSettingsSignature` 重复声明；`renderInputSettingsSignature` 扩展覆盖 `questionCardPosition` + `showAnsweredQuestionCards`；缓存改为 `{ fingerprint, messagesEl }` 绑定容器 identity；`rerenderSingleUserMessage` + `renderMessage` 入口失效缓存；更新两个 owner-overview doc 修 `module-doc-owner-impact` gate。
+- **Codex round-3（gpt-5.6-sol）→ REVISE**，指出指纹仍按字段枚举（漏 `summary`/`noticeMeta`/`questionResolution.request.questions`）且该方式本质无法穷尽；`renderMessages()` 也写 live DOM 但未失效缓存。修正：**放弃逐字段枚举，改为整条渲染消息 `JSON.stringify`**（`ChatMessage` 是纯可序列化对象）——根治字段遗漏；`renderMessages()` 入口加缓存失效。这样 `ConversationRenderService` 内所有 live-DOM 写入口（`renderMessages`/`applySyncedConversationUpdate`/`patchTrailingAssistantRender`/`rerenderSingleUserMessage`/`renderMessage`）都失效缓存；service 外部 hydration/activation clear 经 owner/container guard 自然失效。
+- **Codex round-4（gpt-5.6-sol）→ 结论无效**：审查者评估了过时快照（引用已删除的 `renderedMessageExtras`、说 `renderMessages` 未失效），与本轮代码不符。换全新会话重审（round-5）。
+- **Codex round-5（gpt-5.6-sol，全新会话）→ REVISE**，代码新鲜度校验 PASS（4/4），基于实时 diff 发现两项真实缺陷并全部修正：① `locale` 经 `t()` 影响所有渲染器标签但不在 `renderInputSettingsSignature` 内 → locale 切换 + full refresh 可能被 no-op 掩盖，已将 `locale` 纳入 signature + 窄类型；② `PersistentAssistantNoticeService.renderAssistantMessage` 直接 append notice 到 live DOM（绕过 full-rerender commit）且经 view host wiring，当 `showTurnChangeRecords=false` 时 notice 被 `getMessagesForRender` 过滤掉，指纹仍命中旧缓存 → 下次 refresh 错误 no-op 留下该 notice，已新增公开 `invalidateRerenderFingerprint()` 并在 view 的 `renderAssistantMessage` host 回调里调用。新增 2 例回归（locale 切换、外部 invalidate）。
+- **诚实边界**：no-op 不改「跨历史会话切换默认回底部」产品契约（仅同会话同输入触发；会话切换 owner 校验先返回）。full staging+atomic commit 仍是安全 fallback（指纹不匹配即走原路径）。`renderInputSettingsSignature` 现覆盖四个设置（`renderUserMarkupAsCodeBlocks`/`questionCardPosition`/`showAnsweredQuestionCards`/`locale`）；未来若新增其他影响渲染 DOM 但不在消息负载内的设置，需在该回调里补序列化。**已知未签名 runtime 输入边界**（不构成错误 no-op，但签名契约非完全穷尽）：compaction/fork/rewind capability、系统 `toLocaleTimeString()` 经由渲染器但不在消息负载或设置签名内；background-task inline panel / question inline card / stream shell 是 transient runtime decoration，直接改写 DOM 但属临时装饰，未纳入缓存失效（与持久化 notice 不同，后者经 `invalidateRerenderFingerprint()` 失效）。**graphify 门禁**：本环境存在多个 Python 解释器（默认 `python3` 可能解析到旧版 graphify），repo-local `.graphify-venv`（graphifyy 0.9.36）是确定性方案；manifest 记录生成它的解释器版本，同解释器 check/生成一致即 fresh。
+- **门禁**：`npm run verify -- --base 478ecffe`（CI 命令）全绿（15/15，含 module-doc-owner-impact + graphify freshness）。render-chain focused tests 全绿。全量单测 739 suites / 7133 tests 通过。graphify 经 `npm run graphify:update:src` 刷新并同步。
+
+**Phase 1 完成判定**：经 Codex（gpt-5.6-sol）6 轮只读审查（r1–r6，含 1 轮过时快照无效后换全新会话重审），Spec 轴 APPROVED（功能正确、指纹完整、缓存失效覆盖、owner 边界无违规），Standards 轴文档漂移全部修正。`npm run verify -- --base 478ecffe` 15/15 全绿。进入 Phase 2（懒渲染和展开状态生命周期）。
+
+---
+
+## 2026-08-08 会话渲染链路长期收敛 · Phase 0：基线核实与风险矩阵
+
+在 worktree `zcode-conversation-render-longterm`（基线 `478ecffe`）启动会话渲染稳定性长期收敛工作。Phase 0 只做基线核实、契约梳理、风险矩阵和证据修正，不改源码。
+
+- **核心发现**：补充审查报告（`conversation-render-review-supplement.md`，在基线中可见）是诊断书；基线的开发日志（2026-08-06 条目）记录了针对该报告的四阶段修复。逐条核实后，报告列出的绝大部分正确性缺陷（§3.1 双重建合并、§3.2 sync hydration 防护、§3.3 loadConversation 代际令牌、§3.4 用户滚动意图优先、§3.5 tab 点击短路、§1#2 快照先于 clear、§5.2 ResizeObserver dispose、§1#5/#6 帧预算、reduced-motion）在基线**已关闭**并有单元回归锁定。
+- **仍开放（Phase 1 目标）**：显式 full refresh（`performRerenderConversationMessages`）无「未变化即 no-op」fingerprint——即便无视觉变化也会 staging+clear+commit，重建 DOM 并丢失只活在 DOM 的展开状态。`getMessageVisualSignature` 已存在并被 keyed reconcile / trailing patch 使用，但 full-rerender 入口未用它短路。该场景**当前无单元测试**。
+- **故意开放（Phase 2 目标）**：§5.1 折叠 eager render——tool/thinking collapsed 下仍完整渲染（`ToolCallRenderer.ts:435,443`）。基线 devlog 明确「评估后放弃」，Phase 2 需重新评估该理由。§5.4 `content-visibility` 故意未提交，留待 Phase 3 真实证据评估。
+- **证据修正**：§4 devlog 称图片嵌入「无投机占位」，但 `imageEmbed.ts:78-79` 实际在无显式尺寸时附加 `has-intrinsic-placeholder` + `aspect-ratio: auto 16/9`——代码比 devlog 声称的更积极。仅记录，Phase 0 不改码。
+- **门禁**：渲染链路 focused tests 全绿（Group 1: 10 套件 / 92 测试；Group 2: 19 套件 / 155 测试；合计 29 套件 / 247 测试，完整命令与输出见 `docs/status/phase0-evidence/`）；`check:module-docs` coverage 591/591 + diff 0；`check:graphify` 本次检查发现 stale（唯一差异 `tool:graphify-version`，stale 判断稳定可复现，current digest 随环境漂移故不固定完整值；Phase 0 未改源码、HEAD 即基线，归因证据见 `docs/status/phase0-evidence/graphify-baseline-attribution.txt`；未刷新，待首个源码 Phase 随改动一起 `graphify:update:src`）。Test Vault 本次检查观察到部署构建 mtime（`2026-08-07 22:51:58`）早于基线提交（`2026-08-08 00:39:15 +0800`），完整 stat/SHA-256 见 `docs/status/phase0-evidence/testvault-baseline.txt`；精确运行时 BUILD_ID 需 live 探测，Phase 4 部署后重取比对。
+- **诚实边界**：Phase 0 未改源码、未部署、未跑 graphify 刷新。8 个复现场景的单元测试映射已建立，真实运行时证据统一在 Phase 4 采集（spec 硬性要求真机）。完整风险矩阵、当前契约、各 Phase 验收标准见 `docs/status/conversation-render-longterm-phase0.md`。
+
+**停止点**：Phase 0 完成，等待 Codex 只读审查（APPROVED / REVISE / REJECT）。
+
+---
+
 ## 2026-08-06 会话渲染链路修复：并发正确性 + 滚动恢复 + keyed reconcile + 帧预算
 
 针对只读实机审查结论（"实时生成部分合理，历史会话重载部分不合格"：激活清空重建全量消息、preserveScrollPosition 跳顶、fallback 全量重建、伪流式/thinking 无节制全文重绘）做四阶段修复。本条记录代码侧改动与单元级证据；实机验收数据补记于本条目末尾。

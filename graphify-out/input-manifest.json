@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "92e0600bc05fc5b56cd456e53a5a351a4e1784f637a5151533eb27163d54186d",
+  "digest": "f27376007cc1cdcf180bd0ad832cf56809360fcb4dbb5c395f79964f8fc627a5",
   "recordCount": 605,
   "records": [
     {
@@ -561,7 +561,7 @@
     {
       "kind": "src",
       "key": "src/core/opencode/OpenCodeMessageNormalizationMapper.ts",
-      "sha256": "a94f0415e0a1cc86c63852715ba5624e0431e12f35d8e155f52f5b2abbd86ad9"
+      "sha256": "45515a2072e7edabd7907d66168114463ecc88f53a1de8f8c4c9f6a5cc9f52fe"
     },
     {
       "kind": "src",
@@ -756,7 +756,7 @@
     {
       "kind": "src",
       "key": "src/core/types/chat.ts",
-      "sha256": "178efa2b6c10726cfbedae886b3d91036b1e36d4c21bdc3dbec70c820711e299"
+      "sha256": "bf2fd1b379ac15aeec166a25c316d69924e0537ef714057926690002aee46df7"
     },
     {
       "kind": "src",
@@ -861,7 +861,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/OpenCodianView.ts",
-      "sha256": "a365b203aee9de572212a2822cfe34eebb46551334a860c247678f81c9aec692"
+      "sha256": "4a751c34ffa80e20f1d385f4398982a4b1233e0dde63a20a7eabf909e479d3d6"
     },
     {
       "kind": "src",
@@ -921,7 +921,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/runtime/AssistantShellViewHostAdapter.ts",
-      "sha256": "0a7b667b471f8a204f20090360b12dc49435660a6a14e0141d7cff7e481e49a6"
+      "sha256": "8866216251c228ae00338be29595cb802412ee476f08025bc0d4e1b0ffe6a49d"
     },
     {
       "kind": "src",
@@ -951,7 +951,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/runtime/ChatRuntimeComposition.ts",
-      "sha256": "24b65a99325c9a7ab16a2b7c382e6a93b269c934ab8707ec7cae5d656822ad1d"
+      "sha256": "60771f986bda6963faf40caaf334b4a0402093121d8d12627b6d2ed92f88cdac"
     },
     {
       "kind": "src",
@@ -1016,7 +1016,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/runtime/sendPipelineContent.ts",
-      "sha256": "bede59f1cef929f69c6bd4e7b62b7142249bbb57924ad591b51006dd7b7817ec"
+      "sha256": "15e63d260b079cd91ede9335d78da75d777c9e63426ca73659eb358ced8c74b0"
     },
     {
       "kind": "src",
@@ -1361,7 +1361,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/services/ConversationIdentityRuntime.ts",
-      "sha256": "e5a5c5b63dbdb9638c4a37a3a247fcdf8091dd48148d95c188e6d6cd25743448"
+      "sha256": "2fe056f6d8896e733bbbc9b8cb00af868d78fc5d9013f61548fd4963c9ab4a3d"
     },
     {
       "kind": "src",
@@ -1381,12 +1381,12 @@
     {
       "kind": "src",
       "key": "src/features/chat/services/ConversationRenderRuntime.ts",
-      "sha256": "2304657cf97d8851eaccc99c9b3ffdc0507f409fb1fe71dfcfb1186f88d5a8ed"
+      "sha256": "673f9f1fb70e2d88e9df9104dfc7d956a68c9b573fd51b9d566aeb447772f995"
     },
     {
       "kind": "src",
       "key": "src/features/chat/services/ConversationRenderService.ts",
-      "sha256": "9a4ab7e8adb6aa03f8882ae3d93763f14bd38021121f8f6297ebd228c907f9f5"
+      "sha256": "4eae5498dde53f78df569329cbae573abc8205b8f6ae043617ddf8bafc8188a9"
     },
     {
       "kind": "src",
@@ -2981,17 +2981,17 @@
     {
       "kind": "src",
       "key": "src/utils/streaming/ThinkingBlockRenderer.ts",
-      "sha256": "893b4033f5f1e9d26f3c8e236c5f720e7014c5bf9dadb8cc6bfd8d9da0b05171"
+      "sha256": "c344ea6b92f87bb68adb046d27f09eaef606ca54ee945df6b73064f673ae9e8d"
     },
     {
       "kind": "src",
       "key": "src/utils/streaming/ToolCallRenderer.ts",
-      "sha256": "9f11b3ad1988ff16819a63614fd9295b86d33a855d250f4fe1610fa1117abe56"
+      "sha256": "22e6e8df504ae02a696c77a62ae400a64be272a75a392e2708643772bf4ce21b"
     },
     {
       "kind": "src",
       "key": "src/utils/streaming/types.ts",
-      "sha256": "8292790e57200b127cd566d804d3c84ccbeebb2202ccc56bef028f57da169dc3"
+      "sha256": "7963970110da92068861e508e3a619afda09444b7104c2a4b7b90ebc200eab11"
     },
     {
       "kind": "src",
@@ -3001,7 +3001,7 @@
     {
       "kind": "tool",
       "key": "graphify-version",
-      "sha256": "d27ce4be2c503cc8256349f2efd107c22bd7b0dba071404ef1cb6a9b65bd3b77"
+      "sha256": "3743012c1f0a4169ff074ffacae1312a05745afae16e874a4a80c3061b2624b3"
     },
     {
       "kind": "tsconfig",
@@ -3029,7 +3029,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-08-13T12:37:44.055Z",
-  "headShaAtGeneration": "9c774567981749695d0e6626c166a6cedb29bfaa",
-  "graphifyVersion": "graphify 0.9.31"
+  "generatedAt": "2026-08-15T06:21:08.201Z",
+  "headShaAtGeneration": "eeeb5c9c59a54b0c8710a5cb081e99821f7e1156",
+  "graphifyVersion": "graphify 0.8.50"
 }

@@ -146,6 +146,8 @@
 - 如果存在 `toolMetadata.sessionId`，显示 “Open subagent session” 动作
 - 不默认把 `<task_result>` 原文当普通工具输出展开；上游会把 `resultVisibility: 'hidden'` 作为数据契约，renderer 仍按 task identity 做兜底防护，保持与 OpenCode 本体一致的“结果留在 child session”语义
 
+`render()` 新增 `lazy` 选项（持久化/历史重载路径）：折叠态（默认）只渲染 header + 空 content 容器，不调用 `renderExpandedContent`/`renderTaskExpandedContent`/`renderMcpExpandedContent`；首次展开才经 `populateExpandedContent()` 渲染完整内容，之后折叠/展开复用。流式实时路径不传 `lazy`，保持 eager。constructor 选项 `getInitialExpanded` / `onExpandedChange` 由 feature runtime 传入，按稳定 tool id 恢复展开状态；renderer 不持有 feature state。
+
 ## 关键方法
 
 | 方法 | 说明 |

@@ -253,6 +253,7 @@ describe('OpenCodeMessageNormalizationMapper tool content', () => {
     expect(message.contentBlocks).toEqual([
       {
         type: 'thinking',
+        partId: 'part-reasoning',
         thinking: 'Planning steps',
         durationSeconds: 2,
       },

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-08-01T03:17:00.276Z",
-  "headShaAtGeneration": "43096ac1914370b97f77ad788a57329bc4e0b6a1",
+  "generatedAt": "2026-08-08T14:29:25.739Z",
+  "headShaAtGeneration": "478ecffee882b6abeede394d86c60f55e82c1f9e",
   "edges": [
     {
       "id": "src/app/diagnostics/DiagnosticsRuntimeCoordinator.ts|src/app/diagnostics/types.ts|type-only|./types",
@@ -3595,6 +3595,13 @@
       "specifier": "./composerContext"
     },
     {
+      "id": "src/features/chat/OpenCodianView.ts|src/features/chat/rendering/collapsible.ts|runtime-static|./rendering/collapsible",
+      "from": "src/features/chat/OpenCodianView.ts",
+      "to": "src/features/chat/rendering/collapsible.ts",
+      "kind": "runtime-static",
+      "specifier": "./rendering/collapsible"
+    },
+    {
       "id": "src/features/chat/OpenCodianView.ts|src/features/chat/runtime/AssistantNoticeCardRenderer.ts|runtime-static|./runtime/AssistantNoticeCardRenderer",
       "from": "src/features/chat/OpenCodianView.ts",
       "to": "src/features/chat/runtime/AssistantNoticeCardRenderer.ts",
@@ -3826,10 +3833,10 @@
       "specifier": "./services/ConversationHydrationRuntimeViewHostFactory"
     },
     {
-      "id": "src/features/chat/OpenCodianView.ts|src/features/chat/services/ConversationIdentityRuntime.ts|runtime-static|./services/ConversationIdentityRuntime",
+      "id": "src/features/chat/OpenCodianView.ts|src/features/chat/services/ConversationIdentityRuntime.ts|type-only|./services/ConversationIdentityRuntime",
       "from": "src/features/chat/OpenCodianView.ts",
       "to": "src/features/chat/services/ConversationIdentityRuntime.ts",
-      "kind": "runtime-static",
+      "kind": "type-only",
       "specifier": "./services/ConversationIdentityRuntime"
     },
     {
@@ -3973,10 +3980,10 @@
       "specifier": "./services/PersistentAssistantNoticeService"
     },
     {
-      "id": "src/features/chat/OpenCodianView.ts|src/features/chat/services/QuestionDockSlotCoordinator.ts|runtime-static|./services/QuestionDockSlotCoordinator",
+      "id": "src/features/chat/OpenCodianView.ts|src/features/chat/services/QuestionDockSlotCoordinator.ts|type-only|./services/QuestionDockSlotCoordinator",
       "from": "src/features/chat/OpenCodianView.ts",
       "to": "src/features/chat/services/QuestionDockSlotCoordinator.ts",
-      "kind": "runtime-static",
+      "kind": "type-only",
       "specifier": "./services/QuestionDockSlotCoordinator"
     },
     {
@@ -4050,10 +4057,10 @@
       "specifier": "./services/TabSessionPhase"
     },
     {
-      "id": "src/features/chat/OpenCodianView.ts|src/features/chat/services/TitleGenerationService.ts|runtime-static|./services/TitleGenerationService",
+      "id": "src/features/chat/OpenCodianView.ts|src/features/chat/services/TitleGenerationService.ts|type-only|./services/TitleGenerationService",
       "from": "src/features/chat/OpenCodianView.ts",
       "to": "src/features/chat/services/TitleGenerationService.ts",
-      "kind": "runtime-static",
+      "kind": "type-only",
       "specifier": "./services/TitleGenerationService"
     },
     {
@@ -4183,6 +4190,13 @@
       "specifier": "../../core/types"
     },
     {
+      "id": "src/features/chat/rendering/collapsible.ts|src/utils/streaming/streamingCollapsible.ts|runtime-static|../../../utils/streaming/streamingCollapsible",
+      "from": "src/features/chat/rendering/collapsible.ts",
+      "to": "src/utils/streaming/streamingCollapsible.ts",
+      "kind": "runtime-static",
+      "specifier": "../../../utils/streaming/streamingCollapsible"
+    },
+    {
       "id": "src/features/chat/runtime/AssistantCopyContent.ts|src/core/types/index.ts|type-only|../../../core/types",
       "from": "src/features/chat/runtime/AssistantCopyContent.ts",
       "to": "src/core/types/index.ts",
@@ -4260,6 +4274,13 @@
       "specifier": "./PersistedAssistantFooterFinalizer"
     },
     {
+      "id": "src/features/chat/runtime/AssistantNoticeCardRenderer.ts|src/core/types/index.ts|runtime-static|../../../core/types",
+      "from": "src/features/chat/runtime/AssistantNoticeCardRenderer.ts",
+      "to": "src/core/types/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../../core/types"
+    },
+    {
       "id": "src/features/chat/runtime/AssistantNoticeCardRenderer.ts|src/core/types/index.ts|type-only|../../../core/types",
       "from": "src/features/chat/runtime/AssistantNoticeCardRenderer.ts",
       "to": "src/core/types/index.ts",
@@ -4279,6 +4300,13 @@
       "to": "src/i18n/index.ts",
       "kind": "runtime-static",
       "specifier": "../../../i18n"
+    },
+    {
+      "id": "src/features/chat/runtime/AssistantNoticeCardRenderer.ts|src/shared/index.ts|runtime-static|../../../shared",
+      "from": "src/features/chat/runtime/AssistantNoticeCardRenderer.ts",
+      "to": "src/shared/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../../shared"
     },
     {
       "id": "src/features/chat/runtime/AssistantNoticeFooterFinalizer.ts|src/core/types/index.ts|type-only|../../../core/types",
@@ -4363,6 +4391,13 @@
       "to": "src/core/types/index.ts",
       "kind": "type-only",
       "specifier": "../../../core/types"
+    },
+    {
+      "id": "src/features/chat/runtime/AssistantShellViewHostAdapter.ts|src/features/chat/rendering/ExpansionStateRegistry.ts|runtime-static|../rendering/ExpansionStateRegistry",
+      "from": "src/features/chat/runtime/AssistantShellViewHostAdapter.ts",
+      "to": "src/features/chat/rendering/ExpansionStateRegistry.ts",
+      "kind": "runtime-static",
+      "specifier": "../rendering/ExpansionStateRegistry"
     },
     {
       "id": "src/features/chat/runtime/AssistantShellViewHostAdapter.ts|src/features/chat/runtime/AssistantErrorRenderer.ts|runtime-static|./AssistantErrorRenderer",
@@ -4645,6 +4680,13 @@
       "specifier": "../../../core/opencode"
     },
     {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/core/types/index.ts|runtime-static|../../../core/types",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/core/types/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../../core/types"
+    },
+    {
       "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/core/types/index.ts|type-only|../../../core/types",
       "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
       "to": "src/core/types/index.ts",
@@ -4659,10 +4701,24 @@
       "specifier": "../runtime/AssistantNoticeCardRenderer"
     },
     {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/runtime/AssistantNoticeCardRenderer.ts|type-only|../runtime/AssistantNoticeCardRenderer",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/runtime/AssistantNoticeCardRenderer.ts",
+      "kind": "type-only",
+      "specifier": "../runtime/AssistantNoticeCardRenderer"
+    },
+    {
       "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/runtime/AssistantShellViewHostAdapter.ts|runtime-static|../runtime/AssistantShellViewHostAdapter",
       "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
       "to": "src/features/chat/runtime/AssistantShellViewHostAdapter.ts",
       "kind": "runtime-static",
+      "specifier": "../runtime/AssistantShellViewHostAdapter"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/runtime/AssistantShellViewHostAdapter.ts|type-only|../runtime/AssistantShellViewHostAdapter",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/runtime/AssistantShellViewHostAdapter.ts",
+      "kind": "type-only",
       "specifier": "../runtime/AssistantShellViewHostAdapter"
     },
     {
@@ -4673,10 +4729,24 @@
       "specifier": "../runtime/BackgroundTaskIndicatorCoordinator"
     },
     {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/runtime/BackgroundTaskIndicatorCoordinator.ts|type-only|../runtime/BackgroundTaskIndicatorCoordinator",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/runtime/BackgroundTaskIndicatorCoordinator.ts",
+      "kind": "type-only",
+      "specifier": "../runtime/BackgroundTaskIndicatorCoordinator"
+    },
+    {
       "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/runtime/BackgroundTaskInlinePanelRenderer.ts|runtime-static|../runtime/BackgroundTaskInlinePanelRenderer",
       "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
       "to": "src/features/chat/runtime/BackgroundTaskInlinePanelRenderer.ts",
       "kind": "runtime-static",
+      "specifier": "../runtime/BackgroundTaskInlinePanelRenderer"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/runtime/BackgroundTaskInlinePanelRenderer.ts|type-only|../runtime/BackgroundTaskInlinePanelRenderer",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/runtime/BackgroundTaskInlinePanelRenderer.ts",
+      "kind": "type-only",
       "specifier": "../runtime/BackgroundTaskInlinePanelRenderer"
     },
     {
@@ -4736,6 +4806,13 @@
       "specifier": "../runtime/StreamingInlineCardRenderer"
     },
     {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/runtime/StreamingInlineCardRenderer.ts|type-only|../runtime/StreamingInlineCardRenderer",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/runtime/StreamingInlineCardRenderer.ts",
+      "kind": "type-only",
+      "specifier": "../runtime/StreamingInlineCardRenderer"
+    },
+    {
       "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/runtime/TabConversationActivationBridge.ts|runtime-static|../runtime/TabConversationActivationBridge",
       "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
       "to": "src/features/chat/runtime/TabConversationActivationBridge.ts",
@@ -4771,10 +4848,24 @@
       "specifier": "../runtime/UserMessageContentRenderer"
     },
     {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/runtime/UserMessageContentRenderer.ts|type-only|../runtime/UserMessageContentRenderer",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/runtime/UserMessageContentRenderer.ts",
+      "kind": "type-only",
+      "specifier": "../runtime/UserMessageContentRenderer"
+    },
+    {
       "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/runtime/UserMessageFooterRenderer.ts|runtime-static|../runtime/UserMessageFooterRenderer",
       "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
       "to": "src/features/chat/runtime/UserMessageFooterRenderer.ts",
       "kind": "runtime-static",
+      "specifier": "../runtime/UserMessageFooterRenderer"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/runtime/UserMessageFooterRenderer.ts|type-only|../runtime/UserMessageFooterRenderer",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/runtime/UserMessageFooterRenderer.ts",
+      "kind": "type-only",
       "specifier": "../runtime/UserMessageFooterRenderer"
     },
     {
@@ -4785,10 +4876,24 @@
       "specifier": "../services/ActiveTabContextUsageCoordinator"
     },
     {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/ActiveTabContextUsageCoordinator.ts|type-only|../services/ActiveTabContextUsageCoordinator",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/ActiveTabContextUsageCoordinator.ts",
+      "kind": "type-only",
+      "specifier": "../services/ActiveTabContextUsageCoordinator"
+    },
+    {
       "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/BackgroundTaskCompletionNoticeService.ts|runtime-static|../services/BackgroundTaskCompletionNoticeService",
       "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
       "to": "src/features/chat/services/BackgroundTaskCompletionNoticeService.ts",
       "kind": "runtime-static",
+      "specifier": "../services/BackgroundTaskCompletionNoticeService"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/BackgroundTaskCompletionNoticeService.ts|type-only|../services/BackgroundTaskCompletionNoticeService",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/BackgroundTaskCompletionNoticeService.ts",
+      "kind": "type-only",
       "specifier": "../services/BackgroundTaskCompletionNoticeService"
     },
     {
@@ -4799,10 +4904,24 @@
       "specifier": "../services/BackgroundTaskLiveSignalCoordinator"
     },
     {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/BackgroundTaskLiveSignalCoordinator.ts|type-only|../services/BackgroundTaskLiveSignalCoordinator",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/BackgroundTaskLiveSignalCoordinator.ts",
+      "kind": "type-only",
+      "specifier": "../services/BackgroundTaskLiveSignalCoordinator"
+    },
+    {
       "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/BackgroundTaskNoticeStateService.ts|runtime-static|../services/BackgroundTaskNoticeStateService",
       "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
       "to": "src/features/chat/services/BackgroundTaskNoticeStateService.ts",
       "kind": "runtime-static",
+      "specifier": "../services/BackgroundTaskNoticeStateService"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/BackgroundTaskNoticeStateService.ts|type-only|../services/BackgroundTaskNoticeStateService",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/BackgroundTaskNoticeStateService.ts",
+      "kind": "type-only",
       "specifier": "../services/BackgroundTaskNoticeStateService"
     },
     {
@@ -4820,10 +4939,24 @@
       "specifier": "../services/BackgroundTaskTimelineService"
     },
     {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/BackgroundTaskTimelineService.ts|type-only|../services/BackgroundTaskTimelineService",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/BackgroundTaskTimelineService.ts",
+      "kind": "type-only",
+      "specifier": "../services/BackgroundTaskTimelineService"
+    },
+    {
       "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/ChatHeaderPresenter.ts|runtime-static|../services/ChatHeaderPresenter",
       "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
       "to": "src/features/chat/services/ChatHeaderPresenter.ts",
       "kind": "runtime-static",
+      "specifier": "../services/ChatHeaderPresenter"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/ChatHeaderPresenter.ts|type-only|../services/ChatHeaderPresenter",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/ChatHeaderPresenter.ts",
+      "kind": "type-only",
       "specifier": "../services/ChatHeaderPresenter"
     },
     {
@@ -4834,10 +4967,24 @@
       "specifier": "../services/ChatSelectionControlsCoordinator"
     },
     {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/ChatSelectionControlsCoordinator.ts|type-only|../services/ChatSelectionControlsCoordinator",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/ChatSelectionControlsCoordinator.ts",
+      "kind": "type-only",
+      "specifier": "../services/ChatSelectionControlsCoordinator"
+    },
+    {
       "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/ChatSurfaceAppearanceCoordinator.ts|runtime-static|../services/ChatSurfaceAppearanceCoordinator",
       "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
       "to": "src/features/chat/services/ChatSurfaceAppearanceCoordinator.ts",
       "kind": "runtime-static",
+      "specifier": "../services/ChatSurfaceAppearanceCoordinator"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/ChatSurfaceAppearanceCoordinator.ts|type-only|../services/ChatSurfaceAppearanceCoordinator",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/ChatSurfaceAppearanceCoordinator.ts",
+      "kind": "type-only",
       "specifier": "../services/ChatSurfaceAppearanceCoordinator"
     },
     {
@@ -4848,10 +4995,24 @@
       "specifier": "../services/ChildSessionGraphCoordinator"
     },
     {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/ChildSessionGraphCoordinator.ts|type-only|../services/ChildSessionGraphCoordinator",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/ChildSessionGraphCoordinator.ts",
+      "kind": "type-only",
+      "specifier": "../services/ChildSessionGraphCoordinator"
+    },
+    {
       "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/ComposerContextViewFacade.ts|runtime-static|../services/ComposerContextViewFacade",
       "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
       "to": "src/features/chat/services/ComposerContextViewFacade.ts",
       "kind": "runtime-static",
+      "specifier": "../services/ComposerContextViewFacade"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/ComposerContextViewFacade.ts|type-only|../services/ComposerContextViewFacade",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/ComposerContextViewFacade.ts",
+      "kind": "type-only",
       "specifier": "../services/ComposerContextViewFacade"
     },
     {
@@ -4862,6 +5023,13 @@
       "specifier": "../services/ComposerInputShellCoordinator"
     },
     {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/ComposerInputShellCoordinator.ts|type-only|../services/ComposerInputShellCoordinator",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/ComposerInputShellCoordinator.ts",
+      "kind": "type-only",
+      "specifier": "../services/ComposerInputShellCoordinator"
+    },
+    {
       "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/ConversationAuthoritativeSyncCoordinator.ts|runtime-static|../services/ConversationAuthoritativeSyncCoordinator",
       "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
       "to": "src/features/chat/services/ConversationAuthoritativeSyncCoordinator.ts",
@@ -4869,10 +5037,24 @@
       "specifier": "../services/ConversationAuthoritativeSyncCoordinator"
     },
     {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/ConversationAuthoritativeSyncCoordinator.ts|type-only|../services/ConversationAuthoritativeSyncCoordinator",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/ConversationAuthoritativeSyncCoordinator.ts",
+      "kind": "type-only",
+      "specifier": "../services/ConversationAuthoritativeSyncCoordinator"
+    },
+    {
       "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/ConversationHistoryActionsCoordinator.ts|runtime-static|../services/ConversationHistoryActionsCoordinator",
       "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
       "to": "src/features/chat/services/ConversationHistoryActionsCoordinator.ts",
       "kind": "runtime-static",
+      "specifier": "../services/ConversationHistoryActionsCoordinator"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/ConversationHistoryActionsCoordinator.ts|type-only|../services/ConversationHistoryActionsCoordinator",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/ConversationHistoryActionsCoordinator.ts",
+      "kind": "type-only",
       "specifier": "../services/ConversationHistoryActionsCoordinator"
     },
     {
@@ -4911,6 +5093,13 @@
       "specifier": "../services/ConversationNoticeCoordinator"
     },
     {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/ConversationNoticeCoordinator.ts|type-only|../services/ConversationNoticeCoordinator",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/ConversationNoticeCoordinator.ts",
+      "kind": "type-only",
+      "specifier": "../services/ConversationNoticeCoordinator"
+    },
+    {
       "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/ConversationRenderService.ts|runtime-static|../services/ConversationRenderService",
       "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
       "to": "src/features/chat/services/ConversationRenderService.ts",
@@ -4925,10 +5114,24 @@
       "specifier": "../services/ConversationSessionSettingsCoordinator"
     },
     {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/ConversationSessionSettingsCoordinator.ts|type-only|../services/ConversationSessionSettingsCoordinator",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/ConversationSessionSettingsCoordinator.ts",
+      "kind": "type-only",
+      "specifier": "../services/ConversationSessionSettingsCoordinator"
+    },
+    {
       "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/ConversationSessionSignalRuntime.ts|runtime-static|../services/ConversationSessionSignalRuntime",
       "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
       "to": "src/features/chat/services/ConversationSessionSignalRuntime.ts",
       "kind": "runtime-static",
+      "specifier": "../services/ConversationSessionSignalRuntime"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/ConversationSessionSignalRuntime.ts|type-only|../services/ConversationSessionSignalRuntime",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/ConversationSessionSignalRuntime.ts",
+      "kind": "type-only",
       "specifier": "../services/ConversationSessionSignalRuntime"
     },
     {
@@ -4974,10 +5177,24 @@
       "specifier": "../services/ConversationSyncRuntimeCoordinator"
     },
     {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/ConversationTabLifecycleRecoveryCoordinator.ts|type-only|../services/ConversationTabLifecycleRecoveryCoordinator",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/ConversationTabLifecycleRecoveryCoordinator.ts",
+      "kind": "type-only",
+      "specifier": "../services/ConversationTabLifecycleRecoveryCoordinator"
+    },
+    {
       "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/ConversationTabOpenCoordinator.ts|runtime-static|../services/ConversationTabOpenCoordinator",
       "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
       "to": "src/features/chat/services/ConversationTabOpenCoordinator.ts",
       "kind": "runtime-static",
+      "specifier": "../services/ConversationTabOpenCoordinator"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/ConversationTabOpenCoordinator.ts|type-only|../services/ConversationTabOpenCoordinator",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/ConversationTabOpenCoordinator.ts",
+      "kind": "type-only",
       "specifier": "../services/ConversationTabOpenCoordinator"
     },
     {
@@ -4995,10 +5212,24 @@
       "specifier": "../services/ConversationTabRuntimeCoordinator"
     },
     {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/ConversationViewStateService.ts|type-only|../services/ConversationViewStateService",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/ConversationViewStateService.ts",
+      "kind": "type-only",
+      "specifier": "../services/ConversationViewStateService"
+    },
+    {
       "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/InputPanelAppearanceCoordinator.ts|runtime-static|../services/InputPanelAppearanceCoordinator",
       "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
       "to": "src/features/chat/services/InputPanelAppearanceCoordinator.ts",
       "kind": "runtime-static",
+      "specifier": "../services/InputPanelAppearanceCoordinator"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/InputPanelAppearanceCoordinator.ts|type-only|../services/InputPanelAppearanceCoordinator",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/InputPanelAppearanceCoordinator.ts",
+      "kind": "type-only",
       "specifier": "../services/InputPanelAppearanceCoordinator"
     },
     {
@@ -5023,6 +5254,13 @@
       "specifier": "../services/PersistentAssistantNoticeService"
     },
     {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/PersistentAssistantNoticeService.ts|type-only|../services/PersistentAssistantNoticeService",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/PersistentAssistantNoticeService.ts",
+      "kind": "type-only",
+      "specifier": "../services/PersistentAssistantNoticeService"
+    },
+    {
       "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/QuestionDockSlotCoordinator.ts|runtime-static|../services/QuestionDockSlotCoordinator",
       "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
       "to": "src/features/chat/services/QuestionDockSlotCoordinator.ts",
@@ -5041,6 +5279,13 @@
       "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
       "to": "src/features/chat/services/QuestionRuntimeViewHostFactory.ts",
       "kind": "runtime-static",
+      "specifier": "../services/QuestionRuntimeViewHostFactory"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/QuestionRuntimeViewHostFactory.ts|type-only|../services/QuestionRuntimeViewHostFactory",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/QuestionRuntimeViewHostFactory.ts",
+      "kind": "type-only",
       "specifier": "../services/QuestionRuntimeViewHostFactory"
     },
     {
@@ -5086,6 +5331,13 @@
       "specifier": "../services/SessionTodoHostAdapter"
     },
     {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/SessionTodoHostAdapter.ts|type-only|../services/SessionTodoHostAdapter",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/SessionTodoHostAdapter.ts",
+      "kind": "type-only",
+      "specifier": "../services/SessionTodoHostAdapter"
+    },
+    {
       "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/SlashCommandExecutionHostFactory.ts|runtime-static|../services/SlashCommandExecutionHostFactory",
       "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
       "to": "src/features/chat/services/SlashCommandExecutionHostFactory.ts",
@@ -5098,6 +5350,13 @@
       "to": "src/features/chat/services/SlashCommandExecutionService.ts",
       "kind": "runtime-static",
       "specifier": "../services/SlashCommandExecutionService"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/TabActivationRuntimeHostProvider.ts|type-only|../services/TabActivationRuntimeHostProvider",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/TabActivationRuntimeHostProvider.ts",
+      "kind": "type-only",
+      "specifier": "../services/TabActivationRuntimeHostProvider"
     },
     {
       "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/TabActivationRuntimeViewHostFactory.ts|runtime-static|../services/TabActivationRuntimeViewHostFactory",
@@ -5118,6 +5377,13 @@
       "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
       "to": "src/features/chat/services/TabMessagesPaneCoordinator.ts",
       "kind": "runtime-static",
+      "specifier": "../services/TabMessagesPaneCoordinator"
+    },
+    {
+      "id": "src/features/chat/runtime/ChatRuntimeComposition.ts|src/features/chat/services/TabMessagesPaneCoordinator.ts|type-only|../services/TabMessagesPaneCoordinator",
+      "from": "src/features/chat/runtime/ChatRuntimeComposition.ts",
+      "to": "src/features/chat/services/TabMessagesPaneCoordinator.ts",
+      "kind": "type-only",
       "specifier": "../services/TabMessagesPaneCoordinator"
     },
     {
@@ -5170,6 +5436,13 @@
       "specifier": "../../../core/types"
     },
     {
+      "id": "src/features/chat/runtime/ConversationHydrationOutcomeBridge.ts|src/features/chat/runtime/ConversationHydrationRenderBridge.ts|type-only|./ConversationHydrationRenderBridge",
+      "from": "src/features/chat/runtime/ConversationHydrationOutcomeBridge.ts",
+      "to": "src/features/chat/runtime/ConversationHydrationRenderBridge.ts",
+      "kind": "type-only",
+      "specifier": "./ConversationHydrationRenderBridge"
+    },
+    {
       "id": "src/features/chat/runtime/ConversationHydrationOutcomeBridge.ts|src/features/chat/runtime/TabConversationStateBridge.ts|type-only|./TabConversationStateBridge",
       "from": "src/features/chat/runtime/ConversationHydrationOutcomeBridge.ts",
       "to": "src/features/chat/runtime/TabConversationStateBridge.ts",
@@ -5184,6 +5457,13 @@
       "specifier": "./TabViewActivationBridge"
     },
     {
+      "id": "src/features/chat/runtime/ConversationHydrationOutcomeBridge.ts|src/features/chat/services/ConversationRenderRuntime.ts|type-only|../services/ConversationRenderRuntime",
+      "from": "src/features/chat/runtime/ConversationHydrationOutcomeBridge.ts",
+      "to": "src/features/chat/services/ConversationRenderRuntime.ts",
+      "kind": "type-only",
+      "specifier": "../services/ConversationRenderRuntime"
+    },
+    {
       "id": "src/features/chat/runtime/ConversationHydrationOutcomeBridge.ts|src/features/chat/tabs/index.ts|type-only|../tabs",
       "from": "src/features/chat/runtime/ConversationHydrationOutcomeBridge.ts",
       "to": "src/features/chat/tabs/index.ts",
@@ -5191,17 +5471,17 @@
       "specifier": "../tabs"
     },
     {
+      "id": "src/features/chat/runtime/ConversationHydrationRenderBridge.ts|src/features/chat/services/ConversationRenderRuntime.ts|runtime-static|../services/ConversationRenderRuntime",
+      "from": "src/features/chat/runtime/ConversationHydrationRenderBridge.ts",
+      "to": "src/features/chat/services/ConversationRenderRuntime.ts",
+      "kind": "runtime-static",
+      "specifier": "../services/ConversationRenderRuntime"
+    },
+    {
       "id": "src/features/chat/runtime/ConversationHydrationRenderBridge.ts|src/features/chat/services/ScrollManager.ts|runtime-static|../services/ScrollManager",
       "from": "src/features/chat/runtime/ConversationHydrationRenderBridge.ts",
       "to": "src/features/chat/services/ScrollManager.ts",
       "kind": "runtime-static",
-      "specifier": "../services/ScrollManager"
-    },
-    {
-      "id": "src/features/chat/runtime/ConversationHydrationRenderBridge.ts|src/features/chat/services/ScrollManager.ts|type-only|../services/ScrollManager",
-      "from": "src/features/chat/runtime/ConversationHydrationRenderBridge.ts",
-      "to": "src/features/chat/services/ScrollManager.ts",
-      "kind": "type-only",
       "specifier": "../services/ScrollManager"
     },
     {
@@ -7648,6 +7928,13 @@
       "specifier": "../../../i18n"
     },
     {
+      "id": "src/features/chat/services/ConversationHydrationRuntimeViewHostFactory.ts|src/features/chat/rendering/collapsible.ts|runtime-static|../rendering/collapsible",
+      "from": "src/features/chat/services/ConversationHydrationRuntimeViewHostFactory.ts",
+      "to": "src/features/chat/rendering/collapsible.ts",
+      "kind": "runtime-static",
+      "specifier": "../rendering/collapsible"
+    },
+    {
       "id": "src/features/chat/services/ConversationHydrationRuntimeViewHostFactory.ts|src/features/chat/runtime/ConversationHydrationOutcomeBridge.ts|runtime-static|../runtime/ConversationHydrationOutcomeBridge",
       "from": "src/features/chat/services/ConversationHydrationRuntimeViewHostFactory.ts",
       "to": "src/features/chat/runtime/ConversationHydrationOutcomeBridge.ts",
@@ -7706,6 +7993,48 @@
     {
       "id": "src/features/chat/services/ConversationIdentityRuntime.ts|src/features/chat/tabs/index.ts|type-only|../tabs",
       "from": "src/features/chat/services/ConversationIdentityRuntime.ts",
+      "to": "src/features/chat/tabs/index.ts",
+      "kind": "type-only",
+      "specifier": "../tabs"
+    },
+    {
+      "id": "src/features/chat/services/ConversationKeyedReconcileDelegate.ts|src/core/types/index.ts|type-only|../../../core/types",
+      "from": "src/features/chat/services/ConversationKeyedReconcileDelegate.ts",
+      "to": "src/core/types/index.ts",
+      "kind": "type-only",
+      "specifier": "../../../core/types"
+    },
+    {
+      "id": "src/features/chat/services/ConversationKeyedReconcileDelegate.ts|src/features/chat/rendering/collapsible.ts|runtime-static|../rendering/collapsible",
+      "from": "src/features/chat/services/ConversationKeyedReconcileDelegate.ts",
+      "to": "src/features/chat/rendering/collapsible.ts",
+      "kind": "runtime-static",
+      "specifier": "../rendering/collapsible"
+    },
+    {
+      "id": "src/features/chat/services/ConversationKeyedReconcileDelegate.ts|src/features/chat/services/ConversationRenderRuntime.ts|runtime-static|./ConversationRenderRuntime",
+      "from": "src/features/chat/services/ConversationKeyedReconcileDelegate.ts",
+      "to": "src/features/chat/services/ConversationRenderRuntime.ts",
+      "kind": "runtime-static",
+      "specifier": "./ConversationRenderRuntime"
+    },
+    {
+      "id": "src/features/chat/services/ConversationKeyedReconcileDelegate.ts|src/features/chat/services/ConversationRenderRuntime.ts|type-only|./ConversationRenderRuntime",
+      "from": "src/features/chat/services/ConversationKeyedReconcileDelegate.ts",
+      "to": "src/features/chat/services/ConversationRenderRuntime.ts",
+      "kind": "type-only",
+      "specifier": "./ConversationRenderRuntime"
+    },
+    {
+      "id": "src/features/chat/services/ConversationKeyedReconcileDelegate.ts|src/features/chat/services/ScrollManager.ts|runtime-static|./ScrollManager",
+      "from": "src/features/chat/services/ConversationKeyedReconcileDelegate.ts",
+      "to": "src/features/chat/services/ScrollManager.ts",
+      "kind": "runtime-static",
+      "specifier": "./ScrollManager"
+    },
+    {
+      "id": "src/features/chat/services/ConversationKeyedReconcileDelegate.ts|src/features/chat/tabs/index.ts|type-only|../tabs",
+      "from": "src/features/chat/services/ConversationKeyedReconcileDelegate.ts",
       "to": "src/features/chat/tabs/index.ts",
       "kind": "type-only",
       "specifier": "../tabs"
@@ -7851,6 +8180,13 @@
       "specifier": "../../../core/types/chat"
     },
     {
+      "id": "src/features/chat/services/ConversationNoticeCoordinator.ts|src/core/types/index.ts|runtime-static|../../../core/types",
+      "from": "src/features/chat/services/ConversationNoticeCoordinator.ts",
+      "to": "src/core/types/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../../core/types"
+    },
+    {
       "id": "src/features/chat/services/ConversationNoticeCoordinator.ts|src/core/types/index.ts|type-only|../../../core/types",
       "from": "src/features/chat/services/ConversationNoticeCoordinator.ts",
       "to": "src/core/types/index.ts",
@@ -7900,11 +8236,25 @@
       "specifier": "../../../core/types"
     },
     {
+      "id": "src/features/chat/services/ConversationRenderRuntime.ts|src/features/chat/rendering/collapsible.ts|runtime-static|../rendering/collapsible",
+      "from": "src/features/chat/services/ConversationRenderRuntime.ts",
+      "to": "src/features/chat/rendering/collapsible.ts",
+      "kind": "runtime-static",
+      "specifier": "../rendering/collapsible"
+    },
+    {
       "id": "src/features/chat/services/ConversationRenderRuntime.ts|src/features/chat/runtime/UserMessageContentRenderer.ts|type-only|../runtime/UserMessageContentRenderer",
       "from": "src/features/chat/services/ConversationRenderRuntime.ts",
       "to": "src/features/chat/runtime/UserMessageContentRenderer.ts",
       "kind": "type-only",
       "specifier": "../runtime/UserMessageContentRenderer"
+    },
+    {
+      "id": "src/features/chat/services/ConversationRenderRuntime.ts|src/features/chat/services/ConversationKeyedReconcileDelegate.ts|type-only|./ConversationKeyedReconcileDelegate",
+      "from": "src/features/chat/services/ConversationRenderRuntime.ts",
+      "to": "src/features/chat/services/ConversationKeyedReconcileDelegate.ts",
+      "kind": "type-only",
+      "specifier": "./ConversationKeyedReconcileDelegate"
     },
     {
       "id": "src/features/chat/services/ConversationRenderRuntime.ts|src/features/chat/services/ScrollManager.ts|runtime-static|./ScrollManager",
@@ -7921,6 +8271,13 @@
       "specifier": "../tabs"
     },
     {
+      "id": "src/features/chat/services/ConversationRenderRuntime.ts|src/utils/streaming/MarkdownRenderScheduler.ts|runtime-static|../../../utils/streaming/MarkdownRenderScheduler",
+      "from": "src/features/chat/services/ConversationRenderRuntime.ts",
+      "to": "src/utils/streaming/MarkdownRenderScheduler.ts",
+      "kind": "runtime-static",
+      "specifier": "../../../utils/streaming/MarkdownRenderScheduler"
+    },
+    {
       "id": "src/features/chat/services/ConversationRenderService.ts|src/core/opencode/index.ts|type-only|../../../core/opencode",
       "from": "src/features/chat/services/ConversationRenderService.ts",
       "to": "src/core/opencode/index.ts",
@@ -7935,6 +8292,13 @@
       "specifier": "../../../core/types"
     },
     {
+      "id": "src/features/chat/services/ConversationRenderService.ts|src/features/chat/rendering/collapsible.ts|runtime-static|../rendering/collapsible",
+      "from": "src/features/chat/services/ConversationRenderService.ts",
+      "to": "src/features/chat/rendering/collapsible.ts",
+      "kind": "runtime-static",
+      "specifier": "../rendering/collapsible"
+    },
+    {
       "id": "src/features/chat/services/ConversationRenderService.ts|src/features/chat/runtime/SendPipelineDebugSummaries.ts|runtime-static|../runtime/SendPipelineDebugSummaries",
       "from": "src/features/chat/services/ConversationRenderService.ts",
       "to": "src/features/chat/runtime/SendPipelineDebugSummaries.ts",
@@ -7947,6 +8311,13 @@
       "to": "src/features/chat/runtime/UserMessageContentRenderer.ts",
       "kind": "type-only",
       "specifier": "../runtime/UserMessageContentRenderer"
+    },
+    {
+      "id": "src/features/chat/services/ConversationRenderService.ts|src/features/chat/services/ConversationKeyedReconcileDelegate.ts|runtime-static|./ConversationKeyedReconcileDelegate",
+      "from": "src/features/chat/services/ConversationRenderService.ts",
+      "to": "src/features/chat/services/ConversationKeyedReconcileDelegate.ts",
+      "kind": "runtime-static",
+      "specifier": "./ConversationKeyedReconcileDelegate"
     },
     {
       "id": "src/features/chat/services/ConversationRenderService.ts|src/features/chat/services/ConversationRenderRuntime.ts|re-export|./ConversationRenderRuntime",
@@ -8264,6 +8635,13 @@
       "specifier": "./ConversationSyncVisiblePostSyncRouter"
     },
     {
+      "id": "src/features/chat/services/ConversationSyncHostAdapter.ts|src/features/chat/services/ScrollManager.ts|runtime-static|./ScrollManager",
+      "from": "src/features/chat/services/ConversationSyncHostAdapter.ts",
+      "to": "src/features/chat/services/ScrollManager.ts",
+      "kind": "runtime-static",
+      "specifier": "./ScrollManager"
+    },
+    {
       "id": "src/features/chat/services/ConversationSyncHostAdapter.ts|src/features/chat/services/TabSessionPhase.ts|type-only|./TabSessionPhase",
       "from": "src/features/chat/services/ConversationSyncHostAdapter.ts",
       "to": "src/features/chat/services/TabSessionPhase.ts",
@@ -8486,6 +8864,13 @@
       "to": "src/features/chat/services/MessageSendPreparationService.ts",
       "kind": "type-only",
       "specifier": "./MessageSendPreparationService"
+    },
+    {
+      "id": "src/features/chat/services/ConversationTabRuntimeCoordinator.ts|src/features/chat/services/ScrollManager.ts|runtime-static|./ScrollManager",
+      "from": "src/features/chat/services/ConversationTabRuntimeCoordinator.ts",
+      "to": "src/features/chat/services/ScrollManager.ts",
+      "kind": "runtime-static",
+      "specifier": "./ScrollManager"
     },
     {
       "id": "src/features/chat/services/ConversationTabRuntimeCoordinator.ts|src/features/chat/services/TabMessagesPaneCoordinator.ts|runtime-static|./TabMessagesPaneCoordinator",
@@ -9034,10 +9419,10 @@
       "specifier": "../../../shared"
     },
     {
-      "id": "src/features/chat/services/ModifiedFilesSidebarCoordinator.ts|src/core/types/index.ts|type-only|../../../core/types",
+      "id": "src/features/chat/services/ModifiedFilesSidebarCoordinator.ts|src/core/types/index.ts|runtime-static|../../../core/types",
       "from": "src/features/chat/services/ModifiedFilesSidebarCoordinator.ts",
       "to": "src/core/types/index.ts",
-      "kind": "type-only",
+      "kind": "runtime-static",
       "specifier": "../../../core/types"
     },
     {
@@ -9102,6 +9487,13 @@
       "to": "src/core/types/index.ts",
       "kind": "type-only",
       "specifier": "../../../core/types"
+    },
+    {
+      "id": "src/features/chat/services/PersistentAssistantNoticeService.ts|src/features/chat/services/ConversationWriteSerializationService.ts|runtime-static|./ConversationWriteSerializationService",
+      "from": "src/features/chat/services/PersistentAssistantNoticeService.ts",
+      "to": "src/features/chat/services/ConversationWriteSerializationService.ts",
+      "kind": "runtime-static",
+      "specifier": "./ConversationWriteSerializationService"
     },
     {
       "id": "src/features/chat/services/PersistentAssistantNoticeService.ts|src/features/chat/services/QuestionTodoBackgroundTaskRuntimeServiceBundle.ts|type-only|./QuestionTodoBackgroundTaskRuntimeServiceBundle",
@@ -11020,6 +11412,13 @@
       "to": "src/i18n/index.ts",
       "kind": "runtime-static",
       "specifier": "../../../i18n"
+    },
+    {
+      "id": "src/features/chat/ui/ModifiedFilesSidebar.ts|src/shared/index.ts|runtime-static|../../../shared",
+      "from": "src/features/chat/ui/ModifiedFilesSidebar.ts",
+      "to": "src/shared/index.ts",
+      "kind": "runtime-static",
+      "specifier": "../../../shared"
     },
     {
       "id": "src/features/chat/ui/NavigationSidebar.ts|src/i18n/index.ts|runtime-static|../../../i18n",
@@ -16069,6 +16468,13 @@
       "specifier": "./types"
     },
     {
+      "id": "src/utils/streaming/index.ts|src/utils/streaming/MarkdownRenderScheduler.ts|re-export|./MarkdownRenderScheduler",
+      "from": "src/utils/streaming/index.ts",
+      "to": "src/utils/streaming/MarkdownRenderScheduler.ts",
+      "kind": "re-export",
+      "specifier": "./MarkdownRenderScheduler"
+    },
+    {
       "id": "src/utils/streaming/index.ts|src/utils/streaming/mcpSummaryConfig.ts|re-export|./mcpSummaryConfig",
       "from": "src/utils/streaming/index.ts",
       "to": "src/utils/streaming/mcpSummaryConfig.ts",
@@ -16088,6 +16494,13 @@
       "to": "src/utils/streaming/StreamController.ts",
       "kind": "re-export",
       "specifier": "./StreamController"
+    },
+    {
+      "id": "src/utils/streaming/index.ts|src/utils/streaming/streamingCollapsible.ts|re-export|./streamingCollapsible",
+      "from": "src/utils/streaming/index.ts",
+      "to": "src/utils/streaming/streamingCollapsible.ts",
+      "kind": "re-export",
+      "specifier": "./streamingCollapsible"
     },
     {
       "id": "src/utils/streaming/index.ts|src/utils/streaming/ThinkingBlockRenderer.ts|re-export|./ThinkingBlockRenderer",
@@ -16153,6 +16566,13 @@
       "specifier": "../markdown"
     },
     {
+      "id": "src/utils/streaming/StreamController.ts|src/utils/streaming/MarkdownRenderScheduler.ts|runtime-static|./MarkdownRenderScheduler",
+      "from": "src/utils/streaming/StreamController.ts",
+      "to": "src/utils/streaming/MarkdownRenderScheduler.ts",
+      "kind": "runtime-static",
+      "specifier": "./MarkdownRenderScheduler"
+    },
+    {
       "id": "src/utils/streaming/StreamController.ts|src/utils/streaming/ThinkingBlockRenderer.ts|runtime-static|./ThinkingBlockRenderer",
       "from": "src/utils/streaming/StreamController.ts",
       "to": "src/utils/streaming/ThinkingBlockRenderer.ts",
@@ -16195,6 +16615,20 @@
       "specifier": "../markdown"
     },
     {
+      "id": "src/utils/streaming/ThinkingBlockRenderer.ts|src/utils/streaming/MarkdownRenderScheduler.ts|runtime-static|./MarkdownRenderScheduler",
+      "from": "src/utils/streaming/ThinkingBlockRenderer.ts",
+      "to": "src/utils/streaming/MarkdownRenderScheduler.ts",
+      "kind": "runtime-static",
+      "specifier": "./MarkdownRenderScheduler"
+    },
+    {
+      "id": "src/utils/streaming/ThinkingBlockRenderer.ts|src/utils/streaming/streamingCollapsible.ts|runtime-static|./streamingCollapsible",
+      "from": "src/utils/streaming/ThinkingBlockRenderer.ts",
+      "to": "src/utils/streaming/streamingCollapsible.ts",
+      "kind": "runtime-static",
+      "specifier": "./streamingCollapsible"
+    },
+    {
       "id": "src/utils/streaming/ThinkingBlockRenderer.ts|src/utils/streaming/types.ts|type-only|./types",
       "from": "src/utils/streaming/ThinkingBlockRenderer.ts",
       "to": "src/utils/streaming/types.ts",
@@ -16221,6 +16655,13 @@
       "to": "src/utils/streaming/McpToolCallRenderer.ts",
       "kind": "runtime-static",
       "specifier": "./McpToolCallRenderer"
+    },
+    {
+      "id": "src/utils/streaming/ToolCallRenderer.ts|src/utils/streaming/streamingCollapsible.ts|runtime-static|./streamingCollapsible",
+      "from": "src/utils/streaming/ToolCallRenderer.ts",
+      "to": "src/utils/streaming/streamingCollapsible.ts",
+      "kind": "runtime-static",
+      "specifier": "./streamingCollapsible"
     },
     {
       "id": "src/utils/streaming/ToolCallRenderer.ts|src/utils/streaming/TaskToolCallRenderer.ts|runtime-static|./TaskToolCallRenderer",
@@ -16275,6 +16716,13 @@
         "src/features/chat/services/BackgroundTaskTimelineAssemblyService.ts",
         "src/features/chat/services/BackgroundTaskTimelineLaunchService.ts",
         "src/features/chat/services/BackgroundTaskTimelineService.ts"
+      ]
+    },
+    {
+      "id": "src/features/chat/services/ConversationKeyedReconcileDelegate.ts;;src/features/chat/services/ConversationRenderRuntime.ts",
+      "members": [
+        "src/features/chat/services/ConversationKeyedReconcileDelegate.ts",
+        "src/features/chat/services/ConversationRenderRuntime.ts"
       ]
     }
   ],

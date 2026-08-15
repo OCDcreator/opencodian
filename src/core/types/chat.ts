@@ -190,6 +190,8 @@ export function normalizeConversationSessionSettings(
 /** Content block in a message */
 export interface ContentBlock {
   type: 'text' | 'thinking' | 'tool_use' | 'tool_result' | 'subagent';
+  /** Stable backend part identity when the source provides one. */
+  partId?: string;
   text?: string;
   thinking?: string;
   durationSeconds?: number;

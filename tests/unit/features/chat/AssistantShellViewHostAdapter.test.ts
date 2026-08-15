@@ -218,6 +218,96 @@ describe('AssistantShellViewHostAdapter', () => {
   });
 });
 
+describe('AssistantShellViewHostAdapter expansion state', () => {
+  function createAdapter(): AssistantShellViewHostAdapter {
+    const markdownService = createMockMarkdownService();
+    return new AssistantShellViewHostAdapter(
+      {
+        getActiveTabId: () => 'tab-1',
+        getTabRuntimeState: () => ({ streamingMessageEl: null, streamingContentEl: null }),
+        ensureTurnBody: () => document.createElement('div'),
+        shouldAutoScroll: () => false,
+        scheduleSettledScrollToBottomIfNeeded: jest.fn(),
+        setStreamingAssistantMessageVisibility: jest.fn(),
+        renderNoticeCard: jest.fn(),
+        getMarkdownService: () => markdownService,
+        shouldRenderQuestionResolutionCards: () => false,
+        suppressActiveLayoutAutoScrollOnce: jest.fn(),
+      },
+      jest.fn(),
+    );
+  }
+
+  it('keeps each thinking block expansion with the block after fresh hydration reorders the message', async () => {
+    const adapter = createAdapter();
+    const content = document.createElement('div');
+    const message: ChatMessage = {
+      id: 'assistant-thinking-reorder-1',
+      role: 'assistant',
+      content: '',
+      timestamp: 42345,
+      modelId: 'openai/gpt-5.4',
+      contentBlocks: [
+        { type: 'thinking', thinking: 'First thought' },
+        { type: 'thinking', thinking: 'Second thought' },
+      ],
+    };
+
+    await adapter.renderMessageBody(content, message);
+    const initialHeaders = content.querySelectorAll<HTMLElement>('.streaming-thinking-header');
+    initialHeaders[0].click();
+
+    message.contentBlocks = [
+      { type: 'thinking', thinking: 'Second thought' },
+      { type: 'text', text: 'Inserted text' },
+      { type: 'thinking', thinking: 'First thought' },
+    ];
+    content.replaceChildren();
+    await adapter.renderMessageBody(content, message);
+
+    const reorderedHeaders = content.querySelectorAll<HTMLElement>('.streaming-thinking-header');
+    expect(reorderedHeaders[0].getAttribute('aria-expanded')).toBe('false');
+    expect(reorderedHeaders[1].getAttribute('aria-expanded')).toBe('true');
+  });
+
+  it('bounds remembered expansion state to the most recently interacted blocks', async () => {
+    const adapter = createAdapter();
+    const content = document.createElement('div');
+    const blocks = Array.from({ length: 257 }, (_, index) => ({
+      type: 'thinking' as const,
+      thinking: `Thought ${index}`,
+    }));
+
+    for (const [index, block] of blocks.entries()) {
+      const message: ChatMessage = {
+        id: `assistant-thinking-capacity-${index}`,
+        role: 'assistant',
+        content: '',
+        timestamp: 50000 + index,
+        modelId: 'openai/gpt-5.4',
+        contentBlocks: [block],
+      };
+
+      content.replaceChildren();
+      await adapter.renderMessageBody(content, message);
+      (content.querySelector('.streaming-thinking-header') as HTMLElement).click();
+    }
+
+    const firstMessage: ChatMessage = {
+      id: 'assistant-thinking-capacity-0',
+      role: 'assistant',
+      content: '',
+      timestamp: 50000,
+      modelId: 'openai/gpt-5.4',
+      contentBlocks: [blocks[0]],
+    };
+    content.replaceChildren();
+    await adapter.renderMessageBody(content, firstMessage);
+
+    expect(content.querySelector('.streaming-thinking-header')?.getAttribute('aria-expanded')).toBe('false');
+  });
+});
+
 describe('AssistantShellViewHostAdapter shell lifecycle', () => {
   function createAdapter() {
     const turnBody = document.createElement('div');

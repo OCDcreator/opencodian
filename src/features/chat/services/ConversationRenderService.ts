@@ -109,6 +109,15 @@ export interface ConversationRenderHostDependencies {
   scheduleComposerLayoutSync(): void;
   getMessagesForRender(messages: ChatMessage[]): ChatMessage[];
   getMessageVisualSignature(message: ChatMessage): string;
+  /**
+   * Signature of host display settings affecting full-rerender DOM output but
+   * not captured by getMessageVisualSignature (e.g. renderUserMarkupAsCodeBlocks
+   * rewrites the user body markdown before render, showAnsweredQuestionCards
+   * changes the question-card render plan). Folded into the full-rerender
+   * fingerprint so a setting toggle is never masked by an unchanged-message
+   * no-op.
+   */
+  renderInputSettingsSignature(): string;
   resetTurnState(): void;
   renderPersistedAssistantMessage(options: { message: ChatMessage }): Promise<HTMLElement | void | undefined>;
   createAssistantMessageElements(): { messageEl: HTMLElement; contentEl: HTMLElement };
@@ -204,11 +213,33 @@ export function createConversationRenderHost(
       deps.getMessagesForRender(messages),
     getMessageVisualSignature: (message) =>
       deps.getMessageVisualSignature(message),
+    renderInputSettingsSignature: () =>
+      deps.renderInputSettingsSignature(),
     assistantShellRender,
     assistantTailRender,
     ...createDebugLogCallbacks(),
     summarizeChatMessageForDebug: (message) => summarizeChatMessageForDebug(message),
   };
+}
+
+interface CommittedRerenderInput {
+  fingerprint: string;
+  messagesEl: HTMLElement;
+  conversationId: string;
+  resolvedMessages: ChatMessage[];
+  emptyNotice: boolean;
+  settingsSignature: string;
+}
+
+interface FullRerenderReconcileRequest {
+  cached: CommittedRerenderInput | null;
+  conversationId: string;
+  settingsSignature: string;
+  emptyNotice: boolean;
+  nextMessages: ChatMessage[];
+  tabId: TabId | null;
+  messagesEl: HTMLElement;
+  renderGeneration: number;
 }
 
 export class ConversationRenderService {
@@ -224,6 +255,20 @@ export class ConversationRenderService {
    */
   private rerenderQueue: Promise<void> = Promise.resolve();
   private rerenderGeneration = 0;
+  /**
+   * Fingerprint of the render input committed by the most recent successful
+   * full rerender, paired with the messages container it was rendered into.
+   * A later `performRerenderConversationMessages` computing an identical
+   * fingerprint for the SAME container short-circuits as a no-op: the live DOM
+   * (node identity, collapsible/expand state, scroll position, selection) is
+   * left untouched. The container identity guard means a pane rebind / new
+   * container never matches a stale cache. Only written after a full
+   * staging→clear→commit succeeds and every owner/generation guard still holds;
+   * a no-op hit never overwrites it. Any code path that mutates the live DOM
+   * outside the full-rerender commit (incremental sync, trailing patch, single
+   * message rerender, ad-hoc render) invalidates it.
+   */
+  private lastRerenderFingerprint: CommittedRerenderInput | null = null;
 
   constructor(
     private readonly host: ConversationRenderHost,
@@ -245,6 +290,10 @@ export class ConversationRenderService {
   }
 
   async renderMessage(message: ChatMessage): Promise<HTMLElement | void | undefined> {
+    // Ad-hoc single-message render may write directly to the live pane (callers
+    // can attach the returned element), so invalidate the full-rerender cache;
+    // only a subsequent successful full rerender re-establishes it.
+    this.lastRerenderFingerprint = null;
     return this.messageRenderer.renderMessage(message);
   }
 
@@ -252,6 +301,10 @@ export class ConversationRenderService {
     messages: ChatMessage[],
     options: ConversationRenderMessagesOptions = {},
   ): Promise<void> {
+    // This low-level render can write directly to the live pane (when invoked
+    // without a staging container), so invalidate the full-rerender cache;
+    // only a subsequent successful full rerender re-establishes it.
+    this.lastRerenderFingerprint = null;
     const surfaceGeneration = beginConversationRenderSurfacePass(this.host);
     const messagesEl = this.host.getMessagesContainer();
     const paneSurfaceGeneration = bumpPaneRenderSurfaceGeneration(messagesEl);
@@ -277,10 +330,25 @@ export class ConversationRenderService {
     }
   }
 
+  /**
+   * Drop the cached full-rerender fingerprint. Callers that mutate the live
+   * message DOM outside the full-rerender commit (e.g. appending a notice
+   * directly via the assistant shell adapter) must invoke this so a later
+   * full refresh does not short-circuit against a fingerprint that no longer
+   * reflects the DOM. Only a subsequent successful full rerender re-establishes
+   * the cache.
+   */
+  invalidateRerenderFingerprint(): void {
+    this.lastRerenderFingerprint = null;
+  }
+
   async rerenderSingleUserMessage(
     previousMessageId: string,
     message: ChatMessage,
   ): Promise<void> {
+    // This path rewrites a user message's body in place on the live DOM, so the
+    // cached full-rerender fingerprint no longer reflects what is on screen.
+    this.lastRerenderFingerprint = null;
     await this.messageRenderer.rerenderSingleUserMessage(previousMessageId, message);
   }
 
@@ -307,6 +375,33 @@ export class ConversationRenderService {
 
     const resolvedMessages = this.resolveConversationRenderMessages(conversation);
 
+    // Short-circuit when the render input is identical to what the live DOM
+    // already reflects. This preserves DOM node identity, manual expand/collapse
+    // state, scroll position and text selection that a full staging→clear→commit
+    // would otherwise discard. The fingerprint covers the rendered message
+    // sequence (after getMessagesForRender filtering/merging and compaction-
+    // divider injection) serialized in FULL per message, the empty-conversation-
+    // notice flag, and the host display-settings signature. See
+    // computeRerenderFingerprint() for why the full serialization (rather than
+    // the partial getMessageVisualSignature) is required for completeness.
+    const emptyNotice = this.host.shouldRenderEmptyConversationNotice();
+    const settingsSignature = this.host.renderInputSettingsSignature();
+    const fingerprint = this.computeRerenderFingerprint(
+      conversation,
+      resolvedMessages,
+      emptyNotice,
+      settingsSignature,
+    );
+    const cached = this.lastRerenderFingerprint;
+    if (cached && cached.fingerprint === fingerprint && cached.messagesEl === messagesEl) {
+      this.host.logAssistantFinalizationDebug('rerender-conversation-messages-skipped-unchanged', {
+        conversationId: conversation.id,
+        sessionId: getConversationBackendSessionId(conversation),
+        messageCount: resolvedMessages.length,
+      });
+      return;
+    }
+
     this.host.logAssistantFinalizationDebug('rerender-conversation-messages-start', {
       conversationId: conversation.id,
       sessionId: getConversationBackendSessionId(conversation),
@@ -318,6 +413,34 @@ export class ConversationRenderService {
 
     const activeTabId = this.host.getActiveTabId();
     const renderGeneration = this.rerenderGeneration;
+    if (await this.tryKeyedReconcileFullRerender({
+      cached,
+      conversationId: conversation.id,
+      settingsSignature,
+      emptyNotice,
+      nextMessages: resolvedMessages,
+      tabId: activeTabId,
+      messagesEl,
+      renderGeneration,
+    })) {
+      this.host.scheduleComposerLayoutSync();
+      markHydrationSettledMessages(messagesEl);
+      this.lastRerenderFingerprint = {
+        fingerprint,
+        messagesEl,
+        conversationId: conversation.id,
+        resolvedMessages: this.snapshotResolvedMessages(resolvedMessages),
+        emptyNotice,
+        settingsSignature,
+      };
+      this.host.logAssistantFinalizationDebug('rerender-conversation-messages-reconciled', {
+        conversationId: conversation.id,
+        sessionId: getConversationBackendSessionId(conversation),
+        messageCount: resolvedMessages.length,
+      });
+      return;
+    }
+
     const surfaceGeneration = getConversationRenderSurfaceGeneration(this.host) + 1;
     // renderMessages() owns the pane-generation bump for this pass.
     const paneSurfaceGeneration = getPaneRenderSurfaceGeneration(messagesEl);
@@ -336,6 +459,7 @@ export class ConversationRenderService {
     this.host.resetTurnState();
     const stagedMessagesEl = document.createElement('div');
     this.messageRenderer.setStagingContainer(stagedMessagesEl);
+    let clearRehydratingClassOnNextFrame = false;
 
     try {
       await this.renderMessages(resolvedMessages, {
@@ -395,21 +519,45 @@ export class ConversationRenderService {
       });
       this.host.scheduleComposerLayoutSync();
       markHydrationSettledMessages(messagesEl);
-
-      this.host.requestAnimationFrame(() => {
-        if (
-          this.rerenderGeneration === renderGeneration
-          && this.isRenderOwner(conversation.id, activeTabId, messagesEl)
-          && getConversationRenderSurfaceGeneration(this.host) === surfaceGeneration
-          && getPaneRenderSurfaceGeneration(messagesEl) > paneSurfaceGeneration
-          && (this.host.getScrollRuntimeForTab(activeTabId)?.hydrationDepth ?? 0) <= 0
-        ) {
-          messagesEl.classList.remove('is-rehydrating');
-        }
-      });
+      // Cache the fingerprint only after the staging tree was committed and a
+      // final ownership/generation/container re-check still holds. Scroll
+      // restore and metrics sync are synchronous, but a superseding pass could
+      // have bumped the surface/pane generation during them; re-verify so a
+      // stale pass never poisons the cache for a later legitimate identical input.
+      if (
+        this.isRenderOwner(conversation.id, activeTabId, messagesEl, renderGeneration)
+        && getConversationRenderSurfaceGeneration(this.host) === surfaceGeneration
+        && getPaneRenderSurfaceGeneration(messagesEl) > paneSurfaceGeneration
+      ) {
+        this.lastRerenderFingerprint = {
+          fingerprint,
+          messagesEl,
+          conversationId: conversation.id,
+          resolvedMessages: this.snapshotResolvedMessages(resolvedMessages),
+          emptyNotice,
+          settingsSignature,
+        };
+      }
+      clearRehydratingClassOnNextFrame = true;
     } finally {
       this.messageRenderer.setStagingContainer(null);
       this.host.endConversationHydration(activeTabId);
+      if (clearRehydratingClassOnNextFrame) {
+        // Schedule after decrementing hydration depth. Test hosts and embedded
+        // runtimes may execute requestAnimationFrame synchronously; scheduling
+        // it before endConversationHydration would then retain the class forever.
+        this.host.requestAnimationFrame(() => {
+          if (
+            this.rerenderGeneration === renderGeneration
+            && this.isRenderOwner(conversation.id, activeTabId, messagesEl)
+            && getConversationRenderSurfaceGeneration(this.host) === surfaceGeneration
+            && getPaneRenderSurfaceGeneration(messagesEl) > paneSurfaceGeneration
+            && (this.host.getScrollRuntimeForTab(activeTabId)?.hydrationDepth ?? 0) <= 0
+          ) {
+            messagesEl.classList.remove('is-rehydrating');
+          }
+        });
+      }
     }
 
     this.host.logAssistantFinalizationDebug('rerender-conversation-messages-complete', {
@@ -432,10 +580,105 @@ export class ConversationRenderService {
       && this.host.getCurrentConversation()?.id === conversationId;
   }
 
+  private async tryKeyedReconcileFullRerender({
+    cached,
+    conversationId,
+    settingsSignature,
+    emptyNotice,
+    nextMessages,
+    tabId,
+    messagesEl,
+    renderGeneration,
+  }: FullRerenderReconcileRequest): Promise<boolean> {
+    if (
+      !cached
+      || cached.messagesEl !== messagesEl
+      || cached.conversationId !== conversationId
+      || cached.emptyNotice !== emptyNotice
+      || cached.settingsSignature !== settingsSignature
+    ) {
+      return false;
+    }
+    const ownsRender = (): boolean => this.isRenderOwner(
+      conversationId,
+      tabId,
+      messagesEl,
+      renderGeneration,
+    );
+    const guardedHost = new Proxy(this.host, {
+      get: (target, property, receiver) => {
+        if (property === 'getMessagesContainer') {
+          return () => ownsRender() ? messagesEl : null;
+        }
+        if (property === 'getCurrentConversation') {
+          return () => ownsRender() ? target.getCurrentConversation() : null;
+        }
+        return Reflect.get(target, property, receiver);
+      },
+    });
+    const reconciled = await new ConversationKeyedReconcileDelegate(
+      guardedHost,
+      this.messageRenderer,
+    ).tryApply(cached.resolvedMessages, nextMessages);
+    return reconciled && ownsRender();
+  }
+
+  private snapshotResolvedMessages(messages: ChatMessage[]): ChatMessage[] {
+    return JSON.parse(JSON.stringify(messages)) as ChatMessage[];
+  }
+
+  /**
+   * Build a fingerprint of what `performRerenderConversationMessages` would
+   * actually render, so an identical follow-up request can short-circuit as a
+   * no-op. The input is run through the host's `getMessagesForRender()` — the
+   * same filter/merge/compaction-divider pipeline the render loop uses — so the
+   * fingerprint reflects the real rendered sequence rather than the raw
+   * resolved messages.
+   *
+   * Each surviving message is serialized in FULL (JSON.stringify of the entire
+   * ChatMessage). This is deliberately more comprehensive than the shared
+   * getMessageVisualSignature, which several renderers (keyed reconcile,
+   * trailing patch) depend on and which omits fields those paths don't need
+   * (id, noticeMeta, summary, questionResolution.request.questions, parts,
+   * contextAttachments, ...). The full-rerender no-op must observe ANY field a
+   * renderer could write to the DOM, so it cannot reuse that partial signature;
+   * serializing the whole message is the only way to stay complete without
+   * maintaining an ever-growing field enumeration that lags behind new render
+   * inputs. ChatMessage is a plain serializable object (no cycles/functions).
+   *
+   * `conversationId` prevents a stale cache from one conversation matching an
+   * identical-looking sequence in another; the empty-notice flag distinguishes
+   * an empty conversation that should show a notice from one that should not.
+   * `settingsSignature` covers host display settings that alter rendered DOM
+   * but are not part of the message payload (renderUserMarkupAsCodeBlocks,
+   * questionCardPosition, showAnsweredQuestionCards). Returns a JSON string.
+   */
+  private computeRerenderFingerprint(
+    conversation: Conversation,
+    resolvedMessages: ChatMessage[],
+    emptyNotice: boolean,
+    settingsSignature: string,
+  ): string {
+    const renderedMessages = this.host.getMessagesForRender(resolvedMessages);
+    return JSON.stringify({
+      conversationId: conversation.id,
+      messages: renderedMessages,
+      emptyNotice,
+      settingsSignature,
+    });
+  }
+
   async applySyncedConversationUpdate(
     previousMessages: ChatMessage[],
     nextMessages: ChatMessage[],
   ): Promise<void> {
+    // Incremental/keyed/tail-patch sync mutates the live DOM directly, so the
+    // cached full-rerender fingerprint no longer reflects what is on screen.
+    // Invalidate it up front; only a subsequent successful full rerender
+    // re-establishes a cache entry. Without this, a later full refresh could
+    // re-resolve to the pre-sync input and short-circuit, leaving the synced
+    // DOM change in place while skipping indicator/metrics refresh.
+    this.lastRerenderFingerprint = null;
     const currentConversation = this.host.getCurrentConversation();
     const resolvedNextMessages = currentConversation
       ? this.resolveConversationRenderMessages(currentConversation, nextMessages)
@@ -448,6 +691,9 @@ export class ConversationRenderService {
     nextMessages: ChatMessage[],
     tabId: TabId | null = this.host.getActiveTabId(),
   ): Promise<boolean> {
+    // Same rationale as applySyncedConversationUpdate: this path rewrites the
+    // trailing assistant DOM in place, so the cached fingerprint is stale.
+    this.lastRerenderFingerprint = null;
     const skippedDebugPlanningContext = buildTrailingAssistantPatchSkippedDebugPlanningContext(
       previousMessages,
       nextMessages,

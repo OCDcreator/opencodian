@@ -28,7 +28,7 @@ describe('sendPipelineContent', () => {
 
     expect(result).toEqual([
       { type: 'text', text: 'Hello' },
-      { type: 'thinking', thinking: 'Analyzing', durationSeconds: 3 },
+      { type: 'thinking', thinking: 'Analyzing', partId: 'p1', durationSeconds: 3 },
       {
         type: 'tool_use',
         toolId: 'tool-1',

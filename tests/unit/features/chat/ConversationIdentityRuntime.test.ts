@@ -371,6 +371,27 @@ describe('ConversationIdentityRuntime.getMessageVisualSignature', () => {
     expect(parsed.contentBlocks[1].text).toBe('Hello!');
   });
 
+  it('includes content-block part identity so a keyed refresh replaces a changed block', () => {
+    const runtime = new ConversationIdentityRuntime(createHost());
+    const previous: ChatMessage = {
+      id: 'msg-1',
+      role: 'assistant',
+      content: '',
+      timestamp: 100,
+      contentBlocks: [{ type: 'thinking', partId: 'reasoning-1', thinking: 'same text' }],
+    };
+    const next: ChatMessage = {
+      ...previous,
+      contentBlocks: [{ type: 'thinking', partId: 'reasoning-2', thinking: 'same text' }],
+    };
+
+    const previousSignature = runtime.getMessageVisualSignature(previous);
+    const nextSignature = runtime.getMessageVisualSignature(next);
+
+    expect(nextSignature).not.toBe(previousSignature);
+    expect(JSON.parse(nextSignature).contentBlocks[0].partId).toBe('reasoning-2');
+  });
+
   it('serializes null optional fields correctly', () => {
     const host = createHost();
     const runtime = new ConversationIdentityRuntime(host);

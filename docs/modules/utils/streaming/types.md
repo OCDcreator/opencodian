@@ -84,9 +84,9 @@ interface ToolCallInfo {
 
 ### 渲染器选项
 
-**ToolRendererOptions**: `iconMap?`, `getToolName?`, `getToolSummary?(name, input, toolKind?)`, `renderExpandedContent?`, `onCollapsibleToggle?`, `onOpenToolSession?`, `onOpenMcpServerDetail?`
+**ToolRendererOptions**: `iconMap?`, `getToolName?`, `getToolSummary?(name, input, toolKind?)`, `renderExpandedContent?`, `onCollapsibleToggle?`, `onOpenToolSession?`, `onOpenMcpServerDetail?`, `lazy?`（持久化路径折叠态懒渲染展开内容）, `getInitialExpanded?(blockKey)` / `onExpandedChange?(blockKey, isExpanded)`（展开状态持久化回调）
 
-**ThinkingRendererOptions**: `collapsedByDefault?`, `showTimer?`, `collapsedLabel?`, `expandedLabel?`, `onCollapsibleToggle?`
+**ThinkingRendererOptions**: `collapsedByDefault?`, `showTimer?`, `collapsedLabel?`, `expandedLabel?`, `onCollapsibleToggle?`, `lazy?`（持久化路径折叠态懒渲染 markdown）, `getInitialExpanded?(blockKey)` / `onExpandedChange?(blockKey, isExpanded)`（展开状态持久化回调）
 
 ### 事件回调（StreamEventCallbacks）
 

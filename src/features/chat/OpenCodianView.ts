@@ -1804,6 +1804,10 @@ export class OpenCodianView extends ItemView {
       getActiveTabId: () => this.getActiveTabId(),
       getConversationSyncRuntime: () => this.tabConversationSyncFingerprintRuntimePort,
       renderAssistantMessage: async (message) => {
+        // This appends a notice directly to the live DOM, bypassing the full
+        // rerender commit, so invalidate the fingerprint cache so a later full
+        // refresh does not short-circuit and leave the notice in place.
+        this.conversationRenderService.invalidateRerenderFingerprint();
         await this.assistantShellViewHostAdapter.renderPersistedAssistantMessage({ message });
       },
       saveConversation: (conversation) => this.plugin.saveConversation(conversation),

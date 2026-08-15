@@ -136,7 +136,8 @@ export class ThinkingBlockRenderer {
   private setupCollapsible(
     state: ThinkingBlockState,
     header: HTMLElement,
-    contentEl: HTMLElement
+    contentEl: HTMLElement,
+    hooks?: { onToggle?: (isExpanded: boolean) => void },
   ): void {
     const toggle = () => {
       state.isExpanded = !state.isExpanded;
@@ -144,6 +145,7 @@ export class ThinkingBlockRenderer {
       header.setAttribute('aria-expanded', String(state.isExpanded));
       state.wrapperEl.toggleClass('is-expanded', state.isExpanded);
       this.options.onCollapsibleToggle?.();
+      hooks?.onToggle?.(state.isExpanded);
     };
 
     header.addEventListener('click', toggle);
@@ -233,7 +235,8 @@ export class ThinkingBlockRenderer {
   renderStored(
     parentEl: HTMLElement,
     content: string,
-    durationSeconds?: number
+    durationSeconds?: number,
+    blockKey?: string,
   ): HTMLElement {
     const wrapperEl = parentEl.createDiv({ cls: 'streaming-thinking-block' });
 
@@ -246,22 +249,44 @@ export class ThinkingBlockRenderer {
     labelEl.setText(
       durationSeconds !== undefined
         ? formatDurationSeconds(durationSeconds)
-        : 'Thought (<1s)'
+        : 'Thought (<1s)',
     );
 
     const contentEl = wrapperEl.createDiv({ cls: 'streaming-thinking-content' });
-    this.markdownService.render(contentEl, content);
 
-    if (this.options.collapsedByDefault) {
-      contentEl.style.display = 'none';
+    // Restore the last-known expansion state so manual expansions survive
+    // re-renders (full rebuild / keyed reconcile). Defaults to collapsed.
+    const restoredExpanded = this.options.getInitialExpanded
+      ? Boolean(this.options.getInitialExpanded(blockKey ?? ''))
+      : !this.options.collapsedByDefault;
+    const lazy = this.options.lazy === true && !restoredExpanded;
+
+    if (!lazy) {
+      // Eagerly render the content — either non-lazy mode, or the block was
+      // previously expanded so the content must be visible immediately.
+      this.markdownService.render(contentEl, content);
     }
+    let contentRendered = !lazy;
+
+    contentEl.style.display = restoredExpanded ? 'block' : 'none';
+    header.setAttribute('aria-expanded', String(restoredExpanded));
+    wrapperEl.toggleClass('is-expanded', restoredExpanded);
 
     // Create minimal state for collapsible functionality (only used for wrapperEl reference)
     const toggleState: Pick<ThinkingBlockState, 'isExpanded' | 'wrapperEl'> = {
-      isExpanded: !this.options.collapsedByDefault,
+      isExpanded: restoredExpanded,
       wrapperEl,
     };
-    this.setupCollapsible(toggleState as ThinkingBlockState, header, contentEl);
+    this.setupCollapsible(toggleState as ThinkingBlockState, header, contentEl, {
+      onToggle: (isExpanded) => {
+        // Lazy-render on first expansion, then reuse on subsequent toggles.
+        if (isExpanded && !contentRendered) {
+          this.markdownService.render(contentEl, content);
+          contentRendered = true;
+        }
+        this.options.onExpandedChange?.(blockKey ?? '', isExpanded);
+      },
+    });
 
     return wrapperEl;
   }

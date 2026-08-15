@@ -171,6 +171,9 @@ describe('ConversationRenderService rerender serialization', () => {
 
     const ids = collectMessageIds(host.messagesEl);
     expect(ids).toEqual(['user-1', 'assistant-1']);
-    expect(host.clearMessagesContainer).toHaveBeenCalledTimes(2);
+    // The second pass ran (it was serialized and dequeued) but short-circuited
+    // as a no-op because the render input was visually identical, so only one
+    // full clear+rebuild happened. DOM node identity and scroll are preserved.
+    expect(host.clearMessagesContainer).toHaveBeenCalledTimes(1);
   });
 });

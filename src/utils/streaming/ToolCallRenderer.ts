@@ -154,6 +154,26 @@ export class ToolCallRenderer {
     renderMcpExpandedContent(container, toolCall, this.options.onOpenMcpServerDetail);
   }
 
+  /** Populate the expanded-content container for a tool card. Shared by the
+   *  initial render, the lazy first-expansion, and updateResult. */
+  private populateExpandedContent(container: HTMLElement, toolCall: ToolCallInfo): void {
+    container.empty();
+    if (this.isTaskTool(toolCall)) {
+      this.renderTaskExpandedContent(container, toolCall);
+    } else if (toolCall.kind === 'mcp') {
+      this.renderMcpExpandedContent(container, toolCall);
+      if (toolCall.status !== 'pending' && toolCall.status !== 'running') {
+        this.options.renderExpandedContent!(container, toolCall.name, toolCall.result);
+      } else {
+        container.createDiv({ cls: 'streaming-tool-pending', text: 'Waiting for result...' });
+      }
+    } else if (toolCall.status !== 'pending' && toolCall.status !== 'running') {
+      this.options.renderExpandedContent!(container, toolCall.name, toolCall.result);
+    } else {
+      container.createDiv({ cls: 'streaming-tool-pending', text: 'Waiting for result...' });
+    }
+  }
+
   private updateAuthAffordance(toolEl: HTMLElement, toolCall: ToolCallInfo): void {
     const header = toolEl.querySelector('.streaming-tool-header') as HTMLElement | null;
     if (!header) return;
@@ -425,30 +445,34 @@ export class ToolCallRenderer {
     }
 
     const content = toolEl.createDiv({ cls: 'streaming-tool-content' });
-    content.style.display = 'none';
 
-    if (this.isTaskTool(toolCall)) {
-      this.renderTaskExpandedContent(content, toolCall);
-    } else if (toolCall.kind === 'mcp') {
-      this.renderMcpExpandedContent(content, toolCall);
-      if (toolCall.status !== 'pending' && toolCall.status !== 'running') {
-        this.options.renderExpandedContent!(content, toolCall.name, toolCall.result);
-      } else {
-        content.createDiv({
-          cls: 'streaming-tool-pending',
-          text: 'Waiting for result...',
-        });
-      }
-    } else if (toolCall.status !== 'pending' && toolCall.status !== 'running') {
-      this.options.renderExpandedContent!(content, toolCall.name, toolCall.result);
-    } else {
-      content.createDiv({
-        cls: 'streaming-tool-pending',
-        text: 'Waiting for result...',
-      });
+    // Restore the last-known expansion state so manual expansions survive
+    // re-renders. Defaults to collapsed.
+    const restoredExpanded = this.options.getInitialExpanded
+      ? Boolean(this.options.getInitialExpanded(toolCall.id))
+      : false;
+    const lazy = this.options.lazy === true && !restoredExpanded;
+
+    let contentRendered = false;
+    if (!lazy || restoredExpanded) {
+      this.populateExpandedContent(content, toolCall);
+      contentRendered = true;
     }
+    content.style.display = restoredExpanded ? 'block' : 'none';
+    toolEl.toggleClass('is-expanded', restoredExpanded);
+    header.setAttribute('aria-expanded', String(restoredExpanded));
 
-    this.setupCollapsible(toolEl, header, content);
+    this.setupCollapsible(toolEl, header, content, {
+      initialExpanded: restoredExpanded,
+      onToggle: (isExpanded) => {
+        // Lazy-render on first expansion, then reuse on subsequent toggles.
+        if (isExpanded && !contentRendered) {
+          this.populateExpandedContent(content, toolCall);
+          contentRendered = true;
+        }
+        this.options.onExpandedChange?.(toolCall.id, isExpanded);
+      },
+    });
     this.updateAuthAffordance(toolEl, toolCall);
 
     return toolEl;
@@ -495,9 +519,10 @@ export class ToolCallRenderer {
   private setupCollapsible(
     toolEl: HTMLElement,
     header: HTMLElement,
-    content: HTMLElement
+    content: HTMLElement,
+    hooks?: { initialExpanded?: boolean; onToggle?: (isExpanded: boolean) => void },
   ): void {
-    let isExpanded = false;
+    let isExpanded = hooks?.initialExpanded ?? false;
 
     const toggle = () => {
       isExpanded = !isExpanded;
@@ -505,6 +530,7 @@ export class ToolCallRenderer {
       header.setAttribute('aria-expanded', String(isExpanded));
       toolEl.toggleClass('is-expanded', isExpanded);
       this.options.onCollapsibleToggle?.();
+      hooks?.onToggle?.(isExpanded);
     };
 
     header.addEventListener('click', toggle);
@@ -542,15 +568,7 @@ export class ToolCallRenderer {
   ): void {
     const contentEl = toolEl.querySelector('.streaming-tool-content') as HTMLElement;
     if (contentEl) {
-      contentEl.empty();
-      if (this.isTaskTool(toolCall)) {
-        this.renderTaskExpandedContent(contentEl, toolCall);
-      } else {
-        if (toolCall.kind === 'mcp') {
-          this.renderMcpExpandedContent(contentEl, toolCall);
-        }
-        this.options.renderExpandedContent!(contentEl, toolCall.name, toolCall.result);
-      }
+      this.populateExpandedContent(contentEl, toolCall);
     }
     this.updateStatus(toolEl, toolCall.status);
     this.updateAuthAffordance(toolEl, toolCall);

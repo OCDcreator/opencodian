@@ -94,7 +94,12 @@ export function createHost(
 ): MockedConversationRenderHost & {
   messagesEl: HTMLElement;
   renderRuntime: { currentTurnBodyEl: HTMLElement | null; stagedTurnBodyEl?: HTMLElement | null };
-  scrollRuntime: { autoScrollEnabled: boolean; programmaticScrollGuardUntil: number };
+  scrollRuntime: {
+    autoScrollEnabled: boolean;
+    programmaticScrollGuardUntil: number;
+    isHydratingConversation: boolean;
+    hydrationDepth: number;
+  };
 } {
   const messagesEl = document.createElement('div');
   Object.defineProperty(messagesEl, 'scrollTop', {
@@ -114,6 +119,8 @@ export function createHost(
   const scrollRuntime = {
     autoScrollEnabled: false,
     programmaticScrollGuardUntil: 0,
+    isHydratingConversation: false,
+    hydrationDepth: 0,
   };
   const renderRuntime = {
     currentTurnBodyEl: null,
@@ -176,8 +183,14 @@ export function createHost(
     getScrollRuntimeForTab: jest.fn().mockReturnValue(scrollRuntime),
     getRenderRuntimeForTab: jest.fn().mockReturnValue(renderRuntime),
     clearScheduledScrollToBottom: jest.fn(),
-    beginConversationHydration: jest.fn(),
-    endConversationHydration: jest.fn(),
+    beginConversationHydration: jest.fn().mockImplementation(() => {
+      scrollRuntime.hydrationDepth += 1;
+      scrollRuntime.isHydratingConversation = true;
+    }),
+    endConversationHydration: jest.fn().mockImplementation(() => {
+      scrollRuntime.hydrationDepth = Math.max(0, scrollRuntime.hydrationDepth - 1);
+      scrollRuntime.isHydratingConversation = scrollRuntime.hydrationDepth > 0;
+    }),
     clearMessagesContainer: jest.fn().mockImplementation(() => {
       messagesEl.replaceChildren();
     }),
@@ -238,8 +251,10 @@ export function createHost(
       return 1;
     }),
     getMessagesForRender: jest.fn().mockImplementation((messages: ChatMessage[]) => messages),
+    // Matches the production ConversationIdentityRuntime.getMessageVisualSignature,
+    // which intentionally omits message.id (the DOM writes data-message-id, but
+    // the full-rerender fingerprint serializes the whole message including id).
     getMessageVisualSignature: jest.fn().mockImplementation((message: ChatMessage) => JSON.stringify({
-      id: message.id,
       role: message.role,
       content: message.content,
       timestamp: message.timestamp,
@@ -247,6 +262,7 @@ export function createHost(
       streamState: message.streamState ?? null,
       contentBlocks: message.contentBlocks ?? null,
     })),
+    renderInputSettingsSignature: jest.fn().mockReturnValue('{}'),
     assistantShellRender,
     assistantTailRender,
     logAssistantFinalizationDebug: jest.fn(),

@@ -19,7 +19,8 @@ body rendering（`renderMessageBody` / `renderContentBlock` / `getAssistantBodyS
 - `renderStructuredOutputIfPresent()`：在已存在的 message DOM 中查找 `.opencodian-message-content`，如果存在结构化输出 payload 则注入可折叠的 structured output badge；供 stream finalization 在流式消息壳体上直接追加 badge，而不是等待消息重新渲染
 - `renderPersistedAssistantMessage()`：通过内部 shell + body render + footer renderer，一次性完成普通 persisted assistant message 的壳层、正文与 footer 组装；notice message 也会在这里统一分派到 notice 渲染路径
 - `renderMessageBody()`：公开入口，渲染 assistant message 正文（structured content blocks 或 plain text fallback），并在 `message.structured` 存在时渲染可折叠的结构化输出 JSON 块，供 `ConversationAssistantTailRenderPort` 直接调用；在 structured output 存在时会先过滤掉重复的 raw JSON text block，确保 hydration/reload 后不重新显示已被 streaming finalization 移除的内容
-- `getAssistantBodySignature()`：公开入口，为 body 内容生成可序列化的比较指纹，供 render pipeline 判断是否需要重渲染
+- `getAssistantBodySignature()`：公开入口，为 body 内容生成可序列化的比较指纹，供 render pipeline 判断是否需要重渲染；签名包含每个 content block 的 `partId`，因此 backend block identity 单独变化也会刷新正文而非误走 footer-only
+- `renderContentBlock()`：渲染单个 content block（thinking / tool_use / text）。persisted 路径下对 thinking/tool 渲染器传入 `lazy: true`（折叠态不 eager 渲染完整内容，首次展开才渲染）+ `getInitialExpanded`/`onExpandedChange` 回调；adapter 以最多 256 项的 LRU Map 保存展开状态。key = message id + tool id，或 message id + thinking `partId`（无 `partId` 的旧数据退回完整 persisted payload）。这使 fresh hydration / 重排后的 block 仍恢复到正确状态；流式路径不经此方法，保持 eager。
 - `renderPersistedAssistantNoticeMessage()`：通过内部 shell + notice host 一次性完成 persisted assistant notice 的 shell、card 与 footer 编排
 - `renderAssistantPlaceholderAsNotice()`：通过内部 notice host 把已有 shell 改写成 notice card
 - `finalizePersistedFooter()` / `finalizeNoticeFooter()` / `finalizePseudoStreamFooter()`：让 persisted、notice 与 pseudo-stream assistant footer 变体都复用同一条 footer renderer seam

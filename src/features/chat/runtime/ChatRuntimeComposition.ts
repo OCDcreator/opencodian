@@ -286,6 +286,9 @@ export interface ChatRuntimeCompositionHost {
       readonly slashCommandSkillMode: unknown;
       readonly questionCardPosition: string;
       readonly showTurnChangeRecords: boolean;
+      readonly renderUserMarkupAsCodeBlocks: boolean;
+      readonly showAnsweredQuestionCards: boolean;
+      readonly locale: 'en' | 'zh';
       readonly backendSettings: { readonly claudeCode: { readonly autoTitle: boolean } };
     };
     readonly settingsTab: unknown;
@@ -650,6 +653,22 @@ export class ChatRuntimeComposition {
           host.conversationIdentityRuntime.getMessagesForRender(messages as never),
         getMessageVisualSignature: (message: unknown) =>
           host.conversationIdentityRuntime.getMessageVisualSignature(message as never),
+        renderInputSettingsSignature: () =>
+          // Display settings that alter rendered DOM but are not captured by
+          // getMessageVisualSignature. renderUserMarkupAsCodeBlocks rewrites the
+          // user body markdown; questionCardPosition / showAnsweredQuestionCards
+          // change the question-card render plan. All three trigger a full
+          // rerender, so folding them into the fingerprint ensures a toggle is
+          // never masked by an unchanged-message no-op.
+          JSON.stringify({
+            renderUserMarkupAsCodeBlocks: host.plugin.settings.renderUserMarkupAsCodeBlocks,
+            questionCardPosition: host.plugin.settings.questionCardPosition,
+            showAnsweredQuestionCards: host.plugin.settings.showAnsweredQuestionCards,
+            // locale flows into every renderer via t(); a locale switch changes
+            // rendered labels without altering the message payload, so it must
+            // be part of the fingerprint to avoid masking it with a no-op.
+            locale: host.plugin.settings.locale,
+          }),
         renderPersistedAssistantMessage: (options: unknown) =>
           host.assistantShellViewHostAdapter.renderPersistedAssistantMessage(options as never),
         createAssistantMessageElements: () =>

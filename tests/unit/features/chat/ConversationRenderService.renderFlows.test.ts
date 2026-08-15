@@ -288,7 +288,47 @@ describe('ConversationRenderService incremental render flows', () => {
       expect.any(HTMLElement),
       appendedMessage,
     );
+    const pseudoStreamShell = (host.assistantShellRender.finalizePseudoStreamFooter as jest.Mock)
+      .mock.calls[0][0] as HTMLElement;
+    expect(pseudoStreamShell.dataset.messageId).toBe(appendedMessage.id);
     expect(host.assistantShellRender.renderPersistedMessage).not.toHaveBeenCalled();
+  });
+
+  it('assigns canonical identity before the first pseudo-stream markdown render settles', async () => {
+    const previousMessages = [
+      createMessage({ id: 'user-1', role: 'user', content: 'Hi' }),
+    ];
+    const appendedMessage = createMessage({
+      id: 'assistant-2',
+      sourceMessageId: 'server-assistant-2',
+      content: 'Reveal identity before markdown completion',
+    });
+    const nextMessages = [...previousMessages, appendedMessage];
+    const conversation = createConversation(nextMessages);
+    const host = createHost({
+      getCurrentConversation: jest.fn().mockReturnValue(conversation),
+    });
+    let releaseMarkdown: () => void = () => undefined;
+    const markdownGate = new Promise<void>((resolve) => { releaseMarkdown = resolve; });
+    let enteredMarkdown = false;
+    host.renderMarkdownInto.mockImplementation(async (stagingEl, markdown) => {
+      enteredMarkdown = true;
+      await markdownGate;
+      stagingEl.textContent = markdown;
+    });
+    const service = new ConversationRenderService(host);
+
+    const applyPromise = service.applySyncedConversationUpdate(previousMessages, nextMessages);
+    while (!enteredMarkdown) {
+      await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
+    }
+
+    const streamingShell = host.messagesEl.querySelector<HTMLElement>('.is-streaming');
+    expect(streamingShell?.dataset.messageId).toBe(appendedMessage.id);
+    expect(streamingShell?.dataset.sourceMessageId).toBe(appendedMessage.sourceMessageId);
+
+    releaseMarkdown();
+    await applyPromise;
   });
 
   it('caps pseudo-stream markdown renders within a frame budget', async () => {

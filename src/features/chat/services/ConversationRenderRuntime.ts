@@ -173,6 +173,13 @@ export interface ConversationRenderHost {
 
   getMessagesForRender(messages: ChatMessage[]): ChatMessage[];
   getMessageVisualSignature(message: ChatMessage): string;
+  /**
+   * Signature of host display settings affecting full-rerender DOM output but
+   * not captured by getMessageVisualSignature (e.g. renderUserMarkupAsCodeBlocks).
+   * Folded into the full-rerender fingerprint so a setting toggle is never
+   * masked by an unchanged-message no-op.
+   */
+  renderInputSettingsSignature(): string;
   assistantShellRender: ConversationAssistantShellRenderPort;
   assistantTailRender: ConversationAssistantTailRenderPort;
 
@@ -287,6 +294,16 @@ class ConversationAssistantMessageRenderDelegate {
 
   private async renderSyncedAssistantMessageWithReveal(message: ChatMessage): Promise<void> {
     const { messageEl, contentEl } = this.host.assistantShellRender.createAssistantMessageElement();
+    // The streaming shell is created before its canonical message is known to
+    // the renderer. Stamp the stable identity immediately so later keyed
+    // reconcile, DOM lookups, and the completed pseudo-stream all address the
+    // same message node without ending the streaming state early.
+    messageEl.dataset.messageId = message.id;
+    if (message.sourceMessageId) {
+      messageEl.dataset.sourceMessageId = message.sourceMessageId;
+    } else {
+      delete messageEl.dataset.sourceMessageId;
+    }
     const textEl = document.createElement('div');
     textEl.className = 'streaming-text-block';
     contentEl.appendChild(textEl);
@@ -304,7 +321,18 @@ class ConversationAssistantMessageRenderDelegate {
         // skip writing into the detached shell.
         return;
       }
-      await this.host.renderMarkdownInto(textEl, rendered);
+      // Render into a detached staging element so a container replacement
+      // during the async markdown render cannot write into the now-detached
+      // textEl (mirrors StreamController.renderMarkdownText's staging guard).
+      const stagingEl = document.createElement('div');
+      await this.host.renderMarkdownInto(stagingEl, rendered);
+      if (!this.isElementInCurrentMessagesContainer(messageEl)) {
+        // Re-check after the await: the pane may have been replaced while the
+        // markdown service was awaiting. Drop the staged content rather than
+        // committing it into a detached node.
+        return;
+      }
+      textEl.replaceChildren(...Array.from(stagingEl.childNodes));
       if (messageEl.style.visibility === 'hidden') {
         messageEl.style.visibility = '';
       }

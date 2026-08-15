@@ -46,6 +46,7 @@
 - hydrated user message 会消费 native `agent` part 的 source span 来恢复 `@agent` 可见文本，保持 optimistic bubble 与 canonical/server message 可见内容一致
 - 继续保留 assistant `summary` 标记，供 compaction report 在 render 层显示独立 badge/merge 语义
 - 先通过文件内的 tool/content seam 收束 renderable `tool` parts、pending `toolCalls`、历史 `tool_use` block 与 `contentBlocks` 装配
+- 历史 reasoning part 的 `id` 会投影为 persisted thinking `ContentBlock.partId`，让重建的 UI 能以 backend-stable block identity 恢复用户展开态，而不依赖内容位置
 - 为 assistant message 生成 `modelId`
 - 用 `shared/toolExecution` + `shared/toolIdentity` 归一化 `toolCalls` 与历史 `tool_use`
 - 过滤内部 `structured_output` tool，同时保留 assistant `structured` payload

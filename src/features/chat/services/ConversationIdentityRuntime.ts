@@ -96,6 +96,7 @@ export class ConversationIdentityRuntime {
       } : null,
       contentBlocks: (message.contentBlocks ?? []).map((block) => ({
         type: block.type,
+        partId: block.partId ?? null,
         text: block.text ?? null,
         thinking: block.thinking ?? null,
         durationSeconds: block.durationSeconds ?? null,

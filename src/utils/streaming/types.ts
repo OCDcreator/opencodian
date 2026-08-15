@@ -176,6 +176,20 @@ export interface ToolRendererOptions {
   onOpenMcpServerDetail?: (serverName: string) => void;
   onAuthenticateMcpServer?: (serverName: string) => void;
   onRetryMcpToolCall?: (toolCall: ToolCallInfo) => void;
+  /**
+   * When true (persisted/history restore path), the expanded result/task/mcp
+   * content is not rendered until the card is first expanded; subsequent
+   * collapse/expand reuses it. The streaming path leaves this unset.
+   */
+  lazy?: boolean;
+  /**
+   * Read back the last-known expansion state for this card (keyed by a stable
+   * per-block identifier, typically the toolId) so manual expansions survive
+   * re-renders. Only used by the persisted path.
+   */
+  getInitialExpanded?: (blockKey: string) => boolean;
+  /** Persist a toggle so a later re-render can restore it. */
+  onExpandedChange?: (blockKey: string, isExpanded: boolean) => void;
 }
 
 // ============================================
@@ -188,6 +202,22 @@ export interface ThinkingRendererOptions {
   collapsedLabel?: string;
   expandedLabel?: string;
   onCollapsibleToggle?: () => void;
+  /**
+   * When true (persisted/history restore path), `renderStored` does not render
+   * the full markdown into the content container until the block is first
+   * expanded; subsequent collapse/expand reuses the already-rendered content.
+   * The streaming path leaves this unset so content renders as it arrives.
+   */
+  lazy?: boolean;
+  /**
+   * Read back the last-known expansion state for this block so manual
+   * expansions survive re-renders. The optional key is renderer-provided;
+   * callers may instead own state by the content-block object they close over.
+   * Only used by the persisted path; the streaming path ignores it.
+   */
+  getInitialExpanded?: (blockKey: string) => boolean;
+  /** Persist a toggle so a later re-render can restore it; key may be empty. */
+  onExpandedChange?: (blockKey: string, isExpanded: boolean) => void;
 }
 
 // ============================================

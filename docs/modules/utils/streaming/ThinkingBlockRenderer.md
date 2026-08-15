@@ -72,7 +72,10 @@
 
 ### 存储恢复
 
-`renderStored(parentEl, content, durationSeconds?)` → 创建相同的 DOM 结构，直接设置格式化后的标签文字。
+`renderStored(parentEl, content, durationSeconds?, blockKey?)` → 创建相同的 DOM 结构并设置格式化后的标签文字。
+
+- 当 `lazy: true`（持久化/历史重载路径）且块折叠时，**不立即** `markdownService.render`，只创建 content 容器；首次展开时才渲染，之后折叠/展开复用，不重复 render。
+- `blockKey` + constructor 选项 `getInitialExpanded` / `onExpandedChange` 让 feature 层 registry 持久化展开状态：`renderStored` 通过 `getInitialExpanded(blockKey)` 恢复上次展开态（恢复展开时 eager 渲染），toggle 时通过 `onExpandedChange` 写回。
 
 ## 关键方法
 
@@ -85,7 +88,7 @@
 | `cleanup(state)` | 取消 pending 渲染调度并清理计时器 |
 | `updateDuration(state, durationSeconds)` | 设置服务端提供的持续时间 |
 | `updateStoredDuration(wrapperEl, durationSeconds)` | 更新已持久化块的标签 |
-| `renderStored(parentEl, content, durationSeconds?)` | 从持久化数据重建，返回 wrapper `HTMLElement` |
+| `renderStored(parentEl, content, durationSeconds?, blockKey?)` | 从持久化数据重建，返回 wrapper `HTMLElement` |
 
 ## 数据流
 
@@ -97,8 +100,8 @@
   finalize(state) → durationSeconds → label 更新 → fire-and-forget flush 最终内容
 
 持久化恢复:
-  renderStored(parentEl, savedContent, savedDuration)
-    → 创建 DOM → 设置标签 → markdown render content
+  renderStored(parentEl, savedContent, savedDuration, blockKey?)
+    → 创建 DOM → 设置标签 → lazy 且折叠时延后 markdown render，否则立即渲染
 ```
 
 ## 与其他模块的交互
