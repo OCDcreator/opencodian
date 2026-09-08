@@ -29,6 +29,7 @@ import {
 } from './settingsLayoutRegistry';
 import { SettingsMcpSection } from './SettingsMcpSection';
 import { SettingsModelSection } from './SettingsModelSection';
+import { SettingsPiSection } from './SettingsPiSection';
 import { SettingsPluginSection } from './SettingsPluginSection';
 import { SettingsSecuritySection } from './SettingsSecuritySection';
 import { SettingsServerSection } from './SettingsServerSection';
@@ -88,9 +89,7 @@ export interface TabRendererDependencies {
 export class SettingsTabbedRenderer {
   private readonly deps: TabRendererDependencies;
 
-  constructor(deps: TabRendererDependencies) {
-    this.deps = deps;
-  }
+  constructor(deps: TabRendererDependencies) { this.deps = deps; }
 
   renderDisplay(containerEl: HTMLElement): void {
     containerEl.classList.add('opencodian-settings-tabbed');
@@ -175,7 +174,8 @@ export class SettingsTabbedRenderer {
         'data-secondary-tab': activeSecondaryId,
       },
     });
-    this.renderContent(contentEl, activePrimaryId, activeSecondaryId);
+    if (activePrimaryId === 'pi') new SettingsPiSection(this.deps.plugin).attachTabbed(contentEl, activeSecondaryId);
+    else this.renderContent(contentEl, activePrimaryId, activeSecondaryId);
   }
 
   switchToPrimaryTab(primaryTabId: string, secondaryTabId?: string): void {

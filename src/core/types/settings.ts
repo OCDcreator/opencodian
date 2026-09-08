@@ -437,12 +437,30 @@ export interface ClaudeCodeBackendSettings {
   autoTitle: boolean;
 }
 
+export interface PiBackendSettings {
+  executablePath: string;
+  provider: string;
+  model: string;
+  thinkingLevel: '' | 'off' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
+}
+
+export function normalizePiBackendSettings(value: unknown): PiBackendSettings {
+  const source = value && typeof value === 'object' ? value as Record<string, unknown> : {};
+  const text = (key: string): string => typeof source[key] === 'string' ? (source[key] as string).trim() : '';
+  const thinkingLevel = text('thinkingLevel');
+  return {
+    executablePath: text('executablePath'), provider: text('provider'), model: text('model'),
+    thinkingLevel: ['off', 'minimal', 'low', 'medium', 'high', 'xhigh'].includes(thinkingLevel) ? thinkingLevel as PiBackendSettings['thinkingLevel'] : '',
+  };
+}
+
 export interface BackendSettings {
   opencode: {
     sessionTrace: OpenCodeSessionTraceSettings;
   };
   claudeCode: ClaudeCodeBackendSettings;
   codex: CodexBackendSettings;
+  pi: PiBackendSettings;
 }
 
 export function getDefaultOpenCodeSessionTraceSettings(): OpenCodeSessionTraceSettings {
@@ -543,6 +561,7 @@ export function getDefaultBackendSettings(): BackendSettings {
     },
     claudeCode: getDefaultClaudeCodeBackendSettings(),
     codex: getDefaultCodexBackendSettings(),
+    pi: normalizePiBackendSettings(undefined),
   };
 }
 
@@ -917,12 +936,13 @@ export function normalizeClaudeCodeBackendSettings(value: unknown): ClaudeCodeBa
 
 export function normalizeBackendSettings(value: unknown): BackendSettings {
   const candidate = value && typeof value === 'object' && !Array.isArray(value)
-    ? value as { opencode?: unknown; claudeCode?: unknown; codex?: unknown }
+    ? value as { opencode?: unknown; claudeCode?: unknown; codex?: unknown; pi?: unknown }
     : {};
   return {
     opencode: normalizeOpenCodeBackendSettings(candidate.opencode),
     claudeCode: normalizeClaudeCodeBackendSettings(candidate.claudeCode),
     codex: normalizeCodexBackendSettings(candidate.codex),
+    pi: normalizePiBackendSettings(candidate.pi),
   };
 }
 

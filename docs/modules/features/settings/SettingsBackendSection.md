@@ -43,3 +43,9 @@
 - badge 只表达状态，不改变 backend 启用、active fallback、adapter lifecycle 或保存逻辑
 - 任意 backend 的 start/stop 均为 best-effort：失败不应阻止设置保存或 UI 刷新
 - Active backend 切换时必须 stop 旧 adapter + start 新 adapter，避免 stale 状态
+
+## 2026-09-08 Pi 独立服务接入
+
+Pi 加入已实现后端选择。仅启用 Pi 时挂载独立 SettingsPiSection，既有启停逻辑不变。
+
+2026-09-09：通用智能体页只负责启停/默认后端，移除内联Pi配置；Pi配置在独立后端标签。

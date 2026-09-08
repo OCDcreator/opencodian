@@ -43,3 +43,7 @@ Run before merge: `npm run typecheck`, `npm run module-docs`.
 
 - **Obsidian 1.13.4 compatibility (Phase B):** added `settings.searchDesc` (en + zh) — the description consumed by `OpenCodianSettingTab.getSettingDefinitions()`'s declarative `SettingDefinitionPage`, so the plugin is discoverable by name and description in global Settings search on Obsidian 1.13+. Module-doc changelog entries added to `docs/modules/i18n/locales/{en,zh}.md`.
 - 2026-09-08：中英文 locale 同步新增 Codex `max`、`ultra`、`persistent` 推理档位标签。
+
+## Pi owner boundary review (2026-09-08)
+
+English and Chinese Pi settings copy describe the external CLI, connection check, model defaults and actual extension-dialog behavior.

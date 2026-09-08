@@ -41,3 +41,7 @@
 ## Tests
 
 - `tests/unit/app/diagnostics/**`
+
+## Pi owner boundary review (2026-09-08)
+
+The new core.backend-pi owner isolates the external Pi process service. app.diagnostics-runtime retains its existing responsibilities; Pi process lifecycle, RPC compatibility and native history must not be added to this owner.

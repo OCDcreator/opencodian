@@ -71,6 +71,23 @@ export const SETTINGS_PRIMARY_TABS: SettingsPrimaryTabDefinition[] = [
     ],
   },
   {
+    id: 'pi',
+    labelKey: 'settings.pi.title',
+    icon: 'opencodian-pi',
+    defaultSecondaryTabId: 'connection',
+    backendRequired: 'pi',
+    secondaryTabs: [
+      { id: 'connection', labelKey: 'settings.pi.tab.connection' },
+      { id: 'providers', labelKey: 'settings.pi.tab.providers' },
+      { id: 'model', labelKey: 'settings.pi.tab.model' },
+      { id: 'execution', labelKey: 'settings.pi.tab.execution' },
+      { id: 'resources', labelKey: 'settings.pi.tab.resources' },
+      { id: 'account', labelKey: 'settings.pi.tab.account' },
+      { id: 'sessions', labelKey: 'settings.pi.tab.sessions' },
+      { id: 'advanced', labelKey: 'settings.pi.tab.advanced' },
+    ],
+  },
+  {
     id: 'server',
     labelKey: 'settings.server.title',
     icon: 'server',

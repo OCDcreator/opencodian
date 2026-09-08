@@ -47,3 +47,7 @@ Run before merge: `npm run typecheck`, `npm run module-docs`, `npm run build`.
 
 ## SDK upgrade integration notes
 - 2026-09-02: view 订阅 `ClaudeCodeAdapter.onCommandsChanged`（SDK 0.3.252 `system/commands_changed` 信号）即时失效 slash 命令菜单缓存；镜像 Codex `onSkillsChanged` binding 模式，生命周期随 view teardown 退订。
+
+## Pi owner boundary review (2026-09-08)
+
+The shell supplies the Pi slash-catalog discriminator only. All Pi runtime lifecycle remains behind the registered AgentService adapter.

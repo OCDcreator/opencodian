@@ -83,7 +83,7 @@ describe('Codex hidden wiring', () => {
 
     it('contains only user-facing backends', () => {
       // Currently opencode, claude-code, and codex
-      expect(IMPLEMENTED_AGENT_BACKENDS).toEqual(['opencode', 'claude-code', 'codex']);
+      expect(IMPLEMENTED_AGENT_BACKENDS).toEqual(['opencode', 'claude-code', 'codex', 'pi']);
     });
   });
 

@@ -80,3 +80,7 @@ export class ActiveTabContextUsageCoordinator {
 - `ForegroundCompactionControl` 还携带 `tabId`；modal 把显示时的 tab/session/thread 作为 expected identity 传回 action。若点击前切换 tab，即使新 tab 也有可用 Codex thread，也会在任何 host RPC 前返回 `stale`。
 - `compactForegroundThread()` 只在 identity 仍匹配时转发 `onAccepted`；后端结果若在 tab/session/conversation 切换后返回，会变成 `stale`，不会触发 success 或 usage refresh。只有 `verified + runtimeVerified` 才调用现有 `refreshFromServer()`，不合成 token 状态
 - 这条边界推进的是 master plan 的 P2 `question / todo / background task` 相邻 activation/open ownership 收敛，同时为后续 P3 context/composer 链路留出更清晰的 context usage seam
+
+## Pi 精确用量
+
+2026-09-08：Pi 与既有受支持后端一样可请求精确快照；Pi分支通过独立适配器读取SDK上下文占用和实际费用，其余服务路径不变。

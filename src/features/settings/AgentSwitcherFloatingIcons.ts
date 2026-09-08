@@ -1,4 +1,4 @@
-import { setIcon } from 'obsidian';
+import { addIcon, setIcon } from 'obsidian';
 
 import type { AgentBackendKind } from '../../core/types/chat';
 import { t } from '../../i18n';
@@ -16,12 +16,16 @@ interface AgentSwitcherIconConfig {
 
 const LOBEHUB_ICON_MANIFEST_BY_ID = new Map(LOBEHUB_ICON_MANIFEST.map((entry) => [entry.iconId, entry]));
 
+// User-supplied Pi artwork, scaled from its 800-unit viewBox to Obsidian's 100-unit icon canvas.
+export const PI_BACKEND_ICON = 'opencodian-pi';
+addIcon(PI_BACKEND_ICON, '<g transform="scale(0.125)" fill="currentColor" stroke="none"><path fill-rule="evenodd" d="M165.29 165.29 H517.36 V400 H400 V517.36 H282.65 V634.72 H165.29 Z M282.65 282.65 V400 H400 V282.65 Z"/><path d="M517.36 400 H634.72 V634.72 H517.36 Z"/></g>');
+
 const AGENT_ICON_BY_BACKEND: Record<AgentBackendKind, AgentSwitcherIconConfig> = {
   opencode: { fallbackIcon: 'bot', iconId: 'opencode', variant: 'color' },
   'claude-code': { fallbackIcon: 'sparkles', iconId: 'claudecode', variant: 'color' },
   codex: { fallbackIcon: 'code-2', iconId: 'codex', variant: 'color' },
   copilot: { fallbackIcon: 'github', iconId: 'githubcopilot', variant: 'color' },
-  pi: { fallbackIcon: 'cpu', iconId: 'perplexity', variant: 'color' },
+  pi: { fallbackIcon: PI_BACKEND_ICON },
 };
 
 interface AgentSwitcherOptions {

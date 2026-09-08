@@ -404,3 +404,20 @@ docs/modules/
 - 不要为了填满模板而虚构数据流、方法或配置项
 - 优先写“为什么存在”和“改动时要看哪里”，其次才是重复源码细节
 - 若一个模块高度依赖别处定义，文档中应直接链接或点名对应模块文档
+
+## Pi 独立服务模块（2026-09-08）
+
+- [Pi 适配器](core/agents/backend/pi/PiAdapter.md)
+- [Pi RPC 传输](core/agents/backend/pi/PiRpcClient.md)
+- [Pi 会话元数据](core/agents/backend/pi/PiSessionStore.md)
+- [Pi 流式映射](core/agents/backend/pi/PiStreamMapper.md)
+- [Pi 模型选择绑定](features/chat/services/PiModelSelectionBinding.md)
+- [Pi 设置界面](features/settings/SettingsPiSection.md)
+
+### Pi SDK 完整接入补充
+
+- core/agents/backend/pi/PiProtocol.md、PiSessionRuntime.md：版本化独立服务边界。
+- features/chat/services/PiExtensionUiHost.md：标准扩展UI。
+- features/settings/PiWorkbenchActions.md、PiWorkbenchModal.md：52项管理操作。
+
+- features/settings/SettingsPiConfigurationSection.md 与 SettingsPiProvidersSection.md：Pi原生持久配置页面。

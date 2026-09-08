@@ -66,3 +66,9 @@ Conversation 的默认二级标签是 `display`，因为聊天字号和用户消
 Debug 的默认二级标签是 `plugin`，因为总开关和插件内部模块开关是最通用入口。旧的 `debug/general`、`debug/modules` 会迁移到 `plugin`，旧的 `debug/logs`、`debug/actions` 会迁移到 `export`；`opencode`、`codex` 与 `claude-code` 是来源分区，分别承载 OpenCode 后端诊断、Codex session-trace 工作台和 Claude Code SDK 诊断。`capability-lab` 是诊断/实验面板，提供 SDK 能力矩阵、JSONL 历史浏览器、子代理浏览器、rewind dry-run 预览、结构化输出实验场和发现状态，均标记为 ⚠️ DIAGNOSTIC / EXPERIMENTAL / NOT STABLE，不连接稳定设置持久化。
 
 Plugins 的二级标签 `overview` / `config-sources` / `project-plugins` / `omo` 在 2026-07-21 重命名：旧的 `global` 会迁移到 `config-sources`（新的"配置来源"页同时展示全局与项目配置来源，并通过 segmented filter 按 scope 收窄，避免旧标签与实际渲染范围语义不一致）；旧的 `project-directory` 会迁移到 `project-plugins`（聚焦项目本地插件文件，与配置来源分离）。新增或移除二级标签时需要同步 `SettingsPluginSection.attachTabbed()` 与 locale key。
+
+## Pi 标签
+
+新增backendRequired=pi的主标签，默认connection；providers/model/execution/resources/account/sessions/advanced二级页。切换后端自动定位Pi，现有后端tab定义保持不变。
+
+Pi主标签使用用户SVG注册图标opencodian-pi，与后端状态和切换入口一致。

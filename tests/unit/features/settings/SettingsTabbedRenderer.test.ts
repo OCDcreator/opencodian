@@ -12,6 +12,7 @@ import { SettingsDebugSection } from '../../../../src/features/settings/Settings
 import { SettingsFormatterSection } from '../../../../src/features/settings/SettingsFormatterSection';
 import { SettingsMcpSection } from '../../../../src/features/settings/SettingsMcpSection';
 import { SettingsModelSection } from '../../../../src/features/settings/SettingsModelSection';
+import { SettingsPiSection } from '../../../../src/features/settings/SettingsPiSection';
 import { SettingsPluginSection } from '../../../../src/features/settings/SettingsPluginSection';
 import { SettingsSecuritySection } from '../../../../src/features/settings/SettingsSecuritySection';
 import { SettingsServerSection } from '../../../../src/features/settings/SettingsServerSection';
@@ -130,6 +131,16 @@ function expectSingleContentShell(
 }
 
 describe('SettingsTabbedRenderer', () => {
+  it('shows and routes the Pi backend tab with the same backend visibility rules', () => {
+    const renderPi = jest.spyOn(SettingsPiSection.prototype, 'attachTabbed').mockImplementation(() => {});
+    const { renderer } = createRendererState({ primaryTabId: 'pi', secondaryTabs: { pi: 'providers' }, enabledBackends: ['opencode', 'pi'], activeBackend: 'pi' });
+    const container = document.body.createDiv();
+    renderer.renderDisplay(container);
+    expect(container.querySelector('.opencodian-settings-tabs-primary [data-tab-id="pi"]')).not.toBeNull();
+    expect(container.querySelector('.opencodian-settings-tabs-primary [data-tab-id="codex"]')).toBeNull();
+    expect(container.querySelector('.opencodian-settings-tabs-secondary')?.children).toHaveLength(8);
+    expect(renderPi).toHaveBeenCalledWith(expect.any(HTMLElement), 'providers');
+  });
   beforeEach(() => {
     setLocale('en');
     document.body.innerHTML = '';

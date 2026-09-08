@@ -8,12 +8,16 @@
  * See AGENTS.md: "move stable responsibilities to adjacent owners when touching them."
  */
 
-import type { CodexBackendSettings } from '../../types/settings';
+import * as path from 'node:path';
+
+import type { CodexBackendSettings, PiBackendSettings } from '../../types/settings';
 import type { AgentService } from './AgentService';
 import type { AgentServiceRegistry } from './AgentServiceRegistry';
 import { CodexAdapter } from './CodexAdapter';
 import { resolveCodexCli } from './CodexCliResolver';
 import type { CodexTracePort } from './diagnostics/types';
+import { PiAdapter } from './pi/PiAdapter';
+import type { PiUiHandler } from './pi/PiProtocol';
 
 export interface WireHiddenAdaptersOptions {
   registry: AgentServiceRegistry;
@@ -35,6 +39,8 @@ export interface WireHiddenAdaptersOptions {
    * compatibility with callers that pre-date tracing.
    */
   codexTracePort?: CodexTracePort;
+  getPiSettings?: () => PiBackendSettings;
+  onPiUiRequest?: PiUiHandler;
 }
 
 /**
@@ -79,5 +85,7 @@ export function wireHiddenAdapters(options: WireHiddenAdaptersOptions): void {
         : {}),
       tracePort: options.codexTracePort,
     }));
+    registry.register(new PiAdapter({ workingDirectory: vaultPath, getSettings: options.getPiSettings,
+      servicePath: options.pluginDir ? path.join(options.pluginDir, 'assets', 'pi', 'service.mjs') : '', onUiRequest: options.onPiUiRequest }));
   }
 }

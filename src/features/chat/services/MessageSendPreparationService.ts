@@ -368,7 +368,9 @@ export class MessageSendPreparationService {
     const requestContent = isClaudeBackend
       ? options.content
       : this.agentInvocationService.removeMentionFallbackText(options.content, resolvedAgentInvocation);
-    const skillExpansion = await this.skillContentExpander.expand(requestContent);
+    const skillExpansion = conversation.backend === 'pi'
+      ? { syntheticParts: [] }
+      : await this.skillContentExpander.expand(requestContent);
     const syntheticTextParts: PromptSyntheticTextPartInput[] = [
       ...(options.syntheticTextParts ?? []),
       ...skillExpansion.syntheticParts.map((part) => ({
@@ -675,7 +677,7 @@ export function createMessageSendPreparationHost(
     formatModelId: (model) => selectionCtrl.formatModelId(model),
     shouldUseModelCatalog: (conversation) => {
       const backend = conversation.backend ?? 'opencode';
-      return backend === 'opencode' || backend === 'claude-code';
+      return backend === 'opencode' || backend === 'claude-code' || backend === 'pi';
     },
     ensureSelectedModelAvailable: (provider, model) => selectionCtrl.ensureSelectedModelAvailable(provider, model),
     appendModelUnavailableNoticeMessage: () => deps.appendModelUnavailableNoticeMessage(),

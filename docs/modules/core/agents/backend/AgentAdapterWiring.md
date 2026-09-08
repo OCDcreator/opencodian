@@ -28,3 +28,7 @@
 - 为保持入口层 bootstrap 调用形状兼容，`pluginDir` 可继续传入但在本模块中被刻意忽略
 - 新增隐藏后端时在此函数中追加注册逻辑，不要回到 `main.ts`
 - adapter 的构造（需要 plugin context）仍在调用方完成，此模块只负责注册和路径解析
+
+## 2026-09-08 Pi 独立服务接入
+
+新增 PiAdapter 惰性注册和 getPiSettings 回调。构造时不启动进程，不启用 Pi；OpenCode、Claude、Codex 的构造参数和实现保持不变。

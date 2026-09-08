@@ -82,7 +82,7 @@ describe('SettingsBackendSection', () => {
   });
 
   it('exposes implemented backends without exposing future placeholders', () => {
-    expect(BACKEND_OPTIONS.map((option) => option.id)).toEqual(['opencode', 'claude-code', 'codex']);
+    expect(BACKEND_OPTIONS.map((option) => option.id)).toEqual(['opencode', 'claude-code', 'codex', 'pi']);
   });
 
   it('attaches implemented backend options without rendering future backend placeholders', () => {
@@ -107,7 +107,7 @@ describe('SettingsBackendSection', () => {
     expect(names).toContain('Claude Code');
     expect(names).toContain('Codex');
     expect(names).not.toContain('Copilot');
-    expect(names).not.toContain('Pi');
+    expect(names).toContain('Pi');
   });
 
   // -------------------------------------------------------------------------

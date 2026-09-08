@@ -4,6 +4,7 @@ import type { ElicitationRequest, ElicitationResult } from '@anthropic-ai/claude
 import type { Editor, MarkdownView } from 'obsidian';
 import { addIcon, Notice, Plugin } from 'obsidian';
 import * as path from 'path';
+import { presentPiUiRequest } from './features/chat/services/PiExtensionUiHost';
 
 import { ModelConfigService, ModelPricingService, OpencodeConfigManager } from './core/config';
 import { setAgentServiceRegistry } from './core/agents/AgentCapability';
@@ -368,6 +369,8 @@ export default class OpenCodianPlugin extends Plugin {
           : '',
         codexSettings: this.settings.backendSettings.codex,
         codexTracePort: this.codexTraceService,
+        getPiSettings: () => this.settings.backendSettings.pi,
+        onPiUiRequest: (request, signal) => presentPiUiRequest(this.app, request, signal),
       });
       this.agentServiceRegistry.setEnabledBackends(this.settings.enabledBackends);
       if (this.settings.activeBackend) {

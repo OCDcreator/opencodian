@@ -35,3 +35,7 @@ Run before merge: `npm run typecheck`, `npm run module-docs`.
 - Changes here must update the matching `docs/modules/**` page (via `module-docs.config.json`).
 - Run `npm run inspect:owner -- <this owner or a path>` for an always-fresh summary.
 - 2026-09-08：会话设置 UI 暴露 Codex SDK 0.153.4 新推理档位，不改变其“下一线程生效”语义。
+
+## Pi owner boundary review (2026-09-08)
+
+The new core.backend-pi owner isolates the external Pi process service. feature.chat-ui retains its existing responsibilities; Pi process lifecycle, RPC compatibility and native history must not be added to this owner.

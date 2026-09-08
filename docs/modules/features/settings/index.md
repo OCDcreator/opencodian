@@ -52,3 +52,9 @@ export { OpenCodianSettingTab } from './OpenCodianSettings';
 ## 补充说明
 
 - `OpenCodianSettingTab` 的唯一消费方是 `main.ts` 中的 `this.addSettingTab(new OpenCodianSettingTab(...))` 调用，无其他外部消费方
+
+- [PiWorkbenchActions](PiWorkbenchActions.md)：Pi完整业务操作目录。
+- [PiWorkbenchModal](PiWorkbenchModal.md)：Pi分组管理工作台。
+
+- [SettingsPiConfigurationSection](SettingsPiConfigurationSection.md)：51项原生设置。
+- [SettingsPiProvidersSection](SettingsPiProvidersSection.md)：完整自定义provider/models配置。

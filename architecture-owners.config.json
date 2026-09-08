@@ -738,7 +738,8 @@
         "src/core/agents/backend/**"
       ],
       "delegatesTo": [
-        "core.backend-diagnostics"
+        "core.backend-diagnostics",
+        "core.backend-pi"
       ],
       "responsibilities": [
         "agent backend adapters and transports for OpenCode, Codex and Claude",
@@ -768,7 +769,8 @@
       "adjacentOwners": [
         "core.agents",
         "core.backend-diagnostics",
-        "feature.chat-send"
+        "feature.chat-send",
+        "core.backend-pi"
       ],
       "tests": [
         "tests/unit/core/agents/backend/**"
@@ -777,6 +779,50 @@
       "requiredGates": [
         "typecheck",
         "module-docs"
+      ],
+      "risk": "high"
+    },
+    {
+      "id": "core.backend-pi",
+      "layer": "core",
+      "include": [
+        "src/core/agents/backend/pi/**"
+      ],
+      "delegatesTo": [],
+      "responsibilities": [
+        "independently installed official Pi process service and JSONL RPC transport",
+        "Pi session handles, process isolation, streaming normalization and compatibility checks"
+      ],
+      "canonicalState": [
+        "Pi process handles per active session",
+        "Pi-owned JSONL history; plugin-owned session metadata"
+      ],
+      "entrypoints": [
+        "src/core/agents/backend/pi/PiAdapter.ts"
+      ],
+      "allowedOwnerDependencies": [
+        "core.types",
+        "core.agents",
+        "core.backend"
+      ],
+      "forbiddenDependencies": [
+        "feature",
+        "app",
+        "core.opencode"
+      ],
+      "adjacentOwners": [
+        "core.backend",
+        "feature.chat-services",
+        "feature.settings-shell"
+      ],
+      "tests": [
+        "tests/unit/core/agents/backend/pi/**"
+      ],
+      "overviewDoc": "docs/architecture/owners/core-backend-pi.md",
+      "requiredGates": [
+        "typecheck",
+        "module-docs",
+        "pi-rpc-smoke"
       ],
       "risk": "high"
     },

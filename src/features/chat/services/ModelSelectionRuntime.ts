@@ -19,6 +19,8 @@ import type {
 const logger = createLogger('ModelSelectionRuntime');
 
 export interface ModelSelectionRuntimeHost {
+  /** Opt-in strict selection; default behavior remains unchanged for existing backends. */
+  preserveRequestedModel?(): boolean;
   loadModelCatalogData(): Promise<{
     catalogBundle: ModelCatalogBundle | null;
     providers: readonly ModelSelectorProvider[];
@@ -81,6 +83,7 @@ export class ModelSelectionRuntime {
 
   getCurrentSessionModel(): ModelSelectorSelection | null {
     const requestedModel = this.getRequestedSessionModel();
+    if (this.host.preserveRequestedModel?.()) return requestedModel;
     if (!this.hasLoadedCatalog) {
       return requestedModel;
     }

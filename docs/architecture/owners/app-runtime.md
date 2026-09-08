@@ -41,3 +41,7 @@ Run before merge: `npm run typecheck`, `npm run check:module-docs`, `npm run bui
 - 仅通过 host seam 触发入口拥有的服务能力，不复制 plugin 全局真值。
 - `dispose()` 必须清理 model refresh frame 与 deferred warmup timer，且不得留下未受控的 warmup promise。
 - 不把 view-level rendering、OpenCode server lifecycle 或 plugin update persistence 搬入本 owner。
+
+## Pi owner boundary review (2026-09-08)
+
+The new core.backend-pi owner isolates the external Pi process service. app.runtime retains its existing responsibilities; Pi process lifecycle, RPC compatibility and native history must not be added to this owner.

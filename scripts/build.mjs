@@ -4,7 +4,7 @@ import process from "process";
 import builtins from "builtin-modules";
 import { buildCss } from "./build-css.mjs";
 import { pruneClaudeAgentSdkRuntimeArtifacts } from "./claude-sdk-dist.mjs";
-import { generateBuildId } from './build-utils.mjs';
+import { generateBuildId, readPiServiceSources } from './build-utils.mjs';
 
 const banner =
 `/*
@@ -46,6 +46,7 @@ try {
     },
     define: {
       BUILD_ID: JSON.stringify(buildId),
+      PI_SERVICE_SOURCES: JSON.stringify(readPiServiceSources()),
       'import.meta.url': '__OPENCODIAN_IMPORT_META_URL__',
     },
     entryPoints: ['src/main.ts'],

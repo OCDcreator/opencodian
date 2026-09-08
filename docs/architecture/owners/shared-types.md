@@ -25,3 +25,7 @@ Run before merge: `npm run typecheck`.
 - Do not replicate canonical state in another owner.
 - Changes here must update the matching `docs/modules/**` page (via `module-docs.config.json`).
 - Run `npm run inspect:owner -- <this owner or a path>` for an always-fresh summary.
+
+## Pi owner boundary review (2026-09-08)
+
+The new core.backend-pi owner isolates the external Pi process service. shared.types retains its existing responsibilities; Pi process lifecycle, RPC compatibility and native history must not be added to this owner.

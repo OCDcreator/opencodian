@@ -50,3 +50,7 @@ Run before merge: `npm run typecheck`, `npm run check:module-docs`, `npm run dia
 - The three settings composition paths create OpenCode, Codex, and Claude diagnostics ports at their boundaries. The adapters preserve app-owned service/store/report ownership and expose no mutable service map.
 - Changes here must update the matching `docs/modules/**` page (via `module-docs.config.json`).
 - Run `npm run inspect:owner -- <this owner or a path>` for an always-fresh summary.
+
+## Pi owner boundary review (2026-09-08)
+
+The new core.backend-pi owner isolates the external Pi process service. feature.settings-debug retains its existing responsibilities; Pi process lifecycle, RPC compatibility and native history must not be added to this owner.

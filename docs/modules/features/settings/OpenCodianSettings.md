@@ -285,3 +285,5 @@ provider 开关写回仍遵循 `ModelConfigService` 返回的 `effectiveProvider
 Classic General renders its layout, locale, and editor-area controls inside `.opencodian-settings-general-merged-block`, then mounts `SettingsPluginUpdateSection` as that merged block's direct sibling. `OpenCodianSettingTab` only supplies the redraw seam; release discovery, backup actions, and confirmation behavior remain in the dedicated owner so classic and tabbed layouts cannot drift. The section itself remains the only version-management card and is never wrapped in another settings block.
 
 The owner keeps `pluginUpdateExpanded` as ephemeral UI state. It passes that value and an `onExpandedChange` callback to `SettingsPluginUpdateSection`, so check/install/restore redraws preserve the disclosure state without writing to plugin settings. `hide()` resets the field to `false` for the next classic settings session.
+
+2026-09-09：经典布局在Pi激活时渲染独立SettingsPiSection及二级导航；tabbed模式继续共享SettingsTabbedRenderer。

@@ -312,3 +312,7 @@ After settings load, `OpenCodianPlugin` constructs `PluginUpdateService` with th
 ## 2026-09-02 Claude user dialog 宿主接线
 
 - 构造 `ClaudeCodeAdapter` 时新增 `onUserDialog: handleClaudeCodeUserDialog` + `supportedDialogKinds: ['refusal_fallback_prompt']`（SDK >= 0.3.252）。处理器镜像 `handleClaudeCodeElicitation`：无渲染器时返回 `null`（SDK 不应答，交由 CLI park deadline/其他客户端）；有渲染器时经 `buildClaudeCodeUserDialogQuestionRequest` 转共享问题卡，应答由 `buildClaudeCodeUserDialogResult` 映射——非 accept 一律 `{behavior:'cancelled'}`（CLI 默认行为，与未接线时一致）。
+
+## 2026-09-08 Pi 独立服务接入
+
+bootstrap 仅向注册入口注入 getPiSettings 读取回调，不在入口拥有 Pi 进程、协议或会话逻辑。

@@ -30,3 +30,7 @@ Run before merge: `npm run typecheck`, `npm run module-docs`.
 - Changes here must update the matching `docs/modules/**` page (via `module-docs.config.json`).
 - Run `npm run inspect:owner -- <this owner or a path>` for an always-fresh summary.
 - 2026-09-08：Codex 全局与项目配置 UI/校验共同接入 `max`、`ultra`、`persistent`，保持结构化设置为权威配置面。
+
+## Pi owner boundary review (2026-09-08)
+
+The new core.backend-pi owner isolates the external Pi process service. feature.settings-codex retains its existing responsibilities; Pi process lifecycle, RPC compatibility and native history must not be added to this owner.

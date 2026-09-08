@@ -7,7 +7,7 @@
 
 import type { AgentBackendKind } from '../../types/chat';
 
-export const IMPLEMENTED_AGENT_BACKENDS: readonly AgentBackendKind[] = ['opencode', 'claude-code', 'codex'];
+export const IMPLEMENTED_AGENT_BACKENDS: readonly AgentBackendKind[] = ['opencode', 'claude-code', 'codex', 'pi'];
 
 export {
   wireHiddenAdapters,

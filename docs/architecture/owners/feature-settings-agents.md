@@ -31,3 +31,9 @@ Run before merge: `npm run typecheck`, `npm run module-docs`.
 - Do not replicate canonical state in another owner.
 - Changes here must update the matching `docs/modules/**` page (via `module-docs.config.json`).
 - Run `npm run inspect:owner -- <this owner or a path>` for an always-fresh summary.
+
+## Pi owner boundary review (2026-09-08)
+
+The new core.backend-pi owner isolates the external Pi process service. feature.settings-agents retains its existing responsibilities; Pi process lifecycle, RPC compatibility and native history must not be added to this owner.
+
+Pi图标由AgentSwitcherFloatingIcons单处注册用户SVG形状，三种后端图标入口共用，其他后端图标不变。

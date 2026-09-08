@@ -262,6 +262,7 @@ export class SlashCommandExecutionService {
     // Claude natively handles its own /commands; intercepting them here
     // would route through OpenCode's runSessionCommand which rejects non-opencode backends.
     const currentConversation = this.host.getCurrentConversation?.();
+    if (currentConversation?.backend === 'pi') return false;
     if (currentConversation && (currentConversation.backend ?? 'opencode') === 'claude-code') {
       return false;
     }

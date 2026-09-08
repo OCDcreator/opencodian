@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "digest": "8bbefe50aaa69715a83ed2551defd38930be3b8e97baca365e38c36487f4ad31",
-  "recordCount": 605,
+  "digest": "145fc665b0c30c6ec848fae455f776b804576c365c63bd5e85e8841287034f25",
+  "recordCount": 619,
   "records": [
     {
       "kind": "ignore",
@@ -76,7 +76,7 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/AgentAdapterWiring.ts",
-      "sha256": "a6a74af5dd87c72e2ac060fcc387d2821f851de67b911c1d475e39b8ab023355"
+      "sha256": "431ff9290815d976cfac3b75f303fac31ace1e300c94b5a39a9826cecf6f9d52"
     },
     {
       "kind": "src",
@@ -311,7 +311,7 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/index.ts",
-      "sha256": "e7c262acd2f4a3e3dd16d5c8d85e5723e976917cc04d32d2747d52ac31e3940b"
+      "sha256": "b6e11c0b94ad04da46c7140fd63d643c4edaa5bc4f677cb170a999deba46a9e7"
     },
     {
       "kind": "src",
@@ -322,6 +322,36 @@
       "kind": "src",
       "key": "src/core/agents/backend/PathConfinement.ts",
       "sha256": "882b741325755ef7c3098433440aee7a7f55b4e8bddd1a82ba53061db74b0b8d"
+    },
+    {
+      "kind": "src",
+      "key": "src/core/agents/backend/pi/PiAdapter.ts",
+      "sha256": "cb25179110d2b493006ca6b41e9ee443bf74877838185b1fc31f47efe011008b"
+    },
+    {
+      "kind": "src",
+      "key": "src/core/agents/backend/pi/PiProtocol.ts",
+      "sha256": "92e455cc2d9a97ad92712eb5ec031c2084f2791a2ba3f05b09a6e32bfdfa60ad"
+    },
+    {
+      "kind": "src",
+      "key": "src/core/agents/backend/pi/PiRpcClient.ts",
+      "sha256": "0bcd19ad2589fbeca8f2a1324fd3f7d7a516aac0529d897b6f0a5d8d4949bc02"
+    },
+    {
+      "kind": "src",
+      "key": "src/core/agents/backend/pi/PiSessionRuntime.ts",
+      "sha256": "67e179964f41654af024c791c22fd401e8581952de1630184ed5a045941328a1"
+    },
+    {
+      "kind": "src",
+      "key": "src/core/agents/backend/pi/PiSessionStore.ts",
+      "sha256": "91a25a8dc285769e8c834d0f12d4812e12c265467ef2616292960fb5272611b7"
+    },
+    {
+      "kind": "src",
+      "key": "src/core/agents/backend/pi/PiStreamMapper.ts",
+      "sha256": "4580deea263f74565459a891a0caf95c2cb8b8fc5162a4da78a6700754055356"
     },
     {
       "kind": "src",
@@ -786,7 +816,7 @@
     {
       "kind": "src",
       "key": "src/core/types/settings.ts",
-      "sha256": "5b0eb5060c7177828a216e3d52a9d24d1a9a9887687d007dba6c7920aaaab755"
+      "sha256": "d892bb512a93e93e5eb8a9d22738ffb416eb8781e6da6e15625244d9b7a7804f"
     },
     {
       "kind": "src",
@@ -861,7 +891,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/OpenCodianView.ts",
-      "sha256": "4e52e4f8a25c99021c9e5ceacc6f0fa17d37b8c973bd5e79c44f1cdb62594f4a"
+      "sha256": "0a0c0919b8ee6215372e6f09fbb3087ebd19b91ef8ef80983507d3d4833167af"
     },
     {
       "kind": "src",
@@ -1101,7 +1131,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/services/ActiveTabContextUsageCoordinator.ts",
-      "sha256": "603e223679803c47dcfc1bf5b325c5c82e7cd5f823642ff93fbafffd84d3586e"
+      "sha256": "4e371250a13d978e0360d146674d6bab56d7693ec11ad9779bbc6f7650e68f85"
     },
     {
       "kind": "src",
@@ -1181,7 +1211,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/services/ChatSelectionControlsCoordinator.ts",
-      "sha256": "600ccdf1dd91ad0bfb6569f0c00b04eb322b24e63e076c6b19921d013dac0490"
+      "sha256": "adb1f84c5c20fe356ff34875f87bf3e6606dd6a5afa3ea4d8692e4f39a8b0706"
     },
     {
       "kind": "src",
@@ -1536,12 +1566,12 @@
     {
       "kind": "src",
       "key": "src/features/chat/services/MessageSendPreparationService.ts",
-      "sha256": "dc794c02b219852ce687541fc4be3d590aec648a10f508f36c32a7b8178d7a07"
+      "sha256": "b64c7425ac4e71ccab35d949e8afcf2e205117840a3d9f8c9b11f81d7b0b2cc1"
     },
     {
       "kind": "src",
       "key": "src/features/chat/services/ModelSelectionRuntime.ts",
-      "sha256": "4b909b6af1b5d30a684853134aabd199f6602faa7193bb3f9a66b2456f9195dd"
+      "sha256": "4971f0061d482bf204507ef0ae459d16f7ee6dcdc17d5536ef69dbe53eab6c0b"
     },
     {
       "kind": "src",
@@ -1557,6 +1587,16 @@
       "kind": "src",
       "key": "src/features/chat/services/PersistentAssistantNoticeService.ts",
       "sha256": "20484cfd848a9b234e9c70e44893c056e19239ccecdfb3a94de1bdad92844f1f"
+    },
+    {
+      "kind": "src",
+      "key": "src/features/chat/services/PiExtensionUiHost.ts",
+      "sha256": "f4cb9515e058630925d1dfe03da993e20ab6d64e599ac2920a983588a410dc0a"
+    },
+    {
+      "kind": "src",
+      "key": "src/features/chat/services/PiModelSelectionBinding.ts",
+      "sha256": "d0f021a88e327b80bf7592c5de9fa02c9f8b7334c2e4c8870986420847e4d4a9"
     },
     {
       "kind": "src",
@@ -1726,12 +1766,12 @@
     {
       "kind": "src",
       "key": "src/features/chat/services/SlashCommandExecutionService.ts",
-      "sha256": "102e9b0842702acb0bd81edc1061381ceaaa914f1503bdc9821e1a80ed5d6071"
+      "sha256": "76ccaafb1f1c21362e483fd164b93b372eeda40f6385236e19c9252734e30c36"
     },
     {
       "kind": "src",
       "key": "src/features/chat/services/SlashCommandMenuCatalogCache.ts",
-      "sha256": "0a1dbc064a37ec77321be082777fb40bfa3656335bce921c7e85b3f5137ade77"
+      "sha256": "976fca15477c3e77ad12dbd1817ae308726ebf926946f88f169eb3cbaa819b44"
     },
     {
       "kind": "src",
@@ -1981,7 +2021,7 @@
     {
       "kind": "src",
       "key": "src/features/settings/AgentSwitcherFloatingIcons.ts",
-      "sha256": "45cbc4c2c161d54446610ed22b8d9c7db23311145854e7f2e64e489698c0c3d9"
+      "sha256": "78f5ba156feee6e320ebaa967e845167fb01ba9ea6c5f2179687f09d5481512a"
     },
     {
       "kind": "src",
@@ -2181,12 +2221,22 @@
     {
       "kind": "src",
       "key": "src/features/settings/OpenCodianSettings.ts",
-      "sha256": "f49e5f16f48066f416a039ea05c12ff0b65f212ffa2ee2d00ece9eb62f7b3017"
+      "sha256": "b7c2a903952738b6cb2525b075dac952509c759cc6a4383b952ba0ff9d539855"
     },
     {
       "kind": "src",
       "key": "src/features/settings/OpenCodianSettingsView.ts",
-      "sha256": "eb1b0ae8fa47f54c846e02e557f2366ecb4862f5c3474def7bc5b9c33e8a834b"
+      "sha256": "831ddd722eeefaf635ed105eb97e578927c55040d8ee7274edbc7aeccdf56b9f"
+    },
+    {
+      "kind": "src",
+      "key": "src/features/settings/PiWorkbenchActions.ts",
+      "sha256": "3d5133430b5a25e8cd3ed76912191967e17870066862b18e9a670c2bdf32c6fe"
+    },
+    {
+      "kind": "src",
+      "key": "src/features/settings/PiWorkbenchModal.ts",
+      "sha256": "f126ef9c9126a885b10f16e3f52f6e16ca1c71fe568963e5ac812d4af7af5be6"
     },
     {
       "kind": "src",
@@ -2331,7 +2381,7 @@
     {
       "kind": "src",
       "key": "src/features/settings/settingsLayoutRegistry.ts",
-      "sha256": "ee6b556c56d921e93b9a43fbeee66cdb9f3f1089120d60627617d582d6a0a99e"
+      "sha256": "bb29a13e8461a40a03370e42ddf471063e586cf53f674fadb95c7bdb54d7d671"
     },
     {
       "kind": "src",
@@ -2372,6 +2422,21 @@
       "kind": "src",
       "key": "src/features/settings/SettingsPanelChrome.ts",
       "sha256": "01c93fc4cae2c7f0a985c751253828dcdf9abd3c3542ade8c0dd29f48b4d9bb3"
+    },
+    {
+      "kind": "src",
+      "key": "src/features/settings/SettingsPiConfigurationSection.ts",
+      "sha256": "f771e1def9c2c69726358067a7efa9c0ff1abab55246d706f4b7f26f1f2695d7"
+    },
+    {
+      "kind": "src",
+      "key": "src/features/settings/SettingsPiProvidersSection.ts",
+      "sha256": "34375cbce44752dd162d0f54c4fad846d2c4380fb86cea788a3b1d3c21f7d347"
+    },
+    {
+      "kind": "src",
+      "key": "src/features/settings/SettingsPiSection.ts",
+      "sha256": "e244c884be22c2ab88ce955ce3d958800c7ee5f755a64c82d047ca9793d5d6b0"
     },
     {
       "kind": "src",
@@ -2466,7 +2531,7 @@
     {
       "kind": "src",
       "key": "src/features/settings/SettingsTabbedRenderer.ts",
-      "sha256": "7e3318da6de73bd07e9b1b46a8b9c122516f65fa3cf8c2cc079bd0cf740dcafa"
+      "sha256": "1fc11f440339e5e7d474617d5f6daf362892c599ad8ef98c67b2da12e24ad474"
     },
     {
       "kind": "src",
@@ -2521,7 +2586,7 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/en.ts",
-      "sha256": "fdfeda0055dea200a9a154bd2c684f6acf28fe13c8964bf0d1abf0f50cfaf84c"
+      "sha256": "9a4aa6942a04bc60b753f0136a2295a9ecee736ba4dc34f7d85bf42201e91fac"
     },
     {
       "kind": "src",
@@ -2531,12 +2596,12 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/zh.ts",
-      "sha256": "5fb7aa4f47ef1e0abb148f1ddf373dc8adac9d65089d45f8a133d86e8e73cabd"
+      "sha256": "728d322c4496945184435ef52c86bffc3fa71474cfc01d96a5e7e02a343b5091"
     },
     {
       "kind": "src",
       "key": "src/main.ts",
-      "sha256": "7f95ef9c6e9b7fefb6ebf227a1108eb221ff431911487573fd7ffc5593ec11ae"
+      "sha256": "7ac973a154a7fa7026d4274d6040e3b5e00527a2bc0b713cfc1340b2dd7c1da5"
     },
     {
       "kind": "src",
@@ -2755,6 +2820,11 @@
     },
     {
       "kind": "src",
+      "key": "src/style/components/settings-pi.css",
+      "sha256": "7cc404c69b28f63d025bbb08000fe8d4ec22122011e91068afce008d2f9a1ccc"
+    },
+    {
+      "kind": "src",
       "key": "src/style/components/settings-plugin-update.css",
       "sha256": "9dcd07b4d3ea1a17034b57a0f8c7bc901d8e4765776ea6ae66e346c4c163ceb4"
     },
@@ -2776,7 +2846,7 @@
     {
       "kind": "src",
       "key": "src/style/index.css",
-      "sha256": "f5ce319efb7c521a907f06c164cc65cf30fe1306a81dd669c567040afe590b62"
+      "sha256": "d436ac450ac575bd359503e291852fa7761c90893b079bdb0c19e595a9ed9c31"
     },
     {
       "kind": "src",
@@ -3029,7 +3099,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-09-08T07:52:59.598Z",
-  "headShaAtGeneration": "22fb63d367572332db9573b8a593727e9b0aed2c",
+  "generatedAt": "2026-09-08T16:47:48.199Z",
+  "headShaAtGeneration": "e81524c43565d49beca7e149b1a3c2eeab1ee564",
   "graphifyVersion": "graphify 0.9.31"
 }

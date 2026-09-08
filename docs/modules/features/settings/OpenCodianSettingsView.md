@@ -117,3 +117,5 @@ AgentServiceRegistry.onActiveChange()
 The editor-area settings view passes the same `renderPluginUpdateSection` seam to `SettingsTabbedRenderer` and, in classic mode, mounts `SettingsPluginUpdateSection` directly after the General merged block rather than inside it. This keeps the version card a sibling of the base-settings card while preserving equivalent history, backup restoration, confirmation, and operation-refresh behavior with the standard settings tab.
 
 `OpenCodianSettingsView` owns a non-persisted `pluginUpdateExpanded` field and passes it through the section seam. Operation redraws retain the value; `onClose()` resets it to `false` so a newly opened editor-area view starts collapsed.
+
+2026-09-09：编辑区经典布局在Pi激活时包含Pi独立设置与二级导航；tabbed模式复用共享Pi路由。

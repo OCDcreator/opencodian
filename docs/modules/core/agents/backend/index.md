@@ -94,3 +94,7 @@
 - 更新已实现 backend 时必须同步 `IMPLEMENTED_AGENT_BACKENDS`，避免设置页暴露尚未接入的 backend；新增 backend 进入列表前必须有 adapter、settings normalization、routing tests 和 runtime smoke 证据
 - 新增 backend adapter 或共享类型时，只有需要成为跨目录公共 API 的符号才从这里导出
 - 保持 type-only 导出与 value 导出分离，避免 barrel 引入不必要的运行时依赖
+
+## 2026-09-08 Pi 独立服务接入
+
+IMPLEMENTED_AGENT_BACKENDS 新增 pi；默认启用后端不变。Pi 实现归属独立 core.backend-pi owner。

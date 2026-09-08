@@ -1557,6 +1557,7 @@ export class OpenCodianView extends ItemView {
     this.modifiedFilesSidebarCoordinator = new ModifiedFilesSidebarCoordinator();
     this.currentVariant = undefined;
     this.slashCommandMenuCatalogCache = new SlashCommandMenuCatalogCache({
+      loadPiRuntimeCommands: () => (this.plugin.agentServiceRegistry?.get('pi') as { getRuntimeCommands?(): Promise<Array<{ name: string; description?: string }>> } | undefined)?.getRuntimeCommands?.() ?? Promise.resolve([]),
       getHiddenCommandIds: () => this.plugin.settings.hiddenSlashCommands ?? [],
       loadProjectAgents: async () => (this.isClaudeCodeConversationActive() || this.isCodexConversationActive()) ? {} : (this.plugin.opencodeConfigManager?.getAgentConfig() ?? {}),
       loadProjectCommands: async () => (this.isClaudeCodeConversationActive() || this.isCodexConversationActive()) ? {} : (this.plugin.opencodeConfigManager?.getCommandConfig() ?? {}),
@@ -1586,7 +1587,9 @@ export class OpenCodianView extends ItemView {
         const skills = await adapter?.getRuntimeSkills?.();
         return skills ?? null;
       },
-      getBackendKey: () => this.isClaudeCodeConversationActive() ? 'claude-code' : (this.isCodexConversationActive() ? 'codex' : 'opencode'),
+      getBackendKey: () => (this.currentConversation?.backend ?? this.plugin.settings.activeBackend) === 'pi'
+        ? 'pi'
+        : this.isClaudeCodeConversationActive() ? 'claude-code' : (this.isCodexConversationActive() ? 'codex' : 'opencode'),
       getSlashCommandCapabilityKey: () => {
         // Fold the current v2.command.list / v2.skill.list capability
         // availability into the cache key. When server support flips, the key
@@ -1994,6 +1997,10 @@ export class OpenCodianView extends ItemView {
       getSessionContextUsageSnapshot: (sessionId) => {
         const conversation = this.currentConversation;
         const backend = conversation ? (conversation.backend ?? 'opencode') : 'opencode';
+        if (backend === 'pi') {
+          const adapter = this.plugin.agentServiceRegistry?.get('pi') as { getSessionContextUsageSnapshot?(id: string): Promise<ContextUsageSnapshot> } | undefined;
+          return adapter?.getSessionContextUsageSnapshot?.(sessionId) ?? Promise.resolve(null);
+        }
         if (backend === 'claude-code') {
           const adapter = this.plugin.agentServiceRegistry?.get('claude-code') as {
             getSessionContextUsageSnapshot?(sessionId: string): Promise<unknown | null>;

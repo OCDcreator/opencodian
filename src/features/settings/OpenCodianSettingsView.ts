@@ -37,6 +37,7 @@ import {
   setSettingDescWithFormatting,
   setSettingNameWithFormatting,
 } from './SettingsPanelChrome';
+import { SettingsPiSection } from './SettingsPiSection';
 import { SettingsPluginSection } from './SettingsPluginSection';
 import { SettingsPluginUpdateSection } from './SettingsPluginUpdateSection';
 import { SettingsSectionCoordinator } from './SettingsSectionCoordinator';
@@ -172,15 +173,14 @@ export class OpenCodianSettingsView extends ItemView {
   // ─── Classic layout ────────────────────────────────────────────────
 
   private renderClassicDisplay(containerEl: HTMLElement): void {
-    this.sectionCoordinator.beginDisplay(t('settings.title'), {
-      renderPanelTitle: (hostEl) => { this.renderPanelTitle(hostEl); },
-    });
+    this.sectionCoordinator.beginDisplay(t('settings.title'), { renderPanelTitle: (hostEl) => { this.renderPanelTitle(hostEl); } });
     containerEl.classList.remove('opencodian-settings--tabbed');
     containerEl.classList.add('opencodian-settings--classic');
     containerEl.dataset.settingsSurface = 'page';
     containerEl.dataset.settingsLayoutMode = 'classic';
 
     this.renderClassicGeneralSection(containerEl);
+    if (this.plugin.settings.activeBackend === 'pi') new SettingsPiSection(this.plugin).attach(containerEl);
     this.addClaudeCodeSettings(containerEl);
     this.addServerSettings(containerEl);
     this.addModelSettings(containerEl);

@@ -540,3 +540,7 @@ Claude Code 不再使用过载的 `settings.claudeCode.tab.mcpAdvanced` 标签�
 
 新增 `chat.diffNotice.fileCount`（`{count}`，标题数量徽标的可访问名称）、`chat.diffNotice.expandRemaining`（`{count}`，展开其余文件 toggle 文案）、`chat.diffNotice.collapse`、`chat.diffNotice.statusAdded` 与 `chat.diffNotice.statusDeleted`，供 turn-diff 专用卡片分支使用。`chat.diffNotice.description` 保留用于 persisted Markdown/导出兼容，但结构化卡片分支不再渲染它。
 - 2026-09-08：新增 Codex 推理档位“最大 / 超高 / 持续”中文标签。
+
+## 2026-09-08 Pi 独立服务接入
+
+新增与英文对应的 Pi 设置文案，并去除 Pi 即将推出占位描述。

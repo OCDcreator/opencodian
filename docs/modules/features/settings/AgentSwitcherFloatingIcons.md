@@ -30,3 +30,7 @@
 - `SettingsAcpSection`: 对 OpenCode、Codex、Claude Code 预设按钮调用 `renderAgentSwitcherBackendIcon()`，保证 ACP create card 与设置页 backend selector 使用同一套 backend 图标身份
 - `src/utils/icons/lobehubIconManifest.ts`: 提供 LobeHub 图标分级、格式和明暗资源 URL
 - `src/style/components/agent-switcher.css`: 定义 header icons、legacy hover reveal、click feedback、selected 样式和 light/dark 图标切换
+
+## Pi 自定义图标
+
+2026-09-09：Pi使用用户提供的P/i SVG路径，按800→100坐标缩放注册为opencodian-pi。颜色继承主机currentColor以同时适配浅色/深色；设置标签、后端切换和聊天状态通过同一注册图标呈现，移除Perplexity替代图标。

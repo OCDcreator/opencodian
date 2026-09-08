@@ -56,3 +56,7 @@ Tabbed plugin 内容创建 `SettingsPluginSection` 后，必须通过 `setPlugin
 当 `secondaryTabId === 'capability-lab'` 时，`renderDebugContent` 直接创建 `SettingsCapabilityLabSection` 实例并调用 `attachTabbed()`，不经过 `SettingsDebugSection`。实验内容继续标记为 DIAGNOSTIC / EXPERIMENTAL / NOT STABLE；backend tab 选择会作为独立 UI preference 持久化，但不会改变 `activeBackend`、enabled backends 或实验 gate。
 
 标签内容始终渲染进 `.opencodian-settings-content-shell`。这个 shell 只承担结构职责，并通过 `data-primary-tab` / `data-secondary-tab` 暴露当前路由给样式和测试使用；它不能被设计成重型卡片。可见的内容层级应由 `SettingsPanelChrome.createSettingsBlock()` 生成的共享 settings section block，或兼容的 section-local block 承担。active backend switcher 现在同时挂在 `.opencodian-settings-panel-title-actions` 内的 header icon buttons 与左侧可收缩 floating icon rail；两者共享同一套 `switchAgent()` 持久化、registry 同步与刷新逻辑。不再在标题下方插入 text chips。
+
+## Pi 后端路由
+
+2026-09-09：Pi使用已有activeBackend可见性规则，有独立主标签和八个二级页。renderDisplay对Pi实例化SettingsPiSection，其他路由/生命周期保持不变。

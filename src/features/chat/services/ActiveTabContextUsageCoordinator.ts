@@ -243,7 +243,7 @@ export class ActiveTabContextUsageCoordinator {
   }
 
   private canRefreshPreciseUsageFromServer(backend: string): boolean {
-    return backend === 'opencode' || backend === 'claude-code' || backend === 'codex';
+    return backend === 'opencode' || backend === 'claude-code' || backend === 'codex' || backend === 'pi';
   }
 
   private commitState(contextUsage: TabContextState): void {

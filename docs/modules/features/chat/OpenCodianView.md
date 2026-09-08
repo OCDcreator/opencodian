@@ -758,3 +758,7 @@ OpenCode 的 store 为 memory mode 或仍带 custom-directory fallback `lastErro
 ## 2026-09-02 Claude commands_changed 订阅
 
 - 新增 `syncClaudeCommandsChangedSubscription()`：Claude Code 为激活后端时订阅 `ClaudeCodeAdapter.onCommandsChanged`，信号到达即失效 `slashCommandMenuCatalogCache`（不再等 120s TTL）；切走后端或 view 关闭时退订。镜像 Codex `onSkillsChanged` 的 surface binding 模式，调用点与 codex 的 `syncSkillsChangedSubscription` 相邻（view open + capabilities change）。
+
+## 2026-09-08 Pi 独立服务接入
+
+斜杠菜单的 backend key 识别 Pi，会话后端优先；仅增加组装判断，Pi 不复用 OpenCode 命令目录。

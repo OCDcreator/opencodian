@@ -1,4 +1,12 @@
 import { execSync } from 'child_process';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
+/** Include only the plugin-owned Pi service sources, never the external SDK. */
+export function readPiServiceSources(root = process.cwd()) {
+  return Object.fromEntries(['service.mjs', 'commands.mjs', 'configuration.mjs', 'extension-ui.mjs']
+    .map(name => [name, readFileSync(join(root, 'assets/pi', name), 'utf8')]));
+}
 
 /**
  * Get current git branch name

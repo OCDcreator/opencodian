@@ -532,3 +532,7 @@ Added `settings.pluginUpdate.*` for the shared General version-management sectio
 
 Added `chat.diffNotice.fileCount` (`{count}` accessible name for the header count badge), `chat.diffNotice.expandRemaining` (`{count}` hidden-file toggle label), `chat.diffNotice.collapse`, `chat.diffNotice.statusAdded`, and `chat.diffNotice.statusDeleted` for the dedicated turn-diff notice card. `chat.diffNotice.description` stays in place for persisted Markdown/export compatibility but is no longer rendered by the structured card branch.
 - 2026-09-08：新增 Codex reasoning `max` / `ultra` / `persistent` 英文标签。
+
+## 2026-09-08 Pi 独立服务接入
+
+新增 Pi 设置文案：独立安装、路径、默认提供商/模型、思考等级、连接检查和实际权限/扩展对话框行为。

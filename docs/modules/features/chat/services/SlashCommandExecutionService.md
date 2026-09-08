@@ -108,3 +108,7 @@ export class SlashCommandExecutionService {
 - `session.command` 的返回值不在这层另起一套本地 projector：正常情况下后续 sync event 已写入 canonical graph；如果 command 刚返回但 sync event 尚未投影，visible follow-up sync 会按 canonical-miss fallback 做一次 server gap recovery
 - `OpenCodianView` 只负责提供扁平依赖，不持有 slash command host 装配逻辑；host 回调装配由 `SlashCommandExecutionHostFactory.createSlashCommandExecutionHost()` 工厂函数完成，view 只传递原始 service 引用和简单 lambda
 - synthetic builtin commands 的 host seam 保持扁平：`/compact` 通过 `deps.runCompactSession` 进入 `executeCompactSession()`，`/undo`、`/redo`、`/share`、`/unshare` 与 `/new` 分别从 `deps.openCodeService` 和 `deps.createNewConversation` 映射，不经过 view 层新增方法
+
+## 2026-09-08 Pi 独立服务接入
+
+Pi 的斜杠输入直接交给 Pi prompt，不读取或执行 OpenCode 命令。Claude 与 Codex/OpenCode 的既有分支不变。

@@ -80,3 +80,7 @@ export class ChatSelectionControlsCoordinator {
 - permission dropdown lifecycle 由 build-time `PermissionModeSelectorCoordinator` 承接，并仍通过 shared Escape handler 与 model dropdown 一起关闭
 - send pipeline options、`ModelCatalogStateService`、provider availability 语义与 icon fallback 顺序没有变化
 - 该模块刻意不接管 context usage、effort selector 或 input glass/theme；这些仍在相邻 owner 中维护
+
+## 2026-09-08 Pi 独立服务接入
+
+在原有 Codex host 外组合 bindPiModelSelection；Pi 模型目录与选择策略由独立绑定模块负责，非 Pi 委托原有 host。

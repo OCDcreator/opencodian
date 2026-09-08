@@ -69,3 +69,7 @@ export class ModelSelectionRuntime {
 - `ModelSelectionRuntime` 不创建 DOM、不处理 dropdown/search/keyboard/sticky header，也不解析 provider icon
 - `ChatSelectionControlsCoordinator` 继续负责 selector placement、list render、permission selector display 和 effort selector follow-up
 - settings model catalog、provider icon fallback、send pipeline options 与 session override 语义保持在原有 owner / host seam 内
+
+## Pi 严格选择
+
+2026-09-08：新增可选 preserveRequestedModel。仅 Pi 绑定启用，保留不可用的原请求让发送门禁明确拒绝，不静默选择目录第一项。其他后端的默认解析和异步时序保持不变。

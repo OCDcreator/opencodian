@@ -46,3 +46,15 @@
 - Tests need assertions removed or weakened to pass.
 
 In these cases, stop and design a small controlled queue or ask for review instead of continuing ad hoc.
+
+## Pi service boundary
+
+- `core.backend-pi` owns the external Pi RPC service boundary. Keep process transport, session metadata and event mapping in `src/core/agents/backend/pi/`.
+- Do not import other backend implementations into Pi or move their responsibilities to the Pi service. Shared entrypoints only compose Pi settings/registration/model binding.
+- Pi CLI is upgraded independently. Run `node scripts/pi-rpc-smoke.mjs` against the installed candidate; do not automatically update the CLI or rewrite Pi JSONL history from plugin code.
+
+### Pi 独立 SDK 服务
+
+Pi业务仅在core.backend-pi、专属工作台/UI主机和assets/pi中实现；共享入口按backend分流。29RPC/23SDK操作统一白名单、协议握手；SDK升级先运行完整能力验收。运行时设置内存隔离；禁止改变其余后端实现。
+
+Pi持久配置不能用工作台命令数量代表覆盖。新增后端必须注册与已有后端一致的主标签及分组，区分官方SDK、终端专用和插件会话存储作用域；配置保存、运行时应用与状态读回分别验证。

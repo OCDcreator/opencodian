@@ -46,3 +46,7 @@ Run before merge: `npm run typecheck`, `npm run module-docs`, `npm run build`.
 - Run `npm run inspect:owner -- <this owner or a path>` for an always-fresh summary.
 - Reasoning stream whitespace is semantic content after a reasoning part has begun: preserve standalone spaces/newlines from both `message.part.delta` and `message.part.updated` so Markdown paragraphs, indentation, and ordered lists are not joined before the shared chat renderer sees them. Suppress only leading whitespace that would create an empty thinking block.
 - 2026-09-08：permission responder 收敛到 SDK v2 `permission.reply`；deprecated `permission.respond`、`respondToSessionPermission` facade/hub 路径及能力注册均已移除。
+
+## Pi owner boundary review (2026-09-08)
+
+The new core.backend-pi owner isolates the external Pi process service. core.opencode retains its existing responsibilities; Pi process lifecycle, RPC compatibility and native history must not be added to this owner.

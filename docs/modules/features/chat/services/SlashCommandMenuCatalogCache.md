@@ -57,3 +57,11 @@ project-only command 仍会参与 merge 以提供 override/source 信息，但�
 ### Capability-aware cache key
 
 新增可选 `getSlashCommandCapabilityKey?()` host 方法，纳入 cache key。Chat 传入基于 `v2.command.list` / `v2.skill.list` 可用性的 key，能力变化时自然触发 cache-key mismatch + reload。
+
+## 2026-09-08 Pi 独立服务接入
+
+Pi backend key 返回空目录，不展示 OpenCode 命令，也不触发 OpenCode SDK 读取；Pi 原生命令可直接输入，自动补全暂不声明支持。
+
+## Pi 原生命令目录
+
+2026-09-08：新增可选loadPiRuntimeCommands，只在Pi分支使用SDK命令/模板/skills目录，其余后端缓存及目录不变。

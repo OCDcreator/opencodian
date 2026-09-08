@@ -6,6 +6,7 @@ import {
   type CodexCatalogAdapter,
   resolveCodexModelCatalogFromAdapter,
 } from '../../../core/agents/backend/BackendModelCatalog';
+import type { PiAdapter } from '../../../core/agents/backend/pi/PiAdapter';
 import type { ResolvedModelSelection } from '../../../core/config/modelConfig';
 import { VIEW_TYPE_OPENCODIAN } from '../../../core/types/chat';
 import type { ClaudeCodePermissionMode } from '../../../core/types/settings';
@@ -44,6 +45,7 @@ import {
   createOpenCodePermissionConfig,
   PermissionModeSelectorCoordinator,
 } from './PermissionModeSelectorCoordinator';
+import { bindPiModelSelection } from './PiModelSelectionBinding';
 import { SandboxConfigBadgeCoordinator } from './SandboxConfigBadgeCoordinator';
 
 export interface ChatSelectionControlsCoordinatorHost extends ModelSelectionRuntimeHost {
@@ -336,7 +338,10 @@ export class ChatSelectionControlsCoordinator {
   constructor(
     private readonly host: ChatSelectionControlsCoordinatorHost,
   ) {
-    this.modelSelectionRuntime = new ModelSelectionRuntime(wrapHostForCodex(host));
+    this.modelSelectionRuntime = new ModelSelectionRuntime(bindPiModelSelection(wrapHostForCodex(host), () =>
+      readActiveBackendFromPlugin() === 'pi'
+        ? readOpenCodianPlugin()?.agentServiceRegistry?.get?.('pi') as PiAdapter ?? null
+        : null));
     // Permission selector is created per-build in buildBackendPermissionSelector()
     // because the mode system depends on the active backend.
     this.additionalDirectoriesBadge = new AdditionalDirectoriesConfigBadgeCoordinator();

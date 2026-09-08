@@ -11,6 +11,25 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-09-09 Pi 独立标签与完整原生配置
+
+- 按ClaudeCode/Codex导航契约增加Pi主标签、八个二级页，移除通用页内联配置。
+- 原生settings覆盖51项；模型provider支持结构化和完整JSON。持久配置走独立服务，带revision、备份和官方验证。
+- 保存不默认中断运行会话；用户重连后应用构造期设置。补齐模型循环、技能目录开关及附件缩放。
+- 其余后端实现与依赖不变。测试/部署证据见docs/status/pi-backend-acceptance.md。
+
+## 2026-09-08 Pi 独立本地服务后端
+
+- 新增 `core.backend-pi` 独立 owner；官方外部 SDK 由每会话 Node 服务加载，通过版本化 JSONL 接入。不 bundle Pi SDK，不修改 OpenCode/Claude/Codex 适配器、传输或依赖版本。
+- 支持流式文本/思考、工具、图片和文本上下文、Pi 模型目录、会话持久化恢复、分叉及取消；会话之间使用独立进程，故障与取消隔离。
+- Pi 设置和模型选择分别由独立界面模块负责；共享入口仅增加 Pi 注册和分派。Pi skills/原生命令不读取 OpenCode 目录。
+- 提供 `scripts/pi-rpc-smoke.mjs`，在临时目录验证真实工具、恢复与分叉；升级外部 Pi 后可以独立复验。详情见 `docs/requirements/multi-agent-foundation/07-pi-adapter.md`。
+- 完整接入增加29官方RPC、23补充SDK操作和9种标准扩展UI；工作台分组管理树/原生历史、模型/队列、工具/资源、账户/包及导出。
+- 修复首个agent_end提前结束、静默模型替换、费用丢弃、启动对话框死锁、跨服务认证缓存、包安装后资源未加载、取消后旧弹窗以及自定义消息历史缺失。所有运行时setter使用内存设置，真实全局设置前后字节一致。
+- 当前完整验收及实际构建信息统一记录在 `docs/status/pi-backend-acceptance.md`；最初基础子集的748/7218结果不作为完整业务接入证明。
+
+---
+
 ## 2026-09-08 三后端 SDK 最新版刷新与 API 面收口
 
 - 依赖刷新至 npm 当日 stable/latest：`@anthropic-ai/claude-agent-sdk ^0.3.263`、`@openai/codex-sdk 0.153.4`、`@opencode-ai/sdk 1.18.29`；Codex/OpenCode 保持精确 pin，Claude 保持既有 caret 风格。

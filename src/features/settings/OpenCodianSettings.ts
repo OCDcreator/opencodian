@@ -39,6 +39,7 @@ import {
   setSettingDescWithFormatting,
   setSettingNameWithFormatting,
 } from './SettingsPanelChrome';
+import { SettingsPiSection } from './SettingsPiSection';
 import { SettingsPluginSection } from './SettingsPluginSection';
 import { SettingsPluginUpdateSection } from './SettingsPluginUpdateSection';
 import { SettingsSectionCoordinator } from './SettingsSectionCoordinator';
@@ -374,6 +375,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     if (this.isActiveBackend('claude-code')) {
       this.addClaudeCodeSettings(containerEl);
     }
+    if (this.isActiveBackend('pi')) new SettingsPiSection(this.plugin).attach(containerEl);
     if (this.isActiveBackend('opencode')) {
       this.addServerSettings(containerEl);
       this.addModelSettings(containerEl);
