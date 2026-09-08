@@ -3537,6 +3537,204 @@ describe('ClaudeCodeAdapter', () => {
         await secondRuntime.next;
       }
     });
+
+
+  });
+
+  describe('ClaudeCodeAdapter SDK 0.3.2xx signals (conversation_reset / commands_changed / user dialog)', () => {
+    function createRuntimeControlQuery() {
+      const queue = createAsyncQueue<unknown>();
+      const closeQueue = queue.close;
+      return Object.assign(queue, {
+        supportedModels: jest.fn().mockResolvedValue([]),
+        reloadSkills: jest.fn().mockResolvedValue({ skills: [] }),
+        close: jest.fn(() => closeQueue()),
+      });
+    }
+
+    async function startRuntime(adapter: ClaudeCodeAdapter, sessionId: string) {
+      const stream = adapter.sendMessage({ sessionId, content: 'hello' });
+      const next = stream.next();
+      await waitForExpect(() => expect(next).toBeDefined());
+      return { stream, next };
+    }
+
+    it('remaps sdkSessionId on conversation_reset and accepts later messages under the new id', async () => {
+      const firstQuery = createRuntimeControlQuery();
+      const secondQuery = createRuntimeControlQuery();
+      const sdk = createSdk([]);
+      sdk.query
+        .mockReturnValueOnce(firstQuery)
+        .mockReturnValueOnce(secondQuery);
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: getDefaultClaudeCodeBackendSettings(),
+        sdk,
+      });
+      const sessionId = await adapter.createSession();
+      const firstRuntime = await startRuntime(adapter, sessionId);
+      await waitForExpect(() => expect(sdk.query).toHaveBeenCalledTimes(1));
+
+      firstQuery.push({
+        type: 'system',
+        subtype: 'init',
+        session_id: 'sdk-before-reset',
+      });
+      await expect(firstRuntime.next).resolves.toEqual(expect.objectContaining({
+        value: expect.objectContaining({ sessionId: 'sdk-before-reset' }),
+      }));
+
+      // SDK >= 0.3.2xx conversation_reset: the CLI moved to a new conversation
+      // id; subsequent messages carry it and would otherwise trip the resume
+      // validation in captureSdkSessionId.
+      firstQuery.push({
+        type: 'conversation_reset',
+        new_conversation_id: 'sdk-after-reset',
+        session_id: 'sdk-before-reset',
+        uuid: 'reset-uuid',
+      });
+      firstQuery.push({
+        type: 'assistant',
+        session_id: 'sdk-after-reset',
+        uuid: 'assistant-uuid',
+        message: {
+          id: 'msg-after-reset',
+          content: [{ type: 'text', text: 'post-reset reply' }],
+        },
+      });
+      await expect(Promise.resolve(firstRuntime.stream.next())).resolves.toEqual(expect.objectContaining({
+        value: { type: 'text', content: 'post-reset reply' },
+      }));
+
+      // The remap must persist: after closing the current runtime, a fresh
+      // runtime resumes under the new id.
+      await adapter.restartPersistentQueries('conversation-reset-test');
+      const secondRuntime = await startRuntime(adapter, sessionId);
+      await waitForExpect(() => expect(sdk.query).toHaveBeenCalledTimes(2));
+      try {
+        expect(sdk.query.mock.calls[1][0].options).toEqual(expect.objectContaining({
+          resume: 'sdk-after-reset',
+        }));
+      } finally {
+        secondQuery.close();
+        await secondRuntime.next;
+        firstQuery.close();
+        await firstRuntime.stream.next().catch(() => undefined);
+      }
+    });
+
+    it('notifies onCommandsChanged subscribers when the CLI emits commands_changed', async () => {
+      const query = createRuntimeControlQuery();
+      const sdk = createSdk([]);
+      sdk.query.mockReturnValueOnce(query);
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: getDefaultClaudeCodeBackendSettings(),
+        sdk,
+      });
+      const sessionId = await adapter.createSession();
+      const runtime = await startRuntime(adapter, sessionId);
+      await waitForExpect(() => expect(sdk.query).toHaveBeenCalledTimes(1));
+
+      const handler = jest.fn();
+      const subscription = adapter.onCommandsChanged(handler);
+      try {
+        query.push({
+          type: 'system',
+          subtype: 'commands_changed',
+          commands: [],
+          session_id: 'sdk-commands',
+          uuid: 'commands-uuid',
+        });
+        await waitForExpect(() => expect(handler).toHaveBeenCalledTimes(1));
+
+        subscription.dispose();
+        query.push({
+          type: 'system',
+          subtype: 'commands_changed',
+          commands: [],
+          session_id: 'sdk-commands',
+          uuid: 'commands-uuid-2',
+        });
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        expect(handler).toHaveBeenCalledTimes(1);
+      } finally {
+        query.close();
+        await runtime.next.catch(() => undefined);
+      }
+    });
+
+    it('reloads skills in the active query and notifies command subscribers', async () => {
+      const query = createRuntimeControlQuery();
+      const sdk = createSdk([]);
+      sdk.query.mockReturnValueOnce(query);
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: getDefaultClaudeCodeBackendSettings(),
+        sdk,
+      });
+      const sessionId = await adapter.createSession();
+      const runtime = await startRuntime(adapter, sessionId);
+      await waitForExpect(() => expect(sdk.query).toHaveBeenCalledTimes(1));
+      const commandsChanged = jest.fn();
+      const subscription = adapter.onCommandsChanged(commandsChanged);
+      try {
+        await adapter.reloadSkills();
+        expect(query.reloadSkills).toHaveBeenCalledTimes(1);
+        expect(commandsChanged).toHaveBeenCalledTimes(1);
+      } finally {
+        subscription.dispose();
+        query.close();
+        await runtime.next.catch(() => undefined);
+      }
+    });
+
+    it('passes onUserDialog and supportedDialogKinds to SDK options when wired', async () => {
+      const query = createRuntimeControlQuery();
+      const sdk = createSdk([]);
+      sdk.query.mockReturnValueOnce(query);
+      const onUserDialog = async () => ({ behavior: 'cancelled' as const });
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: getDefaultClaudeCodeBackendSettings(),
+        sdk,
+        onUserDialog,
+        supportedDialogKinds: ['refusal_fallback_prompt'],
+      });
+      const sessionId = await adapter.createSession();
+      const runtime = await startRuntime(adapter, sessionId);
+      await waitForExpect(() => expect(sdk.query).toHaveBeenCalledTimes(1));
+      try {
+        const options = sdk.query.mock.calls[0][0].options;
+        expect(options.onUserDialog).toBe(onUserDialog);
+        expect(options.supportedDialogKinds).toEqual(['refusal_fallback_prompt']);
+      } finally {
+        query.close();
+        await runtime.next.catch(() => undefined);
+      }
+    });
+
+    it('omits onUserDialog and supportedDialogKinds when no host dialog callback is wired', async () => {
+      const query = createRuntimeControlQuery();
+      const sdk = createSdk([]);
+      sdk.query.mockReturnValueOnce(query);
+      const adapter = new ClaudeCodeAdapter({
+        vaultPath: '/vault',
+        settings: getDefaultClaudeCodeBackendSettings(),
+        sdk,
+      });
+      const sessionId = await adapter.createSession();
+      const runtime = await startRuntime(adapter, sessionId);
+      await waitForExpect(() => expect(sdk.query).toHaveBeenCalledTimes(1));
+      try {
+        const options = sdk.query.mock.calls[0][0].options;
+        expect(options.onUserDialog).toBeUndefined();
+        expect(options.supportedDialogKinds).toBeUndefined();
+      } finally {
+        query.close();
+        await runtime.next.catch(() => undefined);
+      }
+    });
   });
 
   describe('ClaudeCodeAdapter introspection counts', () => {

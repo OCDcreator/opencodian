@@ -14,7 +14,16 @@ import {
 } from './settings';
 
 const VALID_CODEX_SANDBOX_MODES: readonly CodexSandboxMode[] = ['read-only', 'workspace-write', 'danger-full-access'];
-const VALID_CODEX_REASONING_EFFORTS: readonly CodexReasoningEffort[] = ['minimal', 'low', 'medium', 'high', 'xhigh'];
+const VALID_CODEX_REASONING_EFFORTS: readonly CodexReasoningEffort[] = [
+  'minimal',
+  'low',
+  'medium',
+  'high',
+  'xhigh',
+  'max',
+  'ultra',
+  'persistent',
+];
 const VALID_CODEX_WEB_SEARCH_MODES: readonly CodexWebSearchMode[] = ['disabled', 'cached', 'live'];
 const VALID_CODEX_APPROVAL_POLICIES: readonly CodexApprovalPolicy[] = ['inherit', 'untrusted', 'on-request', 'never'];
 
@@ -537,7 +546,17 @@ export type StreamChunk =
   | {
       type: 'backend_event';
       source: AgentBackendKind;
-      event: 'hook' | 'subagent' | 'tool_progress' | 'structured_output';
+      event:
+        | 'hook'
+        | 'subagent'
+        | 'tool_progress'
+        | 'structured_output'
+        | 'informational'
+        | 'control_request_progress'
+        | 'background_tasks_changed'
+        | 'thinking_tokens'
+        | 'model_refusal'
+        | 'worker_shutting_down';
       status?: string;
       id?: string;
       name?: string;

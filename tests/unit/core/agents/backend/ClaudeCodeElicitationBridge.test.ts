@@ -1,8 +1,11 @@
 import type { ElicitationRequest } from '@anthropic-ai/claude-agent-sdk';
+import type { UserDialogRequest } from '@anthropic-ai/claude-agent-sdk';
 
 import {
   buildClaudeCodeElicitationContent,
   buildClaudeCodeElicitationQuestionRequest,
+  buildClaudeCodeUserDialogQuestionRequest,
+  buildClaudeCodeUserDialogResult,
   normalizeClaudeCodeElicitationContent,
 } from '../../../../../src/core/agents/backend';
 
@@ -163,5 +166,76 @@ describe('ClaudeCodeElicitationBridge', () => {
       enabled: true,
       labels: ['a', 'b'],
     });
+  });
+});
+
+describe('ClaudeCode user dialog bridge (SDK >= 0.3.2xx)', () => {
+  const refusalRequest: UserDialogRequest = {
+    dialogKind: 'refusal_fallback_prompt',
+    payload: {
+      originalModel: 'claude-opus-4-6',
+      fallbackModel: 'claude-sonnet-4-6',
+      guidanceText: 'The model refused this request.',
+    },
+  };
+
+  it('builds a retry/edit question card for refusal_fallback_prompt', () => {
+    const questionRequest = buildClaudeCodeUserDialogQuestionRequest(refusalRequest);
+    expect(questionRequest.questions).toHaveLength(1);
+    const question = questionRequest.questions[0];
+    expect(question.question).toBe('The model refused this request.');
+    expect(question.options.map((option) => option.label)).toEqual([
+      'Retry with fallback model',
+      'Edit prompt',
+    ]);
+    expect(question.options[0].description).toContain('claude-sonnet-4-6');
+    expect(question.options[1].description).toContain('claude-opus-4-6');
+  });
+
+  it('falls back to a default question when guidanceText is absent', () => {
+    const request: UserDialogRequest = {
+      dialogKind: 'refusal_fallback_prompt',
+      payload: { originalModel: 'a', fallbackModel: 'b' },
+    };
+    const questionRequest = buildClaudeCodeUserDialogQuestionRequest(request);
+    expect(questionRequest.questions[0].question).toContain('refused');
+  });
+
+  it('builds a generic card for unknown dialog kinds', () => {
+    const request: UserDialogRequest = {
+      dialogKind: 'fable_overage_consent_prompt',
+      payload: {},
+    };
+    const questionRequest = buildClaudeCodeUserDialogQuestionRequest(request);
+    expect(questionRequest.questions[0].question).toContain('fable_overage_consent_prompt');
+  });
+
+  it('maps accepted answers to the CLI retry_fallback/edit_prompt enum', () => {
+    expect(buildClaudeCodeUserDialogResult('refusal_fallback_prompt', {
+      action: 'accept',
+      answers: [['Retry with fallback model']],
+    })).toEqual({ behavior: 'completed', result: 'retry_fallback' });
+
+    expect(buildClaudeCodeUserDialogResult('refusal_fallback_prompt', {
+      action: 'accept',
+      answers: [['Edit prompt']],
+    })).toEqual({ behavior: 'completed', result: 'edit_prompt' });
+  });
+
+  it('maps cancel, decline, null, and unknown answers to cancelled (CLI default behavior)', () => {
+    expect(buildClaudeCodeUserDialogResult('refusal_fallback_prompt', null))
+      .toEqual({ behavior: 'cancelled' });
+    expect(buildClaudeCodeUserDialogResult('refusal_fallback_prompt', {
+      action: 'decline',
+      answers: [['Retry with fallback model']],
+    })).toEqual({ behavior: 'cancelled' });
+    expect(buildClaudeCodeUserDialogResult('refusal_fallback_prompt', {
+      action: 'accept',
+      answers: [['Something else']],
+    })).toEqual({ behavior: 'cancelled' });
+    expect(buildClaudeCodeUserDialogResult('fable_overage_consent_prompt', {
+      action: 'accept',
+      answers: [['Continue with default']],
+    })).toEqual({ behavior: 'cancelled' });
   });
 });

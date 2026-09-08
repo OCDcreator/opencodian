@@ -780,6 +780,47 @@ describe('SettingsClaudeCodeSection multi-tab', () => {
       expect(claudeAdapter.restartPersistentQueries).toHaveBeenCalledWith('settings-change');
     });
 
+    it('reloads active Claude skills after a skill resource mutation', async () => {
+      const claudeAdapter = {
+        reloadSkills: jest.fn().mockResolvedValue(undefined),
+        restartPersistentQueries: jest.fn().mockResolvedValue(undefined),
+      };
+      const plugin = createPlugin({ claudeAdapter }) as OpenCodianPlugin;
+      plugin.invalidateSlashCommandCatalog = jest.fn();
+      const section = new SettingsClaudeCodeSection({
+        plugin,
+        createSectionHeading,
+      });
+      const refresh = section as unknown as {
+        refreshClaudeResourcesAfterMutation(kinds: readonly ('skill' | 'command' | 'agent')[]): Promise<void>;
+      };
+
+      await refresh.refreshClaudeResourcesAfterMutation(['skill']);
+
+      expect(claudeAdapter.reloadSkills).toHaveBeenCalledTimes(1);
+      expect(claudeAdapter.restartPersistentQueries).not.toHaveBeenCalled();
+      expect(plugin.invalidateSlashCommandCatalog).toHaveBeenCalledTimes(1);
+    });
+
+    it('restarts persistent Claude queries when the external CLI rejects reloadSkills', async () => {
+      const claudeAdapter = {
+        reloadSkills: jest.fn().mockRejectedValue(new Error('unsupported control request')),
+        restartPersistentQueries: jest.fn().mockResolvedValue(undefined),
+      };
+      const plugin = createPlugin({ claudeAdapter }) as OpenCodianPlugin;
+      const section = new SettingsClaudeCodeSection({
+        plugin,
+        createSectionHeading,
+      });
+      const refresh = section as unknown as {
+        refreshClaudeResourcesAfterMutation(kinds: readonly ('skill' | 'command' | 'agent')[]): Promise<void>;
+      };
+
+      await refresh.refreshClaudeResourcesAfterMutation(['skill']);
+
+      expect(claudeAdapter.restartPersistentQueries).toHaveBeenCalledWith('skill-resource-change');
+    });
+
     it('persists setting source changes from Context & Sources tab', async () => {
       const plugin = createPlugin();
       const containerEl = document.createElement('div');

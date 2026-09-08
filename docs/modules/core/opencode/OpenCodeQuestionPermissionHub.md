@@ -5,9 +5,9 @@
 
 ## 概述
 
-`OpenCodeQuestionPermissionHub` 是 `OpenCodeService` 内部的 question / permission negotiation owner。它把 pending questions/reply/reject、pending permissions/respond，以及 session-scoped permission responder 收束到同一个较厚 hub 中，让 `OpenCodeService` 退回为 SDK/legacy host seam 与对外 façade。
+`OpenCodeQuestionPermissionHub` 是 `OpenCodeService` 内部的 question / permission negotiation owner。它把 pending questions/reply/reject 与 pending permissions/reply 收束到同一个较厚 hub 中，让 `OpenCodeService` 退回为 SDK/legacy host seam 与对外 façade。
 
-它不改变外部 API；上层仍然通过 `OpenCodeService.getPendingQuestions()`、`replyToQuestion()`、`getPendingPermissions()`、`respondToPermission()`、`respondToSessionPermission()` 访问这条协商链路。
+上层通过 `OpenCodeService.getPendingQuestions()`、`replyToQuestion()`、`getPendingPermissions()` 与 `respondToPermission()` 访问这条协商链路。
 
 ## 导入关系
 
@@ -44,8 +44,8 @@ hub 现在统一承接：
 同一个 hub 也承接 permission 侧的交互式协商：
 
 - `getPendingPermissions()`：按 `sdkCrud` 选择 SDK `permission.list()` 或 legacy `/permission`，兼容 `Array` 与 `{ data }` 两种返回形状，并过滤成稳定的 `PermissionRequest` 形状。
-- `respondToPermission()`：保持现有“`sdkCrud` 启用时走 SDK reply，否则走 legacy `/permission/:id/reply`”的语义，同时保留 mutation 失败时直接抛错；插件本地 `session` reply 会在这里映射为 OpenCode wire value `always`。
-- `respondToSessionPermission()`：继续走 SDK session permission responder，但由同一个 owner 收口 permission responder surface，并复用相同的 reply wire-value 映射。
+- `respondToPermission()`：`sdkCrud` 启用时走 SDK v2 `permission.reply(requestID, reply, message)`，否则走 legacy `/permission/:id/reply`；插件本地 `session` reply 会在这里映射为 OpenCode wire value `always`。
+- 2026-09-08 已删除 SDK deprecated `permission.respond(sessionID, permissionID, response)` 及无生产调用方的 `respondToSessionPermission()`，不再维持双 responder surface。
 
 这让 pending/session permissions 与 question negotiation 留在同一个 owner 中，避免再分裂成两个过薄模块。
 
@@ -82,4 +82,4 @@ graph TD
 - 不要再把 question 和 permission 拆成两个薄 façade；roadmap 明确要求它们共享一个较厚 owner。
 - `getPendingPermissions()` / `respondToPermission()` 继续跟随 `sdkCrud`，而 question list/reply/reject 继续跟随 `sdkQuestions`；不要把两组 rollout flag 混成一套。
 - retry 只属于 question reply/reject mutation resiliency，不要扩大到 `question.list()`、permission responder 或 waiter timeout。
-- `respondToSessionPermission()` 目前仍是 SDK-only responder；如果未来需要 legacy fallback，应该在这个 hub 内集中补，而不是把逻辑重新散回 `OpenCodeService`。
+- 兼容旧服务端时只允许由当前 `respondToPermission()` 的既有 legacy HTTP fallback 收口，不得恢复 deprecated session-scoped SDK responder。

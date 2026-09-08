@@ -531,3 +531,4 @@ Added `settings.pluginUpdate.*` for the shared General version-management sectio
 ## 2026-08-04 Turn Change Record compact card locale keys
 
 Added `chat.diffNotice.fileCount` (`{count}` accessible name for the header count badge), `chat.diffNotice.expandRemaining` (`{count}` hidden-file toggle label), `chat.diffNotice.collapse`, `chat.diffNotice.statusAdded`, and `chat.diffNotice.statusDeleted` for the dedicated turn-diff notice card. `chat.diffNotice.description` stays in place for persisted Markdown/export compatibility but is no longer rendered by the structured card branch.
+- 2026-09-08：新增 Codex reasoning `max` / `ultra` / `persistent` 英文标签。

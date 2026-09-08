@@ -18,7 +18,6 @@ export interface OpenCodeQuestionSdk {
 export interface OpenCodePermissionSdk {
   list(): Promise<unknown>;
   reply(request: { requestID: string; reply: OpenCodePermissionWireReply; message?: string }): Promise<unknown>;
-  respond(request: { sessionID: string; permissionID: string; response: OpenCodePermissionWireReply }): Promise<unknown>;
 }
 
 export interface OpenCodeQuestionPermissionHubHost {
@@ -248,18 +247,6 @@ export class OpenCodeQuestionPermissionHub {
     }
 
     await runQuestionMutationWithRetry(() => this.host.postLegacy(`/question/${requestID}/reject`, {}));
-  }
-
-  async respondToSessionPermission(
-    sessionId: string,
-    permissionId: string,
-    reply: PermissionReply,
-  ): Promise<void> {
-    await this.host.getSdkPermission().respond({
-      sessionID: sessionId,
-      permissionID: permissionId,
-      response: toOpenCodePermissionWireReply(reply),
-    });
   }
 
   async getPendingPermissions(): Promise<PermissionRequest[]> {

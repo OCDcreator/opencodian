@@ -96,7 +96,11 @@ function mapTokenUsageNotification(
     outputTokens: nonNegativeNumber(total.outputTokens),
     reasoningTokens: nonNegativeNumber(total.reasoningOutputTokens),
     cacheReadTokens: nonNegativeNumber(total.cachedInputTokens),
-    cacheWriteTokens: null,
+    // Codex SDK >= 0.152 reports prompt-cache write volume per turn; older
+    // app-servers omit the field — keep null there instead of a fake 0.
+    cacheWriteTokens: typeof total.cache_write_input_tokens === 'number' && total.cache_write_input_tokens >= 0
+      ? total.cache_write_input_tokens
+      : null,
     totalCost: null,
   };
   return {

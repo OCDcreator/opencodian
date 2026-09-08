@@ -693,6 +693,7 @@ describe('runResumeSessionAtProbe', () => {
           yield assistantMessage('session-1', 'alpha ok');
           yield resultMessage('session-1');
         } else if (callIndex === 2) {
+          yield { type: 'user', uuid: 'user-uuid-beta', session_id: 'session-1' };
           yield assistantMessage('session-1', 'beta ok');
           yield resultMessage('session-1');
         } else {
@@ -708,6 +709,7 @@ describe('runResumeSessionAtProbe', () => {
     expect(result.classification).toBe('pass');
     expect(result.resumedAtAlpha).toBe(true);
     expect(result.alphaMessageUuid).toBe(alphaUuid);
+    expect(sdk.query.mock.calls[2][0].options.resumeDropsTurn).toBe('user-uuid-beta');
   });
 
   it('returns fail when beta is recalled instead of alpha', async () => {
@@ -737,6 +739,7 @@ describe('runResumeSessionAtProbe', () => {
           yield assistantMessage('session-1', 'alpha ok');
           yield resultMessage('session-1');
         } else if (callIndex === 2) {
+          yield { type: 'user', uuid: 'user-uuid-beta', session_id: 'session-1' };
           yield assistantMessage('session-1', 'beta ok');
           yield resultMessage('session-1');
         } else {

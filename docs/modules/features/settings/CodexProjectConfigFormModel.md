@@ -35,3 +35,4 @@ Form model, allowlist validation, and surgical TOML editing for the vault-level 
 - Consumed by `SettingsCodexProjectConfigSection`.
 - `applyTomlScalarEdits` returns null when a key exists as an unclosed multi-line array (cannot safely edit in-place). The caller blocks save and guides the user to advanced mode.
 - Tests cover: allowlist, forbidden keys, unknown keys, surgical editing (update/insert/remove), comment preservation, key order, escaping, multi-line array blocking, form values parsing.
+- 2026-09-08：项目 `model_reasoning_effort` 白名单新增 Codex SDK 0.153.4 的 `max`、`ultra`、`persistent`；未识别值仍阻止保存。

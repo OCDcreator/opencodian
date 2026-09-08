@@ -42,7 +42,13 @@ export interface ClaudeCodeOptionsBuilderInput {
   pathToClaudeCodeExecutable?: string;
   processEnv?: Record<string, string | undefined>;
   canUseTool?: unknown;
+  /** SDK >= 0.3.263 permission-prompt ownership declaration. */
+  permissionPrompts?: 'host' | 'none';
   onElicitation?: unknown;
+  /** SDK >= 0.3.2xx `request_user_dialog` host callback (see Options.onUserDialog). */
+  onUserDialog?: unknown;
+  /** Dialog kinds the host UI can render; requires onUserDialog. CLI fails closed on absence. */
+  supportedDialogKinds?: string[];
   mcpServers?: Record<string, unknown>;
   hooks?: Record<string, unknown>;
   sessionStore?: unknown;
@@ -74,6 +80,8 @@ export interface ClaudeCodeOptionsBuilderInput {
   continue?: boolean;
   /** Diagnostic-only resume-at message UUID. When provided with resume, asks the SDK to resume only up to this message. */
   resumeSessionAt?: string;
+  /** SDK 0.3.263 guard naming the user turn intentionally dropped by resumeSessionAt. */
+  resumeDropsTurn?: string;
   /** Diagnostic-only fork-on-resume flag. When true AND resume is provided, asks the SDK to fork into a new session. */
   forkSession?: boolean;
 }
@@ -93,7 +101,13 @@ export interface ClaudeCodeSdkOptionsShape {
   additionalDirectories?: string[];
   pathToClaudeCodeExecutable?: string;
   canUseTool?: unknown;
+  /** Declares whether this host or no client answers permission prompts. */
+  permissionPrompts?: 'host' | 'none';
   onElicitation?: unknown;
+  /** SDK >= 0.3.2xx `request_user_dialog` host callback (see Options.onUserDialog). */
+  onUserDialog?: unknown;
+  /** Dialog kinds the host UI can render; requires onUserDialog. CLI fails closed on absence. */
+  supportedDialogKinds?: string[];
   mcpServers?: Record<string, unknown>;
   hooks?: Record<string, unknown>;
   sessionStore?: unknown;
@@ -167,6 +181,8 @@ export interface ClaudeCodeSdkOptionsShape {
   continue?: boolean;
   /** Diagnostic-only resume-at message UUID. When provided with resume, asks the SDK to resume only up to this message. */
   resumeSessionAt?: string;
+  /** Guard for a truncating resume; must identify the discarded user turn. */
+  resumeDropsTurn?: string;
   /** Diagnostic-only fork-on-resume flag. When true AND resume is provided, asks the SDK to fork into a new session. */
   forkSession?: boolean;
   /** Requested beta features passed as the SDK `betas` option. */
@@ -239,8 +255,21 @@ export function buildClaudeCodeOptions(
   if (input.canUseTool) {
     options.canUseTool = input.canUseTool;
   }
+  // SDK >= 0.3.263 can fail closed instead of waiting for a permission host
+  // that does not exist. Main chat passes canUseTool and therefore owns the
+  // prompt; diagnostic/headless callers without it explicitly deny prompts.
+  options.permissionPrompts = input.permissionPrompts
+    ?? (input.canUseTool ? 'host' : 'none');
   if (input.onElicitation) {
     options.onElicitation = input.onElicitation;
+  }
+  // SDK fails closed: only declare supportedDialogKinds when the host dialog
+  // callback is actually wired, so undeclared kinds degrade to CLI defaults.
+  if (input.onUserDialog) {
+    options.onUserDialog = input.onUserDialog;
+    if (input.supportedDialogKinds && input.supportedDialogKinds.length > 0) {
+      options.supportedDialogKinds = input.supportedDialogKinds;
+    }
   }
   if (input.mcpServers && Object.keys(input.mcpServers).length > 0) {
     options.mcpServers = input.mcpServers;
@@ -423,6 +452,9 @@ export function buildClaudeCodeOptions(
   }
   if (input.resumeSessionAt) {
     options.resumeSessionAt = input.resumeSessionAt;
+    if (input.resumeDropsTurn) {
+      options.resumeDropsTurn = input.resumeDropsTurn;
+    }
   }
   if (input.forkSession === true) {
     options.forkSession = true;

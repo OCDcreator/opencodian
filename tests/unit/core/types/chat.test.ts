@@ -121,4 +121,12 @@ describe('conversation session settings normalization', () => {
       codexNetworkAccessEnabled: 'true' as unknown as boolean,
     })).toBeUndefined();
   });
+
+  it.each(['max', 'ultra', 'persistent'] as const)('preserves per-conversation Codex effort %s', (effort) => {
+    expect(normalizeConversationSessionSettings({
+      codexModelReasoningEffort: effort,
+    })).toEqual({
+      codexModelReasoningEffort: effort,
+    });
+  });
 });

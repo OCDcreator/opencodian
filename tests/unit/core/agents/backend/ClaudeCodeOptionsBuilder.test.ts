@@ -36,6 +36,7 @@ describe('ClaudeCodeOptionsBuilder', () => {
       fallbackModel: 'claude-sonnet-4-5',
       additionalDirectories: ['/outside/context'],
       canUseTool,
+      permissionPrompts: 'host',
       mcpServers: {
         filesystem: { command: 'npx', args: ['server'] },
       },
@@ -58,6 +59,7 @@ describe('ClaudeCodeOptionsBuilder', () => {
       tools: { type: 'preset', preset: 'claude_code' },
       settingSources: [],
       permissionMode: 'default',
+      permissionPrompts: 'none',
       thinking: { type: 'adaptive' },
       effort: 'medium',
     });
@@ -118,6 +120,22 @@ describe('ClaudeCodeOptionsBuilder', () => {
     expect(bypassOptions.allowDangerouslySkipPermissions).toBe(true);
   });
 
+  it('declares permission prompt ownership explicitly and allows a deliberate override', () => {
+    const canUseTool = jest.fn();
+    expect(buildClaudeCodeOptions({
+      vaultPath: '/vault/project',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      canUseTool,
+    }).permissionPrompts).toBe('host');
+
+    expect(buildClaudeCodeOptions({
+      vaultPath: '/vault/project',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      canUseTool,
+      permissionPrompts: 'none',
+    }).permissionPrompts).toBe('none');
+  });
+
   it('maps a captured SDK session id to resume options for later sends', () => {
     const options = buildClaudeCodeOptions({
       vaultPath: '/vault/project',
@@ -126,6 +144,23 @@ describe('ClaudeCodeOptionsBuilder', () => {
     });
 
     expect(options.resume).toBe('sdk-session-1');
+  });
+
+  it('only forwards resumeDropsTurn with a truncating resume point', () => {
+    const guarded = buildClaudeCodeOptions({
+      vaultPath: '/vault/project',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      resumeSessionAt: 'assistant-alpha',
+      resumeDropsTurn: 'user-beta',
+    });
+    const unpaired = buildClaudeCodeOptions({
+      vaultPath: '/vault/project',
+      settings: getDefaultClaudeCodeBackendSettings(),
+      resumeDropsTurn: 'user-beta',
+    });
+
+    expect(guarded.resumeDropsTurn).toBe('user-beta');
+    expect(unpaired.resumeDropsTurn).toBeUndefined();
   });
 });
 

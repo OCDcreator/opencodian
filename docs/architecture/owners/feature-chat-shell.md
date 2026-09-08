@@ -44,3 +44,6 @@ Run before merge: `npm run typecheck`, `npm run module-docs`, `npm run build`.
 - Do not replicate canonical state in another owner.
 - Changes here must update the matching `docs/modules/**` page (via `module-docs.config.json`).
 - Run `npm run inspect:owner -- <this owner or a path>` for an always-fresh summary.
+
+## SDK upgrade integration notes
+- 2026-09-02: view 订阅 `ClaudeCodeAdapter.onCommandsChanged`（SDK 0.3.252 `system/commands_changed` 信号）即时失效 slash 命令菜单缓存；镜像 Codex `onSkillsChanged` binding 模式，生命周期随 view teardown 退订。

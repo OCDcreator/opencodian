@@ -81,6 +81,8 @@ export {
 export {
   buildClaudeCodeElicitationContent,
   buildClaudeCodeElicitationQuestionRequest,
+  buildClaudeCodeUserDialogQuestionRequest,
+  buildClaudeCodeUserDialogResult,
   normalizeClaudeCodeElicitationContent,
 } from './ClaudeCodeElicitationBridge';
 export {

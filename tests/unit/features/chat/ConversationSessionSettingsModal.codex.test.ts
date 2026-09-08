@@ -146,7 +146,7 @@ describe('ConversationSessionSettingsModal Codex controls', () => {
 
     sandboxSelect.value = 'read-only';
     sandboxSelect.dispatchEvent(new Event('change', { bubbles: true }));
-    effortSelect.value = 'xhigh';
+    effortSelect.value = 'persistent';
     effortSelect.dispatchEvent(new Event('change', { bubbles: true }));
 
     const saveButton = modal.contentEl.querySelector<HTMLButtonElement>(
@@ -158,7 +158,7 @@ describe('ConversationSessionSettingsModal Codex controls', () => {
     expect(onSave).toHaveBeenCalledWith(
       expect.objectContaining({
         codexSandboxMode: 'read-only',
-        codexModelReasoningEffort: 'xhigh',
+        codexModelReasoningEffort: 'persistent',
       }),
     );
   });

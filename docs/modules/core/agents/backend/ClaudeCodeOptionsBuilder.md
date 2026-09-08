@@ -60,3 +60,8 @@
 - `promptSuggestions?: boolean` 已加入 Input 和 SDK Shape，wiring 逻辑与 `agentProgressSummaries` 一致（input 或 settings 任一为 true 即传入）。
 - `continue?: boolean` 已加入 Input 和 SDK Shape，wiring 逻辑为：只在 `input.continue === true` 时传入 SDK options。分类为 pass（2026-06-02 live runtime proof：BUILD_ID `feature-phase0-capability.202606022255` 上，两阶段诊断探针确认 SDK 能继续同一 session、session id 精确匹配 `2a3b1082-64ba-4862-96a5-a14a2e01cc49`，并成功回忆前一轮 nonce）。这不是稳定的产品面；普通 chat 路径永远不会使用 continue，session 连续性始终由 adapter 拥有。仅供 Capability Lab 诊断探针使用。与 `resumeSessionId` 和显式 `sessionId` 都不兼容——adapter 会在诊断边界 guard 这两种组合。
 - `resumeSessionAt?: string` 已加入 Input 和 SDK Shape，wiring 逻辑为：只在 `input.resumeSessionAt` 非空且 trimmed 后非空时传入 SDK options。分类为 pass（2026-06-03 live runtime proof：BUILD_ID `feature-phase0-capability.202606030008` 上，三阶段诊断探针确认 SDK 在 session `06e82771-6dba-43d1-8191-4d8d8439a3f4` 中按 alpha assistant message UUID `8a2e95c7-9625-4f5d-a875-12702430f85b` 恢复，并成功回忆 ALPHA 而非 BETA）。这不是稳定的产品面；普通 chat 路径永远不会使用 resumeSessionAt，session 连续性始终由 adapter 拥有。仅供 Capability Lab 诊断探针使用。与 `continue` 和显式 `sessionId` 都不兼容，且必须配合 `resumeSessionId` 使用——adapter 会在诊断边界 guard 这些组合。
+
+
+- `onUserDialog` / `supportedDialogKinds`（2026-09-02，SDK 0.3.252）：runtime-injected host 回调与可渲染 dialog kind 声明；只在 `onUserDialog` 存在时透传 `supportedDialogKinds`，缺省不声明任何 kind（CLI fail-closed 退化为无对话框行为）。不写入用户设置。
+- 2026-09-08：SDK 0.3.263 的 `permissionPrompts` 所有权现在显式写入。存在 `canUseTool` 宿主时使用 `host`；诊断/无宿主查询使用 `none`，避免等待不存在的批准界面。
+- 2026-09-08：诊断 options shape 新增 `resumeDropsTurn`，只供与 `resumeSessionAt` 成对的安全截断探针使用。

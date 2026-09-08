@@ -3,7 +3,12 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, statSync, unlinkSync, write
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import type { ElicitationRequest, ElicitationResult, Query } from '@anthropic-ai/claude-agent-sdk';
+import type {
+  ElicitationRequest,
+  ElicitationResult,
+  OnUserDialog,
+  Query,
+} from '@anthropic-ai/claude-agent-sdk';
 import { spawn } from 'child_process';
 
 import { createLogger, sanitizeDiagnosticReport } from '../../../shared';
@@ -45,8 +50,11 @@ import {
   type ClaudeCodeSessionRuntime,
   createSessionId,
   createUserPrompt,
+  isCommandsChangedMessage,
+  isConversationResetMessage,
   isPromptSuggestionMessage,
   isTurnBoundaryMessage,
+  readConversationResetId,
 } from './ClaudeCodeQueue';
 import type { WarmQueryHandle } from './ClaudeCodeSdkLoader';
 import { ClaudeCodeStreamNormalizer } from './ClaudeCodeStreamNormalizer';
@@ -528,6 +536,8 @@ export interface ClaudeCodeDiagnosticPromptRequest {
    * asks the SDK to resume only up to and including the message with this UUID.
    */
   _diagnosticResumeSessionAt?: string;
+  /** User-message UUID of the turn intentionally discarded by resumeSessionAt. */
+  _diagnosticResumeDropsTurn?: string;
   /**
    * Diagnostic-only fork-on-resume flag. When true AND resumeSessionId is
    * provided, asks the SDK to fork the resumed session into a new session id.
@@ -711,6 +721,19 @@ export interface ClaudeCodeAdapterOptions {
   /** Optional diagnostics seam. Every hook is isolated through `trace()`. */
   tracePort?: ClaudeTracePort;
   onElicitation?: (request: ElicitationRequest, options: { signal: AbortSignal }) => Promise<ElicitationResult>;
+  /**
+   * SDK >= 0.3.2xx `request_user_dialog` host callback (e.g. the CLI's
+   * refusal-fallback prompt). Answering `{ behavior: 'cancelled' }` makes the
+   * CLI apply the dialog's default behavior, which is exactly the pre-callback
+   * status quo — so wiring this is fail-safe. When omitted, the SDK sends no
+   * answer at all.
+   */
+  onUserDialog?: OnUserDialog;
+  /**
+   * Dialog kinds the host UI can genuinely render. The CLI fails closed:
+   * kinds not declared here are never emitted. Requires `onUserDialog`.
+   */
+  supportedDialogKinds?: string[];
   mcpServers?: ClaudeCodeMcpServersMap;
   /** Dynamic MCP config loader — called at runtime when building SDK options. */
   mcpConfigLoader?: ClaudeCodeMcpConfigLoader;
@@ -1383,6 +1406,7 @@ export class ClaudeCodeAdapter
   private sdkLoadPromise: Promise<ClaudeCodeSdkFacade> | null = null;
   private lastDiagnosticSdkOptions: ClaudeCodeSdkOptionsShape | null = null;
   private readonly postResultCallbacks = new Set<(chunk: StreamChunk) => void>();
+  private readonly commandsChangedHandlers = new Set<() => void>();
   private readonly options: ClaudeCodeAdapterOptions;
   private readonly tracePort?: ClaudeTracePort;
   /** Current turn context keyed by both plugin-local and SDK session identities. */
@@ -1500,6 +1524,22 @@ export class ClaudeCodeAdapter
   onStatusChange(handler: StatusChangeHandler): Disposable {
     this.statusChangeHandlers.add(handler);
     return { dispose: () => this.statusChangeHandlers.delete(handler) };
+  }
+
+  /**
+   * Subscribe to the CLI's `system/commands_changed` signal (SDK >= 0.3.2xx):
+   * the runtime slash-command list changed and cached catalogs should reload.
+   * Mirrors the Codex adapter's `onSkillsChanged` surface.
+   */
+  onCommandsChanged(handler: () => void): Disposable {
+    this.commandsChangedHandlers.add(handler);
+    return { dispose: () => this.commandsChangedHandlers.delete(handler) };
+  }
+
+  private notifyCommandsChanged(): void {
+    for (const handler of this.commandsChangedHandlers) {
+      try { handler(); } catch { /* ignore callback errors */ }
+    }
   }
 
   async createSession(title = 'New Claude Code chat'): Promise<string> {
@@ -4454,13 +4494,20 @@ export class ClaudeCodeAdapter
       }
 
       // Phase 1b: send BETA in same session
-      await this.runDiagnosticPrompt({
+      const betaResult = await this.runDiagnosticPrompt({
         prompt: `Remember this nonce: ${betaNonce}. Reply with only "beta ok".`,
         persistSession: true,
         resumeSessionId: seedSessionId,
         _diagnosticBypassPermissions: true,
         _diagnosticResumeAt: true,
       });
+      const betaUserMessageUuid = [...betaResult.rawMessages]
+        .reverse()
+        .map((message) => ClaudeCodeAdapter.extractUserMessageUuid(message))
+        .find((uuid): uuid is string => typeof uuid === 'string');
+      if (!betaUserMessageUuid) {
+        return { classification: 'fail', error: 'Could not extract beta user message UUID for resumeDropsTurn guard' };
+      }
 
       // Phase 2: resume at alpha's UUID
       const resumeResult = await this.runDiagnosticPrompt({
@@ -4468,6 +4515,7 @@ export class ClaudeCodeAdapter
         resumeSessionId: seedSessionId,
         _diagnosticResumeAt: true,
         _diagnosticResumeSessionAt: alphaMessageUuid,
+        _diagnosticResumeDropsTurn: betaUserMessageUuid,
         _diagnosticBypassPermissions: true,
       });
 
@@ -4767,7 +4815,12 @@ export class ClaudeCodeAdapter
 
         const chunks = runtime.normalizer.transformSDKMessage(item.message);
         sawTraceError = mergeTraceError(sawTraceError, isSdkResultError(item.message));
-        this.captureSdkSessionId(session, item.message, chunks);
+        // conversation_reset is fully handled by handleConversationReset in the
+        // pump (identity remap); its own session_id may still name the OLD
+        // conversation and must not trip the resume validation below.
+        if (!isConversationResetMessage(item.message)) {
+          this.captureSdkSessionId(session, item.message, chunks);
+        }
         traceContext = this.traceContextForSession(session) ?? traceContext;
         this.trace((port) => port.recordSdkMessage(traceContext, item.message));
         for (const chunk of chunks) {
@@ -4858,6 +4911,12 @@ export class ClaudeCodeAdapter
       runtime.query?.setMcpServers?.(this.options.mcpServers ?? this.cachedMcpServers ?? {}));
   }
 
+  /** Reload skills in every active SDK query without discarding its session. */
+  async reloadSkills(): Promise<void> {
+    await this.applyToActiveQueries((runtime) => runtime.query?.reloadSkills?.());
+    this.notifyCommandsChanged();
+  }
+
   async restartPersistentQueries(reason = 'manual'): Promise<void> {
     runtimeLogger.debug('runtime restart requested', {
       reason,
@@ -4940,6 +4999,8 @@ export class ClaudeCodeAdapter
         }
         : undefined,
       mcpServers: this.options.mcpServers ?? this.cachedMcpServers,
+      onUserDialog: this.options.onUserDialog,
+      supportedDialogKinds: this.options.onUserDialog ? this.options.supportedDialogKinds : undefined,
       hooks: this.options.hooks,
       sessionStore: this.options.sessionStore,
       sessionStoreFlush: this.options.sessionStoreFlush,
@@ -5046,6 +5107,7 @@ export class ClaudeCodeAdapter
       ['sessionId', request._diagnosticSessionId],
       ['continue', request._diagnosticContinue === true ? true : undefined],
       ['resumeSessionAt', request._diagnosticResumeSessionAt],
+      ['resumeDropsTurn', request._diagnosticResumeSessionAt ? request._diagnosticResumeDropsTurn : undefined],
       ['forkSession', request._diagnosticForkSession === true ? true : undefined],
       ['title', request._diagnosticTitle],
     ];
@@ -5288,6 +5350,38 @@ export class ClaudeCodeAdapter
       }
     }
     await Promise.all(updates);
+  }
+
+  /**
+   * `conversation_reset` (SDK >= 0.3.2xx): the CLI moved the conversation to a
+   * new id mid-stream (e.g. /clear from another client). Remap the session
+   * identity so later resume requests and captureSdkSessionId's validation
+   * follow the new id instead of failing against the stale one.
+   */
+  private handleConversationReset(session: ClaudeCodeSessionState, message: unknown): void {
+    const newSessionId = readConversationResetId(message);
+    if (!newSessionId || newSessionId === session.sdkSessionId) {
+      return;
+    }
+    const previousSessionId = session.sdkSessionId;
+    if (previousSessionId && this.sessions.get(previousSessionId) === session) {
+      this.sessions.delete(previousSessionId);
+    }
+    sessionLogger.debug('conversation reset remap', {
+      sessionId: session.id,
+      previousSdkSessionId: previousSessionId ?? null,
+      newSdkSessionId: newSessionId,
+    });
+    const traceContext = this.trace((port) => port.bindSession({
+      sessionId: newSessionId,
+      provisionalId: session.id,
+      resumed: false,
+      via: 'sdk',
+      payload: { sessionId: session.id, reason: 'conversation_reset' },
+    }));
+    if (traceContext) this.rememberTraceContext(session, traceContext);
+    session.sdkSessionId = newSessionId;
+    this.sessions.set(newSessionId, session);
   }
 
   private captureSdkSessionId(
@@ -5860,6 +5954,20 @@ export class ClaudeCodeAdapter
   ): Promise<void> {
     try {
       for await (const message of runtime.query ?? []) {
+        // conversation_reset (SDK >= 0.3.2xx): remap the session identity BEFORE
+        // the message reaches the streaming consumer, so captureSdkSessionId's
+        // resume validation does not see a mismatched session id on the
+        // subsequent messages and close the runtime.
+        if (isConversationResetMessage(message)) {
+          this.handleConversationReset(session, message);
+        }
+        // commands_changed (SDK >= 0.3.2xx): the CLI's slash-command list
+        // changed; surface it to subscribers (slash menu cache invalidation)
+        // regardless of turn state.
+        if (isCommandsChangedMessage(message)) {
+          runtimeLogger.debug('commands changed signal', { sessionId: session.id });
+          this.notifyCommandsChanged();
+        }
         runtime.output.push({ type: 'message', message });
         // Post-result prompt suggestions bypass the normal streaming consumer
         // (sendMessage returns at the turn boundary) and are delivered through

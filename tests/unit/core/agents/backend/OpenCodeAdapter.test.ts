@@ -40,7 +40,6 @@ function createMockOpenCodeService() {
     rejectQuestion: jest.fn(() => Promise.resolve()),
     getPendingPermissions: jest.fn(() => Promise.resolve([])),
     respondToPermission: jest.fn(() => Promise.resolve()),
-    respondToSessionPermission: jest.fn(() => Promise.resolve()),
     getAvailableModels: jest.fn(() => Promise.resolve({})),
     getProviderDirectory: jest.fn(() => Promise.resolve({})),
     getResolvedModelConfig: jest.fn(() => Promise.resolve({})),

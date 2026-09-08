@@ -433,3 +433,4 @@ New normalize functions added:
 ## 2026-07-27 Plugin update persistence
 
 `OpenCodianSettings.pluginUpdateState` 保存更新器的轻量元数据：`lastCheckAt`、`lastNotifiedVersion`、`latestStableVersion` 和 `lastSource`。默认值全部为空，不保存远端资产、Release 清单或本地备份内容。`PluginUpdateService` 在构造时对旧/损坏字段做防御性归一化，并仅在检查或通知标记更新时通过正常 settings persistence 写回。
+- 2026-09-08：`CodexReasoningEffort` 与 SDK 0.153.4 对齐，加入 `max`、`ultra`、`persistent`；加载归一化会保留这些值，未知值仍回退到 `medium`。

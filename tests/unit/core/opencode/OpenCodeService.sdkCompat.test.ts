@@ -98,7 +98,6 @@ describe('OpenCodeService SDK compatibility wrappers', () => {
       },
     ]);
     await expect(service.respondToPermission('permission-1', 'once', 'Allow once')).resolves.toBeUndefined();
-    await expect(service.respondToSessionPermission('session-1', 'permission-1', 'always')).resolves.toBeUndefined();
   });
 
   describe('SDK capability snapshot', () => {

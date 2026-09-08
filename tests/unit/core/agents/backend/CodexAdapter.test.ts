@@ -956,7 +956,7 @@ describe('CodexAdapter', () => {
       const options = createAdapterOptions({
         model: 'o4-mini',
         sandboxMode: 'workspace-write',
-        modelReasoningEffort: 'xhigh',
+        modelReasoningEffort: 'ultra',
       });
       const adapter = new CodexAdapter(options);
       await adapter.start();
@@ -975,7 +975,8 @@ describe('CodexAdapter', () => {
       const threadOpts = options._mockCodex.startThread.mock.calls[0][0] as Record<string, unknown>;
       expect(threadOpts.model).toBe('o4-mini');
       expect(threadOpts.sandboxMode).toBe('workspace-write');
-      expect(threadOpts.modelReasoningEffort).toBe('xhigh');
+      expect(threadOpts.modelReasoningEffort).toBe('ultra');
+      expect(threadOpts.threadSource).toBe('opencodian');
       expect(threadOpts.skipGitRepoCheck).toBe(true);
     });
   });
@@ -1134,12 +1135,12 @@ describe('CodexAdapter', () => {
       });
 
       // Update effort before sending
-      adapter.updateModelReasoningEffort('xhigh');
+      adapter.updateModelReasoningEffort('persistent');
 
       for await (const _ of adapter.sendMessage({ sessionId, content: 'test' })) { void _; }
 
       const threadOpts = options._mockCodex.startThread.mock.calls[0][0] as Record<string, unknown>;
-      expect(threadOpts.modelReasoningEffort).toBe('xhigh');
+      expect(threadOpts.modelReasoningEffort).toBe('persistent');
     });
 
     it('does not affect already-created threads', async () => {

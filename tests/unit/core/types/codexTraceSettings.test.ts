@@ -29,4 +29,12 @@ describe('codex sessionTrace settings', () => {
     const normalized = normalizeBackendSettings({ codex: {} } as never);
     expect(normalized.codex.sessionTrace.captureContent).toBe(true);
   });
+
+  it.each(['max', 'ultra', 'persistent'] as const)('preserves Codex SDK reasoning effort %s', (effort) => {
+    const normalized = normalizeBackendSettings({
+      codex: { modelReasoningEffort: effort },
+    } as never);
+
+    expect(normalized.codex.modelReasoningEffort).toBe(effort);
+  });
 });

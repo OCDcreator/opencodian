@@ -348,7 +348,7 @@ OMO 处理则继续基于 `detectOmoMessageMeta()`，但解析逻辑已经与 qu
 - `getResolvedModelConfig()`: 读取 SDK `config.get()` 或 legacy `/config`，只提取模型相关配置字段。开启 `includeDirectory` 时返回当前项目作用域的解析结果；关闭时返回服务端“默认工作目录作用域”的解析结果，不能把它简单等同于纯全局配置文件。
 - `reapplyCompactionConfigFromProjectConfig()`: 委托 `OpenCodeServiceLifecycleCoordinator` 执行 compaction config reload lifecycle：dispose scoped instance、读取 resolved config、对比 compaction 值，返回 applied/deferred 结果。
 - `getSessionContextUsageSnapshot()`: 现在委托给 `OpenCodeSessionControlOrchestrator`，并发读取 session、messages、providers，计算 provider/model 名称、上下文窗口、token 统计和总 cost。
-- `getPendingPermissions()` / `respondToPermission()` / `respondToSessionPermission()` / `getPendingQuestions()` / `replyToQuestion()` / `rejectQuestion()`: 现在统一委托给 `OpenCodeQuestionPermissionHub`，由它处理 SDK flag、legacy fallback、question prompt normalization 与 permission request filtering。
+- `getPendingPermissions()` / `respondToPermission()` / `getPendingQuestions()` / `replyToQuestion()` / `rejectQuestion()`: 现在统一委托给 `OpenCodeQuestionPermissionHub`，由它处理 SDK flag、legacy fallback、question prompt normalization 与 permission request filtering。
 - `getMcpStatus()` / `addMcpServer()` / provider auth / project / file / find / path / VCS / formatter / LSP 查询：现在统一委托给 `OpenCodeCatalogQueryCoordinator`，由它集中处理 SDK query/admin surface 与 MCP status normalization/writeback。
 
 额外要记住一个容易混淆的点：
@@ -382,7 +382,6 @@ OMO 处理则继续基于 `detectOmoMessageMeta()`，但解析逻辑已经与 qu
 | `getResolvedModelConfig()` | 读取服务器解析后的模型配置子集 |
 | `reapplyCompactionConfigFromProjectConfig()` | 委托 coordinator 执行 compaction config reload lifecycle |
 | `getSessionContextUsageSnapshot()` | 计算 token/cost/context window 快照 |
-| `respondToSessionPermission()` | 回传 session-scoped permission 决策 |
 | `getPendingPermissions()` / `respondToPermission()` | 处理权限请求 |
 | `getPendingQuestions()` / `replyToQuestion()` / `rejectQuestion()` | 处理 OpenCode question 请求 |
 | `getMcpStatus()` / `getProviderAuthMethods()` / `listProjects()` / `listFiles()` / `findText()` / `getVcsDiff()` | 委托 catalog/query owner |
@@ -496,3 +495,4 @@ Compaction config is now project-scoped (`.opencode/opencode.json`). Ownership f
 ### OpenCode session trace wiring
 
 每次 `sendMessage()` 从内部 `diagnosticRunToken` 解析显式 trace context，并用 trace-scoped SDK façade 同时覆盖 prompt、SDK event subscribe、SDK fetch 与 legacy fallback。legacy `/event` GET、raw ingress、normalized outcome 分别记录 transport 与同一 `sourceEventId` 的两侧结果；诊断令牌和 context 不序列化到 OpenCode 请求正文。active trace 以 `runId` 管理，避免同 session 并发标签覆盖。
+- 2026-09-08：移除 deprecated `respondToSessionPermission()` 公共包装；权限应答统一委托 `respondToPermission()` / SDK `permission.reply`。

@@ -34,3 +34,6 @@ Run before merge: `npm run typecheck`, `npm run module-docs`, `npm run build`.
 - Do not replicate canonical state in another owner.
 - Changes here must update the matching `docs/modules/**` page (via `module-docs.config.json`).
 - Run `npm run inspect:owner -- <this owner or a path>` for an always-fresh summary.
+
+## SDK upgrade integration notes
+- 2026-09-02: main.ts 为 ClaudeCodeAdapter 接入 SDK 0.3.252 `onUserDialog` 宿主回调（`refusal_fallback_prompt` 对话框经共享问题卡渲染，cancel 一律映射 CLI 默认行为）并声明 `supportedDialogKinds`；fail-safe——未接线路径行为不变。

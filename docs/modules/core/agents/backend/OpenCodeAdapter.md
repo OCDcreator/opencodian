@@ -32,3 +32,4 @@
 - 新增 OpenCode 能力时需要同时更新 `AgentService.ts` capability interface、`OPENCODE_FULL_CAPABILITIES` 和本 adapter 的委托方法
 - 保持 `underlying` 作为过渡访问口，避免在 Phase 0 一次性重写所有 OpenCode 特有调用路径
 - adapter 只做形状转换和委托，不改变 OpenCode session id、stream chunk 或历史同步语义
+- 2026-09-08：移除 deprecated `respondToSessionPermission` adapter 透传；保留 `respondToPermission` 作为唯一权限回应能力。

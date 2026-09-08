@@ -112,3 +112,4 @@ All six Codex secondary tabs share a single spacing system documented in `DESIGN
 ## 2026-06-16 Modal-first readbacks
 
 The model catalog, permission profile, and loaded threads readbacks in the Resume & Inspect tab no longer append inline cards to the settings panel. Each now opens a dedicated `CodexReadbackModal` with purpose text, read-only/refresh notes, a status bar, and loading / unavailable / failed / empty / success states. The session-browser info/in-memory notices remain as inline cards.
+- 2026-09-08：运行时默认值与项目配置两处 Codex 推理下拉均新增 `max`、`ultra`、`persistent`，并继续通过 `updateModelReasoningEffort` 只影响后续线程。

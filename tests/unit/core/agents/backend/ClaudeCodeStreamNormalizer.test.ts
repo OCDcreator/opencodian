@@ -408,6 +408,131 @@ describe('ClaudeCodeStreamNormalizer', () => {
     }]);
   });
 
+  it('normalizes SDK 0.3.263 system signals into typed backend events', () => {
+    const normalizer = createClaudeCodeStreamNormalizer({ sessionId: 'sess-signals' });
+
+    expect(normalizer.transformSDKMessage({
+      type: 'system',
+      subtype: 'informational',
+      level: 'warning',
+      content: 'Claude needs attention',
+      tool_use_id: 'tool-info',
+      prevent_continuation: true,
+    })).toEqual([expect.objectContaining({
+      type: 'backend_event',
+      source: 'claude-code',
+      event: 'informational',
+      status: 'warning',
+      id: 'tool-info',
+      content: 'Claude needs attention',
+      metadata: { preventContinuation: true },
+      sessionId: 'sess-signals',
+    })]);
+
+    expect(normalizer.transformSDKMessage({
+      type: 'system',
+      subtype: 'control_request_progress',
+      request_id: 'request-1',
+      status: 'api_retry',
+      attempt: 2,
+      max_retries: 3,
+      retry_delay_ms: 250,
+      error_status: 429,
+    })).toEqual([expect.objectContaining({
+      event: 'control_request_progress',
+      status: 'api_retry',
+      id: 'request-1',
+      metadata: {
+        attempt: 2,
+        maxRetries: 3,
+        retryDelayMs: 250,
+        errorStatus: 429,
+      },
+    })]);
+
+    expect(normalizer.transformSDKMessage({
+      type: 'system',
+      subtype: 'background_tasks_changed',
+      tasks: [
+        { task_id: 'task-1', task_type: 'agent', description: 'Review', ambient: false },
+        { task_id: 'task-2', task_type: 'watcher', description: 'Watch', ambient: true },
+      ],
+    })).toEqual([expect.objectContaining({
+      event: 'background_tasks_changed',
+      status: 'replace',
+      metadata: {
+        tasks: [
+          { taskId: 'task-1', taskType: 'agent', description: 'Review', ambient: false },
+          { taskId: 'task-2', taskType: 'watcher', description: 'Watch', ambient: true },
+        ],
+        activeTaskCount: 1,
+        ambientTaskCount: 1,
+      },
+    })]);
+
+    expect(normalizer.transformSDKMessage({
+      type: 'system',
+      subtype: 'thinking_tokens',
+      estimated_tokens: 640,
+      estimated_tokens_delta: 128,
+      user_message_uuid: 'user-1',
+    })).toEqual([expect.objectContaining({
+      event: 'thinking_tokens',
+      status: 'progress',
+      id: 'user-1',
+      metadata: { estimatedTokens: 640, estimatedTokensDelta: 128 },
+    })]);
+
+    expect(normalizer.transformSDKMessage({
+      type: 'system',
+      subtype: 'worker_shutting_down',
+      reason: 'host_exit',
+    })).toEqual([expect.objectContaining({
+      event: 'worker_shutting_down',
+      status: 'stopping',
+      content: 'host_exit',
+      metadata: { reason: 'host_exit' },
+    })]);
+  });
+
+  it('preserves refusal fallback metadata without rendering stale retracted text', () => {
+    const normalizer = createClaudeCodeStreamNormalizer({ sessionId: 'sess-refusal' });
+
+    expect(normalizer.transformSDKMessage({
+      type: 'system',
+      subtype: 'model_refusal_fallback',
+      direction: 'retry',
+      scope: 'session',
+      original_model: 'claude-opus-4-6',
+      fallback_model: 'claude-sonnet-4-6',
+      request_id: 'request-refusal',
+      api_refusal_category: 'cyber',
+      api_refusal_explanation: 'Policy boundary',
+      retracted_message_uuids: ['partial-1', '', 42],
+      refused_user_message_uuid: 'user-refused',
+      content: 'Retrying with the fallback model.',
+    })).toEqual([{
+      type: 'backend_event',
+      source: 'claude-code',
+      event: 'model_refusal',
+      status: 'fallback',
+      id: 'request-refusal',
+      name: 'claude-sonnet-4-6',
+      content: 'Retrying with the fallback model.',
+      metadata: {
+        direction: 'retry',
+        scope: 'session',
+        originalModel: 'claude-opus-4-6',
+        fallbackModel: 'claude-sonnet-4-6',
+        apiRefusalCategory: 'cyber',
+        apiRefusalExplanation: 'Policy boundary',
+        retractedMessageUuids: ['partial-1'],
+        refusedUserMessageUuid: 'user-refused',
+      },
+      sessionId: 'sess-refusal',
+    }]);
+  });
+
   it('surfaces Claude Code tool progress as backend diagnostic events', () => {
     const normalizer = createClaudeCodeStreamNormalizer();
 

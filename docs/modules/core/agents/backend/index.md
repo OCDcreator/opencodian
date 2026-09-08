@@ -86,6 +86,7 @@
 - `src/core/agents/backend/CodexAppServerClientNormalization.ts`：从 `CodexAppServerClient` 拆出的 transcript 归一化纯函数模块（`normalizeThreadList` / `normalizeTurnsToPreviewMessages`）
 - `src/core/agents/backend/diagnostics/`：Codex 会话 trace 子目录（见 `diagnostics/index.md`）——`types` 类型契约、`CodexSessionTraceService` trace runtime、`CodexTraceRingBuffer` 追溯式线记录缓冲、`CodexWireTraceBridge` 线流量桥；不经本 barrel 导出
 - `src/core/types/chat.ts`：提供 `AgentBackendKind` 类型约束
+- `src/core/agents/backend/ClaudeCodeElicitationBridge.ts`：除 elicitation 双向映射外，还导出 SDK >= 0.3.2xx `request_user_dialog` 的 `buildClaudeCodeUserDialogQuestionRequest` / `buildClaudeCodeUserDialogResult`（main.ts 宿主接线消费）
 
 ## 维护约束
 

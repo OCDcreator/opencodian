@@ -836,9 +836,9 @@ describe('SettingsCodexSection model reasoning effort', () => {
 
     const handler = findCodexDropdownHandler('minimal');
 
-    await handler('xhigh');
+    await handler('max');
 
-    expect(updateModelReasoningEffort).toHaveBeenCalledWith('xhigh');
+    expect(updateModelReasoningEffort).toHaveBeenCalledWith('max');
   });
 });
 

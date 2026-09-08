@@ -137,7 +137,7 @@ describe('validateCodexProjectTomlKeys', () => {
 
   it('P1/Fix5: rejects invalid enum value for model_reasoning_effort', () => {
     const result = validateCodexProjectTomlKeys({
-      model_reasoning_effort: 'ultra',
+      model_reasoning_effort: 'extreme',
     });
     expect(result.valid).toBe(false);
     expect(result.diagnostics[0].kind).toBe('invalid-shape');
@@ -170,6 +170,12 @@ describe('validateCodexProjectTomlKeys', () => {
       additional_directories: ['/path/a', '/path/b'],
     });
     expect(result.valid).toBe(true);
+  });
+
+  it.each(['max', 'ultra', 'persistent'])('accepts SDK reasoning effort %s', (effort) => {
+    expect(validateCodexProjectTomlKeys({
+      model_reasoning_effort: effort,
+    }).valid).toBe(true);
   });
 
   it('P1/scope: rejects non-boolean network_access', () => {

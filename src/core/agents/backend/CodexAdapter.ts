@@ -101,7 +101,7 @@ export interface AttemptOptions {
   readonly networkAccessEnabled?: boolean;
   readonly webSearchMode?: 'disabled' | 'cached' | 'live';
   readonly approvalPolicy?: CodexApprovalPolicy;
-  readonly modelReasoningEffort?: 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
+  readonly modelReasoningEffort?: 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra' | 'persistent';
 }
 
 interface AppServerAttempt {
@@ -118,7 +118,7 @@ export interface CodexAdapterOptions {
   /** Sandbox mode passed as ThreadOptions.sandboxMode → SDK --sandbox CLI arg. */
   sandboxMode?: 'read-only' | 'workspace-write' | 'danger-full-access';
   /** Reasoning effort passed as ThreadOptions.modelReasoningEffort → SDK --config CLI arg. */
-  modelReasoningEffort?: 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
+  modelReasoningEffort?: 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra' | 'persistent';
   /** Additional directories passed as ThreadOptions.additionalDirectories → SDK --add-dir per path. */
   additionalDirectories?: readonly string[];
   /** Network access passed as ThreadOptions.networkAccessEnabled → SDK --config CLI arg. */
@@ -2554,6 +2554,10 @@ export class CodexAdapter
 
   private buildThreadOptions(): ThreadOptions {
     return {
+      // Codex SDK >= 0.152 records a caller-defined source on newly created
+      // threads. Keep this stable and product-owned instead of exposing a raw
+      // user override that could fragment attribution.
+      threadSource: 'opencodian',
       ...(this.options.workingDirectory
         ? { workingDirectory: this.options.workingDirectory }
         : {}),

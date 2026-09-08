@@ -397,16 +397,41 @@ export class SettingsClaudeCodeSection {
       section = new SettingsClaudeResourcesSection({
         plugin: this.plugin,
         onAfterMutation: () => {
-          // Invalidate the Claude runtime / slash-command menu catalog so the
-          // next `/` open reflects project changes. Runtime
-          // supportedCommands()/supportedAgents() remains the final menu truth.
-          this.plugin.invalidateSlashCommandCatalog?.();
+          void this.refreshClaudeResourcesAfterMutation(kinds);
         },
         kinds,
       });
       this.resourcesSections.set(key, section);
     }
     section.render(bodyEl);
+  }
+
+  private async refreshClaudeResourcesAfterMutation(
+    kinds: readonly ('skill' | 'command' | 'agent')[],
+  ): Promise<void> {
+    this.plugin.invalidateSlashCommandCatalog?.();
+    if (!kinds.includes('skill')) {
+      return;
+    }
+    const adapter = this.plugin.agentServiceRegistry?.get('claude-code') as {
+      reloadSkills?(): Promise<void> | void;
+      restartPersistentQueries?(reason?: string): Promise<void> | void;
+    } | undefined;
+    try {
+      if (typeof adapter?.reloadSkills === 'function') {
+        await adapter.reloadSkills();
+        return;
+      }
+    } catch {
+      // Older external CLIs can reject the new control request; restart the
+      // persistent query so the next initialize reads the edited skills.
+    }
+    try {
+      await adapter?.restartPersistentQueries?.('skill-resource-change');
+    } catch {
+      // The resource mutation already succeeded. A later query still reloads
+      // from disk, so runtime refresh failure must not turn the write into a lie.
+    }
   }
 
   private renderProvidersTab(bodyEl: HTMLElement): void {

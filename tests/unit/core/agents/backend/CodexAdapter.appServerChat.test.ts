@@ -199,6 +199,7 @@ describe('CodexAdapter app-server chat transport', () => {
 
 });
 
+
 describe('CodexAdapter app-server chat lifecycle', () => {
   beforeEach(resetAppServerMocks);
 
@@ -371,4 +372,107 @@ describe('CodexAdapter app-server chat lifecycle', () => {
     expect(handler).toHaveBeenNthCalledWith(2, expect.any(Set));
     expect(handler.mock.calls[1][0].has(AgentCapability.Context)).toBe(false);
   });
+});
+
+describe('CodexAdapter app-server cache write token mapping (SDK >= 0.152)', () => {
+  beforeEach(resetAppServerMocks);
+
+  it('maps cache_write_input_tokens into the context usage snapshot (SDK >= 0.152)', async () => {
+    mockStartTurn.mockImplementation(async () => {
+      setTimeout(() => {
+        emitNotification('thread/tokenUsage/updated', {
+          threadId: 'thread-new',
+          turnId: 'turn-1',
+          tokenUsage: {
+            total: {
+              totalTokens: 1000,
+              inputTokens: 500,
+              cachedInputTokens: 200,
+              cache_write_input_tokens: 320,
+              outputTokens: 120,
+              reasoningOutputTokens: 80,
+            },
+            modelContextWindow: 128000,
+          },
+        });
+        emitNotification('item/agentMessage/delta', {
+          threadId: 'thread-new',
+          itemId: 'message-1',
+          delta: 'cached write reply',
+        });
+        emitNotification('item/completed', {
+          threadId: 'thread-new',
+          item: { id: 'message-1', type: 'agentMessage', text: 'cached write reply' },
+        });
+        emitNotification('turn/completed', { threadId: 'thread-new', turn: { id: 'turn-1', error: null } });
+      }, 0);
+      return { id: 'turn-1' };
+    });
+    const adapter = new CodexAdapter({
+      createCodex: createMockCodex,
+      model: 'gpt-5',
+      workingDirectory: '/vault',
+      sandboxMode: 'workspace-write',
+    });
+    await adapter.start();
+
+    const chunks = await collectStream(adapter, 'codex-local-1');
+
+    expect(chunks).toContainEqual(expect.objectContaining({
+      type: 'context_usage',
+      snapshot: expect.objectContaining({
+        cacheReadTokens: 200,
+        cacheWriteTokens: 320,
+      }),
+    }));
+  });
+
+  it('keeps cacheWriteTokens null when the app-server omits cache_write_input_tokens', async () => {
+    mockStartTurn.mockImplementation(async () => {
+      setTimeout(() => {
+        emitNotification('thread/tokenUsage/updated', {
+          threadId: 'thread-new',
+          turnId: 'turn-1',
+          tokenUsage: {
+            total: {
+              totalTokens: 700,
+              inputTokens: 400,
+              cachedInputTokens: 100,
+              outputTokens: 90,
+              reasoningOutputTokens: 10,
+            },
+            modelContextWindow: 128000,
+          },
+        });
+        emitNotification('item/agentMessage/delta', {
+          threadId: 'thread-new',
+          itemId: 'message-1',
+          delta: 'legacy reply',
+        });
+        emitNotification('item/completed', {
+          threadId: 'thread-new',
+          item: { id: 'message-1', type: 'agentMessage', text: 'legacy reply' },
+        });
+        emitNotification('turn/completed', { threadId: 'thread-new', turn: { id: 'turn-1', error: null } });
+      }, 0);
+      return { id: 'turn-1' };
+    });
+    const adapter = new CodexAdapter({
+      createCodex: createMockCodex,
+      model: 'gpt-5',
+      workingDirectory: '/vault',
+      sandboxMode: 'workspace-write',
+    });
+    await adapter.start();
+
+    const chunks = await collectStream(adapter, 'codex-local-1');
+
+    expect(chunks).toContainEqual(expect.objectContaining({
+      type: 'context_usage',
+      snapshot: expect.objectContaining({
+        cacheWriteTokens: null,
+      }),
+    }));
+  });
+
 });

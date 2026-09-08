@@ -35,6 +35,7 @@
 - 队列在关闭后不再接受新消息，已排队的等待者会收到 `done: true`。
 - `ClaudeCodeSessionRuntime.effort` 记录创建当前 SDK query 时使用的 Claude Code effort；adapter 用它判断 composer effort 变化时是否需要重启 resumed query。
 - `ClaudeCodeSessionRuntime.query` 是 Claude SDK `Query` 的窄类型，只列出 adapter 会用到的控制方法：`interrupt`、`setModel`、`setPermissionMode`、`setMcpServers`、`rewindFiles`、`supportedModels` 和 `close`。`setMcpServers` 与 `rewindFiles` 返回值按 SDK 的结果对象处理为 `Promise<unknown>`，调用方不假设具体结构。
+- `interrupt` 返回值同样按 `Promise<unknown>` 处理（2026-09-02，SDK 0.3.252 起 `Query.interrupt()` 解析为 `SDKControlInterruptResponse | undefined`——带 `interrupt_receipt_v1` 能力的 CLI 会返回 still-queued 异步消息回执）。插件侧丢弃回执（`void ...interrupt?.()`），不假设具体结构。
 - 从 `ClaudeCodeAdapter` 提取以控制文件行数，不影响公共 API。
 
 ## 图片消息约定（2026-07-22）
@@ -42,3 +43,8 @@
 - `ClaudeCodeQueuedPrompt` 继承官方 `SDKUserMessage`，故每条用户消息都显式携带必填的 `parent_tool_use_id: null`。
 - `createUserPrompt(prompt, images)` 在纯文本时保留 SDK 的字符串 content 快路径；有图片时生成 base64 `image` content blocks，空文字加图片则只发送图片数组。
 - 队列只序列化 composer 已读取完成的 JPEG、PNG、GIF 或 WebP base64 数据，不读文件、不负责 UI 预览。
+
+## 2026-09-02 SDK 0.3.252 消息谓词
+
+- 新增 `isConversationResetMessage` / `isCommandsChangedMessage` / `readConversationResetId`：分别识别顶层 `conversation_reset` 消息（CLI 把会话移到新 id）、`system/commands_changed`（slash 命令目录变化），供 adapter pump 侧在消息进入流消费者前做身份重映射与订阅通知。
+- 2026-09-08：活动 query 兼容形状新增 `reloadSkills?: () => Promise<unknown>`，供设置页在资源写入后原地刷新；旧 CLI 拒绝由设置 owner 退回 runtime restart。

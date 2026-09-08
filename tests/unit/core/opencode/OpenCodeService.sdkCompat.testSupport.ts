@@ -167,7 +167,6 @@ const createMockSdkClient = () => ({
       },
     ]),
     reply: jest.fn().mockResolvedValue(undefined),
-    respond: jest.fn().mockResolvedValue(undefined),
   },
   question: {
     list: jest.fn().mockResolvedValue([]),

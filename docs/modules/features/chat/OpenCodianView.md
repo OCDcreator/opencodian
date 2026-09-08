@@ -754,3 +754,7 @@ Chat 现在在渲染 session 相关操作前检查 `requireSdkCapability(id)`。
 诊断按钮按当前 conversation backend 路由：OpenCode 使用协调器的 inline logic，Codex 和 Claude Code 使用协调器持有的 backend-specific adapters。三者都通过 coordinator 暴露各自的 state/show/claim/cancel operations；header 读取对应 tab-scoped state 并打开对应菜单，`SendPipelineRuntime` 在发送前 claim token，terminal/changed-tab refresh 只在仍匹配 active tab 时刷新 header，tab cleanup 按 backend 取消未消费的 deep capture。
 
 OpenCode 的 store 为 memory mode 或仍带 custom-directory fallback `lastError` 时显示 `degraded`；当前 session copy 使用 current-session report，不回退到其它 session。缺少 service、同步 throw 或异步 rejection 都在 coordinator/adapter 边界 fail closed，不把诊断错误带入聊天路径。conversation deletion 本身不读取、flush、claim 或 report trace；删除过程中如发生 tab lifecycle cleanup，只使用对应的 cancellation operation。View 不读取原始 trace store/report-builder，也不持有 Codex/Claude adapter。
+
+## 2026-09-02 Claude commands_changed 订阅
+
+- 新增 `syncClaudeCommandsChangedSubscription()`：Claude Code 为激活后端时订阅 `ClaudeCodeAdapter.onCommandsChanged`，信号到达即失效 `slashCommandMenuCatalogCache`（不再等 120s TTL）；切走后端或 view 关闭时退订。镜像 Codex `onSkillsChanged` 的 surface binding 模式，调用点与 codex 的 `syncSkillsChangedSubscription` 相邻（view open + capabilities change）。

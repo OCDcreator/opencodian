@@ -38,3 +38,10 @@
 - 不在 helper 中调用 renderer 或 Obsidian API。
 - 不把 synthetic mapper probe 的结果写成 `pass`。
 - 若 SDK elicitation schema 增加新的字段类型，优先在这里收口 mapping，并同步 focused unit tests。
+
+
+
+## SDK >= 0.3.2xx request_user_dialog 桥（2026-09-02）
+
+- `buildClaudeCodeUserDialogQuestionRequest(request)`：把 `UserDialogRequest` 转成共享问题卡。`refusal_fallback_prompt` 有已知 payload 契约（`originalModel` / `fallbackModel` / `apiRefusalCategory?` / `guidanceText?` / `retractedMessageUuids?`，契约从 CLI 2.1.x 二进制提取），映射为 "Retry with fallback model / Edit prompt" 两选项；未知 dialogKind 生成通用说明卡。
+- `buildClaudeCodeUserDialogResult(dialogKind, response)`：问题卡应答映射回 `UserDialogResult`——接受 `retry_fallback` / `edit_prompt`（CLI 内部枚举）；cancel/decline/null/未知应答一律 `{behavior:'cancelled'}`，即 CLI 应用对话框默认行为（与未接线时完全一致，fail-safe）。

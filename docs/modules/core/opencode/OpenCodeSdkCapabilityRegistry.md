@@ -28,3 +28,4 @@
 ### Runtime proof metadata
 
 `runtimeProof` 只保存已经由 Test Vault 场景保留的 `verifiedAt`、`BUILD_ID` 和 artifact path。它不是 SDK presence、server advertisement 或 Capability Lab readback 的替代品；没有这三项保留证据时，诊断面板不会把条目显示成 `runtime-proven`。
+- 2026-09-08：删除 SDK 已 deprecated 的 `permission.respond` capability 条目；只广告 `permission.reply`，防止 Capability Lab 把旧接口误报为可用产品能力。

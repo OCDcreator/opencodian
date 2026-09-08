@@ -117,7 +117,7 @@ export interface CodexProjectConfigValidationResult {
 // Strict value-shape policy for allowed keys.
 const SCALAR_STRING_KEYS = new Set(['model']);
 const SCALAR_ENUM_KEYS: Record<string, readonly string[]> = {
-  model_reasoning_effort: ['minimal', 'low', 'medium', 'high', 'xhigh'],
+  model_reasoning_effort: ['minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra', 'persistent'],
   sandbox_mode: ['read-only', 'workspace-write', 'danger-full-access'],
   approval_policy: ['never', 'on-request', 'on-failure', 'untrusted'],
   web_search: ['disabled', 'cached', 'live'],

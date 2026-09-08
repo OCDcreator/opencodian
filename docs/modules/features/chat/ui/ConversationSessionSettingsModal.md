@@ -128,3 +128,4 @@ Compaction config is now project-scoped (`.opencode/opencode.json`). Ownership f
 ### Experimental action launcher
 
 当上游传入 `onOpenExperimentalActions` 时，modal 提供一个仅作跳转的实验性操作入口。是否可见完全由 coordinator 的 OpenCode conversation/capability gate 决定；modal 本身不执行 action、保存 gate 或读取服务端能力。
+- 2026-09-08：Codex 会话级推理覆盖下拉新增 `max`、`ultra`、`persistent`，保存后仍遵循“下一线程生效”的既有边界。

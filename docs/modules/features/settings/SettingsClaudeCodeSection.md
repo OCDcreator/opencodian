@@ -77,3 +77,4 @@
 - 修改字段时同步 `src/core/types/settings.ts` 的默认值/normalizer 和 `SettingsClaudeCodeSection.test.ts`
 - Runtime / permissions / context / tools textareas that expose manual resize use `TextareaSizeMemory` with stable keys, and `dispose()` cleans the attached observers when the section is rebuilt.
 - 2026-06-06 session browser launcher：`renderBackendSessionBrowserInfo()` 从 read-only notice 升级为 browse-only modal launcher；settings 侧 host 必须保持 `supportsResume: false`，避免在无聊天视图上下文时创建或恢复 conversation。
+- 2026-09-08：Skill 创建、编辑、删除和历史恢复成功后优先调用活动 Claude query 的 `reloadSkills()`；外部旧 CLI 不支持该控制请求时退回 `restartPersistentQueries('skill-resource-change')`，并始终失效 slash catalog。

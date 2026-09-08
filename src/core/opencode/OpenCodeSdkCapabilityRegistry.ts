@@ -292,7 +292,6 @@ export const OPENCODE_SDK_CAPABILITY_REGISTRY: readonly OpenCodeSdkCapabilityDef
   stateChangingEntry({ id: 'question.reject', category: 'top-level-session', surface: 'chat', description: 'Reject a question request.' }, path('question', 'reject'), 'state-changing'),
   readOnlyEntry({ id: 'permission.list', category: 'top-level-session', surface: 'chat', description: 'List pending permission requests.' }, path('permission', 'list')),
   stateChangingEntry({ id: 'permission.reply', category: 'top-level-session', surface: 'chat', description: 'Reply to a permission request.' }, path('permission', 'reply'), 'state-changing'),
-  stateChangingEntry({ id: 'permission.respond', category: 'top-level-session', surface: 'chat', description: 'Respond to a deprecated permission request.' }, path('permission', 'respond'), 'state-changing'),
 
   // ---------- provider ----------
   readOnlyEntry({ id: 'provider.list', category: 'top-level-project', surface: 'settings', description: 'List providers.' }, path('provider', 'list')),

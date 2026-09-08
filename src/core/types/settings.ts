@@ -171,7 +171,15 @@ export interface ClaudeCodeSandboxSettings {
 export type CodexSandboxMode = 'read-only' | 'workspace-write' | 'danger-full-access';
 
 /** Reasoning effort for Codex CLI. Matches SDK's ModelReasoningEffort type. */
-export type CodexReasoningEffort = 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
+export type CodexReasoningEffort =
+  | 'minimal'
+  | 'low'
+  | 'medium'
+  | 'high'
+  | 'xhigh'
+  | 'max'
+  | 'ultra'
+  | 'persistent';
 
 /** Web search mode for Codex CLI. Matches SDK's WebSearchMode type. */
 export type CodexWebSearchMode = 'disabled' | 'cached' | 'live';
@@ -992,7 +1000,16 @@ function normalizeClaudeSessionTraceSettings(value: unknown): ClaudeSessionTrace
 
 function normalizeCodexBackendSettings(value: unknown): CodexBackendSettings {
   const VALID_SANDBOX_MODES: readonly CodexSandboxMode[] = ['read-only', 'workspace-write', 'danger-full-access'];
-  const VALID_EFFORTS: readonly CodexReasoningEffort[] = ['minimal', 'low', 'medium', 'high', 'xhigh'];
+  const VALID_EFFORTS: readonly CodexReasoningEffort[] = [
+    'minimal',
+    'low',
+    'medium',
+    'high',
+    'xhigh',
+    'max',
+    'ultra',
+    'persistent',
+  ];
   const VALID_WEB_SEARCH: readonly CodexWebSearchMode[] = ['disabled', 'cached', 'live'];
   const VALID_APPROVAL_POLICY: readonly CodexApprovalPolicy[] = ['inherit', 'untrusted', 'on-request', 'never'];
   const candidate = value && typeof value === 'object' && !Array.isArray(value)

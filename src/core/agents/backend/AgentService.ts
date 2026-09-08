@@ -191,7 +191,6 @@ export interface AgentQuestionCapability extends AgentService {
 export interface AgentPermissionCapability extends AgentService {
   getPendingPermissions(): Promise<unknown[]>;
   respondToPermission(requestID: string, reply: unknown, message?: string): Promise<void>;
-  respondToSessionPermission(sessionId: string, permissionId: string, reply: unknown): Promise<void>;
 }
 
 /** Models: model listing and selection. */

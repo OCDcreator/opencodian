@@ -29,3 +29,4 @@ Run before merge: `npm run typecheck`, `npm run module-docs`.
 - Do not replicate canonical state in another owner.
 - Changes here must update the matching `docs/modules/**` page (via `module-docs.config.json`).
 - Run `npm run inspect:owner -- <this owner or a path>` for an always-fresh summary.
+- 2026-09-08：Claude Skill 资源变更后的 runtime 刷新由本 owner 协调：SDK `reloadSkills()` 优先、persistent-query restart 兼容回退、slash catalog 同步失效。

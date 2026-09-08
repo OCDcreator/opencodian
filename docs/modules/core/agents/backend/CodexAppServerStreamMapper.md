@@ -12,7 +12,7 @@
 
 - 映射 token usage、文本/推理 delta、MCP 进度、文件变更、tool、todo、结构化输出、warning/error 与 completed turn items
 - 只将 `tokenUsage.total.totalTokens` 作为 context-ring 分子、`modelContextWindow` 作为分母
-- 保留 input、cached input、output、reasoning output；app-server 未提供的 cache-write 与费用保持 `null`
+- 保留 input、cached input、output、reasoning output；`cache_write_input_tokens`（Codex SDK >= 0.152）存在时映射为 `cacheWriteTokens`，旧 app-server 缺省该字段时保持 `null`（不伪造 0）；费用保持 `null`
 - app-server 未公开 `model_provider` 时保留 provider 为 `null`，不能硬编码为 OpenAI；后续本地价格 owner 只可按模型 ID 的无歧义 models.dev 条目推断
 - 跟踪已流式送出的 agent/reasoning item，防止 completed item 重复渲染
 - 不创建 thread、发起 turn、展示 UI 或写入会话；这些副作用归 `CodexAdapter` 所有

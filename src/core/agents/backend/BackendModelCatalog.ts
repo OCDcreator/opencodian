@@ -44,6 +44,9 @@ export const CODEX_EFFORT_VARIANTS: CodexReasoningEffort[] = [
   'medium',
   'high',
   'xhigh',
+  'max',
+  'ultra',
+  'persistent',
 ];
 
 export interface ClaudeCodeModelCatalogEntry {

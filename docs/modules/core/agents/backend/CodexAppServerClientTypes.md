@@ -29,3 +29,4 @@
 - `CodexAppServerClient.ts` 的 `export *` 会自动透传新增类型，无需同步修改
 
 > **新增（2026-07-30）**: `CodexAppServerWireObserver` —— app-server 线流量观察者契约（全部方法可选）。`onRequest` / `onResponse` / `onNotification` / `onServerRequest` / `onServerReply` 对应客户端与服务端发起的 JSON-RPC 各分支，`onConnection` 覆盖连接状态机（starting / ws-url / connected / closed / error / initialized / stopped）。`onServiceOutput` 返回 boolean：`true` 表示 observer 已安全处理 raw chunk，`false` 表示 transport 应恢复 legacy stderr 处理；observer 抛错绝不影响 RPC 主路径或写出 raw chunk。该接口是 Codex 会话 trace 的权威 wire 契约：`CodexWireTraceBridge`（`diagnostics/CodexWireTraceBridge.ts`）实现此接口，把线记录翻译为 `CodexWireRecord` 注入 `CodexSessionTraceService`；Task 5 的本地临时声明已在 Task 7 收敛到此权威定义。
+- 2026-09-08：`turn/start.effort` 本地协议类型与 Codex SDK 0.153.4 对齐，新增 `max`、`ultra`、`persistent`。

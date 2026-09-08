@@ -308,3 +308,7 @@ graph TD
 ## 2026-07-27 Plugin update startup check
 
 After settings load, `OpenCodianPlugin` constructs `PluginUpdateService` with the plugin manifest, persisted update metadata, and a narrow persistence callback. Once normal startup registration completes, it delegates one non-blocking stable-release check to `PluginRuntimeCoordinator`. That runtime owner enforces the once-per-version notice marker; startup never installs, rolls back, or reloads the plugin automatically.
+
+## 2026-09-02 Claude user dialog 宿主接线
+
+- 构造 `ClaudeCodeAdapter` 时新增 `onUserDialog: handleClaudeCodeUserDialog` + `supportedDialogKinds: ['refusal_fallback_prompt']`（SDK >= 0.3.252）。处理器镜像 `handleClaudeCodeElicitation`：无渲染器时返回 `null`（SDK 不应答，交由 CLI park deadline/其他客户端）；有渲染器时经 `buildClaudeCodeUserDialogQuestionRequest` 转共享问题卡，应答由 `buildClaudeCodeUserDialogResult` 映射——非 accept 一律 `{behavior:'cancelled'}`（CLI 默认行为，与未接线时一致）。

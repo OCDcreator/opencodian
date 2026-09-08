@@ -152,6 +152,11 @@ describe('OpenCodeSdkCapabilityRegistry', () => {
     });
   });
 
+  it('does not advertise the deprecated permission.respond SDK method', () => {
+    expect(registry.some((entry) => entry.id === 'permission.respond')).toBe(false);
+    expect(registry.some((entry) => entry.id === 'permission.reply')).toBe(true);
+  });
+
   describe('definition shape', () => {
     const requiredKeys: ReadonlyArray<keyof OpenCodeSdkCapabilityDefinition> = [
       'id',

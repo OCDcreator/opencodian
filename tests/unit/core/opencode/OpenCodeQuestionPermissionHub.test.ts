@@ -39,7 +39,6 @@ function createPermissionSdk(
   return {
     list: jest.fn(),
     reply: jest.fn(),
-    respond: jest.fn(),
     ...overrides,
   };
 }
@@ -256,7 +255,6 @@ describe('OpenCodeQuestionPermissionHub permission negotiation', () => {
         },
       ]),
       reply: jest.fn().mockResolvedValue(undefined),
-      respond: jest.fn().mockResolvedValue(undefined),
     });
     const hub = new OpenCodeQuestionPermissionHub(createHost(createQuestionSdk(), permissionSdk));
 
@@ -273,18 +271,12 @@ describe('OpenCodeQuestionPermissionHub permission negotiation', () => {
     ]);
 
     await hub.respondToPermission('permission-1', 'once', 'Allow once');
-    await hub.respondToSessionPermission('session-1', 'permission-1', 'always');
 
     expect(permissionSdk.list).toHaveBeenCalledWith();
     expect(permissionSdk.reply).toHaveBeenCalledWith({
       requestID: 'permission-1',
       reply: 'once',
       message: 'Allow once',
-    });
-    expect(permissionSdk.respond).toHaveBeenCalledWith({
-      sessionID: 'session-1',
-      permissionID: 'permission-1',
-      response: 'always',
     });
   });
 

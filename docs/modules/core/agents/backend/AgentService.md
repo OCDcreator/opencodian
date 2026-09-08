@@ -33,3 +33,4 @@
 - chat/session contract 是 Phase 0 OpenCode regression seam；新增 backend 必须先实现这些窄接口，再由 chat runtime 做 capability narrowing。
 - `listSessions()` / `getSession()` 返回值保持 `unknown` 是刻意的：不同 backend 的 session metadata 不同，调用方必须在具体 backend/capability 已确认后再解释 payload。
 - 调整方法签名时需要同步 adapter、registry、功能门控测试以及 multi-agent foundation 规格文档
+- 2026-09-08：`AgentPermissionCapability` 删除无生产调用方的旧 `respondToSessionPermission`，权限应答统一为 OpenCode SDK 的 `permission.reply(requestID, reply, message)` 语义。

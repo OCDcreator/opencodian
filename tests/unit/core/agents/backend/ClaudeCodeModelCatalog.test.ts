@@ -39,12 +39,21 @@ describe('ClaudeCodeModelCatalog', () => {
 });
 
 describe('CODEX_EFFORT_VARIANTS', () => {
-  it('contains the five Codex reasoning-effort levels in order', () => {
-    expect(CODEX_EFFORT_VARIANTS).toEqual(['minimal', 'low', 'medium', 'high', 'xhigh']);
+  it('contains every Codex SDK reasoning-effort level in order', () => {
+    expect(CODEX_EFFORT_VARIANTS).toEqual([
+      'minimal',
+      'low',
+      'medium',
+      'high',
+      'xhigh',
+      'max',
+      'ultra',
+      'persistent',
+    ]);
   });
 
-  it('does not include Claude Code max level', () => {
-    expect(CODEX_EFFORT_VARIANTS).not.toContain('max');
+  it('includes the newer max, ultra, and persistent levels', () => {
+    expect(CODEX_EFFORT_VARIANTS).toEqual(expect.arrayContaining(['max', 'ultra', 'persistent']));
   });
 
   it('includes minimal which Claude Code lacks', () => {

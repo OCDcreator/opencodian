@@ -2000,14 +2000,6 @@ export class OpenCodeService {
     return this.catalogQueries.getLspStatus();
   }
 
-  async respondToSessionPermission(
-    sessionId: string,
-    permissionId: string,
-    reply: PermissionReply,
-  ): Promise<void> {
-    return this.questionPermissionHub.respondToSessionPermission(sessionId, permissionId, reply);
-  }
-
   // ==================== Permission API Methods ====================
 
   /** Get pending permission requests */

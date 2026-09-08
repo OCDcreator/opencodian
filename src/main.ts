@@ -17,6 +17,8 @@ import { wireHiddenAdapters } from './core/agents/backend/AgentAdapterWiring';
 import {
   buildClaudeCodeElicitationContent,
   buildClaudeCodeElicitationQuestionRequest,
+  buildClaudeCodeUserDialogQuestionRequest,
+  buildClaudeCodeUserDialogResult,
   normalizeClaudeCodeElicitationContent,
 } from './core/agents/backend/ClaudeCodeElicitationBridge';
 import { adaptMcpConfigForClaude } from './core/agents/backend/ClaudeCodeMcpConfigAdapter';
@@ -340,6 +342,8 @@ export default class OpenCodianPlugin extends Plugin {
           permissionBridge: this.claudeCodePermissionBridge,
           tracePort: this.claudeTraceService,
           onElicitation: (request, options) => this.handleClaudeCodeElicitation(request, options),
+          onUserDialog: (request, options) => this.handleClaudeCodeUserDialog(request, options),
+          supportedDialogKinds: ['refusal_fallback_prompt'],
           mcpConfigLoader: async () => {
             if (!this.opencodeConfigManager) {
               return {};
@@ -453,6 +457,34 @@ export default class OpenCodianPlugin extends Plugin {
       content: normalizeClaudeCodeElicitationContent(response.content)
         ?? buildClaudeCodeElicitationContent(questionRequest, response.answers ?? [], request),
     };
+  }
+
+  /**
+   * SDK >= 0.3.2xx `request_user_dialog` host callback (e.g. the CLI's
+   * refusal-fallback prompt). Renders through the same shared question card as
+   * elicitation. Any non-accept outcome maps to `{behavior: 'cancelled'}`,
+   * which makes the CLI apply the dialog's default behavior — identical to the
+   * pre-callback status quo, so the wiring is fail-safe.
+   */
+  private async handleClaudeCodeUserDialog(
+    request: import('@anthropic-ai/claude-agent-sdk').UserDialogRequest,
+    options: { signal: AbortSignal; requestId: string },
+  ): Promise<import('@anthropic-ai/claude-agent-sdk').UserDialogResult | null> {
+    if (options.signal.aborted) {
+      return { behavior: 'cancelled' };
+    }
+
+    const ctx = this.claudeCodePermissionHostContext;
+    const renderer = ctx.elicitationCardRenderer;
+    if (!renderer) {
+      // No chat surface mounted: send no structured answer so the CLI's park
+      // deadline (or another attached client) resolves the dialog.
+      return null;
+    }
+
+    const questionRequest = buildClaudeCodeUserDialogQuestionRequest(request);
+    const response = await renderer.collectResponse(questionRequest, ctx.getActiveTabId());
+    return buildClaudeCodeUserDialogResult(request.dialogKind, response);
   }
 
   private getClaudeAgentSdkPlatformPackageName(): string {

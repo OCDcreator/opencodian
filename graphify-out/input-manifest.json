@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "0c30e03a8fe8883af927ee40c93a0ae485c3cd9bd8a2387eae15934139f0fc03",
+  "digest": "7e6dd67a114796a4970882995ba21e0781f98b75314f01d3e998de46fba729c3",
   "recordCount": 605,
   "records": [
     {
@@ -16,12 +16,12 @@
     {
       "kind": "package",
       "key": "package-lock.json",
-      "sha256": "c99da3b344de3e3958986b1360372d642ca1f35c56609a4a4755c04e060a6ca4"
+      "sha256": "5ad50ae37a4ab47e44794a82a0a6062624c4547f3f1596025aed5580cf6a1a8e"
     },
     {
       "kind": "package",
       "key": "package.json",
-      "sha256": "0ad6707f1ff3bf0bc48e6dae47c235fcadf169a4e9b4c655623ae47b80d83f38"
+      "sha256": "a6929211e3cb08c6164c221d8021d730c7c5fd5ca95d04bc3180c336b494014e"
     },
     {
       "kind": "src",
@@ -86,7 +86,7 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/AgentService.ts",
-      "sha256": "23c704428b382e493cdc5ec425dbee56eb9f1bb2a81a07361d3d454a1383e805"
+      "sha256": "e2571918310367347881fc08f9bc4e4bc336887dbefa7fe351db0a67d0f1596b"
     },
     {
       "kind": "src",
@@ -96,12 +96,12 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/BackendModelCatalog.ts",
-      "sha256": "3125816ebb875a44a900e91b43fb7009fe1b2ad890e772482163fc40ebe3d2ac"
+      "sha256": "bd33eb182f8997af97b856c64d7f4a0f7396d622fbb70d91739f33707ecff907"
     },
     {
       "kind": "src",
       "key": "src/core/agents/backend/ClaudeCodeAdapter.ts",
-      "sha256": "bde4b3558ab47bd003aaf33ce2c4354eb461e4154a66822c6cf5d4b7ae06f674"
+      "sha256": "c139a2f88bf144fb61bf3238a2909585c60b38acc969efe9eb9e45b60e3c3694"
     },
     {
       "kind": "src",
@@ -111,7 +111,7 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/ClaudeCodeElicitationBridge.ts",
-      "sha256": "569050efa38919ddf56813e92f80a0a3c9585990490d9105d9fbedb35fc078a2"
+      "sha256": "f0de62463706981c00e2567614ff54f035e105e671832cc42a9bdc4b6779b5ca"
     },
     {
       "kind": "src",
@@ -126,7 +126,7 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/ClaudeCodeOptionsBuilder.ts",
-      "sha256": "b5496effdd11bb31b922ba5098c1cabad3223c5bc2e83c816df77f44a37d4fde"
+      "sha256": "405a4a7b43bb8cd834f42fc7fade99ebbdf0275fbda91ebdc7eb714473696fde"
     },
     {
       "kind": "src",
@@ -141,7 +141,7 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/ClaudeCodeQueue.ts",
-      "sha256": "b42612a34604d9035c0e9eb7571c6f22764c6e07748bbfb29a14ef0c699379db"
+      "sha256": "529b08236c5f20a9cc8f27470ec19a8ec325dd3da8a52e8faafa049306f47983"
     },
     {
       "kind": "src",
@@ -151,7 +151,7 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/ClaudeCodeStreamNormalizer.ts",
-      "sha256": "755ac8d8592e72a366350156e1d95e0db87d3ad737cc83fdb240a9f900dbf7ed"
+      "sha256": "7df0159798ed6f87cd1f517650e9e706ed9ab8abd3691823b4f6af47c3ac303a"
     },
     {
       "kind": "src",
@@ -211,7 +211,7 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/CodexAdapter.ts",
-      "sha256": "32d727cd05834a8ef497d8b9dc627b23141cd3193aec54b05461ab0d63058ec1"
+      "sha256": "ca2e0423fa650ebcd11afb61d1eecbfe3ac531c5d1da3c5060765c1edeadcb1f"
     },
     {
       "kind": "src",
@@ -226,12 +226,12 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/CodexAppServerClientTypes.ts",
-      "sha256": "36d6bd65e1eba8ec12f03be74089bbbdf02a6fd4e156c3f3afc46a2070a45aa1"
+      "sha256": "9f523cb92959a534bf88444b72afee6268728068798547044e56d70afb001dcc"
     },
     {
       "kind": "src",
       "key": "src/core/agents/backend/CodexAppServerStreamMapper.ts",
-      "sha256": "4452cbdb624ed61610212f002b92c5b0ccd63c259bee35229f742e02ec77bf5e"
+      "sha256": "e2e11c3a076e15897b07ff7bcb4101e7a0c7bd3cd791ff9bddc54779b5488f28"
     },
     {
       "kind": "src",
@@ -311,12 +311,12 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/index.ts",
-      "sha256": "60c300223bb5f41fdf7642518c287cf012e93544c1871e4659cd078c708126ed"
+      "sha256": "e7c262acd2f4a3e3dd16d5c8d85e5723e976917cc04d32d2747d52ac31e3940b"
     },
     {
       "kind": "src",
       "key": "src/core/agents/backend/OpenCodeAdapter.ts",
-      "sha256": "28df624b626ab564eda3e329738967dc0d0487ab8a744a7beb2ce4f64e22944e"
+      "sha256": "4c4c3e9f27188fbb920eb1a6b21b4e3b3547ec6ad5a6818dd0d8e647fbfa27ab"
     },
     {
       "kind": "src",
@@ -571,7 +571,7 @@
     {
       "kind": "src",
       "key": "src/core/opencode/OpenCodeQuestionPermissionHub.ts",
-      "sha256": "be0f8fa453c022c3f29c0a692ddbc825932b265dbf70e9df1b828e70c8356b8b"
+      "sha256": "61ef89b4fd1da435c5d60423f2973b6c495403cfea05a972edae449caa314b7b"
     },
     {
       "kind": "src",
@@ -581,7 +581,7 @@
     {
       "kind": "src",
       "key": "src/core/opencode/OpenCodeSdkCapabilityRegistry.ts",
-      "sha256": "b6282e6fda3e23779b01e4ab97c629d4a086e2a557ebea428629f0ced77ee25a"
+      "sha256": "c28980f5afad2c79751a38cafdac491b6696fc764c0a446688f369d2be08ad57"
     },
     {
       "kind": "src",
@@ -601,7 +601,7 @@
     {
       "kind": "src",
       "key": "src/core/opencode/OpenCodeService.ts",
-      "sha256": "ac17c2c7869f70f7b80759f44c574cfb9b3b04370cccb28b6992a98586f5c31d"
+      "sha256": "1835e56698feb4c8d5e0a49091d07d73f4861d6da60b37234bce26223a273a37"
     },
     {
       "kind": "src",
@@ -756,7 +756,7 @@
     {
       "kind": "src",
       "key": "src/core/types/chat.ts",
-      "sha256": "bf2fd1b379ac15aeec166a25c316d69924e0537ef714057926690002aee46df7"
+      "sha256": "fb7d321a5154be1d40152c8d49a032d4a27ed196ea6375e87d98c2b70c128120"
     },
     {
       "kind": "src",
@@ -786,7 +786,7 @@
     {
       "kind": "src",
       "key": "src/core/types/settings.ts",
-      "sha256": "b40d04b9bbc9649d092671ba5525472e92ac213eade1f08e63123ad5b68c6b8b"
+      "sha256": "5b0eb5060c7177828a216e3d52a9d24d1a9a9887687d007dba6c7920aaaab755"
     },
     {
       "kind": "src",
@@ -861,7 +861,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/OpenCodianView.ts",
-      "sha256": "4a751c34ffa80e20f1d385f4398982a4b1233e0dde63a20a7eabf909e479d3d6"
+      "sha256": "4e52e4f8a25c99021c9e5ceacc6f0fa17d37b8c973bd5e79c44f1cdb62594f4a"
     },
     {
       "kind": "src",
@@ -1891,7 +1891,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/ui/ConversationSessionSettingsModal.ts",
-      "sha256": "21049e94af47102d41d60e13fd5c1e02cb18580073f66df720978b8c5baffb48"
+      "sha256": "aef0418f16107904a71d0d4609920dadd8d9ed434c243b71ce517f1ee02f337c"
     },
     {
       "kind": "src",
@@ -2041,7 +2041,7 @@
     {
       "kind": "src",
       "key": "src/features/settings/CodexProjectConfigFormModel.ts",
-      "sha256": "dcbb96ca42b7206455822cc70cd3332b302734a18b5bca783aaab8d49b9ba854"
+      "sha256": "b6c27fdf768743ef20a5e322a4878d0daf3f4ab896a84882fbcaa1388e336273"
     },
     {
       "kind": "src",
@@ -2251,7 +2251,7 @@
     {
       "kind": "src",
       "key": "src/features/settings/SettingsClaudeCodeSection.ts",
-      "sha256": "e2e6ad3efcdec014b9b944d6b6e2b209ffe25716fca43d212049c26fd670046e"
+      "sha256": "e5974812b91ebc45c605f5bcd9eb3697416652c5fbb559d3c2c134b7f9e10b99"
     },
     {
       "kind": "src",
@@ -2301,7 +2301,7 @@
     {
       "kind": "src",
       "key": "src/features/settings/SettingsCodexSection.ts",
-      "sha256": "1f14b120e68d9d4da66cd9f4bbb22ae7b1b75350f3441e2c4fc1749f65979abb"
+      "sha256": "1a00c5a86dcbb4786483a3a381210c504505a40ef28d412421cae51d3e25a64b"
     },
     {
       "kind": "src",
@@ -2521,7 +2521,7 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/en.ts",
-      "sha256": "ba55ab944a6b6fa408ae3d95a0ebd8bbe8218ba2963a94c2bf8d31f6c3d86d14"
+      "sha256": "fdfeda0055dea200a9a154bd2c684f6acf28fe13c8964bf0d1abf0f50cfaf84c"
     },
     {
       "kind": "src",
@@ -2531,12 +2531,12 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/zh.ts",
-      "sha256": "bbd19a95a6c4c348f1eaf74279da2ca69977350dba41c718054cf79a09e18b0b"
+      "sha256": "5fb7aa4f47ef1e0abb148f1ddf373dc8adac9d65089d45f8a133d86e8e73cabd"
     },
     {
       "kind": "src",
       "key": "src/main.ts",
-      "sha256": "09f13dc9852d34524de1a9fc8d4ad5a6eec0b58e3b299bb01e86333ed60aecc4"
+      "sha256": "7f95ef9c6e9b7fefb6ebf227a1108eb221ff431911487573fd7ffc5593ec11ae"
     },
     {
       "kind": "src",
@@ -3029,7 +3029,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-08-15T06:34:30.404Z",
-  "headShaAtGeneration": "bcd6512a697084cc7b9e5682c0f5c4a76ed1f68d",
+  "generatedAt": "2026-09-08T07:50:34.753Z",
+  "headShaAtGeneration": "31efaea28550d73f5b6f051634e7bfc6bc0f2a1a",
   "graphifyVersion": "graphify 0.9.31"
 }

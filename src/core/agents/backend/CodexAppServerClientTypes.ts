@@ -156,7 +156,7 @@ export interface AppServerTurnStartOptions {
       excludeSlashTmp: boolean;
     };
   model?: string;
-  effort?: 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
+  effort?: 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra' | 'persistent';
   outputSchema?: unknown;
 }
 

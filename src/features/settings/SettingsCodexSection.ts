@@ -394,7 +394,7 @@ export class SettingsCodexSection {
       .setDesc(t('settings.codex.projectConfig.fieldReasoningEffortDesc'))
       .addDropdown((dropdown) => {
         dropdown.addOption('', t('settings.codex.projectConfig.inherit'));
-        for (const effort of ['minimal', 'low', 'medium', 'high', 'xhigh']) {
+        for (const effort of ['minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra', 'persistent']) {
           dropdown.addOption(effort, effort);
         }
         dropdown.setValue(reasoningEffort);
@@ -794,6 +794,9 @@ export class SettingsCodexSection {
           .addOption('medium', t('settings.codex.reasoning.medium'))
           .addOption('high', t('settings.codex.reasoning.high'))
           .addOption('xhigh', t('settings.codex.reasoning.xhigh'))
+          .addOption('max', t('settings.codex.reasoning.max'))
+          .addOption('ultra', t('settings.codex.reasoning.ultra'))
+          .addOption('persistent', t('settings.codex.reasoning.persistent'))
           .setValue(this.plugin.settings.backendSettings.codex.modelReasoningEffort)
           .onChange(async (value) => {
             this.plugin.settings.backendSettings.codex.modelReasoningEffort = value as CodexReasoningEffort;

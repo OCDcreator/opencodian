@@ -423,6 +423,7 @@ export class OpenCodianView extends ItemView {
   private eventRefs: EventRef[] = [];
   private backendActiveChangeDisposable: { dispose(): void } | null = null;
   private backendCapabilityChangeDisposable: { dispose(): void } | null = null;
+  private claudeCommandsChangedDisposable: { dispose(): void } | null = null;
   private readonly codexChatSurfaceBinding: CodexChatSurfaceBinding;
   private readonly chatDiagnosticsCoordinator: ChatDiagnosticsCoordinator;
   private readonly chatDiagnosticsCoordinatorFactory: ChatDiagnosticsCoordinatorFactory;
@@ -2642,6 +2643,7 @@ export class OpenCodianView extends ItemView {
     await measureStep('wireBackendSurfaceSwitch', () => {
       this.wireBackendSurfaceSwitch();
       this.codexChatSurfaceBinding.syncSkillsChangedSubscription();
+      this.syncClaudeCommandsChangedSubscription();
     });
     await measureStep('startConversationSessionSignalRuntime', () => {
       if (this.shouldStartConversationSessionSignalRuntime()) {
@@ -2687,6 +2689,8 @@ export class OpenCodianView extends ItemView {
     this.backendActiveChangeDisposable = null;
     this.backendCapabilityChangeDisposable?.dispose();
     this.backendCapabilityChangeDisposable = null;
+    this.claudeCommandsChangedDisposable?.dispose();
+    this.claudeCommandsChangedDisposable = null;
     this.codexChatSurfaceBinding.dispose();
 
     // Cleanup navigation sidebar
@@ -3326,8 +3330,36 @@ export class OpenCodianView extends ItemView {
       this.refreshComposerToolbarForActiveBackend();
       this.activeTabContextUsageCoordinator.syncIdentity();
       this.codexChatSurfaceBinding.syncSkillsChangedSubscription();
+      this.syncClaudeCommandsChangedSubscription();
       this.refreshModifiedFilesSidebar();
     }) ?? null;
+  }
+
+  /**
+   * Subscribe to the Claude Code adapter's `commands_changed` signal (SDK >=
+   * 0.3.2xx) so the slash-command menu cache invalidates immediately instead
+   * of waiting out the 120s TTL. Mirrors the Codex `onSkillsChanged` wiring;
+   * only active while Claude Code is the active backend.
+   */
+  private syncClaudeCommandsChangedSubscription(): void {
+    const registry = this.plugin.agentServiceRegistry;
+    if (registry?.getActiveKind() !== 'claude-code') {
+      this.claudeCommandsChangedDisposable?.dispose();
+      this.claudeCommandsChangedDisposable = null;
+      return;
+    }
+    if (this.claudeCommandsChangedDisposable) {
+      return;
+    }
+    const adapter = registry?.get('claude-code') as {
+      onCommandsChanged?(handler: () => void): { dispose(): void };
+    } | undefined;
+    if (typeof adapter?.onCommandsChanged !== 'function') {
+      return;
+    }
+    this.claudeCommandsChangedDisposable = adapter.onCommandsChanged(() => {
+      this.slashCommandMenuCatalogCache.invalidate();
+    });
   }
 
   private async ensureActiveBackendConversationSurface(

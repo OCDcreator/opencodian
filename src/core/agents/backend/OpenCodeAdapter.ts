@@ -269,10 +269,6 @@ export class OpenCodeAdapter
     return this.service.respondToPermission(requestID, reply as never, message);
   }
 
-  async respondToSessionPermission(sessionId: string, permissionId: string, reply: unknown): Promise<void> {
-    return this.service.respondToSessionPermission(sessionId, permissionId, reply as never);
-  }
-
   // -------------------------------------------------------------------------
   // AgentModelCapability
   // -------------------------------------------------------------------------

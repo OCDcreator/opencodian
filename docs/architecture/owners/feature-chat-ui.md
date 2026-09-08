@@ -34,3 +34,4 @@ Run before merge: `npm run typecheck`, `npm run module-docs`.
 - Do not combine a custom tooltip trigger with a native-tooltip-owning `aria-label` or `title` on that trigger or its component-owned ancestor.
 - Changes here must update the matching `docs/modules/**` page (via `module-docs.config.json`).
 - Run `npm run inspect:owner -- <this owner or a path>` for an always-fresh summary.
+- 2026-09-08：会话设置 UI 暴露 Codex SDK 0.153.4 新推理档位，不改变其“下一线程生效”语义。

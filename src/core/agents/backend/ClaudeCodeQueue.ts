@@ -42,10 +42,14 @@ export interface ClaudeCodeSessionRuntime {
   abortController: AbortController;
   effort?: string;
   query?: AsyncIterable<unknown> & {
-    interrupt?: () => Promise<void>;
+    // SDK >= 0.3.2xx resolves to SDKControlInterruptResponse (interrupt
+    // receipt with still_queued uuids); older CLIs resolve to undefined.
+    // OpenCodian discards the receipt, so the return type stays opaque.
+    interrupt?: () => Promise<unknown>;
     setModel?: (model?: string) => Promise<void>;
     setPermissionMode?: (mode: string) => Promise<void>;
     setMcpServers?: (servers: Record<string, unknown>) => Promise<unknown>;
+    reloadSkills?: () => Promise<unknown>;
     rewindFiles?: (userMessageId: string, options?: { dryRun?: boolean }) => Promise<unknown>;
     supportedModels?: () => Promise<Array<{
       id?: string;
@@ -152,4 +156,28 @@ export function isTurnBoundaryMessage(message: unknown): boolean {
 
 export function isPromptSuggestionMessage(message: unknown): boolean {
   return isRecord(message) && message.type === 'prompt_suggestion';
+}
+
+/**
+ * SDK >= 0.3.2xx `conversation_reset`: the CLI moved the conversation to a new
+ * id (e.g. after /clear). Subsequent stream messages carry the new session_id,
+ * so the adapter must remap its sdkSessionId before the resume validation in
+ * captureSdkSessionId sees a mismatched id and closes the runtime.
+ */
+export function isConversationResetMessage(message: unknown): boolean {
+  return isRecord(message) && message.type === 'conversation_reset';
+}
+
+/** SDK >= 0.3.2xx `system/commands_changed`: the CLI's slash-command list changed. */
+export function isCommandsChangedMessage(message: unknown): boolean {
+  return isRecord(message) && message.type === 'system' && message.subtype === 'commands_changed';
+}
+
+/** Reads the new conversation id from a `conversation_reset` message, if present. */
+export function readConversationResetId(message: unknown): string | null {
+  if (!isConversationResetMessage(message)) {
+    return null;
+  }
+  const id = (message as Record<string, unknown>).new_conversation_id;
+  return typeof id === 'string' && id.trim().length > 0 ? id : null;
 }

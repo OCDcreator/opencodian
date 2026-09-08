@@ -200,3 +200,4 @@ Ownership facts:
 2. Conversation session settings no longer own compaction; `ConversationSessionSettings` now only carries display-only `chatFontSizePx`.
 3. Manual `session.summarize()` remains a per-session action available through `OpenCodeService` session control, not a conversation settings field.
 > 2026-08-02: `getTurnDiffNoticeMeta()` now requires a non-blank source message ID, at least one non-empty file entry, and finite numeric additions/deletions before a notice is treated as a valid turn-diff record.
+- 2026-09-08：Codex 会话覆盖的推理档位新增 `max`、`ultra`、`persistent`；Claude 新系统信号拥有明确的 `backend_event.event` 联合成员，避免用无类型字符串穿透核心契约。

@@ -591,6 +591,9 @@ export class ConversationSessionSettingsModal extends Modal {
         { value: 'medium', label: t('settings.codex.reasoning.medium') },
         { value: 'high', label: t('settings.codex.reasoning.high') },
         { value: 'xhigh', label: t('settings.codex.reasoning.xhigh') },
+        { value: 'max', label: t('settings.codex.reasoning.max') },
+        { value: 'ultra', label: t('settings.codex.reasoning.ultra') },
+        { value: 'persistent', label: t('settings.codex.reasoning.persistent') },
       ],
       initialValue: this.options.initialOverrides?.codexModelReasoningEffort,
     });
@@ -939,6 +942,9 @@ export class ConversationSessionSettingsModal extends Modal {
       case 'medium': return t('settings.codex.reasoning.medium');
       case 'high': return t('settings.codex.reasoning.high');
       case 'xhigh': return t('settings.codex.reasoning.xhigh');
+      case 'max': return t('settings.codex.reasoning.max');
+      case 'ultra': return t('settings.codex.reasoning.ultra');
+      case 'persistent': return t('settings.codex.reasoning.persistent');
     }
   }
 

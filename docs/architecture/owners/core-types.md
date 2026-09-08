@@ -29,3 +29,4 @@ Run before merge: `npm run typecheck`, `npm run module-docs`.
 - Do not replicate canonical state in another owner.
 - Changes here must update the matching `docs/modules/**` page (via `module-docs.config.json`).
 - Run `npm run inspect:owner -- <this owner or a path>` for an always-fresh summary.
+- 2026-09-08：核心设置/聊天契约同步 Codex `max` / `ultra` / `persistent` 与 Claude 新 backend event 枚举；未知持久化值仍由规范化器收敛。

@@ -121,6 +121,31 @@ it('builds preview JSON with provider options, variants, and model extras', () =
   expect(parsed.provider.openai.models['gpt-4.1'].cost).toEqual({ input: 1.25, output: 10 });
 });
 
+it('round-trips OpenCode SDK chunkTimeout=false without coercing it to a string', () => {
+  const state = hydrateWorkspaceState({
+    provider: {
+      openai: {
+        name: 'OpenAI',
+        npm: '@ai-sdk/openai-compatible',
+        options: {
+          baseURL: 'https://example.com/v1',
+          chunkTimeout: false,
+        },
+        models: {},
+      },
+    },
+  }, []);
+
+  const preview = JSON.parse(buildConfigPreview(
+    '',
+    '',
+    state.providers,
+    { enabled_providers: undefined, disabled_providers: undefined },
+  )) as { provider: { openai: { options: Record<string, unknown> } } };
+
+  expect(preview.provider.openai.options.chunkTimeout).toBe(false);
+});
+
 it('rejects non-object variant payloads in preview output', () => {
   const state = hydrateWorkspaceState({
     provider: {

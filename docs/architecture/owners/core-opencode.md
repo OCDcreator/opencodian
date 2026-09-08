@@ -45,3 +45,4 @@ Run before merge: `npm run typecheck`, `npm run module-docs`, `npm run build`.
 - Changes here must update the matching `docs/modules/**` page (via `module-docs.config.json`).
 - Run `npm run inspect:owner -- <this owner or a path>` for an always-fresh summary.
 - Reasoning stream whitespace is semantic content after a reasoning part has begun: preserve standalone spaces/newlines from both `message.part.delta` and `message.part.updated` so Markdown paragraphs, indentation, and ordered lists are not joined before the shared chat renderer sees them. Suppress only leading whitespace that would create an empty thinking block.
+- 2026-09-08：permission responder 收敛到 SDK v2 `permission.reply`；deprecated `permission.respond`、`respondToSessionPermission` facade/hub 路径及能力注册均已移除。

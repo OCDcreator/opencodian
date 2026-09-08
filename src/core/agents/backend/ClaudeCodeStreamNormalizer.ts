@@ -421,6 +421,129 @@ function summarizeChunk(chunk: StreamChunk): Record<string, unknown> {
   }
 }
 
+function normalizeBackgroundTasks(value: unknown): Array<Record<string, unknown>> {
+  return readArray(value)
+    .map(readRecord)
+    .filter((task): task is JsonRecord => task !== null)
+    .map((task) => ({
+      taskId: readNonEmptyString(task.task_id) ?? null,
+      taskType: readNonEmptyString(task.task_type) ?? null,
+      description: readNonEmptyString(task.description) ?? null,
+      ambient: readBoolean(task.ambient) ?? false,
+    }));
+}
+
+// eslint-disable-next-line complexity -- SDK 0.3.263 system-signal variants intentionally converge at one audited compatibility boundary.
+function appendSdkSignalChunk(
+  record: JsonRecord,
+  chunks: StreamChunk[],
+  sessionId: string | undefined,
+): boolean {
+  const subtype = readString(record.subtype);
+  const base = {
+    type: 'backend_event' as const,
+    source: 'claude-code' as const,
+    ...(sessionId ? { sessionId } : {}),
+  };
+
+  if (subtype === 'informational') {
+    chunks.push({
+      ...base,
+      event: 'informational',
+      status: readNonEmptyString(record.level) ?? 'info',
+      id: readNonEmptyString(record.tool_use_id),
+      content: readNonEmptyString(record.content),
+      metadata: {
+        preventContinuation: readBoolean(record.prevent_continuation) ?? false,
+      },
+    });
+    return true;
+  }
+
+  if (subtype === 'control_request_progress') {
+    chunks.push({
+      ...base,
+      event: 'control_request_progress',
+      status: readNonEmptyString(record.status) ?? 'started',
+      id: readNonEmptyString(record.request_id),
+      metadata: {
+        attempt: readNumber(record.attempt) ?? null,
+        maxRetries: readNumber(record.max_retries) ?? null,
+        retryDelayMs: readNumber(record.retry_delay_ms) ?? null,
+        errorStatus: readNumber(record.error_status) ?? null,
+      },
+    });
+    return true;
+  }
+
+  if (subtype === 'background_tasks_changed') {
+    const tasks = normalizeBackgroundTasks(record.tasks);
+    chunks.push({
+      ...base,
+      event: 'background_tasks_changed',
+      status: 'replace',
+      metadata: {
+        tasks,
+        activeTaskCount: tasks.filter((task) => task.ambient !== true).length,
+        ambientTaskCount: tasks.filter((task) => task.ambient === true).length,
+      },
+    });
+    return true;
+  }
+
+  if (subtype === 'thinking_tokens') {
+    chunks.push({
+      ...base,
+      event: 'thinking_tokens',
+      status: 'progress',
+      id: readNonEmptyString(record.user_message_uuid),
+      metadata: {
+        estimatedTokens: readNumber(record.estimated_tokens) ?? 0,
+        estimatedTokensDelta: readNumber(record.estimated_tokens_delta) ?? 0,
+      },
+    });
+    return true;
+  }
+
+  if (subtype === 'model_refusal_fallback' || subtype === 'model_refusal_no_fallback') {
+    const retractedMessageUuids = readArray(record.retracted_message_uuids)
+      .filter((value): value is string => typeof value === 'string' && value.trim().length > 0);
+    chunks.push({
+      ...base,
+      event: 'model_refusal',
+      status: subtype === 'model_refusal_fallback' ? 'fallback' : 'no_fallback',
+      id: readNonEmptyString(record.request_id),
+      name: readNonEmptyString(record.fallback_model) ?? readNonEmptyString(record.original_model),
+      content: readNonEmptyString(record.content),
+      metadata: {
+        direction: readNonEmptyString(record.direction) ?? null,
+        scope: readNonEmptyString(record.scope) ?? 'session',
+        originalModel: readNonEmptyString(record.original_model) ?? null,
+        fallbackModel: readNonEmptyString(record.fallback_model) ?? null,
+        apiRefusalCategory: readNonEmptyString(record.api_refusal_category) ?? null,
+        apiRefusalExplanation: readNonEmptyString(record.api_refusal_explanation) ?? null,
+        retractedMessageUuids,
+        refusedUserMessageUuid: readNonEmptyString(record.refused_user_message_uuid) ?? null,
+      },
+    });
+    return true;
+  }
+
+  if (subtype === 'worker_shutting_down') {
+    const reason = readNonEmptyString(record.reason) ?? 'unknown';
+    chunks.push({
+      ...base,
+      event: 'worker_shutting_down',
+      status: 'stopping',
+      content: reason,
+      metadata: { reason },
+    });
+    return true;
+  }
+
+  return false;
+}
+
 function summarizeChunkFingerprint(chunk: StreamChunk): Record<string, unknown> {
   switch (chunk.type) {
     case 'text':
@@ -559,6 +682,10 @@ export class ClaudeCodeStreamNormalizer {
         ...(modelId ? { modelId } : {}),
         ...(sessionId ? { sessionId } : {}),
       });
+      return;
+    }
+
+    if (appendSdkSignalChunk(record, chunks, sessionId)) {
       return;
     }
 

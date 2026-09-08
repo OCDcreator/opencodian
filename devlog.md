@@ -11,6 +11,51 @@
 > 如需查看最新进展，请直接阅读最上方的条目。
 ---
 
+## 2026-09-08 三后端 SDK 最新版刷新与 API 面收口
+
+- 依赖刷新至 npm 当日 stable/latest：`@anthropic-ai/claude-agent-sdk ^0.3.263`、`@openai/codex-sdk 0.153.4`、`@opencode-ai/sdk 1.18.29`；Codex/OpenCode 保持精确 pin，Claude 保持既有 caret 风格。
+- Claude：保留 0.3.252 已接入的 `conversation_reset`、`commands_changed`、`onUserDialog`；新增 `permissionPrompts` 明确宿主所有权，并把 `informational`、`control_request_progress`、`background_tasks_changed`、`thinking_tokens`、`model_refusal_*`、`worker_shutting_down` 归一化为类型化 backend event。Skill 资源写入后对活动 query 调用 `reloadSkills()`，旧 CLI 拒绝时退回 persistent-query 重启。拒答撤回 UUID 等无法由现有渲染身份模型安全消费的数据只进入诊断元数据，不伪造 UI 支持。
+- Codex：接入 `Usage.cache_write_input_tokens`、`ThreadOptions.threadSource`，并把 `max` / `ultra` / `persistent` 推理档位贯通设置、会话覆盖、模型选择器、项目配置与 app-server 类型。
+- OpenCode：1.18.29 将 provider `chunkTimeout` 放宽为 `number | false`；现有高级配置编辑器已能保留布尔 `false`，新增回归测试防止其被字符串化。
+- 删除面审计：Claude 新版删除的 `ConnectRemoteControlOptions/Result/Error` 与 `InboundPrompt` 在插件中均为零引用；OpenCode 已 deprecated 的 `permission.respond(sessionID, permissionID, response)` 兼容链、Agent capability 方法与 capability registry 条目已删除，统一使用 `permission.reply(requestID, reply, message)`；Codex 没有删除插件使用中的导出。
+- 安全保护：Capability Lab 的截断式 `resumeSessionAt` 探针现在从 BETA turn 提取 user UUID，并成对传入 SDK 0.3.263 `resumeDropsTurn`；提取失败即停止，不执行无保护截断。稳定聊天 fork 不使用该诊断选项，既有 rewind-recovery 边界不变。
+- 明确暂缓：Claude `usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET` 不接入；`perTaskStopAffordance` 在插件没有逐任务停止控件前不声明；`pluginDelivery: initialize` 依赖外部 CLI >= 2.1.261，不能对用户自带旧 CLI 默认启用；Codex `configOverrides` 不暴露为原始用户入口，已有结构化设置仍是权威路径。
+
+---
+
+## 2026-09-02 SDK 升级后新接口调研与能力接入：conversation_reset / commands_changed / onUserDialog / cache_write_input_tokens
+
+在三 SDK 升级（同日上一条目）基础上，系统性 diff 三后端 SDK 接口面并将高价值新能力接入插件。
+
+- **接口面调研结论**（详细矩阵见本条目末尾）：
+  - claude 0.3.145→0.3.252：删除 4 类型（ConnectRemoteControl*、InboundPrompt，零引用）；新增 30+ 类型；`SDKMessage` 联合新增 10 个消息类型（conversation_reset、commands_changed、informational、thinking_tokens、background_tasks_changed、worker_shutting_down、model_refusal_fallback/no_fallback、control_request_progress、active_goal）；`Query` 新增 4 方法（reinitialize、reloadSkills、setMcpPermissionModeOverride、usage_EXPERIMENTAL）；`interrupt()` 返回值变化（上一条目已处理）；`Options` 新增 `onUserDialog` + `supportedDialogKinds`（fail-closed：未声明的 dialog kind 永不下发）。
+  - codex 0.139.0→0.152.0：4 处纯增量——`Usage.cache_write_input_tokens`、`ThreadOptions.configOverrides`、reasoning effort 新档位（max/ultra/persistent）、`threadSource`。
+  - opencode 1.18.3→1.18.25：零运行时差异（仅 interleaved reasoning 类型放宽 + global/upgrade target 必填化），无可接入能力。
+- **接入 ① conversation_reset → sdkSessionId 重映射**（鲁棒性修复）：CLI 把会话移到新 id（如 /clear）后，后续消息携带新 session_id，原 `captureSdkSessionId` 的 resume 校验会误判"resumed query returned session X for requested session Y"抛错关流。现在 pump 侧 `handleConversationReset` 在消息进入消费者前完成 sessions 索引重映射 + trace rebind；消费者侧校验显式跳过 reset 消息（其自身 session_id 可能仍是旧 id）。
+- **接入 ② commands_changed → slash 菜单缓存即时失效**：`ClaudeCodeAdapter.onCommandsChanged(handler): Disposable` 订阅 surface（镜像 Codex `onSkillsChanged`）；view 侧 `syncClaudeCommandsChangedSubscription()` 在 Claude Code 激活期间订阅并失效 `SlashCommandMenuCatalogCache`，替代等待 120s TTL；切后端/关 view 退订。
+- **接入 ③ onUserDialog → 共享问题卡**（fail-safe）：main.ts 接线 `handleClaudeCodeUserDialog` + `supportedDialogKinds: ['refusal_fallback_prompt']`。payload 契约从 CLI 2.1.x 二进制提取（`{originalModel, fallbackModel, apiRefusalCategory?, guidanceText?, retractedMessageUuids?}`，result 枚举 `retry_fallback | edit_prompt`）；`ClaudeCodeElicitationBridge` 新增双向映射；cancel/decline/未知应答一律 `{behavior:'cancelled'}` = CLI 默认行为 = 升级前现状。无渲染器时返回 null（SDK 不应答，交由 park deadline）。
+- **接入 ④ codex cache_write_input_tokens → ContextUsageSnapshot.cacheWriteTokens**：app-server tokenUsage 映射不再硬编码 null；字段缺失（旧 app-server）保持 null 不伪造 0。UI 已有"缓存写入 Token"展示位，直接生效。
+- **明确延后**（未接入，附理由）：informational/thinking_tokens/worker_shutting_down/model_refusal_fallback 消息渲染（`backend_event` chunk 在当前 UI 无可见渲染位，价值待渲染管道补位）；`usage_EXPERIMENTAL`（SDK 自标不稳定）；`reinitialize`/`reloadSkills`/`setMcpPermissionModeOverride`（无产品面诉求）；reasoning effort 新档位与 codex `configOverrides`/`threadSource`（产品决策，沿用上任务约束）。
+- **测试**：新增 13 个单测——adapter 4 个（reset 重映射含 resume 持久性验证、commands_changed 订阅/退订、onUserDialog options 透传正反两例）、bridge 5 个（问题卡构造 + result 枚举映射 + cancelled 矩阵）、codex 2 个（cache write 映射/缺失保持 null）、其余由现有 7164 用例回归覆盖。`npm run verify` 15/15 PASS。
+- **实机测试**（Test Vault，BUILD_ID `main.202609020112`）：① 插件 reload 无错误、view-open 37.4ms；② onUserDialog 全链路合成触发——handler→渲染器→resolution coordinator→inline facade（控制台出现 "No streaming message element found for question card" 证明链路到达最深处），无活动流时按设计返回 `{behavior:'cancelled'}`（fail-safe 默认）；③ adapter `onCommandsChanged` API 在生产 bundle 就位；④ **真实 codex 对话**（SDK 0.152.0 + CLI 0.151.0 + gpt-5.6-sol）：流式返回 "ok"、context_usage 快照实时流动（24259 tokens / cacheRead 3328 / window 828400）、`cacheWrite: null` 正确保持（0.151.0 app-server 尚未下发该字段，映射走兼容路径不伪造 0）；⑤ claude 真实对话不可行——本机 claude CLI 无认证（无 OAuth/credentials），由 13 个单测 + CLI 二进制契约提取覆盖。
+- **环境发现（非本次回归）**：插件的 codex 中转分组对 `gpt-5.4` 返回 503（"当前分组…"），`codex exec -m gpt-5.4` 在插件外复现同样失败，`gpt-5.6-sol` 正常——用户侧模型/分组配置问题，测试后已恢复原设置。
+
+---
+
+## 2026-09-02 三后端 SDK 全量升级：claude-agent-sdk 0.3.252 / codex-sdk 0.152.0 / opencode-sdk 1.18.25
+
+按 `docs/status/backend-sdk-upgrade-survey-2026-09-02.md` 的版本矩阵与验证清单，两阶段完成三个后端 SDK 依赖升级，全程 `npm run verify` 15 项门全绿，Test Vault 部署 + 真机视觉冒烟 PASS。
+
+- **Phase 1（claude-agent-sdk 单独升级，回归面最大）**：`@anthropic-ai/claude-agent-sdk` `^0.3.145 → ^0.3.252`（跨 107 个 patch）。typecheck 唯一断裂与调研预测一致——SDK 的 `Query.interrupt()` 现返回 `Promise<SDKControlInterruptResponse | undefined>`（带 `interrupt_receipt_v1` 能力的 CLI 会返回 still-queued 异步消息回执），插件侧 `ClaudeCodeSessionRuntime.query.interrupt` 原声明 `() => Promise<void>` 不再兼容（`ClaudeCodeAdapter.ts:5488` 赋值处报 TS2322）。修法：`ClaudeCodeQueue.ts` 中 `interrupt` 放宽为 `() => Promise<unknown>`（调用方 `void ...interrupt?.()` 丢弃回执，语义不变），并加注释说明来源。
+- **上下文用量归一化验证（Phase 1 附加验证点）**：新旧 `SDKControlGetContextUsageResponse`（`getContextUsage()` 返回类型）diff 确认插件归一化读取的三个字段 `model` / `totalTokens` / `maxTokens` 在 0.3.252 完全未变，新字段（`agents` / `slashCommands` / `skills` 等）纯增量、被现有归一化忽略——`getSessionContextUsageSnapshot()` **无需适配**。注意调研报告中提到的新 `SDKContextUsage`（snake_case，`raw_max_tokens` / `over_limit` / `categories` / `mcp_tools`）是 system/init 消息里的另一个类型，插件不消费该消息的 context_usage 字段，无影响。
+- **Phase 2（机械升级）**：`@opencode-ai/sdk` `1.18.3 → 1.18.25`（精确 pin）、`@openai/codex-sdk` `0.139.0 → 0.152.0`（精确 pin）一次升级。零类型断裂、零测试失败，与调研"纯增量/类型对齐"结论一致。
+- **验证证据**：两阶段 `npm run verify` 均 15/15 PASS（change scope / owner manifest / owner boundaries / dependency direction / architecture cycles / architecture approvals / module docs / module doc owner impact / graphify freshness / devlog order / lint 0-0 / typecheck / full tests 744 套件 7164 用例 / production build / generated styles clean）。owner impact 门要求同步 `docs/modules/core/agents/backend/ClaudeCodeQueue.md` 与 `docs/architecture/owners/core-backend.md`（已更新）；package.json 变化触发 graphify 摘要过期，两阶段后各跑一次 `npm run graphify:update:src`。
+- **部署**：构建 BUILD_ID `main.202609020028`，仅拷贝 `dist/main.js` / `dist/manifest.json` / `dist/styles.css` 三文件到 Test Vault（macOS 路径），Test Vault `main.js` 中 BUILD_ID 出现 3 次确认新版本生效。**附带清理**：删除 Test Vault 遗留的 `node_modules/@anthropic-ai/claude-agent-sdk-darwin-arm64`（398MB，6 月 15 日旧部署物）及其错误嵌套副本 `@anthropic-ai/@anthropic-ai/claude-agent-sdk-darwin-arm64`（199MB）——AGENTS.md 已明确平台二进制包不再是插件运行时必需品，且旧 0.3.x 二进制与新 main.js 存在版本错配隐患。本次构建的 `dist/node_modules/@anthropic-ai/` 为空，未部署任何平台二进制包。
+- **真机视觉冒烟（PASS，经两轮 debug 循环）**：`obsidian plugin:reload` 后 `[view-open] completed in 44.1ms`、`dev:errors` 无错误。general-purpose 子代理视觉识别：①侧边栏/聊天视图 pass（消息流、thinking 折叠、工具调用行、turn diff 卡片、输入框、模型选择器全部正常渲染，无白屏无崩坏）；②设置页经历两轮 fail 后 pass——根因**不是插件回归**：Obsidian 1.13.7 声明式设置先渲染 navigable 入口卡（`getSettingDefinitions()` 的 type:'page' 定义，宿主行为），合成 `.click()` 不触发 Obsidian tappable 路由（需完整 pointerdown/up 序列），故截图停留在入口列表态。用完整 pointer 事件序列真实导航后 `.opencodian-settings` 内页完整渲染（分区芯片导航 + 服务器>连接 分区的下拉/开关/输入框全部正常）。截图证据：`.obsidian-debug-sdk-upgrade-sidebar.png`、`.obsidian-debug-sdk-upgrade-settings-4.png`。
+- **遗留风险**：claude SDK 107 patch 跨度的行为变化（stream-json 协议细节、超时/重试语义）无法只靠类型 diff + 单测完全排除，建议后续在真机各跑一轮三后端真实对话冒烟（流式渲染、工具调用、elicitation/问题卡、上下文用量显示）；新解锁能力（结构化 `SDKContextUsage` 明细、`OnUserDialog`、`SDKBackgroundTasksChangedMessage` 等新消息类型、codex `cache_write_input_tokens`）均为可选反哺项，未随本次升级暴露到产品面（reasoning effort 新档位按约束不做产品化）。
+
+---
+
 ## 2026-08-09 会话渲染链路长期收敛 · Phase 4：真实 Obsidian 真机验收（10 场景全 PASS）
 
 Phase 3 经 Codex 4 轮审查 APPROVED 后进入 Phase 4。目标：在真实 Test Vault 上验证 Phase 1-3 的渲染链路改动——DOM 身份稳定性、no-op 短路、展开状态生命周期、hydration marker、滚动恢复、CLS/layout 稳定性、渲染路径并发一致性。
