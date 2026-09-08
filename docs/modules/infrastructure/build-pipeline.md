@@ -200,12 +200,12 @@ npm run build
 
 `node scripts/pi-rpc-smoke.mjs` 在临时工作目录构建 PiAdapter 并连接用户的官方 Pi CLI，验证工具、流式输出、恢复、分叉和全局设置不变。不安装或升级 CLI，不修改插件 SDK 依赖。验证报告输出到 `.obsidian-debug/pi-smoke.json`。
 
-## Pi 服务资产
+## Pi 服务源码
 
-assets/pi/service.mjs、commands.mjs、extension-ui.mjs随现有assets复制流程进入dist/assets。必须与main.js一起部署；不能仅替换main.js。SDK来自外部官方安装，无新增npm依赖。升级验证运行scripts/pi-sdk-acceptance.mjs与pi-rpc-smoke.mjs。
+assets/pi/service.mjs、commands.mjs、configuration.mjs、extension-ui.mjs是插件内部服务源码，构建时合并到main.js，不是安装脚本，也不是用户需要复制的发行附件。Pi SDK来自用户自行安装，无自动安装或升级操作。升级验证运行scripts/pi-sdk-acceptance.mjs与pi-rpc-smoke.mjs。
 
-2026-09-09：Pi增加assets/pi/configuration.mjs，随dist/assets整体部署。SDK非root帮助函数（FileSettingsStorage、resolveModelScope、resizeImage）集中在Pi服务版本边界并由真实SDK脚本验收。
+SDK非root帮助函数（FileSettingsStorage、resolveModelScope、resizeImage）集中在Pi服务版本边界并由真实SDK脚本验收。
 
 ## Pi三文件发行兼容
 
-scripts/build-utils.mjs的readPiServiceSources供production/dev构建统一嵌入assets/pi的4个包装脚本，PiRpcClient按内容版本展开。npm run package:plugin及GitHub/Gitea仍发布标准main.js/manifest.json/styles.css三文件，无需改现有更新器或新增SDK依赖。scripts/pi-sdk-acceptance.mjs从空安装目录验证自动展开后的全部SDK能力。
+scripts/build-utils.mjs的bundlePiServiceSource供production/dev构建统一合并assets/pi模块，PiRpcClient通过stdin传入外部Node并在内存中加载，不写出服务文件。npm run package:plugin及GitHub/Gitea仅发布标准main.js/manifest.json/styles.css三文件，无需安装脚本、现有更新器改动或新增SDK依赖。scripts/pi-sdk-acceptance.mjs验证未安装Pi时报错，以及没有任何服务资产也能完成全部SDK能力验收。

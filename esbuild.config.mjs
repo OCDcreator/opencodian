@@ -2,7 +2,7 @@ import esbuild from "esbuild";
 import path from "path";
 import process from "process";
 import builtins from "builtin-modules";
-import { generateBuildId, readPiServiceSources } from './scripts/build-utils.mjs';
+import { generateBuildId, bundlePiServiceSource } from './scripts/build-utils.mjs';
 
 const banner =
 `/*
@@ -23,7 +23,7 @@ const context = await esbuild.context({
 	},
 	define: {
 		BUILD_ID: JSON.stringify(buildId),
-		PI_SERVICE_SOURCES: JSON.stringify(readPiServiceSources()),
+		PI_SERVICE_SOURCE: JSON.stringify(bundlePiServiceSource()),
 		'import.meta.url': '__OPENCODIAN_IMPORT_META_URL__',
 	},
 	entryPoints: ['src/main.ts'],

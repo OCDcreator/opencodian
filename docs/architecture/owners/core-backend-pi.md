@@ -26,3 +26,5 @@ Model/thinking overrides are process launch arguments, followed by exact get_sta
 完整接入使用PiProtocol/PiSessionRuntime与assets/pi独立服务，按会话常驻进程。业务命令/扩展UI/原生历史/账号资源分别隔离；运行时内存设置避免全局默认值泄漏。见docs/requirements/multi-agent-foundation/07-pi-adapter.md。
 
 2026-09-09：独立配置进程管理官方settings/models文件，带schema、revision冲突、备份、校验；会话内存设置与持久配置分开。SDK升级测试对照51项设置全集。
+
+v1.1.14安装边界：用户自行安装官方Pi，缺失时直接报错；插件没有Pi安装/升级脚本。服务模块在构建时合并到main.js，通过stdin传给独立Node进程并在内存加载，不再展开assets/pi文件。发行包始终只有main.js、manifest.json、styles.css；真实SDK验收验证无服务文件也可运行。

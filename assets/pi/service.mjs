@@ -158,7 +158,7 @@ export async function startPiService(sdkPath, options, streams = process) {
   return host;
 }
 
-if (process.argv[1] && pathToFileURL(realpathSync(process.argv[1])).href === import.meta.url) {
+if (import.meta.url.startsWith('file:') && process.argv[1] && pathToFileURL(realpathSync(process.argv[1])).href === import.meta.url) {
   startPiService(process.argv[2], JSON.parse(process.argv[3])).catch((error) => {
     process.stdout.write(`${JSON.stringify({ type: 'transport_error', error: `Pi service startup: ${error.message}` })}\n`);
     process.exitCode = 1;

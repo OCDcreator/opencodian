@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "aa437fbf8edaec43dfd07f1c73dd2b6d8c0899ef5b57289c92295df3996a8ab8",
+  "digest": "6bdf61db0a2b58fd60d6974a721e49c2e98f68da64d55da37654ce7c33c25b97",
   "recordCount": 619,
   "records": [
     {
@@ -16,12 +16,12 @@
     {
       "kind": "package",
       "key": "package-lock.json",
-      "sha256": "fdd8e7d09fabd9729b5471bac53063fca40ca7d62b0b39dcdd77d754f9ad7227"
+      "sha256": "4055a826f37958b191d3a522ceace218d589ae36565d1c20cf702291ca37c16b"
     },
     {
       "kind": "package",
       "key": "package.json",
-      "sha256": "6f9eeaff94f05abc8fcd5f72ddce4ea44b80bff8efcb1ed21cebb9c1e35bac76"
+      "sha256": "f86cadb187435b58c1cf6d057588c86fdc4ae675215febe66cc098875e2769ff"
     },
     {
       "kind": "src",
@@ -336,7 +336,7 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/pi/PiRpcClient.ts",
-      "sha256": "0bcd19ad2589fbeca8f2a1324fd3f7d7a516aac0529d897b6f0a5d8d4949bc02"
+      "sha256": "5e2329df3f1231d391bf8aabf7d091c8c723912b334a5dc6eee159747a408a7d"
     },
     {
       "kind": "src",
@@ -3099,7 +3099,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-09-08T16:50:03.526Z",
-  "headShaAtGeneration": "30db9b310637ffaa1081f75431e356fda0a558ae",
+  "generatedAt": "2026-09-08T17:03:54.789Z",
+  "headShaAtGeneration": "14b6a822396a4f9b71b82de6e0f741ff46518baa",
   "graphifyVersion": "graphify 0.9.31"
 }

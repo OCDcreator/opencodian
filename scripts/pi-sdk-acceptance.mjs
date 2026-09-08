@@ -9,7 +9,7 @@ import { pathToFileURL } from 'node:url';
 import { build } from 'esbuild';
 import { RPC_COMMANDS, SDK_COMMANDS, executeCommand } from '../assets/pi/commands.mjs';
 import { createConfigurationService } from '../assets/pi/configuration.mjs';
-import { readPiServiceSources } from './build-utils.mjs';
+import { bundlePiServiceSource } from './build-utils.mjs';
 
 const root = process.cwd();
 const directory = await fs.mkdtemp(path.join(tmpdir(), 'pi-sdk-acceptance-'));
@@ -53,9 +53,11 @@ try {
     }});
   }`);
   await build({ entryPoints: ['src/core/agents/backend/pi/PiAdapter.ts'], outfile: path.join(directory, 'adapter.cjs'), bundle: true, platform: 'node', format: 'cjs' });
-  await build({ entryPoints: ['src/core/agents/backend/pi/PiRpcClient.ts'], outfile: path.join(directory, 'client.cjs'), bundle: true, platform: 'node', format: 'cjs', define: { PI_SERVICE_SOURCES: JSON.stringify(readPiServiceSources(root)) } });
+  await build({ entryPoints: ['src/core/agents/backend/pi/PiRpcClient.ts'], outfile: path.join(directory, 'client.cjs'), bundle: true, platform: 'node', format: 'cjs', define: { PI_SERVICE_SOURCE: JSON.stringify(bundlePiServiceSource(root)) } });
   const { PiAdapter } = require(path.join(directory, 'adapter.cjs'));
   const { PiRpcClient, resolvePiCommand } = require(path.join(directory, 'client.cjs'));
+  assert.throws(() => new PiRpcClient({ workingDirectory: directory, sessionDirectory: directory, executablePath: path.join(directory, 'missing-pi') }), /Pi CLI not found/);
+  report.checks.push('missing-user-pi-fails-without-installation');
   const sdkRoot = path.dirname(path.dirname(resolvePiCommand('').prefix[0]));
   const rpcTypes = await fs.readFile(path.join(sdkRoot, 'dist/modes/rpc/rpc-types.d.ts'), 'utf8');
   const commandUnion = rpcTypes.slice(rpcTypes.indexOf('export type RpcCommand ='), rpcTypes.indexOf('export type RpcResponse'));
@@ -66,9 +68,8 @@ try {
     onUiRequest: async (request) => { report.ui.push(request.method); return request.method === 'confirm' ? { confirmed: true } : { value: ({ select: 'B', input: 'input-value', editor: 'edited-value' })[request.method] }; } });
   adapter.onEvent((_id, e) => events.push(e));
   await adapter.start();
-  const materialized = await fs.readdir(path.join(directory, 'installed-plugin/assets/pi'));
-  assert(materialized.some(name => name.startsWith('.bundled-')));
-  report.checks.push('three-file-install-materializes-bundled-service');
+  await assert.rejects(fs.stat(path.join(directory, 'installed-plugin')), { code: 'ENOENT' });
+  report.checks.push('three-file-install-runs-without-writing-service-files');
   assert(events.some(e => e.message === 'STARTUP_UI_OK'));
   report.checks.push('startup-extension-ui-roundtrip');
   let id = await adapter.createSession('Acceptance');

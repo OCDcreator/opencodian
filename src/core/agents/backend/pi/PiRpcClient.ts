@@ -1,27 +1,28 @@
 import { type ChildProcessWithoutNullStreams, spawn } from 'node:child_process';
-import { createHash, randomUUID } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { homedir } from 'node:os';
 import * as path from 'node:path';
 
-declare const PI_SERVICE_SOURCES: Record<string, string> | undefined;
+declare const PI_SERVICE_SOURCE: string | undefined;
 
-/** Standard Obsidian installs deliver three files; materialize the embedded service atomically. */
-function bundledServicePath(requestedPath: string | undefined): string | undefined {
-  if (!requestedPath || typeof PI_SERVICE_SOURCES === 'undefined') return requestedPath;
-  const digest = createHash('sha256').update(JSON.stringify(PI_SERVICE_SOURCES)).digest('hex').slice(0, 20);
-  const directory = path.join(path.dirname(requestedPath), `.bundled-${digest}`);
-  mkdirSync(directory, { recursive: true });
-  for (const [name, source] of Object.entries(PI_SERVICE_SOURCES)) {
-    if (!/^(service|commands|configuration|extension-ui)\.mjs$/.test(name)) throw new Error('Invalid bundled Pi service asset.');
-    const file = path.join(directory, name);
-    if (existsSync(file) && readFileSync(file, 'utf8') === source) continue;
-    const temporary = `${file}.${randomUUID()}.tmp`;
-    try { writeFileSync(temporary, source, { mode: 0o600 }); renameSync(temporary, file); }
-    finally { rmSync(temporary, { force: true }); }
+// Transfer exactly the source byte count over stdin before JSONL requests. This
+// avoids filesystem writes and Windows command-line limits without consuming RPC data.
+const PI_SERVICE_BOOTSTRAP = `
+const input = process.stdin;
+const receiveSource = async () => {
+  const source = input.read(Number(process.argv[1]));
+  if (!source) return;
+  input.removeListener('readable', receiveSource);
+  try {
+    const service = await import('data:text/javascript;base64,' + source.toString('base64'));
+    await service.startPiService(process.argv[2], JSON.parse(process.argv[3]));
+  } catch (error) {
+    process.stdout.write(JSON.stringify({ type: 'transport_error', error: 'Pi service startup: ' + error.message }) + '\\n');
+    process.exitCode = 1;
   }
-  return path.join(directory, 'service.mjs');
-}
+};
+input.on('readable', receiveSource);
+`;
 
 export type PiRecord = Record<string, unknown>;
 
@@ -105,9 +106,12 @@ export class PiRpcClient implements PiRpcPort {
   constructor(options: PiLaunchOptions) {
     const { command, prefix } = resolvePiCommand(options.executablePath);
     const sdkEntry = path.join(path.dirname(prefix[0]), 'index.js');
-    const servicePath = bundledServicePath(options.servicePath);
-    if (!servicePath || !existsSync(servicePath)) throw new Error('Pi service asset is missing. Reinstall the complete plugin package.');
-    const args = [servicePath, sdkEntry, JSON.stringify(options)];
+    const source = typeof PI_SERVICE_SOURCE === 'string' ? PI_SERVICE_SOURCE : undefined;
+    const servicePath = options.servicePath;
+    if (!source && (!servicePath || !existsSync(servicePath))) throw new Error('Pi service code is missing from the plugin build.');
+    const args = source
+      ? ['--input-type=module', '--eval', PI_SERVICE_BOOTSTRAP, String(Buffer.byteLength(source)), sdkEntry, JSON.stringify(options)]
+      : [servicePath!, sdkEntry, JSON.stringify(options)];
     this.child = spawn(command, args, { cwd: options.workingDirectory, shell: false, windowsHide: true,
       env: { ...process.env, PATH: `${path.dirname(command)}${path.delimiter}${process.env.PATH ?? process.env.Path ?? ''}` },
       stdio: ['pipe', 'pipe', 'pipe'] });
@@ -118,6 +122,7 @@ export class PiRpcClient implements PiRpcPort {
     this.child.stdin.on('error', () => this.fail(new Error('Pi RPC input closed.')));
     this.child.on('error', (error) => this.fail(new Error(`Pi process failed: ${error.message}`)));
     this.child.on('exit', (code, signal) => this.fail(new Error(`Pi process exited (${signal ?? code ?? 'unknown'}).`)));
+    if (source) this.child.stdin.write(source);
   }
 
   request(command: PiRecord, timeoutMs = 30000): Promise<PiRecord> {
