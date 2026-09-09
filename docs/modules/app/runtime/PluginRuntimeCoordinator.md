@@ -71,8 +71,11 @@
 ### Plugin update startup check
 
 - `checkPluginUpdateOnStartup()` 在正常启动注册完成后由入口 fire-and-forget 调用，不会阻塞插件加载。
-- 服务检查出新的兼容稳定版时，coordinator 比较当前版本与 `settings.pluginUpdateState.lastNotifiedVersion`；每个版本最多显示一次 notice，然后让 service 持久化通知标记。
-- 检查、比较或通知标记写入异常只写 runtime warning；它们不影响插件启动，也不会安装、回滚或热重载插件。
+- 服务检查出新的兼容稳定版时，coordinator 先比较远端版本与当前版本；只有远端更新才继续，随后按 `settings.pluginUpdateAutoInstall` 分流。
+- 开启自动安装时走 `autoInstallReleaseOnStartup()`：复用 `PluginUpdateService` 的事务安装路径（备份 → 写入 → 校验 → 失败自动回滚），成功后持久化通知标记并提示用户重载插件或重启 Obsidian；失败时当前版本已被安装路径保留，写 runtime warning 并显示带错误详情的 notice，下次启动会重试。已通知但未安装的版本在开启自动安装后仍会被安装（`lastNotifiedVersion` 不阻止安装路径）。
+- 未开启自动安装时保持原行为：比较当前版本与 `settings.pluginUpdateState.lastNotifiedVersion`，每个版本最多显示一次 notice，然后让 service 持久化通知标记。
+- 无论是否自动安装，都不会在启动流程里热重载插件：运行中的 chat session 与托管本地服务不能在插件自身 onload 中被拆掉，新版本在下一次重载/重启后生效。
+- 检查、比较或通知标记写入异常只写 runtime warning；它们不影响插件启动。
 
 ## 数据流
 

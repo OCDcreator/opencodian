@@ -14,6 +14,7 @@
 > 2026-07-29: Added OpenCode session trace workbench, capture-menu and status strings.
 
 > **源码**: `src/i18n/locales/en.ts`
+> **Updated**: 2026-09-09 — added `settings.pluginUpdate.autoInstallToggle`, `autoInstallToggleDesc`, `autoInstallSuccess`, and `autoInstallFailure` for the startup auto-install toggle and its outcome notices.
 > **Updated**: 2026-07-28 — adds Codex user-CLI path, explicit reload, active-turn warning, and manual-recovery copy.
 > **Updated**: 2026-07-28 stream fallback copy — added `chat.error.claudeNoResponse` so Claude Code empty streams no longer use OpenCode server guidance.
 > **Updated**: 2026-07-27 Version-management status panel — added `settings.pluginUpdate.currentVersionLabel`, `errorLabel`, and short badge copy `badge.{idle,checking,error,empty,update,current}`; removed the combined `currentVersion` and `status.error` sentence keys.

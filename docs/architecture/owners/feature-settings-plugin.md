@@ -39,3 +39,7 @@ Run before merge: `npm run typecheck`, `npm run module-docs`.
 ## Pi owner boundary review (2026-09-08)
 
 The new core.backend-pi owner isolates the external Pi process service. feature.settings-plugin retains its existing responsibilities; Pi process lifecycle, RPC compatibility and native history must not be added to this owner.
+
+## Auto-install toggle (2026-09-09)
+
+`SettingsPluginUpdateSection` renders the startup auto-install toggle bound to `settings.pluginUpdateAutoInstall` inside the status panel; toggling persists through the normal settings save path. Release validation, package writes and rollback remain with `core.update`.

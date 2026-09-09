@@ -2,6 +2,7 @@
 
 > **源码**: `src/features/settings/SettingsPluginUpdateSection.ts`
 > **状态**: [REVIEW]
+> **Updated**: 2026-09-09 — added the startup auto-install toggle bound to `pluginUpdateAutoInstall`.
 > **Updated**: 2026-07-29 — version management is a default-collapsed disclosure with a full-width accessible header, ephemeral expansion state, and inert content while closed.
 > **Updated**: 2026-07-28 — version management now renders as one independent card with flat status, release, and backup groups.
 > **Updated**: 2026-07-27 — added the shared General > Basic version-management section.
@@ -18,6 +19,7 @@
 - Keeps the manual check action and explicit latest-stable action in a flat status group, separated by a hairline inside the one version-management card.
 - Keeps the complete remote stable-release history and local three-file backups as flat groups using `data-plugin-update-list="releases"` and `data-plugin-update-list="backups"`, so their row separators never create nested cards.
 - Keeps incompatible entries visible but disables their action and renders the service-supplied reason.
+- Renders a standard Obsidian toggle bound to `settings.pluginUpdateAutoInstall` inside the status panel; toggling persists immediately through the normal settings save path and lets the startup check auto-install newer compatible stable releases.
 - Uses a confirmation dialog for every remote install and backup restore. A target older than the currently installed version uses downgrade-specific copy.
 - Refreshes the owning settings shell immediately when a check/apply operation begins and once it settles. `data-plugin-update-applying` and disabled buttons expose the serialized in-progress state.
 - Shows completion/failure notices only after the service operation settles; completion copy asks the user to reload the plugin or restart Obsidian.

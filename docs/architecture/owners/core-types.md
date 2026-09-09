@@ -34,3 +34,7 @@ Run before merge: `npm run typecheck`, `npm run module-docs`.
 ## Pi owner boundary review (2026-09-08)
 
 PiBackendSettings is a separate settings branch normalized by normalizePiBackendSettings. Existing backend settings retain their own defaults and normalization.
+
+## Auto-install startup update (2026-09-09)
+
+新增 `OpenCodianSettings.pluginUpdateAutoInstall: boolean`（默认 `false`），由 `settingsLoadNormalization` 在最终 merge 边界做布尔归一化，缺失或非布尔持久化值回退为默认。

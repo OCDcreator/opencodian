@@ -83,3 +83,105 @@ describe('PluginRuntimeCoordinator plugin update startup check', () => {
     expect(markVersionNotified).toHaveBeenCalledWith('1.1.0');
   });
 });
+
+describe('PluginRuntimeCoordinator plugin update auto-install', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  function createAutoInstallHost(settings: OpenCodianSettings, latestVersion = '1.1.0') {
+    const host = createWarmupHost(settings);
+    const installRelease = jest.fn().mockResolvedValue({
+      previousVersion: '1.0.0',
+      installedVersion: latestVersion,
+      source: 'github',
+    });
+    const markVersionNotified = jest.fn(async (version: string) => {
+      settings.pluginUpdateState.lastNotifiedVersion = version;
+    });
+    host.getPluginUpdateService.mockReturnValue({
+      checkForUpdates: jest.fn().mockResolvedValue({
+        status: 'ready',
+        latestRelease: { version: latestVersion, installable: true },
+      }),
+      installRelease,
+      markVersionNotified,
+    });
+    return { host, installRelease, markVersionNotified };
+  }
+
+  it('installs a newer compatible release automatically when auto-install is enabled', async () => {
+    const settings: OpenCodianSettings = { ...DEFAULT_SETTINGS, pluginUpdateAutoInstall: true };
+    const { host, installRelease, markVersionNotified } = createAutoInstallHost(settings);
+    const noticeSpy = jest.spyOn(obsidian, 'Notice').mockImplementation(() => undefined as never);
+    const coordinator = new PluginRuntimeCoordinator(host as never);
+
+    await coordinator.checkPluginUpdateOnStartup();
+
+    expect(installRelease).toHaveBeenCalledWith('1.1.0');
+    expect(markVersionNotified).toHaveBeenCalledWith('1.1.0');
+    expect(noticeSpy).toHaveBeenCalledTimes(1);
+    expect(String(noticeSpy.mock.calls[0][0])).toContain('1.1.0');
+  });
+
+  it('auto-installs even when the version was already notified manually', async () => {
+    const settings: OpenCodianSettings = {
+      ...DEFAULT_SETTINGS,
+      pluginUpdateAutoInstall: true,
+      pluginUpdateState: { ...DEFAULT_SETTINGS.pluginUpdateState, lastNotifiedVersion: '1.1.0' },
+    };
+    const { host, installRelease } = createAutoInstallHost(settings);
+    jest.spyOn(obsidian, 'Notice').mockImplementation(() => undefined as never);
+    const coordinator = new PluginRuntimeCoordinator(host as never);
+
+    await coordinator.checkPluginUpdateOnStartup();
+
+    expect(installRelease).toHaveBeenCalledWith('1.1.0');
+  });
+
+  it('keeps the current version and surfaces the error when auto-install fails', async () => {
+    const settings: OpenCodianSettings = { ...DEFAULT_SETTINGS, pluginUpdateAutoInstall: true };
+    const { host, installRelease, markVersionNotified } = createAutoInstallHost(settings);
+    installRelease.mockRejectedValue(new Error('download failed'));
+    const noticeSpy = jest.spyOn(obsidian, 'Notice').mockImplementation(() => undefined as never);
+    const coordinator = new PluginRuntimeCoordinator(host as never);
+
+    await coordinator.checkPluginUpdateOnStartup();
+
+    expect(noticeSpy).toHaveBeenCalledTimes(1);
+    expect(String(noticeSpy.mock.calls[0][0])).toContain('download failed');
+    expect(markVersionNotified).not.toHaveBeenCalled();
+  });
+
+  it('does not install when the latest release is not newer than the running version', async () => {
+    const settings: OpenCodianSettings = { ...DEFAULT_SETTINGS, pluginUpdateAutoInstall: true };
+    const { host, installRelease } = createAutoInstallHost(settings, '0.9.9');
+    const noticeSpy = jest.spyOn(obsidian, 'Notice').mockImplementation(() => undefined as never);
+    const coordinator = new PluginRuntimeCoordinator(host as never);
+
+    await coordinator.checkPluginUpdateOnStartup();
+
+    expect(installRelease).not.toHaveBeenCalled();
+    expect(noticeSpy).not.toHaveBeenCalled();
+  });
+
+  it('does not install when the latest release is not installable', async () => {
+    const settings: OpenCodianSettings = { ...DEFAULT_SETTINGS, pluginUpdateAutoInstall: true };
+    const { host, installRelease } = createAutoInstallHost(settings);
+    host.getPluginUpdateService.mockReturnValue({
+      checkForUpdates: jest.fn().mockResolvedValue({
+        status: 'ready',
+        latestRelease: { version: '1.1.0', installable: false },
+      }),
+      installRelease,
+      markVersionNotified: jest.fn(),
+    });
+    const noticeSpy = jest.spyOn(obsidian, 'Notice').mockImplementation(() => undefined as never);
+    const coordinator = new PluginRuntimeCoordinator(host as never);
+
+    await coordinator.checkPluginUpdateOnStartup();
+
+    expect(installRelease).not.toHaveBeenCalled();
+    expect(noticeSpy).not.toHaveBeenCalled();
+  });
+});

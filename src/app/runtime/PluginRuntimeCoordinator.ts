@@ -92,6 +92,10 @@ export class PluginRuntimeCoordinator {
       if (comparePluginVersions(latest.version, this.host.getPluginVersion()) <= 0) {
         return;
       }
+      if (settings.pluginUpdateAutoInstall) {
+        await this.autoInstallReleaseOnStartup(service, latest.version);
+        return;
+      }
       if (settings.pluginUpdateState.lastNotifiedVersion === latest.version) {
         return;
       }
@@ -99,6 +103,28 @@ export class PluginRuntimeCoordinator {
       await service.markVersionNotified(latest.version);
     } catch (error) {
       logger.warn('Plugin update startup check failed', error);
+    }
+  }
+
+  /**
+   * Auto-install reuses the service's transactional backup → write → verify →
+   * rollback path. The running plugin code stays old until the user reloads
+   * the plugin or restarts Obsidian; we never reload the plugin from inside
+   * its own startup because that would tear down live chat sessions and the
+   * managed local server mid-flight.
+   */
+  private async autoInstallReleaseOnStartup(service: PluginUpdateService, version: string): Promise<void> {
+    try {
+      const result = await service.installRelease(version);
+      await service.markVersionNotified(result.installedVersion);
+      logger.info(`[startup] auto-installed plugin update ${result.previousVersion} -> ${result.installedVersion}; reload required`);
+      new Notice(t('settings.pluginUpdate.autoInstallSuccess', { version: result.installedVersion }));
+    } catch (error) {
+      logger.warn('Plugin auto-update install failed', error);
+      const detail = error instanceof Error && error.message.trim().length > 0
+        ? error.message
+        : String(error);
+      new Notice(t('settings.pluginUpdate.autoInstallFailure', { version, error: detail }));
     }
   }
 

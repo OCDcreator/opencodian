@@ -2915,6 +2915,9 @@ export interface OpenCodianSettings {
   /** Persisted plugin-update notification and catalogue metadata. */
   pluginUpdateState: PluginUpdatePersistedState;
 
+  /** When enabled, a newer compatible stable release is installed automatically during the startup update check. */
+  pluginUpdateAutoInstall: boolean;
+
   // Language
   locale: string;
 
@@ -2951,6 +2954,11 @@ export function normalizeSettingsLayoutMode(value: unknown): SettingsLayoutMode 
     default:
       return 'tabbed';
   }
+}
+
+/** Anything but a real boolean falls back to the safe default (auto-install off). */
+export function normalizePluginUpdateAutoInstall(value: unknown): boolean {
+  return typeof value === 'boolean' ? value : DEFAULT_SETTINGS.pluginUpdateAutoInstall;
 }
 
 export function normalizeSettingsTabbedPrimaryTab(value: unknown, fallback: string): string {
@@ -3097,6 +3105,7 @@ export const DEFAULT_SETTINGS: OpenCodianSettings = {
     latestStableVersion: null,
     lastSource: null,
   },
+  pluginUpdateAutoInstall: false,
 
   locale: 'en',
 

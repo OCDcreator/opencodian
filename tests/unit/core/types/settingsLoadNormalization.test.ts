@@ -337,4 +337,28 @@ describe('prepareLoadedSettingsBootstrapState backend normalization', () => {
 
     expect(state.settings.backendSettings.claudeCode.autoTitle).toBe(false);
   });
+
+  it('defaults pluginUpdateAutoInstall to off unless a boolean was persisted', () => {
+    const buildState = (pluginUpdateAutoInstall: unknown) => prepareLoadedSettingsBootstrapState({
+      core: {
+        data: pluginUpdateAutoInstall === undefined ? null : { pluginUpdateAutoInstall },
+        filePath: '.opencodian/settings.core.json',
+        source: pluginUpdateAutoInstall === undefined ? 'missing' : 'primary',
+        shouldPersist: false,
+      },
+      ui: {
+        data: null,
+        filePath: '.opencodian/settings.ui.json',
+        source: 'missing',
+        shouldPersist: false,
+      },
+      writable: true,
+      shouldPersist: false,
+    });
+
+    expect(buildState(undefined).settings.pluginUpdateAutoInstall).toBe(false);
+    expect(buildState(null).settings.pluginUpdateAutoInstall).toBe(false);
+    expect(buildState('yes').settings.pluginUpdateAutoInstall).toBe(false);
+    expect(buildState(true).settings.pluginUpdateAutoInstall).toBe(true);
+  });
 });

@@ -14,6 +14,7 @@
 > 2026-07-29: Added Chinese OpenCode session trace workbench, capture-menu and status strings.
 
 > **源码**: `src/i18n/locales/zh.ts`
+> **最近更新**: 2026-09-09 — 新增 `settings.pluginUpdate.autoInstallToggle`、`autoInstallToggleDesc`、`autoInstallSuccess` 与 `autoInstallFailure`，覆盖启动时自动安装更新的开关与结果提示文案。
 > **最近更新**: 2026-07-28 — 新增 Codex 用户 CLI 路径、显式重载、运行回合终止提示与手动恢复文案。
 > **最近更新**: 2026-07-28 流式兜底文案 — 新增 `chat.error.claudeNoResponse`，避免 Claude Code 空流误显示 OpenCode 服务排查指引。
 > **Updated**: 2026-07-27 版本管理状态面板 — 新增 `settings.pluginUpdate.currentVersionLabel`、`errorLabel` 与 `badge.{idle,checking,error,empty,update,current}` 短状态徽章文案；移除合并式 `currentVersion` 与 `status.error` 长句键。

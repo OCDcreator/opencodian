@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "25ba617212d4108b7d6b551bdb2f9f6c62e7b8392bcdbd059899305fdcddb3ab",
+  "digest": "9cc4ce9eaf25a9466644b94abfee9d44339d5e8db4ce947155ae942a78193d29",
   "recordCount": 619,
   "records": [
     {
@@ -16,7 +16,7 @@
     {
       "kind": "package",
       "key": "package-lock.json",
-      "sha256": "284713e2f9c3ef31e46c15aeb57d31c845de94783ccab7052cacc6260d36743c"
+      "sha256": "f1e75e7c2fd0113d37f1b568dfcf56329414a9c4f5e387b404eb49df98338eb1"
     },
     {
       "kind": "package",
@@ -41,7 +41,7 @@
     {
       "kind": "src",
       "key": "src/app/runtime/PluginRuntimeCoordinator.ts",
-      "sha256": "396372e19df626b272cfc495cd2ef9ebd5b751cdbb90b43a2014589bb02f2e9d"
+      "sha256": "d5861639e113c292757fe35fc471b932e9c19535842eb6a68faa40223c9fa031"
     },
     {
       "kind": "src",
@@ -816,12 +816,12 @@
     {
       "kind": "src",
       "key": "src/core/types/settings.ts",
-      "sha256": "d892bb512a93e93e5eb8a9d22738ffb416eb8781e6da6e15625244d9b7a7804f"
+      "sha256": "78a94a4aa6b945d99c5b139d6200c82b15bda9d52b93d530991c307b93ec31dd"
     },
     {
       "kind": "src",
       "key": "src/core/types/settingsLoadNormalization.ts",
-      "sha256": "33adb2f0369730ddfd79e5e4f052e711915bdc7b6f82863dab9158222742470f"
+      "sha256": "949be0f6b7705f87ed7ece4b8fb8c7b03fd9478cd8b4cb17a7037dad11d69285"
     },
     {
       "kind": "src",
@@ -2456,7 +2456,7 @@
     {
       "kind": "src",
       "key": "src/features/settings/SettingsPluginUpdateSection.ts",
-      "sha256": "dddd6f0bcb921c7aa2e533e4818e16cbf1dd6ea4ab008b7c6320cfe922c5862f"
+      "sha256": "2fff64ff323d4cf0a46dfa86bcb7910be0fb75bd14019f2760d05c10ce0d4476"
     },
     {
       "kind": "src",
@@ -2586,7 +2586,7 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/en.ts",
-      "sha256": "9a4aa6942a04bc60b753f0136a2295a9ecee736ba4dc34f7d85bf42201e91fac"
+      "sha256": "c2b9f1bb365172f5f3b9e41b4c1575b92927250895c3b4fea8cb12f9fded3ddf"
     },
     {
       "kind": "src",
@@ -2596,7 +2596,7 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/zh.ts",
-      "sha256": "728d322c4496945184435ef52c86bffc3fa71474cfc01d96a5e7e02a343b5091"
+      "sha256": "d3fa9f54fa50e7b57dca4d79c2f1353a77b93ddf3fb8b2231c73b0c1290a28f7"
     },
     {
       "kind": "src",
@@ -3071,7 +3071,7 @@
     {
       "kind": "tool",
       "key": "graphify-version",
-      "sha256": "d27ce4be2c503cc8256349f2efd107c22bd7b0dba071404ef1cb6a9b65bd3b77"
+      "sha256": "5f45bbcdc1f605c0aa3cce55583a208fba43af4faefecfdf157d982dac286c25"
     },
     {
       "kind": "tsconfig",
@@ -3091,7 +3091,7 @@
     {
       "kind": "wrapper",
       "key": "scripts/run-graphify-update.py",
-      "sha256": "c047df3c6375e534fee00196b07baa497ec4668f0606e4186ef354cd20dfd8d4"
+      "sha256": "a08389aca3c23a50e4fe563b29d30525a789572c73d1197e076539257aa77fd0"
     },
     {
       "kind": "wrapper",
@@ -3099,7 +3099,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-09-09T09:55:48.640Z",
-  "headShaAtGeneration": "7a03e54722d694c90e4245376e8429f5cfdfb584",
-  "graphifyVersion": "graphify 0.9.31"
+  "generatedAt": "2026-09-09T11:06:51.540Z",
+  "headShaAtGeneration": "5a55da286336851f7f4616ce822d76bf29d07d3f",
+  "graphifyVersion": "0.4.31"
 }

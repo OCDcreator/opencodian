@@ -47,3 +47,7 @@ Run before merge: `npm run typecheck`, `npm run module-docs`.
 ## Pi owner boundary review (2026-09-08)
 
 English and Chinese Pi settings copy describe the external CLI, connection check, model defaults and actual extension-dialog behavior.
+
+## Auto-install startup update copy (2026-09-09)
+
+中英文 locale 同步新增 `settings.pluginUpdate.autoInstallToggle` / `autoInstallToggleDesc` / `autoInstallSuccess` / `autoInstallFailure`，覆盖启动自动安装开关说明与成功/失败提示。

@@ -1,4 +1,4 @@
-import { Notice, setIcon } from 'obsidian';
+import { Notice, setIcon,Setting } from 'obsidian';
 
 import { comparePluginVersions, type PluginUpdateBackup, type PluginUpdateRelease, type PluginUpdateSnapshot } from '../../core/update/PluginUpdateService';
 import { t } from '../../i18n';
@@ -102,6 +102,18 @@ export class SettingsPluginUpdateSection {
     });
 
     this.renderStatusDetail(panelEl, snapshot);
+
+    new Setting(panelEl)
+      .setName(t('settings.pluginUpdate.autoInstallToggle'))
+      .setDesc(t('settings.pluginUpdate.autoInstallToggleDesc'))
+      .addToggle((toggle) => {
+        toggle
+          .setValue(this.plugin.settings.pluginUpdateAutoInstall)
+          .onChange(async (value) => {
+            this.plugin.settings.pluginUpdateAutoInstall = value;
+            await this.plugin.saveSettings();
+          });
+      });
 
     const actionsEl = panelEl.createDiv({ cls: 'opencodian-plugin-update-actions' });
     this.createButton(actionsEl, {

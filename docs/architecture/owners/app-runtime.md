@@ -45,3 +45,7 @@ Run before merge: `npm run typecheck`, `npm run check:module-docs`, `npm run bui
 ## Pi owner boundary review (2026-09-08)
 
 The new core.backend-pi owner isolates the external Pi process service. app.runtime retains its existing responsibilities; Pi process lifecycle, RPC compatibility and native history must not be added to this owner.
+
+## Auto-install startup update (2026-09-09)
+
+`checkPluginUpdateOnStartup()` now branches on `settings.pluginUpdateAutoInstall`: when enabled, a newer compatible stable release is installed through the `PluginUpdateService` transactional path (backup → write → verify → rollback) during the startup check, with success/failure notices; the `lastNotifiedVersion` marker no longer blocks installation. The coordinator never hot-reloads the plugin from its own startup flow — the new version takes effect after the user reloads the plugin or restarts Obsidian.
