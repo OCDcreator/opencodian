@@ -1283,108 +1283,58 @@ describe('OpenCodianSettingTab title styling', () => {
   });
 });
 
-// Obsidian 1.13+ declarative Settings: the plugin must expose
-// getSettingDefinitions() so its settings are discoverable in global Settings
-// search, while still rendering the existing classic/tabbed layout (no separate
-// capability-overview page). display() remains the <1.13 fallback.
-describe('OpenCodianSettingTab declarative settings (Obsidian 1.13+)', () => {
-  beforeEach(() => {
-    setLocale('en');
-    document.body.innerHTML = '';
-  });
+// A render definition mounts the complete page immediately; a page definition
+// would introduce the unwanted "OpenCodian Settings" navigation card again.
+describe('OpenCodianSettingTab direct settings (Obsidian 1.13+)', () => {
+  beforeEach(() => { setLocale('en'); document.body.innerHTML = ''; });
+  afterEach(() => { jest.restoreAllMocks(); document.body.innerHTML = ''; });
 
-  afterEach(() => {
-    jest.restoreAllMocks();
-    document.body.innerHTML = '';
-  });
-
-  it('exposes a single searchable page with a name and description', () => {
+  it('renders settings directly while retaining searchable metadata', () => {
     const { tab } = createSettingsTab('classic');
     const defs = tab.getSettingDefinitions();
-
     expect(defs).toHaveLength(1);
-    const page = defs[0];
-    expect(page.type).toBe('page');
-    // name + desc are required for global Settings search indexing.
-    expect(typeof page.name).toBe('string');
-    expect(page.name.length).toBeGreaterThan(0);
-    expect(typeof page.desc).toBe('string');
-    expect((page as { desc?: string }).desc?.length).toBeGreaterThan(0);
-    // No separate capability-overview page: exactly one top-level page.
-    expect(page.type).not.toBe('group');
+    const definition = defs[0] as { name: string; desc: string; type?: string; render: (setting: { settingEl: HTMLElement }) => () => void };
+    expect(definition.type).not.toBe('page');
+    expect(definition.name).not.toBe('');
+    expect(definition.desc).not.toBe('');
+    const row = document.body.createDiv({ cls: 'setting-item' });
+    const display = jest.spyOn(tab, 'displayInto').mockImplementation(container => {
+      container.createEl('input', { attr: { 'aria-label': 'Visible setting' } });
+    });
+    definition.render({ settingEl: row });
+    expect(display).toHaveBeenCalledTimes(1);
+    expect(row.querySelector('input[aria-label="Visible setting"]')).not.toBeNull();
+    expect(row.classList.contains('opencodian-settings-direct-host')).toBe(true);
   });
 
-  it('page factory returns a page that renders the settings surface into its container', () => {
+  it('refreshes the same mounted container and cleans up when the host tears it down', () => {
     const { tab } = createSettingsTab('classic');
-    const pageDef = tab.getSettingDefinitions()[0] as { page: () => { containerEl: HTMLElement; display(): void } };
-    const page = pageDef.page();
-
-    // The page must render into its OWN container (not the plugin tab container),
-    // so spy on displayInto to confirm the declarative path re-targets rendering.
-    const displayIntoSpy = jest.spyOn(tab, 'displayInto').mockImplementation(() => {});
-    page.display();
-    expect(displayIntoSpy).toHaveBeenCalledTimes(1);
-    expect(displayIntoSpy.mock.calls[0][0]).toBe(page.containerEl);
-  });
-
-  it('falls back to display() rendering into the plugin tab container on Obsidian <1.13', () => {
-    const { tab } = createSettingsTab('classic');
-    const displayIntoSpy = jest.spyOn(tab, 'displayInto').mockImplementation(() => {});
-
-    tab.display();
-
-    // On <1.13 the host calls display(); it must render into the tab's containerEl.
-    expect(displayIntoSpy).toHaveBeenCalledTimes(1);
-    expect(displayIntoSpy.mock.calls[0][0]).toBe(tab.containerEl);
-  });
-
-  // REVISE regression (Spec-high): once the declarative page has rendered into
-  // page.containerEl, a subsequent internal refresh via display() (the path taken
-  // by requestDisplayRefresh / language switch / backend toggle) MUST target that
-  // same active container — not the stale plugin tab containerEl. Otherwise the
-  // visible page goes stale and a second surface can appear in the old container.
-  it('refreshes into the active declarative page container, not the stale tab container', () => {
-    const { tab } = createSettingsTab('classic');
-    // Stub the heavy downstream render so displayInto() can run (capturing the
-    // active container) without crashing into un-mocked services.
     jest.spyOn(tab as never, 'renderClassicDisplay').mockImplementation(() => {});
     jest.spyOn(tab as never, 'renderTabbedDisplay').mockImplementation(() => {});
-    const displayIntoSpy = jest.spyOn(tab, 'displayInto');
-
-    const pageDef = tab.getSettingDefinitions()[0] as { page: () => { containerEl: HTMLElement; display(): void } };
-    const page = pageDef.page();
-
-    // 1. Declarative page render: displayInto targets the page's container.
-    page.display();
-    expect(displayIntoSpy).toHaveBeenLastCalledWith(page.containerEl);
-
-    // 2. An internal refresh (e.g. user toggled a setting) calls display().
-    displayIntoSpy.mockClear();
+    const display = jest.spyOn(tab, 'displayInto');
+    const hide = jest.spyOn(tab, 'hide').mockImplementation(() => {});
+    const row = document.body.createDiv({ cls: 'setting-item' });
+    const definition = tab.getSettingDefinitions()[0] as { render: (setting: { settingEl: HTMLElement }) => () => void };
+    const cleanup = definition.render({ settingEl: row });
+    const mounted = display.mock.calls[0][0];
     tab.display();
-
-    // Must re-render the SAME active container (the page's), never the tab's.
-    expect(displayIntoSpy).toHaveBeenCalledTimes(1);
-    expect(displayIntoSpy.mock.calls[0][0]).toBe(page.containerEl);
-    expect(displayIntoSpy.mock.calls[0][0]).not.toBe(tab.containerEl);
+    expect(display).toHaveBeenLastCalledWith(mounted);
+    expect(mounted).not.toBe(tab.containerEl);
+    cleanup();
+    expect(hide).toHaveBeenCalledTimes(1);
   });
 
-  // P0 regression: on Obsidian <1.13 there is no SettingPage runtime export.
-  // getSettingDefinitions() must return [] (host then uses display()), and the
-  // module must never have executed a module-level `extends SettingPage` that
-  // would throw `Class extends value undefined` at load time. Simulate the 1.12.x
-  // host by making the require('obsidian').SettingPage lookup return undefined.
-  it('returns [] and stays loadable when the host has no SettingPage (Obsidian <1.13)', () => {
+  it('falls back to the tab container on hosts without SettingPage', () => {
     const { tab } = createSettingsTab('classic');
-    // The resolver does require('obsidian').SettingPage. Mutate the SAME module
-    // instance the source's require resolves (jest's live module registry).
-    // eslint-disable-next-line @typescript-eslint/no-require-imports -- mirrors the source's runtime lookup to simulate a <1.13 host.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- emulate the pre-1.13 runtime export.
     const obsidianModule = require('obsidian') as { SettingPage?: unknown };
-    const savedSettingPage = obsidianModule.SettingPage;
+    const saved = obsidianModule.SettingPage;
     obsidianModule.SettingPage = undefined;
     try {
       expect(tab.getSettingDefinitions()).toEqual([]);
-    } finally {
-      obsidianModule.SettingPage = savedSettingPage;
-    }
+      const display = jest.spyOn(tab, 'displayInto').mockImplementation(() => {});
+      tab.display();
+      expect(display).toHaveBeenCalledWith(tab.containerEl);
+    } finally { obsidianModule.SettingPage = saved; }
   });
 });

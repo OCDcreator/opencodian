@@ -37,6 +37,8 @@
 
 ## 修改注意点
 
+- Pi徽标的用户SVG内嵌main.js，不依赖远程图标。状态按钮内固定22px SVG画布并轻微向左上移动，使原图留白后的实际字形可辨；使用text-normal保证离线/在线身份颜色稳定，右下角状态标记继续表达连接状态。
+
 - 此文件是全局变量源，改 token 前要检查 `components/`、`features/`、`modals/` 中是否有连锁影响。
 - 标签栏与 sticky header 依赖精确层级（`z-index`、`overflow`、`position`），不要单点改动后遗漏滚动场景验证。
 - 子会话返回面包屑和隐藏子会话关闭按钮在横向和 `below-header-vertical` 布局下分别共用 `opencodian-tab-bar-parent-breadcrumb*` / `opencodian-tab-bar-parent-close*` 类，调整尺寸时要避免挤压 tab 按钮和溢出菜单。

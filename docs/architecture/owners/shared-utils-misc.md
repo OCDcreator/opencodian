@@ -21,6 +21,7 @@
 Run before merge: `npm run typecheck`, `npm run module-docs`.
 
 ## Hard invariants
+- Selection highlight writes are idempotent against the live CodeMirror StateField. Unchanged ranges and already-empty clears must not dispatch, and editor reconfiguration must not leave a stale installation cache.
 - Do not cross `forbiddenDependencies`.
 - Do not replicate canonical state in another owner.
 - Changes here must update the matching `docs/modules/**` page (via `module-docs.config.json`).

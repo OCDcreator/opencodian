@@ -46,6 +46,7 @@ function nativeMessages(manager) {
 export async function executeCommand(host, c) {
   const s = host.runtime.session;
   const manager = s.sessionManager;
+  const registry = s.modelRegistry ?? (host.modelRuntime ? new host.sdk.ModelRegistry(host.modelRuntime) : undefined);
   host.auth.reload?.();
   switch (c.type) {
     case 'get_state': return { ...sessionState(s), serviceProtocol: 1, sdkVersion: host.sdk.VERSION, commands: [...RPC_COMMANDS, ...SDK_COMMANDS, ...CONFIG_COMMANDS] };
@@ -58,9 +59,9 @@ export async function executeCommand(host, c) {
     case 'follow_up': await s.followUp(required(c.message, 'Message'), await host.prepareImages(c.images)); return {};
     case 'abort': host.ui.cancelAll(); s.abortCompaction(); s.abortBranchSummary(); s.abortBash(); host.loginAbort?.abort(); await s.abort(); return {};
     case 'new_session': return host.runtime.newSession({ parentSession: c.parentSession });
-    case 'get_available_models': return { models: s.modelRegistry.getAvailable() };
+    case 'get_available_models': return { models: registry.getAvailable() };
     case 'set_model': {
-      const model = s.modelRegistry.find(required(c.provider, 'Provider'), required(c.modelId, 'Model'));
+      const model = registry.find(required(c.provider, 'Provider'), required(c.modelId, 'Model'));
       if (!model) throw new Error('Requested Pi model does not exist; no fallback is allowed.');
       await s.setModel(model); return model;
     }
@@ -107,21 +108,34 @@ export async function executeCommand(host, c) {
     case 'get_resources': return { skills: s.resourceLoader.getSkills(), prompts: s.resourceLoader.getPrompts(),
       extensions: s.resourceLoader.getExtensions().extensions.map((e) => ({ path: e.path, resolvedPath: e.resolvedPath })),
       errors: s.resourceLoader.getExtensions().errors, context: s.resourceLoader.getAgentsFiles(), systemPrompt: s.systemPrompt };
-    case 'reload': await host.refreshResources(); s.modelRegistry.refresh(); await s.reload(); return { commands: commandCatalog(s) };
+    case 'reload': await host.refreshResources(); await registry.refresh(); await s.reload(); return { commands: commandCatalog(s) };
     case 'clear_queue': return { cleared: s.clearQueue() };
     case 'get_queue': return { steering: s.getSteeringMessages(), followUp: s.getFollowUpMessages(), pending: s.pendingMessageCount };
     case 'abort_compaction': s.abortCompaction(); return {};
     case 'abort_branch_summary': s.abortBranchSummary(); return {};
     case 'set_scoped_models': {
       if (!Array.isArray(c.models)) throw new Error('Expected model references.');
-      const scoped = c.models.map((ref) => { const m = s.modelRegistry.find(ref.provider, ref.model); if (!m) throw new Error('Unknown scoped model.'); return { model: m, thinkingLevel: ref.thinkingLevel ? level(ref.thinkingLevel) : undefined }; });
+      const scoped = c.models.map((ref) => { const m = registry.find(ref.provider, ref.model); if (!m) throw new Error('Unknown scoped model.'); return { model: m, thinkingLevel: ref.thinkingLevel ? level(ref.thinkingLevel) : undefined }; });
       s.setScopedModels(scoped); return { models: scoped };
     }
-    case 'get_auth': return { providers: [...new Set([...host.auth.list(), ...s.modelRegistry.getAll().map((m) => m.provider)])].map((provider) => ({ provider, ...host.auth.getAuthStatus(provider) })), oauthProviders: host.auth.getOAuthProviders().map((p) => ({ id: p.id, name: p.name })) };
-    case 'set_api_key': host.auth.set(required(c.provider, 'Provider'), { type: 'api_key', key: required(c.apiKey, 'API key') }); return { saved: true };
+    case 'get_auth': {
+      if (host.modelRuntime) {
+        await host.modelRuntime.refresh();
+        const stored = await host.modelRuntime.listCredentials();
+        return { providers: [...new Set([...stored.map(item => item.providerId), ...host.modelRuntime.getProviders().map(p => p.id)])].map(provider => ({ provider, ...host.modelRuntime.getProviderAuthStatus(provider) })),
+          oauthProviders: host.modelRuntime.getProviders().filter(p => p.auth?.oauth).map(p => ({ id: p.id, name: p.name })) };
+      }
+      return { providers: [...new Set([...host.auth.list(), ...registry.getAll().map((m) => m.provider)])].map((provider) => ({ provider, ...host.auth.getAuthStatus(provider) })), oauthProviders: host.auth.getOAuthProviders().map((p) => ({ id: p.id, name: p.name })) };
+    }
+    case 'set_api_key': {
+      const provider = required(c.provider, 'Provider'), key = required(c.apiKey, 'API key');
+      if (host.modelRuntime) { await host.credentials.modify(provider, async () => ({ type: 'api_key', key })); await host.modelRuntime.refresh(); }
+      else host.auth.set(provider, { type: 'api_key', key });
+      return { saved: true };
+    }
     case 'login': {
       const controller = new AbortController(); host.loginAbort = controller;
-      try { await host.auth.login(required(c.provider, 'Provider'), {
+      try { const callbacks = {
       signal: controller.signal,
       onAuth: (info) => host.send({ type: 'extension_ui_request', id: 'oauth-link', method: 'notify', message: info.instructions ?? 'Open the sign-in page.', url: info.url }),
       onPrompt: (prompt) => host.ui.ask('input', { title: prompt.message, placeholder: prompt.placeholder }, { signal: controller.signal }).then((v) => { if (v === undefined || (!v && !prompt.allowEmpty)) throw new Error('Login cancelled.'); return v; }),
@@ -132,10 +146,32 @@ export async function executeCommand(host, c) {
         return prompt.options[labels.indexOf(selected)]?.id;
       },
       onProgress: (message) => host.send({ type: 'extension_ui_request', id: 'oauth-progress', method: 'setStatus', statusKey: 'login', statusText: message }),
-    }); return { authenticated: true }; }
+    };
+        if (host.modelRuntime) await host.modelRuntime.login(required(c.provider, 'Provider'), 'oauth', {
+          signal: controller.signal,
+          prompt: async prompt => {
+            const signal = prompt.signal ? AbortSignal.any([controller.signal, prompt.signal]) : controller.signal;
+            if (prompt.type === 'select') {
+              const labels = prompt.options.map(option => `${option.label} (${option.id})`);
+              const selected = await host.ui.ask('select', { title: prompt.message, options: labels }, { signal });
+              const id = prompt.options[labels.indexOf(selected)]?.id;
+              if (!id) throw new Error('Login cancelled.'); return id;
+            }
+            const value = await host.ui.ask('input', { title: prompt.message, placeholder: prompt.placeholder }, { signal });
+            if (!value) throw new Error('Login cancelled.'); return value;
+          },
+          notify: event => {
+            if (event.type === 'auth_url') callbacks.onAuth(event);
+            else if (event.type === 'device_code') callbacks.onAuth({ url: event.verificationUri, instructions: `Code: ${event.userCode}` });
+            else if (event.type === 'progress') callbacks.onProgress(event.message);
+            else callbacks.onAuth({ instructions: event.message, url: event.links?.[0]?.url });
+          },
+        });
+        else await host.auth.login(required(c.provider, 'Provider'), callbacks);
+        return { authenticated: true }; }
       finally { host.loginAbort = undefined; }
     }
-    case 'logout': host.auth.logout(required(c.provider, 'Provider')); return { loggedOut: true };
+    case 'logout': await host.auth.logout(required(c.provider, 'Provider')); return { loggedOut: true };
     case 'get_packages': return { packages: host.packages.listConfiguredPackages() };
     case 'install_package': await host.packages.installAndPersist(required(c.source, 'Package source'), { local: c.local !== false }); await host.refreshResources(); await s.reload(); return { installed: true };
     case 'remove_package': {

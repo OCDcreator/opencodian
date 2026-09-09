@@ -29,6 +29,7 @@ export class SettingsPiConfigurationSection {
   private render(body: HTMLElement, group: string): void {
     if (!this.snapshot) return;
     body.empty();
+    body.addClass('opencodian-settings-form-stack');
     const document = this.snapshot.scopes[this.scope];
     new Setting(body).setName(t('settings.pi.scope')).setDesc(document.path).addDropdown(dropdown => {
       dropdown.addOption('project', t('settings.pi.scope.project')).addOption('global', t('settings.pi.scope.global')).setValue(this.scope)

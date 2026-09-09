@@ -37,14 +37,14 @@ hideHighlightEffect: StateEffect.define<null>
 
 ### 延迟安装
 
-`ensureSelectionHighlightField()` 使用 `WeakSet<EditorView>` 跟踪已安装的编辑器：
+`ensureSelectionHighlightField()` 以编辑器当前 `state.field(selectionHighlightField, false)` 为安装依据：
 - 首次调用时通过 `StateEffect.appendConfig.of` 安装 StateField
-- 后续调用直接跳过
+- 后续调用直接跳过；编辑器重配置移除扩展后允许重新安装，避免独立WeakSet与真实状态漂移
 
 ### 操作函数
 
-`showSelectionHighlight(editorView, from, to)` → 确保安装 → dispatch show effect
-`hideSelectionHighlight(editorView)` → 检查安装 → dispatch hide effect
+`showSelectionHighlight(editorView, from, to)` → 确保安装 → 比较当前映射后的单选区范围，未变化时不dispatch，否则提交show effect。
+`hideSelectionHighlight(editorView)` → 检查当前field，未安装或已经为空时不dispatch，否则提交hide effect。
 
 ## 关键方法
 
@@ -77,9 +77,10 @@ OpenCodianView (用户引用编辑器选区)
 
 ## 注意事项
 
-- 使用 `WeakSet` 跟踪已安装编辑器，不会造成内存泄漏
+- 编辑器StateField是唯一高亮状态来源，不维护独立的范围或安装缓存；文档编辑后的mapped范围参与幂等比较
 - `from`/`to` 参数为 CodeMirror 文档偏移量（0-based），非行号
 - 每次 `showHighlightEffect` 只创建单个范围，之前的范围被替换
 - 不支持多个同时高亮区域
 
+回归：tests/unit/utils/editorSelectionHighlight.test.ts使用真实CodeMirror EditorState验证重复显示/清除无更新、文档位置映射与重配置恢复；实机复测需记录DOM层稳定性，不能只检查最终有高亮。
 

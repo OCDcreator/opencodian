@@ -2,9 +2,28 @@
   min-width: 0;
 }
 
-/* Match the existing Claude/Codex setting-card rhythm, including nested form hosts. */
-.opencodian-settings .opencodian-pi-settings .setting-item + .setting-item {
+/* Native details lay out their contents as blocks; ordinary form hosts use
+   the shared stack so gaps also survive nested editors and empty statuses. */
+.opencodian-settings .opencodian-pi-model-editor > .setting-item + .setting-item {
   margin-top: var(--opencodian-settings-space-lg, 12px);
+}
+
+.opencodian-settings .opencodian-pi-settings .opencodian-settings-section-body,
+.opencodian-pi-models {
+  display: flex;
+  flex-direction: column;
+  gap: var(--opencodian-settings-space-lg, 12px);
+  min-width: 0;
+}
+
+.opencodian-pi-models:empty {
+  display: none;
+}
+
+/* Keep live regions mounted, without an extra empty track between cards. */
+.opencodian-pi-settings [role='status']:empty {
+  position: absolute;
+  margin: 0;
 }
 
 .opencodian-pi-settings h3 {
@@ -47,6 +66,11 @@
 .opencodian-pi-config-advanced,
 .opencodian-pi-model-editor {
   margin-block: var(--opencodian-settings-space-xl, 16px);
+}
+
+.opencodian-settings-form-stack > .opencodian-pi-config-advanced,
+.opencodian-pi-models > .opencodian-pi-model-editor {
+  margin-block: 0;
 }
 
 .opencodian-pi-settings summary {

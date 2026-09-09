@@ -206,6 +206,8 @@ assets/pi/service.mjs、commands.mjs、configuration.mjs、extension-ui.mjs是�
 
 SDK非root帮助函数（FileSettingsStorage、resolveModelScope、resizeImage）集中在Pi服务版本边界并由真实SDK脚本验收。
 
+新@earendil-works包通过ModelRuntime持有模型/认证运行时，AuthStorage非root帮助类仅用于持久化凭据。scripts/pi-sdk-modern-acceptance.mjs验证当前SDK的配置、模型保存与拒绝无效数据、账户读写、模拟流式回复、会话持久化/克隆及reload；可用PI_SMOKE_EXECUTABLE指定安装入口，PI_ACCEPTANCE_CLIENT指定预构建测试client以在无仓库依赖的Windows上验收。原scripts/pi-sdk-acceptance.mjs继续锁定0.73.1完整基线。
+
 ## Pi三文件发行兼容
 
 scripts/build-utils.mjs的bundlePiServiceSource供production/dev构建统一合并assets/pi模块，PiRpcClient通过stdin传入外部Node并在内存中加载，不写出服务文件。npm run package:plugin及GitHub/Gitea仅发布标准main.js/manifest.json/styles.css三文件，无需安装脚本、现有更新器改动或新增SDK依赖。scripts/pi-sdk-acceptance.mjs验证未安装Pi时报错，以及没有任何服务资产也能完成全部SDK能力验收。

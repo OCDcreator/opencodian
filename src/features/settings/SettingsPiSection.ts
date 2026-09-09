@@ -110,7 +110,7 @@ export class SettingsPiSection {
 
   private account(container: HTMLElement, adapter: PiAdapter): void {
     const status = container.createDiv({ text: t('settings.pi.loading'), attr: { role: 'status' } });
-    const body = container.createDiv();
+    const body = container.createDiv({ cls: 'opencodian-settings-form-stack' });
     void adapter.command(undefined, 'get_auth').then(result => {
       status.setText(t('settings.pi.account.help'));
       for (const record of result.providers as Array<{ provider: string; configured: boolean }>) {
@@ -145,7 +145,7 @@ export class SettingsPiSection {
 
   private sessions(container: HTMLElement, adapter: PiAdapter): void {
     this.workbench(container);
-    const body = container.createDiv();
+    const body = container.createDiv({ cls: 'opencodian-settings-form-stack' });
     void adapter.listSessions().then(sessions => {
       if (!sessions.length) body.createEl('p', { text: t('settings.pi.noSessions') });
       for (const session of sessions) new Setting(body).setName(session.title).setDesc(new Date(session.updatedAt).toLocaleString())

@@ -49,7 +49,9 @@ export class FocusContextRuntimeService {
     view?: MarkdownView | null,
     editor?: Editor | null,
   ): void {
-    const actualPreview = this.computeFocusContextPreview(view, editor);
+    const activeView = view?.file ? view : this.getActiveMarkdownView();
+    const activeEditor = editor ?? activeView?.editor ?? null;
+    const actualPreview = this.computeFocusContextPreview(activeView, activeEditor);
     const nextPreview = resolveFocusContextPreview(
       actualPreview,
       this.host.getFocusContextPreview(),
@@ -58,7 +60,7 @@ export class FocusContextRuntimeService {
       },
     );
     this.host.setFocusContextPreview(nextPreview);
-    this.retainedSelectionRuntimeCoordinator.syncFromPreview(actualPreview, view, editor);
+    this.retainedSelectionRuntimeCoordinator.syncFromPreview(actualPreview, activeView, activeEditor);
   }
 
   scheduleFocusContextPreviewRefresh(): void {

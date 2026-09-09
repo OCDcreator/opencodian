@@ -103,19 +103,9 @@ Authoritative references:
   from `getSettingDefinitions()` when it returns a non-empty array; definitions feed
   the global Settings search index. `display()` is **only** called as a fallback for
   <1.13 or when definitions are empty.
-- Code: `src/features/settings/OpenCodianSettings.ts` — `OpenCodianSettingTab extends PluginSettingTab`; `display()` delegates to `displayInto(activeSettingsContainer ?? containerEl)`; `getSettingDefinitions()` returns one `SettingDefinitionPage` whose `page()` factory lazily builds an `OpenCodianSettingsPage` (via `createOpenCodianSettingsPageCtor`) whose `display()` calls `displayInto(this.containerEl)`.
-- Migration strategy: **dual support (Path B)** — keep `display()` (works on all
-  versions; deprecated but functional on 1.13) and add `getSettingDefinitions()`
-  returning a single `SettingDefinitionPage` (NOT groups/items) whose lazy
-  `SettingPage.display()` delegates to the existing classic/tabbed layout via
-  `displayInto()`; the page's name/desc make plugin settings discoverable in global
-  search. Do **not** add a separate capability-overview settings page.
-- `minAppVersion` stays `1.4.5`: the page class is built **lazily** via
-  `getSettingPageCtor()` (runtime `require('obsidian').SettingPage`, no module-level
-  `extends SettingPage`), and `getSettingDefinitions()` returns `[]` when `SettingPage`
-  is absent (<1.13) so the host calls `display()`. This keeps the plugin loadable on
-  Obsidian 1.4.5+ without raising the version floor (covered by a `<1.13` regression
-  test that nulls `SettingPage` and asserts `[]`).
+- Code: `src/features/settings/OpenCodianSettings.ts` — `display()` delegates to `displayInto(activeSettingsContainer ?? containerEl)`; `getSettingDefinitions()` returns one searchable render definition. Its `render(setting)` mounts a plugin-owned container immediately, with no navigable sub-page or extra click.
+- Migration correction (2026-09-09): the earlier single `type: page` definition created an unwanted landing card. A `SettingDefinitionRender` keeps the metadata in global search while displaying the actual settings directly. `.opencodian-settings-direct-host` resets the host row chrome without changing other rows. Host teardown calls the existing hide lifecycle and releases the active container; internal refresh still targets the same live container.
+- `minAppVersion` stays `1.4.5`: `getSettingPageCtor()` remains a lazy capability check; older hosts get `[]` and use `display()`. No runtime `SettingPage` subclass is required. Focused tests cover direct rendering, in-place refresh, cleanup and pre-1.13 fresh module loading.
 
 ## 3. Host DOM/CSS class coupling — **需人工场景验证 / 已修复 (Phase B)**
 

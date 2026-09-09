@@ -637,6 +637,17 @@ body[data-opencodian-provider-icon-mode="color"] {
   height: 16px;
 }
 
+/* Pi is an embedded filled mark, independent of the connection-state color.
+   Its original artwork includes whitespace; keep the glyph legible in the
+   compact badge and away from the separate lower-right status indicator. */
+.opencodian-server-status-icon[data-backend-icon='pi'] > svg.opencodian-pi {
+  flex: 0 0 22px;
+  width: 22px;
+  height: 22px;
+  color: var(--text-normal);
+  transform: translate(-2px, -2px);
+}
+
 .opencodian-server-status-icon-brandmark {
   display: flex;
   align-items: center;
@@ -8279,6 +8290,17 @@ img.opencodian-model-provider-header-icon {
 
 
 /* components/settings-layout-contract.css */
+.setting-item.opencodian-settings-direct-host {
+  display: block;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
 .opencodian-settings {
   --opencodian-settings-section-bg:
     color-mix(in srgb, var(--background-secondary) 88%, var(--background-primary));
@@ -8339,6 +8361,16 @@ img.opencodian-model-provider-header-icon {
   background: transparent;
   border: 0;
   box-shadow: none;
+}
+
+/* Form hosts own the gap across rows, nested editors and status messages.
+   Adjacent-row margins cannot cover cards separated by a wrapper. */
+.opencodian-settings .opencodian-settings-form-stack,
+.opencodian-settings .opencodian-style-input-controls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--opencodian-settings-space-lg);
+  min-width: 0;
 }
 
 .opencodian-settings .opencodian-settings-quick-nav {
@@ -13451,9 +13483,28 @@ img.opencodian-model-provider-header-icon {
   min-width: 0;
 }
 
-/* Match the existing Claude/Codex setting-card rhythm, including nested form hosts. */
-.opencodian-settings .opencodian-pi-settings .setting-item + .setting-item {
+/* Native details lay out their contents as blocks; ordinary form hosts use
+   the shared stack so gaps also survive nested editors and empty statuses. */
+.opencodian-settings .opencodian-pi-model-editor > .setting-item + .setting-item {
   margin-top: var(--opencodian-settings-space-lg, 12px);
+}
+
+.opencodian-settings .opencodian-pi-settings .opencodian-settings-section-body,
+.opencodian-pi-models {
+  display: flex;
+  flex-direction: column;
+  gap: var(--opencodian-settings-space-lg, 12px);
+  min-width: 0;
+}
+
+.opencodian-pi-models:empty {
+  display: none;
+}
+
+/* Keep live regions mounted, without an extra empty track between cards. */
+.opencodian-pi-settings [role='status']:empty {
+  position: absolute;
+  margin: 0;
 }
 
 .opencodian-pi-settings h3 {
@@ -13496,6 +13547,11 @@ img.opencodian-model-provider-header-icon {
 .opencodian-pi-config-advanced,
 .opencodian-pi-model-editor {
   margin-block: var(--opencodian-settings-space-xl, 16px);
+}
+
+.opencodian-settings-form-stack > .opencodian-pi-config-advanced,
+.opencodian-pi-models > .opencodian-pi-model-editor {
+  margin-block: 0;
 }
 
 .opencodian-pi-settings summary {

@@ -19,12 +19,15 @@ export async function startPiService(sdkPath, options, streams = process) {
   const { resolveModelScope } = await import(pathToFileURL(join(dirname(sdkPath), 'core/model-resolver.js')).href);
   const { resizeImage } = await import(pathToFileURL(join(dirname(sdkPath), 'utils/image-resize.js')).href);
   if (typeof resolveModelScope !== 'function' || typeof resizeImage !== 'function') throw new Error('Pi SDK helper compatibility changed. Review the service upgrade.');
-  for (const name of ['createAgentSessionRuntime', 'createAgentSessionServices', 'createAgentSessionFromServices', 'SettingsManager', 'SessionManager', 'AuthStorage']) {
+  for (const name of ['createAgentSessionRuntime', 'createAgentSessionServices', 'createAgentSessionFromServices', 'SettingsManager', 'SessionManager']) {
     if (!sdk[name]) throw new Error(`Pi SDK ${sdk.VERSION ?? 'unknown'} does not provide ${name}. Upgrade compatibility needs review.`);
   }
   const cwd = resolve(options.workingDirectory);
   const agentDir = options.agentDirectory || sdk.getAgentDir();
-  const auth = sdk.AuthStorage.create(join(agentDir, 'auth.json'));
+  const CredentialStorage = sdk.AuthStorage ?? (await import(pathToFileURL(join(dirname(sdkPath), 'core/auth-storage.js')).href)).AuthStorage;
+  const credentials = CredentialStorage.create(join(agentDir, 'auth.json'));
+  const modelRuntime = sdk.ModelRuntime ? await sdk.ModelRuntime.create({ credentials, modelsPath: join(agentDir, 'models.json') }) : undefined;
+  const auth = modelRuntime ?? credentials;
   const read = (file) => { try { return readFileSync(file, 'utf8'); } catch (error) { if (error.code === 'ENOENT') return undefined; throw error; } };
   const memoryScopes = { global: read(join(agentDir, 'settings.json')), project: read(join(cwd, '.pi', 'settings.json')) };
   const settings = sdk.SettingsManager.fromStorage({ withLock(scope, action) { const result = action(memoryScopes[scope]); if (result !== undefined) memoryScopes[scope] = result; } });
@@ -41,7 +44,7 @@ export async function startPiService(sdkPath, options, streams = process) {
     }
     await settings.reload();
   };
-  const host = { sdk, cwd, auth, settings, refreshResources, sessionDirectory: options.sessionDirectory, send: write, runtime: null, ui: null, packages: null };
+  const host = { sdk, cwd, auth, credentials, modelRuntime, settings, refreshResources, sessionDirectory: options.sessionDirectory, send: write, runtime: null, ui: null, packages: null };
   host.configuration = configuration;
   host.prepareImages = async images => {
     if (!images?.length || !settings.getImageAutoResize()) return images;
@@ -52,23 +55,27 @@ export async function startPiService(sdkPath, options, streams = process) {
   host.packages = new sdk.DefaultPackageManager({ cwd, agentDir, settingsManager: sdk.SettingsManager.create(cwd, agentDir) });
   host.packages.setProgressCallback((event) => write({ type: 'package_progress', ...event }));
   const factory = async ({ sessionManager, sessionStartEvent }) => {
-    const services = await sdk.createAgentSessionServices({ cwd, agentDir, authStorage: auth, settingsManager: settings });
+    const services = await sdk.createAgentSessionServices({ cwd, agentDir, ...(modelRuntime ? { modelRuntime } : { authStorage: auth }), settingsManager: settings });
+    const registry = services.modelRegistry ?? new sdk.ModelRegistry(services.modelRuntime);
     const saved = sessionManager.buildSessionContext();
     const provider = options.provider || saved.model?.provider || settings.getDefaultProvider();
     const modelId = options.model || saved.model?.modelId || settings.getDefaultModel();
     let model;
     if (provider && modelId) {
-      model = services.modelRegistry.find(provider, modelId);
+      model = registry.find(provider, modelId);
       if (!model) throw new Error(`Pi model unavailable: ${provider}/${modelId}. Select a model explicitly.`);
     }
     const created = await sdk.createAgentSessionFromServices({ services, sessionManager, sessionStartEvent, model,
-      scopedModels: await resolveModelScope(settings.getEnabledModels() ?? [], services.modelRegistry),
+      scopedModels: await resolveModelScope(settings.getEnabledModels() ?? [], registry),
       ...(options.thinkingLevel ? { thinkingLevel: options.thinkingLevel } : {}) });
     // An unauthenticated installation must still expose login and model discovery.
     // Explicit/saved model mismatches were rejected above; prompt validates auth.
     return { ...created, services, diagnostics: services.diagnostics };
   };
-  const manager = options.sessionPath ? sdk.SessionManager.open(options.sessionPath, options.sessionDirectory) : sdk.SessionManager.inMemory(cwd);
+  // Newer runtimes preserve the initial persistence mode across newSession().
+  // The file-backed manager defers writing until there is session content.
+  const manager = options.sessionPath ? sdk.SessionManager.open(options.sessionPath, options.sessionDirectory)
+    : modelRuntime ? sdk.SessionManager.create(cwd, options.sessionDirectory) : sdk.SessionManager.inMemory(cwd);
   host.runtime = await sdk.createAgentSessionRuntime(factory, { cwd, agentDir, sessionManager: manager });
   let unsubscribe;
   let unsubscribeAgent;

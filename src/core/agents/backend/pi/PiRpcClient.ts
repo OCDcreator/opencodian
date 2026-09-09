@@ -50,32 +50,63 @@ export interface PiLaunchOptions {
   configurationOnly?: boolean;
 }
 
+/** Keep package migration and SDK layout knowledge inside the Pi boundary. */
+function resolvePiSdkCli(executable: string, windows: boolean): string {
+  let cli = realpathSync(executable);
+  // npm shims point at the selected package. Do not guess a scope: old and new
+  // installations may coexist, with only one actually owning the pi command.
+  if (windows && (/\.(cmd|bat|ps1)$/i.test(cli) || path.basename(cli) === 'pi')) {
+    const shim = readFileSync(cli, 'utf8');
+    const target = shim.match(/node_modules[/\\](@(?:mariozechner|earendil-works)[/\\]pi-coding-agent[/\\]dist[/\\](?:bundle[/\\])?cli\.js)(?=["'\s]|$)/);
+    if (!target) throw new Error('Pi shim does not reference a supported official Pi package.');
+    cli = realpathSync(path.join(path.dirname(cli), 'node_modules', target[1]));
+  }
+  let packageRoot = '';
+  let directory = path.dirname(cli);
+  for (let depth = 0; depth < 5; depth++) {
+    try {
+      const metadata = JSON.parse(readFileSync(path.join(directory, 'package.json'), 'utf8')) as PiRecord;
+      const official = metadata.name === '@mariozechner/pi-coding-agent' || metadata.name === '@earendil-works/pi-coding-agent';
+      const bin = typeof metadata.bin === 'string' ? metadata.bin : piRecord(metadata.bin).pi;
+      const declaredCli = typeof bin === 'string' ? path.resolve(directory, bin) : '';
+      if (official && (cli === declaredCli || cli === path.join(directory, 'dist', 'cli.js'))) { packageRoot = directory; break; }
+    } catch { /* Continue up from dist/bundle to the actual package metadata. */ }
+    const parent = path.dirname(directory);
+    if (parent === directory) break;
+    directory = parent;
+  }
+  if (!packageRoot) throw new Error('Pi executable must belong to an official Pi package (@earendil-works/pi-coding-agent or @mariozechner/pi-coding-agent).');
+  // Services load the unbundled SDK and its adjacent helpers, even when npm's
+  // CLI moved to dist/bundle/cli.js. Keep this canonical path for SDK consumers.
+  const canonicalCli = path.join(packageRoot, 'dist', 'cli.js');
+  if (!existsSync(canonicalCli) || !existsSync(path.join(packageRoot, 'dist', 'index.js'))) throw new Error('Pi SDK entry is missing from the installed package.');
+  return canonicalCli;
+}
+
 /** Resolve the official npm CLI and its external Node runtime without executing a shell. */
 export function resolvePiCommand(configuredPath: string): { command: string; prefix: string[] } {
   const home = homedir();
+  const windows = process.platform === 'win32';
+  const pathValue = [process.env.PATH, process.env.Path, process.env.path].find(value => value?.trim()) ?? '';
   const directories = [...new Set([
-    ...(process.env.PATH ?? process.env.Path ?? '').split(path.delimiter),
+    ...pathValue.split(path.delimiter).map(value => value.trim().replace(/^"(.*)"$/, '$1')),
     path.join(home, '.local', 'bin'), path.join(home, '.npm-global', 'bin'),
     path.join(home, '.local', 'share', 'fnm', 'aliases', 'default', 'bin'),
     '/opt/homebrew/bin', '/usr/local/bin',
     process.env.APPDATA ? path.join(process.env.APPDATA, 'npm') : '',
+    ...(windows ? [path.join(home, 'AppData', 'Roaming', 'npm'),
+      path.join(process.env.ProgramFiles || 'C:\\Program Files', 'nodejs'),
+      process.env.NVM_SYMLINK ?? '',
+    ] : []),
   ].filter(Boolean))];
-  const explicit = configuredPath.trim().replace(/^~(?=[/\\])/, home);
-  const candidates = explicit ? [explicit] : directories.map((dir) => path.join(dir, process.platform === 'win32' ? 'pi.cmd' : 'pi'));
+  const explicit = configuredPath.trim().replace(/^"(.*)"$/, '$1').replace(/^~(?=[/\\])/, home);
+  const names = explicit ? (windows && explicit === 'pi' ? ['pi.cmd', 'pi.ps1', 'pi'] : [explicit]) : (windows ? ['pi.cmd', 'pi.ps1', 'pi'] : ['pi']);
+  const candidates = explicit && path.isAbsolute(explicit) ? [explicit] : directories.flatMap(dir => names.map(name => path.join(dir, name)));
   const executable = candidates.find((candidate) => existsSync(candidate));
-  if (!executable) throw new Error('Pi CLI not found. Install @mariozechner/pi-coding-agent or configure its executable path.');
-  let cli = realpathSync(executable);
-  if (/\.(cmd|bat)$/i.test(cli)) {
-    cli = path.join(path.dirname(cli), 'node_modules', '@mariozechner', 'pi-coding-agent', 'dist', 'cli.js');
-  }
-  const packageRoot = path.dirname(path.dirname(cli));
-  try {
-    const metadata = JSON.parse(readFileSync(path.join(packageRoot, 'package.json'), 'utf8')) as PiRecord;
-    if (metadata.name !== '@mariozechner/pi-coding-agent' || path.basename(cli) !== 'cli.js') throw new Error('wrong package');
-  } catch {
-    throw new Error('Pi executable must point to the official @mariozechner/pi-coding-agent CLI (pi or dist/cli.js).');
-  }
-  const nodeName = process.platform === 'win32' ? 'node.exe' : 'node';
+  if (!executable) throw new Error('Pi CLI not found. Install Pi yourself or configure the full path to your Pi executable.');
+  const canonicalCli = resolvePiSdkCli(executable, windows);
+  const packageRoot = path.dirname(path.dirname(canonicalCli));
+  const nodeName = windows ? 'node.exe' : 'node';
   const nodeCandidates = [
     path.join(path.dirname(executable), nodeName),
     path.resolve(packageRoot, '../../../bin', nodeName),
@@ -83,7 +114,7 @@ export function resolvePiCommand(configuredPath: string): { command: string; pre
   ];
   const command = nodeCandidates.find((candidate) => existsSync(candidate));
   if (!command) throw new Error('Pi requires an external Node.js installation on PATH.');
-  return { command, prefix: [cli] };
+  return { command, prefix: [canonicalCli] };
 }
 
 interface PendingRequest {

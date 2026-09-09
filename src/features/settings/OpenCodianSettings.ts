@@ -283,10 +283,8 @@ export class OpenCodianSettingTab extends PluginSettingTab {
    * Renders the full settings surface into the given container.
    *
    * `display()` (the <1.13 imperative fallback) renders into the plugin tab's
-   * own `containerEl`. On Obsidian 1.13+, when {@link getSettingDefinitions}
-   * returns a page, the host renders into a page-scoped container instead, so
-   * the declarative {@link OpenCodianSettingsPage} calls this with its own
-   * container and re-targets the section coordinator onto it.
+   * own `containerEl`. On Obsidian 1.13+, the direct render definition mounts a plugin-owned
+   * container inside the host row and re-targets the section coordinator onto it.
    *
    * This also records the container as the active one so subsequent `display()`
    * refreshes (settings changes, language switch, backend toggle) re-render the
@@ -308,31 +306,25 @@ export class OpenCodianSettingTab extends PluginSettingTab {
     this.dropdownsEnhancer = enhanceSettingsDropdowns(containerEl, this.app.keymap);
   }
 
-  /**
-   * Obsidian 1.13+ declarative Settings entry point.
-   *
-   * Returns a single navigable, searchable page whose `render` delegates to the
-   * existing classic/tabbed multi-level layout (no separate capability-overview
-   * page). The page's name/desc make the plugin discoverable in global Settings
-   * search; opening it renders the full settings surface into the page
-   * container.
-   *
-   * **Runtime safety:** `SettingPage` only exists on Obsidian 1.13+. On older
-   * hosts this returns `[]`, so the host falls back to {@link display} and the
-   * plugin keeps loading (no module-level `extends SettingPage` that would throw
-   * `Class extends value undefined` at load time). `minAppVersion` stays 1.4.5.
-   */
+  /** Render directly on 1.13+ while keeping metadata available to Settings search. */
   getSettingDefinitions(): SettingDefinitionItem[] {
-    const SettingPageCtor = getSettingPageCtor();
-    if (!SettingPageCtor) return [];
-    return [
-      {
-        type: 'page',
-        name: t('settings.title'),
-        desc: t('settings.searchDesc'),
-        page: () => new (createOpenCodianSettingsPageCtor(SettingPageCtor))(this),
+    if (!getSettingPageCtor()) return [];
+    return [{
+      name: t('settings.title'),
+      desc: t('settings.searchDesc'),
+      render: (setting) => {
+        const row = setting.settingEl;
+        row.empty();
+        row.addClass('opencodian-settings-direct-host');
+        const container = row.createDiv();
+        this.displayInto(container);
+        return () => {
+          if (this.activeSettingsContainer !== container) return;
+          this.hide();
+          this.activeSettingsContainer = null;
+        };
       },
-    ];
+    }];
   }
 
   private disposeSections(): void {
@@ -738,44 +730,4 @@ function getSettingPageCtor(): (new () => SettingPage) | undefined {
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- runtime feature detection for the 1.13-only SettingPage; keeps module load safe on <1.13.
   const mod = (require('obsidian') as { SettingPage?: new () => SettingPage });
   return mod?.SettingPage;
-}
-
-let cachedPageCtor: (new (tab: OpenCodianSettingTab) => SettingPage) | null = null;
-let cachedForBase: (new () => SettingPage) | undefined = undefined;
-
-/**
- * Build (and cache) an `OpenCodianSettingsPage` subclass on top of the host's
- * `SettingPage`. Built lazily per host so the plugin loads on any Obsidian
- * version; the subclass delegates `display()` to the tab's existing layout and
- * `hide()` to the tab's teardown — no state of its own.
- */
-function createOpenCodianSettingsPageCtor(
-  SettingPageCtor: new () => SettingPage,
-): new (tab: OpenCodianSettingTab) => SettingPage {
-  if (cachedPageCtor && cachedForBase === SettingPageCtor) return cachedPageCtor;
-  // OpenCodianSettingsPageBase mirrors the previous class body; defined inside
-  // the factory so `extends SettingPageCtor` only evaluates when SettingPage
-  // actually exists (1.13+).
-  class OpenCodianSettingsPageBase extends SettingPageCtor {
-    constructor(private readonly tab: OpenCodianSettingTab) {
-      super();
-      this.title = t('settings.title');
-    }
-
-    display(): void {
-      // Render the full settings surface into this page's container. The tab
-      // re-targets its section coordinator and dropdown enhancer onto the same
-      // element so scroll-restore and custom dropdowns work on the page surface.
-      this.tab.displayInto(this.containerEl);
-    }
-
-    hide(): void {
-      // Delegate teardown to the tab's existing public hide() (disposes
-      // sections, destroys the dropdown enhancer, cancels pending frames).
-      this.tab.hide();
-    }
-  }
-  cachedPageCtor = OpenCodianSettingsPageBase;
-  cachedForBase = SettingPageCtor;
-  return OpenCodianSettingsPageBase;
 }

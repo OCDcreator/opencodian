@@ -6,6 +6,8 @@
 
 解析用户自行安装的官方 npm CLI 及外部 Node；在独立进程运行内嵌服务代码并加载官方 dist/index.js。支持 Windows npm shim，不执行 shell，不打包或安装 SDK。未安装 Pi 时直接提示不可用。
 
+2026-09-09 Windows兼容：按实际npm shim目标和包元数据识别旧@mariozechner及新@earendil-works包，支持pi/pi.cmd/pi.ps1和带引号路径。CLI迁至dist/bundle/cli.js时仍从包根dist/index.js加载SDK，不能用CLI父目录猜SDK位置，也不能在双包共存时静默换包。Node补查标准Program Files/nodejs及NVM_SYMLINK。PiCommandResolution测试覆盖新旧安装、活跃shim、缺失文件和GUI旧PATH。
+
 LF JSONL 保留 Unicode/分片；id/command 校验、请求超时及0无限等待、32MiB帧限制、错误清理。stderr 排空，不进入聊天或日志。close先发shutdown，2秒后强制结束。
 
 ## UI 与验证

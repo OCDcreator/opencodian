@@ -46,6 +46,7 @@ class FocusContextRuntimeService {
 ### focus preview 维护
 
 - `refreshActiveFocusContextPreview()` 会从当前 editor 读取选中文本和行号，生成 `selection` 或 `current_note` preview
+- 先统一解析activeView/activeEditor，再把同一实例交给preview计算与retained-selection同步；无参数selectionchange刷新不能在polling已捕获选区后丢失编辑器引用，否则会形成250ms显示、40ms后清除的闪烁循环。
 - preview 保留策略继续复用 `composerContext.resolveFocusContextPreview()`：只有 composer focus / handoff grace 期间，才允许把旧的 selection preview 保留下来
 - 实际 preview state 仍写回 `OpenCodianView` 的 active-tab runtime，因此多 tab 语义没有改变
 

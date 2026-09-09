@@ -375,6 +375,7 @@ All settings modals share a single chrome/layout layer instead of per-modal marg
 - **Inspection panels:** readback and MCP detail modals use `.opencodian-inspection-panel` with a compact summary band (intro + meta strip), `.opencodian-inspection-row` for item rows, and `.opencodian-inspection-section` for grouped server sections. Spacing follows the modal tokens above; no nested cards.
 - **No nested card surfaces:** a card may contain rows or lists, but not another full card.
 - **No ad-hoc margins:** spacing comes from the shell/section/card gaps, not per-element margins.
+- **Form continuity:** settings form stacks use the shared `12px` gap across rows and nested editor hosts. Empty status regions must not collapse or double that gap. Verify visible card boundaries across wrappers, expanded disclosures, and dynamic rows; adjacent DOM siblings alone are insufficient evidence.
 - **Flush headings:** section headings (`h4`, `h5`) must not carry left padding (`padding-left: 0; padding-inline-start: 0`) so they align with the section content and modal edge.
 
 ### MCP Inspection Modal

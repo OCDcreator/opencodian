@@ -23,6 +23,7 @@ export class SettingsPiProvidersSection {
 
   private render(body: HTMLElement): void {
     body.empty();
+    body.addClass('opencodian-settings-form-stack');
     const document = this.document as PiConfigurationDocument;
     const providers = piRecord(document.value.providers);
     this.selected ||= Object.keys(providers)[0] ?? '';
@@ -37,6 +38,7 @@ export class SettingsPiProvidersSection {
 
   private renderEditor(container: HTMLElement, providers: PiRecord): void {
     container.empty();
+    container.addClass('opencodian-settings-form-stack');
     const draft: PiRecord = JSON.parse(JSON.stringify(providers[this.selected] ?? { models: [] })) as PiRecord;
     let name = this.selected;
     this.editors = [];

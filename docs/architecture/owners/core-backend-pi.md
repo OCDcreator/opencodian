@@ -23,6 +23,8 @@ Model/thinking overrides are process launch arguments, followed by exact get_sta
 
 ## SDK 服务边界
 
+2026-09-09：兼容0.85.x的@earendil-works官方包、ModelRuntime认证/模型接口和保留持久化模式的会话工厂；旧0.73.x AuthStorage路径保持独立分支。配置保存等待异步官方模型校验，保留revision/备份约束；模型校验禁用网络与认证解析。Windows新SDK验收使用本地HTTP fixture，不消费用户模型额度，不安装SDK。51项结构化设置仍对应既有0.73.1基线，原生JSON保留新增字段。
+
 完整接入使用PiProtocol/PiSessionRuntime与assets/pi独立服务，按会话常驻进程。业务命令/扩展UI/原生历史/账号资源分别隔离；运行时内存设置避免全局默认值泄漏。见docs/requirements/multi-agent-foundation/07-pi-adapter.md。
 
 2026-09-09：独立配置进程管理官方settings/models文件，带schema、revision冲突、备份、校验；会话内存设置与持久配置分开。SDK升级测试对照51项设置全集。

@@ -225,7 +225,7 @@ try {
   const fsSync = require('node:fs');
   const raceConfiguration = createConfigurationService({ ...sdkModule, FileSettingsStorage, ModelRegistry: { create: () => { fsSync.writeFileSync(path.join(agentDirectory, 'models.json'), externalModels); return { getError: () => undefined }; } } }, directory, agentDirectory);
   const raceSnapshot = raceConfiguration.getModels();
-  assert.throws(() => raceConfiguration.saveModels({ revision: raceSnapshot.revision, value: nextModels }), /changed during validation/);
+  await assert.rejects(raceConfiguration.saveModels({ revision: raceSnapshot.revision, value: nextModels }), /changed during validation/);
   assert.equal(await fs.readFile(path.join(agentDirectory, 'models.json'), 'utf8'), externalModels);
   config = await adapter.command(undefined, 'get_configuration');
   await adapter.command(undefined, 'save_configuration', { scope: 'project', revision: config.scopes.project.revision, changes: { defaultProvider: 'missing', defaultModel: 'missing' } });

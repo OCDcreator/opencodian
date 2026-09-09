@@ -61,6 +61,8 @@ CSS 依赖加载顺序以确保后加载的样式能正确覆盖前方的样式�
 - **命名规范**: 遵循已有的 `opencodian-` 前缀以防止与 Obsidian 或其他插件的 CSS 类冲突（例如 `.opencodian-icon-cache-modal`）。
 - **同步构建**: 修改了 `src/style/` 下的任何代码后，开发期仍需执行 `node scripts/build-css.mjs` 或 `npm run build:css` 以刷新根目录的 `styles.css`；生产构建 `npm run build` 会自动完成这一步。
 - **设置布局契约**: 设置界面的共享 surface、spacing、row-card、object-card 与 inline group token 归 `components/settings-layout-contract.css` 管理；不要在单个 section CSS 中重复发明普通设置卡片的背景、边框、圆角或间距。
+- **新版设置直达宿主**: `setting-item.opencodian-settings-direct-host`只清理声明式根行外观，让内部完整设置页直接展示；不覆盖普通设置行。
+- **设置表单间距**: `opencodian-settings-form-stack` 用共享12px token在容器层排布表单；输入框样式controls也使用同一规则。Pi只在原生details的连续字段保留局部间距，普通表单不得靠`.setting-item + .setting-item`代替容器gap，避免嵌套editor或空status隔断匹配。动态模型列表与空live region需一起验证。
 
 ## 注意事项
 

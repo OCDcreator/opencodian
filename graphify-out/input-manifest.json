@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "6bdf61db0a2b58fd60d6974a721e49c2e98f68da64d55da37654ce7c33c25b97",
+  "digest": "25ba617212d4108b7d6b551bdb2f9f6c62e7b8392bcdbd059899305fdcddb3ab",
   "recordCount": 619,
   "records": [
     {
@@ -16,12 +16,12 @@
     {
       "kind": "package",
       "key": "package-lock.json",
-      "sha256": "4055a826f37958b191d3a522ceace218d589ae36565d1c20cf702291ca37c16b"
+      "sha256": "284713e2f9c3ef31e46c15aeb57d31c845de94783ccab7052cacc6260d36743c"
     },
     {
       "kind": "package",
       "key": "package.json",
-      "sha256": "f86cadb187435b58c1cf6d057588c86fdc4ae675215febe66cc098875e2769ff"
+      "sha256": "b2545c8630677710e73946a98bea8f870618c63898b6aa8b7a75608fca091e48"
     },
     {
       "kind": "src",
@@ -336,7 +336,7 @@
     {
       "kind": "src",
       "key": "src/core/agents/backend/pi/PiRpcClient.ts",
-      "sha256": "5e2329df3f1231d391bf8aabf7d091c8c723912b334a5dc6eee159747a408a7d"
+      "sha256": "9e992300b6849d6377c3de232c52d733df8631d27e14f1bc1396220d05760c9b"
     },
     {
       "kind": "src",
@@ -1526,7 +1526,7 @@
     {
       "kind": "src",
       "key": "src/features/chat/services/FocusContextRuntimeService.ts",
-      "sha256": "8811b99944ec98665b03a0f98013c3bbc4a722b89956d36a6d459a7a62467013"
+      "sha256": "1eb171d5394484e7ccab33a94a67104b8a177d6d6bed0497acd1c09b3ed5122e"
     },
     {
       "kind": "src",
@@ -2221,7 +2221,7 @@
     {
       "kind": "src",
       "key": "src/features/settings/OpenCodianSettings.ts",
-      "sha256": "b7c2a903952738b6cb2525b075dac952509c759cc6a4383b952ba0ff9d539855"
+      "sha256": "c7483deaf917a352565a884b9d9b0277587d2c8d6fbbaeb110c7dad6939985b0"
     },
     {
       "kind": "src",
@@ -2426,17 +2426,17 @@
     {
       "kind": "src",
       "key": "src/features/settings/SettingsPiConfigurationSection.ts",
-      "sha256": "f771e1def9c2c69726358067a7efa9c0ff1abab55246d706f4b7f26f1f2695d7"
+      "sha256": "ca0d7aac0f38aacb95d830d8df8772b72ce7e4f6beee2c16feea67f319aac0b8"
     },
     {
       "kind": "src",
       "key": "src/features/settings/SettingsPiProvidersSection.ts",
-      "sha256": "34375cbce44752dd162d0f54c4fad846d2c4380fb86cea788a3b1d3c21f7d347"
+      "sha256": "fc29937fc8635eceac0c9431c88f0b237106e0ddf63ffbc6c7b79073a607aec3"
     },
     {
       "kind": "src",
       "key": "src/features/settings/SettingsPiSection.ts",
-      "sha256": "e244c884be22c2ab88ce955ce3d958800c7ee5f755a64c82d047ca9793d5d6b0"
+      "sha256": "a658f4e76b4c59bd89eb8ca2cfee458e83fd45c87b50f63d7a3db81dfe89f6cc"
     },
     {
       "kind": "src",
@@ -2696,7 +2696,7 @@
     {
       "kind": "src",
       "key": "src/style/base/core.css",
-      "sha256": "0ef61a1b7f2f253e73ce026fe90ebd46f25e5a68bc9b7ee17a2311203b4af4d4"
+      "sha256": "a8a29d6fc6bc3525cd123bae131bd5970253ee5e004d9ad5020f329ac59501a9"
     },
     {
       "kind": "src",
@@ -2811,7 +2811,7 @@
     {
       "kind": "src",
       "key": "src/style/components/settings-layout-contract.css",
-      "sha256": "88597e7406c57f1ac180d4f1f70f5c3a20ea1049b1c78b622b2a0674823660d9"
+      "sha256": "42f3aedf52ae8a84a462f872f5e678c014ab9feabba583d02f4503222f6ccfce"
     },
     {
       "kind": "src",
@@ -2821,7 +2821,7 @@
     {
       "kind": "src",
       "key": "src/style/components/settings-pi.css",
-      "sha256": "7cc404c69b28f63d025bbb08000fe8d4ec22122011e91068afce008d2f9a1ccc"
+      "sha256": "65c2826c095334234e85be1f85164a9db339c74fe48a8d3dc3460cf6fb4be4ac"
     },
     {
       "kind": "src",
@@ -2886,7 +2886,7 @@
     {
       "kind": "src",
       "key": "src/utils/editorSelectionHighlight.ts",
-      "sha256": "98b2a1effb323382e726838aec9795bfbcad1c98bb16b4a5db521dca5ed415de"
+      "sha256": "8696d0a0a3c20fd763102b4fd7ea92ffd7fafc902a07b761702eb244e0251f82"
     },
     {
       "kind": "src",
@@ -3099,7 +3099,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-09-08T17:03:54.789Z",
-  "headShaAtGeneration": "14b6a822396a4f9b71b82de6e0f741ff46518baa",
+  "generatedAt": "2026-09-09T09:55:48.640Z",
+  "headShaAtGeneration": "7a03e54722d694c90e4245376e8429f5cfdfb584",
   "graphifyVersion": "graphify 0.9.31"
 }

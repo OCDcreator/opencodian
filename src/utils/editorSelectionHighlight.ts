@@ -27,28 +27,29 @@ const selectionHighlightField = StateField.define<DecorationSet>({
   provide: (field) => EditorView.decorations.from(field),
 });
 
-const installedEditors = new WeakSet<EditorView>();
-
 function ensureSelectionHighlightField(editorView: EditorView): void {
-  if (installedEditors.has(editorView)) {
+  if (editorView.state.field(selectionHighlightField, false)) {
     return;
   }
 
   editorView.dispatch({
     effects: StateEffect.appendConfig.of(selectionHighlightField),
   });
-  installedEditors.add(editorView);
 }
 
 export function showSelectionHighlight(editorView: EditorView, from: number, to: number): void {
   ensureSelectionHighlightField(editorView);
+  const current = editorView.state.field(selectionHighlightField);
+  const range = current.iter();
+  if (current.size === 1 && range.from === from && range.to === to) return;
   editorView.dispatch({
     effects: showHighlightEffect.of({ from, to }),
   });
 }
 
 export function hideSelectionHighlight(editorView: EditorView): void {
-  if (!installedEditors.has(editorView)) {
+  const current = editorView.state.field(selectionHighlightField, false);
+  if (!current || current.size === 0) {
     return;
   }
 

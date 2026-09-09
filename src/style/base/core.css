@@ -636,6 +636,17 @@ body[data-opencodian-provider-icon-mode="color"] {
   height: 16px;
 }
 
+/* Pi is an embedded filled mark, independent of the connection-state color.
+   Its original artwork includes whitespace; keep the glyph legible in the
+   compact badge and away from the separate lower-right status indicator. */
+.opencodian-server-status-icon[data-backend-icon='pi'] > svg.opencodian-pi {
+  flex: 0 0 22px;
+  width: 22px;
+  height: 22px;
+  color: var(--text-normal);
+  transform: translate(-2px, -2px);
+}
+
 .opencodian-server-status-icon-brandmark {
   display: flex;
   align-items: center;

@@ -123,7 +123,7 @@ export function createConfigurationService(sdk, cwd, agentDir) {
       return this.getSettings();
     },
     getModels() { const raw = read(modelFile); return { path: modelFile, value: parse(raw), revision: hash(raw) }; },
-    saveModels(command) {
+    async saveModels(command) {
       if (!object(command.value) || !object(command.value.providers)) throw new Error('Expected a providers object.');
       safeKeys(command.value);
       mkdirSync(agentDir, { recursive: true });
@@ -134,7 +134,9 @@ export function createConfigurationService(sdk, cwd, agentDir) {
         const raw = read(modelFile);
         if (command.revision !== hash(raw)) throw new Error('Model configuration changed on disk. Reload before saving.');
         writeFileSync(temporary, JSON.stringify(command.value, null, 2) + '\n', { mode: 0o600 });
-        const registry = sdk.ModelRegistry.create(sdk.AuthStorage.inMemory(), temporary);
+        const registry = sdk.ModelRuntime
+          ? await sdk.ModelRuntime.create({ modelsPath: temporary, refreshOnCreate: false, credentials: { read: async () => undefined, list: async () => [], modify: async () => { throw new Error('Validation cannot change credentials.'); }, delete: async () => { throw new Error('Validation cannot change credentials.'); } } })
+          : sdk.ModelRegistry.create(sdk.AuthStorage.inMemory(), temporary);
         const error = registry.getError(); if (error) throw new Error(error);
         if (read(modelFile) !== raw) throw new Error('Model configuration changed during validation. Reload before saving.');
         if (raw !== undefined) writeFileSync(`${modelFile}.opencodian.bak`, raw, { mode: 0o600 });
@@ -149,6 +151,7 @@ export function createConfigurationService(sdk, cwd, agentDir) {
 export function startConfigurationTransport(configuration, sdkVersion, streams) {
   const commands = { get_configuration: () => configuration.getSettings(), save_configuration: command => configuration.saveSettings(command), get_model_configuration: () => configuration.getModels(), save_model_configuration: command => configuration.saveModels(command) };
   const send = message => streams.stdout.write(`${JSON.stringify(message)}\n`);
+  let pending = Promise.resolve();
   let buffer = '';
   streams.stdin.setEncoding('utf8');
   streams.stdin.on('data', chunk => {
@@ -162,11 +165,11 @@ export function startConfigurationTransport(configuration, sdkVersion, streams) 
       try { command = JSON.parse(line); }
       catch { send({ type: 'transport_error', error: 'Invalid configuration JSONL.' }); continue; }
       if (command.type === 'shutdown') { process.exit(0); return; }
-      try {
-        const data = command.type === 'get_state' ? { serviceProtocol: 1, sdkVersion, commands: Object.keys(commands) } : Object.hasOwn(commands, command.type) ? commands[command.type](command) : undefined;
+      pending = pending.then(async () => { try {
+        const data = command.type === 'get_state' ? { serviceProtocol: 1, sdkVersion, commands: Object.keys(commands) } : Object.hasOwn(commands, command.type) ? await commands[command.type](command) : undefined;
         if (data === undefined) throw new Error('Unsupported configuration operation.');
         send({ type: 'response', id: command.id, command: command.type, success: true, data });
-      } catch (error) { send({ type: 'response', id: command.id, command: command.type, success: false, error: error.message }); }
+      } catch (error) { send({ type: 'response', id: command.id, command: command.type, success: false, error: error.message }); } });
     }
   });
   streams.stdin.on('end', () => process.exit(0));

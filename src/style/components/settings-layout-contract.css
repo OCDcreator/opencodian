@@ -1,3 +1,14 @@
+.setting-item.opencodian-settings-direct-host {
+  display: block;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
 .opencodian-settings {
   --opencodian-settings-section-bg:
     color-mix(in srgb, var(--background-secondary) 88%, var(--background-primary));
@@ -58,6 +69,16 @@
   background: transparent;
   border: 0;
   box-shadow: none;
+}
+
+/* Form hosts own the gap across rows, nested editors and status messages.
+   Adjacent-row margins cannot cover cards separated by a wrapper. */
+.opencodian-settings .opencodian-settings-form-stack,
+.opencodian-settings .opencodian-style-input-controls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--opencodian-settings-space-lg);
+  min-width: 0;
 }
 
 .opencodian-settings .opencodian-settings-quick-nav {

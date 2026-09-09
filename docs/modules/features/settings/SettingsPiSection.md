@@ -1,5 +1,7 @@
 # SettingsPiSection
 
+账户和原生会话动态列表使用共享opencodian-settings-form-stack，异步结果与后续重绘保持12px卡片间距。经典/标签布局都通过attachTabbed沿用同一section-body布局。
+
 > 源码: src/features/settings/SettingsPiSection.ts
 
 ## 职责

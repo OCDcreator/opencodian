@@ -195,4 +195,23 @@ describe('FocusContextRuntimeService', () => {
     expect(showSelectionHighlight).toHaveBeenCalledWith(editorView, 15, 42);
     expect(hideSelectionHighlight).not.toHaveBeenCalled();
   });
+
+  it('keeps the same editor when a selectionchange refresh follows an explicit polling refresh', () => {
+    jest.useFakeTimers();
+    const editor = createEditor({ selection: 'Stable selection', fromLine: 1, toLine: 2, fromOffset: 5, toOffset: 20 });
+    const view = createMarkdownView('notes/stable.md', editor);
+    const { service, getFocusPreview } = createServiceHarness({ activeView: view, markdownViews: [view] });
+    document.getSelection()?.removeAllRanges();
+    try {
+      service.refreshActiveFocusContextPreview(view, editor);
+      for (let index = 0; index < 8; index++) {
+        service.scheduleFocusContextPreviewRefresh();
+        jest.advanceTimersByTime(40);
+        service.refreshActiveFocusContextPreview(view, editor);
+      }
+      expect(getFocusPreview()?.kind).toBe('selection');
+      expect(showSelectionHighlight).toHaveBeenLastCalledWith(editor.cm, 5, 20);
+      expect(hideSelectionHighlight).not.toHaveBeenCalled();
+    } finally { service.dispose(); jest.useRealTimers(); }
+  });
 });

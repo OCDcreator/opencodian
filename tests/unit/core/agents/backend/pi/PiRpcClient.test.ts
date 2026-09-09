@@ -6,9 +6,9 @@ import { PiRpcClient, resolvePiCommand } from '../../../../../../src/core/agents
 const mockSpawn = jest.fn();
 jest.mock('node:child_process', () => ({ spawn: (...args: unknown[]) => mockSpawn(...args) }));
 jest.mock('node:fs', () => ({
-  existsSync: (file: string) => file === '/bin/pi' || file === '/bin/node' || file === '/plugin/assets/pi/service.mjs',
+  existsSync: (file: string) => ['/bin/pi', '/bin/node', '/pkg/dist/cli.js', '/pkg/dist/index.js', '/plugin/assets/pi/service.mjs'].includes(file),
   realpathSync: () => '/pkg/dist/cli.js',
-  readFileSync: () => '{"name":"@mariozechner/pi-coding-agent"}',
+  readFileSync: (file: string) => { if (file !== '/pkg/package.json') throw new Error('ENOENT'); return '{"name":"@mariozechner/pi-coding-agent","bin":{"pi":"dist/cli.js"}}'; },
 }));
 
 describe('Pi RPC process boundary', () => {
