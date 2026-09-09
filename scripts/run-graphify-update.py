@@ -10,6 +10,10 @@ import sys
 def install_sysconf_compatibility() -> None:
     """Expose an indeterminate semaphore limit when the host denies sysconf."""
 
+    # Windows Python has no os.sysconf at all; nothing to shim there.
+    if not hasattr(os, "sysconf"):
+        return
+
     try:
         os.sysconf("SC_SEM_NSEMS_MAX")
     except PermissionError:
