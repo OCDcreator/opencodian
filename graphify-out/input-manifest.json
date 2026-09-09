@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "9cc4ce9eaf25a9466644b94abfee9d44339d5e8db4ce947155ae942a78193d29",
+  "digest": "78854d967003b14ce35d8e7b55c620f2fd521f9acebed71fc80c635324340ae9",
   "recordCount": 619,
   "records": [
     {
@@ -16,12 +16,12 @@
     {
       "kind": "package",
       "key": "package-lock.json",
-      "sha256": "f1e75e7c2fd0113d37f1b568dfcf56329414a9c4f5e387b404eb49df98338eb1"
+      "sha256": "e37fa59f37e9dfaf0dd218f5b150845190687e58e06dfed02a59ee3e31715537"
     },
     {
       "kind": "package",
       "key": "package.json",
-      "sha256": "b2545c8630677710e73946a98bea8f870618c63898b6aa8b7a75608fca091e48"
+      "sha256": "1541a7ea60c47db1673da023275a8a0339143434588757b12e6012f0aabd5861"
     },
     {
       "kind": "src",
@@ -3071,7 +3071,7 @@
     {
       "kind": "tool",
       "key": "graphify-version",
-      "sha256": "5f45bbcdc1f605c0aa3cce55583a208fba43af4faefecfdf157d982dac286c25"
+      "sha256": "d27ce4be2c503cc8256349f2efd107c22bd7b0dba071404ef1cb6a9b65bd3b77"
     },
     {
       "kind": "tsconfig",
@@ -3099,7 +3099,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-09-09T11:06:51.540Z",
-  "headShaAtGeneration": "5a55da286336851f7f4616ce822d76bf29d07d3f",
-  "graphifyVersion": "0.4.31"
+  "generatedAt": "2026-09-09T11:42:43.203Z",
+  "headShaAtGeneration": "03fbb0f3a98c5077482bb184d1287303aafec186",
+  "graphifyVersion": "graphify 0.9.31"
 }
