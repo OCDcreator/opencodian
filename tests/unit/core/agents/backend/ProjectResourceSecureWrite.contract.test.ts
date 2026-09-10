@@ -47,8 +47,8 @@ function rev(target: string): FileRevision {
   return r;
 }
 function computeFileRevisionSync(target: string): FileRevision | null {
-  // synchronous mirror for test setup convenience
-  const real = fs.realpathSync(target);
+  // Native canonicalization matches fs.promises.realpath, including Windows 8.3 aliases.
+  const real = fs.realpathSync.native(target);
   const st = fs.statSync(real);
   const content = fs.readFileSync(real, 'utf8');
   return { canonicalPath: real, mtimeMs: st.mtimeMs, size: st.size, sha256: sha(content) };
@@ -79,7 +79,7 @@ describe('assertWithinAllowlistedRoot — multi-root + escape protection', () =>
   it('matches a target inside the project root', async () => {
     const match = await assertWithinAllowlistedRoot(allowlist, path.join(projectRoot, 'config.json'));
     expect(match.scope).toBe('project');
-    expect(match.canonicalTarget).toBe(path.join(fs.realpathSync(projectRoot), 'config.json'));
+    expect(match.canonicalTarget).toBe(path.join(fs.realpathSync.native(projectRoot), 'config.json'));
   });
   it('matches a target inside the global root', async () => {
     const match = await assertWithinAllowlistedRoot(allowlist, path.join(globalRoot, 'settings.json'));

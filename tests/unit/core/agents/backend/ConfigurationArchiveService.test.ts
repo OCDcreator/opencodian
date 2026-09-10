@@ -32,7 +32,8 @@ function write(target: string, content: string): void {
   fs.writeFileSync(target, content, 'utf8');
 }
 function revisionOf(target: string): FileRevision {
-  const real = fs.realpathSync(target);
+  // Match fs.promises.realpath: the legacy sync API preserves Windows 8.3 aliases.
+  const real = fs.realpathSync.native(target);
   const st = fs.statSync(real);
   const content = fs.readFileSync(real, 'utf8');
   return {
@@ -74,7 +75,7 @@ describe('ConfigurationArchiveService — archive-root-anchored symlink confinem
     outside = tmpDir('arc-secure-out-');
     target = path.join(projectRoot, 'a.json');
     write(target, '{"a":1}');
-    match = { scope: 'project', canonicalRoot: projectRoot, canonicalTarget: fs.realpathSync(target) };
+    match = { scope: 'project', canonicalRoot: projectRoot, canonicalTarget: fs.realpathSync.native(target) };
     ctx = { backend: 'test', kind: 'config', format: 'json', match };
   });
   afterEach(() => {
@@ -158,7 +159,7 @@ describe('ConfigurationArchiveService — manifest present-but-invalid is fail-c
     archiveRoot = tmpDir('arc-invalid-a-');
     target = path.join(projectRoot, 'a.json');
     write(target, '{"a":1}');
-    match = { scope: 'project', canonicalRoot: projectRoot, canonicalTarget: fs.realpathSync(target) };
+    match = { scope: 'project', canonicalRoot: projectRoot, canonicalTarget: fs.realpathSync.native(target) };
     ctx = { backend: 'test', kind: 'config', format: 'json', match };
   });
   afterEach(() => {
@@ -204,7 +205,7 @@ describe('ConfigurationArchiveService — retention transaction order', () => {
     archiveRoot = tmpDir('arc-ret-a-');
     target = path.join(projectRoot, 'a.json');
     write(target, '{"a":1}');
-    match = { scope: 'project', canonicalRoot: projectRoot, canonicalTarget: fs.realpathSync(target) };
+    match = { scope: 'project', canonicalRoot: projectRoot, canonicalTarget: fs.realpathSync.native(target) };
     ctx = { backend: 'test', kind: 'config', format: 'json', match };
   });
   afterEach(() => {
@@ -255,7 +256,7 @@ describe('ConfigurationArchiveService — revision/content snapshot integrity', 
     archiveRoot = tmpDir('arc-snapshot-a-');
     target = path.join(projectRoot, 'a.json');
     write(target, '{"value":"original"}');
-    match = { scope: 'project', canonicalRoot: projectRoot, canonicalTarget: fs.realpathSync(target) };
+    match = { scope: 'project', canonicalRoot: projectRoot, canonicalTarget: fs.realpathSync.native(target) };
     ctx = { backend: 'test', kind: 'config', format: 'json', match };
   });
 
@@ -287,7 +288,7 @@ describe('ConfigurationArchiveService — cross-format rejection', () => {
     archiveRoot = tmpDir('arc-fmt-a-');
     target = path.join(projectRoot, 'a.json');
     write(target, '{"a":1}');
-    match = { scope: 'project', canonicalRoot: projectRoot, canonicalTarget: fs.realpathSync(target) };
+    match = { scope: 'project', canonicalRoot: projectRoot, canonicalTarget: fs.realpathSync.native(target) };
   });
   afterEach(() => {
     for (const d of [projectRoot, archiveRoot]) fs.rmSync(d, { recursive: true, force: true });
@@ -331,7 +332,7 @@ describe('ConfigurationArchiveService — restore honesty (not-found vs archive-
     archiveRoot = tmpDir('arc-rh-a-');
     target = path.join(projectRoot, 'a.json');
     write(target, '{"a":1}');
-    match = { scope: 'project', canonicalRoot: projectRoot, canonicalTarget: fs.realpathSync(target) };
+    match = { scope: 'project', canonicalRoot: projectRoot, canonicalTarget: fs.realpathSync.native(target) };
     ctx = { backend: 'test', kind: 'config', format: 'json', match };
   });
   afterEach(() => {
@@ -375,7 +376,7 @@ describe('ConfigurationArchiveService — restore honesty (not-found vs archive-
     const readSpy = jest.spyOn(nativeFs, 'readFile').mockRejectedValue(Object.assign(new Error('denied'), { code: 'EACCES' }));
     try {
       expect((await service.readLatestDeletedContent(ctx)).status).toBe('archive-failed');
-      expect(readSpy).toHaveBeenCalledWith(fs.realpathSync(manifestPath), 'utf8');
+      expect(readSpy).toHaveBeenCalledWith(fs.realpathSync.native(manifestPath), 'utf8');
     } finally {
       readSpy.mockRestore();
     }
@@ -419,7 +420,7 @@ describe('ConfigurationArchiveService — entry content integrity (item 3)', () 
     archiveRoot = tmpDir('arc-ci-a-');
     target = path.join(projectRoot, 'a.json');
     write(target, '{"a":1}');
-    match = { scope: 'project', canonicalRoot: projectRoot, canonicalTarget: fs.realpathSync(target) };
+    match = { scope: 'project', canonicalRoot: projectRoot, canonicalTarget: fs.realpathSync.native(target) };
     ctx = { backend: 'test', kind: 'config', format: 'json', match };
   });
   afterEach(() => { for (const d of [projectRoot, archiveRoot]) fs.rmSync(d, { recursive: true, force: true }); });
@@ -452,7 +453,7 @@ describe('ConfigurationArchiveService — clearDeleted honesty (item 4)', () => 
     archiveRoot = tmpDir('arc-ch-a-');
     target = path.join(projectRoot, 'a.json');
     write(target, '{"a":1}');
-    match = { scope: 'project', canonicalRoot: projectRoot, canonicalTarget: fs.realpathSync(target) };
+    match = { scope: 'project', canonicalRoot: projectRoot, canonicalTarget: fs.realpathSync.native(target) };
     ctx = { backend: 'test', kind: 'config', format: 'json', match };
   });
   afterEach(() => { for (const d of [projectRoot, archiveRoot]) fs.rmSync(d, { recursive: true, force: true }); });
@@ -515,7 +516,7 @@ describe('ConfigurationArchiveService — symlink confinement at every archive l
     outside = tmpDir('arc-sym-out-');
     target = path.join(projectRoot, 'a.json');
     write(target, '{"a":1}');
-    match = { scope: 'project', canonicalRoot: projectRoot, canonicalTarget: fs.realpathSync(target) };
+    match = { scope: 'project', canonicalRoot: projectRoot, canonicalTarget: fs.realpathSync.native(target) };
     ctx = { backend: 'test', kind: 'config', format: 'json', match };
   });
   afterEach(() => { for (const d of [projectRoot, archiveRoot, outside]) fs.rmSync(d, { recursive: true, force: true }); });
@@ -586,7 +587,7 @@ describe('ConfigurationArchiveService — clearDeleted fail-closed at scan level
     outside = tmpDir('arc-A-out-');
     target = path.join(projectRoot, 'a.json');
     write(target, '{"a":1}');
-    match = { scope: 'project', canonicalRoot: projectRoot, canonicalTarget: fs.realpathSync(target) };
+    match = { scope: 'project', canonicalRoot: projectRoot, canonicalTarget: fs.realpathSync.native(target) };
     ctx = { backend: 'test', kind: 'config', format: 'json', match };
   });
   afterEach(() => { for (const d of [projectRoot, archiveRoot, outside]) fs.rmSync(d, { recursive: true, force: true }); });
@@ -640,7 +641,7 @@ describe('ConfigurationArchiveService — clearDeleted preflight (item A round 6
     archiveRoot = tmpDir('arc-pf-a-');
     target = path.join(projectRoot, 'a.json');
     write(target, '{"a":1}');
-    match = { scope: 'project', canonicalRoot: projectRoot, canonicalTarget: fs.realpathSync(target) };
+    match = { scope: 'project', canonicalRoot: projectRoot, canonicalTarget: fs.realpathSync.native(target) };
     ctx = { backend: 'test', kind: 'config', format: 'json', match };
   });
   afterEach(() => { for (const d of [projectRoot, archiveRoot]) fs.rmSync(d, { recursive: true, force: true }); });
@@ -695,7 +696,7 @@ describe('ConfigurationArchiveService — preflight directory symlink + EACCES (
     outside = tmpDir('arc-r7-out-');
     target = path.join(projectRoot, 'a.json');
     write(target, '{"a":1}');
-    match = { scope: 'project', canonicalRoot: projectRoot, canonicalTarget: fs.realpathSync(target) };
+    match = { scope: 'project', canonicalRoot: projectRoot, canonicalTarget: fs.realpathSync.native(target) };
     ctx = { backend: 'test', kind: 'config', format: 'json', match };
   });
   afterEach(() => { for (const d of [projectRoot, archiveRoot, outside]) fs.rmSync(d, { recursive: true, force: true }); });
@@ -759,7 +760,7 @@ describe('ConfigurationArchiveService — round 8: readdir seam + in-root symlin
     archiveRoot = tmpDir('arc-r8-a-');
     target = path.join(projectRoot, 'a.json');
     write(target, '{"a":1}');
-    match = { scope: 'project', canonicalRoot: projectRoot, canonicalTarget: fs.realpathSync(target) };
+    match = { scope: 'project', canonicalRoot: projectRoot, canonicalTarget: fs.realpathSync.native(target) };
     ctx = { backend: 'test', kind: 'config', format: 'json', match };
   });
   afterEach(() => { for (const d of [projectRoot, archiveRoot]) fs.rmSync(d, { recursive: true, force: true }); });

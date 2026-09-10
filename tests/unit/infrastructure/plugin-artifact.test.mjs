@@ -120,7 +120,7 @@ describe('plugin artifact packaging', () => {
   });
 
   it('keeps GitHub and Gitea workflows aligned while using compatible artifact actions', () => {
-    const githubCiWorkflow = fs.readFileSync(githubCiWorkflowPath, 'utf8');
+    const githubCiWorkflow = fs.readFileSync(githubCiWorkflowPath, 'utf8').replace(/\r\n/g, '\n');
     const githubWorkflow = fs.readFileSync(githubWorkflowPath, 'utf8');
     const giteaWorkflow = fs.readFileSync(giteaWorkflowPath, 'utf8');
 

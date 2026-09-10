@@ -18,6 +18,8 @@ import {
   OpencodeConfigSourceService,
 } from '../../../../src/core/config/OpencodeConfigSourceService';
 
+// Canonical path expectations use realpathSync.native to match the async reader
+// when the runner's TEMP contains a Windows 8.3 alias such as RUNNER~1.
 let mockBeforeMkdir: ((targetPath: string) => Promise<void>) | undefined;
 
 jest.mock('node:fs/promises', () => {
@@ -320,7 +322,7 @@ describe('P1-B OpenCode configuration source contract', () => {
     if (catalog.status !== 'success') return;
     expect(catalog.targets).toEqual(expect.arrayContaining([
       expect.objectContaining({
-        canonicalTarget: path.join(fs.realpathSync(path.dirname(targetPath)), path.basename(targetPath)),
+        canonicalTarget: path.join(fs.realpathSync.native(path.dirname(targetPath)), path.basename(targetPath)),
         scope: 'global',
       }),
     ]));
@@ -329,7 +331,7 @@ describe('P1-B OpenCode configuration source contract', () => {
     expect(history.status).toBe('success');
     if (history.status !== 'success') return;
     expect(history.targets[0]).toMatchObject({
-      canonicalTarget: path.join(fs.realpathSync(path.dirname(targetPath)), path.basename(targetPath)),
+      canonicalTarget: path.join(fs.realpathSync.native(path.dirname(targetPath)), path.basename(targetPath)),
       backend: 'opencode',
       scope: 'global',
       kind: 'configuration',
@@ -428,7 +430,7 @@ describe('P1-B OpenCode configuration source contract', () => {
     const globalRoot = path.dirname(targetPath);
     const dotOpencodeRoot = path.join(fixture.home, '.opencode');
     await createDeletedArchiveIdentity(fixture, targetPath, 'opencode');
-    const canonicalTarget = path.join(fs.realpathSync(globalRoot), path.basename(targetPath));
+    const canonicalTarget = path.join(fs.realpathSync.native(globalRoot), path.basename(targetPath));
     fs.rmSync(globalRoot, { recursive: true, force: true });
     expect(fs.existsSync(globalRoot)).toBe(false);
     expect(fs.existsSync(dotOpencodeRoot)).toBe(false);
@@ -461,7 +463,7 @@ describe('P1-B OpenCode configuration source contract', () => {
       editable: true,
     });
     expect(snapshot.source.parseError).toBeUndefined();
-    expect(snapshot.source.revision?.canonicalPath).toBe(fs.realpathSync(targetPath));
+    expect(snapshot.source.revision?.canonicalPath).toBe(fs.realpathSync.native(targetPath));
     expect(snapshot.content).toBe(content);
   });
 
@@ -615,7 +617,7 @@ describe('P1-B OpenCode configuration source contract', () => {
     writeText(targetPath, external);
     const actualSnapshot = readAllowlistedFileSnapshot;
     const current: FileRevision = {
-      canonicalPath: fs.realpathSync(targetPath),
+      canonicalPath: fs.realpathSync.native(targetPath),
       mtimeMs: fs.statSync(targetPath).mtimeMs,
       size: Buffer.byteLength(external),
       sha256: 'b'.repeat(64),
@@ -666,7 +668,7 @@ describe('P1-B OpenCode configuration source contract', () => {
     if (history.status !== 'success') return;
     const target = history.targets[0];
     expect(target).toMatchObject({
-      canonicalTarget: path.join(fs.realpathSync(path.dirname(targetPath)), path.basename(targetPath)),
+      canonicalTarget: path.join(fs.realpathSync.native(path.dirname(targetPath)), path.basename(targetPath)),
       backend: 'opencode',
       scope: 'project',
       kind: 'configuration',

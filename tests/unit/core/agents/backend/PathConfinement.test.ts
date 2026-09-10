@@ -68,7 +68,8 @@ describe('PathConfinement — resolveAnchorRealpath', () => {
 
   it('returns the realpath for an existing root', async () => {
     const resolved = await resolveAnchorRealpath(root);
-    expect(isWithinRoot(fs.realpathSync(root), resolved)).toBe(true);
+    // Native realpath expands Windows short names just like fs.promises.realpath.
+    expect(isWithinRoot(fs.realpathSync.native(root), resolved)).toBe(true);
   });
 
   it('falls back to the lexical path when the root does not exist (ENOENT)', async () => {

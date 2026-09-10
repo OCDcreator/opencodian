@@ -52,7 +52,7 @@ jest.mock('node:fs/promises', () => {
   });
   const canonicalizeExisting = (candidate: string): string => {
     try {
-      return actualFs.realpathSync(candidate);
+      return actualFs.realpathSync.native(candidate);
     } catch {
       return actualPath.resolve(candidate);
     }
@@ -115,7 +115,8 @@ function write(target: string, content: string): void {
 }
 
 function revisionOf(target: string): FileRevision {
-  const canonicalPath = fs.realpathSync(target);
+  // Match fs.promises.realpath so short TEMP aliases do not create false conflicts.
+  const canonicalPath = fs.realpathSync.native(target);
   const stat = fs.statSync(canonicalPath);
   const content = fs.readFileSync(canonicalPath, 'utf8');
   return {
@@ -199,7 +200,7 @@ describe('configuration archive history public contract', () => {
   }> {
     const targetPath = path.join(projectRoot, 'settings.json');
     write(targetPath, content);
-    const canonicalTarget = fs.realpathSync(targetPath);
+    const canonicalTarget = fs.realpathSync.native(targetPath);
     const deleted = await safeDeleteFile({
       targetPath,
       expectedRevision: revisionOf(targetPath),
@@ -223,7 +224,7 @@ describe('configuration archive history public contract', () => {
   it('catalogs a deleted target after reload and restores its selected deleted entry', async () => {
     const targetPath = path.join(projectRoot, 'settings.json');
     write(targetPath, '{"version":1}');
-    const canonicalTarget = fs.realpathSync(targetPath);
+    const canonicalTarget = fs.realpathSync.native(targetPath);
     const deleted = await safeDeleteFile({
       targetPath,
       expectedRevision: revisionOf(targetPath),
@@ -286,7 +287,7 @@ describe('configuration archive history public contract', () => {
     const targetPath = path.join(narrowRoot, 'settings.json');
     const narrowAllowlist: ConfigurationAllowlist = [{ scope: 'project', rootPath: narrowRoot }];
     write(targetPath, '{"version":1}');
-    const canonicalTarget = fs.realpathSync(targetPath);
+    const canonicalTarget = fs.realpathSync.native(targetPath);
     const deleted = await safeDeleteFile({
       targetPath,
       expectedRevision: revisionOf(targetPath),
@@ -321,7 +322,7 @@ describe('configuration archive history public contract', () => {
       const targetPath = path.join(lexicalRoot, 'settings.json');
       const narrowAllowlist: ConfigurationAllowlist = [{ scope: 'project', rootPath: lexicalRoot }];
       write(targetPath, '{"version":1}');
-      const canonicalTarget = fs.realpathSync(targetPath);
+      const canonicalTarget = fs.realpathSync.native(targetPath);
       const deleted = await safeDeleteFile({
         targetPath,
         expectedRevision: revisionOf(targetPath),
@@ -489,7 +490,7 @@ describe('configuration archive history public contract', () => {
   it('never reads outside bytes when a selected archive leaf swaps to a symlink at open', async () => {
     const { targetPath, identity } = await createDeletedHistory();
     const entryPath = archiveEntryPath(archiveRoot, 'delete');
-    const canonicalEntryPath = fs.realpathSync(entryPath);
+    const canonicalEntryPath = fs.realpathSync.native(entryPath);
     const outsidePath = path.join(projectRoot, 'outside-secret.json');
     const outsideContent = '{"outside":"must-not-be-read"}';
     write(outsidePath, outsideContent);
@@ -520,7 +521,7 @@ describe('configuration archive history public contract', () => {
   it('never reads outside bytes when cataloging an archive leaf that swaps to a symlink at open', async () => {
     await createDeletedHistory();
     const entryPath = archiveEntryPath(archiveRoot, 'delete');
-    const canonicalEntryPath = fs.realpathSync(entryPath);
+    const canonicalEntryPath = fs.realpathSync.native(entryPath);
     const outsidePath = path.join(projectRoot, 'outside-catalog-secret.json');
     const outsideContent = '{"outside":"catalog-must-not-read"}';
     write(outsidePath, outsideContent);
@@ -604,8 +605,8 @@ describe('configuration archive history public contract', () => {
     const secondPath = path.join(projectRoot, 'second.json');
     write(firstPath, '{"first":true}');
     write(secondPath, '{"second":true}');
-    const firstCanonical = fs.realpathSync(firstPath);
-    const secondCanonical = fs.realpathSync(secondPath);
+    const firstCanonical = fs.realpathSync.native(firstPath);
+    const secondCanonical = fs.realpathSync.native(secondPath);
     await safeDeleteFile({
       targetPath: firstPath,
       expectedRevision: revisionOf(firstPath),

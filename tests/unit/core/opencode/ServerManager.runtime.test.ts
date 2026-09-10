@@ -418,7 +418,7 @@ function registerLaunchLifecycleTests(context: ServerManagerRuntimeContext): voi
         timeout: 1,
       }));
       const pathBinDir = path.join(context.testVaultPath, 'PathBin');
-      const binaryPath = path.join(pathBinDir, 'opencode');
+      const binaryPath = path.join(pathBinDir, process.platform === 'win32' ? 'opencode.cmd' : 'opencode');
       const spawnedProcess = {
         pid: 13579,
         on: jest.fn(),
@@ -467,7 +467,7 @@ function registerLaunchLifecycleTests(context: ServerManagerRuntimeContext): voi
       };
       const { spawn: mockSpawn } = jest.requireMock('child_process') as { spawn: jest.Mock };
       const pathBinDir = path.join(context.testVaultPath, 'WrapperPathBin');
-      const binaryPath = path.join(pathBinDir, 'opencode');
+      const binaryPath = path.join(pathBinDir, process.platform === 'win32' ? 'opencode.cmd' : 'opencode');
 
       fs.mkdirSync(pathBinDir, { recursive: true });
       fs.writeFileSync(binaryPath, '#!/bin/sh', 'utf-8');

@@ -173,8 +173,8 @@ describe('version lifecycle synchronization', () => {
 });
 
 describe('release workflow contracts', () => {
-  const githubWorkflow = fs.readFileSync(path.join(process.cwd(), '.github', 'workflows', 'plugin-package.yml'), 'utf8');
-  const giteaWorkflow = fs.readFileSync(path.join(process.cwd(), '.gitea', 'workflows', 'plugin-package.yml'), 'utf8');
+  const githubWorkflow = fs.readFileSync(path.join(process.cwd(), '.github', 'workflows', 'plugin-package.yml'), 'utf8').replace(/\r\n/g, '\n');
+  const giteaWorkflow = fs.readFileSync(path.join(process.cwd(), '.gitea', 'workflows', 'plugin-package.yml'), 'utf8').replace(/\r\n/g, '\n');
 
   it('grants only repository content writes and detects main-branch version changes', () => {
     for (const workflow of [githubWorkflow, giteaWorkflow]) {

@@ -28,7 +28,8 @@ function write(target: string, content: string): void {
 }
 
 function revision(target: string): FileRevision {
-  const canonicalPath = fs.realpathSync(target);
+  // Use the same native canonical path as the production async revision reader.
+  const canonicalPath = fs.realpathSync.native(target);
   const fileStat = fs.statSync(canonicalPath);
   const content = fs.readFileSync(canonicalPath, 'utf8');
   return {
@@ -106,8 +107,8 @@ describe('ProjectResourceSecureWrite commit identity fence', () => {
     jest.resetModules();
     // The secure-write contract commits against canonical real paths. Normalise
     // test roots too, because macOS `/var` otherwise differs from `/private/var`.
-    projectRoot = fs.realpathSync(tmpDir('cfg-commit-race-'));
-    archiveRoot = fs.realpathSync(tmpDir('cfg-commit-race-archive-'));
+    projectRoot = fs.realpathSync.native(tmpDir('cfg-commit-race-'));
+    archiveRoot = fs.realpathSync.native(tmpDir('cfg-commit-race-archive-'));
     allowlist = [{ scope: 'project', rootPath: projectRoot }];
   });
 
