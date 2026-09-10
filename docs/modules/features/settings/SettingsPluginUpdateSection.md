@@ -17,12 +17,13 @@
 - The header exposes `aria-expanded` and `aria-controls`; the localized expand/collapse label is announced through `aria-label`. The content wrapper uses `aria-hidden` and `inert` while collapsed, and the header toggles this DOM state without rebuilding the settings page or moving focus.
 - Keeps the description, flat status/actions, release history, and local backups inside `.opencodian-plugin-update-content`; the outer card remains the only card surface.
 - Keeps the manual check action and explicit latest-stable action in a flat status group, separated by a hairline inside the one version-management card.
-- Keeps the complete remote stable-release history and local three-file backups as flat groups using `data-plugin-update-list="releases"` and `data-plugin-update-list="backups"`, so their row separators never create nested cards.
+- Keeps stable-release history and local three-file backups as flat groups using `data-plugin-update-list="releases"` and `data-plugin-update-list="backups"`. Initially renders three releases; Show more appends three, Show fewer restores the first three with focus on the surviving control. Incompatible entries remain visible within their batch.
 - Keeps incompatible entries visible but disables their action and renders the service-supplied reason.
 - Renders a standard Obsidian toggle bound to `settings.pluginUpdateAutoInstall` inside the status panel; toggling persists immediately through the normal settings save path and lets the startup check auto-install newer compatible stable releases.
 - Uses a confirmation dialog for every remote install and backup restore. A target older than the currently installed version uses downgrade-specific copy.
-- Refreshes the owning settings shell immediately when a check/apply operation begins and once it settles. `data-plugin-update-applying` and disabled buttons expose the serialized in-progress state.
-- Shows completion/failure notices only after the service operation settles; completion copy asks the user to reload the plugin or restart Obsidian.
+- Subscribes to `PluginUpdateService.onProgress()` during its rendered lifetime. Phase/file-count text, a native indeterminate progress element, the header badge and disabled action states update in place; installing opens the disclosure. Never invents a byte/time percentage when `requestUrl` only returns complete buffers.
+- Terminal completion/failure remains inline and uses the existing notice; installation prompts a reload/restart. The service preserves transient progress so reopening settings during a slow download immediately shows current work.
+- Both settings hosts own the section instance and call `dispose()` before replacement/hide/close. Stale async completions cannot redraw a closed settings surface. Checking/installing terminal changes redraw the visible shell only after the operation settles.
 
 ## Boundaries
 

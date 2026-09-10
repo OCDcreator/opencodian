@@ -1,5 +1,7 @@
 # Plugin Update Settings Styles
 
+2026-09-10：增加主题变量驱动的活动进度条、失败状态、历史分页控件。`hidden` 显式生效，减少动态效果时停止进度动画；按钮允许换行，窄窗口不横向溢出。实际 section 渲染在 420/880px、深浅主题下检查通过。
+
 > **源码**: `src/style/components/settings-plugin-update.css`
 > **状态**: [REVIEW]
 > **Updated**: 2026-07-29 — version management uses a quiet `--background-primary` base with tokenized header hover feedback, while retaining the single-border disclosure and 150ms reduced-motion-aware transition.

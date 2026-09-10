@@ -79,6 +79,7 @@ export class OpenCodianSettingsView extends ItemView {
   private userSection: SettingsUserSection | null = null;
   private dropdownsEnhancer: SettingsDropdownsEnhancerHandle | null = null;
   private pluginUpdateExpanded = false;
+  private pluginUpdateSection: SettingsPluginUpdateSection | null = null;
 
   constructor(leaf: import('obsidian').WorkspaceLeaf, plugin: OpenCodianPlugin) {
     super(leaf);
@@ -97,17 +98,11 @@ export class OpenCodianSettingsView extends ItemView {
     });
   }
 
-  getViewType(): string {
-    return 'opencodian-settings-view';
-  }
+  getViewType(): string { return 'opencodian-settings-view'; }
 
-  getDisplayText(): string {
-    return t('settings.ui.settingsInEditorArea.tabTitle');
-  }
+  getDisplayText(): string { return t('settings.ui.settingsInEditorArea.tabTitle'); }
 
-  getIcon(): string {
-    return 'settings';
-  }
+  getIcon(): string { return 'settings'; }
 
   async onOpen(): Promise<void> {
     this.renderSettings();
@@ -307,7 +302,9 @@ export class OpenCodianSettingsView extends ItemView {
       );
   }
   private renderPluginUpdateSection(containerEl: HTMLElement): void {
-    new SettingsPluginUpdateSection({ plugin: this.plugin, requestDisplayRefresh: () => { this.renderSettings(); }, isExpanded: this.pluginUpdateExpanded, onExpandedChange: (isExpanded) => { this.pluginUpdateExpanded = isExpanded; } }).render(containerEl);
+    this.pluginUpdateSection?.dispose();
+    this.pluginUpdateSection = new SettingsPluginUpdateSection({ plugin: this.plugin, requestDisplayRefresh: () => { this.renderSettings(); }, isExpanded: this.pluginUpdateExpanded, onExpandedChange: (isExpanded) => { this.pluginUpdateExpanded = isExpanded; } });
+    this.pluginUpdateSection.render(containerEl);
   }
 
   // ─── Classic section rendering ─────────────────────────────────────
@@ -539,6 +536,8 @@ export class OpenCodianSettingsView extends ItemView {
   // ─── Shared helpers ────────────────────────────────────────────────
 
   private disposeSections(): void {
+    this.pluginUpdateSection?.dispose();
+    this.pluginUpdateSection = null;
     this.conversationSection?.dispose();
     this.agentsSection?.dispose();
     this.commandsSection?.dispose();

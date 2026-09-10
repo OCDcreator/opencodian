@@ -37,3 +37,7 @@ Run before merge: `npm run typecheck`, `npm run module-docs`.
 ## Pi owner boundary review (2026-09-08)
 
 The new core.backend-pi owner isolates the external Pi process service. core.update retains its existing responsibilities; Pi process lifecycle, RPC compatibility and native history must not be added to this owner.
+
+## Update transaction progress (2026-09-10)
+
+`PluginUpdateService` owns transient operation progress and its disposable snapshot events. Acquire the check or package-operation promise before publishing state or invoking injected IO; checks and installations/restores are mutually exclusive, including subscriber reentry. UI owners may display the current phase and completed-file count but must not invent byte progress. Only publish successful completion after package verification and final backup refresh; failed installation retains its error and publishes restoration before attempting rollback. Consumers must dispose subscriptions on close, and reopening reads the existing service snapshot.

@@ -1,3 +1,4 @@
+import type { PluginUpdateSnapshot } from '../../../../src/core/update/PluginUpdateService';
 import { SettingsPluginUpdateSection } from '../../../../src/features/settings/SettingsPluginUpdateSection';
 import { setLocale } from '../../../../src/i18n';
 
@@ -89,6 +90,105 @@ describe('SettingsPluginUpdateSection', () => {
   afterEach(() => {
     jest.restoreAllMocks();
   });
+
+  it('limits history to three and expands in batches without losing keyboard focus', () => {
+    const snapshot = createSnapshot();
+    snapshot.releases = Array.from({ length: 8 }, (_, index) => ({ ...snapshot.releases[0], version: `1.2.${8 - index}` }));
+    const { section } = createSection(snapshot, { isExpanded: true });
+    const root = document.body.createDiv();
+    section.render(root);
+    const rows = () => root.querySelectorAll('[data-plugin-update-list="releases"] > div');
+    const more = root.querySelector<HTMLButtonElement>('[data-plugin-update-action="show-more"]')!;
+    const less = root.querySelector<HTMLButtonElement>('[data-plugin-update-action="show-less"]')!;
+    expect(rows()).toHaveLength(3);
+    more.focus(); more.click();
+    expect(rows()).toHaveLength(6);
+    expect(document.activeElement).toBe(more);
+    more.click();
+    expect(rows()).toHaveLength(8);
+    expect(document.activeElement).toBe(less);
+    less.click();
+    expect(rows()).toHaveLength(3);
+    expect(document.activeElement).toBe(more);
+  });
+
+  it('shows ongoing progress and disables actions while the download remains pending', async () => {
+    const { section, service, refresh } = createSection(createSnapshot());
+    let state = createSnapshot() as PluginUpdateSnapshot;
+    let publish: ((snapshot: PluginUpdateSnapshot) => void) | undefined;
+    let resolve!: (result: { installedVersion: string }) => void;
+    const pending = new Promise<{ installedVersion: string }>((done) => { resolve = done; });
+    const dispose = jest.fn(() => { publish = undefined; });
+    Object.assign(service, { onProgress: (listener: typeof publish) => { publish = listener; return { dispose }; } });
+    service.getSnapshot.mockImplementation(() => state as ReturnType<typeof createSnapshot>);
+    service.installRelease.mockImplementation(() => {
+      state = { ...state, isApplying: true, progress: { phase: 'preparing', version: '1.2.0' } };
+      publish?.(state);
+      return pending;
+    });
+    jest.spyOn(window, 'confirm').mockReturnValue(true);
+    const root = document.body.createDiv();
+    section.render(root);
+    const install = root.querySelector<HTMLButtonElement>('[data-plugin-update-action="install-latest"]')!;
+    install.click();
+    expect(root.querySelector<HTMLProgressElement>('progress')?.hidden).toBe(false);
+    expect(root.querySelector('progress')?.hasAttribute('value')).toBe(false);
+    expect(install.disabled).toBe(true);
+    expect(root.querySelector('[aria-expanded]')?.getAttribute('aria-expanded')).toBe('true');
+    state = { ...state, progress: { phase: 'downloading', version: '1.2.0', assetName: 'main.js', completedFiles: 0, totalFiles: 3 } };
+    publish?.(state);
+    expect(root.textContent).toContain('Downloading main.js');
+    expect(root.querySelector('[data-plugin-update-action="install-latest"]')).toBe(install);
+    install.click();
+    expect(service.installRelease).toHaveBeenCalledTimes(1);
+    expect(refresh).not.toHaveBeenCalled();
+    section.dispose();
+    resolve({ installedVersion: '1.2.0' });
+    await Promise.resolve(); await Promise.resolve();
+    expect(dispose).toHaveBeenCalledTimes(1);
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it('keeps newly revealed history actions disabled during a pending update check', () => {
+    let state = createSnapshot();
+    state.releases = Array.from({ length: 8 }, (_, i) => ({ ...state.releases[0], version: `1.2.${i}` }));
+    const { section, service } = createSection(state, { isExpanded: true });
+    let publish!: (next: PluginUpdateSnapshot) => void;
+    Object.assign(service, { onProgress: (listener: typeof publish) => { publish = listener; return { dispose: jest.fn() }; } });
+    service.getSnapshot.mockImplementation(() => state);
+    const root = document.body.createDiv();
+    section.render(root);
+    state = { ...state, status: 'checking' } as ReturnType<typeof createSnapshot>;
+    publish(state as PluginUpdateSnapshot);
+    root.querySelector<HTMLButtonElement>('[data-plugin-update-action="show-more"]')!.click();
+    expect(root.querySelectorAll('[data-plugin-update-action="install-release"]')).toHaveLength(6);
+    expect(Array.from(root.querySelectorAll<HTMLButtonElement>('[data-plugin-update-action="install-release"]')).every((b) => b.disabled)).toBe(true);
+    root.querySelector<HTMLButtonElement>('[data-plugin-update-action="show-less"]')!.click();
+    expect(Array.from(root.querySelectorAll<HTMLButtonElement>('[data-plugin-update-action="install-release"]')).every((b) => b.disabled)).toBe(true);
+    section.dispose();
+  });
+
+  it('hydrates an ongoing install and shows inline failure after rollback without leaving the bar running', () => {
+    const snapshot = createSnapshot({ isApplying: true, progress: { phase: 'restoring-original', version: '1.2.0' } });
+    const { section, service, refresh } = createSection(snapshot);
+    let publish!: (next: PluginUpdateSnapshot) => void;
+    Object.assign(service, { onProgress: (listener: typeof publish) => { publish = listener; return { dispose: jest.fn() }; } });
+    const root = document.body.createDiv();
+    section.render(root);
+    expect(root.textContent).toContain('Restoring the original version');
+    publish({ ...snapshot, isApplying: false, error: 'disk full', progress: { phase: 'failed', version: '1.2.0' } } as PluginUpdateSnapshot);
+    expect(root.textContent).toContain('Installation failed: disk full');
+    expect(root.querySelector<HTMLProgressElement>('progress')?.hidden).toBe(true);
+    expect(root.querySelector<HTMLButtonElement>('[data-plugin-update-action="install-latest"]')?.disabled).toBe(false);
+    expect(refresh).toHaveBeenCalledTimes(1);
+    section.dispose();
+  });
+
+});
+
+describe('SettingsPluginUpdateSection existing controls', () => {
+  beforeEach(() => { setLocale('en'); document.body.innerHTML = ''; });
+  afterEach(() => { jest.restoreAllMocks(); });
 
   it('renders separate stable-release and local-backup lists, with incompatible releases disabled', () => {
     const { section } = createSection();
@@ -239,6 +339,6 @@ describe('SettingsPluginUpdateSection', () => {
     await Promise.resolve();
 
     expect(service.installRelease).toHaveBeenCalledWith('1.2.0');
-    expect(refresh).toHaveBeenCalledTimes(2);
+    expect(refresh).toHaveBeenCalledTimes(1);
   });
 });

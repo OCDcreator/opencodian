@@ -14,6 +14,7 @@ interface SettingsPluginUpdateSectionOptions {
 type PluginUpdateBadgeVariant = 'idle' | 'checking' | 'error' | 'empty' | 'update' | 'current';
 
 let pluginUpdateSectionId = 0;
+const RELEASE_HISTORY_PAGE_SIZE = 3;
 
 /** Renders the self-update controls shared by classic and tabbed General settings. */
 export class SettingsPluginUpdateSection {
@@ -21,6 +22,8 @@ export class SettingsPluginUpdateSection {
   private readonly requestDisplayRefresh: () => void;
   private readonly isExpanded: boolean;
   private readonly onExpandedChange: (isExpanded: boolean) => void;
+  private progressSubscription?: { dispose(): void };
+  private renderToken: object | null = null;
 
   constructor(options: SettingsPluginUpdateSectionOptions) {
     this.plugin = options.plugin;
@@ -30,6 +33,8 @@ export class SettingsPluginUpdateSection {
   }
 
   render(containerEl: HTMLElement): void {
+    this.dispose();
+    const renderToken = this.renderToken = {};
     const service = this.plugin.pluginUpdateService;
     const snapshot = service.getSnapshot();
     const sectionEl = containerEl.createDiv({
@@ -40,7 +45,7 @@ export class SettingsPluginUpdateSection {
         'data-plugin-update-applying': String(snapshot.isApplying),
       },
     });
-    let isExpanded = this.isExpanded;
+    let isExpanded = this.isExpanded || snapshot.isApplying;
     const contentId = `opencodian-plugin-update-content-${++pluginUpdateSectionId}`;
     const headingEl = sectionEl.createEl('h4', { cls: 'opencodian-settings-subsection-heading' });
     const headerButton = headingEl.createEl('button', {
@@ -59,7 +64,7 @@ export class SettingsPluginUpdateSection {
       cls: 'opencodian-plugin-update-version-label',
       text: t('settings.pluginUpdate.currentVersionLabel'),
     });
-    versionBlockEl.createDiv({
+    const versionEl = versionBlockEl.createDiv({
       cls: 'opencodian-plugin-update-version-value',
       text: snapshot.currentVersion,
     });
@@ -70,7 +75,7 @@ export class SettingsPluginUpdateSection {
       attr: { 'data-plugin-update-badge': badge.variant },
     });
     badgeEl.createSpan({ cls: 'opencodian-plugin-update-status-dot', attr: { 'aria-hidden': 'true' } });
-    badgeEl.createSpan({ cls: 'opencodian-plugin-update-status-badge-text', text: badge.label });
+    const badgeTextEl = badgeEl.createSpan({ cls: 'opencodian-plugin-update-status-badge-text', text: badge.label });
 
     const contentEl = sectionEl.createDiv({
       cls: 'opencodian-plugin-update-content',
@@ -95,6 +100,7 @@ export class SettingsPluginUpdateSection {
       (contentEl as HTMLElement & { inert?: boolean }).inert = !expanded;
     };
     applyExpandedState(isExpanded);
+    if (snapshot.isApplying) this.onExpandedChange(true);
     headerButton.addEventListener('click', () => {
       isExpanded = !isExpanded;
       applyExpandedState(isExpanded);
@@ -123,14 +129,81 @@ export class SettingsPluginUpdateSection {
       action: 'check',
     });
     this.renderLatestAction(actionsEl, snapshot.latestRelease, snapshot.currentVersion, snapshot.isApplying);
+    const updateProgress = this.renderProgress(panelEl);
 
     if (snapshot.status === 'ready') {
-      this.renderReleaseList(contentInnerEl, snapshot.releases, snapshot.currentVersion, snapshot.isApplying);
+      this.renderReleaseList(contentInnerEl, snapshot.releases, snapshot.currentVersion);
       this.renderBackupList(contentInnerEl, snapshot.backups, snapshot.isApplying);
     }
 
+    let wasApplying = snapshot.isApplying;
+    let wasChecking = snapshot.status === 'checking';
+    const refreshProgress = (next: PluginUpdateSnapshot): void => {
+      if (this.renderToken !== renderToken) return;
+      if (next.isApplying && !wasApplying) {
+        isExpanded = true;
+        applyExpandedState(true);
+        this.onExpandedChange(true);
+      }
+      const settled = wasApplying && !next.isApplying;
+      wasApplying = next.isApplying;
+      sectionEl.dataset.pluginUpdateApplying = String(next.isApplying);
+      sectionEl.dataset.pluginUpdateStatus = next.status;
+      if (next.status === 'checking') sectionEl.querySelector<HTMLElement>('.opencodian-plugin-update-status-detail')?.setText(this.statusText(next));
+      versionEl.setText(next.currentVersion);
+      const nextBadge = this.badgeFor(next);
+      badgeEl.dataset.pluginUpdateBadge = nextBadge.variant;
+      badgeTextEl.setText(nextBadge.label);
+      updateProgress(next);
+      this.updateActionAvailability(sectionEl, next);
+      if (settled || (wasChecking && next.status !== 'checking')) this.requestDisplayRefresh();
+      wasChecking = next.status === 'checking';
+    };
+    this.progressSubscription = service.onProgress?.(refreshProgress);
+    refreshProgress(service.getSnapshot());
+
     if (snapshot.status === 'idle') {
       void this.check();
+    }
+  }
+
+  dispose(): void {
+    this.renderToken = null;
+    this.progressSubscription?.dispose();
+    this.progressSubscription = undefined;
+  }
+
+  private renderProgress(panelEl: HTMLElement): (snapshot: PluginUpdateSnapshot) => void {
+    const progressEl = panelEl.createDiv({ cls: 'opencodian-plugin-update-progress', attr: { 'data-plugin-update-progress': '', hidden: '' } });
+    const labelEl = progressEl.createDiv({ cls: 'opencodian-plugin-update-progress-label', attr: { role: 'status', 'aria-live': 'polite', 'aria-atomic': 'true' } });
+    const bar = progressEl.createEl('progress', { cls: 'opencodian-plugin-update-progress-bar', attr: { max: '1', 'aria-label': t('settings.pluginUpdate.progress.label') } });
+    return (snapshot) => {
+      const progress = snapshot.progress;
+      progressEl.hidden = !progress && !snapshot.isApplying;
+      progressEl.dataset.phase = progress?.phase ?? 'preparing';
+      bar.hidden = !snapshot.isApplying;
+      bar.removeAttribute('value');
+      labelEl.setText(snapshot.isApplying
+        ? t(`settings.pluginUpdate.progress.${progress?.phase ?? 'preparing'}`, {
+            version: progress?.version ?? '', file: progress?.assetName ?? '',
+            count: String(progress?.completedFiles ?? 0), total: String(progress?.totalFiles ?? 3),
+          })
+        : progress?.phase === 'failed'
+          ? t('settings.pluginUpdate.progress.failed', { error: snapshot.error ?? t('settings.pluginUpdate.status.unknown') })
+          : t('settings.pluginUpdate.success', { version: progress?.version ?? snapshot.currentVersion }));
+    };
+  }
+
+  private updateActionAvailability(sectionEl: HTMLElement, snapshot: PluginUpdateSnapshot): void {
+    for (const button of Array.from(sectionEl.querySelectorAll<HTMLButtonElement>('[data-plugin-update-action]'))) {
+      const action = button.dataset.pluginUpdateAction;
+      if (action === 'show-more' || action === 'show-less') continue;
+      const row = button.closest<HTMLElement>('[data-plugin-update-entry-source]');
+      const installable = action === 'install-latest' ? snapshot.latestRelease?.installable
+        : action === 'restore-backup' ? snapshot.backups.find((backup) => backup.id === row?.dataset.pluginUpdateBackup)?.installable
+          : action === 'install-release' ? snapshot.releases.find((release) => release.version === row?.dataset.pluginUpdateVersion)?.installable
+            : true;
+      button.disabled = snapshot.isApplying || snapshot.status === 'checking' || !installable;
     }
   }
 
@@ -170,6 +243,8 @@ export class SettingsPluginUpdateSection {
   }
 
   private badgeFor(snapshot: PluginUpdateSnapshot): { variant: PluginUpdateBadgeVariant; label: string } {
+    if (snapshot.isApplying) return { variant: 'checking', label: t('settings.pluginUpdate.badge.installing') };
+    if (snapshot.progress?.phase === 'failed') return { variant: 'error', label: t('settings.pluginUpdate.badge.installFailed') };
     if (snapshot.status === 'checking') {
       return { variant: 'checking', label: t('settings.pluginUpdate.badge.checking') };
     }
@@ -224,7 +299,6 @@ export class SettingsPluginUpdateSection {
     sectionEl: HTMLElement,
     releases: readonly PluginUpdateRelease[],
     currentVersion: string,
-    isApplying: boolean,
   ): void {
     const groupEl = sectionEl.createDiv({ cls: 'opencodian-plugin-update-list-group' });
     groupEl.createEl('h5', { text: t('settings.pluginUpdate.releaseHistory') });
@@ -233,7 +307,11 @@ export class SettingsPluginUpdateSection {
       return;
     }
     const listEl = groupEl.createDiv({ cls: 'opencodian-plugin-update-list', attr: { 'data-plugin-update-list': 'releases' } });
-    for (const release of releases) {
+    let visibleCount = 0;
+    const appendBatch = (): void => {
+      const batch = releases.slice(visibleCount, visibleCount + RELEASE_HISTORY_PAGE_SIZE);
+      visibleCount += batch.length;
+      for (const release of batch) {
       const rowEl = this.createVersionRow(listEl, {
         version: release.version,
         detail: release.publishedAt
@@ -241,14 +319,33 @@ export class SettingsPluginUpdateSection {
           : t('settings.pluginUpdate.releaseSource', { source: release.source === 'github' ? 'GitHub' : 'Gitea' }),
         source: 'release',
         unavailableReason: release.unavailableReason,
-        disabled: !release.installable || isApplying,
+          disabled: !release.installable || this.plugin.pluginUpdateService.getSnapshot().isApplying
+            || this.plugin.pluginUpdateService.getSnapshot().status === 'checking',
         currentVersion,
         actionLabel: t('settings.pluginUpdate.installVersion'),
         onClick: () => { void this.installRelease(release); },
       });
       rowEl.dataset.pluginUpdateVersion = release.version;
       rowEl.dataset.pluginUpdateCompatible = String(release.compatible);
-    }
+      }
+    };
+    appendBatch();
+    if (releases.length <= RELEASE_HISTORY_PAGE_SIZE) return;
+    const controls = groupEl.createDiv({ cls: 'opencodian-plugin-update-history-controls' });
+    const countEl = controls.createSpan({ attr: { role: 'status' } });
+    const updateControls = (): void => {
+      more.hidden = visibleCount >= releases.length;
+      less.hidden = visibleCount <= RELEASE_HISTORY_PAGE_SIZE;
+      countEl.setText(t('settings.pluginUpdate.historyCount', { count: String(visibleCount), total: String(releases.length) }));
+    };
+    const more = this.createButton(controls, { text: t('settings.pluginUpdate.showMore'), disabled: false, action: 'show-more', onClick: () => {
+      appendBatch(); updateControls();
+      if (more.hidden) less.focus();
+    } });
+    const less = this.createButton(controls, { text: t('settings.pluginUpdate.showLess'), disabled: false, action: 'show-less', onClick: () => {
+      listEl.empty(); visibleCount = 0; appendBatch(); updateControls(); more.focus();
+    } });
+    updateControls();
   }
 
   private renderBackupList(
@@ -330,16 +427,20 @@ export class SettingsPluginUpdateSection {
   }
 
   private async check(): Promise<void> {
+    const token = this.renderToken;
     const operation = this.plugin.pluginUpdateService.checkForUpdates();
-    this.requestDisplayRefresh();
+    if (!this.progressSubscription) this.requestDisplayRefresh();
     try {
       await operation;
+    } catch (error) {
+      new Notice(t('settings.pluginUpdate.failure', { error: error instanceof Error ? error.message : t('settings.pluginUpdate.status.unknown') }));
     } finally {
-      this.requestDisplayRefresh();
+      if (this.renderToken === token && !this.progressSubscription) this.requestDisplayRefresh();
     }
   }
 
   private async installRelease(release: PluginUpdateRelease): Promise<void> {
+    const token = this.renderToken;
     const downgrade = this.isDowngrade(this.plugin.pluginUpdateService.getSnapshot().currentVersion, release.version);
     const message = downgrade
       ? t('settings.pluginUpdate.confirmDowngrade', { version: release.version })
@@ -347,27 +448,26 @@ export class SettingsPluginUpdateSection {
     if (!window.confirm(message)) return;
     try {
       const operation = this.plugin.pluginUpdateService.installRelease(release.version);
-      this.requestDisplayRefresh();
       const result = await operation;
       new Notice(t('settings.pluginUpdate.success', { version: result.installedVersion }));
     } catch (error) {
       new Notice(t('settings.pluginUpdate.failure', { error: error instanceof Error ? error.message : t('settings.pluginUpdate.status.unknown') }));
     } finally {
-      this.requestDisplayRefresh();
+      if (this.renderToken === token && !this.progressSubscription) this.requestDisplayRefresh();
     }
   }
 
   private async restoreBackup(backup: PluginUpdateBackup): Promise<void> {
+    const token = this.renderToken;
     if (!window.confirm(t('settings.pluginUpdate.confirmRestore', { version: backup.version }))) return;
     try {
       const operation = this.plugin.pluginUpdateService.restoreBackup(backup.id);
-      this.requestDisplayRefresh();
       const result = await operation;
       new Notice(t('settings.pluginUpdate.success', { version: result.installedVersion }));
     } catch (error) {
       new Notice(t('settings.pluginUpdate.failure', { error: error instanceof Error ? error.message : t('settings.pluginUpdate.status.unknown') }));
     } finally {
-      this.requestDisplayRefresh();
+      if (this.renderToken === token && !this.progressSubscription) this.requestDisplayRefresh();
     }
   }
 

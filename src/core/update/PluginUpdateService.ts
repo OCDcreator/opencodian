@@ -62,6 +62,15 @@ export interface PluginUpdateBackup {
   readonly unavailableReason: string | null;
 }
 
+export interface PluginUpdateProgress {
+  readonly phase: 'preparing' | 'downloading' | 'backing-up' | 'installing' | 'verifying'
+    | 'restoring-original' | 'complete' | 'failed';
+  readonly version: string;
+  readonly assetName?: string;
+  readonly completedFiles?: number;
+  readonly totalFiles?: number;
+}
+
 export interface PluginUpdateSnapshot {
   readonly status: PluginUpdateStatus;
   readonly source: PluginUpdateSource | null;
@@ -71,6 +80,7 @@ export interface PluginUpdateSnapshot {
   readonly backups: readonly PluginUpdateBackup[];
   readonly error: string | null;
   readonly isApplying: boolean;
+  readonly progress?: PluginUpdateProgress;
 }
 
 export interface PluginUpdateInstallResult {
@@ -312,6 +322,7 @@ export class PluginUpdateService {
   private backups = new Map<string, PluginUpdateBackup>();
   private checkPromise: Promise<PluginUpdateSnapshot> | null = null;
   private applyPromise: Promise<PluginUpdateInstallResult> | null = null;
+  private readonly progressListeners = new Set<(snapshot: PluginUpdateSnapshot) => void>();
   private backupSequence = 0;
 
   constructor(options: PluginUpdateServiceOptions) {
@@ -338,6 +349,11 @@ export class PluginUpdateService {
     return this.snapshot;
   }
 
+  onProgress(listener: (snapshot: PluginUpdateSnapshot) => void): { dispose(): void } {
+    this.progressListeners.add(listener);
+    return { dispose: () => { this.progressListeners.delete(listener); } };
+  }
+
   getPersistedState(): PluginUpdatePersistedState {
     return { ...this.persistedState };
   }
@@ -352,8 +368,11 @@ export class PluginUpdateService {
     if (this.checkPromise) return this.checkPromise;
     if (this.applyPromise) throw new Error('An installation is already in progress.');
 
-    this.snapshot = { ...this.snapshot, status: 'checking', error: null };
-    this.checkPromise = this.checkForUpdatesInternal();
+    // Defer user-supplied IO until the lock exists, including synchronous request
+    // callbacks and subscribers that attempt to start another operation.
+    this.checkPromise = Promise.resolve().then(() => this.checkForUpdatesInternal());
+    this.snapshot = { ...this.snapshot, status: 'checking', error: null, progress: undefined };
+    this.notifyProgress();
     try {
       return await this.checkPromise;
     } finally {
@@ -373,7 +392,7 @@ export class PluginUpdateService {
     if (!candidate.installable) {
       throw new Error(candidate.unavailableReason ?? `Release ${version} cannot be installed.`);
     }
-    return this.runExclusive(async () => {
+    return this.runExclusive(version, async () => {
       const packageToInstall = await this.downloadReleasePackage(candidate);
       const result = await this.applyPackage(packageToInstall, candidate.source);
       await this.refreshBackups();
@@ -387,7 +406,7 @@ export class PluginUpdateService {
     if (!backup.installable) {
       throw new Error(backup.unavailableReason ?? 'The selected local backup cannot be restored.');
     }
-    return this.runExclusive(async () => {
+    return this.runExclusive(backup.version, async () => {
       const packageToInstall = await this.readBackupPackage(id, backup.version);
       const result = await this.applyPackage(packageToInstall, 'backup');
       await this.refreshBackups();
@@ -412,13 +431,14 @@ export class PluginUpdateService {
       this.snapshot = {
         status: 'ready',
         source: latestRelease?.source ?? null,
-        currentVersion: this.manifest.version,
+        currentVersion: this.snapshot.currentVersion,
         latestRelease,
         releases: publicReleases,
         backups: [...this.backups.values()].sort((left, right) => right.capturedAt - left.capturedAt),
         error: null,
         isApplying: false,
       };
+      this.notifyProgress();
       return this.snapshot;
     } catch (error) {
       this.snapshot = {
@@ -427,6 +447,7 @@ export class PluginUpdateService {
         error: formatError(error),
         isApplying: false,
       };
+      this.notifyProgress();
       return this.snapshot;
     }
   }
@@ -468,9 +489,15 @@ export class PluginUpdateService {
 
   private async downloadReleasePackage(candidate: ReleaseCandidate): Promise<PluginPackage> {
     const files = {} as Record<RequiredAssetName, ArrayBuffer>;
+    let completedFiles = 0;
     for (const assetName of REQUIRED_ASSET_NAMES) {
       const asset = candidate.assets.get(assetName);
       if (!asset) throw new PackageValidationError(`Release ${candidate.version} is missing ${assetName}.`);
+      const progress = {
+        phase: 'downloading' as const, version: candidate.version, assetName,
+        totalFiles: REQUIRED_ASSET_NAMES.length,
+      };
+      this.setProgress({ ...progress, completedFiles });
       const response = await this.request({ url: asset.url, method: 'GET', throw: false });
       if (response.status < 200 || response.status >= 300) {
         throw new PackageValidationError(`${assetName} download returned ${response.status}.`);
@@ -479,6 +506,8 @@ export class PluginUpdateService {
         throw new PackageValidationError('main.js cannot be empty.');
       }
       files[assetName] = cloneArrayBuffer(response.arrayBuffer);
+      completedFiles += 1;
+      this.setProgress({ ...progress, completedFiles });
     }
     const parsed = parseManifest(files['manifest.json'], candidate.version);
     if (parsed.minAppVersion !== candidate.minAppVersion) {
@@ -490,10 +519,12 @@ export class PluginUpdateService {
     return { version: parsed.version, minAppVersion: parsed.minAppVersion, files };
   }
 
-  private async runExclusive(action: () => Promise<PluginUpdateInstallResult>): Promise<PluginUpdateInstallResult> {
+  private async runExclusive(version: string, action: () => Promise<PluginUpdateInstallResult>): Promise<PluginUpdateInstallResult> {
     if (this.applyPromise) throw new Error('Another version installation is already in progress.');
+    if (this.checkPromise) throw new Error('An update check is already in progress.');
+    this.applyPromise = Promise.resolve().then(action);
     this.snapshot = { ...this.snapshot, isApplying: true, error: null };
-    this.applyPromise = action();
+    this.setProgress({ phase: 'preparing', version });
     try {
       const result = await this.applyPromise;
       this.snapshot = {
@@ -502,9 +533,11 @@ export class PluginUpdateService {
         currentVersion: result.installedVersion,
         backups: [...this.backups.values()].sort((left, right) => right.capturedAt - left.capturedAt),
       };
+      this.setProgress({ phase: 'complete', version });
       return result;
     } catch (error) {
       this.snapshot = { ...this.snapshot, isApplying: false, error: formatError(error) };
+      this.setProgress({ phase: 'failed', version });
       throw error;
     } finally {
       this.applyPromise = null;
@@ -512,12 +545,17 @@ export class PluginUpdateService {
   }
 
   private async applyPackage(packageToInstall: PluginPackage, source: PluginUpdateSource | 'backup'): Promise<PluginUpdateInstallResult> {
+    const version = packageToInstall.version;
+    this.setProgress({ phase: 'backing-up', version });
     const installed = await this.readInstalledPackage();
     await this.writeBackup(installed);
     try {
+      this.setProgress({ phase: 'installing', version });
       await this.writePackageToPluginDirectory(packageToInstall);
+      this.setProgress({ phase: 'verifying', version });
       await this.verifyInstalledPackage(packageToInstall);
     } catch (error) {
+      this.setProgress({ phase: 'restoring-original', version });
       try {
         await this.writePackageToPluginDirectory(installed);
         await this.verifyInstalledPackage(installed);
@@ -526,11 +564,28 @@ export class PluginUpdateService {
       }
       throw error;
     }
+    this.snapshot = { ...this.snapshot, currentVersion: version };
     return {
       previousVersion: installed.version,
       installedVersion: packageToInstall.version,
       source,
     };
+  }
+
+  private setProgress(progress: PluginUpdateProgress): void {
+    this.snapshot = { ...this.snapshot, progress };
+    this.notifyProgress();
+  }
+
+  private notifyProgress(): void {
+    const snapshot = this.snapshot;
+    for (const listener of [...this.progressListeners]) {
+      try {
+        listener(snapshot);
+      } catch {
+        // A view failure must not interrupt installation or rollback.
+      }
+    }
   }
 
   private pluginDirectory(): string {

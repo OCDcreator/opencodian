@@ -22,6 +22,7 @@ The service is deliberately internal: it has no configurable release URL and nev
 
 - `checkForUpdates()` refreshes the selected source catalogue and local backups, then persists `lastCheckAt`, latest stable version, and source.
 - `getSnapshot()` supplies the settings owner with current version, release/backup history, operation state, and a display-safe error.
+- `onProgress(listener)` returns a disposable snapshot subscription. It reports check start/completion and installation progress; a failing listener cannot interrupt other consumers, installation, or rollback. New UI instances read `getSnapshot()` before subscribing, so an active or terminal operation remains visible after reopening settings.
 - `installLatestStable()` and `installRelease(version)` only operate on the verified snapshot catalogue.
 - `restoreBackup(id)` works offline from an already verified backup.
 - `markVersionNotified(version)` persists the once-per-version startup-notice marker.
@@ -32,6 +33,14 @@ Release files are downloaded and validated completely before the current plugin 
 
 If a write or post-write verification fails, the original three-file package is written back and verified. Update and restore calls share one exclusive promise, preventing concurrent package changes.
 
+Checks and package changes also exclude one another. Each operation acquires its promise lock before notifying subscribers or invoking injected IO; a progress callback cannot reenter installation or let a pending check overwrite installation state. A later check preserves the version installed during the current plugin lifetime instead of resetting it to the manifest captured at startup.
+
+## Transient progress
+
+`PluginUpdateSnapshot.progress` contains a target `version` and phase: `preparing`, `downloading`, `backing-up`, `installing`, `verifying`, `restoring-original`, `complete`, or `failed`. Preparing and `isApplying: true` are published synchronously before slow work begins. During download, `assetName`, `completedFiles`, and `totalFiles` report the current fixed asset and the number of complete validated download responses; no byte percentage is inferred from an opaque `requestUrl` request.
+
+Backup, install, verification, and automatic restoration phases are published before their work begins. A failed operation retains `snapshot.error`; `complete` is published only after the transaction and final backup-list refresh finish. The operation lock remains held throughout that final refresh. Successfully verified package version is retained even if a later backup-list refresh fails. Progress lives only in service memory, remains readable after completion, and resets when the next check or package operation starts.
+
 ## Testing seams
 
-`request`, `isApiVersionSupported`, `now`, and `persistState` are injectable. Unit tests use these seams with an in-memory `DataAdapter` to prove one-request static-index discovery, source fallback boundaries, index/manifest validation rejection, compatibility gating, complete staging, rollback recovery, retention, and concurrent-operation rejection.
+`request`, `isApiVersionSupported`, `now`, and `persistState` are injectable. Unit tests use these seams with an in-memory `DataAdapter` to prove one-request static-index discovery, source fallback boundaries, index/manifest validation rejection, compatibility gating, complete staging, rollback recovery, retention, deferred-download progress, exact phase order, subscription disposal/failure isolation, and concurrent/reentrant-operation rejection.

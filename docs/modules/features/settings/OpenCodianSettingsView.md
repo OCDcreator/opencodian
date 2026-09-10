@@ -1,5 +1,7 @@
 # OpenCodianSettingsView
 
+2026-09-10：编辑器设置页持有插件更新 section 实例，通过已有 `disposeSections()` 在重建/关闭时取消进度订阅，与主设置页使用同一进度和分批历史实现。
+
 > **源码**: `src/features/settings/OpenCodianSettingsView.ts`
 > **状态**: [REVIEW]
 

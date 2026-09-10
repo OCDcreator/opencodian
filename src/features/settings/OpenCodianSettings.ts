@@ -80,6 +80,7 @@ export class OpenCodianSettingTab extends PluginSettingTab {
   private userSection: SettingsUserSection | null = null;
   private dropdownsEnhancer: SettingsDropdownsEnhancerHandle | null = null;
   private pluginUpdateExpanded = false;
+  private pluginUpdateSection: SettingsPluginUpdateSection | null = null;
   private pricingSubscription?: { dispose(): void };
 
   constructor(app: App, plugin: OpenCodianPlugin) {
@@ -173,12 +174,14 @@ export class OpenCodianSettingTab extends PluginSettingTab {
   }
 
   private renderPluginUpdateSection(containerEl: HTMLElement): void {
-    new SettingsPluginUpdateSection({
+    this.pluginUpdateSection?.dispose();
+    this.pluginUpdateSection = new SettingsPluginUpdateSection({
       plugin: this.plugin,
       requestDisplayRefresh: () => { this.display(); },
       isExpanded: this.pluginUpdateExpanded,
       onExpandedChange: (isExpanded) => { this.pluginUpdateExpanded = isExpanded; },
-    }).render(containerEl);
+    });
+    this.pluginUpdateSection.render(containerEl);
   }
 
   // ─── Navigation ────────────────────────────────────────────────────
@@ -334,6 +337,8 @@ export class OpenCodianSettingTab extends PluginSettingTab {
   }
 
   private disposeSections(): void {
+    this.pluginUpdateSection?.dispose();
+    this.pluginUpdateSection = null;
     this.conversationSection?.dispose();
     this.agentsSection?.dispose();
     this.commandsSection?.dispose();
@@ -679,6 +684,8 @@ export class OpenCodianSettingTab extends PluginSettingTab {
   // ─── Shared helpers ────────────────────────────────────────────────
 
   hide(): void {
+    this.pluginUpdateSection?.dispose();
+    this.pluginUpdateSection = null;
     this.pricingSubscription?.dispose();
     this.pricingSubscription = undefined;
     this.pluginUpdateExpanded = false;

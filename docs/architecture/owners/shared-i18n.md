@@ -1,5 +1,7 @@
 # Owner: shared.i18n
 
+2026-09-10: update-install phase labels, failure state, completed-file counts and release-history disclosure controls are translated in English and Chinese; no synthetic download percentages.
+
 > Auto-generated scaffold from `architecture-owners.config.json`. The manifest is the canonical truth source; this page narrates the model and records hard-to-automate rationale. Update it when the owner boundary or its non-obvious invariants change.
 
 - **Layer:** `shared` (may import layers: shared)

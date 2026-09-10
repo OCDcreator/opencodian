@@ -1,5 +1,7 @@
 # OpenCodianSettings
 
+2026-09-10：设置 shell 持有 `SettingsPluginUpdateSection` 实例，重新渲染和 `hide()` 均释放其进度订阅；安装途中返回设置可从服务快照恢复进度。稳定版历史分页状态仅在当前 section 内保留。
+
 2026-09-10：`displayInto()` 为当前（包括 declarative）设置容器注册价格目录订阅；再次渲染或 `hide()` 清理旧订阅，目录就绪仅更新价格说明，不重建设置页。
 
 > **源码**: `src/features/settings/OpenCodianSettings.ts`

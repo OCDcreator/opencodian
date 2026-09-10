@@ -1,5 +1,7 @@
 # Owner: feature.settings-shell
 
+Update progress (2026-09-10): both settings hosts retain and dispose the update section on replacement or close/hide; async completion may not resurrect a disposed surface. The expanded state survives install-driven refreshes.
+
 Pricing readiness (2026-09-10): the settings shell binds catalog notifications to the active display container and disposes the prior binding on render/hide. Notification handlers update only existing pricing descriptions.
 
 > Auto-generated scaffold from `architecture-owners.config.json`. The manifest is the canonical truth source; this page narrates the model and records hard-to-automate rationale. Update it when the owner boundary or its non-obvious invariants change.

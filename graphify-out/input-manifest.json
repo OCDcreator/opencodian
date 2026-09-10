@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "46d7e6be4127ace2b2765d5c7219cff82a7e59dde650bd0395151c7b42c203aa",
+  "digest": "1678ce8c5c2fdcc99db737c85fb0831ebc3a6021b276b83f09a71cf0c3af8872",
   "recordCount": 619,
   "records": [
     {
@@ -16,12 +16,12 @@
     {
       "kind": "package",
       "key": "package-lock.json",
-      "sha256": "6072007d8c6e8173dee4431b46df138eca47c13e2ce9cf6431fb094776459163"
+      "sha256": "76c635bf3e5823460ffbbd2643be2e6d906e4ecfe01720b3a25edda350533225"
     },
     {
       "kind": "package",
       "key": "package.json",
-      "sha256": "fc24834154d70ecba4ad1209e8350c25ee84dcf7b21ce22a27c3b42462413cb7"
+      "sha256": "5c7cf6bdd378101dcb8edea6c047c6eadff44476072ab5317efa9b777f4760ca"
     },
     {
       "kind": "src",
@@ -831,7 +831,7 @@
     {
       "kind": "src",
       "key": "src/core/update/PluginUpdateService.ts",
-      "sha256": "72123d22be9a4a447d904b5bbb16f52501f28fad38aa44b5613b70b395fd08bb"
+      "sha256": "a6f850bf3e2b173b6e3a8d21dc94255aad819e3f92b2f075d33b471a7b4aed39"
     },
     {
       "kind": "src",
@@ -2221,12 +2221,12 @@
     {
       "kind": "src",
       "key": "src/features/settings/OpenCodianSettings.ts",
-      "sha256": "b912fb9bbc9e2eefbaf96f158ff20dff9844e32925088792c271b8d6c8b14aed"
+      "sha256": "3bbbc5538aca9b821edf65452ee9e298e44a8694f91459b133d3c10a349bc5dd"
     },
     {
       "kind": "src",
       "key": "src/features/settings/OpenCodianSettingsView.ts",
-      "sha256": "831ddd722eeefaf635ed105eb97e578927c55040d8ee7274edbc7aeccdf56b9f"
+      "sha256": "c28d53b74970f904097fdc70ac1065651b83122fef4712053747b22a41aad128"
     },
     {
       "kind": "src",
@@ -2456,7 +2456,7 @@
     {
       "kind": "src",
       "key": "src/features/settings/SettingsPluginUpdateSection.ts",
-      "sha256": "2fff64ff323d4cf0a46dfa86bcb7910be0fb75bd14019f2760d05c10ce0d4476"
+      "sha256": "bbbfaeeadf90b5c5531c87614aa0b3edb6bea1b496d46fe2da653b2b893cdf75"
     },
     {
       "kind": "src",
@@ -2586,7 +2586,7 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/en.ts",
-      "sha256": "c2b9f1bb365172f5f3b9e41b4c1575b92927250895c3b4fea8cb12f9fded3ddf"
+      "sha256": "583099d5874743911672c4c4c7d0f8b5e5ebe5522cd7cfa271e9ba499e751dc3"
     },
     {
       "kind": "src",
@@ -2596,7 +2596,7 @@
     {
       "kind": "src",
       "key": "src/i18n/locales/zh.ts",
-      "sha256": "d3fa9f54fa50e7b57dca4d79c2f1353a77b93ddf3fb8b2231c73b0c1290a28f7"
+      "sha256": "9180cb482783e6efa8fac2a0589f99bd0f5f4be3c77a2edc681a68fae627020a"
     },
     {
       "kind": "src",
@@ -2826,7 +2826,7 @@
     {
       "kind": "src",
       "key": "src/style/components/settings-plugin-update.css",
-      "sha256": "9dcd07b4d3ea1a17034b57a0f8c7bc901d8e4765776ea6ae66e346c4c163ceb4"
+      "sha256": "79ad5f9419569a038a00dc1b31558ab80629fa587909e6f9615d1478867b0fa3"
     },
     {
       "kind": "src",
@@ -3099,7 +3099,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-09-10T10:29:01.646Z",
-  "headShaAtGeneration": "5e8ef0926598aa95ffcc92f45a4f9b2351cddb21",
+  "generatedAt": "2026-09-10T11:18:31.296Z",
+  "headShaAtGeneration": "bd538f5afb51bfe017c48c49531c764fec3694f0",
   "graphifyVersion": "graphify 0.9.31"
 }
