@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "digest": "a217ba9ae52242ebcb62098244bd3cb5efd75ae6afe7f8fd36ea593946cd00ef",
+  "digest": "28372c429fbbcacf7d475395f31f6bb0b7514a80dbc296dbef4739867ee0a932",
   "recordCount": 619,
   "records": [
     {
@@ -16,12 +16,12 @@
     {
       "kind": "package",
       "key": "package-lock.json",
-      "sha256": "9a8e042418d05cc9f1e09664f0aea0c42c361df1d13fdbcd5ed9c2c84759dbe2"
+      "sha256": "6d8025063141c2aca6bc20d21a7f77c09e6d90ca9d7f7d0de9febf6452ec9b04"
     },
     {
       "kind": "package",
       "key": "package.json",
-      "sha256": "c162844c4a7a1a998bd4ea61a9f7836ffb471d7b50206b39dcf45b9504f0eb05"
+      "sha256": "908f22691bd92553a70a3d5b8f4ab0c446022c201c06058dcaef972f57ea29d9"
     },
     {
       "kind": "src",
@@ -3099,7 +3099,7 @@
       "sha256": "8c0c60db54b5aa148a1d7ca4a578625bfabc32b21906876a6e9c745012c7e3fc"
     }
   ],
-  "generatedAt": "2026-09-10T09:25:55.676Z",
-  "headShaAtGeneration": "e06fc42dcfcfdf12ec337aebb0d713002bbb7b36",
+  "generatedAt": "2026-09-10T09:30:12.403Z",
+  "headShaAtGeneration": "910a55f5801c4969a83a65a116663150ae49a4d1",
   "graphifyVersion": "graphify 0.9.31"
 }
