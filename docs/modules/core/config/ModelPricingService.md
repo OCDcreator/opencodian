@@ -32,7 +32,7 @@
 
 | 方法 | 说明 |
 |---|---|
-| `load()` | 读取本地目录；首次或超过 24 小时会自动更新，离线失败不阻塞插件启动 |
+| `load()` | 只读取本地目录即返回；首次或超过 24 小时会在后台触发自动更新，网络慢或离线都不阻塞插件启动 |
 | `refresh()` | 请求 models.dev、规范化有价格模型并持久化缓存 |
 | `getStatus()` / `getCatalogEntry()` | 给设置 UI 展示缓存状态与 provider/model 匹配提示 |
 | `upsertOverride()` / `removeOverride()` | 管理持久化于插件设置的 per-provider/model 覆盖 |

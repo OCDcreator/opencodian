@@ -43,3 +43,7 @@ Run before merge: `npm run typecheck`, `npm run module-docs`.
 ## Pi owner boundary review (2026-09-08)
 
 The new core.backend-pi owner isolates the external Pi process service. core.config retains its existing responsibilities; Pi process lifecycle, RPC compatibility and native history must not be added to this owner.
+
+## Startup non-blocking invariant (2026-09-10)
+
+`ModelPricingService.load()` must only read the local cache synchronously; the 24h models.dev auto-refresh runs fire-and-forget in the background. Never `await` a network catalog fetch inside plugin `onload` — it once blocked startup for ~3.5s on a slow link. Explicit user-triggered `refresh()` (settings pricing modal) stays awaited.

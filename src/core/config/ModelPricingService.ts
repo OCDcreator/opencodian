@@ -211,12 +211,12 @@ export class ModelPricingService {
       return;
     }
 
-    try {
-      await this.refresh();
-    } catch {
+    // Fire-and-forget: the multi-megabyte models.dev fetch once blocked plugin
+    // onload for seconds on slow links, so startup only reads the local cache.
+    void this.refresh().catch(() => {
       // Cost estimates stay optional: an offline startup retains a stale cache
       // or shows unavailable pricing instead of failing plugin initialization.
-    }
+    });
   }
 
   getStatus(): ModelPricingStatus {

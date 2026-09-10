@@ -95,13 +95,35 @@ describe('ModelPricingService', () => {
     }));
   });
 
-  it('automatically fetches an empty catalogue so no pricing setup is required', async () => {
+  it('automatically fetches an empty catalogue in the background so no pricing setup is required', async () => {
     const { service, storage } = createService();
 
     await service.load();
+    // Drain the fire-and-forget refresh's microtask chain (no setImmediate in
+    // the jest environment).
+    for (let i = 0; i < 8; i += 1) {
+      await Promise.resolve();
+    }
 
     expect(service.getStatus()).toMatchObject({ entryCount: 3 });
     expect(storage.saveModelPricingCatalog).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps plugin startup non-blocking when the auto-refresh fetch stalls', async () => {
+    const storage = {
+      loadModelPricingCatalog: jest.fn().mockResolvedValue(null),
+      saveModelPricingCatalog: jest.fn().mockResolvedValue(undefined),
+    };
+    const service = new ModelPricingService({
+      storage,
+      getOverrides: () => [],
+      fetchCatalog: () => new Promise(() => { /* never settles */ }),
+    });
+
+    await service.load();
+
+    expect(storage.saveModelPricingCatalog).not.toHaveBeenCalled();
+    expect(service.getStatus()).toMatchObject({ entryCount: 0 });
   });
 
   it('uses all reported token categories and keeps tiered price estimates explicitly approximate', async () => {
